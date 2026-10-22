@@ -1,13 +1,12 @@
 -- 迁移失败方式：DRY 不能把业务源码解析失败当成成功报告。
 -- 迁移自 tests/tooling/slow/quality_report_test.lua（#92，LuaUnit → 原生 Busted）。
--- 平台条件：shell.capture 起的是 cmd 子进程（tools/win_shell.lua 的命令行语法），只在 Windows 可跑；
--- 非 Windows 登记为 pending（名称保留旧方法名，`--list` 行数不变、运行时报 pending 而非失败）。
--- 解释器沿用旧文件的 `"lua"`（走 PATH），不改成 tests/support/interpreter.lua：本案例断言的是
--- report.lua 对坏源码的失败口径，换解释器来源与它无关，保持等价。
-local shell = require("tools.win_shell")
+-- 子进程用 POSIX sh 起（开发端只在 WSL，#116）；解释器取启动本 runner 的那个
+-- （tests/support/interpreter.lua），不走 PATH 猜 `lua`——WSL 上裸 `lua` 可能是 5.1。
+-- 依赖 `tools/quality/project install` 建好的 .toolcache（dry4lua / luacheck / acceptance4lua）：
+-- 缓存缺失时 report.lua 在 require 处失败，日志里不会出现 broken.lua，本案例照样红。
+local interpreter = require("tests.support.interpreter")
+local q = require("tests.support.sh_quote").q
 
-local WINDOWS = package.config:sub(1, 1) == "\\"
-local SKIP = "仅 Windows 可跑（真实 cmd 子进程）"
 local ROOT = "tmp/quality-report-test"
 
 local function write(path, body)
@@ -24,24 +23,27 @@ local function read(path)
   return body
 end
 
+-- 跑一条 sh 命令，stdout+stderr 落 ROOT/run.log，返回退出码与日志。
+local function capture(cmd)
+  local log = ROOT .. "/run.log"
+  local _, _, code = os.execute(cmd .. " > " .. q(log) .. " 2>&1")
+  return code, read(log) or ""
+end
+
 describe("TestQualityReport", function()
-  if WINDOWS then
-    after_each(function()
-      shell.remove({ dir = true, dst = ROOT })
-    end)
-  end
+  before_each(function()
+    os.execute("rm -rf " .. q(ROOT) .. " && mkdir -p " .. q(ROOT))
+  end)
+  after_each(function()
+    os.execute("rm -rf " .. q(ROOT))
+  end)
 
   it("test_invalid_source_does_not_publish_dry_report", function()
-    if not WINDOWS then
-      return pending("test_invalid_source_does_not_publish_dry_report: " .. SKIP)
-    end
-    shell.ensure_dir(ROOT)
     local source, manifest, output = ROOT .. "/broken.lua", ROOT .. "/sources.txt", ROOT .. "/dry.json"
     write(source, "local function broken(\n")
     write(manifest, source .. "\n")
-    os.remove(output)
     -- report.lua 已自包含工具路径，只需调用脚本本身。
-    local code, log = shell.capture("lua tools/quality/report.lua " .. shell.q(manifest) .. " " .. shell.q(output))
+    local code, log = capture(q(interpreter.path()) .. " tools/quality/report.lua " .. q(manifest) .. " " .. q(output))
     assert.are_not.equal(0, code, log)
     assert.matches("broken.lua", log, 1, true)
     assert.is_nil(read(output))

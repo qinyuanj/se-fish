@@ -83,8 +83,8 @@ local function write_config(text)
     os.remove(TEMP)
     return nil, write_err or close_err
   end
-  -- 同目录写完再原子替换：失败时原 GameCfg 保持完整。命令及路径均为静态常量。
-  local success = os.execute('pwsh -NoProfile -NonInteractive -Command "[System.IO.File]::Move(\'common/GameCfg.lua.acceptance-slot.tmp\',\'common/GameCfg.lua\',$true)"')
+  -- 同目录写完再原子替换：POSIX rename(2) 覆盖目标是原子的，失败时原 GameCfg 保持完整。
+  local success = os.rename(TEMP, CONFIG)
   if not success then
     os.remove(TEMP)
     return nil, '配置替换失败，原配置保持不变'

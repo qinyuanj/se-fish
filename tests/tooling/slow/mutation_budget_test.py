@@ -5,14 +5,18 @@ import tempfile
 import unittest
 from pathlib import Path
 
+
+import e2e_gate
+
 ROOT = Path(__file__).resolve().parents[3]
-PYTHON = ROOT / ".uml-viewer/crapper/.venv/Scripts/python.exe"
+PYTHON = ROOT / ".uml-viewer/crapper/.venv/bin/python"
 SOURCE = "local M={}\nfunction M.value(x) return x + 1 end\nreturn M\n"
 # 夹具的 coverage 子命令真的往继承来的 stdout 写字：真实覆盖率的 busted 子进程
 # 正是这样绕过 Python 缓冲直写日志，缺了它「记录在日志头」这条断言就抓不到缺陷。
 COVERAGE_STDOUT = "fixture-coverage-stdout"
 
 
+@e2e_gate.skip_unless_e2e
 class MutationBudgetTest(unittest.TestCase):
     def fixture(self, root, names, *, delay=0.0):
         for name in names:
@@ -29,14 +33,14 @@ class MutationBudgetTest(unittest.TestCase):
         (root / "test.py").write_text(
             "import time\n" + (f"time.sleep({delay})\n" if delay else ""), encoding="utf-8")
         settings = json.loads((ROOT / "tools/quality/project.json").read_text(encoding="utf-8"))
-        settings["commands"] = {"coverage": ["lua", "coverage.lua"],
+        settings["commands"] = {"coverage": [settings["lua"]["executable"], "coverage.lua"],
                                 "mutation_test": [str(PYTHON), "-B", str(root / "test.py")]}
         settings["paths"]["luacov"] = str(ROOT / ".toolcache/luacov/src")
         (root / "config.json").write_text(json.dumps(settings), encoding="utf-8")
 
     def invoke(self, root, *arguments, timeout=150):
         return subprocess.run([
-            "pwsh", "-NoProfile", "-File", str(ROOT / "tools/quality/project.ps1"),
+            str(ROOT / "tools/quality/project"),
             "--root", str(root), "--config", str(root / "config.json"), "mutation", *arguments,
         ], cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace",
             timeout=timeout)
@@ -67,7 +71,9 @@ class MutationBudgetTest(unittest.TestCase):
             result = self.invoke(root, "common/Alpha.lua", "--max-workers", "1")
             record = self.head_record(result)
             self.assertRegex(record, r"日志: target/mutation-logs/mutation-\d{8}-\d{6}\.log")
-            self.assertIn("tools/quality/project.ps1", record)
+            # 采集行可直接粘到 POSIX shell：首个词就是原生入口（前面没有包装解释器），标准重定向。
+            self.assertRegex(record, r"采集: \S*tools/quality/project .*mutation common/Alpha\.lua "
+                                     r"--max-workers 1 > target/mutation-logs/mutation-\d{8}-\d{6}\.log 2>&1")
             self.assertIn("恢复: ", record)
             self.assertIn(".metrics/mutate", record)
 

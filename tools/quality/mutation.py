@@ -63,8 +63,8 @@ def _capture_command(root: Path, invocation: list[str] | None) -> str:
     """还原可复制的公开入口调用；本工具不自动写日志文件。"""
     if not invocation:
         return ""
-    entry = (Path(root) / "tools/quality/project.ps1").as_posix()
-    return _joined(["pwsh", "-NoProfile", "-File", entry, *invocation])
+    entry = (Path(root) / "tools/quality/project").as_posix()
+    return _joined([entry, *invocation])
 
 
 def budget_record(root: Path, *, completed: int, skipped: list[Path], elapsed: float,
@@ -95,7 +95,7 @@ def launch_record(root: Path, config: dict, *, scope: str, targets: list[Path],
     ]
     capture = _capture_command(root, invocation)
     if capture:
-        lines.append(f"采集: {capture} *> {log}")
+        lines.append(f"采集: {capture} > {log} 2>&1")
     lines.append(f"恢复: {_RECOVERY}")
     lines.append("mutation 启动前记录结束")
     return "\n".join(lines)
@@ -299,8 +299,6 @@ def _run(root: Path, config: dict, targets: list[Path], *, original: dict[Path, 
     if max_workers is None:
         max_workers = DEFAULT_MAX_WORKERS
     from mutator.runner import CommandRunner
-    import windows_adapter
-    windows_adapter.install()
     class ProjectRunner(CommandRunner):
         def run(self, command, cwd, timeout):
             result = super().run(command, cwd, timeout)

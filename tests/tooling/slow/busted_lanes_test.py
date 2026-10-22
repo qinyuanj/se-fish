@@ -3,6 +3,7 @@ fast 排除 slow、full 包含 slow；探针、夹具与 Python 回归不进入�
 LuaUnit 基线（#82 验收，commit 3bfd870）：fast 1321 / full 1342；旧 runner 已由 #93（0e435b0）删除，
 当前分支不可复跑，要复现须 `git checkout 3bfd870`。
 """
+import json
 import re
 import shutil
 import subprocess
@@ -10,6 +11,8 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
+# 解释器取项目配置的 lua.executable：WSL 上 PATH 里的裸 lua 可能是 5.1。
+LUA = json.loads((ROOT / "tools/quality/project.json").read_text(encoding="utf-8"))["lua"]["executable"]
 
 DUMP_SNIPPET = (
     'local cfg = dofile(".busted") '
@@ -26,7 +29,7 @@ class BustedLaneConfigTest(unittest.TestCase):
     """.busted 配置形状：车道 ROOT、pattern、recursive、helper 与排序策略。"""
 
     def _dump(self):
-        result = subprocess.run(["lua", "-e", DUMP_SNIPPET], cwd=ROOT,
+        result = subprocess.run([LUA, "-e", DUMP_SNIPPET], cwd=ROOT,
                                 capture_output=True, text=True, encoding="utf-8", errors="replace")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         settings, roots = {}, {}

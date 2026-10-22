@@ -1,5 +1,4 @@
-"""公开 mutation 在 Windows 发布占用失败时保留完整旧快照。"""
-import ctypes
+"""公开 mutation 在发布失败（旧快照无法删除或替换）时保留完整旧快照。"""
 import json
 import shutil
 import subprocess
@@ -10,9 +9,15 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[3]
 # 验收可显式选择只读的已安装工具来源，所有执行产物仍在 fixture。
 import os
+
+import e2e_gate
+
 TOOLS = Path(os.environ.get('QUALITY_TEST_TOOLS_ROOT', str(ROOT)))
+# 解释器取项目配置的 lua.executable：WSL 上 PATH 里的裸 lua 可能是 5.1。
+LUA = json.loads((ROOT / 'tools/quality/project.json').read_text(encoding='utf-8'))['lua']['executable']
 
 
+@e2e_gate.skip_unless_e2e
 class MutationPublishTest(unittest.TestCase):
     def fixture(self, root):
         quality = root / 'tools/quality'
@@ -20,14 +25,14 @@ class MutationPublishTest(unittest.TestCase):
         for path in (ROOT / 'tools/quality').glob('*.py'):
             shutil.copy(path, quality)
         shutil.copy(ROOT / 'tools/quality/report_lcov.lua', quality)
-        entry = (ROOT / 'tools/quality/project.ps1').read_text(encoding='utf-8')
-        interpreter = str(TOOLS / '.uml-viewer/crapper/.venv/Scripts/python.exe').replace("'", "''")
-        entry = entry.replace("$python = Join-Path $root '.uml-viewer/crapper/.venv/Scripts/python.exe'", f"$python = '{interpreter}'")
-        (quality / 'project.ps1').write_text(entry, encoding='utf-8')
+        shutil.copy(ROOT / 'tools/quality/project', quality)
         for tool in ('mutator', 'crapper'):
             shutil.copytree(TOOLS / f'.uml-viewer/{tool}/src', root / f'.uml-viewer/{tool}/src')
+        # 公开入口按自身检出找 crapper venv；symlink 复用已安装环境，不新建。
+        (root / '.uml-viewer/crapper/.venv').symlink_to((TOOLS / '.uml-viewer/crapper/.venv').resolve(),
+                                                      target_is_directory=True)
         config = json.loads((ROOT / 'tools/quality/project.json').read_text(encoding='utf-8'))
-        config['commands'] = {'coverage': ['lua', '-lluacov', 'test.lua'], 'mutation_test': ['lua', 'test.lua']}
+        config['commands'] = {'coverage': [LUA, '-lluacov', 'test.lua'], 'mutation_test': [LUA, 'test.lua']}
         config['paths']['luacov'] = str(TOOLS / '.toolcache/luacov/src')
         (quality / 'project.json').write_text(json.dumps(config), encoding='utf-8')
         (root / 'common').mkdir()
@@ -48,7 +53,7 @@ class MutationPublishTest(unittest.TestCase):
             # 加入 file-bearing 旧记录，触发旧 per-file 快照清理。
             (metrics / 'legacy.edn').write_text('{:namespace "common.B" :forms [{:id "defn/M.value" '
                 ':file "common/B.lua" :hash "old" :killed 1 :survived 0 :uncovered 0 :sites 1}] :outcomes {}}\n')
-            command = ['pwsh', '-NoProfile', '-File', str(root / 'tools/quality/project.ps1'),
+            command = [str(root / 'tools/quality/project'),
                        'mutation', 'common/A.lua', 'common/B.lua', '--max-workers', '1']
             for index, extra in enumerate(([], [], ['--mutate-all'])):
                 result = subprocess.run(command + extra, cwd=root, timeout=90, capture_output=True,
@@ -69,13 +74,15 @@ class MutationPublishTest(unittest.TestCase):
             self.assertEqual(result.returncode, 3, result.stdout + result.stderr)
             self.assertIn('survived', (metrics / 'common.A.edn').read_text())
 
-    def test_windows_delete_failure_preserves_whole_previous_tree(self):
+    def test_delete_failure_preserves_whole_previous_tree(self):
         self.check_locked_publication(delete=True)
 
-    def test_windows_replace_failure_preserves_whole_previous_tree(self):
+    def test_replace_failure_preserves_whole_previous_tree(self):
         self.check_locked_publication(delete=False)
 
     def check_locked_publication(self, delete):
+        if os.geteuid() == 0:
+            self.skipTest('root 不受目录权限限制，无法制造发布失败')
         with tempfile.TemporaryDirectory(prefix='se-fish-publish-76-') as directory:
             root = Path(directory)
             metrics = self.fixture(root)
@@ -85,20 +92,14 @@ class MutationPublishTest(unittest.TestCase):
                 (metrics / 'legacy.edn').write_text('{:namespace "common.B" :forms [{:id "defn/M.value" '
                     ':file "common/B.lua" :hash "old" :killed 1 :survived 0 :uncovered 0 :sites 1}] :outcomes {}}\n')
             before = {p.name: p.read_bytes() for p in metrics.iterdir()}
-            kernel = ctypes.WinDLL('kernel32', use_last_error=True)
-            create = kernel.CreateFileW
-            create.argtypes = [ctypes.c_wchar_p, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_void_p,
-                               ctypes.c_uint32, ctypes.c_uint32, ctypes.c_void_p]
-            create.restype = ctypes.c_void_p
-            kernel.CloseHandle.argtypes = [ctypes.c_void_p]
-            handle = create(str(metrics / ('legacy.edn' if delete else 'common.B.edn')), 0x80000000, 3, None, 3, 0, None)
-            self.assertNotIn(handle, (None, ctypes.c_void_p(-1).value))
+            # 快照目录只读：旧快照既不能删除（delete）也不能被替换（replace），等价 Windows 的占用句柄。
+            metrics.chmod(0o555)
             try:
-                result = subprocess.run(['pwsh', '-NoProfile', '-File', str(root / 'tools/quality/project.ps1'),
+                result = subprocess.run([str(root / 'tools/quality/project'),
                     'mutation', 'common/A.lua', 'common/B.lua', '--max-workers', '1'], cwd=root,
                     timeout=90, capture_output=True, text=True, encoding='utf-8', errors='replace')
             finally:
-                kernel.CloseHandle(handle)
+                metrics.chmod(0o755)
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn('基础设施失败', result.stdout + result.stderr)
             self.assertEqual({p.name: p.read_bytes() for p in metrics.iterdir()}, before)

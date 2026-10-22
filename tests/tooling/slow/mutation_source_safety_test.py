@@ -4,17 +4,20 @@ import os
 import shutil
 import subprocess
 import tempfile
-import time
 import unittest
 from pathlib import Path
 
+
+import e2e_gate
+
 ROOT = Path(__file__).resolve().parents[3]
-PYTHON = ROOT / '.uml-viewer/crapper/.venv/Scripts/python.exe'
+PYTHON = ROOT / '.uml-viewer/crapper/.venv/bin/python'
 OLD = b'{:namespace "common.Example" :forms [] :outcomes {}}\n'
 EDIT = '-- 用户运行期间保存\nreturn {}\n'.encode('utf-8')
 SOURCE = b'local M={}\nfunction M.value(x) return x + 1 end\nreturn M\n'
 
 
+@e2e_gate.skip_unless_e2e
 class MutationSourceSafetyTest(unittest.TestCase):
     def fixture(self, root, action='edit', phase='worker'):
         source = root / 'common/Example.lua'
@@ -25,19 +28,14 @@ class MutationSourceSafetyTest(unittest.TestCase):
         snapshot.write_bytes(OLD)
         quality = root / 'tools/quality'
         shutil.copytree(ROOT / 'tools/quality', quality)
-        scripts = root / '.uml-viewer/uml-viewer/scripts'
-        scripts.mkdir(parents=True)
-        shutil.copy(ROOT / 'uml.ps1', root)
-        shutil.copy(ROOT / '.uml-viewer/uml-viewer/scripts/uml-command.ps1', scripts)
-        shutil.copy(ROOT / '.uml-viewer/uml-viewer/scripts/uml-quality-config.ps1', scripts)
-        # uml.ps1 的 mutate 走仓库根 uml-quality.json 的标准分发，临时项目也要有这份声明。
+        # 图上入口：原生 uml 读取临时项目的 uml-quality.json，viewer 本体用本检出的固定安装。
+        shutil.copy(ROOT / 'uml', root)
         shutil.copy(ROOT / 'uml-quality.json', root)
         # 使用隔离 checkout 的实际包，临时项目自身也拥有公开分发入口。
         for name in ('mutator', 'crapper'):
             shutil.copytree(ROOT / f'.uml-viewer/{name}/src', root / f'.uml-viewer/{name}/src')
-        venv = root / '.uml-viewer/crapper/.venv'
-        # 独立 venv，避免共享 editable 安装；包从临时项目公开 checkout 导入。
-        subprocess.run([str(PYTHON), '-m', 'venv', '--system-site-packages', str(venv)], check=True)
+        # symlink 复用已安装 venv（含 tree-sitter）；mutation.py 把临时项目的 src 插到 sys.path 最前。
+        (root / '.uml-viewer/crapper/.venv').symlink_to(PYTHON.parents[1].resolve(), target_is_directory=True)
         (root / 'coverage.lua').write_text("local f=assert(io.open('luacov.stats.out','w')); f:write('3:common/Example.lua\\n1 1 1 \\n'); f:close()\n")
         operation = ('target.unlink(missing_ok=True)' if action == 'delete' else
                      f'target.write_bytes({EDIT!r})')
@@ -48,7 +46,7 @@ class MutationSourceSafetyTest(unittest.TestCase):
             f'if {"Path.cwd() != root" if phase == "worker" else "Path.cwd() == root"}:\n'
             f'    {operation}\n', encoding='utf-8')
         config = json.loads((quality / 'project.json').read_text(encoding='utf-8'))
-        config['commands'] = {'coverage': ['lua', 'coverage.lua'],
+        config['commands'] = {'coverage': [config['lua']['executable'], 'coverage.lua'],
                               'mutation_test': [str(PYTHON), '-B', str(root / 'test.py')]}
         config['paths']['luacov'] = str(ROOT / '.toolcache/luacov/src')
         (quality / 'project.json').write_text(json.dumps(config), encoding='utf-8')
@@ -56,18 +54,17 @@ class MutationSourceSafetyTest(unittest.TestCase):
 
     def invoke(self, root, entry):
         env = os.environ.copy()
-        env['QUALITY_PYTHON'] = str(PYTHON)
         env['PYTHONPATH'] = os.pathsep.join(str(root / f'.uml-viewer/{name}/src') for name in ('mutator', 'crapper'))
+        env['UML_VIEWER_TOOL_ROOT'] = str((ROOT / '.uml-viewer/uml-viewer').resolve())
         if entry == 'downstream':
-            env['PYTHONPATH'] += os.pathsep + str(ROOT / 'tools/quality')
-            command = [str(PYTHON), '-B', '-c',
-                       'import windows_adapter; windows_adapter.install(); from mutator.cli import main; main()',
+            # 下游直接用上游 mutator CLI：不再安装任何项目侧 worker 适配器。
+            command = [str(PYTHON), '-B', '-c', 'from mutator.cli import main; main()',
                        '--root', str(root), 'common/Example.lua', '--no-coverage',
                        '--test-command', f'"{PYTHON}" -B "{root / "test.py"}"', '--max-workers', '1']
+        elif entry == 'uml':
+            command = [str(root / 'uml'), 'mutate', 'common/Example.lua', '--max-workers', '1']
         else:
-            script = root / ('uml.ps1' if entry == 'uml' else 'tools/quality/project.ps1')
-            command = ['pwsh', '-NoProfile', '-File', str(script),
-                       'mutate' if entry == 'uml' else 'mutation', 'common/Example.lua', '--max-workers', '1']
+            command = [str(root / 'tools/quality/project'), 'mutation', 'common/Example.lua', '--max-workers', '1']
         return subprocess.run(command, cwd=root, env=env, capture_output=True, text=True,
                               encoding='utf-8', errors='replace', timeout=90)
 
@@ -137,40 +134,16 @@ class MutationSourceSafetyTest(unittest.TestCase):
                 self.assertEqual(snapshot.read_bytes(), OLD)
 
     def _lock_source_during_failure(self, root, source):
-        # 外部进程用真实 Windows 句柄拒绝共享读取；公开入口结束后才释放。
-        (root / 'locker.py').write_text(
-            'import ctypes, time\nfrom pathlib import Path\n'
-            'from ctypes import wintypes\n'
-            'kernel=ctypes.WinDLL("kernel32", use_last_error=True)\n'
-            'kernel.CreateFileW.argtypes=[wintypes.LPCWSTR,wintypes.DWORD,wintypes.DWORD,ctypes.c_void_p,wintypes.DWORD,wintypes.DWORD,wintypes.HANDLE]\n'
-            'kernel.CreateFileW.restype=wintypes.HANDLE\n'
-            f'handle=kernel.CreateFileW({str(source)!r},0x80000000,0,None,3,0,None)\n'
-            'assert handle != ctypes.c_void_p(-1).value, ctypes.get_last_error()\n'
-            'Path("locked").touch()\n'
-            'try:\n'
-            ' deadline=time.monotonic()+100\n'
-            ' while not Path("release").exists() and time.monotonic()<deadline: time.sleep(0.05)\n'
-            'finally:\n'
-            ' kernel.CloseHandle.argtypes=[wintypes.HANDLE]\n'
-            ' kernel.CloseHandle(handle)\n'
-            ' Path("unlocked").touch()\n', encoding='utf-8')
+        # 外部进程在失败前撤掉源码读权限；公开入口结束后才恢复，字节本身不变。
         (root / 'test.py').write_text(
-            'import subprocess,time\nfrom pathlib import Path\n'
-            f'subprocess.Popen([{str(PYTHON)!r},"-B","locker.py"],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)\n'
-            'deadline=time.monotonic()+10\n'
-            'while not Path("locked").exists():\n'
-            ' assert time.monotonic()<deadline,"外部锁未就绪"\n'
-            ' time.sleep(0.05)\n'
+            'import os\n'
+            f'os.chmod({str(source)!r}, 0)\n'
             'print("不可读基线原错误",flush=True)\nraise SystemExit(7)\n', encoding='utf-8')
 
-    def _release_source_lock(self, root):
-        (root / 'release').touch()
-        deadline = time.monotonic() + 10
-        while not (root / 'unlocked').exists():
-            self.assertLess(time.monotonic(), deadline, '外部句柄未释放')
-            time.sleep(0.05)
+    def _release_source_lock(self, source):
+        source.chmod(0o644)
 
-    @unittest.skipUnless(os.name == 'nt', '真实 Windows 文件共享句柄')
+    @unittest.skipIf(os.geteuid() == 0, 'root 无视文件权限，无法制造不可读源码')
     def test_unreadable_source_diagnostic_preserves_baseline_failure(self):
         with tempfile.TemporaryDirectory(prefix='mutation-safety-') as directory:
             root = Path(directory)
@@ -179,7 +152,7 @@ class MutationSourceSafetyTest(unittest.TestCase):
             try:
                 result = self.invoke(root, 'project')
             finally:
-                self._release_source_lock(root)
+                self._release_source_lock(source)
             output = result.stdout + result.stderr
             self.assertEqual(result.returncode, 2, output)
             self.assertIn('不可读基线原错误', output)
@@ -187,7 +160,7 @@ class MutationSourceSafetyTest(unittest.TestCase):
             self.assertEqual(source.read_bytes(), SOURCE)
             self.assertEqual(snapshot.read_bytes(), OLD)
 
-    @unittest.skipUnless(os.name == 'nt', '真实 Windows 文件共享句柄')
+    @unittest.skipIf(os.geteuid() == 0, 'root 无视文件权限，无法制造不可读源码')
     def test_unreadable_source_diagnostic_preserves_coverage_exception(self):
         with tempfile.TemporaryDirectory(prefix='mutation-safety-') as directory:
             root = Path(directory)
@@ -195,11 +168,11 @@ class MutationSourceSafetyTest(unittest.TestCase):
             self._lock_source_during_failure(root, source)
             command = f'"{PYTHON}" -B test.py'
             (root / 'coverage.lua').write_text(
-                'os.execute(' + json.dumps(command).replace('\\\\', '/') + ')\n', encoding='utf-8')
+                'os.execute(' + json.dumps(command) + ')\n', encoding='utf-8')
             try:
                 result = self.invoke(root, 'project')
             finally:
-                self._release_source_lock(root)
+                self._release_source_lock(source)
             output = result.stdout + result.stderr
             self.assertEqual(result.returncode, 1, output)
             self.assertIn('未生成 LuaCov 统计', output)

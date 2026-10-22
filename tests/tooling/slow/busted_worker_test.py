@@ -16,12 +16,11 @@ ROOT = Path(__file__).resolve().parents[3]
 CONFIG = ROOT / "tools/quality/project.json"
 
 # 与 tools/quality/mutation.py 相同的固定导入来源：worker 由 vendored mutator 提供，
-# Windows 复制回退由项目侧 windows_adapter 安装。
+# 直接使用上游 symlink overlay，项目侧不再替换 worker 实现。
 sys.path.insert(0, str(ROOT / "tools/quality"))
 sys.path.insert(0, str(ROOT / ".uml-viewer/mutator/src"))
 sys.path.insert(0, str(ROOT / ".uml-viewer/crapper/src"))
 
-import windows_adapter  # noqa: E402
 from mutator import workers  # noqa: E402
 from project import source_files  # noqa: E402
 
@@ -47,7 +46,6 @@ def listed(argv, cwd):
 
 class BustedWorkerTest(unittest.TestCase):
     def setUp(self):
-        windows_adapter.install()
         self.config = settings()
         self.command = self.config["commands"]["mutation_test"]
         self.addCleanup(self._remove_workers)
@@ -66,11 +64,9 @@ class BustedWorkerTest(unittest.TestCase):
         self.worker = workers.create_workers(self.base, ROOT, TARGET, source.read_bytes(), 1)[0]
         return self.worker
 
-    def test_mutation_argv_uses_the_windows_busted_launcher(self):
-        # Windows 的 CreateProcess 只补 .exe，裸 `busted` 会 [WinError 2]。
+    def test_mutation_argv_launcher_resolves_on_path(self):
+        # worker 直接 exec argv，不经 shell；启动器必须能从 PATH 解析（LuaRocks 用户 bin）。
         launcher = self.command[0]
-        self.assertEqual(Path(launcher).suffix, ".bat",
-                         f"mutation 测试 argv 必须以 Busted 的 .bat 启动器开头：{launcher}")
         self.assertTrue(shutil.which(launcher), f"启动器不在 PATH：{launcher}")
         self.assertIn("--run=fast", self.command, "mutation 基线必须跑 fast 车道")
 
@@ -100,6 +96,12 @@ class BustedWorkerTest(unittest.TestCase):
 
         self.assertFalse((worker / TARGET).is_symlink(),
                          "worker 的变异目标必须是独立副本；目录 symlink 会写回真实源码")
+        self.assertFalse((worker / TARGET).parent.is_symlink(),
+                         "变异目标所在目录必须是 worker 自有目录，兄弟文件才走 symlink")
+        sibling = next(path.name for path in (ROOT / TARGET).parent.iterdir()
+                       if path.name != Path(TARGET).name)
+        self.assertTrue((worker / TARGET).parent.joinpath(sibling).is_symlink(),
+                        "worker 只走 symlink overlay，不做整树复制")
         before = (ROOT / TARGET).read_bytes()
         (worker / TARGET).write_bytes(b"return {}\n")
         self.assertEqual((ROOT / TARGET).read_bytes(), before,
