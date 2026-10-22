@@ -21,13 +21,40 @@
 
 > 别照搬社区版 blender-mcp 的工具名：`get_scene_info`、`get_viewport_screenshot` **不存在**。
 
+**无头模式**（2026-10-22 海鸥试点验证）：Blender 不在线时，全部步骤都可以用
+`blender.exe -b --python <脚本>` 跑完，不依赖实时 MCP。脚本要自己建场景、自己摆相机与灯光、
+自己渲染自检图；每步落一个中间 `.blend`（`%TEMP%/<资产名>/`），失败只重跑那一步。
+实时 MCP 留给打开中间件看视口、截图与人工修补，不是必需路径。
+
+本机实测的调用方式（WSL 发起，Windows 执行）：
+
+```bash
+BLENDER="/mnt/c/Program Files/Blender Foundation/Blender 5.2/blender.exe"
+"$BLENDER" -b --python scripts/03-model.py
+```
+
+无头模式下两条注意事项：`bpy.ops.wm.open_mainfile` / `read_homefile` 会弄脏执行 context，
+重建场景用逐个删除对象；`view_transform` 不设 `Standard` 时，AgX 会把已按显示编码存盘的贴图再压一遍，
+自检渲染看起来像全黑。
+
 ### meshy
 
 `npx -y @meshy-ai/meshy-mcp-server`，凭据走环境变量 **`MESHY_API_KEY`**。
 
 **密钥永不入库。** 仓库内引用与本地配置一切写 `MESHY_API_KEY` 变量名，值只放在本机环境（用户级环境变量）。
 
-> 本机实测：Meshy 的 MCP 通道在 Node/undici 下连 `api.meshy.ai` 会 TLS 断开（`--use-system-ca` 可绕，但不可靠）。试点改走 REST 直连同一环境的 `MESHY_API_KEY`，脚本与参数一并留痕，见下方「试点复盘」。
+**执行端必须在 Windows。** 开发端是 WSL，但 WSL 里没有 Node、也没有 `MESHY_API_KEY`；MCP 的启动命令写成
+`cmd.exe /c npx.cmd -y @meshy-ai/meshy-mcp-server`，由 WSL interop 拉起 Windows 的 Node 进程，
+它继承 Windows 用户级环境变量、走 Windows 的 TLS 栈。这样 Codex 照常拿到 `mcp__meshy__*` 工具，
+而真正的 API 调用发生在 Windows 侧。裸 `npx` 在 WSL 会报找不到 node。
+
+> 2026-10-22 实测（海鸥试点 #124）：上述 `cmd.exe /c npx.cmd` 接法可用，MCP 工具正常注册。
+> 早前「MCP 在 Node/undici 下 TLS 断开、改走 REST」的记录是鲤鱼试点时裸 `npx` 的结论，已过时。
+> REST 后备仍是 `tools/meshy.py`（同样用 `curl.exe` 走 Windows TLS），参数与任务 ID 一并留痕。
+>
+> 已知缺陷：`meshy_image_to_3d` 的 `file_path` 在 2026-10-22 对本机三种路径视图（Windows 中文路径、
+> Windows ASCII 路径、WSL Linux 路径）都报 `File not found`，疑为 server 端文件视图问题。
+> 需要传本地图时改走 REST 的 `image_url` data URI，或先排查该缺陷。
 
 ### 前端配置
 
@@ -66,6 +93,10 @@
 - **量法**：顶点先搬到世界空间，按包围盒对角线 `1e-5` 焊接后统计；开放边占比按「只属于 1 个面的边 / 焊接后总边数」计算。与 `05-mesh-audit.py` 同一套口径。
 
 当前状态（2026-10-17 实测）：鲤鱼 435 连通块 / 49.49% 开放边 / 326 游离顶点，按口径判不合格，`art` 车道保持红色直到网格修好。罗非鱼基准 3 连通块 / 0.68% 开放边 / 0 游离顶点，但焊接后仍有 **4 条非流形边**（眼/嘴附近的退化微折叠，边长约为体长的 0.3%~1%），按「硬性为 0」也不合格；把它当基准前需要先清理微面，或单独记录把它定为基线的决定，不要为了让基线变绿去放宽硬性 0 项。
+
+海鸥（2026-10-22 实测）：1 连通块 / 0 开放边 / 0 非流形 / 0 绕向不一致 / 0 游离顶点，
+一次通过硬门槛。加工顺序是**体素重建 → 减面 → 贴图投射**——先重建让网格封闭，再减面就不会
+像鲤鱼那样碎成 435 片；同一条路径值得作为新资产的默认做法。
 
 ## 试点复盘（鲤鱼，2026-10-16）
 
