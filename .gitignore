@@ -9,6 +9,7 @@ design
 # ===== AI 助手 / teamai 分发文件（由工具自动下发，可重新生成）=====
 .codemaker/
 .codex/
+.agents/
 .kimi-code/
 .teamai/
 .claude/
