@@ -5,6 +5,13 @@ import tempfile
 import unittest
 from pathlib import Path
 
+
+# 真实拉起 crapper/mutator 的端到端用例默认跳过（维护者指令，spec/116）：
+# 收尾复验（#122）以 SE_FISH_QUALITY_E2E=1 统一实跑，不得改成 mock 假绿。
+import os as _os
+_E2E = _os.environ.get('SE_FISH_QUALITY_E2E') == '1'
+_E2E_REASON = '真实拉起 crapper/mutator 的端到端用例默认跳过；spec/116 收尾复验（#122，维护者协调）以 SE_FISH_QUALITY_E2E=1 统一实跑'
+
 ROOT = Path(__file__).resolve().parents[3]
 PYTHON = ROOT / ".uml-viewer/crapper/.venv/bin/python"
 SOURCE = "local M={}\nfunction M.value(x) return x + 1 end\nreturn M\n"
@@ -13,6 +20,7 @@ SOURCE = "local M={}\nfunction M.value(x) return x + 1 end\nreturn M\n"
 COVERAGE_STDOUT = "fixture-coverage-stdout"
 
 
+@unittest.skipUnless(_E2E, _E2E_REASON)
 class MutationBudgetTest(unittest.TestCase):
     def fixture(self, root, names, *, delay=0.0):
         for name in names:

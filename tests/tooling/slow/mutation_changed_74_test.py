@@ -5,11 +5,19 @@ import tempfile
 import unittest
 from pathlib import Path
 
+
+# 真实拉起 crapper/mutator 的端到端用例默认跳过（维护者指令，spec/116）：
+# 收尾复验（#122）以 SE_FISH_QUALITY_E2E=1 统一实跑，不得改成 mock 假绿。
+import os as _os
+_E2E = _os.environ.get('SE_FISH_QUALITY_E2E') == '1'
+_E2E_REASON = '真实拉起 crapper/mutator 的端到端用例默认跳过；spec/116 收尾复验（#122，维护者协调）以 SE_FISH_QUALITY_E2E=1 统一实跑'
+
 ROOT = Path(__file__).resolve().parents[3]
 # 解释器取项目配置的 lua.executable：WSL 上 PATH 里的裸 lua 可能是 5.1。
 LUA = json.loads((ROOT / "tools/quality/project.json").read_text(encoding="utf-8"))["lua"]["executable"]
 
 
+@unittest.skipUnless(_E2E, _E2E_REASON)
 class MutationChangedTest(unittest.TestCase):
     # 失败方式：暂存修改/新增漏选，混合状态重复，删除误选，范围排除失效，显式入口被状态干扰。
     def _git(self, root, *args):
