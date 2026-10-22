@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import io
 import os
+import shutil
 import subprocess
 import sys
 import tarfile
@@ -168,7 +169,6 @@ def install_rocks(config):
     """按 busted.rocks 清单经 LuaRocks（用户树）安装固定版本；已安装则跳过，可重跑。"""
     spec = config["busted"]
     luarocks = list(spec.get("luarocks", ["luarocks"]))
-    import shutil
     if not spec["rocks"]:
         return
     if shutil.which(luarocks[0]) is None:
@@ -184,7 +184,8 @@ def install_rocks(config):
 
 
 def install(project_root, root, config, install_only=False, python=None):
-    """持锁完成全部工具替换；返回后由调用方另行持锁运行 doctor。"""
+    """持锁完成全部工具替换；成功恒返回整数退出码 0（失败抛 InstallError），
+    是否另行持锁运行 doctor 由调用方按 --install-only 决定。"""
     project_root, root = Path(project_root).resolve(), Path(root).resolve()
     with repository_lock(root):
         for name, tool in config["tools"].items():
@@ -205,5 +206,5 @@ def install(project_root, root, config, install_only=False, python=None):
             return 0
         install_lua_tools(root, config)
         install_rocks(config)
-    return None
+    return 0
 

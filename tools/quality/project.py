@@ -368,7 +368,7 @@ def main(argv=None):
 
 
 def run_install(root, args):
-    """安装持锁替换工具后释放锁，再交给自行持锁的 doctor，避免父子自锁。"""
+    """安装持锁替换工具后释放锁；完整安装再交给自行持锁的 doctor，避免父子自锁。"""
     import install
     # 配置与补丁来自入口所在检出（入口脚本所在检出），--root 只决定安装位置。
     config_path = args.config or PROJECT_ROOT / "tools/quality/project.json"
@@ -378,8 +378,10 @@ def run_install(root, args):
     except install.InstallError as error:
         print(f"quality install: {error}", file=sys.stderr)
         return 1
-    if code is not None:
+    if code:
         return code
+    if args.install_only:
+        return 0
     from locking import repository_lock
     with repository_lock(root):
         return doctor(root, load_config(root, config_path))

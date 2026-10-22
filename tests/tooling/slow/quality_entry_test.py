@@ -8,6 +8,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -230,6 +231,55 @@ class BustedPinnedConfigTest(unittest.TestCase):
         self.assertEqual(busted["sources"]["luassert"]["commit"], "8d8dc8a54cc468048a128a867f6449a6c3fdd11a")
         # LuaCov 0.17.0-1 由 lua_tools.luacov 的固定提交承载（同一上游 commit）。
         self.assertEqual(config["lua_tools"]["luacov"]["commit"], "b1f9eae400da976b93edb7f94cf5d05f538a0655")
+
+
+class RunInstallContractTest(unittest.TestCase):
+    """install.install 统一返回整数退出码（不再 0/None 混合）；
+    run_install 按返回码与 --install-only 决定是否接 doctor。"""
+
+    @classmethod
+    def setUpClass(cls):
+        sys.path.insert(0, str(ROOT / "tools/quality"))
+
+    def _args(self, install_only):
+        return SimpleNamespace(install_only=install_only, python=None, config=None)
+
+    def test_install_returns_an_int_exit_code_on_success(self):
+        import install
+        config = {"tools": {}, "lua_tools": {}, "busted": {"rocks": []}}
+        with tempfile.TemporaryDirectory(prefix="se-fish-install-code-") as directory:
+            root = Path(directory)
+            with mock.patch.object(install, "run_viewer_installer"), \
+                    mock.patch.object(install, "repository_lock") as lock:
+                lock.return_value.__enter__.return_value = None
+                for install_only in (True, False):
+                    code = install.install(root, root, config, install_only=install_only)
+                    self.assertIsInstance(code, int,
+                                          f"install_only={install_only} 时成功路径必须返回整数退出码")
+
+    def test_run_install_treats_zero_as_success_and_honors_install_only(self):
+        import install
+        import locking
+        import project
+        for install_only, doctor_code, expected in ((True, 5, 0), (False, 5, 5), (False, 0, 0)):
+            with self.subTest(install_only=install_only, doctor_code=doctor_code):
+                with mock.patch.object(install, "install", return_value=0), \
+                        mock.patch.object(locking, "repository_lock") as lock, \
+                        mock.patch.object(project, "doctor", return_value=doctor_code) as doctor:
+                    lock.return_value.__enter__.return_value = None
+                    self.assertEqual(project.run_install(ROOT, self._args(install_only)), expected)
+                    if install_only:
+                        doctor.assert_not_called()
+                    else:
+                        doctor.assert_called_once()
+
+    def test_run_install_passes_through_install_failure(self):
+        import install
+        import project
+        with mock.patch.object(install, "install", return_value=3), \
+                mock.patch.object(project, "doctor") as doctor:
+            self.assertEqual(project.run_install(ROOT, self._args(False)), 3)
+            doctor.assert_not_called()
 
 
 class DoctorBustedTest(unittest.TestCase):
