@@ -133,6 +133,35 @@ def install_lua_tools(root, config):
             raise InstallError(f"{name} 缓存提交不符：{actual}，预期 {tool['commit']}；"
                                f"请移走缓存后重跑 tools/quality/project install")
         print(f"{name} {actual}")
+        if "native" in tool:
+            build_native(name, directory, tool["native"], config)
+
+
+def lua_include_flags(config):
+    """系统 Lua 头文件经 pkg-config 解析（`lua.pkg_config`，默认 lua5.4）。"""
+    package = config.get("lua", {}).get("pkg_config", "lua5.4")
+    result = subprocess.run(["pkg-config", "--cflags", package], capture_output=True, text=True)
+    if result.returncode:
+        raise InstallError(f"找不到 Lua 头文件（pkg-config {package} 失败）；请安装 liblua5.4-dev 与 pkg-config")
+    return result.stdout.split()
+
+
+def build_native(name, directory, native, config):
+    """把 checkout 内的 C 源码编成 Lua 可 require 的共享库；产物已存在则跳过。
+
+    不链接 liblua：符号由加载它的 Lua 5.4 解释器提供（Linux 上 C 模块的常规做法）。
+    """
+    output = directory / native["output"]
+    if output.is_file():
+        print(f"{name} 已构建 {output.name}，跳过")
+        return
+    sources = [str(directory / source) for source in native["sources"]]
+    command = ["cc", "-shared", "-fPIC", "-O2", *lua_include_flags(config), "-o", str(output), *sources]
+    result = subprocess.run(command, capture_output=True, text=True)
+    if result.returncode:
+        output.unlink(missing_ok=True)
+        raise InstallError(f"{name} 原生库构建失败：{' '.join(command)}\n{result.stderr.strip()}")
+    print(f"{name} 构建 {output.name}")
 
 
 def install_rocks(config):
