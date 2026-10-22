@@ -6,6 +6,7 @@
 -- 开发端只在 WSL（#115 / #116）：子进程与夹具全部用 POSIX sh，不再有平台 pending。
 -- sync 自身不调 robocopy，所以这批案例只证明 POSIX 实现正确，不证明 interop 可用。
 local interpreter = require("tests.support.interpreter")
+local q = require("tests.support.sh_quote").q
 
 local function slurp(path)
   local f = io.open(path, "rb")
@@ -13,11 +14,6 @@ local function slurp(path)
   local body = f:read("a")
   f:close()
   return body
-end
-
--- sh 单引号引用：路径与参数里的单引号按 '\'' 拼接。
-local function q(value)
-  return "'" .. tostring(value):gsub("'", "'\\''") .. "'"
 end
 
 -- 本仓库根的绝对路径：LUA_PATH 与 cli.lua 的位置都从它拼。busted 从仓库根运行。

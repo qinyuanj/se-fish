@@ -2,6 +2,7 @@
 -- 配置路径是相对当前目录的 common/GameCfg.lua，所以子进程 cd 进假仓库，LUA_PATH 指回本仓库；
 -- 真仓库的 GameCfg 不被碰。开发端只在 WSL（#116）：替换不得依赖 PowerShell。
 local interpreter = require("tests.support.interpreter")
+local q = require("tests.support.sh_quote").q
 
 local function slurp(path)
   local f = io.open(path, "rb")
@@ -9,10 +10,6 @@ local function slurp(path)
   local body = f:read("a")
   f:close()
   return body
-end
-
-local function q(value)
-  return "'" .. tostring(value):gsub("'", "'\\''") .. "'"
 end
 
 local REPO = assert(io.popen("pwd")):read("l")

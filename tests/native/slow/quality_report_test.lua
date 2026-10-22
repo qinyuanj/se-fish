@@ -5,12 +5,9 @@
 -- 依赖 `tools/quality/project install` 建好的 .toolcache（dry4lua / luacheck / acceptance4lua）：
 -- 缓存缺失时 report.lua 在 require 处失败，日志里不会出现 broken.lua，本案例照样红。
 local interpreter = require("tests.support.interpreter")
+local q = require("tests.support.sh_quote").q
 
 local ROOT = "tmp/quality-report-test"
-
-local function q(value)
-  return "'" .. tostring(value):gsub("'", "'\\''") .. "'"
-end
 
 local function write(path, body)
   local f = assert(io.open(path, "wb"))
