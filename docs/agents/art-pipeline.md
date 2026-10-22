@@ -52,9 +52,10 @@ BLENDER="/mnt/c/Program Files/Blender Foundation/Blender 5.2/blender.exe"
 > 早前「MCP 在 Node/undici 下 TLS 断开、改走 REST」的记录是鲤鱼试点时裸 `npx` 的结论，已过时。
 > REST 后备仍是 `tools/meshy.py`（同样用 `curl.exe` 走 Windows TLS），参数与任务 ID 一并留痕。
 >
-> 已知缺陷：`meshy_image_to_3d` 的 `file_path` 在 2026-10-22 对本机三种路径视图（Windows 中文路径、
-> Windows ASCII 路径、WSL Linux 路径）都报 `File not found`，疑为 server 端文件视图问题。
-> 需要传本地图时改走 REST 的 `image_url` data URI，或先排查该缺陷。
+> `file_path` 由 Windows 侧的 Node 进程读取，所以**必须写 Windows 绝对路径**
+> （`C:\Users\<用户名>\...`，中文目录可以）；`/mnt/c/...`、`/home/...` 这类 WSL 路径一律报 `File not found`。
+> 报 `File not found` 时先核对用户名目录与路径视图，别急着换通道（海鸥试点就是用户名目录写错，误判成了 server 缺陷）。
+> 想不花额度确认文件读得到：传一个超过 20 MB 的 `.png`。server 读到文件后会先报 `File too large`，不会发出 API 请求。
 
 ### 前端配置
 
