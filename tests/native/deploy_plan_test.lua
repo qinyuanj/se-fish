@@ -33,7 +33,7 @@ end)
 
 describe("TestDeployOwnedTargets", function()
   local saved, deployed, removed, finalized, deploy
-  local MODULES = { "tools.deploy", "tools.eggy_workspace", "tools.win_shell", "tools.editor_finalize" }
+  local MODULES = { "tools.deploy", "tools.eggy_workspace", "tools.wsl_seam", "tools.editor_finalize" }
 
   before_each(function()
     saved = { path = package.path, modules = {} }
@@ -41,7 +41,8 @@ describe("TestDeployOwnedTargets", function()
     deployed, removed, finalized = {}, {}, 0
     package.loaded["tools.deploy"] = nil
     package.loaded["tools.eggy_workspace"] = { resolve = function() return WORKSPACE end }
-    package.loaded["tools.win_shell"] = {
+    package.loaded["tools.wsl_seam"] = {
+      interop = function() return true, { cmd = "cmd.exe", robocopy = "robocopy.exe" } end,
       is_dir = function() return true end,
       exists = function() return true end,
       list_entries = list_entries,
