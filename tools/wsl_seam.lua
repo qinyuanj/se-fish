@@ -11,7 +11,6 @@
 -- tmp/ 是 gitignored 的，重定向落点目录由 ensure_dir 在 mirror 前建好。
 local M = {}
 
-M.OUT_FILE = "tmp/wsl_seam.out"
 M.LOG_FILE = "tmp/robocopy.log"
 
 local DEFAULT_WORKSPACE_REL = "Desktop/dev/eggy/LuaSource_钓鱼怎么这么危险啊喂！"
@@ -60,17 +59,15 @@ local function find_on_path(name)
 end
 
 -- interop 预检：cmd.exe 与 robocopy.exe 都能按 PATH 解析。
--- 成功返回 true, { cmd=, robocopy= }；失败返回 nil, 原因。
+-- 成功返回 true；失败返回 nil, 原因。
 function M.interop()
-  local cmd = find_on_path("cmd.exe")
-  if not cmd then
+  if not find_on_path("cmd.exe") then
     return nil, "PATH 上找不到 cmd.exe（WSL interop 不可用）"
   end
-  local robocopy = find_on_path("robocopy.exe")
-  if not robocopy then
+  if not find_on_path("robocopy.exe") then
     return nil, "PATH 上找不到 robocopy.exe（WSL interop 不可用）"
   end
-  return true, { cmd = cmd, robocopy = robocopy }
+  return true
 end
 
 local function robocopy_exe()
@@ -126,10 +123,8 @@ function M.windows_env(name)
     line = trim(line)
     if line ~= "" then
       last = line
-      if line:match("^%a:[/\\]") then
-        value = line
-        break
-      end
+      -- 取最后一个盘符行：告警可能排在值前面，值总在最后一条。
+      if line:match("^%a:[/\\]") then value = line end
     end
   end
   value = value or last
@@ -142,11 +137,16 @@ function M.windows_env(name)
   return M.to_linux(value)
 end
 
+-- 部署端 USERPROFILE 的 WSL 路径（一次推导，多个部署端路径共用）。
+local function profile()
+  return M.windows_env("USERPROFILE")
+end
+
 -- 部署端默认宿主目录：<USERPROFILE>/Desktop/dev/eggy/LuaSource_钓鱼怎么这么危险啊喂！
 function M.default_workspace()
-  local profile, err = M.windows_env("USERPROFILE")
-  if not profile then return nil, err end
-  return profile .. "/" .. DEFAULT_WORKSPACE_REL
+  local home, err = profile()
+  if not home then return nil, err end
+  return home .. "/" .. DEFAULT_WORKSPACE_REL
 end
 
 -- 部署端 Windows 临时目录的 WSL 路径。
@@ -156,9 +156,20 @@ end
 
 -- editor-cli.exe 的 WSL 路径（由 USERPROFILE 推导）。
 function M.editor_cli()
-  local profile, err = M.windows_env("USERPROFILE")
-  if not profile then return nil, err end
-  return profile .. "/" .. EDITOR_CLI_REL
+  local home, err = profile()
+  if not home then return nil, err end
+  return home .. "/" .. EDITOR_CLI_REL
+end
+
+-- 绝对化仓库内路径（realpath）；转换失败返回 nil, 原因。
+function M.absolute(path)
+  local code, out = M.capture("realpath -- " .. M.q(path))
+  if code ~= 0 then
+    return nil, "realpath 失败（退出码 " .. code .. "）: " .. trim(out)
+  end
+  local value = trim(out)
+  if value == "" then return nil, "realpath 没有输出: " .. path end
+  return value
 end
 
 -- 路径是否存在（目录或文件）。

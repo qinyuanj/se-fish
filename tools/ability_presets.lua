@@ -311,8 +311,12 @@ function M.probe_script(key)
 end
 
 -- 仓库内路径 → 部署端可读的 Windows 形式（--file 参数由 editor-cli.exe 读取）。
+-- 先绝对化：相对路径经 wslpath 只会拿到相对 Windows 路径，落到 editor-cli 的 UNC cwd 上
+-- 是否可读不可控；绝对路径转出的 \\wsl.localhost\... 才是明确目标。
 local function windows_path(path)
-  local value, err = shell.to_windows(path)
+  local absolute, abs_err = shell.absolute(path)
+  if not absolute then fail("路径绝对化失败: " .. tostring(abs_err)) end
+  local value, err = shell.to_windows(absolute)
   if not value then fail("路径转换失败: " .. tostring(err)) end
   return value
 end

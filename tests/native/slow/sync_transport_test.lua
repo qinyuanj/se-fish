@@ -8,13 +8,9 @@
 local interpreter = require("tests.support.interpreter")
 local q = require("tests.support.sh_quote").q
 
-local function slurp(path)
-  local f = io.open(path, "rb")
-  if not f then return nil end
-  local body = f:read("a")
-  f:close()
-  return body
-end
+local fs = require("tests.support.sh_fs")
+local slurp, code_of, rmrf, exists, write_file =
+  fs.slurp, fs.code_of, fs.rmrf, fs.exists, fs.write_file
 
 -- 本仓库根的绝对路径：LUA_PATH 与 cli.lua 的位置都从它拼。busted 从仓库根运行。
 local REPO = assert(io.popen("pwd")):read("l")
@@ -22,27 +18,6 @@ local ROOT = REPO .. "/tmp/sync-transport-test"
 local HOST = ROOT .. "/host"
 local FAKE_REPO = ROOT .. "/repo"
 local OUT = ROOT .. ".out"
-
-local function code_of(cmd)
-  local _, _, code = os.execute(cmd)
-  return code
-end
-
-local function rmrf(path)
-  code_of("rm -rf " .. q(path))
-end
-
-local function exists(path)
-  return code_of("test -e " .. q(path)) == 0
-end
-
-local function write_file(path, body)
-  local dir = path:match("^(.*)/[^/]*$")
-  if dir then code_of("mkdir -p " .. q(dir)) end
-  local f = assert(io.open(path, "wb"), path .. " 建不出来")
-  f:write(body)
-  f:close()
-end
 
 local function write_host(rel, body)
   write_file(HOST .. "/" .. rel, body)

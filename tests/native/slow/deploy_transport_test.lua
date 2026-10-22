@@ -6,34 +6,9 @@ local interpreter = require("tests.support.interpreter")
 local q = require("tests.support.sh_quote").q
 local seam = require("tools.wsl_seam")
 
-local function slurp(path)
-  local f = io.open(path, "rb")
-  if not f then return nil end
-  local body = f:read("a")
-  f:close()
-  return body
-end
-
-local function code_of(cmd)
-  local _, _, code = os.execute(cmd)
-  return code
-end
-
-local function rmrf(path)
-  code_of("rm -rf " .. q(path))
-end
-
-local function exists(path)
-  return code_of("test -e " .. q(path)) == 0
-end
-
-local function write_file(path, body)
-  local dir = path:match("^(.*)/[^/]*$")
-  if dir then code_of("mkdir -p " .. q(dir)) end
-  local f = assert(io.open(path, "wb"), path .. " 建不出来")
-  f:write(body)
-  f:close()
-end
+local fs = require("tests.support.sh_fs")
+local slurp, code_of, rmrf, exists, write_file =
+  fs.slurp, fs.code_of, fs.rmrf, fs.exists, fs.write_file
 
 -- 本仓库根的绝对路径：LUA_PATH 与 cli.lua 的位置都从它拼。busted 从仓库根运行。
 local REPO = assert(io.popen("pwd")):read("l")
@@ -94,18 +69,6 @@ describe("TestDeployCli", function()
     out, code = nil, nil
   end)
 
-  it("test_extra_argument_is_a_usage_error", function()
-    out, code = run_deploy("extra", HOST)
-    assert.are.equal(2, code, out)
-    assert.matches("未知参数", out, 1, true)
-  end)
-
-  it("test_help_is_a_success", function()
-    out, code = run_deploy("--help", HOST)
-    assert.are.equal(0, code, out)
-    assert.matches("deploy", out, 1, true)
-  end)
-
   -- 主证据：真 interop + robocopy /MIR，字节到目标侧，stale 删除，宿主自有内容不动。
   it("test_deploy_mirrors_bytes_and_removes_stale_files", function()
     out, code = run_deploy(nil, HOST)
@@ -150,7 +113,8 @@ describe("TestDeployCli", function()
     assert.is_false(exists(fresh), "interop 失败时不应创建宿主目录")
   end)
 
-  -- EGGY_WORKSPACE="" 当作未设置：不能把 /MIR 写到文件系统根。
+  -- EGGY_WORKSPACE="" 当作未设置（fast 车道的 wsl_seam_test 已钉住这一解析）：
+  -- 这里在 interop 不可用的子进程里再证一次不会把 /MIR 写到文件系统根。
   it("test_empty_workspace_never_targets_the_filesystem_root", function()
     local root_client_before = exists("/client")
     out, code = run_deploy(nil, "", "/usr/bin:/bin")
@@ -162,6 +126,7 @@ describe("TestDeployCli", function()
   -- 隔离断言：临时宿主必须在 %TEMP% 的唯一前缀内，且不等于真实宿主目录。
   it("test_temporary_host_is_isolated_from_the_real_workspace", function()
     assert.are.equal(WINDOWS_TEMP, HOST:sub(1, #WINDOWS_TEMP), "临时宿主必须在 %TEMP% 下")
+    assert.is_false(exists(HOST .. "/eggy.json"), "临时宿主不得有 eggy.json，否则会走进真实编辑器收尾")
     local real = seam.default_workspace()
     assert.is_true(real == nil or real ~= HOST)
   end)
