@@ -1,12 +1,13 @@
 {
   "sources": {"roots": ["client", "common", "server"], "exclude": ["server/_trigger"]},
-  "lua": {"executable": "lua", "version": "Lua 5.4."},
+  "lua": {"executable": "lua5.4", "version": "Lua 5.4."},
   "commands": {
-    "coverage": ["busted.bat", "--run=full", "--coverage"],
-    "mutation_test": ["busted.bat", "--run=fast"]
+    "coverage": ["busted", "--run=full", "--coverage"],
+    "mutation_test": ["busted", "--run=fast"]
   },
   "busted": {
     "command": "busted",
+    "luarocks": ["luarocks", "--lua-version=5.4"],
     "version": "2.3.0",
     "rocks": [
       {"name": "luassert", "version": "1.9.0-1"},
@@ -27,13 +28,14 @@
   },
   "lua_tools": {
     "luacov": {"url": "https://github.com/lunarmodules/luacov.git", "commit": "b1f9eae400da976b93edb7f94cf5d05f538a0655", "modules": ["luacov", "luacov.stats"]},
-    "dry4lua": {"url": "http://lzxsvn:3000/eggy/dry4lua", "commit": "1dd42d73116921cd54a00c7b132a9b097e4a288a", "modules": ["dry4lua.analysis", "dry4lua.ast"]},
+    "dry4lua": {"url": "https://github.com/qinyuanj/dry4lua", "commit": "1dd42d73116921cd54a00c7b132a9b097e4a288a", "modules": ["dry4lua.analysis", "dry4lua.ast"]},
     "luacheck": {"url": "https://github.com/lunarmodules/luacheck.git", "commit": "cc089e3f65acdd1ef8716cc73a3eca24a6b845e4", "modules": ["luacheck.parser"]},
-    "acceptance4lua": {"url": "http://lzxsvn:3000/eggy/acceptance4lua", "commit": "8dd107144a7635596d75e4fccfce35121dc67570", "modules": ["acceptance4lua.json"]}
+    "acceptance4lua": {"url": "https://github.com/qinyuanj/acceptance4lua", "commit": "8dd107144a7635596d75e4fccfce35121dc67570", "modules": ["acceptance4lua.json"]}
   },
   "tools": {
-    "viewer": {"directory": "uml-viewer", "source": "../uml-viewer", "commit": "54040575390d68746da241a1e0477726f48ec7cc"},
+    "viewer": {"directory": "uml-viewer", "source": "../uml-viewer", "commit": "73adde704cc207af74b7d4736cc9e568654f402e"},
     "crapper": {"directory": "crapper", "source": "../crapper", "commit": "9b85a1120f5ca4b8293db222b6ac621e5f830488", "patches": ["tools/quality/patches/crapper-lua-has-error.patch"]},
-    "mutator": {"directory": "mutator", "source": "../mutator", "commit": "341a4a6d420857d04a2ff0b582d563ea4e6ff089", "patches": ["tools/quality/patches/mutator-seam.patch"]}
+    "mutator": {"directory": "mutator", "source": "../mutator", "commit": "341a4a6d420857d04a2ff0b582d563ea4e6ff089", "patches": ["tools/quality/patches/mutator-seam.patch"]},
+    "dryer": {"directory": "dryer", "source": "../dryer", "commit": "d4d3e7e98c983ed52d1c8663eef61c9147f68c44"}
   }
 }

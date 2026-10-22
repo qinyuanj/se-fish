@@ -1,4 +1,9 @@
-"""公开 unittest discover 不得启动显式安装验收或消费发现参数。"""
+"""公开安装入口的固定提交、补丁与现场保护；unittest discover 不得启动显式安装验收。
+
+安装用例全部使用本地 fixture 仓库：桩 viewer 安装器按上游 `scripts/get-uml-viewer` 的
+契约工作（读 `<工具>_REPO_URL` / `<工具>_REF`，副本有本地修改即拒绝），不联网、
+不依赖 LOVE / Herdr，也不读取主工作区的 `.uml-viewer` 或 `.toolcache`。
+"""
 import json
 import os
 import shutil
@@ -9,11 +14,9 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
+ENTRY = ROOT / "tools/quality/project"
 
-
-OLD_REVISION = "4cc471417c6f54f0b24b031d8e3a86300322905b"
-
-# 直接问 loader「discover 收进了哪些模块」：verify.ps1 只看退出码，删掉或漏掉一个回归文件
+# 直接问 loader「discover 收进了哪些模块」：删掉或漏掉一个回归文件
 # 只会让 `Ran N tests` 静默下降，因此这里钉「目录全集 == 收集全集」（#93 补的防漏断言）。
 DISCOVER_PROBE = (
     "import unittest\n"
@@ -28,97 +31,182 @@ DISCOVER_PROBE = (
     "walk(suite)\n"
 )
 
+# 桩安装器：与上游 POSIX 安装器同一契约——按环境变量取来源与固定提交，
+# 副本有本地修改（不含安装器自己建的 .venv）时拒绝并保留现场。
+STUB_INSTALLER = r'''#!/bin/sh
+set -e
+[ "$1" = --install-only ] || { echo "stub installer: 只接受 --install-only" >&2; exit 2; }
+mkdir -p .uml-viewer
+for tool in uml-viewer crapper mutator dryer; do
+  case "$tool" in uml-viewer) prefix=UML_VIEWER ;; *) prefix=$(printf %s "$tool" | tr a-z A-Z) ;; esac
+  eval "url=\${${prefix}_REPO_URL:?缺少 ${prefix}_REPO_URL}"
+  eval "ref=\${${prefix}_REF:?缺少 ${prefix}_REF}"
+  directory=".uml-viewer/$tool"
+  if [ -e "$directory" ]; then
+    if [ -n "$(git -C "$directory" status --porcelain -- . ':!.venv')" ]; then
+      echo "stub installer: 安装副本有本地修改，已保留，请先处理：$directory" >&2
+      exit 1
+    fi
+  else
+    git init -q "$directory"
+  fi
+  git -C "$directory" fetch -q --depth 1 "$url" "$ref"
+  git -C "$directory" checkout -q --detach FETCH_HEAD
+done
+cp .uml-viewer/uml-viewer/scripts/uml ./uml
+echo "stub installer: done"
+'''
+
+PATCH = """diff --git a/src/crapper/core.py b/src/crapper/core.py
+index 0000000..1111111 100644
+--- a/src/crapper/core.py
++++ b/src/crapper/core.py
+@@ -1,2 +1,3 @@
+ def score():
++    # se-fish 登记补丁
+     return 1
+"""
 
 
-def standard_installation(sandbox):
+def git(*args, cwd=None):
+    return subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, text=True).stdout.strip()
+
+
+def fixture_repository(path, files):
+    path.mkdir(parents=True)
+    git("init", "-q", str(path))
+    for relative, content in files.items():
+        target = path / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(content, encoding="utf-8")
+        if relative.startswith("scripts/"):
+            target.chmod(0o755)
+    git("-C", str(path), "add", "-A")
+    git("-C", str(path), "-c", "user.name=fixture", "-c", "user.email=fixture@example.invalid",
+        "commit", "-q", "-m", "fixture")
+    commit = git("-C", str(path), "rev-parse", "HEAD")
+    # 再加一个提交，确保安装取的是登记提交而不是分支顶端。
+    (path / "LATER").write_text("later\n", encoding="utf-8")
+    git("-C", str(path), "add", "-A")
+    git("-C", str(path), "-c", "user.name=fixture", "-c", "user.email=fixture@example.invalid",
+        "commit", "-q", "-m", "later")
+    return commit
+
+
+def fixture_installation(sandbox):
+    """driver 是带公开入口的项目检出，target 是 --root 指向的空安装根。"""
+    sources = sandbox / "sources"
+    commits = {
+        "viewer": fixture_repository(sources / "uml-viewer", {
+            "scripts/get-uml-viewer": STUB_INSTALLER,
+            "scripts/uml": "#!/bin/sh\n# Thin Unix entry, installed in the examined project.\n"}),
+        "crapper": fixture_repository(sources / "crapper", {
+            "src/crapper/core.py": "def score():\n    return 1\n"}),
+        "mutator": fixture_repository(sources / "mutator", {
+            "src/mutator/engine.py": "def run():\n    return 0\n"}),
+        "dryer": fixture_repository(sources / "dryer", {
+            "src/dryer/cli.py": "def main():\n    return 0\n"}),
+    }
+    lua_commit = fixture_repository(sources / "luafix", {"src/luafix.lua": "return {}\n"})
     driver = sandbox / "driver"
-    shutil.copytree(ROOT / "tools/quality", driver / "tools/quality")
+    shutil.copytree(ROOT / "tools/quality", driver / "tools/quality",
+                    ignore=shutil.ignore_patterns("__pycache__"))
+    (driver / "tools/quality/patches/crapper-fixture.patch").write_text(PATCH, encoding="utf-8")
     config = json.loads((ROOT / "tools/quality/project.json").read_text(encoding="utf-8"))
-    common = Path(subprocess.check_output(["git", "-C", str(ROOT), "rev-parse", "--git-common-dir"], text=True).strip())
-    if not common.is_absolute():
-        common = ROOT / common
-    siblings = common.resolve().parent.parent
-    for name, tool in config["tools"].items():
-        tool["source"] = os.path.relpath(siblings / ("uml-viewer" if name == "viewer" else name), driver)
-    config["tools"]["viewer"]["commit"] = "79c8d563c42f9c8912e2810fcf71b7c24a72a88d"
-    config["tools"]["viewer"]["patches"] = []
+    directories = {"viewer": "uml-viewer", "crapper": "crapper", "mutator": "mutator", "dryer": "dryer"}
+    config["tools"] = {
+        name: {"directory": directory, "source": os.path.relpath(sources / directory, driver),
+               "commit": commits[name]}
+        for name, directory in directories.items()}
+    config["tools"]["crapper"]["patches"] = ["tools/quality/patches/crapper-fixture.patch"]
+    config["lua_tools"] = {"luafix": {"url": str(sources / "luafix"), "commit": lua_commit, "modules": ["luafix"]}}
+    config["busted"]["rocks"] = []
     (driver / "tools/quality/project.json").write_text(json.dumps(config), encoding="utf-8")
     target = sandbox / "installation"
     target.mkdir()
     return driver, target, config
 
 
-def install(driver, target):
-    return subprocess.run(["pwsh", "-NoProfile", "-File", str(driver / "tools/quality/install.ps1"),
-                           "-Root", str(target), "-InstallOnly"], capture_output=True, text=True,
-                          encoding="utf-8", errors="replace", timeout=90)
+def install(driver, target, *extra):
+    env = os.environ.copy()
+    env["QUALITY_PYTHON"] = sys.executable
+    return subprocess.run([str(driver / "tools/quality/project"), "--root", str(target), "install", *extra],
+                          capture_output=True, text=True, encoding="utf-8", errors="replace",
+                          timeout=120, env=env)
 
 
-class QualityInstallDiscoveryTest(unittest.TestCase):
-    def _old_installation(self, sandbox):
-        driver = sandbox / "driver"
-        shutil.copytree(ROOT / "tools/quality", driver / "tools/quality")
-        subprocess.run(["git", "init", "-q", str(driver)], check=True)
-        subprocess.run(["git", "-C", str(driver), "fetch", "-q", str(ROOT), OLD_REVISION], check=True)
-        old = json.loads(subprocess.check_output([
-            "git", "-C", str(ROOT), "show", f"{OLD_REVISION}:tools/quality/project.json"], text=True))
-        config = json.loads((ROOT / "tools/quality/project.json").read_text(encoding="utf-8"))
-        target = sandbox / "installation"
-        target.mkdir()
-        for name, tool in old["tools"].items():
-            source = ROOT / ".uml-viewer" / tool["directory"]
-            config["tools"][name]["source"] = os.path.relpath(source, driver)
-            directory = target / ".uml-viewer" / tool["directory"]
-            directory.parent.mkdir(parents=True, exist_ok=True)
-            subprocess.run(["git", "clone", "-q", "--no-checkout", str(source), str(directory)], check=True)
-            subprocess.run(["git", "-C", str(directory), "checkout", "-q", tool["commit"]], check=True)
-            for patch in tool.get("patches", []):
-                content = subprocess.check_output(["git", "-C", str(ROOT), "show", f"{OLD_REVISION}:{patch}"])
-                subprocess.run(["git", "-C", str(directory), "apply", "-"], input=content, check=True)
-        (driver / "tools/quality/project.json").write_text(json.dumps(config), encoding="utf-8")
-        return driver, target, config
-
-    def test_standard_installer_supports_empty_cache_and_repeat_install(self):
-        with tempfile.TemporaryDirectory(prefix="quality-standard-") as directory:
-            driver, target, config = standard_installation(Path(directory))
-            for attempt in range(2):
-                result = install(driver, target)
+class QualityInstallTest(unittest.TestCase):
+    def test_empty_root_installs_pinned_tools_and_registered_patch_then_repeats(self):
+        with tempfile.TemporaryDirectory(prefix="quality-install-") as directory:
+            driver, target, config = fixture_installation(Path(directory))
+            for _ in range(2):
+                result = install(driver, target, "--install-only")
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-                viewer = target / ".uml-viewer/uml-viewer"
-                self.assertEqual(subprocess.check_output(["git", "-C", str(viewer), "rev-parse", "HEAD"], text=True).strip(),
-                                 config["tools"]["viewer"]["commit"])
-                self.assertEqual(subprocess.check_output(["git", "-C", str(viewer), "status", "--porcelain"], text=True), "")
-                self.assertTrue((target / "uml.ps1").is_file())
+                for tool in config["tools"].values():
+                    checkout = target / ".uml-viewer" / tool["directory"]
+                    self.assertEqual(git("-C", str(checkout), "rev-parse", "HEAD"), tool["commit"])
+                crapper = target / ".uml-viewer/crapper/src/crapper/core.py"
+                self.assertIn("# se-fish 登记补丁", crapper.read_text(encoding="utf-8"))
+                self.assertEqual(git("-C", str(target / ".uml-viewer/mutator"), "status", "--porcelain"), "")
+                self.assertTrue((target / "uml").is_file(), "上游安装器生成的根入口缺失")
 
-    def test_install_rejects_edits_inside_registered_patch_files_before_any_update(self):
+    def test_unregistered_edit_fails_and_preserves_bytes(self):
         with tempfile.TemporaryDirectory(prefix="quality-dirty-") as directory:
-            driver, target, config = standard_installation(Path(directory))
-            result = install(driver, target)
+            driver, target, _ = fixture_installation(Path(directory))
+            result = install(driver, target, "--install-only")
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            source = target / ".uml-viewer/mutator/src/mutator/engine.py"
-            original = source.read_bytes() + b"\n# user unsaved change\n"
-            source.write_bytes(original)
-            result = install(driver, target)
+            for relative in ("mutator/src/mutator/engine.py", "crapper/src/crapper/core.py"):
+                source = target / ".uml-viewer" / relative
+                original = source.read_bytes()
+                edited = original + b"# user unsaved change\n"
+                source.write_bytes(edited)
+                try:
+                    result = install(driver, target, "--install-only")
+                    self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                    self.assertIn("保留现场", result.stdout + result.stderr)
+                    self.assertEqual(source.read_bytes(), edited, f"{relative} 的未登记改动被覆盖")
+                finally:
+                    source.write_bytes(original)
+
+    def test_untracked_content_fails_and_is_preserved(self):
+        with tempfile.TemporaryDirectory(prefix="quality-untracked-") as directory:
+            driver, target, _ = fixture_installation(Path(directory))
+            result = install(driver, target, "--install-only")
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            note = target / ".uml-viewer/crapper/notes.txt"
+            note.write_text("keep me\n", encoding="utf-8")
+            result = install(driver, target, "--install-only")
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn("保留现场", result.stdout + result.stderr)
-            self.assertEqual(source.read_bytes(), original)
+            self.assertEqual(note.read_text(encoding="utf-8"), "keep me\n")
 
-    def test_upgrade_request_fails_closed_without_touching_registered_tool(self):
-        with tempfile.TemporaryDirectory(prefix="quality-upgrade-stop-") as directory:
-            driver, target, config = standard_installation(Path(directory))
-            result = install(driver, target)
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            source = target / ".uml-viewer/uml-viewer/scripts/get-uml-viewer.ps1"
-            before = source.read_bytes()
-            result = subprocess.run([
-                "pwsh", "-NoProfile", "-File", str(driver / "tools/quality/install.ps1"),
-                "-Root", str(target), "-InstallOnly", "-UpgradeFrom", OLD_REVISION,
-            ], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=90)
+    def test_source_without_pinned_commit_is_named(self):
+        with tempfile.TemporaryDirectory(prefix="quality-missing-commit-") as directory:
+            driver, target, config = fixture_installation(Path(directory))
+            config["tools"]["mutator"]["commit"] = "0" * 40
+            (driver / "tools/quality/project.json").write_text(json.dumps(config), encoding="utf-8")
+            result = install(driver, target, "--install-only")
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn("-UpgradeFrom 已停用", result.stdout + result.stderr)
-            self.assertIn("保留现场", result.stdout + result.stderr)
-            self.assertEqual(source.read_bytes(), before)
+            self.assertIn("mutator", result.stdout + result.stderr)
+            self.assertIn("0" * 40, result.stdout + result.stderr)
+            self.assertFalse((target / ".uml-viewer/mutator").exists())
 
+    def test_full_install_pins_lua_tools_then_runs_doctor(self):
+        with tempfile.TemporaryDirectory(prefix="quality-lua-tools-") as directory:
+            driver, target, config = fixture_installation(Path(directory))
+            result = install(driver, target)
+            output = result.stdout + result.stderr
+            checkout = target / ".toolcache/luafix"
+            self.assertEqual(git("-C", str(checkout), "rev-parse", "HEAD"), config["lua_tools"]["luafix"]["commit"],
+                             output)
+            self.assertEqual(git("-C", str(checkout), "remote", "get-url", "origin"),
+                             config["lua_tools"]["luafix"]["url"])
+            # fixture 安装根没有 uml-quality.json：失败点证明 install 结束后确实交给了 doctor。
+            self.assertEqual(result.returncode, 1, output)
+            self.assertIn("缺少标准分发配置", output)
+
+
+class QualityDoctorPinTest(unittest.TestCase):
     def test_doctor_reports_bootstrap_pin_drift_before_cache_checks(self):
         with tempfile.TemporaryDirectory(prefix="quality-pin-") as directory:
             sandbox = Path(directory)
@@ -131,10 +219,8 @@ class QualityInstallDiscoveryTest(unittest.TestCase):
             settings["lua_tools"]["dry4lua"]["commit"] = "0" * 40
             config = sandbox / "config.json"
             config.write_text(json.dumps(settings), encoding="utf-8")
-            result = subprocess.run([
-                "pwsh", "-NoProfile", "-File", str(ROOT / "tools/quality/project.ps1"),
-                "--root", str(sandbox), "--config", str(config), "doctor",
-            ], cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace")
+            result = subprocess.run([str(ENTRY), "--root", str(sandbox), "--config", str(config), "doctor"],
+                                    cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace")
             output = result.stdout + result.stderr
             self.assertEqual(result.returncode, 1, output)
             self.assertIn("dry4lua", output)
@@ -142,8 +228,10 @@ class QualityInstallDiscoveryTest(unittest.TestCase):
             self.assertIn("固定提交不一致", output)
             self.assertFalse((sandbox / ".toolcache").exists())
 
+
+class QualityDiscoveryTest(unittest.TestCase):
     def test_discovery_collects_every_regression_file(self):
-        """verify.ps1 的 Python 闸门只看退出码：删文件或漏收集只会让 `Ran N tests` 静默下降。
+        """Python 闸门只看退出码：删文件或漏收集只会让 `Ran N tests` 静默下降。
 
         这里直接问 loader 收进了哪些模块，钉「目录中的 *_test.py 全集 == discover 收集全集」，
         新加的文件没被 pattern 收进、或文件被误删导致覆盖面下降，都在这里红。

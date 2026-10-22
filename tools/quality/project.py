@@ -170,7 +170,7 @@ def doctor(root, config):
                                f"{config['lua_tools'][name]['commit']} / {commit}")
     for name, tool in config["lua_tools"].items():
         directory = root / ".toolcache" / name
-        repair = "请移走损坏缓存后运行 tools/quality/install.ps1"
+        repair = "请移走损坏缓存后运行 tools/quality/project install"
         if not (directory / ".git").exists():
             raise RuntimeError(f"{name} 缺少运行依赖 checkout：{directory}；{repair}")
         actual = subprocess.check_output(["git", "-C", str(directory), "rev-parse", "HEAD"], text=True).strip()
@@ -211,12 +211,15 @@ def doctor(root, config):
             result = subprocess.run(["git", "-C", str(directory), "apply", "--reverse", "--check", str(patch_path)],
                                     capture_output=True)
             if result.returncode:
-                raise RuntimeError(f"{name} 缺少已登记补丁 {patch}，请运行 tools/quality/install.ps1")
+                raise RuntimeError(f"{name} 缺少已登记补丁 {patch}，请运行 tools/quality/project install")
         if name == "viewer":
             continue
-        python = directory / ".venv/Scripts/python.exe"
-        snippet = (f"import sys,{name}; print(sys.executable); print(sys.version); print({name}.__file__); "
-                   f"assert {name}.__file__.replace('\\\\','/').lower().startswith({str(directory / 'src').replace(chr(92), '/').lower()!r})")
+        python = directory / ".venv/bin/python"
+        if not python.is_file():
+            raise RuntimeError(f"{name} 缺少 Linux venv：{python}；请运行 tools/quality/project install")
+        snippet = (f"import sys,pathlib,{name}; print(sys.executable); print(sys.version); print({name}.__file__); "
+                   f"assert pathlib.Path({name}.__file__).resolve().is_relative_to("
+                   f"pathlib.Path({str(directory / 'src')!r}).resolve())")
         subprocess.run([str(python), "-c", snippet], check=True)
         subprocess.run([str(python), "-m", "pip", "check"], check=True)
     return 0
@@ -232,10 +235,15 @@ def doctor_busted(root, config):
     spec = config.get("busted")
     if not spec:
         raise RuntimeError("project.json 缺少 busted 固定依赖配置")
-    repair = "请运行 tools/quality/install.ps1 安装固定依赖"
+    repair = "请运行 tools/quality/project install 安装固定依赖"
     command = spec["command"]
+    luarocks_argv = list(spec.get("luarocks", ["luarocks"]))
     path = shutil.which(command)
     if path is None:
+        hint = busted_outside_path(command, luarocks_argv)
+        if hint:
+            raise RuntimeError(f"Busted 已安装在 {hint}，但该目录不在 PATH；"
+                               f"请执行 export PATH=\"{hint}:$PATH\"（并写入 shell 配置）后重试")
         raise RuntimeError(f"缺少 Busted 命令：{command} 不在 PATH；{repair}")
     result = subprocess.run([path, "--version"], capture_output=True, text=True)
     if result.returncode:
@@ -243,12 +251,13 @@ def doctor_busted(root, config):
     actual = result.stdout.strip()
     if actual != spec["version"]:
         raise RuntimeError(f"Busted 版本不符：{actual}，预期 {spec['version']}；{repair}")
-    luarocks = shutil.which("luarocks")
+    luarocks = shutil.which(luarocks_argv[0])
     if luarocks is None:
         raise RuntimeError(f"缺少 LuaRocks 命令，无法核对 Busted 固定依赖；{repair}")
     for rock in spec["rocks"]:
         name, version = rock["name"], rock["version"]
-        result = subprocess.run([luarocks, "list", name, "--porcelain"], capture_output=True, text=True)
+        result = subprocess.run([luarocks, *luarocks_argv[1:], "list", name, "--porcelain"],
+                                capture_output=True, text=True)
         if result.returncode:
             raise RuntimeError(f"无法查询 {name} 安装状态：{result.stderr.strip()}；{repair}")
         rows = [line.split("\t") for line in result.stdout.splitlines() if line.strip()]
@@ -257,6 +266,21 @@ def doctor_busted(root, config):
             raise RuntimeError(f"{name} 固定版本 {version} 未安装；{repair}")
         print(f"{name} {version}（rock）")
     print(f"busted {actual}（{path}）")
+
+
+def busted_outside_path(command, luarocks_argv):
+    """Busted 不在 PATH 时，查 LuaRocks 用户 bin 是否已有它，返回该目录供提示。"""
+    luarocks = shutil.which(luarocks_argv[0])
+    if luarocks is None:
+        return None
+    result = subprocess.run([luarocks, *luarocks_argv[1:], "path", "--lr-bin"], capture_output=True, text=True)
+    if result.returncode:
+        return None
+    for directory in result.stdout.strip().split(os.pathsep):
+        candidate = Path(directory) / command
+        if directory and candidate.is_file() and os.access(candidate, os.X_OK):
+            return directory
+    return None
 
 
 def run_quality(root, config):
@@ -290,7 +314,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=PROJECT_ROOT)
     parser.add_argument("--config", type=Path)
-    parser.add_argument("command", choices=["coverage", "test", "doctor", "run", "quality",
+    parser.add_argument("command", choices=["install", "coverage", "test", "doctor", "run", "quality",
                                             "crap", "refresh-crap", "dry", "mutation", "mutate", "mutation-report"])
     parser.add_argument("files", nargs="*", help="mutation 目标业务 Lua（相对路径）")
     parser.add_argument("--mutate-all", action="store_true", help="显式全量 mutation（必须给文件）")
@@ -301,13 +325,36 @@ def main(argv=None):
                         help="mutation 墙钟预算秒数；缺省为 mutation 模块的 60 分钟默认值")
     parser.add_argument("--lines", type=int, nargs="*")
     parser.add_argument("--verbose", action="store_true")
+    parser.add_argument("--install-only", action="store_true",
+                        help="install 仅准备 viewer/crapper/mutator/dryer checkout 与 venv，不构成完整质量环境")
+    parser.add_argument("--python", help="install 时创建工具 venv 的宿主 Python（传给上游安装器）")
     args = parser.parse_args(argv)
     # 启动前记录要给出可复制的日志采集命令，这里保留调用方原始 argv。
     args.invocation = list(sys.argv[1:] if argv is None else argv)
     root = args.root.resolve()
+    if args.command == "install":
+        return run_install(root, args)
     from locking import repository_lock
     with repository_lock(root):
         return dispatch(root, args)
+
+
+def run_install(root, args):
+    """安装持锁替换工具后释放锁，再交给自行持锁的 doctor，避免父子自锁。"""
+    import install
+    # 配置与补丁来自入口所在检出（等价旧 install.ps1 的 $PSScriptRoot），--root 只决定安装位置。
+    config_path = args.config or PROJECT_ROOT / "tools/quality/project.json"
+    try:
+        code = install.install(PROJECT_ROOT, root, load_config(root, config_path),
+                               install_only=args.install_only, python=args.python)
+    except install.InstallError as error:
+        print(f"quality install: {error}", file=sys.stderr)
+        return 1
+    if code is not None:
+        return code
+    from locking import repository_lock
+    with repository_lock(root):
+        return doctor(root, load_config(root, config_path))
 
 
 def dispatch(root, args):
