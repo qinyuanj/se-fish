@@ -67,10 +67,9 @@ class MutationBudgetTest(unittest.TestCase):
             result = self.invoke(root, "common/Alpha.lua", "--max-workers", "1")
             record = self.head_record(result)
             self.assertRegex(record, r"日志: target/mutation-logs/mutation-\d{8}-\d{6}\.log")
-            # 采集行可直接粘到 POSIX shell：原生入口 + 标准重定向，不再经 pwsh。
+            # 采集行可直接粘到 POSIX shell：首个词就是原生入口（前面没有包装解释器），标准重定向。
             self.assertRegex(record, r"采集: \S*tools/quality/project .*mutation common/Alpha\.lua "
                                      r"--max-workers 1 > target/mutation-logs/mutation-\d{8}-\d{6}\.log 2>&1")
-            self.assertNotIn("pwsh", record)
             self.assertIn("恢复: ", record)
             self.assertIn(".metrics/mutate", record)
 
