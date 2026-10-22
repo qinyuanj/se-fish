@@ -1,27 +1,20 @@
--- 部署收尾：镜像落盘后执行 code validate → （与编辑器有差异时）code push → code diff 复核。
+-- 编辑器收尾：镜像落盘后执行 code validate → （与编辑器有差异时）code push → code diff 复核。
 -- push 之后仍与编辑器不一致才报告尚未同步；地图侧独有文件只提示，保留已有内容。
 --
--- 本模块依赖正在运行的编辑器与 editor-cli.exe；CLI 缺失、宿主未绑定或地图未打开时
--- 打印跳过，磁盘镜像仍算完成，但不宣称编辑器内代码已同步。
+-- 本模块依赖正在运行的编辑器与部署端的 editor-cli.exe（位置由 WSL 接缝层从 USERPROFILE
+-- 推导）。interop 或推导失败时报错并返回非零；编辑器没装、宿主未绑定或地图未打开时打印
+-- 跳过，磁盘镜像仍算完成，但不宣称编辑器内代码已同步。
 -- 宿主必须有自己的 eggy.json，避免 CLI 向上下层目录寻找绑定而读到别的工程。
 --
 -- 纯解析部分（parse_changelist / behind_count）单独导出，可脱离编辑器测。
-local shell = require("tools.win_shell")
+local shell = require("tools.wsl_seam")
 
 local M = {}
 
-local EXE_REL = [[.eggitor\cli\editor-cli.exe]]
-
-local function exe_path()
-  local home = os.getenv("USERPROFILE")
-  if not home then return nil end
-  return home .. "\\" .. EXE_REL
-end
-
 -- 跑一条 code 子命令。必须给 --workspace：不给就按进程 cwd 找绑定，而 cwd 是仓库根。
--- 不用 cd 进宿主目录是为了不让输出重定向跟着切换目录跑。
-local function editor_cli(exe, ws, argline)
-  return shell.capture(shell.q(exe) .. " " .. argline .. " --workspace " .. shell.q(ws))
+-- 部署端的 exe 只认 Windows 路径，所以 --workspace 经 wslpath 转成 Windows 形式。
+local function editor_cli(exe, ws_win, argline)
+  return shell.capture(shell.q(exe) .. " " .. argline .. " --workspace " .. shell.q(ws_win))
 end
 
 -- 解析 `code diff` 文本里的 changelist 行：
@@ -41,27 +34,30 @@ end
 
 -- 返回 true 表示收尾完成（含跳过）；失败返回 nil, 原因。
 function M.run(ws)
-  local exe = exe_path()
+  local exe, err = shell.editor_cli()
   if not exe then
-    print("编辑器收尾跳过: 环境变量 USERPROFILE 不在，定位不了 editor-cli.exe")
-    return true
+    return nil, "编辑器收尾失败: " .. tostring(err)
   end
   if not shell.exists(exe) then
     print("编辑器收尾跳过: 未找到 editor-cli.exe（" .. exe .. "）")
     return true
   end
   if not shell.exists(ws .. "/eggy.json") then
-    print("编辑器收尾跳过: 宿主目录没有 eggy.json（" .. shell.win(ws) .. " 不是编辑器绑定的 Lua 工程）")
+    print("编辑器收尾跳过: 宿主目录没有 eggy.json（" .. ws .. " 不是编辑器绑定的 Lua 工程）")
     return true
   end
+  local ws_win, win_err = shell.to_windows(ws)
+  if not ws_win then
+    return nil, "编辑器收尾失败: " .. tostring(win_err)
+  end
 
-  local code, out = editor_cli(exe, ws, "code validate")
+  local code, out = editor_cli(exe, ws_win, "code validate")
   if not out:find("validate: OK", 1, true) then
     return nil, "code validate 未通过（退出码 " .. tostring(code) .. "）:\n" .. out
   end
   print("validate: OK")
 
-  code, out = editor_cli(exe, ws, "code diff")
+  code, out = editor_cli(exe, ws_win, "code diff")
   local cl = M.parse_changelist(out)
   if not cl then
     print("编辑器未打开该地图（diff 给不出 changelist），未校验编辑器内代码"
@@ -76,13 +72,13 @@ function M.run(ws)
 
   local dirty = M.behind_count(cl)
   if dirty > 0 then
-    local pcode, pout = editor_cli(exe, ws, "code push")
+    local pcode, pout = editor_cli(exe, ws_win, "code push")
     if pcode ~= 0 then
       return nil, "code push 失败（退出码 " .. tostring(pcode) .. "）:\n" .. pout
     end
     print("push: 已推送 " .. dirty .. " 个本地新增或不同文件")
 
-    local dcode, dout = editor_cli(exe, ws, "code diff")
+    local dcode, dout = editor_cli(exe, ws_win, "code diff")
     if dcode ~= 0 then
       return nil, "code push 后 code diff 复核失败（退出码 " .. tostring(dcode) .. "）:\n" .. dout
     end

@@ -5,13 +5,13 @@
 -- 普通产物回灌落盘前做 CRLF→LF 归一（与 .gitattributes 的 eol=lf 配合）；官方包
 -- 保持原始字节。全部源读成功才开始落盘，来源不完整时不写入；内容没变的文件不重写。
 -- 回同步清单与镜像规则在 tools/sync_plan，宿主目录定位在 tools/eggy_workspace，
--- 目录枚举在 tools/win_shell。
+-- 目录枚举在 tools/wsl_seam。
 
 package.path = "./?.lua;./?/init.lua;" .. package.path
 
 local workspace = require("tools.eggy_workspace")
 local plan = require("tools.sync_plan")
-local shell = require("tools.win_shell")
+local shell = require("tools.wsl_seam")
 
 local M = {}
 
@@ -29,7 +29,8 @@ function M.usage()
     "--packages 追加三端 packages/ 字节镜像，删除过期文件。",
     "任一端源 packages/ 缺失或为空，整次同步在写入前失败。",
     "全部源读成功才落盘，内容没变的文件不重写；仓库根与宿主目录的其余内容互不触碰。",
-    "宿主目录默认 " .. workspace.DEFAULT .. "，环境变量 EGGY_WORKSPACE 可覆盖。",
+    "宿主目录默认为部署端 USERPROFILE 下的 " .. workspace.DEFAULT_REL .. "，",
+    "环境变量 EGGY_WORKSPACE 可覆盖（接受 /mnt/c/... 与 C:\\... 两种形式）。",
     "",
   }, "\n") .. "\n"
 end
@@ -96,7 +97,8 @@ local function read_sources(WS, with_packages)
 end
 
 local function run_sync(with_packages)
-  local WS = workspace.resolve()
+  local WS, ws_err = workspace.resolve()
+  if not WS then fail(ws_err or "定位不了编辑器宿主目录") end
   if not shell.is_dir(WS) then
     fail("编辑器宿主目录不存在；可用环境变量 EGGY_WORKSPACE 覆盖（缺 " .. WS .. "）")
   end

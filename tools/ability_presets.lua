@@ -52,7 +52,7 @@
 --   2. editor-unit rename <根 unit-id> <原名> --yes —— 单位名走「plain string」通道（CLI help
 --      明写），落的是真正的 Lua string；
 --   3. exec --file <脚本> --expect-edit-mode —— 脚本里 AssetService:SyncAssetFromUnit(单位) 把
---      单位数据（含 string Name）同步回预设；脚本走 --file 传，中文名不进 cmd 命令行；
+--      单位数据（含 string Name）同步回预设；脚本走 --file 传，中文名不进命令行；
 --   4. editor-unit delete <根 unit-id> --recursive --yes —— 删掉场景单位（子单位跟着根走）。
 --   收尾回读步骤 0 的探针，确认 typeof 已是 String。
 --   前置约束：场景里不能已有同名单位（第 3 步按名字 FindFirstChild 找单位，重名会同步错对象）
@@ -66,23 +66,22 @@
 --   预设改动不存盘就进下一场试玩，所以修完当场生效；但本工具**绝不调 map save**（地图上通常
 --   有人类未存的手动改动），要持久化由人类自己手动存盘。
 --
--- 纯函数部分（parse_gamecfg / plan / json_string / argv_quote / extract_new_id /
+-- 纯函数部分（parse_gamecfg / plan / json_string / extract_new_id /
 -- replace_key / parse_probe / plan_name_fixes / extract_unit_ids / parse_unit_get /
 -- roots_of / lua_quote / sync_script）单独导出，由 tests/native/ability_presets_test.lua
 -- 脱离编辑器测；真编辑器行为只能人工验（编辑器开着本图、编辑态）。
 
 package.path = "./?.lua;./?/init.lua;" .. package.path
 
-local shell = require("tools.win_shell")
+local shell = require("tools.wsl_seam")
 
 local M = {}
 
 local GAMECFG = "common/GameCfg.lua"
 local SHELL_DIR = "tools/ability_presets"
-local EXE_REL = [[.eggitor\cli\editor-cli.exe]]
 
 -- --fix-names 用：建场景单位的位置（离地高、跑完就删）与两个 exec 脚本落点
--- （tmp/ 是 gitignored）。exec 的 Lua 一律走 --file：脚本体是多行，内联进 cmd 命令行会被
+-- （tmp/ 是 gitignored）。exec 的 Lua 一律走 --file：脚本体是多行，内联进命令行会被
 -- 换行切断（实测：后面那些参数被吃成另一条命令，exec 只回了纯文本 "Execution succeeded."）。
 local FIX_POSITION = "0,100,0"
 local PROBE_SCRIPT = "tmp/ability_presets_probe.lua"
@@ -171,57 +170,6 @@ function M.json_string(s)
   return '"' .. (s:gsub('[%c\\"]', function(c)
     return escapes[c] or string.format("\\u%04x", c:byte())
   end)) .. '"'
-end
-
--- 把一个 argv 元素编码进 cmd 命令行：包双引号，内部按 CommandLineToArgvW 规则转义
--- （反斜杠只在 " 或 \ 前特殊；结尾的反斜杠在收尾引号前翻倍）。
-function M.argv_quote(s)
-  local out = {}
-  local run = 0
-  for i = 1, #s do
-    local c = s:sub(i, i)
-    if c == "\\" then
-      run = run + 1
-    elseif c == '"' then
-      out[#out + 1] = string.rep("\\", run * 2 + 1) .. '"'
-      run = 0
-    else
-      out[#out + 1] = string.rep("\\", run) .. c
-      run = 0
-    end
-  end
-  out[#out + 1] = string.rep("\\", run * 2)
-  return '"' .. table.concat(out) .. '"'
-end
-
--- cmd 侧保护：argv_quote 保证的是目标程序（CommandLineToArgvW）拿到的 argv 正确，
--- 但 cmd 自己先按「每个 " 朴素翻转引号态」扫一遍命令行——argv_quote 产生的 \" 序列
--- 会把 cmd 的引号态翻出内容区，落在「引号外」的 cmd 元字符（如壳注释里的 `> 0`）会被
--- 当成重定向/管道执行（实测：命令本身成功，cmd 额外报「系统找不到指定的路径」并把
--- 整条命令的退出码顶成 1）。这里按 cmd 的引号态给引号外的元字符补 ^ 转义；
--- ^ 在引号外会被 cmd 吃掉、不进 argv，对目标程序透明。
--- % 不处理（cmd /c 命令行也做 %var% 展开）：目前所有值都不含 %，见了直接报错。
-local CMD_META = { ["&"] = true, ["|"] = true, ["<"] = true, [">"] = true,
-  ["("] = true, [")"] = true, ["^"] = true }
-
-function M.cmd_protect(fragment)
-  if fragment:find("%%") then
-    fail("命令行里出现 %（cmd 会做 %var% 展开，本工具不支持）: " .. fragment:sub(1, 80))
-  end
-  local out = {}
-  local in_quotes = false
-  for i = 1, #fragment do
-    local c = fragment:sub(i, i)
-    if c == '"' then
-      in_quotes = not in_quotes
-      out[#out + 1] = c
-    elseif not in_quotes and CMD_META[c] then
-      out[#out + 1] = "^" .. c
-    else
-      out[#out + 1] = c
-    end
-  end
-  return table.concat(out)
 end
 
 -- duplicate-asset 的输出里找新预设 id：与模板 id 不同的那个 map://preset/ 串。
@@ -362,10 +310,15 @@ function M.probe_script(key)
   }, "\n")
 end
 
-local function exe_path()
-  local home = os.getenv("USERPROFILE")
-  if not home then return nil end
-  return home .. "\\" .. EXE_REL
+-- 仓库内路径 → 部署端可读的 Windows 形式（--file 参数由 editor-cli.exe 读取）。
+-- 先绝对化：相对路径经 wslpath 只会拿到相对 Windows 路径，落到 editor-cli 的 UNC cwd 上
+-- 是否可读不可控；绝对路径转出的 \\wsl.localhost\... 才是明确目标。
+local function windows_path(path)
+  local absolute, abs_err = shell.absolute(path)
+  if not absolute then fail("路径绝对化失败: " .. tostring(abs_err)) end
+  local value, err = shell.to_windows(absolute)
+  if not value then fail("路径转换失败: " .. tostring(err)) end
+  return value
 end
 
 local function read_file(path)
@@ -377,13 +330,14 @@ local function read_file(path)
 end
 
 -- 跑一条 editor-cli 命令；extra 是 --editor-instance 这类透传参数。
+-- 参数一律按 sh 单引号规则引用：cmd 的 ^ 转义在 WSL 下不再适用，>、& 等元字符在引号内天然安全。
 local function run_cli(ctx, args)
   local parts = { shell.q(ctx.exe) }
   for _, a in ipairs(args) do
-    parts[#parts + 1] = M.cmd_protect(M.argv_quote(a))
+    parts[#parts + 1] = shell.q(a)
   end
   for _, e in ipairs(ctx.extra) do
-    parts[#parts + 1] = M.argv_quote(e)
+    parts[#parts + 1] = shell.q(e)
   end
   return shell.capture(table.concat(parts, " "))
 end
@@ -456,7 +410,7 @@ end
 local function probe_name_kind(ctx, key)
   write_file(PROBE_SCRIPT, M.probe_script(key))
   local out = step(ctx, "读 Name 类型 " .. key,
-    { "exec", "--file", shell.win(PROBE_SCRIPT), "--expect-edit-mode", "--json" })
+    { "exec", "--file", windows_path(PROBE_SCRIPT), "--expect-edit-mode", "--json" })
   local kind, value = M.parse_probe(M.exec_result(out))
   if not kind then
     fail("认不出 " .. key .. " 的类型探针输出:\n" .. out)
@@ -517,7 +471,7 @@ local function apply_name_fix(ctx, key, name, dry_run)
       { "editor-unit", "rename", root, name, "--yes", "--json" })
     write_file(EXEC_SCRIPT, M.sync_script(key, name))
     local sync_out = step(ctx, "3/4 同步回预设 " .. key,
-      { "exec", "--file", shell.win(EXEC_SCRIPT), "--expect-edit-mode", "--json" })
+      { "exec", "--file", windows_path(EXEC_SCRIPT), "--expect-edit-mode", "--json" })
     if not M.sync_succeeded(sync_out) then
       fail("SyncAssetFromUnit 没回 sync=true:\n" .. sync_out)
     end
@@ -641,9 +595,10 @@ local function run(args)
     i = i + 1
   end
 
-  local exe = exe_path()
-  if not exe or not shell.exists(exe) then
-    fail("未找到 editor-cli.exe（" .. tostring(exe) .. "）")
+  local exe, exe_err = shell.editor_cli()
+  if not exe then fail(tostring(exe_err)) end
+  if not shell.exists(exe) then
+    fail("未找到 editor-cli.exe（" .. exe .. "）")
   end
 
   local body = read_file(GAMECFG)

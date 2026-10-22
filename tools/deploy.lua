@@ -3,8 +3,8 @@
 -- 反方向回同步见 tools/sync.lua；先例：se-defense tools/deploy.lua（WSL 接缝版）。
 --
 -- 本模块只管搬字节并核验搬运结果：哪些子树归本仓库（部署规则）在 tools/deploy_plan 回答，
--- 宿主目录在哪在 tools/eggy_workspace，Windows 侧怎么跑在 tools/win_shell，编辑器收尾在
--- tools/editor_finalize。
+-- 宿主目录在哪在 tools/eggy_workspace，跨 WSL/Windows 边界的执行在 tools/wsl_seam，
+-- 编辑器收尾在 tools/editor_finalize。
 --
 -- 部署树：<端>/<child>/... → 宿主目录 <端>/<child>/...（端 = 白名单 client/common/server，
 -- 官方强制的 SE 工作区根，仓库根直接对齐；重置粒度是每端下的一级子树，三端 packages/
@@ -16,7 +16,7 @@ package.path = "./?.lua;./?/init.lua;" .. package.path
 
 local workspace = require("tools.eggy_workspace")
 local plan = require("tools.deploy_plan")
-local shell = require("tools.win_shell")
+local shell = require("tools.wsl_seam")
 local finalize = require("tools.editor_finalize")
 
 local M = {}
@@ -46,7 +46,8 @@ function M.usage()
     "push 后仍与编辑器不一致时报告尚未同步，并以退出码 1 结束。",
     "editor-cli 不在或编辑器没开该地图时打印跳过并以退出码 0 结束（磁盘已是最新）。",
     "地图侧多出的文件只提示，不删。",
-    "宿主目录默认 " .. workspace.DEFAULT .. "，环境变量 EGGY_WORKSPACE 可覆盖。",
+    "宿主目录默认为部署端 USERPROFILE 下的 " .. workspace.DEFAULT_REL .. "，",
+    "环境变量 EGGY_WORKSPACE 可覆盖（接受 /mnt/c/... 与 C:\\... 两种形式）。",
     "",
     "选项：",
     "  --clean   只清不装：删掉宿主目录里本仓库拥有的全部子树（含三端 packages/），不拷贝、不做收尾。",
@@ -103,7 +104,7 @@ local function report_stale(t)
 end
 
 -- 镜像一个目标并核验搬运结果。两层护栏：
---   * tools/win_shell 的 mirror 保证命令真的执行过、且按 robocopy 口径成功（退出码 0–7）；
+--   * tools/wsl_seam 的 mirror 保证命令真的执行过、且按 robocopy 口径成功（退出码 0–7）；
 --   * 这里再对一遍源/目标的文件集合（/MIR 之后本该一模一样）。robocopy 说成功而字节没到齐
 --     （命令被挡掉却回了 1、拷贝中途夭折、残留文件）在这层变成失败，不再落成一句 deploy ok。
 -- 返回 目标侧文件数 或 nil, 失败文案。
@@ -138,7 +139,15 @@ local function mirror_and_verify(t)
 end
 
 local function run_deploy(clean_only)
-  local WS = workspace.resolve()
+  -- interop 预检必须在镜像之前：找不到 cmd.exe / robocopy.exe 时一个文件都不写。
+  if not clean_only then
+    local ok, why = shell.interop()
+    if not ok then
+      fail("WSL interop 不可用，未镜像任何文件：" .. tostring(why))
+    end
+  end
+  local WS, ws_err = workspace.resolve()
+  if not WS then fail(ws_err or "定位不了编辑器宿主目录") end
   for _, realm in ipairs(plan.REALMS) do
     require_dir(realm, "本仓库缺部署根 " .. realm)
   end

@@ -21,7 +21,7 @@
 
 Lua 命令使用 **Lua 5.4**：WSL 上裸 `lua` 经 alternatives 可能指向 5.1，宿主工具一律用 `lua5.4`，执行前用 `lua5.4 -v` 核对（与 `tools/quality/project.json` 的 `lua.executable` 同口径）；验收脚本可用 `ACCEPTANCE_LUA_BIN` 指定解释器。Lua 5.5 对循环变量重新赋值会报 `attempt to assign to const variable`，遇到此错误先检查版本。
 
-- `lua5.4 tools/cli.lua deploy`：将三端一级子树字节镜像到宿主目录（`robocopy /MIR`，镜像前打印将被删掉的宿主多余文件）；编辑器开着本图时执行 validate → 有差异时 `code push` → `code diff` 复核，push 后仍不一致才返回失败。
+- `lua5.4 tools/cli.lua deploy`：将三端一级子树字节镜像到宿主目录（经 WSL 接缝层调用部署端 `robocopy /MIR`，镜像前打印将被删掉的宿主多余文件）；interop 不可用时在镜像前以非零退出码失败。编辑器开着本图时执行 validate → 有差异时 `code push` → `code diff` 复核，push 后仍不一致才返回失败。跨接缝约定见 [ADR-0008](../adr/0008-wsl-development-windows-deploy.md)。
 - `lua5.4 tools/cli.lua sync`：将宿主目录的 `eggy.json`、API 存根、`data/` 回灌仓库。
 - `lua5.4 tools/cli.lua sync --packages`：在上述清单外追加三端 `packages/` 字节镜像，删除过期文件；任一端源 packages 缺失或为空时整次同步在写入前失败。该方向以宿主为准，回灌前先确认工作区已提交。
 - 官方包升级、聚合入口与编辑器预设依赖见 [官方包接入参考](../packages-reference.md)。技能包预设命令见 `lua5.4 tools/cli.lua ability-presets --help`；验收脚本说明见 `tools/acceptance/README.md`。
@@ -59,13 +59,15 @@ done
 
 **美术资产（Blender / Meshy MCP）。** 产出鱼类等模型与动画的接入方式、导出分件与验收步骤见 [美术资产流水线](art-pipeline.md)，尺寸口径见 [ADR-0004](../adr/0004-fish-asset-scale.md)。仓库不提交 MCP 配置，由所用前端（目前是 Codex）自行接入（key 走环境变量 `MESHY_API_KEY`，不入库）。资产本体不进本仓，正式资产走编辑器导入。
 
-**宿主目录专用于镜像。** 默认 `C:\Users\<用户名>\Desktop\dev\eggy\LuaSource_钓鱼怎么这么危险啊喂！`，可用 `EGGY_WORKSPACE` 覆盖。
+**宿主目录专用于镜像。** 默认由 WSL 接缝层从部署端 `USERPROFILE` 推导：`%USERPROFILE%\Desktop\dev\eggy\LuaSource_钓鱼怎么这么危险啊喂！`。可用 `EGGY_WORKSPACE` 覆盖，接受 `/mnt/c/...` 与 `C:\...` 两种形式；空串当作未设置。
 
-**编辑器工程 ≠ 仓库检出。** `eggy.json` 回灌不等于 `code init` 绑定；手动执行 code-* 时用 `--workspace` 指向已绑定的宿主目录，否则会报 `CODE_BINDING_INVALID`。`deploy` 已带此参数。Git Bash 验证命令：
+**编辑器工程 ≠ 仓库检出。** `eggy.json` 回灌不等于 `code init` 绑定；手动执行 code-* 时用 `--workspace` 指向已绑定的宿主目录（部署端 exe 只认 Windows 形式，用 `wslpath -w` 转换），否则会报 `CODE_BINDING_INVALID`。`deploy` 已带此参数。手工复核（WSL interop）：
 
 ```bash
-"$USERPROFILE/.eggitor/cli/editor-cli.exe" code validate --strict --json --workspace "<宿主目录>"
+"/mnt/c/Users/<用户名>/.eggitor/cli/editor-cli.exe" code validate --strict --json --workspace "$(wslpath -w '<宿主目录>')"
 ```
+
+等价地直接看 `lua5.4 tools/cli.lua deploy` 的收尾输出。
 
 ## 测试纪律
 

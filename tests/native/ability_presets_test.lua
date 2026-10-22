@@ -29,36 +29,8 @@ GameCfg.Ability = {
 ]]
 
 describe("TestAbilityPresetsEncoding", function()
-  -- argv_quote 按 CommandLineToArgvW 规则编码：反斜杠只在 " 或 \ 前特殊，
-  -- 收尾引号前的反斜杠要翻倍。
-  it("test_argv_quote", function()
-    assert.are.equal('"abc"', ap.argv_quote("abc"))
-    assert.are.equal('"a\\"b"', ap.argv_quote('a"b'))
-    assert.are.equal('"a\\b"', ap.argv_quote("a\\b"))
-    assert.are.equal('"a\\\\\\"b"', ap.argv_quote('a\\"b'))
-    assert.are.equal('"a\\\\"', ap.argv_quote("a\\"))
-    assert.are.equal('"{\\"x\\":0.0}"', ap.argv_quote('{"x":0.0}'))
-  end)
-
-  -- cmd_protect 按 cmd 的朴素引号态（每个 " 都翻转）给引号外的元字符补 ^；
-  -- 引号内的一律不动。
-  it("test_cmd_protect", function()
-    -- 引号内的 > 不动
-    assert.are.equal('"a>b"', ap.cmd_protect('"a>b"'))
-    -- \" 序列会把 cmd 的引号态翻出去，后面的 > 要补 ^
-    assert.are.equal('"a\\"b^>c"', ap.cmd_protect('"a\\"b>c"'))
-    -- 引号外的 ^ 自身翻倍，引号内的不动
-    assert.are.equal('"a\\"^^b"', ap.cmd_protect('"a\\"^b"'))
-    assert.are.equal('"a^b"', ap.cmd_protect('"a^b"'))
-  end)
-
-  -- 管线合起来：壳注释里的 `> 0` 经过 json_string + argv_quote + cmd_protect 后，
-  -- 必须在 cmd 层面被 ^ 保护（这是 issue #9 实跑踩出来的坑）。
-  it("test_full_pipeline_protects_gt_in_shell_comment", function()
-    local fragment = ap.cmd_protect(ap.argv_quote("SourceCode=" .. ap.json_string("melee_hit 要求 > 0")))
-    assert.matches("^>", fragment, 1, true)
-  end)
-
+  -- 命令行引用规则已随开发端迁到 WSL 改为 sh 单引号（工具的 q()），cmd 的 ^ 转义退役；
+  -- sh 引用断言见 tests/native/wsl_seam_test.lua。
   it("test_json_string_escapes", function()
     assert.are.equal('"abc"', ap.json_string("abc"))
     assert.are.equal('"a\\"b"', ap.json_string('a"b'))
