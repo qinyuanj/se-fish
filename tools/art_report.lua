@@ -18,7 +18,8 @@ M.REPORT = 'validation/validation.json'
 function M.root()
   local override = os.getenv('EGGY_ART_ASSETS')
   if override and override ~= '' then return override end
-  local host = workspace.resolve()
+  local host, err = workspace.resolve()
+  assert(host, err or '定位不了编辑器宿主目录')
   local parent = host:match('^(.*)[/\\][^/\\]+$')
   assert(parent, 'EGGY_WORKSPACE 不像一个目录路径: ' .. host)
   return parent .. '/美术资产'

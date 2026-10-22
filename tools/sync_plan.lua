@@ -1,6 +1,6 @@
 -- 回同步计划：编辑器宿主目录 → 仓库根要回灌哪些产物、行尾怎么归一、data/ 的 stale
 -- 集合。纯模块：不碰文件系统、不起子进程，目录清单由调用方注入
--- （tools/sync.lua 交给 tools/win_shell 枚举）。回同步规则在这里回答一次，
+-- （tools/sync.lua 交给 tools/wsl_seam 枚举）。回同步规则在这里回答一次，
 -- sync 只搬字节。
 local M = {}
 

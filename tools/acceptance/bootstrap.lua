@@ -1,6 +1,6 @@
 -- acceptance4lua 与 dry4lua 按固定提交放入 .toolcache/；缓存存在时只校验，不访问网络。
 -- acceptance4lua 的位置可用 SE_FISH_LUA_TOOLS 覆盖；不依赖 luarocks。
-local shell = require("tools.win_shell")
+local shell = require("tools.wsl_seam")
 
 local M = {}
 
@@ -39,10 +39,9 @@ local function run(cmd)
   return code == 0
 end
 
--- URL 只加引号：tools.win_shell 的 q() 会把 / 换成 \（那是给文件路径用的），
--- 套到 URL 上会把 http:// 拧成 http:\，git 就当成别的协议了。
+-- URL 与路径都按 sh 单引号引用；URL 里没有单引号，直接复用 q()。
 local function url_q(value)
-  return '"' .. tostring(value) .. '"'
+  return shell.q(value)
 end
 
 -- 子进程（生成的 spec）用的 LUA_PATH：框架树最前，其后是仓库根（步骤模块按
