@@ -15,7 +15,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
 
-# 桩聚合入口（真 lua 跑）：--fail 时退出 3 且不写统计；成功时写一份可解析的统计。
+# 桩聚合入口（真 lua5.4 跑）：--fail 时退出 3 且不写统计；成功时写一份可解析的统计。
 STUB_AGGREGATOR = r'''
 if arg[2] == "--fail" then
   os.exit(3)
@@ -53,14 +53,15 @@ class CoveragePublicationTest(unittest.TestCase):
         (root / "stub-aggregator.lua").write_text(STUB_AGGREGATOR, encoding="utf-8")
         interpreter = root / "stub-interpreter.py"
         interpreter.write_text(STUB_INTERPRETER, encoding="utf-8")
-        fake_lua = root / "fake-lua.bat"
-        fake_lua.write_text(f'@echo off\r\n"{sys.executable}" "{interpreter}" %*\r\n', encoding="ascii")
+        fake_lua = root / "fake-lua"
+        fake_lua.write_text(f'#!/bin/sh\nexec "{sys.executable}" "{interpreter}" "$@"\n', encoding="utf-8")
+        fake_lua.chmod(0o755)
         config = root / "project.json"
         config.write_text(json.dumps({
             "lua": {"executable": str(fake_lua), "version": "Lua 5.4."},
             "commands": {
-                "coverage": ["lua", "stub-aggregator.lua", "full", "--fail" if fail else "--ok"],
-                "mutation_test": ["lua", "stub-aggregator.lua", "fast"],
+                "coverage": ["lua5.4", "stub-aggregator.lua", "full", "--fail" if fail else "--ok"],
+                "mutation_test": ["lua5.4", "stub-aggregator.lua", "fast"],
             },
             "paths": {"lcov": "target/coverage/lua/lcov.info",
                       "stats": "build/quality/luacov.stats.out",
@@ -70,7 +71,7 @@ class CoveragePublicationTest(unittest.TestCase):
 
     def _quality(self, root, config):
         environment = os.environ.copy()
-        # 测试命令里的 `lua` 用继承的 PATH 找真解释器跑桩聚合入口；报告脚本走 fake-lua.bat。
+        # 测试命令里的 `lua5.4` 用继承的 PATH 找真解释器跑桩聚合入口；报告脚本走 fake-lua 桩。
         environment.pop("LUA_PATH", None)
         environment.pop("LUA_CPATH", None)
         return subprocess.run([sys.executable, "-B", str(ROOT / "tools/quality/project.py"),

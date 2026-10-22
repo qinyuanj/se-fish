@@ -1,4 +1,4 @@
-"""#74：通过公开 project.ps1 验证 Git 改动业务文件选择。"""
+"""#74：通过公开入口 tools/quality/project 验证 Git 改动业务文件选择。"""
 import json
 import subprocess
 import tempfile
@@ -6,6 +6,8 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
+# 解释器取项目配置的 lua.executable：WSL 上 PATH 里的裸 lua 可能是 5.1。
+LUA = json.loads((ROOT / "tools/quality/project.json").read_text(encoding="utf-8"))["lua"]["executable"]
 
 
 class MutationChangedTest(unittest.TestCase):
@@ -41,12 +43,12 @@ class MutationChangedTest(unittest.TestCase):
     def _assert_selected(self, root, expected, *args):
         settings = json.loads((root / "config.json").read_text(encoding="utf-8"))
         settings["commands"] = {
-            "coverage": ["lua", "-lluacov", "test.lua", *expected],
-            "mutation_test": ["lua", "test.lua", *expected],
+            "coverage": [LUA, "-lluacov", "test.lua", *expected],
+            "mutation_test": [LUA, "test.lua", *expected],
         }
         (root / "config.json").write_text(json.dumps(settings), encoding="utf-8")
         result = subprocess.run([
-            "pwsh", "-NoProfile", "-File", str(ROOT / "tools/quality/project.ps1"),
+            str(ROOT / "tools/quality/project"),
             "--root", str(root), "--config", str(root / "config.json"), "mutation",
             *args, "--max-workers", "1", "--verbose",
         ], cwd=ROOT, timeout=90, capture_output=True, text=True, encoding="utf-8", errors="replace")
@@ -71,7 +73,7 @@ class MutationChangedTest(unittest.TestCase):
             self._change(root, "client/Added.lua", staged=True)
             self._assert_selected(root, ["client/Added.lua"], "--changed")
 
-    def test_mixed_changes_are_unique_and_exclude_deleted_and_nonbusiness(self):
+    def test_mixed_changes_are_unique_and_exclude_deleted_and_out_of_scope(self):
         with tempfile.TemporaryDirectory(prefix="se-fish-changed-") as directory:
             root = Path(directory)
             self._fixture(root)
@@ -89,8 +91,10 @@ class MutationChangedTest(unittest.TestCase):
                          "common/readme.txt", "tests/Outside.lua"):
                 self._change(root, name, staged=True)
             self._change(root, "client/packages/Untracked.lua")
-            expected = ["client/Added.lua", "common/Both.lua", "common/Staged.lua",
-                        "common/Unstaged.lua", "server/New.lua"]
+            # 指标采集范围含各端 packages/（1d0ef96、ADR-0005），只排除 server/_trigger/。
+            expected = ["client/Added.lua", "client/packages/Untracked.lua", "common/Both.lua",
+                        "common/Staged.lua", "common/Unstaged.lua", "server/New.lua",
+                        "server/packages/Official.lua"]
             for args in ((), ("--changed",)):
                 with self.subTest(args=args):
                     self._assert_selected(root, expected, *args)

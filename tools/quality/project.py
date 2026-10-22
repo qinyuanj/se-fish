@@ -335,8 +335,9 @@ def main(argv=None):
     parser.add_argument("--root", type=Path, default=PROJECT_ROOT)
     parser.add_argument("--config", type=Path)
     parser.add_argument("command", choices=["install", "coverage", "test", "doctor", "run", "quality",
-                                            "crap", "refresh-crap", "dry", "mutation", "mutate", "mutation-report"])
-    parser.add_argument("files", nargs="*", help="mutation 目标业务 Lua（相对路径）")
+                                            "crap", "refresh-crap", "dry", "mutation", "mutate", "mutation-report",
+                                            "verify", "test-tooling"])
+    parser.add_argument("files", nargs="*", help="mutation 目标业务 Lua；verify 的代表文件（相对路径）")
     parser.add_argument("--mutate-all", action="store_true", help="显式全量 mutation（必须给文件）")
     parser.add_argument("--changed", action="store_true", help="对 git 变更的业务 Lua 差分")
     parser.add_argument("--max-workers", type=int, default=MUTATION_MAX_WORKERS,
@@ -348,12 +349,19 @@ def main(argv=None):
     parser.add_argument("--install-only", action="store_true",
                         help="install 仅准备 viewer/crapper/mutator/dryer checkout 与 venv，不构成完整质量环境")
     parser.add_argument("--python", help="install 时创建工具 venv 的宿主 Python（传给上游安装器）")
-    args = parser.parse_args(argv)
+    parser.add_argument("--install-root", type=Path,
+                        help="verify 时执行安装 suite 的独立检出绝对路径；缺省降级为警告")
+    # 选项与文件交错（如 `mutation --mutate-all <文件>`）：Python 3.12.3 的 parse_args 会在第一个选项前
+    # 就把空列表交给 nargs="*" 的 files，后面的文件报 unrecognized；intermixed 解析两种顺序都接受。
+    args = parser.parse_intermixed_args(argv)
     # 启动前记录要给出可复制的日志采集命令，这里保留调用方原始 argv。
     args.invocation = list(sys.argv[1:] if argv is None else argv)
     root = args.root.resolve()
     if args.command == "install":
         return run_install(root, args)
+    # verify 的各阶段与 test-tooling 的用例都经公开入口另起子进程并自行持锁，这里不能先持锁。
+    if args.command in ("verify", "test-tooling"):
+        return run_verify(root, args)
     from locking import repository_lock
     with repository_lock(root):
         return dispatch(root, args)
@@ -362,7 +370,7 @@ def main(argv=None):
 def run_install(root, args):
     """安装持锁替换工具后释放锁，再交给自行持锁的 doctor，避免父子自锁。"""
     import install
-    # 配置与补丁来自入口所在检出（等价旧 install.ps1 的 $PSScriptRoot），--root 只决定安装位置。
+    # 配置与补丁来自入口所在检出（入口脚本所在检出），--root 只决定安装位置。
     config_path = args.config or PROJECT_ROOT / "tools/quality/project.json"
     try:
         code = install.install(PROJECT_ROOT, root, load_config(root, config_path),
@@ -375,6 +383,19 @@ def run_install(root, args):
     from locking import repository_lock
     with repository_lock(root):
         return doctor(root, load_config(root, config_path))
+
+
+def run_verify(root, args):
+    import verify
+    try:
+        if args.command == "test-tooling":
+            return verify.run_test_tooling(root)
+        if len(args.files) != 1:
+            raise verify.VerifyError("verify 需要且只接受 1 个代表文件，例如 common/RateLimit.lua")
+        return verify.verify(root, args.files[0], args.install_root)
+    except verify.VerifyError as error:
+        print(f"quality verify: {error}", file=sys.stderr)
+        return 1
 
 
 def dispatch(root, args):

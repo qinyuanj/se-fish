@@ -7,6 +7,8 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
+# 解释器取项目配置的 lua.executable：WSL 上 PATH 里的裸 lua 可能是 5.1。
+LUA = json.loads((ROOT / 'tools/quality/project.json').read_text(encoding='utf-8'))['lua']['executable']
 COUNTS = r'executed=(\d+) reused=(\d+) uncovered=(\d+) excluded=(\d+)'
 
 
@@ -14,7 +16,7 @@ class MutationReuseTest(unittest.TestCase):
     # 失败方式：继承误报执行、survived 不重测、digest/位置变化仍复用、
     # 全量仍复用、未覆盖/过滤误报复用、普通输出缺函数计数、失败发布新快照。
     def test_differential_reasons_and_counts_are_public(self):
-        version = subprocess.run(['lua', '-v'], capture_output=True, text=True)
+        version = subprocess.run([LUA, '-v'], capture_output=True, text=True)
         self.assertEqual(version.returncode, 0, version.stdout + version.stderr)
         self.assertIn('Lua 5.4', version.stdout + version.stderr)
         with tempfile.TemporaryDirectory(prefix='se-fish-reuse-') as directory:
@@ -31,14 +33,14 @@ class MutationReuseTest(unittest.TestCase):
                             'assert(M.strict(1)==2)\nassert(type(M.loose(1))=="number")\n',
                             encoding='utf-8')
             settings = json.loads((ROOT / 'tools/quality/project.json').read_text(encoding='utf-8'))
-            settings['commands'] = {'coverage': ['lua', '-lluacov', 'test.lua'],
-                                    'mutation_test': ['lua', 'test.lua']}
+            settings['commands'] = {'coverage': [LUA, '-lluacov', 'test.lua'],
+                                    'mutation_test': [LUA, 'test.lua']}
             settings['paths']['luacov'] = str(ROOT / '.toolcache/luacov/src')
             config = root / 'config.json'
             config.write_text(json.dumps(settings), encoding='utf-8')
 
             def invoke(*extra):
-                return subprocess.run(['pwsh', '-NoProfile', '-File', str(ROOT / 'tools/quality/project.ps1'),
+                return subprocess.run([str(ROOT / 'tools/quality/project'),
                     '--root', str(root), '--config', str(config), 'mutation', 'common/Example.lua',
                     '--max-workers', '2', *extra], cwd=ROOT, timeout=90,
                     capture_output=True, text=True, encoding='utf-8', errors='replace')
@@ -122,7 +124,7 @@ class MutationReuseTest(unittest.TestCase):
             metrics = root / settings['paths']['mutation']
             snapshots = {path.relative_to(metrics): path.read_bytes() for path in metrics.rglob('*.edn')}
             self.assertTrue(snapshots)
-            settings['commands']['mutation_test'] = ['lua', '-e', 'error("fixture baseline failed")']
+            settings['commands']['mutation_test'] = [LUA, '-e', 'error("fixture baseline failed")']
             config.write_text(json.dumps(settings), encoding='utf-8')
             failed = invoke('--verbose')
             failure_output = failed.stdout + failed.stderr

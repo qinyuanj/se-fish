@@ -6,21 +6,25 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
+ENTRY = str(ROOT / "tools/quality/project")
+# 解释器取项目配置的 lua.executable：WSL 上 PATH 里的裸 lua 可能是 5.1。
+LUA = json.loads((ROOT / "tools/quality/project.json").read_text(encoding="utf-8"))["lua"]["executable"]
 
 
 class QualityMutationTest(unittest.TestCase):
     def test_full_mutation_requires_an_explicit_target(self):
         result = subprocess.run([
-            "pwsh", "-NoProfile", "-File", str(ROOT / "tools/quality/project.ps1"),
+            ENTRY,
             "mutation", "--mutate-all",
         ], cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace")
         self.assertEqual(result.returncode, 1)
         self.assertIn("显式", result.stdout + result.stderr)
 
-    def test_vendor_target_is_rejected_before_tests(self):
+    def test_out_of_scope_target_is_rejected_before_tests(self):
+        # 指标采集范围含各端 packages/（1d0ef96、ADR-0005），只排除 server/_trigger/。
         result = subprocess.run([
-            "pwsh", "-NoProfile", "-File", str(ROOT / "tools/quality/project.ps1"),
-            "mutation", "server/packages/ability_system/init.lua",
+            ENTRY,
+            "mutation", "server/_trigger/GlobalVars.lua",
         ], cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace")
         self.assertEqual(result.returncode, 1)
         self.assertIn("配置范围", result.stdout + result.stderr)
@@ -37,12 +41,12 @@ class QualityMutationTest(unittest.TestCase):
             snapshot.write_bytes(old)
             config = root / "config.json"
             settings = json.loads((ROOT / "tools/quality/project.json").read_text(encoding="utf-8"))
-            settings["commands"]["coverage"] = ["lua", "-e", "error('真实测试基线失败')"]
-            settings["commands"]["mutation_test"] = ["lua", "-e", "error('真实测试基线失败')"]
+            settings["commands"]["coverage"] = [LUA, "-e", "error('真实测试基线失败')"]
+            settings["commands"]["mutation_test"] = [LUA, "-e", "error('真实测试基线失败')"]
             settings["paths"]["luacov"] = str(ROOT / ".toolcache/luacov/src")
             config.write_text(json.dumps(settings), encoding="utf-8")
             result = subprocess.run([
-                "pwsh", "-NoProfile", "-File", str(ROOT / "tools/quality/project.ps1"),
+                ENTRY,
                 "--root", str(root), "--config", str(config), "mutation", "common/Example.lua",
             ], cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace")
             self.assertNotEqual(result.returncode, 0)
@@ -63,7 +67,7 @@ class QualityMutationTest(unittest.TestCase):
             settings["paths"]["luacov"] = str(ROOT / ".toolcache/luacov/src")
             config.write_text(json.dumps(settings), encoding="utf-8")
             result = subprocess.run([
-                "pwsh", "-NoProfile", "-File", str(ROOT / "tools/quality/project.ps1"),
+                ENTRY,
                 "--root", str(root), "--config", str(config), "mutation", "common/Example.lua",
             ], cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace")
             self.assertEqual(result.returncode, 1)
@@ -85,17 +89,17 @@ class QualityMutationTest(unittest.TestCase):
             other.write_bytes(untouched)
             (root / "coverage_fixture.lua").write_text(
                 "local f=assert(io.open('luacov.stats.out','w'))\n"
-                "f:write('3:common\\\\Example.lua\\n1 1 1 \\n')\n"
+                "f:write('3:common/Example.lua\\n1 1 1 \\n')\n"
                 "f:close()\n", encoding="utf-8")
             (root / "mutation_fixture.lua").write_text("os.exit(0)\n", encoding="utf-8")
             config = root / "config.json"
             settings = json.loads((ROOT / "tools/quality/project.json").read_text(encoding="utf-8"))
-            settings["commands"]["coverage"] = ["lua", "coverage_fixture.lua"]
-            settings["commands"]["mutation_test"] = ["lua", "mutation_fixture.lua"]
+            settings["commands"]["coverage"] = [LUA, "coverage_fixture.lua"]
+            settings["commands"]["mutation_test"] = [LUA, "mutation_fixture.lua"]
             settings["paths"]["luacov"] = str(ROOT / ".toolcache/luacov/src")
             config.write_text(json.dumps(settings), encoding="utf-8")
             result = subprocess.run([
-                "pwsh", "-NoProfile", "-File", str(ROOT / "tools/quality/project.ps1"),
+                ENTRY,
                 "--root", str(root), "--config", str(config),
                 "mutation", "common/Example.lua", "--mutate-all", "--max-workers", "1",
             ], cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace")
@@ -125,8 +129,7 @@ class QualityMutationTest(unittest.TestCase):
             sentinel = outside / "sentinel.txt"
             sentinel.write_bytes(b"root outside must remain unchanged\n")
             if link:
-                subprocess.run(["cmd", "/c", "mklink", "/J",
-                    str(metrics / "linked"), str(outside)], check=True, capture_output=True)
+                (metrics / "linked").symlink_to(outside, target_is_directory=True)
             bad = metrics / "history.edn"
             for namespace in namespaces:
                 with self.subTest(namespace=namespace):
@@ -136,7 +139,7 @@ class QualityMutationTest(unittest.TestCase):
                         ':outcomes {}}\n', encoding="utf-8")
                     before = {p.relative_to(metrics): p.read_bytes() for p in metrics.rglob("*.edn")}
                     result = subprocess.run([
-                        "pwsh", "-NoProfile", "-File", str(ROOT / "tools/quality/project.ps1"),
+                        ENTRY,
                         "--root", str(root), "--config", str(root / "config.json"),
                         "mutation", "common/Example.lua", "--max-workers", "1",
                     ], cwd=ROOT, timeout=90, capture_output=True, text=True,
@@ -152,8 +155,8 @@ class QualityMutationTest(unittest.TestCase):
                     self.assertEqual(sentinel.read_bytes(), b"root outside must remain unchanged\n")
                     self.assertFalse(list((root / "target").rglob("escaped.edn")))
             if link:
-                # 仅删除 junction 本身，避免临时目录清理遍历目标。
-                subprocess.run(["cmd", "/c", "rmdir", str(metrics / "linked")], check=True)
+                # 仅删除 symlink 本身，避免临时目录清理遍历目标。
+                (metrics / "linked").unlink()
 
     def test_snapshot_namespace_rejects_parent_traversal(self):
         self._reject_namespace(["../../../../escaped"])
@@ -170,14 +173,14 @@ class QualityMutationTest(unittest.TestCase):
     def _configure_fixture(self, root, script):
         (root / "test.lua").write_text(script, encoding="utf-8")
         settings = json.loads((ROOT / "tools/quality/project.json").read_text(encoding="utf-8"))
-        settings["commands"] = {"coverage": ["lua", "-lluacov", "test.lua"],
-                                "mutation_test": ["lua", "test.lua"]}
+        settings["commands"] = {"coverage": [LUA, "-lluacov", "test.lua"],
+                                "mutation_test": [LUA, "test.lua"]}
         settings["paths"]["luacov"] = str(ROOT / ".toolcache/luacov/src")
         (root / "config.json").write_text(json.dumps(settings), encoding="utf-8")
 
     def _mutate_fixture(self, root, *targets):
         result = subprocess.run([
-            "pwsh", "-NoProfile", "-File", str(ROOT / "tools/quality/project.ps1"),
+            ENTRY,
             "--root", str(root), "--config", str(root / "config.json"),
             "mutation", *targets, "--max-workers", "1", "--verbose",
         ], cwd=ROOT, timeout=90, capture_output=True, text=True,
@@ -295,7 +298,7 @@ class QualityMutationTest(unittest.TestCase):
             settings["commands"]["mutation_test"] = [str(root / "missing-lua.exe")]
             config.write_text(json.dumps(settings), encoding="utf-8")
             result = subprocess.run([
-                "pwsh", "-NoProfile", "-File", str(ROOT / "tools/quality/project.ps1"),
+                ENTRY,
                 "--root", str(root), "--config", str(config), "mutation", "common/Example.lua",
                 "--max-workers", "1",
             ], cwd=ROOT, timeout=90, capture_output=True, text=True,
@@ -319,17 +322,17 @@ class QualityMutationTest(unittest.TestCase):
             other.write_bytes(untouched)
             (root / "coverage_fixture.lua").write_text(
                 "local f=assert(io.open('luacov.stats.out','w'))\n"
-                "f:write('3:common\\\\Example.lua\\n1 1 1 \\n')\n"
+                "f:write('3:common/Example.lua\\n1 1 1 \\n')\n"
                 "f:close()\n", encoding="utf-8")
             (root / "mutation_fixture.lua").write_text("os.exit(0)\n", encoding="utf-8")
             config = root / "config.json"
             settings = json.loads((ROOT / "tools/quality/project.json").read_text(encoding="utf-8"))
-            settings["commands"]["coverage"] = ["lua", "coverage_fixture.lua"]
-            settings["commands"]["mutation_test"] = ["lua", "mutation_fixture.lua"]
+            settings["commands"]["coverage"] = [LUA, "coverage_fixture.lua"]
+            settings["commands"]["mutation_test"] = [LUA, "mutation_fixture.lua"]
             settings["paths"]["luacov"] = str(ROOT / ".toolcache/luacov/src")
             config.write_text(json.dumps(settings), encoding="utf-8")
             result = subprocess.run([
-                "pwsh", "-NoProfile", "-File", str(ROOT / "tools/quality/project.ps1"),
+                ENTRY,
                 "--root", str(root), "--config", str(config),
                 "mutation", "common/Example.lua", "--mutate-all", "--max-workers", "1",
             ], cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace")
@@ -352,13 +355,13 @@ class QualityMutationTest(unittest.TestCase):
                             'local M=require("common.Example")\nassert(M.strict(1)==2)\n',
                             encoding="utf-8")
             settings = json.loads((ROOT / "tools/quality/project.json").read_text(encoding="utf-8"))
-            settings["commands"] = {"coverage": ["lua", "-lluacov", "test.lua"],
-                                    "mutation_test": ["lua", "test.lua"]}
+            settings["commands"] = {"coverage": [LUA, "-lluacov", "test.lua"],
+                                    "mutation_test": [LUA, "test.lua"]}
             settings["paths"]["luacov"] = str(ROOT / ".toolcache/luacov/src")
             config = root / "config.json"
             config.write_text(json.dumps(settings), encoding="utf-8")
             result = subprocess.run([
-                "pwsh", "-NoProfile", "-File", str(ROOT / "tools/quality/project.ps1"),
+                ENTRY,
                 "--root", str(root), "--config", str(config),
                 "mutation", "common/Example.lua", "--max-workers", "1", "--verbose",
             ], cwd=ROOT, timeout=90, capture_output=True, text=True,

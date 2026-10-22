@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 
 SCRIPT = Path(__file__).resolve().parents[3] / "tools/quality/crap.py"
-CRAPPER_PYTHON = Path(__file__).resolve().parents[3] / ".uml-viewer/crapper/.venv/Scripts/python.exe"
+CRAPPER_PYTHON = Path(__file__).resolve().parents[3] / ".uml-viewer/crapper/.venv/bin/python"
 
 
 class CrapFailureTests(unittest.TestCase):
