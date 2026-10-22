@@ -6,11 +6,7 @@ import unittest
 from pathlib import Path
 
 
-# 真实拉起 crapper/mutator 的端到端用例默认跳过（维护者指令，spec/116）：
-# 收尾复验（#122）以 SE_FISH_QUALITY_E2E=1 统一实跑，不得改成 mock 假绿。
-import os as _os
-_E2E = _os.environ.get('SE_FISH_QUALITY_E2E') == '1'
-_E2E_REASON = '真实拉起 crapper/mutator 的端到端用例默认跳过；spec/116 收尾复验（#122，维护者协调）以 SE_FISH_QUALITY_E2E=1 统一实跑'
+import e2e_gate
 
 ROOT = Path(__file__).resolve().parents[3]
 ENTRY = str(ROOT / "tools/quality/project")
@@ -18,7 +14,7 @@ ENTRY = str(ROOT / "tools/quality/project")
 LUA = json.loads((ROOT / "tools/quality/project.json").read_text(encoding="utf-8"))["lua"]["executable"]
 
 
-@unittest.skipUnless(_E2E, _E2E_REASON)
+@e2e_gate.skip_unless_e2e
 class QualityMutationTest(unittest.TestCase):
     def test_full_mutation_requires_an_explicit_target(self):
         result = subprocess.run([

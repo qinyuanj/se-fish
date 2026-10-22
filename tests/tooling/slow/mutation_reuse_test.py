@@ -7,11 +7,7 @@ import unittest
 from pathlib import Path
 
 
-# 真实拉起 crapper/mutator 的端到端用例默认跳过（维护者指令，spec/116）：
-# 收尾复验（#122）以 SE_FISH_QUALITY_E2E=1 统一实跑，不得改成 mock 假绿。
-import os as _os
-_E2E = _os.environ.get('SE_FISH_QUALITY_E2E') == '1'
-_E2E_REASON = '真实拉起 crapper/mutator 的端到端用例默认跳过；spec/116 收尾复验（#122，维护者协调）以 SE_FISH_QUALITY_E2E=1 统一实跑'
+import e2e_gate
 
 ROOT = Path(__file__).resolve().parents[3]
 # 解释器取项目配置的 lua.executable：WSL 上 PATH 里的裸 lua 可能是 5.1。
@@ -19,7 +15,7 @@ LUA = json.loads((ROOT / 'tools/quality/project.json').read_text(encoding='utf-8
 COUNTS = r'executed=(\d+) reused=(\d+) uncovered=(\d+) excluded=(\d+)'
 
 
-@unittest.skipUnless(_E2E, _E2E_REASON)
+@e2e_gate.skip_unless_e2e
 class MutationReuseTest(unittest.TestCase):
     # 失败方式：继承误报执行、survived 不重测、digest/位置变化仍复用、
     # 全量仍复用、未覆盖/过滤误报复用、普通输出缺函数计数、失败发布新快照。
