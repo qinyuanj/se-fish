@@ -179,12 +179,16 @@ def doctor(root, config):
         origin = subprocess.check_output(["git", "-C", str(directory), "remote", "get-url", "origin"], text=True).strip()
         if origin != tool["url"]:
             raise RuntimeError(f"{name} 来源不符：{origin}，预期 {tool['url']}；{repair}")
-        dirty = subprocess.check_output(["git", "-C", str(directory), "status", "--porcelain", "--", "src"], text=True).strip()
+        # 模块根默认是 checkout 的 src/；上游把模块放在仓库根时（如 datafile）登记 "root": "."。
+        module_root = tool.get("root", "src")
+        dirty = subprocess.check_output(["git", "-C", str(directory), "status", "--porcelain", "--", module_root],
+                                        text=True).strip()
         if dirty:
             raise RuntimeError(f"{name} 运行源码已修改或有未登记模块：{dirty}；{repair}")
-        source = directory / "src"
+        source = directory / module_root
         env = os.environ.copy()
-        sources = [source] + [root / ".toolcache" / other / "src" for other in config["lua_tools"] if other != name]
+        sources = [source] + [root / ".toolcache" / other / spec.get("root", "src")
+                              for other, spec in config["lua_tools"].items() if other != name]
         env["LUA_PATH"] = ";".join(pattern for path in sources for pattern in
                                    (f"{path.as_posix()}/?.lua", f"{path.as_posix()}/?/init.lua"))
         env["LUA_CPATH"] = ""
@@ -196,6 +200,8 @@ def doctor(root, config):
             if result.returncode:
                 raise RuntimeError(f"{name} 无法加载运行模块 {module}：{result.stderr.strip()}；{repair}")
             print(f"{name} {actual} {result.stdout.strip()}")
+        if "native" in tool:
+            doctor_native(name, directory, tool["native"], executable, repair)
     doctor_busted(root, config)
     for name, tool in config["tools"].items():
         directory = root / ".uml-viewer" / tool["directory"]
@@ -223,6 +229,20 @@ def doctor(root, config):
         subprocess.run([str(python), "-c", snippet], check=True)
         subprocess.run([str(python), "-m", "pip", "check"], check=True)
     return 0
+
+
+def doctor_native(name, directory, native, executable, repair):
+    """原生库产物必须存在，且能被质量入口的 Lua 解释器只从该 checkout 加载。"""
+    output = directory / native["output"]
+    if not output.is_file():
+        raise RuntimeError(f"{name} 缺少原生库产物 {output}；{repair}")
+    module = native["module"]
+    snippet = (f"package.cpath={str(output)!r}; local p=assert(package.searchpath({module!r}, package.cpath)); "
+               f"assert(require({module!r})); print(p)")
+    result = subprocess.run([executable, "-e", snippet], capture_output=True, text=True)
+    if result.returncode:
+        raise RuntimeError(f"{name} 原生库无法加载 {module}：{result.stderr.strip()}；{repair}")
+    print(f"{name} 原生库 {result.stdout.strip()}")
 
 
 def doctor_busted(root, config):

@@ -20,12 +20,12 @@ end
 local LOADER = { dofile = true, loadfile = true, load = true }
 
 local function lua_files(dir)
-  local handle = assert(io.popen('dir /s /b /a-d ' .. dir .. '\\*.lua 2>nul'))
+  -- dir 只来自本文件的固定字面量（tools / tests），无需转义；find 输出相对仓库根的 / 分隔路径。
+  local handle = assert(io.popen("find '" .. dir .. "' -type f -name '*.lua' 2>/dev/null"))
   local files = {}
   for line in handle:lines() do
-    local name = line:gsub('[\r\n]+$', '')
-    if name ~= '' then
-      files[#files + 1] = name:gsub('\\', '/')
+    if line ~= '' then
+      files[#files + 1] = line
     end
   end
   handle:close()

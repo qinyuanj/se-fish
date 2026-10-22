@@ -67,6 +67,18 @@ index 0000000..1111111 100644
      return 1
 """
 
+# 最小 Lua C 模块：只用 Lua 5.4 公开头文件，证明 install 按系统头文件编出可加载的 .so。
+NATIVE_SOURCE = """#include "lua.h"
+#include "lauxlib.h"
+static int answer(lua_State *L) { lua_pushinteger(L, 42); return 1; }
+int luaopen_fixnative(lua_State *L) {
+  lua_newtable(L);
+  lua_pushcfunction(L, answer);
+  lua_setfield(L, -2, "answer");
+  return 1;
+}
+"""
+
 
 def git(*args, cwd=None):
     return subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, text=True).stdout.strip()
@@ -204,6 +216,29 @@ class QualityInstallTest(unittest.TestCase):
             # fixture 安装根没有 uml-quality.json：失败点证明 install 结束后确实交给了 doctor。
             self.assertEqual(result.returncode, 1, output)
             self.assertIn("缺少标准分发配置", output)
+
+    def test_native_lua_tool_is_built_for_lua54_and_not_rebuilt(self):
+        """原生库按 `native` 描述编成 Linux 共享库，Lua 5.4 可加载；重复安装跳过已构建产物。"""
+        with tempfile.TemporaryDirectory(prefix="quality-native-") as directory:
+            sandbox = Path(directory)
+            driver, target, config = fixture_installation(sandbox)
+            commit = fixture_repository(sandbox / "sources/luanative", {"src/fixnative.c": NATIVE_SOURCE})
+            config["lua_tools"]["luanative"] = {
+                "url": str(sandbox / "sources/luanative"), "commit": commit, "modules": [],
+                "native": {"module": "fixnative", "output": "fixnative.so", "sources": ["src/fixnative.c"]}}
+            (driver / "tools/quality/project.json").write_text(json.dumps(config), encoding="utf-8")
+            install(driver, target)
+            library = target / ".toolcache/luanative/fixnative.so"
+            self.assertTrue(library.is_file(), "原生库未构建")
+            loaded = subprocess.run([
+                config["lua"]["executable"], "-e",
+                f"package.cpath={str(library.parent / '?.so')!r}; print(require('fixnative').answer())",
+            ], capture_output=True, text=True)
+            self.assertEqual((loaded.returncode, loaded.stdout.strip()), (0, "42"), loaded.stderr)
+            built = library.stat().st_mtime_ns
+            result = install(driver, target)
+            self.assertIn("luanative", result.stdout + result.stderr)
+            self.assertEqual(library.stat().st_mtime_ns, built, "重复安装重新构建了已有产物")
 
 
 class QualityDoctorPinTest(unittest.TestCase):
