@@ -54,14 +54,23 @@ function M.capture(cmd)
   return code, read_file(OUT_FILE)
 end
 
--- 路径是否存在（目录或文件）。
-function M.exists(path)
-  return run("if exist " .. M.q(path) .. " (exit /b 0) else (exit /b 1)") == 0
+-- 以下文件系统操作已是 POSIX 实现（开发端只在 WSL，#116 / #119；口径同 #115 的 WSL 接缝层：
+-- 目录枚举、存在性判断、删除改用 POSIX，直接作用于 Linux 路径）。capture / mirror 仍是 cmd 语法，
+-- 留给 #115 的 interop 改造。
+
+-- sh 单引号引用：仅用于下面的 POSIX 命令行，与给 cmd 用的 M.q 无关。
+local function sq(path)
+  return "'" .. tostring(path):gsub("'", "'\\''") .. "'"
 end
 
--- 是否目录：pushd 只对真目录成功。
+-- 路径是否存在（目录或文件）。
+function M.exists(path)
+  return run("test -e " .. sq(path)) == 0
+end
+
+-- 是否目录。
 function M.is_dir(path)
-  return run("pushd " .. M.q(path) .. " 2>nul && (popd & exit /b 0) || exit /b 1") == 0
+  return run("test -d " .. sq(path)) == 0
 end
 
 -- 跑一条输出行清单的命令，返回去空行的结果。
@@ -69,7 +78,6 @@ local function lines(cmd)
   local out = {}
   local handle = io.popen(cmd)
   for line in handle:lines() do
-    line = line:gsub("[\r\n]+$", "")
     if line ~= "" then out[#out + 1] = line end
   end
   handle:close()
@@ -77,47 +85,27 @@ local function lines(cmd)
 end
 
 -- 目录一级条目 { {name=, dir=}, ... }，按名排序（部署计划要稳定）。
--- 分两次 dir 拿目录与文件，省掉逐条目问一次文件系统。
 function M.list_entries(dir)
-  local dirs = {}
-  for _, name in ipairs(lines("dir /b /ad " .. M.q(dir) .. " 2>nul")) do
-    dirs[name] = true
-  end
   local out = {}
-  for _, name in ipairs(lines("dir /b /a-d " .. M.q(dir) .. " 2>nul")) do
-    out[#out + 1] = { name = name, dir = false }
-  end
-  for name in pairs(dirs) do
-    out[#out + 1] = { name = name, dir = true }
+  for _, line in ipairs(lines("find " .. sq(dir) .. " -mindepth 1 -maxdepth 1 -printf '%y %f\\n' 2>/dev/null")) do
+    local kind, name = line:match("^(%S) (.*)$")
+    out[#out + 1] = { name = name, dir = kind == "d" }
   end
   table.sort(out, function(a, b) return a.name < b.name end)
   return out
 end
 
--- 目录的绝对路径（pushd + cd）；目录不存在返回 nil。只服务 list_files。
-local function abs_dir(dir)
-  local out = lines("pushd " .. M.q(dir) .. " 2>nul && (cd & popd)")
-  return out[1]
-end
-
 -- 目录下全部文件（递归），返回相对 dir 的 / 分隔路径，按名排序；目录不存在返回 nil。
--- dir /s /b 无论入参是不是相对路径都打印绝对路径（实测），所以先拿绝对前缀再剥。
 function M.list_files(dir)
-  local root = abs_dir(dir)
-  if not root then return nil end
-  local prefix = (root:gsub("\\", "/"))
-  local out = {}
-  for _, p in ipairs(lines("dir /s /b /a-d " .. M.q(dir) .. " 2>nul")) do
-    p = (p:gsub("\\", "/"))
-    out[#out + 1] = p:sub(#prefix + 2)
-  end
+  if not M.is_dir(dir) then return nil end
+  local out = lines("find " .. sq(dir) .. " -type f -printf '%P\\n' 2>/dev/null")
   table.sort(out)
   return out
 end
 
 -- 递归建目录；已存在不算失败。
 function M.ensure_dir(path)
-  run("if not exist " .. M.q(path) .. " md " .. M.q(path) .. " >nul 2>&1")
+  run("mkdir -p " .. sq(path))
 end
 
 -- 镜像一个目标的命令行（纯字符串；失败文案要放命令原文，所以单独取出来）。
@@ -158,11 +146,7 @@ end
 
 -- 删掉一个目标（目录或单文件）；目标本来就不在不算失败。
 function M.remove(target)
-  if target.dir then
-    run("if exist " .. M.q(target.dst) .. " rmdir /s /q " .. M.q(target.dst))
-  else
-    run("if exist " .. M.q(target.dst) .. " del /f /q " .. M.q(target.dst))
-  end
+  run((target.dir and "rm -rf " or "rm -f ") .. sq(target.dst))
 end
 
 return M
