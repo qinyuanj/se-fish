@@ -4,12 +4,10 @@ HERE=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P) || exit 1
 ROOT=$(dirname -- "$(dirname -- "$HERE")")
 PYTHON="$ROOT/.uml-viewer/crapper/.venv/bin/python"
 # install 负责重建 venv，因此用宿主 Python 引导，不依赖它将要替换的环境。
-for argument in "$@"; do
-  if [ "$argument" = install ]; then
-    PYTHON=${QUALITY_PYTHON:-python3}
-    break
-  fi
-done
+# 只判 $1：其它位置出现 install（如同名文件参数）只是普通参数，不得切换引导解释器。
+if [ "${1-}" = install ]; then
+  PYTHON=${QUALITY_PYTHON:-python3}
+fi
 if [ "$PYTHON" = "$ROOT/.uml-viewer/crapper/.venv/bin/python" ] && [ ! -x "$PYTHON" ]; then
   echo "quality: 缺少质量工具 Python 环境（$PYTHON），请先运行 tools/quality/project install。" >&2
   exit 1

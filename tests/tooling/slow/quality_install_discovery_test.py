@@ -142,7 +142,8 @@ def fixture_installation(sandbox):
 def install(driver, target, *extra):
     env = os.environ.copy()
     env["QUALITY_PYTHON"] = sys.executable
-    return subprocess.run([str(driver / "tools/quality/project"), "--root", str(target), "install", *extra],
+    # install 必须是首个参数：入口只按 $1 判定是否用宿主 Python 引导。
+    return subprocess.run([str(driver / "tools/quality/project"), "install", "--root", str(target), *extra],
                           capture_output=True, text=True, encoding="utf-8", errors="replace",
                           timeout=120, env=env)
 

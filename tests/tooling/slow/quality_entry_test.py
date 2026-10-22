@@ -66,11 +66,24 @@ class PosixEntryTest(unittest.TestCase):
             host.write_text(FAKE_PYTHON, encoding="utf-8")
             host.chmod(0o755)
             env = dict(os.environ, QUALITY_PYTHON=str(host))
-            result = subprocess.run([str(root / "tools/quality/project"), "--root", str(root), "install"],
+            result = subprocess.run([str(root / "tools/quality/project"), "install", "--root", str(root)],
                                     capture_output=True, text=True, env=env)
             self.assertEqual(result.returncode, 7, result.stdout + result.stderr)
             received = (root / "argv.txt").read_text(encoding="utf-8").splitlines()
-            self.assertEqual(received, ["-B", str(root / "tools/quality/project.py"), "--root", str(root), "install"])
+            self.assertEqual(received, ["-B", str(root / "tools/quality/project.py"), "install", "--root", str(root)])
+
+    def test_install_detection_only_looks_at_the_first_argument(self):
+        # install 探测只判 $1：其它位置出现 install（如同名文件参数）不得切到宿主 Python 引导。
+        with tempfile.TemporaryDirectory(prefix="se-fish-entry-") as directory:
+            root = self._sandbox(directory)
+            host = root / "host-python"
+            host.write_text("#!/bin/sh\nexit 9\n", encoding="utf-8")
+            host.chmod(0o755)
+            env = dict(os.environ, QUALITY_PYTHON=str(host))
+            result = subprocess.run([str(root / "tools/quality/project"), "mutation", "install"],
+                                    capture_output=True, text=True, env=env)
+            self.assertEqual(result.returncode, 7,
+                             "非首位的 install 触发了宿主 Python 引导（退出码应透传 venv 桩的 7）")
 
     def test_viewer_checkout_matches_registered_patch(self):
         result = subprocess.run([str(ENTRY), "doctor"],
