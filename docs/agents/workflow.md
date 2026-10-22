@@ -19,12 +19,12 @@
 
 ## 工具链
 
-Lua 命令使用 **Lua 5.4**，执行前用 `lua -v` 核对；验收脚本可用 `ACCEPTANCE_LUA_BIN` 指定解释器。Lua 5.5 对循环变量重新赋值会报 `attempt to assign to const variable`，遇到此错误先检查版本。
+Lua 命令使用 **Lua 5.4**：WSL 上裸 `lua` 经 alternatives 可能指向 5.1，宿主工具一律用 `lua5.4`，执行前用 `lua5.4 -v` 核对（与 `tools/quality/project.json` 的 `lua.executable` 同口径）；验收脚本可用 `ACCEPTANCE_LUA_BIN` 指定解释器。Lua 5.5 对循环变量重新赋值会报 `attempt to assign to const variable`，遇到此错误先检查版本。
 
-- `lua tools/cli.lua deploy`：将三端一级子树字节镜像到宿主目录（`robocopy /MIR`，镜像前打印将被删掉的宿主多余文件）；编辑器开着本图时执行 validate → 有差异时 `code push` → `code diff` 复核，push 后仍不一致才返回失败。
-- `lua tools/cli.lua sync`：将宿主目录的 `eggy.json`、API 存根、`data/` 回灌仓库。
-- `lua tools/cli.lua sync --packages`：在上述清单外追加三端 `packages/` 字节镜像，删除过期文件；任一端源 packages 缺失或为空时整次同步在写入前失败。该方向以宿主为准，回灌前先确认工作区已提交。
-- 官方包升级、聚合入口与编辑器预设依赖见 [官方包接入参考](../packages-reference.md)。技能包预设命令见 `lua tools/cli.lua ability-presets --help`；验收脚本说明见 `tools/acceptance/README.md`。
+- `lua5.4 tools/cli.lua deploy`：将三端一级子树字节镜像到宿主目录（`robocopy /MIR`，镜像前打印将被删掉的宿主多余文件）；编辑器开着本图时执行 validate → 有差异时 `code push` → `code diff` 复核，push 后仍不一致才返回失败。
+- `lua5.4 tools/cli.lua sync`：将宿主目录的 `eggy.json`、API 存根、`data/` 回灌仓库。
+- `lua5.4 tools/cli.lua sync --packages`：在上述清单外追加三端 `packages/` 字节镜像，删除过期文件；任一端源 packages 缺失或为空时整次同步在写入前失败。该方向以宿主为准，回灌前先确认工作区已提交。
+- 官方包升级、聚合入口与编辑器预设依赖见 [官方包接入参考](../packages-reference.md)。技能包预设命令见 `lua5.4 tools/cli.lua ability-presets --help`；验收脚本说明见 `tools/acceptance/README.md`。
 - 质量入口为 `tools/quality/project`（POSIX sh 薄转发），安装、覆盖率、CRAP、DRY、差分 mutation 与复验步骤见 [tools/quality/README.md](../../tools/quality/README.md)；只出报告，不设指标门槛。
 - 单测放 `tests/native/`（slow 车道放 `tests/native/slow/`），共享夹具放 `tests/support/`，探针放 `tests/probes/`（手工探针，不入任何车道）。日常运行 `busted --run=fast`（等价 `default`），收尾运行 `busted --run=full`；车道由根目录 `.busted` 定义，共享初始化在 `tests/native/helper.lua`。开发端（WSL）是唯一测试环境，案例不分平台，完成判据表里的 `0 pending` 就是在开发端取的严格值。
   - **执行序只保证到文件内**：迁移保留的是**文件内**执行序（`it` 注册序 == 旧 LuaUnit 类内方法序），**不保留跨文件的全局类名字典序**。LuaUnit 的 `collectTests()` 排的是全局 `_G.Test*` **类名**，`.busted` 的 `sort-files=true` 排的是**文件路径字符串**，是两个键空间，技术上无法廉价复现；且 helper 在文件发现**之前**执行，插不进重排钩子。
@@ -83,11 +83,11 @@ done
 | `busted --run=fast`（日常） | fast 车道全部用例通过，末行匹配 `N successes / 0 failures / 0 errors / 0 pending : T seconds`，退出码 0 |
 | `busted --run=full`（收尾） | 含 slow 车道，全部用例通过，末行匹配 `N successes / 0 failures / 0 errors / 0 pending : T seconds`，退出码 0 |
 | `tools/quality/project quality` | 完整 Busted 套件通过，生成本轮 LCOV、全树 CRAP 与 DRY 报告 |
-| `tools/quality/project test-tooling` | `tests/tooling/slow` 的 Python 回归全绿（空缓存安装 suite 只吃独立检出，此处按设计跳过） |
+| `tools/quality/project test-tooling` | `tests/tooling/slow` 的 Python 回归全绿（空缓存安装 suite 只吃独立检出，此处按设计跳过）；真实拉起 crapper/mutator 的端到端用例由 `SE_FISH_QUALITY_E2E` 门控，默认跳过、`SE_FISH_QUALITY_E2E=1` 释放，「全绿」指门控默认形态下全绿 |
 | `bash tools/acceptance/run_acceptance.sh`（有 feature 时） | `N passed, 0 failed`，末行 `acceptance run OK`；无 feature 时提示跳过且返回 0 |
 | 美术资产交付 | `04-validate.py` 跑完并通过（报告里 `failures` 为空，含网格封闭性硬门槛），且 `bash tools/acceptance/run_acceptance.sh` 的 `features/art/` 车道全绿；只经这两个公开入口调用，不另开 pre-commit / CI。预算文件或 `mesh` 段缺失同样算失败，口径见 [美术资产流水线](art-pipeline.md#网格封闭性硬门槛) |
-| 每个改过的 `.lua` 执行 `lua -e "assert(loadfile('<file>'))"` | 无输出、退出码 0 |
-| `lua tools/cli.lua deploy` 后执行上面的 `code validate` | `ok=true`、`data.valid=true`、`data.is_se_map=true`，`data.issues` 与 `meta.warnings` 均为空 |
+| 每个改过的 `.lua` 执行 `lua5.4 -e "assert(loadfile('<file>'))"` | 无输出、退出码 0 |
+| `lua5.4 tools/cli.lua deploy` 后执行上面的 `code validate` | `ok=true`、`data.valid=true`、`data.is_se_map=true`，`data.issues` 与 `meta.warnings` 均为空 |
 | validate 通过后全套试玩 | 每条验收现象都有取证产物；`log trace` 本轮窗口有效且无错误 |
 
 ## 产物归属
