@@ -18,9 +18,9 @@ MANIFEST = "uml-quality.json"
 # （声明侧由 standard_quality_dispatch_test.py 重抄一份作回归），doctor 负责比对两侧，
 # 因此不需要抽公共常量。改 uml-quality.json 时必须同步改此处，否则 doctor 报「分发配置」失败。
 DISPATCH = {
-    "crap": {"argv": ["./tools/quality/project.ps1", "refresh-crap"], "forwardArgs": "none",
+    "crap": {"argv": ["./tools/quality/project", "refresh-crap"], "forwardArgs": "none",
              "scope": "whole-tree", "validResultExitCodes": [0]},
-    "mutate": {"argv": ["./tools/quality/project.ps1", "mutation"], "forwardArgs": "append",
+    "mutate": {"argv": ["./tools/quality/project", "mutation"], "forwardArgs": "append",
                "validResultExitCodes": [0, 3]},
 }
 # 声明与实现的显式重复（同 DISPATCH 的既有做法）：值必须等于 mutation.DEFAULT_MAX_WORKERS，

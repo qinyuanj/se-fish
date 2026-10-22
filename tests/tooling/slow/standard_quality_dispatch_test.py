@@ -25,15 +25,17 @@ FAILING_MESSAGE = '完整测试基线失败'
 
 
 def link(path, target):
-    """junction 复用工具来源检出，不新建环境，也不写共享缓存。"""
+    """symlink 复用工具来源检出，不新建环境，也不写共享缓存。"""
     path.parent.mkdir(parents=True, exist_ok=True)
-    result = subprocess.run(['cmd', '/c', 'mklink', '/J', str(path), str(target)],
-                            capture_output=True, text=True)
-    assert result.returncode == 0, result.stdout + result.stderr
+    path.symlink_to(Path(target).resolve(), target_is_directory=True)
+
+
+def project_lua():
+    return json.loads((ROOT / 'tools/quality/project.json').read_text(encoding='utf-8'))['lua']
 
 
 def coverage_argv(body):
-    return ['lua', '-e', body]
+    return [project_lua()['executable'], '-e', body]
 
 
 def set_coverage_command(root, body):
@@ -54,12 +56,12 @@ def build_fixture(root, command):
                    check=True, capture_output=True, encoding='utf-8', errors='replace')
     subprocess.run(['git', '-C', str(checkout), 'checkout', viewer['commit']],
                    check=True, capture_output=True, encoding='utf-8', errors='replace')
-    for name in ('uml', 'uml.ps1', 'uml-quality.json'):
+    for name in ('uml', 'uml-quality.json'):
         shutil.copy(ROOT / name, root / name)
     shutil.copytree(ROOT / 'tools/quality', root / 'tools/quality')
     config = {
         'sources': {'roots': ['common'], 'exclude': ['packages']},
-        'lua': {'executable': 'lua', 'version': 'Lua 5.4.'},
+        'lua': project_lua(),
         'commands': {'coverage': command, 'mutation_test': command},
         'paths': {'luacov': (TOOLS / '.toolcache/luacov/src').as_posix(),
                   'stats': 'build/quality/luacov.stats.out',
@@ -69,7 +71,7 @@ def build_fixture(root, command):
         'lua_tools': json.loads((ROOT / 'tools/quality/project.json').read_text(encoding='utf-8'))['lua_tools'],
     }
     (root / 'tools/quality/project.json').write_text(json.dumps(config), encoding='utf-8')
-    # 复用工具来源检出的 venv 与 Lua 工具缓存（junction），不新建环境，也不写共享缓存。
+    # 复用工具来源检出的 venv 与 Lua 工具缓存（symlink），不新建环境，也不写共享缓存。
     link(root / '.uml-viewer/crapper/.venv', TOOLS / '.uml-viewer/crapper/.venv')
     link(root / '.toolcache', TOOLS / '.toolcache')
     (root / 'common/packages').mkdir(parents=True)
@@ -86,11 +88,11 @@ def build_fixture(root, command):
 
 
 def invoke_graph(root, *args):
-    """图上公开入口：与终端 project.ps1 平行的另一个入口。"""
+    """图上公开入口：固定 viewer 的原生 `uml`，与终端 tools/quality/project 平行。"""
     env = os.environ.copy()
     env.pop('LUA_PATH', None)
     env.pop('LUA_CPATH', None)
-    return subprocess.run(['pwsh', '-NoProfile', '-File', str(root / 'uml.ps1'), *args],
+    return subprocess.run([str(root / 'uml'), *args],
                           cwd=root, env=env, capture_output=True, text=True,
                           encoding='utf-8', errors='replace')
 
@@ -99,7 +101,7 @@ def invoke_terminal(root, *args):
     env = os.environ.copy()
     env.pop('LUA_PATH', None)
     env.pop('LUA_CPATH', None)
-    return subprocess.run(['pwsh', '-NoProfile', '-File', str(root / 'tools/quality/project.ps1'), *args],
+    return subprocess.run([str(root / 'tools/quality/project'), *args],
                           cwd=root, env=env, capture_output=True, text=True,
                           encoding='utf-8', errors='replace')
 
@@ -148,11 +150,12 @@ class StandardDispatchTest(unittest.TestCase):
         self.assertFalse(result_record(self.root)['validResult'])
 
     def test_graph_mutate_forwards_arguments_and_exit_code(self):
-        (self.root / 'tools/quality/project.ps1').write_text(
-            '$args | ConvertTo-Json -Compress | Set-Content calls.jsonl\nexit 3\n', encoding='utf-8')
+        entry = self.root / 'tools/quality/project'
+        entry.write_text('#!/bin/sh\nprintf \'%s\\n\' "$@" > calls.txt\nexit 3\n', encoding='utf-8')
+        entry.chmod(0o755)
         result = invoke_graph(self.root, 'mutate', 'common/First.lua', '--mutate-all')
         self.assertEqual(result.returncode, 3, result.stdout + result.stderr)
-        calls = json.loads((self.root / 'calls.jsonl').read_text(encoding='utf-8'))
+        calls = (self.root / 'calls.txt').read_text(encoding='utf-8').splitlines()
         self.assertEqual(['mutation', 'common/First.lua', '--mutate-all'], calls)
         self.assertTrue(result_record(self.root)['validResult'], '存活结果按声明契约视为有效')
 
@@ -185,13 +188,17 @@ class StandardDispatchTest(unittest.TestCase):
         (self.root / 'uml-quality.json').write_text('{broken', encoding='utf-8')
         result = invoke_graph(self.root, 'crap')
         self.assertEqual(1, result.returncode, result.stdout + result.stderr)
-        self.assertIn('uml-quality.json', result.stdout + result.stderr)
+        # 原生 viewer 对 JSON 语法错误只转述解析器信息（不含文件名）；契约是失败关闭。
+        self.assertTrue((result.stdout + result.stderr).startswith('uml:'), result.stdout + result.stderr)
         self.assertIsNone(result_record(self.root), '配置无效时不得发布质量结果')
+        self.assertEqual(self.snapshot.read_text(encoding='utf-8'), '旧快照', '配置无效时不得启动质量命令')
         partial = {'version': 1, 'operations': {'crap': json.loads((ROOT / 'uml-quality.json').read_text())['operations']['crap']}}
         (self.root / 'uml-quality.json').write_text(json.dumps(partial), encoding='utf-8')
         result = invoke_graph(self.root, 'crap')
         self.assertEqual(1, result.returncode, result.stdout + result.stderr)
-        self.assertIn('uml-quality.json', result.stdout + result.stderr)
+        self.assertIn('operations', result.stdout + result.stderr)
+        self.assertIsNone(result_record(self.root), '配置无效时不得发布质量结果')
+        self.assertEqual(self.snapshot.read_text(encoding='utf-8'), '旧快照')
         self.assertNotIn(FAILING_MESSAGE, result.stdout + result.stderr, '校验失败不得启动任何质量命令')
 
 
@@ -234,7 +241,7 @@ class DeclaredMappingTest(unittest.TestCase):
         operations = config['operations']
         self.assertEqual(['crap', 'mutate'], sorted(operations))
         for name in ('crap', 'mutate'):
-            self.assertEqual(['./tools/quality/project.ps1'], operations[name]['argv'][:1])
+            self.assertEqual(['./tools/quality/project'], operations[name]['argv'][:1])
         self.assertEqual('none', operations['crap']['forwardArgs'])
         self.assertEqual(['refresh-crap'], operations['crap']['argv'][1:])
         self.assertEqual('whole-tree', operations['crap']['scope'])
@@ -245,17 +252,20 @@ class DeclaredMappingTest(unittest.TestCase):
 
     def test_fixed_viewer_validator_accepts_declared_manifest(self):
         viewer = json.loads((ROOT / 'tools/quality/project.json').read_text(encoding='utf-8'))['tools']['viewer']
-        script = (TOOLS / viewer['source'] / 'scripts/uml-quality-config.ps1').resolve()
-        result = subprocess.run(['pwsh', '-NoProfile', '-Command',
-                                 f'. {str(script)!r}; $c = Read-UmlQualityConfig {str(ROOT)!r}; '
-                                 "$c.operations.crap.scope; $c.operations.mutate.argv[1]"],
+        # 校验器取自本仓库安装的固定 viewer checkout（install 已核对提交）。
+        scripts = (TOOLS / '.uml-viewer/uml-viewer/scripts').resolve()
+        result = subprocess.run([sys.executable, '-I', '-B', '-c',
+                                 'import sys; from pathlib import Path; sys.path.insert(0, sys.argv[1]); '
+                                 'from uml_quality import read_config; c = read_config(Path(sys.argv[2])); '
+                                 "print(c['operations']['crap']['scope']); print(c['operations']['mutate']['argv'][1])",
+                                 str(scripts), str(ROOT)],
                                 capture_output=True, text=True, encoding='utf-8', errors='replace')
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(['whole-tree', 'mutation'],
                          [line.strip() for line in result.stdout.splitlines() if line.strip()])
 
     def test_terminal_and_graph_share_one_implementation(self):
-        """终端 project.ps1 与图上 uml.ps1 都落到同一分发实现（refresh-crap / mutation）。"""
+        """终端 tools/quality/project 与图上 uml 都落到同一分发实现（refresh-crap / mutation）。"""
         project_entry = (ROOT / 'tools/quality/project.py').read_text(encoding='utf-8')
         self.assertIn('refresh-crap', project_entry)
         self.assertIn('"mutation"', project_entry)
@@ -316,12 +326,13 @@ class TerminalGraphParityTest(unittest.TestCase):
             self.assertNotIn('Vendor', text)
 
     def test_graph_request_is_refused_by_the_same_repository_lock(self):
-        holder = self.root / 'holder.ps1'
-        holder.write_text("$s=[IO.File]::Open('target/quality.lock',[IO.FileMode]::OpenOrCreate,"
-                          "[IO.FileAccess]::ReadWrite,[IO.FileShare]::ReadWrite)\n"
-                          "$s.Lock(0,1)\n'已持锁' | Set-Content held.txt\n"
-                          "Start-Sleep -Seconds 20\n", encoding='utf-8')
-        process = subprocess.Popen(['pwsh', '-NoProfile', '-File', str(holder)], cwd=self.root)
+        holder = self.root / 'holder.py'
+        holder.write_text("import fcntl, time\nfrom pathlib import Path\n"
+                          "Path('target').mkdir(exist_ok=True)\n"
+                          "s = open('target/quality.lock', 'a+b')\n"
+                          "fcntl.flock(s, fcntl.LOCK_EX)\nPath('held.txt').write_text('已持锁')\n"
+                          "time.sleep(20)\n", encoding='utf-8')
+        process = subprocess.Popen([sys.executable, '-I', '-B', str(holder)], cwd=self.root)
         try:
             deadline = time.monotonic() + 15
             while not (self.root / 'held.txt').exists():
@@ -349,7 +360,7 @@ class TerminalGraphParityTest(unittest.TestCase):
 class DoctorDispatchCheckTest(unittest.TestCase):
     """doctor 核对声明式分发：图上入口的前提缺失时明确失败，而不是等到右键才发现。
 
-    公开接缝是 `project.ps1 doctor`；分发校验在其它环境核对之前执行，
+    公开接缝是 `tools/quality/project doctor`；分发校验在其它环境核对之前执行，
     因此隔离项目只需 uml-quality.json 与 project.json 就能观察失败信息。
     """
 
