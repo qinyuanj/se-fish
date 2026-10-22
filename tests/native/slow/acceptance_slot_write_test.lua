@@ -1,6 +1,6 @@
 -- 验收槽 CLI 的落盘替换：真 Lua 子进程在临时假仓库里执行 set / off，断言 GameCfg 文本与临时文件。
 -- 配置路径是相对当前目录的 common/GameCfg.lua，所以子进程 cd 进假仓库，LUA_PATH 指回本仓库；
--- 真仓库的 GameCfg 不被碰。开发端只在 WSL（#116）：替换不得依赖 pwsh。
+-- 真仓库的 GameCfg 不被碰。开发端只在 WSL（#116）：替换不得依赖 PowerShell。
 local interpreter = require("tests.support.interpreter")
 
 local function slurp(path)
