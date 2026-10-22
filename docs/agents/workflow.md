@@ -8,6 +8,10 @@
 - **业务树**：`client/`、`common/`、`server/` 中的业务源码，即架构图上的三棵树；排除各端 `packages/` 与 `server/_trigger/` 等非业务目录。
 - **指标采集范围**：CRAP、DRY 与差分 mutation 实际读的源码集合，三端全树（**含**各端 `packages/`），仅排除 `server/_trigger/`；以 `tools/quality/project.json` 的 `sources` 为准。与「业务树」不是一回事，理由见 [ADR-0005](../adr/0005-packages-as-external.md)。
 - **宿主目录**：编辑器 `code init` 绑定的本地 Lua 工程目录，根有 `eggy.json`，是部署目的地；与仓库检出分别管理。路径和绑定方式见下方「工具链」。
+- **开发端**：WSL 里的仓库检出及其原生工具链，是唯一的开发、测试与质量运行环境；不在 Windows 开发。
+  _Avoid_: 本机
+- **部署端**：Windows 侧的 eggitor 编辑器、`editor-cli.exe` 与宿主目录；开发端只经 WSL interop 调用，不在开发端安装编辑器组件。
+  _Avoid_: 本机
 - **部署树**：镜像进宿主目录的仓库根 `client/`、`common/`、`server/`；仓库根其余内容不部署。宿主内不归本仓库管理的内容由 `sync` 回灌，镜像粒度与操作细节见下方「工具链」。
   _Avoid_: 源码树（指仓库全部时）
 - **quality gate**：质量流程的失败处理与快照发布规则，见 [质量工具](../../tools/quality/README.md#日常命令)及其中的「墙钟预算、启动前记录与退出码」；指标只出报告，不设门槛。
