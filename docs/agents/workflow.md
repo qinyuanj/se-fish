@@ -114,8 +114,8 @@ chmod +x "$H/pre-commit"
 |---|---|
 | `busted --run=fast`（日常） | fast 车道全部用例通过，末行匹配 `N successes / 0 failures / 0 errors / 0 pending : T seconds`，退出码 0 |
 | `busted --run=full`（收尾） | 含 slow 车道，全部用例通过，末行匹配 `N successes / 0 failures / 0 errors / 0 pending : T seconds`，退出码 0 |
-| `bash tools/acceptance/run_acceptance.sh`（有 feature 时） | `N passed, 0 failed`，末行 `acceptance run OK`；无 feature 时提示跳过且返回 0 |
-| 美术资产交付 | `04-validate.py` 跑完并通过（报告里 `failures` 为空，含网格封闭性硬门槛），且 `bash tools/acceptance/run_acceptance.sh` 的 `features/art/` 车道全绿；只经这两个公开入口调用，不另开 CI，资产校验不进 pre-commit。预算文件或 `mesh` 段缺失同样算失败，口径见 [美术资产流水线](art-pipeline.md#网格封闭性硬门槛) |
+| `bash tools/acceptance/run_acceptance.sh`（无参数；有 feature 时） | 跑除 `art` 外的全部车道及 `features/` 根下的裸 feature，每个 feature `N passed, 0 failed`，末行 `acceptance run OK`；所选范围无 feature 时提示跳过且返回 0。`art` 断言仓库外美术产物，不进代码收尾门（见「美术资产交付」行）；`--all` 跑全部车道 |
+| 美术资产交付 | `04-validate.py` 跑完并通过（报告里 `failures` 为空，含网格封闭性硬门槛），且 `bash tools/acceptance/run_acceptance.sh art` 全绿；只经这两个公开入口调用，不另开 CI，资产校验不进 pre-commit。预算文件、`mesh` 段或 `validation.json` 缺失同样算失败（缺报告时提示缺哪份，可用 `EGGY_ART_ASSETS` 指到美术资产根目录），口径见 [美术资产流水线](art-pipeline.md#网格封闭性硬门槛) |
 | 提交时 pre-commit hook 自动检查（见上方「pre-commit hook」）：暂存的 `.lua` 逐个 `loadfile`，含 Lua 改动时再跑 `busted --run=fast`；agent 不另跑这一项，提交时也不必为它重复手跑 fast | `git commit` 成功，未被 hook 拦下 |
 | `lua5.4 tools/cli.lua deploy` 后执行上面的 `code validate` | `ok=true`、`data.valid=true`、`data.is_se_map=true`，`data.issues` 与 `meta.warnings` 均为空 |
 | validate 通过后全套试玩 | 每条验收现象都有取证产物；`log trace` 本轮窗口有效且无错误 |
