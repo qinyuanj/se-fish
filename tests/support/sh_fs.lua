@@ -1,4 +1,4 @@
--- POSIX sh 文件系统夹具助手：slow 车道的传输回归（sync / deploy）共用。
+-- POSIX sh 文件系统夹具助手：需要真实落盘的回归（sync / deploy 传输、worktree-init 等）共用。
 -- 断言在 CLI 进程边界上做，夹具只需要最少的读写与存在性判断；路径一律由调用方给出。
 local q = require("tests.support.sh_quote").q
 
@@ -27,6 +27,11 @@ end
 
 function M.exists(path)
   return M.code_of("test -e " .. q(path)) == 0
+end
+
+-- 含断开的 symlink：它也占着名字。
+function M.lexists(path)
+  return M.code_of("test -e " .. q(path) .. " || test -L " .. q(path)) == 0
 end
 
 function M.write_file(path, body)

@@ -9,8 +9,10 @@ local interpreter = require("tests.support.interpreter")
 local q = require("tests.support.sh_quote").q
 
 local ROOT = "tmp/quality-report-test"
--- report.lua 自包含加载的三个工具（与其 package.path 同口径）。
-local TOOLCACHE_SOURCES = { ".toolcache/dry4lua/src", ".toolcache/luacheck/src", ".toolcache/acceptance4lua/src" }
+-- report.lua 自包含加载的工具源码目录，直接取它导出的同一份常量。
+-- 预检只看目录在不在：.toolcache 半装（目录在、模块缺）时仍会绕到 report.lua 的 require 处失败，
+-- 那种情况重跑 tools/quality/project install。
+local TOOLCACHE_SOURCES = require("tools.quality.report").TOOLCACHE_SOURCES
 
 local function write(path, body)
   local f = assert(io.open(path, "wb"))

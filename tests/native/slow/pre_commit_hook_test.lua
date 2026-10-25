@@ -1,6 +1,7 @@
 -- pre-commit hook 的回归护栏（#142，#131 复盘）：接缝是 `git commit`。
--- 每例在 tmp/ 下新建临时 git 仓库，复制入库的 tools/hooks/pre-commit，按
--- docs/agents/workflow.md「pre-commit hook」装一行式 shim，再断言提交的退出码与输出。
+-- 每例在 tmp/ 下新建临时 git 仓库，复制入库的 tools/hooks/pre-commit，把入库的
+-- tools/hooks/shim 装进 hooks 目录（与 docs/agents/workflow.md「pre-commit hook」同一份），
+-- 再断言提交的退出码与输出。
 -- PATH 前插桩 busted：只记录是否被调用及其看到的环境，不真跑 fast。
 -- 每个子进程先清掉全部 GIT_* 变量并屏蔽全局/系统 git 配置——本文件可能在别的 hook
 -- 或 git 子进程里被跑到，不能让临时仓库的 git 操作落到外层仓库的索引上。
@@ -17,16 +18,11 @@ local ROOT = REPO .. "/tmp/pre-commit-hook-test"
 local FAKE = ROOT .. "/repo"
 local STUB_DIR = ROOT .. "/bin"
 local BUSTED_LOG = ROOT .. "/busted.log"
+local STUB_ERROR = ROOT .. "/stub-error.log"
 local OUT = ROOT .. "/out"
 
--- 一行式 shim 直接从 workflow.md 的安装命令里抽出，测的就是文档让人装的那一份，不另抄副本。
-local function shim_from_doc()
-  local doc = assert(slurp(REPO .. "/docs/agents/workflow.md"))
-  local body = doc:match("\nprintf '%%s\\n' '#!/bin/sh' '([^\n]-)' >\"%$H/pre%-commit\"\n")
-  assert(body, "workflow.md「pre-commit hook」里找不到 shim 安装命令")
-  return "#!/bin/sh\n" .. body .. "\n"
-end
-local SHIM = shim_from_doc()
+-- 测的就是文档让人装的那一份 shim，不另抄副本。
+local SHIM = assert(slurp(REPO .. "/tools/hooks/shim"), "缺 tools/hooks/shim")
 
 -- 清掉外层 git 导出的全部 GIT_* 与 LUA_BIN，再屏蔽全局/系统配置（hooksPath、签名等）。
 local CLEAN_ENV = "for v in $(env | sed -n 's/^\\(GIT_[A-Za-z0-9_]*\\)=.*/\\1/p'); do unset \"$v\"; done; "
@@ -41,7 +37,8 @@ local function sh(script, opts)
     .. "export PATH=" .. q(opts.path or (STUB_DIR .. ":" .. os.getenv("PATH"))) .. "; "
     .. "export STUB_BUSTED_LOG=" .. q(BUSTED_LOG)
     .. " STUB_BUSTED_RC=" .. q(stub.rc or 0)
-    .. " STUB_BUSTED_SIGNAL=" .. q(stub.signal or "") .. "; "
+    .. " STUB_BUSTED_SIGNAL=" .. q(stub.signal or "")
+    .. " STUB_ERROR_LOG=" .. q(STUB_ERROR) .. "; "
     .. "cd " .. q(FAKE) .. " && " .. script .. " ) > " .. q(OUT) .. " 2>&1"
   local code = code_of(cmd)
   return slurp(OUT) or "", code
@@ -70,20 +67,27 @@ local function write_repo(rel, body)
 end
 
 -- 桩 busted：追加一行调用记录（参数 + 是否看到 GIT_DIR/GIT_INDEX_FILE），以 STUB_BUSTED_RC 退出。
--- STUB_BUSTED_SIGNAL 非空时，先沿父进程链找到最外层的 hook 进程（shim exec 后的 sh，
--- 它 fork 的子 shell 命令行相同），给它发该信号，模拟提交途中被 Ctrl-C / kill。
+-- STUB_BUSTED_SIGNAL 非空时，沿父进程链找到最外层的 hook 进程（shim `exec sh "$f"` 后命令行
+-- 含 tools/hooks/pre-commit；它 fork 的子 shell 命令行相同），给它发该信号，模拟提交途中被
+-- Ctrl-C / kill。这依赖 shim 的 exec 写法：若 shim 改写后链上（往上 8 级内）找不到这样的进程，
+-- 桩把原因写进 STUB_ERROR_LOG 并以 97 退出，用例据此显式失败，而不是误杀别的进程后静默变绿。
 local STUB = [[#!/bin/sh
 printf 'args=%s GIT_DIR=%s GIT_INDEX_FILE=%s\n' "$*" "${GIT_DIR-unset}" "${GIT_INDEX_FILE-unset}" >>"$STUB_BUSTED_LOG"
 if [ -n "${STUB_BUSTED_SIGNAL-}" ]; then
-  p=$PPID
-  while :; do
-    pp=$(ps -o ppid= -p "$p" | tr -d ' ')
-    case $(ps -o args= -p "$pp") in
-      *tools/hooks/pre-commit*) p=$pp ;;
-      *) break ;;
+  p=$PPID hook= n=0
+  while [ "$n" -lt 8 ] && [ -n "$p" ] && [ "$p" -gt 1 ]; do
+    case $(ps -o args= -p "$p") in
+      *tools/hooks/pre-commit*) hook=$p ;;
+      *) [ -n "$hook" ] && break ;;
     esac
+    p=$(ps -o ppid= -p "$p" | tr -d ' ')
+    n=$((n + 1))
   done
-  kill -s "$STUB_BUSTED_SIGNAL" "$p"
+  if [ -z "$hook" ]; then
+    echo "父进程链上找不到命令行含 tools/hooks/pre-commit 的 hook 进程（shim 不再 exec sh \"\$f\"？）" >"$STUB_ERROR_LOG"
+    exit 97
+  fi
+  kill -s "$STUB_BUSTED_SIGNAL" "$hook"
 fi
 echo "stub busted: 9 successes / 0 failures / 0 errors / 0 pending : 0.1 seconds"
 exit "${STUB_BUSTED_RC-0}"
@@ -239,6 +243,7 @@ describe("TestPreCommitHook", function()
       write_repo("a.lua", "return 1\n")
       stage("a.lua")
       local out, code = commit({ stub = { signal = sig } })
+      assert.is_nil(slurp(STUB_ERROR), slurp(STUB_ERROR))
       assert.are.equal(1, #busted_calls(), out)
       assert.are_not.equal(0, code, out)
       assert.are.equal(1, commit_count(), out)

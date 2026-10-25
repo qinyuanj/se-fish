@@ -51,9 +51,9 @@ Lua 命令使用 **Lua 5.4**：WSL 上裸 `lua` 经 alternatives 可能指向 5.
 lua5.4 tools/cli.lua worktree-init
 ```
 
-- 做两件事，已存在的条目一律跳过（幂等，可重复执行），任一来源缺失时在写入前失败：从 magpie 资源库复制上游 `blender-*` skill 到 `.agents/skills/`（来源见[美术资产流水线](art-pipeline.md#上游-blender--skill)）；按 `tools/quality/project.json` 的 `tools.*.source`（`../<工具>`）在 worktree 的**父目录**建 symlink，指向主检出旁的真实工具检出。`--skills-from`、`--tools-from` 可覆盖默认来源，见 `--help`。
+- 做两件事，已存在的条目跳过（可重复执行），任一来源缺失时在写入前失败：从 magpie 资源库复制上游 `blender-*` skill 到 `.agents/skills/`（来源见[美术资产流水线](art-pipeline.md#上游-blender--skill)）；按 `tools/quality/project.json` 的 `tools.*.source`（`../<工具>`）在 worktree 的**父目录**建 symlink，指向主检出旁的真实工具检出。参数见 `--help`。
 - 不执行 `tools/quality/project install`。`.toolcache` 与 `.uml-viewer` **不** symlink 共享，由人在 worktree 里执行 install 独立安装（pip、字体与 cimgui 有缓存）；`lua_tools` 七项的 url 与 commit 登记在 `project.json`，由 install 拉取、校验与构建。独立安装也避开共享 venv 的必然后果：`doctor` 里针对 `crapper.__file__` 的断言会失败（editable 安装写下的 `.pth` 硬编码主检出路径）。未安装时 full 只剩 `tests/native/slow/quality_report_test.lua` 一处失败，报「缺 `.toolcache`，需人执行 `tools/quality/project install`」。
-- 不要手工改建这些 symlink：指向 `.uml-viewer/<tool>`（安装产物而非上游检出）会让 install／doctor 预检与标准分发回归大面积报错；建在 worktree 根内则无人引用，又不在 `.gitignore`，一次 `git add -A` 就会提交进去。
+- 某个 skill 损坏，或 worktree-init 报「已有工具链接指向不符」时，删掉对应目录或链接后重跑 `worktree-init`，由它重建。它只把链接建在父目录、指向真实检出：指向 `.uml-viewer/<tool>`（安装产物而非上游检出）会让 install／doctor 预检与标准分发回归大面积报错；建在 worktree 根内则无人引用，又不在 `.gitignore`，一次 `git add -A` 就会提交进去。
 
 **美术资产（Meshy MCP + 无头 Blender）。** 产出鱼类等模型与动画的接入方式、导出分件与验收步骤见 [美术资产流水线](art-pipeline.md)，尺寸口径见 [ADR-0004](../adr/0004-fish-asset-scale.md)。唯一的 MCP 是 Meshy，注册与密钥接法见 [美术资产流水线](art-pipeline.md#前端配置)。Blender 不接 MCP，只经 `blender` 子命令无头执行（[ADR-0009](../adr/0009-blender-headless-only.md)）。资产本体不进本仓，正式资产走编辑器导入。
 
@@ -72,12 +72,10 @@ lua5.4 tools/cli.lua worktree-init
 
 **teamai 的 Gitea 凭据（开发端接入）。** `GITEA_URL`、`GITEA_TOKEN` 存在部署端用户环境变量，经 Windows 用户变量 `WSLENV=GITEA_URL:GITEA_TOKEN` 透传到开发端，凭据只存一份。改 `WSLENV` 后关闭全部终端并 `wsl --shutdown` 才生效，常驻会话（Herdr 等）一并重启；`teamai doctor` 的两项 Gitea 检查通过即接入完成。缺凭据时 pull、recall 与 hook 照常，走 Gitea API 的操作（`members`、贡献 learning）失败。
 
-**pre-commit hook（开发端接入）。** 检查脚本入库在 `tools/hooks/pre-commit`：对暂存区每个 `.lua` 取**暂存内容**做 Lua 5.4 `loadfile`，暂存区含 `.lua` 或 `.busted` 时再跑 `busted --run=fast`，纯文档提交不跑 busted；质量工具不进 hook。共享 hooks 目录（`git rev-parse --git-common-dir` 下的 `hooks/`，所有 worktree 共用）里的 `pre-commit` 只转发到当前检出的脚本，每个克隆装一次：
+**pre-commit hook（开发端接入）。** 检查脚本入库在 `tools/hooks/pre-commit`：对暂存区每个 `.lua` 取**暂存内容**做 Lua 5.4 `loadfile`，暂存区含 `.lua` 或 `.busted` 时再跑 `busted --run=fast`，纯文档提交不跑 busted；质量工具不进 hook。共享 hooks 目录（`git rev-parse --git-common-dir` 下的 `hooks/`，所有 worktree 共用）里的 `pre-commit` 是入库的转发 shim `tools/hooks/shim`，只转发到当前检出的脚本。每个克隆在检出根装一次；shim 改动后重装：
 
 ```bash
-H="$(git rev-parse --git-common-dir)/hooks"
-printf '%s\n' '#!/bin/sh' 'f="$(git rev-parse --show-toplevel)/tools/hooks/pre-commit"; [ -f "$f" ] || exit 0; exec sh "$f" "$@"' >"$H/pre-commit"
-chmod +x "$H/pre-commit"
+install -m 755 tools/hooks/shim "$(git rev-parse --git-common-dir)/hooks/pre-commit"
 ```
 
 - 当前分支没有该脚本时放行，旧分支与并行 worktree 不受影响。
@@ -110,7 +108,7 @@ chmod +x "$H/pre-commit"
 | 检查 | 通过条件 |
 |---|---|
 | `busted --run=fast`（日常） | fast 车道全部用例通过，末行匹配 `N successes / 0 failures / 0 errors / 0 pending : T seconds`，退出码 0 |
-| `busted --run=full`（收尾） | 含 slow 车道，全部用例通过，末行匹配 `N successes / 0 failures / 0 errors / 0 pending : T seconds`，退出码 0。worktree 执行「worktree 起手式」后若只因缺 `.toolcache` 达不到（install 由人运行），以合并后主检出的 full 为准，并在交付说明里写明 |
+| `busted --run=full`（收尾） | 含 slow 车道，全部用例通过，末行匹配 `N successes / 0 failures / 0 errors / 0 pending : T seconds`，退出码 0。唯一例外：worktree 里仅 `quality_report_test` 因缺 `.toolcache` 失败一例（install 由人运行）时，以合并后主检出的 full 为准，并在交付说明里写明 |
 | `bash tools/acceptance/run_acceptance.sh`（无参数；有 feature 时） | 跑除 `art` 外的全部车道及 `features/` 根下的裸 feature，每个 feature `N passed, 0 failed`，末行 `acceptance run OK`；所选范围无 feature 时提示跳过且返回 0。`art` 断言仓库外美术产物，不进代码收尾门（见「美术资产交付」行）；`--all` 跑全部车道 |
 | 美术资产交付 | `04-validate.py` 跑完并通过（报告里 `failures` 为空，含网格封闭性硬门槛），且 `bash tools/acceptance/run_acceptance.sh art` 全绿；只经这两个公开入口调用，不另开 CI，资产校验不进 pre-commit。预算文件、`mesh` 段或 `validation.json` 缺失同样算失败（缺报告时提示缺哪份，可用 `EGGY_ART_ASSETS` 指到美术资产根目录），口径见 [美术资产流水线](art-pipeline.md#网格封闭性硬门槛) |
 | 提交时 pre-commit hook 自动检查（见上方「pre-commit hook」）：暂存的 `.lua` 逐个 `loadfile`，含 Lua 改动时再跑 `busted --run=fast`；agent 不另跑这一项，提交时也不必为它重复手跑 fast | `git commit` 成功，未被 hook 拦下 |
