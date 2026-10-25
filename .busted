@@ -7,6 +7,12 @@
 -- Python 回归（tests/tooling/slow/*_test.py）由 tools/quality/project test-tooling 独立 discover，
 -- 且 busted 只 glob *.lua，天然不进发现范围。
 -- sort-files 保留文件名字典序；不开启 sort-tests，案例保持注册顺序。
+-- auto-insulate 显式为 true（#135）：跨文件隔离由它承担。每个案例文件包在 insulate 块里，
+-- 文件结束后按键还原 _G 与 package.loaded：文件内首次 require 的模块被丢弃、下个文件重新加载，
+-- 被替换的全局与 package.loaded 条目换回原值。还原是浅的：helper 之前已加载的表（如 GameCfg）
+-- 引用不变，原地改字段不会被撤销，那部分由 helper 的逐例快照（只管 GameCfg.Debug 与
+-- Save.AcceptanceSlot）和案例自己的还原负责。关掉后 fast 出现 package.loaded / GameCfg
+-- 跨文件残留导致的 7 failures / 3 errors（#130 审阅实测）；busted_lanes_test.py 固定此开关。
 -- 本文件必须保持纯 Lua 可求值：tests/tooling/slow/busted_lanes_test.py 用
 -- `<lua.executable> -e 'dofile(".busted")'` 读真实配置，改写时不得引用 Busted 运行期全局。
 
@@ -16,6 +22,7 @@ return {
     recursive = false,
     helper = "tests/native/helper.lua",
     ["sort-files"] = true,
+    ["auto-insulate"] = true,
     output = "plainTerminal",
   },
   default = { ROOT = { "tests/native" } },
