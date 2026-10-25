@@ -30,6 +30,12 @@ lua5.4 tools/cli.lua blender --expr "import bpy; print(len(bpy.data.objects))"
 - **跳过上游 skill 的 Live/MCP 段落**：上游 blender-* skill 写着「Live 优先」和 MCP `look` 工具，本项目一律不用；看图改用 `review_shots.py` 无头渲染。上游 skill 不在本仓管理，不改其文件。
 - 资产自己的步骤脚本也照此调用；脚本写法与上游一致最省事（`_bpyx.cli` 负责解析 `--` 后参数、`--save` 与 JSON 输出）。
 
+#### 上游 blender-* skill
+
+`.agents/skills/blender-*`（gitignored，不归本仓管理）由 magpie 资源库复制而来：来源是部署端 `C:\Users\<用户名>\.config\magpie\library\skills\<skill 名>`，每个 skill 目录下的 `.magpie-library` 记录来源路径（`copied from ...`）与 `hash`。`blender` 子命令依赖其中的 `blender-core/scripts/run_in_blender.py`，缺失时报「上游 blender-core skill 未安装」并指向本节。
+
+缺失或损坏时，从 magpie 资源库把对应 skill 目录整个重新复制到 `.agents/skills/` 下（开发端路径 `/mnt/c/Users/<用户名>/.config/magpie/library/skills/`），复制后核对 `.magpie-library` 里的来源与 hash，再跑 `lua5.4 tools/cli.lua blender --which` 与 `env_report.py` 确认可用。不要手改这些文件。
+
 **中间件 `.blend` 交接**：每一步把结果存成一个中间件，失败只重跑那一步。位置固定为美术工作区该资产目录下的 `work/`，按步骤编号命名（`<资产目录>/work/NN-<步骤>.blend`，例如 `军舰鸟/work/03-model.blend`）。人工修模时，人在 Blender GUI 里打开最新的中间件，修改后**原地存盘**，然后通知 agent；agent 用 `--blend` 读这份文件，接着跑后续步骤。不经任何实时通道。
 
 无头模式下两条注意事项：`bpy.ops.wm.open_mainfile` / `read_homefile` 会弄脏执行 context，
@@ -60,7 +66,7 @@ AgX 会把已按显示编码存盘的贴图再压一遍，自检渲染看起来�
 
 ### 前端配置
 
-仓库不提交 MCP 配置，也不再维护 DSH 接入。在所用前端（目前是 Codex）里只接入 `meshy` MCP server，key 走环境变量 `MESHY_API_KEY`；接入后核对工具已注册。**不要注册 Blender MCP**：注册了 agent 就会被诱导去试实时通道。
+Codex 的 MCP 注册在仓库内 `.codex/config.toml`（gitignored，不入库），目前只有 `[mcp_servers.meshy]` 一个条目，启动命令即上节的 `cmd.exe /c npx.cmd ...` 接法；文件里不写密钥值，key 走环境变量 `MESHY_API_KEY`。不再维护 DSH 接入。改动后重启会话，核对 `mcp__meshy__*` 工具已注册。**不要注册 Blender MCP**：注册了 agent 就会被诱导去试实时通道。
 
 ## 制作约定
 
