@@ -37,7 +37,7 @@
                       "native": {"module": "lfs", "output": "lfs.so", "sources": ["src/lfs.c"]}}
   },
   "tools": {
-    "viewer": {"directory": "uml-viewer", "source": "../uml-viewer", "commit": "73adde704cc207af74b7d4736cc9e568654f402e"},
+    "viewer": {"directory": "uml-viewer", "source": "../uml-viewer", "commit": "6367d0ff27107fd49d9c0c085c1a2e6e763da4e9"},
     "crapper": {"directory": "crapper", "source": "../crapper", "commit": "9b85a1120f5ca4b8293db222b6ac621e5f830488", "patches": ["tools/quality/patches/crapper-lua-has-error.patch"]},
     "mutator": {"directory": "mutator", "source": "../mutator", "commit": "341a4a6d420857d04a2ff0b582d563ea4e6ff089", "patches": ["tools/quality/patches/mutator-seam.patch"]},
     "dryer": {"directory": "dryer", "source": "../dryer", "commit": "d4d3e7e98c983ed52d1c8663eef61c9147f68c44"}
