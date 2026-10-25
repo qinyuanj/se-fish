@@ -14,6 +14,7 @@ local M = {}
 M.LOG_FILE = "tmp/robocopy.log"
 
 local DEFAULT_WORKSPACE_REL = "Desktop/dev/eggy/LuaSource_钓鱼怎么这么危险啊喂！"
+local MAGPIE_LIBRARY_REL = ".config/magpie/library/skills"
 local EDITOR_CLI_REL = ".eggitor/cli/editor-cli.exe"
 
 -- sh 单引号引用：内部的 ' 收成 '\''。
@@ -27,9 +28,10 @@ function M.is_windows_path(path)
 end
 local is_windows_path = M.is_windows_path
 
-local function trim(text)
+function M.trim(text)
   return (tostring(text):gsub("^%s+", ""):gsub("%s+$", ""))
 end
+local trim = M.trim
 
 local function run(cmd)
   local _, _, code = os.execute(cmd)
@@ -173,6 +175,13 @@ function M.editor_cli()
   return home .. "/" .. EDITOR_CLI_REL
 end
 
+-- 部署端 magpie 资源库的 skill 目录（上游 blender-* skill 的来源）。
+function M.magpie_library()
+  local home, err = profile()
+  if not home then return nil, err end
+  return home .. "/" .. MAGPIE_LIBRARY_REL
+end
+
 -- 绝对化仓库内路径（realpath）；转换失败返回 nil, 原因。
 function M.absolute(path)
   local code, out = M.capture("realpath -- " .. M.q(path))
@@ -187,6 +196,18 @@ end
 -- 路径是否存在（目录或文件）。
 function M.exists(path)
   return run("test -e " .. M.q(path)) == 0
+end
+
+-- 名字是否被占用：存在，或是 symlink（含断开的——它也占着名字，不能当成空位去覆盖）。
+function M.lexists(path)
+  return run("test -e " .. M.q(path) .. " || test -L " .. M.q(path)) == 0
+end
+
+-- symlink 的原始指向；不是 symlink 返回 nil。
+function M.readlink(path)
+  local code, out = M.capture("readlink -- " .. M.q(path))
+  if code ~= 0 then return nil end
+  return trim(out)
 end
 
 -- 是否目录。

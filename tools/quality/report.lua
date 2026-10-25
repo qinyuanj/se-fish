@@ -1,14 +1,18 @@
 -- DRY 与 CRAP 共用配置生成的三端业务清单；这里仅负责重复代码报告。
 -- 自包含路径：无论调用方是否设置 LUA_PATH，都从脚本位置加载固定工具。
+-- 加载的固定工具源码目录（相对仓库根），唯一来源：
+-- tests/native/slow/quality_report_test.lua 经 require("tools.quality.report") 取同一份做缺失预检。
+local TOOLCACHE_SOURCES = { ".toolcache/dry4lua/src", ".toolcache/luacheck/src", ".toolcache/acceptance4lua/src" }
+-- 被 require 时只导出常量，不当脚本执行（作为脚本运行时 ... 是命令行参数）。
+if ... == "tools.quality.report" then return { TOOLCACHE_SOURCES = TOOLCACHE_SOURCES } end
+
 local script_dir = arg[0]:match("^(.*)[/\\][^/\\]*$") or "."
 local root = script_dir .. "/../.."
-package.path = root .. "/.toolcache/dry4lua/src/?.lua;"
-  .. root .. "/.toolcache/dry4lua/src/?/init.lua;"
-  .. root .. "/.toolcache/luacheck/src/?.lua;"
-  .. root .. "/.toolcache/luacheck/src/?/init.lua;"
-  .. root .. "/.toolcache/acceptance4lua/src/?.lua;"
-  .. root .. "/.toolcache/acceptance4lua/src/?/init.lua;"
-  .. package.path
+local search = {}
+for _, dir in ipairs(TOOLCACHE_SOURCES) do
+  search[#search + 1] = root .. "/" .. dir .. "/?.lua;" .. root .. "/" .. dir .. "/?/init.lua;"
+end
+package.path = table.concat(search) .. package.path
 local json = require("acceptance4lua.json")
 local dry = require("dry4lua.analysis")
 local ast = require("dry4lua.ast")
