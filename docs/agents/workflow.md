@@ -45,18 +45,15 @@ Lua 命令使用 **Lua 5.4**：WSL 上裸 `lua` 经 alternatives 可能指向 5.
 - 根目录 `uml` 由安装器生成（原生 POSIX 入口），不要编辑；固定工具组合的安装与校验使用 [tools/quality/README.md](../../tools/quality/README.md) 的项目入口。
 - **实机验收在开发端（WSL2）**：安装、doctor、full／fast、coverage、CRAP、独立 Python 回归与 Herdr 恢复的实机数据都来自 WSL。**macOS 未实机验证，没有实机数据**。
 
-**worktree 起手式。** `tools/quality/project.json` 的 `tools.*.source` 写成 `../uml-viewer` 这类相对路径，从检出根的**父目录**解析；worktree 里没有主检出旁的真实工具检出，必须在 worktree 的父目录建 symlink：
+**worktree 起手式。** 新建 worktree 后在其根执行一次：
 
 ```bash
-cd "<worktree 父目录>"
-for t in uml-viewer crapper mutator dryer; do
-  ln -s "<主检出旁的 $t 检出路径>" "$t"
-done
+lua5.4 tools/cli.lua worktree-init
 ```
 
-- 目标必须是这些**真实检出**。指向 `.uml-viewer/<tool>`（安装产物而非上游检出）会让 install／doctor 预检与标准分发回归大面积报错。
-- `.toolcache` 与 `.uml-viewer` **不** symlink 共享：由人在 worktree 里执行 `tools/quality/project install` 独立安装（pip、字体与 cimgui 有缓存；agent 不执行，见「完成判据」的人工验收表）。`lua_tools` 七项（`luacov`、`dry4lua`、`luacheck`、`acceptance4lua`、`argparse`、`datafile`、`luafilesystem`）全部登记在 `project.json`，url 与 commit 是声明式来源，由 install 拉取、校验与构建。独立安装也避开共享 venv 的必然后果：`doctor` 里针对 `crapper.__file__` 的断言会失败（editable 安装写下的 `.pth` 硬编码主检出路径）。缺 `luacheck` 时 `tests/native/slow/quality_report_test.lua` 会经 `dry4lua/ast.lua` 抛 `luacheck required`，断言先撞在 `broken.lua` 那一行——报错点离根因三层。
-- **不要在 worktree 根内建这四个 symlink**：install 只按 `../<tool>` 从**父目录**解析来源，根内的同名目录无人引用；它们又不在 `.gitignore`（只忽略 `.toolcache/` 与 `.uml-viewer/`），会以 `?? crapper/` 出现在 `git status`，一次 `git add -A` 就提交进去。
+- 做两件事，已存在的条目一律跳过（幂等，可重复执行），任一来源缺失时在写入前失败：从 magpie 资源库复制上游 `blender-*` skill 到 `.agents/skills/`（来源见[美术资产流水线](art-pipeline.md#上游-blender--skill)）；按 `tools/quality/project.json` 的 `tools.*.source`（`../<工具>`）在 worktree 的**父目录**建 symlink，指向主检出旁的真实工具检出。`--skills-from`、`--tools-from` 可覆盖默认来源，见 `--help`。
+- 不执行 `tools/quality/project install`。`.toolcache` 与 `.uml-viewer` **不** symlink 共享，由人在 worktree 里执行 install 独立安装（pip、字体与 cimgui 有缓存）；`lua_tools` 七项的 url 与 commit 登记在 `project.json`，由 install 拉取、校验与构建。独立安装也避开共享 venv 的必然后果：`doctor` 里针对 `crapper.__file__` 的断言会失败（editable 安装写下的 `.pth` 硬编码主检出路径）。未安装时 full 只剩 `tests/native/slow/quality_report_test.lua` 一处失败，报「缺 `.toolcache`，需人执行 `tools/quality/project install`」。
+- 不要手工改建这些 symlink：指向 `.uml-viewer/<tool>`（安装产物而非上游检出）会让 install／doctor 预检与标准分发回归大面积报错；建在 worktree 根内则无人引用，又不在 `.gitignore`，一次 `git add -A` 就会提交进去。
 
 **美术资产（Meshy MCP + 无头 Blender）。** 产出鱼类等模型与动画的接入方式、导出分件与验收步骤见 [美术资产流水线](art-pipeline.md)，尺寸口径见 [ADR-0004](../adr/0004-fish-asset-scale.md)。唯一的 MCP 是 Meshy，注册与密钥接法见 [美术资产流水线](art-pipeline.md#前端配置)。Blender 不接 MCP，只经 `blender` 子命令无头执行（[ADR-0009](../adr/0009-blender-headless-only.md)）。资产本体不进本仓，正式资产走编辑器导入。
 
@@ -113,7 +110,7 @@ chmod +x "$H/pre-commit"
 | 检查 | 通过条件 |
 |---|---|
 | `busted --run=fast`（日常） | fast 车道全部用例通过，末行匹配 `N successes / 0 failures / 0 errors / 0 pending : T seconds`，退出码 0 |
-| `busted --run=full`（收尾） | 含 slow 车道，全部用例通过，末行匹配 `N successes / 0 failures / 0 errors / 0 pending : T seconds`，退出码 0 |
+| `busted --run=full`（收尾） | 含 slow 车道，全部用例通过，末行匹配 `N successes / 0 failures / 0 errors / 0 pending : T seconds`，退出码 0。worktree 执行「worktree 起手式」后若只因缺 `.toolcache` 达不到（install 由人运行），以合并后主检出的 full 为准，并在交付说明里写明 |
 | `bash tools/acceptance/run_acceptance.sh`（无参数；有 feature 时） | 跑除 `art` 外的全部车道及 `features/` 根下的裸 feature，每个 feature `N passed, 0 failed`，末行 `acceptance run OK`；所选范围无 feature 时提示跳过且返回 0。`art` 断言仓库外美术产物，不进代码收尾门（见「美术资产交付」行）；`--all` 跑全部车道 |
 | 美术资产交付 | `04-validate.py` 跑完并通过（报告里 `failures` 为空，含网格封闭性硬门槛），且 `bash tools/acceptance/run_acceptance.sh art` 全绿；只经这两个公开入口调用，不另开 CI，资产校验不进 pre-commit。预算文件、`mesh` 段或 `validation.json` 缺失同样算失败（缺报告时提示缺哪份，可用 `EGGY_ART_ASSETS` 指到美术资产根目录），口径见 [美术资产流水线](art-pipeline.md#网格封闭性硬门槛) |
 | 提交时 pre-commit hook 自动检查（见上方「pre-commit hook」）：暂存的 `.lua` 逐个 `loadfile`，含 Lua 改动时再跑 `busted --run=fast`；agent 不另跑这一项，提交时也不必为它重复手跑 fast | `git commit` 成功，未被 hook 拦下 |
