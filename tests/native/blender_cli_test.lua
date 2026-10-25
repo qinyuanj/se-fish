@@ -163,6 +163,17 @@ describe("TestBlenderCliPreflight", function()
     assert.are_not.equal(0, code)
     assert.matches("blender-core", err, 1, true)
     assert.matches("docs/agents/art-pipeline.md", err, 1, true)
+    -- 报错指向的小节标题须真实存在于文档，防止文档改名后报错指向空处。
+    local section = err:match("docs/agents/art%-pipeline%.md 的「(.-)」")
+    assert.is_not_nil(section, "报错未按「小节名」引用 art-pipeline.md")
+    local f = assert(io.open("docs/agents/art-pipeline.md", "r"))
+    local doc = f:read("a")
+    f:close()
+    local found = false
+    for line in doc:gmatch("[^\n]+") do
+      if line:match("^#+%s+(.-)%s*$") == section then found = true end
+    end
+    assert.is_true(found, "art-pipeline.md 中没有标题「" .. section .. "」")
     assert.are.equal(0, #world.executed)
   end)
 

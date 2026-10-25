@@ -2,7 +2,7 @@
 # 入库的 pre-commit 检查（#133，#131）。
 # 由共享 hooks 目录里的一行式 pre-commit 调起，安装方式见 docs/agents/workflow.md「pre-commit hook」。
 # 1. 暂存区每个 .lua 取暂存内容做 Lua 5.4 loadfile（检查的是将要提交的内容，不是工作区）；
-# 2. 暂存区含 .lua 或 .busted 时再跑 busted --run=fast；纯文档提交不跑。
+# 2. 暂存区含 .lua 或 .busted 时再跑 busted --run=fast（跑的是工作区，部分暂存时可能与提交内容不同）；纯文档提交不跑。
 # 质量工具不进 hook。
 set -u
 
@@ -10,9 +10,11 @@ LUA_BIN=${LUA_BIN:-lua5.4}
 
 git_dir=$(git rev-parse --git-dir) || exit 1
 work=$(mktemp -d "$git_dir/pre-commit.XXXXXX") || exit 1
-trap 'rm -rf "$work"' EXIT HUP INT TERM
+# 只在 EXIT 清理；信号先转成 exit 1 再走 EXIT，否则收到信号后脚本会接着跑并以 0 放行提交。
+trap 'rm -rf "$work"' EXIT
+trap 'exit 1' HUP INT TERM
 
-# -z 防止空格/中文路径被拆词。
+# -z 关掉 git 对中文等非 ASCII 路径的引号转义；随后按行读取，空格路径没问题，含换行的文件名不支持。
 # 是否跑 busted 看全部暂存变更（删掉 .lua 也可能弄坏 fast）；loadfile 只看 ACMR（删除的文件无暂存内容可查）。
 git diff --cached --name-only -z >"$work/all" || exit 1
 git diff --cached --name-only -z --diff-filter=ACMR >"$work/staged" || exit 1
