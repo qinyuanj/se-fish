@@ -26,7 +26,7 @@ Lua 命令使用 **Lua 5.4**：WSL 上裸 `lua` 经 alternatives 可能指向 5.
 - `lua5.4 tools/cli.lua sync --packages`：在上述清单外追加三端 `packages/` 字节镜像，删除过期文件；任一端源 packages 缺失或为空时整次同步在写入前失败。该方向以宿主为准，回灌前先确认工作区已提交。
 - `lua5.4 tools/cli.lua blender <脚本.py> [--blend <输入.blend>] [-- <脚本参数>...]`：在部署端无头 Blender 里执行脚本，是唯一的 Blender 入口；`--which` 核对将用的 Blender，`--expr` 执行内联代码。路径写开发端形式，由入口转换；用法与约定见 [美术资产流水线](art-pipeline.md)，决策见 [ADR-0009](../adr/0009-blender-headless-only.md)。
 - 官方包升级、聚合入口与编辑器预设依赖见 [官方包接入参考](../packages-reference.md)。技能包预设命令见 `lua5.4 tools/cli.lua ability-presets --help`；验收脚本说明见 `tools/acceptance/README.md`。
-- **临时产物**：手工验证的中间文件、单据正文草稿等临时产物一律放仓库 `tmp/`（已 gitignored），无需清理；不放系统临时目录，也不为清理去 `rm`（沙盒会拒绝）。
+- **临时产物**：手工验证的中间文件、单据正文草稿等临时产物一律放仓库 `tmp/`（已 gitignored），无需清理；不放系统临时目录，也不为清理去 `rm`（沙盒会拒绝）。这条管 agent 手工产生的文件；脚本自建自删的临时目录（如 pre-commit hook 在 git 目录下的工作目录）不在此列。
 - 质量入口为 `tools/quality/project`（POSIX sh 薄转发），安装、覆盖率、CRAP、DRY、差分 mutation 与复验步骤见 [tools/quality/README.md](../../tools/quality/README.md)；只出报告，不设指标门槛。
 - 单测放 `tests/native/`（slow 车道放 `tests/native/slow/`），共享夹具放 `tests/support/`，探针放 `tests/probes/`（手工探针，不入任何车道）。日常运行 `busted --run=fast`（等价 `default`），收尾运行 `busted --run=full`；车道由根目录 `.busted` 定义，共享初始化在 `tests/native/helper.lua`。开发端（WSL）是唯一测试环境，案例不分平台，完成判据表里的 `0 pending` 就是在开发端取的严格值。
   - **执行序只保证到文件内**：迁移保留的是**文件内**执行序（`it` 注册序 == 旧 LuaUnit 类内方法序），**不保留跨文件的全局类名字典序**。LuaUnit 的 `collectTests()` 排的是全局 `_G.Test*` **类名**，`.busted` 的 `sort-files=true` 排的是**文件路径字符串**，是两个键空间，技术上无法廉价复现；且 helper 在文件发现**之前**执行，插不进重排钩子。
@@ -59,7 +59,7 @@ done
 - `.toolcache` 与 `.uml-viewer` **不** symlink 共享：由人在 worktree 里执行 `tools/quality/project install` 独立安装（pip、字体与 cimgui 有缓存；agent 不执行，见「完成判据」的人工验收表）。`lua_tools` 七项（`luacov`、`dry4lua`、`luacheck`、`acceptance4lua`、`argparse`、`datafile`、`luafilesystem`）全部登记在 `project.json`，url 与 commit 是声明式来源，由 install 拉取、校验与构建。独立安装也避开共享 venv 的必然后果：`doctor` 里针对 `crapper.__file__` 的断言会失败（editable 安装写下的 `.pth` 硬编码主检出路径）。缺 `luacheck` 时 `tests/native/slow/quality_report_test.lua` 会经 `dry4lua/ast.lua` 抛 `luacheck required`，断言先撞在 `broken.lua` 那一行——报错点离根因三层。
 - **不要在 worktree 根内建这四个 symlink**：install 只按 `../<tool>` 从**父目录**解析来源，根内的同名目录无人引用；它们又不在 `.gitignore`（只忽略 `.toolcache/` 与 `.uml-viewer/`），会以 `?? crapper/` 出现在 `git status`，一次 `git add -A` 就提交进去。
 
-**美术资产（Meshy MCP + 无头 Blender）。** 产出鱼类等模型与动画的接入方式、导出分件与验收步骤见 [美术资产流水线](art-pipeline.md)，尺寸口径见 [ADR-0004](../adr/0004-fish-asset-scale.md)。唯一的 MCP 是 Meshy：Codex 的注册在仓库内 `.codex/config.toml`（gitignored，不入库），key 走环境变量 `MESHY_API_KEY`，位置与接法见 [美术资产流水线](art-pipeline.md#前端配置)。Blender 不接 MCP，只经 `blender` 子命令无头执行（[ADR-0009](../adr/0009-blender-headless-only.md)）。资产本体不进本仓，正式资产走编辑器导入。
+**美术资产（Meshy MCP + 无头 Blender）。** 产出鱼类等模型与动画的接入方式、导出分件与验收步骤见 [美术资产流水线](art-pipeline.md)，尺寸口径见 [ADR-0004](../adr/0004-fish-asset-scale.md)。唯一的 MCP 是 Meshy，注册与密钥接法见 [美术资产流水线](art-pipeline.md#前端配置)。Blender 不接 MCP，只经 `blender` 子命令无头执行（[ADR-0009](../adr/0009-blender-headless-only.md)）。资产本体不进本仓，正式资产走编辑器导入。
 
 **蛋仔 hook 与技能（开发端接入）。** eggitor 的 `SessionStart` hook（`session_start.mjs`）向会话注入 `eggy-se.mdc` 规则与帧同步技能禁用清单，但安装器只把它登记在部署端的 `~/.codex/hooks.json`。开发端手动接入，复用部署端资产，随编辑器升级自动更新：
 
@@ -85,6 +85,7 @@ chmod +x "$H/pre-commit"
 ```
 
 - 当前分支没有该脚本时放行，旧分支与并行 worktree 不受影响。
+- **检查对象不同**：`loadfile` 查的是暂存内容；`busted --run=fast` 跑的是工作区。部分暂存（`git add -p`、暂存后又改）时 fast 的结果可能与实际提交的内容不一致，需要确认时先把未暂存改动 `git stash --keep-index` 再提交。
 - **不用 `core.hooksPath`**：git 2.43 下设了它，teamai 装在 hooks 目录的 post-* hook 就不再执行，teamai 也拒绝重装。**不用软链**：软链按主 worktree 解析，其他 worktree 会跑主检出那份脚本。
 - **与 teamai 分工**：teamai 只管 `post-checkout` / `post-merge` / `post-rewrite`（文件内有 `managed by teamai` 标记），`pre-commit` 归本仓库；两边互不覆盖，改 hook 后核对三个 post-* 仍在且内容未变。
 - **`--no-verify` 仅限人用**：agent 不得使用；hook 拦下时修复问题后重新提交。
@@ -108,7 +109,7 @@ chmod +x "$H/pre-commit"
 
 ## 完成判据
 
-代码改动按顺序执行，全部通过才算完成。下表只列 agent 执行的项；质量工具由人运行，见表后的「人工验收」。
+代码改动按顺序执行，全部通过才算完成；pre-commit 一项不占顺序，每次提交时由 hook 自动完成。下表只列 agent 执行的项；质量工具由人运行，见表后的「人工验收」。
 
 | 检查 | 通过条件 |
 |---|---|
@@ -116,10 +117,10 @@ chmod +x "$H/pre-commit"
 | `busted --run=full`（收尾） | 含 slow 车道，全部用例通过，末行匹配 `N successes / 0 failures / 0 errors / 0 pending : T seconds`，退出码 0 |
 | `bash tools/acceptance/run_acceptance.sh`（有 feature 时） | `N passed, 0 failed`，末行 `acceptance run OK`；无 feature 时提示跳过且返回 0 |
 | 美术资产交付 | `04-validate.py` 跑完并通过（报告里 `failures` 为空，含网格封闭性硬门槛），且 `bash tools/acceptance/run_acceptance.sh` 的 `features/art/` 车道全绿；只经这两个公开入口调用，不另开 CI，资产校验不进 pre-commit。预算文件或 `mesh` 段缺失同样算失败，口径见 [美术资产流水线](art-pipeline.md#网格封闭性硬门槛) |
-| 每个改过的 `.lua` 由 pre-commit 执行 `loadfile`（见上方「pre-commit hook」） | 提交未被 hook 拦下 |
+| 提交时 pre-commit hook 自动检查（见上方「pre-commit hook」）：暂存的 `.lua` 逐个 `loadfile`，含 Lua 改动时再跑 `busted --run=fast`；agent 不另跑这一项，提交时也不必为它重复手跑 fast | `git commit` 成功，未被 hook 拦下 |
 | `lua5.4 tools/cli.lua deploy` 后执行上面的 `code validate` | `ok=true`、`data.valid=true`、`data.is_se_map=true`，`data.issues` 与 `meta.warnings` 均为空 |
 | validate 通过后全套试玩 | 每条验收现象都有取证产物；`log trace` 本轮窗口有效且无错误 |
-| 提交前对 `<基线>...HEAD` 跑 `/code-review` | 取得 Standards / Spec 两轴结论；硬性违规已修复，或在交付说明里逐条写明 |
+| 本轮改动提交到分支后、合入 main 前，对 `<基线>...HEAD` 跑 `/code-review`（改动尚未提交时用 `git diff <基线>` 的范围） | 取得 Standards / Spec 两轴结论；硬性违规已修复，或在交付说明里逐条写明 |
 
 **人工验收**：质量工具（`tools/quality/project` 的 `install`、`quality`、`test-tooling` 等全部子命令）由人手动运行，agent 不执行；agent 在交付说明里照抄下表命令，列为待人工跑的项。
 
