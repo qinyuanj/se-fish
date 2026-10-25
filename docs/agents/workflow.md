@@ -5,8 +5,7 @@
 ## 工程用语
 
 - **se-fish**：本图的 Lua 源码与质量工具仓库。
-- **业务树**：`client/`、`common/`、`server/` 中的业务源码，即架构图上的三棵树；排除各端 `packages/` 与 `server/_trigger/` 等非业务目录。
-- **指标采集范围**：CRAP、DRY 与差分 mutation 实际读的源码集合，三端全树（**含**各端 `packages/`），仅排除 `server/_trigger/`；以 `tools/quality/project.json` 的 `sources` 为准。与「业务树」不是一回事，理由见 [ADR-0005](../adr/0005-packages-as-external.md)。
+- **业务范围**：质量工具与架构图共用的源码集合，定义见 `GLOSSARY.md`，决策见 [ADR-0010](../adr/0010-packages-as-business-code.md)。
 - **宿主目录**：编辑器 `code init` 绑定的本地 Lua 工程目录，根有 `eggy.json`，是部署目的地；与仓库检出分别管理。路径和绑定方式见下方「工具链」。
 - **开发端**：WSL 里的仓库检出及其原生工具链，是唯一的开发、测试与质量运行环境；不在 Windows 开发。
   _Avoid_: 本机
@@ -34,13 +33,13 @@ Lua 命令使用 **Lua 5.4**：WSL 上裸 `lua` 经 alternatives 可能指向 5.
     - 裁定原文见迁移台账 `issue-84-mapping.md:96` 与 `issue-85-mapping.md:63`（台账在仓库外，按文件名检索）。
   - `busted` 命令：人手 shell 与工具子进程统一用裸 `busted`；`tools/quality/project.json` 的 `commands.*` 与 `busted.command` 都写裸 `busted`。它由 LuaRocks 按固定版本装在 `~/.luarocks/bin`，该目录必须在 PATH 里；`tools/quality/project doctor` 会在缺失时给出提示。
 
-**架构图（uml-viewer）。** 根目录 `policy.edn` 描述三端模块树、排除目录与外部节点（`:exclude`、`:foreign`），`docs/uml/se-fish.edn` 是生成的依赖图（不要手编）。
+**架构图（uml-viewer）。** 根目录 `policy.edn` 描述三端模块树、排除目录与隐藏模块（`:exclude`、`:omit`），`docs/uml/se-fish.edn` 是生成的依赖图（不要手编）。
 
 - `./uml`（安装器生成的原生入口）：首次启动 viewer 与 companion 看图、向 agent 发起图上操作；`./uml ir` 在修改三端代码后重新生成图，viewer 检测文件变化自动重载。
 - **companion 后端是 Herdr（>= 0.9.3，socket protocol 22）**：旧 tmux/psmux 路径已退役，运行平台是 WSL2/Linux（Windows 原生不受支持，macOS 当前不承诺）。PATH 上每个 `herdr` 都逐一预检，选出兼容者中版本最高者（同版本取 PATH 靠前者），本次启动的全部 Herdr 调用都走它的绝对路径；无兼容候选时列出各候选路径与拒绝原因，不自动下载、升级或回退。companion ownership 记录在 `.uml-viewer/companion.edn`，必须显式记为 Herdr；旧记录或缺 backend 的记录会保留并拒绝接管，不要猜着重连。能力契约与验收边界见 uml-viewer 的 `docs/herdr-backend-contract.md`，版本下限与可执行文件选择见其 `docs/adr/0003-herdr-version-floor.md`、`docs/adr/0004-herdr-executable-selection.md`。
 - **重启 viewer 必须走协议**：往 `.uml-viewer/to-viewer.edn` 写 `:quit-for-restart` → 等旧 JVM 自然退出 → `./uml --restart`；新 JVM 按持久化记录重新 bind 原 pane，不新建 companion。**绝不 SIGKILL**，也不要绕开公开 wrapper 直接传 `--restart`。
 - 图上 `crap` / `mutate`：companion 消费邮箱命令后执行项目公开入口（即 `uml-quality.json` 声明的 `tools/quality/project refresh-crap` / `tools/quality/project mutation`）。每次调用前删掉上一条 `.uml-viewer/quality-result.json`，运行后核对刚等到的记录里 `version`、`operation`、`projectRoot`、实际退出码与 `validResult`；只有 `validResult` 为真才继续 IR 与显示。
-- 图上 `client|common|server` 为三棵**业务树**：各端 `packages/` 不建类，业务代码对官方包的 `require` 收成外部椭圆（`policy.edn` 的 `:foreign` 取 `client|common|server.packages` 三个端级前缀，每端一个椭圆，新增包无需改 policy）。viewer 从 `.metrics/crap.edn` 与 `.metrics/mutate/*.edn` 加载指标；缺少任一指标的类卡片为红色，指标里没有对应类的记录被忽略（包内代码仍在「指标采集范围」内，只是图上无类可上色）。Lua 指标安装与命令见 [tools/quality/README.md](../../tools/quality/README.md)。
+- 图上 `client|common|server` 三棵树覆盖整个**业务范围**：各端 `packages/` 按真实命名空间建类，不设外部节点（`policy.edn` 不写 `:foreign`，`:exclude` 只排除 `_trigger`）。viewer 从 `.metrics/crap.edn` 与 `.metrics/mutate/*.edn` 加载指标；缺少任一指标的类卡片为红色。包内类不跑 mutation 基线，因缺快照显红并拉低端级聚合分数，属已接受的代价，理由见 [ADR-0010](../adr/0010-packages-as-business-code.md)。Lua 指标安装与命令见 [tools/quality/README.md](../../tools/quality/README.md)。
 - **标准 quality 分发**：根目录 `uml-quality.json`（版本管理）声明图上 `crap` / `mutate` 转交哪个项目公开命令，终端与右键走同一实现；参数、退出码、锁与失败报告一致。改项目质量入口时同步核对这份声明，`tools/quality/project doctor` 会先校验它。
 - `target/` 放覆盖率与 mutation worker，属于忽略的临时产物；`.metrics/` 保留质量快照并纳入版本管理。无函数定义的配置或转发模块不生成 mutation 快照；当前工具不测试模块顶层语句。
 - 根目录 `uml` 由安装器生成（原生 POSIX 入口），不要编辑；固定工具组合的安装与校验使用 [tools/quality/README.md](../../tools/quality/README.md) 的项目入口。

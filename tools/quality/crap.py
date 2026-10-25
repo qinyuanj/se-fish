@@ -21,7 +21,7 @@ from crapper.report import format_report
 
 def run_crap(root, config, files=None, lcov_path=None):
     root = Path(root).resolve()
-    # 即使请求携带单模块，也重新从统一配置发现完整业务树。
+    # 即使请求携带单模块，也重新从统一配置发现整个业务范围。
     files = source_files(root, config)
     if not files:
         raise RuntimeError("没有可分析的业务 Lua 源码")

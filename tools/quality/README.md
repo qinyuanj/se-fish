@@ -1,6 +1,6 @@
 # 质量工具
 
-项目使用 WSL（Linux）、Lua 5.4 与原生 Busted。终端与 viewer 刷新共用 `project.json`：分析 `client/`、`common/`、`server/` 的 Lua，排除 `server/_trigger/`；CRAP 与 DRY 都使用这一范围。这是**指标采集范围**，含各端 `packages/`（官方包）；架构图是另一回事——`policy.edn` 的图上只画业务树，各端 `packages/` 收成外部椭圆，因此包内指标记录没有对应类，叠加时被忽略（[ADR-0005](../../docs/adr/0005-packages-as-external.md)）。
+项目使用 WSL（Linux）、Lua 5.4 与原生 Busted。终端与 viewer 刷新共用 `project.json`：分析 `client/`、`common/`、`server/` 的 Lua，排除 `server/_trigger/`；CRAP、mutation 与 DRY 都使用这一范围。这就是**业务范围**，含各端 `packages/`（官方包）；架构图 `policy.edn` 用同一范围，包内模块按真实命名空间建类，指标都有对应类可上色。包内类没有 mutation 基线，在图上显红属已接受的代价（[ADR-0010](../../docs/adr/0010-packages-as-business-code.md)）。
 
 ## 解释器与测试命令契约
 
@@ -75,7 +75,7 @@ tools/quality/project test-tooling
 ./uml ir
 ```
 
-完整测试失败时停止覆盖率发布，旧 LCOV 失效；转换失败同样停止后续指标。任何 CRAP 刷新都替换完整业务树快照，选中单模块也保持其他模块的指标。DRY 保留重复代码候选报告，不设质量门槛。
+完整测试失败时停止覆盖率发布，旧 LCOV 失效；转换失败同样停止后续指标。任何 CRAP 刷新都替换整个业务范围的快照，选中单模块也保持其他模块的指标。DRY 保留重复代码候选报告，不设质量门槛。
 
 标准分发映射声明在仓库根 `uml-quality.json`（`version: 1`，`operations.crap` / `operations.mutate`），固定版本的 viewer 与 companion 每次执行命令时读取，无需 viewer 私有补丁（crapper/mutator 仍有各自未上游化的保护，补丁照常登记）。图上入口因此落到项目公开命令：`./uml crap` → `./tools/quality/project refresh-crap`（`forwardArgs: none`、`scope: whole-tree`，有效结果退出码 0），`./uml mutate <文件> [参数]` → `./tools/quality/project mutation`（`forwardArgs: append`，保留参数与退出码，0 与 3 视为有效结果）。超预算的 4 与失败码一样**不是**有效结果，图上操作失败关闭，不把部分结果当成全范围证明。`tools/quality/project doctor` 会先核对这份声明与项目公开入口是否一致，缺失、无效 JSON 或错映射都在环境核对之前明确失败；校验不通过时图上操作失败关闭，不回退到通用 crapper/mutator 或 `deps.edn` 别名。
 
@@ -126,7 +126,7 @@ tools/quality/project verify common/RateLimit.lua --install-root <独立检出�
 
 真实 viewer 验收步骤：
 
-1. 使用 `./uml` 首次启动，等待 companion 的 `:display` 被消费。确认顶层为 `client`、`common`、`server`，三棵树里只有业务源码，各端 `packages/` 以外部椭圆出现（顶层共 2 个：client、server 各 1 个，各带一条来自所属端盒子的箭头；common 没有业务代码引用包，不出椭圆）。钻进单端后只留该端可见模块引用的椭圆（server 有；client 与 common 没有，引用包的聚合入口在 `:omit` 里），并查看真实窗口。
+1. 使用 `./uml` 首次启动，等待 companion 的 `:display` 被消费。确认顶层为 `client`、`common`、`server`，三棵树覆盖整个业务范围：各端 `packages/` 按真实命名空间出现在所属端的树里，图上没有外部节点；`server/_trigger/` 与 `:omit` 里的模块不出现。查看真实窗口。
 2. 打开代表模块卡片，对照 EDN 检查 CRAP、覆盖率、函数名与 mutation 数量。缺少任一指标仍显示红色；红色本身不作为工具失败。
 3. 右键刷新 CRAP，核对 companion 实际执行项目入口，完整 CRAP 快照仍含其他模块，IR 与窗口自动更新。
 4. 右键差分 mutation，再对同一明确选定文件执行右键全量 mutation。核对邮件队列按顺序消费、命令使用相同配置、结果与窗口更新。
