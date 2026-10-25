@@ -35,6 +35,12 @@ local function run(cmd)
   return tonumber(code) or 1
 end
 
+-- 跑一条 sh 命令行，stdout/stderr 直通当前进程，返回退出码。供需要原样透传输出的
+-- 子命令（blender）使用；导出成字段是为了让 fast 车道能用桩替换，本模块内部仍走 run。
+function M.execute(cmd)
+  return run(cmd)
+end
+
 -- 跑一条 sh 命令行，拿回退出码与 stdout+stderr。io.popen 的 close 返回
 -- true / "exit" / 0（成功）或 nil / "exit" / code（失败）。
 function M.capture(cmd)
@@ -56,6 +62,11 @@ local function find_on_path(name)
   path = trim(path)
   if path == "" then return nil end
   return path
+end
+
+-- 按 PATH 解析一个命令的绝对路径；找不到返回 nil。
+function M.which(name)
+  return find_on_path(name)
 end
 
 -- interop 预检：cmd.exe 与 robocopy.exe 都能按 PATH 解析。

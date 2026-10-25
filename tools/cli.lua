@@ -13,6 +13,7 @@ local commands = {
   { name = "sync",   mod = "tools.sync",   summary = "从宿主回同步配置 / API 存根 / data/，--packages 追加三端官方包" },
   { name = "acceptance-slot", mod = "tools.acceptance_slot", summary = "查看、新建或切换 #93 验收存档槽（试玩前需 deploy）" },
   { name = "ability-presets", mod = "tools.ability_presets", summary = "重建技能包的编辑器侧预设（复制官方模板、刷壳与属性、回写 GameCfg key）" },
+  { name = "blender", mod = "tools.blender", summary = "在 Windows 侧无头 Blender 执行脚本（唯一 Blender 入口，透传 JSON 与退出码）" },
 }
 
 package.path = "./?.lua;./?/init.lua;" .. package.path

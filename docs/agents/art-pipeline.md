@@ -4,38 +4,39 @@
 
 ## 定位
 
-本仓只管**接入方式与约定**：流水线用哪两个 MCP server、装什么版本、导出怎么命名与分件、验收看什么。**资产本体不进本仓**——正式资产走编辑器导入，预设随地图存档（见 [官方包接入参考](../packages-reference.md)）。生成某个模型的具体过程不在此记录。
+本仓只管**接入方式与约定**：Blender 怎么执行、Meshy 怎么接入、导出怎么命名与分件、验收看什么。**资产本体不进本仓**——正式资产走编辑器导入，预设随地图存档（见 [官方包接入参考](../packages-reference.md)）。生成某个模型的具体过程不在此记录。
 
 ## 接入
 
-需要两个 MCP server：`blender`（驱动 Blender 本体）与 `meshy`（AI 生成模型）。
+Blender 只走无头模式，唯一入口是开发端的 CLI 子命令 `blender`；AI 生成模型走 `meshy` MCP server。决定与被拒的备选见 [ADR-0009](../adr/0009-blender-headless-only.md)。
 
-### blender —— Blender 官方 MCP 插件 + `blmcp`
+### blender —— CLI 子命令（只走无头）
 
-两侧都要：
-
-- **Blender 侧**：Blender **≥ 5.1.0**，装官方 **MCP** 插件（Blender Lab，`id=mcp`，已验证 **1.0.3**）。插件注册 `blmcp.server_start` / `blmcp.server_stop`，默认监听 `localhost:9876`，null 字节分隔 JSON 协议；打开 Auto Start 后随 Blender 启动。插件是上游产物、随 Blender 分发，不必入库（Windows 下装在 `%APPDATA%\Blender Foundation\Blender\<版本>\extensions\`，可据此核对已装版本）。
-- **Server 侧**：pip 包 `blender-mcp`（顶层模块 `blmcp`，入口 `blender-mcp`），已验证 **1.0.2**，来源 `https://projects.blender.org/lab/blender_mcp.git`。装完后 `blender-mcp` 在 Python 的 `Scripts` 目录，**通常不在 PATH 上**，配置里按需写绝对路径。
-
-工具以 `mcp__blender__*` 注册，常用的有 `execute_blender_code`（在已连接的 Blender 里执行 Python）、`get_objects_summary`、`get_blendfile_summary_*`、`search_api_docs` / `search_manual_docs`（随包带全量 Blender API 与手册，可直接检索）、`render_viewport_to_path`、`get_screenshot_of_window_as_image`。
-
-> 别照搬社区版 blender-mcp 的工具名：`get_scene_info`、`get_viewport_screenshot` **不存在**。
-
-**无头模式**（2026-10-22 海鸥试点验证）：Blender 不在线时，全部步骤都可以用
-`blender.exe -b --python <脚本>` 跑完，不依赖实时 MCP。脚本要自己建场景、自己摆相机与灯光、
-自己渲染自检图；每步落一个中间 `.blend`（`%TEMP%/<资产名>/`），失败只重跑那一步。
-实时 MCP 留给打开中间件看视口、截图与人工修补，不是必需路径。
-
-本机实测的调用方式（WSL 发起，Windows 执行）：
+在仓库根执行（开发端 WSL，Blender 装在部署端 Windows）：
 
 ```bash
-BLENDER="/mnt/c/Program Files/Blender Foundation/Blender 5.2/blender.exe"
-"$BLENDER" -b --python scripts/03-model.py
+lua5.4 tools/cli.lua blender --which                       # 核对将用的 Blender 路径与版本
+lua5.4 tools/cli.lua blender .agents/skills/blender-core/scripts/env_report.py   # 会话首调：环境报告
+lua5.4 tools/cli.lua blender .agents/skills/blender-asset-qa/scripts/qa_check.py \
+  --blend <中间件.blend> -- --objects Fish
+lua5.4 tools/cli.lua blender <资产目录>/scripts/03-model.py --blend <上一步.blend> -- --save <本步.blend>
+lua5.4 tools/cli.lua blender --expr "import bpy; print(len(bpy.data.objects))"
 ```
 
+- **路径写开发端形式**：脚本、`--blend` 与 `--` 之后以 `/`、`./`、`../` 开头的参数（含 `--key=/path`）由入口转成 Windows 形式；美术工作区写 `/mnt/c/Users/<用户名>/...`。`--expr` 里的代码原样传递，里面的路径要自己写 Windows 形式。
+- **输出与退出码**：stdout 只有脚本的 JSON（`@@JSON@@` 行去掉标记），不夹带 Blender 启动日志；脚本失败时退出码非零，并输出 `{"ok": false, ...}`。interop 不可用或找不到 Blender 时，在启动 Blender 前以退出码 1 失败。
+- **Blender 定位**：只认 `BLENDER_EXE`（接受 `/mnt/c/...` 与 `C:\...`）；未设置时在 Windows 标准安装目录下按版本号取最新。`BLENDER_PATH` 不再使用。
+- **上游 skill 的脚本优先**：QA（`blender-asset-qa/scripts/qa_check.py`）、审阅渲染（`review_shots.py`）、环境报告（`blender-core/scripts/env_report.py`）都直接调用，不再为每只资产手写审计代码。上游脚本都遵守 `run(**kw) -> dict` 契约，`--` 之后的参数见各脚本的 argparse。
+- **跳过上游 skill 的 Live/MCP 段落**：上游 blender-* skill 写着「Live 优先」和 MCP `look` 工具，本项目一律不用；看图改用 `review_shots.py` 无头渲染。上游 skill 不在本仓管理，不改其文件。
+- 资产自己的步骤脚本也照此调用；脚本写法与上游一致最省事（`_bpyx.cli` 负责解析 `--` 后参数、`--save` 与 JSON 输出）。
+
+**中间件 `.blend` 交接**：每一步把结果存成一个中间件，失败只重跑那一步。位置固定为美术工作区该资产目录下的 `work/`，按步骤编号命名（`<资产目录>/work/NN-<步骤>.blend`，例如 `军舰鸟/work/03-model.blend`）。人工修模时，人在 Blender GUI 里打开最新的中间件，修改后**原地存盘**，然后通知 agent；agent 用 `--blend` 读这份文件，接着跑后续步骤。不经任何实时通道。
+
 无头模式下两条注意事项：`bpy.ops.wm.open_mainfile` / `read_homefile` 会弄脏执行 context，
-重建场景用逐个删除对象；`view_transform` 不设 `Standard` 时，AgX 会把已按显示编码存盘的贴图再压一遍，
-自检渲染看起来像全黑。
+换文件用 `--blend` 交给入口，重建场景用逐个删除对象；`view_transform` 不设 `Standard` 时，
+AgX 会把已按显示编码存盘的贴图再压一遍，自检渲染看起来像全黑。
+
+历史脚本（海鸥 01~05、军舰鸟冒烟、鲤鱼）不迁移，作为留痕保留。鲤鱼脚本 docstring 里的 `blend.py` 用法已失效：socket 桥接脚本已改名为 `blend.py.bak`，需要重跑时改用 `blender` 子命令。
 
 ### meshy
 
@@ -59,7 +60,7 @@ BLENDER="/mnt/c/Program Files/Blender Foundation/Blender 5.2/blender.exe"
 
 ### 前端配置
 
-仓库不提交 MCP 配置，也不再维护 DSH 接入。在所用前端（目前是 Codex）里接入 `blender` 与 `meshy` 两个 MCP server，`meshy` 的 key 走环境变量 `MESHY_API_KEY`；接入后核对工具已注册。
+仓库不提交 MCP 配置，也不再维护 DSH 接入。在所用前端（目前是 Codex）里只接入 `meshy` MCP server，key 走环境变量 `MESHY_API_KEY`；接入后核对工具已注册。**不要注册 Blender MCP**：注册了 agent 就会被诱导去试实时通道。
 
 ## 制作约定
 
@@ -101,7 +102,7 @@ BLENDER="/mnt/c/Program Files/Blender Foundation/Blender 5.2/blender.exe"
 
 ## 试点复盘（鲤鱼，2026-10-16）
 
-过程数据、任务 ID、脚本与校验报告都在美术工作区 `Desktop/dev/eggy/美术资产/鲤鱼/`（脚本工具 `blend.py` 直连 Blender、`meshy.py` 走 Meshy REST，位于同级的 `Desktop/dev/eggy/tools/`）。这里只留可复用的结论。
+过程数据、任务 ID、脚本与校验报告都在美术工作区 `Desktop/dev/eggy/美术资产/鲤鱼/`（脚本工具 `meshy.py` 走 Meshy REST，位于同级的 `Desktop/dev/eggy/tools/`；当时直连 Blender 的 `blend.py` 已退役为 `blend.py.bak`）。这里只留可复用的结论。
 
 - **额度口径要按模型档位算**：`meshy-7.1` 的预览是 **20** 额度（低模档才是 5），精修 10。一条鱼实扣 **30**；开工前按 20 报预览价。
 - **精修只回 BaseColor**：Normal 与 ORM 必须在 Blender 自烘（high-poly → low-poly，roughness 值对齐参照鱼的 ORM G 通道均值）。

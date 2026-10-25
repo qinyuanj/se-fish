@@ -10,7 +10,7 @@
 - **编码与审查**：编写或审查 SE 业务 Lua 前，读 `CODING_STANDARDS.md`。
 - **开发工作流**：修改代码、运行测试、同步宿主或操作编辑器前，以及整理过程产物时，读 `docs/agents/workflow.md`（工具链、测试纪律、完成判据、产物归属）。
 - **架构导航**：需要模块依赖全景、评估改动影响或从图上发起操作时，用 uml-viewer 打开 `docs/uml/se-fish.edn`；命令与约定见 `docs/agents/workflow.md` 工具链。
-- **美术资产**：制作、导出或验收模型与动画资产前，读 `docs/agents/art-pipeline.md`（Blender / Meshy MCP 接入、导出约定与验收），尺寸口径见 `docs/adr/0004-fish-asset-scale.md`。
+- **美术资产**：制作、导出或验收模型与动画资产前，读 `docs/agents/art-pipeline.md`（无头 Blender 入口、Meshy MCP 接入、导出约定与验收），尺寸口径见 `docs/adr/0004-fish-asset-scale.md`。Blender 只走无头：一律用 `lua5.4 tools/cli.lua blender`，**跳过上游 blender-* skill 的 Live/MCP 段落**（含 `execute_blender_code` 与 `look` 工具），不裸调 `blender.exe`、不用 `run_in_blender.py` 直连；见 `docs/adr/0009-blender-headless-only.md`。
 - **Issue**：读写前看 `docs/agents/issue-tracker.md`；打 triage 标签前看 `docs/agents/triage-labels.md`。本项目在 GitHub `qinyuanj/se-fish` 跟踪单据，通过 `gh` 操作。
 
 ## 修改边界

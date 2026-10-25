@@ -24,6 +24,7 @@ Lua 命令使用 **Lua 5.4**：WSL 上裸 `lua` 经 alternatives 可能指向 5.
 - `lua5.4 tools/cli.lua deploy`：将三端一级子树字节镜像到宿主目录（经 WSL 接缝层调用部署端 `robocopy /MIR`，镜像前打印将被删掉的宿主多余文件）；interop 不可用时在镜像前以非零退出码失败。编辑器开着本图时执行 validate → 有差异时 `code push` → `code diff` 复核，push 后仍不一致才返回失败。跨接缝约定见 [ADR-0008](../adr/0008-wsl-development-windows-deploy.md)。
 - `lua5.4 tools/cli.lua sync`：将宿主目录的 `eggy.json`、API 存根、`data/` 回灌仓库。
 - `lua5.4 tools/cli.lua sync --packages`：在上述清单外追加三端 `packages/` 字节镜像，删除过期文件；任一端源 packages 缺失或为空时整次同步在写入前失败。该方向以宿主为准，回灌前先确认工作区已提交。
+- `lua5.4 tools/cli.lua blender <脚本.py> [--blend <输入.blend>] [-- <脚本参数>...]`：在部署端无头 Blender 里执行脚本，是唯一的 Blender 入口；`--which` 核对将用的 Blender，`--expr` 执行内联代码。路径写开发端形式，由入口转换；用法与约定见 [美术资产流水线](art-pipeline.md)，决策见 [ADR-0009](../adr/0009-blender-headless-only.md)。
 - 官方包升级、聚合入口与编辑器预设依赖见 [官方包接入参考](../packages-reference.md)。技能包预设命令见 `lua5.4 tools/cli.lua ability-presets --help`；验收脚本说明见 `tools/acceptance/README.md`。
 - 质量入口为 `tools/quality/project`（POSIX sh 薄转发），安装、覆盖率、CRAP、DRY、差分 mutation 与复验步骤见 [tools/quality/README.md](../../tools/quality/README.md)；只出报告，不设指标门槛。
 - 单测放 `tests/native/`（slow 车道放 `tests/native/slow/`），共享夹具放 `tests/support/`，探针放 `tests/probes/`（手工探针，不入任何车道）。日常运行 `busted --run=fast`（等价 `default`），收尾运行 `busted --run=full`；车道由根目录 `.busted` 定义，共享初始化在 `tests/native/helper.lua`。开发端（WSL）是唯一测试环境，案例不分平台，完成判据表里的 `0 pending` 就是在开发端取的严格值。
@@ -57,7 +58,7 @@ done
 - `.toolcache` 与 `.uml-viewer` **不** symlink 共享：在 worktree 里直接 `tools/quality/project install` 独立安装即可（pip、字体与 cimgui 有缓存）。`lua_tools` 七项（`luacov`、`dry4lua`、`luacheck`、`acceptance4lua`、`argparse`、`datafile`、`luafilesystem`）全部登记在 `project.json`，url 与 commit 是声明式来源，由 install 拉取、校验与构建。独立安装也避开共享 venv 的必然后果：`doctor` 里针对 `crapper.__file__` 的断言会失败（editable 安装写下的 `.pth` 硬编码主检出路径）。缺 `luacheck` 时 `tests/native/slow/quality_report_test.lua` 会经 `dry4lua/ast.lua` 抛 `luacheck required`，断言先撞在 `broken.lua` 那一行——报错点离根因三层。
 - **不要在 worktree 根内建这四个 symlink**：install 只按 `../<tool>` 从**父目录**解析来源，根内的同名目录无人引用；它们又不在 `.gitignore`（只忽略 `.toolcache/` 与 `.uml-viewer/`），会以 `?? crapper/` 出现在 `git status`，一次 `git add -A` 就提交进去。
 
-**美术资产（Blender / Meshy MCP）。** 产出鱼类等模型与动画的接入方式、导出分件与验收步骤见 [美术资产流水线](art-pipeline.md)，尺寸口径见 [ADR-0004](../adr/0004-fish-asset-scale.md)。仓库不提交 MCP 配置，由所用前端（目前是 Codex）自行接入（key 走环境变量 `MESHY_API_KEY`，不入库）。资产本体不进本仓，正式资产走编辑器导入。
+**美术资产（Meshy MCP + 无头 Blender）。** 产出鱼类等模型与动画的接入方式、导出分件与验收步骤见 [美术资产流水线](art-pipeline.md)，尺寸口径见 [ADR-0004](../adr/0004-fish-asset-scale.md)。唯一的 MCP 是 Meshy：仓库不提交 MCP 配置，由所用前端（目前是 Codex）自行接入（key 走环境变量 `MESHY_API_KEY`，不入库）。Blender 不接 MCP，只经 `blender` 子命令无头执行（[ADR-0009](../adr/0009-blender-headless-only.md)）。资产本体不进本仓，正式资产走编辑器导入。
 
 **蛋仔 hook 与技能（开发端接入）。** eggitor 的 `SessionStart` hook（`session_start.mjs`）向会话注入 `eggy-se.mdc` 规则与帧同步技能禁用清单，但安装器只把它登记在部署端的 `~/.codex/hooks.json`。开发端手动接入，复用部署端资产，随编辑器升级自动更新：
 
@@ -93,7 +94,7 @@ done
 
 ## 完成判据
 
-代码改动按顺序执行，全部通过才算完成：
+代码改动按顺序执行，全部通过才算完成。质量工具（`tools/quality/project` 的 `install`、`quality`、`test-tooling` 等全部子命令）**由人手动运行**，agent 不执行；agent 完成其余各项后，在交付说明里列出待人工跑的质量命令。
 
 | 检查 | 通过条件 |
 |---|---|
