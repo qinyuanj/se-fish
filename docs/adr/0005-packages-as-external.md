@@ -1,6 +1,8 @@
 # 0005 各端 packages/ 在架构图上作为外部节点
 
-**Status**: accepted
+**Status**: superseded by [ADR-0010](0010-packages-as-business-code.md)
+
+> 已被 [ADR-0010](0010-packages-as-business-code.md) 取代：`c141b67` 起三端 packages 按业务代码建类，不再收成外部节点。下文保留为历史记录，其中的「业务树」「外部椭圆」等说法已不再使用。
 
 三端 `packages/` 是网易官方作者版包：整包替换、包内无版本号、不由本仓库维护（见 [packages-reference](../packages-reference.md)）。此前 `policy.edn` 只排除 `_trigger`，包被当普通源码扫进图：94 个包内类并入 `client`/`common`/`server` 三棵树，包内热点（CRAP 最高 8219.6）与官方内部依赖都画在业务树上。viewer 升到 `5404057` 后（[ADR-0004](0004-viewer-herdr-version-floor.md)）聚合语义改为按函数数加权，缺 mutation 快照的类**按每个函数算一次失败试验**，包内 533 个函数便成了三棵树分数里的假失败。现决定：`policy.edn` 的 `:exclude` 加 `"packages"`，包不建类；业务代码对包的 `require` 收成外部椭圆，`:foreign` 取三个端级前缀 `client.packages`、`common.packages`、`server.packages`，三端 `packages/` 整体都是 vendor，每端收成一个椭圆（当前 client、server 各 1 个；`common` 没有业务代码引用包，不出椭圆）。
 

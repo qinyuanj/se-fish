@@ -24,7 +24,7 @@
 
 ## 架构图上的位置
 
-图上三棵树只画业务源码，三端 `packages/` 不建类；业务代码对这些包的 `require` 收成外部椭圆，由 `policy.edn` 的 `:foreign` 三个端级前缀（`client.packages`、`common.packages`、`server.packages`）匹配，每端一个椭圆；新增包无需改 policy。决策与后果见 [ADR-0005](adr/0005-packages-as-external.md)；指标仍全量采集包内代码，只是没有对应类可上色。
+三端 `packages/` 属于业务范围：在图上按真实命名空间（如 `server.packages.<包名>.*`）建类，与其他业务模块一样连依赖、上指标；`policy.edn` 不为包写 `:foreign` 或排除项，新增包无需改 policy。包内类不跑 mutation 基线，缺快照显红属已接受的代价。决策与后果见 [ADR-0010](adr/0010-packages-as-business-code.md)（取代 ADR-0005）。
 
 ## 编辑器预设依赖
 

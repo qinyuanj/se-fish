@@ -3,7 +3,8 @@
  :lang :lua
  :hierarchical true
  :exclude ["_trigger"]
- ;; 各端 packages/ 已纳入业务代码开发：按真实命名空间建类，不再收成外部椭圆。
+ ;; 业务范围：三端源码排除 server/_trigger/，与 tools/quality/project.json 的 sources 一致；
+ ;; 各端 packages/ 属于业务范围，按真实命名空间建类，不设外部节点（ADR-0010）。
  ;; 无函数定义的配置与转发模块：不产生 CRAP 与 mutation 快照，图上恒判 1.0 分红，
  ;; 不代表可测业务逻辑，故按项目约定（docs/agents/workflow.md）从视图隐藏。
  :omit [common.cfg.Blindbox
