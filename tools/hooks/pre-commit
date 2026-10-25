@@ -1,0 +1,76 @@
+#!/bin/sh
+# 入库的 pre-commit 检查（#133，#131）。
+# 由共享 hooks 目录里的一行式 pre-commit 调起，安装方式见 docs/agents/workflow.md「pre-commit hook」。
+# 1. 暂存区每个 .lua 取暂存内容做 Lua 5.4 loadfile（检查的是将要提交的内容，不是工作区）；
+# 2. 暂存区含 .lua 或 .busted 时再跑 busted --run=fast；纯文档提交不跑。
+# 质量工具不进 hook。
+set -u
+
+LUA_BIN=${LUA_BIN:-lua5.4}
+
+git_dir=$(git rev-parse --git-dir) || exit 1
+work=$(mktemp -d "$git_dir/pre-commit.XXXXXX") || exit 1
+trap 'rm -rf "$work"' EXIT HUP INT TERM
+
+# -z 防止空格/中文路径被拆词。
+# 是否跑 busted 看全部暂存变更（删掉 .lua 也可能弄坏 fast）；loadfile 只看 ACMR（删除的文件无暂存内容可查）。
+git diff --cached --name-only -z >"$work/all" || exit 1
+git diff --cached --name-only -z --diff-filter=ACMR >"$work/staged" || exit 1
+tr '\0' '\n' <"$work/all" >"$work/all.lst"
+tr '\0' '\n' <"$work/staged" >"$work/staged.lst"
+
+need_busted=0
+if grep -qE '(\.lua|^\.busted)$' "$work/all.lst"; then
+  need_busted=1
+fi
+failed=0
+n=0
+while IFS= read -r path; do
+  case $path in
+    *.lua)
+      n=$((n + 1))
+      blob="blob$n.lua"
+      git show ":$path" >"$work/$blob" || { failed=1; continue; }
+      # 路径经环境变量传入：lua5.4 -e ... <file> 会把文件当脚本执行；stdin 接 /dev/null 防止读到假输入。
+      # 在 $work 里用短相对名 loadfile：长路径会被 Lua 截成 "..." 开头，没法换回暂存路径。
+      if ! (cd "$work" && HOOK_BLOB="$blob" HOOK_NAME="$path" "$LUA_BIN" -e '
+        local blob, name = os.getenv("HOOK_BLOB"), os.getenv("HOOK_NAME")
+        local ok, err = loadfile(blob)
+        if ok then os.exit(0) end
+        local i, j = err:find(blob, 1, true)
+        if i then err = err:sub(1, i - 1) .. name .. err:sub(j + 1) end
+        io.stderr:write("pre-commit: loadfile 失败: ", err, "\n")
+        os.exit(1)
+      ' </dev/null); then
+        failed=1
+      fi
+      ;;
+  esac
+done <"$work/staged.lst"
+
+if [ "$failed" -ne 0 ]; then
+  echo "pre-commit: 暂存区有 .lua 无法 loadfile，提交已拦下。" >&2
+  exit 1
+fi
+
+[ "$need_busted" -eq 1 ] || exit 0
+
+if ! command -v busted >/dev/null 2>&1; then
+  echo "pre-commit: 找不到 busted（应在 ~/.luarocks/bin 且该目录在 PATH 中），提交已拦下。" >&2
+  exit 1
+fi
+
+echo "pre-commit: busted --run=fast" >&2
+# git 在 hook 里导出的 GIT_INDEX_FILE 等变量不能漏给测试，否则用例里的 git 会操作到本次提交的索引。
+(
+  unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_PREFIX GIT_OBJECT_DIRECTORY GIT_COMMON_DIR
+  busted --run=fast </dev/null
+) >"$work/busted.out" 2>&1
+status=$?
+if [ "$status" -ne 0 ]; then
+  cat "$work/busted.out" >&2
+  echo "pre-commit: busted --run=fast 未通过（退出码 $status），提交已拦下。" >&2
+  exit 1
+fi
+tail -n 1 "$work/busted.out" >&2
+exit 0
