@@ -26,7 +26,7 @@ DUMP_SNIPPET = (
 
 
 class BustedLaneConfigTest(unittest.TestCase):
-    """.busted 配置形状：车道 ROOT、pattern、recursive、helper 与排序策略。"""
+    """.busted 配置形状：车道 ROOT、pattern、recursive、helper、排序策略与 auto-insulate。"""
 
     def _dump(self):
         result = subprocess.run([LUA, "-e", DUMP_SNIPPET], cwd=ROOT,
@@ -49,6 +49,17 @@ class BustedLaneConfigTest(unittest.TestCase):
                          "recursive 必须显式为 false，否则 fast 会沿目录递归捕获 tests/native/slow")
         self.assertEqual(settings.get("helper"), "tests/native/helper.lua")
         self.assertEqual(settings.get("sort-files"), "true")
+
+    def test_auto_insulate_is_explicitly_on(self):
+        """跨文件隔离靠 auto-insulate，不靠 helper（#135）。
+
+        Busted 默认即开启，但隐式依赖默认值时，配置里写成 false、删掉这一项或上游改默认都没人察觉；
+        这里要求 .busted 显式写 true。关掉后 fast 出现 package.loaded / GameCfg
+        跨文件残留（#130 审阅实测 7 failures / 3 errors）。
+        """
+        settings, _ = self._dump()
+        self.assertEqual(settings.get("auto-insulate"), "true",
+                         ".busted 的 _all 必须显式写 [\"auto-insulate\"] = true，跨文件隔离由它承担")
 
     def test_lane_roots_are_exactly_the_native_dirs(self):
         """ROOT 白名单是「谁会被发现」的唯一机制，因此钉精确集合而不是排除法。
