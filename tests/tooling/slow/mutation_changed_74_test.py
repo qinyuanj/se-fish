@@ -95,7 +95,7 @@ class MutationChangedTest(unittest.TestCase):
                          "common/readme.txt", "tests/Outside.lua"):
                 self._change(root, name, staged=True)
             self._change(root, "client/packages/Untracked.lua")
-            # 指标采集范围含各端 packages/（1d0ef96、ADR-0005），只排除 server/_trigger/。
+            # 业务范围含各端 packages/（1d0ef96、ADR-0010），只排除 server/_trigger/。
             expected = ["client/Added.lua", "client/packages/Untracked.lua", "common/Both.lua",
                         "common/Staged.lua", "common/Unstaged.lua", "server/New.lua",
                         "server/packages/Official.lua"]

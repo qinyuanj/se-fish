@@ -301,7 +301,7 @@ class TerminalGraphParityTest(unittest.TestCase):
                          (graph.stdout + graph.stderr).count(marker))
 
     def test_target_and_routing_arguments_cannot_narrow_the_declared_scope(self):
-        """图上单类右键与越界路由旗标都不能缩小快照：与终端全树刷新得到同一份业务树。"""
+        """图上单类右键与越界路由旗标都不能缩小快照：与终端全树刷新得到同一份业务范围快照。"""
         with self.subTest(arguments='目标'), tempfile.TemporaryDirectory(prefix='se-fish-parity-') as directory:
             root = Path(directory)
             snapshot, _ = build_fixture(root, coverage_argv(PASSING_STATS))

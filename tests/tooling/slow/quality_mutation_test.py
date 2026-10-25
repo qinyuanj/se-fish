@@ -25,7 +25,7 @@ class QualityMutationTest(unittest.TestCase):
         self.assertIn("显式", result.stdout + result.stderr)
 
     def test_out_of_scope_target_is_rejected_before_tests(self):
-        # 指标采集范围含各端 packages/（1d0ef96、ADR-0005），只排除 server/_trigger/。
+        # 业务范围含各端 packages/（1d0ef96、ADR-0010），只排除 server/_trigger/。
         result = subprocess.run([
             ENTRY,
             "mutation", "server/_trigger/GlobalVars.lua",
