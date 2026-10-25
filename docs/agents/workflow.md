@@ -76,6 +76,19 @@ done
 
 **teamai 的 Gitea 凭据（开发端接入）。** `GITEA_URL`、`GITEA_TOKEN` 存在部署端用户环境变量，经 Windows 用户变量 `WSLENV=GITEA_URL:GITEA_TOKEN` 透传到开发端，凭据只存一份。改 `WSLENV` 后关闭全部终端并 `wsl --shutdown` 才生效，常驻会话（Herdr 等）一并重启；`teamai doctor` 的两项 Gitea 检查通过即接入完成。缺凭据时 pull、recall 与 hook 照常，走 Gitea API 的操作（`members`、贡献 learning）失败。
 
+**pre-commit hook（开发端接入）。** 检查脚本入库在 `tools/hooks/pre-commit`：对暂存区每个 `.lua` 取**暂存内容**做 Lua 5.4 `loadfile`，暂存区含 `.lua` 或 `.busted` 时再跑 `busted --run=fast`，纯文档提交不跑 busted；质量工具不进 hook。共享 hooks 目录（`git rev-parse --git-common-dir` 下的 `hooks/`，所有 worktree 共用）里的 `pre-commit` 只转发到当前检出的脚本，每个克隆装一次：
+
+```bash
+H="$(git rev-parse --git-common-dir)/hooks"
+printf '%s\n' '#!/bin/sh' 'f="$(git rev-parse --show-toplevel)/tools/hooks/pre-commit"; [ -f "$f" ] || exit 0; exec sh "$f" "$@"' >"$H/pre-commit"
+chmod +x "$H/pre-commit"
+```
+
+- 当前分支没有该脚本时放行，旧分支与并行 worktree 不受影响。
+- **不用 `core.hooksPath`**：git 2.43 下设了它，teamai 装在 hooks 目录的 post-* hook 就不再执行，teamai 也拒绝重装。**不用软链**：软链按主 worktree 解析，其他 worktree 会跑主检出那份脚本。
+- **与 teamai 分工**：teamai 只管 `post-checkout` / `post-merge` / `post-rewrite`（文件内有 `managed by teamai` 标记），`pre-commit` 归本仓库；两边互不覆盖，改 hook 后核对三个 post-* 仍在且内容未变。
+- **`--no-verify` 仅限人用**：agent 不得使用；hook 拦下时修复问题后重新提交。
+
 **宿主目录专用于镜像。** 默认由 WSL 接缝层从部署端 `USERPROFILE` 推导：`%USERPROFILE%\Desktop\dev\eggy\LuaSource_钓鱼怎么这么危险啊喂！`。可用 `EGGY_WORKSPACE` 覆盖，接受 `/mnt/c/...` 与 `C:\...` 两种形式；空串当作未设置。
 
 **编辑器工程 ≠ 仓库检出。** `eggy.json` 回灌不等于 `code init` 绑定；手动执行 code-* 时用 `--workspace` 指向已绑定的宿主目录（部署端 exe 只认 Windows 形式，用 `wslpath -w` 转换），否则会报 `CODE_BINDING_INVALID`。`deploy` 已带此参数。手工复核（WSL interop）：
@@ -102,8 +115,8 @@ done
 | `busted --run=fast`（日常） | fast 车道全部用例通过，末行匹配 `N successes / 0 failures / 0 errors / 0 pending : T seconds`，退出码 0 |
 | `busted --run=full`（收尾） | 含 slow 车道，全部用例通过，末行匹配 `N successes / 0 failures / 0 errors / 0 pending : T seconds`，退出码 0 |
 | `bash tools/acceptance/run_acceptance.sh`（有 feature 时） | `N passed, 0 failed`，末行 `acceptance run OK`；无 feature 时提示跳过且返回 0 |
-| 美术资产交付 | `04-validate.py` 跑完并通过（报告里 `failures` 为空，含网格封闭性硬门槛），且 `bash tools/acceptance/run_acceptance.sh` 的 `features/art/` 车道全绿；只经这两个公开入口调用，不另开 pre-commit / CI。预算文件或 `mesh` 段缺失同样算失败，口径见 [美术资产流水线](art-pipeline.md#网格封闭性硬门槛) |
-| 每个改过的 `.lua` 执行 `lua5.4 -e "assert(loadfile('<file>'))"` | 无输出、退出码 0 |
+| 美术资产交付 | `04-validate.py` 跑完并通过（报告里 `failures` 为空，含网格封闭性硬门槛），且 `bash tools/acceptance/run_acceptance.sh` 的 `features/art/` 车道全绿；只经这两个公开入口调用，不另开 CI，资产校验不进 pre-commit。预算文件或 `mesh` 段缺失同样算失败，口径见 [美术资产流水线](art-pipeline.md#网格封闭性硬门槛) |
+| 每个改过的 `.lua` 由 pre-commit 执行 `loadfile`（见上方「pre-commit hook」） | 提交未被 hook 拦下 |
 | `lua5.4 tools/cli.lua deploy` 后执行上面的 `code validate` | `ok=true`、`data.valid=true`、`data.is_se_map=true`，`data.issues` 与 `meta.warnings` 均为空 |
 | validate 通过后全套试玩 | 每条验收现象都有取证产物；`log trace` 本轮窗口有效且无错误 |
 | 提交前对 `<基线>...HEAD` 跑 `/code-review` | 取得 Standards / Spec 两轴结论；硬性违规已修复，或在交付说明里逐条写明 |
