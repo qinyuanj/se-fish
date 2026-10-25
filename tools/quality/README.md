@@ -114,9 +114,9 @@ mutation 发布先校验完整暂存树，准备新文件，再将受影响旧�
 | 变量 | 覆盖的用例 | 何时释放 |
 |---|---|---|
 | `SE_FISH_QUALITY_E2E` | 真实拉起 crapper/mutator 的端到端用例（mutation 预算、差分、复用、发布、源码安全、质量 mutation 系列） | spec/116 收尾复验，或改 mutation 接缝时 |
-| `SE_FISH_QUALITY_INSTALL` | 经公开入口真实执行 `install` 的用例：`quality_lock_76_test.py` 用真实上游安装器两次 `install --install-only`（建 venv、pip，单例可达数分钟），`quality_install_discovery_test.py` 的 `QualityInstallTest`（本地 fixture 仓库上的完整 install 流程，含原生库编译） | 改 `install.py`、安装入口或 `project.json` 的工具固定提交时 |
+| `SE_FISH_QUALITY_INSTALL` | 用真实上游安装器执行 `install` 的用例：目前只有 `quality_lock_76_test.py` 的两次 `install --install-only`（建 venv、pip，并从外网下载字体包；网络卡住时单例会耗满 900s 超时） | 改 `install.py`、安装入口或 `project.json` 的工具固定提交时 |
 
-两道门控只在 `tests/tooling/slow/e2e_gate.py` 实现（`gate()` 一处语义），用例类或方法装饰 `@e2e_gate.skip_unless_e2e` / `@e2e_gate.skip_unless_install`；测试模块不得自行读这些变量，带 `--install-only` 实参的回归文件必须导入共享门控，由 `e2e_gate_test.py` 钉住。锁冲突下秒退的 install 调用（`quality_lock_76_test.py` 的互斥用例）仍默认运行。空缓存安装 suite（`quality_install_test.py`）不归门控，它只吃显式独立检出，见下文「可重跑验收」。
+两道门控只在 `tests/tooling/slow/e2e_gate.py` 实现（`gate()` 一处语义），用例类或方法装饰 `@e2e_gate.skip_unless_e2e` / `@e2e_gate.skip_unless_install`；测试模块不得自行读这些变量，由 `e2e_gate_test.py` 钉住。只打本地 fixture 的 install 用例（`quality_install_discovery_test.py` 的 `QualityInstallTest`，实测每例不到 1s）和锁冲突下秒退的 install 调用（`quality_lock_76_test.py` 的互斥用例）都是秒级契约用例，默认运行。空缓存安装 suite（`quality_install_test.py`）不归门控，它只吃显式独立检出，见下文「可重跑验收」。
 
 ```bash
 # 门控全开实跑并给出耗时排名

@@ -73,14 +73,6 @@ class E2EGateSharingTest(unittest.TestCase):
                      if 'skipUnless' in text and 'import e2e_gate' not in text]
         self.assertEqual(offenders, [])
 
-    def test_install_only_callers_go_through_the_shared_gate(self):
-        # 真实执行 install 的回归（#137）：带 --install-only 实参的文件必须导入共享门控。
-        # 只钉文件级，具体哪个用例受门控由装饰器决定（如锁冲突下秒退的 install 仍默认运行）。
-        offenders = [name for name, text in regression_sources().items()
-                     if ("'--install-only'" in text or '"--install-only"' in text)
-                     and 'import e2e_gate' not in text]
-        self.assertEqual(offenders, [])
-
 
 if __name__ == '__main__':
     unittest.main()

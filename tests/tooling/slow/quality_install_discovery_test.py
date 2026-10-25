@@ -3,8 +3,8 @@
 安装用例全部使用本地 fixture 仓库：桩 viewer 安装器按上游 `scripts/get-uml-viewer` 的
 契约工作（读 `<工具>_REPO_URL` / `<工具>_REF`，副本有本地修改即拒绝），不联网、
 不依赖 LOVE / Herdr，也不读取主工作区的 `.uml-viewer` 或 `.toolcache`。
-`QualityInstallTest` 经公开入口真实执行 install（每例 1～3 次，含 C 原生库编译），
-归 SE_FISH_QUALITY_INSTALL 门控（#137）；doctor pin 与 discover 契约用例保持默认运行。
+`QualityInstallTest` 虽经公开入口执行 install，但只打本地 fixture 与桩安装器，实测每例不到 1s，
+属秒级契约用例，默认运行，不归 SE_FISH_QUALITY_INSTALL 门控（#137 复测）。
 """
 import json
 import os
@@ -14,8 +14,6 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-
-import e2e_gate
 
 ROOT = Path(__file__).resolve().parents[3]
 ENTRY = ROOT / "tools/quality/project"
@@ -152,7 +150,6 @@ def install(driver, target, *extra):
                           timeout=120, env=env)
 
 
-@e2e_gate.skip_unless_install
 class QualityInstallTest(unittest.TestCase):
     def test_empty_root_installs_pinned_tools_and_registered_patch_then_repeats(self):
         with tempfile.TemporaryDirectory(prefix="quality-install-") as directory:

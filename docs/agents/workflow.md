@@ -121,7 +121,7 @@ install -m 755 tools/hooks/shim "$(git rev-parse --git-common-dir)/hooks/pre-com
 | 检查 | 通过条件 |
 |---|---|
 | `tools/quality/project quality` | 完整 Busted 套件通过，生成本轮 LCOV、全树 CRAP 与 DRY 报告 |
-| `tools/quality/project test-tooling` | `tests/tooling/slow` 的 Python 回归全绿（空缓存安装 suite 只吃独立检出，此处按设计跳过）；两道门控默认跳过、取值 `1` 才释放：真实拉起 crapper/mutator 的端到端用例归 `SE_FISH_QUALITY_E2E`，真实执行 `install` 的用例归 `SE_FISH_QUALITY_INSTALL`（改安装器或固定提交时释放）。「全绿」指门控默认形态下全绿，默认形态只留秒级契约用例，见 [质量工具](../../tools/quality/README.md#python-回归与门控) |
+| `tools/quality/project test-tooling` | `tests/tooling/slow` 的 Python 回归全绿（空缓存安装 suite 只吃独立检出，此处按设计跳过）；两道门控默认跳过、取值 `1` 才释放：真实拉起 crapper/mutator 的端到端用例归 `SE_FISH_QUALITY_E2E`，用真实上游安装器（联网）执行 `install` 的用例归 `SE_FISH_QUALITY_INSTALL`（改安装器或固定提交时释放）。「全绿」指门控默认形态下全绿，默认形态只留秒级契约用例，见 [质量工具](../../tools/quality/README.md#python-回归与门控) |
 
 ## 产物归属
 
