@@ -32,9 +32,9 @@ lua5.4 tools/cli.lua blender --expr "import bpy; print(len(bpy.data.objects))"
 
 #### 上游 blender-* skill
 
-`.agents/skills/blender-*`（gitignored，不归本仓管理）由 magpie 资源库复制而来：来源是部署端 `C:\Users\<用户名>\.config\magpie\library\skills\<skill 名>`，每个 skill 目录下的 `.magpie-library` 记录来源路径（`copied from ...`）与 `hash`。`blender` 子命令依赖其中的 `blender-core/scripts/run_in_blender.py`，缺失时报「上游 blender-core skill 未安装」并指向本节。
+`.agents/skills/blender-*`（gitignored，不归本仓管理）由 magpie 资源库复制而来：来源是部署端 `C:\Users\<用户名>\.config\magpie\library\skills\<skill 名>`，经 magpie 复制的 skill 目录下有 magpie 写入的 `.magpie-library`，记录来源路径（`copied from ...`）与 `hash`；资源库源目录里没有这个文件。`blender` 子命令依赖其中的 `blender-core/scripts/run_in_blender.py`，缺失时报「上游 blender-core skill 未安装」并指向本节。
 
-缺失或损坏时，从 magpie 资源库把对应 skill 目录整个重新复制到 `.agents/skills/` 下（开发端路径 `/mnt/c/Users/<用户名>/.config/magpie/library/skills/`），复制后核对 `.magpie-library` 里的来源与 hash，再跑 `lua5.4 tools/cli.lua blender --which` 与 `env_report.py` 确认可用。不要手改这些文件。
+缺失或损坏时（新建的 worktree 里也没有这个目录），从 magpie 资源库把对应 skill 目录整个重新复制到 `.agents/skills/` 下（开发端路径 `/mnt/c/Users/<用户名>/.config/magpie/library/skills/`）。手工复制不会生成 `.magpie-library`，用 `diff -rq` 对照资源库确认内容一致即可；再跑 `lua5.4 tools/cli.lua blender --which` 与 `env_report.py` 确认可用。不要手改这些文件。
 
 **中间件 `.blend` 交接**：每一步把结果存成一个中间件，失败只重跑那一步。位置固定为美术工作区该资产目录下的 `work/`，按步骤编号命名（`<资产目录>/work/NN-<步骤>.blend`，例如 `军舰鸟/work/03-model.blend`）。人工修模时，人在 Blender GUI 里打开最新的中间件，修改后**原地存盘**，然后通知 agent；agent 用 `--blend` 读这份文件，接着跑后续步骤。不经任何实时通道。
 
