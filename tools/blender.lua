@@ -215,7 +215,8 @@ local function run(opts)
 
   if not seam.which("python3") then fail("PATH 上找不到 python3（上游 run_in_blender.py 需要它）") end
   if not seam.exists(M.RUNNER) then
-    fail("上游 blender-core skill 未安装（缺 " .. M.RUNNER .. "）")
+    fail("上游 blender-core skill 未安装（缺 " .. M.RUNNER .. "），"
+      .. "来源与重装方式见 docs/agents/art-pipeline.md 的「上游 blender-* skill」")
   end
 
   local parts = { "BLENDER_EXE=" .. seam.q(exe), "python3", seam.q(M.RUNNER) }

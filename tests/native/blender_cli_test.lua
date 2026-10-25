@@ -162,6 +162,7 @@ describe("TestBlenderCliPreflight", function()
     local code, _, err = run({ "a.py" })
     assert.are_not.equal(0, code)
     assert.matches("blender-core", err, 1, true)
+    assert.matches("docs/agents/art-pipeline.md", err, 1, true)
     assert.are.equal(0, #world.executed)
   end)
 
