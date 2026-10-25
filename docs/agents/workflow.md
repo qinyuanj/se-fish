@@ -59,6 +59,21 @@ done
 
 **美术资产（Blender / Meshy MCP）。** 产出鱼类等模型与动画的接入方式、导出分件与验收步骤见 [美术资产流水线](art-pipeline.md)，尺寸口径见 [ADR-0004](../adr/0004-fish-asset-scale.md)。仓库不提交 MCP 配置，由所用前端（目前是 Codex）自行接入（key 走环境变量 `MESHY_API_KEY`，不入库）。资产本体不进本仓，正式资产走编辑器导入。
 
+**蛋仔 hook 与技能（开发端接入）。** eggitor 的 `SessionStart` hook（`session_start.mjs`）向会话注入 `eggy-se.mdc` 规则与帧同步技能禁用清单，但安装器只把它登记在部署端的 `~/.codex/hooks.json`。开发端手动接入，复用部署端资产，随编辑器升级自动更新：
+
+- 软链 `ln -sfn /mnt/c/Users/<用户名>/.eggitor ~/.eggitor`：脚本按 `os.homedir()` 定位规则与技能。
+- 在开发端 `~/.codex/hooks.json` 的 `SessionStart` **末尾**追加 `bash -lc "node ~/.eggitor/codex/hooks/session_start.mjs"`（`bash -lc` 取到 nvm 的 `node`）。Codex 按 `事件:序号` 在 `config.toml` 的 `hooks.state` 记录信任，追加在末尾才保得住已信任的条目；新条目首次启动时确认信任。
+- 把 `~/.eggitor/codex/se/skills/*` 逐个软链进 `~/.codex/skills/`，只挂 `se`。
+- 自检：`echo '{"cwd":"'"$PWD"'"}' | node ~/.eggitor/codex/hooks/session_start.mjs` 输出的 `additionalContext` 以 `eggy-se.mdc` 的 front matter 开头即接入完成。
+
+注入的规则有三处与开发端不符，以本仓约定为准：
+
+- **沙盒警告**：脚本只在 `~/.codex/config.toml` 全文找 `danger-full-access` 字样，"检测到 Codex 沙盒环境"按实际 `sandbox_mode` 判断。
+- **编辑工具**："只用 `replace_in_file` 编辑文件"写给 codemaker；Codex 用 `apply_patch`，保持 UTF-8。
+- **技能表**：`eggy-se-scene-env` 未随 eggitor 分发，氛围类需求没有对应技能。
+
+**teamai 的 Gitea 凭据（开发端接入）。** `GITEA_URL`、`GITEA_TOKEN` 存在部署端用户环境变量，经 Windows 用户变量 `WSLENV=GITEA_URL:GITEA_TOKEN` 透传到开发端，凭据只存一份。改 `WSLENV` 后关闭全部终端并 `wsl --shutdown` 才生效，常驻会话（Herdr 等）一并重启；`teamai doctor` 的两项 Gitea 检查通过即接入完成。缺凭据时 pull、recall 与 hook 照常，走 Gitea API 的操作（`members`、贡献 learning）失败。
+
 **宿主目录专用于镜像。** 默认由 WSL 接缝层从部署端 `USERPROFILE` 推导：`%USERPROFILE%\Desktop\dev\eggy\LuaSource_钓鱼怎么这么危险啊喂！`。可用 `EGGY_WORKSPACE` 覆盖，接受 `/mnt/c/...` 与 `C:\...` 两种形式；空串当作未设置。
 
 **编辑器工程 ≠ 仓库检出。** `eggy.json` 回灌不等于 `code init` 绑定；手动执行 code-* 时用 `--workspace` 指向已绑定的宿主目录（部署端 exe 只认 Windows 形式，用 `wslpath -w` 转换），否则会报 `CODE_BINDING_INVALID`。`deploy` 已带此参数。手工复核（WSL interop）：
