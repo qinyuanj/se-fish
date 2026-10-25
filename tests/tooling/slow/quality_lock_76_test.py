@@ -10,6 +10,8 @@ import time
 import unittest
 from pathlib import Path
 
+import e2e_gate
+
 ROOT = Path(__file__).resolve().parents[3]
 # 解释器取项目配置的 lua.executable：WSL 上 PATH 里的裸 lua 可能是 5.1。
 LUA = json.loads((ROOT / 'tools/quality/project.json').read_text(encoding='utf-8'))['lua']['executable']
@@ -37,6 +39,8 @@ class QualityLockTest(unittest.TestCase):
     def command(self, root):
         return [str(root / 'tools/quality/project'), 'test']
 
+    # 真实上游安装器建 venv、pip 安装工具，两次各给 900s：#130 实测单例可超 7 分钟，归安装门控。
+    @e2e_gate.skip_unless_install
     def test_installer_first_and_repeat_install_accept_atomic_viewer_patch(self):
         tools = Path(os.environ.get('QUALITY_TEST_TOOLS_ROOT', str(ROOT)))
         with tempfile.TemporaryDirectory(prefix='se-fish-install-76-') as directory:

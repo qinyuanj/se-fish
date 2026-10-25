@@ -65,7 +65,7 @@ tools/quality/project mutation common/RateLimit.lua
 # 仅显式全量操作重新测试该文件的全部变异
 tools/quality/project mutation --mutate-all common/RateLimit.lua
 
-# 独立 Python 回归（tests/tooling/slow）
+# 独立 Python 回归（tests/tooling/slow；门控见「Python 回归与门控」）
 tools/quality/project test-tooling
 
 # viewer / companion 使用同一公开入口：完整 Busted → 本轮 LCOV → 全树 CRAP
@@ -106,6 +106,23 @@ mutation 的存活与未覆盖结果表示测试缺口，保留有效快照。�
 `refresh-crap` 在一次持锁请求内执行完整 coverage → 全树 CRAP，供 viewer 使用。mutation 在同一请求内直接复用覆盖率流程，不启动另一个抢锁的项目请求。所有质量命令及 mutation-report/doctor 的一致性读取均受保护；IR 生成和 viewer 邮件/会话属于独立工具边界。
 
 mutation 发布先校验完整暂存树，准备新文件，再将受影响旧路径可逆移入事务备份；替换、过期路径删除或最终验证失败时恢复发布前快照。成功后清理备份。若回滚自身失败，报出并保留 `target/mutation-publication/publish-*` 恢复材料；该目录有遗留材料时停止后续 mutation，避免覆盖证据。此保护针对质量请求与可控发布失败，不能保证任意外部进程持续禁止恢复写入时仍能自动恢复。
+
+## Python 回归与门控
+
+`tools/quality/project test-tooling` 用 crapper venv 对 `tests/tooling/slow` 执行 `unittest discover`。默认形态只保留秒级的契约用例，重的用例由两道环境变量门控默认跳过，取值严格为 `1` 才释放，两道互不连带：
+
+| 变量 | 覆盖的用例 | 何时释放 |
+|---|---|---|
+| `SE_FISH_QUALITY_E2E` | 真实拉起 crapper/mutator 的端到端用例（mutation 预算、差分、复用、发布、源码安全、质量 mutation 系列） | spec/116 收尾复验，或改 mutation 接缝时 |
+| `SE_FISH_QUALITY_INSTALL` | 经公开入口真实执行 `install` 的用例：`quality_lock_76_test.py` 用真实上游安装器两次 `install --install-only`（建 venv、pip，单例可达数分钟），`quality_install_discovery_test.py` 的 `QualityInstallTest`（本地 fixture 仓库上的完整 install 流程，含原生库编译） | 改 `install.py`、安装入口或 `project.json` 的工具固定提交时 |
+
+两道门控只在 `tests/tooling/slow/e2e_gate.py` 实现（`gate()` 一处语义），用例类或方法装饰 `@e2e_gate.skip_unless_e2e` / `@e2e_gate.skip_unless_install`；测试模块不得自行读这些变量，带 `--install-only` 实参的回归文件必须导入共享门控，由 `e2e_gate_test.py` 钉住。锁冲突下秒退的 install 调用（`quality_lock_76_test.py` 的互斥用例）仍默认运行。空缓存安装 suite（`quality_install_test.py`）不归门控，它只吃显式独立检出，见下文「可重跑验收」。
+
+```bash
+# 门控全开实跑并给出耗时排名
+SE_FISH_QUALITY_E2E=1 SE_FISH_QUALITY_INSTALL=1 \
+  .uml-viewer/crapper/.venv/bin/python -B -m unittest discover -s tests/tooling/slow -p '*_test.py' -v --durations 20
+```
 
 ## 可重跑验收
 
