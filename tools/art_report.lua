@@ -32,7 +32,7 @@ end
 local function decode(path, body)
   local ok, json = pcall(require, 'acceptance4lua.json')
   assert(ok, '模块 tools.art_report 解析 ' .. path
-    .. ' 需要 acceptance4lua.json，请用 bash tools/acceptance/run_acceptance.sh 跑这条车道；错误：'
+    .. ' 需要 acceptance4lua.json，请用 bash tools/acceptance/run_acceptance.sh art 跑这条车道；错误：'
     .. tostring(json))
   return json.decode(body)
 end

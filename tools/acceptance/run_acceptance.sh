@@ -2,23 +2,87 @@
 # 钓鱼图的 acceptance 入口：parse → dry-check（advisory）→ generate → run，一条命令跑完。
 # 在任意目录执行；脚本自己 cd 到仓库根。
 #
-# 需要 PATH 里的 lua（5.4，本机命令名就是 lua；可用 ACCEPTANCE_LUA_BIN 覆盖）；
+# 用法：run_acceptance.sh [车道...] | --all
+#   无参数：跑 features/ 下除 art 外的全部车道，外加 features/ 根下的裸 feature（代码收尾门）；
+#   车道名：只跑 features/<车道>/，可给多个；未知车道非零退出；
+#   --all：跑全部车道与裸 feature。
+#
+# 需要 PATH 里的 lua5.4（可用 ACCEPTANCE_LUA_BIN 覆盖；裸 lua 在 WSL 上可能指向 5.1）；
 # acceptance4lua 在有 feature 时由 tools/acceptance/bootstrap.lua 按需安装；
 # 见 tools/acceptance/README.md。
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
-# 扫每一条车道子目录，外加 features/ 下的裸 feature；stem 带车道名，同名文件不会撞。
+# art 车道断言的是仓库外美术工作区的产物（重导入校验报告），红绿取决于资产状态，
+# 与代码回归不在同一维度，所以写死排除在无参数的收尾门之外；要跑就显式给 art 或 --all。
+# 决策见 #136。
+DEFAULT_EXCLUDED_LANES=(art)
+
+usage() {
+  echo "用法: bash tools/acceptance/run_acceptance.sh [车道...] | --all" >&2
+}
+
 shopt -s nullglob
-features=(features/*.feature features/*/*.feature)
+mode=default
+lanes=()
+for arg in "$@"; do
+  case "$arg" in
+    --all) mode=all ;;
+    -h|--help) usage; exit 0 ;;
+    -*) echo "未知选项: $arg" >&2; usage; exit 2 ;;
+    *)
+      # 车道名就是 features/ 下的一级目录名；拒绝路径分隔与 . / ..，免得指到 features/ 外面。
+      if [[ "$arg" == */* || "$arg" == . || "$arg" == .. || ! -d "features/$arg" ]]; then
+        known="$(cd features 2>/dev/null && for d in */; do printf '%s ' "${d%/}"; done)"
+        echo "未知车道: $arg（features/ 下现有车道: ${known:-无}）" >&2
+        exit 2
+      fi
+      lanes+=("$arg")
+      ;;
+  esac
+done
+if [ "$mode" = all ] && [ "${#lanes[@]}" -gt 0 ]; then
+  echo "--all 不能与车道名同时使用" >&2
+  usage
+  exit 2
+fi
+if [ "${#lanes[@]}" -gt 0 ]; then
+  mode=lanes
+fi
+
+# stem 带车道名，同名文件不会撞。
+features=()
+case "$mode" in
+  all)
+    features=(features/*.feature features/*/*.feature)
+    ;;
+  lanes)
+    for lane in "${lanes[@]}"; do
+      features+=("features/$lane/"*.feature)
+    done
+    ;;
+  default)
+    features=(features/*.feature)
+    for dir in features/*/; do
+      lane="$(basename "$dir")"
+      skip=0
+      for excluded in "${DEFAULT_EXCLUDED_LANES[@]}"; do
+        [ "$lane" = "$excluded" ] && skip=1
+      done
+      [ "$skip" -eq 1 ] && continue
+      features+=("$dir"*.feature)
+    done
+    ;;
+esac
+
 if [ "${#features[@]}" -eq 0 ]; then
   rm -rf build/acceptance
-  echo "features/ 下没有 feature 文件，跳过验收"
+  echo "所选范围内没有 feature 文件，跳过验收"
   exit 0
 fi
 
-LUA="${ACCEPTANCE_LUA_BIN:-lua}"
+LUA="${ACCEPTANCE_LUA_BIN:-lua5.4}"
 if ! command -v "$LUA" >/dev/null 2>&1; then
   echo "找不到 lua 解释器（PATH 里没有 $LUA）；用 ACCEPTANCE_LUA_BIN 指一个" >&2
   exit 1
