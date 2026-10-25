@@ -21,10 +21,11 @@ function M.q(value)
   return "'" .. tostring(value):gsub("'", "'\\''") .. "'"
 end
 
--- 路径是否是 Windows 形式（盘符或 UNC）。
-local function is_windows_path(path)
+-- 路径是否是 Windows 形式（盘符或 UNC）；跨接缝的子命令共用这一口径。
+function M.is_windows_path(path)
   return path:match("^%a:[/\\]") ~= nil or path:sub(1, 2) == "\\\\"
 end
+local is_windows_path = M.is_windows_path
 
 local function trim(text)
   return (tostring(text):gsub("^%s+", ""):gsub("%s+$", ""))

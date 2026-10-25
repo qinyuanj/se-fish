@@ -55,10 +55,6 @@ local function fail(msg)
   error("blender: " .. msg, 0)
 end
 
-local function is_windows_path(path)
-  return path:match("^%a:[/\\]") ~= nil or path:sub(1, 2) == "\\\\"
-end
-
 -- "5.10" → {5, 10}；按数字逐段比较，5.10 比 5.9 新。
 local function version_key(text)
   local key = {}
@@ -77,7 +73,7 @@ end
 -- 解析 BLENDER_EXE；返回 WSL 路径，或 nil, 原因。
 local function from_env(value)
   local path = value
-  if is_windows_path(value) then
+  if seam.is_windows_path(value) then
     local converted, err = seam.to_linux(value)
     if not converted then return nil, "BLENDER_EXE 转换失败: " .. tostring(err) end
     path = converted
@@ -130,7 +126,7 @@ end
 
 -- 开发端已存在的文件 → 绝对 Windows 路径（wslpath -w 对相对路径只给相对结果，所以先绝对化）。
 local function existing_windows(path, what)
-  if not is_windows_path(path) then
+  if not seam.is_windows_path(path) then
     local abs = path
     if path:sub(1, 1) ~= "/" then
       local err
@@ -193,7 +189,8 @@ local function parse(args)
   return opts
 end
 
-local function which(exe)
+-- --which：打印将用的 Blender（WSL 与 Windows 两种形式）及其版本。
+local function report_which(exe)
   local code, out = seam.capture(seam.q(exe) .. " --version")
   local version = code == 0 and out:match("Blender%s+(%d[^\r\n]*)")
   if not version then
@@ -211,7 +208,7 @@ local function run(opts)
   local exe
   exe, err = M.locate()
   if not exe then fail(err) end
-  if opts.which then return which(exe) end
+  if opts.which then return report_which(exe) end
 
   if not seam.which("python3") then fail("PATH 上找不到 python3（上游 run_in_blender.py 需要它）") end
   if not seam.exists(M.RUNNER) then

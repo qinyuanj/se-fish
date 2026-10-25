@@ -12,6 +12,22 @@ describe("TestWslSeamQuote", function()
   end)
 end)
 
+-- Windows 形式判定是接缝的唯一口径，blender 子命令据此决定是否经 wslpath 转换。
+describe("TestWslSeamWindowsPathForm", function()
+  it("test_drive_and_unc_forms_are_windows", function()
+    assert.is_true(seam.is_windows_path("C:\\Program Files\\Blender Foundation"))
+    assert.is_true(seam.is_windows_path("d:/Blender/blender.exe"))
+    assert.is_true(seam.is_windows_path("\\\\wsl.localhost\\Ubuntu\\home\\x"))
+  end)
+
+  it("test_linux_and_relative_forms_are_not_windows", function()
+    assert.is_false(seam.is_windows_path("/mnt/c/Program Files"))
+    assert.is_false(seam.is_windows_path("./tmp/a.blend"))
+    assert.is_false(seam.is_windows_path("blender.exe"))
+    assert.is_false(seam.is_windows_path("C:relative"))
+  end)
+end)
+
 describe("TestWslSeamWindowsEnv", function()
   local saved
   before_each(function()
