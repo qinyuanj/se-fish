@@ -1,21 +1,20 @@
 # ===== 编辑器运行产物 =====
-log.txt
+/log.txt
 *.log
 
 # ===== 外部链接 =====
-# design 是指向 eggitor/1_开发中/渔力全开 的符号链接，内容不在本仓库管理
-design
+# 指向仓库外 eggitor/1_开发中/渔力全开 的符号链接
+/design
 
-# ===== AI 助手 / teamai 分发文件（由工具自动下发，可重新生成）=====
-.codemaker/
-.codex/
-.agents/
-.kimi-code/
-.teamai/
-.claude/
-.dsh/
-# 如需提交团队共享的 Claude 配置，改为只忽略本地文件：
-# .claude/settings.local.json
+# ===== AI 助手 / teamai 分发文件（工具自动下发，可重新生成）=====
+/.agents/
+/.claude/
+/.codemaker/
+/.codex/
+/.dsh/
+/.kimi-code/
+/.teamai/
+/.zcode/
 
 # ===== IDE =====
 .vscode/*
@@ -31,24 +30,46 @@ desktop.ini
 
 # ===== Python 缓存与本地虚拟环境 =====
 __pycache__/
-*.pyc
-*.pyo
+*.py[co]
 /.venv/
 /venv/
 
 # ===== 工具链临时 / 缓存目录 =====
-tmp/
-build/
-target/
-.toolcache/
+/tmp/
+/build/
+/target/
+/.toolcache/
 # LuaCov 根产物：完整套件在仓库根产出统计与报告，run_coverage 消费后立即搬走。
 /luacov.stats.out
 /luacov.report.out
 
-# >>> magpie: library skills placed here (magpie adds and removes these lines) >>>
-/.codex/config.toml
-# <<< magpie <<<
 # BEGIN UML-VIEWER
 .uml-viewer/
 uml-viewer-log.txt
 # END UML-VIEWER
+
+# 以下区块由 magpie 增删，手改会被覆盖；条目已被 /.agents/ 覆盖，只作 magpie 的登记。
+# >>> magpie: library skills placed here (magpie adds and removes these lines) >>>
+/.agents/skills/blender-addon-development
+/.agents/skills/blender-animation
+/.agents/skills/blender-asset-qa
+/.agents/skills/blender-character-rigging
+/.agents/skills/blender-core
+/.agents/skills/blender-export-pipelines
+/.agents/skills/blender-facial-shapekeys
+/.agents/skills/blender-game-optimization
+/.agents/skills/blender-geometry-nodes
+/.agents/skills/blender-hardsurface-modeling
+/.agents/skills/blender-lighting-lookdev
+/.agents/skills/blender-pbr-materials
+/.agents/skills/blender-pipeline-automation
+/.agents/skills/blender-rendering
+/.agents/skills/blender-retopology-uv
+/.agents/skills/blender-scene-setup
+/.agents/skills/blender-sculpting
+/.agents/skills/blender-simulation
+/.agents/skills/blender-texture-baking
+/.agents/skills/blender-time-of-day
+/.agents/skills/blender-weather-fx
+/.agents/skills/blender-workflow-recipes
+# <<< magpie <<<
