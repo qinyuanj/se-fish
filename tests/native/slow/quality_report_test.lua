@@ -3,11 +3,14 @@
 -- 子进程用 POSIX sh 起（开发端只在 WSL，#116）；解释器取启动本 runner 的那个
 -- （tests/support/interpreter.lua），不走 PATH 猜 `lua`——WSL 上裸 `lua` 可能是 5.1。
 -- 依赖 `tools/quality/project install` 建好的 .toolcache（dry4lua / luacheck / acceptance4lua）：
--- 缓存缺失时 report.lua 在 require 处失败，日志里不会出现 broken.lua，本案例照样红。
+-- 缓存缺失时先在本文件直接报缺什么、谁来装（#141），不再让 report.lua 绕到 require 处失败。
+-- 新 worktree 没有 .toolcache，本案例按设计红；agent 不执行 install（docs/agents/workflow.md）。
 local interpreter = require("tests.support.interpreter")
 local q = require("tests.support.sh_quote").q
 
 local ROOT = "tmp/quality-report-test"
+-- report.lua 自包含加载的三个工具（与其 package.path 同口径）。
+local TOOLCACHE_SOURCES = { ".toolcache/dry4lua/src", ".toolcache/luacheck/src", ".toolcache/acceptance4lua/src" }
 
 local function write(path, body)
   local f = assert(io.open(path, "wb"))
@@ -30,6 +33,16 @@ local function capture(cmd)
   return code, read(log) or ""
 end
 
+local function require_toolcache()
+  local missing = {}
+  for _, dir in ipairs(TOOLCACHE_SOURCES) do
+    local _, _, code = os.execute("test -d " .. q(dir))
+    if code ~= 0 then missing[#missing + 1] = dir end
+  end
+  assert.is_true(#missing == 0,
+    "缺 .toolcache（" .. table.concat(missing, "、") .. "），需人执行 tools/quality/project install")
+end
+
 describe("TestQualityReport", function()
   before_each(function()
     os.execute("rm -rf " .. q(ROOT) .. " && mkdir -p " .. q(ROOT))
@@ -39,6 +52,7 @@ describe("TestQualityReport", function()
   end)
 
   it("test_invalid_source_does_not_publish_dry_report", function()
+    require_toolcache()
     local source, manifest, output = ROOT .. "/broken.lua", ROOT .. "/sources.txt", ROOT .. "/dry.json"
     write(source, "local function broken(\n")
     write(manifest, source .. "\n")
