@@ -1,6 +1,8 @@
-# 0004 Viewer 固定版本升到接受 Herdr >= 0.9.3
+# 0007 Viewer 固定版本升到接受 Herdr >= 0.9.3（原编号 0004）
 
 **Status**: accepted
+
+> 改号说明：本 ADR 写于 10-16，原编号 0004；次日 [ADR-0004](0004-fish-asset-scale.md)（鱼类资产尺寸）也取了 0004，造成撞号。后者在 `AGENTS.md`、美术流水线等处有多处入链，本篇入链只有一处，故本篇改用空着的 0007，正文保持原样（#139）。文中 `.\uml.ps1`、`install.ps1` 与「平台仍限原生 Windows/macOS」是 Windows 时期的事实，现行约定见 [ADR-0008](0008-wsl-development-windows-deploy.md) 与 `docs/agents/workflow.md`。
 
 本机 Herdr 已升到 0.9.5，而 se-fish 固定的 viewer（`79c8d56`）版本预检只认字面量 `herdr 0.9.3`，`.\uml.ps1` 在预检阶段直接失败、companion 起不来。决定把 `tools/quality/project.json` 的 `tools.viewer.commit` 升到 `54040575390d68746da241a1e0477726f48ec7cc`（来源检出 `../uml-viewer` 的 `lua` 分支尖端），再用 `.\tools\quality\install.ps1` 重装。该提交上的质量分发声明（`uml-quality.json` v1 的 `operations`）、`policy.edn` 与 `.metrics/crap.edn` 加 `.metrics/mutate/*.edn` 的路径契约都没变，只有指标聚合语义变了。
 
