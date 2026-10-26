@@ -23,7 +23,7 @@ Lua 命令使用 **Lua 5.4**：WSL 上裸 `lua` 经 alternatives 可能指向 5.
 - `lua5.4 tools/cli.lua deploy`：将三端一级子树字节镜像到宿主目录（经 WSL 接缝层调用部署端 `robocopy /MIR`，镜像前打印将被删掉的宿主多余文件）；interop 不可用时在镜像前以非零退出码失败。编辑器开着本图时执行 validate → 有差异时 `code push` → `code diff` 复核，push 后仍不一致才返回失败。跨接缝约定见 [ADR-0008](../adr/0008-wsl-development-windows-deploy.md)。
 - `lua5.4 tools/cli.lua sync`：将宿主目录的 `eggy.json`、API 存根、`data/` 回灌仓库。
 - `lua5.4 tools/cli.lua sync --packages`：在上述清单外追加三端 `packages/` 字节镜像，删除过期文件；任一端源 packages 缺失或为空时整次同步在写入前失败。该方向以宿主为准，回灌前先确认工作区已提交。
-- `lua5.4 tools/cli.lua blender <脚本.py> [--blend <输入.blend>] [-- <脚本参数>...]`：在部署端无头 Blender 里执行脚本，是唯一的 Blender 入口；`--which` 核对将用的 Blender，`--expr` 执行内联代码。路径写开发端形式，由入口转换；用法与约定见 [美术资产流水线](art-pipeline.md)，决策见 [ADR-0009](../adr/0009-blender-headless-only.md)。
+- `lua5.4 tools/cli.lua blender <脚本.py> [--blend <输入.blend>] [-- <脚本参数>...]`：在部署端无头 Blender 里执行脚本，是唯一的 Blender 入口；`--which` 核对将用的 Blender，`--expr` 执行内联代码。路径写开发端形式，由入口转换；用法见 [Blender 与 Meshy 使用](art-pipeline.md)，决策见 [ADR-0009](../adr/0009-blender-headless-only.md)。
 - 官方包升级、聚合入口与编辑器预设依赖见 [官方包接入参考](../packages-reference.md)。技能包预设命令见 `lua5.4 tools/cli.lua ability-presets --help`；验收脚本说明见 `tools/acceptance/README.md`。
 - **临时产物**：手工验证的中间文件、单据正文草稿等临时产物一律放仓库 `tmp/`（已 gitignored），无需清理；不放系统临时目录，也不为清理去 `rm`（沙盒会拒绝）。这条管 agent 手工产生的文件；脚本自建自删的临时目录（如 pre-commit hook 在 git 目录下的工作目录）不在此列。
 - 质量入口为 `tools/quality/project`（POSIX sh 薄转发），安装、覆盖率、CRAP、DRY、差分 mutation 与复验步骤见 [tools/quality/README.md](../../tools/quality/README.md)；只出报告，不设指标门槛。
@@ -51,11 +51,11 @@ Lua 命令使用 **Lua 5.4**：WSL 上裸 `lua` 经 alternatives 可能指向 5.
 lua5.4 tools/cli.lua worktree-init
 ```
 
-- 做两件事，已存在的条目跳过（可重复执行），任一来源缺失时在写入前失败：从 magpie 资源库复制上游 `blender-*` skill 到 `.agents/skills/`（来源见[美术资产流水线](art-pipeline.md#上游-blender--skill)）；按 `tools/quality/project.json` 的 `tools.*.source`（`../<工具>`）在 worktree 的**父目录**建 symlink，指向主检出旁的真实工具检出。参数见 `--help`。
+- 做两件事，已存在的条目跳过（可重复执行），任一来源缺失时在写入前失败：从 magpie 资源库复制上游 `blender-*` skill 到 `.agents/skills/`（来源见[Blender 与 Meshy 使用](art-pipeline.md#上游-blender--skill)）；按 `tools/quality/project.json` 的 `tools.*.source`（`../<工具>`）在 worktree 的**父目录**建 symlink，指向主检出旁的真实工具检出。参数见 `--help`。
 - 不执行 `tools/quality/project install`。`.toolcache` 与 `.uml-viewer` **不** symlink 共享，由人在 worktree 里执行 install 独立安装（pip、字体与 cimgui 有缓存）；`lua_tools` 七项的 url 与 commit 登记在 `project.json`，由 install 拉取、校验与构建。独立安装也避开共享 venv 的必然后果：`doctor` 里针对 `crapper.__file__` 的断言会失败（editable 安装写下的 `.pth` 硬编码主检出路径）。未安装时 full 只剩 `tests/native/slow/quality_report_test.lua` 一处失败，报「缺 `.toolcache`，需人执行 `tools/quality/project install`」。
 - 某个 skill 损坏，或 worktree-init 报「已有工具链接指向不符」时，删掉对应目录或链接后重跑 `worktree-init`，由它重建。它只把链接建在父目录、指向真实检出：指向 `.uml-viewer/<tool>`（安装产物而非上游检出）会让 install／doctor 预检与标准分发回归大面积报错；建在 worktree 根内则无人引用，又不在 `.gitignore`，一次 `git add -A` 就会提交进去。
 
-**美术资产（Meshy MCP + 无头 Blender）。** 产出鱼类等模型与动画的接入方式、导出分件与验收步骤见 [美术资产流水线](art-pipeline.md)，尺寸口径见 [ADR-0004](../adr/0004-fish-asset-scale.md)。唯一的 MCP 是 Meshy，注册与密钥接法见 [美术资产流水线](art-pipeline.md#前端配置)。Blender 不接 MCP，只经 `blender` 子命令无头执行（[ADR-0009](../adr/0009-blender-headless-only.md)）。资产本体不进本仓，正式资产走编辑器导入。
+**美术资产（Meshy MCP + 无头 Blender）。** Blender 与 Meshy 的接入与用法见 [Blender 与 Meshy 使用](art-pipeline.md)，尺寸口径见 [ADR-0004](../adr/0004-fish-asset-scale.md)。唯一的 MCP 是 Meshy，注册与密钥接法见 [Blender 与 Meshy 使用](art-pipeline.md#前端配置)。Blender 不接 MCP，只经 `blender` 子命令无头执行（[ADR-0009](../adr/0009-blender-headless-only.md)）。资产本体不进本仓，正式资产走编辑器导入。
 
 **蛋仔 hook 与技能（开发端接入）。** eggitor 的 `SessionStart` hook（`session_start.mjs`）向会话注入 `eggy-se.mdc` 规则与帧同步技能禁用清单，但安装器只把它登记在部署端的 `~/.codex/hooks.json`。开发端手动接入，复用部署端资产，随编辑器升级自动更新：
 
@@ -110,7 +110,7 @@ install -m 755 tools/hooks/shim "$(git rev-parse --git-common-dir)/hooks/pre-com
 | `busted --run=fast`（日常） | fast 车道全部用例通过，末行匹配 `N successes / 0 failures / 0 errors / 0 pending : T seconds`，退出码 0 |
 | `busted --run=full`（收尾） | 含 slow 车道，全部用例通过，末行匹配 `N successes / 0 failures / 0 errors / 0 pending : T seconds`，退出码 0。唯一例外：worktree 里仅 `quality_report_test` 因缺 `.toolcache` 失败一例（install 由人运行）时，以合并后主检出的 full 为准，并在交付说明里写明 |
 | `bash tools/acceptance/run_acceptance.sh`（无参数；有 feature 时） | 跑除 `art` 外的全部车道及 `features/` 根下的裸 feature，每个 feature `N passed, 0 failed`，末行 `acceptance run OK`；所选范围无 feature 时提示跳过且返回 0。`art` 断言仓库外美术产物，不进代码收尾门（见「美术资产交付」行）；`--all` 跑全部车道 |
-| 美术资产交付 | `04-validate.py` 跑完并通过（报告里 `failures` 为空，含网格封闭性硬门槛），且 `bash tools/acceptance/run_acceptance.sh art` 全绿；只经这两个公开入口调用，不另开 CI，资产校验不进 pre-commit。预算文件、`mesh` 段或 `validation.json` 缺失同样算失败（缺报告时提示缺哪份，可用 `EGGY_ART_ASSETS` 指到美术资产根目录），口径见 [美术资产流水线](art-pipeline.md#网格封闭性硬门槛) |
+| 美术资产交付 | 资产校验脚本跑完并产出 `validation/validation.json`（报告里 `failures` 为空，含网格封闭性硬门槛），且 `bash tools/acceptance/run_acceptance.sh art` 全绿；只经这两个公开入口调用，不另开 CI，资产校验不进 pre-commit。预算文件、`mesh` 段或 `validation.json` 缺失同样算失败（缺报告时提示缺哪份，可用 `EGGY_ART_ASSETS` 指到美术资产根目录），口径见 [美术资产概要「验收」](../art-asset-overview.md#验收) |
 | 提交时 pre-commit hook 自动检查（见上方「pre-commit hook」）：暂存的 `.lua` 逐个 `loadfile`，含 Lua 改动时再跑 `busted --run=fast`；agent 不另跑这一项，提交时也不必为它重复手跑 fast | `git commit` 成功，未被 hook 拦下 |
 | `lua5.4 tools/cli.lua deploy` 后执行上面的 `code validate` | `ok=true`、`data.valid=true`、`data.is_se_map=true`，`data.issues` 与 `meta.warnings` 均为空 |
 | validate 通过后全套试玩 | 每条验收现象都有取证产物；`log trace` 本轮窗口有效且无错误 |
