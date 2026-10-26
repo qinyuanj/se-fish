@@ -27,8 +27,8 @@ local function sorted(list)
   return copy
 end
 
--- 聚合入口的锚点补挂还依赖两个包内模块：框架 anchor_logic 与各锚点行为模块。
--- 它们不在 api.lua 的导出名单里，所以单独拿文件存在性兜底：包升级改名时这里一起断。
+-- 聚合入口的锚点补挂还依赖包内框架 anchor_logic，它不在 api.lua 的导出名单里，
+-- 所以单独拿文件存在性兜底：包升级改名时这里一起断。各锚点行为模块的登记与存在性见 static_require_test。
 local function file_exists(path)
   local handle = io.open(path, "rb")
   if not handle then
@@ -77,18 +77,6 @@ describe("TestAbilityAPIBase", function()
       sorted(exported_names("client/packages/ability_system/api.lua", "AbilityClientAPI")),
       sorted(AbilityAPIBase.CLIENT_API)
     )
-  end)
-
-  it("test_every_configured_anchor_behavior_module_exists", function()
-    local GameCfg = require("common.GameCfg")
-    for _, entry in ipairs(GameCfg.Ability.InitialAbilities or {}) do
-      if entry.AnchorBehavior then
-        local path = entry.AnchorBehavior == "melee_hit"
-          and "server/AbilityBehaviors/melee_hit.lua"
-          or "server/packages/ability_system/anchors/" .. entry.AnchorBehavior .. ".lua"
-        assert.is_true(file_exists(path), path .. " 不存在（行为模块名写错或包升级改名）")
-      end
-    end
   end)
 
   it("test_missing_api_fails_loudly_at_build_time", function()

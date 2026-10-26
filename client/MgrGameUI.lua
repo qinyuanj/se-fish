@@ -37,8 +37,7 @@ function MgrGameUI:GetScreen(screenName)
     end
     local loadHandler = ScreenHandlerLoaders[screenName]
     if not loadHandler then
-        print("[MgrGameUI] 界面 handler 未登记", screenName)
-        return
+        error("[MgrGameUI] 界面 handler 未登记: " .. tostring(screenName), 2)
     end
     local screenHandler = loadHandler()
 
