@@ -877,7 +877,7 @@ GameCfg.Ability = {
         },
     },
     -- 进图后装的初始技能：AssetId=技能预设，Index=槽位（0 基），
-    -- Anchor=锚点预设，AnchorBehavior=锚点行为模块名（anchors/ 下的文件名），
+    -- Anchor=锚点预设，AnchorBehavior=锚点行为名（server/AbilityAPI.lua 的 AnchorBehaviorLoaders 登记的键），
     -- AnchorAttributes=挂接前覆盖到锚点实例的属性（{x,y,z} 表会转成 Vector3）
     InitialAbilities = {
         {

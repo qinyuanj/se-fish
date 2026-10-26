@@ -144,23 +144,40 @@ function AbilityAPI.DetachFromSocket(mount)
 	return ok
 end
 
+-- 锚点行为登记表：键是行为名（GameCfg 的 AnchorBehavior），值按需加载行为模块。
+-- 用字面量 require 而非拼路径，依赖才能被静态解析；登记 server/AbilityBehaviors/ 与包内 anchors/ 的全部行为，
+-- 两处任一新增文件都须在此登记。本图挥砍受击体使用 BaseController，官方行为多传 owner 会触发类型告警，
+-- 故 melee_hit 用本图实现、不用包内同名行为。
+local AnchorBehaviorLoaders = {
+	-- 本图实现
+	eel_discharge = function() return require("server.AbilityBehaviors.eel_discharge") end,
+	melee_hit = function() return require("server.AbilityBehaviors.melee_hit") end,
+	-- 包内行为
+	active_cd = function() return require("server.packages.ability_system.anchors.active_cd") end,
+	add_bind_diy_model = function() return require("server.packages.ability_system.anchors.add_bind_diy_model") end,
+	bungee_cord = function() return require("server.packages.ability_system.anchors.bungee_cord") end,
+	cast_face_target = function() return require("server.packages.ability_system.anchors.cast_face_target") end,
+	create_bullet_to_castangle = function() return require("server.packages.ability_system.anchors.create_bullet_to_castangle") end,
+	create_landmine = function() return require("server.packages.ability_system.anchors.create_landmine") end,
+	create_obstacle = function() return require("server.packages.ability_system.anchors.create_obstacle") end,
+	create_teleportball = function() return require("server.packages.ability_system.anchors.create_teleportball") end,
+	custom_event = function() return require("server.packages.ability_system.anchors.custom_event") end,
+	destroy_ability = function() return require("server.packages.ability_system.anchors.destroy_ability") end,
+	gravity_change = function() return require("server.packages.ability_system.anchors.gravity_change") end,
+	play_body_animation = function() return require("server.packages.ability_system.anchors.play_body_animation") end,
+	play_sfx = function() return require("server.packages.ability_system.anchors.play_sfx") end,
+	play_vfx = function() return require("server.packages.ability_system.anchors.play_vfx") end,
+	speed_add = function() return require("server.packages.ability_system.anchors.speed_add") end,
+}
+
 -- 锚点挂接（本图补充，不属于包内 api.lua 的导出）
 -- 官方流程把锚点预设作为技能预设的子预设，靠锚点预设自己的壳源码调 anchor_logic.Attach；
 -- 但本编辑器不认包内的 ---@export_prefab_type 自定义预设类型，锚点预设壳的编译代码为空、
 -- 试玩里不会执行（结论见 issue #7）。壳该做的事在这里补上：加载锚点框架，再按业务侧给的
--- 行为模块名挂上行为逻辑。放在聚合入口里，业务代码仍然只依赖根 AbilityAPI 一个入口。
--- 锚点行为登记表：键是 GameCfg 的 AnchorBehavior，值按需加载行为模块。
--- 用字面量 require 而非拼路径，依赖才能被静态解析；新配锚点行为须在此登记。
--- 本图挥砍受击体使用 BaseController；官方行为多传 owner 会触发类型告警，故 melee_hit、eel_discharge 用本图实现。
-local AnchorBehaviorLoaders = {
-	melee_hit = function() return require("server.AbilityBehaviors.melee_hit") end,
-	eel_discharge = function() return require("server.AbilityBehaviors.eel_discharge") end,
-	speed_add = function() return require("server.packages.ability_system.anchors.speed_add") end,
-}
-
+-- 行为名挂上行为逻辑。放在聚合入口里，业务代码仍然只依赖根 AbilityAPI 一个入口。
 ---把锚点单位挂到技能单位下（锚点应先 parent 到技能单位）
 ---@param anchorScript Script 锚点脚本单位
----@param behaviorModule string 锚点行为模块名（anchors/ 目录下的文件名，如 "speed_add"）
+---@param behaviorModule string 锚点行为名（AnchorBehaviorLoaders 的键，如 "speed_add"）
 ---@return boolean 是否已挂接
 function AbilityAPI.AttachAnchor(anchorScript, behaviorModule)
 	if not anchorScript then

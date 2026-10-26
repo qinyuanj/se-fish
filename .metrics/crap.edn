@@ -78,7 +78,6 @@
   {:name "Mgr:Release", :namespace "server.Mgr.MgrFishUnit", :complexity 46, :coverage 97.6744, :crap 46.0266}
   {:name "SubAbilityHandler.addChild", :namespace "server.packages.ability_system.sub_ability", :complexity 7, :coverage 7.6923, :crap 45.5398}
   {:name "ScreenHandler:Show", :namespace "client.ScreenHandlers.ScreenMain", :complexity 44, :coverage 100.0, :crap 44.0}
-  {:name "AbilityAPI.AttachAnchor", :namespace "server.AbilityAPI", :complexity 7, :coverage 9.0909, :crap 43.8144}
   {:name "SModifierSystemManager:getModifierKeyOfEntity", :namespace "server.packages.modifier_system.modifier_system", :complexity 7, :coverage 9.0909, :crap 43.8144}
   {:name "Mgr:RequestStart", :namespace "server.Mgr.MgrGrill", :complexity 27, :coverage 72.0, :crap 43.003}
   {:name "PlayerData:SelectWeapon", :namespace "server.Data.PlayerData", :complexity 7, :coverage 10.0, :crap 42.721}
@@ -209,7 +208,6 @@
   {:name "Mgr:Restore", :namespace "server.Mgr.MgrSpecialItem", :complexity 19, :coverage 100.0, :crap 19.0}
   {:name "Mgr:OnPlayerAdded", :namespace "server.Mgr.MgrSurvival", :complexity 19, :coverage 100.0, :crap 19.0}
   {:name "Mgr:Damage", :namespace "server.Mgr.MgrFishCarrier", :complexity 18, :coverage 85.7143, :crap 18.9446}
-  {:name "MgrGameUI:GetScreen", :namespace "client.MgrGameUI", :complexity 11, :coverage 60.0, :crap 18.744}
   {:name "Mgr:Draw", :namespace "server.Mgr.MgrLottery", :complexity 14, :coverage 71.4286, :crap 18.5714}
   {:name "ScreenHandler:Node", :namespace "client.ScreenHandlers.ScreenLottery", :complexity 6, :coverage 30.0, :crap 18.348}
   {:name "Mgr:Handle", :namespace "server.Mgr.MgrInteract", :complexity 18, :coverage 90.9091, :crap 18.2434}
@@ -246,6 +244,7 @@
   {:name "MgrMap.MgrSave.OnReady", :namespace "server.main", :complexity 16, :coverage 100.0, :crap 16.0}
   {:name "Mgr:FindAnchor", :namespace "server.Mgr.MgrGrill", :complexity 4, :coverage 10.0, :crap 15.664}
   {:name "AbilityServerAPI.RemoveAbility", :namespace "server.packages.ability_system.api", :complexity 4, :coverage 10.0, :crap 15.664}
+  {:name "MgrGameUI:GetScreen", :namespace "client.MgrGameUI", :complexity 11, :coverage 66.6667, :crap 15.4815}
   {:name "_readSubAbilityIds", :namespace "server.packages.ability_system.sub_ability_plugin", :complexity 7, :coverage 44.4444, :crap 15.4019}
   {:name "AbilityUtils.sortByIndex", :namespace "common.packages.ability_system.util", :complexity 4, :coverage 11.1111, :crap 15.2373}
   {:name "AbilityUtils.sortByLevel", :namespace "common.packages.ability_system.util", :complexity 4, :coverage 11.1111, :crap 15.2373}
@@ -551,6 +550,7 @@
   {:name "Mgr:LifeStatus", :namespace "server.Mgr.MgrVitals", :complexity 8, :coverage 100.0, :crap 8.0}
   {:name "Mgr:BlastCandidates", :namespace "server.Mgr.MgrWeapon", :complexity 8, :coverage 100.0, :crap 8.0}
   {:name "Mgr:Detonate", :namespace "server.Mgr.MgrWeapon", :complexity 8, :coverage 100.0, :crap 8.0}
+  {:name "AbilityAPI.AttachAnchor", :namespace "server.AbilityAPI", :complexity 7, :coverage 72.7273, :crap 7.994}
   {:name "LocalAttackButton:OnPressEnd", :namespace "client.LocalAttackButton", :complexity 7, :coverage 75.0, :crap 7.7656}
   {:name "SModifierSystemManager:getRemainingTimeByKey", :namespace "server.packages.modifier_system.modifier_system", :complexity 7, :coverage 75.0, :crap 7.7656}
   {:name "Mgr:Start", :namespace "server.Mgr.MgrPlatform", :complexity 6, :coverage 64.2857, :crap 7.6399}
