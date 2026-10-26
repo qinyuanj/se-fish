@@ -1,10 +1,10 @@
 -- #65 P1 七区空气墙真实顶底范围（运行时射线口径，server 平台）。
 -- 复跑（验收槽隔离，不动正式存档）：
---   lua tools/cli.lua acceptance-slot new && lua tools/cli.lua deploy
+--   lua5.4 tools/cli.lua acceptance-slot new && lua5.4 tools/cli.lua deploy
 --   editor-cli play start --wait-ready --json
 --   editor-cli exec --platform server --file <本文件绝对路径> --timeout 60 --json
 --   editor-cli log grep AIRWALLBOUNDS65 --play-session <session> --json
---   editor-cli play stop && lua tools/cli.lua acceptance-slot off && lua tools/cli.lua deploy
+--   editor-cli play stop && lua5.4 tools/cli.lua acceptance-slot off && lua5.4 tools/cli.lua deploy
 --
 -- 为什么是运行时：编辑器 eval 上下文只暴露 World/Task/Environment/Asset，没有 PhysicsService
 --   （2026-10-14 实测），编辑模式无法打射线；沿用 2026-10-12 鱼塘施工时验证过的运行时射线口径。
