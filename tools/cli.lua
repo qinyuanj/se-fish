@@ -41,7 +41,7 @@ M.commands = {
   { name = "acceptance-slot", mod = "tools.acceptance_slot", summary = "查看、新建或切换 #93 验收存档槽（试玩前需 deploy）" },
   { name = "ability-presets", mod = "tools.ability_presets", summary = "重建技能包的编辑器侧预设（复制官方模板、刷壳与属性、回写 GameCfg key）" },
   { name = "blender", mod = "tools.blender", summary = "在 Windows 侧无头 Blender 执行脚本（唯一 Blender 入口，透传 JSON 与退出码）" },
-  { name = "worktree-init", mod = "tools.worktree_init", summary = "把新 worktree 补齐到能跑 full（复制上游 blender-* skill、父目录建工具 symlink；幂等）" },
+  { name = "worktree-init", mod = "tools.worktree_init", summary = "把新 worktree 补齐到能跑 test full（复制上游 blender-* skill；幂等）" },
 }
 
 -- 被 require（如测试读路由表）时只交出路由表，不执行入口流程。
