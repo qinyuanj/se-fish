@@ -37,9 +37,9 @@
                       "native": {"module": "lfs", "output": "lfs.so", "sources": ["src/lfs.c"]}}
   },
   "tools": {
-    "viewer": {"directory": "uml-viewer", "source": "../uml-viewer", "commit": "6367d0ff27107fd49d9c0c085c1a2e6e763da4e9"},
-    "crapper": {"directory": "crapper", "source": "../crapper", "commit": "9b85a1120f5ca4b8293db222b6ac621e5f830488", "patches": ["tools/quality/patches/crapper-lua-has-error.patch"]},
-    "mutator": {"directory": "mutator", "source": "../mutator", "commit": "341a4a6d420857d04a2ff0b582d563ea4e6ff089", "patches": ["tools/quality/patches/mutator-seam.patch"]},
-    "dryer": {"directory": "dryer", "source": "../dryer", "commit": "d4d3e7e98c983ed52d1c8663eef61c9147f68c44"}
+    "viewer": {"directory": "uml-viewer", "source": "../uml-viewer", "commit": "e7f5a48317fffcf7be8ad7cd40568b2e5c93d124"},
+    "crapper": {"directory": "crapper", "source": "../crapper", "commit": "78a5b31e6cf8e3d00afb6f4e409ed2adb5f776f5"},
+    "mutator": {"directory": "mutator", "source": "../mutator", "commit": "3e89334a32475bd33e92b6aa4aaec7d4deb20c0a"},
+    "dryer": {"directory": "dryer", "source": "../dryer", "commit": "7279cb81e9995510058d246d7eff65fb70866a14"}
   }
 }
