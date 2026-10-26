@@ -46,7 +46,6 @@
   {:name "ModifierStack:_onLayerExpire", :namespace "server.packages.modifier_system.ModifierStack", :complexity 9, :coverage 5.5556, :crap 77.236}
   {:name "SOfficialAiFeatureManager.searchEnemy", :namespace "server.packages.official_ai_feature.official_ai_feature", :complexity 44, :coverage 74.2424, :crap 77.0843}
   {:name "Mgr:Throw", :namespace "server.Mgr.MgrWeapon", :complexity 43, :coverage 73.6842, :crap 76.6966}
-  {:name "AbilityAPI.AttachAnchor", :namespace "server.AbilityAPI", :complexity 9, :coverage 7.1429, :crap 73.853}
   {:name "ScreenHandler:ShowDialoguePage", :namespace "client.ScreenHandlers.ScreenMain", :complexity 9, :coverage 7.6923, :crap 72.7087}
   {:name "getAttrRuleFunc", :namespace "server.packages.modifier_system.ModifierHandler", :complexity 8, :coverage 0.0, :crap 72.0}
   {:name "GameUI:FindChildUINode", :namespace "client.GameUI", :complexity 9, :coverage 9.0909, :crap 69.8565}
@@ -79,6 +78,7 @@
   {:name "Mgr:Release", :namespace "server.Mgr.MgrFishUnit", :complexity 46, :coverage 97.6744, :crap 46.0266}
   {:name "SubAbilityHandler.addChild", :namespace "server.packages.ability_system.sub_ability", :complexity 7, :coverage 7.6923, :crap 45.5398}
   {:name "ScreenHandler:Show", :namespace "client.ScreenHandlers.ScreenMain", :complexity 44, :coverage 100.0, :crap 44.0}
+  {:name "AbilityAPI.AttachAnchor", :namespace "server.AbilityAPI", :complexity 7, :coverage 9.0909, :crap 43.8144}
   {:name "SModifierSystemManager:getModifierKeyOfEntity", :namespace "server.packages.modifier_system.modifier_system", :complexity 7, :coverage 9.0909, :crap 43.8144}
   {:name "Mgr:RequestStart", :namespace "server.Mgr.MgrGrill", :complexity 27, :coverage 72.0, :crap 43.003}
   {:name "PlayerData:SelectWeapon", :namespace "server.Data.PlayerData", :complexity 7, :coverage 10.0, :crap 42.721}
@@ -209,6 +209,7 @@
   {:name "Mgr:Restore", :namespace "server.Mgr.MgrSpecialItem", :complexity 19, :coverage 100.0, :crap 19.0}
   {:name "Mgr:OnPlayerAdded", :namespace "server.Mgr.MgrSurvival", :complexity 19, :coverage 100.0, :crap 19.0}
   {:name "Mgr:Damage", :namespace "server.Mgr.MgrFishCarrier", :complexity 18, :coverage 85.7143, :crap 18.9446}
+  {:name "MgrGameUI:GetScreen", :namespace "client.MgrGameUI", :complexity 11, :coverage 60.0, :crap 18.744}
   {:name "Mgr:Draw", :namespace "server.Mgr.MgrLottery", :complexity 14, :coverage 71.4286, :crap 18.5714}
   {:name "ScreenHandler:Node", :namespace "client.ScreenHandlers.ScreenLottery", :complexity 6, :coverage 30.0, :crap 18.348}
   {:name "Mgr:Handle", :namespace "server.Mgr.MgrInteract", :complexity 18, :coverage 90.9091, :crap 18.2434}
@@ -265,7 +266,6 @@
   {:name "Mgr:TakeKilled", :namespace "server.Mgr.MgrFishUnit", :complexity 15, :coverage 100.0, :crap 15.0}
   {:name "Mgr:ReadExplicit", :namespace "server.Mgr.MgrSave", :complexity 15, :coverage 100.0, :crap 15.0}
   {:name "SModifierSystemManager:_createModifier", :namespace "server.packages.modifier_system.modifier_system", :complexity 13, :coverage 77.4194, :crap 14.9458}
-  {:name "MgrGameUI:GetScreen", :namespace "client.MgrGameUI", :complexity 10, :coverage 63.6364, :crap 14.8084}
   {:name "Mgr:Update", :namespace "server.Mgr.MgrPlatform", :complexity 7, :coverage 46.1538, :crap 14.65}
   {:name "AbilityBridge.castByKey", :namespace "server.packages.official_ai_feature.ability_bridge", :complexity 7, :coverage 46.1538, :crap 14.65}
   {:name "Mgr:Exchange", :namespace "server.Mgr.MgrInteract", :complexity 14, :coverage 86.9565, :crap 14.4349}

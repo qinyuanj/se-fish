@@ -149,6 +149,15 @@ end
 -- 但本编辑器不认包内的 ---@export_prefab_type 自定义预设类型，锚点预设壳的编译代码为空、
 -- 试玩里不会执行（结论见 issue #7）。壳该做的事在这里补上：加载锚点框架，再按业务侧给的
 -- 行为模块名挂上行为逻辑。放在聚合入口里，业务代码仍然只依赖根 AbilityAPI 一个入口。
+-- 锚点行为登记表：键是 GameCfg 的 AnchorBehavior，值按需加载行为模块。
+-- 用字面量 require 而非拼路径，依赖才能被静态解析；新配锚点行为须在此登记。
+-- 本图挥砍受击体使用 BaseController；官方行为多传 owner 会触发类型告警，故 melee_hit、eel_discharge 用本图实现。
+local AnchorBehaviorLoaders = {
+	melee_hit = function() return require("server.AbilityBehaviors.melee_hit") end,
+	eel_discharge = function() return require("server.AbilityBehaviors.eel_discharge") end,
+	speed_add = function() return require("server.packages.ability_system.anchors.speed_add") end,
+}
+
 ---把锚点单位挂到技能单位下（锚点应先 parent 到技能单位）
 ---@param anchorScript Script 锚点脚本单位
 ---@param behaviorModule string 锚点行为模块名（anchors/ 目录下的文件名，如 "speed_add"）
@@ -161,12 +170,8 @@ function AbilityAPI.AttachAnchor(anchorScript, behaviorModule)
 	require("server.packages.ability_system.anchor_logic").Attach(anchorScript)
 
 	if behaviorModule and behaviorModule ~= "" then
-		-- 本图挥砍受击体使用 BaseController；官方行为多传 owner 会触发类型告警。
-        local localBehavior = behaviorModule == "melee_hit" or behaviorModule == "eel_discharge"
-		local modulePath = localBehavior
-			and "server.AbilityBehaviors." .. behaviorModule
-			or "server.packages.ability_system.anchors." .. behaviorModule
-		local behavior = require(modulePath)
+		local loadBehavior = AnchorBehaviorLoaders[behaviorModule]
+		local behavior = loadBehavior and loadBehavior()
 		if type(behavior) ~= "table" or type(behavior.Attach) ~= "function" then
 			error("[AbilityAPI] 锚点行为模块不可用: " .. tostring(behaviorModule), 2)
 		end
