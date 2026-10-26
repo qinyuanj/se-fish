@@ -4,6 +4,7 @@
 -- 退出码：busted 通过 0；busted 非 0 一律收成 1（业务失败）——busted 的退出码是失败数加错误数，
 -- 原样透传时恰好 3 个失败会与「工具不可用」的 3 冲突；未知车道或参数 2；busted 不在 PATH 上 3。
 local seam = require("tools.wsl_seam")
+local exit_code = require("tools.exit_code")
 
 local M = {}
 
@@ -81,13 +82,13 @@ function M.main(args, env)
   if not busted then
     io.stderr:write("test: 找不到 busted。按固定版本用 luarocks 安装（luarocks --local install busted），"
       .. "并确认 ~/.luarocks/bin 在 PATH 中\n")
-    return 3
+    return exit_code.UNAVAILABLE
   end
   local root = (env and env.repo_root) or "."
   local parts = { "cd", seam.q(root), "&&", seam.q(busted), seam.q("--run=" .. opts.lane) }
   for _, a in ipairs(opts.rest) do parts[#parts + 1] = seam.q(a) end
-  if seam.execute(table.concat(parts, " ")) ~= 0 then return 1 end
-  return 0
+  if seam.execute(table.concat(parts, " ")) ~= 0 then return exit_code.FAILURE end
+  return exit_code.OK
 end
 
 return M

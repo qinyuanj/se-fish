@@ -18,6 +18,7 @@ local workspace = require("tools.eggy_workspace")
 local plan = require("tools.deploy_plan")
 local shell = require("tools.wsl_seam")
 local finalize = require("tools.editor_finalize")
+local exit_code = require("tools.exit_code")
 
 local M = {}
 
@@ -28,7 +29,7 @@ end
 
 -- 平台或工具不可用（WSL interop、editor-cli.exe 推导）：main 收成退出码 3。
 local function unavailable(msg)
-  error({ code = 3, msg = "deploy: " .. msg }, 0)
+  exit_code.unavailable("deploy: " .. msg)
 end
 
 local function require_dir(path, msg)
@@ -180,7 +181,7 @@ local function run_deploy(clean_only)
 
   local ok, err, code = finalize.run(WS)
   if not ok then
-    if code == 3 then unavailable(err) end
+    if code == exit_code.UNAVAILABLE then unavailable(err) end
     fail(err)
   end
 end
@@ -200,16 +201,7 @@ function M.main(args)
       return 2
     end
   end
-  local ok, err = pcall(run_deploy, clean_only)
-  if not ok then
-    if type(err) == "table" then
-      io.stderr:write(err.msg .. "\n")
-      return err.code
-    end
-    io.stderr:write(tostring(err) .. "\n")
-    return 1
-  end
-  return 0
+  return exit_code.protect(run_deploy, clean_only)
 end
 
 if ... == "tools.deploy" then

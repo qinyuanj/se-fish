@@ -74,6 +74,7 @@
 package.path = "./?.lua;./?/init.lua;" .. package.path
 
 local shell = require("tools.wsl_seam")
+local exit_code = require("tools.exit_code")
 
 local M = {}
 
@@ -99,7 +100,7 @@ end
 
 -- 平台或工具不可用（editor-cli.exe 推导失败或找不到）：main 收成退出码 3。
 local function unavailable(msg)
-  error({ code = 3, msg = "ability-presets: " .. msg }, 0)
+  exit_code.unavailable("ability-presets: " .. msg)
 end
 
 M.SPECS = {
@@ -694,17 +695,7 @@ function M.main(args)
       return 0
     end
   end
-  local ok, err = pcall(run, args)
-  if not ok then
-    if type(err) == "table" then
-      io.stderr:write(err.msg .. "\n")
-      return err.code
-    end
-    io.stderr:write(tostring(err) .. "\n")
-    return 1
-  end
-  if type(err) == "number" then return err end
-  return 0
+  return exit_code.protect(run, args)
 end
 
 if ... == "tools.ability_presets" then

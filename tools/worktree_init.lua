@@ -5,6 +5,7 @@
 -- 不为质量工具做任何准备（#146）：质量工具是 uml-viewer 的标准工具，由人按 uml-viewer 文档安装。
 -- acceptance4lua 已删除（#147），.toolcache 不再有使用者，这里也不准备。
 local seam = require("tools.wsl_seam")
+local exit_code = require("tools.exit_code")
 
 local M = {}
 
@@ -116,7 +117,7 @@ function M.main(args)
     if not opts.skills_from then
       -- 推导要经 WSL interop：推不出属平台不可用（#145 退出码 3）。
       io.stderr:write("worktree-init: " .. err .. "\n")
-      return 3
+      return exit_code.UNAVAILABLE
     end
   end
   return M.run(opts)
