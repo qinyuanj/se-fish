@@ -10,8 +10,8 @@
 -- seam：MgrBlindbox:Handle / Settle / PushState / OnPlayerAdded；真实 MgrSave + MgrPlayerData +
 --   MgrPlatform（#123 持久操作协议），替换引擎边界（game / REUtil / DataStore / 时钟）；
 --   随机数经 MgrBlindbox.Random 注入（脚本化序列锁定权重区间与保底时机）；Loot 替身记录落地。
--- 迁移说明：引擎边界夹具下沉到 tests/support/blindbox_world.lua（验收步骤 tools/acceptance/platform_steps.lua
---   与本 spec 各自实例化，互不共享状态）；案例按旧 LuaUnit 实际执行序（方法名字典序）逐个 it 注册。
+-- 迁移说明：引擎边界夹具下沉到 tests/support/blindbox_world.lua（调用方各自实例化，
+--   互不共享状态）；案例按旧 LuaUnit 实际执行序（方法名字典序）逐个 it 注册。
 local GameCfg = require("common.GameCfg")
 local BlindboxWorld = require("tests.support.blindbox_world")
 local RandomGuard = require("tests.support.random_guard")
