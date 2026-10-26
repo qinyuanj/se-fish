@@ -2,7 +2,7 @@
 -- 每例在 tmp/ 下新建临时 git 仓库，复制入库的 tools/hooks/pre-commit，把入库的
 -- tools/hooks/shim 装进 hooks 目录（与 docs/agents/workflow.md「pre-commit hook」同一份），
 -- 再断言提交的退出码与输出。
--- fast 车道经 CLI 调起（#145）：夹具仓库里放入库的 tools/cli.lua、tools/test.lua 与
+-- fast 车道经 CLI 调起（#145）：夹具仓库里放入库的 tools/cli.lua、tools/test.lua、tools/exit_code.lua 与
 -- tools/wsl_seam.lua，hook 执行 `lua5.4 tools/cli.lua test fast`，由 CLI 找 busted。
 -- PATH 前插桩 busted：只记录是否被调用及其看到的环境，不真跑 fast。
 -- 每个子进程先清掉全部 GIT_* 变量并屏蔽全局/系统 git 配置——本文件可能在别的 hook
@@ -17,7 +17,7 @@ local slurp, code_of, rmrf, exists, write_file =
 local REPO = assert(io.popen("pwd")):read("l")
 local HOOK = REPO .. "/tools/hooks/pre-commit"
 -- hook 经 CLI 跑 fast 所需的入库文件，原样复制进夹具仓库。
-local CLI_FILES = { "tools/cli.lua", "tools/test.lua", "tools/wsl_seam.lua" }
+local CLI_FILES = { "tools/cli.lua", "tools/test.lua", "tools/wsl_seam.lua", "tools/exit_code.lua" }
 local ROOT = REPO .. "/tmp/pre-commit-hook-test"
 local FAKE = ROOT .. "/repo"
 local STUB_DIR = ROOT .. "/bin"

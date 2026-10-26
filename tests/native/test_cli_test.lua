@@ -1,5 +1,5 @@
 -- test 子命令的命令边界（#145 接缝二）：给定参数与环境，入口拼出什么 busted 命令行、
--- 何时拒绝执行、退出码是否透传。沿用 blender_cli_test 的做法，WSL 接缝层的 which / execute
+-- 何时拒绝执行、busted 的退出码如何收成 CLI 退出码。沿用 blender_cli_test 的做法，WSL 接缝层的 which / execute
 -- 用桩替换，不真起 busted；真实经 CLI 跑 fast 由 pre-commit hook 的提交证明。
 local seam = require("tools.wsl_seam")
 local test_cmd = require("tools.test")
@@ -112,11 +112,12 @@ describe("TestTestCliFailures", function()
     assert.are.equal(0, #world.executed)
   end)
 
-  it("test_busted_exit_code_is_passed_through", function()
+  -- busted 退出码是失败数加错误数；恰好 3 个失败不能被当成「busted 不可用」的 3。
+  it("test_busted_failure_exits_1_even_when_busted_returns_3", function()
     world.exit_code = 1
     assert.are.equal(1, (run({ "fast" })))
-    world.exit_code = 7
-    assert.are.equal(7, (run({ "full" })))
+    world.exit_code = 3
+    assert.are.equal(1, (run({ "full" })))
   end)
 
   it("test_help_lists_lanes_without_running_busted", function()

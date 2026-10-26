@@ -8,7 +8,7 @@
 
 agent 与人日常反复调用的检查与运维命令都经 `lua5.4 tools/cli.lua <子命令>`，包括新增的 `test [fast|full] [-- <busted 参数>...]`；pre-commit hook 也经它跑 fast 车道。入口强制 Lua 5.4，由脚本自身位置推导仓库根，子命令接口为 `main(args, env) -> 退出码`。不进清单的模块及理由写在 CLI 头注释。
 
-- **退出码 3 与 ADR-0008 并存**：0 成功 / 1 业务失败 / 2 用法错误 / 3 平台或工具不可用（busted 缺失、`editor-cli.exe` 或 Blender 找不到、WSL interop 失败）。退出码 3 让调用方分清「该查环境」还是「该改代码」。[ADR-0008](0008-wsl-development-windows-deploy.md) 的「编辑器没装或没打开本图 → 打印跳过并返回 0」不变：那是 `deploy` 有意设计的可跳过收尾，镜像本身已经成功，不算工具不可用。
+- **退出码 3 与 ADR-0008 并存**：0 成功 / 1 业务失败 / 2 用法错误 / 3 平台或工具不可用（busted 缺失、`editor-cli.exe` 或 Blender 找不到、WSL interop 失败）。退出码 3 让调用方分清「该查环境」还是「该改代码」。`test` 不原样透传 busted 的退出码：busted 的退出码是失败数加错误数，恰好 3 个失败会被误读成「busted 不可用」，所以 busted 非 0 一律收成 1，只有 busted 缺失才是 3。[ADR-0008](0008-wsl-development-windows-deploy.md) 的「编辑器没装或没打开本图 → 打印跳过并返回 0」不变：那是 `deploy` 有意设计的可跳过收尾，镜像本身已经成功，不算工具不可用。
 - **不照搬 monopoly 的 `packages/<pkg>/cli` + foundation 结构**：本仓库只有七个路由模块，顶层路由表加平铺模块足以表达封闭命令集；多层包结构和非路由白名单 guard 只增加样板，没有对应的复用收益。
 - **CLI 不包装 `./uml`**：`./uml` 由 uml-viewer 安装器生成，命令集与参数随上游演进；包一层只会多一份要同步的转发，且质量工具只由人运行，不需要进 agent 的入口。
 

@@ -1,10 +1,10 @@
 -- #65 P0「鱼塘 Boundary 批次」试玩探针：风神之翼（item169）横向钳制与高度上限。
 -- 复跑（验收槽隔离，不动正式存档）：
---   lua tools/cli.lua acceptance-slot new && lua tools/cli.lua deploy
+--   lua5.4 tools/cli.lua acceptance-slot new && lua5.4 tools/cli.lua deploy
 --   editor-cli play start --wait-ready --json
 --   editor-cli exec --platform server --file <本文件绝对路径> --timeout 60 --json
 --   editor-cli log grep CLAMP65 --play-session <session> --json
---   editor-cli play stop && lua tools/cli.lua acceptance-slot off && lua tools/cli.lua deploy
+--   editor-cli play stop && lua5.4 tools/cli.lua acceptance-slot off && lua5.4 tools/cli.lua deploy
 --
 -- 口径声明：本探针断言的是**运行时数学边界**（GameCfg.Zones[1].Scene.Boundary 经
 -- GameCfg 末尾布局变换后的绝对值），不是实体空气墙面。实体墙的顶底与位置由编辑器侧

@@ -11,6 +11,7 @@
 package.path = "./?.lua;./?/init.lua;" .. package.path
 
 local seam = require("tools.wsl_seam")
+local exit_code = require("tools.exit_code")
 
 local M = {}
 
@@ -58,7 +59,7 @@ end
 
 -- 平台或工具不可用（interop、Blender、python3、上游 runner）：main 收成退出码 3。
 local function unavailable(msg)
-  error({ code = 3, msg = "blender: " .. msg }, 0)
+  exit_code.unavailable("blender: " .. msg)
 end
 
 -- "5.10" → {5, 10}；按数字逐段比较，5.10 比 5.9 新。
@@ -249,16 +250,7 @@ function M.main(args)
     io.stdout:write(M.usage())
     return 0
   end
-  local ok, result = pcall(run, opts)
-  if not ok then
-    if type(result) == "table" then
-      io.stderr:write(result.msg .. "\n")
-      return result.code
-    end
-    io.stderr:write(tostring(result) .. "\n")
-    return 1
-  end
-  return result
+  return exit_code.protect(run, opts)
 end
 
 if ... == "tools.blender" then

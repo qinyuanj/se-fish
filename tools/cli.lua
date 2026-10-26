@@ -13,13 +13,15 @@
 --
 -- 退出码：0 成功 / 1 业务失败 / 2 用法错误（未知子命令、模块加载失败、未知参数）/
 --         3 平台或工具不可用（busted 缺失、editor-cli.exe 或 Blender 找不到、WSL interop 失败）。
+-- test 不原样透传 busted 的退出码（那是失败数加错误数，恰好 3 个失败会撞上退出码 3）：
+-- busted 非 0 一律收成 1。
 -- ADR 0008 的「编辑器没装或没打开本图 → 打印跳过并返回 0」不受退出码 3 影响。
 --
 -- 不进清单（不挂路由）及理由：
 --   - verify：只剩一项检查，不包编排；收尾直接跑 `test full`。
 --   - quality / uml：质量工具由人直接用 `./uml crap|mutate|dry`，CLI 不包装。
 --   - 内部模块：部署 / 同步计划（deploy_plan、sync_plan）、WSL 接缝（wsl_seam）、
---     宿主目录定位（eggy_workspace）、编辑器收尾（editor_finalize）——只供子命令调用。
+--     宿主目录定位（eggy_workspace）、编辑器收尾（editor_finalize）、退出码约定（exit_code）——只供子命令调用。
 --   - 一次性离线脚本：内容校验（validate_content）、布局规划与探针生成（plan_zone_layout、
 --     gen_zone_layout_probe、gen_config_anchor_probe）、基线转换（baseline_csv）、
 --     锚点坐标 dry-run（anchor_coord_sync_dry_run）、空间合同核对（zone_space_contract）。
@@ -81,7 +83,7 @@ local function usage()
   lines[#lines + 1] = ""
   lines[#lines + 1] = "退出码："
   lines[#lines + 1] = "  0 成功"
-  lines[#lines + 1] = "  1 业务失败（含测试失败）"
+  lines[#lines + 1] = "  1 业务失败（含测试失败：busted 的任何非 0 退出码都收成 1）"
   lines[#lines + 1] = "  2 用法错误（未知子命令、模块加载失败、未知参数）"
   lines[#lines + 1] = "  3 平台或工具不可用（busted 缺失、editor-cli.exe 或 Blender 找不到、WSL interop 失败）"
   lines[#lines + 1] = ""
