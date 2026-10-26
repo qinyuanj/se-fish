@@ -1,7 +1,8 @@
 -- test 子命令：按测试车道跑 busted（#145）。`lua5.4 tools/cli.lua test [fast|full] [-- <busted 参数>...]`。
 -- 车道名与 .busted 的任务名同名，始终显式传 --run=<车道>（不依赖 .busted 的 default）；
 -- 在仓库根执行 busted，进程调用经 WSL 接缝层的 which / execute，fast 车道用桩替换。
--- 退出码：busted 的退出码原样透传；未知车道或参数 2；busted 不在 PATH 上 3。
+-- 退出码：busted 通过 0；busted 非 0 一律收成 1（业务失败）——busted 的退出码是失败数加错误数，
+-- 原样透传时恰好 3 个失败会与「工具不可用」的 3 冲突；未知车道或参数 2；busted 不在 PATH 上 3。
 local seam = require("tools.wsl_seam")
 
 local M = {}
@@ -22,7 +23,7 @@ function M.usage()
   local lines = {
     "用法: lua5.4 tools/cli.lua test [fast|full] [-- <busted 参数>...]",
     "",
-    "在仓库根按测试车道跑 busted（显式 --run=<车道>），退出码透传 busted。缺省车道 " .. M.DEFAULT_LANE .. "。",
+    "在仓库根按测试车道跑 busted（显式 --run=<车道>），测试通过退出码 0、有失败或错误 1。缺省车道 " .. M.DEFAULT_LANE .. "。",
     "",
     "车道（与 .busted 任务同名）：",
   }
@@ -85,7 +86,8 @@ function M.main(args, env)
   local root = (env and env.repo_root) or "."
   local parts = { "cd", seam.q(root), "&&", seam.q(busted), seam.q("--run=" .. opts.lane) }
   for _, a in ipairs(opts.rest) do parts[#parts + 1] = seam.q(a) end
-  return seam.execute(table.concat(parts, " "))
+  if seam.execute(table.concat(parts, " ")) ~= 0 then return 1 end
+  return 0
 end
 
 return M

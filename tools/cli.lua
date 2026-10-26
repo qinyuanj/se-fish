@@ -13,6 +13,8 @@
 --
 -- 退出码：0 成功 / 1 业务失败 / 2 用法错误（未知子命令、模块加载失败、未知参数）/
 --         3 平台或工具不可用（busted 缺失、editor-cli.exe 或 Blender 找不到、WSL interop 失败）。
+-- test 不原样透传 busted 的退出码（那是失败数加错误数，恰好 3 个失败会撞上退出码 3）：
+-- busted 非 0 一律收成 1。
 -- ADR 0008 的「编辑器没装或没打开本图 → 打印跳过并返回 0」不受退出码 3 影响。
 --
 -- 不进清单（不挂路由）及理由：
@@ -81,7 +83,7 @@ local function usage()
   lines[#lines + 1] = ""
   lines[#lines + 1] = "退出码："
   lines[#lines + 1] = "  0 成功"
-  lines[#lines + 1] = "  1 业务失败（含测试失败）"
+  lines[#lines + 1] = "  1 业务失败（含测试失败：busted 的任何非 0 退出码都收成 1）"
   lines[#lines + 1] = "  2 用法错误（未知子命令、模块加载失败、未知参数）"
   lines[#lines + 1] = "  3 平台或工具不可用（busted 缺失、editor-cli.exe 或 Blender 找不到、WSL interop 失败）"
   lines[#lines + 1] = ""
