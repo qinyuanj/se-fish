@@ -1,16 +1,8 @@
 {
   "version": 1,
-  "operations": {
-    "crap": {
-      "argv": ["./tools/quality/project", "refresh-crap"],
-      "forwardArgs": "none",
-      "scope": "whole-tree",
-      "validResultExitCodes": [0]
-    },
-    "mutate": {
-      "argv": ["./tools/quality/project", "mutation"],
-      "forwardArgs": "append",
-      "validResultExitCodes": [0, 3]
-    }
+  "standardTools": {
+    "sourceRoots": ["client", "common", "server"],
+    "exclude": ["server/_trigger"],
+    "mutatorOptions": ["--busted-task", "fast"]
   }
 }

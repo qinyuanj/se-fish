@@ -81,3 +81,70 @@ describe("TestDeployOwnedTargets", function()
     assert.are.equal(1, finalized, "--clean 不应进入编辑器收尾")
   end)
 end)
+
+-- 退出码约定（#145）：interop 或 editor-cli.exe 推导失败属平台不可用，退 3；
+-- ADR 0008 的「编辑器没装 → 打印跳过」仍退 0。编辑器收尾走真实模块，只桩接缝层。
+describe("TestDeployExitCodes", function()
+  local saved, deploy, world, err_text
+  local MODULES = { "tools.deploy", "tools.eggy_workspace", "tools.wsl_seam", "tools.editor_finalize" }
+  local EXE = "/mnt/c/Users/u/.eggitor/cli/editor-cli.exe"
+
+  before_each(function()
+    saved = { modules = {}, print = print, stderr = io.stderr }
+    for _, name in ipairs(MODULES) do saved.modules[name] = package.loaded[name] end
+    world = { interop = true, editor_cli = EXE, exe_exists = true }
+    err_text = ""
+    package.loaded["tools.deploy"] = nil
+    package.loaded["tools.editor_finalize"] = nil
+    package.loaded["tools.eggy_workspace"] = { resolve = function() return WORKSPACE end }
+    package.loaded["tools.wsl_seam"] = {
+      q = function(v) return "'" .. tostring(v) .. "'" end,
+      interop = function()
+        if world.interop then return true end
+        return nil, "PATH 上找不到 cmd.exe（WSL interop 不可用）"
+      end,
+      editor_cli = function()
+        if world.editor_cli then return world.editor_cli end
+        return nil, "PATH 上找不到 cmd.exe（WSL interop 不可用）"
+      end,
+      is_dir = function() return true end,
+      exists = function(path)
+        if path == EXE then return world.exe_exists end
+        return true
+      end,
+      list_entries = list_entries,
+      list_files = function() return {} end,
+      mirror = function() return true, 0 end,
+      remove = function() end,
+    }
+    _G.print = function() end
+    io.stderr = { write = function(self, ...)
+      for _, v in ipairs({ ... }) do err_text = err_text .. tostring(v) end
+      return self
+    end }
+    deploy = require("tools.deploy")
+  end)
+
+  after_each(function()
+    for _, name in ipairs(MODULES) do package.loaded[name] = saved.modules[name] end
+    _G.print, io.stderr = saved.print, saved.stderr
+    saved, deploy = nil, nil
+  end)
+
+  it("test_missing_interop_exits_3", function()
+    world.interop = false
+    assert.are.equal(3, deploy.main({}))
+    assert.matches("interop 不可用", err_text, 1, true)
+  end)
+
+  it("test_editor_cli_derivation_failure_exits_3", function()
+    world.editor_cli = nil
+    assert.are.equal(3, deploy.main({}))
+    assert.matches("编辑器收尾失败", err_text, 1, true)
+  end)
+
+  it("test_missing_editor_cli_is_still_a_skip_with_exit_0", function()
+    world.exe_exists = false
+    assert.are.equal(0, deploy.main({}))
+  end)
+end)

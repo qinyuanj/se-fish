@@ -6,7 +6,7 @@
 
 - **`GLOSSARY.md`**（仓库根）：领域术语表，给出每个玩法概念该说的词与该避开的说法。
 - **`docs/adr/`**：读与你要动的区域相关的 ADR。
-- **工程约定**：修改代码、运行测试或操作编辑器前读 [开发工作流](workflow.md)；质量规则见 [质量工具](../../tools/quality/README.md)。
+- **工程约定**：修改代码、运行测试或操作编辑器前读 [开发工作流](workflow.md)；质量工具（`./uml crap|mutate|dry`，范围在 `uml-quality.json` 的 `standardTools`）见开发工作流的「架构图」与「人工验收」。
 
 不存在的文件**静默跳过**。`/domain-modeling` 在术语或决策真正定下来时按需创建。
 

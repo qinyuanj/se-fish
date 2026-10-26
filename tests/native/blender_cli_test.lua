@@ -123,7 +123,7 @@ describe("TestBlenderCliPreflight", function()
     install_blender(PF, "5.2")
     world.files[REPO .. "/a.py"] = true
     local code, _, err = run({ "a.py" })
-    assert.are_not.equal(0, code)
+    assert.are.equal(3, code) -- 平台或工具不可用（#145）
     assert.matches("interop 不可用", err, 1, true)
     assert.are.equal(0, #world.executed)
   end)
@@ -131,7 +131,7 @@ describe("TestBlenderCliPreflight", function()
   it("test_blender_not_found_hints_blender_exe", function()
     world.files[REPO .. "/a.py"] = true
     local code, _, err = run({ "a.py" })
-    assert.are_not.equal(0, code)
+    assert.are.equal(3, code) -- 平台或工具不可用（#145）
     assert.matches("BLENDER_EXE", err, 1, true)
     assert.matches("C:\\", err, 1, true)
     assert.matches("/mnt/c/", err, 1, true)
@@ -142,7 +142,7 @@ describe("TestBlenderCliPreflight", function()
     world.env.BLENDER_EXE = "/mnt/c/nope/blender.exe"
     install_blender(PF, "5.2") -- 显式指定时不回退到自动定位
     local code, _, err = run({ "--which" })
-    assert.are_not.equal(0, code)
+    assert.are.equal(3, code) -- 平台或工具不可用（#145）
     assert.matches("BLENDER_EXE", err, 1, true)
     assert.matches("/mnt/c/nope/blender.exe", err, 1, true)
     assert.is_nil(world.captured)
@@ -160,7 +160,7 @@ describe("TestBlenderCliPreflight", function()
     world.files[blender.RUNNER] = nil
     world.files[REPO .. "/a.py"] = true
     local code, _, err = run({ "a.py" })
-    assert.are_not.equal(0, code)
+    assert.are.equal(3, code) -- 平台或工具不可用（#145）
     assert.matches("blender-core", err, 1, true)
     assert.matches("docs/agents/art-pipeline.md", err, 1, true)
     -- 报错指向的小节标题须真实存在于文档，防止文档改名后报错指向空处。
@@ -182,7 +182,7 @@ describe("TestBlenderCliPreflight", function()
     world.python = false
     world.files[REPO .. "/a.py"] = true
     local code, _, err = run({ "a.py" })
-    assert.are_not.equal(0, code)
+    assert.are.equal(3, code) -- 平台或工具不可用（#145）
     assert.matches("python3", err, 1, true)
     assert.are.equal(0, #world.executed)
   end)

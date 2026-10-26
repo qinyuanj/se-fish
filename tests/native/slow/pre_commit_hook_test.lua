@@ -2,6 +2,8 @@
 -- 每例在 tmp/ 下新建临时 git 仓库，复制入库的 tools/hooks/pre-commit，把入库的
 -- tools/hooks/shim 装进 hooks 目录（与 docs/agents/workflow.md「pre-commit hook」同一份），
 -- 再断言提交的退出码与输出。
+-- fast 车道经 CLI 调起（#145）：夹具仓库里放入库的 tools/cli.lua、tools/test.lua、tools/exit_code.lua 与
+-- tools/wsl_seam.lua，hook 执行 `lua5.4 tools/cli.lua test fast`，由 CLI 找 busted。
 -- PATH 前插桩 busted：只记录是否被调用及其看到的环境，不真跑 fast。
 -- 每个子进程先清掉全部 GIT_* 变量并屏蔽全局/系统 git 配置——本文件可能在别的 hook
 -- 或 git 子进程里被跑到，不能让临时仓库的 git 操作落到外层仓库的索引上。
@@ -14,6 +16,8 @@ local slurp, code_of, rmrf, exists, write_file =
 -- 本仓库根的绝对路径。busted 从仓库根运行。
 local REPO = assert(io.popen("pwd")):read("l")
 local HOOK = REPO .. "/tools/hooks/pre-commit"
+-- hook 经 CLI 跑 fast 所需的入库文件，原样复制进夹具仓库。
+local CLI_FILES = { "tools/cli.lua", "tools/test.lua", "tools/wsl_seam.lua", "tools/exit_code.lua" }
 local ROOT = REPO .. "/tmp/pre-commit-hook-test"
 local FAKE = ROOT .. "/repo"
 local STUB_DIR = ROOT .. "/bin"
@@ -102,6 +106,9 @@ local function seed(opts)
   write_repo("README.md", "# 夹具\n")
   if opts.with_script ~= false then
     write_repo("tools/hooks/pre-commit", assert(slurp(HOOK)))
+    for _, rel in ipairs(CLI_FILES) do
+      write_repo(rel, assert(slurp(REPO .. "/" .. rel), "缺 " .. rel))
+    end
   end
   code_of("mkdir -p " .. q(FAKE))
   local _, code = sh("git init -q . && git add -A && " .. GIT .. "commit -q -m init")
@@ -180,6 +187,7 @@ describe("TestPreCommitHook", function()
     local out, code = commit()
     assert.are.equal(0, code, out)
     assert.are.same({ "args=--run=fast GIT_DIR=unset GIT_INDEX_FILE=unset" }, busted_calls())
+    assert.matches("pre-commit: lua5.4 tools/cli.lua test fast", out, 1, true)
     assert.matches("9 successes / 0 failures", out, 1, true)
     assert.are.equal(2, commit_count())
   end)
@@ -234,6 +242,8 @@ describe("TestPreCommitHook", function()
     local out, code = commit({ path = table.concat(dirs, ":") })
     assert.are_not.equal(0, code, out)
     assert.matches("找不到 busted", out, 1, true)
+    assert.matches("退出码 3", out, 1, true)
+    assert.matches("安装 busted", out, 1, true)
     assert.are.equal(1, commit_count())
   end)
 

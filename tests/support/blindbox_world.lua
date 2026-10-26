@@ -1,7 +1,7 @@
 -- 盲盒服务端结算引擎边界夹具（#87 从 tests/gameplay/blindbox_settle_test.lua 抽出）。
--- 抽出的原因：旧 LuaUnit 套件同时被 busted 车道与 tools/acceptance/platform_steps.lua 的
--- 验收步骤复用（dofile + setmetatable 借用类方法）。迁移到原生后测试文件不再是全局类，
--- 因此把「搭世界」这一段下沉为共享夹具，测试与验收各自 new() 一个实例。
+-- 抽出的原因：旧 LuaUnit 套件同时被 busted 车道与当时的 Gherkin 验收步骤复用（dofile + setmetatable
+-- 借用类方法；验收步骤已随 acceptance4lua 于 #147 删除）。迁移到原生后测试文件不再是全局类，
+-- 因此把「搭世界」这一段下沉为共享夹具，调用方各自 new() 一个实例。
 -- 只搭环境、不含任何断言；业务行为一律走真实管理器公共接口。
 -- seam：真实 MgrSave + MgrPlayerData + MgrPlatform + MgrBlindbox（#123 持久操作协议），
 --   替换引擎边界（game / REUtil / DataStore / 时钟）；随机数经 MgrBlindbox.Random 注入。

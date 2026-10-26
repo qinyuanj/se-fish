@@ -1,6 +1,6 @@
 -- 迁移自 tests/tooling/fixture_verify.lua（#93，手工脚本 → 原生 Busted）。
 -- 旧文件名字不含 `_test`，在任何车道里都发现不到，是 tests/support/combat_world.lua
--- 唯一的自动检查（它只被探针与 acceptance 引用）。转成原生案例后由 fast 车道接管。
+-- 唯一的自动检查（它只被探针引用）。转成原生案例后由 fast 车道接管。
 -- 失败方式（先列后写）：夹具 setUp 中途失败后 tearDown 不还原全局（把 _G.game / Vector3 /
 -- RaycastParams / Color / Quaternion / math.random 留给下一个案例），或还原时把别的替换也一起抹掉。
 local FishLift = require("tests.support.fish_lift")

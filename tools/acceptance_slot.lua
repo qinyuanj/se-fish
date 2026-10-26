@@ -6,13 +6,13 @@ local TEMP = 'common/GameCfg.lua.acceptance-slot.tmp'
 
 function M.usage()
   return table.concat({
-    '用法: lua tools/cli.lua acceptance-slot <status|new|set|off> [槽名]',
+    '用法: lua5.4 tools/cli.lua acceptance-slot <status|new|set|off> [槽名]',
     '  status       查看当前槽；空槽表示正式存档',
     '  new          生成一个新的验收槽名并写入配置',
     '  set <槽名>   指定验收槽；复用槽名会恢复该槽上次进度',
     '  off          恢复正式存档配置（不删除任何存档）',
     '槽名只能包含 1—40 位字母、数字、下划线或连字符。',
-    '请在试玩前运行，再执行 lua tools/cli.lua deploy；同槽重进不要运行 new。',
+    '请在试玩前运行，再执行 lua5.4 tools/cli.lua deploy；同槽重进不要运行 new。',
   }, '\n') .. '\n'
 end
 
@@ -130,7 +130,7 @@ function M.main(args)
     if not ok then io.stderr:write('acceptance-slot: ' .. tostring(err) .. '\n'); return 1 end
   end
   print(slot == '' and '已切回正式存档配置' or '已设置验收槽：' .. slot)
-  print('试玩前执行 lua tools/cli.lua deploy；同槽重进时不要更换槽名。')
+  print('试玩前执行 lua5.4 tools/cli.lua deploy；同槽重进时不要更换槽名。')
   return 0
 end
 

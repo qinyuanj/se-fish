@@ -1,20 +1,20 @@
 -- Busted 车道配置（#81 建立；#93 全量切换后是唯一的 Lua 测试入口，ADR 0002）。
--- fast 为日常车道（default 等价 fast）；full 追加 tests/native/slow。
+-- fast 为日常车道；full 追加 tests/native/slow，是收尾车道。
+-- default 与 full 相同（#146）：crapper 列测试文件时不带 --run、读 default，覆盖率因此含 slow 车道；
+-- mutator 每个变异体经 uml-quality.json 的 mutatorOptions（--busted-task fast）只跑 fast。
+-- 直接敲裸 busted 得到 full；日常 fast 须显式指定车道。
 -- ROOT 的白名单是「谁会被发现」的唯一机制：只列 tests/native 与 tests/native/slow，
 -- 别的目录一律不交给 Busted。recursive 必须显式为 false——否则 ROOT = tests/native
 -- 会递归吞掉 tests/native/slow，fast 就跑了 slow。
 -- pattern 只匹配 *_test.lua：探针（tests/probes）、共享夹具（tests/support）不在任何 ROOT 内。
--- Python 回归（tests/tooling/slow/*_test.py）由 tools/quality/project test-tooling 独立 discover，
--- 且 busted 只 glob *.lua，天然不进发现范围。
 -- sort-files 保留文件名字典序；不开启 sort-tests，案例保持注册顺序。
 -- auto-insulate 显式为 true（#135）：跨文件隔离由它承担。每个案例文件包在 insulate 块里，
 -- 文件结束后按键还原 _G 与 package.loaded：文件内首次 require 的模块被丢弃、下个文件重新加载，
 -- 被替换的全局与 package.loaded 条目换回原值。还原是浅的：helper 之前已加载的表（如 GameCfg）
 -- 引用不变，原地改字段不会被撤销，那部分由 helper 的逐例快照（只管 GameCfg.Debug 与
 -- Save.AcceptanceSlot）和案例自己的还原负责。关掉后 fast 出现 package.loaded / GameCfg
--- 跨文件残留导致的 7 failures / 3 errors（#130 审阅实测）；busted_lanes_test.py 固定此开关。
--- 本文件必须保持纯 Lua 可求值：tests/tooling/slow/busted_lanes_test.py 用
--- `<lua.executable> -e 'dofile(".busted")'` 读真实配置，改写时不得引用 Busted 运行期全局。
+-- 跨文件残留导致的 7 failures / 3 errors（#130 审阅实测）。
+-- 本文件保持纯 Lua 可求值（不引用 Busted 运行期全局），便于工具以 dofile 读取真实配置。
 
 return {
   _all = {
@@ -25,7 +25,7 @@ return {
     ["auto-insulate"] = true,
     output = "plainTerminal",
   },
-  default = { ROOT = { "tests/native" } },
+  default = { ROOT = { "tests/native", "tests/native/slow" } },
   fast = { ROOT = { "tests/native" } },
   full = { ROOT = { "tests/native", "tests/native/slow" } },
 }

@@ -1,5 +1,5 @@
 -- deploy 子命令：把仓库的三端一级子树字节镜像进编辑器宿主目录。
--- 在仓库根执行 `lua tools/cli.lua deploy`；直接 `lua tools/deploy.lua` 亦可。
+-- 在仓库根执行 `lua5.4 tools/cli.lua deploy`；直接 `lua5.4 tools/deploy.lua` 亦可。
 -- 反方向回同步见 tools/sync.lua；先例：se-defense tools/deploy.lua（WSL 接缝版）。
 --
 -- 本模块只管搬字节并核验搬运结果：哪些子树归本仓库（部署规则）在 tools/deploy_plan 回答，
@@ -18,12 +18,18 @@ local workspace = require("tools.eggy_workspace")
 local plan = require("tools.deploy_plan")
 local shell = require("tools.wsl_seam")
 local finalize = require("tools.editor_finalize")
+local exit_code = require("tools.exit_code")
 
 local M = {}
 
 -- 业务失败统一 error 出去，由 main 收成 stderr + 退出码 1。
 local function fail(msg)
   error("deploy: " .. msg, 0)
+end
+
+-- 平台或工具不可用（WSL interop、editor-cli.exe 推导）：main 收成退出码 3。
+local function unavailable(msg)
+  exit_code.unavailable("deploy: " .. msg)
 end
 
 local function require_dir(path, msg)
@@ -34,7 +40,7 @@ end
 
 function M.usage()
   return table.concat({
-    "用法: lua tools/cli.lua deploy",
+    "用法: lua5.4 tools/cli.lua deploy",
     "",
     "把仓库根 <端>/<child> 字节镜像进编辑器宿主目录 <端>/<child>（先重置目标子树）。",
     "端为白名单 " .. table.concat(plan.REALMS, "/") .. "（官方强制的工作区根，仓库根直接对齐）；",
@@ -143,7 +149,7 @@ local function run_deploy(clean_only)
   if not clean_only then
     local ok, why = shell.interop()
     if not ok then
-      fail("WSL interop 不可用，未镜像任何文件：" .. tostring(why))
+      unavailable("WSL interop 不可用，未镜像任何文件：" .. tostring(why))
     end
   end
   local WS, ws_err = workspace.resolve()
@@ -173,11 +179,14 @@ local function run_deploy(clean_only)
 
   print("deploy ok → " .. WS)
 
-  local ok, err = finalize.run(WS)
-  if not ok then fail(err) end
+  local ok, err, code = finalize.run(WS)
+  if not ok then
+    if code == exit_code.UNAVAILABLE then unavailable(err) end
+    fail(err)
+  end
 end
 
--- 退出码：0 成功 / 1 业务失败 / 2 用法错误。
+-- 退出码：0 成功 / 1 业务失败 / 2 用法错误 / 3 平台或工具不可用。
 function M.main(args)
   args = args or {}
   local clean_only = false
@@ -192,12 +201,7 @@ function M.main(args)
       return 2
     end
   end
-  local ok, err = pcall(run_deploy, clean_only)
-  if not ok then
-    io.stderr:write(tostring(err) .. "\n")
-    return 1
-  end
-  return 0
+  return exit_code.protect(run_deploy, clean_only)
 end
 
 if ... == "tools.deploy" then

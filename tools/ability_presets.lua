@@ -1,6 +1,6 @@
 -- ability-presets 子命令：一键重建技能包的编辑器侧预设（不进 git 的地图侧状态）。
--- 在仓库根执行 `lua tools/cli.lua ability-presets [--dry-run] [--editor-instance <pid>]`，
--- 或 `lua tools/cli.lua ability-presets --fix-names [--dry-run] [--editor-instance <pid>]`
+-- 在仓库根执行 `lua5.4 tools/cli.lua ability-presets [--dry-run] [--editor-instance <pid>]`，
+-- 或 `lua5.4 tools/cli.lua ability-presets --fix-names [--dry-run] [--editor-instance <pid>]`
 -- 修预设的 Name 类型（见下面「Name 类型」一节）。
 --
 -- 依据是 issue #7/#8 的编辑器侧命令记录。本编辑器不认包内 ---@export_prefab_type
@@ -11,7 +11,7 @@
 --     见 issue #7），再 change-asset-value 写入属性值。
 -- 预设 key 的唯一真源是 common/GameCfg.lua 的 GameCfg.Ability：本命令按 key 查预设，
 -- 还在就原地重刷壳与属性（可重复执行）；不在就复制模板建新的，并把新 key 回写
--- GameCfg.lua。跑完后照常 lua tools/cli.lua deploy 落地、试玩验证。
+-- GameCfg.lua。跑完后照常 lua5.4 tools/cli.lua deploy 落地、试玩验证。
 --
 -- 已知坑（issue #7/#8 实测，Name 那条由 issue #22 运行期探针复核，脚本使用者不必再踩）：
 --   * preset 命令要编辑态，试玩中一律报「需要编辑态」；
@@ -74,6 +74,7 @@
 package.path = "./?.lua;./?/init.lua;" .. package.path
 
 local shell = require("tools.wsl_seam")
+local exit_code = require("tools.exit_code")
 
 local M = {}
 
@@ -95,6 +96,11 @@ local TEMPLATE_ANCHOR = "map://preset/uccfb9dbe3f4428bb972096ba01f1f25"
 
 local function fail(msg)
   error("ability-presets: " .. msg, 0)
+end
+
+-- 平台或工具不可用（editor-cli.exe 推导失败或找不到）：main 收成退出码 3。
+local function unavailable(msg)
+  exit_code.unavailable("ability-presets: " .. msg)
 end
 
 M.SPECS = {
@@ -550,7 +556,7 @@ end
 
 function M.usage()
   return table.concat({
-    "用法: lua tools/cli.lua ability-presets [--fix-names] [--dry-run] [--editor-instance <pid>]",
+    "用法: lua5.4 tools/cli.lua ability-presets [--fix-names] [--dry-run] [--editor-instance <pid>]",
     "",
     "重建技能包的编辑器侧预设（技能背包 / 加速技能 / 加速锚点 / 挥砍技能 / 挥砍锚点）：",
     "GameCfg.Ability 里的 key 还在就原地重刷壳与属性（可重复执行）；不在就复制官方模板",
@@ -560,7 +566,7 @@ function M.usage()
     "删场景单位」四步修回来（保原预设 id、不改 GameCfg.lua、不存盘）。",
     "两种模式都要求编辑器开着本地图且在编辑态（preset 命令试玩中不可用）；多个编辑器实例时",
     "用 --editor-instance <pid> 指定。",
-    "常规模式跑完后：lua tools/cli.lua deploy 落地，试玩验证，再把 GameCfg.lua 的 key 变更提交。",
+    "常规模式跑完后：lua5.4 tools/cli.lua deploy 落地，试玩验证，再把 GameCfg.lua 的 key 变更提交。",
     "",
     "选项：",
     "  --fix-names            修预设 Name 的类型（见上），不再跑重建/重刷",
@@ -596,9 +602,9 @@ local function run(args)
   end
 
   local exe, exe_err = shell.editor_cli()
-  if not exe then fail(tostring(exe_err)) end
+  if not exe then unavailable(tostring(exe_err)) end
   if not shell.exists(exe) then
-    fail("未找到 editor-cli.exe（" .. exe .. "）")
+    unavailable("未找到 editor-cli.exe（" .. exe .. "）")
   end
 
   local body = read_file(GAMECFG)
@@ -680,7 +686,7 @@ local function run(args)
   return 0
 end
 
--- 退出码：0 成功 / 1 业务失败 / 2 用法错误。
+-- 退出码：0 成功 / 1 业务失败 / 2 用法错误 / 3 平台或工具不可用。
 function M.main(args)
   args = args or {}
   for _, a in ipairs(args) do
@@ -689,13 +695,7 @@ function M.main(args)
       return 0
     end
   end
-  local ok, err = pcall(run, args)
-  if not ok then
-    io.stderr:write(tostring(err) .. "\n")
-    return 1
-  end
-  if type(err) == "number" then return err end
-  return 0
+  return exit_code.protect(run, args)
 end
 
 if ... == "tools.ability_presets" then

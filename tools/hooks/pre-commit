@@ -2,13 +2,15 @@
 # 入库的 pre-commit 检查（#133，#131）。
 # 由共享 hooks 目录里的一行式 pre-commit 调起，安装方式见 docs/agents/workflow.md「pre-commit hook」。
 # 1. 暂存区每个 .lua 取暂存内容做 Lua 5.4 loadfile（检查的是将要提交的内容，不是工作区）；
-# 2. 暂存区含 .lua 或 .busted 时再跑 busted --run=fast（跑的是工作区，部分暂存时可能与提交内容不同）；纯文档提交不跑。
+# 2. 暂存区含 .lua 或 .busted 时再经 CLI 跑 fast 车道（`lua5.4 tools/cli.lua test fast`，#145；
+#    跑的是工作区，部分暂存时可能与提交内容不同）；纯文档提交不跑。CLI 退出码 3 = busted 不可用。
 # 质量工具不进 hook。
 set -u
 
 LUA_BIN=${LUA_BIN:-lua5.4}
 
 git_dir=$(git rev-parse --git-dir) || exit 1
+top=$(git rev-parse --show-toplevel) || exit 1
 work=$(mktemp -d "$git_dir/pre-commit.XXXXXX") || exit 1
 # 只在 EXIT 清理；信号先转成 exit 1 再走 EXIT，否则收到信号后脚本会接着跑并以 0 放行提交。
 trap 'rm -rf "$work"' EXIT
@@ -57,21 +59,21 @@ fi
 
 [ "$need_busted" -eq 1 ] || exit 0
 
-if ! command -v busted >/dev/null 2>&1; then
-  echo "pre-commit: 找不到 busted（应在 ~/.luarocks/bin 且该目录在 PATH 中），提交已拦下。" >&2
-  exit 1
-fi
-
-echo "pre-commit: busted --run=fast" >&2
+echo "pre-commit: lua5.4 tools/cli.lua test fast" >&2
 # git 在 hook 里导出的 GIT_INDEX_FILE 等变量不能漏给测试，否则用例里的 git 会操作到本次提交的索引。
 (
   unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_PREFIX GIT_OBJECT_DIRECTORY GIT_COMMON_DIR
-  busted --run=fast </dev/null
+  "$LUA_BIN" "$top/tools/cli.lua" test fast </dev/null
 ) >"$work/busted.out" 2>&1
 status=$?
+if [ "$status" -eq 3 ]; then
+  cat "$work/busted.out" >&2
+  echo "pre-commit: busted 不可用（退出码 3）：用 luarocks 安装 busted，并把 ~/.luarocks/bin 加进 PATH；提交已拦下。" >&2
+  exit 1
+fi
 if [ "$status" -ne 0 ]; then
   cat "$work/busted.out" >&2
-  echo "pre-commit: busted --run=fast 未通过（退出码 $status），提交已拦下。" >&2
+  echo "pre-commit: fast 车道未通过（退出码 $status），提交已拦下。" >&2
   exit 1
 fi
 tail -n 1 "$work/busted.out" >&2

@@ -41,4 +41,4 @@
 
 `attr_rule` 还需编辑器导出的「全局默认属性」（`List<attr_rule.AttrConfig>`）；`official_ai_feature` 无预设引用。
 
-预设丢失时按上表类型在编辑器重建；技能包可用 `lua tools/cli.lua ability-presets`，规格见 `tools/ability_presets.lua`。
+预设丢失时按上表类型在编辑器重建；技能包可用 `lua5.4 tools/cli.lua ability-presets`，规格见 `tools/ability_presets.lua`。

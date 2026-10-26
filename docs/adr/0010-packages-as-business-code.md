@@ -2,6 +2,8 @@
 
 **Status**: accepted（取代 [ADR-0005](0005-packages-as-external.md)）
 
+> **出处迁移（#146 / #147 追加）**：下文「以 `tools/quality/project.json` 的 `sources` 为准」已过时——`tools/quality/` 随项目自建质量工具一并删除。业务范围的定义不变，真源改为根目录 `uml-quality.json` 的 `standardTools`（`sourceRoots` 与 `exclude`），由 uml-viewer 标准工具读取；决策与取舍见 [ADR-0011](0011-cli-single-entry-standard-quality-no-acceptance.md)。下文提到的 `tools/quality/README.md` 同样已删除，当前口径见 [开发工作流](../agents/workflow.md)「架构图」。
+
 ADR-0005 曾把三端 `packages/` 当作 vendor：`policy.edn` 的 `:exclude` 加 `"packages"`，业务代码对包的 `require` 用 `:foreign` 端级前缀收成外部椭圆。于是文档里出现了两个口径：架构图上只画「业务树」，质量工具读的是更大的「指标采集范围」，包内指标因为图上没有同名类，叠加时被忽略。之后 `c141b67` 把三端 packages 按真实命名空间建类（94 个包内模块），并移除了 `:foreign` 与 packages 排除；当前 `policy.edn` 的 `:exclude` 只剩 `_trigger`。包已经纳入业务代码开发，ADR-0005、`docs/agents/workflow.md`、`tools/quality/README.md` 与 `docs/packages-reference.md` 却仍用外部椭圆的口径（#126 决策 3）。
 
 决定：
