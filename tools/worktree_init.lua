@@ -231,8 +231,9 @@ function M.main(args)
   if not opts.skills_from then
     opts.skills_from, err = default_skills_from()
     if not opts.skills_from then
+      -- 推导要经 WSL interop：推不出属平台不可用（#145 退出码 3）。
       io.stderr:write("worktree-init: " .. err .. "\n")
-      return 1
+      return 3
     end
   end
   return M.run(opts)

@@ -186,6 +186,15 @@ describe("TestWorktreeInit", function()
     assert.is_false(lexists(WT .. "/.agents"))
   end)
 
+  -- 退出码约定（#145）：magpie 资源库要经 WSL interop 推导，推不出属平台不可用，退 3。
+  it("test_magpie_library_derivation_failure_exits_3", function()
+    seam.magpie_library = function() return nil, "PATH 上找不到 cmd.exe（WSL interop 不可用）" end
+    assert.are.equal(3, run({ "--root", WT, "--tools-from", TOOLS }))
+    assert.matches("interop 不可用", err.text, 1, true)
+    assert.matches("--skills-from", err.text, 1, true)
+    assert.is_false(lexists(WT .. "/.agents"))
+  end)
+
   it("test_never_runs_quality_install_and_names_toolcache_owner", function()
     assert.are.equal(0, run(), err.text)
     assert.is_false(lexists(WT .. "/.toolcache"))

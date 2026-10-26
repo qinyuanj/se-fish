@@ -108,7 +108,7 @@ describe("TestDeployCli", function()
     local fresh = HOST .. "-no-interop"
     rmrf(fresh)
     out, code = run_deploy(nil, fresh, "/usr/bin:/bin")
-    assert.are_not.equal(0, code, out)
+    assert.are.equal(3, code, out) -- 平台不可用（#145）
     assert.matches("interop 不可用", out, 1, true)
     assert.is_false(exists(fresh), "interop 失败时不应创建宿主目录")
   end)
@@ -118,7 +118,7 @@ describe("TestDeployCli", function()
   it("test_empty_workspace_never_targets_the_filesystem_root", function()
     local root_client_before = exists("/client")
     out, code = run_deploy(nil, "", "/usr/bin:/bin")
-    assert.are_not.equal(0, code, out)
+    assert.are.equal(3, code, out) -- 平台不可用（#145）
     assert.matches("interop 不可用", out, 1, true)
     assert.are.equal(root_client_before, exists("/client"), "空宿主路径不应写到文件系统根")
   end)

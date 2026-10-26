@@ -32,11 +32,12 @@ function M.behind_count(cl)
   return (cl["only-local"] or 0) + (cl["differs"] or 0)
 end
 
--- 返回 true 表示收尾完成（含跳过）；失败返回 nil, 原因。
+-- 返回 true 表示收尾完成（含跳过）；失败返回 nil, 原因[, 3]——第三个值 3 表示平台不可用
+-- （interop 或 USERPROFILE 推导失败，推不出 editor-cli.exe），调用方据此退 3。
 function M.run(ws)
   local exe, err = shell.editor_cli()
   if not exe then
-    return nil, "编辑器收尾失败: " .. tostring(err)
+    return nil, "编辑器收尾失败: " .. tostring(err), 3
   end
   if not shell.exists(exe) then
     print("编辑器收尾跳过: 未找到 editor-cli.exe（" .. exe .. "）")

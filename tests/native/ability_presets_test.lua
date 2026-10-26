@@ -349,3 +349,38 @@ describe("TestAbilityPresetsReplace", function()
     assert.is_nil(out:find("map://preset/ubdb4a7e737d4eddb87729e9055ba375", 1, true))
   end)
 end)
+
+-- 退出码约定（#145）：推不出或找不到 editor-cli.exe 属平台不可用，退 3，且不调编辑器。
+describe("TestAbilityPresetsUnavailable", function()
+  local shell = require("tools.wsl_seam")
+  local saved, err_text, captured
+
+  before_each(function()
+    saved = { editor_cli = shell.editor_cli, exists = shell.exists, capture = shell.capture, stderr = io.stderr }
+    err_text, captured = "", 0
+    shell.capture = function() captured = captured + 1; return 1, "" end
+    io.stderr = { write = function(self, ...)
+      for _, v in ipairs({ ... }) do err_text = err_text .. tostring(v) end
+      return self
+    end }
+  end)
+  after_each(function()
+    shell.editor_cli, shell.exists, shell.capture = saved.editor_cli, saved.exists, saved.capture
+    io.stderr = saved.stderr
+  end)
+
+  it("test_editor_cli_derivation_failure_exits_3", function()
+    shell.editor_cli = function() return nil, "PATH 上找不到 cmd.exe（WSL interop 不可用）" end
+    assert.are.equal(3, ap.main({ "--dry-run" }))
+    assert.matches("interop 不可用", err_text, 1, true)
+    assert.are.equal(0, captured)
+  end)
+
+  it("test_missing_editor_cli_exits_3", function()
+    shell.editor_cli = function() return "/mnt/c/Users/u/.eggitor/cli/editor-cli.exe" end
+    shell.exists = function() return false end
+    assert.are.equal(3, ap.main({ "--dry-run" }))
+    assert.matches("未找到 editor-cli.exe", err_text, 1, true)
+    assert.are.equal(0, captured)
+  end)
+end)
