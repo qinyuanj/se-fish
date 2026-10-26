@@ -210,3 +210,7 @@ _Avoid_: 极限重量、排名
 **业务范围**：
 三个质量工具（CRAP、mutation、DRY）共享的源码集合，由项目质量配置声明；范围之外只有测试代码。难以测试的业务代码仍在范围内；缺数据的类在图上照常显示为红。本项目即 `uml-quality.json` 的 `standardTools`（`sourceRoots` 与 `exclude`）：三端 `client/`、`common/`、`server/` 排除 `server/_trigger/`，含各端 `packages/`；架构图（`policy.edn`）用同一范围（[ADR-0010](docs/adr/0010-packages-as-business-code.md)）。
 _Avoid_: 业务树、指标采集范围、mutation 范围、scope（单独使用时）
+
+**测试车道**：
+busted 按耗时划分的用例集合，与 `.busted` 任务同名：fast 是日常车道（`tests/native`），full 在 fast 之上追加 slow 用例（`tests/native/slow`），用于收尾。经 `lua5.4 tools/cli.lua test [fast|full]` 运行（[ADR-0011](docs/adr/0011-cli-single-entry-standard-quality-no-acceptance.md)）。
+_Avoid_: 验收车道、代码收尾门、lane（单独使用时）
