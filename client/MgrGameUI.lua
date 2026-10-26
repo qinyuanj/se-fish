@@ -6,6 +6,23 @@ local OpenScreenRE = REUtil:GetRE("OpenScreenRE")
 local CloseScreenRE = REUtil:GetRE("CloseScreenRE")
 local curShowMap = {}
 
+-- 界面 handler 登记表：键是 EUI 节点名（与 ScreenHandlers/ 下文件同名），值按需加载 handler。
+-- 用字面量 require 而非拼路径，依赖才能被静态解析；新增 handler 须在此登记。
+local ScreenHandlerLoaders = {
+    DialogNoticeConfirm = function() return require("client.ScreenHandlers.DialogNoticeConfirm") end,
+    ScreenBlindbox = function() return require("client.ScreenHandlers.ScreenBlindbox") end,
+    ScreenCompendium = function() return require("client.ScreenHandlers.ScreenCompendium") end,
+    ScreenFerry = function() return require("client.ScreenHandlers.ScreenFerry") end,
+    ScreenGM = function() return require("client.ScreenHandlers.ScreenGM") end,
+    ScreenGrill = function() return require("client.ScreenHandlers.ScreenGrill") end,
+    ScreenLottery = function() return require("client.ScreenHandlers.ScreenLottery") end,
+    ScreenMain = function() return require("client.ScreenHandlers.ScreenMain") end,
+    ScreenMsg = function() return require("client.ScreenHandlers.ScreenMsg") end,
+    ScreenPlatform = function() return require("client.ScreenHandlers.ScreenPlatform") end,
+    ScreenShop = function() return require("client.ScreenHandlers.ScreenShop") end,
+    ScreenSurvival = function() return require("client.ScreenHandlers.ScreenSurvival") end,
+}
+
 function MgrGameUI:GetScreen(screenName)
     local UIRoot = GameUI:GetUIRoot()
     if not UIRoot then
@@ -18,8 +35,12 @@ function MgrGameUI:GetScreen(screenName)
         print("[MgrGameUI] 找不到界面节点", screenName)
         return
     end
-    local handlerName = string.format("client.ScreenHandlers.%s", screenName)
-    local screenHandler = require(handlerName)
+    local loadHandler = ScreenHandlerLoaders[screenName]
+    if not loadHandler then
+        print("[MgrGameUI] 界面 handler 未登记", screenName)
+        return
+    end
+    local screenHandler = loadHandler()
 
     screenHandler.ScreenName = screenName
     screenHandler.RootNode = screenNode
