@@ -19,7 +19,6 @@
 - **界面**：由 `MgrGameUI` 管理；handler 放在 `client/ScreenHandlers/`，文件名与 EUI 节点同名，并在 `MgrGameUI` 的 `ScreenHandlerLoaders` 登记，供 `GetScreen` 按节点名加载。
 - **共享配置**：数值配置集中在 `common/GameCfg.lua`；技能配置在 `GameCfg.Ability`。
 - **生成内容**：`data/` 只读，修改须回编辑器重新导出，再用 `sync` 回灌；`unit_scripts/` 由引擎生成，不在本仓库管理。
-- **验收文件**：Gherkin 放在 `features/<车道>/<名字>.feature`，以 `# language: zh-CN` 开头。
 
 <!-- [teamai:culture:start] -->
 <!-- DO NOT EDIT: This section is auto-managed by teamai -->

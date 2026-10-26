@@ -1,8 +1,8 @@
--- 濒死复活引擎边界夹具（#89 从 tests/gameplay/revive_callback_test.lua 迁移，本模块在修复 acceptance 接缝时下沉）。
--- 抽出的原因：旧 LuaUnit 套件同时被 busted 车道与 tools/acceptance/platform_steps.lua 的
--- 验收步骤复用（dofile + setmetatable 借用全局类方法）。迁移到原生后测试文件不再是全局类，
--- 旧文件已随迁移删除，验收侧的 dofile 目标因此断裂；与 #87 的 blindbox_world 同法，
--- 把「搭世界」这一段下沉为共享夹具，测试与验收各自 new() 一个实例。
+-- 濒死复活引擎边界夹具（#89 从 tests/gameplay/revive_callback_test.lua 迁移，本模块在修复当时的验收接缝时下沉）。
+-- 抽出的原因：旧 LuaUnit 套件同时被 busted 车道与当时的 Gherkin 验收步骤复用（dofile + setmetatable
+-- 借用全局类方法；验收步骤已随 acceptance4lua 于 #147 删除）。迁移到原生后测试文件不再是全局类，
+-- 旧文件已随迁移删除；与 #87 的 blindbox_world 同法，把「搭世界」这一段下沉为共享夹具，
+-- 调用方各自 new() 一个实例。
 -- 只搭环境、不含任何断言；业务行为一律走真实管理器公共接口。
 -- seam：真实 MgrVitals + MgrSurvival（#147 T26 PlatformRevive / FullRevive / Update 暂停分支），
 --   Platform 替身脚本化回调（成功/取消/失败/超时/迟到由调用方驱动），REUtil 模块缓存替身收 SurvivalResult。

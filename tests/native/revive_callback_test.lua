@@ -10,7 +10,7 @@
 --   7. 可用性错：平台不可用（生产未配置）时不明确回包，或还暂停了倒计时；
 --   8. 并发错：flow 在飞时重复发起被接受（应 busy），payload 畸形报错而不是拒绝。
 -- seam：MgrSurvival:PlatformRevive / FullRevive / Update 暂停分支；搭世界下沉为
---   tests/support/revive_world（与验收侧 tools/acceptance/platform_steps.lua 共用同一夹具），
+--   tests/support/revive_world，
 --   本文件只留断言。
 -- 旧 setUp 是逐例的（含替换 package.loaded['common.REUtil']），映射为 before_each，
 -- after_each 恢复模块缓存，并对未完成的 before_each 幂等。

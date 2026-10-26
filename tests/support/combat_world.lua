@@ -1,4 +1,4 @@
--- 战斗岛（#141 树林岛 / #142 沙滩岛）探针与验收步骤共用的假引擎战斗世界。
+-- 战斗岛（#141 树林岛 / #142 沙滩岛）探针与测试共用的假引擎战斗世界。
 -- 复用 fish_escape 测试夹具：真实 MgrFishUnit + 假载体 / Vitals / RE；双人各 5000 血，
 -- 预警 payload 记入 env.notices，结算伤害记入 env.hits。在仓库根运行（require 路径以根为准）。
 local FishEscape = require('tests.support.fish_escape')
@@ -8,7 +8,7 @@ local M = setmetatable({}, { __index = FishEscape })
 
 --- 建世界：内部已 setUp + prepare，返回的 env 直接可用；调用方负责在案例结束时 :tearDown()。
 --- 拆除入口名与 blindbox_world / revive_world 相同，但**构造入口语义不同**：那三个的 new()
---- 只返回空壳、要调用方再 :setUp()，本夹具的既有调用方（探针、acceptance 步骤、生命周期回归）
+--- 只返回空壳、要调用方再 :setUp()，本夹具的既有调用方（探针、生命周期回归）
 --- 都按「拿起来就用」写，故这里 new() 直接搭好世界。
 --- 本文件的两个约定：生命周期走实例方法（:setUp / :tearDown），世界操作是不收 self 的普通函数，
 --- 由调用方以 `CombatWorld.at(env, now)` 这类形态调用；继承自 fish_escape 的方法仍走实例。
