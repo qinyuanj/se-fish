@@ -5,6 +5,7 @@ local SOURCES = { 'tools.acceptance.fish_damage_steps', 'tools.acceptance.abilit
   'tools.acceptance.prize_growth_steps', 'tools.acceptance.special_item_steps', 'tools.acceptance.platform_steps',
   'tools.acceptance.forest_island_steps', 'tools.acceptance.beach_island_steps',
   'tools.acceptance.carp_asset_steps', 'tools.acceptance.seagull_asset_steps',
+  'tools.acceptance.alligator_gar_asset_steps',
   'tools.acceptance.mesh_topology_steps' }
 local M = {}
 
