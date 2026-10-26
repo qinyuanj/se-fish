@@ -900,6 +900,11 @@ local EUITouchInfo = {}
 ---@field BindUnitId Int 绑定单位
 EffectBindData = {}
 
+---创建特效绑定数据实例
+---**适用范围**: 客户端和服务端
+---@return EffectBindData
+function EffectBindData.New() end
+
 ---蛋形生物的外观数据，描述蛋仔的盲盒、染色、时装散件、配饰、脸型、表情、肤色、蛋皮等可换装外观信息，并提供运行时换装、挂接外观件、显示头顶气泡与表情等表现能力。
 ---@class EggyAppearance
 local EggyAppearance = {}
@@ -1027,7 +1032,7 @@ local JoinData = {}
 ---LogService:GetLogHistory 返回的单条历史日志记录
 ---@class LogRecord
 ---@field Context Table 结构化上下文数据
----@field Message string 日志消息内容
+---@field Message String 日志消息内容
 ---@field MessageType Enums.MessageType 日志类型枚举值
 ---@field Timestamp Float 写入历史时的服务器时间，单位秒。此值为服务器时区时间。
 local LogRecord = {}
@@ -2000,35 +2005,6 @@ Region3int16 = {}
 ---@param max Vector3int16
 ---@return Region3int16
 function Region3int16.New(min, max) end
-
----远程事件，用于客户端与服务端之间的异步单向通信，可由服务端发送给指定客户端或所有客户端，也可由客户端发送给服务端。
----**适用范围**: 客户端和服务端
----@class RemoteEvent
----@field OnClientEvent Signal<fun(args?: Any)> 客户端监听服务端消息的信号。回调参数：args 事件参数
----@field OnServerEvent Signal<fun(player: Player, args?: Any)> 服务端监听客户端消息的信号。回调参数：player 触发事件的玩家, args 事件参数
-RemoteEvent = {}
-
----从服务端发送事件给所有客户端
----**适用范围**: 客户端和服务端
----@param args? Any 事件参数
-function RemoteEvent:FireAllClients(args) end
-
----从服务端发送事件给指定玩家客户端
----**适用范围**: 客户端和服务端
----@param player Player 目标玩家
----@param args? Any 事件参数
-function RemoteEvent:FireClient(player, args) end
-
----从客户端发送事件给服务端
----**适用范围**: 客户端和服务端
----@param args? Any 事件参数
-function RemoteEvent:FireServer(args) end
-
----RemoteEvent.New(EventName)创建一个新的远程事件实例，用于客户端与服务端之间的异步单向通信
----**适用范围**: 客户端和服务端
----@param eventName String 事件名称，用于标识该远程事件
----@return RemoteEvent 新创建的 RemoteEvent 实例
-function RemoteEvent.New(eventName) end
 
 ---预留服务器结果, 由 TeleportService:ReserveServerAsync 返回
 ---@class ReserveServerResult
@@ -3540,6 +3516,23 @@ Enums.RaycastFilterType = {
 	Include = 1,  ---仅包含列表
 }
 
+---场景阴影模式。DEFAULT 自动：按画质档使用默认阴影距离；CUSTOM 自定义：使用 ShadowDistance 指定的距离，距离为 0 时关闭场景阴影。
+---@enum Enums.ShadowMode 
+Enums.ShadowMode = {
+	DEFAULT = 0,  ---自动
+	CUSTOM = 1,  ---自定义
+}
+
+---动态真光源的阴影质量枚举。LOW 低质量，MIDDLE 中等质量，HIGH 高质量，MAX 最高质量，UNIQUE 独特质量。
+---@enum Enums.ShadowQuality 
+Enums.ShadowQuality = {
+	LOW = 0,  ---低
+	MIDDLE = 1,  ---中
+	HIGH = 2,  ---高
+	MAX = 3,  ---最高
+	UNIQUE = 4,  ---独特
+}
+
 ---生物身体上的骨骼挂点位置，用于在指定部位绑定外观件、特效或道具。
 ---@enum Enums.SkeletalSocketType 
 Enums.SkeletalSocketType = {
@@ -4424,8 +4417,17 @@ function Game:SetClipboardText(text) end
 ---@field EnvironmentMap String 场景反射立方体贴图
 ---@field FilmicTonemapEnabled Bool 电影色调映射
 ---@field Intensity Float 主光源强度
+---@field MultiLightEnabled Bool 开启后，场景将支持显示大量实时灯光。关闭时仅支持基础光照。
+---@field MultiLightGridSize Float 设置水平方向（XZ轴）光照计算格子的边长（单位：米）。数值越小，光照分布越精确，但性能开销越大，且光照的可见范围越小。
+---@field MultiLightGridYScale Float 设置垂直方向（Y轴）格子的拉伸倍数。垂直格子高度 = 光照网格尺寸 × 拉伸比。通常用于降低垂直方向的计算密度以节省性能。
+---@field MultiLightOriginDistance Float 将多光源的计算中心向相机前方移动的距离（单位：米）。调大此值可以让远处的灯光更早被看见，适合长景深地图。
+---@field MultiLightRectEnabled Bool 开启后，多光源模式支持矩形光源（配合动态矩形光源使用，矩形光源放置时会自动开启）。
+---@field MultiLightRectHD Bool 矩形光源进阶渲染（LTC），光斑过渡更平滑，性能开销更高。需先开启矩形光源。
 ---@field Orientation Vector3 主光源朝向
+---@field ShadowDistance Float 自定义模式下的阴影可见距离（单位：米），0 表示关闭场景阴影
 ---@field ShadowFade Float 阴影淡化
+---@field ShadowMode Enums.ShadowMode 自动：按画质档使用默认阴影距离；自定义：使用「阴影距离」指定的距离
+---@field SoftShadowWidth Float 阴影边缘的虚化宽度，值越大阴影越柔和
 local LightingService = {}
 
 ---LogService 日志服务
@@ -4834,6 +4836,11 @@ function SocialService:GetPartyAsync(partyId) end
 ---@param partyId String 队伍 Id
 ---@return Player[]? 同队伍的在线玩家列表
 function SocialService:GetPlayersByPartyId(partyId) end
+
+---客户端调用时弹出点赞界面；服务端调用时下发给目标玩家客户端执行。
+---**适用范围**: 客户端和服务端
+---@param player Player 目标玩家
+function SocialService:ShowMapLikePanel(player) end
 
 ---声音服务
 ---**适用范围**: 客户端和服务端
@@ -5426,6 +5433,12 @@ local Animator = {}
 ---@return AnimationTrack[] AnimationTrack 数组
 function Animator:GetPlayingAnimationTracks() end
 
+---查找已加载的轨道，不创建新实例
+---**适用范围**: 客户端和服务端
+---@param animationId String 动画或图资源标识
+---@return AnimationTrack 已加载轨道；不存在返回 nil
+function Animator:GetTrackByAnimationId(animationId) end
+
 ---加载动画轨道，返回可播放的 AnimationTrack
 ---同一个 contentId 多次调用会返回缓存的同一个 AnimationTrack 实例
 ---支持传入 Animation 对象或 asset URI 字符串
@@ -5523,7 +5536,8 @@ function BaseController:ApplyForce(force) end
 
 ---切换到指定角色状态
 ---@param state Enums.ControllerStateType 目标状态
-function BaseController:ChangeState(state) end
+---@param force? Bool 是否强制切换状态
+function BaseController:ChangeState(state, force) end
 
 ---获取当前所有附加状态
 ---@return String[] 附加状态名列表
@@ -5659,7 +5673,7 @@ function BaseMotorUnit:Stop() end
 ---@field ModelColor4 Color 模型染色区域4的颜色；启用自定义外观后该属性不生效
 ---@field ModelVisible Bool 控制模型是否可见，隐藏后仍参与物理碰撞
 ---@field OcclusionType Int 当模型遮挡住摄像机与玩家之间的视线时的处理策略
----@field Persistent Bool 仅在World开启了AOI功能时此字段生效
+---@field Persistent Bool streaming相关字段，功能暂未启用，目前修改无任何效果。
 ---@field PivotOffset CFrame 轴心点相对于组件原点的偏移，影响 GetPivot 和 PivotTo 的结果
 ---@field Position Vector3 单位在世界空间中的位置坐标。该属性为 CFrame 的语法糖：读取等价于 CFrame.Position，写入会保持当前旋转不变、仅重建 CFrame 的位置分量
 ---@field Rotation Quaternion 单位在世界空间中的旋转，以四元数表示。该属性为 CFrame 的语法糖：读取等价于 CFrame.Rotation，写入会保持当前位置不变、仅重建 CFrame 的旋转分量
@@ -5893,6 +5907,41 @@ local CurveVelMotorUnit = {}
 ---@field MaxBlurSize Float 最大模糊半径
 local DepthOfFieldEffect = {}
 
+---动态真光源抽象基类，能够真实照亮周围物体并投射阴影。不可直接创建，请使用 DynamicPointLight（动态点光源）、DynamicRectLight（动态矩形光源）、DynamicSpotLight（动态聚光源）。
+---**适用范围**: 客户端和服务端
+---@class DynamicLight : Unit
+---@field Color Color 颜色
+---@field EnableShadow Bool 投射阴影
+---@field Enabled Bool 启用
+---@field FogClamp Float 雾效钳制
+---@field Intensity Float 强度
+---@field Position Vector3 位置
+---@field Priority Int 优先级
+---@field Range Float 范围
+---@field Rotation Quaternion 旋转
+---@field ShadowQuality Enums.ShadowQuality 阴影质量
+local DynamicLight = {}
+
+---从一个点向四周真实照亮场景并投射阴影，强度随距离衰减。适合做路灯、舞台灯、火把等需要真实光照效果的场景。
+---**适用范围**: 客户端和服务端
+---@class DynamicPointLight : DynamicLight
+local DynamicPointLight = {}
+
+---以矩形区域真实照亮场景并投射阴影，可通过宽度和高度调节光照区域形状。适合做窗户光、门缝光、灯箱等。
+---**适用范围**: 客户端和服务端
+---@class DynamicRectLight : DynamicLight
+---@field RectConeAngle Float 张角
+---@field RectHeight Float 矩形高度
+---@field RectWidth Float 矩形宽度
+local DynamicRectLight = {}
+
+---以锥形区域真实照亮场景并投射阴影，可通过内外锥角调节光照范围。适合做手电筒、舞台追光、车灯等。
+---**适用范围**: 客户端和服务端
+---@class DynamicSpotLight : DynamicLight
+---@field InnerAngle Float 内锥角
+---@field OuterAngle Float 外锥角
+local DynamicSpotLight = {}
+
 ---UI按钮节点
 ---@class EUIButton : EUINodeBase
 ---@field ButtonDisableColor Color 禁用按钮颜色
@@ -6056,6 +6105,7 @@ local EUILoadingBar = {}
 ---@field TopAdaption Float 顶部自适应
 ---@field TouchBeginAudio String 按下音效
 ---@field TouchClickAudio String 点击音效
+---@field TouchDragEnabled Bool 是否可拖动
 ---@field TouchEnabled Bool 是否可触摸
 ---@field TouchEndAudio String 抬起音效
 ---@field TouchbeginEvent String 触摸开始事件
@@ -6216,6 +6266,32 @@ function EUISceneNode:AttachUnit(unit, socket) end
 ---@field TextVerticalAlignment Enums.EUITextVerticalAlignment 垂直对齐方式
 local EUISimpleRichTextLabel = {}
 
+---UI滑动器
+---@class EUISlider : EUINodeBase
+---@field Direction Enums.EUIScrollDirection 横向从左到右递增，竖向从上到下递增。使用EUIScrollDirection枚举：Vertical为1，Horizontal为2。
+---@field Disabled Bool 为true时禁用滑动条交互并显示禁用状态；若正在拖动，则以取消状态结束本次触摸。
+---@field HandleDisabledImage String 滑块处于禁用状态时使用的图片，使用图片资源协议地址。
+---@field HandleNormalImage String 滑块未按下且未禁用时使用的图片，使用图片资源协议地址。
+---@field HandlePressedImage String 滑块处于按下状态时使用的图片，使用图片资源协议地址。
+---@field MaxValue Float 自定义范围的最大值，必须为有限数值且大于MinValue；未启用自定义范围时仍要求配置合法。修改范围时保持原位置比例，再按步长吸附。
+---@field MinValue Float 自定义范围的最小值，必须为有限数值且小于MaxValue；未启用自定义范围时仍要求配置合法。修改范围时保持原位置比例，再按步长吸附。
+---@field PressEvent String 有效触摸开始时派发的自定义事件名称，参数为应用本次点击位置前的实际数值progress。空字符串表示不派发该自定义事件。
+---@field Progress Float 当前范围内的实际数值。关闭自定义范围时为0～1；开启后使用最小值和最大值。赋值会裁剪到有效范围并按步长吸附，仅实际数值改变时通知。
+---@field ProgressDisabledImage String 禁用状态下显示当前位置比例的禁用填充条图片，使用图片资源协议地址。
+---@field ProgressImage String 用于显示当前位置比例的填充条图片，使用图片资源协议地址。
+---@field ProgressStretchArea Vector4 上、下、左、右边距百分比。
+---@field RangeEnabled Bool 开启后使用MinValue和MaxValue，关闭时使用0～1。切换时保持原位置比例，再按当前步长吸附。
+---@field ReleaseEvent String 有效触摸结束时派发的自定义事件名称，参数为最终实际数值progress和是否取消canceled。空字符串表示不派发该自定义事件。
+---@field SlideEvent String 实际数值变化时派发的自定义事件名称，参数为当前范围内的实际数值progress。空字符串表示不派发该自定义事件。
+---@field Step Float 非负有限数值，0表示连续滑动。以当前有效最小值为起点就近吸附，中点取较大值，最大端点始终可达；修改步长后对当前实际数值重新吸附。
+---@field TrackImage String 滑动条轨道的背景图片，使用图片资源协议地址。
+---@field TrackStretchArea Vector4 上、下、左、右边距百分比。
+---@field OnPressed Signal<fun(progress: Float)> 客户端有效触摸开始时触发一次，先于本次点击位置导致的数值变化。参数为应用点击位置前的实际数值。回调参数：progress 应用本次点击位置前的实际数值。
+---@field OnReleased Signal<fun(progress: Float, canceled: Bool)> 客户端有效触摸结束时触发一次，携带最终实际数值。正常抬手时canceled为false；触摸取消或交互状态刷新时发现已不可交互，则为true。节点销毁不派发此事件。回调参数：progress 当前范围内的实际数值；抬手事件中为本次触摸的最终值。, canceled 正常抬手为false；触摸取消或交互失效导致结束时为true。
+---@field OnSlide Signal<fun(progress: Float)> OnValueChanged的兼容别名，两者为同一个信号；同时连接两者会分别执行各自注册的回调。回调参数：progress 裁剪和吸附后的实际数值，不是固定的0～1位置比例。
+---@field OnValueChanged Signal<fun(progress: Float)> 客户端实际数值改变时触发，用户操作、程序赋值及范围或步长调整均适用。初始化及重复赋相同结果不触发；程序赋值不产生按下或抬手事件。回调参数：progress 裁剪和吸附后的实际数值，不是固定的0～1位置比例。
+local EUISlider = {}
+
 ---UI表格布局容器
 ---@class EUITableLayout : EUINodeBase
 ---@field AutoLayout Bool 自动布局
@@ -6246,88 +6322,88 @@ function EUITableLayout:ApplyLayout() end
 ---@field TextVerticalAlignment Enums.EUITextVerticalAlignment 垂直对齐方式
 local EUITextLabel = {}
 
----特效
+---特效单位。通过 EffectId 指定特效资源。变换字段有特殊规则：Parent 为 BasePart/Attachment 子类时进入父跟随模式，Position/Rotation 由 Parent 驱动且不会被回写更新（读到的可能是旧值），SetPosition/SetRotation/SetScale/MoveTo 会被静默忽略，而 Scale 属性仍由自身控制、直写属性生效；设置 EffectBindData 后绑定优先于父跟随
 ---@class EffectUnit : Unit
----@field AsyncLoad Bool 异步加载
----@field BlendFactor Float 融合系数
----@field ColorStrength Int 颜色强度
----@field DiffuseColor Color 基础颜色
----@field Duration Float 持续时间
----@field EffectBindData EffectBindData EffectUnit有2中bind模式, 1、有合法的parent，就跟随parent（basepart，attachemnt）,2、设置EffectBindData绑定信息,主动设置EffectBindData视为第一优先级，如果想恢复跟随Parent，EffectBindData 需要赋空实现
----@field EffectEndBindData EffectBindData 终点绑定数据（socket）
----@field EffectId String 特效资源
----@field EnableColor Bool 启用自定义颜色
----@field EnemyEffectEnable Bool 启动敌我特效区分
----@field EnemyEffectId String 敌方显示特效
----@field ForceLoop Bool 开启后强制特效循环播放；关闭时按特效资源自带的播放方式执行（资源本身是循环的仍会循环）。对 efx 与 sfx 特效均生效。
----@field IsMute Bool 是否静音
----@field PlayRate Float 播放速率
----@field Position Vector3 位置
----@field Rotation Quaternion 旋转
----@field Scale Vector3 缩放
----@field Visible Bool 可见性
----@field Volume Float 音量
+---@field AsyncLoad Bool 是否异步加载特效资源。开启后特效资源在后台加载，不阻塞主线程，适合较大的特效；加载期间设置的属性会被缓存，特效就绪后按最后一次设置统一生效。注意：特效创建后、资源就绪前的极短时段内，只有可见性、音量、播放速率、强制循环与自定义颜色（基础颜色/颜色强度/融合系数）这些渲染属性会被自动应用，缩放、是否静音等在此时段内修改可能被忽略，建议等特效就绪后再设置这些属性（该时段是资源路径解析阶段，与是否开启本开关无关）。
+---@field BlendFactor Float 颜色融合系数（0-1）。仅当 EnableColor 为 true 时生效
+---@field ColorStrength Int 颜色强度（0-100）。仅当 EnableColor 为 true 时生效
+---@field DiffuseColor Color 特效自定义颜色。仅 efx 类特效支持染色（sfx 忽略本字段）；资源初始化/刷新时按 EnableColor 决定是否应用，运行期直接改本字段仍会推送到引擎。
+---@field Duration Float 持续时间（秒）。小于等于 0 表示不自动销毁自身，并取消已有计时器；大于 0 时到期自动销毁特效。运行期修改重排计时器仅在客户端生效
+---@field EffectBindData EffectBindData EffectUnit 有两种绑定模式：1、Parent 为 BasePart/Attachment 子类时跟随 Parent；2、设置 EffectBindData 主动绑定到目标挂点。主动设置 EffectBindData 为第一优先级：绑定生效期间 Parent 跟随自动关闭，特效由引擎按挂点持续驱动（持续覆盖特效变换，不回写本字段），Position 被写成 BindOffset 偏移量，想恢复 Parent 跟随需将 EffectBindData 赋为空。
+---@field EffectEndBindData EffectBindData 连线特效终点挂点绑定数据（BindUnitId / BindSocket / BindOffset）。目标单位尚未创建时会等待其创建后自动接通。
+---@field EffectId String 特效资源。支持 official://effect/{id} 与 custom://{asset_id} 两种资源协议。
+---@field EnableColor Bool 是否启用自定义颜色。false 时特效使用资源自带颜色，此时修改 DiffuseColor/ColorStrength/BlendFactor 不产生效果；true 时三者按当前值整体应用。
+---@field EnemyEffectEnable Bool 启动敌我特效区分。开启后，在特效创建期根据特效 Owner 与当前玩家的阵营关系，决定使用 EffectId 还是 EnemyEffectId。
+---@field EnemyEffectId String 敌方视角使用的特效资源。仅在 EnemyEffectEnable 为 true 且 Owner 与当前玩家为敌对关系时生效，且在创建期完成替换——特效创建后再修改本字段不会切换已播放的特效。
+---@field ForceLoop Bool 开启后强制特效循环播放；关闭时不额外干预，按特效资源自带的播放方式执行（资源本身是循环的仍会循环）。对 efx 与 sfx 特效均生效。运行期由 true 改为 false 不会恢复资源原始 loop，已播放完毕的实例改本字段无效。
+---@field IsMute Bool 是否静音。只能运行时设置，等价于调用 SetMute：写入 true 会把音效音量置 0；写回 false 不会自动恢复音量（需用 Volume 恢复）。
+---@field PlayRate Float 特效播放速率，有效范围 [0.1, 50]，越界值会被截断到边界
+---@field Position Vector3 单位位置。父跟随模式下（Parent 为 BasePart/Attachment 子类）位置完全由 Parent 驱动，运行期不会被回写更新（服务端初始化时会用 Parent 变换回写一次），读取得到的通常是旧值；该模式下 SetPosition / MoveTo 会被静默忽略，拦截判定只看 Parent、与是否设置绑定无关。设置 EffectBindData 后以绑定为第一优先级：特效被挂到目标挂点，由引擎按挂点持续驱动特效变换（不回写本字段），本字段的值等于传入的 BindOffset 偏移量（缺省为 (0,0,0)），不再表示世界坐标。
+---@field Rotation Quaternion 单位旋转（四元数）。父跟随模式下（Parent 为 BasePart/Attachment 子类）旋转由 Parent 驱动，本字段不会被回写更新；该模式下 SetRotation 会被静默忽略。
+---@field Scale Vector3 单位缩放。与 Position/Rotation 略有不同：父跟随模式下 Scale 属性不会被拦截，直写本字段仍生效；但 SetScale() 在该模式下与 SetPosition/SetRotation 一样被静默忽略，此时请直写本属性。
+---@field Visible Bool 可见性。只能运行时设置，等价于调用 SetVisible。
+---@field Volume Float 特效音效音量（0-100）。只能运行时设置。
 local EffectUnit = {}
 
----设置连线特效终点
+---设置连线特效终点挂点。unit 为空或 UnitId 为 0 时跳过绑定
 ---@param otherUnit SpaceUnit 单位预制
 ---@param socket String 挂点
 ---@param offset Vector3 位置偏移
 function EffectUnit:EndposAttach(otherUnit, socket, offset) end
 
----设置特效位移
+---设置特效位移，内部写入 MoveTarget/MoveSpeed 并触发移动。父跟随模式下直接返回，不修改任何数据；target 为空或 speed <= 0 时也不生效。
 ---@param targetPos Vector3 目标位置
 ---@param speed Float 线速度(米/秒)
 ---@param callBack function 结束回调
 function EffectUnit:MoveTo(targetPos, speed, callBack) end
 
----移除特效的声音
+---关闭特效音效，等价于将 Volume 置为 0。
 function EffectUnit:RemoveSound() end
 
----重播特效
+---重播特效，等价于自增 RestartTrigger。一次性特效播完后会被引擎移出场景，重播时自动重新入场并补推起点/终点绑定。
 function EffectUnit:Restart() end
 
----绑定特效
+---把特效起点绑定到目标单位的挂点。绑定优先于 Parent 跟随：绑定生效期间父跟随自动关闭，Position 被改写为 offset，特效由引擎按挂点驱动（不回写本字段）。unit 为空或未入场景（UnitId 为 0）时跳过（是跳过，不是解绑）；解绑请把 EffectBindData 赋为空。bindType 必须包含位移绑定。
 ---@param otherUnit SpaceUnit 单位预制
 ---@param socket String 挂点
 ---@param offset Vector3 位置偏移
 ---@param bindType Enums.EffectBindType 绑定类型
 function EffectUnit:SetBindData(otherUnit, socket, offset, bindType) end
 
----设置特效的颜色、强度和混合比列
+---一次性设置特效颜色、颜色强度与融合系数，等价于同时写入 DiffuseColor、ColorStrength、BlendFactor。仅 efx 类特效支持，且需要 EnableColor 为 true。
 ---@param color Color 颜色
 ---@param strength Int 强度
 ---@param blendFactor Float 混合比例
 function EffectUnit:SetColor(color, strength, blendFactor) end
 
----设置特效时长
+---设置特效持续时间，等价于写入 Duration：小于等于 0 表示不自动销毁自身，并取消已有计时器；大于 0 会重排到期销毁计时。
 ---@param duration Float 时长
 function EffectUnit:SetDuration(duration) end
 
----设置特效静音
+---将特效音效静音，等价于写入 IsMute。
 function EffectUnit:SetMute() end
 
----设置特效的坐标
+---设置特效位置。父跟随模式（Parent 为 BasePart/Attachment 子类）下直接返回，不修改任何数据（拦截判定只看 Parent，与是否设置绑定无关）；绑定状态下本值语义为挂点局部偏移。
 ---@param position Vector3 位置
 function EffectUnit:SetPosition(position) end
 
----设置特效的播放速率
+---设置特效播放速率，范围 [0.1, 50]，越界会被截断，等价于写入 PlayRate。
 ---@param rate Float 速率
 function EffectUnit:SetRate(rate) end
 
----设置特效的旋转
+---设置特效旋转。父跟随模式下直接返回，不修改任何数据。
 ---@param rotate Quaternion 旋转
 function EffectUnit:SetRotation(rotate) end
 
----设置特效的缩放
+---设置特效缩放，等价于直写 Scale 属性。注意：父跟随模式（Parent 为 BasePart/Attachment 子类）下与 SetPosition/SetRotation 一样被静默忽略，该模式下请直写 Scale 属性。
 ---@param scale Vector3 缩放
 function EffectUnit:SetScale(scale) end
 
----设置特效的可见性
+---设置特效可见性，等价于写入 Visible。
 ---@param visible Bool 可见性
 function EffectUnit:SetVisible(visible) end
 
----设置连线特效起点
+---设置连线特效起点，语义与 SetBindData 完全一致。
 ---@param otherUnit SpaceUnit 单位预制
 ---@param socket String 挂点
 ---@param offset Vector3 位置偏移
@@ -6378,6 +6454,14 @@ function EggyController:Throw() end
 ---@field Visible Bool 可见性
 local EggyUnit = {}
 
+---动态添加本单位与指定碰撞组的碰撞关系
+---@param groupName String 碰撞组名
+function EggyUnit:AddCollisionWithGroup(groupName) end
+
+---获取本单位当前允许碰撞的目标组名称列表
+---@return String[]
+function EggyUnit:GetCollisionWithGroups() end
+
 ---获取{#0}的网络拥有者
 ---@return Player 网络拥有者
 function EggyUnit:GetNetworkOwner() end
@@ -6397,6 +6481,10 @@ function EggyUnit:GetScale() end
 ---获取Yaw朝向
 ---@return Float Yaw朝向
 function EggyUnit:GetYaw() end
+
+---动态移除本单位与指定碰撞组的碰撞关系
+---@param groupName String 碰撞组名
+function EggyUnit:RemoveCollisionWithGroup(groupName) end
 
 ---设置{#0}的网络拥有者
 ---@param player Player 玩家
@@ -6724,6 +6812,11 @@ local LocalScript = {}
 ---@field WorldPivot CFrame 模型在世界空间中的枢轴位置。仅用于更新 ModelUnit 自身的枢轴，不会移动子对象。当未设置 PrimaryPart 时，PivotTo、MoveTo 等轴心操作以该值为参考基准计算位移增量。设置 PrimaryPart 后，该属性被忽略，模型枢轴改为跟随 PrimaryPart。新创建模型的枢轴在首次设置 WorldPivot 之前默认位于原点 (0,0,0)。设置方式：通过 unit.WorldPivot = cf 赋值，或在 world:CreateUnit("ModelUnit", { WorldPivot = cf }) 参数中指定。
 local ModelUnit = {}
 
+---计算模型包围盒的尺寸。与 GetBoundingBox 描述同一个枢轴朝向 OBB，返回值与其 size 恒等。
+---**适用范围**: 客户端和服务端
+---@return Vector3 包围盒各轴的尺寸
+function ModelUnit:GetExtentsSize() end
+
 ---将模型整体移动到世界空间中的指定位置
 ---@param position Vector3 世界空间中的目标坐标
 function ModelUnit:MoveTo(position) end
@@ -6983,7 +7076,7 @@ function Player:IsVip() end
 ---@param reason? String 踢出原因提示，踢出前向该玩家展示 tips
 function Player:Kick(reason) end
 
----异步加载玩家角色
+---在出生点重新创建玩家角色，原玩家角色会删除，加载完会变成操控新角色
 ---**适用范围**: 客户端和服务端
 function Player:LoadCharacterAsync() end
 
@@ -7042,6 +7135,35 @@ local PrismaticConstraint = {}
 ---@field ZenithHeight Float 天顶高度
 local QuadGradientSky = {}
 
+---远程事件RemoteEvent：可挂接到 World/场景的 Unit，用于客户端与服务端之间的异步单向通信。服务端可发送给指定客户端或所有客户端，客户端可发送给服务端。
+---**适用范围**: 客户端和服务端
+---@class RemoteEvent : Unit
+---@field OnClientEvent Signal<fun(args?: Any)> 客户端监听来自服务端的远程事件，回调参数为 (...)。懒注册：首个监听者 Connect 时才注册网络通道。回调参数：args 事件参数
+---@field OnServerEvent Signal<fun(player: Player, args?: Any)> 服务端监听来自客户端的远程事件，回调参数为 (player, ...)。懒注册：首个监听者 Connect 时才注册网络通道。回调参数：player 触发事件的玩家, args 事件参数
+local RemoteEvent = {}
+
+---从服务端发送事件给所有客户端
+---**适用范围**: 客户端和服务端
+---@param args? Any 事件参数
+function RemoteEvent:FireAllClients(args) end
+
+---从服务端发送事件给指定玩家客户端
+---**适用范围**: 客户端和服务端
+---@param player Player 目标玩家
+---@param args? Any 事件参数
+function RemoteEvent:FireClient(player, args) end
+
+---从客户端发送事件给服务端
+---**适用范围**: 客户端和服务端
+---@param args? Any 事件参数
+function RemoteEvent:FireServer(args) end
+
+---RemoteEvent.New(EventName) 创建一个新的远程事件实例（老地图兼容的位置参数写法）。
+---**适用范围**: 客户端和服务端
+---@param eventName String 事件名称，用于标识该远程事件
+---@return RemoteEvent 新创建的 RemoteEvent 实例
+function RemoteEvent.New(eventName) end
+
 ---触发区域
 ---@class RenderTriggerUnit : TriggerUnit
 ---@field CastShadow Bool 控制模型是否向场景投射阴影；启用自定义外观后该属性不生效
@@ -7067,10 +7189,6 @@ local RenderTriggerUnit = {}
 ---切换 RenderMeshId 并自动应用新模型的默认皮肤：默认皮肤 >1 个时进入多槽位模式（逐 Submesh 一个默认皮并回填默认染色），单个/无默认皮肤时回到单皮肤模式并写入默认 SkinId（含默认染色回填）。双端可调用，服务端权威（客户端仅本机生效）；自定义外观开启期间不可用
 ---@param renderMeshId String 模型资源ID
 function RenderTriggerUnit:SetRenderMeshWithDefaultSkin(renderMeshId) end
-
----设置单位的自定义贴图，整模型生效，传空字符串恢复默认贴图；双端可调用（服务端广播全端，客户端仅本机生效）；自定义外观期间不可用；换模型/换皮肤/开启自定义外观时自动清除
----@param textureAssetId String 贴图资源ID
-function RenderTriggerUnit:SetTexture(textureAssetId) end
 
 ---RenderUnit是一种可创建的3D空间组件，具备渲染表现能力。常用于场景中需要模型展示的装饰物件。
 ---@class RenderUnit : BasePart
@@ -7151,12 +7269,13 @@ local SimpleAreaShadowLight = {}
 ---这是一类装饰性的发光物体——它们自身会亮、会发光，但不会照亮周围的其他物体。适合做路灯、霓虹灯、灯具造型等装饰用途。
 ---**适用范围**: 客户端和服务端
 ---@class SimpleLight : Unit
----@field CloseEvent String 关灯事件
+---@field CloseEvent String 关灯事件名
 ---@field Enabled Bool 启用
----@field OpenEvent String 开灯事件
+---@field OpenEvent String 开灯事件名
 ---@field Position Vector3 位置
 ---@field Rotation Quaternion 旋转
----@field Scale Vector3 缩放
+---@field Scale Vector3 组件各轴的缩放比例，默认为 (1, 1, 1)
+---@field Shadows Bool 投射阴影
 local SimpleLight = {}
 
 ---沿一条线段发光，两端可设置不同颜色形成渐变。适合做霓虹灯管、光剑、灯带等。
@@ -7391,8 +7510,7 @@ local Stars = {}
 ---@field LightInfluence Float 受场景光照影响程度，0.0~1.0，默认 1.0
 ---@field MaxDistance Float 世界单位，超出该距离则剔除不渲染；0 表示不限制
 ---@field PixelsPerWorldUnit Vector2 每轴像素密度，分量需 > 0。仅 PixelsPerWorldUnit 模式生效
----@field SizingMode Enums.SurfaceGuiSizingMode 画布尺寸语义。FixedSize=以 CanvasSize 为固定布局尺寸；PixelsPerWorldUnit=以 PixelsPerWorldUnit 为像素密度锚定，实际尺寸=WorldScale.xy×密度
----@field WorldScale Vector3 画布在世界中的尺寸（各轴缩放）
+---@field SizingMode Enums.SurfaceGuiSizingMode 画布尺寸语义。FixedSize=以 CanvasSize 为固定布局尺寸；PixelsPerWorldUnit=以 PixelsPerWorldUnit 为像素密度锚定，实际尺寸=Scale.xy×密度
 local SurfaceGui = {}
 
 ---3D文字组件
@@ -7638,6 +7756,7 @@ local WaypointMotorUnit = {}
 
 ---焊接约束
 ---@class WeldConstraint : Unit
+---@field Active Bool 只读派生状态：Enabled 且自身+所有连接单元都处于 World 且已接入装配体时为 true。不可写。
 ---@field ConnectUnitList BasePart[] 服务端创建 WeldConstraint 的构造参数：SpaceUnit 或其继承类的列表。仅服务端初始化使用；单元对象无法序列化跨网络，客户端仍通过 ConnectUnitIdDict 同步接收。
 ---@field Enabled Bool 用户持久意图（默认 true）。false 时行为等同本约束被销毁：所属装配体移除该组件（按剩余约束拆分，最后一个约束时销毁整个装配体）；true 时若自身+所有连接单元都在 World 下则重新接入。真实生效状态以只读 Active 为准。
 ---@field ExpectRootUnit BasePart 服务端创建 WeldConstraint 的构造参数：期望作为装配体 Root 的 SpaceUnit。仅服务端初始化使用；客户端仍通过 RootUnitId 同步接收。
