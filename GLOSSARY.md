@@ -208,5 +208,5 @@ _Avoid_: 极限重量、排名
 ### 质量工具
 
 **业务范围**：
-三个质量工具（CRAP、mutation、DRY）共享的源码集合，由项目质量配置声明；范围之外只有测试代码。难以测试的业务代码仍在范围内；缺数据的类在图上照常显示为红。本项目即 `tools/quality/project.json` 的 `sources`：三端 `client/`、`common/`、`server/` 排除 `server/_trigger/`，含各端 `packages/`；架构图（`policy.edn`）用同一范围（[ADR-0010](docs/adr/0010-packages-as-business-code.md)）。
+三个质量工具（CRAP、mutation、DRY）共享的源码集合，由项目质量配置声明；范围之外只有测试代码。难以测试的业务代码仍在范围内；缺数据的类在图上照常显示为红。本项目即 `uml-quality.json` 的 `standardTools`（`sourceRoots` 与 `exclude`）：三端 `client/`、`common/`、`server/` 排除 `server/_trigger/`，含各端 `packages/`；架构图（`policy.edn`）用同一范围（[ADR-0010](docs/adr/0010-packages-as-business-code.md)）。
 _Avoid_: 业务树、指标采集范围、mutation 范围、scope（单独使用时）
