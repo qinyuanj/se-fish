@@ -1,7 +1,7 @@
 -- worktree-init 子命令的外部行为（#141，#146 收窄）：在真实临时目录里搭出「资源库 skill 目录 +
 -- 新 worktree」，经 main(args) 调用，断言落盘结果、幂等与缺来源时的报错。
 -- #146 起质量工具交给 uml-viewer 标准工具（由人经 get-uml-viewer 安装），worktree-init 不再为
--- 质量工具建父目录链接或提示 .toolcache。
+-- 质量工具建父目录链接或提示 .toolcache；#147 删除 acceptance4lua 后同样不为其准备缓存。
 -- 来源默认用 --skills-from 显式给出；默认推导的用例只桩掉 WSL 接缝层的 magpie_library，不碰 interop。
 local init = require("tools.worktree_init")
 local seam = require("tools.wsl_seam")
@@ -71,13 +71,15 @@ describe("TestWorktreeInit", function()
   end)
 
   -- 质量工具交给 uml-viewer 标准工具后，新 worktree 不需要任何质量工具准备：
-  -- 不读质量配置、不在父目录建工具链接、不提示 .toolcache 或项目质量入口。
-  it("test_prepares_nothing_for_quality_tools", function()
+  -- 不读质量配置、不在父目录建工具链接、不提示 .toolcache 或项目质量入口；
+  -- acceptance4lua 已删除（#147），也不为它准备缓存。
+  it("test_prepares_nothing_for_quality_or_deleted_tools", function()
     assert.are.equal(0, run(), err.text)
     assert.are.same({ "se-fish" }, entries(WT_PARENT))
     assert.are.same({ ".agents" }, entries(WT))
     assert.is_nil(out.text:find(".toolcache", 1, true))
     assert.is_nil(out.text:find("tools/quality", 1, true))
+    assert.is_nil(out.text:find("acceptance4lua", 1, true))
     assert.are.equal("", err.text)
   end)
 
@@ -133,6 +135,10 @@ describe("TestWorktreeInit", function()
     assert.matches("--tools-from", err.text, 1, true)
     assert.are.equal(0, run({ "--help" }))
     assert.matches("worktree-init", out.text, 1, true)
+    -- 帮助里的车道口径与 CLI 一致（#147）：收尾命令是 test full，不再是裸 busted。
+    assert.matches("lua5.4 tools/cli.lua test full", out.text, 1, true)
+    assert.is_nil(out.text:find("busted --run", 1, true))
+    assert.is_nil(out.text:find(".toolcache", 1, true))
     assert.is_nil(out.text:find("tools-from", 1, true))
     assert.is_nil(out.text:find("tools/quality", 1, true))
   end)
