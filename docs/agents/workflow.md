@@ -4,7 +4,7 @@
 
 ## 工程用语
 
-- **se-fish**：本图的 Lua 源码与质量工具仓库。
+- **se-fish**：本图的 Lua 源码仓库。
 - **业务范围**：质量工具与架构图共用的源码集合，定义见 `GLOSSARY.md`，决策见 [ADR-0010](../adr/0010-packages-as-business-code.md)。
 - **宿主目录**：编辑器 `code init` 绑定的本地 Lua 工程目录，根有 `eggy.json`，是部署目的地；与仓库检出分别管理。路径和绑定方式见下方「工具链」。
 - **开发端**：WSL 里的仓库检出及其原生工具链，是唯一的开发、测试与质量运行环境；不在 Windows 开发。
@@ -13,12 +13,12 @@
   _Avoid_: 本机
 - **部署树**：镜像进宿主目录的仓库根 `client/`、`common/`、`server/`；仓库根其余内容不部署。宿主内不归本仓库管理的内容由 `sync` 回灌，镜像粒度与操作细节见下方「工具链」。
   _Avoid_: 源码树（指仓库全部时）
-- **quality gate**：质量流程的失败处理与快照发布规则，见 [质量工具](../../tools/quality/README.md#日常命令)及其中的「墙钟预算、启动前记录与退出码」；指标只出报告，不设门槛。
+- **quality gate**：质量工具（CRAP、mutation、DRY）的结果处理规则：由 uml-viewer 标准工具发布快照与退出码（见 uml-viewer README 的质量分发说明），指标只出报告，不设门槛。
 - **Busted migration**：全部 Lua 测试改写为原生 Busted、移除 LuaUnit 依赖及桥接层的迁移，决策见 [ADR-0002](../adr/0002-native-busted-migration.md)，当前车道与运行约定见下方「工具链」。
 
 ## 工具链
 
-Lua 命令使用 **Lua 5.4**：WSL 上裸 `lua` 经 alternatives 可能指向 5.1，宿主工具一律用 `lua5.4`，执行前用 `lua5.4 -v` 核对（与 `tools/quality/project.json` 的 `lua.executable` 同口径）；验收脚本可用 `ACCEPTANCE_LUA_BIN` 指定解释器。Lua 5.5 对循环变量重新赋值会报 `attempt to assign to const variable`，遇到此错误先检查版本。
+Lua 命令使用 **Lua 5.4**：WSL 上裸 `lua` 经 alternatives 可能指向 5.1，宿主工具一律用 `lua5.4`，执行前用 `lua5.4 -v` 核对；验收脚本可用 `ACCEPTANCE_LUA_BIN` 指定解释器。Lua 5.5 对循环变量重新赋值会报 `attempt to assign to const variable`，遇到此错误先检查版本。
 
 - `lua5.4 tools/cli.lua deploy`：将三端一级子树字节镜像到宿主目录（经 WSL 接缝层调用部署端 `robocopy /MIR`，镜像前打印将被删掉的宿主多余文件）；interop 不可用时在镜像前以非零退出码失败。编辑器开着本图时执行 validate → 有差异时 `code push` → `code diff` 复核，push 后仍不一致才返回失败。跨接缝约定见 [ADR-0008](../adr/0008-wsl-development-windows-deploy.md)。
 - `lua5.4 tools/cli.lua sync`：将宿主目录的 `eggy.json`、API 存根、`data/` 回灌仓库。
@@ -26,24 +26,24 @@ Lua 命令使用 **Lua 5.4**：WSL 上裸 `lua` 经 alternatives 可能指向 5.
 - `lua5.4 tools/cli.lua blender <脚本.py> [--blend <输入.blend>] [-- <脚本参数>...]`：在部署端无头 Blender 里执行脚本，是唯一的 Blender 入口；`--which` 核对将用的 Blender，`--expr` 执行内联代码。路径写开发端形式，由入口转换；用法见 [Blender 与 Meshy 使用](art-pipeline.md)，决策见 [ADR-0009](../adr/0009-blender-headless-only.md)。
 - 官方包升级、聚合入口与编辑器预设依赖见 [官方包接入参考](../packages-reference.md)。技能包预设命令见 `lua5.4 tools/cli.lua ability-presets --help`；验收脚本说明见 `tools/acceptance/README.md`。
 - **临时产物**：手工验证的中间文件、单据正文草稿等临时产物一律放仓库 `tmp/`（已 gitignored），无需清理；不放系统临时目录，也不为清理去 `rm`（沙盒会拒绝）。这条管 agent 手工产生的文件；脚本自建自删的临时目录（如 pre-commit hook 在 git 目录下的工作目录）不在此列。
-- 质量入口为 `tools/quality/project`（POSIX sh 薄转发），安装、覆盖率、CRAP、DRY、差分 mutation 与复验步骤见 [tools/quality/README.md](../../tools/quality/README.md)；只出报告，不设指标门槛。
-- 单测放 `tests/native/`（slow 车道放 `tests/native/slow/`），共享夹具放 `tests/support/`，探针放 `tests/probes/`（手工探针，不入任何车道）。日常运行 `busted --run=fast`（等价 `default`），收尾运行 `busted --run=full`；车道由根目录 `.busted` 定义，共享初始化在 `tests/native/helper.lua`。开发端（WSL）是唯一测试环境，案例不分平台，完成判据表里的 `0 pending` 就是在开发端取的严格值。
+- 质量工具（CRAP / mutation / DRY）是 uml-viewer 自带的标准工具（crapper / mutator / dryer），由人运行 `./uml crap`、`./uml mutate`、`./uml dry`；业务范围与选项只在根目录 `uml-quality.json` 的 `standardTools` 声明，见下方「架构图」。只出报告，不设指标门槛。
+- 单测放 `tests/native/`（slow 车道放 `tests/native/slow/`），共享夹具放 `tests/support/`，探针放 `tests/probes/`（手工探针，不入任何车道）。日常运行 `busted --run=fast`，收尾运行 `busted --run=full`；裸 `busted` 读 `default`，与 full 相同（crapper 列测试文件时不带 `--run`，覆盖率因此含 slow 车道）。车道由根目录 `.busted` 定义，共享初始化在 `tests/native/helper.lua`。开发端（WSL）是唯一测试环境，案例不分平台，完成判据表里的 `0 pending` 就是在开发端取的严格值。
   - **执行序只保证到文件内**：迁移保留的是**文件内**执行序（`it` 注册序 == 旧 LuaUnit 类内方法序），**不保留跨文件的全局类名字典序**。LuaUnit 的 `collectTests()` 排的是全局 `_G.Test*` **类名**，`.busted` 的 `sort-files=true` 排的是**文件路径字符串**，是两个键空间，技术上无法廉价复现；且 helper 在文件发现**之前**执行，插不进重排钩子。
     - 为什么可以接受：跨类没有共享状态；跨文件隔离由 `.busted` 显式开启的 `auto-insulate` 承担（每个文件结束后按键还原 `_G` 与 `package.loaded`，关掉后 fast 出现 7 failures / 3 errors），`tests/native/helper.lua` 只逐例快照 `GameCfg.Debug` 与 `Save.AcceptanceSlot`；**且不复刻旧序反而修了一个真 bug**——旧序下 `damage_float_test.lua` 与 `vitals_test.lua` 都定义全局 `TestDamageNotice`，后加载整表覆盖前者，导致 `test_rounding_and_effective_health` **从未被执行**，迁移后复活（+1，属修复而非回归）。
     - 裁定原文见迁移台账 `issue-84-mapping.md:96` 与 `issue-85-mapping.md:63`（台账在仓库外，按文件名检索）。
-  - `busted` 命令：人手 shell 与工具子进程统一用裸 `busted`；`tools/quality/project.json` 的 `commands.*` 与 `busted.command` 都写裸 `busted`。它由 LuaRocks 按固定版本装在 `~/.luarocks/bin`，该目录必须在 PATH 里；`tools/quality/project doctor` 会在缺失时给出提示。
+  - `busted` 命令：人手 shell 与工具子进程统一用 PATH 上的 `busted`。它由 LuaRocks 装在 `~/.luarocks/bin`，该目录必须在 PATH 里。
 
 **架构图（uml-viewer）。** 根目录 `policy.edn` 描述三端模块树、排除目录与隐藏模块（`:exclude`、`:omit`），`docs/uml/se-fish.edn` 是生成的依赖图（不要手编）。
 
 - `./uml`（安装器生成的原生入口）：首次启动 viewer 与 companion 看图、向 agent 发起图上操作；`./uml ir` 在修改三端代码后重新生成图，viewer 检测文件变化自动重载。
 - **companion 后端是 Herdr（>= 0.9.3，socket protocol 22）**：旧 tmux/psmux 路径已退役，运行平台是 WSL2/Linux（Windows 原生不受支持，macOS 当前不承诺）。PATH 上每个 `herdr` 都逐一预检，选出兼容者中版本最高者（同版本取 PATH 靠前者），本次启动的全部 Herdr 调用都走它的绝对路径；无兼容候选时列出各候选路径与拒绝原因，不自动下载、升级或回退。companion ownership 记录在 `.uml-viewer/companion.edn`，必须显式记为 Herdr；旧记录或缺 backend 的记录会保留并拒绝接管，不要猜着重连。能力契约与验收边界见 uml-viewer 的 `docs/herdr-backend-contract.md`，版本下限与可执行文件选择见其 `docs/adr/0003-herdr-version-floor.md`、`docs/adr/0004-herdr-executable-selection.md`。
 - **重启 viewer 必须走协议**：往 `.uml-viewer/to-viewer.edn` 写 `:quit-for-restart` → 等旧 JVM 自然退出 → `./uml --restart`；新 JVM 按持久化记录重新 bind 原 pane，不新建 companion。**绝不 SIGKILL**，也不要绕开公开 wrapper 直接传 `--restart`。
-- 图上 `crap` / `mutate`：companion 消费邮箱命令后执行项目公开入口（即 `uml-quality.json` 声明的 `tools/quality/project refresh-crap` / `tools/quality/project mutation`）。每次调用前删掉上一条 `.uml-viewer/quality-result.json`，运行后核对刚等到的记录里 `version`、`operation`、`projectRoot`、实际退出码与 `validResult`；只有 `validResult` 为真才继续 IR 与显示。
-- 图上 `client|common|server` 三棵树覆盖整个**业务范围**：各端 `packages/` 按真实命名空间建类，不设外部节点（`policy.edn` 不写 `:foreign`，`:exclude` 只排除 `_trigger`）。viewer 从 `.metrics/crap.edn` 与 `.metrics/mutate/*.edn` 加载指标；缺少任一指标的类卡片为红色。包内类不跑 mutation 基线，因缺快照显红并拉低端级聚合分数，属已接受的代价，理由见 [ADR-0010](../adr/0010-packages-as-business-code.md)。Lua 指标安装与命令见 [tools/quality/README.md](../../tools/quality/README.md)。
-- **标准 quality 分发**：根目录 `uml-quality.json`（版本管理）声明图上 `crap` / `mutate` 转交哪个项目公开命令，终端与右键走同一实现；参数、退出码、锁与失败报告一致。改项目质量入口时同步核对这份声明，`tools/quality/project doctor` 会先校验它。
+- 图上 `crap` / `mutate`：companion 消费邮箱命令后执行与终端 `./uml crap` / `./uml mutate` 相同的标准工具调用（范围取自 `uml-quality.json` 的 `standardTools`）。每次调用前删掉上一条 `.uml-viewer/quality-result.json`，运行后核对刚等到的记录里 `version`、`operation`、`projectRoot`、实际退出码与 `validResult`；只有 `validResult` 为真才继续 IR 与显示。
+- 图上 `client|common|server` 三棵树覆盖整个**业务范围**：各端 `packages/` 按真实命名空间建类，不设外部节点（`policy.edn` 不写 `:foreign`，`:exclude` 只排除 `_trigger`）。viewer 从 `.metrics/crap.edn` 与 `.metrics/mutate/*.edn` 加载指标；缺少任一指标的类卡片为红色。包内类不跑 mutation 基线，因缺快照显红并拉低端级聚合分数，属已接受的代价，理由见 [ADR-0010](../adr/0010-packages-as-business-code.md)。标准工具的环境准备（含 crapper 要求的 cluacov 1.0.0）按 uml-viewer 文档由人完成。
+- **标准 quality 分发**：根目录 `uml-quality.json`（版本管理）只含 `standardTools`：`sourceRoots` 为三端 `client`、`common`、`server`，`exclude` 为 `server/_trigger`，`mutatorOptions` 为 `--busted-task fast`（每个变异体只跑 fast 车道）。终端 `./uml crap|mutate|dry` 与图上右键走同一实现；业务范围只在这里声明一次，CRAP、mutation、DRY 与架构图口径一致。不用 CLI 包装 `./uml`。
 - `target/` 放覆盖率与 mutation worker，属于忽略的临时产物；`.metrics/` 保留质量快照并纳入版本管理。无函数定义的配置或转发模块不生成 mutation 快照；当前工具不测试模块顶层语句。
-- 根目录 `uml` 由安装器生成（原生 POSIX 入口），不要编辑；固定工具组合的安装与校验使用 [tools/quality/README.md](../../tools/quality/README.md) 的项目入口。
-- **实机验收在开发端（WSL2）**：安装、doctor、full／fast、coverage、CRAP、独立 Python 回归与 Herdr 恢复的实机数据都来自 WSL。**macOS 未实机验证，没有实机数据**。
+- 根目录 `uml` 由安装器生成（原生 POSIX 入口），不要编辑；安装与升级按 uml-viewer 文档（`get-uml-viewer`）由人执行。
+- **实机验收在开发端（WSL2）**：安装、full／fast、coverage、CRAP 与 Herdr 恢复的实机数据都来自 WSL。**macOS 未实机验证，没有实机数据**。
 
 **worktree 起手式。** 新建 worktree 后在其根执行一次：
 
@@ -51,9 +51,9 @@ Lua 命令使用 **Lua 5.4**：WSL 上裸 `lua` 经 alternatives 可能指向 5.
 lua5.4 tools/cli.lua worktree-init
 ```
 
-- 做两件事，已存在的条目跳过（可重复执行），任一来源缺失时在写入前失败：从 magpie 资源库复制上游 `blender-*` skill 到 `.agents/skills/`（来源见[Blender 与 Meshy 使用](art-pipeline.md#上游-blender--skill)）；按 `tools/quality/project.json` 的 `tools.*.source`（`../<工具>`）在 worktree 的**父目录**建 symlink，指向主检出旁的真实工具检出。参数见 `--help`。
-- 不执行 `tools/quality/project install`。`.toolcache` 与 `.uml-viewer` **不** symlink 共享，由人在 worktree 里执行 install 独立安装（pip、字体与 cimgui 有缓存）；`lua_tools` 七项的 url 与 commit 登记在 `project.json`，由 install 拉取、校验与构建。独立安装也避开共享 venv 的必然后果：`doctor` 里针对 `crapper.__file__` 的断言会失败（editable 安装写下的 `.pth` 硬编码主检出路径）。未安装时 full 只剩 `tests/native/slow/quality_report_test.lua` 一处失败，报「缺 `.toolcache`，需人执行 `tools/quality/project install`」。
-- 某个 skill 损坏，或 worktree-init 报「已有工具链接指向不符」时，删掉对应目录或链接后重跑 `worktree-init`，由它重建。它只把链接建在父目录、指向真实检出：指向 `.uml-viewer/<tool>`（安装产物而非上游检出）会让 install／doctor 预检与标准分发回归大面积报错；建在 worktree 根内则无人引用，又不在 `.gitignore`，一次 `git add -A` 就会提交进去。
+- 从 magpie 资源库复制上游 `blender-*` skill 到 `.agents/skills/`（来源见[Blender 与 Meshy 使用](art-pipeline.md#上游-blender--skill)）；已存在的条目跳过（可重复执行），来源缺失时在写入前失败。参数见 `--help`。
+- 不为质量工具做任何准备：质量工具是 uml-viewer 的标准工具，`.uml-viewer` 不共享，需要在某个 worktree 跑 `./uml` 时由人按 uml-viewer 文档在该 worktree 安装。
+- 某个 skill 损坏时，删掉对应目录后重跑 `worktree-init`，由它重建。
 
 **美术资产（Meshy MCP + 无头 Blender）。** Blender 与 Meshy 的接入与用法见 [Blender 与 Meshy 使用](art-pipeline.md)，尺寸口径见 [ADR-0004](../adr/0004-fish-asset-scale.md)。唯一的 MCP 是 Meshy，注册与密钥接法见 [Blender 与 Meshy 使用](art-pipeline.md#前端配置)。Blender 不接 MCP，只经 `blender` 子命令无头执行（[ADR-0009](../adr/0009-blender-headless-only.md)）。资产本体不进本仓，正式资产走编辑器导入。
 
@@ -108,7 +108,7 @@ install -m 755 tools/hooks/shim "$(git rev-parse --git-common-dir)/hooks/pre-com
 | 检查 | 通过条件 |
 |---|---|
 | `busted --run=fast`（日常） | fast 车道全部用例通过，末行匹配 `N successes / 0 failures / 0 errors / 0 pending : T seconds`，退出码 0 |
-| `busted --run=full`（收尾） | 含 slow 车道，全部用例通过，末行匹配 `N successes / 0 failures / 0 errors / 0 pending : T seconds`，退出码 0。唯一例外：worktree 里仅 `quality_report_test` 因缺 `.toolcache` 失败一例（install 由人运行）时，以合并后主检出的 full 为准，并在交付说明里写明 |
+| `busted --run=full`（收尾） | 含 slow 车道，全部用例通过，末行匹配 `N successes / 0 failures / 0 errors / 0 pending : T seconds`，退出码 0 |
 | `bash tools/acceptance/run_acceptance.sh`（无参数；有 feature 时） | 跑除 `art` 外的全部车道及 `features/` 根下的裸 feature，每个 feature `N passed, 0 failed`，末行 `acceptance run OK`；所选范围无 feature 时提示跳过且返回 0。`art` 断言仓库外美术产物，不进代码收尾门（见「美术资产交付」行）；`--all` 跑全部车道 |
 | 美术资产交付 | 资产校验脚本跑完并产出 `validation/validation.json`（报告里 `failures` 为空，含网格封闭性硬门槛），且 `bash tools/acceptance/run_acceptance.sh art` 全绿；只经这两个公开入口调用，不另开 CI，资产校验不进 pre-commit。预算文件、`mesh` 段或 `validation.json` 缺失同样算失败（缺报告时提示缺哪份，可用 `EGGY_ART_ASSETS` 指到美术资产根目录），口径见 [美术资产概要「验收」](../art-asset-overview.md#验收) |
 | 提交时 pre-commit hook 自动检查（见上方「pre-commit hook」）：暂存的 `.lua` 逐个 `loadfile`，含 Lua 改动时再经 CLI 跑 `lua5.4 tools/cli.lua test fast`；agent 不另跑这一项，提交时也不必为它重复手跑 fast | `git commit` 成功，未被 hook 拦下 |
@@ -116,12 +116,13 @@ install -m 755 tools/hooks/shim "$(git rev-parse --git-common-dir)/hooks/pre-com
 | validate 通过后全套试玩 | 每条验收现象都有取证产物；`log trace` 本轮窗口有效且无错误 |
 | 本轮改动提交到分支后、合入 main 前，对 `<基线>...HEAD` 跑 `/code-review`（改动尚未提交时用 `git diff <基线>` 的范围） | 取得 Standards / Spec 两轴结论；硬性违规已修复，或在交付说明里逐条写明 |
 
-**人工验收**：质量工具（`tools/quality/project` 的 `install`、`quality`、`test-tooling` 等全部子命令）由人手动运行，agent 不执行；agent 在交付说明里照抄下表命令，列为待人工跑的项。
+**人工验收**：质量工具（`./uml crap`、`./uml mutate`、`./uml dry`）只由人运行，agent 不执行；标准工具环境（含 crapper 要求的 cluacov 1.0.0）由人按 uml-viewer 文档准备。agent 在交付说明里照抄下表命令，列为待人工跑的项。
 
 | 检查 | 通过条件 |
 |---|---|
-| `tools/quality/project quality` | 完整 Busted 套件通过，生成本轮 LCOV、全树 CRAP 与 DRY 报告 |
-| `tools/quality/project test-tooling` | `tests/tooling/slow` 的 Python 回归全绿（空缓存安装 suite 只吃独立检出，此处按设计跳过）；两道门控默认跳过、取值 `1` 才释放：真实拉起 crapper/mutator 的端到端用例归 `SE_FISH_QUALITY_E2E`，用真实上游安装器（联网）执行 `install` 的用例归 `SE_FISH_QUALITY_INSTALL`（改安装器或固定提交时释放）。「全绿」指门控默认形态下全绿，默认形态只留秒级契约用例，见 [质量工具](../../tools/quality/README.md#python-回归与门控) |
+| `./uml crap` | crapper 以 `.busted` 的 `default`（与 full 相同）跑完整套件并采集覆盖率，按 `standardTools` 业务范围发布全树 `.metrics/crap.edn` |
+| `./uml mutate`（可带文件或 `--changed`） | mutator 对业务范围内的目标做差分 mutation，每个变异体经 `--busted-task fast` 只跑 fast 车道，快照写入 `.metrics/mutate/` |
+| `./uml dry` | dryer 对业务范围出 DRY 报告 `.metrics/dry.edn` |
 
 ## 产物归属
 
