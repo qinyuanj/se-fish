@@ -72,14 +72,14 @@ lua5.4 tools/cli.lua worktree-init
 
 **teamai 的 Gitea 凭据（开发端接入）。** `GITEA_URL`、`GITEA_TOKEN` 存在部署端用户环境变量，经 Windows 用户变量 `WSLENV=GITEA_URL:GITEA_TOKEN` 透传到开发端，凭据只存一份。改 `WSLENV` 后关闭全部终端并 `wsl --shutdown` 才生效，常驻会话（Herdr 等）一并重启；`teamai doctor` 的两项 Gitea 检查通过即接入完成。缺凭据时 pull、recall 与 hook 照常，走 Gitea API 的操作（`members`、贡献 learning）失败。
 
-**pre-commit hook（开发端接入）。** 检查脚本入库在 `tools/hooks/pre-commit`：对暂存区每个 `.lua` 取**暂存内容**做 Lua 5.4 `loadfile`，暂存区含 `.lua` 或 `.busted` 时再跑 `busted --run=fast`，纯文档提交不跑 busted；质量工具不进 hook。共享 hooks 目录（`git rev-parse --git-common-dir` 下的 `hooks/`，所有 worktree 共用）里的 `pre-commit` 是入库的转发 shim `tools/hooks/shim`，只转发到当前检出的脚本。每个克隆在检出根装一次；shim 改动后重装：
+**pre-commit hook（开发端接入）。** 检查脚本入库在 `tools/hooks/pre-commit`：对暂存区每个 `.lua` 取**暂存内容**做 Lua 5.4 `loadfile`，暂存区含 `.lua` 或 `.busted` 时再经 CLI 跑 `lua5.4 tools/cli.lua test fast`（busted 不可用时 CLI 退出码 3，hook 提示安装 busted 并拦下），纯文档提交不跑 busted；质量工具不进 hook。共享 hooks 目录（`git rev-parse --git-common-dir` 下的 `hooks/`，所有 worktree 共用）里的 `pre-commit` 是入库的转发 shim `tools/hooks/shim`，只转发到当前检出的脚本。每个克隆在检出根装一次；shim 改动后重装：
 
 ```bash
 install -m 755 tools/hooks/shim "$(git rev-parse --git-common-dir)/hooks/pre-commit"
 ```
 
 - 当前分支没有该脚本时放行，旧分支与并行 worktree 不受影响。
-- **检查对象不同**：`loadfile` 查的是暂存内容；`busted --run=fast` 跑的是工作区。部分暂存（`git add -p`、暂存后又改）时 fast 的结果可能与实际提交的内容不一致，需要确认时先把未暂存改动 `git stash --keep-index` 再提交。
+- **检查对象不同**：`loadfile` 查的是暂存内容；fast 车道跑的是工作区。部分暂存（`git add -p`、暂存后又改）时 fast 的结果可能与实际提交的内容不一致，需要确认时先把未暂存改动 `git stash --keep-index` 再提交。
 - **不用 `core.hooksPath`**：git 2.43 下设了它，teamai 装在 hooks 目录的 post-* hook 就不再执行，teamai 也拒绝重装。**不用软链**：软链按主 worktree 解析，其他 worktree 会跑主检出那份脚本。
 - **与 teamai 分工**：teamai 只管 `post-checkout` / `post-merge` / `post-rewrite`（文件内有 `managed by teamai` 标记），`pre-commit` 归本仓库；两边互不覆盖，改 hook 后核对三个 post-* 仍在且内容未变。
 - **`--no-verify` 仅限人用**：agent 不得使用；hook 拦下时修复问题后重新提交。
@@ -111,7 +111,7 @@ install -m 755 tools/hooks/shim "$(git rev-parse --git-common-dir)/hooks/pre-com
 | `busted --run=full`（收尾） | 含 slow 车道，全部用例通过，末行匹配 `N successes / 0 failures / 0 errors / 0 pending : T seconds`，退出码 0 |
 | `bash tools/acceptance/run_acceptance.sh`（无参数；有 feature 时） | 跑除 `art` 外的全部车道及 `features/` 根下的裸 feature，每个 feature `N passed, 0 failed`，末行 `acceptance run OK`；所选范围无 feature 时提示跳过且返回 0。`art` 断言仓库外美术产物，不进代码收尾门（见「美术资产交付」行）；`--all` 跑全部车道 |
 | 美术资产交付 | 资产校验脚本跑完并产出 `validation/validation.json`（报告里 `failures` 为空，含网格封闭性硬门槛），且 `bash tools/acceptance/run_acceptance.sh art` 全绿；只经这两个公开入口调用，不另开 CI，资产校验不进 pre-commit。预算文件、`mesh` 段或 `validation.json` 缺失同样算失败（缺报告时提示缺哪份，可用 `EGGY_ART_ASSETS` 指到美术资产根目录），口径见 [美术资产概要「验收」](../art-asset-overview.md#验收) |
-| 提交时 pre-commit hook 自动检查（见上方「pre-commit hook」）：暂存的 `.lua` 逐个 `loadfile`，含 Lua 改动时再跑 `busted --run=fast`；agent 不另跑这一项，提交时也不必为它重复手跑 fast | `git commit` 成功，未被 hook 拦下 |
+| 提交时 pre-commit hook 自动检查（见上方「pre-commit hook」）：暂存的 `.lua` 逐个 `loadfile`，含 Lua 改动时再经 CLI 跑 `lua5.4 tools/cli.lua test fast`；agent 不另跑这一项，提交时也不必为它重复手跑 fast | `git commit` 成功，未被 hook 拦下 |
 | `lua5.4 tools/cli.lua deploy` 后执行上面的 `code validate` | `ok=true`、`data.valid=true`、`data.is_se_map=true`，`data.issues` 与 `meta.warnings` 均为空 |
 | validate 通过后全套试玩 | 每条验收现象都有取证产物；`log trace` 本轮窗口有效且无错误 |
 | 本轮改动提交到分支后、合入 main 前，对 `<基线>...HEAD` 跑 `/code-review`（改动尚未提交时用 `git diff <基线>` 的范围） | 取得 Standards / Spec 两轴结论；硬性违规已修复，或在交付说明里逐条写明 |

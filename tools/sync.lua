@@ -1,6 +1,6 @@
 -- sync 子命令：把编辑器宿主目录的产物回同步进仓库根——eggy.json、EggyAPI.lua、
 -- EggyEditorAPI.lua 三份单文件 + data/ 整目录镜像，--packages 追加三端官方包（宿主侧删掉的文件在仓库里
--- 也跟着消失）。在仓库根执行 `lua tools/cli.lua sync`；正方向部署见 tools/deploy.lua。
+-- 也跟着消失）。在仓库根执行 `lua5.4 tools/cli.lua sync`；正方向部署见 tools/deploy.lua。
 --
 -- 普通产物回灌落盘前做 CRLF→LF 归一（与 .gitattributes 的 eol=lf 配合）；官方包
 -- 保持原始字节。全部源读成功才开始落盘，来源不完整时不写入；内容没变的文件不重写。
@@ -22,7 +22,7 @@ end
 
 function M.usage()
   return table.concat({
-    "用法: lua tools/cli.lua sync [--packages]",
+    "用法: lua5.4 tools/cli.lua sync [--packages]",
     "",
     "把宿主目录的 " .. table.concat(plan.ROOT_FILES, " / ") .. " 与 " .. plan.DATA_DIR .. "/ 整目录回同步进仓库根。",
     plan.DATA_DIR .. "/ 按镜像纪律抹平（宿主侧删掉的文件在仓库里跟着消失）；落盘前 CRLF→LF 归一。",

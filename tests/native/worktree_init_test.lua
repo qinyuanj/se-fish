@@ -116,6 +116,15 @@ describe("TestWorktreeInit", function()
     assert.are.equal("blender-core\n", slurp(WT .. "/.agents/skills/blender-core/SKILL.md"))
   end)
 
+  -- 退出码约定（#145）：magpie 资源库要经 WSL interop 推导，推不出属平台不可用，退 3。
+  it("test_magpie_library_derivation_failure_exits_3", function()
+    seam.magpie_library = function() return nil, "PATH 上找不到 cmd.exe（WSL interop 不可用）" end
+    assert.are.equal(3, run({ "--root", WT }))
+    assert.matches("interop 不可用", err.text, 1, true)
+    assert.matches("--skills-from", err.text, 1, true)
+    assert.is_false(lexists(WT .. "/.agents"))
+  end)
+
   it("test_usage_errors_and_help", function()
     assert.are.equal(2, run({ "--bogus" }))
     assert.matches("用法", err.text, 1, true)

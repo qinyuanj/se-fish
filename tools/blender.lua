@@ -46,13 +46,19 @@ function M.usage()
     "",
     "Blender 定位：先看 BLENDER_EXE（接受 /mnt/c/... 与 C:\\... 两种形式，空串当作未设置）；",
     "未设置时在 %ProgramFiles%\\Blender Foundation 与 %LOCALAPPDATA%\\Programs\\Blender Foundation",
-    "下按版本号取最新。interop 不可用或找不到 Blender 时，在启动 Blender 前以退出码 1 失败。",
+    "下按版本号取最新。interop 不可用、找不到 Blender、缺 python3 或上游 skill 时，",
+    "在启动 Blender 前以退出码 3 失败。",
     "",
   }, "\n") .. "\n"
 end
 
 local function fail(msg)
   error("blender: " .. msg, 0)
+end
+
+-- 平台或工具不可用（interop、Blender、python3、上游 runner）：main 收成退出码 3。
+local function unavailable(msg)
+  error({ code = 3, msg = "blender: " .. msg }, 0)
 end
 
 -- "5.10" → {5, 10}；按数字逐段比较，5.10 比 5.9 新。
@@ -204,15 +210,15 @@ end
 
 local function run(opts)
   local ok, err = seam.interop()
-  if not ok then fail(err) end
+  if not ok then unavailable(err) end
   local exe
   exe, err = M.locate()
-  if not exe then fail(err) end
+  if not exe then unavailable(err) end
   if opts.which then return report_which(exe) end
 
-  if not seam.which("python3") then fail("PATH 上找不到 python3（上游 run_in_blender.py 需要它）") end
+  if not seam.which("python3") then unavailable("PATH 上找不到 python3（上游 run_in_blender.py 需要它）") end
   if not seam.exists(M.RUNNER) then
-    fail("上游 blender-core skill 未安装（缺 " .. M.RUNNER .. "），"
+    unavailable("上游 blender-core skill 未安装（缺 " .. M.RUNNER .. "），"
       .. "来源与重装方式见 docs/agents/art-pipeline.md 的「上游 blender-* skill」")
   end
 
@@ -232,7 +238,7 @@ local function run(opts)
   return seam.execute(table.concat(parts, " "))
 end
 
--- 退出码：0 成功 / 1 业务失败（含预检失败）/ 2 用法错误；执行后透传上游脚本的退出码。
+-- 退出码：0 成功 / 1 业务失败 / 2 用法错误 / 3 平台或工具不可用；执行后透传上游脚本的退出码。
 function M.main(args)
   local opts, err = parse(args or {})
   if not opts then
@@ -245,6 +251,10 @@ function M.main(args)
   end
   local ok, result = pcall(run, opts)
   if not ok then
+    if type(result) == "table" then
+      io.stderr:write(result.msg .. "\n")
+      return result.code
+    end
     io.stderr:write(tostring(result) .. "\n")
     return 1
   end
