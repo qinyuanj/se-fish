@@ -48,7 +48,7 @@ local function fixture(options)
             { AttrKey = 'ProbeBound', Default = 20, Min = 10, Max = 50 },
         }
     end
-    local api = env.require('server.AttrAPI')
+    local api = env.require('server.packages.attr_rule.api')
     local target = unit('Target', world)
     return { AttrAPI = api, Target = target, Isolated = true,
         CreateBuffUnits = function() return world:CreateAsset('map://preset/u95e3ac002304b8483aa099a955e14a8') end,
@@ -75,7 +75,7 @@ describe("TestAttrRuleProbe", function()
 
   it("test_dirty_isolated_target_is_rejected", function()
     local context = fixture()
-    assert.is_true(context.AttrAPI.EnsureAttrUnit(context.Target) ~= nil)
+    assert.is_true(context.AttrAPI.Funcs.EnsureAttrUnit(context.Target) ~= nil)
     local report = Probe.Run(context)
     assert.is_false(report.Ok)
     assert.matches('拒绝污染', report.Error, 1, true)

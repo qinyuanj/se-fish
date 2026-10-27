@@ -68,7 +68,7 @@ function Runtime.New(clock)
         local loaded = {}
         local env = setmetatable({ game = e.game, RemoteEvent = e.remote }, { __index = _G })
         env.require = function(name)
-            if name:find('modifier_system', 1, true) or name == 'server.ModifierAPI' or name == 'common.ModifierAPIBase' then
+            if name:find('modifier_system', 1, true) then
                 if not loaded[name] then loaded[name] = assert(loadfile(name:gsub('%.', '/') .. '.lua', 't', env))() end
                 return loaded[name]
             end

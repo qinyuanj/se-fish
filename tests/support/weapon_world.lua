@@ -25,18 +25,21 @@ end
 function M:setUp()
     local ctx = self
     ctx.saved = { game = rawget(_G, 'game'), re = rawget(_G, 'REUtil'),
-        api = package.loaded['server.AbilityAPI'] }
+        api = package.loaded['server.AbilityAPI'], swing = package.loaded['server.SwingRegistry'] }
     ctx.now = 1000
     ctx.player = weaponPlayer(42)
     ctx.other = weaponPlayer(43)
     ctx.casts, ctx.swingStaged, ctx.replies = {}, {}, {}
     ctx.applied, ctx.spawnedFish, ctx.order = {}, {}, 0
-    -- 与真实 server.AbilityAPI 一致的点调用签名（模块函数，非方法）
-    package.loaded['server.AbilityAPI'] = {
-        StageSwing = function(userId, swing) ctx.swingStaged[userId] = swing end,
+    -- 挥砍登记与技能施法分开替换，均保持模块函数点调用签名
+    package.loaded['server.SwingRegistry'] = {
+        StageSwing = function(userId, swing) ctx.swingStaged[userId] = swing; return true end,
+        ClearSwing = function(userId) ctx.swingStaged[userId] = nil end,
         PeekSwing = function(userId) return ctx.swingStaged[userId] end,
         TakeSwing = function(userId)
             local s = ctx.swingStaged[userId]; ctx.swingStaged[userId] = nil; return s end,
+    }
+    package.loaded['server.AbilityAPI'] = {
         CastAbility = function(unit, index)
             ctx.casts[#ctx.casts + 1] = { unit = unit, index = index }; return true end,
         AddCastGuard = function(fn) ctx.castGuard = fn end,
@@ -97,6 +100,7 @@ function M:tearDown()
     _G.game = ctx.saved.game
     _G.REUtil = ctx.saved.re
     package.loaded['server.AbilityAPI'] = ctx.saved.api
+    package.loaded['server.SwingRegistry'] = ctx.saved.swing
 end
 
 function M.lastReply(ctx)

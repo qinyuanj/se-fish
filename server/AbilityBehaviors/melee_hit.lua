@@ -7,11 +7,9 @@
 -- 命中盒与武器随锚点生命周期回收：Duration 到时 / 施法结束 / 施法打断 / 锚点销毁
 -- → 锚点 Duration 必须 > 0。
 
-local MgrVitals = require("server.Mgr.MgrVitals")
-local MgrFishCarrier = require("server.Mgr.MgrFishCarrier")
-local MgrAbility = require("server.Mgr.MgrAbility") -- #139 武器特效应用口（运行时挂接，无加载环）
+local SwingRegistry = require("server.SwingRegistry")
 
-local M = {}
+local M = { Services = {} }
 
 -- 硬编码常量
 local TRIGGER_BOX_PREFAB_ID = 57450
@@ -117,13 +115,13 @@ local function _applyDamage(target, damage, owner, hit)
 	end
 	-- #128：本图业务伤害不直接碰 Controller。鱼受击体与玩家角色都经根 Vitals 的命中身份结算；
 	-- 同一判定段对同一目标的重放由入口拒绝，未解析到业务目标时不做旧式直扣。
-	if MgrFishCarrier:ResolveCarrier(target) then
-		return (MgrVitals:ApplyHit(hit, target, damage))
+	if M.Services.FishCarrier:ResolveCarrier(target) then
+		return (M.Services.Vitals:ApplyHit(hit, target, damage))
 	end
 	local players = game:GetService("Players")
 	local targetPlayer = players and players.GetPlayerFromCharacter and players:GetPlayerFromCharacter(target)
 	if targetPlayer then
-		return (MgrVitals:ApplyHit(hit, targetPlayer, damage))
+		return (M.Services.Vitals:ApplyHit(hit, targetPlayer, damage))
 	end
 	return false
 end
@@ -188,7 +186,11 @@ local function _createHitSfx(anchor_script, target)
 	end
 end
 
-function M.Attach(anchor_script)
+function M.Attach(anchor_script, services)
+	if services then M.Services = services end
+	for _, name in ipairs({ 'Vitals', 'FishCarrier', 'GM', 'Modifier' }) do
+		assert(M.Services[name], '[melee_hit] 缺少行为依赖: ' .. name)
+	end
 	local RunService = game:GetService("RunService")
 	if not RunService:IsServer() then
 		return
@@ -255,7 +257,7 @@ function M.Attach(anchor_script)
 		local player = game:GetService("Players"):GetPlayerFromCharacter(owner)
 		local swing = nil
 		if player then
-			swing = require("server.AbilityAPI").TakeSwing(player.UserId)
+			swing = SwingRegistry.TakeSwing(player.UserId)
 			if not swing then
 				print("[melee_hit] 玩家挥砍缺少服务端登记，只播表现不结算伤害 uid=" .. tostring(player.UserId))
 			end
@@ -277,9 +279,9 @@ function M.Attach(anchor_script)
 			state.effect = swing.effect -- #139 近战大奖特效（毒/灼烧），命中成功后应用
 		end
 		if player then
-			hit_damage = require("server.Mgr.MgrGM"):GetMeleeDamage(player, hit_damage)
+			hit_damage = M.Services.GM:GetMeleeDamage(player, hit_damage)
 		end
-		state.hit = MgrVitals:NewHit(player or owner, "weapon")
+		state.hit = M.Services.Vitals:NewHit(player or owner, "weapon")
 		local hit_power = anchor_script:GetAttribute("ABILITY_ANOSTATE_HITPOWER") or 0.0
 		local weapon_prefab = anchor_script:GetAttribute("ABILITY_ANOSTATE_USE_PERFAB") or ""
 		local anim_id = anchor_script:GetAttribute("ABILITY_ANOSTATE_ANIMKEY") or ""
@@ -401,8 +403,9 @@ function M.Attach(anchor_script)
 				_applyHitPower(target, hit_power, owner)
 				_createHitSfx(anchor_script, target)
 				-- #139：伤害被统一入口接受后才挂特效；hit_map 去重保证一次判定段对同一目标只挂一次
-				if player and state and state.effect and MgrAbility.ApplyWeaponEffect then
-					local ok, err = pcall(MgrAbility.ApplyWeaponEffect, MgrAbility, player, target, state.effect)
+				local modifier = M.Services.Modifier
+				if player and state and state.effect and modifier.ApplyWeaponEffect then
+					local ok, err = pcall(modifier.ApplyWeaponEffect, modifier, player, target, state.effect)
 					if not ok then print("[melee_hit] 武器特效应用失败", tostring(err)) end
 				end
 			end

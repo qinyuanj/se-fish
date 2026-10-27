@@ -8,7 +8,6 @@
 --   6. 回退成拼字符串的 require → 图上依赖再次丢失。
 -- 登记覆盖（1~4、6）只读源码文本校对，与 grill_test 的接线断言同口径；失败路径（5）加载真实模块验证。
 
-local stub = require("tests.support.ability_package_stub")
 
 local SCREEN_DIR = "client/ScreenHandlers"
 local LOCAL_BEHAVIOR_DIR = "server/AbilityBehaviors"
@@ -156,7 +155,7 @@ describe("未登记名字的失败路径", function()
     save({ "game" }, { vendor, anchorLogic, "server.AbilityAPI" })
     _G.game = { GetService = function() return nil end }
     package.loaded[vendor] = nil
-    package.preload[vendor] = function() return stub.packageApi() end
+    package.preload[vendor] = function() return {} end
     local attached = {}
     package.loaded[anchorLogic] = { Attach = function(script) attached[#attached + 1] = script end }
     local api = assert(loadfile("server/AbilityAPI.lua"))()

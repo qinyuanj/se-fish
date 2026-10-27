@@ -9,14 +9,7 @@
 -- 投掷一发一件走 #123 协议（重放不重复扣）、20 米钳制、落水 3–5 条当地 1 级普通鱼后算伤害、
 -- 5 米爆炸、普通投掷召唤不出首领；装备/选中重进恢复、弹匣按满匣恢复。
 --
--- vendor 接缝处理（迁移期必修）：旧 TestAbilitySwingRegistry.setUp 给
--- server.packages.ability_system.api 装的 preload 桩只有 CastAbility 一个函数，
--- 而 common/AbilityAPIBase.build 按 SERVER_API 全名单校验、缺名即 error。旧套件能跑通
--- 完全依赖别处先把「真包模块」灌进 package.loaded，让那个 preload 永不被调用；
--- 旧 ability_seams 被迁走后这条残留断了，本文件 4 个案例直接报错（AddAbility 缺失）。
--- 现改用 tests/support/ability_package_stub.lua 按名单建齐桩，并在 after_each 把 preload
--- 与两份模块缓存放回快照，因此不再依赖任何别处的残留（详见 issue-90-mapping.md）。
-local lu_stub = require('tests.support.ability_package_stub')
+-- 每例只替换包内 CastAbility，并在 after_each 还原 preload 与模块缓存。
 local Weapon = require('tests.support.weapon_world')
 local GameCfg = require('common.GameCfg')
 local PlayerData = require('server.Data.PlayerData')
@@ -29,7 +22,7 @@ describe('TestAbilitySwingRegistry', function()
     before_each(function()
         saved = { game = rawget(_G, 'game'), preload = package.preload[VENDOR],
             vendor = package.loaded[VENDOR], api = package.loaded['server.AbilityAPI'] }
-        package.preload[VENDOR] = function() return lu_stub.packageApi({ CastAbility = function() return true end }) end
+        package.preload[VENDOR] = function() return { CastAbility = function() return true end } end
         package.loaded[VENDOR] = nil
         ctx = { now = 1000 }
         _G.game = { GetService = function(_, name)
@@ -58,25 +51,86 @@ describe('TestAbilitySwingRegistry', function()
     end)
 
     it('test_expired_or_future_swing_rejected', function()
-        ctx.api.StageSwing(7, { damage = 5, range = 2 })  -- at=1000
+        ctx.swing = assert(loadfile('server/SwingRegistry.lua'))()
+        ctx.swing.StageSwing(7, { damage = 5, range = 2 })  -- at=1000
         ctx.now = 1000 + 1.6                              -- TTL 1.5 秒
-        assert.is_nil(ctx.api.PeekSwing(7))
-        assert.is_nil(ctx.api.TakeSwing(7))
+        assert.is_nil(ctx.swing.PeekSwing(7))
+        assert.is_nil(ctx.swing.TakeSwing(7))
         ctx.now = 1000
-        ctx.api.StageSwing(8, { damage = 5, range = 2 })
+        ctx.swing.StageSwing(8, { damage = 5, range = 2 })
         ctx.now = 500                                     -- 登记在未来（时钟回拨）视为过期
-        assert.is_nil(ctx.api.TakeSwing(8))
+        assert.is_nil(ctx.swing.TakeSwing(8))
     end)
 
     it('test_stage_take_once_and_overwrite', function()
-        assert.is_true(ctx.api.StageSwing(7, { damage = 5, range = 2 }))
-        assert.same(5, ctx.api.PeekSwing(7).damage)
-        assert.same({ damage = 5, range = 2, at = 1000 }, ctx.api.TakeSwing(7))
-        assert.is_nil(ctx.api.TakeSwing(7))
+        ctx.swing = assert(loadfile('server/SwingRegistry.lua'))()
+        assert.is_true(ctx.swing.StageSwing(7, { damage = 5, range = 2 }))
+        assert.same(5, ctx.swing.PeekSwing(7).damage)
+        assert.same({ damage = 5, range = 2, at = 1000 }, ctx.swing.TakeSwing(7))
+        assert.is_nil(ctx.swing.TakeSwing(7))
         -- 重复登记覆盖旧的（换武器不串档）
-        ctx.api.StageSwing(7, { damage = 40, range = 4 })
-        ctx.api.StageSwing(7, { damage = 10, range = 2 })
-        assert.same(10, ctx.api.TakeSwing(7).damage)
+        ctx.swing.StageSwing(7, { damage = 40, range = 4 })
+        ctx.swing.StageSwing(7, { damage = 10, range = 2 })
+        assert.same(10, ctx.swing.TakeSwing(7).damage)
+    end)
+
+    it('时钟异常时拒绝登记和消费，恢复后不复活旧登记', function()
+        local swing = assert(loadfile('server/SwingRegistry.lua'))()
+        assert.is_true(swing.StageSwing(7, { damage = 5 }))
+        ctx.now = math.huge
+        assert.is_false(swing.StageSwing(7, { damage = 40 }))
+        ctx.now = 1000
+        assert.is_nil(swing.TakeSwing(7))
+        assert.is_true(swing.StageSwing(8, { damage = 5 }))
+        ctx.now = nil
+        assert.is_nil(swing.PeekSwing(8))
+        ctx.now = 1000
+        assert.is_nil(swing.TakeSwing(8))
+        _G.game = { GetService = function() error('clock-denied') end }
+        assert.is_false(swing.StageSwing(9, { damage = 5 }))
+    end)
+
+    it('过期登记读取后清除，不随时钟回拨复活', function()
+        local swing = assert(loadfile('server/SwingRegistry.lua'))()
+        swing.StageSwing(7, { damage = 5 })
+        ctx.now = 1002
+        assert.is_nil(swing.PeekSwing(7))
+        ctx.now = 1000
+        assert.is_nil(swing.PeekSwing(7))
+    end)
+
+    it('玩家退出清除未消费的挥砍登记', function()
+        local world = Weapon.new()
+        world:setUp()
+        local ok, err = pcall(function()
+            local swing = assert(loadfile('server/SwingRegistry.lua'))()
+            local stub = package.loaded['server.SwingRegistry']
+            stub.ClearSwing = swing.ClearSwing
+            swing.StageSwing(world.player.UserId, { damage = 5 })
+            world.mgr:OnPlayerRemoving(world.player)
+            assert.is_nil(swing.TakeSwing(world.player.UserId))
+        end)
+        world:tearDown()
+        if not ok then error(err, 0) end
+    end)
+
+    it('施法拒绝或异常时清除登记并回复失败', function()
+        local world = Weapon.new()
+        world:setUp()
+        local ok, err = pcall(function()
+            for _, cast in ipairs({
+                function() return false end,
+                function() error('cast-denied') end,
+            }) do
+                package.loaded['server.AbilityAPI'].CastAbility = cast
+                world.now = world.now + 2
+                world.mgr:AttackMelee(world.player, nil)
+                assert.is_nil(world.swingStaged[world.player.UserId])
+                assert.is_false(world.replies[#world.replies].payload.ok)
+            end
+        end)
+        world:tearDown()
+        if not ok then error(err, 0) end
     end)
 end)
 
@@ -792,7 +846,7 @@ describe('TestWeaponPersistence', function()
     before_each(function()
         saved = { preload = package.preload[VENDOR], vendor = package.loaded[VENDOR],
             api = package.loaded['server.AbilityAPI'] }
-        package.preload[VENDOR] = function() return lu_stub.packageApi({ CastAbility = function() return true end }) end
+        package.preload[VENDOR] = function() return { CastAbility = function() return true end } end
         package.loaded[VENDOR] = nil
         package.loaded['server.AbilityAPI'] = nil
     end)

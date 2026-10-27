@@ -30,7 +30,7 @@ local LocalCastSource = require('client.LocalCastSource')
 local LocalAttr = require('client.LocalAttr')
 
 -- 运行时 require 失败只进日志并返回 nil，所以这里判一次再调
-local AbilityAPI = require("client.AbilityAPI")
+local AbilityAPI = require("client.packages.ability_system.api")
 if AbilityAPI then
     AbilityAPI.StartClientLifecycle()
 end

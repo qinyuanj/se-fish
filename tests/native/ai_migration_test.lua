@@ -1,5 +1,5 @@
 -- #84 迁移：AI 生命周期与官方 AI 接管（原 tests/gameplay/ai_migration_test.lua，3 + 9 例）。
--- 接缝：根 AiAPI → MgrAi → 实际载体交接；以及 MgrFishUnit 侧的释放 / 删除必交接、失败交接不启动业务移动。
+-- 接缝：包内 AI API → MgrAi → 实际载体交接；以及 MgrFishUnit 侧的释放 / 删除必交接、失败交接不启动业务移动。
 -- TestFishAiLifecycle 沿用 tests/support/fish_lift 共享夹具；TestAiMigration 用官方 AI vendor 运行时。
 -- describe/it 名称保留旧类名与方法名，并按方法名字典序注册以保持旧套件执行顺序
 -- （旧套件里 TestAiMigration 整体先于 TestFishAiLifecycle，按类名字典序）。
@@ -14,7 +14,8 @@ describe('TestAiMigration', function()
         env = {}
         env.ai, env.runtime = Loader.loadAi()
         local e = setmetatable({ Vector3 = { New = env.runtime.Vector }, require = function(name)
-            if name == 'server.AiAPI' then return env.ai end
+            if name == 'server.packages.official_ai_feature.api' then return env.ai end
+            if name == 'server.packages.official_ai_feature.behavior_runtime' then return env.runtime.behavior end
             return require(name)
         end }, { __index = _G })
         env.mgr = assert(loadfile('server/Mgr/MgrAi.lua', 't', e))()
@@ -83,13 +84,13 @@ describe('TestAiMigration', function()
             } } end } end,
         }
         env.fish.AbilityRecord = { Ready = true, Receiver = env.unit, Entry = { Index = 2 } }
-        env.mgr.AiAPI = { StopAI = function() end, StopMove = function() end,
-            Configs = { CMD_ABILITY = 5 }, BasicCommand = function(_, command, slot)
+        env.mgr.AiAPI = { Configs = { CMD_ABILITY = 5 }, Funcs = { StopAI = function() end, StopMove = function() end,
+            BasicCommand = function(_, command, slot)
                 assert.are.equal(5, command)
                 assert.are.equal(2, slot)
                 calls = calls + 1
                 if calls == 2 then handler() end
-            end }
+            end } }
         assert.is_false(env.mgr:CastFish(env.fish))
         assert.is_false(connected)
         assert.is_true(env.mgr:CastFish(env.fish))

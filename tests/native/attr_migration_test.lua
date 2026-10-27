@@ -1,6 +1,6 @@
 -- #89 迁移（原 tests/gameplay/attr_migration_test.lua）：
 -- 失败方式：永久成长重复累加、默认100污染、重复乘区、写入失败误报、重建/退出残留。
--- 接缝：MgrAttr公开刷新/读取，真实根AttrAPI/vendor，仅Unit/World为离线引擎替身。
+-- 接缝：MgrAttr公开刷新/读取，真实包内 attr_rule.api，仅Unit/World为离线引擎替身。
 -- fixture 用独立 env + 自己的 require 缓存 loadfile 出整套沙盒，不写 _G 也不写 package.loaded，
 -- 因此旧套件没有 setUp/tearDown、原生侧同样不需要逐例恢复。
 -- describe/it 名沿用旧类名与方法名，案例顺序沿用旧 LuaUnit 的字典序执行序。
@@ -54,13 +54,13 @@ describe('TestAttrMigration', function()
     it('test_character_rebuild_and_leave_release_owned_attr_units', function()
         local mgr, p, _, all, unit, world = fixture()
         assert.is_true(mgr:ApplyGrowth(p).Ok)
-        local first = mgr.AttrAPI.GetAttrUnit(p.Character)
+        local first = mgr.AttrAPI.Funcs.GetAttrUnit(p.Character)
         p.Character = unit('Character', world)
         p.Character.Controller.WalkSpeed = 8
         assert.is_true(mgr:ApplyGrowth(p).Ok)
         assert.is_true(first.destroyed)
         assert.near(3.64, p.Character.Controller.WalkSpeed, 1e-8)
-        local current = mgr.AttrAPI.GetAttrUnit(p.Character)
+        local current = mgr.AttrAPI.Funcs.GetAttrUnit(p.Character)
         mgr:OnPlayerRemoving(p)
         assert.is_true(current.destroyed)
     end)
@@ -121,7 +121,7 @@ describe('TestAttrMigration', function()
         assert.same(before + 1, #logs)
         broken = false
         local config = { Min = 0 }
-        mgr.AttrAPI.GetAttrConfig = function() return config end
+        mgr.AttrAPI.Funcs.GetAttrConfig = function() return config end
         mgr:Update()
         assert.same(before + 2, #logs)
         assert.matches('业务属性键不允许地图钳制配置', logs[#logs], nil, true)
@@ -154,14 +154,14 @@ describe('TestAttrMigration', function()
         assert.is_true(vitals:Eat(p, 'goldfish'))
         assert.same(570, p.Character.Controller.Health)
         assert.same(190, vitals:GetState(p).hunger)
-        assert.same(190, mgr.AttrAPI.GetAttr(p.Character, 'PlayerHunger'))
+        assert.same(190, mgr.AttrAPI.Funcs.GetAttr(p.Character, 'PlayerHunger'))
         local state = vitals:GetState(p) state.dead = true
         p.Character.scale = 1 p.Character.Controller.WalkSpeed = 7
         vitals:Revive(state, 'test')
         assert.same(3, p.Character.scale)
         assert.near(3.185, p.Character.Controller.WalkSpeed, 1e-8)
         assert.same(900, p.Character.Controller.Health)
-        assert.same(300, mgr.AttrAPI.GetAttr(p.Character, 'PlayerHunger'))
+        assert.same(300, mgr.AttrAPI.Funcs.GetAttr(p.Character, 'PlayerHunger'))
     end)
 
     -- 写入失败要报出来，刷新按当前投影重试

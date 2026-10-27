@@ -1,6 +1,13 @@
 -- #53 官方指令只作用于真实受击体；轨迹交接先取消模式，再归还本体写入权。
-local AiAPI = require('server.AiAPI')
+local AiAPI = require('server.packages.official_ai_feature.api')
+local BehaviorRuntime = require('server.packages.official_ai_feature.behavior_runtime')
 local Mgr = { AiAPI = AiAPI, States = {} }
+
+-- 官方任务结束会清 modeTask；disabled 时不能继续沿用位移缓存。
+function Mgr:HasActiveMove(unit)
+    local state = BehaviorRuntime.getState(unit)
+    return state ~= nil and state.modeTask ~= nil and not state.disabled
+end
 
 function Mgr:State(fish)
     local state = self.States[fish]
@@ -14,8 +21,8 @@ function Mgr:Custom(fish)
     if state.Failed then return false end
     if state.Mode or not state.Initialized then
         local ok, err = pcall(function()
-            self.AiAPI.StopAI(carrier.Receiver)
-            self.AiAPI.StopMove(carrier.Receiver, 0)
+            self.AiAPI.Funcs.StopAI(carrier.Receiver)
+            self.AiAPI.Funcs.StopMove(carrier.Receiver, 0)
             local p, offset = carrier.Body.Position, carrier.ReceiverOffset
             carrier.Receiver.Position = Vector3.New(p.x + (offset and offset.x or 0),
                 p.y + (offset and offset.y or 0), p.z + (offset and offset.z or 0))
@@ -35,7 +42,7 @@ function Mgr:Pause(fish, paused)
         self:Custom(fish)
         local record = fish.AbilityRecord
         if record and record.Ready and not state.Paused then
-            local api = self.AbilityAPI or require('server.AbilityAPI')
+            local api = self.AbilityAPI or require('server.packages.ability_system.api')
             local ok, stopped = pcall(api.StopAbility, record.Receiver, record.Entry.Index)
             if not ok then print('[MgrAi] 控制打断技能失败', fish.Id, tostring(stopped)); state.Failed = true end
         end
@@ -55,17 +62,17 @@ function Mgr:Command(fish, mode, target, direction, speed, distance, range)
     end
     if state.Mode == mode and state.Target == target and state.Direction == direction
         and state.Speed == speed and state.Distance == distance and state.Range == range
-        and self.AiAPI.HasActiveMove(unit) then return true end
+        and self:HasActiveMove(unit) then return true end
     if not self:Custom(fish) then return false end
     local ok, err = pcall(function()
         local p, offset = carrier.Body.Position, carrier.ReceiverOffset
         unit.Position = Vector3.New(p.x + (offset and offset.x or 0),
             p.y + (offset and offset.y or 0), p.z + (offset and offset.z or 0))
         unit.Controller.WalkSpeed = speed
-        self.AiAPI.StartAI(unit)
-        self.AiAPI.StopMove(unit, 0)
-        if mode == 'direction' then self.AiAPI.MoveDirection(unit, direction, 0, 0)
-        else self.AiAPI.ChaseTarget(unit, target, range or 0, distance or 0.1, 0, nil, 0, 1) end
+        self.AiAPI.Funcs.StartAI(unit)
+        self.AiAPI.Funcs.StopMove(unit, 0)
+        if mode == 'direction' then self.AiAPI.Funcs.MoveDirection(unit, direction, 0, 0)
+        else self.AiAPI.Funcs.ChaseTarget(unit, target, range or 0, distance or 0.1, 0, nil, 0, 1) end
     end)
     if not ok then
         print('[MgrAi] 指令启动失败', fish.Id, mode, tostring(err))
@@ -95,7 +102,7 @@ function Mgr:CastFish(fish)
     local record = fish.AbilityRecord
     if self.Stopped or state.Paused or state.Failed or not record or not record.Ready
         or record.Cancelled or fish.Carrier.Dead then return false end
-    local api = self.AbilityAPI or require('server.AbilityAPI')
+    local api = self.AbilityAPI or require('server.packages.ability_system.api')
     local connection, started = nil, false
     local ok, err = pcall(function()
         local script = api.GetAbility(record.Receiver, record.Entry.Index)
@@ -103,7 +110,7 @@ function Mgr:CastFish(fish)
         local signals = handler and handler.getSignals and handler.getSignals()
         if not signals or not signals.CastStart then return end
         connection = signals.CastStart:Connect(function() started = true end)
-        self.AiAPI.BasicCommand(record.Receiver, self.AiAPI.Configs.CMD_ABILITY, record.Entry.Index)
+        self.AiAPI.Funcs.BasicCommand(record.Receiver, self.AiAPI.Configs.CMD_ABILITY, record.Entry.Index)
     end)
     if connection then connection:Disconnect() end
     if not ok then print('[MgrAi] 官方技能指令失败', fish.Id, tostring(err)); return false end

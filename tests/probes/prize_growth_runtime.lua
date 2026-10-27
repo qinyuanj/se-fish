@@ -3,6 +3,7 @@
 -- 不自动发奖、不提交存档、不模拟多人；拾取/钓鱼/摆渡及真实枪击/挥砍另列真机遗留。
 local cfg = require('common.GameCfg')
 local ability = require('server.Mgr.MgrAbility')
+local modifier = require('server.Mgr.MgrModifier')
 local pd = require('server.Mgr.MgrPlayerData')
 local vitals = require('server.Mgr.MgrVitals')
 local survival = require('server.Mgr.MgrSurvival')
@@ -44,15 +45,15 @@ task:Spawn(function()
         growth.item167, growth.item168 = 20, 10
         if state then survival:ApplyWeak(state, 60); attrs('虚弱'); survival:ClearWeak(state); attrs('虚弱消退') end
         for _ = 1, 6 do
-            ability:ApplyWeaponEffect(player, player, { Kind = 'poison' })
-            ability:ApplyWeaponEffect(player, player, { Kind = 'burn' })
+            modifier:ApplyWeaponEffect(player, player, { Kind = 'poison' })
+            modifier:ApplyWeaponEffect(player, player, { Kind = 'burn' })
         end
         local effects = ability.Effects[key]
         log('层上限', 'poison=' .. tostring(effects.poison.stacks), 'burn=' .. tostring(effects.burn.stacks))
-        ability:ApplyWeaponEffect(player, player, { Kind = 'frost' })
-        ability:ApplyWeaponEffect(player, player, { Kind = 'frost' })
+        modifier:ApplyWeaponEffect(player, player, { Kind = 'frost' })
+        modifier:ApplyWeaponEffect(player, player, { Kind = 'frost' })
         attrs('霜冻重复')
-        ability:ApplyWeaponEffect(player, player, { Kind = 'paralyze' })
+        modifier:ApplyWeaponEffect(player, player, { Kind = 'paralyze' })
         attrs('麻痹')
         task:Wait(0.7)
         attrs('麻痹到期')

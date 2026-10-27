@@ -1,6 +1,6 @@
 -- 属性唯一投影接缝：存档仍归PlayerData，attr_rule持有五类运行期分量。
 -- 业务键避开vendor ControllerAttrMap：分量重算不写引擎，中间值不会污染生命/移速。
-local AttrAPI = require('server.AttrAPI')
+local AttrAPI = require('server.packages.attr_rule.api')
 local Model = require('common.AttrModel')
 local BodyScale = require('common.BodyScale')
 local GameCfg = require('common.GameCfg')
@@ -35,21 +35,21 @@ function Mgr:Project(player, key, components)
     local state = self:State(player)
     if not state.character then return false, 'no-character' end
     local api = self.AttrAPI
-    local config = api.GetAttrConfig(key)
+    local config = api.Funcs.GetAttrConfig(key)
     if config and (config.Min ~= nil or config.Max ~= nil) then
         return false, '业务属性键不允许地图钳制配置: ' .. key
     end
     if not state.unit then
-        local existing = api.GetAttrUnit(state.character)
-        local unit, err = api.EnsureAttrUnit(state.character)
+        local existing = api.Funcs.GetAttrUnit(state.character)
+        local unit, err = api.Funcs.EnsureAttrUnit(state.character)
         if not unit then return false, err end
         state.unit, state.owned = unit, existing == nil
     end
     for _, name in ipairs({ 'Base', 'BaseExtra', 'Ratio', 'Bonus' }) do
-        local ok, err = api.SetAttrComponent(state.character, key, api.Enums.AttrComponentType[name], components[name])
+        local ok, err = api.Funcs.SetAttrComponent(state.character, key, api.Enums.AttrComponentType[name], components[name])
         if not ok then return false, err end
     end
-    return true, api.GetAttr(state.character, key)
+    return true, api.Funcs.GetAttr(state.character, key)
 end
 function Mgr:Plan(player)
     return Model.Plan(self:Input(player))

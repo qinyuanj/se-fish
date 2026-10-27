@@ -9,16 +9,17 @@
 - 回灌前先确认工作区已提交。部署前确认需要保留的宿主包修改已回灌，避免被仓库覆盖。
 - 部署收尾执行 validate → 有差异时 push → diff 复核。push 后复核失败、离线、无 changelist 或仍有差异均返回失败；地图侧独有文件只提示保留。
 - 包内没有版本号、变更记录或来源 URL，升级以整包导入为准，替换后 diff 三端子树确认改动面。
-- 业务层通过根聚合入口接入。转发名单与包内 `api.lua` 导出由 `tests/native/ability_api_test.lua`、`tests/native/package_api_test.lua` 校对，升级改名或删名时须重新核对契约。
+- 业务层直接 require 对应端的包内 `api.lua`；不在上一层复制导出名单、拍平 `Funcs` 或逐函数转发。属性和 AI 包使用原生 `Funcs` 函数表，`Enums` / `Configs` / `Prefabs` 保持包内结构。升级后通过真实包回归核对调用契约（属性：`attr_migration_test.lua`、`attr_rule_probe_test.lua`；效果：`modifier_system_probe_test.lua`；AI 与技能桥：`ai_migration_test.lua`、`official_ai_probe_test.lua`）。
+- `server/AbilityAPI.lua` 仅保留本图业务：施法守卫、体型、挂点与锚点补挂。需要守卫的业务施法继续调用它；装配、停止和查询技能直接调用包。锚点行为所需的管理器由 `server/main.lua` 通过 `BehaviorServices` 注入，行为不反向加载 `server.Mgr`。AI 位移生命周期查询由 `MgrAi` 持有，不另建 AI 转发入口。挥砍登记由 `server/SwingRegistry.lua` 独立持有，武器入口与近战行为共同依赖它。
 
 ## 包清单
 
-| 包 | 用途 | 导入时间 | 根聚合入口 |
+| 包 | 用途 | 导入时间 | 真实包接口 |
 |---|---|---|---|
-| `ability_system` | 技能系统 | 2026-09-19（commit `9382ad8`） | `server/AbilityAPI.lua`、`client/AbilityAPI.lua`；名单在 `common/AbilityAPIBase.lua` |
-| `attr_rule` | 属性规则 | 2026-10-08（#153） | `server/AttrAPI.lua`、`client/AttrAPI.lua`；名单在 `common/AttrAPIBase.lua` |
-| `modifier_system` | 效果（Buff）系统 | 2026-10-08（#153） | `server/ModifierAPI.lua`、`client/ModifierAPI.lua`；名单在 `common/ModifierAPIBase.lua` |
-| `official_ai_feature` | 生物 AI | 2026-10-08（#153） | `server/AiAPI.lua`；名单在 `common/AiAPIBase.lua`，client 侧无 api.lua |
+| `ability_system` | 技能系统 | 2026-09-19（commit `9382ad8`） | `server.packages.ability_system.api`、`client.packages.ability_system.api`，函数平铺 |
+| `attr_rule` | 属性规则 | 2026-10-08（#153） | `server.packages.attr_rule.api`、`client.packages.attr_rule.api`，函数在 `Funcs`，另有 `Enums` / `Prefabs` |
+| `modifier_system` | 效果（Buff）系统 | 2026-10-08（#153） | `server.packages.modifier_system.api`、`client.packages.modifier_system.api`，函数平铺 |
+| `official_ai_feature` | 生物 AI | 2026-10-08（#153） | `server.packages.official_ai_feature.api`，函数在 `Funcs`，另有 `Configs`；client 侧无 api.lua |
 
 `win_rule` 于 2026-10-09 从宿主删除并经回灌移除，删除前未接入业务聚合入口或正式结算。原包有结算枚举遮蔽（[GitHub #58](https://github.com/qinyuanj/se-fish/issues/58)）及未结算玩家离开后缺少全员结算重判（[GitHub #59](https://github.com/qinyuanj/se-fish/issues/59)）的问题。删除不代表缺陷已修复，重新引入须取得官方修正版并验证结算与玩家离开时序。
 

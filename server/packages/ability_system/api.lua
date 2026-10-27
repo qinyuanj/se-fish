@@ -1,5 +1,5 @@
 --技能系统 - server端api
---服务端权威技能 API 实现；仅由根 AbilityAPI.lua 在服务端加载。
+--服务端权威技能 API 实现；业务调用方直接加载。
 
 local AbilityConstants = require("common.packages.ability_system.constants")
 local AbilityRegistry = require("common.packages.ability_system.registry")

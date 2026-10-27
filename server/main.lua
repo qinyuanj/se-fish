@@ -42,6 +42,15 @@ local MgrMap = {
     MgrAi = require("server.Mgr.MgrAi"),
 }
 
+-- 锚点行为只接收入口注入的协作管理器，不再反向 require server.Mgr。
+-- MgrAbility.Start 再把同一份依赖交给 AbilityAPI，保留入口测试替换管理器的接缝。
+MgrMap.MgrAbility.BehaviorServices = {
+    Vitals = MgrMap.MgrVitals,
+    FishCarrier = MgrMap.MgrFishCarrier,
+    Modifier = MgrMap.MgrModifier,
+    GM = MgrMap.MgrGM,
+}
+
 MgrMap.MgrCast.ReelIn = MgrMap.MgrReelIn
 MgrMap.MgrReelIn.Cast = MgrMap.MgrCast
 MgrMap.MgrCast.FishUnit = MgrMap.MgrFishUnit
@@ -166,7 +175,7 @@ MgrMap.MgrWeapon.PlayerData = MgrMap.MgrPlayerData
 MgrMap.MgrWeapon.FishUnit = MgrMap.MgrFishUnit
 MgrMap.MgrWeapon.FishCarrier = MgrMap.MgrFishCarrier
 MgrMap.MgrWeapon.Save = MgrMap.MgrSave
-MgrMap.MgrWeapon.Ability = MgrMap.MgrAbility -- #139 枪械大奖特效应用口
+MgrMap.MgrWeapon.Modifier = MgrMap.MgrModifier -- #139 枪械大奖特效直接由效果管理器应用
 
 -- #137 烧烤接线：会话物品进出走 #123 持久协议（Save+PlayerData），烤糊伤害经统一伤害入口
 -- （Vitals）；满格时物品不入地、会话转 ready 保留冻结倍率，腾出格位后重试原倍率发还。

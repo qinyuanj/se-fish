@@ -83,7 +83,7 @@ local function business(run)
     local savedGame, savedRemote = _G.game, _G.RemoteEvent
     local saved = {}
     for name, value in pairs(package.loaded) do
-        if name:find('modifier_system', 1, true) or name == 'server.ModifierAPI' then
+        if name:find('modifier_system', 1, true) or name == 'server.packages.modifier_system.api' then
             saved[name] = value; package.loaded[name] = nil
         end
     end
@@ -105,7 +105,7 @@ local function business(run)
     end)
     _G.game, _G.RemoteEvent = savedGame, savedRemote
     for name in pairs(package.loaded) do
-        if name:find('modifier_system', 1, true) or name == 'server.ModifierAPI' then package.loaded[name] = nil end
+        if name:find('modifier_system', 1, true) or name == 'server.packages.modifier_system.api' then package.loaded[name] = nil end
     end
     for name, value in pairs(saved) do package.loaded[name] = value end
     if not ok then error(err, 0) end
@@ -187,44 +187,32 @@ describe("TestModifierProbe", function()
 
   it("test_business_dot_uses_real_manager_phase_final_tick_and_latest_source", function()
     local clock, hits = 100, {}
-    local env = setmetatable({ game = { GetService = function(_, name)
-      if name == 'World' then return { GetServerTime = function() return clock end } end
-      if name == 'Players' then return { GetPlayerFromCharacter = function() end } end
-      return {}
-    end } }, { __index = _G })
-    env.require = function(name)
-      if name == 'server.AbilityAPI' then return {} end
-      return require(name)
-    end
-    local mgr = assert(loadfile('server/Mgr/MgrAbility.lua', 't', env))()
-    local target = { UserId = 49001, Character = { Controller = {} } }
+    local runtime = require('tests.support.modifier_runtime').New(clock)
+    local target = { UserId = 49001, Character = runtime.unit('target') }
+    local mgr = runtime.loadModifier()
     mgr.Vitals = {
       NewHit = function(_, source, category) return { source = source, category = category } end,
       ApplyHit = function(_, hit, ref, amount)
         hits[#hits + 1] = { source = hit.source, category = hit.category, target = ref, amount = amount, at = clock }
       end,
     }
-    local runtime = require('tests.support.modifier_runtime').New(clock)
-    target.Character = runtime.unit('target')
-    mgr.Modifier = runtime.loadModifier()
-    mgr.Modifier.Vitals = mgr.Vitals
     local source, source2 = {}, {}
     local report = require('tools.probes.modifier_system_probe').VerifyBusinessDot({
       cfg = require('common.GameCfg'), source = source, source2 = source2, dotTarget = target,
       now = function() return clock end,
-      wait = function(s) runtime.wait(s); clock = runtime.now; mgr:UpdateEffects() end,
+      wait = function(s) runtime.wait(s); clock = runtime.now; mgr:Update() end,
       businessDot = {
         apply = function(src, ref, kind) return mgr:ApplyWeaponEffect(src, ref, { Kind = kind }) end,
         hits = function() return hits end,
-        clear = function() mgr.Modifier:ClearTarget(target) end,
+        clear = function() mgr:ClearTarget(target) end,
       },
     })
     assert.are.equal('business', report.owner)
     assert.is_true(report.ok)
     assert.are.equal(3, report.kinds.poison.count)
     assert.are.equal(3, report.kinds.burn.count)
-    assert.are.equal(0, mgr.Modifier:GetRemaining(target, 'poison'))
-    assert.are.equal(0, mgr.Modifier:GetRemaining(target, 'burn'))
+    assert.are.equal(0, mgr:GetRemaining(target, 'poison'))
+    assert.are.equal(0, mgr:GetRemaining(target, 'burn'))
   end)
 
   it("test_business_modifier_stacks_uses_latest_source_and_retains_dot_phase", function()
@@ -304,14 +292,14 @@ describe("TestModifierProbe", function()
     local savedGame, savedRemote = _G.game, _G.RemoteEvent
     local saved = {}
     for name, value in pairs(package.loaded) do
-      if name:find('modifier_system', 1, true) or name == 'server.ModifierAPI' then
+      if name:find('modifier_system', 1, true) or name == 'server.packages.modifier_system.api' then
         saved[name] = value; package.loaded[name] = nil
       end
     end
     local e = engine()
     _G.game, _G.RemoteEvent = e.game, e.remote
     local ok, err = pcall(function()
-      local api = require('server.ModifierAPI')
+      local api = require('server.packages.modifier_system.api')
       for _ = 1, 2 do
         local owner, source, source2 = e.unit('owner'), e.unit('source'), e.unit('source2')
         local report = require('tools.probes.modifier_system_probe').Run({
@@ -331,7 +319,7 @@ describe("TestModifierProbe", function()
     end)
     _G.game, _G.RemoteEvent = savedGame, savedRemote
     for name in pairs(package.loaded) do
-      if name:find('modifier_system', 1, true) or name == 'server.ModifierAPI' then package.loaded[name] = nil end
+      if name:find('modifier_system', 1, true) or name == 'server.packages.modifier_system.api' then package.loaded[name] = nil end
     end
     for name, value in pairs(saved) do package.loaded[name] = value end
     if not ok then error(err) end

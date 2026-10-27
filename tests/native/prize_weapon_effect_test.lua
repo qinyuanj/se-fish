@@ -6,22 +6,16 @@
 --   1. 特效武器命中后不挂效果（毒匕挥中不中毒）：swing 载荷丢 effect、枪械命中不调应用口；
 --   2. 未命中也挂效果 / 无特效武器也挂效果 / 命中被统一入口拒绝（安全区）仍挂效果；
 --   3. 近战命中盒重放（同一目标重复进盒）导致效果重复叠加超过一次判定段语义。
--- 接缝：AbilityAPI.StageSwing 载荷、MgrWeapon:AttackMelee/AttackGun、melee_hit 的 process_hit
---   成功分支（_applyDamage 返回 true 后经 MgrAbility:ApplyWeaponEffect 应用）。
+-- 接缝：SwingRegistry.StageSwing 载荷、MgrWeapon:AttackMelee/AttackGun、melee_hit 的 process_hit
+--   成功分支（_applyDamage 返回 true 后直接经 MgrModifier:ApplyWeaponEffect 应用）。
 --
--- vendor 接缝处理（迁移期必修）：旧文件用 package.preload 给 server.packages.ability_system.api 装桩，
--- 但桩只提供 CastAbility 一个函数，而 common/AbilityAPIBase.build 会按 SERVER_API 全名单校验、缺名即 error。
--- 旧套件能跑通完全依赖另一份文件先把「真包模块」灌进 package.loaded，让 preload 永不被调用——
--- 这是跨文件的隐性耦合（与 damage_float 的 Color 泄漏同类）。本 spec 改为按 SERVER_API 名单建齐桩，
--- 并在 after_each 把 preload 与 package.loaded 放回快照，因此不再依赖任何别处的残留。
+-- 技能包替身只提供本案例需要的施法接口，每例还原模块缓存。
 local PlayerData = require('server.Data.PlayerData')
-local AbilityAPIBase = require('common.AbilityAPIBase')
 local VENDOR = 'server.packages.ability_system.api'
 
--- 按接缝契约建齐包内 api 的导出名单，只把 CastAbility 换成可用实现；不碰 vendor 源码。
+-- 只替换包内 CastAbility，保持业务守卫的真实实现。
 local function stubPackageApi(castAbility)
     local impl = {}
-    for _, name in ipairs(AbilityAPIBase.SERVER_API) do impl[name] = function() return false end end
     impl.CastAbility = castAbility or function() return true end
     return impl
 end
@@ -45,7 +39,7 @@ local function weaponPlayer(id)
 end
 
 describe('TestMeleeHitEffect', function()
-    -- ===== 3. melee_hit 行为：命中成功后经 MgrAbility 挂特效 =====
+    -- ===== 3. melee_hit 行为：命中成功后直接经 MgrModifier 挂特效 =====
     local ctx
     local saved
     before_each(function()
@@ -55,7 +49,8 @@ describe('TestMeleeHitEffect', function()
             carrier = package.loaded['server.Mgr.MgrFishCarrier'],
             gm = package.loaded['server.Mgr.MgrGM'],
             ability = package.loaded['server.Mgr.MgrAbility'],
-            api = package.loaded['server.AbilityAPI'] }
+            modifier = package.loaded['server.Mgr.MgrModifier'],
+            api = package.loaded['server.AbilityAPI'], swing = package.loaded['server.SwingRegistry'] }
         ctx = { effects = {}, hitsApplied = {} }
         ctx.owner = { UnitId = 1, Position = vec(0, 0, 0) }
         ctx.player = { UserId = 13931, Character = ctx.owner }
@@ -74,13 +69,24 @@ describe('TestMeleeHitEffect', function()
         }
         package.loaded['server.Mgr.MgrFishCarrier'] = { ResolveCarrier = function() return nil end }
         package.loaded['server.Mgr.MgrGM'] = { GetMeleeDamage = function(_, _, d) return d end }
-        package.loaded['server.Mgr.MgrAbility'] = { ApplyWeaponEffect = function(_, source, target, effect)
+        package.loaded['server.Mgr.MgrAbility'] = { ApplyWeaponEffect = function()
+            error('近战特效不应再经 MgrAbility 转发')
+        end }
+        package.loaded['server.Mgr.MgrModifier'] = { ApplyWeaponEffect = function(_, source, target, effect)
             ctx.effects[#ctx.effects + 1] = { source = source, target = target, effect = effect }
             return true
         end }
-        package.loaded['server.AbilityAPI'] = { TakeSwing = function()
+        package.loaded['server.AbilityAPI'] = {}
+        package.loaded['server.SwingRegistry'] = { TakeSwing = function()
             local s = ctx.swing; ctx.swing = nil; return s
         end }
+        ctx.services = { Vitals = package.loaded['server.Mgr.MgrVitals'],
+            FishCarrier = package.loaded['server.Mgr.MgrFishCarrier'], GM = package.loaded['server.Mgr.MgrGM'],
+            Modifier = package.loaded['server.Mgr.MgrModifier'] }
+        for _, name in ipairs({ 'server.Mgr.MgrVitals', 'server.Mgr.MgrFishCarrier', 'server.Mgr.MgrGM', 'server.Mgr.MgrModifier' }) do
+            package.loaded[name] = setmetatable({}, { __index = function()
+                error('近战行为不应再加载上层管理器: ' .. name) end })
+        end
         ctx.anchorStart = sig()
         local anchor = {
             GetAttribute = function(_, name)
@@ -113,7 +119,7 @@ describe('TestMeleeHitEffect', function()
             return nil
         end }
         ctx.behavior = assert(loadfile('server/AbilityBehaviors/melee_hit.lua'))()
-        ctx.behavior.Attach(anchor)
+        ctx.behavior.Attach(anchor, ctx.services)
     end)
     after_each(function()
         _G.game = saved.game
@@ -123,7 +129,9 @@ describe('TestMeleeHitEffect', function()
         package.loaded['server.Mgr.MgrFishCarrier'] = saved.carrier
         package.loaded['server.Mgr.MgrGM'] = saved.gm
         package.loaded['server.Mgr.MgrAbility'] = saved.ability
+        package.loaded['server.Mgr.MgrModifier'] = saved.modifier
         package.loaded['server.AbilityAPI'] = saved.api
+        package.loaded['server.SwingRegistry'] = saved.swing
     end)
 
     -- 把 Players 服务换成能认出 victim 的版本（保留其余服务）
@@ -189,15 +197,18 @@ describe('TestPrizeWeaponEffect', function()
     local saved
     before_each(function()
         saved = { game = rawget(_G, 'game'), re = rawget(_G, 'REUtil'),
-            api = package.loaded['server.AbilityAPI'] }
+            api = package.loaded['server.AbilityAPI'], swing = package.loaded['server.SwingRegistry'] }
         ctx = { now = 1000, casts = {}, swingStaged = {}, replies = {}, applied = {}, effects = {} }
         ctx.player = weaponPlayer(13921)
         ctx.other = weaponPlayer(13922)
-        package.loaded['server.AbilityAPI'] = {
-            StageSwing = function(userId, swing) ctx.swingStaged[userId] = swing end,
+        package.loaded['server.SwingRegistry'] = {
+            StageSwing = function(userId, swing) ctx.swingStaged[userId] = swing; return true end,
+            ClearSwing = function(userId) ctx.swingStaged[userId] = nil end,
             PeekSwing = function(userId) return ctx.swingStaged[userId] end,
             TakeSwing = function(userId)
                 local s = ctx.swingStaged[userId]; ctx.swingStaged[userId] = nil; return s end,
+        }
+        package.loaded['server.AbilityAPI'] = {
             CastAbility = function() return true end,
             AddCastGuard = function(fn) ctx.castGuard = fn end,
         }
@@ -237,8 +248,8 @@ describe('TestPrizeWeaponEffect', function()
         }
         ctx.mgr.FishUnit = { Fish = {} }
         ctx.mgr.FishCarrier = { ResolveCarrier = function() return nil end }
-        -- 注入的持续效果应用口（main.lua 接 MgrAbility）
-        ctx.mgr.Ability = { ApplyWeaponEffect = function(_, source, target, effect)
+        -- 注入的持续效果应用口（main.lua 接 MgrModifier）
+        ctx.mgr.Modifier = { ApplyWeaponEffect = function(_, source, target, effect)
             ctx.effects[#ctx.effects + 1] = { source = source, target = target, effect = effect }
             return true
         end }
@@ -247,6 +258,7 @@ describe('TestPrizeWeaponEffect', function()
         _G.game = saved.game
         _G.REUtil = saved.re
         package.loaded['server.AbilityAPI'] = saved.api
+        package.loaded['server.SwingRegistry'] = saved.swing
     end)
 
     -- 命中被统一入口拒绝（ApplyHit false，如安全区）时不挂效果
@@ -308,12 +320,12 @@ describe('TestPrizeWeaponEffect', function()
 end)
 
 describe('TestSwingEffectPassthrough', function()
-    -- ===== 1. 挥砍登记载荷携带 effect（真实 AbilityAPI 根入口 + 建齐名单的包桩）=====
+    -- ===== 1. 挥砍登记载荷携带 effect（真实 AbilityAPI 业务入口 + 施法包桩）=====
     local ctx
     local saved
     before_each(function()
         saved = { game = rawget(_G, 'game'), preload = package.preload[VENDOR],
-            vendor = package.loaded[VENDOR], api = package.loaded['server.AbilityAPI'] }
+            vendor = package.loaded[VENDOR], api = package.loaded['server.AbilityAPI'], swing = package.loaded['server.SwingRegistry'] }
         package.preload[VENDOR] = function() return stubPackageApi() end
         package.loaded[VENDOR] = nil
         ctx = { now = 1000 }
@@ -321,13 +333,14 @@ describe('TestSwingEffectPassthrough', function()
             if name == 'World' then return { GetServerTime = function() return ctx.now end } end
             return nil
         end }
-        ctx.api = assert(loadfile('server/AbilityAPI.lua'))()
+        ctx.api = assert(loadfile('server/SwingRegistry.lua'))()
     end)
     after_each(function()
         _G.game = saved.game
         package.preload[VENDOR] = saved.preload
         package.loaded[VENDOR] = saved.vendor
         package.loaded['server.AbilityAPI'] = saved.api
+        package.loaded['server.SwingRegistry'] = saved.swing
     end)
 
     it('test_swing_carries_effect_through_stage_and_take', function()

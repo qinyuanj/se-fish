@@ -1,5 +1,5 @@
 --技能系统 - client技能请求api
---仅由根 AbilityAPI.lua 在客户端加载。
+--客户端技能 API，业务调用方直接加载。
 
 local AbilityEventDefs = require("common.packages.ability_system.event_defs")
 local AbilityConstants = require("common.packages.ability_system.constants")

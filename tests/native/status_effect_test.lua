@@ -1,5 +1,5 @@
 -- #89 迁移（原 tests/gameplay/status_effect_test.lua，#139 T18 大奖成长切片 3）：
--- MgrAbility 持续效果状态机与属性应用。
+-- MgrModifier 持续效果与 MgrAbility 属性应用。
 -- 失败方式（先列后写）：
 --   1. 毒/灼烧叠层无上限或刷新清零层数；DOT 不走 T07/#128 统一伤害入口（绕过 NewHit/ApplyHit）；
 --   2. 霜冻/麻痹可叠加（重复命中把时间越加越长）；失效后状态残留继续生效；
@@ -140,8 +140,8 @@ describe('TestStatusEffect', function()
     -- 灼烧：每层 4 点，一跳 = 层数 × 4
     it('test_burn_ticks_damage_per_stack', function()
         local target = { UserId = 13903, Character = ctx.runtime.unit('target') }
-        ctx.mgr:ApplyWeaponEffect(ctx.player, target, { Kind = 'burn' })
-        ctx.mgr:ApplyWeaponEffect(ctx.player, target, { Kind = 'burn' })
+        ctx.mgr.Modifier:ApplyWeaponEffect(ctx.player, target, { Kind = 'burn' })
+        ctx.mgr.Modifier:ApplyWeaponEffect(ctx.player, target, { Kind = 'burn' })
         advance(1.0)
         assert.same(1, #ctx.hits)
         assert.same(8, ctx.hits[1].amount)
@@ -165,16 +165,16 @@ describe('TestStatusEffect', function()
     -- 刷新已过期状态视为全新（层数不继承）
     it('test_expired_dot_restarts_from_zero_stacks', function()
         local target = { UserId = 13904, Character = ctx.runtime.unit('target') }
-        for _ = 1, 5 do ctx.mgr:ApplyWeaponEffect(ctx.player, target, { Kind = 'poison' }) end
+        for _ = 1, 5 do ctx.mgr.Modifier:ApplyWeaponEffect(ctx.player, target, { Kind = 'poison' }) end
         advance(4) -- 到期清空
-        ctx.mgr:ApplyWeaponEffect(ctx.player, target, { Kind = 'poison' })
+        ctx.mgr.Modifier:ApplyWeaponEffect(ctx.player, target, { Kind = 'poison' })
         assert.same(1, ctx.mgr.Modifier.ModifierAPI.GetUnitModifiers(target.Character, 'test:poison')[1]:GetAttribute('CurrCount'))
     end)
 
     -- 鱼的 DOT 也走统一入口；鱼死亡（carrier.Dead）即清理
     it('test_fish_dot_ticks_and_dead_fish_is_cleaned', function()
         local fish, carrier = installFish()
-        ctx.mgr:ApplyWeaponEffect(ctx.player, fish, { Kind = 'burn' })
+        ctx.mgr.Modifier:ApplyWeaponEffect(ctx.player, fish, { Kind = 'burn' })
         advance(1)
         assert.same(1, #ctx.hits)
         assert.same(4, ctx.hits[1].amount)
@@ -188,9 +188,9 @@ describe('TestStatusEffect', function()
     it('test_fish_speed_factor_and_cleanup_on_remove', function()
         local fish = installFish()
         assert.same(1, ctx.mgr:FishSpeedFactor(fish))
-        ctx.mgr:ApplyWeaponEffect(ctx.player, fish, { Kind = 'frost' })
+        ctx.mgr.Modifier:ApplyWeaponEffect(ctx.player, fish, { Kind = 'frost' })
         assert.near(0.7, ctx.mgr:FishSpeedFactor(fish), 1e-9)
-        ctx.mgr:ApplyWeaponEffect(ctx.player, fish, { Kind = 'paralyze' })
+        ctx.mgr.Modifier:ApplyWeaponEffect(ctx.player, fish, { Kind = 'paralyze' })
         assert.same(0, ctx.mgr:FishSpeedFactor(fish))
         assert.is_true(ctx.mgr:FishParalyzed(fish))
         advance(0.5) -- 麻痹到期
@@ -203,10 +203,10 @@ describe('TestStatusEffect', function()
     -- 霜冻：移速经唯一口写 0.7 倍；重复命中只刷新不衰减两次；到期恢复
     it('test_frost_slows_once_refreshes_and_restores', function()
         ctx.mgr:CaptureBaseSpeed(ctx.player)
-        assert.is_true(ctx.mgr:ApplyWeaponEffect(ctx.player, ctx.player, { Kind = 'frost' }))
+        assert.is_true(ctx.mgr.Modifier:ApplyWeaponEffect(ctx.player, ctx.player, { Kind = 'frost' }))
         assert.near(7 * 0.7, ctx.player.Character.Controller.WalkSpeed, 1e-9)
         advance(2)
-        ctx.mgr:ApplyWeaponEffect(ctx.player, ctx.player, { Kind = 'frost' })
+        ctx.mgr.Modifier:ApplyWeaponEffect(ctx.player, ctx.player, { Kind = 'frost' })
         assert.message('霜冻不叠加').near(7 * 0.7, ctx.player.Character.Controller.WalkSpeed, 1e-9)
         assert.same(3, ctx.mgr.Modifier:GetRemaining(ctx.player, 'frost'))
         advance(3) -- 到期
@@ -262,11 +262,11 @@ describe('TestStatusEffect', function()
     -- 麻痹：无法行动闸 + 移速 0；0.5 秒到期恢复；不叠加
     it('test_paralyze_blocks_acts_and_zeroes_speed_briefly', function()
         ctx.mgr:CaptureBaseSpeed(ctx.player)
-        ctx.mgr:ApplyWeaponEffect(ctx.player, ctx.player, { Kind = 'paralyze' })
+        ctx.mgr.Modifier:ApplyWeaponEffect(ctx.player, ctx.player, { Kind = 'paralyze' })
         assert.is_true(ctx.mgr:IsParalyzed(ctx.player))
         assert.same(0, ctx.player.Character.Controller.WalkSpeed)
         advance(0.3)
-        ctx.mgr:ApplyWeaponEffect(ctx.player, ctx.player, { Kind = 'paralyze' })
+        ctx.mgr.Modifier:ApplyWeaponEffect(ctx.player, ctx.player, { Kind = 'paralyze' })
         assert.message('麻痹只刷新').same(0.5, ctx.mgr.Modifier:GetRemaining(ctx.player, 'paralyze'))
         advance(0.5)
         assert.is_false(ctx.mgr:IsParalyzed(ctx.player))
@@ -276,7 +276,7 @@ describe('TestStatusEffect', function()
     -- 玩家离场：效果与基准速清理
     it('test_player_removal_clears_effects_and_base_speed', function()
         ctx.mgr:CaptureBaseSpeed(ctx.player)
-        ctx.mgr:ApplyWeaponEffect(ctx.player, ctx.player, { Kind = 'poison' })
+        ctx.mgr.Modifier:ApplyWeaponEffect(ctx.player, ctx.player, { Kind = 'poison' })
         ctx.mgr:OnPlayerRemoving(ctx.player)
         ctx.mgr.Modifier:OnPlayerRemoving(ctx.player)
         assert.same(0, ctx.mgr.Modifier:GetRemaining(ctx.player, 'poison'))
@@ -289,7 +289,7 @@ describe('TestStatusEffect', function()
     it('test_poison_stacks_caps_refreshes_and_ticks_via_unified_entry', function()
         local src, target = ctx.player, { UserId = 13902, Character = ctx.runtime.unit('target') }
         for _ = 1, 6 do
-            assert.is_true(ctx.mgr:ApplyWeaponEffect(src, target, { Kind = 'poison' }))
+            assert.is_true(ctx.mgr.Modifier:ApplyWeaponEffect(src, target, { Kind = 'poison' }))
         end
         local entity = ctx.mgr.Modifier.ModifierAPI.GetUnitModifiers(target.Character, 'test:poison')[1]
         assert.message('毒最多 5 层').same(5, entity:GetAttribute('CurrCount'))
@@ -301,7 +301,7 @@ describe('TestStatusEffect', function()
         assert.same('dot', ctx.hits[1].category)
         assert.same(src, ctx.hits[1].source)
         assert.same(target, ctx.hits[1].target)
-        ctx.mgr:ApplyWeaponEffect(src, target, { Kind = 'poison' })
+        ctx.mgr.Modifier:ApplyWeaponEffect(src, target, { Kind = 'poison' })
         assert.same(5, entity:GetAttribute('CurrCount'))
         assert.same(3, ctx.mgr.Modifier:GetRemaining(target, 'poison'))
         -- 第二跳 102、第三跳 103、104 之后 104.5 到期失效：每跳都重新 NewHit
@@ -325,7 +325,7 @@ describe('TestStatusEffect', function()
         ctx.mgr.Modifier:Apply(nil, ctx.player, 'weak')
         ctx.mgr:RefreshMoveSpeed(ctx.player)
         assert.near(10.5, ctx.player.Character.Controller.WalkSpeed, 1e-9)
-        ctx.mgr:ApplyWeaponEffect(ctx.player, ctx.player, { Kind = 'frost' })
+        ctx.mgr.Modifier:ApplyWeaponEffect(ctx.player, ctx.player, { Kind = 'frost' })
         assert.near(21 * 0.5 * 0.7, ctx.player.Character.Controller.WalkSpeed, 1e-9)
         -- 虚弱消退（Survival 委托同一路径）：霜冻仍在，只去掉 0.5
         ctx.mgr.Modifier:Clear(ctx.player, 'weak')
@@ -351,7 +351,7 @@ describe('TestStatusEffect', function()
         end
         ctx.mgr.Vitals = v
         ctx.mgr.Modifier.Vitals = v
-        ctx.mgr:ApplyWeaponEffect(ctx.player, fish, { Kind = 'poison' })
+        ctx.mgr.Modifier:ApplyWeaponEffect(ctx.player, fish, { Kind = 'poison' })
         advance(1)
         assert.same({ ctx.player }, seen)
         v:OnPlayerRemoving(ctx.player)
@@ -371,8 +371,8 @@ describe('TestStatusEffect', function()
         fish.FishId, fish.StraightEscape, fish.Heading = 'alligatorGar', true, { x = 1, z = 0 }
         carrier.Body.Position = { x = 9999, y = 500, z = 9999 }
         local base = GameCfg.Fish.alligatorGar.Speed
-        ctx.mgr:ApplyWeaponEffect(ctx.player, fish, { Kind = 'frost' })
-        ctx.mgr:ApplyWeaponEffect(ctx.player, fish, { Kind = 'paralyze' })
+        ctx.mgr.Modifier:ApplyWeaponEffect(ctx.player, fish, { Kind = 'frost' })
+        ctx.mgr.Modifier:ApplyWeaponEffect(ctx.player, fish, { Kind = 'paralyze' })
         unit:UpdateEscaping(fish, ctx.now)
         assert.same(0, carrier.Body.LinearVelocity.x)
         advance(0.5)
@@ -386,9 +386,9 @@ describe('TestStatusEffect', function()
 
     -- 无法解析的目标不建状态
     it('test_unresolvable_target_is_rejected', function()
-        assert.is_false(ctx.mgr:ApplyWeaponEffect(ctx.player, {}, { Kind = 'poison' }))
-        assert.is_false(ctx.mgr:ApplyWeaponEffect(ctx.player, nil, { Kind = 'poison' }))
-        assert.is_false(ctx.mgr:ApplyWeaponEffect(ctx.player, ctx.player, { Kind = 'nosuch' }))
+        assert.is_false(ctx.mgr.Modifier:ApplyWeaponEffect(ctx.player, {}, { Kind = 'poison' }))
+        assert.is_false(ctx.mgr.Modifier:ApplyWeaponEffect(ctx.player, nil, { Kind = 'poison' }))
+        assert.is_false(ctx.mgr.Modifier:ApplyWeaponEffect(ctx.player, ctx.player, { Kind = 'nosuch' }))
         assert.same(0, ctx.mgr.Modifier:GetRemaining(ctx.player, 'poison'))
     end)
 
@@ -397,8 +397,8 @@ describe('TestStatusEffect', function()
         local reject, read = rejectableSpeed(ctx)
         ctx.potions.item167 = 20
         ctx.mgr:RefreshMoveSpeed(ctx.player)
-        ctx.mgr:ApplyWeaponEffect(ctx.player, ctx.player, { Kind = 'frost' })
-        ctx.mgr:ApplyWeaponEffect(ctx.player, ctx.player, { Kind = 'paralyze' })
+        ctx.mgr.Modifier:ApplyWeaponEffect(ctx.player, ctx.player, { Kind = 'frost' })
+        ctx.mgr.Modifier:ApplyWeaponEffect(ctx.player, ctx.player, { Kind = 'paralyze' })
         reject(true)
         advance(0.5) -- 麻痹到期，控制器拒写，仍为0
         assert.same(0, read())

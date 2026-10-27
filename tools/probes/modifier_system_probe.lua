@@ -81,7 +81,7 @@ function Probe.VerifyBusinessDot(c)
     return report
 end
 
--- context：api=server.ModifierAPI；owner/source/source2 均为本轮专属新建单位；
+-- context：api=server.packages.modifier_system.api；owner/source/source2 均为本轮专属新建单位；
 -- isolated=true 是调用者明确承诺；isIsolated(unit) 必须验证其归属及非玩家性质。
 -- assets 含五个不同效果预设 AssetKey；cfg=GameCfg；wait(seconds) 在协程等待；
 -- dispose() 销毁本轮全部隔离单位（包含失败创建后未注册的子实体）。

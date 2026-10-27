@@ -1,7 +1,7 @@
 -- 技能管理器：把官方技能包装进本图。只做装配，不含任何玩法逻辑。
 -- 装到角色下的技能管理器单位（官方叫「技能背包」，与 GLOSSARY.md 的物品「背包」不同物）
 -- 由包内管理器脚本负责解析归属、按 InitAbilities 装备技能；
--- 本模块只负责「建管理器 → 装技能 → 挂锚点」三件事，全程经根 AbilityAPI 触达技能包。
+-- 技能装配直接调用包内 API，锚点补挂经本图 AbilityAPI。
 
 local World = game:GetService("World")
 local Task = game:GetService("Task")
@@ -10,6 +10,7 @@ local GameCfg = require("common.GameCfg")
 -- 体型计划由 MgrAttr 通过属性模型投影。
 -- 属性计算与引擎投影由注入的 MgrAttr 统一持有。
 local AbilityAPI = require("server.AbilityAPI")
+local AbilityPackageAPI = require("server.packages.ability_system.api")
 
 local Mgr = { PendingFishCleanup = {} }
 
@@ -100,7 +101,7 @@ local function equip(character, entry)
 			if not characterReadable(character) then
 				return
 			end
-			local abilityScript = AbilityAPI.AddAbility(character, entry.AssetId, entry.Index)
+			local abilityScript = AbilityPackageAPI.AddAbility(character, entry.AssetId, entry.Index)
 			if abilityScript then
 				-- 技能模板默认 CdTime=3 / CastTime=0.5；有配置时覆盖，出手节奏交给 MgrWeapon 的 IntervalSec
 				if entry.CdSec then abilityScript:SetAttribute("CdTime", entry.CdSec) end
@@ -142,7 +143,7 @@ function Mgr:RemoveFish(fish)
     if not record then return end
     record.Cancelled = true
     if record.Ready then
-        local ok, err = pcall(AbilityAPI.StopAbility, record.Receiver, record.Entry.Index)
+        local ok, err = pcall(AbilityPackageAPI.StopAbility, record.Receiver, record.Entry.Index)
         if not ok then print('[MgrAbility] 停止鱼技能失败', fish.Id, tostring(err)) end
     end
     local ok, err = pcall(function() record.Manager:Destroy() end)
@@ -172,7 +173,7 @@ function Mgr:EquipFish(fish)
         for _ = 1, EQUIP_RETRY_COUNT do
             if record.Cancelled then return end
             if fish.Carrier.Dead then self:RemoveFish(fish) return end
-            local ability = AbilityAPI.AddAbility(receiver, entry.AssetId, entry.Index)
+            local ability = AbilityPackageAPI.AddAbility(receiver, entry.AssetId, entry.Index)
             if ability then
                 ability:SetAttribute('CastTime', entry.CastSec)
                 ability:SetAttribute('CdTime', 0)
@@ -310,15 +311,6 @@ function Mgr:Now()
 	return ok and now or 0
 end
 
----武器命中挂持续效果（统一规格 §6.3）：毒/灼烧叠层（上限 5）并刷新持续、tick 相位不变；
----霜冻/麻痹不叠加只刷新。同一目标同一效果只有一条状态（唯一状态管理）。
----@param source any 攻击来源玩家（DOT 的 NewHit 来源）
----@param target any 命中目标（玩家/角色/鱼记录/载体/鱼本体）
----@param effect table { Kind = 'poison'|'burn'|'frost'|'paralyze' }
-function Mgr:ApplyWeaponEffect(source, target, effect)
-	return self.Modifier:ApplyWeaponEffect(source, target, effect)
-end
-
 -- 兼容既有离线探针公开入口；运行时仅 MgrModifier.Update 调度 DOT。
 function Mgr:UpdateEffects()
 	return self.Modifier:Update()
@@ -340,6 +332,7 @@ function Mgr:FishParalyzed(fish)
 end
 
 function Mgr:Start()
+	AbilityAPI.BehaviorServices = self.BehaviorServices
 	AbilityAPI.SetCastGuard(function(unit, index) return self:CanCast(unit) end)
 end
 

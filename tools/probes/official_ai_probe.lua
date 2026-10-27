@@ -81,21 +81,21 @@ function Probe.Run(context)
         unit = assert(c.createUnit(), '创建隔离单位失败')
         assert(c.isIsolated(unit), '拒绝非隔离单位')
         local ai, v = c.ai, c.vector
-        ai.MoveDirection(unit, v(1, 0, 0), 0.3, 0)
+        ai.Funcs.MoveDirection(unit, v(1, 0, 0), 0.3, 0)
         c.wait(0.1); observe('移动方向', 'moving', true)
-        ai.StopMove(unit, 0.3)
+        ai.Funcs.StopMove(unit, 0.3)
         c.wait(0.1); observe('停止移动', 'stopped', true)
         c.wait(0.4)
-        ai.MoveToPos(unit, unit:GetPosition() + v(4, 0, 0), 0.3, 0.1, 0)
+        ai.Funcs.MoveToPos(unit, unit:GetPosition() + v(4, 0, 0), 0.3, 0.1, 0)
         c.wait(0.1); observe('移动位置', 'moving', true)
-        ai.StopAI(unit)
+        ai.Funcs.StopAI(unit)
         c.wait(0.4); observe('指令取消', 'stopped', true)
-        ai.StartAI(unit)
+        ai.Funcs.StartAI(unit)
         if c.target then
             assert(c.isIsolated(c.target) and c.target ~= unit, '追逐目标必须隔离')
-            ai.ChaseTarget(unit, c.target, 20, 0.1, 0.3, ai.Configs.CMD_JUMP, 0, 1)
+            ai.Funcs.ChaseTarget(unit, c.target, 20, 0.1, 0.3, ai.Configs.CMD_JUMP, 0, 1)
             c.wait(0.1); observe('追逐目标', 'moving', true)
-            ai.StopAI(unit); ai.StartAI(unit)
+            ai.Funcs.StopAI(unit); ai.Funcs.StartAI(unit)
         else missing('追逐目标', '没有隔离 target') end
         -- players必须来自真实Players服务；context不能替换vendor使用的Players列表。
         local safe, targetVisible = true, false
@@ -105,24 +105,24 @@ function Probe.Run(context)
         end
         safe = safe and targetVisible
         if safe and c.target then
-            ai.SearchEnemy(unit, 20, 0, {}, {}, 0.1, ai.Configs.CMD_JUMP, nil, 20, 3)
+            ai.Funcs.SearchEnemy(unit, 20, 0, {}, {}, 0.1, ai.Configs.CMD_JUMP, nil, 20, 3)
             c.wait(ai.Configs.REACT_TICK * 2 + 0.05); observe('选敌追逐', 'moving', true)
-            ai.StopAI(unit); ai.StartAI(unit)
+            ai.Funcs.StopAI(unit); ai.Funcs.StartAI(unit)
         else missing('选敌追逐', 'Players包含非隔离对象或无目标，拒绝扫描真实玩家') end
         local facts = c.observe and c.observe(unit, '基础指令前')
-        ai.BasicCommand(unit, ai.Configs.CMD_JUMP)
+        ai.Funcs.BasicCommand(unit, ai.Configs.CMD_JUMP)
         c.wait(0.1)
         if facts and facts.jumps ~= nil then observe('基础跳跃', 'jumps', nil, facts.jumps)
         else missing('基础跳跃', '缺少跳跃计数观测') end
         if c.abilityKey then
-            ai.CastAbilityByKey(unit, c.abilityKey, 0, c.target)
+            ai.Funcs.CastAbilityByKey(unit, c.abilityKey, 0, c.target)
             c.wait(0.1); observe('技能指令', 'castObserved', true)
         else missing('技能指令', '无隔离技能预设与技能观测') end
         -- 交接门卫只控制业务回调；vendor取消通过停止后再次观测证明。
         local gate = Probe.newHandoff(ai, unit, function(p) unit:SetPosition(p) end,
             function(damage) if c.applyHit then c.applyHit(damage) end end, log)
         local old = gate:Switch('official')
-        ai.MoveDirection(unit, v(1, 0, 0), 0, 0)
+        ai.Funcs.MoveDirection(unit, v(1, 0, 0), 0, 0)
         c.wait(0.1)
         local custom = gate:Switch('custom')
         assert(not gate:Write(old, v(99, 99, 99)), '旧代次未撤权')
@@ -131,14 +131,14 @@ function Probe.Run(context)
         assert(not gate:Write(control, v(99, 99, 99)) and not gate:Hit(control, 'control', 1), '控制态未禁用写入/伤害')
         c.wait(0.2); observe('轨迹交接取消官方移动', 'stopped', true)
         gate:Switch('official')
-        ai.MoveDirection(unit, v(0, 0, 1), 0.2, 0)
+        ai.Funcs.MoveDirection(unit, v(0, 0, 1), 0.2, 0)
         c.wait(0.1); observe('控制解除恢复官方', 'moving', true)
         missing('Nav', '未提供真实 FindingPathUnit，导航与避障不能由离线向量证明')
         missing('仇恨注入', 'vendor优先级/焦点/阈值为预留接口，当前不生效；业务需维护目标')
     end)
     if not ok then report.errors[#report.errors + 1] = tostring(failure) end
     if unit then
-        local stopped, stopErr = pcall(c.ai.StopAI, unit)
+        local stopped, stopErr = pcall(c.ai.Funcs.StopAI, unit)
         if not stopped then report.errors[#report.errors + 1] = '停止AI: ' .. tostring(stopErr) end
         local cleaned, cleanupErr = pcall(c.destroyUnit, unit)
         if not cleaned then error('official_ai_probe 清理失败: ' .. tostring(cleanupErr), 0) end
@@ -159,8 +159,8 @@ function Probe.newHandoff(ai, unit, applyPosition, applyHit, log)
         self.generation = self.generation + 1
         self.owner = nil -- 先撤权，接口失败也不能保留旧写入权。
         self.appliedHits = {}
-        ai.StopAI(unit)
-        if mode == 'official' then ai.StartAI(unit) end
+        ai.Funcs.StopAI(unit)
+        if mode == 'official' then ai.Funcs.StartAI(unit) end
         local token = { mode = mode, generation = self.generation }
         self.owner = token
         log(string.format('[official_ai_probe] 轨迹交接 mode=%s generation=%d', mode, self.generation))

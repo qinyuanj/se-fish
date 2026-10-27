@@ -24,7 +24,7 @@ Lua 命令使用 **Lua 5.4**：WSL 上裸 `lua` 经 alternatives 可能指向 5.
 - `lua5.4 tools/cli.lua sync`：将宿主目录的 `eggy.json`、API 存根、`data/` 回灌仓库。
 - `lua5.4 tools/cli.lua sync --packages`：在上述清单外追加三端 `packages/` 字节镜像，删除过期文件；任一端源 packages 缺失或为空时整次同步在写入前失败。该方向以宿主为准，回灌前先确认工作区已提交。
 - `lua5.4 tools/cli.lua blender <脚本.py> [--blend <输入.blend>] [-- <脚本参数>...]`：在部署端无头 Blender 里执行脚本，是唯一的 Blender 入口；`--which` 核对将用的 Blender，`--expr` 执行内联代码。路径写开发端形式，由入口转换；用法见 [Blender 与 Meshy 使用](art-pipeline.md)，决策见 [ADR-0009](../adr/0009-blender-headless-only.md)。
-- 官方包升级、聚合入口与编辑器预设依赖见 [官方包接入参考](../packages-reference.md)。技能包预设命令见 `lua5.4 tools/cli.lua ability-presets --help`。
+- 官方包升级、直接调用接口与编辑器预设依赖见 [官方包接入参考](../packages-reference.md)。技能包预设命令见 `lua5.4 tools/cli.lua ability-presets --help`。
 - **临时产物**：手工验证的中间文件、单据正文草稿等临时产物一律放仓库 `tmp/`（已 gitignored），无需清理；不放系统临时目录，也不为清理去 `rm`（沙盒会拒绝）。这条管 agent 手工产生的文件；脚本自建自删的临时目录（如 pre-commit hook 在 git 目录下的工作目录）不在此列。
 - 质量工具（CRAP / mutation / DRY）是 uml-viewer 自带的标准工具（crapper / mutator / dryer），由人运行 `./uml crap`、`./uml mutate`、`./uml dry`；业务范围与选项只在根目录 `uml-quality.json` 的 `standardTools` 声明，见下方「架构图」。只出报告，不设指标门槛。
 - 单测放 `tests/native/`（slow 车道放 `tests/native/slow/`），共享夹具放 `tests/support/`，探针放 `tests/probes/`（手工探针，不入任何车道）。日常运行 `lua5.4 tools/cli.lua test`（缺省 fast），收尾运行 `lua5.4 tools/cli.lua test full`，`--` 之后的参数原样透传给 busted，退出码不透传：测试通过 0，busted 非 0（失败数加错误数）一律收成 1，busted 缺失 3；裸 `busted` 读 `default`，与 full 相同（crapper 列测试文件时不带 `--run`，覆盖率因此含 slow 车道）。车道由根目录 `.busted` 定义，共享初始化在 `tests/native/helper.lua`。开发端（WSL）是唯一测试环境，案例不分平台，完成判据表里的 `0 pending` 就是在开发端取的严格值。
@@ -33,7 +33,7 @@ Lua 命令使用 **Lua 5.4**：WSL 上裸 `lua` 经 alternatives 可能指向 5.
     - 裁定原文见迁移台账 `issue-84-mapping.md:96` 与 `issue-85-mapping.md:63`（台账在仓库外，按文件名检索）。
   - `busted` 命令：`test` 子命令与人手 shell 统一用 PATH 上的 `busted`（不在 PATH 时 CLI 退出码 3）。它由 LuaRocks 装在 `~/.luarocks/bin`，该目录必须在 PATH 里。
 
-**架构图（uml-viewer）。** 根目录 `policy.edn` 描述三端模块树、排除目录与隐藏模块（`:exclude`、`:omit`），`docs/uml/se-fish.edn` 是生成的依赖图（不要手编）。
+**架构图（uml-viewer）。** 根目录 `policy.edn` 描述三端模块树、排除目录与隐藏模块（`:exclude`、`:omit`），`docs/uml/se-fish.edn` 是生成的依赖图（不要手编）。 六层职责与依赖方向见 [架构分层与依赖门禁](../architecture.md)，唯一分层声明在 `tools/arch_policy.lua`；`tests/native/arch_policy_test.lua` 随 fast/full 阻止未分类、反向依赖、业务环及 `:levels` 漂移。
 
 - `./uml`（安装器生成的原生入口）：首次启动 viewer 与 companion 看图、向 agent 发起图上操作；`./uml ir` 在修改三端代码后重新生成图，viewer 检测文件变化自动重载。
 - **companion 后端是 Herdr（>= 0.9.3，socket protocol 22）**：旧 tmux/psmux 路径已退役，运行平台是 WSL2/Linux（Windows 原生不受支持，macOS 当前不承诺）。PATH 上每个 `herdr` 都逐一预检，选出兼容者中版本最高者（同版本取 PATH 靠前者），本次启动的全部 Herdr 调用都走它的绝对路径；无兼容候选时列出各候选路径与拒绝原因，不自动下载、升级或回退。companion ownership 记录在 `.uml-viewer/companion.edn`，必须显式记为 Herdr；旧记录或缺 backend 的记录会保留并拒绝接管，不要猜着重连。能力契约与验收边界见 uml-viewer 的 `docs/herdr-backend-contract.md`，版本下限与可执行文件选择见其 `docs/adr/0003-herdr-version-floor.md`、`docs/adr/0004-herdr-executable-selection.md`。

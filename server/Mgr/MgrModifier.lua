@@ -1,5 +1,5 @@
 -- 五效果的业务装配：层数、持续与到期归 modifier_system；这里只保存 DOT 相位和末次业务来源。
-local ModifierAPI = require('server.ModifierAPI')
+local ModifierAPI = require('server.packages.modifier_system.api')
 local GameCfg = require('common.GameCfg')
 local Mgr = { ModifierAPI = ModifierAPI, Targets = {}, Characters = {}, Departing = {}, WeakCarry = {} }
 local kinds = { 'poison', 'burn', 'frost', 'paralyze', 'weak' }

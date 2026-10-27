@@ -4,8 +4,6 @@ local Probe = require('tools.probes.official_ai_probe')
 local Loader = {}
 
 local MODULE_PATHS = {
-    ['common.AbilityAPIBase'] = 'common/AbilityAPIBase.lua',
-    ['common.AiAPIBase'] = 'common/AiAPIBase.lua',
     ['server.packages.official_ai_feature.api'] = 'server/packages/official_ai_feature/api.lua',
     ['common.packages.official_ai_feature.configs'] = 'common/packages/official_ai_feature/configs.lua',
     ['server.packages.official_ai_feature.official_ai_feature'] = 'server/packages/official_ai_feature/official_ai_feature.lua',
@@ -189,8 +187,9 @@ function Loader.loadAi()
     end
     Env.require = loadOne
     Env.__stub_ability_api = nil
-    local ai = loadOne('server.AiAPI', 'server/AiAPI.lua')
+    local ai = loadOne('server.packages.official_ai_feature.api')
     return ai, {
+        behavior = loaded['server.packages.official_ai_feature.behavior_runtime'],
         time = time, task = taskService, players = players, world = world,
         Vector = Vector, vecLen = vecLen, vecNorm = vecNorm, newUnit = newUnit,
         registry = loaded['common.packages.ability_system.registry'],

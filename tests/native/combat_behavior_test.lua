@@ -67,6 +67,12 @@ describe('TestEelDischargeEntry', function()
         }
         ctx.inside = { UserId = 1, Character = { Position = vec(1, 0, 0), Controller = { Health = 300 } } }
         ctx.outside = { UserId = 2, Character = { Position = vec(9, 0, 0), Controller = { Health = 300 } } }
+        ctx.services = { Vitals = package.loaded['server.Mgr.MgrVitals'],
+            FishCarrier = package.loaded['server.Mgr.MgrFishCarrier'] }
+        package.loaded['server.Mgr.MgrVitals'] = setmetatable({}, { __index = function()
+            error('电鳗行为不应再加载 MgrVitals') end })
+        package.loaded['server.Mgr.MgrFishCarrier'] = setmetatable({}, { __index = function()
+            error('电鳗行为不应再加载 MgrFishCarrier') end })
         _G.game = { GetService = function(_, name)
             if name == 'Players' then return { GetPlayers = function() return { ctx.inside, ctx.outside } end } end
         end }
@@ -79,6 +85,7 @@ describe('TestEelDischargeEntry', function()
 
     it('test_discharge_uses_fish_hit_and_replay_does_not_double_apply', function()
         local behavior = assert(loadfile('server/AbilityBehaviors/eel_discharge.lua'))()
+        behavior.Services = ctx.services
         assert.same(1, behavior.Discharge(ctx.owner, 5, 15))
         assert.same(1, #ctx.hits)
         assert.same(ctx.carrier, ctx.hits[1][1].source)
@@ -94,6 +101,7 @@ describe('TestEelDischargeEntry', function()
     it('test_formal_radius_boundary_and_dead_targets', function()
         local eel = GameCfg.Ability.FishAbilities.eel
         local behavior = assert(loadfile('server/AbilityBehaviors/eel_discharge.lua'))()
+        behavior.Services = ctx.services
         ctx.inside.Character.Position = vec(3, 0, 4)
         ctx.outside.Character.Position = vec(5.01, 0, 0)
         assert.same(1, behavior.Discharge(ctx.owner, eel.Radius, eel.Damage))
@@ -128,6 +136,11 @@ describe('TestMainCombatWiring', function()
             'MgrMap.MgrFishUnit.Vitals = MgrMap.MgrVitals',
             'MgrMap.MgrVitals.FishCarrier = MgrMap.MgrFishCarrier',
             'MgrMap.MgrCast.Vitals = MgrMap.MgrVitals',
+            'MgrMap.MgrAbility.BehaviorServices = {',
+            'Vitals = MgrMap.MgrVitals',
+            'FishCarrier = MgrMap.MgrFishCarrier',
+            'Modifier = MgrMap.MgrModifier',
+            'GM = MgrMap.MgrGM',
             'MgrMap.MgrFishCarrier.DamageListener',
             -- 有效鱼受击伤害要回报仇恨：监听里必须经 FindByCarrier 找回鱼并 NoteDamage
             'FindByCarrier',
@@ -147,8 +160,13 @@ describe('TestMeleeHitEntry', function()
             vitals = package.loaded['server.Mgr.MgrVitals'],
             carrier = package.loaded['server.Mgr.MgrFishCarrier'],
             gm = package.loaded['server.Mgr.MgrGM'],
+            vendorApi = package.loaded['server.packages.ability_system.api'],
             api = package.loaded['server.AbilityAPI'],
+            modifier = package.loaded['server.Mgr.MgrModifier'],
+            swing = package.loaded['server.SwingRegistry'],
         }
+        package.loaded['server.packages.ability_system.api'] = {}
+        package.loaded['server.Mgr.MgrModifier'] = {}
         ctx = { controllerCalls = 0, hits = {}, swingStaged = {}, created = {} }
         _G.Vector3 = { New = vec }
         _G.Quaternion = { FromEulerAngles = function(x, y, z) return { x = x, y = y, z = z } end }
@@ -160,7 +178,8 @@ describe('TestMeleeHitEntry', function()
         } }
         ctx.carrier = { Receiver = ctx.target }
         -- #129：玩家挥砍只认 AbilityAPI 登记值；测试用假登记模块，不经真实包链
-        package.loaded['server.AbilityAPI'] = {
+        package.loaded['server.AbilityAPI'] = {}
+        package.loaded['server.SwingRegistry'] = {
             TakeSwing = function(userId)
                 local s = ctx.swingStaged[userId]
                 ctx.swingStaged[userId] = nil
@@ -182,6 +201,13 @@ describe('TestMeleeHitEntry', function()
             ResolveCarrier = function(_, target) return target == ctx.target and ctx.carrier or nil end,
         }
         package.loaded['server.Mgr.MgrGM'] = { GetMeleeDamage = function(_, _, damage) return damage end }
+        ctx.services = { Vitals = package.loaded['server.Mgr.MgrVitals'],
+            FishCarrier = package.loaded['server.Mgr.MgrFishCarrier'], GM = package.loaded['server.Mgr.MgrGM'],
+            Modifier = package.loaded['server.Mgr.MgrModifier'] }
+        for _, name in ipairs({ 'server.Mgr.MgrVitals', 'server.Mgr.MgrFishCarrier', 'server.Mgr.MgrGM', 'server.Mgr.MgrModifier' }) do
+            package.loaded[name] = setmetatable({}, { __index = function()
+                error('近战行为不应再加载上层管理器: ' .. name) end })
+        end
         _G.game = { GetService = function(_, name)
             if name == 'RunService' then return { IsServer = function() return true end } end
             if name == 'World' then return { CreateUnit = function(_, unitType, values)
@@ -205,6 +231,9 @@ describe('TestMeleeHitEntry', function()
         package.loaded['server.Mgr.MgrFishCarrier'] = saved.carrier
         package.loaded['server.Mgr.MgrGM'] = saved.gm
         package.loaded['server.AbilityAPI'] = saved.api
+        package.loaded['server.Mgr.MgrModifier'] = saved.modifier
+        package.loaded['server.SwingRegistry'] = saved.swing
+        package.loaded['server.packages.ability_system.api'] = saved.vendorApi
     end)
 
     local function buildAnchor(attrs)
@@ -214,7 +243,7 @@ describe('TestMeleeHitEntry', function()
         function anchor:FindFirstChild(name) return self[name] end
         function anchor:GetAttribute(name) return attrs[name] end
         local behavior = assert(loadfile('server/AbilityBehaviors/melee_hit.lua'))()
-        behavior.Attach(anchor)
+        behavior.Attach(anchor, ctx.services)
         return anchor
     end
 

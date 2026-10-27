@@ -8,7 +8,7 @@
 --      或退出时先写速度后清 weakUntil，唯一计算口仍按虚弱算；
 --   5. 鱼被霜冻/麻痹后移速不变；麻痹的鱼仍追咬/施法；
 --   6. server/main.lua 漏接 MgrAbility.PlayerData / Survival、Vitals.ActGuard / MaxHealthProvider、
---      Survival.SpeedWriter、MgrWeapon.Ability（单测注入了、生产没接 = 生产里药水数恒 0）。
+--      Survival.SpeedWriter、MgrWeapon.Modifier（单测注入了、生产没接 = 生产里药水数恒 0）。
 -- 接缝：MgrPlayerData:Handle（ItemBarAction 通道）、PlayerData 存档往返、MgrSurvival:ApplyWeak/ClearWeak、
 --   MgrFishUnit:Speed / UpdateCombat、MgrAbility:CastFish、server/main.lua 源码接线断言。
 -- 旧套件的逐例 setUp/tearDown 映射为 before_each/after_each；被替换的全局（game / Vector3 / REUtil）、
@@ -227,7 +227,7 @@ describe('TestPrizeGrowthWiring', function()
         assert.matches('MgrMap.MgrAbility.PlayerData = MgrMap.MgrPlayerData', src, nil, true)
         assert.matches('MgrMap.MgrAbility.Survival = MgrMap.MgrSurvival', src, nil, true)
         assert.matches('MgrMap.MgrSurvival.SpeedWriter = MgrMap.MgrAbility', src, nil, true)
-        assert.matches('MgrMap.MgrWeapon.Ability = MgrMap.MgrAbility', src, nil, true)
+        assert.matches('MgrMap.MgrWeapon.Modifier = MgrMap.MgrModifier', src, nil, true)
         assert.matches('MgrMap.MgrVitals.ActGuard = function(player)', src, nil, true)
         assert.matches('not MgrMap.MgrAbility:IsParalyzed(player)', src, nil, true)
         assert.matches('MgrMap.MgrVitals.MaxHealthProvider = function(player)', src, nil, true)

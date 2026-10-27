@@ -4,7 +4,7 @@
 --   武器库存用 #124 PlayerData 独立武器库存（GetItemBarSnapshot，装备=held 优先、selectedWeapon 兜底）；
 --   投掷消耗走 #123 MgrSave 操作协议（ResolveRequest + Execute，成功回调里才发飞行物）。
 -- 设计要点：
---   近战伤害不经预设属性：攻击前按 GameCfg.Ability 表向 AbilityAPI 登记挥砍（伤害/射程），
+--   近战伤害不经预设属性：攻击前按 GameCfg.Ability 表向 SwingRegistry 登记挥砍（伤害/射程），
 --   melee_hit 行为取用登记值结算——伪造 RequestCast 与旧的 25 伤害残留被结构性堵住。
 --   枪械状态按 (userId, weaponId) 墙钟记录：fireAt 限射速、{ammo, reloadUntil} 管弹匣；
 --   手动/自动换弹均 2 秒、到期惰性补满，切枪换不来别的枪的时间线，重开会话弹匣自然回满
@@ -14,6 +14,7 @@
 local GameCfg = require('common.GameCfg')
 local MathWaterJudge = require('common.MathWaterJudge')
 local AbilityAPI = require('server.AbilityAPI')
+local SwingRegistry = require('server.SwingRegistry')
 
 local Mgr = { States = {}, Flying = {} }
 
@@ -132,10 +133,16 @@ function Mgr:AttackMelee(player, weaponId, data)
     end
     local scale = weaponId and self.Attr:WeaponDamageScale(player, 'melee') or 1
     local damage = mcfg.Damage * scale
-    state.meleeAt[key] = now
     -- #139：近战大奖的特效（毒/灼烧）随挥砍登记传给 melee_hit，命中成功后才应用
-    AbilityAPI.StageSwing(player.UserId, { damage = damage, range = mcfg.Range, effect = mcfg.Effect })
+    if not SwingRegistry.StageSwing(player.UserId, { damage = damage, range = mcfg.Range, effect = mcfg.Effect }) then
+        return self:Fail(player, 'attack', 'swing-unavailable', { weapon = weaponId })
+    end
+    state.meleeAt[key] = now
     local cast = self:CastMelee(player)
+    if not cast then
+        SwingRegistry.ClearSwing(player.UserId)
+        return self:Fail(player, 'attack', 'cast-failed', { weapon = weaponId })
+    end
     print('[MgrWeapon] 挥砍发起', player.UserId, tostring(weaponId or 'unarmed'),
         'damage=' .. tostring(damage), 'range=' .. tostring(mcfg.Range),
         'interval=' .. tostring(mcfg.IntervalSec), cast and 'cast' or 'cast-failed')
@@ -195,8 +202,8 @@ function Mgr:AttackGun(player, weaponId, gcfg, data, aim)
             appliedAny = appliedAny or ok == true
         end
         -- #139：枪械大奖特效（霜冻/麻痹）只在伤害被统一入口接受后挂；脱靶与被拒（安全区等）不挂
-        if appliedAny and gcfg.Effect and self.Ability and self.Ability.ApplyWeaponEffect then
-            local ok, err = pcall(self.Ability.ApplyWeaponEffect, self.Ability, player, target, gcfg.Effect)
+        if appliedAny and gcfg.Effect and self.Modifier and self.Modifier.ApplyWeaponEffect then
+            local ok, err = pcall(self.Modifier.ApplyWeaponEffect, self.Modifier, player, target, gcfg.Effect)
             if not ok then print('[MgrWeapon] 武器特效应用失败', weaponId, tostring(err)) end
         end
         print('[MgrWeapon] 枪击命中', player.UserId, weaponId,
@@ -595,7 +602,7 @@ function Mgr:CastGuard(unit, index)
     local player = players and players.GetPlayerFromCharacter
         and players:GetPlayerFromCharacter(unit)
     if not player then return true end
-    return AbilityAPI.PeekSwing(player.UserId) ~= nil
+    return SwingRegistry.PeekSwing(player.UserId) ~= nil
 end
 
 function Mgr:Handle(player, payload)
@@ -628,6 +635,7 @@ function Mgr:Start()
 end
 
 function Mgr:OnPlayerRemoving(player)
+    SwingRegistry.ClearSwing(player.UserId)
     self.States[player.UserId] = nil
 end
 

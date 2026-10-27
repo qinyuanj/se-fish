@@ -1,12 +1,11 @@
 -- 电鳗放电：每次锚点点火只结算一次，对球形范围内所有活着的玩家扣血。
 -- 不按鱼主人或小队过滤；非玩家受击体不会被放电误伤。#128 起伤害经统一命中身份。
-local MgrVitals = require('server.Mgr.MgrVitals')
-local MgrFishCarrier = require('server.Mgr.MgrFishCarrier')
-
-local M = {}
+local M = { Services = {} }
 
 function M.Discharge(owner, radius, damage, hit)
-    hit = hit or MgrVitals:NewHit(MgrFishCarrier:ResolveCarrier(owner) or owner, 'fishAttack')
+    local Vitals = assert(M.Services.Vitals, '[EelDischarge] 缺少 Vitals 注入')
+    local FishCarrier = assert(M.Services.FishCarrier, '[EelDischarge] 缺少 FishCarrier 注入')
+    hit = hit or Vitals:NewHit(FishCarrier:ResolveCarrier(owner) or owner, 'fishAttack')
     local position = owner.Position
     local hits = 0
     for _, player in ipairs(game:GetService('Players'):GetPlayers()) do
@@ -16,7 +15,7 @@ function M.Discharge(owner, radius, damage, hit)
             local pos = character.Position
             local dx, dy, dz = pos.x - position.x, pos.y - position.y, pos.z - position.z
             if dx * dx + dy * dy + dz * dz <= radius * radius then
-                if MgrVitals:ApplyHit(hit, player, damage) then
+                if Vitals:ApplyHit(hit, player, damage) then
                     hits = hits + 1
                     print('[EelDischarge] 命中', player.UserId, damage, 'health=' .. tostring(controller.Health))
                 end
@@ -26,7 +25,8 @@ function M.Discharge(owner, radius, damage, hit)
     return hits
 end
 
-function M.Attach(anchor)
+function M.Attach(anchor, services)
+    if services then M.Services = services end
     local start = anchor:FindFirstChild('AnchorStart')
     if not start then error('[EelDischarge] 缺少 AnchorStart') end
     local connection = start:Connect(function()

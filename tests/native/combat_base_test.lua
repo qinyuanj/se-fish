@@ -50,7 +50,6 @@ describe('TestAbilityCastGuard', function()
     -- 根 AbilityAPI 必须先跑服务端守卫，再进 vendor 的包内 CastAbility；守卫拒绝时包完全不被调用。
     it('test_root_api_applies_server_guard_before_package_cast', function()
         local impl = {}
-        for _, name in ipairs(require('common.AbilityAPIBase').SERVER_API) do impl[name] = function() return false end end
         local calls = {}
         impl.CastAbility = function(unit, index) calls[#calls + 1] = { unit, index } return true end
         package.preload[VENDOR] = function() return impl end
@@ -214,16 +213,20 @@ describe('TestMgrAbilityActionGuard', function()
     -- 但把恢复挪进 after_each，使断言失败时也不把桩留给下一条案例。
     local saved
     before_each(function()
-        saved = { game = rawget(_G, 'game'), api = package.loaded['server.AbilityAPI'] }
+        saved = { game = rawget(_G, 'game'), vendorApi = package.loaded['server.packages.ability_system.api'],
+            api = package.loaded['server.AbilityAPI'] }
     end)
     after_each(function()
         _G.game = saved.game
         package.loaded['server.AbilityAPI'] = saved.api
+        package.loaded['server.packages.ability_system.api'] = saved.vendorApi
     end)
 
     it('test_player_cast_is_blocked_by_vitals_state', function()
         local guard
-        package.loaded['server.AbilityAPI'] = { SetCastGuard = function(fn) guard = fn end }
+        package.loaded['server.packages.ability_system.api'] = {}
+        local api = { SetCastGuard = function(fn) guard = fn end }
+        package.loaded['server.AbilityAPI'] = api
         _G.game = { GetService = function() return {} end }
         local mgr = assert(loadfile('server/Mgr/MgrAbility.lua'))()
         local blocked, free = player(1), player(2)
@@ -235,10 +238,13 @@ describe('TestMgrAbilityActionGuard', function()
             return state.player == blocked and 'downed' or 'alive'
         end })
         mgr.Vitals = vitals
+        mgr.BehaviorServices = { Vitals = vitals }
         mgr:Start()
+        assert.same(mgr.BehaviorServices, api.BehaviorServices)
         -- 装配完成后立刻放回真实环境：守卫闭包已捕获 vitals，后续断言不需要假 game
         _G.game = saved.game
         package.loaded['server.AbilityAPI'] = saved.api
+        package.loaded['server.packages.ability_system.api'] = saved.vendorApi
         assert.is_not_nil(guard)
         assert.is_false(mgr:CanCast(blocked))
         assert.is_false(guard(blocked, 0))
