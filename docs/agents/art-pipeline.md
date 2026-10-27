@@ -2,6 +2,19 @@
 
 用无头 Blender 加工模型、用 Meshy 生成模型前读本文。决定与被拒的备选见 [ADR-0009](../adr/0009-blender-headless-only.md)。
 
+## 工作区导航
+
+美术文件在部署端 `C:\Users\<用户名>\Desktop\dev\eggy\` 下；开发端对应 `/mnt/c/Users/<用户名>/Desktop/dev/eggy/`。部署端路径可用 `wslpath -u '<Windows 路径>'` 转为开发端路径，反向用 `wslpath -w`。按下表定位后只搜索目标目录，避免递归扫描整个 `Desktop/dev/`。
+
+| 位置（相对美术工作区） | 用途 |
+| --- | --- |
+| `美术资产/mesh-budget.json` | 默认网格预算；验收口径见[美术资产概要](../art-asset-overview.md#验收) |
+| `美术资产/<资产名>/scripts/` | 单资产步骤脚本；既有重导入校验先例为 `鳄雀鳝/scripts/06-validate.py`、`海鸥/scripts/05-validate.py` |
+| `美术资产/<资产名>/work/`、`output/`、`validation/` | 中间件、导出物与报告；实际路径以对应任务单为准 |
+| `assets_import/<稳定 ID>/` | 纯 ASCII 导入副本，也可能包含诊断失败件；存在文件不表示已发布或已通过验收 |
+
+用户提供的源素材目录以任务单为准，与上述加工工作区分开。例如正式素材可能在 `eggitor/1_开发中/渔力全开/正式模型动画/`；不要因文件同名改用其他目录的历史副本。先读任务单的来源和证据索引，再查已有脚本；共用工具归项目工具体系，资产与执行报告留在工作区。
+
 ## blender —— CLI 子命令（只走无头）
 
 Blender 只走无头模式，唯一入口是开发端的 CLI 子命令 `blender`。在仓库根执行（开发端 WSL，Blender 装在部署端 Windows）：
