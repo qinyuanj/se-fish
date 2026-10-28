@@ -94,9 +94,18 @@ install -m 755 tools/hooks/shim "$(git rev-parse --git-common-dir)/hooks/pre-com
 
 等价地直接看 `lua5.4 tools/cli.lua deploy` 的收尾输出。
 
+**编辑器 CLI 取证（本项目实测，`editor-cli` 0.20.12）。**
+
+- **`exec` 异步**：服务端与客户端 `exec` 都不回传脚本输出。脚本里 `print` 一个唯一标记，再用 `editor-cli log grep <标记> --max-matches N --context 0` 取回；`log grep` 区分大小写（不支持 `-i`），标记照原样写。
+- **截图**：只有 `screenshot editor` 与 `screenshot game`；`editor` 带网格，要干净画面就进试玩后用 `game`。
+- **摆位与相机**：`input move-to x y z` 把玩家移到指定点；客户端 `exec` 读 `CameraService.MainCamera` 的 `Position` / `Focus` 取镜头位置与焦点。
+- **场景枚举**：编辑器侧按 [技术难点识别「工具链能力缺口」](../技术难点识别.md#工具链能力缺口编辑器-sdk-全树枚举故障) 的绕过合同操作；试玩中服务端 `exec` 可用 `World:GetDescendants`。
+- **文档检索**：`docs search` 的 `editor-api` docset 返回 HTTP 500，改用 `--docset manual` 或编辑器在线时的 `api search-editor` / `api get-editor`。
+- **动画是否在播**：看连续截图的画面差异，口径见 [美术资产概要「验收」](../art-asset-overview.md#验收)。接缝 A 的可复用探针由 #160 入库，入库前按需自写。
+
 ## 测试纪律
 
-- **试玩优先**：新增验证尽量只用编辑器 E2E，复杂功能以试玩证明可用；操作见 `eggy-lua` 的「试玩验收」。
+- **试玩优先**：新增验证尽量只用编辑器 E2E，复杂功能以试玩证明可用；操作见 skill `eggy-se-qa`。
 - **先列失败方式**：确需单独测试某个系统时，先列出所有可能失败的方式，再写代码；代码写完后不补写单测。
 - **局部开发、全量收尾**：开发期间用 `lua5.4 tools/cli.lua test` 验证；业务功能仍按需试玩，收尾执行下面的全部检查。
 - **可复现取证**：每次试玩保留可重跑的触发步骤（`input` 命令、探针文件）与对应证据（`log grep` 命中行、截图路径）。
