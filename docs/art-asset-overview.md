@@ -10,6 +10,7 @@
 - **尺度与贴图**：见 [ADR-0004](adr/0004-fish-asset-scale.md)。首领原设计米数先按同数值游戏单位预摆，再经场景验收收敛。贴图按需配置，小型资产可只用 BaseColor。
 - **交付**：模型 FBX 不含动画，每段动画单独导出仅骨架的 FBX。路径全为 ASCII，使用英文稳定 ID（`fish_<名>`；普通／极品加 `_normal`／`_premium` 后缀）。网格封闭性硬门槛不放宽，离线验收不能替代游戏内验收。蒙皮导入器可能拒绝 UCX 碰撞网格：碰撞体在引擎侧搭，Blender 里的碰撞代理只作编辑参考，不随导出交付。
 - **概念图（2026-10-28 定稿，[#156](https://github.com/qinyuanj/se-fish/issues/156)）**：造型在概念图阶段锁定，用户确认后才生成 3D（重出概念图 9 额度，重生成模型 30）。提示词末尾统一加风格描述 `Stylized 3D game creature asset, semi-realistic hand-painted look with clean matte surfaces, natural coloration and true-to-species anatomy, slightly simplified shapes with a bold readable silhouette, not a photograph, plain white background, even soft studio lighting, no cast shadow, whole body in frame`。起点版本缺 `hand-painted`、`matte`、`not a photograph`，非鱼物种会出成照片级，试图见鲈鱼、小龙虾的 `concept-trial-v2.png`。姿态按身体结构定：鱼侧视、鳍展开；鸟 T 姿态、双腿朝下、腿与翼尖画粗；双足正面 A 姿态；四足低姿态。首领另出三视图，做法见 [Blender 与 Meshy 使用](agents/art-pipeline.md)。
+- **三视图范围（2026-10-28，[#158](https://github.com/qinyuanj/se-fish/issues/158) 三头鲨试点）**：首领走三视图，精英鱼和普通鱼走单图。三头鲨的概念图只露出一张正脸，用三视图生成后三个头都有完整正脸，三叉分颈和背部也与概念图一致。七种精英鱼（电鳗、虾霸、帝王蟹、剑鱼、海象、白头鹰、沧龙）都是单头、常规结构，一张侧视或正面概念图就能交代清楚，多花 9~18 额度（三视图要核对顺序，可能重出）没有收益。精英鱼若出现单图看不到的结构（多头、背部关键特征），按首领处理。
 
 ## 验收
 
@@ -38,7 +39,6 @@
   - **蒙皮**：权重能迁移，没有空组和无权重顶点；`triangle` 跑 Walk 与基线相当。Remesh 不会切开嘴缝，Attack 张嘴时拉出帘子。切嘴是本地流程第 04 步，用 Remesh 也省不掉。
   - **重开条件**：Meshy 输出保证流形时再试，优先试 `triangle`。
 - **原点**：候选为绑定静止姿态下包围盒底面中心，所有资产统一，使 `BodyScale` 的胶囊高度与挂点偏移只按一个基准缩放；鱼离地高度由程序控制。待鳄雀鳝在游戏内核对（接缝 A）后写入 [ADR-0004](adr/0004-fish-asset-scale.md)。
-- **首领三视图试点与精英鱼跟进**：首领先拿三头鲨试三视图（多头排布与背部单图难猜）；精英鱼是否跟进等试点结果。
 - **骨架归桶提案**：按运动模式分 4 桶，另加程序兜底，以压缩绑骨工时和蒙皮开销。待美术确认分件交付、螯开合骨与步足僵硬边界，并待引擎挂点挂载试点。
 
   | 桶 | 成员数 | 骨数候选 |

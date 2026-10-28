@@ -64,7 +64,7 @@ REST 后备是美术工作区同级的 `Desktop/dev/eggy/tools/meshy.py`（不�
 - **额度按模型档位算**：`meshy-7.1` 图生 3D 不带贴图 20、带 2K 贴图 30；低模档才是 5。开工前按档位报价并等用户确认。
 - **只回 BaseColor**：Normal 与 ORM 要在 Blender 自烘。
 - **不传 `auto_size` 与 `origin_at`**：`auto_size` 按现实米数估高度，与 [ADR-0004](../adr/0004-fish-asset-scale.md) 的单位方块口径冲突；尺寸与原点只在 Blender 步骤脚本里设定一次，避免多环节重复补偿。
-- **首领走三视图**：先用 image-to-image（`generate_multi_view`）从已确认的概念图出正、侧、背三视图，再用 multi-image-to-3d 生成。该接口把第一张图当正面，而返回的视图顺序不一定是正面在前，提交前按画面核对顺序。精英鱼与普通鱼仍走单图。
+- **首领走三视图**：先用 image-to-image（`generate_multi_view`）从已确认的概念图出正、侧、背三视图，再用 multi-image-to-3d 生成。该接口把第一张图当正面，而返回的视图顺序不一定是正面在前，提交前按画面核对顺序（三头鲨返回的是背、侧、正），用 `file_paths` 重排后提交。三视图会沿用概念图的机位：概念图是俯视时，返回的是俯视和仰视，交进去会被当成竖立的物体重建。因此提示词要写明 `camera always horizontal at body height (no top view, no bottom view)`，并逐张写出 front / side / back。精英鱼与普通鱼仍走单图。
 - **参数探针有副作用**：`raw` 直发请求不受本地校验，服务端忽略未知字段，探测也可能真建任务。核账靠任务列表 + 余额差值。
 - **过程留痕**：Meshy 任务 ID 与参数记在美术工作区该资产目录下，本仓不复制。
 
