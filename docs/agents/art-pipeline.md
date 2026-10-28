@@ -1,6 +1,6 @@
 # Blender 与 Meshy 使用
 
-用无头 Blender 加工模型、用 Meshy 生成模型前读本文。决定与被拒的备选见 [ADR-0009](../adr/0009-blender-headless-only.md)。
+定位美术工作区、用无头 Blender 加工模型或用 Meshy 生成模型前读本文。决定与被拒的备选见 [ADR-0009](../adr/0009-blender-headless-only.md)。
 
 ## 工作区导航
 
@@ -11,7 +11,7 @@
 | `美术资产/mesh-budget.json` | 默认网格预算；验收口径见[美术资产概要](../art-asset-overview.md#验收) |
 | `美术资产/<资产名>/scripts/` | 单资产步骤脚本；既有重导入校验先例为 `鳄雀鳝/scripts/06-validate.py`、`海鸥/scripts/05-validate.py` |
 | `美术资产/<资产名>/work/`、`output/`、`validation/` | 中间件、导出物与报告；实际路径以对应任务单为准 |
-| `assets_import/<稳定 ID>/` | 纯 ASCII 导入副本，也可能包含诊断失败件；存在文件不表示已发布或已通过验收。导入编辑器前读[验收](../art-asset-overview.md#验收)的纯 ASCII 路径与动画随模型导入两条 |
+| `assets_import/<稳定 ID>/` | 纯 ASCII 导入副本，也可能包含诊断失败件；存在文件不表示已发布或已通过验收。导入编辑器前读[验收](../art-asset-overview.md#验收)与[模型动画导入与播放](../art-asset-overview.md#模型动画导入与播放) |
 
 用户提供的源素材目录以任务单为准，与上述加工工作区分开。例如正式素材可能在 `eggitor/1_开发中/渔力全开/正式模型动画/`；不要因文件同名改用其他目录的历史副本。先读任务单的来源和证据索引，再查已有脚本；共用工具归项目工具体系，资产与执行报告留在工作区。
 

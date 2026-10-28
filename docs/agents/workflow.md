@@ -94,14 +94,13 @@ install -m 755 tools/hooks/shim "$(git rev-parse --git-common-dir)/hooks/pre-com
 
 等价地直接看 `lua5.4 tools/cli.lua deploy` 的收尾输出。
 
-**编辑器 CLI 取证（本项目实测，`editor-cli` 0.20.12）。**
+**编辑器 CLI 取证。** 操作前用目标命令的 `--help` 确认当前版本能力；以下是 0.20.12 的项目实测：
 
-- **`exec` 异步**：服务端与客户端 `exec` 都不回传脚本输出。脚本里 `print` 一个唯一标记，再用 `editor-cli log grep <标记> --max-matches N --context 0` 取回；`log grep` 区分大小写（不支持 `-i`），标记照原样写。
-- **截图**：只有 `screenshot editor` 与 `screenshot game`；`editor` 带网格，要干净画面就进试玩后用 `game`。
-- **摆位与相机**：`input move-to x y z` 把玩家移到指定点；客户端 `exec` 读 `CameraService.MainCamera` 的 `Position` / `Focus` 取镜头位置与焦点。
-- **场景枚举**：编辑器侧按 [技术难点识别「工具链能力缺口」](../技术难点识别.md#工具链能力缺口编辑器-sdk-全树枚举故障) 的绕过合同操作；试玩中服务端 `exec` 可用 `World:GetDescendants`。
-- **文档检索**：`docs search` 的 `editor-api` docset 返回 HTTP 500，改用 `--docset manual` 或编辑器在线时的 `api search-editor` / `api get-editor`。
-- **动画是否在播**：看连续截图的画面差异，口径见 [美术资产概要「验收」](../art-asset-overview.md#验收)。接缝 A 的可复用探针由 #160 入库，入库前按需自写。
+- **异步输出**：服务端、客户端 `exec` 提交成功只表示代码已提交。脚本打印唯一标记后，用 `log grep <标记>` 读取实际结果。
+- **画面**：该版本没有 `screenshot offscreen`；编辑态截图带网格时，改用试玩的 `screenshot game` 取无网格证据。只截判读对象，结束后还原取景和现场。
+- **场景枚举**：编辑器侧执行[技术难点识别的绕过合同](../技术难点识别.md#绕过合同四条硬边界)；该限制不适用于本次实测正常的试玩服务端 `World:GetDescendants`。
+- **检索失败**：`editor-api` docset 本次返回 HTTP 500；遇到同类错误时，改查 `manual` 或编辑器在线时的 `api search-editor` / `api get-editor`。
+- **模型动画验收**：导入、播放与画面判定读[美术资产概要「模型动画导入与播放」](../art-asset-overview.md#模型动画导入与播放)。
 
 ## 测试纪律
 
