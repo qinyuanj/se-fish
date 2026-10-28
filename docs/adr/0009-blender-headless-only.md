@@ -27,6 +27,7 @@ agent 驱动 Blender 原本有 2 种模式、5 个入口：实时模式有 Blend
 3. **blmcp 的 `execute_blender_code_for_cli`**：依赖已撤掉的 MCP，变量名与 `BLENDER_EXE` 不统一，在 WSL 下报 `Blender executable not found at 'blender'`。
 4. **修改上游 skill 的执行脚本**：重装或升级 skill 时修改会丢失。
 5. **在 `tools/` 下另写 shell 包装**：会多出一个没有测试车道的接缝；CLI 子命令能复用现有接缝与 fast/slow 车道。
+6. **MCP for Blender 的 Meshy 集成（`mcp-for-blender` 2.2.1 起，2026-10-28 评估）**：插件的 `generate_3d` 在 Blender 界面里调 Meshy 并直接导入场景，仍属实时通道，需要有人开着界面并在插件侧栏填密钥，理由同第 1 条。它发出的 Meshy 请求（image-to-3d、multi-image-to-3d、remesh）都能经现有 `meshy-mcp-server` 或 REST 直接发起，不需要插件。
 
 后果：
 
