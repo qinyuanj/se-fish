@@ -9,12 +9,12 @@
 - **复用**：骨架与动作复用、程序位移的职责边界见 [ADR-0006](adr/0006-structural-asset-reuse.md)。
 - **尺度、原点与贴图**：制作与导出前按 [ADR-0004](adr/0004-fish-asset-scale.md) 确定比例、原点和贴图组合。
 - **交付**：模型与动画分包导出，文件构成见 [ADR-0004](adr/0004-fish-asset-scale.md)「制作与导出约定」；导入与播放按下文「模型动画导入与播放」执行。路径全为 ASCII，使用英文稳定 ID（`fish_<名>`；普通／极品加 `_normal`／`_premium` 后缀）。交付门槛见「验收」。蒙皮导入器可能拒绝 UCX 碰撞网格：碰撞体在引擎侧搭，Blender 里的碰撞代理只作编辑参考，不随导出交付。
-- **概念图（2026-10-28 定稿，[#156](https://github.com/qinyuanj/se-fish/issues/156)）**：造型在概念图阶段锁定，用户确认后才生成 3D（重出概念图 9 额度，重生成模型 30）。提示词末尾统一加风格描述 `Stylized 3D game creature asset, semi-realistic hand-painted look with clean matte surfaces, natural coloration and true-to-species anatomy, slightly simplified shapes with a bold readable silhouette, not a photograph, plain white background, even soft studio lighting, no cast shadow, whole body in frame`。起点版本缺 `hand-painted`、`matte`、`not a photograph`，非鱼物种会出成照片级，试验图见鲈鱼、小龙虾的 `concept-trial-v2.png`。姿态按身体结构定：鱼侧视、鳍展开；鸟 T 姿态、双腿朝下、腿与翼尖画粗；双足正面 A 姿态；四足低姿态。首领另出三视图，做法见 [Blender 与 Meshy 使用](agents/art-pipeline.md)。
+- **概念图（2026-10-28 定稿，[#156](https://github.com/qinyuanj/se-fish/issues/156)）**：造型在概念图阶段锁定，用户确认后才生成 3D（重出概念图 9 额度，重生成模型 30）。提示词末尾统一加风格描述 `Stylized 3D game creature asset, semi-realistic hand-painted look with clean matte surfaces, natural coloration and true-to-species anatomy, slightly simplified shapes with a bold readable silhouette, not a photograph, plain white background, even soft studio lighting, no cast shadow, whole body in frame`。起点版本缺 `hand-painted`、`matte`、`not a photograph`，非鱼物种会出成照片级（试验记录见 #156）。姿态按身体结构定：鱼侧视、鳍展开；鸟 T 姿态、双腿朝下、腿与翼尖画粗；双足正面 A 姿态；四足低姿态。首领另出三视图，做法见 [Blender 与 Meshy 使用](agents/art-pipeline.md)。
 - **三视图范围（2026-10-28，[#158](https://github.com/qinyuanj/se-fish/issues/158) 三头鲨试点）**：首领走三视图，精英鱼和普通鱼走单图。三头鲨的概念图只露出一张正脸，用三视图生成后三个头都有完整正脸，三叉分颈和背部也与概念图一致。七种精英鱼（电鳗、虾霸、帝王蟹、剑鱼、海象、白头鹰、沧龙）都是单头、常规结构，一张侧视或正面概念图就能交代清楚，多花 9~18 额度（三视图要核对顺序，可能重出）没有收益。精英鱼若出现单图看不到的结构（多头、背部关键特征），按首领处理。
 
 ## 验收
 
-分两道：离线重导入（接缝 B）只证明导出链路自洽；游戏内验收（接缝 A）按 [ADR-0004](adr/0004-fish-asset-scale.md)「验收」一节做。**接缝 A 不做完不得宣布资产可用**，校验报告通过也一样。接缝 A 的取证探针尚未入库，由 [#160](https://github.com/qinyuanj/se-fish/issues/160) 负责。
+分两道：离线重导入（接缝 B）只证明导出链路自洽；游戏内验收（接缝 A）按 [ADR-0004](adr/0004-fish-asset-scale.md)「验收」一节做。**接缝 A 不做完不得宣布资产可用**，校验报告通过也一样。
 
 - **离线重导入**：逐文件按类型重导入。模型量尺寸、核对网格数并跑网格封闭性审计；蒙皮模型另核对骨骼与权重；纯骨架动画核对骨架兼容性、帧区间与有效运动。报告写到美术工作区该资产目录的 `validation/validation.json`。离线交付门槛只看这份校验脚本报告：`failures` 为空（含网格封闭性硬门槛）才算通过；报告、`mesh` 段或预算文件缺失都算失败。
 - **网格封闭性（硬门槛，口径见 [#112](https://github.com/qinyuanj/se-fish/issues/112)）**：
@@ -29,26 +29,26 @@
 适用于自定义非人形模型；人形角色的 `Animator` 路径见[技术难点识别 §1](技术难点识别.md#1-非人形鱼--首领的模型与动画)。以下流程由 [#159](https://github.com/qinyuanj/se-fish/issues/159) 鳄雀鳝试点验证。
 
 1. **挂动画**：打开模型 FBX 的「自定义模型导入」对话框，在「模型动画导入」中点「添加模型动画」，加入各段仅骨架的动画 FBX。逐段切换预览，确认骨架能驱动网格，再与模型同一次上传。
-2. **更新引用**：记录上传后的网格资源 ID，并更新待验收单位的引用。鳄雀鳝重新上传生成了新 ID；继续引用旧网格会仍然看不到动画。
-3. **播放**：用 `AnimatedUnit` 承载网格，在服务端调用 `PlayAnimation("fish_alligator_gar_Walk", {looped = true, speed = 1})`，多端播放由服务端同步。名称使用导入对话框中的片段名；鳄雀鳝默认显示的是动画文件名。普通模型单位没有此播放接口。
-4. **验画面**：固定镜头，连续截取几帧，核对模型姿态变化，并检查尺寸、站位与骨架匹配。像素差只比较模型区域，排除 UI、水面和镜头移动；有差异后仍需确认变化来自动画。逐段记录结果，能播只证明播放链路通过，其余接缝 A 项目仍须分别验收。
+2. **更新引用**：每次上传都生成新的网格资源 ID，记下它并更新待验收单位的引用。
+3. **播放**：用 `AnimatedUnit` 承载网格，单位同步到客户端后（约 0.5 秒）在服务端调用 `PlayAnimation("fish_alligator_gar_Walk", {looped = true, speed = 1})`，多端播放由服务端同步。名称使用导入对话框中的片段名；鳄雀鳝默认显示的是动画文件名。普通模型单位没有此播放接口。
+4. **验画面**：固定镜头，连续截取几帧，核对模型姿态变化，并检查尺寸、站位与骨架匹配。像素差只比较模型区域，排除 UI、水面和镜头移动；同一位置用不存在的片段名做对照，差异应为 0。探针与调用顺序见 [Blender 与 Meshy 使用「接缝 A 取证」](agents/art-pipeline.md#接缝-a-取证)。逐段记录结果，能播只证明播放链路通过，其余接缝 A 项目仍须分别验收。
 
-**实测陷阱**：模型动画作为片段随网格保存，鳄雀鳝上传后未出现独立动画资源；不能因资源列表没有动画类型就判断未导入。`GetAnimationState` 对不存在的片段名也曾返回 `isPlaying=true`，返回状态不能替代画面验证。
+**实测陷阱**（[#160](https://github.com/qinyuanj/se-fish/issues/160) 复测）：
+
+- 刚 `CreateUnit` 就立即 `PlayAnimation`，服务端状态显示在播，客户端画面却不动。#159 曾因此误判首次上传的网格不含片段；延迟播放后两次上传的网格都能播。
+- 模型动画作为片段随网格保存，资源列表里没有独立动画资源；不能因此判断未导入。
+- `GetAnimationState` 对不存在的片段名也返回 `isPlaying=true`，返回状态不能替代画面验证。
 
 ## 资产状态
 
 - **罗非鱼**：8268 三角面、1 材质、1K 贴图。2026-10-16 用户口头确认游戏内导入通过，但模型、动画、尺寸各自验到哪、碰撞体怎么搭**没有书面记录**，不能据此推定罗非鱼的网格带有动画片段；导入方式见「模型动画导入与播放」。焊接后有 4 条非流形边（眼/嘴附近的退化微折叠，边长约体长 0.3%~1%），按硬门槛不合格；作基准前先清微面，或单独记录定为基线的决定，不为基线变绿放宽硬性 0 项。
 - **鲤鱼**：网格碎片化（435 连通块、约 49% 开放边、326 游离顶点），校验报告 `failures` 非空。已决定**不重新生成**（Meshy 已实扣 30），优先在 Blender 里修补；修好前不可用，接缝 A 也等修复后再验。
 - **海鸥**（2026-10-22）：接缝 B 通过，网格 1 连通块且硬性 0 项全为 0；接缝 A 未做。
-- **鳄雀鳝**（2026-10-28 更新）：原点改为底面中心后重导出，接缝 B 通过（7820 三角面、导出全长 0.05 即折算游戏内 5 单位、Idle/Walk/Attack）。接缝 A 已核对原点（脚踩地，与单位方块同一平面）、尺寸（约为方块边长 4~5 倍，与 5 单位同一量级），以及三段动画在 `AnimatedUnit` 上能播。可用网格为 `custom://0h1DIiDiCuEpQD9Kj`（带片段），早先的 `0h1D75CoYl8bow4id` 不含动画、已作废。以下未核对，留给首领功能实现：Walk 步幅与 6 m/s 移速是否匹配（是否滑步）、胶囊与挂点位置。
+- **鳄雀鳝**（2026-10-28 更新）：原点改为底面中心后重导出，接缝 B 通过（7820 三角面、导出全长 0.05 即折算游戏内 5 单位、Idle/Walk/Attack）。接缝 A 已核对原点（脚踩地，与单位方块同一平面）、尺寸（约为方块边长 4~5 倍，与 5 单位同一量级），以及三段动画在 `AnimatedUnit` 上能播。当前用网格 `custom://0h1DIiDiCuEpQD9Kj`；首次上传的 `0h1D75CoYl8bow4id` 经 #160 复测同样带片段，场上摆放的单位仍引用它且不是 `AnimatedUnit`。以下未核对，留给首领功能实现：Walk 步幅与 6 m/s 移速是否匹配（是否滑步）、胶囊与挂点位置。
 
 ## 待定
 
-- **Meshy Remesh 替代本地减面（2026-10-28 鳄雀鳝试点未通过，见 [#157](https://github.com/qinyuanj/se-fish/issues/157)）**：减面仍在 Blender 本地完成。通过条件是三项全过：未经本地修补 `failures` 为空；同机位 BaseColor 不糊、无接缝错位；迁移骨架权重后 Walk / Attack 无撕裂穿插。试点 4 次（`triangle` 7792/7000、`quad` 3900/3200，共 20 额度）结果如下：
-  - **网格**：4 份都有 5~15 条非流形边，硬性 0 项不过。目标 7792 / 3900 时实测 8132 / 8567 三角面，超出预算；`quad` 的 GLB 是三角化后的结果，面数约为目标的 2.1 倍。
-  - **贴图**：每份都重排了 UV，并重烘 BaseColor 2K，还额外带回 Normal 2K 与金属粗糙度 4K。`triangle` 的清晰度不低于基线 1K，接缝也没有错位；`quad` 偏糊，轮廓有折角。
-  - **蒙皮**：权重能迁移，没有空组和无权重顶点；`triangle` 跑 Walk 与基线相当。Remesh 不会切开嘴缝，Attack 张嘴时拉出帘子。切嘴是本地流程第 04 步，用 Remesh 也省不掉。
-  - **重开条件**：Meshy 输出保证流形时再试，优先试 `triangle`。
+- **Meshy Remesh 替代本地减面（2026-10-28 鳄雀鳝试点未通过，见 [#157](https://github.com/qinyuanj/se-fish/issues/157)）**：减面仍在 Blender 本地完成。通过条件是三项全过：未经本地修补 `failures` 为空；同机位 BaseColor 不糊、无接缝错位；迁移骨架权重后 Walk / Attack 无撕裂穿插。4 次试点都有非流形边，硬性 0 项不过；Remesh 也不切嘴缝，切嘴步骤省不掉。数据与审阅图见 #157。**重开条件**：Meshy 输出保证流形时再试，优先试 `triangle`。
 - **骨架归桶提案**：按运动模式分 4 桶，另加程序兜底，以压缩绑骨工时和蒙皮开销。待美术确认分件交付、螯开合骨与步足僵硬边界，并待引擎挂点挂载试点。
 
   | 桶 | 成员数 | 骨数候选 |

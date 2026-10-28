@@ -1,6 +1,6 @@
 # Blender 与 Meshy 使用
 
-定位美术工作区、用无头 Blender 加工模型或用 Meshy 生成模型前读本文。决定与被拒的备选见 [ADR-0009](../adr/0009-blender-headless-only.md)。
+定位美术工作区、用无头 Blender 加工模型、用 Meshy 生成模型或做接缝 A 取证前读本文。决定与被拒的备选见 [ADR-0009](../adr/0009-blender-headless-only.md)。
 
 ## 工作区导航
 
@@ -71,3 +71,16 @@ REST 后备是美术工作区同级的 `Desktop/dev/eggy/tools/meshy.py`（不�
 ### 前端配置
 
 Codex 的 MCP 注册在仓库内 `.codex/config.toml`（gitignored，不入库），只有 `[mcp_servers.meshy]` 一个条目，启动命令即上节的 `cmd.exe /c npx.cmd ...` 接法；文件里不写密钥值。改动后重启会话，核对 `mcp__meshy__*` 工具已注册。**不要注册 Blender MCP**：注册了 agent 就会被诱导去试实时通道。
+
+## 接缝 A 取证
+
+模型动画的导入、播放与判定口径见[美术资产概要「模型动画导入与播放」](../art-asset-overview.md#模型动画导入与播放)。探针按下面顺序调用，`exec` 与 `log grep` 用法见 [workflow「编辑器 CLI 取证」](workflow.md)：
+
+1. 进试玩，`input move-to` 把角色移到空地。
+2. 客户端 exec `tests/probes/seam_a_camera_client.lua`，`log grep SEAMA_CAM` 取相机与焦点坐标。
+3. 服务端 exec 一行 `_G.SeamA = {mesh=..., clip=..., skin=..., cam={...}, focus={...}}`，再 exec `tests/probes/seam_a_anim_server.lua`；参数说明在探针文件头。
+4. 等 2 秒后 `screenshot game --stdout` 连截 4 帧，用 `uv run -q --with pillow python -I tools/frame_diff.py --box L,T,R,B <帧...>` 比较鱼身区域。
+5. 换 `clip` 重跑第 3、4 步；最后用 `clip='NoSuchClip'` 做对照，差异应为 0。
+6. `_G.SeamA = {action='cleanup'}` 后再 exec 探针，确认 `left=0`，然后停试玩。
+
+鳄雀鳝基准（2026-10-28）：镜头距离 `dist=7`，裁剪框 `520,270,860,345`，Walk / Idle / Attack 变化像素 187~3235，`NoSuchClip` 为 0。

@@ -98,8 +98,8 @@ install -m 755 tools/hooks/shim "$(git rev-parse --git-common-dir)/hooks/pre-com
 
 - **异步输出**：服务端、客户端 `exec` 提交成功只表示代码已提交。脚本打印唯一标记后，用 `log grep <标记>` 读取实际结果。
 - **画面**：该版本没有 `screenshot offscreen`；编辑态截图带网格时，改用试玩的 `screenshot game` 取无网格证据。只截判读对象，结束后还原取景和现场。
-- **场景枚举**：编辑器侧执行[技术难点识别的绕过合同](../技术难点识别.md#绕过合同四条硬边界)；该限制不适用于本次实测正常的试玩服务端 `World:GetDescendants`。
-- **检索失败**：`editor-api` docset 本次返回 HTTP 500；遇到同类错误时，改查 `manual` 或编辑器在线时的 `api search-editor` / `api get-editor`。
+- **场景枚举**：编辑器侧执行[技术难点识别的绕过合同](../技术难点识别.md#绕过合同四条硬边界)，试玩服务端的例外也写在那里。
+- **检索失败**：`docs search` 报 HTTP 500 等服务端错误时（0.20.12 的 `editor-api` docset 出现过），改查 `manual` 或编辑器在线时的 `api search-editor` / `api get-editor`。
 - **模型动画验收**：导入、播放与画面判定读[美术资产概要「模型动画导入与播放」](../art-asset-overview.md#模型动画导入与播放)。
 
 ## 测试纪律
