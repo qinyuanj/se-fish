@@ -13,7 +13,7 @@
 - **开发工作流**：修改代码、运行测试、同步宿主或操作编辑器前，以及整理过程产物时，读 `docs/agents/workflow.md`（工具链、测试纪律、完成判据、产物归属）。
 - **架构导航**：需要模块依赖全景、评估改动影响或从图上发起操作时，用 uml-viewer 打开 `docs/uml/se-fish.edn`；命令与约定见 `docs/agents/workflow.md` 工具链。
 - **架构分层**：新增模块、调整模块职责或依赖方向前，读 `docs/architecture.md`；层归属与门禁唯一声明在 `tools/arch_policy.lua`。
-- **美术资产**：用 Blender 或 Meshy 前，读 `docs/agents/art-pipeline.md`（无头 Blender 入口与踩坑、Meshy MCP 接入）；验收资产前读 `docs/art-asset-overview.md`「验收」，尺寸口径见 `docs/adr/0004-fish-asset-scale.md`。Blender 只走无头：一律用 `lua5.4 tools/cli.lua blender`，**跳过上游 blender-* skill 的 Live/MCP 段落**（含 `execute_blender_code` 与 `look` 工具），不裸调 `blender.exe`、不用 `run_in_blender.py` 直连；见 `docs/adr/0009-blender-headless-only.md`。
+- **美术资产**：定位美术工作区文件、用 Blender 或 Meshy 前，读 `docs/agents/art-pipeline.md`（工作区路径表、无头 Blender 入口与踩坑、Meshy MCP 接入）；验收资产前读 `docs/art-asset-overview.md`「验收」，尺寸口径见 `docs/adr/0004-fish-asset-scale.md`。Blender 只走无头：一律用 `lua5.4 tools/cli.lua blender`，**跳过上游 blender-* skill 的 Live/MCP 段落**（含 `execute_blender_code` 与 `look` 工具），不裸调 `blender.exe`、不用 `run_in_blender.py` 直连；见 `docs/adr/0009-blender-headless-only.md`。
 - **Issue**：读写前看 `docs/agents/issue-tracker.md`；打 triage 标签前看 `docs/agents/triage-labels.md`。本项目在 GitHub `qinyuanj/se-fish` 跟踪单据，通过 `gh` 操作。
 
 ## 修改边界
