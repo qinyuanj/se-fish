@@ -94,9 +94,11 @@ install -m 755 tools/hooks/shim "$(git rev-parse --git-common-dir)/hooks/pre-com
 
 等价地直接看 `lua5.4 tools/cli.lua deploy` 的收尾输出。
 
-**编辑器 CLI 取证。** 操作前用目标命令的 `--help` 确认当前版本能力；以下是 0.20.12 的项目实测：
+**编辑器 CLI 取证。** 操作前用目标命令的 `--help` 确认当前版本能力；以下是 0.20.12～0.20.13 的项目实测：
 
-- **异步输出**：服务端、客户端 `exec` 提交成功只表示代码已提交。脚本打印唯一标记后，用 `log grep <标记>` 读取实际结果。
+- **多实例**：`editor-instances list` 列出多个实例时（含停在 `<starting>` 的），每条命令都带 `--editor-instance <pid>`。
+- **试玩闸门例外**：`code diff` 中 `differs`、`only-on-map` 为空，且 `only-local` 全在 `unit_scripts/` 下时，视为干净，不 push、直接试玩，并在取证记录里写明这些文件。`unit_scripts/` 由引擎生成（见 `AGENTS.md`），编辑器导入资源后会在宿主目录留下这类文件。
+- **异步输出**：服务端、客户端 `exec` 提交成功只表示代码已提交。脚本打印唯一标记后，用 `log grep <标记> | grep '^>'` 读取实际结果（不带过滤时会混入上下文行与统计行）。
 - **画面**：该版本没有 `screenshot offscreen`；编辑态截图带网格时，改用试玩的 `screenshot game` 取无网格证据。只截判读对象，结束后还原取景和现场。
 - **场景枚举**：编辑器侧执行[技术难点识别的绕过合同](../技术难点识别.md#绕过合同四条硬边界)，试玩服务端的例外也写在那里。
 - **检索失败**：`docs search` 报 HTTP 500 等服务端错误时（0.20.12 的 `editor-api` docset 出现过），改查 `manual` 或编辑器在线时的 `api search-editor` / `api get-editor`。

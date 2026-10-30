@@ -45,7 +45,7 @@ lua5.4 tools/cli.lua blender --expr "import bpy; print(len(bpy.data.objects))"
 
 - **换文件**：`bpy.ops.wm.open_mainfile` / `read_homefile` 会弄脏执行 context；换文件用 `--blend` 交给入口，重建场景用逐个删除对象。
 - **自检渲染**：`view_transform` 设 `Standard`，否则 AgX 会把已按显示编码存盘的贴图再压一遍，看起来像全黑。
-- **看图**：`view_image` 只认 `/mnt/c/...` 路径，读不了 `/tmp`；重渲同名 PNG 可能拿到旧图，换新文件名再看。
+- **看图**：`view_image` 只认 `/mnt/c/...` 路径，读不了 `/tmp`；重渲同名 PNG 可能拿到旧图，换新文件名再看。刚写入的图可能报“文件不存在”，先 `ls` 确认或等约 3 秒再看。
 - **贴图投射压暗**：EMIT 投射到 Non-Color 缓冲前，源贴图也要设为 Non-Color，否则按 sRGB 解码会整体压到约 40%。
 - **`ARMATURE_AUTO` 会静默失败**：求解失败或网格有重合点（如切口）时不抛异常、顶点组全空。热权重要在切口之前求；求完核对顶点组非空，失败改用参考网格的顶点组做 Data Transfer。
 - **FBX 动画往返**：动画源用已导出的动画 FBX；从 `.blend` 里 `wm.append` 出的 action 绑到同名骨架上位移恒 0。往返固定 **+1 帧**（导出按 `t=frame/fps`，导入按 `frame=t*fps+1`）。导出统一 `add_leaf_bones=False`，否则多出 `*_end` 骨骼。
@@ -76,11 +76,15 @@ Codex 的 MCP 注册在仓库内 `.codex/config.toml`（gitignored，不入库�
 
 模型动画的导入、播放与判定口径见[美术资产概要「模型动画导入与播放」](../art-asset-overview.md#模型动画导入与播放)。探针按下面顺序调用，`exec` 与 `log grep` 用法见 [workflow「编辑器 CLI 取证」](workflow.md)：
 
-1. 进试玩，`input move-to` 把角色移到空地。
+1. 进试玩，等游戏 UI 加载完；连截 2 帧，md5 相同就先 `input joystick` 让角色动一下，确认画面在刷新。
 2. 客户端 exec `tests/probes/seam_a_camera_client.lua`，`log grep SEAMA_CAM` 取相机与焦点坐标。
 3. 服务端 exec 一行 `_G.SeamA = {mesh=..., clip=..., skin=..., cam={...}, focus={...}}`，再 exec `tests/probes/seam_a_anim_server.lua`；参数说明在探针文件头。
-4. 等 2 秒后 `screenshot game --stdout` 连截 4 帧，用 `uv run -q --with pillow python -I tools/frame_diff.py --box L,T,R,B <帧...>` 比较鱼身区域。
-5. 换 `clip` 重跑第 3、4 步；最后用 `clip='NoSuchClip'` 做对照，差异应为 0。
-6. `_G.SeamA = {action='cleanup'}` 后再 exec 探针，确认 `left=0`，然后停试玩。
+4. 客户端用 `tests/probes/seam_a_view_client.lua` 固定侧机位并隐藏 UI（主界面按钮会挡住鱼身）；服务端用 `tests/probes/seam_a_measure_server.lua` 的 `cube` 在鱼旁摆 1 单位方块。
+5. 等 2 秒后 `screenshot game` 连截 4 帧，用 `uv run -q --with pillow python -I tools/frame_diff.py --box L,T,R,B <帧...>` 比较鱼身区域。
+6. 换 `clip` 重跑第 3、5 步；最后用 `clip='NoSuchClip'` 做对照，鱼身区域差异应为 0（裁剪框边缘的远景闪烁不算）。
+7. 量尺寸与碰撞：`NoSuchClip` 静止帧里按同框方块换算，像素/单位 = 方块正面像素 × 方块正面深度 ÷ 鱼所在深度；`seam_a_measure_server.lua` 的 `aabb` 给出碰撞 AABB，播放中重扫可判断碰撞体是否随动画变化。
+8. 还原与清理：`SeamAView` 的 `restore`、`SeamAMeasure` 的 `cleanup`、`SeamA` 的 `cleanup`，确认 `left=0` 后停试玩。
 
 鳄雀鳝基准（2026-10-28）：镜头距离 `dist=7`，裁剪框 `520,270,860,345`，Walk / Idle / Attack 变化像素 187~3235，`NoSuchClip` 为 0。
+
+fish_001 基准（2026-10-30，[#162](https://github.com/qinyuanj/se-fish/issues/162)）：机位 `(-498.5, 6.8, 349.5)`、`yaw=-pi/2`，鱼在 `(-502.9, 6.446, 349.5)`，方块 `at={-502.9, 6.0, 351.6}`，裁剪框 `480,460,900,700`；三段变化像素 3195~60287，`NoSuchClip` 鱼身区域为 0。
