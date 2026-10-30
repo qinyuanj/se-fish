@@ -2374,8 +2374,8 @@ TweenInfo = {}
 ---创建 TweenInfo 对象
 ---**适用范围**: 客户端和服务端
 ---@param duration Float 持续时间
----@param easingStyle? Int 缓动风格, 默认 0 (Linear)
----@param easingDirection? Int 缓动方向, 默认 0 (In)
+---@param easingStyle? Enums.EasingStyle 缓动风格, 默认 0 (Linear)
+---@param easingDirection? Enums.EasingDirection 缓动方向, 默认 1 (Out)
 ---@param repeatCount? Int 重复次数, 默认 0 (0=一次, -1=无限)
 ---@param reverses? Bool 反向播放, 默认 false
 ---@param delayTime? Float 延迟时间, 默认 0
@@ -2956,11 +2956,11 @@ Enums.DataStoreErrorCode = {
 	ValueNotAllowed = 121,  ---不合法的值数据, 无法完成json序列化
 	CantStoreValue = 122,  ---无法存储该值
 	ValueTooLarge = 123,  ---值数据序列化后超过限制
-	MaxValueInvalid = 131,  ---MaxValue 必须是整数
-	MinValueInvalid = 132,  ---MinValue 必须是整数
+	MaxValueInvalid = 131,  ---maxValue 如果指定必须是整数或浮点数
+	MinValueInvalid = 132,  ---minValue 如果指定必须是整数或浮点数
 	PageSizeGreater = 133,  ---PageSize 超过上限, 必须在1-100内
 	PageSizeLesser = 134,  ---PageSize 低于下限, 必须在1-100内
-	MinMaxOrderInvalid = 135,  ---MinValue 必须小于 MaxValue
+	MinMaxOrderInvalid = 135,  ---minValue 必须小于 maxValue
 	MetaKeyEmpty = 141,  ---元数据键名不能为空
 	MetaKeyInvalid = 142,  ---元数据键名只能是字符串
 	MetaKeyLengthInvalid = 143,  ---元数据键名长度必须在1-50之间
@@ -3000,11 +3000,16 @@ Enums.DataStoreErrorCode = {
 	OrderedWriteTotalThrottle = 342,  ---写入请求被丢弃, 有序存储服务所有服务器写速率超限制
 	OrderedListTotalThrottle = 343,  ---列出请求被丢弃, 有序存储服务所有服务器列出速率超限制
 	OrderedRemoveTotalThrottle = 344,  ---删除请求被丢弃, 有序存储服务所有服务器删除速率超限制
+	MemorySpaceThrottled = 351,  ---作品的存储空间达到上限
+	DatastoreTrafficThrottled = 352,  ---作品的所有请求的流量超过了限制
+	KeyTrafficThrottled = 353,  ---单个键的流量超过了限制
 	DataStoreNotExist = 401,  ---数据存储集合不存在
 	DataStoreDeleted = 402,  ---数据存储集合已删除
 	OrderedDataStoreNotExist = 403,  ---有序数据存储集合不存在
 	OrderedDataStoreDeleted = 404,  ---有序数据存储集合已删除
-	OrderedDataStoreValueMustBeInt = 411,  ---有序数据存储集合的值必须是整数
+	DataStoreNotDeleted = 405,  ---数据存储集合未删除
+	DataStoreInClearOperation = 406,  ---数据存储集合正在清除操作中
+	OrderedDataStoreValueMustBeInt = 411,  ---有序数据存储集合的值必须是整数或浮点数
 	DataStoreServiceNotReady = 412,  ---数据存储服务未准备好, 无法完成操作
 	DataStoreServiceError = 413,  ---数据存储服务内部错误, 无法完成操作
 	DataStoreServiceNotReach = 414,  ---数据存储服务未就绪, 无法完成操作
@@ -3015,6 +3020,8 @@ Enums.DataStoreErrorCode = {
 	VersionMismatch = 504,  ---版本不匹配, 期望版本与实际版本不一致
 	VersionInvalid = 505,  ---非法的版本
 	VersionNotFound = 506,  ---版本已过期或不存在
+	LtsVersionForbidRemove = 507,  ---最新版本无法作为版本移除
+	InvalidRequest = 508,  ---非法的请求
 }
 
 ---数据存储类型
@@ -3214,11 +3221,11 @@ Enums.EasingStyle = {
 	Quart = 3,  ---四次曲线
 	Quint = 4,  ---五次曲线
 	Sine = 5,  ---正弦曲线
-	Back = 6,  ---回弹效果
-	Bounce = 7,  ---弹跳效果
-	Elastic = 8,  ---弹性效果
-	Exponential = 9,  ---指数曲线
-	Circular = 10,  ---圆弧曲线
+	Exponential = 6,  ---指数曲线
+	Circular = 7,  ---圆弧曲线
+	Back = 8,  ---回弹效果
+	Bounce = 9,  ---弹跳效果
+	Elastic = 10,  ---弹性效果
 }
 
 ---特效绑定类型
@@ -3228,6 +3235,30 @@ Enums.EffectBindType = {
 	POS_ROT = 3,  ---位置+旋转
 	POS_SCALE = 5,  ---位置+缩放
 	ALL = 7,  ---全部跟随
+}
+
+---蛋形生物（蛋仔骨架）可自定义偏移与缩放的骨骼。
+---@enum Enums.EggySkeletalBone 
+Enums.EggySkeletalBone = {
+	Root = "biped",  ---根骨骼
+	Head = "biped head",  ---头部
+	LCalf = "biped l calf",  ---左小腿
+	LClavicle = "biped l clavicle",  ---左肩
+	LFoot = "biped l foot",  ---左脚
+	LForearm = "biped l forearm",  ---左小臂
+	LHand = "biped l hand",  ---左手
+	LThigh = "biped l thigh",  ---左大腿
+	LUpperArm = "biped l upperarm",  ---左大臂
+	Pelvis = "biped pelvis",  ---盆骨
+	RCalf = "biped r calf",  ---右小腿
+	RClavicle = "biped r clavicle",  ---右肩
+	RFoot = "biped r foot",  ---右脚
+	RForearm = "biped r forearm",  ---右小臂
+	RHand = "biped r hand",  ---右手
+	RThigh = "biped r thigh",  ---右大腿
+	RUpperArm = "biped r upperarm",  ---右大臂
+	Waist = "biped spine",  ---腰部
+	Chest = "biped spine1",  ---胸部
 }
 
 ---蛋仔的动态表情状态，覆盖待机、开心、伤心、生气、思考、震惊、害怕、大笑、说话等常见情绪与动作表情。
@@ -3413,12 +3444,12 @@ Enums.MemoryStoreErrorCode = {
 	RequestThrottled = 108,  ---请求被限流
 	UpdateRetryTimesLimit = 109,  ---更新冲突后，超过最大重试次数
 	LocalErrorEnd = 999,  ---本地错误码结束
-	AccessDenied = 1001,  ---未授权访问数据
+	AccessDenied = 1001,  ---未授权访问数据，此请求不消耗请求单位或使用配额
 	InternalError = 1003,  ---远端服务内部错误
 	InvalidRequest = 1004,  ---请求参数错误
 	ServiceNotReady = 1005,  ---服务未就绪
 	StoreMemoryOverLimit = 1101,  ---超过数据结构级别内存大小限制 (100MB)
-	StoreItemsOverLimit = 1102,  ---超过数据结构元素个数限制 (1M)
+	StoreItemsOverLimit = 1102,  ---超过数据结构元素个数限制 (100000)
 	KeyValueSizeTooLarge = 1103,  ---单个键值大小超过限制 (1MB)
 	KeySizeTooLarge = 1104,  ---单个键大小超过限制 (128B)
 	SortKeySizeTooLarge = 1105,  ---单个排序键大小超过限制 (128B)
@@ -3427,7 +3458,7 @@ Enums.MemoryStoreErrorCode = {
 	PartitionRequestsOverLimit = 1202,  ---超过分区请求次数限制
 	TotalMemoryOverLimit = 1203,  ---超过总内存限制
 	DataUpdateConflict = 1301,  ---数据更新冲突
-	NoItemFound = 1302,  ---未找到指定元素 (Queue:ReadAsync 空队列)
+	NoItemFound = 1302,  ---未找到项目（MemoryStoreQueue:ReadAsync()/MemoryStoreSortedMap:UpdateAsync()）；ReadAsync() 每 2 秒轮询，找到队列项目之前返回此码
 	KeyExists = 1303,  ---键已存在 (NX 条件失败)
 	KeyNotExists = 1304,  ---键不存在 (XX 条件失败)
 	MemoryStoreExists = 1305,  ---数据结构已存在 (MSNX 条件失败)
@@ -3547,6 +3578,16 @@ Enums.SkeletalSocketType = {
 	Origin = "socket_origin",  ---底面中心
 	LWeapon = "socket_weapon_l",  ---左手武器
 	RWeapon = "socket_weapon_r",  ---右手武器
+}
+
+---SkinSlotIndex 皮肤槽位
+---@enum Enums.SkinSlotIndex 
+Enums.SkinSlotIndex = {
+	ALL = -1,  ---全部槽位（多槽位模式作用于所有槽位；单皮肤模式作用于当前皮肤）
+	SLOT_1 = 0,  ---槽位1
+	SLOT_2 = 1,  ---槽位2
+	SLOT_3 = 2,  ---槽位3
+	SLOT_4 = 3,  ---槽位4
 }
 
 ---天空模板
@@ -3689,6 +3730,14 @@ Enums.TextOverflowStrategy = {
 	OVERFLOW_SCROLL = 2,  ---跑马
 }
 
+---TextureChannel 贴图通道
+---@enum Enums.TextureChannel 
+Enums.TextureChannel = {
+	MAIN = 0,  ---主贴图（Tex0）
+	NORMAL = 1,  ---法线（Tex1）
+	MRE = 2,  ---MRE（Tex2）
+}
+
 ---头像缩略图尺寸
 ---@enum Enums.ThumbnailSize 
 Enums.ThumbnailSize = {
@@ -3778,6 +3827,23 @@ Enums.WhenUserFirstPlayed = {
 	Days91To180 = 3,  ---91-180 天前首次游玩
 	Days181To365 = 4,  ---181-365 天前首次游玩
 	Days366Plus = 5,  ---365 天前首次游玩
+}
+
+---局部风场的应用层类型枚举（非引擎 WindForceMapType）。Suction 吸风：植被朝目标点倾倒，引擎侧为 Conical + 吸风材质；Conical 径向：从中心向外吹；Sector 扇形：沿朝向扇形吹；Wave 波浪：波浪状起伏。
+---@enum Enums.WindForceType 
+Enums.WindForceType = {
+	Suction = 0,  ---吸风
+	Conical = 1,  ---径向
+	Sector = 2,  ---扇形
+	Wave = 3,  ---波浪
+}
+
+---固定大小风场 / 可变大小风场的形状枚举（非引擎 WindForceMapType）。Conical 锥形：从中心向四周散开吹动；Sector 扇形：沿单位朝向（Rotation 的 yaw）的扇形区域吹动；Wave 波浪：波浪状起伏摆动。注意本枚举不含吸风，吸风仅 SE 既有 WindForce 单位支持。
+---@enum Enums.WindShapeType 
+Enums.WindShapeType = {
+	Conical = 0,  ---锥形
+	Sector = 1,  ---扇形
+	Wave = 2,  ---波浪形
 }
 
 --========================== 服务 Service ==========================
@@ -4075,13 +4141,15 @@ function CameraService:ViewportPointToRay(x, y, depth) end
 ---世界坐标转屏幕坐标，供类3DUI功能使用
 ---**适用范围**: 客户端和服务端
 ---@param worldPoint Vector3 世界坐标
----@return Vector3 屏幕坐标 (X， Y， Z深度)；Lua 多返回值第二项为 Bool isOnScreen
+---@return Vector3 X/Y 为渲染像素，Z 为相机前向轴的有符号线性深度（前正后负）
+---@return Bool 是否位于相机前方且投影坐标落在屏幕范围内；不检查近远裁剪或遮挡
 function CameraService:WorldToScreenPoint(worldPoint) end
 
 ---世界坐标转视口坐标（不包含 GUI inset）
 ---**适用范围**: 客户端和服务端
 ---@param worldPoint Vector3 世界坐标
----@return Vector3 视口坐标 (X， Y， Z深度)；Lua 多返回值第二项为 Bool isInViewport
+---@return Vector3 X/Y 为渲染像素，Z 为相机前向轴的有符号线性深度（前正后负）
+---@return Bool 是否位于相机前方且投影坐标落在视口范围内；不检查近远裁剪或遮挡
 function CameraService:WorldToViewportPoint(worldPoint) end
 
 ---Camps
@@ -4303,14 +4371,14 @@ function DataStoreService:ListDataStoresAsync(prefix, pageSize, cursor, options)
 ---@return DataStoreInfoPages 分页迭代器
 function DataStoreService:ListOrderedDataStoresAsync(prefix, pageSize, cursor, options) end
 
----特效服务
+---播放特效的便捷入口，effectId仅支持official://effect/{asset_id} 或 custom://{asset_id}格式
 ---**适用范围**: 客户端和服务端
 ---@class EffectService : Unit
 local EffectService = {}
 
 ---播放本地特效{#0}，位置{1}，旋转{#2}，缩放{#3}
 ---**适用范围**: 客户端和服务端
----@param effectId String 特效资源 URI（仅 official://effect/{path} 或 custom://{asset_id}）
+---@param effectId String 特效资源 URI（仅 official://effect/{asset_id} 或 custom://{asset_id}）
 ---@param position Vector3 世界坐标位置（默认 0,0,0）
 ---@param rotation Quaternion 旋转（默认单位四元数）
 ---@param scale Vector3 缩放（默认 1,1,1）
@@ -5501,6 +5569,8 @@ local BallSocketConstraint = {}
 ---生物角色控制器基类，承载生命体的状态、生命值、移动与跳跃、血条与名字显示等通用能力。通过Unit.Controller获取使用。不同Unit会有不同的Controller实现，如EggyController，HumanController，提供各自特有的能力与表现。
 ---@class BaseController : Unit
 ---@field AutoRotate Bool 自动朝向移动方向
+---@field CapsuleHeight Float 胶囊体高度
+---@field CapsuleRadius Float 胶囊体半径
 ---@field DisplayDistanceType Int 显示距离类型
 ---@field GravityEnabled Bool 受重力作用
 ---@field HPBarShowMode Int 血条显示模式
@@ -5707,8 +5777,8 @@ function BasePart:IsWeldConstraintChild() end
 ---@return Bool
 function BasePart:IsWeldConstraintRoot() end
 
----将物体的物理模拟权限转移给指定玩家
----@param player Player 要转移权限的玩家对象
+---将物体的物理模拟权限转给指定玩家：player 传 nil 表示改由服务端模拟，传 Player 表示交给该玩家的客户端模拟。只有服务端调用生效，客户端调用会被忽略。调用后 owner 从引擎自动分配变为手动固定 。切换会作用到整个物理组，焊接/装配在同一组内的其他部件会跟着一起换 owner。当前 owner 用 GetNetworkOwner 查，判断本端是否在模拟用 IsNetworkOwnerSide
+---@param player Player 要转移权限的玩家对象；传 nil 或省略表示由服务端模拟
 function BasePart:SetNetworkOwner(player) end
 
 ---设置物体的物理拥有者是否由引擎自动分配。一旦调用将owner的切换交给引擎，引擎会自动根据角色距离等信息来切换owner
@@ -5755,7 +5825,7 @@ function BindableEvent:Fire(args) end
 function BindableEvent:Once(func) end
 
 ---在协程中挂起，直到事件触发后恢复并返回事件参数；可选超时（超时返回 false, "Timed out"）。
----@param duration? number 超时时间（秒）
+---@param duration? Float 超时时间（秒）
 ---@return Any 事件参数
 function BindableEvent:Wait(duration) end
 
@@ -6267,6 +6337,7 @@ function EUISceneNode:AttachUnit(unit, socket) end
 local EUISimpleRichTextLabel = {}
 
 ---UI滑动器
+---**适用范围**: 客户端和服务端
 ---@class EUISlider : EUINodeBase
 ---@field Direction Enums.EUIScrollDirection 横向从左到右递增，竖向从上到下递增。使用EUIScrollDirection枚举：Vertical为1，Horizontal为2。
 ---@field Disabled Bool 为true时禁用滑动条交互并显示禁用状态；若正在拖动，则以取消状态结束本次触摸。
@@ -6419,10 +6490,13 @@ function EffectUnit:StartposAttach(otherUnit, socket, offset, bindType) end
 ---@field RollChargeTime Float 滚动充能时长
 ---@field RollSpeed Float 滚动速度
 ---@field RollTime Float 滚动持续时长
+---@field SeatPart Unit 当前正在乘坐的座椅 Unit 引用，未坐下时为 nil
+---@field Sit Bool 是否处于坐下状态；写入 true 尝试坐入，写入 false 起身
 ---@field OnLiftBegin Signal<fun(liftedUnit: SpaceUnit)> 开始抓举其他单位时触发。回调参数：liftedUnit 举起的单位
 ---@field OnLiftEnd Signal<fun()> 结束抓举（扔出/打断）时触发
 ---@field OnLiftedBegin Signal<fun(liftunit: EggyUnit)> 被其他生物抓举起时触发。回调参数：liftunit 举起当前对象的生物
 ---@field OnLiftedEnd Signal<fun()> 结束被抓举状态时触发
+---@field Seated Signal<fun(active: Bool, seat: Unit)> 单位坐下或起身时触发，携带当前座位 Unit 引用。回调参数：active true=坐下，false=起身, seat 座位 Unit
 local EggyController = {}
 
 ---执行一次翻滚
@@ -6486,6 +6560,10 @@ function EggyUnit:GetYaw() end
 ---@param groupName String 碰撞组名
 function EggyUnit:RemoveCollisionWithGroup(groupName) end
 
+---设置蛋形生物的面部贴图
+---@param assetId String 贴图资源ID（内容 URI，如 official://image/xxx 或 custom://xxx）
+function EggyUnit:SetFaceTexture(assetId) end
+
 ---设置{#0}的网络拥有者
 ---@param player Player 玩家
 function EggyUnit:SetNetworkOwner(player) end
@@ -6501,6 +6579,35 @@ function EggyUnit:SetRotation(rotation) end
 ---设置缩放
 ---@param scale Vector3 缩放
 function EggyUnit:SetScale(scale) end
+
+---修改蛋形生物指定骨骼的偏移量
+---@param skeleton_name Enums.EggySkeletalBone 骨骼名称
+---@param offset Vector3 偏移量
+function EggyUnit:SetSkeletonOffset(skeleton_name, offset) end
+
+---修改蛋形生物指定骨骼的缩放比例
+---@param skeleton_name Enums.EggySkeletalBone 骨骼名称
+---@param scale Vector3 缩放比例
+function EggyUnit:SetSkeletonScale(skeleton_name, scale) end
+
+---影响半径从初始大小按速度与加速度扩散到最终大小的局部风场，驱动范围内植被摆动。只影响开启了风场贴图的植被；风场高度需贴近草根（离地过高会完全看不到效果）。缩放 gizmo 与最终大小双向联动（1:1）。本类型是**一次性爆发**：「单次持续时间」是整段扰动的总时长，同时决定扩散与波形快慢（越短越快）；需要多次出现时开启「循环触发」（每「循环触发间隔」秒重放一次，间隔小于单次时长会中途打断重来），或用触发效果事件反复触发。
+---**适用范围**: 客户端和服务端
+---@class ExplosionWindForce : Unit
+---@field Acceleration Float 加速度
+---@field BeginRadius Float 初始大小
+---@field Duration Float 单次持续时间
+---@field Enabled Bool 游戏开始时触发
+---@field EndEvent String 停止效果事件
+---@field EndRadius Float 最终大小
+---@field LoopEnabled Bool 循环触发
+---@field LoopInterval Float 循环触发间隔
+---@field Position Vector3 位置
+---@field Rotation Quaternion 旋转
+---@field Scale Vector3 缩放
+---@field Shape Enums.WindShapeType 形状
+---@field Speed Float 速度
+---@field StartEvent String 触发效果事件
+local ExplosionWindForce = {}
 
 ---文件网格
 ---@class FileMesh : Unit
@@ -6532,6 +6639,22 @@ function FindingPathUnit:GetWaypoints() end
 ---移除路点
 ---@param index Int 路点索引
 function FindingPathUnit:RemovePoint(index) end
+
+---半径固定、持续指定时间的局部风场，驱动圆形范围内植被摆动。只影响开启了风场贴图的植被；风场高度需贴近草根（离地过高会完全看不到效果）。缩放 gizmo 与半径双向联动（1:1）。锥形/扇形为持续风；波浪形的波形只推进一遍、不循环。「单次持续时间」是一次扰动的总时长，同时决定波形快慢（越短越快）；开启「循环触发」后每「循环触发间隔」秒重放一次——间隔大于单次时长会留空档，小于则上一波会被中途打断重来。
+---**适用范围**: 客户端和服务端
+---@class FixedWindForce : Unit
+---@field Duration Float 单次持续时间
+---@field Enabled Bool 游戏开始时触发
+---@field EndEvent String 停止效果事件
+---@field LoopEnabled Bool 循环触发
+---@field LoopInterval Float 循环触发间隔
+---@field Position Vector3 位置
+---@field Radius Float 半径
+---@field Rotation Quaternion 旋转
+---@field Scale Vector3 缩放
+---@field Shape Enums.WindShapeType 形状
+---@field StartEvent String 触发效果事件
+local FixedWindForce = {}
 
 ---雾效
 ---**适用范围**: 客户端和服务端
@@ -6634,14 +6757,22 @@ function HumanController:GetRelativeVelocityAtFloor() end
 ---@field LinearVelocity Vector3 当前线速度（m/s），运行时只读，反映单位在世界空间中的移动速度
 ---@field Mass Float 单位质量，影响碰撞反馈和受力效果，仅 Dynamic 类型有效
 ---@field Massless Bool 是否将质量视为零，启用后碰撞不会产生反作用力
+---@field MaterialParamList MaterialParam[] 材质参数列表
+---@field ModelColor1 Color3 模型染色区域1的颜色
+---@field ModelColor2 Color3 模型染色区域2的颜色
+---@field ModelColor3 Color3 模型染色区域3的颜色
+---@field ModelColor4 Color3 模型染色区域4的颜色
 ---@field PhysicsActive Bool 是否启用物理模拟，关闭后单位不受重力、碰撞等物理影响
 ---@field Position Vector3 单位在世界空间中的位置坐标
 ---@field RenderMeshId String 单位使用的骨骼网格资源路径，支持 official:// 协议引用官方资源
 ---@field Rotation Quaternion 单位在世界空间中的旋转，以四元数表示
 ---@field RotationLocked Bool 是否锁定旋转自由度，启用后物理模拟不会改变单位朝向
 ---@field Scale Vector3 单位在三个轴向上的缩放倍数，默认 (1,1,1) 表示原始尺寸
+---@field SkinId String 皮肤
+---@field SkinSlots SkinSlot[] 每个子网格的皮肤与染色配置，元素包含 SkinId、ModelColor1~4；启用自定义外观后该属性不生效
 ---@field UseCustomAppearance Bool 使用自定义外观
 ---@field UseIndividualGravity Bool 是否覆盖全局重力，启用后将使用 IndividualGravityValue 指定的重力方向与大小
+---@field UseSkinList Bool 启用后使用多槽位皮肤系统，每个子网格可独立配置皮肤与染色；启用自定义外观后该属性不生效
 ---@field Visible Bool 控制单位模型是否在场景中渲染显示
 ---@field OnCollisionEnter Signal<fun(otherUnit: Unit)> 当本单位与其他 Unit 开始碰撞时触发。回调参数：otherUnit 碰撞到的单位
 ---@field OnCollisionExit Signal<fun(otherUnit: Unit)> 当本单位与其他 Unit 结束碰撞时触发。回调参数：otherUnit 结束碰撞的单位
@@ -7190,6 +7321,12 @@ local RenderTriggerUnit = {}
 ---@param renderMeshId String 模型资源ID
 function RenderTriggerUnit:SetRenderMeshWithDefaultSkin(renderMeshId) end
 
+---以单位当前皮肤为底派生一个只改指定贴图通道的自定义皮肤并替换旧皮肤（单皮肤与多槽位皮肤均支持）；传空字符串清除该通道覆盖，全部清空时回退原皮肤；双端可调用（服务端同步全端，客户端仅本机生效）；自定义外观期间或单位无皮肤时忽略本次调用
+---@param textureAssetId String 贴图资源ID，传空字符串清除该通道覆盖
+---@param texIndex? Enums.TextureChannel 贴图通道（TextureChannel.MAIN=主贴图 / NORMAL=法线 / MRE），缺省 TextureChannel.MAIN
+---@param slotIndex? Enums.SkinSlotIndex 皮肤槽位（SkinSlotIndex.SLOT_1~4）；缺省或 SkinSlotIndex.ALL 时：多槽位模式作用于全部槽位、单皮肤模式作用于当前皮肤
+function RenderTriggerUnit:SetTexture(textureAssetId, texIndex, slotIndex) end
+
 ---RenderUnit是一种可创建的3D空间组件，具备渲染表现能力。常用于场景中需要模型展示的装饰物件。
 ---@class RenderUnit : BasePart
 ---@field CastShadow Bool 控制模型是否向场景投射阴影；启用自定义外观后该属性不生效
@@ -7214,6 +7351,12 @@ local RenderUnit = {}
 ---切换 RenderMeshId 并自动应用新模型的默认皮肤：默认皮肤 >1 个时进入多槽位模式（逐 Submesh 一个默认皮并回填默认染色），单个/无默认皮肤时回到单皮肤模式并写入默认 SkinId（含默认染色回填）。双端可调用，服务端权威（客户端仅本机生效）；自定义外观开启期间不可用
 ---@param renderMeshId String 模型资源ID
 function RenderUnit:SetRenderMeshWithDefaultSkin(renderMeshId) end
+
+---以单位当前皮肤为底派生一个只改指定贴图通道的自定义皮肤并替换旧皮肤（单皮肤与多槽位皮肤均支持）；传空字符串清除该通道覆盖，全部清空时回退原皮肤；双端可调用（服务端同步全端，客户端仅本机生效）；自定义外观期间或单位无皮肤时忽略本次调用
+---@param textureAssetId String 贴图资源ID，传空字符串清除该通道覆盖
+---@param texIndex? Enums.TextureChannel 贴图通道（TextureChannel.MAIN=主贴图 / NORMAL=法线 / MRE），缺省 TextureChannel.MAIN
+---@param slotIndex? Enums.SkinSlotIndex 皮肤槽位（SkinSlotIndex.SLOT_1~4）；缺省或 SkinSlotIndex.ALL 时：多槽位模式作用于全部槽位、单皮肤模式作用于当前皮肤
+function RenderUnit:SetTexture(textureAssetId, texIndex, slotIndex) end
 
 ---刚性约束用于将两个物理部件完全固定在一起，使其之间不能有任何相对运动（位置和旋转均锁定）。使用时需设置 Attachment0 和 Attachment1 指向两个已存在的 Attachment。物理约束建议在服务端创建。
 ---@class RigidConstraint : Unit
@@ -7243,11 +7386,21 @@ local Script = {}
 
 ---座椅
 ---@class SeatUnit : BasePart
+---@field BodyType Int 物理类型
+---@field CanCollide Bool 能否碰撞
+---@field CanTouch Bool 其他物体碰到此物体时，是否触发此物体的碰撞事件
 ---@field Disabled Bool 是否禁用
 ---@field Occupant Unit 当前乘客
+---@field PhysicsActive Bool 开启物理
 ---@field RenderMeshId String 模型资源ID
 ---@field OnOccupantChanged Signal<fun(occupant: Unit)> 回调参数：occupant 当前乘客
 local SeatUnit = {}
+
+---以单位当前皮肤为底派生一个只改指定贴图通道的自定义皮肤并替换旧皮肤（单皮肤与多槽位皮肤均支持）；传空字符串清除该通道覆盖，全部清空时回退原皮肤；双端可调用（服务端同步全端，客户端仅本机生效）；自定义外观期间或单位无皮肤时忽略本次调用
+---@param textureAssetId String 贴图资源ID，传空字符串清除该通道覆盖
+---@param texIndex? Enums.TextureChannel 贴图通道（TextureChannel.MAIN=主贴图 / NORMAL=法线 / MRE），缺省 TextureChannel.MAIN
+---@param slotIndex? Enums.SkinSlotIndex 皮肤槽位（SkinSlotIndex.SLOT_1~4）；缺省或 SkinSlotIndex.ALL 时：多槽位模式作用于全部槽位、单皮肤模式作用于当前皮肤
+function SeatUnit:SetTexture(textureAssetId, texIndex, slotIndex) end
 
 ---从一个矩形平面发光，像一个发光的面板。适合做电视屏幕、LED广告牌、窗户透光等。
 ---**适用范围**: 客户端和服务端
@@ -7334,6 +7487,7 @@ local SimpleSpotShadowLight = {}
 
 ---骨骼挂点
 ---@class SkeletalSocketMount : Unit
+---@field PhysicsSyncEnabled Bool 关闭后仅把子单位模型绑到挂点，子单位不再做物理同步，减少物理开销。
 ---@field SocketName String 挂点名称
 ---@field SocketOffset Vector3 挂点位移
 ---@field SocketRotation Quaternion 挂点旋转
@@ -7608,7 +7762,7 @@ function TriggerUnit:RemoveNoCollisionPairWithUnit(targetUnit) end
 ---@class Tween : Unit
 ---@field Instance Unit 被动画的目标对象
 ---@field PlaybackState Enums.TweenPlayState 播放状态
----@field Completed Signal<fun(playbackState: Enums.TweenStatus)> 完成事件。回调参数：playbackState 完成状态
+---@field Completed Signal<fun(playbackState: Enums.TweenPlayState)> 播放结束事件（Completed/Cancelled）。回调参数：playbackState 结束时的播放状态
 local Tween = {}
 
 ---取消播放
@@ -7766,6 +7920,21 @@ local WeldConstraint = {}
 ---@return BasePart
 function WeldConstraint:GetRootUnit() end
 
+---在圆形范围内驱动植被摆动的局部风场，仅影响支持风场贴图的植被，仅高画质生效。吸风类型可让草朝风口倾倒，适合做抽风机、吸尘口等表现；可挂在模型或挂点下跟随移动。
+---**适用范围**: 客户端和服务端
+---@class WindForce : Unit
+---@field Enabled Bool 启用
+---@field Intensity Float 强度
+---@field Position Vector3 位置
+---@field Radius Float 影响半径
+---@field RenderPriority Int 绘制优先级
+---@field Rotation Quaternion 旋转
+---@field TargetOffset Vector3 吸引目标偏移
+---@field VentFadeWidth Float 风口渐变宽度
+---@field VentRadius Float 风口半径
+---@field WindType Enums.WindForceType 风场类型
+local WindForce = {}
+
 ---处理物理模拟和3D空间查询的基类，预期为任何用于处理3D空间查询和模拟的实例提供API，例如World
 ---@class WorldRoot : ModelUnit
 local WorldRoot = {}
@@ -7878,6 +8047,12 @@ function WorldUnit:RemoveNoCollisionPairWithUnit(targetUnit) end
 ---切换 RenderMeshId 并自动应用新模型的默认皮肤：默认皮肤 >1 个时进入多槽位模式（逐 Submesh 一个默认皮并回填默认染色），单个/无默认皮肤时回到单皮肤模式并写入默认 SkinId（含默认染色回填）。双端可调用，服务端权威（客户端仅本机生效）；自定义外观开启期间不可用
 ---@param renderMeshId String 模型资源ID
 function WorldUnit:SetRenderMeshWithDefaultSkin(renderMeshId) end
+
+---以单位当前皮肤为底派生一个只改指定贴图通道的自定义皮肤并替换旧皮肤（单皮肤与多槽位皮肤均支持）；传空字符串清除该通道覆盖，全部清空时回退原皮肤；双端可调用（服务端同步全端，客户端仅本机生效）；自定义外观期间或单位无皮肤时忽略本次调用
+---@param textureAssetId String 贴图资源ID，传空字符串清除该通道覆盖
+---@param texIndex? Enums.TextureChannel 贴图通道（TextureChannel.MAIN=主贴图 / NORMAL=法线 / MRE），缺省 TextureChannel.MAIN
+---@param slotIndex? Enums.SkinSlotIndex 皮肤槽位（SkinSlotIndex.SLOT_1~4）；缺省或 SkinSlotIndex.ALL 时：多槽位模式作用于全部槽位、单皮肤模式作用于当前皮肤
+function WorldUnit:SetTexture(textureAssetId, texIndex, slotIndex) end
 
 ---全局Game对象单例。
 ---@type Game
