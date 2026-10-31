@@ -94,12 +94,15 @@ install -m 755 tools/hooks/shim "$(git rev-parse --git-common-dir)/hooks/pre-com
 
 等价地直接看 `lua5.4 tools/cli.lua deploy` 的收尾输出。
 
-**编辑器 CLI 取证。** 操作前用目标命令的 `--help` 确认当前版本能力；以下是 0.20.12～0.20.13 的项目实测：
+**编辑器 CLI 取证。** 操作前用目标命令的 `--help`（或 `help export <命令>`）确认当前版本能力。编辑器分发的 skill（`eggy-se-*`）与本节或 CLI `--help` 冲突时，以后两者为准，见 [ADR-0014](../adr/0014-eggitor-ai-resources-not-source-of-truth.md)。以下是 0.20.12～0.20.13 的项目实测：
 
+- **会话首开对齐**：本会话第一次做 Lua 相关操作且编辑器在线时，先跑 `code diff --json`；changelist 非空就把分类计数与文件清单报给用户，由用户选 push、pull 或暂不处理，agent 不自选方向。
 - **多实例**：`editor-instances list` 列出多个实例时（含停在 `<starting>` 的），每条命令都带 `--editor-instance <pid>`。
-- **试玩闸门例外**：`code diff` 中 `differs`、`only-on-map` 为空，且 `only-local` 全在 `unit_scripts/` 下时，视为干净，不 push、直接试玩，并在取证记录里写明这些文件。`unit_scripts/` 由引擎生成（见 `AGENTS.md`），`deploy` 只镜像三端子树，不会清理它。
-- **异步输出**：服务端、客户端 `exec` 提交成功只表示代码已提交。脚本打印唯一标记后，用 `log grep <标记> | grep '^>'` 读取实际结果（不带过滤时会混入上下文行与统计行）。
-- **画面**：该版本没有 `screenshot offscreen`；编辑态截图带网格时，改用试玩的 `screenshot game` 取无网格证据。只截判读对象，结束后还原取景和现场。
+- **试玩闸门例外**：`code diff` 中 `differs`、`only-on-map` 为空，且 `only-local` 全在 `unit_scripts/` 或 `.agents/` 下时，视为干净，不 push、直接试玩，并在取证记录里写明这些文件。`unit_scripts/` 由引擎生成（见 `AGENTS.md`），`deploy` 只镜像三端子树，不会清理它；`.agents/` 是 agent 配置，不进地图。
+- **异步输出**：服务端、客户端 `exec` 提交成功只表示代码已提交。脚本打印唯一标记后，用 `log grep <标记> | grep '^>'` 读取实际结果（不带过滤时会混入上下文行与统计行）。`log grep` 没有 `-i`：默认就不区分大小写，需要区分时加 `--case-sensitive`。
+- **画面**：该版本没有 `screenshot offscreen`，也没有 `--format`（只出 PNG，用 `--output` / `--stdout`）；编辑态截图带网格时，改用试玩的 `screenshot game` 取无网格证据。只截判读对象，结束后还原取景和现场。
+- **截图失败**：窗口被遮挡、最小化或在远程虚拟屏上时，`screenshot game` 会返回 `FRAME_NEAR_WHITE` 或黑帧，`screenshot editor` 会得到 1×1（`SCREENSHOT_INVALID_DIMENSIONS`）。先把编辑器窗口置前再重试一次；仍失败就请用户目视确认，给出选项、时间点和观察要点，不要循环重试。
+- **保存与重开**：`map save` 成功后 `map dirty` 仍可能为 true，此时 `map reopen` 报 `MAP_REOPEN_REJECTED`。先用 `map dirty --json` 列出 dirty 来源请用户确认，确认后才可 `map reopen --force`；来源不明时可能是用户的手动编辑，不要强制。停止试玩本身也会让 dirty 变成 true。
 - **场景枚举**：编辑器侧执行[技术难点识别的绕过合同](../技术难点识别.md#绕过合同四条硬边界)，试玩服务端的例外也写在那里。
 - **检索失败**：`docs search` 报 HTTP 500 等服务端错误时（0.20.12 的 `editor-api` docset 出现过），改查 `manual` 或编辑器在线时的 `api search-editor` / `api get-editor`。
 - **模型动画验收**：导入、播放与画面判定读[美术资产概要「模型动画导入与播放」](../art-asset-overview.md#模型动画导入与播放)。
