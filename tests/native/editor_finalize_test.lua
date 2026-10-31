@@ -6,9 +6,18 @@ local shell = require("tools.wsl_seam")
 local WORKSPACE = "C:/workspace"
 local EXE = "C:/fixture/.eggitor/cli/editor-cli.exe"
 
-local function diff(local_count, differs, channel)
-  return "channel=" .. (channel or "online") .. "\nchangelist: only-local="
-    .. local_count .. " differs=" .. differs .. " only-on-map=2 unchanged=3"
+-- 编辑器侧编出来的地图独有文件（三端外），deploy 永远保留。
+local FOREIGN = { "temp/Script_map___preset_u0.lua", "unit_scripts/World/a.lua" }
+
+-- 仿 `code diff` 文本：changelist 行 + 每个地图独有文件一行（CRLF，与真 CLI 一致）。
+-- map_only 缺省为 FOREIGN；count_override 用来造计数与清单对不上的输出。
+local function diff(local_count, differs, channel, map_only, count_override)
+  map_only = map_only or FOREIGN
+  local lines = { "codec=mm channel=" .. (channel or "online"),
+    "changelist: only-local=" .. local_count .. " differs=" .. differs
+      .. " only-on-map=" .. (count_override or #map_only) .. " unchanged=3" }
+  for _, path in ipairs(map_only) do lines[#lines + 1] = "  only-on-map  " .. path end
+  return table.concat(lines, "\r\n") .. "\r\n"
 end
 
 describe("TestEditorFinalize", function()
@@ -47,7 +56,55 @@ describe("TestEditorFinalize", function()
     responses = { { 0, "validate: OK" }, { 0, diff(0, 0) } }
     assert.is_true(finalize.run(WORKSPACE))
     assert.are.equal(2, #commands)
-    assert.is_truthy(messages[#messages]:find("地图侧多出 2", 1, true))
+    assert.is_truthy(messages[#messages]:find("多出 2 个三端外", 1, true))
+  end)
+
+  -- 本地已删的三端文件：带 --delete --yes 推送，复核时三端独有文件必须清零。
+  it("test_owned_map_only_files_are_deleted_by_push", function()
+    local stale = { "client/AttrAPI.lua", "server/ProtoWater.lua" }
+    responses = { { 0, "validate: OK" }, { 0, diff(0, 0, nil, { stale[1], stale[2], FOREIGN[1] }) },
+      { 0, "push: OK" }, { 0, diff(0, 0) } }
+    local ok, err = finalize.run(WORKSPACE)
+    assert.is_nil(ok)
+    assert.is_truthy(err:find("三端外", 1, true), "三端内外混杂时不应推送")
+    assert.are.equal(2, #commands)
+
+    commands, messages = {}, {}
+    responses = { { 0, "validate: OK" }, { 0, diff(0, 0, nil, stale) },
+      { 0, "push: OK" }, { 0, diff(0, 0, nil, {}) } }
+    assert.is_true(finalize.run(WORKSPACE))
+    assert.are.equal(4, #commands)
+    assert.is_truthy(commands[3]:find("code push --delete --yes", 1, true))
+  end)
+
+  it("test_push_without_owned_map_only_files_never_deletes", function()
+    ready_for_push(0, diff(0, 0))
+    assert.is_true(finalize.run(WORKSPACE))
+    assert.is_truthy(commands[3]:find("code push", 1, true))
+    assert.is_nil(commands[3]:find("--delete", 1, true))
+  end)
+
+  it("test_owned_map_only_left_after_push_is_a_failure", function()
+    responses = { { 0, "validate: OK" }, { 0, diff(0, 0, nil, { "client/AttrAPI.lua" }) },
+      { 0, "push: OK" }, { 0, diff(0, 0, nil, { "client/AttrAPI.lua" }) } }
+    local ok, err = finalize.run(WORKSPACE)
+    assert.is_nil(ok)
+    assert.is_truthy(err:find("client/AttrAPI.lua", 1, true))
+  end)
+
+  -- 计数与逐行清单对不上就分不清删除候选，失败关闭、不推送。
+  it("test_map_only_count_mismatch_fails_closed", function()
+    responses = { { 0, "validate: OK" }, { 0, diff(0, 0, nil, { "client/AttrAPI.lua" }, 3) } }
+    local ok, err = finalize.run(WORKSPACE)
+    assert.is_nil(ok)
+    assert.is_truthy(err:find("only-on-map", 1, true))
+    assert.are.equal(2, #commands)
+  end)
+
+  it("test_realm_prefix_must_be_a_directory", function()
+    local owned, foreign = finalize.split_map_only({ "client/a.lua", "clientx/b.lua", "server" })
+    assert.same({ "client/a.lua" }, owned)
+    assert.same({ "clientx/b.lua", "server" }, foreign)
   end)
 
   it("test_push_is_followed_by_online_verification", function()

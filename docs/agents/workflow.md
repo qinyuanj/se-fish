@@ -20,7 +20,7 @@
 
 Lua 命令使用 **Lua 5.4**：WSL 上裸 `lua` 经 alternatives 可能指向 5.1，宿主工具一律用 `lua5.4`，执行前用 `lua5.4 -v` 核对；`tools/cli.lua` 入口在非 5.4 解释器下直接退 1。Lua 5.5 对循环变量重新赋值会报 `attempt to assign to const variable`，遇到此错误先检查版本。
 
-- `lua5.4 tools/cli.lua deploy`：将三端一级子树字节镜像到宿主目录（经 WSL 接缝层调用部署端 `robocopy /MIR`，镜像前打印将被删掉的宿主多余文件）；interop 不可用时在镜像前以退出码 3 失败。编辑器开着本图时执行 validate → 有差异时 `code push` → `code diff` 复核，push 后仍不一致才返回失败。跨接缝约定见 [ADR-0008](../adr/0008-wsl-development-windows-deploy.md)。
+- `lua5.4 tools/cli.lua deploy`：将三端一级子树字节镜像到宿主目录（经 WSL 接缝层调用部署端 `robocopy /MIR`，镜像前打印将被删掉的宿主多余文件；宿主三端根下仓库已删的散文件或子树同样先删）；interop 不可用时在镜像前以退出码 3 失败。编辑器开着本图时执行 validate → 有差异时 `code push` → `code diff` 复核，push 后仍不一致才返回失败。三端内本地已删的地图文件用 `code push --delete --yes` 删掉；三端外的地图独有文件（`temp/` 等编辑器生成物）只提示保留，两类同时出现时不推送（#167）。跨接缝约定见 [ADR-0008](../adr/0008-wsl-development-windows-deploy.md)。
 - `lua5.4 tools/cli.lua sync`：将宿主目录的 `eggy.json`、API 存根、`data/` 回灌仓库。
 - `lua5.4 tools/cli.lua sync --packages`：在上述清单外追加三端 `packages/` 字节镜像，删除过期文件；任一端源 packages 缺失或为空时整次同步在写入前失败。该方向以宿主为准，回灌前先确认工作区已提交。
 - `lua5.4 tools/cli.lua blender <脚本.py> [--blend <输入.blend>] [-- <脚本参数>...]`：在部署端无头 Blender 里执行脚本，是唯一的 Blender 入口；`--which` 核对将用的 Blender，`--expr` 执行内联代码。路径写开发端形式，由入口转换；用法见 [Blender 与 Meshy 使用](art-pipeline.md)，决策见 [ADR-0009](../adr/0009-blender-headless-only.md)。

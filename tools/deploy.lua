@@ -9,7 +9,8 @@
 -- 部署树：<端>/<child>/... → 宿主目录 <端>/<child>/...（端 = 白名单 client/common/server，
 -- 官方强制的 SE 工作区根，仓库根直接对齐；重置粒度是每端下的一级子树，三端 packages/
 -- 官方包与业务子目录同级，一并镜像）。
--- 仓库根白名单之外的内容（docs/、tools/、tests/ 等）不部署；宿主目录其余内容
+-- 仓库根白名单之外的内容（docs/、tools/、tests/ 等）不部署；宿主端根下仓库没有的条目
+-- 当作本地已删的代码删掉（#167）；宿主目录其余内容
 -- （eggy.json、两份 API 存根、data/、unit_scripts/、编辑器生成物）不碰。
 
 package.path = "./?.lua;./?/init.lua;" .. package.path
@@ -45,13 +46,16 @@ function M.usage()
     "把仓库根 <端>/<child> 字节镜像进编辑器宿主目录 <端>/<child>（先重置目标子树）。",
     "端为白名单 " .. table.concat(plan.REALMS, "/") .. "（官方强制的工作区根，仓库根直接对齐）；",
     "三端 packages/（官方包）与业务子目录同级一起镜像；仓库根其他内容不部署，宿主目录其余内容不碰。",
+    "宿主端根下仓库没有的散文件或子树（本地已删的代码）在镜像前逐条打印并删除，删不掉即失败。",
     "传输一律 robocopy /MIR 增量镜像；镜像前打印 /MIR 将删掉的宿主多余文件，镜像完拿源/目标的",
-    "文件集合对一遍，",
+    "文件集合对一遍；",
     "命令没执行成、退出码 >= 8、或目标侧文件集合与源不一致，都算整条命令失败（退出码 1）；",
     "镜像完自动做编辑器收尾：code validate → 有落后文件时 code push → code diff 复核；",
+    "三端内地图有、宿主没有的文件计入落后，用 code push --delete --yes 从地图删掉；",
+    "三端内外的地图独有文件同时出现、或 only-on-map 清单读不全时，不推送并以退出码 1 结束；",
     "push 后仍与编辑器不一致时报告尚未同步，并以退出码 1 结束。",
     "editor-cli 不在或编辑器没开该地图时打印跳过并以退出码 0 结束（磁盘已是最新）。",
-    "地图侧多出的文件只提示，不删。",
+    "三端以外的地图独有文件（temp/ 等编辑器生成物）只提示，不删。",
     "宿主目录默认为部署端 USERPROFILE 下的 " .. workspace.DEFAULT_REL .. "，",
     "环境变量 EGGY_WORKSPACE 可覆盖（接受 /mnt/c/... 与 C:\\... 两种形式）。",
     "",
@@ -106,6 +110,16 @@ local function report_stale(t)
   local _, extra = M.file_set_diff(src, dst)
   if #extra > 0 then
     print("将删除宿主多余文件: " .. t.rel .. " " .. #extra .. " 个: " .. brief(extra))
+  end
+end
+
+-- 删掉宿主端根下仓库已删的条目（见 tools/deploy_plan 的 stale）。逐条打印再删，删完复查：
+-- 还在就整条命令失败，不进镜像，避免收尾时把残留当成本地仍有的代码推回地图。
+local function remove_stale(WS)
+  for _, t in ipairs(plan.stale(WS, shell.list_entries)) do
+    print("删除宿主残留: " .. t.rel)
+    shell.remove(t)
+    if shell.exists(t.dst) then fail("宿主残留删不掉: " .. t.rel .. "（" .. t.dst .. "）") end
   end
 end
 
@@ -169,6 +183,8 @@ local function run_deploy(clean_only)
     print("deploy --clean ok → " .. WS)
     return
   end
+
+  remove_stale(WS)
 
   for _, t in ipairs(targets) do
     report_stale(t)

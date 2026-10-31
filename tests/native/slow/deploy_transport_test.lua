@@ -47,12 +47,16 @@ local function seed_repo()
   write_file(FAKE_REPO .. "/server/Mgr/c.lua", "-- 服务端 C\n")
 end
 
--- 宿主目录：预置会被 /MIR 删掉的 stale 文件，以及不归本仓库管理的 unit_scripts/。
+-- 宿主目录：预置会被 /MIR 删掉的 stale 文件、仓库已删的端根散文件与整棵子树（#167），
+-- 以及不归本仓库管理的 unit_scripts/、temp/。
 local function seed_host()
   rmrf(HOST)
   code_of("mkdir -p " .. q(HOST))
   write_file(HOST .. "/client/UI/stale.lua", "-- 宿主多余文件，应被 /MIR 删除\n")
+  write_file(HOST .. "/client/AttrAPI.lua", "-- 仓库已删的端根散文件\n")
+  write_file(HOST .. "/server/Proto/water.lua", "-- 仓库已删的子树\n")
   write_file(HOST .. "/unit_scripts/keep.lua", "-- 宿主自有内容，不动\n")
+  write_file(HOST .. "/temp/keep.lua", "-- 编辑器生成物，不动\n")
 end
 
 describe("TestDeployCli", function()
@@ -80,7 +84,11 @@ describe("TestDeployCli", function()
     assert.are.equal("-- 共享配置\n", slurp(HOST .. "/common/GameCfg.lua"))
     assert.are.equal("-- 服务端 C\n", slurp(HOST .. "/server/Mgr/c.lua"))
     assert.is_false(exists(HOST .. "/client/UI/stale.lua"), "宿主多余文件应被 /MIR 删除")
+    assert.is_false(exists(HOST .. "/client/AttrAPI.lua"), "仓库已删的端根散文件应被删除")
+    assert.is_false(exists(HOST .. "/server/Proto"), "仓库已删的子树应被删除")
+    assert.matches("删除宿主残留: client/AttrAPI.lua", out, 1, true)
     assert.are.equal("-- 宿主自有内容，不动\n", slurp(HOST .. "/unit_scripts/keep.lua"))
+    assert.are.equal("-- 编辑器生成物，不动\n", slurp(HOST .. "/temp/keep.lua"))
   end)
 
   -- 连跑两次：第二次 robocopy 无变化仍成功（防 9P 时间戳导致的误判）。

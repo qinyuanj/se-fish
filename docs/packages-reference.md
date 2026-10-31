@@ -7,7 +7,7 @@
 - `deploy` 以仓库为源，三端 `packages/` 与业务一级子树一起字节镜像；宿主多余文件会删除。`deploy --clean` 也删除对应包子树。
 - `sync --packages` 以宿主为源，按原始字节回灌三端包并删除仓库多余文件，根 `README.md` 同样参与镜像。任一端来源缺失或为空时，整次同步在写入前失败；普通 `sync` 不回灌包。
 - 回灌前先确认工作区已提交。部署前确认需要保留的宿主包修改已回灌，避免被仓库覆盖。
-- 部署收尾执行 validate → 有差异时 push → diff 复核。push 后复核失败、离线、无 changelist 或仍有差异均返回失败；地图侧独有文件只提示保留。
+- 部署收尾执行 validate → 有差异时 push → diff 复核。push 后复核失败、离线、无 changelist 或仍有差异均返回失败；三端内本地已删的地图文件随 `--delete --yes` 删除，三端外的地图独有文件只提示保留，两类混杂时不推送。
 - 包内没有版本号、变更记录或来源 URL，升级以整包导入为准，替换后 diff 三端子树确认改动面。
 - 业务层直接 require 对应端的包内 `api.lua`；不在上一层复制导出名单、拍平 `Funcs` 或逐函数转发。属性和 AI 包使用原生 `Funcs` 函数表，`Enums` / `Configs` / `Prefabs` 保持包内结构。升级后通过真实包回归核对调用契约（属性：`attr_migration_test.lua`、`attr_rule_probe_test.lua`；效果：`modifier_system_probe_test.lua`；AI 与技能桥：`ai_migration_test.lua`、`official_ai_probe_test.lua`）。
 - `server/AbilityAPI.lua` 仅保留本图业务：施法守卫、体型、挂点与锚点补挂。需要守卫的业务施法继续调用它；装配、停止和查询技能直接调用包。锚点行为所需的管理器由 `server/main.lua` 通过 `BehaviorServices` 注入，行为不反向加载 `server.Mgr`。AI 位移生命周期查询由 `MgrAi` 持有，不另建 AI 转发入口。挥砍登记由 `server/SwingRegistry.lua` 独立持有，武器入口与近战行为共同依赖它。
