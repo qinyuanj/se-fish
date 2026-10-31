@@ -1,6 +1,6 @@
 # 0003 虾池套用七区统一模板
 
-**Status**: accepted
+**Status**: superseded by ADR-0013
 
 虾池（02 区）一直停在原型阶段：6×6 的 `ShrimpPool` 小池、20×18 的「星光地板」、50 米宽的窄边界（x 215..265），没有按 03–07 区的模板落地。决定让虾池完全套用这套模板：边界拓宽到 120 米（x 180..300，z −70..50 不变），新建 80×24 的 `shrimpPond.water` 作为钓虾水面，地形、设施、鱼饵、摆渡点和安全点都按模板与 #62 动线公式摆放；旧小池与星光地板退役，虾池原有 4 面空气墙移到新边界。`GameCfg.Zones[2].WaterId` 早已预留为 `shrimpPond.water`，统一模板本就是原设计意图；拓宽后两侧不会与鱼塘、蟹湖重叠。决定记录见 [#102 决定评论](https://github.com/qinyuanj/se-fish/issues/102#issuecomment-6185707871)。
 
