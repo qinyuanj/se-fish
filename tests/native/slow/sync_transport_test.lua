@@ -43,8 +43,8 @@ local function run_sync(args, cwd)
   return slurp(OUT) or "", code
 end
 
--- 临时宿主目录：三个根文件 + data/（含嵌套子目录）全是 CRLF；unit_scripts/ 是
--- 宿主侧非回同步内容。临时假仓库：eggy.json 是旧内容，EggyAPI.lua 与宿主归一后
+-- 临时宿主目录：eggy.json、两份存根 + data/（含嵌套子目录）全是 CRLF；eggy.json 与
+-- unit_scripts/ 是宿主侧非回同步内容。临时假仓库：eggy.json 是仓库自有内容，EggyAPI.lua 与宿主归一后
 -- 一致（造「未变」），data/ 里有旧内容、有 stale，server/ 是仓库自有内容。
 local function seed_and_sync()
   rmrf(ROOT)
@@ -248,7 +248,7 @@ describe("TestSyncPackages", function()
     end
     out, code = run_sync("--packages")
     assert.are.equal(0, code, out)
-    assert.are.equal(slurp(HOST .. "/eggy.json"):gsub("\r\n", "\n"), slurp(FAKE_REPO .. "/eggy.json"))
+    assert.are.equal("sentinel\n", slurp(FAKE_REPO .. "/eggy.json"))
     for _, side in ipairs({ "server", "client", "common" }) do
       assert.are.equal(body, slurp(FAKE_REPO .. "/" .. side .. "/packages/README.md"))
       assert.is_nil(slurp(FAKE_REPO .. "/" .. side .. "/packages/fixture/api.lua"))
@@ -278,7 +278,7 @@ describe("TestSyncTransport", function()
 
   -- 宿主侧是 CRLF 的产物落进仓库后是 LF，git status 才不会有行尾噪音。
   it("test_crlf_is_normalized_to_lf", function()
-    for _, rel in ipairs({ "eggy.json", "EggyEditorAPI.lua", "data/FontData.lua" }) do
+    for _, rel in ipairs({ "EggyEditorAPI.lua", "data/FontData.lua" }) do
       assert.is_nil((slurp(FAKE_REPO .. "/" .. rel) or ""):find("\r", 1, true), rel .. " 里还有 CR")
     end
   end)
@@ -297,8 +297,13 @@ describe("TestSyncTransport", function()
   end)
 
   it("test_root_files_are_synced", function()
-    assert.are.equal('{\n  "projectName": "fixture"\n}\n', slurp(FAKE_REPO .. "/eggy.json"))
     assert.are.equal("-- 宿主目录里的编辑时 API 存根\n", slurp(FAKE_REPO .. "/EggyEditorAPI.lua"))
+  end)
+
+  -- #166：宿主 eggy.json 带部署端本机信息，不回灌；仓库那份原样保留（只留 isSEMap，由守卫把关）。
+  it("test_eggy_json_is_not_synced", function()
+    assert.are.equal("old-binding\n", slurp(FAKE_REPO .. "/eggy.json"))
+    assert.is_nil(out:find("write eggy.json", 1, true))
   end)
 
   it("test_stale_repo_files_are_deleted", function()

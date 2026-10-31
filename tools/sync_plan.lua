@@ -4,9 +4,11 @@
 -- sync 只搬字节。
 local M = {}
 
--- 宿主目录根要回灌的单文件：工程绑定 + 运行时 / 编辑时两份 API 存根
+-- 宿主目录根要回灌的单文件：运行时 / 编辑时两份 API 存根
 -- （本工程比 se-defense 多一份 EggyEditorAPI.lua）；顺序即回灌顺序。
-M.ROOT_FILES = { "eggy.json", "EggyAPI.lua", "EggyEditorAPI.lua" }
+-- eggy.json 不回灌（#166）：宿主那份是 code init 绑定，带部署端本机信息；
+-- 仓库那份只留 isSEMap 给 SessionStart hook，由 tools/eggy_json_guard 把关。
+M.ROOT_FILES = { "EggyAPI.lua", "EggyEditorAPI.lua" }
 
 -- 编辑器插件导出的数据目录，整目录镜像：宿主侧删掉的文件在仓库里也跟着消失。
 M.DATA_DIR = "data"

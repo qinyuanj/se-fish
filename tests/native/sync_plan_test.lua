@@ -28,9 +28,10 @@ describe("TestSyncPlan", function()
     assert.are.equal("a\nb", plan.normalize_eol("a\rb"))
   end)
 
-  -- 回灌清单就是编辑器侧产物：工程绑定 + 两份 API 存根（本工程比 se-defense 多一份）。
+  -- 回灌清单就是编辑器侧产物：两份 API 存根（本工程比 se-defense 多一份）。
+  -- eggy.json 不回灌（#166）：宿主那份带部署端本机信息，仓库那份只留 isSEMap。
   it("test_root_files_are_the_editor_side_products", function()
-    assert.same({ "eggy.json", "EggyAPI.lua", "EggyEditorAPI.lua" }, plan.ROOT_FILES)
+    assert.same({ "EggyAPI.lua", "EggyEditorAPI.lua" }, plan.ROOT_FILES)
   end)
 
   -- 镜像纪律：仓库侧有而宿主侧没有的就是 stale，跟着消失；交集不产生删除。
