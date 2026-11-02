@@ -105,6 +105,7 @@ install -m 755 tools/hooks/shim "$(git rev-parse --git-common-dir)/hooks/pre-com
 - **保存与重开**：`map save` 成功后 `map dirty` 仍可能为 true，此时 `map reopen` 报 `MAP_REOPEN_REJECTED`。先用 `map dirty --json` 列出 dirty 来源请用户确认，确认后才可 `map reopen --force`；来源不明时可能是用户的手动编辑，不要强制。停止试玩本身也会让 dirty 变成 true。
 - **场景枚举**：编辑器侧执行[技术难点识别的绕过合同](../技术难点识别.md#绕过合同四条硬边界)，试玩服务端的例外也写在那里。
 - **检索失败**：`docs search` 报 HTTP 500 等服务端错误时（0.20.12 的 `editor-api` docset 出现过），改查 `manual` 或编辑器在线时的 `api search-editor` / `api get-editor`。
+- **检索范围**：本图是世界版（SE），`status --json` 显示 `editor_mode: "se"`。`docs search` 只查世界版文档库：`manual`、`game-api`、`editor-api`、`asset`。用户问题里的词在这些库里查不到时，先问用户指什么，等确认后再换库或换方向。原点版（FS）的 `fs-manual`、`fs-component` 只在用户点名「原点版 / FS」时才查。
 - **模型动画验收**：导入、播放与画面判定读[美术资产概要「模型动画导入与播放」](../art-asset-overview.md#模型动画导入与播放)。
 
 ## 测试纪律
