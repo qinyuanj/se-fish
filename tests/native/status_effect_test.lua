@@ -7,9 +7,10 @@
 --   4. 目标离场（玩家退出/鱼移除）后状态不清理，DOT 打空目标、查询泄漏；
 --   5. BodyPlan 读不存在的 player.Data 恒为 0（#132 原型死代码），存档里的药水永远不生效。
 -- 接缝：loadfile 取全新 MgrAbility 实例；桩 _G.game（World:GetServerTime 可控时钟、Players）、
---   server.AbilityAPI；Vitals/PlayerData/Survival 以假实现注入（与 main.lua 的接线同形状）。
+--   server.AbilityAPI 与技能包 server.packages.ability_system.api（加载即注册事件，不可载真包）；
+--   Vitals/PlayerData/Survival 以假实现注入（与 main.lua 的接线同形状）。
 -- 旧 setUp/tearDown 逐例映射为 before_each/after_each：替换的全局（game / Vector3）、模块缓存
--- （server.AbilityAPI、server.Mgr.MgrAbility、common.REUtil）在 after_each 恢复，对未完成的
+-- （server.AbilityAPI、技能包 api、server.Mgr.MgrAbility、common.REUtil）在 after_each 恢复，对未完成的
 -- before_each 幂等。describe/it 名沿用旧类名与方法名，案例顺序沿用旧 LuaUnit 的字典序执行序。
 local GameCfg = require('common.GameCfg')
 
@@ -46,6 +47,7 @@ describe('TestStatusEffect', function()
             now = 100,
             savedGame = rawget(_G, 'game'),
             savedAPI = package.loaded['server.AbilityAPI'],
+            savedPackageAPI = package.loaded['server.packages.ability_system.api'],
             savedMgr = package.loaded['server.Mgr.MgrAbility'],
             bodyScales = {},
             hits = {},
@@ -70,6 +72,7 @@ describe('TestStatusEffect', function()
                 return { Ok = true, Scale = scale, Derived = {} }
             end,
         }
+        package.loaded['server.packages.ability_system.api'] = {}
         state.mgr = assert(loadfile('server/Mgr/MgrAbility.lua'))()
         -- 假 Vitals：记录 DOT 结算（统一入口证据）
         state.mgr.Vitals = {
@@ -106,6 +109,7 @@ describe('TestStatusEffect', function()
         if not ctx then return end
         _G.game = ctx.savedGame
         package.loaded['server.AbilityAPI'] = ctx.savedAPI
+        package.loaded['server.packages.ability_system.api'] = ctx.savedPackageAPI
         package.loaded['server.Mgr.MgrAbility'] = ctx.savedMgr
     end)
 
