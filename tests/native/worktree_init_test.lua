@@ -9,7 +9,13 @@ local q = require("tests.support.sh_quote").q
 local fs = require("tests.support.sh_fs")
 local code_of, slurp, write_file, lexists = fs.code_of, fs.slurp, fs.write_file, fs.lexists
 
-local ROOT = "tmp/worktree-init-test"
+-- 夹具放系统临时目录：用例会建 chmod 000 的文件，留在项目树里会让复制项目树的工具（如覆盖率分片）读失败。
+local ROOT = (function()
+  local h = io.popen("mktemp -d")
+  local dir = h:read("l")
+  h:close()
+  return assert(dir, "mktemp -d 失败") .. "/worktree-init-test"
+end)()
 local LIB = ROOT .. "/library"
 local WT_PARENT = ROOT .. "/wt-parent"
 local WT = WT_PARENT .. "/se-fish"
