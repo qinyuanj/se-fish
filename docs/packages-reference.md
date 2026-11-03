@@ -12,6 +12,16 @@
 - 业务层直接 require 对应端的包内 `api.lua`；不在上一层复制导出名单、拍平 `Funcs` 或逐函数转发。属性和 AI 包使用原生 `Funcs` 函数表，`Enums` / `Configs` / `Prefabs` 保持包内结构。升级后通过真实包回归核对调用契约（属性：`attr_migration_test.lua`、`attr_rule_probe_test.lua`；效果：`modifier_system_probe_test.lua`；AI 与技能桥：`ai_migration_test.lua`、`official_ai_probe_test.lua`）。
 - `server/AbilityAPI.lua` 仅保留本图业务：施法守卫、体型、挂点与锚点补挂。需要守卫的业务施法继续调用它；装配、停止和查询技能直接调用包。锚点行为所需的管理器由 `server/main.lua` 通过 `BehaviorServices` 注入，行为不反向加载 `server.Mgr`。AI 位移生命周期查询由 `MgrAi` 持有，不另建 AI 转发入口。挥砍登记由 `server/SwingRegistry.lua` 独立持有，武器入口与近战行为共同依赖它。
 
+## 导入不可逆
+
+本图的 `ability_system`、`attr_rule`、`modifier_system`、`official_ai_feature` 都是**导入**（见 `GLOSSARY.md`），资源包面板显示「已导入」。官方手册写明导入后不能取消；2026-11-03 实测确认没有本地退路：
+
+- 从宿主删掉三端 `packages/`，再存盘、reopen，面板仍是「已导入」。删代码不会让包退回引用，只会让地图缺代码；业务代码还 require 包内模块，此时试玩必然报错。
+- 本地存档缓存 `etc/help_build_gmps/<地图>__pc/` 里有两份登记：`packageinfo.mm` 的 `__official_refs__` 与 `mapcustomize.mm` 的 `se_official_package_refs`，都写着 `mode=imported`。把两份都改成 `off` 后从本地目录启动，编辑器确实读了改过的文件，面板仍是「已导入」。所以状态另有来源（加密的 `.gmp` 或服务端），本地改不到。
+- 编辑时 Lua API 只有 `is_official_asset_id` 这类只读判断，没有切换引用或导入的入口。
+
+因此：不要从宿主删除导入过的包；包的升级与删除都走仓库加 `deploy`。真要改回引用，只能请官方在服务端重置该地图的导入状态，并且要先确认引用模式下业务代码 require 的包内模块仍然可用。
+
 ## 包清单
 
 | 包 | 用途 | 导入时间 | 真实包接口 |

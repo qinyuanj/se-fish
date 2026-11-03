@@ -222,3 +222,13 @@ _Avoid_: 业务树、指标采集范围、mutation 范围、scope（单独使用
 **测试车道**：
 busted 按耗时划分的用例集合，与 `.busted` 任务同名：fast 是日常车道（`tests/native`），full 在 fast 之上追加 slow 用例（`tests/native/slow`），用于收尾。经 `lua5.4 tools/cli.lua test [fast|full]` 运行（[ADR-0011](docs/adr/0011-cli-single-entry-standard-quality-no-acceptance.md)）。
 _Avoid_: 验收车道、代码收尾门、lane（单独使用时）
+
+### 官方包
+
+**引用（官方包）**：
+地图挂接官方托管的包，代码与预设随官方更新，地图里看不到也改不了包内 Lua；可随时取消。
+_Avoid_: 开启、安装
+
+**导入（官方包）**：
+把官方包的代码与预设一次性拷进地图，之后由本图维护、不随官方更新；资源包面板显示「已导入」，不能撤销回引用。
+_Avoid_: vendor（指编辑器状态时）、de-init、取消导入
