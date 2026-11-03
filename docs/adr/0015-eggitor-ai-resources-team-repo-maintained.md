@@ -1,6 +1,6 @@
 # 0015 蛋仔 AI 环境迁入团队仓维护
 
-**Status**: proposed（通过后取代 [ADR-0014](0014-eggitor-ai-resources-not-source-of-truth.md)）
+**Status**: accepted（取代 [ADR-0014](0014-eggitor-ai-resources-not-source-of-truth.md)；团队仓配套决策见 `eggy/teamai-netease` 的 `docs/adr/0002-reintroduce-eggy-upstream-baseline.md`，PR #9 于 2026-11-03 合入）
 
 编辑器经 `env-res` 分发两套 AI 环境，放在 `~/.eggitor/codex/` 下：`se/`（状态同步）有 8 个 `eggy-*` / `eggy-se-*` skill 和 `eggy-se.mdc`，`fs/`（帧同步）有 7 个 `eggy-fs-*` skill 和 `eggy-fs.mdc`。两套共用一个 SessionStart hook，它按工程 `eggy.json` 的 `isSEMap` 判断模式，注入对应的 mdc，并列出另一模式的 skill 禁止使用。本仓开发端把 SE skill 软链进 `~/.codex/skills/`，hook 换成了只注入固定文本的精简版。ADR-0014 的做法是保留上游原样，勘误记在 `docs/agents/workflow.md`，同时整理给 eggitor 团队（#165）。运行下来有三个问题：
 

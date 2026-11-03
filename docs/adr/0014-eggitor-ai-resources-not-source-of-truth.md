@@ -1,6 +1,6 @@
 # 0014 编辑器分发的 AI 资源不作事实源
 
-**Status**: accepted
+**Status**: superseded by [ADR-0015](0015-eggitor-ai-resources-team-repo-maintained.md)
 
 编辑器经 `env-res` 分发一套 AI 资源：`~/.eggitor/codex/se/rules/eggy-se.mdc` 由 SessionStart hook 注入，8 个 `eggy-se-*` / `eggy-*` skill 软链进 `~/.codex/skills/`。2026-10-31 用 CLI 0.20.13 的 `help export` 对照，并考古 115 个历史会话，发现问题主要是**文档跑在 CLI 前面**，而不是简单的过期：`screenshot offscreen`、`screenshot --format` 还没发布，却被写成默认做法；截图在遮挡或最小化时仍能出图、`editor-unit list/search` 可用等说法被实测推翻；判脏闸门没有排除非业务目录；`map save`、`preflight`、`preset` 等常用命令完全没写到。注入规则的优先级高于按需读取的仓库文档，所以 `docs/agents/workflow.md` 里已有的勘误也被压过。
 
