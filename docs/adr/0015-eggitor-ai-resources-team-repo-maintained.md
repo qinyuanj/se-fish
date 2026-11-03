@@ -11,7 +11,7 @@
 决定：蛋仔 AI 环境改由团队仓 `eggy/teamai-netease` 维护和分发，编辑器分发的那份只作为上游来源。
 
 - **范围**：SE 与 FS 一起迁，即 `~/.eggitor/codex/se/`、`~/.eggitor/codex/fs/` 下的全部 15 个 skill 和两份 mdc，以及 hook 的模式判定。编辑器本体和 `editor-cli` 不在范围内。
-- **导入**：以 `env-res` 当前版本（sts_zip 0.3.4）为基线，分别整体导入团队仓 `skills/eggy-se/` 与 `skills/eggy-fs/`，skill 名称保持不变（两套之间没有重名）。上游原样快照放在不分发的 `upstream/eggy/`，版本和逐文件哈希记在 `eggy-upstream.json`。这套布局与同步脚本沿用团队仓 9 月的做法，细节以团队仓配套 ADR 为准。
+- **导入**：以 `env-res` 当前版本（SE `codemaker-se` 0.3.4、FS `codex-fs` 0.3.6）为基线，分别整体导入团队仓 `skills/eggy-se/` 与 `skills/eggy-fs/`，skill 名称保持不变（两套之间没有重名）。上游原样快照放在不分发的 `upstream/eggy/`，版本和逐文件哈希记在 `eggy-upstream.json`。这套布局与同步脚本沿用团队仓 9 月的做法，细节以团队仓配套 ADR 为准。
 - **修订**：#165 的勘误和 `workflow.md`「编辑器 CLI 取证」里的通用条目直接改进 SE 副本；FS 的勘误由 FS 工程整理后改进 FS 副本。都走分支加 PR，由 reviewer 审核。两套共用的 CLI 行为（截图、`--editor-instance`、`map save` 等）两边一起改。命令和参数细节仍以 CLI 的 `--help` / `help export` 为准，skill 只写工作流和踩坑。没有发布的能力不写进默认流程。
 - **规则与 hook**：注入文本改由团队仓维护，SE、FS 各一份，内容沿用 ADR-0014 的精简版：CLI 路径与调用方式、优先级、该模式的 `docs search` 别名表（SE 用 `manual` 等四个库，FS 用 `fs-manual`、`fs-component`）。模式仍按 `eggy.json` 的 `isSEMap` 判定，无 `eggy.json` 时不注入。开发端不再读取上游的 mdc。
 - **模式隔离**：teamai 把团队技能全量发给每个成员，SE 工程里也装着 FS skill，反之亦然。注入文本必须照上游 hook 的做法列出另一模式的 skill 并禁止使用，清单按团队仓目录生成，不手写。
