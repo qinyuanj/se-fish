@@ -1,6 +1,6 @@
 # 0015 蛋仔 AI 环境迁入团队仓维护
 
-**Status**: accepted（取代 [ADR-0014](0014-eggitor-ai-resources-not-source-of-truth.md)；团队仓配套决策见 `eggy/teamai-netease` 的 `docs/adr/0002-reintroduce-eggy-upstream-baseline.md`，PR #9 于 2026-11-03 合入）
+**Status**: accepted（取代 [ADR-0014](0014-eggitor-ai-resources-not-source-of-truth.md)；团队仓配套决策见 `eggy/teamai-netease` 的 `docs/adr/0002-reintroduce-eggy-upstream-baseline.md`，PR #9 于 2026-11-03 合入；同日 PR #11 把模式隔离改为按工程目录分发，见「模式隔离」）
 
 编辑器经 `env-res` 分发两套 AI 环境，放在 `~/.eggitor/codex/` 下：`se/`（状态同步）有 8 个 `eggy-*` / `eggy-se-*` skill 和 `eggy-se.mdc`，`fs/`（帧同步）有 7 个 `eggy-fs-*` skill 和 `eggy-fs.mdc`。两套共用一个 SessionStart hook，它按工程 `eggy.json` 的 `isSEMap` 判断模式，注入对应的 mdc，并列出另一模式的 skill 禁止使用。本仓开发端把 SE skill 软链进 `~/.codex/skills/`，hook 换成了只注入固定文本的精简版。ADR-0014 的做法是保留上游原样，勘误记在 `docs/agents/workflow.md`，同时整理给 eggitor 团队（#165）。运行下来有三个问题：
 
@@ -14,8 +14,8 @@
 - **导入**：以 `env-res` 当前版本（SE `codemaker-se` 0.3.4、FS `codex-fs` 0.3.6）为基线，分别整体导入团队仓 `skills/eggy-se/` 与 `skills/eggy-fs/`，skill 名称保持不变（两套之间没有重名）。上游原样快照放在不分发的 `upstream/eggy/`，版本和逐文件哈希记在 `eggy-upstream.json`。这套布局与同步脚本沿用团队仓 9 月的做法，细节以团队仓配套 ADR 为准。
 - **修订**：#165 的勘误和 `workflow.md`「编辑器 CLI 取证」里的通用条目直接改进 SE 副本；FS 的勘误由 FS 工程整理后改进 FS 副本。都走分支加 PR，由 reviewer 审核。两套共用的 CLI 行为（截图、`--editor-instance`、`map save` 等）两边一起改。命令和参数细节仍以 CLI 的 `--help` / `help export` 为准，skill 只写工作流和踩坑。没有发布的能力不写进默认流程。
 - **规则与 hook**：注入文本改由团队仓维护，SE、FS 各一份，内容沿用 ADR-0014 的精简版：CLI 路径与调用方式、优先级、该模式的 `docs search` 别名表（SE 用 `manual` 等四个库，FS 用 `fs-manual`、`fs-component`）。模式仍按 `eggy.json` 的 `isSEMap` 判定，无 `eggy.json` 时不注入。开发端不再读取上游的 mdc。
-- **模式隔离**：teamai 把团队技能全量发给每个成员，SE 工程里也装着 FS skill，反之亦然。注入文本必须照上游 hook 的做法列出另一模式的 skill 并禁止使用，清单按团队仓目录生成，不手写。
-- **分发**：成员通过 `teamai pull` 获取，注入 hook 由团队仓 `hooks/hooks.yaml` 下发到工程的 `.codex/hooks.json`（Codex、Claude Code 支持，Kimi 不支持）。开发端撤掉 `~/.codex/skills/` 下指向 `~/.eggitor` 的软链（SE 与 FS），删掉本仓自建的 `~/.codex/hooks/eggy-se-lean.mjs` 条目，避免同名重复或重复注入。`.ai_res_update_skip` 标记在 0.20.13 下没有证据仍然有效，不作依据；编辑器以后若把联接和 hook 装回来，发现时再处理。
+- **模式隔离（2026-11-03 修订）**：安装时按工程目录隔开。团队仓 `manifest/projects.yaml` 声明 `common`、`eggy-se`、`eggy-fs` 三个项目，每个目录选一个，只装 Matt skills 加所选模式的技能与 hook；目录所选项目与 `isSEMap` 不一致时，注入提示切换项目（团队仓 PR #11）。原口径是全员全量、注入里列另一模式的 skill 禁止使用，但禁用只是提示，Kimi 又收不到 hook。
+- **分发**：成员通过 `teamai pull` 获取，注入 hook 由团队仓 `hooks/eggy-se/`、`hooks/eggy-fs/` 只下发给对应项目的目录（Codex、Claude Code 支持，Kimi 不支持）。本仓接 `eggy-se`，开发端 teamai 只接 Codex。开发端撤掉 `~/.codex/skills/` 下指向 `~/.eggitor` 的软链（SE 与 FS），删掉本仓自建的 `~/.codex/hooks/eggy-se-lean.mjs` 条目，避免同名重复或重复注入。`.ai_res_update_skip` 标记在 0.20.13 下没有证据仍然有效，不作依据；编辑器以后若把联接和 hook 装回来，发现时再处理。
 - **上游跟进**：`env-res` 更新后，用同步脚本对照锁文件列出上游差异，人工挑选要合入的部分，在同一个 PR 里更新锁文件，不整体覆盖。
 - **优先级**：CLI `--help` 优先于团队仓 skill，团队仓 skill 优先于编辑器分发的原文。`workflow.md` 只保留 se-fish 自身的项目实测，比如宿主目录、试玩闸门例外、多实例约定。
 

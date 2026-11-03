@@ -57,18 +57,13 @@ lua5.4 tools/cli.lua worktree-init
 
 **美术资产（Meshy MCP + 无头 Blender）。** Blender 与 Meshy 的接入与用法见 [Blender 与 Meshy 使用](art-pipeline.md)，尺寸口径见 [ADR-0004](../adr/0004-fish-asset-scale.md)。唯一的 MCP 是 Meshy，注册与密钥接法见 [Blender 与 Meshy 使用](art-pipeline.md#前端配置)。Blender 不接 MCP，只经 `blender` 子命令无头执行（[ADR-0009](../adr/0009-blender-headless-only.md)）。资产本体不进本仓，正式资产走编辑器导入。
 
-**蛋仔 hook 与技能（开发端接入）。** eggitor 的 `SessionStart` hook（`session_start.mjs`）向会话注入 `eggy-se.mdc` 规则与帧同步技能禁用清单，但安装器只把它登记在部署端的 `~/.codex/hooks.json`。开发端手动接入，复用部署端资产，随编辑器升级自动更新：
+**蛋仔技能与注入（teamai 接入）。** 蛋仔 SE 技能和 SessionStart 注入由团队仓 `eggy/teamai-netease` 分发（[ADR-0015](../adr/0015-eggitor-ai-resources-team-repo-maintained.md)），接入前提、验收与排错以团队仓 `INSTALL-AGENT.md` 为准。本仓开发端：
 
-- 软链 `ln -sfn /mnt/c/Users/<用户名>/.eggitor ~/.eggitor`：脚本按 `os.homedir()` 定位规则与技能。
-- 在开发端 `~/.codex/hooks.json` 的 `SessionStart` **末尾**追加 `bash -lc "node ~/.eggitor/codex/hooks/session_start.mjs"`（`bash -lc` 取到 nvm 的 `node`）。Codex 按 `事件:序号` 在 `config.toml` 的 `hooks.state` 记录信任，追加在末尾才保得住已信任的条目；新条目首次启动时确认信任。
-- 把 `~/.eggitor/codex/se/skills/*` 逐个软链进 `~/.codex/skills/`，只挂 `se`。
-- 自检：`echo '{"cwd":"'"$PWD"'"}' | node ~/.eggitor/codex/hooks/session_start.mjs` 输出的 `additionalContext` 以 `eggy-se.mdc` 的 front matter 开头即接入完成。
-
-注入的规则有三处与开发端不符，以本仓约定为准：
-
-- **沙盒警告**：脚本只在 `~/.codex/config.toml` 全文找 `danger-full-access` 字样，"检测到 Codex 沙盒环境"按实际 `sandbox_mode` 判断。
-- **编辑工具**："只用 `replace_in_file` 编辑文件"写给 codemaker；Codex 用 `apply_patch`，保持 UTF-8。
-- **技能表**：`eggy-se-scene-env` 未随 eggitor 分发，氛围类需求没有对应技能。
+- 本目录接团队项目 `eggy-se`，teamai 只接 Codex：`teamai projects set eggy-se` 后 `teamai pull --force`（新检出用 `teamai init <团队仓> --scope workspace --agent codex --project eggy-se`）。技能装进 `.codex/skills/`，注入 hook 写进 `.codex/hooks.json`。
+- hook 直接调 `node`，用的是 Codex 进程的 PATH：从加载了 nvm 的 shell 启动 Codex。
+- `~/.codex/config.toml` 的 `[[skills.config]]` 屏蔽 `.codex/skills/eggy-se-*/references/features/` 下的 9 个子技能，它们由父技能按需引用；团队仓增删子技能后同步这份清单。
+- `~/.eggitor` 软链（`ln -sfn /mnt/c/Users/<用户名>/.eggitor ~/.eggitor`）保留，注入脚本按它定位 CLI。
+- 自检：新开会话的上下文里「蛋仔编辑器（世界版 SE」只出现一次，且没有「项目接错了」。
 
 **teamai 的 Gitea 凭据（开发端接入）。** `GITEA_URL`、`GITEA_TOKEN` 存在部署端用户环境变量，经 Windows 用户变量 `WSLENV=GITEA_URL:GITEA_TOKEN` 透传到开发端，凭据只存一份。改 `WSLENV` 后关闭全部终端并 `wsl --shutdown` 才生效，常驻会话（Herdr 等）一并重启；`teamai doctor` 的两项 Gitea 检查通过即接入完成。缺凭据时 pull、recall 与 hook 照常，走 Gitea API 的操作（`members`、贡献 learning）失败。
 
@@ -94,13 +89,12 @@ install -m 755 tools/hooks/shim "$(git rev-parse --git-common-dir)/hooks/pre-com
 
 等价地直接看 `lua5.4 tools/cli.lua deploy` 的收尾输出。
 
-**编辑器 CLI 取证。** 操作前用目标命令的 `--help`（或 `help export <命令>`）确认当前版本能力。编辑器分发的 skill（`eggy-se-*`）与本节或 CLI `--help` 冲突时，以后两者为准，见 [ADR-0014](../adr/0014-eggitor-ai-resources-not-source-of-truth.md)。以下是 0.20.12～0.20.13 的项目实测：
+**编辑器 CLI 取证。** 操作前用目标命令的 `--help`（或 `help export <命令>`）确认当前版本能力。团队仓分发的 `eggy-*` 技能与本节或 CLI `--help` 冲突时，以后两者为准；通用勘误提 PR 改团队仓 SE 副本（[ADR-0015](../adr/0015-eggitor-ai-resources-team-repo-maintained.md)），本节只留项目实测。以下是 0.20.12～0.20.13 的项目实测：
 
 - **会话首开对齐**：本会话第一次做 Lua 相关操作且编辑器在线时，先跑 `code diff --json`；changelist 非空就把分类计数与文件清单报给用户，由用户选 push、pull 或暂不处理，agent 不自选方向。
 - **多实例**：`editor-instances list` 列出多个实例时（含停在 `<starting>` 的），每条命令都带 `--editor-instance <pid>`。
 - **试玩闸门例外**：`code diff` 中 `differs`、`only-on-map` 为空，且 `only-local` 全在 `unit_scripts/` 或 `.agents/` 下时，视为干净，不 push、直接试玩，并在取证记录里写明这些文件。`unit_scripts/` 由引擎生成（见 `AGENTS.md`），`deploy` 只镜像三端子树，不会清理它；`.agents/` 是 agent 配置，不进地图。
 - **异步输出**：服务端、客户端 `exec` 提交成功只表示代码已提交。脚本打印唯一标记后，用 `log grep <标记> | grep '^>'` 读取实际结果（不带过滤时会混入上下文行与统计行）。`log grep` 没有 `-i`：默认就不区分大小写，需要区分时加 `--case-sensitive`。
-- **画面**：该版本没有 `screenshot offscreen`，也没有 `--format`（只出 PNG，用 `--output` / `--stdout`）；编辑态截图带网格时，改用试玩的 `screenshot game` 取无网格证据。只截判读对象，结束后还原取景和现场。
 - **截图失败**：窗口被遮挡、最小化或在远程虚拟屏上时，`screenshot game` 会返回 `FRAME_NEAR_WHITE` 或黑帧，`screenshot editor` 会得到 1×1（`SCREENSHOT_INVALID_DIMENSIONS`）。先把编辑器窗口置前再重试一次；仍失败就请用户目视确认，给出选项、时间点和观察要点，不要循环重试。
 - **保存与重开**：`map save` 成功后 `map dirty` 仍可能为 true，此时 `map reopen` 报 `MAP_REOPEN_REJECTED`。先用 `map dirty --json` 列出 dirty 来源请用户确认，确认后才可 `map reopen --force`；来源不明时可能是用户的手动编辑，不要强制。停止试玩本身也会让 dirty 变成 true。
 - **场景枚举**：编辑器侧执行[技术难点识别的绕过合同](../技术难点识别.md#绕过合同四条硬边界)，试玩服务端的例外也写在那里。
