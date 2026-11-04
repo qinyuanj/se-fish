@@ -847,6 +847,21 @@ GameCfg.FishCombat = {
 -- 所以加速技能用的是模板默认 CastTime=0.5 秒（加速窗口只有 0.5 秒），详见 issue #7；
 -- 锚点的关键实例值改由 AnchorAttributes 在挂接前 SetAttribute 覆盖（含 Duration，melee_hit 要求 > 0）。
 -- melee_hit 的命中盒用包内硬编码的官方网格 57450——已实测它是平台级资源，本图直接可用（issue #8）。
+-- #172 出手动作：引擎官方动画临时占位（ID 取自 data/OfficialAsset.lua，正式资源见 #44），
+-- 每个出手来源只在下方 Unarmed / MeleeWeapons / Guns / Throw 各行的 Anim 配一处；
+-- 挥砍预设的 ABILITY_ANOSTATE_ANIMKEY 保持空，动作统一由 MgrWeapon 在出手成功后播（上半身）。
+-- 官方库没有投掷动作，投掷暂用「挥舞武器」。
+local AttackAnim = {
+    Fist = 'official://animation/20701',     -- 拳击右挥拳1
+    Knuckle = 'official://animation/20698',  -- 拳击KO攻击1
+    Dagger = 'official://animation/20670',   -- 单刀连击1-1
+    Axe = 'official://animation/20755',      -- 锤子攻击1
+    Pistol = 'official://animation/20705',   -- 手枪开火
+    Rifle = 'official://animation/20706',    -- 步枪开火
+    Auto = 'official://animation/20707',     -- 机枪开火
+    Rocket = 'official://animation/20708',   -- 手炮开火
+    Throw = 'official://animation/50',       -- 挥舞武器
+}
 GameCfg.Ability = {
     -- 角色进图时实例化到角色下的技能背包预设
     ManagerPreset = "map://preset/ubdb4a7e737d4eddb87729e9055ba375",
@@ -904,44 +919,44 @@ GameCfg.Ability = {
     -- 武器页 R16—R27）逐行对应；票面参数（射程、换弹、爆炸半径、保底鱼）来自 #129 任务说明。
     -- 暂取值（原表未给，待策划确认）：火箭筒 IntervalSec、GunShared.Range、Throw.FlightSec /
     -- FishTtlSec / LongPressSec / ArcHeight。
-    Unarmed = { Damage = 5, IntervalSec = 0.5, Range = 2 }, -- 票面：空手 5 伤害 / 0.5 秒 / 2 米
+    Unarmed = { Damage = 5, IntervalSec = 0.5, Range = 2, Anim = AttackAnim.Fist }, -- 票面：空手 5 伤害 / 0.5 秒 / 2 米
     MeleeWeapons = {
-        item134 = { Damage = 10, IntervalSec = 0.5, Range = 2 },  -- 指虎 商店表!R27
-        item135 = { Damage = 15, IntervalSec = 0.5, Range = 3 },  -- 匕首 商店表!R26
-        item136 = { Damage = 40, IntervalSec = 1.0, Range = 4 },  -- 斧头 商店表!R25
+        item134 = { Damage = 10, IntervalSec = 0.5, Range = 2, Anim = AttackAnim.Knuckle }, -- 指虎 商店表!R27
+        item135 = { Damage = 15, IntervalSec = 0.5, Range = 3, Anim = AttackAnim.Dagger },  -- 匕首 商店表!R26
+        item136 = { Damage = 40, IntervalSec = 1.0, Range = 4, Anim = AttackAnim.Axe },     -- 斧头 商店表!R25
         -- #139 抽奖武器大奖（统一规格 §6.3）：匕首组 Range 暂取 3 对齐商店匕首，
         -- 斧组 Range 暂取 4 对齐商店斧头（原表未给近战射程，待策划确认）。
-        item152 = { Damage = 15, IntervalSec = 0.5, Range = 3,    -- 淬毒匕首（毒 1/s/3s/5 层）
+        item152 = { Damage = 15, IntervalSec = 0.5, Range = 3, Anim = AttackAnim.Dagger, -- 淬毒匕首（毒 1/s/3s/5 层）
                     Effect = { Kind = 'poison' } },
-        item153 = { Damage = 18, IntervalSec = 0.5, Range = 3 },  -- 秘银匕首
-        item154 = { Damage = 18, IntervalSec = 0.5, Range = 3 },  -- 黄金匕首
-        item155 = { Damage = 18, IntervalSec = 0.5, Range = 3 },  -- 黑曜石匕首
-        item156 = { Damage = 18, IntervalSec = 0.5, Range = 3 },  -- 锯齿匕首
-        item157 = { Damage = 52, IntervalSec = 1.0, Range = 4 },  -- 银斧
-        item158 = { Damage = 52, IntervalSec = 1.0, Range = 4 },  -- 金斧
-        item159 = { Damage = 40, IntervalSec = 1.0, Range = 4,    -- 炽焰战斧（灼烧 4/s/3s/5 层）
+        item153 = { Damage = 18, IntervalSec = 0.5, Range = 3, Anim = AttackAnim.Dagger }, -- 秘银匕首
+        item154 = { Damage = 18, IntervalSec = 0.5, Range = 3, Anim = AttackAnim.Dagger }, -- 黄金匕首
+        item155 = { Damage = 18, IntervalSec = 0.5, Range = 3, Anim = AttackAnim.Dagger }, -- 黑曜石匕首
+        item156 = { Damage = 18, IntervalSec = 0.5, Range = 3, Anim = AttackAnim.Dagger }, -- 锯齿匕首
+        item157 = { Damage = 52, IntervalSec = 1.0, Range = 4, Anim = AttackAnim.Axe },    -- 银斧
+        item158 = { Damage = 52, IntervalSec = 1.0, Range = 4, Anim = AttackAnim.Axe },    -- 金斧
+        item159 = { Damage = 40, IntervalSec = 1.0, Range = 4, Anim = AttackAnim.Axe,      -- 炽焰战斧（灼烧 4/s/3s/5 层）
                     Effect = { Kind = 'burn' } },
-        item160 = { Damage = 60, IntervalSec = 1.0, Range = 4 },  -- 血吼
-        item161 = { Damage = 68, IntervalSec = 1.0, Range = 4 },  -- 无坚不摧之力
+        item160 = { Damage = 60, IntervalSec = 1.0, Range = 4, Anim = AttackAnim.Axe },    -- 血吼
+        item161 = { Damage = 68, IntervalSec = 1.0, Range = 4, Anim = AttackAnim.Axe },    -- 无坚不摧之力
     },
     -- 枪械公共：手动/自动换弹均 2 秒（票面）；备弹无限、弹匣有限；射程暂取 30 米
     GunShared = { ReloadSec = 2, Range = 30, ActionCooldownSec = 0.1 },
     Guns = {
-        item137 = { Damage = 10, IntervalSec = 1.0, Magazine = 10 },              -- 手枪 商店表!R24
-        item138 = { Damage = 20, Pellets = 5, IntervalSec = 1.5, Magazine = 2 },  -- 霰弹枪 商店表!R23
-        item139 = { Damage = 13, IntervalSec = 0.15, Magazine = 30, Auto = true }, -- 冲锋枪 商店表!R22
-        item140 = { Damage = 20, IntervalSec = 0.2, Magazine = 30, Auto = true }, -- 自动步枪 商店表!R21
-        item141 = { Damage = 200, IntervalSec = 1.5, Magazine = 5 },              -- 狙击枪 商店表!R20
-        item142 = { Damage = 500, IntervalSec = 2.0, Magazine = 1,               -- 火箭筒 商店表!R19（射速暂取 2 秒）
+        item137 = { Damage = 10, IntervalSec = 1.0, Magazine = 10, Anim = AttackAnim.Pistol },             -- 手枪 商店表!R24
+        item138 = { Damage = 20, Pellets = 5, IntervalSec = 1.5, Magazine = 2, Anim = AttackAnim.Rifle },  -- 霰弹枪 商店表!R23
+        item139 = { Damage = 13, IntervalSec = 0.15, Magazine = 30, Auto = true, Anim = AttackAnim.Auto }, -- 冲锋枪 商店表!R22
+        item140 = { Damage = 20, IntervalSec = 0.2, Magazine = 30, Auto = true, Anim = AttackAnim.Auto },  -- 自动步枪 商店表!R21
+        item141 = { Damage = 200, IntervalSec = 1.5, Magazine = 5, Anim = AttackAnim.Rifle },              -- 狙击枪 商店表!R20
+        item142 = { Damage = 500, IntervalSec = 2.0, Magazine = 1, Anim = AttackAnim.Rocket,              -- 火箭筒 商店表!R19（射速暂取 2 秒）
                     Splash = { Damage = 100, Radius = 5 } },                      -- 周围 5 米 100（票面/原表一致）
         -- #139 抽奖武器大奖（统一规格 §6.3）
-        item162 = { Damage = 15, IntervalSec = 1.0, Magazine = 15 },              -- 沙漠之鹰
-        item163 = { Damage = 10, IntervalSec = 1.0, Magazine = 10,                -- 霜之新星（霜冻 -30%/3s 不叠加）
+        item162 = { Damage = 15, IntervalSec = 1.0, Magazine = 15, Anim = AttackAnim.Pistol },             -- 沙漠之鹰
+        item163 = { Damage = 10, IntervalSec = 1.0, Magazine = 10, Anim = AttackAnim.Pistol,               -- 霜之新星（霜冻 -30%/3s 不叠加）
                     Effect = { Kind = 'frost' } },
-        item164 = { Damage = 10, IntervalSec = 1.0, Magazine = 10,                -- 雷霆之力（麻痹 0.5s 不叠加）
+        item164 = { Damage = 10, IntervalSec = 1.0, Magazine = 10, Anim = AttackAnim.Pistol,               -- 雷霆之力（麻痹 0.5s 不叠加）
                     Effect = { Kind = 'paralyze' } },
-        item165 = { Damage = 30, IntervalSec = 0.2, Magazine = 30, Auto = true }, -- 黄金AK47
-        item166 = { Damage = 500, IntervalSec = 1.0, Magazine = 10, Auto = true,               -- 连发火箭筒（溅射 5m/100）
+        item165 = { Damage = 30, IntervalSec = 0.2, Magazine = 30, Auto = true, Anim = AttackAnim.Auto },  -- 黄金AK47
+        item166 = { Damage = 500, IntervalSec = 1.0, Magazine = 10, Auto = true, Anim = AttackAnim.Rocket, -- 连发火箭筒（溅射 5m/100）
                     Splash = { Damage = 100, Radius = 5 } },
     },
     -- #139 持续效果钉表（统一规格 §6.3）：毒/灼烧每秒一跳、最多 5 层、持续 3 秒，
@@ -984,6 +999,7 @@ GameCfg.Ability = {
         FlightSec = 0.8,     -- 投掷飞行时间（暂取）
         ArcHeight = 3,       -- 飞行弧线高度（暂取，表现参数）
         LongPressSec = 0.35, -- 长按进入选点（暂取，UI 参数）
+        Anim = AttackAnim.Throw,
     },
     -- T11（#132）高风险能力原型：三倍体型 / 飞行 / 巡航叼人 / 分阶段首领的数值与契约集中在此，
     -- 纯逻辑见 common/BodyScale.lua、common/FlightPath.lua、common/CarryMount.lua、common/BossPhase.lua。

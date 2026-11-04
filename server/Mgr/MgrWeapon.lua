@@ -16,11 +16,16 @@ local MathWaterJudge = require('common.MathWaterJudge')
 local AbilityAPI = require('server.AbilityAPI')
 local SwingRegistry = require('server.SwingRegistry')
 
-local Mgr = { States = {}, Flying = {} }
+-- AnimTracks：角色 → { 动画 ID → track }，弱键，角色重生换新对象后旧表随 GC 回收
+local Mgr = { States = {}, Flying = {}, AnimTracks = setmetatable({}, { __mode = 'k' }) }
 
 -- 投掷物视觉占位网格：与 melee_hit 命中盒同款平台级资源（issue #8 实测可用），
 -- 编辑器冻结期间不做资源预设，后续可在编辑器里换成正式爆炸物模型（见 issue #129 编辑器待办）。
 local THROW_VISUAL_MESH = 57450
+-- #172 出手动作：上半身位掩码 30（Head|Trunk|LeftArm|RightArm；运行时 Enums.AnimationFilterType
+-- 没有 UpperBody 成员，见 play_body_animation.lua），优先级取 AnimationPriority.Action 的值 2（未实测）
+local ATTACK_ANIM_FILTER = 30
+local ATTACK_ANIM_PRIORITY = 2
 
 local function acfg() return GameCfg.Ability end
 local function isBadNumber(v)
@@ -89,6 +94,36 @@ function Mgr:Fail(player, action, reason, extra)
     return self:Reply(player, payload)
 end
 
+-- 同一角色同一动画复用 track：自动枪 0.15 秒一发，每发 LoadAnimation 会不停堆 track。
+-- 优先级赋值单独保护：运行时不认时只记日志，照样播
+function Mgr:AttackTrack(character, anim)
+    local tracks = self.AnimTracks[character]
+    if not tracks then
+        tracks = {}
+        self.AnimTracks[character] = tracks
+    end
+    local track = tracks[anim]
+    if track then return track end
+    track = character.Animator:LoadAnimation(anim)
+    track.FilterType = ATTACK_ANIM_FILTER
+    track.Looped = false
+    local ok, err = pcall(function() track.Priority = ATTACK_ANIM_PRIORITY end)
+    if not ok then print('[MgrWeapon] 出手动作优先级设置失败，按默认优先级播', tostring(anim), tostring(err)) end
+    tracks[anim] = track
+    return track
+end
+
+-- 出手成功后才调；动作只是表现，Animator 缺失或播放异常只记日志，不影响结算
+function Mgr:PlayAttackAnim(player, anim)
+    local character = player.Character
+    if not (anim and character and character.Animator) then return false end
+    local ok, err = pcall(function()
+        self:AttackTrack(character, anim):Play(0.05, 1, 1)
+    end)
+    if not ok then print('[MgrWeapon] 出手动作播放失败', player.UserId, tostring(anim), tostring(err)) end
+    return ok
+end
+
 -- ===== 攻击入口 =====
 
 function Mgr:Attack(player, aim)
@@ -143,6 +178,7 @@ function Mgr:AttackMelee(player, weaponId, data)
         SwingRegistry.ClearSwing(player.UserId)
         return self:Fail(player, 'attack', 'cast-failed', { weapon = weaponId })
     end
+    self:PlayAttackAnim(player, mcfg.Anim)
     print('[MgrWeapon] 挥砍发起', player.UserId, tostring(weaponId or 'unarmed'),
         'damage=' .. tostring(damage), 'range=' .. tostring(mcfg.Range),
         'interval=' .. tostring(mcfg.IntervalSec), cast and 'cast' or 'cast-failed')
@@ -190,6 +226,7 @@ function Mgr:AttackGun(player, weaponId, gcfg, data, aim)
     end
     mag.ammo = mag.ammo - 1
     state.fireAt[weaponId] = now
+    self:PlayAttackAnim(player, gcfg.Anim)
 
     local target, hitPos = self:GunHit(player, gcfg, aim)
     local pellets = gcfg.Pellets or 1
@@ -566,6 +603,7 @@ function Mgr:Launch(player, itemId, target)
         startAt = self:Now(), flightSec = acfg().Throw.FlightSec or 0.8 }
     flight.visual = self:CreateThrowVisual(player, itemId, flight)
     self.Flying[#self.Flying + 1] = flight
+    self:PlayAttackAnim(player, acfg().Throw.Anim)
     print('[MgrWeapon] 投掷', player.UserId, itemId,
         zone and ('落水 ' .. zone.Id) or '落地', 'flight=' .. tostring(flight.flightSec))
     return flight

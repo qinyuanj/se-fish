@@ -769,8 +769,17 @@ describe('TestWeaponConfig', function()
 
     -- 商店表 R24—R19：手枪 10/1s/10、霰弹 5×20/1.5s/2、冲锋 13/0.15s/30、
     -- 自动步枪 20/0.2s/30、狙击 200/1.5s/5、火箭筒 500/1 发/周围 5 米 100
+    -- 出手动作 Anim（#172）是表现字段，由 attack_animation_test 管，钉表只比数值
+    local function numbers(row)
+        local copy = {}
+        for key, value in pairs(row) do
+            if key ~= 'Anim' then copy[key] = value end
+        end
+        return copy
+    end
     it('test_guns_match_shop_table', function()
-        local g = GameCfg.Ability.Guns
+        local g = {}
+        for id, row in pairs(GameCfg.Ability.Guns) do g[id] = numbers(row) end
         assert.same({ Damage = 10, IntervalSec = 1.0, Magazine = 10 }, g.item137)
         assert.same({ Damage = 20, Pellets = 5, IntervalSec = 1.5, Magazine = 2 }, g.item138)
         assert.same({ Damage = 13, IntervalSec = 0.15, Magazine = 30, Auto = true }, g.item139)
@@ -782,7 +791,8 @@ describe('TestWeaponConfig', function()
 
     -- 商店表 R27/R26/R25：指虎 10/0.5、匕首 15/0.5、斧头 40/1.0；#129 票面射程 2/3/4 米
     it('test_melee_weapons_match_design_table', function()
-        local m = GameCfg.Ability.MeleeWeapons
+        local m = {}
+        for id, row in pairs(GameCfg.Ability.MeleeWeapons) do m[id] = numbers(row) end
         assert.same({ Damage = 10, IntervalSec = 0.5, Range = 2 }, m.item134)
         assert.same({ Damage = 15, IntervalSec = 0.5, Range = 3 }, m.item135)
         assert.same({ Damage = 40, IntervalSec = 1.0, Range = 4 }, m.item136)
