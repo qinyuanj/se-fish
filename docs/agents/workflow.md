@@ -94,9 +94,12 @@ install -m 755 tools/hooks/shim "$(git rev-parse --git-common-dir)/hooks/pre-com
 - **会话首开对齐**：本会话第一次做 Lua 相关操作且编辑器在线时，先跑 `code diff --json`；changelist 非空就把分类计数与文件清单报给用户，由用户选 push、pull 或暂不处理，agent 不自选方向。
 - **多实例**：`editor-instances list` 列出多个实例时（含停在 `<starting>` 的），每条命令都带 `--editor-instance <pid>`。
 - **试玩闸门例外**：`code diff` 中 `differs`、`only-on-map` 为空，且 `only-local` 全在 `unit_scripts/` 或 `.agents/` 下时，视为干净，不 push、直接试玩，并在取证记录里写明这些文件。`unit_scripts/` 由引擎生成（见 `AGENTS.md`），`deploy` 只镜像三端子树，不会清理它；`.agents/` 是 agent 配置，不进地图。
-- **异步输出**：服务端、客户端 `exec` 提交成功只表示代码已提交。脚本打印唯一标记后，用 `log grep <标记> | grep '^>'` 读取实际结果（不带过滤时会混入上下文行与统计行）。`log grep` 没有 `-i`：默认就不区分大小写，需要区分时加 `--case-sensitive`。
+- **异步输出**：服务端、客户端 `exec` 提交成功只表示代码已提交。脚本打印唯一标记后，用 `log grep <标记> | grep '^>'` 读取实际结果（不带过滤时会混入上下文行与统计行）。`log grep` 没有 `-i`：默认就不区分大小写，需要区分时加 `--case-sensitive`。编辑器 `exec` 的同步返回值在约 5KB 处静默截断，批量读取同样走打印标记加 `log grep`。
 - **截图失败**：窗口被遮挡、最小化或在远程虚拟屏上时，`screenshot game` 会返回 `FRAME_NEAR_WHITE` 或黑帧，`screenshot editor` 会得到 1×1（`SCREENSHOT_INVALID_DIMENSIONS`）。先把编辑器窗口置前再重试一次；仍失败就请用户目视确认，给出选项、时间点和观察要点，不要循环重试。
 - **保存与重开**：`map save` 成功后 `map dirty` 仍可能为 true，此时 `map reopen` 报 `MAP_REOPEN_REJECTED`。先用 `map dirty --json` 列出 dirty 来源请用户确认，确认后才可 `map reopen --force`；来源不明时可能是用户的手动编辑，不要强制。停止试玩本身也会让 dirty 变成 true。
+- **风险步逐次确认**：部署、试玩、地图保存、推送、场景写入，每一步单独取得用户确认；一次授权只覆盖它点名的那一轮或那一批，一次试玩授权只覆盖那一轮试玩。场景写入即以 `APPLY = true` 执行写场景探针：先以 `APPLY = false` 跑 dry-run 并把结果交给用户，用户确认一批才执行一批，执行完立即把探针改回 `APPLY = false`。
+- **场景整理顺序**：空目录清理排在全部建标记批次之后，只处理基线回读时已存在的空目录。删除或挪动场景地面（灰盒地块等）前，先在试玩服务端对受影响区的 `Z*` 点位与设施打向下射线，确认其下仍有地面（删 01 灰盒大地板后，渔夫、商店、抽奖、出生点、鱼饵曾悬在鱼塘水面上）。
+- **编辑态读不到的设置**：编辑态 `editor:GetService('PhysicsService')` 为 nil，地面高度只能在试玩服务端用射线测；编辑态读 World 的 `AOIType`、`StreamingEnabled` 得到 nil，流式加载设置无法经 CLI 确认。
 - **场景枚举**：编辑器侧执行[技术难点识别的绕过合同](../技术难点识别.md#绕过合同四条硬边界)，试玩服务端的例外也写在那里。
 - **检索失败**：`docs search` 报 HTTP 500 等服务端错误时（0.20.12 的 `editor-api` docset 出现过），改查 `manual` 或编辑器在线时的 `api search-editor` / `api get-editor`。
 - **检索范围**：本图是世界版（SE），`status --json` 显示 `editor_mode: "se"`。`docs search` 只查世界版文档库：`manual`、`game-api`、`editor-api`、`asset`。用户问题里的词在这些库里查不到时，先问用户指什么，等确认后再换库或换方向。原点版（FS）的 `fs-manual`、`fs-component` 只在用户点名「原点版 / FS」时才查。
@@ -135,4 +138,6 @@ install -m 755 tools/hooks/shim "$(git rev-parse --git-common-dir)/hooks/pre-com
 ## 产物归属
 
 执行过程产物（调研全文、验证台账、验收记录、开发计划）贴进对应 issue 的评论；`docs/` 只留长期参考（术语、技术难点、ADR）。`eggy-dev-plan` 默认的 `docs/plan/` 输出在本仓库改为 issue 评论。
+
+**交接摘要**：写交接或续接摘要时附授权台账，逐条列「用户授权原文 → 覆盖的动作 → 已用完 / 未用」；台账里写不出原文的动作视为未授权，续接方须重新取得确认。
 
