@@ -68,10 +68,7 @@ local unitMembers = {
   end),
   GetDescendants = method(function(self) return descendants(self, {}) end),
   FindFirstChild = method(directChild),
-  GetProperty = method(function(self, key)
-    if key ~= 'Size' then error('Unit 没有属性 ' .. tostring(key), 2) end
-    return toVector(states[self].size)
-  end),
+  Size = function(_, state) return toVector(state.size) end,
 }
 
 local unitWritable = {

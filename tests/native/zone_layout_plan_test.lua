@@ -107,7 +107,7 @@ describe('#164 场景标记读取合同', function()
       local zone = findChild(world, '01 鱼塘')
       local waters = findChild(zone, '水域')
       local water = findChild(waters, 'Z1_Water1')
-      local size = water:GetProperty('Size')
+      local size = water.Size
       Engine.SetSize(water, { x = bad, y = size.y, z = size.z })
       assert.error_matches(function() ZoneMarkers.Resolve(world, cfg) end, '尺寸非法', nil, true)
       assert.is_false(ZoneMarkers.Ready)

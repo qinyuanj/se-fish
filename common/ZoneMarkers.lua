@@ -5,6 +5,9 @@ local GameCfg = require('common.GameCfg')
 local ZoneMarkers = { Ready = false, Zones = {} }
 
 local zoneNames = { '01 鱼塘', '02 虾池', '03 蟹湖', '04 树林岛', '05 沙滩岛', '06 礁石岛', '07 火山岛' }
+-- 客户端 main 早于场景同步完成执行（2026-11-04 实测约早 10 ms），启动时按此节奏重试解析
+local START_POLL_SEC = 0.1
+local START_WAIT_SEC = 30
 
 local function finite(value)
     return type(value) == 'number' and value == value and math.abs(value) < math.huge
@@ -20,7 +23,7 @@ local function vector(value, label, name)
 end
 
 local function sizeOf(unit, name)
-    local size = vector(unit:GetProperty('Size'), '尺寸', name)
+    local size = vector(unit.Size, '尺寸', name)
     if size.x <= 0 or size.y <= 0 or size.z <= 0 then error('区域标记尺寸非法: ' .. name) end
     return size
 end
@@ -273,9 +276,17 @@ function ZoneMarkers.Resolve(world, config)
 end
 
 function ZoneMarkers.Start()
-    local snapshot = ZoneMarkers.Resolve(game:GetService('World'))
+    local world, task = game:GetService('World'), game:GetService('Task')
+    local ok, snapshot = pcall(ZoneMarkers.Resolve, world)
+    local waited = 0
+    while not ok and waited < START_WAIT_SEC do
+        task:Wait(START_POLL_SEC)
+        waited = waited + START_POLL_SEC
+        ok, snapshot = pcall(ZoneMarkers.Resolve, world)
+    end
+    if not ok then error(snapshot, 0) end
     print('[ZoneMarkers] ready', 'waters=' .. #snapshot.Waters, 'baits=' .. #snapshot.BaitSpots,
-        'routes=' .. #snapshot.FerryRoutes)
+        'routes=' .. #snapshot.FerryRoutes, 'waitedSec=' .. waited)
     return snapshot
 end
 
