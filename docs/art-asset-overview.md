@@ -52,7 +52,8 @@
 - **引擎临时占位（[#172](https://github.com/qinyuanj/se-fish/issues/172)）**：以下全部是引擎临时占位，正式资源见 [#44](https://github.com/qinyuanj/se-fish/issues/44)；只用引擎内官方资源，不自制、不付费生成。
   - **出手动作**：官方动画，ID 只配在 `common/GameCfg.lua` 的 `AttackAnim` 表，经 `GameCfg.Ability` 的 `Unarmed`、`MeleeWeapons`、`Guns`、`Throw` 各行 `Anim` 引用；由 `MgrWeapon` 在出手成功后按上半身播放，挥砍预设的 `ABILITY_ANOSTATE_ANIMKEY` 保持空。空手、指虎用拳击类，匕首组用单刀连击，斧组用锤子攻击，枪械按手枪、步枪、机枪、手炮开火分组；官方库没有投掷动作，投掷暂用「挥舞武器」。
   - **钓鱼佬**：七区都是官方「咸鱼」`official://preset/102179`，场景单位名 01 为 `FishermanModel`，02–07 为 `Z<i>_FishermanModel`（`GameCfg.Interact.Fishermen[i].ModelName`），放在本区「设施」、与本区钓鱼佬触发器同点。
-  - **抽奖机**：七区抽奖点（`Z<i>_Lottery`）都只是「基础方块」标记（mesh 5000001），没有机器模型；官方资源库里也没有抽奖机类预设，占位选型待定。
+  - **抽奖机**：官方资源库没有抽奖机类预设，七区都用官方「电视」`official://preset/1504175` 占位，场景单位名 `Z<i>_LotteryModel`，放在本区「设施」、与本区抽奖点标记 `Z<i>_Lottery`（「基础方块」，mesh 5000001）同点；交互仍以标记为锚点。摆放探针 `tests/probes/zone172_lottery_models.lua`。
+  - **试玩核对（2026-11-04）**：14 个模型贴地，`tests/probes/zone172_model_ground_gap.lua` 全部通过（最大偏差 Z4 抽奖机 -0.063 m，其余在 ±0.03 m 内）；地图已保存，重开后位置不变。出手动作九类（空手、134–139、142、投掷）经 `tests/probes/zone172_attack_anim_runtime.lua` 走真实出手入口均成功，但服务端 track 读回恒为未播放、长度 0，客户端也拿不到播放中的 track，截图又遇到游戏窗口停止渲染，**动作画面尚未目视确认**。
 
 ## 待定
 
