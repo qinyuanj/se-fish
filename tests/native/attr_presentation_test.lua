@@ -8,13 +8,13 @@ describe('TestAttrPresentation', function()
     -- 相机刷新尊重其他拥有者，Stop 时恢复
     it('test_camera_rebuild_restores_old_camera_and_uses_new_character_projection', function()
         local mgr = assert(loadfile('client/LocalAttr.lua'))()
-        local first = { GetAttribute = function() return 18 end }
-        local second = { GetAttribute = function() return 6 end }
+        local first = { GetAttribute = function() return 39 end }
+        local second = { GetAttribute = function() return 13 end }
         local camera = { Distance = 8, TrackingUnit = first }
         assert.is_true(mgr:Refresh(first, camera))
         camera.TrackingUnit = second
         assert.is_true(mgr:Refresh(second, camera))
-        assert.same(6, camera.Distance)
+        assert.same(13, camera.Distance)
         mgr:Stop()
         assert.same(8, camera.Distance)
     end)
@@ -23,10 +23,10 @@ describe('TestAttrPresentation', function()
     it('test_camera_refresh_respects_other_owner_and_restores_on_stop', function()
         local env = setmetatable({}, { __index = _G })
         local mgr = assert(loadfile('client/LocalAttr.lua', 't', env))()
-        local character = { GetAttribute = function() return 24 end }
+        local character = { GetAttribute = function() return 52 end }
         local camera = { Distance = 8, TrackingUnit = character }
         assert.is_true(mgr:Refresh(character, camera))
-        assert.same(18, camera.Distance)
+        assert.same(39, camera.Distance)
         camera.Distance = 12
         assert.is_false(mgr:Refresh(character, camera))
         assert.same(12, camera.Distance)

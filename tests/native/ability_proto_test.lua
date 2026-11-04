@@ -54,11 +54,11 @@ describe("TestBodyScale", function()
     local base = { CapsuleHeight = c.CapsuleHeight, CameraDistance = c.CameraDistance,
       InteractRange = c.InteractRange, SocketOffset = { x = 0, y = 2.4, z = 0 } }
     local one = BodyScale.Derive(1, base)
-    assert.same({ Scale = 1, CapsuleHeight = 2, CameraDistance = 6, InteractRange = 2,
+    assert.same({ Scale = 1, CapsuleHeight = 2, CameraDistance = 13, InteractRange = 2,
       SocketOffset = { x = 0, y = 2.4, z = 0 } }, one)
     local three = BodyScale.Derive(3, base)
     assert.are.equal(6, three.CapsuleHeight)
-    assert.are.equal(18, three.CameraDistance)
+    assert.are.equal(39, three.CameraDistance)
     assert.are.equal(6, three.InteractRange)
     assert.near(0, three.SocketOffset.x, 1e-9)
     assert.near(7.2, three.SocketOffset.y, 1e-9)
