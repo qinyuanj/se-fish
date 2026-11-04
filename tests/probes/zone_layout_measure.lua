@@ -11,11 +11,12 @@ local physics = game:GetService('PhysicsService')
 local world = game:GetService('World')
 
 local targets = {}
+local byName = {}
 for _, unit in ipairs(world:GetDescendants()) do
   if unit.Name == '地形' then targets[#targets + 1] = unit end
+  byName[unit.Name] = unit
 end
-local reef = world:FindFirstChild('06 礁石岛')
-local greybox = reef and reef:FindFirstChild('地块')
+local greybox = byName['地块']
 if greybox then targets[#targets + 1] = greybox end
 local params = RaycastParams.New()
 params.FilterType = Enums.RaycastFilterType.Include
@@ -23,7 +24,7 @@ params.FilterDescendantsInstances = targets
 print(MARK .. '|targets=' .. #targets .. '|greybox06=' .. tostring(greybox ~= nil))
 
 local function wall(zoneIndex, side)
-  return world:FindFirstChild('Z' .. zoneIndex .. '_Boundary' .. side).Position
+  return byName['Z' .. zoneIndex .. '_Boundary' .. side].Position
 end
 
 for index = 1, #ZONES do
