@@ -1,5 +1,6 @@
 -- 架构分层与源码图共用一份声明；扫描与判定均可脱离引擎运行。
 local Arch = require('tools.arch_policy')
+local fs = require('tests.support.sh_fs')
 
 local function fixture_policy()
   return {
@@ -130,6 +131,38 @@ describe('架构分层门禁', function()
     local graph = assert(Arch.scan('.', Arch.policy))
     local result = Arch.check(Arch.policy, graph)
     assert.is_true(result.ok, result.message)
+  end)
+
+  it('三端与 tools 不得 require 测试代码', function()
+    local result = Arch.check(Arch.policy, {
+      modules = { 'common.Util' },
+      edges = {
+        { from = 'common.Util', to = 'tests.support.baseline' },
+        { from = 'tools.gen_config_anchor_probe', to = 'tests.support.zone_fixtures' },
+        { from = 'tests.support.baseline', to = 'tests.support.zone_fixtures' },
+      },
+    })
+    assert.is_false(result.ok)
+    local found = {}
+    for _, item in ipairs(result.violations) do found[#found + 1] = item.rule .. ': ' .. item.from end
+    assert.same({ 'no_test_imports: common.Util', 'no_test_imports: tools.gen_config_anchor_probe' }, found)
+  end)
+
+  describe('扫描 tools 对测试代码的依赖', function()
+    local root = assert(io.popen('pwd')):read('l') .. '/tmp/arch-policy-test'
+    after_each(function() fs.rmrf(root) end)
+
+    it('tools 只贡献依赖边，不进分层名单', function()
+      fs.rmrf(root)
+      fs.mkdirp(root .. '/client')
+      fs.mkdirp(root .. '/server')
+      fs.write_file(root .. '/common/Util.lua', 'return {}\n')
+      fs.write_file(root .. '/tools/probes/gen.lua',
+        "local Fixtures = require('tests.support.zone_fixtures')\nlocal Util = require('common.Util')\n")
+      local result = Arch.check(Arch.policy, assert(Arch.scan(root, Arch.policy)))
+      assert.is_false(result.ok)
+      assert.equals('forbidden_dependency: tools.probes.gen -> tests.support.zone_fixtures', result.message)
+    end)
   end)
 
   it('源码图 levels 与门禁声明一致且 packages 最底', function()

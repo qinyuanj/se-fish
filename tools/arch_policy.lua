@@ -6,6 +6,8 @@ local M = {}
 
 M.policy = {
   roots = { 'client', 'common', 'server' },
+  -- 只扫描 require 边、不进分层名单的源码根：forbidden 规则对它们同样生效。
+  guarded_roots = { 'tools' },
   -- 内层优先：官方包、配置内容、共享规则、运行端适配、应用流程、入口。
   levels = {
     { ids = { 'client.packages', 'server.packages', 'common.packages' } },
@@ -47,6 +49,9 @@ M.policy = {
     { name = 'common_independent', from = { '^common%.' }, to = { '^client%.', '^server%.' } },
     { name = 'client_not_server', from = { '^client%.' }, to = { '^server%.' } },
     { name = 'server_not_client', from = { '^server%.' }, to = { '^client%.' } },
+    -- 正式代码引用测试夹具会把假数据带进产物（曾生成 108 条假锚点）。
+    { name = 'no_test_imports', from = { '^client%.', '^common%.', '^server%.', '^tools%.' },
+      to = { '^tests%.' } },
   },
 }
 
@@ -163,6 +168,11 @@ function M.check(policy, graph)
   end
   local edges = {}
   for _, edge in ipairs(graph.edges) do
+    for _, rule in ipairs(policy.forbidden or {}) do
+      if matches(edge.from, rule.from) and matches(edge.to, rule.to) then
+        add({ kind = 'forbidden_dependency', rule = rule.name, from = edge.from, to = edge.to })
+      end
+    end
     if known[edge.from] and known[edge.to] then
       edges[#edges + 1] = edge
       local from_rank, from_prefix = classify(policy, edge.from)
@@ -170,11 +180,6 @@ function M.check(policy, graph)
       if from_rank and to_rank and from_rank < to_rank then
         add({ kind = 'layer_violation', from = edge.from, to = edge.to,
           from_prefix = from_prefix, to_prefix = to_prefix })
-      end
-      for _, rule in ipairs(policy.forbidden or {}) do
-        if matches(edge.from, rule.from) and matches(edge.to, rule.to) then
-          add({ kind = 'forbidden_dependency', rule = rule.name, from = edge.from, to = edge.to })
-        end
       end
     end
   end
@@ -333,26 +338,23 @@ local function collect(root, relative, files)
 end
 
 function M.scan(root, policy)
-  local files = {}
+  local files, guarded = {}, {}
   for _, source_root in ipairs(policy.roots) do collect(root, source_root, files) end
+  for _, source_root in ipairs(policy.guarded_roots or {}) do collect(root, source_root, guarded) end
+  local known = {}
+  for _, path in ipairs(files) do known[path:sub(1, -5):gsub('/', '.')] = true end
+  for _, path in ipairs(guarded) do files[#files + 1] = path end
   table.sort(files)
-  local known, requires_by_module = {}, {}
+  local edges = {}
   for _, path in ipairs(files) do
     local id = path:sub(1, -5):gsub('/', '.')
-    known[id] = true
     local handle, err = io.open(root .. '/' .. path, 'rb')
     if not handle then return nil, err end
     local source = handle:read('*a')
     handle:close()
-    requires_by_module[id] = M.requires(source)
+    for _, to in ipairs(M.requires(source)) do edges[#edges + 1] = { from = id, to = to } end
   end
-  local modules, edges = sorted_keys(known), {}
-  for _, from in ipairs(modules) do
-    for _, to in ipairs(requires_by_module[from]) do
-      if known[to] then edges[#edges + 1] = { from = from, to = to } end
-    end
-  end
-  return { modules = modules, edges = edges }
+  return { modules = sorted_keys(known), edges = edges }
 end
 
 function M.levels_edn(policy)
