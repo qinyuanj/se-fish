@@ -36,7 +36,7 @@ local function itemCount(data, itemId)
     return data.Data.Bait[itemId] or data:ItemCount(itemId)
 end
 
--- 七区钓鱼佬（#127）：共享表现参数（Radius/Slack/BubbleHeight/DialogText/BaitPrice/ModelName）
+-- 七区钓鱼佬（#127）：共享表现参数（Radius/Slack/BubbleHeight/DialogText/BaitPrice）
 -- 与本区锚点、本区兑换链合成一个完整交互点。每次请求现取共享表，配置热改与测试替身都即时生效。
 local function fishermanPoint(shared, npc)
     local point = {}

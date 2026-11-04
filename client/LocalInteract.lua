@@ -2,8 +2,8 @@
 -- （Interact.Fishermen[i].AnchorNames，锚点取 #125 场景合同）上方建一个场景 UI，放两个按钮，
 -- 本地角色在该锚点 Radius 米内（只看 x/z）才显示。「对话」读取本区配置并逐段显示；「喂食」只发请求
 -- （InteractAction{target, action, seq}，seq 递增防重放），结果以服务端回包为准。
--- 喂食成功的吃动作是客户端缩放脉冲：对 ModelName 模型按 Heartbeat 帧数播 1→放大→还原，
--- 仅喂食者本机可见；模型缺失或写 Scale 失败只记日志，不影响文字泡与结算。
+-- 喂食成功的吃动作是客户端缩放脉冲：对点「喂食」那一区的模型（Fishermen[i].ModelName，#172 每区一个）
+-- 按 Heartbeat 帧数播 1→放大→还原，仅喂食者本机可见；模型缺失或写 Scale 失败只记日志，不影响文字泡与结算。
 local GameCfg = require('common.GameCfg')
 local BodyScale = require('common.BodyScale')
 local REUtil = require('common.REUtil')
@@ -11,7 +11,7 @@ local Util = require('common.Util')
 local Dialogue = require('common.NpcDialogue')
 
 local Bubble = require('client.InteractionBubble')
-local LocalInteract = { Seq = 0, Bubbles = {} }
+local LocalInteract = { Seq = 0, Bubbles = {}, Models = {} }
 
 -- 缩放脉冲参数：PulseFrames 帧内按 sin 曲线放大到 1+PulseAmp 再还原（帧率相关，表现层可接受）
 local PulseFrames = 20
@@ -28,12 +28,13 @@ function LocalInteract:Button(node, name, text, x, onClick)
     return Bubble.CreateButton(node, name, text, x, onClick)
 end
 
-function LocalInteract:Feed()
+function LocalInteract:Feed(index)
     self.Seq = self.Seq + 1
+    self.FeedIndex = index
     REUtil:GetRE('InteractAction'):FireServer({ target = 'fisherman', action = 'Feed', seq = self.Seq })
 end
 
-function LocalInteract:Create(anchor, suffix, zoneId)
+function LocalInteract:Create(anchor, suffix, zoneId, index)
     local cfg = GameCfg.Interact.Fisherman
     local player = Players.LocalPlayer
     local eui = player and player.PlayerGui and player.PlayerGui.EuiManager
@@ -57,15 +58,23 @@ function LocalInteract:Create(anchor, suffix, zoneId)
                 notice(Dialogue.Describe(zoneId) or cfg.DialogText)
             end
         end)
-    self:Button(node, 'BtnFishermanFeed' .. suffix, '喂食', offset, function() self:Feed() end)
+    self:Button(node, 'BtnFishermanFeed' .. suffix, '喂食', offset, function() self:Feed(index) end)
     node.Visible = false
     self.Bubbles[#self.Bubbles + 1] = { Node = node, Center = center, Visible = false }
 end
 
+-- 喂食成功：只脉冲喂食所在区的模型；该区没摆模型（或读 Scale 失败）时不播
+function LocalInteract:StartPulse()
+    local entry = self.FeedIndex and self.Models[self.FeedIndex]
+    if not entry then return end
+    self.Pulse = entry
+    self.PulseLeft = PulseFrames
+end
+
 function LocalInteract:UpdatePulse()
     if not self.PulseLeft then return end
-    local model = self.Model
-    if not model then
+    local entry = self.Pulse
+    if not entry then
         self.PulseLeft = nil
         return
     end
@@ -75,14 +84,17 @@ function LocalInteract:UpdatePulse()
         local progress = 1 - self.PulseLeft / PulseFrames
         factor = 1 + PulseAmp * math.sin(math.pi * progress)
     end
-    local base = self.ModelBaseScale
+    local base = entry.BaseScale
     local ok, err = pcall(function()
-        model.Scale = Vector3.New(base.x * factor, base.y * factor, base.z * factor)
+        entry.Model.Scale = Vector3.New(base.x * factor, base.y * factor, base.z * factor)
     end)
     if not ok then
         print('[LocalInteract] 钓鱼佬缩放脉冲失败，放弃表现', tostring(err))
         self.PulseLeft = nil
-        self.Model = nil
+        self.Pulse = nil
+        for index, other in pairs(self.Models) do
+            if other == entry then self.Models[index] = nil end
+        end
         return
     end
     self.PulseLeft = self.PulseLeft - 1
@@ -126,38 +138,41 @@ function LocalInteract:Start()
             else
                 notice('钓鱼佬吃得很香，金币 +' .. tostring(result.coins))
             end
-            if self.Model then self.PulseLeft = PulseFrames end
+            self:StartPulse()
         elseif result.reason == 'nothing' then
             notice('先选中要喂的鱼获或鱼饵')
         elseif result.reason == 'full' then
             notice('格子满了，钓鱼佬不肯换')
         end
     end)
-    local shared = GameCfg.Interact.Fisherman
     -- 按区分派（#127）：七区各一个钓鱼佬；未建区的锚点取不到时只记日志
     for index, npc in ipairs(GameCfg.Interact.Fishermen) do
         for _, name in ipairs(npc.AnchorNames) do
             local anchor = Util:WaitForChild(World, name)
             if anchor then
-                self:Create(anchor, index .. '_' .. name, npc.ZoneId)
+                self:Create(anchor, index .. '_' .. name, npc.ZoneId, index)
             else
                 print('[LocalInteract] 找不到钓鱼佬单位', npc.ZoneId, name)
             end
         end
     end
-    local model = shared.ModelName and Util:WaitForChild(World, shared.ModelName)
-    if model then
-        local ok, scale = pcall(function() return model.Scale end)
-        if ok and scale then
-            self.Model = model
-            self.ModelBaseScale = scale
-        else
-            print('[LocalInteract] 钓鱼佬模型读 Scale 失败，跳过吃动作', tostring(scale))
-        end
-    else
-        print('[LocalInteract] 找不到钓鱼佬模型，跳过吃动作', tostring(shared.ModelName))
-    end
     game:GetService('RunService').Heartbeat:Connect(function() self:Update() end)
+    -- 模型最后绑：缺模型时 WaitForChild 每个要等满超时，不能拖住文字泡显隐
+    for index, npc in ipairs(GameCfg.Interact.Fishermen) do self:BindModel(index, npc) end
+end
+
+function LocalInteract:BindModel(index, npc)
+    local model = npc.ModelName and Util:WaitForChild(World, npc.ModelName)
+    if not model then
+        print('[LocalInteract] 找不到钓鱼佬模型，跳过吃动作', npc.ZoneId, tostring(npc.ModelName))
+        return
+    end
+    local ok, scale = pcall(function() return model.Scale end)
+    if ok and scale then
+        self.Models[index] = { Model = model, BaseScale = scale }
+    else
+        print('[LocalInteract] 钓鱼佬模型读 Scale 失败，跳过吃动作', npc.ZoneId, tostring(scale))
+    end
 end
 
 return LocalInteract

@@ -49,6 +49,11 @@
 - **海鸥**（2026-10-22）：接缝 B 通过，网格 1 连通块且硬性 0 项全为 0；接缝 A 未做。
 - **鳄雀鳝**（2026-10-28 更新）：原点改为底面中心后重导出，接缝 B 通过（7820 三角面、导出全长 0.05 即折算游戏内 5 单位、Idle/Walk/Attack）。接缝 A 已核对原点（脚踩地，与单位方块同一平面）、尺寸（约为方块边长 4~5 倍，与 5 单位同一量级），以及三段动画在 `AnimatedUnit` 上能播。当前用网格 `custom://0h1DIiDiCuEpQD9Kj`；首次上传的 `0h1D75CoYl8bow4id` 经 #160 复测同样带片段，场上摆放的单位仍引用它且不是 `AnimatedUnit`。以下未核对，留给首领功能实现：Walk 步幅与 6 m/s 移速是否匹配（是否滑步）、胶囊与挂点位置。
 
+- **引擎临时占位（[#172](https://github.com/qinyuanj/se-fish/issues/172)）**：以下全部是引擎临时占位，正式资源见 [#44](https://github.com/qinyuanj/se-fish/issues/44)；只用引擎内官方资源，不自制、不付费生成。
+  - **出手动作**：官方动画，ID 只配在 `common/GameCfg.lua` 的 `AttackAnim` 表，经 `GameCfg.Ability` 的 `Unarmed`、`MeleeWeapons`、`Guns`、`Throw` 各行 `Anim` 引用；由 `MgrWeapon` 在出手成功后按上半身播放，挥砍预设的 `ABILITY_ANOSTATE_ANIMKEY` 保持空。空手、指虎用拳击类，匕首组用单刀连击，斧组用锤子攻击，枪械按手枪、步枪、机枪、手炮开火分组；官方库没有投掷动作，投掷暂用「挥舞武器」。
+  - **钓鱼佬**：七区都是官方「咸鱼」`official://preset/102179`，场景单位名 01 为 `FishermanModel`，02–07 为 `Z<i>_FishermanModel`（`GameCfg.Interact.Fishermen[i].ModelName`），放在本区「设施」、与本区钓鱼佬触发器同点。
+  - **抽奖机**：七区抽奖点（`Z<i>_Lottery`）都只是「基础方块」标记（mesh 5000001），没有机器模型；官方资源库里也没有抽奖机类预设，占位选型待定。
+
 ## 待定
 
 - **Meshy Remesh 替代本地减面（2026-10-28 鳄雀鳝试点未通过，见 [#157](https://github.com/qinyuanj/se-fish/issues/157)）**：减面仍在 Blender 本地完成。通过条件是三项全过：未经本地修补 `failures` 为空；同机位 BaseColor 不糊、无接缝错位；迁移骨架权重后 Walk / Attack 无撕裂穿插。4 次试点都有非流形边，硬性 0 项不过；Remesh 也不切嘴缝，切嘴步骤省不掉。数据与审阅图见 #157。**重开条件**：Meshy 输出保证流形时再试，优先试 `triangle`。

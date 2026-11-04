@@ -335,13 +335,13 @@ GameCfg.CastFeedback = {
 -- Radius 米内（只看 x/z）显示「对话」「喂食」，服务端复验多给 Slack 米容差。
 -- 喂食即出售（#127 改为按物品表回收）：未烤的本区信物优先走本区链 1:1 兑换（表见 Interact.Fishermen），
 -- 其余选中物品按基础价 × 实例倍率结金币、烤过的按烤熟价；选中的鱼饵按 BaitPrice 每只结算。
--- 钓鱼佬的可见模型是官方「咸鱼」（official://preset/102179，场景单位名见 ModelName）；
+-- 钓鱼佬的可见模型是官方「咸鱼」（official://preset/102179，引擎临时占位，正式资源见 #44）；
+-- 每区一个，场景单位名见 Interact.Fishermen[i].ModelName（#172：01 沿用 FishermanModel，其余 Z<i>_FishermanModel）。
 -- 模型无 Eat 动画（EatAnimation 留空，服务端播动画自动跳过），喂食吃动作为客户端缩放脉冲
--- （LocalInteract 播，仅喂食者本机可见）。触发器贴地（#164），文字泡相对触发器抬高 3 米，露出约 1.1 米高的模型。
+-- （LocalInteract 播在喂食者所在区的模型上，仅喂食者本机可见）。触发器贴地（#164），文字泡相对触发器抬高 3 米，露出约 1.1 米高的模型。
 -- 本表只放七区共享的表现与鱼饵价；每区的锚点与兑换链见下方 GameCfg.Interact.Fishermen（#127）。
 GameCfg.Interact = {
     Fisherman = {
-        ModelName = 'FishermanModel',
         Radius = 5,
         Slack = 0.5,
         BubbleHeight = 3,
@@ -1175,6 +1175,7 @@ for index, chain in ipairs(GameCfg.Content.Exchanges) do
     local fishermanName = index == 1 and 'TGUnitFish' or index == 2 and 'TGUnitFishShrimp' or ('Z' .. index .. '_Fisherman')
     GameCfg.Interact.Fishermen[index] = {
         ZoneId = zone.Id, AnchorNames = { fishermanName },
+        ModelName = index == 1 and 'FishermanModel' or ('Z' .. index .. '_FishermanModel'),
         Exchange = { [chain.EliteToken] = chain.BossBait, [chain.BossToken] = chain.Result }, Chain = index,
     }
 end
