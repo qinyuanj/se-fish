@@ -90,6 +90,22 @@ function MathWaterJudge.Build(zones)
     end
 end
 
+-- 朝水方向（#164）：在给定水域里找平面上最近的矩形点，返回单位向量 dx, dz；已在水里或无水域返回 nil。
+function MathWaterJudge.Toward(zones, pos)
+    local best, bestX, bestZ
+    for _, zone in ipairs(zones) do
+        local halfX, halfZ = zone.HalfX or zone.HalfXZ, zone.HalfZ or zone.HalfXZ
+        local nearX = math.max(zone.Center.x - halfX, math.min(pos.x, zone.Center.x + halfX))
+        local nearZ = math.max(zone.Center.z - halfZ, math.min(pos.z, zone.Center.z + halfZ))
+        local dx, dz = nearX - pos.x, nearZ - pos.z
+        local distance = dx * dx + dz * dz
+        if not best or distance < best then best, bestX, bestZ = distance, dx, dz end
+    end
+    if not best or best < 1e-4 then return nil end
+    local length = math.sqrt(best)
+    return bestX / length, bestZ / length
+end
+
 -- 输入为只读现场快照：每项含 Name、Position={x,y,z}，不在模块内获取 Service。
 -- EntitiesMatch 只说明实体名/坐标匹配；保存、sync、碰撞和试玩始终单列未验证，不提供总就绪值。
 function MathWaterJudge.InspectScene(zones, snapshot)

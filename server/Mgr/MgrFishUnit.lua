@@ -235,15 +235,19 @@ local function flatDirection(x, z)
     return x / length, z / length
 end
 
--- 离 (x,z) 最近的水区中心方向（单位向量）
+-- 离 (x,z) 最近的水域方向（单位向量）：只看鱼所在区的水域，免得朝隔壁区的水撞空气墙；不在任何区内时看全图
 local function towardWater(pos)
-    local best, bx, bz
-    for _, zone in ipairs(GameCfg.Water.Zones) do
-        local dx, dz = zone.Center.x - pos.x, zone.Center.z - pos.z
-        local d = dx * dx + dz * dz
-        if not best or d < best then best, bx, bz = d, dx, dz end
+    local waters = GameCfg.Water.Zones
+    for _, zone in ipairs(GameCfg.Zones) do
+        local scene = zone.Scene
+        local bounds = scene and scene.Boundary
+        if bounds and scene.Waters and #scene.Waters > 0
+            and pos.x > bounds.MinX and pos.x < bounds.MaxX and pos.z > bounds.MinZ and pos.z < bounds.MaxZ then
+            waters = scene.Waters
+            break
+        end
     end
-    if best then return flatDirection(bx, bz) end
+    return MathWaterJudge.Toward(waters, pos)
 end
 
 -- 入水只看 (x,z)：岸上鱼的 y 高于水面（V4 实测 2.15 > SurfaceY），按 y 判会永远判不进

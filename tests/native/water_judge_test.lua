@@ -226,3 +226,32 @@ describe("TestWaterJudgeSemantics", function()
       at(CENTER_X, UNDER_WATER_Y, CENTER_Z + OUTER_HALF + 0.1)))
   end)
 end)
+
+-- #164：一区多块贴岸矩形后，逃鱼朝向取「最近矩形上的最近点」，不取矩形中心；
+-- 只在调用方给的这组水域里找（MgrFishUnit 传鱼所在区的水域）。
+describe("TestWaterJudgeToward", function()
+  local function rect(id, x0, x1, z0, z1)
+    return { Id = id, Center = { x = (x0 + x1) / 2, z = (z0 + z1) / 2 },
+      HalfX = (x1 - x0) / 2, HalfZ = (z1 - z0) / 2, SurfaceY = -0.25 }
+  end
+
+  it("test_points_to_nearest_edge_not_center", function()
+    local long = rect("long", 10, 20, -200, 200)
+    local dx, dz = MathWaterJudge.Toward({ long }, { x = 0, z = 150 })
+    assert.are.equal(1, dx)
+    assert.are.equal(0, dz)
+  end)
+
+  it("test_picks_nearest_rect_by_edge_distance", function()
+    local bigFar = rect("big", -400, -30, -400, 400)
+    local smallNear = rect("small", 5, 9, -2, 2)
+    local dx, dz = MathWaterJudge.Toward({ bigFar, smallNear }, { x = 0, z = 0 })
+    assert.are.equal(1, dx)
+    assert.are.equal(0, dz)
+  end)
+
+  it("test_returns_nil_inside_or_without_waters", function()
+    assert.is_nil(MathWaterJudge.Toward({ rect("a", -1, 1, -1, 1) }, { x = 0, z = 0 }))
+    assert.is_nil(MathWaterJudge.Toward({}, { x = 0, z = 0 }))
+  end)
+end)
