@@ -332,19 +332,19 @@ GameCfg.CastFeedback = {
 }
 
 -- 交互点（#44，#27 规格）：场景既有触发器单位登记为可交互目标。当前只有钓鱼佬：
--- Radius 米内（只看 x/z：触发器中心在高处）显示「对话」「喂食」，服务端复验多给 Slack 米容差。
+-- Radius 米内（只看 x/z）显示「对话」「喂食」，服务端复验多给 Slack 米容差。
 -- 喂食即出售（#127 改为按物品表回收）：未烤的本区信物优先走本区链 1:1 兑换（表见 Interact.Fishermen），
 -- 其余选中物品按基础价 × 实例倍率结金币、烤过的按烤熟价；选中的鱼饵按 BaitPrice 每只结算。
 -- 钓鱼佬的可见模型是官方「咸鱼」（official://preset/102179，场景单位名见 ModelName）；
 -- 模型无 Eat 动画（EatAnimation 留空，服务端播动画自动跳过），喂食吃动作为客户端缩放脉冲
--- （LocalInteract 播，仅喂食者本机可见）。文字泡相对触发器中心（y=-1）抬高 9.5 米，露出高岸地面（y≈8.03）。
+-- （LocalInteract 播，仅喂食者本机可见）。触发器贴地（#164），文字泡相对触发器抬高 3 米，露出约 1.1 米高的模型。
 -- 本表只放七区共享的表现与鱼饵价；每区的锚点与兑换链见下方 GameCfg.Interact.Fishermen（#127）。
 GameCfg.Interact = {
     Fisherman = {
         ModelName = 'FishermanModel',
         Radius = 5,
         Slack = 0.5,
-        BubbleHeight = 9.5,
+        BubbleHeight = 3,
         DialogText = '我好饿啊，什么都吃！',
         BaitPrice = { worm = 1 },
     },
