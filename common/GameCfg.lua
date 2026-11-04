@@ -847,20 +847,20 @@ GameCfg.FishCombat = {
 -- 所以加速技能用的是模板默认 CastTime=0.5 秒（加速窗口只有 0.5 秒），详见 issue #7；
 -- 锚点的关键实例值改由 AnchorAttributes 在挂接前 SetAttribute 覆盖（含 Duration，melee_hit 要求 > 0）。
 -- melee_hit 的命中盒用包内硬编码的官方网格 57450——已实测它是平台级资源，本图直接可用（issue #8）。
--- #172 出手动作：引擎官方动画临时占位（ID 取自 data/OfficialAsset.lua，正式资源见 #44），
+-- #172 出手动作：引擎官方动画临时占位（正式资源见 #44）。ID 取自手册「状态同步编辑器 · 动作 · 资产目录」；
+-- data/OfficialAsset.lua 的 motion 段 ID 不是运行时 ID（同名「钓鱼」那里是 20880，运行时是 24450），不要从那里取。
 -- 每个出手来源只在下方 Unarmed / MeleeWeapons / Guns / Throw 各行的 Anim 配一处；
 -- 挥砍预设的 ABILITY_ANOSTATE_ANIMKEY 保持空，动作统一由 MgrWeapon 在出手成功后播（上半身）。
--- 官方库没有投掷动作，投掷暂用「挥舞武器」。
 local AttackAnim = {
-    Fist = 'official://animation/20701',     -- 拳击右挥拳1
-    Knuckle = 'official://animation/20698',  -- 拳击KO攻击1
-    Dagger = 'official://animation/20670',   -- 单刀连击1-1
-    Axe = 'official://animation/20755',      -- 锤子攻击1
-    Pistol = 'official://animation/20705',   -- 手枪开火
-    Rifle = 'official://animation/20706',    -- 步枪开火
-    Auto = 'official://animation/20707',     -- 机枪开火
-    Rocket = 'official://animation/20708',   -- 手炮开火
-    Throw = 'official://animation/50',       -- 挥舞武器
+    Fist = 'official://animation/24318',     -- 拳击右挥拳1
+    Knuckle = 'official://animation/24315',  -- 拳击KO攻击1
+    Dagger = 'official://animation/24287',   -- 单刀连击1-1
+    Axe = 'official://animation/24358',      -- 锤子攻击1
+    Pistol = 'official://animation/24322',   -- 手枪开火
+    Rifle = 'official://animation/24323',    -- 步枪开火
+    Auto = 'official://animation/24324',     -- 机枪开火
+    Rocket = 'official://animation/24325',   -- 手炮开火
+    Throw = 'official://animation/25860',    -- 投掷（蛋仔控制器动作组）
 }
 GameCfg.Ability = {
     -- 角色进图时实例化到角色下的技能背包预设

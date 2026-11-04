@@ -1,6 +1,7 @@
 -- #172 出手动作（引擎官方动画临时占位，正式资源见 #44）。
 -- 失败方式先列：
---   1. 空手 / 某近战 / 某枪 / 投掷漏配 Anim，或 ID 不在官方动画清单（data/OfficialAsset.lua）→ 出手不动；
+--   1. 空手 / 某近战 / 某枪 / 投掷漏配 Anim，或 ID 取自 data/OfficialAsset.lua 的 motion 段
+--      （那里的 ID 不是 SE 运行时 ID，试玩实测 20701、20880 在蛋仔上不动；正确 ID 查手册「动作 · 资产目录」）→ 出手不动；
 --   2. 被拒的出手（冷却、空匣、换弹中）也播动作 → 画面与结算不一致；
 --   3. 近战施法失败仍播动作；
 --   4. Animator 缺失或 LoadAnimation 抛错时连带攻击失败；
@@ -9,12 +10,22 @@
 local Weapon = require('tests.support.weapon_world')
 local GameCfg = require('common.GameCfg')
 
-local function officialAnimationIds()
+local function exportedMotionIds()
     local ids = {}
-    local file = assert(io.open('data/OfficialAsset.lua', 'r'))
-    for id in file:read('a'):gmatch('"(official://animation/%d+)"') do ids[id] = true end
-    file:close()
+    for _, id in pairs(dofile('data/OfficialAsset.lua').motion) do ids[id] = true end
     return ids
+end
+
+local function configuredAnimations(node, path, found)
+    for key, value in pairs(node) do
+        local here = path .. '.' .. tostring(key)
+        if type(value) == 'table' then
+            configuredAnimations(value, here, found)
+        elseif type(value) == 'string' and value:match('^official://animation/') then
+            found[#found + 1] = { here, value }
+        end
+    end
+    return found
 end
 
 local function attackSources()
@@ -27,11 +38,17 @@ end
 
 describe('攻击动作配置', function()
     it('空手、每把近战与枪械、投掷都配了官方动画', function()
-        local official = officialAnimationIds()
         for _, source in ipairs(attackSources()) do
             local name, row = source[1], source[2]
             assert.is_string(row.Anim, name .. ' 缺 Anim')
-            assert.is_true(official[row.Anim] == true, name .. ' 的 Anim 不在官方动画清单: ' .. tostring(row.Anim))
+            assert.is_truthy(row.Anim:match('^official://animation/%d+$'), name .. ' 的 Anim 不是官方动画 URI: ' .. row.Anim)
+        end
+    end)
+
+    it('GameCfg 里的官方动画都不取自 OfficialAsset 的 motion 段', function()
+        local exported = exportedMotionIds()
+        for _, entry in ipairs(configuredAnimations(GameCfg, 'GameCfg', {})) do
+            assert.is_nil(exported[entry[2]], entry[1] .. ' 用了 OfficialAsset.motion 的 ID: ' .. entry[2])
         end
     end)
 end)
