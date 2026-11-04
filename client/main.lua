@@ -1,3 +1,6 @@
+local ZoneMarkers = require("common.ZoneMarkers")
+ZoneMarkers.Start()
+
 local LocalMgrUtil = require("client.LocalMgrUtil")
 LocalMgrUtil:Start()
 

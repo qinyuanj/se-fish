@@ -6,6 +6,8 @@
 local Task = game:GetService("Task")
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
+local ZoneMarkers = require("common.ZoneMarkers")
+ZoneMarkers.Start()
 MgrUtil = require("server.MgrUtil")
 MgrUtil:Start()
 

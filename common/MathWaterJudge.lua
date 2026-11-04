@@ -104,7 +104,7 @@ function MathWaterJudge.InspectScene(zones, snapshot)
     } }
     for _, zone in ipairs(zones) do
         local scene = zone.Scene
-        if not scene or scene.State ~= 'verified' then
+        if not scene or scene.State ~= 'resolved' then
             report.PendingZones[#report.PendingZones + 1] = zone.Id
         end
         for _, expected in ipairs(scene and scene.Entities or {}) do

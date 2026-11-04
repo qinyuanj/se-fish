@@ -249,14 +249,19 @@ describe("新手任务九步（MgrQuest × QuestSteps × 玩法事实）", funct
   end)
 
   it("test_formal_bait_spots_configured", function()
-    local fresh = assert(loadfile("common/GameCfg.lua"))()
+    local fresh = require("tests.support.zone_fixtures").Apply(assert(loadfile("common/GameCfg.lua"))())
     local spots = fresh.BaitSpots.Spots
-    assert.is_true(#spots >= 5)
+    assert.same(17, #spots)
     local ids = {}
     for _, spot in ipairs(spots) do
       assert.is_nil(ids[spot.Id])
       ids[spot.Id] = true
-      assert.same("worm", spot.ItemId)
+      local zone
+      for _, candidate in ipairs(fresh.Zones) do
+        if candidate.Id == spot.ZoneId then zone = candidate end
+      end
+      assert.is_not_nil(zone)
+      assert.same(zone.BaitItemId, spot.ItemId)
       assert.is_true(type(spot.Position.x) == "number" and type(spot.Position.z) == "number")
     end
     assert.same(15, fresh.BaitSpots.RespawnSec)

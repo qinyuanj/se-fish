@@ -95,8 +95,15 @@ function Mgr:OnCarrierDied(carrier)
     end
 end
 
--- 落点归入水平距离最近的钓鱼区（Water.Zones[*].ZoneId）：同区多块水域共用一份预算
+-- 落点归入所在区（区域标记边界）；边界外才退回水平距离最近的水域所属区。同区多块水域共用一份预算
 function Mgr:RegionAt(pos)
+    for _, zone in ipairs(GameCfg.Zones) do
+        local bounds = zone.Scene and zone.Scene.Boundary
+        if bounds and pos.x >= bounds.MinX and pos.x <= bounds.MaxX
+            and pos.z >= bounds.MinZ and pos.z <= bounds.MaxZ then
+            return zone.Id
+        end
+    end
     local best, bestDist
     for _, zone in ipairs(GameCfg.Water.Zones) do
         local dx, dz = pos.x - zone.Center.x, pos.z - zone.Center.z

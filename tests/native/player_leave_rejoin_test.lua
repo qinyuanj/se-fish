@@ -120,6 +120,7 @@ describe('TestPlayerLeaveRejoin', function()
             end,
             require = function(path)
                 if path == 'server.MgrUtil' then return { Start = function() end } end
+                if path == 'common.ZoneMarkers' then return { Start = function() end } end
                 local name = path:match('^server%.Mgr%.(.*)$')
                 if not name then return require(path) end
                 if not env.mgrs[name] then

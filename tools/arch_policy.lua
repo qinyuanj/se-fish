@@ -21,7 +21,7 @@ M.policy = {
         'common.FlightPath', 'common.GameCfg', 'common.GrillCurve', 'common.LotteryDraw',
         'common.LotteryEligibility', 'common.MathWaterJudge', 'common.NpcDialogue', 'common.QuestSteps',
         'common.RateLimit', 'common.Records', 'common.ReelDisplay', 'common.ReelProgress',
-        'common.SpecialItem', 'common.Vitals',
+        'common.SpecialItem', 'common.Vitals', 'common.ZoneMarkers',
       },
     },
     {

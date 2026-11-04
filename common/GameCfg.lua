@@ -268,13 +268,7 @@ GameCfg.BaitSpots = {
     RespawnSec = 15,
     Mesh = 'official://mesh/7000571',
     Scale = 0.3,
-    Spots = {
-        { Id = 'worm-1', ItemId = 'worm', Count = 1, Position = { x = 5, y = 6, z = 31 } },
-        { Id = 'worm-2', ItemId = 'worm', Count = 1, Position = { x = 5, y = 6, z = 40 } },
-        { Id = 'worm-3', ItemId = 'worm', Count = 1, Position = { x = 10, y = 6, z = 28 } },
-        { Id = 'worm-4', ItemId = 'worm', Count = 1, Position = { x = 15, y = 6, z = 34 } },
-        { Id = 'worm-5', ItemId = 'worm', Count = 1, Position = { x = 10, y = 6, z = 45 } },
-    },
+    Spots = {},
 }
 
 -- 新手任务（#51 前三步，#52 续写第 4–9 步；#40 规格）：文案对应策划案「新手任务」的 9 句（钓场老板按 GLOSSARY.md 用词），
@@ -747,6 +741,7 @@ for _, rows in pairs(sourceCastRows) do
 end
 GameCfg.Casting.Catalog = sourceCastRows
 GameCfg.Casting.BossBaitCatalog = bossBaitCatalog
+GameCfg.Casting.Zones['fishPond.water'] = GameCfg.Casting.Zones.WaterCircle2
 
 -- 火山岛完整内容采用源表原行，灰盒模型沿用已验证的鱼本体；正式资源由资源交付替换。
 GameCfg.Casting.Zones['volcanoIsland.water'] = sourceCastRows.volcanoIsland
@@ -1035,9 +1030,7 @@ GameCfg.Ability = {
                 ThrowIntervalSec = 4, ThrowRadius = 5, ThrowDamage = 100 },
             fish55Elite = { Mode = 'leap', CruiseHeight = 0, DiveIntervalSec = 15, DiveDamage = 100 },
         },
-        -- 场景合同缺失时的兜底边界（以鱼塘的中心为原点，见 GameCfg.Zones[1].Scene.Boundary）
-        FallbackBounds = { MinX = -69, MaxX = 69, MinZ = -59, MaxZ = 79, BottomY = -30, TopY = 40,
-            MaxFlightHeight = 20 },
+        FallbackBounds = nil,
     },
     Carry = {
         -- 巡航叼人（沧龙「咬最近岛中心玩家、叼走入海」，GameSpec §12）：咬中 300、过程接触 150。
@@ -1130,280 +1123,28 @@ GameCfg.Ability = {
     },
 }
 
--- 水判定：同一钓鱼区可用多条正方形拼接。Center 只用到 x/z（y 留作场景溯源），HalfXZ 是水平半宽（米），
--- SurfaceY 是水面高度（米）；判定语义与配置校验见 common/MathWaterJudge.lua，
--- 边界用例见 tests/native/water_judge_test.lua，取值溯源见 issue #25 的 M0 模块线台账（评论 9862）。
--- 2026-09-24 在 #12 的场景基础上水平扩建两倍，中心与高度不变；编辑器回读：
---   WaterCircle1  Position(-11.75, 1.05, 27.75) Size(6, 1, 6) Scale(2, 1, 2)
---   WaterCircle2  Position(-11.75, 1.05, 27.75) Size(12, 1, 12) Scale(4, 1, 4)
---   两个水圈同心；HalfXZ 与 SurfaceY 的取值见下面两条注意，SurfaceY 已按 #31 的实测改正。
--- 注意 1：运行时读到的 Size 已含 Scale（WaterCircle2 的 Scale.x=4 已经算进 Size.x=12），
---         HalfXZ 直接写半边尺寸（12/2=6），配置时再乘缩放会重复计算（#12 W-4）。
--- 注意 2（#31 改正）：**Position.y 是底面、Size 是包围盒半长**，单位顶面 y = Position.y + Size.y——
---         大地板 pos.y=0 + size.y=2 = 顶面 2.000，与射线实测命中的 y=2.0 自洽；水圈
---         pos.y=1.18 + size.y=1 = 顶面 ≈2.183。旧值 1.55（1.05 + Size.y/2，按 Position 是几何中心算）
---         偏低、已作废；实测来源见 issue #25 的 M0 试玩验证台账（评论 9865）。
--- 注意 3：水圈在运行时会漂移（同一次 M15 试玩里 pos.y 从 1.05 变到 1.09 / 1.18），y 阈值本身不稳——
---         判定以 (x,z) 矩形为主、y 只当松过滤（台账 §3）。这里取漂移高点的顶面 2.183 而不是低点
---         2.05：判低会把真在水面的点漏成陆地（V4 实测的入水点 y=2.15 在旧值 1.55 下也判不到），
---         判高的代价只是水面之上约 0.13m 的空气薄层被算作水里，且这一层由 (x,z) 矩形兜住。
---         Center.y 保留 1.05（#12 11:46 的 INSPECT 读数，M15 16:10 复读同为 1.05），只作场景溯源
---         （判定不用 Center.y）；它与 SurfaceY（M15 16:24 的读数）批次不同属已知事实。
--- 顺序：外圈 WaterCircle2 在前，同心时先命中它；M1 若要按水区选鱼表，改这里。
-GameCfg.Water = {
-    Zones = {
-        { Id = "WaterCircle2", Center = { x = -11.75, y = 1.05, z = 27.75 }, HalfXZ = 6.0, SurfaceY = 2.183 },
-        { Id = "WaterCircle1", Center = { x = -11.75, y = 1.05, z = 27.75 }, HalfXZ = 3.0, SurfaceY = 2.183 },
-        -- 虾池（#102，ADR 0003）：与 03–07 区共用 80×24 米矩形水面；中心在文件末尾统一折返。
-        { Id = 'shrimpPond.water', Center = { x = 100, y = 2, z = 144 }, HalfX = 40, HalfZ = 12, SurfaceY = 3 },
-        -- 蟹湖水面（#136）：第三区北侧水区，场景合同 Z3_Water 实测中心 (260,2,144)、
-        -- 80×24 米矩形（HalfX=40/HalfZ=12，MathWaterJudge 长方形口径）。SurfaceY 沿用场景合同
-        -- 值 3（水面单位 pos.y=2、顶面约 3）；与其他水区相距数百米，无重叠。
-        { Id = "crabLake.water", Center = { x = 260, y = 2, z = 144 }, HalfX = 40, HalfZ = 12, SurfaceY = 3 },
-        -- 树林岛水面（#141）：第四区北侧水区，场景合同（Zones[4].Scene 派生）水面中心 (460,2,144)、
-        -- 80×24 米矩形（HalfX=40/HalfZ=12，MathWaterJudge 长方形口径）。SurfaceY 沿用场景合同值 3；
-        -- 与蟹湖相距 200 米（> 两个半宽之和），无重叠。
-        { Id = "forestIsland.water", Center = { x = 460, y = 2, z = 144 }, HalfX = 40, HalfZ = 12, SurfaceY = 3 },
-        -- 沙滩岛水面（#142）：第五区北侧水区，场景合同（Zones[5].Scene 派生）水面中心 (660,2,144)、
-        -- 80×24 米矩形（HalfX=40/HalfZ=12，MathWaterJudge 长方形口径）。SurfaceY 沿用场景合同值 3；
-        -- 与树林岛相距 200 米（> 两个半宽之和），无重叠。
-        { Id = "beachIsland.water", Center = { x = 660, y = 2, z = 144 }, HalfX = 40, HalfZ = 12, SurfaceY = 3 },
-        { Id = 'reefIsland.water', Center = { x = 880, y = 2, z = 144 }, HalfX = 40, HalfZ = 12, SurfaceY = 3 },
-        { Id = 'volcanoIsland.water', Center = { x = 1160, y = 2, z = 144 }, HalfX = 40, HalfZ = 12, SurfaceY = 3 },
-    },
-}
+-- 水判定：可钓水域由 common.ZoneMarkers 从各区 Z<i>_Water / Z<i>_Water<n> 标记解析（ADR-0013），
+-- 判定语义见 common/MathWaterJudge.lua。标记 Position.y 是底面，水面 SurfaceY = Position.y + Size.y；
+-- 运行时 Size 已含 Scale，半宽直接取 Size/2（#12 W-4、#31 实测）。
+GameCfg.Water = { Zones = {}, ZoneIdByWater = {}, ContentWaterIds = {} }
 
--- 2026-09-27 编辑器实测：六面空气墙围成带西南凹角的地块。
--- 按墙体水平厚度 3 米的外沿留出陆地：外框 x[-24.25,21.75]、z[16.25,61.25]，
--- 西南凹角 x<-4.982 且 z<35.268。墙体本身不作为水域，闭区间交界线沿用水判定约定。
--- 本轮只覆盖大地板水平尺寸 90×60 的范围 x[-58.75,31.25]、z[10.75,70.75]。
--- 各矩形用短边作正方形边长，最后一块向回贴齐；允许重叠，避免末端留缝或越界。
-local function addWaterStrip(name, minX, maxX, minZ, maxZ)
-    local side = math.min(maxX - minX, maxZ - minZ)
-    local countX = math.ceil((maxX - minX) / side)
-    local countZ = math.ceil((maxZ - minZ) / side)
-    for ix = 1, countX do
-        for iz = 1, countZ do
-            local id = name .. '_' .. ix .. '_' .. iz
-            GameCfg.Water.Zones[#GameCfg.Water.Zones + 1] = {
-                Id = id,
-                Center = {
-                    x = math.min(minX + (ix - 1) * side, maxX - side) + side / 2,
-                    y = 1.05,
-                    z = math.min(minZ + (iz - 1) * side, maxZ - side) + side / 2,
-                },
-                HalfXZ = side / 2,
-                SurfaceY = 2.183,
-            }
-            GameCfg.Casting.Zones[id] = GameCfg.Casting.Zones.WaterCircle2
-        end
-    end
-end
-
-addWaterStrip('PondWest', -58.75, -24.25, 10.75, 70.75)
-addWaterStrip('PondEast', 21.75, 31.25, 10.75, 70.75)
-addWaterStrip('PondSouth', -24.25, 21.75, 10.75, 16.25)
-addWaterStrip('PondNorth', -24.25, 21.75, 61.25, 70.75)
-addWaterStrip('PondNotch', -24.25, -4.982, 16.25, 35.268)
-
--- 运行时水域到钓鱼区的映射；鱼塘水条在下方补齐同区归属。
-GameCfg.Water.ZoneIdByWater = {
-    WaterCircle1 = 'fishPond', WaterCircle2 = 'fishPond', ['shrimpPond.water'] = 'shrimpPond',
-    ['crabLake.water'] = 'crabLake',
-    ['forestIsland.water'] = 'forestIsland',
-    ['beachIsland.water'] = 'beachIsland',
-    ['reefIsland.water'] = 'reefIsland',
-    ['volcanoIsland.water'] = 'volcanoIsland',
-}
-for _, zone in ipairs(GameCfg.Water.Zones) do
-    if not GameCfg.Water.ZoneIdByWater[zone.Id] then
-        GameCfg.Water.ZoneIdByWater[zone.Id] = zone.ZoneId or 'fishPond'
-    end
-    zone.ZoneId = GameCfg.Water.ZoneIdByWater[zone.Id]
-end
-GameCfg.Water.ContentWaterIds = {}
-for _, zone in ipairs(GameCfg.Zones) do
-    GameCfg.Water.ContentWaterIds[zone.WaterId] = zone.Id
-end
-
--- #125 七区场景合同；#102 将 02–07 区统一到模板几何。
--- 运行时各消费者分别接入水域、设施与航线；Scene.State 保留 planned，碰撞与落点试玩由 #107 验收。
--- State 不能由名称匹配自动提升。
-local sceneCenters = {
-    { x = 0, z = 40 }, { x = 100, z = 100 }, { x = 260, z = 100 },
-    { x = 460, z = 100 }, { x = 660, z = 100 }, { x = 880, z = 100 },
-    { x = 1160, z = 100 },
-}
--- #102：02–07 区动线锚点的退让量按 #62 决议的「连续战斗净空间 X×Z」（按区序 1..7）算。
--- 这张表与 tools/zone_space_contract.lua、tools/plan_zone_layout.lua 的 M.COMBAT 同源：
--- 现场那批设施就是规划器按它摆的（见 evidence/issue65/zone-layout-p3.md §1/§3），改一处要三处一起改。
-local zoneCombat = {
-    { 24, 20 }, { 24, 20 }, { 32, 28 }, { 40, 36 }, { 40, 36 }, { 48, 40 }, { 48, 40 },
-}
-local existingScene = {
-    { LandName = '大地板', FishermanName = 'TGUnitFish', ShopName = 'TGUnitShop',
-      Land = { MinX = 0, MaxX = 18, MinZ = 25, MaxZ = 55 },
-      SafePoint = { x = 6.26, y = 5.01, z = 39.29 },
-      LandPosition = { x = -13.75, y = 0, z = 40.75 },
-      FishermanPosition = { x = -6.25, y = -1, z = 30.75 },
-      ShopPosition = { x = -8.75, y = 2.5, z = 55.25 } },
-}
-for index, zone in ipairs(GameCfg.Zones) do
-    local center, old = sceneCenters[index], existingScene[index]
-    local prefix = 'Z' .. index .. '_'
-    -- #102：02–07 区共用规划器模板；01 区保留 existingScene 的实测几何。
-    -- 现场值出自规划器 tools/plan_zone_layout.lua 的同一套式子 —— 区中心 / 水岸线 / 内侧墙内面 + 退让量，
-    -- 所以在「折返前」的坐标系里照抄即可（本坐标系里水面在 +Z 侧、朝区内是 −Z）；文件末尾的折返变换再把它
-    -- 翻成现场坐标，两排区因此仍是同一套模板的 180° 副本。退让量（15 / 12 / 25 / 14 / 8 / 18 / 6 米）
-    -- 与规划器 §3 逐条一致，改配方时两边要一起改。
-    local combat = zoneCombat[index]
-    local halfX, depth = combat[1] / 2, combat[2]   -- #62 战斗净空间 X×Z（半宽 / 进深）
-    local boundaryHalfX = index == 1 and 69 or 60
-    local boundaryMinZ = center.z - (index == 1 and 59 or 50)
-    local waterCenterZ, waterHalfX, waterHalfZ = center.z + 44, 40, 12 -- 数学水域（与下面 Waters[1] 同源）
-    local shoreZ = waterCenterZ - waterHalfZ        -- 水岸线：水域朝区内那一侧
-    local innerWallZ = boundaryMinZ + 1.5           -- 内侧墙内面：数学边界 + 半个墙厚（墙厚 3 压中线）
-    -- 鱼饵贴水面两侧外沿：现场 Zx_Bait1 在 −X 一侧。折返区（02–04）的 +X 在现场就是 −X，
-    -- 所以名字对应的边在这里要翻过来写，否则 03/04 区的两个鱼饵会与现场对调。
-    local baitSide = (index >= 2 and index <= 4) and 1 or -1
-    local scene = {
-        State = 'planned', Entities = {}, Waters = {},
-        SafePoint = old and old.SafePoint or { x = center.x, y = 6, z = innerWallZ + 18 },
-        -- 活动岛地面：现场同步后取现场的 `Zx_Land` 地块板范围（区内全宽 × 水岸线到内侧墙内面）。
-        -- 折返变换会把它整块翻过去，rectangle() 里按 min/max 摆正。
-        Land = old and old.Land or { MinX = center.x - boundaryHalfX, MaxX = center.x + boundaryHalfX,
-            MinZ = innerWallZ, MaxZ = shoreZ },
-        Boundary = { MinX = center.x - boundaryHalfX, MaxX = center.x + boundaryHalfX,
-            MinZ = boundaryMinZ, MaxZ = center.z + (index == 1 and 79 or 70), BottomY = -30, TopY = 40,
-            MaxFlightHeight = 20, CanClimb = false },
-        BaitSpots = { ItemId = zone.BaitItemId, RespawnSec = 15, Count = 1, Positions = {} },
-    }
-    zone.Scene = scene
-    local function entity(role, position, name, observed)
-        name = name or prefix .. role
-        scene.Entities[#scene.Entities + 1] = {
-            Name = name, Role = role, Position = position,
-            State = observed and 'observed' or 'planned',
-        }
-        return name
-    end
-    scene.LandName = entity('Land', old and old.LandPosition
-        or { x = center.x, y = 0, z = (shoreZ + innerWallZ) / 2 }, old and old.LandName, old ~= nil)
-    scene.SafePointName = entity('Safe', scene.SafePoint)
-    local fishermanName = index == 2 and 'TGUnitFishShrimp' or old and old.FishermanName
-    local shopName = index == 2 and 'TGUnitShopShrimp' or old and old.ShopName
-    scene.FishermanName = entity('Fisherman', old and old.FishermanPosition
-        or { x = center.x + halfX + 15, y = 6, z = shoreZ - 15 }, fishermanName, old ~= nil)
-    scene.ShopName = entity('Shop', old and old.ShopPosition
-        or { x = center.x + halfX + 12, y = 6, z = shoreZ - (depth + 25) }, shopName, old ~= nil)
-    scene.LotteryName = entity('Lottery', index == 1 and { x = center.x + 5, y = 5, z = center.z + 5 }
-        or { x = center.x - halfX - 6, y = 6, z = shoreZ - 14 })
-    if index >= 3 then
-        scene.GrillName = entity('Grill', { x = center.x - halfX - 6, y = 6, z = shoreZ - (depth + 15) })
-    end
-    if index == 1 then
-        for _, water in ipairs(GameCfg.Water.Zones) do
-            if water.ZoneId == zone.Id then scene.Waters[#scene.Waters + 1] = water end
-        end
-        entity('Water', { x = -11.75, y = 1.05, z = 27.75 }, 'WaterCircle2', true)
-    else
-        local water = { Id = zone.WaterId, ZoneId = zone.Id,
-            Center = { x = center.x, y = 2, z = waterCenterZ },
-            HalfX = waterHalfX, HalfZ = waterHalfZ, SurfaceY = 3 }
-        scene.Waters[1] = water
-        water.EntityName = entity('Water', water.Center)
-    end
-    local b = scene.Boundary
-    b.EntityNames = {
-        entity('BoundaryWest', { x = b.MinX, y = b.BottomY, z = center.z + 10 }),
-        entity('BoundaryEast', { x = b.MaxX, y = b.BottomY, z = center.z + 10 }),
-        entity('BoundarySouth', { x = center.x, y = b.BottomY, z = b.MinZ }),
-        entity('BoundaryNorth', { x = center.x, y = b.BottomY, z = b.MaxZ }),
-    }
-    if index == 1 then
-        for _, spot in ipairs(GameCfg.BaitSpots.Spots) do
-            scene.BaitSpots.Positions[#scene.BaitSpots.Positions + 1] = spot.Position
-        end
-    else
-        -- 02–07 区鱼饵贴水面两侧外沿。
-        scene.BaitSpots.Positions = {
-            { x = center.x + baitSide * (waterHalfX + 12), y = 6, z = shoreZ - 8 },
-            { x = center.x - baitSide * (waterHalfX + 12), y = 6, z = shoreZ - 8 },
-        }
-    end
-    for n, point in ipairs(scene.BaitSpots.Positions) do entity('Bait' .. n, point) end
-    if index == 6 then
-        scene.AirCombat = { MinY = 5, MaxY = 30, Radius = 35, Center = center }
-    elseif index == 7 then
-        scene.CruiseWater = scene.Waters[1]
-        scene.BossArena = { Center = center, HalfX = 30, HalfZ = 25 }
-    end
-end
-GameCfg.Ferry.PlannedRoutes = {}
-local plannedReturnPrices = { 10, 30, 90, 270, 810, 2430 }
--- #102：02–07 区摆渡锚点共用模板（内侧墙内面内 8 米、左右 ±25）。
--- 数组下标是锚点所在区：去程锚点在出发区、返程锚点在到达区；01 区去程保留既有值。
-local function ferryOutPosition(zoneIndex)
-    local center = sceneCenters[zoneIndex]
-    if zoneIndex == 1 then return { x = -8, y = 1.5, z = 25 } end
-    return { x = center.x + 25, y = 6, z = center.z - 40.5 }
-end
-local function ferryReturnPosition(zoneIndex)
-    local center = sceneCenters[zoneIndex]
-    return { x = center.x - 25, y = 6, z = center.z - 40.5 }
-end
-for index = 1, 6 do
-    local from, to = GameCfg.Zones[index], GameCfg.Zones[index + 1]
-    local outName = index == 1 and 'FerryBoat' or ('Z' .. index .. '_FerryOut')
-    local returnName = index == 1 and 'FerryReturn' or ('Z' .. (index + 1) .. '_FerryReturn')
-    local function ferryEntity(zone, name, position, observed)
-        zone.Scene.Entities[#zone.Scene.Entities + 1] = {
-            Name = name, Role = 'Ferry', Position = position,
-            State = observed and 'observed' or 'planned',
-        }
-    end
-    ferryEntity(from, outName, ferryOutPosition(index), index == 1)
-    ferryEntity(to, returnName, ferryReturnPosition(index + 1), false)
-    GameCfg.Ferry.PlannedRoutes[index] = {
-        State = 'planned', FromZoneId = from.Id, ToZoneId = to.Id,
-        Outbound = { AnchorName = outName, Ticket = GameCfg.Content.Exchanges[index].Result,
-            CountdownSec = 5, Destination = to.Scene.SafePoint },
-        Return = { AnchorName = returnName, Price = plannedReturnPrices[index], Destination = from.Scene.SafePoint },
-    }
-end
-
--- #127 T06 六条航线（路线图 §8.2）：一条航线 = 一段去程（第 i 区 → 第 i+1 区）+ 一段返程（第 i+1 区 → 第 i 区），
--- 去程与返程各有**独立标识与独立状态**，不同航线互不占用倒计时。Id 是服务端唯一的航线凭证：
--- 请求里带 Id 才能拿到这条航线的 NPC 锚点、目的地、船票（去程）与票价（返程），查不到就拒收。
--- 票与价都随本区链推进：去程票 = 本区首领信物的产物（Content.Exchanges[i].Result，#126），
--- 返程价 = 10 × 3^(到达区序 − 2)，即 10 / 30 / 90 / 270 / 810 / 2430。
--- 腿的公共几何（BoatRange / Radius / Slack / BubbleHeight）与 #89 保持一致，逐条航线可单独覆盖。
+-- 区域几何只由 common.ZoneMarkers 在试玩启动时从场景标记填充。
 GameCfg.Ferry.Routes = {}
 local ferryLegGeometry = { BoatRange = 6, Radius = 5, Slack = 0.5, BubbleHeight = 6 }
+local returnPrices = { 10, 30, 90, 270, 810, 2430 }
 for index = 1, 6 do
-    local planned = GameCfg.Ferry.PlannedRoutes[index]
     local from, to = GameCfg.Zones[index], GameCfg.Zones[index + 1]
-    local outbound, back = {}, {}
+    local outbound = { AnchorName = index == 1 and 'FerryBoat' or ('Z' .. index .. '_FerryOut'),
+        Ticket = GameCfg.Content.Exchanges[index].Result, CountdownSec = 5, Zone = to.Id }
+    local back = { AnchorName = index == 1 and 'FerryReturn' or ('Z' .. (index + 1) .. '_FerryReturn'),
+        Price = returnPrices[index], Zone = from.Id }
     for key, value in pairs(ferryLegGeometry) do outbound[key], back[key] = value, value end
-    for key, value in pairs(planned.Outbound) do outbound[key] = value end
-    for key, value in pairs(planned.Return) do back[key] = value end
-    outbound.Zone = to.Id      -- 到达区（去程落点写进 Data.Zone）
-    back.Zone = from.Id        -- 返程回出发区
-    GameCfg.Ferry.Routes[index] = {
-        Id = from.Id .. '>' .. to.Id,
-        FromZoneId = from.Id,
-        ToZoneId = to.Id,
-        Outbound = outbound,
-        Return = back,
-    }
+    GameCfg.Ferry.Routes[index] = { Id = from.Id .. '>' .. to.Id,
+        FromZoneId = from.Id, ToZoneId = to.Id, Outbound = outbound, Return = back }
 end
-
--- 第一段（鱼塘 ⇄ 虾池）的兼容别名，供只使用首段航线的消费者读取。
 GameCfg.Ferry.HomeZone = GameCfg.Zones[1].Id
 GameCfg.Ferry.Outbound = GameCfg.Ferry.Routes[1].Outbound
 GameCfg.Ferry.Return = GameCfg.Ferry.Routes[1].Return
-
--- 航线 id 校验（#127）：只有登记在 Routes 里的字符串 id 才算数，伪造成别的区号或数字一律查不到。
 function GameCfg.Ferry.Route(routeId)
     if type(routeId) ~= 'string' then return nil end
     for _, route in ipairs(GameCfg.Ferry.Routes) do
@@ -1411,53 +1152,29 @@ function GameCfg.Ferry.Route(routeId)
     end
 end
 
--- #127 T06 七区兑换：每区一个钓鱼佬，锚点取本区场景合同（Zones[].Scene.FishermanName，#125 的真源），
--- 兑换链取本区信物链（Content.Exchanges）。共享表现参数与鱼饵价留在 Interact.Fisherman，
--- 消费端（server/Mgr/MgrInteract.lua）把两者合成一个完整交互点，避免把共享参数抄七份。
 GameCfg.Interact.Fishermen = {}
 for index, chain in ipairs(GameCfg.Content.Exchanges) do
     local zone = GameCfg.Zones[index]
+    local fishermanName = index == 1 and 'TGUnitFish' or index == 2 and 'TGUnitFishShrimp' or ('Z' .. index .. '_Fisherman')
     GameCfg.Interact.Fishermen[index] = {
-        ZoneId = zone.Id,
-        AnchorNames = { zone.Scene.FishermanName },
-        -- 未烤信物 1:1：精英信物 → 本区首领饵，首领信物 → 本区产物（第七区是 achievement.final）
-        Exchange = { [chain.EliteToken] = chain.BossBait, [chain.BossToken] = chain.Result },
-        Chain = index,
+        ZoneId = zone.Id, AnchorNames = { fishermanName },
+        Exchange = { [chain.EliteToken] = chain.BossBait, [chain.BossToken] = chain.Result }, Chain = index,
     }
 end
 
--- 烧烤（#137 T16，策划案烧烤段）：第三区起每区一个烧烤点（#125 场景合同 Zones[].Scene.GrillName），
--- 2 米内可操作；服务端从投入计时按 common/GrillCurve.lua 的曲线 1→1.5→0，4.5 秒烤糊损毁并
--- 对烤炉周围 3 米玩家造成 30 伤害（经 MgrVitals 统一伤害入口）。按玩家独立会话，取出时价格与
--- 食用恢复同乘当时倍率；烤过物品不可重烤/抽奖，烤过信物失去兑换资格（操作信物前先提示）。
 GameCfg.Grill = {
-    Radius = 2,                 -- docx：2 米内出现「烧烤」操作文字泡
-    Slack = 0.5,                -- 距离复验宽限（对齐 Interact 惯例）
-    BubbleHeight = 2.5,         -- 文字泡悬浮高度
-    RiseSec = 2,                -- 0-2 秒：1 → 1.5
-    HoldSec = 0.5,              -- 2-2.5 秒：保持 1.5
-    FallSec = 2,                -- 2.5-4.5 秒：1.5 → 0
-    MaxRate = 1.5,              -- 烤熟 1.5 倍价格加成、食用恢复 +50%
-    BurnSec = 4.5,              -- = RiseSec + HoldSec + FallSec；到达即烤糊
-    BurnDamage = 30,            -- docx：烤糊爆炸 30 伤害
-    BurnRadius = 3,             -- docx：周围 3 米
-    BubbleText = '烧烤',
-    NoFishText = '你没有可烤的鱼',
-    BurntText = '你的鱼烤糊了！',
-    CookedPrefix = '烤',         -- 烤好的鱼名字加此前缀（GLOSSARY.md 烤鱼条 Avoid「烤过的鱼」，用「烤」构成菜名式称呼）
+    Radius = 2, Slack = 0.5, BubbleHeight = 2.5, RiseSec = 2, HoldSec = 0.5, FallSec = 2,
+    MaxRate = 1.5, BurnSec = 4.5, BurnDamage = 30, BurnRadius = 3, BubbleText = '烧烤',
+    NoFishText = '你没有可烤的鱼', BurntText = '你的鱼烤糊了！', CookedPrefix = '烤',
     TokenWarnText = '信物烤制后将失去兑换和抽奖资格，再次点击确认烤制',
-    FullText = '背包已满，烤好的鱼先留在烤炉上',
-    TakeoutText = '取出',
+    FullText = '背包已满，烤好的鱼先留在烤炉上', TakeoutText = '取出',
     source = '策划案--渔力全开.docx#烧烤',
 }
--- 烧烤点清单：锚点是 #125 场景合同真源（仅三区起有 GrillName），消费端按距离命中
 GameCfg.Grill.Points = {}
-for index, zone in ipairs(GameCfg.Zones) do
-    if zone.Scene.GrillName then
-        GameCfg.Grill.Points[#GameCfg.Grill.Points + 1] = {
-            ZoneId = zone.Id, AnchorName = zone.Scene.GrillName,
-        }
-    end
+for index = 3, #GameCfg.Zones do
+    GameCfg.Grill.Points[#GameCfg.Grill.Points + 1] = {
+        ZoneId = GameCfg.Zones[index].Id, AnchorName = 'Z' .. index .. '_Grill',
+    }
 end
 
 -- 高频输入契约（M0-V5）：窗口与次数上限的常量，逻辑见 common/RateLimit.lua，
@@ -1545,49 +1262,6 @@ GameCfg.FishCombatLabel = {
     SleepColor = { 140, 200, 255, 255 },
     IdleColor = { 255, 255, 255, 255 },
 }
-
--- 七区折返双排第一阶段：保留上方旧场景测量基线，只对场景坐标做一次刚体变换。
--- 不改变高度、尺寸、局部技能偏移；后续设施精确落位另行校准。
-do
-    local destinations = {
-        { x = 0, z = 0 }, { x = 240, z = 0 }, { x = 480, z = 0 },
-        { x = 720, z = 0 }, { x = 720, z = 320 }, { x = 480, z = 320 },
-        { x = 240, z = 320 },
-    }
-    local visited = {}
-    local function point(position, origin, target, sign)
-        if not position or visited[position] then return end
-        visited[position] = true
-        position.x = target.x + sign * (position.x - origin.x)
-        position.z = target.z + sign * (position.z - origin.z)
-    end
-    local function rectangle(bounds, origin, target, sign)
-        if not bounds or visited[bounds] then return end
-        visited[bounds] = true
-        local x1, x2 = target.x + sign * (bounds.MinX - origin.x), target.x + sign * (bounds.MaxX - origin.x)
-        local z1, z2 = target.z + sign * (bounds.MinZ - origin.z), target.z + sign * (bounds.MaxZ - origin.z)
-        bounds.MinX, bounds.MaxX = math.min(x1, x2), math.max(x1, x2)
-        bounds.MinZ, bounds.MaxZ = math.min(z1, z2), math.max(z1, z2)
-    end
-    for index, zone in ipairs(GameCfg.Zones) do
-        -- 中心自身也被 AirCombat/BossArena 引用，先复制旧值，避免修改原点影响后续点。
-        local origin = { x = sceneCenters[index].x, z = sceneCenters[index].z }
-        local target, scene = destinations[index], zone.Scene
-        local sign = index >= 2 and index <= 4 and -1 or 1
-        point(scene.SafePoint, origin, target, sign)
-        rectangle(scene.Land, origin, target, sign)
-        rectangle(scene.Boundary, origin, target, sign)
-        for _, water in ipairs(GameCfg.Water.Zones) do
-            if water.ZoneId == zone.Id then point(water.Center, origin, target, sign) end
-        end
-        for _, water in ipairs(scene.Waters) do point(water.Center, origin, target, sign) end
-        for _, position in ipairs(scene.BaitSpots.Positions) do point(position, origin, target, sign) end
-        for _, entity in ipairs(scene.Entities) do point(entity.Position, origin, target, sign) end
-        point(sceneCenters[index], origin, target, sign)
-    end
-    -- Safe/鱼饵/水面/航线目的地通过共享表自然同步，不再二次变换。
-    -- Flight.FallbackBounds 已以新鱼塘原点配置，保持原值。
-end
 
 GameCfg.PlaceholderAssets = require('common.cfg.PlaceholderAssets')
 GameCfg.PlaceholderAssets.Apply(GameCfg)

@@ -77,8 +77,7 @@ describe("TestExchangeZones", function()
     t = env
     env.savedGame = rawget(_G, 'game')
     env.savedCfg = package.loaded['common.GameCfg']
-    package.loaded['common.GameCfg'] = nil
-    env.cfg = require('common.GameCfg')
+    env.cfg = require('tests.support.zone_fixtures').Load()
     -- 关掉进图白送，库存完全由用例自己摆
     env.cfg.Debug = { Enabled = false }
     env.PlayerData = assert(loadfile('server/Data/PlayerData.lua'))()

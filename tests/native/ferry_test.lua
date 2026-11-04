@@ -59,10 +59,9 @@ describe('摆渡（MgrFerry × MgrSave × PlayerData）', function()
     for _, name in ipairs(moduleNames) do
       restore[name] = package.loaded[name]
     end
-    package.loaded['common.GameCfg'] = nil
     env = { now = 100, sent = {}, broadcasts = {}, values = {}, queue = {},
       defer = false, writeFailure = false, loseReply = false }
-    env.cfg = require('common.GameCfg')
+    env.cfg = require('tests.support.zone_fixtures').Load()
     env.cfg.Debug = { Enabled = false }
     env.routes = env.cfg.Ferry.Routes
     env.route = env.routes[1]

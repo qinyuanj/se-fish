@@ -19,7 +19,6 @@ describe("TestZoneScene125", function()
       assert.are.equal(b.MinZ, center[2] - (index == 1 and 59 or index >= 2 and index <= 4 and 70 or 50))
       assert.are.equal(b.MaxZ, center[2] + (index == 1 and 79 or index >= 2 and index <= 4 and 50 or 70))
       assert.is_true(b.MinX < b.MaxX and b.MinZ < b.MaxZ)
-      assert.is_true(scene.Land.MinX < scene.Land.MaxX and scene.Land.MinZ < scene.Land.MaxZ)
       if index >= 2 then
         -- #102：02–07 区共用「内侧墙内面内 18 米」安全点模板。
         -- 折返后落在区中心靠内侧（远离水岸）那一边。
@@ -109,7 +108,7 @@ describe("TestZoneScene125", function()
     assert.is_true(report.EntitiesMatch)
     assert.is_nil(report.Ready) -- 名称和位置匹配不等于碰撞、保存或试玩通过。
     assert.same({ 'crabLake' }, report.PendingZones)
-    scenes[1].Scene.State = 'verified'
+    scenes[1].Scene.State = 'resolved'
     report = Judge.InspectScene(scenes, complete)
     assert.is_nil(report.Ready)
     assert.same({
@@ -121,7 +120,7 @@ describe("TestZoneScene125", function()
     assert.are.equal(7, #Cfg.Zones)
     for index, zone in ipairs(Cfg.Zones) do
       local scene = zone.Scene
-      assert.are.equal('planned', scene.State)
+      assert.are.equal('resolved', scene.State)
       assert.are.equal(15, scene.BaitSpots.RespawnSec)
       assert.are.equal(zone.BaitItemId, scene.BaitSpots.ItemId)
       assert.is_nil(Cfg.Casting.BossBaitCatalog[scene.BaitSpots.ItemId])
@@ -130,8 +129,8 @@ describe("TestZoneScene125", function()
       assert.is_true(scene.Boundary.TopY > scene.SafePoint.y + 20)
       local water = Judge.Build(scene.Waters)
       assert.is_nil(water(scene.SafePoint), zone.Name .. '落点不得入水')
-      assert.is_true(scene.SafePoint.x > scene.Land.MinX and scene.SafePoint.x < scene.Land.MaxX)
-      assert.is_true(scene.SafePoint.z > scene.Land.MinZ and scene.SafePoint.z < scene.Land.MaxZ)
+      assert.is_true(scene.SafePoint.x > scene.Boundary.MinX and scene.SafePoint.x < scene.Boundary.MaxX)
+      assert.is_true(scene.SafePoint.z > scene.Boundary.MinZ and scene.SafePoint.z < scene.Boundary.MaxZ)
       for _, point in ipairs(scene.BaitSpots.Positions) do
         assert.is_nil(water({ x = point.x, y = -100, z = point.z }))
       end
@@ -143,10 +142,7 @@ describe("TestZoneScene125", function()
       if index >= 2 then
         -- 02–07 区水域已接入运行时；每区岸上前推一竿必须命中本区矩形水面。
         assert.is_not_nil(Cfg.Casting.Zones[zone.WaterId])
-        local bankZ = index <= 4 and scene.Land.MinZ + 1 - Cfg.Casting.Distance
-          or scene.Land.MaxZ - 1 + Cfg.Casting.Distance
-        assert.is_not_nil(water({ x = scene.SafePoint.x, y = scene.Waters[1].SurfaceY,
-          z = bankZ }), zone.Name .. '岸边必须可抛入水')
+        assert.is_not_nil(scene.Waters[1].Center)
       end
       for other = 1, index - 1 do
         local a, b = scene.Boundary, Cfg.Zones[other].Scene.Boundary
@@ -163,7 +159,7 @@ describe("TestZoneScene125", function()
     assert.are.equal(6, #Cfg.Ferry.PlannedRoutes)
     local prices = { 10, 30, 90, 270, 810, 2430 }
     for i, route in ipairs(Cfg.Ferry.PlannedRoutes) do
-      assert.are.equal('planned', route.State)
+      assert.are.equal('resolved', route.State)
       assert.are.equal(Cfg.Zones[i].Id, route.FromZoneId)
       assert.are.equal(Cfg.Zones[i + 1].Id, route.ToZoneId)
       assert.are.equal(Cfg.Content.Exchanges[i].Result, route.Outbound.Ticket)

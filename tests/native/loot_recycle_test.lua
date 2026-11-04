@@ -43,7 +43,7 @@ end
 -- #126：池壁水条（addWaterStrip 生成）与鱼塘水圈同属一个钓鱼区，落点取第一块水条的中心
 local function spawnStrip(env)
     for _, zone in ipairs(GameCfg.Water.Zones) do
-        if tostring(zone.Id):find('^PondWest') then
+        if zone.Id == 'fishPond.water.2' then
             return spawnAt(env, zone.Center.x, zone.Center.z), zone
         end
     end

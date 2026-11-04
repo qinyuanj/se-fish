@@ -308,8 +308,7 @@ describe("回收烤鱼的金币结算", function()
         ctx.savedGame = _G.game
         ctx.savedCfg = package.loaded['common.GameCfg']
         -- 换一份私有配置副本：用例改 Debug 不污染其它 spec。
-        package.loaded['common.GameCfg'] = nil
-        ctx.cfg = require('common.GameCfg')
+        ctx.cfg = require('tests.support.zone_fixtures').Load()
         ctx.cfg.Debug = { Enabled = false }
         ctx.PlayerData = assert(loadfile('server/Data/PlayerData.lua'))()
         ctx.player = { UserId = 1, Character = { Position = vec(0, 0, 0) },

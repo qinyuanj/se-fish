@@ -345,6 +345,20 @@ describe("共享掉落的地面侧", function()
         assert.same(ctx.loot:RegionAt(loot.Position), loot.ZoneId)
     end)
 
+    -- 区归属先看区域边界：岛屿环带水域的中心可能离邻区更近，最近水域不能决定归区
+    it("test_region_follows_zone_boundary_before_nearest_water", function()
+        local waters = GameCfg.Water.Zones
+        for index, zone in ipairs(GameCfg.Zones) do
+            local bounds = zone.Scene.Boundary
+            local point = { x = bounds.MinX + 1, y = 0, z = bounds.MinZ + 1 }
+            local other = GameCfg.Zones[index % #GameCfg.Zones + 1]
+            GameCfg.Water.Zones = { { Id = other.WaterId, ZoneId = other.Id, Center = { x = point.x, y = 0, z = point.z } } }
+            local zoneId = ctx.loot:RegionAt(point)
+            GameCfg.Water.Zones = waters
+            assert.same(zone.Id, zoneId)
+        end
+    end)
+
     -- 生成失败：实例建不出来就不进入扣件流程（库存不动、无地面实例）
     it("test_spawn_failure_never_deducts", function()
         seed('carp', 1.37)

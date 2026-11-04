@@ -24,8 +24,7 @@ describe('向钓鱼佬喂食换金币（MgrInteract）', function()
     -- 快照先于任何改动：before_each 中途失败时 after_each 仍能还原。
     restore = { game = _G.game, GameCfg = package.loaded['common.GameCfg'] }
     env = { attrs = {}, plays = {}, synced = {}, replies = {}, seq = 0 }
-    package.loaded['common.GameCfg'] = nil
-    env.cfg = require('common.GameCfg')
+    env.cfg = require('tests.support.zone_fixtures').Load()
     -- #49：进图白送只在调试开关下发放，这里沿用它的起始库存（鱼竿在第 1 格、蚯蚓若干）
     env.cfg.Debug = { Enabled = true, InitialGrants = env.cfg.Debug.InitialGrants }
     local PlayerData = assert(loadfile('server/Data/PlayerData.lua'))()

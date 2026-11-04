@@ -21,8 +21,7 @@ describe("喂钓鱼佬的信物兑换", function()
         ctx.savedGame = _G.game
         ctx.savedCfg = package.loaded['common.GameCfg']
         -- 换一份私有配置副本：用例改 Debug 不污染其它 spec。
-        package.loaded['common.GameCfg'] = nil
-        ctx.cfg = require('common.GameCfg')
+        ctx.cfg = require('tests.support.zone_fixtures').Load()
         -- 关掉进图白送，库存完全由用例自己摆
         ctx.cfg.Debug = { Enabled = false }
         local PlayerData = assert(loadfile('server/Data/PlayerData.lua'))()

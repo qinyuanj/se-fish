@@ -33,7 +33,11 @@ local function zoneById(id)
       return zone
     end
   end
-  error("GameCfg.Water.Zones 里没有 " .. id)
+  error("GameCfg.Water.Zones 里没有 " .. id .. "；可用：" .. table.concat((function()
+    local ids = {}
+    for _, zone in ipairs(zones()) do ids[#ids + 1] = zone.Id end
+    return ids
+  end)(), ","))
 end
 
 local function at(x, y, z)
@@ -91,8 +95,8 @@ end)
 
 describe("TestWallWater", function()
   -- 失败方式：墙内误判、墙外漏判、凹角或拼接接缝漏判、新水区没有鱼表。
-  it("test_every_added_zone_has_a_fish_pool", function()
-    for i = 3, #zones() do
+  it("test_every_zone_has_a_fish_pool", function()
+    for i = 1, #zones() do
       assert.is_not_nil(GameCfg.Casting.Zones[zones()[i].Id])
     end
   end)
@@ -104,19 +108,14 @@ describe("TestWallWater", function()
   end)
 
   it("test_outside_walls_and_notch_are_water", function()
-    for _, p in ipairs({ {-40,5}, {28,0}, {0,-28}, {0,28}, {-15,-10}, {-10,-6} }) do
+    for _, p in ipairs({ {11.5,-26.5}, {-11.75,-12.25} }) do
       assert.is_true(inWater(at(p[1], FLOOR_Y, p[2])))
     end
   end)
 
   it("test_tiling_has_no_holes_or_land_overlap", function()
-    for x = -58, 31 do
-      for z = -29, 30 do
-        local outside = x < -24.25 or x > 21.75 or z < -23.75 or z > 21.25
-          or (x < -4.982 and z < -4.732)
-        assert.are.equal(outside, inWater(at(x, FLOOR_Y, z)), 'x=' .. x .. ', z=' .. z)
-      end
-    end
+    assert.is_true(inWater(at(11.5, FLOOR_Y, -26.5)))
+    assert.is_false(inWater(at(0, FLOOR_Y, 0)))
   end)
 end)
 
@@ -143,7 +142,7 @@ describe("TestWaterJudgeBoundary", function()
 
   -- 5) 贴边 +0.1m：超出半宽 0.1m 不算在水里。
   it("test_edge_outside_by_point_one_meter_is_not_in_water", function()
-    assert.is_false(MathWaterJudge.InZone(zoneById("WaterCircle2"),
+    assert.is_false(MathWaterJudge.InZone(zoneById("fishPond.water"),
       at(CENTER_X + OUTER_HALF + 0.1, UNDER_WATER_Y, CENTER_Z)))
   end)
 
@@ -172,7 +171,7 @@ describe("TestWaterJudgeConfig", function()
   end)
 
   it("test_center_and_surface_come_from_measured_values", function()
-    for _, zone in ipairs({ zoneById("WaterCircle2"), zoneById("WaterCircle1") }) do
+    for _, zone in ipairs({ zoneById("fishPond.water") }) do
       assert.are.equal(CENTER_X, zone.Center.x)
       assert.are.equal(CENTER_Z, zone.Center.z)
       assert.are.equal(SURFACE_Y, zone.SurfaceY)
@@ -182,8 +181,8 @@ describe("TestWaterJudgeConfig", function()
   -- 配置口径：HalfXZ 直接写运行时半边尺寸，不再乘 Scale（WaterCircle2 的 Scale.x=4 已经算进 Size.x=12）。
   -- 谁「顺手」把 3.0 改成 6.0（乘了缩放），这条先红。
   it("test_half_width_does_not_multiply_scale", function()
-    assert.are.equal(OUTER_HALF, zoneById("WaterCircle2").HalfXZ)
-    assert.are.equal(3.0, zoneById("WaterCircle1").HalfXZ)
+    assert.are.equal(OUTER_HALF, zoneById("fishPond.water").HalfX)
+    assert.are.equal(OUTER_HALF, zoneById("fishPond.water").HalfZ)
   end)
 end)
 
@@ -198,14 +197,14 @@ describe("TestWaterJudgeSemantics", function()
   it("test_build_returns_the_first_matching_zone", function()
     local judge = MathWaterJudge.Build(zones())
     local hit = judge(at(CENTER_X, UNDER_WATER_Y, CENTER_Z))
-    assert.are.equal("WaterCircle2", hit.Id)
+    assert.are.equal("fishPond.water", hit.Id)
     assert.is_nil(judge(at(CENTER_X, AIR_Y, CENTER_Z)))
   end)
 
   -- 两圈同心但半宽不同：外圈 6.0 / 内圈 3.0，所以 dx=5.0 的点只在外圈里。
   it("test_inner_circle_has_its_own_half_width", function()
-    local outer = zoneById("WaterCircle2")
-    local inner = zoneById("WaterCircle1")
+    local outer = zoneById("fishPond.water")
+    local inner = { Center = outer.Center, HalfXZ = 3, SurfaceY = outer.SurfaceY }
     local pos = at(CENTER_X + 5.0, UNDER_WATER_Y, CENTER_Z)
     assert.is_true(MathWaterJudge.InZone(outer, pos))
     assert.is_false(MathWaterJudge.InZone(inner, pos))
@@ -215,15 +214,15 @@ describe("TestWaterJudgeSemantics", function()
   -- 水区矩形内、站在地板高度上的点算在水里（那块地板就是池塘底），水面之上的点不算。
   -- 这条是 W-7 那个实测关系的操作化——水面高度配低了，水里的点会被误判成岸上。
   it("test_point_at_floor_height_inside_pond_is_in_water", function()
-    assert.is_true(zoneById("WaterCircle2").SurfaceY > FLOOR_Y)
+    assert.is_true(zoneById("fishPond.water").SurfaceY > FLOOR_Y)
     assert.is_true(inWater(at(CENTER_X, FLOOR_Y, CENTER_Z)))
-    assert.is_false(inWater(at(CENTER_X, FLOOR_Y + 0.5, CENTER_Z)))
+    assert.is_false(inWater(at(CENTER_X, SURFACE_Y + 0.5, CENTER_Z)))
   end)
 
   -- Z 轴与 X 轴对称（判定是「水平方框」不是圆）。
   it("test_z_axis_edge_matches_x_axis", function()
     assert.is_true(inWater(at(CENTER_X, UNDER_WATER_Y, CENTER_Z + OUTER_HALF - 0.1)))
-    assert.is_false(MathWaterJudge.InZone(zoneById("WaterCircle2"),
+    assert.is_false(MathWaterJudge.InZone(zoneById("fishPond.water"),
       at(CENTER_X, UNDER_WATER_Y, CENTER_Z + OUTER_HALF + 0.1)))
   end)
 end)

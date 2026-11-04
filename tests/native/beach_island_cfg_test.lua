@@ -28,8 +28,7 @@ describe("TestBeachIslandCfg", function()
 
   before_each(function()
     savedCfg = package.loaded['common.GameCfg']
-    package.loaded['common.GameCfg'] = nil
-    cfg = require('common.GameCfg')
+    cfg = require('tests.support.zone_fixtures').Load()
   end)
 
   after_each(function()

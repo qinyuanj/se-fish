@@ -27,14 +27,9 @@ function M.collect(GameCfg)
         entries[#entries + 1] = { source = source, zone = zoneLabel or '-',
             name = tostring(name), state = state or '-' }
     end
-    -- 1. #125 场景合同实体（Land / Safe / Fisherman / Shop / Lottery / Grill / Water / Boundary / Bait / Ferry）
-    for index, zone in ipairs(GameCfg.Zones) do
-        local scene = zone.Scene
-        if scene then
-            for _, entity in ipairs(scene.Entities or {}) do
-                add('Scene.' .. tostring(entity.Role), labels[index], entity.Name, entity.State)
-            end
-        end
+    -- 1. 区域标记命名合同（ADR-0013，common/ZoneMarkers.Contract；水域按 Z<i>_Water 前缀枚举，不在清单内）
+    for _, entry in ipairs(require('common.ZoneMarkers').Contract(GameCfg)) do
+        add('Marker.' .. entry.Role, labels[entry.ZoneIndex], entry.Name, 'contract')
     end
     -- 2. 钓鱼佬锚点（MgrInteract.FindAnchor 的名字来源）
     for index, fisherman in ipairs(GameCfg.Interact.Fishermen or {}) do
@@ -50,12 +45,7 @@ function M.collect(GameCfg)
     for _, point in ipairs((GameCfg.Grill or {}).Points or {}) do
         add('Grill.Points', labelByZoneId[point.ZoneId], point.AnchorName, '-')
     end
-    -- 5. 抽奖机锚点（GameCfg.Lottery.MachineAnchors）
-    local okAnchors, anchors = pcall(function() return GameCfg.Lottery.MachineAnchors() end)
-    if okAnchors then
-        for index, name in ipairs(anchors) do add('Lottery', labels[index], name, '-') end
-    end
-    -- 6. 摆渡锚点（MgrFerry）：去程锚点在出发区，返程锚点在到达区
+    -- 5. 摆渡锚点（MgrFerry）：去程锚点在出发区，返程锚点在到达区
     local okRoutes, routes = pcall(function() return GameCfg.Ferry.Routes end)
     if okRoutes and routes then
         for index, route in ipairs(routes) do

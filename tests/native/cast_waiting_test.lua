@@ -130,11 +130,11 @@ describe('抛竿与等待上钩（MgrCast）', function()
     castRod()
     local castId = lastState().castId
     local remaining = env.data:GetItemBarSnapshot().bait.worm
-    local original = GameCfg.Casting.Zones.WaterCircle2
-    GameCfg.Casting.Zones.WaterCircle2 = {}
+    local original = GameCfg.Casting.Zones['fishPond.water']
+    GameCfg.Casting.Zones['fishPond.water'] = {}
     env.now = GameCfg.Casting.HookDelaySec
     local ok, err = pcall(function() env.cast:Update() end)
-    GameCfg.Casting.Zones.WaterCircle2 = original
+    GameCfg.Casting.Zones['fishPond.water'] = original
     if not ok then error(err) end
     assert.is_nil(env.cast.Sessions[env.player.UserId])
     assert.same('idle', lastState().phase)
@@ -258,10 +258,10 @@ describe('抛竿与等待上钩（MgrCast）', function()
       env.cast:EndSession(env.player, env.cast.Sessions[env.player.UserId])
       castRod()
       env.now = env.now + GameCfg.Casting.HookDelaySec
-      local originalRows = GameCfg.Casting.Zones.WaterCircle2
-      GameCfg.Casting.Zones.WaterCircle2 = { { Id = 'carp', Bait = 'worm', RodLevel = 1, DrawWeight = 1 } }
+      local originalRows = GameCfg.Casting.Zones['fishPond.water']
+      GameCfg.Casting.Zones['fishPond.water'] = { { Id = 'carp', Bait = 'worm', RodLevel = 1, DrawWeight = 1 } }
       env.cast:Update()
-      GameCfg.Casting.Zones.WaterCircle2 = originalRows
+      GameCfg.Casting.Zones['fishPond.water'] = originalRows
       assert.same('carp', env.cast.Sessions[env.player.UserId].session.fishId)
     end)
     GameCfg.Debug, _G.Vector3 = savedDebug, savedVector
@@ -351,7 +351,7 @@ describe('抛竿与等待上钩（MgrCast）', function()
     castRod()
     local state = lastState()
     assert.same('cast', state.phase)
-    assert.same('WaterCircle2', state.zoneId)
+    assert.same('fishPond.water', state.zoneId)
     assert.same('number', type(state.castId))
     assert.same(-11.75, state.landing.x)
     assert.same(-12.25, state.landing.z)

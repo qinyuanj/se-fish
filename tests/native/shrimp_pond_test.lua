@@ -69,8 +69,7 @@ describe('虾池最小内容（水区 / 鱼表 / 商店 / 钓鱼佬 / 抛竿）'
       MgrFishUnit = package.loaded['server.Mgr.MgrFishUnit'],
     }
     env = { replies = {}, sent = {}, seq = 0, now = 0 }
-    package.loaded['common.GameCfg'] = nil
-    env.cfg = require('common.GameCfg')
+    env.cfg = require('tests.support.zone_fixtures').Load()
     -- 与 shop_test 同一口径：吃 #49 调试白送的起始库存（鱼竿第 1 格、蚯蚓若干）
     env.cfg.Debug = { Enabled = true, InitialGrants = env.cfg.Debug.InitialGrants }
     local PlayerData = assert(loadfile('server/Data/PlayerData.lua'))()
@@ -141,7 +140,7 @@ describe('虾池最小内容（水区 / 鱼表 / 商店 / 钓鱼佬 / 抛竿）'
 
   it('虾池套用统一模板并迁移运行时水域', function()
     local scene = env.cfg.Zones[2].Scene
-    assert.same('planned', scene.State)
+    assert.same('resolved', scene.State)
     assert.same({ MinX = 180, MaxX = 300, MinZ = -70, MaxZ = 50,
       BottomY = -30, TopY = 40, MaxFlightHeight = 20, CanClimb = false,
       EntityNames = scene.Boundary.EntityNames }, scene.Boundary)
@@ -155,8 +154,8 @@ describe('虾池最小内容（水区 / 鱼表 / 商店 / 钓鱼佬 / 抛竿）'
     assert.same({ x = 292, y = 6, z = -24 }, positions.Z2_Bait2)
     assert.same({ x = 215, y = 6, z = 40.5 }, positions.Z2_FerryOut)
     assert.same({ x = 265, y = 6, z = 40.5 }, positions.FerryReturn)
-    assert.same('Z2_Land', scene.LandName)
-    assert.same('Z2_Water', scene.Waters[1].EntityName)
+    assert.is_nil(scene.LandName)
+    assert.same('Z2_Water1', scene.Waters[1].EntityName)
     assert.same({ x = 240, y = 2, z = -44 }, scene.Waters[1].Center)
     assert.same(40, scene.Waters[1].HalfX)
     assert.same(12, scene.Waters[1].HalfZ)

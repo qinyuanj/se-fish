@@ -5,6 +5,9 @@
 local M = {}
 
 local GameCfg = require("common.GameCfg")
+local ZoneFixtures = require("tests.support.zone_fixtures")
+
+ZoneFixtures.Apply(GameCfg)
 
 function M.apply()
   GameCfg.Debug = { Enabled = true, InitialGrants = GameCfg.Debug.InitialGrants }

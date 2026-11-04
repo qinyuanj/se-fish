@@ -118,6 +118,8 @@ local function newWorld()
     env.prints[#env.prints + 1] = table.concat(parts, "\t")
   end
 
+  package.loaded["common.GameCfg"] = nil
+  require("tests.support.zone_fixtures").Load()
   env.localLottery = assert(loadfile("client/LocalLottery.lua"))()
 
   function env:anchor(name, x, z)

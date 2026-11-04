@@ -39,8 +39,7 @@ describe('首领饵必出首领（PlayerData × MgrCast）', function()
       FishUnit = package.loaded['server.Mgr.MgrFishUnit'],
     }
     env = { now = 0, sent = {} }
-    package.loaded['common.GameCfg'] = nil
-    env.cfg = require('common.GameCfg')
+    env.cfg = require('tests.support.zone_fixtures').Load()
     env.cfg.Debug = { Enabled = false }
     local PlayerData = assert(loadfile('server/Data/PlayerData.lua'))()
     env.player = { UserId = 1, Character = {

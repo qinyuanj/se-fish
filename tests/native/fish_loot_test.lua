@@ -249,7 +249,7 @@ describe('TestFishLoot', function()
     end)
 
     it('test_pond_rares_match_source_rows_and_are_catchable', function()
-        local cfg = assert(loadfile('common/GameCfg.lua'))()
+        local cfg = require('tests.support.zone_fixtures').Apply(assert(loadfile('common/GameCfg.lua'))())
         local rows = cfg.Casting.Zones.WaterCircle2
         local byId = {}
         for _, row in ipairs(rows) do byId[row.Id] = row end
@@ -287,6 +287,6 @@ describe('TestFishLoot', function()
         assert.are.equal(13, count)
         for _, pair in ipairs(POND_RARES) do assert.is_true(worm[pair.id], pair.id) end
         -- 鱼塘外圈条带水域共用同一张表
-        assert.same(rows, cfg.Casting.Zones.PondWest_1_1)
+        assert.same(rows, cfg.Casting.Zones['fishPond.water.2'])
     end)
 end)

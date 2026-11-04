@@ -48,7 +48,8 @@ describe('摆渡界面（ScreenFerry）', function()
       package.loaded[name] = nil
     end
     env = { nodes = {}, sceneNodes = {}, commands = {}, notices = {}, events = {} }
-    env.cfg = require('common.GameCfg')
+    package.loaded['common.GameCfg'] = nil
+    env.cfg = require('tests.support.zone_fixtures').Load()
     env.routes = env.cfg.Ferry.Routes
 
     -- 摆渡锚点（#125 场景合同里的 Ferry 实体）连未建区一起登记，十二条腿都能建出来
