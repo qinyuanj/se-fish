@@ -48,11 +48,17 @@ end
 function Screen:Button(parent, name, x, y, w, h, text, onClick)
     local button = self:Create('EUIButton', parent, name, x, y, w, h, {
         ButtonText = '', NormalImage = ColorBlockImage, PressImage = ColorBlockImage,
-        Color = Color.New(150, 80, 170, 255) })
+        -- #174 #16：EUIButton 没有 Color 属性（读回 nil），按钮底色走 ButtonNormalColor
+        ButtonNormalColor = Color.New(150, 80, 170, 255) })
     if not button then return nil end
     button.TouchEnabled = true
-    self:Create('EUITextLabel', button, name .. 'Text', 0, 0, w, h, {
+    -- #174 #16：文字子节点按父节点左下角原点与按钮同位同尺寸，并水平、垂直居中
+    local label = self:Create('EUITextLabel', button, name .. 'Text', x, y, w, h, {
         Text = text, FontSize = 28, TextColor = Color.New(255, 255, 255, 255), LocalZOrder = 1 })
+    if label then
+        label.TextHorizontalAlignment = 1
+        label.TextVerticalAlignment = 1
+    end
     if button.OnClicked then button.OnClicked:Connect(onClick) end
     return button
 end
@@ -76,17 +82,18 @@ function Screen:BuildNodes()
     local single = GameCfg.Platform.Goods.blindboxSingle
     local ten = GameCfg.Platform.Goods.blindboxTen
     local bean = GameCfg.Platform.BeanCurrency
-    self:Create('EUITextLabel', panel, 'LabelBlindboxTitle', 0, -250, 600, 60, {
+    -- #174 #17：面板子节点按父节点左下角原点布局，Y 向上；标题最高、按钮最低，全部落在面板内
+    self:Create('EUITextLabel', panel, 'LabelBlindboxTitle', 150, 500, 600, 60, {
         Text = cfg().HintText, FontSize = 40, TextColor = Color.New(255, 255, 255, 255) })
-    self:Create('EUITextLabel', panel, 'LabelBlindboxPity', 0, -180, 800, 50, {
+    self:Create('EUITextLabel', panel, 'LabelBlindboxPity', 50, 430, 800, 50, {
         Text = '', FontSize = 26, TextColor = Color.New(255, 230, 150, 255) })
-    self:Create('EUITextLabel', panel, 'LabelBlindboxResult', 0, -20, 860, 240, {
+    self:Create('EUITextLabel', panel, 'LabelBlindboxResult', 20, 140, 860, 240, {
         Text = '', FontSize = 24, TextColor = Color.New(255, 255, 255, 255) })
-    self:Button(panel, 'BtnBlindboxSingle', -260, 200, 280, 80,
+    self:Button(panel, 'BtnBlindboxSingle', 60, 30, 280, 80,
         string.format('单抽（%d%s）', single.beans, bean), function() self:Draw(1) end)
-    self:Button(panel, 'BtnBlindboxTen', 60, 200, 280, 80,
+    self:Button(panel, 'BtnBlindboxTen', 360, 30, 280, 80,
         string.format('十连（%d%s）', ten.beans, bean), function() self:Draw(10) end)
-    self:Button(panel, 'BtnBlindboxClose', 330, 200, 160, 80, '关闭', function() self:SetOpen(false) end)
+    self:Button(panel, 'BtnBlindboxClose', 680, 30, 160, 80, '关闭', function() self:SetOpen(false) end)
     self:RefreshPity()
     return true
 end

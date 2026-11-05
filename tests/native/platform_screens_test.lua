@@ -238,6 +238,48 @@ describe('盲盒界面（ScreenBlindbox）', function()
     assert.matches('极品美人鱼', text, 1, true) -- 内容表 Pity.prizeItemKeys → 名字
     assert.matches('极品蛇颈龙', text, 1, true)
   end)
+
+  -- #174 #16/#17：按钮用 ButtonNormalColor；面板子节点按父节点左下角原点布局，Y 向上，
+  -- 子节点坐标与尺寸都落在面板尺寸以内，文字与按钮同位、居中。
+  it('test_buttons_use_normal_color_and_panel_children_inside_bounds', function()
+    for _, name in ipairs({ 'BtnBlindboxEntry', 'BtnBlindboxSingle', 'BtnBlindboxTen', 'BtnBlindboxClose' }) do
+      local button = env.nodes[name]
+      assert.is_nil(button.Color, name)
+      assert.is_not_nil(button.ButtonNormalColor, name)
+      local label = env.nodes[name .. 'Text']
+      assert.same(button.Position, label.Position, name)
+      assert.same(button.Size, label.Size, name)
+      assert.same(1, label.TextHorizontalAlignment, name)
+      assert.same(1, label.TextVerticalAlignment, name)
+    end
+    local panel = env.nodes.ScreenBlindbox
+    -- 引擎子节点按父节点左下角算坐标：同位标签与按钮同 Position，同样落在父面板尺寸内
+    for _, name in ipairs({ 'LabelBlindboxTitle', 'LabelBlindboxPity', 'LabelBlindboxResult',
+      'BtnBlindboxSingle', 'BtnBlindboxTen', 'BtnBlindboxClose',
+      'BtnBlindboxSingleText', 'BtnBlindboxTenText', 'BtnBlindboxCloseText' }) do
+      local node = env.nodes[name]
+      assert.is_true(node.Position.x >= 0, name .. ' x>=0')
+      assert.is_true(node.Position.y >= 0, name .. ' y>=0')
+      assert.is_true(node.Position.x + node.Size.x <= panel.Size.x, name .. ' right')
+      assert.is_true(node.Position.y + node.Size.y <= panel.Size.y, name .. ' top')
+    end
+    for _, name in ipairs({ 'LabelBlindboxTitle', 'LabelBlindboxPity', 'LabelBlindboxResult',
+      'BtnBlindboxSingle', 'BtnBlindboxTen', 'BtnBlindboxClose' }) do
+      local node = env.nodes[name]
+      assert.equal(panel, node.Parent, name)
+      assert.is_true(node.Position.x >= 0, name .. ' x>=0')
+      assert.is_true(node.Position.y >= 0, name .. ' y>=0')
+      assert.is_true(node.Position.x + node.Size.x <= panel.Size.x, name .. ' right')
+      assert.is_true(node.Position.y + node.Size.y <= panel.Size.y, name .. ' top')
+    end
+    -- Y 向上：标题最高，保底其次，按钮最低
+    assert.is_true(env.nodes.LabelBlindboxTitle.Position.y > env.nodes.LabelBlindboxPity.Position.y)
+    assert.is_true(env.nodes.LabelBlindboxPity.Position.y > env.nodes.BtnBlindboxSingle.Position.y)
+    assert.is_true(env.nodes.LabelBlindboxResult.Position.y > env.nodes.BtnBlindboxSingle.Position.y)
+    -- 单抽左、十连中、关闭右
+    assert.is_true(env.nodes.BtnBlindboxSingle.Position.x < env.nodes.BtnBlindboxTen.Position.x)
+    assert.is_true(env.nodes.BtnBlindboxTen.Position.x < env.nodes.BtnBlindboxClose.Position.x)
+  end)
 end)
 
 describe('平台购买界面（ScreenPlatform）', function()

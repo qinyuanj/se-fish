@@ -233,4 +233,116 @@ describe("道具栏的界面侧", function()
         clientFile:close()
         assert.matches("OpenScreen('ScreenMain')", client, nil, true)
     end)
+
+    -- #174 #8：动态行集合变化后每次 Show 都按当前排序重排，可见按钮 x 两两不同且连续
+    it("test_dynamic_rows_reflow_after_membership_change", function()
+        -- 用配置里不存在的 bait 键（走 definition 兜底的 id 显示），保证 id 排序可预期
+        local baitA, baitB, baitC, baitD = 'baitTestA', 'baitTestB', 'baitTestC', 'baitTestD'
+        ctx.states:Fire({ slots = {}, bait = { [baitB] = 2, [baitD] = 1 } })
+        assert.same(120, ctx.nodes['BaitDyn_' .. baitB].Position.x)
+        assert.same(300, ctx.nodes['BaitDyn_' .. baitD].Position.x)
+        assert.same(120, ctx.nodes['BaitDynLabel_' .. baitB].Position.x)
+        assert.same(300, ctx.nodes['BaitDynLabel_' .. baitD].Position.x)
+        -- 集合先 A、B、C 再 B、D：隐藏按钮不占位，可见按钮连续排布
+        ctx.states:Fire({ slots = {}, bait = { [baitA] = 1, [baitB] = 2, [baitC] = 3 } })
+        assert.same(120, ctx.nodes['BaitDyn_' .. baitA].Position.x)
+        assert.same(300, ctx.nodes['BaitDyn_' .. baitB].Position.x)
+        assert.same(480, ctx.nodes['BaitDyn_' .. baitC].Position.x)
+        assert.is_false(ctx.nodes['BaitDyn_' .. baitD].Visible)
+        ctx.states:Fire({ slots = {}, bait = { [baitB] = 5, [baitD] = 1 } })
+        assert.is_false(ctx.nodes['BaitDyn_' .. baitA].Visible)
+        assert.is_false(ctx.nodes['BaitDyn_' .. baitC].Visible)
+        assert.same(120, ctx.nodes['BaitDyn_' .. baitB].Position.x)
+        assert.same(300, ctx.nodes['BaitDyn_' .. baitD].Position.x)
+        assert.same(120, ctx.nodes['BaitDynLabel_' .. baitB].Position.x)
+        assert.same(300, ctx.nodes['BaitDynLabel_' .. baitD].Position.x)
+        -- 武器行同理（按 id 字典序：axe < spear < sword）
+        ctx.states:Fire({ slots = {}, bait = {}, weapons = { sword = 1, axe = 1, spear = 1 } })
+        assert.same(120, ctx.nodes.WeaponItem_axe.Position.x)
+        assert.same(300, ctx.nodes.WeaponItem_spear.Position.x)
+        assert.same(480, ctx.nodes.WeaponItem_sword.Position.x)
+        ctx.states:Fire({ slots = {}, bait = {}, weapons = { axe = 1, bow = 1 } })
+        assert.is_false(ctx.nodes.WeaponItem_sword.Visible)
+        assert.same(120, ctx.nodes.WeaponItem_axe.Position.x)
+        assert.same(300, ctx.nodes.WeaponItem_bow.Position.x)
+        assert.same(120, ctx.nodes.WeaponItemLabel_axe.Position.x)
+    end)
+
+    -- #174 #11：主界面原点左下、Y 向上——标题在上、正文居中、按钮在下
+    it("test_dialogue_layout_y_up_title_above_body_above_buttons", function()
+        local title, body = ctx.nodes.DialogueTitle, ctx.nodes.DialogueBody
+        assert.is_true(title.Position.y > body.Position.y)
+        for _, name in ipairs({ 'DialogueNext', 'DialogueRead', 'DialogueNextLabel', 'DialogueReadLabel' }) do
+            assert.is_true(body.Position.y > ctx.nodes[name].Position.y)
+        end
+        assert.same(ctx.nodes.DialogueNext.Position, ctx.nodes.DialogueNextLabel.Position)
+        assert.same(ctx.nodes.DialogueRead.Position, ctx.nodes.DialogueReadLabel.Position)
+    end)
+
+    -- #174 #13：背包打开时被面板盖住的鱼饵键、武器条及文字标签一起隐藏，关闭后恢复
+    it("test_backpack_open_hides_covered_buttons_and_labels", function()
+        ctx.states:Fire({ slots = { [1] = { itemId = 'starterRod', count = 1 } }, slotCount = 2,
+            bait = { worm = 3 }, weapons = { sword = 1 }, backpackCount = 4 })
+        assert.is_true(ctx.nodes.BaitWorm.Visible)
+        assert.is_true(ctx.nodes.BaitDuck.Visible)
+        assert.is_true(ctx.nodes.WeaponItem_sword.Visible)
+        ctx.nodes.BtnBackpack.OnClicked:Fire()
+        for _, name in ipairs({ 'BaitWorm', 'BaitNone', 'BaitEat', 'BaitDuck', 'BaitSausage',
+            'ItemDiscard', 'ItemAction2', 'ReelClose', 'WeaponItem_sword', 'WeaponItemLabel_sword' }) do
+            assert.is_false(ctx.nodes[name].Visible, name)
+        end
+        for _, name in ipairs({ 'BtnBaitLabel', 'BtnNoneLabel', 'BtnEatLabel', 'BtnDuckLabel',
+            'BtnSausageLabel', 'BtnItemActionLabel', 'BtnDiscardLabel', 'ItemBarLabel1' }) do
+            assert.is_false(ctx.nodes[name].Visible, name)
+        end
+        assert.is_false(ctx.nodes.BaitWorm.TouchEnabled)
+        assert.is_false(ctx.nodes.WeaponItem_sword.TouchEnabled)
+        ctx.nodes.BtnBackpack.OnClicked:Fire()
+        assert.is_true(ctx.nodes.BaitWorm.Visible)
+        assert.is_true(ctx.nodes.BaitWorm.TouchEnabled)
+        assert.is_true(ctx.nodes.BtnBaitLabel.Visible)
+        assert.is_true(ctx.nodes.WeaponItem_sword.Visible)
+        -- 快照已移除的动态项在关闭背包后不得复活
+        ctx.states:Fire({ slots = {}, slotCount = 2, bait = { worm = 1 }, weapons = {}, backpackCount = 4 })
+        assert.is_false(ctx.nodes.WeaponItem_sword.Visible)
+        ctx.nodes.BtnBackpack.OnClicked:Fire()
+        assert.is_false(ctx.nodes.WeaponItem_sword.Visible)
+        assert.is_false(ctx.nodes.WeaponItem_sword.TouchEnabled)
+        assert.is_false(ctx.nodes.WeaponItemLabel_sword.Visible)
+    end)
+
+    -- #174 #14：背包格底色与面板有区分；#1：任务条带深色半透明底板
+    it("test_backpack_slot_color_differs_and_quest_has_backplate", function()
+        assert.is_not.same(ctx.nodes.BackpackPanel.ButtonNormalColor,
+            ctx.nodes.BackpackSlot1.ButtonNormalColor)
+        local plate = ctx.nodes.QuestBackground
+        assert.is_not_nil(plate)
+        assert.is_false(plate.TouchEnabled)
+        assert.is_false(plate.SwallowTouchEnabled)
+        assert.same(plate.Position, ctx.nodes.QuestLabel.Position)
+        assert.is_true(plate.Size.x >= ctx.nodes.QuestLabel.Size.x)
+        assert.is_true(plate.Size.y >= ctx.nodes.QuestLabel.Size.y)
+        local rgba = plate.Color
+        assert.is_true(rgba[4] < 255 and rgba[4] > 0)
+        assert.is_true(rgba[1] <= 60 and rgba[2] <= 60 and rgba[3] <= 60)
+        ctx.states:Fire({ slots = {}, bait = {} })
+        -- 底板随任务文字一起显隐
+        assert.is_false(plate.Visible)
+        ctx.events.QuestState.OnClientEvent:Fire({ text = '新手任务 1/5：去钓鱼' })
+        assert.is_true(ctx.nodes.QuestLabel.Visible)
+        assert.is_true(plate.Visible)
+    end)
+
+    -- #174 #18：overlay 生成的按钮文字水平、垂直居中
+    it("test_button_labels_center_aligned", function()
+        for _, name in ipairs({ 'BtnBaitLabel', 'BtnNoneLabel', 'BtnEatLabel', 'LabelBackpack',
+            'DialogueNextLabel', 'DialogueReadLabel', 'WeaponItemLabel_sword', 'QuestLabel' }) do
+            local label = ctx.nodes[name]
+            if label then
+                assert.same(1, label.TextHorizontalAlignment, name)
+                assert.same(1, label.TextVerticalAlignment, name)
+            end
+        end
+        assert.same(1, ctx.nodes.BtnBaitLabel.TextHorizontalAlignment)
+    end)
 end)

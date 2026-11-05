@@ -337,6 +337,7 @@ function ScreenHandler:ShowQuest(state)
     if not self.QuestLabel or type(state) ~= 'table' or type(state.text) ~= 'string' then return end
     self.QuestLabel.Text = state.text
     self.QuestLabel.Visible = true
+    if self.QuestBackground then self.QuestBackground.Visible = true end
     if type(state.notice) == 'string' and _G.LocalMsgNotice then _G.LocalMsgNotice(state.notice) end
 end
 
@@ -554,6 +555,9 @@ local function overlay(parent, name, x, y, width, height, text, size, color)
         Position = Vector2.New(x, y), Size = Vector2.New(width, height),
         Text = text, FontSize = size, TextColor = color,
     })
+    -- #174 #18：按钮与提示文字在自身框内水平、垂直居中（枚举 Center = 1，同 LocalAttackButton）
+    label.TextHorizontalAlignment = 1
+    label.TextVerticalAlignment = 1
     label.TouchEnabled = false
     label.SwallowTouchEnabled = false
     label.LocalZOrder = 1
@@ -590,9 +594,8 @@ function ScreenHandler:ShowDynamicBait(state)
     for i, id in ipairs(order) do
         local entry = self.BaitDyn[id]
         if not entry then
-            local x = 120 + (i - 1) * 180
-            local btn = button(self.UIRoot, 'BaitDyn_' .. id, x, 800, 170)
-            local label = overlay(self.UIRoot, 'BaitDynLabel_' .. id, x, 800, 170, 70,
+            local btn = button(self.UIRoot, 'BaitDyn_' .. id, 120, 800, 170)
+            local label = overlay(self.UIRoot, 'BaitDynLabel_' .. id, 120, 800, 170, 70,
                 '', 24, Color.New(255, 255, 255, 255))
             self.Buttons[#self.Buttons + 1] = btn
             self.Overlays[#self.Overlays + 1] = label
@@ -600,10 +603,15 @@ function ScreenHandler:ShowDynamicBait(state)
             entry = { Button = btn, Label = label }
             self.BaitDyn[id] = entry
         end
+        -- #174 #8：每次 Show 按当前排序重排，隐藏项不占位，避免新旧按钮叠在一起
+        local x = 120 + (i - 1) * 180
+        entry.Button.Position = Vector2.New(x, 800)
+        entry.Label.Position = Vector2.New(x, 800)
         local definition = GameCfg.Items.Definitions[id]
         entry.Label.Text = (definition and definition.Name or id) .. ' ×' .. tostring(state.bait[id])
-        entry.Button.Visible = true
-        entry.Label.Visible = true
+        entry.Button.Visible = not self.BackpackOpen
+        entry.Button.TouchEnabled = not self.BackpackOpen
+        entry.Label.Visible = not self.BackpackOpen
     end
 end
 
@@ -624,9 +632,8 @@ function ScreenHandler:ShowDynamicWeapons(state)
     for i, id in ipairs(order) do
         local entry = self.WeaponBtns[id]
         if not entry then
-            local x = 120 + (i - 1) * 180
-            local btn = button(self.UIRoot, 'WeaponItem_' .. id, x, 910, 170)
-            local label = overlay(self.UIRoot, 'WeaponItemLabel_' .. id, x, 910, 170, 70,
+            local btn = button(self.UIRoot, 'WeaponItem_' .. id, 120, 910, 170)
+            local label = overlay(self.UIRoot, 'WeaponItemLabel_' .. id, 120, 910, 170, 70,
                 '', 24, Color.New(255, 255, 255, 255))
             self.Buttons[#self.Buttons + 1] = btn
             self.Overlays[#self.Overlays + 1] = label
@@ -634,10 +641,14 @@ function ScreenHandler:ShowDynamicWeapons(state)
             entry = { Button = btn, Label = label }
             self.WeaponBtns[id] = entry
         end
+        local x = 120 + (i - 1) * 180
+        entry.Button.Position = Vector2.New(x, 910)
+        entry.Label.Position = Vector2.New(x, 910)
         local definition = GameCfg.Items.Definitions[id]
         entry.Label.Text = (definition and definition.Name or id) .. ' ×' .. tostring(state.weapons[id])
-        entry.Button.Visible = true
-        entry.Label.Visible = true
+        entry.Button.Visible = not self.BackpackOpen
+        entry.Button.TouchEnabled = not self.BackpackOpen
+        entry.Label.Visible = not self.BackpackOpen
     end
 end
 
@@ -689,6 +700,51 @@ function ScreenHandler:BuildVitals(root, resolution)
     end
 end
 
+-- #174 #13：背包打开时收起面板覆盖区内的固定键、动态行与文字标签；关闭后按当前快照恢复
+function ScreenHandler:ApplyBackpackOcclusion()
+    local hidden = self.BackpackOpen == true
+    local fixed = {
+        { self.BtnBait, self.BtnBaitLabel }, { self.BtnNone, self.BtnNoneLabel },
+        { self.BtnEat, self.BtnEatLabel }, { self.BtnDiscard, self.BtnDiscardLabel },
+        { self.BtnDuck, self.BtnDuckLabel }, { self.BtnSausage, self.BtnSausageLabel },
+        { self.BtnItemAction, self.BtnItemActionLabel }, { self.BtnReelClose, self.BtnReelCloseLabel },
+    }
+    for _, pair in ipairs(fixed) do
+        local btn, label = pair[1], pair[2]
+        if btn then
+            btn.Visible = not hidden
+            btn.TouchEnabled = not hidden
+        end
+        if label then label.Visible = not hidden end
+    end
+    for _, group in ipairs({ self.BaitDyn, self.WeaponBtns }) do
+        for _, entry in pairs(group or {}) do
+            if hidden then
+                entry.Button.Visible = false
+                entry.Button.TouchEnabled = false
+                entry.Label.Visible = false
+            end
+            -- 关闭背包不在这里复活动态行：可见性由随后的 ShowDynamicBait/ShowDynamicWeapons 按快照重算
+        end
+    end
+    for _, slot in ipairs(self.Slots or {}) do
+        slot.Label.Visible = slot.Label.Visible and not hidden
+        slot.Count.Visible = slot.Count.Visible and not hidden
+    end
+    if not hidden then
+        -- 恢复既有显隐规则：抛竿/收线键交给 ShowCast，丢弃键按快照重算，其余由 Show 重刷
+        self:ShowCast()
+        local selected = self.Snapshot and self.Snapshot.selectedSlot
+            and self.Snapshot.slots and self.Snapshot.slots[self.Snapshot.selectedSlot]
+        self.BtnDiscard.Visible = selected ~= nil
+        self.BtnDiscardLabel.Visible = selected ~= nil
+        if self.Snapshot then
+            self:ShowDynamicBait(self.Snapshot)
+            self:ShowDynamicWeapons(self.Snapshot)
+        end
+    end
+end
+
 function ScreenHandler:ShowBackpack()
     if not self.BackpackButton or not self.Snapshot then return end
     local state = self.Snapshot
@@ -714,7 +770,7 @@ function ScreenHandler:ShowBackpack()
         slot.Label.Text = definition
             and ((GameCfg.Items.CookRate(entry) ~= nil and GameCfg.Grill.CookedPrefix or '') .. definition.Name) or '空'
         slot.Button.ButtonNormalColor = index == self.SelectedBackpackSlot
-            and Color.New(36, 130, 94, 255) or Color.New(54, 100, 140, 255)
+            and Color.New(36, 130, 94, 255) or Color.New(120, 168, 200, 255)
     end
     local entry = state.backpack and state.backpack[self.SelectedBackpackSlot]
     self.MoveButton.Visible = self.BackpackOpen == true and entry ~= nil
@@ -730,6 +786,9 @@ function ScreenHandler:ShowBackpack()
     else
         self.MoveLabel.Text = '转入道具栏'
     end
+    -- #174 #13：背包面板盖住的鱼饵键、武器条与文字标签一起隐藏，点面板不会点到下层；
+    -- 放在 ShowBackpack 末尾，关闭时恢复逻辑能看到刚重算的道具栏显隐
+    self:ApplyBackpackOcclusion()
 end
 
 function ScreenHandler:BuildBackpack(root, resolution)
@@ -744,6 +803,8 @@ function ScreenHandler:BuildBackpack(root, resolution)
     self.BackpackPanel = button(root, 'BackpackPanel', center, top - 360, 850)
     self.BackpackPanel.Size = Vector2.New(850, 690)
     self.BackpackPanel.TouchEnabled = false
+    -- #174 #14：面板用深色，背包格用浅色，空格不再只剩一个「空」字
+    self.BackpackPanel.ButtonNormalColor = Color.New(30, 46, 66, 240)
     self.BackpackTitle = overlay(root, 'BackpackTitle', center, top - 70, 700, 48,
         '选择背包物品，再转入道具栏', 28, Color.New(255, 255, 255, 255))
     for index = 1, GameCfg.Items.MaxBackpackSlots do
@@ -751,6 +812,7 @@ function ScreenHandler:BuildBackpack(root, resolution)
         local x, y = center - 350 + col * 100, top - 160 - row * 100
         local btn = button(root, 'BackpackSlot' .. index, x, y, 95)
         btn.Size = Vector2.New(95, 90)
+        btn.ButtonNormalColor = Color.New(120, 168, 200, 255)
         local label = overlay(root, 'BackpackLabel' .. index, x, y, 95, 80,
             '', 19, Color.New(255, 255, 255, 255))
         self.BackpackSlots[index] = { Button = btn, Label = label }
@@ -849,6 +911,7 @@ function ScreenHandler:Cleanup()
     self.SplashUntil = nil
     self.AlertedCastId = nil
     self.QuestLabel = nil
+    self.QuestBackground = nil
     self.DialogueNodes = nil
     self.DialoguePayload = nil
     self.HealthRing = nil
@@ -983,6 +1046,14 @@ function ScreenHandler:Init()
         self.Overlays[#self.Overlays + 1] = node
     end
     -- [未查证：任务条位置与 LabelCoin / 血球饥饿球（#53）是否重叠，待 #55 截图迭代]
+    -- #174 #1：任务条加深色半透明底板，白字不再直接压在亮色地面上
+    self.QuestBackground = passive(World:CreateUnit('EUIImage', {
+        Parent = root, Name = 'QuestBackground',
+        Position = Vector2.New(500, resolution.y - 330), Size = Vector2.New(920, 64),
+        Image = 'official://image/11017', Color = Color.New(16, 24, 34, 180),
+    }))
+    self.QuestBackground.Visible = false
+    self.Overlays[#self.Overlays + 1] = self.QuestBackground
     self.QuestLabel = overlay(root, 'QuestLabel', 500, resolution.y - 330, 900, 56,
         '', 30, Color.New(255, 255, 255, 255))
     self.QuestLabel.Visible = false
@@ -996,15 +1067,16 @@ function ScreenHandler:Init()
         Color = Color.New(22, 38, 54, 250),
     })
     panel.TouchEnabled, panel.SwallowTouchEnabled, panel.LocalZOrder = true, true, 20
-    self.DialogueTitle = overlay(root, 'DialogueTitle', cx, cy - 120, width - 50, 50,
+    -- #174 #11：主界面原点左下、Y 向上——标题在上、正文居中、按钮在下
+    self.DialogueTitle = overlay(root, 'DialogueTitle', cx, cy + 120, width - 50, 50,
         '', 30, Color.New(255, 225, 130, 255))
     self.DialogueBody = overlay(root, 'DialogueBody', cx, cy - 10, width - 80, 130,
         '', 26, Color.New(255, 255, 255, 255))
-    self.DialogueNext = button(root, 'DialogueNext', cx - 160, cy + 115, 260)
-    self.DialogueRead = button(root, 'DialogueRead', cx + 160, cy + 115, 300)
-    local nextLabel = overlay(root, 'DialogueNextLabel', cx - 160, cy + 115, 260, 80,
+    self.DialogueNext = button(root, 'DialogueNext', cx - 160, cy - 115, 260)
+    self.DialogueRead = button(root, 'DialogueRead', cx + 160, cy - 115, 300)
+    local nextLabel = overlay(root, 'DialogueNextLabel', cx - 160, cy - 115, 260, 80,
         '下一段', 26, Color.New(255, 255, 255, 255))
-    self.DialogueReadLabel = overlay(root, 'DialogueReadLabel', cx + 160, cy + 115, 300, 80,
+    self.DialogueReadLabel = overlay(root, 'DialogueReadLabel', cx + 160, cy - 115, 300, 80,
         '已读，开始钓鱼', 26, Color.New(255, 255, 255, 255))
     self.DialogueNodes = { panel, self.DialogueTitle, self.DialogueBody,
         self.DialogueNext, self.DialogueRead, nextLabel, self.DialogueReadLabel }
