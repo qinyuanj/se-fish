@@ -8,7 +8,13 @@ local GameCfg = require('common.GameCfg')
 local Mgr = { AttackBonuses = {} }
 
 local AttackStep = 25
-local BaseAttack = GameCfg.Ability.InitialAbilities[2].AnchorAttributes.ABILITY_ANOSTATE_BULLET_DAMAGE
+local BaseAttack = 0
+for _, entry in ipairs(GameCfg.Ability.InitialAbilities) do
+    if entry.AnchorBehavior == 'melee_hit' then
+        BaseAttack = entry.AnchorAttributes.ABILITY_ANOSTATE_BULLET_DAMAGE
+        break
+    end
+end
 
 function Mgr:GetMeleeDamage(player, base)
     return base + (player and self.AttackBonuses[player.UserId] or 0)

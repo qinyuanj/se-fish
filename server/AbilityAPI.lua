@@ -140,7 +140,7 @@ local AnchorBehaviorLoaders = {
 -- 行为名挂上行为逻辑。这里保留本图补挂逻辑，普通技能操作直接调用包内 API。
 ---把锚点单位挂到技能单位下（锚点应先 parent 到技能单位）
 ---@param anchorScript Script 锚点脚本单位
----@param behaviorModule string 锚点行为名（AnchorBehaviorLoaders 的键，如 "speed_add"）
+---@param behaviorModule string 锚点行为名（AnchorBehaviorLoaders 的键，如 "melee_hit"）
 ---@return boolean 是否已挂接
 function AbilityAPI.AttachAnchor(anchorScript, behaviorModule)
 	if not anchorScript then

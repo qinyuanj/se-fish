@@ -163,7 +163,7 @@ function Mgr:Hooks()
 end
 
 -- 虚弱（策划案：虚弱复活后 1 分钟移速减半）：进入时记当前 WalkSpeed 为基准并乘 WeakSpeedScale，
--- 结束恢复基准值。与加速技能（speed_add 锚点）叠加时的恢复顺序是已知边界，见 issue 评论。
+-- 结束恢复基准值。
 -- #139：注入 SpeedWriter（MgrAbility）后，移速只由其 RefreshMoveSpeed 按「基础 × 永久成长 × 虚弱 × 霜冻」
 -- 整体重算，本管理器只维护 weakUntil 标记，不再私写 WalkSpeed；未注入时保留下面的旧逻辑兜底。
 local function refreshSpeed(self, state)

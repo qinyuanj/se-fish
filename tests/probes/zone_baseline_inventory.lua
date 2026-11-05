@@ -157,8 +157,8 @@ end
 table.sort(roots)
 emit('ROOTS|count=' .. tostring(#roots))
 for _, row in ipairs(roots) do emit(row) end
--- 按名探测已知根级残留（非穷尽）：'预设链接' / 'Link' / '加速锚点' / '名称1'
-for _, name in ipairs({ '预设链接', '加速锚点', '名称1' }) do
+-- 按名探测已知根级残留（非穷尽）：'预设链接' / '名称1'
+for _, name in ipairs({ '预设链接', '名称1' }) do
     local hit = safe(function() return world:FindFirstChild(name) end, nil)
     emit('ROOTNAME|' .. name .. '|' .. (hit and unitType(hit) or 'nil'))
 end

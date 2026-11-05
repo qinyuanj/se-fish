@@ -10,14 +10,8 @@ GameCfg.Ability = {
     ManagerPreset = "map://preset/ubdb4a7e737d4eddb87729e9055ba375",
     InitialAbilities = {
         {
-            AssetId = "map://preset/uf7fac66639546e2aa376151835cf3a6",
-            Index = 0,
-            Anchor = "map://preset/uaf2781161d6460990a4941b12ad30c2",
-            AnchorBehavior = "speed_add",
-        },
-        {
             AssetId = "map://preset/u0d0b1993faa482b93e806d23715b73e",
-            Index = 1,
+            Index = 0,
             Anchor = "map://preset/ucc500ac3aac4b749fd9bee03b57e4d5",
             AnchorBehavior = "melee_hit",
             AnchorAttributes = {
@@ -51,7 +45,7 @@ describe("TestAbilityPresetsExistence", function()
     local listed = '{"success":true,"asset_ids":["map://preset/ukeep"]}'
     assert.is_true(ap.preset_exists(listed, "map://preset/ukeep"))
     assert.is_false(ap.preset_exists(listed, "map://preset/umissing"))
-    local actions = ap.plan({ manager = true, speed_ability = true, speed_anchor = true,
+    local actions = ap.plan({ manager = true,
       melee_ability = ap.preset_exists(listed, "map://preset/umissing"), melee_anchor = true })
     for _, action in ipairs(actions) do
       if action.slot == "melee_ability" then assert.are.equal("rebuild", action.op) end
@@ -68,7 +62,7 @@ describe("TestAbilityPresetsFixNamesPlan", function()
     return probes
   end
 
-  -- 五个预设全是 string：一个都不动（这是本图现在的常态，工具跑完应报「无需修」）。
+  -- 三个预设全是 string：一个都不动（这是本图现在的常态，工具跑完应报「无需修」）。
   it("test_all_string_is_all_skips", function()
     local kinds = {}
     for _, spec in ipairs(ap.SPECS) do kinds[spec.slot] = "String" end
@@ -84,28 +78,28 @@ describe("TestAbilityPresetsFixNamesPlan", function()
   it("test_non_string_goes_to_fix_with_the_read_back_name", function()
     local kinds = {}
     for _, spec in ipairs(ap.SPECS) do kinds[spec.slot] = "String" end
-    kinds.speed_anchor = "userdata"
-    local actions = ap.plan_name_fixes(probes_for(kinds, "加速锚点"))
+    kinds.melee_anchor = "userdata"
+    local actions = ap.plan_name_fixes(probes_for(kinds, "技能锚点模板"))
     local ops = {}
     for _, action in ipairs(actions) do ops[action.slot] = action.op end
-    assert.are.equal("fix", ops.speed_anchor)
+    assert.are.equal("fix", ops.melee_anchor)
     assert.are.equal("skip", ops.manager)
     for _, action in ipairs(actions) do
-      if action.slot == "speed_anchor" then
-        assert.are.equal("加速锚点", action.name, "改名的名字取自 get-asset-value 的内容")
+      if action.slot == "melee_anchor" then
+        assert.are.equal("技能锚点模板", action.name, "改名的名字取自 get-asset-value 的内容")
       end
     end
   end)
 
   -- 探针没读出来 / 名字为空 → unreadable（报错不猜），不能当成 skip 蒙过去。
   it("test_unreadable_probe_is_not_a_skip", function()
-    local actions = ap.plan_name_fixes({ speed_ability = { kind = nil, name = "加速技能" } })
+    local actions = ap.plan_name_fixes({ melee_ability = { kind = nil, name = "技能模板" } })
     local ops = {}
     for _, action in ipairs(actions) do ops[action.slot] = action.op end
-    assert.are.equal("unreadable", ops.speed_ability)
     assert.are.equal("unreadable", ops.melee_ability)
+    assert.are.equal("unreadable", ops.melee_anchor)
 
-    local empty = ap.plan_name_fixes({ speed_ability = { kind = "userdata", name = "" } })
+    local empty = ap.plan_name_fixes({ melee_ability = { kind = "userdata", name = "" } })
     assert.are.equal("unreadable", empty[2].op)
   end)
 end)
@@ -189,9 +183,9 @@ describe("TestAbilityPresetsFixNamesScript", function()
   end)
 
   it("test_sync_script_targets_unit_and_asset", function()
-    local key = "map://preset/uaf2781161d6460990a4941b12ad30c2"
-    local src = ap.sync_script(key, "加速锚点")
-    assert.matches('World:FindFirstChild("加速锚点")', src, 1, true)
+    local key = "map://preset/ucc500ac3aac4b749fd9bee03b57e4d5"
+    local src = ap.sync_script(key, "技能锚点模板")
+    assert.matches('World:FindFirstChild("技能锚点模板")', src, 1, true)
     assert.matches("AssetService.SyncAssetFromUnit", src, 1, true)
     assert.matches('"' .. key .. '"', src, 1, true)
     assert.matches('return "sync="', src, 1, true)
@@ -270,11 +264,11 @@ describe("TestAbilityPresetsOutput", function()
 end)
 
 describe("TestAbilityPresetsParse", function()
-  it("test_fixture_yields_all_five_keys", function()
+  it("test_fixture_yields_all_three_keys", function()
     local keys = ap.parse_gamecfg(FIXTURE)
     assert.are.equal("map://preset/ubdb4a7e737d4eddb87729e9055ba375", keys.manager)
-    assert.are.equal("map://preset/uf7fac66639546e2aa376151835cf3a6", keys.speed_ability)
-    assert.are.equal("map://preset/uaf2781161d6460990a4941b12ad30c2", keys.speed_anchor)
+    assert.is_nil(keys.speed_ability)
+    assert.is_nil(keys.speed_anchor)
     assert.are.equal("map://preset/u0d0b1993faa482b93e806d23715b73e", keys.melee_ability)
     assert.are.equal("map://preset/ucc500ac3aac4b749fd9bee03b57e4d5", keys.melee_anchor)
   end)
@@ -285,7 +279,7 @@ describe("TestAbilityPresetsParse", function()
     assert.are.equal("map://preset/ucc500ac3aac4b749fd9bee03b57e4d5", keys.melee_anchor)
   end)
 
-  -- 真源对得上：直接读仓库的 common/GameCfg.lua，五个 key 都要在、互不重复。
+  -- 真源对得上：直接读仓库的 common/GameCfg.lua，三个 key 都要在、互不重复。
   -- GameCfg.Ability 结构改动时这条先红，脚本不会在编辑器侧白跑。
   it("test_real_gamecfg_parses", function()
     local f = io.open("common/GameCfg.lua", "rb")
@@ -294,7 +288,7 @@ describe("TestAbilityPresetsParse", function()
     f:close()
     local keys = ap.parse_gamecfg(body)
     local seen = {}
-    for _, slot in ipairs({ "manager", "speed_ability", "speed_anchor", "melee_ability", "melee_anchor" }) do
+    for _, slot in ipairs({ "manager", "melee_ability", "melee_anchor" }) do
       local key = keys[slot]
       assert.is_not_nil(key, slot)
       assert.matches("^map://preset/u[0-9a-f]+$", key)
@@ -307,14 +301,12 @@ end)
 describe("TestAbilityPresetsPlan", function()
   it("test_all_present_keeps_skills_and_reapplies_anchors", function()
     local actions = ap.plan({
-      manager = true, speed_ability = true, speed_anchor = true,
-      melee_ability = true, melee_anchor = true,
+      manager = true, melee_ability = true, melee_anchor = true,
     })
     local ops = {}
     for _, a in ipairs(actions) do ops[a.slot] = a.op end
     assert.same({
-      manager = "keep", speed_ability = "keep", speed_anchor = "reapply",
-      melee_ability = "keep", melee_anchor = "reapply",
+      manager = "keep", melee_ability = "keep", melee_anchor = "reapply",
     }, ops)
   end)
 
@@ -323,7 +315,7 @@ describe("TestAbilityPresetsPlan", function()
     local ops = {}
     for _, a in ipairs(actions) do ops[a.slot] = a.op end
     assert.are.equal("rebuild", ops.manager)
-    assert.are.equal("rebuild", ops.speed_anchor)
+    assert.are.equal("rebuild", ops.melee_anchor)
   end)
 end)
 

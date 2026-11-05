@@ -5,8 +5,8 @@
 --
 -- 依据是 issue #7/#8 的编辑器侧命令记录。本编辑器不认包内 ---@export_prefab_type
 -- 自定义预设类型，预设一律「复制官方模板 → 改壳源码 / 属性」：
---   * 技能背包 / 加速技能 / 挥砍技能：duplicate-asset 官方模板即用（壳原样）；
---   * 加速锚点 / 挥砍锚点：duplicate 后重写壳源码（只声明属性、不挂接——壳在实例化时
+--   * 技能背包 / 挥砍技能：duplicate-asset 官方模板即用（壳原样）；
+--   * 挥砍锚点：duplicate 后重写壳源码（只声明属性、不挂接——壳在实例化时
 --     Parent 还是 World 就会抢跑认错宿主，挂接由根 AbilityAPI.AttachAnchor 补做，
 --     见 issue #7），再 change-asset-value 写入属性值。
 -- 预设 key 的唯一真源是 common/GameCfg.lua 的 GameCfg.Ability：本命令按 key 查预设，
@@ -42,7 +42,7 @@
 --       local v=AS:GetAssetValue("<预设 id>","Name"); return typeof(v).."|"..tostring(v)'
 --     → `String|技能背包`（正常）/ `userdata|u'\u52a0\u901f\u6280\u80fd'`（中招）；
 --   * 试玩期：读 MapData:GetAssetData(预设 id) 的根单位 Name 的 type()，再看实例出来的单位名是否为空。
---   实测提醒：写脏的值经 preset get-asset-value 照样显示「加速技能」，看不出类型；告警条数也
+--   实测提醒：写脏的值经 preset get-asset-value 照样显示原名，看不出类型；告警条数也
 --   数不出中招个数——同一条告警一个 Lua VM 只打一次。
 --
 -- 修（`--fix-names` 跑的就是这四步，全在编辑器内存态，不动 GameCfg、保原预设 id、不存盘）：
@@ -88,7 +88,7 @@ local FIX_POSITION = "0,100,0"
 local PROBE_SCRIPT = "tmp/ability_presets_probe.lua"
 local EXEC_SCRIPT = "tmp/ability_presets_sync.lua"
 
--- 五个预设槽位的规格。template 是复制源（官方模板，issue #7 硬假设 2 确认在本图）；
+-- 三个预设槽位的规格。template 是复制源（官方模板，issue #7 硬假设 2 确认在本图）；
 -- shell 与 attrs 只有锚点有（技能与背包的壳用模板原样）。attrs 一批一条
 -- change-asset-value，元素是原样的 key=<json>（与 issue #7/#8 命令记录一致）。
 local TEMPLATE_ABILITY = "map://preset/uc57b9f26db1463083f9ace34d6db0d5"
@@ -105,11 +105,6 @@ end
 
 M.SPECS = {
   { slot = "manager", template = "map://preset/u014968df4aa4427aebac4388ed79bf7" },
-  { slot = "speed_ability", template = TEMPLATE_ABILITY },
-  { slot = "speed_anchor", template = TEMPLATE_ANCHOR, shell = "anchor_speed_add.lua", attrs = {
-    { "StartTime=0.0", "Duration=0.0", "Phase=2", "TrackIndex=0",
-      "ABILITY_ANOSTATE_WALK_SPEED=6.0" },
-  } },
   { slot = "melee_ability", template = TEMPLATE_ABILITY },
   { slot = "melee_anchor", template = TEMPLATE_ANCHOR, shell = "anchor_melee_hit.lua", attrs = {
     { "ABILITY_ANOSTATE_BULLET_DAMAGE=25.0", "ABILITY_ANOSTATE_HITPOWER=0.0",
@@ -120,13 +115,13 @@ M.SPECS = {
   } },
 }
 
--- 从 GameCfg.lua 文本里取出五个预设 key（slot → key）；取不到的槽位值为 nil。
+-- 从 GameCfg.lua 文本里取出三个预设 key（slot → key）；取不到的槽位值为 nil。
 -- 结构约定见 common/GameCfg.lua 的 GameCfg.Ability：技能条目里 AssetId/Anchor 出现在
 -- AnchorBehavior 之前、且中间没有嵌套表，所以按 `{` 起、不跨 `{` 截到 AnchorBehavior。
 function M.parse_gamecfg(text)
   local keys = {}
   keys.manager = text:match('ManagerPreset%s*=%s*"(map://preset/u[0-9a-f]+)"')
-  local behaviors = { speed_add = "speed", melee_hit = "melee" }
+  local behaviors = { melee_hit = "melee" }
   for behavior, prefix in pairs(behaviors) do
     local entry = text:match('{[^{]-AnchorBehavior%s*=%s*"' .. behavior .. '"')
     if entry then
@@ -558,7 +553,7 @@ function M.usage()
   return table.concat({
     "用法: lua5.4 tools/cli.lua ability-presets [--fix-names] [--dry-run] [--editor-instance <pid>]",
     "",
-    "重建技能包的编辑器侧预设（技能背包 / 加速技能 / 加速锚点 / 挥砍技能 / 挥砍锚点）：",
+    "重建技能包的编辑器侧预设（技能背包 / 挥砍技能 / 挥砍锚点）：",
     "GameCfg.Ability 里的 key 还在就原地重刷壳与属性（可重复执行）；不在就复制官方模板",
     "建新的，并把新 key 回写 common/GameCfg.lua。",
     "加 --fix-names 则改跑 Name 类型修复：对 GameCfg.Ability 引用的每个预设查 Name 类型，",

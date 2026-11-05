@@ -839,12 +839,10 @@ GameCfg.FishCombat = {
 -- 预设本体存在图里、不进 git，这里只记 key；预设的建法与完整命令记录见 issue #7 / #8——
 -- 本编辑器不认包内的 ---@export_prefab_type 自定义预设类型（见 #7 结论），所以：
 --   技能管理器（官方叫技能背包）= 复制官方「技能背包」模板（u014968…）
---   技能 = 复制官方「技能」模板（uc57b9…）；加速技能重写过壳源码（官方文档的「手工创建方式」），
---         挥砍技能沿用模板原壳
+--   技能 = 复制官方「技能」模板（uc57b9…），挥砍技能沿用模板原壳
 --   锚点 = 复制官方「锚点」模板（uccfb9d…），壳改成只声明属性（壳会在 Parent=World 时抢跑），
 --         挂接由根 AbilityAPI.AttachAnchor 补做
--- 注意：change-asset-value 改不动「壳里已声明的属性」，实例拿到的是预设单位数据里的旧值，
--- 所以加速技能用的是模板默认 CastTime=0.5 秒（加速窗口只有 0.5 秒），详见 issue #7；
+-- 注意：change-asset-value 改不动「壳里已声明的属性」，实例拿到的是预设单位数据里的旧值；
 -- 锚点的关键实例值改由 AnchorAttributes 在挂接前 SetAttribute 覆盖（含 Duration，melee_hit 要求 > 0）。
 -- melee_hit 的命中盒用包内硬编码的官方网格 57450——已实测它是平台级资源，本图直接可用（issue #8）。
 -- #172 出手动作：引擎官方动画临时占位（正式资源见 #44）。ID 取自手册「状态同步编辑器 · 动作 · 资产目录」；
@@ -890,16 +888,10 @@ GameCfg.Ability = {
     -- Anchor=锚点预设，AnchorBehavior=锚点行为名（server/AbilityAPI.lua 的 AnchorBehaviorLoaders 登记的键），
     -- AnchorAttributes=挂接前覆盖到锚点实例的属性（{x,y,z} 表会转成 Vector3）
     InitialAbilities = {
-        {
-            AssetId = "map://preset/uf7fac66639546e2aa376151835cf3a6",
-            Index = 0,
-            Anchor = "map://preset/uaf2781161d6460990a4941b12ad30c2",
-            AnchorBehavior = "speed_add",
-        },
         -- 挥砍：玩家的攻击（手持武器发起，见 GLOSSARY.md「战斗」），道具按钮触发
         {
             AssetId = "map://preset/ucc31d1999a543a7ab329eff1fd3c00d",
-            Index = 1,
+            Index = 0,
             Anchor = "map://preset/u471a1004c1f43f1ae6ebe4ee2bcd080",
             AnchorBehavior = "melee_hit",
             -- 技能实例覆盖：CD 归零（间隔由 MgrWeapon 的 IntervalSec 权威控制）；施法时长须 ≥ Duration 且 < 最小 IntervalSec 0.5

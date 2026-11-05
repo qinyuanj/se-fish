@@ -266,12 +266,13 @@ describe('TestMgrWeapon', function()
     it('test_cast_guard_requires_staged_swing_for_melee_only', function()
         ctx.mgr:Start() -- 注册 AddCastGuard 与 WeaponAction 通道
         assert.is_not_nil(ctx.castGuard)
+        local meleeIndex = ctx.mgr:MeleeIndex()
         ctx.swingStaged[42] = { damage = 5, range = 2 }
-        assert.is_true(ctx.castGuard(ctx.player.Character, 1))  -- 已登记放行
+        assert.is_true(ctx.castGuard(ctx.player.Character, meleeIndex))  -- 已登记放行
         ctx.swingStaged[42] = nil
-        assert.is_false(ctx.castGuard(ctx.player.Character, 1)) -- 近战槽无登记拒绝
-        assert.is_true(ctx.castGuard(ctx.player.Character, 0))  -- 其它槽位不受影响
-        assert.is_true(ctx.castGuard({ UnitId = 5 }, 1))        -- 非玩家单位（鱼施法）不受影响
+        assert.is_false(ctx.castGuard(ctx.player.Character, meleeIndex)) -- 近战槽无登记拒绝
+        assert.is_true(ctx.castGuard(ctx.player.Character, 1))          -- 其它槽位不受影响
+        assert.is_true(ctx.castGuard({ UnitId = 5 }, meleeIndex))       -- 非玩家单位（鱼施法）不受影响
     end)
 
     it('test_fire_rate_enforced_server_side', function()
@@ -399,7 +400,7 @@ describe('TestMgrWeapon', function()
         ctx.mgr:Attack(ctx.player)
         assert.same({ damage = 5, range = 2 }, ctx.swingStaged[42])
         assert.same(1, #ctx.casts)
-        assert.same(1, ctx.casts[1].index) -- GameCfg 挥砍槽位
+        assert.same(0, ctx.casts[1].index) -- GameCfg 挥砍槽位
         assert.same(ctx.player.Character, ctx.casts[1].unit)
         assert.is_true(Weapon.lastReply(ctx).ok)
     end)
