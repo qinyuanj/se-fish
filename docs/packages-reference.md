@@ -22,6 +22,15 @@
 
 因此：不要从宿主删除导入过的包；包的升级与删除都走仓库加 `deploy`。真要改回引用，只能请官方在服务端重置该地图的导入状态，并且要先确认引用模式下业务代码 require 的包内模块仍然可用。
 
+## 引擎 bootstrap 钩子
+
+2026-11-05 实测发现：引擎在 `unit_scripts/World/__OfficialPackageBootstrap__.lua` 生成启动脚本，新建空图里也有。据生成文件，它对列表里的 `server.packages.<包名>.bootstrap` 做 `pcall(require)`，再按函数名排序依次调用表里的函数。本图的列表只有 `modifier_system`（`sdk_extend` 已于 2026-10-09 删除）；空图的列表是 `modifier_system`、`sdk_extend`。引擎从哪个版本开始生成这份脚本未查证，宿主日志里这条报错 2026-11-05 才首次出现。
+
+本图导入的 `modifier_system`（2026-10-08，#153）里没有 `bootstrap.lua`；缺这个文件时，每次试玩服务端都会报 `module not found`。仓库因此补了一个返回空表的 `server/packages/modifier_system/bootstrap.lua`（#176），没有函数可调，行为与缺文件时相同。`tests/native/official_package_bootstrap_test.lua` 保证它可加载且不含启动函数。官方新版是否带 bootstrap、内容是什么，都未查证。
+
+- 整包重新导入后，新包里有 `bootstrap.lua` 就以官方文件为准，跑上文的真实包回归测试，并按新文件改写该测试。
+- 新包里仍没有它时，`sync --packages` 会把这个空钩子当作多余文件删掉。回灌后要恢复它，再提交。
+
 ## 包清单
 
 | 包 | 用途 | 导入时间 | 真实包接口 |
