@@ -57,8 +57,8 @@ function Screen:Button(parent, name, x, y, w, h, text, onClick)
         ButtonNormalColor = Color.New(150, 80, 170, 255) })
     if not button then return nil end
     button.TouchEnabled = true
-    -- #174 #16：文字子节点按父节点左下角原点与按钮同位同尺寸，并水平、垂直居中
-    local label = self:Create('EUITextLabel', button, name .. 'Text', x, y, w, h, {
+    -- #174 #16：文字是按钮的子节点，按父（按钮）左下角原点放 (0,0)、与按钮同尺寸，水平垂直居中
+    local label = self:Create('EUITextLabel', button, name .. 'Text', 0, 0, w, h, {
         Text = text, FontSize = 28, TextColor = Color.New(255, 255, 255, 255), LocalZOrder = 1 })
     if label then
         label.TextHorizontalAlignment = 1
@@ -83,6 +83,8 @@ function Screen:BuildNodes()
     local panel = self:Create('EUIImage', root, 'ScreenBlindbox', cx, cy, 900, 600, {
         Image = ColorBlockImage, Color = Color.New(20, 20, 40, 220), Visible = false })
     if not panel then return false end
+    -- 面板自身是根节点子级，恢复中心锚点，让 (cx,cy) 落在屏幕正中；子节点仍按左下原点
+    panel.Anchor = Vector2.New(0.5, 0.5)
     self.Panel = panel
     local single = GameCfg.Platform.Goods.blindboxSingle
     local ten = GameCfg.Platform.Goods.blindboxTen

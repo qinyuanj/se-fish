@@ -247,22 +247,14 @@ describe('盲盒界面（ScreenBlindbox）', function()
       assert.is_nil(button.Color, name)
       assert.is_not_nil(button.ButtonNormalColor, name)
       local label = env.nodes[name .. 'Text']
-      assert.same(button.Position, label.Position, name)
+      assert.same({ x = 0, y = 0 }, label.Position, name .. ' text at parent origin')
       assert.same(button.Size, label.Size, name)
       assert.same(1, label.TextHorizontalAlignment, name)
       assert.same(1, label.TextVerticalAlignment, name)
     end
     local panel = env.nodes.ScreenBlindbox
-    -- 引擎子节点按父节点左下角算坐标：同位标签与按钮同 Position，同样落在父面板尺寸内
-    for _, name in ipairs({ 'LabelBlindboxTitle', 'LabelBlindboxPity', 'LabelBlindboxResult',
-      'BtnBlindboxSingle', 'BtnBlindboxTen', 'BtnBlindboxClose',
-      'BtnBlindboxSingleText', 'BtnBlindboxTenText', 'BtnBlindboxCloseText' }) do
-      local node = env.nodes[name]
-      assert.is_true(node.Position.x >= 0, name .. ' x>=0')
-      assert.is_true(node.Position.y >= 0, name .. ' y>=0')
-      assert.is_true(node.Position.x + node.Size.x <= panel.Size.x, name .. ' right')
-      assert.is_true(node.Position.y + node.Size.y <= panel.Size.y, name .. ' top')
-    end
+    assert.same({ x = 0.5, y = 0.5 }, panel.Anchor, 'panel centered on screen')
+    -- 引擎子节点按父节点左下角算坐标（Anchor=0,0），按钮与文字都落在父面板尺寸内
     for _, name in ipairs({ 'LabelBlindboxTitle', 'LabelBlindboxPity', 'LabelBlindboxResult',
       'BtnBlindboxSingle', 'BtnBlindboxTen', 'BtnBlindboxClose' }) do
       local node = env.nodes[name]
