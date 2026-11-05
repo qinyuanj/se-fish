@@ -247,7 +247,9 @@ describe('盲盒界面（ScreenBlindbox）', function()
       assert.is_nil(button.Color, name)
       assert.is_not_nil(button.ButtonNormalColor, name)
       local label = env.nodes[name .. 'Text']
-      assert.same({ x = 0, y = 0 }, label.Position, name .. ' text at parent origin')
+      -- 文字挂按钮父节点、与按钮同位同尺寸（EUIButton 下文字子节点不渲染）
+      assert.equal(button.Parent, label.Parent, name)
+      assert.same(button.Position, label.Position, name)
       assert.same(button.Size, label.Size, name)
       assert.same(1, label.TextHorizontalAlignment, name)
       assert.same(1, label.TextVerticalAlignment, name)

@@ -57,8 +57,9 @@ function Screen:Button(parent, name, x, y, w, h, text, onClick)
         ButtonNormalColor = Color.New(150, 80, 170, 255) })
     if not button then return nil end
     button.TouchEnabled = true
-    -- #174 #16：文字是按钮的子节点，按父（按钮）左下角原点放 (0,0)、与按钮同尺寸，水平垂直居中
-    local label = self:Create('EUITextLabel', button, name .. 'Text', 0, 0, w, h, {
+    -- #174 #16：EUIButton 下的文字子节点不渲染（试玩实测），ButtonText 也不出字；
+    -- 文字挂到按钮的父节点、与按钮同位同尺寸，ZOrder 盖在按钮上
+    local label = self:Create('EUITextLabel', parent, name .. 'Text', x, y, w, h, {
         Text = text, FontSize = 28, TextColor = Color.New(255, 255, 255, 255), LocalZOrder = 1 })
     if label then
         label.TextHorizontalAlignment = 1
