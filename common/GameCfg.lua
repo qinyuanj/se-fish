@@ -860,7 +860,7 @@ local AttackAnim = {
     Rifle = 'official://animation/24323',    -- 步枪开火
     Auto = 'official://animation/24324',     -- 机枪开火
     Rocket = 'official://animation/24325',   -- 手炮开火
-    Throw = 'official://animation/25860',    -- 投掷（蛋仔控制器动作组）
+    Throw = 'official://animation/26646',    -- 攻击（目录里的投掷类 25860、26649–26651 运行时加载长度为 0，试玩实测不播）
 }
 GameCfg.Ability = {
     -- 角色进图时实例化到角色下的技能背包预设

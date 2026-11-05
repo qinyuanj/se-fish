@@ -6,11 +6,11 @@
 local MARK = 'AAC172'
 local WINDOW = 45
 local WATCH = {
-  ['official://animation/20701'] = '空手', ['official://animation/20698'] = '指虎',
-  ['official://animation/20670'] = '匕首组', ['official://animation/20755'] = '斧组',
-  ['official://animation/20705'] = '手枪组', ['official://animation/20706'] = '霰弹与狙击',
-  ['official://animation/20707'] = '自动枪', ['official://animation/20708'] = '火箭筒',
-  ['official://animation/50'] = '投掷',
+  ['official://animation/24318'] = '空手', ['official://animation/24315'] = '指虎',
+  ['official://animation/24287'] = '匕首组', ['official://animation/24358'] = '斧组',
+  ['official://animation/24322'] = '手枪组', ['official://animation/24323'] = '霰弹与狙击',
+  ['official://animation/24324'] = '自动枪', ['official://animation/24325'] = '火箭筒',
+  ['official://animation/26646'] = '投掷',
 }
 local seen = {}
 local player = game:GetService('Players').LocalPlayer
