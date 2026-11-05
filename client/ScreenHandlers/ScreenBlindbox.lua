@@ -31,12 +31,17 @@ function Screen:Create(kind, parent, name, x, y, w, h, props)
     props.Name = name
     props.Position = Vector2.New(x, y)
     props.Size = Vector2.New(w, h)
+    -- #174 #17：Position 在父节点坐标系（左下原点、Y 向上）；Anchor 统一左下对齐，
+    -- 子节点按父左下角算坐标（引擎默认 Anchor=(0.5,0.5) 会让子节点中心对齐父左下角而溢出）
+    props.Anchor = Vector2.New(0, 0)
     local world = game:GetService('World')
     local ok, node = pcall(world.CreateUnit, world, kind, props)
     if not ok or not node then
         print('[ScreenBlindbox] 节点创建失败', name, tostring(node))
         return nil
     end
+    -- 部分节点类型不接受创建期 Anchor，补一次显式赋值
+    pcall(function() node.Anchor = Vector2.New(0, 0) end)
     if kind == 'EUITextLabel' then
         node.TouchEnabled = false
         node.SwallowTouchEnabled = false

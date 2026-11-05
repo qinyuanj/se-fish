@@ -267,6 +267,7 @@ describe('盲盒界面（ScreenBlindbox）', function()
       'BtnBlindboxSingle', 'BtnBlindboxTen', 'BtnBlindboxClose' }) do
       local node = env.nodes[name]
       assert.equal(panel, node.Parent, name)
+      assert.same({ x = 0, y = 0 }, node.Anchor, name .. ' anchor')
       assert.is_true(node.Position.x >= 0, name .. ' x>=0')
       assert.is_true(node.Position.y >= 0, name .. ' y>=0')
       assert.is_true(node.Position.x + node.Size.x <= panel.Size.x, name .. ' right')
