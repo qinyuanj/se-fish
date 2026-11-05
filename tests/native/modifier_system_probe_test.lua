@@ -170,6 +170,29 @@ describe("TestModifierProbe", function()
     end)
   end)
 
+  -- #177 失败方式：新版预设壳的「清除规则」默认击败后清除（RemoveMode=1），
+  -- 引擎死亡信号会顺带移除虚弱与控制；本图生死由 MgrSurvival 管理，效果只按业务规则清理。
+  it("test_engine_owner_death_signal_does_not_clear_effects", function()
+    business(function(e, mgr, player)
+      local world = e.game:GetService('World')
+      local create = world.CreateAsset
+      world.CreateAsset = function(self, key)
+        local units = create(self, key)
+        units[1]:SetAttribute('RemoveMode', 1)
+        return units
+      end
+      local died = { callbacks = {} }
+      function died:Connect(fn) self.callbacks[#self.callbacks + 1] = fn return { Disconnect = function() end } end
+      player.Character.Died = died
+      assert.is_true(mgr:Apply(nil, player, 'weak', 20))
+      assert.is_true(mgr:Apply(nil, player, 'paralyze', 5))
+      e.wait(2)
+      for _, fn in ipairs(died.callbacks) do fn() end
+      assert.are.equal(18, mgr:GetRemaining(player, 'weak'))
+      assert.is_true(mgr:IsControlled(player))
+    end)
+  end)
+
   it("test_business_death_rebuild_and_source_leave_do_not_keep_old_dot", function()
     business(function(e, mgr, player, hits)
       local source = { UserId = 2, Character = e.unit('source') }

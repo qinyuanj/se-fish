@@ -73,7 +73,7 @@ function TargetFilter.isValidTarget(handler, target, owner)
 	return true
 end
 
----获取施法范围内有效目标（根据 PointerType 执行不同形状的空间查询；空间查询未启用时返回空列表）
+---获取施法范围内有效目标（根据 PointerType 执行矩形 / 圆形 / 扇形区域查询）
 ---@param handler table AbilityItem handler 引用
 ---@param owner table 施法者 Unit
 ---@param height number 可选，查询高度（默认 10.0）
@@ -86,6 +86,7 @@ function TargetFilter.getValidTargetsInRange(handler, owner, height)
 	end
 
 	local World = game:GetService("World")
+	local PhysicsService = game:GetService("PhysicsService")
 	local pointerType = handler._getRawAttribute and handler._getRawAttribute("PointerType") or 0
 	local releasePoint = handler.getReleasePoint and handler.getReleasePoint()
 	local units = {}
@@ -97,36 +98,38 @@ function TargetFilter.getValidTargetsInRange(handler, owner, height)
 			or Vector3.New(0, 0, 1)
 		local length = handler._getRawAttribute and handler._getRawAttribute("ReleaseDistance")
 			or 10.0
-		local width = handler._getRawAttribute and handler._getRawAttribute("AffectWidth") or 2.0
-		local searchRadius = math.sqrt(length * length + width * width) * 0.5
+		local width = handler._getRawAttribute and handler._getRawAttribute("AffectWidth") or 1.0
 		local center = ownerPos + releaseDir * (length * 0.5)
-		local candidates = {} -- 空间查询未启用，候选列表留空
-		local faceRad = math.atan(releaseDir.x, releaseDir.z)
-		local cosA = math.cos(-faceRad)
-		local sinA = math.sin(-faceRad)
-		local halfLength = length * 0.5
-		local halfWidth = width * 0.5
-		for _, unit in ipairs(candidates or {}) do
-			local offset = unit.Position - center
-			local localX = offset.x * cosA - offset.z * sinA
-			local localZ = offset.x * sinA + offset.z * cosA
-			if math.abs(localX) <= halfWidth and math.abs(localZ) <= halfLength then
-				table.insert(units, unit)
-			end
-		end
+		local cf = CFrame.LookAlong(center, releaseDir, Vector3.New(0, 1, 0))
+		units = PhysicsService:GetPartBoundsInBox(cf, Vector3.New(width, height, length))
 	elseif pointerType == 2 then
 		-- Circle 圆形
-		local radius = handler._getRawAttribute and handler._getRawAttribute("ReleaseRadius") or 5.0
-		-- 空间查询未启用，units 保持空列表
+		local radius = handler._getRawAttribute and handler._getRawAttribute("ReleaseRadius") or 3.0
+		units = PhysicsService:GetPartBoundsInRadius(releasePoint or owner.Position, radius)
 	elseif pointerType == 3 then
 		-- Sector 扇形
-		local radius = handler._getRawAttribute and handler._getRawAttribute("ReleaseRadius") or 5.0
+		local radius = handler._getRawAttribute and handler._getRawAttribute("ReleaseRadius") or 3.0
 		local releaseDir = handler.getReleaseDirection and handler.getReleaseDirection()
 			or Vector3.New(0, 0, 1)
-		local faceRad = math.atan(releaseDir.x, releaseDir.z)
 		local centralAngle = handler._getRawAttribute and handler._getRawAttribute("SectorAngle")
 			or 90.0
-		-- 空间查询未启用，units 保持空列表
+		local ownerPos = owner.Position
+		local cosMin = math.cos(math.rad(centralAngle * 0.5))
+		local dirLen = math.sqrt(releaseDir.x * releaseDir.x + releaseDir.y * releaseDir.y + releaseDir.z * releaseDir.z)
+		units = {}
+		if dirLen > 0 then
+			local nx, ny, nz = releaseDir.x / dirLen, releaseDir.y / dirLen, releaseDir.z / dirLen
+			for _, unit in ipairs(PhysicsService:GetPartBoundsInRadius(ownerPos, radius)) do
+				local offset = unit.Position - ownerPos
+				local len = math.sqrt(offset.x * offset.x + offset.y * offset.y + offset.z * offset.z)
+				if len > 0 then
+					local dot = (offset.x * nx + offset.y * ny + offset.z * nz) / len
+					if dot >= cosMin then
+						table.insert(units, unit)
+					end
+				end
+			end
+		end
 	else
 		-- None / Parabola: 不进行范围查询
 		return validTargets

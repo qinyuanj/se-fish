@@ -38,6 +38,12 @@ function M.attach(abilityScript)
 			AbilityUIHooks.onInCDChange(abilityScript, newVal, cdFinishTime)
 		end)
 
+		abilityScript:GetAttributeChangedSignal("CdFinishTime"):Connect(function(newVal)
+			if newVal and newVal > 0 and abilityScript:GetAttribute("InCD") then
+				AbilityUIHooks.onInCDChange(abilityScript, true, newVal)
+			end
+		end)
+
 		-- 2. InCast 变化 → 施法指示器
 		abilityScript:GetAttributeChangedSignal("InCast"):Connect(function(newVal)
 			local castStartTime = abilityScript:GetAttribute("CastStartTime")
@@ -49,6 +55,19 @@ function M.attach(abilityScript)
 			local maxChargeCount = abilityScript:GetAttribute("MaxChargeCount")
 			AbilityUIHooks.onChargeCountChange(abilityScript, newVal, maxChargeCount)
 		end)
+
+		-- 3b. 充能开关/配置变化（运行时 SetChargeSkill 等）→ 充能 UI 刷新（含显示/隐藏切换）
+		local function fireChargeUIChange()
+			AbilityUIHooks.onChargeCountChange(
+				abilityScript,
+				abilityScript:GetAttribute("ChargeCount"),
+				abilityScript:GetAttribute("MaxChargeCount")
+			)
+		end
+		abilityScript:GetAttributeChangedSignal("IsChargeConsuming"):Connect(fireChargeUIChange)
+		abilityScript:GetAttributeChangedSignal("MaxChargeCount"):Connect(fireChargeUIChange)
+		abilityScript:GetAttributeChangedSignal("ChargeType"):Connect(fireChargeUIChange)
+		abilityScript:GetAttributeChangedSignal("ChargeInterval"):Connect(fireChargeUIChange)
 
 		-- 4. PointerType 变化 → 重建 Pointer 实例
 		abilityScript:GetAttributeChangedSignal("PointerType"):Connect(function(newVal)

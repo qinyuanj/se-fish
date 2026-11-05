@@ -120,6 +120,7 @@ local AnchorBehaviorLoaders = {
 	add_bind_diy_model = function() return require("server.packages.ability_system.anchors.add_bind_diy_model") end,
 	bungee_cord = function() return require("server.packages.ability_system.anchors.bungee_cord") end,
 	cast_face_target = function() return require("server.packages.ability_system.anchors.cast_face_target") end,
+	caster_add_buff = function() return require("server.packages.ability_system.anchors.caster_add_buff") end,
 	create_bullet_to_castangle = function() return require("server.packages.ability_system.anchors.create_bullet_to_castangle") end,
 	create_landmine = function() return require("server.packages.ability_system.anchors.create_landmine") end,
 	create_obstacle = function() return require("server.packages.ability_system.anchors.create_obstacle") end,

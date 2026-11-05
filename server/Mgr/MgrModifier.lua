@@ -76,6 +76,7 @@ function Mgr:Apply(source, target, kind, seconds)
         duration = duration, stackable = true, maxStackCount = cfg and cfg.MaxStacks or 1,
         stackCountStep = 1, stackCountMode = cfg and cfg.MaxStacks and 2 or 0,
         stackDurationMode = 1, sameSourceStack = false,
+        removeMode = 0,
         source = source and (source.Character or source), attrConfigs = {},
         obtainPerformanceList = {}, lostPerformanceList = {},
     })

@@ -73,6 +73,30 @@ local function _nextRandom(group)
 	return pick
 end
 
+-- 触发成员技能上的事件单位（技能被切换前 / 技能切换后）
+-- 事件单位由 ability_logic.Attach 在技能脚本下创建；未就绪（时序晚）时静默跳过
+local function _fireMemberEvent(member, event_name, ...)
+	if not member then
+		return
+	end
+	local script_unit = member.getScript and member.getScript()
+	if not script_unit then
+		return
+	end
+	local args = { ... }
+	local ok, signal = pcall(function()
+		return script_unit:FindFirstChild(event_name)
+	end)
+	if ok and signal then
+		local okFire, errFire = pcall(function()
+			signal:Fire(table.unpack(args, 1, #args))
+		end)
+		if not okFire then
+			print("[SubAbility] member event fire failed:", event_name, tostring(errFire))
+		end
+	end
+end
+
 -- 工厂：create
 
 -- 参数：
@@ -206,6 +230,8 @@ function SubAbilityHandler.create(
 			group._revertTimer = nil
 		end
 	end
+	group._startRevertTimer = start_revert_timer
+	group._cancelRevertTimer = cancel_revert_timer
 
 	_doSwitchTo = function(target_index, is_revert)
 		local old_handler = group.members[group.activeIndex]
@@ -214,23 +240,28 @@ function SubAbilityHandler.create(
 			return false
 		end
 
+		-- 技能被切换前：旧活跃成员广播（ECA「当 此类技能 被切换前」；参数=即将切入的技能）
+		_fireMemberEvent(
+			old_handler,
+			"SwitchBefore",
+			new_handler.getScript and new_handler.getScript() or nil
+		)
+
 		-- 槽位共享：经管理器 handler 换槽（服务端缓存/信号/客户端通知三合一）；
-		-- 被切下成员转休眠（-1 哨兵，不打断进行中的施法）。
-		-- manager handler 缺失时退化为纯属性交换。
+		-- 先释放旧成员（-1 哨兵）再换入新成员：保证任意瞬间至多一个成员持有
+		-- group.slotIndex，消除「双 S 瞬时态」下客户端按 Index 误绑旧成员；
+		-- 被切下成员转休眠不打断进行中的施法；manager 缺失时退化为纯属性交换。
 		if group.shareSlot then
 			local old_script = old_handler.getScript and old_handler.getScript()
 			local new_script = new_handler.getScript and new_handler.getScript()
+			if old_script then
+				old_script:SetAttribute("Index", AbilityConstants.SLOT_INDEX_UNASSIGNED)
+			end
 			if group._managerHandler and group._managerHandler.setSlotAbility then
 				if new_script then
 					group._managerHandler.setSlotAbility(group.slotIndex, new_script)
 				end
-				if old_script then
-					old_script:SetAttribute("Index", AbilityConstants.SLOT_INDEX_UNASSIGNED)
-				end
 			else
-				if old_script then
-					old_script:SetAttribute("Index", AbilityConstants.SLOT_INDEX_UNASSIGNED)
-				end
 				if new_script then
 					new_script:SetAttribute("Index", group.slotIndex)
 				end
@@ -248,6 +279,13 @@ function SubAbilityHandler.create(
 		group.signals.OnActivated:Fire(new_handler, target_index)
 
 		group.activeIndex = target_index
+
+		-- 技能切换后：新活跃成员广播（ECA「当 此类技能 切换后」；参数=上一技能）
+		_fireMemberEvent(
+			new_handler,
+			"Switched",
+			old_handler.getScript and old_handler.getScript() or nil
+		)
 
 		-- 组级切换通知：作者可听 OnSwitchNext（事件单位挂父脚本下）+ s→c 广播
 		--（UI 槽位跟随走 setSlotAbility 的 Removed/Added 通道，此通知仅为作者钩子/上层感知）
@@ -423,6 +461,7 @@ function SubAbilityHandler.create(
 			end
 		end)
 	end
+	group._bindDestroyCleanup = _bindDestroyCleanup
 	_bindDestroyCleanup(parentHandler)
 	for _, childHandler in ipairs(childHandlers or {}) do
 		_bindDestroyCleanup(childHandler)
@@ -449,6 +488,9 @@ function SubAbilityHandler.addChild(group, childHandler)
 		if child_script then
 			child_script:SetAttribute("Index", AbilityConstants.SLOT_INDEX_UNASSIGNED)
 		end
+	end
+	if group._bindDestroyCleanup then
+		group._bindDestroyCleanup(childHandler)
 	end
 	-- Shuffle 序列由 _nextShuffle 惰性逐轮重建，增删成员无需手动重洗
 	return true
@@ -498,15 +540,35 @@ function SubAbilityHandler.removeChild(group, childHandler)
 		group.activeIndex = group.activeIndex - 1
 	elseif was_active then
 		group.activeIndex = math.max(1, group.activeIndex - 1)
-		if group.shareSlot then
-			local new_active = group.members[group.activeIndex]
-			local new_active_script = new_active and new_active.getScript and new_active.getScript()
+		local new_active = group.members[group.activeIndex]
+		if group.shareSlot and new_active then
+			local new_active_script = new_active.getScript and new_active.getScript()
 			if
 				new_active_script
 				and group._managerHandler
 				and group._managerHandler.setSlotAbility
 			then
 				group._managerHandler.setSlotAbility(group.slotIndex, new_active_script)
+			end
+		end
+		if new_active then
+			if new_active.onActivate then
+				new_active.onActivate()
+			end
+			group.signals.OnActivated:Fire(new_active, group.activeIndex)
+			_fireMemberEvent(new_active, "Switched", removed_script)
+			group.signals.OnSwitchNext:Fire(new_active, group.activeIndex)
+			if group._managerHandler and group._managerHandler.notifySwitchNext then
+				group._managerHandler.notifySwitchNext(group.slotIndex, group.activeIndex)
+			end
+			if group.switchMode == AbilityConstants.SwitchMode.AfterCast and group.revertTime > 0 then
+				if group.activeIndex == 1 then
+					if group._cancelRevertTimer then
+						group._cancelRevertTimer()
+					end
+				elseif group._startRevertTimer then
+					group._startRevertTimer()
+				end
 			end
 		end
 	end

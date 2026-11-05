@@ -60,6 +60,48 @@ function AbilityManagerLogic.Attach(manager)
 		remoteEvent:FireAllClients(AbilityEventDefs.packServerPayload(action, ...))
 	end
 
+	-- 技能级事件触发（派发到技能脚本单位下的事件单位，供 ECA「当 此类技能」事件绑定）
+	-- 技能脚本 Attach 时序可能晚于管理器添加调用（World:CreateAsset 后脚本执行存在滞后），
+	-- 事件单位未就绪时有界重试等一等（最多 ~2s），避免「技能被获得」丢失。
+	local function fireAbilityEventWhenReady(abilityScript, eventName, ...)
+		if not abilityScript or not eventName then
+			return
+		end
+		local args = { ... }
+		local tries = 0
+		local function attempt()
+			local ok, signal = pcall(function()
+				return abilityScript:FindFirstChild(eventName)
+			end)
+			if ok and signal then
+				local okFire, errFire = pcall(function()
+					signal:Fire(table.unpack(args, 1, #args))
+				end)
+				if not okFire then
+					print("[AbilityManagerLogic] event fire failed:", eventName, tostring(errFire))
+				end
+				return
+			end
+			tries = tries + 1
+			if tries < 100 then
+				game:GetService("Task"):Delay(0.02, attempt)
+			end
+		end
+		attempt()
+	end
+
+	-- 「技能被获得」一次发放（同一技能实例在管理器生命周期内只发一次；
+	-- 子技能组切槽/切换重入不重发）
+	local obtainedSet = setmetatable({}, { __mode = "k" })
+
+	local function fireObtainedOnce(abilityScript)
+		if not abilityScript or obtainedSet[abilityScript] then
+			return
+		end
+		obtainedSet[abilityScript] = true
+		fireAbilityEventWhenReady(abilityScript, "Obtained", abilityScript)
+	end
+
 	-- handler 方法（暴露给 AbilityAPI、AbilityRegistry 反查）
 
 	local handler = {}
@@ -111,9 +153,10 @@ function AbilityManagerLogic.Attach(manager)
 		abilityScript:SetAttribute("OwnerId", manager:GetAttribute("OwnerId") or "")
 		abilities[slotIndex] = abilityScript
 
-		local abilityHandler = AbilityRegistry.getAbilityHandler(abilityScript)
 		signals.AbilityAdded:Fire(abilityScript, slotIndex)
 		notifyClients("AbilityAdded", abilityScript.UnitId, slotIndex)
+		-- 技能被获得（ECA「当 此类技能 被获得」）
+		fireObtainedOnce(abilityScript)
 		return true
 	end
 
@@ -124,8 +167,20 @@ function AbilityManagerLogic.Attach(manager)
 		end
 		abilities[slotIndex] = nil
 		signals.AbilityRemoved:Fire(abilityScript, slotIndex)
-		notifyClients("AbilityRemoved", slotIndex)
+		notifyClients("AbilityRemoved", slotIndex, abilityScript.UnitId)
 		return abilityScript
+	end
+
+	function handler.removeAbilityByScript(abilityScript)
+		if not abilityScript then
+			return nil
+		end
+		for slotIndex, script in pairs(abilities) do
+			if script == abilityScript then
+				return handler.removeAbility(slotIndex)
+			end
+		end
+		return nil
 	end
 
 	function handler.stopAbility(slotIndex)
@@ -181,13 +236,15 @@ function AbilityManagerLogic.Attach(manager)
 		abilities[slotIndex] = abilityScript
 		if old then
 			signals.AbilityRemoved:Fire(old, slotIndex)
-			notifyClients("AbilityRemoved", slotIndex)
+			notifyClients("AbilityRemoved", slotIndex, old.UnitId)
 		end
 		if abilityScript then
 			abilityScript:SetAttribute("Index", slotIndex)
 			abilityScript:SetAttribute("OwnerId", manager:GetAttribute("OwnerId") or "")
 			signals.AbilityAdded:Fire(abilityScript, slotIndex)
 			notifyClients("AbilityAdded", abilityScript.UnitId, slotIndex)
+			-- 首次上位（休眠子技能首次进入槽位）视为被获得；切换重入不重发
+			fireObtainedOnce(abilityScript)
 		end
 		return true
 	end
@@ -220,8 +277,8 @@ function AbilityManagerLogic.Attach(manager)
 
 	-- 初始技能配置（InitAbilities）
 	-- 作者在编辑器配置的初始技能列表：{ AssetId = 技能预设URI, Index = 槽位 }。
-	-- 角色生成后自动把这些技能装备到对应槽位；
-	-- AddAbility 对空 AssetId 与已占用槽位均安全（幂等，不覆盖既有技能）。
+	-- 角色生成后自动把这些技能装备到对应槽位；空 AssetId 跳过；
+	-- 指定槽位已占用时为覆盖语义：同预设复用现有实例，不同预设先移除旧技能再装配。
 	local function tryInitAbilities()
 		local initAbilities = nil
 		local ok, val = pcall(function()
@@ -298,7 +355,7 @@ function AbilityManagerLogic.Attach(manager)
 		Task:Delay(0.1, retryResolve)
 	end
 
-	tryInitAbilities()
+	Task:Delay(0, tryInitAbilities)
 
 	-- 注：客户端施法请求（Cast/BreakCast 等 c→s 监听）由 api.lua 的
 	-- RegisterEvents() 统一分发（模块加载时自动注册），本模块不再重复监听。
@@ -328,10 +385,11 @@ function AbilityManagerLogic.Attach(manager)
 		if AbilityRegistry.hasTag(child, AbilityConstants.Tag.AbilityUnit) then
 			-- 拿 child 的 Index attribute（如果作者在场景里设了）
 			local childIndex = child:GetAttribute("Index")
-			if childIndex and not abilities[childIndex] then
+			if childIndex and childIndex >= AbilityConstants.SLOT_BASE and not abilities[childIndex] then
 				abilities[childIndex] = child
 				signals.AbilityAdded:Fire(child, childIndex)
 				notifyClients("AbilityAdded", child.UnitId, childIndex)
+				fireObtainedOnce(child)
 			elseif not childIndex then
 				-- 没设 Index，自动找空槽
 				local freeSlot = AbilityUtils.getFirstAvailableSlot(
@@ -343,6 +401,7 @@ function AbilityManagerLogic.Attach(manager)
 					abilities[freeSlot] = child
 					signals.AbilityAdded:Fire(child, freeSlot)
 					notifyClients("AbilityAdded", child.UnitId, freeSlot)
+					fireObtainedOnce(child)
 				end
 			end
 		end

@@ -9,8 +9,20 @@
 - 回灌前先确认工作区已提交。部署前确认需要保留的宿主包修改已回灌，避免被仓库覆盖。
 - 部署收尾执行 validate → 有差异时 push → diff 复核。push 后复核失败、离线、无 changelist 或仍有差异均返回失败；三端内本地已删的地图文件随 `--delete --yes` 删除，三端外的地图独有文件只提示保留，两类混杂时不推送。
 - 包内没有版本号、变更记录或来源 URL，升级以整包导入为准，替换后 diff 三端子树确认改动面。
+- 升级来源用官方资源包空图（新建空图导入四个包后的宿主目录）：三端 `packages/<包>/` 按原始字节整包覆盖并删除旧包多余文件；不走 `sync --packages`，它以本图宿主为源。2026-11-05 的全量升级与逐包差异摘要见 [GitHub #177](https://github.com/qinyuanj/se-fish/issues/177)。
 - 业务层直接 require 对应端的包内 `api.lua`；不在上一层复制导出名单、拍平 `Funcs` 或逐函数转发。属性和 AI 包使用原生 `Funcs` 函数表，`Enums` / `Configs` / `Prefabs` 保持包内结构。升级后通过真实包回归核对调用契约（属性：`attr_migration_test.lua`、`attr_rule_probe_test.lua`；效果：`modifier_system_probe_test.lua`；AI 与技能桥：`ai_migration_test.lua`、`official_ai_probe_test.lua`）。
 - `server/AbilityAPI.lua` 仅保留本图业务：施法守卫、体型、挂点与锚点补挂。需要守卫的业务施法继续调用它；装配、停止和查询技能直接调用包。锚点行为所需的管理器由 `server/main.lua` 通过 `BehaviorServices` 注入，行为不反向加载 `server.Mgr`。AI 位移生命周期查询由 `MgrAi` 持有，不另建 AI 转发入口。挥砍登记由 `server/SwingRegistry.lua` 独立持有，武器入口与近战行为共同依赖它。
+
+## 新版包的默认行为（2026-11-05 版）
+
+以下行为随 #177 升级进来，业务依赖它们时以此为准：
+
+- **效果清除规则**：效果预设壳新增「清除规则」`RemoveMode`，默认 `1`（击败后清除），拥有者触发引擎死亡信号时移除效果。本图生死由 `MgrSurvival` 管理，`MgrModifier` 获得效果时显式传 `removeMode = 0`，保持旧包「死亡不清效果」的行为。
+- **效果阻断与打断**：预设的 `ForbidTags` 命中已有效果时获得结果为 `Blocked`，`RemoveTags` 会移除带对应标签的已有效果；本图预设未配置这两项。`MgrModifier` 把 `Added` / `Reobtained` 以外的结果都当失败处理。
+- **效果状态栏 UI**：客户端效果管理器启动后自动拉起 `ui/EffectStatusBarUI`，按 `UIType=EffectStatusBar` 或节点名「效果状态栏」找界面节点。本图没有这个节点，界面不显示；循环每 0.5 秒重查一次，约 30 秒后打一条「未找到可用的效果状态栏」提示，属预期。
+- **技能覆盖装配**：`AddAbility` 指定的槽位被另一预设占用时，旧包返回失败，新包先移除旧技能再装配。本图初始技能与鱼技能各占一个槽位，不触发覆盖。
+- **客户端施法竞态守卫**：包内 `CastAbility` 新增末参数 `fromClient`，只有包自带的客户端施法请求传 `true`；`server/AbilityAPI.lua` 的守卫转发不传，行为与旧包一致。
+- ECA（两个包的 `eca.lua`）、技能 `event_bridge.lua` 与 `common/.../enums.lua` 随包进来，本图未接入；锚点 `caster_add_buff` 按惯例在 `AnchorBehaviorLoaders` 登记，未配置使用。
 
 ## 导入不可逆
 
@@ -24,23 +36,18 @@
 
 ## 引擎 bootstrap 钩子
 
-2026-11-05 实测发现：引擎在 `unit_scripts/World/__OfficialPackageBootstrap__.lua` 生成启动脚本，新建空图里也有。据生成文件，它对列表里的 `server.packages.<包名>.bootstrap` 做 `pcall(require)`，再按函数名排序依次调用表里的函数。本图的列表只有 `modifier_system`（`sdk_extend` 已于 2026-10-09 删除）；空图的列表是 `modifier_system`、`sdk_extend`。引擎从哪个版本开始生成这份脚本未查证，宿主日志里这条报错 2026-11-05 才首次出现。
+2026-11-05 实测发现：引擎在 `unit_scripts/World/__OfficialPackageBootstrap__.lua` 生成启动脚本，新建空图里也有。据生成文件，它对列表里的 `server.packages.<包名>.bootstrap` 做 `pcall(require)`，再按函数名排序依次调用表里的函数。本图的列表只有 `modifier_system`（`sdk_extend` 已于 2026-10-09 删除）；空图的列表是 `modifier_system`、`sdk_extend`。`ability_system` 没有 bootstrap。
 
-本图导入的 `modifier_system`（2026-10-08，#153）里没有 `bootstrap.lua`；缺这个文件时，每次试玩服务端都会报 `module not found`。仓库因此补了一个返回空表的 `server/packages/modifier_system/bootstrap.lua`（#176），没有函数可调，行为与缺文件时相同。`tests/native/official_package_bootstrap_test.lua` 保证它可加载且不含启动函数。
-
-官方新版（2026-11-05 在空图导入后读到）带 `bootstrap.lua`，导出 4 个启动函数：为全部蛋仔预建「即将获得效果」事件单位、为编辑器预放置的效果预建事件信号、为仍生效的预放置效果补发一次「获得」事件、监听新出现的蛋仔补建事件单位。这些服务于 ECA 绑定和预放置效果；本图业务只经 `api` 调用效果系统，不用 ECA，也没有预放置效果，旧包又会在触发时按需建事件单位，所以空钩子不缺功能。新版 bootstrap 属于整包升级的一部分（三端多个文件改动，另有 `eca.lua` 与客户端 `ui/`），不单独拷入旧包。
-
-- 整包升级后以官方 `bootstrap.lua` 为准，跑上文的真实包回归测试，并按新文件改写该测试。
-- 回灌来源的包仍没有它时，`sync --packages` 会把这个空钩子当作多余文件删掉。回灌后要恢复它，再提交。
+旧包（2026-10-08，#153）缺 `bootstrap.lua`，试玩服务端报 `module not found`，#176 曾补过一个返回空表的钩子。#177 整包升级后改用官方 `bootstrap.lua`，导出 4 个启动函数：为全部蛋仔预建「即将获得效果」事件单位、为编辑器预放置的效果预建事件信号、为仍生效的预放置效果补发一次「获得」事件、监听新出现的蛋仔补建事件单位。前两个会遍历 World 全部后代，并在服务端日志打出 `[modifier_system] ensure scan: total=… eggy=…` 与 `ensure modifier events: total=… modifier=…`。本图不用 ECA，也没有预放置效果，这些函数只做预建，不改变业务调用效果系统的结果。`tests/native/official_package_bootstrap_test.lua` 保证它可加载，且导出的启动函数清单与官方一致。
 
 ## 包清单
 
 | 包 | 用途 | 导入时间 | 真实包接口 |
 |---|---|---|---|
-| `ability_system` | 技能系统 | 2026-09-19（commit `9382ad8`） | `server.packages.ability_system.api`、`client.packages.ability_system.api`，函数平铺 |
-| `attr_rule` | 属性规则 | 2026-10-08（#153） | `server.packages.attr_rule.api`、`client.packages.attr_rule.api`，函数在 `Funcs`，另有 `Enums` / `Prefabs` |
-| `modifier_system` | 效果（Buff）系统 | 2026-10-08（#153） | `server.packages.modifier_system.api`、`client.packages.modifier_system.api`，函数平铺 |
-| `official_ai_feature` | 生物 AI | 2026-10-08（#153） | `server.packages.official_ai_feature.api`，函数在 `Funcs`，另有 `Configs`；client 侧无 api.lua |
+| `ability_system` | 技能系统 | 2026-09-19（commit `9382ad8`），2026-11-05 升级（#177） | `server.packages.ability_system.api`、`client.packages.ability_system.api`，函数平铺 |
+| `attr_rule` | 属性规则 | 2026-10-08（#153），2026-11-05 复核与官方一致（#177） | `server.packages.attr_rule.api`、`client.packages.attr_rule.api`，函数在 `Funcs`，另有 `Enums` / `Prefabs` |
+| `modifier_system` | 效果（Buff）系统 | 2026-10-08（#153），2026-11-05 升级（#177） | `server.packages.modifier_system.api`、`client.packages.modifier_system.api`，函数平铺 |
+| `official_ai_feature` | 生物 AI | 2026-10-08（#153），2026-11-05 复核与官方一致（#177） | `server.packages.official_ai_feature.api`，函数在 `Funcs`，另有 `Configs`；client 侧无 api.lua |
 
 `win_rule` 于 2026-10-09 从宿主删除并经回灌移除，删除前未接入业务聚合入口或正式结算。原包有结算枚举遮蔽（[GitHub #58](https://github.com/qinyuanj/se-fish/issues/58)）及未结算玩家离开后缺少全员结算重判（[GitHub #59](https://github.com/qinyuanj/se-fish/issues/59)）的问题。删除不代表缺陷已修复，重新引入须取得官方修正版并验证结算与玩家离开时序。
 

@@ -37,6 +37,14 @@ function HoldStrategy:TryCast()
 	if not ctrl._ability then
 		return
 	end
+	-- 充能次数耗尽：结束本次持续施法交互（停循环并收掉界面残留）
+	if ctrl.HasCastableCharge and not ctrl:HasCastableCharge() then
+		self:Cancel()
+		if ctrl.CancelInteraction then
+			ctrl:CancelInteraction()
+		end
+		return
+	end
 	-- 简单检查 CD（服务端也会检查，客户端预判减少请求）
 	if not ctrl._ability:GetAttribute("InCD") then
 		local owner = ctrl:GetOwner()
@@ -57,6 +65,15 @@ function HoldStrategy:OnTouchEnd(eventData)
 
 	local ctrl = self.ctrl
 	ctrl:_requestStop()
+end
+
+-- 外部强制取消（如按钮被禁用）：停止持续施法循环；不打断服务端进行中的施法
+function HoldStrategy:Cancel()
+	self.isHolding = false
+	if self.timer then
+		game:GetService("Task"):Cancel(self.timer)
+		self.timer = nil
+	end
 end
 
 function HoldStrategy:Destroy()

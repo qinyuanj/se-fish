@@ -25,6 +25,13 @@ local _accumulateNode = nil -- 蓄力进度共享节点缓存（单例，不与�
 local _hooksInjected = false
 local _pendingRetries = {} -- {[abilityIndex] = { ability=abilityScript, remaining=N }}
 
+-- 单位是否为本机玩家当前操控的单位（技能栏归属判定）
+local function isLocalUnit(unit)
+	local player = game:GetService("Players").LocalPlayer
+	local character = player and player.Character
+	return unit ~= nil and character ~= nil and unit == character
+end
+
 -- 单例 / 生命周期
 
 ---@param unit Unit 本地玩家角色（或其下的 AbilityManager）
@@ -162,7 +169,12 @@ function UIManager.InjectHooks()
 		-- 技能移除 → 解绑 UI
 		onAbilityRemoved = function(managerScript, slotIndex)
 			local um = UIManager.GetInstance()
-			if um then
+			if not um then
+				return
+			end
+			local controller = um.controllers[slotIndex]
+			local manager = controller and controller._manager
+			if manager == nil or manager == managerScript then
 				um:UnBindAbility(slotIndex)
 			end
 		end,
@@ -244,6 +256,9 @@ end
 -- 绑定 / 解绑
 
 function UIManager:SetManager(managerScript)
+	if not isLocalUnit(managerScript and managerScript.Parent) then
+		return
+	end
 	self.manager = managerScript
 	Controller.SetUIManager(self)
 end
@@ -255,6 +270,11 @@ function UIManager:BindAbility(abilityScript)
 	local index = abilityScript:GetAttribute("Index")
 	-- 未入槽哨兵（< SLOT_BASE）不参与绑定，也不进入重试循环
 	if not index or index < AbilityConstants.SLOT_BASE then
+		return
+	end
+	local manager = abilityScript.Parent
+	if not isLocalUnit(manager and manager.Parent) then
+		self:_ScheduleRetry(abilityScript, index)
 		return
 	end
 	if self.controllers[index] ~= nil then
@@ -279,13 +299,30 @@ function UIManager:BindAbility(abilityScript)
 
 	AbilitySlot.Attach(node)
 
-local delayTimer = nil
-    delayTimer = game:GetService("Task"):Delay(0.033, function()
-        local presetLink = abilityScript:FindFirstChildWhichIsA("PresetLink")
-        local icon = (presetLink and presetLink:GetAttribute("PrefabIcon")) or abilityScript:GetAttribute("Icon")
-        EuiAdapter.SetImage(node, icon or nil)
-        game:GetService("Task"):Cancel(delayTimer)
-    end)
+	game:GetService("Task"):Delay(0.033, function()
+		local icon = nil
+		local ok, children = pcall(function()
+			return abilityScript:GetChildren()
+		end)
+		if ok and children then
+			for _, child in ipairs(children) do
+				local okIs, isLink = pcall(function()
+					return child:IsA("PresetLink")
+				end)
+				if okIs and isLink then
+					local okAttr, v = pcall(function()
+						return child:GetAttribute("PrefabIcon")
+					end)
+					if okAttr and v and v ~= "" then
+						icon = v
+						break
+					end
+				end
+			end
+		end
+		icon = icon or abilityScript:GetAttribute("Icon")
+		EuiAdapter.SetImage(node, icon)
+	end)
 
 	-- 显示主节点并开启触摸
 	EuiAdapter.SetVisible(node, true)
@@ -358,11 +395,21 @@ end
 -- 仅清掉节点侧的本地状态（Lua 定时器等），防止残留空转。
 function UIManager:ResetBindings()
 	for index, controller in pairs(self.controllers) do
-		self:_CancelRetry(index)
-		if controller and controller._node then
-			AbilitySlot.Cleanup(controller._node)
+		local manager = controller and controller._manager
+		if not isLocalUnit(manager and manager.Parent) then
+			self:_CancelRetry(index)
+			if controller and controller._node then
+				AbilitySlot.Cleanup(controller._node)
+			end
+			self.controllers[index] = nil
 		end
-		self.controllers[index] = nil
+	end
+	if not self._accumulateOwner then
+		return
+	end
+	local ownerManager = self._accumulateOwner.Parent
+	if isLocalUnit(ownerManager and ownerManager.Parent) then
+		return
 	end
 	-- 共享蓄力节点复位（旧技能已销毁，驱动者作废）
 	self._accumulateOwner = nil
@@ -376,6 +423,10 @@ end
 
 -- 显示蓄力进度：记录驱动者 + 起表（后触发的蓄力直接覆盖显示）
 function UIManager:ShowAccumulate(abilityScript, startTime)
+	local manager = abilityScript and abilityScript.Parent
+	if not isLocalUnit(manager and manager.Parent) then
+		return
+	end
 	local node = self:_EnsureAccumulateNode()
 	if not node then
 		return
@@ -400,6 +451,19 @@ function UIManager:HideAccumulate(abilityScript)
 	end
 end
 
+-- 服务端蓄力被打断（OnAccumulateEnd 广播）：收掉该技能按触交互
+-- （指示器/拖拽指示/取消区）+ 蓄力进度显示（供广播分发方调用）
+function UIManager:CancelAccumulateInteraction(abilityScript)
+	if not abilityScript then
+		return
+	end
+	local controller = self:_FindControllerByAbility(abilityScript)
+	if controller and controller.CancelInteraction then
+		controller:CancelInteraction()
+	end
+	self:HideAccumulate(abilityScript)
+end
+
 -- 按 abilityScript 反查 controller
 function UIManager:_FindControllerByAbility(abilityScript)
 	for _, controller in pairs(self.controllers) do
@@ -416,10 +480,14 @@ local _RETRY_INTERVAL = 0.1 -- 秒
 local _RETRY_MAX_ATTEMPTS = 20 -- 最多 2 秒
 
 function UIManager:_ScheduleRetry(abilityScript, index)
-	if _pendingRetries[index] then
+	local pending = _pendingRetries[index]
+	if pending and pending.ability == abilityScript then
 		return
 	end
 	_pendingRetries[index] = { ability = abilityScript, remaining = _RETRY_MAX_ATTEMPTS }
+	if pending then
+		return
+	end
 	self:_RunRetryLoop(index)
 end
 
@@ -437,7 +505,15 @@ function UIManager:_RunRetryLoop(index)
 
 		-- 技能已不存在或已被替换
 		local ability = entry.ability
-		local currentIndex = ability and ability.GetAttribute and ability:GetAttribute("Index")
+		local currentIndex = nil
+		if ability and ability.GetAttribute then
+			local okIdx, idx = pcall(function()
+				return ability:GetAttribute("Index")
+			end)
+			if okIdx then
+				currentIndex = idx
+			end
+		end
 		if currentIndex ~= index then
 			_pendingRetries[index] = nil
 			return

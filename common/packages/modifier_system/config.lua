@@ -8,6 +8,7 @@ config.CreateResult = {
 	Added = "added",
 	Reobtained = "reobtain",
 	Rejected = "rejected",
+	Blocked = "blocked", -- 被「阻断标签」命中，先到先得
 	Failed = "failed",
 }
 
@@ -31,6 +32,7 @@ config.Attr = {
 	CharMtg = "CharMtg",
 	IsPaused = "IsPaused",
 	EndTime = "EndTime",
+	TotalDuration = "TotalDuration",
 	ModifierKey = "ModifierKey",
 }
 
@@ -63,6 +65,12 @@ config.ModifierType = {
 	Beneficial = 0,
 	Harmful = 1,
 	Neutral = 2,
+}
+
+-- 清除规则，与预设壳 RemoveMode 枚举一致
+config.RemoveMode = {
+	None = 0,
+	OnDie = 1,
 }
 
 -- 表现类型：区分获得/失去表现的不同形式

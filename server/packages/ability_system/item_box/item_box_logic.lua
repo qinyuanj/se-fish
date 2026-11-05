@@ -3,9 +3,10 @@
 -- 用法：在技能预设下挂一个子 Script 节点，SourceCode 贴同目录 item_box_shell.lua；
 --       不需要道具箱表现的技能不挂该子节点即可，本组件完全可选。
 -- 约定：属性一律 abilityScript:GetAttribute(...)；定时用 Task:Delay；
---       摘 UI 用 abilityScript:SetAttribute("Index", nil)；销毁用 abilityScript:Destroy()。
+--       摘 UI 用 abilityScript:SetAttribute("Index", SLOT_INDEX_UNASSIGNED)；销毁用 abilityScript:Destroy()。
 
 local AbilityConstants = require("common.packages.ability_system.constants")
+local AbilityRegistry = require("common.packages.ability_system.registry")
 
 local ItemBoxLogic = {}
 
@@ -242,7 +243,7 @@ function ItemBoxLogic.Attach(script)
 		end
 	end
 
-	-- 挂点：与锚点 add_bind_diy_model 的 SocketType 默认值一致（Enums.SkeletalSocketType.Origin）
+	-- 挂点：语义挂点 key 与物理挂点名均可（"origin" 为角色骨架物理挂点）
 	local HEAD_SOCKET = "origin"
 
 	-- 反射值可能是 Vector3，也可能是裸表 {x,y,z} / {0,0,0}，统一成三个数字
@@ -288,8 +289,9 @@ function ItemBoxLogic.Attach(script)
 		local World = game:GetService("World")
 
 		-- 骨骼挂点 + 资产（world_extend 公开通道在 SE 沙盒不可用，挂点方案同 melee_hit）
-		local ok, modelOrErr, mountOrErr = pcall(function()
-			local mount = World:CreateUnit("SkeletalSocketMount", {
+		local mount = nil
+		local ok, modelOrErr = pcall(function()
+			mount = World:CreateUnit("SkeletalSocketMount", {
 				Name = "ItemBoxMount_" .. tostring(ownerUnit.UnitId),
 				Parent = ownerUnit,
 				SocketName = HEAD_SOCKET,
@@ -298,14 +300,15 @@ function ItemBoxLogic.Attach(script)
 				SocketRotation = math.Quaternion(math.rad(rx), math.rad(ry), math.rad(rz)),
 			})
 			if not mount then
-				return nil, nil
+				return nil
 			end
 
 			local assets = World:CreateAsset(prefab)
 			local unit = assets and assets[1]
 			if not unit then
 				pcall(function() mount:Destroy() end)
-				return nil, nil
+				mount = nil
+				return nil
 			end
 
 			unit.Parent = mount
@@ -316,10 +319,13 @@ function ItemBoxLogic.Attach(script)
 			if unit.CanTouch ~= nil then unit.CanTouch = false end
 			if unit.CanTrigger ~= nil then unit.CanTrigger = false end
 			if unit.CanQuery ~= nil then unit.CanQuery = false end
-			return unit, mount
+			return unit
 		end)
 		if not ok then
 			print("[item_box] _bindHeadComponent ERROR:", modelOrErr)
+			if mount then
+				pcall(function() mount:Destroy() end)
+			end
 			return
 		end
 		if not modelOrErr then
@@ -327,7 +333,7 @@ function ItemBoxLogic.Attach(script)
 			return
 		end
 		_bindModel = modelOrErr
-		_bindMount = mountOrErr
+		_bindMount = mount
 
 		-- 头顶组件仅作展示，不应参与物理碰撞（避免顶到天花板/挡角色/被其他物理体推动）
 		_disableCollisionDeep(_bindModel)
@@ -362,7 +368,65 @@ function ItemBoxLogic.Attach(script)
 
 	-- 状态切换
 
-	local function _enterHoldState()
+	-- 入槽瞬间技能管理器可能还没挂到角色上（父链是无效占位单位），
+	-- 此时建出来的挂点/模型挂在占位单位下永远不可见；等父链就绪后再绑。
+	local _enterHoldState -- 前向声明：重试回调需要
+	local _holdRetryTimer = nil
+	local _holdRetryCount = 0
+	local HOLD_RETRY_INTERVAL = 0.5
+	local HOLD_RETRY_MAX = 60 -- 0.5s × 60 = 最多等 30s
+	local INVALID_UNIT_ID = 4294967294 -- 0xFFFFFFFE：引擎无效单位哨兵
+
+	local function _isOwnerReady(ownerUnit)
+		if not ownerUnit then
+			return false
+		end
+		local okc, ctrl = pcall(function()
+			return ownerUnit.Controller
+		end)
+		if not okc or not ctrl or not ctrl.GetState then
+			return false
+		end
+		local oks, state = pcall(function()
+			return ctrl:GetState()
+		end)
+		if not oks or state == nil then
+			return false
+		end
+		local oku, uid = pcall(function()
+			return ownerUnit.UnitId
+		end)
+		if oku and uid ~= nil and (uid == 0 or uid == INVALID_UNIT_ID) then
+			return false
+		end
+		return true
+	end
+
+	local function _cancelHoldRetry()
+		if _holdRetryTimer then
+			local Task = game:GetService("Task")
+			Task:Cancel(_holdRetryTimer)
+			_holdRetryTimer = nil
+		end
+		_holdRetryCount = 0
+	end
+
+	local function _scheduleHoldRetry()
+		if _holdRetryTimer or _holdRetryCount >= HOLD_RETRY_MAX then
+			return
+		end
+		_holdRetryCount = _holdRetryCount + 1
+		if _holdRetryCount == 1 or _holdRetryCount % 10 == 0 then
+			print("[item_box] _enterHoldState WAIT: owner not ready, retry=", _holdRetryCount)
+		end
+		local Task = game:GetService("Task")
+		_holdRetryTimer = Task:Delay(HOLD_RETRY_INTERVAL, function()
+			_holdRetryTimer = nil
+			_enterHoldState()
+		end)
+	end
+
+	_enterHoldState = function()
 		if not _hasCharges() then
 			print(
 				"[item_box] _enterHoldState SKIPPED: no charges (ChargeCount=",
@@ -371,6 +435,11 @@ function ItemBoxLogic.Attach(script)
 			)
 			return
 		end
+		if not _isOwnerReady(_getOwner()) then
+			_scheduleHoldRetry()
+			return
+		end
+		_cancelHoldRetry()
 		_playAnim(HoldAnimId, true, true)
 		_bindHeadComponent()
 	end
@@ -391,6 +460,8 @@ function ItemBoxLogic.Attach(script)
 		end
 	end
 
+	local _destroyed = false
+
 	local function _cancelPendingDestroy()
 		if _pendingDestroyTimer then
 			local Task = game:GetService("Task")
@@ -399,40 +470,47 @@ function ItemBoxLogic.Attach(script)
 		end
 	end
 
-	-- 摘 UI：把技能本体的 Index attribute 置 nil 触发客户端 AttributeChangedSignal，
+	-- 摘 UI：把技能本体的 Index 置为未入槽哨兵（-1）触发客户端 AttributeChangedSignal，
 	-- uiManager:UnBindAbility 立刻解绑技能槽位图标。幂等。
 	local function _hideSkillIcon()
 		if not abilityScript then
 			return
 		end
-		if abilityScript:GetAttribute("Index") == nil then
+		local cur = abilityScript:GetAttribute("Index")
+		if cur == nil or cur < AbilityConstants.SLOT_BASE then
 			return
 		end
-		print(
-			"[item_box] _hideSkillIcon: was Index=",
-			tostring(abilityScript:GetAttribute("Index"))
-		)
-		abilityScript:SetAttribute("Index", nil)
+		print("[item_box] _hideSkillIcon: was Index=", tostring(cur))
+		abilityScript:SetAttribute("Index", AbilityConstants.SLOT_INDEX_UNASSIGNED)
 	end
 
 	-- 延时 DestroyDelay 后真正销毁技能本体 ScriptUnit（重复调度幂等）。
 	-- 摘 UI 由 _hideSkillIcon 先于本函数调用，否则图标会等 Destroy 时才消失。
 	-- 不能用 manager:removeAbility（会同步打断 cast）。
 	local function _scheduleDelayedDestroy(reason)
-		if _pendingDestroyTimer then
+		if _destroyed or _pendingDestroyTimer then
 			return
 		end
 		print("[item_box] _scheduleDelayedDestroy: reason=", reason, "delay=", DestroyDelay, "s")
 		local Task = game:GetService("Task")
 		_pendingDestroyTimer = Task:Delay(DestroyDelay, function()
 			_pendingDestroyTimer = nil
+			if _destroyed or not abilityScript then
+				return
+			end
+			_destroyed = true
 			print(
 				"[item_box] delayed destroy fired, Destroy abilityScript=",
 				tostring(abilityScript)
 			)
-			if abilityScript then
-				abilityScript:Destroy()
-			end
+			pcall(function()
+				local manager = abilityScript.Parent
+				local managerHandler = manager and AbilityRegistry.getManagerHandler(manager)
+				if managerHandler and managerHandler.removeAbilityByScript then
+					managerHandler.removeAbilityByScript(abilityScript)
+				end
+			end)
+			abilityScript:Destroy()
 		end)
 	end
 
@@ -473,6 +551,7 @@ function ItemBoxLogic.Attach(script)
 				end
 			elseif count <= 0 then
 				_cancelPostPlaceTimer()
+				_cancelHoldRetry()
 				-- 若箱子还顶着（如外部改 ChargeCount 触发的场景），放下箱子。
 				if _bindModel then
 					_exitHoldState()
@@ -491,6 +570,9 @@ function ItemBoxLogic.Attach(script)
 
 	-- 入槽：进入持有态 + 监听充能
 	local function _onAbilityAdded()
+		if _bindModel then
+			return
+		end
 		print(
 			"[item_box] OnAbilityAdded owner=",
 			_ownerInfo(_getOwner()),
@@ -511,6 +593,7 @@ function ItemBoxLogic.Attach(script)
 		local placeAnim = _getAttr("PlaceAnimId", DEF.PlaceAnimId)
 		print("[item_box] OnCastStart owner=", _ownerInfo(_getOwner()), "PlaceAnimId=", placeAnim)
 		_cancelPostPlaceTimer()
+		_cancelHoldRetry()
 		-- 非充能技能：cast 一开始就摘 UI，让玩家点击瞬间感知图标消失；
 		-- 真正销毁推迟到 CastEnd（_scheduleDelayedDestroy + 50s）等放置动画演完
 		if not _isChargeable() then
@@ -524,8 +607,12 @@ function ItemBoxLogic.Attach(script)
 
 	-- CastEnd：可充能技能 0.3s 后回持有态；非充能技能延时销毁
 	local function _onCastEnd()
+		if _destroyed then
+			return
+		end
 		_cancelPostPlaceTimer()
 		if not _isChargeable() then
+			_cancelHoldRetry()
 			_scheduleDelayedDestroy("non-chargeable, one-shot done")
 			return
 		end
@@ -541,6 +628,7 @@ function ItemBoxLogic.Attach(script)
 	local function _onAbilityRemoved()
 		print("[item_box] OnAbilityRemoved")
 		_cancelPostPlaceTimer()
+		_cancelHoldRetry()
 		_cancelPendingDestroy()
 		_disconnectChargeWatch()
 		_exitHoldState()
@@ -614,11 +702,6 @@ function ItemBoxLogic.Attach(script)
 		if sig then
 			_indexConn = _trackConn(sig:Connect(function(newVal)
 				if newVal and newVal >= AbilityConstants.SLOT_BASE then
-					-- 一次生效后断开，避免重复初始化
-					if _indexConn then
-						_indexConn:Disconnect()
-						_indexConn = nil
-					end
 					_tryInitOnIndexSet()
 				end
 			end))
@@ -642,16 +725,66 @@ function ItemBoxLogic.Attach(script)
 		end))
 	end
 
+	-- 「技能移除」：监听管理器 AbilityRemoved 事件单位（挂在 manager 下）
+	-- removeAbility / setSlotAbility 只摘槽位不 Destroy，仅靠上面的 Destroying 会漏掉。
+
+	local managerScript = abilityScript and abilityScript.Parent
+
+	local _managerRemovedConnected = false
+	local _managerRemovedPending = nil
+
+	local function _connectManagerRemoved()
+		if _managerRemovedConnected or not managerScript then
+			return
+		end
+		if not managerScript.FindFirstChild then
+			return
+		end
+		local removedSignal = managerScript:FindFirstChild("AbilityRemoved")
+		if not removedSignal then
+			return
+		end
+		_managerRemovedConnected = true
+		if _managerRemovedPending then
+			_managerRemovedPending:Disconnect()
+			_managerRemovedPending = nil
+		end
+		_trackConn(removedSignal:Connect(function(removedAbility, slotIndex)
+			if removedAbility ~= abilityScript then
+				return
+			end
+			local ok2, err = pcall(_onAbilityRemoved)
+			if not ok2 then
+				print("[item_box] AbilityRemoved ERROR:", err)
+			end
+		end))
+		print("[item_box] manager AbilityRemoved connected")
+	end
+
+	if managerScript and managerScript.FindFirstChild then
+		if managerScript:FindFirstChild("AbilityRemoved") then
+			_connectManagerRemoved()
+		elseif managerScript.ChildAdded then
+			_managerRemovedPending = managerScript.ChildAdded:Connect(_connectManagerRemoved)
+			_connectManagerRemoved() -- 连接建立后再补查一次，防竞态
+		end
+	end
+
 	-- 销毁清理（回收 timer / conn / 组件）
 
 	script.Destroying:Connect(function()
 		print("[item_box] Destroying clean up")
 		_cancelPostPlaceTimer()
+		_cancelHoldRetry()
 		_cancelPendingDestroy()
 		_disconnectChargeWatch()
 		if _hostEventsPending then
 			_hostEventsPending:Disconnect()
 			_hostEventsPending = nil
+		end
+		if _managerRemovedPending then
+			_managerRemovedPending:Disconnect()
+			_managerRemovedPending = nil
 		end
 		if _indexConn then
 			_indexConn:Disconnect()

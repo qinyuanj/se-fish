@@ -115,8 +115,16 @@ function SubAbilityPlugin.OnAbilityReady(abilityScript)
 		if #child_scripts == 0 then
 			return
 		end
+		local function cleanupChildren()
+			for _, child in ipairs(child_scripts) do
+				pcall(function()
+					child:Destroy()
+				end)
+			end
+		end
 		if not _waitHandlers(abilityScript, child_scripts) then
 			print("[SubAbilityPlugin] 子技能组未就绪，跳过: " .. tostring(abilityScript))
+			cleanupChildren()
 			return
 		end
 
@@ -129,6 +137,7 @@ function SubAbilityPlugin.OnAbilityReady(abilityScript)
 			end
 		end
 		if not parent_handler or #child_handlers == 0 then
+			cleanupChildren()
 			return
 		end
 

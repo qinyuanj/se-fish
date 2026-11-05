@@ -38,10 +38,13 @@ AbilityEventDefs.ClientAction = {
 
 -- s→c 服务端可推的 action
 -- OnSwitchNext 契约：args = { ownerUnitId, slotIndex, newActiveIndex }（子技能组切换广播，客户端按归属过滤）
+-- OnAccumulateEnd 契约：args = { abilityUnitId, broken }（broken=true 表示未转施法，客户端据此收掉按触交互）
+--   模式：单事件 + broken 标志（本地 signals 为 End 必发 / Break 额外发，广播收敛为一条）
 AbilityEventDefs.ServerAction = {
 	OnCastStart = "OnCastStart",
 	OnCastEnd = "OnCastEnd",
 	OnCastBreak = "OnCastBreak",
+	OnAccumulateEnd = "OnAccumulateEnd",
 	OnCDEnd = "OnCDEnd",
 	OnCharge = "OnCharge",
 	OnSwitchNext = "OnSwitchNext",

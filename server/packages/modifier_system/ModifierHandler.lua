@@ -3,6 +3,7 @@
 --配置动态读取：每次从效果单位属性取值，保证拿到覆盖后的最新配置。
 
 local TimerService = game:GetService("TimerService")
+local TagService = game:GetService("TagService")
 
 local config = require("common.packages.modifier_system.config")
 local eventDefs = require("common.packages.modifier_system.event_defs")
@@ -40,12 +41,42 @@ local function getAttrRuleFunc(methodName)
 	return func
 end
 
+-- 标签列表上限，超出部分忽略
+local MAX_TAG_COUNT = 10
+
+---归一化标签类列表配置：仅保留非空字符串，trim 后按序去重，超上限截断
+---@param raw any 原始配置值
+---@return string[] 归一化标签列表
+local function normalizeTagList(raw)
+	if type(raw) ~= "table" then
+		return {}
+	end
+	local result = {}
+	local seen = {}
+	for _, tag in ipairs(raw) do
+		if type(tag) == "string" then
+			local trimmed = tag:match("^%s*(.-)%s*$")
+			if trimmed ~= "" and not seen[trimmed] then
+				if #result >= MAX_TAG_COUNT then
+					print("[modifier_system] tag list exceeds max size, extra tags ignored")
+					break
+				end
+				seen[trimmed] = true
+				table.insert(result, trimmed)
+			end
+		end
+	end
+	return result
+end
+
 ---效果处理器：单个效果实例的服务端状态与行为
 ---@class ModifierHandler
 ---@field unit Unit 效果实体单位，脚本直接运行在效果单位上
 ---@field manager SModifierSystemManager 服务端效果管理器
 ---@field private _source Unit? 效果来源单位，动态创建时注入，可空
 ---@field private _destroyHandled boolean 销毁收尾是否已执行，幂等保护
+---@field private _ownerDeathConns table? 拥有者死亡信号连接集合
+---@field private _ownerDeathHandled boolean 拥有者死亡清理是否已执行
 ---@field signals table<string, Unit> 效果级事件单位集合
 ---@field state table 权威状态，含激活/层数/倒计时/材质/暂停/Buff句柄/叠加组件
 local ModifierHandler = {}
@@ -61,10 +92,13 @@ function ModifierHandler.new(modifierUnit, manager)
 	self.manager = manager
 	self._source = nil
 	self._destroyHandled = false
+	self._ownerDeathConns = nil
+	self._ownerDeathHandled = false
 	self.signals = eventDefs.createModifierSignals(modifierUnit)
 	self.state = {
 		isActive = false,
 		endTime = 0,
+		totalDuration = 0,
 		obtainTime = 0,
 		currCount = 0,
 		charMtg = 0,
@@ -82,6 +116,7 @@ function ModifierHandler.new(modifierUnit, manager)
 	modifierUnit:SetAttribute(Attr.CharMtg, 0)
 	modifierUnit:SetAttribute(Attr.IsPaused, false)
 	modifierUnit:SetAttribute(Attr.EndTime, 0)
+	modifierUnit:SetAttribute(Attr.TotalDuration, 0)
 	manager:addTag(modifierUnit, config.Tag.ModifierUnit)
 	manager:registerModifierHandler(modifierUnit, self)
 	modifierUnit.Destroying:Connect(function()
@@ -147,6 +182,31 @@ function ModifierHandler:getModifierKey()
 	return ""
 end
 
+---获取「打断规则」配置：本效果获得时，移除拥有这些标签的既有实例
+---@return string[] 打断规则标签列表
+function ModifierHandler:getRemoveTags()
+	return normalizeTagList(self:_getListConf("RemoveTags"))
+end
+
+---获取「阻断规则」配置：本效果获得时，已有实例拥有这些标签则拒绝
+---@return string[] 阻断规则标签列表
+function ModifierHandler:getForbidTags()
+	return normalizeTagList(self:_getListConf("ForbidTags"))
+end
+
+---判断本效果单位是否拥有指定标签
+---@param tag string 标签
+---@return boolean 是否拥有
+function ModifierHandler:hasTag(tag)
+	if type(tag) ~= "string" or tag == "" then
+		return false
+	end
+	local ok, has = pcall(function()
+		return TagService:HasTag(self.unit, tag)
+	end)
+	return ok and has == true
+end
+
 ---是否处于激活状态
 ---@return boolean 是否激活
 function ModifierHandler:isActive()
@@ -190,10 +250,25 @@ function ModifierHandler:getModifierType()
 	return self:_getScalarConf("UgcModifierType", config.ModifierType.Neutral)
 end
 
----获取效果描述
+---获取清除规则，取值见 config.RemoveMode
+---@return number 清除规则
+function ModifierHandler:getRemoveMode()
+	local raw = self:_getScalarConf("RemoveMode", config.RemoveMode.None)
+	return tonumber(raw) or config.RemoveMode.None
+end
+
+---获取效果描述：属性为空时回退到效果单位自身的 Desc（即预设根节点的描述字段）
 ---@return string 描述
 function ModifierHandler:getDesc()
-	return self:_getScalarConf("ModifierDesc", "")
+	local value = self:_getScalarConf("ModifierDesc", "")
+	if value ~= nil and value ~= "" then
+		return value
+	end
+	local desc = self.unit.Desc
+	if type(desc) == "string" and desc ~= "" then
+		return desc
+	end
+	return ""
 end
 
 ---获取效果图标资源路径
@@ -202,10 +277,18 @@ function ModifierHandler:getIcon()
 	return self:_getScalarConf("Icon", "")
 end
 
----获取效果名称
+---获取效果名称：属性为空时回退到效果单位自身的 Name（即预设根节点的名称字段）
 ---@return string 名称
 function ModifierHandler:getName()
-	return self:_getScalarConf("Name", "")
+	local value = self:_getScalarConf("Name", "")
+	if value ~= nil and value ~= "" then
+		return value
+	end
+	local name = self.unit.Name
+	if type(name) == "string" and name ~= "" then
+		return name
+	end
+	return ""
 end
 
 ---通知所有客户端，附带 ownerUnitId 供客户端过滤；消息体以 unitId 定位实例
@@ -214,6 +297,68 @@ end
 function ModifierHandler:_notify(action, ...)
 	local ownerUnitId = self.unit.Parent and self.unit.Parent.UnitId or 0
 	self.manager:notifyClients(ownerUnitId, action, ...)
+end
+
+---绑定拥有者死亡清理；仅 RemoveMode=OnDie 且拥有者存在死亡信号时生效
+function ModifierHandler:_bindOwnerDeath()
+	if self._ownerDeathHandled or self._ownerDeathConns then
+		return
+	end
+	if self:getRemoveMode() ~= config.RemoveMode.OnDie then
+		return
+	end
+	local owner = self:getOwner()
+	if not owner then
+		return
+	end
+	local controller = owner.Controller
+	local diedSignal = controller and controller.Died or owner.Died
+	local stateChanged = controller and controller.StateChanged
+	if not diedSignal and not stateChanged then
+		return
+	end
+	local conns = {}
+	if diedSignal then
+		table.insert(conns, diedSignal:Connect(function()
+			self:_onOwnerDied()
+		end))
+	end
+	if stateChanged then
+		table.insert(conns, stateChanged:Connect(function(_, newState)
+			if newState == Enums.ControllerStateType.Dead then
+				self:_onOwnerDied()
+			end
+		end))
+	end
+	self._ownerDeathConns = conns
+end
+
+---解除拥有者死亡信号监听
+function ModifierHandler:_unbindOwnerDeath()
+	local conns = self._ownerDeathConns
+	if not conns then
+		return
+	end
+	self._ownerDeathConns = nil
+	for _, conn in ipairs(conns) do
+		pcall(function()
+			conn:Disconnect()
+		end)
+	end
+end
+
+---拥有者死亡：按 OnDie 规则移除本效果
+function ModifierHandler:_onOwnerDied()
+	if self._ownerDeathHandled then
+		return
+	end
+	self._ownerDeathHandled = true
+	self:_unbindOwnerDeath()
+	local owner = self:getOwner()
+	local container = owner and self.manager:getContainer(owner)
+	if container then
+		self.manager:removeModifierWithLoss(container, self.unit)
+	end
 end
 
 ---激活效果：设激活态、按当前层数应用属性修改、计算材质、启动倒计时、初始化叠加组件
@@ -260,12 +405,14 @@ function ModifierHandler:onObtain()
 		self.state.currCount,
 		self.state.charMtg
 	)
+	self:_bindOwnerDeath()
 	return true
 end
 
 ---失活效果：设失活态、回滚属性修改、清材质、取消倒计时、销毁叠加组件
 ---被 _onDurationFinish / removeModifierWithLoss 触发
 function ModifierHandler:onLoss()
+	self:_unbindOwnerDeath()
 	if not self.state.isActive then
 		return
 	end
@@ -317,13 +464,22 @@ end
 function ModifierHandler:_setupMaxDuration()
 	local duration = tonumber(self:_getScalarConf("Duration", config.DEFAULT_DURATION)) or 0
 	if duration > 0 then
-		self:_setEndTime(util.getServerTime() + duration)
+		-- 暂停中重置：按暂停基准对齐剩余时间且不创建倒计时，恢复时统一重建
+		local baseTime = util.getServerTime()
+		if self.state.isPaused then
+			baseTime = self.state.pauseTime
+		end
+		self:_setEndTime(baseTime + duration)
+		self:_setTotalDuration(duration)
 		self:_cancelRemoveTimer()
-		self.state.removeTimer = TimerService:CreateTimer(1, duration, false, function()
-			self:_onDurationFinish()
-		end)
+		if not self.state.isPaused then
+			self.state.removeTimer = TimerService:CreateTimer(1, duration, false, function()
+				self:_onDurationFinish()
+			end)
+		end
 	else
 		self:_setEndTime(-1)
+		self:_setTotalDuration(0)
 	end
 end
 
@@ -359,6 +515,7 @@ function ModifierHandler:_ensureEndTimeCovers(targetEndTime)
 	end
 	if self.state.endTime < targetEndTime then
 		self:_setEndTime(targetEndTime)
+		self:_setTotalDuration(math.max(self.state.totalDuration, self:getRemainingTime()))
 		self:_rebuildTimerFromEndTime()
 	end
 end
@@ -410,6 +567,15 @@ function ModifierHandler:_setEndTime(value)
 	self.unit:SetAttribute(config.Attr.EndTime, value)
 end
 
+---TotalDuration 单一写入口：更新权威状态并同步实体属性；
+---累计总时长 = 初始 Duration + 各次叠加延长的累加量，客户端状态栏进度环按
+---"剩余时间/总时长"显示，叠加延长时总时长须同步推进
+---@param value number 累计总时长，单位秒
+function ModifierHandler:_setTotalDuration(value)
+	self.state.totalDuration = value
+	self.unit:SetAttribute(config.Attr.TotalDuration, value)
+end
+
 ---暂停效果：记暂停起始时刻、取消倒计时、暂停叠加计时器
 function ModifierHandler:pause()
 	if self.state.isPaused then
@@ -456,7 +622,16 @@ function ModifierHandler:extendDuration(extra)
 	if self.state.endTime <= 0 then
 		return
 	end
-	self:_setEndTime(self.state.endTime + (tonumber(extra) or 0))
+	extra = tonumber(extra) or 0
+	local newEndTime = self.state.endTime + extra
+	if newEndTime <= 0 then
+		-- 缩短量超过剩余倒计时：按立即到期处理，避免负值落入"永久"语义区间
+		self:_onDurationFinish()
+		return
+	end
+	self:_setEndTime(newEndTime)
+	-- 累计总时长同步推进：进度环按"剩余/总时长"计算，总时长须覆盖叠加延长后的剩余时间
+	self:_setTotalDuration(math.max(self.state.totalDuration + extra, self:getRemainingTime()))
 	if not self.state.isPaused then
 		self:_rebuildTimerFromEndTime()
 	end
@@ -470,6 +645,8 @@ function ModifierHandler:setRemainingTime(remaining)
 		return
 	end
 	remaining = math.max(0, tonumber(remaining) or 0)
+	-- 设剩余时间可能大于当前累计总时长（加长场景），总时长至少覆盖剩余时间
+	self:_setTotalDuration(math.max(self.state.totalDuration, remaining))
 	if self.state.isPaused then
 		self:_setEndTime(self.state.pauseTime + remaining)
 	else
@@ -739,6 +916,7 @@ function ModifierHandler:_onDestroying()
 		return
 	end
 	self._destroyHandled = true
+	self:_unbindOwnerDeath()
 	-- 防御：清理未消费的动态来源注入，正常路径已在注册时消费
 	self.manager:clearPendingSourceOverride(self.unit)
 	-- 补偿：激活态下被直接销毁 → 触发失活，回滚属性 / 事件 / 客户端通知

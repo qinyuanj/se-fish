@@ -99,8 +99,17 @@ local ModifierLostPerformanceInfo = {
 	SoundDistance = 10,
 }
 
+---快捷键效果：数字键列表项，第 N 项对应数字键 N，值为效果预设
+---@export_struct
+---@title 效果预设
+---@field AssetId String 效果预设 style:AssetResource unit_types:["modifier"]
+local HotkeyEffect = {
+	AssetId = "",
+}
+
 return {
 	ModifierAttrConfig = ModifierAttrConfig,
 	ModifierObtainPerformanceInfo = ModifierObtainPerformanceInfo,
 	ModifierLostPerformanceInfo = ModifierLostPerformanceInfo,
+	HotkeyEffect = HotkeyEffect,
 }

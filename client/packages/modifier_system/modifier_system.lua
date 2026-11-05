@@ -29,6 +29,7 @@ end
 ---@field private _luaTags table<number, string[]> Lua 层单位标记，引擎标记组件不可用时的回退
 ---@field private _attachedModifiers table 已注册实体，幂等重入保护
 ---@field private _remoteEvent RemoteEvent 跨端事件通道，客户端实例
+---@field private _detachedReady boolean 常驻资源脱管引导是否已建立
 local CModifierSystemManager = {}
 CModifierSystemManager.__index = CModifierSystemManager
 
@@ -41,8 +42,31 @@ function CModifierSystemManager.new()
 	self._luaTags = {}
 	self._attachedModifiers = setmetatable({}, { __mode = "k" })
 	self._remoteEvent = RemoteEvent.New(config.CHANNEL_NAME)
-	self:_bindRemoteEvent()
+	self:_ensureDetachedInit()
 	return self
+end
+
+---建立常驻资源脱管引导（幂等）：跨端订阅与状态栏刷新循环创建在无归属上下文中，
+---避免随首个 require 本模块的效果脚本销毁被连带回收；引导跳约一帧后异步执行，
+---丢失（引导脚本先于触发被销毁）时，由后续注册调用本方法补挂
+function CModifierSystemManager:_ensureDetachedInit()
+	if self._detachedReady then
+		return
+	end
+	util.runDetached(function()
+		if self._detachedReady then
+			return
+		end
+		self._detachedReady = true
+		self:_bindRemoteEvent()
+		-- UI 软启动：拉起效果状态栏（可选能力；模块缺失或失败不影响效果系统本体）
+		local okUI, errUI = pcall(function()
+			require("client.packages.modifier_system.ui.EffectStatusBarUI").ensureStarted(self)
+		end)
+		if not okUI then
+			print("[modifier_system][UI] 状态栏 UI 启动失败：" .. tostring(errUI))
+		end
+	end)
 end
 
 ---订阅服务端推送：按拥有者 UnitId 分发到各容器
@@ -79,6 +103,7 @@ function CModifierSystemManager:getContainer(ownerUnit)
 	end
 	local container = self._containers[ownerUnit.UnitId]
 	if container then
+		self:_bindRegisteredModifiers(container)
 		return container
 	end
 	container = {
@@ -89,6 +114,7 @@ function CModifierSystemManager:getContainer(ownerUnit)
 	}
 	self._containers[ownerUnit.UnitId] = container
 	self:_bindOwnerChildren(container)
+	self:_bindRegisteredModifiers(container)
 	ownerUnit.Destroying:Connect(function()
 		-- 拥有者销毁时清理容器
 		self._containers[ownerUnit.UnitId] = nil
@@ -118,6 +144,23 @@ function CModifierSystemManager:_bindOwnerChildren(container)
 	for _, child in ipairs(ownerUnit:GetChildren()) do
 		if self:_isModifierChild(child) then
 			self:_bindModifier(container, child)
+		end
+	end
+end
+
+---补绑已注册但未进入容器的效果处理器，覆盖 ChildAdded 早于处理器注册的场景
+---@param container table 容器
+function CModifierSystemManager:_bindRegisteredModifiers(container)
+	local ownerUnit = container.owner
+	for unitId, handler in pairs(self._modifiers) do
+		local modifierUnit = handler and handler.unit
+		if modifierUnit and not container.slots[unitId] then
+			local ok, ownerUnitId = pcall(function()
+				return modifierUnit:GetAttribute("OwnerUnitId")
+			end)
+			if ok and tonumber(ownerUnitId) == ownerUnit.UnitId then
+				self:_bindModifier(container, modifierUnit)
+			end
 		end
 	end
 end
@@ -219,8 +262,21 @@ function CModifierSystemManager:_bindModifier(container, child)
 	if not slot.maxStackCount then
 		slot.maxStackCount = readAttribute("MaxStackCount", config.DEFAULT_MAX_STACK_COUNT)
 	end
+	-- 展示字段补读（覆盖首个实例推送先于容器就绪被丢弃、重连/晚加入场景）：
+	-- 属性为空时回退效果实体自身的 Name/Desc（预设根节点字段，随实体复制），与推送侧口径一致
+	if not slot.name then
+		slot.name = readAttribute("Name", "")
+		if slot.name == "" then
+			local name = child.Name
+			slot.name = type(name) == "string" and name or ""
+		end
+	end
 	if not slot.desc then
 		slot.desc = readAttribute("ModifierDesc", "")
+		if slot.desc == "" then
+			local desc = child.Desc
+			slot.desc = type(desc) == "string" and desc or ""
+		end
 	end
 	-- 真销毁清理通道 1：引擎销毁复制触发 Destroying，与 OnModifierRemoved 消息通道互为兜底，
 	-- 解绑幂等，双通道都触发时第二次为 no-op；ChildRemoved 不作为清理依据
@@ -250,11 +306,18 @@ function CModifierSystemManager:registerModifier(modifierUnit)
 	if RunService:IsServer() then
 		return
 	end
+	-- 补挂脱管引导（幂等）：引导跳丢失时随注册重试建立
+	self:_ensureDetachedInit()
 	if self._attachedModifiers[modifierUnit] then
 		return
 	end
 	self._attachedModifiers[modifierUnit] = true
 	ClientModifierHandler.new(modifierUnit, self)
+	local ownerUnitId = modifierUnit:GetAttribute("OwnerUnitId")
+	local container = ownerUnitId and self._containers[ownerUnitId] or nil
+	if container then
+		self:_bindModifier(container, modifierUnit)
+	end
 end
 
 ---按 unitId 从拥有者子节点反查客户端处理器

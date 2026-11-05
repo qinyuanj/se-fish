@@ -11,6 +11,7 @@ local M = {}
 
 -- 幂等标记：防止重复 attach
 local _attachedManager = nil
+local _remoteConnection = nil -- 广播分发连接句柄（重挂/重生时断开旧连接，防闭包残留）
 
 -- attach：把客户端监听挂到 manager 上
 ---@param manager ScriptUnit AbilityManager（character 的子节点）
@@ -40,6 +41,11 @@ function M.attach(manager)
 		if um then
 			um:ResetBindings()
 		end
+	end
+	-- 断开上一 manager 的广播分发连接（防重生后旧闭包对每条广播空转）
+	if _remoteConnection and _remoteConnection.Disconnect then
+		_remoteConnection:Disconnect()
+		_remoteConnection = nil
 	end
 
 	_attachedManager = manager
@@ -104,6 +110,11 @@ function M.attach(manager)
 		local controller = um.controllers[slotIndex]
 		if controller and controller._node then
 			local AbilitySlot = require("client.packages.ability_system.ui.nodes.AbilitySlot")
+			if isForbid and controller.CancelInteraction then
+				-- 禁用/置灰时强制收掉进行中的按触交互（指示器/拖拽态/取消区）：
+				-- 触控关闭后本次触控序列收不到 OnTouchEnded，不主动清理会残留瞄准特效
+				controller:CancelInteraction()
+			end
 			AbilitySlot.SetForbidden(
 				controller._node,
 				isForbid and true or false,
@@ -112,10 +123,75 @@ function M.attach(manager)
 		end
 	end
 
+	-- 蓄力结束/打断广播（服务端触发，如 ECA「打断技能蓄力」）：broken=true 时收掉
+	-- 该技能本地进行中的按触交互（指示器/拖拽指示/取消区），并作废本次触控序列——
+	-- 后续松开不再补发施法请求（本次使用已判定未转施法）
+	local function _handleAccumulateEnd(abilityUnitId, broken)
+		if not broken or not abilityUnitId then
+			return
+		end
+		-- manager 存活预检（重生后旧 manager 的残留闭包仍会被广播触发）
+		if not manager or not manager.Parent then
+			return
+		end
+		local um = UIManager.GetInstance()
+		if not um or not um.controllers then
+			return
+		end
+		local ok, children = pcall(function()
+			return manager:GetChildren()
+		end)
+		if not ok or not children then
+			return
+		end
+		for _, child in ipairs(children) do
+			if child.UnitId == abilityUnitId then
+				-- 收口统一封装在 UIManager（按触交互 + 蓄力进度节点）
+				if um.CancelAccumulateInteraction then
+					um:CancelAccumulateInteraction(child)
+				end
+				return
+			end
+		end
+	end
+
+	local function reconcileSlot(slotIndex)
+		if slotIndex == nil then
+			return
+		end
+		local bound = abilities[slotIndex]
+		if bound then
+			local ok, idx = pcall(function()
+				return bound:GetAttribute("Index")
+			end)
+			if ok and idx ~= slotIndex then
+				AbilityUIHooks.onAbilityRemoved(manager, slotIndex)
+				abilities[slotIndex] = nil
+			end
+		end
+		if abilities[slotIndex] then
+			AbilityUIHooks.onAbilityAdded(manager, abilities[slotIndex], slotIndex)
+			return
+		end
+		for _, child in ipairs(manager:GetChildren()) do
+			if isAbilityChild(child) then
+				local okIdx, idx = pcall(function()
+					return child:GetAttribute("Index")
+				end)
+				if okIdx and idx == slotIndex then
+					bindAbility(child, slotIndex)
+					return
+				end
+			end
+		end
+	end
+
 	-- OnClientEvent 分发（s→c 通知）
 	-- 载荷：{ action = ..., args = {...} }（单参数契约）
 
-	remoteEvent.OnClientEvent:Connect(function(payload)
+	local _handleFullSnapshot
+
+	_remoteConnection = remoteEvent.OnClientEvent:Connect(function(payload)
 		local action
 		local args = {}
 		if type(payload) == "table" and payload.action then
@@ -143,33 +219,47 @@ function M.attach(manager)
 		elseif action == AbilityEventDefs.ServerAction.ForbidSlot then
 			-- 槽位禁用/启用广播：args = { unitId, slotIndex, isForbid, grayout }
 			_handleForbidSlot(args[1], args[2], args[3], args[4])
+		elseif action == AbilityEventDefs.ServerAction.OnAccumulateEnd then
+			-- 蓄力结束/打断广播：args = { abilityUnitId, broken }（打断时收掉本地按触交互）
+			_handleAccumulateEnd(args[1], args[2])
 		elseif action == AbilityEventDefs.ServerAction.FullSnapshot then
 			local playerId, abilityStates = args[1], args[2]
 			_handleFullSnapshot(playerId, abilityStates)
 		elseif action == "AbilityAdded" then
-			-- server 通知新 ability 入场（ChildAdded 之外的兜底通道）
+			-- server 通知新 ability 入场（ChildAdded 之外的兜底通道）。
+			-- 无条件收敛：属性复制可能晚于通知到达，mirror 残留旧成员时不能整段跳过；
+			-- 按 unitId 优先匹配目标成员，与当前绑定不一致时强制重绑
 			local abilityUnitId, slotIndex = args[1], args[2]
-			if abilities[slotIndex] then
-				return
-			end
+			local found = nil
 			for _, child in ipairs(manager:GetChildren()) do
-				if
-					child.UnitId == abilityUnitId
-					or (
-						AbilityRegistry.hasTag(child, AbilityConstants.Tag.AbilityUnit)
-						and child:GetAttribute("Index") == slotIndex
-					)
-				then
-					bindAbility(child, slotIndex)
+				if child.UnitId == abilityUnitId then
+					found = child
 					break
 				end
 			end
+			if not found then
+				for _, child in ipairs(manager:GetChildren()) do
+					if child:GetAttribute("Index") == slotIndex then
+						found = child
+						break
+					end
+				end
+			end
+			if found and abilities[slotIndex] ~= found then
+				-- 强制重绑（UIManager.BindAbility 内部会替换槽位上不匹配的旧 controller）
+				abilities[slotIndex] = nil
+				bindAbility(found, slotIndex)
+			else
+				reconcileSlot(slotIndex)
+			end
 		elseif action == "AbilityRemoved" then
-			local slotIndex = args[1]
-			if abilities[slotIndex] then
+			local slotIndex, removedUnitId = args[1], args[2]
+			local current = abilities[slotIndex]
+			if current and (not removedUnitId or current.UnitId == removedUnitId) then
 				AbilityUIHooks.onAbilityRemoved(manager, slotIndex)
 				abilities[slotIndex] = nil
 			end
+			reconcileSlot(slotIndex)
 		elseif action == "AbilityMoved" then
 			local fromIndex, toIndex = args[1], args[2]
 			if abilities[fromIndex] then
@@ -177,6 +267,8 @@ function M.attach(manager)
 				abilities[fromIndex] = nil
 				abilities[toIndex] = abilityScript
 			end
+			reconcileSlot(fromIndex)
+			reconcileSlot(toIndex)
 		end
 		-- 其余 action（OnCastStart/OnCastEnd/OnCharge 等）由 ability_local_script
 		-- 的 reactive 属性绑定驱动 UI，无需在此处理
@@ -185,17 +277,23 @@ function M.attach(manager)
 	-- FastCatch 全量快照
 
 	function _handleFullSnapshot(playerId, abilityStates)
-		for i = 1, #abilities do
-			abilities[i] = nil
+		for k in pairs(abilities) do
+			abilities[k] = nil
 		end
+		local used = {}
 		for _, state in ipairs(abilityStates or {}) do
 			for _, child in ipairs(manager:GetChildren()) do
-				if
-					child.UnitId == state.unitId
-					or AbilityRegistry.hasTag(child, AbilityConstants.Tag.AbilityUnit)
-				then
-					bindAbility(child, state.slotIndex)
-					break
+				if not used[child] then
+					local matched = (state.unitId ~= nil and child.UnitId == state.unitId)
+						or (
+							state.unitId == nil
+							and AbilityRegistry.hasTag(child, AbilityConstants.Tag.AbilityUnit)
+						)
+					if matched then
+						used[child] = true
+						bindAbility(child, state.slotIndex)
+						break
+					end
 				end
 			end
 		end
@@ -204,11 +302,13 @@ function M.attach(manager)
 	-- 子节点监听
 	-- ChildAdded 触发时 Index attribute 可能未同步，等 Index 就绪后再绑
 
-	manager.ChildAdded:Connect(function(child)
+	-- 追踪单个子单位：已入槽直接绑；休眠（Index=-1）挂监听等待入槽后绑
+	local function watchAbilityChild(child)
+		if not child then
+			return
+		end
 		local function tryBind()
 			local slotIndex = child:GetAttribute("Index")
-			-- Index<SLOT_BASE（-1 未入槽哨兵）是初始化中间态，
-			-- 等待同步到真实槽位再绑
 			if not slotIndex or slotIndex < AbilityConstants.SLOT_BASE then
 				return false
 			end
@@ -236,12 +336,18 @@ function M.attach(manager)
 		-- 兜底：等 Posted（Index 通常已同步）
 		if child.Posted then
 			child.Posted:Connect(function()
-				if not tryBind() then
-					game:GetService("Task"):Wait(0.1)
-					tryBind()
+				if tryBind() then
+					return
 				end
+				game:GetService("Task"):Delay(0.1, function()
+					tryBind()
+				end)
 			end)
 		end
+	end
+
+	manager.ChildAdded:Connect(function(child)
+		watchAbilityChild(child)
 	end)
 
 	manager.ChildRemoved:Connect(function(child)
@@ -265,16 +371,7 @@ function M.attach(manager)
 		end)
 		if ok and children then
 			for _, child in ipairs(children) do
-				if isAbilityChild(child) then
-					local slotIndex = child:GetAttribute("Index")
-					if
-						slotIndex
-						and slotIndex >= AbilityConstants.SLOT_BASE
-						and not abilities[slotIndex]
-					then
-						bindAbility(child, slotIndex)
-					end
-				end
+				watchAbilityChild(child)
 			end
 		end
 	end

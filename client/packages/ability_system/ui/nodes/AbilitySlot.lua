@@ -369,7 +369,28 @@ function AbilitySlot.UpdateChargeUI(node, chargeCount, chargeConfig)
 	end
 
 	if not st.isChargeConsuming then
+		-- 充能关闭（或运行时被关闭）：隐藏充能相关子节点
+		if st.ChargeBackground then
+			EuiAdapter.SetVisible(st.ChargeBackground, false)
+		end
+		if st.ChargeProgressTimer then
+			EuiAdapter.SetVisible(st.ChargeProgressTimer, false)
+		end
+		if st.ChargeCount then
+			EuiAdapter.SetVisible(st.ChargeCount, false)
+		end
 		return
+	end
+
+	-- 充能开启：确保充能相关子节点可见（运行时 SetChargeSkill 打开充能时需补显）
+	if st.ChargeBackground then
+		EuiAdapter.SetVisible(st.ChargeBackground, true)
+	end
+	if st.ChargeProgressTimer and st.chargeType ~= 0 then
+		EuiAdapter.SetVisible(st.ChargeProgressTimer, true)
+	end
+	if st.ChargeCount then
+		EuiAdapter.SetVisible(st.ChargeCount, true)
 	end
 
 	local oldCount = st.chargeCount
@@ -384,29 +405,36 @@ function AbilitySlot.UpdateChargeUI(node, chargeCount, chargeConfig)
 	end
 
 	if st.ChargeProgressTimer then
+		-- 不充能（无自动充能策略）：进度条恒不显示（次数已满也不显示 100%）
+		if st.chargeType == 0 then
+			st._wasCharging = false
+			EuiAdapter.SetVisible(st.ChargeProgressTimer, false)
+			return
+		end
+
 		if st.chargeCount >= st.maxChargeCount then
+			st._wasCharging = false
 			EuiAdapter.SetPercent(st.ChargeProgressTimer, 100)
 			return
 		end
 
 		local shouldCharge = false
-		if st.chargeType == 0 then
-			EuiAdapter.SetVisible(st.ChargeProgressTimer, false)
-			return
-		elseif st.chargeType == 1 then
+		if st.chargeType == 1 then
 			shouldCharge = st.chargeCount < st.maxChargeCount
 		elseif st.chargeType == 2 then
 			shouldCharge = st.chargeCount == 0
 		end
 
 		if not shouldCharge then
+			st._wasCharging = false
 			EuiAdapter.SetPercent(st.ChargeProgressTimer, 100)
 			return
 		end
 
-		if st.chargeCount > oldCount or st.charge_start_time <= 0 then
+		if (not st._wasCharging) or st.chargeCount > oldCount or st.charge_start_time <= 0 then
 			st.charge_start_time = World:GetServerTime()
 		end
+		st._wasCharging = true
 
 		if st.charge_start_time > 0 and st.chargeInterval > 0 then
 			local function tick()

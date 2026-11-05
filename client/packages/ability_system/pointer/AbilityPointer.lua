@@ -70,7 +70,7 @@ function AbilityPointer:Create(dirInfo)
 		local effectId = self.distanceEffectInfo[1]
 		local units = game:GetService("World"):CreateAsset(effectId)
 		local effect = units and units[1]
-		local releaseDistance = self:GetAbilityProperty("ReleaseDistance")
+		local releaseDistance = self:GetAbilityProperty("ReleaseDistance") or 10.0
 		local scale = releaseDistance / self.distanceEffectInfo[3]
 		if effect then
 			effect.Position = owner.Position
@@ -136,7 +136,6 @@ function AbilityPointer:UpdateTransforms(ownerPosition, dirInfo)
 		return
 	end -- NaN 检查
 
-	local releaseDistance = self:GetAbilityProperty("ReleaseDistance")
 	local offsetAngle = math.rad(self:GetAbilityProperty("PointerOffsetAngle") or 0)
 	local intervalAngle = math.rad(self:GetAbilityProperty("PointerIntervalAngle") or 0)
 
@@ -166,18 +165,17 @@ function AbilityPointer:Refresh(dirInfo)
 	if self.effects == nil then
 		return
 	end
-	dirInfo:Normalize()
 	-- Vector2 无 Length 声明，用欧氏距离
-	if math.sqrt(dirInfo.x * dirInfo.x + dirInfo.y * dirInfo.y) <= 0.01 then
+	local len = math.sqrt(dirInfo.x * dirInfo.x + dirInfo.y * dirInfo.y)
+	if len <= 0.01 then
 		return
 	end
 
-	self.currentDirInfo = dirInfo
+	self.currentDirInfo = Vector2.New(dirInfo.x / len, dirInfo.y / len)
 	self:UpdateEffect()
 end
 
 function AbilityPointer:Clear(dirInfo)
-	local World = game:GetService("World")
 	self.currentDirInfo = nil
 
 	if self.effects then
@@ -200,14 +198,13 @@ function AbilityPointer:Clear(dirInfo)
 	end
 end
 
-function AbilityPointer:GetReleasePoint(dirInfo)
-	local owner = self:_GetOwner()
-	if not owner then
-		return Vector3.New(0, 0, 0)
+---把拖拽位移换算成 0~1 的施法距离比例
+---@param pixelLength number 位移长度
+---@return number 0~1 的比例
+function AbilityPointer:GetDragRatio(pixelLength)
+	if not pixelLength or pixelLength <= 0 then
+		return 0
 	end
-	local releaseDistance = self:GetAbilityProperty("ReleaseDistance")
-
-	-- touchRange 存在 AbilitySlot 的 Lua 侧状态表（EUI userdata 不能挂字段）
 	local touchRange = 0
 	if self._uiController and self._uiController._node then
 		local SlotNode = require("client.packages.ability_system.ui.nodes.AbilitySlot")
@@ -217,24 +214,48 @@ function AbilityPointer:GetReleasePoint(dirInfo)
 		end
 	end
 	if touchRange and touchRange > 0 then
-		dirInfo = dirInfo * (1 / touchRange)
-	end
-	-- Vector2 无 Length 声明，用欧氏距离
-	if math.sqrt(dirInfo.x * dirInfo.x + dirInfo.y * dirInfo.y) > 0 then
-		if math.sqrt(dirInfo.x * dirInfo.x + dirInfo.y * dirInfo.y) > 1.0 then
-			dirInfo:Normalize()
+		local ratio = pixelLength / touchRange
+		if ratio > 1.0 then
+			ratio = 1.0
 		end
-		local quat = self.beginRotation or Quaternion.Identity()
-		local relPos = Vector3.New(releaseDistance * dirInfo.x, 0, releaseDistance * dirInfo.y)
-		return owner.Position + quat:Apply(relPos)
+		return ratio
 	end
-	-- 无方向输入（按下即抬起）：用 beginRotation 朝向（有指示器时）
-	if self.beginRotation then
-		return owner.Position + self.beginRotation:Apply(Vector3.New(0, 0, releaseDistance))
+	if pixelLength > 1.0 then
+		return 1.0
 	end
-	-- PointerType=None fallback：用角色朝向
-	local forward = owner.Rotation:Apply(Vector3.New(0, 0, 1))
-	return owner.Position + forward * releaseDistance
+	return pixelLength
+end
+
+function AbilityPointer:GetReleasePoint(dirInfo)
+	local owner = self:_GetOwner()
+	if not owner then
+		return Vector3.New(0, 0, 0)
+	end
+	local releaseDistance = self:GetAbilityProperty("ReleaseDistance") or 10.0
+
+	-- Vector2 无 Length 声明，用欧氏距离
+	local rawLen = math.sqrt(dirInfo.x * dirInfo.x + dirInfo.y * dirInfo.y)
+	if rawLen <= 0 then
+		-- 无方向输入（按下即抬起）：用 beginRotation 朝向（有指示器时）
+		if self.beginRotation then
+			return owner.Position + self.beginRotation:Apply(Vector3.New(0, 0, releaseDistance))
+		end
+		-- PointerType=None fallback：用角色朝向
+		local forward
+		if owner.Rotation then
+			forward = owner.Rotation:Apply(Vector3.New(0, 0, 1))
+		end
+		if not forward then
+			forward = Vector3.New(0, 0, 1)
+		end
+		return owner.Position + forward * releaseDistance
+	end
+
+	local ratio = self:GetDragRatio(rawLen)
+	local dir = Vector2.New(dirInfo.x / rawLen, dirInfo.y / rawLen)
+	local quat = self.beginRotation or Quaternion.Identity()
+	local relPos = Vector3.New(releaseDistance * ratio * dir.x, 0, releaseDistance * ratio * dir.y)
+	return owner.Position + quat:Apply(relPos)
 end
 
 function AbilityPointer:GetCameraRotation()

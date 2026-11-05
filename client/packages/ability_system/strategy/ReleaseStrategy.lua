@@ -133,4 +133,23 @@ function ReleaseStrategy:OnTouchEnd(eventData)
 	end
 end
 
+-- 外部强制取消（如按钮被禁用）：收指示器/拖拽态/取消区，不施法；
+-- 蓄力中与「拖入取消区」同语义，通知服务端结束蓄力
+function ReleaseStrategy:Cancel()
+	local ctrl = self.ctrl
+	if ctrl._node then
+		require("client.packages.ability_system.ui.nodes.AbilitySlot").HideDragIndicator(ctrl._node)
+	end
+	if ctrl.abilityPointer then
+		ctrl.abilityPointer:Clear()
+	end
+	if ctrl._ability and ctrl._ability:GetAttribute("EnableAccumulate") then
+		ctrl:_requestStopAccumulate()
+	end
+	local um = ctrl.GetUIManager()
+	if um then
+		um:SetCancelAreaVisible(false)
+	end
+end
+
 return ReleaseStrategy

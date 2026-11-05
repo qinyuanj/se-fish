@@ -31,8 +31,6 @@ function ParabolaPointer:Create(dirInfo)
 
 	local ps = game:GetService("PrimitiveService")
 	self._primitiveHandle = ps:CreatePrimitive()
-	ps:SetMaterial(self._primitiveHandle, "shader/splendor/vertex_color.mtg")
-	ps:CullNone(self._primitiveHandle)
 
 	-- 更新循环用 Task:Delay 自调度，取消统一走 Task:Cancel
 	local Task = game:GetService("Task")

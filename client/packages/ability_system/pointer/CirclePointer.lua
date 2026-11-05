@@ -72,12 +72,13 @@ function CirclePointer:Refresh(dirInfo)
 
 	-- Vector2 无 Length 声明，用欧氏距离
 	local pixelLength = math.sqrt(dirInfo.x * dirInfo.x + dirInfo.y * dirInfo.y)
-	if pixelLength < 1.0 then
+	if pixelLength <= 0.0001 then
 		return
 	end
-	dirInfo:Normalize()
+	local dirX = dirInfo.x / pixelLength
+	local dirY = dirInfo.y / pixelLength
 
-	local baseRad = math.atan(dirInfo.x, dirInfo.y)
+	local baseRad = math.atan(dirX, dirY)
 	if baseRad ~= baseRad then
 		return
 	end
@@ -86,22 +87,7 @@ function CirclePointer:Refresh(dirInfo)
 	local offsetAngle = math.rad(self:GetAbilityProperty("PointerOffsetAngle") or 0)
 	local intervalAngle = math.rad(self:GetAbilityProperty("PointerIntervalAngle") or 0)
 
-	-- touchRange 存在 AbilitySlot 的 Lua 侧状态表（EUI userdata 不能挂字段）
-	local touchRange = 0
-	if self._uiController and self._uiController._node then
-		local SlotNode = require("client.packages.ability_system.ui.nodes.AbilitySlot")
-		local nodeState = SlotNode.GetState(self._uiController._node)
-		if nodeState then
-			touchRange = nodeState.touchRange or 0
-		end
-	end
-	local ratio = 1.0
-	if touchRange and touchRange > 0 then
-		ratio = pixelLength / touchRange
-		if ratio > 1.0 then
-			ratio = 1.0
-		end
-	end
+	local ratio = self:GetDragRatio(pixelLength)
 
 	local count = #self.effects
 	local startAngle = baseRad + offsetAngle - (count - 1) * intervalAngle * 0.5
@@ -112,11 +98,11 @@ function CirclePointer:Refresh(dirInfo)
 	for i, effect in ipairs(self.effects) do
 		local currentAngle = startAngle + (i - 1) * intervalAngle
 
-		local dirX = math.sin(currentAngle)
-		local dirY = math.cos(currentAngle)
+		local dirSin = math.sin(currentAngle)
+		local dirCos = math.cos(currentAngle)
 
 		local distance = releaseDistance * ratio
-		local pos = Vector3.New(distance * dirX, 0, distance * dirY)
+		local pos = Vector3.New(distance * dirSin, 0, distance * dirCos)
 
 		if self.beginRotation then
 			pos = self.beginRotation:Apply(pos)

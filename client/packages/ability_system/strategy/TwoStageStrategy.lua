@@ -122,6 +122,11 @@ function TwoStageStrategy:CancelAiming()
 	self.mouseListener = nil
 end
 
+-- 外部强制取消（如按钮被禁用）：复用瞄准取消
+function TwoStageStrategy:Cancel()
+	self:CancelAiming()
+end
+
 function TwoStageStrategy:Destroy()
 	self:CancelAiming()
 end

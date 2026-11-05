@@ -3,7 +3,7 @@
 
 local AbilityConstants = {}
 
--- 事件类型（技能级 18 个事件）
+-- 事件类型（技能级 23 个事件）
 AbilityConstants.EventType = {
 	BeforeCast = "BeforeCast", -- 施法前（可拦截）
 	CastStart = "CastStart", -- 施法开始
@@ -23,6 +23,11 @@ AbilityConstants.EventType = {
 	AnchorBreak = "AnchorBreak", -- 锚点中断（施法被打断时未终结的锚点）
 	AnchorEnd = "AnchorEnd", -- 锚点结束（Duration 到点或施法正常结束）
 	AnchorStop = "AnchorStop", -- 锚点终结（Break/End 之后必发，统一收尾信号）
+	Obtained = "Obtained", -- 技能被获得（加入管理器槽位；ECA「当 此类技能 被获得」）
+	Lost = "Lost", -- 技能失去（销毁/移除/被覆盖统一在 Destroying 收口）
+	Upgraded = "Upgraded", -- 技能升级（携带新等级参数）
+	SwitchBefore = "SwitchBefore", -- 技能被切换前（子技能组切换时旧活跃成员广播，参数=即将切入技能）
+	Switched = "Switched", -- 技能切换后（子技能组切换时新活跃成员广播，参数=上一技能）
 }
 
 -- 事件类型（锚点级 4 个事件）
@@ -40,6 +45,15 @@ AbilityConstants.ManagerEvent = {
 	AbilityRemoved = "AbilityRemoved", -- 技能移除管理器
 	AbilityUpgraded = "AbilityUpgraded", -- 技能升级
 	SwitchNext = "SwitchNext", -- 子技能切换
+}
+
+-- 单位级中继事件名（挂在技能拥有者单位下的 BindableEvent 子单位名）
+-- 技能级关键事件（冷却/充能完成、降级）由 event_bridge 中继到拥有者单位，
+-- ECA 预设路径事件按 unit:FindFirstChild(事件名) 绑定监听
+AbilityConstants.UnitEvent = {
+	CDEnd = "AbilityCDEnd", -- 技能冷却完成
+	ChargeFull = "AbilityChargeFull", -- 技能充能完成
+	Downgrade = "AbilityDowngrade", -- 技能降级
 }
 
 -- 指针类型（数值/名称对齐官方 enums.lua）

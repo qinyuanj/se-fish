@@ -57,8 +57,20 @@ local StackDurationMode = 0
 ---@style enum
 ---@enum [[0, "None", "不变"], [1, "Overlay", "覆盖"], [2, "Accumulate", "增加"]]
 ---@title 叠加层数变化
----@filter ["EQ","Stackable",true]
+---@filter ["AND",["EQ","Stackable",true],["OR",["EQ","StackDurationMode",0],["EQ","StackDurationMode",1],["EQ","StackDurationMode",2]]]
 local StackCountMode = 0
+
+-- 标签互动
+
+---@type List<string> 打断标签
+---@style ObjTags
+---@desc 当拥有相同打断标签的两个效果先后添加给角色时，后到者会将先到者移除
+local RemoveTags = {}
+
+---@type List<string> 阻断标签
+---@style ObjTags
+---@desc 当拥有相同阻断标签的两个效果先后添加给角色时，后到者会被先到者阻断，无法添加
+local ForbidTags = {}
 
 -- 属性修改
 

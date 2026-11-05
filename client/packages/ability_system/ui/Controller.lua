@@ -98,6 +98,8 @@ function Controller.new(abilityScript, node, manager)
 end
 
 function Controller:Destroy()
+	-- 销毁前先收掉进行中的交互（触控序列被外部中断时指示器等不会残留）
+	self:CancelInteraction()
 	if self.strategy and self.strategy.Destroy then
 		self.strategy:Destroy()
 	end
@@ -135,6 +137,10 @@ function Controller:_onClicked(...)
 		self._touchHandled = false
 		return
 	end
+	-- 充能技能无可用次数：不施法
+	if not self:HasCastableCharge() then
+		return
+	end
 	if self.strategy and self.strategy.OnTouchEnd then
 		-- 走策略的 OnTouchEnd（无触摸信息，用零向量）
 		local eventData = {
@@ -150,6 +156,14 @@ end
 
 function Controller:_onTouchBegan(eventData)
 	self._touchHandled = false
+	self._touchActive = true
+	self._chargeGated = false
+	-- 充能技能无可用次数：不开启交互（不唤出指示器/取消区，不进入策略）
+	if not self:HasCastableCharge() then
+		self._touchActive = false
+		self._chargeGated = true
+		return
+	end
 	if self.strategy then
 		self.strategy:OnTouchBegin(eventData)
 		return
@@ -171,6 +185,9 @@ function Controller:_onTouchBegan(eventData)
 end
 
 function Controller:_onTouchMoved(eventData)
+	if self._chargeGated then
+		return
+	end
 	if self.strategy then
 		self.strategy:OnTouchMove(eventData)
 		return
@@ -205,6 +222,12 @@ end
 
 function Controller:_onTouchEnded(eventData)
 	self._touchHandled = true
+	self._touchActive = false
+	-- 本次触控在按下时已被拦截（充能次数不足）：不进策略、不施法
+	if self._chargeGated then
+		self._chargeGated = false
+		return
+	end
 	if self.strategy then
 		self.strategy:OnTouchEnd(eventData)
 		return
@@ -227,6 +250,62 @@ function Controller:_onTouchEnded(eventData)
 	if not canceled then
 		self:_requestCast(nil, nil, nil)
 	end
+end
+
+-- 交互取消（外部原因中断触控序列时收口）
+
+-- 是否存在进行中的按触交互（按住 / 拖拽瞄准 / 两段瞄准等待落点）
+function Controller:IsInteracting()
+	if self._touchActive then
+		return true
+	end
+	if self.abilityPointer then
+		return true
+	end
+	if self.strategy and self.strategy.isAiming then
+		return true
+	end
+	return false
+end
+
+-- 充能可用性预判：非充能技能恒可用；充能技能当前次数 > 0 才可用
+--（仅客户端体验预判，服务端施法/蓄力入口仍会二次校验）
+function Controller:HasCastableCharge()
+	local ability = self._ability
+	if not ability then
+		return false
+	end
+	if not ability:GetAttribute("IsChargeConsuming") then
+		return true
+	end
+	return (ability:GetAttribute("ChargeCount") or 0) > 0
+end
+
+-- 外部强制取消进行中的交互（按钮被禁用/置灰等导致触控序列中断时调用）：
+-- 停策略循环、销毁指示器、隐藏拖拽指示与取消区，防止瞄准特效残留
+function Controller:CancelInteraction()
+	if not self:IsInteracting() then
+		return
+	end
+	if self.strategy and self.strategy.Cancel then
+		self.strategy:Cancel()
+	end
+	if self.abilityPointer then
+		self.abilityPointer:Clear()
+		self.abilityPointer:Destroy()
+		self.abilityPointer = nil
+	end
+	if self._node then
+		local AbilitySlot = require("client.packages.ability_system.ui.nodes.AbilitySlot")
+		AbilitySlot.HideDragIndicator(self._node)
+		AbilitySlot.SetCancelState(self._node, false)
+	end
+	local uiManager = _getUIManager()
+	if uiManager then
+		uiManager:SetCancelAreaVisible(false)
+	end
+	self._touchActive = false
+	self._touchHandled = false
 end
 
 -- 施法请求

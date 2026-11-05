@@ -95,13 +95,6 @@ TargetFilterType = {}
 TargetType = 1
 ---目标类型
 
----@type Int
----@style enum
----@enum [[0, "None", "不限"],[1, "Enemy", "敌方"],[2, "Ally", "友方"]]
----@title 目标筛选阵营
-TargetFilterCamp = 0
----目标筛选阵营
-
 ---@type String[] 筛选必需标签
 TargetRequiredTags = {}
 ---筛选必需标签（所有标签必须满足）

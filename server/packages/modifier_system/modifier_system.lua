@@ -7,6 +7,7 @@ local World = game:GetService("World")
 
 local config = require("common.packages.modifier_system.config")
 local eventDefs = require("common.packages.modifier_system.event_defs")
+local util = require("common.packages.modifier_system.util")
 local eventBridge = require("server.packages.modifier_system.event_bridge")
 local ModifierHandler = require("server.packages.modifier_system.ModifierHandler")
 
@@ -43,6 +44,22 @@ local function getTagsComponent(unit)
 	return nil
 end
 
+---本效果的规则标签是否命中既有实例的实际标签
+---@param modifierHandler ModifierHandler 既有实例处理器
+---@param tags string[] 本效果配置的规则标签
+---@return boolean 是否命中
+local function hasAnyUnitTag(modifierHandler, tags)
+	if not modifierHandler or #tags == 0 then
+		return false
+	end
+	for _, tag in ipairs(tags) do
+		if modifierHandler:hasTag(tag) then
+			return true
+		end
+	end
+	return false
+end
+
 ---服务端效果管理器，单例
 ---@class SModifierSystemManager
 ---@field private _containers table<number, table> 拥有者 UnitId → 容器
@@ -51,6 +68,7 @@ end
 ---@field private _luaTags table<number, string[]> Lua 层单位标记，引擎标记组件不可用时的回退
 ---@field private _attachedResults table 已注册实体的结果缓存，幂等重入保护
 ---@field private _remoteEvent RemoteEvent 跨端事件通道，服务端实例
+---@field private _detachedReady boolean 常驻资源脱管引导是否已建立
 local SModifierSystemManager = {}
 SModifierSystemManager.__index = SModifierSystemManager
 
@@ -64,8 +82,24 @@ function SModifierSystemManager.new()
 	self._luaTags = {}
 	self._attachedResults = setmetatable({}, { __mode = "k" })
 	self._remoteEvent = RemoteEvent.New(config.CHANNEL_NAME)
-	self:_bindClientRequests()
+	self:_ensureDetachedInit()
 	return self
+end
+
+---建立常驻资源脱管引导（幂等）：客户端请求通道创建在无归属上下文中，
+---避免随首个 require 本模块的效果脚本销毁被连带回收；引导跳约一帧后异步执行，
+---丢失（引导脚本先于触发被销毁）时，由后续注册调用本方法补挂
+function SModifierSystemManager:_ensureDetachedInit()
+	if self._detachedReady then
+		return
+	end
+	util.runDetached(function()
+		if self._detachedReady then
+			return
+		end
+		self._detachedReady = true
+		self:_bindClientRequests()
+	end)
 end
 
 ---订阅客户端请求：按拥有者容器分发，含基础鉴权与 unitId 优先路由
@@ -198,10 +232,15 @@ function SModifierSystemManager:registerModifier(modifierUnit)
 	if not RunService:IsServer() then
 		return config.CreateResult.Failed
 	end
+	-- 补挂脱管引导（幂等）：引导跳丢失时随注册重试建立
+	self:_ensureDetachedInit()
 	-- 已处理过：返回既有结果
 	if self._attachedResults[modifierUnit] ~= nil then
 		return self._attachedResults[modifierUnit]
 	end
+	-- 蛋码「效果自身事件」随预设树创建即挂接（早于注册完成），事件单位需先行就位；
+	-- 先查后建，注册成功路径由 ModifierHandler 直接复用
+	eventDefs.createModifierSignals(modifierUnit)
 	local owner = modifierUnit.Parent
 	if not owner then
 		return config.CreateResult.Failed
@@ -304,7 +343,58 @@ function SModifierSystemManager:addModifierToUnit(ownerUnit, assetId, addConfig)
 	return self:_createModifier(ownerUnit, assetId, mergedConfig)
 end
 
----效果实体的注册主流程：来源注入 → 上限检查 → 叠加路由 → 追加实例 → 激活
+---阻断门：本效果的「阻断规则」命中任一既有实例的实际标签时返回该实例，同 Key 跳过
+---@param container table 容器
+---@param modifierHandler ModifierHandler 待注册的效果处理器
+---@return ModifierHandler? 命中的阻断者
+function SModifierSystemManager:_findForbidBlocker(container, modifierHandler)
+	local forbidTags = modifierHandler:getForbidTags()
+	if #forbidTags == 0 then
+		return nil
+	end
+	local key = modifierHandler:getModifierKey()
+	for _, other in ipairs(self:getModifierHandlers(container)) do
+		if other ~= modifierHandler then
+			local otherKey = other:getModifierKey()
+			local sameKey = key and key ~= "" and otherKey == key
+			if not sameKey and hasAnyUnitTag(other, forbidTags) then
+				return other
+			end
+		end
+	end
+	return nil
+end
+
+---打断清理：移除实际标签命中本效果「打断规则」的全部既有实例，同 Key 跳过，返回移除数
+---@param container table 容器
+---@param modifierHandler ModifierHandler 待注册的效果处理器
+---@return number 移除数量
+function SModifierSystemManager:_removeInterrupted(container, modifierHandler)
+	local removeTags = modifierHandler:getRemoveTags()
+	if #removeTags == 0 then
+		return 0
+	end
+	local key = modifierHandler:getModifierKey()
+	local victims = {}
+	for _, other in ipairs(self:getModifierHandlers(container)) do
+		if other ~= modifierHandler then
+			local otherKey = other:getModifierKey()
+			local sameKey = key and key ~= "" and otherKey == key
+			if not sameKey and hasAnyUnitTag(other, removeTags) then
+				table.insert(victims, other:getUnit())
+			end
+		end
+	end
+	for _, unit in ipairs(victims) do
+		-- 单个移除失败不阻断其余实例
+		pcall(function()
+			self:removeModifierWithLoss(container, unit)
+		end)
+	end
+	return #victims
+end
+
+---效果实体的注册主流程：来源注入 → 上限检查 → 阻断门 → 叠加路由 → 追加实例 → 激活 → 打断清理
 ---@param container table 容器
 ---@param modifierUnit Unit 效果实体单位
 ---@param modifierHandler ModifierHandler 效果处理器
@@ -319,6 +409,16 @@ function SModifierSystemManager:_registerModifierChild(container, modifierUnit, 
 	-- 客户端经该属性 + World:GetUnitByID 反查拥有者
 	modifierUnit:SetAttribute("OwnerUnitId", container.owner.UnitId)
 
+	-- 预设即 Key 兜底补写：预放置等非动态创建路径未写 ModifierKey 时，以实体 AssetId（=来源预设）
+	-- 作为 Key，保证按 Key 移除/叠加/查询与动态添加路径口径一致
+	local modifierKeyValue = modifierUnit:GetAttribute("ModifierKey")
+	if modifierKeyValue == nil or modifierKeyValue == "" then
+		local assetIdValue = modifierUnit.AssetId
+		if type(assetIdValue) == "string" and assetIdValue ~= "" then
+			modifierUnit:SetAttribute("ModifierKey", assetIdValue)
+		end
+	end
+
 	-- 消费动态创建的来源注入，注册必然发生在创建之后，无时序竞争
 	local pendingSource = self._pendingSourceOverrides[modifierUnit.UnitId]
 	if pendingSource then
@@ -332,6 +432,14 @@ function SModifierSystemManager:_registerModifierChild(container, modifierUnit, 
 			modifierUnit:Destroy()
 		end)
 		return config.CreateResult.Rejected
+	end
+
+	-- 阻断门：与既有实例共享阻断标签时拒绝本效果（先到先得）
+	if self:_findForbidBlocker(container, modifierHandler) then
+		pcall(function()
+			modifierUnit:Destroy()
+		end)
+		return config.CreateResult.Blocked
 	end
 
 	-- 叠加路由：同 Key 已存在则尝试叠加
@@ -395,6 +503,9 @@ function SModifierSystemManager:_registerModifierChild(container, modifierUnit, 
 		end)
 		return config.CreateResult.Rejected
 	end
+
+	-- 打断清理：移除与新效果共享打断标签的既有实例（占位替换）
+	self:_removeInterrupted(container, modifierHandler)
 	return config.CreateResult.Added
 end
 

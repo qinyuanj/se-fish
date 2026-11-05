@@ -18,7 +18,7 @@ local function playEffect(performanceConfig, owner)
 		return nil
 	end
 	-- 绑定数据随初始 values 直达：特效首帧即位于挂点，避免先建后绑的瞬移（连线类特效会拉伸）
-	local effectUnit = World:CreateUnit("EffectUnit", {
+	local values = {
 		EffectId = effectId,
 		EffectBindData = {
 			BindUnitId = owner.UnitId,
@@ -26,27 +26,26 @@ local function playEffect(performanceConfig, owner)
 			BindOffset = Vector3.New(0, 0, 0),
 			BindType = tonumber(performanceConfig.EffectInherit) or 7,
 		},
-	})
-	if not effectUnit then
-		return nil
-	end
+	}
+	-- 缩放/速率随初始 values 直达（与 World:CreateEffect 一致；创建后再设置不可靠）
 	local scale = tonumber(performanceConfig.EffectScale) or 1.0
 	if scale ~= 1.0 then
-		effectUnit:SetScale(Vector3.New(scale, scale, scale))
+		values.Scale = Vector3.New(scale, scale, scale)
 	end
 	local frameRate = tonumber(performanceConfig.EffectFrameRate) or 1.0
 	if frameRate ~= 1.0 then
-		effectUnit:SetRate(frameRate)
+		values.PlayRate = frameRate
 	end
-	-- DestroyWithModifier 缺省 true（属性面板只物化作者改动的字段，nil 须按 true 处理），避免失去引用永续播放
-	local destroyWithModifier = performanceConfig.DestroyWithModifier ~= false
 	-- IsLoop=true → ForceLoop=true 持续循环直至跟随销毁；false → 按资源自带方式播放（循环资源仍会循环）
 	if performanceConfig.IsLoop == true then
-		effectUnit.ForceLoop = true
-		return effectUnit
+		values.ForceLoop = true
 	end
-	effectUnit.ForceLoop = false
-	if destroyWithModifier then
+	local effectUnit = World:CreateUnit("EffectUnit", values)
+	if not effectUnit then
+		return nil
+	end
+	-- DestroyWithModifier 缺省 true（属性面板只物化作者改动的字段，nil 须按 true 处理），避免失去引用永续播放
+	if performanceConfig.DestroyWithModifier ~= false or performanceConfig.IsLoop == true then
 		return effectUnit
 	end
 	return nil
