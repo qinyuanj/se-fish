@@ -1657,9 +1657,6 @@
   {:name "Mgr:Vec3", :namespace "server.Mgr.MgrWeapon", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "MgrUtil:Start", :namespace "server.MgrUtil", :complexity 1, :coverage 0.0, :crap 2.0}
   {:name "M.PeekSwing", :namespace "server.SwingRegistry", :complexity 2, :coverage 100.0, :crap 2.0}
-  {:name "TableMgr:GetTable", :namespace "server.TableMgr", :complexity 1, :coverage 0.0, :crap 2.0}
-  {:name "TableMgr:GetTableRowColData", :namespace "server.TableMgr", :complexity 1, :coverage 0.0, :crap 2.0}
-  {:name "TableMgr:GetTableRowType", :namespace "server.TableMgr", :complexity 1, :coverage 0.0, :crap 2.0}
   {:name "HandlePlayerAdded", :namespace "server.main", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "_buildSignalView", :namespace "server.packages.ability_system.anchor_logic", :complexity 1, :coverage 0.0, :crap 2.0}
   {:name "_rotateYaw", :namespace "server.packages.ability_system.anchors.melee_hit", :complexity 1, :coverage 0.0, :crap 2.0}

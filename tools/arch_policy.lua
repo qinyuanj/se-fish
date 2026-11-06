@@ -15,7 +15,7 @@ M.policy = {
     {
       ids = { 'server.Data' },
       modules = {
-        'server.SwingRegistry', 'server.TableMgr',
+        'server.SwingRegistry',
         'common.AttrGrowth', 'common.AttrModel', 'common.BlindboxDraw', 'common.BodyScale',
         'common.BossPhase', 'common.CarryMount', 'common.ContentValidation', 'common.FishCatch',
         'common.FlightPath', 'common.GameCfg', 'common.GrillCurve', 'common.LotteryDraw',
