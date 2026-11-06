@@ -3478,6 +3478,15 @@ Enums.MessageType = {
 	MessageError = 3,
 }
 
+---ModelColorIndex 染色区域
+---@enum Enums.ModelColorIndex 
+Enums.ModelColorIndex = {
+	MODEL_COLOR_1 = 1,  ---染色区域1（ModelColor1）
+	MODEL_COLOR_2 = 2,  ---染色区域2（ModelColor2）
+	MODEL_COLOR_3 = 3,  ---染色区域3（ModelColor3）
+	MODEL_COLOR_4 = 4,  ---染色区域4（ModelColor4）
+}
+
 ---MouseBehavior 鼠标行为枚举
 ---@enum Enums.MouseBehavior 
 Enums.MouseBehavior = {
@@ -3733,9 +3742,9 @@ Enums.TextOverflowStrategy = {
 ---TextureChannel 贴图通道
 ---@enum Enums.TextureChannel 
 Enums.TextureChannel = {
-	MAIN = 0,  ---主贴图（Tex0）
-	NORMAL = 1,  ---法线（Tex1）
-	MRE = 2,  ---MRE（Tex2）
+	MAIN = 0,  ---换色贴图（Tex0）
+	NORMAL = 1,  ---法线贴图（Tex1）
+	MRE = 2,  ---混合贴图（Tex2）
 }
 
 ---头像缩略图尺寸
@@ -4743,7 +4752,7 @@ function Players:GetUserThumbnailAsync(userId, thumbnailType, thumbnailSize) end
 ---@param chatStyle Enums.ChatStyle 聊天显示样式
 function Players:SetChatStyle(chatStyle) end
 
----PrimitiveService SE 客户端图元渲染统一入口，提供图元创建/销毁、位置与可见性控制，及抛物线绘制
+---PrimitiveService SE 客户端图元渲染统一入口，提供图元创建/销毁与抛物线绘制
 ---**适用范围**: 仅客户端
 ---@class PrimitiveService : Unit
 local PrimitiveService = {}
@@ -4979,9 +4988,11 @@ function StarterGui:SetCore(parameterName, value) end
 ---@param enabled Bool 是否启用
 function StarterGui:SetCoreGuiEnabled(coreGuiType, enabled) end
 
----剧情对话播放服务，提供剧情开始、停止、跳过、状态查询等接口，供地图作者控制玩家播放地图中配置的剧情对话，并提供剧情开始、结束、跳过三个信号供订阅剧情生命周期事件。用法示例：game:GetService('StoryService'):StartStory(player, storyID)
+---剧情对话播放服务，提供剧情开始、停止、跳过、状态查询等接口，供地图作者控制玩家播放地图中配置的剧情对话，并提供剧情开始、结束、跳过三个服务端信号，以及客户端逐句触发的 OnDialogStart / OnDialogEnd 信号。用法示例：game:GetService('StoryService'):StartStory(player, storyID)
 ---**适用范围**: 客户端和服务端
 ---@class StoryService : Unit
+---@field OnDialogEnd Signal<fun(player?: Player, storyID: String, dialogIndex: Int)> 当客户端正常结束一句对话时触发（仅客户端）。仅在玩家点击推进、选择选项或自动播放推进导致本句结束时触发；跳过剧情、EndStory、角色切换等中断路径不会补发。回调参数：player 播放剧情的玩家，客户端恒为 LocalPlayer。, storyID 当前播放的剧情 ID。, dialogIndex 刚刚结束的对话在剧情中的 1 基播放序号（对应 dialogData.play_id + 1）。
+---@field OnDialogStart Signal<fun(player?: Player, storyID: String, dialogIndex: Int)> 当客户端开始播放剧情中的一句对话时触发（仅客户端）。在对话面板完成本句数据设置、逐字显示与配音启动后触发。回调参数：player 播放剧情的玩家，客户端恒为 LocalPlayer。, storyID 当前播放的剧情 ID。, dialogIndex 当前对话在剧情中的 1 基播放序号（对应 dialogData.play_id + 1）。插删台词会导致后续序号位移。
 ---@field OnStoryEnd Signal<fun(player: Player, storyID: String)> 当玩家当前剧情正常结束时触发（仅服务端）。回调参数：player 结束剧情的玩家。, storyID 本次结束的剧情 ID。
 ---@field OnStorySkip Signal<fun(player: Player, storyID: String)> 当玩家主动跳过当前剧情时触发（仅服务端）。与 OnStoryEnd 的区别：跳过属于玩家主动操作（例如点击跳过按钮），不触发剧情配表中配置的结束事件。回调参数：player 跳过剧情的玩家。, storyID 本次跳过的剧情 ID。
 ---@field OnStoryStart Signal<fun(player: Player, storyID: String)> 当玩家开始播放某剧情时触发（仅服务端）。回调参数：player 开始播放剧情的玩家。, storyID 本次开始的剧情 ID，对应地图剧情配表中的剧情条目。
@@ -5322,12 +5333,12 @@ function VibrationService:StartVibration(player, vibrateType, vibrateCount, vibr
 ---World的核心职责是容纳存在于3D世界中的所有对象，主要是各类Unit如 WorldUnit、ModelUnit、EffectUnit 等）。当这些对象作为World的后代时，它们将处于活跃状态。对于具有物理属性的Unit（如 WorldUnit），这意味着它们将被渲染，并与其他Unit及世界进行物理交互。脱离World层级的对象不会被渲染也不会参与物理计算，直至被重新挂载到World树中。
 ---@class World : WorldRoot
 ---@field AOIDestroyType Int AOI销毁类型
----@field AOIType Int AOI类型
+---@field AOIType Int 此字段无法运行时修改。本 World 的同步范围策略，决定单位如何按玩家位置同步到客户端。None：不启用 AOI/Streaming，全部单位对所有玩家可见；OnlyStreaming：仅启用流式加载。
 ---@field AOIType2MaxRadius Float AOI外圈
 ---@field AOIType2MinRadius Float AOI内圈
 ---@field AOIType2StreamingMainRadius Float Streaming主半径
 ---@field CurrentCamera CameraUnit 当前相机
----@field StreamingMainRadius Float Streaming主半径
+---@field StreamingMainRadius Float 此字段无法运行时修改。OnlyStreaming 模式下的流式加载半径（世界单位，默认 64）。以每个玩家为圆心，半径内的单位会在游戏开始前在客户端中加载，半径范围外的单位会在角色进入游戏之后按照客户端性能以一定速度由近到远逐渐加载。可使用 World:WaitForUnit 等待还没有加载的单位。
 local World = {}
 
 ---加载Asset
@@ -5386,6 +5397,7 @@ function AnimatedUnit:StopAnimation() end
 ---@class AnimationTrack : Unit
 ---@field Animation Animation 动画资源引用对象（只读），包含 Name（短名）和 AnimationId（asset URI）属性
 ---@field FilterType Enums.AnimationFilterType 骨骼过滤类型，参见 AnimationFilterType 枚举
+---@field IgnoreSignals Bool 是否关闭动画自带的音效/特效触发，下次 Play 生效
 ---@field IsPlaying Bool 是否正在播放（只读）
 ---@field Length Float 动画长度，单位秒（只读）
 ---@field Looped Bool 是否循环播放
@@ -5479,6 +5491,16 @@ function AnimationTrack:Play(fadeTime, weight, speed) end
 ---**适用范围**: 客户端和服务端
 ---@param cueName String 要移除的 Cue 名称
 function AnimationTrack:RemoveCue(cueName) end
+
+---关闭/恢复动画自带的音效/特效触发；不影响 AddCue，下次 Play 生效且不重建轨道
+---**适用范围**: 客户端和服务端
+---**示例**:
+---```lua
+---track.IgnoreSignals = true
+---track:SetIgnoreSignals(true)
+---```
+---@param value Bool 是否关闭，true 为关闭
+function AnimationTrack:SetIgnoreSignals(value) end
 
 ---停止动画播放
 ---**适用范围**: 客户端和服务端
@@ -5644,7 +5666,7 @@ function BaseController:Move(moveDirection, relativeToCamera) end
 
 ---移动到指定位置或目标对象
 ---@param position Vector3 目标位置
----@param targetUnit Unit 目标模型(可选)
+---@param targetUnit? Unit 目标模型(可选)
 function BaseController:MoveTo(position, targetUnit) end
 
 ---复活角色
@@ -6590,25 +6612,6 @@ function EggyUnit:SetSkeletonOffset(skeleton_name, offset) end
 ---@param scale Vector3 缩放比例
 function EggyUnit:SetSkeletonScale(skeleton_name, scale) end
 
----影响半径从初始大小按速度与加速度扩散到最终大小的局部风场，驱动范围内植被摆动。只影响开启了风场贴图的植被；风场高度需贴近草根（离地过高会完全看不到效果）。缩放 gizmo 与最终大小双向联动（1:1）。本类型是**一次性爆发**：「单次持续时间」是整段扰动的总时长，同时决定扩散与波形快慢（越短越快）；需要多次出现时开启「循环触发」（每「循环触发间隔」秒重放一次，间隔小于单次时长会中途打断重来），或用触发效果事件反复触发。
----**适用范围**: 客户端和服务端
----@class ExplosionWindForce : Unit
----@field Acceleration Float 加速度
----@field BeginRadius Float 初始大小
----@field Duration Float 单次持续时间
----@field Enabled Bool 游戏开始时触发
----@field EndEvent String 停止效果事件
----@field EndRadius Float 最终大小
----@field LoopEnabled Bool 循环触发
----@field LoopInterval Float 循环触发间隔
----@field Position Vector3 位置
----@field Rotation Quaternion 旋转
----@field Scale Vector3 缩放
----@field Shape Enums.WindShapeType 形状
----@field Speed Float 速度
----@field StartEvent String 触发效果事件
-local ExplosionWindForce = {}
-
 ---文件网格
 ---@class FileMesh : Unit
 ---@field MeshId String 网格资产ID
@@ -6639,22 +6642,6 @@ function FindingPathUnit:GetWaypoints() end
 ---移除路点
 ---@param index Int 路点索引
 function FindingPathUnit:RemovePoint(index) end
-
----半径固定、持续指定时间的局部风场，驱动圆形范围内植被摆动。只影响开启了风场贴图的植被；风场高度需贴近草根（离地过高会完全看不到效果）。缩放 gizmo 与半径双向联动（1:1）。锥形/扇形为持续风；波浪形的波形只推进一遍、不循环。「单次持续时间」是一次扰动的总时长，同时决定波形快慢（越短越快）；开启「循环触发」后每「循环触发间隔」秒重放一次——间隔大于单次时长会留空档，小于则上一波会被中途打断重来。
----**适用范围**: 客户端和服务端
----@class FixedWindForce : Unit
----@field Duration Float 单次持续时间
----@field Enabled Bool 游戏开始时触发
----@field EndEvent String 停止效果事件
----@field LoopEnabled Bool 循环触发
----@field LoopInterval Float 循环触发间隔
----@field Position Vector3 位置
----@field Radius Float 半径
----@field Rotation Quaternion 旋转
----@field Scale Vector3 缩放
----@field Shape Enums.WindShapeType 形状
----@field StartEvent String 触发效果事件
-local FixedWindForce = {}
 
 ---雾效
 ---**适用范围**: 客户端和服务端
@@ -7317,9 +7304,24 @@ function RemoteEvent.New(eventName) end
 ---@field UseSkinList Bool 启用后使用多槽位皮肤系统，每个子网格可独立配置皮肤与染色；启用自定义外观后该属性不生效
 local RenderTriggerUnit = {}
 
+---读取 SkinSlots 全部槽位（槽位1~4）的皮肤资源 ID（单一模式皮肤请直接读取 SkinId 属性）；返回数组 [1]~[4] 依次对应 SkinSlotIndex.SLOT_1~SLOT_4，空槽位为空字符串
+---@return String[]
+function RenderTriggerUnit:GetAllSlotSkinIds() end
+
 ---切换 RenderMeshId 并自动应用新模型的默认皮肤：默认皮肤 >1 个时进入多槽位模式（逐 Submesh 一个默认皮并回填默认染色），单个/无默认皮肤时回到单皮肤模式并写入默认 SkinId（含默认染色回填）。双端可调用，服务端权威（客户端仅本机生效）；自定义外观开启期间不可用
 ---@param renderMeshId String 模型资源ID
 function RenderTriggerUnit:SetRenderMeshWithDefaultSkin(renderMeshId) end
+
+---设置 SkinSlots 指定槽位（或全部槽位）的染色区颜色（单一模式整体染色请直接设置 ModelColor1-4 属性）：index 取枚举 SkinSlotIndex.SLOT_1~SLOT_4（0~3）或 ALL（全部槽位），colorIndex 取枚举 ModelColorIndex.MODEL_COLOR_1~MODEL_COLOR_4（1~4）。权威与刷新语义同 SetSlotSkinId
+---@param slotIndex Enums.SkinSlotIndex 槽位索引（SkinSlotIndex.SLOT_1~SLOT_4，对应 0~3；ALL = 全部槽位）
+---@param colorIndex Enums.ModelColorIndex 染色区索引（ModelColorIndex.MODEL_COLOR_1~MODEL_COLOR_4，对应 1~4）
+---@param color Color 染色颜色
+function RenderTriggerUnit:SetSlotModelColor(slotIndex, colorIndex, color) end
+
+---设置 SkinSlots 指定槽位（或全部槽位）的皮肤（单一模式整体皮肤请直接设置 SkinId 属性）：index 取枚举 SkinSlotIndex.SLOT_1~SLOT_4（0~3）或 ALL（全部槽位），中间空槽位自动补齐。仅写数据不联动 UseSkinList，UseSkinList 开启时同步刷新对应 Submesh 渲染。双端可调用，服务端权威
+---@param slotIndex Enums.SkinSlotIndex 槽位索引（SkinSlotIndex.SLOT_1~SLOT_4，对应 0~3；ALL = 全部槽位）
+---@param skinId String 皮肤资源ID
+function RenderTriggerUnit:SetSlotSkinId(slotIndex, skinId) end
 
 ---以单位当前皮肤为底派生一个只改指定贴图通道的自定义皮肤并替换旧皮肤（单皮肤与多槽位皮肤均支持）；传空字符串清除该通道覆盖，全部清空时回退原皮肤；双端可调用（服务端同步全端，客户端仅本机生效）；自定义外观期间或单位无皮肤时忽略本次调用
 ---@param textureAssetId String 贴图资源ID，传空字符串清除该通道覆盖
@@ -7348,9 +7350,24 @@ function RenderTriggerUnit:SetTexture(textureAssetId, texIndex, slotIndex) end
 ---@field UseSkinList Bool 启用后使用多槽位皮肤系统，每个子网格可独立配置皮肤与染色；启用自定义外观后该属性不生效
 local RenderUnit = {}
 
+---读取 SkinSlots 全部槽位（槽位1~4）的皮肤资源 ID（单一模式皮肤请直接读取 SkinId 属性）；返回数组 [1]~[4] 依次对应 SkinSlotIndex.SLOT_1~SLOT_4，空槽位为空字符串
+---@return String[]
+function RenderUnit:GetAllSlotSkinIds() end
+
 ---切换 RenderMeshId 并自动应用新模型的默认皮肤：默认皮肤 >1 个时进入多槽位模式（逐 Submesh 一个默认皮并回填默认染色），单个/无默认皮肤时回到单皮肤模式并写入默认 SkinId（含默认染色回填）。双端可调用，服务端权威（客户端仅本机生效）；自定义外观开启期间不可用
 ---@param renderMeshId String 模型资源ID
 function RenderUnit:SetRenderMeshWithDefaultSkin(renderMeshId) end
+
+---设置 SkinSlots 指定槽位（或全部槽位）的染色区颜色（单一模式整体染色请直接设置 ModelColor1-4 属性）：index 取枚举 SkinSlotIndex.SLOT_1~SLOT_4（0~3）或 ALL（全部槽位），colorIndex 取枚举 ModelColorIndex.MODEL_COLOR_1~MODEL_COLOR_4（1~4）。权威与刷新语义同 SetSlotSkinId
+---@param slotIndex Enums.SkinSlotIndex 槽位索引（SkinSlotIndex.SLOT_1~SLOT_4，对应 0~3；ALL = 全部槽位）
+---@param colorIndex Enums.ModelColorIndex 染色区索引（ModelColorIndex.MODEL_COLOR_1~MODEL_COLOR_4，对应 1~4）
+---@param color Color 染色颜色
+function RenderUnit:SetSlotModelColor(slotIndex, colorIndex, color) end
+
+---设置 SkinSlots 指定槽位（或全部槽位）的皮肤（单一模式整体皮肤请直接设置 SkinId 属性）：index 取枚举 SkinSlotIndex.SLOT_1~SLOT_4（0~3）或 ALL（全部槽位），中间空槽位自动补齐。仅写数据不联动 UseSkinList，UseSkinList 开启时同步刷新对应 Submesh 渲染。双端可调用，服务端权威
+---@param slotIndex Enums.SkinSlotIndex 槽位索引（SkinSlotIndex.SLOT_1~SLOT_4，对应 0~3；ALL = 全部槽位）
+---@param skinId String 皮肤资源ID
+function RenderUnit:SetSlotSkinId(slotIndex, skinId) end
 
 ---以单位当前皮肤为底派生一个只改指定贴图通道的自定义皮肤并替换旧皮肤（单皮肤与多槽位皮肤均支持）；传空字符串清除该通道覆盖，全部清空时回退原皮肤；双端可调用（服务端同步全端，客户端仅本机生效）；自定义外观期间或单位无皮肤时忽略本次调用
 ---@param textureAssetId String 贴图资源ID，传空字符串清除该通道覆盖
@@ -7525,6 +7542,26 @@ local SketchEffect = {}
 ---@field SkinSlots SkinSlot[] 每个子网格的皮肤与染色配置，元素包含 SkinId、ModelColor1~4；启用自定义外观后该属性不生效
 ---@field UseSkinList Bool 启用后使用多槽位皮肤系统，每个子网格可独立配置皮肤与染色；启用自定义外观后该属性不生效
 local SkinUnit = {}
+
+---读取皮肤组件 SkinSlots 全部槽位（槽位1~4）的皮肤资源 ID（单一模式皮肤请直接读取 SkinId 属性）；返回数组 [1]~[4] 依次对应 SkinSlotIndex.SLOT_1~SLOT_4，空槽位为空字符串
+---@return String[]
+function SkinUnit:GetAllSlotSkinIds() end
+
+---设置皮肤组件 MaterialParamList 指定槽位（或全部槽位）的材质参数（单一模式整模型材质参数请直接设置 MaterialParam 属性）：index 取枚举 SkinSlotIndex.SLOT_1~SLOT_4（0~3）或 ALL（全部槽位），中间空槽位自动补齐，整体替换该槽位皮肤自带材质参数；传空值清除覆盖、恢复皮肤自带参数。写入参与当前渲染的存储时父单位渲染同步更新
+---@param slotIndex Enums.SkinSlotIndex 槽位索引（SkinSlotIndex.SLOT_1~SLOT_4，对应 0~3；ALL = 全部槽位）
+---@param materialParam MaterialParam 材质参数；传空清除覆盖
+function SkinUnit:SetSlotMaterialParam(slotIndex, materialParam) end
+
+---设置皮肤组件 SkinSlots 指定槽位（或全部槽位）的染色区颜色（单一模式染色请直接设置 ModelColor1-4 属性）：index 取枚举 SkinSlotIndex.SLOT_1~SLOT_4（0~3）或 ALL（全部槽位），colorIndex 取枚举 ModelColorIndex.MODEL_COLOR_1~MODEL_COLOR_4（1~4）。写入参与当前渲染的存储时父单位渲染同步更新
+---@param slotIndex Enums.SkinSlotIndex 槽位索引（SkinSlotIndex.SLOT_1~SLOT_4，对应 0~3；ALL = 全部槽位）
+---@param colorIndex Enums.ModelColorIndex 染色区索引（ModelColorIndex.MODEL_COLOR_1~MODEL_COLOR_4，对应 1~4）
+---@param color Color 染色颜色
+function SkinUnit:SetSlotModelColor(slotIndex, colorIndex, color) end
+
+---设置皮肤组件 SkinSlots 指定槽位（或全部槽位）的皮肤（单一模式皮肤请直接设置 SkinId 属性）：index 取枚举 SkinSlotIndex.SLOT_1~SLOT_4（0~3）或 ALL（全部槽位），中间空槽位自动补齐。仅写数据不联动 UseSkinList；写入参与当前渲染的存储时父单位渲染同步更新。双端可调用，服务端权威
+---@param slotIndex Enums.SkinSlotIndex 槽位索引（SkinSlotIndex.SLOT_1~SLOT_4，对应 0~3；ALL = 全部槽位）
+---@param skinId String 皮肤资源ID
+function SkinUnit:SetSlotSkinId(slotIndex, skinId) end
 
 ---普通天空
 ---**适用范围**: 客户端和服务端
@@ -7920,21 +7957,6 @@ local WeldConstraint = {}
 ---@return BasePart
 function WeldConstraint:GetRootUnit() end
 
----在圆形范围内驱动植被摆动的局部风场，仅影响支持风场贴图的植被，仅高画质生效。吸风类型可让草朝风口倾倒，适合做抽风机、吸尘口等表现；可挂在模型或挂点下跟随移动。
----**适用范围**: 客户端和服务端
----@class WindForce : Unit
----@field Enabled Bool 启用
----@field Intensity Float 强度
----@field Position Vector3 位置
----@field Radius Float 影响半径
----@field RenderPriority Int 绘制优先级
----@field Rotation Quaternion 旋转
----@field TargetOffset Vector3 吸引目标偏移
----@field VentFadeWidth Float 风口渐变宽度
----@field VentRadius Float 风口半径
----@field WindType Enums.WindForceType 风场类型
-local WindForce = {}
-
 ---处理物理模拟和3D空间查询的基类，预期为任何用于处理3D空间查询和模拟的实例提供API，例如World
 ---@class WorldRoot : ModelUnit
 local WorldRoot = {}
@@ -7949,7 +7971,7 @@ local WorldRoot = {}
 ---@field CanTouch Bool 其他物体碰到此物体时，是否触发此物体的碰撞事件
 ---@field CanTrigger Bool 此物体碰到其他物体时，是否触发对方的碰撞事件
 ---@field CenterOfMass Vector3 物体在局部空间中的质心偏移位置
----@field Climbable Bool 玩家角色是否可以攀爬此物体，仅对静态(Static)物体生效
+---@field Climbable Bool 玩家角色是否可以攀爬此物体，仅对非动态物体生效
 ---@field CollisionGroup String 物体所属的碰撞组名称，用于按碰撞组规则过滤碰撞关系
 ---@field CustomPhysicalProperties PhysicalProperties 自定义物理材质参数（摩擦力、弹性、密度等），为空时使用默认值
 ---@field CustomThrownAngle Float 自定义的投掷角度，正值向上抛，负值向下抛
@@ -8020,6 +8042,10 @@ function WorldUnit:ApplyImpulseAtWorldPosition(impulse, worldPosition) end
 ---@param torque Vector3 各轴方向的力矩大小
 function WorldUnit:ApplyTorque(torque) end
 
+---读取 SkinSlots 全部槽位（槽位1~4）的皮肤资源 ID（单一模式皮肤请直接读取 SkinId 属性）；返回数组 [1]~[4] 依次对应 SkinSlotIndex.SLOT_1~SLOT_4，空槽位为空字符串
+---@return String[]
+function WorldUnit:GetAllSlotSkinIds() end
+
 ---获取物体当前所属的所有碰撞组名称
 ---@return String[]
 function WorldUnit:GetCollisionWithGroups() end
@@ -8047,6 +8073,17 @@ function WorldUnit:RemoveNoCollisionPairWithUnit(targetUnit) end
 ---切换 RenderMeshId 并自动应用新模型的默认皮肤：默认皮肤 >1 个时进入多槽位模式（逐 Submesh 一个默认皮并回填默认染色），单个/无默认皮肤时回到单皮肤模式并写入默认 SkinId（含默认染色回填）。双端可调用，服务端权威（客户端仅本机生效）；自定义外观开启期间不可用
 ---@param renderMeshId String 模型资源ID
 function WorldUnit:SetRenderMeshWithDefaultSkin(renderMeshId) end
+
+---设置 SkinSlots 指定槽位（或全部槽位）的染色区颜色（单一模式整体染色请直接设置 ModelColor1-4 属性）：index 取枚举 SkinSlotIndex.SLOT_1~SLOT_4（0~3）或 ALL（全部槽位），colorIndex 取枚举 ModelColorIndex.MODEL_COLOR_1~MODEL_COLOR_4（1~4）。权威与刷新语义同 SetSlotSkinId
+---@param slotIndex Enums.SkinSlotIndex 槽位索引（SkinSlotIndex.SLOT_1~SLOT_4，对应 0~3；ALL = 全部槽位）
+---@param colorIndex Enums.ModelColorIndex 染色区索引（ModelColorIndex.MODEL_COLOR_1~MODEL_COLOR_4，对应 1~4）
+---@param color Color 染色颜色
+function WorldUnit:SetSlotModelColor(slotIndex, colorIndex, color) end
+
+---设置 SkinSlots 指定槽位（或全部槽位）的皮肤（单一模式整体皮肤请直接设置 SkinId 属性）：index 取枚举 SkinSlotIndex.SLOT_1~SLOT_4（0~3）或 ALL（全部槽位），中间空槽位自动补齐。仅写数据不联动 UseSkinList，UseSkinList 开启时同步刷新对应 Submesh 渲染。双端可调用，服务端权威
+---@param slotIndex Enums.SkinSlotIndex 槽位索引（SkinSlotIndex.SLOT_1~SLOT_4，对应 0~3；ALL = 全部槽位）
+---@param skinId String 皮肤资源ID
+function WorldUnit:SetSlotSkinId(slotIndex, skinId) end
 
 ---以单位当前皮肤为底派生一个只改指定贴图通道的自定义皮肤并替换旧皮肤（单皮肤与多槽位皮肤均支持）；传空字符串清除该通道覆盖，全部清空时回退原皮肤；双端可调用（服务端同步全端，客户端仅本机生效）；自定义外观期间或单位无皮肤时忽略本次调用
 ---@param textureAssetId String 贴图资源ID，传空字符串清除该通道覆盖
