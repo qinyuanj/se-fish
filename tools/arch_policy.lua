@@ -368,4 +368,27 @@ function M.levels_edn(policy)
   return ':levels [' .. table.concat(groups, ' ') .. ']'
 end
 
+-- 声明了却在源码中找不到的模块或命名空间：删模块后漏改声明时由测试拦下。
+function M.stale(policy, graph)
+  local present = {}
+  for _, id in ipairs(graph.modules) do
+    local prefix
+    for part in id:gmatch('[^.]+') do
+      prefix = prefix and prefix .. '.' .. part or part
+      present[prefix] = true
+    end
+  end
+  local out = {}
+  for _, group in ipairs(policy.levels) do
+    for _, id in ipairs(group.ids or {}) do
+      if not present[id] then out[#out + 1] = id end
+    end
+    for _, id in ipairs(group.modules or {}) do
+      if not present[id] then out[#out + 1] = id end
+    end
+  end
+  table.sort(out)
+  return out
+end
+
 return M

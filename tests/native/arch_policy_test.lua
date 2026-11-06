@@ -133,6 +133,18 @@ describe('架构分层门禁', function()
     assert.is_true(result.ok, result.message)
   end)
 
+  it('列出源码中已不存在的分层声明', function()
+    local policy = fixture_policy()
+    policy.levels[2].modules = { 'app.gone', 'app.kept' }
+    assert.same({ 'app.entry', 'app.gone' }, Arch.stale(policy, {
+      modules = { 'app.packages', 'app.rules.fish', 'app.kept' },
+    }))
+  end)
+
+  it('真实分层声明的模块与命名空间都在源码中', function()
+    assert.same({}, Arch.stale(Arch.policy, assert(Arch.scan('.', Arch.policy))))
+  end)
+
   it('三端与 tools 不得 require 测试代码', function()
     local result = Arch.check(Arch.policy, {
       modules = { 'common.Util' },
