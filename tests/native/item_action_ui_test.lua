@@ -156,4 +156,111 @@ describe('道具按钮合并（#181）', function()
         assert.is_true(ctx.nodes.ItemAction2.TouchEnabled)
         assert.same('手持' .. NAME.carp, label())
     end)
+
+    -- 失败方式 3：特殊道具生效且空闲时，手持鱼竿 / 食物都让位给吐息
+    it('test_special_effect_overrides_rod_and_food', function()
+        ctx = setUp()
+        push('ItemBarState', selecting('starterRod'))
+        push('SpecialItemState', { effect = 'godzilla', breathRemaining = 0 })
+        assert.same('原子吐息', label())
+        assert.is_true(ctx.nodes.ItemAction2.TouchEnabled)
+        click()
+        assert.same({ 'SpecialItemAction' }, sentNames(ctx, 1)) -- 第 1 条是初始化补取的 SpecialItemStateRequest
+        assert.same({ action = 'breath' }, ctx.sent[#ctx.sent].payload)
+        local sent = #ctx.sent
+        push('ItemBarState', selecting('carp', true))
+        assert.same('原子吐息', label())
+        click()
+        assert.same({ 'SpecialItemAction' }, sentNames(ctx, sent))
+        assert.same(0, #ctx.commands)
+    end)
+
+    -- 失败方式 4：上钩时手持食物 / 鱼竿、甚至特殊道具生效，按钮都是「点击收线」，点击走本地收线
+    it('test_hooked_overrides_food_rod_and_special', function()
+        ctx = setUp()
+        push('ItemBarState', selecting('carp', true))
+        push('SpecialItemState', { effect = 'godzilla', breathRemaining = 0 })
+        local sent = #ctx.sent
+        push('CastState', { phase = 'hooked', reelSession = 7 })
+        assert.same('点击收线', label())
+        assert.is_true(ctx.nodes.ItemAction2.TouchEnabled)
+        click()
+        assert.same(1, ctx.clicks)
+        assert.same({}, sentNames(ctx, sent))
+        push('ItemBarState', selecting('starterRod'))
+        assert.same('点击收线', label())
+        click()
+        assert.same(2, ctx.clicks)
+        assert.same({}, sentNames(ctx, sent))
+        -- 「结束收线」仍是独立的临时按钮，攻击键照旧是攻击
+        assert.is_true(ctx.nodes.ReelClose.Visible)
+        assert.same('结束收线', ctx.nodes.BtnReelCloseLabel.Text)
+        assert.same('攻击', ctx.nodes.AttackLabel.Text)
+    end)
+
+    -- 失败方式 5：鱼线在外（未上钩 cast / 脱钩 unhooked）时手持食物，按钮仍是收回鱼线
+    it('test_line_out_overrides_food', function()
+        ctx = setUp()
+        push('ItemBarState', selecting('carp', true))
+        for _, phase in ipairs({ 'cast', 'unhooked' }) do
+            push('CastState', { phase = phase })
+            assert.same('收竿', label(), phase)
+            assert.is_true(ctx.nodes.ItemAction2.TouchEnabled, phase)
+            click()
+            assert.same({ name = 'CastAction', payload = { action = 'Reel' } }, ctx.sent[#ctx.sent], phase)
+        end
+        assert.same(0, #ctx.commands)
+        assert.is_false(ctx.nodes.ReelClose.Visible)
+    end)
+
+    -- 失败方式 6：头上顶着鱼时，选中食物 / 鱼竿或特殊道具生效，显示与点击都是「放下」
+    it('test_holding_fish_drops_before_food_rod_and_special', function()
+        ctx = setUp()
+        push('CastState', { phase = 'idle', holding = { fishId = 'carp' } })
+        for _, itemId in ipairs({ 'carp', 'starterRod' }) do
+            push('ItemBarState', selecting(itemId))
+            assert.same('放下', label(), itemId)
+            click()
+            assert.same({ name = 'CastAction', payload = { action = 'Drop' } }, ctx.sent[#ctx.sent], itemId)
+        end
+        push('SpecialItemState', { effect = 'godzilla', breathRemaining = 0 })
+        assert.same('放下', label())
+        click()
+        assert.same({ name = 'CastAction', payload = { action = 'Drop' } }, ctx.sent[#ctx.sent])
+        push('SpecialItemState', { effect = 'wings', breathRemaining = 0 })
+        assert.same('放下', label())
+        local sent = #ctx.sent
+        ctx.nodes.ItemAction2.OnTouchBegan:Fire()
+        assert.same({}, sentNames(ctx, sent), '顶着鱼时长按不起飞')
+        assert.same(0, #ctx.commands)
+    end)
+
+    -- 失败方式 6 的反面：鱼获放下后，同一选中格回到它自己的语义
+    it('test_idle_rod_casts_after_fish_dropped', function()
+        ctx = setUp()
+        push('ItemBarState', selecting('starterRod'))
+        push('CastState', { phase = 'idle', holding = { fishId = 'carp' } })
+        assert.same('放下', label())
+        push('CastState', { phase = 'idle' })
+        assert.same('抛竿', label())
+        assert.is_true(ctx.nodes.ItemAction2.TouchEnabled)
+        click()
+        assert.same({ name = 'CastAction', payload = { action = 'Cast', slot = 1, itemId = 'starterRod' } },
+            ctx.sent[#ctx.sent])
+    end)
+
+    -- 失败方式 7：选中的既非鱼竿也非食物（船票），按钮不出现；强行点击给「请重新选择鱼竿」
+    it('test_other_item_hides_button_and_forced_click_hints_invalid_rod', function()
+        ctx = setUp()
+        push('ItemBarState', selecting('item147'))
+        assert.is_false(ctx.nodes.ItemAction2.Visible)
+        assert.is_false(ctx.nodes.BtnItemActionLabel.Visible)
+        assert.is_false(ctx.nodes.ItemAction2.TouchEnabled)
+        local sent = #ctx.sent
+        click()
+        assert.same({}, sentNames(ctx, sent))
+        assert.same(0, #ctx.commands)
+        assert.is_true(ctx.nodes.CastFailureHint.Visible)
+        assert.same('请重新选择鱼竿', ctx.nodes.CastFailureHint.Text)
+    end)
 end)

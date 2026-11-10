@@ -1420,8 +1420,7 @@ function ScreenHandler:Init()
     -- #140 风神之翼：长按升空、松开缓降（按下 / 松开成对发送，服务端以调和为准）
     if self.BtnItemAction.OnTouchBegan and self.BtnItemAction.OnTouchEnded then
         self:Listen(self.BtnItemAction.OnTouchBegan, function()
-            if self.IsOpen and self.SpecialEffect == 'wings'
-                and (not self.CastState or self.CastState.phase == 'idle') then
+            if self.IsOpen and self.SpecialEffect == 'wings' and self:ItemActionMode() == 'special' then
                 _G.REUtil:GetRE('SpecialItemAction'):FireServer({ action = 'fly', holding = true })
             end
         end)
