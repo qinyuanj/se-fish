@@ -990,7 +990,13 @@ function ScreenHandler:BuildEquipBars(root, layout)
     local w, h = self.EuiResolution.x, self.EuiResolution.y
     self.PopupDismiss = button(root, 'PopupDismiss', w / 2, h / 2, w)
     self.PopupDismiss.Size = Vector2.New(w, h)
-    self.PopupDismiss.ButtonNormalColor = Color.New(20, 30, 40, 40)
+    -- 只接点击、不挡画面：带色块图时引擎不认颜色 alpha，会把整屏盖成深色（#178 试玩实测），
+    -- 所以去掉图片并全透明；去图后仍可点中（同轮试玩实测点空白可关闭）
+    self.PopupDismiss.NormalImage = ''
+    self.PopupDismiss.PressImage = ''
+    self.PopupDismiss.DisableImage = ''
+    self.PopupDismiss.ButtonNormalColor = Color.New(0, 0, 0, 0)
+    self.PopupDismiss.ButtonPressColor = Color.New(0, 0, 0, 0)
     self.PopupDismiss.LocalZOrder = 4
     self.PopupDismiss.Visible = false
     self.PopupDismiss.TouchEnabled = false

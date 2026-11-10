@@ -261,6 +261,12 @@ describe('武器栏、鱼饵栏与弹窗（#180）', function()
         assert.is_true(ctx.nodes.BaitBar.LocalZOrder > dismiss.LocalZOrder)
         assert.is_true(ctx.nodes.WeaponBar.LocalZOrder > dismiss.LocalZOrder)
         assert.is_true(dismiss.LocalZOrder > (ctx.nodes.ItemAction2.LocalZOrder or 0))
+        -- 关闭层不挡画面（#178 试玩：带色块图时引擎忽略颜色 alpha，整屏被盖成深色）：无图且全透明
+        for _, key in ipairs({ 'NormalImage', 'PressImage', 'DisableImage' }) do
+            assert.same('', dismiss[key], key)
+        end
+        assert.same(0, dismiss.ButtonNormalColor[4])
+        assert.same(0, dismiss.ButtonPressColor[4])
         -- 点弹窗外空白处：关闭、不发命令
         dismiss.OnClicked:Fire()
         assert.is_false(ctx.nodes.BaitPopup.Visible)
