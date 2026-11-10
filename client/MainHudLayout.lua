@@ -1,5 +1,6 @@
 -- 主界面布局模块（#179，spec #178）：纯函数，只做计算。
--- 不依赖 World、EUI 或任何引擎全局，也不读共享数值配置：道具栏开放格数等数据由调用方传入。
+-- 不依赖 World、EUI 或任何引擎全局；布局坐标只在本模块里。道具栏开放格数由调用方传入，
+-- 上下限（初始格数 / 满格数）读共享配置 GameCfg.Items，不在这里另记一份。
 --
 -- 坐标约定与 EUI 一致：原点在左下、Y 向上；每个矩形是 { x, y, w, h }，x / y 指中心点。
 -- 区域名（讨论界面时的叫法）：
@@ -10,15 +11,14 @@
 --   EquipBottom     底部装备栏：武器栏｜道具栏（2–8 格）｜背包按钮｜鱼饵栏
 --   ActionRight     右侧操作区：攻击键、道具按钮、丢弃键；收线期间加「结束收线」
 --   CenterClear     中央留空区：不放任何常驻控件
+local GameCfg = require('common.GameCfg')
+
 local MainHudLayout = {}
 
 local DESIGN_W, DESIGN_H = 1920, 1238
 local SAFE = 16   -- 屏幕边安全距离
 local GAP = 12    -- 控件之间、控件与保留区之间的间隔
 local PAD = 10    -- 实测误差：保留区四边各外扩 10
-
-MainHudLayout.MinItemBarSlots = 2
-MainHudLayout.MaxItemBarSlots = 8
 
 -- 引擎控件占位实测：#173 第一阶段结论评论「引擎控件占位实测」表
 -- （https://github.com/qinyuanj/se-fish/issues/173#issuecomment-6651176291）。
@@ -72,9 +72,11 @@ local function bounds(controls, pad)
     return fromEdges(l - pad, r + pad, b - pad, t + pad)
 end
 
+-- 道具栏格数夹到「初始格数–满格数」（GameCfg.Items，现为 2–8）
 local function clampSlots(n)
-    n = type(n) == 'number' and math.floor(n) or MainHudLayout.MinItemBarSlots
-    return math.max(MainHudLayout.MinItemBarSlots, math.min(MainHudLayout.MaxItemBarSlots, n))
+    local items = GameCfg.Items
+    n = type(n) == 'number' and math.floor(n) or items.InitialItemBarSlots
+    return math.max(items.InitialItemBarSlots, math.min(items.ItemBarSlots, n))
 end
 
 -- 尺寸常量（调试期占位方块）
