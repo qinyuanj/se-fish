@@ -427,12 +427,6 @@ function ScreenHandler:ItemActionMode()
     return 'none'
 end
 
-local function castActionEnabled(self, mode, active)
-    if self.IsOpen ~= true then return false end
-    if mode == 'hooked' then return active == true end
-    return mode == 'lineOut' or mode == 'drop' or mode == 'food' or mode == 'rod'
-end
-
 local function foodActionText(self)
     local food, foodSlot = self:SelectedFood()
     local name = GameCfg.Items.Definitions[food.itemId].Name
@@ -451,36 +445,107 @@ local function castActionColor(phase, now, alert)
         math.floor(100 + (h[2] - 100) * k), math.floor(140 + (h[3] - 140) * k), h[4])
 end
 
-local castActionText = {
-    hooked = '点击收线', lineOut = '收竿', landed = '已上岸', drop = '放下', rod = '抛竿',
-}
-
-local function showCastAction(self, mode, phase, active, alertNow)
-    local visible = mode ~= 'none'
-    self.BtnItemAction.Visible = visible
-    self.BtnItemActionLabel.Visible = visible
-    self.BtnItemAction.TouchEnabled = castActionEnabled(self, mode, active)
-    self.BtnItemAction.ButtonNormalColor = castActionColor(phase, alertNow, GameCfg.HookAlert)
-    self.BtnItemActionLabel.Text = mode == 'food' and foodActionText(self) or castActionText[mode] or '使用'
+local function fireCast(action, extra)
+    local payload = { action = action }
+    for key, value in pairs(extra or {}) do payload[key] = value end
+    _G.REUtil:GetRE('CastAction'):FireServer(payload)
 end
 
+-- 原子吐息冷却剩余秒数（本地按服务端权威剩余秒数起的倒计时），不在冷却时为 0
+local function breathLeft(self)
+    return self.BreathCooldownUntil and (self.BreathCooldownUntil - World:GetServerTime()) or 0
+end
+
+-- 道具按钮各档（#181）：文字、可点、点击、长按集中在一张表里，显示、点击与长按都只经 itemAction 分派。
+-- text / enabled 为常量或 function(self, active)；enabled 之外还要求界面开着；visible 缺省为真；
+-- click / pressBegan 缺省表示不响应。
 -- #140 特殊道具：空闲且服务端生效效果（SpecialItemState.effect）存在时，
--- 2 号位从钓鱼语义切换为「长按飞行」（风神之翼）/「原子吐息」（哥斯拉）；
+-- 道具按钮从钓鱼语义切换为「长按飞行」（风神之翼）/「原子吐息」（哥斯拉）；
 -- 冷却用本地墙钟倒计时展示（服务端每次状态推送带来权威剩余秒数）。
-local function showSpecialAction(self, effect)
-    self.BtnItemAction.Visible = true
-    self.BtnItemActionLabel.Visible = true
-    self.BtnItemAction.ButtonNormalColor = Color.New(54, 100, 140, 255)
-    if effect == 'wings' then
-        self.BtnItemAction.TouchEnabled = self.IsOpen == true
-        self.BtnItemActionLabel.Text = '长按飞行'
-    elseif effect == 'godzilla' then
-        local left = self.BreathCooldownUntil and (self.BreathCooldownUntil - World:GetServerTime()) or 0
-        local onCooldown = left > 0
-        self.BtnItemAction.TouchEnabled = self.IsOpen == true and not onCooldown
-        self.BtnItemActionLabel.Text = onCooldown
-            and string.format('吐息冷却 %d秒', math.ceil(left)) or '原子吐息'
-    end
+local SPECIAL_ACTIONS = {
+    -- 风神之翼：长按升空、松开缓降（松开在 OnTouchEnded 里按效果发送）；点击不做事
+    wings = {
+        text = '长按飞行', enabled = true,
+        pressBegan = function()
+            _G.REUtil:GetRE('SpecialItemAction'):FireServer({ action = 'fly', holding = true })
+        end,
+    },
+    godzilla = {
+        text = function(self)
+            local left = breathLeft(self)
+            return left > 0 and string.format('吐息冷却 %d秒', math.ceil(left)) or '原子吐息'
+        end,
+        enabled = function(self) return breathLeft(self) <= 0 end,
+        click = function(self)
+            if breathLeft(self) <= 0 then _G.REUtil:GetRE('SpecialItemAction'):FireServer({ action = 'breath' }) end
+        end,
+    },
+}
+-- 服务端只会下发上面两种效果；万一是别的，按钮可见但文字、可点保持原样（text / enabled 为 nil）
+local UNKNOWN_SPECIAL = {}
+
+local ITEM_ACTIONS = {
+    hooked = {
+        text = '点击收线',
+        enabled = function(_, active) return active == true end,
+        click = function(self)
+            if _G.LocalReelIn.SessionId == self.CastState.reelSession then
+                _G.LocalReelIn:Click()
+                self:ShowCast()
+            end
+        end,
+    },
+    lineOut = { text = '收竿', enabled = true, click = function() fireCast('Reel') end },
+    landed = { text = '已上岸', enabled = false },
+    drop = { text = '放下', enabled = true, click = function() fireCast('Drop') end },
+    -- 两步进食（#53/#124）：首次只切手持，服务端快照确认手持该格后再点才真吃
+    food = {
+        text = foodActionText, enabled = true,
+        click = function(self)
+            local _, slot = self:SelectedFood()
+            self:Operate({ op = 'eat', slot = slot })
+        end,
+    },
+    rod = {
+        text = '抛竿', enabled = true,
+        click = function(self)
+            local slot = self.Snapshot.selectedSlot
+            fireCast('Cast', { slot = slot, itemId = self.Snapshot.slots[slot].itemId })
+        end,
+    },
+    -- 其他：按钮隐藏；强行点击时给「请重新选择鱼竿」
+    none = {
+        text = '使用', enabled = false, visible = false,
+        click = function(self)
+            if not self.Snapshot then return end
+            self.FailureUntil = nil
+            self.FailureLanding = nil
+            self:ShowCast()
+            self:ShowCastFailure({ reason = 'invalidRod' })
+        end,
+    },
+}
+
+local function itemAction(self, mode)
+    if mode == 'special' then return SPECIAL_ACTIONS[self.SpecialEffect] or UNKNOWN_SPECIAL end
+    return ITEM_ACTIONS[mode]
+end
+
+local function resolve(value, self, active)
+    if type(value) == 'function' then return value(self, active) end
+    return value
+end
+
+local function showItemAction(self, mode, phase, active, alertNow)
+    local entry = itemAction(self, mode)
+    local visible = entry.visible ~= false
+    self.BtnItemAction.Visible = visible
+    self.BtnItemActionLabel.Visible = visible
+    self.BtnItemAction.ButtonNormalColor = castActionColor(phase, alertNow, GameCfg.HookAlert)
+    local enabled = resolve(entry.enabled, self, active)
+    if enabled ~= nil then self.BtnItemAction.TouchEnabled = self.IsOpen == true and enabled == true end
+    local text = resolve(entry.text, self, active)
+    if text ~= nil then self.BtnItemActionLabel.Text = text end
 end
 
 local function castProgress(self, reel, active)
@@ -589,12 +654,7 @@ function ScreenHandler:ShowCast()
     local now = active == true and self.HookAlertUntil ~= nil and World:GetServerTime()
     local alerting = now and now < self.HookAlertUntil
     -- #140：空闲且特殊道具生效时按钮让给飞行 / 吐息；钓鱼各阶段保持钓鱼语义
-    local mode = self:ItemActionMode()
-    if mode == 'special' then
-        showSpecialAction(self, self.SpecialEffect)
-    else
-        showCastAction(self, mode, phase, active, alerting and now)
-    end
+    showItemAction(self, self:ItemActionMode(), phase, active, alerting and now)
     local progress = castProgress(self, reel, active)
     if type(progress) ~= 'number' or progress ~= progress then progress = 50 end
     progress = math.max(0, math.min(100, progress))
@@ -1386,46 +1446,18 @@ function ScreenHandler:Init()
     end)
     self.BtnDiscard.Visible = false
     self.BtnDiscardLabel.Visible = false
+    -- 点击与长按按 ItemActionMode 查道具按钮表（ITEM_ACTIONS / SPECIAL_ACTIONS），与显示同源
     self:Listen(self.BtnItemAction.OnClicked, function()
         if not self.IsOpen then return end
-        local mode = self:ItemActionMode()
-        -- #140：特殊道具生效且空闲时，点击 = 原子吐息（风神之翼走长按，点击不做事）
-        if mode == 'special' then
-            if self.SpecialEffect == 'godzilla'
-                and not (self.BreathCooldownUntil and self.BreathCooldownUntil > World:GetServerTime()) then
-                _G.REUtil:GetRE('SpecialItemAction'):FireServer({ action = 'breath' })
-            end
-        elseif mode == 'hooked' then
-            if _G.LocalReelIn.SessionId == self.CastState.reelSession then
-                _G.LocalReelIn:Click()
-                self:ShowCast()
-            end
-        elseif mode == 'lineOut' then
-            _G.REUtil:GetRE('CastAction'):FireServer({ action = 'Reel' })
-        elseif mode == 'drop' then
-            _G.REUtil:GetRE('CastAction'):FireServer({ action = 'Drop' })
-        elseif mode == 'food' then
-            -- 两步进食（#53/#124）：首次只切手持，服务端快照确认手持该格后再点才真吃
-            local _, slot = self:SelectedFood()
-            self:Operate({ op = 'eat', slot = slot })
-        elseif mode == 'rod' then
-            local slot = self.Snapshot.selectedSlot
-            _G.REUtil:GetRE('CastAction'):FireServer({
-                action = 'Cast', slot = slot, itemId = self.Snapshot.slots[slot].itemId,
-            })
-        elseif mode == 'none' and self.Snapshot then
-            self.FailureUntil = nil
-            self.FailureLanding = nil
-            self:ShowCast()
-            self:ShowCastFailure({ reason = 'invalidRod' })
-        end
+        local click = itemAction(self, self:ItemActionMode()).click
+        if click then click(self) end
     end)
     -- #140 风神之翼：长按升空、松开缓降（按下 / 松开成对发送，服务端以调和为准）
     if self.BtnItemAction.OnTouchBegan and self.BtnItemAction.OnTouchEnded then
         self:Listen(self.BtnItemAction.OnTouchBegan, function()
-            if self.IsOpen and self.SpecialEffect == 'wings' and self:ItemActionMode() == 'special' then
-                _G.REUtil:GetRE('SpecialItemAction'):FireServer({ action = 'fly', holding = true })
-            end
+            if not self.IsOpen then return end
+            local pressBegan = itemAction(self, self:ItemActionMode()).pressBegan
+            if pressBegan then pressBegan(self) end
         end)
         self:Listen(self.BtnItemAction.OnTouchEnded, function()
             if self.SpecialEffect == 'wings' then
