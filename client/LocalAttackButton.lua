@@ -8,18 +8,24 @@ local Gesture = require("client.PressGesture")
 local WeaponAim = require('client.WeaponAim')
 local LocalAttackButton = {}
 
+-- 当前装备的武器 id：手持武器优先，其次已选武器，库存为 0 的不算；都没有返回 nil。
+-- 攻击键语义与主界面武器栏（#180）共用这一处判定
+function LocalAttackButton.EquippedWeapon(state)
+    local weapons = type(state) == "table" and type(state.weapons) == "table" and state.weapons or {}
+    local held = type(state) == "table" and state.held or nil
+    if type(held) == "table" and held.kind == "weapon" and (weapons[held.id] or 0) > 0 then
+        return held.id
+    end
+    local selected = type(state) == "table" and state.selectedWeapon or nil
+    if selected and (weapons[selected] or 0) > 0 then return selected end
+    return nil
+end
+
 -- ScreenMain 每次快照刷新时同步装备状态：决定点按语义（攻击/连发）与长按语义（换弹）
 function LocalAttackButton:SetEquipped(state)
-    self.EquippedId = nil
+    self.EquippedId = LocalAttackButton.EquippedWeapon(state)
     self.EquippedGun = nil
     self.AutoFireGun = nil
-    local weapons = state and state.weapons or {}
-    local held = state and state.held
-    if held and held.kind == "weapon" and (weapons[held.id] or 0) > 0 then
-        self.EquippedId = held.id
-    elseif state and state.selectedWeapon and (weapons[state.selectedWeapon] or 0) > 0 then
-        self.EquippedId = state.selectedWeapon
-    end
     local gcfg = self.EquippedId and GameCfg.Ability.Guns[self.EquippedId] or nil
     if gcfg then
         self.EquippedGun = gcfg
@@ -30,22 +36,22 @@ function LocalAttackButton:SetEquipped(state)
     end
 end
 
-function LocalAttackButton:Start(parent, resolution)
+-- rect：主界面布局模块给的攻击键占位（中心点 + 尺寸，原点左下、Y 向上），本模块不再自定坐标（#179）
+function LocalAttackButton:Start(parent, rect)
     if self.Root == parent and self.Container then return end
     self:Destroy()
     self.Root = parent
     self.Gesture = Gesture.New({ LongPressSec = GameCfg.Ability.Throw.LongPressSec })
-    -- 左下原点：位于原生大按钮上方，并避开上方的道具操作位。
     local container = World:CreateUnit("EUILayout", {
         Parent = parent, Name = "AttackControl",
-        Position = Vector2.New(resolution.x - 245, 555), Size = Vector2.New(200, 200),
+        Position = Vector2.New(rect.x, rect.y), Size = Vector2.New(rect.w, rect.h),
     })
     container.TouchEnabled = false
     container.SwallowTouchEnabled = false
     self.Container = container
     local btn = World:CreateUnit("EUIButton", {
         Parent = container, Name = "BtnAttack",
-        Position = Vector2.New(100, 100), Size = Vector2.New(200, 200),
+        Position = Vector2.New(rect.w / 2, rect.h / 2), Size = Vector2.New(rect.w, rect.h),
     })
     btn.ButtonText = ""
     btn.NormalImage = "official://image/10055"
@@ -57,7 +63,7 @@ function LocalAttackButton:Start(parent, resolution)
     self.BtnAttack = btn
     local label = World:CreateUnit("EUITextLabel", {
         Parent = container, Name = "AttackLabel",
-        Position = Vector2.New(100, 100), Size = Vector2.New(160, 70),
+        Position = Vector2.New(rect.w / 2, rect.h / 2), Size = Vector2.New(rect.w * 0.8, 70),
     })
     label.Text = "攻击"
     label.FontSize = 36

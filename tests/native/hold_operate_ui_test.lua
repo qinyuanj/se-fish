@@ -108,37 +108,43 @@ describe("持有操作的界面侧", function()
         assert.same(before, #ctx.commands)
     end)
 
-    -- 动态按钮：快照里的武器与硬编码三键之外的鱼饵各自生成按钮，点击发对应请求。
+    -- 弹窗候选格（#180 取代平铺按钮）：快照里的武器与固定三种之外的鱼饵各有候选格，点击发对应请求。
     it("test_dynamic_weapon_and_extra_bait_buttons", function()
         ctx.states:Fire({ slots = {}, bait = { worm = 3, rareShrimp = 2 }, weapons = { item134 = 1 } })
-        local baitBtn = ctx.nodes['BaitDyn_rareShrimp']
-        local weaponBtn = ctx.nodes['WeaponItem_item134']
+        ctx.nodes.BaitBar.OnClicked:Fire()
+        local baitBtn = ctx.nodes['BaitPopupCell_rareShrimp']
         assert.is_not_nil(baitBtn)
-        assert.is_not_nil(weaponBtn)
         assert.is_true(baitBtn.Visible)
-        assert.is_true(weaponBtn.Visible)
         baitBtn.OnClicked:Fire()
         assert.same({ action = 'SelectBait', value = 'rareShrimp' }, ctx.commands[#ctx.commands])
+        ctx.nodes.WeaponBar.OnClicked:Fire()
+        local weaponBtn = ctx.nodes['WeaponPopupCell_item134']
+        assert.is_not_nil(weaponBtn)
+        assert.is_true(weaponBtn.Visible)
         weaponBtn.OnClicked:Fire()
         assert.same({ action = 'Operate', op = 'attack', weapon = 'item134', seq = 1 },
             ctx.commands[#ctx.commands])
-        -- 快照清空后动态按钮隐藏
+        -- 快照清空后候选格不再出现
         ctx.states:Fire({ slots = {}, bait = {}, weapons = {} })
+        ctx.nodes.BaitBar.OnClicked:Fire()
         assert.is_false(baitBtn.Visible)
+        ctx.nodes.WeaponBar.OnClicked:Fire()
         assert.is_false(weaponBtn.Visible)
     end)
 
     -- 吃/丢弃走 Operate 两步：点击发带 seq 的 Operate 请求，手持确认态由服务端快照驱动。
+    -- #181：吃改由道具按钮（ItemAction2）承担，命令不变
     it("test_eat_and_discard_send_operate_with_seq", function()
+        ctx.handler.IsOpen = true
         ctx.states:Fire({ slots = { [1] = { itemId = 'carp', count = 1 } },
             bait = { worm = 10 }, selectedSlot = 1 })
-        ctx.nodes.BaitEat.OnClicked:Fire()
+        ctx.nodes.ItemAction2.OnClicked:Fire()
         assert.same({ action = 'Operate', op = 'eat', slot = 1, seq = 1 }, ctx.commands[1])
         -- 服务端回快照：手持已切 → 按钮进入确认态
         ctx.states:Fire({ slots = { [1] = { itemId = 'carp', count = 1 } },
             bait = { worm = 10 }, selectedSlot = 1, held = { kind = 'slot', id = 'carp', slot = 1 } })
-        assert.same('吃鲤鱼', ctx.nodes.BtnEatLabel.Text)
-        ctx.nodes.BaitEat.OnClicked:Fire()
+        assert.same('吃鲤鱼', ctx.nodes.BtnItemActionLabel.Text)
+        ctx.nodes.ItemAction2.OnClicked:Fire()
         assert.same({ action = 'Operate', op = 'eat', slot = 1, seq = 2 }, ctx.commands[2])
         ctx.nodes.ItemDiscard.OnClicked:Fire()
         assert.same({ action = 'Operate', op = 'discard', slot = 1, seq = 3 }, ctx.commands[3])

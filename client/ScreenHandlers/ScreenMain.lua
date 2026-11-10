@@ -5,6 +5,7 @@ local WeaponAim = require('client.WeaponAim')
 local PressGesture = require('client.PressGesture')
 local DamageFloat = require('client.DamageFloat')
 local FishCombatLabel = require('client.FishCombatLabel')
+local MainHudLayout = require('client.MainHudLayout')
 
 local ScreenHandler = { UINodes = {}, UINodeMap = {} }
 
@@ -48,7 +49,7 @@ function ScreenHandler:SlotAtPosition(pos)
     for index, p in ipairs(self.ItemBarSlotPos or {}) do
         local slot = self.Slots and self.Slots[index]
         if slot and slot.Background.Visible
-            and math.abs(pos.x - p.x) <= 55 and math.abs(pos.y - p.y) <= 55 then
+            and math.abs(pos.x - p.x) <= p.hw and math.abs(pos.y - p.y) <= p.hh then
             return { container = GameCfg.Items.ContainerId.ItemBar, index = index }
         end
     end
@@ -172,11 +173,31 @@ function ScreenHandler:EndAim()
     self.AimSlot = nil
 end
 
+-- 快照里某种鱼饵的库存，缺失或非数字按 0（鱼饵栏文字、候选格、「蚯蚓用尽」共用这一处）
+local function baitStock(state, id)
+    local bait = type(state) == 'table' and type(state.bait) == 'table' and state.bait or {}
+    local count = id ~= nil and bait[id] or nil
+    return type(count) == 'number' and count or 0
+end
+
+local function wormCount(state)
+    return baitStock(state, GameCfg.Items.Id.Worm)
+end
+
+-- 服务端确认手持的道具栏格号（手持的不是道具栏格时为 nil）
+local function heldSlot(state)
+    local held = type(state) == 'table' and state.held
+    return type(held) == 'table' and held.kind == 'slot' and held.slot or nil
+end
+
 function ScreenHandler:Show(state)
     if type(state) ~= 'table' or type(state.slots) ~= 'table' then return end
+    -- #180「蚯蚓用尽」：只在蚯蚓从有到无的那一次快照报，开局即 0 或一直是 0 都不报
+    local depleted = self.Snapshot ~= nil and wormCount(self.Snapshot) > 0 and wormCount(state) <= 0
     self.Snapshot = state
     LocalAttackButton:SetEquipped(state) -- #129：攻击按钮语义随装备走（攻击/射击/连发/换弹）
     local capacity = state.slotCount or GameCfg.Items.ItemBarSlots
+    self:ApplyLayout(capacity, nil) -- #179：开放格数变化时按布局重排装备栏
     for index, slot in ipairs(self.Slots or {}) do
         local entry = state.slots[index]
         local definition = entry and GameCfg.Items.Definitions[entry.itemId]
@@ -197,48 +218,18 @@ function ScreenHandler:Show(state)
         slot.Background.ButtonNormalColor = index == state.selectedSlot
             and Color.New(36, 130, 94, 255) or Color.New(54, 100, 140, 255)
     end
-    local baitId = GameCfg.Items.Id.Worm
-    local count = state.bait and state.bait[baitId] or 0
-    self.BtnBaitLabel.Text = '蚯蚓 ×' .. tostring(count)
-    self.BtnBait.ButtonNormalColor = state.selectedBait == baitId
-        and Color.New(36, 130, 94, 255) or Color.New(54, 100, 140, 255)
-    self.BtnBait.TouchEnabled = count > 0
-    -- 首领饵「鸭子」（#88）：件数由服务端快照 bait 表给出，挂上后抛竿必出鳄雀鳝
-    local duckId = GameCfg.Items.Id.Duck
-    local duckCount = state.bait and state.bait[duckId] or 0
-    self.BtnDuckLabel.Text = '鸭子 ×' .. tostring(duckCount)
-    self.BtnDuck.ButtonNormalColor = state.selectedBait == duckId
-        and Color.New(36, 130, 94, 255) or Color.New(54, 100, 140, 255)
-    self.BtnDuck.TouchEnabled = duckCount > 0
-    -- 香肠（#90）：虾池鱼饵，与蚯蚓同走 Bait 计数库存
-    local sausageId = GameCfg.Items.Id.Sausage
-    local sausageCount = state.bait and state.bait[sausageId] or 0
-    self.BtnSausageLabel.Text = '香肠 ×' .. tostring(sausageCount)
-    self.BtnSausage.ButtonNormalColor = state.selectedBait == sausageId
-        and Color.New(36, 130, 94, 255) or Color.New(54, 100, 140, 255)
-    self.BtnSausage.TouchEnabled = sausageCount > 0
-    -- 吃（#53/#124）：选中格有食物时走 Operate 两步——首次只切手持，再点真吃；
-    -- 手持确认态由服务端快照驱动，重复点击、关闭界面后状态仍合法
-    local food, foodSlot = self:SelectedFood()
-    local heldSlot = state.held and state.held.kind == 'slot' and state.held.slot or nil
-    self.BtnEat.TouchEnabled = food ~= nil or count > 0
-    if food then
-        local name = GameCfg.Items.Definitions[food.itemId].Name
-        self.BtnEatLabel.Text = heldSlot == foodSlot and ('吃' .. name) or ('手持' .. name)
-    else
-        self.BtnEatLabel.Text = count > 0 and '吃蚯蚓' or '蚯蚓用尽'
-    end
-    self.BtnNoneLabel.Text = '不挂鱼饵'
+    -- 鱼饵（蚯蚓、香肠、鸭子、动态鱼饵）与武器的选择、吃蚯蚓都在武器栏 / 鱼饵栏弹窗里（#180）；
+    -- 选中格食物的两步进食在道具按钮上（#181）
     self:ShowCoin(state.coin)
     self:ShowCast()
     local selected = state.selectedSlot and state.slots[state.selectedSlot]
     self.BtnDiscard.Visible = selected ~= nil
     self.BtnDiscardLabel.Visible = selected ~= nil
-    self.BtnDiscardLabel.Text = selected and heldSlot == state.selectedSlot
+    self.BtnDiscardLabel.Text = selected and heldSlot(state) == state.selectedSlot
         and '确认丢弃' or '丢弃选中物'
-    self:ShowDynamicBait(state)
-    self:ShowDynamicWeapons(state)
+    self:RenderEquipBars(state)
     self:ShowBackpack()
+    if depleted then self:ShowCastFailure({ reason = 'wormDepleted' }) end
 end
 
 -- 上钩提示（#54）：同一收线会话只触发一次；提示音缺失或播放失败时只保留文字与高亮
@@ -271,6 +262,9 @@ local function readVital(player, key, default)
     return value and math.floor(value) or default
 end
 
+-- 球上文字前缀（术语见 GLOSSARY「饥饿度」）
+local HEALTH_PREFIX, HUNGER_PREFIX = '血 ', '饥饿度 '
+
 local function vitalPercent(value, maximum)
     return maximum > 0 and math.max(0, math.min(100, value * 100 / maximum)) or 0
 end
@@ -282,7 +276,7 @@ local function updateStarving(self, health, hunger)
     self:UpdateStarveFx()
 end
 
--- 血球 / 饥饿球（#53）：数值只读服务端写的玩家属性 Health / MaxHealth / Hunger / MaxHunger
+-- 血球 / 饥饿度球（#53）：数值只读服务端写的玩家属性 Health / MaxHealth / Hunger / MaxHunger
 function ScreenHandler:ShowVitals()
     if not self.HealthRing then return end
     local player = game:GetService('Players').LocalPlayer
@@ -294,8 +288,8 @@ function ScreenHandler:ShowVitals()
     local maxHunger = readVital(player, 'MaxHunger', c.MaxHunger)
     self.HealthRing.Percent = vitalPercent(health, maxHealth)
     self.HungerRing.Percent = vitalPercent(hunger, maxHunger)
-    self.HealthText.Text = '血 ' .. tostring(health)
-    self.HungerText.Text = '饥饿 ' .. tostring(hunger)
+    self.HealthText.Text = HEALTH_PREFIX .. tostring(health)
+    self.HungerText.Text = HUNGER_PREFIX .. tostring(hunger)
     updateStarving(self, health, hunger)
 end
 
@@ -331,14 +325,46 @@ function ScreenHandler:ShowCoin(value)
     self.LabelCoin.Text = tostring(math.floor(tonumber(value) or 0))
 end
 
--- 新手任务条（#51）：左上角一行「新手任务 步号/总数：文案（计数）」，以服务端 QuestState 为准；
--- 推进那一次带 notice，走既有消息条提示下一步
+-- 按列数折行（中文按一字一列，ASCII 也按整列算，宁宽勿溢）
+local function wrapColumns(text, columns)
+    local out, count = {}, 0
+    for character in text:gmatch('[%z\1-\127\194-\244][\128-\191]*') do
+        if character == '\n' then
+            count = 0
+        else
+            if count >= columns then out[#out + 1], count = '\n', 0 end
+            count = count + 1
+        end
+        out[#out + 1] = character
+    end
+    return table.concat(out)
+end
+
+-- 新手任务追踪条（#51，#179 改到左侧任务区）：「新手任务 步号/总数：文案（计数）」按追踪条宽度折行，
+-- 以服务端 QuestState 为准；推进那一次带 notice，走既有消息条提示下一步
 function ScreenHandler:ShowQuest(state)
     if not self.QuestLabel or type(state) ~= 'table' or type(state.text) ~= 'string' then return end
-    self.QuestLabel.Text = state.text
-    self.QuestLabel.Visible = true
-    if self.QuestBackground then self.QuestBackground.Visible = true end
+    local columns = math.max(1, math.floor(self.QuestLabel.Size.x / self.QuestLabel.FontSize))
+    self.QuestLabel.Text = wrapColumns(state.text, columns)
+    self.QuestShown = true
+    self:RenderQuest()
     if type(state.notice) == 'string' and _G.LocalMsgNotice then _G.LocalMsgNotice(state.notice) end
+end
+
+-- 折叠 / 展开（#179）：折叠状态 QuestCollapsed 只存在客户端处理器上，不发服务端、不进存档；
+-- 重进界面（Cleanup）不清它，任务文字刷新也不改它
+function ScreenHandler:RenderQuest()
+    if not self.QuestLabel then return end
+    local shown = self.QuestShown == true
+    local expanded = shown and not self.QuestCollapsed
+    self.QuestLabel.Visible = expanded
+    if self.QuestBackground then self.QuestBackground.Visible = expanded end
+    if self.QuestToggle then
+        self.QuestToggle.Visible = shown
+        self.QuestToggle.TouchEnabled = shown
+        self.QuestToggleLabel.Visible = shown
+        self.QuestToggleLabel.Text = self.QuestCollapsed and '展开任务' or '收起任务'
+    end
 end
 
 function ScreenHandler:ShowDialogue(payload)
@@ -381,9 +407,33 @@ local function lineStillOut(phase)
     return phase == 'cast' or phase == 'unhooked'
 end
 
-local function castActionEnabled(self, phase, rod, drop, active)
-    return self.IsOpen == true
-        and ((rod and phase == 'idle') or drop or lineStillOut(phase) or active == true) or false
+-- 选中格是不是鱼竿（物品表配了 Level）
+local function selectedRod(state)
+    local entry = state and state.selectedSlot and state.slots[state.selectedSlot]
+    local definition = entry and GameCfg.Items.Definitions[entry.itemId]
+    return definition ~= nil and type(definition.Level) == 'number'
+end
+
+-- 道具按钮（#181）：显示与点击共用同一份优先级判定，避免两边各判一套而不一致。
+-- 特殊道具（空闲）> 上钩 > 鱼线在外 > 上岸停留 > 手持鱼获 > 手持食物 > 手持鱼竿 > 其他。
+-- 「空闲」指没有抛竿且头上没顶着鱼：顶着鱼时先放下（沿用 #140 起的显示语义）。
+function ScreenHandler:ItemActionMode()
+    local phase = self.CastState and self.CastState.phase or 'idle'
+    local drop = phase == 'idle' and self.CastState ~= nil and self.CastState.holding ~= nil
+    if phase == 'idle' and not drop and self.SpecialEffect then return 'special' end
+    if phase == 'hooked' then return 'hooked' end
+    if lineStillOut(phase) then return 'lineOut' end
+    if phase == 'landed' then return 'landed' end
+    if drop then return 'drop' end
+    if self:SelectedFood() then return 'food' end
+    if selectedRod(self.Snapshot) then return 'rod' end
+    return 'none'
+end
+
+local function foodActionText(self)
+    local food, foodSlot = self:SelectedFood()
+    local name = GameCfg.Items.Definitions[food.itemId].Name
+    return heldSlot(self.Snapshot) == foodSlot and ('吃' .. name) or ('手持' .. name)
 end
 
 local function castActionColor(phase, now, alert)
@@ -398,34 +448,107 @@ local function castActionColor(phase, now, alert)
         math.floor(100 + (h[2] - 100) * k), math.floor(140 + (h[3] - 140) * k), h[4])
 end
 
-local function showCastAction(self, phase, rod, drop, active, alertNow)
-    local visible = rod == true or phase ~= 'idle' or drop
-    self.BtnItemAction.Visible = visible
-    self.BtnItemActionLabel.Visible = visible
-    self.BtnItemAction.TouchEnabled = castActionEnabled(self, phase, rod, drop, active)
-    self.BtnItemAction.ButtonNormalColor = castActionColor(phase, alertNow, GameCfg.HookAlert)
-    self.BtnItemActionLabel.Text = phase == 'hooked' and '点击收线'
-        or phase == 'landed' and '已上岸' or lineStillOut(phase) and '收竿'
-        or drop and '放下' or rod and '抛竿' or '使用'
+local function fireCast(action, extra)
+    local payload = { action = action }
+    for key, value in pairs(extra or {}) do payload[key] = value end
+    _G.REUtil:GetRE('CastAction'):FireServer(payload)
 end
 
+-- 原子吐息冷却剩余秒数（本地按服务端权威剩余秒数起的倒计时），不在冷却时为 0
+local function breathLeft(self)
+    return self.BreathCooldownUntil and (self.BreathCooldownUntil - World:GetServerTime()) or 0
+end
+
+-- 道具按钮各档（#181）：文字、可点、点击、长按集中在一张表里，显示、点击与长按都只经 itemAction 分派。
+-- text / enabled 为常量或 function(self, active)；enabled 之外还要求界面开着；visible 缺省为真；
+-- click / pressBegan 缺省表示不响应。
 -- #140 特殊道具：空闲且服务端生效效果（SpecialItemState.effect）存在时，
--- 2 号位从钓鱼语义切换为「长按飞行」（风神之翼）/「原子吐息」（哥斯拉）；
+-- 道具按钮从钓鱼语义切换为「长按飞行」（风神之翼）/「原子吐息」（哥斯拉）；
 -- 冷却用本地墙钟倒计时展示（服务端每次状态推送带来权威剩余秒数）。
-local function showSpecialAction(self, effect)
-    self.BtnItemAction.Visible = true
-    self.BtnItemActionLabel.Visible = true
-    self.BtnItemAction.ButtonNormalColor = Color.New(54, 100, 140, 255)
-    if effect == 'wings' then
-        self.BtnItemAction.TouchEnabled = self.IsOpen == true
-        self.BtnItemActionLabel.Text = '长按飞行'
-    elseif effect == 'godzilla' then
-        local left = self.BreathCooldownUntil and (self.BreathCooldownUntil - World:GetServerTime()) or 0
-        local onCooldown = left > 0
-        self.BtnItemAction.TouchEnabled = self.IsOpen == true and not onCooldown
-        self.BtnItemActionLabel.Text = onCooldown
-            and string.format('吐息冷却 %d秒', math.ceil(left)) or '原子吐息'
-    end
+local SPECIAL_ACTIONS = {
+    -- 风神之翼：长按升空、松开缓降（松开在 OnTouchEnded 里按效果发送）；点击不做事
+    wings = {
+        text = '长按飞行', enabled = true,
+        pressBegan = function()
+            _G.REUtil:GetRE('SpecialItemAction'):FireServer({ action = 'fly', holding = true })
+        end,
+    },
+    godzilla = {
+        text = function(self)
+            local left = breathLeft(self)
+            return left > 0 and string.format('吐息冷却 %d秒', math.ceil(left)) or '原子吐息'
+        end,
+        enabled = function(self) return breathLeft(self) <= 0 end,
+        click = function(self)
+            if breathLeft(self) <= 0 then _G.REUtil:GetRE('SpecialItemAction'):FireServer({ action = 'breath' }) end
+        end,
+    },
+}
+-- 服务端只会下发上面两种效果；万一是别的，按钮可见但文字、可点保持原样（text / enabled 为 nil）
+local UNKNOWN_SPECIAL = {}
+
+local ITEM_ACTIONS = {
+    hooked = {
+        text = '点击收线',
+        enabled = function(_, active) return active == true end,
+        click = function(self)
+            if _G.LocalReelIn.SessionId == self.CastState.reelSession then
+                _G.LocalReelIn:Click()
+                self:ShowCast()
+            end
+        end,
+    },
+    lineOut = { text = '收竿', enabled = true, click = function() fireCast('Reel') end },
+    landed = { text = '已上岸', enabled = false },
+    drop = { text = '放下', enabled = true, click = function() fireCast('Drop') end },
+    -- 两步进食（#53/#124）：首次只切手持，服务端快照确认手持该格后再点才真吃
+    food = {
+        text = foodActionText, enabled = true,
+        click = function(self)
+            local _, slot = self:SelectedFood()
+            self:Operate({ op = 'eat', slot = slot })
+        end,
+    },
+    rod = {
+        text = '抛竿', enabled = true,
+        click = function(self)
+            local slot = self.Snapshot.selectedSlot
+            fireCast('Cast', { slot = slot, itemId = self.Snapshot.slots[slot].itemId })
+        end,
+    },
+    -- 其他：按钮隐藏；强行点击时给「请重新选择鱼竿」
+    none = {
+        text = '使用', enabled = false, visible = false,
+        click = function(self)
+            if not self.Snapshot then return end
+            self.FailureUntil = nil
+            self.FailureLanding = nil
+            self:ShowCast()
+            self:ShowCastFailure({ reason = 'invalidRod' })
+        end,
+    },
+}
+
+local function itemAction(self, mode)
+    if mode == 'special' then return SPECIAL_ACTIONS[self.SpecialEffect] or UNKNOWN_SPECIAL end
+    return ITEM_ACTIONS[mode]
+end
+
+local function resolve(value, self, active)
+    if type(value) == 'function' then return value(self, active) end
+    return value
+end
+
+local function showItemAction(self, mode, phase, active, alertNow)
+    local entry = itemAction(self, mode)
+    local visible = entry.visible ~= false
+    self.BtnItemAction.Visible = visible
+    self.BtnItemActionLabel.Visible = visible
+    self.BtnItemAction.ButtonNormalColor = castActionColor(phase, alertNow, GameCfg.HookAlert)
+    local enabled = resolve(entry.enabled, self, active)
+    if enabled ~= nil then self.BtnItemAction.TouchEnabled = self.IsOpen == true and enabled == true end
+    local text = resolve(entry.text, self, active)
+    if text ~= nil then self.BtnItemActionLabel.Text = text end
 end
 
 local function castProgress(self, reel, active)
@@ -452,7 +575,9 @@ local function showCastFeedback(self, phase, active, alerting, progress)
     end
 end
 
+-- 上方提示区的临时提示通道（HintTransient）：抛竿失败与客户端状态提示共用，白名单外的 reason 丢弃
 local castFailureText = {
+    wormDepleted = '蚯蚓用尽', -- #180：客户端按库存快照判定，服务端不发
     invalidLanding = '落点不在可钓水域，请重新抛竿',
     noFish = '本次没有鱼上钩，请重新抛竿',
     holding = '先放下鱼再抛竿',
@@ -464,15 +589,28 @@ local castFailureText = {
     cannotAct = '现在无法行动，等恢复后再试',
 }
 
+-- 只做提示、不算抛竿失败的 reason：不打断「等待上钩」、入水提示与浮标，新抛竿也不清掉它
+-- （抛竿一刻扣掉最后一只蚯蚓时，库存快照与「已入水」的先后不定）
+local noticeOnly = { wormDepleted = true }
+
 function ScreenHandler:ShowCastFailure(result)
     local text = type(result) == 'table' and castFailureText[result.reason]
     if not text or not self.IsOpen then return end
-    self.SplashUntil = nil
+    local notice = noticeOnly[result.reason] == true
+    if not notice then self.SplashUntil = nil end
+    self.FailureNotice = notice
     self.FailureUntil = World:GetServerTime() + GameCfg.CastFeedback.SplashDurationSec
     self.CastFailureHint.Text = text
     self.FailureLanding = result.reason == 'invalidLanding' and result.landing or nil
     self:UpdateCastFeedback()
-    print('[ScreenMain] 抛竿失败', result.reason, text)
+    print('[ScreenMain] ' .. (notice and '临时提示' or '抛竿失败'), result.reason, text)
+end
+
+-- 新的抛竿反馈到来时清掉旧的失败提示；只做提示的（如蚯蚓用尽）留到自然消失
+local function clearCastFailure(self)
+    if self.FailureNotice then return end
+    self.FailureUntil = nil
+    self.FailureLanding = nil
 end
 
 local function waitingCast(state)
@@ -487,8 +625,9 @@ function ScreenHandler:UpdateCastFeedback()
     if not self.CastFloat then return end
     local now = (self.FailureUntil or self.SplashUntil) and World:GetServerTime() or 0
     local waiting = self.IsOpen and waitingCast(self.CastState)
-    local failing = self.IsOpen and self.FailureUntil ~= nil and now < self.FailureUntil
-    self.CastFailureHint.Visible = failing == true
+    local hinting = self.IsOpen and self.FailureUntil ~= nil and now < self.FailureUntil
+    local failing = hinting and not self.FailureNotice
+    self.CastFailureHint.Visible = hinting == true
     self.CastWaitHint.Visible = waiting == true and not failing
     self.CastSplashHint.Visible = waiting == true and not failing and self.SplashUntil ~= nil
         and now < self.SplashUntil
@@ -509,25 +648,16 @@ end
 
 function ScreenHandler:ShowCast()
     if not self.BtnItemAction then return end
-    local state = self.Snapshot
-    local selected = state and state.selectedSlot and state.slots[state.selectedSlot]
-    local rod = selected and GameCfg.Items.Definitions[selected.itemId]
-        and type(GameCfg.Items.Definitions[selected.itemId].Level) == 'number'
     local phase = self.CastState and self.CastState.phase or 'idle'
     local reel = _G.LocalReelIn
     local active = self.IsOpen and phase == 'hooked' and reel
         and reel.SessionId == self.CastState.reelSession
-    -- 头上顶着鱼（#41，以服务端 holding 为准）：空闲时 2 号位是「放下」
-    local drop = phase == 'idle' and self.CastState ~= nil and self.CastState.holding ~= nil
+    self:ApplyLayout(nil, active == true) -- #179：收线期间「结束收线」按布局占位
     -- 上钩提示（#54）：本收线会话的前 DurationSec 秒按钮呼吸式高亮、文字改为提示语
     local now = active == true and self.HookAlertUntil ~= nil and World:GetServerTime()
     local alerting = now and now < self.HookAlertUntil
     -- #140：空闲且特殊道具生效时按钮让给飞行 / 吐息；钓鱼各阶段保持钓鱼语义
-    if phase == 'idle' and not drop and self.SpecialEffect then
-        showSpecialAction(self, self.SpecialEffect)
-    else
-        showCastAction(self, phase, rod, drop, active, alerting and now)
-    end
+    showItemAction(self, self:ItemActionMode(), phase, active, alerting and now)
     local progress = castProgress(self, reel, active)
     if type(progress) ~= 'number' or progress ~= progress then progress = 50 end
     progress = math.max(0, math.min(100, progress))
@@ -574,106 +704,42 @@ local function passive(node)
     return node
 end
 
-
--- #124 动态鱼饵：硬编码三键之外的鱼饵按快照生成按钮（策划「弹窗列出背包现有鱼饵」的最小形态），
--- 数量为 0 或快照消失即隐藏。位置与 HookHint 同排，待 #55 截图迭代整体布局。
-function ScreenHandler:ShowDynamicBait(state)
-    self.BaitDyn = self.BaitDyn or {}
-    for _, entry in pairs(self.BaitDyn) do
-        entry.Button.Visible = false
-        entry.Label.Visible = false
-    end
-    if type(state.bait) ~= 'table' or not self.UIRoot then return end
-    local fixed = { [GameCfg.Items.Id.Worm] = true, [GameCfg.Items.Id.Duck] = true,
-        [GameCfg.Items.Id.Sausage] = true }
-    local order = {}
-    for id, count in pairs(state.bait) do
-        if not fixed[id] and type(count) == 'number' and count > 0 then order[#order + 1] = id end
-    end
-    table.sort(order)
-    for i, id in ipairs(order) do
-        local entry = self.BaitDyn[id]
-        if not entry then
-            local btn = button(self.UIRoot, 'BaitDyn_' .. id, 120, 800, 170)
-            local label = overlay(self.UIRoot, 'BaitDynLabel_' .. id, 120, 800, 170, 70,
-                '', 24, Color.New(255, 255, 255, 255))
-            self.Buttons[#self.Buttons + 1] = btn
-            self.Overlays[#self.Overlays + 1] = label
-            self:Listen(btn.OnClicked, function() self:Action('SelectBait', id) end)
-            entry = { Button = btn, Label = label }
-            self.BaitDyn[id] = entry
-        end
-        -- #174 #8：每次 Show 按当前排序重排，隐藏项不占位，避免新旧按钮叠在一起
-        local x = 120 + (i - 1) * 180
-        entry.Button.Position = Vector2.New(x, 800)
-        entry.Label.Position = Vector2.New(x, 800)
-        local definition = GameCfg.Items.Definitions[id]
-        entry.Label.Text = (definition and definition.Name or id) .. ' ×' .. tostring(state.bait[id])
-        entry.Button.Visible = not self.BackpackOpen
-        entry.Button.TouchEnabled = not self.BackpackOpen
-        entry.Label.Visible = not self.BackpackOpen
-    end
+-- 文字列数：中文按一字一列，ASCII 也按整列算（同 wrapColumns，宁宽勿溢）
+local function columnsOf(text)
+    local count = 0
+    for _ in text:gmatch('[%z\1-\127\194-\244][\128-\191]*') do count = count + 1 end
+    return count
 end
 
--- #124 武器独立库存：快照驱动的武器按钮（武器不占普通格），点击走 Operate 两步——
--- 首次切手持，再次由 #129 客户端回包转成 WeaponAction 攻击（结算在 MgrWeapon，服务端权威）。
-function ScreenHandler:ShowDynamicWeapons(state)
-    self.WeaponBtns = self.WeaponBtns or {}
-    for _, entry in pairs(self.WeaponBtns) do
-        entry.Button.Visible = false
-        entry.Label.Visible = false
-    end
-    if type(state.weapons) ~= 'table' or not self.UIRoot then return end
-    local order = {}
-    for id, count in pairs(state.weapons) do
-        if type(count) == 'number' and count > 0 then order[#order + 1] = id end
-    end
-    table.sort(order)
-    for i, id in ipairs(order) do
-        local entry = self.WeaponBtns[id]
-        if not entry then
-            local btn = button(self.UIRoot, 'WeaponItem_' .. id, 120, 910, 170)
-            local label = overlay(self.UIRoot, 'WeaponItemLabel_' .. id, 120, 910, 170, 70,
-                '', 24, Color.New(255, 255, 255, 255))
-            self.Buttons[#self.Buttons + 1] = btn
-            self.Overlays[#self.Overlays + 1] = label
-            self:Listen(btn.OnClicked, function() self:Operate({ op = 'attack', weapon = id }) end)
-            entry = { Button = btn, Label = label }
-            self.WeaponBtns[id] = entry
-        end
-        local x = 120 + (i - 1) * 180
-        entry.Button.Position = Vector2.New(x, 910)
-        entry.Label.Position = Vector2.New(x, 910)
-        local definition = GameCfg.Items.Definitions[id]
-        entry.Label.Text = (definition and definition.Name or id) .. ' ×' .. tostring(state.weapons[id])
-        entry.Button.Visible = not self.BackpackOpen
-        entry.Button.TouchEnabled = not self.BackpackOpen
-        entry.Label.Visible = not self.BackpackOpen
-    end
+-- 球上文字字号：按满值时最长的文字（如「饥饿度 300」）放得进球宽来定，最大 20
+local VITAL_FONT_MAX = 20
+local function vitalFontSize(width, c)
+    local longest = math.max(columnsOf(HEALTH_PREFIX .. tostring(c.MaxHealth)),
+        columnsOf(HUNGER_PREFIX .. tostring(c.MaxHunger)))
+    return math.max(1, math.min(VITAL_FONT_MAX, math.floor(width / longest)))
 end
 
--- 左上角血球 / 饥饿球与四边红框（#53）；图片用途见 GameCfg.Vitals
--- [未查证：位置是否与场景既有的 LabelCoin 重叠，待 #55 截图迭代；原点左下、Y 向上]
-function ScreenHandler:BuildVitals(root, resolution)
+-- 左上状态区血球 / 饥饿度球（#53，#179 位置取自布局模块）与四边红框；图片用途见 GameCfg.Vitals
+function ScreenHandler:BuildVitals(root, resolution, layout)
     local c = GameCfg.Vitals
-    local y = resolution.y - 130
     local rings = {
-        { 'Health', 130, c.HealthRing, c.HealthColor },
-        { 'Hunger', 290, c.HungerRing, c.HungerColor },
+        { 'Health', layout.Rects.HealthRing, c.HealthRing, c.HealthColor },
+        { 'Hunger', layout.Rects.HungerRing, c.HungerRing, c.HungerColor },
     }
     for _, spec in ipairs(rings) do
-        local name, x = spec[1], spec[2]
+        local name, r = spec[1], spec[2]
         local bg = passive(World:CreateUnit('EUIImage', {
             Parent = root, Name = name .. 'RingBg',
-            Position = Vector2.New(x, y), Size = Vector2.New(128, 128), Image = c.RingBg,
+            Position = Vector2.New(r.x, r.y), Size = Vector2.New(r.w, r.h), Image = c.RingBg,
         }))
         local ring = passive(World:CreateUnit('EUIProgressTimer', {
             Parent = root, Name = name .. 'Ring',
-            Position = Vector2.New(x, y), Size = Vector2.New(128, 128), Image = spec[3], Percent = 100,
+            Position = Vector2.New(r.x, r.y), Size = Vector2.New(r.w, r.h), Image = spec[3], Percent = 100,
         }))
         ring.Color = color(spec[4])
         ring.LocalZOrder = 1
-        local text = overlay(root, name .. 'Text', x, y, 140, 40, '', 26, Color.New(255, 255, 255, 255))
+        local text = overlay(root, name .. 'Text', r.x, r.y, r.w, 40, '', vitalFontSize(r.w, c),
+            Color.New(255, 255, 255, 255))
         text.LocalZOrder = 2
         self[name .. 'Ring'] = ring
         self[name .. 'Text'] = text
@@ -700,15 +766,16 @@ function ScreenHandler:BuildVitals(root, resolution)
     end
 end
 
--- #174 #13：背包打开时收起面板覆盖区内的固定键、动态行与文字标签；关闭后按当前快照恢复
+-- #174 #13：背包打开时收起面板覆盖区内的固定键、装备栏两格与文字标签；关闭后按当前快照恢复
 function ScreenHandler:ApplyBackpackOcclusion()
     local hidden = self.BackpackOpen == true
+    -- #180：开着的弹窗随背包打开直接关闭，关背包时不复活
+    if hidden and self.OpenPopup then self:ClosePopup() end
     local fixed = {
-        { self.BtnBait, self.BtnBaitLabel }, { self.BtnNone, self.BtnNoneLabel },
-        { self.BtnEat, self.BtnEatLabel }, { self.BtnDiscard, self.BtnDiscardLabel },
-        { self.BtnDuck, self.BtnDuckLabel }, { self.BtnSausage, self.BtnSausageLabel },
+        { self.BtnDiscard, self.BtnDiscardLabel },
         { self.BtnItemAction, self.BtnItemActionLabel }, { self.BtnReelClose, self.BtnReelCloseLabel },
     }
+    for _, entry in pairs(self.EquipBars or {}) do fixed[#fixed + 1] = { entry.Button, entry.Label } end
     for _, pair in ipairs(fixed) do
         local btn, label = pair[1], pair[2]
         if btn then
@@ -717,31 +784,18 @@ function ScreenHandler:ApplyBackpackOcclusion()
         end
         if label then label.Visible = not hidden end
     end
-    for _, group in ipairs({ self.BaitDyn, self.WeaponBtns }) do
-        for _, entry in pairs(group or {}) do
-            if hidden then
-                entry.Button.Visible = false
-                entry.Button.TouchEnabled = false
-                entry.Label.Visible = false
-            end
-            -- 关闭背包不在这里复活动态行：可见性由随后的 ShowDynamicBait/ShowDynamicWeapons 按快照重算
-        end
-    end
     for _, slot in ipairs(self.Slots or {}) do
         slot.Label.Visible = slot.Label.Visible and not hidden
         slot.Count.Visible = slot.Count.Visible and not hidden
     end
     if not hidden then
-        -- 恢复既有显隐规则：抛竿/收线键交给 ShowCast，丢弃键按快照重算，其余由 Show 重刷
+        -- 恢复既有显隐规则：道具按钮交给 ShowCast，丢弃键按快照重算，装备栏两格按快照重刷
         self:ShowCast()
         local selected = self.Snapshot and self.Snapshot.selectedSlot
             and self.Snapshot.slots and self.Snapshot.slots[self.Snapshot.selectedSlot]
         self.BtnDiscard.Visible = selected ~= nil
         self.BtnDiscardLabel.Visible = selected ~= nil
-        if self.Snapshot then
-            self:ShowDynamicBait(self.Snapshot)
-            self:ShowDynamicWeapons(self.Snapshot)
-        end
+        if self.Snapshot then self:RenderEquipBars(self.Snapshot) end
     end
 end
 
@@ -791,25 +845,28 @@ function ScreenHandler:ShowBackpack()
     self:ApplyBackpackOcclusion()
 end
 
-function ScreenHandler:BuildBackpack(root, resolution)
-    local center = resolution.x / 2
-    local top = resolution.y - 100
+-- #179：背包按钮在底部装备栏（随道具栏格数重排，见 ApplyLayout）；面板位置取自布局模块，
+-- 面板内部排版不变：标题、背包格、转入按钮都按面板中心的固定偏移摆放
+function ScreenHandler:BuildBackpack(root, layout)
+    local entry, panelRect = layout.Rects.BackpackButton, layout.Panels.BackpackPanel
+    local center, cy = panelRect.x, panelRect.y
     self.BackpackOpen = false
     self.BackpackSlots = {}
     self.BackpackSlotPos = {}
-    self.BackpackButton = button(root, 'BtnBackpack', center, top, 220)
-    self.BackpackLabel = overlay(root, 'LabelBackpack', center, top, 220, 70,
-        '背包', 26, Color.New(255, 255, 255, 255))
-    self.BackpackPanel = button(root, 'BackpackPanel', center, top - 360, 850)
-    self.BackpackPanel.Size = Vector2.New(850, 690)
+    self.BackpackButton = button(root, 'BtnBackpack', entry.x, entry.y, entry.w)
+    self.BackpackButton.Size = Vector2.New(entry.w, entry.h)
+    self.BackpackLabel = overlay(root, 'LabelBackpack', entry.x, entry.y, entry.w, entry.h,
+        '背包', 22, Color.New(255, 255, 255, 255))
+    self.BackpackPanel = button(root, 'BackpackPanel', center, cy, panelRect.w)
+    self.BackpackPanel.Size = Vector2.New(panelRect.w, panelRect.h)
     self.BackpackPanel.TouchEnabled = false
     -- #174 #14：面板用深色，背包格用浅色，空格不再只剩一个「空」字
     self.BackpackPanel.ButtonNormalColor = Color.New(30, 46, 66, 240)
-    self.BackpackTitle = overlay(root, 'BackpackTitle', center, top - 70, 700, 48,
+    self.BackpackTitle = overlay(root, 'BackpackTitle', center, cy + 290, 700, 48,
         '选择背包物品，再转入道具栏', 28, Color.New(255, 255, 255, 255))
     for index = 1, GameCfg.Items.MaxBackpackSlots do
         local col, row = (index - 1) % 8, math.floor((index - 1) / 8)
-        local x, y = center - 350 + col * 100, top - 160 - row * 100
+        local x, y = center - 350 + col * 100, cy + 200 - row * 100
         local btn = button(root, 'BackpackSlot' .. index, x, y, 95)
         btn.Size = Vector2.New(95, 90)
         btn.ButtonNormalColor = Color.New(120, 168, 200, 255)
@@ -825,8 +882,8 @@ function ScreenHandler:BuildBackpack(root, resolution)
             self:ShowBackpack()
         end)
     end
-    self.MoveButton = button(root, 'BtnMoveToItemBar', center, top - 670, 330)
-    self.MoveLabel = overlay(root, 'LabelMoveToItemBar', center, top - 670, 330, 70,
+    self.MoveButton = button(root, 'BtnMoveToItemBar', center, cy - 310, 330)
+    self.MoveLabel = overlay(root, 'LabelMoveToItemBar', center, cy - 310, 330, 70,
         '转入道具栏', 26, Color.New(255, 255, 255, 255))
     self.Buttons[#self.Buttons + 1] = self.BackpackButton
     self.Buttons[#self.Buttons + 1] = self.BackpackPanel
@@ -852,6 +909,280 @@ function ScreenHandler:BuildBackpack(root, resolution)
     end
 end
 
+local function place(node, r)
+    if not node or not r then return end
+    node.Position = Vector2.New(r.x, r.y)
+    node.Size = Vector2.New(r.w, r.h)
+end
+
+-- ===== #180 武器栏、鱼饵栏单格与弹窗 =====
+-- 底部装备栏里各占一格，显示当前选中的那一种；点开在该格正上方弹出一排候选格（位置取自布局模块）。
+-- 同一时间最多开一个弹窗（OpenPopup = 'Weapon' | 'Bait' | nil）；点候选格或弹窗外空白处关闭。
+-- 叠放：空白关闭层 4 < 弹窗底板 5 < 栏位与候选格 6 < 文字 7；对话框 20–22 仍在最上。
+-- 控件名：WeaponBar / WeaponBarLabel、BaitBar / BaitBarLabel、WeaponPopup / BaitPopup（底板）、
+-- <种类>PopupCell_<键> / <种类>PopupLabel_<键>（键：武器 id、鱼饵 id、NoBait、EatWorm）、PopupDismiss。
+local SELECTED_COLOR = { 36, 130, 94, 255 }
+local NORMAL_COLOR = { 54, 100, 140, 255 }
+local DISABLED_COLOR = { 120, 120, 120, 255 }
+local CELL_FONT = 18
+
+local function itemName(id)
+    local definition = GameCfg.Items.Definitions[id]
+    return definition and definition.Name or tostring(id)
+end
+
+-- 候选格 / 栏位文字：名字按格宽折行，带数量时另起一行「×N」
+local function cellText(name, count, width)
+    local text = wrapColumns(name, math.max(1, math.floor(width / CELL_FONT)))
+    return count and (text .. '\n×' .. tostring(count)) or text
+end
+
+-- 武器候选：全部持有的武器（库存为 0 的也列出，置灰），按 id 排序；选中 = 切换手持
+-- （按武器 id 发起攻击类 Operate，服务端据此切换手持，与原平铺武器行一致）
+local function weaponCandidates(self, state)
+    local weapons = type(state.weapons) == 'table' and state.weapons or {}
+    local ids = {}
+    for id, count in pairs(weapons) do
+        if type(count) == 'number' then ids[#ids + 1] = id end
+    end
+    table.sort(ids)
+    local equipped = LocalAttackButton.EquippedWeapon(state)
+    local list = {}
+    for _, id in ipairs(ids) do
+        list[#list + 1] = { key = id, name = itemName(id), count = weapons[id], enabled = weapons[id] > 0,
+            selected = id == equipped, choose = function() self:Operate({ op = 'attack', weapon = id }) end }
+    end
+    return list
+end
+
+-- 鱼饵候选：蚯蚓、香肠、鸭子（固定列出，库存为 0 置灰）、其余动态鱼饵（库存 > 0 才列，按 id 排序）、
+-- 「不挂鱼饵」、「吃蚯蚓」（蚯蚓为 0 置灰）。命令与原平铺按钮一致：SelectBait id / SelectBait（nil）/ EatBait worm
+local function baitCandidates(self, state)
+    local ids = GameCfg.Items.Id
+    local fixed = { ids.Worm, ids.Sausage, ids.Duck }
+    local dynamic, isFixed = {}, {}
+    for _, id in ipairs(fixed) do isFixed[id] = true end
+    for id in pairs(type(state.bait) == 'table' and state.bait or {}) do
+        if not isFixed[id] and baitStock(state, id) > 0 then dynamic[#dynamic + 1] = id end
+    end
+    table.sort(dynamic)
+    local list = {}
+    local function add(id)
+        local count = baitStock(state, id)
+        list[#list + 1] = { key = id, name = itemName(id), count = count, enabled = count > 0,
+            selected = state.selectedBait == id, choose = function() self:Action('SelectBait', id) end }
+    end
+    for _, id in ipairs(fixed) do add(id) end
+    for _, id in ipairs(dynamic) do add(id) end
+    list[#list + 1] = { key = 'NoBait', name = '不挂鱼饵', enabled = true, selected = state.selectedBait == nil,
+        choose = function() self:Action('SelectBait') end }
+    list[#list + 1] = { key = 'EatWorm', name = '吃蚯蚓', enabled = wormCount(state) > 0,
+        choose = function() self:Action('EatBait', ids.Worm) end }
+    return list
+end
+
+local POPUP_CANDIDATES = { Weapon = weaponCandidates, Bait = baitCandidates }
+
+function ScreenHandler:BuildEquipBars(root, layout)
+    self.EquipBars = {}
+    self.PopupPool = {}
+    self.PopupPlates = {}
+    local w, h = self.EuiResolution.x, self.EuiResolution.y
+    self.PopupDismiss = button(root, 'PopupDismiss', w / 2, h / 2, w)
+    self.PopupDismiss.Size = Vector2.New(w, h)
+    -- 只接点击、不挡画面：带色块图时引擎不认颜色 alpha，会把整屏盖成深色（#178 试玩实测），
+    -- 所以去掉图片并全透明；去图后仍可点中（同轮试玩实测点空白可关闭）
+    self.PopupDismiss.NormalImage = ''
+    self.PopupDismiss.PressImage = ''
+    self.PopupDismiss.DisableImage = ''
+    self.PopupDismiss.ButtonNormalColor = Color.New(0, 0, 0, 0)
+    self.PopupDismiss.ButtonPressColor = Color.New(0, 0, 0, 0)
+    self.PopupDismiss.LocalZOrder = 4
+    self.PopupDismiss.Visible = false
+    self.PopupDismiss.TouchEnabled = false
+    self.Buttons[#self.Buttons + 1] = self.PopupDismiss
+    self:Listen(self.PopupDismiss.OnClicked, function() self:ClosePopup() end)
+    for _, kind in ipairs({ 'Weapon', 'Bait' }) do
+        local r = layout.Rects[kind .. 'Bar']
+        local btn = button(root, kind .. 'Bar', r.x, r.y, r.w)
+        place(btn, r)
+        btn.LocalZOrder = 6
+        local label = overlay(root, kind .. 'BarLabel', r.x, r.y, r.w, r.h, '', CELL_FONT, Color.New(255, 255, 255, 255))
+        label.LocalZOrder = 7
+        self.Buttons[#self.Buttons + 1] = btn
+        self.Overlays[#self.Overlays + 1] = label
+        self.EquipBars[kind] = { Button = btn, Label = label }
+        self:Listen(btn.OnClicked, function() self:TogglePopup(kind) end)
+        local plate = passive(World:CreateUnit('EUIImage', {
+            Parent = root, Name = kind .. 'Popup', Position = Vector2.New(r.x, r.y), Size = Vector2.New(r.w, r.h),
+            Image = 'official://image/11017', Color = Color.New(16, 24, 34, 200),
+        }))
+        plate.LocalZOrder = 5
+        plate.Visible = false
+        self.Overlays[#self.Overlays + 1] = plate
+        self.PopupPlates[kind] = plate
+        self.PopupPool[kind] = {}
+    end
+end
+
+-- 候选格按键惰性创建、复用；点击时按当前快照重新取候选，置灰的不响应
+function ScreenHandler:PopupCell(kind, key)
+    local pool = self.PopupPool[kind]
+    if pool[key] then return pool[key] end
+    local btn = button(self.UIRoot, kind .. 'PopupCell_' .. key, 0, 0, 80)
+    btn.LocalZOrder = 6
+    local label = overlay(self.UIRoot, kind .. 'PopupLabel_' .. key, 0, 0, 80, 80, '', CELL_FONT,
+        Color.New(255, 255, 255, 255))
+    label.LocalZOrder = 7
+    self.Buttons[#self.Buttons + 1] = btn
+    self.Overlays[#self.Overlays + 1] = label
+    self:Listen(btn.OnClicked, function() self:ChoosePopup(kind, key) end)
+    pool[key] = { Button = btn, Label = label }
+    return pool[key]
+end
+
+function ScreenHandler:PopupCandidates(kind)
+    local state = self.Snapshot
+    return state and POPUP_CANDIDATES[kind](self, state) or {}
+end
+
+function ScreenHandler:TogglePopup(kind)
+    if self.BackpackOpen then return end
+    self.OpenPopup = self.OpenPopup ~= kind and kind or nil
+    self:RenderPopup()
+end
+
+function ScreenHandler:ClosePopup()
+    self.OpenPopup = nil
+    self:RenderPopup()
+end
+
+function ScreenHandler:ChoosePopup(kind, key)
+    if self.OpenPopup ~= kind then return end
+    for _, candidate in ipairs(self:PopupCandidates(kind)) do
+        if candidate.key == key then
+            if not candidate.enabled then return end
+            candidate.choose()
+            break
+        end
+    end
+    self:ClosePopup()
+end
+
+function ScreenHandler:RenderPopup()
+    if not self.PopupPool then return end
+    for kind, pool in pairs(self.PopupPool) do
+        for _, cell in pairs(pool) do
+            cell.Button.Visible = false
+            cell.Button.TouchEnabled = false
+            cell.Label.Visible = false
+        end
+        self.PopupPlates[kind].Visible = false
+    end
+    local kind = self.OpenPopup
+    local open = kind ~= nil and self.HudLayout ~= nil
+    self.PopupDismiss.Visible = open
+    self.PopupDismiss.TouchEnabled = open
+    for barKind, bar in pairs(self.EquipBars) do
+        bar.Button.ButtonNormalColor = color(barKind == kind and SELECTED_COLOR or NORMAL_COLOR)
+    end
+    if not open then return end
+    local list = self:PopupCandidates(kind)
+    local rects = MainHudLayout.PopupCells(self.HudLayout, kind, #list)
+    for i, candidate in ipairs(list) do
+        local r, cell = rects[i], self:PopupCell(kind, candidate.key)
+        place(cell.Button, r)
+        place(cell.Label, r)
+        cell.Label.Text = cellText(candidate.name, candidate.count, r.w)
+        cell.Button.Visible = true
+        cell.Button.TouchEnabled = candidate.enabled
+        cell.Button.ButtonNormalColor = color(not candidate.enabled and DISABLED_COLOR
+            or candidate.selected and SELECTED_COLOR or NORMAL_COLOR)
+        cell.Label.Visible = true
+    end
+    -- 底板 = 候选格外包框四边外扩 4
+    local plateRect = MainHudLayout.Bounds(rects, 4)
+    if plateRect then
+        local plate = self.PopupPlates[kind]
+        place(plate, plateRect)
+        plate.Visible = true
+    end
+end
+
+-- 栏位文字：武器栏 = 当前手持或已选武器（没有就空格）；鱼饵栏 = 当前鱼饵及数量，或「不挂鱼饵」
+function ScreenHandler:RenderEquipBars(state)
+    if not self.EquipBars then return end
+    local weapon, bar = LocalAttackButton.EquippedWeapon(state), self.EquipBars.Weapon
+    bar.Label.Text = weapon and cellText(itemName(weapon), nil, bar.Button.Size.x) or ''
+    local baitId, baitBar = state.selectedBait, self.EquipBars.Bait
+    baitBar.Label.Text = baitId and cellText(itemName(baitId), baitStock(state, baitId), baitBar.Button.Size.x)
+        or cellText('不挂鱼饵', nil, baitBar.Button.Size.x)
+    for _, entry in pairs(self.EquipBars) do
+        entry.Button.Visible = not self.BackpackOpen
+        entry.Button.TouchEnabled = not self.BackpackOpen
+        entry.Label.Visible = not self.BackpackOpen
+    end
+    self:RenderPopup()
+end
+
+-- 道具栏格：底板占满格子，图标、名字、数量按格子尺寸比例落在格内
+local function placeSlot(slot, r)
+    local x, y, w, h = r.x, r.y, r.w, r.h
+    slot.Background.Position = Vector2.New(x, y)
+    slot.Background.Size = Vector2.New(w, h)
+    slot.Icon.Position = Vector2.New(x, y + h * 0.1)
+    slot.Icon.Size = Vector2.New(w * 0.6, h * 0.6)
+    slot.Label.Position = Vector2.New(x, y - h * 0.34)
+    slot.Label.Size = Vector2.New(w, h * 0.28)
+    slot.Count.Position = Vector2.New(x + w * 0.33, y + h * 0.33)
+    slot.Count.Size = Vector2.New(w * 0.32, h * 0.32)
+end
+
+-- 编辑器摆放的节点（金币图标 / 文字）：运行时改到布局给的位置，锚点统一按中心
+-- [未查证：编辑器节点的默认 Anchor；显式设为 (0.5, 0.5) 与布局的中心点口径一致]
+local function placeEditorNode(node, r)
+    if not node then return end
+    local ok, err = pcall(function() node.Anchor = Vector2.New(0.5, 0.5) end)
+    if not ok then print('[ScreenMain] 设置节点锚点失败', tostring(node.Name), tostring(err)) end
+    place(node, r)
+end
+
+-- #179：随输入变化的常驻控件（装备栏一行、右侧操作区）按主界面布局模块重排。
+-- slots / reeling 传 nil 表示沿用上一次；输入不变时不重算（收线期间 ShowCast 逐帧调用）。
+function ScreenHandler:ApplyLayout(slots, reeling)
+    local key, resolution = self.LayoutKey, self.EuiResolution
+    if not key or not resolution then return end
+    if slots == nil then slots = key.slots end
+    if reeling == nil then reeling = key.reeling end
+    if key.slots == slots and key.reeling == reeling then return end
+    self.LayoutKey = { slots = slots, reeling = reeling }
+    local layout = MainHudLayout.Compute({ width = resolution.x, height = resolution.y,
+        itemBarSlots = slots, reeling = reeling })
+    self.HudLayout = layout
+    local r = layout.Rects
+    for index, slot in ipairs(self.Slots or {}) do
+        local cell = layout.ItemBarSlots[index]
+        if cell then
+            placeSlot(slot, cell)
+            self.ItemBarSlotPos[index] = { x = cell.x, y = cell.y, hw = cell.w / 2, hh = cell.h / 2 }
+        end
+    end
+    place(self.BackpackButton, r.BackpackButton)
+    place(self.BackpackLabel, r.BackpackButton)
+    for kind, bar in pairs(self.EquipBars or {}) do
+        place(bar.Button, r[kind .. 'Bar'])
+        place(bar.Label, r[kind .. 'Bar'])
+    end
+    if self.OpenPopup then self:RenderPopup() end -- 候选行跟着栏位走
+    place(self.BtnItemAction, r.ItemAction)
+    place(self.BtnItemActionLabel, r.ItemAction)
+    place(self.BtnDiscard, r.Discard)
+    place(self.BtnDiscardLabel, r.Discard)
+    -- 不在收线期间时布局不给「结束收线」占位（按钮本就隐藏），保留上一次的位置
+    place(self.BtnReelClose, r.ReelClose)
+    place(self.BtnReelCloseLabel, r.ReelClose)
+end
+
 function ScreenHandler:Listen(source, callback)
     self.Connections[#self.Connections + 1] = source:Connect(callback)
 end
@@ -871,8 +1202,11 @@ function ScreenHandler:Cleanup()
     self.ItemBarSlotPos = nil
     self.BackpackSlots = nil
     self.BackpackSlotPos = nil
-    self.BaitDyn = nil
-    self.WeaponBtns = nil
+    self.EquipBars = nil
+    self.PopupPool = nil
+    self.PopupPlates = nil
+    self.PopupDismiss = nil
+    self.OpenPopup = nil
     self.DragSource = nil
     self.OpSeq = nil
     self.UIRoot = nil
@@ -885,21 +1219,11 @@ function ScreenHandler:Cleanup()
     self.MoveLabel = nil
     self.SelectedBackpackSlot = nil
     self.Buttons = nil
-    self.BtnBait = nil
-    self.BtnNone = nil
-    self.BtnEat = nil
     self.BtnDiscard = nil
-    self.BtnDuck = nil
-    self.BtnSausage = nil
     self.BtnItemAction = nil
     self.BtnReelClose = nil
     self.BtnReelCloseLabel = nil
-    self.BtnBaitLabel = nil
-    self.BtnNoneLabel = nil
-    self.BtnEatLabel = nil
     self.BtnDiscardLabel = nil
-    self.BtnDuckLabel = nil
-    self.BtnSausageLabel = nil
     self.BtnItemActionLabel = nil
     self.HookHint = nil
     self.CastFloat = nil
@@ -924,6 +1248,12 @@ function ScreenHandler:Cleanup()
     self.ReelBar = nil
     self.ReelBarBg = nil
     self.LabelCoin = nil
+    self.ImageCoin = nil
+    self.HudLayout = nil
+    self.LayoutKey = nil
+    self.QuestToggle = nil
+    self.QuestToggleLabel = nil
+    self.QuestShown = nil
     self.Snapshot = nil
     self.CastState = nil
     self.BoundRootNode = nil
@@ -951,41 +1281,47 @@ function ScreenHandler:Init()
     local root = self.RootNode
     DamageFloat:Bind(root, resolution)
     FishCombatLabel:Bind(root, resolution)
+    -- #179：主界面常驻控件的位置一律取自布局模块。首次按道具栏满格、收线期间计算，
+    -- 让「结束收线」也有初始位置；快照到达后 ApplyLayout 按实际格数重排
+    local count = GameCfg.Items.ItemBarSlots
+    local layout = MainHudLayout.Compute({ width = resolution.x, height = resolution.y,
+        itemBarSlots = count, reeling = true })
+    self.HudLayout = layout
+    local rects = layout.Rects
     self.LabelCoin = root:FindFirstChild('LabelCoin', true)
-    local imageCoin = root:FindFirstChild('ImageCoin', true)
+    self.ImageCoin = root:FindFirstChild('ImageCoin', true)
     if self.LabelCoin then self.LabelCoin.Visible = true else print('[ScreenMain] 找不到 LabelCoin 节点') end
-    if imageCoin then imageCoin.Visible = true end
+    if self.ImageCoin then self.ImageCoin.Visible = true end
+    placeEditorNode(self.ImageCoin, rects.CoinIcon)
+    placeEditorNode(self.LabelCoin, rects.CoinLabel)
     self.Slots = {}
     self.ItemBarSlotPos = {}
     self.Buttons = {}
     self.Connections = {}
     self.Overlays = {}
-    local count = GameCfg.Items.ItemBarSlots
-    local step = 120
-    local firstX = (resolution.x - (count - 1) * step) / 2
     for index = 1, count do
-        local x, y = firstX + (index - 1) * step, 400
-        local background = button(root, 'ItemBarSlot' .. index, x, y, 110)
-        background.Size = Vector2.New(110, 110)
+        local cell = layout.ItemBarSlots[index]
+        local background = button(root, 'ItemBarSlot' .. index, cell.x, cell.y, cell.w)
         local icon = World:CreateUnit('EUIImage', {
             Parent = root, Name = 'ItemBarIcon' .. index,
-            Position = Vector2.New(x, y + 15), Size = Vector2.New(78, 78),
+            Position = Vector2.New(cell.x, cell.y), Size = Vector2.New(cell.w, cell.h),
         })
         icon.TouchEnabled = false
         icon.SwallowTouchEnabled = false
         icon.LocalZOrder = 1
         icon.Visible = false
-        local label = overlay(root, 'ItemBarLabel' .. index, x, y - 35, 110, 28,
-            '', 24, Color.New(255, 255, 255, 255))
-        local amount = overlay(root, 'ItemBarAmount' .. index, x + 37, y + 37, 30, 30,
-            '', 24, Color.New(255, 220, 40, 255))
+        local label = overlay(root, 'ItemBarLabel' .. index, cell.x, cell.y, cell.w, cell.h,
+            '', 18, Color.New(255, 255, 255, 255))
+        local amount = overlay(root, 'ItemBarAmount' .. index, cell.x, cell.y, cell.w, cell.h,
+            '', 20, Color.New(255, 220, 40, 255))
         label.Visible = false
         amount.Visible = false
         self.Overlays[#self.Overlays + 1] = icon
         self.Overlays[#self.Overlays + 1] = label
         self.Overlays[#self.Overlays + 1] = amount
         self.Slots[index] = { Background = background, Icon = icon, Label = label, Count = amount }
-        self.ItemBarSlotPos[index] = { x = x, y = y }
+        placeSlot(self.Slots[index], cell)
+        self.ItemBarSlotPos[index] = { x = cell.x, y = cell.y, hw = cell.w / 2, hh = cell.h / 2 }
         self:bindDrag(background, GameCfg.Items.ContainerId.ItemBar, index)
         self:BindSlotGesture(background, index)
         self:Listen(background.OnClicked, function()
@@ -994,28 +1330,22 @@ function ScreenHandler:Init()
         end)
     end
     self.UIRoot = root
-    self:BuildBackpack(root, resolution)
-    self.BtnBait = button(root, 'BaitWorm', firstX + 80, 540, 170)
-    self.BtnNone = button(root, 'BaitNone', firstX + 270, 540, 170)
-    self.BtnEat = button(root, 'BaitEat', firstX + 460, 540, 170)
-    self.BtnDiscard = button(root, 'ItemDiscard', firstX + 650, 540, 170)
-    -- 首领饵挂饵键（#88）：蚯蚓键正上方，数量为零时不可点
-    self.BtnDuck = button(root, 'BaitDuck', firstX + 80, 650, 170)
-    -- 香肠挂饵键（#90）：鸭子键右侧，虾池鱼饵
-    self.BtnSausage = button(root, 'BaitSausage', firstX + 270, 650, 170)
-    self.BtnItemAction = button(root, 'ItemAction2', resolution.x - 220, 690, 180)
-    self.BtnReelClose = button(root, 'ReelClose', resolution.x - 220, 570, 180)
-    for _, node in ipairs({ self.BtnBait, self.BtnNone, self.BtnEat, self.BtnDiscard, self.BtnDuck, self.BtnSausage, self.BtnItemAction, self.BtnReelClose }) do
+    self:BuildBackpack(root, layout)
+    self:BuildEquipBars(root, layout)
+    local discard = rects.Discard
+    self.BtnDiscard = button(root, 'ItemDiscard', discard.x, discard.y, discard.w)
+    local action, reelClose = rects.ItemAction, rects.ReelClose
+    self.BtnItemAction = button(root, 'ItemAction2', action.x, action.y, action.w)
+    self.BtnReelClose = button(root, 'ReelClose', reelClose.x, reelClose.y, reelClose.w)
+    place(self.BtnDiscard, discard)
+    place(self.BtnItemAction, action)
+    place(self.BtnReelClose, reelClose)
+    for _, node in ipairs({ self.BtnDiscard, self.BtnItemAction, self.BtnReelClose }) do
         self.Buttons[#self.Buttons + 1] = node
     end
     local labels = {
         { 'BtnReelCloseLabel', self.BtnReelClose, '结束收线' },
-        { 'BtnBaitLabel', self.BtnBait, '蚯蚓' },
-        { 'BtnNoneLabel', self.BtnNone, '不挂鱼饵' },
-        { 'BtnEatLabel', self.BtnEat, '吃蚯蚓' },
         { 'BtnDiscardLabel', self.BtnDiscard, '丢弃选中物' },
-        { 'BtnDuckLabel', self.BtnDuck, '鸭子' },
-        { 'BtnSausageLabel', self.BtnSausage, '香肠' },
         { 'BtnItemActionLabel', self.BtnItemAction, '抛竿' },
     }
     for _, entry in ipairs(labels) do
@@ -1025,19 +1355,21 @@ function ScreenHandler:Init()
         self[entry[1]] = label
         self.Overlays[#self.Overlays + 1] = label
     end
-    self.HookHint = overlay(root, 'HookHint', resolution.x - 320, 800, 400, 80,
+    -- 上方提示区：上钩 / 等待提示同位（互斥显示），入水提示与收线进度同位，临时提示单独一行
+    local primary, secondary, transient = rects.HintPrimary, rects.HintSecondary, rects.HintTransient
+    self.HookHint = overlay(root, 'HookHint', primary.x, primary.y, primary.w, primary.h,
         '', 32, Color.New(255, 220, 40, 255))
     self.HookHint.Visible = false
     self.Overlays[#self.Overlays + 1] = self.HookHint
     local feedback = GameCfg.CastFeedback
     self.CastFloat = overlay(root, 'CastFloat', 0, 0, feedback.FloatSize, feedback.FloatSize,
         '●', 48, color(feedback.FloatColor))
-    self.CastWaitHint = overlay(root, 'CastWaitHint', resolution.x - 320, 800, 400, 80,
+    self.CastWaitHint = overlay(root, 'CastWaitHint', primary.x, primary.y, primary.w, primary.h,
         '等待上钩…', 32, Color.New(255, 255, 255, 255))
-    self.CastSplashHint = overlay(root, 'CastSplashHint', resolution.x / 2, resolution.y - 430, 520, 72,
-        '已入水，等待上钩', 32, Color.New(255, 225, 70, 255))
-    self.CastFailureHint = overlay(root, 'CastFailureHint', resolution.x / 2, resolution.y - 430, 740, 72,
-        '', 32, Color.New(255, 90, 90, 255))
+    self.CastSplashHint = overlay(root, 'CastSplashHint', secondary.x, secondary.y, secondary.w, secondary.h,
+        '已入水，等待上钩', 30, Color.New(255, 225, 70, 255))
+    self.CastFailureHint = overlay(root, 'CastFailureHint', transient.x, transient.y, transient.w, transient.h,
+        '', 30, Color.New(255, 90, 90, 255))
     self.CastFailureMark = overlay(root, 'CastFailureMark', 0, 0, feedback.FloatSize, feedback.FloatSize,
         '●', 48, Color.New(255, 65, 65, 255))
     for _, node in ipairs({ self.CastFloat, self.CastWaitHint, self.CastSplashHint,
@@ -1045,19 +1377,30 @@ function ScreenHandler:Init()
         node.Visible = false
         self.Overlays[#self.Overlays + 1] = node
     end
-    -- [未查证：任务条位置与 LabelCoin / 血球饥饿球（#53）是否重叠，待 #55 截图迭代]
-    -- #174 #1：任务条加深色半透明底板，白字不再直接压在亮色地面上
+    -- #179 左侧任务区：追踪条（#174 #1 深色半透明底板 + 折行文字）与折叠 / 展开按钮
+    local questPanel, questToggle = rects.QuestPanel, rects.QuestToggle
     self.QuestBackground = passive(World:CreateUnit('EUIImage', {
         Parent = root, Name = 'QuestBackground',
-        Position = Vector2.New(500, resolution.y - 330), Size = Vector2.New(920, 64),
+        Position = Vector2.New(questPanel.x, questPanel.y), Size = Vector2.New(questPanel.w, questPanel.h),
         Image = 'official://image/11017', Color = Color.New(16, 24, 34, 180),
     }))
     self.QuestBackground.Visible = false
     self.Overlays[#self.Overlays + 1] = self.QuestBackground
-    self.QuestLabel = overlay(root, 'QuestLabel', 500, resolution.y - 330, 900, 56,
-        '', 30, Color.New(255, 255, 255, 255))
+    self.QuestLabel = overlay(root, 'QuestLabel', questPanel.x, questPanel.y, questPanel.w - 20,
+        questPanel.h - 12, '', 24, Color.New(255, 255, 255, 255))
     self.QuestLabel.Visible = false
     self.Overlays[#self.Overlays + 1] = self.QuestLabel
+    self.QuestToggle = button(root, 'QuestToggle', questToggle.x, questToggle.y, questToggle.w)
+    place(self.QuestToggle, questToggle)
+    self.QuestToggleLabel = overlay(root, 'QuestToggleLabel', questToggle.x, questToggle.y,
+        questToggle.w, questToggle.h, '收起任务', 22, Color.New(255, 255, 255, 255))
+    self.Buttons[#self.Buttons + 1] = self.QuestToggle
+    self.Overlays[#self.Overlays + 1] = self.QuestToggleLabel
+    self:Listen(self.QuestToggle.OnClicked, function()
+        self.QuestCollapsed = not self.QuestCollapsed
+        self:RenderQuest()
+    end)
+    self:RenderQuest()
     local cx, cy = resolution.x / 2, resolution.y / 2
     local width = math.min(1000, resolution.x - 60)
     self.DialogueColumns = math.max(12, math.floor((width - 80) / 26))
@@ -1099,15 +1442,15 @@ function ScreenHandler:Init()
         self.DialogueRead.TouchEnabled = false
         _G.REUtil:GetRE('StoryRead'):FireServer({ action = 'read', readKey = payload.readKey })
     end)
-    self:BuildVitals(root, resolution)
+    self:BuildVitals(root, resolution, layout)
     self.ReelBarBg = World:CreateUnit('EUIImage', {
         Parent = root, Name = 'ReelProgressBg',
-        Position = Vector2.New(resolution.x - 600, 860), Size = Vector2.New(400, 36),
+        Position = Vector2.New(secondary.x, secondary.y), Size = Vector2.New(400, 36),
         Image = 'official://image/30008',
     })
     self.ReelBar = World:CreateUnit('EUILoadingBar', {
         Parent = root, Name = 'ReelProgress',
-        Position = Vector2.New(resolution.x - 600, 860), Size = Vector2.New(400, 36),
+        Position = Vector2.New(secondary.x, secondary.y), Size = Vector2.New(400, 36),
         Image = 'official://image/30007', Direction = 0, Percent = 50,
         Color = Color.New(36, 200, 94, 255),
     })
@@ -1128,49 +1471,18 @@ function ScreenHandler:Init()
     end)
     self.BtnDiscard.Visible = false
     self.BtnDiscardLabel.Visible = false
+    -- 点击与长按按 ItemActionMode 查道具按钮表（ITEM_ACTIONS / SPECIAL_ACTIONS），与显示同源
     self:Listen(self.BtnItemAction.OnClicked, function()
         if not self.IsOpen then return end
-        local phase = self.CastState and self.CastState.phase or 'idle'
-        -- #140：特殊道具生效且空闲时，点击 = 原子吐息（风神之翼走长按，点击不做事）
-        if phase == 'idle' and self.SpecialEffect then
-            if self.SpecialEffect == 'godzilla'
-                and not (self.BreathCooldownUntil and self.BreathCooldownUntil > World:GetServerTime()) then
-                _G.REUtil:GetRE('SpecialItemAction'):FireServer({ action = 'breath' })
-            end
-            return
-        end
-        if phase == 'hooked' and self.IsOpen
-            and _G.LocalReelIn.SessionId == self.CastState.reelSession then
-            _G.LocalReelIn:Click()
-            self:ShowCast()
-        elseif lineStillOut(phase) then
-            _G.REUtil:GetRE('CastAction'):FireServer({ action = 'Reel' })
-        elseif phase == 'idle' and self.CastState and self.CastState.holding then
-            _G.REUtil:GetRE('CastAction'):FireServer({ action = 'Drop' })
-        elseif phase == 'idle' and self.Snapshot then
-            local slot = self.Snapshot.selectedSlot
-            local entry = slot and self.Snapshot.slots[slot]
-            if entry and GameCfg.Items.Definitions[entry.itemId]
-                and type(GameCfg.Items.Definitions[entry.itemId].Level) == 'number' then
-                _G.REUtil:GetRE('CastAction'):FireServer({
-                    action = 'Cast', slot = slot, itemId = entry.itemId,
-                })
-            else
-                self.FailureUntil = nil
-                self.FailureLanding = nil
-                self:ShowCast()
-                self:ShowCastFailure({ reason = 'invalidRod' })
-            end
-        end
+        local click = itemAction(self, self:ItemActionMode()).click
+        if click then click(self) end
     end)
-    self:Listen(self.BtnBait.OnClicked, function() self:Action('SelectBait', GameCfg.Items.Id.Worm) end)
     -- #140 风神之翼：长按升空、松开缓降（按下 / 松开成对发送，服务端以调和为准）
     if self.BtnItemAction.OnTouchBegan and self.BtnItemAction.OnTouchEnded then
         self:Listen(self.BtnItemAction.OnTouchBegan, function()
-            if self.IsOpen and self.SpecialEffect == 'wings'
-                and (not self.CastState or self.CastState.phase == 'idle') then
-                _G.REUtil:GetRE('SpecialItemAction'):FireServer({ action = 'fly', holding = true })
-            end
+            if not self.IsOpen then return end
+            local pressBegan = itemAction(self, self:ItemActionMode()).pressBegan
+            if pressBegan then pressBegan(self) end
         end)
         self:Listen(self.BtnItemAction.OnTouchEnded, function()
             if self.SpecialEffect == 'wings' then
@@ -1178,17 +1490,6 @@ function ScreenHandler:Init()
             end
         end)
     end
-    self:Listen(self.BtnDuck.OnClicked, function() self:Action('SelectBait', GameCfg.Items.Id.Duck) end)
-    self:Listen(self.BtnSausage.OnClicked, function() self:Action('SelectBait', GameCfg.Items.Id.Sausage) end)
-    self:Listen(self.BtnNone.OnClicked, function() self:Action('SelectBait') end)
-    self:Listen(self.BtnEat.OnClicked, function()
-        local _, slot = self:SelectedFood()
-        if slot then
-            self:Operate({ op = 'eat', slot = slot })
-        else
-            self:Action('EatBait', GameCfg.Items.Id.Worm)
-        end
-    end)
     self:Listen(self.BtnDiscard.OnClicked, function()
         if self.Snapshot and self.Snapshot.selectedSlot then
             self:Operate({ op = 'discard', slot = self.Snapshot.selectedSlot })
@@ -1267,8 +1568,7 @@ function ScreenHandler:Init()
         if not self.IsOpen then return end
         if waitingCast(state) then
             if self.AlertedCastId and state.castId < self.AlertedCastId then return end
-            self.FailureUntil = nil
-            self.FailureLanding = nil
+            clearCastFailure(self)
             if self.AlertedCastId ~= state.castId then
                 self.AlertedCastId = state.castId
                 self.SplashUntil = nil
@@ -1279,10 +1579,7 @@ function ScreenHandler:Init()
             end
         else
             self.SplashUntil = nil
-            if not state.snapshot or state.phase ~= 'idle' then
-                self.FailureUntil = nil
-                self.FailureLanding = nil
-            end
+            if not state.snapshot or state.phase ~= 'idle' then clearCastFailure(self) end
         end
         if state.phase == 'hooked' then
             _G.LocalReelIn:SetSession(state.reelSession)
@@ -1347,7 +1644,8 @@ function ScreenHandler:Init()
             listenPlayerAttributes(self, player)
         end)
     end
-    LocalAttackButton:Start(root, resolution)
+    LocalAttackButton:Start(root, rects.AttackControl)
+    self.LayoutKey = { slots = count, reeling = true }
     self.BoundRootNode = root
     self.Inited = true
     self.IsOpen = false
@@ -1389,9 +1687,12 @@ function ScreenHandler:CloseScreen()
     DamageFloat:Clear()
     FishCombatLabel:Clear()
     self.IsOpen = false
+    -- 临时提示状态整体收尾（Cleanup 经由这里），重开 / 重进不带上一轮的「只做提示」标志
     self.FailureUntil = nil
     self.FailureLanding = nil
+    self.FailureNotice = nil
     self:EndAim()
+    self:ClosePopup() -- #180：界面被盖住时弹窗不留到重开
     LocalAttackButton:SetOpen(false)
     -- #133 遮挡只影响表现：不主动收线，待发点击先 flush，会话与进度留给重开时接着显示
     if _G.LocalReelIn then _G.LocalReelIn:Suspend() end
