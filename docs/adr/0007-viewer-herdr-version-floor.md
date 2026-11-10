@@ -1,6 +1,6 @@
 # 0007 Viewer 固定版本升到接受 Herdr >= 0.9.3（原编号 0004）
 
-**Status**: accepted
+**Status**: superseded by [ADR-0016](0016-dsh-uml-viewer-plugin.md)
 
 > **出处迁移（#146 / #147 追加）**：下文的 `tools/quality/project.json`（`tools.viewer.commit`）与 `tools/quality/install.ps1` 已随项目自建质量工具一并删除；质量工具改由 uml-viewer 标准工具承担，业务范围与选项只在根目录 `uml-quality.json` 的 `standardTools` 声明，决策与取舍见 [ADR-0011](0011-cli-single-entry-standard-quality-no-acceptance.md)。
 

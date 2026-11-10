@@ -1,6 +1,6 @@
 # 0001 Direct standard viewer integration
 
-**Status**: accepted
+**Status**: superseded by [ADR-0016](0016-dsh-uml-viewer-plugin.md)
 
 se-fish 直接接入最新标准 uml-viewer，取消全部五个私有补丁（installer、viewer-seam、restart-spec、companion、restart）。所需能力上游化到 uml-viewer（quality dispatch 配置、companion 失败语义、session 恢复缺口）后，通过版本控制的 `uml-quality.json` 声明 quality 命令映射，由 install.ps1 固定 SHA 接入 Herdr 后端。
 

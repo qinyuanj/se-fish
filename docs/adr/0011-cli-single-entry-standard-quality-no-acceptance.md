@@ -1,6 +1,6 @@
 # 0011 CLI 为唯一公开工具入口，质量交给 uml-viewer 标准工具，删除 acceptance4lua
 
-**Status**: accepted（部分取代 [ADR-0010](0010-packages-as-business-code.md) 中业务范围的出处）
+**Status**: accepted（部分取代 [ADR-0010](0010-packages-as-business-code.md) 中业务范围的出处）；第 2 节的 `./uml` 入口与「质量工具只由人运行」已被 [ADR-0016](0016-dsh-uml-viewer-plugin.md) 取代
 
 此前在 se-fish 跑检查要记多个形态各异的入口：裸 `busted --run=fast|full`、项目自建的 Python 质量入口 `tools/quality/project`、bash 验收脚本 `run_acceptance.sh`，以及只收运维子命令的 `tools/cli.lua`。质量工具在仓库内重复实现了 uml-viewer 标准工具已有的能力，Gherkin 验收（acceptance4lua）与 busted 用例高度重合，art 车道又和美术校验脚本核对同一份报告（#144）。本 ADR 记录收口时的三项决定。
 
