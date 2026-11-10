@@ -14,7 +14,7 @@
 --   9. 背包打开时栏位与弹窗没收起；关背包后栏位不恢复或弹窗复活；
 --  10. 「蚯蚓用尽」仍是按钮文字；临时提示不出现、不消失；开局即 0 时误报；
 --      抛竿扣掉最后一只蚯蚓时，提示打断「等待上钩」与浮标，或被随后的 CastState 立刻清掉；
---  11. 「吃」按钮没有食物时仍显示或可点（吃蚯蚓入口残留）；
+--  11. 平铺行与固定鱼饵键残留（「吃」按钮 #181 起由道具按钮承担，见 item_action_ui_test）；
 --  12. 重进界面后弹窗节点或监听残留。
 local MainHudLayout = require('client.MainHudLayout')
 local GameCfg = require('common.GameCfg')
@@ -374,7 +374,8 @@ describe('武器栏、鱼饵栏与弹窗（#180）', function()
         assert.is_false(ctx.nodes.WeaponPopup.Visible)
     end)
 
-    it('test_tiled_rows_gone_and_eat_button_only_for_selected_food', function()
+    -- 平铺行与固定鱼饵键已被弹窗取代；独立「吃」按钮 #181 并入道具按钮后删除（见 item_action_ui_test）
+    it('test_tiled_rows_and_fixed_bait_buttons_gone', function()
         ctx = setUp(1080)
         ctx.states:Fire({ slots = {}, bait = { worm = 3, rareShrimp = 2, duck = 1, sausage = 1 },
             weapons = { item134 = 1 } })
@@ -382,31 +383,9 @@ describe('武器栏、鱼饵栏与弹窗（#180）', function()
             assert.is_nil(name:match('^BaitDyn') or name:match('^WeaponItem'), name)
         end
         for _, name in ipairs({ 'BaitWorm', 'BaitNone', 'BaitDuck', 'BaitSausage', 'BtnBaitLabel',
-            'BtnNoneLabel', 'BtnDuckLabel', 'BtnSausageLabel' }) do
+            'BtnNoneLabel', 'BtnDuckLabel', 'BtnSausageLabel', 'BaitEat', 'BtnEatLabel' }) do
             assert.is_nil(ctx.nodes[name], name)
         end
-        -- 没有选中食物：「吃」按钮不出现（吃蚯蚓入口已移进鱼饵栏弹窗）
-        assert.is_false(ctx.nodes.BaitEat.Visible)
-        assert.is_false(ctx.nodes.BaitEat.TouchEnabled)
-        assert.is_false(ctx.nodes.BtnEatLabel.Visible)
-        ctx.nodes.BaitEat.OnClicked:Fire()
-        assert.same(0, #ctx.commands)
-        -- 选中格是食物：两步进食路径照旧
-        ctx.states:Fire({ slots = { [1] = { itemId = 'carp', count = 1 } }, bait = { worm = 3 }, selectedSlot = 1 })
-        assert.is_true(ctx.nodes.BaitEat.Visible)
-        assert.is_true(ctx.nodes.BaitEat.TouchEnabled)
-        assert.is_true(ctx.nodes.BtnEatLabel.Visible)
-        assert.same('手持' .. NAME.carp, ctx.nodes.BtnEatLabel.Text)
-        -- 背包打开时一并收起，关闭后按快照恢复
-        ctx.nodes.BtnBackpack.OnClicked:Fire()
-        assert.is_false(ctx.nodes.BaitEat.Visible)
-        ctx.nodes.BtnBackpack.OnClicked:Fire()
-        assert.is_true(ctx.nodes.BaitEat.Visible)
-        ctx.states:Fire({ slots = { [1] = { itemId = 'starterRod', count = 1 } }, bait = { worm = 3 }, selectedSlot = 1 })
-        assert.is_false(ctx.nodes.BaitEat.Visible)
-        ctx.nodes.BtnBackpack.OnClicked:Fire()
-        ctx.nodes.BtnBackpack.OnClicked:Fire()
-        assert.is_false(ctx.nodes.BaitEat.Visible)
     end)
 
     it('test_worm_depleted_shows_transient_hint_then_fades', function()

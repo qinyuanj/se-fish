@@ -133,16 +133,18 @@ describe("持有操作的界面侧", function()
     end)
 
     -- 吃/丢弃走 Operate 两步：点击发带 seq 的 Operate 请求，手持确认态由服务端快照驱动。
+    -- #181：吃改由道具按钮（ItemAction2）承担，命令不变
     it("test_eat_and_discard_send_operate_with_seq", function()
+        ctx.handler.IsOpen = true
         ctx.states:Fire({ slots = { [1] = { itemId = 'carp', count = 1 } },
             bait = { worm = 10 }, selectedSlot = 1 })
-        ctx.nodes.BaitEat.OnClicked:Fire()
+        ctx.nodes.ItemAction2.OnClicked:Fire()
         assert.same({ action = 'Operate', op = 'eat', slot = 1, seq = 1 }, ctx.commands[1])
         -- 服务端回快照：手持已切 → 按钮进入确认态
         ctx.states:Fire({ slots = { [1] = { itemId = 'carp', count = 1 } },
             bait = { worm = 10 }, selectedSlot = 1, held = { kind = 'slot', id = 'carp', slot = 1 } })
-        assert.same('吃鲤鱼', ctx.nodes.BtnEatLabel.Text)
-        ctx.nodes.BaitEat.OnClicked:Fire()
+        assert.same('吃鲤鱼', ctx.nodes.BtnItemActionLabel.Text)
+        ctx.nodes.ItemAction2.OnClicked:Fire()
         assert.same({ action = 'Operate', op = 'eat', slot = 1, seq = 2 }, ctx.commands[2])
         ctx.nodes.ItemDiscard.OnClicked:Fire()
         assert.same({ action = 'Operate', op = 'discard', slot = 1, seq = 3 }, ctx.commands[3])

@@ -110,9 +110,7 @@ describe("道具栏的界面侧", function()
         assert.is_false(ctx.nodes.BtnItemActionLabel.Visible)
         assert.is_false(ctx.nodes.ItemDiscard.Visible)
         assert.is_false(ctx.nodes.BtnDiscardLabel.Visible)
-        -- #180：没有选中食物时「吃」按钮不出现；蚯蚓与吃蚯蚓在鱼饵栏弹窗里置灰
-        assert.is_false(ctx.nodes.BaitEat.Visible)
-        assert.is_false(ctx.nodes.BaitEat.TouchEnabled)
+        -- #180：蚯蚓与吃蚯蚓在鱼饵栏弹窗里置灰（独立「吃」按钮 #181 已删除，见 item_action_ui_test）
         ctx.nodes.BaitBar.OnClicked:Fire()
         assert.is_false(ctx.nodes.BaitPopupCell_worm.TouchEnabled)
         assert.is_false(ctx.nodes.BaitPopupCell_EatWorm.TouchEnabled)
@@ -149,7 +147,7 @@ describe("道具栏的界面侧", function()
         assert.same('official://image/11017', ctx.nodes.ItemBarSlot1.NormalImage)
         assert.same('official://image/11017', ctx.nodes.BaitBar.NormalImage)
         assert.same('official://image/11017', ctx.nodes.WeaponBar.NormalImage)
-        for labelName, buttonName in pairs({ BtnEatLabel = 'BaitEat', BtnDiscardLabel = 'ItemDiscard',
+        for labelName, buttonName in pairs({ BtnDiscardLabel = 'ItemDiscard',
             BtnItemActionLabel = 'ItemAction2', BaitBarLabel = 'BaitBar', WeaponBarLabel = 'WeaponBar' }) do
             local label, button = ctx.nodes[labelName], ctx.nodes[buttonName]
             assert.equal(ctx.handler.RootNode, label.Parent)
@@ -314,11 +312,11 @@ describe("道具栏的界面侧", function()
         ctx.nodes.WeaponBar.OnClicked:Fire()
         assert.is_true(ctx.nodes.WeaponPopupCell_sword.Visible)
         ctx.nodes.BtnBackpack.OnClicked:Fire()
-        for _, name in ipairs({ 'BaitBar', 'WeaponBar', 'BaitEat', 'ItemDiscard', 'ItemAction2', 'ReelClose',
+        for _, name in ipairs({ 'BaitBar', 'WeaponBar', 'ItemDiscard', 'ItemAction2', 'ReelClose',
             'WeaponPopup', 'WeaponPopupCell_sword', 'WeaponPopupLabel_sword', 'PopupDismiss' }) do
             assert.is_false(ctx.nodes[name].Visible, name)
         end
-        for _, name in ipairs({ 'BaitBarLabel', 'WeaponBarLabel', 'BtnEatLabel', 'BtnItemActionLabel',
+        for _, name in ipairs({ 'BaitBarLabel', 'WeaponBarLabel', 'BtnItemActionLabel',
             'BtnDiscardLabel', 'ItemBarLabel1' }) do
             assert.is_false(ctx.nodes[name].Visible, name)
         end
@@ -362,7 +360,7 @@ describe("道具栏的界面侧", function()
     it("test_button_labels_center_aligned", function()
         ctx.states:Fire({ slots = {}, bait = { worm = 1 }, weapons = { sword = 1 } })
         ctx.nodes.WeaponBar.OnClicked:Fire()
-        for _, name in ipairs({ 'BaitBarLabel', 'WeaponBarLabel', 'BtnEatLabel', 'LabelBackpack',
+        for _, name in ipairs({ 'BaitBarLabel', 'WeaponBarLabel', 'BtnItemActionLabel', 'LabelBackpack',
             'DialogueNextLabel', 'DialogueReadLabel', 'WeaponPopupLabel_sword', 'QuestLabel' }) do
             local label = ctx.nodes[name]
             assert.same(1, label.TextHorizontalAlignment, name)

@@ -207,8 +207,8 @@ function ScreenHandler:Show(state)
         slot.Background.ButtonNormalColor = index == state.selectedSlot
             and Color.New(36, 130, 94, 255) or Color.New(54, 100, 140, 255)
     end
-    -- 鱼饵（蚯蚓、香肠、鸭子、动态鱼饵）与武器的选择、吃蚯蚓都在武器栏 / 鱼饵栏弹窗里（#180）
-    self:ShowEat()
+    -- 鱼饵（蚯蚓、香肠、鸭子、动态鱼饵）与武器的选择、吃蚯蚓都在武器栏 / 鱼饵栏弹窗里（#180）；
+    -- 选中格食物的两步进食在道具按钮上（#181）
     self:ShowCoin(state.coin)
     self:ShowCast()
     local heldSlot = state.held and state.held.kind == 'slot' and state.held.slot or nil
@@ -220,24 +220,6 @@ function ScreenHandler:Show(state)
     self:RenderEquipBars(state)
     self:ShowBackpack()
     if depleted then self:ShowCastFailure({ reason = 'wormDepleted' }) end
-end
-
--- 吃（#53/#124）：只在选中格有食物时出现，走 Operate 两步——首次只切手持，再点真吃；
--- 手持确认态由服务端快照驱动，重复点击、关闭界面后状态仍合法。
--- #180 起「吃蚯蚓」移进鱼饵栏弹窗；这颗按钮由 #181 并入道具按钮后删除
-function ScreenHandler:ShowEat()
-    if not self.BtnEat then return end
-    local state = self.Snapshot
-    local food, foodSlot = self:SelectedFood()
-    local visible = food ~= nil and not self.BackpackOpen
-    self.BtnEat.Visible = visible
-    self.BtnEat.TouchEnabled = visible
-    self.BtnEatLabel.Visible = visible
-    if food then
-        local heldSlot = state.held and state.held.kind == 'slot' and state.held.slot or nil
-        local name = GameCfg.Items.Definitions[food.itemId].Name
-        self.BtnEatLabel.Text = heldSlot == foodSlot and ('吃' .. name) or ('手持' .. name)
-    end
 end
 
 -- 上钩提示（#54）：同一收线会话只触发一次；提示音缺失或播放失败时只保留文字与高亮
@@ -412,9 +394,41 @@ local function lineStillOut(phase)
     return phase == 'cast' or phase == 'unhooked'
 end
 
-local function castActionEnabled(self, phase, rod, drop, active)
-    return self.IsOpen == true
-        and ((rod and phase == 'idle') or drop or lineStillOut(phase) or active == true) or false
+-- 选中格是不是鱼竿（物品表配了 Level）
+local function selectedRod(state)
+    local entry = state and state.selectedSlot and state.slots[state.selectedSlot]
+    local definition = entry and GameCfg.Items.Definitions[entry.itemId]
+    return definition ~= nil and type(definition.Level) == 'number'
+end
+
+-- 道具按钮（#181）：显示与点击共用同一份优先级判定，避免两边各判一套而不一致。
+-- 特殊道具（空闲）> 上钩 > 鱼线在外 > 上岸停留 > 手持鱼获 > 手持食物 > 手持鱼竿 > 其他。
+-- 「空闲」指没有抛竿且头上没顶着鱼：顶着鱼时先放下（沿用 #140 起的显示语义）。
+function ScreenHandler:ItemActionMode()
+    local phase = self.CastState and self.CastState.phase or 'idle'
+    local drop = phase == 'idle' and self.CastState ~= nil and self.CastState.holding ~= nil
+    if phase == 'idle' and not drop and self.SpecialEffect then return 'special' end
+    if phase == 'hooked' then return 'hooked' end
+    if lineStillOut(phase) then return 'lineOut' end
+    if phase == 'landed' then return 'landed' end
+    if drop then return 'drop' end
+    if self:SelectedFood() then return 'food' end
+    if selectedRod(self.Snapshot) then return 'rod' end
+    return 'none'
+end
+
+local function castActionEnabled(self, mode, active)
+    if self.IsOpen ~= true then return false end
+    if mode == 'hooked' then return active == true end
+    return mode == 'lineOut' or mode == 'drop' or mode == 'food' or mode == 'rod'
+end
+
+local function foodActionText(self)
+    local food, foodSlot = self:SelectedFood()
+    local held = self.Snapshot.held
+    local heldSlot = held and held.kind == 'slot' and held.slot or nil
+    local name = GameCfg.Items.Definitions[food.itemId].Name
+    return heldSlot == foodSlot and ('吃' .. name) or ('手持' .. name)
 end
 
 local function castActionColor(phase, now, alert)
@@ -429,15 +443,17 @@ local function castActionColor(phase, now, alert)
         math.floor(100 + (h[2] - 100) * k), math.floor(140 + (h[3] - 140) * k), h[4])
 end
 
-local function showCastAction(self, phase, rod, drop, active, alertNow)
-    local visible = rod == true or phase ~= 'idle' or drop
+local castActionText = {
+    hooked = '点击收线', lineOut = '收竿', landed = '已上岸', drop = '放下', rod = '抛竿',
+}
+
+local function showCastAction(self, mode, phase, active, alertNow)
+    local visible = mode ~= 'none'
     self.BtnItemAction.Visible = visible
     self.BtnItemActionLabel.Visible = visible
-    self.BtnItemAction.TouchEnabled = castActionEnabled(self, phase, rod, drop, active)
+    self.BtnItemAction.TouchEnabled = castActionEnabled(self, mode, active)
     self.BtnItemAction.ButtonNormalColor = castActionColor(phase, alertNow, GameCfg.HookAlert)
-    self.BtnItemActionLabel.Text = phase == 'hooked' and '点击收线'
-        or phase == 'landed' and '已上岸' or lineStillOut(phase) and '收竿'
-        or drop and '放下' or rod and '抛竿' or '使用'
+    self.BtnItemActionLabel.Text = mode == 'food' and foodActionText(self) or castActionText[mode] or '使用'
 end
 
 -- #140 特殊道具：空闲且服务端生效效果（SpecialItemState.effect）存在时，
@@ -556,25 +572,20 @@ end
 
 function ScreenHandler:ShowCast()
     if not self.BtnItemAction then return end
-    local state = self.Snapshot
-    local selected = state and state.selectedSlot and state.slots[state.selectedSlot]
-    local rod = selected and GameCfg.Items.Definitions[selected.itemId]
-        and type(GameCfg.Items.Definitions[selected.itemId].Level) == 'number'
     local phase = self.CastState and self.CastState.phase or 'idle'
     local reel = _G.LocalReelIn
     local active = self.IsOpen and phase == 'hooked' and reel
         and reel.SessionId == self.CastState.reelSession
     self:ApplyLayout(nil, active == true) -- #179：收线期间「结束收线」按布局占位
-    -- 头上顶着鱼（#41，以服务端 holding 为准）：空闲时 2 号位是「放下」
-    local drop = phase == 'idle' and self.CastState ~= nil and self.CastState.holding ~= nil
     -- 上钩提示（#54）：本收线会话的前 DurationSec 秒按钮呼吸式高亮、文字改为提示语
     local now = active == true and self.HookAlertUntil ~= nil and World:GetServerTime()
     local alerting = now and now < self.HookAlertUntil
     -- #140：空闲且特殊道具生效时按钮让给飞行 / 吐息；钓鱼各阶段保持钓鱼语义
-    if phase == 'idle' and not drop and self.SpecialEffect then
+    local mode = self:ItemActionMode()
+    if mode == 'special' then
         showSpecialAction(self, self.SpecialEffect)
     else
-        showCastAction(self, phase, rod, drop, active, alerting and now)
+        showCastAction(self, mode, phase, active, alerting and now)
     end
     local progress = castProgress(self, reel, active)
     if type(progress) ~= 'number' or progress ~= progress then progress = 50 end
@@ -674,7 +685,7 @@ function ScreenHandler:ApplyBackpackOcclusion()
     -- #180：开着的弹窗随背包打开直接关闭，关背包时不复活
     if hidden and self.OpenPopup then self:ClosePopup() end
     local fixed = {
-        { self.BtnEat, self.BtnEatLabel }, { self.BtnDiscard, self.BtnDiscardLabel },
+        { self.BtnDiscard, self.BtnDiscardLabel },
         { self.BtnItemAction, self.BtnItemActionLabel }, { self.BtnReelClose, self.BtnReelCloseLabel },
     }
     for _, entry in pairs(self.EquipBars or {}) do fixed[#fixed + 1] = { entry.Button, entry.Label } end
@@ -691,9 +702,8 @@ function ScreenHandler:ApplyBackpackOcclusion()
         slot.Count.Visible = slot.Count.Visible and not hidden
     end
     if not hidden then
-        -- 恢复既有显隐规则：抛竿/收线键交给 ShowCast，「吃」与丢弃键按快照重算，装备栏两格按快照重刷
+        -- 恢复既有显隐规则：道具按钮交给 ShowCast，丢弃键按快照重算，装备栏两格按快照重刷
         self:ShowCast()
-        self:ShowEat()
         local selected = self.Snapshot and self.Snapshot.selectedSlot
             and self.Snapshot.slots and self.Snapshot.slots[self.Snapshot.selectedSlot]
         self.BtnDiscard.Visible = selected ~= nil
@@ -1121,12 +1131,10 @@ function ScreenHandler:Cleanup()
     self.MoveLabel = nil
     self.SelectedBackpackSlot = nil
     self.Buttons = nil
-    self.BtnEat = nil
     self.BtnDiscard = nil
     self.BtnItemAction = nil
     self.BtnReelClose = nil
     self.BtnReelCloseLabel = nil
-    self.BtnEatLabel = nil
     self.BtnDiscardLabel = nil
     self.BtnItemActionLabel = nil
     self.HookHint = nil
@@ -1236,10 +1244,6 @@ function ScreenHandler:Init()
     self.UIRoot = root
     self:BuildBackpack(root, layout)
     self:BuildEquipBars(root, layout)
-    -- 「吃」按钮只剩选中格食物的两步进食（#180），由 #181 并入道具按钮；在那之前暂留原坐标
-    -- （按旧 8 格道具栏居中推算），只在选中食物时出现
-    local firstX = (resolution.x - 7 * 120) / 2
-    self.BtnEat = button(root, 'BaitEat', firstX + 460, 540, 170)
     local discard = rects.Discard
     self.BtnDiscard = button(root, 'ItemDiscard', discard.x, discard.y, discard.w)
     local action, reelClose = rects.ItemAction, rects.ReelClose
@@ -1248,12 +1252,11 @@ function ScreenHandler:Init()
     place(self.BtnDiscard, discard)
     place(self.BtnItemAction, action)
     place(self.BtnReelClose, reelClose)
-    for _, node in ipairs({ self.BtnEat, self.BtnDiscard, self.BtnItemAction, self.BtnReelClose }) do
+    for _, node in ipairs({ self.BtnDiscard, self.BtnItemAction, self.BtnReelClose }) do
         self.Buttons[#self.Buttons + 1] = node
     end
     local labels = {
         { 'BtnReelCloseLabel', self.BtnReelClose, '结束收线' },
-        { 'BtnEatLabel', self.BtnEat, '' },
         { 'BtnDiscardLabel', self.BtnDiscard, '丢弃选中物' },
         { 'BtnItemActionLabel', self.BtnItemAction, '抛竿' },
     }
@@ -1380,42 +1383,38 @@ function ScreenHandler:Init()
     end)
     self.BtnDiscard.Visible = false
     self.BtnDiscardLabel.Visible = false
-    self.BtnEat.Visible = false
-    self.BtnEat.TouchEnabled = false
-    self.BtnEatLabel.Visible = false
     self:Listen(self.BtnItemAction.OnClicked, function()
         if not self.IsOpen then return end
-        local phase = self.CastState and self.CastState.phase or 'idle'
+        local mode = self:ItemActionMode()
         -- #140：特殊道具生效且空闲时，点击 = 原子吐息（风神之翼走长按，点击不做事）
-        if phase == 'idle' and self.SpecialEffect then
+        if mode == 'special' then
             if self.SpecialEffect == 'godzilla'
                 and not (self.BreathCooldownUntil and self.BreathCooldownUntil > World:GetServerTime()) then
                 _G.REUtil:GetRE('SpecialItemAction'):FireServer({ action = 'breath' })
             end
-            return
-        end
-        if phase == 'hooked' and self.IsOpen
-            and _G.LocalReelIn.SessionId == self.CastState.reelSession then
-            _G.LocalReelIn:Click()
-            self:ShowCast()
-        elseif lineStillOut(phase) then
-            _G.REUtil:GetRE('CastAction'):FireServer({ action = 'Reel' })
-        elseif phase == 'idle' and self.CastState and self.CastState.holding then
-            _G.REUtil:GetRE('CastAction'):FireServer({ action = 'Drop' })
-        elseif phase == 'idle' and self.Snapshot then
-            local slot = self.Snapshot.selectedSlot
-            local entry = slot and self.Snapshot.slots[slot]
-            if entry and GameCfg.Items.Definitions[entry.itemId]
-                and type(GameCfg.Items.Definitions[entry.itemId].Level) == 'number' then
-                _G.REUtil:GetRE('CastAction'):FireServer({
-                    action = 'Cast', slot = slot, itemId = entry.itemId,
-                })
-            else
-                self.FailureUntil = nil
-                self.FailureLanding = nil
+        elseif mode == 'hooked' then
+            if _G.LocalReelIn.SessionId == self.CastState.reelSession then
+                _G.LocalReelIn:Click()
                 self:ShowCast()
-                self:ShowCastFailure({ reason = 'invalidRod' })
             end
+        elseif mode == 'lineOut' then
+            _G.REUtil:GetRE('CastAction'):FireServer({ action = 'Reel' })
+        elseif mode == 'drop' then
+            _G.REUtil:GetRE('CastAction'):FireServer({ action = 'Drop' })
+        elseif mode == 'food' then
+            -- 两步进食（#53/#124）：首次只切手持，服务端快照确认手持该格后再点才真吃
+            local _, slot = self:SelectedFood()
+            self:Operate({ op = 'eat', slot = slot })
+        elseif mode == 'rod' then
+            local slot = self.Snapshot.selectedSlot
+            _G.REUtil:GetRE('CastAction'):FireServer({
+                action = 'Cast', slot = slot, itemId = self.Snapshot.slots[slot].itemId,
+            })
+        elseif mode == 'none' and self.Snapshot then
+            self.FailureUntil = nil
+            self.FailureLanding = nil
+            self:ShowCast()
+            self:ShowCastFailure({ reason = 'invalidRod' })
         end
     end)
     -- #140 风神之翼：长按升空、松开缓降（按下 / 松开成对发送，服务端以调和为准）
@@ -1432,10 +1431,6 @@ function ScreenHandler:Init()
             end
         end)
     end
-    self:Listen(self.BtnEat.OnClicked, function()
-        local _, slot = self:SelectedFood()
-        if slot then self:Operate({ op = 'eat', slot = slot }) end
-    end)
     self:Listen(self.BtnDiscard.OnClicked, function()
         if self.Snapshot and self.Snapshot.selectedSlot then
             self:Operate({ op = 'discard', slot = self.Snapshot.selectedSlot })
