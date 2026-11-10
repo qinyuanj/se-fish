@@ -204,7 +204,7 @@ describe('道具按钮合并（#181）', function()
         push('ItemBarState', selecting('carp', true))
         for _, phase in ipairs({ 'cast', 'unhooked' }) do
             push('CastState', { phase = phase })
-            assert.same('收线', label(), phase)
+            assert.same('收竿', label(), phase)
             assert.is_true(ctx.nodes.ItemAction2.TouchEnabled, phase)
             click()
             assert.same({ name = 'CastAction', payload = { action = 'Reel' } }, ctx.sent[#ctx.sent], phase)
