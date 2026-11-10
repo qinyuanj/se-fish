@@ -5,6 +5,7 @@ local WeaponAim = require('client.WeaponAim')
 local PressGesture = require('client.PressGesture')
 local DamageFloat = require('client.DamageFloat')
 local FishCombatLabel = require('client.FishCombatLabel')
+local MainHudLayout = require('client.MainHudLayout')
 
 local ScreenHandler = { UINodes = {}, UINodeMap = {} }
 
@@ -48,7 +49,7 @@ function ScreenHandler:SlotAtPosition(pos)
     for index, p in ipairs(self.ItemBarSlotPos or {}) do
         local slot = self.Slots and self.Slots[index]
         if slot and slot.Background.Visible
-            and math.abs(pos.x - p.x) <= 55 and math.abs(pos.y - p.y) <= 55 then
+            and math.abs(pos.x - p.x) <= p.hw and math.abs(pos.y - p.y) <= p.hh then
             return { container = GameCfg.Items.ContainerId.ItemBar, index = index }
         end
     end
@@ -177,6 +178,7 @@ function ScreenHandler:Show(state)
     self.Snapshot = state
     LocalAttackButton:SetEquipped(state) -- #129：攻击按钮语义随装备走（攻击/射击/连发/换弹）
     local capacity = state.slotCount or GameCfg.Items.ItemBarSlots
+    self:ApplyLayout(capacity, nil) -- #179：开放格数变化时按布局重排装备栏
     for index, slot in ipairs(self.Slots or {}) do
         local entry = state.slots[index]
         local definition = entry and GameCfg.Items.Definitions[entry.itemId]
@@ -282,7 +284,7 @@ local function updateStarving(self, health, hunger)
     self:UpdateStarveFx()
 end
 
--- 血球 / 饥饿球（#53）：数值只读服务端写的玩家属性 Health / MaxHealth / Hunger / MaxHunger
+-- 血球 / 饥饿度球（#53）：数值只读服务端写的玩家属性 Health / MaxHealth / Hunger / MaxHunger
 function ScreenHandler:ShowVitals()
     if not self.HealthRing then return end
     local player = game:GetService('Players').LocalPlayer
@@ -295,7 +297,7 @@ function ScreenHandler:ShowVitals()
     self.HealthRing.Percent = vitalPercent(health, maxHealth)
     self.HungerRing.Percent = vitalPercent(hunger, maxHunger)
     self.HealthText.Text = '血 ' .. tostring(health)
-    self.HungerText.Text = '饥饿 ' .. tostring(hunger)
+    self.HungerText.Text = '饥饿度 ' .. tostring(hunger)
     updateStarving(self, health, hunger)
 end
 
@@ -331,14 +333,46 @@ function ScreenHandler:ShowCoin(value)
     self.LabelCoin.Text = tostring(math.floor(tonumber(value) or 0))
 end
 
--- 新手任务条（#51）：左上角一行「新手任务 步号/总数：文案（计数）」，以服务端 QuestState 为准；
--- 推进那一次带 notice，走既有消息条提示下一步
+-- 按列数折行（中文按一字一列，ASCII 也按整列算，宁宽勿溢）
+local function wrapColumns(text, columns)
+    local out, count = {}, 0
+    for character in text:gmatch('[%z\1-\127\194-\244][\128-\191]*') do
+        if character == '\n' then
+            count = 0
+        else
+            if count >= columns then out[#out + 1], count = '\n', 0 end
+            count = count + 1
+        end
+        out[#out + 1] = character
+    end
+    return table.concat(out)
+end
+
+-- 新手任务追踪条（#51，#179 改到左侧任务区）：「新手任务 步号/总数：文案（计数）」按追踪条宽度折行，
+-- 以服务端 QuestState 为准；推进那一次带 notice，走既有消息条提示下一步
 function ScreenHandler:ShowQuest(state)
     if not self.QuestLabel or type(state) ~= 'table' or type(state.text) ~= 'string' then return end
-    self.QuestLabel.Text = state.text
-    self.QuestLabel.Visible = true
-    if self.QuestBackground then self.QuestBackground.Visible = true end
+    local columns = math.max(1, math.floor(self.QuestLabel.Size.x / self.QuestLabel.FontSize))
+    self.QuestLabel.Text = wrapColumns(state.text, columns)
+    self.QuestShown = true
+    self:RenderQuest()
     if type(state.notice) == 'string' and _G.LocalMsgNotice then _G.LocalMsgNotice(state.notice) end
+end
+
+-- 折叠 / 展开（#179）：折叠状态 QuestCollapsed 只存在客户端处理器上，不发服务端、不进存档；
+-- 重进界面（Cleanup）不清它，任务文字刷新也不改它
+function ScreenHandler:RenderQuest()
+    if not self.QuestLabel then return end
+    local shown = self.QuestShown == true
+    local expanded = shown and not self.QuestCollapsed
+    self.QuestLabel.Visible = expanded
+    if self.QuestBackground then self.QuestBackground.Visible = expanded end
+    if self.QuestToggle then
+        self.QuestToggle.Visible = shown
+        self.QuestToggle.TouchEnabled = shown
+        self.QuestToggleLabel.Visible = shown
+        self.QuestToggleLabel.Text = self.QuestCollapsed and '展开任务' or '收起任务'
+    end
 end
 
 function ScreenHandler:ShowDialogue(payload)
@@ -517,6 +551,7 @@ function ScreenHandler:ShowCast()
     local reel = _G.LocalReelIn
     local active = self.IsOpen and phase == 'hooked' and reel
         and reel.SessionId == self.CastState.reelSession
+    self:ApplyLayout(nil, active == true) -- #179：收线期间「结束收线」按布局占位
     -- 头上顶着鱼（#41，以服务端 holding 为准）：空闲时 2 号位是「放下」
     local drop = phase == 'idle' and self.CastState ~= nil and self.CastState.holding ~= nil
     -- 上钩提示（#54）：本收线会话的前 DurationSec 秒按钮呼吸式高亮、文字改为提示语
@@ -652,28 +687,26 @@ function ScreenHandler:ShowDynamicWeapons(state)
     end
 end
 
--- 左上角血球 / 饥饿球与四边红框（#53）；图片用途见 GameCfg.Vitals
--- [未查证：位置是否与场景既有的 LabelCoin 重叠，待 #55 截图迭代；原点左下、Y 向上]
-function ScreenHandler:BuildVitals(root, resolution)
+-- 左上状态区血球 / 饥饿度球（#53，#179 位置取自布局模块）与四边红框；图片用途见 GameCfg.Vitals
+function ScreenHandler:BuildVitals(root, resolution, layout)
     local c = GameCfg.Vitals
-    local y = resolution.y - 130
     local rings = {
-        { 'Health', 130, c.HealthRing, c.HealthColor },
-        { 'Hunger', 290, c.HungerRing, c.HungerColor },
+        { 'Health', layout.Rects.HealthRing, c.HealthRing, c.HealthColor },
+        { 'Hunger', layout.Rects.HungerRing, c.HungerRing, c.HungerColor },
     }
     for _, spec in ipairs(rings) do
-        local name, x = spec[1], spec[2]
+        local name, r = spec[1], spec[2]
         local bg = passive(World:CreateUnit('EUIImage', {
             Parent = root, Name = name .. 'RingBg',
-            Position = Vector2.New(x, y), Size = Vector2.New(128, 128), Image = c.RingBg,
+            Position = Vector2.New(r.x, r.y), Size = Vector2.New(r.w, r.h), Image = c.RingBg,
         }))
         local ring = passive(World:CreateUnit('EUIProgressTimer', {
             Parent = root, Name = name .. 'Ring',
-            Position = Vector2.New(x, y), Size = Vector2.New(128, 128), Image = spec[3], Percent = 100,
+            Position = Vector2.New(r.x, r.y), Size = Vector2.New(r.w, r.h), Image = spec[3], Percent = 100,
         }))
         ring.Color = color(spec[4])
         ring.LocalZOrder = 1
-        local text = overlay(root, name .. 'Text', x, y, 140, 40, '', 26, Color.New(255, 255, 255, 255))
+        local text = overlay(root, name .. 'Text', r.x, r.y, r.w, 40, '', 20, Color.New(255, 255, 255, 255))
         text.LocalZOrder = 2
         self[name .. 'Ring'] = ring
         self[name .. 'Text'] = text
@@ -791,25 +824,28 @@ function ScreenHandler:ShowBackpack()
     self:ApplyBackpackOcclusion()
 end
 
-function ScreenHandler:BuildBackpack(root, resolution)
-    local center = resolution.x / 2
-    local top = resolution.y - 100
+-- #179：背包按钮在底部装备栏（随道具栏格数重排，见 ApplyLayout）；面板位置取自布局模块，
+-- 面板内部排版不变：标题、背包格、转入按钮都按面板中心的固定偏移摆放
+function ScreenHandler:BuildBackpack(root, layout)
+    local entry, panelRect = layout.Rects.BackpackButton, layout.Panels.BackpackPanel
+    local center, cy = panelRect.x, panelRect.y
     self.BackpackOpen = false
     self.BackpackSlots = {}
     self.BackpackSlotPos = {}
-    self.BackpackButton = button(root, 'BtnBackpack', center, top, 220)
-    self.BackpackLabel = overlay(root, 'LabelBackpack', center, top, 220, 70,
-        '背包', 26, Color.New(255, 255, 255, 255))
-    self.BackpackPanel = button(root, 'BackpackPanel', center, top - 360, 850)
-    self.BackpackPanel.Size = Vector2.New(850, 690)
+    self.BackpackButton = button(root, 'BtnBackpack', entry.x, entry.y, entry.w)
+    self.BackpackButton.Size = Vector2.New(entry.w, entry.h)
+    self.BackpackLabel = overlay(root, 'LabelBackpack', entry.x, entry.y, entry.w, entry.h,
+        '背包', 22, Color.New(255, 255, 255, 255))
+    self.BackpackPanel = button(root, 'BackpackPanel', center, cy, panelRect.w)
+    self.BackpackPanel.Size = Vector2.New(panelRect.w, panelRect.h)
     self.BackpackPanel.TouchEnabled = false
     -- #174 #14：面板用深色，背包格用浅色，空格不再只剩一个「空」字
     self.BackpackPanel.ButtonNormalColor = Color.New(30, 46, 66, 240)
-    self.BackpackTitle = overlay(root, 'BackpackTitle', center, top - 70, 700, 48,
+    self.BackpackTitle = overlay(root, 'BackpackTitle', center, cy + 290, 700, 48,
         '选择背包物品，再转入道具栏', 28, Color.New(255, 255, 255, 255))
     for index = 1, GameCfg.Items.MaxBackpackSlots do
         local col, row = (index - 1) % 8, math.floor((index - 1) / 8)
-        local x, y = center - 350 + col * 100, top - 160 - row * 100
+        local x, y = center - 350 + col * 100, cy + 200 - row * 100
         local btn = button(root, 'BackpackSlot' .. index, x, y, 95)
         btn.Size = Vector2.New(95, 90)
         btn.ButtonNormalColor = Color.New(120, 168, 200, 255)
@@ -825,8 +861,8 @@ function ScreenHandler:BuildBackpack(root, resolution)
             self:ShowBackpack()
         end)
     end
-    self.MoveButton = button(root, 'BtnMoveToItemBar', center, top - 670, 330)
-    self.MoveLabel = overlay(root, 'LabelMoveToItemBar', center, top - 670, 330, 70,
+    self.MoveButton = button(root, 'BtnMoveToItemBar', center, cy - 310, 330)
+    self.MoveLabel = overlay(root, 'LabelMoveToItemBar', center, cy - 310, 330, 70,
         '转入道具栏', 26, Color.New(255, 255, 255, 255))
     self.Buttons[#self.Buttons + 1] = self.BackpackButton
     self.Buttons[#self.Buttons + 1] = self.BackpackPanel
@@ -850,6 +886,65 @@ function ScreenHandler:BuildBackpack(root, resolution)
         slot.Button.Visible = false
         slot.Label.Visible = false
     end
+end
+
+local function place(node, r)
+    if not node or not r then return end
+    node.Position = Vector2.New(r.x, r.y)
+    node.Size = Vector2.New(r.w, r.h)
+end
+
+-- 道具栏格：底板占满格子，图标、名字、数量按格子尺寸比例落在格内
+local function placeSlot(slot, r)
+    local x, y, w, h = r.x, r.y, r.w, r.h
+    slot.Background.Position = Vector2.New(x, y)
+    slot.Background.Size = Vector2.New(w, h)
+    slot.Icon.Position = Vector2.New(x, y + h * 0.1)
+    slot.Icon.Size = Vector2.New(w * 0.6, h * 0.6)
+    slot.Label.Position = Vector2.New(x, y - h * 0.34)
+    slot.Label.Size = Vector2.New(w, h * 0.28)
+    slot.Count.Position = Vector2.New(x + w * 0.33, y + h * 0.33)
+    slot.Count.Size = Vector2.New(w * 0.32, h * 0.32)
+end
+
+-- 编辑器摆放的节点（金币图标 / 文字）：运行时改到布局给的位置，锚点统一按中心
+-- [未查证：编辑器节点的默认 Anchor；显式设为 (0.5, 0.5) 与布局的中心点口径一致]
+local function placeEditorNode(node, r)
+    if not node then return end
+    local ok, err = pcall(function() node.Anchor = Vector2.New(0.5, 0.5) end)
+    if not ok then print('[ScreenMain] 设置节点锚点失败', tostring(node.Name), tostring(err)) end
+    place(node, r)
+end
+
+-- #179：随输入变化的常驻控件（装备栏一行、右侧操作区）按主界面布局模块重排。
+-- slots / reeling 传 nil 表示沿用上一次；输入不变时不重算（收线期间 ShowCast 逐帧调用）。
+function ScreenHandler:ApplyLayout(slots, reeling)
+    local key, resolution = self.LayoutKey, self.EuiResolution
+    if not key or not resolution then return end
+    if slots == nil then slots = key.slots end
+    if reeling == nil then reeling = key.reeling end
+    if key.slots == slots and key.reeling == reeling then return end
+    self.LayoutKey = { slots = slots, reeling = reeling }
+    local layout = MainHudLayout.Compute({ width = resolution.x, height = resolution.y,
+        itemBarSlots = slots, reeling = reeling })
+    self.HudLayout = layout
+    local r = layout.Rects
+    for index, slot in ipairs(self.Slots or {}) do
+        local cell = layout.ItemBarSlots[index]
+        if cell then
+            placeSlot(slot, cell)
+            self.ItemBarSlotPos[index] = { x = cell.x, y = cell.y, hw = cell.w / 2, hh = cell.h / 2 }
+        end
+    end
+    place(self.BackpackButton, r.BackpackButton)
+    place(self.BackpackLabel, r.BackpackButton)
+    place(self.BtnItemAction, r.ItemAction)
+    place(self.BtnItemActionLabel, r.ItemAction)
+    place(self.BtnDiscard, r.Discard)
+    place(self.BtnDiscardLabel, r.Discard)
+    -- 不在收线期间时布局不给「结束收线」占位（按钮本就隐藏），保留上一次的位置
+    place(self.BtnReelClose, r.ReelClose)
+    place(self.BtnReelCloseLabel, r.ReelClose)
 end
 
 function ScreenHandler:Listen(source, callback)
@@ -924,6 +1019,12 @@ function ScreenHandler:Cleanup()
     self.ReelBar = nil
     self.ReelBarBg = nil
     self.LabelCoin = nil
+    self.ImageCoin = nil
+    self.HudLayout = nil
+    self.LayoutKey = nil
+    self.QuestToggle = nil
+    self.QuestToggleLabel = nil
+    self.QuestShown = nil
     self.Snapshot = nil
     self.CastState = nil
     self.BoundRootNode = nil
@@ -951,41 +1052,47 @@ function ScreenHandler:Init()
     local root = self.RootNode
     DamageFloat:Bind(root, resolution)
     FishCombatLabel:Bind(root, resolution)
+    -- #179：主界面常驻控件的位置一律取自布局模块。首次按道具栏满格、收线期间计算，
+    -- 让「结束收线」也有初始位置；快照到达后 ApplyLayout 按实际格数重排
+    local count = GameCfg.Items.ItemBarSlots
+    local layout = MainHudLayout.Compute({ width = resolution.x, height = resolution.y,
+        itemBarSlots = count, reeling = true })
+    self.HudLayout = layout
+    local rects = layout.Rects
     self.LabelCoin = root:FindFirstChild('LabelCoin', true)
-    local imageCoin = root:FindFirstChild('ImageCoin', true)
+    self.ImageCoin = root:FindFirstChild('ImageCoin', true)
     if self.LabelCoin then self.LabelCoin.Visible = true else print('[ScreenMain] 找不到 LabelCoin 节点') end
-    if imageCoin then imageCoin.Visible = true end
+    if self.ImageCoin then self.ImageCoin.Visible = true end
+    placeEditorNode(self.ImageCoin, rects.CoinIcon)
+    placeEditorNode(self.LabelCoin, rects.CoinLabel)
     self.Slots = {}
     self.ItemBarSlotPos = {}
     self.Buttons = {}
     self.Connections = {}
     self.Overlays = {}
-    local count = GameCfg.Items.ItemBarSlots
-    local step = 120
-    local firstX = (resolution.x - (count - 1) * step) / 2
     for index = 1, count do
-        local x, y = firstX + (index - 1) * step, 400
-        local background = button(root, 'ItemBarSlot' .. index, x, y, 110)
-        background.Size = Vector2.New(110, 110)
+        local cell = layout.ItemBarSlots[index]
+        local background = button(root, 'ItemBarSlot' .. index, cell.x, cell.y, cell.w)
         local icon = World:CreateUnit('EUIImage', {
             Parent = root, Name = 'ItemBarIcon' .. index,
-            Position = Vector2.New(x, y + 15), Size = Vector2.New(78, 78),
+            Position = Vector2.New(cell.x, cell.y), Size = Vector2.New(cell.w, cell.h),
         })
         icon.TouchEnabled = false
         icon.SwallowTouchEnabled = false
         icon.LocalZOrder = 1
         icon.Visible = false
-        local label = overlay(root, 'ItemBarLabel' .. index, x, y - 35, 110, 28,
-            '', 24, Color.New(255, 255, 255, 255))
-        local amount = overlay(root, 'ItemBarAmount' .. index, x + 37, y + 37, 30, 30,
-            '', 24, Color.New(255, 220, 40, 255))
+        local label = overlay(root, 'ItemBarLabel' .. index, cell.x, cell.y, cell.w, cell.h,
+            '', 18, Color.New(255, 255, 255, 255))
+        local amount = overlay(root, 'ItemBarAmount' .. index, cell.x, cell.y, cell.w, cell.h,
+            '', 20, Color.New(255, 220, 40, 255))
         label.Visible = false
         amount.Visible = false
         self.Overlays[#self.Overlays + 1] = icon
         self.Overlays[#self.Overlays + 1] = label
         self.Overlays[#self.Overlays + 1] = amount
         self.Slots[index] = { Background = background, Icon = icon, Label = label, Count = amount }
-        self.ItemBarSlotPos[index] = { x = x, y = y }
+        placeSlot(self.Slots[index], cell)
+        self.ItemBarSlotPos[index] = { x = cell.x, y = cell.y, hw = cell.w / 2, hh = cell.h / 2 }
         self:bindDrag(background, GameCfg.Items.ContainerId.ItemBar, index)
         self:BindSlotGesture(background, index)
         self:Listen(background.OnClicked, function()
@@ -994,17 +1101,24 @@ function ScreenHandler:Init()
         end)
     end
     self.UIRoot = root
-    self:BuildBackpack(root, resolution)
+    self:BuildBackpack(root, layout)
+    -- 平铺的鱼饵 / 吃按钮由 #180 的鱼饵栏弹窗取代，在那之前暂留原坐标（按旧 8 格道具栏居中推算）
+    local firstX = (resolution.x - 7 * 120) / 2
     self.BtnBait = button(root, 'BaitWorm', firstX + 80, 540, 170)
     self.BtnNone = button(root, 'BaitNone', firstX + 270, 540, 170)
     self.BtnEat = button(root, 'BaitEat', firstX + 460, 540, 170)
-    self.BtnDiscard = button(root, 'ItemDiscard', firstX + 650, 540, 170)
+    local discard = rects.Discard
+    self.BtnDiscard = button(root, 'ItemDiscard', discard.x, discard.y, discard.w)
     -- 首领饵挂饵键（#88）：蚯蚓键正上方，数量为零时不可点
     self.BtnDuck = button(root, 'BaitDuck', firstX + 80, 650, 170)
     -- 香肠挂饵键（#90）：鸭子键右侧，虾池鱼饵
     self.BtnSausage = button(root, 'BaitSausage', firstX + 270, 650, 170)
-    self.BtnItemAction = button(root, 'ItemAction2', resolution.x - 220, 690, 180)
-    self.BtnReelClose = button(root, 'ReelClose', resolution.x - 220, 570, 180)
+    local action, reelClose = rects.ItemAction, rects.ReelClose
+    self.BtnItemAction = button(root, 'ItemAction2', action.x, action.y, action.w)
+    self.BtnReelClose = button(root, 'ReelClose', reelClose.x, reelClose.y, reelClose.w)
+    place(self.BtnDiscard, discard)
+    place(self.BtnItemAction, action)
+    place(self.BtnReelClose, reelClose)
     for _, node in ipairs({ self.BtnBait, self.BtnNone, self.BtnEat, self.BtnDiscard, self.BtnDuck, self.BtnSausage, self.BtnItemAction, self.BtnReelClose }) do
         self.Buttons[#self.Buttons + 1] = node
     end
@@ -1025,19 +1139,21 @@ function ScreenHandler:Init()
         self[entry[1]] = label
         self.Overlays[#self.Overlays + 1] = label
     end
-    self.HookHint = overlay(root, 'HookHint', resolution.x - 320, 800, 400, 80,
+    -- 上方提示区：上钩 / 等待提示同位（互斥显示），入水提示与收线进度同位，临时提示单独一行
+    local primary, secondary, transient = rects.HintPrimary, rects.HintSecondary, rects.HintTransient
+    self.HookHint = overlay(root, 'HookHint', primary.x, primary.y, primary.w, primary.h,
         '', 32, Color.New(255, 220, 40, 255))
     self.HookHint.Visible = false
     self.Overlays[#self.Overlays + 1] = self.HookHint
     local feedback = GameCfg.CastFeedback
     self.CastFloat = overlay(root, 'CastFloat', 0, 0, feedback.FloatSize, feedback.FloatSize,
         '●', 48, color(feedback.FloatColor))
-    self.CastWaitHint = overlay(root, 'CastWaitHint', resolution.x - 320, 800, 400, 80,
+    self.CastWaitHint = overlay(root, 'CastWaitHint', primary.x, primary.y, primary.w, primary.h,
         '等待上钩…', 32, Color.New(255, 255, 255, 255))
-    self.CastSplashHint = overlay(root, 'CastSplashHint', resolution.x / 2, resolution.y - 430, 520, 72,
-        '已入水，等待上钩', 32, Color.New(255, 225, 70, 255))
-    self.CastFailureHint = overlay(root, 'CastFailureHint', resolution.x / 2, resolution.y - 430, 740, 72,
-        '', 32, Color.New(255, 90, 90, 255))
+    self.CastSplashHint = overlay(root, 'CastSplashHint', secondary.x, secondary.y, secondary.w, secondary.h,
+        '已入水，等待上钩', 30, Color.New(255, 225, 70, 255))
+    self.CastFailureHint = overlay(root, 'CastFailureHint', transient.x, transient.y, transient.w, transient.h,
+        '', 30, Color.New(255, 90, 90, 255))
     self.CastFailureMark = overlay(root, 'CastFailureMark', 0, 0, feedback.FloatSize, feedback.FloatSize,
         '●', 48, Color.New(255, 65, 65, 255))
     for _, node in ipairs({ self.CastFloat, self.CastWaitHint, self.CastSplashHint,
@@ -1045,19 +1161,30 @@ function ScreenHandler:Init()
         node.Visible = false
         self.Overlays[#self.Overlays + 1] = node
     end
-    -- [未查证：任务条位置与 LabelCoin / 血球饥饿球（#53）是否重叠，待 #55 截图迭代]
-    -- #174 #1：任务条加深色半透明底板，白字不再直接压在亮色地面上
+    -- #179 左侧任务区：追踪条（#174 #1 深色半透明底板 + 折行文字）与折叠 / 展开按钮
+    local questPanel, questToggle = rects.QuestPanel, rects.QuestToggle
     self.QuestBackground = passive(World:CreateUnit('EUIImage', {
         Parent = root, Name = 'QuestBackground',
-        Position = Vector2.New(500, resolution.y - 330), Size = Vector2.New(920, 64),
+        Position = Vector2.New(questPanel.x, questPanel.y), Size = Vector2.New(questPanel.w, questPanel.h),
         Image = 'official://image/11017', Color = Color.New(16, 24, 34, 180),
     }))
     self.QuestBackground.Visible = false
     self.Overlays[#self.Overlays + 1] = self.QuestBackground
-    self.QuestLabel = overlay(root, 'QuestLabel', 500, resolution.y - 330, 900, 56,
-        '', 30, Color.New(255, 255, 255, 255))
+    self.QuestLabel = overlay(root, 'QuestLabel', questPanel.x, questPanel.y, questPanel.w - 20,
+        questPanel.h - 12, '', 24, Color.New(255, 255, 255, 255))
     self.QuestLabel.Visible = false
     self.Overlays[#self.Overlays + 1] = self.QuestLabel
+    self.QuestToggle = button(root, 'QuestToggle', questToggle.x, questToggle.y, questToggle.w)
+    place(self.QuestToggle, questToggle)
+    self.QuestToggleLabel = overlay(root, 'QuestToggleLabel', questToggle.x, questToggle.y,
+        questToggle.w, questToggle.h, '收起任务', 22, Color.New(255, 255, 255, 255))
+    self.Buttons[#self.Buttons + 1] = self.QuestToggle
+    self.Overlays[#self.Overlays + 1] = self.QuestToggleLabel
+    self:Listen(self.QuestToggle.OnClicked, function()
+        self.QuestCollapsed = not self.QuestCollapsed
+        self:RenderQuest()
+    end)
+    self:RenderQuest()
     local cx, cy = resolution.x / 2, resolution.y / 2
     local width = math.min(1000, resolution.x - 60)
     self.DialogueColumns = math.max(12, math.floor((width - 80) / 26))
@@ -1099,15 +1226,15 @@ function ScreenHandler:Init()
         self.DialogueRead.TouchEnabled = false
         _G.REUtil:GetRE('StoryRead'):FireServer({ action = 'read', readKey = payload.readKey })
     end)
-    self:BuildVitals(root, resolution)
+    self:BuildVitals(root, resolution, layout)
     self.ReelBarBg = World:CreateUnit('EUIImage', {
         Parent = root, Name = 'ReelProgressBg',
-        Position = Vector2.New(resolution.x - 600, 860), Size = Vector2.New(400, 36),
+        Position = Vector2.New(secondary.x, secondary.y), Size = Vector2.New(400, 36),
         Image = 'official://image/30008',
     })
     self.ReelBar = World:CreateUnit('EUILoadingBar', {
         Parent = root, Name = 'ReelProgress',
-        Position = Vector2.New(resolution.x - 600, 860), Size = Vector2.New(400, 36),
+        Position = Vector2.New(secondary.x, secondary.y), Size = Vector2.New(400, 36),
         Image = 'official://image/30007', Direction = 0, Percent = 50,
         Color = Color.New(36, 200, 94, 255),
     })
@@ -1347,7 +1474,8 @@ function ScreenHandler:Init()
             listenPlayerAttributes(self, player)
         end)
     end
-    LocalAttackButton:Start(root, resolution)
+    LocalAttackButton:Start(root, rects.AttackControl)
+    self.LayoutKey = { slots = count, reeling = true }
     self.BoundRootNode = root
     self.Inited = true
     self.IsOpen = false

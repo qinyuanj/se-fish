@@ -127,9 +127,13 @@ describe("道具栏的界面侧", function()
             assert.is_false(ctx.nodes[name].SwallowTouchEnabled)
             assert.same(1, ctx.nodes[name].LocalZOrder)
         end
-        assert.same({ x = slot.Position.x, y = slot.Position.y + 15 }, ctx.nodes.ItemBarIcon1.Position)
-        assert.same({ x = slot.Position.x, y = slot.Position.y - 35 }, ctx.nodes.ItemBarLabel1.Position)
-        assert.same({ x = slot.Position.x + 37, y = slot.Position.y + 37 }, ctx.nodes.ItemBarAmount1.Position)
+        -- #179：格子位置与尺寸取自布局模块，图标、名字、数量都落在格内（坐标接线见 main_hud_wiring_test）
+        for _, name in ipairs({ 'ItemBarIcon1', 'ItemBarLabel1', 'ItemBarAmount1' }) do
+            local node = ctx.nodes[name]
+            assert.is_true(math.abs(node.Position.x - slot.Position.x) * 2 + node.Size.x <= slot.Size.x + 0.01, name)
+            assert.is_true(math.abs(node.Position.y - slot.Position.y) * 2 + node.Size.y <= slot.Size.y + 0.01, name)
+        end
+        assert.is_true(ctx.nodes.ItemBarIcon1.Position.y > ctx.nodes.ItemBarLabel1.Position.y)
         assert.same('official://image/11017', ctx.nodes.ItemBarSlot1.NormalImage)
         assert.same('official://image/11017', ctx.nodes.BaitWorm.NormalImage)
         for labelName, buttonName in pairs({ BtnBaitLabel = 'BaitWorm', BtnNoneLabel = 'BaitNone',

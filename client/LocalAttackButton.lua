@@ -30,22 +30,22 @@ function LocalAttackButton:SetEquipped(state)
     end
 end
 
-function LocalAttackButton:Start(parent, resolution)
+-- rect：主界面布局模块给的攻击键占位（中心点 + 尺寸，原点左下、Y 向上），本模块不再自定坐标（#179）
+function LocalAttackButton:Start(parent, rect)
     if self.Root == parent and self.Container then return end
     self:Destroy()
     self.Root = parent
     self.Gesture = Gesture.New({ LongPressSec = GameCfg.Ability.Throw.LongPressSec })
-    -- 左下原点：位于原生大按钮上方，并避开上方的道具操作位。
     local container = World:CreateUnit("EUILayout", {
         Parent = parent, Name = "AttackControl",
-        Position = Vector2.New(resolution.x - 245, 555), Size = Vector2.New(200, 200),
+        Position = Vector2.New(rect.x, rect.y), Size = Vector2.New(rect.w, rect.h),
     })
     container.TouchEnabled = false
     container.SwallowTouchEnabled = false
     self.Container = container
     local btn = World:CreateUnit("EUIButton", {
         Parent = container, Name = "BtnAttack",
-        Position = Vector2.New(100, 100), Size = Vector2.New(200, 200),
+        Position = Vector2.New(rect.w / 2, rect.h / 2), Size = Vector2.New(rect.w, rect.h),
     })
     btn.ButtonText = ""
     btn.NormalImage = "official://image/10055"
@@ -57,7 +57,7 @@ function LocalAttackButton:Start(parent, resolution)
     self.BtnAttack = btn
     local label = World:CreateUnit("EUITextLabel", {
         Parent = container, Name = "AttackLabel",
-        Position = Vector2.New(100, 100), Size = Vector2.New(160, 70),
+        Position = Vector2.New(rect.w / 2, rect.h / 2), Size = Vector2.New(rect.w * 0.8, 70),
     })
     label.Text = "攻击"
     label.FontSize = 36
