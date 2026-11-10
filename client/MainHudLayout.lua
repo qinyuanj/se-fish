@@ -93,7 +93,7 @@ local POPUP_STEP = 86                  -- 候选格 80 + 间隔 6
 local CENTER_HALF_W, CENTER_HALF_H_RATIO = 280, 0.18
 
 -- input = { width, height, itemBarSlots, reeling }
--- 返回 { Width, Height, Regions = { 区域名 = { Bounds, Controls } }, Rects = 扁平索引,
+-- 返回 { Regions = { 区域名 = { Bounds, Controls } }, Rects = 扁平索引,
 --        ItemBarSlots = { 第 1..N 格 }, Panels = { BackpackPanel }, Reserved = { { name, rect } },
 --        Popup = 候选行参数（供 PopupCells） }
 function MainHudLayout.Compute(input)
@@ -208,7 +208,6 @@ function MainHudLayout.Compute(input)
         for name, r in pairs(region.Controls) do rects[name] = r end
     end
     return {
-        Width = W, Height = H, SafeMargin = SAFE,
         Regions = regions, Rects = rects, ItemBarSlots = itemBar,
         Panels = { BackpackPanel = backpackPanel },
         Reserved = reserved,
