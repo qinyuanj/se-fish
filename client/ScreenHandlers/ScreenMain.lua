@@ -262,6 +262,9 @@ local function readVital(player, key, default)
     return value and math.floor(value) or default
 end
 
+-- 球上文字前缀（术语见 GLOSSARY「饥饿度」）
+local HEALTH_PREFIX, HUNGER_PREFIX = '血 ', '饥饿度 '
+
 local function vitalPercent(value, maximum)
     return maximum > 0 and math.max(0, math.min(100, value * 100 / maximum)) or 0
 end
@@ -285,8 +288,8 @@ function ScreenHandler:ShowVitals()
     local maxHunger = readVital(player, 'MaxHunger', c.MaxHunger)
     self.HealthRing.Percent = vitalPercent(health, maxHealth)
     self.HungerRing.Percent = vitalPercent(hunger, maxHunger)
-    self.HealthText.Text = '血 ' .. tostring(health)
-    self.HungerText.Text = '饥饿度 ' .. tostring(hunger)
+    self.HealthText.Text = HEALTH_PREFIX .. tostring(health)
+    self.HungerText.Text = HUNGER_PREFIX .. tostring(hunger)
     updateStarving(self, health, hunger)
 end
 
@@ -701,6 +704,21 @@ local function passive(node)
     return node
 end
 
+-- 文字列数：中文按一字一列，ASCII 也按整列算（同 wrapColumns，宁宽勿溢）
+local function columnsOf(text)
+    local count = 0
+    for _ in text:gmatch('[%z\1-\127\194-\244][\128-\191]*') do count = count + 1 end
+    return count
+end
+
+-- 球上文字字号：按满值时最长的文字（如「饥饿度 300」）放得进球宽来定，最大 20
+local VITAL_FONT_MAX = 20
+local function vitalFontSize(width, c)
+    local longest = math.max(columnsOf(HEALTH_PREFIX .. tostring(c.MaxHealth)),
+        columnsOf(HUNGER_PREFIX .. tostring(c.MaxHunger)))
+    return math.max(1, math.min(VITAL_FONT_MAX, math.floor(width / longest)))
+end
+
 -- 左上状态区血球 / 饥饿度球（#53，#179 位置取自布局模块）与四边红框；图片用途见 GameCfg.Vitals
 function ScreenHandler:BuildVitals(root, resolution, layout)
     local c = GameCfg.Vitals
@@ -720,7 +738,8 @@ function ScreenHandler:BuildVitals(root, resolution, layout)
         }))
         ring.Color = color(spec[4])
         ring.LocalZOrder = 1
-        local text = overlay(root, name .. 'Text', r.x, r.y, r.w, 40, '', 20, Color.New(255, 255, 255, 255))
+        local text = overlay(root, name .. 'Text', r.x, r.y, r.w, 40, '', vitalFontSize(r.w, c),
+            Color.New(255, 255, 255, 255))
         text.LocalZOrder = 2
         self[name .. 'Ring'] = ring
         self[name .. 'Text'] = text

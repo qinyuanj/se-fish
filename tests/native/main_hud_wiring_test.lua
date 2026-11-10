@@ -11,8 +11,10 @@
 --   6. 图鉴入口不在右上入口组；
 --   7. 任务条折叠后被下一次 QuestState 重新展开、重进界面后丢失，或折叠操作发往服务端；
 --   8. 任务文字超出追踪条宽度（没有换行）；
---   9. 血量 / 饥饿度文字仍写「饥饿」。
+--   9. 血量 / 饥饿度文字仍写「饥饿」；
+--  10. 数值到上限（如「饥饿度 300」）时文字超出文字框被截断，或两颗球的文字框互叠、压住金币。
 local MainHudLayout = require('client.MainHudLayout')
+local GameCfg = require('common.GameCfg')
 
 local function signal()
     local listeners = {}
@@ -54,6 +56,7 @@ local function setUp(height)
     end
     function world:GetServerTime() return ctx.now end
     local attributes = { Health = 80, MaxHealth = 100, Hunger = 60, MaxHunger = 100, FishCoin = 5 }
+    ctx.attributes = attributes
     local player = { GetAttribute = function(_, key) return attributes[key] end,
         GetAttributeChangedSignal = function() return signal() end }
     _G.game = { GetService = function(_, name)
@@ -236,6 +239,26 @@ describe('主界面接线（布局模块）', function()
         file:close()
         assert.is_nil(source:find("'饥饿 '", 1, true))
     end)
+
+    -- 文字宽度按「一字一列、ASCII 也按整列」估算（同任务条折行口径，宁宽勿溢）
+    for _, height in ipairs({ 886, 1080, 1238, 1440 }) do
+        it('test_vital_texts_fit_at_max_values_' .. height, function()
+            ctx = setUp(height)
+            local c = GameCfg.Vitals
+            ctx.attributes.Health, ctx.attributes.MaxHealth = c.MaxHealth, c.MaxHealth
+            ctx.attributes.Hunger, ctx.attributes.MaxHunger = c.MaxHunger, c.MaxHunger
+            ctx.handler:ShowVitals()
+            local health, hunger = ctx.nodes.HealthText, ctx.nodes.HungerText
+            assert.same('饥饿度 ' .. c.MaxHunger, hunger.Text)
+            for _, label in ipairs({ health, hunger }) do
+                assert.is_true(utf8.len(label.Text) * label.FontSize <= label.Size.x,
+                    string.format('%s「%s」字号 %s 放不进宽 %s', label.Name, label.Text, label.FontSize, label.Size.x))
+                assert.is_true(label.FontSize <= label.Size.y, label.Name)
+            end
+            assert.is_false(overlaps(health, hunger), '血量与饥饿度文字框互叠')
+            assert.is_false(overlaps(hunger, ctx.nodes.ImageCoin), '饥饿度文字压住金币图标')
+        end)
+    end
 end)
 
 describe('右上入口组接线（图鉴入口）', function()
