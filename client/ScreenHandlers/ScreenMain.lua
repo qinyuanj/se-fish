@@ -1627,8 +1627,10 @@ function ScreenHandler:CloseScreen()
     DamageFloat:Clear()
     FishCombatLabel:Clear()
     self.IsOpen = false
+    -- 临时提示状态整体收尾（Cleanup 经由这里），重开 / 重进不带上一轮的「只做提示」标志
     self.FailureUntil = nil
     self.FailureLanding = nil
+    self.FailureNotice = nil
     self:EndAim()
     self:ClosePopup() -- #180：界面被盖住时弹窗不留到重开
     LocalAttackButton:SetOpen(false)

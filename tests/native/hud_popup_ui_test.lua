@@ -409,6 +409,27 @@ describe('武器栏、鱼饵栏与弹窗（#180）', function()
         assert.is_false(hint.Visible)
     end)
 
+    -- 临时提示状态（「只做提示」标志、时长、落点）归 CloseScreen / Cleanup 收尾：
+    -- 关界面或重进后不留上一轮的状态（同 reel_ui_test 对 CastState 的收尾断言）
+    it('test_close_screen_and_cleanup_clear_transient_hint_state', function()
+        ctx = setUp(1080)
+        ctx.states:Fire({ slots = {}, bait = { worm = 1 } })
+        ctx.states:Fire({ slots = {}, bait = { worm = 0 } })
+        assert.is_true(ctx.nodes.CastFailureHint.Visible)
+        ctx.handler:CloseScreen()
+        assert.is_false(ctx.nodes.CastFailureHint.Visible)
+        for _, field in ipairs({ 'FailureNotice', 'FailureUntil', 'FailureLanding' }) do
+            assert.is_nil(ctx.handler[field], 'CloseScreen 后 ' .. field)
+        end
+        ctx.handler:OpenScreen()
+        ctx.states:Fire({ slots = {}, bait = { worm = 1 } })
+        ctx.states:Fire({ slots = {}, bait = { worm = 0 } })
+        ctx.handler:Cleanup()
+        for _, field in ipairs({ 'FailureNotice', 'FailureUntil', 'FailureLanding' }) do
+            assert.is_nil(ctx.handler[field], 'Cleanup 后 ' .. field)
+        end
+    end)
+
     for _, order in ipairs({ 'bait-first', 'cast-first' }) do
         it('test_worm_depleted_by_cast_keeps_waiting_feedback_' .. order, function()
             ctx = setUp(1080)
