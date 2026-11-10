@@ -173,10 +173,21 @@ function ScreenHandler:EndAim()
     self.AimSlot = nil
 end
 
-local function wormCount(state)
+-- 快照里某种鱼饵的库存，缺失或非数字按 0（鱼饵栏文字、候选格、「蚯蚓用尽」共用这一处）
+local function baitStock(state, id)
     local bait = type(state) == 'table' and type(state.bait) == 'table' and state.bait or {}
-    local count = bait[GameCfg.Items.Id.Worm]
+    local count = id ~= nil and bait[id] or nil
     return type(count) == 'number' and count or 0
+end
+
+local function wormCount(state)
+    return baitStock(state, GameCfg.Items.Id.Worm)
+end
+
+-- 服务端确认手持的道具栏格号（手持的不是道具栏格时为 nil）
+local function heldSlot(state)
+    local held = type(state) == 'table' and state.held
+    return type(held) == 'table' and held.kind == 'slot' and held.slot or nil
 end
 
 function ScreenHandler:Show(state)
@@ -211,11 +222,10 @@ function ScreenHandler:Show(state)
     -- 选中格食物的两步进食在道具按钮上（#181）
     self:ShowCoin(state.coin)
     self:ShowCast()
-    local heldSlot = state.held and state.held.kind == 'slot' and state.held.slot or nil
     local selected = state.selectedSlot and state.slots[state.selectedSlot]
     self.BtnDiscard.Visible = selected ~= nil
     self.BtnDiscardLabel.Visible = selected ~= nil
-    self.BtnDiscardLabel.Text = selected and heldSlot == state.selectedSlot
+    self.BtnDiscardLabel.Text = selected and heldSlot(state) == state.selectedSlot
         and '确认丢弃' or '丢弃选中物'
     self:RenderEquipBars(state)
     self:ShowBackpack()
@@ -425,10 +435,8 @@ end
 
 local function foodActionText(self)
     local food, foodSlot = self:SelectedFood()
-    local held = self.Snapshot.held
-    local heldSlot = held and held.kind == 'slot' and held.slot or nil
     local name = GameCfg.Items.Definitions[food.itemId].Name
-    return heldSlot == foodSlot and ('吃' .. name) or ('手持' .. name)
+    return heldSlot(self.Snapshot) == foodSlot and ('吃' .. name) or ('手持' .. name)
 end
 
 local function castActionColor(phase, now, alert)
@@ -871,18 +879,17 @@ end
 -- 鱼饵候选：蚯蚓、香肠、鸭子（固定列出，库存为 0 置灰）、其余动态鱼饵（库存 > 0 才列，按 id 排序）、
 -- 「不挂鱼饵」、「吃蚯蚓」（蚯蚓为 0 置灰）。命令与原平铺按钮一致：SelectBait id / SelectBait（nil）/ EatBait worm
 local function baitCandidates(self, state)
-    local bait = type(state.bait) == 'table' and state.bait or {}
     local ids = GameCfg.Items.Id
     local fixed = { ids.Worm, ids.Sausage, ids.Duck }
     local dynamic, isFixed = {}, {}
     for _, id in ipairs(fixed) do isFixed[id] = true end
-    for id, count in pairs(bait) do
-        if not isFixed[id] and type(count) == 'number' and count > 0 then dynamic[#dynamic + 1] = id end
+    for id in pairs(type(state.bait) == 'table' and state.bait or {}) do
+        if not isFixed[id] and baitStock(state, id) > 0 then dynamic[#dynamic + 1] = id end
     end
     table.sort(dynamic)
     local list = {}
     local function add(id)
-        local count = type(bait[id]) == 'number' and bait[id] or 0
+        local count = baitStock(state, id)
         list[#list + 1] = { key = id, name = itemName(id), count = count, enabled = count > 0,
             selected = state.selectedBait == id, choose = function() self:Action('SelectBait', id) end }
     end
@@ -890,8 +897,7 @@ local function baitCandidates(self, state)
     for _, id in ipairs(dynamic) do add(id) end
     list[#list + 1] = { key = 'NoBait', name = '不挂鱼饵', enabled = true, selected = state.selectedBait == nil,
         choose = function() self:Action('SelectBait') end }
-    local worms = type(bait[ids.Worm]) == 'number' and bait[ids.Worm] or 0
-    list[#list + 1] = { key = 'EatWorm', name = '吃蚯蚓', enabled = worms > 0,
+    list[#list + 1] = { key = 'EatWorm', name = '吃蚯蚓', enabled = wormCount(state) > 0,
         choose = function() self:Action('EatBait', ids.Worm) end }
     return list
 end
@@ -998,7 +1004,6 @@ function ScreenHandler:RenderPopup()
     if not open then return end
     local list = self:PopupCandidates(kind)
     local rects = MainHudLayout.PopupCells(self.HudLayout, kind, #list)
-    local left, right, bottom, top
     for i, candidate in ipairs(list) do
         local r, cell = rects[i], self:PopupCell(kind, candidate.key)
         place(cell.Button, r)
@@ -1009,13 +1014,12 @@ function ScreenHandler:RenderPopup()
         cell.Button.ButtonNormalColor = color(not candidate.enabled and DISABLED_COLOR
             or candidate.selected and SELECTED_COLOR or NORMAL_COLOR)
         cell.Label.Visible = true
-        left, right = math.min(left or r.x, r.x - r.w / 2), math.max(right or r.x, r.x + r.w / 2)
-        bottom, top = math.min(bottom or r.y, r.y - r.h / 2), math.max(top or r.y, r.y + r.h / 2)
     end
-    if left then
-        local plate, pad = self.PopupPlates[kind], 4
-        place(plate, { x = (left + right) / 2, y = (bottom + top) / 2,
-            w = right - left + pad * 2, h = top - bottom + pad * 2 })
+    -- 底板 = 候选格外包框四边外扩 4
+    local plateRect = MainHudLayout.Bounds(rects, 4)
+    if plateRect then
+        local plate = self.PopupPlates[kind]
+        place(plate, plateRect)
         plate.Visible = true
     end
 end
@@ -1026,8 +1030,7 @@ function ScreenHandler:RenderEquipBars(state)
     local weapon, bar = LocalAttackButton.EquippedWeapon(state), self.EquipBars.Weapon
     bar.Label.Text = weapon and cellText(itemName(weapon), nil, bar.Button.Size.x) or ''
     local baitId, baitBar = state.selectedBait, self.EquipBars.Bait
-    local count = baitId and type(state.bait) == 'table' and state.bait[baitId] or 0
-    baitBar.Label.Text = baitId and cellText(itemName(baitId), count, baitBar.Button.Size.x)
+    baitBar.Label.Text = baitId and cellText(itemName(baitId), baitStock(state, baitId), baitBar.Button.Size.x)
         or cellText('不挂鱼饵', nil, baitBar.Button.Size.x)
     for _, entry in pairs(self.EquipBars) do
         entry.Button.Visible = not self.BackpackOpen

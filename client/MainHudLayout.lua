@@ -61,7 +61,7 @@ local function scaledReserved(spec, width, height)
     return fromEdges(l - PAD, r + PAD, b - PAD, t + PAD)
 end
 
--- 一组矩形的外包框，再外扩 pad
+-- 一组矩形的外包框，再外扩 pad；一个矩形都没有时返回 nil
 local function bounds(controls, pad)
     local l, r, b, t
     for _, c in pairs(controls) do
@@ -69,6 +69,7 @@ local function bounds(controls, pad)
         l, r = math.min(l or cl, cl), math.max(r or cr, cr)
         b, t = math.min(b or cb, cb), math.max(t or ct, ct)
     end
+    if not l then return nil end
     return fromEdges(l - pad, r + pad, b - pad, t + pad)
 end
 
@@ -236,6 +237,11 @@ function MainHudLayout.PopupCells(layout, kind, count)
         remaining, row = remaining - n, row + 1
     end
     return cells
+end
+
+-- 一组矩形（如 PopupCells 的候选格）的外包框，四边外扩 pad；空表返回 nil
+function MainHudLayout.Bounds(rects, pad)
+    return bounds(rects or {}, pad or 0)
 end
 
 -- Anchor=(0,0) 的节点（如盲盒入口）用：中心矩形换成左下角坐标
