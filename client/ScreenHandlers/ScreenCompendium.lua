@@ -4,6 +4,7 @@ local GameCfg = require('common.GameCfg')
 local Records = require('common.Records')
 local REUtil = require('common.REUtil')
 local GameUI = require('client.GameUI')
+local MainHudLayout = require('client.MainHudLayout')
 
 local Screen = { Page = 1, Seq = 0, RecordSeq = 0, Nodes = {},
     UINodes = {}, UINodeMap = {}, Connections = {} }
@@ -209,8 +210,10 @@ function Screen:BuildNodes(uiRoot)
     local resolution = manager and manager:GetDeviceResolution()
     if not resolution then return false end
     local scale = math.min(1, (resolution.x - 40) / 1180, (resolution.y - 40) / 840)
-    self.EntryNode = self:Button(uiRoot, 'BtnCompendiumEntry', resolution.x - 120,
-        resolution.y - 230, 160, 65, '图鉴', function()
+    -- #179：入口在主界面布局的右上入口组（与道具栏格数无关，按默认输入取）
+    local entry = MainHudLayout.Compute({ width = resolution.x, height = resolution.y }).Rects.CompendiumEntry
+    self.EntryNode = self:Button(uiRoot, 'BtnCompendiumEntry', entry.x, entry.y,
+        entry.w, entry.h, '图鉴', function()
             _G.MgrGameUI:OpenScreen('ScreenCompendium')
         end)
     local panel = self:Create('EUIImage', uiRoot, 'ScreenCompendium', resolution.x / 2,

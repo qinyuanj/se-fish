@@ -8,6 +8,7 @@
 local GameCfg = require('common.GameCfg')
 local REUtil = require('common.REUtil')
 local GameUI = require('client.GameUI')
+local MainHudLayout = require('client.MainHudLayout')
 
 local ColorBlockImage = 'official://image/11017'
 
@@ -79,7 +80,11 @@ function Screen:BuildNodes()
     if not root then return false end
     local resolution = GameUI:GetEuiManager():GetDeviceResolution() or { x = 1920, y = 1080 }
     local cx, cy = resolution.x / 2, resolution.y / 2
-    self:Button(root, 'BtnBlindboxEntry', resolution.x - 120, 180, 160, 70, cfg().HintText,
+    -- #179：入口在主界面布局的右上入口组，不再压在引擎跳跃键上；本界面节点 Anchor=(0,0)，
+    -- 布局给的中心矩形换成左下角坐标
+    local entry = MainHudLayout.Compute({ width = resolution.x, height = resolution.y }).Rects.BlindboxEntry
+    local entryX, entryY = MainHudLayout.BottomLeft(entry)
+    self:Button(root, 'BtnBlindboxEntry', entryX, entryY, entry.w, entry.h, cfg().HintText,
         function() self:Toggle() end)
     local panel = self:Create('EUIImage', root, 'ScreenBlindbox', cx, cy, 900, 600, {
         Image = ColorBlockImage, Color = Color.New(20, 20, 40, 220), Visible = false })

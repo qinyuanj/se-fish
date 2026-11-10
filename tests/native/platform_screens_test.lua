@@ -230,6 +230,16 @@ describe('盲盒界面（ScreenBlindbox）', function()
     assert.is_false(env.nodes.ScreenBlindbox.Visible)
   end)
 
+  -- #179：入口位置取自主界面布局模块的右上入口组；盲盒节点 Anchor=(0,0)，Position 是左下角
+  it('test_entry_position_from_main_hud_layout', function()
+    local rect = require('client.MainHudLayout').Compute({ width = 1920, height = 1080, itemBarSlots = 2 })
+      .Rects.BlindboxEntry
+    local entry = env.nodes.BtnBlindboxEntry
+    assert.same({ x = rect.x - rect.w / 2, y = rect.y - rect.h / 2 }, entry.Position)
+    assert.same({ x = rect.w, y = rect.h }, entry.Size)
+    assert.same(entry.Position, env.nodes.BtnBlindboxEntryText.Position)
+  end)
+
   it('test_state_handshake_refreshes_pity_with_content_prize_names', function()
     fireResult({ ok = true, action = 'State', pity = 49, guaranteeAt = 50 })
     local text = env.nodes.LabelBlindboxPity.Text
