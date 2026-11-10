@@ -108,23 +108,27 @@ describe("持有操作的界面侧", function()
         assert.same(before, #ctx.commands)
     end)
 
-    -- 动态按钮：快照里的武器与硬编码三键之外的鱼饵各自生成按钮，点击发对应请求。
+    -- 弹窗候选格（#180 取代平铺按钮）：快照里的武器与固定三种之外的鱼饵各有候选格，点击发对应请求。
     it("test_dynamic_weapon_and_extra_bait_buttons", function()
         ctx.states:Fire({ slots = {}, bait = { worm = 3, rareShrimp = 2 }, weapons = { item134 = 1 } })
-        local baitBtn = ctx.nodes['BaitDyn_rareShrimp']
-        local weaponBtn = ctx.nodes['WeaponItem_item134']
+        ctx.nodes.BaitBar.OnClicked:Fire()
+        local baitBtn = ctx.nodes['BaitPopupCell_rareShrimp']
         assert.is_not_nil(baitBtn)
-        assert.is_not_nil(weaponBtn)
         assert.is_true(baitBtn.Visible)
-        assert.is_true(weaponBtn.Visible)
         baitBtn.OnClicked:Fire()
         assert.same({ action = 'SelectBait', value = 'rareShrimp' }, ctx.commands[#ctx.commands])
+        ctx.nodes.WeaponBar.OnClicked:Fire()
+        local weaponBtn = ctx.nodes['WeaponPopupCell_item134']
+        assert.is_not_nil(weaponBtn)
+        assert.is_true(weaponBtn.Visible)
         weaponBtn.OnClicked:Fire()
         assert.same({ action = 'Operate', op = 'attack', weapon = 'item134', seq = 1 },
             ctx.commands[#ctx.commands])
-        -- 快照清空后动态按钮隐藏
+        -- 快照清空后候选格不再出现
         ctx.states:Fire({ slots = {}, bait = {}, weapons = {} })
+        ctx.nodes.BaitBar.OnClicked:Fire()
         assert.is_false(baitBtn.Visible)
+        ctx.nodes.WeaponBar.OnClicked:Fire()
         assert.is_false(weaponBtn.Visible)
     end)
 

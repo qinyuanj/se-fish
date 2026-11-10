@@ -8,18 +8,24 @@ local Gesture = require("client.PressGesture")
 local WeaponAim = require('client.WeaponAim')
 local LocalAttackButton = {}
 
+-- 当前装备的武器 id：手持武器优先，其次已选武器，库存为 0 的不算；都没有返回 nil。
+-- 攻击键语义与主界面武器栏（#180）共用这一处判定
+function LocalAttackButton.EquippedWeapon(state)
+    local weapons = type(state) == "table" and type(state.weapons) == "table" and state.weapons or {}
+    local held = type(state) == "table" and state.held or nil
+    if type(held) == "table" and held.kind == "weapon" and (weapons[held.id] or 0) > 0 then
+        return held.id
+    end
+    local selected = type(state) == "table" and state.selectedWeapon or nil
+    if selected and (weapons[selected] or 0) > 0 then return selected end
+    return nil
+end
+
 -- ScreenMain 每次快照刷新时同步装备状态：决定点按语义（攻击/连发）与长按语义（换弹）
 function LocalAttackButton:SetEquipped(state)
-    self.EquippedId = nil
+    self.EquippedId = LocalAttackButton.EquippedWeapon(state)
     self.EquippedGun = nil
     self.AutoFireGun = nil
-    local weapons = state and state.weapons or {}
-    local held = state and state.held
-    if held and held.kind == "weapon" and (weapons[held.id] or 0) > 0 then
-        self.EquippedId = held.id
-    elseif state and state.selectedWeapon and (weapons[state.selectedWeapon] or 0) > 0 then
-        self.EquippedId = state.selectedWeapon
-    end
     local gcfg = self.EquippedId and GameCfg.Ability.Guns[self.EquippedId] or nil
     if gcfg then
         self.EquippedGun = gcfg
