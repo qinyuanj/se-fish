@@ -409,6 +409,49 @@ describe('武器栏、鱼饵栏与弹窗（#180）', function()
         assert.is_false(ctx.nodes.BaitEat.Visible)
     end)
 
+    it('test_worm_depleted_shows_transient_hint_then_fades', function()
+        ctx = setUp(1080)
+        local hint = ctx.nodes.CastFailureHint
+        -- 开局快照本来就是 0：不报
+        ctx.states:Fire({ slots = {}, bait = { worm = 0 } })
+        assert.is_false(hint.Visible)
+        ctx.states:Fire({ slots = {}, bait = { worm = 1 } })
+        assert.is_false(hint.Visible)
+        -- 吃掉 / 用掉最后一只：上方提示区出现临时提示
+        ctx.states:Fire({ slots = {}, bait = { worm = 0 } })
+        assert.is_true(hint.Visible)
+        assert.same('蚯蚓用尽', hint.Text)
+        assertAt(hint, layoutFor(1080, 8).Rects.HintTransient, 'CastFailureHint')
+        -- 仍是 0 的后续快照不重复刷新提示时长
+        ctx.now = ctx.now + GameCfg.CastFeedback.SplashDurationSec - 0.5
+        ctx.states:Fire({ slots = {}, bait = { worm = 0 } })
+        ctx.now = ctx.now + 1
+        ctx.handler:UpdateCastFeedback()
+        assert.is_false(hint.Visible)
+    end)
+
+    for _, order in ipairs({ 'bait-first', 'cast-first' }) do
+        it('test_worm_depleted_by_cast_keeps_waiting_feedback_' .. order, function()
+            ctx = setUp(1080)
+            local cast = ctx.events.CastState.OnClientEvent
+            ctx.states:Fire({ slots = {}, bait = { worm = 1 }, selectedBait = 'worm' })
+            -- 抛竿扣掉最后一只蚯蚓：库存快照与「已入水」两条消息先后到达，顺序不定
+            local function depleted() ctx.states:Fire({ slots = {}, bait = { worm = 0 }, selectedBait = 'worm' }) end
+            local function waiting()
+                cast:Fire({ phase = 'cast', zoneId = 'pond', castId = 1, landing = { x = 1, y = 0, z = 2 } })
+            end
+            if order == 'bait-first' then depleted() waiting() else waiting() depleted() end
+            assert.is_true(ctx.nodes.CastFailureHint.Visible)
+            assert.same('蚯蚓用尽', ctx.nodes.CastFailureHint.Text)
+            assert.is_true(ctx.nodes.CastWaitHint.Visible)
+            assert.is_true(ctx.nodes.CastSplashHint.Visible)
+            assert.is_false(ctx.nodes.CastFailureMark.Visible)
+            -- 真正的抛竿失败照旧接管临时提示
+            ctx.handler:ShowCastFailure({ reason = 'noFish' })
+            assert.same('本次没有鱼上钩，请重新抛竿', ctx.nodes.CastFailureHint.Text)
+        end)
+    end
+
     it('test_eat_worm_greyed_when_no_worm', function()
         ctx = setUp(1080)
         ctx.states:Fire({ slots = {}, bait = { worm = 0 } })

@@ -173,8 +173,16 @@ function ScreenHandler:EndAim()
     self.AimSlot = nil
 end
 
+local function wormCount(state)
+    local bait = type(state) == 'table' and type(state.bait) == 'table' and state.bait or {}
+    local count = bait[GameCfg.Items.Id.Worm]
+    return type(count) == 'number' and count or 0
+end
+
 function ScreenHandler:Show(state)
     if type(state) ~= 'table' or type(state.slots) ~= 'table' then return end
+    -- #180「蚯蚓用尽」：只在蚯蚓从有到无的那一次快照报，开局即 0 或一直是 0 都不报
+    local depleted = self.Snapshot ~= nil and wormCount(self.Snapshot) > 0 and wormCount(state) <= 0
     self.Snapshot = state
     LocalAttackButton:SetEquipped(state) -- #129：攻击按钮语义随装备走（攻击/射击/连发/换弹）
     local capacity = state.slotCount or GameCfg.Items.ItemBarSlots
@@ -211,6 +219,7 @@ function ScreenHandler:Show(state)
         and '确认丢弃' or '丢弃选中物'
     self:RenderEquipBars(state)
     self:ShowBackpack()
+    if depleted then self:ShowCastFailure({ reason = 'wormDepleted' }) end
 end
 
 -- 吃（#53/#124）：只在选中格有食物时出现，走 Operate 两步——首次只切手持，再点真吃；
@@ -474,7 +483,9 @@ local function showCastFeedback(self, phase, active, alerting, progress)
     end
 end
 
+-- 上方提示区的临时提示通道（HintTransient）：抛竿失败与客户端状态提示共用，白名单外的 reason 丢弃
 local castFailureText = {
+    wormDepleted = '蚯蚓用尽', -- #180：客户端按库存快照判定，服务端不发
     invalidLanding = '落点不在可钓水域，请重新抛竿',
     noFish = '本次没有鱼上钩，请重新抛竿',
     holding = '先放下鱼再抛竿',
@@ -486,15 +497,28 @@ local castFailureText = {
     cannotAct = '现在无法行动，等恢复后再试',
 }
 
+-- 只做提示、不算抛竿失败的 reason：不打断「等待上钩」、入水提示与浮标，新抛竿也不清掉它
+-- （抛竿一刻扣掉最后一只蚯蚓时，库存快照与「已入水」的先后不定）
+local noticeOnly = { wormDepleted = true }
+
 function ScreenHandler:ShowCastFailure(result)
     local text = type(result) == 'table' and castFailureText[result.reason]
     if not text or not self.IsOpen then return end
-    self.SplashUntil = nil
+    local notice = noticeOnly[result.reason] == true
+    if not notice then self.SplashUntil = nil end
+    self.FailureNotice = notice
     self.FailureUntil = World:GetServerTime() + GameCfg.CastFeedback.SplashDurationSec
     self.CastFailureHint.Text = text
     self.FailureLanding = result.reason == 'invalidLanding' and result.landing or nil
     self:UpdateCastFeedback()
-    print('[ScreenMain] 抛竿失败', result.reason, text)
+    print('[ScreenMain] ' .. (notice and '临时提示' or '抛竿失败'), result.reason, text)
+end
+
+-- 新的抛竿反馈到来时清掉旧的失败提示；只做提示的（如蚯蚓用尽）留到自然消失
+local function clearCastFailure(self)
+    if self.FailureNotice then return end
+    self.FailureUntil = nil
+    self.FailureLanding = nil
 end
 
 local function waitingCast(state)
@@ -509,8 +533,9 @@ function ScreenHandler:UpdateCastFeedback()
     if not self.CastFloat then return end
     local now = (self.FailureUntil or self.SplashUntil) and World:GetServerTime() or 0
     local waiting = self.IsOpen and waitingCast(self.CastState)
-    local failing = self.IsOpen and self.FailureUntil ~= nil and now < self.FailureUntil
-    self.CastFailureHint.Visible = failing == true
+    local hinting = self.IsOpen and self.FailureUntil ~= nil and now < self.FailureUntil
+    local failing = hinting and not self.FailureNotice
+    self.CastFailureHint.Visible = hinting == true
     self.CastWaitHint.Visible = waiting == true and not failing
     self.CastSplashHint.Visible = waiting == true and not failing and self.SplashUntil ~= nil
         and now < self.SplashUntil
@@ -1489,8 +1514,7 @@ function ScreenHandler:Init()
         if not self.IsOpen then return end
         if waitingCast(state) then
             if self.AlertedCastId and state.castId < self.AlertedCastId then return end
-            self.FailureUntil = nil
-            self.FailureLanding = nil
+            clearCastFailure(self)
             if self.AlertedCastId ~= state.castId then
                 self.AlertedCastId = state.castId
                 self.SplashUntil = nil
@@ -1501,10 +1525,7 @@ function ScreenHandler:Init()
             end
         else
             self.SplashUntil = nil
-            if not state.snapshot or state.phase ~= 'idle' then
-                self.FailureUntil = nil
-                self.FailureLanding = nil
-            end
+            if not state.snapshot or state.phase ~= 'idle' then clearCastFailure(self) end
         end
         if state.phase == 'hooked' then
             _G.LocalReelIn:SetSession(state.reelSession)
