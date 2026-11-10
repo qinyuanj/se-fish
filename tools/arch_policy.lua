@@ -27,7 +27,7 @@ M.policy = {
     {
       modules = {
         'client.DamageFloat', 'client.FishCombatLabel', 'client.GameUI', 'client.InteractionBubble',
-        'client.PressGesture', 'client.WeaponAim',
+        'client.MainHudLayout', 'client.PressGesture', 'client.WeaponAim',
         'server.FishBehaviors', 'server.MgrUtil',
         'common.DamageNotice', 'common.FXUtil', 'common.GarBiteNotice', 'common.REUtil',
         'common.TeleportUtil', 'common.Util',

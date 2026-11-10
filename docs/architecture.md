@@ -10,7 +10,7 @@
 |---|---|---|
 | L1 入口 | `client.main`、`server.main` | 启动、组装、生命周期分发与依赖注入 |
 | L2 应用流程 | `server.Mgr`、`server.AbilityAPI`、`server.AbilityBehaviors`；`client.Local*`、`client.MgrGameUI`、`client.ScreenHandlers` | 服务端玩法协调、技能装配与战斗行为；客户端输入、交互和界面流程 |
-| L3 展示与运行端支撑 | `client.GameUI` 等六个展示基元；`server.FishBehaviors`、`server.MgrUtil`；`common.REUtil`、`Util`、`FXUtil`、`TeleportUtil`、`DamageNotice`、`GarBiteNotice` | 展示、手势与瞄准；行为分发；引擎和协议适配 |
+| L3 展示与运行端支撑 | `client.GameUI` 等七个展示基元；`server.FishBehaviors`、`server.MgrUtil`；`common.REUtil`、`Util`、`FXUtil`、`TeleportUtil`、`DamageNotice`、`GarBiteNotice` | 展示、主界面布局、手势与瞄准；行为分发；引擎和协议适配 |
 | L4 共享规则与业务状态 | `server.Data`、`server.SwingRegistry`；`common.GameCfg`、`AttrModel`、`FishCatch`、`Vitals` 等规则模块 | 存档与记录、一次性挥砍登记、配置解析与共享玩法计算 |
 | L5 配置内容 | `common.cfg` | 鱼、物品、商店、抽奖、盲盒与占位资产数据 |
 | L6 官方包 | `client.packages`、`server.packages`、`common.packages` | 网易官方作者版包，三端共同的最底层 |
