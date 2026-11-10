@@ -13,7 +13,7 @@
   _Avoid_: 本机
 - **部署树**：镜像进宿主目录的仓库根 `client/`、`common/`、`server/`；仓库根其余内容不部署。宿主内不归本仓库管理的内容由 `sync` 回灌，镜像粒度与操作细节见下方「工具链」。
   _Avoid_: 源码树（指仓库全部时）
-- **quality gate**：质量工具（CRAP、mutation、DRY）的结果处理规则：由 uml-viewer 标准工具发布快照与退出码（见 uml-viewer README 的质量分发说明），指标只出报告，不设门槛。
+- **quality gate**：质量工具（CRAP、mutation、DRY）的结果处理规则：由 dsh-uml-viewer 插件自带的标准工具发布快照与结果记录（`validResult`、实际退出码），指标只出报告，不设门槛。
 - **Busted migration**：全部 Lua 测试改写为原生 Busted、移除 LuaUnit 依赖及桥接层的迁移，决策见 [ADR-0002](../adr/0002-native-busted-migration.md)，当前车道与运行约定见下方「工具链」。
 
 ## 工具链
@@ -25,24 +25,20 @@ Lua 命令使用 **Lua 5.4**：WSL 上裸 `lua` 经 alternatives 可能指向 5.
 - `lua5.4 tools/cli.lua blender <脚本.py> [--blend <输入.blend>] [-- <脚本参数>...]`：在部署端无头 Blender 里执行脚本，是唯一的 Blender 入口；`--which` 核对将用的 Blender，`--expr` 执行内联代码。路径写开发端形式，由入口转换；用法见 [Blender 与 Meshy 使用](art-pipeline.md)，决策见 [ADR-0009](../adr/0009-blender-headless-only.md)。
 - 官方包升级、直接调用接口与编辑器预设依赖见 [官方包接入参考](../packages-reference.md)。技能包预设命令见 `lua5.4 tools/cli.lua ability-presets --help`。
 - **临时产物**：手工验证的中间文件、单据正文草稿等临时产物一律放仓库 `tmp/`（已 gitignored），无需清理；不放系统临时目录，也不为清理去 `rm`（沙盒会拒绝）。这条管 agent 手工产生的文件；脚本自建自删的临时目录（如 pre-commit hook 在 git 目录下的工作目录）不在此列。
-- 质量工具（CRAP / mutation / DRY）是 uml-viewer 自带的标准工具（crapper / mutator / dryer），由人运行 `./uml crap`、`./uml mutate`、`./uml dry`；业务范围与选项只在根目录 `uml-quality.json` 的 `standardTools` 声明，见下方「架构图」。只出报告，不设指标门槛。
+- 质量工具（CRAP / mutation / DRY）是 dsh-uml-viewer 插件自带的标准工具（crapper / mutator / dryer），经插件面板触发，由 agent 调用插件工具 `uml_crap`、`uml_mutate`、`uml_dry` 执行；业务范围与选项只在根目录 `uml-quality.json` 的 `standardTools` 声明，见下方「架构图」。只出报告，不设指标门槛。
 - 单测放 `tests/native/`（slow 车道放 `tests/native/slow/`），共享夹具放 `tests/support/`，探针放 `tests/probes/`（手工探针，不入任何车道）。日常运行 `lua5.4 tools/cli.lua test`（缺省 fast），收尾运行 `lua5.4 tools/cli.lua test full`，`--` 之后的参数原样透传给 busted，退出码不透传：测试通过 0，busted 非 0（失败数加错误数）一律收成 1，busted 缺失 3；裸 `busted` 读 `default`，与 full 相同（crapper 列测试文件时不带 `--run`，覆盖率因此含 slow 车道）。车道由根目录 `.busted` 定义，共享初始化在 `tests/native/helper.lua`。开发端（WSL）是唯一测试环境，案例不分平台，完成判据表里的 `0 pending` 就是在开发端取的严格值。
   - **执行序只保证到文件内**：迁移保留的是**文件内**执行序（`it` 注册序 == 旧 LuaUnit 类内方法序），**不保留跨文件的全局类名字典序**。LuaUnit 的 `collectTests()` 排的是全局 `_G.Test*` **类名**，`.busted` 的 `sort-files=true` 排的是**文件路径字符串**，是两个键空间，技术上无法廉价复现；且 helper 在文件发现**之前**执行，插不进重排钩子。
     - 为什么可以接受：跨类没有共享状态；跨文件隔离由 `.busted` 显式开启的 `auto-insulate` 承担（每个文件结束后按键还原 `_G` 与 `package.loaded`，关掉后 fast 出现 7 failures / 3 errors），`tests/native/helper.lua` 只逐例快照 `GameCfg.Debug` 与 `Save.AcceptanceSlot`；**且不复刻旧序反而修了一个真 bug**——旧序下 `damage_float_test.lua` 与 `vitals_test.lua` 都定义全局 `TestDamageNotice`，后加载整表覆盖前者，导致 `test_rounding_and_effective_health` **从未被执行**，迁移后复活（+1，属修复而非回归）。
     - 裁定原文见迁移台账 `issue-84-mapping.md:96` 与 `issue-85-mapping.md:63`（台账在仓库外，按文件名检索）。
   - `busted` 命令：`test` 子命令与人手 shell 统一用 PATH 上的 `busted`（不在 PATH 时 CLI 退出码 3）。它由 LuaRocks 装在 `~/.luarocks/bin`，该目录必须在 PATH 里。
 
-**架构图（uml-viewer）。** 根目录 `policy.edn` 描述三端模块树、排除目录与隐藏模块（`:exclude`、`:omit`），`docs/uml/se-fish.edn` 是生成的依赖图（不要手编）。 六层职责与依赖方向见 [架构分层与依赖门禁](../architecture.md)，唯一分层声明在 `tools/arch_policy.lua`；`tests/native/arch_policy_test.lua` 随 fast/full 阻止未分类、反向依赖、业务环、`:levels` 漂移及声明残留（源码已删、声明仍在）。
+**架构图（dsh-uml-viewer）。** 根目录 `policy.edn` 描述三端模块树、排除目录与隐藏模块（`:exclude`、`:omit`），`docs/uml/se-fish.edn` 是生成的依赖图（不要手编）。 六层职责与依赖方向见 [架构分层与依赖门禁](../architecture.md)，唯一分层声明在 `tools/arch_policy.lua`；`tests/native/arch_policy_test.lua` 随 fast/full 阻止未分类、反向依赖、业务环、`:levels` 漂移及声明残留（源码已删、声明仍在）。
 
-- `./uml`（安装器生成的原生入口）：首次启动 viewer 与 companion 看图、向 agent 发起图上操作；`./uml ir` 在修改三端代码后重新生成图，viewer 检测文件变化自动重载。
-- **companion 后端是 Herdr（>= 0.9.3，socket protocol 22）**：旧 tmux/psmux 路径已退役，运行平台是 WSL2/Linux（Windows 原生不受支持，macOS 当前不承诺）。PATH 上每个 `herdr` 都逐一预检，选出兼容者中版本最高者（同版本取 PATH 靠前者），本次启动的全部 Herdr 调用都走它的绝对路径；无兼容候选时列出各候选路径与拒绝原因，不自动下载、升级或回退。companion ownership 记录在 `.uml-viewer/companion.edn`，必须显式记为 Herdr；旧记录或缺 backend 的记录会保留并拒绝接管，不要猜着重连。能力契约与验收边界见 uml-viewer 的 `docs/herdr-backend-contract.md`，版本下限与可执行文件选择见其 `docs/adr/0003-herdr-version-floor.md`、`docs/adr/0004-herdr-executable-selection.md`。
-- **重启 viewer 必须走协议**：往 `.uml-viewer/to-viewer.edn` 写 `:quit-for-restart` → 等旧 JVM 自然退出 → `./uml --restart`；新 JVM 按持久化记录重新 bind 原 pane，不新建 companion。**绝不 SIGKILL**，也不要绕开公开 wrapper 直接传 `--restart`。
-- 图上 `crap` / `mutate`：companion 消费邮箱命令后执行与终端 `./uml crap` / `./uml mutate` 相同的标准工具调用（范围取自 `uml-quality.json` 的 `standardTools`）。每次调用前删掉上一条 `.uml-viewer/quality-result.json`，运行后核对刚等到的记录里 `version`、`operation`、`projectRoot`、实际退出码与 `validResult`；只有 `validResult` 为真才继续 IR 与显示。
-- 图上 `client|common|server` 三棵树覆盖整个**业务范围**：各端 `packages/` 按真实命名空间建类，不设外部节点（`policy.edn` 不写 `:foreign`，`:exclude` 只排除 `_trigger`）。viewer 从 `.metrics/crap.edn` 与 `.metrics/mutate/*.edn` 加载指标；缺少任一指标的类卡片为红色。包内类不跑 mutation 基线，因缺快照显红并拉低端级聚合分数，属已接受的代价，理由见 [ADR-0010](../adr/0010-packages-as-business-code.md)。标准工具的环境准备（含 crapper 要求的 cluacov 1.0.0）按 uml-viewer 文档由人完成。
-- **标准 quality 分发**：根目录 `uml-quality.json`（版本管理）只含 `standardTools`：`sourceRoots` 为三端 `client`、`common`、`server`，`exclude` 为 `server/_trigger`，`mutatorOptions` 为 `--busted-task fast`（每个变异体只跑 fast 车道）。终端 `./uml crap|mutate|dry` 与图上右键走同一实现；业务范围只在这里声明一次，CRAP、mutation、DRY 与架构图口径一致。不用 CLI 包装 `./uml`。
+- 看图与图上操作用 DSH 的 dsh-uml-viewer 插件面板，插件自带二进制与质量工具，无需在项目里安装；面板请求的处理规则（质量 → `uml_ir` → `uml_display` 的顺序、`validResult` 校验等）由插件在打开面板的会话里注入，以注入规则为准；决策见 [ADR-0016](../adr/0016-dsh-uml-viewer-plugin.md)。修改三端代码或 `policy.edn` 后用插件工具 `uml_ir` 重新生成图。
+- 图上 `client|common|server` 三棵树覆盖整个**业务范围**：各端 `packages/` 按真实命名空间建类，不设外部节点（`policy.edn` 不写 `:foreign`，`:exclude` 只排除 `_trigger`）。viewer 从 `.metrics/crap.edn` 与 `.metrics/mutate/*.edn` 加载指标；缺少任一指标的类卡片为红色。包内类不跑 mutation 基线，因缺快照显红并拉低端级聚合分数，属已接受的代价，理由见 [ADR-0010](../adr/0010-packages-as-business-code.md)。标准工具的环境准备（含 crapper 要求的 cluacov 1.0.0）按 dsh-uml-viewer 插件文档由人完成。
+- **标准 quality 分发**：根目录 `uml-quality.json`（版本管理）只含 `standardTools`：`sourceRoots` 为三端 `client`、`common`、`server`，`exclude` 为 `server/_trigger`，`mutatorOptions` 为 `--busted-task fast`（每个变异体只跑 fast 车道）。插件的 `uml_crap`、`uml_mutate`、`uml_dry` 读这里的范围；业务范围只在这里声明一次，CRAP、mutation、DRY 与架构图口径一致。CLI 不包装质量工具。
 - `target/` 放覆盖率与 mutation worker，属于忽略的临时产物；`.metrics/` 保留质量快照并纳入版本管理。无函数定义的配置或转发模块不生成 mutation 快照；当前工具不测试模块顶层语句。
-- 根目录 `uml` 由安装器生成（原生 POSIX 入口），不要编辑；安装与升级按 uml-viewer 文档（`get-uml-viewer`）由人执行。
-- **实机验收在开发端（WSL2）**：安装、full／fast、coverage、CRAP 与 Herdr 恢复的实机数据都来自 WSL。**macOS 未实机验证，没有实机数据**。
+- **实机验收在开发端（WSL2）**：full／fast、coverage 与 CRAP 的实机数据都来自 WSL。**macOS 未实机验证，没有实机数据**。
 
 **worktree 起手式。** 新建 worktree 后在其根执行一次：
 
@@ -51,7 +47,7 @@ lua5.4 tools/cli.lua worktree-init
 ```
 
 - 从 magpie 资源库复制上游 `blender-*` skill 到 `.agents/skills/`（来源见[Blender 与 Meshy 使用](art-pipeline.md#上游-blender--skill)）；已存在的条目跳过（可重复执行），来源缺失时在写入前失败。参数见 `--help`。
-- 不为质量工具做任何准备：质量工具是 uml-viewer 的标准工具，`.uml-viewer` 不共享，需要在某个 worktree 跑 `./uml` 时由人按 uml-viewer 文档在该 worktree 安装。
+- 不为质量工具做任何准备：质量工具由 dsh-uml-viewer 插件自带，worktree 里无需安装。
 - 某个 skill 损坏时，删掉对应目录后重跑 `worktree-init`，由它重建。
 
 **美术资产（Meshy MCP + 无头 Blender）。** Blender 与 Meshy 的接入与用法见 [Blender 与 Meshy 使用](art-pipeline.md)，尺寸口径见 [ADR-0004](../adr/0004-fish-asset-scale.md)。唯一的 MCP 是 Meshy，注册与密钥接法见 [Blender 与 Meshy 使用](art-pipeline.md#前端配置)。Blender 不接 MCP，只经 `blender` 子命令无头执行（[ADR-0009](../adr/0009-blender-headless-only.md)）。资产本体不进本仓，正式资产走编辑器导入。
@@ -126,13 +122,13 @@ install -m 755 tools/hooks/shim "$(git rev-parse --git-common-dir)/hooks/pre-com
 
 **美术诊断任务**：任务单明确允许以失败或阻塞报告交付时，完成诊断须逐项记录实际校验结果、缺失或未完成的检查、停止位置、产物绝对路径和重跑命令，并在任务单保留证据索引。交付说明开头分别说明离线校验是否通过、是否已向 eggitor 发布、是否完成游戏内验收；未执行的阶段写“未执行”。诊断任务结案不改变上表的资产交付门槛，后续发布仍须取得当前输入的合格报告。
 
-**人工验收**：质量工具（`./uml crap`、`./uml mutate`、`./uml dry`）只由人运行，agent 不执行；标准工具环境（含 crapper 要求的 cluacov 1.0.0）由人按 uml-viewer 文档准备。agent 在交付说明里照抄下表命令，列为待人工跑的项。
+**人工验收**：质量工具由人在 dsh-uml-viewer 插件面板上发起，agent 只在收到面板请求时调用对应插件工具，不自行运行；标准工具环境（含 crapper 要求的 cluacov 1.0.0）由人按插件文档准备。agent 在交付说明里照抄下表，列为待人工在面板发起的项。
 
 | 检查 | 通过条件 |
 |---|---|
-| `./uml crap` | crapper 以 `.busted` 的 `default`（与 full 相同）跑完整套件并采集覆盖率，按 `standardTools` 业务范围发布全树 `.metrics/crap.edn` |
-| `./uml mutate`（可带文件或 `--changed`） | mutator 对业务范围内的目标做差分 mutation，每个变异体经 `--busted-task fast` 只跑 fast 车道，快照写入 `.metrics/mutate/` |
-| `./uml dry` | dryer 对业务范围出 DRY 报告 `.metrics/dry.edn` |
+| `uml_crap` | crapper 以 `.busted` 的 `default`（与 full 相同）跑完整套件并采集覆盖率，按 `standardTools` 业务范围发布全树 `.metrics/crap.edn` |
+| `uml_mutate`（差分；面板的 mutate-all 才全量重测） | mutator 对业务范围内的目标做差分 mutation，每个变异体经 `--busted-task fast` 只跑 fast 车道，快照写入 `.metrics/mutate/` |
+| `uml_dry` | dryer 对业务范围出 DRY 报告 `.metrics/dry.edn` |
 
 ## 产物归属
 

@@ -44,13 +44,6 @@ __pycache__/
 /luacov.report.out
 
 # 以下区块由 magpie 增删，手改会被覆盖；条目已被 /.agents/ 覆盖，只作 magpie 的登记。
-# UML-VIEWER 区块由 uml-viewer 安装器维护：内容完整时原地保留，缺失或不符才追加到末尾；magpie 会把自己的区块挪到最后，两者顺序不限。
-
-# BEGIN UML-VIEWER
-.uml-viewer/
-uml-viewer-log.txt
-# END UML-VIEWER
-
 # >>> magpie: library skills placed here (magpie adds and removes these lines) >>>
 /.agents/skills/blender-addon-development
 /.agents/skills/blender-animation

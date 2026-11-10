@@ -50,7 +50,8 @@ lua5.4 tools/cli.lua test full
 
 ```sh
 lua5.4 -e 'local a = require("tools.arch_policy"); io.write(a.levels_edn(a.policy)); os.exit(0)'
-./uml ir
 ```
+
+写回 `policy.edn` 后，用 dsh-uml-viewer 插件工具 `uml_ir` 重新生成 `docs/uml/se-fish.edn`。
 
 决策理由见 [ADR-0012](adr/0012-six-layer-architecture.md)，包职责见 [官方包接入参考](packages-reference.md)。

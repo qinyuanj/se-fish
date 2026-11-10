@@ -19,7 +19,7 @@
 --
 -- 不进清单（不挂路由）及理由：
 --   - verify：只剩一项检查，不包编排；收尾直接跑 `test full`。
---   - quality / uml：质量工具由人直接用 `./uml crap|mutate|dry`，CLI 不包装。
+--   - quality / uml：质量工具由 dsh-uml-viewer 插件面板发起（uml_crap / uml_mutate / uml_dry），CLI 不包装。
 --   - 内部模块：部署 / 同步计划（deploy_plan、sync_plan）、WSL 接缝（wsl_seam）、
 --     宿主目录定位（eggy_workspace）、编辑器收尾（editor_finalize）、退出码约定（exit_code）——只供子命令调用。
 --   - 一次性离线脚本：内容校验（validate_content）、锚点探针生成（gen_config_anchor_probe）、

@@ -2,7 +2,7 @@
 -- 从 magpie 资源库把上游 blender-* skill 复制到 <根>/.agents/skills/（gitignored，
 -- 来源口径见 docs/agents/art-pipeline.md「上游 blender-* skill」）。
 -- 已存在的条目跳过（幂等），不覆盖；来源缺失时在写入前失败。
--- 不为质量工具做任何准备（#146）：质量工具是 uml-viewer 的标准工具，由人按 uml-viewer 文档安装。
+-- 不为质量工具做任何准备（#146）：质量工具由 dsh-uml-viewer 插件自带，项目里无需安装。
 -- acceptance4lua 已删除（#147），.toolcache 不再有使用者，这里也不准备。
 local seam = require("tools.wsl_seam")
 local exit_code = require("tools.exit_code")
@@ -18,7 +18,7 @@ function M.usage()
     "  把 worktree 补齐到能跑 lua5.4 tools/cli.lua test full；重复执行只跳过已有条目。",
     "  --root         目标检出根，默认当前目录",
     "  --skills-from  上游 skill 来源，默认部署端 magpie 资源库（经 WSL interop 推导）",
-    "  不为质量工具做准备；质量工具由人按 uml-viewer 文档安装。",
+    "  不为质量工具做准备；质量工具由 dsh-uml-viewer 插件自带。",
   }, "\n") .. "\n"
 end
 
