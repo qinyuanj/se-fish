@@ -389,7 +389,7 @@ end
 -- 免得迟到 / 旧回包把界面拉回一个不存在的状态。
 local CAST_PHASES = { idle = true, cast = true, hooked = true, landed = true, unhooked = true }
 
--- 线还在水里的阶段：还没上钩的 cast，与鱼已脱钩但没收竿的 unhooked；都按「收竿」一次收回
+-- 线还在水里的阶段：还没上钩的 cast，与鱼已脱钩但没收竿的 unhooked；道具按钮显示「收线」（spec #178），一次收回
 local function lineStillOut(phase)
     return phase == 'cast' or phase == 'unhooked'
 end
@@ -444,7 +444,7 @@ local function castActionColor(phase, now, alert)
 end
 
 local castActionText = {
-    hooked = '点击收线', lineOut = '收竿', landed = '已上岸', drop = '放下', rod = '抛竿',
+    hooked = '点击收线', lineOut = '收线', landed = '已上岸', drop = '放下', rod = '抛竿',
 }
 
 local function showCastAction(self, mode, phase, active, alertNow)

@@ -387,7 +387,7 @@ describe('收线界面表现（ScreenMain × LocalReelIn × MgrGameUI）', funct
   end)
 
   it('test_unhooked_phase_reels_back_without_showing_the_bar', function()
-    -- #133：脱钩后按钮变「收竿」且可点；收竿回包 idle 后恢复「抛竿」
+    -- #133：脱钩后按钮变「收线」且可点；收回鱼线回包 idle 后恢复「抛竿」
     env.events.ItemBarState.OnClientEvent:Fire({ slots = {
       [1] = { itemId = 'starterRod', count = 1 },
     }, bait = { worm = 1 }, selectedSlot = 1 })
@@ -396,7 +396,7 @@ describe('收线界面表现（ScreenMain × LocalReelIn × MgrGameUI）', funct
     env.events.ReelInRE.OnClientEvent:Fire({ action = 'unhooked', session = 'e1' })
     env.events.CastState.OnClientEvent:Fire({ phase = 'unhooked', reelSession = 'e1' })
     assert.is_nil(env.reel.SessionId)
-    assert.same('收竿', env.nodes.BtnItemActionLabel.Text)
+    assert.same('收线', env.nodes.BtnItemActionLabel.Text)
     assert.is_true(env.nodes.ItemAction2.TouchEnabled)
     assert.is_false(env.nodes.ReelProgress.Visible)
     local sent = #env.sent

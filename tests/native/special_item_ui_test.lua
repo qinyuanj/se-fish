@@ -145,7 +145,7 @@ describe('TestSpecialItemUI', function()
     it('test_fishing_phase_keeps_reel_semantics_over_special_effect', function()
         ctx.handler.CastState = { phase = 'cast' }
         pushState({ effect = 'godzilla', airborne = false, breathRemaining = 0 })
-        assert.same('收竿', ctx.nodes.BtnItemActionLabel.Text)
+        assert.same('收线', ctx.nodes.BtnItemActionLabel.Text)
         ctx.nodes.ItemAction2.OnClicked:Fire()
         assert.same(0, #specialCommands(), '收线阶段不得发吐息')
     end)
