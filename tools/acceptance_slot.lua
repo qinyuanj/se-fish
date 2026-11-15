@@ -86,8 +86,10 @@ local function write_config(text)
   -- 语义降级（#192）：Windows 上 os.rename 不覆盖已存在目标（返回 nil, "File exists"），
   -- 因此改为「删除目标（不存在则忽略）→ 重命名临时文件到目标」。
   -- 保留「写入期间不破坏旧档」：临时文件完整写完并关闭后才动目标；
-  -- 放弃「替换瞬间原子」：删除目标到重命名完成之间存在短暂窗口，进程若在此中断目标会缺失，
-  -- 但旧档内容已完整落在临时文件里，可人工恢复。
+  -- 放弃「替换瞬间原子」：删除目标到重命名完成之间存在短暂窗口，进程若在此中断目标会缺失。
+  -- 失败清理分两类（#195）：
+  --   * 还没动旧档（写 TEMP 失败、删目标失败）→ 清掉 TEMP，旧档原样保留；
+  --   * 旧档已删除（os.rename 失败）→ **保留 TEMP**：它是完整的新档，删掉就是新旧两空。
   local removed, remove_err = os.remove(CONFIG)
   if not removed and remove_err then
     -- 目标不存在时 os.remove 也返回错误，用可读性探测区分「不存在可忽略」与「真删不掉」。
@@ -100,8 +102,8 @@ local function write_config(text)
   end
   local success = os.rename(TEMP, CONFIG)
   if not success then
-    os.remove(TEMP)
-    return nil, '配置替换失败，原配置保持不变'
+    return nil, '旧配置已删除，新配置保留在 ' .. TEMP .. '，可人工恢复（重命名到 '
+      .. CONFIG .. ' 失败）'
   end
   return true
 end

@@ -40,9 +40,8 @@ local STUB = table.concat({
 local function stub_env(opts)
   opts = opts or {}
   return {
-    -- PWD 必须清空：调用方 shell（MSYS）可能导出 POSIX 形式的 PWD，cli.lua 会把它当前缀
-    -- 拼到已绝对的仓库根上，导致 test.lua 的 spawn cwd 变成非法路径。同 cli_entry_test。
-    PWD = "",
+    -- 不清理 PWD：cli.lua 由入口脚本位置 + lfs.currentdir() 推导仓库根，不读 PWD（#195）。
+    -- 这里故意让调用方 shell（MSYS）的 POSIX 形式 PWD 漏进来，证明它不影响 CLI。
     PATH = opts.path or (BIN .. ";" .. ORIG_PATH),
     STUB_BUSTED_LOG = LOG,
     STUB_BUSTED_RC = tostring((opts.stub and opts.stub.rc) or 0),

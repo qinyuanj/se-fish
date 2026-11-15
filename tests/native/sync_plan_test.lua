@@ -29,7 +29,7 @@ describe("TestSyncPlan", function()
   end)
 
   -- 回灌清单就是编辑器侧产物：两份 API 存根（本工程比 se-defense 多一份）。
-  -- eggy.json 不回灌（#166）：宿主那份带部署端本机信息，仓库那份只留 isSEMap。
+  -- eggy.json 不回灌（#166）：宿主那份带宿主侧绑定信息，仓库那份只留 isSEMap。
   it("test_root_files_are_the_editor_side_products", function()
     assert.same({ "EggyAPI.lua", "EggyEditorAPI.lua" }, plan.ROOT_FILES)
   end)

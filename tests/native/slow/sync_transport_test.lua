@@ -219,7 +219,7 @@ describe("TestSyncTransport", function()
     assert.are.equal("-- 宿主目录里的编辑时 API 存根\n", slurp(FAKE_REPO .. "/EggyEditorAPI.lua"))
   end)
 
-  -- #166：宿主 eggy.json 带部署端本机信息，不回灌；仓库那份原样保留（只留 isSEMap，由守卫把关）。
+  -- #166：宿主 eggy.json 带宿主侧绑定信息，不回灌；仓库那份原样保留（只留 isSEMap，由守卫把关）。
   it("test_eggy_json_is_not_synced", function()
     assert.are.equal("old-binding\n", slurp(FAKE_REPO .. "/eggy.json"))
     assert.is_nil(out:find("write eggy.json", 1, true))

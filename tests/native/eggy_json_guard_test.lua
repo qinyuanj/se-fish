@@ -1,5 +1,5 @@
 -- 仓库根 eggy.json 守卫（#166）：只允许 isSEMap 一个布尔键。
--- 宿主那份带 projectID / playerNid / serverPort / mapDir 等部署端信息，回流进工作树时本车道判红。
+-- 宿主那份带 projectID / playerNid / serverPort / mapDir 等宿主侧绑定信息，回流进工作树时本车道判红。
 local guard = require("tools.eggy_json_guard")
 
 describe("TestEggyJsonGuard", function()

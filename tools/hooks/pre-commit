@@ -63,9 +63,6 @@ echo "pre-commit: lua tools/cli.lua test fast" >&2
 # git 在 hook 里导出的 GIT_INDEX_FILE 等变量不能漏给测试，否则用例里的 git 会操作到本次提交的索引。
 (
   unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_PREFIX GIT_OBJECT_DIRECTORY GIT_COMMON_DIR
-  # Git for Windows 在 hook 里把 PWD 设成 POSIX 形式（/d/...）；CLI 由绝对 $top 推导仓库根，
-  # 留着 PWD 会把 POSIX 前缀拼到 Windows 绝对路径上。PWD 对 CLI 无用，一并清掉。
-  unset PWD
   "$LUA_BIN" "$top/tools/cli.lua" test fast </dev/null
 ) >"$work/busted.out" 2>&1
 status=$?

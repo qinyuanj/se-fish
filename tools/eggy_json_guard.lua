@@ -1,6 +1,6 @@
 -- 仓库根 eggy.json 守卫（#166）：仓库这份只留 isSEMap（布尔）。
 -- 仓库这份唯一的读者是 eggitor SessionStart hook（session_start.mjs 从 cwd 向上找 eggy.json，
--- 只认 "isSEMap": true）；projectID / playerNid / serverPort / mapDir 等是部署端本机信息，
+-- 只认 "isSEMap": true）；projectID / playerNid / serverPort / mapDir 等是宿主侧的绑定信息，
 -- 只属于宿主目录那份（code-* 一律 --workspace 指宿主）。纯模块：判定只看传入文本，
 -- 读真文件由 tests/native/eggy_json_guard_test.lua 做，随 fast 车道判红。
 local M = {}

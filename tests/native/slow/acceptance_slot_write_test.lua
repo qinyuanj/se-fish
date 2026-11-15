@@ -109,6 +109,21 @@ describe("TestAcceptanceSlotWrite", function()
     assert.is_nil(slurp(TEMP))
   end)
 
+  -- 删除目标之后的失败（os.rename 失败）：旧档已经没了，TEMP 就是完整的新档，
+  -- 必须保留下来供人工恢复，不能连它一起删掉。
+  it("test_rename_failure_keeps_new_config_in_temp_file", function()
+    local real_rename = os.rename
+    os.rename = function() return nil, "stub: rename failed" end
+    local ok, code, output, err = pcall(invoke, { "set", "qa124" })
+    os.rename = real_rename
+    assert.is_true(ok, tostring(code))
+    assert.are_not.equal(0, code, output .. err)
+    local kept = slurp(TEMP)
+    assert.is_not_nil(kept, "旧配置已删除，TEMP 必须保留为可恢复的新配置")
+    assert.are.equal((SAMPLE:gsub("AcceptanceSlot = ''", "AcceptanceSlot = 'qa124'")), kept)
+    assert.is_truthy(err:find("acceptance-slot.tmp", 1, true), "错误信息应写明新配置留在 " .. TEMP .. "：" .. err)
+  end)
+
   it("test_set_reports_error_and_keeps_old_config_when_temp_file_exists", function()
     local stale = assert(io.open(TEMP, "wb"))
     stale:write("stale")

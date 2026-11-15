@@ -1,45 +1,66 @@
--- 编辑器收尾：镜像落盘后执行 code validate → （与编辑器有差异时）code push → code diff 复核。
+-- 编辑器收尾：镜像落盘后执行 code validate --strict --json → （与编辑器有差异时）code push →
+-- code diff 复核。validate 的判据是结构化 JSON（ok / data.valid / issues / warnings），不认文本。
 -- 三端（client/common/server）里地图有、宿主没有的文件是本地已删的代码，用
 -- code push --delete --yes 一并删掉；三端以外的地图独有文件（temp/ 等编辑器生成物）只提示、保留。
 -- 两类同时出现时 --delete 分不开它们，失败关闭、不推送。push 之后仍不一致才报告尚未同步。
 --
--- 本模块依赖正在运行的编辑器与部署端的 editor-cli.exe（位置由接缝层 tools.seam 从 USERPROFILE
+-- 本模块依赖正在运行的编辑器与宿主侧的 editor-cli.exe（位置由接缝层 tools.seam 从 USERPROFILE
 -- 推导）。推导失败时报错并返回退出码 3；编辑器没装、宿主未绑定或地图未打开时打印跳过，磁盘镜像
 -- 仍算完成，但不宣称编辑器内代码已同步。宿主必须有自己的 eggy.json，避免 CLI 向上下层目录寻找
 -- 绑定而读到别的工程。
 --
--- 子进程一律走 seam.spawn（argv 形式，不再拼整条命令串，也不再有 wslpath）；spawn 不带 capture，
--- 需要读输出时把 stdout/stderr 重定向到临时文件再读回。
+-- 子进程一律走 seam.spawn / seam.capture（argv 形式，不拼整条命令串，也不再有 wslpath）；
+-- 需要读输出时用 capture，它内部把 stdout/stderr 重定向到临时文件再读回。
 --
 -- 纯解析部分（parse_changelist / map_only / split_map_only / behind_count）单独导出，可脱离编辑器测。
+local dkjson = require("dkjson")
 local seam = require("tools.seam")
 local exit_code = require("tools.exit_code")
 local plan = require("tools.deploy_plan")
 
 local M = {}
 
--- 每条 code 子命令的输出落这个文件再读回（tmp/ 已 gitignored）。
-local OUTPUT_FILE = "tmp/editor_finalize.log"
-
-local function read_file(path)
-  local f = io.open(path, "rb")
-  if not f then return "" end
-  local body = f:read("a") or ""
-  f:close()
-  return body
-end
-
 -- 跑一条 code 子命令：argv 形式，--workspace 传 Windows 正斜杠路径（ws 由 eggy_workspace 给出）。
 -- 必须给 --workspace：不给就按进程 cwd 找绑定，而 cwd 是仓库根。
+-- 输出由 seam.capture 落临时文件再读回（接缝只认 argv，不拼命令串）。
 local function editor_cli(exe, ws, args)
-  seam.ensure_dir("tmp")
-  os.remove(OUTPUT_FILE)
   local argv = { exe }
   for _, a in ipairs(args) do argv[#argv + 1] = a end
   argv[#argv + 1] = "--workspace"
   argv[#argv + 1] = ws
-  local code = seam.spawn({ argv = argv, stdout = OUTPUT_FILE, stderr = OUTPUT_FILE })
-  return code, read_file(OUTPUT_FILE)
+  return seam.capture({ argv = argv })
+end
+
+-- `code validate --strict --json` 的结构化判据（#189）：ok=true、data.valid=true、
+-- data.issues 与 warnings 均为空。返回 true 或 nil, 可读原因。
+-- dkjson 解出的 JSON 空数组是「没有数组部分的 table」，JSON null 是 dkjson.null 哨兵。
+local function empty_list(value)
+  if value == nil or value == dkjson.null then return true end
+  return type(value) == "table" and #value == 0
+end
+
+function M.validate_verdict(out)
+  local body = out and out:match("%b{}")
+  if not body then return nil, "输出里没有 JSON 对象" end
+  local parsed, _, json_err = dkjson.decode(body, 1, nil)
+  if type(parsed) ~= "table" then
+    return nil, "JSON 解析失败: " .. tostring(json_err)
+  end
+  if parsed.ok ~= true then return nil, "ok 不是 true" end
+  local data = parsed.data
+  if type(data) ~= "table" then return nil, "缺 data 对象" end
+  if data.valid ~= true then return nil, "data.valid 不是 true" end
+  if not empty_list(data.issues) then
+    return nil, "data.issues 非空: " .. dkjson.encode(data.issues)
+  end
+  local meta = parsed.meta
+  if not empty_list(type(meta) == "table" and meta.warnings or nil) then
+    return nil, "meta.warnings 非空: " .. dkjson.encode(meta.warnings)
+  end
+  if not empty_list(data.warnings) then
+    return nil, "data.warnings 非空: " .. dkjson.encode(data.warnings)
+  end
+  return true
 end
 
 -- 解析 `code diff` 文本里的 changelist 行：
@@ -114,9 +135,11 @@ function M.run(ws)
     return true
   end
 
-  local code, out = editor_cli(exe, ws, { "code", "validate" })
-  if not out:find("validate: OK", 1, true) then
-    return nil, "code validate 未通过（退出码 " .. tostring(code) .. "）:\n" .. out
+  local code, out = editor_cli(exe, ws, { "code", "validate", "--strict", "--json" })
+  local verdict, why = M.validate_verdict(out)
+  if not verdict then
+    return nil, "code validate --strict 未通过（退出码 " .. tostring(code) .. "）："
+      .. tostring(why) .. "\n" .. out
   end
   print("validate: OK")
 

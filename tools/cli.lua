@@ -51,10 +51,10 @@ if loaded_as == "tools.cli" then
   return M
 end
 
--- 仓库根 = 入口脚本所在目录（tools/）的上一级，不依赖当前目录；相对路径按 PWD 绝对化。
--- 入口脚本所在目录（tools/）的上一级。反斜杠先归一（Windows 下 arg[0] 可能是 tools\cli.lua）。
--- 相对入口路径用 lfs.currentdir() 绝对化，**不读 PWD**：Git for Windows 与 MSYS bash 会把 PWD 设成
--- POSIX 形式（/d/...），拼出来的路径 cmd 的 cd /d 不认（ADR-0017：路径只有一种形式）。
+-- 仓库根 = 入口脚本所在目录（tools/）的上一级，不依赖当前目录。
+-- 入口路径先归一（Windows 下 arg[0] 可能是 tools\cli.lua）；相对的入口路径用 lfs.currentdir()
+-- 绝对化，**不读 PWD**：Git for Windows 与 MSYS bash 会把 PWD 设成 POSIX 形式（/d/...），
+-- 拼出来的路径 cmd 的 cd /d 不认（ADR-0017：路径只有一种形式）。
 local function repo_root()
   local script = (arg and arg[0] or "tools/cli.lua"):gsub("\\", "/")
   local dir = script:match("^(.*)/[^/]*$") or "."
