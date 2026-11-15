@@ -77,9 +77,14 @@ function M.exists(path)
 end
 
 -- 名字是否被占用：存在，或是 symlink（含断开的——它也占着名字）。
+-- Windows 上 lfs.symlinkattributes 对目录会直接抛错（attempt to index a nil value），
+-- 所以先试 symlinkattributes 并 pcall 兜住，失败时退回 exists；两种口径都判不出才算不占名。
 function M.lexists(path)
   if path == nil then return false end
-  return lfs.symlinkattributes(tostring(path)) ~= nil
+  local name = tostring(path)
+  local ok, mode = pcall(lfs.symlinkattributes, name, "mode")
+  if ok and mode ~= nil then return true end
+  return M.exists(name)
 end
 
 function M.is_dir(path)

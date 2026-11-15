@@ -3,22 +3,43 @@
 -- code push --delete --yes 一并删掉；三端以外的地图独有文件（temp/ 等编辑器生成物）只提示、保留。
 -- 两类同时出现时 --delete 分不开它们，失败关闭、不推送。push 之后仍不一致才报告尚未同步。
 --
--- 本模块依赖正在运行的编辑器与部署端的 editor-cli.exe（位置由 WSL 接缝层从 USERPROFILE
--- 推导）。interop 或推导失败时报错并返回非零；编辑器没装、宿主未绑定或地图未打开时打印
--- 跳过，磁盘镜像仍算完成，但不宣称编辑器内代码已同步。
--- 宿主必须有自己的 eggy.json，避免 CLI 向上下层目录寻找绑定而读到别的工程。
+-- 本模块依赖正在运行的编辑器与部署端的 editor-cli.exe（位置由接缝层 tools.seam 从 USERPROFILE
+-- 推导）。推导失败时报错并返回退出码 3；编辑器没装、宿主未绑定或地图未打开时打印跳过，磁盘镜像
+-- 仍算完成，但不宣称编辑器内代码已同步。宿主必须有自己的 eggy.json，避免 CLI 向上下层目录寻找
+-- 绑定而读到别的工程。
+--
+-- 子进程一律走 seam.spawn（argv 形式，不再拼整条命令串，也不再有 wslpath）；spawn 不带 capture，
+-- 需要读输出时把 stdout/stderr 重定向到临时文件再读回。
 --
 -- 纯解析部分（parse_changelist / map_only / split_map_only / behind_count）单独导出，可脱离编辑器测。
-local shell = require("tools.wsl_seam")
+local seam = require("tools.seam")
 local exit_code = require("tools.exit_code")
 local plan = require("tools.deploy_plan")
 
 local M = {}
 
--- 跑一条 code 子命令。必须给 --workspace：不给就按进程 cwd 找绑定，而 cwd 是仓库根。
--- 部署端的 exe 只认 Windows 路径，所以 --workspace 经 wslpath 转成 Windows 形式。
-local function editor_cli(exe, ws_win, argline)
-  return shell.capture(shell.q(exe) .. " " .. argline .. " --workspace " .. shell.q(ws_win))
+-- 每条 code 子命令的输出落这个文件再读回（tmp/ 已 gitignored）。
+local OUTPUT_FILE = "tmp/editor_finalize.log"
+
+local function read_file(path)
+  local f = io.open(path, "rb")
+  if not f then return "" end
+  local body = f:read("a") or ""
+  f:close()
+  return body
+end
+
+-- 跑一条 code 子命令：argv 形式，--workspace 传 Windows 正斜杠路径（ws 由 eggy_workspace 给出）。
+-- 必须给 --workspace：不给就按进程 cwd 找绑定，而 cwd 是仓库根。
+local function editor_cli(exe, ws, args)
+  seam.ensure_dir("tmp")
+  os.remove(OUTPUT_FILE)
+  local argv = { exe }
+  for _, a in ipairs(args) do argv[#argv + 1] = a end
+  argv[#argv + 1] = "--workspace"
+  argv[#argv + 1] = ws
+  local code = seam.spawn({ argv = argv, stdout = OUTPUT_FILE, stderr = OUTPUT_FILE })
+  return code, read_file(OUTPUT_FILE)
 end
 
 -- 解析 `code diff` 文本里的 changelist 行：
@@ -76,33 +97,30 @@ local function read_diff(out)
   return { cl = cl, owned = owned, foreign = foreign }
 end
 
--- 返回 true 表示收尾完成（含跳过）；失败返回 nil, 原因[, 3]——第三个值 exit_code.UNAVAILABLE 表示平台不可用
--- （interop 或 USERPROFILE 推导失败，推不出 editor-cli.exe），调用方据此退 3。
+-- 返回 true 表示收尾完成（含跳过）；失败返回 nil, 原因[, 3]——第三个值 exit_code.UNAVAILABLE 表示
+-- 外部工具不可用（USERPROFILE 推导失败，推不出 editor-cli.exe），调用方据此退 3。
 function M.run(ws)
-  local exe, err = shell.editor_cli()
+  ws = seam.normalize(ws)
+  local exe, err = seam.editor_cli()
   if not exe then
     return nil, "编辑器收尾失败: " .. tostring(err), exit_code.UNAVAILABLE
   end
-  if not shell.exists(exe) then
+  if not seam.exists(exe) then
     print("编辑器收尾跳过: 未找到 editor-cli.exe（" .. exe .. "）")
     return true
   end
-  if not shell.exists(ws .. "/eggy.json") then
+  if not seam.exists(ws .. "/eggy.json") then
     print("编辑器收尾跳过: 宿主目录没有 eggy.json（" .. ws .. " 不是编辑器绑定的 Lua 工程）")
     return true
   end
-  local ws_win, win_err = shell.to_windows(ws)
-  if not ws_win then
-    return nil, "编辑器收尾失败: " .. tostring(win_err)
-  end
 
-  local code, out = editor_cli(exe, ws_win, "code validate")
+  local code, out = editor_cli(exe, ws, { "code", "validate" })
   if not out:find("validate: OK", 1, true) then
     return nil, "code validate 未通过（退出码 " .. tostring(code) .. "）:\n" .. out
   end
   print("validate: OK")
 
-  code, out = editor_cli(exe, ws_win, "code diff")
+  code, out = editor_cli(exe, ws, { "code", "diff" })
   if not M.parse_changelist(out) then
     print("编辑器未打开该地图（diff 给不出 changelist），未校验编辑器内代码"
       .. "（磁盘已是最新）")
@@ -123,15 +141,15 @@ function M.run(ws)
 
   local dirty = M.behind_count(d.cl, #d.owned)
   if dirty > 0 then
-    local push = #d.owned > 0 and "code push --delete --yes" or "code push"
-    local pcode, pout = editor_cli(exe, ws_win, push)
+    local push = #d.owned > 0 and { "code", "push", "--delete", "--yes" } or { "code", "push" }
+    local pcode, pout = editor_cli(exe, ws, push)
     if pcode ~= 0 then
       return nil, "code push 失败（退出码 " .. tostring(pcode) .. "）:\n" .. pout
     end
     print("push: 已推送 " .. M.behind_count(d.cl) .. " 个本地新增或不同文件，删除地图上 "
       .. #d.owned .. " 个本地已删的三端文件")
 
-    local dcode, dout = editor_cli(exe, ws_win, "code diff")
+    local dcode, dout = editor_cli(exe, ws, { "code", "diff" })
     if dcode ~= 0 then
       return nil, "code push 后 code diff 复核失败（退出码 " .. tostring(dcode) .. "）:\n" .. dout
     end
