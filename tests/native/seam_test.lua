@@ -92,6 +92,19 @@ describe("TestSeamQuote", function()
     assert.are.equal('"a' .. BS .. BS .. '"', seam.quote("a" .. BS))
     assert.are.equal('"a b' .. BS .. BS .. '"', seam.quote("a b" .. BS))
   end)
+
+  -- 测试侧 cmd 引用规则（ADR-0017 承接 sh_quote）同样对具体期望字面量断言，
+  -- 不与 seam.quote 互比：两份实现逐字相同，互比在规则写错时会一起错。
+  it("test-side cmd quote rule matches the same concrete literals", function()
+    local cmd_quote = require("tests.support.cmd_quote")
+    assert.are.equal([["abc"]], cmd_quote.q("abc"))
+    assert.are.equal([["a b"]], cmd_quote.q("a b"))
+    assert.are.equal([["say ""hi"""]], cmd_quote.q('say "hi"'))
+    assert.are.equal([["中文"]], cmd_quote.q("中文"))
+    assert.are.equal([["a&b"]], cmd_quote.q("a&b"))
+    assert.are.equal([["！"]], cmd_quote.q("！"))
+    assert.are.equal('"a' .. BS .. BS .. '"', cmd_quote.q("a" .. BS))
+  end)
 end)
 
 describe("TestSeamWhich", function()

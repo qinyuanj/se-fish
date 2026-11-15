@@ -16,7 +16,7 @@
 - **子进程只有一种形状**：新增 `seam.spawn{ argv, cwd, env, stdout, stderr }`，cmd 引用、`set "X=1" &&`、`cd /d`、输出重定向全部收进接缝；只收 argv，不收整条字符串；断言 cmd 命令行 8191 字符上限。
 - **解释器名统一 `lua`**：5.4 硬检查留在 `tools/cli.lua` 入口，不提供带版本号后缀的解释器别名。Blender 运行器只认 `python`。
 - **唯一例外是 git 自带的 sh**：`tools/hooks/pre-commit`、`tools/hooks/shim` 保留 `#!/bin/sh`，由 Git for Windows 执行。这不要求在 PATH 上提供任何 shell，故不构成"第二个开发环境"，但作为显式前提写在此处。
-- **测试支撑层重组**：`tests/support/sh_fs.lua` → `fs_fixture.lua`（lfs 实现，并收拢 `repo_root()`、`temp_dir()`、`list_dir()`、`find_on_path()`）；`sh_quote.lua` 删除，新增 `cmd_quote.lua`（该文件在 #195 删除：它与 `seam.quote` 逐字相同，拿两份实现互比是同义反复，测试改为对具体期望字面量断言）；8 个直接吃 POSIX 的用例文件一并替换（`arch_policy_test`、`cli_entry_test`、`static_require_test`、`worktree_init_test`、`wsl_seam_test`、`blender_cli_test`、`deploy_plan_test`、`ability_presets_test`）。
+- **测试支撑层重组**：`tests/support/sh_fs.lua` → `fs_fixture.lua`（lfs 实现，并收拢 `repo_root()`、`temp_dir()`、`list_dir()`、`find_on_path()`）；`sh_quote.lua` 删除，新增 `cmd_quote.lua`（两者都只对具体期望字面量断言，不拿两份实现互比——逐字相同的实现互比，规则写错时会一起错）；8 个直接吃 POSIX 的用例文件一并替换（`arch_policy_test`、`cli_entry_test`、`static_require_test`、`worktree_init_test`、`wsl_seam_test`、`blender_cli_test`、`deploy_plan_test`、`ability_presets_test`）。
 
 备选方案（拒绝）：
 
