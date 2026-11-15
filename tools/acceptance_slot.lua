@@ -83,7 +83,21 @@ local function write_config(text)
     os.remove(TEMP)
     return nil, write_err or close_err
   end
-  -- 同目录写完再原子替换：POSIX rename(2) 覆盖目标是原子的，失败时原 GameCfg 保持完整。
+  -- 语义降级（#192）：Windows 上 os.rename 不覆盖已存在目标（返回 nil, "File exists"），
+  -- 因此改为「删除目标（不存在则忽略）→ 重命名临时文件到目标」。
+  -- 保留「写入期间不破坏旧档」：临时文件完整写完并关闭后才动目标；
+  -- 放弃「替换瞬间原子」：删除目标到重命名完成之间存在短暂窗口，进程若在此中断目标会缺失，
+  -- 但旧档内容已完整落在临时文件里，可人工恢复。
+  local removed, remove_err = os.remove(CONFIG)
+  if not removed and remove_err then
+    -- 目标不存在时 os.remove 也返回错误，用可读性探测区分「不存在可忽略」与「真删不掉」。
+    local probe = io.open(CONFIG, 'rb')
+    if probe then
+      probe:close()
+      os.remove(TEMP)
+      return nil, '配置删除失败，原配置保持不变'
+    end
+  end
   local success = os.rename(TEMP, CONFIG)
   if not success then
     os.remove(TEMP)
