@@ -9,6 +9,8 @@
 -- 登记覆盖（1~4、6）只读源码文本校对，与 grill_test 的接线断言同口径；失败路径（5）加载真实模块验证。
 
 
+local fs = require("tests.support.fs_fixture")
+
 local SCREEN_DIR = "client/ScreenHandlers"
 local LOCAL_BEHAVIOR_DIR = "server/AbilityBehaviors"
 local PACKAGE_ANCHOR_DIR = "server/packages/ability_system/anchors"
@@ -31,12 +33,10 @@ end
 
 local function lua_module_names(dir)
   local names = {}
-  local pipe = assert(io.popen('ls "' .. dir .. '"'))
-  for file in pipe:lines() do
+  for _, file in ipairs(fs.list_dir(dir)) do
     local name = file:match("^(.+)%.lua$")
     if name then names[#names + 1] = name end
   end
-  pipe:close()
   assert.is_true(#names > 0, dir .. " 下没有模块")
   return names
 end

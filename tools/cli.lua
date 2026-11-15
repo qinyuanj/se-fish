@@ -2,8 +2,8 @@
 -- tools/cli.lua 的封闭命令集，但保持顶层路由表 + 平铺模块，不迁移到 packages / foundation 结构）。
 --
 -- 用法（仓库任意子目录、任一 worktree 均可执行）：
---   lua5.4 tools/cli.lua <子命令> [args...]
---   lua5.4 tools/cli.lua --help | -h
+--   lua tools/cli.lua <子命令> [args...]
+--   lua tools/cli.lua --help | -h
 --
 -- 入口流程：Lua 5.4 预检 → 由本脚本位置推导仓库根并据此拼 package.path → 查静态路由表 →
 -- require(<mod>) → mod.main(args, env) → 统一 os.exit。
@@ -12,7 +12,7 @@
 -- 进程当前目录不改：deploy / sync 等按当前目录读写，与之前一致。
 --
 -- 退出码：0 成功 / 1 业务失败 / 2 用法错误（未知子命令、模块加载失败、未知参数）/
---         3 平台或工具不可用（busted 缺失、editor-cli.exe 或 Blender 找不到、WSL interop 失败）。
+--         3 外部工具不可用（busted / editor-cli / Blender / robocopy 缺失）。
 -- test 不原样透传 busted 的退出码（那是失败数加错误数，恰好 3 个失败会撞上退出码 3）：
 -- busted 非 0 一律收成 1。
 -- ADR 0008 的「编辑器没装或没打开本图 → 打印跳过并返回 0」不受退出码 3 影响。
@@ -20,7 +20,7 @@
 -- 不进清单（不挂路由）及理由：
 --   - verify：只剩一项检查，不包编排；收尾直接跑 `test full`。
 --   - quality / uml：质量工具由 dsh-uml-viewer 插件面板发起（uml_crap / uml_mutate / uml_dry），CLI 不包装。
---   - 内部模块：部署 / 同步计划（deploy_plan、sync_plan）、WSL 接缝（wsl_seam）、
+--   - 内部模块：部署 / 同步计划（deploy_plan、sync_plan）、接缝（seam）、
 --     宿主目录定位（eggy_workspace）、编辑器收尾（editor_finalize）、退出码约定（exit_code）——只供子命令调用。
 --   - 一次性离线脚本：内容校验（validate_content）、锚点探针生成（gen_config_anchor_probe）、
 --     基线转换（baseline_csv）。
@@ -29,7 +29,7 @@
 -- 解释器预检必须最先做；整个文件只用 5.1 也能解析的语法，否则旧解释器连提示都打不出来。
 if _VERSION ~= "Lua 5.4" then
   io.stderr:write("tools/cli.lua 需要 Lua 5.4，当前是 " .. tostring(_VERSION)
-    .. "；请用 lua5.4 tools/cli.lua（WSL 上裸 lua 可能指向 5.1）\n")
+    .. "；请用 lua tools/cli.lua\n")
   os.exit(1)
 end
 
@@ -75,7 +75,7 @@ local ROOT = repo_root()
 package.path = ROOT .. "/?.lua;" .. ROOT .. "/?/init.lua;" .. package.path
 
 local function usage()
-  local lines = { "用法: lua5.4 tools/cli.lua <子命令> [args...]", "", "子命令（封闭命令集）：" }
+  local lines = { "用法: lua tools/cli.lua <子命令> [args...]", "", "子命令（封闭命令集）：" }
   for _, c in ipairs(M.commands) do
     lines[#lines + 1] = string.format("  %-15s %s", c.name, c.summary)
   end
@@ -84,9 +84,9 @@ local function usage()
   lines[#lines + 1] = "  0 成功"
   lines[#lines + 1] = "  1 业务失败（含测试失败：busted 的任何非 0 退出码都收成 1）"
   lines[#lines + 1] = "  2 用法错误（未知子命令、模块加载失败、未知参数）"
-  lines[#lines + 1] = "  3 平台或工具不可用（busted 缺失、editor-cli.exe 或 Blender 找不到、WSL interop 失败）"
+  lines[#lines + 1] = "  3 外部工具不可用（busted / editor-cli / Blender / robocopy 缺失）"
   lines[#lines + 1] = ""
-  lines[#lines + 1] = "  lua5.4 tools/cli.lua <子命令> --help   子命令帮助"
+  lines[#lines + 1] = "  lua tools/cli.lua <子命令> --help   子命令帮助"
   return table.concat(lines, "\n") .. "\n"
 end
 
@@ -108,7 +108,7 @@ end
 local ok, mod = pcall(require, entry.mod)
 if not ok or type(mod) ~= "table" or type(mod.main) ~= "function" then
   -- 只印第一行：require 失败时后面跟着一长串搜索路径，对使用者是噪音；
-  -- 真要追，直接 `lua5.4 <模块文件>` 跑一次就有完整报错。
+  -- 真要追，直接 `lua <模块文件>` 跑一次就有完整报错。
   io.stderr:write("子命令加载失败: " .. name .. " (" .. entry.mod .. ")\n"
     .. (tostring(mod):match("^[^\r\n]*") or "") .. "\n")
   os.exit(2)
