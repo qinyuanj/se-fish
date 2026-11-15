@@ -1,21 +1,15 @@
--- worktree-init 子命令的外部行为（#141，#146 收窄）：在真实临时目录里搭出「资源库 skill 目录 +
+-- worktree-init 子命令的外部行为（#141，#146 收窄）：在临时目录里搭出「资源库 skill 目录 +
 -- 新 worktree」，经 main(args) 调用，断言落盘结果、幂等与缺来源时的报错。
 -- #146 起质量工具交给标准工具（现由 dsh-uml-viewer 插件自带），worktree-init 不再为
 -- 质量工具建父目录链接或提示 .toolcache；#147 删除 acceptance4lua 后同样不为其准备缓存。
--- 来源默认用 --skills-from 显式给出；默认推导的用例只桩掉 WSL 接缝层的 magpie_library，不碰 interop。
+-- Windows 原生（#191）：临时目录用 fs_fixture.temp_dir（仓库 tmp/），落盘/枚举/删除走纯 Lua；
+-- 复制失败的注入用 seam.list_entries 桩（fast 车道整模块桩接缝的口径，不靠 chmod）。
 local init = require("tools.worktree_init")
-local seam = require("tools.wsl_seam")
-local q = require("tests.support.sh_quote").q
-local fs = require("tests.support.sh_fs")
-local code_of, slurp, write_file, lexists = fs.code_of, fs.slurp, fs.write_file, fs.lexists
+local seam = require("tools.seam")
+local fs = require("tests.support.fs_fixture")
+local write_file, slurp, exists = fs.write_file, fs.slurp, fs.exists
 
--- 夹具放系统临时目录：用例会建 chmod 000 的文件，留在项目树里会让复制项目树的工具（如覆盖率分片）读失败。
-local ROOT = (function()
-  local h = io.popen("mktemp -d")
-  local dir = h:read("l")
-  h:close()
-  return assert(dir, "mktemp -d 失败") .. "/worktree-init-test"
-end)()
+local ROOT = fs.temp_dir()
 local LIB = ROOT .. "/library"
 local WT_PARENT = ROOT .. "/wt-parent"
 local WT = WT_PARENT .. "/se-fish"
@@ -37,24 +31,17 @@ local function run(extra)
   io.stdout, io.stderr = out, err
   local ok, code = pcall(init.main, extra or { "--root", WT, "--skills-from", LIB })
   io.stdout, io.stderr = saved_out, saved_err
-  assert(ok, code)
+  assert(ok, tostring(code))
   return code
 end
 
-local function entries(dir)
-  local h = io.popen("ls -A " .. q(dir) .. " 2>/dev/null")
-  local names = {}
-  for line in h:lines() do names[#names + 1] = line end
-  h:close()
-  table.sort(names)
-  return names
-end
+local function entries(dir) return fs.list_dir(dir) end
 
 describe("TestWorktreeInit", function()
   before_each(function()
     saved_out, saved_err = io.stdout, io.stderr
-    saved_seam = { capture = seam.capture, magpie_library = seam.magpie_library }
-    code_of("rm -rf " .. q(ROOT))
+    saved_seam = { list_entries = seam.list_entries, magpie_library = seam.magpie_library }
+    fs.rmrf(ROOT)
     for _, name in ipairs({ "blender-core", "blender-rendering", "tdd" }) do
       write_file(LIB .. "/" .. name .. "/SKILL.md", name .. "\n")
     end
@@ -64,7 +51,7 @@ describe("TestWorktreeInit", function()
   after_each(function()
     io.stdout, io.stderr = saved_out, saved_err
     for k, v in pairs(saved_seam) do seam[k] = v end
-    code_of("chmod -R u+rwX " .. q(ROOT) .. " 2>/dev/null; rm -rf " .. q(ROOT))
+    fs.rmrf(ROOT)
   end)
 
   it("test_fresh_worktree_gets_blender_skills", function()
@@ -73,7 +60,7 @@ describe("TestWorktreeInit", function()
       slurp(WT .. "/.agents/skills/blender-core/scripts/run_in_blender.py"))
     assert.are.equal("blender-rendering\n", slurp(WT .. "/.agents/skills/blender-rendering/SKILL.md"))
     -- 只复制 blender-*，资源库里的其他 skill 不进来。
-    assert.is_false(lexists(WT .. "/.agents/skills/tdd"))
+    assert.is_false(exists(WT .. "/.agents/skills/tdd"))
   end)
 
   -- 质量工具交给 dsh-uml-viewer 插件自带的标准工具后，新 worktree 不需要任何质量工具准备：
@@ -100,13 +87,20 @@ describe("TestWorktreeInit", function()
   end)
 
   -- 中途复制失败时不留下 <名>.partial（否则只能人去清）。
+  -- 注入方式：让 seam.list_entries 对某个源目录多报一个不存在的文件，复制到它时 io.open 失败。
   it("test_failed_skill_copy_removes_partial", function()
-    write_file(LIB .. "/blender-rendering/secret.txt", "x\n")
-    code_of("chmod 000 " .. q(LIB .. "/blender-rendering/secret.txt"))
+    local real = saved_seam.list_entries
+    seam.list_entries = function(dir)
+      local list = real(dir)
+      if dir == LIB .. "/blender-rendering" then
+        list[#list + 1] = { name = "phantom-missing.txt", dir = false }
+      end
+      return list
+    end
     assert.are.equal(1, run())
     assert.matches("blender-rendering", err.text, 1, true)
-    assert.is_false(lexists(WT .. "/.agents/skills/blender-rendering.partial"))
-    assert.is_false(lexists(WT .. "/.agents/skills/blender-rendering"))
+    assert.is_false(exists(WT .. "/.agents/skills/blender-rendering.partial"))
+    assert.is_false(exists(WT .. "/.agents/skills/blender-rendering"))
   end)
 
   it("test_missing_skills_source_fails_before_writing", function()
@@ -114,7 +108,7 @@ describe("TestWorktreeInit", function()
     assert.are.equal(1, code)
     assert.matches(ROOT .. "/nope", err.text, 1, true)
     assert.matches("上游 blender-* skill", err.text, 1, true)
-    assert.is_false(lexists(WT .. "/.agents"))
+    assert.is_false(exists(WT .. "/.agents"))
   end)
 
   -- 默认来源：skill 取 magpie 资源库。
@@ -124,13 +118,13 @@ describe("TestWorktreeInit", function()
     assert.are.equal("blender-core\n", slurp(WT .. "/.agents/skills/blender-core/SKILL.md"))
   end)
 
-  -- 退出码约定（#145）：magpie 资源库要经 WSL interop 推导，推不出属平台不可用，退 3。
+  -- 退出码约定（#145）：magpie 资源库由 USERPROFILE 推导，推不出属外部工具不可用，退 3。
   it("test_magpie_library_derivation_failure_exits_3", function()
-    seam.magpie_library = function() return nil, "PATH 上找不到 cmd.exe（WSL interop 不可用）" end
+    seam.magpie_library = function() return nil, "环境变量 USERPROFILE 未设置" end
     assert.are.equal(3, run({ "--root", WT }))
-    assert.matches("interop 不可用", err.text, 1, true)
+    assert.matches("USERPROFILE", err.text, 1, true)
     assert.matches("--skills-from", err.text, 1, true)
-    assert.is_false(lexists(WT .. "/.agents"))
+    assert.is_false(exists(WT .. "/.agents"))
   end)
 
   it("test_usage_errors_and_help", function()
@@ -142,7 +136,7 @@ describe("TestWorktreeInit", function()
     assert.are.equal(0, run({ "--help" }))
     assert.matches("worktree-init", out.text, 1, true)
     -- 帮助里的车道口径与 CLI 一致（#147）：收尾命令是 test full，不再是裸 busted。
-    assert.matches("lua5.4 tools/cli.lua test full", out.text, 1, true)
+    assert.matches("lua tools/cli.lua test full", out.text, 1, true)
     assert.is_nil(out.text:find("busted --run", 1, true))
     assert.is_nil(out.text:find(".toolcache", 1, true))
     assert.is_nil(out.text:find("tools-from", 1, true))
