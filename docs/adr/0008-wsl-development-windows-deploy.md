@@ -1,6 +1,6 @@
 # 0008 WSL 开发、Windows 部署的接缝
 
-**Status**: accepted
+**Status**: superseded by [ADR-0017](0017-windows-native-only.md)
 
 开发端迁到 WSL2：仓库检出、Lua 5.4、Busted、原生 node 与 teamai 都在 WSL 运行；部署端仍是 Windows 侧的 eggitor 编辑器、`editor-cli.exe` 与宿主目录。两者之间只保留一层窄接缝 `tools/wsl_seam.lua`：仓库内路径一律是 Linux 形式，只有拼 `robocopy.exe` / `editor-cli.exe` 的命令行时用 `wslpath` 转成 Windows 形式；目录枚举、存在性判断、删除与输出捕获都是 POSIX 实现，直接作用于 `/mnt/c` 下的路径。
 
