@@ -1,6 +1,6 @@
 # 0017 放弃 WSL，本仓改为 Windows native only
 
-**Status**: proposed（接受后取代 [ADR-0008](0008-wsl-development-windows-deploy.md)；ADR-0009、ADR-0011 的接缝引用随之改链）
+**Status**: accepted（取代 [ADR-0008](0008-wsl-development-windows-deploy.md)；ADR-0009、ADR-0011 的接缝引用已随之改链）
 
 本机已无 WSL 开发端，agent 与人工都在 Windows 原生环境里工作（仓库检出在 `D:`，编辑器与宿主目录在 `C:`）。而当前工具链在 Windows 上是**整体不可执行**的，不是"需要装点东西"：`tools/wsl_seam.lua` 用 POSIX 命令实现文件系统探测，而 Lua 的 `os.execute` 在 Windows 上走 `cmd.exe`。实测（2026-11-15）：
 
@@ -14,7 +14,7 @@
 - **路径只有一种形式**：仓库内用相对路径；离开仓库一律正斜杠 + 盘符（`C:/Users/<用户名>/...`）。`lfs.currentdir()` 与 `%USERPROFILE%` 的反斜杠进接缝即归一。
 - **文件系统探测纯 Lua**：存在性、递归枚举、建目录、绝对化用 `lfs` + `io`/`os`。删除也纯 Lua 递归，不设 `rmdir` 降级——口径只有一套。
 - **子进程只有一种形状**：新增 `seam.spawn{ argv, cwd, env, stdout, stderr }`，cmd 引用、`set "X=1" &&`、`cd /d`、输出重定向全部收进接缝；只收 argv，不收整条字符串；断言 cmd 命令行 8191 字符上限。
-- **解释器名统一 `lua`**：5.4 硬检查留在 `tools/cli.lua` 入口，不提供 `lua5.4` shim。Blender 运行器只认 `python`。
+- **解释器名统一 `lua`**：5.4 硬检查留在 `tools/cli.lua` 入口，不提供带版本号后缀的解释器别名。Blender 运行器只认 `python`。
 - **唯一例外是 git 自带的 sh**：`tools/hooks/pre-commit`、`tools/hooks/shim` 保留 `#!/bin/sh`，由 Git for Windows 执行。这不要求在 PATH 上提供任何 shell，故不构成"第二个开发环境"，但作为显式前提写在此处。
 - **测试支撑层重组**：`tests/support/sh_fs.lua` → `fs_fixture.lua`（lfs 实现，并收拢 `repo_root()`、`temp_dir()`、`list_dir()`、`find_on_path()`）；`sh_quote.lua` 删除，新增 `cmd_quote.lua`；8 个直接吃 POSIX 的用例文件一并替换（`arch_policy_test`、`cli_entry_test`、`static_require_test`、`worktree_init_test`、`wsl_seam_test`、`blender_cli_test`、`deploy_plan_test`、`ability_presets_test`）。
 
@@ -23,7 +23,7 @@
 1. **WSL 与 Windows 双轨并存**（加 `is_windows()` 分支、接缝双实现）：重新制造"测试到底跑在哪个实现上"说不清的问题，正是 ADR-0008 当年用"只支持 WSL"拒掉的那一类。
 2. **用 PowerShell 包装文件操作**（`rmdir /s /q`、`Move-Item -Force`）：为一次目录删除把 PowerShell 拉回工具链，而 PowerShell 入口正是 #118–#121 刚退役的；且每次起进程的引号与开销都要另付。
 3. **依赖 MSYS/Git Bash 作为开发 shell**（保留 sh 命令与单引号规则）：等于把"要装 Git Bash 并让它当 shell"变成隐性前提，而本机 agent 的 shell 与 Lua 的 `os.execute` 并不是同一个 shell。
-4. **保留 `lua5.4` shim**：为不改文档给每台机器加一层骗人的间接层；`lua5.4` 的存在理由本来就是"WSL 上裸 `lua` 可能是 5.1"。
+4. **保留带版本号后缀的解释器别名**：为不改文档给每台机器加一层骗人的间接层；这类别名的存在理由本来就是"WSL 上裸 `lua` 可能是 5.1"。
 5. **改写 ADR-0008 正文**：会洗掉"当年为什么只留 WSL、拒掉了哪三条备选"这段推理，而这正是现在要被推翻的东西。
 
 后果：

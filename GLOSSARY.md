@@ -223,6 +223,16 @@ _Avoid_: 实机测试、真机验收（指编辑器试玩时）
 玩家实际使用的手机或客户端平台；其上的验收与编辑器试玩验收分开记录。
 _Avoid_: 实机（单独使用时）
 
+### 工程环境
+
+**仓库检出**：
+本仓的 git 工作树（含 worktree）：Lua 5.4、busted 与全部工具链都在这棵树上跑，测试与质量数据也只从这里产生。仓库内路径一律相对、`/` 分隔；离开仓库时写正斜杠加盘符（`C:/...`）。与**宿主目录**只经 `deploy` 与 `sync` 往来。
+_Avoid_: 开发端、本机
+
+**宿主目录**：
+编辑器 `code init` 绑定的本地 Lua 工程目录，根有 `eggy.json`，是 `deploy` 的镜像目的地与 `sync` 的回灌来源；路径默认由 `USERPROFILE` 推导，`EGGY_WORKSPACE` 可覆盖（正斜杠 Windows 路径，空串视为未设置）。宿主内不归本仓库管理的内容（`unit_scripts/`、编辑器生成物）不镜像、不回灌。
+_Avoid_: 部署端、本机
+
 ### 质量工具
 
 **业务范围**：
@@ -230,7 +240,7 @@ _Avoid_: 实机（单独使用时）
 _Avoid_: 业务树、指标采集范围、mutation 范围、scope（单独使用时）
 
 **测试车道**：
-busted 按耗时划分的用例集合，与 `.busted` 任务同名：fast 是日常车道（`tests/native`），full 在 fast 之上追加 slow 用例（`tests/native/slow`），用于收尾。经 `lua5.4 tools/cli.lua test [fast|full]` 运行（[ADR-0011](docs/adr/0011-cli-single-entry-standard-quality-no-acceptance.md)）。
+busted 按耗时划分的用例集合，与 `.busted` 任务同名：fast 是日常车道（`tests/native`），full 在 fast 之上追加 slow 用例（`tests/native/slow`），用于收尾。经 `lua tools/cli.lua test [fast|full]` 运行（[ADR-0011](docs/adr/0011-cli-single-entry-standard-quality-no-acceptance.md)）。
 _Avoid_: 验收车道、代码收尾门、lane（单独使用时）
 
 ### 官方包
