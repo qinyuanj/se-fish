@@ -1,6 +1,6 @@
 -- 架构分层与源码图共用一份声明；扫描与判定均可脱离引擎运行。
 local Arch = require('tools.arch_policy')
-local fs = require('tests.support.sh_fs')
+local fs = require('tests.support.fs_fixture')
 
 local function fixture_policy()
   return {
@@ -161,7 +161,7 @@ describe('架构分层门禁', function()
   end)
 
   describe('扫描 tools 对测试代码的依赖', function()
-    local root = assert(io.popen('pwd')):read('l') .. '/tmp/arch-policy-test'
+    local root = fs.repo_root() .. '/tmp/arch-policy-test'
     after_each(function() fs.rmrf(root) end)
 
     it('tools 只贡献依赖边，不进分层名单', function()
