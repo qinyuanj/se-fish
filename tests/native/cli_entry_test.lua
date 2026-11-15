@@ -45,20 +45,14 @@ describe("TestCliEntryInterpreter", function()
   after_each(function() fs.rmrf(ROOT) end)
 
   -- 入口在做任何事之前就拒绝非 5.4 解释器，并告诉人该用 lua。
-  -- 本机 PATH 上只有 5.4.6，没有非 5.4 的 lua 可执行（lua5.1/5.2/5.3 均不在），
-  -- 无法在进程边界验证这条 guard，故 pending；guard 见 tools/cli.lua 顶部
-  -- \`if _VERSION ~= "Lua 5.4"\` 分支。
-  local function non_54_lua()
-    for _, name in ipairs({ "lua5.1", "lua5.2", "lua5.3", "lua51", "lua52", "lua53" }) do
-      local path = fs.find_on_path(name)
-      if path then return path end
-    end
-    return nil
-  end
-  local alt = non_54_lua()
-  local case = alt and it or pending
-  case("test_non_54_interpreter_exits_1_with_hint (本机无 5.4 以外的 lua，pending)", function()
-    local code, out, err = cli({ "--help" }, { lua = alt })
+  -- 本机没有 5.4 以外的 lua 可执行，所以造一个 .cmd 垫片：先用 -e 把 _VERSION 改成 5.1，
+  -- 再把脚本与参数原样转给真实 lua；guard 仍在真实进程边界上被验证。
+  it("test_non_54_interpreter_exits_1_with_hint", function()
+    fs.mkdirp(ROOT)
+    local shim = ROOT .. "/lua51.cmd"
+    local content = '@echo off\r\n"' .. LUA .. '" -e "_VERSION=' .. "'" .. 'Lua 5.1' .. "'" .. '" %*\r\n'
+    fs.write_file(shim, content)
+    local code, out, err = cli({ "--help" }, { lua = shim })
     assert.are.equal(1, code, out .. err)
     assert.matches("需要 Lua 5.4", err, 1, true)
     assert.matches("请用 lua tools/cli.lua", err, 1, true)

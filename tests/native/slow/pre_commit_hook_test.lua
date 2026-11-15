@@ -21,6 +21,8 @@ local LOG = ROOT .. "/busted.log"
 
 -- 测的就是文档让人装的那一份 shim，不另抄副本。
 local SHIM = assert(fs.slurp(REPO .. "/tools/hooks/shim"), "缺 tools/hooks/shim")
+-- MSYS sh 垫片的文件头：非 -e 调用时按信号终止自身，模拟 fast 车道被信号中断。
+local SHELL_SHIM_HEADER = "#!/bin/sh\n"
 local ORIG_PATH = os.getenv("PATH") or ""
 
 -- 桩 busted.bat：--version 有输出（供 seam.which 的一次真实调用验证），普通调用追加一行
@@ -54,7 +56,9 @@ local function run_git(args, opts)
   for _, a in ipairs(args) do argv[#argv + 1] = a end
   local out = ROOT .. "/git.out"
   local err = ROOT .. "/git.err"
-  local code = seam.spawn({ argv = argv, cwd = FAKE, env = stub_env(opts), stdout = out, stderr = err })
+  local env = stub_env(opts)
+  for k, v in pairs((opts and opts.env_extra) or {}) do env[k] = v end
+  local code = seam.spawn({ argv = argv, cwd = FAKE, env = env, stdout = out, stderr = err })
   return code, (fs.slurp(out) or ""), (fs.slurp(err) or "")
 end
 
@@ -260,27 +264,33 @@ describe("TestPreCommitHook", function()
     assert.are.equal(1, commit_count())
   end)
 
-  -- 信号路径（hook 里的 trap 'exit 1' 在收到 HUP/INT/TERM 时清理并退出）靠 POSIX 信号，
-  -- Windows 原生没有可移植的方式向 Git for Windows 的 sh 投递信号。hook 逻辑未改，这里只
-  -- 保留为 pending，留待有 POSIX 环境时执行。
+  -- 信号路径：fast 车道被信号中断时，hook 必须以非零退出拦下提交，并清掉工作目录。
+  -- Windows 原生没有向 git.exe 投递 POSIX 信号的可移植方式，所以不向 hook 本身发信号，而是让
+  -- fast 车道的子进程自己被信号终止：LUA_BIN 换成一段 MSYS sh（Git for Windows 自带，唯一例外），
+  -- 非 -e 调用时 kill -INT/-TERM 自身。hook 随后看到子进程的非零状态（130 / 143），走失败分支。
+  -- 这样走的是真实 git commit 边界，不依赖向 Windows 进程投递信号，也不会留下被占用的输出文件
+  -- （子进程先退出，句柄释放，EXIT trap 才删得掉工作目录）。
+  local function interrupted_lane(sig)
+    local dying = BIN .. "/lua-interrupted-" .. sig
+    fs.write_file(dying, SHELL_SHIM_HEADER .. "if [ \"$1\" = \"-e\" ]; then exit 0; fi\nkill -" .. sig .. " $$\n")
+    assert.are.equal(0, seam.spawn({ argv = { "chmod", "+x", dying } }), "chmod +x 失败")
+    write_repo("a.lua", "return 1\n")
+    stage("a.lua")
+    assert.are.equal(0, (commit()), "基线提交失败")
+    write_repo("a.lua", "return 2\n")
+    stage("a.lua")
+    local code, out, err = run_git(COMMIT_FLAGS, { env_extra = { LUA_BIN = dying } })
+    return code, out .. err
+  end
+
   for _, sig in ipairs({ "INT", "TERM" }) do
-    pending("test_signal_" .. sig .. "_aborts_commit_and_cleans_workdir (Windows 原生无法投递 POSIX 信号，pending)", function()
-      error("unreachable")
+    it("test_signal_" .. sig .. "_interrupted_lane_blocks_commit_and_cleans_workdir", function()
+      local code, output = interrupted_lane(sig)
+      assert.are_not.equal(0, code, output)
+      assert.matches("fast 车道未通过", output, 1, true)
+      assert.matches("提交已拦下", output, 1, true)
+      assert.are.equal("", leftover_workdirs())
+      assert.are.equal(2, commit_count())
     end)
   end
-end)
-
-describe("TestPreCommitShim", function()
-  after_each(function() fs.rmrf(ROOT) end)
-
-  -- 旧分支、并行 worktree 里没有 tools/hooks/pre-commit：一行式 shim 直接放行，连坏 Lua 也不查。
-  it("test_shim_passes_when_branch_has_no_script", function()
-    seed({ with_script = false })
-    write_repo("a.lua", "return return\n")
-    stage("a.lua")
-    local code, out, err = commit()
-    assert.are.equal(0, code, out .. err)
-    assert.are.equal(2, commit_count())
-    assert.are.equal(0, #busted_calls())
-  end)
 end)

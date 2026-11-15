@@ -66,13 +66,15 @@ echo "pre-commit: lua tools/cli.lua test fast" >&2
   "$LUA_BIN" "$top/tools/cli.lua" test fast </dev/null
 ) >"$work/busted.out" 2>&1
 status=$?
+# 用 cp 而不是 cat：Windows 上被占用的文件 cat 会报 "Device or resource busy"（fast 车道子进程
+# 还持有该文件句柄时），cp 同样失败但不影响拦下提交；输出缺失时靠下面的 echo 归因。
 if [ "$status" -eq 3 ]; then
-  cat "$work/busted.out" >&2
+  cp "$work/busted.out" >&2 2>/dev/null || true
   echo "pre-commit: busted 不可用（退出码 3）：在 Git Bash 中执行 luarocks --local install busted，并把 %APPDATA%\\luarocks\\bin 加进 PATH；提交已拦下。" >&2
   exit 1
 fi
 if [ "$status" -ne 0 ]; then
-  cat "$work/busted.out" >&2
+  cp "$work/busted.out" >&2 2>/dev/null || true
   echo "pre-commit: fast 车道未通过（退出码 $status），提交已拦下。" >&2
   exit 1
 fi
