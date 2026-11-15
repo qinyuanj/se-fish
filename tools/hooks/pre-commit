@@ -2,12 +2,12 @@
 # 入库的 pre-commit 检查（#133，#131）。
 # 由共享 hooks 目录里的一行式 pre-commit 调起，安装方式见 docs/agents/workflow.md「pre-commit hook」。
 # 1. 暂存区每个 .lua 取暂存内容做 Lua 5.4 loadfile（检查的是将要提交的内容，不是工作区）；
-# 2. 暂存区含 .lua 或 .busted 时再经 CLI 跑 fast 车道（`lua5.4 tools/cli.lua test fast`，#145；
+# 2. 暂存区含 .lua 或 .busted 时再经 CLI 跑 fast 车道（`lua tools/cli.lua test fast`，#145；
 #    跑的是工作区，部分暂存时可能与提交内容不同）；纯文档提交不跑。CLI 退出码 3 = busted 不可用。
 # 质量工具不进 hook。
 set -u
 
-LUA_BIN=${LUA_BIN:-lua5.4}
+LUA_BIN=${LUA_BIN:-lua}
 
 git_dir=$(git rev-parse --git-dir) || exit 1
 top=$(git rev-parse --show-toplevel) || exit 1
@@ -35,7 +35,7 @@ while IFS= read -r path; do
       n=$((n + 1))
       blob="blob$n.lua"
       git show ":$path" >"$work/$blob" || { failed=1; continue; }
-      # 路径经环境变量传入：lua5.4 -e ... <file> 会把文件当脚本执行；stdin 接 /dev/null 防止读到假输入。
+      # 路径经环境变量传入：lua -e ... <file> 会把文件当脚本执行；stdin 接 /dev/null 防止读到假输入。
       # 在 $work 里用短相对名 loadfile：长路径会被 Lua 截成 "..." 开头，没法换回暂存路径。
       if ! (cd "$work" && HOOK_BLOB="$blob" HOOK_NAME="$path" "$LUA_BIN" -e '
         local blob, name = os.getenv("HOOK_BLOB"), os.getenv("HOOK_NAME")
@@ -59,16 +59,19 @@ fi
 
 [ "$need_busted" -eq 1 ] || exit 0
 
-echo "pre-commit: lua5.4 tools/cli.lua test fast" >&2
+echo "pre-commit: lua tools/cli.lua test fast" >&2
 # git 在 hook 里导出的 GIT_INDEX_FILE 等变量不能漏给测试，否则用例里的 git 会操作到本次提交的索引。
 (
   unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_PREFIX GIT_OBJECT_DIRECTORY GIT_COMMON_DIR
+  # Git for Windows 在 hook 里把 PWD 设成 POSIX 形式（/d/...）；CLI 由绝对 $top 推导仓库根，
+  # 留着 PWD 会把 POSIX 前缀拼到 Windows 绝对路径上。PWD 对 CLI 无用，一并清掉。
+  unset PWD
   "$LUA_BIN" "$top/tools/cli.lua" test fast </dev/null
 ) >"$work/busted.out" 2>&1
 status=$?
 if [ "$status" -eq 3 ]; then
   cat "$work/busted.out" >&2
-  echo "pre-commit: busted 不可用（退出码 3）：用 luarocks 安装 busted，并把 ~/.luarocks/bin 加进 PATH；提交已拦下。" >&2
+  echo "pre-commit: busted 不可用（退出码 3）：在 Git Bash 中执行 luarocks --local install busted，并把 %APPDATA%\\luarocks\\bin 加进 PATH；提交已拦下。" >&2
   exit 1
 fi
 if [ "$status" -ne 0 ]; then
