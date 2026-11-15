@@ -1,18 +1,18 @@
 -- sync 子命令：把编辑器宿主目录的产物回同步进仓库根——EggyAPI.lua、EggyEditorAPI.lua
 -- 两份 API 存根 + data/ 整目录镜像（宿主侧删掉的文件在仓库里也跟着消失）；eggy.json
 -- 不回灌（#166），三端 packages/ 由仓库管理，也不回灌。在仓库根执行
--- `lua5.4 tools/cli.lua sync`；正方向部署见 tools/deploy.lua。
+-- `lua tools/cli.lua sync`；正方向部署见 tools/deploy.lua。
 --
 -- 回灌落盘前做 CRLF→LF 归一（与 .gitattributes 的 eol=lf 配合）。
 -- 全部源读成功才开始落盘，来源不完整时不写入；内容没变的文件不重写。
 -- 回同步清单与镜像规则在 tools/sync_plan，宿主目录定位在 tools/eggy_workspace，
--- 目录枚举在 tools/wsl_seam。
+-- 目录枚举在 tools/seam（ADR-0017 的唯一接缝）。
 
 package.path = "./?.lua;./?/init.lua;" .. package.path
 
 local workspace = require("tools.eggy_workspace")
 local plan = require("tools.sync_plan")
-local shell = require("tools.wsl_seam")
+local seam = require("tools.seam")
 
 local M = {}
 
@@ -23,14 +23,14 @@ end
 
 function M.usage()
   return table.concat({
-    "用法: lua5.4 tools/cli.lua sync",
+    "用法: lua tools/cli.lua sync",
     "",
     "把宿主目录的 " .. table.concat(plan.ROOT_FILES, " / ") .. " 与 " .. plan.DATA_DIR .. "/ 整目录回同步进仓库根。",
     plan.DATA_DIR .. "/ 按镜像纪律抹平（宿主侧删掉的文件在仓库里跟着消失）；落盘前 CRLF→LF 归一。",
     "三端 packages/ 由仓库管理，不回灌。",
     "全部源读成功才落盘，内容没变的文件不重写；仓库根与宿主目录的其余内容互不触碰。",
-    "宿主目录默认为部署端 USERPROFILE 下的 " .. workspace.DEFAULT_REL .. "，",
-    "环境变量 EGGY_WORKSPACE 可覆盖（接受 /mnt/c/... 与 C:\\... 两种形式）。",
+    "宿主目录默认为 USERPROFILE 下的 " .. workspace.DEFAULT_REL .. "，",
+    "环境变量 EGGY_WORKSPACE 可覆盖（正斜杠 Windows 路径，如 C:/Users/<用户名>/...；空串当作未设置）。",
     "",
   }, "\n") .. "\n"
 end
@@ -45,7 +45,7 @@ end
 
 local function write_file(path, body)
   local dir = path:match("^(.-)/[^/]*$")
-  if dir then shell.ensure_dir(dir) end
+  if dir then seam.ensure_dir(dir) end
   local f = assert(io.open(path, "wb"), path .. " 写不进去")
   f:write(body)
   f:close()
@@ -68,7 +68,7 @@ local function read_sources(WS)
   for _, rel in ipairs(plan.ROOT_FILES) do
     take(rel, WS .. "/" .. rel)
   end
-  local data_files = shell.list_files(WS .. "/" .. plan.DATA_DIR)
+  local data_files = seam.list_files(WS .. "/" .. plan.DATA_DIR)
   if data_files == nil then
     missing[#missing + 1] = plan.DATA_DIR .. "/"
     data_files = {}
@@ -85,14 +85,14 @@ end
 local function run_sync()
   local WS, ws_err = workspace.resolve()
   if not WS then fail(ws_err or "定位不了编辑器宿主目录") end
-  if not shell.is_dir(WS) then
+  if not seam.is_dir(WS) then
     fail("编辑器宿主目录不存在；可用环境变量 EGGY_WORKSPACE 覆盖（缺 " .. WS .. "）")
   end
 
   local write_order, contents, data_files = read_sources(WS)
   -- 仓库侧 data/ 是跟踪目录，枚举不到 = 当前目录多半不是仓库根，不能当空目录处理，
   -- 否则既漏删 stale 又会把产物写进错误的地方。
-  local repo_files = shell.list_files(plan.DATA_DIR)
+  local repo_files = seam.list_files(plan.DATA_DIR)
   if repo_files == nil then
     fail("仓库目录无法枚举 " .. plan.DATA_DIR .. "/；sync 须在仓库根执行")
   end
@@ -113,9 +113,9 @@ local function run_sync()
     end
   end
   for _, dst in ipairs(deletes) do
-    shell.remove({ dir = false, dst = dst })
-    -- shell.remove 不看 del 的退出码；stale 没删掉（被占用等）不能报 ok，复核一次。
-    if shell.exists(dst) then
+    seam.remove({ dir = false, dst = dst })
+    -- seam.remove 不看 del 的退出码；stale 没删掉（被占用等）不能报 ok，复核一次。
+    if seam.exists(dst) then
       fail("stale 文件删不掉: " .. dst)
     end
     print("delete " .. dst)

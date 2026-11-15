@@ -74,9 +74,8 @@ end)
 
 describe("TestDeployOwnedTargets", function()
   local saved, deployed, removed, finalized, deploy
-  -- editor_finalize 走 tools.seam（#191），deploy 仍走 tools.wsl_seam；两个接缝都要桩。
-  local MODULES = { "tools.deploy", "tools.eggy_workspace", "tools.wsl_seam", "tools.seam",
-    "tools.editor_finalize" }
+  -- deploy 与 editor_finalize 都走同一个接缝 tools.seam（#189），桩一份就够。
+  local MODULES = { "tools.deploy", "tools.eggy_workspace", "tools.seam", "tools.editor_finalize" }
 
   before_each(function()
     HOST_ENTRIES = same_as_repo()
@@ -85,8 +84,8 @@ describe("TestDeployOwnedTargets", function()
     deployed, removed, finalized = {}, {}, 0
     package.loaded["tools.deploy"] = nil
     package.loaded["tools.eggy_workspace"] = { resolve = function() return WORKSPACE end }
-    package.loaded["tools.wsl_seam"] = {
-      interop = function() return true, { cmd = "cmd.exe", robocopy = "robocopy.exe" } end,
+    package.loaded["tools.seam"] = {
+      preflight = function() return true end,
       is_dir = function() return true end,
       exists = function(path)
         for _, t in ipairs(removed) do
@@ -100,9 +99,9 @@ describe("TestDeployOwnedTargets", function()
         deployed[#deployed + 1] = target
         return true, 0
       end,
+      mirror_cmd = function(target) return "robocopy " .. target.rel end,
       remove = function(target) removed[#removed + 1] = target end,
     }
-    package.loaded["tools.seam"] = { exists = function() return true end }
     package.loaded["tools.editor_finalize"] = {
       run = function(ws)
         assert.are.equal(WORKSPACE, ws)
@@ -142,7 +141,7 @@ describe("TestDeployOwnedTargets", function()
 
   it("test_stale_entry_that_survives_removal_fails_deploy", function()
     HOST_ENTRIES = STALE_HOST
-    package.loaded["tools.wsl_seam"].remove = function() end
+    package.loaded["tools.seam"].remove = function() end
     local err = ""
     local saved_stderr = io.stderr
     io.stderr = { write = function(self, ...)
@@ -162,29 +161,29 @@ end)
 -- ADR 0008 的「编辑器没装 → 打印跳过」仍退 0。编辑器收尾走真实模块，只桩接缝层。
 describe("TestDeployExitCodes", function()
   local saved, deploy, world, err_text
-  -- 编辑器收尾走真实模块、只桩接缝层：deploy 用 tools.wsl_seam，editor_finalize 用 tools.seam（#191）。
-  local MODULES = { "tools.deploy", "tools.eggy_workspace", "tools.wsl_seam", "tools.seam",
-    "tools.editor_finalize" }
-  local EXE = "/mnt/c/Users/u/.eggitor/cli/editor-cli.exe"
+  -- 编辑器收尾走真实模块、只桩接缝层：deploy 与 editor_finalize 共用 tools.seam（#189）。
+  local MODULES = { "tools.deploy", "tools.eggy_workspace", "tools.seam", "tools.editor_finalize" }
+  local EXE = "C:/Users/fixture/.eggitor/cli/editor-cli.exe"
 
   before_each(function()
     HOST_ENTRIES = same_as_repo()
     saved = { modules = {}, print = print, stderr = io.stderr }
     for _, name in ipairs(MODULES) do saved.modules[name] = package.loaded[name] end
-    world = { interop = true, editor_cli = EXE, exe_exists = true }
+    world = { preflight = true, editor_cli = EXE, exe_exists = true }
     err_text = ""
     package.loaded["tools.deploy"] = nil
     package.loaded["tools.editor_finalize"] = nil
     package.loaded["tools.eggy_workspace"] = { resolve = function() return WORKSPACE end }
-    package.loaded["tools.wsl_seam"] = {
-      q = function(v) return "'" .. tostring(v) .. "'" end,
-      interop = function()
-        if world.interop then return true end
-        return nil, "PATH 上找不到 cmd.exe（WSL interop 不可用）"
+    package.loaded["tools.seam"] = {
+      normalize = function(path) return path end,
+      quote = function(v) return '"' .. tostring(v) .. '"' end,
+      preflight = function()
+        if world.preflight then return true end
+        return nil, "PATH 上找不到 robocopy.exe（部署工具不可用）"
       end,
       editor_cli = function()
         if world.editor_cli then return world.editor_cli end
-        return nil, "PATH 上找不到 cmd.exe（WSL interop 不可用）"
+        return nil, "环境变量 USERPROFILE 未设置"
       end,
       is_dir = function() return true end,
       exists = function(path)
@@ -194,19 +193,8 @@ describe("TestDeployExitCodes", function()
       list_entries = list_entries,
       list_files = function() return {} end,
       mirror = function() return true, 0 end,
+      mirror_cmd = function(target) return "robocopy " .. target.rel end,
       remove = function() end,
-    }
-    -- editor_finalize 经 tools.seam 定位 exe：推导失败时返回 nil, 原因（退出码 3 的来源）。
-    package.loaded["tools.seam"] = {
-      normalize = function(path) return path end,
-      editor_cli = function()
-        if world.editor_cli then return world.editor_cli end
-        return nil, "环境变量 USERPROFILE 未设置"
-      end,
-      exists = function(path)
-        if path == EXE then return world.exe_exists end
-        return true
-      end,
     }
     _G.print = function() end
     io.stderr = { write = function(self, ...)
@@ -222,10 +210,11 @@ describe("TestDeployExitCodes", function()
     saved, deploy = nil, nil
   end)
 
-  it("test_missing_interop_exits_3", function()
-    world.interop = false
+  -- robocopy 缺失属「外部工具不可用」（#145）：镜像之前退 3，一个文件都不写。
+  it("test_missing_preflight_exits_3", function()
+    world.preflight = false
     assert.are.equal(3, deploy.main({}))
-    assert.matches("interop 不可用", err_text, 1, true)
+    assert.matches("部署工具不可用", err_text, 1, true)
   end)
 
   it("test_editor_cli_derivation_failure_exits_3", function()
