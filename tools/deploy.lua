@@ -1,9 +1,9 @@
 -- deploy 子命令：把仓库的三端一级子树字节镜像进编辑器宿主目录。
--- 在仓库根执行 `lua5.4 tools/cli.lua deploy`；直接 `lua5.4 tools/deploy.lua` 亦可。
--- 反方向回同步见 tools/sync.lua；先例：se-defense tools/deploy.lua（WSL 接缝版）。
+-- 在仓库根执行 `lua tools/cli.lua deploy`；直接 `lua tools/deploy.lua` 亦可。
+-- 反方向回同步见 tools/sync.lua；先例：se-defense tools/deploy.lua。
 --
 -- 本模块只管搬字节并核验搬运结果：哪些子树归本仓库（部署规则）在 tools/deploy_plan 回答，
--- 宿主目录在哪在 tools/eggy_workspace，跨 WSL/Windows 边界的执行在 tools/wsl_seam，
+-- 宿主目录在哪在 tools/eggy_workspace，外部进程与文件系统探测在 tools/seam（ADR-0017 的唯一接缝），
 -- 编辑器收尾在 tools/editor_finalize。
 --
 -- 部署树：<端>/<child>/... → 宿主目录 <端>/<child>/...（端 = 白名单 client/common/server，
@@ -17,7 +17,7 @@ package.path = "./?.lua;./?/init.lua;" .. package.path
 
 local workspace = require("tools.eggy_workspace")
 local plan = require("tools.deploy_plan")
-local shell = require("tools.wsl_seam")
+local seam = require("tools.seam")
 local finalize = require("tools.editor_finalize")
 local exit_code = require("tools.exit_code")
 
@@ -28,20 +28,20 @@ local function fail(msg)
   error("deploy: " .. msg, 0)
 end
 
--- 平台或工具不可用（WSL interop、editor-cli.exe 推导）：main 收成退出码 3。
+-- 外部工具不可用（robocopy 缺失、editor-cli.exe 推导失败）：main 收成退出码 3。
 local function unavailable(msg)
   exit_code.unavailable("deploy: " .. msg)
 end
 
 local function require_dir(path, msg)
-  if not shell.is_dir(path) then
+  if not seam.is_dir(path) then
     fail(msg .. "（缺 " .. path .. "）")
   end
 end
 
 function M.usage()
   return table.concat({
-    "用法: lua5.4 tools/cli.lua deploy",
+    "用法: lua tools/cli.lua deploy",
     "",
     "把仓库根 <端>/<child> 字节镜像进编辑器宿主目录 <端>/<child>（先重置目标子树）。",
     "端为白名单 " .. table.concat(plan.REALMS, "/") .. "（官方强制的工作区根，仓库根直接对齐）；",
@@ -50,14 +50,15 @@ function M.usage()
     "传输一律 robocopy /MIR 增量镜像；镜像前打印 /MIR 将删掉的宿主多余文件，镜像完拿源/目标的",
     "文件集合对一遍；",
     "命令没执行成、退出码 >= 8、或目标侧文件集合与源不一致，都算整条命令失败（退出码 1）；",
+    "robocopy 不在 PATH 上时在镜像前失败（退出码 3），一个文件都不写；",
     "镜像完自动做编辑器收尾：code validate → 有落后文件时 code push → code diff 复核；",
     "三端内地图有、宿主没有的文件计入落后，用 code push --delete --yes 从地图删掉；",
     "三端内外的地图独有文件同时出现、或 only-on-map 清单读不全时，不推送并以退出码 1 结束；",
     "push 后仍与编辑器不一致时报告尚未同步，并以退出码 1 结束。",
     "editor-cli 不在或编辑器没开该地图时打印跳过并以退出码 0 结束（磁盘已是最新）。",
     "三端以外的地图独有文件（temp/ 等编辑器生成物）只提示，不删。",
-    "宿主目录默认为部署端 USERPROFILE 下的 " .. workspace.DEFAULT_REL .. "，",
-    "环境变量 EGGY_WORKSPACE 可覆盖（接受 /mnt/c/... 与 C:\\... 两种形式）。",
+    "宿主目录默认为 USERPROFILE 下的 " .. workspace.DEFAULT_REL .. "，",
+    "环境变量 EGGY_WORKSPACE 可覆盖（正斜杠 Windows 路径，如 C:/Users/<用户名>/...；空串当作未设置）。",
     "",
     "选项：",
     "  --clean   只清不装：删掉宿主目录里本仓库拥有的全部子树（含三端 packages/），不拷贝、不做收尾。",
@@ -105,7 +106,7 @@ end
 -- 先列出来再删，避免静默丢掉宿主上仓库没有的内容。
 local function report_stale(t)
   if not t.dir then return end
-  local src, dst = shell.list_files(t.src), shell.list_files(t.dst)
+  local src, dst = seam.list_files(t.src), seam.list_files(t.dst)
   if not src or not dst then return end
   local _, extra = M.file_set_diff(src, dst)
   if #extra > 0 then
@@ -116,20 +117,20 @@ end
 -- 删掉宿主端根下仓库已删的条目（见 tools/deploy_plan 的 stale）。逐条打印再删，删完复查：
 -- 还在就整条命令失败，不进镜像，避免收尾时把残留当成本地仍有的代码推回地图。
 local function remove_stale(WS)
-  for _, t in ipairs(plan.stale(WS, shell.list_entries)) do
+  for _, t in ipairs(plan.stale(WS, seam.list_entries)) do
     print("删除宿主残留: " .. t.rel)
-    shell.remove(t)
-    if shell.exists(t.dst) then fail("宿主残留删不掉: " .. t.rel .. "（" .. t.dst .. "）") end
+    seam.remove(t)
+    if seam.exists(t.dst) then fail("宿主残留删不掉: " .. t.rel .. "（" .. t.dst .. "）") end
   end
 end
 
 -- 镜像一个目标并核验搬运结果。两层护栏：
---   * tools/wsl_seam 的 mirror 保证命令真的执行过、且按 robocopy 口径成功（退出码 0–7）；
+--   * tools/seam 的 mirror 保证命令真的执行过、且按 robocopy 口径成功（退出码 0–7）；
 --   * 这里再对一遍源/目标的文件集合（/MIR 之后本该一模一样）。robocopy 说成功而字节没到齐
 --     （命令被挡掉却回了 1、拷贝中途夭折、残留文件）在这层变成失败，不再落成一句 deploy ok。
 -- 返回 目标侧文件数 或 nil, 失败文案。
 local function mirror_and_verify(t)
-  local ok, res = shell.mirror(t)
+  local ok, res = seam.mirror(t)
   if not ok then
     local notes = {}
     if not res.executed then notes[#notes + 1] = "命令没有执行过（重定向落点建不出来？）" end
@@ -137,8 +138,8 @@ local function mirror_and_verify(t)
   end
 
   if t.dir then
-    local src, dst = shell.list_files(t.src), shell.list_files(t.dst)
-    if not src then return nil, failure_text(t, shell.mirror_cmd(t), res,
+    local src, dst = seam.list_files(t.src), seam.list_files(t.dst)
+    if not src then return nil, failure_text(t, seam.mirror_cmd(t), res,
       { "源目录读不出来: " .. t.src }, nil) end
     local missing, extra = M.file_set_diff(src, dst)
     local notes = {}
@@ -146,24 +147,24 @@ local function mirror_and_verify(t)
       notes[#notes + 1] = "镜像结果与源不一致"
       if #missing > 0 then notes[#notes + 1] = "目标侧缺 " .. #missing .. " 个文件: " .. brief(missing) end
       if #extra > 0 then notes[#notes + 1] = "目标侧多出 " .. #extra .. " 个文件: " .. brief(extra) end
-      return nil, failure_text(t, shell.mirror_cmd(t), res, notes, nil)
+      return nil, failure_text(t, seam.mirror_cmd(t), res, notes, nil)
     end
     return #(dst or {})
   end
 
-  if not shell.exists(t.dst) then
-    return nil, failure_text(t, shell.mirror_cmd(t), res,
+  if not seam.exists(t.dst) then
+    return nil, failure_text(t, seam.mirror_cmd(t), res,
       { "镜像结果与源不一致", "目标侧缺 1 个文件: " .. t.src:match("[^/]+$") }, nil)
   end
   return 1
 end
 
 local function run_deploy(clean_only)
-  -- interop 预检必须在镜像之前：找不到 cmd.exe / robocopy.exe 时一个文件都不写。
+  -- 预检必须在镜像之前：PATH 上找不到 robocopy.exe 时一个文件都不写。
   if not clean_only then
-    local ok, why = shell.interop()
+    local ok, why = seam.preflight()
     if not ok then
-      unavailable("WSL interop 不可用，未镜像任何文件：" .. tostring(why))
+      unavailable("部署工具不可用：" .. tostring(why) .. "，未镜像任何文件")
     end
   end
   local WS, ws_err = workspace.resolve()
@@ -173,11 +174,11 @@ local function run_deploy(clean_only)
   end
   require_dir(WS, "编辑器宿主目录不存在；可用环境变量 EGGY_WORKSPACE 覆盖")
 
-  local targets = plan.targets(WS, shell.list_entries)
+  local targets = plan.targets(WS, seam.list_entries)
 
   if clean_only then
     for _, t in ipairs(targets) do
-      shell.remove(t)
+      seam.remove(t)
       print("removed " .. t.rel)
     end
     print("deploy --clean ok → " .. WS)
@@ -202,7 +203,7 @@ local function run_deploy(clean_only)
   end
 end
 
--- 退出码：0 成功 / 1 业务失败 / 2 用法错误 / 3 平台或工具不可用。
+-- 退出码：0 成功 / 1 业务失败 / 2 用法错误 / 3 外部工具不可用。
 function M.main(args)
   args = args or {}
   local clean_only = false

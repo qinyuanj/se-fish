@@ -214,7 +214,7 @@ function M.preflight()
       if M.exists(exe) then return true end
     end
   end
-  return nil, "PATH 上找不到 robocopy.exe（部署工具不可用）"
+  return nil, "PATH 上找不到 robocopy.exe"
 end
 
 -- 按 PATH 找命令的候选绝对路径（name.exe / name.bat）。不做真实调用验证。
