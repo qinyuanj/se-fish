@@ -1,7 +1,7 @@
 -- 回同步的回归护栏：断言都从 CLI 那一侧（真 Lua 子进程 + EGGY_WORKSPACE 指向临时
 -- 宿主目录）打进去，断言外部行为——回灌后的文件树、行尾归一、stale 删除、退出码；
--- 不断言内部函数调用。目的地是「当前目录=仓库根」，所以子进程统一以临时假仓库为 cwd
--- （假仓库里放一份按绝对路径钉住 package.path 的 cli.lua 副本，跑的是真入口），真仓库不被碰。
+-- 不断言内部函数调用。目的地是「当前目录=仓库根」，所以子进程统一以临时假仓库为 cwd，
+-- 入口按自身绝对位置定位仓库模块，真仓库不被碰。
 -- 迁移自 tests/tooling/slow/sync_transport_test.lua（#92，LuaUnit → 原生 Busted）。
 -- ADR-0017 起只有 Windows 原生环境（#189）：子进程经 tools.seam 发起，夹具用 fs_fixture。
 -- sync 自身不调 robocopy，所以这批案例只证明回灌逻辑正确，不证明 robocopy 可用。
@@ -18,15 +18,8 @@ local ROOT = REPO .. "/tmp/sync-transport-test"
 local HOST = ROOT .. "/宿主 目录！"
 local FAKE_REPO = ROOT .. "/repo"
 local OUT = ROOT .. ".out"
--- 假仓库里的 cli.lua：把真入口按绝对路径钉住 package.path 再 dofile。
--- 真入口自己按「脚本位置 / PWD」推仓库根，而子进程的 cwd 是假仓库，那套推导给不出本仓库；
--- 这里只替换「怎么找到模块」这一段，路由表与入口流程仍是被测的真代码。
-local CLI_ABS = REPO .. "/tools/cli.lua"
-local CLI_SHIM = [[
-package.path = "]] .. REPO .. [[/?.lua;]] .. REPO .. [[/?/init.lua;" .. package.path
-local f = assert(loadfile("]] .. CLI_ABS .. [["))
-f()
-]]
+-- 真入口按脚本自身位置推仓库根，所以传绝对路径、cwd 仍是假仓库（sync 按当前目录落盘）。
+local CLI = REPO .. "/tools/cli.lua"
 
 local function write_host(rel, body)
   write_file(HOST .. "/" .. rel, body)
@@ -40,9 +33,8 @@ end
 local function run_sync(args, cwd)
   fs.mkdirp(ROOT)
   fs.mkdirp(FAKE_REPO)
-  write_file(FAKE_REPO .. "/cli.lua", CLI_SHIM)
   os.remove(OUT)
-  local argv = { interpreter.path(), FAKE_REPO .. "/cli.lua", "sync" }
+  local argv = { interpreter.path(), CLI, "sync" }
   if args then argv[#argv + 1] = args end
   local code = seam.spawn({
     argv = argv,

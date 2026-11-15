@@ -19,22 +19,15 @@ local FAKE_REPO = REPO .. "/tmp/deploy-transport-test/repo"
 -- PATH 里不含 System32 的「空 bin」：用它模拟 robocopy 缺失。
 local EMPTY_BIN = REPO .. "/tmp/deploy-transport-test/empty-bin"
 local OUT = REPO .. "/tmp/deploy-transport-test.out"
--- 假仓库里的 cli.lua：把真入口按绝对路径钉住 package.path 再 dofile。
--- 真入口自己按「脚本位置 / PWD」推仓库根，而子进程的 cwd 是假仓库，那套推导给不出本仓库；
--- 这里只替换「怎么找到模块」这一段，路由表与入口流程仍是被测的真代码。
-local CLI_ABS = REPO .. "/tools/cli.lua"
-local CLI_SHIM = [[
-package.path = "]] .. REPO .. [[/?.lua;]] .. REPO .. [[/?/init.lua;" .. package.path
-local f = assert(loadfile("]] .. CLI_ABS .. [["))
-f()
-]]
+-- 真入口按脚本自身位置推仓库根，所以传绝对路径、cwd 仍是假仓库（deploy 按当前目录读写）。
+local CLI = REPO .. "/tools/cli.lua"
 
 -- 真 CLI 子进程：以假仓库为 cwd 跑 deploy，拿回 stdout+stderr 与退出码。
 -- env_override 用于模拟 robocopy 缺失（PATH 指向不含 System32 的目录）。
 local function run_deploy(args, workspace, env_override)
   local env = { EGGY_WORKSPACE = workspace }
   for k, v in pairs(env_override or {}) do env[k] = v end
-  local argv = { interpreter.path(), FAKE_REPO .. "/cli.lua", "deploy" }
+  local argv = { interpreter.path(), CLI, "deploy" }
   if args then argv[#argv + 1] = args end
   fs.mkdirp(REPO .. "/tmp")
   os.remove(OUT)
@@ -50,7 +43,6 @@ local function seed_repo()
   write_file(FAKE_REPO .. "/client/UI/sub/b.lua", "-- 客户端 B\n")
   write_file(FAKE_REPO .. "/common/GameCfg.lua", "-- 共享配置\n")
   write_file(FAKE_REPO .. "/server/Mgr/c.lua", "-- 服务端 C\n")
-  write_file(FAKE_REPO .. "/cli.lua", CLI_SHIM)
 end
 
 -- 宿主目录：预置会被 /MIR 删掉的 stale 文件、仓库已删的端根散文件与整棵子树（#167），
