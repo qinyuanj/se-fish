@@ -266,20 +266,12 @@ local function run(opts, root)
   return seam.spawn({ argv = argv, cwd = root, env = { BLENDER_EXE = exe } })
 end
 
--- 仓库根：优先用 CLI 传来的 env.repo_root，但它必须是 Windows 绝对路径（盘符或 UNC）。
--- MSYS 的 POSIX PWD 会让 cli.lua 把 /d/... 拼进 repo_root，而 cmd 的 cd 不认这种路径；
--- 这时按当前目录向上找 .busted 兜底。cli.lua 的 PWD 口径是 #188 的范围，本模块不改它。
+-- 仓库根：CLI 入口给的是 Windows 绝对路径（cli.lua 已用 lfs.currentdir 推导，不读 PWD）。
+-- 直接跑本模块时没有 env，用接缝按当前目录绝对化兜底。
 local function repo_root(env)
   local root = env and env.repo_root
   if root and (root:match("^%a:/") or root:sub(1, 2) == "//") then return root end
-  local dir = seam.absolute(".")
-  while dir do
-    if seam.exists(dir .. "/.busted") then return dir end
-    local parent = dir:match("^(.*)/[^/]+$")
-    if not parent or parent == dir then break end
-    dir = parent
-  end
-  return root or "."
+  return assert(seam.absolute("."))
 end
 
 -- 退出码：0 成功 / 1 业务失败 / 2 用法错误 / 3 平台或工具不可用；执行后透传上游脚本的退出码。
