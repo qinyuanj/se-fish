@@ -1,18 +1,22 @@
--- blender 子命令的命令边界（#125）：给定参数与环境，入口拼出什么命令行、何时拒绝执行、
--- 输出与退出码是否透传。WSL 接缝的进程调用（interop 预检、wslpath、cmd.exe 取值、执行）
--- 全部用桩替换，不需要 Blender 与 interop；真实往返由 tests/native/slow/blender_transport_test.lua 证明。
-local seam = require("tools.wsl_seam")
+-- blender 子命令的命令边界（#125；ADR-0017 Windows native）：给定参数与环境，
+-- 入口用 seam.which 找 python、用 seam.spawn{argv, env} 起上游 run_in_blender.py，
+-- 断言 argv 形状、BLENDER_EXE 经 env 传入、--which 只输出一条正斜杠 Windows 路径。
+-- 接缝的进程调用与文件系统探测全部用桩替换，不需要真 Blender；真实往返由
+-- tests/native/slow/blender_transport_test.lua 证明。
+local seam = require("tools.seam")
 local blender = require("tools.blender")
+local fs = require("tests.support.fs_fixture")
+local interpreter = require("tests.support.interpreter")
 
-local PF = "/mnt/c/Program Files"
-local LAD = "/mnt/c/Users/u/AppData/Local"
-local REPO = "/home/u/se-fish"
+local REPO = fs.repo_root()
+local PF = "C:/Program Files"
+local LAD = "C:/Users/dev/AppData/Local"
+local PYTHON = "C:/Users/dev/AppData/Local/Programs/Python/Python312/python.exe"
 
 -- 假文件系统与 Windows 环境：files 是存在的路径集合，dirs 是「目录 → 一级条目名」。
 local world
 local saved = {}
-local SEAM_KEYS = { "interop", "which", "windows_env", "list_entries", "exists", "to_windows",
-  "to_linux", "absolute", "capture", "execute" }
+local SEAM_KEYS = { "which", "spawn", "windows_env", "list_entries", "exists", "absolute" }
 
 local function fake_stream()
   local s = { text = "" }
@@ -23,11 +27,10 @@ local function fake_stream()
   return s
 end
 
-local function to_win(path)
-  if path:match("^%a:[/\\]") then return path end
-  local drive, rest = path:match("^/mnt/(%a)/(.*)$")
-  if drive then return drive:upper() .. ":\\" .. rest:gsub("/", "\\") end
-  return "\\\\wsl.localhost\\Ubuntu" .. path:gsub("/", "\\")
+local function write(path, body)
+  local f = assert(io.open(path, "wb"), path .. " 建不出来")
+  f:write(body)
+  f:close()
 end
 
 local function install_world()
@@ -36,49 +39,41 @@ local function install_world()
     win_env = { ProgramFiles = PF, LOCALAPPDATA = LAD },
     files = { [blender.RUNNER] = true },
     dirs = {},
-    interop = true,
-    python = true,
-    executed = {},
+    python = PYTHON,
+    python_version = "Python 3.12.10\r\n",
+    blender_version = "Blender 5.2.1 LTS\n\tbuild date: 2026-08-25\n",
+    calls = {},
+    runs = {},
     exit_code = 0,
-    version_out = "Blender 5.2.1 LTS\n\tbuild date: 2026-08-25\n",
   }
   for _, k in ipairs(SEAM_KEYS) do saved[k] = seam[k] end
   saved.getenv, saved.stdout, saved.stderr = os.getenv, io.stdout, io.stderr
 
-  seam.interop = function()
-    if world.interop then return true end
-    return nil, "PATH 上找不到 cmd.exe（WSL interop 不可用）"
-  end
   seam.which = function(name)
-    if name == "python3" and world.python then return "/usr/bin/python3" end
+    if name == "python" then return world.python end
     return nil
   end
-  seam.windows_env = function(name)
-    local v = world.win_env[name]
-    if v then return v end
-    return nil, "Windows 变量 " .. name .. " 未定义"
-  end
+  seam.windows_env = function(name) return world.win_env[name] end
   seam.list_entries = function(dir)
     local out = {}
     for _, name in ipairs(world.dirs[dir] or {}) do out[#out + 1] = { name = name, dir = true } end
     return out
   end
   seam.exists = function(path) return world.files[path] == true end
-  seam.to_windows = function(path) return to_win(path) end
-  seam.to_linux = function(path)
-    local drive, rest = path:match("^(%a):\\(.*)$")
-    return "/mnt/" .. drive:lower() .. "/" .. rest:gsub("\\", "/")
-  end
   seam.absolute = function(path)
-    if path:sub(1, 1) == "/" then return path end
-    return REPO .. "/" .. path:gsub("^%./", "")
+    local p = seam.normalize(path)
+    if p:match("^%a:/") or p:sub(1, 2) == "//" then return p end
+    return REPO .. "/" .. p:gsub("^%./", "")
   end
-  seam.capture = function(cmd)
-    world.captured = cmd
-    return 0, world.version_out
-  end
-  seam.execute = function(cmd)
-    world.executed[#world.executed + 1] = cmd
+  seam.spawn = function(spec)
+    world.calls[#world.calls + 1] = spec
+    local argv = spec.argv
+    if argv[2] == "--version" then
+      local body = (argv[1] == world.python) and world.python_version or world.blender_version
+      if spec.stdout then write(spec.stdout, body) end
+      return 0
+    end
+    world.runs[#world.runs + 1] = spec
     return world.exit_code
   end
   os.getenv = function(name)
@@ -104,55 +99,40 @@ local function install_blender(root, ver)
   return exe
 end
 
+-- 与 CLI 入口一致：把仓库根作为 env.repo_root 传进去（RUNNER 是相对仓库根的路径）。
 local function run(args)
-  local code = blender.main(args)
+  local code = blender.main(args, { repo_root = REPO, command = "blender" })
   return code, io.stdout.text, io.stderr.text
-end
-
--- 拼出的命令行里某个经 sh 单引号引用的值。
-local function quoted(value)
-  return seam.q(value)
 end
 
 describe("TestBlenderCliPreflight", function()
   before_each(install_world)
   after_each(restore_world)
 
-  it("test_missing_interop_fails_before_blender_starts", function()
-    world.interop = false
-    install_blender(PF, "5.2")
-    world.files[REPO .. "/a.py"] = true
-    local code, _, err = run({ "a.py" })
-    assert.are.equal(3, code) -- 平台或工具不可用（#145）
-    assert.matches("interop 不可用", err, 1, true)
-    assert.are.equal(0, #world.executed)
-  end)
-
   it("test_blender_not_found_hints_blender_exe", function()
     world.files[REPO .. "/a.py"] = true
     local code, _, err = run({ "a.py" })
-    assert.are.equal(3, code) -- 平台或工具不可用（#145）
+    assert.are.equal(3, code) -- 外部工具不可用（#145）
     assert.matches("BLENDER_EXE", err, 1, true)
-    assert.matches("C:\\", err, 1, true)
-    assert.matches("/mnt/c/", err, 1, true)
-    assert.are.equal(0, #world.executed)
+    assert.matches("C:/", err, 1, true)
+    assert.are.equal(0, #world.runs)
   end)
 
   it("test_blender_exe_pointing_nowhere_is_rejected", function()
-    world.env.BLENDER_EXE = "/mnt/c/nope/blender.exe"
+    world.env.BLENDER_EXE = "C:/nope/blender.exe"
     install_blender(PF, "5.2") -- 显式指定时不回退到自动定位
     local code, _, err = run({ "--which" })
-    assert.are.equal(3, code) -- 平台或工具不可用（#145）
+    assert.are.equal(3, code)
     assert.matches("BLENDER_EXE", err, 1, true)
-    assert.matches("/mnt/c/nope/blender.exe", err, 1, true)
-    assert.is_nil(world.captured)
+    assert.matches("C:/nope/blender.exe", err, 1, true)
+    assert.are.equal(0, #world.calls)
   end)
 
   it("test_relative_blender_exe_is_rejected", function()
     world.env.BLENDER_EXE = "blender.exe"
     local code, _, err = run({ "--which" })
     assert.are_not.equal(0, code)
-    assert.matches("绝对路径", err, 1, true)
+    assert.matches("绝对", err, 1, true)
   end)
 
   it("test_missing_upstream_runner_fails_before_blender_starts", function()
@@ -160,7 +140,7 @@ describe("TestBlenderCliPreflight", function()
     world.files[blender.RUNNER] = nil
     world.files[REPO .. "/a.py"] = true
     local code, _, err = run({ "a.py" })
-    assert.are.equal(3, code) -- 平台或工具不可用（#145）
+    assert.are.equal(3, code)
     assert.matches("blender-core", err, 1, true)
     assert.matches("docs/agents/art-pipeline.md", err, 1, true)
     -- 报错指向的小节标题须真实存在于文档，防止文档改名后报错指向空处。
@@ -174,17 +154,37 @@ describe("TestBlenderCliPreflight", function()
       if line:match("^#+%s+(.-)%s*$") == section then found = true end
     end
     assert.is_true(found, "art-pipeline.md 中没有标题「" .. section .. "」")
-    assert.are.equal(0, #world.executed)
+    assert.are.equal(0, #world.runs)
   end)
 
-  it("test_missing_python3_fails_before_blender_starts", function()
+  it("test_missing_python_fails_before_blender_starts", function()
     install_blender(PF, "5.2")
-    world.python = false
+    world.python = nil
     world.files[REPO .. "/a.py"] = true
     local code, _, err = run({ "a.py" })
-    assert.are.equal(3, code) -- 平台或工具不可用（#145）
-    assert.matches("python3", err, 1, true)
-    assert.are.equal(0, #world.executed)
+    assert.are.equal(3, code)
+    assert.matches("python", err, 1, true)
+    assert.are.equal(0, #world.runs)
+  end)
+
+  it("test_python_major_version_must_be_3", function()
+    install_blender(PF, "5.2")
+    world.files[REPO .. "/a.py"] = true
+    world.python_version = "Python 2.7.18\r\n"
+    local code, _, err = run({ "a.py" })
+    assert.are.equal(3, code)
+    assert.matches("Python 3", err, 1, true)
+    assert.are.equal(0, #world.runs)
+  end)
+
+  it("test_unreadable_python_version_fails", function()
+    install_blender(PF, "5.2")
+    world.files[REPO .. "/a.py"] = true
+    world.python_version = ""
+    local code, _, err = run({ "a.py" })
+    assert.are.equal(3, code)
+    assert.matches("版本", err, 1, true)
+    assert.are.equal(0, #world.runs)
   end)
 
   it("test_missing_script_fails_before_blender_starts", function()
@@ -192,7 +192,7 @@ describe("TestBlenderCliPreflight", function()
     local code, _, err = run({ "nope.py" })
     assert.are_not.equal(0, code)
     assert.matches("nope.py", err, 1, true)
-    assert.are.equal(0, #world.executed)
+    assert.are.equal(0, #world.runs)
   end)
 end)
 
@@ -200,30 +200,29 @@ describe("TestBlenderCliLocate", function()
   before_each(install_world)
   after_each(restore_world)
 
-  it("test_linux_form_blender_exe_is_used_as_is", function()
-    world.env.BLENDER_EXE = "/mnt/d/Blender/blender.exe"
-    world.files["/mnt/d/Blender/blender.exe"] = true
+  it("test_forward_slash_blender_exe_is_used_as_is", function()
+    world.env.BLENDER_EXE = "D:/Blender/blender.exe"
+    world.files["D:/Blender/blender.exe"] = true
     install_blender(PF, "9.9")
     local code, out = run({ "--which" })
     assert.are.equal(0, code)
-    assert.matches("/mnt/d/Blender/blender.exe", out, 1, true)
-    assert.matches("D:\\Blender\\blender.exe", out, 1, true)
+    assert.matches("blender: D:/Blender/blender.exe", out, 1, true)
   end)
 
-  it("test_windows_form_blender_exe_is_converted", function()
+  it("test_backslash_blender_exe_is_normalized", function()
     world.env.BLENDER_EXE = "D:\\Blender\\blender.exe"
-    world.files["/mnt/d/Blender/blender.exe"] = true
+    world.files["D:/Blender/blender.exe"] = true
     local code, out = run({ "--which" })
     assert.are.equal(0, code)
-    assert.matches("/mnt/d/Blender/blender.exe", out, 1, true)
+    assert.matches("blender: D:/Blender/blender.exe", out, 1, true)
   end)
 
   it("test_empty_blender_exe_is_treated_as_unset", function()
     world.env.BLENDER_EXE = ""
-    install_blender(PF, "5.2")
+    local exe = install_blender(PF, "5.2")
     local code, out = run({ "--which" })
     assert.are.equal(0, code)
-    assert.matches(PF .. "/Blender Foundation/Blender 5.2/blender.exe", out, 1, true)
+    assert.matches("blender: " .. exe, out, 1, true)
   end)
 
   it("test_unset_picks_newest_version_numerically", function()
@@ -232,7 +231,7 @@ describe("TestBlenderCliLocate", function()
     local newest = install_blender(LAD .. "/Programs", "5.10")
     local code, out = run({ "--which" })
     assert.are.equal(0, code)
-    assert.matches(newest, out, 1, true)
+    assert.matches("blender: " .. newest, out, 1, true)
   end)
 
   it("test_version_dir_without_exe_is_skipped", function()
@@ -241,34 +240,36 @@ describe("TestBlenderCliLocate", function()
     world.files[PF .. "/Blender Foundation/Blender 6.0/blender.exe"] = nil
     local code, out = run({ "--which" })
     assert.are.equal(0, code)
-    assert.matches(exe, out, 1, true)
+    assert.matches("blender: " .. exe, out, 1, true)
   end)
 
   it("test_blender_path_is_not_consulted", function()
-    world.env.BLENDER_PATH = "/mnt/d/Blender/blender.exe"
-    world.files["/mnt/d/Blender/blender.exe"] = true
+    world.env.BLENDER_PATH = "D:/Blender/blender.exe"
+    world.files["D:/Blender/blender.exe"] = true
     local code, _, err = run({ "--which" })
     assert.are_not.equal(0, code)
     assert.matches("BLENDER_EXE", err, 1, true)
   end)
 
-  it("test_which_prints_path_and_version_without_running_a_script", function()
+  it("test_which_prints_one_forward_slash_path_and_version", function()
     local exe = install_blender(PF, "5.2")
     local code, out = run({ "--which" })
     assert.are.equal(0, code)
-    assert.matches(exe, out, 1, true)
-    assert.matches("C:\\Program Files\\Blender Foundation\\Blender 5.2\\blender.exe", out, 1, true)
-    assert.matches("5.2.1 LTS", out, 1, true)
-    assert.matches(quoted(exe) .. " --version", world.captured, 1, true)
-    assert.are.equal(0, #world.executed)
+    assert.matches("blender: " .. exe, out, 1, true)
+    assert.matches("version: 5.2.1 LTS", out, 1, true)
+    assert.is_nil(out:find("windows:", 1, true), out)
+    assert.is_nil(out:find("\\", 1, true), "路径不得含反斜杠: " .. out)
+    assert.are.equal(1, #world.calls)
+    assert.are.same({ exe, "--version" }, world.calls[1].argv)
+    assert.are.equal(0, #world.runs)
   end)
 
   it("test_which_fails_when_version_query_fails", function()
     install_blender(PF, "5.2")
-    seam.capture = function() return 1, "boom" end
+    world.blender_version = ""
     local code, _, err = run({ "--which" })
     assert.are_not.equal(0, code)
-    assert.matches("boom", err, 1, true)
+    assert.matches("读取 Blender 版本失败", err, 1, true)
   end)
 end)
 
@@ -282,34 +283,41 @@ describe("TestBlenderCliCommand", function()
   end)
   after_each(restore_world)
 
-  it("test_script_and_blend_are_converted_to_windows_form", function()
+  it("test_blender_exe_goes_through_env_and_script_is_absolute", function()
     local code = run({ "tools/x/step.py", "--blend", "tmp/in 鱼.blend" })
     assert.are.equal(0, code)
-    local cmd = world.executed[1]
-    assert.matches("BLENDER_EXE=" .. quoted(exe), cmd, 1, true)
-    assert.matches("python3 " .. quoted(blender.RUNNER), cmd, 1, true)
-    assert.matches("--blend " .. quoted(to_win(REPO .. "/tmp/in 鱼.blend")), cmd, 1, true)
-    assert.matches(quoted(to_win(REPO .. "/tools/x/step.py")), cmd, 1, true)
+    assert.are.equal(1, #world.runs)
+    local spec = world.runs[1]
+    assert.are.same({
+      PYTHON, blender.RUNNER,
+      "--blend", REPO .. "/tmp/in 鱼.blend",
+      REPO .. "/tools/x/step.py",
+    }, spec.argv)
+    assert.are.equal(exe, spec.env.BLENDER_EXE)
+    assert.are.equal(REPO, spec.cwd, "run_in_blender.py 须在仓库根执行")
+    -- BLENDER_EXE 不再拼在命令行前面。
+    assert.is_nil(spec.argv[1]:find("BLENDER_EXE", 1, true))
   end)
 
-  it("test_path_like_script_args_are_converted", function()
+  it("test_path_like_script_args_are_absolute", function()
     local code = run({ "tools/x/step.py", "--", "--objects", "Fish", "Fin/Top",
-      "--save", "/mnt/c/Users/u/AppData/Local/Temp/out.blend",
-      "--out=/home/u/art/a.png", "--rel", "./tmp/b.blend" })
+      "--save", "C:/Users/dev/AppData/Local/Temp/out.blend",
+      "--out=C:/art/a.png", "--rel", "./tmp/b.blend" })
     assert.are.equal(0, code)
-    local cmd = world.executed[1]
-    local tail = cmd:sub((cmd:find(" '--' ", 1, true)))
-    assert.matches(" '--objects' 'Fish' 'Fin/Top' ", tail, 1, true)
-    assert.matches("'--save' " .. quoted("C:\\Users\\u\\AppData\\Local\\Temp\\out.blend"), tail, 1, true)
-    assert.matches(quoted("--out=" .. to_win("/home/u/art/a.png")), tail, 1, true)
-    assert.matches("'--rel' " .. quoted(to_win(REPO .. "/tmp/b.blend")), tail, 1, true)
+    assert.are.same({
+      PYTHON, blender.RUNNER, REPO .. "/tools/x/step.py",
+      "--", "--objects", "Fish", "Fin/Top",
+      "--save", "C:/Users/dev/AppData/Local/Temp/out.blend",
+      "--out=C:/art/a.png",
+      "--rel", REPO .. "/tmp/b.blend",
+    }, world.runs[1].argv)
   end)
 
   it("test_expr_is_passed_verbatim", function()
-    local code = run({ "--expr", "import bpy; print('/home/u -- x')" })
+    local expr = "import bpy; print('C:/x -- y')"
+    local code = run({ "--expr", expr })
     assert.are.equal(0, code)
-    local cmd = world.executed[1]
-    assert.matches("--expr " .. quoted("import bpy; print('/home/u -- x')"), cmd, 1, true)
+    assert.are.same({ PYTHON, blender.RUNNER, "--expr", expr }, world.runs[1].argv)
   end)
 
   it("test_nonzero_exit_code_is_passed_through", function()
@@ -323,7 +331,7 @@ describe("TestBlenderCliCommand", function()
     local code, _, err = run({ "tools/x/step.py", "--blend", "tmp/nope.blend" })
     assert.are_not.equal(0, code)
     assert.matches("nope.blend", err, 1, true)
-    assert.are.equal(0, #world.executed)
+    assert.are.equal(0, #world.runs)
   end)
 end)
 
@@ -345,7 +353,7 @@ describe("TestBlenderCliUsage", function()
       install_blender(PF, "5.2")
       local code = run(c.args)
       assert.are.equal(2, code)
-      assert.are.equal(0, #world.executed)
+      assert.are.equal(0, #world.runs)
     end)
   end
 
@@ -356,15 +364,22 @@ describe("TestBlenderCliUsage", function()
     assert.matches("--expr", out, 1, true)
     assert.matches("--blend", out, 1, true)
     assert.matches("BLENDER_EXE", out, 1, true)
+    assert.is_nil(out:find("lua5.4", 1, true), out)
+    assert.is_nil(out:find("WSL", 1, true), out)
   end)
 end)
 
 describe("TestBlenderCliHelp", function()
+  after_each(function() fs.rmrf(REPO .. "/tmp/blender-cli-help") end)
+
   it("test_cli_help_lists_blender_subcommand", function()
-    local interpreter = require("tests.support.interpreter")
-    local pipe = assert(io.popen(seam.q(interpreter.path()) .. " tools/cli.lua --help"))
-    local out = pipe:read("a")
-    pipe:close()
-    assert.matches("\n  blender%s+%S", out)
+    local dir = fs.temp_dir()
+    local out = dir .. "/help.txt"
+    local code = seam.spawn({
+      argv = { interpreter.path(), REPO .. "/tools/cli.lua", "--help" },
+      cwd = REPO, stdout = out, stderr = out,
+    })
+    assert.are.equal(0, code)
+    assert.matches("\n  blender%s+%S", fs.slurp(out) or "")
   end)
 end)
