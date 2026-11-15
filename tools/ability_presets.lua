@@ -1,6 +1,6 @@
 -- ability-presets 子命令：一键重建技能包的编辑器侧预设（不进 git 的地图侧状态）。
--- 在仓库根执行 `lua5.4 tools/cli.lua ability-presets [--dry-run] [--editor-instance <pid>]`，
--- 或 `lua5.4 tools/cli.lua ability-presets --fix-names [--dry-run] [--editor-instance <pid>]`
+-- 在仓库根执行 `lua tools/cli.lua ability-presets [--dry-run] [--editor-instance <pid>]`，
+-- 或 `lua tools/cli.lua ability-presets --fix-names [--dry-run] [--editor-instance <pid>]`
 -- 修预设的 Name 类型（见下面「Name 类型」一节）。
 --
 -- 依据是 issue #7/#8 的编辑器侧命令记录。本编辑器不认包内 ---@export_prefab_type
@@ -11,7 +11,7 @@
 --     见 issue #7），再 change-asset-value 写入属性值。
 -- 预设 key 的唯一真源是 common/GameCfg.lua 的 GameCfg.Ability：本命令按 key 查预设，
 -- 还在就原地重刷壳与属性（可重复执行）；不在就复制模板建新的，并把新 key 回写
--- GameCfg.lua。跑完后照常 lua5.4 tools/cli.lua deploy 落地、试玩验证。
+-- GameCfg.lua。跑完后照常 lua tools/cli.lua deploy 落地、试玩验证。
 --
 -- 已知坑（issue #7/#8 实测，Name 那条由 issue #22 运行期探针复核，脚本使用者不必再踩）：
 --   * preset 命令要编辑态，试玩中一律报「需要编辑态」；
@@ -73,7 +73,7 @@
 
 package.path = "./?.lua;./?/init.lua;" .. package.path
 
-local shell = require("tools.wsl_seam")
+local seam = require("tools.seam")
 local exit_code = require("tools.exit_code")
 
 local M = {}
@@ -311,15 +311,12 @@ function M.probe_script(key)
   }, "\n")
 end
 
--- 仓库内路径 → 部署端可读的 Windows 形式（--file 参数由 editor-cli.exe 读取）。
--- 先绝对化：相对路径经 wslpath 只会拿到相对 Windows 路径，落到 editor-cli 的 UNC cwd 上
--- 是否可读不可控；绝对路径转出的 \\wsl.localhost\... 才是明确目标。
-local function windows_path(path)
-  local absolute, abs_err = shell.absolute(path)
+-- 仓库内路径 → 绝对 Windows 正斜杠路径（--file 参数由 editor-cli.exe 在 Windows 原生下读取）。
+-- 先绝对化，避免相对路径落到 editor-cli 的 cwd 上不可控。
+local function absolute_path(path)
+  local absolute, abs_err = seam.absolute(path)
   if not absolute then fail("路径绝对化失败: " .. tostring(abs_err)) end
-  local value, err = shell.to_windows(absolute)
-  if not value then fail("路径转换失败: " .. tostring(err)) end
-  return value
+  return absolute
 end
 
 local function read_file(path)
@@ -331,16 +328,18 @@ local function read_file(path)
 end
 
 -- 跑一条 editor-cli 命令；extra 是 --editor-instance 这类透传参数。
--- 参数一律按 sh 单引号规则引用：cmd 的 ^ 转义在 WSL 下不再适用，>、& 等元字符在引号内天然安全。
+-- 子进程统一走 seam.spawn 的 argv 形式：引用、cwd、输出重定向都由接缝拼；spawn 不带 capture，
+-- 所以把 stdout/stderr 重定向到临时文件再读回。
+local CLI_LOG = "tmp/ability_presets_cli.log"
+
 local function run_cli(ctx, args)
-  local parts = { shell.q(ctx.exe) }
-  for _, a in ipairs(args) do
-    parts[#parts + 1] = shell.q(a)
-  end
-  for _, e in ipairs(ctx.extra) do
-    parts[#parts + 1] = shell.q(e)
-  end
-  return shell.capture(table.concat(parts, " "))
+  seam.ensure_dir("tmp")
+  os.remove(CLI_LOG)
+  local argv = { ctx.exe }
+  for _, a in ipairs(args) do argv[#argv + 1] = a end
+  for _, e in ipairs(ctx.extra) do argv[#argv + 1] = e end
+  local code = seam.spawn({ argv = argv, stdout = CLI_LOG, stderr = CLI_LOG })
+  return code, read_file(CLI_LOG) or ""
 end
 
 -- 跑一条 preset 子命令。
@@ -399,7 +398,7 @@ local function apply_shell(ctx, spec, key, dry_run)
 end
 
 local function write_file(path, body)
-  shell.ensure_dir("tmp")
+  seam.ensure_dir("tmp")
   local f = io.open(path, "wb")
   if not f then fail("写不了 " .. path) end
   f:write(body)
@@ -411,7 +410,7 @@ end
 local function probe_name_kind(ctx, key)
   write_file(PROBE_SCRIPT, M.probe_script(key))
   local out = step(ctx, "读 Name 类型 " .. key,
-    { "exec", "--file", windows_path(PROBE_SCRIPT), "--expect-edit-mode", "--json" })
+    { "exec", "--file", absolute_path(PROBE_SCRIPT), "--expect-edit-mode", "--json" })
   local kind, value = M.parse_probe(M.exec_result(out))
   if not kind then
     fail("认不出 " .. key .. " 的类型探针输出:\n" .. out)
@@ -472,7 +471,7 @@ local function apply_name_fix(ctx, key, name, dry_run)
       { "editor-unit", "rename", root, name, "--yes", "--json" })
     write_file(EXEC_SCRIPT, M.sync_script(key, name))
     local sync_out = step(ctx, "3/4 同步回预设 " .. key,
-      { "exec", "--file", windows_path(EXEC_SCRIPT), "--expect-edit-mode", "--json" })
+      { "exec", "--file", absolute_path(EXEC_SCRIPT), "--expect-edit-mode", "--json" })
     if not M.sync_succeeded(sync_out) then
       fail("SyncAssetFromUnit 没回 sync=true:\n" .. sync_out)
     end
@@ -551,7 +550,7 @@ end
 
 function M.usage()
   return table.concat({
-    "用法: lua5.4 tools/cli.lua ability-presets [--fix-names] [--dry-run] [--editor-instance <pid>]",
+    "用法: lua tools/cli.lua ability-presets [--fix-names] [--dry-run] [--editor-instance <pid>]",
     "",
     "重建技能包的编辑器侧预设（技能背包 / 挥砍技能 / 挥砍锚点）：",
     "GameCfg.Ability 里的 key 还在就原地重刷壳与属性（可重复执行）；不在就复制官方模板",
@@ -561,7 +560,7 @@ function M.usage()
     "删场景单位」四步修回来（保原预设 id、不改 GameCfg.lua、不存盘）。",
     "两种模式都要求编辑器开着本地图且在编辑态（preset 命令试玩中不可用）；多个编辑器实例时",
     "用 --editor-instance <pid> 指定。",
-    "常规模式跑完后：lua5.4 tools/cli.lua deploy 落地，试玩验证，再把 GameCfg.lua 的 key 变更提交。",
+    "常规模式跑完后：lua tools/cli.lua deploy 落地，试玩验证，再把 GameCfg.lua 的 key 变更提交。",
     "",
     "选项：",
     "  --fix-names            修预设 Name 的类型（见上），不再跑重建/重刷",
@@ -596,9 +595,9 @@ local function run(args)
     i = i + 1
   end
 
-  local exe, exe_err = shell.editor_cli()
+  local exe, exe_err = seam.editor_cli()
   if not exe then unavailable(tostring(exe_err)) end
-  if not shell.exists(exe) then
+  if not seam.exists(exe) then
     unavailable("未找到 editor-cli.exe（" .. exe .. "）")
   end
 

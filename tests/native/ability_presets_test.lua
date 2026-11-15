@@ -3,6 +3,7 @@
 -- 不碰编辑器、不起子进程；真实 editor-cli 行为只能在本机编辑器开着地图、编辑态时人工验。
 -- 迁移自 tests/tooling/ability_presets_test.lua（#92，LuaUnit → 原生 Busted）；
 -- 案例顺序沿用旧入口的类名 + 方法名字典序，保证与迁移前后可逐条对账。
+-- Windows 原生（#191）：子进程与文件探测全部换到 tools.seam，命令行引用由 seam.quote 承担。
 local ap = require("tools.ability_presets")
 
 local FIXTURE = [[
@@ -23,8 +24,7 @@ GameCfg.Ability = {
 ]]
 
 describe("TestAbilityPresetsEncoding", function()
-  -- 命令行引用规则已随开发端迁到 WSL 改为 sh 单引号（工具的 q()），cmd 的 ^ 转义退役；
-  -- sh 引用断言见 tests/native/wsl_seam_test.lua。
+  -- 命令行引用规则由 tools.seam 的 quote() 承担，调用方只给 argv；引用规则自测见 seam_test。
   it("test_json_string_escapes", function()
     assert.are.equal('"abc"', ap.json_string("abc"))
     assert.are.equal('"a\\"b"', ap.json_string('a"b'))
@@ -342,37 +342,41 @@ describe("TestAbilityPresetsReplace", function()
   end)
 end)
 
--- 退出码约定（#145）：推不出或找不到 editor-cli.exe 属平台不可用，退 3，且不调编辑器。
+-- 退出码约定（#145）：推不出或找不到 editor-cli.exe 属外部工具不可用，退 3，且不调编辑器。
 describe("TestAbilityPresetsUnavailable", function()
-  local shell = require("tools.wsl_seam")
-  local saved, err_text, captured
+  local seam = require("tools.seam")
+  local saved, err_text, spawned, calls
 
   before_each(function()
-    saved = { editor_cli = shell.editor_cli, exists = shell.exists, capture = shell.capture, stderr = io.stderr }
-    err_text, captured = "", 0
-    shell.capture = function() captured = captured + 1; return 1, "" end
+    saved = { editor_cli = seam.editor_cli, exists = seam.exists, spawn = seam.spawn, stderr = io.stderr }
+    err_text, spawned, calls = "", 0, {}
+    seam.spawn = function(spec)
+      spawned = spawned + 1
+      calls[#calls + 1] = spec
+      return 1
+    end
     io.stderr = { write = function(self, ...)
       for _, v in ipairs({ ... }) do err_text = err_text .. tostring(v) end
       return self
     end }
   end)
   after_each(function()
-    shell.editor_cli, shell.exists, shell.capture = saved.editor_cli, saved.exists, saved.capture
+    seam.editor_cli, seam.exists, seam.spawn = saved.editor_cli, saved.exists, saved.spawn
     io.stderr = saved.stderr
   end)
 
   it("test_editor_cli_derivation_failure_exits_3", function()
-    shell.editor_cli = function() return nil, "PATH 上找不到 cmd.exe（WSL interop 不可用）" end
+    seam.editor_cli = function() return nil, "环境变量 USERPROFILE 未设置" end
     assert.are.equal(3, ap.main({ "--dry-run" }))
-    assert.matches("interop 不可用", err_text, 1, true)
-    assert.are.equal(0, captured)
+    assert.matches("USERPROFILE", err_text, 1, true)
+    assert.are.equal(0, spawned)
   end)
 
   it("test_missing_editor_cli_exits_3", function()
-    shell.editor_cli = function() return "/mnt/c/Users/u/.eggitor/cli/editor-cli.exe" end
-    shell.exists = function() return false end
+    seam.editor_cli = function() return "C:/Users/x/.eggitor/cli/editor-cli.exe" end
+    seam.exists = function() return false end
     assert.are.equal(3, ap.main({ "--dry-run" }))
     assert.matches("未找到 editor-cli.exe", err_text, 1, true)
-    assert.are.equal(0, captured)
+    assert.are.equal(0, spawned)
   end)
 end)

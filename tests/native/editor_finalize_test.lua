@@ -1,7 +1,9 @@
 -- 编辑器收尾的命令边界：用响应队列验证失败关闭，不启动真实编辑器。
--- 部署端 exe 的定位（USERPROFILE 推导）也用桩替换；真实 interop 往返由 slow 车道证明。
+-- 定位（USERPROFILE 推导）与子进程都经 tools.seam；spawn 桩把响应写进重定向文件再读回，
+-- 与真实 seam.spawn 的 stdout/stderr 重定向同口径（seam 无 capture）。
 local finalize = require("tools.editor_finalize")
-local shell = require("tools.wsl_seam")
+local seam = require("tools.seam")
+local fs = require("tests.support.fs_fixture")
 
 local WORKSPACE = "C:/workspace"
 local EXE = "C:/fixture/.eggitor/cli/editor-cli.exe"
@@ -24,26 +26,26 @@ describe("TestEditorFinalize", function()
   local saved, responses, commands, messages, exists
   before_each(function()
     saved = {
-      capture = shell.capture, exists = shell.exists,
-      editor_cli = shell.editor_cli, to_windows = shell.to_windows,
+      spawn = seam.spawn, exists = seam.exists, editor_cli = seam.editor_cli,
       print = print,
     }
     responses, commands, messages = {}, {}, {}
     exists = { [EXE] = true, [WORKSPACE .. "/eggy.json"] = true }
-    shell.editor_cli = function() return EXE end
-    shell.to_windows = function(path) return path end
-    shell.exists = function(path) return exists[path] == true end
-    shell.capture = function(command)
-      commands[#commands + 1] = command
+    seam.editor_cli = function() return EXE end
+    seam.exists = function(path) return exists[path] == true end
+    -- spawn 桩：记录 argv，把响应写进重定向文件，返回退出码。
+    seam.spawn = function(spec)
+      commands[#commands + 1] = table.concat(spec.argv, " ")
       local response = table.remove(responses, 1)
       assert.is_not_nil(response, "出现未预期的编辑器命令")
-      return response[1], response[2]
+      if response[2] ~= nil and spec.stdout then fs.write_file(spec.stdout, response[2]) end
+      return response[1]
     end
     _G.print = function(message) messages[#messages + 1] = message end
   end)
   after_each(function()
-    shell.capture, shell.exists = saved.capture, saved.exists
-    shell.editor_cli, shell.to_windows = saved.editor_cli, saved.to_windows
+    seam.spawn, seam.exists = saved.spawn, saved.exists
+    seam.editor_cli = saved.editor_cli
     _G.print = saved.print
   end)
 
@@ -150,12 +152,12 @@ describe("TestEditorFinalize", function()
     assert.is_truthy(messages[#messages]:find("未校验编辑器内代码", 1, true))
   end)
 
-  -- 环境坏了（interop 或 USERPROFILE 推导失败）必须报错，不能当成「编辑器没开」跳过。
+  -- 环境坏了（USERPROFILE 推导失败）必须报错，不能当成「编辑器没开」跳过。
   it("test_editor_cli_derivation_failure_is_an_error", function()
-    shell.editor_cli = function() return nil, "PATH 上找不到 cmd.exe（WSL interop 不可用）" end
+    seam.editor_cli = function() return nil, "环境变量 USERPROFILE 未设置" end
     local ok, err = finalize.run(WORKSPACE)
     assert.is_nil(ok)
-    assert.is_truthy(err:find("interop 不可用", 1, true))
+    assert.is_truthy(err:find("USERPROFILE", 1, true))
     assert.are.equal(0, #commands)
   end)
 
@@ -171,13 +173,5 @@ describe("TestEditorFinalize", function()
     assert.is_true(finalize.run(WORKSPACE))
     assert.are.equal(0, #commands)
     assert.is_truthy(messages[#messages]:find("没有 eggy.json", 1, true))
-  end)
-
-  it("test_workspace_conversion_failure_is_an_error", function()
-    shell.to_windows = function() return nil, "wslpath -w 失败" end
-    local ok, err = finalize.run(WORKSPACE)
-    assert.is_nil(ok)
-    assert.is_truthy(err:find("wslpath -w 失败", 1, true))
-    assert.are.equal(0, #commands)
   end)
 end)
