@@ -51,17 +51,32 @@ describe("TestSeamFilesystemProbes", function()
     assert.is_nil(abs:find(BS, 1, true))
     assert.is_truthy(abs:match("^%a:/") ~= nil or abs:sub(1, 2) == "//")
   end)
-end)
 
-describe("TestCmdQuote", function()
-  it("matches the seam cmd quoting rules on sample values", function()
-    local cmd_quote = require("tests.support.cmd_quote")
-    for _, v in ipairs({ "abc", "a b", 'say "hi"', "中文", "a&b", "！" }) do
-      assert.are.equal(seam.quote(v), cmd_quote.q(v), v)
+  -- 目录存在却读不出来（权限、句柄耗尽）是真错误：返回空表会让 deploy 误判「没有残留」。
+  it("raises a readable error when a directory exists but cannot be listed", function()
+    local lfs = require("lfs")
+    local real = lfs.dir
+    local dir = fs.temp_dir()
+    lfs.dir = function() error("stub: 拒绝访问") end
+    local ok_entries, err_entries = pcall(seam.list_entries, dir)
+    local ok_files, err_files = pcall(seam.list_files, dir)
+    lfs.dir = real
+    for _, case in ipairs({ { ok_entries, err_entries }, { ok_files, err_files } }) do
+      assert.is_false(case[1])
+      assert.is_truthy(tostring(case[2]):find(dir, 1, true), tostring(case[2]))
+      assert.is_truthy(tostring(case[2]):find("拒绝访问", 1, true), tostring(case[2]))
     end
+  end)
+
+  -- Windows 上 "C:" 表示该盘的当前目录，不是根；盘符根的尾斜杠不能丢。
+  it("keeps the trailing slash of a drive root", function()
+    assert.are.equal("C:/", seam.absolute("C:/"))
+    assert.are.equal("C:/", seam.absolute("C:/Users/.."))
+    assert.are.equal("C:/Users/a", seam.absolute("C:/Users/a/."))
   end)
 end)
 
+-- 引用规则对具体期望字面量断言：不拿测试侧另一份实现互比（两份逐字相同，写错会一起错）。
 describe("TestSeamQuote", function()
   it("wraps cmd arguments and escapes embedded quotes", function()
     assert.are.equal([["abc"]], seam.quote("abc"))
@@ -70,6 +85,25 @@ describe("TestSeamQuote", function()
     assert.are.equal([["中文"]], seam.quote("中文"))
     assert.are.equal([["a&b"]], seam.quote("a&b"))
     assert.are.equal([["！"]], seam.quote("！"))
+  end)
+
+  -- CRT 把引号前的反斜杠当转义：尾随反斜杠必须加倍，否则闭合引号被吃掉。
+  it("doubles a trailing backslash before the closing quote", function()
+    assert.are.equal('"a' .. BS .. BS .. '"', seam.quote("a" .. BS))
+    assert.are.equal('"a b' .. BS .. BS .. '"', seam.quote("a b" .. BS))
+  end)
+
+  -- 测试侧 cmd 引用规则（ADR-0017 承接 sh_quote）同样对具体期望字面量断言，
+  -- 不与 seam.quote 互比：两份实现逐字相同，互比在规则写错时会一起错。
+  it("test-side cmd quote rule matches the same concrete literals", function()
+    local cmd_quote = require("tests.support.cmd_quote")
+    assert.are.equal([["abc"]], cmd_quote.q("abc"))
+    assert.are.equal([["a b"]], cmd_quote.q("a b"))
+    assert.are.equal([["say ""hi"""]], cmd_quote.q('say "hi"'))
+    assert.are.equal([["中文"]], cmd_quote.q("中文"))
+    assert.are.equal([["a&b"]], cmd_quote.q("a&b"))
+    assert.are.equal([["！"]], cmd_quote.q("！"))
+    assert.are.equal('"a' .. BS .. BS .. '"', cmd_quote.q("a" .. BS))
   end)
 end)
 
@@ -138,6 +172,42 @@ describe("TestSeamSpawn", function()
     end)
     assert.is_false(ok)
     assert.is_truthy(tostring(err):find("8191", 1, true), tostring(err))
+  end)
+end)
+
+-- capture 是「跑一条命令并读回输出」的唯一形状：只收 argv，输出落临时文件再读回并删除。
+describe("TestSeamCapture", function()
+  it("captures stdout, stderr and the exit code from argv", function()
+    local lua = fs.find_on_path("lua")
+    assert.is_not_nil(lua, "PATH 上应有 lua")
+    local dir = fs.temp_dir()
+    local code, out = seam.capture({
+      argv = { lua, "-e", 'io.write("out 值"); io.stderr:write("err 值"); os.exit(2)' },
+      tmp_dir = dir,
+    })
+    assert.are.equal(2, code)
+    assert.is_truthy(out:find("out 值", 1, true), out)
+    assert.is_truthy(out:find("err 值", 1, true), out)
+  end)
+
+  it("removes its temporary output file", function()
+    local lua = fs.find_on_path("lua")
+    local dir = fs.temp_dir()
+    assert.are.equal(0, seam.capture({ argv = { lua, "-e", "print(1)" }, tmp_dir = dir }))
+    assert.are.same({}, fs.list_dir(dir))
+  end)
+
+  it("runs the child in the requested directory", function()
+    local lua = fs.find_on_path("lua")
+    local dir = fs.temp_dir()
+    fs.write_file(dir .. "/marker.txt", "here")
+    local code, out = seam.capture({
+      argv = { lua, "-e", 'io.write(io.open("marker.txt") and "cwd-ok" or "cwd-bad")' },
+      cwd = dir,
+      tmp_dir = dir,
+    })
+    assert.are.equal(0, code)
+    assert.are.equal("cwd-ok", out)
   end)
 end)
 

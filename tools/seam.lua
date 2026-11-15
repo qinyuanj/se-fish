@@ -1,5 +1,6 @@
 -- 全仓唯一发起外部进程与文件系统探测的模块（ADR-0017）。
--- 文件系统探测全部纯 Lua（lfs + io/os）；外部进程统一走 spawn{ argv, ... }。
+-- 文件系统探测全部纯 Lua（lfs + io/os）；外部进程只有一种形状：spawn{ argv, ... }。
+-- 需要读回输出时用 capture{ argv, ... }——它内部仍是 spawn，只把两路输出重定向到临时文件再读回。
 -- 路径只有一种形式：仓库内相对、离开仓库正斜杠+盘符；系统返回的反斜杠进本模块即归一。
 -- 本模块假定进程 cwd 是仓库根（与 tools/cli.lua 一致），临时输出落 tmp/（gitignored）。
 local lfs = require("lfs")
@@ -53,6 +54,8 @@ local function collapse(path)
   end
   local body = table.concat(segs, "/")
   if unc then return "//" .. body end
+  -- 盘符根的尾斜杠不能丢：Windows 上 "C:" 是「该盘的当前目录」，不是根。
+  if body:match("^%a:$") then return body .. "/" end
   return body
 end
 
@@ -78,7 +81,8 @@ end
 
 -- 名字是否被占用：存在，或是 symlink（含断开的——它也占着名字）。
 -- Windows 上 lfs.symlinkattributes 对目录会直接抛错（attempt to index a nil value），
--- 所以先试 symlinkattributes 并 pcall 兜住，失败时退回 exists；两种口径都判不出才算不占名。
+-- 所以先试 symlinkattributes 并用 pcall 兜住。这里的 pcall 是刻意的语义：查不出类型时
+-- 不能断言「不占名」，失败结果不丢——回退到 exists，两种口径都判不出才算不占名。
 function M.lexists(path)
   if path == nil then return false end
   local name = tostring(path)
@@ -92,12 +96,22 @@ function M.is_dir(path)
   return lfs.attributes(tostring(path), "mode") == "directory"
 end
 
+-- 打开目录迭代器。调用方已确认目标是目录，所以这里的失败是真错误（权限、句柄耗尽）；
+-- 不能返回空表——deploy 会把读不出的宿主目录当成「没有残留」而放行。
+local function open_dir(path)
+  local ok, iter, state, ctrl = pcall(lfs.dir, path)
+  if not ok then
+    error(string.format("seam: 读取目录失败 %s（lfs.dir 报错：%s）",
+      tostring(path), tostring(iter)), 0)
+  end
+  return iter, state, ctrl
+end
+
 -- 目录一级条目 { {name=, dir=}, ... }，按名排序；目录不存在返回空表。
 function M.list_entries(dir)
   local out = {}
   if not M.is_dir(dir) then return out end
-  local ok, iter, state, ctrl = pcall(lfs.dir, dir)
-  if not ok then return out end
+  local iter, state, ctrl = open_dir(dir)
   for name in iter, state, ctrl do
     if name ~= "." and name ~= ".." then
       out[#out + 1] = { name = name, dir = M.is_dir(dir .. "/" .. name) }
@@ -108,8 +122,7 @@ function M.list_entries(dir)
 end
 
 local function walk_files(dir, prefix, acc)
-  local ok, iter, state, ctrl = pcall(lfs.dir, dir)
-  if not ok then return end
+  local iter, state, ctrl = open_dir(dir)
   for name in iter, state, ctrl do
     if name ~= "." and name ~= ".." then
       local full = dir .. "/" .. name
@@ -164,7 +177,8 @@ local function rmrf(path)
 end
 
 -- 递归删除（纯 Lua；不设 rmdir 降级）。目标不存在不算失败。
--- target = { dir = <bool>, dst = <path> }
+-- target = { dir = <bool>, dst = <path> }：dir 只是调用方的意图标记，实际按目标自身的
+-- 文件属性递归删（目录 lfs.rmdir、文件 os.remove），所以 dir 与真实类型不一致也不会删错。
 function M.remove(target)
   if type(target) ~= "table" or target.dst == nil then return true end
   rmrf(M.normalize(target.dst))
@@ -194,17 +208,44 @@ end
 
 -- ============================ 子进程 ============================
 
--- 跑一条命令，拿回退出码与 stdout+stderr。@ 前缀规避 cmd /c 对引号开头命令行的剥离。
-local function capture(command)
-  local handle = io.popen("@" .. command .. " 2>&1", "r")
-  if not handle then return 1, "" end
-  local out = handle:read("a") or ""
-  local ok, _, code = handle:close()
-  if ok then return 0, out end
-  return tonumber(code) or 1, out
+local function read_file(path)
+  local f = io.open(path, "rb")
+  if not f then return "" end
+  local body = f:read("a") or ""
+  f:close()
+  return body
 end
 
--- 部署端工具就位（至少 robocopy 可用）。成功 true；失败 nil, 原因。
+local capture_counter = 0
+
+-- 每次 capture 独占一个临时目录：lfs.mkdir 是原子的，同名已被别的进程占住就换下一个，
+-- 两个进程（例如 hook 与手动 test 同时跑）不会抢同一个输出文件。
+local function capture_dir(base)
+  for _ = 1, 1000 do
+    capture_counter = capture_counter + 1
+    local dir = string.format("%s/seam-capture-%d-%06d", base, os.time(), capture_counter)
+    if lfs.mkdir(dir) then return dir end
+  end
+  error(string.format("seam.capture: 无法在 %s 下创建临时目录", base), 0)
+end
+
+-- 跑一条命令并读回 stdout+stderr：只收 argv，不收整条命令串（ADR-0017）。
+-- spec = { argv=<字符串数组>, cwd=<?>, tmp_dir=<? 默认 tmp> }
+-- 内部仍是 spawn：两路输出重定向到临时文件，读完即删。返回 退出码, 输出文本。
+function M.capture(spec)
+  assert(type(spec) == "table", "capture 需要一个 table 参数")
+  local base = M.normalize(spec.tmp_dir or "tmp")
+  M.ensure_dir(base)
+  local dir = capture_dir(base)
+  local out = dir .. "/out.log"
+  local code = M.spawn({ argv = spec.argv, cwd = spec.cwd, stdout = out, stderr = out })
+  local body = read_file(out)
+  os.remove(out)
+  lfs.rmdir(dir)
+  return code, body
+end
+
+-- 宿主侧工具就位（至少 robocopy 可用）。成功 true；失败 nil, 原因。
 function M.preflight()
   local raw = os.getenv("PATH") or ""
   for entry in (raw .. ";"):gmatch("([^;]*);") do
@@ -247,9 +288,9 @@ end
 -- 一次真实调用验证：--version 有非空输出且退 0；Lua 5.4 只认 -v，故回退 -v。
 -- 两者都不满足即判不可用（防止 0 字节假壳 python3）。
 local function version_ok(exe)
-  local code, out = capture(M.quote(exe) .. " --version")
+  local code, out = M.capture({ argv = { exe, "--version" } })
   if code == 0 and has_output(out) then return true end
-  code, out = capture(M.quote(exe) .. " -v")
+  code, out = M.capture({ argv = { exe, "-v" } })
   return code == 0 and has_output(out)
 end
 
@@ -382,14 +423,6 @@ function M.mirror_cmd(target)
   local rendered = {}
   for i, a in ipairs(mirror_argv(target)) do rendered[i] = M.quote(a) end
   return table.concat(rendered, " ")
-end
-
-local function read_file(path)
-  local f = io.open(path, "rb")
-  if not f then return "" end
-  local body = f:read("a") or ""
-  f:close()
-  return body
 end
 
 -- robocopy 退出码 0-7 成功，>=8 失败；但退回码 1 也意味着"命令没起来"，

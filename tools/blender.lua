@@ -27,8 +27,6 @@ local INSTALL_ROOTS = {
   { env = "LOCALAPPDATA", rel = "Programs/Blender Foundation" },
 }
 
-local version_counter = 0
-
 function M.usage()
   return table.concat({
     "用法: lua tools/cli.lua blender <脚本.py> [--blend <输入.blend>] [-- <脚本参数>...]",
@@ -83,18 +81,10 @@ local function trim(text)
   return (tostring(text):match("^%s*(.-)%s*$")) or ""
 end
 
--- 跑一条只读查询命令，把 stdout+stderr 收进仓库 tmp/ 下的临时文件后读回（seam 无 capture）。
--- 基准用 CLI 传来的仓库根，避免从子目录调用时把 tmp/ 建在子目录里。
+-- 跑一条只读查询命令并读回 stdout+stderr（seam.capture 内部就是 spawn + 临时文件再读回）。
+-- tmp 基准用 CLI 传来的仓库根，避免从子目录调用时把 tmp/ 建在子目录里。
 local function capture(root, argv)
-  seam.ensure_dir(root .. "/tmp")
-  version_counter = version_counter + 1
-  local out = root .. "/tmp/blender-cap-" .. tostring(os.time()) .. "-" .. tostring(version_counter) .. ".txt"
-  local code = seam.spawn({ argv = argv, stdout = out, stderr = out })
-  local body = ""
-  local f = io.open(out, "rb")
-  if f then body = f:read("a") or ""; f:close() end
-  os.remove(out)
-  return code, body
+  return seam.capture({ argv = argv, tmp_dir = root .. "/tmp" })
 end
 
 local function is_absolute_windows(path)
@@ -162,7 +152,7 @@ local function python3(root)
   return python, tonumber(major) .. "." .. minor
 end
 
--- 开发端已存在的路径 → 绝对正斜杠 Windows 路径（seam.absolute 已归一）。
+-- 仓库检出里已存在的路径 → 绝对正斜杠 Windows 路径（seam.absolute 已归一）。
 local function existing_windows(path, what)
   local abs, err = seam.absolute(path)
   if not abs then fail(what .. "路径无法绝对化: " .. tostring(path) .. "（" .. tostring(err) .. "）") end

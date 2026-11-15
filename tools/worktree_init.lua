@@ -20,7 +20,7 @@ function M.usage()
     "用法: lua tools/cli.lua worktree-init [--root <检出根>] [--skills-from <目录>]",
     "  把 worktree 补齐到能跑 lua tools/cli.lua test full；重复执行只跳过已有条目。",
     "  --root         目标检出根，默认当前目录",
-    "  --skills-from  上游 skill 来源，默认部署端 magpie 资源库（由 USERPROFILE 推导）",
+    "  --skills-from  上游 skill 来源，默认宿主侧 magpie 资源库（由 USERPROFILE 推导）",
     "  不为质量工具做准备；质量工具由 dsh-uml-viewer 插件自带。",
   }, "\n") .. "\n"
 end

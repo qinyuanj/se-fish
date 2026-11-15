@@ -14,11 +14,11 @@ agent 驱动 Blender 原本有 2 种模式、5 个入口：实时模式有 Blend
 - **上游 skill 不改**：blender-* skill 被 gitignore，重装会覆盖本地修改。它们写着的「Live 优先」与不存在的 `look` 工具，改由 `AGENTS.md` 的「美术资产」条目覆盖：跳过 Live/MCP 段落，用 `blender` 子命令。
 - **人工修模**：只靠中间件 `.blend` 交接。agent 每步把中间件存到固定位置，人在 GUI 里打开、修改、存盘，agent 接着用无头模式往下跑。
 
-实测结论（2026-10-25，Blender 5.2.1 LTS；当时环境是 WSL2 Ubuntu-24.04，下面的路径形式已由 [ADR-0017](0017-windows-native-only.md) 取代，结论本身保留）：
+历史实测（2026-10-25，Blender 5.2.1 LTS，WSL2 Ubuntu-24.04；下面记录的是当时的实测结论与路径形式，路径口径已由 [ADR-0017](0017-windows-native-only.md) 取代，结论本身保留）：
 
-- Windows 侧 Blender 能直接读写 WSL 的 UNC 路径，包括 `-P` 脚本、`--blend` 输入与 `save_as_mainfile` 输出；中文与空格目录都可以，脚本同目录的依赖（`_bpyx.py`）也能 import。所以入口**不**把脚本复制到 Windows 临时目录。
-- 当时的路径转换工具对相对路径只给出相对结果，因此入口先绝对化，再转换。
-- 由 WSL 拉起的 Windows 进程以当前目录对应的 UNC 路径为 cwd（Windows 原生下 cwd 直接就是仓库检出）。
+- Windows 侧 Blender 能直接读写 `\\wsl.localhost\...` 形式的 UNC 路径，包括 `-P` 脚本、`--blend` 输入与 `save_as_mainfile` 输出；中文与空格目录都可以，脚本同目录的依赖（`_bpyx.py`）也能 import。所以入口**不**把脚本复制到 Windows 临时目录。
+- `wslpath -w` 对相对路径只给出相对的 Windows 路径，因此入口先绝对化，再转换。
+- 由 WSL 拉起的 Windows 进程以当前目录对应的 UNC 路径为 cwd。
 
 备选方案（拒绝）：
 

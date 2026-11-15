@@ -328,18 +328,12 @@ local function read_file(path)
 end
 
 -- 跑一条 editor-cli 命令；extra 是 --editor-instance 这类透传参数。
--- 子进程统一走 seam.spawn 的 argv 形式：引用、cwd、输出重定向都由接缝拼；spawn 不带 capture，
--- 所以把 stdout/stderr 重定向到临时文件再读回。
-local CLI_LOG = "tmp/ability_presets_cli.log"
-
+-- 子进程统一走 seam.capture：只收 argv，输出由接缝落临时文件再读回。
 local function run_cli(ctx, args)
-  seam.ensure_dir("tmp")
-  os.remove(CLI_LOG)
   local argv = { ctx.exe }
   for _, a in ipairs(args) do argv[#argv + 1] = a end
   for _, e in ipairs(ctx.extra) do argv[#argv + 1] = e end
-  local code = seam.spawn({ argv = argv, stdout = CLI_LOG, stderr = CLI_LOG })
-  return code, read_file(CLI_LOG) or ""
+  return seam.capture({ argv = argv })
 end
 
 -- 跑一条 preset 子命令。
