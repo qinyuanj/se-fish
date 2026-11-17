@@ -22,6 +22,7 @@ Lua 命令使用 **Lua 5.4**，命令名统一 `lua`，执行前用 `lua -v` 核
 - `lua tools/cli.lua deploy`：将三端一级子树字节镜像到宿主目录（经 `tools/seam.lua` 调用 `robocopy /MIR`，镜像前打印将被删掉的宿主多余文件；宿主三端根下仓库已删的散文件或子树同样先删）；robocopy 缺失时在镜像前以退出码 3 失败。编辑器开着本图时执行 validate → 有差异时 `code push` → `code diff` 复核，push 后仍不一致才返回失败。三端内本地已删的地图文件用 `code push --delete --yes` 删掉；三端外的地图独有文件（`temp/` 等编辑器生成物）只提示保留，两类同时出现时不推送（#167）。跨接缝约定见 [ADR-0017](../adr/0017-windows-native-only.md)。
 - `lua tools/cli.lua sync`：将宿主目录的 API 存根、`data/` 回灌仓库；`eggy.json` 不回灌，见下方「编辑器工程 ≠ 仓库检出」；三端 `packages/` 由仓库管理，也不回灌。
 - `lua tools/cli.lua blender <脚本.py> [--blend <输入.blend>] [-- <脚本参数>...]`：在本机无头 Blender 里执行脚本，是唯一的 Blender 入口；`--which` 核对将用的 Blender，`--expr` 执行内联代码。路径写正斜杠 Windows 形式（`C:/...`）或仓库内相对路径；用法见 [Blender 与 Meshy 使用](art-pipeline.md)，决策见 [ADR-0009](../adr/0009-blender-headless-only.md)。
+- `lua tools/cli.lua screenshot [--window <标题子串> | --rect X,Y,W,H] [--out <文件.png>]`：抓桌面合成像素存 PNG，是虚拟屏（UU 远程的 GameViewer Virtual Display Adapter 这类）上取证游戏画面的入口。editor-cli 的 `screenshot` 走窗口表面抓取，在虚拟屏上拿到的是黑帧且校验判 `FRAME_VALID`；本命令读桌面合成，缺省取标题为 `client` 的试玩窗口客户区，输出落 `tmp/`。目标窗口必须显示在屏幕上，被盖住时抓到的是遮挡物。
 - 官方包升级、直接调用接口与编辑器预设依赖见 [官方包接入参考](../packages-reference.md)。技能包预设命令见 `lua tools/cli.lua ability-presets --help`。
 - **临时产物**：手工验证的中间文件、单据正文草稿等临时产物一律放仓库 `tmp/`（已 gitignored），无需清理；不放系统临时目录，也不为清理去 `rm`（沙盒会拒绝）。这条管 agent 手工产生的文件；脚本自建自删的临时目录（如 pre-commit hook 在 git 目录下的工作目录）不在此列。
 - 质量工具（CRAP / mutation / DRY）是 dsh-uml-viewer 插件自带的标准工具（crapper / mutator / dryer），经插件面板触发，由 agent 调用插件工具 `uml_crap`、`uml_mutate`、`uml_dry` 执行；业务范围与选项只在根目录 `uml-quality.json` 的 `standardTools` 声明，见下方「架构图」。只出报告，不设指标门槛。
@@ -88,7 +89,7 @@ install -m 755 tools/hooks/shim "$(git rev-parse --git-common-dir)/hooks/pre-com
 - **多实例**：`editor-instances list` 列出多个实例时（含停在 `<starting>` 的），每条命令都带 `--editor-instance <pid>`。
 - **试玩闸门例外**：`code diff` 中 `differs`、`only-on-map` 为空，且 `only-local` 全在 `unit_scripts/` 或 `.agents/` 下时，视为干净，不 push、直接试玩，并在取证记录里写明这些文件。`unit_scripts/` 由引擎生成（见 `AGENTS.md`），`deploy` 只镜像三端子树，不会清理它；`.agents/` 是 agent 配置，不进地图。
 - **异步输出**：服务端、客户端 `exec` 提交成功只表示代码已提交。脚本打印唯一标记后，用 `log grep <标记> | grep '^>'` 读取实际结果（不带过滤时会混入上下文行与统计行）。`log grep` 没有 `-i`：默认就不区分大小写，需要区分时加 `--case-sensitive`。编辑器 `exec` 的同步返回值在约 5KB 处静默截断，批量读取同样走打印标记加 `log grep`。
-- **截图失败**：窗口被遮挡、最小化或在远程虚拟屏上时，`screenshot game` 会返回 `FRAME_NEAR_WHITE` 或黑帧，`screenshot editor` 会得到 1×1（`SCREENSHOT_INVALID_DIMENSIONS`）。先把编辑器窗口置前再重试一次；仍失败就请用户目视确认，给出选项、时间点和观察要点，不要循环重试。
+- **截图**：非虚拟屏用 editor-cli `screenshot game`（游戏画面）与 `screenshot editor`（编辑器界面）。虚拟屏（UU 远程的 GameViewer Virtual Display Adapter）上窗口表面抓取返回校验通过的黑帧（`FRAME_VALID`，0.20.16 实测），置前重试无效，改用工具链的 `lua tools/cli.lua screenshot`。窗口被遮挡或最小化时，先让目标窗口显示在屏幕上再抓一次；`screenshot game` 可能返回 `FRAME_NEAR_WHITE`，`screenshot editor` 可能得到 1×1（`SCREENSHOT_INVALID_DIMENSIONS`）。仍无画面就请用户目视确认，给出选项、时间点和观察要点，不要循环重试。
 - **保存与重开**：`map save` 成功后 `map dirty` 仍可能为 true，此时 `map reopen` 报 `MAP_REOPEN_REJECTED`。先用 `map dirty --json` 列出 dirty 来源请用户确认，确认后才可 `map reopen --force`；来源不明时可能是用户的手动编辑，不要强制。停止试玩本身也会让 dirty 变成 true。
 - **风险步逐次确认**：部署、试玩、地图保存、推送、场景写入，每一步单独取得用户确认；一次授权只覆盖它点名的那一轮或那一批，一次试玩授权只覆盖那一轮试玩。场景写入即以 `APPLY = true` 执行写场景探针：先以 `APPLY = false` 跑 dry-run 并把结果交给用户，用户确认一批才执行一批，执行完立即把探针改回 `APPLY = false`。
 - **场景整理顺序**：空目录清理排在全部建标记批次之后，只处理基线回读时已存在的空目录。删除或挪动场景地面（灰盒地块等）前，先在试玩服务端对受影响区的 `Z*` 点位与设施打向下射线，确认其下仍有地面（删 01 灰盒大地板后，渔夫、商店、抽奖、出生点、鱼饵曾悬在鱼塘水面上）。
