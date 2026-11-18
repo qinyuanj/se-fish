@@ -161,7 +161,7 @@ end)
 --  15. 升级行不给当前等级与买完的等级 → 不知道这一级值不值；
 --  16. 切页签/重开商店后详情区留着上一条、购买按钮仍可点 → 买家以为还能买上一页的商品；
 --  17. 详情区购买按钮没接线、或行点击也下单（#216 旧行为）→ 唯一购买入口失效或误下单；
---  18. 锁定/已购行仍可选中（#217 旧行为）→ 玩家白点，选中后详情还在教他怎么买；
+--  18. 已购行能点（白点）/ 锁定行点不了、或点了详情不写原因 → 玩家看不出这件商品是什么、往哪升；
 --  19. 服务端拒绝时客户端伪成功（扣金币 / 行转已购）→ 玩家以为买到了；
 --  20. 买成后金币条等属性刷新、行与详情不刷新 → 当场看不到扣款，已买满的行还能点；
 --  21. 本地拒绝静默 → 玩家不知道为什么买不了。
@@ -183,18 +183,25 @@ describe("钓场商店界面（#216 固定骨架 / #217 行与选中 / #218 详�
             attributes = { FishCoin = 77 } }
         ctx.previous = { game = rawget(_G, 'game'), Vector2 = rawget(_G, 'Vector2'),
             Color = rawget(_G, 'Color'), REUtil = rawget(_G, 'REUtil'),
-            GameUI = rawget(_G, 'GameUI'), MgrGameUI = rawget(_G, 'MgrGameUI'),
+            MgrGameUI = rawget(_G, 'MgrGameUI'),
             PlatformShop = rawget(_G, 'PlatformShop'), LocalMsgNotice = rawget(_G, 'LocalMsgNotice') }
         ctx.previousLocalShop = package.loaded['client.LocalShop']
         ctx.previousHandler = package.loaded['client.ScreenHandlers.ScreenShop']
         _G.LocalMsgNotice = function(msg) ctx.notices[#ctx.notices + 1] = msg end
         package.loaded['client.ScreenHandlers.ScreenShop'] = nil
-        -- 假 World：建点即挂到 Parent 的子节点表上（供 FindFirstChild 取行与行内子节点），
+        -- 假 EUI 节点：Children 按引擎口径记子节点；FindFirstChild 支持深查（生产按名字从 RootNode 取骨架节点），
         -- 销毁按引擎口径递归（EUI 节点 Destroy 带走子节点，所以行内子节点不必单独登记）。
-        local world = {}
-        function world:CreateUnit(kind, attrs)
-            local node = { Kind = kind, OnClicked = signal(), Children = {} }
-            function node:FindFirstChild(name) return self.Children[name] end
+        local function newNode(name, kind, parent)
+            local node = { Name = name, Kind = kind, Visible = true, Text = '', Children = {},
+                OnClicked = signal() }
+            function node:FindFirstChild(child, recursive)
+                local hit = self.Children[child]
+                if hit or not recursive then return hit end
+                for _, candidate in pairs(self.Children) do
+                    hit = candidate:FindFirstChild(child, true)
+                    if hit then return hit end
+                end
+            end
             function node:Destroy()
                 self.Destroyed = true
                 -- 真引擎销毁会同时把节点从父节点子表里摘掉；不摘会让「复用行」按名找回死节点
@@ -205,9 +212,19 @@ describe("钓场商店界面（#216 固定骨架 / #217 行与选中 / #218 详�
                 self.Children = {}
                 for _, child in pairs(children) do child:Destroy() end
             end
+            if parent then
+                node.Parent = parent
+                parent.Children[name] = node
+            end
+            if name then ctx.nodes[name] = node end
+            return node
+        end
+        -- 假 World：建点即挂到 Parent 的子节点表上（供 FindFirstChild 取行与行内子节点）
+        local world = {}
+        function world:CreateUnit(kind, attrs)
+            local node = newNode(attrs and attrs.Name, kind)
             for key, value in pairs(attrs or {}) do node[key] = value end
             if node.Parent and node.Name then node.Parent.Children[node.Name] = node end
-            if node.Name then ctx.nodes[node.Name] = node end
             ctx.created[#ctx.created + 1] = node
             return node
         end
@@ -220,8 +237,6 @@ describe("钓场商店界面（#216 固定骨架 / #217 行与选中 / #218 详�
         end }
         _G.Vector2 = { New = function(x, y) return { x = x, y = y } end }
         _G.Color = { New = function(...) return { ... } end }
-        _G.GameUI = { GetEuiManager = function() return {
-            GetDeviceResolution = function() return { x = 1920, y = 1080 } end } end }
         _G.MgrGameUI = { CloseScreen = function() end }
         _G.PlatformShop = nil
         _G.REUtil = { GetRE = function(_, name)
@@ -237,13 +252,15 @@ describe("钓场商店界面（#216 固定骨架 / #217 行与选中 / #218 详�
         package.loaded['client.LocalShop'] = localShop
         ctx.localShop = localShop
         ctx.handler = assert(loadfile('client/ScreenHandlers/ScreenShop.lua'))()
-        -- 预制体骨架替身：名册里的节点按名字给；层级与几何不进单测，契约在共享简报里。
-        for _, name in ipairs(ctx.handler.UINodes) do
-            ctx.nodes[name] = { Name = name, Visible = true, Text = '', Children = {},
-                OnClicked = signal(), FindFirstChild = function(self, child) return self.Children[child] end }
+        -- 预制体骨架替身：名册里的节点按名字挂在 RootNode 子树下（Init 自己按名字深查填表）；
+        -- 层级与几何不进单测，契约在共享简报里。换树重建时用同一份名册再建一棵。
+        local function makeRoot()
+            local root = newNode('ScreenShop')
+            for _, name in ipairs(ctx.handler.UINodes) do newNode(name, 'EUITextLabel', root) end
+            return root
         end
-        ctx.handler.UINodeMap = ctx.nodes
-        ctx.handler.RootNode = { Name = 'ScreenShop' }
+        ctx.makeRoot = makeRoot
+        ctx.handler.RootNode = makeRoot()
         ctx.handler:Init()
         ctx.handler:OpenScreen()
     end)
@@ -251,7 +268,7 @@ describe("钓场商店界面（#216 固定骨架 / #217 行与选中 / #218 详�
     after_each(function()
         package.loaded['client.LocalShop'] = ctx.previousLocalShop
         package.loaded['client.ScreenHandlers.ScreenShop'] = ctx.previousHandler
-        for _, key in ipairs({ 'game', 'Vector2', 'Color', 'REUtil', 'GameUI', 'MgrGameUI', 'PlatformShop',
+        for _, key in ipairs({ 'game', 'Vector2', 'Color', 'REUtil', 'MgrGameUI', 'PlatformShop',
             'LocalMsgNotice' }) do
             _G[key] = ctx.previous[key]
         end
@@ -280,7 +297,7 @@ describe("钓场商店界面（#216 固定骨架 / #217 行与选中 / #218 详�
     it("test_every_tab_switches_container_and_clears_selection", function()
         local coin = GameCfg.Shop.Pages[#GameCfg.Shop.Pages]
         for index, page in ipairs(GameCfg.Shop.Pages) do
-            for _, row in ipairs(ctx.handler:View().rows) do -- 选当前页第一个可购买行（锁定/已购行不可选中）
+            for _, row in ipairs(ctx.handler:View().rows) do -- 选当前页第一个能点的行（已购行不可点）
                 if row.selectable then ctx.handler:Select(row.index) break end
             end
             ctx.nodes['BtnShopPage' .. index].OnClicked:Fire()
@@ -433,22 +450,23 @@ describe("钓场商店界面（#216 固定骨架 / #217 行与选中 / #218 详�
         assert.same({}, ctx.commands)
     end)
 
-    -- 选中：点行只选中不下单；快照逐行暴露 selected；整体重绘（购买回包）后选中的还是同一行。
-    -- #218 反转 #217 的「锁定行同样可选中」：锁定行点了不选中（行节点禁用，Select 也拒绝）。
+    -- 选中：点行只选中不下单（可买行与锁定行都能点，已购行不可点见上一条用例）；
+    -- 快照逐行暴露 selected；整体重绘（购买回包）后选中的还是同一行。
     -- 失败方式：点行直接下单（#216 旧行为）→ 想看一眼详情就花了钱；选中只活在点击当帧、重绘后丢失；
-    --           selected 同时标在多行（下标比较写成「有值即选中」）；锁定行仍能选中（玩家白点）。
+    --           selected 同时标在多行（下标比较写成「有值即选中」）；点了行节点没接上（没反应）。
     it("test_row_click_selects_without_buying_and_survives_refresh", function()
-        ctx.nodes.ShopRow1.OnClicked:Fire()
+        ctx.nodes.ShopRow1.OnClicked:Fire() -- 香肠：可买
         assert.same(1, ctx.handler:View().selected)
         assert.same({}, ctx.commands)
-        ctx.nodes.ShopRow3.OnClicked:Fire() -- 科技假饵：2 级摊位买不到，点了不选中
-        assert.same(1, ctx.handler:View().selected)
+        ctx.nodes.ShopRow3.OnClicked:Fire() -- 科技假饵：锁定行也可点（看详情），仍不下单
+        assert.same(3, ctx.handler:View().selected)
+        assert.same({}, ctx.commands)
         local rows = ctx.handler:View().rows
-        assert.same({ true, false, false }, { rows[1].selected, rows[2].selected, rows[3].selected })
+        assert.same({ false, false, true }, { rows[1].selected, rows[2].selected, rows[3].selected })
         ctx.events.ShopResult.OnClientEvent:Fire({ ok = true, number = 11, price = 2 })
         local after = ctx.handler:View()
-        assert.same(1, after.selected)
-        assert.same({ true, false, false }, { after.rows[1].selected, after.rows[2].selected, after.rows[3].selected })
+        assert.same(3, after.selected)
+        assert.same({ false, false, true }, { after.rows[1].selected, after.rows[2].selected, after.rows[3].selected })
         assert.same({}, ctx.commands)
     end)
 
@@ -502,18 +520,23 @@ describe("钓场商店界面（#216 固定骨架 / #217 行与选中 / #218 详�
         assert.same({}, ctx.commands)
     end)
 
-    -- 可点性（#218 修正 #217「锁定行同样可选中」）：锁定 / 已购行不可选中——Select 拒绝且不改选中，
-    -- 快照逐行给 selectable（单测不读节点的 TouchEnabled）。
-    -- 失败方式：锁定/已购行仍可选中（玩家白点，选中后详情还在教他怎么买）；快照看不出哪行可点。
-    it("test_locked_and_owned_rows_are_not_selectable", function()
+    -- 可选与可买是两个概念（#214 用户故事 8 / 20 / 21）：已购行不可点（买满限购的别让玩家白点）；
+    -- 锁定行可点、详情区照常给描述与原因，只是买不了；可买行两者皆真。快照逐行给 selectable / purchasable
+    -- （单测不读节点的 TouchEnabled）。
+    -- 失败方式：把「可买」当成「可选」→ 锁定行点不动，玩家看不出这件商品是什么、差哪一级；
+    --           把锁定行当可买（或节点可点）→ 客户端发出必被服务端拒的请求；已购行仍可点（白点）。
+    it("test_selectable_and_purchasable_are_independent", function()
         local rows = ctx.handler:View().rows
-        assert.same({ true, true, false }, { rows[1].selectable, rows[2].selectable, rows[3].selectable })
-        assert.is_true(ctx.handler:Select(1))
-        assert.is_false(ctx.handler:Select(3)) -- 科技假饵：2 级摊位买不到
-        assert.same(1, ctx.handler:View().selected)
+        assert.same({ true, true, true }, { rows[1].selectable, rows[2].selectable, rows[3].selectable })
+        assert.same({ true, true, false }, { rows[1].purchasable, rows[2].purchasable, rows[3].purchasable })
+        assert.is_true(ctx.handler:Select(3)) -- 科技假饵：需 7 级摊位，仍可选
+        assert.same(3, ctx.handler:View().selected)
         ctx.handler:SetPage('升级')
         local view = ctx.handler:View()
-        assert.is_false(view.rows[rowIndexOf(view, 32)].selectable) -- 背包升级2：越级
+        local leap = view.rows[rowIndexOf(view, 32)] -- 背包升级2：越级（当前 0 级），锁定但可点
+        assert.same('locked', leap.state)
+        assert.is_true(leap.selectable)
+        assert.is_false(leap.purchasable)
         local index = rowIndexOf(view, 51) -- 近战武器升级1：限购 1 次
         assert.is_true(ctx.handler:Select(index))
         ctx.nodes.BtnShopBuyDetail.OnClicked:Fire()
@@ -522,7 +545,32 @@ describe("钓场商店界面（#216 固定骨架 / #217 行与选中 / #218 详�
         local after = ctx.handler:View()
         assert.same('owned', after.rows[index].state)
         assert.is_false(after.rows[index].selectable) -- 已买满：行不可点
-        assert.is_false(ctx.handler:Select(index))
+        assert.is_false(after.rows[index].purchasable)
+        local other = rowIndexOf(after, 41) -- 弹容量升级1：仍可买
+        assert.is_true(ctx.handler:Select(other))
+        assert.is_false(ctx.handler:Select(index)) -- 已购行：拒绝，选中不跟着挪
+        assert.same(other, ctx.handler:View().selected)
+    end)
+
+    -- 锁定行详情（#214 故事 8 / 21）：点了照常选中，详情区给描述、价格与「需 N 级摊位」，
+    -- 购买按钮禁用并把原因写在按钮上——玩家知道这件商品是什么、差什么才能买。
+    -- 失败方式：锁定行详情只灰不解释（按钮上仍写「购买」）；按钮可点，或点了发出必被拒的请求；
+    --           原因写成 reason 码（stand / level）而不是玩家能读懂的话。
+    it("test_locked_row_detail_shows_reason_on_disabled_buy_button", function()
+        assert.is_true(ctx.handler:Select(3)) -- 科技假饵：需 7 级摊位
+        local detail = ctx.handler:View().detail
+        assert.same(1, detail.number)
+        assert.same('科技假饵', detail.name)
+        assert.same('可以在火山岛钓到各种神奇生物的高科技。别吃！', detail.desc)
+        assert.same('7', detail.priceText)
+        assert.same('需 7 级摊位', detail.buyText) -- 原因写在按钮上
+        assert.is_false(detail.buyEnabled)
+        assert.same('需 7 级摊位', ctx.nodes.LabelShopBuyDetail.Text)
+        assert.is_true(ctx.nodes.BtnShopBuyDetail.Disabled)
+        ctx.commands = {}
+        ctx.nodes.BtnShopBuyDetail.OnClicked:Fire() -- 点了：本地拒绝、同一条文案，不发请求
+        assert.same({}, ctx.commands)
+        assert.same({ ctx.localShop.FailText.stand }, ctx.notices)
     end)
 
     -- 服务端拒绝（#218）：不伪成功——金币不动、行不算已购、限购次数与按钮不变。
@@ -665,7 +713,7 @@ describe("钓场商店界面（#216 固定骨架 / #217 行与选中 / #218 详�
         assert.same(#ctx.handler:View().rows, OwnedUnits.Count(ctx.handler))
         local previous = ctx.created
         ctx.created = {}
-        ctx.handler.RootNode = { Name = 'ScreenShopRebuilt' }
+        ctx.handler.RootNode = ctx.makeRoot() -- 换 RootNode 重建：同名节点都是新树上的
         ctx.handler:Init()
         assert.same(0, OwnedUnits.Count(ctx.handler))
         for _, node in ipairs(previous) do
