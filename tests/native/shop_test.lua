@@ -117,7 +117,7 @@ describe("钓场商店购买", function()
         assert.same('melee', last.kind)
         assert.same(1, last.level)
         assert.near(1.1, ctx.data:WeaponDamageScale('melee'), 1e-9)
-        -- 重复强化：限购拒绝，钱与等级都不动
+        -- 重复升级：限购拒绝，钱与等级都不动
         assert.is_false(buyNumber(51))
         assert.same('limit', lastReason())
         assert.same(950, ctx.data.Data.FishCoin)

@@ -49,17 +49,17 @@ local function createButtonLabel(self, parent, button, name, text, fontSize)
     return label
 end
 
--- 行状态后缀（编辑器行与补位行共用）：已购 / 锁定（摊位等级不够或强化越级）
+-- 行状态后缀（编辑器行与补位行共用）：已购 / 锁定（摊位等级不够或升级越级）
 local function stateSuffix(state, goods, level)
     if state == 'owned' then return '（已购）' end
     if state == 'locked' then
         if goods.MinShopLevel > level then return '（需 ' .. goods.MinShopLevel .. ' 级摊位）' end
-        return '（需先购前一级）'
+        return '（请先完成前一级升级）'
     end
     return ''
 end
 
--- 行状态：locked（摊位等级不够或强化越级，灰显）/ owned（限购已满或强化级别已购）/ buy（可购买）
+-- 行状态：locked（摊位等级不够或升级越级，灰显）/ owned（限购已满或升级级别已购）/ buy（可购买）
 function ScreenHandler:RowState(goods, level)
     if goods.MinShopLevel > level then return 'locked' end
     if goods.Upgrade then
@@ -191,7 +191,7 @@ function ScreenHandler:ShowGoods()
     end
 end
 
--- 购买结果回包：会话内累计购买次数与强化等级（服务端仍是唯一权威，失败不回包计数）
+-- 购买结果回包：会话内累计购买次数与升级等级（服务端仍是唯一权威，失败不回包计数）
 function ScreenHandler:NoteResult(result)
     if type(result) ~= 'table' then return end
     if result.ok then

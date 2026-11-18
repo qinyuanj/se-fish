@@ -466,7 +466,7 @@ describe('TestEconomyPersistence', function()
     end)
 
     it('test_upgrade_row_persists_and_replays_without_double_charge', function()
-        -- #130 升级行购买走 Save 协议：先持久后生效、同键重放不重复、限购与强化重进保持
+        -- #130 升级行购买走 Save 协议：先持久后生效、同键重放不重复、限购与升级重进保持
         env.data:AddCoin(1000)
         persistSetup()
         local request = { action = 'Buy', number = 51, seq = 1 } -- 近战武器升级1，50 金
@@ -490,7 +490,7 @@ describe('TestEconomyPersistence', function()
         assert.same(950, env.data.Data.FishCoin)
         assert.same(1, env.data:ShopUpgradeLevel('melee'))
         assert.same(1, env.data:PurchaseCount(51))
-        -- 重进保持：强化等级与购买计数都在存档里
+        -- 重进保持：升级等级与购买计数都在存档里
         join()
         drain()
         local restored = env.players:GetDataInst(env.player)

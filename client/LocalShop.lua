@@ -21,7 +21,7 @@ LocalShop.FailText = {
     range = '离钓场老板太远了',
     item = '这件商品暂不出售',
     limit = '该商品已达购买次数上限',
-    level = '需要先购买前一级强化',
+    level = '请先完成前一级升级',
 }
 local FailText = LocalShop.FailText
 
