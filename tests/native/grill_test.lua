@@ -899,7 +899,7 @@ describe("烧烤界面的单位清理", function()
     end
 
     before_each(function()
-        ctx = { nodes = {}, bubbles = {}, saved = {} }
+        ctx = { nodes = {}, bubbles = {}, created = {}, saved = {} }
         for _, key in ipairs({ 'game', 'Vector2', 'Vector3', 'Color', 'REUtil' }) do
             ctx.saved[key] = rawget(_G, key)
         end
@@ -919,6 +919,7 @@ describe("烧烤界面的单位清理", function()
                 for key, value in pairs(attrs or {}) do node[key] = value end
                 node.Destroy = function(me) me.Destroyed = true end
                 if node.Name then ctx.nodes[node.Name] = node end
+                ctx.created[#ctx.created + 1] = node
                 return node
             end,
             FindFirstChild = function(_, name) return anchors[name] end,
@@ -978,7 +979,17 @@ describe("烧烤界面的单位清理", function()
         local root = ctx.panel.Root
         local bubbles = {}
         for index, bubble in ipairs(ctx.panel.Bubbles) do bubbles[index] = bubble.Node end
-        assert.same(8, OwnedUnits.Count(ctx.panel)) -- 面板 1 + 标题 / 时间 / 倍率 3 + 两按钮各 2
+        -- 数本轮夹具实际收到的建点：面板名下的那些才登记在 ScreenGrill 名下，
+        -- 气泡按钮与文字挂在气泡根上（属于气泡），不参与面板的登记数
+        local panelCreated = 0
+        for _, node in ipairs(ctx.created) do
+            local ownPanel = true
+            for _, bubble in ipairs(ctx.bubbles) do
+                if node.Parent == bubble then ownPanel = false break end
+            end
+            if ownPanel then panelCreated = panelCreated + 1 end
+        end
+        assert.same(panelCreated, OwnedUnits.Count(ctx.panel))
         assert.is_true(#bubbles > 0)
         ctx.panel:Clear()
         assert.same(0, OwnedUnits.Count(ctx.panel))
@@ -1001,5 +1012,15 @@ describe("烧烤界面的单位清理", function()
         assert.is_nil(ctx.panel.RateLabel)
         ctx.panel:Clear() -- 幂等：重复清空不报错
         assert.same(0, OwnedUnits.Count(ctx.panel))
+    end)
+
+    -- 重建前先清空：BuildPanel 再来一次不叠第二套面板
+    it("test_build_panel_rebuild_does_not_stack_nodes", function()
+        local firstPanel = ctx.panel.Root
+        local before = #ctx.created
+        ctx.panel:BuildPanel()
+        assert.is_true(firstPanel.Destroyed, '上一轮面板根应被拆掉')
+        assert.not_equal(firstPanel, ctx.panel.Root)
+        assert.same(#ctx.created - before, OwnedUnits.Count(ctx.panel)) -- 登记表只留新一轮
     end)
 end)

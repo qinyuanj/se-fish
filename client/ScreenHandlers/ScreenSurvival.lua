@@ -142,6 +142,8 @@ function Panel:Start()
         print('[ScreenSurvival] EUI 未就绪，跳过建面板')
         return
     end
+    -- 重建前先清空上一轮节点：Start 重入不叠第二套蒙版。
+    self:Clear()
     local resolution = root[2] or { x = 1920, y = 1080 }
     local cx, cy = resolution.x / 2, resolution.y / 2
     local banner = create('EUIImage', root[1], 'SurvivalBanner', cx - 320, cy - 90, 640, 180, {

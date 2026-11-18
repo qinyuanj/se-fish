@@ -140,4 +140,22 @@ describe('主界面 HUD 的节点归属（#209）', function()
         end
         assert.same(0, OwnedUnits.Count(ctx.handler))
     end)
+
+    it('test_cleanup_reclaims_aim_overlay_left_by_mid_aim_close', function()
+        ctx = setUp()
+        local hudNodes = OwnedUnits.Count(ctx.handler)
+        -- 关屏路径没走到 EndAim（Cleanup 前半段抛错时就会这样）：拾取层得由 Cleanup 自己回收，
+        -- 否则全屏拦截按钮会留在 UIRoot 上继续吃点击
+        ctx.handler.CloseScreen = function() end
+        ctx.handler:BeginAim(1)
+        local overlay = ctx.created[#ctx.created]
+        assert.same('ThrowAimOverlay', overlay.Name)
+        assert.same(hudNodes, OwnedUnits.Count(ctx.handler)) -- 拾取层不挂在主界面名下
+        assert.same(1, OwnedUnits.Count(ctx.handler.AimOwner))
+        ctx.handler:Cleanup() -- 瞄准中途关屏，不调 EndAim
+        assert.is_true(overlay.Destroyed, '关屏后瞄准拾取层必须被销毁')
+        assert.same(1, overlay.Destroys) -- 只拆一次（重复销毁在真引擎里会报错）
+        assert.same(0, OwnedUnits.Count(ctx.handler.AimOwner))
+        assert.same(0, OwnedUnits.Count(ctx.handler))
+    end)
 end)

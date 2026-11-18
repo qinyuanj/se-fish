@@ -19,6 +19,14 @@ local Players = game:GetService('Players')
 
 local ScreenFerry = { Seq = 0, Legs = {}, Countdowns = {} }
 
+-- 倒计时条按需建、按需拆，跟航线文字泡各归各的所有者：挂在 ScreenFerry 名下时，
+-- HideCountdown 只能用 Clear 清整张表，将来别的建点一起登记就会被误拆。
+local COUNTDOWN_OWNER = {}
+ScreenFerry.CountdownOwner = COUNTDOWN_OWNER
+
+-- 倒计时条建失败后的重试冷却（秒）：失败只落一条日志，冷却期内不每帧重试、不每帧刷屏。
+local COUNTDOWN_RETRY_INTERVAL = 5
+
 local function notice(msg)
     if _G.LocalMsgNotice then _G.LocalMsgNotice(msg) end
 end
@@ -80,9 +88,10 @@ function ScreenFerry:UpdateLegs()
     end
 end
 
----顶部倒计时条按需创建：真有航线在倒计时才占节点，建完交给本模块的登记表保管。
+---顶部倒计时条按需创建：真有航线在倒计时才占节点，建完交给倒计时条自己的所有者保管。
 function ScreenFerry:ShowCountdown()
     if self.CountdownLabel then return self.CountdownLabel end
+    if (self.CountdownRetryIn or 0) > 0 then return nil end -- 冷却中：UpdateCountdown 扣完才再试
     local eui = Players.LocalPlayer and Players.LocalPlayer.PlayerGui
         and Players.LocalPlayer.PlayerGui.EuiManager
     local root = eui and eui:GetRootNode()
@@ -95,28 +104,35 @@ function ScreenFerry:ShowCountdown()
         TextColor = Color.New(255, 255, 255, 255),
     })
     if not ok or not label then
-        print('[ScreenFerry] 倒计时条创建失败', tostring(label))
+        -- 记一次冷却再返回：这一次失败只落这一条日志，冷却期内的帧不再重试
+        print('[ScreenFerry] 倒计时条创建失败，' .. COUNTDOWN_RETRY_INTERVAL .. ' 秒后重试', tostring(label))
+        self.CountdownRetryIn = COUNTDOWN_RETRY_INTERVAL
         return nil
     end
     label.Visible = false
     label.TouchEnabled = false
     label.SwallowTouchEnabled = false
-    self.CountdownLabel = OwnedUnits.Track(self, label)
+    self.CountdownLabel = OwnedUnits.Track(COUNTDOWN_OWNER, label)
     return self.CountdownLabel
 end
 
 ---航线结束后销毁倒计时条（幂等）：先隐藏再销毁，既不再显示，也不留看不见的残留。
+-- 只清倒计时条自己的所有者；ScreenFerry 名下的其它登记一个都不碰。
 function ScreenFerry:HideCountdown()
     if not self.CountdownLabel then return end
     local label = self.CountdownLabel
     self.CountdownLabel = nil
     pcall(function() label.Visible = false end)
-    OwnedUnits.Clear(self)
+    OwnedUnits.Clear(COUNTDOWN_OWNER)
 end
 
 -- 逐航线扣时；倒计时条显示剩余最少的一班（同一时刻可能有多条航线在倒计时）
 function ScreenFerry:UpdateCountdown(dt)
     local step = type(dt) == 'number' and dt or 0
+    if self.CountdownRetryIn then
+        self.CountdownRetryIn = self.CountdownRetryIn - step
+        if self.CountdownRetryIn <= 0 then self.CountdownRetryIn = nil end
+    end
     local soonest, soonestLeft
     for routeId, left in pairs(self.Countdowns) do
         local remaining = left - step

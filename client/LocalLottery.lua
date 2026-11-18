@@ -97,6 +97,7 @@ function LocalLottery:Update()
 end
 
 function LocalLottery:Start()
+    self:Clear() -- 重建语义：重复启动先拆上一轮的入口气泡，不叠第二套
     for _, name in ipairs(GameCfg.Lottery.MachineAnchors()) do
         local anchor = Util:WaitForChild(World, name)
         if anchor then

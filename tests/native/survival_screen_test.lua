@@ -28,6 +28,7 @@ describe('TestScreenSurvival', function()
         ctx = {
             now = 1000,
             nodes = {},
+            created = {},
             requests = {},
             events = {},
             notices = {},
@@ -50,6 +51,7 @@ describe('TestScreenSurvival', function()
                 for key, value in pairs(props) do node[key] = value end
                 node.Destroy = function(me) me.Destroyed = true end
                 env.nodes[node.Name] = node
+                env.created[#env.created + 1] = node
                 return node
             end,
             GetServerTime = function() return env.now or 1000 end,
@@ -180,7 +182,8 @@ describe('TestScreenSurvival', function()
     -- #211：面板节点一律登记到归属登记，清空只走登记表；清空后不再自持已销毁节点
     it('test_clear_destroys_every_registered_node_and_resets_lookup', function()
         local banner = ctx.nodes['SurvivalBanner']
-        assert.same(9, OwnedUnits.Count(ctx.panel)) -- 横幅 1 + 大字 1 + 三按钮各 2 + 虚弱提示 1
+        -- 横幅 1 + 大字 1 + 三按钮各 2 + 虚弱提示 1：数本轮夹具实际收到的建点，不写死
+        assert.same(#ctx.created, OwnedUnits.Count(ctx.panel))
         ctx.panel:Clear()
         assert.same(0, OwnedUnits.Count(ctx.panel))
         for name, node in pairs(ctx.nodes) do
@@ -197,5 +200,15 @@ describe('TestScreenSurvival', function()
         assert.is_nil(ctx.panel.WeakLabel)
         ctx.panel:Clear() -- 幂等：重复清空不报错
         assert.same(0, OwnedUnits.Count(ctx.panel))
+    end)
+
+    -- 重建前先清空：Start 重入不叠第二套蒙版
+    it('test_start_rebuild_does_not_stack_nodes', function()
+        local firstBanner = ctx.nodes['SurvivalBanner']
+        local before = #ctx.created
+        ctx.panel:Start()
+        assert.is_true(firstBanner.Destroyed, '上一轮横幅应被拆掉')
+        assert.not_equal(firstBanner, ctx.nodes['SurvivalBanner'])
+        assert.same(#ctx.created - before, OwnedUnits.Count(ctx.panel)) -- 登记表只留新一轮
     end)
 end)

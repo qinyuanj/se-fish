@@ -150,6 +150,7 @@ function LocalShop:Update()
 end
 
 function LocalShop:Start()
+    self:Clear() -- 重建语义：重复启动先拆上一轮的摊口气泡，不叠第二套
     REUtil:GetRE('ShopResult').OnClientEvent:Connect(function(result)
         if type(result) ~= 'table' then return end
         local definition = GameCfg.Items.Definitions[result.itemId]

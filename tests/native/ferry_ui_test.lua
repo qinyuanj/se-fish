@@ -49,7 +49,15 @@ describe('摆渡界面（ScreenFerry）', function()
       restore[name] = package.loaded[name]
       package.loaded[name] = nil
     end
-    env = { nodes = {}, sceneNodes = {}, commands = {}, notices = {}, events = {} }
+    env = { nodes = {}, sceneNodes = {}, commands = {}, notices = {}, events = {}, logs = {} }
+    -- 捕获 print：闸门用例要数日志条数，日志也不能刷进测试输出
+    -- 写 _G：生产模块的 chunk 环境是全局表，裸 print = ... 只落在测试 chunk 自己的沙盒里
+    env.savedPrint = _G.print
+    rawset(_G, 'print', function(...)
+      local parts = {}
+      for index = 1, select('#', ...) do parts[index] = tostring((select(index, ...))) end
+      env.logs[#env.logs + 1] = table.concat(parts, ' ')
+    end)
     package.loaded['common.GameCfg'] = nil
     env.cfg = require('tests.support.zone_fixtures').Load()
     env.routes = env.cfg.Ferry.Routes
@@ -66,6 +74,7 @@ describe('摆渡界面（ScreenFerry）', function()
     end
     local world = { FindFirstChild = function(_, name) return env.anchors[name] end }
     function world:CreateUnit(kind, attrs)
+      if env.failCreateUnit then return nil end -- 造「建点失败」：闸门与日志用例用
       local node = { Kind = kind, OnClicked = signal() }
       for key, value in pairs(attrs) do node[key] = value end
       node.Destroy = function(me) me.Destroyed = true end
@@ -116,6 +125,7 @@ describe('摆渡界面（ScreenFerry）', function()
   end)
 
   after_each(function()
+    if env then rawset(_G, 'print', env.savedPrint) end
     for _, name in ipairs(moduleNames) do
       package.loaded[name] = restore[name]
     end
@@ -154,32 +164,70 @@ describe('摆渡界面（ScreenFerry）', function()
     -- 没有在倒计时的航线时不占节点；结束后节点销毁、登记表归空；下一趟重新按需建一个（不叠加）
     local state = env.events.FerryState.OnClientEvent
     assert.is_nil(env.nodes.FerryCountdown)
-    assert.same(0, OwnedUnits.Count(env.handler))
+    assert.same(0, OwnedUnits.Count(env.handler.CountdownOwner))
     local routeA, routeB = env.routes[1], env.routes[2]
     state:Fire({ phase = 'countdown', routeId = routeA.Id, seconds = 5 })
     env.handler:UpdateCountdown(1)
     local label = env.nodes.FerryCountdown
     assert.is_not_nil(label)
     assert.is_true(label.Visible)
-    assert.same(1, OwnedUnits.Count(env.handler))
+    assert.same(1, OwnedUnits.Count(env.handler.CountdownOwner))
     -- 另一条航线也倒计时：仍只有一个节点，不叠加
     state:Fire({ phase = 'countdown', routeId = routeB.Id, seconds = 6 })
     env.handler:UpdateCountdown(1)
-    assert.same(1, OwnedUnits.Count(env.handler))
+    assert.same(1, OwnedUnits.Count(env.handler.CountdownOwner))
     assert.equal(label, env.nodes.FerryCountdown)
     -- 倒计时全部走完：节点被销毁，登记表归空，不再显示
     env.handler:UpdateCountdown(10)
     assert.is_nil(env.handler.CountdownLabel)
     assert.same({}, env.handler.Countdowns)
-    assert.same(0, OwnedUnits.Count(env.handler))
+    assert.same(0, OwnedUnits.Count(env.handler.CountdownOwner))
     assert.is_true(label.Destroyed, '航线结束后倒计时节点应被销毁')
     assert.is_false(label.Visible)
     -- 下一趟摆渡重新建，不复活已销毁的旧节点
     state:Fire({ phase = 'countdown', routeId = routeA.Id, seconds = 3 })
     env.handler:UpdateCountdown(1)
-    assert.same(1, OwnedUnits.Count(env.handler))
+    assert.same(1, OwnedUnits.Count(env.handler.CountdownOwner))
     assert.is_not_nil(env.nodes.FerryCountdown)
     assert.not_equal(label, env.nodes.FerryCountdown)
+  end)
+
+  it('test_countdown_create_failure_logs_once_and_retries_after_cooldown', function()
+    -- 建失败一次只落一条日志：冷却期内的帧不再重试、也不再刷屏；冷却过去后才重新尝试
+    env.failCreateUnit = true
+    local state = env.events.FerryState.OnClientEvent
+    state:Fire({ phase = 'countdown', routeId = env.routes[1].Id, seconds = 30 })
+    env.handler:UpdateCountdown(1) -- 第一次尝试：失败
+    for _ = 1, 4 do env.handler:UpdateCountdown(1) end -- 冷却期内的四帧：不重试
+    local failures = 0
+    for _, line in ipairs(env.logs) do
+      if line:find('倒计时条创建失败', 1, true) then failures = failures + 1 end
+    end
+    assert.same(1, failures) -- 连续多帧只落一条日志
+    assert.is_nil(env.handler.CountdownLabel)
+    assert.is_nil(env.nodes.FerryCountdown)
+    env.failCreateUnit = false
+    env.handler:UpdateCountdown(1) -- 冷却过去：重新尝试并建出来
+    assert.is_not_nil(env.handler.CountdownLabel)
+    assert.is_true(env.nodes.FerryCountdown.Visible)
+  end)
+
+  it('test_hide_countdown_only_reclaims_its_own_owner', function()
+    -- 倒计时条有独立所有者：HideCountdown 只拆它，ScreenFerry 名下别的登记一个都不碰
+    local state = env.events.FerryState.OnClientEvent
+    state:Fire({ phase = 'countdown', routeId = env.routes[1].Id, seconds = 5 })
+    env.handler:UpdateCountdown(1)
+    local label = env.nodes.FerryCountdown
+    assert.is_not_nil(label)
+    assert.same(1, OwnedUnits.Count(env.handler.CountdownOwner))
+    local other = { Destroy = function(me) me.Destroyed = true end }
+    OwnedUnits.Track(env.handler, other) -- 模拟将来别的建点登记到 ScreenFerry 名下
+    env.handler:UpdateCountdown(10) -- 倒计时走完 → HideCountdown
+    assert.is_true(label.Destroyed, '倒计时结束后节点应被销毁')
+    assert.is_nil(other.Destroyed, 'HideCountdown 不许误拆 ScreenFerry 名下的其它节点')
+    assert.same(1, OwnedUnits.Count(env.handler))
+    assert.same(0, OwnedUnits.Count(env.handler.CountdownOwner))
+    OwnedUnits.Clear(env.handler) -- 收尾：别把登记记录留给后面的用例
   end)
 
   it('test_each_leg_sends_its_own_route_id', function()
