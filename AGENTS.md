@@ -2,25 +2,25 @@
 
 蛋仔派对世界版（状态同步，SE）地图的 Lua 源码。
 
-**语言**：思考、工具调用之间的进度说明和最终回复都用中文，会话全程如此；产出物语言与例外见文末「团队协作约定」。
+**语言**：思考、进度说明与最终回复一律用中文；产出物见文末「团队协作约定」。
 
 ## 按任务读取
 
 - **探索代码**：先读 `docs/agents/domain.md`，按其中指引读取领域资料；ADR 放在 `docs/adr/`。
-- **玩法与术语**：玩法与系统设计以 `design` 为准（指向仓库外 `eggitor/1_开发中/渔力全开` 的符号链接）；起名、读设计案或写玩家可见文案前查 `GLOSSARY.md`。
+- **玩法与术语**：玩法与系统设计以 `design` 为准（符号链接到仓库外 `eggitor/1_开发中/渔力全开`）；起名或写玩家可见文案前查 `GLOSSARY.md`。
 - **技术方案**：先读 `docs/技术难点识别.md`；涉及策划矛盾时读 `docs/to-questionnaire-策划案内部矛盾.md`。
 - **编码与审查**：编写或审查 SE 业务 Lua 前，读 `CODING_STANDARDS.md`。
-- **开发工作流**：修改代码、运行测试、同步宿主或操作编辑器前，以及整理过程产物时，读 `docs/agents/workflow.md`（工具链、测试纪律、完成判据、产物归属）。
-- **截图**：取证前先跑 `lua tools/cli.lua screenshot --info` 判显示路径，别用适配器列表里有没有 GameViewer 来推断；非虚拟屏用 editor-cli `screenshot`，虚拟屏（UU 远程）上它可能给校验通过的黑帧或静止旧帧，改用 `lua tools/cli.lua screenshot`。判帧新旧只能连拍比 md5（先锁尺寸）。取景与失败处理见 `docs/agents/editor-cli.md`。
-- **架构导航**：需要模块依赖全景、评估改动影响或从图上发起操作时，在 DSH 中打开 dsh-uml-viewer 插件面板；图由根目录 `policy.edn` 生成到 `docs/uml/se-fish.edn`（不要手编），面板操作规则由插件注入。
+- **开发工作流**：修改代码、运行测试、同步宿主或操作编辑器前，以及整理过程产物时，读 `docs/agents/workflow.md`。
+- **截图**：取证前先跑 `lua tools/cli.lua screenshot --info` 判显示路径，再照 `docs/agents/editor-cli.md`「截图」条执行（虚拟屏上 editor-cli 可能给校验通过的黑帧或旧帧，判帧新旧连拍比 md5）。
+- **架构导航**：需要模块依赖全景、评估改动影响或从图上操作时，打开 dsh-uml-viewer 插件面板；图由根目录 `policy.edn` 生成到 `docs/uml/se-fish.edn`（不要手编），操作规则由插件注入。
 - **架构分层**：新增模块、调整模块职责或依赖方向前，读 `docs/architecture.md`；层归属与门禁唯一声明在 `tools/arch_policy.lua`。
-- **美术资产**：定位美术工作区文件、用 Blender 或 Meshy 前，读 `docs/agents/art-pipeline.md`（工作区路径表、无头 Blender 入口与踩坑、Meshy MCP 接入）；验收资产前读 `docs/art-asset-overview.md`「验收」，尺寸口径见 `docs/adr/0004-fish-asset-scale.md`。Blender 只走无头：一律用 `lua tools/cli.lua blender`，**跳过上游 blender-* skill 的 Live/MCP 段落**（含 `execute_blender_code` 与 `look` 工具），不裸调 `blender.exe`、不用 `run_in_blender.py` 直连；见 `docs/adr/0009-blender-headless-only.md`。
-- **Issue**：读写前看 `docs/agents/issue-tracker.md`；打 triage 标签前看 `docs/agents/triage-labels.md`。本项目在 GitHub `qinyuanj/se-fish` 跟踪单据，通过 `gh` 操作。
+- **美术资产**：定位美术工作区文件、用 Blender 或 Meshy 前读 `docs/agents/art-pipeline.md`；验收资产前读 `docs/art-asset-overview.md`「验收」，尺寸口径见 `docs/adr/0004-fish-asset-scale.md`。Blender 只走无头：一律 `lua tools/cli.lua blender`，跳过上游 blender-* skill 的 Live/MCP 段落，见 `docs/adr/0009-blender-headless-only.md`。
+- **Issue**：读写前看 `docs/agents/issue-tracker.md`；打 triage 标签前看 `docs/agents/triage-labels.md`。单据在 GitHub `qinyuanj/se-fish`，用 `gh` 操作。
 
 ## 修改边界
 
 - **管理器**：新增服务端管理器须加入 `server/main.lua` 的 `MgrMap`，由入口统一分发 `Start` / `OnPlayerAdded` / `OnPlayerRemoving` / `Update`。
-- **界面**：由 `MgrGameUI` 管理；handler 放在 `client/ScreenHandlers/`，文件名与 EUI 节点同名，并在 `MgrGameUI` 的 `ScreenHandlerLoaders` 登记，供 `GetScreen` 按节点名加载。
+- **界面**：handler 放在 `client/ScreenHandlers/`，文件名与 EUI 节点同名，并在 `MgrGameUI` 的 `ScreenHandlerLoaders` 登记，供 `GetScreen` 按节点名加载。
 - **共享配置**：数值配置集中在 `common/GameCfg.lua`；技能配置在 `GameCfg.Ability`。
 - **生成内容**：`data/` 只读，修改须回编辑器重新导出，再用 `sync` 回灌；`unit_scripts/` 由引擎生成，不在本仓库管理。
 
