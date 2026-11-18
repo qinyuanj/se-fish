@@ -5,7 +5,7 @@
 --   editor-cli log grep P2CFG65 --platform editor --context 0 --max-matches 800 --json
 --
 -- 数据块由 `lua tools/gen_config_anchor_probe.lua` 生成，**不要手改数据块**：
--- fast 车道的 tests/native/config_anchor_baseline_sync_test.lua 会逐字节校验它与当前 GameCfg 同步。
+-- lua tools/gen_config_anchor_probe.lua --check 会逐字节校验它与当前 GameCfg 同步（不同步退出码 1）。
 --
 -- 为什么清单是生成出来的字面量：编辑器 exec 沙盒里 require 不可用
 -- （sdk.common.lua:830: attempt to call a nil value (field 'require')），且没有 io/os，

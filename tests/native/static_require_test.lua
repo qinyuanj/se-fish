@@ -7,6 +7,8 @@
 --   5. 未登记的名字被静默吞掉 → 配置或节点名写错时没有报错；
 --   6. 回退成拼字符串的 require → 图上依赖再次丢失。
 -- 登记覆盖（1~4、6）只读源码文本校对，与 grill_test 的接线断言同口径；失败路径（5）加载真实模块验证。
+-- 包内锚点框架 anchor_logic.lua 不进任何登记表（server/AbilityAPI.lua 直接按字面量 require 它），
+-- 文件被删或包升级改名同样只在运行时炸，由文末「字面量 require 的包内模块」单独登记。
 
 
 local fs = require("tests.support.fs_fixture")
@@ -163,5 +165,12 @@ describe("未登记名字的失败路径", function()
     assert.error_matches(function() api.AttachAnchor(anchor, "no_such_behavior") end,
       "锚点行为模块不可用: no_such_behavior", nil, true)
     assert.same({ anchor }, attached)
+  end)
+end)
+
+describe("字面量 require 的包内模块", function()
+  it("test_anchor_framework_module_exists", function()
+    local path = "server/packages/ability_system/anchor_logic.lua"
+    assert.is_true(file_exists(path), path .. " 不存在（AbilityAPI 按字面量 require 它）")
   end)
 end)

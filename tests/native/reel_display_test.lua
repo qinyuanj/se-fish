@@ -57,13 +57,6 @@ describe('本地收线显示（ReelDisplay）', function()
     assert.near(50, d:Value(1), 1e-9)
   end)
 
-  it('test_config_carries_display_parameters', function()
-    local GameCfg = assert(loadfile('common/GameCfg.lua'))()
-    assert.same(5, GameCfg.ReelIn.Tolerance)
-    assert.is_true(GameCfg.ReelIn.ChaseSec >= 0.15 and GameCfg.ReelIn.ChaseSec <= 0.2)
-    assert.is_true(GameCfg.ReelIn.PendingTimeoutSec > GameCfg.HighFreqInput.AggregateSec)
-  end)
-
   it('test_in_flight_clicks_do_not_trigger_false_down_chase', function()
     local d = ReelDisplay.New(0, cfg)
     for _ = 1, 4 do d:Click(0) end

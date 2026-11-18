@@ -33,23 +33,39 @@ describe('TestKingCrabCombat', function()
 
     it('test_chase_step_scales_with_frame_dt', function()
         -- 追击步长与帧率解耦：位移 = Speed × 实际帧间隔 dt（审查修复：原为 Speed × 0.1 硬编码，
-        -- 60Hz 下追击速度约为鱼种 Speed 的 6 倍）；步长仍被咬距钳制，追进咬距即起手
-        local fish = drop(env)
-        local p = fish.Carrier.Body.Position
-        env.player.Character.Position = { x = p.x, y = p.y, z = p.z + 20 } -- 咬距外 20 米
-        env.mgr:Update() -- 首帧 dt=0，不位移
-        local z0 = fish.Carrier.Body.Position.z
-        env.now = 0.5
-        env.mgr:Update()
-        assert.near(10 * 0.5, fish.Carrier.Body.Position.z - z0, 1e-6, '追击步长 = Speed × dt')
-        assert.is_nil(fish.Move, '追击帧不起手')
-        -- 大 dt 帧：步长按实际间隔放大，但被咬距钳制（distance - BiteRange）
-        env.now = 5.5
-        env.mgr:Update()
-        assert.near(20 - 2.5, fish.Carrier.Body.Position.z - z0, 1e-6, '大 dt 一帧追到咬距边')
-        env.now = 5.6
-        env.mgr:Update()
-        assert.are.equal('jab', fish.Move.Name, '追进咬距即起手乱刺')
+        -- 60Hz 下追击速度约为鱼种 Speed 的 6 倍）；步长仍被咬距钳制，追进咬距即起手。
+        -- 帝王蟹与蟹老板同一规则，招式名并进参数表（蟹老板的追击起手是双击 pinch）。
+        for _, case in ipairs({
+            { fishId = 'fish23Elite', move = 'jab', fleeAt = 180 },
+            { fishId = 'fish24Boss', move = 'pinch', fleeAt = 300 },
+        }) do
+            env.now = 0 -- 每条鱼都从同一时刻掉落：FleeAt / 招式节拍都按掉落时刻起算
+            env:prepare()
+            env.player.Character.Controller.Health = 2000
+            env.player.Character.Controller.TakeDamage = function() end
+            local fish = env:heldFish(env.player, case.fishId)
+            env.mgr:Drop(env.player)
+            assert.are.equal('combat', fish.State)
+            assert.are.equal(case.fleeAt, fish.FleeAt)
+            local p = fish.Carrier.Body.Position
+            env.player.Character.Position = { x = p.x, y = p.y, z = p.z + 20 } -- 咬距外 20 米
+            env.other.Character.Controller.Health = 0
+            env.now = 0
+            env.mgr:Update() -- 首帧 dt=0，不位移
+            local z0 = fish.Carrier.Body.Position.z
+            env.now = 0.5
+            env.mgr:Update()
+            assert.near(10 * 0.5, fish.Carrier.Body.Position.z - z0, 1e-6, '追击步长 = Speed × dt')
+            assert.is_nil(fish.Move, '追击帧不起手')
+            -- 大 dt 帧：步长按实际间隔放大，但被咬距钳制（distance - BiteRange）
+            env.now = 5.5
+            env.mgr:Update()
+            assert.near(20 - 2.5, fish.Carrier.Body.Position.z - z0, 1e-6, '大 dt 一帧追到咬距边')
+            env.now = 5.6
+            env.mgr:Update()
+            assert.are.equal(case.move, fish.Move.Name, '追进咬距即起手')
+            env.mgr:Remove(fish)
+        end
     end)
 
     it('test_combat_payload_carries_jab_move_name', function()

@@ -44,7 +44,6 @@ describe("TestBodyScale", function()
     local derived = BodyScale.Derive(3, { CapsuleHeight = 0 / 0, CameraDistance = 'x' })
     assert.are.equal(0, derived.CapsuleHeight)
     assert.are.equal(0, derived.CameraDistance)
-    assert.are.equal(#tostring(derived), #tostring(derived)) -- 只保证不抛错
     assert.is_not_nil(derived)
     assert.is_false(derived.CapsuleHeight ~= derived.CapsuleHeight)
   end)

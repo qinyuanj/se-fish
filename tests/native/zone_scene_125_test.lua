@@ -1,67 +1,15 @@
--- #125 失败方式：长方形水域误判成正方形、无穷值、重名、缺实体、错位以及规划被当成可用。
--- 迁移自 tests/gameplay/zone_scene_125_test.lua（#83）。单类 TestZoneScene125，无 setUp/tearDown；
--- it 顺序沿用旧入口的方法名字典序，与迁移前逐条对账。
+-- #125 失败方式：无穷值或重名水域让 Build 静默返回判定器、长方形水域被当成正方形
+-- （贴边 0.1m 误判）、场景诊断把缺实体/重名/错位报成通过，以及场景实体与快照点不再共享同一张
+-- 坐标表（复制成两份后改一处另一处不动）。
+-- 迁移自 tests/gameplay/zone_scene_125_test.lua（#83）。单类 TestZoneScene125，无 setUp/tearDown。
 -- 断言口径：旧 assertEquals 对 table 是深比较 → assert.same；旧 assertIs 要求同一引用
 -- → 用 assert.are.equal（就是 `==`，深比较的 same 会把「共享同一表」弱化成「内容相等」而漏判）。
+-- 七区几何、SafePoint 与航线 Destination、返程票价已由 zone_layout_plan_test 与 ferry_test
+-- 对同一份快照断言，这里不再重算。
 local Judge = require('common.MathWaterJudge')
 local Cfg = require('common.GameCfg')
 
 describe("TestZoneScene125", function()
-  -- 搬移失败方式：共享点被重复变换、矩形倒置、两套水域错位/错归属、摆渡与围栏留在旧址。
-  it("test_folded_layout_keeps_runtime_geometry_and_shared_points_consistent", function()
-    local centers = { {0,0}, {240,0}, {480,0}, {720,0}, {720,320}, {480,320}, {240,320} }
-    local runtime = {}
-    for _, water in ipairs(Cfg.Water.Zones) do runtime[water.Id] = water end
-    for index, zone in ipairs(Cfg.Zones) do
-      local scene, center = zone.Scene, centers[index]
-      local b = scene.Boundary
-      assert.are.equal((b.MinX + b.MaxX) / 2, center[1])
-      assert.are.equal(b.MinZ, center[2] - (index == 1 and 59 or index >= 2 and index <= 4 and 70 or 50))
-      assert.are.equal(b.MaxZ, center[2] + (index == 1 and 79 or index >= 2 and index <= 4 and 50 or 70))
-      assert.is_true(b.MinX < b.MaxX and b.MinZ < b.MaxZ)
-      if index >= 2 then
-        -- #102：02–07 区共用「内侧墙内面内 18 米」安全点模板。
-        -- 折返后落在区中心靠内侧（远离水岸）那一边。
-        assert.same({ x = center[1], y = 6,
-          z = center[2] + (index <= 4 and 30.5 or -30.5) }, scene.SafePoint)
-      else
-        assert.near(-0.71, scene.SafePoint.z, 1e-9)
-      end
-      for _, water in ipairs(scene.Waters) do
-        assert.are.equal(zone.Id, water.ZoneId)
-        local active = assert(runtime[water.Id])
-        -- 旧 assertEquals 两侧同为 table → 深比较；注意这里不是 assertIs，
-        -- 「两套水域必须是同一引用」由下面的 Safe / Water 实体 Position 断言负责。
-        assert.same(water.Center, active.Center)
-        assert.are.equal(active.ZoneId, zone.Id)
-        assert.are.equal(active.HalfX, water.HalfX)
-        assert.are.equal(active.HalfZ, water.HalfZ)
-        assert.are.equal(active.HalfXZ, water.HalfXZ)
-        assert.are.equal(active.SurfaceY, water.SurfaceY)
-      end
-      for _, entity in ipairs(scene.Entities) do
-        if entity.Role == 'Safe' then assert.are.equal(scene.SafePoint, entity.Position) end
-        if index >= 2 and entity.Role == 'Water' then
-          assert.are.equal(scene.Waters[1].Center, entity.Position)
-        end
-      end
-      local judge = Judge.Build(Cfg.Water.Zones)
-      assert.is_nil(judge({ x = scene.SafePoint.x, y = -100, z = scene.SafePoint.z }))
-      for _, point in ipairs(scene.BaitSpots.Positions) do
-        assert.is_nil(judge({ x = point.x, y = -100, z = point.z }))
-      end
-    end
-    assert.are.equal('reefIsland', Cfg.Water.ZoneIdByWater['reefIsland.water'])
-    assert.are.equal('volcanoIsland', Cfg.Water.ZoneIdByWater['volcanoIsland.water'])
-    assert.same({ x = 5, y = 6, z = -9 }, Cfg.BaitSpots.Spots[1].Position)
-    assert.are.equal(Cfg.Zones[1].Scene.BaitSpots.Positions[1], Cfg.BaitSpots.Spots[1].Position)
-    assert.are.equal(Cfg.Zones[7].Scene.Waters[1], Cfg.Zones[7].Scene.CruiseWater)
-    for i, route in ipairs(Cfg.Ferry.Routes) do
-      assert.are.equal(Cfg.Zones[i + 1].Scene.SafePoint, route.Outbound.Destination)
-      assert.are.equal(Cfg.Zones[i].Scene.SafePoint, route.Return.Destination)
-    end
-  end)
-
   it("test_invalid_geometry_fails_before_a_judge_is_returned", function()
     for _, bad in ipairs({ math.huge, -math.huge, 0 / 0 }) do
       assert.error_matches(function()
@@ -114,63 +62,24 @@ describe("TestZoneScene125", function()
     assert.same({
       Saved = 'unverified', Synced = 'unverified', Collision = 'unverified', Playtested = 'unverified',
     }, report.Verification)
-  end)
 
-  it("test_seven_zone_plan_keeps_unbuilt_entities_out_of_active_water", function()
-    assert.are.equal(7, #Cfg.Zones)
-    for index, zone in ipairs(Cfg.Zones) do
+    -- 配置真值：实体与快照点必须是同一张表（不是内容相等）——共享点被复制成两份后，
+    -- 改一处另一处不动就漂移，诊断按位置比也会各说一套。
+    for _, zone in ipairs(Cfg.Zones) do
       local scene = zone.Scene
-      assert.are.equal('resolved', scene.State)
-      assert.are.equal(15, scene.BaitSpots.RespawnSec)
-      assert.are.equal(zone.BaitItemId, scene.BaitSpots.ItemId)
-      assert.is_nil(Cfg.Casting.BossBaitCatalog[scene.BaitSpots.ItemId])
-      assert.is_not_nil(scene.LotteryName)
-      assert.are.equal(index >= 3, scene.GrillName ~= nil)
-      assert.is_true(scene.Boundary.TopY > scene.SafePoint.y + 20)
-      local water = Judge.Build(scene.Waters)
-      assert.is_nil(water(scene.SafePoint), zone.Name .. '落点不得入水')
-      assert.is_true(scene.SafePoint.x > scene.Boundary.MinX and scene.SafePoint.x < scene.Boundary.MaxX)
-      assert.is_true(scene.SafePoint.z > scene.Boundary.MinZ and scene.SafePoint.z < scene.Boundary.MaxZ)
-      for _, point in ipairs(scene.BaitSpots.Positions) do
-        assert.is_nil(water({ x = point.x, y = -100, z = point.z }))
-      end
-      local fallback = false
-      for _, row in ipairs(Cfg.Casting.Catalog[zone.Id]) do
-        fallback = fallback or (row.Bait == 0 and row.RodLevel == 1)
-      end
-      assert.is_true(fallback, zone.Name .. '缺无饵保底')
-      if index >= 2 then
-        -- 02–07 区水域已接入运行时；每区岸上前推一竿必须命中本区矩形水面。
-        assert.is_not_nil(Cfg.Casting.Zones[zone.WaterId])
-        assert.is_not_nil(scene.Waters[1].Center)
-      end
-      for other = 1, index - 1 do
-        local a, b = scene.Boundary, Cfg.Zones[other].Scene.Boundary
-        assert.is_true(a.MinX > b.MaxX or b.MinX > a.MaxX or a.MinZ > b.MaxZ or b.MinZ > a.MaxZ,
-          zone.Name .. '围栏不得与其他钓鱼区重叠')
+      for _, entity in ipairs(scene.Entities) do
+        if entity.Role == 'Safe' then assert.are.equal(scene.SafePoint, entity.Position) end
+        if entity.Role == 'Water' then
+          for _, water in ipairs(scene.Waters) do
+            if water.EntityName == entity.Name then
+              assert.are.equal(water.Center, entity.Position, entity.Name)
+              break
+            end
+          end
+        end
       end
     end
-    assert.is_not_nil(Cfg.Zones[6].Scene.AirCombat)
-    assert.is_not_nil(Cfg.Zones[7].Scene.CruiseWater)
-    assert.is_not_nil(Cfg.Zones[7].Scene.BossArena)
-  end)
-
-  it("test_six_route_pairs_target_dry_same_zone_safe_points", function()
-    assert.are.equal(6, #Cfg.Ferry.PlannedRoutes)
-    local prices = { 10, 30, 90, 270, 810, 2430 }
-    for i, route in ipairs(Cfg.Ferry.PlannedRoutes) do
-      assert.are.equal('resolved', route.State)
-      assert.are.equal(Cfg.Zones[i].Id, route.FromZoneId)
-      assert.are.equal(Cfg.Zones[i + 1].Id, route.ToZoneId)
-      assert.are.equal(Cfg.Content.Exchanges[i].Result, route.Outbound.Ticket)
-      assert.are.equal(5, route.Outbound.CountdownSec)
-      assert.are.equal(prices[i], route.Return.Price)
-      assert.are.equal(Cfg.Zones[i + 1].Scene.SafePoint, route.Outbound.Destination)
-      assert.are.equal(Cfg.Zones[i].Scene.SafePoint, route.Return.Destination)
-    end
-    assert.are.equal('FerryBoat', Cfg.Ferry.Outbound.AnchorName)
-    for _, water in ipairs(Cfg.Water.Zones) do
-      assert.are.equal(Cfg.Water.ZoneIdByWater[water.Id], water.ZoneId)
-    end
+    assert.are.equal(Cfg.Zones[1].Scene.BaitSpots.Positions[1], Cfg.BaitSpots.Spots[1].Position)
+    assert.are.equal(Cfg.Zones[7].Scene.Waters[1], Cfg.Zones[7].Scene.CruiseWater)
   end)
 end)

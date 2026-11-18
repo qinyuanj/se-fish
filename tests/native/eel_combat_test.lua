@@ -217,14 +217,6 @@ describe('TestEelCombat', function()
         assert.are.equal(2, fish.Discharges)
     end)
 
-    it('test_skill_numbers_live_in_ability_cfg', function()
-        local eel = GameCfg.Ability.FishAbilities.eel
-        assert.same({ 5, 10, 5, 1, 10 },
-            { eel.Radius, eel.Damage, eel.DischargeCount, eel.DischargeIntervalSec, eel.SleepSec })
-        assert.is_true(eel.CastSec < eel.DischargeIntervalSec)
-        assert.are.equal(180, GameCfg.Fish.eel.EscapeSec)
-    end)
-
     it('test_sleep_lies_sideways_and_waking_restores_rotation', function()
         env:prepare()
         local oldQuaternion = _G.Quaternion

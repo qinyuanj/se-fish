@@ -8,7 +8,8 @@
 -- 用法（仓库根执行）：
 --   lua tools/gen_config_anchor_probe.lua           # 重写数据块
 --   lua tools/gen_config_anchor_probe.lua --check   # 只校验是否同步，不同步退出码 1
--- 同步守卫同时由 tests/native/config_anchor_baseline_sync_test.lua 在 fast 车道执行。
+-- 同步守卫就是 --check 本身（2026-11-18 起，原 tests/native/config_anchor_baseline_sync_test.lua 已删：
+-- 它做的就是这个 --check，重复跑一遍只是把同一个检查算两次）。改动 GameCfg 的锚点名后须重生成再提交。
 local M = {}
 M.PROBE = 'tests/probes/config_anchor_resolution.lua'
 M.BEGIN_MARK = '-- >>> GENERATED ANCHOR DATA'

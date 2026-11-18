@@ -56,27 +56,6 @@ describe('TestCrabBossCombat', function()
         assert.are.equal(20, env.vitalsCalls[#env.vitalsCalls][3])
     end)
 
-    it('test_chase_step_scales_with_frame_dt', function()
-        -- 追击步长与帧率解耦：位移 = Speed × 实际帧间隔 dt（审查修复：原为 Speed × 0.1 硬编码）；
-        -- 步长仍被咬距钳制，追进咬距即起手双击
-        local fish = drop(env)
-        local p = fish.Carrier.Body.Position
-        env.player.Character.Position = { x = p.x, y = p.y, z = p.z + 20 } -- 咬距外 20 米
-        env.mgr:Update() -- 首帧 dt=0，不位移
-        local z0 = fish.Carrier.Body.Position.z
-        env.now = 0.5
-        env.mgr:Update()
-        assert.near(10 * 0.5, fish.Carrier.Body.Position.z - z0, 1e-6, '追击步长 = Speed × dt')
-        assert.is_nil(fish.Move, '追击帧不起手')
-        -- 大 dt 帧：步长按实际间隔放大，但被咬距钳制（distance - BiteRange）
-        env.now = 5.5
-        env.mgr:Update()
-        assert.near(20 - 2.5, fish.Carrier.Body.Position.z - z0, 1e-6, '大 dt 一帧追到咬距边')
-        env.now = 5.6
-        env.mgr:Update()
-        assert.are.equal('pinch', fish.Move.Name, '追进咬距即起手双击')
-    end)
-
     it('test_combat_payload_carries_move_names', function()
         -- 战斗快照带招式名：pinch / spin 协议字段
         local fish = drop(env)

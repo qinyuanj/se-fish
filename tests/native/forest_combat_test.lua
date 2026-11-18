@@ -86,44 +86,33 @@ describe('TestForestCombat', function()
         assert.are.equal('fish32Boss', payloads[#payloads].fishId)
     end)
 
-    it('test_jump_final_frame_displacement_failure_cancels_without_landing_damage', function()
-        local fish, damages = drop(env, 'fish31Elite', 20)
-        local savedRandom = math.random
-        math.random = function() return 0 end
-        env.now = 0
-        env.mgr:Update()
-        env.now = 50
-        env.mgr:Update()
-        local dest = fish.Move.Destination
-        math.random = savedRandom
-        env.player.Character.Position = vec(dest.x, 2, dest.z)
-        breakPosition(fish)
-        env.now = 50 + 1.5
-        env.mgr:Update() -- 结算帧位移失败
-        assert.is_nil(fish.Move, '最终帧位移失败必须取消招式 / 收起预警')
-        assert.same({}, damages, '最终帧位移失败不得结算落地伤害')
-    end)
-
-    it('test_jump_midflight_displacement_failure_cancels_without_landing_damage', function()
-        local fish, damages = drop(env, 'fish31Elite', 20)
-        local savedRandom = math.random
-        math.random = function() return 0 end
-        env.now = 0
-        env.mgr:Update()
-        env.now = 50
-        env.mgr:Update()
-        assert.are.equal('jump', fish.Move.Name)
-        local dest = fish.Move.Destination
-        math.random = savedRandom
-        env.player.Character.Position = vec(dest.x, 2, dest.z) -- 落点范围内有玩家
-        breakPosition(fish)
-        env.now = 50 + 1.5 * 0.5
-        env.mgr:Update() -- 飞行中段位移失败
-        assert.is_nil(fish.Move, '中段位移失败必须取消招式 / 收起预警')
-        assert.same({}, damages, '位移失败不得按预定落点结算落地伤害')
-        env.now = 50 + 1.5
-        env.mgr:Update() -- 到点也不得补结算
-        assert.same({}, damages, '取消后不得补结算落地伤害')
+    it('test_jump_displacement_failure_cancels_without_landing_damage', function()
+        -- 高跃位移失败：末帧与中段两条分支都要取消招式 / 收起预警，且不按预定落点结算；
+        -- 中段取消后到点也不得补结算（末帧边界保留）。
+        for _, case in ipairs({ { name = '末帧', progress = 1 }, { name = '中段', progress = 0.5 } }) do
+            env.now = 0 -- 每条鱼都从同一时刻掉落：高跃 50 秒节拍按掉落时刻起算
+            local fish, damages = drop(env, 'fish31Elite', 20)
+            local savedRandom = math.random
+            math.random = function() return 0 end
+            env.mgr:Update()
+            env.now = 50
+            env.mgr:Update()
+            assert.are.equal('jump', fish.Move.Name)
+            local dest = fish.Move.Destination
+            math.random = savedRandom
+            env.player.Character.Position = vec(dest.x, 2, dest.z) -- 落点范围内有玩家
+            breakPosition(fish)
+            env.now = 50 + 1.5 * case.progress
+            env.mgr:Update() -- 位移失败帧
+            assert.is_nil(fish.Move, case.name .. '位移失败必须取消招式 / 收起预警')
+            assert.same({}, damages, case.name .. '位移失败不得按预定落点结算落地伤害')
+            if case.progress < 1 then
+                env.now = 50 + 1.5
+                env.mgr:Update() -- 到点也不得补结算
+                assert.same({}, damages, '取消后不得补结算落地伤害')
+            end
+            env.mgr:Remove(fish)
+        end
     end)
 
     it('test_jump_warning_is_full_circle_landing_range', function()

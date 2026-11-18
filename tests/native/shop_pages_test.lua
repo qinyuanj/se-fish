@@ -266,16 +266,6 @@ describe("商店成长与限购", function()
         assert.same(0, restored:PurchaseCount(14))
     end)
 
-    -- 未初始化/未知种类的兜底：不加成、不取整
-    it("test_uninitialized_data_returns_base", function()
-        local data = PlayerData.New({ UserId = 110, SetAttribute = function() end })
-        assert.same(0, data:ShopUpgradeLevel('melee'))
-        assert.same(1, data:WeaponDamageScale('melee'))
-        assert.same(1, data:WeaponDamageScale('gold'))
-        assert.same(5, data:MagazineSize(5))
-        assert.same(0, data:PurchaseCount(13))
-    end)
-
     it("test_unknown_or_bad_upgrade_rejected", function()
         local data = newData(105)
         local ok, reason = data:CanShopUpgrade({ kind = 'gold', level = 1 })

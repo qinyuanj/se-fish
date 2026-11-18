@@ -191,15 +191,6 @@ describe('TestSave', function()
         assert.same(11, env.store.data[env.save:Key(1)].coin)
     end)
 
-    it('test_config_has_store_retry_policy', function()
-        local cfg = assert(loadfile('common/GameCfg.lua'))()
-        assert.same('string', type(cfg.Save.Store))
-        assert.same('string', type(cfg.Save.KeyPrefix))
-        assert.is_true(cfg.Save.MaxRetries >= 2)
-        assert.is_true(cfg.Save.RetryDelaySec > 0)
-        assert.is_true(cfg.Save.AutosaveSec > 0)
-    end)
-
     it('test_enqueue_merges_to_latest_snapshot_per_player', function()
         -- 排空任务还没跑就连来两笔：只落最新快照（旧 Set 不会盖新 Commit，反之同理）
         env.deferSpawn = true

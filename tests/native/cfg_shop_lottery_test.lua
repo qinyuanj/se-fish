@@ -1,5 +1,6 @@
--- 失败方式：漏录/重复源行、作废售卖、金额和限购错位、抽奖返奖混淆、保底或货币错误、引用失效；
---   内容表被运行期写入污染（#203：重载 GameCfg 后键集合变化、锚点入口指向未解析的场景区域表）。
+-- 失败方式：内容表被运行期写入污染（#203：重载 GameCfg 后键集合变化、锚点入口指向未解析的场景区域表）；
+--   盲盒保底两件与大奖表顺序脱钩；抽奖判奖口径与代码注释不再一致；升级组漏级/重级、背包描述与容量错位。
+-- 源行的编号/价/等级/限购/名称/权重/倍率等口径由 common/ContentValidation.lua 与 content_validation_test 覆盖，这里不再重列。
 -- 迁移自 tests/gameplay/cfg_shop_lottery_test.lua（#83）；案例顺序沿用旧入口的方法名字典序。
 describe("TestContentCfg", function()
   it("test_blindbox_content_table_holds_no_runtime_keys_across_gamecfg_loads", function()
@@ -28,36 +29,12 @@ describe("TestContentCfg", function()
       assert.is_true(cfg.Blindbox.Pity == content.Pity)
       assert(loadfile('common/GameCfg.lua'))()
       assert.same(before, contentKeys())
+      -- 保底两件按大奖表顺序取前两名（迁移自 cfg_item_refs_test 的唯一增量）：抽奖机在 prizeItemKeys 中等概率
+      -- 取一件，顺序一旦与 Entries 前两名脱钩，保底就抽到非大奖物品。
+      assert.same({ content.Entries[1].itemKey, content.Entries[2].itemKey }, content.Pity.prizeItemKeys)
     end)
     package.loaded[cfgModule], package.loaded[contentModule] = savedCfg, savedContent
     if not ok then error(err, 0) end
-  end)
-
-  it("test_blindbox_weight_pricing_and_pity", function()
-    local box = require('common.cfg.Blindbox')
-    assert.are.equal(42, #box.Entries)
-    local weight, priceExpectation = 0, 0
-    for _, entry in ipairs(box.Entries) do
-      assert.is_not_nil(entry.source:match('^地图盲盒表!R%d+$'))
-      assert.is_not_nil(entry.itemKey)
-      assert.is_true(entry.weight > 0 and entry.weight % 1 == 0)
-      assert.is_true(entry.basePrice > 0 and entry.basePrice % 1 == 0)
-      assert.are.equal(1, entry.multiplier)
-      assert.are.equal(false, entry.implemented)
-      weight = weight + entry.weight
-      priceExpectation = priceExpectation + entry.weight * entry.basePrice / 1000
-    end
-    assert.are.equal(1000, weight)
-    assert.near(166.075, priceExpectation, 0.00001)
-    assert.are.equal('金豆', box.Currency)
-    assert.are.equal(10, box.SinglePrice)
-    assert.are.equal(90, box.TenPrice)
-    assert.are.equal(49, box.Pity.afterMisses)
-    assert.are.equal(50, box.Pity.guaranteedDraw)
-    assert.are.equal(2, #box.Pity.prizeItemKeys)
-    assert.are.equal('极品美人鱼', box.Entries[1].itemName)
-    assert.are.equal('极品蛇颈龙', box.Entries[2].itemName)
-    assert.is_true(box.Entries[1].jackpot and box.Entries[2].jackpot)
   end)
 
   -- #203：内容表只承载内容。运行期写入一旦落在 require('common.cfg.Lottery') 返回的共享表上，
@@ -83,50 +60,10 @@ describe("TestContentCfg", function()
     assert.is_true(anchors == require('common.GameCfg').Lottery.MachineAnchors)
     assert.same({ 'Z1_Lottery', 'Z2_Lottery', 'Z3_Lottery', 'Z4_Lottery', 'Z5_Lottery', 'Z6_Lottery', 'Z7_Lottery' },
       anchors())
-  end)
-
-  it("test_lottery_has_seven_patterns_and_independent_prizes", function()
-    local lottery = require('common.cfg.Lottery')
-    assert.are.equal(7, #lottery.Patterns)
-    local weight = 0
-    for _, pattern in ipairs(lottery.Patterns) do
-      weight = weight + pattern.weight
-      assert.is_not_nil(pattern.source:match('^抽奖表!R%d+$'))
-      assert.is_true(pattern.pairMultiplier > 0)
-      assert.are.equal(true, pattern.implemented, pattern.source .. ' #138 起接入抽奖机')
-    end
-    assert.are.equal(100, weight)
-    assert.are.equal(2, lottery.Patterns[1].pairMultiplier)
-    assert.are.equal(20, lottery.Patterns[7].pairMultiplier)
-    assert.are.equal(5, #lottery.Patterns[1].tripleReward.itemKeys)
-    assert.are.equal(5, #lottery.Patterns[2].tripleReward.itemKeys)
-    assert.are.equal(5, #lottery.Patterns[3].tripleReward.itemKeys)
-    assert.are.equal('加速药水', lottery.Patterns[4].tripleReward.itemName)
-    assert.are.equal('exactlyTwo', lottery.PairRule)
-    assert.are.equal('tripleFirst', lottery.TripleRule)
-  end)
-
-  it("test_shop_rows_and_source_prices", function()
-    local shop = require('common.cfg.Shop')
-    assert.are.equal(50, #shop.Goods)
-    assert.are.equal(1, #shop.Excluded)
-    assert.are.equal(27, shop.Excluded[1].number)
-    local seen = {}
-    for _, goods in ipairs(shop.Goods) do
-      assert.is_not_nil(goods.source:match('^商店表!R%d+$'))
-      assert.is_nil(seen[goods.number], '重复编号 ' .. goods.number)
-      seen[goods.number] = true
-      assert.is_true(goods.price > 0 and goods.price % 1 == 0)
-      assert.is_true(goods.purchaseLimit >= 0 and goods.purchaseLimit % 1 == 0)
-      assert.is_true(goods.minShopLevel >= 1 and goods.minShopLevel <= 7)
-      assert.are_not.equal('夜明珠', goods.itemName)
-      assert.are_not.equal('背包升级7', goods.itemName)
-      assert.are.equal(true, goods.implemented, goods.source .. ' #130 起全量接入商店')
-    end
-    assert.is_nil(seen[27])
-    assert.are.equal('新手鱼竿', shop.Goods[14].itemName)
-    assert.are.equal(5, shop.Goods[14].price)
-    assert.are.equal('商店表!R15', shop.Goods[14].source)
+    -- 判奖口径只留两个字符串（common/LotteryDraw.lua 的判奖注释按它们写死）；权重、倍率、五件武器组、
+    -- 七图案数量等数值维度由 ContentValidation 覆盖，不再逐条重列。
+    assert.are.equal('exactlyTwo', content.PairRule)
+    assert.are.equal('tripleFirst', content.TripleRule)
   end)
 
   it("test_upgrades_are_once_per_level", function()

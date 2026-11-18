@@ -83,22 +83,42 @@ describe('TestBeachCombat', function()
 
     -- ===== 虎鲸 =====
 
-    it('test_orca_chase_failure_logs_module_fish_and_error', function()
-        local fish, damages = drop(env, 'fish40Boss', 20)
-        env.now = 0
-        env.mgr:Update()
-        breakPosition(fish)
+    -- 位移失败日志：追击失败（虎鲸 / 海象同口径）与海象突击位移失败都必须带模块名、鱼 id 与引擎错误
+    it('test_displacement_failures_log_module_fish_and_error', function()
+        for _, fishId in ipairs({ 'fish40Boss', 'fish39Elite' }) do
+            local fish, damages = drop(env, fishId, 20)
+            env.now = 0
+            env.mgr:Update()
+            breakPosition(fish)
+            local savedPrint, lines = capturePrint()
+            env.now = 1
+            local ok, err = pcall(function() env.mgr:Update() end)
+            _G.print = savedPrint
+            assert.is_true(ok, tostring(err))
+            local text = table.concat(lines, '\n')
+            assert.matches('[MgrFishUnit]', text, nil, true)
+            assert.matches('追击位移失败', text, nil, true)
+            assert.matches('fish=' .. tostring(fish.Id), text, nil, true)
+            assert.matches('position-write-failed', text, nil, true)
+            assert.same({}, damages)
+            env.mgr:Remove(fish)
+        end
+        -- 海象还有独立的突击位移失败日志
+        local chargeFish, chargeDamages = drop(env, 'fish39Elite', 20)
+        local move = startCharge(env, chargeFish)
+        chargeDamages = {}
+        breakPosition(chargeFish)
         local savedPrint, lines = capturePrint()
-        env.now = 1
+        env.now = move.At + GameCfg.FishCombat.walrus.ChargeWindupSec + 0.2
         local ok, err = pcall(function() env.mgr:Update() end)
         _G.print = savedPrint
         assert.is_true(ok, tostring(err))
         local text = table.concat(lines, '\n')
         assert.matches('[MgrFishUnit]', text, nil, true)
-        assert.matches('追击位移失败', text, nil, true)
-        assert.matches('fish=' .. tostring(fish.Id), text, nil, true)
+        assert.matches('突击位移失败', text, nil, true)
+        assert.matches('fish=' .. tostring(chargeFish.Id), text, nil, true)
         assert.matches('position-write-failed', text, nil, true)
-        assert.same({}, damages)
+        assert.same({}, chargeDamages)
     end)
 
     it('test_orca_claw_30_every_2s_in_bite_range', function()
@@ -405,47 +425,6 @@ describe('TestBeachCombat', function()
         env.mgr:Update()
         assert.same({}, damages, '挪到身后的目标不得被冲锋撞到')
         assert.near(params.ChargeDistance, fish.Carrier.Body.Position.z - bp.z, 1e-6)
-    end)
-
-    it('test_walrus_displacement_failures_log_module_fish_and_error', function()
-        -- 追击失败日志（与 #141 同口径）
-        local fish, damages = drop(env, 'fish39Elite', 20)
-        env.now = 0
-        env.mgr:Update()
-        breakPosition(fish)
-        local savedPrint, lines = capturePrint()
-        env.now = 1
-        local ok, err = pcall(function() env.mgr:Update() end)
-        _G.print = savedPrint
-        assert.is_true(ok, tostring(err))
-        local text = table.concat(lines, '\n')
-        assert.matches('[MgrFishUnit]', text, nil, true)
-        assert.matches('追击位移失败', text, nil, true)
-        assert.matches('fish=' .. tostring(fish.Id), text, nil, true)
-        assert.matches('position-write-failed', text, nil, true)
-        assert.same({}, damages)
-        env.mgr:Remove(fish)
-        -- 突击位移失败日志
-        fish, damages = drop(env, 'fish39Elite', 20)
-        local move = startCharge(env, fish)
-        damages = {}
-        breakPosition(fish)
-        lines = {}
-        _G.print = function(...)
-            local words = {}
-            for _, value in ipairs({ ... }) do words[#words + 1] = tostring(value) end
-            lines[#lines + 1] = table.concat(words, ' ')
-        end
-        env.now = move.At + GameCfg.FishCombat.walrus.ChargeWindupSec + 0.2
-        local ok2, err2 = pcall(function() env.mgr:Update() end)
-        _G.print = savedPrint
-        assert.is_true(ok2, tostring(err2))
-        local text2 = table.concat(lines, '\n')
-        assert.matches('[MgrFishUnit]', text2, nil, true)
-        assert.matches('突击位移失败', text2, nil, true)
-        assert.matches('fish=' .. tostring(fish.Id), text2, nil, true)
-        assert.matches('position-write-failed', text2, nil, true)
-        assert.same({}, damages)
     end)
 
     it('test_walrus_drop_chases_and_flees_at_180', function()

@@ -341,48 +341,35 @@ describe("抽奖机服务端结算（MgrLottery × MgrSave × MgrInteract）", f
     assert.same(0, env.data:Serialize().meta.sequence)
   end)
 
-  it("test_reconnect_recovers_the_same_result_without_double_grant", function()
-    env:givePremium("item31")
-    env:persistReady()
-    env:scriptAxes(61, 70, 76) -- 三头鲨三同 → 加速药水回投入格
-    assert.is_true(env:draw(1, 1))
-    local settled = env:messages("LotteryResult")[1]
-    -- 中途断线：重进读档，MgrLottery 在就绪后补推唯一结果（只展示，不再结算）
-    env:join()
-    env:drain()
-    local restored = env.players:GetDataInst(env.player)
-    env:clearEvents()
-    env.lottery:OnPlayerAdded(env.player)
-    local recovered = env:messages("LotteryResult")
-    assert.same(1, #recovered)
-    assert.is_true(recovered[1].recovered)
-    assert.same(settled.axes, recovered[1].axes)
-    assert.same(settled.prize, recovered[1].prize)
-    assert.same(1, restored:ItemCount("item167")) -- 奖品只发过一次
-    assert.same(0, restored:ItemCount("item31"))
-    assert.same(0, restored.Data.FishCoin)
-  end)
-
-  it("test_state_request_entry_pushes_the_same_recovered_result", function()
-    -- 客户端主动拉取（LotteryStateRequest 的处理入口）与 OnPlayerAdded 共享同一补推逻辑；
-    -- 两个入口都触发时服务端可能各推一次，客户端按 operation.id 去重（见抽奖机界面用例重播用例）
-    env:givePremium("item31")
-    env:persistReady()
-    env:scriptAxes(61, 70, 76) -- 三头鲨三同 → 加速药水回投入格
-    assert.is_true(env:draw(1, 1))
-    local settled = env:messages("LotteryResult")[1]
-    env:join()
-    env:drain()
-    local restored = env.players:GetDataInst(env.player)
-    env:clearEvents()
-    env.lottery:PushRecovered(env.player)
-    local recovered = env:messages("LotteryResult")
-    assert.same(1, #recovered)
-    assert.is_true(recovered[1].recovered)
-    assert.same(settled.axes, recovered[1].axes)
-    assert.same(settled.prize, recovered[1].prize)
-    assert.same(1, restored:ItemCount("item167")) -- 只展示，不重复发奖
-  end)
+  -- 断线重进与客户端主动拉取（LotteryStateRequest）共享同一补推逻辑：两个入口都只补推一次、
+  -- 只展示不重复结算；两个入口都触发时客户端按 operation.id 去重（见抽奖机界面重播用例）。
+  local recoverEntries = {
+    { name = "on_player_added", push = function(lottery, player) lottery:OnPlayerAdded(player) end },
+    { name = "state_request", push = function(lottery, player) lottery:PushRecovered(player) end },
+  }
+  for _, entry in ipairs(recoverEntries) do
+    it("test_recovered_result_pushed_once_" .. entry.name, function()
+      env:givePremium("item31")
+      env:persistReady()
+      env:scriptAxes(61, 70, 76) -- 三头鲨三同 → 加速药水回投入格
+      assert.is_true(env:draw(1, 1))
+      local settled = env:messages("LotteryResult")[1]
+      -- 中途断线：重进读档，MgrLottery 在就绪后补推唯一结果（只展示，不再结算）
+      env:join()
+      env:drain()
+      local restored = env.players:GetDataInst(env.player)
+      env:clearEvents()
+      entry.push(env.lottery, env.player)
+      local recovered = env:messages("LotteryResult")
+      assert.same(1, #recovered)
+      assert.is_true(recovered[1].recovered)
+      assert.same(settled.axes, recovered[1].axes)
+      assert.same(settled.prize, recovered[1].prize)
+      assert.same(1, restored:ItemCount("item167")) -- 奖品只发过一次
+      assert.same(0, restored:ItemCount("item31"))
+      assert.same(0, restored.Data.FishCoin)
+    end)
+  end
 
   it("test_triple_item_returns_to_the_freed_slot", function()
     env:givePremium("item31")

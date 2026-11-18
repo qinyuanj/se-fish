@@ -143,50 +143,49 @@ describe("持有操作的服务端分发", function()
     end)
 
     -- 切手持与实际使用分两次：首次只切手持不消费，再次才经 Vitals 吃掉。
+    -- 两条入口同一 happy path：非持久直接改会话数据；持久走 MgrSave 的 ResolveRequest+Execute，
+    -- 两步语义整体落在隔离 draft 上（回包与副作用一致，额外核对解析出的操作种类）。
     it("test_operate_eat_first_hold_then_eat", function()
-        assert.is_true(ctx.data:AddItem('carp', 1.37))
-        local first = operate({ action = 'Operate', op = 'eat', slot = 1 })
-        assert.same({ ok = true, op = 'eat', held = true }, first)
-        assert.same(0, #ctx.eaten)
-        assert.same({ kind = 'slot', id = 'carp', slot = 1 }, ctx.data:GetItemBarSnapshot().held)
-        local second = operate({ action = 'Operate', op = 'eat', slot = 1 })
-        assert.same({ ok = true, op = 'eat', held = false, itemId = 'carp' }, second)
-        assert.same(1, #ctx.eaten)
-        assert.same('carp', ctx.eaten[1].itemId)
-        assert.is_nil(ctx.data:GetItemBarSnapshot().held.kind)
-        assert.is_nil(ctx.data:GetItemBarSnapshot().slots[1])
-        -- 吃完再点：格已空，明确拒绝
-        local third = operate({ action = 'Operate', op = 'eat', slot = 1 })
-        assert.same({ ok = false, reason = 'empty' }, third)
-        assert.same(1, #ctx.eaten)
-    end)
-
-    -- 持久模式：走 MgrSave 的 ResolveRequest+Execute；两步语义整体落在隔离 draft 上。
-    it("test_operate_persistent_path_resolves_and_executes", function()
-        local resolvedKinds = {}
-        Mgr.Save = {
-            ResolveRequest = function(_, player, data, kind, requestId)
-                resolvedKinds[#resolvedKinds + 1] = kind
-                return { id = '34010:' .. tostring(#resolvedKinds), sequence = #resolvedKinds,
-                    kind = kind, requestKey = 'k' .. tostring(#resolvedKinds) }, 'new'
-            end,
-            Execute = function(_, player, data, operation, transform, done)
-                local result, reason = transform(data)
-                if result == nil then done(false, reason) return false end
-                done(true, result)
-                return true
-            end,
+        local entries = {
+            { name = 'direct', persistent = false },
+            { name = 'persistent', persistent = true },
         }
-        assert.is_true(ctx.data:AddItem('carp', 1.37))
-        local first = operate({ action = 'Operate', op = 'eat', slot = 1, seq = 1 })
-        assert.same({ 'operate:eat' }, resolvedKinds)
-        assert.same({ ok = true, op = 'eat', held = true }, first)
-        assert.same(0, #ctx.eaten)
-        local second = operate({ action = 'Operate', op = 'eat', slot = 1, seq = 2 })
-        assert.same({ ok = true, op = 'eat', held = false, itemId = 'carp' }, second)
-        assert.same(1, #ctx.eaten)
-        assert.same('carp', ctx.eaten[1].itemId)
-        Mgr.Save = nil
+        for _, entry in ipairs(entries) do
+            local resolvedKinds = {}
+            if entry.persistent then
+                Mgr.Save = {
+                    ResolveRequest = function(_, player, data, kind, requestId)
+                        resolvedKinds[#resolvedKinds + 1] = kind
+                        return { id = '34010:' .. tostring(#resolvedKinds), sequence = #resolvedKinds,
+                            kind = kind, requestKey = 'k' .. tostring(#resolvedKinds) }, 'new'
+                    end,
+                    Execute = function(_, player, data, operation, transform, done)
+                        local result, reason = transform(data)
+                        if result == nil then done(false, reason) return false end
+                        done(true, result)
+                        return true
+                    end,
+                }
+            end
+            local eatenBefore = #ctx.eaten
+            assert.is_true(ctx.data:AddItem('carp', 1.37))
+            local first = operate({ action = 'Operate', op = 'eat', slot = 1, seq = 1 })
+            if entry.persistent then assert.same({ 'operate:eat' }, resolvedKinds) end
+            assert.same({ ok = true, op = 'eat', held = true }, first)
+            assert.same(eatenBefore, #ctx.eaten)
+            assert.same({ kind = 'slot', id = 'carp', slot = 1 }, ctx.data:GetItemBarSnapshot().held)
+            local second = operate({ action = 'Operate', op = 'eat', slot = 1, seq = 2 })
+            assert.same({ ok = true, op = 'eat', held = false, itemId = 'carp' }, second)
+            assert.same(eatenBefore + 1, #ctx.eaten)
+            assert.same('carp', ctx.eaten[#ctx.eaten].itemId)
+            assert.is_nil(ctx.data:GetItemBarSnapshot().held.kind)
+            assert.is_nil(ctx.data:GetItemBarSnapshot().slots[1])
+            -- 吃完再点：格已空，明确拒绝
+            local third = operate({ action = 'Operate', op = 'eat', slot = 1, seq = 3 })
+            assert.same({ ok = false, reason = 'empty' }, third)
+            assert.same(eatenBefore + 1, #ctx.eaten)
+            Mgr.Save = nil
+        end
     end)
 
     -- 持久模式重放：同 seq 重试只回原结果，不重复扣食。

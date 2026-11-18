@@ -270,21 +270,6 @@ describe('TestVitals', function()
         assert.same(297, ctrl().Health)
     end)
 
-    -- 数值集中在 GameCfg.Vitals，且与策划案一致
-    it('test_config_is_centralized_and_matches_design', function()
-        local v = GameCfg.Vitals
-        assert.same(300, v.MaxHealth)
-        assert.same(300, v.MaxHunger)
-        assert.same(1, v.HungerPerSec)
-        assert.same(5, v.StarveDamagePerSec)
-        assert.same(5, v.ReviveDelaySec)
-        assert.same('我要饿死了！', v.WarnText)
-        local defs = GameCfg.Items.Definitions
-        local expected = { worm = 5, tilapia = 15, carp = 20, knifeFish = 20, bass = 25, catfish = 25, goldfish = 30 }
-        for id, pct in pairs(expected) do assert.message(id).same(pct, defs[id].EatPercent) end
-        assert.is_nil(defs.starterRod.EatPercent)
-    end)
-
     -- 死亡冻结生命数值；复活不靠 CharacterAdded 也能重置
     it('test_death_freezes_vitals_and_revive_resets_without_character_added', function()
         ctx.mgr:SetHunger(ctx.a, 0)

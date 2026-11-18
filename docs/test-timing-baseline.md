@@ -6,6 +6,10 @@
 > **测量环境**：测量期间蛋仔编辑器客户端 `client` 进程未运行。编辑器跑地图时同一套件实测慢约 2×（`client` 进程占满 CPU），任何后续基线与本次对比前须先确认编辑器状态，否则没有可比性。
 > **文件名**：本报告写于 `qa-slot` 改名之前，文中的 `acceptance_slot_*` 即现在的 `qa_slot_*`，数字不受影响。
 > **已过时项**：文中反复出现的 pre-commit hook（`tools/hooks/pre-commit`）已随 [ADR-0018](adr/0018-delete-pre-commit-hook.md) 删除，`slow/pre_commit_hook_test.lua`（15.016 s / 12 用例）一并移除；本仓现在没有任何提交时的自动检查。
+>
+> **2026-11-18 当日复测（本文写完之后的第二批次改动）**：`test fast` 连跑五轮 **9.44 / 7.45 / 7.56 / 7.95 / 8.61 s，中位 7.95 s / 1490 用例 / 132 文件**（0 失败 0 错误 0 待定）；`test full` 一轮 **10.5 s / 1518 用例**。同一批改动里：`main_hud_layout_test` 的参数矩阵从 16 组全组合降为 8 组两两覆盖，并把断言消息改成只在失败分支里格式化（文件级 2825 ms → 176 ms，这是本批次最大的一笔）；三份 `*_island_cfg_test` 合并成 `island_content_test`；另外删掉 8 个低价值测试文件、收缩十余处重复用例，用例数由 1552 降到 1490。本文 §10.3 的第一条建议（`arch_policy_test` 的文件级 `Arch.scan` 缓存）**在写下时就已经落地**，`arch_policy_test` 现在仍占约 0.75 s，全部是那一次全树扫描本身。
+>
+> 第 4~7 节的逐文件表、`cases.csv`、`files.csv` 仍是提交 `4eb7b67` 的快照：它们包含本日删除的 8 个文件与 `pre_commit_hook_test` 等更早移除的文件行，**不要当现状读**。要新基线，须用 §9.1 的命令重跑（`tmp/timing/*` 是一次性脚本，已不在仓库里，需要重写）。
 
 ## 0. 摘要
 
@@ -93,7 +97,7 @@
 | 整套件总耗时 | ±15.6 ms / 34 s ≈ ±0.05% | 可以 |
 | 单文件端到端 wall（外部） | ±(进程启动 93–142 ms) + 抖动 | 小文件的 wall 几乎全是启动成本，不代表测试本身 |
 
-单文件进程启动成本实测：`busted --run=fast --filter=__no_such_case__ tests/native/ability_api_test.lua` → wall 93/142 ms（0 用例）；`lua -e "print(1)"` → 36–86 ms。逐文件表的 wall 与进程内耗时之差（中位 **116 ms**）就是这个成本。
+单文件进程启动成本实测：`busted --run=fast --filter=__no_such_case__ tests/native/cfg_shop_lottery_test.lua` → wall 93/142 ms（0 用例）；`lua -e "print(1)"` → 36–86 ms。逐文件表的 wall 与进程内耗时之差（中位 **116 ms**）就是这个成本。
 
 ### 2.3 环境
 

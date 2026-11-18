@@ -60,4 +60,21 @@ describe('TestAttrGrowth', function()
         -- 小数按 BodyScale 同口径取整：1.5 个按 1 个算
         assert.near(1.1, AttrGrowth.SpeedFactor(1.5), 1e-9)
     end)
+
+    -- 属性投影（common/AttrModel.lua 的 35 行实现）只组合既有成长与商店真源，不另算一份：
+    -- 体型与血量上限走 BodyScale.Plan，移速走 AttrGrowth 口径，武器强化走 Shop.DamageScale，
+    -- 饥饿上限钳到 Vitals.MaxHunger。并入自 tests/native/attr_model_test.lua（原 2 例）。
+    it('test_attr_model_projection_reuses_growth_and_shop_sources', function()
+        local AttrModel = require('common.AttrModel')
+        local BodyScale = require('common.BodyScale')
+        local plan = AttrModel.Plan({ bodyPotions = 2, speedPotions = 3, baseSpeed = 7, moveMultiplier = 0.35, hunger = 500 })
+        assert.same(BodyScale.Plan(2).Scale, plan.Body.Scale)
+        assert.same(plan.Body.Health - GameCfg.Ability.BodyScale.HealthBase, plan.Attributes.PlayerMaxHealth.BaseExtra)
+        assert.near(AttrGrowth.SpeedFactor(3) * 0.35 - 1, plan.Attributes.PlayerWalkSpeed.Ratio, 1e-9)
+        assert.same(GameCfg.Vitals.MaxHunger, plan.Attributes.PlayerHunger.Base)
+        local component = AttrModel.WeaponComponents('melee', 7)
+        assert.same(1, component.Base)
+        assert.near(GameCfg.Shop.DamageScale('melee', 7) - 1, component.Ratio, 1e-9)
+        assert.same({ Base = 1, BaseExtra = 0, Ratio = 0, Bonus = 0 }, AttrModel.WeaponComponents('unknown', 99))
+    end)
 end)

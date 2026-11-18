@@ -1,6 +1,6 @@
--- #122 失败方式：漏鱼/漏物/漏商店行、重复原表编号、普通与极品同号被覆盖；
--- 鱼饵或掉落物悬空、七区精英信物/首领饵/首领信物断链；价格、权重、限购无效；
--- 夜明珠进入金币商店、作废升级或旧奖池混入；未接入行为误标为已实现。
+-- #122 失败方式：把兑换链或鱼种掉落改成悬空引用后，Check 必须报出原始表行
+-- （物品表!R8 / 钓鱼表!R14），不能静默放行，也不能只报「有错」而不给定位。
+-- 全量配置零错误与各表计数由 lua tools/validate_content.lua 接手（它就是同一 Check 的入口）。
 -- 迁移自 tests/gameplay/content_validation_test.lua（#83）；案例顺序沿用旧入口的方法名字典序。
 local Validate = require('common.ContentValidation')
 local cfg = require('common.GameCfg')
@@ -13,22 +13,6 @@ describe("TestContentValidation", function()
     local result = Validate.Check(cfg)
     cfg.Content.Exchanges[1].BossBait = original
     assert.matches('missing-bait', table.concat(result.errors, '\n'), nil, true)
-  end)
-
-  it("test_duplicate_source_id_reports_both_rows", function()
-    local old = cfg.Items.Definitions.item7.SourceId
-    cfg.Items.Definitions.item7.SourceId = 8
-    local result = Validate.Check(cfg)
-    cfg.Items.Definitions.item7.SourceId = old
-    assert.matches('物品表!R8', table.concat(result.errors, '\n'), nil, true)
-    assert.matches('物品表!R9', table.concat(result.errors, '\n'), nil, true)
-  end)
-
-  it("test_full_catalog_has_no_reference_errors", function()
-    local result = Validate.Check(cfg)
-    assert.same({}, result.errors)
-    assert.same({ zones = 7, fish = 98, items = 171,
-      shop = 50, lottery = 7, blindbox = 42, lotteryWeight = 100, blindboxWeight = 1000 }, result.counts)
   end)
 
   it("test_missing_drop_reports_original_row", function()

@@ -96,32 +96,37 @@ describe("道具栏的请求流", function()
         Mgr:OnPlayerRemoving(other)
     end)
 
-    it("test_cast_consumption_broadcasts_and_clears_last_bait", function()
+    -- 请求通道的回包面：每个有效动作（含数据层直接消耗与客户端主动拉取）都推一次新的
+    -- ItemBarState，客户端靠它刷新选中与鱼饵。选中 / 消耗 / 清选中的数据层规则由 item_bar_test 覆盖，
+    -- 这里只守住回包与广播这个增量断言面。
+    it("test_actions_reply_and_broadcast_state", function()
+        local action = ctx.events.ItemBarAction.OnServerEvent
         local data = Mgr:GetDataInst(ctx.player)
         data:UpdateData(function(state) state.Bait.worm = 1 end, true)
-        ctx.events.ItemBarAction.OnServerEvent:Fire(ctx.player, { action = 'SelectBait', value = 'worm' })
-        assert.same(1, ctx.player.lastState.bait.worm)
-        assert.same('worm', ctx.player.lastState.selectedBait)
-        local previous = ctx.player.lastState
-        local ok, itemId = data:ConsumeSelectedBait()
-        assert.is_true(ok)
-        assert.same('worm', itemId)
-        assert.is_not.equal(ctx.player.lastState, previous)
-        assert.same(0, ctx.player.lastState.bait.worm)
-        assert.is_nil(ctx.player.lastState.selectedBait)
-    end)
-
-    it("test_client_commands_are_authoritative_and_state_replies", function()
-        local action = ctx.events.ItemBarAction.OnServerEvent
         action:Fire(ctx.player, { action = 'SelectSlot', value = 1 })
         assert.same(1, ctx.player.lastState.selectedSlot)
         action:Fire(ctx.player, { action = 'SelectBait', value = 'worm' })
-        assert.same(10, ctx.player.lastState.bait.worm)
+        assert.same('worm', ctx.player.lastState.selectedBait)
+        assert.same(1, ctx.player.lastState.bait.worm)
+        local previous = ctx.player.lastState
         action:Fire(ctx.player, { action = 'EatBait', value = 'worm' })
-        assert.same(9, ctx.player.lastState.bait.worm)
-        action:Fire(ctx.player, { action = 'SelectSlot', value = 2 })
-        assert.is_nil(ctx.player.lastState.selectedSlot)
+        assert.is_not.equal(ctx.player.lastState, previous) -- 吃完推新状态
+        assert.same(0, ctx.player.lastState.bait.worm)
+        assert.is_nil(ctx.player.lastState.selectedBait)
+        -- 数据层直接消耗（抛竿）同样广播，不必等下一次动作
+        data:UpdateData(function(state) state.Bait.worm = 1 end, true)
+        action:Fire(ctx.player, { action = 'SelectBait', value = 'worm' })
+        previous = ctx.player.lastState
+        assert.is_true((data:ConsumeSelectedBait()))
+        assert.is_not.equal(ctx.player.lastState, previous)
+        assert.same(0, ctx.player.lastState.bait.worm)
+        assert.is_nil(ctx.player.lastState.selectedBait)
+        -- 客户端主动拉取：回包带上当前选中
+        data:UpdateData(function(state) state.Bait.worm = 1 end, true)
+        action:Fire(ctx.player, { action = 'SelectBait', value = 'worm' })
+        previous = ctx.player.lastState
         ctx.events.RequestItemBar.OnServerEvent:Fire(ctx.player)
+        assert.is_not.equal(ctx.player.lastState, previous)
         assert.same('worm', ctx.player.lastState.selectedBait)
     end)
 
@@ -184,18 +189,6 @@ describe("道具栏的请求流", function()
         end)
         Mgr.Vitals = nil
         if not ok then error(err, 0) end
-    end)
-
-    it("test_eating_last_selected_bait_broadcasts_clear", function()
-        local data = Mgr:GetDataInst(ctx.player)
-        data:UpdateData(function(state) state.Bait.worm = 1 end, true)
-        local action = ctx.events.ItemBarAction.OnServerEvent
-        action:Fire(ctx.player, { action = 'SelectBait', value = 'worm' })
-        local sent = ctx.player.stateCount
-        action:Fire(ctx.player, { action = 'EatBait', value = 'worm' })
-        assert.same(sent + 1, ctx.player.stateCount)
-        assert.same(0, ctx.player.lastState.bait.worm)
-        assert.is_nil(ctx.player.lastState.selectedBait)
     end)
 
     it("test_external_item_depletion_broadcasts_state", function()
