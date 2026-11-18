@@ -2,7 +2,7 @@
   "version": 1,
   "standardTools": {
     "sourceRoots": ["client", "common", "server"],
-    "exclude": ["server/_trigger"],
+    "exclude": ["server/_trigger", "client/packages", "common/packages", "server/packages"],
     "mutatorOptions": ["--busted-task", "fast"]
   }
 }

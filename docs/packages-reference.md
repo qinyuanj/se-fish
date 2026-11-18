@@ -1,6 +1,6 @@
 # 官方包接入参考
 
-三端 `packages/` 保存网易官方作者版包；包内模块路径依赖 `server/`、`client/`、`common/` 同名子树布局。
+三端 `packages/` 保存整包交付的库：官方包随官方整包更新，自研包由本仓维护；包内模块路径依赖 `server/`、`client/`、`common/` 同名子树布局。
 
 ## 镜像与升级
 
@@ -50,9 +50,22 @@
 
 `win_rule` 于 2026-10-09 从宿主删除并经回灌移除，删除前未接入业务聚合入口或正式结算。原包有结算枚举遮蔽（[GitHub #58](https://github.com/qinyuanj/se-fish/issues/58)）及未结算玩家离开后缺少全员结算重判（[GitHub #59](https://github.com/qinyuanj/se-fish/issues/59)）的问题。删除不代表缺陷已修复，重新引入须取得官方修正版并验证结算与玩家离开时序。
 
+## 自研包
+
+`spoke` 是第一个自研包，也是第一个非官方来源的 `packages/` 条目，引入方式见 [ADR-0022](adr/0022-introduce-spoke-runtime.md)。
+
+| 项 | 值 |
+|---|---|
+| 用途 | 响应式运行时与生命周期管理（Epoch / Ticker / SpokeTree / Dock / Trigger / State / Effect / Memo / Phase） |
+| 落位 | `common/packages/spoke/`，门面 `require("common.packages.spoke.api")` |
+| 上游 | 同级仓库 `spoke` |
+| 上游 commit | `19f10099a1e5f3624a128e22727aab368f6c6d29`（2026-11-18）；纯拷贝，一次同步记一个 SHA；库与 `.dsh/skills/spoke/` 技能必须同源 |
+| 升级 | 从上游检出整体重拷 `common/packages/spoke/` 与技能，再更新本表 SHA |
+| 约束 | 不就地修改包内文件；不搬上游 `tests/`；不改写上游技能 |
+
 ## 架构图上的位置
 
-三端 `packages/` 属于业务范围：在图上按真实命名空间（如 `server.packages.<包名>.*`）建类，与其他业务模块一样连依赖、上指标；`policy.edn` 不为包写 `:foreign` 或排除项，新增包无需改 policy。包内类不跑 mutation 基线，缺快照显红属已接受的代价。决策与后果见 [ADR-0010](adr/0010-packages-as-business-code.md)（取代 ADR-0005）。
+三端 `packages/` 不进业务范围：`uml-quality.json` 的 `exclude` 与 `policy.edn` 的 `:exclude` 都把包排除，质量工具不度量、架构图上不建类；业务对包的 `require` 经 `:foreign [client.packages common.packages server.packages]` 收成外部椭圆。分层门禁不跟着退：`tools/arch_policy.lua` 仍要求包内每个模块可分类，包内循环照旧豁免。决策与后果见 [ADR-0021](adr/0021-packages-outside-business-scope.md)（取代 [ADR-0010](adr/0010-packages-as-business-code.md)）。
 
 ## 编辑器预设依赖
 

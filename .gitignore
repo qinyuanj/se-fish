@@ -11,7 +11,12 @@
 /.claude/
 /.codemaker/
 /.codex/
-/.dsh/
+# .dsh/ 是 DSH 的会话技能目录，工具下发、可重新生成；唯一例外是 spoke——
+# 它的库与技能都由上游 spoke 仓库维护，必须同版本（ADR-0022）。
+/.dsh/*
+!/.dsh/skills/
+/.dsh/skills/*
+!/.dsh/skills/spoke/
 /.kimi-code/
 /.teamai/
 /.zcode/

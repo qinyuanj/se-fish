@@ -1,6 +1,8 @@
 # 0010 各端 packages/ 作为业务代码，质量工具与架构图共用业务范围
 
-**Status**: accepted（取代 [ADR-0005](0005-packages-as-external.md)）
+**Status**: superseded by [ADR-0021](0021-packages-outside-business-scope.md)（取代 [ADR-0005](0005-packages-as-external.md)）
+
+> 已被 [ADR-0021](0021-packages-outside-business-scope.md) 取代：`packages/` 退出业务范围，质量工具不度量、架构图不建类。下文保留为历史记录。
 
 > **出处迁移（#146 / #147 追加）**：下文「以 `tools/quality/project.json` 的 `sources` 为准」已过时——`tools/quality/` 随项目自建质量工具一并删除。业务范围的定义不变，真源改为根目录 `uml-quality.json` 的 `standardTools`（`sourceRoots` 与 `exclude`），由 uml-viewer 标准工具读取；决策与取舍见 [ADR-0011](0011-cli-single-entry-standard-quality-no-acceptance.md)。下文提到的 `tools/quality/README.md` 同样已删除，当前口径见 [开发工作流](../agents/workflow.md)「架构图」。
 

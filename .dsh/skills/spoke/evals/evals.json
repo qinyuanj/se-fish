@@ -1,0 +1,61 @@
+{
+  "skill_name": "spoke",
+  "evals": [
+    {
+      "id": 1,
+      "name": "roster-panel-auto-tree",
+      "prompt": "项目里已经落位了 common/packages/spoke/。我要做一个多人玩家列表面板：玩家 join/leave 时增删列表项，score State 变化时只更新对应分数；一次宿主事件可能同时改多个 State，面板销毁时必须完整清理。请写一个消费方 Lua 模块和简短使用说明。",
+      "expected_output": "一棵 Auto 树的消费方模块：join/leave 走静态 Trigger 驱动的结构 Effect，Dock 保住行身份，每行只跟踪自己的 score State，多写事件用 SpokeRuntime.batch 合并，销毁走 tree:dispose()；common/packages/spoke/ 零改动。",
+      "files": [],
+      "expectations": [
+        "使用 SpokeTree.spawn 建 Auto 树，并给出面板销毁时 tree:dispose() 的明确路径；没有把 Auto 改成宿主每帧 flush，也没有改动 common/packages/spoke/。",
+        "join/leave 结构变化通过静态 Trigger 驱动结构 Effect，在有效 builder 窗口内取得 Dock，宿主事件之后只用 dock:call / dock:drop 修改 keyed children；并说明未受影响的玩家行保留身份，不是整表重建。",
+        "每个玩家行用 s:d(score_state) 只跟踪自己的分数：写分只重跑该行，其余行不重建。",
+        "同一宿主事件的多 State 写入用深 require common.packages.spoke.runtime.spoke_runtime 的 SpokeRuntime.batch(fn) 合并，并说明不批会多次 flush。",
+        "销毁走 tree:dispose()，说明 detach 逆序清理整棵子树，销毁后再触发宿主事件是安全 no-op。"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "driver-and-scope-boundaries",
+      "prompt": "为了统一设计，我想把 spoke 仓库里的 SpokePool 和 ReadOnlyList 也引入这个项目，并让所有 Auto 树挂到 EVENT.REPEAT_TIMEOUT 每帧 flush。请给出落地方案。",
+      "expected_output": "识别这些要求与库的实际公共面和 Auto 语义冲突，把帧节拍与池化都留在消费方，并说明要改变库行为必须回 spoke 仓库。",
+      "files": [],
+      "expectations": [
+        "指出 SpokePool、ReadOnlyList 不在本版本公共面（api 导出的 13 个类）里，也不属于分发内容，不在 common/packages/spoke/ 里自行补。",
+        "拒绝把 Auto 树改成 EVENT.REPEAT_TIMEOUT 每帧 flush，并解释 Auto 是同步 inline flush、核心不读取宿主全局也不注册宿主计时器。",
+        "把帧节拍需求落到消费方 Manual 树（SpokeTree.spawn_manual 加 tick / flush）和消费方自己的节拍驱动上。",
+        "池化只在有具体性能测量时由消费方项目实现，不放进包树。",
+        "引用 spoke 仓库 docs/spec.md 与 ADR 0002、0003、0004 的适用依据，说明改变库行为要先回 spoke 仓库改规格与验收；未覆盖的点明确标为未核对。"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "panel-not-updating-after-join",
+      "prompt": "面板的 join 处理器里对 roster 表做了 table.insert，然后把同一个 State 再 set 一次，界面完全没有变化。请定位原因并给出修法。",
+      "expected_output": "定位到结构变化没有进入任何被跟踪的依赖：改同一个 table 不改变 State 的值，动态依赖不会因此重跑；修法是结构事件走静态 Trigger，同一事件的多写用 batch 合并，并用可观察手段验证。",
+      "files": [],
+      "expectations": [
+        "指出 table.insert 改的是同一个表，State 默认按 == 比较，写回同值被抑制；动态依赖不会因表内容变化重跑。",
+        "修法让 join/leave 走静态 Trigger（例如 s:effect(block, { roster_changed })）驱动结构挂载，而不是要求某个 signal 的值变化。",
+        "同一事件里的多次 State 写入用 SpokeRuntime.batch 包起来，避免同时依赖多个值的 Effect 重跑多次。",
+        "给出可观察的验证手段：事件日志区分 Init、Tick 与 frame-pop 调度，或检查 tree.fault，而不是只凭读代码断言修好。",
+        "修法不落进 common/packages/spoke/，也没有把 Auto 树改成宿主每帧 flush。"
+      ]
+    },
+    {
+      "id": 4,
+      "name": "effect-reaction-and-subscription-ownership",
+      "prompt": "我要写一个挂载时立刻运行、之后跟着 signal 重跑的块。同文件里还有个 Reaction，第一次挂载时一次都没跑，这是 bug 吗？另外 Effect 每轮重跑都会重新订阅，订阅会不会越积越多？",
+      "expected_output": "说明 Effect 首轮必跑、Reaction 首轮不跑是契约而非 bug，并说明每轮重跑先逆序清理上轮 attachments 再重建，订阅不会累积；累积说明清理缺失。",
+      "files": [],
+      "expectations": [
+        "说明 Effect 挂载即运行一次、依赖触发后重跑；Reaction 跳过首次运行，静态订阅在 mount 时已装好但 block 要等首次触发，两者不同不是 bug。",
+        "给出选择依据：需要首轮就运行用 Effect，首轮不运行才符合语义时用 Reaction。",
+        "说明每轮重跑先逆序清理上一轮的 cleanup、订阅、子 computation 和其他 attachments，再执行新 block，因此订阅不会累积；累积说明有清理缺失（例如窗口外手工订阅或绕过 s:subscribe / s:d）。",
+        "订阅交给本轮 ownership：builder 的 s:subscribe，或动态槽位 s:d 按读取位置换绑并裁剪本轮未读到的尾部槽位。",
+        "区分 tracker 回调次数与 block 运行次数，说明多次 schedule 合并成一次 Tick 是 Epoch 的职责，不是依赖跟踪去重。"
+      ]
+    }
+  ]
+}

@@ -188,6 +188,14 @@ _Avoid_: 官方库、官方资源包、third-party package
 **In-house package / 自研包**：本仓自研、以整包形式落位与升级的库，位于三端 `packages/` 下；不随官方更新，升级由本仓决定。
 _Avoid_: 自研库、第三方库、内置库、vendor 包、内部包
 
+## 官方资产
+
+**Asset table / 资产表**：官方按编辑器分类发布的资产目录数据，给出资产的名称、编号与外观描述；与工程导出的 `OfficialAsset.lua` 是两套独立口径。
+_Avoid_: 资产清单、资源表、资产列表
+
+**Two generations of IDs / 两代编号**：同一资产在资产表与工程导出中各自成号，名称也不构成子集，两者不能互相推导或合并。
+_Avoid_: 编号映射、ID 对照、编号兼容
+
 ## 工程与验收
 
 **Checkout / 仓库检出**：本仓的 Git 工作树（含 worktree），是唯一跑 Lua、测试与工具链的地方；仓库内路径一律相对、`/` 分隔，离开仓库写正斜杠加盘符。
@@ -196,7 +204,7 @@ _Avoid_: 开发端、本机、repo copy
 **Host directory / 宿主目录**：编辑器 `code init` 绑定的本地 Lua 工程目录，根有 `eggy.json`，是部署目的地；与仓库检出只经 `deploy` 与 `sync` 往来。
 _Avoid_: 部署端、本机、deploy target
 
-**Business scope / 业务范围**：质量工具与架构图共用的业务源码集合，含官方包；由根目录 `uml-quality.json` 的 `sourceRoots` 声明。
+**Business scope / 业务范围**：质量工具与架构图共用的业务源码集合，不含任何 `packages/` 子树（整包交付物另见**官方包**、**自研包**）；由根目录 `uml-quality.json` 的 `exclude` 与 `policy.edn` 的 `:exclude` 声明。
 _Avoid_: 业务树、指标采集范围、mutation 范围、scope（单独使用时）
 
 **Test lane / 测试车道**：按耗时划分的测试集合：fast 用于日常，full 追加慢用例、用于收尾。
