@@ -6,8 +6,15 @@ local PressGesture = require('client.PressGesture')
 local DamageFloat = require('client.DamageFloat')
 local FishCombatLabel = require('client.FishCombatLabel')
 local MainHudLayout = require('client.MainHudLayout')
+local OwnedUnits = require('common.OwnedUnits')
 
 local ScreenHandler = { UINodes = {}, UINodeMap = {} }
+
+-- #209：本界面建出来的节点一律登记在所有者名下，关屏时 OwnedUnits.Clear(self) 一次拆完，
+-- 私有桶不再是生命周期的第二套答案。瞄准拾取层例外——它每次长按建一个、松开立刻拆，
+-- 挂在主界面名下的话 EndAim 拆过一次登记表还留着它，关屏时会再拆一遍（登记表没有「取消登记」），
+-- 所以它有自己的所有者。
+local AIM_OWNER = {}
 
 function ScreenHandler:Action(action, value)
     _G.REUtil:GetRE('ItemBarAction'):FireServer({ action = action, value = value })
@@ -129,16 +136,15 @@ function ScreenHandler:BeginAim(slot)
     if not self.UIRoot or not self.EuiResolution then return end
     self.AimSlot = slot
     local resolution = self.EuiResolution
-    local overlay = World:CreateUnit('EUIButton', {
+    local overlay = OwnedUnits.Track(AIM_OWNER, World:CreateUnit('EUIButton', {
         Parent = self.UIRoot, Name = 'ThrowAimOverlay',
         Position = Vector2.New(resolution.x / 2, resolution.y / 2),
         Size = Vector2.New(resolution.x, resolution.y),
-    })
+    }))
     if not overlay then self.AimSlot = nil return end
     overlay.ButtonText = ''
     pcall(function() overlay.ButtonNormalColor = Color.New(30, 40, 30, 40) end)
     pcall(function() overlay.ButtonPressColor = Color.New(30, 40, 30, 60) end)
-    self.AimOverlay = overlay
     if _G.LocalMsgNotice then _G.LocalMsgNotice('点击屏幕选择投掷落点') end
     self:Listen(overlay.OnTouchEnded, function(touch) self:PickAim(touch) end)
 end
@@ -166,10 +172,7 @@ function ScreenHandler:PickAim(touch)
 end
 
 function ScreenHandler:EndAim()
-    if self.AimOverlay then
-        pcall(function() self.AimOverlay:Destroy() end)
-    end
-    self.AimOverlay = nil
+    OwnedUnits.Clear(AIM_OWNER) -- 拾取层名下的节点一次拆完；这一轮没建就是空操作
     self.AimSlot = nil
 end
 
@@ -665,11 +668,12 @@ function ScreenHandler:ShowCast()
     self:UpdateCastFeedback()
 end
 
-local function button(parent, name, x, y, width)
-    local btn = World:CreateUnit('EUIButton', {
+-- #209：建点的第一个参数是所有者，建完即登记；销毁只看 OwnedUnits.Clear(owner)，不再分桶记账。
+local function button(owner, parent, name, x, y, width)
+    local btn = OwnedUnits.Track(owner, World:CreateUnit('EUIButton', {
         Parent = parent, Name = name,
         Position = Vector2.New(x, y), Size = Vector2.New(width, 90),
-    })
+    }))
     btn.TouchEnabled = true
     btn.ButtonText = ''
     btn.NormalImage = 'official://image/11017'
@@ -679,12 +683,12 @@ local function button(parent, name, x, y, width)
     return btn
 end
 
-local function overlay(parent, name, x, y, width, height, text, size, color)
-    local label = World:CreateUnit('EUITextLabel', {
+local function overlay(owner, parent, name, x, y, width, height, text, size, color)
+    local label = OwnedUnits.Track(owner, World:CreateUnit('EUITextLabel', {
         Parent = parent, Name = name,
         Position = Vector2.New(x, y), Size = Vector2.New(width, height),
         Text = text, FontSize = size, TextColor = color,
-    })
+    }))
     -- #174 #18：按钮与提示文字在自身框内水平、垂直居中（枚举 Center = 1，同 LocalAttackButton）
     label.TextHorizontalAlignment = 1
     label.TextVerticalAlignment = 1
@@ -728,24 +732,21 @@ function ScreenHandler:BuildVitals(root, resolution, layout)
     }
     for _, spec in ipairs(rings) do
         local name, r = spec[1], spec[2]
-        local bg = passive(World:CreateUnit('EUIImage', {
+        local bg = passive(OwnedUnits.Track(self, World:CreateUnit('EUIImage', {
             Parent = root, Name = name .. 'RingBg',
             Position = Vector2.New(r.x, r.y), Size = Vector2.New(r.w, r.h), Image = c.RingBg,
-        }))
-        local ring = passive(World:CreateUnit('EUIProgressTimer', {
+        })))
+        local ring = passive(OwnedUnits.Track(self, World:CreateUnit('EUIProgressTimer', {
             Parent = root, Name = name .. 'Ring',
             Position = Vector2.New(r.x, r.y), Size = Vector2.New(r.w, r.h), Image = spec[3], Percent = 100,
-        }))
+        })))
         ring.Color = color(spec[4])
         ring.LocalZOrder = 1
-        local text = overlay(root, name .. 'Text', r.x, r.y, r.w, 40, '', vitalFontSize(r.w, c),
+        local text = overlay(self, root, name .. 'Text', r.x, r.y, r.w, 40, '', vitalFontSize(r.w, c),
             Color.New(255, 255, 255, 255))
         text.LocalZOrder = 2
         self[name .. 'Ring'] = ring
         self[name .. 'Text'] = text
-        self.Overlays[#self.Overlays + 1] = bg
-        self.Overlays[#self.Overlays + 1] = ring
-        self.Overlays[#self.Overlays + 1] = text
     end
     local t, w, h = c.FlashThickness, resolution.x, resolution.y
     local edges = {
@@ -754,15 +755,14 @@ function ScreenHandler:BuildVitals(root, resolution, layout)
     }
     self.FlashEdges = {}
     for _, spec in ipairs(edges) do
-        local edge = passive(World:CreateUnit('EUIImage', {
+        local edge = passive(OwnedUnits.Track(self, World:CreateUnit('EUIImage', {
             Parent = root, Name = spec[1],
             Position = Vector2.New(spec[2], spec[3]), Size = Vector2.New(spec[4], spec[5]), Image = c.FlashImage,
-        }))
+        })))
         edge.Color = color(c.FlashColor)
         edge.LocalZOrder = 3
         edge.Visible = false
         self.FlashEdges[#self.FlashEdges + 1] = edge
-        self.Overlays[#self.Overlays + 1] = edge
     end
 end
 
@@ -853,44 +853,36 @@ function ScreenHandler:BuildBackpack(root, layout)
     self.BackpackOpen = false
     self.BackpackSlots = {}
     self.BackpackSlotPos = {}
-    self.BackpackButton = button(root, 'BtnBackpack', entry.x, entry.y, entry.w)
+    self.BackpackButton = button(self, root, 'BtnBackpack', entry.x, entry.y, entry.w)
     self.BackpackButton.Size = Vector2.New(entry.w, entry.h)
-    self.BackpackLabel = overlay(root, 'LabelBackpack', entry.x, entry.y, entry.w, entry.h,
+    self.BackpackLabel = overlay(self, root, 'LabelBackpack', entry.x, entry.y, entry.w, entry.h,
         '背包', 22, Color.New(255, 255, 255, 255))
-    self.BackpackPanel = button(root, 'BackpackPanel', center, cy, panelRect.w)
+    self.BackpackPanel = button(self, root, 'BackpackPanel', center, cy, panelRect.w)
     self.BackpackPanel.Size = Vector2.New(panelRect.w, panelRect.h)
     self.BackpackPanel.TouchEnabled = false
     -- #174 #14：面板用深色，背包格用浅色，空格不再只剩一个「空」字
     self.BackpackPanel.ButtonNormalColor = Color.New(30, 46, 66, 240)
-    self.BackpackTitle = overlay(root, 'BackpackTitle', center, cy + 290, 700, 48,
+    self.BackpackTitle = overlay(self, root, 'BackpackTitle', center, cy + 290, 700, 48,
         '选择背包物品，再转入道具栏', 28, Color.New(255, 255, 255, 255))
     for index = 1, GameCfg.Items.MaxBackpackSlots do
         local col, row = (index - 1) % 8, math.floor((index - 1) / 8)
         local x, y = center - 350 + col * 100, cy + 200 - row * 100
-        local btn = button(root, 'BackpackSlot' .. index, x, y, 95)
+        local btn = button(self, root, 'BackpackSlot' .. index, x, y, 95)
         btn.Size = Vector2.New(95, 90)
         btn.ButtonNormalColor = Color.New(120, 168, 200, 255)
-        local label = overlay(root, 'BackpackLabel' .. index, x, y, 95, 80,
+        local label = overlay(self, root, 'BackpackLabel' .. index, x, y, 95, 80,
             '', 19, Color.New(255, 255, 255, 255))
         self.BackpackSlots[index] = { Button = btn, Label = label }
         self.BackpackSlotPos[index] = { x = x, y = y }
         self:bindDrag(btn, GameCfg.Items.ContainerId.Backpack, index)
-        self.Buttons[#self.Buttons + 1] = btn
-        self.Overlays[#self.Overlays + 1] = label
         self:Listen(btn.OnClicked, function()
             self.SelectedBackpackSlot = index
             self:ShowBackpack()
         end)
     end
-    self.MoveButton = button(root, 'BtnMoveToItemBar', center, cy - 310, 330)
-    self.MoveLabel = overlay(root, 'LabelMoveToItemBar', center, cy - 310, 330, 70,
+    self.MoveButton = button(self, root, 'BtnMoveToItemBar', center, cy - 310, 330)
+    self.MoveLabel = overlay(self, root, 'LabelMoveToItemBar', center, cy - 310, 330, 70,
         '转入道具栏', 26, Color.New(255, 255, 255, 255))
-    self.Buttons[#self.Buttons + 1] = self.BackpackButton
-    self.Buttons[#self.Buttons + 1] = self.BackpackPanel
-    self.Buttons[#self.Buttons + 1] = self.MoveButton
-    self.Overlays[#self.Overlays + 1] = self.BackpackLabel
-    self.Overlays[#self.Overlays + 1] = self.BackpackTitle
-    self.Overlays[#self.Overlays + 1] = self.MoveLabel
     self:Listen(self.BackpackButton.OnClicked, function()
         self.BackpackOpen = not self.BackpackOpen
         self.SelectedBackpackSlot = nil
@@ -988,7 +980,7 @@ function ScreenHandler:BuildEquipBars(root, layout)
     self.PopupPool = {}
     self.PopupPlates = {}
     local w, h = self.EuiResolution.x, self.EuiResolution.y
-    self.PopupDismiss = button(root, 'PopupDismiss', w / 2, h / 2, w)
+    self.PopupDismiss = button(self, root, 'PopupDismiss', w / 2, h / 2, w)
     self.PopupDismiss.Size = Vector2.New(w, h)
     -- 只接点击、不挡画面：带色块图时引擎不认颜色 alpha，会把整屏盖成深色（#178 试玩实测），
     -- 所以去掉图片并全透明；去图后仍可点中（同轮试玩实测点空白可关闭）
@@ -1000,26 +992,22 @@ function ScreenHandler:BuildEquipBars(root, layout)
     self.PopupDismiss.LocalZOrder = 4
     self.PopupDismiss.Visible = false
     self.PopupDismiss.TouchEnabled = false
-    self.Buttons[#self.Buttons + 1] = self.PopupDismiss
     self:Listen(self.PopupDismiss.OnClicked, function() self:ClosePopup() end)
     for _, kind in ipairs({ 'Weapon', 'Bait' }) do
         local r = layout.Rects[kind .. 'Bar']
-        local btn = button(root, kind .. 'Bar', r.x, r.y, r.w)
+        local btn = button(self, root, kind .. 'Bar', r.x, r.y, r.w)
         place(btn, r)
         btn.LocalZOrder = 6
-        local label = overlay(root, kind .. 'BarLabel', r.x, r.y, r.w, r.h, '', CELL_FONT, Color.New(255, 255, 255, 255))
+        local label = overlay(self, root, kind .. 'BarLabel', r.x, r.y, r.w, r.h, '', CELL_FONT, Color.New(255, 255, 255, 255))
         label.LocalZOrder = 7
-        self.Buttons[#self.Buttons + 1] = btn
-        self.Overlays[#self.Overlays + 1] = label
         self.EquipBars[kind] = { Button = btn, Label = label }
         self:Listen(btn.OnClicked, function() self:TogglePopup(kind) end)
-        local plate = passive(World:CreateUnit('EUIImage', {
+        local plate = passive(OwnedUnits.Track(self, World:CreateUnit('EUIImage', {
             Parent = root, Name = kind .. 'Popup', Position = Vector2.New(r.x, r.y), Size = Vector2.New(r.w, r.h),
             Image = 'official://image/11017', Color = Color.New(16, 24, 34, 200),
-        }))
+        })))
         plate.LocalZOrder = 5
         plate.Visible = false
-        self.Overlays[#self.Overlays + 1] = plate
         self.PopupPlates[kind] = plate
         self.PopupPool[kind] = {}
     end
@@ -1029,13 +1017,11 @@ end
 function ScreenHandler:PopupCell(kind, key)
     local pool = self.PopupPool[kind]
     if pool[key] then return pool[key] end
-    local btn = button(self.UIRoot, kind .. 'PopupCell_' .. key, 0, 0, 80)
+    local btn = button(self, self.UIRoot, kind .. 'PopupCell_' .. key, 0, 0, 80)
     btn.LocalZOrder = 6
-    local label = overlay(self.UIRoot, kind .. 'PopupLabel_' .. key, 0, 0, 80, 80, '', CELL_FONT,
+    local label = overlay(self, self.UIRoot, kind .. 'PopupLabel_' .. key, 0, 0, 80, 80, '', CELL_FONT,
         Color.New(255, 255, 255, 255))
     label.LocalZOrder = 7
-    self.Buttons[#self.Buttons + 1] = btn
-    self.Overlays[#self.Overlays + 1] = label
     self:Listen(btn.OnClicked, function() self:ChoosePopup(kind, key) end)
     pool[key] = { Button = btn, Label = label }
     return pool[key]
@@ -1193,11 +1179,9 @@ function ScreenHandler:Cleanup()
     self:CloseScreen()
     LocalAttackButton:Destroy()
     for _, connection in ipairs(self.Connections or {}) do connection:Disconnect() end
-    for _, node in ipairs(self.Overlays or {}) do node:Destroy() end
-    for _, slot in ipairs(self.Slots or {}) do slot.Background:Destroy() end
-    for _, node in ipairs(self.Buttons or {}) do node:Destroy() end
+    -- #209：本界面建的全部节点都记在所有者名下，这里一次清空；私有表不再参与销毁。
+    OwnedUnits.Clear(self)
     self.Connections = nil
-    self.Overlays = nil
     self.Slots = nil
     self.ItemBarSlotPos = nil
     self.BackpackSlots = nil
@@ -1218,7 +1202,6 @@ function ScreenHandler:Cleanup()
     self.MoveButton = nil
     self.MoveLabel = nil
     self.SelectedBackpackSlot = nil
-    self.Buttons = nil
     self.BtnDiscard = nil
     self.BtnItemAction = nil
     self.BtnReelClose = nil
@@ -1296,29 +1279,24 @@ function ScreenHandler:Init()
     placeEditorNode(self.LabelCoin, rects.CoinLabel)
     self.Slots = {}
     self.ItemBarSlotPos = {}
-    self.Buttons = {}
     self.Connections = {}
-    self.Overlays = {}
     for index = 1, count do
         local cell = layout.ItemBarSlots[index]
-        local background = button(root, 'ItemBarSlot' .. index, cell.x, cell.y, cell.w)
-        local icon = World:CreateUnit('EUIImage', {
+        local background = button(self, root, 'ItemBarSlot' .. index, cell.x, cell.y, cell.w)
+        local icon = OwnedUnits.Track(self, World:CreateUnit('EUIImage', {
             Parent = root, Name = 'ItemBarIcon' .. index,
             Position = Vector2.New(cell.x, cell.y), Size = Vector2.New(cell.w, cell.h),
-        })
+        }))
         icon.TouchEnabled = false
         icon.SwallowTouchEnabled = false
         icon.LocalZOrder = 1
         icon.Visible = false
-        local label = overlay(root, 'ItemBarLabel' .. index, cell.x, cell.y, cell.w, cell.h,
+        local label = overlay(self, root, 'ItemBarLabel' .. index, cell.x, cell.y, cell.w, cell.h,
             '', 18, Color.New(255, 255, 255, 255))
-        local amount = overlay(root, 'ItemBarAmount' .. index, cell.x, cell.y, cell.w, cell.h,
+        local amount = overlay(self, root, 'ItemBarAmount' .. index, cell.x, cell.y, cell.w, cell.h,
             '', 20, Color.New(255, 220, 40, 255))
         label.Visible = false
         amount.Visible = false
-        self.Overlays[#self.Overlays + 1] = icon
-        self.Overlays[#self.Overlays + 1] = label
-        self.Overlays[#self.Overlays + 1] = amount
         self.Slots[index] = { Background = background, Icon = icon, Label = label, Count = amount }
         placeSlot(self.Slots[index], cell)
         self.ItemBarSlotPos[index] = { x = cell.x, y = cell.y, hw = cell.w / 2, hh = cell.h / 2 }
@@ -1333,16 +1311,13 @@ function ScreenHandler:Init()
     self:BuildBackpack(root, layout)
     self:BuildEquipBars(root, layout)
     local discard = rects.Discard
-    self.BtnDiscard = button(root, 'ItemDiscard', discard.x, discard.y, discard.w)
+    self.BtnDiscard = button(self, root, 'ItemDiscard', discard.x, discard.y, discard.w)
     local action, reelClose = rects.ItemAction, rects.ReelClose
-    self.BtnItemAction = button(root, 'ItemAction2', action.x, action.y, action.w)
-    self.BtnReelClose = button(root, 'ReelClose', reelClose.x, reelClose.y, reelClose.w)
+    self.BtnItemAction = button(self, root, 'ItemAction2', action.x, action.y, action.w)
+    self.BtnReelClose = button(self, root, 'ReelClose', reelClose.x, reelClose.y, reelClose.w)
     place(self.BtnDiscard, discard)
     place(self.BtnItemAction, action)
     place(self.BtnReelClose, reelClose)
-    for _, node in ipairs({ self.BtnDiscard, self.BtnItemAction, self.BtnReelClose }) do
-        self.Buttons[#self.Buttons + 1] = node
-    end
     local labels = {
         { 'BtnReelCloseLabel', self.BtnReelClose, '结束收线' },
         { 'BtnDiscardLabel', self.BtnDiscard, '丢弃选中物' },
@@ -1350,52 +1325,45 @@ function ScreenHandler:Init()
     }
     for _, entry in ipairs(labels) do
         local btn = entry[2]
-        local label = overlay(root, entry[1], btn.Position.x, btn.Position.y,
+        local label = overlay(self, root, entry[1], btn.Position.x, btn.Position.y,
             btn.Size.x, btn.Size.y, entry[3], 30, Color.New(255, 255, 255, 255))
         self[entry[1]] = label
-        self.Overlays[#self.Overlays + 1] = label
     end
     -- 上方提示区：上钩 / 等待提示同位（互斥显示），入水提示与收线进度同位，临时提示单独一行
     local primary, secondary, transient = rects.HintPrimary, rects.HintSecondary, rects.HintTransient
-    self.HookHint = overlay(root, 'HookHint', primary.x, primary.y, primary.w, primary.h,
+    self.HookHint = overlay(self, root, 'HookHint', primary.x, primary.y, primary.w, primary.h,
         '', 32, Color.New(255, 220, 40, 255))
     self.HookHint.Visible = false
-    self.Overlays[#self.Overlays + 1] = self.HookHint
     local feedback = GameCfg.CastFeedback
-    self.CastFloat = overlay(root, 'CastFloat', 0, 0, feedback.FloatSize, feedback.FloatSize,
+    self.CastFloat = overlay(self, root, 'CastFloat', 0, 0, feedback.FloatSize, feedback.FloatSize,
         '●', 48, color(feedback.FloatColor))
-    self.CastWaitHint = overlay(root, 'CastWaitHint', primary.x, primary.y, primary.w, primary.h,
+    self.CastWaitHint = overlay(self, root, 'CastWaitHint', primary.x, primary.y, primary.w, primary.h,
         '等待上钩…', 32, Color.New(255, 255, 255, 255))
-    self.CastSplashHint = overlay(root, 'CastSplashHint', secondary.x, secondary.y, secondary.w, secondary.h,
+    self.CastSplashHint = overlay(self, root, 'CastSplashHint', secondary.x, secondary.y, secondary.w, secondary.h,
         '已入水，等待上钩', 30, Color.New(255, 225, 70, 255))
-    self.CastFailureHint = overlay(root, 'CastFailureHint', transient.x, transient.y, transient.w, transient.h,
+    self.CastFailureHint = overlay(self, root, 'CastFailureHint', transient.x, transient.y, transient.w, transient.h,
         '', 30, Color.New(255, 90, 90, 255))
-    self.CastFailureMark = overlay(root, 'CastFailureMark', 0, 0, feedback.FloatSize, feedback.FloatSize,
+    self.CastFailureMark = overlay(self, root, 'CastFailureMark', 0, 0, feedback.FloatSize, feedback.FloatSize,
         '●', 48, Color.New(255, 65, 65, 255))
     for _, node in ipairs({ self.CastFloat, self.CastWaitHint, self.CastSplashHint,
         self.CastFailureHint, self.CastFailureMark }) do
         node.Visible = false
-        self.Overlays[#self.Overlays + 1] = node
     end
     -- #179 左侧任务区：追踪条（#174 #1 深色半透明底板 + 折行文字）与折叠 / 展开按钮
     local questPanel, questToggle = rects.QuestPanel, rects.QuestToggle
-    self.QuestBackground = passive(World:CreateUnit('EUIImage', {
+    self.QuestBackground = passive(OwnedUnits.Track(self, World:CreateUnit('EUIImage', {
         Parent = root, Name = 'QuestBackground',
         Position = Vector2.New(questPanel.x, questPanel.y), Size = Vector2.New(questPanel.w, questPanel.h),
         Image = 'official://image/11017', Color = Color.New(16, 24, 34, 180),
-    }))
+    })))
     self.QuestBackground.Visible = false
-    self.Overlays[#self.Overlays + 1] = self.QuestBackground
-    self.QuestLabel = overlay(root, 'QuestLabel', questPanel.x, questPanel.y, questPanel.w - 20,
+    self.QuestLabel = overlay(self, root, 'QuestLabel', questPanel.x, questPanel.y, questPanel.w - 20,
         questPanel.h - 12, '', 24, Color.New(255, 255, 255, 255))
     self.QuestLabel.Visible = false
-    self.Overlays[#self.Overlays + 1] = self.QuestLabel
-    self.QuestToggle = button(root, 'QuestToggle', questToggle.x, questToggle.y, questToggle.w)
+    self.QuestToggle = button(self, root, 'QuestToggle', questToggle.x, questToggle.y, questToggle.w)
     place(self.QuestToggle, questToggle)
-    self.QuestToggleLabel = overlay(root, 'QuestToggleLabel', questToggle.x, questToggle.y,
+    self.QuestToggleLabel = overlay(self, root, 'QuestToggleLabel', questToggle.x, questToggle.y,
         questToggle.w, questToggle.h, '收起任务', 22, Color.New(255, 255, 255, 255))
-    self.Buttons[#self.Buttons + 1] = self.QuestToggle
-    self.Overlays[#self.Overlays + 1] = self.QuestToggleLabel
     self:Listen(self.QuestToggle.OnClicked, function()
         self.QuestCollapsed = not self.QuestCollapsed
         self:RenderQuest()
@@ -1404,22 +1372,22 @@ function ScreenHandler:Init()
     local cx, cy = resolution.x / 2, resolution.y / 2
     local width = math.min(1000, resolution.x - 60)
     self.DialogueColumns = math.max(12, math.floor((width - 80) / 26))
-    local panel = World:CreateUnit('EUIImage', {
+    local panel = OwnedUnits.Track(self, World:CreateUnit('EUIImage', {
         Parent = root, Name = 'DialogueBackground', Position = Vector2.New(cx, cy),
         Size = Vector2.New(width, 360), Image = 'official://image/11017',
         Color = Color.New(22, 38, 54, 250),
-    })
+    }))
     panel.TouchEnabled, panel.SwallowTouchEnabled, panel.LocalZOrder = true, true, 20
     -- #174 #11：主界面原点左下、Y 向上——标题在上、正文居中、按钮在下
-    self.DialogueTitle = overlay(root, 'DialogueTitle', cx, cy + 120, width - 50, 50,
+    self.DialogueTitle = overlay(self, root, 'DialogueTitle', cx, cy + 120, width - 50, 50,
         '', 30, Color.New(255, 225, 130, 255))
-    self.DialogueBody = overlay(root, 'DialogueBody', cx, cy - 10, width - 80, 130,
+    self.DialogueBody = overlay(self, root, 'DialogueBody', cx, cy - 10, width - 80, 130,
         '', 26, Color.New(255, 255, 255, 255))
-    self.DialogueNext = button(root, 'DialogueNext', cx - 160, cy - 115, 260)
-    self.DialogueRead = button(root, 'DialogueRead', cx + 160, cy - 115, 300)
-    local nextLabel = overlay(root, 'DialogueNextLabel', cx - 160, cy - 115, 260, 80,
+    self.DialogueNext = button(self, root, 'DialogueNext', cx - 160, cy - 115, 260)
+    self.DialogueRead = button(self, root, 'DialogueRead', cx + 160, cy - 115, 300)
+    local nextLabel = overlay(self, root, 'DialogueNextLabel', cx - 160, cy - 115, 260, 80,
         '下一段', 26, Color.New(255, 255, 255, 255))
-    self.DialogueReadLabel = overlay(root, 'DialogueReadLabel', cx + 160, cy - 115, 300, 80,
+    self.DialogueReadLabel = overlay(self, root, 'DialogueReadLabel', cx + 160, cy - 115, 300, 80,
         '已读，开始钓鱼', 26, Color.New(255, 255, 255, 255))
     self.DialogueNodes = { panel, self.DialogueTitle, self.DialogueBody,
         self.DialogueNext, self.DialogueRead, nextLabel, self.DialogueReadLabel }
@@ -1427,7 +1395,6 @@ function ScreenHandler:Init()
         if node ~= panel then node.LocalZOrder = 21 end
         if node == nextLabel or node == self.DialogueReadLabel then node.LocalZOrder = 22 end
         node.Visible = false
-        self.Overlays[#self.Overlays + 1] = node
     end
     self:Listen(self.DialogueNext.OnClicked, function()
         if not self.DialoguePayload or self.DialoguePage >= #self.DialoguePayload.lines then return end
@@ -1443,22 +1410,21 @@ function ScreenHandler:Init()
         _G.REUtil:GetRE('StoryRead'):FireServer({ action = 'read', readKey = payload.readKey })
     end)
     self:BuildVitals(root, resolution, layout)
-    self.ReelBarBg = World:CreateUnit('EUIImage', {
+    self.ReelBarBg = OwnedUnits.Track(self, World:CreateUnit('EUIImage', {
         Parent = root, Name = 'ReelProgressBg',
         Position = Vector2.New(secondary.x, secondary.y), Size = Vector2.New(400, 36),
         Image = 'official://image/30008',
-    })
-    self.ReelBar = World:CreateUnit('EUILoadingBar', {
+    }))
+    self.ReelBar = OwnedUnits.Track(self, World:CreateUnit('EUILoadingBar', {
         Parent = root, Name = 'ReelProgress',
         Position = Vector2.New(secondary.x, secondary.y), Size = Vector2.New(400, 36),
         Image = 'official://image/30007', Direction = 0, Percent = 50,
         Color = Color.New(36, 200, 94, 255),
-    })
+    }))
     for _, node in ipairs({ self.ReelBarBg, self.ReelBar }) do
         node.TouchEnabled = false
         node.SwallowTouchEnabled = false
         node.Visible = false
-        self.Overlays[#self.Overlays + 1] = node
     end
     self.BtnItemAction.TouchEnabled = false
     self.BtnItemAction.Visible = false
