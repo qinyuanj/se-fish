@@ -54,7 +54,7 @@ describe('平台适配层（MgrPlatform）', function()
   before_each(function()
     -- 快照先于任何改动：夹具中途失败时 after_each 仍能还原已改项。
     -- 商品 goodsId 是共享配置表的字段：快照原值，after_each 逐个还原（不是换表，避免突变泄漏）。
-    -- GameCfg.Debug / Save.AcceptanceSlot 由 helper 的根级快照兜底，但本夹具把 Debug 换成新表，
+    -- GameCfg.Debug / Save.QaSlot 由 helper 的根级快照兜底，但本夹具把 Debug 换成新表，
     -- 这里再显式快照一次，保证 after_each 幂等（不依赖根级 hook 的执行时机）。
     -- _G.MgrPlayerData 是 server/Mgr/MgrPlayerData.lua 装载时写下的模块全局，旧单进程 runner 里
     -- 它跨套件长存；原生逐例隔离后必须快照并还原，否则同一 chunk 的实例会泄漏到后续案例。

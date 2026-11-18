@@ -13,12 +13,12 @@ describe("outer", function()
   describe("pollution", function()
     it("dirties the shared config then fails", function()
       GameCfg.Debug = { Enabled = false }
-      GameCfg.Save.AcceptanceSlot = "dirty"
+      GameCfg.Save.QaSlot = "dirty"
       error("intentional fixture failure")
     end)
     it("observes the config restored by the helper", function()
       rec("cfg_enabled=" .. tostring(GameCfg.Debug.Enabled))
-      rec("cfg_slot=" .. (GameCfg.Save.AcceptanceSlot == "" and "EMPTY" or GameCfg.Save.AcceptanceSlot))
+      rec("cfg_slot=" .. (GameCfg.Save.QaSlot == "" and "EMPTY" or GameCfg.Save.QaSlot))
     end)
   end)
 

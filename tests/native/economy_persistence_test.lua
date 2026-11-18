@@ -48,7 +48,7 @@ describe('TestEconomyPersistence', function()
     -- 全部存进 saved，之后才动任何全局与配置，因此夹具中途抛错时 after_each 仍能完整还原。
     -- Shop.Stands 在旧套件里是案例体末尾手工还原；改由 after_each 统一还原，
     -- 使「断言失败也不把配置泄漏给后续案例」，与其余配置项的清理口径一致。
-    -- GameCfg.Save.AcceptanceSlot 由 helper 的根级 before_each/after_each 建基线并逐例恢复。
+    -- GameCfg.Save.QaSlot 由 helper 的根级 before_each/after_each 建基线并逐例恢复。
     before_each(function()
         saved.game, saved.REUtil, saved.MgrPlayerData = rawget(_G, 'game'), rawget(_G, 'REUtil'), rawget(_G, 'MgrPlayerData')
         saved.Debug, saved.Quest = GameCfg.Debug, GameCfg.Quest

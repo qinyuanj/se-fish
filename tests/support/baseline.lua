@@ -11,12 +11,12 @@ ZoneFixtures.Apply(GameCfg)
 
 function M.apply()
   GameCfg.Debug = { Enabled = true, InitialGrants = GameCfg.Debug.InitialGrants }
-  GameCfg.Save.AcceptanceSlot = ""
+  GameCfg.Save.QaSlot = ""
   return GameCfg
 end
 
 function M.snapshot()
-  return { Debug = GameCfg.Debug, AcceptanceSlot = GameCfg.Save.AcceptanceSlot }
+  return { Debug = GameCfg.Debug, QaSlot = GameCfg.Save.QaSlot }
 end
 
 -- 部分 setup 失败时也要能恢复：调用方（tests/native/helper.lua 的 after_each）
@@ -26,7 +26,7 @@ function M.restore(snapshot)
     return M.apply()
   end
   GameCfg.Debug = snapshot.Debug
-  GameCfg.Save.AcceptanceSlot = snapshot.AcceptanceSlot
+  GameCfg.Save.QaSlot = snapshot.QaSlot
   return GameCfg
 end
 

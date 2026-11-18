@@ -11,7 +11,7 @@
 --   8. 只有离场才存档：中途掉线/关服丢进度（周期自动存档、BindToClose 兜底）；
 --   9. 读档竞态：读档返回前玩家已操作，旧档灌入吞掉新操作（Touched 会话锁）。
 -- it 按旧 LuaUnit 的方法名字典序注册，保持与旧套件一致的案例顺序。
--- 夹具必须恢复三样：共享配置（GameCfg.Debug / Save.AcceptanceSlot，槽位由 helper 建基线、
+-- 夹具必须恢复三样：共享配置（GameCfg.Debug / Save.QaSlot，槽位由 helper 建基线、
 -- 案例内改动在本例结束时还原）、模块缓存 package.loaded['server.Mgr.MgrSave']、全局 _G.game。
 local GameCfg = require('common.GameCfg')
 
@@ -49,16 +49,16 @@ describe('TestSave', function()
     local env, savedDebug, savedSlot, savedGame, savedSaveModule
 
     -- 逐例夹具：旧 LuaUnit 每例跑 setUp/tearDown，这里同样用 before_each/after_each。
-    -- before_each 依次快照 Debug / AcceptanceSlot / _G.game / MgrSave 模块缓存，
+    -- before_each 依次快照 Debug / QaSlot / _G.game / MgrSave 模块缓存，
     -- 全部保存在改任何状态之前，因此夹具中途抛错时 after_each 仍能逐项还原。
     before_each(function()
         savedDebug = GameCfg.Debug
-        savedSlot = GameCfg.Save.AcceptanceSlot
+        savedSlot = GameCfg.Save.QaSlot
         savedGame = rawget(_G, 'game')
         savedSaveModule = package.loaded['server.Mgr.MgrSave']
         package.loaded['server.Mgr.MgrSave'] = nil
         GameCfg.Debug = { Enabled = true, InitialGrants = savedDebug.InitialGrants }
-        GameCfg.Save.AcceptanceSlot = ''
+        GameCfg.Save.QaSlot = ''
         env = { cfg = GameCfg, ops = {}, waits = {}, players = {}, dataInsts = {}, spawnQueue = {} }
         env.failGet, env.failSet, env.failUpdate, env.casConflicts = 0, 0, 0, 0
         env.store = fakeStore(env)
@@ -110,7 +110,7 @@ describe('TestSave', function()
         env.save.Ledger = {}
     end)
     after_each(function()
-        GameCfg.Save.AcceptanceSlot = savedSlot
+        GameCfg.Save.QaSlot = savedSlot
         GameCfg.Debug = savedDebug
         package.loaded['server.Mgr.MgrSave'] = savedSaveModule
         _G.game = savedGame
@@ -118,14 +118,14 @@ describe('TestSave', function()
         env = nil
     end)
 
-    it('test_acceptance_slot_keeps_keys_isolated_and_pinned_for_the_session', function()
+    it('test_qa_slot_keeps_keys_isolated_and_pinned_for_the_session', function()
         assert.same('u1', env.save:Key(1))
-        env.cfg.Save.AcceptanceSlot = 'qa93-first'
+        env.cfg.Save.QaSlot = 'qa-first'
         assert.same('u1', env.save:Key(1)) -- 本局内修改配置不改变写入目标
         local another = assert(loadfile('server/Mgr/MgrSave.lua'))()
-        assert.same('u1:qa:qa93-first', another:Key(1))
-        env.cfg.Save.AcceptanceSlot = 'qa93-second'
-        assert.same('u1:qa:qa93-first', another:Key(1))
+        assert.same('u1:qa:qa-first', another:Key(1))
+        env.cfg.Save.QaSlot = 'qa-second'
+        assert.same('u1:qa:qa-first', another:Key(1))
     end)
 
     it('test_apply_save_rejects_garbage_without_partial_recovery', function()
@@ -240,11 +240,11 @@ describe('TestSave', function()
         assert.same(0, d2:ItemCount('eelHead'))  -- 信物不复活
     end)
 
-    it('test_invalid_acceptance_slot_fails_before_any_key_is_used', function()
-        env.cfg.Save.AcceptanceSlot = false
+    it('test_invalid_qa_slot_fails_before_any_key_is_used', function()
+        env.cfg.Save.QaSlot = false
         local another = assert(loadfile('server/Mgr/MgrSave.lua'))()
         assert.has_error(function() another:Key(1) end)
-        env.cfg.Save.AcceptanceSlot = '../unsafe'
+        env.cfg.Save.QaSlot = '../unsafe'
         assert.has_error(function() another:Key(1) end)
     end)
 

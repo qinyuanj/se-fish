@@ -2,6 +2,8 @@
 
 **Status**: accepted（取代 [ADR-0008](0008-wsl-development-windows-deploy.md)；ADR-0009、ADR-0011 的接缝引用已随之改链）
 
+> **后续变更（ADR-0018 追加）**：`tools/acceptance_slot.lua` 后来改名 `tools/qa_slot.lua`；「唯一例外是 git 自带的 sh」所指的 `tools/hooks/pre-commit`、`tools/hooks/shim` 已随 [ADR-0018](0018-delete-pre-commit-hook.md) 一并删除，本仓现在没有任何非 Windows 原生的入口。下面「slow 车道的五条护栏」里的 `blender_transport` 已移入新增的 `art` 车道（[ADR-0019](0019-art-lane-optional.md)），不再随 `slow` 跑。
+
 本机已无 WSL 开发端，agent 与人工都在 Windows 原生环境里工作（仓库检出在 `D:`，编辑器与宿主目录在 `C:`）。而当前工具链在 Windows 上是**整体不可执行**的，不是"需要装点东西"：`tools/wsl_seam.lua` 用 POSIX 命令实现文件系统探测，而 Lua 的 `os.execute` 在 Windows 上走 `cmd.exe`。实测（2026-11-15）：
 
 - `seam.which("busted")` → `nil`；`seam.exists("README.md")` → `false`（文件明明在）；`seam.interop()` → `nil`。于是 `deploy`、`sync`、`test`、`blender` 全部起不来。

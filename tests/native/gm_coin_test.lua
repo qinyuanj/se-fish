@@ -18,7 +18,7 @@ describe('GM 发放与金币唯一入口（MgrGM × PlayerData）', function()
 
   before_each(function()
     -- 快照先于任何改动：before_each 中途失败时 after_each 仍能还原已改项。
-    -- helper 的根级 after_each 只恢复 GameCfg.Debug / Save.AcceptanceSlot 的引用，
+    -- helper 的根级 after_each 只恢复 GameCfg.Debug / Save.QaSlot 的引用，
     -- 本夹具把 Debug 换成新表，故这里再快照一次并按旧 tearDown 顺序显式还原。
     restore = {
       game = rawget(_G, 'game'),

@@ -31,7 +31,7 @@ agent 驱动 Blender 原本有 2 种模式、5 个入口：实时模式有 Blend
 
 后果：
 
-- 测试分两层：fast 车道（`tests/native/blender_cli_test.lua`）用桩验证命令拼接、路径转换、定位与拒绝执行；slow 车道（`tests/native/slow/blender_transport_test.lua`）用真 interop 与真 `blender.exe` 跑环境报告与 QA 检查，产物只落 Windows `%TEMP%`。
+- 测试分两层：fast 车道（`tests/native/blender_cli_test.lua`）用桩验证命令拼接、路径转换、定位与拒绝执行；art 车道（`tests/native/art/blender_transport_test.lua`）用真 interop 与真 `blender.exe` 跑环境报告与 QA 检查，产物只落 Windows `%TEMP%`。
 - 去掉 MCP 自带的 Blender API 与手册检索，改由上游 skill 的 `references/` 覆盖。
 - 视口截图改为无头渲染（上游 `blender-asset-qa/scripts/review_shots.py`）。
 - 海鸥 01~05、军舰鸟冒烟与鲤鱼的历史脚本不迁移，作为留痕保留；鲤鱼脚本 docstring 里的 `blend.py` 用法已失效（桥接脚本已改名为 `blend.py.bak`），需要重跑时改用 `blender` 子命令。

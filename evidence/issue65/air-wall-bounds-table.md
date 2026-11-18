@@ -87,6 +87,8 @@ lua tools/cli.lua acceptance-slot off
 lua tools/cli.lua deploy
 ```
 
+> 上面的 `acceptance-slot` 子命令已改名 `qa-slot`，槽名前缀也从 `!qa93-` 改为 `!qa-`。代码块是当时的原始记录，照抄时把子命令换成 `qa-slot` 即可。
+
 本轮运行：
 
 - 属性基线脚本 sha256 `d07fb634cc8f3ba9fbf7eb3dd254cc1f67d8860541ae70ef68515a4b6f6e0ce7`（30 面墙）

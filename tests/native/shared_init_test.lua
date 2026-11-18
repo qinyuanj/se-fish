@@ -15,14 +15,14 @@ describe("共享初始化：基线接缝", function()
     baseline.apply()
     assert.is_true(GameCfg.Debug.Enabled)
     assert.is_not_nil(GameCfg.Debug.InitialGrants)
-    assert.are.equal(GameCfg.Save.AcceptanceSlot, "")
+    assert.are.equal(GameCfg.Save.QaSlot, "")
 
     -- 入口必须调用同一接缝，而不是自己复制两行配置。
     local path = "tests/native/helper.lua"
     local source = assert(io.open(path, "rb")):read("a")
     assert.is_not_nil(source:find("tests.support.baseline", 1, true),
       path .. " 没有使用共享基线接缝")
-    assert.is_nil(source:find("AcceptanceSlot%s*=%s*[\"']", 1),
+    assert.is_nil(source:find("QaSlot%s*=%s*[\"']", 1),
       path .. " 仍在入口里直接写基线值，基线会漂移")
   end)
 
@@ -38,10 +38,10 @@ describe("共享初始化：基线接缝", function()
     baseline.apply()
     local snapshot = baseline.snapshot()
     GameCfg.Debug = { Enabled = false }
-    GameCfg.Save.AcceptanceSlot = "dirty"
+    GameCfg.Save.QaSlot = "dirty"
     -- 部分 setup 失败：清理必须在测试体根本没跑的情况下也把基线恢复。
     baseline.restore(snapshot)
     assert.is_true(GameCfg.Debug.Enabled)
-    assert.are.equal(GameCfg.Save.AcceptanceSlot, "")
+    assert.are.equal(GameCfg.Save.QaSlot, "")
   end)
 end)

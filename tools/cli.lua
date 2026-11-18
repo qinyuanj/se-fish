@@ -36,10 +36,10 @@ end
 local M = {}
 
 M.commands = {
-  { name = "test", mod = "tools.test", summary = "按测试车道跑 busted：test [fast|full] [-- <busted 参数>...]，缺省 fast" },
+  { name = "test", mod = "tools.test", summary = "按测试车道跑 busted：test [fast|full|art] [-- <busted 参数>...]，缺省 fast" },
   { name = "deploy", mod = "tools.deploy", summary = "仓库三端一级子树镜像进编辑器宿主目录（robocopy /MIR + 编辑器收尾）" },
   { name = "sync",   mod = "tools.sync",   summary = "从宿主回同步配置 / API 存根 / data/" },
-  { name = "acceptance-slot", mod = "tools.acceptance_slot", summary = "查看、新建或切换 #93 验收存档槽（试玩前需 deploy）" },
+  { name = "qa-slot", mod = "tools.qa_slot", summary = "查看、新建或切换 QA 存档槽（试玩前需 deploy）" },
   { name = "ability-presets", mod = "tools.ability_presets", summary = "重建技能包的编辑器侧预设（复制官方模板、刷壳与属性、回写 GameCfg key）" },
   { name = "blender", mod = "tools.blender", summary = "在 Windows 侧无头 Blender 执行脚本（唯一 Blender 入口，透传 JSON 与退出码）" },
   { name = "worktree-init", mod = "tools.worktree_init", summary = "把新 worktree 补齐到能跑 test full（复制上游 blender-* skill；幂等）" },

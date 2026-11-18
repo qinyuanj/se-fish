@@ -74,13 +74,13 @@ describe('TestPlayerLeaveRejoin', function()
     end
 
     -- 逐例夹具：旧 LuaUnit 每例跑 setUp/tearDown，这里同样用 before_each/after_each。
-    -- 第一步把所有被改状态（4 个全局 + Debug + AcceptanceSlot）存进 saved，之后才改任何东西，
+    -- 第一步把所有被改状态（4 个全局 + Debug + QaSlot）存进 saved，之后才改任何东西，
     -- 因此夹具中途抛错时 after_each 仍能完整还原，不把失败泄漏给后续案例。
     before_each(function()
         saved.game, saved.REUtil = rawget(_G, 'game'), rawget(_G, 'REUtil')
         saved.MgrUtil, saved.MgrPlayerData = rawget(_G, 'MgrUtil'), rawget(_G, 'MgrPlayerData')
-        saved.Debug, saved.slot = GameCfg.Debug, GameCfg.Save.AcceptanceSlot
-        GameCfg.Debug, GameCfg.Save.AcceptanceSlot = { Enabled = false }, ''
+        saved.Debug, saved.slot = GameCfg.Debug, GameCfg.Save.QaSlot
+        GameCfg.Debug, GameCfg.Save.QaSlot = { Enabled = false }, ''
         env = { tasks = {}, values = {}, errors = {}, cleanups = {}, mgrs = {} }
         env.players = { PlayerAdded = signal(), PlayerRemoving = signal(), GetPlayers = function() return {} end }
         env.heartbeat = signal()
@@ -146,7 +146,7 @@ describe('TestPlayerLeaveRejoin', function()
     end)
     after_each(function()
         _G.game, _G.REUtil, _G.MgrUtil, _G.MgrPlayerData = saved.game, saved.REUtil, saved.MgrUtil, saved.MgrPlayerData
-        GameCfg.Debug, GameCfg.Save.AcceptanceSlot = saved.Debug, saved.slot
+        GameCfg.Debug, GameCfg.Save.QaSlot = saved.Debug, saved.slot
         saved = {}
         env = nil
     end)

@@ -15,6 +15,13 @@ local function fixture_policy()
   }
 end
 
+-- 真实仓库扫描只做一次：Arch.scan 只读仓库、每次返回新表，三个用例共享同一张图。
+local scanned
+local function scan_real()
+  if not scanned then scanned = assert(Arch.scan('.', Arch.policy)) end
+  return scanned
+end
+
 local function kinds(result)
   local out = {}
   for _, item in ipairs(result.violations) do out[#out + 1] = item.kind end
@@ -120,7 +127,7 @@ describe('架构分层门禁', function()
     ]])
     assert.same({ 'common.Util', 'server.Mgr.MgrPlayer' }, names)
 
-    local graph = assert(Arch.scan('.', Arch.policy))
+    local graph = scan_real()
     assert.is_true(#graph.modules > 100)
     for _, id in ipairs(graph.modules) do
       assert.is_nil(id:match('^server%._trigger'))
@@ -128,7 +135,7 @@ describe('架构分层门禁', function()
   end)
 
   it('真实业务模块全部分类且无反向依赖或循环', function()
-    local graph = assert(Arch.scan('.', Arch.policy))
+    local graph = scan_real()
     local result = Arch.check(Arch.policy, graph)
     assert.is_true(result.ok, result.message)
   end)
@@ -142,7 +149,7 @@ describe('架构分层门禁', function()
   end)
 
   it('真实分层声明的模块与命名空间都在源码中', function()
-    assert.same({}, Arch.stale(Arch.policy, assert(Arch.scan('.', Arch.policy))))
+    assert.same({}, Arch.stale(Arch.policy, scan_real()))
   end)
 
   it('三端与 tools 不得 require 测试代码', function()

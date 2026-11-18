@@ -3,22 +3,22 @@
 local GameCfg = require("common.GameCfg")
 
 describe("native shared baseline", function()
-  it("helper establishes Debug and AcceptanceSlot baseline before cases load", function()
+  it("helper establishes Debug and QaSlot baseline before cases load", function()
     assert.is_true(GameCfg.Debug.Enabled)
     assert.is_table(GameCfg.Debug.InitialGrants)
     assert.is_true(#GameCfg.Debug.InitialGrants > 0)
-    assert.are.equal("", GameCfg.Save.AcceptanceSlot)
+    assert.are.equal("", GameCfg.Save.QaSlot)
   end)
 
   it("a passing case may dirty the shared config", function()
     GameCfg.Debug = { Enabled = false }
-    GameCfg.Save.AcceptanceSlot = "dirty"
+    GameCfg.Save.QaSlot = "dirty"
     assert.is_false(GameCfg.Debug.Enabled)
   end)
 
   it("helper restores the shared config after the previous case", function()
     assert.is_true(GameCfg.Debug.Enabled)
     assert.is_table(GameCfg.Debug.InitialGrants)
-    assert.are.equal("", GameCfg.Save.AcceptanceSlot)
+    assert.are.equal("", GameCfg.Save.QaSlot)
   end)
 end)

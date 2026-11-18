@@ -49,7 +49,7 @@ describe('TestGuidePersistence', function()
 
     -- 逐例夹具：旧 LuaUnit 每例跑 setUp/tearDown，这里同样用 before_each/after_each。
     -- 第一步保存 4 项被改状态（game / REUtil / Debug / Story）后才动任何全局与配置，
-    -- 夹具中途抛错时 after_each 仍能完整还原；GameCfg.Save.AcceptanceSlot 由 helper 的
+    -- 夹具中途抛错时 after_each 仍能完整还原；GameCfg.Save.QaSlot 由 helper 的
     -- 根级 before_each/after_each 建基线并逐例恢复，本批不在案例内改它。
     before_each(function()
         saved.game, saved.REUtil = rawget(_G, 'game'), rawget(_G, 'REUtil')

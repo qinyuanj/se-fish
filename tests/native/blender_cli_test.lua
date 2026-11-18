@@ -2,7 +2,7 @@
 -- 入口用 seam.which 找 python、用 seam.spawn{argv, env} 起上游 run_in_blender.py，
 -- 断言 argv 形状、BLENDER_EXE 经 env 传入、--which 只输出一条正斜杠 Windows 路径。
 -- 接缝的进程调用与文件系统探测全部用桩替换，不需要真 Blender；真实往返由
--- tests/native/slow/blender_transport_test.lua 证明。
+-- tests/native/art/blender_transport_test.lua 证明。
 local seam = require("tools.seam")
 local blender = require("tools.blender")
 local fs = require("tests.support.fs_fixture")

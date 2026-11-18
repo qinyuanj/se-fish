@@ -12,6 +12,7 @@ local M = {}
 M.LANES = {
   { name = "fast", summary = "日常车道：tests/native" },
   { name = "full", summary = "收尾车道：fast 加 tests/native/slow" },
+  { name = "art", summary = "美术车道：tests/native/art，要本机 Blender，默认不进 full" },
 }
 M.DEFAULT_LANE = "fast"
 
@@ -23,7 +24,7 @@ end
 
 function M.usage()
   local lines = {
-    "用法: lua tools/cli.lua test [fast|full] [-- <busted 参数>...]",
+    "用法: lua tools/cli.lua test [fast|full|art] [-- <busted 参数>...]",
     "",
     "在仓库根按测试车道跑 busted（显式 --run=<车道>），测试通过退出码 0、有失败或错误 1。缺省车道 " .. M.DEFAULT_LANE .. "。",
     "",

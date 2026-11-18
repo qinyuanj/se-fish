@@ -27,18 +27,18 @@ local function validSlot(slot)
 end
 function Mgr:Key(userId)
     if not self.SlotPinned then
-        local slot = cfg().AcceptanceSlot
-        assert(slot == nil or slot == '' or validSlot(slot), '验收存档槽须为 1—40 位字母、数字、下划线或连字符')
-        self.AcceptanceSlot, self.SlotPinned = slot or '', true
+        local slot = cfg().QaSlot
+        assert(slot == nil or slot == '' or validSlot(slot), 'QA 存档槽须为 1—40 位字母、数字、下划线或连字符')
+        self.QaSlot, self.SlotPinned = slot or '', true
     end
     local session = self.Sessions[userId]
-    local slot = session and session.Current or self.AcceptanceSlot
+    local slot = session and session.Current or self.QaSlot
     return cfg().KeyPrefix .. tostring(userId) .. (slot ~= '' and ':qa:' .. slot or '')
 end
 function Mgr:Session(userId)
     self:Key(userId)
     if not self.Sessions[userId] then
-        self.Sessions[userId] = { Current = self.AcceptanceSlot, Next = self.AcceptanceSlot, Paused = false }
+        self.Sessions[userId] = { Current = self.QaSlot, Next = self.QaSlot, Paused = false }
     end
     return self.Sessions[userId]
 end
@@ -138,7 +138,7 @@ function Mgr:LoadInto(player, data)
     end
     self.Counter = (self.Counter or 0) + 1
     -- 会话 token 仅用于 fencing/请求命名空间，不作为鉴权秘密；存储回读仍须核对 epoch/revision。
-    local s = { Current = self.AcceptanceSlot, Next = self.AcceptanceSlot, Paused = false,
+    local s = { Current = self.QaSlot, Next = self.QaSlot, Paused = false,
         State = 'pending', Player = player, Data = data,
         Token = tostring(userId) .. ':' .. tostring(self.Counter) .. ':' .. tostring({}) .. ':' .. tostring(math.random()) }
     self.Sessions[userId] = s

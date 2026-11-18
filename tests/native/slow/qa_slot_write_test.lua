@@ -1,13 +1,13 @@
--- 验收槽 CLI 的落盘替换：在进程内把当前目录切到临时假仓库，直接调 acceptance_slot.main，
+-- 验收槽 CLI 的落盘替换：在进程内把当前目录切到临时假仓库，直接调 qa_slot.main，
 -- 断言 GameCfg 文本、退出码与临时文件无残留。Windows 原生（#192）：不再拼 POSIX 命令串，
 -- 也不再起 lua 子进程；配置路径相对当前目录，所以先 lfs.chdir 进假仓库，真仓库的 GameCfg 不被碰。
 local lfs = require("lfs")
-local slot = require("tools.acceptance_slot")
+local slot = require("tools.qa_slot")
 
 local SAMPLE = table.concat({
   "GameCfg.Save = {",
   "    Store = 'sefish_save_v1',",
-  "    AcceptanceSlot = '',",
+  "    QaSlot = '',",
   "    MaxRetries = 3,",
   "}",
   "",
@@ -46,7 +46,7 @@ local function make_temp_root()
   local base = (os.getenv("TEMP") or os.getenv("TMP") or "."):gsub("\\", "/")
   math.randomseed(os.time() + math.floor(os.clock() * 1000000))
   for _ = 1, 100 do
-    local name = string.format("%s/se-fish-acceptance-slot-%d-%06d",
+    local name = string.format("%s/se-fish-qa-slot-%d-%06d",
       base, os.time(), math.random(0, 999999))
     if lfs.mkdir(name) then return (name:gsub("\\", "/")) end
   end
@@ -70,13 +70,13 @@ local function invoke(args)
   return code, table.concat(out_lines, "\n"), table.concat(err_lines)
 end
 
-describe("TestAcceptanceSlotWrite", function()
+describe("TestQaSlotWrite", function()
   before_each(function()
     original_dir = assert(lfs.currentdir())
     ROOT = make_temp_root()
     assert(lfs.mkdir(ROOT .. "/common"))
     CONFIG = ROOT .. "/common/GameCfg.lua"
-    TEMP = CONFIG .. ".acceptance-slot.tmp"
+    TEMP = CONFIG .. ".qa-slot.tmp"
     local f = assert(io.open(CONFIG, "wb"))
     f:write(SAMPLE)
     f:close()
@@ -91,7 +91,7 @@ describe("TestAcceptanceSlotWrite", function()
   it("test_set_and_off_replace_config_without_leaving_temp_file", function()
     local code, output = invoke({ "set", "qa121" })
     assert.are.equal(0, code, output)
-    assert.are.equal((SAMPLE:gsub("AcceptanceSlot = ''", "AcceptanceSlot = 'qa121'")), slurp(CONFIG))
+    assert.are.equal((SAMPLE:gsub("QaSlot = ''", "QaSlot = 'qa121'")), slurp(CONFIG))
     assert.is_nil(slurp(TEMP))
     code, output = invoke({ "off" })
     assert.are.equal(0, code, output)
@@ -105,7 +105,7 @@ describe("TestAcceptanceSlotWrite", function()
     assert.is_not_nil(slurp(CONFIG))
     local code, output = invoke({ "set", "qa122" })
     assert.are.equal(0, code, output)
-    assert.are.equal((SAMPLE:gsub("AcceptanceSlot = ''", "AcceptanceSlot = 'qa122'")), slurp(CONFIG))
+    assert.are.equal((SAMPLE:gsub("QaSlot = ''", "QaSlot = 'qa122'")), slurp(CONFIG))
     assert.is_nil(slurp(TEMP))
   end)
 
@@ -120,8 +120,8 @@ describe("TestAcceptanceSlotWrite", function()
     assert.are_not.equal(0, code, output .. err)
     local kept = slurp(TEMP)
     assert.is_not_nil(kept, "旧配置已删除，TEMP 必须保留为可恢复的新配置")
-    assert.are.equal((SAMPLE:gsub("AcceptanceSlot = ''", "AcceptanceSlot = 'qa124'")), kept)
-    assert.is_truthy(err:find("acceptance-slot.tmp", 1, true), "错误信息应写明新配置留在 " .. TEMP .. "：" .. err)
+    assert.are.equal((SAMPLE:gsub("QaSlot = ''", "QaSlot = 'qa124'")), kept)
+    assert.is_truthy(err:find("qa-slot.tmp", 1, true), "错误信息应写明新配置留在 " .. TEMP .. "：" .. err)
   end)
 
   it("test_set_reports_error_and_keeps_old_config_when_temp_file_exists", function()

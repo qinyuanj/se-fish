@@ -22,7 +22,7 @@
 --  14. 通道限频吞掉紧跟按下的「松开」，holding 卡死一路升到顶。
 --
 -- 迁移纪律：旧 setUp 会就地改 GameCfg 的两条外观资源 id，并在 tearDown 复原；
--- helper 的根级快照只管 Debug / AcceptanceSlot，覆盖不到这两个字段，所以本 spec 自己存自己回，
+-- helper 的根级快照只管 Debug / QaSlot，覆盖不到这两个字段，所以本 spec 自己存自己回，
 -- 且快照在任何赋值之前取（before_each 半路抛错时 after_each 仍会跑，见 issue-90-mapping.md 探针）。
 local GameCfg = require('common.GameCfg')
 

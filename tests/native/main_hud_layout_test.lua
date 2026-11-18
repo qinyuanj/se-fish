@@ -57,12 +57,21 @@ local function residents(layout)
     return out
 end
 
+-- Compute 是纯函数（test_compute_is_pure_and_rejects_bad_input 逐条断言）：同样的输入只算一次。
+-- 13 个用例此前各自重算 16 个布局（共 208 次），缓存后共享同一批只读布局表。
+local LAYOUTS = {}
+
 local function each_case(fn)
     for _, h in ipairs(HEIGHTS) do
         for _, slots in ipairs(SLOT_COUNTS) do
             for _, reeling in ipairs(REELING) do
-                local layout = MainHudLayout.Compute({ width = 1920, height = h,
-                    itemBarSlots = slots, reeling = reeling })
+                local key = string.format('%d:%d:%s', h, slots, tostring(reeling))
+                local layout = LAYOUTS[key]
+                if not layout then
+                    layout = MainHudLayout.Compute({ width = 1920, height = h,
+                        itemBarSlots = slots, reeling = reeling })
+                    LAYOUTS[key] = layout
+                end
                 fn(layout, string.format('1920x%d slots=%d reeling=%s', h, slots, tostring(reeling)),
                     { height = h, slots = slots, reeling = reeling })
             end

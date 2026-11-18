@@ -24,11 +24,11 @@ Lua 命令使用 **Lua 5.4**，命令名统一 `lua`，执行前用 `lua -v` 核
 - `lua tools/cli.lua blender <脚本.py> [--blend <输入.blend>] [-- <脚本参数>...]`：在本机无头 Blender 里执行脚本，是唯一的 Blender 入口；`--which` 核对将用的 Blender，`--expr` 执行内联代码。路径写正斜杠 Windows 形式（`C:/...`）或仓库内相对路径；用法见 [Blender 与 Meshy 使用](art-pipeline.md)，决策见 [ADR-0009](../adr/0009-blender-headless-only.md)。
 - `lua tools/cli.lua screenshot [--window <标题子串> | --rect X,Y,W,H] [--out <文件.png>]`：抓桌面合成像素存 PNG，是虚拟屏（UU 远程的 GameViewer Virtual Display Adapter 这类）上取证游戏画面的入口。editor-cli 的 `screenshot` 走窗口表面抓取，在虚拟屏上拿到的可能是黑帧，也可能是尺寸正常、内容停在旧帧的图（两种都判 `FRAME_VALID`）；本命令读桌面合成，缺省取标题为 `client` 的试玩窗口客户区，输出落 `tmp/`。目标窗口必须显示在屏幕上，被盖住时抓到的是遮挡物。加 `--info` 不抓图，只报屏幕列表、目标窗口所在显示器与「虚拟屏 / 非虚拟屏 / 不确定」判定，判据是该屏适配器是否挂在 PCI 总线上（`PCI\` 开头为真实显卡）。
 - 官方包升级、直接调用接口与编辑器预设依赖见 [官方包接入参考](../packages-reference.md)。技能包预设命令见 `lua tools/cli.lua ability-presets --help`。
-- **临时产物**：手工验证的中间文件、单据正文草稿等临时产物一律放仓库 `tmp/`（已 gitignored），无需清理；不放系统临时目录，也不为清理去 `rm`（沙盒会拒绝）。这条管 agent 手工产生的文件；脚本自建自删的临时目录（如 pre-commit hook 在 git 目录下的工作目录）不在此列。
+- **临时产物**：手工验证的中间文件、单据正文草稿等临时产物一律放仓库 `tmp/`（已 gitignored），无需清理；不放系统临时目录，也不为清理去 `rm`（沙盒会拒绝）。这条管 agent 手工产生的文件；脚本自建自删的临时目录不在此列。
 - 质量工具（CRAP / mutation / DRY）是 dsh-uml-viewer 插件自带的标准工具（crapper / mutator / dryer），经插件面板触发，由 agent 调用插件工具 `uml_crap`、`uml_mutate`、`uml_dry` 执行；业务范围与选项只在根目录 `uml-quality.json` 的 `standardTools` 声明，见下方「架构图」。只出报告，不设指标门槛。
-- 单测放 `tests/native/`（slow 车道放 `tests/native/slow/`），共享夹具放 `tests/support/`，探针放 `tests/probes/`（手工探针，不入任何车道）。日常运行 `lua tools/cli.lua test`（缺省 fast），收尾运行 `lua tools/cli.lua test full`，`--` 之后的参数原样透传给 busted，退出码不透传：测试通过 0，busted 非 0（失败数加错误数）一律收成 1，busted 缺失 3；裸 `busted` 读 `default`，与 full 相同（crapper 列测试文件时不带 `--run`，覆盖率因此含 slow 车道）。车道由根目录 `.busted` 定义，共享初始化在 `tests/native/helper.lua`。Windows 原生是唯一测试环境，案例不分平台，完成判据表里的 `0 pending` 就是在这台机器上取的严格值。
+- 单测放 `tests/native/`（slow 车道放 `tests/native/slow/`，美术车道放 `tests/native/art/`：**美术 optional**，Blender 用例不进 full，用 `lua tools/cli.lua test art` 单独跑），共享夹具放 `tests/support/`，探针放 `tests/probes/`（手工探针，不入任何车道）。日常运行 `lua tools/cli.lua test`（缺省 fast），收尾运行 `lua tools/cli.lua test full`，`--` 之后的参数原样透传给 busted，退出码不透传：测试通过 0，busted 非 0（失败数加错误数）一律收成 1，busted 缺失 3；裸 `busted` 读 `default`，与 full 相同（crapper 列测试文件时不带 `--run`，覆盖率因此含 slow 车道）。车道由根目录 `.busted` 定义，共享初始化在 `tests/native/helper.lua`。Windows 原生是唯一测试环境，案例不分平台，完成判据表里的 `0 pending` 就是在这台机器上取的严格值。
   - **执行序只保证到文件内**：迁移保留的是**文件内**执行序（`it` 注册序 == 旧 LuaUnit 类内方法序），**不保留跨文件的全局类名字典序**。LuaUnit 的 `collectTests()` 排的是全局 `_G.Test*` **类名**，`.busted` 的 `sort-files=true` 排的是**文件路径字符串**，是两个键空间，技术上无法廉价复现；且 helper 在文件发现**之前**执行，插不进重排钩子。
-    - 为什么可以接受：跨类没有共享状态；跨文件隔离由 `.busted` 显式开启的 `auto-insulate` 承担（每个文件结束后按键还原 `_G` 与 `package.loaded`，关掉后 fast 出现 7 failures / 3 errors），`tests/native/helper.lua` 只逐例快照 `GameCfg.Debug` 与 `Save.AcceptanceSlot`；**且不复刻旧序反而修了一个真 bug**——旧序下 `damage_float_test.lua` 与 `vitals_test.lua` 都定义全局 `TestDamageNotice`，后加载整表覆盖前者，导致 `test_rounding_and_effective_health` **从未被执行**，迁移后复活（+1，属修复而非回归）。
+    - 为什么可以接受：跨类没有共享状态；跨文件隔离由 `.busted` 显式开启的 `auto-insulate` 承担（每个文件结束后按键还原 `_G` 与 `package.loaded`，关掉后 fast 出现 7 failures / 3 errors），`tests/native/helper.lua` 只逐例快照 `GameCfg.Debug` 与 `Save.QaSlot`；**且不复刻旧序反而修了一个真 bug**——旧序下 `damage_float_test.lua` 与 `vitals_test.lua` 都定义全局 `TestDamageNotice`，后加载整表覆盖前者，导致 `test_rounding_and_effective_health` **从未被执行**，迁移后复活（+1，属修复而非回归）。
     - 裁定原文见迁移台账 `issue-84-mapping.md:96` 与 `issue-85-mapping.md:63`（台账在仓库外，按文件名检索）。
   - `busted` 命令：`test` 子命令与人手 shell 统一用 PATH 上的 `busted`（不在 PATH 时 CLI 退出码 3）。它由 LuaRocks 装在 `%APPDATA%\luarocks\bin`，该目录必须在 PATH 里；安装命令 `luarocks --local install busted` 在 Git Bash 里执行。
 
@@ -60,18 +60,6 @@ lua tools/cli.lua worktree-init
 - 自检：新开会话的上下文里「蛋仔编辑器（世界版 SE」只出现一次，且没有「项目接错了」。
 
 **teamai 的 Gitea 凭据。** `GITEA_URL`、`GITEA_TOKEN` 存在 Windows 用户环境变量里，Windows 原生进程直接可见，不需要任何透传或转换，凭据只存一份。改完变量后重开终端（含常驻会话）才生效；`teamai doctor` 的两项 Gitea 检查通过即接入完成。缺凭据时 pull、recall 与 hook 照常，走 Gitea API 的操作（`members`、贡献 learning）失败。
-
-**pre-commit hook。** 检查脚本入库在 `tools/hooks/pre-commit`：对暂存区每个 `.lua` 取**暂存内容**做 Lua 5.4 `loadfile`，暂存区含 `.lua` 或 `.busted` 时再经 CLI 跑 `lua tools/cli.lua test fast`（busted 不可用时 CLI 退出码 3，hook 提示安装 busted 并拦下），纯文档提交不跑 busted；质量工具不进 hook。解释器由 `LUA_BIN` 指定，缺省 `lua`。脚本与共享 hooks 目录里的转发 shim `tools/hooks/shim` 都写成 `#!/bin/sh`：**这是全仓唯一的非 Windows 原生例外**，由 Git for Windows 自带的 sh 执行，不要求在 PATH 上另装任何 shell。共享 hooks 目录（`git rev-parse --git-common-dir` 下的 `hooks/`，所有 worktree 共用）里的 `pre-commit` 只转发到当前检出的脚本。每个克隆在检出根装一次，**下面的安装命令在 Git Bash 里执行**；shim 改动后重装：
-
-```bash
-install -m 755 tools/hooks/shim "$(git rev-parse --git-common-dir)/hooks/pre-commit"
-```
-
-- 当前分支没有该脚本时放行，旧分支与并行 worktree 不受影响。
-- **检查对象不同**：`loadfile` 查的是暂存内容；fast 车道跑的是工作区。部分暂存（`git add -p`、暂存后又改）时 fast 的结果可能与实际提交的内容不一致，需要确认时先把未暂存改动 `git stash --keep-index` 再提交。
-- **不用 `core.hooksPath`**：git 2.43 下设了它，teamai 装在 hooks 目录的 post-* hook 就不再执行，teamai 也拒绝重装。**不用软链**：软链按主 worktree 解析，其他 worktree 会跑主检出那份脚本。
-- **与 teamai 分工**：teamai 只管 `post-checkout` / `post-merge` / `post-rewrite`（文件内有 `managed by teamai` 标记），`pre-commit` 归本仓库；两边互不覆盖，改 hook 后核对三个 post-* 仍在且内容未变。
-- **`--no-verify` 仅限人用**：agent 不得使用；hook 拦下时修复问题后重新提交。
 
 **宿主目录专用于镜像。** 默认由 `USERPROFILE` 推导：`C:/Users/<用户名>/Desktop/dev/eggy/LuaSource_钓鱼怎么这么危险啊喂！`。可用 `EGGY_WORKSPACE` 覆盖，值写正斜杠 Windows 路径（如 `C:/Users/<用户名>/Desktop/dev/eggy/LuaSource_钓鱼怎么这么危险啊喂！`）；空串当作未设置。
 
@@ -108,13 +96,12 @@ install -m 755 tools/hooks/shim "$(git rev-parse --git-common-dir)/hooks/pre-com
 
 ## 完成判据
 
-代码改动按顺序执行，全部通过才算完成；pre-commit 一项不占顺序，每次提交时由 hook 自动完成。下表只列 agent 执行的项；质量工具由人运行，见表后的「人工验收」。
+代码改动按顺序执行，全部通过才算完成。本仓没有提交时自动检查，也没有 CI：下表每一项都由 agent 显式执行。质量工具由人运行，见表后的「人工验收」。
 
 | 检查 | 通过条件 |
 |---|---|
 | `lua tools/cli.lua test full`（收尾） | 含 slow 车道，全部用例通过，末行匹配 `N successes / 0 failures / 0 errors / 0 pending : T seconds`，退出码 0 |
-| 美术资产交付（美术校验） | 仓库外的资产校验脚本跑完并产出 `validation/validation.json`，报告里 `failures` 为空（含网格封闭性硬门槛）；只看这份报告，不另开 CI，资产校验不进 pre-commit。预算文件、`mesh` 段或 `validation.json` 缺失同样算失败，口径见 [美术资产概要「验收」](../art-asset-overview.md#验收) |
-| 提交时 pre-commit hook 自动检查（见上方「pre-commit hook」）：暂存的 `.lua` 逐个 `loadfile`，含 Lua 改动时再经 CLI 跑 `lua tools/cli.lua test fast`；agent 不另跑这一项，提交时也不必为它重复手跑 fast | `git commit` 成功，未被 hook 拦下 |
+| 美术资产交付（美术校验） | 仓库外的资产校验脚本跑完并产出 `validation/validation.json`，报告里 `failures` 为空（含网格封闭性硬门槛）；只看这份报告，不另开 CI，资产校验不进测试车道。预算文件、`mesh` 段或 `validation.json` 缺失同样算失败，口径见 [美术资产概要「验收」](../art-asset-overview.md#验收) |
 | `lua tools/cli.lua deploy` 后执行上面的 `code validate` | `ok=true`、`data.valid=true`、`data.is_se_map=true`，`data.issues` 与 `meta.warnings` 均为空 |
 | validate 通过后全套试玩 | 每条验收现象都有取证产物；`log trace` 本轮窗口有效且无错误 |
 | 本轮改动提交到分支后、合入 main 前，对 `<基线>...HEAD` 跑 `/code-review`（改动尚未提交时用 `git diff <基线>` 的范围） | 取得 Standards / Spec 两轴结论；硬性违规已修复，或在交付说明里逐条写明 |

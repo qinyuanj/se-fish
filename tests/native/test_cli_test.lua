@@ -1,7 +1,6 @@
 -- test 子命令的命令边界（#145 接缝二；ADR-0017 Windows native）：给定参数与环境，
 -- 入口用 seam.which 找 busted、用 seam.spawn{argv,cwd} 在仓库根跑它，并断言 argv 形状、
--- cwd 与退出码映射。进程调用全部用桩替换，不真起 busted；真 CLI 驱动由 slow 用例与
--- pre-commit hook 的提交证明。
+-- cwd 与退出码映射。进程调用全部用桩替换，不真起 busted；真 CLI 驱动由 slow 用例证明。
 local seam = require("tools.seam")
 local test_cmd = require("tools.test")
 
