@@ -1,6 +1,6 @@
 -- screenshot 子命令的命令边界：给定参数与环境，入口用 seam.which 找 pwsh、
 -- 用 seam.capture{argv} 执行 tools/screenshot_capture.ps1，断言 argv 形状与退出码。
--- 接缝的进程调用与文件系统探测全部用桩替换，不需要真屏幕；真实抓屏由人工在虚拟屏上验证。
+-- 接缝的进程调用与文件系统探测全部用桩替换，不需要真屏幕；真实抓屏由人工在编辑器上验证。
 local seam = require("tools.seam")
 local shot = require("tools.screenshot")
 local fs = require("tests.support.fs_fixture")
@@ -26,7 +26,7 @@ local function install_world()
     pwsh = PWSH,
     files = { [REPO .. "/" .. shot.SCRIPT] = true },
     dirs = {},
-    result = "RESULT=OK 100,200,800,600 client C:/out.png",
+    result = "RESULT=OK 100,200,800,600 client bg C:/out.png",
     exit_code = 0,
     calls = {},
   }
@@ -67,6 +67,14 @@ local function argv_of()
   return world.calls[#world.calls].argv
 end
 
+-- argv 里扫某个开关是否出现（-Screen 之类没有值的开关）。
+local function has_flag(argv, flag)
+  for _, v in ipairs(argv) do
+    if v == flag then return true end
+  end
+  return false
+end
+
 describe("TestScreenshotParse", function()
   it("test_parse_rect_accepts_signed_origin", function()
     local rect = assert(shot.parse_rect("-10,20,800,600"))
@@ -79,16 +87,24 @@ describe("TestScreenshotParse", function()
     assert.is_nil(shot.parse_rect("a,b,c,d"))
   end)
 
-  it("test_framing_defaults_to_client_window", function()
+  it("test_framing_defaults_to_auto_window", function()
     local frame = assert(shot.framing({}))
     assert.are.equal("-Window", frame.flag)
-    assert.are.equal(shot.DEFAULT_WINDOW, frame.value)
+    -- 没有标题子串时交给抓屏脚本的 -Auto 选（编辑器进程里面积最大的窗口）。
+    assert.is_nil(frame.value)
+    assert.is_nil(shot.DEFAULT_WINDOW)
   end)
 
   it("test_framing_rect_overrides_window", function()
     local frame = assert(shot.framing({ rect = "1,2,3,4", window = "other" }))
     assert.are.equal("-Rect", frame.flag)
     assert.are.equal("1,2,3,4", frame.value)
+  end)
+
+  it("test_parse_accepts_screen_switch", function()
+    local opts = assert(shot.parse({ "--screen" }))
+    assert.is_true(opts.screen)
+    assert.is_nil(opts.window)
   end)
 end)
 
@@ -100,6 +116,7 @@ describe("TestScreenshotCommand", function()
     local code, out, err = run({ "--help" })
     assert.are.equal(0, code, err)
     assert.matches("--window", out, 1, true)
+    assert.matches("--screen", out, 1, true)
     assert.are.equal(0, #world.calls)
   end)
 
@@ -123,7 +140,7 @@ describe("TestScreenshotCommand", function()
     assert.matches("找不到 pwsh", err, 1, true)
   end)
 
-  it("test_default_captures_client_window_into_tmp", function()
+  it("test_default_uses_background_channel_with_auto_window", function()
     local code, out, err = run({})
     assert.are.equal(0, code, err)
     local argv = argv_of()
@@ -133,10 +150,11 @@ describe("TestScreenshotCommand", function()
     assert.matches(shot.SCRIPT, argv[4], 1, true)
     assert.are.equal("-Out", argv[5])
     assert.matches("/tmp/screenshot-", argv[6], 1, true)
-    assert.are.equal("-Window", argv[7])
-    assert.are.equal("client", argv[8])
+    assert.are.equal("-Auto", argv[7], "缺省交给脚本自动选窗")
+    assert.is_nil(argv[8])
+    assert.is_false(has_flag(argv, "-Screen"), "缺省走后台抓屏")
     assert.are.equal(argv[6] .. "\n", out)
-    assert.matches("取景 100,200,800,600 client", err, 1, true)
+    assert.matches("通道=后台", err, 1, true)
   end)
 
   it("test_window_and_out_are_forwarded", function()
@@ -149,12 +167,24 @@ describe("TestScreenshotCommand", function()
     assert.are.equal(REPO .. "/tmp/a.png\n", out)
   end)
 
-  it("test_rect_overrides_default_window", function()
+  it("test_screen_switch_requests_desktop_composition", function()
+    world.result = "RESULT=OK 100,200,800,600 client screen C:/out.png"
+    local code, _, err = run({ "--window", "钓鱼", "--screen" })
+    assert.are.equal(0, code, err)
+    local argv = argv_of()
+    assert.are.equal("-Window", argv[7])
+    assert.are.equal("钓鱼", argv[8])
+    assert.is_true(has_flag(argv, "-Screen"))
+    assert.matches("通道=桌面合成", err, 1, true)
+  end)
+
+  it("test_rect_forces_desktop_composition", function()
     local code, _, err = run({ "--rect", "10,20,30,40" })
     assert.are.equal(0, code, err)
     local argv = argv_of()
     assert.are.equal("-Rect", argv[7])
     assert.are.equal("10,20,30,40", argv[8])
+    assert.is_true(has_flag(argv, "-Screen"), "屏幕矩形只能走桌面合成")
   end)
 
   it("test_info_reports_display_verdict", function()
@@ -163,8 +193,7 @@ describe("TestScreenshotCommand", function()
     assert.are.equal(0, code, err)
     local argv = argv_of()
     assert.are.equal("-Info", argv[5])
-    assert.are.equal("-Window", argv[6])
-    assert.are.equal("client", argv[7])
+    assert.are.equal("-Auto", argv[6], "--info 缺省同样自动选窗")
     assert.matches("判定 非虚拟屏", out, 1, true)
     assert.are.equal("", err)
   end)
@@ -178,7 +207,7 @@ describe("TestScreenshotCommand", function()
 
   it("test_info_failure_reports_reason_and_exits_1", function()
     world.exit_code = 1
-    world.result = "RESULT=FAIL WINDOW_NOT_FOUND 没有标题包含「client」的可见窗口\r\n"
+    world.result = "RESULT=FAIL WINDOW_NOT_FOUND 找不到编辑器进程（client.exe）可见窗口\r\n"
     local code, out, err = run({ "--info" })
     assert.are.equal(1, code)
     assert.matches("WINDOW_NOT_FOUND", err, 1, true)
@@ -187,7 +216,7 @@ describe("TestScreenshotCommand", function()
 
   it("test_capture_failure_reports_reason_and_exits_1", function()
     world.exit_code = 1
-    world.result = "RESULT=FAIL WINDOW_NOT_FOUND 没有标题包含「client」的可见窗口\n"
+    world.result = "RESULT=FAIL WINDOW_NOT_FOUND 找不到编辑器进程（client.exe）可见窗口\n"
     local code, out, err = run({})
     assert.are.equal(1, code)
     assert.matches("WINDOW_NOT_FOUND", err, 1, true)
@@ -195,7 +224,7 @@ describe("TestScreenshotCommand", function()
   end)
 
   it("test_success_without_file_exits_1", function()
-    world.result = "RESULT=OK 1,2,3,4 rect C:/missing.png"
+    world.result = "RESULT=OK 1,2,3,4 rect: 1,2,3,4 screen C:/missing.png"
     world.file_created = false
     local code, _, err = run({})
     assert.are.equal(1, code)

@@ -1,13 +1,14 @@
--- screenshot 子命令：抓桌面合成像素存 PNG（虚拟屏兜底；ADR-0017）。
+-- screenshot 子命令：抓游戏/编辑器画面存 PNG。
 -- 在仓库根执行 `lua tools/cli.lua screenshot ...`。
 --
--- 背景：editor-cli 的 `screenshot game` / `screenshot editor` 走窗口表面抓取（PrintWindow）。
--- 在虚拟显示器上（UU 远程的 GameViewer Virtual Display Adapter 这类）3D 画面只存在于桌面
--- 合成里，窗口表面抓到的是旧画面：可能整张黑帧，也可能尺寸正常、内容停在旧帧却校验通过
--- （#185）。本命令改读桌面合成（CopyFromScreen），是虚拟屏上取证游戏画面的入口；`--info`
--- 只报显示路径（虚拟屏 / 非虚拟屏 / 不确定），判据是显示器适配器是否挂在 PCI 总线上。
+-- 两条通道：
+--   后台（缺省）    PrintWindow + PW_RENDERFULLCONTENT 直接读窗口表面，目标窗口被遮挡也能取当前帧
+--   前台（--screen）CopyFromScreen 读桌面合成，目标窗口必须在最前面；被盖住时抓到的是遮挡物
 --
--- 前置条件：目标窗口必须真的显示在屏幕上——被别的窗口盖住时，抓到的是遮挡物。
+-- 缺省取景是编辑器主窗口（client.exe 进程里面积最大的窗口），试玩时游戏视口就在它里面。
+-- 选窗一律排除 WS_EX_LAYERED 的辅助表面：Qt 的 Qt5QWindowToolSaveBits 这类窗口标题也叫
+-- client，却什么都不画，桌面合成在那个矩形上给的是盖在上层的别的东西（#185）。
+-- `--info` 只报显示路径（虚拟屏 / 非虚拟屏 / 不确定），判据是显示器适配器是否挂在 PCI 总线上。
 --
 -- 进程与文件系统探测只经 tools/seam.lua（唯一接缝）：pwsh 由 seam.which 定位并做一次真实
 -- 调用验证，抓屏经 seam.capture{argv} 执行同目录的 screenshot_capture.ps1。
@@ -19,25 +20,28 @@ local M = {}
 
 M.SCRIPT = "tools/screenshot_capture.ps1"
 
--- 默认目标窗口：编辑器试玩时游戏画面那层顶层窗口的标题就叫 client。
-M.DEFAULT_WINDOW = "client"
+-- 缺省不指定标题：抓屏脚本按 -Auto 自动选（编辑器进程里面积最大的窗口）。
+M.DEFAULT_WINDOW = nil
 
 function M.usage()
   return table.concat({
-    "用法: lua tools/cli.lua screenshot [--window <标题子串> | --rect X,Y,W,H] [--out <文件.png>]",
+    "用法: lua tools/cli.lua screenshot [--window <标题子串>] [--screen] [--out <文件.png>]",
+    "      lua tools/cli.lua screenshot --rect X,Y,W,H [--out <文件.png>]",
     "      lua tools/cli.lua screenshot --info [--window <标题子串>]",
     "",
-    "抓桌面合成像素存 PNG。给虚拟屏用：3D 画面只在桌面合成里，",
-    "editor-cli 的 screenshot 走窗口表面抓取，在虚拟屏上拿到的是黑帧或旧帧。",
+    "抓画面存 PNG。缺省走后台抓屏（PrintWindow），读窗口表面，目标窗口被遮挡也能取到当前帧；",
+    "取景缺省是编辑器主窗口，试玩时游戏视口就在它里面。",
     "",
     "选项：",
-    "  --window <子串>   取标题包含该子串、面积最大的可见顶层窗口的客户区（缺省 client）",
-    "  --rect X,Y,W,H    直接给屏幕矩形，覆盖 --window",
+    "  --window <子串>   取标题包含该子串、面积最大的窗口（排除不可见与 layered 辅助表面）；",
+    "                    省略时自动选编辑器进程（client.exe）里面积最大的窗口",
+    "  --screen          改走桌面合成（CopyFromScreen），抓窗口在屏幕上显示的样子；",
+    "                    目标窗口必须在最前面，被盖住时抓到的是遮挡物",
+    "  --rect X,Y,W,H    直接给屏幕矩形（只能走桌面合成），覆盖 --window",
     "  --out <文件.png>  输出路径（缺省 tmp/screenshot-<时间>.png，相对路径相对仓库根）",
     "  --info            只报显示路径与判定（虚拟屏 / 非虚拟屏 / 不确定），不抓图；",
-    "                    与 --rect 互斥，--window 缺省 client",
+    "                    与 --rect 互斥",
     "",
-    "前置条件：目标窗口必须显示在屏幕上；被盖住时抓到的是遮挡物，先把窗口切到前台。",
     "成功时 stdout 只输出一行绝对 PNG 路径，退出码 0；找不到窗口或抓屏失败 1；",
     "pwsh 不在 PATH 上时在抓屏前以退出码 3 失败。",
     "",
@@ -54,6 +58,8 @@ function M.parse(args)
       opts.help = true
     elseif a == "--info" then
       opts.info = true
+    elseif a == "--screen" then
+      opts.screen = true
     elseif a == "--window" or a == "--rect" or a == "--out" then
       local value = args[i + 1]
       if value == nil or value:match("^%-") then
@@ -92,14 +98,14 @@ local function resolve_out(root, value)
   return root .. "/" .. path:gsub("^%./", "")
 end
 
--- 取景参数：--rect 优先，否则按标题找窗口（缺省 client）。
+-- 取景参数：--rect 优先（只能前台），否则按窗口标题（空串=自动选窗）。
 function M.framing(opts)
   if opts.rect then
     local rect, err = M.parse_rect(opts.rect)
     if not rect then return nil, err end
     return { flag = "-Rect", value = opts.rect, rect = rect }
   end
-  return { flag = "-Window", value = opts.window or M.DEFAULT_WINDOW }
+  return { flag = "-Window", value = opts.window }
 end
 
 -- 抓屏脚本的 stdout：若干 INFO 行（人读）+ 一行 RESULT=<结果>。
@@ -115,7 +121,7 @@ end
 -- 显示路径自检：只问脚本，不抓图；取证前先看清是虚拟屏还是物理屏。
 function M.info(opts, env)
   if opts.rect then
-    io.stderr:write("screenshot: --info 不能用 --rect；它按窗口标题判定所在屏\n")
+    io.stderr:write("screenshot: --info 不能用 --rect；它按窗口判定所在屏\n")
     return exit_code.USAGE
   end
   return exit_code.protect(function()
@@ -130,10 +136,14 @@ function M.info(opts, env)
       exit_code.unavailable("screenshot: 抓屏脚本缺失: " .. script)
     end
 
-    local code, body = seam.capture({
-      argv = { pwsh, "-NoProfile", "-File", script, "-Info", "-Window", opts.window or M.DEFAULT_WINDOW },
-      tmp_dir = root .. "/tmp",
-    })
+    local argv = { pwsh, "-NoProfile", "-File", script, "-Info" }
+    if opts.window then
+      argv[#argv + 1] = "-Window"
+      argv[#argv + 1] = opts.window
+    else
+      argv[#argv + 1] = "-Auto"
+    end
+    local code, body = seam.capture({ argv = argv, tmp_dir = root .. "/tmp" })
     local lines, result = M.parse_info(body)
     local verdict = result and result:match("^OK%s+INFO%s+(.+)$")
     if code ~= 0 or not verdict then
@@ -186,21 +196,36 @@ function M.main(args, env)
       or (root .. "/tmp/screenshot-" .. os.time() .. ".png")
     seam.ensure_dir(out:match("^(.*)/[^/]*$") or root)
 
-    local code, body = seam.capture({
-      argv = { pwsh, "-NoProfile", "-File", script, "-Out", out, frame.flag, frame.value },
-      tmp_dir = root .. "/tmp",
-    })
+    local argv = { pwsh, "-NoProfile", "-File", script, "-Out", out }
+    if frame.rect then
+      -- 屏幕矩形没有窗口可抓，桌面合成是唯一通道。
+      argv[#argv + 1] = "-Rect"
+      argv[#argv + 1] = frame.value
+      argv[#argv + 1] = "-Screen"
+    else
+      if opts.window then
+        argv[#argv + 1] = "-Window"
+        argv[#argv + 1] = opts.window
+      else
+        argv[#argv + 1] = "-Auto"
+      end
+      -- --screen 显式要求抓屏幕上显示的样子，缺省是后台抓窗口表面。
+      if opts.screen then argv[#argv + 1] = "-Screen" end
+    end
+
+    local code, body = seam.capture({ argv = argv, tmp_dir = root .. "/tmp" })
     local line = tostring(body):match("RESULT=([^\r\n]*)")
     if code ~= 0 or not line or line:sub(1, 2) ~= "OK" then
       local reason = line and (line:gsub("^FAIL%s*", "")) or tostring(body)
       io.stderr:write("screenshot: " .. reason .. "\n")
       return exit_code.FAILURE
     end
-    -- 抓对了没有取决于窗口，把实际取景打给人看；stdout 只留路径给脚本消费。
-    local geometry, tail = line:match("^OK%s+(%S+)%s+(.*)$")
-    if geometry then
-      local label = tail:match("^(.-)%s+%S+$") or tail
-      io.stderr:write("screenshot: 取景 " .. geometry .. " " .. label .. "\n")
+    -- 抓对了没有取决于窗口与通道，把实际取景和通道打给人看；stdout 只留路径给脚本消费。
+    local rest = line:match("^OK%s+%S+%s+(.*)$")
+    if rest then
+      local label, channel = rest:match("^(.-)%s+(%S+)%s+%S+$")
+      io.stderr:write("screenshot: 取景 " .. (line:match("^OK%s+(%S+)") or "?") .. " " ..
+        (label or rest) .. " 通道=" .. (channel == "bg" and "后台" or "桌面合成") .. "\n")
     end
     if not seam.exists(out) then
       io.stderr:write("screenshot: 抓屏脚本声称成功但文件不存在: " .. out .. "\n")
