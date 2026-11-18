@@ -1,4 +1,5 @@
--- 失败方式：漏录/重复源行、作废售卖、金额和限购错位、抽奖返奖混淆、保底或货币错误、引用失效。
+-- 失败方式：漏录/重复源行、作废售卖、金额和限购错位、抽奖返奖混淆、保底或货币错误、引用失效；
+--   内容表被运行期写入污染（#203：重载 GameCfg 后键集合变化、锚点入口指向未解析的场景区域表）。
 -- 迁移自 tests/gameplay/cfg_shop_lottery_test.lua（#83）；案例顺序沿用旧入口的方法名字典序。
 describe("TestContentCfg", function()
   it("test_blindbox_weight_pricing_and_pity", function()
@@ -26,6 +27,31 @@ describe("TestContentCfg", function()
     assert.are.equal('极品美人鱼', box.Entries[1].itemName)
     assert.are.equal('极品蛇颈龙', box.Entries[2].itemName)
     assert.is_true(box.Entries[1].jackpot and box.Entries[2].jackpot)
+  end)
+
+  -- #203：内容表只承载内容。运行期写入一旦落在 require('common.cfg.Lottery') 返回的共享表上，
+  -- 任何一次 loadfile('common/GameCfg.lua')()（测试重载不换 package.loaded）都会改写它的键，
+  -- 而分片跑时没有别的文件把锚点入口装回来，抽奖结算全部被范围校验拒绝。
+  it("test_lottery_content_table_holds_no_runtime_keys_across_gamecfg_reload", function()
+    local ZoneFixtures = require('tests.support.zone_fixtures')
+    ZoneFixtures.Load()
+    local content = require('common.cfg.Lottery')
+    local before = {}
+    for key in pairs(content) do before[#before + 1] = key end
+    table.sort(before)
+    for key, value in pairs(content) do
+      assert.are_not.equal('function', type(value), '内容表不能承载运行期函数：' .. tostring(key))
+    end
+    local anchors = require('common.GameCfg').Lottery.MachineAnchors
+    assert(loadfile('common/GameCfg.lua'))()
+    local after = {}
+    for key in pairs(content) do after[#after + 1] = key end
+    table.sort(after)
+    assert.same(before, after)
+    -- 重载换不掉已加载模块表上的可调用入口：函数指针原样，锚点仍取同一份场景解析结果
+    assert.is_true(anchors == require('common.GameCfg').Lottery.MachineAnchors)
+    assert.same({ 'Z1_Lottery', 'Z2_Lottery', 'Z3_Lottery', 'Z4_Lottery', 'Z5_Lottery', 'Z6_Lottery', 'Z7_Lottery' },
+      anchors())
   end)
 
   it("test_lottery_has_seven_patterns_and_independent_prizes", function()

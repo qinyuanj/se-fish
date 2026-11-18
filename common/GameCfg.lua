@@ -512,7 +512,13 @@ GameCfg.Compendium = { RefreshSec = 3, RootPollSec = 0.5, RequestCooldownSec = 0
 GameCfg.AchievementDelivery = { RetrySec = 15 }
 GameCfg.Shop.Catalog = ContentShop.Goods
 GameCfg.Shop.Excluded = ContentShop.Excluded
-GameCfg.Lottery = ContentLottery
+-- 抽奖运行期配置（#203）：内容表（common/cfg/Lottery.lua）只承载内容，运行期写入只落在本表顶层键上。
+-- 直接复用内容表时，任何一次加载本文件（测试的 loadfile 重载不换 package.loaded）都会改写
+-- require('common.cfg.Lottery') 同一张表的键；这里浅拷贝顶层键，运行期写入随模块表存在。
+-- 嵌套内容（Patterns 等）仍与内容表同表，只读使用。
+local LotteryCfg = {}
+for key, value in pairs(ContentLottery) do LotteryCfg[key] = value end
+GameCfg.Lottery = LotteryCfg
 -- 抽奖机运行参数（#138 T17，GameSpec §14 与策划案抽奖段）：内容表（七图案/权重/倍数/大奖）
 -- 在 common/cfg/Lottery.lua；这里是行为参数。投注为投入物的实际回收价值
 -- （GameCfg.Items.SalePrice 未烤口径）；结果服务端先定并持久化，动画只是表现：
@@ -532,6 +538,7 @@ GameCfg.Lottery.AxisOrder = { 'left', 'right', 'middle' } -- 停轴顺序，客�
 GameCfg.Lottery.ResultTimeoutSec = 5
 -- 每区一台抽奖机：锚点名复用 #125 场景合同的 Lottery 实体（Z1_Lottery … Z7_Lottery）；
 -- 现场未建的区取不到单位时交互自然拒绝（范围校验找不到锚点），不伪造可用性。
+-- 入口随运行期表走（#203）：它不在共享内容表上，重载 GameCfg 换不掉已加载模块表里的这个函数。
 function GameCfg.Lottery.MachineAnchors()
     local names = {}
     for _, zone in ipairs(GameCfg.Zones) do
