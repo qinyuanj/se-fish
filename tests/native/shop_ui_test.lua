@@ -165,7 +165,10 @@ end)
 --  19. 服务端拒绝时客户端伪成功（扣金币 / 行转已购）→ 玩家以为买到了；
 --  20. 买成后金币条等属性刷新、行与详情不刷新 → 当场看不到扣款，已买满的行还能点；
 --  21. 本地拒绝静默 → 玩家不知道为什么买不了。
-describe("钓场商店界面（#216 固定骨架 / #217 行与选中 / #218 详情与购买）", function()
+--  22. 买不起仍显示「购买」并发出必被拒的请求（#219）→ 玩家被拒两次，还找不到获得金币的入口；
+--  23. 金币页平台缺失/抛错时伪成功、发请求或卡住页签（#219）→ 玩家以为买到了，或回不去商店；
+--  24. 金币页写出汇率、价目换算或平台商品 ID（#219 编造后台参数），界面另写第二套文案。
+describe("钓场商店界面（#216 固定骨架 / #217 行与选中 / #218 详情与购买 / #219 金币引导与降级）", function()
     local ctx
 
     -- 行下标按商店编号找：行序取自 GameCfg.Shop.ListForPage，别在用例里数下标（数错就测成别的商品）
@@ -176,7 +179,8 @@ describe("钓场商店界面（#216 固定骨架 / #217 行与选中 / #218 详�
     end
 
     before_each(function()
-        ctx = { nodes = {}, created = {}, commands = {}, events = {}, notices = {} }
+        ctx = { nodes = {}, created = {}, commands = {}, events = {}, notices = {},
+            attributes = { FishCoin = 77 } }
         ctx.previous = { game = rawget(_G, 'game'), Vector2 = rawget(_G, 'Vector2'),
             Color = rawget(_G, 'Color'), REUtil = rawget(_G, 'REUtil'),
             GameUI = rawget(_G, 'GameUI'), MgrGameUI = rawget(_G, 'MgrGameUI'),
@@ -210,7 +214,8 @@ describe("钓场商店界面（#216 固定骨架 / #217 行与选中 / #218 详�
         _G.game = { GetService = function(_, name)
             if name == 'World' then return world end
             if name == 'Players' then
-                return { LocalPlayer = { GetAttribute = function() return 77 end } }
+                -- 余额在用例里可改：金币不足的引导（#219）据此切换购买按钮文案
+                return { LocalPlayer = { GetAttribute = function(_, key) return ctx.attributes[key] end } }
             end
         end }
         _G.Vector2 = { New = function(x, y) return { x = x, y = y } end }
@@ -341,7 +346,8 @@ describe("钓场商店界面（#216 固定骨架 / #217 行与选中 / #218 详�
         assert.same('locked', rowOf(1).state)
         assert.same('需 7 级摊位', rowOf(1).stateText)
         ctx.handler:SetPage('升级')
-        assert.same('请先完成前一级升级', rowOf(32).stateText) -- 背包升级2：越级（当前 0 级）
+        -- 跨真源：行上的越级原因与本地拒绝文案是同一句（LocalShop.FailText.level），界面不另写一份
+        assert.same(ctx.localShop.FailText.level, rowOf(32).stateText) -- 背包升级2：越级（当前 0 级）
         assert.same('buy', rowOf(41).state)                    -- 弹容量升级1：逐级可买
         assert.same('', rowOf(41).stateText)
         assert.same('buy', rowOf(51).state)                    -- 近战武器升级1
@@ -358,6 +364,9 @@ describe("钓场商店界面（#216 固定骨架 / #217 行与选中 / #218 详�
                 assert.is_nil(row.stateText:find('强化', 1, true), row.name .. ' 的行文字用了「强化」')
             end
         end
+        for name, text in pairs(ctx.localShop.ShopText) do -- 文案表（#219 的真源）同样守这一条
+            if text:find('强化', 1, true) then fail('文案 ' .. name .. ' 用了「强化」：' .. text) end
+        end
     end)
 
     -- 唯一购买入口（#218）：只有详情区的 BtnShopBuyDetail 会下单，点列表行只换选中（#217）。
@@ -370,13 +379,58 @@ describe("钓场商店界面（#216 固定骨架 / #217 行与选中 / #218 详�
         assert.same(2, ctx.handler:View().selected)
         ctx.nodes.BtnShopBuyDetail.OnClicked:Fire()
         assert.same({ { action = 'Buy', number = 12, seq = 1 } }, ctx.commands)
-        -- 升级行走同一条入口与同一个购买键（编号 41 = 弹容量升级1）
+        -- 升级行走同一条入口与同一个购买键（编号 41 = 弹容量升级1，200 金币）：这里测的是下单入口，
+        -- 余额调到买得起——买不起时按钮会就地变成「去地图商店」（#219），下单路径另有用例覆盖。
+        ctx.attributes.FishCoin = 1000
+        ctx.events.ItemBarState.OnClientEvent:Fire({})
         ctx.handler:SetPage('升级')
         assert.is_true(ctx.handler:Select(rowIndexOf(ctx.handler:View(), 41)))
         ctx.nodes.BtnShopBuyDetail.OnClicked:Fire()
         assert.same(41, ctx.commands[2].number)
         assert.is_nil(ctx.commands[2].itemId)
         assert.same(2, ctx.commands[2].seq)
+    end)
+
+    -- 金币不足就地引导（#219）：余额买不起选中行时，详情区的购买按钮就地变成「去地图商店」，
+    -- 点了落到金币页且**不发购买请求**；余额回来后按钮变回「购买」，点了才下单。
+    -- 失败方式：
+    --   1. 买不起仍写「购买」→ 点了发出必被服务端拒的请求（玩家被拒两次还不知道出路）；
+    --   2. 引导按钮照样下单（或跳外部、关屏），玩家花了冤枉钱或回不来；
+    --   3. 余额够了按钮仍是引导（买得起的商品反而买不了）；
+    --   4. 买完余额降到价格以下、按钮不跟着变（当场还能点一次必被拒的购买）。
+    it("test_insufficient_coin_turns_buy_into_coin_page_guide", function()
+        local texts = ctx.localShop.ShopText
+        ctx.attributes.FishCoin = 1
+        ctx.events.ItemBarState.OnClientEvent:Fire({})    -- 属性刷新：重读余额 1 金币
+        assert.is_true(ctx.handler:Select(1))             -- 钓具页第 1 行 = 香肠（编号 11，2 金币）
+        local detail = ctx.handler:View().detail
+        assert.same(texts.GoPlatformShop, detail.buyText)
+        assert.same('coin', detail.buyAction)
+        assert.is_true(detail.buyEnabled)                 -- 引导是可点的入口，不是灰按钮
+        assert.same(texts.GoPlatformShop, ctx.nodes.LabelShopBuyDetail.Text)
+        ctx.nodes.BtnShopBuyDetail.OnClicked:Fire()
+        assert.same({}, ctx.commands)                     -- 这一步没有发出购买请求
+        local view = ctx.handler:View()
+        assert.same(GameCfg.Shop.Pages[#GameCfg.Shop.Pages], view.page) -- 就地落到金币页
+        assert.is_true(view.panels.coin)
+        assert.is_nil(view.selected)
+        -- 切回商品页、余额也回来：按钮变回「购买」，点了才下单
+        ctx.attributes.FishCoin = 100
+        ctx.events.ItemBarState.OnClientEvent:Fire({})
+        ctx.handler:SetPage('钓具')
+        assert.is_true(ctx.handler:Select(1))
+        assert.same(texts.Buy, ctx.handler:View().detail.buyText)
+        assert.same(texts.Buy, ctx.nodes.LabelShopBuyDetail.Text)
+        ctx.nodes.BtnShopBuyDetail.OnClicked:Fire()
+        assert.same({ { action = 'Buy', number = 11, seq = 1 } }, ctx.commands)
+        -- 买完余额只剩 1 金币（服务端回包 coinAfter）：按钮当场变回引导，不再发出必被拒的购买
+        ctx.commands = {}
+        ctx.events.ShopResult.OnClientEvent:Fire({ ok = true, number = 11, price = 2, coinAfter = 1 })
+        local after = ctx.handler:View()
+        assert.same('1', after.coinText)
+        assert.same(texts.GoPlatformShop, after.detail.buyText)
+        assert.same('coin', after.detail.buyAction)
+        assert.same({}, ctx.commands)
     end)
 
     -- 选中：点行只选中不下单；快照逐行暴露 selected；整体重绘（购买回包）后选中的还是同一行。
@@ -524,25 +578,70 @@ describe("钓场商店界面（#216 固定骨架 / #217 行与选中 / #218 详�
         end
     end)
 
-    -- 金币页：只显示自己的容器、没有商品行；平台缺失或抛错都只提示、不关屏、不发购买请求
+    -- 金币页降级（#219 按新结构重写 #218 的旧用例：旧断言只查提示子串，看不出「发了请求 / 伪成功 / 卡住」）：
+    -- 平台能力缺失 / 打开抛错都只提示、不发请求、不伪成功，页签照常切换（不卡死在金币页）；
+    -- 打开成功时请求归平台模块，本屏只给中性提示、不承诺买到了。
+    -- 失败方式：
+    --   1. 平台缺失或抛错时记成已打开（伪成功）或照样发请求；
+    --   2. 提示留在旧值，或金币页把页签占死（切不回其它分页）；
+    --   3. 金币页写出汇率、价目换算或平台商品 ID（编造后台参数）；
+    --   4. 界面另写一套文案（LocalShop 里的文案改了，界面还是旧句子）。
     it("test_coin_page_degrades_without_faking_success", function()
+        local texts = ctx.localShop.ShopText
         ctx.handler:SetPage('金币')
         local view = ctx.handler:View()
-        assert.same({}, numbersOf(view.rows))
+        assert.same({}, numbersOf(view.rows))          -- 金币页没有商品行
         assert.is_true(view.panels.coin)
         assert.is_false(view.panels.list)
-        assert.is_false(view.panels.detail) -- 金币页不叠详情区（#218）
+        assert.is_false(view.panels.detail)            -- 金币页不叠详情区（#218）
         assert.is_nil(view.detail.number)
+        assert.same(texts.CoinPageHint, view.coinHint) -- 进入金币页的默认提示
+        assert.same('idle', view.coinState)
+
+        -- 平台能力缺失：只提示、不发请求、屏不关
         ctx.nodes.BtnOpenPlatformShop.OnClicked:Fire()
-        assert.matches('平台商店暂不可用', ctx.handler:View().coinHint, 1, true)
+        view = ctx.handler:View()
+        assert.same('unavailable', view.coinState)
+        assert.same(texts.PlatformUnavailable, view.coinHint)
+        assert.same(view.coinHint, ctx.nodes.LabelCoinPageHint.Text)
+        assert.same({}, ctx.commands)
         assert.is_true(ctx.handler.IsOpen)
+
+        -- 页签照常切回：不卡死在金币页
+        ctx.handler:SetPage('钓具')
+        assert.same('钓具', ctx.handler:View().page)
+        assert.same(11, numbersOf(ctx.handler:View().rows)[1])
+
+        -- 打开抛错：记失败，错误串只进日志、不拼进玩家文案
+        ctx.handler:SetPage('金币')
         _G.PlatformShop = { Open = function() error('平台未接入') end }
         ctx.nodes.BtnOpenPlatformShop.OnClicked:Fire()
-        assert.matches('打开失败', ctx.handler:View().coinHint, 1, true)
-        assert.is_true(ctx.handler.IsOpen)
-        ctx.handler:SetPage('钓具')
-        assert.same(11, numbersOf(ctx.handler:View().rows)[1])
+        view = ctx.handler:View()
+        assert.same('failed', view.coinState)
+        assert.same(texts.PlatformOpenFailed, view.coinHint)
         assert.same({}, ctx.commands)
+        ctx.handler:SetPage('武器')
+        assert.same('武器', ctx.handler:View().page)
+
+        -- 打开成功：请求由平台模块发出（本屏不发购买请求），提示中性、不承诺买到
+        ctx.handler:SetPage('金币')
+        local opened = 0
+        _G.PlatformShop = { Open = function() opened = opened + 1 end }
+        ctx.nodes.BtnOpenPlatformShop.OnClicked:Fire()
+        view = ctx.handler:View()
+        assert.same(1, opened)
+        assert.same('opened', view.coinState)
+        assert.same(texts.PlatformOpened, view.coinHint)
+        assert.same({}, ctx.commands)
+
+        -- 不编造数据：金币页可见文案里没有汇率、价目换算与平台商品 ID
+        for _, text in ipairs({ texts.CoinPageHint, texts.PlatformUnavailable, texts.PlatformOpenFailed,
+            texts.PlatformOpened }) do
+            if text:find('%d') then fail('金币页文案不该出现数字（汇率/价目）：' .. text) end
+            for _, banned in ipairs({ '汇率', '兑换', '折', '商品ID', 'goodsId' }) do
+                if text:find(banned, 1, true) then fail('金币页文案不该出现「' .. banned .. '」：' .. text) end
+            end
+        end
     end)
 
     -- 重开商店：回到钓具页，不残留选中与上一条详情（关屏不做事，复位靠 OpenScreen）

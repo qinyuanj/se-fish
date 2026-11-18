@@ -12,8 +12,10 @@
 -- （文字清空、购买按钮禁用），切页签与重开商店都不留上一条的残留。全屏只有 BtnShopBuyDetail 能下单；
 -- 锁定与已购行在节点层禁用、Select 也拒绝（这是对 #217「锁定行同样可选中」的反转，依据 #214 用户故事 20）。
 -- 买成后金币条取服务端回包的 coinAfter、行与详情立刻刷新；服务端拒绝时不改本地金币与行状态。
--- 失败文案只来自 client/LocalShop.lua 的 FailText（与 ShopResult 通道同一份），界面里不另写一套。
--- 金币页是平台商店入口：平台不可用时提示并可返回其他分页，不伪成功（汇率与商品 ID 由后台交付）。
+-- 玩家可见文案只来自 client/LocalShop.lua（FailText 与 ShopText 同一处真源），界面里不另写一套。
+-- #219：余额买不起选中行时，详情区购买按钮就地变成「去地图商店」，点了切到金币页、不发购买请求；
+-- 金币页是地图商店入口：平台能力缺失或打开失败只提示、不发请求、不伪成功，页签照常可切
+-- （汇率与商品 ID 由后台交付，界面里不出现）。
 -- 唯一的测试接缝是 View()（纯显示快照）：单测只断言显示了什么、点了发出什么、登记表计数。
 local GameCfg = require('common.GameCfg')
 local OwnedUnits = require('common.OwnedUnits')
@@ -21,6 +23,9 @@ local LocalShop = require('client.LocalShop')
 
 local TabNames = GameCfg.Shop.Pages
 local CoinPage = TabNames[#TabNames]              -- 金币页是最后一个页签
+
+-- 玩家可见文案统一取 client/LocalShop.lua（#219）：界面里不写第二套字符串。
+local Text, FailText = LocalShop.ShopText, LocalShop.FailText
 
 -- 皮肤参数：图 ID、字号、色板、行高、行间距、行内子节点几何只在这里给一次，换美术只改这张表。
 -- 数字出处：共享简报「骨架布局」「商品行几何」（ShopRoot 本地盒 1200×800，锚点统一左下对齐）。
@@ -40,6 +45,7 @@ local Skin = {
         ButtonActive = { 36, 130, 94, 255 },
         ButtonPress = { 36, 130, 94, 255 },
         ButtonDisable = { 120, 120, 120, 255 },
+        ButtonGuide = { 36, 130, 94, 255 },     -- 金币不足时按钮变「去地图商店」（#219）
         RowSelected = { 60, 132, 176, 255 },    -- 选中行高亮（#217）
     },
     -- 商品行：行间由列表视图的 ItemsMargin 负责；子节点坐标相对行左下角
@@ -73,33 +79,28 @@ end
 -- 行状态文案（#217 口径，与共享简报「商品行」一致）：已购 / 需 N 级摊位 / 请先完成前一级升级。
 -- 玩家可见文案不用术语表禁用的「强化」。
 local function stateText(state, goods, level)
-    if state == 'owned' then return '已购' end
+    if state == 'owned' then return Text.Owned end
     if state == 'locked' then
-        if goods.MinShopLevel > level then return '需 ' .. goods.MinShopLevel .. ' 级摊位' end
-        return '请先完成前一级升级'
+        if goods.MinShopLevel > level then return string.format(Text.StandLocked, goods.MinShopLevel) end
+        return FailText.level -- 越级原因与本地拒绝文案同一句，不另写一份
     end
     return ''
 end
 
 -- 本摊新解锁标记（#217）：MinShopLevel == 当前摊位等级即新品，不新增数据字段。
-local NewBadgeText = '新品'
-
--- 详情区（#218）的玩家可见文案：购买按钮、限购次数、升级等级都从这里出，界面里不再散落。
-local BuyText = '购买'
-
 -- 限购文案（#218）：已买几次 / 上限几次；没有限购的行明确写「不限购」，不留一个空格子。
 local function limitText(goods, bought)
     local limit = goods.PurchaseLimit or 0
-    if limit <= 0 then return '不限购' end
-    return '已购 ' .. bought .. ' / ' .. limit .. ' 次'
+    if limit <= 0 then return Text.NoLimit end
+    return string.format(Text.LimitText, bought, limit)
 end
 
 -- 升级类商品的等级（#218）：当前几级、买完升到几级；非升级行留空。买到这一级之后如实说已购买。
 local function upgradeText(goods, current)
     local upgrade = goods.Upgrade
     if not upgrade then return '' end
-    if current >= upgrade.level then return '当前 ' .. current .. ' 级，本行已购买' end
-    return '当前 ' .. current .. ' 级，买完升到 ' .. upgrade.level .. ' 级'
+    if current >= upgrade.level then return string.format(Text.UpgradeOwned, current) end
+    return string.format(Text.UpgradeTarget, current, upgrade.level)
 end
 
 -- 行文字颜色：禁用（锁定/已购）灰显 > 本摊新品金色 > 常规白色。色值只在皮肤表里出现一次。
@@ -119,6 +120,8 @@ local ScreenHandler = {
     UINodeMap = {}, Connections = {}, Seq = 0,
     Page = TabNames[1], Selected = nil, Purchases = {}, UpgradeLevels = {},
     DisplayRows = {}, RowCount = 0, Panels = { list = false, coin = false, detail = false },
+    -- 余额同时进显示与模型（#219）：详情区按钮是「购买」还是「去地图商店」由 Coin 决定
+    Coin = 0, CoinText = '0', CoinState = 'idle',
 }
 
 -- 四页签：按钮与文字都由骨架提供，这里只登记名字（顺序即 GameCfg.Shop.Pages）
@@ -154,7 +157,7 @@ function ScreenHandler:View()
     for index, row in ipairs(self.DisplayRows or {}) do
         rows[index] = { index = index, number = row.number, name = row.name, priceText = row.priceText,
             state = row.state, stateText = row.stateText,
-            isNew = row.isNew == true, newText = row.isNew and NewBadgeText or '',
+            isNew = row.isNew == true, newText = row.isNew and Text.New or '',
             selectable = row.state == 'buy',
             selected = index == self.Selected }
     end
@@ -166,6 +169,7 @@ function ScreenHandler:View()
         detail = self.Detail or self:DetailModel(),
         coinText = self.CoinText or '0',
         coinHint = self.CoinHintText,
+        coinState = self.CoinState,
         panels = { list = self.Panels.list, coin = self.Panels.coin, detail = self.Panels.detail },
     }
 end
@@ -188,7 +192,10 @@ function ScreenHandler:SetPage(page)
         if name == page then known = true end
     end
     if not known then return false end
+    local changed = self.Page ~= page
     self.Page, self.Selected = page, nil
+    -- 从别的页进金币页时回到默认提示：上一次的「打开失败」不跨次残留（#219）
+    if changed and page == CoinPage then self:SetCoinHint('idle', Text.CoinPageHint) end
     self:ShowGoods()
     return true
 end
@@ -207,22 +214,30 @@ function ScreenHandler:Buy(index)
     return true
 end
 
+-- 详情区唯一的购买按钮（#218）：买得起就下单；买不起就地引导到金币页（#219），这一步不发购买请求。
+function ScreenHandler:ConfirmBuy()
+    -- 现算模型：按钮动作跟着当前余额走，不读上一次渲染的缓存（#219）
+    if self:DetailModel().buyAction == 'coin' then return self:SetPage(CoinPage) end
+    return self:Buy(self.Selected)
+end
+
 -- 本地拒绝的提示：文案与 ShopResult 通道同一份（LocalShop.FailText），界面里不另写一套。
 function ScreenHandler:NoteFail(reason)
-    local texts = LocalShop.FailText
-    local text = reason and texts and texts[reason]
+    local text = reason and FailText[reason]
     if text and _G.LocalMsgNotice then _G.LocalMsgNotice(text) end
 end
 
-function ScreenHandler:SetCoinText(coin)
-    self.CoinText = tostring(math.floor(coin or 0))
+-- 余额既进显示（金币条）也进模型（#219）：详情区买不买得起据此判断，不在渲染时另读属性。
+function ScreenHandler:SetCoin(coin)
+    self.Coin = math.floor(coin or 0)
+    self.CoinText = tostring(self.Coin)
     local label = self.UINodeMap.LabelCurCoin
     if label then label.Text = self.CoinText end
 end
 
 function ScreenHandler:ShowCoin()
     local player = game:GetService('Players').LocalPlayer
-    self:SetCoinText(player and tonumber(player:GetAttribute('FishCoin')) or 0)
+    self:SetCoin(player and tonumber(player:GetAttribute('FishCoin')) or 0)
 end
 
 -- 容器切换：列表页与金币页各看各的容器，其余骨架（标题/页签/详情/金币条）常驻
@@ -248,24 +263,29 @@ function ScreenHandler:StyleTabs()
     end
 end
 
--- 金币页：平台商店入口（降级口径）。平台不可用时只提示、停留本屏（页签可返回），不伪成功。
+-- 金币页提示（#219）：文案只从 LocalShop.ShopText 取；状态进 View 快照，单测据此断言降级。
+function ScreenHandler:SetCoinHint(state, text)
+    self.CoinState, self.CoinHintText = state, text
+    local label = self.UINodeMap.LabelCoinPageHint
+    if label then label.Text = text end
+end
+
+-- 金币页：地图商店入口（#219，口径照 ScreenPlatform）。平台能力缺失或打开失败只提示、不发请求、
+-- 不伪成功；页签照常可切，玩家不会卡在金币页。打开成功也只给中性提示：买没买到以平台侧回执为准。
 function ScreenHandler:OpenPlatformShop()
     local platform = rawget(_G, 'PlatformShop')
-    local hint
     if type(platform) ~= 'table' or type(platform.Open) ~= 'function' then
-        hint = '平台商店暂不可用，请稍后再试；可返回其他分页继续购买金币商品'
-    else
-        local ok, err = pcall(function() platform:Open() end)
-        if ok then
-            hint = '已请求打开平台商店，请在平台侧完成购买'
-        else
-            print('[ScreenShop] 平台商店打开失败', tostring(err))
-            hint = '平台商店打开失败：' .. tostring(err) .. '；可返回其他分页'
-        end
+        self:SetCoinHint('unavailable', Text.PlatformUnavailable)
+        return false
     end
-    self.CoinHintText = hint
-    local label = self.UINodeMap.LabelCoinPageHint
-    if label then label.Text = hint end
+    local ok, err = pcall(function() platform:Open() end)
+    if not ok then
+        print('[ScreenShop] 打开地图商店失败', tostring(err)) -- 错误串只进日志，不拼进玩家文案
+        self:SetCoinHint('failed', Text.PlatformOpenFailed)
+        return false
+    end
+    self:SetCoinHint('opened', Text.PlatformOpened)
+    return true
 end
 
 function ScreenHandler:RowModel(goods, level)
@@ -329,7 +349,7 @@ function ScreenHandler:PaintRow(row, index, model)
             elseif child.Key == 'Name' then
                 node.Text, node.TextColor = model.name, textColor
             elseif child.Key == 'New' then
-                node.Text, node.TextColor = model.isNew and NewBadgeText or '', color(Skin.Color.TextNew)
+                node.Text, node.TextColor = model.isNew and Text.New or '', color(Skin.Color.TextNew)
             elseif child.Key == 'Price' then
                 node.Text, node.TextColor = model.priceText, textColor
             elseif child.Key == 'State' then
@@ -366,17 +386,24 @@ function ScreenHandler:DetailModel()
     local row = self.Selected and (self.DisplayRows or {})[self.Selected] or nil
     if not row then
         return { number = nil, name = '', desc = '', priceText = '', limitText = '', upgradeText = '',
-            buyText = BuyText, buyEnabled = false }
+            buyText = Text.Buy, buyAction = nil, buyEnabled = false }
     end
     local goods = row.goods
     local current = goods.Upgrade and self:CurrentUpgradeLevel(goods.Upgrade.kind) or 0
+    -- 买得起才下单；买不起时就地引导到金币页（#219）——同一个按钮，换的是动作与文案。
+    -- 不可买的行（锁定 / 已购）不给动作，按钮按空态禁用。
+    local action
+    if row.state == 'buy' then
+        action = (self.Coin or 0) >= (goods.Price or 0) and 'buy' or 'coin'
+    end
     return {
         number = row.number, name = row.name, desc = goods.Desc or '', icon = row.icon,
         priceText = row.priceText,
         limitText = limitText(goods, self.Purchases[goods.Number] or 0),
         upgradeText = upgradeText(goods, current),
-        buyText = BuyText,
-        buyEnabled = row.state == 'buy',
+        buyText = action == 'coin' and Text.GoPlatformShop or Text.Buy,
+        buyAction = action,
+        buyEnabled = action ~= nil,
     }
 end
 
@@ -401,10 +428,13 @@ function ScreenHandler:RenderDetail()
         if model.icon then icon.Image = model.icon end
     end
     if coinIcon then coinIcon.Visible = model.number ~= nil end
+    -- 按钮图归预制体，这里只刷颜色：引导态换另一色，玩家一眼看出这一下不是下单（#219）
     local button = nodes.BtnShopBuyDetail
     if button then
         button.Disabled = not model.buyEnabled
-        button.ButtonNormalColor = color(model.buyEnabled and Skin.Color.Button or Skin.Color.ButtonDisable)
+        local tone = Skin.Color.ButtonDisable
+        if model.buyEnabled then tone = model.buyAction == 'coin' and Skin.Color.ButtonGuide or Skin.Color.Button end
+        button.ButtonNormalColor = color(tone)
     end
 end
 
@@ -440,9 +470,10 @@ function ScreenHandler:NoteResult(result)
         if result.action == 'UpgradeStorage' and result.level then self.UpgradeLevel = result.level end
     end
     if not self.IsOpen then return end
-    self:ShowGoods()
+    -- 先定余额再重绘：详情按钮是「购买」还是「去地图商店」取决于更新后的金币（#219）
     self:ShowCoin()
-    if result.ok and type(result.coinAfter) == 'number' then self:SetCoinText(result.coinAfter) end
+    if result.ok and type(result.coinAfter) == 'number' then self:SetCoin(result.coinAfter) end
+    self:ShowGoods()
 end
 
 -- 只接线、不渲染：重建（换 RootNode 再 Init）时先按归属登记清掉上一轮的运行期建点，
@@ -454,6 +485,7 @@ function ScreenHandler:Init()
     self.Connections = {}
     self.RowCount, self.DisplayRows = 0, {}
     self.Selected, self.Page, self.Detail = nil, TabNames[1], nil
+    self.Coin, self.CoinText = 0, '0'
     self.Panels = { list = false, coin = false, detail = false }
     local function listen(signal, callback)
         if signal then self.Connections[#self.Connections + 1] = signal:Connect(callback) end
@@ -474,7 +506,7 @@ function ScreenHandler:Init()
         styleButton(close)
         -- 关闭按钮的文字在子节点 LabelShopClose（按钮自身的 ButtonText 由 styleButton 清空）
         local closeLabel = self.UINodeMap.LabelShopClose
-        if closeLabel then closeLabel.Text = '关闭' end
+        if closeLabel then closeLabel.Text = Text.Close end
         listen(close.OnClicked, function() _G.MgrGameUI:CloseScreen('ScreenShop') end)
     end
     -- 详情区（#218）：唯一购买入口。按钮图归预制体，这里只接线、清文字，未选中时按空态禁用。
@@ -483,10 +515,10 @@ function ScreenHandler:Init()
         styleButton(buy)
         buy.ButtonText = ''
         buy.Disabled = true
-        listen(buy.OnClicked, function() self:Buy(self.Selected) end)
+        listen(buy.OnClicked, function() self:ConfirmBuy() end)
     end
     local buyLabel = self.UINodeMap.LabelShopBuyDetail
-    if buyLabel then buyLabel.Text = BuyText end
+    if buyLabel then buyLabel.Text = Text.Buy end
     -- 行间距只在皮肤表里写一次，落在列表视图的 ItemsMargin 上
     local list = self.UINodeMap.ShopList
     if list then list.ItemsMargin = Skin.Row.Margin end
@@ -496,11 +528,12 @@ function ScreenHandler:Init()
         platform.ButtonText = ''
         listen(platform.OnClicked, function() self:OpenPlatformShop() end)
     end
-    local hint = self.UINodeMap.LabelCoinPageHint
-    if hint then self.CoinHintText = hint.Text end
+    local openLabel = self.UINodeMap.LabelOpenPlatformShop
+    if openLabel then openLabel.Text = Text.OpenPlatformShop end
+    self:SetCoinHint('idle', Text.CoinPageHint)
     listen(_G.REUtil:GetRE('ItemBarState').OnClientEvent, function(state)
         if state and state.upgradeLevel then self.UpgradeLevel = state.upgradeLevel end
-        if self.IsOpen then self:ShowGoods() self:ShowCoin() end
+        if self.IsOpen then self:ShowCoin() self:ShowGoods() end -- 先读余额再重绘（#219）
     end)
     listen(_G.REUtil:GetRE('ShopResult').OnClientEvent, function(result) self:NoteResult(result) end)
     self.BoundRootNode = self.RootNode
@@ -511,8 +544,8 @@ end
 function ScreenHandler:OpenScreen()
     self.IsOpen = true
     self.Page, self.Selected = TabNames[1], nil
+    self:ShowCoin() -- 先读余额：详情按钮是「购买」还是「去地图商店」取决于它（#219）
     self:ShowGoods()
-    self:ShowCoin()
 end
 
 function ScreenHandler:CloseScreen()
