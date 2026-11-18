@@ -1,6 +1,6 @@
 -- 钓场商店界面（#48/#90 多摊位；#130 四页；#216 固定骨架 + 运行期填行；#217 行内容与选中；
 -- #218 详情区与唯一购买入口；#219 金币不足就地引导）：
--- 骨架（标题、关闭、四页签、列表容器 ShopListPanel > ShopList、详情容器、金币页容器、底部金币条）
+-- 骨架（标题、关闭、四页签、列表容器 ShopListPanel > ShopList、详情容器、金币页容器、顶部金币条）
 -- 由预制体摆好；本屏只读骨架节点——Init 按 UINodes 从 RootNode 重新取一遍填表，不再运行时建页签、
 -- 翻页按钮或补位行。商品行由本屏建在 ShopList（EUIListView）之下并按序号复用，生命周期交给 OwnedUnits：
 -- 换 RootNode 再 Init 时上一轮整体销毁、登记表归零、节点表换新。
@@ -37,12 +37,13 @@ local function color(spec) return Color.New(spec[1], spec[2], spec[3], spec[4]) 
 
 local Skin                                       -- 皮肤表在下面填：行内子节点的写入函数要引用 Skin
 
--- 行文字颜色：禁用（已购 / 锁定灰显）> 本摊新品金色 > 常规白；色值只在皮肤表里出现一次。
--- 判据是行模型的 purchasable / isNew，这里不重判行状态。
+-- 行文字颜色：选中反白 > 不可购买行深色 > 本摊新品深棕 > 暖纸上的墨色。
+-- 判据是行模型的 selected / purchasable / isNew，这里不重判行状态。
 local function rowTextColor(row)
+    if row.selected then return Skin.Color.TextSelected end
     if not row.purchasable then return Skin.Color.TextDisabled end
     if row.isNew then return Skin.Color.TextNew end
-    return Skin.Color.Text
+    return Skin.Color.TextOnPaper
 end
 
 -- 行底色：选中高亮 > 禁用灰 > 常规。锁定与已购整天灰显（#214 故事 21），不是只换后缀文字的颜色。
@@ -56,59 +57,77 @@ local function writeText(node, text, tone)
     node.Text, node.TextColor = text or '', color(tone)
 end
 
+-- 商品行子节点与页签装饰共用一个建点入口，避免同类节点分散建点参数。
+local function createChildNode(world, kind, attrs)
+    return world:CreateUnit(kind, attrs)
+end
+
 -- 皮肤参数：图 ID、字号、色板、行高、行间距与行内子节点的几何 / 建点 / 写入方式只在这里给一次，
--- 换美术只改这张表。数字出处：共享简报「骨架布局」「商品行几何」（ShopRoot 本地盒 1200×800，锚点左下对齐）。
+-- 换美术只改这张表。ShopRoot 本地盒 1200×800；商品行子节点统一中心锚点，坐标为节点中心。
 do
-    -- 只有运行时新建的节点才从这里取图：预制体里的按钮与面板归编辑器，代码不覆盖它们的图。
+    -- 暖纸货单只使用已验证图片。行背景独立成 EUIImage，避免 11017 作为按钮底图遮住子文字。
     local Image = {
-        Panel = 'official://image/11017',   -- 官方正方形纯色块
-        Row = 'official://image/11017',     -- 运行时新建的行按钮底图
-        Coin = 'official://image/11017',    -- 金币图标占位：正式图随美术批次只改这一处
+        Panel = 'official://image/11017',   -- 可染色的货单与次级按钮底
+        Primary = 'official://image/10066', -- 全屏唯一金色购买动作
+        Coin = 'official://image/16878',    -- 与编辑器金币条共用正式金币图
     }
-    local Font = { Row = 24, RowSmall = 20 }
+    local Font = { Row = 28, RowSmall = 20, Price = 26 }
     local Palette = {
-        Text = { 255, 255, 255, 255 },
-        TextNew = { 255, 214, 92, 255 },        -- 本摊新解锁的名字金色（#217）
-        TextDisabled = { 150, 150, 150, 255 },  -- 锁定 / 已购行的文字灰显（#217）
-        Button = { 54, 100, 140, 255 },
-        ButtonActive = { 36, 130, 94, 255 },
-        ButtonPress = { 36, 130, 94, 255 },
-        ButtonDisable = { 120, 120, 120, 255 },
-        ButtonGuide = { 36, 130, 94, 255 },     -- 金币不足时按钮变「去地图商店」（#219）
-        Row = { 54, 100, 140, 255 },            -- 可买行的行底
-        RowSelected = { 60, 132, 176, 255 },    -- 选中行高亮（#217）
-        RowDisabled = { 74, 78, 86, 255 },      -- 锁定 / 已购行的行底灰显（#214 故事 21）
+        Text = { 232, 225, 207, 255 },          -- 墨绿框架上的帆布白，不用纯白
+        TextMuted = { 157, 171, 151, 255 },
+        TextOnPaper = { 41, 56, 47, 255 },
+        TextSelected = { 240, 231, 208, 255 },
+        TextOnActive = { 41, 56, 47, 255 },     -- 黄铜主按钮上的墨色
+        TextNew = { 128, 83, 26, 255 },
+        TextDisabled = { 57, 65, 54, 255 },
+        Button = { 255, 255, 255, 255 },        -- 保留金色主按钮图本色
+        ButtonPress = { 224, 224, 224, 255 },
+        ButtonDisable = { 74, 86, 74, 255 },
+        ButtonGuide = { 62, 112, 91, 255 },     -- 金币引导是次级动作，不抢购买的金色
+        Row = { 229, 220, 194, 255 },
+        RowSelected = { 62, 112, 91, 255 },
+        RowDisabled = { 174, 170, 148, 255 },
+        Brass = { 214, 168, 62, 255 },
     }
     -- 商品行内子节点：每个条目自带建点类型与参数（Kind / Create）和写入方式（Paint）。
-    -- 建行与刷行读同一份驱动数据，加一种子节点只加一个条目，不必同时改建点与刷点两处；
-    -- Paint 为 nil 表示不随行模型变（纯装饰，如金币图标）。
+    -- 背景在最底层，点击仍由透明行按钮统一接收；文本统一左对齐或右对齐，不按内容手调坐标。
     local Children = {
-        { Name = 'ShopRowIcon', Kind = 'EUIImage', X = 8, Y = 18, Width = 60, Height = 60,
+        { Name = 'ShopRowBackground', Kind = 'EUIImage', X = 330, Y = 44, Width = 660, Height = 88, Z = 0,
+            Create = { Image = Image.Panel, Color = color(Palette.Row) },
+            Paint = function(node, row) node.Color = color(rowBaseColor(row)) end },
+        { Name = 'ShopRowIcon', Kind = 'EUIImage', X = 48, Y = 44, Width = 56, Height = 56,
             Create = { Image = Image.Coin },
-            Paint = function(node, row) node.Image = row.icon end },
-        { Name = 'ShopRowNew', Kind = 'EUITextLabel', X = 76, Y = 54, Width = 84, Height = 36,
-            Create = { Text = '', FontSize = Font.RowSmall, TextColor = color(Palette.Text) },
+            Paint = function(node, row)
+                node.Visible = row.icon ~= nil and row.icon ~= ''
+                if row.icon then node.Image = row.icon end
+            end },
+        { Name = 'ShopRowNew', Kind = 'EUITextLabel', X = 132, Y = 20, Width = 80, Height = 24,
+            Create = { Text = '', FontSize = Font.RowSmall, TextColor = color(Palette.TextNew),
+                TextHorizontalAlignment = 0, TextVerticalAlignment = 1 },
             Paint = function(node, row) writeText(node, row.newText, rowTextColor(row)) end },
-        { Name = 'ShopRowName', Kind = 'EUITextLabel', X = 76, Y = 10, Width = 320, Height = 44,
-            Create = { Text = '', FontSize = Font.Row, TextColor = color(Palette.Text) },
+        { Name = 'ShopRowName', Kind = 'EUITextLabel', X = 262, Y = 56, Width = 340, Height = 40,
+            Create = { Text = '', FontSize = Font.Row, TextColor = color(Palette.TextOnPaper),
+                TextHorizontalAlignment = 0, TextVerticalAlignment = 1 },
             Paint = function(node, row) writeText(node, row.name, rowTextColor(row)) end },
-        { Name = 'ShopRowCoin', Kind = 'EUIImage', X = 470, Y = 26, Width = 32, Height = 32,
+        { Name = 'ShopRowCoin', Kind = 'EUIImage', X = 498, Y = 56, Width = 28, Height = 28,
             Create = { Image = Image.Coin } },
-        { Name = 'ShopRowPrice', Kind = 'EUITextLabel', X = 506, Y = 14, Width = 140, Height = 44,
-            Create = { Text = '', FontSize = Font.Row, TextColor = color(Palette.Text) },
+        { Name = 'ShopRowPrice', Kind = 'EUITextLabel', X = 580, Y = 56, Width = 120, Height = 40,
+            Create = { Text = '', FontSize = Font.Price, TextColor = color(Palette.TextOnPaper),
+                TextHorizontalAlignment = 2, TextVerticalAlignment = 1 },
             Paint = function(node, row) writeText(node, row.priceText, rowTextColor(row)) end },
-        { Name = 'ShopRowState', Kind = 'EUITextLabel', X = 300, Y = 54, Width = 340, Height = 34,
-            Create = { Text = '', FontSize = Font.RowSmall, TextColor = color(Palette.Text) },
+        { Name = 'ShopRowState', Kind = 'EUITextLabel', X = 480, Y = 20, Width = 300, Height = 24,
+            Create = { Text = '', FontSize = Font.RowSmall, TextColor = color(Palette.TextDisabled),
+                TextHorizontalAlignment = 2, TextVerticalAlignment = 1 },
             Paint = function(node, row) writeText(node, row.stateText, rowTextColor(row)) end },
     }
-    -- 商品行：行间由列表视图的 ItemsMargin 负责；子节点坐标相对行左下角
+    -- 商品行：4 像素间隙只露出列表底色，形成连续货单而不是卡片网格。
     Skin = {
         Image = Image, Font = Font, Color = Palette,
-        Row = { Width = 660, Height = 96, Margin = 8, Children = Children },
+        Row = { Width = 660, Height = 88, Margin = 4, Children = Children },
     }
 end
 
--- 骨架按钮只改颜色与文字：按钮图与面板图由预制体摆好，运行时覆盖会让所有按钮变成同一块纯色方块。
+-- 普通骨架按钮只改颜色与文字；页签选中态由独立下划线节点表达。
 local function styleButton(button)
     if not button then return end
     button.ButtonNormalColor = color(Skin.Color.Button)
@@ -194,7 +213,7 @@ function ScreenHandler:BuildRow(index, goods, level)
         name = goods.Name, priceText = tostring(goods.Price),
         state = state, reason = reason, stateText = stateText, upgradeLevel = upgradeLevel,
         isNew = isNew, newText = isNew and Text.New or '',
-        icon = definition and definition.Icon or Skin.Image.Panel,
+        icon = definition and definition.Icon or nil,
         selectable = state ~= 'owned',
         purchasable = state == 'buy',
         selected = index == self.Selected,
@@ -258,7 +277,7 @@ end
 -- 公开显示快照：本屏唯一的测试接缝。纯函数，只读——不发指令、不建节点、不改状态。
 function ScreenHandler:View() return self:Model() end
 
--- 把模型刷到骨架节点：只改文字、颜色、可见性与可用性；按钮图与几何归预制体。
+-- 把模型刷到骨架节点：文字、颜色、可见性与可用性在这里更新，主按钮按动作换图。
 function ScreenHandler:Apply(model)
     local nodes = self.UINodeMap
     local listPanel, coinPanel, detailPanel = nodes.ShopListPanel, nodes.ShopCoinPanel, nodes.ShopDetailPanel
@@ -266,10 +285,11 @@ function ScreenHandler:Apply(model)
     if coinPanel then coinPanel.Visible = model.panels.coin end
     if detailPanel then detailPanel.Visible = model.panels.detail end
     for index, name in ipairs(TabNames) do
-        local tab = nodes['BtnShopPage' .. index]
-        if tab then
-            tab.ButtonNormalColor = color(name == model.page and Skin.Color.ButtonActive or Skin.Color.Button)
-        end
+        local selected = name == model.page
+        local label = nodes['LabelShopPage' .. index]
+        if label then label.TextColor = color(selected and Skin.Color.Brass or Skin.Color.TextMuted) end
+        local indicator = nodes['ImageShopTabIndicator' .. index]
+        if indicator then indicator.Visible = selected end
     end
     local coinLabel = nodes.LabelCurCoin
     if coinLabel then coinLabel.Text = model.coinText end
@@ -380,8 +400,8 @@ function ScreenHandler:CreateRow(list, index)
         print('[ScreenShop] 商品行创建失败', index, tostring(row))
         return nil
     end
-    -- 行是运行时新建的按钮：底图从皮肤表取（骨架按钮的图归预制体），颜色随后由 PaintRow 按状态刷
-    row.NormalImage, row.PressImage, row.DisableImage = Skin.Image.Row, Skin.Image.Row, Skin.Image.Row
+    -- 透明按钮只负责命中；暖纸底色由 ShopRowBackground 独立绘制，避免按钮图盖住文字。
+    row.NormalImage, row.PressImage, row.DisableImage = '', '', ''
     styleButton(row)
     row.ButtonText = ''
     row.TouchEnabled = true
@@ -389,9 +409,10 @@ function ScreenHandler:CreateRow(list, index)
     for _, child in ipairs(Skin.Row.Children) do
         local attrs = { Parent = row, Name = child.Name .. index,
             Position = Vector2.New(child.X, child.Y), Size = Vector2.New(child.Width, child.Height),
-            TouchEnabled = false, SwallowTouchEnabled = false, LocalZOrder = 1 }
+            Anchor = Vector2.New(0.5, 0.5), TouchEnabled = false, SwallowTouchEnabled = false,
+            LocalZOrder = child.Z or 1 }
         for key, value in pairs(child.Create) do attrs[key] = value end
-        local node = world:CreateUnit(child.Kind, attrs)
+        local node = createChildNode(world, child.Kind, attrs)
         if not node then print('[ScreenShop] 商品行子节点创建失败', child.Name, index) end
     end
     OwnedUnits.Track(self, row)
@@ -409,7 +430,7 @@ function ScreenHandler:PaintRow(row, model)
     -- 行是选择器：点行只改选中与高亮，下单由详情区的唯一购买按钮发起（#218）。
     -- 已购行不可点（#214 故事 20）；锁定行可点，点了在详情区看到描述、价格与原因（故事 8 / 21）。
     row.TouchEnabled = model.selectable
-    row.ButtonNormalColor = color(rowBaseColor(model))
+    row.Opacity = 1.0
 end
 
 -- 把模型的行刷到 ShopList 下：缺行就建，多出来的行隐藏（行按序号复用，不重建）
@@ -429,7 +450,7 @@ function ScreenHandler:RenderRows(model)
     self.RowCount = shown
 end
 
--- 把详情模型刷到骨架节点：只改文字、图标可见性与按钮可用性/颜色，几何与按钮图归预制体。
+-- 把详情模型刷到骨架节点：更新文字、图标、购买按钮状态与购买/引导图，几何仍归预制体。
 function ScreenHandler:RenderDetail(model)
     local nodes = self.UINodeMap
     local function setText(name, text)
@@ -445,17 +466,24 @@ function ScreenHandler:RenderDetail(model)
     local hasRow = model.number ~= nil
     local icon, coinIcon = nodes.ImageShopDetailIcon, nodes.ImageShopDetailCoin
     if icon then
-        icon.Visible = hasRow
+        icon.Visible = hasRow and model.icon ~= nil and model.icon ~= ''
         if model.icon then icon.Image = model.icon end
     end
     if coinIcon then coinIcon.Visible = hasRow end
-    -- 按钮图归预制体，这里只刷颜色：引导态换另一色，玩家一眼看出这一下不是下单（#219）
+    -- 购买是全屏唯一金色动作；金币引导用海绿，禁用态退回墨绿，避免三个按钮同时抢眼。
     local button = nodes.BtnShopBuyDetail
     if button then
         button.Disabled = not model.buyEnabled
-        local tone = Skin.Color.ButtonDisable
-        if model.buyEnabled then tone = model.buyAction == 'coin' and Skin.Color.ButtonGuide or Skin.Color.Button end
+        local image, tone, labelTone = Skin.Image.Panel, Skin.Color.ButtonDisable, Skin.Color.Text
+        if model.buyEnabled and model.buyAction == 'coin' then
+            tone = Skin.Color.ButtonGuide
+        elseif model.buyEnabled then
+            image, tone, labelTone = Skin.Image.Primary, Skin.Color.Button, Skin.Color.TextOnActive
+        end
+        button.NormalImage = image
         button.ButtonNormalColor = color(tone)
+        local label = nodes.LabelShopBuyDetail
+        if label then label.TextColor = color(labelTone) end
     end
 end
 
@@ -476,6 +504,26 @@ function ScreenHandler:NoteResult(result)
     self:ShowCoin()
     if result.ok and type(result.coinAfter) == 'number' then self:SetCoin(result.coinAfter) end
     self:Render()
+end
+
+-- 页签短下划线是运行期装饰，不需要手动导出 UINodes；已存在于旧预制体时直接复用。
+function ScreenHandler:EnsureTabIndicator(index, tab)
+    local name = 'ImageShopTabIndicator' .. index
+    local node = tab and tab:FindFirstChild(name)
+    if not node and tab then
+        node = createChildNode(game:GetService('World'), 'EUIImage', {
+            Parent = tab, Name = name, Position = Vector2.New(110, 7), Size = Vector2.New(56, 4),
+            Anchor = Vector2.New(0.5, 0.5), TouchEnabled = false, SwallowTouchEnabled = false, LocalZOrder = 2,
+        })
+        if node then
+            node.Image = Skin.Image.Panel
+            node.Color = color(Skin.Color.Brass)
+            OwnedUnits.Track(self, node)
+        else
+            print('[ScreenShop] 页签下划线创建失败', index)
+        end
+    end
+    self.UINodeMap[name] = node
 end
 
 -- 只接线、不渲染：重建（换 RootNode 再 Init）时先按归属登记清掉上一轮的运行期建点，
@@ -503,9 +551,11 @@ function ScreenHandler:Init()
     -- 四页签：文字取 GameCfg.Shop.Pages（钓具/武器/升级/金币），骨架里已有按钮与文字节点
     for index, name in ipairs(TabNames) do
         local tab, label = self.UINodeMap['BtnShopPage' .. index], self.UINodeMap['LabelShopPage' .. index]
-        if label then label.Text = name end
+        if label then label.Text, label.FontSize, label.LocalZOrder = name, 28, 10 end
         if tab then
+            self:EnsureTabIndicator(index, tab)
             styleButton(tab)
+            tab.NormalImage, tab.PressImage, tab.DisableImage = '', '', ''
             tab.ButtonText = ''
             tab.TouchEnabled = true
             listen(tab.OnClicked, function() self:SetPage(name) end)
@@ -516,30 +566,39 @@ function ScreenHandler:Init()
         styleButton(close)
         -- 关闭按钮的文字在子节点 LabelShopClose（按钮自身的 ButtonText 由 styleButton 清空）
         local closeLabel = self.UINodeMap.LabelShopClose
-        if closeLabel then closeLabel.Text = Text.Close end
+        if closeLabel then
+            closeLabel.Text, closeLabel.FontSize, closeLabel.LocalZOrder = Text.Close, 24, 10
+            closeLabel.TextColor = color(Skin.Color.Text)
+        end
         listen(close.OnClicked, function() _G.MgrGameUI:CloseScreen('ScreenShop') end)
     end
-    -- 详情区（#218）：唯一购买入口。按钮图归预制体，这里只接线、清文字，未选中时按空态禁用。
+    -- 详情区（#218）：唯一购买入口。使用兼容子文字的官方按钮图，未选中时按空态禁用。
     local buy = self.UINodeMap.BtnShopBuyDetail
     if buy then
         styleButton(buy)
+        buy.NormalImage = Skin.Image.Primary
         buy.ButtonText = ''
         buy.Disabled = true
         listen(buy.OnClicked, function() self:ConfirmBuy() end)
     end
     local buyLabel = self.UINodeMap.LabelShopBuyDetail
-    if buyLabel then buyLabel.Text = Text.Buy end
+    if buyLabel then
+        buyLabel.Text, buyLabel.TextColor, buyLabel.LocalZOrder = Text.Buy, color(Skin.Color.TextOnActive), 10
+    end
     -- 行间距只在皮肤表里写一次，落在列表视图的 ItemsMargin 上
     local list = self.UINodeMap.ShopList
     if list then list.ItemsMargin = Skin.Row.Margin end
     local platform = self.UINodeMap.BtnOpenPlatformShop
     if platform then
         styleButton(platform)
+        platform.NormalImage = Skin.Image.Primary
         platform.ButtonText = ''
         listen(platform.OnClicked, function() self:OpenPlatformShop() end)
     end
     local openLabel = self.UINodeMap.LabelOpenPlatformShop
-    if openLabel then openLabel.Text = Text.OpenPlatformShop end
+    if openLabel then
+        openLabel.Text, openLabel.TextColor, openLabel.LocalZOrder = Text.OpenPlatformShop, color(Skin.Color.TextOnActive), 10
+    end
     listen(_G.REUtil:GetRE('ItemBarState').OnClientEvent, function(state)
         if state and state.upgradeLevel then self.UpgradeLevel = state.upgradeLevel end
         if self.IsOpen then self:ShowCoin() self:Render() end -- 先读余额再重绘（#219）

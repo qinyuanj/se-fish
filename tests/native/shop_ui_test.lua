@@ -284,13 +284,47 @@ describe("钓场商店界面（#216 固定骨架 / #217 行与选中 / #218 详�
         assert.same('77', view.coinText)
     end)
 
-    -- 骨架外观归预制体（#217 契约）：运行时只改颜色与文字，不覆盖按钮图。
-    -- 失败方式：styleButton 又把 NormalImage/PressImage/DisableImage 写成同一张纯色块 → 美术摆好的按钮图全被盖掉；
-    --           关闭按钮没字（文字没落到子节点 LabelShopClose）。
-    it("test_skeleton_buttons_keep_prefab_art_and_close_label", function()
-        assert.is_nil(ctx.nodes.BtnShopPage1.NormalImage)
+    -- 页签是文字加短下划线，不再换黄色胶囊；切页时只能有一条下划线可见。
+    -- 失败方式：选中标记停留在旧页，或多个标记同时显示；关闭文字没落到 LabelShopClose。
+    it("test_selected_tab_moves_single_underline", function()
+        assert.is_true(ctx.nodes.ImageShopTabIndicator1.Visible)
+        assert.is_false(ctx.nodes.ImageShopTabIndicator2.Visible)
+        ctx.handler:SetPage('武器')
+        assert.is_false(ctx.nodes.ImageShopTabIndicator1.Visible)
+        assert.is_true(ctx.nodes.ImageShopTabIndicator2.Visible)
+        for index = 3, #GameCfg.Shop.Pages do
+            assert.is_false(ctx.nodes['ImageShopTabIndicator' .. index].Visible)
+        end
+        assert.same('', ctx.nodes.BtnShopPage1.NormalImage)
         assert.is_nil(ctx.nodes.BtnShopClose.NormalImage)
         assert.same('关闭', ctx.nodes.LabelShopClose.Text)
+    end)
+
+    -- 行背景必须独立于按钮底图：11017 作为 EUIButton 图片会遮住子文字。
+    it("test_row_background_is_independent_and_selected_text_inverts", function()
+        ctx.handler:SetPage('升级')
+        ctx.handler:Select(1)
+        local row = ctx.nodes.ShopList:FindFirstChild('ShopRow1', true)
+        local background = row and row:FindFirstChild('ShopRowBackground1', true)
+        local name = row and row:FindFirstChild('ShopRowName1', true)
+        assert.is_not_nil(background)
+        assert.same('', row.NormalImage)
+        assert.same(0, background.LocalZOrder)
+        assert.same(1, name.LocalZOrder)
+        assert.same({ 240, 231, 208, 255 }, name.TextColor)
+    end)
+
+    -- 没有美术资源的商品不能显示引擎白色占位块；隐藏图标但保留名字与详情。
+    it("test_missing_item_icon_is_hidden_instead_of_placeholder", function()
+        ctx.handler:SetPage('升级')
+        ctx.handler:Select(1)
+        local view = ctx.handler:View()
+        assert.is_nil(view.detail.icon)
+        assert.is_false(ctx.nodes.ImageShopDetailIcon.Visible)
+        local row = ctx.nodes.ShopList:FindFirstChild('ShopRow1', true)
+        local icon = row and row:FindFirstChild('ShopRowIcon1', true)
+        assert.is_not_nil(icon)
+        assert.is_false(icon.Visible)
     end)
 
     -- 四页签逐个点：页名、容器可见性与选中三样一起换
@@ -707,19 +741,20 @@ describe("钓场商店界面（#216 固定骨架 / #217 行与选中 / #218 详�
         assert.same('77', view.coinText)
     end)
 
-    -- 归属登记：本屏运行期只建商品行（行内子节点随行递归销毁，不单独登记），一行一个登记项；
-    -- 换 RootNode 再 Init 时上一轮整体销毁、登记表归零，重开渲染只留新一轮。
+    -- 归属登记：商品行一行一个登记项，页签下划线一页一个；行内子节点随行递归销毁。
+    -- 换 RootNode 再 Init 时上一轮整体销毁，只留新一轮装饰，重开渲染后再补新一轮商品行。
     it("test_rebuild_clears_registry_and_keeps_one_owner", function()
-        assert.same(#ctx.handler:View().rows, OwnedUnits.Count(ctx.handler))
+        local decorations = #GameCfg.Shop.Pages
+        assert.same(#ctx.handler:View().rows + decorations, OwnedUnits.Count(ctx.handler))
         local previous = ctx.created
         ctx.created = {}
         ctx.handler.RootNode = ctx.makeRoot() -- 换 RootNode 重建：同名节点都是新树上的
         ctx.handler:Init()
-        assert.same(0, OwnedUnits.Count(ctx.handler))
+        assert.same(decorations, OwnedUnits.Count(ctx.handler))
         for _, node in ipairs(previous) do
             assert.is_true(node.Destroyed, '上一轮运行期建点应被销毁')
         end
         ctx.handler:OpenScreen()
-        assert.same(#ctx.handler:View().rows, OwnedUnits.Count(ctx.handler))
+        assert.same(#ctx.handler:View().rows + decorations, OwnedUnits.Count(ctx.handler))
     end)
 end)
