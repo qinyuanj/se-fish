@@ -218,14 +218,14 @@ function PlayerData:Migrate(snapshot)
             if not def or def.Type ~= '近战武器' and def.Type ~= '远程武器'
                 or not integer(count, 1) then return nil, '武器库存损坏' end
         end
-        -- #130 成长字段：强化等级不超上限、购买次数为整数（键统一为行编号字符串）
+        -- #130 成长字段：升级等级不超上限、购买次数为整数（键统一为行编号字符串）
         local growth = extra.growth
         if type(growth.upgrades) ~= 'table' or type(growth.purchases) ~= 'table' then
             return nil, '成长字段损坏'
         end
         for kind, level in pairs(growth.upgrades) do
             local spec = GameCfg.Shop.UpgradeKinds[kind]
-            if not spec or not integer(level, 0, spec.MaxLevel) then return nil, '强化等级损坏' end
+            if not spec or not integer(level, 0, spec.MaxLevel) then return nil, '升级等级损坏' end
         end
         for key, count in pairs(growth.purchases) do
             if type(key) ~= 'string' or not integer(count, 0) then return nil, '购买次数损坏' end
@@ -249,7 +249,7 @@ function PlayerData:IsValidSave(snapshot)
 end
 
 -- 存档序列化（#92）：最小集——金币、道具栏/背包物品（含格子位置与个体倍率）、鱼饵计数、
--- 升级等级、当前区域；v 版本号预留扩展（图鉴/强化/药水随各自系统进存档）。
+-- 升级等级、当前区域；v 版本号预留扩展（图鉴/升级/药水随各自系统进存档）。
 -- 键名缩写为体积考量：bar/bp=道具栏/背包格位表（i=格号 id=物品 n=件数 m=倍率）、up=升级等级。
 function PlayerData:Serialize()
     if not self.Inited then return nil end
@@ -482,7 +482,7 @@ local function isWeapon(itemId)
     return definition ~= nil and (definition.Type == '近战武器' or definition.Type == '远程武器')
 end
 
--- 商店强化等级（#130）：背包沿用 Data.UpgradeLevel，其余按种类存 extra.growth.upgrades；
+-- 商店升级等级（#130）：背包沿用 Data.UpgradeLevel，其余按种类存 extra.growth.upgrades；
 -- 读取侧永不报错，未初始化/损坏一律按 0 级处理。
 function PlayerData:ShopUpgradeLevel(kind)
     if kind == 'backpack' then

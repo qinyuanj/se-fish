@@ -398,7 +398,7 @@ for _, row in ipairs(ContentShop.Goods) do
     }
 end
 
--- 强化参数由商店表升级行派生（#130，GameSpec §6.2）：逐级一次、按基础线性叠加。
+-- 升级参数由商店表升级行派生（#130，GameSpec §6.2）：逐级一次、按基础线性叠加。
 -- melee 7 级 +10%/级（满级 +70%）、ranged 5 级 +10%/级（+50%）、explosive 3 级 +20%/级（+60%）、
 -- magazine 3 级 +50%/级向上取整（+150%）；backpack 6 级沿用 Items.UpgradePrices 同源价格。
 -- 火箭筒直击与溅射都只归 ranged（不双加成），消费点在 server/Mgr/MgrWeapon.lua。

@@ -2,7 +2,7 @@
 --   1. 50 行有效商品没有全部上架为可购买货架行（漏行、页名错、编号 27 混入）；
 --   2. 分页过滤错（等级不够的行上架、金币页混入金币定价商品）；
 --   3. 新品没置顶（minShopLevel == 摊位等级的当地新品须排最前），或同组顺序不稳定（table.sort 不稳定）；
---   4. 强化公式错：不是按基础线性叠加（复利/错位）、系数与商店表不符、弹容没向上取整；
+--   4. 升级公式错：不是按基础线性叠加（复利/错位）、系数与商店表不符、弹容没向上取整；
 --   5. 逐级价格与商店表行价不符；
 --   6. 升级行没有稳定的购买键（itemKey 缺失时 number 必须可用）；
 --   7. 旧白名单商品（钓具 9 行）换表后价格/等级漂移，不再兼容。
@@ -138,10 +138,10 @@ describe("钓场商店货架表", function()
         assert.near(240, ability.Explosives.item145.Damage * shop.DamageScale('explosive', 3), 1e-9)
     end)
 
-    -- 强化参数由商店表行派生：种类、级数、增量、逐级价格
+    -- 升级参数由商店表行派生：种类、级数、增量、逐级价格
     it("test_upgrade_kinds_derived_from_shop_rows", function()
         local kinds = GameCfg.Shop.UpgradeKinds
-        assert.is_not_nil(kinds, '缺强化参数表')
+        assert.is_not_nil(kinds, '缺升级参数表')
         assert.same(7, kinds.melee.MaxLevel)
         assert.near(0.1, kinds.melee.Increment, 1e-9)
         assert.same({ 50, 100, 200, 400, 800, 1600, 3200 }, kinds.melee.Prices)
@@ -163,7 +163,7 @@ describe("钓场商店货架表", function()
 end)
 
 -- ===== PlayerData 成长与限购状态（#130 持久字段）=====
--- 失败方式：强化等级/购买次数不走持久字段（重进丢失）；越级或重复强化生效；满级继续扣钱；
+-- 失败方式：升级等级/购买次数不走持久字段（重进丢失）；越级或重复升级生效；满级继续扣钱；
 -- 武器购买被背包满格误拒（武器独立库存不占格）；损坏的 growth 存档被静默接受。
 local function newData(userId)
     local data = PlayerData.New({ UserId = userId, SetAttribute = function() end })
@@ -232,7 +232,7 @@ describe("商店成长与限购", function()
         data:NotePurchase(13)
         assert.is_true(data:ApplyShopUpgrade(upgradeRow(51).Upgrade))
         local snapshot = data:Serialize()
-        -- 强化等级超上限
+        -- 升级等级超上限
         local corrupt1 = data:Migrate(snapshot)
         assert.is_not_nil(corrupt1)
         corrupt1.extra.growth.upgrades.melee = 99

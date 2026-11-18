@@ -19,9 +19,10 @@ M.policy = {
         'common.AttrGrowth', 'common.AttrModel', 'common.BlindboxDraw', 'common.BodyScale',
         'common.BossPhase', 'common.CarryMount', 'common.ContentValidation', 'common.FishCatch',
         'common.FlightPath', 'common.GameCfg', 'common.GrillCurve', 'common.LotteryDraw',
-        'common.LotteryEligibility', 'common.MathWaterJudge', 'common.NpcDialogue', 'common.QuestSteps',
-        'common.RateLimit', 'common.Records', 'common.ReelDisplay', 'common.ReelProgress',
-        'common.SpecialItem', 'common.Vitals', 'common.ZoneMarkers',
+        'common.LotteryEligibility', 'common.MathWaterJudge', 'common.NpcDialogue',
+        'common.OwnedUnits', 'common.QuestSteps', 'common.RateLimit', 'common.Records',
+        'common.ReelDisplay', 'common.ReelProgress', 'common.SpecialItem', 'common.Vitals',
+        'common.ZoneMarkers',
       },
     },
     {
@@ -29,7 +30,7 @@ M.policy = {
         'client.DamageFloat', 'client.FishCombatLabel', 'client.GameUI', 'client.InteractionBubble',
         'client.MainHudLayout', 'client.PressGesture', 'client.WeaponAim',
         'server.FishBehaviors', 'server.MgrUtil',
-        'common.DamageNotice', 'common.FXUtil', 'common.GarBiteNotice', 'common.REUtil',
+        'common.DamageNotice', 'common.GarBiteNotice', 'common.REUtil',
         'common.TeleportUtil', 'common.Util',
       },
     },
@@ -271,6 +272,23 @@ local function in_hole(holes, position)
     if position >= hole[1] and position <= hole[2] then return true end
   end
   return false
+end
+
+-- 「只剩代码」的源码视图：注释与字符串字面量的内容都抹成空格，保留换行与两侧引号，
+-- 长度不变，因此行号仍对得上源码。门禁测试按调用点数源码时用它把注释与文案排除在外，
+-- 词法切分复用上面的 mask，不另写一份。
+function M.code_only(source)
+  local text, holes = mask(source)
+  local out, cursor = {}, 1
+  for _, hole in ipairs(holes) do
+    if hole[2] >= hole[1] then
+      out[#out + 1] = text:sub(cursor, hole[1] - 1)
+      out[#out + 1] = blank(text:sub(hole[1], hole[2]))
+      cursor = hole[2] + 1
+    end
+  end
+  out[#out + 1] = text:sub(cursor)
+  return table.concat(out)
 end
 
 function M.requires(source)

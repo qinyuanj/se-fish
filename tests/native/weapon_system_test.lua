@@ -641,7 +641,7 @@ describe('TestMgrWeaponThrow', function()
     end)
 end)
 
--- ===== #130 强化加成消费 =====
+-- ===== #130 升级加成消费 =====
 -- 失败方式：加成买了不生效/生效错对象（火箭筒溅射双加成、空手被加成）、
 -- 弹容没向上取整、按复利算。
 describe('TestMgrWeaponUpgrade', function()
@@ -731,7 +731,7 @@ describe('TestMgrWeaponUpgrade', function()
         assert.same(1, direct)
     end)
 
-    -- 无强化时行为与 #129 基线完全一致（0 级不加成、弹容取基础值）
+    -- 无升级时行为与 #129 基线完全一致（0 级不加成、弹容取基础值）
     it('test_zero_level_matches_129_baseline', function()
         ctx.data:GrantWeapon('item136', 1)
         ctx.data:HoldWeapon('item136')

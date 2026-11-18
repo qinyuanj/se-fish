@@ -62,7 +62,7 @@ describe('TestAttrGrowth', function()
     end)
 
     -- 属性投影（common/AttrModel.lua 的 35 行实现）只组合既有成长与商店真源，不另算一份：
-    -- 体型与血量上限走 BodyScale.Plan，移速走 AttrGrowth 口径，武器强化走 Shop.DamageScale，
+    -- 体型与血量上限走 BodyScale.Plan，移速走 AttrGrowth 口径，武器升级走 Shop.DamageScale，
     -- 饥饿上限钳到 Vitals.MaxHunger。并入自 tests/native/attr_model_test.lua（原 2 例）。
     it('test_attr_model_projection_reuses_growth_and_shop_sources', function()
         local AttrModel = require('common.AttrModel')

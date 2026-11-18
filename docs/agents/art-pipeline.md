@@ -73,7 +73,7 @@ Codex 的 MCP 注册在仓库内 `.codex/config.toml`（gitignored，不入库�
 
 ## 接缝 A 取证
 
-模型动画的导入、播放与判定口径见[美术资产概要「模型动画导入与播放」](../art-asset-overview.md#模型动画导入与播放)。探针按下面顺序调用，`exec` 与 `log grep` 用法见 [workflow「编辑器 CLI 取证」](workflow.md)：
+模型动画的导入、播放与判定口径见[美术资产概要「模型动画导入与播放」](../art-asset-overview.md#模型动画导入与播放)。探针按下面顺序调用，`exec` 与 `log grep` 用法见 [editor-cli](editor-cli.md)：
 
 1. 进试玩，等游戏 UI 加载完；连截 2 帧，md5 相同就先 `input joystick` 让角色动一下，确认画面在刷新。
 2. 客户端 exec `tests/probes/seam_a_camera_client.lua`，`log grep SEAMA_CAM` 取相机与焦点坐标。

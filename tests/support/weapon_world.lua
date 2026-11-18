@@ -1,4 +1,4 @@
--- #90 迁移期共享夹具：MgrWeapon 的服务端权威世界（武器系统本体用例与强化用例共用）。
+-- #90 迁移期共享夹具：MgrWeapon 的服务端权威世界（武器系统本体用例与升级用例共用）。
 -- 原 tests/gameplay/weapon_system_test.lua 里 TestMgrWeaponUpgrade 用
 -- `TestMgrWeaponUpgrade.setUp = function(self) TestMgrWeapon.setUp(self) end` 直接复用
 -- TestMgrWeapon 的夹具（LuaUnit 靠全局类名互访实现）；Busted 每个 spec 是独立 chunk、

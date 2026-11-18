@@ -71,21 +71,7 @@ lua tools/cli.lua worktree-init
 
 等价地直接看 `lua tools/cli.lua deploy` 的收尾输出。
 
-**编辑器 CLI 取证。** 操作前用目标命令的 `--help`（或 `help export <命令>`）确认当前版本能力。团队仓分发的 `eggy-*` 技能与本节或 CLI `--help` 冲突时，以后两者为准；通用勘误提 PR 改团队仓 SE 副本（[ADR-0015](../adr/0015-eggitor-ai-resources-team-repo-maintained.md)），本节只留项目实测。以下是 0.20.12～0.20.13 的项目实测：
-
-- **会话首开对齐**：本会话第一次做 Lua 相关操作且编辑器在线时，先跑 `code diff --json`；changelist 非空就把分类计数与文件清单报给用户，由用户选 push、pull 或暂不处理，agent 不自选方向。
-- **多实例**：`editor-instances list` 列出多个实例时（含停在 `<starting>` 的），每条命令都带 `--editor-instance <pid>`。
-- **试玩闸门例外**：`code diff` 中 `differs`、`only-on-map` 为空，且 `only-local` 全在 `unit_scripts/` 或 `.agents/` 下时，视为干净，不 push、直接试玩，并在取证记录里写明这些文件。`unit_scripts/` 由引擎生成（见 `AGENTS.md`），`deploy` 只镜像三端子树，不会清理它；`.agents/` 是 agent 配置，不进地图。
-- **异步输出**：服务端、客户端 `exec` 提交成功只表示代码已提交。脚本打印唯一标记后，用 `log grep <标记> | grep '^>'` 读取实际结果（不带过滤时会混入上下文行与统计行）。`log grep` 没有 `-i`：默认就不区分大小写，需要区分时加 `--case-sensitive`。编辑器 `exec` 的同步返回值在约 5KB 处静默截断，批量读取同样走打印标记加 `log grep`。
-- **截图**：先判显示路径——`lua tools/cli.lua screenshot --info` 报「虚拟屏 / 非虚拟屏 / 不确定」，别用适配器列表里有没有 GameViewer 来推断（虚拟适配器常挂着但未附加到桌面）。非虚拟屏用 editor-cli `screenshot game`（游戏画面）与 `screenshot editor`（编辑器界面）。虚拟屏（UU 远程的 GameViewer Virtual Display Adapter）上窗口表面抓取取不到新内容，形态有两种：校验通过的黑帧（`FRAME_VALID`，0.20.16 实测），以及尺寸正常、内容停在旧帧（#185，0.20.13 实测）；置前重试都无效，改用工具链的 `lua tools/cli.lua screenshot`。**单帧 `FRAME_VALID` 证明不了帧是新的**：判新旧用连拍，先确认两帧尺寸一致，再比 md5，尺寸变了的那组作废重采。窗口被遮挡或最小化时，先让目标窗口显示在屏幕上再抓一次；`screenshot game` 可能返回 `FRAME_NEAR_WHITE`，`screenshot editor` 可能得到 1×1（`SCREENSHOT_INVALID_DIMENSIONS`）。仍无画面就请用户目视确认，给出选项、时间点和观察要点，不要循环重试。
-- **保存与重开**：`map save` 成功后 `map dirty` 仍可能为 true，此时 `map reopen` 报 `MAP_REOPEN_REJECTED`。先用 `map dirty --json` 列出 dirty 来源请用户确认，确认后才可 `map reopen --force`；来源不明时可能是用户的手动编辑，不要强制。停止试玩本身也会让 dirty 变成 true。
-- **风险步逐次确认**：部署、试玩、地图保存、推送、场景写入，每一步单独取得用户确认；一次授权只覆盖它点名的那一轮或那一批，一次试玩授权只覆盖那一轮试玩。场景写入即以 `APPLY = true` 执行写场景探针：先以 `APPLY = false` 跑 dry-run 并把结果交给用户，用户确认一批才执行一批，执行完立即把探针改回 `APPLY = false`。
-- **场景整理顺序**：空目录清理排在全部建标记批次之后，只处理基线回读时已存在的空目录。删除或挪动场景地面（灰盒地块等）前，先在试玩服务端对受影响区的 `Z*` 点位与设施打向下射线，确认其下仍有地面（删 01 灰盒大地板后，渔夫、商店、抽奖、出生点、鱼饵曾悬在鱼塘水面上）。
-- **编辑态读不到的设置**：编辑态 `editor:GetService('PhysicsService')` 为 nil，地面高度只能在试玩服务端用射线测；编辑态读 World 的 `AOIType`、`StreamingEnabled` 得到 nil，流式加载设置无法经 CLI 确认。
-- **场景枚举**：编辑器侧执行[技术难点识别的绕过合同](../技术难点识别.md#绕过合同四条硬边界)，试玩服务端的例外也写在那里。
-- **检索失败**：`docs search` 报 HTTP 500 等服务端错误时（0.20.12 的 `editor-api` docset 出现过），改查 `manual` 或编辑器在线时的 `api search-editor` / `api get-editor`。
-- **检索范围**：本图是世界版（SE），`status --json` 显示 `editor_mode: "se"`。`docs search` 只查世界版文档库：`manual`、`game-api`、`editor-api`、`asset`。用户问题里的词在这些库里查不到时，先问用户指什么，等确认后再换库或换方向。原点版（FS）的 `fs-manual`、`fs-component` 只在用户点名「原点版 / FS」时才查。
-- **模型动画验收**：导入、播放与画面判定读[美术资产概要「模型动画导入与播放」](../art-asset-overview.md#模型动画导入与播放)。
+**编辑器 CLI 取证。** 目标命令的 `--help`、试玩与截图、保存与重开、风险步闸门等项目实测都记在 [editor-cli.md](editor-cli.md)。操作前先读它。
 
 ## 测试纪律
 

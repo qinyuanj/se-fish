@@ -69,7 +69,7 @@ function Mgr:Fail(player, itemId, reason, number)
     return false
 end
 
--- 结算一次购买（live/draft 通用，#130）：限购复验、扣款、发货或强化、购买计数一次落地。
+-- 结算一次购买（live/draft 通用，#130）：限购复验、扣款、发货或升级、购买计数一次落地。
 -- 价格一律取货架行（服务端定价，客户端传价忽略）；返回 result 或 nil, reason。
 local function settlePurchase(draft, goods)
     if (goods.PurchaseLimit or 0) > 0 and draft:PurchaseCount(goods.Number) >= goods.PurchaseLimit then

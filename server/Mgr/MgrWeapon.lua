@@ -156,7 +156,7 @@ function Mgr:CastMelee(player)
 end
 
 -- 空手（weaponId=nil）与近战武器共用挥砍预设（纯表现），伤害/射程来自登记值；
--- 近战武器吃近战强化（#130 按基础线性叠加），空手不加成
+-- 近战武器吃近战升级（#130 按基础线性叠加），空手不加成
 function Mgr:AttackMelee(player, weaponId, data)
     local mcfg = weaponId and acfg().MeleeWeapons[weaponId] or acfg().Unarmed
     if not mcfg then return self:Fail(player, 'attack', 'bad-weapon', { weapon = weaponId }) end
@@ -206,7 +206,7 @@ end
 function Mgr:AttackGun(player, weaponId, gcfg, data, aim)
     local now = self:Now()
     local state = self:GetState(player.UserId)
-    -- #130：弹容强化向上取整（PlayerData:MagazineSize），0 级即基础值
+    -- #130：弹容升级向上取整（PlayerData:MagazineSize），0 级即基础值
     local magazine = data and data.MagazineSize and data:MagazineSize(gcfg.Magazine) or gcfg.Magazine
     local scale = self.Attr:WeaponDamageScale(player, 'ranged')
     local mag = self:MagState(state, weaponId, magazine)
@@ -250,7 +250,7 @@ function Mgr:AttackGun(player, weaponId, gcfg, data, aim)
         print('[MgrWeapon] 枪击未命中', player.UserId, weaponId, 'ammo=' .. tostring(mag.ammo))
     end
     if gcfg.Splash and hitPos then
-        -- 火箭筒两段都只归远程强化（不乘爆炸物强化，不双加成）
+        -- 火箭筒两段都只归远程升级（不乘爆炸物升级，不双加成）
         local splashHit = self.Vitals:NewHit(player, 'weapon')
         local splashDamage = gcfg.Splash.Damage * scale
         local damaged = self:RadialDamage(hitPos, gcfg.Splash.Radius, splashDamage,
@@ -453,7 +453,7 @@ end
 function Mgr:Detonate(player, itemId, landing, zone)
     local ecfg = acfg().Explosives[itemId]
     if not ecfg or not landing then return 0 end
-    -- #130：爆炸物强化按基础线性叠加（投掷爆炸结算唯一消费点）
+    -- #130：爆炸物升级按基础线性叠加（投掷爆炸结算唯一消费点）
     local data = self.PlayerData and self.PlayerData:GetDataInst(player)
     local scale = self.Attr:WeaponDamageScale(player, 'explosive')
     local damage = ecfg.Damage * scale

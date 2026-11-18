@@ -10,6 +10,7 @@
 --   旧 tearDown 用 pairs 恢复全局，原本为 nil 的键会被跳过（留下假 world），
 --   原生逐例隔离后必须显式还回 nil，否则假 _G.game 会泄漏到后续案例。
 local GameCfg = require("common.GameCfg")
+local OwnedUnits = require("common.OwnedUnits")
 local RandomGuard = require("tests.support.random_guard")
 
 local GLOBAL_KEYS = { "game", "Vector2", "Vector3", "Color", "REUtil", "GameUI", "MgrGameUI", "print" }
@@ -54,6 +55,9 @@ local function newWorld()
     for key, value in pairs(attrs) do
       node[key] = value
     end
+    node.Destroy = function(self)
+      self.Destroyed = true
+    end
     if node.Name then
       env.nodes[node.Name] = node
     end
@@ -90,6 +94,7 @@ local function newWorld()
       return {
         Name = "BubbleNode", Visible = true, Anchor = anchor,
         FindFirstChild = function() return nil end,
+        Destroy = function(self) self.Destroyed = true end,
       }
     end,
     GetEuiManager = function()
@@ -197,6 +202,31 @@ describe("抽奖机入口表现（client/LocalLottery）", function()
     env.character.Position.x = 999
     env.localLottery:Update()
     assert.same({ "ScreenLottery" }, env.screens.closed)
+  end)
+
+  it("test_clear_destroys_bubble_nodes_and_does_not_accumulate", function()
+    local names = GameCfg.Lottery.MachineAnchors()
+    env:anchor(names[1], 0, 0)
+    env.localLottery:Start()
+    local btn, label = env.nodes.BtnLotteryEnter, env.nodes.LabelLotteryEnterTheme
+    local bubbleNode = env.localLottery.Bubbles[1].Node
+    assert.same(2, OwnedUnits.Count(env.localLottery))
+    env.localLottery:Clear()
+    assert.same(0, OwnedUnits.Count(env.localLottery)) -- 关闭气泡后登记表归空
+    assert.is_true(btn.Destroyed, "入口按钮应被销毁")
+    assert.is_true(label.Destroyed, "入口文字应被销毁")
+    assert.is_true(bubbleNode.Destroyed, "气泡根节点应被销毁")
+    assert.same({}, env.localLottery.Bubbles)
+    env.localLottery:Clear() -- 幂等：重复清空不报错
+    assert.same(0, OwnedUnits.Count(env.localLottery))
+    -- 反复「建→清空」不累积：第二次清空同样销毁新节点，气泡记录只有一条
+    env.localLottery:Start()
+    assert.same(1, #env.localLottery.Bubbles)
+    assert.same(2, OwnedUnits.Count(env.localLottery))
+    env.localLottery:Clear()
+    assert.same(0, OwnedUnits.Count(env.localLottery))
+    assert.is_true(env.nodes.BtnLotteryEnter.Destroyed)
+    assert.is_true(env.nodes.LabelLotteryEnterTheme.Destroyed)
   end)
 
   it("test_update_does_not_touch_visibility_without_state_change", function()

@@ -5,6 +5,7 @@
 -- SurvivalState 带 platformPending，这里改显等待文案、隐藏按钮；结局以服务端回包为准。
 -- 正常状态整个面板隐藏；任何节点创建失败都只记日志，不阻塞主流程。
 local GameCfg = require('common.GameCfg')
+local OwnedUnits = require('common.OwnedUnits')
 local REUtil = require('common.REUtil')
 
 local Panel = { Seq = 0, Phase = 'alive', EndsAt = nil, WeakUntil = nil, PlatformPending = nil }
@@ -25,7 +26,18 @@ local function create(kind, parent, name, x, y, width, height, props)
     if not node then error('生存界面节点创建失败：' .. name) end
     node.TouchEnabled = false
     node.SwallowTouchEnabled = false
-    return node
+    return OwnedUnits.Track(Panel, node)
+end
+
+---销毁生存界面建的全部节点并复位自持引用（幂等，#211）：销毁只走归属登记。
+function Panel:Clear()
+    OwnedUnits.Clear(self)
+    self.Banner = nil
+    self.Title = nil
+    self.AdrenalineBtn = nil
+    self.AdReviveBtn = nil
+    self.PaidReviveBtn = nil
+    self.WeakLabel = nil
 end
 
 function Panel:Send(action, mode)
