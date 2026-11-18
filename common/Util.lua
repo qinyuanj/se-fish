@@ -103,38 +103,6 @@ function Util:SplitString(inputstr, sep)
 	return t
 end
 
-function Util:WeldTo(unit, toUnit)
-	local connectDict = {}
-	connectDict[unit.UnitId] = true
-	connectDict[toUnit.UnitId] = true
-	-- 创建焊接约束，RootUnitId 指定根单位
-	local weld = World:CreateUnit("WeldConstraint", {
-		ConnectUnitIdDict = connectDict,
-		RootUnitId = toUnit.UnitId,
-		Parent = unit
-	})
-	return weld
-end
-
-function Util:MarkPointPart(position, color, keepTime)
-	if not color then color = tonumber("ff0000", 16) end
-	local part = World:CreateUnit("WorldUnit", {
-		Position = position,
-		ModelColor1 = color,
-		Scale = Vector3(0.5, 0.5, 0.5),
-		PhysicsActive = false,
-		BodyType = Enums.BodyType.Kinematic,
-	})
-
-	if keepTime then
-		Task:Delay(keepTime, function() 
-			part:Destroy()
-		end)
-	end
-
-	return part
-end
-
 function Util:RandomDirection(detailRange, ignoreY)
 	if not detailRange then
 		detailRange = 10

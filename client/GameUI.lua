@@ -83,40 +83,6 @@ function GameUI:CreateSceneNode(prefabKey, attachUnit, Offset)
     return sceneNode
 end
 
-function GameUI:CreateHPBar(unit, changeInfo)
-    local euiMgr = GameUI:GetEuiManager()
-    if not changeInfo then changeInfo = {} end
-
-    local sceneNode = euiMgr:CreateSceneNodeAttachUnit(
-        unit,
-        "Head",              -- 绑定到头部骨骼
-        changeInfo.Offset or Vector3(0, 1.5, 0),  -- 向上偏移1.5m
-        true                     -- 跟随单位显隐
-    )
-    
-    -- 头顶血条背景
-    local hpBg = World:CreateUnit("EUIImage", {
-        Parent = sceneNode,
-        Name     = "img_hp_bg",
-        Image    = changeInfo.BgImage or 30008,                    -- 血条背景预设
-        Position = Vector2(0, 0),
-        Size     = changeInfo.BgSize or Vector2(200, 20),
-    })
-
-    -- 血条填充
-    local hpBar = World:CreateUnit("EUILoadingBar",  {
-        Name      = "bar_hp",
-        Image     = changeInfo.BarImage or 30007,                   -- 血条填充预设
-        Position  = Vector2(0, 0),
-        Size      = changeInfo.BarSize or Vector2(200, 20),
-        Percent   = 100,                     -- 初始满血 0~100
-        Direction = 0,                       -- 从左到右填充
-        Color     = changeInfo.Color or Color.New(0, 255, 0, 255),
-    })
-
-    return sceneNode, hpBar
-end
-
 _G.GameUI = GameUI
 
 return GameUI
