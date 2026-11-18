@@ -390,6 +390,27 @@ describe('TestFishCarrierEngine', function()
     assert.is_true(mgr.Carriers[carrier.Body.UnitId] == carrier)
   end)
 
+  it('test_each_spawned_body_gets_its_own_name', function()
+    -- #212：鱼本体的名字归本模块生成。两条同种鱼同名就是同名兄弟，按名定位只能随机命中一条；
+    -- 调用方塞进 Name 也不该改写它——名字是定位手段，不是调用方的自由字段。
+    local mgr = freshManager()
+    local world = newFakeWorld()
+    local first, second = withFakeEngine(world, function()
+      local opts = {}
+      for k, v in pairs(SPAWN_OPTS) do opts[k] = v end
+      opts.Name = 'CallerChosen'
+      return mgr:Spawn(opts), mgr:Spawn(opts)
+    end)
+    assert.is_not.same(first.Body.Name, second.Body.Name)
+    for _, carrier in ipairs({ first, second }) do
+      local name = carrier.Body.Name
+      assert.is_truthy(name, '鱼本体建单位必须带名字')
+      assert.is_truthy(string.find(name, 'FishCarrier', 1, true),
+        '名字要带模块前缀：' .. tostring(name))
+      assert.is_false(name == 'CallerChosen', '调用方不能直接决定鱼本体名字')
+    end
+  end)
+
   it('test_spawn_refuses_without_a_mesh', function()
     local mgr = freshManager()
     local world = newFakeWorld()

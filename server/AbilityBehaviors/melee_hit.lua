@@ -11,6 +11,10 @@ local SwingRegistry = require("server.SwingRegistry")
 
 local M = { Services = {} }
 
+-- #212：每次挥击的实例序号（模块内自增，不建全局计数器）。武器挂点与命中盒的名字都带它，
+-- 同一玩家连击时才不会短暂并存两个同名兄弟节点、按名查到哪个不确定。
+local SwingSeq = 0
+
 -- 硬编码常量
 local TRIGGER_BOX_PREFAB_ID = 57450
 local HIT_SFX_LIFETIME = 1.0
@@ -244,6 +248,8 @@ function M.Attach(anchor_script, services)
 	start_sig:Connect(function()
 		_cleanup() -- 防御：上一轮未正常终结时先回收
 		state = {}
+		SwingSeq = SwingSeq + 1
+		local swing_seq = SwingSeq
 		local ability_script = anchor_script.Parent
 		local manager = ability_script and ability_script.Parent
 		local owner = manager and manager.Parent
@@ -300,7 +306,7 @@ function M.Attach(anchor_script, services)
 		-- 武器模型：SkeletalSocketMount 挂插槽 + CreateAsset 生成
 		if weapon_prefab ~= "" then
 			local weapon_mount = World:CreateUnit("SkeletalSocketMount", {
-				Name = "ToolMount_" .. tostring(owner.UnitId),
+				Name = "ToolMount_" .. tostring(owner.UnitId) .. "_" .. tostring(swing_seq),
 				Parent = owner,
 				SocketName = bind_socket,
 				SocketOffset = bind_offset,
@@ -368,7 +374,7 @@ function M.Attach(anchor_script, services)
 			Scale = hit_box_scale,
 			Position = center,
 			Rotation = Quaternion.FromEulerAngles(0, yaw, 0),
-			Name = "MeleeHitBox_TU",
+			Name = "MeleeHitBox_" .. tostring(owner.UnitId) .. "_" .. tostring(swing_seq),
 		})
 		if not tu then
 			print("[melee_hit] WARNING: failed to create trigger unit")
