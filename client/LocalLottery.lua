@@ -4,6 +4,7 @@
 -- 不影响其余入口。结算与发奖全部在服务端（MgrLottery），这里只负责入口与开关窗。
 local GameCfg = require('common.GameCfg')
 local BodyScale = require('common.BodyScale')
+local OwnedUnits = require('common.OwnedUnits')
 local Util = require('common.Util')
 local SquareButtonImage = 'official://image/11017'
 
@@ -24,6 +25,7 @@ function LocalLottery:CreateBubble(anchor)
         Parent = node, Name = 'BtnLotteryEnter', Position = Vector2.New(0, 0), Size = Vector2.New(360, 72),
     })
     if okBtn and btn then
+        OwnedUnits.Track(self, btn) -- 气泡按钮归本模块所有，Clear 时销毁
         btn.ButtonText = ''
         btn.NormalImage = SquareButtonImage
         btn.PressImage = SquareButtonImage
@@ -37,6 +39,7 @@ function LocalLottery:CreateBubble(anchor)
             Text = cfg.HintText, FontSize = 26, TextColor = Color.New(255, 255, 255, 255),
         })
         if okLabel and label then
+            OwnedUnits.Track(self, label) -- 气泡文字同上
             label.TouchEnabled = false
             label.SwallowTouchEnabled = false
             label.LocalZOrder = 1
@@ -47,6 +50,18 @@ function LocalLottery:CreateBubble(anchor)
     end
     node.Visible = false
     return node
+end
+
+---关闭本模块建的全部入口气泡（幂等）：销毁名下按钮与文字，再销毁气泡根节点，登记表归空。
+-- 气泡根节点是 EUI 场景节点（不在建点清单里），随气泡一起显式销毁，不留看不见的残留。
+function LocalLottery:Clear()
+    OwnedUnits.Clear(self)
+    for _, bubble in ipairs(self.Bubbles) do
+        local ok, err = pcall(function() bubble.Node:Destroy() end)
+        if not ok then print('[LocalLottery] 气泡根节点销毁失败', tostring(err)) end
+    end
+    self.Bubbles = {}
+    self.Machine = nil
 end
 
 function LocalLottery:Open()

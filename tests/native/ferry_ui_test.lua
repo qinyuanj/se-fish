@@ -10,6 +10,8 @@
 -- seam：直接调 ScreenFerry 的 Start/Update*，替换 game/REUtil/EUI 边界（与 item_bar_ui_test 同款）。
 -- it 名字沿用旧方法名，注册顺序 = LuaUnit sortedPairs 的实际执行顺序。
 
+local OwnedUnits = require('common.OwnedUnits')
+
 local moduleNames = { 'common.GameCfg', 'common.REUtil', 'common.Util',
   'client.InteractionBubble', 'client.ScreenHandlers.ScreenFerry' }
 
@@ -66,7 +68,7 @@ describe('摆渡界面（ScreenFerry）', function()
     function world:CreateUnit(kind, attrs)
       local node = { Kind = kind, OnClicked = signal() }
       for key, value in pairs(attrs) do node[key] = value end
-      node.Destroy = function() self.Destroyed = true end
+      node.Destroy = function(me) me.Destroyed = true end
       if node.Name then env.nodes[node.Name] = node end
       return node
     end
@@ -74,7 +76,7 @@ describe('摆渡界面（ScreenFerry）', function()
     local eui = {
       CreateSceneNodeAtPosition = function(_, position)
         local node = { Position = position, Visible = true, OnClicked = signal() }
-        node.Destroy = function() self.Destroyed = true end
+        node.Destroy = function(me) me.Destroyed = true end
         env.sceneNodes[#env.sceneNodes + 1] = node
         return node
       end,
@@ -148,6 +150,38 @@ describe('摆渡界面（ScreenFerry）', function()
     assert.same({}, env.handler.Countdowns)
   end)
 
+  it('test_countdown_label_is_created_on_demand_and_destroyed_when_it_ends', function()
+    -- 没有在倒计时的航线时不占节点；结束后节点销毁、登记表归空；下一趟重新按需建一个（不叠加）
+    local state = env.events.FerryState.OnClientEvent
+    assert.is_nil(env.nodes.FerryCountdown)
+    assert.same(0, OwnedUnits.Count(env.handler))
+    local routeA, routeB = env.routes[1], env.routes[2]
+    state:Fire({ phase = 'countdown', routeId = routeA.Id, seconds = 5 })
+    env.handler:UpdateCountdown(1)
+    local label = env.nodes.FerryCountdown
+    assert.is_not_nil(label)
+    assert.is_true(label.Visible)
+    assert.same(1, OwnedUnits.Count(env.handler))
+    -- 另一条航线也倒计时：仍只有一个节点，不叠加
+    state:Fire({ phase = 'countdown', routeId = routeB.Id, seconds = 6 })
+    env.handler:UpdateCountdown(1)
+    assert.same(1, OwnedUnits.Count(env.handler))
+    assert.equal(label, env.nodes.FerryCountdown)
+    -- 倒计时全部走完：节点被销毁，登记表归空，不再显示
+    env.handler:UpdateCountdown(10)
+    assert.is_nil(env.handler.CountdownLabel)
+    assert.same({}, env.handler.Countdowns)
+    assert.same(0, OwnedUnits.Count(env.handler))
+    assert.is_true(label.Destroyed, '航线结束后倒计时节点应被销毁')
+    assert.is_false(label.Visible)
+    -- 下一趟摆渡重新建，不复活已销毁的旧节点
+    state:Fire({ phase = 'countdown', routeId = routeA.Id, seconds = 3 })
+    env.handler:UpdateCountdown(1)
+    assert.same(1, OwnedUnits.Count(env.handler))
+    assert.is_not_nil(env.nodes.FerryCountdown)
+    assert.not_equal(label, env.nodes.FerryCountdown)
+  end)
+
   it('test_each_leg_sends_its_own_route_id', function()
     -- 点哪条腿就发哪条航线的 id（去程 Board / 返程 Return），seq 单调递增
     local routeA, routeB = env.routes[1], env.routes[2]
@@ -208,7 +242,6 @@ describe('摆渡界面（ScreenFerry）', function()
       assert.is_not_nil(env.nodes['BtnFerry' .. route.Outbound.AnchorName])
       assert.is_not_nil(env.nodes['BtnFerry' .. route.Return.AnchorName])
     end
-    assert.is_not_nil(env.nodes.FerryCountdown)
     assert.same(12, #env.sceneNodes)
   end)
 end)

@@ -2,6 +2,9 @@
 -- 页签缺失/页内容错（排序与 ListForPage 口径不一致）、
 -- 升级页不分页、行状态错（锁定可点/已购可重复买）、购买发了 itemKey 而不是编号、
 -- 金币页平台不可用时伪成功或卡死（不可返回）、失败提示缺 limit/level/金币页引导。
+local GameCfg = require('common.GameCfg')
+local OwnedUnits = require('common.OwnedUnits')
+
 local function signal()
     local listeners = {}
     return {
@@ -29,10 +32,10 @@ describe("钓场商店的失败提示", function()
     local ctx
 
     before_each(function()
-        ctx = { notices = {}, created = {} }
-        ctx.previous = { game = rawget(_G, 'game'), Vector3 = rawget(_G, 'Vector3'),
-            Color = rawget(_G, 'Color'), GameUI = rawget(_G, 'GameUI'),
-            LocalMsgNotice = rawget(_G, 'LocalMsgNotice') }
+        ctx = { notices = {}, created = {}, bubbleRoots = {}, anchors = {} }
+        ctx.previous = { game = rawget(_G, 'game'), Vector2 = rawget(_G, 'Vector2'),
+            Vector3 = rawget(_G, 'Vector3'), Color = rawget(_G, 'Color'),
+            GameUI = rawget(_G, 'GameUI'), LocalMsgNotice = rawget(_G, 'LocalMsgNotice') }
         ctx.previousModules = { ['common.REUtil'] = package.loaded['common.REUtil'],
             ['common.Util'] = package.loaded['common.Util'], ['client.LocalShop'] = package.loaded['client.LocalShop'] }
         ctx.shopResult = signal()
@@ -41,13 +44,15 @@ describe("钓场商店的失败提示", function()
                 FireClient = function() end } end
             return { FireClient = function() end }
         end }
-        package.loaded['common.Util'] = { WaitForChild = function() return nil end,
+        package.loaded['common.Util'] = { WaitForChild = function(_, _, name) return ctx.anchors[name] end,
             MsgNotice = function() end }
         package.loaded['client.LocalShop'] = nil
         _G.LocalMsgNotice = function(msg) ctx.notices[#ctx.notices + 1] = msg end
         local world = {}
         function world:CreateUnit(_, attrs)
             local node = attrs or {}
+            node.OnClicked = signal()
+            node.Destroy = function(self) self.Destroyed = true end
             ctx.created[#ctx.created + 1] = node
             return node
         end
@@ -57,10 +62,16 @@ describe("钓场商店的失败提示", function()
             if name == 'RunService' then return { IsServer = function() return false end,
                 Heartbeat = { Connect = function() end } } end
         end }
+        _G.Vector2 = { New = function(x, y) return { x = x, y = y } end }
         _G.Vector3 = { New = function(x, y, z) return { x = x, y = y, z = z } end }
         _G.Color = { New = function(...) return { ... } end }
         _G.GameUI = { CreateSceneNode = function() error('无预设') end,
-            GetEuiManager = function() return { CreateSceneNodeAtPosition = function() return {} end } end }
+            GetEuiManager = function() return { CreateSceneNodeAtPosition = function()
+                local node = { Visible = true, FindFirstChild = function() return nil end,
+                    Destroy = function(self) self.Destroyed = true end }
+                ctx.bubbleRoots[#ctx.bubbleRoots + 1] = node
+                return node
+            end } end }
         _G.REUtil = { GetRE = function(_, name)
             if name == 'ShopResult' then return { OnClientEvent = ctx.shopResult } end
             return { FireClient = function() end }
@@ -70,7 +81,7 @@ describe("钓场商店的失败提示", function()
 
     after_each(function()
         for key, value in pairs(ctx.previousModules) do package.loaded[key] = value end
-        for _, key in ipairs({ 'game', 'Vector3', 'Color', 'GameUI', 'LocalMsgNotice' }) do
+        for _, key in ipairs({ 'game', 'Vector2', 'Vector3', 'Color', 'GameUI', 'LocalMsgNotice' }) do
             _G[key] = ctx.previous[key]
         end
     end)
@@ -79,6 +90,28 @@ describe("钓场商店的失败提示", function()
         assert.matches('上限', ctx.localShop.FailText.limit, nil, true)
         assert.matches('前一级', ctx.localShop.FailText.level, nil, true)
         assert.matches('金币页', ctx.localShop.FailText.coin, nil, true)
+    end)
+
+    -- 入口气泡关闭（清空）后：登记表归空、按钮与文字确被销毁、气泡根节点也销毁；重复清空幂等
+    it("test_clear_destroys_bubble_nodes_and_empties_registry", function()
+        for _, stand in ipairs(GameCfg.Shop.Stands) do
+            ctx.anchors[stand.AnchorName] = { Name = stand.AnchorName, Position = { x = 0, y = 0, z = 0 } }
+        end
+        ctx.localShop:Start()
+        assert.same(2 * #GameCfg.Shop.Stands, OwnedUnits.Count(ctx.localShop))
+        assert.same(#GameCfg.Shop.Stands, #ctx.localShop.Bubbles)
+        ctx.localShop:Clear()
+        assert.same(0, OwnedUnits.Count(ctx.localShop)) -- 登记表归空
+        assert.same(0, #ctx.localShop.Bubbles)
+        assert.same(2 * #GameCfg.Shop.Stands, #ctx.created)
+        for _, node in ipairs(ctx.created) do
+            assert.is_true(node.Destroyed, "入口按钮与文字都应销毁")
+        end
+        for _, node in ipairs(ctx.bubbleRoots) do
+            assert.is_true(node.Destroyed, "气泡根节点也应销毁")
+        end
+        ctx.localShop:Clear() -- 幂等：重复清空不报错
+        assert.same(0, OwnedUnits.Count(ctx.localShop))
     end)
 
     it("test_notice_mapping_for_new_reasons", function()

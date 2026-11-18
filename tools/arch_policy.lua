@@ -19,9 +19,10 @@ M.policy = {
         'common.AttrGrowth', 'common.AttrModel', 'common.BlindboxDraw', 'common.BodyScale',
         'common.BossPhase', 'common.CarryMount', 'common.ContentValidation', 'common.FishCatch',
         'common.FlightPath', 'common.GameCfg', 'common.GrillCurve', 'common.LotteryDraw',
-        'common.LotteryEligibility', 'common.MathWaterJudge', 'common.NpcDialogue', 'common.QuestSteps',
-        'common.RateLimit', 'common.Records', 'common.ReelDisplay', 'common.ReelProgress',
-        'common.SpecialItem', 'common.Vitals', 'common.ZoneMarkers',
+        'common.LotteryEligibility', 'common.MathWaterJudge', 'common.NpcDialogue',
+        'common.OwnedUnits', 'common.QuestSteps', 'common.RateLimit', 'common.Records',
+        'common.ReelDisplay', 'common.ReelProgress', 'common.SpecialItem', 'common.Vitals',
+        'common.ZoneMarkers',
       },
     },
     {
