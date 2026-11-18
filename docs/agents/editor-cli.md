@@ -2,21 +2,21 @@
 
 本文件由 `docs/agents/workflow.md` 的同名一节整体搬出；workflow.md 原地只留一行指针。条目按主题排列，新增实测接在相关条目之后。
 
-**通用用法读技能。** CLI 定位、`status` 字段、code 命令组与判脏、日志子命令、截图通道、EUI 与场景命令的用法，以团队技能 `eggy-se-editor-cli`（含其 references）为准，本节不重复；这里只留项目实测、技能没写到的坑，以及与本图口径或实测结果不同的地方。技能与本节或 CLI `--help` 冲突时以后两者为准；通用勘误提 PR 改团队仓 SE 副本（[ADR-0015](../adr/0015-eggitor-ai-resources-team-repo-maintained.md)）。实测版本 0.20.12～0.20.13，另标注者除外。
+**通用用法读技能。** CLI 定位、`status` 字段、code 命令组与判脏、日志子命令、截图通道、EUI 与场景命令的用法以团队技能 `eggy-se-editor-cli`（含 references）为准，本节只留项目实测、技能没写到的坑，以及与本图口径或实测结果不同的地方。技能与本节或 CLI `--help` 冲突时以后两者为准；通用勘误提 PR 改团队仓 SE 副本（[ADR-0015](../adr/0015-eggitor-ai-resources-team-repo-maintained.md)）。实测版本 0.20.12～0.20.13，另标注者除外。
 
-- **试玩闸门例外**：技能的判脏例外只列 `unit_scripts/`；`.agents/` 同样算干净——它是 agent 配置，不进地图。`deploy` 只镜像三端子树，不会清理这两者；取证记录里写明白名单。
-- **试玩就绪**：`status.ready` 表示「编辑器可以编辑地图」，试玩跑起来后它是 `false`，拿来做轮询条件永远等不到。判据是 `in_game_runtime == true` 且 `editor_state == "playing"`，或直接跑一条 `input state` 看有没有返回玩家坐标。
-- **异步输出**：服务端、客户端 `exec` 提交成功只表示代码已提交；编辑器 `exec` 的同步返回值在约 5KB 处静默截断，批量读取一律打印唯一标记再 `log grep <标记> | grep '^>'`（不带 `^>` 过滤会混入上下文行与统计行）。
-- **exec 预算**：编辑器 `exec` 有 5 秒硬预算，`--timeout` 改不动。超时是半途中断：已写入的部分生效，返回里只有一条 timeout 错误，不告诉你做到第几个节点（实测一次建了 8 个 EUI 节点就被掐断，26 个节点的骨架分了 5 轮才补齐）。写场景的探针因此必须幂等（同名节点存在就跳过或只改属性，不重建）并分批（每次只动固定个数，剩下的下次重跑）；每轮跑之前先 dry-run，跑完立刻改回 `APPLY = false`。
-- **EUI 几何写入（技能写法实测无效）**：技能文档让 `SetProperty('Position', {100.0, 200.0})` 这样传 table，`CreateEUINode` 的位置尺寸也传 `{X=..., Y=...}`；实测 `SetProperty` 照样返回 `true`，值一点不变（写 `{X=24, Y=700}` 后读回还是原值，8 个节点全停在 `0,0 100×100`，探针一路报成功）。正确写法是 `node:SetProperty('Position', Vector2.New(24, 700))`——`Vector2` 在编辑态 exec 沙箱里是全局可用的。读写还不对称：写入用 userdata（字段 `.X` / `.Y`），读回来是数组下标形态（`[1]` / `[2]`，`.X` 为 nil），拿 `.X` 比对永远判不等，表现成每次重跑都全量重写。规则：写几何用 `Vector2.New`，读回来用下标，不拿 `SetProperty` 的返回值当成功证据，要读回校验。
-- **截图**：技能的 `capture.md` 讲通道选择与自述判读；这里只补本机的显示路径判定——先跑 `lua tools/cli.lua screenshot --info`，它报「虚拟屏 / 非虚拟屏 / 不确定」，别用适配器列表里有没有 GameViewer 来推断（虚拟适配器常挂着但未附加到桌面）。虚拟屏（UU 远程的 GameViewer Virtual Display Adapter）上 editor-cli 的窗口表面抓取取不到新内容：可能是校验通过的黑帧（`FRAME_VALID`，0.20.16 实测），也可能是尺寸正常、内容停在旧帧（#185，0.20.13 实测）；置前重试都无效，改用工具链的 `lua tools/cli.lua screenshot`。**单帧 `FRAME_VALID` 证明不了帧是新的**：判新旧用连拍，先确认两帧尺寸一致，再比 md5，尺寸变了的那组作废重采。仍无画面就请用户目视确认，给出选项、时间点和观察要点，不要循环重试。
-- **保存与重开**：`map save` 成功后 `map dirty` 仍可能为 true，此时 `map reopen` 报 `MAP_REOPEN_REJECTED`。保存与重开都不需要授权：先用 `map dirty --json` 列出 dirty 来源并记进取证，再执行 `map reopen --force`。来源不明时可能是用户的手动编辑，强制重开前把来源清单与当前 `code diff` 写进取证，别静默丢弃。停止试玩本身也会让 dirty 变成 true。
-- **风险步逐次确认**：推送、场景写入，每一步单独取得用户确认；一次授权只覆盖它点名的那一轮或那一批。部署（`lua tools/cli.lua deploy`，含它收尾阶段随行的 validate → `code push` → `code diff` 复核）、试玩（起停、`input` 操作、截图取证）与地图保存、重开都不需要授权，直接执行，但照「测试纪律」留可重跑的触发步骤与证据。不经 `deploy` 的手工 `code push` 仍算推送，要确认。场景写入即以 `APPLY = true` 执行写场景探针：先以 `APPLY = false` 跑 dry-run 并把结果交给用户，用户确认一批才执行一批，执行完立即把探针改回 `APPLY = false`。
-- **场景整理顺序**：空目录清理排在全部建标记批次之后，只处理基线回读时已存在的空目录。删除或挪动场景地面（灰盒地块等）前，先在试玩服务端对受影响区的 `Z*` 点位与设施打向下射线，确认其下仍有地面（删 01 灰盒大地板后，渔夫、商店、抽奖、出生点、鱼饵曾悬在鱼塘水面上）。
+- **试玩闸门例外**：技能的判脏例外只列 `unit_scripts/`；`.agents/` 同样算干净（agent 配置，不进地图，`deploy` 也不清理），取证时点名。
+- **试玩就绪**：`status.ready` 是「编辑器可编辑地图」，试玩中为 `false`，等它永远等不到。判据是 `in_game_runtime == true` 且 `editor_state == "playing"`，或 `input state` 有玩家坐标。
+- **异步输出**：服务端、客户端 `exec` 提交成功只表示已提交；编辑器 `exec` 的同步返回在约 5KB 处静默截断。批量读取一律打印唯一标记再 `log grep <标记> | grep '^>'`（不加 `^>` 会混入上下文行与统计行）。
+- **exec 预算**：编辑器 `exec` 有 5 秒硬预算，`--timeout` 改不动；超时是半途中断，已写入的部分生效，返回只有一条 timeout 错误，不告诉你做到第几个节点。写场景探针因此必须幂等（同名节点跳过或只改属性）并分批；每轮先 dry-run，跑完立刻改回 `APPLY = false`。
+- **EUI 几何写入（技能写法实测无效）**：技能文档让 `SetProperty('Position', {100.0, 200.0})` 传 table、`CreateEUINode` 传 `{X=..., Y=...}`；实测 `SetProperty` 返回 `true` 但值不变。写几何用 `node:SetProperty('Position', Vector2.New(24, 700))`（`Vector2` 在编辑态沙箱可用）；读回来是下标形态（`[1]` / `[2]`，`.X` 为 nil），拿 `.X` 比对永远不等。不拿 `SetProperty` 返回值当成功证据，要读回校验。
+- **截图**：技能的 `capture.md` 讲通道与自述判读；这里补显示路径——先跑 `lua tools/cli.lua screenshot --info`（报虚拟屏 / 非虚拟屏 / 不确定），别用 GameViewer 适配器在不在列表里推断。虚拟屏上 editor-cli 的窗口抓取可能给校验通过的黑帧（0.20.16 实测）或内容停在旧帧（#185，0.20.13 实测），置前重试无效，改用 `lua tools/cli.lua screenshot`。单帧 `FRAME_VALID` 证明不了帧新：连拍比 md5，先锁尺寸。仍无画面就请用户目视确认，不循环重试。
+- **保存与重开**：`map save` 成功后 `map dirty` 仍可能为 true，此时 `map reopen` 报 `MAP_REOPEN_REJECTED`。两者都不需要授权；先用 `map dirty --json` 列出来源记进取证再执行，别静默丢弃可能是用户手动编辑的来源（停止试玩本身也会让 dirty 变 true）。
+- **风险步逐次确认**：推送、场景写入单独取得用户确认，一次授权只覆盖它点名的那一轮或那一批；不经 `deploy` 的手工 `code push` 算推送。部署（含随行 validate → `code push` → `code diff`）、试玩（起停、`input`、截图取证）、地图保存与重开都不需要授权，直接执行，照「测试纪律」留证据。场景写入以 `APPLY = true` 跑探针：先 `APPLY = false` dry-run 交用户，确认一批执行一批，执行完改回 `APPLY = false`。
+- **场景整理顺序**：空目录清理排在全部建标记批次之后，只处理基线回读时已存在的空目录。删除或挪动场景地面前，先在试玩服务端对受影响区打向下射线，确认其下仍有地面。
 - **编辑态读不到的设置**：编辑态 `editor:GetService('PhysicsService')` 为 nil，地面高度只能在试玩服务端用射线测；编辑态读 World 的 `AOIType`、`StreamingEnabled` 得到 nil，流式加载设置无法经 CLI 确认。
 - **场景枚举**：编辑器侧执行[技术难点识别的绕过合同](../技术难点识别.md#绕过合同四条硬边界)，试玩服务端的例外也写在那里。
 - **检索失败**：`docs search` 报 HTTP 500 等服务端错误时（0.20.12 的 `editor-api` docset 出现过），改查 `manual` 或编辑器在线时的 `api search-editor` / `api get-editor`。
 - **检索范围**：本图是世界版（SE，`status --json` 的 `editor_mode: "se"`）。`docs search` 查不到问题里的词时先问用户指什么，等确认后再换库或换方向，不自行换库；原点版（FS）的库只在用户点名「原点版 / FS」时才查。
 - **模型动画验收**：导入、播放与画面判定读[美术资产概要「模型动画导入与播放」](../art-asset-overview.md#模型动画导入与播放)。
-- **验收判据读产物**：判据不要读工具或探针自己打印的摘要。实测验收手册把「探针打印的 `PLANNED-MISSING(0)`」当判据，而探针统计缺失时一律从根节点 `FindFirstChild` 取（函数不递归），嵌套子节点永远是「缺失」，判据根本不可能达成。正确做法是让判据落在产物上：节点树回读、`data/UINodes.lua`、`log grep` 的实打实行；探针自己算的摘要本身也要有测试。两条工具用法：`log grep` 追「最新进展」要加 `--max-matches` 一个大值再 `tail`（默认只留最旧的 50 条，本次拿到的是 457 条里最早的 50 条）；等长时状态别在一条命令里塞 `sleep` 循环（期间没有任何输出，中断或超时等于零信息），每次只查一次由调用方重试，或用后台任务。
+- **验收判据读产物**：判据不读工具或探针自己打印的摘要——探针统计缺失时只从根节点 `FindFirstChild` 取（不递归），嵌套子节点永远「缺失」，这类摘要本身也要有测试。判据落在产物上：节点树回读、`data/UINodes.lua`、`log grep` 的实打实行。`log grep` 追最新进展加 `--max-matches` 大值再 `tail`（默认只留最旧 50 条）；等长时状态一条命令只查一次，别塞 `sleep` 循环（无输出，超时等于零信息），由调用方重试或用后台任务。
 - **sync 回灌的引擎生成物**：`sync` 会把 `EggyAPI.lua` 这样的引擎生成物一并带回仓库；与本次改动无关时单独 `git restore`，并在验收记录里点名，别让无关的 API 刷新混进功能分支。
