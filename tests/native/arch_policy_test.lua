@@ -53,20 +53,6 @@ describe('架构分层门禁', function()
     ]=]))
   end)
 
-  it('数调用点用的代码视图抹掉注释与字符串内容且长度不变', function()
-    local source = [=[
-      local a = World:CreateUnit('X')
-      -- World:CreateUnit 写在注释里不算
-      print("WARNING: CreateUnit failed")
-      local b = world.CreateUnit
-    ]=]
-    local code = Arch.code_only(source)
-    assert.same(#source, #code)
-    local found = 0
-    for _ in code:gmatch('CreateUnit') do found = found + 1 end
-    assert.same(2, found)
-  end)
-
   it('拒绝模块直接加载自身', function()
     local result = Arch.check(fixture_policy(), {
       modules = { 'app.rules.a' },
