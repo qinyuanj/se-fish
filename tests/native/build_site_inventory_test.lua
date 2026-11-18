@@ -14,7 +14,7 @@ local Arch = require("tools.arch_policy")
 local fs = require("tests.support.fs_fixture")
 local lfs = require("lfs")
 
--- 63：#214 审查修复把商品行子节点的两处建点（图片 / 文字各一支）合成一处驱动表建点，client 39 → 38
+-- 63：#214 审查修复把商品行子节点的两处建点（图片 / 文字各一支）合成一处驱动表建点，client 40 → 39
 local SITES = 63
 local SITE_ROOTS = { "client", "common", "server" }
 local REF_ROOTS = { "client", "common", "server", "tests", "tools" }
