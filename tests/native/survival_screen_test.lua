@@ -8,6 +8,7 @@
 -- 旧实现用 pairs 遍历会漏掉 nil 项），after_each 对未完成的 before_each 幂等。
 -- describe/it 名沿用旧类名与方法名，案例顺序沿用旧 LuaUnit 的字典序执行序。
 local GameCfg = require('common.GameCfg')
+local OwnedUnits = require('common.OwnedUnits')
 
 local function signal()
     local listeners = {}
@@ -47,6 +48,7 @@ describe('TestScreenSurvival', function()
             CreateUnit = function(_, kind, props)
                 local node = { Kind = kind, Visible = true, OnClicked = signal() }
                 for key, value in pairs(props) do node[key] = value end
+                node.Destroy = function(me) me.Destroyed = true end
                 env.nodes[node.Name] = node
                 return node
             end,
@@ -173,5 +175,27 @@ describe('TestScreenSurvival', function()
         ctx.events.SurvivalResult.OnClientEvent:Fire({ action = 'FullRevive', ok = false, reason = 'not-dead' })
         ctx.events.SurvivalResult.OnClientEvent:Fire({ action = 'FullRevive', ok = true, mode = 'ad' })
         assert.same(count, #ctx.notices) -- 安静结局不刷提示
+    end)
+
+    -- #211：面板节点一律登记到归属登记，清空只走登记表；清空后不再自持已销毁节点
+    it('test_clear_destroys_every_registered_node_and_resets_lookup', function()
+        local banner = ctx.nodes['SurvivalBanner']
+        assert.same(9, OwnedUnits.Count(ctx.panel)) -- 横幅 1 + 大字 1 + 三按钮各 2 + 虚弱提示 1
+        ctx.panel:Clear()
+        assert.same(0, OwnedUnits.Count(ctx.panel))
+        for name, node in pairs(ctx.nodes) do
+            if not node.Destroyed then
+                assert.is_true(false, name .. ' 建过但清空后没销毁')
+            end
+        end
+        assert.is_true(banner.Destroyed)
+        assert.is_nil(ctx.panel.Banner)
+        assert.is_nil(ctx.panel.Title)
+        assert.is_nil(ctx.panel.AdrenalineBtn)
+        assert.is_nil(ctx.panel.AdReviveBtn)
+        assert.is_nil(ctx.panel.PaidReviveBtn)
+        assert.is_nil(ctx.panel.WeakLabel)
+        ctx.panel:Clear() -- 幂等：重复清空不报错
+        assert.same(0, OwnedUnits.Count(ctx.panel))
     end)
 end)

@@ -7,6 +7,7 @@
 --   * _G.PlatformShop.Open：地图商店金币页入口（ScreenShop:OpenPlatformShop），上行 OpenCoinShop。
 -- 节点全部运行时创建（data/ 只读）；创建失败只记日志，不阻塞主流程。
 local GameCfg = require('common.GameCfg')
+local OwnedUnits = require('common.OwnedUnits')
 local REUtil = require('common.REUtil')
 local GameUI = require('client.GameUI')
 
@@ -43,7 +44,14 @@ function Panel:Create(kind, parent, name, x, y, w, h, props)
         node.SwallowTouchEnabled = false
     end
     self.Nodes[name] = node
-    return node
+    return OwnedUnits.Track(self, node)
+end
+
+---销毁平台界面建的全部节点并复位查找表（幂等，#211）：销毁只走归属登记，不从 Nodes 枚举。
+function Panel:Clear()
+    OwnedUnits.Clear(self)
+    self.Nodes = {}
+    self.Offers = nil
 end
 
 function Panel:Button(parent, name, x, y, w, h, text, onClick)
