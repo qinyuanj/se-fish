@@ -13,7 +13,8 @@ local LocalShop = { Bubbles = {} }
 local World = game:GetService('World')
 local Players = game:GetService('Players')
 
--- 失败提示（#130 扩展 limit/level 与金币页引导）；服务端 reason 为准，未知原因兜底通用文案
+-- 失败提示（#130 扩展 limit/level 与金币页引导；#218 补 stand）：服务端 reason 为准，未知原因兜底通用文案。
+-- 商店界面的失败文案只认这一张表：界面侧本地拒绝（摊位等级不够 / 越级，见 ScreenShop）也读这里，不另写一套。
 LocalShop.FailText = {
     coin = '金币不足，可切到商店金币页购买金币（平台商店）',
     full = '背包已满',
@@ -22,6 +23,7 @@ LocalShop.FailText = {
     item = '这件商品暂不出售',
     limit = '该商品已达购买次数上限',
     level = '请先完成前一级升级',
+    stand = '需要更高等级摊位', -- 客户端侧原因：货架行要求的 MinShopLevel 高于当前摊位等级
 }
 local FailText = LocalShop.FailText
 

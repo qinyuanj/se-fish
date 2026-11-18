@@ -20,6 +20,9 @@ local function signal()
     }
 end
 
+-- luassert 没有 fail()：只在失败分支拼消息（通过的断言不付一次 string.format 的钱）
+local function fail(fmt, ...) error(string.format(fmt, ...), 0) end
+
 local function numbersOf(rows)
     local out = {}
     for i, row in ipairs(rows or {}) do out[i] = row and row.number or nil end
@@ -85,10 +88,14 @@ describe("钓场商店的失败提示", function()
         end
     end)
 
-    it("test_fail_text_covers_limit_level_and_coin_guidance", function()
-        assert.matches('上限', ctx.localShop.FailText.limit, nil, true)
-        assert.matches('前一级', ctx.localShop.FailText.level, nil, true)
-        assert.matches('金币页', ctx.localShop.FailText.coin, nil, true)
+    -- #218 的五类失败文案：#214 要求每类都有一条玩家能读懂的话（不是 reason 码），且只在这一张表里。
+    it("test_fail_text_covers_the_five_failure_classes", function()
+        local text = ctx.localShop.FailText
+        if not (text.coin and text.coin:find('金币不足', 1, true)) then fail('金币不足缺文案') end
+        if not (text.full and text.full:find('背包已满', 1, true)) then fail('背包已满缺文案') end
+        if not (text.limit and text.limit:find('上限', 1, true)) then fail('已达上限缺文案') end
+        if not (text.level and text.level:find('前一级', 1, true)) then fail('前一级升级缺文案') end
+        if not (text.stand and text.stand:find('更高等级摊位', 1, true)) then fail('摊位等级缺文案') end
     end)
 
     -- 入口气泡关闭（清空）后：登记表归空、按钮与文字确被销毁、气泡根节点也销毁；重复清空幂等
@@ -113,22 +120,27 @@ describe("钓场商店的失败提示", function()
         assert.same(0, OwnedUnits.Count(ctx.localShop))
     end)
 
-    it("test_notice_mapping_for_new_reasons", function()
+    -- 回包 → 消息条（#218）：四类服务端失败各给对应文案（不分错类），成功给「购买成功：X，花费 N 金币」。
+    -- 失败方式：两类失败共用一句（分不清是没钱还是背包满）；未知原因没兜底；成功文案漏掉花费金额。
+    it("test_notice_mapping_for_success_and_server_failures", function()
         ctx.localShop:Start() -- 连接 ShopResult；摊位锚点缺失只打日志
-        ctx.shopResult:Fire({ ok = false, reason = 'limit', number = 51 })
-        ctx.shopResult:Fire({ ok = false, reason = 'level', number = 50 })
-        ctx.shopResult:Fire({ ok = false, reason = 'coin', itemId = 'starterRod' })
+        for _, reason in ipairs({ 'coin', 'full', 'limit', 'level' }) do
+            ctx.shopResult:Fire({ ok = false, reason = reason, number = 51 })
+        end
+        ctx.shopResult:Fire({ ok = false, reason = 'newReason', number = 51 })
         ctx.shopResult:Fire({ ok = true, number = 51, kind = 'melee', level = 1, price = 50, name = '近战武器升级1' })
         assert.same({
+            ctx.localShop.FailText.coin,
+            ctx.localShop.FailText.full,
             ctx.localShop.FailText.limit,
             ctx.localShop.FailText.level,
-            ctx.localShop.FailText.coin,
+            '购买失败',
             '购买成功：近战武器升级1，花费 50 金币',
         }, ctx.notices)
     end)
 end)
 
--- ===== 商店界面（#216 固定骨架 + 运行期填行，#217 行内容与选中） =====
+-- ===== 商店界面（#216 固定骨架 + 运行期填行，#217 行内容与选中，#218 详情与唯一购买） =====
 -- 本屏唯一的测试接缝是 handler:View()（纯显示快照）与行/页签按钮发出的指令；不断言节点数量、
 -- 坐标、颜色与层级——那些由共享简报的骨架契约与编辑器试玩负责。
 -- 动手前列出的失败方式（每例对应其中一条）：
@@ -145,18 +157,33 @@ end)
 --  11. 新品标记按编号或「前两行」写死（不是 MinShopLevel == 摊位等级）→ 换摊位后「新品」标到别行；
 --  12. 点行直接下单（#216 旧行为）→ 玩家想看一眼详情就花了钱；
 --  13. 选中只活在点击当帧、重绘后丢失 → 买完看不见选中的是哪一行；selected 同时标在多行。
-describe("钓场商店界面（#216 固定骨架 / #217 行与选中）", function()
+--  14. 详情区不显示描述/限购次数、价格口径与行不一致 → 玩家不知道买什么、还能买几次；
+--  15. 升级行不给当前等级与买完的等级 → 不知道这一级值不值；
+--  16. 切页签/重开商店后详情区留着上一条、购买按钮仍可点 → 买家以为还能买上一页的商品；
+--  17. 详情区购买按钮没接线、或行点击也下单（#216 旧行为）→ 唯一购买入口失效或误下单；
+--  18. 锁定/已购行仍可选中（#217 旧行为）→ 玩家白点，选中后详情还在教他怎么买；
+--  19. 服务端拒绝时客户端伪成功（扣金币 / 行转已购）→ 玩家以为买到了；
+--  20. 买成后金币条等属性刷新、行与详情不刷新 → 当场看不到扣款，已买满的行还能点；
+--  21. 本地拒绝静默 → 玩家不知道为什么买不了。
+describe("钓场商店界面（#216 固定骨架 / #217 行与选中 / #218 详情与购买）", function()
     local ctx
 
+    -- 行下标按商店编号找：行序取自 GameCfg.Shop.ListForPage，别在用例里数下标（数错就测成别的商品）
+    local function rowIndexOf(view, number)
+        for _, row in ipairs(view.rows or {}) do
+            if row.number == number then return row.index end
+        end
+    end
+
     before_each(function()
-        ctx = { nodes = {}, created = {}, commands = {}, events = {} }
+        ctx = { nodes = {}, created = {}, commands = {}, events = {}, notices = {} }
         ctx.previous = { game = rawget(_G, 'game'), Vector2 = rawget(_G, 'Vector2'),
             Color = rawget(_G, 'Color'), REUtil = rawget(_G, 'REUtil'),
             GameUI = rawget(_G, 'GameUI'), MgrGameUI = rawget(_G, 'MgrGameUI'),
-            PlatformShop = rawget(_G, 'PlatformShop') }
+            PlatformShop = rawget(_G, 'PlatformShop'), LocalMsgNotice = rawget(_G, 'LocalMsgNotice') }
         ctx.previousLocalShop = package.loaded['client.LocalShop']
         ctx.previousHandler = package.loaded['client.ScreenHandlers.ScreenShop']
-        package.loaded['client.LocalShop'] = { Stand = { AnchorName = 'TGUnitShopShrimp', Level = 2 } }
+        _G.LocalMsgNotice = function(msg) ctx.notices[#ctx.notices + 1] = msg end
         package.loaded['client.ScreenHandlers.ScreenShop'] = nil
         -- 假 World：建点即挂到 Parent 的子节点表上（供 FindFirstChild 取行与行内子节点），
         -- 销毁按引擎口径递归（EUI 节点 Destroy 带走子节点，所以行内子节点不必单独登记）。
@@ -199,6 +226,11 @@ describe("钓场商店界面（#216 固定骨架 / #217 行与选中）", functi
             end
             return ctx.events[name]
         end }
+        -- 真 LocalShop 只取 Stand 与 FailText（文案唯一来源）：它的 Start 不调用，不建点也不连信号
+        local localShop = assert(loadfile('client/LocalShop.lua'))()
+        localShop.Stand = { AnchorName = 'TGUnitShopShrimp', Level = 2 }
+        package.loaded['client.LocalShop'] = localShop
+        ctx.localShop = localShop
         ctx.handler = assert(loadfile('client/ScreenHandlers/ScreenShop.lua'))()
         -- 预制体骨架替身：名册里的节点按名字给；层级与几何不进单测，契约在共享简报里。
         for _, name in ipairs(ctx.handler.UINodes) do
@@ -214,7 +246,8 @@ describe("钓场商店界面（#216 固定骨架 / #217 行与选中）", functi
     after_each(function()
         package.loaded['client.LocalShop'] = ctx.previousLocalShop
         package.loaded['client.ScreenHandlers.ScreenShop'] = ctx.previousHandler
-        for _, key in ipairs({ 'game', 'Vector2', 'Color', 'REUtil', 'GameUI', 'MgrGameUI', 'PlatformShop' }) do
+        for _, key in ipairs({ 'game', 'Vector2', 'Color', 'REUtil', 'GameUI', 'MgrGameUI', 'PlatformShop',
+            'LocalMsgNotice' }) do
             _G[key] = ctx.previous[key]
         end
     end)
@@ -242,7 +275,9 @@ describe("钓场商店界面（#216 固定骨架 / #217 行与选中）", functi
     it("test_every_tab_switches_container_and_clears_selection", function()
         local coin = GameCfg.Shop.Pages[#GameCfg.Shop.Pages]
         for index, page in ipairs(GameCfg.Shop.Pages) do
-            ctx.handler:Select(1)
+            for _, row in ipairs(ctx.handler:View().rows) do -- 选当前页第一个可购买行（锁定/已购行不可选中）
+                if row.selectable then ctx.handler:Select(row.index) break end
+            end
             ctx.nodes['BtnShopPage' .. index].OnClicked:Fire()
             local view = ctx.handler:View()
             assert.same(page, view.page)
@@ -325,35 +360,168 @@ describe("钓场商店界面（#216 固定骨架 / #217 行与选中）", functi
         end
     end)
 
-    -- 购买指令（#218 的唯一购买按钮调到它）：一律发商店编号，不发 itemKey（升级行没有 itemKey，
-    -- 发 itemKey 的旧写法会让升级行根本买不了）。行点击只选中，见下一条用例。
-    -- 失败方式：payload 发 itemKey；或选中项与行下标错位，买成别的商品。
-    it("test_buy_command_carries_shop_number_not_item_key", function()
-        ctx.handler:Select(1) -- 钓具页第 1 行 = 香肠（编号 11，itemKey = sausage）
-        ctx.handler:Buy(ctx.handler:View().selected)
-        assert.same({ { action = 'Buy', number = 11, seq = 1 } }, ctx.commands)
+    -- 唯一购买入口（#218）：只有详情区的 BtnShopBuyDetail 会下单，点列表行只换选中（#217）。
+    -- 指令一律发商店编号，不发 itemKey（升级行没有 itemKey，发旧键根本买不了）。
+    -- 失败方式：行点击也下单（#216 旧行为）；购买按钮没接线（点了没反应）；payload 发 itemKey 或选中项错位。
+    it("test_buy_button_is_the_only_entry_and_sends_shop_number", function()
+        assert.is_true(ctx.handler:Select(1)) -- 香肠（编号 11，itemKey = sausage）
+        ctx.nodes.ShopRow2.OnClicked:Fire()  -- 钓具页第 2 行 = 钓虾竿（编号 12）
+        assert.same({}, ctx.commands)
+        assert.same(2, ctx.handler:View().selected)
+        ctx.nodes.BtnShopBuyDetail.OnClicked:Fire()
+        assert.same({ { action = 'Buy', number = 12, seq = 1 } }, ctx.commands)
+        -- 升级行走同一条入口与同一个购买键（编号 41 = 弹容量升级1）
         ctx.handler:SetPage('升级')
-        ctx.handler:Select(2) -- 升级页第 2 行 = 弹容量升级1（编号 41）
-        ctx.handler:Buy(2)
+        assert.is_true(ctx.handler:Select(rowIndexOf(ctx.handler:View(), 41)))
+        ctx.nodes.BtnShopBuyDetail.OnClicked:Fire()
         assert.same(41, ctx.commands[2].number)
         assert.is_nil(ctx.commands[2].itemId)
+        assert.same(2, ctx.commands[2].seq)
     end)
 
     -- 选中：点行只选中不下单；快照逐行暴露 selected；整体重绘（购买回包）后选中的还是同一行。
+    -- #218 反转 #217 的「锁定行同样可选中」：锁定行点了不选中（行节点禁用，Select 也拒绝）。
     -- 失败方式：点行直接下单（#216 旧行为）→ 想看一眼详情就花了钱；选中只活在点击当帧、重绘后丢失；
-    --           selected 同时标在多行（下标比较写成「有值即选中」）。
+    --           selected 同时标在多行（下标比较写成「有值即选中」）；锁定行仍能选中（玩家白点）。
     it("test_row_click_selects_without_buying_and_survives_refresh", function()
         ctx.nodes.ShopRow1.OnClicked:Fire()
         assert.same(1, ctx.handler:View().selected)
         assert.same({}, ctx.commands)
-        ctx.handler:Select(3) -- 锁定行同样可选中：「选中禁用行是否拒绝」属 #218 的边界
+        ctx.nodes.ShopRow3.OnClicked:Fire() -- 科技假饵：2 级摊位买不到，点了不选中
+        assert.same(1, ctx.handler:View().selected)
         local rows = ctx.handler:View().rows
-        assert.same({ false, false, true }, { rows[1].selected, rows[2].selected, rows[3].selected })
+        assert.same({ true, false, false }, { rows[1].selected, rows[2].selected, rows[3].selected })
         ctx.events.ShopResult.OnClientEvent:Fire({ ok = true, number = 11, price = 2 })
         local after = ctx.handler:View()
-        assert.same(3, after.selected)
-        assert.same({ false, false, true }, { after.rows[1].selected, after.rows[2].selected, after.rows[3].selected })
+        assert.same(1, after.selected)
+        assert.same({ true, false, false }, { after.rows[1].selected, after.rows[2].selected, after.rows[3].selected })
         assert.same({}, ctx.commands)
+    end)
+
+    -- 详情区（#218）：选中一行后给全决策信息——名字、描述、价格、限购次数；快照与节点文字一致。
+    -- 失败方式：详情只给名字、缺描述或限购次数（玩家不知道买什么、还能买几次）；
+    --           价格口径与行/货架行不一致（详情价与扣费价对不上）。
+    it("test_detail_shows_name_desc_price_and_limit", function()
+        assert.is_true(ctx.handler:Select(1)) -- 钓具页第 1 行 = 香肠（编号 11，不限购）
+        local detail = ctx.handler:View().detail
+        assert.same(11, detail.number)
+        assert.same('香肠', detail.name)
+        assert.same('香咸可口的香肠，虾子们也喜欢它。', detail.desc)
+        assert.same('2', detail.priceText)
+        assert.same('不限购', detail.limitText)
+        assert.same('', detail.upgradeText)
+        assert.is_true(detail.buyEnabled)
+        assert.same('香肠', ctx.nodes.LabelShopDetailName.Text)
+        assert.same('2', ctx.nodes.LabelShopDetailPrice.Text)
+        assert.same('不限购', ctx.nodes.LabelShopDetailLimit.Text)
+    end)
+
+    -- 升级类详情（#218）：另给「当前几级、买完升到几级」——决定买不买的关键信息。
+    -- 失败方式：升级行不给等级（玩家不知道现在几级、买完到几级）；目标等级写成当前等级。
+    it("test_detail_upgrade_row_shows_current_and_target_level", function()
+        ctx.handler:SetPage('升级')
+        assert.is_true(ctx.handler:Select(rowIndexOf(ctx.handler:View(), 41))) -- 弹容量升级1：0 级 → 1 级
+        local detail = ctx.handler:View().detail
+        assert.same('弹容量升级1', detail.name)
+        assert.same('已购 0 / 1 次', detail.limitText)
+        assert.same('当前 0 级，买完升到 1 级', detail.upgradeText)
+        assert.same(detail.upgradeText, ctx.nodes.LabelShopDetailUpgrade.Text)
+    end)
+
+    -- 空态（#218）：没选中（切页签 / 重开商店）时详情区清空、购买按钮禁用，不留上一条的残留。
+    -- 失败方式：切页签后详情区还写着上一页的商品、按钮仍可点（玩家以为还能买到上一页的东西）。
+    it("test_detail_empty_state_clears_texts_and_disables_buy", function()
+        assert.is_true(ctx.handler:Select(1))
+        ctx.nodes['BtnShopPage' .. #GameCfg.Shop.Pages].OnClicked:Fire() -- 金币页：内容区换容器、选中清空
+        local detail = ctx.handler:View().detail
+        assert.is_nil(detail.number)
+        assert.same({ '', '', '', '', '' }, { detail.name, detail.desc, detail.priceText,
+            detail.limitText, detail.upgradeText })
+        assert.is_false(detail.buyEnabled)
+        for _, name in ipairs({ 'LabelShopDetailName', 'LabelShopDetailDesc', 'LabelShopDetailPrice',
+            'LabelShopDetailLimit', 'LabelShopDetailUpgrade' }) do
+            if ctx.nodes[name].Text ~= '' then fail(name .. ' 空态应清空，实际：' .. ctx.nodes[name].Text) end
+        end
+        assert.is_true(ctx.nodes.BtnShopBuyDetail.Disabled)
+        ctx.commands = {}
+        ctx.nodes.BtnShopBuyDetail.OnClicked:Fire() -- 空态点购买按钮不发请求
+        assert.same({}, ctx.commands)
+    end)
+
+    -- 可点性（#218 修正 #217「锁定行同样可选中」）：锁定 / 已购行不可选中——Select 拒绝且不改选中，
+    -- 快照逐行给 selectable（单测不读节点的 TouchEnabled）。
+    -- 失败方式：锁定/已购行仍可选中（玩家白点，选中后详情还在教他怎么买）；快照看不出哪行可点。
+    it("test_locked_and_owned_rows_are_not_selectable", function()
+        local rows = ctx.handler:View().rows
+        assert.same({ true, true, false }, { rows[1].selectable, rows[2].selectable, rows[3].selectable })
+        assert.is_true(ctx.handler:Select(1))
+        assert.is_false(ctx.handler:Select(3)) -- 科技假饵：2 级摊位买不到
+        assert.same(1, ctx.handler:View().selected)
+        ctx.handler:SetPage('升级')
+        local view = ctx.handler:View()
+        assert.is_false(view.rows[rowIndexOf(view, 32)].selectable) -- 背包升级2：越级
+        local index = rowIndexOf(view, 51) -- 近战武器升级1：限购 1 次
+        assert.is_true(ctx.handler:Select(index))
+        ctx.nodes.BtnShopBuyDetail.OnClicked:Fire()
+        assert.same(1, #ctx.commands)
+        ctx.events.ShopResult.OnClientEvent:Fire({ ok = true, number = 51, kind = 'melee', level = 1, price = 50 })
+        local after = ctx.handler:View()
+        assert.same('owned', after.rows[index].state)
+        assert.is_false(after.rows[index].selectable) -- 已买满：行不可点
+        assert.is_false(ctx.handler:Select(index))
+    end)
+
+    -- 服务端拒绝（#218）：不伪成功——金币不动、行不算已购、限购次数与按钮不变。
+    -- 失败方式：失败回包也扣本地金币或把行转已购（玩家以为买到了，重试还被客户端自拒）。
+    it("test_server_rejection_keeps_coin_and_row_state", function()
+        ctx.handler:SetPage('升级')
+        local index = rowIndexOf(ctx.handler:View(), 51)
+        assert.is_true(ctx.handler:Select(index))
+        ctx.nodes.BtnShopBuyDetail.OnClicked:Fire()
+        assert.same(1, #ctx.commands)
+        ctx.events.ShopResult.OnClientEvent:Fire({ ok = false, reason = 'coin', number = 51 })
+        local view = ctx.handler:View()
+        assert.same('77', view.coinText) -- 属性仍是 77：客户端没有自行扣款
+        assert.same('buy', view.rows[index].state)
+        assert.same('已购 0 / 1 次', view.detail.limitText)
+        assert.is_true(view.detail.buyEnabled)
+    end)
+
+    -- 购买成功（#218）：金币条取服务端结算后的金币（属性刷新滞后也不停旧数）、行与详情立刻刷新。
+    -- 失败方式：金币条等属性刷新才变（当场看不到扣款）；行状态/详情限购次数不刷新；已买满的行仍能点。
+    it("test_success_refreshes_coin_row_and_detail_at_once", function()
+        ctx.handler:SetPage('升级')
+        local index = rowIndexOf(ctx.handler:View(), 51)
+        assert.is_true(ctx.handler:Select(index))
+        ctx.events.ShopResult.OnClientEvent:Fire({ ok = true, number = 51, kind = 'melee', level = 1,
+            price = 50, coinAfter = 27 })
+        local view = ctx.handler:View()
+        assert.same('27', view.coinText)
+        assert.same('27', ctx.nodes.LabelCurCoin.Text)
+        assert.same('owned', view.rows[index].state)
+        assert.is_false(view.rows[index].selectable)
+        assert.same('已购 1 / 1 次', view.detail.limitText)
+        assert.is_false(view.detail.buyEnabled)
+        assert.same('buy', view.rows[rowIndexOf(view, 50)].state) -- 下一级放开
+    end)
+
+    -- 本地拒绝（#218）：不可买状态在发请求前就拒绝，但要用同一份文案说明原因，不许静默；
+    -- 文案只来自 LocalShop.FailText，界面里不再写第二套。
+    -- 失败方式：点了没反应（玩家不知道为什么卖不了他）；本地拒绝照样发请求（必然被服务端拒）；
+    --           界面自己另写一套文案（服务端改了原因，界面还是旧的）。
+    it("test_blocked_buy_stays_local_and_shares_one_fail_text", function()
+        ctx.handler:SetPage('升级')
+        ctx.handler:Buy(rowIndexOf(ctx.handler:View(), 32)) -- 背包升级2：越级
+        assert.same({}, ctx.commands)
+        assert.same({ ctx.localShop.FailText.level }, ctx.notices)
+        ctx.notices = {}
+        ctx.handler:SetPage('钓具')
+        ctx.handler:Buy(3) -- 科技假饵：摊位等级不够
+        assert.same({}, ctx.commands)
+        assert.same({ ctx.localShop.FailText.stand }, ctx.notices)
+        if not ctx.notices[1]:find('更高等级摊位', 1, true) then
+            fail('摊位等级不够要写成玩家能读懂的话，实际：' .. tostring(ctx.notices[1]))
+        end
     end)
 
     -- 金币页：只显示自己的容器、没有商品行；平台缺失或抛错都只提示、不关屏、不发购买请求
@@ -363,6 +531,8 @@ describe("钓场商店界面（#216 固定骨架 / #217 行与选中）", functi
         assert.same({}, numbersOf(view.rows))
         assert.is_true(view.panels.coin)
         assert.is_false(view.panels.list)
+        assert.is_false(view.panels.detail) -- 金币页不叠详情区（#218）
+        assert.is_nil(view.detail.number)
         ctx.nodes.BtnOpenPlatformShop.OnClicked:Fire()
         assert.matches('平台商店暂不可用', ctx.handler:View().coinHint, 1, true)
         assert.is_true(ctx.handler.IsOpen)
@@ -375,7 +545,7 @@ describe("钓场商店界面（#216 固定骨架 / #217 行与选中）", functi
         assert.same({}, ctx.commands)
     end)
 
-    -- 重开商店：回到钓具页，不残留选中（关屏不做事，复位靠 OpenScreen）
+    -- 重开商店：回到钓具页，不残留选中与上一条详情（关屏不做事，复位靠 OpenScreen）
     it("test_reopen_resets_to_first_page_without_selection", function()
         ctx.handler:SetPage('升级')
         ctx.handler:Select(2)
@@ -384,6 +554,8 @@ describe("钓场商店界面（#216 固定骨架 / #217 行与选中）", functi
         local view = ctx.handler:View()
         assert.same('钓具', view.page)
         assert.is_nil(view.selected)
+        assert.is_nil(view.detail.number) -- 详情区跟着空态走（#218）
+        assert.is_false(view.detail.buyEnabled)
         assert.same(11, numbersOf(view.rows)[1])
         assert.same('77', view.coinText)
     end)
