@@ -1,9 +1,11 @@
 -- 仅调试地图显示的 GM 面板；按钮只发送固定参数，余额与结果以服务端同步为准。
 local GameCfg = require('common.GameCfg')
+local OwnedUnits = require('common.OwnedUnits')
 local GameUI = require('client.GameUI')
 local REUtil = require('common.REUtil')
 
-local Panel = { Connections = {}, Nodes = {} }
+-- 生命周期只认归属登记（#210）：建完 Track、Destroy 时 Clear，不再自持节点表。
+local Panel = { Connections = {} }
 
 -- 官方正方形纯色块（120×120），配合 Color 叠色成任意底色；不设 Image 时 EUIImage/EUIButton
 -- 会渲染默认椭圆贴图，被深色染色后成为遮挡面板的黑色异形块（本面板曾因此不可读）。
@@ -57,8 +59,7 @@ local function create(self, kind, parent, name, x, y, width, height, props)
     if props.FontSize then props.FontSize = math.max(12, math.floor(props.FontSize * scale)) end
     local node = game:GetService('World'):CreateUnit(kind, props)
     if not node then error('GM 界面节点创建失败：' .. name) end
-    self.Nodes[#self.Nodes + 1] = node
-    return node
+    return OwnedUnits.Track(self, node)
 end
 
 local function label(self, parent, name, text, x, y, width, height, fontSize)
@@ -482,9 +483,9 @@ end
 
 function Panel:Destroy()
     for _, connection in ipairs(self.Connections) do connection:Disconnect() end
-    for index = #self.Nodes, 1, -1 do self.Nodes[index]:Destroy() end
+    -- 先断连接再整体销毁：清空幂等，失败路径（Build 中途出错）与正常收尾共用同一条路。
+    OwnedUnits.Clear(self)
     self.Connections = {}
-    self.Nodes = {}
     self.PanelNodes = {}
     self.Started = false
     self.Root = nil
