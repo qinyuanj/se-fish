@@ -182,6 +182,12 @@ _Avoid_: 开启、安装（指引用时）、link
 **Import / 导入**：一次性拷入地图、由本图维护的包，不能撤销回引用。
 _Avoid_: vendor、de-init、取消导入（指编辑器状态时）、copy-in
 
+**Official package / 官方包**：网易官方托管、随官方整包更新、包内无版本号的包，位于三端 `packages/` 下。
+_Avoid_: 官方库、官方资源包、third-party package
+
+**In-house package / 自研包**：本仓自研、以整包形式落位与升级的库，位于三端 `packages/` 下；不随官方更新，升级由本仓决定。
+_Avoid_: 自研库、第三方库、内置库、vendor 包、内部包
+
 ## 工程与验收
 
 **Checkout / 仓库检出**：本仓的 Git 工作树（含 worktree），是唯一跑 Lua、测试与工具链的地方；仓库内路径一律相对、`/` 分隔，离开仓库写正斜杠加盘符。
