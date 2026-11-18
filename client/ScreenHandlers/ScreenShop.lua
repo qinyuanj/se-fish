@@ -1,11 +1,13 @@
--- 钓场商店界面（#48/#90 多摊位；#130 四页；#216 固定骨架 + 运行期填行）：
+-- 钓场商店界面（#48/#90 多摊位；#130 四页；#216 固定骨架 + 运行期填行；#217 行内容与选中）：
 -- 骨架（标题、关闭、四页签、列表容器 ShopListPanel > ShopList、详情容器、金币页容器、底部金币条）
 -- 由预制体摆好；本屏只读骨架节点（UINodes 登记 / UINodeMap 取用），不再运行时建页签、翻页按钮
 -- 或补位行。商品行由本屏建在 ShopList（EUIListView）之下并按需复用，生命周期交给 OwnedUnits：
 -- 换 RootNode 再 Init 时上一轮整体销毁、登记表归零。
 -- 页签文字取 GameCfg.Shop.Pages；切页签 = 切容器可见性（ShopListPanel / ShopCoinPanel）+ 清空选中。
--- 行内容沿用 GameCfg.Shop.ListForPage 的排序口径（含锁定行）；升级行没有 itemKey，购买一律发货架
--- 行编号 Number；结果以服务端 ShopResult 为准。
+-- 行内容沿用 GameCfg.Shop.ListForPage 的排序口径（含锁定行），界面里不再排序；升级行没有 itemKey，
+-- 购买一律发货架行编号 Number；结果以服务端 ShopResult 为准。
+-- #217：行的新品标记、状态文字、灰显与选中高亮都从 DisplayRows 模型推出；点行只选中（不下单），
+-- 购买入口是 #218 的唯一购买按钮（调到 Buy）。
 -- 金币页是平台商店入口：平台不可用时提示并可返回其他分页，不伪成功（汇率与商品 ID 由后台交付）。
 -- 唯一的测试接缝是 View()（纯显示快照）：单测只断言显示了什么、点了发出什么、登记表计数。
 local GameCfg = require('common.GameCfg')
@@ -18,18 +20,22 @@ local CoinPage = TabNames[#TabNames]              -- 金币页是最后一个页
 -- 皮肤参数：图 ID、字号、色板、行高、行间距、行内子节点几何只在这里给一次，换美术只改这张表。
 -- 数字出处：共享简报「骨架布局」「商品行几何」（ShopRoot 本地盒 1200×800，锚点统一左下对齐）。
 local Skin = {
+    -- 只有运行时新建的节点才从这里取图：预制体里的按钮与面板归编辑器，代码不覆盖它们的图。
     Image = {
         Panel = 'official://image/11017',   -- 官方正方形纯色块
-        Button = 'official://image/11017',
+        Row = 'official://image/11017',     -- 运行时新建的行按钮底图
         Coin = 'official://image/11017',    -- 金币图标占位：正式图随美术批次只改这一处
     },
     Font = { Row = 24, RowSmall = 20 },
     Color = {
         Text = { 255, 255, 255, 255 },
+        TextNew = { 255, 214, 92, 255 },        -- 本摊新解锁的名字金色（#217）
+        TextDisabled = { 150, 150, 150, 255 },  -- 锁定 / 已购行灰显（#217）
         Button = { 54, 100, 140, 255 },
         ButtonActive = { 36, 130, 94, 255 },
         ButtonPress = { 36, 130, 94, 255 },
         ButtonDisable = { 120, 120, 120, 255 },
+        RowSelected = { 60, 132, 176, 255 },    -- 选中行高亮（#217）
     },
     -- 商品行：行间由列表视图的 ItemsMargin 负责；子节点坐标相对行左下角
     Row = {
@@ -51,28 +57,37 @@ local Skin = {
 
 local function color(spec) return Color.New(spec[1], spec[2], spec[3], spec[4]) end
 
+-- 骨架按钮只改颜色与文字：按钮图与面板图由预制体摆好，运行时覆盖会让所有按钮变成同一块纯色方块。
 local function styleButton(button)
     if not button then return end
-    button.NormalImage = Skin.Image.Button
-    button.PressImage = Skin.Image.Button
-    button.DisableImage = Skin.Image.Button
     button.ButtonNormalColor = color(Skin.Color.Button)
     button.ButtonPressColor = color(Skin.Color.ButtonPress)
     button.ButtonDisableColor = color(Skin.Color.ButtonDisable)
 end
 
--- 行状态后缀（#216 沿用既有文案，#217 再改「新品」标记与禁用细节）
-local function stateSuffix(state, goods, level)
-    if state == 'owned' then return '（已购）' end
+-- 行状态文案（#217 口径，与共享简报「商品行」一致）：已购 / 需 N 级摊位 / 请先完成前一级升级。
+-- 玩家可见文案不用术语表禁用的「强化」。
+local function stateText(state, goods, level)
+    if state == 'owned' then return '已购' end
     if state == 'locked' then
-        if goods.MinShopLevel > level then return '（需 ' .. goods.MinShopLevel .. ' 级摊位）' end
-        return '（请先完成前一级升级）'
+        if goods.MinShopLevel > level then return '需 ' .. goods.MinShopLevel .. ' 级摊位' end
+        return '请先完成前一级升级'
     end
     return ''
 end
 
+-- 本摊新解锁标记（#217）：MinShopLevel == 当前摊位等级即新品，不新增数据字段。
+local NewBadgeText = '新品'
+
+-- 行文字颜色：禁用（锁定/已购）灰显 > 本摊新品金色 > 常规白色。色值只在皮肤表里出现一次。
+local function rowTextColor(model)
+    if model.state ~= 'buy' then return Skin.Color.TextDisabled end
+    if model.isNew then return Skin.Color.TextNew end
+    return Skin.Color.Text
+end
+
 local ScreenHandler = {
-    UINodes = { 'BtnShopClose', 'LabelCurCoin', 'ShopListPanel', 'ShopList', 'ShopCoinPanel',
+    UINodes = { 'BtnShopClose', 'LabelShopClose', 'LabelCurCoin', 'ShopListPanel', 'ShopList', 'ShopCoinPanel',
         'LabelCoinPageHint', 'BtnOpenPlatformShop', 'LabelOpenPlatformShop' },
     UINodeMap = {}, Connections = {}, Seq = 0,
     Page = TabNames[1], Selected = nil, Purchases = {}, UpgradeLevels = {},
@@ -108,9 +123,10 @@ end
 function ScreenHandler:View()
     local rows = {}
     for index, row in ipairs(self.DisplayRows or {}) do
-        rows[index] = { index = index, number = row.number, name = row.name,
-            text = row.name .. row.stateText, priceText = row.priceText,
-            state = row.state, stateText = row.stateText }
+        rows[index] = { index = index, number = row.number, name = row.name, priceText = row.priceText,
+            state = row.state, stateText = row.stateText,
+            isNew = row.isNew == true, newText = row.isNew and NewBadgeText or '',
+            selected = index == self.Selected }
     end
     return {
         page = self.Page,
@@ -123,9 +139,11 @@ function ScreenHandler:View()
     }
 end
 
+-- 选中只是显示状态：任何一行都能选中（禁用行是否拒绝属 #218），重绘后高亮仍落在同一行下标。
 function ScreenHandler:Select(index)
     if index ~= nil and not (self.DisplayRows or {})[index] then return false end
     self.Selected = index
+    self:RenderRows()
     return true
 end
 
@@ -199,7 +217,8 @@ function ScreenHandler:RowModel(goods, level)
     local state = self:RowState(goods, level)
     local definition = goods.ItemId and GameCfg.Items.Definitions[goods.ItemId] or nil
     return { number = goods.Number, goods = goods, name = goods.Name, priceText = tostring(goods.Price),
-        state = state, stateText = stateSuffix(state, goods, level),
+        state = state, stateText = stateText(state, goods, level),
+        isNew = goods.MinShopLevel == level,
         icon = definition and definition.Icon or Skin.Image.Panel }
 end
 
@@ -215,6 +234,8 @@ function ScreenHandler:CreateRow(list, index)
         print('[ScreenShop] 商品行创建失败', index, tostring(row))
         return nil
     end
+    -- 行是运行时新建的按钮：底图从皮肤表取（骨架按钮的图归预制体），颜色随后由 PaintRow 按状态刷
+    row.NormalImage, row.PressImage, row.DisableImage = Skin.Image.Row, Skin.Image.Row, Skin.Image.Row
     styleButton(row)
     row.ButtonText = ''
     row.TouchEnabled = true
@@ -239,28 +260,30 @@ function ScreenHandler:CreateRow(list, index)
         if not node then print('[ScreenShop] 商品行子节点创建失败', child.Name, index) end
     end
     OwnedUnits.Track(self, row)
-    self.Connections[#self.Connections + 1] = row.OnClicked:Connect(function() self:Buy(index) end)
+    self.Connections[#self.Connections + 1] = row.OnClicked:Connect(function() self:Select(index) end)
     return row
 end
 
 function ScreenHandler:PaintRow(row, index, model)
+    local textColor = color(rowTextColor(model))
     for _, child in ipairs(Skin.Row.Children) do
         local node = row:FindFirstChild(child.Name .. index)
         if node then
             if child.Key == 'Icon' then
                 node.Image = model.icon
             elseif child.Key == 'Name' then
-                node.Text = model.name
+                node.Text, node.TextColor = model.name, textColor
+            elseif child.Key == 'New' then
+                node.Text, node.TextColor = model.isNew and NewBadgeText or '', color(Skin.Color.TextNew)
             elseif child.Key == 'Price' then
-                node.Text = model.priceText
+                node.Text, node.TextColor = model.priceText, textColor
             elseif child.Key == 'State' then
-                node.Text = model.stateText
+                node.Text, node.TextColor = model.stateText, textColor
             end
-            -- 'New'（新品）与选中高亮的文案属 #217，这里只留空标签占好位置
         end
     end
-    row.TouchEnabled = model.state == 'buy'
-    row.Disabled = model.state ~= 'buy'
+    -- 行是选择器：点行只改选中与高亮，下单由 #218 的唯一购买按钮发起；禁用行的「不可买」由 Buy 拦。
+    row.ButtonNormalColor = color(index == self.Selected and Skin.Color.RowSelected or Skin.Color.Button)
 end
 
 -- 把当前显示模型刷到 ShopList 下：缺行就建，多出来的行隐藏（行按序号复用，不重建）
@@ -338,6 +361,9 @@ function ScreenHandler:Init()
     local close = self.UINodeMap.BtnShopClose
     if close then
         styleButton(close)
+        -- 关闭按钮的文字在子节点 LabelShopClose（按钮自身的 ButtonText 由 styleButton 清空）
+        local closeLabel = self.UINodeMap.LabelShopClose
+        if closeLabel then closeLabel.Text = '关闭' end
         listen(close.OnClicked, function() _G.MgrGameUI:CloseScreen('ScreenShop') end)
     end
     -- 行间距只在皮肤表里写一次，落在列表视图的 ItemsMargin 上
