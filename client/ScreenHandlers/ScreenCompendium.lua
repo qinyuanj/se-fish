@@ -1,6 +1,7 @@
 -- 七区图鉴：收集、个人最大钓取重量与唯一通关状态由服务端快照提供。
 -- 普通/极品使用各自稳定 ID；盲盒只解锁，未钓取时不推算重量。
 local GameCfg = require('common.GameCfg')
+local OwnedUnits = require('common.OwnedUnits')
 local Records = require('common.Records')
 local REUtil = require('common.REUtil')
 local GameUI = require('client.GameUI')
@@ -95,8 +96,9 @@ function Screen:Create(kind, parent, name, x, y, width, height, props)
         print('[ScreenCompendium] 创建节点失败', name, tostring(node))
         return nil
     end
+    -- 按名查找表只服务于定位与更新（SetText / Render）；生命周期归归属登记。
     self.Nodes[name] = node
-    return node
+    return OwnedUnits.Track(self, node)
 end
 
 function Screen:Label(parent, name, x, y, width, height, text, size)
@@ -187,15 +189,12 @@ function Screen:CloseScreen()
     self.RecordSeq = self.RecordSeq + 1
 end
 
--- 节点属于本 handler；切换 UIRoot 或重启时撤销旧按钮连接，再销毁两棵运行时子树。
+-- 节点属于本 handler；切换 UIRoot 或重启时撤销旧按钮连接，再清空登记表销毁全部运行时节点。
+-- 销毁来源只有归属登记（#210）：不再从按名查找表枚举，也不再逐个点名销毁。
 function Screen:ClearNodes()
     for _, connection in ipairs(self.NodeConnections or {}) do connection:Disconnect() end
     self.NodeConnections = {}
-    for _, node in pairs({ panel = self.RootNode, entry = self.EntryNode,
-        entryText = self.Nodes.BtnCompendiumEntryText }) do
-        local ok, err = pcall(function() node:Destroy() end)
-        if not ok then print('[ScreenCompendium] 销毁节点失败', tostring(err)) end
-    end
+    OwnedUnits.Clear(self)
     self.Nodes, self.Inited, self.BoundRootNode, self.RootNode, self.EntryNode = {}, nil, nil, nil, nil
     self.IsOpen = false
     self.SelectedId, self.RecordState = nil, nil

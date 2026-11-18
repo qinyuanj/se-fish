@@ -6,28 +6,52 @@
 --   旧文件的 tearDown 声明夹在两个用例之间，LuaUnit 仍按每例 setUp/tearDown 运行，
 --   原生侧统一为 describe 内的 before_each/after_each，语义一致。
 --   lu.assertStrContains 省略第 3 参即 plain 子串查找，映射为 assert.matches(sub, s, 1, true)。
+local OwnedUnits = require("common.OwnedUnits")
 local RandomGuard = require("tests.support.random_guard")
 
 local MODULE_KEYS = { "common.REUtil", "client.GameUI" }
+local GLOBAL_KEYS = { "game", "Vector2", "Color", "MgrGameUI" }
 
---- 换掉图鉴界面依赖的两个模块缓存；调用方负责 cleanup() 还回原引用。
+--- 换掉图鉴界面依赖的模块缓存与全局（World / UI 管理器替身）；调用方负责 cleanup() 还回原引用。
 local function newWorld()
-  local env = {}
+  local env = { created = {} }
   env.previous = {}
   for _, name in ipairs(MODULE_KEYS) do
     env.previous[name] = package.loaded[name]
   end
+  for _, key in ipairs(GLOBAL_KEYS) do env.previous[key] = rawget(_G, key) end
   package.loaded["common.REUtil"] = {
     GetRE = function()
       return { FireServer = function() end }
     end,
   }
-  package.loaded["client.GameUI"] = {}
+  package.loaded["client.GameUI"] = {
+    GetEuiManager = function()
+      return { GetDeviceResolution = function() return { x = 1920, y = 1080 } end }
+    end,
+  }
+  local world = {}
+  function world:CreateUnit(kind, props)
+    -- 引擎的 UI 节点自带 OnClicked 信号；替身只需提供 Button 会用的 Connect。
+    local node = { Kind = kind, Destroyed = false,
+      OnClicked = { Connect = function() return { Disconnect = function() end } end } }
+    function node:Destroy() self.Destroyed = true end
+    for key, value in pairs(props) do node[key] = value end
+    env.created[#env.created + 1] = node
+    return node
+  end
+  _G.game = { GetService = function(_, name)
+    if name == "World" then return world end
+  end }
+  _G.Vector2 = { New = function(x, y) return { x = x, y = y } end }
+  _G.Color = { New = function(...) return { ... } end }
+  _G.MgrGameUI = { GetScreen = function() end, CloseScreen = function() end }
 
   function env:cleanup()
     for _, name in ipairs(MODULE_KEYS) do
       package.loaded[name] = self.previous[name]
     end
+    for _, key in ipairs(GLOBAL_KEYS) do _G[key] = self.previous[key] end
   end
 
   return env
@@ -105,5 +129,29 @@ describe("图鉴界面表现（ScreenCompendium）", function()
       end
     end
     assert.same(98, total)
+  end)
+
+  -- #210 建点/清场：BuildNodes 建的每个节点都登记在册；换 UI 根重建前先清旧节点，关闭后登记表归空。
+  -- 失败方式：Screen:Create 只写按名查找表不登记 → 销毁路径漏节点、换根重建时旧图鉴在场上叠加。
+  it("test_build_nodes_registers_every_node_and_clear_nodes_destroys_them", function()
+    local screen = assert(loadfile("client/ScreenHandlers/ScreenCompendium.lua"))()
+    assert.is_true(screen:BuildNodes({ Name = "UIRoot" }))
+    assert.is_true(#env.created > 0)
+    assert.same(#env.created, OwnedUnits.Count(screen)) -- 每个建点都登记在册
+    local previous = env.created
+    env.created = {}
+    assert.is_true(screen:BuildNodes({ Name = "UIRoot2" })) -- 换根重建：先清旧节点再建新的
+    for _, node in ipairs(previous) do
+      assert.is_true(node.Destroyed, "旧 UI 根下的节点应被销毁")
+    end
+    assert.same(#env.created, OwnedUnits.Count(screen)) -- 登记表只剩新一轮
+    screen:ClearNodes()
+    assert.same(0, OwnedUnits.Count(screen))
+    assert.is_nil(next(screen.Nodes)) -- 按名查找表一并复位
+    for _, node in ipairs(env.created) do
+      assert.is_true(node.Destroyed, "关闭后节点应被销毁")
+    end
+    screen:ClearNodes() -- 幂等：重复清场不报错
+    assert.same(0, OwnedUnits.Count(screen))
   end)
 end)

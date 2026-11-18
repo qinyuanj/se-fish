@@ -5,6 +5,7 @@
 -- （含锁定行灰显）；升级行无 itemKey，购买一律发货架行编号 number；结果以服务端 ShopResult 为准。
 -- 金币页是平台商店入口：平台不可用时提示并可返回其他分页，不伪成功（汇率/商品 ID 由后台交付）。
 local GameCfg = require('common.GameCfg')
+local OwnedUnits = require('common.OwnedUnits')
 local LocalShop = require('client.LocalShop')
 
 local SquareButtonImage = 'official://image/11017'
@@ -29,10 +30,10 @@ local function styleButton(button)
     button.DisableImage = SquareButtonImage
 end
 
--- 运行时创建节点统一登记：重建（换 RootNode 再 Init）时整体销毁，不残留旧按钮/标签（#130 code-review）
+-- 运行时创建节点建完就交给本 handler 的归属登记保管：重建（换 RootNode 再 Init）时整体销毁，
+-- 不残留旧按钮/标签（#130 code-review、#210）。生命周期只认 OwnedUnits，不再自持节点表。
 local function track(self, node)
-    if node then self.RuntimeNodes[#self.RuntimeNodes + 1] = node end
-    return node
+    return OwnedUnits.Track(self, node)
 end
 
 local function createButtonLabel(self, parent, button, name, text, fontSize)
@@ -207,8 +208,7 @@ function ScreenHandler:Init()
     if self.Inited and self.BoundRootNode == self.RootNode then return end
     for _, connection in ipairs(self.Connections or {}) do connection:Disconnect() end
     -- 重建前整体销毁上一轮运行时创建的节点（页签/翻页/补位行/金币页），换 RootNode 再 Init 不残留
-    for _, node in ipairs(self.RuntimeNodes or {}) do pcall(function() node:Destroy() end) end
-    self.RuntimeNodes = {}
+    OwnedUnits.Clear(self)
     self.ExtraButtons, self.ExtraLabels = {}, {}
     self.PageTabs = {}
     self.CoinHint, self.CoinButton, self.CoinButtonLabel = nil, nil, nil

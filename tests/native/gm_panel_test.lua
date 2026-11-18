@@ -5,6 +5,7 @@
 -- it 名字沿用旧方法名，注册顺序 = LuaUnit sortedPairs 的实际执行顺序。
 
 local GameCfg = require('common.GameCfg')
+local OwnedUnits = require('common.OwnedUnits')
 
 local globalNames = { 'game', 'Vector2', 'Color' }
 local moduleNames = { 'client.GameUI', 'common.REUtil' }
@@ -39,11 +40,13 @@ describe('GM 面板（ScreenGM）', function()
       restore[name] = package.loaded[name]
     end
     GameCfg.Debug = { Enabled = true, InitialGrants = restore.Debug.InitialGrants }
-    env = { nodes = {}, requests = {}, events = {}, root = {} }
+    env = { nodes = {}, created = {}, requests = {}, events = {}, root = {} }
     local world = { CreateUnit = function(_, kind, props)
-      local node = { Kind = kind, OnClicked = signal(), OnDetach = signal(), Destroy = function() end }
+      local node = { Kind = kind, OnClicked = signal(), OnDetach = signal(), Destroyed = false }
+      function node:Destroy() self.Destroyed = true end
       for key, value in pairs(props) do node[key] = value end
       env.nodes[node.Name] = node
+      env.created[#env.created + 1] = node
       return node
     end }
     rawset(_G, 'game', { GetService = function(_, name)
@@ -164,6 +167,24 @@ describe('GM 面板（ScreenGM）', function()
     env.panel.Fields.index.OnDetach:Fire('1')
     assert.matches('罗非鱼', env.nodes['GM字段名_itemId'].Text, 1, true)
     assert.matches('1.5', env.nodes['GM字段名_mult'].Text, 1, true)
+  end)
+
+  -- #210 销毁（关闭与换根重建前的收尾）：登记表归空、全部节点被销毁，之后还能重建一份新面板。
+  -- 失败方式：仍自持 self.Nodes 或漏登记 → 销毁后节点留在场上；清空不幂等 → 重复 Destroy 报错。
+  it('test_destroy_releases_nodes_and_allows_rebuild', function()
+    assert.is_true(env.panel.Started)
+    assert.same(#env.created, OwnedUnits.Count(env.panel)) -- 每个建点都登记在册
+    local previous = env.created
+    env.created = {}
+    env.panel:Destroy()
+    assert.same(0, OwnedUnits.Count(env.panel))
+    for _, node in ipairs(previous) do
+      assert.is_true(node.Destroyed, 'GM 面板节点应被销毁')
+    end
+    env.panel:Destroy() -- 幂等：重复销毁不报错
+    assert.same(0, OwnedUnits.Count(env.panel))
+    env.panel:Start() -- 重建：新节点重新登记
+    assert.same(#env.created, OwnedUnits.Count(env.panel))
   end)
 
   it('test_state_page_acknowledges_refresh_and_apply', function()

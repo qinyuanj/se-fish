@@ -297,6 +297,23 @@ describe("钓场商店界面", function()
         assert.same({}, ctx.commands)
     end)
 
+    -- #210 重建（换 RootNode 再 Init）：上一轮运行时节点全部销毁、登记表只留新一轮，不残留旧按钮/标签。
+    -- 失败方式：仍自持 self.RuntimeNodes 或漏登记 → 旧节点留在场上；销毁路径没走登记表 → 计数叠加。
+    it("test_rebuild_destroys_previous_runtime_nodes_and_replaces_registry", function()
+        assert.same(#ctx.created, OwnedUnits.Count(ctx.handler)) -- 每个运行时建点都登记在册
+        local previous = ctx.created
+        ctx.created = {}
+        ctx.handler.RootNode = { Name = 'ScreenShopRebuilt' }
+        ctx.handler:Init()
+        for _, node in ipairs(previous) do
+            assert.is_true(node.Destroyed, '上一轮运行时节点应被销毁')
+        end
+        assert.same(#ctx.created, OwnedUnits.Count(ctx.handler)) -- 登记表只剩新一轮
+        for _, node in ipairs(ctx.created) do
+            assert.is_nil(node.Destroyed) -- 新一轮节点仍在场上
+        end
+    end)
+
     it("test_tabs_cover_four_pages", function()
         for _, page in ipairs({ '钓具', '武器', '升级', '金币' }) do
             assert.is_not_nil(ctx.nodes['BtnShopPage' .. page], '缺页签 ' .. page)
