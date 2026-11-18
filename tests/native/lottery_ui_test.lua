@@ -14,6 +14,7 @@
 --   旧 tearDown 用 pairs 恢复全局，原本不存在的键会被跳过（假 _G.game 泄漏到后续案例），
 --   原生逐例隔离后按键名单 rawset 还回 nil，杜绝泄漏。
 local RandomGuard = require("tests.support.random_guard")
+local OwnedUnits = require("common.OwnedUnits")
 
 local GLOBAL_KEYS = { "game", "Vector2", "Vector3", "Color", "REUtil", "LocalMsgNotice", "MgrGameUI" }
 local MODULE_KEYS = {
@@ -65,6 +66,7 @@ local function newWorld()
     for key, value in pairs(attrs) do
       node[key] = value
     end
+    node.Destroy = function(me) me.Destroyed = true end
     if node.Name then
       env.nodes[node.Name] = node
     end
@@ -343,5 +345,23 @@ describe("抽奖机界面表现（ScreenLottery）", function()
     assert.matches("恭喜获得", env.nodes.LabelLotteryResult.Text, 1, true)
     assert.matches("加速药水", env.nodes.LabelLotteryResult.Text, 1, true)
     assert.matches("三头鲨", env.nodes.LabelLotteryResult.Text, 1, true)
+  end)
+
+  -- #211：建点一律登记到归属登记，清空只走登记表，不再从 UINodeMap 枚举
+  it("test_clear_destroys_every_registered_node_and_resets_lookup", function()
+    local root = env.handler.RootNode
+    assert.same(14, OwnedUnits.Count(env.handler)) -- EUILayout 根 + 13 个运行时节点
+    env.handler:Clear()
+    assert.same(0, OwnedUnits.Count(env.handler))
+    for name, node in pairs(env.nodes) do
+      if not node.Destroyed then
+        assert.is_true(false, name .. " 建过但清空后没销毁")
+      end
+    end
+    assert.is_true(root.Destroyed)
+    assert.is_nil(env.handler.RootNode)
+    assert.same({}, env.handler.UINodeMap)
+    env.handler:Clear() -- 幂等：重复清空不报错
+    assert.same(0, OwnedUnits.Count(env.handler))
   end)
 end)

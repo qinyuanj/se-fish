@@ -21,6 +21,7 @@ local GameCfg = require('common.GameCfg')
 local Curve = require('common.GrillCurve')
 local PlayerData = require('server.Data.PlayerData')
 local LotteryEligibility = require('common.LotteryEligibility')
+local OwnedUnits = require('common.OwnedUnits')
 
 local function signal()
     local handlers = {}
@@ -878,5 +879,127 @@ describe("烧烤的接线", function()
         assert.is_nil(src:find('MgrMap.MgrGrill.Loot'), '满格走 ready 冻结重试，不接 MgrLoot')
         assert.is_not_nil(src:find("MgrGrill', MgrMap.MgrGrill, 'BeforeLeave'"),
             '离开前要先结算烧烤会话再序列化存档')
+    end)
+end)
+
+-- #211 界面单位清理：烧烤面板的私有 create 封装改为委托归属登记，
+-- 清空入口销毁面板与气泡根、复位自持引用；重复清空不报错。
+describe("烧烤界面的单位清理", function()
+    local ctx
+
+    local function uiSignal()
+        local handlers = {}
+        return {
+            Connect = function(_, fn)
+                handlers[#handlers + 1] = fn
+                return { Disconnect = function() end }
+            end,
+            Fire = function(_, ...) for _, cb in ipairs(handlers) do cb(...) end end,
+        }
+    end
+
+    before_each(function()
+        ctx = { nodes = {}, bubbles = {}, saved = {} }
+        for _, key in ipairs({ 'game', 'Vector2', 'Vector3', 'Color', 'REUtil' }) do
+            ctx.saved[key] = rawget(_G, key)
+        end
+        -- ScreenGrill 与 InteractionBubble 都在加载时抓 game 服务，桩要先装好再重新加载
+        ctx.saved.util = package.loaded['common.Util']
+        ctx.saved.bubble = package.loaded['client.InteractionBubble']
+        ctx.saved.screen = package.loaded['client.ScreenHandlers.ScreenGrill']
+        ctx.saved.re = package.loaded['common.REUtil']
+
+        local anchors = {}
+        for index, point in ipairs(GameCfg.Grill.Points) do
+            anchors[point.AnchorName] = { Name = point.AnchorName, Position = vec(index * 10, 0, 0) }
+        end
+        local world = {
+            CreateUnit = function(_, kind, attrs)
+                local node = { Kind = kind, OnClicked = uiSignal(), Visible = true }
+                for key, value in pairs(attrs or {}) do node[key] = value end
+                node.Destroy = function(me) me.Destroyed = true end
+                if node.Name then ctx.nodes[node.Name] = node end
+                return node
+            end,
+            FindFirstChild = function(_, name) return anchors[name] end,
+            GetServerTime = function() return 1000 end,
+        }
+        local eui = {
+            GetRootNode = function() return { Name = 'Root' } end,
+            GetDeviceResolution = function() return { x = 1920, y = 1080 } end,
+            CreateSceneNodeAtPosition = function(_, position)
+                local node = { Position = position, Visible = true }
+                node.Destroy = function(me) me.Destroyed = true end
+                ctx.bubbles[#ctx.bubbles + 1] = node
+                return node
+            end,
+        }
+        rawset(_G, 'Vector2', { New = function(x, y) return { x = x, y = y } end })
+        rawset(_G, 'Vector3', { New = vec })
+        rawset(_G, 'Color', { New = function(...) return { ... } end })
+        rawset(_G, 'game', { GetService = function(_, name)
+            if name == 'World' then return world end
+            if name == 'Players' then
+                return { LocalPlayer = { PlayerGui = { EuiManager = eui },
+                    Character = { Position = vec(9999, 0, 9999) } } }
+            end
+            if name == 'Task' then return { Spawn = function(_, fn) fn() end, Wait = function() end } end
+            if name == 'RunService' then return { Heartbeat = uiSignal(),
+                IsClient = function() return true end, IsServer = function() return false end } end
+        end })
+        local events = {}
+        package.loaded['common.REUtil'] = { GetRE = function(_, name)
+            if not events[name] then
+                events[name] = { OnClientEvent = uiSignal(), FireServer = function() end }
+            end
+            return events[name]
+        end }
+        package.loaded['common.Util'] = nil
+        package.loaded['client.InteractionBubble'] = nil
+        package.loaded['client.ScreenHandlers.ScreenGrill'] = nil
+        ctx.panel = assert(loadfile('client/ScreenHandlers/ScreenGrill.lua'))()
+        ctx.panel:Start()
+    end)
+
+    after_each(function()
+        if not ctx then return end
+        local saved = ctx.saved
+        for _, key in ipairs({ 'game', 'Vector2', 'Vector3', 'Color', 'REUtil' }) do
+            rawset(_G, key, saved[key])
+        end
+        package.loaded['common.Util'] = saved.util
+        package.loaded['client.InteractionBubble'] = saved.bubble
+        package.loaded['client.ScreenHandlers.ScreenGrill'] = saved.screen
+        package.loaded['common.REUtil'] = saved.re
+        ctx = nil
+    end)
+
+    it("test_clear_destroys_panel_nodes_and_bubble_roots", function()
+        local root = ctx.panel.Root
+        local bubbles = {}
+        for index, bubble in ipairs(ctx.panel.Bubbles) do bubbles[index] = bubble.Node end
+        assert.same(8, OwnedUnits.Count(ctx.panel)) -- 面板 1 + 标题 / 时间 / 倍率 3 + 两按钮各 2
+        assert.is_true(#bubbles > 0)
+        ctx.panel:Clear()
+        assert.same(0, OwnedUnits.Count(ctx.panel))
+        for _, name in ipairs({ 'GrillPanel', 'GrillTitle', 'GrillTime', 'GrillRate',
+            'GrillTakeout', 'GrillTakeoutText', 'GrillClose', 'GrillCloseText' }) do
+            if not ctx.nodes[name].Destroyed then
+                assert.is_true(false, name .. ' 建过但清空后没销毁')
+            end
+        end
+        for index, bubble in ipairs(bubbles) do
+            if not bubble.Destroyed then
+                assert.is_true(false, '第 ' .. index .. ' 个气泡根清空后没销毁')
+            end
+        end
+        assert.is_true(root.Destroyed)
+        assert.same({}, ctx.panel.Bubbles)
+        assert.is_nil(ctx.panel.Root)
+        assert.is_nil(ctx.panel.Title)
+        assert.is_nil(ctx.panel.TimeLabel)
+        assert.is_nil(ctx.panel.RateLabel)
+        ctx.panel:Clear() -- 幂等：重复清空不报错
+        assert.same(0, OwnedUnits.Count(ctx.panel))
     end)
 end)

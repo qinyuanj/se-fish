@@ -15,6 +15,7 @@
 
 -- GameUI 是真实 client.GameUI 装载时写下的模块全局（_G.GameUI），旧单进程 runner 里它跨套件长存；
 -- 原生逐例隔离后纳入快照面，跑完不留下新全局。
+local OwnedUnits = require('common.OwnedUnits')
 local globalNames = { 'game', 'Vector2', 'Color', 'REUtil', 'LocalMsgNotice', 'PlatformShop', 'GameUI' }
 local moduleNames = { 'common.GameCfg', 'common.REUtil', 'client.GameUI' }
 
@@ -44,6 +45,7 @@ local function setUpClient()
   function world:CreateUnit(kind, attrs)
     local node = { Kind = kind, OnClicked = signal(), Visible = true }
     for key, value in pairs(attrs) do node[key] = value end
+    node.Destroy = function(me) me.Destroyed = true end
     if node.Name then env.nodes[node.Name] = node end
     return node
   end
@@ -285,6 +287,22 @@ describe('盲盒界面（ScreenBlindbox）', function()
     assert.is_true(env.nodes.BtnBlindboxSingle.Position.x < env.nodes.BtnBlindboxTen.Position.x)
     assert.is_true(env.nodes.BtnBlindboxTen.Position.x < env.nodes.BtnBlindboxClose.Position.x)
   end)
+
+  -- #211：节点一律登记到归属登记，清空只走登记表，不再从 Nodes 枚举
+  it('test_clear_destroys_every_registered_node_and_resets_lookup', function()
+    assert.same(12, OwnedUnits.Count(env.screen)) -- 入口按钮与文字 + 面板 + 面板内 9 个
+    env.screen:Clear()
+    assert.same(0, OwnedUnits.Count(env.screen))
+    for name, node in pairs(env.nodes) do
+      if not node.Destroyed then
+        assert.is_true(false, name .. ' 建过但清空后没销毁')
+      end
+    end
+    assert.same({}, env.screen.Nodes)
+    assert.is_nil(env.screen.Panel)
+    env.screen:Clear() -- 幂等：重复清空不报错
+    assert.same(0, OwnedUnits.Count(env.screen))
+  end)
 end)
 
 describe('平台购买界面（ScreenPlatform）', function()
@@ -352,5 +370,23 @@ describe('平台购买界面（ScreenPlatform）', function()
     fire({ ok = true, action = 'Grant', goods = 'adrenaline5', overflow = 2 })
     assert.matches('肾上腺素×5', env.notices[#env.notices], 1, true)
     assert.matches('2 件落在面前地上', env.notices[#env.notices], 1, true)
+  end)
+
+  -- #211：同上，清空后报价面板撤销、查找表复位，销毁不再自持表
+  it('test_clear_destroys_every_registered_node_and_resets_lookup', function()
+    env.panel:ShowOffers({ { key = 'adrenaline1', name = '肾上腺素', beans = 1 } })
+    assert.is_not_nil(env.panel.Offers)
+    assert.same(16, OwnedUnits.Count(env.panel)) -- 报价面板 8 个 + 测试驱动面板 8 个
+    env.panel:Clear()
+    assert.same(0, OwnedUnits.Count(env.panel))
+    for name, node in pairs(env.nodes) do
+      if not node.Destroyed then
+        assert.is_true(false, name .. ' 建过但清空后没销毁')
+      end
+    end
+    assert.same({}, env.panel.Nodes)
+    assert.is_nil(env.panel.Offers)
+    env.panel:Clear() -- 幂等：重复清空不报错
+    assert.same(0, OwnedUnits.Count(env.panel))
   end)
 end)
