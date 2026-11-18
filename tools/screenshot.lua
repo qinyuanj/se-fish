@@ -3,8 +3,9 @@
 --
 -- 背景：editor-cli 的 `screenshot game` / `screenshot editor` 走窗口表面抓取（PrintWindow）。
 -- 在虚拟显示器上（UU 远程的 GameViewer Virtual Display Adapter 这类）3D 画面只存在于桌面
--- 合成里，窗口表面抓到的永远是黑帧，而且校验会判 FRAME_VALID。本命令改读桌面合成
--- （CopyFromScreen），是虚拟屏上取证游戏画面的入口。
+-- 合成里，窗口表面抓到的是旧画面：可能整张黑帧，也可能尺寸正常、内容停在旧帧却校验通过
+-- （#185）。本命令改读桌面合成（CopyFromScreen），是虚拟屏上取证游戏画面的入口；`--info`
+-- 只报显示路径（虚拟屏 / 非虚拟屏 / 不确定），判据是显示器适配器是否挂在 PCI 总线上。
 --
 -- 前置条件：目标窗口必须真的显示在屏幕上——被别的窗口盖住时，抓到的是遮挡物。
 --
@@ -24,14 +25,17 @@ M.DEFAULT_WINDOW = "client"
 function M.usage()
   return table.concat({
     "用法: lua tools/cli.lua screenshot [--window <标题子串> | --rect X,Y,W,H] [--out <文件.png>]",
+    "      lua tools/cli.lua screenshot --info [--window <标题子串>]",
     "",
     "抓桌面合成像素存 PNG。给虚拟屏用：3D 画面只在桌面合成里，",
-    "editor-cli 的 screenshot 走窗口表面抓取，在虚拟屏上拿到的是黑帧。",
+    "editor-cli 的 screenshot 走窗口表面抓取，在虚拟屏上拿到的是黑帧或旧帧。",
     "",
     "选项：",
     "  --window <子串>   取标题包含该子串、面积最大的可见顶层窗口的客户区（缺省 client）",
     "  --rect X,Y,W,H    直接给屏幕矩形，覆盖 --window",
     "  --out <文件.png>  输出路径（缺省 tmp/screenshot-<时间>.png，相对路径相对仓库根）",
+    "  --info            只报显示路径与判定（虚拟屏 / 非虚拟屏 / 不确定），不抓图；",
+    "                    与 --rect 互斥，--window 缺省 client",
     "",
     "前置条件：目标窗口必须显示在屏幕上；被盖住时抓到的是遮挡物，先把窗口切到前台。",
     "成功时 stdout 只输出一行绝对 PNG 路径，退出码 0；找不到窗口或抓屏失败 1；",
@@ -48,6 +52,8 @@ function M.parse(args)
     local a = args[i]
     if a == "--help" or a == "-h" then
       opts.help = true
+    elseif a == "--info" then
+      opts.info = true
     elseif a == "--window" or a == "--rect" or a == "--out" then
       local value = args[i + 1]
       if value == nil or value:match("^%-") then
@@ -96,6 +102,52 @@ function M.framing(opts)
   return { flag = "-Window", value = opts.window or M.DEFAULT_WINDOW }
 end
 
+-- 抓屏脚本的 stdout：若干 INFO 行（人读）+ 一行 RESULT=<结果>。
+function M.parse_info(body)
+  local lines = {}
+  for line in tostring(body):gmatch("[^\r\n]+") do
+    local info = line:match("^INFO%s+(.*)$")
+    if info then lines[#lines + 1] = info end
+  end
+  return lines, tostring(body):match("RESULT=([^\r\n]*)")
+end
+
+-- 显示路径自检：只问脚本，不抓图；取证前先看清是虚拟屏还是物理屏。
+function M.info(opts, env)
+  if opts.rect then
+    io.stderr:write("screenshot: --info 不能用 --rect；它按窗口标题判定所在屏\n")
+    return exit_code.USAGE
+  end
+  return exit_code.protect(function()
+    local pwsh = seam.which("pwsh")
+    if not pwsh then
+      exit_code.unavailable("screenshot: 找不到 pwsh。PowerShell 7 需在 PATH 上（pwsh.exe）")
+    end
+
+    local root = repo_root(env)
+    local script = root .. "/" .. M.SCRIPT
+    if not seam.exists(script) then
+      exit_code.unavailable("screenshot: 抓屏脚本缺失: " .. script)
+    end
+
+    local code, body = seam.capture({
+      argv = { pwsh, "-NoProfile", "-File", script, "-Info", "-Window", opts.window or M.DEFAULT_WINDOW },
+      tmp_dir = root .. "/tmp",
+    })
+    local lines, result = M.parse_info(body)
+    local verdict = result and result:match("^OK%s+INFO%s+(.+)$")
+    if code ~= 0 or not verdict then
+      local reason = (result and result:gsub("^FAIL%s*", "")) or tostring(body)
+      io.stderr:write("screenshot: " .. reason .. "\n")
+      return exit_code.FAILURE
+    end
+    for _, line in ipairs(lines) do
+      io.stdout:write("screenshot: " .. line .. "\n")
+    end
+    return exit_code.OK
+  end)
+end
+
 function M.main(args, env)
   local opts, err = M.parse(args or {})
   if not opts then
@@ -105,6 +157,10 @@ function M.main(args, env)
   if opts.help then
     io.stdout:write(M.usage())
     return exit_code.OK
+  end
+
+  if opts.info then
+    return M.info(opts, env)
   end
 
   local frame, frame_err = M.framing(opts)

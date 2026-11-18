@@ -157,6 +157,34 @@ describe("TestScreenshotCommand", function()
     assert.are.equal("10,20,30,40", argv[8])
   end)
 
+  it("test_info_reports_display_verdict", function()
+    world.result = "INFO 屏幕 \\\\.\\DISPLAY2 1920,0 1920x1080 适配器=NVIDIA\r\nINFO 判定 非虚拟屏\r\nRESULT=OK INFO 非虚拟屏\r\n"
+    local code, out, err = run({ "--info" })
+    assert.are.equal(0, code, err)
+    local argv = argv_of()
+    assert.are.equal("-Info", argv[5])
+    assert.are.equal("-Window", argv[6])
+    assert.are.equal("client", argv[7])
+    assert.matches("判定 非虚拟屏", out, 1, true)
+    assert.are.equal("", err)
+  end)
+
+  it("test_info_rejects_rect", function()
+    local code, _, err = run({ "--info", "--rect", "1,2,3,4" })
+    assert.are.equal(2, code)
+    assert.matches("--info 不能用 --rect", err, 1, true)
+    assert.are.equal(0, #world.calls)
+  end)
+
+  it("test_info_failure_reports_reason_and_exits_1", function()
+    world.exit_code = 1
+    world.result = "RESULT=FAIL WINDOW_NOT_FOUND 没有标题包含「client」的可见窗口\r\n"
+    local code, out, err = run({ "--info" })
+    assert.are.equal(1, code)
+    assert.matches("WINDOW_NOT_FOUND", err, 1, true)
+    assert.are.equal("", out)
+  end)
+
   it("test_capture_failure_reports_reason_and_exits_1", function()
     world.exit_code = 1
     world.result = "RESULT=FAIL WINDOW_NOT_FOUND 没有标题包含「client」的可见窗口\n"

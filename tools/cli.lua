@@ -43,7 +43,7 @@ M.commands = {
   { name = "ability-presets", mod = "tools.ability_presets", summary = "重建技能包的编辑器侧预设（复制官方模板、刷壳与属性、回写 GameCfg key）" },
   { name = "blender", mod = "tools.blender", summary = "在 Windows 侧无头 Blender 执行脚本（唯一 Blender 入口，透传 JSON 与退出码）" },
   { name = "worktree-init", mod = "tools.worktree_init", summary = "把新 worktree 补齐到能跑 test full（复制上游 blender-* skill；幂等）" },
-  { name = "screenshot", mod = "tools.screenshot", summary = "抓桌面合成画面的一段矩形存 PNG（虚拟屏上取证游戏画面；editor-cli 截图在该环境给黑帧）" },
+  { name = "screenshot", mod = "tools.screenshot", summary = "抓桌面合成画面存 PNG；--info 只报显示路径判定（虚拟屏上 editor-cli 截图给黑帧或旧帧）" },
 }
 
 -- 被 require（如测试读路由表）时只交出路由表，不执行入口流程。
