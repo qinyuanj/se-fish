@@ -3,10 +3,12 @@
 -- 航线 id 由服务端校验；结果以服务端 FerryResult 为准。
 -- 倒计时是服务端广播的 FerryState{phase, routeId, seconds}：**按航线分开记账**，
 -- 不同航线的倒计时互不串台；顶部倒计时条只显示最近的一班并写明目的地。
+-- 倒计时条按需创建、最后一条航线结束后销毁（#207）：重复摆渡不在场上叠加残留。
 -- 放在 ScreenHandlers 下（#89 端别约定），但不是 MgrGameUI 屏幕：随 client/main.lua 直接 Start，
 -- 与 ScreenGM 的用法同款。
 local GameCfg = require('common.GameCfg')
 local BodyScale = require('common.BodyScale')
+local OwnedUnits = require('common.OwnedUnits')
 local REUtil = require('common.REUtil')
 local Util = require('common.Util')
 
@@ -78,6 +80,40 @@ function ScreenFerry:UpdateLegs()
     end
 end
 
+---顶部倒计时条按需创建：真有航线在倒计时才占节点，建完交给本模块的登记表保管。
+function ScreenFerry:ShowCountdown()
+    if self.CountdownLabel then return self.CountdownLabel end
+    local eui = Players.LocalPlayer and Players.LocalPlayer.PlayerGui
+        and Players.LocalPlayer.PlayerGui.EuiManager
+    local root = eui and eui:GetRootNode()
+    if not root then return nil end
+    local resolution = eui:GetDeviceResolution()
+    local ok, label = pcall(World.CreateUnit, World, 'EUITextLabel', {
+        Parent = root, Name = 'FerryCountdown',
+        Position = Vector2.New(resolution.x / 2, resolution.y - 120),
+        Size = Vector2.New(360, 60), Text = '', FontSize = 36,
+        TextColor = Color.New(255, 255, 255, 255),
+    })
+    if not ok or not label then
+        print('[ScreenFerry] 倒计时条创建失败', tostring(label))
+        return nil
+    end
+    label.Visible = false
+    label.TouchEnabled = false
+    label.SwallowTouchEnabled = false
+    self.CountdownLabel = OwnedUnits.Track(self, label)
+    return self.CountdownLabel
+end
+
+---航线结束后销毁倒计时条（幂等）：先隐藏再销毁，既不再显示，也不留看不见的残留。
+function ScreenFerry:HideCountdown()
+    if not self.CountdownLabel then return end
+    local label = self.CountdownLabel
+    self.CountdownLabel = nil
+    pcall(function() label.Visible = false end)
+    OwnedUnits.Clear(self)
+end
+
 -- 逐航线扣时；倒计时条显示剩余最少的一班（同一时刻可能有多条航线在倒计时）
 function ScreenFerry:UpdateCountdown(dt)
     local step = type(dt) == 'number' and dt or 0
@@ -91,14 +127,15 @@ function ScreenFerry:UpdateCountdown(dt)
             if not soonestLeft or remaining < soonestLeft then soonest, soonestLeft = routeId, remaining end
         end
     end
-    if not self.CountdownLabel then return end
     if not soonest then
-        pcall(function() self.CountdownLabel.Visible = false end)
+        self:HideCountdown()
         return
     end
+    local label = self:ShowCountdown()
+    if not label then return end
     pcall(function()
-        self.CountdownLabel.Visible = true
-        self.CountdownLabel.Text = string.format('前往%s %d 秒', self:ZoneName(soonest), math.ceil(soonestLeft))
+        label.Visible = true
+        label.Text = string.format('前往%s %d 秒', self:ZoneName(soonest), math.ceil(soonestLeft))
     end)
 end
 
@@ -147,27 +184,6 @@ function ScreenFerry:Start()
     for index, route in ipairs(GameCfg.Ferry.Routes) do
         self:CreateLeg(index .. ':out', route.Id, route.Outbound, 'Board', '乘船')
         self:CreateLeg(index .. ':return', route.Id, route.Return, 'Return', '返程')
-    end
-    -- 顶部倒计时条：代码建 EUITextLabel，与 ScreenMain 的运行时建节点同款
-    local eui = Players.LocalPlayer and Players.LocalPlayer.PlayerGui
-        and Players.LocalPlayer.PlayerGui.EuiManager
-    local root = eui and eui:GetRootNode()
-    if root then
-        local resolution = eui:GetDeviceResolution()
-        local ok, label = pcall(World.CreateUnit, World, 'EUITextLabel', {
-            Parent = root, Name = 'FerryCountdown',
-            Position = Vector2.New(resolution.x / 2, resolution.y - 120),
-            Size = Vector2.New(360, 60), Text = '', FontSize = 36,
-            TextColor = Color.New(255, 255, 255, 255),
-        })
-        if ok and label then
-            label.Visible = false
-            label.TouchEnabled = false
-            label.SwallowTouchEnabled = false
-            self.CountdownLabel = label
-        else
-            print('[ScreenFerry] 倒计时条创建失败', tostring(label))
-        end
     end
     REUtil:GetRE('FerryResult').OnClientEvent:Connect(function(result) self:OnResult(result) end)
     REUtil:GetRE('FerryState').OnClientEvent:Connect(function(state) self:OnState(state) end)

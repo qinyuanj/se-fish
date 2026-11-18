@@ -3,6 +3,7 @@
 -- 的等级（Stands.Level）上架。走出所有摊位范围自动关商店。购买结果 ShopResult 在这里统一转成消息条提示。
 local GameCfg = require('common.GameCfg')
 local BodyScale = require('common.BodyScale')
+local OwnedUnits = require('common.OwnedUnits')
 local REUtil = require('common.REUtil')
 local Util = require('common.Util')
 local SquareButtonImage = 'official://image/11017'
@@ -51,6 +52,7 @@ function LocalShop:CreateBubble(anchor)
         Parent = node, Name = 'BtnShopEnter', Position = Vector2.New(0, 0), Size = Vector2.New(360, 72),
     })
     if okBtn and btn then
+        OwnedUnits.Track(self, btn) -- 气泡按钮归本模块所有，Clear 时销毁
         btn.ButtonText = ''
         btn.NormalImage = SquareButtonImage
         btn.PressImage = SquareButtonImage
@@ -64,6 +66,7 @@ function LocalShop:CreateBubble(anchor)
             Text = cfg.HintText, FontSize = 26, TextColor = Color.New(255, 255, 255, 255),
         })
         if label then
+            OwnedUnits.Track(self, label) -- 气泡文字同上
             label.TouchEnabled = false
             label.SwallowTouchEnabled = false
             label.LocalZOrder = 1
@@ -74,6 +77,18 @@ function LocalShop:CreateBubble(anchor)
     end
     node.Visible = false
     return node
+end
+
+---关闭本模块建的全部摊口气泡（幂等）：销毁名下按钮与文字，再销毁气泡根节点，登记表归空。
+-- 气泡根节点是 EUI 场景节点（不在建点清单里），随气泡一起显式销毁，不留看不见的残留。
+function LocalShop:Clear()
+    OwnedUnits.Clear(self)
+    for _, bubble in ipairs(self.Bubbles) do
+        local ok, err = pcall(function() bubble.Node:Destroy() end)
+        if not ok then print('[LocalShop] 气泡根节点销毁失败', tostring(err)) end
+    end
+    self.Bubbles = {}
+    self.Stand = nil
 end
 
 function LocalShop:Open()
