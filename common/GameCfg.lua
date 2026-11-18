@@ -546,7 +546,11 @@ function GameCfg.Lottery.MachineAnchors()
     end
     return names
 end
-GameCfg.Blindbox = ContentBlindbox
+-- 盲盒运行期配置（#204）：内容表只承载内容，运行期写入只落在本表顶层键上。
+-- 与 Lottery 同口径浅拷贝；Entries、Pity 等嵌套内容仍与内容表同表，只读使用。
+local BlindboxCfg = {}
+for key, value in pairs(ContentBlindbox) do BlindboxCfg[key] = value end
+GameCfg.Blindbox = BlindboxCfg
 -- 盲盒行为参数（#147 T26，GameSpec §15）：抽样与保底纯逻辑在 common/BlindboxDraw.lua；
 -- 收费走平台适配层（GameCfg.Platform.Goods 的 blindboxSingle/blindboxTen 行），结果服务端先定并持久化；
 -- 满格落地经 MgrLoot:SpawnItem 计入全区 200 件预算，购买前由客户端按库存快照明确告知。

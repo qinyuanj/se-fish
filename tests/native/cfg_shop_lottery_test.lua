@@ -2,6 +2,37 @@
 --   内容表被运行期写入污染（#203：重载 GameCfg 后键集合变化、锚点入口指向未解析的场景区域表）。
 -- 迁移自 tests/gameplay/cfg_shop_lottery_test.lua（#83）；案例顺序沿用旧入口的方法名字典序。
 describe("TestContentCfg", function()
+  it("test_blindbox_content_table_holds_no_runtime_keys_across_gamecfg_loads", function()
+    local cfgModule, contentModule = 'common.GameCfg', 'common.cfg.Blindbox'
+    local savedCfg, savedContent = package.loaded[cfgModule], package.loaded[contentModule]
+    -- 测试基线已预加载 GameCfg。单独加载这两个模块，断言失败时也恢复原缓存。
+    package.loaded[cfgModule], package.loaded[contentModule] = nil, nil
+    local ok, err = pcall(function()
+      local content = require(contentModule)
+      local function contentKeys()
+        local keys = {}
+        for key, value in pairs(content) do
+          assert.are_not.equal('function', type(value), '内容表不能承载运行期函数：' .. key)
+          keys[#keys + 1] = key
+        end
+        table.sort(keys)
+        return keys
+      end
+
+      local before = contentKeys()
+      local cfg = require(cfgModule)
+      assert.same(before, contentKeys())
+      assert.is_true(cfg.Content.Blindbox == content)
+      assert.is_false(cfg.Blindbox == content)
+      assert.is_true(cfg.Blindbox.Entries == content.Entries)
+      assert.is_true(cfg.Blindbox.Pity == content.Pity)
+      assert(loadfile('common/GameCfg.lua'))()
+      assert.same(before, contentKeys())
+    end)
+    package.loaded[cfgModule], package.loaded[contentModule] = savedCfg, savedContent
+    if not ok then error(err, 0) end
+  end)
+
   it("test_blindbox_weight_pricing_and_pity", function()
     local box = require('common.cfg.Blindbox')
     assert.are.equal(42, #box.Entries)
