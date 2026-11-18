@@ -9,6 +9,7 @@
 local GameCfg = require('common.GameCfg')
 local BodyScale = require('common.BodyScale')
 local GrillCurve = require('common.GrillCurve')
+local OwnedUnits = require('common.OwnedUnits')
 local REUtil = require('common.REUtil')
 local Util = require('common.Util')
 local Bubble = require('client.InteractionBubble')
@@ -38,7 +39,22 @@ local function create(kind, parent, name, x, y, width, height, props)
     if not node then error('烧烤界面节点创建失败：' .. name) end
     node.TouchEnabled = false
     node.SwallowTouchEnabled = false
-    return node
+    return OwnedUnits.Track(Panel, node)
+end
+
+---销毁烧烤界面建的全部节点与气泡根（幂等，#211）：面板节点走归属登记，销毁不从别的表枚举。
+-- 气泡根是 EUI 场景节点（不在建点台账里），随 Clear 一起销毁，不留看不见的残留。
+function Panel:Clear()
+    OwnedUnits.Clear(self)
+    for _, bubble in ipairs(self.Bubbles) do
+        local ok, err = pcall(function() bubble.Node:Destroy() end)
+        if not ok then print('[ScreenGrill] 气泡根节点销毁失败', tostring(err)) end
+    end
+    self.Bubbles = {}
+    self.Root = nil
+    self.Title = nil
+    self.TimeLabel = nil
+    self.RateLabel = nil
 end
 
 function Panel:Now()

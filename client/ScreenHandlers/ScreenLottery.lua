@@ -7,6 +7,7 @@
 -- recovered（断线重进补推）直接展示不播动画。开奖后不必关窗即可选下一件继续抽。
 local GameCfg = require('common.GameCfg')
 local Eligibility = require('common.LotteryEligibility')
+local OwnedUnits = require('common.OwnedUnits')
 local REUtil = require('common.REUtil')
 local GameUI = require('client.GameUI')
 
@@ -68,7 +69,7 @@ local function createNode(self, kind, name, x, y, w, h, props)
         node.SwallowTouchEnabled = false
     end
     self.UINodeMap[name] = node
-    return node
+    return OwnedUnits.Track(self, node)
 end
 
 -- 取节点：优先自建登记表（运行时创建的节点都在），编辑器预设场景兜底 FindFirstChild
@@ -84,6 +85,18 @@ function ScreenHandler:Node(name)
         end
     end
     return nil
+end
+
+---销毁本界面建的全部节点并复位查找表（幂等，#211）：清空后不再拿着已销毁的节点。
+-- 销毁只走归属登记，不从 UINodeMap 枚举；查找表、根节点与监听一并复位，重新 BuildNodes + Init 即重建。
+function ScreenHandler:Clear()
+    OwnedUnits.Clear(self)
+    for _, connection in ipairs(self.Connections or {}) do connection:Disconnect() end
+    self.Connections = {}
+    self.UINodeMap = {}
+    self.RootNode = nil
+    self.BoundRootNode = nil
+    self.Inited = nil
 end
 
 -- 运行时建全部节点；UIRoot 未就绪时有限重试，仍拿不到只记日志（与既有界面同级风险）
@@ -104,7 +117,8 @@ function ScreenHandler:BuildNodes()
         return false
     end
     layout.Visible = false
-    self.RootNode = layout
+    -- 界面根也是本界面的建点，与子节点一起登记
+    self.RootNode = OwnedUnits.Track(self, layout)
     createNode(self, 'EUITextLabel', 'LabelLotteryTitle', x, y - 250, 400, 60,
         { Text = '抽奖机', FontSize = 40, TextColor = Color.New(255, 255, 255, 255) })
     createNode(self, 'EUITextLabel', 'LabelLotteryBet', x, y - 160, 700, 60,

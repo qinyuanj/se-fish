@@ -6,6 +6,7 @@
 -- 同 operation.id 的重放回包不重复展示；保底计数经 BlindboxStateRequest 握手与每次结果刷新。
 -- 节点全部运行时创建（data/ 只读），创建失败只记日志。
 local GameCfg = require('common.GameCfg')
+local OwnedUnits = require('common.OwnedUnits')
 local REUtil = require('common.REUtil')
 local GameUI = require('client.GameUI')
 local MainHudLayout = require('client.MainHudLayout')
@@ -48,7 +49,15 @@ function Screen:Create(kind, parent, name, x, y, w, h, props)
         node.SwallowTouchEnabled = false
     end
     self.Nodes[name] = node
-    return node
+    return OwnedUnits.Track(self, node)
+end
+
+---销毁盲盒界面建的全部节点并复位查找表（幂等，#211）：销毁只走归属登记，不从 Nodes 枚举。
+function Screen:Clear()
+    OwnedUnits.Clear(self)
+    self.Nodes = {}
+    self.Panel = nil
+    self.IsOpen = false
 end
 
 function Screen:Button(parent, name, x, y, w, h, text, onClick)
