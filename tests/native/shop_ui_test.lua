@@ -22,10 +22,9 @@ end
 
 local function numbersOf(rows)
     local out = {}
-    for i, row in ipairs(rows or {}) do out[i] = row and row.goods.Number or nil end
+    for i, row in ipairs(rows or {}) do out[i] = row and row.number or nil end
     return out
 end
-
 
 -- ===== LocalShop 失败提示（#130 文案） =====
 describe("钓场商店的失败提示", function()
@@ -128,43 +127,68 @@ describe("钓场商店的失败提示", function()
         }, ctx.notices)
     end)
 end)
-describe("钓场商店界面", function()
+
+-- ===== 商店界面（#216 固定骨架 + 运行期填行） =====
+-- 本屏唯一的测试接缝是 handler:View()（纯显示快照）与行/页签按钮发出的指令；不断言节点数量、
+-- 坐标、颜色与层级——那些由共享简报的骨架契约与编辑器试玩负责。
+-- 动手前列出的失败方式（每例对应其中一条）：
+--   1. 页签文字不取 GameCfg.Shop.Pages（写死旧文案）→ 改术语后界面与配置对不上；
+--   2. 打开不回钓具页、金币条不刷新 → 重开商店停在上次的页、读到旧金币；
+--   3. 切页签只改字不切容器（或只切容器不改字）→ 金币页叠着商品列表；
+--   4. 切页签不清选中 → 详情区留着上一页的商品；
+--   5. 行序与 ListForPage 不一致、锁定行不写原因 → 摊位等级不够时看不出为什么不能买；
+--   6. 升级页仍按 8 行切页 → 滚动列表里只看到 8 条；
+--   7. 三态判错（锁定能买、已购能重买、逐级升级不开放）→ 客户端发出必被服务端拒的请求；
+--   8. 购买 payload 发 itemKey 而不是商店编号 → 升级行没有 itemKey，根本买不了；
+--   9. 平台不可用/抛错时伪成功或关屏 → 玩家以为买到了，或回不去其他分页；
+--  10. 运行期建行没登记、或 Init 里就渲染 → 重建界面后旧行叠加、登记表不归零。
+describe("钓场商店界面（#216 固定骨架）", function()
     local ctx
 
-    -- 与旧 LuaUnit 的每例 setUp/tearDown 同级成对：处理器逐例重载，页签状态不串味。
     before_each(function()
         ctx = { nodes = {}, created = {}, commands = {}, events = {} }
         ctx.previous = { game = rawget(_G, 'game'), Vector2 = rawget(_G, 'Vector2'),
             Color = rawget(_G, 'Color'), REUtil = rawget(_G, 'REUtil'),
             GameUI = rawget(_G, 'GameUI'), MgrGameUI = rawget(_G, 'MgrGameUI'),
-            Players = rawget(_G, 'Players') }
+            PlatformShop = rawget(_G, 'PlatformShop') }
         ctx.previousLocalShop = package.loaded['client.LocalShop']
         ctx.previousHandler = package.loaded['client.ScreenHandlers.ScreenShop']
         package.loaded['client.LocalShop'] = { Stand = { AnchorName = 'TGUnitShopShrimp', Level = 2 } }
         package.loaded['client.ScreenHandlers.ScreenShop'] = nil
+        -- 假 World：建点即挂到 Parent 的子节点表上（供 FindFirstChild 取行与行内子节点），
+        -- 销毁按引擎口径递归（EUI 节点 Destroy 带走子节点，所以行内子节点不必单独登记）。
         local world = {}
         function world:CreateUnit(kind, attrs)
-            local node = { Kind = kind, OnClicked = signal() }
-            for key, value in pairs(attrs) do node[key] = value end
+            local node = { Kind = kind, OnClicked = signal(), Children = {} }
+            function node:FindFirstChild(name) return self.Children[name] end
             function node:Destroy()
                 self.Destroyed = true
-                for _, child in ipairs(ctx.created) do
-                    if child.Parent == self then child:Destroy() end
+                -- 真引擎销毁会同时把节点从父节点子表里摘掉；不摘会让「复用行」按名找回死节点
+                if self.Parent and self.Parent.Children[self.Name] == self then
+                    self.Parent.Children[self.Name] = nil
                 end
+                local children = self.Children
+                self.Children = {}
+                for _, child in pairs(children) do child:Destroy() end
             end
+            for key, value in pairs(attrs or {}) do node[key] = value end
+            if node.Parent and node.Name then node.Parent.Children[node.Name] = node end
             if node.Name then ctx.nodes[node.Name] = node end
             ctx.created[#ctx.created + 1] = node
             return node
         end
-        ctx.localPlayer = { GetAttribute = function() return 77 end }
         _G.game = { GetService = function(_, name)
             if name == 'World' then return world end
-            if name == 'Players' then return { LocalPlayer = ctx.localPlayer } end
+            if name == 'Players' then
+                return { LocalPlayer = { GetAttribute = function() return 77 end } }
+            end
         end }
         _G.Vector2 = { New = function(x, y) return { x = x, y = y } end }
         _G.Color = { New = function(...) return { ... } end }
         _G.GameUI = { GetEuiManager = function() return {
             GetDeviceResolution = function() return { x = 1920, y = 1080 } end } end }
+        _G.MgrGameUI = { CloseScreen = function() end }
+        _G.PlatformShop = nil
         _G.REUtil = { GetRE = function(_, name)
             if not ctx.events[name] then
                 ctx.events[name] = { OnClientEvent = signal(), FireServer = function(_, payload)
@@ -173,150 +197,152 @@ describe("钓场商店界面", function()
             return ctx.events[name]
         end }
         ctx.handler = assert(loadfile('client/ScreenHandlers/ScreenShop.lua'))()
+        -- 预制体骨架替身：名册里的节点按名字给；层级与几何不进单测，契约在共享简报里。
         for _, name in ipairs(ctx.handler.UINodes) do
-            ctx.nodes[name] = { Visible = true, OnClicked = signal() }
+            ctx.nodes[name] = { Name = name, Visible = true, Text = '', Children = {},
+                OnClicked = signal(), FindFirstChild = function(self, child) return self.Children[child] end }
         end
         ctx.handler.UINodeMap = ctx.nodes
         ctx.handler.RootNode = { Name = 'ScreenShop' }
         ctx.handler:Init()
-        ctx.handler.IsOpen = true
+        ctx.handler:OpenScreen()
     end)
 
-    -- 全局与模块缓存逐例恢复；setUp 中途失败也照样清理。
     after_each(function()
         package.loaded['client.LocalShop'] = ctx.previousLocalShop
         package.loaded['client.ScreenHandlers.ScreenShop'] = ctx.previousHandler
-        for _, key in ipairs({ 'game', 'Vector2', 'Color', 'REUtil', 'GameUI', 'MgrGameUI' }) do
+        for _, key in ipairs({ 'game', 'Vector2', 'Color', 'REUtil', 'GameUI', 'MgrGameUI', 'PlatformShop' }) do
             _G[key] = ctx.previous[key]
         end
     end)
 
-    -- 购买一律发编号（升级行无 itemKey）；点击行与上行一致
-    it("test_buy_sends_number_not_item_key", function()
-        ctx.handler:Buy(1) -- 钓具页第 1 行 = 香肠(11)
+    it("test_open_shows_skeleton_tabs_on_first_page", function()
+        local view = ctx.handler:View()
+        assert.same(GameCfg.Shop.Pages, view.tabs)
+        assert.same('钓具', view.page)
+        assert.is_nil(view.selected)
+        assert.is_true(view.panels.list)
+        assert.is_false(view.panels.coin)
+        assert.same('77', view.coinText)
+    end)
+
+    -- 四页签逐个点：页名、容器可见性与选中三样一起换
+    it("test_every_tab_switches_container_and_clears_selection", function()
+        local coin = GameCfg.Shop.Pages[#GameCfg.Shop.Pages]
+        for index, page in ipairs(GameCfg.Shop.Pages) do
+            ctx.handler:Select(1)
+            ctx.nodes['BtnShopPage' .. index].OnClicked:Fire()
+            local view = ctx.handler:View()
+            assert.same(page, view.page)
+            assert.is_nil(view.selected)
+            assert.same(page == coin, view.panels.coin)
+            assert.same(page ~= coin, view.panels.list)
+        end
+    end)
+
+    it("test_rows_follow_list_for_page_order_with_locked_reason", function()
+        local rows = ctx.handler:View().rows
+        -- 2 级摊「钓具」页：当地新品（香肠 11 / 钓虾竿 12）置顶，其余按商店编号升序，锁定行也在列
+        assert.same({ 11, 12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 13, 14 }, numbersOf(rows))
+        assert.same('香肠', rows[1].name)
+        assert.same('2', rows[1].priceText)
+        assert.same('buy', rows[1].state)
+        assert.same('', rows[1].stateText)
+        -- 科技假饵（编号 1）需 7 级摊位：列出来，但要说清为什么不能买
+        assert.same('locked', rows[3].state)
+        assert.matches('需 7 级摊位', rows[3].stateText, 1, true)
+    end)
+
+    -- 滚动列表：升级页 24 行一次进列表，不再按 8 行切页（翻页按钮随骨架一起消失）
+    it("test_upgrade_page_lists_every_row_without_paging", function()
+        package.loaded['client.LocalShop'].Stand = { AnchorName = 'TGUnitShop7', Level = 7 }
+        ctx.handler:SetPage('升级')
+        local numbers = numbersOf(ctx.handler:View().rows)
+        assert.same(24, #numbers)
+        assert.same(34, numbers[1]) -- 7 级新品置顶：远程武器升级5
+        assert.same(45, numbers[3]) -- 近战武器升级7
+        assert.same(28, numbers[4]) -- 之后回到编号升序：背包升级6
+        assert.same(51, numbers[#numbers])
+    end)
+
+    -- 行三态：锁定不可买、逐级开放、已购拦截；服务端成功回包后行转已购并放出下一级
+    it("test_row_states_lock_buy_and_owned", function()
+        ctx.handler:SetPage('升级')
+        local function rowOf(number)
+            for _, row in ipairs(ctx.handler:View().rows) do
+                if row.number == number then return row end
+            end
+        end
+        assert.same('locked', rowOf(32).state) -- 背包升级2：越级（当前 0 级）
+        assert.same('buy', rowOf(41).state)    -- 弹容量升级1：逐级可买
+        assert.same('locked', rowOf(50).state) -- 近战武器升级2：越级
+        assert.same('buy', rowOf(51).state)    -- 近战武器升级1
+        assert.matches('前一级', rowOf(32).stateText, 1, true)
+        ctx.nodes['ShopRow' .. rowOf(51).index].OnClicked:Fire()
+        assert.same(51, ctx.commands[1].number)
+        ctx.events.ShopResult.OnClientEvent:Fire({ ok = true, number = 51, kind = 'melee', level = 1, price = 50 })
+        assert.same('owned', rowOf(51).state)
+        assert.same('buy', rowOf(50).state)
+        ctx.commands = {}
+        ctx.nodes['ShopRow' .. rowOf(51).index].OnClicked:Fire()
+        assert.same({}, ctx.commands)
+    end)
+
+    -- 购买一律发商店编号（升级行没有 itemKey）
+    it("test_buy_sends_shop_number_not_item_key", function()
+        ctx.nodes.ShopRow1.OnClicked:Fire() -- 钓具页第 1 行 = 香肠（编号 11）
         assert.same({ { action = 'Buy', number = 11, seq = 1 } }, ctx.commands)
         ctx.handler:SetPage('升级')
-        ctx.handler:Buy(2) -- 2 级摊位升级页第 2 行 = 弹容量升级1(41)，逐级可买
+        ctx.nodes.ShopRow2.OnClicked:Fire() -- 升级页第 2 行 = 弹容量升级1（编号 41）
         assert.same(41, ctx.commands[2].number)
         assert.is_nil(ctx.commands[2].itemId)
     end)
 
-    -- 金币页：无商品行；平台不可用时提示、停留本屏（页签可返回）、不发购买请求（不伪成功）
-    it("test_coin_page_degrades_without_platform", function()
+    -- 金币页：只显示自己的容器、没有商品行；平台缺失或抛错都只提示、不关屏、不发购买请求
+    it("test_coin_page_degrades_without_faking_success", function()
         ctx.handler:SetPage('金币')
-        assert.same({}, numbersOf(ctx.handler.VisibleRows))
-        assert.is_true(ctx.nodes.LabelCoinPageHint.Visible)
-        assert.is_true(ctx.nodes.BtnOpenPlatformShop.Visible)
-        _G.PlatformShop = nil
+        local view = ctx.handler:View()
+        assert.same({}, numbersOf(view.rows))
+        assert.is_true(view.panels.coin)
+        assert.is_false(view.panels.list)
         ctx.nodes.BtnOpenPlatformShop.OnClicked:Fire()
-        assert.matches('平台商店暂不可用', ctx.nodes.LabelCoinPageHint.Text, nil, true)
-        assert.is_true(ctx.handler.IsOpen) -- 未关闭，可返回
-        ctx.handler:SetPage('钓具')
-        assert.same({ 11, 12, 1, 2, 3, 4, 5, 6 }, numbersOf(ctx.handler.VisibleRows))
-        assert.same({}, ctx.commands) -- 全程未发购买请求
-    end)
-
-    -- 平台入口抛错同样不伪成功
-    it("test_coin_page_platform_error_not_faked", function()
-        _G.PlatformShop = { Open = function() error('平台未接入') end }
-        ctx.handler:SetPage('金币')
-        ctx.nodes.BtnOpenPlatformShop.OnClicked:Fire()
-        assert.matches('打开失败', ctx.nodes.LabelCoinPageHint.Text, nil, true)
+        assert.matches('平台商店暂不可用', ctx.handler:View().coinHint, 1, true)
         assert.is_true(ctx.handler.IsOpen)
-        _G.PlatformShop = nil
-    end)
-
-    -- 页内翻页：7 级摊位升级页 24 行 > 8 行/页
-    it("test_in_page_paging_for_upgrade_page", function()
-        package.loaded['client.LocalShop'].Stand = { AnchorName = 'TGUnitShop7', Level = 7 }
-        ctx.handler:SetPage('升级')
-        local function nums()
-            local out = {}
-            for i, row in ipairs(ctx.handler.VisibleRows) do out[i] = row and row.goods.Number end
-            return out
-        end
-        -- 7 级新品：远程5(34)/爆炸3(42)/近战7(45) 置顶（弹容3 是 6 级新品，不在 7 级组），其后按编号
-        assert.same({ 34, 42, 45, 28, 29, 30, 31, 32 }, nums())
-        assert.is_false(ctx.nodes.BtnShopPrev.Visible)
-        assert.is_true(ctx.nodes.BtnShopNext.Visible)
-        ctx.handler:TurnPage(1)
-        assert.same({ 33, 35, 36, 37, 38, 39, 40, 41 }, nums())
-        assert.is_true(ctx.nodes.BtnShopPrev.Visible)
-        ctx.handler:TurnPage(1)
-        assert.same({ 43, 44, 46, 47, 48, 49, 50, 51 }, nums())
-        assert.is_false(ctx.nodes.BtnShopNext.Visible)
-        ctx.handler:TurnPage(-1) -- 可返回上一页
-        assert.same(33, nums()[1])
-    end)
-
-    -- 2 级摊位钓具页：新品（香肠 11/钓虾竿 12）置顶，其后按编号；锁定行（等级不够）也列出但灰显
-    it("test_page_rows_follow_list_for_page_order", function()
-        assert.same({ 11, 12, 1, 2, 3, 4, 5, 6 }, numbersOf(ctx.handler.VisibleRows))
-        assert.same('香肠', ctx.nodes.ShopItemName1.Text)
-        assert.same('钓虾竿', ctx.nodes.ShopItemName2.Text)
-        -- 第 3 行起是运行时补位行：科技假饵（1）需 7 级摊位 → 锁定灰显
-        local extra3 = ctx.nodes.BtnShopBuyExtra3
-        assert.is_true(extra3.Visible)
-        assert.is_false(extra3.TouchEnabled)
-        assert.matches('需 7 级摊位', ctx.nodes.LabelShopBuyExtra3.Text, nil, true)
-    end)
-
-    it("test_page_switch_renders_target_page", function()
-        ctx.handler:SetPage('武器')
-        -- 新品手枪(23)/斧头(24)/鞭炮(17) 置顶组按编号 17<23<24，其后按编号含锁定行
-        assert.same({ 17, 23, 24, 15, 16, 18, 19, 20 }, numbersOf(ctx.handler.VisibleRows))
-    end)
-
-    -- 行状态：锁定行灰显且不可点；购买后已购且同号重购被客户端拦下
-    it("test_row_states_locked_and_owned", function()
-        ctx.handler:SetPage('升级')
-        local function rowOf(number)
-            for index, row in ipairs(ctx.handler.VisibleRows) do
-                if row and row.goods.Number == number then return row.goods, index end
-            end
-            return nil
-        end
-        -- 2 级摊位升级页：第 3 页才有近战 1 级（51）
-        ctx.handler:TurnPage(1)
-        ctx.handler:TurnPage(1)
-        local melee1 = rowOf(51)
-        assert.is_not_nil(melee1)
-        assert.same('buy', ctx.handler:RowState(melee1, 2))
-        assert.same('locked', ctx.handler:RowState(rowOf(49), 2)) -- 近战 3 级需 3 级摊位
-        ctx.handler:TurnPage(-2) -- 回第 1 页
-        assert.same('locked', ctx.handler:RowState(rowOf(32), 2)) -- 背包 2 级越级（当前 0 级）
-        -- 模拟服务端回包：近战 1 级购买成功 → 行转已购，近战 2 级（50）逐级解锁
-        ctx.events.ShopResult.OnClientEvent:Fire({ ok = true, number = 51, kind = 'melee', level = 1, price = 50 })
-        assert.same('owned', ctx.handler:RowState(melee1, 2))
-        assert.same('buy', ctx.handler:RowState(rowOf(50), 2))
-        -- 已购行点击不发请求
-        ctx.commands = {}
-        ctx.handler:TurnPage(2)
-        local _, index = rowOf(51)
-        ctx.handler:Buy(index)
+        _G.PlatformShop = { Open = function() error('平台未接入') end }
+        ctx.nodes.BtnOpenPlatformShop.OnClicked:Fire()
+        assert.matches('打开失败', ctx.handler:View().coinHint, 1, true)
+        assert.is_true(ctx.handler.IsOpen)
+        ctx.handler:SetPage('钓具')
+        assert.same(11, numbersOf(ctx.handler:View().rows)[1])
         assert.same({}, ctx.commands)
     end)
 
-    -- #210 重建（换 RootNode 再 Init）：上一轮运行时节点全部销毁、登记表只留新一轮，不残留旧按钮/标签。
-    -- 失败方式：仍自持 self.RuntimeNodes 或漏登记 → 旧节点留在场上；销毁路径没走登记表 → 计数叠加。
-    it("test_rebuild_destroys_previous_runtime_nodes_and_replaces_registry", function()
-        assert.same(#ctx.created, OwnedUnits.Count(ctx.handler)) -- 每个运行时建点都登记在册
+    -- 重开商店：回到钓具页，不残留选中（关屏不做事，复位靠 OpenScreen）
+    it("test_reopen_resets_to_first_page_without_selection", function()
+        ctx.handler:SetPage('升级')
+        ctx.handler:Select(2)
+        ctx.handler:CloseScreen()
+        ctx.handler:OpenScreen()
+        local view = ctx.handler:View()
+        assert.same('钓具', view.page)
+        assert.is_nil(view.selected)
+        assert.same(11, numbersOf(view.rows)[1])
+        assert.same('77', view.coinText)
+    end)
+
+    -- 归属登记：本屏运行期只建商品行（行内子节点随行递归销毁，不单独登记），一行一个登记项；
+    -- 换 RootNode 再 Init 时上一轮整体销毁、登记表归零，重开渲染只留新一轮。
+    it("test_rebuild_clears_registry_and_keeps_one_owner", function()
+        assert.same(#ctx.handler:View().rows, OwnedUnits.Count(ctx.handler))
         local previous = ctx.created
         ctx.created = {}
         ctx.handler.RootNode = { Name = 'ScreenShopRebuilt' }
         ctx.handler:Init()
+        assert.same(0, OwnedUnits.Count(ctx.handler))
         for _, node in ipairs(previous) do
-            assert.is_true(node.Destroyed, '上一轮运行时节点应被销毁')
+            assert.is_true(node.Destroyed, '上一轮运行期建点应被销毁')
         end
-        assert.same(#ctx.created, OwnedUnits.Count(ctx.handler)) -- 登记表只剩新一轮
-        for _, node in ipairs(ctx.created) do
-            assert.is_nil(node.Destroyed) -- 新一轮节点仍在场上
-        end
-    end)
-
-    it("test_tabs_cover_four_pages", function()
-        for _, page in ipairs({ '钓具', '武器', '升级', '金币' }) do
-            assert.is_not_nil(ctx.nodes['BtnShopPage' .. page], '缺页签 ' .. page)
-        end
+        ctx.handler:OpenScreen()
+        assert.same(#ctx.handler:View().rows, OwnedUnits.Count(ctx.handler))
     end)
 end)

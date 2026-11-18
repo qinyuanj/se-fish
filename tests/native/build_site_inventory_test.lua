@@ -14,7 +14,7 @@ local Arch = require("tools.arch_policy")
 local fs = require("tests.support.fs_fixture")
 local lfs = require("lfs")
 
-local SITES = 68
+local SITES = 64
 local SITE_ROOTS = { "client", "common", "server" }
 local REF_ROOTS = { "client", "common", "server", "tests", "tools" }
 local REMOVED = { "FXUtil", "WeldTo", "MarkPointPart", "CreateHPBar" }
@@ -74,7 +74,7 @@ local function breakdown(per_root)
 end
 
 describe("运行期建点台账", function()
-  it("三端运行期建点数与 #206 台账同为 68 个", function()
+  it("三端运行期建点数与 #206 台账同为 64 个", function()
     local total, per_root = count_sites()
     if total ~= SITES then
       fail("运行期建点 %d 个，台账与本守卫断言 %d 个（%s）。新增或删除建点要同步 #206 台账与本计数。",
