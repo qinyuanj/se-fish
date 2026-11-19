@@ -11,6 +11,8 @@ description: 用 Lua 5.4 版 Spoke 在蛋仔 SE（世界编辑器）UGC 里写�
 
 依据优先级：`common/packages/spoke/` 的实际行为，其验收契约是 spoke 仓库的 `docs/spec.md`；与本技能冲突时按实际行为写代码，并把差异说明出来。需要新的库行为时，那是 spoke 仓库的改动，不是在本项目里给包打补丁的理由。
 
+本技能中的宿主标识符都按 SE（世界编辑器）解释，出处与签名口径见 `references/eggy-integration.md`；依据 SE 工程证据使用原名称，不凭它们与其他平台的字面相似性改写。
+
 ## 代码形状
 
 ```lua

@@ -1,6 +1,6 @@
 # 蛋仔 SE 宿主集成
 
-落地细节见 spoke 仓库的 `docs/integration-best-practices.md` 与 `docs/eggy-host-integration-guide.md`，范式决策见 ADR 0002、0004、0005、0009。目标宿主是 SE（世界编辑器）；原点版（帧同步）是并行编辑器，不是旧版本。集成代码写在本项目里；`common/packages/spoke/` 是从 spoke 仓库镜像来的原始字节，升级只换 submodule SHA。
+落地细节见 spoke 仓库的 `docs/integration-best-practices.md` 与 `docs/eggy-host-integration-guide.md`，范式决策见 ADR 0002、0004、0009、0013。目标宿主是 SE（世界编辑器）；原点版（帧同步）是并行编辑器，不是旧版本。集成代码写在本项目里；`common/packages/spoke/` 是从 spoke 仓库镜像来的原始字节，消费方自选 submodule 或纯拷贝，版本都固定到完整上游 commit SHA。
 
 ## 部署与加载
 
@@ -10,7 +10,19 @@
 local spoke = require("common.packages.spoke.api")
 ```
 
-通过 submodule 固定源码 SHA，部署时把包的原始字节镜像到相同路径。镜像要清除已删除的旧文件，不能只做增量合并。文档和脚本使用 PowerShell 7 / Windows 原生形式，保留 LF、无 BOM。
+submodule 由指针固定 SHA，纯拷贝由消费方版本台账固定同一个完整 SHA。每次同步把核心包、使用时的 `spoke_eggy` 与技能按原始字节整包镜像到消费方对应路径，三者同源；技能不进宿主部署树。镜像要清除已删除的旧文件，不能只做增量合并，也不能就地修改副本。文档和脚本使用 PowerShell 7 / Windows 原生形式，保留 LF、无 BOM。
+
+## SE 宿主 API 出处
+
+本技能中的 `game:GetService`、`RunService.Heartbeat`、`TimerService:CreateTimer`、`Unit.Destroying`、`Unit.Name` 与 `Parent` 都是 SE 宿主 API。签名以消费方工程从 SE 导出的 `EggyAPI.lua` 为现场依据，公开手册取证见 spoke 仓库的 `docs/research/se-host-capabilities.md`；按这些证据保留原名称，不按其他平台的字面相似性猜测或替换。
+
+| API | 签名或用途 |
+| --- | --- |
+| `RunService.Heartbeat` | `Heartbeat:Connect(function(deltaTime) ... end)`；每逻辑帧触发，`deltaTime` 单位为秒 |
+| `TimerService:CreateTimer` | `CreateTimer(repeatCount, interval, execute, func)`；创建计时器，不是 Auto 树的驱动 |
+| `Unit.Destroying` | `Destroying:Connect(function() ... end)`；无事件参数，用于显式销毁边界 |
+
+`EggyAPI.lua` 是编辑器提示与类型辅助存根，不属于玩法代码，不要在业务脚本里 `require` 它。核心包保持零宿主依赖；这些 API 只落在消费方集成或 `spoke_eggy` 的宿主边界上。`EVENT.REPEAT_TIMEOUT` 是原点版口径；SE 的 Manual 树由消费方用 `Heartbeat` 驱动，Auto 树保持同步 inline flush。
 
 ## 默认 Auto-first
 

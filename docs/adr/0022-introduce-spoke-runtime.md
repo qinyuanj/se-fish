@@ -8,7 +8,7 @@
 
 - **落位 `common/packages/spoke/`**，模块前缀 `common.packages.spoke.`，消费方写 `require("common.packages.spoke.api")`。选择这里是因为 `deploy` 已经把三端 `packages/` 整棵镜像到宿主目录，落位即部署，不需要新增部署步骤。
 - **传递形态是纯拷贝**：不挂 submodule，不做 subtree。整仓 subtree 会把上游仓根的 `docs/`、`tests/`、`AGENTS.md` 一并带进 `packages/`，而 deploy 会原样镜像进宿主目录；split 后再 subtree 则每次同步都要在上游检出里手工 `git subtree split`。纯拷贝的代价是同步靠人，因此把上游 commit SHA 记在[官方包接入参考](../packages-reference.md) 的「自研包」一节，一次同步记一个 SHA。
-- **库与配套技能同源**：上游 `.agents/skills/spoke/` 破例复制进本仓 `.dsh/skills/spoke/`（`.gitignore` 的唯一例外条目），两者必须来自同一个上游 commit。副本原样引用、不就地改写：上游在 `19f1009` 已把技能改成面向消费方的写法（删掉 `testing.md` 与 `upstream-porting.md`，通篇不再出现「本仓」指代库仓库），只剩 `references/eggy-integration.md` 的「submodule 固定 SHA」一句不合本仓，由 `AGENTS.md` 的「按任务读取」一行覆盖。
+- **库与配套技能同源**：上游 `.agents/skills/spoke/` 破例复制进本仓 `.dsh/skills/spoke/`（`.gitignore` 的唯一例外条目），两者必须来自同一个上游 commit。副本原样引用、不就地改写：上游在 `19f1009` 已把技能改成面向消费方的写法（删掉 `testing.md` 与 `upstream-porting.md`，通篇不再出现「本仓」指代库仓库），当时只剩 `references/eggy-integration.md` 的「submodule 固定 SHA」一句不合本仓，由 `AGENTS.md` 的「按任务读取」一行覆盖；上游 `7605d7b`（2026-11-19）已把该句改为「消费方自选 submodule 或纯拷贝」，这一偏差随之消失。
 - **不搬测试、不跑测试**：上游 22 个 `*_spec.lua` 不进本仓；`require` 链与基本行为由 `tests/probes/spoke_load.lua` 探针覆盖，`tests/probes/` 不在任何 `.busted` 车道内（见 `.busted`）。
 - **不就地修改**这 35 个文件：要改回上游仓库改，再整体重新拷贝。
 - **本轮业务零改动**，且不限制后续使用范围：13 个类全部开放，用哪几个、管哪一种生命周期由后续业务自行决定。
