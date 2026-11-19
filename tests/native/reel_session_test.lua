@@ -4,16 +4,8 @@
 -- 旧 setUp 每个方法重跑一次（含 reload MgrReelIn、注入 Cast 桩、建两个玩家并 Begin），
 -- 因此映射为 describe 内的逐例 before_each/after_each，不是 suite 级 setup/teardown。
 
-local function signal()
-  local callbacks = {}
-  return {
-    Connect = function(_, fn)
-      callbacks[#callbacks + 1] = fn
-      return { Disconnect = function() end }
-    end,
-    Fire = function(_, ...) for _, fn in ipairs(callbacks) do fn(...) end end,
-  }
-end
+-- #231：RE / World 换成 tests/support/reel_env 的适配器——断开真实生效，存活订阅数对用例可读。
+local Reel = require('tests.support.reel_env')
 
 describe('收线会话管理器（MgrReelIn）', function()
   local env
@@ -21,23 +13,13 @@ describe('收线会话管理器（MgrReelIn）', function()
 
   before_each(function()
     -- 快照先于任何改动：before_each 中途失败时 after_each 仍能还原。
-    restore = {
-      RE = package.loaded['common.REUtil'],
-      mgr = package.loaded['server.Mgr.MgrReelIn'],
-      game = _G.game,
-    }
-    env = { events = {}, now = 0 }
-    package.loaded['common.REUtil'] = { GetRE = function(_, name)
-      if not env.events[name] then
-        env.events[name] = { OnServerEvent = signal(), FireClient = function(_, player, value)
-          player.messages[#player.messages + 1] = value
-        end }
-      end
-      return env.events[name]
-    end }
-    _G.game = { GetService = function(_, name)
-      if name == 'World' then return { GetServerTime = function() return env.now end } end
-    end }
+    restore = { mgr = package.loaded['server.Mgr.MgrReelIn'] }
+    env = Reel.new('server')
+    env:setUp()
+    -- 第一参是事件名；记录方式沿用旧夹具（玩家收件箱里只留 payload）
+    env.onFireClient = function(_, player, value)
+      player.messages[#player.messages + 1] = value
+    end
     package.loaded['server.Mgr.MgrReelIn'] = nil
     env.mgr = require('server.Mgr.MgrReelIn')
     env.cast = { Sessions = {}, FinishReel = function(_, player, id, outcome)
@@ -49,8 +31,10 @@ describe('收线会话管理器（MgrReelIn）', function()
     end }
     env.mgr.Cast = env.cast
     env.mgr:Start()
-    env.a = { UserId = 1, messages = {}, results = {}, CharacterAdded = signal(), CharacterRemoving = signal() }
-    env.b = { UserId = 2, messages = {}, results = {}, CharacterAdded = signal(), CharacterRemoving = signal() }
+    env.a = { UserId = 1, messages = {}, results = {},
+      CharacterAdded = Reel.signal(), CharacterRemoving = Reel.signal() }
+    env.b = { UserId = 2, messages = {}, results = {},
+      CharacterAdded = Reel.signal(), CharacterRemoving = Reel.signal() }
     for _, player in ipairs({ env.a, env.b }) do
       env.mgr:OnPlayerAdded(player)
       env.cast.Sessions[player.UserId] = { player = player, session = { phase = 'hooked', reelSession = 's' .. player.UserId } }
@@ -65,8 +49,7 @@ describe('收线会话管理器（MgrReelIn）', function()
       env.mgr:OnPlayerRemoving(env.b)
     end
     package.loaded['server.Mgr.MgrReelIn'] = restore and restore.mgr or nil
-    package.loaded['common.REUtil'] = restore and restore.RE or nil
-    _G.game = restore and restore.game or nil
+    if env then env:tearDown() end
     env = nil
     restore = nil
   end)
@@ -109,7 +92,7 @@ describe('收线会话管理器（MgrReelIn）', function()
   end)
 
   it('test_controller_died_clears_session_once', function()
-    local controller = { Died = signal() }
+    local controller = { Died = Reel.signal() }
     env.a.Character = { Controller = controller }
     env.a.CharacterAdded:Fire(env.a.Character)
     controller.Died:Fire()
@@ -201,7 +184,7 @@ describe('收线会话管理器（MgrReelIn）', function()
   it('test_old_player_removal_does_not_disconnect_replacement', function()
     local old = env.a
     local replacement = { UserId = 1, messages = {}, results = {},
-      CharacterAdded = signal(), CharacterRemoving = signal() }
+      CharacterAdded = Reel.signal(), CharacterRemoving = Reel.signal() }
     env.mgr:OnPlayerAdded(replacement)
     env.cast.Sessions[1] = { player = replacement,
       session = { phase = 'hooked', reelSession = 'next' } }
@@ -224,12 +207,17 @@ describe('收线会话管理器（MgrReelIn）', function()
 
   it('test_restart_cleans_connections_and_sessions', function()
     local first = env.mgr.REConnection
+    local subscriptions = env:subscriptionCount('ReelInRE')
     env.mgr:Start()
     assert.are.equal(first, env.mgr.REConnection)
+    -- 重复 Start 不叠监听：存活订阅数不变
+    assert.same(subscriptions, env:subscriptionCount('ReelInRE'))
     env.mgr:Stop()
     assert.is_nil(env.mgr.REConnection)
     assert.is_nil(env.mgr.Sessions[1])
     assert.is_nil(env.mgr.Connections[1])
+    -- Stop 的断开真实生效：入站订阅归零
+    assert.same(0, env:subscriptionCount('ReelInRE'))
     env.mgr:Start()
     assert.are_not.equal(first, env.mgr.REConnection)
   end)

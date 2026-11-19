@@ -2,16 +2,10 @@
 -- 被测接缝：client.LocalReelIn（客户端收线本地状态机 + 批次上报）。
 -- it 名字沿用旧方法名，注册顺序 = LuaUnit sortedPairs 的实际执行顺序。
 -- setUp/tearDown 逐例化为 before_each/after_each：旧 runner 每个方法都跑一次夹具。
+-- #231：RE / World / Heartbeat 换成 tests/support/reel_env 的适配器——断开真实生效，
+-- 存活订阅数与合批心跳连接数对用例可读（#234 / #232 的验收点依赖这两点）。
 
-local function signal()
-  local callbacks = {}
-  return { Connect = function(_, fn)
-    callbacks[#callbacks + 1] = fn
-    return { Disconnect = function() end }
-  end, Fire = function(_, value)
-    for _, fn in ipairs(callbacks) do fn(value) end
-  end }
-end
+local Reel = require('tests.support.reel_env')
 
 describe('客户端收线状态机（LocalReelIn）', function()
   -- ctx 承载旧 self 的字段；after_each 对未完成的 before_each 幂等。
@@ -20,25 +14,9 @@ describe('客户端收线状态机（LocalReelIn）', function()
 
   before_each(function()
     -- 先抓快照再动任何全局：夹具中途失败时 after_each 才有得还原。
-    restore = {
-      RE = package.loaded['common.REUtil'],
-      client = package.loaded['client.LocalReelIn'],
-      game = _G.game,
-    }
-    ctx = { sent = {}, events = {}, heartbeat = signal() }
-    local env = ctx
-    package.loaded['common.REUtil'] = { GetRE = function(_, name)
-      if not env.events[name] then
-        env.events[name] = { OnClientEvent = signal(), FireServer = function(_, payload)
-          env.sent[#env.sent + 1] = { name = name, payload = payload }
-        end }
-      end
-      return env.events[name]
-    end }
-    _G.game = { GetService = function(_, name)
-      if name == 'World' then return { GetServerTime = function() return env.now end } end
-      if name == 'RunService' then return { Heartbeat = env.heartbeat } end
-    end }
+    restore = { client = package.loaded['client.LocalReelIn'] }
+    ctx = Reel.new('client')
+    ctx:setUp()
     package.loaded['client.LocalReelIn'] = nil
     ctx.client = require('client.LocalReelIn')
     ctx.client:Start()
@@ -46,9 +24,8 @@ describe('客户端收线状态机（LocalReelIn）', function()
   end)
 
   after_each(function()
-    package.loaded['common.REUtil'] = restore and restore.RE or nil
     package.loaded['client.LocalReelIn'] = restore and restore.client or nil
-    _G.game = restore and restore.game or nil
+    if ctx then ctx:tearDown() end
     ctx = nil
     restore = nil
   end)
@@ -86,15 +63,28 @@ describe('客户端收线状态机（LocalReelIn）', function()
   it('test_restart_does_not_stack_listeners_or_leave_pending_clicks', function()
     local first = ctx.client.Connection
     local update = ctx.client.UpdateConnection
+    local subscriptions = ctx:subscriptionCount('ReelInRE')
+    local beats = ctx:heartbeatCount()
     ctx.client:Start()
     assert.are.equal(first, ctx.client.Connection)
     assert.are.equal(update, ctx.client.UpdateConnection)
+    -- 重复 Start 不叠监听：存活订阅数与心跳连接数都不变
+    assert.same(subscriptions, ctx:subscriptionCount('ReelInRE'))
+    assert.same(beats, ctx:heartbeatCount())
     ctx.client:SetSession('s1')
     ctx.client:Click()
     ctx.client:Stop()
     assert.is_nil(ctx.client.SessionId)
     assert.is_nil(ctx.client.Connection)
     assert.same({ name = 'CloseReelIn', payload = { session = 's1' } }, ctx.sent[#ctx.sent])
+    -- Stop 的断开真实生效：旧 RE / 心跳回调不再送达，存活连接归零
+    assert.same(0, ctx:subscriptionCount('ReelInRE'))
+    assert.same(0, ctx:heartbeatCount())
+    local sent = #ctx.sent
+    ctx.heartbeat:Fire()
+    ctx.events.ReelInRE.OnClientEvent:Fire({ action = 'started', session = 'late', progress = 50 })
+    assert.same(sent, #ctx.sent)
+    assert.is_nil(ctx.client.SessionId)
     ctx.client:Start()
     assert.are_not.equal(first, ctx.client.Connection)
   end)
