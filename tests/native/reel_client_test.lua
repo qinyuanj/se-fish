@@ -77,7 +77,11 @@ describe('客户端收线状态机（LocalReelIn）', function()
     -- 重复 Start 不叠监听：存活订阅数与心跳连接数都不变
     assert.same(subscriptions, ctx:subscriptionCount('ReelInRE'))
     assert.same(beats, ctx:heartbeatCount())
+    -- #232：合批心跳归会话 Phase 所有，还没有会话时一条都不该有
+    assert.same(0, ctx:heartbeatCount())
     ctx.client:SetSession('s1')
+    -- 设置会话返回时心跳已同步挂上
+    assert.same(1, ctx:heartbeatCount())
     ctx.client:Click()
     ctx.client:Stop()
     assert.is_nil(ctx.client.SessionId)
@@ -90,10 +94,10 @@ describe('客户端收线状态机（LocalReelIn）', function()
     ctx.events.ReelInRE.OnClientEvent:Fire({ action = 'started', session = 'late', progress = 50 })
     assert.same(sent, #ctx.sent)
     assert.is_nil(ctx.client.SessionId)
-    -- 重启得到一条全新的订阅与一份全新的心跳
+    -- 重启得到一条全新的订阅；心跳则要等会话重新出现（#232）
     ctx.client:Start()
     assert.same(1, ctx:subscriptionCount('ReelInRE'))
-    assert.same(1, ctx:heartbeatCount())
+    assert.same(0, ctx:heartbeatCount())
   end)
 
   it('test_stop_then_start_rebuilds_the_session_from_clean_input', function()
@@ -165,5 +169,83 @@ describe('客户端收线状态机（LocalReelIn）', function()
     assert.same({ { name = 'ReelInRE', payload = { s = 's1', n = 1, q = 1 } } }, ctx.sent)
     assert.same('s1', ctx.client.SessionId)
     assert.is_not_nil(ctx.client.Display)
+    -- #232：Suspend 只 flush，会话与合批心跳都还在，之后的点击仍能按窗口上行
+    assert.same(1, ctx:heartbeatCount())
+    ctx.client:Click()
+    ctx.now = 0.11
+    ctx.heartbeat:Fire()
+    assert.same({ name = 'ReelInRE', payload = { s = 's1', n = 1, q = 2 } }, ctx.sent[#ctx.sent])
+  end)
+
+  it('test_no_batching_heartbeat_until_a_live_session_exists', function()
+    -- #232：合批心跳由会话 Phase 拥有——没有有效会话时不存在这条逐帧回调，空闲不承担逐帧开销
+    assert.same(0, ctx:heartbeatCount())
+    ctx.now = 0.5
+    ctx.client:Click()
+    ctx.heartbeat:Fire()
+    assert.same(0, #ctx.sent)
+    -- started 返回时心跳已同步挂上：紧随其后的一次点击在同一帧内就能被收拢，到窗口照常上行
+    ctx.events.ReelInRE.OnClientEvent:Fire({ action = 'started', session = 's1', progress = 50, q = 0 })
+    assert.same(1, ctx:heartbeatCount())
+    ctx.client:Click()
+    ctx.now = 0.61
+    ctx.heartbeat:Fire()
+    assert.same({ name = 'ReelInRE', payload = { s = 's1', n = 1, q = 1 } }, ctx.sent[1])
+    assert.same(1, #ctx.sent)
+  end)
+
+  it('test_replacing_the_session_remounts_a_single_heartbeat_from_clean_input', function()
+    ctx.client:SetSession('s1')
+    assert.same(1, ctx:heartbeatCount())
+    ctx.client:Click()                       -- s1 的待发点击
+    ctx.client:SetSession('s2')
+    -- 先清旧再挂新：同一时刻最多一条，不是两条叠加
+    assert.same(1, ctx:heartbeatCount())
+    ctx.now = 0.2
+    ctx.heartbeat:Fire()
+    assert.same(0, #ctx.sent)                -- 待发点击不继承给新会话
+    ctx.client:Click()
+    ctx.now = 0.31
+    ctx.heartbeat:Fire()
+    assert.same({ name = 'ReelInRE', payload = { s = 's2', n = 1, q = 1 } }, ctx.sent[1])
+    assert.same(1, #ctx.sent)
+  end)
+
+  it('test_every_ending_path_takes_the_batching_heartbeat_with_it', function()
+    local function hook(id)
+      ctx.events.ReelInRE.OnClientEvent:Fire({ action = 'started', session = id, progress = 50, q = 0 })
+      assert.same(1, ctx:heartbeatCount())
+      ctx.client:Click()
+    end
+    -- 上岸
+    hook('a')
+    ctx.events.ReelInRE.OnClientEvent:Fire({ action = 'landed', session = 'a', progress = 100, q = 1 })
+    assert.same(0, ctx:heartbeatCount())
+    -- 脱钩
+    hook('b')
+    ctx.events.ReelInRE.OnClientEvent:Fire({ action = 'unhooked', session = 'b', progress = 0, q = 0 })
+    assert.same(0, ctx:heartbeatCount())
+    -- 清理
+    hook('c')
+    ctx.client:Clear('c')
+    assert.same(0, ctx:heartbeatCount())
+    -- 关闭
+    hook('d')
+    ctx.client:Close()
+    assert.same(0, ctx:heartbeatCount())
+    -- 四条路径之后都不再有任何上行
+    local sent = #ctx.sent
+    ctx.now = 5
+    ctx.client:Click()
+    ctx.heartbeat:Fire()
+    assert.same(sent, #ctx.sent)
+    assert.is_nil(ctx.client.SessionId)
+  end)
+
+  it('test_close_without_pending_sends_no_empty_batch', function()
+    ctx.client:SetSession('s1')
+    ctx.client:Close()
+    -- 无待发点击时不伪造空批次，仍然只发关闭请求
+    assert.same({ { name = 'CloseReelIn', payload = { session = 's1' } } }, ctx.sent)
   end)
 end)
