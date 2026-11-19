@@ -17,8 +17,7 @@ function LocalReelIn:SetSession(id)
     self.Aggregator = RateLimit.NewAggregator({ SessionId = id,
         AggregateSec = GameCfg.HighFreqInput.AggregateSec })
     self.Display = ReelDisplay.New(self.World:GetServerTime(), GameCfg.ReelIn)
-    -- 会话 State 是「会话有效」Phase 的唯一挂载条件：写它 = 挂上合批心跳。
-    -- 聚合器必须先就位，新心跳挂上来的那一刻就能收拢点击；这里同步写完，返回时心跳已在。
+    -- #232 聚合器先就位再写会话 State：心跳挂上的同一时刻就能收拢点击。
     self.Session:set(id)
     return true
 end
@@ -56,7 +55,7 @@ function LocalReelIn:Close(id)
     self.Aggregator = nil
     self.Display = nil
     if payload then self.RE:FireServer(payload) end
-    -- 会话失效：Phase 条件转假，合批心跳同步拆除；此后不再产生任何上行，再发关闭请求。
+    -- #232 会话 State 清空即拆心跳，且排在 CloseReelIn 之前：之后不再产生任何上行。
     self.Session:set(nil)
     self.CloseRE:FireServer({ session = session })
 end
@@ -74,13 +73,10 @@ function LocalReelIn:Clear(id)
     self.SessionId = nil
     self.Aggregator = nil
     self.Display = nil
-    -- 上岸 / 脱钩 / 清理都走这里：会话失效，合批心跳随之消失。
-    -- 与 Close 不同，这条路径不 flush、不发 CloseReelIn（既有上行序列）。
+    -- #232 上岸 / 脱钩 / 清理都走这里：会话失效即拆心跳；与 Close 不同，这条路径不 flush、不发 CloseReelIn。
     self.Session:set(nil)
 end
 
--- 一条入站事件的业务处理。它由树里的 Effect 调用，不直接挂在 RE 连接上：
--- 这里抛出的执行期错误会进 tree.fault（树级故障），不会甩回宿主的事件回调。
 function LocalReelIn:HandleInbound(payload)
     if type(payload) ~= 'table' or type(payload.session) ~= 'string' then return end
     if payload.action == 'started' then
@@ -95,38 +91,38 @@ function LocalReelIn:HandleInbound(payload)
     end
 end
 
--- 停止：先走既有结束顺序（Close 送出待发批次与 CloseReelIn），再统一销毁树与各处连接。
+-- 先走既有结束顺序（Close 送出待发批次与 CloseReelIn），再销毁树。
 function LocalReelIn:Stop()
     self:Close()
     if self.Tree then
         self.Tree:dispose()
         self.Tree = nil
     end
-    -- 合批心跳由会话 Phase 拥有，dispose 已经把它连同 RE 订阅一起断干净，这里没有单独要收的连接。
+    -- 心跳与 RE 订阅都由树持有，dispose 已一并断开，这里没有单独的连接要收。
     self.Session = nil
     self.World = nil
     self.RE = nil
     self.CloseRE = nil
 end
 
--- 启停与入站订阅交给一棵 Auto 树持有：重复 Start 不叠加订阅，Stop 之后 Start 得到一棵全新的树。
+-- 订阅由一棵 Auto 树持有（#234）：重复 Start 不叠加，Stop 之后 Start 得到新树。
 function LocalReelIn:Start()
     if self.Tree then return end
     self.World = game:GetService('World')
     self.RE = REUtil:GetRE(self.CHANNEL)
     self.CloseRE = REUtil:GetRE('CloseReelIn')
-    -- 收线会话：字符串 id；nil 表示没有有效会话。两参数的 State.new 才是「名字 + 初值」，
-    -- 只写 State.new('session') 会把 'session' 当成初值。
+    -- #232 两参数的 State.new 才是「名字 + 初值」；只写 State.new('session') 会把 'session' 当成初值。
     self.Session = State.new('session', nil)
-    -- RE 回调只登记载荷并唤醒 Trigger，真正的处理在树里的 Effect 里跑。
-    -- 队列与 Trigger 都是本次 Start 私有的：旧连接即使有残留送达，也只写进没人读的队列。
+    -- RE 回调只登记载荷并唤醒 Trigger，处理在树里的 Effect 里跑：执行期错误才进 tree.fault，不甩回宿主（#234）。
     local inbox = {}
     local inbound = Trigger.new('LocalReelIn.Inbound')
     self.Tree = SpokeTree.spawn('LocalReelIn', LambdaEpoch.new(function(s)
         -- 宿主连接只有 Disconnect、不是 disposable：用 s:use 会在 Init 期 fault 整棵树，只能走 on_cleanup。
         local connection = self.RE.OnClientEvent:Connect(function(payload)
+            -- 树 fault 后 Effect 不再被调度，入队只进不出；连接仍在，这里直接丢弃，免 inbox 无界增长。
+            if self.Tree and self.Tree.fault then return end
             inbox[#inbox + 1] = payload
-            inbound:invoke(payload)
+            inbound:invoke()
         end)
         s:on_cleanup(function() connection:Disconnect() end)
         s:call(Effect.new(function()
@@ -134,15 +130,13 @@ function LocalReelIn:Start()
                 self:HandleInbound(table.remove(inbox, 1))
             end
         end, inbound))
-        -- 合批心跳：Phase 是它唯一的生命周期拥有者——会话有效才有这条逐帧回调，会话结束就拆掉。
-        -- 条件直接给会话 State（非 nil 即真），不能写成 Memo(session ~= nil)：s1→s2 会被归约成
-        -- true→true 而不重跑，旧心跳就带着旧会话活下去了。直接给 State，换会话的值变化才会触发重挂：
-        -- 上一轮 on_cleanup 按逆序跑完才进新块，同一时刻最多一条。
+        -- #232 心跳由会话 Phase 拥有：会话有效才有这条逐帧回调，结束即拆、换会话即重挂。
+        -- 条件必须直接给 State：写成 Memo(session ~= nil) 会把 s1→s2 归约成 true→true 而不重跑，
+        -- 旧心跳就带着旧会话活下去了。
         s:call(Phase.new(self.Session, function(ps)
-            -- 会话 id 在挂载时捕获：cleanup 里再读 State 读到的是新会话，闭包只认自己这一轮。
-            local session = self.Session:now()
+            local session = self.Session:now() -- 挂载时捕获：cleanup 里再读 State 读到的是新会话
             local heartbeat = game:GetService('RunService').Heartbeat:Connect(function()
-                if self.SessionId == session and self.Aggregator then
+                if self.SessionId == session then
                     self:Send(self.Aggregator:Collect(self.World:GetServerTime()))
                 end
             end)

@@ -9,7 +9,6 @@
 --   local env = Reel.new('client')        -- 或 'server'；缺省 'client'
 --   env:setUp() / env:tearDown()          -- 装/还原 _G.game、package.loaded['common.REUtil']、_G.REUtil
 --   env.now                               -- 假时钟；World:GetServerTime() 读它，可直接赋值
---   env:advance(seconds)                  -- now = now + seconds，返回新 now
 --   env.sent                              -- 有序上行记录
 --                                         --   client: { name, payload }
 --                                         --   server: { name, player, payload }
@@ -19,8 +18,6 @@
 --   env.world                             -- World 服务（GetServerTime，可挂 CreateUnit 等）
 --   env.heartbeat                         -- RunService.Heartbeat
 --   env:serve(name, service)              -- 注册额外服务（如 CameraService）
---   env:inbound(name)                     -- 该 role 的入站 signal（client: OnClientEvent；server: OnServerEvent）
---   env:fire(name, ...)                   -- 触发入站 signal；server 侧第一个显式参数仍是 player
 --   env:subscriptionCount(name)           -- 入站 signal 的当前存活订阅数（重复 Start 不增加用这条）
 --   env:heartbeatCount()                  -- 当前存活的 Heartbeat 连接数（无会话时为 0 用这条）
 --   env.onFireServer(name, payload)       -- 可选钩子：client 每次 FireServer 后调用
@@ -167,32 +164,16 @@ function Env:remote(name)
   return remote
 end
 
---- 该 role 的入站 signal：client 是 OnClientEvent，server 是 OnServerEvent。
-function Env:inbound(name)
-  local remote = self:remote(name)
-  if self.role == 'server' then return remote.OnServerEvent end
-  return remote.OnClientEvent
-end
-
---- 触发入站 signal；server 侧的第一个显式参数仍是 player。
-function Env:fire(name, ...)
-  return self:inbound(name):Fire(...)
-end
-
 --- 入站 signal 的当前存活订阅数（重复 Start 不叠加订阅用这条）。
 function Env:subscriptionCount(name)
-  return self:inbound(name):Count()
+  local remote = self:remote(name)
+  if self.role == 'server' then return remote.OnServerEvent:Count() end
+  return remote.OnClientEvent:Count()
 end
 
 --- 当前存活的 Heartbeat 连接数（无会话时为 0 用这条）。
 function Env:heartbeatCount()
   return self.heartbeat:Count()
-end
-
---- 推进假时钟；也可直接写 env.now。
-function Env:advance(seconds)
-  self.now = self.now + seconds
-  return self.now
 end
 
 return M

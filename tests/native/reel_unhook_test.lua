@@ -9,7 +9,7 @@
 
 local moduleNames = { 'common.REUtil', 'server.Mgr.MgrPlayerData', 'server.Mgr.MgrFishUnit' }
 
--- #231：RE / World 换成 tests/support/reel_env 的适配器——断开真实生效。
+-- #231 夹具语义见 tests/support/reel_env.lua 顶部。
 local Reel = require('tests.support.reel_env')
 
 local function vec(x, y, z)
