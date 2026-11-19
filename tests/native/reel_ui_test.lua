@@ -5,8 +5,7 @@
 -- 再 loadfile ScreenMain 处理器并塞进 package.loaded；最后 loadfile MgrGameUI（它把 _G.MgrGameUI
 -- 与界面节点绑上），才能 OpenScreen('ScreenMain')。
 
--- #231：RE / World / Heartbeat 换成 tests/support/reel_env 的适配器——断开真实生效，
--- 存活订阅数与合批心跳连接数对用例可读。
+-- #231 夹具语义见 tests/support/reel_env.lua 顶部。
 
 local Reel = require('tests.support.reel_env')
 

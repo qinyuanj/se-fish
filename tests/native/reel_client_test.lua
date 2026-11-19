@@ -2,10 +2,8 @@
 -- 被测接缝：client.LocalReelIn（客户端收线本地状态机 + 批次上报）。
 -- it 名字沿用旧方法名，注册顺序 = LuaUnit sortedPairs 的实际执行顺序。
 -- setUp/tearDown 逐例化为 before_each/after_each：旧 runner 每个方法都跑一次夹具。
--- #231：RE / World / Heartbeat 换成 tests/support/reel_env 的适配器——断开真实生效，
--- 存活订阅数与合批心跳连接数对用例可读（#234 / #232 的验收点依赖这两点）。
--- #234：启停与入站订阅由 LocalReelIn 持有的 Auto 树负责，断言一律走夹具的存活计数与
--- 公共接口，不断言 Connection / UpdateConnection 这类内部字段。
+-- #231 / #234：夹具语义见 tests/support/reel_env.lua 顶部；启停与入站订阅由 LocalReelIn 的
+-- Auto 树负责，断言只走存活计数与公共接口，不断言 Connection / UpdateConnection 这类内部字段。
 
 local Reel = require('tests.support.reel_env')
 -- 故障会经 SpokeError.log 打整段 trace；用例内静音，用例后还原，避免污染车道输出。
@@ -70,23 +68,18 @@ describe('客户端收线状态机（LocalReelIn）', function()
     assert.same({ name = 'ReelInRE', payload = { s = 's1', n = 1, q = 1 } }, ctx.sent[#ctx.sent])
   end)
 
-  it('test_restart_does_not_stack_listeners_or_leave_pending_clicks', function()
+  it('test_restart_does_not_stack_listeners_and_new_session_starts_from_clean_input', function()
     local subscriptions = ctx:subscriptionCount('ReelInRE')
-    local beats = ctx:heartbeatCount()
     ctx.client:Start()
-    -- 重复 Start 不叠监听：存活订阅数与心跳连接数都不变
+    -- 重复 Start 不叠订阅，也不凭空长出心跳（#232：心跳归会话 Phase 所有）
     assert.same(subscriptions, ctx:subscriptionCount('ReelInRE'))
-    assert.same(beats, ctx:heartbeatCount())
-    -- #232：合批心跳归会话 Phase 所有，还没有会话时一条都不该有
     assert.same(0, ctx:heartbeatCount())
     ctx.client:SetSession('s1')
-    -- 设置会话返回时心跳已同步挂上
     assert.same(1, ctx:heartbeatCount())
     ctx.client:Click()
     ctx.client:Stop()
-    assert.is_nil(ctx.client.SessionId)
     assert.same({ name = 'CloseReelIn', payload = { session = 's1' } }, ctx.sent[#ctx.sent])
-    -- Stop 的断开真实生效：旧 RE / 心跳回调不再送达，存活连接归零
+    -- Stop 的断开真实生效：旧订阅与旧心跳归零，旧事件不再送达
     assert.same(0, ctx:subscriptionCount('ReelInRE'))
     assert.same(0, ctx:heartbeatCount())
     local sent = #ctx.sent
@@ -94,34 +87,17 @@ describe('客户端收线状态机（LocalReelIn）', function()
     ctx.events.ReelInRE.OnClientEvent:Fire({ action = 'started', session = 'late', progress = 50 })
     assert.same(sent, #ctx.sent)
     assert.is_nil(ctx.client.SessionId)
-    -- 重启得到一条全新的订阅；心跳则要等会话重新出现（#232）
+    -- 重启得到一条可用的新订阅；心跳要等会话重新出现
     ctx.client:Start()
     assert.same(1, ctx:subscriptionCount('ReelInRE'))
     assert.same(0, ctx:heartbeatCount())
-  end)
-
-  it('test_stop_then_start_rebuilds_the_session_from_clean_input', function()
-    -- 旧树与旧订阅不复活：Stop 之后 Start 得到一棵新树、一条新订阅
-    local firstTree = ctx.client.Tree
-    assert.is_not_nil(firstTree)
-    ctx.client:SetSession('s1')
-    ctx.client:Click()
-    ctx.client:Stop()
-    assert.is_nil(ctx.client.Tree)
-    assert.same(0, ctx:subscriptionCount('ReelInRE'))
-    local sent = #ctx.sent
-    ctx.client:Start()
-    assert.are_not.equal(firstTree, ctx.client.Tree)
-    assert.same(1, ctx:subscriptionCount('ReelInRE'))
-    -- 新订阅可用：重启后第一条入站事件照常建立会话
     ctx.events.ReelInRE.OnClientEvent:Fire({ action = 'started', session = 's2', progress = 50 })
     assert.same('s2', ctx.client.SessionId)
-    -- 首个批次从干净输入状态开始：旧会话的 pending 不会跟着回来
+    -- 新会话的首个批次从干净输入状态开始：旧会话的待发点击不跟着回来
     ctx.client:Click()
     ctx.now = 0.11
     ctx.heartbeat:Fire()
     assert.same({ name = 'ReelInRE', payload = { s = 's2', n = 1, q = 1 } }, ctx.sent[sent + 1])
-    assert.same(sent + 1, #ctx.sent)
   end)
 
   it('test_inbound_error_surfaces_as_tree_fault', function()

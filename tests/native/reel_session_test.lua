@@ -4,7 +4,7 @@
 -- 旧 setUp 每个方法重跑一次（含 reload MgrReelIn、注入 Cast 桩、建两个玩家并 Begin），
 -- 因此映射为 describe 内的逐例 before_each/after_each，不是 suite 级 setup/teardown。
 
--- #231：RE / World 换成 tests/support/reel_env 的适配器——断开真实生效，存活订阅数对用例可读。
+-- #231 夹具语义见 tests/support/reel_env.lua 顶部。
 local Reel = require('tests.support.reel_env')
 
 describe('收线会话管理器（MgrReelIn）', function()
