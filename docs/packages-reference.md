@@ -63,6 +63,18 @@
 | 升级 | 从上游检出整体重拷 `common/packages/spoke/` 与技能，再更新本表 SHA |
 | 约束 | 不就地修改包内文件；不搬上游 `tests/`；不改写上游技能 |
 
+`spoke_eggy` 是同一次同步引入的 SE 宿主层，独立成包、不嵌进核心，边界见 [ADR-0024](adr/0024-introduce-spoke-eggy-host-package.md)。
+
+| 项 | 值 |
+|---|---|
+| 用途 | SE 宿主装配：树随 `Unit.Destroying` 销毁（先翻 `is_alive` 再 detach）、带树名前缀的 logger、`State<boolean> is_alive` |
+| 落位 | `common/packages/spoke_eggy/`，门面 `require("common.packages.spoke_eggy.api")`；不进核心 `api.lua` 的 13 类 |
+| 上游 | 同 `spoke` 仓，与核心包同一次同步 |
+| 上游 commit | 与 `spoke` 相同：`4d10e907e0e2669ba53b9ad822eec4b9aa73b96a`（2026-11-19） |
+| 依赖 | 只 require `common.packages.spoke.*`（门面与 `runtime.spoke_error`）；核心不反向 require |
+| 升级 | 与 `spoke` 一起整体重拷，不单独记 SHA |
+| 约束 | 不就地修改；不搬上游 `tests/host/spoke_eggy_spec.lua`，加载与生命周期由 `tests/probes/spoke_eggy_load.lua` 覆盖 |
+
 ## 架构图上的位置
 
 三端 `packages/` 不进业务范围：`uml-quality.json` 的 `exclude` 与 `policy.edn` 的 `:exclude` 都把包排除，质量工具不度量、架构图上不建类；业务对包的 `require` 经 `:foreign [client.packages common.packages server.packages]` 收成外部椭圆。分层门禁不跟着退：`tools/arch_policy.lua` 仍要求包内每个模块可分类，包内循环照旧豁免。决策与后果见 [ADR-0021](adr/0021-packages-outside-business-scope.md)（取代 [ADR-0010](adr/0010-packages-as-business-code.md)）。
