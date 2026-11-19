@@ -22,7 +22,18 @@ Manual 只保留给三种场景：高频写入合并（一帧内多次写同一�
 
 - Auto 树 `SpokeTree.spawn` 返回时首帧渲染已经同步完成，不需要额外动作。
 - Manual 树 spawn 只同步跑 root Init，通常立即补一次 `tree:flush()` 完成 Effect 挂载；否则早于首帧的宿主事件会撞上尚未挂载的结构（Dock 为 nil）。之后由消费方帧节拍驱动 `tick()` / `flush()`。
-- 退出、换场景、面板销毁时显式 `tree:dispose()`；宿主不会自动拆树，detach 逆序清理整棵子树。
+- 树要跟随 Unit 的显式销毁（含父级销毁级联）时，用与核心包平级的 `spoke_eggy`：
+
+```lua
+local spoke_eggy = require("common.packages.spoke_eggy.api")
+local behaviour = spoke_eggy.behaviour(unit, function(s, self)
+  -- init 收到 EffectBuilder 与 Behaviour；返回值会被丢弃
+end, { name = "Panel" })
+```
+
+  `behaviour()` 返回前首帧已经完成。handle 提供 `root`、`is_alive` 和幂等的 `dispose()`：`Destroying` 先把 `is_alive` 设为 false 并刷新仍挂载的 Auto 树，再拆树、断开连接。树名按 `options.name`、非空 `Unit.Name`、`"SpokeBehaviour"` 回落。init 故障留在 `behaviour.root.fault`，不抛给宿主。
+- 没有 Unit 生命周期时不要用 `spoke_eggy`，直接 `SpokeTree.spawn`。Manual 树也不进这个包：消费方自己 `spawn_manual`、连接 `Destroying`，并用 `RunService.Heartbeat` 驱动。两种情况下，退出点都要显式 `dispose()`。
+- `is_alive` 只表示这次显式销毁。关局、换场景不触发 `Destroying`，包内也没有关局总线；需要那种清理时必须另有已取证触发点。`Destroying` 回调里 `Parent` 可能已是 nil，回调只使用连接时捕获的 handle。
 
 ## 组合模式
 
@@ -41,5 +52,6 @@ Manual 只保留给三种场景：高频写入合并（一帧内多次写同一�
 1. 是否默认使用多棵小 Auto 树，而 Manual 有明确理由？
 2. 结构变化和值变化是否分别走静态 Trigger 与动态 signal？
 3. 是否只捕获 ports / Dock，而没有在窗口后调用密封 builder？
-4. 多状态写入是否 batch，树退出是否 dispose？
-5. `common/packages/spoke/` 是否零改动？部署路径与 require 前缀是否逐字一致？
+4. 多状态写入是否 batch；跟随 Unit 的树是否交给 `spoke_eggy`，其余树是否有明确 `dispose()`？
+5. 是否把关局或换场景清理误挂在 `is_alive` 上？
+6. `common/packages/spoke/` 与 `spoke_eggy` 是否都保持原样？各自部署路径与 require 前缀是否逐字一致？

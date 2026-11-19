@@ -59,7 +59,7 @@
 | 用途 | 响应式运行时与生命周期管理（Epoch / Ticker / SpokeTree / Dock / Trigger / State / Effect / Memo / Phase） |
 | 落位 | `common/packages/spoke/`，门面 `require("common.packages.spoke.api")` |
 | 上游 | 同级仓库 `spoke` |
-| 上游 commit | `4d10e907e0e2669ba53b9ad822eec4b9aa73b96a`（2026-11-19）；纯拷贝，一次同步记一个 SHA；库与 `.dsh/skills/spoke/` 技能必须同源 |
+| 上游 commit | `40234c7a05b48fa292c57d0c90e18c214c7f3365`（2026-11-19）；纯拷贝，一次同步记一个 SHA；库与 `.dsh/skills/spoke/` 技能必须同源 |
 | 升级 | 从上游检出整体重拷 `common/packages/spoke/` 与技能，再更新本表 SHA |
 | 约束 | 不就地修改包内文件；不搬上游 `tests/`；不改写上游技能 |
 
@@ -70,7 +70,7 @@
 | 用途 | SE 宿主装配：树随 `Unit.Destroying` 销毁（先翻 `is_alive` 再 detach）、带树名前缀的 logger、`State<boolean> is_alive` |
 | 落位 | `common/packages/spoke_eggy/`，门面 `require("common.packages.spoke_eggy.api")`；不进核心 `api.lua` 的 13 类 |
 | 上游 | 同 `spoke` 仓，与核心包同一次同步 |
-| 上游 commit | 与 `spoke` 相同：`4d10e907e0e2669ba53b9ad822eec4b9aa73b96a`（2026-11-19） |
+| 上游 commit | 与 `spoke` 相同：`40234c7a05b48fa292c57d0c90e18c214c7f3365`（2026-11-19） |
 | 依赖 | 只 require `common.packages.spoke.*`（门面与 `runtime.spoke_error`）；核心不反向 require |
 | 升级 | 与 `spoke` 一起整体重拷，不单独记 SHA |
 | 约束 | 不就地修改；不搬上游 `tests/host/spoke_eggy_spec.lua`，加载与生命周期由 `tests/probes/spoke_eggy_load.lua` 覆盖 |

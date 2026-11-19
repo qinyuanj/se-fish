@@ -42,7 +42,7 @@ tree:dispose()                -- 面板销毁时必须调用
 | --- | --- |
 | 驱动树、生命周期、调度顺序、坐标、Dock、故障 | `references/runtime.md` |
 | Trigger、State、Effect、Reaction、Memo、Phase 的响应式行为 | `references/reactive.md` |
-| 落位部署、EUI 面板、宿主事件、batch、销毁 | `references/eggy-integration.md` |
+| 落位部署、EUI 面板、宿主事件、batch、`spoke_eggy` 与销毁边界 | `references/eggy-integration.md` |
 
 Effect 重跑、batch、Dock 这几处同时跨运行时与响应式，遇到它们就两边都读。
 
@@ -70,9 +70,11 @@ builder（`s`）只在 Init/Tick/Bootstrap 窗口内有效：跨窗口只捕获 
 
 一次宿主事件写多个 State 时，用 `SpokeRuntime.batch(fn)` 包住（深 require `common.packages.spoke.runtime.spoke_runtime`）：Auto 树的 flush 推迟到最外层返回，同时依赖多个值的 Effect 因此只跑一次。
 
-面板销毁、退出、换场景时显式 `tree:dispose()`；宿主不会替你拆树，detach 逆序清理整棵子树。
+树挂在 Unit 上、并要随该 Unit 显式销毁时，用 `spoke_eggy.behaviour(unit, init [, options])`：它在 `Destroying` 时先把 `is_alive` 翻成 false 并完成这次 Auto 刷新，再 `dispose()`。没有 Unit 生命周期就继续 `SpokeTree.spawn`，由消费方在明确退出点调用 `tree:dispose()`。
 
-完成标准：多写事件有 batch，并能说清不批会多跑哪几次；每棵树都有明确的 dispose 调用点。
+关局和换场景没有 author 回调，`spoke_eggy` 也收不到，因此都不构成自动清理。需要跨关局的清理时，另找已取证的触发点；没有触发点就写明未核对，不把清理挂在 `is_alive` 上。
+
+完成标准：多写事件有 batch，并能说清不批会多跑哪几次；每棵树要么由 `spoke_eggy` 覆盖一次显式销毁，要么有明确的 `dispose()` 调用点，且关局清理没有误挂在 `is_alive` 上。
 
 ### 5. 按可观察行为验收
 
