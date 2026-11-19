@@ -5,21 +5,16 @@
 -- 再 loadfile ScreenMain 处理器并塞进 package.loaded；最后 loadfile MgrGameUI（它把 _G.MgrGameUI
 -- 与界面节点绑上），才能 OpenScreen('ScreenMain')。
 
-local moduleNames = { 'common.REUtil', 'common.Util', 'client.GameUI',
+-- #231：RE / World / Heartbeat 换成 tests/support/reel_env 的适配器——断开真实生效，
+-- 存活订阅数与合批心跳连接数对用例可读。
+
+local Reel = require('tests.support.reel_env')
+
+local moduleNames = { 'common.Util', 'client.GameUI',
   'client.ScreenHandlers.ScreenMain', 'client.LocalReelIn' }
 
-local globalNames = { 'game', 'Vector2', 'Vector3', 'Color', 'REUtil', 'GameUI',
-  'LocalReelIn', 'MgrGameUI' }
-
-local function signal()
-  local listeners = {}
-  return { Connect = function(_, fn)
-    listeners[#listeners + 1] = fn
-    return { Disconnect = function() end }
-  end, Fire = function(_, ...)
-    for _, fn in ipairs(listeners) do fn(...) end
-  end }
-end
+-- game 与 REUtil 由夹具 setUp/tearDown 负责，这里只快照其余的全局。
+local globalNames = { 'Vector2', 'Vector3', 'Color', 'GameUI', 'LocalReelIn', 'MgrGameUI' }
 
 describe('收线界面表现（ScreenMain × LocalReelIn × MgrGameUI）', function()
   local env
@@ -34,26 +29,22 @@ describe('收线界面表现（ScreenMain × LocalReelIn × MgrGameUI）', funct
     for _, name in ipairs(moduleNames) do
       restore[name] = package.loaded[name]
     end
-    env = { events = {}, sent = {}, nodes = {}, heartbeat = signal(), now = 0 }
-    local world = { GetServerTime = function() return env.now end }
+    env = Reel.new('client')
+    env.nodes = {}
     env.projected = { x = 960, y = 540, z = 4 }
     env.camera = { WorldToViewportPoint = function(_, position)
       env.lastProjected = position
       return env.projected, true
     end }
-    function world:CreateUnit(kind, attrs)
-      local node = { Kind = kind, OnClicked = signal() }
+    env:serve('CameraService', env.camera)
+    function env.world:CreateUnit(kind, attrs)
+      local node = { Kind = kind, OnClicked = Reel.signal() }
       for key, value in pairs(attrs) do node[key] = value end
       function node:Destroy() self.Destroyed = true end
       env.nodes[node.Name] = node
       return node
     end
-    _G.game = { GetService = function(_, name)
-      if name == 'World' then return world end
-      if name == 'RunService' then return { Heartbeat = env.heartbeat } end
-      if name == 'CameraService' then return env.camera end
-      return {}
-    end }
+    env:setUp()
     _G.Vector2 = { New = function(x, y) return { x = x, y = y } end }
     _G.Vector3 = { New = function(x, y, z) return { x = x, y = y, z = z } end }
     _G.Color = { New = function(...) return { ... } end }
@@ -65,16 +56,6 @@ describe('收线界面表现（ScreenMain × LocalReelIn × MgrGameUI）', funct
     _G.GameUI = { GetEuiManager = function() return {
       GetDeviceResolution = function() return { x = 1920, y = 1080 } end,
     } end, GetUIRoot = function() return uiRoot end }
-    local remote = { GetRE = function(_, name)
-      if not env.events[name] then
-        env.events[name] = { OnClientEvent = signal(), FireServer = function(_, payload)
-          env.sent[#env.sent + 1] = { name = name, payload = payload }
-        end }
-      end
-      return env.events[name]
-    end }
-    _G.REUtil = remote
-    package.loaded['common.REUtil'] = remote
     package.loaded['common.Util'] = {}
     package.loaded['client.GameUI'] = _G.GameUI
     env.reel = assert(loadfile('client/LocalReelIn.lua'))()
@@ -93,6 +74,7 @@ describe('收线界面表现（ScreenMain × LocalReelIn × MgrGameUI）', funct
     for _, name in ipairs(globalNames) do
       _G[name] = restore[name]
     end
+    if env then env:tearDown() end
     env = nil
     restore = nil
   end)

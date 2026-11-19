@@ -9,16 +9,8 @@
 
 local moduleNames = { 'common.REUtil', 'server.Mgr.MgrPlayerData', 'server.Mgr.MgrFishUnit' }
 
-local function signal()
-  local callbacks = {}
-  return {
-    Connect = function(_, fn)
-      callbacks[#callbacks + 1] = fn
-      return { Disconnect = function() end }
-    end,
-    Fire = function(_, ...) for _, fn in ipairs(callbacks) do fn(...) end end,
-  }
-end
+-- #231：RE / World 换成 tests/support/reel_env 的适配器——断开真实生效。
+local Reel = require('tests.support.reel_env')
 
 local function vec(x, y, z)
   return { x = x, y = y, z = z }
@@ -29,26 +21,18 @@ describe('脱钩后收回鱼线（MgrCast × MgrReelIn）', function()
   local restore
 
   before_each(function()
-    restore = { game = rawget(_G, 'game'), Vector3 = rawget(_G, 'Vector3') }
+    restore = { Vector3 = rawget(_G, 'Vector3') }
     for _, name in ipairs(moduleNames) do
       restore[name] = package.loaded[name]
     end
-    env = { now = 0, events = {}, messages = {}, spawned = {}, facts = {} }
+    env = Reel.new('server')
+    env.messages, env.spawned, env.facts = {}, {}, {}
+    env:setUp()
+    -- 第一参是事件名；记录方式沿用旧夹具（带事件名）
+    env.onFireClient = function(name, player, value)
+      player.messages[#player.messages + 1] = { name = name, value = value }
+    end
     _G.Vector3 = { New = vec }
-    _G.game = { GetService = function(_, name)
-      if name == 'World' then return { GetServerTime = function() return env.now end } end
-    end }
-    package.loaded['common.REUtil'] = {
-      GetRE = function(_, name)
-        if not env.events[name] then
-          env.events[name] = { OnServerEvent = signal(), FireClient = function(_, player, value)
-            player.messages[#player.messages + 1] = { name = name, value = value }
-          end }
-        end
-        return env.events[name]
-      end,
-      CheckRECD = function() return false end,
-    }
     env.data = { Data = { SelectedSlot = 1, FishCoin = 0, Bait = { worm = 3 }, SelectedBait = 'worm',
       Containers = { itemBar = { [1] = { itemId = 'starterRod', count = 1, containerId = 'itemBar' } } } } }
     function env.data:ConsumeSelectedBait() return true, 'worm' end
@@ -90,8 +74,8 @@ describe('脱钩后收回鱼线（MgrCast × MgrReelIn）', function()
     for _, name in ipairs(moduleNames) do
       package.loaded[name] = restore[name]
     end
-    _G.game = restore.game
     _G.Vector3 = restore.Vector3
+    if env then env:tearDown() end
     env = nil
     restore = nil
   end)
