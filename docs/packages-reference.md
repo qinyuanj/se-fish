@@ -59,7 +59,7 @@
 | 用途 | 响应式运行时与生命周期管理（Epoch / Ticker / SpokeTree / Dock / Trigger / State / Effect / Memo / Phase） |
 | 落位 | `common/packages/spoke/`，门面 `require("common.packages.spoke.api")` |
 | 上游 | 同级仓库 `spoke` |
-| 上游 commit | `19f10099a1e5f3624a128e22727aab368f6c6d29`（2026-11-18）；纯拷贝，一次同步记一个 SHA；库与 `.dsh/skills/spoke/` 技能必须同源 |
+| 上游 commit | `4d10e907e0e2669ba53b9ad822eec4b9aa73b96a`（2026-11-19）；纯拷贝，一次同步记一个 SHA；库与 `.dsh/skills/spoke/` 技能必须同源 |
 | 升级 | 从上游检出整体重拷 `common/packages/spoke/` 与技能，再更新本表 SHA |
 | 约束 | 不就地修改包内文件；不搬上游 `tests/`；不改写上游技能 |
 

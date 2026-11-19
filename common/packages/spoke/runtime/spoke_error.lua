@@ -10,8 +10,11 @@ end
 
 SpokeError.log = function(message, cause)
   if type(print) == "function" then
-    local traceback = type(debug) == "table" and debug.traceback or nil
-    local suffix = traceback and ("\n" .. traceback("", 2)) or ""
+    -- SE removes the debug library but keeps the equivalent global `traceback`
+    -- (docs/research/eggy-u5-lua-runtime.md). Prefer the library, fall back to the
+    -- host global, and degrade to no stack when the host offers neither.
+    local capture = type(debug) == "table" and debug.traceback or traceback
+    local suffix = type(capture) == "function" and ("\n" .. capture("", 2)) or ""
     print(render(message, cause) .. suffix)
   end
 end

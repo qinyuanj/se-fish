@@ -1,13 +1,13 @@
 ---
 name: spoke
-description: 用 Lua 5.4 版 Spoke 在蛋仔 UGC 里写界面与玩法逻辑：Epoch、Ticker、SpokeTree、Dock 与 Trigger、State、Effect、Reaction、Memo、Phase 的用法与可观察语义，以及 EUI 宿主集成。凡是用 spoke 写面板、玩法实体或 manager，或排查生命周期、调度顺序、cleanup、动态依赖、batch、Auto/Manual、渲染时机的问题，都应加载本技能。
+description: 用 Lua 5.4 版 Spoke 在蛋仔 SE（世界编辑器）UGC 里写界面与玩法逻辑：Epoch、Ticker、SpokeTree、Dock 与 Trigger、State、Effect、Reaction、Memo、Phase 的用法与可观察语义，以及 EUI 宿主集成。凡是用 spoke 写面板、玩法实体或 manager，或排查生命周期、调度顺序、cleanup、动态依赖、batch、Auto/Manual、渲染时机的问题，都应加载本技能。
 ---
 
 # Spoke（Lua 5.4）使用
 
 ## 核心原则
 
-本技能写给 spoke 的消费方：在蛋仔 UGC 项目里用已经落位的库写业务代码，`common/packages/spoke/` 保持原样。设计判断落在可观察行为上——什么先跑、什么被清理、宿主事件返回时渲染走到哪一步——而不是内部实现。
+本技能写给 spoke 的消费方：在蛋仔 SE 项目里用已经落位的库写业务代码，`common/packages/spoke/` 保持原样。设计判断落在可观察行为上——什么先跑、什么被清理、宿主事件返回时渲染走到哪一步——而不是内部实现。
 
 依据优先级：`common/packages/spoke/` 的实际行为，其验收契约是 spoke 仓库的 `docs/spec.md`；与本技能冲突时按实际行为写代码，并把差异说明出来。需要新的库行为时，那是 spoke 仓库的改动，不是在本项目里给包打补丁的理由。
 

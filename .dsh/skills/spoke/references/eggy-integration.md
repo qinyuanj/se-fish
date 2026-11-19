@@ -1,10 +1,10 @@
-# 蛋仔宿主集成
+# 蛋仔 SE 宿主集成
 
-落地细节见 spoke 仓库的 `docs/integration-best-practices.md` 与 `docs/eggy-host-integration-guide.md`，范式决策见 ADR 0002、0004、0005、0009。集成代码写在本项目里；`common/packages/spoke/` 是从 spoke 仓库镜像来的原始字节，升级只换 submodule SHA。
+落地细节见 spoke 仓库的 `docs/integration-best-practices.md` 与 `docs/eggy-host-integration-guide.md`，范式决策见 ADR 0002、0004、0005、0009。目标宿主是 SE（世界编辑器）；原点版（帧同步）是并行编辑器，不是旧版本。集成代码写在本项目里；`common/packages/spoke/` 是从 spoke 仓库镜像来的原始字节，升级只换 submodule SHA。
 
 ## 部署与加载
 
-消费方 require 根下必须物理存在 `common/packages/spoke/`。宿主没有可配置的 `package.path`，目录折叠加载也没有作为契约验证，因此统一使用：
+消费方脚本工程根下必须物理存在 `common/packages/spoke/`。宿主没有可配置的 `package.path`；`require` 必须带目录前缀、不带 `.lua`、不能跨端，因此包必须落在 `common/` 下才双端可用。目录折叠加载也没有作为契约验证，因此统一使用：
 
 ```lua
 local spoke = require("common.packages.spoke.api")
@@ -16,7 +16,7 @@ local spoke = require("common.packages.spoke.api")
 
 每个 EUI 面板、玩法实体或 manager 拥有一棵小的 Auto 树。宿主事件回调修改 State 或 Trigger 后，SpokeRuntime 在回调返回前同步完成相关渲染。
 
-Manual 只保留给三种场景：高频写入合并（一帧内多次写同一状态只渲染一次）、大计算分帧（`tree:tick()` 逐步推进）、单步调试。不要为核心添加 `SetTimeOut`、`EVENT.REPEAT_TIMEOUT` 或宿主全局读取。
+Manual 只保留给三种场景：高频写入合并（一帧内多次写同一状态只渲染一次）、大计算分帧（`tree:tick()` 逐步推进）、单步调试。不要为核心添加 `RunService.Heartbeat` 订阅、`TimerService:CreateTimer` 或宿主全局读取。
 
 ## 生命周期
 
