@@ -4,8 +4,8 @@ local GameCfg = require('common.GameCfg')
 local ReelDisplay = require('common.ReelDisplay')
 local spoke = require('common.packages.spoke.api')
 
-local SpokeTree, LambdaEpoch, Effect, Trigger =
-    spoke.SpokeTree, spoke.LambdaEpoch, spoke.Effect, spoke.Trigger
+local SpokeTree, LambdaEpoch, Effect, Trigger, Phase, State =
+    spoke.SpokeTree, spoke.LambdaEpoch, spoke.Effect, spoke.Trigger, spoke.Phase, spoke.State
 
 local LocalReelIn = { SessionId = nil }
 LocalReelIn.CHANNEL = 'ReelInRE'
@@ -17,6 +17,9 @@ function LocalReelIn:SetSession(id)
     self.Aggregator = RateLimit.NewAggregator({ SessionId = id,
         AggregateSec = GameCfg.HighFreqInput.AggregateSec })
     self.Display = ReelDisplay.New(self.World:GetServerTime(), GameCfg.ReelIn)
+    -- 会话 State 是「会话有效」Phase 的唯一挂载条件：写它 = 挂上合批心跳。
+    -- 聚合器必须先就位，新心跳挂上来的那一刻就能收拢点击；这里同步写完，返回时心跳已在。
+    self.Session:set(id)
     return true
 end
 
@@ -53,6 +56,8 @@ function LocalReelIn:Close(id)
     self.Aggregator = nil
     self.Display = nil
     if payload then self.RE:FireServer(payload) end
+    -- 会话失效：Phase 条件转假，合批心跳同步拆除；此后不再产生任何上行，再发关闭请求。
+    self.Session:set(nil)
     self.CloseRE:FireServer({ session = session })
 end
 
@@ -69,6 +74,9 @@ function LocalReelIn:Clear(id)
     self.SessionId = nil
     self.Aggregator = nil
     self.Display = nil
+    -- 上岸 / 脱钩 / 清理都走这里：会话失效，合批心跳随之消失。
+    -- 与 Close 不同，这条路径不 flush、不发 CloseReelIn（既有上行序列）。
+    self.Session:set(nil)
 end
 
 -- 一条入站事件的业务处理。它由树里的 Effect 调用，不直接挂在 RE 连接上：
@@ -94,8 +102,8 @@ function LocalReelIn:Stop()
         self.Tree:dispose()
         self.Tree = nil
     end
-    if self.UpdateConnection then self.UpdateConnection:Disconnect() end
-    self.UpdateConnection = nil
+    -- 合批心跳由会话 Phase 拥有，dispose 已经把它连同 RE 订阅一起断干净，这里没有单独要收的连接。
+    self.Session = nil
     self.World = nil
     self.RE = nil
     self.CloseRE = nil
@@ -107,6 +115,9 @@ function LocalReelIn:Start()
     self.World = game:GetService('World')
     self.RE = REUtil:GetRE(self.CHANNEL)
     self.CloseRE = REUtil:GetRE('CloseReelIn')
+    -- 收线会话：字符串 id；nil 表示没有有效会话。两参数的 State.new 才是「名字 + 初值」，
+    -- 只写 State.new('session') 会把 'session' 当成初值。
+    self.Session = State.new('session', nil)
     -- RE 回调只登记载荷并唤醒 Trigger，真正的处理在树里的 Effect 里跑。
     -- 队列与 Trigger 都是本次 Start 私有的：旧连接即使有残留送达，也只写进没人读的队列。
     local inbox = {}
@@ -123,13 +134,21 @@ function LocalReelIn:Start()
                 self:HandleInbound(table.remove(inbox, 1))
             end
         end, inbound))
+        -- 合批心跳：Phase 是它唯一的生命周期拥有者——会话有效才有这条逐帧回调，会话结束就拆掉。
+        -- 条件直接给会话 State（非 nil 即真），不能写成 Memo(session ~= nil)：s1→s2 会被归约成
+        -- true→true 而不重跑，旧心跳就带着旧会话活下去了。直接给 State，换会话的值变化才会触发重挂：
+        -- 上一轮 on_cleanup 按逆序跑完才进新块，同一时刻最多一条。
+        s:call(Phase.new(self.Session, function(ps)
+            -- 会话 id 在挂载时捕获：cleanup 里再读 State 读到的是新会话，闭包只认自己这一轮。
+            local session = self.Session:now()
+            local heartbeat = game:GetService('RunService').Heartbeat:Connect(function()
+                if self.SessionId == session and self.Aggregator then
+                    self:Send(self.Aggregator:Collect(self.World:GetServerTime()))
+                end
+            end)
+            ps:on_cleanup(function() heartbeat:Disconnect() end)
+        end))
     end))
-    -- 合批心跳仍按现状挂在这里（#232 才把它搬进会话 Phase）：上行频率、批次内容与消息顺序逐字不变。
-    self.UpdateConnection = game:GetService('RunService').Heartbeat:Connect(function()
-        if self.Aggregator then
-            self:Send(self.Aggregator:Collect(self.World:GetServerTime()))
-        end
-    end)
 end
 
 return LocalReelIn
