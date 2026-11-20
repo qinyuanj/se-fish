@@ -471,9 +471,12 @@ function ScreenHandler:RenderDetail(model)
     end
     if coinIcon then coinIcon.Visible = hasRow end
     -- 购买是全屏唯一金色动作；金币引导用海绿，禁用态退回墨绿，避免三个按钮同时抢眼。
+    -- #235：Disabled 只换禁用图，不恢复触摸。Init 的空态禁用把它关掉之后没人再打开，
+    -- 渲染成可买也就是一块点不动的图；每次刷状态都要在写完 Disabled 之后把触摸开回来。
     local button = nodes.BtnShopBuyDetail
     if button then
         button.Disabled = not model.buyEnabled
+        button.TouchEnabled = true
         local image, tone, labelTone = Skin.Image.Panel, Skin.Color.ButtonDisable, Skin.Color.Text
         if model.buyEnabled and model.buyAction == 'coin' then
             tone = Skin.Color.ButtonGuide

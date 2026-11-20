@@ -554,9 +554,23 @@ describe("钓场商店界面（#216 固定骨架 / #217 行与选中 / #218 详�
         assert.same({}, ctx.commands)
     end)
 
+    -- #235 购买按钮「看得见、点不动」：Init 的空态把它 Disabled 之后，运行期 TouchEnabled 一直是 false，
+    -- 界面渲染成可买也点不中。可买与不可买两种状态都要能被真实点按命中——不可买时由 Buy 兜底本地拒绝、
+    -- 给出同一条文案，而不是把按钮变成一块点不动的图。
+    -- 失败方式：只设 Disabled、不管 TouchEnabled（本单的 bug）；或反过来跟着 Disabled 一起关掉触摸，
+    --           不可买时点按走不到本地拒绝，玩家连差什么才能买都看不到。
+    it("test_buy_button_accepts_touch_in_both_buy_states", function()
+        assert.is_true(ctx.handler:Select(1)) -- 香肠：可买
+        assert.is_true(ctx.handler:View().detail.buyEnabled)
+        assert.is_true(ctx.nodes.BtnShopBuyDetail.TouchEnabled)
+        assert.is_true(ctx.handler:Select(3)) -- 科技假饵：锁定，详情区照常给原因
+        assert.is_false(ctx.handler:View().detail.buyEnabled)
+        assert.is_true(ctx.nodes.BtnShopBuyDetail.TouchEnabled)
+    end)
+
     -- 可选与可买是两个概念（#214 用户故事 8 / 20 / 21）：已购行不可点（买满限购的别让玩家白点）；
-    -- 锁定行可点、详情区照常给描述与原因，只是买不了；可买行两者皆真。快照逐行给 selectable / purchasable
-    -- （单测不读节点的 TouchEnabled）。
+    -- 锁定行可点、详情区照常给描述与原因，只是买不了；可买行两者皆真。快照逐行给 selectable / purchasable；
+    -- 行节点上的可点性与购买按钮的可触摸另有用例单守（#235）。
     -- 失败方式：把「可买」当成「可选」→ 锁定行点不动，玩家看不出这件商品是什么、差哪一级；
     --           把锁定行当可买（或节点可点）→ 客户端发出必被服务端拒的请求；已购行仍可点（白点）。
     it("test_selectable_and_purchasable_are_independent", function()
