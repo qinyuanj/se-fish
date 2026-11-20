@@ -29,7 +29,7 @@
 
 ## 可执行门禁
 
-`tests/native/arch_policy_test.lua` 随 fast 与 full 车道运行，检查：
+`tests/native/guards/arch_policy_test.lua`（guards 车道）随 fast 与 full 车道运行，检查：
 
 1. 未分类模块；
 2. 向内层到外层、包到业务、跨运行端的依赖；
@@ -42,7 +42,7 @@
 定向检查与完整收尾：
 
 ```sh
-lua tools/cli.lua test fast -- tests/native/arch_policy_test.lua
+lua tools/cli.lua test guards -- tests/native/guards/arch_policy_test.lua
 lua tools/cli.lua test full
 ```
 

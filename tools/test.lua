@@ -11,8 +11,9 @@ local exit_code = require("tools.exit_code")
 local M = {}
 
 M.LANES = {
-  { name = "fast", summary = "日常车道：tests/native" },
+  { name = "fast", summary = "日常车道：tests/native 加 tests/native/guards" },
   { name = "full", summary = "收尾车道：fast 加 tests/native/slow 与 tests/native/spec" },
+  { name = "guards", summary = "门禁型车道：tests/native/guards，随 fast 与 full 运行" },
   { name = "spec", summary = "条款断言车道：tests/native/spec，随 full 运行" },
   { name = "art", summary = "美术车道：tests/native/art，要本机 Blender，默认不进 full" },
 }
