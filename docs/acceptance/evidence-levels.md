@@ -73,6 +73,7 @@ C 级条款的状态在本轮一律是 `blocked`，理由写 `卡在：需编辑
 `lua tools/cli.lua acceptance --check`（随 fast 车道跑，见 `tests/native/acceptance_matrix_test.lua`）会实际去核：
 
 - `evidenced` / `accepted` 行里的**每个**仓库相对路径必须真实存在，缺一个就红（C 级也适用，见第三节）。
+- `evidenced` / `accepted` 且执行者为 `agent` 的行，证据列里**至少有一个** `tests/native/spec/` 或 `tests/probes/` 路径，**且那个文件的正文里出现过该条款 ID**（如 `9-12`、`12-07`）：路径前缀只说明放对了车道，条款号才说明断言的是这一条。找不到判 `evidence_not_clause_assertion`，消息会分清是「路径不符」还是「文件里没有条款号」。
 - `accepted` 行的证据列必须带 `（签署：@用户名 YYYY-MM-DD）`，否则红。
 - `blocked` 行的证据列必须以 `卡在：` 开头并写明卡在谁，`out-of-scope` 行必须以 `理由：` 开头（本规格不用 `out-of-scope`）。
 - [实现覆盖表](coverage.md)里，已贯通小节的每条非试玩条款必须有代码落点，落点与关联测试的路径必须真实存在；空落点直接判红。覆盖表只证明落点在哪，**不是**条款证据。
