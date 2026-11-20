@@ -555,7 +555,9 @@ end
 function Mgr:PlatformRevive(player, payload)
     local seq = type(payload) == 'table' and payload.seq or nil
     local function fail(reason)
-        self:Reply(player, { seq = seq, ok = false, action = 'FullRevive', reason = reason })
+        -- #249：占位通道被闸门挡住时把「未开放」文案随回执带下去（其余原因沿用客户端映射）
+        self:Reply(player, { seq = seq, ok = false, action = 'FullRevive', reason = reason,
+            text = reason == 'not_open' and GameCfg.Platform.NotOpenText or nil })
         return false
     end
     if type(payload) ~= 'table' then return false end

@@ -167,15 +167,18 @@ describe('条款 11 广告满血复活（占位广告位）', function()
   before_each(function()
     assert_wiring()
     env = { now = 100, queue = {}, sent = {}, re = {}, values = {} }
-    -- 生产构建（Debug 关）：广告复活必须靠共享配置里的占位广告位走通，不能靠调试构建的测试驱动器
+    -- #249 占位闸门：占位广告位只在调试构建（或发布构建显式 AllowInPublish）下可用。
+    -- 本文件显式打开调试开关，证的是「占位广告路径可用」，不是「发布构建可用」；
+    -- 发布构建默认关闭的那条断言在本文件的「发布构建闸门」用例里。
     env.cfg = GameCfg
     env.saved = { cfgDebug = GameCfg.Debug, qaSlot = GameCfg.Save.QaSlot,
       placeholderEnabled = GameCfg.Platform.Placeholder.Enabled,
+      placeholderAllowInPublish = GameCfg.Platform.Placeholder.AllowInPublish,
       placeholderAd = GameCfg.Platform.Placeholder.Ads.revive,
       game = rawget(_G, 'game'), Vector3 = rawget(_G, 'Vector3'),
       Vector2 = rawget(_G, 'Vector2'), Color = rawget(_G, 'Color'),
       REUtil = rawget(_G, 'REUtil'), reutil = package.loaded['common.REUtil'] }
-    env.cfg.Debug = { Enabled = false }
+    env.cfg.Debug = { Enabled = true }
     env.cfg.Save.QaSlot = ''
     env.cfg.Platform.Placeholder.Enabled = true
     _G.Vector3 = { New = vec }
@@ -251,6 +254,7 @@ describe('条款 11 广告满血复活（占位广告位）', function()
     GameCfg.Debug = saved.cfgDebug
     GameCfg.Save.QaSlot = saved.qaSlot
     GameCfg.Platform.Placeholder.Enabled = saved.placeholderEnabled
+    GameCfg.Platform.Placeholder.AllowInPublish = saved.placeholderAllowInPublish
     GameCfg.Platform.Placeholder.Ads.revive = saved.placeholderAd
     _G.game = saved.game
     _G.Vector3 = saved.Vector3
@@ -259,6 +263,33 @@ describe('条款 11 广告满血复活（占位广告位）', function()
     _G.REUtil = saved.REUtil
     package.loaded['common.REUtil'] = saved.reutil
     env = nil
+  end)
+
+  -- #249 占位闸门（ADR-0029 第四节第 9 项；条款 19-13「发布前检查」）：
+  -- 关闭调试且 AllowInPublish=false 时，广告复活经 SurvivalAction 业务入口被拒绝，
+  -- 不拉起占位广告通道、不复活、不发任何权益，回执说明「未开放」。
+  -- 失败方式：闸门失位（发布构建里没打开开关也能看广告复活，玩家没看广告就复活），
+  -- 或被拒后回执静默 / 措辞含糊，玩家不知道是「未开放」。
+  it('19-13 发布构建未显式打开 AllowInPublish 时广告复活被拒且不发权益', function()
+    GameCfg.Debug.Enabled = false
+    GameCfg.Platform.Placeholder.Enabled = true
+    GameCfg.Platform.Placeholder.AllowInPublish = false
+    local player = join(7101)
+    down(player)
+    local state = env.s:GetState(player)
+    local hunger = state.hunger
+    local health = player.Character.Controller.Health
+    adRequest(player, 1)
+    local refused = lastPayload('SurvivalResult')
+    assert.is_not_nil(refused, '被闸门挡下的广告复活必须明确回包')
+    assert.is_false(refused.ok)
+    assert.same('not_open', refused.reason, '闸门关闭必须给出「未开放」这一原因')
+    assert.is_truthy(tostring(refused.text):find('未开放', 1, true) ~= nil, '回执没说明未开放')
+    assert.is_nil(flowOpen(), '闸门关闭时不得拉起占位广告通道')
+    assert.is_false(env.platform:HasFlow(player), '闸门关闭时不得建平台 flow')
+    assert.same('downed', env.s:Phase(player), '闸门关闭时不得复活')
+    assert.same(health, player.Character.Controller.Health, '闸门关闭时不得回血')
+    assert.same(hunger, env.s:GetState(player).hunger, '闸门关闭时不得补饥饿')
   end)
 
   -- 11-19：濒死与死亡两个相位都能发起广告满血复活；入口只经可替换广告适配层，活动相位拒绝。
@@ -512,7 +543,10 @@ describe('条款 11 广告满血复活（占位广告位）', function()
 
   -- 11-38 失败路径：真实广告位与占位广告位都没交付时明确不可用，且不暂停倒计时。
   it('11-38 占位广告通道关闭时明确不可用且不暂停倒计时', function()
+    -- 生产口径：调试构建的测试驱动器也关掉，真实与占位两条通道都没有
+    GameCfg.Debug.Enabled = false
     GameCfg.Platform.Placeholder.Enabled = false
+    GameCfg.Platform.Placeholder.AllowInPublish = false
     local player = join(7170)
     down(player)
     adRequest(player, 1)

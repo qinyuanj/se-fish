@@ -656,6 +656,8 @@ GameCfg.Platform = {
     -- 17-18 分享任务：平台分享能力未开通时走明确占位入口（回包带原因与可读文案），
     -- 不让玩家点了没反应。开放情况作为生产开关单列：真实能力交付后只改这里，判定不动。
     Share = { Enabled = false, UnavailableText = '分享功能暂未开放' },
+    -- #249 占位通道被闸门挡住时的回执文案：说「未开放」而不是「暂不可用」，也不静默吞掉请求。
+    NotOpenText = '占位支付与广告通道未开放，请稍后再试',
     -- 平台流程失败原因 → 玩家可读文案（客户端 ScreenPlatform / ScreenBlindbox 共用）
     ReasonText = {
         busy = '已有一笔平台购买正在处理，请稍候',
@@ -663,6 +665,8 @@ GameCfg.Platform = {
         fail = '购买未完成，请查看平台订单状态',
         timeout = '平台未响应，本次购买已结束',
         pending = '存档同步中，请稍后再试',
+        -- #249 占位通道在发布构建未显式打开：与 NotOpenText 同一句，客户端按 reason 取文案
+        ['not_open'] = '占位支付与广告通道未开放，请稍后再试',
     },
     OfferTitle = '购买肾上腺素',
     TestDriverTitle = '测试支付（仅调试构建）',
@@ -674,8 +678,13 @@ GameCfg.Platform = {
 -- 不拉起真实购买面板、不扣真实货币、不发放平台权益；真实参数到位后只替换本表并把 Enabled 置 false，
 -- 价目、保底与结算顺序等玩法判定一行不动。
 -- 未查证数值：「金币页的占位汇率」（docs/to-questionnaire-策划案内部矛盾.md）。
+-- #249 占位通道闸门（ADR-0029 第四节第 9 项）：占位支付 / 广告 / 分享默认只在调试构建
+-- （GameCfg.Debug.Enabled）可用；发布构建要显式把 AllowInPublish 置 true 才允许占位通道。
+-- 关闭时占位动作一律拒绝、不发任何物品与权益，回执 reason = 'not_open' + NotOpenText（「未开放」）；
+-- 机器判据见 tests/native/spec/17_platform_boundary_placeholder_test.lua 与 11_ad_revive_placeholder_test.lua。
 GameCfg.Platform.Placeholder = {
     Enabled = true,
+    AllowInPublish = false,
     Label = '占位支付通道',
     Notice = '占位支付通道：不发放真实付费权益',
     -- 占位商品 ID：真实 goodsId 由平台后台交付；交付前只走 placeholder. 前缀，不冒充真实商品

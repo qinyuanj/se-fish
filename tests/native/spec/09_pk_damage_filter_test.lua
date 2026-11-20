@@ -94,7 +94,8 @@ describe('条款 9 PK 伤害过滤', function()
 
   before_each(function()
     assert_wiring()
-    env = { queue = {}, sent = {}, values = {}, re = {}, now = 100, game = rawget(_G, 'game'),
+    env = { queue = {}, sent = {}, values = {}, re = {}, now = 100, byCharacter = {},
+      game = rawget(_G, 'game'),
       vector = rawget(_G, 'Vector3'), reutil = rawget(_G, 'REUtil'), cfg = rawget(package.loaded, 'common.GameCfg') }
     _G.Vector3 = { New = vec }
     _G.game = { GetService = function(_, name)
@@ -113,8 +114,16 @@ describe('条款 9 PK 伤害过滤', function()
         } end }
       end
       if name == 'World' then return { GetServerTime = function() return env.now end } end
-      if name == 'Players' then return { GetPlayers = function() return {} end } end
+      if name == 'Players' then return { GetPlayers = function() return {} end,
+        GetPlayerFromCharacter = function(_, inst) return env.byCharacter[inst] end } end
       if name == 'RunService' then return { IsServer = function() return true end } end
+      -- 9-12（review #249）：枪械命中要从 MgrWeapon 真实发起。弹道解析是引擎边界，用替身
+      -- 返回「打中了 env.shot 指的那名玩家」；伤害仍然只经 MgrVitals 的统一入口结算。
+      if name == 'PhysicsService' then return { Raycast = function()
+        local target = env.shot
+        if not target then return nil end
+        return { Instance = target.Character, Position = env.shotAt or { x = 0, y = 0, z = 0 } }
+      end } end
     end, CreateRemoteEvent = function() return signal() end }
     local re = { GetRE = function(_, name)
       env.re[name] = env.re[name] or { OnServerEvent = signal(), OnClientEvent = signal(),
@@ -138,6 +147,20 @@ describe('条款 9 PK 伤害过滤', function()
     env.vitals.DamageFilter = function(hit, target, mgr) return env.filter(hit, target, mgr) end
     env.vitals.DamagePublisher = function() end
     env.vitals.Now = function() return env.now end
+    -- 9-12（review #249）：武器管理器照 main.lua 的接线装进同一套环境（伤害仍只经统一入口）。
+    -- AbilityAPI 在装载时要引擎的 RemoteEvent 全局：补替身并清模块缓存，避免复用别的用例的上下文。
+    env.remoteEvent, env.abilityModule, env.swingModule =
+      rawget(_G, 'RemoteEvent'), package.loaded['server.AbilityAPI'], package.loaded['server.SwingRegistry']
+    _G.RemoteEvent = { New = function()
+      return { OnServerEvent = { Connect = function() return { Disconnect = function() end } end } }
+    end }
+    package.loaded['server.AbilityAPI'], package.loaded['server.SwingRegistry'] = nil, nil
+    env.weapon = assert(loadfile('server/Mgr/MgrWeapon.lua'))()
+    env.weapon.Vitals = env.vitals
+    env.weapon.Attr = { WeaponDamageScale = function() return 1 end }
+    env.weapon.PlayerData = { GetDataInst = function() return {} end }
+    env.weapon.Now = function() return env.now end
+    env.weapon.Vec3 = function(x, y, z) return vec(x, y, z) end
     env.party:Start()
     env.vitals:Start()
   end)
@@ -145,6 +168,9 @@ describe('条款 9 PK 伤害过滤', function()
   after_each(function()
     if not env then return end
     _G.game, _G.Vector3, _G.REUtil = env.game, env.vector, env.reutil
+    _G.RemoteEvent = env.remoteEvent
+    package.loaded['server.AbilityAPI'] = env.abilityModule
+    package.loaded['server.SwingRegistry'] = env.swingModule
     package.loaded['common.GameCfg'] = env.cfg
     env = nil
   end)
@@ -172,6 +198,26 @@ describe('条款 9 PK 伤害过滤', function()
     request(a, 'Leave', {})
     assert.is_true(hit(a, b, 'melee', 30))
     assert.same(270, b.Character.Controller.Health)
+  end)
+
+  -- 9-12（review #249）：类别字段（melee/gun/area...）是装饰，过滤器只认「玩家来源」。
+  -- 本用例不再给统一入口贴标签，而是从 MgrWeapon 真实发起一次枪击：
+  -- 同队玩家被挡成 0 伤害，离队后同一把枪照常结算。
+  it('9-12 枪械经 MgrWeapon 真实发起：同队命中被挡，离队后照常结算', function()
+    local a = join(1, vec(241, 6, 0))
+    local b = join(2, vec(242, 6, 0))
+    makeTeam(a, b)
+    local gun = env.cfg.Ability.Guns.item137 -- 手枪：Damage 10 / IntervalSec 1.0 / Magazine 10
+    assert.is_not_nil(gun, '枪械数值表里没有 item137')
+    env.shot, env.shotAt = b, vec(242, 6, 0)
+    env.byCharacter[b.Character] = b
+    env.weapon:AttackGun(a, 'item137', gun, {}, vec(1, 0, 0))
+    assert.same(300, b.Character.Controller.Health, '同队玩家被枪械命中也不掉血')
+    request(a, 'Leave', {})
+    assert.is_false(env.party:SameParty(a, b))
+    env.now = env.now + gun.IntervalSec + 1
+    env.weapon:AttackGun(a, 'item137', gun, {}, vec(1, 0, 0))
+    assert.same(300 - gun.Damage, b.Character.Controller.Health, '离队后同一把枪照常结算')
   end)
 
   it('9-13：鱼塘区内任意两名非同队玩家免伤', function()

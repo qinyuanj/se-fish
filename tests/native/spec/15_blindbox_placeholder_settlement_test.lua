@@ -80,8 +80,9 @@ describe('条款 15-21 / 15-01 / 15-09 / 15-10 / 15-11 盲盒占位支付通道�
         assert_wiring()
         world = BlindboxWorld.new()
         world:setUp()
-        -- 生产构建 + 占位通道：整条路径不靠调试构建的测试驱动器
-        GameCfg.Debug = { Enabled = false }
+        -- #249 占位闸门：占位通道随调试构建放行（发布构建要显式 AllowInPublish）；
+        -- 本文件证的是占位通道整条路径，不走调试构建的测试驱动器。
+        GameCfg.Debug = { Enabled = true }
         savedPlaceholder = GameCfg.Platform.Placeholder.Enabled
         GameCfg.Platform.Placeholder.Enabled = true
     end)

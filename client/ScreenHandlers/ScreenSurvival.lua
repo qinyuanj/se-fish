@@ -145,6 +145,8 @@ function Panel:Start()
     }
     REVIVE_TEXT = {
         ['unavailable'] = GameCfg.Survival.PlatformPendingText,
+        -- #249 占位通道闸门关闭（发布构建未显式 AllowInPublish）：说「未开放」，不冒充等待中的临时不可用
+        ['not_open'] = GameCfg.Platform.NotOpenText,
         ['busy'] = GameCfg.Survival.PlatformWaitText,
         ['cancel'] = GameCfg.Survival.PlatformResumeText,
         ['fail'] = GameCfg.Survival.PlatformResumeText,

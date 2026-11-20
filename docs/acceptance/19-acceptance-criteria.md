@@ -16,7 +16,7 @@
 | 19-10 | 每个系统交付都附带对应的存档验证 | 契约 | agent | A | unverified | — |
 | 19-11 | 每个系统交付都附带对应的失败恢复验证 | 契约 | agent | A | unverified | — |
 | 19-12 | 多人行为由本地连接夹具证明加入、离开与共享世界状态的完整代码路径；真实多人结论作为生产开关单列，不用夹具结论替代 | 契约 | 平台 | B | evidenced | tests/native/spec/19_multiplayer_local_link_test.lua：八条以上虚拟连接同时在线时，同队免伤与野外 PK、鱼塘安全区、共享地面实例只结算一次、施救者断线中止抢救且重连不补结算、换人重新发起才救起各自成立；离开的连接不改共享世界状态与别人的登录态。另附可重跑 B 级探针 tests/probes/local_link_runtime.lua。真实多人结论仍归生产开关，不用夹具结论替代。 |
-| 19-13 | 对外开放前汇总发布检查项，检查项全部通过才允许发布；占位参数下门禁与快速车道全绿只证明代码路径完整，不作为发布依据 | 契约 | 平台 | B | unverified | — |
+| 19-13 | 对外开放前汇总发布检查项，检查项全部通过才允许发布；占位参数下门禁与快速车道全绿只证明代码路径完整，不作为发布依据 | 契约 | 平台 | B | evidenced | tests/native/spec/17_platform_boundary_placeholder_test.lua：发布构建（关闭调试）且 `AllowInPublish = false` 时，占位支付、金币页、广告与分享四个入口一律被拒——回执 `reason = 'not_open'` 且写明「未开放」，不发物品、不改金币、不建平台 flow；把 `AllowInPublish` 置 true 后同一批动作恢复可用，证明它是显式开关而不是把通道焊死。另附 tests/native/spec/11_ad_revive_placeholder_test.lua：广告复活经 SurvivalAction 业务入口同样被拒，不复活、不回血、不补饥饿。这只覆盖发布检查里的「占位通道默认不进发布构建」一项；门禁全绿仍不等于可发布，真实渠道项见 ADR-0029 第四节台账。 |
 
 ## C 级（试玩取证）
 

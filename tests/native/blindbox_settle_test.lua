@@ -316,9 +316,11 @@ describe("盲盒服务端结算（MgrBlindbox × MgrSave × MgrPlatform）", fun
   end)
 
   it("test_production_build_uses_placeholder_channel_not_test_driver", function()
-    -- 生产守卫（#261）：Debug 关 + 占位通道开 → 只有占位确认能结算；
-    -- 测试驱动器在生产碰不到占位 flow（不能伪造支付成功），确认前不发奖。
+    -- 生产守卫（#261）：Debug 关 + 占位通道开 + 显式 AllowInPublish（#249 闸门）→
+    -- 只有占位确认能结算；测试驱动器在生产碰不到占位 flow（不能伪造支付成功），确认前不发奖。
     GameCfg.Debug = { Enabled = false }
+    GameCfg.Platform.Placeholder.Enabled = true
+    GameCfg.Platform.Placeholder.AllowInPublish = true
     world.rolls = { 1000 }
     assert.is_true(world.blindbox:Handle(world.player, { action = "Draw", count = 1, seq = 1 }))
     world:drain()

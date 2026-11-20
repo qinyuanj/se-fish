@@ -58,8 +58,8 @@
 | [16](16-item-base-data.md) | 物品基础数据 | 17 | 14 | 3 | 0 | 0 | 0 | 82% |
 | [17](17-tutorial-story-platform.md) | 新手任务、剧情与平台边界 | 22 | 20 | 2 | 0 | 0 | 0 | 91% |
 | [18](18-save-and-recovery.md) | 存档与恢复契约 | 32 | 9 | 23 | 0 | 0 | 0 | 28% |
-| [19](19-acceptance-criteria.md) | 验收口径 | 19 | 12 | 1 | 0 | 6 | 0 | 95% |
-| 合计 | — | 523 | 321 | 146 | 0 | 56 | 0 | 72% |
+| [19](19-acceptance-criteria.md) | 验收口径 | 19 | 11 | 2 | 0 | 6 | 0 | 89% |
+| 合计 | — | 523 | 320 | 147 | 0 | 56 | 0 | 72% |
 
-已取证（evidenced + accepted）146 / 523；缺口密度 72% =（unverified + blocked + out-of-scope）÷ 条款数，其中 out-of-scope 占 0%。
+已取证（evidenced + accepted）147 / 523；缺口密度 72% =（unverified + blocked + out-of-scope）÷ 条款数，其中 out-of-scope 占 0%。
 <!-- END GENERATED: acceptance-counts -->
