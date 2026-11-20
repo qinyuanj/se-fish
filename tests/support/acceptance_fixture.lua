@@ -123,7 +123,7 @@ end
 function M.sync_baseline(root, override)
   local matrix = Acceptance.scan(root)
   local values = { evidenced = matrix.counts.evidenced, legacyTests = #matrix.lanes.legacy,
-    updated = '2026-11-20', note = Acceptance.BASELINE_NOTE }
+    updated = '2026-11-20' }
   for key, value in pairs(override or {}) do values[key] = value end
   fs.write_file(root .. '/' .. Acceptance.BASELINE, Acceptance.render_baseline(values))
   return values

@@ -1,13 +1,35 @@
 -- 条款 7-11（docs/acceptance/07-economy-and-shop.md）：每人上限为 1 的商品每档只能购买一次；
 -- 上限为 0 表示不限购。
--- 只走业务入口：server/main.lua 的 MgrMap 里注册的 MgrShop（购买请求）、MgrPlayerData（玩家数据）、
--- MgrGM（调试发金币），三者按 main.lua 的接线注入同一份协作关系；交互点距离用替身置真。
+-- 只走业务入口：进入的是 server/main.lua 的 **MgrMap 里注册的管理器**——MgrShop（购买请求）、
+-- MgrPlayerData（玩家数据）、MgrGM（调试发金币），三者按 main.lua 的接线注入同一份协作关系；
+-- 交互点距离用替身置真。**不执行 main.lua 本体**：它一开头就要完整引擎服务
+-- （common/ZoneMarkers.lua 那一步就起不来），所以在原生测试里只能读它的源码核对接线（见 assert_wiring）。
 -- 只断言玩家可观察的结果：ShopResult 回包载荷（客户端据此显示余额与已购）与库存件数。
 -- 失败方式（先列后写）：
+--   0. main.lua 的接线被改掉（商店不再拿玩家数据/交互点，或 MgrGM 不再注册）：本文件先红，逼人复核断言；
 --   1. 上限为 1 的商品能被买第二次（限购没生效，或结算绕过了限购）；
 --   2. 第二次被拒但金币照扣（扣了钱没给货）；
 --   3. 上限为 0 的商品被当成限购、只能买一次（把 0 误解成「不许买」）。
 local GameCfg = require('common.GameCfg')
+
+-- 前提守卫：本文件复现的是 main.lua 的接线，而不是自造一套协作关系。
+-- 三个管理器怎么互相注入写死在 server/main.lua 的 MgrMap 段，这里按源码子串核对；
+-- 接线一改（换注入对象、删掉 MgrGM 注册），这条断言先红，逼人回来复核黑盒断言。
+local WIRING = {
+    'MgrMap.MgrShop.PlayerData = MgrMap.MgrPlayerData',
+    'MgrMap.MgrShop.Interact = MgrMap.MgrInteract',
+    'MgrGM = require("server.Mgr.MgrGM")',
+}
+
+local function assert_wiring()
+    local handle = assert(io.open('server/main.lua', 'rb'), '读不到 server/main.lua')
+    local source = handle:read('a')
+    handle:close()
+    for _, line in ipairs(WIRING) do
+        assert.is_truthy(source:find(line, 1, true),
+            'server/main.lua 里找不到本文件复现的接线：' .. line)
+    end
+end
 
 -- 引擎侧信号替身：MgrPlayerData 只用到 Connect，回调由测试自己驱动。
 local function signal()
@@ -46,6 +68,7 @@ describe('条款 7-11 商店限购', function()
     local ctx
 
     before_each(function()
+        assert_wiring()
         ctx = { seq = 0, outcome = {} }
         ctx.savedREUtil = rawget(_G, 'REUtil')
         ctx.re = channels()

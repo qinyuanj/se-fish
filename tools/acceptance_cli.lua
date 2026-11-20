@@ -91,6 +91,13 @@ local function write_file(root, relative, body)
   return true
 end
 
+-- 内部函数以「nil, 原因」报错时走这里：原因印到 stderr，退出码由调用方定，绝不静默退 1。
+-- 关键文件读不出来或写不下去都属于「前提不可用」（ADR-0011 的 3），不是「矩阵校验不通过」（1）。
+local function failed(message, code)
+  io.stderr:write('acceptance: ' .. tostring(message) .. '\n')
+  return code
+end
+
 local function run_check(root)
   local result = acceptance.verify(root)
   if not result.ok then
@@ -104,16 +111,18 @@ end
 
 local function run_write(root)
   local matrix = acceptance.scan(root)
-  if not matrix.index.body then return nil, '读不到 ' .. acceptance.INDEX end
+  if not matrix.index.body then
+    return failed('读不到 ' .. acceptance.INDEX, exit_code.UNAVAILABLE)
+  end
   local block = acceptance.render(matrix)
   if matrix.index.block == block then
     io.stdout:write('README 生成块已是最新，无需改动\n')
     return exit_code.OK
   end
   local body, err = acceptance.rewrite(matrix.index.body, block)
-  if not body then return nil, err end
+  if not body then return failed(err, exit_code.UNAVAILABLE) end
   local written, write_err = write_file(root, acceptance.INDEX, body)
-  if not written then return nil, write_err end
+  if not written then return failed(write_err, exit_code.UNAVAILABLE) end
   io.stdout:write(string.format('已重写 %s 的生成块（%d 份分片 / %d 条条款）\n',
     acceptance.INDEX, #matrix.shards, matrix.counts.total))
   return exit_code.OK
@@ -127,7 +136,7 @@ local function run_baseline(root)
     return code == 'refuse' and exit_code.USAGE or exit_code.UNAVAILABLE
   end
   local written, err = write_file(root, acceptance.BASELINE, text)
-  if not written then return nil, err end
+  if not written then return failed(err, exit_code.UNAVAILABLE) end
   io.stdout:write(string.format('已重写 %s：evidenced %d / legacyTests %d\n',
     acceptance.BASELINE, matrix.counts.evidenced, #matrix.lanes.legacy))
   return exit_code.OK
@@ -145,13 +154,16 @@ function M.main(args, env)
   end
   local root = (env and env.repo_root) or '.'
   local runner = ({ check = run_check, write = run_write, baseline = run_baseline })[opts.mode]
-  local ok, result = pcall(runner, root)
+  local ok, code = pcall(runner, root)
   if not ok then
-    io.stderr:write('acceptance: ' .. tostring(result) .. '\n')
+    io.stderr:write('acceptance: ' .. tostring(code) .. '\n')
     return exit_code.FAILURE
   end
-  if result == nil then return exit_code.FAILURE end
-  return result
+  -- 动作函数一律返回退出码；返回 nil 是漏了 return，当成前提不可用报出来，别静默变成 1。
+  if type(code) ~= 'number' then
+    return failed('内部错误：' .. opts.mode .. ' 没有返回退出码', exit_code.UNAVAILABLE)
+  end
+  return code
 end
 
 return M
