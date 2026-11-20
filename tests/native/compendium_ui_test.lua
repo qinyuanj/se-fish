@@ -93,10 +93,11 @@ describe("图鉴界面表现（ScreenCompendium）", function()
     local screen = assert(loadfile("client/ScreenHandlers/ScreenCompendium.lua"))()
     screen:SelectFish("goldfish")
     assert.is_true(screen:NoteRecord({ fishId = "goldfish", seq = 1, state = "missing" }))
-    assert.same("全服纪录：暂无", screen:View().recordText)
+    -- 13-08：没有纪录与读不到在 state 上分开，玩家看到的都是「未取得数据」。
+    assert.same("全服纪录：未取得数据", screen:View().recordText)
     screen:SelectFish("goldfish")
     assert.is_true(screen:NoteRecord({ fishId = "goldfish", seq = 2, state = "unavailable" }))
-    assert.same("全服纪录：暂不可用", screen:View().recordText)
+    assert.same("全服纪录：未取得数据", screen:View().recordText)
     screen:SelectFish("goldfish")
     assert.is_true(screen:NoteRecord({
       fishId = "goldfish", seq = 3, state = "ok", weight = 0.2, holder = "钓鱼佬", stale = true,
@@ -107,7 +108,7 @@ describe("图鉴界面表现（ScreenCompendium）", function()
     assert.is_false(screen:NoteRecord({
       fishId = "goldfish", seq = 3, state = "ok", weight = 9, holder = "旧回包",
     }))
-    assert.same("全服纪录：暂不可用", screen:View().recordText)
+    assert.same("全服纪录：未取得数据", screen:View().recordText)
   end)
 
   it("test_seven_pages_show_98_distinct_entries_with_separate_grades", function()
