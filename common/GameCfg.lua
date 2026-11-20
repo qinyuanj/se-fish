@@ -4,6 +4,7 @@ local ContentFish = require('common.cfg.Fish')
 local ContentShop = require('common.cfg.Shop')
 local ContentLottery = require('common.cfg.Lottery')
 local ContentBlindbox = require('common.cfg.Blindbox')
+local BossMoves = require('common.cfg.BossMoves')
 local FishCatch = require('common.FishCatch')
 
 -- 钓鱼区 ID 用于内容与后续场景锚点；存档旧值在 LegacyZoneIdMap 中解析。
@@ -136,6 +137,42 @@ GameCfg.Survival = {
     PlatformResumeText = '未完成满血复活，免费复活倒计时继续',
     WeakText = '虚弱中：移动速度减半',
     UnavailableText = '操作暂时不可用，请稍后再试',
+}
+
+-- 小队（#253，§9 多人规则「小队最多 3 人，2 米内邀请，10 秒未处理按拒绝，离线自动离队，少于 2 人解散」）：
+-- 三个数值都是规格原文，不是占位值；服务端唯一权威，见 server/Mgr/MgrParty.lua。
+GameCfg.Party = {
+    MaxMembers = 3,          -- 一支小队最多 3 名玩家
+    MinMembers = 2,          -- 少于 2 人解散
+    InviteRange = 2,         -- 邀请距离 2 米（场景平面距离）
+    InviteTimeoutSec = 10,   -- 邀请 10 秒未处理按拒绝结算
+    ActionCooldownSec = 0.2, -- 请求限频，防连点；不是玩法数值
+    StateCooldownSec = 0.5,
+    -- [未查证] 队伍界面布局：规格只要求「不与左上角自身血量重叠、实机分辨率可读」，
+    -- 具体位置与尺寸待策划给草图（docs/to-questionnaire-策划案内部矛盾.md「队伍界面的布局」）。
+    HUD = {
+        RowWidth = 240,
+        RowHeight = 56,
+        MarginRight = 24,   -- [未查证] 右侧竖排，避开左上角自身血量
+        MarginTop = 220,
+        MaxRows = 2,        -- [未查证] 小队上限 3 人，自己占一栏，队友最多 2 行
+        BarWidth = 120,
+        BarHeight = 12,
+        InviteWidth = 360,
+        InviteHeight = 96,
+        InviteTop = 24,
+        InviteText = '收到了组队邀请',
+        InviteCountdownText = '秒后自动拒绝',
+        DisbandText = '小队已解散',
+        LeftText = '你已离开小队',
+        RestoredText = '已回到原来的小队',
+        UnavailableText = '组队操作暂时不可用',
+        TooFarText = '距离太远，走到 2 米内再邀请',
+        FullText = '小队已满 3 人',
+        OfflineText = '对方不在线',
+        TargetInPartyText = '对方已在别的队伍里',
+        NoInviteText = '邀请已失效'
+    },
 }
 
 -- 调试开关（#47 / #49，#28 规格）：开发阶段默认开启，发布或开放地图前关闭。开启后服务端接受 GM 发放
@@ -1122,13 +1159,10 @@ GameCfg.Ability = {
             water = { 'bite' },
             enraged = { 'claw', 'tail', 'breath', 'stomp' },
         },
-        Attacks = {
-            claw = { IntervalSec = 2, Damage = 50, Range = 4 },   -- 表内 2 秒爪击（基础攻击 50）
-            tail = { IntervalSec = 6, Damage = 50, Range = 5 },   -- 表内每 6 秒甩尾
-            breath = { IntervalSec = 30, Range = 10, Width = 2, OneShot = true, WindupSec = 1.5 }, -- 正前 10 米秒杀；2米宽灰盒可躲避
-            bite = { IntervalSec = 2, Range = 2.5 },                -- 入水后的咬击：伤害取阶段条目的 BiteDamage
-            stomp = { IntervalSec = 2, Damage = 150, Range = 10, WindupSec = 0.8 }, -- 正文独立跺脚
-        },
+        -- 招式数值不在此处另写一份：#256 起唯一来源是 common/cfg/BossMoves.lua 的逐招表，
+        -- 这里只把哥斯拉的行折成阶段机消费的形态（间隔 / 伤害 / 起手 / 走廊宽度）。
+        -- 改动招式数值请改逐招表；本表的行集合就是 §12 的招式并集（12-05）。
+        Attacks = BossMoves.AttackTable('godzilla'),
         -- 走阶段机的鱼种（键为 GameCfg.Fish 的 Id）。本单只登记哥斯拉；
         -- 正式接入由 #144 决定是加 Combat 标签还是建「首领」注册表（本单不改 common/cfg/Fish.lua）。
         Species = { fish56Boss = true },

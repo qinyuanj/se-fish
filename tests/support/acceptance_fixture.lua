@@ -80,6 +80,8 @@ local function busted_body()
   }, '\n')
 end
 
+-- 已贯通小节（M.COVERAGE_SECTIONS）里除第 1 节外的分片在夹具里各只有一条非试玩条款，
+-- 逐节跟着清单生成落点行，登记新节时夹具起点仍然全绿。
 local function coverage_body()
   local lines = {
     '# 夹具实现覆盖表',
