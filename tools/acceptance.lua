@@ -48,7 +48,7 @@ M.SIGNATURE = '（签署：@%S+ %d%d%d%d%-%d%d%-%d%d）'
 -- 等级与矩阵不一致都判红，随 acceptance --check 进 fast 车道。
 M.COVERAGE = 'docs/acceptance/coverage.md'
 -- 已贯通小节：这些节的每条非试玩条款都必须在覆盖表里登记。逐节扩大——加一节就补齐该节落点。
-M.COVERAGE_SECTIONS = { 1, 5, 12, 16 }
+M.COVERAGE_SECTIONS = { 1, 5, 12, 16, 18 }
 -- 四类证据列只有两个取值（完成口径见 ADR-0028）。
 M.COVERAGE_EVIDENCE = { '有', '缺' }
 -- 覆盖表每行八格：条款、代码落点、关联测试、正常流程、失败流程、退出重进、存档恢复、等级。
@@ -636,6 +636,22 @@ local function check_shards(matrix, add)
           if not exists(matrix.root, path) then
             add('evidence_missing', string.format('%s 的证据路径不存在：%s', clause.id, path),
               shard.path, clause.line)
+          end
+        end
+        -- 条款断言车道：evidenced/accepted 的 agent 条款必须至少有一条 tests/native/spec 或 tests/probes 证据。
+        if #paths > 0 and (clause.status == 'evidenced' or clause.status == 'accepted')
+            and clause.executor == 'agent' then
+          local clause_assertion = false
+          for _, path in ipairs(paths) do
+            if path:match('^tests/native/spec/') or path:match('^tests/probes/') then
+              clause_assertion = true
+              break
+            end
+          end
+          if not clause_assertion then
+            add('evidence_not_clause_assertion', string.format(
+              '%s 标为 %s，但证据列没有 tests/native/spec/ 或 tests/probes/ 下的条款断言（现写的是 %q）',
+              clause.id, clause.status, evidence), shard.path, clause.line)
           end
         end
         -- accepted 另要人背书：路径后面必须跟（签署：@用户名 YYYY-MM-DD）。
