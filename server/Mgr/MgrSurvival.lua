@@ -598,7 +598,7 @@ function Mgr:PlatformRevive(player, payload)
         return fail(reason or 'unavailable')
     end
     if state.platform == platform then
-        print('[MgrSurvival] 平台复活流程开始，免费倒计时暂停', player.UserId, mode)
+        print('[MgrSurvival] 平台复活流程开始，复活倒计时暂停（' .. state.phase .. '）', player.UserId, mode)
         self:SendState(state)
     end
     return true
