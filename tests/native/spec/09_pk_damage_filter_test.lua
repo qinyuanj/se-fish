@@ -131,7 +131,7 @@ describe('条款 9 PK 伤害过滤', function()
     env.save = assert(loadfile('server/Mgr/MgrSave.lua'))()
     env.players.Save, env.save.PlayerData = env.save, env.players
     env.party.PlayerData, env.party.Save, env.party.Vitals = env.players, env.save, env.vitals
-    env.filter = assert(loadfile('server/Mgr/MgrPkFilter.lua'))()()
+    env.filter = assert(loadfile('server/Mgr/MgrPkFilter.lua'))().Make()
     -- 生产装配：过滤接缝与区域真源都经 mgr 注入，不缓存队伍归属。
     env.vitals.Party = env.party
     env.vitals.ZoneMarkers = require('common.ZoneMarkers')

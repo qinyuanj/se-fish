@@ -197,7 +197,7 @@ function M.new(opts)
         Loot = assert(loadfile('server/Mgr/MgrLoot.lua'))(),
     }
     local mgr = env.managers
-    env.filter = assert(loadfile('server/Mgr/MgrPkFilter.lua'))()
+    env.filter = assert(loadfile('server/Mgr/MgrPkFilter.lua'))().Make
 
     mgr.Save.PlayerData = mgr.PlayerData
     mgr.PlayerData.Save, mgr.PlayerData.Vitals = mgr.Save, mgr.Vitals

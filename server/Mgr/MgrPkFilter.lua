@@ -55,4 +55,6 @@ local function makePkDamageFilter()
     end
 end
 
-return makePkDamageFilter
+-- 模块导出的是工厂表，不是管理器：MgrMap 只放有 Start/Update 生命周期的管理器，
+-- 过滤器由 server/main.lua 装配进 MgrVitals.DamageFilter（见该处注释）。
+return { Make = makePkDamageFilter }
