@@ -217,11 +217,27 @@ function Mgr:HandleTestAction(player, payload)
     return true
 end
 
+-- 17-18 分享任务入口：平台分享能力未开通时给明确占位回包，不静默吞掉（点了没反应）。
+-- 真实分享能力由平台侧交付后替换共享配置并接真实回调，判定不动；占位不发任何权益。
+function Mgr:Share(player, purpose)
+    if type(player) ~= 'table' or player.UserId == nil then return false, 'invalid' end
+    local share = cfg().Share or {}
+    -- 未开通（占位）与「配置已打开但真实能力还没接」都明确回不可用，不伪装成已分享。
+    local reason = share.Enabled == true and 'unavailable' or 'placeholder'
+    self:Reply(player, { ok = false, action = 'Share', purpose = purpose, reason = reason,
+        text = share.UnavailableText })
+    return false, reason
+end
+
 -- 客户端平台操作通道：打开肾上腺素 / 金币购买入口，或发起肾上腺素购买
 function Mgr:HandleAction(player, payload)
     if type(payload) ~= 'table' then return false end
     if payload.action == 'OpenAdrenaline' then return self:OpenAdrenalineShop(player) end
     if payload.action == 'OpenCoinShop' then return self:OpenCoinShop(player) end
+    if payload.action == 'Share' then
+        self:Share(player, payload.purpose)
+        return true
+    end
     if payload.action == 'Purchase' then
         local goodsKey = payload.goods
         local row = cfg().Goods[goodsKey]
