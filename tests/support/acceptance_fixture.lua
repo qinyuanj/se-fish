@@ -81,17 +81,24 @@ local function busted_body()
 end
 
 local function coverage_body()
-  return table.concat({
+  local lines = {
     '# 夹具实现覆盖表',
     '',
     '> 夹具：八列与 docs/acceptance/coverage.md 一致。',
     '',
     '| 条款 | 代码落点 | 关联测试 | 正常流程 | 失败流程 | 退出重进 | 存档恢复 | 等级 |',
     '| --- | --- | --- | --- | --- | --- | --- | --- |',
-    string.format('| 1-01 | %s | %s | 缺 | 缺 | 缺 | 缺 | A |', M.COVERAGE_LANDING, M.COVERAGE_TEST),
-    string.format('| 1-02 | %s | — | 缺 | 缺 | 缺 | 缺 | B |', M.COVERAGE_LANDING),
-    '',
-  }, '\n')
+  }
+  -- 已贯通小节里的每条非试玩条款都要登记：夹具分片每节只有一条，第 1 节额外一条契约。
+  for _, section in ipairs(Acceptance.COVERAGE_SECTIONS) do
+    lines[#lines + 1] = string.format('| %d-01 | %s | %s | 缺 | 缺 | 缺 | 缺 | A |',
+      section, M.COVERAGE_LANDING, M.COVERAGE_TEST)
+    if section == 1 then
+      lines[#lines + 1] = string.format('| 1-02 | %s | — | 缺 | 缺 | 缺 | 缺 | B |', M.COVERAGE_LANDING)
+    end
+  end
+  lines[#lines + 1] = ''
+  return table.concat(lines, '\n')
 end
 
 local function readme_body()
