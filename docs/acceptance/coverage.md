@@ -101,7 +101,45 @@
 第 16 节的 16-04、16-06、16-07 已由服务端 MgrVitals 的公开食用入口取证：食物 / 极品食物 / 鱼饵全部可吃，
 其余类别一律拒绝；负恢复项吃后扣饥饿并扣血。16-13 的「实现标记只有一份真源」由 common/cfg/ContentLedger.lua
 与 common/ContentValidation.lua 的一致性门禁守住。
+
+### 第 18 节 存档与恢复契约（32 条）
+
+| 条款 | 代码落点 | 关联测试 | 正常流程 | 失败流程 | 退出重进 | 存档恢复 | 等级 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 18-01 | server/Data/PlayerData.lua、server/Mgr/MgrSave.lua | tests/native/spec/18_session_settlement_contract_test.lua | 有 | 有 | 有 | 有 | B |
+| 18-02 | server/Data/PlayerData.lua、server/Mgr/MgrSave.lua | tests/native/spec/18_session_settlement_contract_test.lua | 有 | 缺 | 缺 | 有 | B |
+| 18-03 | server/Data/PlayerData.lua、server/Mgr/MgrWeapon.lua | — | 缺 | 缺 | 缺 | 缺 | B |
+| 18-04 | server/Data/PlayerData.lua、server/Mgr/MgrShop.lua | tests/native/spec/18_session_settlement_contract_test.lua | 有 | 缺 | 缺 | 有 | B |
+| 18-05 | server/Data/PlayerData.lua、server/Mgr/MgrSurvival.lua | tests/native/spec/18_session_settlement_contract_test.lua | 有 | 缺 | 有 | 有 | B |
+| 18-06 | server/Mgr/MgrSurvival.lua、server/Data/PlayerData.lua | tests/native/spec/18_session_settlement_contract_test.lua | 有 | 缺 | 缺 | 有 | B |
+| 18-07 | server/Mgr/MgrCompendium.lua、server/Data/PlayerData.lua | tests/native/spec/18_session_settlement_contract_test.lua | 有 | 缺 | 缺 | 有 | B |
+| 18-08 | server/Mgr/MgrQuest.lua、server/Mgr/MgrStory.lua | tests/native/spec/18_session_settlement_contract_test.lua | 有 | 缺 | 缺 | 有 | B |
+| 18-09 | server/Mgr/MgrFerry.lua、server/Data/PlayerData.lua | tests/native/spec/18_session_settlement_contract_test.lua | 有 | 缺 | 缺 | 有 | B |
+| 18-10 | server/Data/PlayerData.lua、server/Mgr/MgrSave.lua | tests/native/spec/18_session_settlement_contract_test.lua | 有 | 有 | 有 | 有 | B |
+| 18-11 | server/Mgr/MgrBlindbox.lua、server/Data/PlayerData.lua | tests/native/spec/18_session_settlement_contract_test.lua | 有 | 缺 | 缺 | 有 | B |
+| 18-12 | server/Mgr/MgrAchievements.lua、server/Data/PlayerData.lua | tests/native/spec/18_session_settlement_contract_test.lua | 有 | 缺 | 缺 | 有 | B |
+| 18-13 | server/Mgr/MgrSave.lua、server/Mgr/MgrFerry.lua | tests/native/spec/18_session_settlement_contract_test.lua | 有 | 有 | 有 | 有 | B |
+| 18-14 | server/Mgr/MgrWeapon.lua、server/Data/PlayerData.lua | — | 缺 | 缺 | 缺 | 缺 | B |
+| 18-15 | server/Mgr/MgrWeapon.lua、server/Mgr/MgrSave.lua | tests/native/weapon_system_test.lua | 缺 | 缺 | 缺 | 缺 | B |
+| 18-16 | server/Data/PlayerData.lua | tests/native/spec/18_session_settlement_contract_test.lua | 有 | 缺 | 缺 | 有 | B |
+| 18-17 | server/Data/PlayerData.lua | tests/native/spec/18_session_settlement_contract_test.lua | 有 | 缺 | 缺 | 有 | B |
+| 18-18 | server/Data/PlayerData.lua、server/Mgr/MgrSave.lua | tests/native/spec/18_session_settlement_contract_test.lua | 有 | 有 | 缺 | 有 | B |
+| 18-19 | server/main.lua、server/Mgr/MgrSave.lua | tests/native/spec/18_session_settlement_contract_test.lua | 有 | 有 | 缺 | 缺 | B |
+| 18-20 | server/Mgr/MgrSave.lua、server/main.lua | tests/native/spec/18_session_settlement_contract_test.lua | 有 | 有 | 有 | 有 | B |
+| 18-21 | server/Mgr/MgrSave.lua | tests/native/spec/18_session_settlement_contract_test.lua | 有 | 有 | 缺 | 有 | B |
+| 18-22 | server/Mgr/MgrSave.lua | tests/native/spec/18_session_settlement_contract_test.lua | 有 | 有 | 缺 | 有 | B |
+| 18-23 | server/Mgr/MgrSave.lua、server/Mgr/MgrShop.lua | tests/native/spec/18_session_settlement_contract_test.lua | 有 | 有 | 有 | 有 | B |
+| 18-24 | server/Mgr/MgrSave.lua、server/Mgr/MgrFerry.lua | tests/native/spec/18_session_settlement_contract_test.lua | 有 | 有 | 有 | 有 | B |
+| 18-25 | server/Mgr/MgrFerry.lua、server/Mgr/MgrSave.lua | tests/native/ferry_test.lua | 缺 | 缺 | 缺 | 缺 | B |
+| 18-26 | server/Mgr/MgrPlatform.lua | — | 缺 | 缺 | 缺 | 缺 | B |
+| 18-27 | server/Data/PlayerData.lua、server/Mgr/MgrLoot.lua | tests/native/spec/18_session_settlement_contract_test.lua | 有 | 缺 | 缺 | 有 | B |
+| 18-28 | server/Mgr/MgrLottery.lua、server/Mgr/MgrSave.lua | tests/native/lottery_settle_test.lua | 缺 | 缺 | 缺 | 缺 | B |
+| 18-29 | server/Mgr/MgrInteract.lua、server/Mgr/MgrSave.lua | tests/native/economy_persistence_test.lua | 缺 | 缺 | 缺 | 缺 | B |
+| 18-30 | server/Mgr/MgrGrill.lua、server/main.lua | tests/native/grill_test.lua | 缺 | 缺 | 缺 | 缺 | B |
+| 18-31 | server/Mgr/MgrSave.lua、server/Data/PlayerData.lua | tests/native/spec/18_session_settlement_contract_test.lua | 有 | 有 | 有 | 有 | B |
+| 18-32 | server/main.lua、server/Mgr/MgrPlayerData.lua | tests/native/player_leave_rejoin_test.lua | 缺 | 缺 | 缺 | 缺 | B |
+
 ## 三、待登记小节
 
-第 2～4、6～15、17～19 节尚未登记。按依赖顺序逐节扩大，每节登记时同时补齐该节的代码落点与既有测试，
+第 2～4、6～15、17、19 节尚未登记。按依赖顺序逐节扩大，每节登记时同时补齐该节的代码落点与既有测试，
 并把该节加进 `tools/acceptance.lua` 的 `M.COVERAGE_SECTIONS`。
