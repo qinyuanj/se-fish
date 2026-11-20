@@ -33,6 +33,7 @@ local MgrMap = {
     MgrWeapon = require("server.Mgr.MgrWeapon"),
     MgrSpecialItem = require("server.Mgr.MgrSpecialItem"),
     MgrParty = require("server.Mgr.MgrParty"),
+    MgrPkFilter = require("server.Mgr.MgrPkFilter"),
     MgrCompendium = require("server.Mgr.MgrCompendium"),
     MgrRecords = require("server.Mgr.MgrRecords"),
     MgrAchievements = require("server.Mgr.MgrAchievements"),
@@ -202,6 +203,17 @@ MgrMap.MgrFerry.SpecialItem = MgrMap.MgrSpecialItem
 MgrMap.MgrParty.PlayerData = MgrMap.MgrPlayerData
 MgrMap.MgrParty.Save = MgrMap.MgrSave
 MgrMap.MgrParty.Vitals = MgrMap.MgrVitals
+
+-- #255 PK 伤害过滤：统一入口的 DamageFilter 只读注入进来的权威接缝。
+-- 小队归属每次判定都问 MgrParty（离队即刻失效）；鱼塘边界读 ZoneMarkers 快照；
+-- 鱼攻击不解析成玩家来源，因此安全区不挡鱼。
+local makePkDamageFilter = MgrMap.MgrPkFilter
+-- 夹具可以给 MgrPkFilter 注入同名工厂替换；生产接线就是已实例化的过滤函数。
+if type(makePkDamageFilter) == 'function' then
+    MgrMap.MgrVitals.ZoneMarkers = ZoneMarkers
+    MgrMap.MgrVitals.Party = MgrMap.MgrParty
+    MgrMap.MgrVitals.DamageFilter = makePkDamageFilter()
+end
 
 -- 存档就绪前不创建 Vitals/Ability 等玩家状态；退出先撤销就绪标记，再清理管理器。
 local ActivePlayers = {}

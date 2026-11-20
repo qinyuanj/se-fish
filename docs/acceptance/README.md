@@ -48,7 +48,7 @@
 | [6](06-combat-and-growth.md) | 战斗与成长 | 37 | 30 | 4 | 0 | 3 | 0 | 89% |
 | [7](07-economy-and-shop.md) | 经济与钓场商店 | 27 | 21 | 4 | 0 | 2 | 0 | 85% |
 | [8](08-npc-exchange-ferry.md) | NPC、兑换与摆渡 | 41 | 34 | 0 | 0 | 7 | 0 | 100% |
-| [9](09-multiplayer-rules.md) | 多人规则 | 25 | 11 | 11 | 0 | 3 | 0 | 56% |
+| [9](09-multiplayer-rules.md) | 多人规则 | 25 | 5 | 17 | 0 | 3 | 0 | 32% |
 | [10](10-grilling.md) | 烧烤 | 28 | 15 | 10 | 0 | 3 | 0 | 64% |
 | [11](11-downed-death-revive.md) | 濒死、死亡与复活 | 42 | 39 | 0 | 0 | 3 | 0 | 100% |
 | [12](12-elite-boss-behavior.md) | 精英与首领行为 | 55 | 23 | 25 | 0 | 7 | 0 | 55% |
@@ -59,7 +59,7 @@
 | [17](17-tutorial-story-platform.md) | 新手任务、剧情与平台边界 | 22 | 20 | 2 | 0 | 0 | 0 | 91% |
 | [18](18-save-and-recovery.md) | 存档与恢复契约 | 32 | 9 | 23 | 0 | 0 | 0 | 28% |
 | [19](19-acceptance-criteria.md) | 验收口径 | 19 | 13 | 0 | 0 | 6 | 0 | 100% |
-| 合计 | — | 523 | 359 | 108 | 0 | 56 | 0 | 79% |
+| 合计 | — | 523 | 353 | 114 | 0 | 56 | 0 | 78% |
 
-已取证（evidenced + accepted）108 / 523；缺口密度 79% =（unverified + blocked + out-of-scope）÷ 条款数，其中 out-of-scope 占 0%。
+已取证（evidenced + accepted）114 / 523；缺口密度 78% =（unverified + blocked + out-of-scope）÷ 条款数，其中 out-of-scope 占 0%。
 <!-- END GENERATED: acceptance-counts -->
