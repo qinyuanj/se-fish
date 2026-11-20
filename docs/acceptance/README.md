@@ -57,9 +57,9 @@
 | [15](15-map-blindbox.md) | 地图盲盒 | 21 | 18 | 0 | 0 | 3 | 0 | 100% |
 | [16](16-item-base-data.md) | 物品基础数据 | 17 | 14 | 3 | 0 | 0 | 0 | 82% |
 | [17](17-tutorial-story-platform.md) | 新手任务、剧情与平台边界 | 22 | 22 | 0 | 0 | 0 | 0 | 100% |
-| [18](18-save-and-recovery.md) | 存档与恢复契约 | 32 | 3 | 29 | 0 | 0 | 0 | 9% |
+| [18](18-save-and-recovery.md) | 存档与恢复契约 | 32 | 9 | 23 | 0 | 0 | 0 | 28% |
 | [19](19-acceptance-criteria.md) | 验收口径 | 19 | 13 | 0 | 0 | 6 | 0 | 100% |
-| 合计 | — | 523 | 431 | 36 | 0 | 56 | 0 | 93% |
+| 合计 | — | 523 | 437 | 30 | 0 | 56 | 0 | 94% |
 
-已取证（evidenced + accepted）36 / 523；缺口密度 93% =（unverified + blocked + out-of-scope）÷ 条款数，其中 out-of-scope 占 0%。
+已取证（evidenced + accepted）30 / 523；缺口密度 94% =（unverified + blocked + out-of-scope）÷ 条款数，其中 out-of-scope 占 0%。
 <!-- END GENERATED: acceptance-counts -->

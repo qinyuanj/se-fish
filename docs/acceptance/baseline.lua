@@ -3,7 +3,7 @@
 -- legacyTests（fast 与 full 车道实际发现的测试文件数，剔除 spec 等条款断言车道）只减：清理不许停在半路。
 -- 调高 evidenced 或调低 legacyTests 之后才允许重写本文件；反方向的 --update-baseline 直接拒绝并退 2。
 return {
-  evidenced = 36,
+  evidenced = 30,
   legacyTests = 142,
   updated = "2026-11-20",
 }

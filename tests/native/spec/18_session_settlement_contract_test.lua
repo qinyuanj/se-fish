@@ -274,18 +274,74 @@ describe('条款 18 存档会话与结算身份', function()
     assert.same(0, rejoined.teleports)
   end)
 
+  it('个人持久状态逐项保存与恢复', function()
+    local uid = 5209
+    local snapshot = seedSnapshot(uid)
+    local safe = env.cfg.Zones[1].Scene.SafePoint
+    snapshot.extra.travel.safePoint = { x = safe.x, y = safe.y, z = safe.z }
+    snapshot.extra.survival.health = 210
+    snapshot.extra.survival.hunger = 140
+    snapshot.extra.survival.dying = true
+    snapshot.extra.survival.dead = true
+    snapshot.extra.survival.dyingRemaining = 12
+    snapshot.extra.survival.deadRemaining = 25
+    snapshot.extra.growth.upgrades.backpack = 1
+    snapshot.extra.growth.purchases['33'] = 2
+    snapshot.extra.growth.potions.item167 = 1
+    snapshot.extra.collection.weights.goldfish = 0.2
+    snapshot.extra.collection.unlocked.goldfish = true
+    snapshot.extra.quest = { step = 3, count = 2 }
+    snapshot.extra.story.read.opening = true
+    snapshot.extra.travel.arrived[2] = 1
+    snapshot.extra.lottery.pity = 5
+    snapshot.extra.achievements.final = true
+
+    local _, data = ready(uid, vec(safe.x, safe.y, safe.z), snapshot)
+    assert.same(210, data.Extra.survival.health)
+    assert.same(140, data.Extra.survival.hunger)
+    assert.is_true(data.Extra.survival.dying)
+    assert.is_true(data.Extra.survival.dead)
+    assert.same(12, data.Extra.survival.dyingRemaining)
+    assert.same(25, data.Extra.survival.deadRemaining)
+    assert.same(1, data.Extra.growth.upgrades.backpack)
+    assert.same(2, data.Extra.growth.purchases['33'])
+    assert.same(1, data.Extra.growth.potions.item167)
+    assert.same(0.2, data.Extra.collection.weights.goldfish)
+    assert.is_true(data.Extra.collection.unlocked.goldfish)
+    assert.same({ step = 3, count = 2 }, data.Extra.quest)
+    assert.is_true(data.Extra.story.read.opening)
+    assert.same(1, data.Extra.travel.arrived[2])
+    assert.same(5, data.Extra.lottery.pity)
+    assert.is_true(data.Extra.achievements.final)
+
+    local restored = data:Serialize()
+    assert.same(210, restored.extra.survival.health)
+    assert.same(140, restored.extra.survival.hunger)
+    assert.same(0.2, restored.extra.collection.weights.goldfish)
+    assert.same(5, restored.extra.lottery.pity)
+    assert.is_true(restored.extra.achievements.final)
+  end)
+
   it('重进恢复合法落点与虚弱剩余时间，旧档升级保留财产补默认值', function()
     local uid = 5205
     local snapshot = seedSnapshot(uid)
     snapshot.v = 1
     snapshot.extra, snapshot.meta = nil, nil
     snapshot.coin = 321
-    snapshot.bar = { { i = 1, id = 'starterRod', n = 1 } }
-    snapshot.bait = { worm = 2 }
+    snapshot.bar = { { i = 1, id = 'starterRod', n = 1, m = 1.5, k = 1.2 } }
+    snapshot.bp = { { i = 1, id = 'shrimpTicket', n = 1 }, { i = 2, id = 'shrimpTicket', n = 1 } }
+    snapshot.bait = { worm = 2, sausage = 1 }
     local _, data = ready(uid, vec(99999, 5, 99999), snapshot)
     assert.same(321, data.Data.FishCoin, 'v1 旧档财产必须保留')
     assert.same(1, data:ItemCount('starterRod'))
+    assert.same(2, data:ItemCount('shrimpTicket'))
     assert.same(2, data.Data.Bait.worm, 'v1 鱼饵计数必须保留')
+    assert.same(1, data.Data.Bait.sausage)
+    local roundtrip = data:Serialize()
+    assert.same(1.5, roundtrip.bar[1].m, 'v1 实例倍率必须保留')
+    assert.same(1.2, roundtrip.bar[1].k, 'v1 烤制状态必须保留')
+    assert.same(env.cfg.Vitals.MaxHealth, data.Extra.survival.health, '新增血量字段按默认值填充')
+    assert.same(env.cfg.Vitals.MaxHunger, data.Extra.survival.hunger, '新增饥饿字段按默认值填充')
     assert.same(0, data.Extra.survival.weakRemaining, '新增虚弱字段按默认值填充')
     assert.is_table(data.Extra.travel.safePoint)
     assert.is_table(data.Extra.recovery)
