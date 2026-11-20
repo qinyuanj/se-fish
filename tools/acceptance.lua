@@ -48,7 +48,7 @@ M.SIGNATURE = '（签署：@%S+ %d%d%d%d%-%d%d%-%d%d）'
 -- 等级与矩阵不一致都判红，随 acceptance --check 进 fast 车道。
 M.COVERAGE = 'docs/acceptance/coverage.md'
 -- 已贯通小节：这些节的每条非试玩条款都必须在覆盖表里登记。逐节扩大——加一节就补齐该节落点。
-M.COVERAGE_SECTIONS = { 1, 5, 7, 9, 12, 13, 15, 16, 17, 18 }
+M.COVERAGE_SECTIONS = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 13, 14, 15, 16, 17, 18 }
 -- 四类证据列只有两个取值（完成口径见 ADR-0028）。
 M.COVERAGE_EVIDENCE = { '有', '缺' }
 -- 覆盖表每行八格：条款、代码落点、关联测试、正常流程、失败流程、退出重进、存档恢复、等级。
