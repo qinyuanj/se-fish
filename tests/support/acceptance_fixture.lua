@@ -80,8 +80,10 @@ local function busted_body()
   }, '\n')
 end
 
+-- 已贯通小节（M.COVERAGE_SECTIONS）里除第 1 节外的分片在夹具里各只有一条非试玩条款，
+-- 逐节跟着清单生成落点行，登记新节时夹具起点仍然全绿。
 local function coverage_body()
-  return table.concat({
+  local lines = {
     '# 夹具实现覆盖表',
     '',
     '> 夹具：八列与 docs/acceptance/coverage.md 一致。',
@@ -90,11 +92,15 @@ local function coverage_body()
     '| --- | --- | --- | --- | --- | --- | --- | --- |',
     string.format('| 1-01 | %s | %s | 缺 | 缺 | 缺 | 缺 | A |', M.COVERAGE_LANDING, M.COVERAGE_TEST),
     string.format('| 1-02 | %s | — | 缺 | 缺 | 缺 | 缺 | B |', M.COVERAGE_LANDING),
-    -- 已贯通小节扩到第 5、16 节：夹具对应分片的 5-01 / 16-01 也要有落点，起点才全绿。
-    string.format('| 5-01 | %s | — | 缺 | 缺 | 缺 | 缺 | A |', M.COVERAGE_LANDING),
-    string.format('| 16-01 | %s | — | 缺 | 缺 | 缺 | 缺 | A |', M.COVERAGE_LANDING),
-    '',
-  }, '\n')
+  }
+  for _, section in ipairs(Acceptance.COVERAGE_SECTIONS) do
+    if section ~= 1 then
+      lines[#lines + 1] = string.format('| %d-01 | %s | — | 缺 | 缺 | 缺 | 缺 | A |',
+        section, M.COVERAGE_LANDING)
+    end
+  end
+  lines[#lines + 1] = ''
+  return table.concat(lines, '\n')
 end
 
 local function readme_body()
