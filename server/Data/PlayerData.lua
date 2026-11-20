@@ -109,6 +109,8 @@ local function defaults(zone)
         collection = { weights = {}, unlocked = {} }, quest = { step = 1, count = 0 },
         story = { read = {} }, travel = { arrived = {}, zone = GameCfg.ResolveZoneId(zone), safePoint = {} },
         lottery = { pity = 0 }, achievements = {}, recovery = {}, cooldowns = {},
+        -- #253 队伍归属：0 = 无队伍；进队写小队号，主动离队立即清零，离线保留给重连恢复。
+        party = { id = 0 },
     }
 end
 
@@ -248,9 +250,13 @@ function PlayerData:Migrate(snapshot)
             or type(meta.operations) ~= 'table' or #meta.operations > 64 or type(extra) ~= 'table' then
             return nil, '持久身份损坏'
         end
+        -- #253 新增的队伍字段：旧档没有就按「无队伍」补默认，不让新增字段掀掉整份存档；
+        -- 其余扩展字段仍然严格，缺一个都算损坏。
+        if extra.party == nil then extra.party = defaults(saved.zone).party end
         for name in pairs(defaults(saved.zone)) do
             if type(extra[name]) ~= 'table' then return nil, '扩展字段缺失 ' .. name end
         end
+        if not integer(extra.party.id, 0) then return nil, '队伍字段损坏' end
         if type(extra.inventory.selection) ~= 'table' or type(extra.travel.arrived) ~= 'table'
             or type(extra.travel.safePoint) ~= 'table' or type(extra.inventory.weapons) ~= 'table' then return nil, '扩展字段损坏' end
         local held = extra.inventory.selection.held
