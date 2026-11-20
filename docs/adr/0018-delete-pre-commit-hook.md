@@ -19,7 +19,7 @@
 - 本仓**没有任何提交时自动检查**。提交前是否跑 `test fast` 由 agent 与人自行执行；PR 与 `main` 推送的 full 检查后来由 [ADR-0025](0025-windows-pr-full-test-gate.md) 引入，其余完成判据仍由 agent 显式执行。
 - [ADR-0017](0017-windows-native-only.md) 的「唯一非 Windows 原生例外」消失：仓库里不再有任何 `#!/bin/sh` 脚本。
 - `tools/hooks/` 目录整体删除。
-- 坏提交（含语法错）可以静默进分支，直到下一次有人跑 `test fast` 才发现。这是明确认领的代价。
+- 坏提交（含语法错）仍可静默进本地分支，直到下一次有人跑 `test fast` 才发现；推送后的 full 拦截见 [ADR-0025](0025-windows-pr-full-test-gate.md)。
 
 ## 备选方案（拒绝）
 

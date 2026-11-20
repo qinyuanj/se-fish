@@ -18,14 +18,11 @@ jobs:
         uses: actions/checkout@v4
       - name: 配置 MSVC
         uses: step-security/msvc-dev-cmd@v1
-      - name: 安装 Lua 5.4.6
-        uses: leafo/gh-actions-lua@v13
-        with:
-          luaVersion: "5.4.6"
-      - name: 安装 LuaRocks 3.12.2
-        uses: leafo/gh-actions-luarocks@v6
-        with:
-          luaRocksVersion: "3.12.2"
+      - name: 安装 Lua 5.4.6 与 LuaRocks 3.12.2
+        run: |
+          python -m pip install hererocks==0.25.1
+          python -m hererocks .hererocks --lua 5.4.6 --luarocks 3.12.2
+          "$(Resolve-Path .hererocks/bin)" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
       - name: 安装 Busted 2.3.0
         run: luarocks install busted 2.3.0-1
       - name: 运行 full 测试车道
