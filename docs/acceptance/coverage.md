@@ -166,44 +166,45 @@
 
 ### 第 6 节 战斗与成长（34 条）
 
+> #260 目标选择接线：6-26 / 6-29 / 6-30 / 6-31 的规格断言在 tests/native/spec/06_ai_target_test.lua；
+> 属性与效果投影的接线验收同在该文件（AttrModel → attr_rule、modifier_system → 移速倍率）。
+
 | 条款 | 代码落点 | 关联测试 | 正常流程 | 失败流程 | 退出重进 | 存档恢复 | 等级 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 6-01 | server/Mgr/MgrWeapon.lua、common/GameCfg.lua | tests/native/weapon_system_test.lua、tests/native/combat_behavior_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 6-02 | server/Mgr/MgrWeapon.lua、common/GameCfg.lua | tests/native/weapon_system_test.lua、tests/native/combat_behavior_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 6-02 | server/Mgr/MgrWeapon.lua、common/GameCfg.lua、common/cfg/Items.lua | tests/native/weapon_system_test.lua、tests/native/combat_behavior_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 6-03 | server/Mgr/MgrWeapon.lua、common/GameCfg.lua | tests/native/weapon_system_test.lua、tests/native/combat_behavior_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 6-04 | server/Mgr/MgrWeapon.lua、common/GameCfg.lua | tests/native/weapon_system_test.lua、tests/native/combat_behavior_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 6-05 | server/Mgr/MgrWeapon.lua、client/packages/ability_system/strategy/HoldStrategy.lua | tests/native/weapon_system_test.lua、tests/native/combat_behavior_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 6-06 | common/cfg/Shop.lua、server/Mgr/MgrWeapon.lua | tests/native/weapon_system_test.lua、tests/native/combat_behavior_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 6-07 | common/cfg/Items.lua | tests/native/cfg_fish_items_test.lua、tests/native/prize_weapon_effect_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 6-05 | server/Mgr/MgrWeapon.lua、client/packages/ability_system/strategy/HoldStrategy.lua、client/WeaponAim.lua | tests/native/weapon_system_test.lua、tests/native/combat_behavior_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 6-06 | common/cfg/Shop.lua、server/Mgr/MgrWeapon.lua、common/GameCfg.lua | tests/native/weapon_system_test.lua、tests/native/combat_behavior_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 6-07 | common/cfg/Items.lua、common/GameCfg.lua | tests/native/cfg_fish_items_test.lua、tests/native/prize_weapon_effect_test.lua、tests/native/prize_weapon_cfg_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 6-08 | common/cfg/Shop.lua、server/Mgr/MgrWeapon.lua | tests/native/weapon_system_test.lua、tests/native/combat_behavior_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 6-09 | server/Mgr/MgrWeapon.lua | tests/native/weapon_system_test.lua、tests/native/combat_behavior_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 6-09 | server/Mgr/MgrWeapon.lua、server/Mgr/MgrVitals.lua | tests/native/weapon_system_test.lua、tests/native/combat_behavior_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 6-10 | server/Mgr/MgrWeapon.lua | tests/native/weapon_system_test.lua、tests/native/combat_behavior_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 6-11 | server/Mgr/MgrWeapon.lua | tests/native/weapon_system_test.lua、tests/native/combat_behavior_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 6-11 | server/Mgr/MgrWeapon.lua、client/WeaponAim.lua | tests/native/weapon_system_test.lua、tests/native/combat_behavior_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 6-12 | server/Mgr/MgrWeapon.lua | tests/native/weapon_system_test.lua、tests/native/combat_behavior_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 6-13 | server/Mgr/MgrWeapon.lua、common/FishCatch.lua | tests/native/weapon_system_test.lua、tests/native/combat_behavior_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 6-14 | common/cfg/Shop.lua、server/Mgr/MgrShop.lua、server/Mgr/MgrWeapon.lua | tests/native/prize_growth_wiring_test.lua、tests/native/shop_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 6-15 | common/cfg/Shop.lua、server/Mgr/MgrShop.lua、server/Mgr/MgrWeapon.lua | tests/native/prize_growth_wiring_test.lua、tests/native/shop_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 6-16 | common/cfg/Shop.lua、server/Mgr/MgrShop.lua、server/Mgr/MgrWeapon.lua | tests/native/prize_growth_wiring_test.lua、tests/native/shop_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 6-17 | server/Mgr/MgrShop.lua、server/Mgr/MgrWeapon.lua | tests/native/prize_growth_wiring_test.lua、tests/native/shop_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 6-18 | server/Mgr/MgrWeapon.lua、server/Mgr/MgrShop.lua | tests/native/prize_weapon_effect_test.lua、tests/native/special_item_mgr_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 6-19 | server/Mgr/MgrWeapon.lua、server/Mgr/MgrAttr.lua | tests/native/prize_weapon_effect_test.lua、tests/native/special_item_mgr_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 6-20 | server/Mgr/MgrSpecialItem.lua、common/SpecialItem.lua | tests/native/prize_weapon_effect_test.lua、tests/native/special_item_mgr_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 6-21 | common/cfg/Items.lua、common/cfg/Lottery.lua | tests/native/cfg_fish_items_test.lua、tests/native/prize_weapon_effect_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 6-22 | server/Mgr/MgrLottery.lua、common/LotteryDraw.lua | tests/native/prize_weapon_effect_test.lua、tests/native/lottery_draw_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 6-23 | common/cfg/Items.lua | tests/native/cfg_fish_items_test.lua、tests/native/prize_weapon_effect_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 6-24 | server/Mgr/MgrWeapon.lua、common/cfg/Items.lua、server/AbilityBehaviors/melee_hit.lua | tests/native/prize_weapon_effect_test.lua、tests/native/weapon_system_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 6-25 | server/Mgr/MgrWeapon.lua、common/cfg/Items.lua、server/AbilityBehaviors/melee_hit.lua | tests/native/prize_weapon_effect_test.lua、tests/native/weapon_system_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 6-26 | server/Mgr/MgrWeapon.lua、common/cfg/Items.lua、server/AbilityBehaviors/melee_hit.lua | tests/native/prize_weapon_effect_test.lua、tests/native/weapon_system_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 6-27 | server/Mgr/MgrWeapon.lua、common/cfg/Items.lua、server/AbilityBehaviors/melee_hit.lua | tests/native/prize_weapon_effect_test.lua、tests/native/weapon_system_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 6-28 | common/cfg/Items.lua、server/Mgr/MgrWeapon.lua | tests/native/prize_weapon_effect_test.lua、tests/native/weapon_system_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 6-29 | server/Mgr/MgrAi.lua | tests/native/ai_migration_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 6-30 | server/Mgr/MgrAi.lua | tests/native/ai_migration_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 6-31 | server/Mgr/MgrAi.lua、common/BossPhase.lua | tests/native/ai_migration_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 6-13 | server/Mgr/MgrWeapon.lua、common/FishCatch.lua、server/Mgr/MgrFishUnit.lua | tests/native/weapon_system_test.lua、tests/native/combat_behavior_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 6-14 | common/cfg/Shop.lua、server/Mgr/MgrShop.lua、server/Mgr/MgrWeapon.lua、common/AttrModel.lua、server/Mgr/MgrAttr.lua | tests/native/prize_growth_wiring_test.lua、tests/native/shop_test.lua、tests/native/attr_migration_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 6-15 | common/cfg/Shop.lua、server/Mgr/MgrShop.lua、server/Mgr/MgrWeapon.lua、common/AttrModel.lua、server/Mgr/MgrAttr.lua | tests/native/prize_growth_wiring_test.lua、tests/native/shop_test.lua、tests/native/attr_migration_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 6-16 | common/cfg/Shop.lua、server/Mgr/MgrShop.lua、server/Mgr/MgrWeapon.lua、common/AttrModel.lua、server/Mgr/MgrAttr.lua | tests/native/prize_growth_wiring_test.lua、tests/native/shop_test.lua、tests/native/attr_migration_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 6-17 | server/Mgr/MgrShop.lua、server/Mgr/MgrWeapon.lua、common/AttrModel.lua、server/Mgr/MgrAttr.lua | tests/native/prize_growth_wiring_test.lua、tests/native/shop_test.lua、tests/native/attr_migration_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 6-18 | server/Mgr/MgrWeapon.lua、server/Mgr/MgrShop.lua、common/AttrModel.lua、server/Mgr/MgrAttr.lua | tests/native/prize_weapon_effect_test.lua、tests/native/special_item_mgr_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 6-19 | server/Mgr/MgrWeapon.lua、server/Mgr/MgrAttr.lua、common/AttrModel.lua | tests/native/prize_weapon_effect_test.lua、tests/native/special_item_mgr_test.lua、tests/native/prize_growth_wiring_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 6-20 | server/Mgr/MgrSpecialItem.lua、common/SpecialItem.lua、common/AttrModel.lua、server/Mgr/MgrAttr.lua | tests/native/prize_weapon_effect_test.lua、tests/native/special_item_mgr_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 6-21 | common/cfg/Items.lua、common/cfg/Lottery.lua、common/GameCfg.lua | tests/native/cfg_fish_items_test.lua、tests/native/prize_weapon_effect_test.lua、tests/native/prize_weapon_cfg_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 6-22 | server/Mgr/MgrLottery.lua、common/LotteryDraw.lua、common/cfg/Lottery.lua | tests/native/prize_weapon_effect_test.lua、tests/native/lottery_draw_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 6-23 | common/cfg/Items.lua、common/GameCfg.lua | tests/native/cfg_fish_items_test.lua、tests/native/prize_weapon_effect_test.lua、tests/native/prize_weapon_cfg_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 6-24 | server/Mgr/MgrWeapon.lua、common/cfg/Items.lua、server/AbilityBehaviors/melee_hit.lua、server/Mgr/MgrModifier.lua、common/GameCfg.lua | tests/native/prize_weapon_effect_test.lua、tests/native/weapon_system_test.lua、tests/native/status_effect_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 6-25 | server/Mgr/MgrWeapon.lua、common/cfg/Items.lua、server/AbilityBehaviors/melee_hit.lua、server/Mgr/MgrModifier.lua、common/GameCfg.lua | tests/native/prize_weapon_effect_test.lua、tests/native/weapon_system_test.lua、tests/native/status_effect_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 6-26 | server/Mgr/MgrWeapon.lua、common/cfg/Items.lua、server/AbilityBehaviors/melee_hit.lua、server/Mgr/MgrModifier.lua、server/Mgr/MgrAttr.lua | tests/native/prize_weapon_effect_test.lua、tests/native/weapon_system_test.lua、tests/native/status_effect_test.lua、tests/native/spec/06_ai_target_test.lua | 有 | 缺 | 缺 | 缺 | A |
+| 6-27 | server/Mgr/MgrWeapon.lua、common/cfg/Items.lua、server/AbilityBehaviors/melee_hit.lua、server/Mgr/MgrModifier.lua、common/GameCfg.lua | tests/native/prize_weapon_effect_test.lua、tests/native/weapon_system_test.lua、tests/native/status_effect_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 6-28 | common/cfg/Items.lua、server/Mgr/MgrWeapon.lua、common/GameCfg.lua | tests/native/prize_weapon_effect_test.lua、tests/native/weapon_system_test.lua、tests/native/prize_weapon_cfg_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 6-29 | server/Mgr/MgrAi.lua、server/Mgr/MgrFishUnit.lua、server/Mgr/MgrAiTarget.lua、common/AiTargetPolicy.lua | tests/native/ai_migration_test.lua、tests/native/spec/06_ai_target_test.lua | 有 | 有 | 缺 | 缺 | A |
+| 6-30 | server/Mgr/MgrAi.lua、server/Mgr/MgrFishUnit.lua、server/Mgr/MgrAiTarget.lua | tests/native/ai_migration_test.lua、tests/native/spec/06_ai_target_test.lua | 缺 | 有 | 缺 | 缺 | A |
+| 6-31 | server/Mgr/MgrAi.lua、common/BossPhase.lua、server/Mgr/MgrFishUnit.lua、server/Mgr/MgrAiTarget.lua | tests/native/ai_migration_test.lua、tests/native/spec/06_ai_target_test.lua | 有 | 有 | 缺 | 缺 | A |
 | 6-32 | server/Mgr/MgrVitals.lua、server/Mgr/MgrWeapon.lua | tests/native/combat_base_test.lua、tests/native/damage_float_test.lua | 缺 | 缺 | 缺 | 缺 | B |
-| 6-33 | common/DamageNotice.lua、client/DamageFloat.lua | tests/native/combat_base_test.lua、tests/native/damage_float_test.lua | 缺 | 缺 | 缺 | 缺 | B |
+| 6-33 | common/DamageNotice.lua、client/DamageFloat.lua、server/Mgr/MgrVitals.lua | tests/native/combat_base_test.lua、tests/native/damage_float_test.lua | 缺 | 缺 | 缺 | 缺 | B |
 | 6-34 | server/Mgr/MgrVitals.lua、server/Mgr/MgrSurvival.lua | tests/native/combat_base_test.lua、tests/native/damage_float_test.lua | 缺 | 缺 | 缺 | 缺 | B |
-
-武器数值以 common/cfg/Shop.lua 与 common/cfg/Items.lua 为准，升级倍率在 MgrShop 与 MgrWeapon；武器特效（淬毒、灼烧、霜冻、麻痹）经 server/AbilityBehaviors/melee_hit.lua 落到统一伤害入口。
 
 ### 第 7 节 经济与钓场商店（25 条）
 
@@ -283,7 +284,7 @@
 
 | 条款 | 代码落点 | 关联测试 | 正常流程 | 失败流程 | 退出重进 | 存档恢复 | 等级 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 9-01 | server/Mgr/MgrVitals.lua、server/AbilityBehaviors/melee_hit.lua | tests/native/vitals_test.lua、tests/native/combat_behavior_test.lua | 缺 | 缺 | 缺 | 缺 | B |
+| 9-01 | server/Mgr/MgrVitals.lua、server/Mgr/MgrPkFilter.lua、server/main.lua | tests/native/spec/09_pk_damage_filter_test.lua | 有 | 有 | 缺 | 缺 | B |
 | 9-02 | server/Mgr/MgrParty.lua、server/main.lua | tests/native/spec/09_party_authority_test.lua | 缺 | 有 | 缺 | 缺 | A |
 | 9-03 | server/Mgr/MgrVitals.lua、server/Mgr/MgrSurvival.lua | tests/native/revive_callback_test.lua、tests/native/survival_test.lua | 缺 | 缺 | 缺 | 缺 | B |
 | 9-04 | server/Mgr/MgrFishUnit.lua、server/Mgr/MgrLoot.lua、server/Mgr/MgrFerry.lua | tests/native/fish_lift_test.lua、tests/native/ferry_test.lua | 缺 | 缺 | 缺 | 缺 | B |
@@ -294,11 +295,11 @@
 | 9-09 | server/Mgr/MgrParty.lua、common/GameCfg.lua | tests/native/spec/09_party_authority_test.lua | 有 | 缺 | 有 | 缺 | B |
 | 9-10 | server/Mgr/MgrParty.lua、common/GameCfg.lua | tests/native/spec/09_party_authority_test.lua | 有 | 缺 | 有 | 缺 | A |
 | 9-11 | server/Mgr/MgrParty.lua、common/GameCfg.lua | tests/native/spec/09_party_authority_test.lua | 有 | 缺 | 缺 | 缺 | A |
-| 9-12 | server/Mgr/MgrVitals.lua、server/AbilityBehaviors/melee_hit.lua | tests/native/vitals_test.lua、tests/native/combat_behavior_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 9-13 | server/Mgr/MgrVitals.lua、common/GameCfg.lua | tests/native/vitals_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 9-14 | server/Mgr/MgrVitals.lua、common/GameCfg.lua | tests/native/vitals_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 9-15 | server/Mgr/MgrVitals.lua | tests/native/vitals_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 9-16 | server/Mgr/MgrVitals.lua、common/GameCfg.lua | tests/native/vitals_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 9-12 | server/Mgr/MgrVitals.lua、server/Mgr/MgrPkFilter.lua、server/main.lua | tests/native/spec/09_pk_damage_filter_test.lua | 有 | 有 | 缺 | 缺 | A |
+| 9-13 | server/Mgr/MgrVitals.lua、server/Mgr/MgrPkFilter.lua、common/ZoneMarkers.lua | tests/native/spec/09_pk_damage_filter_test.lua | 有 | 有 | 缺 | 缺 | A |
+| 9-14 | server/Mgr/MgrVitals.lua、server/Mgr/MgrPkFilter.lua、common/ZoneMarkers.lua | tests/native/spec/09_pk_damage_filter_test.lua | 有 | 有 | 缺 | 缺 | A |
+| 9-15 | server/Mgr/MgrVitals.lua、server/Mgr/MgrPkFilter.lua | tests/native/spec/09_pk_damage_filter_test.lua | 有 | 缺 | 缺 | 缺 | A |
+| 9-16 | server/Mgr/MgrVitals.lua、server/Mgr/MgrPkFilter.lua、server/Mgr/MgrFishUnit.lua | tests/native/spec/09_pk_damage_filter_test.lua | 有 | 有 | 缺 | 缺 | A |
 | 9-17 | server/Mgr/MgrSurvival.lua、server/Mgr/MgrVitals.lua | tests/native/survival_test.lua、tests/native/revive_callback_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 9-18 | server/Mgr/MgrSurvival.lua、server/Mgr/MgrVitals.lua | tests/native/survival_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 9-19 | server/Mgr/MgrParty.lua、common/GameCfg.lua、client/ScreenHandlers/ScreenParty.lua | tests/native/spec/09_party_authority_test.lua、tests/native/spec/09_party_hud_test.lua | 有 | 有 | 缺 | 缺 | A |
@@ -308,7 +309,7 @@
 
 第 9 节由小队子单先贯通：9-02、9-06～9-11、9-19～9-22 的代码落点是 `server/Mgr/MgrParty.lua`（服务端唯一权威的归属与名单）
 与 `client/ScreenHandlers/ScreenParty.lua`（队友血量与邀请倒计时），证据是两份 spec 断言。
-9-01、9-12～9-16 的落点是既有伤害入口，免伤判定与证据归 PK 子单；9-03、9-17、9-18 归抢救子单。
+9-01、9-12～9-16 经统一伤害入口与 PK 过滤接缝落地，spec 断言覆盖同队全武器免伤、鱼塘豁免、鱼塘外 PK、人数不足与鱼攻击；9-03、9-17、9-18 归抢救子单。
 三者共用同一份矩阵小节，因此本表一次登记到位，四类证据只勾已经真取到的那几栏。
 
 ### 第 10 节 烧烤（25 条）

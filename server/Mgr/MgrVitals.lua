@@ -387,7 +387,7 @@ function Mgr:ApplyHit(hit, target, amount)
     local sourceState = hit.sourcePlayer and self:GetState(hit.sourcePlayer)
     if hit.sourcePlayer and (not sourceState or sourceState.player ~= hit.sourcePlayer) then return false end
     if self.DamageFilter then
-        local filterOk, allowed = pcall(self.DamageFilter, hit, player)
+        local filterOk, allowed = pcall(self.DamageFilter, hit, player, self)
         if not filterOk then print('[MgrVitals] 伤害过滤失败', player.UserId, tostring(allowed)) end
         if not filterOk or allowed ~= true then return false end
     end

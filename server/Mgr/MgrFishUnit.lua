@@ -15,6 +15,8 @@ local BossPhase = require('common.BossPhase')
 local GarBiteNotice = require('common.GarBiteNotice')
 local BossMoves = require('common.cfg.BossMoves')
 local FishBehaviors = require('server.FishBehaviors')
+-- #260 目标选择唯一裁决口（业务侧适配层）；它只读消费官方 AI 包，不写 Controller 位移。
+local AiTarget = require('server.Mgr.MgrAiTarget')
 
 -- AbilityAPI 懒加载：MgrFishUnit 被大量单测用假 game 加载，顶层 require 会连带跑技能包
 -- （包内 api.lua 加载时要 RunService:IsServer()），把无关用例拖挂。
@@ -30,6 +32,11 @@ Mgr.State = { AwaitLift = 'awaitLift', Held = 'held', Escaping = 'escaping',
 
 local function cfg()
     return GameCfg.FishUnit
+end
+
+local function distanceSq(pos, cp)
+    if not pos or not cp then return math.huge end
+    return (cp.x - pos.x) * (cp.x - pos.x) + (cp.z - pos.z) * (cp.z - pos.z)
 end
 
 function Mgr:Now()
@@ -542,36 +549,40 @@ function Mgr:SetTargetOverride(fish, player)
     return true
 end
 
+-- #260 目标选择只在这里裁决：6-31 指定目标优先，6-30 合法性由 IsTargetValid 守门，
+-- 其余候选（6-29 累计有效伤害优先、无记录取最近）交给适配层排序并登记到官方 AI 管理器。
+-- 本函数只返回玩家与坐标，不碰移动：位移仍归 FishBehaviors / FlightPath / BossPhase。
 function Mgr:ChooseTarget(fish, pos, params)
+    local adapter = self.AiTarget or AiTarget
     local override = fish.TargetOverride
     if override then
         local valid, cp = self:IsTargetValid(override, pos, params)
-        if valid then return override, cp end
+        if valid then
+            adapter:SetFocus(fish, override)
+            return override, cp
+        end
         fish.TargetOverride = nil
     end
-    local target, tpos, bestThreat = nil, nil, -1
+    local candidates, present = {}, {}
+    for _, player in ipairs(self:Players()) do
+        present[player] = true
+        local valid, cp = self:IsTargetValid(player, pos, params)
+        if valid then
+            candidates[#candidates + 1] = { player = player, pos = cp,
+                damage = fish.Threat and fish.Threat[player] or 0, distance = distanceSq(pos, cp) }
+        end
+    end
+    -- 离开战斗范围 / 濒死 / 死亡的玩家同时从仇恨账本清掉，避免回血后再被旧伤害拉回目标。
     if fish.Threat then
-        for player, total in pairs(fish.Threat) do
-            local valid, cp = self:IsTargetValid(player, pos, params)
-            if valid then
-                if total > bestThreat or (total == bestThreat and target and player.UserId < target.UserId) then
-                    bestThreat, target, tpos = total, player, cp
-                end
-            else
+        for player in pairs(fish.Threat) do
+            if not present[player] or not self:IsTargetValid(player, pos, params) then
                 fish.Threat[player] = nil
             end
         end
     end
-    if target then return target, tpos end
-    local bestDistance
-    for _, player in ipairs(self:Players()) do
-        local valid, cp = self:IsTargetValid(player, pos, params)
-        if valid then
-            local d = (cp.x - pos.x) * (cp.x - pos.x) + (cp.z - pos.z) * (cp.z - pos.z)
-            if not bestDistance or d < bestDistance then bestDistance, target, tpos = d, player, cp end
-        end
-    end
-    return target, tpos
+    local ranked = adapter:Select(fish, candidates)
+    local top = ranked[1]
+    return top and top.player or nil, top and top.pos or nil
 end
 
 -- #134 头部攻击：头部区 = 以鱼身中点为圆心 BiteRange 内、与朝向夹角 < HeadHalfAngleDeg；

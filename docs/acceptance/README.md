@@ -45,10 +45,10 @@
 | [3](03-inventory-and-controls.md) | 持有与操作 | 25 | 22 | 0 | 0 | 3 | 0 | 100% |
 | [4](04-fishing-system.md) | 钓鱼系统 | 31 | 25 | 3 | 0 | 3 | 0 | 90% |
 | [5](05-zone-fish-data.md) | 七区鱼种完整数据 | 18 | 16 | 2 | 0 | 0 | 0 | 89% |
-| [6](06-combat-and-growth.md) | 战斗与成长 | 37 | 34 | 0 | 0 | 3 | 0 | 100% |
+| [6](06-combat-and-growth.md) | 战斗与成长 | 37 | 30 | 4 | 0 | 3 | 0 | 89% |
 | [7](07-economy-and-shop.md) | 经济与钓场商店 | 27 | 21 | 4 | 0 | 2 | 0 | 85% |
 | [8](08-npc-exchange-ferry.md) | NPC、兑换与摆渡 | 41 | 34 | 0 | 0 | 7 | 0 | 100% |
-| [9](09-multiplayer-rules.md) | 多人规则 | 25 | 11 | 11 | 0 | 3 | 0 | 56% |
+| [9](09-multiplayer-rules.md) | 多人规则 | 25 | 5 | 17 | 0 | 3 | 0 | 32% |
 | [10](10-grilling.md) | 烧烤 | 28 | 15 | 10 | 0 | 3 | 0 | 64% |
 | [11](11-downed-death-revive.md) | 濒死、死亡与复活 | 42 | 39 | 0 | 0 | 3 | 0 | 100% |
 | [12](12-elite-boss-behavior.md) | 精英与首领行为 | 55 | 13 | 35 | 0 | 7 | 0 | 36% |
