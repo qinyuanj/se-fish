@@ -244,7 +244,7 @@ function Mgr:Decline(player)
     return true
 end
 
-function Mgr:Disband(party, notice)
+function Mgr:Disband(party, notice, skipUserId)
     local members = party.Members
     party.Members = {}
     self.Parties[party.Id] = nil
@@ -254,9 +254,13 @@ function Mgr:Disband(party, notice)
         self:SavePartyId(member, 0)
         self:Push(member, notice)
     end
+    -- #249：解散也走一次满员等待的重试——等着的那批人的原队已经不在，
+    -- 让他们当场拿到「原队已散」的明确结果，归属落回无队伍，而不是把悬空归属留到下次重连。
+    self:RetryRestore(skipUserId)
 end
 
 -- reason = 'offline' 时保留存档里的归属，重连才有「恢复原队伍」；主动离队立即落回无队伍。
+-- #249：离队会空出位置，末尾统一重试一次「满员等待」的玩家（见 RetryRestore，条款 9-22）。
 function Mgr:Leave(player, reason)
     local party = self.Parties[self:PartyIdOf(player) or 0]
     if not party then
@@ -268,11 +272,13 @@ function Mgr:Leave(player, reason)
     local notice = reason == 'offline' and nil or 'left'
     if #party.Members < cfg().MinMembers then
         self:Push(player, notice)
-        self:Disband(party, 'disbanded')
+        -- Disband 末尾自己会重试一次满员等待，这里不再重复
+        self:Disband(party, 'disbanded', player.UserId)
         return true, 'disbanded'
     end
     self:Push(player, notice)
     self:PushParty(party)
+    self:RetryRestore(player.UserId)
     return true
 end
 
@@ -321,11 +327,38 @@ function Mgr:Restore(player)
             self:PushParty(party, 'restored')
             return 'restored'
         end
-        -- 原队伍还在、只是满了：保留归属（下次有位置再谈恢复），回执与文案与解散分开。
+        -- 原队伍还在、只是满了：保留归属，等下一次空位——Leave / Disband 末尾的 RetryRestore
+        -- 会替这名玩家重试（9-22）；回执与文案与解散分开。
         return 'full'
     end
     self:SavePartyId(player, 0)
     return 'disbanded'
+end
+
+-- #249 满员等待的重试时机（review：原注释写「下次有位置再谈恢复」却没有后续时机）：
+-- 有存档归属、当前无队伍、且在线的玩家，在 Leave / Disband 空出位置（或队伍消失）之后各自重试一次。
+-- skipUserId 排除正在离场的那名玩家：OnPlayerRemoving 里 Online 还没清，不能把他又恢复回队伍。
+-- 重试仍失败（原队已散）时 Restore 自己把归属落回无队伍；满员仍返回 'full'，等下一次空位。
+function Mgr:RetryRestore(skipUserId)
+    local waiting = {}
+    for userId, player in pairs(self.Online) do
+        if userId ~= skipUserId and player and player.UserId == userId and not self.PartyOf[userId]
+            and self:SavedParty(player) then
+            waiting[#waiting + 1] = player
+        end
+    end
+    -- pairs 无序：按 UserId 排序，恢复顺序与回执顺序可复现
+    table.sort(waiting, function(a, b) return a.UserId < b.UserId end)
+    local restored = 0
+    for _, player in ipairs(waiting) do
+        local result = self:Restore(player)
+        if result == 'restored' then
+            restored = restored + 1 -- Restore 内部已 PushParty(party, 'restored')
+        elseif result == 'disbanded' then
+            self:Push(player, 'disbanded')
+        end
+    end
+    return restored
 end
 
 function Mgr:OnPlayerAdded(player)

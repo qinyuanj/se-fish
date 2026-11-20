@@ -423,6 +423,15 @@ describe('条款 9 小队权威状态', function()
     assert.same('full', lastState(back).notice, '回执是满员，不是解散')
     assert.is_not_nil(id)
     assert.same(id, env.players:GetDataInst(back).Extra.party.id, '队伍还在，归属保留')
+
+    -- 9-22（review #249）：满员等待不是一个没有后续的结局——队员一离队空出位置，
+    -- 有存档归属、当前无队伍、且在线的玩家自动重试恢复，不必再重连一次。
+    request(b, { action = 'Leave' })
+    assert.same(id, env.party:PartyIdOf(back), '空出位置后自动恢复到原队伍')
+    assert.is_true(env.party:SameParty(back, a), '恢复后与队友同队')
+    assert.same(3, #env.party:Members(a), '恢复后人数回到三人')
+    assert.same('restored', lastState(back).notice, '恢复结果对玩家是明确的')
+    assert.same(id, env.players:GetDataInst(back).Extra.party.id)
   end)
 
   -- 9-22（review #249-5）：队伍号只在一轮开服里唯一，存档带会话纪元；跨开服同号不恢复。
