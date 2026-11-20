@@ -139,7 +139,61 @@
 | 18-31 | server/Mgr/MgrSave.lua、server/Data/PlayerData.lua | tests/native/spec/18_session_settlement_contract_test.lua | 有 | 有 | 有 | 有 | B |
 | 18-32 | server/main.lua、server/Mgr/MgrPlayerData.lua | tests/native/player_leave_rejoin_test.lua | 缺 | 缺 | 缺 | 缺 | B |
 
+### 第 13 节 图鉴与成就（16 条）
+
+| 条款 | 代码落点 | 关联测试 | 正常流程 | 失败流程 | 退出重进 | 存档恢复 | 等级 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 13-01 | common/cfg/Fish.lua、client/ScreenHandlers/ScreenCompendium.lua | tests/native/compendium_test.lua、tests/native/compendium_ui_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 13-02 | client/ScreenHandlers/ScreenCompendium.lua、common/GameCfg.lua | tests/native/compendium_ui_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 13-03 | client/ScreenHandlers/ScreenCompendium.lua | tests/native/compendium_ui_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 13-04 | server/Mgr/MgrCompendium.lua、server/Mgr/MgrReelIn.lua、server/Mgr/MgrFishUnit.lua | tests/native/compendium_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 13-05 | server/Mgr/MgrCompendium.lua | tests/native/compendium_test.lua | 缺 | 缺 | 缺 | 缺 | B |
+| 13-06 | server/Mgr/MgrCompendium.lua、server/Data/PlayerData.lua | tests/native/compendium_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 13-07 | client/ScreenHandlers/ScreenCompendium.lua、server/Mgr/MgrRecords.lua、common/Records.lua | tests/native/spec/13_record_display_placeholder_test.lua | 有 | 缺 | 缺 | 缺 | A |
+| 13-08 | client/ScreenHandlers/ScreenCompendium.lua、server/Mgr/MgrRecords.lua、common/Records.lua | tests/native/spec/13_record_display_placeholder_test.lua | 有 | 缺 | 缺 | 缺 | A |
+| 13-09 | server/Mgr/MgrCompendium.lua、server/Mgr/MgrBlindbox.lua、server/Mgr/MgrInteract.lua | tests/native/compendium_test.lua | 缺 | 缺 | 缺 | 缺 | B |
+| 13-10 | server/Mgr/MgrInteract.lua、common/GameCfg.lua、server/Mgr/MgrAchievements.lua | tests/native/exchange_zones_127_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 13-11 | server/Mgr/MgrCompendium.lua、server/Mgr/MgrInteract.lua | tests/native/compendium_test.lua、tests/native/exchange_zones_127_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 13-12 | server/Mgr/MgrAchievements.lua、common/GameCfg.lua | tests/native/spec/13_achievement_delivery_placeholder_test.lua | 有 | 缺 | 有 | 有 | B |
+| 13-13 | server/Mgr/MgrAchievements.lua | tests/native/spec/13_achievement_delivery_placeholder_test.lua | 有 | 缺 | 有 | 有 | B |
+| 13-14 | server/Mgr/MgrAchievements.lua、server/Mgr/MgrSave.lua | tests/native/spec/13_achievement_delivery_placeholder_test.lua | 有 | 有 | 缺 | 缺 | B |
+| 13-17 | server/Mgr/MgrRecords.lua、server/Data/RecordsAdapter.lua、common/Records.lua、client/ScreenHandlers/ScreenCompendium.lua | tests/native/spec/13_record_display_placeholder_test.lua、tests/native/records_test.lua | 缺 | 有 | 缺 | 缺 | B |
+| 13-18 | server/Mgr/MgrAchievements.lua、common/GameCfg.lua | tests/native/spec/13_achievement_delivery_placeholder_test.lua、tests/native/spec/17_platform_achievement_id_test.lua | 有 | 有 | 有 | 有 | B |
+
+第 13 节的 13-07、13-08、13-17 由图鉴客户端与服务端纪录查询的公开入口取证：`tests/native/spec/13_record_display_placeholder_test.lua` 
+翻到「没有纪录」与「纪录服务未接入」两种回包，断言该列只显示「未取得数据」、不出现任何数字与保持者；13-12～13-14、13-18 由
+成就交付队列取证。13-15、13-16 是试玩条款，不在本表登记。
+
+### 第 17 节 新手任务、剧情与平台边界（22 条）
+
+| 条款 | 代码落点 | 关联测试 | 正常流程 | 失败流程 | 退出重进 | 存档恢复 | 等级 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 17-01 | common/GameCfg.lua、server/Mgr/MgrQuest.lua | tests/native/quest_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 17-02 | common/GameCfg.lua、server/Mgr/MgrQuest.lua | tests/native/quest_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 17-03 | server/Mgr/MgrQuest.lua | tests/native/quest_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 17-04 | server/Mgr/MgrQuest.lua、server/Mgr/MgrSave.lua、server/Data/PlayerData.lua | tests/native/quest_test.lua、tests/native/save_test.lua | 缺 | 缺 | 缺 | 缺 | B |
+| 17-05 | server/Mgr/MgrQuest.lua | tests/native/quest_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 17-06 | common/GameCfg.lua、server/Mgr/MgrPlayerData.lua | tests/native/gm_panel_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 17-07 | common/GameCfg.lua、common/cfg/Shop.lua、server/Mgr/MgrShop.lua | tests/native/quest_test.lua、tests/native/shop_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 17-08 | server/Mgr/MgrStory.lua、client/ScreenHandlers/ScreenMain.lua | tests/native/guide_persistence_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 17-09 | server/Mgr/MgrStory.lua、client/ScreenHandlers/ScreenMain.lua | tests/native/guide_persistence_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 17-10 | server/Mgr/MgrStory.lua、server/Data/PlayerData.lua | tests/native/guide_persistence_test.lua | 缺 | 缺 | 缺 | 缺 | B |
+| 17-11 | common/NpcDialogue.lua、server/Mgr/MgrStory.lua | — | 缺 | 缺 | 缺 | 缺 | A |
+| 17-12 | common/NpcDialogue.lua、server/Mgr/MgrStory.lua | — | 缺 | 缺 | 缺 | 缺 | A |
+| 17-13 | common/NpcDialogue.lua、server/Mgr/MgrStory.lua | — | 缺 | 缺 | 缺 | 缺 | A |
+| 17-14 | server/Mgr/MgrStory.lua | — | 缺 | 缺 | 缺 | 缺 | B |
+| 17-15 | server/Mgr/MgrShop.lua、server/Mgr/MgrPlatform.lua、common/GameCfg.lua | tests/native/shop_test.lua、tests/native/platform_seam_test.lua | 缺 | 缺 | 缺 | 缺 | B |
+| 17-16 | server/Mgr/MgrPlatform.lua、common/GameCfg.lua | tests/native/platform_seam_test.lua | 缺 | 缺 | 缺 | 缺 | B |
+| 17-17 | server/Mgr/MgrAchievements.lua、common/GameCfg.lua | tests/native/spec/17_platform_achievement_id_test.lua | 有 | 有 | 缺 | 缺 | B |
+| 17-18 | server/Mgr/MgrPlatform.lua、common/GameCfg.lua | tests/native/spec/17_platform_boundary_placeholder_test.lua | 有 | 有 | 缺 | 缺 | B |
+| 17-19 | common/cfg/PlaceholderAssets.lua | tests/native/placeholder_assets_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 17-20 | server/Mgr/MgrPlatform.lua、server/Mgr/MgrRecords.lua | tests/native/platform_seam_test.lua、tests/native/records_test.lua | 缺 | 缺 | 缺 | 缺 | B |
+| 17-21 | server/Mgr/MgrPlatform.lua、common/GameCfg.lua | tests/native/platform_seam_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 17-22 | server/Mgr/MgrPlatform.lua、common/GameCfg.lua | tests/native/platform_seam_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+
+第 17 节的 17-17 由平台成就占位 ID 的完成与补交换配置取证，17-18 由分享占位入口取证；其余条款先登记落点，断言待后续。
+
 ## 三、待登记小节
 
-第 2～4、6～15、17、19 节尚未登记。按依赖顺序逐节扩大，每节登记时同时补齐该节的代码落点与既有测试，
+第 2～4、6～12、14～15、19 节尚未登记。按依赖顺序逐节扩大，每节登记时同时补齐该节的代码落点与既有测试，
 并把该节加进 `tools/acceptance.lua` 的 `M.COVERAGE_SECTIONS`。
