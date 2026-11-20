@@ -80,7 +80,7 @@ local function busted_body()
   }, '\n')
 end
 
-local function coverage_body()
+local function coverage_body(bodies)
   local lines = {
     '# 夹具实现覆盖表',
     '',
@@ -89,12 +89,23 @@ local function coverage_body()
     '| 条款 | 代码落点 | 关联测试 | 正常流程 | 失败流程 | 退出重进 | 存档恢复 | 等级 |',
     '| --- | --- | --- | --- | --- | --- | --- | --- |',
   }
-  -- 已贯通小节里的每条非试玩条款都要登记：夹具分片每节只有一条，第 1 节额外一条契约。
+  -- 覆盖表从分片正文派生：已贯通小节里每条非试玩条款都要有一行，等级照抄分片那一格。
+  -- 这样「改坏分片的 ID」这类用例不会顺带把覆盖表也判红——门禁仍然只报被改坏的那一类；
+  -- 新增已贯通小节也不必再改夹具，节号取 Acceptance.COVERAGE_SECTIONS。
+  local seen = {}
   for _, section in ipairs(Acceptance.COVERAGE_SECTIONS) do
-    lines[#lines + 1] = string.format('| %d-01 | %s | %s | 缺 | 缺 | 缺 | 缺 | A |',
-      section, M.COVERAGE_LANDING, M.COVERAGE_TEST)
-    if section == 1 then
-      lines[#lines + 1] = string.format('| 1-02 | %s | — | 缺 | 缺 | 缺 | 缺 | B |', M.COVERAGE_LANDING)
+    local body = bodies and bodies[section] or shard_body(section)
+    for line in body:gmatch('[^\n]+') do
+      local cells = {}
+      for cell in line:gmatch('[^|]+') do cells[#cells + 1] = cell:match('^%s*(.-)%s*$') end
+      local id, executor, level, status = cells[1], cells[4], cells[5], cells[6]
+      if id and id:match('^%d+%-%d%d$') and executor ~= '试玩' and not seen[id] then
+        seen[id] = true
+        -- 卡在外部依赖或划出范围的条款没有可跑的关联测试，按格式写全角破折号。
+        local tests = (status == 'blocked' or status == 'out-of-scope') and '—' or M.COVERAGE_TEST
+        lines[#lines + 1] = string.format('| %s | %s | %s | 缺 | 缺 | 缺 | 缺 | %s |',
+          id, M.COVERAGE_LANDING, tests, level)
+      end
     end
   end
   lines[#lines + 1] = ''
@@ -164,6 +175,15 @@ function M.patch(root, relative, from, to)
   local first, last = body:find(from, 1, true)
   assert(first, string.format('夹具里找不到要替换的片段 %q（%s）', from, relative))
   fs.write_file(path, body:sub(1, first - 1) .. to .. body:sub(last + 1))
+  -- 改的是分片正文就把覆盖表按改后的分片重派生：否则改坏条款 ID 会顺带触发覆盖表的
+  -- 「条款不在矩阵里 / 已贯通小节缺条款」，被改坏的那一类反而淹没在噪声里。
+  if relative:match('^docs/acceptance/%d%d%-') then
+    local bodies = {}
+    for _, section in ipairs(Acceptance.COVERAGE_SECTIONS) do
+      bodies[section] = assert(fs.slurp(root .. '/' .. M.shard(section)))
+    end
+    fs.write_file(root .. '/' .. Acceptance.COVERAGE, coverage_body(bodies))
+  end
 end
 
 return M
