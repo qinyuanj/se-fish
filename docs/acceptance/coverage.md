@@ -76,6 +76,66 @@
 第 5 节的 5-01 与 5-03 已由图鉴客户端的公开显示快照取证：tests/native/spec/05_zone_fish_data_test.lua 翻满七页，
 断言每页 14 条、总数 98、七区 6/6/1/1 品级分布；其余条款待后续断言。
 
+### 第 7 节 经济与钓场商店（25 条）
+
+| 条款 | 代码落点 | 关联测试 | 正常流程 | 失败流程 | 退出重进 | 存档恢复 | 等级 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 7-01 | server/Mgr/MgrInteract.lua、server/Mgr/MgrLottery.lua | tests/native/feed_exchange_test.lua、tests/native/lottery_settle_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 7-02 | server/Mgr/MgrShop.lua、server/Mgr/MgrFerry.lua | tests/native/shop_test.lua、tests/native/ferry_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 7-03 | server/Mgr/MgrBlindbox.lua、common/BlindboxDraw.lua | tests/native/blindbox_settle_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 7-04 | common/GameCfg.lua、server/Mgr/MgrPlatform.lua | tests/native/platform_seam_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 7-05 | server/Mgr/MgrShop.lua | tests/native/shop_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 7-06 | server/Mgr/MgrInteract.lua、server/Mgr/MgrLoot.lua | tests/native/feed_exchange_test.lua、tests/native/loot_recycle_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 7-07 | common/cfg/Shop.lua、server/Mgr/MgrShop.lua | tests/native/shop_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 7-08 | common/cfg/Shop.lua、server/Mgr/MgrShop.lua | tests/native/shop_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 7-09 | common/cfg/Shop.lua、client/ScreenHandlers/ScreenShop.lua | tests/native/shop_ui_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 7-10 | common/cfg/Shop.lua | tests/native/cfg_shop_lottery_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 7-11 | server/Mgr/MgrShop.lua、server/Data/PlayerData.lua | tests/native/spec/07_shop_purchase_limit_test.lua | 有 | 缺 | 缺 | 缺 | A |
+| 7-12 | common/cfg/Shop.lua、common/GameCfg.lua | tests/native/cfg_shop_lottery_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 7-13 | server/Mgr/MgrShop.lua、client/ScreenHandlers/ScreenShop.lua | tests/native/shop_ui_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 7-14 | server/Mgr/MgrShop.lua、client/ScreenHandlers/ScreenShop.lua | tests/native/shop_ui_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 7-15 | client/ScreenHandlers/ScreenShop.lua | tests/native/shop_ui_test.lua | 缺 | 有 | 缺 | 缺 | A |
+| 7-16 | server/Mgr/MgrPlatform.lua、client/ScreenHandlers/ScreenPlatform.lua、common/GameCfg.lua | tests/native/spec/07_coin_page_placeholder_test.lua | 有 | 有 | 缺 | 缺 | A |
+| 7-17 | server/Mgr/MgrShop.lua、server/Mgr/MgrSave.lua、server/Data/PlayerData.lua | tests/native/spec/07_shop_settlement_atomic_test.lua | 有 | 有 | 缺 | 缺 | A |
+| 7-18 | server/Mgr/MgrSave.lua、server/Mgr/MgrShop.lua | tests/native/spec/18_session_settlement_contract_test.lua | 缺 | 缺 | 有 | 缺 | B |
+| 7-19 | server/Mgr/MgrShop.lua、server/Data/PlayerData.lua | tests/native/spec/07_shop_purchase_limit_test.lua | 缺 | 有 | 缺 | 缺 | B |
+| 7-20 | server/Data/PlayerData.lua、client/ScreenHandlers/ScreenShop.lua | tests/native/shop_test.lua | 缺 | 缺 | 缺 | 缺 | B |
+| 7-21 | server/Mgr/MgrSave.lua、server/Data/PlayerData.lua | tests/native/economy_persistence_test.lua | 缺 | 缺 | 缺 | 有 | B |
+| 7-22 | server/Data/PlayerData.lua、client/ScreenHandlers/ScreenShop.lua | tests/native/shop_ui_test.lua | 缺 | 缺 | 缺 | 缺 | B |
+| 7-23 | server/Data/PlayerData.lua、server/Mgr/MgrShop.lua、server/Mgr/MgrFerry.lua | tests/native/economy_persistence_test.lua | 缺 | 缺 | 缺 | 缺 | B |
+| 7-24 | client/ScreenHandlers/ScreenShop.lua、client/ScreenHandlers/ScreenPlatform.lua | tests/native/shop_ui_test.lua | 缺 | 有 | 缺 | 缺 | B |
+| 7-25 | common/GameCfg.lua、server/Mgr/MgrPlatform.lua | tests/native/spec/07_coin_page_placeholder_test.lua | 有 | 有 | 缺 | 缺 | A |
+
+第 7 节的 7-16、7-17、7-25 已由适配层与商店结算的公开入口取证：金币页占位购买「先开通道、确认才到账」，
+取消/超时不到账也不扣金币；商店一笔购买的成功与两类失败都在同一次结算里落地。7-24 只到客户端失败流程一栏。
+
+### 第 15 节 地图盲盒（18 条）
+
+| 条款 | 代码落点 | 关联测试 | 正常流程 | 失败流程 | 退出重进 | 存档恢复 | 等级 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 15-01 | common/GameCfg.lua、server/Mgr/MgrBlindbox.lua | tests/native/spec/15_blindbox_placeholder_settlement_test.lua | 有 | 缺 | 缺 | 缺 | A |
+| 15-02 | common/GameCfg.lua、server/Mgr/MgrBlindbox.lua | tests/native/blindbox_draw_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 15-03 | common/BlindboxDraw.lua、common/GameCfg.lua | tests/native/blindbox_draw_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 15-04 | server/Data/PlayerData.lua、server/Mgr/MgrBlindbox.lua | tests/native/blindbox_settle_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 15-05 | server/Mgr/MgrLoot.lua、server/Mgr/MgrBlindbox.lua | tests/native/blindbox_settle_test.lua | 缺 | 有 | 缺 | 缺 | A |
+| 15-06 | server/Mgr/MgrLoot.lua | tests/native/loot_drop_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 15-07 | server/Mgr/MgrBlindbox.lua、client/ScreenHandlers/ScreenBlindbox.lua | tests/native/platform_screens_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 15-08 | server/Data/PlayerData.lua | tests/native/blindbox_settle_test.lua | 缺 | 有 | 缺 | 缺 | B |
+| 15-09 | common/BlindboxDraw.lua、common/GameCfg.lua | tests/native/spec/15_blindbox_placeholder_settlement_test.lua、tests/native/blindbox_draw_test.lua | 有 | 缺 | 缺 | 缺 | A |
+| 15-10 | common/BlindboxDraw.lua、common/GameCfg.lua | tests/native/spec/15_blindbox_placeholder_settlement_test.lua | 有 | 缺 | 缺 | 缺 | A |
+| 15-11 | common/BlindboxDraw.lua、common/GameCfg.lua | tests/native/spec/15_blindbox_placeholder_settlement_test.lua | 有 | 缺 | 缺 | 缺 | A |
+| 15-12 | server/Mgr/MgrBlindbox.lua、server/Mgr/MgrSave.lua | tests/native/blindbox_settle_test.lua | 缺 | 缺 | 缺 | 缺 | B |
+| 15-13 | common/GameCfg.lua、common/BlindboxDraw.lua | tests/native/blindbox_draw_test.lua、tests/native/cfg_shop_lottery_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 15-14 | common/GameCfg.lua、common/BlindboxDraw.lua | tests/native/blindbox_draw_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 15-15 | server/Mgr/MgrBlindbox.lua、server/Mgr/MgrSave.lua | tests/native/blindbox_settle_test.lua | 缺 | 缺 | 有 | 缺 | B |
+| 15-16 | server/Mgr/MgrBlindbox.lua、server/Mgr/MgrLoot.lua | tests/native/blindbox_settle_test.lua | 缺 | 缺 | 缺 | 有 | B |
+| 15-17 | common/GameCfg.lua、server/Mgr/MgrBlindbox.lua | tests/native/content_validation_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 15-21 | common/GameCfg.lua、server/Mgr/MgrPlatform.lua、client/ScreenHandlers/ScreenPlatform.lua | tests/native/spec/15_blindbox_placeholder_settlement_test.lua | 有 | 有 | 缺 | 缺 | A |
+
+第 15 节的 15-01、15-09～15-11、15-21 已由占位支付通道的公开入口取证（价目 10 / 90 金豆同一通道收费、
+确认前不发奖、取消与超时不到账、第 50 抽强制保底、大奖清零计数）。15-21 原挂 C 级试玩口径，
+按 ADR-0029 生产开关把「占位通道」判给 agent，真实平台支付通道作为生产开关单列。
+
 ### 第 16 节 物品基础数据（17 条）
 
 | 条款 | 代码落点 | 关联测试 | 正常流程 | 失败流程 | 退出重进 | 存档恢复 | 等级 |
@@ -141,5 +201,5 @@
 
 ## 三、待登记小节
 
-第 2～4、6～15、17、19 节尚未登记。按依赖顺序逐节扩大，每节登记时同时补齐该节的代码落点与既有测试，
+第 2～4、6、8～14、17、19 节尚未登记。按依赖顺序逐节扩大，每节登记时同时补齐该节的代码落点与既有测试，
 并把该节加进 `tools/acceptance.lua` 的 `M.COVERAGE_SECTIONS`。
