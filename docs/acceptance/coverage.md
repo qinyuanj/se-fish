@@ -309,7 +309,10 @@
 
 第 9 节由小队子单先贯通：9-02、9-06～9-11、9-19～9-22 的代码落点是 `server/Mgr/MgrParty.lua`（服务端唯一权威的归属与名单）
 与 `client/ScreenHandlers/ScreenParty.lua`（队友血量与邀请倒计时），证据是两份 spec 断言。
-9-01、9-12～9-16 经统一伤害入口与 PK 过滤接缝落地，spec 断言覆盖同队全武器免伤、鱼塘豁免、鱼塘外 PK、人数不足与鱼攻击；9-03、9-17、9-18 已由抢救子单取证。
+9-01、9-12～9-16 经统一伤害入口与 PK 过滤接缝落地，spec 断言覆盖同队全武器免伤、鱼塘豁免、鱼塘外 PK、人数不足与鱼攻击；
+9-12 除统一入口的类别遍历外，另从 `server/Mgr/MgrWeapon.lua` 真实发起一次枪击（弹道只替身引擎边界）：
+同队命中被挡成 0 伤害，离队后同一把枪照常结算——这样「近战 / 枪械 / 范围都按 0」不再只靠贴 category 标签；
+9-03、9-17、9-18 已由抢救子单取证。
 三者共用同一份矩阵小节，因此本表一次登记到位，四类证据只勾已经真取到的那几栏。
 
 ### 第 10 节 烧烤（25 条）
@@ -636,7 +639,9 @@
 `tests/native/spec/11_ad_revive_placeholder_test.lua`（濒死与死亡两个界面的广告入口、满血与饥饿下限、
 倒计时暂停与平移、三条复活路径互斥、失败不扣费、重复点击与迟到回调、适配层成功与失败两条路径）。
 占位广告位与广告文案集中在 `common/GameCfg.lua` 的 `GameCfg.Platform.Placeholder.Ads`、`GameCfg.Platform.Ads`
-与 `GameCfg.Survival.AdReviveText`；真实广告位到位只替换那两处参数，判定不动，参数缺口记在
+与 `GameCfg.Survival.AdReviveText`；真实广告位到位只替换那两处参数，判定不动。占位通道另有一道构建闸门
+（`GameCfg.Platform.Placeholder.AllowInPublish`，默认 false）：关闭调试且未显式打开时，广告复活经
+SurvivalAction 被拒、不复活，回执写「未开放」——这一条的证据是本文件里同一份 spec 的闸门用例（19-13）。参数缺口记在
 docs/to-questionnaire-策划案内部矛盾.md。金豆入口（11-20）、迟到回调补发（11-33）与占位对称结算（11-39）不归本单，
 仍是 unverified，四类证据列只勾该断言真正跑过的场景。
 
@@ -656,14 +661,18 @@ docs/to-questionnaire-策划案内部矛盾.md。金豆入口（11-20）、迟�
 | 19-10 | server/Mgr/MgrSave.lua、server/Data/PlayerData.lua、docs/acceptance/coverage.md | tests/native/save_test.lua、tests/native/spec/18_session_settlement_contract_test.lua | 缺 | 缺 | 缺 | 有 | A |
 | 19-11 | server/Mgr/MgrSave.lua、server/Mgr/MgrPlatform.lua | tests/native/spec/01_platform_adapter_failure_test.lua、tests/native/save_foundation_test.lua | 缺 | 有 | 缺 | 缺 | A |
 | 19-12 | server/main.lua、server/Mgr/MgrParty.lua、server/Mgr/MgrPkFilter.lua、server/Mgr/MgrInteract.lua | tests/native/spec/19_multiplayer_local_link_test.lua、tests/native/spec/01_capacity_local_link_test.lua、tests/probes/local_link_runtime.lua | 有 | 有 | 有 | 有 | B |
-| 19-13 | tools/acceptance.lua、tools/cli.lua | tests/native/acceptance_matrix_test.lua、tests/native/cli_entry_test.lua | 有 | 缺 | 缺 | 缺 | B |
+| 19-13 | tools/acceptance.lua、tools/cli.lua、server/Mgr/MgrPlatform.lua、common/GameCfg.lua | tests/native/acceptance_matrix_test.lua、tests/native/cli_entry_test.lua、tests/native/spec/17_platform_boundary_placeholder_test.lua、tests/native/spec/11_ad_revive_placeholder_test.lua | 有 | 有 | 缺 | 缺 | B |
 
 第 19 节由 #264 整节登记：19-01～19-06 是数量与结构的静态口径，落点在共享配置，四类证据列都还空着；
 19-08 的可重跑探针已就位（`tests/probes/forest_island.lua`、`tests/probes/lottery_runtime.lua`、`tests/probes/local_link_runtime.lua`），
 所以「正常流程」勾 `有`，其余三栏留 `缺`。19-12 的证据是 `tests/native/spec/19_multiplayer_local_link_test.lua`：
 八条以上虚拟连接同时在线时小队免伤、野外 PK、鱼塘安全区、共享地面实例只结算一次、施救者断线中止抢救与重连不补结算各自成立；
-夹具结论只证代码路径，真实多人结论仍是生产开关，不用它替代。19-13 的四类证据只勾「正常流程」——
-门禁全绿只证明代码路径完整，不作为发布依据。19-14～19-19 是 C 级试玩条款，不进覆盖表。
+夹具结论只证代码路径，真实多人结论仍是生产开关，不用它替代。
+19-13 的「占位通道默认不进发布构建」一项由两份 spec 断言机器判定：发布构建（Debug 关）且
+`GameCfg.Platform.Placeholder.AllowInPublish = false` 时，占位支付、金币页、广告与分享一律被拒
+（`reason = 'not_open'`、回执写「未开放」），不发物品、不改金币、不建 flow；显式把开关置 true 才恢复——
+所以「失败流程」这一栏也勾 `有`。其余发布检查项（真实渠道、容量、资源）仍是生产开关，门禁全绿只证明
+代码路径完整，不作为发布依据。19-14～19-19 是 C 级试玩条款，不进覆盖表。
 
 ## 三、待登记小节
 
