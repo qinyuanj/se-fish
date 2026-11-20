@@ -596,6 +596,39 @@ GameCfg.Platform = {
     TestDriverTitle = '测试支付（仅调试构建）',
 }
 
+-- #261 生产开关：平台真实参数（商品 ID、广告位、金币汇率）未交付期间的占位参数集中点
+-- （ADR-0029 第三、四节）。缺参数时靠这张表把钓场商店金币页与地图盲盒的完整购买路径走通。
+-- 占位不发真实付费权益：占位通道只在编辑器内结算地图内虚拟产出（盲盒抽数、金币页到账），
+-- 不拉起真实购买面板、不扣真实货币、不发放平台权益；真实参数到位后只替换本表并把 Enabled 置 false，
+-- 价目、保底与结算顺序等玩法判定一行不动。
+-- 未查证数值：「金币页的占位汇率」（docs/to-questionnaire-策划案内部矛盾.md）。
+GameCfg.Platform.Placeholder = {
+    Enabled = true,
+    Label = '占位支付通道',
+    Notice = '占位支付通道：不发放真实付费权益',
+    -- 占位商品 ID：真实 goodsId 由平台后台交付；交付前只走 placeholder. 前缀，不冒充真实商品
+    Goods = {
+        blindboxSingle = 'placeholder.goods.blindbox.single',
+        blindboxTen = 'placeholder.goods.blindbox.ten',
+        reviveFull = 'placeholder.goods.revive.full',
+        adrenaline1 = 'placeholder.goods.adrenaline.single',
+        adrenaline5 = 'placeholder.goods.adrenaline.five',
+    },
+    Ads = {
+        revive = 'placeholder.ad.revive',
+    },
+    -- 金币页（钓场商店第 4 页，GameSpec §7）：真实汇率与商品 ID 由平台后台交付；
+    -- 占位按「每 1 个展示货币单位到账 CoinPerUnit 金币」计价，到账金币 = price × CoinPerUnit。
+    CoinPage = {
+        Unit = '元',
+        CoinPerUnit = 100, -- [未查证] 占位汇率：1 元到账 100 金币
+        Offers = {
+            { key = 'coinPouch', goodsId = 'placeholder.goods.coin.pouch', name = '金币小袋', price = 6 },
+            { key = 'coinBag', goodsId = 'placeholder.goods.coin.bag', name = '金币大袋', price = 30 },
+        },
+    },
+}
+
 -- 摆渡（#89 定细则，#127 T06 扩到七区六航线）：去程一人在船边交 1 张船票，倒计时 CountdownSec 秒后
 -- 带走 BoatRange 米内（只看 x/z）所有玩家到本航线目的区落点，无票同行者搭便船合法；倒计时中再交票拒绝且不扣。
 -- 返程按人付 Price 金币、立即传送回出发区。票、价、锚点、落点、区域名全部由航线（Ferry.Routes，见下）
