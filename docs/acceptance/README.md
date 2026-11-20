@@ -51,7 +51,7 @@
 | [9](09-multiplayer-rules.md) | 多人规则 | 25 | 5 | 17 | 0 | 3 | 0 | 32% |
 | [10](10-grilling.md) | 烧烤 | 28 | 15 | 10 | 0 | 3 | 0 | 64% |
 | [11](11-downed-death-revive.md) | 濒死、死亡与复活 | 42 | 39 | 0 | 0 | 3 | 0 | 100% |
-| [12](12-elite-boss-behavior.md) | 精英与首领行为 | 55 | 23 | 25 | 0 | 7 | 0 | 55% |
+| [12](12-elite-boss-behavior.md) | 精英与首领行为 | 55 | 13 | 35 | 0 | 7 | 0 | 36% |
 | [13](13-compendium-achievements.md) | 图鉴与成就 | 18 | 9 | 7 | 0 | 2 | 0 | 61% |
 | [14](14-lottery.md) | 抽奖机 | 28 | 15 | 8 | 0 | 5 | 0 | 71% |
 | [15](15-map-blindbox.md) | 地图盲盒 | 21 | 13 | 5 | 0 | 3 | 0 | 76% |
@@ -59,7 +59,7 @@
 | [17](17-tutorial-story-platform.md) | 新手任务、剧情与平台边界 | 22 | 20 | 2 | 0 | 0 | 0 | 91% |
 | [18](18-save-and-recovery.md) | 存档与恢复契约 | 32 | 9 | 23 | 0 | 0 | 0 | 28% |
 | [19](19-acceptance-criteria.md) | 验收口径 | 19 | 13 | 0 | 0 | 6 | 0 | 100% |
-| 合计 | — | 523 | 353 | 114 | 0 | 56 | 0 | 78% |
+| 合计 | — | 523 | 343 | 124 | 0 | 56 | 0 | 76% |
 
-已取证（evidenced + accepted）114 / 523；缺口密度 78% =（unverified + blocked + out-of-scope）÷ 条款数，其中 out-of-scope 占 0%。
+已取证（evidenced + accepted）124 / 523；缺口密度 76% =（unverified + blocked + out-of-scope）÷ 条款数，其中 out-of-scope 占 0%。
 <!-- END GENERATED: acceptance-counts -->

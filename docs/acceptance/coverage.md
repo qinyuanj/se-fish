@@ -354,19 +354,19 @@
 | 12-04 | common/cfg/BossMoves.lua、server/Mgr/MgrFishUnit.lua | tests/native/spec/12_boss_moves_test.lua | 有 | 缺 | 缺 | 缺 | A |
 | 12-05 | common/cfg/BossMoves.lua | tests/native/spec/12_boss_moves_test.lua | 有 | 缺 | 缺 | 缺 | A |
 | 12-06 | server/Mgr/MgrFishUnit.lua、common/GameCfg.lua | tests/native/boss_bait_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 12-07 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/eel_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 12-08 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua、common/GarBiteNotice.lua | tests/native/gar_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 12-09 | server/Mgr/MgrFishUnit.lua | tests/native/gar_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 12-10 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/shrimp_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 12-11 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/shrimp_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 12-07 | common/cfg/BossMoves.lua、common/GameCfg.lua、server/Mgr/MgrFishUnit.lua| tests/native/spec/12_boss_moves_melee_aoe_test.lua、tests/native/eel_combat_test.lua| 有| 缺 | 缺 | 缺 | A |
+| 12-08 | common/cfg/BossMoves.lua、common/GameCfg.lua、server/Mgr/MgrFishUnit.lua、common/GarBiteNotice.lua| tests/native/spec/12_boss_moves_melee_aoe_test.lua、tests/native/gar_combat_test.lua| 有| 缺 | 缺 | 缺 | A |
+| 12-09 | common/cfg/BossMoves.lua、server/Mgr/MgrFishUnit.lua| tests/native/spec/12_boss_moves_melee_aoe_test.lua、tests/native/gar_combat_test.lua| 有| 有| 缺 | 缺 | A |
+| 12-10 | common/cfg/BossMoves.lua、common/GameCfg.lua、server/Mgr/MgrFishUnit.lua| tests/native/spec/12_boss_moves_melee_aoe_test.lua、tests/native/shrimp_combat_test.lua| 有| 缺 | 缺 | 缺 | A |
+| 12-11 | common/cfg/BossMoves.lua、common/GameCfg.lua、server/Mgr/MgrFishUnit.lua| tests/native/spec/12_boss_moves_melee_aoe_test.lua、tests/native/shrimp_combat_test.lua| 有| 缺 | 缺 | 缺 | A |
 | 12-12 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/shrimp_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 12-13 | common/cfg/BossMoves.lua、common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/spec/12_boss_moves_ranged_dive_test.lua | 有 | 缺 | 缺 | 缺 | A |
-| 12-14 | common/cfg/BossMoves.lua、common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/spec/12_boss_moves_ranged_dive_test.lua | 有 | 缺 | 缺 | 缺 | A |
-| 12-15 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/king_crab_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 12-16 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/king_crab_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 12-17 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/crab_boss_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 12-18 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/crab_boss_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 12-19 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/crab_boss_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 12-13 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/shrimp_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 12-14 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/shrimp_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 12-15 | common/cfg/BossMoves.lua、common/GameCfg.lua、server/Mgr/MgrFishUnit.lua| tests/native/spec/12_boss_moves_melee_aoe_test.lua、tests/native/king_crab_combat_test.lua| 有| 缺 | 缺 | 缺 | A |
+| 12-16 | common/cfg/BossMoves.lua、common/GameCfg.lua、server/Mgr/MgrFishUnit.lua| tests/native/spec/12_boss_moves_melee_aoe_test.lua、tests/native/king_crab_combat_test.lua| 有| 缺 | 缺 | 缺 | A |
+| 12-17 | common/cfg/BossMoves.lua、common/GameCfg.lua、server/Mgr/MgrFishUnit.lua| tests/native/spec/12_boss_moves_melee_aoe_test.lua、tests/native/crab_boss_combat_test.lua| 有| 缺 | 缺 | 缺 | A |
+| 12-18 | common/cfg/BossMoves.lua、common/GameCfg.lua、server/Mgr/MgrFishUnit.lua| tests/native/spec/12_boss_moves_melee_aoe_test.lua、tests/native/crab_boss_combat_test.lua| 有| 缺 | 缺 | 缺 | A |
+| 12-19 | common/cfg/BossMoves.lua、common/GameCfg.lua、server/Mgr/MgrFishUnit.lua| tests/native/spec/12_boss_moves_melee_aoe_test.lua、tests/native/crab_boss_combat_test.lua| 有| 缺 | 缺 | 缺 | A |
 | 12-20 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/forest_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 12-21 | common/cfg/BossMoves.lua、common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/spec/12_boss_moves_ranged_dive_test.lua | 有 | 缺 | 缺 | 缺 | A |
 | 12-22 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/forest_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |

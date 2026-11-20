@@ -11,19 +11,19 @@
 | 12-04 | 表中未明确的命中次数、轨迹、预警与效果持续时间属实现期配置细化，须先形成可复验样例 | 规则 | agent | A | evidenced | tests/native/spec/12_boss_moves_test.lua |
 | 12-05 | 实现期细化不得暗中增加新招式，本节列出的招式集合之外不新增攻击 | 规则 | agent | A | evidenced | tests/native/spec/12_boss_moves_test.lua |
 | 12-06 | 精英与首领只在被召出并放下后进入战斗态，本节不新设召唤入口（出场沿用首领饵与信物兑换，见 §4、§8） | 规则 | agent | A | unverified | — |
-| 12-07 | 电鳗移速 6，5 米内每秒放电一次、每次 10，持续 5 秒，之后睡眠 10 秒且睡眠中可受击 | 规则 | agent | A | unverified | — |
-| 12-08 | 鳄雀鳝追咬伤害 30、间隔 1.5 秒 | 规则 | agent | A | unverified | — |
-| 12-09 | 鳄雀鳝只在头部区判定命中，玩家绕到后身即咬空 | 规则 | agent | A | unverified | — |
-| 12-10 | 虾霸每 2 秒左右攻击一次，连续两下后接尾刺击飞，基础攻击 20 | 规则 | agent | A | unverified | — |
-| 12-11 | 虾霸每活动 15 秒眩晕 5 秒，取代正文旧的 20 秒活动时长 | 规则 | agent | A | unverified | — |
+| 12-07 | 电鳗移速 6，5 米内每秒放电一次、每次 10，持续 5 秒，之后睡眠 10 秒且睡眠中可受击 | 规则 | agent | A | evidenced | tests/native/spec/12_boss_moves_melee_aoe_test.lua |
+| 12-08 | 鳄雀鳝追咬伤害 30、间隔 1.5 秒 | 规则 | agent | A | evidenced | tests/native/spec/12_boss_moves_melee_aoe_test.lua |
+| 12-09 | 鳄雀鳝只在头部区判定命中，玩家绕到后身即咬空 | 规则 | agent | A | evidenced | tests/native/spec/12_boss_moves_melee_aoe_test.lua |
+| 12-10 | 虾霸每 2 秒左右攻击一次，连续两下后接尾刺击飞，基础攻击 20 | 规则 | agent | A | evidenced | tests/native/spec/12_boss_moves_melee_aoe_test.lua |
+| 12-11 | 虾霸每活动 15 秒眩晕 5 秒，取代正文旧的 20 秒活动时长 | 规则 | agent | A | evidenced | tests/native/spec/12_boss_moves_melee_aoe_test.lua |
 | 12-12 | 小白龙啄击 50、间隔 1.5 秒 | 规则 | agent | A | unverified | — |
 | 12-13 | 小白龙每 30 秒召雨云，10 米范围、每秒 50、持续 6 秒 | 规则 | agent | A | evidenced | tests/native/spec/12_boss_moves_ranged_dive_test.lua |
 | 12-14 | 小白龙每 30 秒飞起俯冲，落地后自身眩晕 5 秒 | 规则 | agent | A | evidenced | tests/native/spec/12_boss_moves_ranged_dive_test.lua |
-| 12-15 | 帝王蟹每 5 秒对前方乱刺，左右各 3 下、每下间隔 0.2 秒、每下 15 伤害 | 规则 | agent | A | unverified | — |
-| 12-16 | 帝王蟹每活动 30 秒眩晕 5 秒 | 规则 | agent | A | unverified | — |
-| 12-17 | 蟹老板正面蟹钳双击、基础攻击 20、冷却 4 秒 | 规则 | agent | A | unverified | — |
-| 12-18 | 蟹老板每 30 秒冲撞一次 | 规则 | agent | A | unverified | — |
-| 12-19 | 蟹老板每 25 秒旋转一次，每秒 360 度、持续 5 秒、碰触伤害 30 | 规则 | agent | A | unverified | — |
+| 12-15 | 帝王蟹每 5 秒对前方乱刺，左右各 3 下、每下间隔 0.2 秒、每下 15 伤害 | 规则 | agent | A | evidenced | tests/native/spec/12_boss_moves_melee_aoe_test.lua |
+| 12-16 | 帝王蟹每活动 30 秒眩晕 5 秒 | 规则 | agent | A | evidenced | tests/native/spec/12_boss_moves_melee_aoe_test.lua |
+| 12-17 | 蟹老板正面蟹钳双击、基础攻击 20、冷却 4 秒 | 规则 | agent | A | evidenced | tests/native/spec/12_boss_moves_melee_aoe_test.lua |
+| 12-18 | 蟹老板每 30 秒冲撞一次 | 规则 | agent | A | evidenced | tests/native/spec/12_boss_moves_melee_aoe_test.lua |
+| 12-19 | 蟹老板每 25 秒旋转一次，每秒 360 度、持续 5 秒、碰触伤害 30 | 规则 | agent | A | evidenced | tests/native/spec/12_boss_moves_melee_aoe_test.lua |
 | 12-20 | 剑鱼左右挥头，基础攻击 20 | 规则 | agent | A | unverified | — |
 | 12-21 | 剑鱼跳跃周期 50 秒，落点为随机 10 米外、落地 5 米范围 100 伤害 | 规则 | agent | A | evidenced | tests/native/spec/12_boss_moves_ranged_dive_test.lua |
 | 12-22 | 三头鲨扫头基础攻击 25、冷却 3 秒 | 规则 | agent | A | unverified | — |

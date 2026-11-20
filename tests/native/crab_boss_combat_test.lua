@@ -50,7 +50,7 @@ describe('TestCrabBossCombat', function()
         assert.are.equal('charge', fish.Move.Name, '旋转结束后冲撞起手')
         -- 冲撞命中 20（窗口内结算一次）
         local before = #env.vitalsCalls
-        env.now = 35.5
+        env.now = 35.7
         env.mgr:Update()
         assert.are.equal(before + 1, #env.vitalsCalls, '冲撞命中一次')
         assert.are.equal(20, env.vitalsCalls[#env.vitalsCalls][3])
@@ -92,16 +92,16 @@ describe('TestCrabBossCombat', function()
         env.mgr:Update()
         assert.are.equal('pinch', fish.Move.Name)
         assert.are.equal(0, #env.vitalsCalls, '起手帧只是预警')
-        env.now = 0.2
+        env.now = 0.7
         env.mgr:Update()
         env.mgr:Update() -- 同一击重复帧不重复结算
         assert.are.equal(1, #env.vitalsCalls)
         assert.are.equal(20, env.vitalsCalls[1][3])
-        env.now = 0.4
+        env.now = 0.9
         env.mgr:Update()
         assert.are.equal(2, #env.vitalsCalls, '第二击')
         assert.are.equal(20, env.vitalsCalls[2][3])
-        env.now = 0.5
+        env.now = 1.0
         env.mgr:Update()
         assert.is_nil(fish.Move, '双击后招式即收')
         -- 冷却 4 秒：3.9 秒不起手，4 秒后起第二轮
@@ -111,7 +111,7 @@ describe('TestCrabBossCombat', function()
         env.now = 4.0
         env.mgr:Update()
         assert.are.equal('pinch', fish.Move.Name)
-        env.now = 4.2
+        env.now = 4.7
         env.mgr:Update()
         assert.are.equal(3, #env.vitalsCalls, '第二轮第一击')
     end)
