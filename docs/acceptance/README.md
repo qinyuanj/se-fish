@@ -45,7 +45,7 @@
 | [3](03-inventory-and-controls.md) | 持有与操作 | 25 | 22 | 0 | 0 | 3 | 0 | 100% |
 | [4](04-fishing-system.md) | 钓鱼系统 | 31 | 28 | 0 | 0 | 3 | 0 | 100% |
 | [5](05-zone-fish-data.md) | 七区鱼种完整数据 | 18 | 16 | 2 | 0 | 0 | 0 | 89% |
-| [6](06-combat-and-growth.md) | 战斗与成长 | 37 | 34 | 0 | 0 | 3 | 0 | 100% |
+| [6](06-combat-and-growth.md) | 战斗与成长 | 37 | 30 | 4 | 0 | 3 | 0 | 89% |
 | [7](07-economy-and-shop.md) | 经济与钓场商店 | 27 | 24 | 1 | 0 | 2 | 0 | 96% |
 | [8](08-npc-exchange-ferry.md) | NPC、兑换与摆渡 | 41 | 34 | 0 | 0 | 7 | 0 | 100% |
 | [9](09-multiplayer-rules.md) | 多人规则 | 25 | 22 | 0 | 0 | 3 | 0 | 100% |
@@ -59,7 +59,7 @@
 | [17](17-tutorial-story-platform.md) | 新手任务、剧情与平台边界 | 22 | 22 | 0 | 0 | 0 | 0 | 100% |
 | [18](18-save-and-recovery.md) | 存档与恢复契约 | 32 | 9 | 23 | 0 | 0 | 0 | 28% |
 | [19](19-acceptance-criteria.md) | 验收口径 | 19 | 13 | 0 | 0 | 6 | 0 | 100% |
-| 合计 | — | 523 | 427 | 40 | 0 | 56 | 0 | 92% |
+| 合计 | — | 523 | 423 | 44 | 0 | 56 | 0 | 92% |
 
-已取证（evidenced + accepted）40 / 523；缺口密度 92% =（unverified + blocked + out-of-scope）÷ 条款数，其中 out-of-scope 占 0%。
+已取证（evidenced + accepted）44 / 523；缺口密度 92% =（unverified + blocked + out-of-scope）÷ 条款数，其中 out-of-scope 占 0%。
 <!-- END GENERATED: acceptance-counts -->
