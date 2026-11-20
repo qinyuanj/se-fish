@@ -71,7 +71,10 @@ local function channels()
                     posts[name] = posts[name] or {}
                     table.insert(posts[name], payload)
                 end,
-                FireServer = function() end,
+                FireServer = function(_, payload)
+                    posts[name] = posts[name] or {}
+                    table.insert(posts[name], payload)
+                end,
                 OnServerEvent = { Connect = function() end },
             }
         end
@@ -125,8 +128,12 @@ describe('条款 13-07 / 13-08 / 13-17：全服纪录列的占位口径', functi
     -- 从客户端入口发一次纪录查询，返回服务端回给客户端的 RecordsState 载荷。
     local function query(screen)
         screen:SelectFish('goldfish')
-        local request = re.posts.RecordsRequest
-        records:Handle(player, { fishId = 'goldfish', seq = screen.RecordSeq })
+        -- 客户端真的发出了查询（fishId + 单调 seq），不是断言自己造了一份回包。
+        local request = (re.posts.RecordsRequest or {})[#(re.posts.RecordsRequest or {})]
+        assert.is_table(request, '客户端没有发出纪录查询')
+        assert.same('goldfish', request.fishId)
+        assert.same(screen.RecordSeq, request.seq)
+        records:Handle(player, request)
         local states = re.posts.RecordsState or {}
         assert.is_table(states[#states], '服务端没有回 RecordsState')
         return states[#states], request
