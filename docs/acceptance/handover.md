@@ -2,7 +2,7 @@
 
 > 给接手这个仓库的人。看完这一页，你应当知道三件事：矩阵满屏 `unverified` 是**正常状态**，下一步该从哪取活，以及证据等业务代码完成后怎么补。
 >
-> 规则以这四份文件为准，本文件只解释怎么用：[README.md](README.md)（矩阵入口与脚本生成的计数）、[TEMPLATE.md](TEMPLATE.md)（新增条款的唯一入口）、[证据分级](evidence-levels.md)（A/B/C 三档怎么判）、[遗留台账](legacy-ledger.md)（七张旧单的未完成项去向）；范围与延后理由见 [ADR-0027](../adr/0027-clause-matrix-as-sole-acceptance-surface.md) 与 [ADR-0028](../adr/0028-solo-clear-on-shared-world.md)。
+> 规则以这四份文件为准，本文件只解释怎么用：[README.md](README.md)（矩阵入口与脚本生成的计数）、[TEMPLATE.md](TEMPLATE.md)（新增条款的唯一入口）、[证据分级](evidence-levels.md)（A/B/C 三档怎么判）、[遗留台账](legacy-ledger.md)（七张旧单的未完成项去向）；范围与延后理由见 [ADR-0027](../adr/0027-clause-matrix-as-sole-acceptance-surface.md)、[ADR-0028](../adr/0028-solo-clear-on-shared-world.md) 与 [ADR-0029](../adr/0029-scope-completeness-and-placeholder-first.md)（范围口径、生产开关台账）。
 >
 > 本文件与它们冲突时以它们为准，并且把冲突摆到台面上——不要默默按其中一边做。
 
@@ -10,17 +10,18 @@
 
 **规格说「是什么」，矩阵说「验到哪一步」，证据说「凭什么说验到了」，门禁说「这本账还可信吗」。**
 
-从规格到重跑是一条直路：`docs/GameSpec.md` 按 19 个小节写规格 → `docs/acceptance/` 一节一份分片，把每一句能独立判真假的规格写成一条**条款**（本轮 523 条），每条七列：ID、条款、组、执行者、证据等级、状态、证据·理由 → 状态只有五个值（`unverified`、`evidenced`、`accepted`、`blocked`、`out-of-scope`）→ 证据分三档（A 走业务入口的黑盒断言、B 可重跑的时序探针、C 编辑器试玩）→ 已取证的行必须在证据列写一个**真实存在**的仓库相对路径，让人照着那一行就能重跑 → 整本账由 `lua tools/cli.lua acceptance --check` 机器核对，它随 fast 车道跑；红一格会让 `test fast` 变红，从而在 PR 的 required check 上拦住（本仓**没有**提交时自动检查，pre-commit hook 已按 ADR-0018 删除）。
+从规格到重跑是一条直路：`docs/GameSpec.md` 按 19 个小节写规格 → `docs/acceptance/` 一节一份分片，把每一句能独立判真假的规格写成一条**条款**（本轮 523 条），每条七列：ID、条款、组、执行者、证据等级、状态、证据·理由 → 状态只有五个值（`unverified`、`evidenced`、`accepted`、`blocked`、`out-of-scope`，最后一个本规格不用，见 [ADR-0029](../adr/0029-scope-completeness-and-placeholder-first.md) 第一节）→ 证据分三档（A 走业务入口的黑盒断言、B 可重跑的时序探针、C 编辑器试玩）→ 已取证的行必须在证据列写一个**真实存在**的仓库相对路径，让人照着那一行就能重跑 → 整本账由 `lua tools/cli.lua acceptance --check` 机器核对，它随 fast 车道跑；红一格会让 `test fast` 变红，从而在 PR 的 required check 上拦住（本仓**没有**提交时自动检查，pre-commit hook 已按 ADR-0018 删除）。
 
 | 层 | 落在哪 | 它回答 | 谁能改 |
 | --- | --- | --- | --- |
 | 规格 | `docs/GameSpec.md` | 这条规矩是什么 | 人；改完要同步分片 |
 | 矩阵 | `docs/acceptance/NN-*.md` | 每条规矩验到哪一步 | 人按 [TEMPLATE.md](TEMPLATE.md) 增删条款行 |
 | 索引 | `docs/acceptance/README.md` 的生成块 | 19 节的条数、状态分布、缺口密度 | **只由脚本写**，手改判红 |
+| 覆盖表 | `docs/acceptance/coverage.md` | 每条非试玩条款的代码落点、关联测试与四类证据 | 人；已贯通小节逐节补齐 |
 | 门禁 | `tools/acceptance.lua`、`tests/native/acceptance_matrix_test.lua` | 这本账还可信吗 | 代码；随 fast 跑 |
 | 基线 | `docs/acceptance/baseline.lua` | 两道棘轮的两端 | 只经 `--update-baseline`，单向 |
 
-门禁一次核这些事：19 个规格小节各恰好一份分片、四列取值在封闭词表内、条款 ID 从 01 起连续不跳号、`blocked` 写了卡在谁、`out-of-scope` 写了理由、已取证行的每个路径真实存在、`accepted` 行带人签署、条款文案里没有禁用措辞、索引生成块与分片一字不差，以及「规格与分片里都不出现工单编号」；再加两道单向棘轮（已取证只增、遗留测试只减）。禁用措辞清单与门禁判不了的那两条见 [TEMPLATE.md](TEMPLATE.md) 第六节。
+门禁一次核这些事：19 个规格小节各恰好一份分片、四列取值在封闭词表内、条款 ID 从 01 起连续不跳号、`blocked` 写了卡在谁、`out-of-scope` 写了理由、已取证行的每个路径真实存在、`accepted` 行带人签署、条款文案里没有禁用措辞、索引生成块与分片一字不差，以及「规格与分片里都不出现工单编号」，还有覆盖表这一层：已贯通小节的非试玩条款必须登记、代码落点必须是真实存在的文件、等级与矩阵一致；再加两道单向棘轮（已取证只增、遗留测试只减）。禁用措辞清单与门禁判不了的那两条见 [TEMPLATE.md](TEMPLATE.md) 第六节。
 
 ## 二、从一条旧单的未完成项走到证据（实例路径）
 
@@ -41,14 +42,15 @@
 
 ## 三、满屏 `unverified` 是正常状态
 
-当前盘面（2026-11-20，`lua tools/cli.lua acceptance --check` 实测）：523 条条款，`unverified` 445、`evidenced` 1、`accepted` 0、`blocked` 72、`out-of-scope` 5。
+当前盘面（2026-11-20，`lua tools/cli.lua acceptance --check` 实测）：523 条条款，`unverified` 465、`evidenced` 2、`accepted` 0、`blocked` 56、`out-of-scope` 0。
 
 这是**只建框架、不铺取证**的结果，不是业务没做完的判决书，也不是框架没做完：
 
 - 框架的完成判据是第七节的八条，其中**没有任何一条**是「矩阵里没有 `unverified`」。
 - 445 条 `unverified` 是这份账的价值本身——它把「未知」写成了可数的行，让下一个人不必读代码去猜哪里没做完。
-- 72 条 `blocked` 是外部依赖（真实平台、正式美术交付、试玩场次），5 条 `out-of-scope` 是明确划出的小队与队伍界面（含随队伍界面一并划出的 9-23 可读性条款）；三类都不该被当成技术债去「清掉」。
-- 唯一那条 `evidenced`（[7-11](07-economy-and-shop.md) 商店限购）是样板：它证明「一条真实条款可以由一条走业务入口的断言转成 `evidenced`」，仅此而已，不代表第 7 节做完了。
+- 56 条 `blocked` **只剩一个原因**：55 条 C 级条款要编辑器试玩，加上 9-23 这条随小队系统排期后一并取证的界面可读性条款。外部依赖不再是阻塞理由——它们改记成 [ADR-0029](../adr/0029-scope-completeness-and-placeholder-first.md) 的生产开关，相应条款改 `unverified` 并按占位口径取证。
+- `out-of-scope` 归零：规格内没有永久出界（ADR-0029 第一节）。词表里保留这个值，但《渔力全开》的条款一律不用它。
+- 两条 `evidenced` 是样板：[7-11](07-economy-and-shop.md) 商店限购与 [1-12](01-overview-and-scope.md) 适配层失败路径。它们证明「一条真实条款可以由一条走业务入口的断言转成 `evidenced`」，仅此而已，不代表第 7 节或第 1 节做完了。
 
 什么时候才该紧张：`evidenced` 少于基线（门禁会先红）、或某条 `accepted` 没有「签署：@某人 日期」。**`evidenced` 也不等于业务上线**：它只等于「有一条能重跑的断言在守这句话」，要人背书才升 `accepted`。
 
@@ -77,16 +79,23 @@
 
 - 判的是只有人在地图里才能判的性质：贴地、净空、遮挡、可读性、手感、操作距离、整体旅程。
 - 组织方式：按**会话**，一次覆盖一节或一组强相关节；零散抓单条既费事又不可比。
-- 本轮状态：C 级条款一律 `blocked`，理由写「卡在：需编辑器试玩取证（业务代码完成后整批进行）」；明确砍掉范围的（9-23 随队伍界面一并划出）写 `out-of-scope` 并附 `理由：`。
+- 本轮状态：C 级条款一律 `blocked`，理由写「卡在：需编辑器试玩取证（业务代码完成后整批进行）」；9-23（队伍界面可读性）随小队系统排期，同一理由里注明「队伍界面随小队系统排期后同一会话覆盖 9-20…9-23」。规格内没有 `out-of-scope` 的 C 级条款（ADR-0029 第一节）。
 - 取证后：会话记录落成仓库文件（`evidence/<日期>-<会话号>/session.md`，含抓屏清单与观察结论），证据列写 `该文件路径（会话 <会话号>）`。门禁只认真实存在的仓库路径，纯会话标识会被判 `evidence_missing`——这不是放宽门禁，是让 C 级证据也能被核。抓屏走 `lua tools/cli.lua screenshot`，取帧前先 `--info` 判显示路径、连拍比 md5 判帧新旧。
 
-### 4.4 哪一种证据不能冒充哪一种
+### 4.4 覆盖表管落点，不管证据
+
+- [实现覆盖表](coverage.md)回答的是「这条条款由哪段代码负责、有没有测试守着」，八列：条款、代码落点、关联测试、四类证据、等级。
+- 它**不是证据**：`关联测试` 是实现自检，条款转 `evidenced` 仍然只认矩阵证据列里那条走业务入口的断言。
+- 空落点、落点或测试路径不存在、条款 ID 不在矩阵里、等级与矩阵不一致，都让 `acceptance --check` 与 `test fast` 判红。已贯通小节由 `tools/acceptance.lua` 的 `M.COVERAGE_SECTIONS` 声明，逐节扩大；扩一节就要补齐该节落点。
+- 真实渠道事项不在这张表里，也不在矩阵里：它们进 [ADR-0029](../adr/0029-scope-completeness-and-placeholder-first.md) 第四节的生产开关台账，缺位时用占位参数或本地夹具走通流程，**占位不发放真实付费权益**。
+
+### 4.5 哪一种证据不能冒充哪一种
 
 | 这个 | 不能当 | 为什么 |
 | --- | --- | --- |
 | 跑通 `tests/native/` 的旧测试 | 条款证据 | 九成是实现自检、没有条款 ID；它们通过只说明实现没坏，不说明规矩成立 |
 | 单次快照（一张截图、一段日志、一次成功） | B 级 | 判不出重连、迟到回调、超时与争抢；不可重跑就不是 B |
-| 编辑器内模拟平台回调成功 | 平台条款验收 | 真实平台结论只能在真实平台取；这类条款保持 `blocked` 并写清缺什么 |
+| 编辑器内模拟平台回调成功 | 平台条款验收 | 真实平台结论只能在真实平台取；这类条款按适配层口径记 `unverified`，真实渠道结论单列进 ADR-0029 的生产开关台账 |
 | 一处满足（一条分支、一个鱼种、一次成功） | 整条要求 | 条款写的是「谁在什么条件下做什么」，条件没覆盖完就不成立；该拆就拆，别拿一处充数 |
 | 写完了、代码看过了、PR 合了 | 取证 | 那是「做完了」，不是「验证过了」 |
 | 证据指向临时文件、仓库外路径或已删文件 | 真实证据 | 门禁判红：`evidenced` 的每个路径都必须在仓库里存在 |
@@ -105,12 +114,14 @@ lua tools/cli.lua acceptance --update-baseline # 证据变多后抬基线（单�
 
 节奏四条：
 
-1. **新增条款**：先改 `docs/GameSpec.md` 的小节（规格是本体），再按 [TEMPLATE.md](TEMPLATE.md) 在对应分片登记一行，新条款一律 `unverified`；登记完跑 `acceptance --write`，否则 `index_stale` 判红。
+1. **新增条款**：先改 `docs/GameSpec.md` 的小节（规格是本体），再按 [TEMPLATE.md](TEMPLATE.md) 在对应分片登记一行，新条款一律 `unverified`；登记完跑 `acceptance --write`，否则 `index_stale` 判红。若该节已贯通（在 `M.COVERAGE_SECTIONS` 里），同时在 [实现覆盖表](coverage.md) 补一行代码落点，否则 `coverage_clause_missing` 判红。
 2. **补证据**：写断言或探针 → 跑 `test spec` 或 `test full` → 状态改 `evidenced`、证据列填真实路径 → `acceptance --check` 绿 → `acceptance --update-baseline`。基线只许 `evidenced` 抬、`legacyTests` 降，反方向 `--update-baseline` 直接退 2 拒绝。
 3. **四车道**：`fast`（日常，`tests/native` 顶层）、`full`（收尾，加 `slow` 与 `spec`）、`spec`（条款断言）、`art`（美术，optional，不进 full）。`default` 与 `full` 相同。车道定义只看根目录 `.busted`。
 4. **入口只有一个**：矩阵。工单、聊天、临时文档里记一笔不算登记——没进矩阵的活等于没有。
 
 ## 六、延后范围（与 ADR-0027 逐字一致）
+
+> 本节说的是**批次延后**，不是条款出界：规格内没有永久出界（[ADR-0029](../adr/0029-scope-completeness-and-placeholder-first.md) 第一节）。9-19～9-23 随 E 批次（多人规则组）恢复排期，条款状态已是 `unverified`（9-23 为 `blocked`），不是 `out-of-scope`。
 
 下列内容本轮不做，**不是放弃**。范围与恢复条件逐字取自 [ADR-0027](../adr/0027-clause-matrix-as-sole-acceptance-surface.md) 的「后果」一节，本文件不增不减：
 
@@ -118,7 +129,7 @@ lua tools/cli.lua acceptance --update-baseline # 证据变多后抬基线（单�
 >   - **D 通关取证**、**E 多人规则组**、**F A 级断言铺开**、**G B 级探针补齐**、**H 旧测试清账**。
 >   - 恢复条件：D/E 等业务代码（第 12–16 节与多人接缝）合入集成分支、接口稳定之后启动；F 与 G 按分片逐节推进，每转一条 `evidenced` 都顺手抬一次基线；H 与新证据同步进行——只有删掉一条遗留测试才能把 `legacyTests` 降一格。
 
-同一份 ADR 的「本轮只建框架」口径也照抄：本轮只把**一条真实条款**（`7-11` 商店限购）转成 `evidenced`，作为「框架能拦人、断言能落地」的样板；其余条款保持 `unverified` / `blocked`。
+同一份 ADR 的「本轮只建框架」口径也照抄：框架阶段只把**真实条款**转成 `evidenced`（先是 `7-11` 商店限购，本轮又有 `1-12` 适配层失败路径），作为「框架能拦人、断言能落地」的样板；其余条款保持 `unverified` / `blocked`。
 
 两处口径是否还一致，用一条命令自查：
 
@@ -137,11 +148,11 @@ rg -n 'D 通关取证|恢复条件：D/E' docs/adr/0027-*.md docs/acceptance/han
 | 1. 19 个规格小节各有一份条款分片，条款 ID 稳定可引用。 | `ls docs/acceptance/[0-9][0-9]-*.md \| wc -l`；`lua tools/cli.lua acceptance --check`；`tests/native/acceptance_matrix_test.lua` 的「真实矩阵恰好覆盖规格的 19 个小节，节号连续」 | 19；`--check` 输出「19 份分片 / 523 条条款」并以「验收矩阵校验通过」退 0；ID 从 01 连续由 `id_sequence` 规则守着 |
 | 2. 索引页的计数与缺口密度由脚本生成且与分片一致；手改索引会被门禁判红。 | `lua tools/cli.lua acceptance --write` 连跑两次并比对 README；手改 README 合计行的数字 | 两次都输出「README 生成块已是最新，无需改动」且零差异（幂等）；手改后判红 `[index_stale]`，`test fast` 1581 successes / 1 failure |
 | 3. 规格全篇无工单编号，且这条由门禁守着，不靠人记。 | `rg -n '#[0-9]+' docs/GameSpec.md`（无输出即通过）；往 GameSpec 正文塞一个 `#123` | 无输出（rg 退 1）；塞入后判红 `[spec_issue_ref] docs/GameSpec.md:8 规格不得出现工单编号 #123`，`test fast` 1581/1；分片里塞 `工单46` 同样判红（`docs/acceptance/09-multiplayer-rules.md:3`） |
-| 4. 五状态词汇生效；blocked 必须写明卡在谁、out-of-scope 必须写明理由，缺了就判红。 | 删掉 1-04 的「卡在：」；删掉 9-19 的「理由：」；把 5-01 的状态改成 `done`；三者各跑一次 `--check` | 分别判红 `[blocked_reason]`（1-04）、`[out_of_scope_reason]`（9-19）、`[vocabulary]`（5-01 取值 "done"）；`test fast` 各 1 failure |
+| 4. 五状态词汇生效；blocked 必须写明卡在谁、out-of-scope 必须写明理由，缺了就判红。 | 删掉 1-15 的「卡在：」；在夹具里删掉 out-of-scope 行的「理由：」；把 5-01 的状态改成 `done`；三者各跑一次 `--check` | 分别判红 `[blocked_reason]`（9-04）、`[out_of_scope_reason]`（夹具）、`[vocabulary]`（5-01 取值 "done"）；`test fast` 各 1 failure |
 | 5. evidenced 指向的证据路径必须真实存在。 | 把 7-11 的证据路径改成 `tests/native/spec/07_shop_purchase_limit_gone_test.lua` | 判红 `[evidence_missing] docs/acceptance/07-economy-and-shop.md:17 7-11 的证据路径不存在`，`test fast` 1581/1；还原后恢复绿 |
-| 6. 双棘轮有基线文件：已取证计数下降、或遗留测试计数上升，都让日常车道变红。 | `docs/acceptance/baseline.lua`（`evidenced = 1`、`legacyTests = 142`）；把 evidenced 抬到 2 跑一次；把 legacyTests 压到 141 跑一次；再试反向 `acceptance --update-baseline` | `[ratchet_evidenced]`（`test fast` 1580/2）与 `[ratchet_legacy]`（1 failure）各判红一次；反向 `--update-baseline` 退 2：「已取证 1 条 < 基线 2 条：棘轮只许增，拒绝下调」 |
-| 7. spec 车道随 full 运行，且至少有一条真实条款通过它转成 evidenced。 | `lua tools/cli.lua test spec`；`lua tools/cli.lua test full -- --filter='条款 7%-11'`；`lua tools/cli.lua test full`；7-11 的条款行 | spec 车道 2 successes；full 车道内同一过滤命中同样 2 条（证明 full 收录 spec）；full 1612 successes / 0 failures / 0 pending（fast 1582 / 0）；矩阵里 7-11 为 `evidenced`，证据 `tests/native/spec/07_shop_purchase_limit_test.lua` |
-| 8. ADR、五个术语、证据分级口径、新增条款的受控入口均有明确真源。 | [ADR-0027](../adr/0027-clause-matrix-as-sole-acceptance-surface.md)「决定」与 [ADR-0028](../adr/0028-solo-clear-on-shared-world.md)；条款 / 验收矩阵见 [README.md](README.md) 开头和 [TEMPLATE.md](TEMPLATE.md) 第一、三节；棘轮见 ADR-0027「决定」第 4 条及 [workflow.md](../agents/workflow.md)「工具链」的 `acceptance` 条；取证 / 证据分级见 [evidence-levels.md](evidence-levels.md) 第一、五节；新增条款入口见 TEMPLATE 第一节 | 上述文件与小节均在；2026-11-20 实跑 `lua tools/cli.lua acceptance --check` 退 0，输出「19 份分片 / 523 条条款」「验收矩阵校验通过」；该命令核矩阵，不检查上述文档存在性 |
+| 6. 双棘轮有基线文件：已取证计数下降、或遗留测试计数上升，都让日常车道变红。 | `docs/acceptance/baseline.lua`（`evidenced = 2`、`legacyTests = 142`）；把 evidenced 抬到 3 跑一次；把 legacyTests 压到 141 跑一次；再试反向 `acceptance --update-baseline` | `[ratchet_evidenced]` 与 `[ratchet_legacy]` 各判红一次；反向 `--update-baseline` 退 2：「已取证 2 条 < 基线 3 条：棘轮只许增，拒绝下调」 |
+| 7. spec 车道随 full 运行，且至少有一条真实条款通过它转成 evidenced。 | `lua tools/cli.lua test spec`；`lua tools/cli.lua test full -- --filter='条款 7%-11'`；`lua tools/cli.lua test full`；7-11 与 1-12 的条款行 | spec 车道 5 successes；full 车道内同一过滤命中 7-11 的 2 条（证明 full 收录 spec）；矩阵里 7-11 为 `evidenced`、证据 `tests/native/spec/07_shop_purchase_limit_test.lua`，1-12 为 `evidenced`、证据 `tests/native/spec/01_platform_adapter_failure_test.lua` |
+| 8. ADR、五个术语、证据分级口径、新增条款的受控入口均有明确真源。 | [ADR-0027](../adr/0027-clause-matrix-as-sole-acceptance-surface.md)「决定」、[ADR-0028](../adr/0028-solo-clear-on-shared-world.md) 与 [ADR-0029](../adr/0029-scope-completeness-and-placeholder-first.md)；范围口径与生产开关台账见 ADR-0029，实现覆盖表见 [coverage.md](coverage.md)；条款 / 验收矩阵见 [README.md](README.md) 开头和 [TEMPLATE.md](TEMPLATE.md) 第一、三节；棘轮见 ADR-0027「决定」第 4 条及 [workflow.md](../agents/workflow.md)「工具链」的 `acceptance` 条；取证 / 证据分级见 [evidence-levels.md](evidence-levels.md) 第一、五节；新增条款入口见 TEMPLATE 第一节 | 上述文件与小节均在；2026-11-20 实跑 `lua tools/cli.lua acceptance --check` 退 0，输出「19 份分片 / 523 条条款」「验收矩阵校验通过」；该命令核矩阵，不检查上述文档存在性 |
 
 八条全绿。附带事实：`gh issue list -R qinyuanj/se-fish --state open` 只剩 #240（总单）与 #245（本单）；七张旧单（#239、#172、#171、#46、#44、#42、#14）均已关闭，未完成项在 [legacy-ledger.md](legacy-ledger.md) 里逐条有去向。
 

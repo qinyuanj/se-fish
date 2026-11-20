@@ -8,7 +8,7 @@
 
 - **探索代码**：先读 `docs/agents/domain.md`，按其中指引读取领域资料；ADR 放在 `docs/adr/`。
 - **玩法与术语**：玩法与系统设计以 `design` 为准（符号链接到仓库外 `eggitor/1_开发中/渔力全开`）；起名或写玩家可见文案前查 `GLOSSARY.md`。
-- **技术方案**：先读 `docs/技术难点识别.md`；涉及策划矛盾时读 `docs/to-questionnaire-策划案内部矛盾.md`。
+- **技术方案**：先读 `docs/技术难点识别.md`；策划案内部矛盾与数值缺口一律记在 [`docs/to-questionnaire-策划案内部矛盾.md`](docs/to-questionnaire-策划案内部矛盾.md)（未定的题），定案后移进 [策划案已确认结论](docs/策划案已确认结论.md)。
 - **编码与审查**：编写或审查 SE 业务 Lua 前，读 `CODING_STANDARDS.md`。
 - **开发工作流**：修改代码、运行测试、同步宿主或操作编辑器前，以及整理过程产物时，读 `docs/agents/workflow.md`。
 - **截图**：取证统一走 `lua tools/cli.lua screenshot`——缺省后台抓屏（PrintWindow），目标窗口被遮挡也能取到当前帧；取证前先跑 `--info` 判显示路径，判帧新旧连拍比 md5。editor-cli 的 `screenshot` 只作备选，细节见 `docs/agents/editor-cli.md`「截图」条。
