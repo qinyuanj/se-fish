@@ -758,7 +758,7 @@ GameCfg.Casting.Zones['fishPond.water'] = GameCfg.Casting.Zones.WaterCircle2
 GameCfg.Casting.Zones['volcanoIsland.water'] = sourceCastRows.volcanoIsland
 for _, species in pairs(GameCfg.Fish) do
     if species.ZoneId == 'volcanoIsland' then
-        species.implemented, species.Model = true, '7000546'
+        species.Model = '7000546'
         if species.Grade == 'elite' then species.Combat = 'mosasaur' end
         if species.Grade == 'boss' then species.Combat = 'godzilla' end
     end

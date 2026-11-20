@@ -1,10 +1,61 @@
 -- 纯配置检查；不依赖引擎服务。返回的每项错误都带原始表行或规则来源。
+-- #251 实现标记的唯一真源是 common/cfg/ContentLedger.lua：内容表不存状态，加载期不改写。
 local Validate = {}
+local Ledger = require('common.cfg.ContentLedger')
 
 local function positive(value) return type(value) == 'number' and value > 0 end
 local function nonnegative(value) return type(value) == 'number' and value >= 0 end
 local function integer(value) return type(value) == 'number' and value % 1 == 0 end
 local function count(map) local n = 0; for _ in pairs(map or {}) do n = n + 1 end; return n end
+
+-- 实现标记只在纯台账登记：内容表没有状态，加载期也不改写；这里只核对两边是否一致。
+-- 反向不一致直接判红：false 却留着代码落点，或 true 却没有落点。
+local function check_ledger(cfg, fail, activeGoods)
+    local groups = {
+        Fish = { rows = cfg.Fish, key = function(row) return row.Id end },
+        Items = { rows = cfg.Items.Definitions, key = function(row) return row.Id end },
+        Shop = { rows = cfg.Content.Shop.Goods, key = function(row) return row.number end },
+        Lottery = { rows = cfg.Content.Lottery.Patterns, key = function(row) return row.number end },
+        Blindbox = { rows = cfg.Content.Blindbox.Entries, key = function(row) return row.number end },
+    }
+    for name, group in pairs(groups) do
+        local ledger = Ledger[name] or {}
+        local seen = {}
+        for _, row in pairs(group.rows) do
+            local id = group.key(row)
+            local entry = ledger[id]
+            if not entry then
+                fail(row.source, name .. ' 的实现标记未登记到纯台账 ' .. tostring(id))
+            else
+                seen[id] = true
+                if row.implemented ~= nil then fail(row.source, name .. ' 的内容表不得自带实现标记') end
+                if entry.source ~= row.source then
+                    fail(row.source, name .. ' 的台账来源与内容表不符 ' .. tostring(entry.source))
+                end
+                if entry.implemented ~= true and entry.implemented ~= false then
+                    fail(row.source, name .. ' 的台账未标记可用状态')
+                end
+                local path = entry.path
+                local inBusinessTree = type(path) == 'string'
+                    and (path:sub(1, 7) == 'server/' or path:sub(1, 8) == 'common/' or path:sub(1, 7) == 'client/')
+                if entry.implemented == false and path ~= nil then
+                    fail(row.source, '标记为未实现但已有实现路径 ' .. tostring(path))
+                elseif entry.implemented == true and not inBusinessTree then
+                    fail(row.source, '标记为已实现但没有代码落点')
+                end
+                if name == 'Shop' and entry.implemented == true then
+                    local active = activeGoods[row.number]
+                    if not active or active.Price ~= row.price or active.MinShopLevel ~= row.minShopLevel then
+                        fail(row.source, '标为可用但现有商店未上架该商品或价格/等级不同')
+                    end
+                end
+            end
+        end
+        for id, entry in pairs(ledger) do
+            if not seen[id] then fail(tostring(entry.source), name .. ' 的台账登记了不存在的内容 ' .. tostring(id)) end
+        end
+    end
+end
 
 function Validate.Check(cfg)
     local errors = {}
@@ -24,7 +75,6 @@ function Validate.Check(cfg)
         itemNumbers[item.SourceId] = source
         if cfg.Items.SourceIdMap[item.SourceId] ~= key then fail(source, '物品编号映射失效 ' .. tostring(item.SourceId)) end
         if not nonnegative(item.BasePrice) then fail(source, '出售价格无效') end
-        if item.implemented ~= true and item.implemented ~= false then fail(source, '未标记可用状态') end
     end
     local fishNumbers = {}
     for key, species in pairs(fish) do
@@ -48,7 +98,6 @@ function Validate.Check(cfg)
                 if not integer(drop.Count) or drop.Count < 1 then fail(source, '掉落数量无效') end
             end
         end
-        if species.implemented ~= true and species.implemented ~= false then fail(source, '未标记可用状态') end
         if species.Grade ~= 'boss' then zoneSeen[species.ZoneId] = true end
     end
     for _, zone in ipairs(cfg.Zones or {}) do
@@ -67,13 +116,6 @@ function Validate.Check(cfg)
         end
         if not positive(row.price) or not integer(row.minShopLevel) or row.minShopLevel < 1 or row.minShopLevel > 7
             or not nonnegative(row.purchaseLimit) or not integer(row.purchaseLimit) then fail(row.source, '商品价格/商店等级/限购无效') end
-        if row.implemented ~= true and row.implemented ~= false then fail(row.source, '未标记可用状态') end
-        if row.implemented == true then
-            local active = activeGoods[row.number]
-            if not active or active.Price ~= row.price or active.MinShopLevel ~= row.minShopLevel then
-                fail(row.source, '标为可用但现有商店未上架该商品或价格/等级不同')
-            end
-        end
     end
     local lotteryWeight = 0
     for _, row in ipairs(lottery) do
@@ -86,8 +128,6 @@ function Validate.Check(cfg)
         elseif reward.kind == 'item' then
             if not items[reward.itemKey] then fail(row.source, '三同物品不存在 ' .. tostring(reward.itemKey)) end
         else fail(row.source, '三同奖项无效') end
-        -- #138 起抽奖机接入（server/Mgr/MgrLottery.lua）：七个图案全部标可用；回退为 false 视为内容事故
-        if row.implemented ~= true then fail(row.source, '抽奖图案须随 #138 标可用') end
     end
     local blindboxWeight, jackpotCount, blindboxKeys = 0, 0, {}
     for _, row in ipairs(blindbox) do
@@ -100,7 +140,6 @@ function Validate.Check(cfg)
         elseif item.Name ~= row.itemName or item.Type ~= '极品食物' or item.BasePrice ~= row.basePrice then
             fail(row.source, '盲盒物品名称/类别/基础价与物品表不符') end
         if not positive(row.weight) or row.multiplier ~= 1 then fail(row.source, '盲盒权重或固定倍率无效') end
-        if row.implemented ~= false then fail(row.source, '未接入平台盲盒不能标可用') end
     end
     local blind = cfg.Content.Blindbox
     if blind.Currency ~= '金豆' or blind.SinglePrice ~= 10 or blind.TenPrice ~= 90
@@ -124,6 +163,7 @@ function Validate.Check(cfg)
             fail(source, '首领饵或首领信物与鱼种不匹配') end
     end
     if #chains ~= 7 then fail('GameSpec.md#8.1', '信物兑换链不是七组') end
+    check_ledger(cfg, fail, activeGoods)
     local counts = { zones = #(cfg.Zones or {}), fish = count(fish), items = count(items), shop = #goods,
         lottery = #lottery, blindbox = #blindbox, lotteryWeight = lotteryWeight, blindboxWeight = blindboxWeight }
     for field, expected in pairs({ zones = 7, fish = 98, items = 171, shop = 50, lottery = 7,

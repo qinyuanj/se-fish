@@ -3,6 +3,7 @@
 -- 沿用 tests/support/fish_loot 共享夹具（真 PlayerData + 真 MgrLoot + 举鱼假引擎）。
 -- describe/it 名称保留旧类名与方法名，并按方法名字典序注册以保持旧套件执行顺序。
 local FishLoot = require('tests.support.fish_loot')
+local Ledger = require('common.cfg.ContentLedger')
 
 local function vec(x, y, z)
     return setmetatable({ x = x, y = y, z = z }, { __add = function(a, b)
@@ -255,7 +256,7 @@ describe('TestFishLoot', function()
         for _, row in ipairs(rows) do byId[row.Id] = row end
         for _, pair in ipairs(POND_RARES) do
             local rare, base = cfg.Fish[pair.id], cfg.Fish[pair.base]
-            assert.is_true(rare.implemented, pair.id)
+            assert.is_true(Ledger.Fish[pair.id].implemented, pair.id)
             assert.are.equal('极品' .. base.Name, rare.Name, pair.id)
             -- 模型按鱼名复用同名普通鱼，并在鱼载体表内
             assert.are.equal(base.Model, rare.Model, pair.id)
@@ -265,7 +266,7 @@ describe('TestFishLoot', function()
             assert.same({ Id = pair.id, Bait = rare.Bait, RodLevel = rare.RodLevel, DrawWeight = rare.DrawWeight }, byId[pair.id])
             -- 抽奖机赌注资格：物品表类别「极品食物」、已接入、有图标
             local item = cfg.Items.Definitions[pair.id]
-            assert.same({ rare.Name, '极品食物', true }, { item.Name, item.Type, item.implemented })
+            assert.same({ rare.Name, '极品食物', true }, { item.Name, item.Type, Ledger.Items[pair.id].implemented })
             assert.are.equal(rare.BasePrice, item.BasePrice, pair.id)
             assert.is_not.is_nil(item.Icon, pair.id)
         end
