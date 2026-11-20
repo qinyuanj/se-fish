@@ -223,7 +223,7 @@ function Panel:NoteResult(result)
             notice(reasonText(result.reason))
         end
     elseif action == 'CoinGrant' and result.ok then
-        notice(string.format('到账 %d%s（%s）', result.coin or 0, cfg().BeanCurrency,
+        notice(string.format(cfg().Placeholder.CoinGrantText, result.coin or 0, cfg().BeanCurrency,
             tostring(result.name or result.goods)))
     elseif action == 'AdrenalineShop' then
         if result.ok then self:ShowOffers(result.offers) else notice(cfg().UnavailableText) end
