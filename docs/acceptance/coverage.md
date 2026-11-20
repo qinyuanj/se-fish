@@ -114,17 +114,17 @@
 | 12-32 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua、common/FlightPath.lua | tests/native/reef_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 12-33 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua、common/FlightPath.lua | tests/native/reef_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 12-34 | common/GameCfg.lua、common/cfg/BossMoves.lua | tests/native/reef_combat_test.lua | 缺 | 缺 | 缺 | 缺 | B |
-| 12-35 | common/cfg/Fish.lua、server/Mgr/MgrFishUnit.lua | tests/native/volcano_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 12-36 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/volcano_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 12-37 | server/Mgr/MgrFishUnit.lua | tests/native/volcano_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 12-38 | server/Mgr/MgrFishUnit.lua、common/GameCfg.lua | tests/native/volcano_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 12-35 | common/cfg/BossMoves.lua、server/Mgr/MgrFishUnit.lua | tests/native/spec/12_boss_moves_phase_test.lua | 有 | 缺 | 缺 | 缺 | A |
+| 12-36 | common/cfg/BossMoves.lua、common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/spec/12_boss_moves_phase_test.lua | 有 | 缺 | 缺 | 缺 | A |
+| 12-37 | common/cfg/BossMoves.lua、server/Mgr/MgrFishUnit.lua | tests/native/spec/12_boss_moves_phase_test.lua | 有 | 缺 | 缺 | 缺 | A |
+| 12-38 | common/cfg/BossMoves.lua、common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/spec/12_boss_moves_phase_test.lua | 有 | 缺 | 缺 | 缺 | A |
 | 12-39 | common/cfg/Fish.lua、common/cfg/BossMoves.lua | tests/native/spec/12_boss_moves_test.lua | 有 | 缺 | 缺 | 缺 | A |
 | 12-40 | common/cfg/BossMoves.lua、common/BossPhase.lua | tests/native/spec/12_boss_moves_test.lua | 有 | 缺 | 缺 | 缺 | A |
 | 12-41 | common/cfg/BossMoves.lua、server/Mgr/MgrFishUnit.lua | tests/native/spec/12_boss_moves_test.lua | 有 | 缺 | 缺 | 缺 | A |
 | 12-42 | common/cfg/BossMoves.lua、server/Mgr/MgrFishUnit.lua | tests/native/spec/12_boss_moves_test.lua | 有 | 缺 | 缺 | 缺 | A |
 | 12-43 | common/GameCfg.lua、common/BossPhase.lua、server/Mgr/MgrFishUnit.lua | tests/native/spec/12_boss_moves_test.lua | 有 | 缺 | 缺 | 缺 | A |
 | 12-44 | common/GameCfg.lua、common/BossPhase.lua、server/Mgr/MgrFishUnit.lua | tests/native/spec/12_boss_moves_test.lua | 有 | 缺 | 缺 | 缺 | A |
-| 12-45 | common/BossPhase.lua、server/Mgr/MgrFishUnit.lua | tests/native/spec/12_boss_moves_test.lua | 有 | 缺 | 缺 | 缺 | B |
+| 12-45 | common/cfg/BossMoves.lua、common/GameCfg.lua、common/BossPhase.lua、server/Mgr/MgrFishUnit.lua | tests/native/spec/12_boss_moves_test.lua、tests/native/spec/12_boss_moves_phase_test.lua | 有 | 缺 | 缺 | 缺 | B |
 | 12-46 | common/cfg/BossMoves.lua | tests/native/spec/12_boss_moves_test.lua | 有 | 缺 | 缺 | 缺 | A |
 | 12-47 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | — | 缺 | 缺 | 缺 | 缺 | A |
 | 12-48 | common/GameCfg.lua | — | 缺 | 缺 | 缺 | 缺 | A |
@@ -132,6 +132,9 @@
 第 12 节先建逐招表，再用火山岛首领哥斯拉贯通「配置 → 服务端调度 → 客户端预警 → 断言」：
 12-04、12-05、12-39～12-46 已由 tests/native/spec/12_boss_moves_test.lua 走 MgrFishUnit 的业务入口取证；
 其余条款的落点与关联测试都是实现自检，状态仍是 unverified。
+
+阶段与复合组（#259）另有一组 A/B 证据：沧龙用逐招表的 patrol / leap / head / bite / contact 五行区分绕岛巡航、命中段与叼走过程接触段，哥斯拉的阶段阈值单独放在 `M.Phases`（普通招式表仍是 `M.Rows`），由 tests/native/spec/12_boss_moves_phase_test.lua 走 MgrFishUnit 的业务入口断言移速上限、砸击/甩头、最近岛中心目标、叼走入海、两段伤害与同帧阈值优先；四类证据只勾「正常流程」，失败 / 退出重进 / 存档恢复仍缺。
+
 ### 第 16 节 物品基础数据（17 条）
 
 | 条款 | 代码落点 | 关联测试 | 正常流程 | 失败流程 | 退出重进 | 存档恢复 | 等级 |
