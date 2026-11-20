@@ -7,6 +7,8 @@
 > **文件名**：本报告写于 `qa-slot` 改名之前，文中的 `acceptance_slot_*` 即现在的 `qa_slot_*`，数字不受影响。
 > **已过时项**：文中反复出现的 pre-commit hook（`tools/hooks/pre-commit`）已随 [ADR-0018](adr/0018-delete-pre-commit-hook.md) 删除，`slow/pre_commit_hook_test.lua`（15.016 s / 12 用例）一并移除；本仓现在没有任何提交时的自动检查。
 >
+> **已过时项（2026-11-20）**：`arch_policy_test`、`eggy_json_guard_test`、`static_require_test`、`acceptance_matrix_test` 已迁到 `tests/native/guards/`（guards 门禁车道，随 fast 与 full 跑、不计入验收基线的遗留测试数）。第 4~7 节与两份 CSV 的行**保持提交 `4eb7b67` 的原样未改**——那描述的是当时的仓库，改路径会把历史写成没发生过的事。读旧路径时按 `tests/native/<同名文件>` 对应到新位置即可，数字不受影响。
+>
 > **2026-11-18 当日复测（本文写完之后的第二批次改动）**：`test fast` 连跑五轮 **9.44 / 7.45 / 7.56 / 7.95 / 8.61 s，中位 7.95 s / 1490 用例 / 132 文件**（0 失败 0 错误 0 待定）；`test full` 一轮 **10.5 s / 1518 用例**。同一批改动里：`main_hud_layout_test` 的参数矩阵从 16 组全组合降为 8 组两两覆盖，并把断言消息改成只在失败分支里格式化（文件级 2825 ms → 176 ms，这是本批次最大的一笔）；三份 `*_island_cfg_test` 合并成 `island_content_test`；另外删掉 8 个低价值测试文件、收缩十余处重复用例，用例数由 1552 降到 1490。本文 §10.3 的第一条建议（`arch_policy_test` 的文件级 `Arch.scan` 缓存）**在写下时就已经落地**，`arch_policy_test` 现在仍占约 0.75 s，全部是那一次全树扫描本身。
 >
 > 第 4~7 节的逐文件表、`cases.csv`、`files.csv` 仍是提交 `4eb7b67` 的快照：它们包含本日删除的 8 个文件与 `pre_commit_hook_test` 等更早移除的文件行，**不要当现状读**。要新基线，须用 §9.1 的命令重跑（`tmp/timing/*` 是一次性脚本，已不在仓库里，需要重写）。
@@ -34,19 +36,20 @@
 
 | 入口 | 命令 | 范围 | 触发时机 |
 |---|---|---|---|
-| fast 车道 | `lua tools/cli.lua test fast` | `tests/native` | 日常开发 |
-| full 车道 | `lua tools/cli.lua test full` | `tests/native` + `tests/native/slow` | 收尾、完成判据 |
+| fast 车道 | `lua tools/cli.lua test fast` | `tests/native` + `tests/native/guards` | 日常开发 |
+| full 车道 | `lua tools/cli.lua test full` | fast + `tests/native/slow` + `tests/native/spec` | 收尾、完成判据 |
 | default（裸 `busted`） | `busted` | 与 full 相同 | crapper 列测试文件时读 default |
-| 提交闸门 | `tools/hooks/pre-commit` → `lua tools/cli.lua test fast` | 与 fast 相同 | 每次 `git commit`（含 `.lua`/`.busted` 时） |
+| 提交时闸门 | 无 | — | pre-commit hook 已随 [ADR-0018](adr/0018-delete-pre-commit-hook.md) 删除；PR 与 main 推送由 `.github/workflows/test.yml` 跑 `test full`（[ADR-0025](adr/0025-windows-pr-full-test-gate.md)） |
 | 覆盖率 | `busted --run=full --coverage` | 与 full 相同 + LuaCov | crapper（人工在插件面板发起） |
 
-车道由根目录 `.busted` 定义，关键项：`ROOT` 白名单（只列 `tests/native` 与 `tests/native/slow`，`recursive = false`，slow 因此不会被 fast 吞掉）、`pattern = "_test"`、`helper = "tests/native/helper.lua"`、`sort-files = true`、`auto-insulate = true`、`output = "plainTerminal"`。
+车道由根目录 `.busted` 定义，关键项：`ROOT` 白名单（列 `tests/native`、`tests/native/guards`、`tests/native/slow` 与 `tests/native/spec`，`recursive = false`，后三者因此不会被 fast 的 `tests/native` 吞掉）、`pattern = "_test"`、`helper = "tests/native/helper.lua"`、`sort-files = true`、`auto-insulate = true`、`output = "plainTerminal"`。
 
 ### 1.2 文件与用例
 
 | 资产 | 数量 | 是否入车道 |
 |---|---:|---|
-| `tests/native/*_test.lua`（fast） | 142 个文件 / 1552 用例 | 是（fast、full） |
+| `tests/native/*_test.lua`（fast） | 142 个文件 / 1552 用例（4eb7b67 快照；门禁迁出后现为 134） | 是（fast、full） |
+| `tests/native/guards/*_test.lua`（guards） | 4 个文件（2026-11-20 起；不计入遗留测试） | 是（fast、full） |
 | `tests/native/slow/*_test.lua`（slow） | 6 个文件 / 45 用例 | 是（仅 full） |
 | `tests/support/*.lua` 共享夹具 | 19 个 | 否（被 require） |
 | `tests/native/helper.lua` | 1 个 | 否（helper 钩子） |
@@ -65,7 +68,7 @@
 
 ### 1.3 哪些"检查"不算测试（本报告不跑）
 
-- **本仓没有任何 CI 配置**（`docs/agents/workflow.md`「实机验收在 Windows 原生」明确：历史上也从未有，不新增）。唯一自动闸门是 pre-commit hook。
+- **自动闸门只有 CI**：PR 与 `main` 推送由 `test.yml` 跑 `test full`（[ADR-0025](../adr/0025-windows-pr-full-test-gate.md)）；提交时不做任何自动检查（[ADR-0018](../adr/0018-delete-pre-commit-hook.md) 删掉了 pre-commit hook）。
 - **质量工具** `uml_crap` / `uml_mutate` / `uml_dry`：由人在 dsh-uml-viewer 插件面板发起，不进 CLI、不进 hook。本次只测了它们的底层跑法（full + 覆盖率）。
 - **构建/同步/编辑器操作**（`deploy`、`sync`、`acceptance-slot`、`ability-presets`、试玩 E2E、`code validate`）：会改宿主目录或依赖编辑器在线，**不是测试**，本次不跑（见第 8 节）。
 - **`tests/probes/` 的 55 个探针**：手工探针，`.busted` 的 ROOT 白名单把它们排除在任何车道外。

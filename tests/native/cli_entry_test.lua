@@ -109,7 +109,7 @@ describe("TestCliEntryHelp", function()
   it("test_unknown_lane_exits_2_through_the_entry", function()
     local code, out, err = cli({ "test", "slow" })
     assert.are.equal(2, code, out .. err)
-    assert.matches("可用车道: fast, full, spec, art", err, 1, true)
+    assert.matches("可用车道: fast, full, guards, spec, art", err, 1, true)
   end)
 
   it("test_unknown_subcommand_exits_2", function()

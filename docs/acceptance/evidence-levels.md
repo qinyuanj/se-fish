@@ -70,7 +70,7 @@ C 级条款的状态在本轮一律是 `blocked`，理由写 `卡在：需编辑
 
 ## 六、门禁怎么核
 
-`lua tools/cli.lua acceptance --check`（随 fast 车道跑，见 `tests/native/acceptance_matrix_test.lua`）会实际去核：
+`lua tools/cli.lua acceptance --check`（随 fast 车道跑，见 `tests/native/guards/acceptance_matrix_test.lua`）会实际去核：
 
 - `evidenced` / `accepted` 行里的**每个**仓库相对路径必须真实存在，缺一个就红（C 级也适用，见第三节）。
 - `accepted` 行的证据列必须带 `（签署：@用户名 YYYY-MM-DD）`，否则红。

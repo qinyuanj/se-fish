@@ -17,7 +17,7 @@
 | 规格 | `docs/GameSpec.md` | 这条规矩是什么 | 人；改完要同步分片 |
 | 矩阵 | `docs/acceptance/NN-*.md` | 每条规矩验到哪一步 | 人按 [TEMPLATE.md](TEMPLATE.md) 增删条款行 |
 | 索引 | `docs/acceptance/README.md` 的生成块 | 19 节的条数、状态分布、缺口密度 | **只由脚本写**，手改判红 |
-| 门禁 | `tools/acceptance.lua`、`tests/native/acceptance_matrix_test.lua` | 这本账还可信吗 | 代码；随 fast 跑 |
+| 门禁 | `tools/acceptance.lua`、`tests/native/guards/acceptance_matrix_test.lua` | 这本账还可信吗 | 代码；随 fast 跑 |
 | 基线 | `docs/acceptance/baseline.lua` | 两道棘轮的两端 | 只经 `--update-baseline`，单向 |
 
 门禁一次核这些事：19 个规格小节各恰好一份分片、四列取值在封闭词表内、条款 ID 从 01 起连续不跳号、`blocked` 写了卡在谁、`out-of-scope` 写了理由、已取证行的每个路径真实存在、`accepted` 行带人签署、条款文案里没有禁用措辞、索引生成块与分片一字不差，以及「规格与分片里都不出现工单编号」；再加两道单向棘轮（已取证只增、遗留测试只减）。禁用措辞清单与门禁判不了的那两条见 [TEMPLATE.md](TEMPLATE.md) 第六节。
@@ -54,7 +54,7 @@
 
 ## 四、三种证据怎么取、怎么补
 
-三档说的是**怎么取证**，不是取证什么。它与 [ADR-0028](../adr/0028-solo-clear-on-shared-world.md) 的四类证据（正常流程、失败流程、退出重进、存档恢复）是两条正交的轴：四类管覆盖范围，三档管取证方式；一栏里的每条条款再按三档之一取证。
+三档说的是**怎么取证**，不是取证什么。它与 [ADR-0028](../adr/0028-solo-clear-on-shared-world.md) 的四类证据（正常流程、失败流程、退出重进、存档恢复）是两条正交的轴：四类管覆盖范围，三档管取证方式；一栏里的每条条款再按三档之一取证。**门禁型用例（只读仓库、挡不变量）不属于这三档**：它们放 `tests/native/guards/`，随 fast 与 full 跑、不计入遗留测试，用来挡住仓库不变量而不是取证条款。
 
 ### 4.1 A 级：走业务入口的黑盒断言
 
@@ -134,12 +134,12 @@ rg -n 'D 通关取证|恢复条件：D/E' docs/adr/0027-*.md docs/acceptance/han
 
 | 判据（#240 原文） | 证据（可重跑） | 结果 |
 | --- | --- | --- |
-| 1. 19 个规格小节各有一份条款分片，条款 ID 稳定可引用。 | `ls docs/acceptance/[0-9][0-9]-*.md \| wc -l`；`lua tools/cli.lua acceptance --check`；`tests/native/acceptance_matrix_test.lua` 的「真实矩阵恰好覆盖规格的 19 个小节，节号连续」 | 19；`--check` 输出「19 份分片 / 523 条条款」并以「验收矩阵校验通过」退 0；ID 从 01 连续由 `id_sequence` 规则守着 |
+| 1. 19 个规格小节各有一份条款分片，条款 ID 稳定可引用。 | `ls docs/acceptance/[0-9][0-9]-*.md \| wc -l`；`lua tools/cli.lua acceptance --check`；`tests/native/guards/acceptance_matrix_test.lua` 的「真实矩阵恰好覆盖规格的 19 个小节，节号连续」 | 19；`--check` 输出「19 份分片 / 523 条条款」并以「验收矩阵校验通过」退 0；ID 从 01 连续由 `id_sequence` 规则守着 |
 | 2. 索引页的计数与缺口密度由脚本生成且与分片一致；手改索引会被门禁判红。 | `lua tools/cli.lua acceptance --write` 连跑两次并比对 README；手改 README 合计行的数字 | 两次都输出「README 生成块已是最新，无需改动」且零差异（幂等）；手改后判红 `[index_stale]`，`test fast` 1581 successes / 1 failure |
 | 3. 规格全篇无工单编号，且这条由门禁守着，不靠人记。 | `rg -n '#[0-9]+' docs/GameSpec.md`（无输出即通过）；往 GameSpec 正文塞一个 `#123` | 无输出（rg 退 1）；塞入后判红 `[spec_issue_ref] docs/GameSpec.md:8 规格不得出现工单编号 #123`，`test fast` 1581/1；分片里塞 `工单46` 同样判红（`docs/acceptance/09-multiplayer-rules.md:3`） |
 | 4. 五状态词汇生效；blocked 必须写明卡在谁、out-of-scope 必须写明理由，缺了就判红。 | 删掉 1-04 的「卡在：」；删掉 9-19 的「理由：」；把 5-01 的状态改成 `done`；三者各跑一次 `--check` | 分别判红 `[blocked_reason]`（1-04）、`[out_of_scope_reason]`（9-19）、`[vocabulary]`（5-01 取值 "done"）；`test fast` 各 1 failure |
 | 5. evidenced 指向的证据路径必须真实存在。 | 把 7-11 的证据路径改成 `tests/native/spec/07_shop_purchase_limit_gone_test.lua` | 判红 `[evidence_missing] docs/acceptance/07-economy-and-shop.md:17 7-11 的证据路径不存在`，`test fast` 1581/1；还原后恢复绿 |
-| 6. 双棘轮有基线文件：已取证计数下降、或遗留测试计数上升，都让日常车道变红。 | `docs/acceptance/baseline.lua`（`evidenced = 1`、`legacyTests = 142`）；把 evidenced 抬到 2 跑一次；把 legacyTests 压到 141 跑一次；再试反向 `acceptance --update-baseline` | `[ratchet_evidenced]`（`test fast` 1580/2）与 `[ratchet_legacy]`（1 failure）各判红一次；反向 `--update-baseline` 退 2：「已取证 1 条 < 基线 2 条：棘轮只许增，拒绝下调」 |
+| 6. 双棘轮有基线文件：已取证计数下降、或遗留测试计数上升，都让日常车道变红。 | `docs/acceptance/baseline.lua`（`evidenced = 1`、`legacyTests = 138`）；把 evidenced 抬到 2 跑一次；把 legacyTests 压到 137 跑一次；再试反向 `acceptance --update-baseline` | `[ratchet_evidenced]`（`test fast` 1580/2）与 `[ratchet_legacy]`（1 failure）各判红一次；反向 `--update-baseline` 退 2：「已取证 1 条 < 基线 2 条：棘轮只许增，拒绝下调」 |
 | 7. spec 车道随 full 运行，且至少有一条真实条款通过它转成 evidenced。 | `lua tools/cli.lua test spec`；`lua tools/cli.lua test full -- --filter='条款 7%-11'`；`lua tools/cli.lua test full`；7-11 的条款行 | spec 车道 2 successes；full 车道内同一过滤命中同样 2 条（证明 full 收录 spec）；full 1612 successes / 0 failures / 0 pending（fast 1582 / 0）；矩阵里 7-11 为 `evidenced`，证据 `tests/native/spec/07_shop_purchase_limit_test.lua` |
 | 8. ADR、五个术语、证据分级口径、新增条款的受控入口均有明确真源。 | [ADR-0027](../adr/0027-clause-matrix-as-sole-acceptance-surface.md)「决定」与 [ADR-0028](../adr/0028-solo-clear-on-shared-world.md)；条款 / 验收矩阵见 [README.md](README.md) 开头和 [TEMPLATE.md](TEMPLATE.md) 第一、三节；棘轮见 ADR-0027「决定」第 4 条及 [workflow.md](../agents/workflow.md)「工具链」的 `acceptance` 条；取证 / 证据分级见 [evidence-levels.md](evidence-levels.md) 第一、五节；新增条款入口见 TEMPLATE 第一节 | 上述文件与小节均在；2026-11-20 实跑 `lua tools/cli.lua acceptance --check` 退 0，输出「19 份分片 / 523 条条款」「验收矩阵校验通过」；该命令核矩阵，不检查上述文档存在性 |
 

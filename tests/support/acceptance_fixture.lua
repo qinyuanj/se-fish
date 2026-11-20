@@ -1,4 +1,4 @@
--- 验收矩阵夹具（#243）：在临时目录里拼一份最小可用的假仓库，供 tests/native/acceptance_matrix_test.lua
+-- 验收矩阵夹具（#243）：在临时目录里拼一份最小可用的假仓库，供 tests/native/guards/acceptance_matrix_test.lua
 -- 逐项改坏再验红。夹具只写磁盘，不碰真实 docs/acceptance/；生成块与基线由 tools.acceptance 自己算，
 -- 保证夹具起点就是绿的（改坏了才红，红的不是夹具本身）。
 local fs = require('tests.support.fs_fixture')
