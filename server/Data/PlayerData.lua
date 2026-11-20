@@ -257,6 +257,10 @@ function PlayerData:Migrate(snapshot)
             if type(extra[name]) ~= 'table' then return nil, '扩展字段缺失 ' .. name end
         end
         if not integer(extra.party.id, 0) then return nil, '队伍字段损坏' end
+        -- 队伍号旁的会话纪元是后加的可选字段：旧档没有按「无纪元」处理，类型不对才算坏档。
+        if extra.party.epoch ~= nil and type(extra.party.epoch) ~= 'string' then
+            return nil, '队伍纪元损坏'
+        end
         if type(extra.inventory.selection) ~= 'table' or type(extra.travel.arrived) ~= 'table'
             or type(extra.travel.safePoint) ~= 'table' or type(extra.inventory.weapons) ~= 'table' then return nil, '扩展字段损坏' end
         local held = extra.inventory.selection.held

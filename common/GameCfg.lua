@@ -184,6 +184,7 @@ GameCfg.Party = {
         DisbandText = '小队已解散',
         LeftText = '你已离开小队',
         RestoredText = '已回到原来的小队',
+        RestoreFullText = '原小队已满 3 人，暂时回不去',
         UnavailableText = '组队操作暂时不可用',
         TooFarText = '距离太远，走到 2 米内再邀请',
         FullText = '小队已满 3 人',

@@ -5,7 +5,7 @@
 -- 伤害入口一行不动：队友免伤的证据归 PK/抢救子单，这里只提供 SameParty 接缝给后续判定用。
 local GameCfg = require('common.GameCfg')
 
-local Mgr = { Parties = {}, PartyOf = {}, Invites = {}, Online = {}, NextId = 0 }
+local Mgr = { Parties = {}, PartyOf = {}, Invites = {}, Online = {}, NextId = 0, Epoch = nil }
 
 local function cfg() return GameCfg.Party end
 
@@ -65,20 +65,39 @@ function Mgr:DataOf(player)
     return ok and data or nil
 end
 
+-- 服务端会话纪元：本轮开服发的队伍号都带它。与 MgrLoot.DeliveryEpoch 同口径
+-- （开服时刻 + 随机数），只用来分辨「号码是不是这一轮发的」，不是鉴权秘密。
+function Mgr:SessionEpoch()
+    if not self.Epoch then
+        local ok, value = pcall(function() return game:GetService('World'):GetServerTime() end)
+        self.Epoch = tostring(ok and value or 0) .. ':' .. tostring(math.random())
+    end
+    return self.Epoch
+end
+
 -- 归属写进存档的持久字段；落账交给 MgrSave 的自动存档与离场快照，这里只改权威值。
+-- 队伍号旁同时记纪元：NextId 每轮开服从 0 自增，只凭裸号码会把旧档玩家恢复进陌生队伍。
 function Mgr:SavePartyId(player, id)
     local data = self:DataOf(player)
     if not data or type(data.Extra) ~= 'table' then return false end
     if type(data.Extra.party) ~= 'table' then data.Extra.party = { id = 0 } end
-    data.Extra.party.id = id or 0
+    local partyId = id or 0
+    data.Extra.party.id = partyId
+    data.Extra.party.epoch = partyId > 0 and self:SessionEpoch() or nil
     return true
 end
 
-function Mgr:SavedPartyId(player)
+-- 存档里的队伍归属：号码 + 写入时的会话纪元（旧档没有纪元，返回 nil）。
+function Mgr:SavedParty(player)
     local data = self:DataOf(player)
     local party = data and data.Extra and data.Extra.party
     local id = party and party.id
-    if type(id) == 'number' and id == math.floor(id) and id > 0 then return id end
+    if type(id) ~= 'number' or id ~= math.floor(id) or id <= 0 then return nil end
+    return id, type(party.epoch) == 'string' and party.epoch or nil
+end
+
+function Mgr:SavedPartyId(player)
+    return (self:SavedParty(player))
 end
 
 local function newParty(self)
@@ -184,6 +203,12 @@ end
 function Mgr:Accept(player, fromUserId)
     local invite = self.Invites[player.UserId]
     if not invite then return false, 'no-invite' end
+    -- 到期判定与 Update 的清扫同一口径：不等 Update 的同一帧窗口里到点的邀请也不放行。
+    if now() >= invite.ExpiresAt then
+        self.Invites[player.UserId] = nil
+        self:Push(player)
+        return false, 'expired'
+    end
     if fromUserId ~= nil and fromUserId ~= invite.From then return false, 'stale' end
     local inviter = self.Online[invite.From]
     if not inviter then
@@ -282,17 +307,22 @@ function Mgr:Update()
     end
 end
 
--- 重连恢复：存档里的小队号还在、那支队伍也还在（有队友在线、未满）就回到原队伍；
--- 队伍已经不在（离线自动离队后解散了）就把归属落回无队伍，并明确告诉玩家解散结果。
+-- 重连恢复：存档里的小队号还在、纪元是本轮的、那支队伍也还在（有队友在线、未满）就回到原队伍；
+-- 号码对不上本轮纪元（上一轮开服的号）或队伍已经不在（离线自动离队后解散了）就把归属落回无队伍，
+-- 并明确告诉玩家解散结果；队伍还在但满员给 'full'，与「原队已散」区分。
 function Mgr:Restore(player)
-    local saved = self:SavedPartyId(player)
+    local saved, epoch = self:SavedParty(player)
     if not saved then return nil end
     if self:PartyIdOf(player) then return nil end
     local party = self.Parties[saved]
-    if party and #party.Members < cfg().MaxMembers then
-        self:AddMember(party, player)
-        self:PushParty(party, 'restored')
-        return 'restored'
+    if party and epoch == self:SessionEpoch() then
+        if #party.Members < cfg().MaxMembers then
+            self:AddMember(party, player)
+            self:PushParty(party, 'restored')
+            return 'restored'
+        end
+        -- 原队伍还在、只是满了：保留归属（下次有位置再谈恢复），回执与文案与解散分开。
+        return 'full'
     end
     self:SavePartyId(player, 0)
     return 'disbanded'
@@ -302,7 +332,7 @@ function Mgr:OnPlayerAdded(player)
     if not player or not player.UserId then return end
     self.Online[player.UserId] = player
     local notice = self:Restore(player)
-    if notice == 'disbanded' then self:Push(player, notice)
+    if notice == 'disbanded' or notice == 'full' then self:Push(player, notice)
     elseif not notice then self:Push(player) end
 end
 
