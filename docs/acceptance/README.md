@@ -59,13 +59,7 @@
 | [17](17-tutorial-story-platform.md) | 新手任务、剧情与平台边界 | 22 | 20 | 2 | 0 | 0 | 0 | 91% |
 | [18](18-save-and-recovery.md) | 存档与恢复契约 | 32 | 9 | 23 | 0 | 0 | 0 | 28% |
 | [19](19-acceptance-criteria.md) | 验收口径 | 19 | 13 | 0 | 0 | 6 | 0 | 100% |
-<<<<<<< HEAD
-| 合计 | — | 523 | 407 | 60 | 0 | 56 | 0 | 89% |
+| 合计 | — | 523 | 399 | 68 | 0 | 56 | 0 | 87% |
 
-已取证（evidenced + accepted）60 / 523；缺口密度 89% =（unverified + blocked + out-of-scope）÷ 条款数，其中 out-of-scope 占 0%。
-=======
-| 合计 | — | 523 | 408 | 59 | 0 | 56 | 0 | 89% |
-
-已取证（evidenced + accepted）59 / 523；缺口密度 89% =（unverified + blocked + out-of-scope）÷ 条款数，其中 out-of-scope 占 0%。
->>>>>>> ticket/261-shop-blindbox-placeholder
+已取证（evidenced + accepted）68 / 523；缺口密度 87% =（unverified + blocked + out-of-scope）÷ 条款数，其中 out-of-scope 占 0%。
 <!-- END GENERATED: acceptance-counts -->
