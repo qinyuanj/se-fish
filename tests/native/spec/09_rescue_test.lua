@@ -226,7 +226,7 @@ describe('条款 9/11 他人抢救', function()
   -- 9-17 客户端：抢救提示复用现有 InteractionBubble 与 InteractAction 通道，不另造入口。
   it('9-17 客户端复用交互气泡发起抢救', function()
     env.clientNodes = {}
-    local localPlayer = { Character = { Position = vec(0, 0, 0) },
+    local localPlayer = { UserId = 41, Character = { Position = vec(0, 0, 0) },
       PlayerGui = { EuiManager = { CreateSceneNodeAtPosition = function(_, position)
         local node = { Position = position, Visible = false }
         env.clientNodes.RescueRoot = node

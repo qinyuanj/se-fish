@@ -2,7 +2,7 @@
 
 > 本文件是《渔力全开》规格第 9 节的条款清单。格式与必填项见 [TEMPLATE.md](TEMPLATE.md)，小节索引见 [README.md](README.md)。
 > 本节按组物理分开成**四张表**：**契约**是接口与共享世界必须成立的接缝，**规则**是可与实现解耦的玩法判定，**功能**是需要新建的小队系统与队伍界面，最后的 **C 级（试玩取证）** 小节专收只能用试玩观察取证的条款（按证据等级而不是按组划分）。
-> 本节按 [ADR-0029](../adr/0029-scope-completeness-and-placeholder-first.md) 的范围口径执行：规格内的条款没有永久出界。小队已落地并取证（9-02、9-06～9-11、9-19～9-22，证据在 `tests/native/spec/09_party_authority_test.lua` 与 `tests/native/spec/09_party_hud_test.lua`）；伤害入口相关条款（9-01、9-12～9-16）的落点已登记在[实现覆盖表](coverage.md)，取证归各自的子单；抢救条款（9-03、9-17、9-18）已由 `tests/native/spec/09_rescue_test.lua` 走 InteractAction / SurvivalAction 业务入口取证；C 级小节里的可读性条款按试玩口径写 `blocked`。
+> 本节按 [ADR-0029](../adr/0029-scope-completeness-and-placeholder-first.md) 的范围口径执行：规格内的条款没有永久出界。小队已落地并取证（9-02、9-06～9-11、9-19～9-22，证据在 `tests/native/spec/09_party_authority_test.lua` 与 `tests/native/spec/09_party_hud_test.lua`）；伤害入口相关条款（9-01、9-12～9-16）的落点已登记在[实现覆盖表](coverage.md)，取证归各自的子单；抢救条款（9-03、9-17、9-18）已由 `tests/native/spec/09_rescue_test.lua` 走 InteractAction / SurvivalAction 业务入口取证；9-05 只取了「抢救」这一句的证（重复请求号重放、并发抢先、断线重连各一次），伤害与队伍变更两段仍归各自子单，所以 9-05 整体保持 `unverified`；C 级小节里的可读性条款按试玩口径写 `blocked`。
 
 ## 契约
 

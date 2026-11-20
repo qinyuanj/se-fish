@@ -66,7 +66,9 @@ function LocalInteract:UpdateRescuePrompts()
     local me = Players.LocalPlayer
     local pos = me and me.Character and me.Character.Position
     local players = Players.GetPlayers and Players:GetPlayers() or {}
+    local present = {}
     for _, player in ipairs(players) do
+        present[player.UserId] = true
         local entry = self.RescueBubbles[player.UserId]
         local phase = player.GetAttribute and player:GetAttribute('SurvivalPhase') or nil
         local visible = false
@@ -79,11 +81,24 @@ function LocalInteract:UpdateRescuePrompts()
         end
         if visible then
             entry = self:EnsureRescueBubble(player)
-            if entry then entry.Position = player.Character.Position end
+            if entry then
+                -- 濒死玩家可能被推动或缓慢滑落，气泡每帧跟到脚下
+                local target = player.Character.Position
+                entry.Position = target
+                pcall(function() entry.Node.Position = Vector3.New(target.x,
+                    target.y + GameCfg.Interact.Fisherman.BubbleHeight, target.z) end)
+            end
         end
         if entry then
             local ok, err = pcall(function() entry.Node.Visible = visible end)
             if not ok then print('[LocalInteract] 抢救气泡显隐失败', tostring(err)) end
+        end
+    end
+    -- 离场玩家（下线、换区）的气泡立即收起，等下次同 UserId 重连再重建
+    for userId, entry in pairs(self.RescueBubbles) do
+        if not present[userId] then
+            pcall(function() entry.Node.Visible = false end)
+            self.RescueBubbles[userId] = nil
         end
     end
 end
