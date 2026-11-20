@@ -1,4 +1,5 @@
--- test 子命令：按测试车道跑 busted（#145）。`lua tools/cli.lua test [fast|full] [-- <busted 参数>...]`。
+-- test 子命令：按测试车道跑 busted（#145）。`lua tools/cli.lua test [fast|full|spec|art] [-- <busted 参数>...]`。
+-- 车道从三条扩到四条（#243）：新增 spec（条款断言车道），并让它随 full 一起跑。
 -- 车道名与 .busted 的任务名同名，始终显式传 --run=<车道>（不依赖 .busted 的 default）。
 -- 进程调用只经 tools/seam.lua（唯一接缝）：seam.which 找 busted、seam.spawn{argv,cwd} 在仓库根执行，
 -- 让 busted 的输出直接到控制台。fast 车道用桩替换 seam。
@@ -11,7 +12,8 @@ local M = {}
 
 M.LANES = {
   { name = "fast", summary = "日常车道：tests/native" },
-  { name = "full", summary = "收尾车道：fast 加 tests/native/slow" },
+  { name = "full", summary = "收尾车道：fast 加 tests/native/slow 与 tests/native/spec" },
+  { name = "spec", summary = "条款断言车道：tests/native/spec，随 full 运行" },
   { name = "art", summary = "美术车道：tests/native/art，要本机 Blender，默认不进 full" },
 }
 M.DEFAULT_LANE = "fast"
@@ -24,7 +26,7 @@ end
 
 function M.usage()
   local lines = {
-    "用法: lua tools/cli.lua test [fast|full|art] [-- <busted 参数>...]",
+    "用法: lua tools/cli.lua test [fast|full|spec|art] [-- <busted 参数>...]",
     "",
     "在仓库根按测试车道跑 busted（显式 --run=<车道>），测试通过退出码 0、有失败或错误 1。缺省车道 " .. M.DEFAULT_LANE .. "。",
     "",

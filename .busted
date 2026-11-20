@@ -1,11 +1,13 @@
 -- Busted 车道配置（#81 建立；#93 全量切换后是唯一的 Lua 测试入口，ADR 0002）。
--- fast 为日常车道；full 追加 tests/native/slow，是收尾车道。
--- default 与 full 相同（#146）：crapper 列测试文件时不带 --run、读 default，覆盖率因此含 slow 车道；
+-- fast 为日常车道；full 追加 tests/native/slow 与 tests/native/spec（#243），是收尾车道。
+-- spec 是条款断言车道：每条断言对应 docs/acceptance/ 的一条条款，只走业务入口黑盒断言；
+-- 它随 full 跑，但**不算遗留测试**（tools/acceptance.lua 的 NON_LEGACY_LANES 按这里的 ROOT 剔除）。
+-- default 与 full 相同（#146）：crapper 列测试文件时不带 --run、读 default，覆盖率因此含 slow 与 spec 车道；
 -- mutator 每个变异体经 uml-quality.json 的 mutatorOptions（--busted-task fast）只跑 fast。
 -- 直接敲裸 busted 得到 full；日常 fast 须显式指定车道。
--- ROOT 的白名单是「谁会被发现」的唯一机制：只列 tests/native 与 tests/native/slow，
+-- ROOT 的白名单是「谁会被发现」的唯一机制：只列 tests/native、tests/native/slow 与 tests/native/spec，
 -- 别的目录一律不交给 Busted。recursive 必须显式为 false——否则 ROOT = tests/native
--- 会递归吞掉 tests/native/slow，fast 就跑了 slow。
+-- 会递归吞掉 tests/native/slow 与 tests/native/spec，fast 就跑了 slow 与 spec。
 -- pattern 只匹配 *_test.lua：探针（tests/probes）、共享夹具（tests/support）不在任何 ROOT 内。
 -- sort-files 保留文件名字典序；不开启 sort-tests，案例保持注册顺序。
 -- auto-insulate 显式为 true（#135）：跨文件隔离由它承担。每个案例文件包在 insulate 块里，
@@ -25,8 +27,9 @@ return {
     ["auto-insulate"] = true,
     output = "plainTerminal",
   },
-  default = { ROOT = { "tests/native", "tests/native/slow" } },
+  default = { ROOT = { "tests/native", "tests/native/slow", "tests/native/spec" } },
   fast = { ROOT = { "tests/native" } },
-  full = { ROOT = { "tests/native", "tests/native/slow" } },
+  full = { ROOT = { "tests/native", "tests/native/slow", "tests/native/spec" } },
+  spec = { ROOT = { "tests/native/spec" } },
   art = { ROOT = { "tests/native/art" } },
 }
