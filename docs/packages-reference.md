@@ -2,6 +2,24 @@
 
 三端 `packages/` 保存整包交付的库：官方包随官方整包更新，自研包由本仓维护；包内模块路径依赖 `server/`、`client/`、`common/` 同名子树布局。
 
+## 术语辨析
+
+- **Ability / 技能**：玩家武器攻击或鱼攻击行为背后的施法单元，仅用于系统层描述；玩家文案使用对应攻击名称。
+  _Avoid_: 招式、spell（指技能时）
+- **Ability manager / 技能管理器**：管理技能的容器，官方预设名「技能背包」；不是物品「背包」。
+  _Avoid_: 背包（省略「技能」时）、skill bar
+- **Ability anchor / 技能锚点**：技能时间轴上的动作单元；与 **Anchor name / 锚点名**同名不同义。
+  _Avoid_: 锚点（单说时与场景锚点名混淆）
+- **Anchor name / 锚点名**：场景实体在编辑器里的位置节点名，属区域标记的落地形式，代码中为 `AnchorName`，如 `Interact.Fishermen[i].AnchorNames`；与 **Ability anchor / 技能锚点**同名不同义。
+- **Reference / 引用**：挂接官方托管、随官方更新且可取消的包。
+  _Avoid_: 开启、安装（指引用时）、link
+- **Import / 导入**：一次性拷入地图、由本图维护的包，不能撤销回引用。
+  _Avoid_: vendor、de-init、取消导入（指编辑器状态时）、copy-in
+- **Official package / 官方包**：定义见下文[镜像与升级](#镜像与升级)。
+  _Avoid_: 官方库、官方资源包、third-party package
+- **In-house package / 自研包**：定义见下文[自研包](#自研包)。
+  _Avoid_: 自研库、第三方库、内置库、vendor 包、内部包
+
 ## 镜像与升级
 
 - `deploy` 以仓库为源，三端 `packages/` 与业务一级子树一起字节镜像；宿主多余文件会删除。`deploy --clean` 也删除对应包子树。
@@ -25,7 +43,7 @@
 
 ## 导入不可逆
 
-本图的 `ability_system`、`attr_rule`、`modifier_system`、`official_ai_feature` 都是**导入**（见 `GLOSSARY.md`），资源包面板显示「已导入」。官方手册写明导入后不能取消；2026-11-03 实测确认没有本地退路：
+本图的 `ability_system`、`attr_rule`、`modifier_system`、`official_ai_feature` 都是**导入**（见上文[术语辨析](#术语辨析)），资源包面板显示「已导入」。官方手册写明导入后不能取消；2026-11-03 实测确认没有本地退路：
 
 - 从宿主删掉三端 `packages/`，再存盘、reopen，面板仍是「已导入」。删代码不会让包退回引用，只会让地图缺代码；业务代码还 require 包内模块，此时试玩必然报错。
 - 本地存档缓存 `etc/help_build_gmps/<地图>__pc/` 里有两份登记：`packageinfo.mm` 的 `__official_refs__` 与 `mapcustomize.mm` 的 `se_official_package_refs`，都写着 `mode=imported`。把两份都改成 `off` 后从本地目录启动，编辑器确实读了改过的文件，面板仍是「已导入」。所以状态另有来源（加密的 `.gmp` 或服务端），本地改不到。

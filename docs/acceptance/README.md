@@ -1,6 +1,7 @@
 # 验收矩阵索引
 
 > 本文件是《渔力全开》规格的条款矩阵入口。`docs/GameSpec.md` 的每个小节对应本目录下的一份分片：一条条款是一句能独立判真假的话，并逐条标注组、执行者、所需证据等级与状态。
+> **Acceptance matrix / 验收矩阵**：_Avoid_: 验收清单、测试清单、验收文档、checklist
 > 七列取值、必填项与新增条款的入口见 [TEMPLATE.md](TEMPLATE.md)；可照抄的示范样本是 [09-multiplayer-rules.md](09-multiplayer-rules.md)。
 > 本文件**不含手写计数**：各节条数与状态分布由扫描脚本写入下方生成块，手改会被门禁判红。
 > 接手先读 [交接说明](handover.md)：矩阵满屏 `unverified` 是正常状态、A/B/C 三档证据怎么补、八条完成判据的逐条核对表。

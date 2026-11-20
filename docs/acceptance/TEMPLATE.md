@@ -2,6 +2,7 @@
 
 > 本文件规定 `docs/acceptance/` 下条款行的唯一格式、七列必填项、编号与重排规则，以及什么样的行**不算**合法条款。
 > 小节索引见 [README.md](README.md)；可照抄的写法见示范样本 [09-multiplayer-rules.md](09-multiplayer-rules.md)。
+> **Clause / 条款**：_Avoid_: 条目、需求点、checklist、item
 
 ## 一、什么时候必须走这个入口
 

@@ -5,11 +5,12 @@
 ## 工程用语
 
 - **se-fish**：本图的 Lua 源码仓库。
-- **业务范围**：质量工具与架构图共用的源码集合，定义见 `GLOSSARY.md`，决策见 [ADR-0010](../adr/0010-packages-as-business-code.md)。
-- **仓库检出**：本仓的 git 工作树（含 worktree），是唯一跑 Lua、测试与工具链的地方；仓库内路径一律相对、`/` 分隔，离开仓库写正斜杠加盘符。定义见 `GLOSSARY.md`。
-  _Avoid_: 开发端、本机
-- **宿主目录**：编辑器 `code init` 绑定的本地 Lua 工程目录，根有 `eggy.json`，是部署目的地；与仓库检出分别管理，两者只经 `deploy` 与 `sync` 往来。路径与绑定方式见下方「工具链」。
-  _Avoid_: 部署端、本机
+- **Business scope / 业务范围**：质量工具与架构图共用的源码集合，不含任何 `packages/` 子树；机器真源是根目录 `uml-quality.json` 与 `policy.edn`，决策见 [ADR-0021](../adr/0021-packages-outside-business-scope.md)。
+  _Avoid_: 业务树、指标采集范围、mutation 范围、scope（单独使用时）
+- **Checkout / 仓库检出**：本仓的 git 工作树（含 worktree），是唯一跑 Lua、测试与工具链的地方；仓库内路径一律相对、`/` 分隔，离开仓库写正斜杠加盘符。
+  _Avoid_: 开发端、本机、repo copy
+- **Host directory / 宿主目录**：编辑器 `code init` 绑定的本地 Lua 工程目录，根有 `eggy.json`，是部署目的地；与仓库检出分别管理，两者只经 `deploy` 与 `sync` 往来。路径与绑定方式见下方「工具链」。
+  _Avoid_: 部署端、本机、deploy target
 - **部署树**：镜像进宿主目录的仓库根 `client/`、`common/`、`server/`；仓库根其余内容不部署。宿主内不归本仓库管理的内容由 `sync` 回灌，镜像粒度与操作细节见下方「工具链」。
   _Avoid_: 源码树（指仓库全部时）
 - **quality gate**：质量工具（CRAP、mutation、DRY）的结果处理规则：由 dsh-uml-viewer 插件自带的标准工具发布快照与结果记录（`validResult`、实际退出码），指标只出报告，不设门槛。
@@ -24,20 +25,32 @@ Lua 命令使用 **Lua 5.4**，命令名统一 `lua`，执行前用 `lua -v` 核
 - `lua tools/cli.lua blender <脚本.py> [--blend <输入.blend>] [-- <脚本参数>...]`：在本机无头 Blender 里执行脚本，是唯一的 Blender 入口；`--which` 核对将用的 Blender，`--expr` 执行内联代码。路径写正斜杠 Windows 形式（`C:/...`）或仓库内相对路径；用法见 [Blender 与 Meshy 使用](art-pipeline.md)，决策见 [ADR-0009](../adr/0009-blender-headless-only.md)。
 - `lua tools/cli.lua screenshot [--window <标题子串>] [--screen] [--out <文件.png>]`：取证画面的统一入口，替代 editor-cli 的 `screenshot`。缺省走**后台抓屏**——`PrintWindow` + `PW_RENDERFULLCONTENT` 直接读窗口表面，目标窗口被遮挡、不在前台也不影响取帧；`--screen` 或 `--rect X,Y,W,H` 才走桌面合成（`CopyFromScreen`），那时窗口必须在最前面，被盖住抓到的是遮挡物。缺省取景是编辑器主窗口（`client.exe` 进程里面积最大的窗口），试玩时游戏视口就在它里面；`--window <子串>` 按标题挑，取面积最大的一条。选窗一律排除 `WS_EX_LAYERED` 的辅助表面——Qt 的 `Qt5QWindowToolSaveBits` 这类窗口标题也叫 `client`，却什么都不画（#185）。输出落 `tmp/`。加 `--info` 不抓图，只报屏幕列表、选中的目标窗口（标题、进程、尺寸）、所在显示器与「虚拟屏 / 非虚拟屏 / 不确定」判定，判据是该屏适配器是否挂在 PCI 总线上（`PCI\` 开头为真实显卡）。**判帧新旧只能连拍比 md5**：先确认两帧尺寸一致，再比 md5，尺寸变了的那组作废重采；单帧有效证明不了帧是新的。
 - `lua tools/cli.lua acceptance [--check|--write|--update-baseline]`：验收矩阵的统一校验入口（#243），矩阵入口见 [条款矩阵](../acceptance/README.md)（接手先读 [交接说明](../acceptance/handover.md)），判定逻辑在 `tools/acceptance.lua`。缺省 `--check` 核对一件事——**矩阵是不是一本可信的账**：19 个规格小节各恰好一份分片、四列取值在封闭词表内、条款 ID 连续不跳号、`blocked` 写了卡在谁、`out-of-scope` 写了理由、`evidenced`/`accepted` 的每个仓库相对路径真实存在、`docs/GameSpec.md` 全文无工单编号、README 生成块与分片一致，以及两道单向棘轮（已取证数不低于 `docs/acceptance/baseline.lua`，遗留测试数不高于它）。`--write` 按分片重写索引的生成块（幂等）；`--update-baseline` 把基线抬到当前值，只许 evidenced 抬、legacyTests 降，反方向退 2。同一份判定随 fast 车道跑（`tests/native/acceptance_matrix_test.lua`），手改索引、写不存在的证据路径、调低基线都会在下次提交时变红。
+  **Ratchet / 棘轮**：_Avoid_: 阈值、配额、budget、上限
 - 官方包升级、直接调用接口与编辑器预设依赖见 [官方包接入参考](../packages-reference.md)。技能包预设命令见 `lua tools/cli.lua ability-presets --help`。
 - **临时产物**：手工验证的中间文件、单据正文草稿等临时产物一律放仓库 `tmp/`（已 gitignored），无需清理；不放系统临时目录，也不为清理去 `rm`（沙盒会拒绝）。这条管 agent 手工产生的文件；脚本自建自删的临时目录不在此列。
 - 质量工具（CRAP / mutation / DRY）是 dsh-uml-viewer 插件自带的标准工具（crapper / mutator / dryer），经插件面板触发，由 agent 调用插件工具 `uml_crap`、`uml_mutate`、`uml_dry` 执行；业务范围与选项只在根目录 `uml-quality.json` 的 `standardTools` 声明，见下方「架构图」。只出报告，不设指标门槛。
-- 车道从三条扩到四条（#243）：单测放 `tests/native/`、slow 放 `tests/native/slow/`、**条款断言**放 `tests/native/spec/`、美术放 `tests/native/art/`（**美术 optional**，Blender 用例不进 full，用 `lua tools/cli.lua test art` 单独跑），共享夹具放 `tests/support/`，探针放 `tests/probes/`（手工探针，不入任何车道）。日常运行 `lua tools/cli.lua test`（缺省 fast），收尾运行 `lua tools/cli.lua test full`（= fast + slow + spec），只跑条款断言用 `lua tools/cli.lua test spec`（等价 `busted --run=spec`），`--` 之后的参数原样透传给 busted，退出码不透传：测试通过 0，busted 非 0（失败数加错误数）一律收成 1，busted 缺失 3；裸 `busted` 读 `default`，与 full 相同（crapper 列测试文件时不带 `--run`，覆盖率因此含 slow 与 spec 车道）。车道由根目录 `.busted` 定义，共享初始化在 `tests/native/helper.lua`。**spec 车道装的是条款断言，不是「实现自检」**：每条断言对应 `docs/acceptance/` 的一条条款、只走业务入口黑盒断言，所以它不随 fast 跑（证据增长不拖慢日常），也**不计入遗留测试**（`tools/acceptance.lua` 按 `.busted` 的 spec ROOT 把它剔除）。Windows 原生是唯一测试环境，案例不分平台，完成判据表里的 `0 pending` 就是在这台机器上取的严格值。
+- **Test lane / 测试车道**从三条扩到四条（#243）：单测放 `tests/native/`、slow 放 `tests/native/slow/`、**条款断言**放 `tests/native/spec/`、美术放 `tests/native/art/`（**美术 optional**，Blender 用例不进 full，用 `lua tools/cli.lua test art` 单独跑），共享夹具放 `tests/support/`，探针放 `tests/probes/`（手工探针，不入任何车道）。日常运行 `lua tools/cli.lua test`（缺省 fast），收尾运行 `lua tools/cli.lua test full`（= fast + slow + spec），只跑条款断言用 `lua tools/cli.lua test spec`（等价 `busted --run=spec`），`--` 之后的参数原样透传给 busted，退出码不透传：测试通过 0，busted 非 0（失败数加错误数）一律收成 1，busted 缺失 3；裸 `busted` 读 `default`，与 full 相同（crapper 列测试文件时不带 `--run`，覆盖率因此含 slow 与 spec 车道）。车道由根目录 `.busted` 定义，共享初始化在 `tests/native/helper.lua`。**spec 车道装的是条款断言，不是「实现自检」**：每条断言对应 `docs/acceptance/` 的一条条款、只走业务入口黑盒断言，所以它不随 fast 跑（证据增长不拖慢日常），也**不计入遗留测试**（`tools/acceptance.lua` 按 `.busted` 的 spec ROOT 把它剔除）。Windows 原生是唯一测试环境，案例不分平台，完成判据表里的 `0 pending` 就是在这台机器上取的严格值。
+  _Avoid_: 验收车道、代码收尾门、lane（单独使用时）、test suite、test group
   - **执行序只保证到文件内**：迁移保留的是**文件内**执行序（`it` 注册序 == 旧 LuaUnit 类内方法序），**不保留跨文件的全局类名字典序**。LuaUnit 的 `collectTests()` 排的是全局 `_G.Test*` **类名**，`.busted` 的 `sort-files=true` 排的是**文件路径字符串**，是两个键空间，技术上无法廉价复现；且 helper 在文件发现**之前**执行，插不进重排钩子。
     - 为什么可以接受：跨类没有共享状态；跨文件隔离由 `.busted` 显式开启的 `auto-insulate` 承担（每个文件结束后按键还原 `_G` 与 `package.loaded`，关掉后 fast 出现 7 failures / 3 errors），`tests/native/helper.lua` 只逐例快照 `GameCfg.Debug` 与 `Save.QaSlot`；**且不复刻旧序反而修了一个真 bug**——旧序下 `damage_float_test.lua` 与 `vitals_test.lua` 都定义全局 `TestDamageNotice`，后加载整表覆盖前者，导致 `test_rounding_and_effective_health` **从未被执行**，迁移后复活（+1，属修复而非回归）。
     - 裁定原文见迁移台账 `issue-84-mapping.md:96` 与 `issue-85-mapping.md:63`（台账在仓库外，按文件名检索）。
   - `busted` 命令：`test` 子命令与人手 shell 统一用 PATH 上的 `busted`（不在 PATH 时 CLI 退出码 3）。它由 LuaRocks 装在 `%APPDATA%\luarocks\bin`，该目录必须在 PATH 里；安装命令 `luarocks --local install busted` 在 Git Bash 里执行。
 
+### 试玩存档隔离
+
+- **Production save / 正式存档**：QA 不得写入。
+  _Avoid_: 主存档、线上档、main save
+- **QA save slot / QA 存档槽**：试玩验收必须使用。会话开始在试玩前执行 `lua tools/cli.lua qa-slot new`，再执行 `lua tools/cli.lua deploy`；会话内槽位固定，同槽重进不要重新 `new`。
+  _Avoid_: 验收存档槽、acceptance-slot、沙盒存档、sandbox save、test save
+- `lua tools/cli.lua qa-slot off` 只切回正式存档配置，不删除任何存档。
+- **Save key / 存档 key**：拼接以 `server/Mgr/MgrSave.lua` 为实现真源。
+  _Avoid_: 存档 ID、档位号、save id
+
 **架构图（dsh-uml-viewer）。** 根目录 `policy.edn` 描述三端模块树、排除目录与隐藏模块（`:exclude`、`:omit`），`docs/uml/se-fish.edn` 是生成的依赖图（不要手编）。 六层职责与依赖方向见 [架构分层与依赖门禁](../architecture.md)，唯一分层声明在 `tools/arch_policy.lua`；`tests/native/arch_policy_test.lua` 随 fast/full 阻止未分类、反向依赖、业务环、`:levels` 漂移及声明残留（源码已删、声明仍在）。
 
 - 看图与图上操作用 DSH 的 dsh-uml-viewer 插件面板，插件自带二进制与质量工具，无需在项目里安装；面板请求的处理规则（质量 → `uml_ir` → `uml_display` 的顺序、`validResult` 校验等）由插件在打开面板的会话里注入，以注入规则为准；决策见 [ADR-0016](../adr/0016-dsh-uml-viewer-plugin.md)。修改三端代码或 `policy.edn` 后用插件工具 `uml_ir` 重新生成图。
-- 图上 `client|common|server` 三棵树覆盖整个**业务范围**：各端 `packages/` 按真实命名空间建类，不设外部节点（`policy.edn` 不写 `:foreign`，`:exclude` 只排除 `_trigger`）。viewer 从 `.metrics/crap.edn` 与 `.metrics/mutate/*.edn` 加载指标；缺少任一指标的类卡片为红色。包内类不跑 mutation 基线，因缺快照显红并拉低端级聚合分数，属已接受的代价，理由见 [ADR-0010](../adr/0010-packages-as-business-code.md)。标准工具的环境准备（含 crapper 要求的 cluacov 1.0.0）按 dsh-uml-viewer 插件文档由人完成。
-- **标准 quality 分发**：根目录 `uml-quality.json`（版本管理）只含 `standardTools`：`sourceRoots` 为三端 `client`、`common`、`server`，`exclude` 为 `server/_trigger`，`mutatorOptions` 为 `--busted-task fast`（每个变异体只跑 fast 车道）。插件的 `uml_crap`、`uml_mutate`、`uml_dry` 读这里的范围；业务范围只在这里声明一次，CRAP、mutation、DRY 与架构图口径一致。CLI 不包装质量工具。
+- 图上 `client|common|server` 三棵树覆盖**业务范围**；所有 `packages/` 子树退出业务范围，业务对包的 `require` 在图上收成外部椭圆，见 [ADR-0021](../adr/0021-packages-outside-business-scope.md)。viewer 从 `.metrics/crap.edn` 与 `.metrics/mutate/*.edn` 加载指标；缺少任一指标的类卡片为红色。标准工具的环境准备（含 crapper 要求的 cluacov 1.0.0）按 dsh-uml-viewer 插件文档由人完成。
+- **标准 quality 分发**：根目录 `uml-quality.json`（版本管理）的 `standardTools` 是质量工具范围与选项的机器真源，`policy.edn` 是架构图的机器真源；两者按 [ADR-0021](../adr/0021-packages-outside-business-scope.md) 保持同一业务范围，本文不复制排除清单。插件的 `uml_crap`、`uml_mutate`、`uml_dry` 读取质量工具配置，CRAP、mutation、DRY 与架构图口径一致。CLI 不包装质量工具。
 - `target/` 放覆盖率与 mutation worker，属于忽略的临时产物；`.metrics/` 保留质量快照并纳入版本管理。无函数定义的配置或转发模块不生成 mutation 快照；当前工具不测试模块顶层语句。
 - **Windows 原生**：full／fast、coverage 与 CRAP 的标准环境是 Windows。PR 与 `main` 的 full 由 GitHub Actions `windows-latest` 执行（见 [ADR-0025](../adr/0025-windows-pr-full-test-gate.md)）；coverage 与 CRAP 的实机数据仍来自本机仓库检出。**macOS 未实机验证，没有实机数据**。
 
