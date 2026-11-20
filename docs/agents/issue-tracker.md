@@ -2,6 +2,8 @@
 
 本仓库的开发任务、缺陷、验收台账与过程产物统一在 GitHub `qinyuanj/se-fish` 跟踪，使用 GitHub CLI `gh`。执行时显式指定 `-R qinyuanj/se-fish`，避免按本地 remote 推断到其他仓库。
 
+> **工单已清空，验收面改为 [条款矩阵](../acceptance/README.md)**：待办不再由 issue 承载，"哪里没做完"的唯一答案是 `docs/acceptance/` 下的条款与状态。新建工单前先判断这件事该不该落成条款——能落成条款的走 [TEMPLATE.md](../acceptance/TEMPLATE.md) 的受控入口，已关闭旧单的未完成项去向见 [legacy-ledger.md](../acceptance/legacy-ledger.md)。
+
 ## 操作
 
 - **核对身份**：`gh api user --jq .login`；本项目使用 `qinyuanj`。
