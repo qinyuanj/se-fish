@@ -42,6 +42,7 @@ local MgrMap = {
     MgrAttr = require("server.Mgr.MgrAttr"),
     MgrModifier = require("server.Mgr.MgrModifier"),
     MgrAi = require("server.Mgr.MgrAi"),
+    MgrAiTarget = require("server.Mgr.MgrAiTarget"),
 }
 
 -- 锚点行为只接收入口注入的协作管理器，不再反向 require server.Mgr。
@@ -148,6 +149,8 @@ MgrMap.MgrModifier.Ability = MgrMap.MgrAbility
 MgrMap.MgrModifier.Vitals = MgrMap.MgrVitals
 MgrMap.MgrAbility.Ai = MgrMap.MgrAi
 MgrMap.MgrFishUnit.Ai = MgrMap.MgrAi
+-- #260 目标选择适配层：只在服务端裁决并登记到官方 AI 管理器，客户端没有目标选择入口。
+MgrMap.MgrFishUnit.AiTarget = MgrMap.MgrAiTarget
 MgrMap.MgrAi.FishUnit = MgrMap.MgrFishUnit
 MgrMap.MgrSurvival.SpeedWriter = MgrMap.MgrAbility
 MgrMap.MgrVitals.ActGuard = function(player) return not MgrMap.MgrAbility:IsParalyzed(player) end
