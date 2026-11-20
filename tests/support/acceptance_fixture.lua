@@ -141,7 +141,8 @@ function M.build(root)
   for _, path in ipairs(M.LEGACY) do
     fs.write_file(root .. '/' .. path, '-- 夹具遗留测试：不跑，只用来数发现结果。\n')
   end
-  fs.write_file(root .. '/' .. M.EVIDENCE, '-- 夹具证据文件：存在即可。\n')
+  -- 证据文件正文要带条款号：门禁除了看路径在不在 spec 车道，还看文件里有没有这条条款的 ID。
+  fs.write_file(root .. '/' .. M.EVIDENCE, '-- 夹具证据文件：条款 3-02 的断言落在这里。\n')
   fs.write_file(root .. '/' .. Acceptance.COVERAGE, coverage_body())
   fs.write_file(root .. '/' .. M.COVERAGE_LANDING, '-- 夹具代码落点：存在即算有落点。\n')
   fs.write_file(root .. '/tests/native/helper.lua', '-- 夹具助手：不是测试文件。\n')
