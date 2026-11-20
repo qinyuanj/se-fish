@@ -139,6 +139,42 @@ GameCfg.Survival = {
     UnavailableText = '操作暂时不可用，请稍后再试',
 }
 
+-- 小队（#253，§9 多人规则「小队最多 3 人，2 米内邀请，10 秒未处理按拒绝，离线自动离队，少于 2 人解散」）：
+-- 三个数值都是规格原文，不是占位值；服务端唯一权威，见 server/Mgr/MgrParty.lua。
+GameCfg.Party = {
+    MaxMembers = 3,          -- 一支小队最多 3 名玩家
+    MinMembers = 2,          -- 少于 2 人解散
+    InviteRange = 2,         -- 邀请距离 2 米（场景平面距离）
+    InviteTimeoutSec = 10,   -- 邀请 10 秒未处理按拒绝结算
+    ActionCooldownSec = 0.2, -- 请求限频，防连点；不是玩法数值
+    StateCooldownSec = 0.5,
+    -- [未查证] 队伍界面布局：规格只要求「不与左上角自身血量重叠、实机分辨率可读」，
+    -- 具体位置与尺寸待策划给草图（docs/to-questionnaire-策划案内部矛盾.md「队伍界面的布局」）。
+    HUD = {
+        RowWidth = 240,
+        RowHeight = 56,
+        MarginRight = 24,   -- [未查证] 右侧竖排，避开左上角自身血量
+        MarginTop = 220,
+        MaxRows = 2,        -- [未查证] 小队上限 3 人，自己占一栏，队友最多 2 行
+        BarWidth = 120,
+        BarHeight = 12,
+        InviteWidth = 360,
+        InviteHeight = 96,
+        InviteTop = 24,
+        InviteText = '收到了组队邀请',
+        InviteCountdownText = '秒后自动拒绝',
+        DisbandText = '小队已解散',
+        LeftText = '你已离开小队',
+        RestoredText = '已回到原来的小队',
+        UnavailableText = '组队操作暂时不可用',
+        TooFarText = '距离太远，走到 2 米内再邀请',
+        FullText = '小队已满 3 人',
+        OfflineText = '对方不在线',
+        TargetInPartyText = '对方已在别的队伍里',
+        NoInviteText = '邀请已失效'
+    },
+}
+
 -- 调试开关（#47 / #49，#28 规格）：开发阶段默认开启，发布或开放地图前关闭。开启后服务端接受 GM 发放
 -- （server/Mgr/MgrGM.lua，客户端控制台 _G.GM.Coin / _G.GM.Item / _G.GM.SetHealth / _G.GM.SetHunger），进图时按 InitialGrants 白送（M1 的进图白送降级至此）。
 -- 关闭时正式获取路径只有拾饵、喂食换金币与商店购买。
