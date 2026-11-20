@@ -1,6 +1,6 @@
 # 钓鱼怎么这么危险啊喂！术语表
 
-统一命名与易混概念。玩法规则见 [GameSpec](docs/GameSpec.md) 的资料优先级；工程操作见[开发工作流](docs/agents/workflow.md)。
+统一玩法命名与易混概念。玩法规则见 [GameSpec](docs/GameSpec.md) 的资料优先级。
 
 **命名规则**：一个术语同时给出英文与中文，**英文在前、中文在后**，写作 `**English / 中文**`。英文句首大写、其余小写，取自代码标识符（`ReelProgress` → `Reel`），代码标识符一律用英文。一个术语一条，不把两个概念塞进一个标题。`_Avoid_` 列中英双语，只在确有混淆风险时列英文。
 
@@ -21,13 +21,13 @@ _Avoid_: 平台、地板（编辑器单位名除外）
 
 **Zone marker / 区域标记**：表达钓鱼区边界、水域或落点等几何位置的场景标记。
 
-**Safe spot / 安全落点**：钓鱼区内供玩家落脚的基准点，属于区域标记；摆渡目的地、飞行高度基准与首领场地中心都取它。
+**Safe spot / 安全落点**：钓鱼区内供玩家落脚的基准点，属于区域标记。
 _Avoid_: 出生点、复活点
 
 **Bait spot / 鱼饵刷新点**：周期性刷出鱼饵的固定位置，属于区域标记。
 _Avoid_: 蚯蚓点、worm point
 
-**Spawn point / 出生点**：玩家进入地图时站立的引擎出生单位，全图只有 01 鱼塘一个，位置与所在钓鱼区的安全落点重合。
+**Spawn point / 出生点**：玩家进入地图时站立的引擎出生单位。
 _Avoid_: 出生点位、复活点
 
 **Squad / 小队**：玩家结成的互相免伤的团体。
@@ -35,13 +35,13 @@ _Avoid_: 队伍、阵营、team、party
 
 ## 鱼与钓鱼
 
-**Fish / 鱼**：上岸后仍存活的生物。
+**Fish / 鱼**：可被钓取、上岸后仍存活并按品级行动的生物。
 _Avoid_: 怪物、怪（指鱼时）、monster、mob
 
-**Loot / 鱼获**：鱼死亡后掉落的物品。
+**Loot / 鱼获**：鱼类产出的可持有物品，包括击杀掉落与盲盒直接生成的极品鱼获。
 _Avoid_: 食物、海鲜（代指鱼获时）、catch
 
-**Tier / 品级**：鱼的行为类别：普通鱼、极品鱼只逃跑，精英鱼、首领会攻击玩家；极品鱼获可抽奖，首领用于通关。
+**Tier / 品级**：鱼在行为、掉落与奖励规则中使用的分类，包括普通、极品、精英、首领。
 _Avoid_: 类型、BOSS、精英怪、type、rarity
 
 **Multiplier / 个体倍率**：每条鱼上钩时随机得到、共同决定重量与鱼获价格的系数。
@@ -68,7 +68,7 @@ _Avoid_: 顶鱼
 **Item / 物品**：可持有之物的总称；过关道具、自救道具、属性道具是其中的分类。
 _Avoid_: 道具（作总称时）、prop
 
-**Token / 信物**：精英鱼或首领独有的鱼获；未经烤制时可兑换首领饵、船票或最终通关成就，也可用于抽奖。
+**Token / 信物**：精英鱼或首领独有的鱼获。
 _Avoid_: 任务物品、独有道具、部件、relic、badge
 
 **Boss bait / 首领饵**：由信物换得、必定钓出对应首领的鱼饵。
@@ -77,7 +77,7 @@ _Avoid_: BOSS 专用鱼饵
 <a id="船票"></a>
 
 **Ferry ticket / 船票**：去程摆渡消耗的凭证，物品类型为过关道具。
-_Avoid_: 车票、门票
+_Avoid_: 车票（作通用术语时；正式物品名除外）、门票
 
 **Rod / 鱼竿**：带等级的钓具。
 _Avoid_: 钓竿、杆子、fishing pole
@@ -124,8 +124,15 @@ _Avoid_: 商店（指摊位时）、店铺、柜台
 **Stand level / 摊位等级**：摊位上架商品的门槛等级，等级越高兼容越多商品。
 _Avoid_: 商店等级、shop level
 
-**Ferry / 摆渡**：钓鱼区之间的通行方式。**Outbound / 去程**交船票，同行未交票者称**Hitchhike / 搭便船**；**Return / 返程**按人付金币。
-_Avoid_: 顺风船、蹭车、过关（指摆渡时）
+**Ferry / 摆渡**：钓鱼区之间的通行方式，包括去程与返程。
+_Avoid_: 顺风船、过关（指摆渡时）
+
+**Outbound / 去程**：交船票后前往下一钓鱼区的行程。
+
+**Hitchhike / 搭便船**：去程中未交船票、随已交票玩家同行的行为。
+_Avoid_: 蹭车
+
+**Return / 返程**：按人支付金币、返回上一钓鱼区的行程。
 
 **Grill point / 烧烤点**：加工鱼获的设施，涵盖篝火、烤炉、火山口等形态。
 
@@ -144,7 +151,9 @@ _Avoid_: 复活（指解除濒死时）
 
 **Revive / 复活**：死亡后重新回到场上。
 
-**Weak revive / 虚弱复活**：等待后以低血量并附带限时减速的**Weak / 虚弱**状态复活。
+**Weak revive / 虚弱复活**：等待后以低血量复活的方式，复活后进入虚弱。
+
+**Weak / 虚弱**：虚弱复活后持续一段时间的减速状态。
 
 **Full revive / 满血复活**：通过广告或金豆立即满血复活。
 
@@ -157,88 +166,8 @@ _Avoid_: 金、钱（代指金币时）、gold
 
 **Platform shop / 地图商店**：以金豆或乐园币支付的平台商店。使用时写全称，以区别钓场商店。
 
-**Compendium / 图鉴**：鱼的收集册，含个人最大钓取重量。盲盒解锁收集条目，不产生钓取重量纪录。
+**Compendium / 图鉴**：鱼的收集册，包含个人最大钓取重量。
 _Avoid_: 图册、catalog
 
 **Records / 纪录**：某种鱼在所有玩家中的最大重量及保持者。
 _Avoid_: 极限重量、排名（指纪录时）、ranking、leaderboard
-
-## 技能与官方包
-
-**Ability / 技能**：玩家武器攻击或鱼攻击行为背后的施法单元，仅用于系统层描述；玩家文案使用对应攻击名称。
-_Avoid_: 招式、spell（指技能时）
-
-**Ability manager / 技能管理器**：管理技能的容器（官方预设名「技能背包」）。
-_Avoid_: 背包（省略「技能」时）、skill bar
-
-**Ability anchor / 技能锚点**：技能时间轴上的动作单元。与场景里的**锚点名**同名不同义。
-_Avoid_: 锚点（单说时与场景锚点名混淆）
-
-**Anchor name / 锚点名**：场景实体在编辑器里的位置节点名，属区域标记的落地形式；代码里以 `AnchorName` 出现（如 `Interact.Fishermen[i].AnchorNames`）。与技能时间轴的**技能锚点**同名不同义。
-
-**Reference / 引用**：挂接官方托管、随官方更新且可取消的包。
-_Avoid_: 开启、安装（指引用时）、link
-
-**Import / 导入**：一次性拷入地图、由本图维护的包，不能撤销回引用。
-_Avoid_: vendor、de-init、取消导入（指编辑器状态时）、copy-in
-
-**Official package / 官方包**：网易官方托管、随官方整包更新、包内无版本号的包，位于三端 `packages/` 下。
-_Avoid_: 官方库、官方资源包、third-party package
-
-**In-house package / 自研包**：本仓自研、以整包形式落位与升级的库，位于三端 `packages/` 下；不随官方更新，升级由本仓决定。
-_Avoid_: 自研库、第三方库、内置库、vendor 包、内部包
-
-## 官方资产
-
-**Asset table / 资产表**：官方按编辑器分类发布的资产目录数据，给出资产的名称、编号与外观描述；与工程导出的 `OfficialAsset.lua` 是两套独立口径。
-_Avoid_: 资产清单、资源表、资产列表
-
-**Two generations of IDs / 两代编号**：同一资产在资产表与工程导出中各自成号，名称也不构成子集，两者不能互相推导或合并。
-_Avoid_: 编号映射、ID 对照、编号兼容
-
-## 工程与验收
-
-**Unit / 单位**：脚本经 `CreateUnit` 建出的引擎单位，是引擎侧的对象本体（`UnitId`、`UnitType`、`Name`）；与游戏实体不等同：一个游戏实体可能由多个单位组成（鱼本体 + 隐形受击体），界面节点也是单位。运行期建点清单见 #206 台账。
-_Avoid_: 对象、实体、game object、object（指单位时）
-
-**Checkout / 仓库检出**：本仓的 Git 工作树（含 worktree），是唯一跑 Lua、测试与工具链的地方；仓库内路径一律相对、`/` 分隔，离开仓库写正斜杠加盘符。
-_Avoid_: 开发端、本机、repo copy
-
-**Host directory / 宿主目录**：编辑器 `code init` 绑定的本地 Lua 工程目录，根有 `eggy.json`，是部署目的地；与仓库检出只经 `deploy` 与 `sync` 往来。
-_Avoid_: 部署端、本机、deploy target
-
-**Business scope / 业务范围**：质量工具与架构图共用的业务源码集合，不含任何 `packages/` 子树（整包交付物另见**官方包**、**自研包**）；由根目录 `uml-quality.json` 的 `exclude` 与 `policy.edn` 的 `:exclude` 声明。
-_Avoid_: 业务树、指标采集范围、mutation 范围、scope（单独使用时）
-
-**Test lane / 测试车道**：按耗时与用途划分的测试集合：fast 用于日常，full 追加慢用例与条款断言、用于收尾，spec 只跑条款断言，art 只跑美术用例（optional，不进 full）。
-_Avoid_: 验收车道、代码收尾门、lane（单独使用时）、test suite、test group
-
-**Clause / 条款**：一句能独立判真假的话——谁在什么条件下做什么、结果是什么；一条只判一件事，带组、执行者、所需证据等级与状态，编号形如 `9-07`。规格里的一句话拆不成可判真的条件时不算条款。
-_Avoid_: 条目、需求点、checklist、item
-
-**Acceptance matrix / 验收矩阵**：`docs/acceptance/` 下的条款总账：每个规格小节一份分片，一条条款一行；索引页的计数与缺口密度由脚本生成，矩阵是唯一待办面。
-_Avoid_: 验收清单、测试清单、验收文档、checklist
-
-**Ratchet / 棘轮**：只许朝单向走的门禁：已取证条款数只增、遗留测试数只减，越界即让日常车道变红；基线写在 `docs/acceptance/baseline.lua`。
-_Avoid_: 阈值、配额、budget、上限
-
-**Evidence / 取证**：为一条条款留下可重跑的证据入口——A 级是可断言的用例，B 级是可重跑的时序探针，C 级是某次试玩验收的会话；「实现做完了」与「跑通旧测试」都不是取证。
-_Avoid_: 验证过、测过、自测、verified
-
-**Evidence level / 证据分级**：取证方式的三档：A（走业务入口黑盒断言）、B（时序探针：重连、迟到回调、超时、争抢）、C（试玩观察：贴地、净空、手感、可读性）；哪一档都不可冒充另一档，口径见 [证据分级](docs/acceptance/evidence-levels.md)。
-_Avoid_: 优先级、等级、severity、级别
-
-**Playtest acceptance / 试玩验收**：编辑器试玩中以合法输入、新档走通玩家流程并留证的验收。
-_Avoid_: 实机测试、真机验收（指编辑器试玩时）、QA test
-
-**Physical device / 真实设备**：玩家实际使用的手机或客户端平台；与试玩验收的结果分开记录。
-_Avoid_: 实机（未说明环境时）、real device
-
-**Production save / 正式存档**：玩家账号在 DataStore 中的常驻存档，键为 `u<userId>`；试玩验收不得写入。
-_Avoid_: 主存档、线上档、main save
-
-**QA save slot / QA 存档槽**：试玩验收专用的存档槽，键为 `u<userId>:qa:<slot>`；槽名由 `lua tools/cli.lua qa-slot new` 生成，空槽表示使用正式存档。配置字段为 `GameCfg.Save.QaSlot`。
-_Avoid_: 验收存档槽、acceptance-slot、沙盒存档、sandbox save、test save
-
-**Save key / 存档 key**：`GameCfg.Save.Store` 集合内定位一份存档的键，由 `KeyPrefix`、userId 与可选的 QA 存档槽后缀拼成。
-_Avoid_: 存档 ID、档位号、save id

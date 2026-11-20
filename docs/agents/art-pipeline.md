@@ -15,6 +15,15 @@
 
 用户提供的源素材目录以任务单为准，与上述加工工作区分开。例如正式素材可能在 `eggitor/1_开发中/渔力全开/正式模型动画/`；不要因文件同名改用其他目录的历史副本。先读任务单的来源和证据索引，再查已有脚本；共用工具归项目工具体系，资产与执行报告留在工作区。
 
+## 官方资产
+
+**Asset table / 资产表**与 **Two generations of IDs / 两代编号**的真源与查询入口见团队仓 `docs/eggy-se/assets.md`。数据以 CSV 为准；两代编号不合并、不互推。
+
+- **Asset table / 资产表**
+  _Avoid_: 资产清单、资源表、资产列表
+- **Two generations of IDs / 两代编号**
+  _Avoid_: 自动编号映射、可互相推导的 ID 对照、编号兼容
+
 ## blender —— CLI 子命令（只走无头）
 
 Blender 只走无头模式，唯一入口是 CLI 子命令 `blender`。在仓库根执行（Windows 原生，Blender 装在本机）：
