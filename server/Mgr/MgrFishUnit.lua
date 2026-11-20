@@ -739,6 +739,14 @@ function Mgr:StartMove(fish, name, pos, target, tpos, now, duration, range, shap
         payload.shape = 'cone'
     end
     if warning and warning.Notice then payload.notice = warning.Notice end
+    -- #258 本组招式预警的形状与落点口径只认逐招表；客户端拿到的载荷能分辨落点与危险区。
+    local row = BossMoves.Get(BossMoves.KeyOf(GameCfg.Fish[fish.FishId], fish.FishId), name)
+    if row and row.Delivery and row.Warning.Kind ~= 'none' then
+        payload.shape = row.Warning.Shape or payload.shape
+        payload.notice, payload.delivery, payload.landing = row.Warning.Notice, row.Delivery, row.Landing
+        payload.width = row.Warning.Width
+        payload.landingPoint = fish.Move.Destination or fish.Move.Center
+    end
     publishBite(self, payload)
     fish.MoveName = name
     self:PublishCombat(fish)
@@ -1395,7 +1403,9 @@ function Mgr:UpdateCombat(fish, now)
     -- 首领近战（#88）不走技能装配与睡眠，追咬由 UpdateChase 驱动
     local chase = GameCfg.FishCombat and GameCfg.FishCombat[combat]
     if chase then
-        FishBehaviors.Step(self, fish, now, pos, chase, combat)
+        -- #258 远程与俯冲段的参数来自逐招表，FishCombat 只提供表里未列的近战 / 表现字段。
+        local key = BossMoves.KeyOf(GameCfg.Fish[fish.FishId], fish.FishId)
+        FishBehaviors.Step(self, fish, now, pos, BossMoves.CombatParams(chase, key), combat)
         return
     end
     self:UpdateEel(fish, now, GameCfg.Ability.FishAbilities[combat])
@@ -1550,7 +1560,10 @@ end
 ---该鱼种是否走飞行（GameCfg.Ability.Flight.Species 按鱼种 Id 登记）
 function Mgr:FlightProfile(fishId)
     local species = GameCfg.Ability.Flight.Species
-    if species and species[fishId] then return species[fishId] end
+    if species and species[fishId] then
+        -- #258 飞行鱼的投掷 / 俯冲伤害与节拍以逐招表为准，档案只是缺省值。
+        return BossMoves.CombatParams(species[fishId], fishId)
+    end
     local fish = GameCfg.Fish[fishId]
     if fish and fish.CatchSource == 'air' and (fish.Grade == 'normal' or fish.Grade == 'rare') then
         return { Speed = fish.Speed, CruiseHeight = GameCfg.Ability.Flight.CruiseHeight,
@@ -1651,6 +1664,13 @@ function Mgr:StartAirAttack(fish, kind, pos, now)
     local payload = GarBiteNotice.Lock(attack.Id, attack.Center, 0, 1, attack.Radius, 180, duration)
     payload.shape, payload.move, payload.ownerFishId = 'circle', kind, fish.Id
     payload.flightOrigin = attack.Origin
+    -- #258 投掷 / 追踪俯冲各自取表里那一行：预警点就是服务端结算的锁定落点。
+    local row = BossMoves.Get(fish.FishId, dive and 'dive' or 'throw')
+    if row and row.Delivery and row.Warning.Kind ~= 'none' then
+        payload.shape = row.Warning.Shape or payload.shape
+        payload.notice, payload.delivery, payload.landing = row.Warning.Notice, row.Delivery, row.Landing
+        payload.landingPoint = attack.Center
+    end
     publishBite(self, payload)
     print('[MgrFishUnit] 空战预警', fish.FishId, kind, attack.Id, attack.Damage)
     return attack

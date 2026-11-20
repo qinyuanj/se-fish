@@ -17,7 +17,12 @@
 --             与 GameCfg.FishCombat / GameCfg.Ability.BossPhase 的键一致；服务端用 KeyOf 反查
 --   Name      鱼名（给文档与报错用，不参与判定）
 --   Move      招式键；MoveName 中文名
+--   Delivery  伤害投送方式（远程与俯冲组 #258）：projectile 投射物 / sweep 直线扫射 /
+--             diveLine 俯冲直线 / diveArea 俯冲落地范围；用于分辨落点与危险区。
+--   Landing   落点口径：self 以施法者为心 / target 锁定目标当前点 / random 随机方向固定距离。
 --   Clause    该行主要覆盖的条款 ID
+--   Segment   判定归属：'hit' 命中那一下、'carry' 叼走过程、'none' 无伤的位移 / 巡逻；
+--             同一招的命中与过程接触必须分行写，不能把两段伤害合并
 --   Range     作用 / 命中范围（米）；接触类写接触半径
 --   Damage    伤害来源映射：
 --               Kind = 'flat'      固定数值，Value 必填
@@ -74,11 +79,13 @@ M.Rows = {
       Warning = { Kind = 'none', Shape = 'none', WindupSec = 0 },
       Dodge = { Kind = 'distance', Sec = 0, Range = 2.5 } },
     { Fish = 'dragon', Name = '小白龙', Move = 'rain', MoveName = '雨云', Clause = '12-13', Range = 10,
+      Delivery = 'projectile', Landing = 'self',
       Damage = { Kind = 'flat', Value = 50, From = '§12 正文：每秒 50' },
       Schedule = { Kind = 'period', Sec = 30, DurationSec = 6 },
       Warning = { Kind = 'circle', Shape = 'circle', WindupSec = 1, Unverified = true },
       Dodge = { Kind = 'telegraph', Sec = 1, Range = 10 } },
     { Fish = 'dragon', Name = '小白龙', Move = 'dive', MoveName = '飞起俯冲', Clause = '12-14', Range = 2.5,
+      Delivery = 'diveLine', Landing = 'target',
       Damage = { Kind = 'flat', Value = 50, From = 'GameCfg.FishCombat.dragon.DiveDamage' },
       Schedule = { Kind = 'period', Sec = 30, StunSec = 5 },
       Warning = { Kind = 'circle', Shape = 'circle', WindupSec = 1, Unverified = true },
@@ -113,6 +120,7 @@ M.Rows = {
       Warning = { Kind = 'none', Shape = 'none', WindupSec = 0 },
       Dodge = { Kind = 'distance', Sec = 0, Range = 2.5 } },
     { Fish = 'swordfish', Name = '剑鱼', Move = 'jump', MoveName = '高跃', Clause = '12-21', Range = 5,
+      Delivery = 'diveArea', Landing = 'random',
       Damage = { Kind = 'flat', Value = 100, From = '§12 正文：落地 5 米范围 100' },
       Schedule = { Kind = 'period', Sec = 50, Distance = 10 },
       Warning = { Kind = 'circle', Shape = 'circle', WindupSec = 1, Unverified = true },
@@ -128,6 +136,7 @@ M.Rows = {
       Warning = { Kind = 'none', Shape = 'none', WindupSec = 0 },
       Dodge = { Kind = 'distance', Sec = 0, Range = 2.5 } },
     { Fish = 'shark', Name = '三头鲨', Move = 'jump', MoveName = '高跃', Clause = '12-24', Range = 10,
+      Delivery = 'diveArea', Landing = 'random',
       Damage = { Kind = 'flat', Value = 200, From = '§12 正文：10 米范围 200' },
       Schedule = { Kind = 'period', Sec = 20, Distance = 15 },
       Warning = { Kind = 'circle', Shape = 'circle', WindupSec = 1, Unverified = true },
@@ -140,6 +149,7 @@ M.Rows = {
       Warning = { Kind = 'none', Shape = 'none', WindupSec = 0 },
       Dodge = { Kind = 'distance', Sec = 0, Range = 2.5 } },
     { Fish = 'walrus', Name = '海象', Move = 'charge', MoveName = '突击', Clause = '12-26', Range = 2.5,
+      Delivery = 'sweep', Landing = 'target', Corridor = 20,
       Damage = { Kind = 'flat', Value = 120, From = '§12 正文：命中 120' },
       Schedule = { Kind = 'period', Sec = 40, Distance = 20 },
       Warning = { Kind = 'line', Shape = 'line', WindupSec = 1, Unverified = true },
@@ -150,6 +160,7 @@ M.Rows = {
       Warning = { Kind = 'cone', Shape = 'cone', WindupSec = 1, Unverified = true },
       Dodge = { Kind = 'telegraph', Sec = 1, Range = 2.5 } },
     { Fish = 'orca', Name = '虎鲸', Move = 'roar', MoveName = '虎啸', Clause = '12-28', Range = 15,
+      Delivery = 'projectile', Landing = 'target',
       Damage = { Kind = 'flat', Value = 30, From = 'GameCfg.FishCombat.orca.RoarDamage（表未给虎啸独立数值，#142 披露）' },
       Schedule = { Kind = 'period', Sec = 10 },
       Warning = { Kind = 'circle', Shape = 'circle', WindupSec = 1, Unverified = true },
@@ -160,6 +171,7 @@ M.Rows = {
       Warning = { Kind = 'circle', Shape = 'circle', WindupSec = 0.8, Unverified = true },
       Dodge = { Kind = 'telegraph', Sec = 0.8, Range = 4 } },
     { Fish = 'orca', Name = '虎鲸', Move = 'jump', MoveName = '鲸跃', Clause = '12-30', Range = 10,
+      Delivery = 'diveArea', Landing = 'random',
       Damage = { Kind = 'flat', Value = 240, From = '§12 正文：10 米范围 240' },
       Schedule = { Kind = 'period', Sec = 25, Distance = 15 },
       Warning = { Kind = 'circle', Shape = 'circle', WindupSec = 1, Unverified = true },
@@ -167,34 +179,50 @@ M.Rows = {
 
     -- 礁石岛
     { Fish = 'fish47Elite', Name = '白头鹰', Move = 'dive', MoveName = '俯冲', Clause = '12-31', Range = 5,
+      Delivery = 'diveLine', Landing = 'target',
       Damage = { Kind = 'flat', Value = 30, From = '§12 表：基础攻击 30' },
       Schedule = { Kind = 'period', Sec = 20 },
       Warning = { Kind = 'circle', Shape = 'circle', WindupSec = 1, Unverified = true },
       Dodge = { Kind = 'telegraph', Sec = 1, Range = 5 } },
     { Fish = 'fish48Boss', Name = '风神翼龙', Move = 'throw', MoveName = '投掷', Clause = '12-32', Range = 5,
+      Delivery = 'projectile', Landing = 'target',
       Damage = { Kind = 'flat', Value = 100, From = '§12 正文：投掷 100（12-34 要求核对映射，不静默丢弃）' },
       Schedule = { Kind = 'period', Sec = 4 },
       Warning = { Kind = 'circle', Shape = 'circle', WindupSec = 1.2, Unverified = true },
       Dodge = { Kind = 'telegraph', Sec = 1.2, Range = 5 } },
     { Fish = 'fish48Boss', Name = '风神翼龙', Move = 'dive', MoveName = '追踪俯冲', Clause = '12-33', Range = 5,
+      Delivery = 'diveLine', Landing = 'target',
       Damage = { Kind = 'flat', Value = 260, From = '§12 正文：俯冲 260（12-34 要求核对映射，不静默丢弃）' },
       Schedule = { Kind = 'period', Sec = 20 },
       Warning = { Kind = 'circle', Shape = 'circle', WindupSec = 1, Unverified = true },
       Dodge = { Kind = 'telegraph', Sec = 1, Range = 5 } },
 
-    -- 火山岛
-    { Fish = 'mosasaur', Name = '沧龙', Move = 'leap', MoveName = '跃起砸击', Clause = '12-36', Range = 10,
-      Damage = { Kind = 'flat', Value = 100, From = 'GameCfg.Ability.Flight.Species.fish55Elite.DiveDamage（正文未给砸击数值）' },
+    -- 火山岛 · 沧龙（复合型）：绕岛巡航 → 跃起砸击 / 落地甩头 → 咬中叼走入海 → 过程接触。
+    -- Segment 只标判定归属：'hit' 命中那一下、'carry' 叼走过程、'none' 无伤害的位移 / 巡逻。
+    -- 正文咬中 300 与过程接触 150 是两个独立判定段；绕岛巡航本身无伤、叼走位移也不额外扣血，
+    -- 所以 patrol 行写 Kind='none' 并注明来源，不能把 150 记到咬中那一下上（12-37 / 12-38）。
+    { Fish = 'mosasaur', Name = '沧龙', Move = 'patrol', MoveName = '绕岛巡航', Clause = '12-37', Segment = 'none', Range = 2.5,
+      Damage = { Kind = 'none', From = '§12 正文：绕岛巡航本身无伤；命中 300 与叼走过程接触 150 分两段结算' },
+      Schedule = { Kind = 'cruise', Sec = 1, Speed = 13 },
+      Warning = { Kind = 'none', Shape = 'none', WindupSec = 0 },
+      Dodge = { Kind = 'distance', Sec = 0, Range = 2.5 } },
+    { Fish = 'mosasaur', Name = '沧龙', Move = 'leap', MoveName = '跃起砸击', Clause = '12-36', Segment = 'hit', Range = 5,
+      Damage = { Kind = 'flat', Value = 35, From = '§12 表：基础攻击 35（正文未给砸击数值，[未查证] 灰盒取基础攻击）' },
       Schedule = { Kind = 'period', Sec = 15 },
       Warning = { Kind = 'circle', Shape = 'circle', WindupSec = 1, Unverified = true },
-      Dodge = { Kind = 'outrun', Sec = 1, Range = 10 } },
-    { Fish = 'mosasaur', Name = '沧龙', Move = 'bite', MoveName = '咬中叼走', Clause = '12-37', Range = 2.5,
-      Damage = { Kind = 'flat', Value = 300, From = '§12 正文：咬中 300' },
-      Schedule = { Kind = 'period', Sec = 15 },
-      Warning = { Kind = 'circle', Shape = 'circle', WindupSec = 1, Unverified = true },
-      Dodge = { Kind = 'telegraph', Sec = 1, Range = 2.5 } },
-    { Fish = 'mosasaur', Name = '沧龙', Move = 'contact', MoveName = '过程接触', Clause = '12-38', Range = 2.5,
-      Damage = { Kind = 'contact', Value = 150, From = '§12 正文：过程接触 150（与咬中 300 分属两段）' },
+      Dodge = { Kind = 'outrun', Sec = 1, Range = 5 } },
+    { Fish = 'mosasaur', Name = '沧龙', Move = 'head', MoveName = '落地甩头', Clause = '12-36', Segment = 'hit', Range = 2.5,
+      Damage = { Kind = 'flat', Value = 35, From = '§12 表：基础攻击 35（正文只写落地后甩头，未给独立伤害，[未查证]）' },
+      Schedule = { Kind = 'landing', Sec = 15 },
+      Warning = { Kind = 'circle', Shape = 'circle', WindupSec = 0.8, Unverified = true },
+      Dodge = { Kind = 'telegraph', Sec = 0.8, Range = 2.5 } },
+    { Fish = 'mosasaur', Name = '沧龙', Move = 'bite', MoveName = '咬中叼走入海', Clause = '12-37', Segment = 'hit', Range = 2.5,
+      Damage = { Kind = 'flat', Value = 300, From = '§12 正文：咬中 300（命中段；叼走位移不额外扣血）' },
+      Schedule = { Kind = 'landing', Sec = 15, MaxCarrySec = 20 },
+      Warning = { Kind = 'none', Shape = 'none', WindupSec = 0 },
+      Dodge = { Kind = 'distance', Sec = 0, Range = 2.5 } },
+    { Fish = 'mosasaur', Name = '沧龙', Move = 'contact', MoveName = '叼走过程接触', Clause = '12-38', Segment = 'carry', Range = 2.5,
+      Damage = { Kind = 'contact', Value = 150, From = '§12 正文：叼走过程接触 150（携带段，与命中 300 分开结算）' },
       Schedule = { Kind = 'contact', Sec = 1 },
       Warning = { Kind = 'none', Shape = 'none', WindupSec = 0 },
       Dodge = { Kind = 'distance', Sec = 0, Range = 2.5 } },
@@ -225,6 +253,27 @@ M.Rows = {
       Dodge = { Kind = 'distance', Sec = 0, Range = 2.5 } },
 }
 
+-- 阶段表（#259）：只描述走分阶段机的复合型首领，与上面的普通招式表分开表达。
+-- 阈值不是招式行：阶段只决定「什么时候换哪一套招式」，招式的数值 / 预警仍全在 M.Rows 里。
+-- Thresholds 按百分比降序 = 阶段升级顺序；正文是「低于」，正好等于阈值不切（见 common/BossPhase.lua）。
+M.Phases = {
+    godzilla = {
+        Name = '哥斯拉',
+        NormalName = '常态（陆上）',
+        Thresholds = {
+            { Percent = 60, Phase = 'water', PhaseName = '入水（切换沧龙式咬击）',
+              Move = 'bite', BiteDamage = 1000 },
+            { Percent = 20, Phase = 'enraged', PhaseName = '狂暴（重新上岸，伤害 +50%，吐息每 10 秒）',
+              DamageBonusPercent = 50, BreathIntervalSec = 10 },
+        },
+        AttackSets = {
+            normal = { 'claw', 'tail', 'breath', 'stomp' },
+            water = { 'bite' },
+            enraged = { 'claw', 'tail', 'breath', 'stomp' },
+        },
+    },
+}
+
 -- 索引：按鱼键、招式键取值；同一 (Fish, Move) 只能出现一次。
 M.Index, M.FishKeys = {}, {}
 for _, row in ipairs(M.Rows) do
@@ -236,6 +285,22 @@ for _, row in ipairs(M.Rows) do
     end
     assert(fish[row.Move] == nil, 'common/cfg/BossMoves.lua: 重复的一招一行 ' .. row.Fish .. '.' .. row.Move)
     fish[row.Move] = row
+end
+
+-- 阶段表只能引用普通招式表里已有的招式（12-05：阶段切换不新增表外招式）。
+for fishKey, boss in pairs(M.Phases) do
+    for _, set in pairs(boss.AttackSets) do
+        for _, move in ipairs(set) do
+            assert(M.Index[fishKey] and M.Index[fishKey][move] ~= nil,
+                'common/cfg/BossMoves.lua: 阶段表引用了表外招式 ' .. fishKey .. '.' .. move)
+        end
+    end
+    for _, threshold in ipairs(boss.Thresholds) do
+        if threshold.Move then
+            assert(M.Index[fishKey] and M.Index[fishKey][threshold.Move] ~= nil,
+                'common/cfg/BossMoves.lua: 阶段阈值引用了表外招式 ' .. fishKey .. '.' .. threshold.Move)
+        end
+    end
 end
 
 ---取一行；鱼键或招式不存在时返回 nil（调用方负责退化）。
@@ -280,13 +345,56 @@ function M.AttackTable(fishKey)
     return attacks
 end
 
----预警映射：服务端广播只从这里取形状 / 起手 / 范围，命中判定不读这张表。
+--预警映射：服务端广播只从这里取形状 / 起手 / 范围，命中判定不读这张表。
 function M.WarningOf(fishKey, move)
     local row = M.Get(fishKey, move)
     if not row then return nil end
     return { Kind = row.Warning.Kind, Shape = row.Warning.Shape,
         WindupSec = row.Warning.WindupSec, Width = row.Warning.Width,
         Notice = row.Warning.Notice, Range = row.Range }
+end
+
+-- #258 远程与俯冲组：逐招表 → 服务端战斗参数的唯一映射。
+-- 地面精英 / 首领经 FishBehaviors 拿到的 FishCombat 参数、飞行鱼拿到的 Flight.Species 档案，
+-- 都在进入行为分发前过一遍这里；表里改一格，实际预警与伤害就跟着改，不再有第二份数值。
+-- 只映射本组已核对的招式；未列字段沿用原参数（表外不新增招式、不改写别人的行）。
+local COMBAT_FIELDS = {
+    ['dragon.rain'] = { RainRadius = 'Range', RainDamage = 'Damage', RainSec = 'DurationSec' },
+    ['dragon.dive'] = { DiveRadius = 'Range', DiveDamage = 'Damage', StunSec = 'StunSec' },
+    ['swordfish.jump'] = { JumpRadius = 'Range', JumpDamage = 'Damage', JumpIntervalSec = 'Sec', JumpDistance = 'Distance' },
+    ['shark.jump'] = { JumpRadius = 'Range', JumpDamage = 'Damage', JumpIntervalSec = 'Sec', JumpDistance = 'Distance' },
+    ['walrus.charge'] = { ChargeDamage = 'Damage', ChargeSec = 'Sec', ChargeDistance = 'Distance' },
+    ['orca.roar'] = { RoarDamage = 'Damage', RoarSec = 'Sec', RoarRange = 'Range' },
+    ['orca.jump'] = { JumpRadius = 'Range', JumpDamage = 'Damage', JumpIntervalSec = 'Sec', JumpDistance = 'Distance' },
+    ['fish47Elite.dive'] = { DiveRadius = 'Range', DiveDamage = 'Damage', DiveIntervalSec = 'Sec' },
+    ['fish48Boss.throw'] = { ThrowRadius = 'Range', ThrowDamage = 'Damage', ThrowIntervalSec = 'Sec' },
+    ['fish48Boss.dive'] = { DiveRadius = 'Range', DiveDamage = 'Damage', DiveIntervalSec = 'Sec' },
+}
+
+local function column(row, name)
+    if name == 'Range' then return row.Range end
+    if name == 'Damage' then return row.Damage.Value end
+    if name == 'Sec' then return row.Schedule.Sec end
+    if name == 'DurationSec' then return row.Schedule.DurationSec end
+    if name == 'Distance' then return row.Schedule.Distance end
+    if name == 'StunSec' then return row.Schedule.StunSec end
+    return nil
+end
+
+--把逐招表折进战斗参数副本；params 可为 nil，绝不原地改写共享配置。
+function M.CombatParams(params, fishKey)
+    local out = {}
+    for key, value in pairs(params or {}) do out[key] = value end
+    for _, row in ipairs(M.Rows) do
+        local fields = row.Fish == fishKey and COMBAT_FIELDS[row.Fish .. '.' .. row.Move] or nil
+        if fields then
+            for target, source in pairs(fields) do
+                local value = column(row, source)
+                if value ~= nil then out[target] = value end
+            end
+        end
+    end
+    return out
 end
 
 return M
