@@ -9,8 +9,6 @@ local REUtil = require('common.REUtil')
 
 local Panel = { Teammates = {}, PartyState = 'none', Rows = {}, Connections = {} }
 
-local ColorBlockImage = 'official://image/11017' -- 官方正方形纯色块（ScreenSurvival 同款约定）
-
 local function hud() return GameCfg.Party.HUD end
 
 local function notice(message)
@@ -51,7 +49,11 @@ end
 
 function Panel:Now()
     local ok, now = pcall(function() return game:GetService('World'):GetServerTime() end)
-    return ok and tonumber(now) or 0
+    if not ok then
+        print('[ScreenParty] 读取服务器时间失败', tostring(now))
+        return 0
+    end
+    return tonumber(now) or 0
 end
 
 function Panel:Send(action, extra)
@@ -182,6 +184,7 @@ function Panel:Start()
         ['restored'] = hud().RestoredText,
         ['full'] = hud().RestoreFullText,
         ['joined'] = '',
+        ['save-failed'] = hud().UnavailableText,
     }
     REASON = {
         ['too-far'] = hud().TooFarText,
@@ -200,7 +203,7 @@ function Panel:Start()
         return eui and eui:GetRootNode(), eui and eui:GetDeviceResolution()
     end)
     if not okRoot or not root then
-        print('[ScreenParty] EUI 未就绪，跳过建面板')
+        print('[ScreenParty] EUI 未就绪，跳过建面板', tostring(root))
         return
     end
     -- 重建前先清空上一轮节点：Start 重入不叠第二套队友栏。
@@ -218,7 +221,7 @@ function Panel:Start()
         local bar = create('EUILayout', row, 'PartyMember' .. index .. 'Bar', 0, 28, hud().BarWidth, hud().BarHeight, {
             Visible = true })
         local fill = create('EUIImage', bar, 'PartyMember' .. index .. 'Fill', 0, 0, 0, hud().BarHeight, {
-            Image = ColorBlockImage, Color = Color.New(230, 60, 60, 255), LocalZOrder = 1 })
+            Image = hud().ColorBlockImage, Color = Color.New(230, 60, 60, 255), LocalZOrder = 1 })
         local health = create('EUITextLabel', row, 'PartyMember' .. index .. 'Health',
             hud().BarWidth + 8, 24, width - hud().BarWidth - 8, 24, {
                 Text = '', FontSize = 20, TextColor = Color.New(235, 235, 235, 255), LocalZOrder = 1 })
@@ -231,10 +234,10 @@ function Panel:Start()
     local countdown = create('EUITextLabel', invite, 'PartyInviteCountdown', 0, 32, hud().InviteWidth, 24, {
         Text = '', FontSize = 20, TextColor = Color.New(255, 220, 140, 255), LocalZOrder = 1 })
     local accept = create('EUIButton', invite, 'PartyInviteAccept', hud().InviteWidth - 180, 56, 80, 32, {
-        ButtonText = hud().AcceptText, NormalImage = ColorBlockImage, PressImage = ColorBlockImage,
+        ButtonText = hud().AcceptText, NormalImage = hud().ColorBlockImage, PressImage = hud().ColorBlockImage,
         Color = Color.New(60, 150, 90, 255) })
     local decline = create('EUIButton', invite, 'PartyInviteDecline', hud().InviteWidth - 90, 56, 80, 32, {
-        ButtonText = hud().DeclineText, NormalImage = ColorBlockImage, PressImage = ColorBlockImage,
+        ButtonText = hud().DeclineText, NormalImage = hud().ColorBlockImage, PressImage = hud().ColorBlockImage,
         Color = Color.New(150, 60, 60, 255) })
     for _, button in ipairs({ accept, decline }) do
         button.TouchEnabled = true

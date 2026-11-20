@@ -9,7 +9,8 @@
 --   4. 同 seq 重放、两个施救者并发、重连后旧请求重放产生第二次恢复（9-05）；
 --   5. 濒死还掉血、致命伤害直接死亡（11-01、11-03、11-34）；
 --   6. 呼救不发给附近玩家（11-06）；
---   7. 濒死断线重连仍继续濒死计时，或多结算一次复活（11-35）。
+--   7. 濒死断线重连仍继续濒死计时，或多结算一次复活（11-35）；
+--   8. 抢救按钮创建失败后泄漏已创建的气泡根节点。
 local function vec(x, y, z) return { x = x, y = y, z = z } end
 local GameCfg = require('common.GameCfg')
 
@@ -269,6 +270,28 @@ describe('条款 9/11 他人抢救', function()
     env.clientPlayers = { localPlayer }
     client:Update()
     assert.is_true(env.clientNodes.RescueRoot.Destroyed, '离场玩家的抢救气泡要销毁，不只 Visible=false')
+  end)
+
+  it('9-17 客户端按钮创建失败会销毁抢救气泡根节点', function()
+    env.clientNodes = {}
+    local root
+    local localPlayer = { UserId = 41, Character = { Position = vec(0, 0, 0) },
+      PlayerGui = { EuiManager = { CreateSceneNodeAtPosition = function(_, position)
+        root = { Position = position, Visible = false }
+        function root:Destroy() self.Destroyed = true end
+        return root
+      end } } }
+    env.playersService.LocalPlayer = localPlayer
+    env.clientPlayers = { localPlayer, { UserId = 42, Character = { Position = vec(1, 0, 0) },
+      GetAttribute = function(_, key) return key == 'SurvivalPhase' and 'downed' or nil end } }
+    local client = assert(loadfile('client/LocalInteract.lua'))()
+    client.Button = function() return nil end
+
+    client:Update()
+
+    assert.is_not_nil(root)
+    assert.is_true(root.Destroyed, '按钮创建失败后不能泄漏已创建的根节点')
+    assert.is_nil(client.RescueBubbles[42], '创建失败的气泡不能进入管理表')
   end)
 
   -- 11-03（review #249-10）：抢救中濒死倒计时到点，撤销抢救不再先播一份 downed，转死亡只广播一次。

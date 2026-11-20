@@ -5,13 +5,22 @@
 -- 伤害入口一行不动：队友免伤的证据归 PK/抢救子单，这里只提供 SameParty 接缝给后续判定用。
 local GameCfg = require('common.GameCfg')
 
-local Mgr = { Parties = {}, PartyOf = {}, Invites = {}, Online = {}, NextId = 0, Epoch = nil }
+local Mgr = { Parties = {}, PartyOf = {}, Invites = {}, Online = {}, HealthCache = {}, NextId = 0, Epoch = nil }
 
 local function cfg() return GameCfg.Party end
 
+local function logFailure(operation, player, err)
+    local userId = type(player) == 'table' and player.UserId or player
+    print('[MgrParty]', operation, 'userId=' .. tostring(userId), tostring(err))
+end
+
 local function now()
     local ok, value = pcall(function() return game:GetService('World'):GetServerTime() end)
-    return ok and tonumber(value) or 0
+    if not ok then
+        logFailure('读取服务器时间 GetServerTime', nil, value)
+        return 0
+    end
+    return tonumber(value) or 0
 end
 
 local function re(name) return _G.REUtil:GetRE(name) end
@@ -27,7 +36,11 @@ local function positionOf(player)
     local character = player and player.Character
     if not character then return nil end
     local ok, pos = pcall(function() return character.Position end)
-    if ok and pos and type(pos.x) == 'number' and type(pos.z) == 'number' then return pos end
+    if not ok then
+        logFailure('读取角色位置 Position', player, pos)
+        return nil
+    end
+    if pos and type(pos.x) == 'number' and type(pos.z) == 'number' then return pos end
 end
 
 function Mgr:PartyIdOf(player)
@@ -62,7 +75,11 @@ function Mgr:DataOf(player)
     local PlayerData = self.PlayerData
     if not PlayerData or not player then return nil end
     local ok, data = pcall(PlayerData.GetDataInst, PlayerData, player)
-    return ok and data or nil
+    if not ok then
+        logFailure('读取玩家存档 GetDataInst', player, data)
+        return nil
+    end
+    return data
 end
 
 -- 服务端会话纪元：本轮开服发的队伍号都带它。与 MgrLoot.DeliveryEpoch 同口径
@@ -70,6 +87,7 @@ end
 function Mgr:SessionEpoch()
     if not self.Epoch then
         local ok, value = pcall(function() return game:GetService('World'):GetServerTime() end)
+        if not ok then logFailure('创建队伍会话纪元 GetServerTime', nil, value) end
         self.Epoch = tostring(ok and value or 0) .. ':' .. tostring(math.random())
     end
     return self.Epoch
@@ -79,7 +97,10 @@ end
 -- 队伍号旁同时记纪元：NextId 每轮开服从 0 自增，只凭裸号码会把旧档玩家恢复进陌生队伍。
 function Mgr:SavePartyId(player, id)
     local data = self:DataOf(player)
-    if not data or type(data.Extra) ~= 'table' then return false end
+    if not data or type(data.Extra) ~= 'table' then
+        logFailure('写入队伍归属 SavePartyId', player, '玩家存档或 Extra 不可用')
+        return false, 'save-failed'
+    end
     if type(data.Extra.party) ~= 'table' then data.Extra.party = { id = 0 } end
     local partyId = id or 0
     data.Extra.party.id = partyId
@@ -104,25 +125,40 @@ local function newParty(self)
 end
 
 function Mgr:AddMember(party, player)
-    if self.PartyOf[player.UserId] then return false end
+    if self.PartyOf[player.UserId] then return false, 'already-in-party' end
+    -- 先写归属再提交内存成员关系；写档失败时这名玩家从未占队名额。
+    local ok, reason = self:SavePartyId(player, party.Id)
+    if not ok then return false, reason or 'save-failed' end
     party.Members[#party.Members + 1] = player.UserId
     self.PartyOf[player.UserId] = party.Id
-    self:SavePartyId(player, party.Id)
     return true
 end
 
 function Mgr:RemoveMember(party, player)
+    local removedIndex
     for index, userId in ipairs(party.Members) do
-        if userId == player.UserId then table.remove(party.Members, index) break end
+        if userId == player.UserId then
+            table.remove(party.Members, index)
+            removedIndex = index
+            break
+        end
     end
     self.PartyOf[player.UserId] = nil
+    self.HealthCache[player.UserId] = nil
+    return removedIndex ~= nil, removedIndex
+end
+
+local function restoreMember(self, party, player, index)
+    table.insert(party.Members, index or (#party.Members + 1), player.UserId)
+    self.PartyOf[player.UserId] = party.Id
 end
 
 local function healthRows(self, member)
     local health, maxHealth
     if self.Vitals and type(self.Vitals.SnapshotHealth) == 'function' then
         local ok, value, maxValue = pcall(self.Vitals.SnapshotHealth, self.Vitals, member)
-        if ok then health, maxHealth = value, maxValue end
+        if ok then health, maxHealth = value, maxValue
+        else logFailure('读取队伍血量 SnapshotHealth', member, value) end
     end
     return health, maxHealth
 end
@@ -143,6 +179,7 @@ function Mgr:SnapshotOf(player, notice)
             local member = self.Online[userId]
             if not member then return nil end
             local health, maxHealth = healthRows(self, member)
+            self.HealthCache[userId] = { health = health, maxHealth = maxHealth }
             return { userId = userId, name = member.Name, health = health, maxHealth = maxHealth,
                 self = userId == player.UserId }
         end
@@ -217,11 +254,29 @@ function Mgr:Accept(player, fromUserId)
     if party and #party.Members >= cfg().MaxMembers then return drop('full') end
     if self:PartyIdOf(player) then return drop('already-in-party') end
     self.Invites[player.UserId] = nil
-    if not party then
+    local created = not party
+    if created then
         party = newParty(self)
-        self:AddMember(party, inviter)
+        local ok, reason = self:AddMember(party, inviter)
+        if not ok then
+            self.Parties[party.Id] = nil
+            self:Push(player)
+            return false, reason
+        end
     end
-    self:AddMember(party, player)
+    local ok, reason = self:AddMember(party, player)
+    if not ok then
+        if created then
+            -- 新队是两名成员的一次提交：第二人失败时，邀请人的内存与存档归属都回滚。
+            self:RemoveMember(party, inviter)
+            self.Parties[party.Id] = nil
+            local restored, restoreReason = self:SavePartyId(inviter, 0)
+            if not restored then logFailure('回滚新建队伍邀请人', inviter, restoreReason or '存档不可用') end
+            self:Push(inviter)
+        end
+        self:Push(player)
+        return false, reason
+    end
     self:PushParty(party, 'joined')
     return true
 end
@@ -234,18 +289,34 @@ function Mgr:Decline(player)
 end
 
 function Mgr:Disband(party, notice, skipUserId)
+    -- 先清完全部存档归属再提交内存解散；中途失败时恢复此前已清的值，成员关系不动。
+    local saved = {}
+    for _, userId in ipairs(party.Members) do
+        local member = self.Online[userId]
+        local ok, reason = self:SavePartyId(member, 0)
+        if not ok then
+            for _, savedUserId in ipairs(saved) do
+                local savedPlayer = self.Online[savedUserId]
+                local restored, restoreReason = self:SavePartyId(savedPlayer, party.Id)
+                if not restored then logFailure('回滚解散队伍归属', savedUserId, restoreReason or '存档不可用') end
+            end
+            return false, reason or 'save-failed'
+        end
+        saved[#saved + 1] = userId
+    end
     local members = party.Members
     party.Members = {}
     self.Parties[party.Id] = nil
     for _, userId in ipairs(members) do
         local member = self.Online[userId]
         self.PartyOf[userId] = nil
-        self:SavePartyId(member, 0)
+        self.HealthCache[userId] = nil
         self:Push(member, notice)
     end
     -- #249：解散也走一次满员等待的重试——等着的那批人的原队已经不在，
     -- 让他们当场拿到「原队已散」的明确结果，归属落回无队伍，而不是把悬空归属留到下次重连。
     self:RetryRestore(skipUserId)
+    return true
 end
 
 -- reason = 'offline' 时保留存档里的归属，重连才有「恢复原队伍」；主动离队立即落回无队伍。
@@ -256,13 +327,27 @@ function Mgr:Leave(player, reason)
         self.PartyOf[player.UserId] = nil
         return false, 'not-in-party'
     end
-    self:RemoveMember(party, player)
-    if reason ~= 'offline' then self:SavePartyId(player, 0) end
+    if reason ~= 'offline' then
+        local ok, saveReason = self:SavePartyId(player, 0)
+        if not ok then return false, saveReason end
+    end
+    local _, removedIndex = self:RemoveMember(party, player)
     local notice = reason == 'offline' and nil or 'left'
     if #party.Members < cfg().MinMembers then
-        self:Push(player, notice)
         -- Disband 末尾自己会重试一次满员等待，这里不再重复
-        self:Disband(party, 'disbanded', player.UserId)
+        local ok, saveReason = self:Disband(party, 'disbanded', player.UserId)
+        if not ok then
+            -- 主动离队可完整回滚；离线玩家仍须移除，不能用内存队伍阻止引擎离场。
+            if reason ~= 'offline' then
+                restoreMember(self, party, player, removedIndex)
+                local restored, restoreReason = self:SavePartyId(player, party.Id)
+                if not restored then logFailure('回滚主动离队成员', player, restoreReason or '存档不可用') end
+            end
+            -- 主动分支推送回滚后的完整名单；离线分支推送移除离线者后的剩余名单，共用一次。
+            self:PushParty(party)
+            return false, saveReason
+        end
+        self:Push(player, notice)
         return true, 'disbanded'
     end
     self:Push(player, notice)
@@ -285,6 +370,28 @@ function Mgr:Handle(player, payload)
     return self:Reply(player, action, ok, reason)
 end
 
+-- 血量不是入队时的一次性快照：周期读取 Vitals，变化时向整队推送，未变化不广播。
+-- 这是 Vitals 自身 HealthChanged 属性同步之外的队伍 HUD 通道，伤害、治疗与复活都走同一读面。
+function Mgr:SyncHealth(time)
+    if self.NextHealthSyncAt and time < self.NextHealthSyncAt then return end
+    self.NextHealthSyncAt = time + cfg().HealthSyncIntervalSec
+    local dirty = {}
+    for partyId, party in pairs(self.Parties) do
+        for _, userId in ipairs(party.Members) do
+            local member = self.Online[userId]
+            if member then
+                local health, maxHealth = healthRows(self, member)
+                local previous = self.HealthCache[userId]
+                if not previous or previous.health ~= health or previous.maxHealth ~= maxHealth then
+                    self.HealthCache[userId] = { health = health, maxHealth = maxHealth }
+                    dirty[partyId] = party
+                end
+            end
+        end
+    end
+    for _, party in pairs(dirty) do self:PushParty(party) end
+end
+
 -- 超时结算：过期邀请按拒绝处理，双方界面都收到状态刷新，之后再接受不生效。
 function Mgr:Update()
     local time = now()
@@ -300,6 +407,7 @@ function Mgr:Update()
         local from = invite and self.Online[invite.From]
         if from then self:Push(from) end
     end
+    self:SyncHealth(time)
 end
 
 -- 重连恢复：存档里的小队号还在、纪元是本轮的、那支队伍也还在（有队友在线、未满）就回到原队伍；
@@ -312,7 +420,8 @@ function Mgr:Restore(player)
     local party = self.Parties[saved]
     if party and epoch == self:SessionEpoch() then
         if #party.Members < cfg().MaxMembers then
-            self:AddMember(party, player)
+            local ok = self:AddMember(party, player)
+            if not ok then return 'save-failed' end
             self:PushParty(party, 'restored')
             return 'restored'
         end
@@ -320,7 +429,8 @@ function Mgr:Restore(player)
         -- 会替这名玩家重试（9-22）；回执与文案与解散分开。
         return 'full'
     end
-    self:SavePartyId(player, 0)
+    local ok = self:SavePartyId(player, 0)
+    if not ok then return 'save-failed' end
     return 'disbanded'
 end
 
@@ -343,8 +453,8 @@ function Mgr:RetryRestore(skipUserId)
         local result = self:Restore(player)
         if result == 'restored' then
             restored = restored + 1 -- Restore 内部已 PushParty(party, 'restored')
-        elseif result == 'disbanded' then
-            self:Push(player, 'disbanded')
+        elseif result == 'disbanded' or result == 'save-failed' then
+            self:Push(player, result)
         end
     end
     return restored
@@ -354,7 +464,7 @@ function Mgr:OnPlayerAdded(player)
     if not player or not player.UserId then return end
     self.Online[player.UserId] = player
     local notice = self:Restore(player)
-    if notice == 'disbanded' or notice == 'full' then self:Push(player, notice)
+    if notice == 'disbanded' or notice == 'full' or notice == 'save-failed' then self:Push(player, notice)
     elseif not notice then self:Push(player) end
 end
 

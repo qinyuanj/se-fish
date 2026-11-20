@@ -3,6 +3,14 @@
 -- 合法性（濒死/死亡/离线/离战范围，6-30）和特殊招式指定目标（6-31）由调用方在排序前处理。
 local M = {}
 
+--- 纯比较规则：业务适配层调用 Order 完成排序与选择；官方管理器只接收裁决结果。
+function M.Compare(a, b)
+    if a.damage ~= b.damage then return a.damage > b.damage end
+    if a.distance ~= b.distance then return a.distance < b.distance end
+    -- 同分同距按 UserId 数值裁决（不是字符串序：'100' < '91' 会颠倒），保证确定性。
+    return (tonumber(a.userId) or math.huge) < (tonumber(b.userId) or math.huge)
+end
+
 function M.Order(candidates)
     local ranked = {}
     for _, row in ipairs(candidates or {}) do
@@ -13,12 +21,7 @@ function M.Order(candidates)
                 userId = row.player.UserId }
         end
     end
-    table.sort(ranked, function(a, b)
-        if a.damage ~= b.damage then return a.damage > b.damage end
-        if a.distance ~= b.distance then return a.distance < b.distance end
-        -- 同分同距按 UserId 数值裁决（不是字符串序：'100' < '91' 会颠倒），保证确定性。
-        return (tonumber(a.userId) or math.huge) < (tonumber(b.userId) or math.huge)
-    end)
+    table.sort(ranked, M.Compare)
     return ranked
 end
 

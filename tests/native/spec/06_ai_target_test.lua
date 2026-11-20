@@ -1,12 +1,13 @@
 -- 条款 6-29 / 6-30 / 6-31（docs/acceptance/06-combat-and-growth.md，#260）与
--- #260 接线验收：官方 AI 管理器按伤害优先持有鱼的目标选择；属性与效果投影保持与自研模型一致。
+-- #260 接线验收：业务按伤害优先裁决目标，官方 AI 管理器只登记可观察结果；属性与效果投影保持一致。
 --
 -- 业务入口：MgrFishUnit:SpawnLanded + Drop 放下哥斯拉（一只鱼贯通），逐帧 Update 推进服务端权威时钟；
 -- 玩家经公开损伤登记口 NoteDamage 记累计有效伤害，经 SetTargetOverride 指定特殊招式目标。
 -- 观察三条外部可见结果：
 --   1. 玩家血量：爪击只落在被选中的目标身上；
---   2. 官方 AI 管理器持有的目标（BehaviorRuntime.getState(receiver).focusTarget 与 priorityMode）：
---      适配层把裁决交给官方包，不调用 SearchEnemy / ChaseTarget，移动仍归自研 FishBehaviors / FlightPath；
+--   2. 官方 AI 管理器登记的结果（BehaviorRuntime.getState(receiver) 的 focusTarget / priorityMode）：
+--      业务 Policy.Order 负责伤害优先裁决，官方包只保存登记值，不参与裁决；
+--      适配层不调用 SearchEnemy / ChaseTarget，移动仍归自研 FishBehaviors / FlightPath；
 --   3. 属性/效果投影值：MgrAttr 对 attr_rule 的分量写入，MgrModifier 对 modifier_system 的效果实例。
 -- 客户端没有任何目标选择入口：目标只由服务端适配层裁决。
 --
@@ -15,7 +16,9 @@
 --   2. 濒死 / 死亡 / 离线 / 离战范围的玩家仍被选中（6-30）；
 --   3. 特殊招式指定目标被自动仇恨覆盖（6-31）；
 --   4. 适配层写了 Controller 位移或启动官方搜敌模式，与自研轨迹双写权威；
---   5. 属性/效果投影与 AttrModel / GameCfg 公差不一致。
+--   5. 属性/效果投影与 AttrModel / GameCfg 公差不一致；
+--   6. 官方加载、登记或状态读取失败阻断业务已经裁决的目标或 override；
+--   7. require / pcall / State 失败日志缺模块、操作、鱼/单位标识或原始错误。
 
 local Islet = require('tests.support.isle_combat')
 local GameCfg = require('common.GameCfg')
@@ -79,6 +82,7 @@ describe('第 6 节 官方 AI 目标选择接线（哥斯拉贯通）', function
             'server.packages.official_ai_feature.ability_bridge' }) do
             package.loaded[name] = nil
         end
+        env.mgr.AiTarget = require('server.Mgr.MgrAiTarget')
         local p = Islet.shoreDryPoint(7)
         env.player.Character.Position = vec(p.x, p.y, p.z)
         env.player.Character.Controller.Health = 100000
@@ -90,7 +94,7 @@ describe('第 6 节 官方 AI 目标选择接线（哥斯拉贯通）', function
         _G.RemoteEvent = savedExtra.remote
     end)
 
-    it('条款 6-29：累计有效伤害优先于距离，裁决交给官方 AI 管理器', function()
+    it('条款 6-29：业务按累计有效伤害裁决，结果登记到官方 AI 管理器', function()
         local fish = dropBoss()
         place(fish, env.player, 3)
         place(fish, env.rival, 1.5)
@@ -133,10 +137,114 @@ describe('第 6 节 官方 AI 目标选择接线（哥斯拉贯通）', function
         high.Character.Position = vec(p.x - 2, p.y, p.z)
         env:advance(0.2)
         assert.same(low.Character, officialFocus(fish), '同伤害同距离时没有按 UserId 数值裁决')
-        local ranked = require('server.Mgr.MgrAiTarget').Policy.Order({
-            { player = high, damage = 0, distance = 4 },
-            { player = low, damage = 0, distance = 4 } })
-        assert.same(91, ranked[1].player.UserId, '名次表首项不是号码更小的玩家')
+        local selected = env.mgr:ChooseTarget(fish, p)
+        assert.same(low, selected, '业务裁决目标不是号码更小的玩家')
+    end)
+
+    it('官方登记抛错时保留业务伤害优先目标，并记录模块、操作、对象与错误', function()
+        local fish = dropBoss()
+        place(fish, env.player, 3)
+        place(fish, env.rival, 1.5)
+        env.mgr:NoteDamage(fish, env.player, 300)
+
+        local manager = require('server.packages.official_ai_feature.official_ai_feature')
+        local original = manager.setSearchEnemyPriorityMode
+        manager.setSearchEnemyPriorityMode = function() error('official-register-failed') end
+        local rawPrint = _G.print
+        local logs = {}
+        _G.print = function(...)
+            local parts = {}
+            for i = 1, select('#', ...) do parts[#parts + 1] = tostring(select(i, ...)) end
+            logs[#logs + 1] = table.concat(parts, ' ')
+        end
+        local ok, selected, cp = pcall(env.mgr.ChooseTarget, env.mgr, fish, fish.Carrier.Body.Position)
+        _G.print = rawPrint
+        manager.setSearchEnemyPriorityMode = original
+        assert.is_true(ok, tostring(selected))
+        assert.same(env.player, selected, '官方登记失败阻断了业务伤害优先目标')
+        assert.same(env.player.Character.Position, cp)
+
+        local text = table.concat(logs, '\n')
+        assert.is_truthy(text:find('[MgrAiTarget]', 1, true), '日志缺模块名')
+        assert.is_truthy(text:find('SetFocus', 1, true), '日志缺官方登记操作名')
+        assert.is_truthy(text:find(tostring(fish.Id), 1, true), '日志缺鱼标识')
+        assert.is_truthy(text:find(tostring(fish.Carrier.Receiver.UnitId), 1, true), '日志缺单位标识')
+        assert.is_truthy(text:find('official-register-failed', 1, true), '日志缺原始错误')
+    end)
+
+    it('官方 API 加载失败时保留业务目标，并记录完整错误日志', function()
+        local fish = dropBoss()
+        place(fish, env.player, 3)
+        place(fish, env.rival, 1.5)
+        env.mgr:NoteDamage(fish, env.player, 300)
+
+        local apiName = 'server.packages.official_ai_feature.api'
+        local oldApi, oldPreload = package.loaded[apiName], package.preload[apiName]
+        package.loaded[apiName] = nil
+        package.preload[apiName] = function() error('official-api-load-failed') end
+        package.loaded['server.Mgr.MgrAiTarget'] = nil
+        env.mgr.AiTarget = require('server.Mgr.MgrAiTarget')
+        local rawPrint = _G.print
+        local logs = {}
+        _G.print = function(...) logs[#logs + 1] = tostring((...)) end
+        local ok, selected = pcall(env.mgr.ChooseTarget, env.mgr, fish, fish.Carrier.Body.Position)
+        _G.print = rawPrint
+        package.preload[apiName] = oldPreload
+        package.loaded[apiName] = oldApi
+        assert.is_true(ok, tostring(selected))
+        assert.same(env.player, selected, '官方 API 加载失败阻断了业务伤害优先目标')
+
+        local text = table.concat(logs, '\n')
+        assert.is_truthy(text:find('[MgrAiTarget]', 1, true), '日志缺模块名')
+        assert.is_truthy(text:find('RequireOfficialAPI', 1, true), '日志缺官方 API 加载操作名')
+        assert.is_truthy(text:find(tostring(fish.Id), 1, true), '日志缺鱼标识')
+        assert.is_truthy(text:find(tostring(fish.Carrier.Receiver.UnitId), 1, true), '日志缺单位标识')
+        assert.is_truthy(text:find('official-api-load-failed', 1, true), '日志缺原始错误')
+    end)
+
+    it('特殊招式目标官方登记失败时仍采用业务 override', function()
+        local fish = dropBoss()
+        place(fish, env.rival, 2)
+        assert.is_true(env.mgr:SetTargetOverride(fish, env.rival))
+        local manager = require('server.packages.official_ai_feature.official_ai_feature')
+        local original = manager.setSearchEnemyPriorityMode
+        manager.setSearchEnemyPriorityMode = function() error('official-focus-failed') end
+        local rawPrint = _G.print
+        local logs = {}
+        _G.print = function(...) logs[#logs + 1] = tostring((...)) end
+        local ok, selected = pcall(env.mgr.ChooseTarget, env.mgr, fish, fish.Carrier.Body.Position)
+        _G.print = rawPrint
+        manager.setSearchEnemyPriorityMode = original
+        assert.is_true(ok, tostring(selected))
+        assert.same(env.rival, selected, '官方焦点登记失败阻断了业务 override')
+        local text = table.concat(logs, '\n')
+        assert.is_truthy(text:find('[MgrAiTarget]', 1, true), '日志缺模块名')
+        assert.is_truthy(text:find('SetFocus', 1, true), '日志缺焦点注册操作名')
+        assert.is_truthy(text:find(tostring(fish.Id), 1, true), '日志缺鱼标识')
+        assert.is_truthy(text:find(tostring(env.rival.UserId), 1, true), '日志缺目标玩家标识')
+        assert.is_truthy(text:find('official-focus-failed', 1, true), '日志缺原始错误')
+    end)
+
+    it('官方状态读取失败时记录模块、操作、对象与原始错误', function()
+        local fish = dropBoss()
+        local adapter = require('server.Mgr.MgrAiTarget')
+        local runtime = require('server.packages.official_ai_feature.behavior_runtime')
+        local original = runtime.getState
+        runtime.getState = function() error('official-state-read-failed') end
+        local rawPrint = _G.print
+        local logs = {}
+        _G.print = function(...) logs[#logs + 1] = tostring((...)) end
+        local ok, state = pcall(adapter.State, adapter, fish)
+        _G.print = rawPrint
+        runtime.getState = original
+        assert.is_true(ok, tostring(state))
+        assert.is_nil(state)
+        local text = table.concat(logs, '\n')
+        assert.is_truthy(text:find('[MgrAiTarget]', 1, true), '日志缺模块名')
+        assert.is_truthy(text:find('ReadOfficialState', 1, true), '日志缺状态读取操作名')
+        assert.is_truthy(text:find(tostring(fish.Id), 1, true), '日志缺鱼标识')
+        assert.is_truthy(text:find(tostring(fish.Carrier.Receiver.UnitId), 1, true), '日志缺单位标识')
+        assert.is_truthy(text:find('official-state-read-failed', 1, true), '日志缺原始错误')
     end)
 
     it('条款 6-30：死亡与离线的玩家不参与选择', function()
@@ -270,6 +378,7 @@ describe('第 6 节 6-30：离开战斗范围的玩家退出飞行鱼目标', fu
             'server.packages.official_ai_feature.ability_bridge' }) do
             package.loaded[name] = nil
         end
+        env.mgr.AiTarget = require('server.Mgr.MgrAiTarget')
         local p = Islet.shoreDryPoint(6)
         env.player.Character.Position = vec(p.x, p.y, p.z)
     end)

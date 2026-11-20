@@ -133,15 +133,15 @@
 现状：规格只给伤害与范围（雨云 10 米每秒、高跃 5/10 米、虎啸、突击 20 米、俯冲 5 米），没有轨迹与预警秒数。逐招表以 Delivery（projectile / sweep / diveLine / diveArea）、Landing（self / target / random）与 Warning.* 记录实现期细化，全部属 [未查证]；海象突击的 20 米走廊来自正文距离，接触半径 2.5 米是 [未查证] 占位。随机落点方向沿用服务端 math.random，真机可读性未试玩。
 
 待定：由策划补轨迹与预警秒数；补上之前只替换逐招表字段与对应共享配置，不改玩法判定。#258 的断言只证明「表是唯一数值来源、预警点即结算落点、伤害由服务端独立结算」，不把这些占位值当已确认数值。
-| 13 | 官方 AI 搜敌优先级类型的取值是多少？ | 上游接口标注「预留」，包内不提供枚举；共享配置里暂填 1 并标 [未查证]，伤害优先的裁决在业务适配层完成 | 6-29；`common/GameCfg.lua` 的 `Ability.AiTarget.PriorityMode` |
+| 13 | 官方 AI 搜敌优先级类型的取值是多少？ | 上游接口标注「预留」，包内不提供枚举；6-29 只完成业务伤害排序与结果登记，官方按伤害接管仍未完成，由 6-38 单记缺口 | 6-29、6-38；`common/GameCfg.lua` 的 `Ability.AiTarget.PriorityMode` |
 
 ### 官方 AI 搜敌优先级类型
 
 问：官方 AI 管理器的搜敌优先级类型（priorityMode）有哪些取值，哪一个代表「按伤害优先」？
 
-现状：上游 official_ai_feature 只预留了字段并在包内存档，接口注释写明「当前搜敌按距离最近」，没有给出枚举。因此 common/GameCfg.lua 的 Ability.AiTarget.PriorityMode = 1 是 [未查证] 占位值；伤害优先的裁决由业务侧适配层完成，官方管理器只持有裁决结果，真实枚举到位后只替换配置。
+现状：上游 official_ai_feature 的 searchEnemy 当前按距离最近搜敌，priority / focus 均为预留，包内没有按伤害枚举。因此 common/GameCfg.lua 的 Ability.AiTarget.PriorityMode = 1 是 [未查证] 占位值。当前只完成业务侧伤害排序与结果登记，官方管理器尚未按伤害接管；该接口本身不参与搜敌，真实枚举到位后也不能只替换配置。适配层最终应只提交候选 / 权重，不承担最终排序，且不修改上游包。
 
-待定：由官方包维护方给出枚举；影响 6-29。
+待定：由官方包维护方提供按伤害搜敌能力及对应接口语义；6-29 保留业务伤害规则证据，官方接管缺口由 6-38 验收。
 | 14 | 濒死界面的满血复活入口该不该在濒死相位直接生效？术语表把解除濒死记作抢救、把复活限定为死亡后回来，与 11-19/11-20 的「濒死界面提供满血复活入口」冲突 | 本单只把广告入口开到濒死相位（11-19），金豆入口仍只在死亡相位；濒死相位结算走同一处 `MgrSurvival:FullRevive`，满血、饥饿至少 10%、不带虚弱 | 11-19、11-20；若金豆入口也要开到濒死，复用 `PlatformRevive` 的金豆分支，判定不另写 |
 | 15 | 濒死相位播放广告期间暂停哪条倒计时？11-28 只写「免费复活倒计时」 | 实现按同一意图暂停濒死 15 秒倒计时，否则玩家看广告途中被判死亡；暂停时长在取消 / 失败 / 超时后平移 | 11-19、11-28、11-29 |
 | 16 | 激励广告的真实参数（广告位 ID、广告播放时长、failEvent 是否触发）取什么值？ | 真实广告位未交付：占位标识 `placeholder.ad.revive` 走通成功 / 取消 / 失败 / 超时四条结局；`GameCfg.Platform.FlowTimeoutSec = 60` 为 [未查证] 等待上限 | 11-19、11-28、11-38；真实参数到位只替换 `GameCfg.Platform.Ads` 与 `GameCfg.Platform.Placeholder.Ads` |
@@ -169,4 +169,3 @@
 现状：真实广告位由商业化后台交付，仓库里只有占位标识 `placeholder.ad.revive`（`GameCfg.Platform.Placeholder.Ads.revive`）与商品名 `GameCfg.Platform.Ads.revive`；等待上限 `GameCfg.Platform.FlowTimeoutSec = 60` 是 [未查证] 占位值（官方无取消 / 失败事件时的唯一兜底）。占位通道能走通成功 / 取消 / 失败 / 超时四条结局，但不拉起真实广告、不发放任何平台权益。
 
 待定：由商业化后台交付广告位与时长；到位后只替换 `GameCfg.Platform.Ads.revive` 的 goodsId / adTag 与 `Placeholder.Enabled`，判定与断言不动。真实广告结论只在真实平台上取，本行的占位通过不算渠道结项。
-

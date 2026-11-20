@@ -6,7 +6,8 @@
 --   1. 界面只显示队友名字、血量不跟服务端快照走，或把队友血量错算成自己的（9-20）；
 --   2. 无队伍时队友栏还在，或快照结构不对时把上一份状态清掉（9-20 失败流程）；
 --   3. 邀请提示不显示邀请人、倒计时不从 10 秒开始或到点不撤板（9-21）；
---   4. handler 没登记进 ScreenHandlerLoaders / 没在客户端入口启动，界面对局里根本不存在（9-20 接线）。
+--   4. handler 没登记进 ScreenHandlerLoaders / 没在客户端入口启动，界面对局里根本不存在（9-20 接线）；
+--   5. 血条与按钮绕过 GameCfg.Party.HUD 内嵌正式资产 ID，配置换图后界面仍用旧资源（ADR-0029）。
 local function signal()
   local listeners = {}
   return {
@@ -185,6 +186,19 @@ describe('条款 9 队伍界面', function()
     push({ state = 'none', members = {}, notice = 'disbanded' })
     assert.same(hud.DisbandText, ctx.notices[#ctx.notices])
     assert.is_true(hud.RestoreFullText ~= hud.DisbandText)
+  end)
+
+  -- ADR-0029：正式资产由共享配置持有；换成测试 URI 后，重建的血条与按钮必须一起换。
+  it('9-20 队伍血条与按钮资产统一读取 GameCfg', function()
+    local hud = require('common.GameCfg').Party.HUD
+    local original = hud.ColorBlockImage
+    hud.ColorBlockImage = 'test://party-color-block'
+    ctx.panel:Start()
+    local fillImage = ctx.nodes['PartyMember1Fill'].Image
+    local acceptImage = ctx.nodes['PartyInviteAccept'].NormalImage
+    hud.ColorBlockImage = original
+    assert.same('test://party-color-block', fillImage)
+    assert.same('test://party-color-block', acceptImage)
   end)
 
   -- 接线：handler 按 AGENTS.md 登记进 ScreenHandlerLoaders，并由客户端入口启动。

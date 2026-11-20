@@ -6,7 +6,7 @@
 -- 失败方式（先列后写）：
 --   1. 近战、枪械、范围、爆炸里任一类别绕过统一入口，导致同队仍掉血；
 --   2. 过滤器缓存队伍归属，离队后同队免伤仍生效；
---   3. 鱼塘区内非同队互伤；鱼塘外非同队被拦；
+--   3. 鱼塘区内非同队互伤；鱼塘外非同队被拦；区域几何缺失时全局误拒非同队互伤；
 --   4. 过滤器读在线人数，玩家少于 8 时 PK 不成立；
 --   5. 过滤鱼攻击，安全区里的玩家不被鱼扣血。
 local function vec(x, y, z) return { x = x, y = y, z = z } end
@@ -227,8 +227,8 @@ describe('条款 9 PK 伤害过滤', function()
     assert.same(300, b.Character.Controller.Health)
   end)
 
-  -- 失败方式：区域快照没解析出来时，鱼塘免伤悄悄失效（fail-open）会让区内非同队玩家互秒。
-  it('9-13 区域快照缺失时玩家互伤保守拒绝并留日志', function()
+  -- 失败方式：区域快照没解析出来时把全地图当成鱼塘，会误拒鱼塘外非同队玩家互伤。
+  it('9-13 区域快照缺失时非同队互伤放行并留日志，同队仍免伤', function()
     local a = join(1, vec(6.26, 5.01, -0.71))
     local b = join(2, vec(5, 6, -9))
     local snapshot, scene = env.vitals.ZoneMarkers, env.cfg.Zones[1].Scene
@@ -245,16 +245,20 @@ describe('条款 9 PK 伤害过滤', function()
     local fishHit = hit({ Id = 91, Body = { UnitId = 91 }, Receiver = {} }, b, 'fishAttack', 10)
     _G.print = rawPrint
     env.vitals.ZoneMarkers, env.cfg.Zones[1].Scene = snapshot, scene
-    assert.is_false(ok, '区域未解析时玩家间伤害必须拒伤')
-    assert.is_nil(actual)
-    assert.same(300, blockedHealth)
+    assert.is_true(ok, '区域未解析不能全局误拒非同队玩家互伤')
+    assert.same(45, actual)
+    assert.same(255, blockedHealth)
     assert.is_true(fishHit, '区域缺失不该挡住鱼对玩家的伤害')
-    assert.same(290, b.Character.Controller.Health)
+    assert.same(245, b.Character.Controller.Health)
+    a.Character.Position, b.Character.Position = vec(241, 6, 0), vec(242, 6, 0)
+    makeTeam(a, b)
+    assert.is_false(hit(a, b, 'gun', 20), '区域未解析仍保留同队免伤')
+    assert.same(245, b.Character.Controller.Health)
     local logged = false
     for _, line in ipairs(printed) do
       if line:find('MgrPkFilter', 1, true) then logged = true end
     end
-    assert.is_true(logged, '保守拒伤要留下日志')
+    assert.is_true(logged, '区域缺失的放行兜底要留下日志')
   end)
 
   it('9-14：鱼塘外非同队玩家攻击扣血，同队仍免伤', function()

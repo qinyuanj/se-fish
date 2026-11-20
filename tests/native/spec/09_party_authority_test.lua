@@ -11,7 +11,10 @@
 --   5. 队员离线后名单里还留着他，人数不重算（9-09）；
 --   6. 只剩 1 人时不解散，剩余玩家仍带着队伍身份（9-10）；
 --   7. 主动离队后仍算同队，或离队不落回无队伍（9-11）；
---   8. 队伍归属不进存档，或重连后既不恢复也不给明确的解散结果（9-22）。
+--   8. 队伍归属不进存档，或重连后既不恢复也不给明确的解散结果（9-22）；
+--   9. 写档失败仍入队/离队，成员名单只改了一半，或错误没有模块、操作、UserId 与原因（9-22 失败流程）；
+--   10. 队伍不变时伤害/治疗不同步，只有下一次组队事件才看到旧血量快照（9-20）；
+--   11. 离线离队触发解散但写档失败时，剩余成员 HUD 仍保留已经离线的玩家（9-09 失败流程）。
 local function vec(x, y, z) return { x = x, y = y, z = z } end
 
 local function signal()
@@ -75,6 +78,20 @@ describe('条款 9 小队权威状态', function()
 
   local function storeSnapshot(userId)
     return env.values[env.cfg.Save.KeyPrefix .. tostring(userId)]
+  end
+
+  local function capturePrint(fn)
+    local original = _G.print
+    local lines = {}
+    _G.print = function(...)
+      local parts = {}
+      for index = 1, select('#', ...) do parts[#parts + 1] = tostring(select(index, ...)) end
+      lines[#lines + 1] = table.concat(parts, ' ')
+    end
+    local ok, err = pcall(fn)
+    _G.print = original
+    assert.is_true(ok, tostring(err))
+    return table.concat(lines, '\n')
   end
 
   local function saveNow(player)
@@ -470,5 +487,145 @@ describe('条款 9 小队权威状态', function()
     assert.same('disbanded', lastState(back).notice, '按原队已散结算')
     assert.same(0, env.players:GetDataInst(back).Extra.party.id, '归属落回无队伍')
     assert.same(savedId, restarted:PartyIdOf(c), '本轮队伍不受影响')
+  end)
+
+  -- 9-22 失败流程：写档异常不得变成成功入队，更不能留下只有一方有归属的新队。
+  it('9-22 入队写档失败时回滚新队与已有队伍成员并记录错误', function()
+    local a = join(6491, vec(0, 0, 0), '甲')
+    local b = join(6492, vec(1, 0, 0), '乙')
+    request(a, { action = 'Invite', targetUserId = b.UserId })
+    local getData = env.players.GetDataInst
+    env.players.GetDataInst = function(self, player)
+      if player.UserId == b.UserId then error('party-save-unavailable') end
+      return getData(self, player)
+    end
+    local logs = capturePrint(function() request(b, { action = 'Accept' }) end)
+    env.players.GetDataInst = getData
+
+    assert.is_false(lastReply('PartyResult').payload.ok, '写档失败必须传播到行动回执')
+    assert.same('save-failed', lastReply('PartyResult').payload.reason)
+    assert.is_nil(env.party:PartyIdOf(a), '新队邀请人的内存归属也要回滚')
+    assert.is_nil(env.party:PartyIdOf(b))
+    assert.is_nil(next(env.party.Parties), '两名成员未全部写成功时不留下空队')
+    assert.same(0, env.players:GetDataInst(a).Extra.party.id, '邀请人的存档归属同步回滚')
+    for _, row in ipairs(env.sent.PartyState) do
+      assert.is_not_equal('joined', row.payload.notice, '失败路径不得推送 joined')
+    end
+    assert.is_truthy(logs:find('[MgrParty]', 1, true), '日志带模块名')
+    assert.is_truthy(logs:find('读取玩家存档', 1, true), '日志带操作名')
+    assert.is_truthy(logs:find(tostring(b.UserId), 1, true), '日志带对象 UserId')
+    assert.is_truthy(logs:find('party-save-unavailable', 1, true), '日志保留原始错误')
+
+    -- 已有队伍新增第三人失败时，原有两人保持不变，失败目标不占名额。
+    request(a, { action = 'Invite', targetUserId = b.UserId })
+    request(b, { action = 'Accept' })
+    local id = env.party:PartyIdOf(a)
+    assert.is_not_nil(id, '正常存档下邀请/接受仍可组队')
+    local c = join(6493, vec(0, 0, 1), '丙')
+    request(a, { action = 'Invite', targetUserId = c.UserId })
+    env.players.GetDataInst = function(self, player)
+      if player.UserId == c.UserId then error('third-member-save-unavailable') end
+      return getData(self, player)
+    end
+    capturePrint(function() request(c, { action = 'Accept' }) end)
+    env.players.GetDataInst = getData
+    assert.is_false(lastReply('PartyResult').payload.ok)
+    assert.same('save-failed', lastReply('PartyResult').payload.reason)
+    assert.same(id, env.party:PartyIdOf(a))
+    assert.same(id, env.party:PartyIdOf(b))
+    assert.is_nil(env.party:PartyIdOf(c))
+    assert.same(2, #env.party:Members(a), '已有队伍成员不被失败入队改坏')
+  end)
+
+  -- 9-11/9-22 失败流程：离队导致解散时任一归属清不掉，整次成员变更都要回滚。
+  it('9-11 离队解散写档失败时恢复成员与归属，修复后可重试', function()
+    local a = join(6495, vec(0, 0, 0), '甲')
+    local b = join(6496, vec(1, 0, 0), '乙')
+    request(a, { action = 'Invite', targetUserId = b.UserId })
+    request(b, { action = 'Accept' })
+    local id = env.party:PartyIdOf(a)
+    local getData = env.players.GetDataInst
+    env.players.GetDataInst = function(self, player)
+      if player.UserId == a.UserId then error('disband-save-unavailable') end
+      return getData(self, player)
+    end
+    capturePrint(function() request(b, { action = 'Leave' }) end)
+    env.players.GetDataInst = getData
+
+    assert.is_false(lastReply('PartyResult').payload.ok)
+    assert.same('save-failed', lastReply('PartyResult').payload.reason)
+    assert.is_true(env.party:SameParty(a, b), '解散未落档时两名成员都留在原队')
+    assert.same(id, env.party:PartyIdOf(a))
+    assert.same(id, env.party:PartyIdOf(b))
+    assert.same(id, env.players:GetDataInst(b).Extra.party.id, '先清掉的离队归属也回滚')
+
+    request(b, { action = 'Leave' })
+    assert.is_true(lastReply('PartyResult').payload.ok, '存档恢复后同一操作可重试')
+    assert.is_nil(env.party:PartyIdOf(a))
+    assert.is_nil(env.party:PartyIdOf(b))
+  end)
+
+  -- 9-09 失败流程：解散写档失败只阻止解散提交，不能把离线者留在剩余成员的 HUD 里。
+  it('9-09 离线离队解散写档失败时仍刷新剩余成员快照', function()
+    local a = join(6500, vec(0, 0, 0), '甲')
+    local b = join(6501, vec(1, 0, 0), '乙')
+    request(a, { action = 'Invite', targetUserId = b.UserId })
+    request(b, { action = 'Accept' })
+    local id = env.party:PartyIdOf(a)
+    local sentBefore = #env.sent.PartyState
+    local getData = env.players.GetDataInst
+    env.players.GetDataInst = function(self, player)
+      if player.UserId == a.UserId then error('offline-disband-save-unavailable') end
+      return getData(self, player)
+    end
+    capturePrint(function() leave(b) end)
+    env.players.GetDataInst = getData
+
+    assert.same(id, env.party:PartyIdOf(a), '清档失败时剩余玩家仍保留原队归属')
+    assert.is_nil(env.party:PartyIdOf(b), '离线玩家仍按引擎离场')
+    assert.same(1, #env.party:Members(a), '服务端在线名单已移除离线玩家')
+    assert.is_true(#env.sent.PartyState > sentBefore, '失败分支也要向剩余成员推送状态')
+    local snapshot = lastState(a)
+    assert.same('party', snapshot.state)
+    assert.same(id, snapshot.partyId)
+    assert.same(1, #snapshot.members, '剩余成员 HUD 不再保留离线者')
+    assert.same(a.UserId, snapshot.members[1].userId)
+  end)
+
+  -- 9-20：不依赖邀请/入队事件，周期同步伤害与治疗后的当前血量；不变时不重复广播。
+  it('9-20 队伍不变时也按周期推送当前血量并记录读取失败', function()
+    local a = join(6498, vec(0, 0, 0), '甲')
+    local b = join(6499, vec(1, 0, 0), '乙')
+    request(a, { action = 'Invite', targetUserId = b.UserId })
+    request(b, { action = 'Accept' })
+    local interval = env.cfg.Party.HealthSyncIntervalSec or 0.5
+    env.party:Update() -- 建立第一次周期边界
+    local count = #env.sent.PartyState
+
+    env.health[b.UserId] = { 90, 300 }
+    env.now = env.now + interval / 2
+    env.party:Update()
+    assert.same(count, #env.sent.PartyState, '未到同步周期不重复推送')
+    env.now = env.now + interval / 2
+    env.party:Update()
+    assert.same(count + 2, #env.sent.PartyState, '到周期向两名队伍成员各推一份新快照')
+    local snapshot = lastState(a)
+    local current
+    for _, row in ipairs(snapshot.members) do if row.userId == b.UserId then current = row end end
+    assert.is_not_nil(current)
+    assert.same(90, current.health, '界面收到的是伤害后的当前血量，不是入队快照')
+    assert.same(300, current.maxHealth)
+
+    count = #env.sent.PartyState
+    env.now = env.now + interval
+    env.party:Update()
+    assert.same(count, #env.sent.PartyState, '血量没变时不重复广播')
+
+    env.party.Vitals.SnapshotHealth = function() error('vitals-read-failed') end
+    local logs = capturePrint(function() env.party:Push(a) end)
+    assert.is_truthy(logs:find('[MgrParty]', 1, true))
+    assert.is_truthy(logs:find('读取队伍血量', 1, true))
+    assert.is_truthy(logs:find(tostring(a.UserId), 1, true))
+    assert.is_truthy(logs:find('vitals-read-failed', 1, true))
   end)
 end)

@@ -57,7 +57,13 @@ function LocalInteract:EnsureRescueBubble(player)
     end
     local button = self:Button(node, 'BtnRescue' .. userId, GameCfg.Rescue.PromptText, 0,
         function() self:Rescue(userId) end)
-    if not button then return nil end
+    if not button then
+        local destroyed, err = pcall(function() node:Destroy() end)
+        if not destroyed then
+            print('[LocalInteract] 抢救气泡按钮创建失败后销毁根节点失败', tostring(userId), tostring(err))
+        end
+        return nil
+    end
     node.Visible = false
     local entry = { Node = node, Position = pos }
     -- 气泡根交给 OwnedUnits 保管：离场时整棵拆掉（按钮等子节点随根销毁），不只藏起来

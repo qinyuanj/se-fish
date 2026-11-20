@@ -167,9 +167,11 @@ GameCfg.Party = {
     InviteTimeoutSec = 10,   -- 邀请 10 秒未处理按拒绝结算
     ActionCooldownSec = 0.2, -- 请求限频，防连点；不是玩法数值
     StateCooldownSec = 0.5,
+    HealthSyncIntervalSec = 0.5, -- 队伍 HUD 当前血量周期同步；仅变化时推送
     -- [未查证] 队伍界面布局：规格只要求「不与左上角自身血量重叠、实机分辨率可读」，
     -- 具体位置与尺寸待策划给草图（docs/to-questionnaire-策划案内部矛盾.md「队伍界面的布局」）。
     HUD = {
+        ColorBlockImage = 'official://image/11017', -- 官方正方形纯色块（ScreenSurvival 同款约定）
         RowWidth = 240,
         RowHeight = 56,
         MarginRight = 24,   -- [未查证] 右侧竖排，避开左上角自身血量

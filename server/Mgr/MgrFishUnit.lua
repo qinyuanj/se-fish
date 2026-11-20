@@ -549,8 +549,8 @@ function Mgr:SetTargetOverride(fish, player)
     return true
 end
 
--- #260 目标选择只在这里裁决：6-31 指定目标优先，6-30 合法性由 IsTargetValid 守门，
--- 其余候选（6-29 累计有效伤害优先、无记录取最近）交给适配层排序并登记到官方 AI 管理器。
+-- #260 6-31 指定目标优先，6-30 合法性由 IsTargetValid 守门；6-29 由业务 Policy.Order 按伤害裁决。
+-- 官方 AI 管理器只登记结果；登记失败不阻断业务目标，但适配层必须记录完整失败日志。
 -- 本函数只返回玩家与坐标，不碰移动：位移仍归 FishBehaviors / FlightPath / BossPhase。
 function Mgr:ChooseTarget(fish, pos, params)
     local adapter = self.AiTarget

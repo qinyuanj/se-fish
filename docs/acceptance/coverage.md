@@ -112,12 +112,12 @@
 | 4-03 | server/Mgr/MgrCast.lua、common/FishCatch.lua | tests/native/cast_waiting_test.lua、tests/native/fish_loot_test.lua | 缺 | 缺 | 缺 | 缺 | B |
 | 4-04 | server/Mgr/MgrCast.lua | tests/native/cast_waiting_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 4-05 | server/Mgr/MgrReelIn.lua、client/LocalReelIn.lua | tests/native/cast_waiting_test.lua、tests/native/reel_session_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 4-06 | common/ReelProgress.lua、common/GameCfg.lua | tests/native/cast_waiting_test.lua、tests/native/reel_session_test.lua、tests/native/spec/04_fishing_reel_rules_test.lua | 有 | 缺 | 缺 | 缺 | A |
-| 4-07 | common/ReelProgress.lua、common/GameCfg.lua | tests/native/cast_waiting_test.lua、tests/native/reel_session_test.lua、tests/native/spec/04_fishing_reel_rules_test.lua | 有 | 缺 | 缺 | 缺 | A |
+| 4-06 | server/Mgr/MgrCast.lua、server/Mgr/MgrReelIn.lua、common/ReelProgress.lua、common/GameCfg.lua | tests/native/cast_waiting_test.lua、tests/native/reel_session_test.lua、tests/native/spec/04_fishing_reel_rules_test.lua | 有 | 缺 | 缺 | 缺 | A |
+| 4-07 | server/Mgr/MgrCast.lua、server/Mgr/MgrReelIn.lua、common/ReelProgress.lua、common/GameCfg.lua | tests/native/cast_waiting_test.lua、tests/native/reel_session_test.lua、tests/native/spec/04_fishing_reel_rules_test.lua | 有 | 缺 | 缺 | 缺 | A |
 | 4-08 | common/ReelProgress.lua、common/GameCfg.lua | tests/native/cast_waiting_test.lua、tests/native/reel_session_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 4-09 | client/LocalReelIn.lua、common/ReelDisplay.lua | tests/native/cast_waiting_test.lua、tests/native/reel_session_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 4-10 | common/ReelProgress.lua、common/GameCfg.lua | tests/native/cast_waiting_test.lua、tests/native/reel_session_test.lua | 缺 | 缺 | 缺 | 缺 | B |
-| 4-11 | server/Mgr/MgrReelIn.lua、common/ReelProgress.lua | tests/native/cast_waiting_test.lua、tests/native/reel_session_test.lua、tests/native/spec/04_fishing_reel_rules_test.lua | 缺 | 有 | 缺 | 缺 | A |
+| 4-11 | server/Mgr/MgrCast.lua、server/Mgr/MgrReelIn.lua、common/ReelProgress.lua | tests/native/cast_waiting_test.lua、tests/native/reel_session_test.lua、tests/native/spec/04_fishing_reel_rules_test.lua | 缺 | 有 | 缺 | 缺 | A |
 | 4-12 | server/Mgr/MgrCast.lua、client/LocalCastSource.lua | tests/native/landing_test.lua、tests/native/fish_lift_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 4-13 | server/Mgr/MgrFishUnit.lua、server/Mgr/MgrFishCarrier.lua | tests/native/landing_test.lua、tests/native/fish_lift_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 4-14 | common/FishCatch.lua | tests/native/cfg_fish_items_test.lua、tests/native/fish_loot_test.lua | 缺 | 缺 | 缺 | 缺 | A |
@@ -164,10 +164,11 @@
 第 5 节的 5-01 与 5-03 已由图鉴客户端的公开显示快照取证：tests/native/spec/05_zone_fish_data_test.lua 翻满七页，
 断言每页 14 条、总数 98、七区 6/6/1/1 品级分布；其余条款待后续断言。
 
-### 第 6 节 战斗与成长（34 条）
+### 第 6 节 战斗与成长（35 条）
 
 > #260 目标选择接线：6-26 / 6-29 / 6-30 / 6-31 的规格断言在 tests/native/spec/06_ai_target_test.lua；
 > 属性与效果投影的接线验收同在该文件（AttrModel → attr_rule、modifier_system → 移速倍率）。
+> 6-29 的 evidenced 只覆盖业务伤害排序与结果登记；官方 AI 按伤害接管由 6-38 单独跟踪，当前 unverified。
 
 | 条款 | 代码落点 | 关联测试 | 正常流程 | 失败流程 | 退出重进 | 存档恢复 | 等级 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -205,6 +206,7 @@
 | 6-32 | server/Mgr/MgrVitals.lua、server/Mgr/MgrWeapon.lua | tests/native/combat_base_test.lua、tests/native/damage_float_test.lua | 缺 | 缺 | 缺 | 缺 | B |
 | 6-33 | common/DamageNotice.lua、client/DamageFloat.lua、server/Mgr/MgrVitals.lua | tests/native/combat_base_test.lua、tests/native/damage_float_test.lua | 缺 | 缺 | 缺 | 缺 | B |
 | 6-34 | server/Mgr/MgrVitals.lua、server/Mgr/MgrSurvival.lua | tests/native/combat_base_test.lua、tests/native/damage_float_test.lua | 缺 | 缺 | 缺 | 缺 | B |
+| 6-38 | server/Mgr/MgrAiTarget.lua、common/AiTargetPolicy.lua、common/GameCfg.lua | — | 缺 | 缺 | 缺 | 缺 | A |
 
 ### 第 7 节 经济与钓场商店（25 条）
 
@@ -433,7 +435,7 @@
 | 13-17 | server/Mgr/MgrRecords.lua、server/Data/RecordsAdapter.lua、common/Records.lua、client/ScreenHandlers/ScreenCompendium.lua | tests/native/spec/13_record_display_placeholder_test.lua、tests/native/records_test.lua | 缺 | 有 | 缺 | 缺 | B |
 | 13-18 | server/Mgr/MgrAchievements.lua、common/GameCfg.lua | tests/native/spec/13_achievement_delivery_placeholder_test.lua、tests/native/spec/17_platform_achievement_id_test.lua | 有 | 有 | 有 | 有 | B |
 
-第 13 节的 13-07、13-08、13-17 由图鉴客户端与服务端纪录查询的公开入口取证：`tests/native/spec/13_record_display_placeholder_test.lua` 
+第 13 节的 13-07、13-08、13-17 由图鉴客户端与服务端纪录查询的公开入口取证：`tests/native/spec/13_record_display_placeholder_test.lua`
 翻到「没有纪录」与「纪录服务未接入」两种回包，断言该列只显示「未取得数据」、不出现任何数字与保持者；13-12～13-14、13-18 由
 成就交付队列取证。13-15、13-16 是试玩条款，不在本表登记。
 
@@ -645,7 +647,7 @@ SurvivalAction 被拒、不复活，回执写「未开放」——这一条的�
 docs/to-questionnaire-策划案内部矛盾.md。金豆入口（11-20）、迟到回调补发（11-33）与占位对称结算（11-39）不归本单，
 仍是 unverified，四类证据列只勾该断言真正跑过的场景。
 
-### 第 19 节 验收口径（19 条，其中 19-14～19-19 是 C 级试玩条款）
+### 第 19 节 验收口径（20 条，其中 19-15～19-20 是 C 级试玩条款）
 
 | 条款 | 代码落点 | 关联测试 | 正常流程 | 失败流程 | 退出重进 | 存档恢复 | 等级 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -661,22 +663,22 @@ docs/to-questionnaire-策划案内部矛盾.md。金豆入口（11-20）、迟�
 | 19-10 | server/Mgr/MgrSave.lua、server/Data/PlayerData.lua、docs/acceptance/coverage.md | tests/native/save_test.lua、tests/native/spec/18_session_settlement_contract_test.lua | 缺 | 缺 | 缺 | 有 | A |
 | 19-11 | server/Mgr/MgrSave.lua、server/Mgr/MgrPlatform.lua | tests/native/spec/01_platform_adapter_failure_test.lua、tests/native/save_foundation_test.lua | 缺 | 有 | 缺 | 缺 | A |
 | 19-12 | server/main.lua、server/Mgr/MgrParty.lua、server/Mgr/MgrPkFilter.lua、server/Mgr/MgrInteract.lua | tests/native/spec/19_multiplayer_local_link_test.lua、tests/native/spec/01_capacity_local_link_test.lua、tests/probes/local_link_runtime.lua | 有 | 有 | 有 | 有 | B |
-| 19-13 | tools/acceptance.lua、tools/cli.lua、server/Mgr/MgrPlatform.lua、common/GameCfg.lua | tests/native/acceptance_matrix_test.lua、tests/native/cli_entry_test.lua、tests/native/spec/17_platform_boundary_placeholder_test.lua、tests/native/spec/11_ad_revive_placeholder_test.lua | 有 | 有 | 缺 | 缺 | B |
+| 19-13 | server/Mgr/MgrPlatform.lua、common/GameCfg.lua | tests/native/spec/17_platform_boundary_placeholder_test.lua、tests/native/spec/11_ad_revive_placeholder_test.lua | 有 | 有 | 缺 | 缺 | A |
+| 19-14 | tools/acceptance.lua、tools/cli.lua、server/Mgr/MgrPlatform.lua、common/GameCfg.lua | tests/native/acceptance_matrix_test.lua、tests/native/cli_entry_test.lua | 缺 | 缺 | 缺 | 缺 | B |
 
 第 19 节由 #264 整节登记：19-01～19-06 是数量与结构的静态口径，落点在共享配置，四类证据列都还空着；
 19-08 的可重跑探针已就位（`tests/probes/forest_island.lua`、`tests/probes/lottery_runtime.lua`、`tests/probes/local_link_runtime.lua`），
 所以「正常流程」勾 `有`，其余三栏留 `缺`。19-12 的证据是 `tests/native/spec/19_multiplayer_local_link_test.lua`：
 八条以上虚拟连接同时在线时小队免伤、野外 PK、鱼塘安全区、共享地面实例只结算一次、施救者断线中止抢救与重连不补结算各自成立；
 夹具结论只证代码路径，真实多人结论仍是生产开关，不用它替代。
-19-13 的「占位通道默认不进发布构建」一项由两份 spec 断言机器判定：发布构建（Debug 关）且
+19-13 由两份 spec 断言机器判定：发布构建（Debug 关）且
 `GameCfg.Platform.Placeholder.AllowInPublish = false` 时，占位支付、金币页、广告与分享一律被拒
 （`reason = 'not_open'`、回执写「未开放」），不发物品、不改金币、不建 flow；显式把开关置 true 才恢复——
-所以「失败流程」这一栏也勾 `有`。其余发布检查项（真实渠道、容量、资源）仍是生产开关，门禁全绿只证明
-代码路径完整，不作为发布依据。19-14～19-19 是 C 级试玩条款，不进覆盖表。
+所以「失败流程」这一栏也勾 `有`。19-14 的完整发布汇总仍未取证：其余发布检查项（真实渠道、容量、资源）
+仍是生产开关，门禁全绿只证明代码路径完整，不作为发布依据。19-15～19-20 是 C 级试玩条款，不进覆盖表。
 
 ## 三、待登记小节
 
 已无待登记小节：第 1～19 节全部登记，`tools/acceptance.lua` 的 `M.COVERAGE_SECTIONS` 跟着补到 19；
 第 11 节由 #254（抢救）与 #262（广告复活）两组登记完毕。下一节扩大时仍按同一节奏：
 先把该节非试玩条款的代码落点与既有测试补齐，再加进 `M.COVERAGE_SECTIONS`。
-
