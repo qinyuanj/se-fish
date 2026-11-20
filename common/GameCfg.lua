@@ -1022,6 +1022,8 @@ GameCfg.Ability = {
         item160 = { Damage = 60, IntervalSec = 1.0, Range = 4, Anim = AttackAnim.Axe },    -- 血吼
         item161 = { Damage = 68, IntervalSec = 1.0, Range = 4, Anim = AttackAnim.Axe },    -- 无坚不摧之力
     },
+    -- #260 官方 AI 目标选择：上游优先级模式是预留字段，取值未查证，集中登记并记入矛盾清单。
+    AiTarget = { PriorityMode = 1 }, -- [未查证] 6-29
     -- 枪械公共：手动/自动换弹均 2 秒（票面）；备弹无限、弹匣有限；射程暂取 30 米
     GunShared = { ReloadSec = 2, Range = 30, ActionCooldownSec = 0.1 },
     Guns = {

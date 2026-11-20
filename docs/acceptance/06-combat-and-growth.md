@@ -29,12 +29,12 @@
 | 6-23 | 物品表中只记载基础伤害的武器，不额外附加表外特效 | 规则 | agent | A | unverified | — |
 | 6-24 | 淬毒匕首命中造成 15 点伤害，中毒每秒 1 点、持续 3 秒、最多叠加 5 层 | 规则 | agent | A | unverified | — |
 | 6-25 | 炽焰战斧命中造成 40 点伤害，灼烧每秒 4 点、持续 3 秒、最多叠加 5 层 | 规则 | agent | A | unverified | — |
-| 6-26 | 霜之新星命中使目标移速降低 30%、持续 3 秒，霜冻效果不叠加 | 规则 | agent | A | unverified | — |
+| 6-26 | 霜之新星命中使目标移速降低 30%、持续 3 秒，霜冻效果不叠加 | 规则 | agent | A | evidenced | tests/native/spec/06_ai_target_test.lua |
 | 6-27 | 雷霆之力命中使目标麻痹 0.5 秒，麻痹效果不叠加 | 规则 | agent | A | unverified | — |
 | 6-28 | 连发火箭筒直击 500 点、周围 5 米 100 点、射击间隔 1 秒、基础弹容量 10 | 规则 | agent | A | unverified | — |
-| 6-29 | 普通追击优先选择本场累计有效伤害最高的有效玩家；没有伤害记录时选择最近的玩家 | 规则 | agent | A | unverified | — |
-| 6-30 | 濒死、死亡、离线与离开战斗范围的玩家不会被普通追击选为目标 | 规则 | agent | A | unverified | — |
-| 6-31 | 特殊招式指定的目标优先于普通追击的自动选目标规则 | 规则 | agent | A | unverified | — |
+| 6-29 | 普通追击优先选择本场累计有效伤害最高的有效玩家；没有伤害记录时选择最近的玩家 | 规则 | agent | A | evidenced | tests/native/spec/06_ai_target_test.lua |
+| 6-30 | 濒死、死亡、离线与离开战斗范围的玩家不会被普通追击选为目标 | 规则 | agent | A | evidenced | tests/native/spec/06_ai_target_test.lua |
+| 6-31 | 特殊招式指定的目标优先于普通追击的自动选目标规则 | 规则 | agent | A | evidenced | tests/native/spec/06_ai_target_test.lua |
 | 6-32 | 所有玩家伤害（含饥饿掉血、负值食用、核废料桶、烧烤爆炸与各类持续伤害）统一经过「来源、目标、伤害类别、状态」判定入口 | 契约 | agent | B | unverified | — |
 | 6-33 | 任何来源的伤害都产生同一种伤害跳字表现，复用既有公共通路 | 契约 | agent | B | unverified | — |
 | 6-34 | 伤害在结算前先做目标状态判定：处于濒死、死亡、离线或离战范围的目标不产生新的伤害结算 | 契约 | agent | B | unverified | — |
