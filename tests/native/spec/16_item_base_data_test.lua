@@ -1,0 +1,108 @@
+-- 条款 16-04 / 16-06 / 16-07（docs/acceptance/16-item-base-data.md）：
+--   16-04 食物、极品食物与鱼饵可食用；
+--   16-06 除食物、极品食物、鱼饵与药水外，其余类别不能走普通食用；
+--   16-07 食用恢复百分比可为负值，负值表示食用后扣减而非恢复。
+-- 只走业务入口：server/main.lua 的 MgrMap 里注册的 MgrVitals（血量 / 饥饿的唯一写入口）
+-- 与 MgrPlayerData（玩家数据）；引擎边界用替身。断言只看玩家可观察的饥饿、血量与能否食用。
+local GameCfg = require('common.GameCfg')
+
+-- 前提守卫：本文件复现的是 main.lua 的接线，而不是自造一套协作关系。
+local WIRING = {
+    'MgrVitals = require("server.Mgr.MgrVitals")',
+    'MgrPlayerData = require("server.Mgr.MgrPlayerData")',
+}
+
+local function assert_wiring()
+    local handle = assert(io.open('server/main.lua', 'rb'), '读不到 server/main.lua')
+    local source = handle:read('a')
+    handle:close()
+    for _, line in ipairs(WIRING) do
+        assert.is_truthy(source:find(line, 1, true), 'server/main.lua 里找不到本文件复现的接线：' .. line)
+    end
+end
+
+local function signal()
+    local handlers = {}
+    return {
+        Connect = function(_, fn)
+            handlers[#handlers + 1] = fn
+            return { Disconnect = function() end }
+        end,
+        Fire = function(_, ...) for _, fn in ipairs(handlers) do fn(...) end end,
+    }
+end
+
+local function newController()
+    local c = { Health = 300, MaxHealth = 300, HealthChanged = signal(), Died = signal(), OnReborn = signal(),
+        damages = {}, reborns = 0 }
+    function c:TakeDamage(amount)
+        self.damages[#self.damages + 1] = amount
+        self.Health = math.max(0, self.Health - amount)
+        self.HealthChanged:Fire(self.Health)
+        if self.Health <= 0 then self.Died:Fire() end
+    end
+    function c:Reborn() self.reborns = self.reborns + 1 end
+    return c
+end
+
+local function newPlayer(id)
+    local p = { UserId = id, Name = 'p' .. id, attrs = {}, CharacterAdded = signal() }
+    p.Character = { Controller = newController(), Position = { x = 0, y = 0, z = 0 }, Size = { y = 2 } }
+    function p:SetAttribute(key, value) self.attrs[key] = value end
+    return p
+end
+
+local EDIBLE = { ['食物'] = true, ['极品食物'] = true, ['鱼饵'] = true }
+
+describe('条款 16-04 / 16-06 / 16-07：物品食用规则', function()
+    local env
+
+    before_each(function()
+        assert_wiring()
+        env = { Vitals = assert(loadfile('server/Mgr/MgrVitals.lua'))() }
+        env.Vitals.Now = function() return 0 end
+        env.Vitals.DamagePublisher = function() end
+        env.player = newPlayer(7001)
+        env.Vitals:OnPlayerAdded(env.player)
+    end)
+
+    after_each(function()
+        if env and env.player then env.Vitals:OnPlayerRemoving(env.player) end
+    end)
+
+    it('食物、极品食物与鱼饵可食用，恢复或扣减按恢复百分比生效', function()
+        local checked = 0
+        for id, item in pairs(GameCfg.Items.Definitions) do
+            if EDIBLE[item.Type] then
+                checked = checked + 1
+                assert.is_true(env.Vitals:CanEat(env.player, id), '可食用类别被拒：' .. id)
+                env.Vitals:SetHunger(env.player, 100)
+                local before = env.Vitals:GetState(env.player).hunger
+                local damages = #env.player.Character.Controller.damages
+                assert.is_true(env.Vitals:Eat(env.player, id), '可食用类别吃不下：' .. id)
+                local after = env.Vitals:GetState(env.player).hunger
+                if item.EatPercent > 0 then
+                    assert.is_true(after > before, '正恢复没有回饥饿：' .. id)
+                elseif item.EatPercent < 0 then
+                    assert.is_true(after < before, '负恢复没有扣饥饿：' .. id)
+                    assert.is_true(#env.player.Character.Controller.damages > damages, '负恢复没有扣血：' .. id)
+                else
+                    assert.are.equal(before, after, '零恢复改动了饥饿：' .. id)
+                end
+            end
+        end
+        assert.is_true(checked > 0, '物品表里没有可食用项')
+    end)
+
+    it('其余类别不能走普通食用', function()
+        local checked = 0
+        for id, item in pairs(GameCfg.Items.Definitions) do
+            if not EDIBLE[item.Type] then
+                checked = checked + 1
+                assert.is_false(env.Vitals:CanEat(env.player, id), '非食用类别被当成可吃：' .. id)
+                assert.is_false(env.Vitals:Eat(env.player, id), '非食用类别吃成功：' .. id)
+            end
+        end
+        assert.is_true(checked > 0, '物品表里没有非食用项')
+    end)
+end)

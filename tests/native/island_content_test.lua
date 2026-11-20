@@ -56,9 +56,11 @@
 --     缺表静默不攻击）；明确不再拦。
 local cfg = require('common.GameCfg')
 local FishCatch = require('common.FishCatch')
+local Ledger = require('common.cfg.ContentLedger')
 
 -- 三座岛的参数：Index 是钓鱼区 / 信物链 / 渔夫 / 摊位的序号（蟹湖 3、树林岛 4、沙滩岛 5）。
 -- 水区 ID、鱼种、船票、鱼竿一律按序号从真源派生，不另抄一份 id 清单。
+
 local ISLANDS = {
   { Id = 'crabLake', Index = 3, Name = '蟹湖' },
   { Id = 'forestIsland', Index = 4, Name = '树林岛' },
@@ -203,7 +205,7 @@ describe("TestIslandContent", function()
   it("test_island_species_are_implemented", function()
     for _, island in ipairs(ISLANDS) do
       for _, species in ipairs(islandSpecies(island)) do
-        assert.is_true(species.implemented,
+        assert.is_true(Ledger.Fish[species.Id].implemented,
           island.Name .. ' 鱼种 ' .. species.Id .. ' 未标 implemented 却出现在玩家可遇路径上')
       end
     end
