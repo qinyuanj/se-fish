@@ -12,6 +12,8 @@
 --   6. 蚯蚓等普通鱼饵的既有行为被改坏。
 -- it 名字沿用旧方法名，注册顺序 = LuaUnit sortedPairs 的实际执行顺序。
 
+local Ledger = require('common.cfg.ContentLedger')
+
 local function vec(x, y, z) return { x = x, y = y, z = z } end
 
 local function signal()
@@ -163,7 +165,7 @@ describe('首领饵必出首领（PlayerData × MgrCast）', function()
     local FishCatch = require('common.FishCatch')
     assert.same('item97', FishCatch.Select(env.cfg.Casting.Zones['volcanoIsland.water'], 1, nil,
       function() return 0 end))
-    assert.is_true(env.cfg.Fish.fish56Boss.implemented)
+    assert.is_true(Ledger.Fish.fish56Boss.implemented)
   end)
 
   it('test_last_duck_consumed_clears_selection', function()
