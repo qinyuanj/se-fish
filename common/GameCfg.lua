@@ -1069,27 +1069,31 @@ GameCfg.Ability = {
         ContactIntervalSec = 1, ContactDamage = 150, -- 叼走过程的接触伤害节奏与数值（伤害取自正文 150）
         FallDamage = 0,                       -- 落地额外伤害（正文未给，先 0）
     },
+    -- 沧龙（复合型首领）的招式数值统一取自逐招表 common/cfg/BossMoves.lua 的 mosasaur 行：
+    -- 砸击 / 甩头 = 基础攻击 35，咬中 300（命中段），过程接触 150（携带段），三段不合并（12-36 / 12-38）。
+    -- 命中次数、轨迹与预警时长属实现期细化，标 [未查证]（12-04）。
     Aquatic = {
-        LeapIntervalSec = 15, LeapWindupSec = 1, LeapSec = 1.5, LeapHeight = 8,
-        LeapRadius = 5, LeapDamage = 35, -- 沧龙表基础攻击35；落点范围为灰盒判定细化
-        HeadRadius = 2.5, HeadWindupSec = 0.8, HeadDamage = 35,
-        GrabDamage = 300, ContactDamage = 150, ContactRange = 2.5, -- 正文独立咬中/过程接触；接触半径为灰盒细化
+        LeapIntervalSec = BossMoves.Get('mosasaur', 'leap').Schedule.Sec,
+        LeapWindupSec = 1, LeapSec = 1.5, LeapHeight = 8,        -- [未查证] 滞空与高度
+        LeapRadius = BossMoves.Get('mosasaur', 'leap').Range,
+        LeapDamage = BossMoves.Get('mosasaur', 'leap').Damage.Value,
+        HeadRadius = BossMoves.Get('mosasaur', 'head').Range,
+        HeadWindupSec = BossMoves.Get('mosasaur', 'head').Warning.WindupSec, -- [未查证] 起手时长
+        HeadDamage = BossMoves.Get('mosasaur', 'head').Damage.Value,
+        GrabDamage = BossMoves.Get('mosasaur', 'bite').Damage.Value,
+        ContactDamage = BossMoves.Get('mosasaur', 'contact').Damage.Value,
+        ContactRange = BossMoves.Get('mosasaur', 'contact').Range,
     },
     BossPhase = {
         -- 哥斯拉（fish56Boss，GameSpec §12）：低于 60% 入水、切沧龙式攻击（咬中 1000）；
         -- 低于 20% 重新上岸、伤害 +50%、原子吐息改为每 10 秒。阈值优先于普通招式循环。
         -- 阈值按百分比降序排列（= 阶段升级顺序）；一帧跨两个阈值只进最终合法阶段，
         -- 中间被跳过的阶段记进 Skipped（见 common/BossPhase.lua）。
-        Thresholds = {
-            { Percent = 60, Phase = 'water', BiteDamage = 1000 },
-            { Percent = 20, Phase = 'enraged', DamageBonusPercent = 50, BreathIntervalSec = 10 },
-        },
+        -- 阶段表（#259）与普通招式表分开表达：阈值与阶段招式集取自 common/cfg/BossMoves.lua 的
+        -- M.Phases.godzilla，阶段只决定「什么时候换哪一套招式」，招式数值仍在逐招表里（12-45）。
+        Thresholds = BossMoves.Phases.godzilla.Thresholds,
         -- 各阶段的招式集合；同一帧多个招式到期时按 Attacks 的书写顺序取唯一一个，保证确定性。
-        AttackSets = {
-            normal = { 'claw', 'tail', 'breath', 'stomp' },
-            water = { 'bite' },
-            enraged = { 'claw', 'tail', 'breath', 'stomp' },
-        },
+        AttackSets = BossMoves.Phases.godzilla.AttackSets,
         -- 招式数值不在此处另写一份：#256 起唯一来源是 common/cfg/BossMoves.lua 的逐招表，
         -- 这里只把哥斯拉的行折成阶段机消费的形态（间隔 / 伤害 / 起手 / 走廊宽度）。
         -- 改动招式数值请改逐招表；本表的行集合就是 §12 的招式并集（12-05）。
