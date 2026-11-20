@@ -310,9 +310,12 @@ function M.Get(fishKey, move)
 end
 
 ---鱼种 → 逐招表键：优先用 Combat 标签（与 GameCfg.FishCombat 同一套键），
----没有标签的鱼（如白头鹰、风神翼龙走飞行档案）退回鱼种 Id。
+---但标签在表里没有行时退回鱼种 Id（白头鹰 / 风神翼龙声明了 Combat 标签却按 Id 登记，
+---直接返回标签会让预警与伤害映射静默落空，见 12-31 / 12-32）。
 function M.KeyOf(species, fishId)
-    return (species and species.Combat) or fishId
+    local combat = species and species.Combat
+    if combat and M.Index[combat] then return combat end
+    return fishId
 end
 
 ---某只鱼的全部招式行，按书写顺序（= AttackSets 的确定性顺序）。

@@ -229,6 +229,11 @@ describe('第 12 节 远程与俯冲组逐招表', function()
     end)
 
     it('条款 12-31 / 12-32 / 12-33 / 12-34：白头鹰俯冲与风神翼龙投掷 / 追踪俯冲的独立伤害不丢映射', function()
+        -- 12-31 / 12-32：这两只鱼声明了 Combat 标签，但逐招表按鱼种 Id 登记；
+        -- 反查必须落回表里的行，否则预警形状与范围会静默退回默认值。
+        assert.same('fish47Elite', BossMoves.KeyOf({ Combat = 'eagle' }, 'fish47Elite'))
+        assert.same('fish48Boss', BossMoves.KeyOf({ Combat = 'pterosaur' }, 'fish48Boss'))
+        assert.same('eel', BossMoves.KeyOf({ Combat = 'eel' }, 'fish22Elite'))
         assert.same(100, BossMoves.Get('fish48Boss', 'throw').Damage.Value, '12-32 的正文投掷伤害丢失')
         assert.same(260, BossMoves.Get('fish48Boss', 'dive').Damage.Value, '12-34 的正文俯冲伤害不得静默丢弃')
         sentinel('fish47Elite', 'dive', 31)
