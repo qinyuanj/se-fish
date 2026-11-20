@@ -36,7 +36,8 @@ end
 local M = {}
 
 M.commands = {
-  { name = "test", mod = "tools.test", summary = "按测试车道跑 busted：test [fast|full|art] [-- <busted 参数>...]，缺省 fast" },
+  { name = "test", mod = "tools.test", summary = "按测试车道跑 busted：test [fast|full|spec|art] [-- <busted 参数>...]，缺省 fast" },
+  { name = "acceptance", mod = "tools.acceptance_cli", summary = "验收矩阵校验：acceptance [--check|--write|--update-baseline]，缺省 --check" },
   { name = "deploy", mod = "tools.deploy", summary = "仓库三端一级子树镜像进编辑器宿主目录（robocopy /MIR + 编辑器收尾）" },
   { name = "sync",   mod = "tools.sync",   summary = "从宿主回同步配置 / API 存根 / data/" },
   { name = "qa-slot", mod = "tools.qa_slot", summary = "查看、新建或切换 QA 存档槽（试玩前需 deploy）" },

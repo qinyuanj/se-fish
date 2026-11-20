@@ -210,8 +210,23 @@ _Avoid_: 部署端、本机、deploy target
 **Business scope / 业务范围**：质量工具与架构图共用的业务源码集合，不含任何 `packages/` 子树（整包交付物另见**官方包**、**自研包**）；由根目录 `uml-quality.json` 的 `exclude` 与 `policy.edn` 的 `:exclude` 声明。
 _Avoid_: 业务树、指标采集范围、mutation 范围、scope（单独使用时）
 
-**Test lane / 测试车道**：按耗时划分的测试集合：fast 用于日常，full 追加慢用例、用于收尾。
+**Test lane / 测试车道**：按耗时与用途划分的测试集合：fast 用于日常，full 追加慢用例与条款断言、用于收尾，spec 只跑条款断言，art 只跑美术用例（optional，不进 full）。
 _Avoid_: 验收车道、代码收尾门、lane（单独使用时）、test suite、test group
+
+**Clause / 条款**：一句能独立判真假的话——谁在什么条件下做什么、结果是什么；一条只判一件事，带组、执行者、所需证据等级与状态，编号形如 `9-07`。规格里的一句话拆不成可判真的条件时不算条款。
+_Avoid_: 条目、需求点、checklist、item
+
+**Acceptance matrix / 验收矩阵**：`docs/acceptance/` 下的条款总账：每个规格小节一份分片，一条条款一行；索引页的计数与缺口密度由脚本生成，矩阵是唯一待办面。
+_Avoid_: 验收清单、测试清单、验收文档、checklist
+
+**Ratchet / 棘轮**：只许朝单向走的门禁：已取证条款数只增、遗留测试数只减，越界即让日常车道变红；基线写在 `docs/acceptance/baseline.lua`。
+_Avoid_: 阈值、配额、budget、上限
+
+**Evidence / 取证**：为一条条款留下可重跑的证据入口——A 级是可断言的用例，B 级是可重跑的时序探针，C 级是某次试玩验收的会话；「实现做完了」与「跑通旧测试」都不是取证。
+_Avoid_: 验证过、测过、自测、verified
+
+**Evidence level / 证据分级**：取证方式的三档：A（走业务入口黑盒断言）、B（时序探针：重连、迟到回调、超时、争抢）、C（试玩观察：贴地、净空、手感、可读性）；哪一档都不可冒充另一档，口径见 [证据分级](docs/acceptance/evidence-levels.md)。
+_Avoid_: 优先级、等级、severity、级别
 
 **Playtest acceptance / 试玩验收**：编辑器试玩中以合法输入、新档走通玩家流程并留证的验收。
 _Avoid_: 实机测试、真机验收（指编辑器试玩时）、QA test

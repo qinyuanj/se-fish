@@ -1,0 +1,218 @@
+-- #243 验收矩阵门禁（fast 车道）：spec-240 完成判据 2、4、5、6 的唯一硬门。
+-- 真实仓库扫描只做一次，再叠一组夹具用例：夹具在临时目录里拼一份最小可用的假仓库，
+-- 每次只改坏一处，断言门禁**只**因为那一处判红（kinds 精确比对，避免一处坏了别处顶着）。
+-- 失败方式（先列后写）：
+--   1. 真实矩阵不绿（分片缺、词表越界、证据路径不存在、索引与分片不一致、棘轮被反向推动）；
+--   2. 改坏一处却不红（门禁睡着了），或红的地方不对（判错的规则）；
+--   3. 条款断言车道被算进遗留测试（spec 断言一多，遗留棘轮就没法只减）。
+local Acceptance = require('tools.acceptance')
+local fs = require('tests.support.fs_fixture')
+local fixture = require('tests.support.acceptance_fixture')
+
+-- 真实仓库只扫一次：Arch.scan 那样的惯例，四个用例共享同一份结果。
+local scanned, verified
+local function real_matrix()
+  if not scanned then scanned = Acceptance.scan('.') end
+  return scanned
+end
+local function real_verify()
+  if not verified then verified = Acceptance.verify('.') end
+  return verified
+end
+
+local function kinds(findings)
+  local out = {}
+  for _, item in ipairs(findings) do out[#out + 1] = item.kind end
+  table.sort(out)
+  return out
+end
+
+local function messages(findings)
+  local out = {}
+  for _, item in ipairs(findings) do
+    out[#out + 1] = string.format('[%s] %s %s', item.kind, item.path or '', item.message or '')
+  end
+  return table.concat(out, '\n')
+end
+
+describe('验收矩阵门禁', function()
+  it('真实仓库的条款矩阵全绿', function()
+    local result = real_verify()
+    assert.is_true(result.ok, messages(result.findings))
+  end)
+
+  it('真实矩阵恰好覆盖规格的 19 个小节，节号连续', function()
+    local matrix = real_matrix()
+    assert.same(Acceptance.SPEC_SECTIONS, #matrix.spec.sections)
+    assert.same(Acceptance.SPEC_SECTIONS, #matrix.shards)
+    for number = 1, Acceptance.SPEC_SECTIONS do
+      local list = matrix.by_section[number]
+      assert.is_not_nil(list, '第 ' .. number .. ' 节没有分片')
+      assert.same(1, #list, '第 ' .. number .. ' 节有多份分片')
+      assert.same(number, list[1].section)
+    end
+    assert.is_true(matrix.counts.total > 0, '条款总数为 0：分片解析没生效')
+  end)
+
+  it('遗留测试数按 .busted 算，且不含条款断言车道', function()
+    local matrix = real_matrix()
+    local legacy = matrix.lanes.legacy
+    assert.is_not_nil(legacy, '读不到车道定义')
+    assert.is_true(#legacy > 0)
+    local spec_lane = Acceptance.lane_files('.', matrix.lanes.config, 'spec')
+    assert.is_true(#spec_lane > 0, 'spec 车道里没有文件：条款断言还没落地')
+    local counted = {}
+    for _, path in ipairs(legacy) do counted[path] = true end
+    for _, path in ipairs(spec_lane) do
+      assert.is_nil(counted[path], 'spec 车道的断言被算进遗留测试了: ' .. path)
+    end
+  end)
+
+  it('真实基线与当前值同向：已取证不低于基线，遗留测试不高于基线', function()
+    local matrix = real_matrix()
+    assert.is_not_nil(matrix.baseline, matrix.baseline_error)
+    assert.is_true(matrix.counts.evidenced >= matrix.baseline.evidenced)
+    assert.is_true(#matrix.lanes.legacy <= matrix.baseline.legacyTests)
+    -- 本轮至少有一条真实条款通过 spec 车道转成 evidenced（完成判据 7 的证据侧）。
+    assert.is_true(matrix.counts.evidenced >= 1)
+  end)
+
+  describe('夹具：逐项改坏必须判红', function()
+    local root = fs.temp_dir()
+
+    before_each(function() fixture.build(root) end)
+    after_each(function() fs.rmrf(root) end)
+
+    local function verify()
+      local result = Acceptance.verify(root)
+      return result.ok, kinds(result.findings), messages(result.findings)
+    end
+
+    it('起点合法：夹具本身不红', function()
+      local ok, found, text = verify()
+      assert.is_true(ok, text)
+      assert.same({}, found)
+    end)
+
+    it('证据路径写成不存在的文件就红', function()
+      fixture.patch(root, fixture.shard(3), fixture.EVIDENCE, 'tests/native/spec/gone_test.lua')
+      local ok, found, text = verify()
+      assert.is_false(ok)
+      assert.same({ 'evidence_missing' }, found, text)
+    end)
+
+    it('已取证计数低于基线就红', function()
+      fixture.sync_baseline(root, { evidenced = 2 })
+      local ok, found, text = verify()
+      assert.is_false(ok)
+      assert.same({ 'ratchet_evidenced' }, found, text)
+    end)
+
+    it('遗留测试计数高于基线就红', function()
+      fixture.sync_baseline(root, { legacyTests = 1 })
+      local ok, found, text = verify()
+      assert.is_false(ok)
+      assert.same({ 'ratchet_legacy' }, found, text)
+    end)
+
+    it('手改 README 生成块里的一个数字就红', function()
+      -- 改合计行的数字：条款数一变，手改的串也不跟着变，用例才稳。
+      fixture.patch(root, Acceptance.INDEX, '| 合计 | — |', '| 合计 | — | 9')
+      local ok, found, text = verify()
+      assert.is_false(ok)
+      assert.same({ 'index_stale' }, found, text)
+    end)
+
+    it('新增条款后不重跑 --write 就红，重跑后恢复且幂等', function()
+      fixture.patch(root, fixture.shard(4), '| 4-01 | 夹具条款：第 4 节第一条 | 规则 | agent | A | unverified | — |',
+        '| 4-01 | 夹具条款：第 4 节第一条 | 规则 | agent | A | unverified | — |\n'
+          .. '| 4-02 | 夹具条款：新加的一条 | 规则 | agent | A | unverified | — |')
+      local ok, found, text = verify()
+      assert.is_false(ok)
+      assert.same({ 'index_stale' }, found, text)
+      local first = fixture.sync_index(root)
+      local second = fixture.sync_index(root)
+      assert.same(first, second, '生成块必须幂等')
+      local after_ok, after_found, after_text = verify()
+      assert.is_true(after_ok, after_text)
+      assert.same({}, after_found)
+    end)
+
+    it('blocked 少了「卡在：」就红', function()
+      fixture.patch(root, fixture.shard(1), '卡在：夹具外部依赖', '夹具外部依赖')
+      local ok, found, text = verify()
+      assert.is_false(ok)
+      assert.same({ 'blocked_reason' }, found, text)
+    end)
+
+    it('out-of-scope 少了「理由：」就红', function()
+      fixture.patch(root, fixture.shard(2), '理由：夹具划出范围', '夹具划出范围')
+      local ok, found, text = verify()
+      assert.is_false(ok)
+      assert.same({ 'out_of_scope_reason' }, found, text)
+    end)
+
+    it('GameSpec 里塞一个工单编号就红', function()
+      fixture.patch(root, Acceptance.SPEC, '正文。', '正文（见 #123）。')
+      local ok, found, text = verify()
+      assert.is_false(ok)
+      assert.same({ 'spec_issue_ref' }, found, text)
+    end)
+
+    it('少一份分片就红', function()
+      assert(fs.exists(root .. '/' .. fixture.shard(12)))
+      os.remove(root .. '/' .. fixture.shard(12))
+      -- 索引跟着分片重算，避免同时命中 index_stale：本用例只问「缺分片」这一条规则。
+      fixture.sync_index(root)
+      local ok, found, text = verify()
+      assert.is_false(ok)
+      assert.same({ 'shard_missing' }, found, text)
+    end)
+
+    it('状态写成词表外的 done 就红', function()
+      fixture.patch(root, fixture.shard(5), 'A | unverified |', 'A | done |')
+      fixture.sync_index(root)
+      local ok, found, text = verify()
+      assert.is_false(ok)
+      assert.same({ 'vocabulary' }, found, text)
+    end)
+
+    it('C 级小节里的条款写成 A 级就红', function()
+      fixture.patch(root, fixture.shard(1), '| 规则 | 试玩 | C | blocked |', '| 规则 | 试玩 | A | blocked |')
+      local ok, found, text = verify()
+      assert.is_false(ok)
+      assert.same({ 'level_section' }, found, text)
+    end)
+
+    it('C 级条款放在没有「## C 级」的正文表里就红', function()
+      fixture.patch(root, fixture.shard(2), '| 功能 | agent | A | out-of-scope |',
+        '| 功能 | agent | C | out-of-scope |')
+      local ok, found, text = verify()
+      assert.is_false(ok)
+      assert.same({ 'level_section' }, found, text)
+    end)
+
+    it('条款 ID 跳号就红', function()
+      fixture.patch(root, fixture.shard(6), '| 6-01 |', '| 6-03 |')
+      local ok, found, text = verify()
+      assert.is_false(ok)
+      assert.same({ 'id_sequence' }, found, text)
+    end)
+
+    it('多一份同节分片就红', function()
+      fs.write_file(root .. '/' .. Acceptance.DIR .. '/07-second.md',
+        fs.slurp(root .. '/' .. fixture.shard(7)))
+      fixture.sync_index(root)
+      local ok, found, text = verify()
+      assert.is_false(ok)
+      assert.same({ 'shard_duplicate' }, found, text)
+    end)
+
+    it('spec 车道的断言不计入遗留测试', function()
+      local before = #Acceptance.scan(root).lanes.legacy
+      fs.write_file(root .. '/tests/native/spec/two_test.lua', '-- 夹具：多一条条款断言。\n')
+      local after = #Acceptance.scan(root).lanes.legacy
+      assert.same(before, after, 'spec 新文件不该改变遗留测试数')
+    end)
+  end)
+end)

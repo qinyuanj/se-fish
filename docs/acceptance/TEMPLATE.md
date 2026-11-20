@@ -119,3 +119,5 @@ rg -o '^\| [0-9]+-[0-9]{2} \|' docs/acceptance/NN-*.md | sort
 ```
 
 四条硬要求：条款 ID 连续不跳号、无重复；组 / 执行者 / 证据等级 / 状态 四列取值都在封闭词表内；blocked 行以 `卡在：` 开头；out-of-scope 行以 `理由：` 开头。
+
+上面这些（以及分片是否恰好覆盖规格的 19 个小节、evidenced 行的证据路径是否存在、索引生成块是否被手改）一次性由门禁核对：`lua tools/cli.lua acceptance --check`，它随 fast 车道跑。证据等级与执行者两列的判定口径见 [证据分级](evidence-levels.md)。
