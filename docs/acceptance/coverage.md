@@ -80,7 +80,7 @@
 
 | 条款 | 代码落点 | 关联测试 | 正常流程 | 失败流程 | 退出重进 | 存档恢复 | 等级 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 9-01 | server/Mgr/MgrVitals.lua、server/AbilityBehaviors/melee_hit.lua | tests/native/vitals_test.lua、tests/native/combat_behavior_test.lua | 缺 | 缺 | 缺 | 缺 | B |
+| 9-01 | server/Mgr/MgrVitals.lua、server/Mgr/MgrPkFilter.lua、server/main.lua | tests/native/spec/09_pk_damage_filter_test.lua | 有 | 有 | 缺 | 缺 | B |
 | 9-02 | server/Mgr/MgrParty.lua、server/main.lua | tests/native/spec/09_party_authority_test.lua | 缺 | 有 | 缺 | 缺 | A |
 | 9-03 | server/Mgr/MgrVitals.lua、server/Mgr/MgrSurvival.lua | tests/native/revive_callback_test.lua、tests/native/survival_test.lua | 缺 | 缺 | 缺 | 缺 | B |
 | 9-04 | server/Mgr/MgrFishUnit.lua、server/Mgr/MgrLoot.lua、server/Mgr/MgrFerry.lua | tests/native/fish_lift_test.lua、tests/native/ferry_test.lua | 缺 | 缺 | 缺 | 缺 | B |
@@ -91,11 +91,11 @@
 | 9-09 | server/Mgr/MgrParty.lua、common/GameCfg.lua | tests/native/spec/09_party_authority_test.lua | 有 | 缺 | 有 | 缺 | B |
 | 9-10 | server/Mgr/MgrParty.lua、common/GameCfg.lua | tests/native/spec/09_party_authority_test.lua | 有 | 缺 | 有 | 缺 | A |
 | 9-11 | server/Mgr/MgrParty.lua、common/GameCfg.lua | tests/native/spec/09_party_authority_test.lua | 有 | 缺 | 缺 | 缺 | A |
-| 9-12 | server/Mgr/MgrVitals.lua、server/AbilityBehaviors/melee_hit.lua | tests/native/vitals_test.lua、tests/native/combat_behavior_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 9-13 | server/Mgr/MgrVitals.lua、common/GameCfg.lua | tests/native/vitals_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 9-14 | server/Mgr/MgrVitals.lua、common/GameCfg.lua | tests/native/vitals_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 9-15 | server/Mgr/MgrVitals.lua | tests/native/vitals_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 9-16 | server/Mgr/MgrVitals.lua、common/GameCfg.lua | tests/native/vitals_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 9-12 | server/Mgr/MgrVitals.lua、server/Mgr/MgrPkFilter.lua、server/main.lua | tests/native/spec/09_pk_damage_filter_test.lua | 有 | 有 | 缺 | 缺 | A |
+| 9-13 | server/Mgr/MgrVitals.lua、server/Mgr/MgrPkFilter.lua、common/ZoneMarkers.lua | tests/native/spec/09_pk_damage_filter_test.lua | 有 | 有 | 缺 | 缺 | A |
+| 9-14 | server/Mgr/MgrVitals.lua、server/Mgr/MgrPkFilter.lua、common/ZoneMarkers.lua | tests/native/spec/09_pk_damage_filter_test.lua | 有 | 有 | 缺 | 缺 | A |
+| 9-15 | server/Mgr/MgrVitals.lua、server/Mgr/MgrPkFilter.lua | tests/native/spec/09_pk_damage_filter_test.lua | 有 | 缺 | 缺 | 缺 | A |
+| 9-16 | server/Mgr/MgrVitals.lua、server/Mgr/MgrPkFilter.lua、server/Mgr/MgrFishUnit.lua | tests/native/spec/09_pk_damage_filter_test.lua | 有 | 有 | 缺 | 缺 | A |
 | 9-17 | server/Mgr/MgrSurvival.lua、server/Mgr/MgrVitals.lua | tests/native/survival_test.lua、tests/native/revive_callback_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 9-18 | server/Mgr/MgrSurvival.lua、server/Mgr/MgrVitals.lua | tests/native/survival_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 9-19 | server/Mgr/MgrParty.lua、common/GameCfg.lua、client/ScreenHandlers/ScreenParty.lua | tests/native/spec/09_party_authority_test.lua、tests/native/spec/09_party_hud_test.lua | 有 | 有 | 缺 | 缺 | A |
@@ -105,7 +105,7 @@
 
 第 9 节由小队子单先贯通：9-02、9-06～9-11、9-19～9-22 的代码落点是 `server/Mgr/MgrParty.lua`（服务端唯一权威的归属与名单）
 与 `client/ScreenHandlers/ScreenParty.lua`（队友血量与邀请倒计时），证据是两份 spec 断言。
-9-01、9-12～9-16 的落点是既有伤害入口，免伤判定与证据归 PK 子单；9-03、9-17、9-18 归抢救子单。
+9-01、9-12～9-16 经统一伤害入口与 PK 过滤接缝落地，spec 断言覆盖同队全武器免伤、鱼塘豁免、鱼塘外 PK、人数不足与鱼攻击；9-03、9-17、9-18 归抢救子单。
 三者共用同一份矩阵小节，因此本表一次登记到位，四类证据只勾已经真取到的那几栏。
 
 ### 第 12 节 精英与首领行为（48 条）
