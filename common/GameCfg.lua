@@ -139,6 +139,21 @@ GameCfg.Survival = {
     UnavailableText = '操作暂时不可用，请稍后再试',
 }
 
+-- 他人抢救（#254，§9 多人规则）：2 米与 10% 是规格原文（9-17、9-18；
+-- 10% 统一复用 GameCfg.Survival.ReviveHealthPercent，不另立第二份血量比例）。
+-- 耗时与打断规则策划案没给，下面带 [未查证] 的字段是占位值；真实数值到位只换配置，
+-- 不改判定代码。待决题见 docs/to-questionnaire-策划案内部矛盾.md「他人抢救的耗时与打断规则」。
+GameCfg.Rescue = {
+    Target = 'downedPlayer',     -- 复用 MgrInteract 既有交互通道，不新造入口
+    Action = 'Rescue',
+    PromptText = '抢救',
+    RescuingTitle = '正在抢救…',
+    Range = 2,                   -- 规格原文：2 米内（场景平面距离）
+    DurationSec = 2,             -- [未查证] 抢救耗时占位值
+    InterruptMoveMeters = 1,     -- [未查证] 施救者离开濒死者超过此距离打断
+    InterruptOnDamage = true,    -- [未查证] 施救者受击是否打断
+}
+
 -- 小队（#253，§9 多人规则「小队最多 3 人，2 米内邀请，10 秒未处理按拒绝，离线自动离队，少于 2 人解散」）：
 -- 三个数值都是规格原文，不是占位值；服务端唯一权威，见 server/Mgr/MgrParty.lua。
 GameCfg.Party = {

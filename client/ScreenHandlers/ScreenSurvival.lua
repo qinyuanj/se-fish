@@ -53,7 +53,7 @@ function Panel:Tick()
     if self.Phase == 'downed' or self.Phase == 'dead' then
         local left = math.max(0, math.ceil((self.EndsAt or 0) - self:Now()))
         local key = self.Phase == 'downed' and 'DownedTitle' or 'DeadTitle'
-        local base = GameCfg.Survival[key]
+        local base = self.Phase == 'rescuing' and GameCfg.Rescue.RescuingTitle or GameCfg.Survival[key]
         local text = base .. '（' .. left .. ' 秒）'
         -- 平台流程在飞：服务端已冻结倒计时，显示等待文案而不是会误导的走秒
         if self.Phase == 'dead' and self.PlatformPending then text = GameCfg.Survival.PlatformWaitText end
@@ -83,12 +83,13 @@ function Panel:SetPhase(state)
     self.EndsAt = tonumber(state and state.endsAt) or nil
     self.WeakUntil = tonumber(state and state.weakUntil) or nil
     self.PlatformPending = state and state.platformPending or nil
-    local downed = phase == 'downed' or phase == 'dead'
+    local downed = phase == 'downed' or phase == 'rescuing' or phase == 'dead'
     if self.Banner then pcall(function() self.Banner.Visible = downed end) end
     if self.Title then
         pcall(function()
             self.Title.Visible = downed
-            self.Title.Text = GameCfg.Survival[phase == 'dead' and 'DeadTitle' or 'DownedTitle']
+            self.Title.Text = phase == 'rescuing' and GameCfg.Rescue.RescuingTitle
+                or GameCfg.Survival[phase == 'dead' and 'DeadTitle' or 'DownedTitle']
         end)
     end
     if self.AdrenalineBtn then pcall(function() self.AdrenalineBtn.Visible = phase == 'downed' end) end

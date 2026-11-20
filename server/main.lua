@@ -85,6 +85,9 @@ MgrMap.MgrQuest.Save = MgrMap.MgrSave
 MgrMap.MgrStory.PlayerData = MgrMap.MgrPlayerData
 MgrMap.MgrStory.Save = MgrMap.MgrSave
 MgrMap.MgrInteract.Save = MgrMap.MgrSave
+-- #254 他人抢救：交互入口只读生存状态、经 Vitals 的统一 Rescue 接缝结算，不反向 require 管理器。
+MgrMap.MgrInteract.Vitals = MgrMap.MgrVitals
+MgrMap.MgrInteract.Survival = MgrMap.MgrSurvival
 MgrMap.MgrAchievements.PlayerData = MgrMap.MgrPlayerData
 MgrMap.MgrAchievements.Save = MgrMap.MgrSave
 MgrMap.MgrFerry.Save = MgrMap.MgrSave

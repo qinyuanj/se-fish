@@ -12,11 +12,11 @@ local Mgr = { LastSeq = {}, Anchors = {} }
 local ITEM_BAR = GameCfg.Items.ContainerId.ItemBar
 
 -- 同通道相同 seq 重放原结果；完整 operation 可跨重连重试，身份校验归 Save。
-local function resolve(mgr, player, data, payload)
+local function resolve(mgr, player, data, payload, kind)
     local requestId = payload.operation
     if requestId ~= nil and type(requestId) ~= 'table' then return nil, false end
     if requestId == nil then requestId = payload.seq end
-    local operation, mode = mgr.Save:ResolveRequest(player, data, 'interact:fisherman', requestId)
+    local operation, mode = mgr.Save:ResolveRequest(player, data, kind or 'interact:fisherman', requestId)
     if not operation then return nil, false end
     if mode ~= 'replay' then return operation end
     local accepted = mgr.Save:Execute(player, data, operation, function() return nil, 'expired' end,
@@ -45,6 +45,12 @@ local function fishermanPoint(shared, npc)
     return point
 end
 
+-- #254 平面距离：抢救目标与场景锚点共用一个口径（只看 x/z，高度差不计入）。
+local function nearbyDistance(a, b)
+    local dx, dz = a.x - b.x, a.z - b.z
+    return math.sqrt(dx * dx + dz * dz)
+end
+
 -- 选中并实际可用的道具栏格（#127）：兑换与回收都只看选中的这一格，不看背包
 local function selectedEntry(data)
     local items = data.Data.Containers[ITEM_BAR]
@@ -69,6 +75,24 @@ local Points = {
                 local anchor = mgr:InRange(player, probe)
                 if anchor then return fishermanPoint(shared, npc), anchor end
             end
+        end },
+    -- #254 他人抢救复用本交互通道：目标由服务端按 UserId 解析，距离与濒死相位在此复验。
+    downedPlayer = { Cfg = function() return GameCfg.Rescue end, RequestKey = 'rescue',
+        Actions = { Rescue = 'RescueDowned' },
+        Resolve = function(mgr, player, payload)
+            local function reject(reason)
+                mgr:Reply(player, { action = 'Rescue', ok = false, reason = reason,
+                    seq = payload.seq, targetUserId = payload.targetUserId })
+                return nil
+            end
+            if type(payload.targetUserId) ~= 'number' then return reject('invalid') end
+            local target = mgr:ResolveDownedTarget(payload.targetUserId)
+            if not target then return reject('not-downed') end
+            local from = player.Character and player.Character.Position
+            local to = target.Character and target.Character.Position
+            if not from or not to then return reject('no-position') end
+            if nearbyDistance(from, to) > GameCfg.Rescue.Range then return reject('too-far') end
+            return GameCfg.Rescue, target
         end },
 }
 
@@ -292,6 +316,26 @@ function Mgr:Feed(player, data, anchor, point, seq, operation)
     return true
 end
 
+-- #254 抢救目标解析：UserId 由客户端给，玩家身份与目标相位只由服务端判定。
+function Mgr:ResolveDownedTarget(userId)
+    local survival, vitals = self.Survival, self.Vitals
+    if not survival or not vitals then return nil end
+    local target = survival:PlayerByUserId(userId)
+    if not target or not vitals:IsDowned(target) then return nil end
+    return target
+end
+
+-- #254 发起他人抢救：只把「请求已受理」写进持久操作身份，实际结算由生存状态机到期后
+-- 经 Vitals:Rescue 统一接缝完成。相位守卫与操作身份一起拦住重复、并发与重连重放。
+function Mgr:RescueDowned(player, data, target, point, seq, operation)
+    local ok, reason
+    if self.Survival then ok, reason = self.Survival:BeginRescue(target, player)
+    else ok, reason = false, 'unavailable' end
+    self:Reply(player, { action = 'Rescue', ok = ok, reason = reason, seq = seq,
+        targetUserId = target.UserId, operation = operation })
+    return ok
+end
+
 -- 处理一次交互请求；持久模式返回是否接收，最终结果经 InteractResult 回包。
 function Mgr:Handle(player, payload)
     if type(payload) ~= 'table' then return false end
@@ -306,14 +350,14 @@ function Mgr:Handle(player, payload)
     local operation
     if self.Save then
         local replayed
-        operation, replayed = resolve(self, player, data, payload)
+        operation, replayed = resolve(self, player, data, payload, entry.RequestKey)
         if not operation then return replayed end
     end
     local last = self.LastSeq[player.UserId]
     if last and seq <= last then return false end
     local point, anchor
     if entry.Resolve then
-        point, anchor = entry.Resolve(self, player)
+        point, anchor = entry.Resolve(self, player, payload)
     else
         point = entry.Cfg()
         anchor = self:InRange(player, point)

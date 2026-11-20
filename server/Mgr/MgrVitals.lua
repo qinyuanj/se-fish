@@ -12,6 +12,7 @@ local Vitals = require('common.Vitals')
 local DamageNotice = require('common.DamageNotice')
 
 local Mgr = { States = {} }
+local healthOf -- 前置声明：SnapshotHealth（#253）定义在读取辅助之前，避免取到全局 nil
 
 local function cfg()
     return GameCfg.Vitals
@@ -143,7 +144,7 @@ local function controllerOf(state)
     return character and character.Controller
 end
 
-local function healthOf(state)
+healthOf = function(state)
     local controller = controllerOf(state)
     local ok, health = pcall(function() return controller and controller.Health end)
     return ok and tonumber(health) or nil
