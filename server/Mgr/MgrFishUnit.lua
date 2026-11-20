@@ -15,6 +15,8 @@ local BossPhase = require('common.BossPhase')
 local GarBiteNotice = require('common.GarBiteNotice')
 local BossMoves = require('common.cfg.BossMoves')
 local FishBehaviors = require('server.FishBehaviors')
+-- #260 目标选择唯一裁决口（业务侧适配层）；它只读消费官方 AI 包，不写 Controller 位移。
+local AiTarget = require('server.Mgr.MgrAiTarget')
 
 -- AbilityAPI 懒加载：MgrFishUnit 被大量单测用假 game 加载，顶层 require 会连带跑技能包
 -- （包内 api.lua 加载时要 RunService:IsServer()），把无关用例拖挂。
@@ -30,6 +32,11 @@ Mgr.State = { AwaitLift = 'awaitLift', Held = 'held', Escaping = 'escaping',
 
 local function cfg()
     return GameCfg.FishUnit
+end
+
+local function distanceSq(pos, cp)
+    if not pos or not cp then return math.huge end
+    return (cp.x - pos.x) * (cp.x - pos.x) + (cp.z - pos.z) * (cp.z - pos.z)
 end
 
 function Mgr:Now()
@@ -542,36 +549,40 @@ function Mgr:SetTargetOverride(fish, player)
     return true
 end
 
+-- #260 目标选择只在这里裁决：6-31 指定目标优先，6-30 合法性由 IsTargetValid 守门，
+-- 其余候选（6-29 累计有效伤害优先、无记录取最近）交给适配层排序并登记到官方 AI 管理器。
+-- 本函数只返回玩家与坐标，不碰移动：位移仍归 FishBehaviors / FlightPath / BossPhase。
 function Mgr:ChooseTarget(fish, pos, params)
+    local adapter = self.AiTarget or AiTarget
     local override = fish.TargetOverride
     if override then
         local valid, cp = self:IsTargetValid(override, pos, params)
-        if valid then return override, cp end
+        if valid then
+            adapter:SetFocus(fish, override)
+            return override, cp
+        end
         fish.TargetOverride = nil
     end
-    local target, tpos, bestThreat = nil, nil, -1
+    local candidates, present = {}, {}
+    for _, player in ipairs(self:Players()) do
+        present[player] = true
+        local valid, cp = self:IsTargetValid(player, pos, params)
+        if valid then
+            candidates[#candidates + 1] = { player = player, pos = cp,
+                damage = fish.Threat and fish.Threat[player] or 0, distance = distanceSq(pos, cp) }
+        end
+    end
+    -- 离开战斗范围 / 濒死 / 死亡的玩家同时从仇恨账本清掉，避免回血后再被旧伤害拉回目标。
     if fish.Threat then
-        for player, total in pairs(fish.Threat) do
-            local valid, cp = self:IsTargetValid(player, pos, params)
-            if valid then
-                if total > bestThreat or (total == bestThreat and target and player.UserId < target.UserId) then
-                    bestThreat, target, tpos = total, player, cp
-                end
-            else
+        for player in pairs(fish.Threat) do
+            if not present[player] or not self:IsTargetValid(player, pos, params) then
                 fish.Threat[player] = nil
             end
         end
     end
-    if target then return target, tpos end
-    local bestDistance
-    for _, player in ipairs(self:Players()) do
-        local valid, cp = self:IsTargetValid(player, pos, params)
-        if valid then
-            local d = (cp.x - pos.x) * (cp.x - pos.x) + (cp.z - pos.z) * (cp.z - pos.z)
-            if not bestDistance or d < bestDistance then bestDistance, target, tpos = d, player, cp end
-        end
-    end
-    return target, tpos
+    local ranked = adapter:Select(fish, candidates)
+    local top = ranked[1]
+    return top and top.player or nil, top and top.pos or nil
 end
 
 -- #134 头部攻击：头部区 = 以鱼身中点为圆心 BiteRange 内、与朝向夹角 < HeadHalfAngleDeg；
@@ -638,8 +649,16 @@ function Mgr:LockBite(fish, target, pos, tpos, now, params)
     if fx then self:Face(fish, fx, fz, params) end
     fish.BiteAim = { Target = target, StrikeAt = now + params.BiteCooldownSec }
     local facing = fish.Facing or { x = 0, z = 1 }
-    publishBite(self, GarBiteNotice.Lock(fish.Id, pos, facing.x, facing.z, params.BiteRange,
-        params.HeadHalfAngleDeg, params.BiteCooldownSec))
+    local species = GameCfg.Fish[fish.FishId]
+    local warning = species and BossMoves.WarningOf(BossMoves.KeyOf(species, fish.FishId), 'bite') or nil
+    local notice = GarBiteNotice.Lock(fish.Id, pos, facing.x, facing.z, params.BiteRange,
+        params.HeadHalfAngleDeg, params.BiteCooldownSec)
+    notice.move = 'bite'
+    if warning then
+        notice.shape, notice.duration = warning.Shape, warning.WindupSec
+        if warning.Notice then notice.notice = warning.Notice end
+    end
+    publishBite(self, notice)
     print('[MgrFishUnit] 首领起咬', fish.FishId, 'target=' .. tostring(target.UserId),
         string.format('facing=%.2f,%.2f', facing.x, facing.z), 'fish=' .. tostring(fish.Id))
 end
@@ -713,9 +732,32 @@ function Mgr:StartMove(fish, name, pos, target, tpos, now, duration, range, shap
     local facing = fish.Facing or { x = 0, z = 1 }
     local warningPos = (name == 'dive' or name == 'jump') and fish.Move.Destination or pos
     warningPos = warningPos or pos
-    local payload = GarBiteNotice.Lock(fish.Id, warningPos, facing.x, facing.z, range, 90, duration)
+    -- #257 预警与命中分离：形状 / 起手 / 范围只取逐招表行，命中调度仍用 duration 与 params。
+    local species = GameCfg.Fish[fish.FishId]
+    local warning = species and BossMoves.WarningOf(BossMoves.KeyOf(species, fish.FishId), name) or nil
+    -- 表内 Range 是命中半径；冲锋类走廊半径由调用方传更大的 range，宁可超警不欠警。
+    local warningRange = warning and math.max(range or 0, warning.Range or 0) or range
+    local warningSec = warning and warning.WindupSec and warning.WindupSec > 0 and warning.WindupSec or duration
+    local payload = GarBiteNotice.Lock(fish.Id, warningPos, facing.x, facing.z, warningRange, 90, warningSec)
     payload.move = name
-    if shape == 'circle' or name == 'jump' then payload.shape, payload.halfAngleDeg = 'circle', 180 end
+    local shapeName = (warning and warning.Kind ~= 'none' and warning.Shape) or shape
+    if shapeName == 'circle' or name == 'jump' then
+        payload.shape, payload.halfAngleDeg = 'circle', 180
+    elseif shapeName == 'line' then
+        payload.shape = 'line'
+        if warning and warning.Width then payload.width = warning.Width end
+    elseif shapeName == 'cone' then
+        payload.shape = 'cone'
+    end
+    if warning and warning.Notice then payload.notice = warning.Notice end
+    -- #258 本组招式预警的形状与落点口径只认逐招表；客户端拿到的载荷能分辨落点与危险区。
+    local row = BossMoves.Get(BossMoves.KeyOf(GameCfg.Fish[fish.FishId], fish.FishId), name)
+    if row and row.Delivery and row.Warning.Kind ~= 'none' then
+        payload.shape = row.Warning.Shape or payload.shape
+        payload.notice, payload.delivery, payload.landing = row.Warning.Notice, row.Delivery, row.Landing
+        payload.width = row.Warning.Width
+        payload.landingPoint = fish.Move.Destination or fish.Move.Center
+    end
     publishBite(self, payload)
     fish.MoveName = name
     self:PublishCombat(fish)
@@ -930,8 +972,9 @@ function Mgr:UpdateKingCrabCombat(fish, now, pos, params)
         -- 钳与钳之间完整隔一个 JabStepSec；StrikeAt = At + 钳数 × step，末槽（第 6 钳）
         -- 与收招同帧：先结算末钳再收招。掉帧只补当前槽不追溯。
         local elapsed = now - move.At
-        local slot = elapsed <= 0 and -1 or math.min(params.JabsPerSide * 2 - 1,
-            math.floor(elapsed / params.JabStepSec + 1e-9) - 1)
+        local windup = BossMoves.Get('kingCrab', 'jab').Warning.WindupSec
+        local slot = elapsed <= windup and -1 or math.min(params.JabsPerSide * 2 - 1,
+            math.floor((elapsed - windup) / params.JabStepSec + 1e-9) - 1)
         if slot > (move.LastSlot or -1) then
             move.LastSlot = slot
             local target, tp = self:IsTargetValid(move.Target, pos, params)
@@ -958,7 +1001,8 @@ function Mgr:UpdateKingCrabCombat(fish, now, pos, params)
     -- 收招帧（now == StrikeAt）先结算末钳再收招。
     fish.JabAt = now + params.JabIntervalSec
     self:StartMove(fish, 'jab', pos, target, tp, now,
-        params.JabStepSec * params.JabsPerSide * 2, params.BiteRange)
+        BossMoves.Get('kingCrab', 'jab').Warning.WindupSec
+            + params.JabStepSec * params.JabsPerSide * 2, params.BiteRange)
 end
 
 -- #136 蟹老板：三招互斥——双击（pinch）、冲撞（charge）、旋转（spin）。
@@ -972,8 +1016,9 @@ function Mgr:UpdateCrabBossCombat(fish, now, pos, params)
         if move.Name == 'pinch' then
             -- 双击第 k 击在起手后 k × PinchStepSec 秒起结算
             local elapsed = now - move.At
-            local strike = elapsed <= 0 and 0 or math.min(params.PinchStrikes,
-                math.floor(elapsed / params.PinchStepSec + 1e-9))
+            local windup = BossMoves.Get('crabBoss', 'pinch').Warning.WindupSec
+            local strike = elapsed <= windup and 0 or math.min(params.PinchStrikes,
+                math.floor((elapsed - windup) / params.PinchStepSec + 1e-9))
             if strike > (move.LastStrike or 0) and strike >= 1 then
                 move.LastStrike = strike
                 local target, tp = self:IsTargetValid(move.Target, pos, params)
@@ -987,7 +1032,7 @@ function Mgr:UpdateCrabBossCombat(fish, now, pos, params)
             return
         elseif move.Name == 'charge' then
             -- 冲撞窗口内命中一次（窗口内只结算一次，不按帧重复）
-            if not move.HitDone then
+            if not move.HitDone and now >= move.At + BossMoves.Get('crabBoss', 'charge').Warning.WindupSec then
                 local target, tp = self:ChooseTarget(fish, pos, params)
                 if target and tp and (tp.x - pos.x)^2 + (tp.z - pos.z)^2 <= params.ChargeRange^2 then
                     move.HitDone = true
@@ -1035,7 +1080,8 @@ function Mgr:UpdateCrabBossCombat(fish, now, pos, params)
     if now >= (fish.PinchAt or 0) and withinBite(pos, tp, params) then
         fish.PinchAt = now + params.PinchCooldownSec
         self:StartMove(fish, 'pinch', pos, target, tp, now,
-            params.PinchStepSec * params.PinchStrikes, params.BiteRange)
+            BossMoves.Get('crabBoss', 'pinch').Warning.WindupSec
+                + params.PinchStepSec * params.PinchStrikes, params.BiteRange)
         return
     end
     -- 追击
@@ -1368,7 +1414,9 @@ function Mgr:UpdateCombat(fish, now)
     -- 首领近战（#88）不走技能装配与睡眠，追咬由 UpdateChase 驱动
     local chase = GameCfg.FishCombat and GameCfg.FishCombat[combat]
     if chase then
-        FishBehaviors.Step(self, fish, now, pos, chase, combat)
+        -- #258 远程与俯冲段的参数来自逐招表，FishCombat 只提供表里未列的近战 / 表现字段。
+        local key = BossMoves.KeyOf(GameCfg.Fish[fish.FishId], fish.FishId)
+        FishBehaviors.Step(self, fish, now, pos, BossMoves.CombatParams(chase, key), combat)
         return
     end
     self:UpdateEel(fish, now, GameCfg.Ability.FishAbilities[combat])
@@ -1426,10 +1474,9 @@ function Mgr:StartCombatChannel()
     end)
 end
 
--- #134 电鳗：Combat →（首次施法成功）Attacking 每 DischargeIntervalSec 施法放电一次，共 DischargeCount 次
--- →（最后一次后再满一个间隔）Sleeping SleepSec → Combat 重新开始。
--- 每次 Update 最多放电一次、下一次按实际放电时刻 + 间隔排期：重复 Update 不连放，大 dt 不补发连击，
--- 次数只按施法成功计（施法被拒/打断不计数，下帧重试）。睡眠从实际入睡时刻起算，大 dt 不会吞掉睡眠窗口。
+-- #134 / #257 电鳗：Combat →（首次起手）Attacking，每 interval 起一次放电预警，
+-- 起手 windup（逐招表）后 CastFish 放电；共 DischargeCount 次，最后一次再满一个间隔入睡 SleepSec。
+-- 预警与结算分离：广播来自逐招表，伤害只在服务端 CastFish 点火时结算。
 function Mgr:UpdateEel(fish, now, entry)
     local body = fish.Carrier.Body
     body.Position = fish.CombatPosition
@@ -1440,48 +1487,63 @@ function Mgr:UpdateEel(fish, now, entry)
         fish.State = Mgr.State.Combat
         fish.WakeAt = nil
         fish.Discharges = 0
+        fish.WarnAt, fish.DischargeAt = nil, nil
         print('[MgrFishUnit] 电鳗醒来', 'fish=' .. tostring(fish.Id))
         self:PublishCombat(fish)
     end
     local attacking = fish.State == Mgr.State.Attacking
     local done = fish.Discharges or 0
-    if attacking and done >= entry.DischargeCount then
-        if now < fish.NextDischargeAt then
-            self:FlailEel(fish, now, entry)
-            return
-        end
+    local row = BossMoves.Get('eel', 'discharge')
+    local windup = row.Warning.WindupSec
+    local interval = entry.DischargeIntervalSec
+    if attacking then self:FlailEel(fish, now, entry) end
+    if attacking and done >= entry.DischargeCount and not fish.DischargeAt then
+        if now < (fish.WarnAt or math.huge) then return end
         if fish.CombatRotation and Quaternion then
             body.Rotation = fish.CombatRotation * Quaternion.FromEulerAngles(0, 0, entry.SleepRollRadians)
         end
         fish.State = Mgr.State.Sleeping
         fish.WakeAt = now + entry.SleepSec
-        fish.NextDischargeAt = nil
+        fish.WarnAt = nil
+        publishBite(self, GarBiteNotice.Clear(fish.Id, 'sleep'))
         print('[MgrFishUnit] 电鳗睡眠', 'fish=' .. tostring(fish.Id), 'wakeAt=' .. tostring(fish.WakeAt))
         self:PublishCombat(fish)
         return
     end
-    if attacking then self:FlailEel(fish, now, entry) end
-    if attacking and now < fish.NextDischargeAt then return end
+    if fish.DischargeAt then
+        if now < fish.DischargeAt then return end
+    elseif not attacking then
+        fish.State, fish.AttackAt = Mgr.State.Attacking, now
+        done, fish.Discharges = 0, 0
+        fish.WarnAt = now
+    elseif now < fish.WarnAt then
+        return
+    end
+    if not fish.DischargeAt then
+        local warning = BossMoves.WarningOf('eel', 'discharge')
+        local notice = GarBiteNotice.Lock(fish.Id, fish.CombatPosition or body.Position, 0, 1,
+            warning.Range, 180, warning.WindupSec)
+        notice.move, notice.shape, notice.notice = 'discharge', warning.Shape, warning.Notice
+        publishBite(self, notice)
+        fish.DischargeAt, fish.WarnAt = now + windup, now + interval
+        self:PublishCombat(fish) -- 起手也属于战斗态变化，客户端标签同步
+        return
+    end
     local castOk, casted = true, false
     if self.Ability then castOk, casted = pcall(self.Ability.CastFish, self.Ability, fish) end
     if not castOk then
         print('[MgrFishUnit] 电鳗施法异常', 'fish=' .. tostring(fish.Id), tostring(casted))
     end
     if not castOk or not casted then
+        fish.DischargeAt = now -- 施法被拒：不计数、不重发预警，下帧重试
         if not fish.CastRejected then
             fish.CastRejected = true
             print('[MgrFishUnit] 电鳗施法未成功，下帧重试', 'fish=' .. tostring(fish.Id), 'done=' .. tostring(done))
         end
         return
     end
-    fish.CastRejected = nil
-    if not attacking then
-        fish.State = Mgr.State.Attacking
-        fish.AttackAt = now
-        done = 0
-    end
+    fish.CastRejected, fish.DischargeAt = nil, nil
     fish.Discharges = done + 1
-    fish.NextDischargeAt = now + entry.DischargeIntervalSec
     print('[MgrFishUnit] 电鳗放电', 'fish=' .. tostring(fish.Id), fish.Discharges .. '/' .. entry.DischargeCount)
     self:PublishCombat(fish)
 end
@@ -1509,7 +1571,10 @@ end
 ---该鱼种是否走飞行（GameCfg.Ability.Flight.Species 按鱼种 Id 登记）
 function Mgr:FlightProfile(fishId)
     local species = GameCfg.Ability.Flight.Species
-    if species and species[fishId] then return species[fishId] end
+    if species and species[fishId] then
+        -- #258 飞行鱼的投掷 / 俯冲伤害与节拍以逐招表为准，档案只是缺省值。
+        return BossMoves.CombatParams(species[fishId], fishId)
+    end
     local fish = GameCfg.Fish[fishId]
     if fish and fish.CatchSource == 'air' and (fish.Grade == 'normal' or fish.Grade == 'rare') then
         return { Speed = fish.Speed, CruiseHeight = GameCfg.Ability.Flight.CruiseHeight,
@@ -1610,6 +1675,13 @@ function Mgr:StartAirAttack(fish, kind, pos, now)
     local payload = GarBiteNotice.Lock(attack.Id, attack.Center, 0, 1, attack.Radius, 180, duration)
     payload.shape, payload.move, payload.ownerFishId = 'circle', kind, fish.Id
     payload.flightOrigin = attack.Origin
+    -- #258 投掷 / 追踪俯冲各自取表里那一行：预警点就是服务端结算的锁定落点。
+    local row = BossMoves.Get(fish.FishId, dive and 'dive' or 'throw')
+    if row and row.Delivery and row.Warning.Kind ~= 'none' then
+        payload.shape = row.Warning.Shape or payload.shape
+        payload.notice, payload.delivery, payload.landing = row.Warning.Notice, row.Delivery, row.Landing
+        payload.landingPoint = attack.Center
+    end
     publishBite(self, payload)
     print('[MgrFishUnit] 空战预警', fish.FishId, kind, attack.Id, attack.Damage)
     return attack
@@ -2133,6 +2205,7 @@ function Mgr:Remove(fish)
     -- #132 T11：鱼被打死/清场时先把叼着的玩家放下来（否则玩家会跟着一条死鱼卡在空中）
     if fish.Carry then self:ReleaseCarried(fish, nil, 'died') end
     self:EndBite(fish, 'gone') -- #134：死亡或清场时收起咬预警
+    if fish.DischargeAt then publishBite(self, GarBiteNotice.Clear(fish.Id, 'gone')) end -- #257 放电预警
     self:EndMove(fish, 'gone')
     fish.WakeAt, fish.MoveName = nil, nil
     self.Fish[fish.Id] = nil
