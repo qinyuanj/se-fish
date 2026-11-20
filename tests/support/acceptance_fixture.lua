@@ -90,6 +90,9 @@ local function coverage_body()
     '| --- | --- | --- | --- | --- | --- | --- | --- |',
     string.format('| 1-01 | %s | %s | 缺 | 缺 | 缺 | 缺 | A |', M.COVERAGE_LANDING, M.COVERAGE_TEST),
     string.format('| 1-02 | %s | — | 缺 | 缺 | 缺 | 缺 | B |', M.COVERAGE_LANDING),
+    -- 已贯通小节扩到第 5、16 节：夹具对应分片的 5-01 / 16-01 也要有落点，起点才全绿。
+    string.format('| 5-01 | %s | — | 缺 | 缺 | 缺 | 缺 | A |', M.COVERAGE_LANDING),
+    string.format('| 16-01 | %s | — | 缺 | 缺 | 缺 | 缺 | A |', M.COVERAGE_LANDING),
     '',
   }, '\n')
 end
