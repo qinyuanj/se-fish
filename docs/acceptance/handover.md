@@ -77,8 +77,8 @@
 
 - 判的是只有人在地图里才能判的性质：贴地、净空、遮挡、可读性、手感、操作距离、整体旅程。
 - 组织方式：按**会话**，一次覆盖一节或一组强相关节；零散抓单条既费事又不可比。
-- 本轮状态：C 级条款一律 `blocked`，理由写「卡在：需编辑器试玩取证（业务代码完成后整批进行）」。
-- 取证后：证据列写会话标识，并按第二节第 7 步的注意点让它落进一个仓库文件；抓屏走 `lua tools/cli.lua screenshot`，取帧前先 `--info` 判显示路径、连拍比 md5 判帧新旧。
+- 本轮状态：C 级条款一律 `blocked`，理由写「卡在：需编辑器试玩取证（业务代码完成后整批进行）」；明确砍掉范围的（9-23 随队伍界面一并划出）写 `out-of-scope` 并附 `理由：`。
+- 取证后：会话记录落成仓库文件（`evidence/<日期>-<会话号>/session.md`，含抓屏清单与观察结论），证据列写 `该文件路径（会话 <会话号>）`。门禁只认真实存在的仓库路径，纯会话标识会被判 `evidence_missing`——这不是放宽门禁，是让 C 级证据也能被核。抓屏走 `lua tools/cli.lua screenshot`，取帧前先 `--info` 判显示路径、连拍比 md5 判帧新旧。
 
 ### 4.4 哪一种证据不能冒充哪一种
 
@@ -130,17 +130,17 @@ rg -n 'D 通关取证|恢复条件：D/E' docs/adr/0027-*.md docs/acceptance/han
 
 ## 七、八条完成判据核对表
 
-判据原文照抄 #240「完成判据」一节，未作改写。证据列是可重跑命令或真实文件；结果列是 2026-11-20 在 `spec240/245-handover` worktree 的实测摘要（Windows，Lua 5.4.6）。
+判据原文照抄 #240「完成判据」一节，未作改写。证据列是可重跑命令或真实文件；结果列是 2026-11-20 在 `spec240/fix-review` worktree 的实测摘要（Windows，Lua 5.4.6，审查修复之后重测）。
 
 | 判据（#240 原文） | 证据（可重跑） | 结果 |
 | --- | --- | --- |
 | 1. 19 个规格小节各有一份条款分片，条款 ID 稳定可引用。 | `ls docs/acceptance/[0-9][0-9]-*.md \| wc -l`；`lua tools/cli.lua acceptance --check`；`tests/native/acceptance_matrix_test.lua` 的「真实矩阵恰好覆盖规格的 19 个小节，节号连续」 | 19；`--check` 输出「19 份分片 / 523 条条款」并以「验收矩阵校验通过」退 0；ID 从 01 连续由 `id_sequence` 规则守着 |
-| 2. 索引页的计数与缺口密度由脚本生成且与分片一致；手改索引会被门禁判红。 | `lua tools/cli.lua acceptance --write` 连跑两次并比对 README；手改 README 合计行的数字 | 两次都输出「README 生成块已是最新，无需改动」且零差异（幂等）；手改后判红 `[index_stale]`，`test fast` 1569 successes / 1 failure |
-| 3. 规格全篇无工单编号，且这条由门禁守着，不靠人记。 | `rg -n '#[0-9]+' docs/GameSpec.md`（无输出即通过）；往 GameSpec 正文塞一个 `#123` | 无输出（rg 退 1）；塞入后判红 `[spec_issue_ref] docs/GameSpec.md:8 规格不得出现工单编号 #123`，`test fast` 1569/1 |
+| 2. 索引页的计数与缺口密度由脚本生成且与分片一致；手改索引会被门禁判红。 | `lua tools/cli.lua acceptance --write` 连跑两次并比对 README；手改 README 合计行的数字 | 两次都输出「README 生成块已是最新，无需改动」且零差异（幂等）；手改后判红 `[index_stale]`，`test fast` 1581 successes / 1 failure |
+| 3. 规格全篇无工单编号，且这条由门禁守着，不靠人记。 | `rg -n '#[0-9]+' docs/GameSpec.md`（无输出即通过）；往 GameSpec 正文塞一个 `#123` | 无输出（rg 退 1）；塞入后判红 `[spec_issue_ref] docs/GameSpec.md:8 规格不得出现工单编号 #123`，`test fast` 1581/1；分片里塞 `工单46` 同样判红（`docs/acceptance/09-multiplayer-rules.md:3`） |
 | 4. 五状态词汇生效；blocked 必须写明卡在谁、out-of-scope 必须写明理由，缺了就判红。 | 删掉 1-04 的「卡在：」；删掉 9-19 的「理由：」；把 5-01 的状态改成 `done`；三者各跑一次 `--check` | 分别判红 `[blocked_reason]`（1-04）、`[out_of_scope_reason]`（9-19）、`[vocabulary]`（5-01 取值 "done"）；`test fast` 各 1 failure |
-| 5. evidenced 指向的证据路径必须真实存在。 | 把 7-11 的证据路径改成 `tests/native/spec/07_shop_purchase_limit_gone_test.lua` | 判红 `[evidence_missing] docs/acceptance/07-economy-and-shop.md:17 7-11 的证据路径不存在`，`test fast` 1569/1；还原后恢复绿 |
-| 6. 双棘轮有基线文件：已取证计数下降、或遗留测试计数上升，都让日常车道变红。 | `docs/acceptance/baseline.lua`（`evidenced = 1`、`legacyTests = 142`）；把 evidenced 抬到 2 跑一次；把 legacyTests 压到 141 跑一次；再试反向 `acceptance --update-baseline` | `[ratchet_evidenced]`（`test fast` 1568/2）与 `[ratchet_legacy]`（1 failure）各判红一次；反向 `--update-baseline` 退 2：「已取证 1 条 < 基线 2 条：棘轮只许增，拒绝下调」 |
-| 7. spec 车道随 full 运行，且至少有一条真实条款通过它转成 evidenced。 | `lua tools/cli.lua test spec`；`lua tools/cli.lua test full -- --filter='条款 7%-11'`；`lua tools/cli.lua test full`；7-11 的条款行 | spec 车道 2 successes；full 车道内同一过滤命中同样 2 条（证明 full 收录 spec）；full 1600 successes / 0 failures / 0 pending；矩阵里 7-11 为 `evidenced`，证据 `tests/native/spec/07_shop_purchase_limit_test.lua` |
+| 5. evidenced 指向的证据路径必须真实存在。 | 把 7-11 的证据路径改成 `tests/native/spec/07_shop_purchase_limit_gone_test.lua` | 判红 `[evidence_missing] docs/acceptance/07-economy-and-shop.md:17 7-11 的证据路径不存在`，`test fast` 1581/1；还原后恢复绿 |
+| 6. 双棘轮有基线文件：已取证计数下降、或遗留测试计数上升，都让日常车道变红。 | `docs/acceptance/baseline.lua`（`evidenced = 1`、`legacyTests = 142`）；把 evidenced 抬到 2 跑一次；把 legacyTests 压到 141 跑一次；再试反向 `acceptance --update-baseline` | `[ratchet_evidenced]`（`test fast` 1580/2）与 `[ratchet_legacy]`（1 failure）各判红一次；反向 `--update-baseline` 退 2：「已取证 1 条 < 基线 2 条：棘轮只许增，拒绝下调」 |
+| 7. spec 车道随 full 运行，且至少有一条真实条款通过它转成 evidenced。 | `lua tools/cli.lua test spec`；`lua tools/cli.lua test full -- --filter='条款 7%-11'`；`lua tools/cli.lua test full`；7-11 的条款行 | spec 车道 2 successes；full 车道内同一过滤命中同样 2 条（证明 full 收录 spec）；full 1612 successes / 0 failures / 0 pending（fast 1582 / 0）；矩阵里 7-11 为 `evidenced`，证据 `tests/native/spec/07_shop_purchase_limit_test.lua` |
 | 8. ADR、五个术语、证据分级口径、新增条款的受控入口，四份文档落定。 | `docs/adr/0027-*.md`、`docs/adr/0028-*.md`；`GLOSSARY.md` 的条款 / 验收矩阵 / 棘轮 / 取证 / 证据分级五条；[evidence-levels.md](evidence-levels.md)；[TEMPLATE.md](TEMPLATE.md) | 四份都在；术语表第 216–228 行命中五个词；`--check` 不报文档缺失 |
 
 八条全绿。附带事实：`gh issue list -R qinyuanj/se-fish --state open` 只剩 #240（总单）与 #245（本单）；七张旧单（#239、#172、#171、#46、#44、#42、#14）均已关闭，未完成项在 [legacy-ledger.md](legacy-ledger.md) 里逐条有去向。
