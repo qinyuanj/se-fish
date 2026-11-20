@@ -957,6 +957,15 @@ local function engageOrChase(self, fish, now, pos, params, dt, name, windup, lab
     return chaseStep(self, fish, pos, tpos, dt, params, label, skipIdle)
 end
 
+-- 逐招表起手时长：鱼键经 BossMoves.KeyOf 反查（与预警广播同一口径），缺行 / 缺字段按 0 退化，
+-- 不让一只表外鱼把整帧战斗更新打崩（review #249-6）。
+local function bossWindup(fish, move)
+    local row = BossMoves.Get(BossMoves.KeyOf(GameCfg.Fish[fish.FishId], fish.FishId), move) or {}
+    local warning = row.Warning
+    local windup = type(warning) == 'table' and warning.WindupSec or nil
+    return type(windup) == 'number' and windup or 0
+end
+
 -- #136 帝王蟹：放下即锁定最近目标起手乱刺；每轮左右钳各 JabsPerSide 下、每下间隔
 -- JabStepSec、每下 JabDamage。同一刺段（0.2 秒槽）只结算一次；掉帧大 dt 只补当前槽不追溯。
 -- 一轮结束招式清除、预警收起，下一轮 JabAt + JabIntervalSec 后重新起手；活动 ActiveSec 秒
@@ -972,7 +981,7 @@ function Mgr:UpdateKingCrabCombat(fish, now, pos, params)
         -- 钳与钳之间完整隔一个 JabStepSec；StrikeAt = At + 钳数 × step，末槽（第 6 钳）
         -- 与收招同帧：先结算末钳再收招。掉帧只补当前槽不追溯。
         local elapsed = now - move.At
-        local windup = BossMoves.Get('kingCrab', 'jab').Warning.WindupSec
+        local windup = bossWindup(fish, 'jab')
         local slot = elapsed <= windup and -1 or math.min(params.JabsPerSide * 2 - 1,
             math.floor((elapsed - windup) / params.JabStepSec + 1e-9) - 1)
         if slot > (move.LastSlot or -1) then
@@ -1001,8 +1010,7 @@ function Mgr:UpdateKingCrabCombat(fish, now, pos, params)
     -- 收招帧（now == StrikeAt）先结算末钳再收招。
     fish.JabAt = now + params.JabIntervalSec
     self:StartMove(fish, 'jab', pos, target, tp, now,
-        BossMoves.Get('kingCrab', 'jab').Warning.WindupSec
-            + params.JabStepSec * params.JabsPerSide * 2, params.BiteRange)
+        bossWindup(fish, 'jab') + params.JabStepSec * params.JabsPerSide * 2, params.BiteRange)
 end
 
 -- #136 蟹老板：三招互斥——双击（pinch）、冲撞（charge）、旋转（spin）。
@@ -1016,7 +1024,7 @@ function Mgr:UpdateCrabBossCombat(fish, now, pos, params)
         if move.Name == 'pinch' then
             -- 双击第 k 击在起手后 k × PinchStepSec 秒起结算
             local elapsed = now - move.At
-            local windup = BossMoves.Get('crabBoss', 'pinch').Warning.WindupSec
+            local windup = bossWindup(fish, 'pinch')
             local strike = elapsed <= windup and 0 or math.min(params.PinchStrikes,
                 math.floor((elapsed - windup) / params.PinchStepSec + 1e-9))
             if strike > (move.LastStrike or 0) and strike >= 1 then
@@ -1032,7 +1040,7 @@ function Mgr:UpdateCrabBossCombat(fish, now, pos, params)
             return
         elseif move.Name == 'charge' then
             -- 冲撞窗口内命中一次（窗口内只结算一次，不按帧重复）
-            if not move.HitDone and now >= move.At + BossMoves.Get('crabBoss', 'charge').Warning.WindupSec then
+            if not move.HitDone and now >= move.At + bossWindup(fish, 'charge') then
                 local target, tp = self:ChooseTarget(fish, pos, params)
                 if target and tp and (tp.x - pos.x)^2 + (tp.z - pos.z)^2 <= params.ChargeRange^2 then
                     move.HitDone = true
@@ -1080,8 +1088,7 @@ function Mgr:UpdateCrabBossCombat(fish, now, pos, params)
     if now >= (fish.PinchAt or 0) and withinBite(pos, tp, params) then
         fish.PinchAt = now + params.PinchCooldownSec
         self:StartMove(fish, 'pinch', pos, target, tp, now,
-            BossMoves.Get('crabBoss', 'pinch').Warning.WindupSec
-                + params.PinchStepSec * params.PinchStrikes, params.BiteRange)
+            bossWindup(fish, 'pinch') + params.PinchStepSec * params.PinchStrikes, params.BiteRange)
         return
     end
     -- 追击
@@ -1493,8 +1500,7 @@ function Mgr:UpdateEel(fish, now, entry)
     end
     local attacking = fish.State == Mgr.State.Attacking
     local done = fish.Discharges or 0
-    local row = BossMoves.Get('eel', 'discharge')
-    local windup = row.Warning.WindupSec
+    local windup = bossWindup(fish, 'discharge')
     local interval = entry.DischargeIntervalSec
     if attacking then self:FlailEel(fish, now, entry) end
     if attacking and done >= entry.DischargeCount and not fish.DischargeAt then
