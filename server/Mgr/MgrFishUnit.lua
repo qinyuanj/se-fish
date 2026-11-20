@@ -638,8 +638,16 @@ function Mgr:LockBite(fish, target, pos, tpos, now, params)
     if fx then self:Face(fish, fx, fz, params) end
     fish.BiteAim = { Target = target, StrikeAt = now + params.BiteCooldownSec }
     local facing = fish.Facing or { x = 0, z = 1 }
-    publishBite(self, GarBiteNotice.Lock(fish.Id, pos, facing.x, facing.z, params.BiteRange,
-        params.HeadHalfAngleDeg, params.BiteCooldownSec))
+    local species = GameCfg.Fish[fish.FishId]
+    local warning = species and BossMoves.WarningOf(BossMoves.KeyOf(species, fish.FishId), 'bite') or nil
+    local notice = GarBiteNotice.Lock(fish.Id, pos, facing.x, facing.z, params.BiteRange,
+        params.HeadHalfAngleDeg, params.BiteCooldownSec)
+    notice.move = 'bite'
+    if warning then
+        notice.shape, notice.duration = warning.Shape, warning.WindupSec
+        if warning.Notice then notice.notice = warning.Notice end
+    end
+    publishBite(self, notice)
     print('[MgrFishUnit] 首领起咬', fish.FishId, 'target=' .. tostring(target.UserId),
         string.format('facing=%.2f,%.2f', facing.x, facing.z), 'fish=' .. tostring(fish.Id))
 end
@@ -713,9 +721,24 @@ function Mgr:StartMove(fish, name, pos, target, tpos, now, duration, range, shap
     local facing = fish.Facing or { x = 0, z = 1 }
     local warningPos = (name == 'dive' or name == 'jump') and fish.Move.Destination or pos
     warningPos = warningPos or pos
-    local payload = GarBiteNotice.Lock(fish.Id, warningPos, facing.x, facing.z, range, 90, duration)
+    -- #257 预警与命中分离：形状 / 起手 / 范围只取逐招表行，命中调度仍用 duration 与 params。
+    local species = GameCfg.Fish[fish.FishId]
+    local warning = species and BossMoves.WarningOf(BossMoves.KeyOf(species, fish.FishId), name) or nil
+    -- 表内 Range 是命中半径；冲锋类走廊半径由调用方传更大的 range，宁可超警不欠警。
+    local warningRange = warning and math.max(range or 0, warning.Range or 0) or range
+    local warningSec = warning and warning.WindupSec and warning.WindupSec > 0 and warning.WindupSec or duration
+    local payload = GarBiteNotice.Lock(fish.Id, warningPos, facing.x, facing.z, warningRange, 90, warningSec)
     payload.move = name
-    if shape == 'circle' or name == 'jump' then payload.shape, payload.halfAngleDeg = 'circle', 180 end
+    local shapeName = (warning and warning.Kind ~= 'none' and warning.Shape) or shape
+    if shapeName == 'circle' or name == 'jump' then
+        payload.shape, payload.halfAngleDeg = 'circle', 180
+    elseif shapeName == 'line' then
+        payload.shape = 'line'
+        if warning and warning.Width then payload.width = warning.Width end
+    elseif shapeName == 'cone' then
+        payload.shape = 'cone'
+    end
+    if warning and warning.Notice then payload.notice = warning.Notice end
     publishBite(self, payload)
     fish.MoveName = name
     self:PublishCombat(fish)
@@ -930,8 +953,9 @@ function Mgr:UpdateKingCrabCombat(fish, now, pos, params)
         -- 钳与钳之间完整隔一个 JabStepSec；StrikeAt = At + 钳数 × step，末槽（第 6 钳）
         -- 与收招同帧：先结算末钳再收招。掉帧只补当前槽不追溯。
         local elapsed = now - move.At
-        local slot = elapsed <= 0 and -1 or math.min(params.JabsPerSide * 2 - 1,
-            math.floor(elapsed / params.JabStepSec + 1e-9) - 1)
+        local windup = BossMoves.Get('kingCrab', 'jab').Warning.WindupSec
+        local slot = elapsed <= windup and -1 or math.min(params.JabsPerSide * 2 - 1,
+            math.floor((elapsed - windup) / params.JabStepSec + 1e-9) - 1)
         if slot > (move.LastSlot or -1) then
             move.LastSlot = slot
             local target, tp = self:IsTargetValid(move.Target, pos, params)
@@ -958,7 +982,8 @@ function Mgr:UpdateKingCrabCombat(fish, now, pos, params)
     -- 收招帧（now == StrikeAt）先结算末钳再收招。
     fish.JabAt = now + params.JabIntervalSec
     self:StartMove(fish, 'jab', pos, target, tp, now,
-        params.JabStepSec * params.JabsPerSide * 2, params.BiteRange)
+        BossMoves.Get('kingCrab', 'jab').Warning.WindupSec
+            + params.JabStepSec * params.JabsPerSide * 2, params.BiteRange)
 end
 
 -- #136 蟹老板：三招互斥——双击（pinch）、冲撞（charge）、旋转（spin）。
@@ -972,8 +997,9 @@ function Mgr:UpdateCrabBossCombat(fish, now, pos, params)
         if move.Name == 'pinch' then
             -- 双击第 k 击在起手后 k × PinchStepSec 秒起结算
             local elapsed = now - move.At
-            local strike = elapsed <= 0 and 0 or math.min(params.PinchStrikes,
-                math.floor(elapsed / params.PinchStepSec + 1e-9))
+            local windup = BossMoves.Get('crabBoss', 'pinch').Warning.WindupSec
+            local strike = elapsed <= windup and 0 or math.min(params.PinchStrikes,
+                math.floor((elapsed - windup) / params.PinchStepSec + 1e-9))
             if strike > (move.LastStrike or 0) and strike >= 1 then
                 move.LastStrike = strike
                 local target, tp = self:IsTargetValid(move.Target, pos, params)
@@ -987,7 +1013,7 @@ function Mgr:UpdateCrabBossCombat(fish, now, pos, params)
             return
         elseif move.Name == 'charge' then
             -- 冲撞窗口内命中一次（窗口内只结算一次，不按帧重复）
-            if not move.HitDone then
+            if not move.HitDone and now >= move.At + BossMoves.Get('crabBoss', 'charge').Warning.WindupSec then
                 local target, tp = self:ChooseTarget(fish, pos, params)
                 if target and tp and (tp.x - pos.x)^2 + (tp.z - pos.z)^2 <= params.ChargeRange^2 then
                     move.HitDone = true
@@ -1035,7 +1061,8 @@ function Mgr:UpdateCrabBossCombat(fish, now, pos, params)
     if now >= (fish.PinchAt or 0) and withinBite(pos, tp, params) then
         fish.PinchAt = now + params.PinchCooldownSec
         self:StartMove(fish, 'pinch', pos, target, tp, now,
-            params.PinchStepSec * params.PinchStrikes, params.BiteRange)
+            BossMoves.Get('crabBoss', 'pinch').Warning.WindupSec
+                + params.PinchStepSec * params.PinchStrikes, params.BiteRange)
         return
     end
     -- 追击
@@ -1426,10 +1453,9 @@ function Mgr:StartCombatChannel()
     end)
 end
 
--- #134 电鳗：Combat →（首次施法成功）Attacking 每 DischargeIntervalSec 施法放电一次，共 DischargeCount 次
--- →（最后一次后再满一个间隔）Sleeping SleepSec → Combat 重新开始。
--- 每次 Update 最多放电一次、下一次按实际放电时刻 + 间隔排期：重复 Update 不连放，大 dt 不补发连击，
--- 次数只按施法成功计（施法被拒/打断不计数，下帧重试）。睡眠从实际入睡时刻起算，大 dt 不会吞掉睡眠窗口。
+-- #134 / #257 电鳗：Combat →（首次起手）Attacking，每 interval 起一次放电预警，
+-- 起手 windup（逐招表）后 CastFish 放电；共 DischargeCount 次，最后一次再满一个间隔入睡 SleepSec。
+-- 预警与结算分离：广播来自逐招表，伤害只在服务端 CastFish 点火时结算。
 function Mgr:UpdateEel(fish, now, entry)
     local body = fish.Carrier.Body
     body.Position = fish.CombatPosition
@@ -1440,48 +1466,63 @@ function Mgr:UpdateEel(fish, now, entry)
         fish.State = Mgr.State.Combat
         fish.WakeAt = nil
         fish.Discharges = 0
+        fish.WarnAt, fish.DischargeAt = nil, nil
         print('[MgrFishUnit] 电鳗醒来', 'fish=' .. tostring(fish.Id))
         self:PublishCombat(fish)
     end
     local attacking = fish.State == Mgr.State.Attacking
     local done = fish.Discharges or 0
-    if attacking and done >= entry.DischargeCount then
-        if now < fish.NextDischargeAt then
-            self:FlailEel(fish, now, entry)
-            return
-        end
+    local row = BossMoves.Get('eel', 'discharge')
+    local windup = row.Warning.WindupSec
+    local interval = entry.DischargeIntervalSec
+    if attacking then self:FlailEel(fish, now, entry) end
+    if attacking and done >= entry.DischargeCount and not fish.DischargeAt then
+        if now < (fish.WarnAt or math.huge) then return end
         if fish.CombatRotation and Quaternion then
             body.Rotation = fish.CombatRotation * Quaternion.FromEulerAngles(0, 0, entry.SleepRollRadians)
         end
         fish.State = Mgr.State.Sleeping
         fish.WakeAt = now + entry.SleepSec
-        fish.NextDischargeAt = nil
+        fish.WarnAt = nil
+        publishBite(self, GarBiteNotice.Clear(fish.Id, 'sleep'))
         print('[MgrFishUnit] 电鳗睡眠', 'fish=' .. tostring(fish.Id), 'wakeAt=' .. tostring(fish.WakeAt))
         self:PublishCombat(fish)
         return
     end
-    if attacking then self:FlailEel(fish, now, entry) end
-    if attacking and now < fish.NextDischargeAt then return end
+    if fish.DischargeAt then
+        if now < fish.DischargeAt then return end
+    elseif not attacking then
+        fish.State, fish.AttackAt = Mgr.State.Attacking, now
+        done, fish.Discharges = 0, 0
+        fish.WarnAt = now
+    elseif now < fish.WarnAt then
+        return
+    end
+    if not fish.DischargeAt then
+        local warning = BossMoves.WarningOf('eel', 'discharge')
+        local notice = GarBiteNotice.Lock(fish.Id, fish.CombatPosition or body.Position, 0, 1,
+            warning.Range, 180, warning.WindupSec)
+        notice.move, notice.shape, notice.notice = 'discharge', warning.Shape, warning.Notice
+        publishBite(self, notice)
+        fish.DischargeAt, fish.WarnAt = now + windup, now + interval
+        self:PublishCombat(fish) -- 起手也属于战斗态变化，客户端标签同步
+        return
+    end
     local castOk, casted = true, false
     if self.Ability then castOk, casted = pcall(self.Ability.CastFish, self.Ability, fish) end
     if not castOk then
         print('[MgrFishUnit] 电鳗施法异常', 'fish=' .. tostring(fish.Id), tostring(casted))
     end
     if not castOk or not casted then
+        fish.DischargeAt = now -- 施法被拒：不计数、不重发预警，下帧重试
         if not fish.CastRejected then
             fish.CastRejected = true
             print('[MgrFishUnit] 电鳗施法未成功，下帧重试', 'fish=' .. tostring(fish.Id), 'done=' .. tostring(done))
         end
         return
     end
-    fish.CastRejected = nil
-    if not attacking then
-        fish.State = Mgr.State.Attacking
-        fish.AttackAt = now
-        done = 0
-    end
+    fish.CastRejected, fish.DischargeAt = nil, nil
     fish.Discharges = done + 1
-    fish.NextDischargeAt = now + entry.DischargeIntervalSec
     print('[MgrFishUnit] 电鳗放电', 'fish=' .. tostring(fish.Id), fish.Discharges .. '/' .. entry.DischargeCount)
     self:PublishCombat(fish)
 end
@@ -2133,6 +2174,7 @@ function Mgr:Remove(fish)
     -- #132 T11：鱼被打死/清场时先把叼着的玩家放下来（否则玩家会跟着一条死鱼卡在空中）
     if fish.Carry then self:ReleaseCarried(fish, nil, 'died') end
     self:EndBite(fish, 'gone') -- #134：死亡或清场时收起咬预警
+    if fish.DischargeAt then publishBite(self, GarBiteNotice.Clear(fish.Id, 'gone')) end -- #257 放电预警
     self:EndMove(fish, 'gone')
     fish.WakeAt, fish.MoveName = nil, nil
     self.Fish[fish.Id] = nil
