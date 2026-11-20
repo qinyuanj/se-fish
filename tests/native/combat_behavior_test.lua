@@ -297,4 +297,34 @@ describe('TestMeleeHitEntry', function()
         assert.same(0, #ctx.created)
         assert.same(0, #ctx.hits)
     end)
+
+    -- #212：同一玩家连击时，每次挥击各建一套武器挂点与命中盒。名字里没有本次挥击的实例标识，
+    -- 两个同名兄弟节点就并存在 owner 下与世界根上，按名 FindFirstChild 拿到哪个不确定。
+    it('test_two_swings_of_one_owner_get_distinct_unit_names', function()
+        ctx.swingStaged[7] = { damage = 12, range = 4 }
+        local attrs = baseAttrs()
+        attrs.ABILITY_ANOSTATE_USE_PERFAB = 'official://unit/T-weapon'
+        local anchor = buildAnchor(attrs)
+        anchor.AnchorStart:Fire()
+        ctx.swingStaged[7] = { damage = 12, range = 4 } -- 连击的第二下同样要经服务端登记
+        anchor.AnchorStart:Fire()
+        local mounts, boxes = {}, {}
+        for _, unit in ipairs(ctx.created) do
+            if unit.UnitType == 'SkeletalSocketMount' then
+                mounts[#mounts + 1] = unit.Name
+            elseif unit.UnitType == 'TriggerUnit' then
+                boxes[#boxes + 1] = unit.Name
+            end
+        end
+        assert.same(2, #mounts)
+        assert.same(2, #boxes)
+        for _, names in ipairs({ mounts, boxes }) do
+            assert.is_not.same(names[1], names[2])
+            for _, name in ipairs(names) do
+                assert.is_truthy(name, '建单位必须带名字')
+                assert.is_truthy(string.find(name, '70', 1, true),
+                    '名字要带施法者标识：' .. tostring(name))
+            end
+        end
+    end)
 end)

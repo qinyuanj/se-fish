@@ -108,6 +108,22 @@ describe("钓场商店的失败提示", function()
         assert.same(0, OwnedUnits.Count(ctx.localShop))
     end)
 
+    it("test_restart_rebuilds_instead_of_stacking_bubbles", function()
+        -- 同上：重复启动摊位入口先清空上一轮，不叠第二套气泡
+        for _, stand in ipairs(GameCfg.Shop.Stands) do
+            ctx.anchors[stand.AnchorName] = { Name = stand.AnchorName, Position = { x = 0, y = 0, z = 0 } }
+        end
+        ctx.localShop:Start()
+        local firstBubbles = {}
+        for index, bubble in ipairs(ctx.localShop.Bubbles) do firstBubbles[index] = bubble.Node end
+        ctx.localShop:Start()
+        assert.same(#GameCfg.Shop.Stands, #ctx.localShop.Bubbles) -- 气泡记录还是每摊一条
+        for _, node in ipairs(firstBubbles) do
+            assert.is_true(node.Destroyed, "上一轮气泡根应被拆掉")
+        end
+        assert.same(2 * #GameCfg.Shop.Stands, OwnedUnits.Count(ctx.localShop)) -- 登记表只留新一轮
+    end)
+
     -- 回包 → 消息条（#218）：四类服务端失败各给对应文案（不分错类），成功给「购买成功：X，花费 N 金币」。
     -- 失败方式：两类失败共用一句（分不清是没钱还是背包满）；未知原因没兜底；成功文案漏掉花费金额。
     it("test_notice_mapping_for_success_and_server_failures", function()

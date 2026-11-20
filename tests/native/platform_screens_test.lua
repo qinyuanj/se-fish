@@ -32,7 +32,7 @@ end
 
 -- 每例重建客户端边界夹具。返回 env 与一个只做「还原」的闭包，供 after_each 幂等调用。
 local function setUpClient()
-  local env = { previous = {}, previousLoaded = {}, nodes = {}, commands = {}, notices = {}, events = {} }
+  local env = { previous = {}, previousLoaded = {}, nodes = {}, created = {}, commands = {}, notices = {}, events = {} }
   for _, key in ipairs(globalNames) do
     env.previous[key] = rawget(_G, key)
   end
@@ -47,6 +47,7 @@ local function setUpClient()
     for key, value in pairs(attrs) do node[key] = value end
     node.Destroy = function(me) me.Destroyed = true end
     if node.Name then env.nodes[node.Name] = node end
+    env.created[#env.created + 1] = node
     return node
   end
   function world:FindFirstChild() return nil end
@@ -290,7 +291,8 @@ describe('盲盒界面（ScreenBlindbox）', function()
 
   -- #211：节点一律登记到归属登记，清空只走登记表，不再从 Nodes 枚举
   it('test_clear_destroys_every_registered_node_and_resets_lookup', function()
-    assert.same(12, OwnedUnits.Count(env.screen)) -- 入口按钮与文字 + 面板 + 面板内 9 个
+    -- 入口按钮与文字 + 面板 + 面板内 9 个：数本轮夹具实际收到的建点，不写死
+    assert.same(#env.created, OwnedUnits.Count(env.screen))
     env.screen:Clear()
     assert.same(0, OwnedUnits.Count(env.screen))
     for name, node in pairs(env.nodes) do
@@ -302,6 +304,16 @@ describe('盲盒界面（ScreenBlindbox）', function()
     assert.is_nil(env.screen.Panel)
     env.screen:Clear() -- 幂等：重复清空不报错
     assert.same(0, OwnedUnits.Count(env.screen))
+  end)
+
+  -- 重建前先清空：重试循环里上一轮部分成功建出的入口 / 面板不叠到第二轮上
+  it('test_build_nodes_rebuild_does_not_stack_previous_attempt', function()
+    local firstEntry = env.nodes.BtnBlindboxEntry
+    local before = #env.created
+    assert.is_true(env.screen:BuildNodes())
+    assert.is_true(firstEntry.Destroyed, '上一轮入口按钮应被拆掉')
+    assert.not_equal(firstEntry, env.nodes.BtnBlindboxEntry)
+    assert.same(#env.created - before, OwnedUnits.Count(env.screen)) -- 登记表只留新一轮
   end)
 end)
 
@@ -376,7 +388,8 @@ describe('平台购买界面（ScreenPlatform）', function()
   it('test_clear_destroys_every_registered_node_and_resets_lookup', function()
     env.panel:ShowOffers({ { key = 'adrenaline1', name = '肾上腺素', beans = 1 } })
     assert.is_not_nil(env.panel.Offers)
-    assert.same(16, OwnedUnits.Count(env.panel)) -- 报价面板 8 个 + 测试驱动面板 8 个
+    -- 报价面板 8 个 + 测试驱动面板 8 个：数本轮夹具实际收到的建点，不写死
+    assert.same(#env.created, OwnedUnits.Count(env.panel))
     env.panel:Clear()
     assert.same(0, OwnedUnits.Count(env.panel))
     for name, node in pairs(env.nodes) do
@@ -388,5 +401,15 @@ describe('平台购买界面（ScreenPlatform）', function()
     assert.is_nil(env.panel.Offers)
     env.panel:Clear() -- 幂等：重复清空不报错
     assert.same(0, OwnedUnits.Count(env.panel))
+  end)
+
+  -- 同上：重建不叠重复节点
+  it('test_build_nodes_rebuild_does_not_stack_previous_attempt', function()
+    local firstOffers = env.nodes.PlatformOffers
+    local before = #env.created
+    assert.is_true(env.panel:BuildNodes())
+    assert.is_true(firstOffers.Destroyed, '上一轮报价面板应被拆掉')
+    assert.not_equal(firstOffers, env.nodes.PlatformOffers)
+    assert.same(#env.created - before, OwnedUnits.Count(env.panel)) -- 登记表只留新一轮
   end)
 end)

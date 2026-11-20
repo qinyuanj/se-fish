@@ -106,6 +106,10 @@ function ScreenHandler:BuildNodes()
         print('[ScreenLottery] UIRoot 未就绪，抽奖界面不可用')
         return false
     end
+    -- 重建前先清空上一轮的节点（#211 的 Clear）：重试循环里一次只成功一半后再试，不叠出重复节点。
+    -- 已有的 Init 监听指向的正是要销毁的节点，Clear 一并复位；重试跑在开屏之前，正常路径这里还没有监听，
+    -- 之后的 Init 由 MgrGameUI 的 Inited 守卫按新根节点重新跑一遍。
+    self:Clear()
     local resolution = GameUI:GetEuiManager():GetDeviceResolution()
     local x, y = resolution.x / 2, resolution.y / 2
     local ok, layout = pcall(game:GetService('World').CreateUnit, game:GetService('World'), 'EUILayout', {

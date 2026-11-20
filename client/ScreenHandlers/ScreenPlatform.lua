@@ -74,6 +74,8 @@ end
 function Panel:BuildNodes()
     local root = GameUI:GetUIRoot()
     if not root then return false end
+    -- 重建前先清空上一轮尝试建出的节点：重试循环里一次只成功一半后再试，不叠重复报价 / 驱动面板。
+    self:Clear()
     local resolution = GameUI:GetEuiManager():GetDeviceResolution() or { x = 1920, y = 1080 }
     local cx, cy = resolution.x / 2, resolution.y / 2
     local offers = self:Create('EUIImage', root, 'PlatformOffers', cx - 300, cy + 120, 600, 220, {

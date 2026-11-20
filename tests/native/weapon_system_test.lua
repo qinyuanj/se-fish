@@ -417,7 +417,8 @@ describe('TestMgrWeaponThrow', function()
     before_each(function()
         saved = { game = rawget(_G, 'game'), re = rawget(_G, 'REUtil'),
             api = package.loaded['server.AbilityAPI'] }
-        ctx = { now = 2000, replies = {}, applied = {}, spawnedFish = {}, order = 0, launches = {} }
+        ctx = { now = 2000, replies = {}, applied = {}, spawnedFish = {}, order = 0, launches = {},
+            visuals = {} }
         ctx.player = throwPlayer(77)
         ctx.other = throwPlayer(78)
         package.loaded['server.AbilityAPI'] = { StageSwing = function() end,
@@ -430,7 +431,10 @@ describe('TestMgrWeaponThrow', function()
             end, CheckRECD = function() return nil end }
         _G.game = { GetService = function(_, name)
             if name == 'World' then return { GetServerTime = function() return ctx.now end,
-                CreateUnit = function() return { Destroy = function() end, Position = { x = 0, y = 0, z = 0 } } end } end
+                CreateUnit = function(_, unitType, values)
+                    ctx.visuals[#ctx.visuals + 1] = { unitType = unitType, name = values and values.Name }
+                    return { Destroy = function() end, Position = { x = 0, y = 0, z = 0 } }
+                end } end
             if name == 'Players' then return { GetPlayers = function() return { ctx.player, ctx.other } end,
                 GetPlayerFromCharacter = function() return nil end } end
             return nil
@@ -544,6 +548,21 @@ describe('TestMgrWeaponThrow', function()
         assert.same(0, #ctx.mgr.Flying)
         assert.same(3, #ctx.spawnedFish) -- 落水保底鱼
         assert.same(1, ctx.data:ItemCount('item143')) -- Launch 不经存档协议，本用例直接发射不扣
+    end)
+
+    -- #212：同屏两发在飞时，投掷物名字必须各自可区分。原来全服都叫 ThrowProjectile，
+    -- 按名 FindFirstChild 拿到哪一发不确定，排查与定点回收都做不到。
+    it('test_concurrent_projectiles_get_distinct_names', function()
+        local landing = { x = 0, y = 2, z = 10 }
+        ctx.mgr:Launch(ctx.player, 'item143', landing)
+        ctx.mgr:Launch(ctx.other, 'item143', landing)
+        assert.same(2, #ctx.visuals)
+        assert.same('TriggerUnit', ctx.visuals[1].unitType)
+        assert.is_not.same(ctx.visuals[1].name, ctx.visuals[2].name)
+        assert.is_truthy(string.find(ctx.visuals[1].name, '77', 1, true),
+            '名字要带投掷者标识：' .. tostring(ctx.visuals[1].name))
+        assert.is_truthy(string.find(ctx.visuals[2].name, '78', 1, true),
+            '名字要带投掷者标识：' .. tostring(ctx.visuals[2].name))
     end)
 
     it('test_target_clamped_to_20m', function()

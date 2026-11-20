@@ -211,6 +211,8 @@ function Panel:BuildPanel()
         print('[ScreenGrill] EUI 未就绪，跳过建面板')
         return
     end
+    -- 重建前先清空上一轮的节点（面板与气泡根）：Start 重入或部分成功后重建不叠第二套面板。
+    self:Clear()
     local size = resolution or { x = 1920, y = 1080 }
     local cx, cy = size.x / 2, size.y / 2
     local ok, err = pcall(function()

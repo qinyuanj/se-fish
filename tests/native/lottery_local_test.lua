@@ -229,6 +229,18 @@ describe("抽奖机入口表现（client/LocalLottery）", function()
     assert.is_true(env.nodes.LabelLotteryEnterTheme.Destroyed)
   end)
 
+  it("test_restart_rebuilds_instead_of_stacking_bubbles", function()
+    -- Start 的真实语义是重建：重复启动先清空上一轮，不叠第二套气泡
+    local names = GameCfg.Lottery.MachineAnchors()
+    env:anchor(names[1], 0, 0)
+    env.localLottery:Start()
+    local first = env.localLottery.Bubbles[1].Node
+    env.localLottery:Start()
+    assert.same(1, #env.localLottery.Bubbles) -- 气泡记录还是一条
+    assert.is_true(first.Destroyed, "上一轮气泡根应被拆掉")
+    assert.same(2, OwnedUnits.Count(env.localLottery)) -- 登记表只留新一轮的按钮与文字
+  end)
+
   it("test_update_does_not_touch_visibility_without_state_change", function()
     local names = GameCfg.Lottery.MachineAnchors()
     env:anchor(names[1], 0, 0)

@@ -59,7 +59,7 @@ local function newWorld()
   end
   env.cfg = require("common.GameCfg")
 
-  env.nodes = {}
+  env.nodes, env.created = {}, {}
   local world = {}
   function world:CreateUnit(kind, attrs)
     local node = { Kind = kind, OnClicked = signal(), Visible = true }
@@ -70,6 +70,7 @@ local function newWorld()
     if node.Name then
       env.nodes[node.Name] = node
     end
+    env.created[#env.created + 1] = node
     return node
   end
   function world:FindFirstChild()
@@ -350,7 +351,8 @@ describe("抽奖机界面表现（ScreenLottery）", function()
   -- #211：建点一律登记到归属登记，清空只走登记表，不再从 UINodeMap 枚举
   it("test_clear_destroys_every_registered_node_and_resets_lookup", function()
     local root = env.handler.RootNode
-    assert.same(14, OwnedUnits.Count(env.handler)) -- EUILayout 根 + 13 个运行时节点
+    -- EUILayout 根 + 13 个运行时节点：数本轮夹具实际收到的建点，不写死
+    assert.same(#env.created, OwnedUnits.Count(env.handler))
     env.handler:Clear()
     assert.same(0, OwnedUnits.Count(env.handler))
     for name, node in pairs(env.nodes) do
@@ -363,5 +365,15 @@ describe("抽奖机界面表现（ScreenLottery）", function()
     assert.same({}, env.handler.UINodeMap)
     env.handler:Clear() -- 幂等：重复清空不报错
     assert.same(0, OwnedUnits.Count(env.handler))
+  end)
+
+  -- 重建前先清空：重试循环里上一轮部分成功建出的节点不叠到第二轮上
+  it("test_rebuild_does_not_stack_previous_attempt", function()
+    local firstRoot = env.handler.RootNode
+    local before = #env.created
+    assert.is_true(env.handler:BuildNodes())
+    assert.is_true(firstRoot.Destroyed, "上一轮根节点应被拆掉")
+    assert.not_equal(firstRoot, env.handler.RootNode)
+    assert.same(#env.created - before, OwnedUnits.Count(env.handler)) -- 登记表只留新一轮
   end)
 end)

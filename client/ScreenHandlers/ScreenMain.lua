@@ -15,6 +15,8 @@ local ScreenHandler = { UINodes = {}, UINodeMap = {} }
 -- 挂在主界面名下的话 EndAim 拆过一次登记表还留着它，关屏时会再拆一遍（登记表没有「取消登记」），
 -- 所以它有自己的所有者。
 local AIM_OWNER = {}
+-- 导出这个所有者：测试与排查要按「瞄准拾取层」这一个桶数节点，和主界面名下的登记分开算。
+ScreenHandler.AimOwner = AIM_OWNER
 
 function ScreenHandler:Action(action, value)
     _G.REUtil:GetRE('ItemBarAction'):FireServer({ action = action, value = value })
@@ -1180,6 +1182,9 @@ function ScreenHandler:Cleanup()
     LocalAttackButton:Destroy()
     for _, connection in ipairs(self.Connections or {}) do connection:Disconnect() end
     -- #209：本界面建的全部节点都记在所有者名下，这里一次清空；私有表不再参与销毁。
+    -- 瞄准拾取层挂在自己的所有者名下（AIM_OWNER）：关屏时若没走到 EndAim（例如收尾前半段抛错），
+    -- 这里兜底把它拆掉，全屏拦截按钮不会留在 UIRoot 上继续吃点击。
+    OwnedUnits.Clear(AIM_OWNER)
     OwnedUnits.Clear(self)
     self.Connections = nil
     self.Slots = nil

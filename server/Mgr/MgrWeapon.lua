@@ -18,6 +18,9 @@ local SwingRegistry = require('server.SwingRegistry')
 
 -- AnimTracks：角色 → { 动画 ID → track }，弱键，角色重生换新对象后旧表随 GC 回收
 local Mgr = { States = {}, Flying = {}, AnimTracks = setmetatable({}, { __mode = 'k' }) }
+-- #212：投掷物实例序号。模块内自增，不建全局计数器；名字带它，同屏多发在飞时才可区分
+-- （原先全服同名 ThrowProjectile，按名查到的是哪一发不确定）。
+Mgr.ThrowSeq = 0
 
 -- 投掷物视觉占位网格：与 melee_hit 命中盒同款平台级资源（issue #8 实测可用），
 -- 编辑器冻结期间不做资源预设，后续可在编辑器里换成正式爆炸物模型（见 issue #129 编辑器待办）。
@@ -581,9 +584,12 @@ function Mgr:FlightPosition(flight, t)
 end
 
 function Mgr:CreateThrowVisual(player, itemId, flight)
+    self.ThrowSeq = self.ThrowSeq + 1
+    local name = 'ThrowProjectile_' .. tostring(player and player.UserId or 'unknown')
+        .. '_' .. tostring(self.ThrowSeq)
     local ok, visual = pcall(function()
         return game:GetService('World'):CreateUnit('TriggerUnit', {
-            Name = 'ThrowProjectile',
+            Name = name,
             PhysicsMeshId = THROW_VISUAL_MESH,
             Position = self:FlightPosition(flight, 0),
             Scale = self:Vec3(1, 1, 1),

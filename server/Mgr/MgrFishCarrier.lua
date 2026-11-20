@@ -31,8 +31,10 @@ local Mgr = {}
 
 -- 受击体的名字固定：探针与调试按名字反查
 Mgr.RECEIVER_NAME = "FishHitReceiver"
--- 鱼本体默认名前缀
+-- 鱼本体名前缀。本体名字由本模块拼（前缀_实例序号_FishId），调用方塞 Name 改不了它（#212）
 Mgr.BODY_NAME_PREFIX = "FishCarrier"
+-- 鱼本体实例序号：模块内自增，同一鱼种的多条鱼也因此名字各不相同
+Mgr.BodySeq = 0
 
 -- 血量口径：本图 GameCfg 与策划案都还没有鱼的血量（M0-V3 只定了模型号，挥砍伤害 25 在
 -- GameCfg.Ability 里），缺口径 → 取引擎自己的默认：EggyUnit 的 Controller 默认
@@ -306,8 +308,10 @@ function Mgr:Spawn(opts)
 	local cfg = GameCfg.FishCarrier or {}
 	local species = GameCfg.Fish[opts.FishId]
 	local tint = species and species.VisualColor
+	-- #212：名字在这里生成，不读 opts.Name——调用方只能给业务标识（FishId），不能直接决定名字
+	Mgr.BodySeq = Mgr.BodySeq + 1
 	local values = {
-		Name = Mgr.BODY_NAME_PREFIX .. "_" .. tostring(opts.FishId or "unknown"),
+		Name = Mgr.BODY_NAME_PREFIX .. "_" .. tostring(Mgr.BodySeq) .. "_" .. tostring(opts.FishId or "unknown"),
 		Position = opts.Position or Vector3.New(0, 0, 0),
 		Rotation = opts.Rotation or Quaternion.FromEulerAngles(0, 0, 0),
 		RenderMeshId = mesh,
