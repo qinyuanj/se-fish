@@ -425,6 +425,43 @@
 | 13-11 | server/Mgr/MgrCompendium.lua、server/Mgr/MgrInteract.lua | tests/native/compendium_test.lua、tests/native/exchange_zones_127_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 13-12 | server/Mgr/MgrAchievements.lua、common/GameCfg.lua | tests/native/spec/13_achievement_delivery_placeholder_test.lua | 有 | 缺 | 有 | 有 | B |
 | 13-13 | server/Mgr/MgrAchievements.lua | tests/native/spec/13_achievement_delivery_placeholder_test.lua | 有 | 缺 | 有 | 有 | B |
+| 13-14 | server/Mgr/MgrAchievements.lua、server/Mgr/MgrSave.lua | tests/native/spec/13_achievement_delivery_placeholder_test.lua | 有 | 有 | 缺 | 缺 | B |
+| 13-17 | server/Mgr/MgrRecords.lua、server/Data/RecordsAdapter.lua、common/Records.lua、client/ScreenHandlers/ScreenCompendium.lua | tests/native/spec/13_record_display_placeholder_test.lua、tests/native/records_test.lua | 缺 | 有 | 缺 | 缺 | B |
+| 13-18 | server/Mgr/MgrAchievements.lua、common/GameCfg.lua | tests/native/spec/13_achievement_delivery_placeholder_test.lua、tests/native/spec/17_platform_achievement_id_test.lua | 有 | 有 | 有 | 有 | B |
+
+第 13 节的 13-07、13-08、13-17 由图鉴客户端与服务端纪录查询的公开入口取证：`tests/native/spec/13_record_display_placeholder_test.lua` 
+翻到「没有纪录」与「纪录服务未接入」两种回包，断言该列只显示「未取得数据」、不出现任何数字与保持者；13-12～13-14、13-18 由
+成就交付队列取证。13-15、13-16 是试玩条款，不在本表登记。
+
+### 第 14 节 抽奖机（23 条）
+
+| 条款 | 代码落点 | 关联测试 | 正常流程 | 失败流程 | 退出重进 | 存档恢复 | 等级 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 14-01 | common/GameCfg.lua、server/Mgr/MgrLottery.lua | tests/native/lottery_settle_test.lua、tests/native/lottery_draw_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 14-02 | common/LotteryEligibility.lua、server/Mgr/MgrLottery.lua | tests/native/lottery_eligibility_test.lua、tests/native/lottery_ui_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 14-03 | common/LotteryDraw.lua、common/cfg/Lottery.lua | tests/native/lottery_settle_test.lua、tests/native/lottery_draw_test.lua、tests/native/spec/14_lottery_rules_test.lua | 有 | 缺 | 缺 | 缺 | A |
+| 14-04 | common/LotteryDraw.lua、server/Mgr/MgrLottery.lua | tests/native/lottery_settle_test.lua、tests/native/lottery_draw_test.lua、tests/native/spec/14_lottery_rules_test.lua | 有 | 缺 | 缺 | 缺 | A |
+| 14-05 | common/LotteryDraw.lua、server/Mgr/MgrLottery.lua | tests/native/lottery_settle_test.lua、tests/native/lottery_draw_test.lua、tests/native/spec/14_lottery_rules_test.lua | 有 | 缺 | 缺 | 缺 | A |
+| 14-06 | common/LotteryDraw.lua、common/cfg/Lottery.lua | tests/native/lottery_settle_test.lua、tests/native/lottery_draw_test.lua、tests/native/spec/14_lottery_rules_test.lua | 有 | 缺 | 缺 | 缺 | A |
+| 14-07 | common/cfg/Lottery.lua、common/LotteryDraw.lua | tests/native/lottery_settle_test.lua、tests/native/lottery_draw_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 14-08 | common/cfg/Lottery.lua、common/LotteryDraw.lua | tests/native/lottery_settle_test.lua、tests/native/lottery_draw_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 14-09 | common/LotteryDraw.lua、server/Mgr/MgrLottery.lua | tests/native/lottery_settle_test.lua、tests/native/lottery_draw_test.lua、tests/native/spec/14_lottery_rules_test.lua | 有 | 缺 | 缺 | 缺 | A |
+| 14-10 | common/LotteryDraw.lua、server/Mgr/MgrLottery.lua | tests/native/lottery_settle_test.lua、tests/native/lottery_draw_test.lua、tests/native/spec/14_lottery_rules_test.lua | 有 | 缺 | 缺 | 缺 | A |
+| 14-11 | common/GameCfg.lua、client/ScreenHandlers/ScreenLottery.lua | tests/native/lottery_local_test.lua、tests/native/lottery_ui_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 14-12 | server/Mgr/MgrLottery.lua、server/Mgr/MgrSave.lua | tests/native/lottery_settle_test.lua | 缺 | 缺 | 缺 | 缺 | B |
+| 14-13 | server/Mgr/MgrLottery.lua | tests/native/lottery_settle_test.lua、tests/native/lottery_draw_test.lua、tests/native/spec/14_lottery_rules_test.lua | 有 | 缺 | 缺 | 缺 | A |
+| 14-14 | server/Mgr/MgrLottery.lua、server/Data/PlayerData.lua | tests/native/lottery_settle_test.lua、tests/native/lottery_ui_test.lua | 缺 | 缺 | 缺 | 缺 | B |
+| 14-15 | server/Mgr/MgrLottery.lua、server/Data/PlayerData.lua | tests/native/lottery_settle_test.lua、tests/native/lottery_draw_test.lua、tests/native/spec/14_lottery_rules_test.lua | 有 | 缺 | 缺 | 缺 | A |
+| 14-16 | client/ScreenHandlers/ScreenLottery.lua | tests/native/lottery_eligibility_test.lua、tests/native/lottery_ui_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 14-17 | server/Mgr/MgrLottery.lua、server/Mgr/MgrSave.lua | tests/native/lottery_settle_test.lua | 缺 | 缺 | 缺 | 缺 | B |
+| 14-18 | server/Mgr/MgrLottery.lua、server/Mgr/MgrSave.lua | tests/native/lottery_settle_test.lua | 缺 | 缺 | 缺 | 缺 | B |
+| 14-19 | server/Mgr/MgrLottery.lua、server/Mgr/MgrSave.lua | tests/native/lottery_settle_test.lua | 缺 | 缺 | 缺 | 缺 | B |
+| 14-20 | common/SpecialItem.lua、server/Mgr/MgrSpecialItem.lua | tests/native/special_item_mgr_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 14-21 | common/SpecialItem.lua、common/FlightPath.lua | tests/native/special_item_mgr_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 14-22 | common/SpecialItem.lua、server/Mgr/MgrSpecialItem.lua | tests/native/special_item_mgr_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 14-23 | common/SpecialItem.lua、common/BossPhase.lua | tests/native/special_item_mgr_test.lua | 缺 | 缺 | 缺 | 缺 | B |
+
+图案权重与两同倍数在 common/cfg/Lottery.lua，抽样与判奖在 common/LotteryDraw.lua，扣物发奖与落位在 MgrLottery。
 
 ### 第 15 节 地图盲盒（18 条）
 
@@ -545,3 +582,7 @@
 | 18-31 | server/Mgr/MgrSave.lua、server/Data/PlayerData.lua | tests/native/spec/18_session_settlement_contract_test.lua | 有 | 有 | 有 | 有 | B |
 | 18-32 | server/main.lua、server/Mgr/MgrPlayerData.lua | tests/native/player_leave_rejoin_test.lua | 缺 | 缺 | 缺 | 缺 | B |
 
+## 三、待登记小节
+
+第 11、19 节尚未登记。按依赖顺序逐节扩大，每节登记时同时补齐该节的代码落点与既有测试，
+并把该节加进 `tools/acceptance.lua` 的 `M.COVERAGE_SECTIONS`。
