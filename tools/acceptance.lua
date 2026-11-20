@@ -168,6 +168,14 @@ function M.evidence_paths(cell)
   return out
 end
 
+-- 证据文件里有没有这条条款：要求完整的条款号，前后都不能再贴词字符。
+-- 只比路径前缀证明不了「断言的是这一条」——9-12 不能靠 19-12 或 9-120 蒙过去。
+function M.clause_mentioned(body, id)
+  if type(body) ~= 'string' or body == '' or type(id) ~= 'string' or id == '' then return false end
+  local escaped = id:gsub('[%W]', '%%%0')
+  return body:find('%f[%w]' .. escaped .. '%f[%W]') ~= nil
+end
+
 -- GameSpec 的小节：只看 '## N. 标题' 这一种标题；别的层级不算小节。
 function M.spec_sections(body)
   local sections = {}
@@ -638,20 +646,35 @@ local function check_shards(matrix, add)
               shard.path, clause.line)
           end
         end
-        -- 条款断言车道：evidenced/accepted 的 agent 条款必须至少有一条 tests/native/spec 或 tests/probes 证据。
+        -- 条款断言车道：evidenced/accepted 的 agent 条款必须有一条 tests/native/spec 或 tests/probes 证据，
+        -- 且那个文件的正文里出现过本条条款号。路径前缀只说明「放对了车道」，条款号才说明「断言的是这一条」。
         if #paths > 0 and (clause.status == 'evidenced' or clause.status == 'accepted')
             and clause.executor == 'agent' then
-          local clause_assertion = false
+          local clause_assertion, lane_paths, readable = false, 0, 0
           for _, path in ipairs(paths) do
             if path:match('^tests/native/spec/') or path:match('^tests/probes/') then
-              clause_assertion = true
-              break
+              lane_paths = lane_paths + 1
+              local body = read_text(matrix.root, path)
+              if body then
+                readable = readable + 1
+                if M.clause_mentioned(body, clause.id) then
+                  clause_assertion = true
+                  break
+                end
+              end
             end
           end
+          -- 文件不存在由 evidence_missing 报：一处坏处只出一个红，这里不重复计。
           if not clause_assertion then
-            add('evidence_not_clause_assertion', string.format(
-              '%s 标为 %s，但证据列没有 tests/native/spec/ 或 tests/probes/ 下的条款断言（现写的是 %q）',
-              clause.id, clause.status, evidence), shard.path, clause.line)
+            if lane_paths == 0 then
+              add('evidence_not_clause_assertion', string.format(
+                '%s 标为 %s，但证据列没有 tests/native/spec/ 或 tests/probes/ 下的条款断言：路径不符（现写的是 %q）',
+                clause.id, clause.status, evidence), shard.path, clause.line)
+            elseif readable > 0 then
+              add('evidence_not_clause_assertion', string.format(
+                '%s 标为 %s，但条款断言文件的正文里没有条款号 %s：文件里没有条款号（现写的是 %q）',
+                clause.id, clause.status, clause.id, evidence), shard.path, clause.line)
+            end
           end
         end
         -- accepted 另要人背书：路径后面必须跟（签署：@用户名 YYYY-MM-DD）。

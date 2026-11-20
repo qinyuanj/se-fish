@@ -237,7 +237,8 @@ describe('接线验收：属性与效果投影一致', function()
             '官方 attr_rule 的属性值与 AttrModel 分量不一致')
     end)
 
-    it('效果投影由 modifier_system 持有，霜冻减速 30% 且不叠加', function()
+    -- 条款 6-26：霜之新星命中减速 30%、霜冻不叠加（持续 3 秒由效果定义给，这里断言倍率与不叠加）。
+    it('条款 6-26：效果投影由 modifier_system 持有，霜冻减速 30% 且不叠加', function()
         local Runtime = require('tests.support.modifier_runtime')
         local rt = Runtime.New(100)
         local modifier = rt:loadModifier()
