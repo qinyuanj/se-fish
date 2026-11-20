@@ -72,6 +72,27 @@ describe('验收矩阵门禁', function()
     end
   end)
 
+  it('真实实现覆盖表：已贯通小节的非试玩条款没有空落点', function()
+    local matrix = real_matrix()
+    assert.is_not_nil(matrix.coverage, '读不到实现覆盖表：' .. Acceptance.COVERAGE)
+    local landed = {}
+    for _, row in ipairs(matrix.coverage.rows) do
+      assert.is_truthy(row.landing ~= nil and row.landing ~= '' and row.landing ~= '—',
+        '覆盖表里的 ' .. row.id .. ' 没有代码落点')
+      landed[row.id] = true
+    end
+    for _, section in ipairs(Acceptance.COVERAGE_SECTIONS) do
+      for _, shard in ipairs(matrix.by_section[section] or {}) do
+        for _, clause in ipairs(shard.clauses) do
+          if clause.executor ~= '试玩' then
+            assert.is_truthy(landed[clause.id],
+              '第 ' .. section .. ' 节的 ' .. clause.id .. ' 是已贯通小节里的非试玩条款，却没登记代码落点')
+          end
+        end
+      end
+    end
+  end)
+
   it('真实基线与当前值同向：已取证不低于基线，遗留测试不高于基线', function()
     local matrix = real_matrix()
     assert.is_not_nil(matrix.baseline, matrix.baseline_error)
@@ -140,6 +161,46 @@ describe('验收矩阵门禁', function()
       local after_ok, after_found, after_text = verify()
       assert.is_true(after_ok, after_text)
       assert.same({}, after_found)
+    end)
+
+    it('覆盖表的代码落点写成破折号就红', function()
+      fixture.patch(root, Acceptance.COVERAGE,
+        '| 1-01 | server/Mgr/MgrPlatform.lua |', '| 1-01 | — |')
+      local ok, found, text = verify()
+      assert.is_false(ok)
+      assert.same({ 'coverage_landing_missing' }, found, text)
+    end)
+
+    it('覆盖表的代码落点是不存在的文件就红', function()
+      fixture.patch(root, Acceptance.COVERAGE,
+        '| 1-02 | server/Mgr/MgrPlatform.lua |', '| 1-02 | server/Mgr/GonePlatform.lua |')
+      local ok, found, text = verify()
+      assert.is_false(ok)
+      assert.same({ 'coverage_landing_path' }, found, text)
+    end)
+
+    it('已贯通小节里的非试玩条款漏登记就红', function()
+      fixture.patch(root, Acceptance.COVERAGE,
+        '\n| 1-02 | server/Mgr/MgrPlatform.lua | — | 缺 | 缺 | 缺 | 缺 | B |', '')
+      local ok, found, text = verify()
+      assert.is_false(ok)
+      assert.same({ 'coverage_clause_missing' }, found, text)
+    end)
+
+    it('覆盖表的等级与矩阵不一致就红', function()
+      fixture.patch(root, Acceptance.COVERAGE,
+        '| 缺 | 缺 | 缺 | 缺 | B |', '| 缺 | 缺 | 缺 | 缺 | A |')
+      local ok, found, text = verify()
+      assert.is_false(ok)
+      assert.same({ 'coverage_level' }, found, text)
+    end)
+
+    it('覆盖表的关联测试是不存在的文件就红', function()
+      fixture.patch(root, Acceptance.COVERAGE, 'tests/native/alpha_test.lua',
+        'tests/native/gone_test.lua')
+      local ok, found, text = verify()
+      assert.is_false(ok)
+      assert.same({ 'coverage_test_path' }, found, text)
     end)
 
     it('blocked 少了「卡在：」就红', function()
