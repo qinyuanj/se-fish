@@ -85,8 +85,10 @@ function Panel:NoteState(state)
     if type(state.members) ~= 'table' then return false end
     local teammates = {}
     for _, member in ipairs(state.members) do
+        -- 血量允许缺失（队友还没出生时服务端没有读数）：名单照常收下，血量显示占位。
         if type(member) ~= 'table' or type(member.userId) ~= 'number' or type(member.name) ~= 'string'
-            or type(member.health) ~= 'number' or type(member.maxHealth) ~= 'number' then return false end
+            or (member.health ~= nil and type(member.health) ~= 'number')
+            or (member.maxHealth ~= nil and type(member.maxHealth) ~= 'number') then return false end
         if member.self ~= true then
             teammates[#teammates + 1] = { userId = member.userId, name = member.name,
                 health = member.health, maxHealth = member.maxHealth }

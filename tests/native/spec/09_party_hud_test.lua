@@ -115,6 +115,14 @@ describe('条款 9 队伍界面', function()
     assert.is_true(ctx.nodes['PartyRoot'].Visible)
     push({ state = 'party', members = '坏数据' })
     assert.same('200/300', ctx.nodes['PartyMember1Health'].Text, '坏快照不覆盖可信状态')
+    -- 队友还没出生（服务端没有血量读数）时，名单照常在，血量显示占位而不是伪造数值。
+    push({ state = 'party', partyId = 7, members = {
+      { userId = 1, name = '甲', health = 300, maxHealth = 300, self = true },
+      { userId = 2, name = '乙' },
+    } })
+    assert.same(1, #ctx.panel:View().rows, '缺血量不丢整份名单')
+    assert.same('—', ctx.panel:View().rows[1].healthText)
+
     push({ state = 'none', members = {} })
     assert.is_false(ctx.nodes['PartyRoot'].Visible, '无队伍时收起队友栏')
     assert.same(0, #ctx.panel:View().rows)

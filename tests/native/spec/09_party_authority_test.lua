@@ -106,7 +106,9 @@ describe('条款 9 小队权威状态', function()
 
   before_each(function()
     assert_wiring()
-    env = { cfg = require('tests.support.zone_fixtures').Load() }
+    -- 小队不碰场景，直接用真共享配置：不经 zone_fixtures 的「丢弃并重载 GameCfg」，
+    -- 免得给同车道后面的文件换掉配置实例。
+    env = { cfg = require('common.GameCfg') }
     env.cfg.Debug = { Enabled = false }
     env.cfg.Save.QaSlot = ''
     env.values, env.queue, env.sent, env.re = {}, {}, {}, {}
