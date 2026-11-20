@@ -6,11 +6,11 @@
 
 接入管理器、界面、技能包，或修改配置、导出物时，先查 [AGENTS.md 的修改边界](AGENTS.md#修改边界)；命名和玩家文案查 [GLOSSARY.md](GLOSSARY.md)。
 
-**已机检，审查时不必逐条比对**：`require` 的工程前缀与大小写、禁止加载 `EggyAPI.lua` 等引擎存根、禁用 `io`/`os`/`package`/`debug`、`server/Mgr/*.lua` 与 `MgrMap` 登记一致、可重入口不泄漏监听，以及界面 handler 与锚点行为的登记一致（[guards/static_require_test](tests/native/guards/static_require_test.lua)）；三端依赖方向、循环依赖与禁止引用测试夹具（[guards/arch_policy_test](tests/native/guards/arch_policy_test.lua)）。
+**已机检，审查时不必逐条比对**：`require` 的工程前缀与大小写、禁止加载 `EggyAPI.lua` 等引擎存根、禁用 `io`/`os`/`package`/`debug`（三端业务代码，`packages/` 是上游整包拷贝、不在其列）、`server/Mgr/*.lua` 与 `MgrMap` 登记一致、可重入口不泄漏监听（[guards/source_guard_test](tests/native/guards/source_guard_test.lua)），以及界面 handler、锚点行为与 `MgrMap` 的登记一致（[guards/static_require_test](tests/native/guards/static_require_test.lua)）；三端依赖方向、循环依赖与禁止引用测试夹具（[guards/arch_policy_test](tests/native/guards/arch_policy_test.lua)）。
 
 ## API 与运行端
 
-**约束**（[S0]、[S1]）：使用 SE 公开 API，核对成员签名、对象类型和运行端；查询结果可能为空时先判空；位置、碰撞、文本等成员须从具有该能力的具体类型访问，普通 table 不能替代引擎数据类型。`game`、`Enums`、`Vector3`、`Color`、`Quaternion`、`CFrame`、`RemoteEvent` 是全局入口；`EggyAPI.lua` 只是类型存根。common 模块在双端独立运行，table 修改不会自动跨端同步，普通 Lua 变量也不提供跨对局持久化。
+**约束**（[S0]、[S1]）：使用 SE 公开 API，核对成员签名、对象类型和运行端；查询结果可能为空时先判空；位置、碰撞、文本等成员须从具有该能力的具体类型访问，普通 table 不能替代引擎数据类型；沙盒的 `getmetatable` 只接受 table。`game`、`Enums`、`Vector3`、`Color`、`Quaternion`、`CFrame`、`RemoteEvent` 是全局入口；`EggyAPI.lua` 只是类型存根。common 模块在双端独立运行，table 修改不会自动跨端同步，普通 Lua 变量也不提供跨对局持久化。
 
 **项目规则**：新增或变更 API 调用时，按 [eggy 规则的查 API 顺序](.claude/rules/eggy/eggy.md#查-api-的顺序) 核对；签名、语义与运行端都有依据才算查清，未查到的名称标 `[未查证]`，不作为已可用接口交付。文档与实例不一致时记录并验证；CLI 命中的编辑时 `editor:GetService(...)` 示例不能用于玩法运行时。
 

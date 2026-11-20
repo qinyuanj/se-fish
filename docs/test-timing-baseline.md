@@ -36,19 +36,20 @@
 
 | 入口 | 命令 | 范围 | 触发时机 |
 |---|---|---|---|
-| fast 车道 | `lua tools/cli.lua test fast` | `tests/native` | 日常开发 |
-| full 车道 | `lua tools/cli.lua test full` | `tests/native` + `tests/native/slow` | 收尾、完成判据 |
+| fast 车道 | `lua tools/cli.lua test fast` | `tests/native` + `tests/native/guards` | 日常开发 |
+| full 车道 | `lua tools/cli.lua test full` | fast + `tests/native/slow` + `tests/native/spec` | 收尾、完成判据 |
 | default（裸 `busted`） | `busted` | 与 full 相同 | crapper 列测试文件时读 default |
-| 提交闸门 | `tools/hooks/pre-commit` → `lua tools/cli.lua test fast` | 与 fast 相同 | 每次 `git commit`（含 `.lua`/`.busted` 时） |
+| 提交时闸门 | 无 | — | pre-commit hook 已随 [ADR-0018](adr/0018-delete-pre-commit-hook.md) 删除；PR 与 main 推送由 `.github/workflows/test.yml` 跑 `test full`（[ADR-0025](adr/0025-windows-pr-full-test-gate.md)） |
 | 覆盖率 | `busted --run=full --coverage` | 与 full 相同 + LuaCov | crapper（人工在插件面板发起） |
 
-车道由根目录 `.busted` 定义，关键项：`ROOT` 白名单（只列 `tests/native` 与 `tests/native/slow`，`recursive = false`，slow 因此不会被 fast 吞掉）、`pattern = "_test"`、`helper = "tests/native/helper.lua"`、`sort-files = true`、`auto-insulate = true`、`output = "plainTerminal"`。
+车道由根目录 `.busted` 定义，关键项：`ROOT` 白名单（列 `tests/native`、`tests/native/guards`、`tests/native/slow` 与 `tests/native/spec`，`recursive = false`，后三者因此不会被 fast 的 `tests/native` 吞掉）、`pattern = "_test"`、`helper = "tests/native/helper.lua"`、`sort-files = true`、`auto-insulate = true`、`output = "plainTerminal"`。
 
 ### 1.2 文件与用例
 
 | 资产 | 数量 | 是否入车道 |
 |---|---:|---|
-| `tests/native/*_test.lua`（fast） | 142 个文件 / 1552 用例 | 是（fast、full） |
+| `tests/native/*_test.lua`（fast） | 142 个文件 / 1552 用例（4eb7b67 快照；门禁迁出后现为 134） | 是（fast、full） |
+| `tests/native/guards/*_test.lua`（guards） | 4 个文件（2026-11-20 起；不计入遗留测试） | 是（fast、full） |
 | `tests/native/slow/*_test.lua`（slow） | 6 个文件 / 45 用例 | 是（仅 full） |
 | `tests/support/*.lua` 共享夹具 | 19 个 | 否（被 require） |
 | `tests/native/helper.lua` | 1 个 | 否（helper 钩子） |
