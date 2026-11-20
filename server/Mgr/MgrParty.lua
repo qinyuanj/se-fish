@@ -96,10 +96,6 @@ function Mgr:SavedParty(player)
     return id, type(party.epoch) == 'string' and party.epoch or nil
 end
 
-function Mgr:SavedPartyId(player)
-    return (self:SavedParty(player))
-end
-
 local function newParty(self)
     self.NextId = self.NextId + 1
     local party = { Id = self.NextId, Members = {} }
@@ -165,7 +161,8 @@ end
 
 function Mgr:Push(player, notice)
     if not player or not player.UserId then return end
-    pcall(function() re('PartyState'):FireClient(player, self:SnapshotOf(player, notice)) end)
+    local ok, err = pcall(function() re('PartyState'):FireClient(player, self:SnapshotOf(player, notice)) end)
+    if not ok then print('[MgrParty] 状态下发失败', player.UserId, tostring(err)) end
 end
 
 function Mgr:PushParty(party, notice)
@@ -173,9 +170,10 @@ function Mgr:PushParty(party, notice)
 end
 
 function Mgr:Reply(player, action, ok, reason)
-    pcall(function()
+    local sent, err = pcall(function()
         re('PartyResult'):FireClient(player, { action = action, ok = ok, reason = reason })
     end)
+    if not sent then print('[MgrParty] 回执下发失败', tostring(player and player.UserId), tostring(action), tostring(err)) end
     return ok, reason
 end
 
@@ -194,7 +192,8 @@ function Mgr:Invite(player, targetUserId)
     if not mine or not theirs then return false, 'no-position' end
     if flatDistance(mine, theirs) > cfg().InviteRange then return false, 'too-far' end
     -- 同一目标只留最新一条待处理邀请：旧邀请随新邀请作废，避免两条邀请各记一个名额。
-    self.Invites[targetUserId] = { From = player.UserId, At = now(), ExpiresAt = now() + cfg().InviteTimeoutSec }
+    local at = now()
+    self.Invites[targetUserId] = { From = player.UserId, At = at, ExpiresAt = at + cfg().InviteTimeoutSec }
     self:Push(target)
     return true
 end
@@ -203,30 +202,20 @@ end
 function Mgr:Accept(player, fromUserId)
     local invite = self.Invites[player.UserId]
     if not invite then return false, 'no-invite' end
-    -- 到期判定与 Update 的清扫同一口径：不等 Update 的同一帧窗口里到点的邀请也不放行。
-    if now() >= invite.ExpiresAt then
+    -- 拒绝收场只有一件事：清掉这条待处理邀请、推一次状态、把原因回给调用方。
+    local function drop(reason)
         self.Invites[player.UserId] = nil
         self:Push(player)
-        return false, 'expired'
+        return false, reason
     end
+    -- 到期判定与 Update 的清扫同一口径：不等 Update 的同一帧窗口里到点的邀请也不放行。
+    if now() >= invite.ExpiresAt then return drop('expired') end
     if fromUserId ~= nil and fromUserId ~= invite.From then return false, 'stale' end
     local inviter = self.Online[invite.From]
-    if not inviter then
-        self.Invites[player.UserId] = nil
-        self:Push(player)
-        return false, 'inviter-offline'
-    end
+    if not inviter then return drop('inviter-offline') end
     local party = self.Parties[self:PartyIdOf(inviter) or 0]
-    if party and #party.Members >= cfg().MaxMembers then
-        self.Invites[player.UserId] = nil
-        self:Push(player)
-        return false, 'full'
-    end
-    if self:PartyIdOf(player) then
-        self.Invites[player.UserId] = nil
-        self:Push(player)
-        return false, 'already-in-party'
-    end
+    if party and #party.Members >= cfg().MaxMembers then return drop('full') end
+    if self:PartyIdOf(player) then return drop('already-in-party') end
     self.Invites[player.UserId] = nil
     if not party then
         party = newParty(self)

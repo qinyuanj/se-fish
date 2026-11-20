@@ -68,7 +68,7 @@ describe('第 12 节 逐招表（近战与范围组）', function()
         local row = BossMoves.Get(env.moveFish, move)
         assert.truthy(#list > 0, move .. ' 没有预警广播')
         for _, notice in ipairs(list) do
-            assert.same(row.Warning.Shape, notice.shape, move .. ' 预警形状与表不一致')
+            assert.same(row.Warning.Kind, notice.shape, move .. ' 预警形状与表不一致')
             assert.same(row.Warning.WindupSec, notice.duration, move .. ' 预警时长与表不一致')
             assert.same(row.Range, notice.range, move .. ' 预警范围与表不一致')
             if row.Warning.Width then

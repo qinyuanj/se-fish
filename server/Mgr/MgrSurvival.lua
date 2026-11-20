@@ -53,7 +53,8 @@ function Mgr:SendState(state)
     end
     if state.platform then payload.platformPending = state.platform.mode end -- 平台复活流程在飞：倒计时暂停
     -- #254 只读相位属性：其他玩家的交互气泡复用这一份服务端状态，不新增通信通道。
-    pcall(function() state.player:SetAttribute('SurvivalPhase', state.phase) end)
+    local okAttr, attrErr = pcall(function() state.player:SetAttribute('SurvivalPhase', state.phase) end)
+    if not okAttr then print('[MgrSurvival] 相位属性写入失败', state.player.UserId, tostring(attrErr)) end
     REUtil:GetRE('SurvivalState'):FireClient(state.player, payload)
     self:Mirror(state) -- 状态每变一次，离线标记跟着落一次
 end
@@ -180,12 +181,13 @@ function Mgr:BeginRescue(target, rescuer)
     return true
 end
 
-function Mgr:CancelRescue(state, reason)
+-- silent = true 时只清字段、不下发：调用方紧接着就写新的相位并广播一次（EnterDead 不再先发一份 downed）。
+function Mgr:CancelRescue(state, reason, silent)
     if not state or not state.rescue then return false end
     state.rescue = nil
     if state.phase == 'rescuing' then state.phase = 'downed' end
     print('[MgrSurvival] 抢救打断', state.player.UserId, tostring(reason))
-    self:SendState(state)
+    if not silent then self:SendState(state) end
     return true
 end
 
@@ -205,6 +207,7 @@ end
 -- 抢救中的打断与到期推进；倒计时仍是原来的濒死倒计时，不因开始抢救而重置。
 function Mgr:UpdateRescue(state, now)
     local rescue = state.rescue
+    if not rescue then return false end
     local rescuer = rescue.by
     local rescuerState = self:GetState(rescuer)
     if not rescuerState or rescuerState.phase ~= 'alive' then return self:CancelRescue(state, 'rescuer-downed') end
@@ -395,7 +398,8 @@ end
 -- 立即修正为虚弱复活——原生自动复活一旦发生，不能留下满血。锁血路径血停在 1，不看血量。
 -- 濒死到点转死亡：抢救中先撤销抢救，再走同一个相位写入点。
 function Mgr:EnterDead(state, now)
-    self:CancelRescue(state, 'timeout')
+    -- 抢救中断不是单独一帧状态：撤销抢救后直接写死亡相位，只广播一次 dead（不再先发 downed）。
+    self:CancelRescue(state, 'timeout', true)
     self.Modifier:ClearTarget(state.player, true)
     state.phase = 'dead'
     state.downedAt = nil

@@ -278,15 +278,20 @@ function Mgr:PurchaseCoin(player, key)
     end)
 end
 
--- 金币页到账（持久操作，#123 协议）：只入账、不扣金币余额（金币页商品不参与金币扣减结算）
-function Mgr:GrantCoin(player, key)
+-- 金币页到账（持久操作，#123 协议）：只入账、不扣金币余额（金币页商品不参与金币扣减结算）。
+-- requestId 可传上一次回执里的 operation：同一操作身份重试只补回执、不再入账一次（18-24）；
+-- 不传时按本会话的到账序号新开一笔。
+function Mgr:GrantCoin(player, key, requestId)
     local offer = coinOffer(key)
     local amount = coinAmount(offer)
     if not amount then return false end
     local data = self.PlayerData and self.PlayerData:GetDataInst(player)
     if not data or not self.Save then return false end
-    self.CoinSeq[player.UserId] = (self.CoinSeq[player.UserId] or 0) + 1
-    local operation, mode = self.Save:ResolveRequest(player, data, 'platform:coin', self.CoinSeq[player.UserId])
+    if requestId == nil then
+        self.CoinSeq[player.UserId] = (self.CoinSeq[player.UserId] or 0) + 1
+        requestId = self.CoinSeq[player.UserId]
+    end
+    local operation, mode = self.Save:ResolveRequest(player, data, 'platform:coin', requestId)
     if not operation then
         print('[MgrPlatform] 金币到账被拒', player.UserId, key, tostring(mode))
         self:Reply(player, { ok = false, action = 'BuyCoin', goods = key, reason = mode or 'pending' })
@@ -305,8 +310,10 @@ function Mgr:GrantCoin(player, key)
         end
         print('[MgrPlatform] 金币到账落账', player.UserId, key,
             'coinBefore=' .. tostring(result.coinBefore), 'coinAfter=' .. tostring(result.coinAfter))
+        -- 回执带操作身份：客户端在没收到回执时可用它原样重试，服务端只补回执、不再入账一次。
         self:Reply(player, { ok = true, action = 'CoinGrant', goods = key, name = result.name,
-            coin = result.coin, coinBefore = result.coinBefore, coinAfter = result.coinAfter })
+            coin = result.coin, coinBefore = result.coinBefore, coinAfter = result.coinAfter,
+            operation = operation })
     end)
 end
 

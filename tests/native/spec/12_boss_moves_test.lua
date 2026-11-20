@@ -104,7 +104,7 @@ describe('第 12 节 首领逐招表（哥斯拉）', function()
                 '%s 缺预警或起手时长', key)
             if row.Warning.Kind ~= 'none' then
                 need(row.Warning.WindupSec > 0, '%s 有预警却没有起手时长', key)
-                local shape = row.Warning.Shape
+                local shape = row.Warning.Kind
                 need(shape == 'circle' or shape == 'line' or shape == 'cone',
                     '%s 的预警形状 %s 不在词表里', key, tostring(shape))
             end
@@ -272,7 +272,7 @@ describe('第 12 节 首领逐招表（哥斯拉）', function()
         local warning = noticesBy('bossStomp')[1]
         assert.is_not_nil(warning)
         local row = BossMoves.Get('godzilla', 'stomp')
-        assert.same(row.Warning.Shape, warning.shape)
+        assert.same(row.Warning.Kind, warning.shape)
         assert.same(row.Warning.WindupSec, warning.duration)
         assert.same(row.Range, warning.range)
         assert.is_true(require('common.GarBiteNotice').Valid(warning))

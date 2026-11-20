@@ -11,6 +11,7 @@ local Util = require('common.Util')
 local Dialogue = require('common.NpcDialogue')
 
 local Bubble = require('client.InteractionBubble')
+local OwnedUnits = require('common.OwnedUnits')
 local LocalInteract = { Seq = 0, Bubbles = {}, Models = {}, RescueBubbles = {} }
 
 -- 缩放脉冲参数：PulseFrames 帧内按 sin 曲线放大到 1+PulseAmp 再还原（帧率相关，表现层可接受）
@@ -49,7 +50,7 @@ function LocalInteract:EnsureRescueBubble(player)
     local pos = player.Character and player.Character.Position
     if not eui or not pos then return nil end
     local ok, node = pcall(eui.CreateSceneNodeAtPosition, eui,
-        Vector3.New(pos.x, pos.y + GameCfg.Interact.Fisherman.BubbleHeight, pos.z))
+        Vector3.New(pos.x, pos.y + GameCfg.Rescue.BubbleHeight, pos.z))
     if not ok or not node then
         print('[LocalInteract] 抢救气泡创建失败', tostring(node))
         return nil
@@ -58,8 +59,11 @@ function LocalInteract:EnsureRescueBubble(player)
         function() self:Rescue(userId) end)
     if not button then return nil end
     node.Visible = false
-    self.RescueBubbles[userId] = { Node = node, Position = pos }
-    return self.RescueBubbles[userId]
+    local entry = { Node = node, Position = pos }
+    -- 气泡根交给 OwnedUnits 保管：离场时整棵拆掉（按钮等子节点随根销毁），不只藏起来
+    OwnedUnits.Track(entry, node)
+    self.RescueBubbles[userId] = entry
+    return entry
 end
 
 function LocalInteract:UpdateRescuePrompts()
@@ -72,11 +76,13 @@ function LocalInteract:UpdateRescuePrompts()
         local entry = self.RescueBubbles[player.UserId]
         local phase = player.GetAttribute and player:GetAttribute('SurvivalPhase') or nil
         local visible = false
-        if player ~= me and (phase == 'downed' or phase == 'rescuing') and pos then
+        -- 濒死与抢救中同一套显隐：抢救开始后相位变 'rescuing'，气泡不能凭空消失（否则施救过程没有提示）。
+        local downed = phase == 'downed' or phase == 'rescuing'
+        if player ~= me and downed and pos then
             local target = player.Character and player.Character.Position
             if target then
                 local dx, dz = pos.x - target.x, pos.z - target.z
-                visible = phase == 'downed' and dx * dx + dz * dz <= GameCfg.Rescue.Range * GameCfg.Rescue.Range
+                visible = dx * dx + dz * dz <= GameCfg.Rescue.Range * GameCfg.Rescue.Range
             end
         end
         if visible then
@@ -86,7 +92,7 @@ function LocalInteract:UpdateRescuePrompts()
                 local target = player.Character.Position
                 entry.Position = target
                 pcall(function() entry.Node.Position = Vector3.New(target.x,
-                    target.y + GameCfg.Interact.Fisherman.BubbleHeight, target.z) end)
+                    target.y + GameCfg.Rescue.BubbleHeight, target.z) end)
             end
         end
         if entry then
@@ -94,10 +100,12 @@ function LocalInteract:UpdateRescuePrompts()
             if not ok then print('[LocalInteract] 抢救气泡显隐失败', tostring(err)) end
         end
     end
-    -- 离场玩家（下线、换区）的气泡立即收起，等下次同 UserId 重连再重建
+    -- 离场玩家（下线、换区）的气泡立即拆掉，等下次同 UserId 重连再重建；只藏起来会留下看不见的残留单位
     for userId, entry in pairs(self.RescueBubbles) do
         if not present[userId] then
-            pcall(function() entry.Node.Visible = false end)
+            local ok, err = pcall(function() entry.Node.Visible = false end)
+            if not ok then print('[LocalInteract] 抢救气泡离场隐藏失败', userId, tostring(err)) end
+            OwnedUnits.Clear(entry)
             self.RescueBubbles[userId] = nil
         end
     end
