@@ -605,33 +605,42 @@
 | 11-16 | server/Mgr/MgrPlayerData.lua、server/Mgr/MgrSave.lua、server/Mgr/MgrSurvival.lua | tests/native/spec/18_session_settlement_contract_test.lua | 缺 | 缺 | 缺 | 有 | A |
 | 11-17 | server/Mgr/MgrReelIn.lua、server/Mgr/MgrFishUnit.lua、server/Mgr/MgrSurvival.lua | tests/native/fish_lift_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 11-18 | server/Mgr/MgrFishCarrier.lua、server/Mgr/MgrFishUnit.lua、server/Mgr/MgrSurvival.lua | tests/native/fish_lift_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 11-19 | client/ScreenHandlers/ScreenSurvival.lua、server/Mgr/MgrPlatform.lua | tests/native/platform_screens_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 11-19 | client/ScreenHandlers/ScreenSurvival.lua、server/Mgr/MgrSurvival.lua、server/Mgr/MgrPlatform.lua、common/GameCfg.lua | tests/native/spec/11_ad_revive_placeholder_test.lua | 有 | 有 | 缺 | 缺 | A |
 | 11-20 | client/ScreenHandlers/ScreenSurvival.lua、server/Mgr/MgrPlatform.lua、server/Mgr/MgrShop.lua | tests/native/platform_screens_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 11-21 | server/Mgr/MgrSurvival.lua、server/Mgr/MgrPlatform.lua | tests/native/revive_callback_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 11-22 | server/Mgr/MgrSurvival.lua、server/Mgr/MgrModifier.lua | tests/native/revive_callback_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 11-21 | server/Mgr/MgrSurvival.lua、server/Mgr/MgrVitals.lua、common/GameCfg.lua | tests/native/spec/11_ad_revive_placeholder_test.lua | 有 | 缺 | 缺 | 缺 | A |
+| 11-22 | server/Mgr/MgrSurvival.lua、server/Mgr/MgrModifier.lua | tests/native/spec/11_ad_revive_placeholder_test.lua | 有 | 缺 | 缺 | 缺 | A |
 | 11-23 | common/cfg/Shop.lua、server/Mgr/MgrShop.lua | tests/native/shop_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 11-24 | common/cfg/Shop.lua、server/Mgr/MgrShop.lua | tests/native/shop_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 11-25 | server/Mgr/MgrSurvival.lua、server/Mgr/MgrSave.lua、server/Data/PlayerData.lua | tests/native/spec/09_rescue_test.lua | 缺 | 缺 | 有 | 有 | A |
 | 11-26 | server/Mgr/MgrFerry.lua、server/Mgr/MgrSurvival.lua、server/Data/PlayerData.lua | tests/native/spec/18_session_settlement_contract_test.lua | 缺 | 缺 | 有 | 有 | A |
 | 11-27 | server/Mgr/MgrSurvival.lua、server/Mgr/MgrModifier.lua、server/Data/PlayerData.lua | tests/native/survival_test.lua | 缺 | 缺 | 有 | 有 | A |
-| 11-28 | server/Mgr/MgrSurvival.lua、server/Mgr/MgrPlatform.lua | tests/native/revive_callback_test.lua | 缺 | 缺 | 缺 | 缺 | B |
-| 11-29 | server/Mgr/MgrSurvival.lua、server/Mgr/MgrPlatform.lua | tests/native/revive_callback_test.lua | 缺 | 缺 | 缺 | 缺 | B |
-| 11-30 | server/Mgr/MgrSurvival.lua、server/Mgr/MgrPlatform.lua | tests/native/revive_callback_test.lua | 有 | 有 | 缺 | 缺 | B |
-| 11-31 | server/Mgr/MgrPlatform.lua、server/Mgr/MgrSave.lua | tests/native/platform_seam_test.lua | 缺 | 有 | 缺 | 缺 | B |
-| 11-32 | server/Mgr/MgrSurvival.lua、common/RateLimit.lua | tests/native/revive_callback_test.lua | 缺 | 有 | 缺 | 缺 | B |
+| 11-28 | server/Mgr/MgrSurvival.lua、server/Mgr/MgrPlatform.lua | tests/native/spec/11_ad_revive_placeholder_test.lua | 有 | 有 | 缺 | 缺 | B |
+| 11-29 | server/Mgr/MgrSurvival.lua、server/Mgr/MgrPlatform.lua、common/GameCfg.lua | tests/native/spec/11_ad_revive_placeholder_test.lua | 有 | 有 | 缺 | 缺 | B |
+| 11-30 | server/Mgr/MgrSurvival.lua、server/Mgr/MgrPlatform.lua | tests/native/spec/11_ad_revive_placeholder_test.lua | 有 | 有 | 缺 | 缺 | B |
+| 11-31 | server/Mgr/MgrPlatform.lua、server/Mgr/MgrSurvival.lua、common/GameCfg.lua | tests/native/spec/11_ad_revive_placeholder_test.lua | 有 | 有 | 缺 | 缺 | B |
+| 11-32 | server/Mgr/MgrSurvival.lua、server/Mgr/MgrPlatform.lua、common/RateLimit.lua | tests/native/spec/11_ad_revive_placeholder_test.lua | 有 | 有 | 缺 | 缺 | B |
 | 11-33 | server/Mgr/MgrSurvival.lua、server/Mgr/MgrPlatform.lua | tests/native/revive_callback_test.lua | 缺 | 缺 | 缺 | 缺 | B |
 | 11-34 | server/Mgr/MgrVitals.lua、server/Mgr/MgrSurvival.lua、common/GameCfg.lua | tests/native/spec/09_rescue_test.lua | 缺 | 有 | 缺 | 缺 | B |
 | 11-35 | server/Mgr/MgrSurvival.lua、server/Mgr/MgrSave.lua、server/Data/PlayerData.lua | tests/native/spec/09_rescue_test.lua | 缺 | 缺 | 有 | 有 | B |
 | 11-36 | server/Mgr/MgrVitals.lua、server/Mgr/MgrSurvival.lua | tests/native/spec/09_rescue_test.lua | 有 | 缺 | 缺 | 缺 | B |
-| 11-37 | server/Mgr/MgrPlatform.lua、common/GameCfg.lua | tests/native/platform_seam_test.lua | 缺 | 有 | 缺 | 缺 | B |
-| 11-38 | server/Mgr/MgrPlatform.lua、common/GameCfg.lua | tests/native/platform_seam_test.lua | 缺 | 有 | 缺 | 缺 | A |
+| 11-37 | server/Mgr/MgrPlatform.lua、server/Mgr/MgrSurvival.lua、common/GameCfg.lua | tests/native/spec/11_ad_revive_placeholder_test.lua | 有 | 有 | 缺 | 缺 | B |
+| 11-38 | server/Mgr/MgrPlatform.lua、common/GameCfg.lua | tests/native/spec/11_ad_revive_placeholder_test.lua | 有 | 有 | 缺 | 缺 | A |
 | 11-39 | server/Mgr/MgrPlatform.lua、server/Mgr/MgrSave.lua、common/GameCfg.lua | tests/native/platform_seam_test.lua | 缺 | 有 | 缺 | 缺 | A |
 
 第 11 节由 #254 抢救子单整节登记：11-01、11-03、11-06、11-34、11-35、11-36 的证据走 `tests/native/spec/09_rescue_test.lua`
 （致命伤害锁血、濒死免伤、呼救、其它伤害来源豁免、断线重连结算与血量夹取）；其余条款的代码落点与关联测试是实现自检，
 状态仍是 unverified，等各自实现与断言。抢救耗时与打断规则的占位值集中在 `common/GameCfg.lua` 的 `GameCfg.Rescue`，
 带 [未查证] 标记，待决题见 docs/to-questionnaire-策划案内部矛盾.md。
+
+广告满血复活一组由 #262 登记：11-19、11-21、11-22、11-28～11-32、11-37、11-38 的证据统一走
+`tests/native/spec/11_ad_revive_placeholder_test.lua`（濒死与死亡两个界面的广告入口、满血与饥饿下限、
+倒计时暂停与平移、三条复活路径互斥、失败不扣费、重复点击与迟到回调、适配层成功与失败两条路径）。
+占位广告位与广告文案集中在 `common/GameCfg.lua` 的 `GameCfg.Platform.Placeholder.Ads`、`GameCfg.Platform.Ads`
+与 `GameCfg.Survival.AdReviveText`；真实广告位到位只替换那两处参数，判定不动，参数缺口记在
+docs/to-questionnaire-策划案内部矛盾.md。金豆入口（11-20）、迟到回调补发（11-33）与占位对称结算（11-39）不归本单，
+仍是 unverified，四类证据列只勾该断言真正跑过的场景。
+
 ## 三、待登记小节
 
 第 19 节尚未登记。按依赖顺序逐节扩大，每节登记时同时补齐该节的代码落点与既有测试，
-并把该节加进 `tools/acceptance.lua` 的 `M.COVERAGE_SECTIONS`；第 11 节由本单登记完毕。
+并把该节加进 `tools/acceptance.lua` 的 `M.COVERAGE_SECTIONS`；第 11 节已登记完毕（#254 抢救组整节 + #262 广告复活组）。
