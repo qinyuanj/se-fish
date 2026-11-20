@@ -76,6 +76,8 @@ function M:setUp()
     }
     package.loaded['server.Mgr.MgrFishUnit'] = nil
     self.mgr = assert(loadfile('server/Mgr/MgrFishUnit.lua'))()
+    -- 目标裁决适配层由入口注入（生产见 server/main.lua）；夹具照生产接线补上，不走模块内 require。
+    self.mgr.AiTarget = require('server.Mgr.MgrAiTarget')
     self.pushed = {}
     self.mgr.Cast = { PushState = function(_, player) env.pushed[#env.pushed + 1] = player end }
     self.mgr:Start()

@@ -300,8 +300,11 @@ describe("盲盒服务端结算（MgrBlindbox × MgrSave × MgrPlatform）", fun
   end)
 
   it("test_production_build_rejects_unconfigured_goods", function()
-    -- 生产守卫：Debug 关 + goodsId 未配置 → 明确 unavailable，不建 flow 不发奖
+    -- 生产守卫（#261）：Debug 关时真实通道仍关闭，占位通道也关掉才是「无可用支付通道」→
+    -- 明确 unavailable，不建 flow 不发奖、不落抽奖意向。占位通道开着时的完整路径见
+    -- tests/native/spec/15_blindbox_placeholder_settlement_test.lua。
     GameCfg.Debug = { Enabled = false }
+    GameCfg.Platform.Placeholder.Enabled = false
     assert.is_true(world.blindbox:Handle(world.player, { action = "Draw", count = 1, seq = 1 }))
     world:drain()
     local result = world:lastResult()
@@ -309,6 +312,26 @@ describe("盲盒服务端结算（MgrBlindbox × MgrSave × MgrPlatform）", fun
     assert.same("unavailable", result.reason)
     assert.same(0, world.data:ItemCount("item7"))
     assert.same(0, world.data.Extra.lottery.pity)
+    assert.is_false(world.platform:HasFlow(world.player))
+  end)
+
+  it("test_production_build_uses_placeholder_channel_not_test_driver", function()
+    -- 生产守卫（#261）：Debug 关 + 占位通道开 + 显式 AllowInPublish（#249 闸门）→
+    -- 只有占位确认能结算；测试驱动器在生产碰不到占位 flow（不能伪造支付成功），确认前不发奖。
+    GameCfg.Debug = { Enabled = false }
+    GameCfg.Platform.Placeholder.Enabled = true
+    GameCfg.Platform.Placeholder.AllowInPublish = true
+    world.rolls = { 1000 }
+    assert.is_true(world.blindbox:Handle(world.player, { action = "Draw", count = 1, seq = 1 }))
+    world:drain()
+    assert.is_false(world.platform:HandleTestAction(world.player,
+      { action = "ResolveFlow", outcome = "success" }))
+    assert.same(0, world.data:ItemCount("item7"))
+    assert.is_true(world.platform:HasFlow(world.player))
+    assert.is_true(world.platform:HandleAction(world.player,
+      { action = "PlaceholderOutcome", outcome = "success" }))
+    world:drain()
+    assert.same(1, world.data:ItemCount("item7"))
     assert.is_false(world.platform:HasFlow(world.player))
   end)
 
@@ -446,7 +469,9 @@ describe("盲盒服务端结算（MgrBlindbox × MgrSave × MgrPlatform）", fun
   end)
 
   it("test_unavailable_does_not_persist_intent", function()
+    -- 真实通道与占位通道都不可用时，连抽奖意向都不落（不留单边状态）。
     GameCfg.Debug = { Enabled = false }
+    GameCfg.Platform.Placeholder.Enabled = false
     world:draw(1, 1)
     assert.is_nil(next(world.data.Extra.lottery.intents or {}))
   end)

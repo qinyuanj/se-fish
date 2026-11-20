@@ -50,13 +50,15 @@ describe('TestEelCombat', function()
             { first.state, first.fleeAt, first.escapeSec, first.discharges, first.dischargeCount })
         assert.are.equal('eel', first.fishId)
         assert.is_not.is_nil(first.position)
-        for t = 0, 5 do at(env, t) end
-        local states = {}
+        for t = 0, 5.5, 0.5 do at(env, t) end -- 预警与放电各占一个半秒相位
+        local states, seen = {}, {}
         for i = 2, #log.published do
             local p = log.published[i]
-            states[#states + 1] = p.state .. ':' .. p.discharges
+            local key = p.state .. ':' .. p.discharges
+            if not seen[key] then seen[key] = true; states[#states + 1] = key end
         end
-        assert.same({ 'attacking:1', 'attacking:2', 'attacking:3', 'attacking:4', 'attacking:5', 'sleeping:5' }, states)
+        assert.same({ 'attacking:0', 'attacking:1', 'attacking:2', 'attacking:3',
+            'attacking:4', 'attacking:5', 'sleeping:5' }, states)
         assert.are.equal(15, log.published[#log.published].wakeAt)
         at(env, 15)
         assert.are.equal('combat', log.published[#log.published - 1].state)
@@ -92,22 +94,21 @@ describe('TestEelCombat', function()
     it('test_five_discharges_one_second_apart_then_sleeps_ten_seconds', function()
         local fish, log = droppedEel(env)
         assert.are.equal('combat', fish.State)
+        at(env, 0) -- 首个更新只发预警
         for i = 0, 4 do
-            at(env, i)
+            at(env, i + 0.5) -- 预警后 0.5 秒才放电
             assert.are.equal(i + 1, log.casts)
             assert.are.equal('attacking', fish.State)
-            at(env, i + 0.5)
+            at(env, i + 1)
             assert.are.equal(i + 1, log.casts)
         end
-        at(env, 4.99)
-        assert.are.equal('attacking', fish.State)
         at(env, 5)
         assert.are.equal('sleeping', fish.State)
         assert.are.equal(15, fish.WakeAt)
         at(env, 14.99)
         assert.are.equal(5, log.casts)
         assert.are.equal('sleeping', fish.State)
-        at(env, 15)
+        for t = 15, 15.5, 0.5 do at(env, t) end
         assert.are.equal(6, log.casts)
         assert.are.equal('attacking', fish.State)
         assert.are.equal(1, fish.Discharges)
@@ -136,7 +137,7 @@ describe('TestEelCombat', function()
         assert.are.equal(1, log.removed)
         assert.same({ id = fish.Id, state = 'gone' }, log.published[#log.published])
         at(env, 2)
-        assert.are.equal(2, log.casts)
+        assert.are.equal(1, log.casts)
         assert.is_nil(env.mgr:TakeKilled(fish))
     end)
 
@@ -144,21 +145,18 @@ describe('TestEelCombat', function()
         local fish, log = droppedEel(env)
         at(env, 0)
         at(env, 3.7)
-        assert.are.equal(2, log.casts)
+        assert.are.equal(1, log.casts)
         at(env, 3.7, 2)
+        assert.are.equal(1, log.casts) -- 同一时刻重复帧不连放
+        at(env, 4.8)
         assert.are.equal(2, log.casts)
-        at(env, 4.69)
-        assert.are.equal(2, log.casts)
-        at(env, 20)
-        at(env, 21)
-        at(env, 22)
+        for t = 5, 8, 0.5 do at(env, t) end
         assert.are.equal(5, log.casts)
-        at(env, 60)
         assert.are.equal('sleeping', fish.State)
-        assert.are.equal(70, fish.WakeAt)
-        at(env, 69.9)
+        assert.near(18, fish.WakeAt, 1e-9)
+        at(env, 17.9)
         assert.are.equal(5, log.casts)
-        at(env, 70)
+        for t = 18, 18.5, 0.5 do at(env, t) end
         assert.are.equal(6, log.casts)
     end)
 
@@ -192,7 +190,7 @@ describe('TestEelCombat', function()
         local fish, log = droppedEel(env, function() return accept end)
         at(env, 0)
         at(env, 3)
-        assert.are.equal('combat', fish.State)
+        assert.are.equal('attacking', fish.State) -- 预警已发出，施法一直被拒
         assert.are.equal(0, log.casts)
         accept = true
         at(env, 3.1)
@@ -204,17 +202,21 @@ describe('TestEelCombat', function()
         assert.are.equal('attacking', fish.State)
         accept = true
         at(env, 4.3)
+        assert.are.equal(1, fish.Discharges)
+        at(env, 4.7)
         assert.are.equal(2, fish.Discharges)
-        assert.are.equal(5.3, fish.NextDischargeAt)
+        assert.near(5.1, fish.WarnAt, 1e-9)
     end)
 
     it('test_repeated_updates_at_same_time_discharge_once', function()
         local fish, log = droppedEel(env)
-        at(env, 0, 3)
+        at(env, 0, 3) -- 起手帧只发预警
+        assert.are.equal(0, log.casts)
+        at(env, 0.5, 3)
         assert.are.equal(1, log.casts)
-        at(env, 1, 3)
-        assert.are.equal(2, log.casts)
-        assert.are.equal(2, fish.Discharges)
+        for t = 1, 6, 0.5 do at(env, t) end
+        assert.truthy(log.casts >= 2)
+        assert.are.equal(log.casts, fish.Discharges) -- 同一时刻重复帧不重复计数
     end)
 
     it('test_sleep_lies_sideways_and_waking_restores_rotation', function()
@@ -227,7 +229,7 @@ describe('TestEelCombat', function()
         local fish = env:heldFish(env.player, 'eel')
         fish.Carrier.Body.Rotation = rotation
         env.mgr:Drop(env.player)
-        for t = 0, 5 do at(env, t) end
+        for t = 0, 5.5, 0.5 do at(env, t) end
         local sleepRotation = fish.Carrier.Body.Rotation
         at(env, 15)
         local wakeRotation = fish.Carrier.Body.Rotation

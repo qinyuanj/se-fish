@@ -58,7 +58,9 @@ describe('平台适配层（MgrPlatform）', function()
     -- 这里再显式快照一次，保证 after_each 幂等（不依赖根级 hook 的执行时机）。
     -- _G.MgrPlayerData 是 server/Mgr/MgrPlayerData.lua 装载时写下的模块全局，旧单进程 runner 里
     -- 它跨套件长存；原生逐例隔离后必须快照并还原，否则同一 chunk 的实例会泄漏到后续案例。
-    restore = { Debug = GameCfg.Debug }
+    -- #261 占位支付通道也是共享配置：用例会临时关掉它以取证「无可用通道」，逐例还原。
+    restore = { Debug = GameCfg.Debug, PlaceholderEnabled = GameCfg.Platform.Placeholder.Enabled,
+      PlaceholderAllowInPublish = GameCfg.Platform.Placeholder.AllowInPublish }
     for _, name in ipairs(globalNames) do
       restore[name] = rawget(_G, name)
     end
@@ -73,6 +75,9 @@ describe('平台适配层（MgrPlatform）', function()
       restore.oldAdIds[key] = row.goodsId
     end
     GameCfg.Debug = { Enabled = true }
+    -- #249 占位闸门：调试构建里占位面优先于测试驱动器，本套件要取证的是测试 flow，显式关掉占位通道；
+    -- 占位通道自身的那条用例在用例里把两把开关都重新打开。
+    GameCfg.Platform.Placeholder.Enabled = false
     env = { now = 1000, values = {}, queue = {}, events = {}, purchasePanels = {}, adCalls = {},
       replies = {} }
     env.goodsSignal = signal()
@@ -133,6 +138,8 @@ describe('平台适配层（MgrPlatform）', function()
         rawset(_G, name, restore[name])
       end
       GameCfg.Debug = restore.Debug
+      GameCfg.Platform.Placeholder.Enabled = restore.PlaceholderEnabled
+      GameCfg.Platform.Placeholder.AllowInPublish = restore.PlaceholderAllowInPublish
       for key, row in pairs(GameCfg.Platform.Goods) do
         row.goodsId = restore.oldGoodsIds[key]
       end
@@ -144,9 +151,10 @@ describe('平台适配层（MgrPlatform）', function()
     restore = nil
   end)
 
-  -- 未配置商品（goodsId 空）+ 生产构建（Debug 关）：购买明确不可用，不建 flow、不发权益
+  -- 未配置商品（goodsId 空）+ 生产构建（Debug 关）+ 占位通道关闭：购买明确不可用，不建 flow、不发权益
   it('test_ad_flow_availability', function()
     GameCfg.Debug = { Enabled = false }
+    GameCfg.Platform.Placeholder.Enabled = false
     local accepted, reason = env.platform:ShowAd(env.player, 'revive', 'revive', function() end)
     assert.is_false(accepted)
     assert.same('unavailable', reason)
@@ -197,6 +205,7 @@ describe('平台适配层（MgrPlatform）', function()
     GameCfg.Platform.Goods.adrenaline1.goodsId = 'goodsAdr1'
     GameCfg.Platform.Ads.revive.goodsId = 'adRevive'
     GameCfg.Debug = { Enabled = false }
+    GameCfg.Platform.Placeholder.Enabled = false -- 占位通道也关掉：真实与占位都没有通道
     local accepted, reason = env.platform:Purchase(env.player, 'adrenaline1', 'adrenaline', function() end)
     assert.is_false(accepted)
     assert.same('unavailable', reason)
@@ -303,6 +312,7 @@ describe('平台适配层（MgrPlatform）', function()
   -- OpenAdrenalineShop / OpenCoinShop：未配置时明确回包不可用，不伪成功
   it('test_shop_entries_reply_unavailable_when_unconfigured', function()
     GameCfg.Debug = { Enabled = false }
+    GameCfg.Platform.Placeholder.Enabled = false
     env.platform:OpenAdrenalineShop(env.player)
     env.platform:OpenCoinShop(env.player)
     local replies = messages('PlatformResult')
@@ -354,9 +364,33 @@ describe('平台适配层（MgrPlatform）', function()
     assert.is_true(messages('PlatformResult')[1].open) -- 配置ID仍只允许测试flow
   end)
 
-  -- 未配置商品（goodsId 空）+ 生产构建（Debug 关）：购买明确不可用，不建 flow、不发权益
+  -- 占位通道开着、Debug 关：生产构建经共享配置的占位商品 ID 开占位 flow，测试驱动器碰不到它。
+  -- #249 发布构建还须显式 AllowInPublish=true（默认 false 时占位动作一律被拒，见 17 平台边界用例）。
+  it('test_placeholder_channel_opens_with_placeholder_goods_id', function()
+    GameCfg.Debug = { Enabled = false }
+    GameCfg.Platform.Placeholder.Enabled = true
+    GameCfg.Platform.Placeholder.AllowInPublish = true
+    local outcomes = {}
+    assert.is_true(env.platform:Purchase(env.player, 'blindboxSingle', 'blindbox',
+      function(outcome) outcomes[#outcomes + 1] = outcome end))
+    local opened = messages('PlatformResult')[1]
+    assert.same('PlaceholderFlow', opened.action)
+    assert.is_true(opened.open)
+    assert.is_truthy(opened.goodsId:find('^placeholder%.goods%.') ~= nil)
+    assert.same(10, opened.beans)
+    assert.is_truthy(opened.notice:find('不发放真实付费权益', 1, true) ~= nil)
+    -- 生产不能伪造支付成功：测试驱动器拒结算占位 flow，占位确认才结算
+    assert.is_false(env.platform:HandleTestAction(env.player, { action = 'ResolveFlow', outcome = 'success' }))
+    assert.same({}, outcomes)
+    assert.is_true(env.platform:HandleAction(env.player, { action = 'PlaceholderOutcome', outcome = 'success' }))
+    assert.same({ 'success' }, outcomes)
+    assert.is_false(env.platform:HasFlow(env.player))
+  end)
+
+  -- 未配置商品（goodsId 空）+ 生产构建（Debug 关）+ 占位通道关闭：购买明确不可用，不建 flow、不发权益
   it('test_unconfigured_goods_unavailable_in_production', function()
     GameCfg.Debug = { Enabled = false }
+    GameCfg.Platform.Placeholder.Enabled = false
     local outcomes = {}
     local accepted, reason = env.platform:Purchase(env.player, 'blindboxSingle', 'blindbox',
       function(outcome) outcomes[#outcomes + 1] = outcome end)

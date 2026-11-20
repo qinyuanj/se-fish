@@ -4,6 +4,7 @@ local ContentFish = require('common.cfg.Fish')
 local ContentShop = require('common.cfg.Shop')
 local ContentLottery = require('common.cfg.Lottery')
 local ContentBlindbox = require('common.cfg.Blindbox')
+local BossMoves = require('common.cfg.BossMoves')
 local FishCatch = require('common.FishCatch')
 
 -- 钓鱼区 ID 用于内容与后续场景锚点；存档旧值在 LegacyZoneIdMap 中解析。
@@ -127,15 +128,75 @@ GameCfg.Survival = {
     DeadTitle = '你已经死了！倒计时结束后虚弱复活。',
     AdrenalineText = '给自己一针肾上腺素',
     CallHelpText = '向队友呼救',
-    FreeReviveText = '免费满血复活',
+    -- #262 广告满血复活入口（11-19）：「看广告」是玩家可观察的入口形态，广告位本身在
+    -- GameCfg.Platform.Ads 与 GameCfg.Platform.Placeholder.Ads 里，这里只有文案。
+    AdReviveText = '看广告满血复活',
     PaidReviveText = '5金豆满血复活',
     NoAdrenalineText = '没有肾上腺素，可前往地图商店购买',
     PlatformPendingText = '平台复活即将开放，请等待倒计时虚弱复活',
-    -- #147 平台复活 flow 在飞：免费倒计时暂停期间的提示；取消/失败/超时后倒计时从暂停处继续
-    PlatformWaitText = '平台处理中，免费复活倒计时已暂停',
+    -- #147/#262 平台复活 flow 在飞：被暂停的那条倒计时（濒死 15 秒或免费复活 30 秒，
+    -- 两条都经 PlatformRevive 的同一处暂停分支）期间的提示；取消/失败/超时后从暂停处继续
+    PlatformWaitText = '平台处理中，复活倒计时已暂停',
     PlatformResumeText = '未完成满血复活，免费复活倒计时继续',
     WeakText = '虚弱中：移动速度减半',
     UnavailableText = '操作暂时不可用，请稍后再试',
+}
+
+-- 他人抢救（#254，§9 多人规则）：2 米与 10% 是规格原文（9-17、9-18；
+-- 10% 统一复用 GameCfg.Survival.ReviveHealthPercent，不另立第二份血量比例）。
+-- 耗时与打断规则策划案没给，下面带 [未查证] 的字段是占位值；真实数值到位只换配置，
+-- 不改判定代码。待决题见 docs/to-questionnaire-策划案内部矛盾.md「他人抢救的耗时与打断规则」。
+GameCfg.Rescue = {
+    Target = 'downedPlayer',     -- 复用 MgrInteract 既有交互通道，不新造入口
+    Action = 'Rescue',
+    PromptText = '抢救',
+    RescuingTitle = '正在抢救…',
+    Range = 2,                   -- 规格原文：2 米内（场景平面距离）
+    BubbleHeight = 1.2,          -- [未查证] 抢救气泡在濒死者脚底上方的高度（与钓鱼佬文字泡同量级）
+    DurationSec = 2,             -- [未查证] 抢救耗时占位值
+    InterruptMoveMeters = 1,     -- [未查证] 施救者离开濒死者超过此距离打断
+    InterruptOnDamage = true,    -- [未查证] 施救者受击是否打断
+}
+
+-- 小队（#253，§9 多人规则「小队最多 3 人，2 米内邀请，10 秒未处理按拒绝，离线自动离队，少于 2 人解散」）：
+-- 三个数值都是规格原文，不是占位值；服务端唯一权威，见 server/Mgr/MgrParty.lua。
+GameCfg.Party = {
+    MaxMembers = 3,          -- 一支小队最多 3 名玩家
+    MinMembers = 2,          -- 少于 2 人解散
+    InviteRange = 2,         -- 邀请距离 2 米（场景平面距离）
+    InviteTimeoutSec = 10,   -- 邀请 10 秒未处理按拒绝结算
+    ActionCooldownSec = 0.2, -- 请求限频，防连点；不是玩法数值
+    StateCooldownSec = 0.5,
+    HealthSyncIntervalSec = 0.5, -- 队伍 HUD 当前血量周期同步；仅变化时推送
+    -- [未查证] 队伍界面布局：规格只要求「不与左上角自身血量重叠、实机分辨率可读」，
+    -- 具体位置与尺寸待策划给草图（docs/to-questionnaire-策划案内部矛盾.md「队伍界面的布局」）。
+    HUD = {
+        ColorBlockImage = 'official://image/11017', -- 官方正方形纯色块（ScreenSurvival 同款约定）
+        RowWidth = 240,
+        RowHeight = 56,
+        MarginRight = 24,   -- [未查证] 右侧竖排，避开左上角自身血量
+        MarginTop = 220,
+        MaxRows = 2,        -- [未查证] 小队上限 3 人，自己占一栏，队友最多 2 行
+        BarWidth = 120,
+        BarHeight = 12,
+        InviteWidth = 360,
+        InviteHeight = 96,
+        InviteTop = 24,
+        InviteText = '收到了组队邀请',
+        InviteCountdownText = '秒后自动拒绝',
+        AcceptText = '接受',
+        DeclineText = '拒绝',
+        DisbandText = '小队已解散',
+        LeftText = '你已离开小队',
+        RestoredText = '已回到原来的小队',
+        RestoreFullText = '原小队已满 3 人，暂时回不去',
+        UnavailableText = '组队操作暂时不可用',
+        TooFarText = '距离太远，走到 2 米内再邀请',
+        FullText = '小队已满 3 人',
+        OfflineText = '对方不在线',
+        TargetInPartyText = '对方已在别的队伍里',
+        NoInviteText = '邀请已失效'
+    },
 }
 
 -- 调试开关（#47 / #49，#28 规格）：开发阶段默认开启，发布或开放地图前关闭。开启后服务端接受 GM 发放
@@ -250,10 +311,12 @@ GameCfg.Records = {
     MaxRetries = 3,              -- 写失败重试次数（重试走 CAS，过期候选不会盖掉更新的纪录）
     RetryDelaySec = 1,           -- 重试退避（秒）
     RequestCooldownSec = 0.2,    -- 单玩家纪录查询限频
+    -- 13-08 / 13-17：「没有纪录」与「读不到」在内部是两种状态（前者可写、后者既不写也不对账），
+    -- 但对玩家只显示同一句「未取得数据」——不出现重量或保持者，不拿占位值冒充纪录。
     Texts = {
         Format = '全服纪录：%.2f kg（%s）',
-        Missing = '全服纪录：暂无',
-        Unavailable = '全服纪录：暂不可用',
+        Missing = '全服纪录：未取得数据',
+        Unavailable = '全服纪录：未取得数据',
     },
 }
 
@@ -505,7 +568,12 @@ end
 -- 最终成就（#127 第七区，GameSpec §8.1「哥斯拉头 → 通关成就」）：兑换产物是 'achievement.<id>'
 -- 时写进 Extra.achievements[<id>]（不占道具格，重进照旧保留），这里只给客户端提示用的名字。
 GameCfg.Achievements = {
-    final = { Name = '通关成就', PlatformId = nil }, -- 平台后台ID未交付，本地先完成、保留补交。
+    -- 平台成就 ID 只在这里换（13-12、17-17）：真实 ID 由平台侧交付后只改 PlatformId，玩法判定不动。
+    -- PlatformId 留 nil = 平台侧未交付：本地先记完成，每个重试窗口重走补交判定（13-18）。
+    -- PlaceholderId 只在调试构建（GameCfg.Debug.Enabled）里走通「查询 → 提交」路径，且永不落「已送达」：
+    -- 平台对占位 ID 的回答不代表本成就已授予（ADR-0029 生产开关 3「占位不宣称平台已授予」）。
+    -- [未查证] 占位值待平台侧确认，见 docs/to-questionnaire-策划案内部矛盾.md。
+    final = { Name = '通关成就', PlatformId = nil, PlaceholderId = 390001 },
 }
 -- 图鉴只读快照：打开时刷新，保持打开时补取盲盒/信物兑换后的权威状态。
 GameCfg.Compendium = { RefreshSec = 3, RootPollSec = 0.5, RequestCooldownSec = 0.2 }
@@ -579,11 +647,19 @@ GameCfg.Platform = {
         adrenaline1 = { beans = 1, count = 1, name = '肾上腺素', itemId = GameCfg.Survival.AdrenalineItemId },
         adrenaline5 = { beans = 4, count = 5, name = '肾上腺素×5', itemId = GameCfg.Survival.AdrenalineItemId },
     },
-    -- 激励广告：广告看完发放商品奖励（ShowRewardedVideoAd 的 goodsId 语义），goodsId/adTag 未交付
+    -- 激励广告：广告看完发放商品奖励（ShowRewardedVideoAd 的 goodsId 语义），goodsId/adTag 未交付。
+    -- #262：广告位是外部交付参数（生产开关，ADR-0029 第四节第 2 项）。未交付期间由
+    -- GameCfg.Platform.Placeholder.Ads 的占位广告位走通同一条路径；真实广告位到位后只替换那行参数，
+    -- PlatformRevive / ShowAd 的判定与回包一行不动。
     Ads = {
         revive = { name = '广告满血复活' },
     },
     UnavailableText = '平台功能暂不可用，请稍后再试',
+    -- 17-18 分享任务：平台分享能力未开通时走明确占位入口（回包带原因与可读文案），
+    -- 不让玩家点了没反应。开放情况作为生产开关单列：真实能力交付后只改这里，判定不动。
+    Share = { Enabled = false, UnavailableText = '分享功能暂未开放' },
+    -- #249 占位通道被闸门挡住时的回执文案：说「未开放」而不是「暂不可用」，也不静默吞掉请求。
+    NotOpenText = '占位支付与广告通道未开放，请稍后再试',
     -- 平台流程失败原因 → 玩家可读文案（客户端 ScreenPlatform / ScreenBlindbox 共用）
     ReasonText = {
         busy = '已有一笔平台购买正在处理，请稍候',
@@ -591,9 +667,56 @@ GameCfg.Platform = {
         fail = '购买未完成，请查看平台订单状态',
         timeout = '平台未响应，本次购买已结束',
         pending = '存档同步中，请稍后再试',
+        -- #249 占位通道在发布构建未显式打开：与 NotOpenText 同一句，客户端按 reason 取文案
+        ['not_open'] = '占位支付与广告通道未开放，请稍后再试',
     },
     OfferTitle = '购买肾上腺素',
     TestDriverTitle = '测试支付（仅调试构建）',
+}
+
+-- #261 生产开关：平台真实参数（商品 ID、广告位、金币汇率）未交付期间的占位参数集中点
+-- （ADR-0029 第三、四节）。缺参数时靠这张表把钓场商店金币页与地图盲盒的完整购买路径走通。
+-- 占位不发真实付费权益：占位通道只在编辑器内结算地图内虚拟产出（盲盒抽数、金币页到账），
+-- 不拉起真实购买面板、不扣真实货币、不发放平台权益；真实参数到位后只替换本表并把 Enabled 置 false，
+-- 价目、保底与结算顺序等玩法判定一行不动。
+-- 未查证数值：「金币页的占位汇率」（docs/to-questionnaire-策划案内部矛盾.md）。
+-- #249 占位通道闸门（ADR-0029 第四节第 9 项）：占位支付 / 广告 / 分享默认只在调试构建
+-- （GameCfg.Debug.Enabled）可用；发布构建要显式把 AllowInPublish 置 true 才允许占位通道。
+-- 关闭时占位动作一律拒绝、不发任何物品与权益，回执 reason = 'not_open' + NotOpenText（「未开放」）；
+-- 机器判据见 tests/native/spec/17_platform_boundary_placeholder_test.lua 与 11_ad_revive_placeholder_test.lua。
+GameCfg.Platform.Placeholder = {
+    Enabled = true,
+    AllowInPublish = false,
+    Label = '占位支付通道',
+    Notice = '占位支付通道：不发放真实付费权益',
+    -- 占位商品 ID：真实 goodsId 由平台后台交付；交付前只走 placeholder. 前缀，不冒充真实商品
+    Goods = {
+        blindboxSingle = 'placeholder.goods.blindbox.single',
+        blindboxTen = 'placeholder.goods.blindbox.ten',
+        reviveFull = 'placeholder.goods.revive.full',
+        adrenaline1 = 'placeholder.goods.adrenaline.single',
+        adrenaline5 = 'placeholder.goods.adrenaline.five',
+    },
+    -- #262 占位广告位：广告复活（11-19、11-37、11-38）在真实广告位交付前走这里。
+    -- 占位只拉起编辑器内的确认面板，不拉起真实广告、不发放任何平台权益；成功结算给的是
+    -- 地图内资源（血量与饥饿），不是平台商品。参数与文案集中在本表，判定代码不认商品字面量。
+    Ads = {
+        revive = 'placeholder.ad.revive',
+    },
+    AdsLabel = '占位广告通道',
+    AdsNotice = '占位广告通道：不发放真实付费权益',
+    -- 金币页（钓场商店第 4 页，GameSpec §7）：真实汇率与商品 ID 由平台后台交付；
+    -- 占位按「每 1 个展示货币单位到账 CoinPerUnit 金币」计价，到账金币 = price × CoinPerUnit。
+    -- 金币页到账提示（ScreenPlatform 的 CoinGrant 回执）：到账金币数 / 展示货币 / 商品名
+    CoinGrantText = '到账 %d%s（%s）',
+    CoinPage = {
+        Unit = '元',
+        CoinPerUnit = 100, -- [未查证] 占位汇率：1 元到账 100 金币
+        Offers = {
+            { key = 'coinPouch', goodsId = 'placeholder.goods.coin.pouch', name = '金币小袋', price = 6 },
+            { key = 'coinBag', goodsId = 'placeholder.goods.coin.bag', name = '金币大袋', price = 30 },
+        },
+    },
 }
 
 -- 摆渡（#89 定细则，#127 T06 扩到七区六航线）：去程一人在船边交 1 张船票，倒计时 CountdownSec 秒后
@@ -758,7 +881,7 @@ GameCfg.Casting.Zones['fishPond.water'] = GameCfg.Casting.Zones.WaterCircle2
 GameCfg.Casting.Zones['volcanoIsland.water'] = sourceCastRows.volcanoIsland
 for _, species in pairs(GameCfg.Fish) do
     if species.ZoneId == 'volcanoIsland' then
-        species.implemented, species.Model = true, '7000546'
+        species.Model = '7000546'
         if species.Grade == 'elite' then species.Combat = 'mosasaur' end
         if species.Grade == 'boss' then species.Combat = 'godzilla' end
     end
@@ -942,6 +1065,8 @@ GameCfg.Ability = {
         item160 = { Damage = 60, IntervalSec = 1.0, Range = 4, Anim = AttackAnim.Axe },    -- 血吼
         item161 = { Damage = 68, IntervalSec = 1.0, Range = 4, Anim = AttackAnim.Axe },    -- 无坚不摧之力
     },
+    -- #260 官方 AI 目标选择：上游优先级模式是预留字段，取值未查证，集中登记并记入矛盾清单。
+    AiTarget = { PriorityMode = 1 }, -- [未查证] 6-29
     -- 枪械公共：手动/自动换弹均 2 秒（票面）；备弹无限、弹匣有限；射程暂取 30 米
     GunShared = { ReloadSec = 2, Range = 30, ActionCooldownSec = 0.1 },
     Guns = {
@@ -1068,34 +1193,35 @@ GameCfg.Ability = {
         ContactIntervalSec = 1, ContactDamage = 150, -- 叼走过程的接触伤害节奏与数值（伤害取自正文 150）
         FallDamage = 0,                       -- 落地额外伤害（正文未给，先 0）
     },
+    -- 沧龙（复合型首领）的招式数值统一取自逐招表 common/cfg/BossMoves.lua 的 mosasaur 行：
+    -- 砸击 / 甩头 = 基础攻击 35，咬中 300（命中段），过程接触 150（携带段），三段不合并（12-36 / 12-38）。
+    -- 命中次数、轨迹与预警时长属实现期细化，标 [未查证]（12-04）。
     Aquatic = {
-        LeapIntervalSec = 15, LeapWindupSec = 1, LeapSec = 1.5, LeapHeight = 8,
-        LeapRadius = 5, LeapDamage = 35, -- 沧龙表基础攻击35；落点范围为灰盒判定细化
-        HeadRadius = 2.5, HeadWindupSec = 0.8, HeadDamage = 35,
-        GrabDamage = 300, ContactDamage = 150, ContactRange = 2.5, -- 正文独立咬中/过程接触；接触半径为灰盒细化
+        LeapIntervalSec = BossMoves.Get('mosasaur', 'leap').Schedule.Sec,
+        LeapWindupSec = 1, LeapSec = 1.5, LeapHeight = 8,        -- [未查证] 滞空与高度
+        LeapRadius = BossMoves.Get('mosasaur', 'leap').Range,
+        LeapDamage = BossMoves.Get('mosasaur', 'leap').Damage.Value,
+        HeadRadius = BossMoves.Get('mosasaur', 'head').Range,
+        HeadWindupSec = BossMoves.Get('mosasaur', 'head').Warning.WindupSec, -- [未查证] 起手时长
+        HeadDamage = BossMoves.Get('mosasaur', 'head').Damage.Value,
+        GrabDamage = BossMoves.Get('mosasaur', 'bite').Damage.Value,
+        ContactDamage = BossMoves.Get('mosasaur', 'contact').Damage.Value,
+        ContactRange = BossMoves.Get('mosasaur', 'contact').Range,
     },
     BossPhase = {
         -- 哥斯拉（fish56Boss，GameSpec §12）：低于 60% 入水、切沧龙式攻击（咬中 1000）；
         -- 低于 20% 重新上岸、伤害 +50%、原子吐息改为每 10 秒。阈值优先于普通招式循环。
         -- 阈值按百分比降序排列（= 阶段升级顺序）；一帧跨两个阈值只进最终合法阶段，
         -- 中间被跳过的阶段记进 Skipped（见 common/BossPhase.lua）。
-        Thresholds = {
-            { Percent = 60, Phase = 'water', BiteDamage = 1000 },
-            { Percent = 20, Phase = 'enraged', DamageBonusPercent = 50, BreathIntervalSec = 10 },
-        },
+        -- 阶段表（#259）与普通招式表分开表达：阈值与阶段招式集取自 common/cfg/BossMoves.lua 的
+        -- M.Phases.godzilla，阶段只决定「什么时候换哪一套招式」，招式数值仍在逐招表里（12-45）。
+        Thresholds = BossMoves.Phases.godzilla.Thresholds,
         -- 各阶段的招式集合；同一帧多个招式到期时按 Attacks 的书写顺序取唯一一个，保证确定性。
-        AttackSets = {
-            normal = { 'claw', 'tail', 'breath', 'stomp' },
-            water = { 'bite' },
-            enraged = { 'claw', 'tail', 'breath', 'stomp' },
-        },
-        Attacks = {
-            claw = { IntervalSec = 2, Damage = 50, Range = 4 },   -- 表内 2 秒爪击（基础攻击 50）
-            tail = { IntervalSec = 6, Damage = 50, Range = 5 },   -- 表内每 6 秒甩尾
-            breath = { IntervalSec = 30, Range = 10, Width = 2, OneShot = true, WindupSec = 1.5 }, -- 正前 10 米秒杀；2米宽灰盒可躲避
-            bite = { IntervalSec = 2, Range = 2.5 },                -- 入水后的咬击：伤害取阶段条目的 BiteDamage
-            stomp = { IntervalSec = 2, Damage = 150, Range = 10, WindupSec = 0.8 }, -- 正文独立跺脚
-        },
+        AttackSets = BossMoves.Phases.godzilla.AttackSets,
+        -- 招式数值不在此处另写一份：#256 起唯一来源是 common/cfg/BossMoves.lua 的逐招表，
+        -- 这里只把哥斯拉的行折成阶段机消费的形态（间隔 / 伤害 / 起手 / 走廊宽度）。
+        -- 改动招式数值请改逐招表；本表的行集合就是 §12 的招式并集（12-05）。
+        Attacks = BossMoves.AttackTable('godzilla'),
         -- 走阶段机的鱼种（键为 GameCfg.Fish 的 Id）。本单只登记哥斯拉；
         -- 正式接入由 #144 决定是加 Combat 标签还是建「首领」注册表（本单不改 common/cfg/Fish.lua）。
         Species = { fish56Boss = true },

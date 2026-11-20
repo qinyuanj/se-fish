@@ -45,6 +45,17 @@ local CLAUSE_PUNCT = ' 	，。；、：！？（）「」'
 -- accepted 的证据列必须带人签署（TEMPLATE 第四节）：路径（签署：@用户名 YYYY-MM-DD）。
 M.SIGNATURE = '（签署：@%S+ %d%d%d%d%-%d%d%-%d%d）'
 
+-- 实现覆盖表（ADR-0029 第五节）：把每条非试玩条款接到它的代码落点、关联测试、四类证据与证据等级。
+-- 它是文档与代码之间的静态缝隙，不是运行时入口；空落点、落点路径不存在、条款 ID 不在矩阵里、
+-- 等级与矩阵不一致都判红，随 acceptance --check 进 fast 车道。
+M.COVERAGE = 'docs/acceptance/coverage.md'
+-- 已贯通小节：这些节的每条非试玩条款都必须在覆盖表里登记。逐节扩大——加一节就补齐该节落点。
+M.COVERAGE_SECTIONS = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19 }
+-- 四类证据列只有两个取值（完成口径见 ADR-0028）。
+M.COVERAGE_EVIDENCE = { '有', '缺' }
+-- 覆盖表每行八格：条款、代码落点、关联测试、正常流程、失败流程、退出重进、存档恢复、等级。
+M.COVERAGE_COLUMNS = 8
+
 -- 工单编号的四种常见写法：规格与分片都不得出现，台账按设计带历史单号（它不是分片，另算）。
 -- 注意别误伤 Markdown 标题：'## 1. 概述' 的井号后面跟着另一个井号，'%s#%s%d+' 不成立。
 M.ISSUE_PATTERNS = {
@@ -159,6 +170,14 @@ function M.evidence_paths(cell)
   return out
 end
 
+-- 证据文件里有没有这条条款：要求完整的条款号，前后都不能再贴词字符。
+-- 只比路径前缀证明不了「断言的是这一条」——9-12 不能靠 19-12 或 9-120 蒙过去。
+function M.clause_mentioned(body, id)
+  if type(body) ~= 'string' or body == '' or type(id) ~= 'string' or id == '' then return false end
+  local escaped = id:gsub('[%W]', '%%%0')
+  return body:find('%f[%w]' .. escaped .. '%f[%W]') ~= nil
+end
+
 -- GameSpec 的小节：只看 '## N. 标题' 这一种标题；别的层级不算小节。
 function M.spec_sections(body)
   local sections = {}
@@ -260,6 +279,42 @@ function M.parse_shard(body, path, section)
 end
 
 -- 分片文件：docs/acceptance/NN-*.md；README、TEMPLATE、evidence-levels 等不带两位数字前缀的不是分片。
+-- 覆盖表里的一格可以写多个路径，用顿号分隔（模板见 docs/acceptance/coverage.md）。
+-- 只取「像路径」的串：路径全为 ASCII，中文说明与破折号自然不算落点，也不会被多字节分隔符切碎。
+local function coverage_tokens(cell)
+  local out = {}
+  if type(cell) ~= 'string' then return out end
+  for token in cell:gmatch('[%w_%-%./]+') do
+    out[#out + 1] = token
+  end
+  return out
+end
+
+-- 落点必须是仓库里的一个**文件**：目录、通配符、中文说明都不算落点。
+local function is_file(root, relative)
+  local attr = lfs.attributes(root .. '/' .. relative)
+  return attr ~= nil and attr.mode == 'file'
+end
+
+-- 覆盖表 = 若干张八列表，首格形如 '9-07' 的行才算登记行；表头与分隔行不算。
+function M.parse_coverage(body, path)
+  local coverage = { path = path, rows = {} }
+  if not body then return coverage end
+  each_line(body, function(number, line)
+    local cells = cells_of(line)
+    if not cells or #cells == 0 then return end
+    local id = cells[1]
+    if not id:match('^%d+%-%d%d$') then return end
+    coverage.rows[#coverage.rows + 1] = {
+      id = id, line = number, cells = cells, count = #cells,
+      landing = cells[2], tests = cells[3],
+      normal = cells[4], failure = cells[5], relogin = cells[6], restore = cells[7],
+      level = cells[8],
+    }
+  end)
+  return coverage
+end
+
 function M.shard_files(root)
   local out = {}
   for _, name in ipairs(list_dir(root, M.DIR)) do
@@ -450,6 +505,10 @@ function M.scan(root)
   matrix.index = { path = M.INDEX, body = index_body, block = index_body and index_block(index_body) or nil }
   if not index_body then problem('index_unreadable', '读不到 ' .. M.INDEX, M.INDEX) end
 
+  -- 实现覆盖表：登记行只做扫描与统计，判红在 M.check 的 check_coverage。
+  local coverage_body = read_text(root, M.COVERAGE)
+  matrix.coverage = coverage_body and M.parse_coverage(coverage_body, M.COVERAGE) or nil
+
   matrix.baseline, matrix.baseline_error = M.read_baseline(root)
 
   local config, config_error = M.read_busted(root)
@@ -589,6 +648,37 @@ local function check_shards(matrix, add)
               shard.path, clause.line)
           end
         end
+        -- 条款断言车道：evidenced/accepted 的 agent 条款必须有一条 tests/native/spec 或 tests/probes 证据，
+        -- 且那个文件的正文里出现过本条条款号。路径前缀只说明「放对了车道」，条款号才说明「断言的是这一条」。
+        if #paths > 0 and (clause.status == 'evidenced' or clause.status == 'accepted')
+            and clause.executor == 'agent' then
+          local clause_assertion, lane_paths, readable = false, 0, 0
+          for _, path in ipairs(paths) do
+            if path:match('^tests/native/spec/') or path:match('^tests/probes/') then
+              lane_paths = lane_paths + 1
+              local body = read_text(matrix.root, path)
+              if body then
+                readable = readable + 1
+                if M.clause_mentioned(body, clause.id) then
+                  clause_assertion = true
+                  break
+                end
+              end
+            end
+          end
+          -- 文件不存在由 evidence_missing 报：一处坏处只出一个红，这里不重复计。
+          if not clause_assertion then
+            if lane_paths == 0 then
+              add('evidence_not_clause_assertion', string.format(
+                '%s 标为 %s，但证据列没有 tests/native/spec/ 或 tests/probes/ 下的条款断言：路径不符（现写的是 %q）',
+                clause.id, clause.status, evidence), shard.path, clause.line)
+            elseif readable > 0 then
+              add('evidence_not_clause_assertion', string.format(
+                '%s 标为 %s，但条款断言文件的正文里没有条款号 %s：文件里没有条款号（现写的是 %q）',
+                clause.id, clause.status, clause.id, evidence), shard.path, clause.line)
+            end
+          end
+        end
         -- accepted 另要人背书：路径后面必须跟（签署：@用户名 YYYY-MM-DD）。
         if clause.status == 'accepted' and not M.signed(evidence) then
           add('accepted_signature', string.format(
@@ -656,6 +746,97 @@ local function check_ratchet(matrix, add)
   end
 end
 
+-- 实现覆盖表：每条登记的条款都要有真实存在的代码落点；已贯通小节的非试玩条款一条都不能漏。
+-- 覆盖表是「玩法实现」的台账（ADR-0029 第二节），它只证明代码落点在哪，不证明条款成立——
+-- 条款转 evidenced 仍然只认矩阵证据列里那条走业务入口的断言。
+local function check_coverage(matrix, add)
+  local coverage = matrix.coverage
+  if not coverage then
+    add('coverage_unreadable', '读不到 ' .. M.COVERAGE, M.COVERAGE)
+    return
+  end
+
+  -- 矩阵里的条款按 ID 建索引：覆盖表登记的 ID 必须在这里找得到，等级也要对得上。
+  local clauses = {}
+  for _, shard in ipairs(matrix.shards) do
+    for _, clause in ipairs(shard.clauses) do
+      clauses[clause.id] = clauses[clause.id] or clause
+    end
+  end
+
+  local registered = {}
+  for _, row in ipairs(coverage.rows) do
+    local where = M.COVERAGE
+    if row.count ~= M.COVERAGE_COLUMNS then
+      add('coverage_cells', string.format('%s 的 %s 有 %d 格，覆盖表行必须恰好 %d 格',
+        where, row.id, row.count, M.COVERAGE_COLUMNS), where, row.line)
+    end
+    if registered[row.id] then
+      add('coverage_duplicate', string.format('%s 的条款 %s 被登记了不止一次', where, row.id),
+        where, row.line)
+    end
+    registered[row.id] = true
+
+    local clause = clauses[row.id]
+    if not clause then
+      add('coverage_clause_unknown', string.format('%s 登记的条款 %s 不在验收矩阵里', where, row.id),
+        where, row.line)
+    elseif clause.level ~= row.level then
+      add('coverage_level', string.format('%s 的条款 %s 等级写的是 %s，矩阵里是 %s',
+        where, row.id, tostring(row.level), tostring(clause.level)), where, row.line)
+    end
+
+    -- 代码落点：空、破折号、或路径不存在都判红——「没有落点」是这张表要拦住的第一件事。
+    local landing = coverage_tokens(row.landing)
+    if #landing == 0 then
+      add('coverage_landing_missing', string.format('%s 的条款 %s 没有代码落点（现写的是 %q）',
+        where, row.id, tostring(row.landing)), where, row.line)
+    else
+      for _, path in ipairs(landing) do
+        if not is_file(matrix.root, path) then
+          add('coverage_landing_path', string.format('%s 的条款 %s 的代码落点不存在或不是文件：%s',
+            where, row.id, path), where, row.line)
+        end
+      end
+    end
+
+    -- 关联测试：允许写 —（还没有测试），写了路径就必须真实存在。
+    if row.tests ~= '—' then
+      local tests = coverage_tokens(row.tests)
+      if #tests == 0 then
+        add('coverage_test_missing', string.format('%s 的条款 %s 的关联测试列只能写 — 或仓库路径（现写的是 %q）',
+          where, row.id, tostring(row.tests)), where, row.line)
+      end
+      for _, path in ipairs(tests) do
+        if not is_file(matrix.root, path) then
+          add('coverage_test_path', string.format('%s 的条款 %s 的关联测试不存在：%s',
+            where, row.id, path), where, row.line)
+        end
+      end
+    end
+
+    -- 四类证据：只有「有 / 缺」两个取值，缺也要写出来，不允许留白。
+    for _, key in ipairs({ 'normal', 'failure', 'relogin', 'restore' }) do
+      if not in_vocabulary(M.COVERAGE_EVIDENCE, row[key]) then
+        add('coverage_evidence', string.format('%s 的条款 %s 的四类证据列写了词表外的取值 %q（只能写 有 或 缺）',
+          where, row.id, tostring(row[key])), where, row.line)
+      end
+    end
+  end
+
+  -- 已贯通小节：非试玩条款必须全部登记，漏一条就没有「无落点条款数为零」可言。
+  for _, section in ipairs(M.COVERAGE_SECTIONS) do
+    for _, shard in ipairs(matrix.by_section[section] or {}) do
+      for _, clause in ipairs(shard.clauses) do
+        if clause.executor ~= '试玩' and not registered[clause.id] then
+          add('coverage_clause_missing', string.format('%s 里缺少第 %d 节的条款 %s：已贯通小节必须登记每条非试玩条款',
+            M.COVERAGE, section, clause.id), M.COVERAGE)
+        end
+      end
+    end
+  end
+end
+
 -- 门禁总判：四类规则各在自己的函数里，这里只编排、最后统一排序。
 -- finding 的 kind 字符串是对外契约（夹具按它精确断言、文档按它引用），名字一个都不许改。
 function M.check(matrix)
@@ -670,6 +851,7 @@ function M.check(matrix)
   check_spec(matrix, add)
   check_shards(matrix, add)
   check_index(matrix, add)
+  check_coverage(matrix, add)
   check_ratchet(matrix, add)
 
   table.sort(findings, function(a, b)

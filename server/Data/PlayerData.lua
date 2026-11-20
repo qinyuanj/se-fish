@@ -54,6 +54,50 @@ local function stripArrayMeta(value, path, seen)
 end
 PlayerData.StripArrayMeta = stripArrayMeta
 
+-- 安全落点（#249/§18）：坐标只来自本区场景标记与角色当前位置，个人存档只留 x/y/z 三个数；
+-- 共享世界的活鱼、地面实例永远不进这张表。场景未解析时保留旧值，不猜测坐标。
+local function zoneScene(zoneId)
+    for _, zone in ipairs(GameCfg.Zones or {}) do
+        if zone.Id == zoneId then return zone.Scene end
+    end
+end
+local function finitePoint(point)
+    return type(point) == 'table' and type(point.x) == 'number' and type(point.y) == 'number'
+        and type(point.z) == 'number' and point.x == point.x and point.y == point.y and point.z == point.z
+        and math.abs(point.x) < math.huge and math.abs(point.y) < math.huge and math.abs(point.z) < math.huge
+end
+local function insideBoundary(point, bounds)
+    if not finitePoint(point) or type(bounds) ~= 'table' then return false end
+    return point.x > bounds.MinX and point.x < bounds.MaxX
+        and point.z > bounds.MinZ and point.z < bounds.MaxZ
+end
+
+-- 返回落点与「是否改过」；改过就表示存档里的落点非法，重进时要由 MgrSave 送回同区安全点。
+function PlayerData:ResolveSafePoint()
+    local scene = zoneScene(GameCfg.ResolveZoneId(self.Data.Zone))
+    if not scene or not scene.Boundary or not finitePoint(scene.SafePoint) then return nil, false end
+    local mark = self.Extra.travel.safePoint
+    if insideBoundary(mark, scene.Boundary) then
+        return { x = mark.x, y = mark.y, z = mark.z }, false
+    end
+    local fallback = { x = scene.SafePoint.x, y = scene.SafePoint.y, z = scene.SafePoint.z }
+    self.Extra.travel.safePoint = fallback
+    return fallback, true
+end
+
+-- 每次写档前镜像角色当前位置：只有落在本区边界内才覆盖，越界留旧安全点或场景安全点。
+function PlayerData:NoteSafePoint()
+    if not self.Inited then return end
+    local scene = zoneScene(GameCfg.ResolveZoneId(self.Data.Zone))
+    if not scene or not scene.Boundary then return end
+    self:ResolveSafePoint()
+    local character = self.Player and self.Player.Character
+    local position = character and character.Position
+    if insideBoundary(position, scene.Boundary) then
+        self.Extra.travel.safePoint = { x = position.x, y = position.y, z = position.z }
+    end
+end
+
 -- 扩展字段仅承载持久状态；库存、成长、任务等系统由各子单接入。
 local function defaults(zone)
     return {
@@ -65,6 +109,8 @@ local function defaults(zone)
         collection = { weights = {}, unlocked = {} }, quest = { step = 1, count = 0 },
         story = { read = {} }, travel = { arrived = {}, zone = GameCfg.ResolveZoneId(zone), safePoint = {} },
         lottery = { pity = 0 }, achievements = {}, recovery = {}, cooldowns = {},
+        -- #253 队伍归属：0 = 无队伍；进队写小队号，主动离队立即清零，离线保留给重连恢复。
+        party = { id = 0 },
     }
 end
 
@@ -204,8 +250,16 @@ function PlayerData:Migrate(snapshot)
             or type(meta.operations) ~= 'table' or #meta.operations > 64 or type(extra) ~= 'table' then
             return nil, '持久身份损坏'
         end
+        -- #253 新增的队伍字段：旧档没有就按「无队伍」补默认，不让新增字段掀掉整份存档；
+        -- 其余扩展字段仍然严格，缺一个都算损坏。
+        if extra.party == nil then extra.party = defaults(saved.zone).party end
         for name in pairs(defaults(saved.zone)) do
             if type(extra[name]) ~= 'table' then return nil, '扩展字段缺失 ' .. name end
+        end
+        if not integer(extra.party.id, 0) then return nil, '队伍字段损坏' end
+        -- 队伍号旁的会话纪元是后加的可选字段：旧档没有按「无纪元」处理，类型不对才算坏档。
+        if extra.party.epoch ~= nil and type(extra.party.epoch) ~= 'string' then
+            return nil, '队伍纪元损坏'
         end
         if type(extra.inventory.selection) ~= 'table' or type(extra.travel.arrived) ~= 'table'
             or type(extra.travel.safePoint) ~= 'table' or type(extra.inventory.weapons) ~= 'table' then return nil, '扩展字段损坏' end
@@ -253,6 +307,7 @@ end
 -- 键名缩写为体积考量：bar/bp=道具栏/背包格位表（i=格号 id=物品 n=件数 m=倍率）、up=升级等级。
 function PlayerData:Serialize()
     if not self.Inited then return nil end
+    self:NoteSafePoint()
     local function pack(containerId)
         local out = {}
         for index, entry in pairs(self.Data.Containers[containerId]) do

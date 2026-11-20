@@ -12,6 +12,7 @@ local Vitals = require('common.Vitals')
 local DamageNotice = require('common.DamageNotice')
 
 local Mgr = { States = {} }
+local healthOf -- 前置声明：SnapshotHealth（#253）定义在读取辅助之前，避免取到全局 nil
 
 local function cfg()
     return GameCfg.Vitals
@@ -102,6 +103,21 @@ function Mgr:MaxHealthOf(player)
     return cfg().MaxHealth
 end
 
+-- #253 只读血量快照：给队伍界面等服务端快照转手用，与 WriteHealth 同源读同一个 Controller。
+-- 不改判定、不参与伤害入口（ApplyDamage / ApplyHit / CanTakeDamage 一行不动）。
+function Mgr:SnapshotHealth(player)
+    local state = self:GetState(player)
+    if not state then return nil, nil end
+    local health = healthOf(state)
+    if health == nil then health = state.baseline end
+    if type(health) ~= 'number' or health ~= health or math.abs(health) >= math.huge then
+        health = nil
+    else
+        health = math.max(0, math.floor(health))
+    end
+    return health, self:MaxHealthOf(player)
+end
+
 function Mgr:CanTakeDamage(player, hit)
     local state = self:GetState(player)
     if not state then return false end
@@ -128,7 +144,7 @@ local function controllerOf(state)
     return character and character.Controller
 end
 
-local function healthOf(state)
+healthOf = function(state)
     local controller = controllerOf(state)
     local ok, health = pcall(function() return controller and controller.Health end)
     return ok and tonumber(health) or nil
@@ -372,7 +388,7 @@ function Mgr:ApplyHit(hit, target, amount)
     local sourceState = hit.sourcePlayer and self:GetState(hit.sourcePlayer)
     if hit.sourcePlayer and (not sourceState or sourceState.player ~= hit.sourcePlayer) then return false end
     if self.DamageFilter then
-        local filterOk, allowed = pcall(self.DamageFilter, hit, player)
+        local filterOk, allowed = pcall(self.DamageFilter, hit, player, self)
         if not filterOk then print('[MgrVitals] 伤害过滤失败', player.UserId, tostring(allowed)) end
         if not filterOk or allowed ~= true then return false end
     end

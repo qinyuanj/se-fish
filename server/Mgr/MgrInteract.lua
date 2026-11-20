@@ -12,11 +12,11 @@ local Mgr = { LastSeq = {}, Anchors = {} }
 local ITEM_BAR = GameCfg.Items.ContainerId.ItemBar
 
 -- 同通道相同 seq 重放原结果；完整 operation 可跨重连重试，身份校验归 Save。
-local function resolve(mgr, player, data, payload)
+local function resolve(mgr, player, data, payload, kind)
     local requestId = payload.operation
     if requestId ~= nil and type(requestId) ~= 'table' then return nil, false end
     if requestId == nil then requestId = payload.seq end
-    local operation, mode = mgr.Save:ResolveRequest(player, data, 'interact:fisherman', requestId)
+    local operation, mode = mgr.Save:ResolveRequest(player, data, kind or 'interact:fisherman', requestId)
     if not operation then return nil, false end
     if mode ~= 'replay' then return operation end
     local accepted = mgr.Save:Execute(player, data, operation, function() return nil, 'expired' end,
@@ -45,6 +45,13 @@ local function fishermanPoint(shared, npc)
     return point
 end
 
+-- #254 平面距离：抢救目标与场景锚点共用一个口径（只看 x/z，高度差不计入）。
+-- 摆渡 BoatRange、小队邀请与近战判定同一口径，不另立第二份实现。
+local function flatDistance(a, b)
+    local dx, dz = a.x - b.x, a.z - b.z
+    return math.sqrt(dx * dx + dz * dz)
+end
+
 -- 选中并实际可用的道具栏格（#127）：兑换与回收都只看选中的这一格，不看背包
 local function selectedEntry(data)
     local items = data.Data.Containers[ITEM_BAR]
@@ -70,6 +77,24 @@ local Points = {
                 if anchor then return fishermanPoint(shared, npc), anchor end
             end
         end },
+    -- #254 他人抢救复用本交互通道：目标由服务端按 UserId 解析，距离与濒死相位在此复验。
+    downedPlayer = { Cfg = function() return GameCfg.Rescue end, RequestKey = 'rescue',
+        Actions = { Rescue = 'RescueDowned' },
+        Resolve = function(mgr, player, payload)
+            local function reject(reason)
+                mgr:Reply(player, { action = 'Rescue', ok = false, reason = reason,
+                    seq = payload.seq, targetUserId = payload.targetUserId })
+                return nil
+            end
+            if type(payload.targetUserId) ~= 'number' then return reject('invalid') end
+            local target = mgr:ResolveDownedTarget(payload.targetUserId)
+            if not target then return reject('not-downed') end
+            local from = player.Character and player.Character.Position
+            local to = target.Character and target.Character.Position
+            if not from or not to then return reject('no-position') end
+            if flatDistance(from, to) > GameCfg.Rescue.Range then return reject('too-far') end
+            return GameCfg.Rescue, target
+        end },
 }
 
 function Mgr:Reply(player, payload)
@@ -87,11 +112,6 @@ function Mgr:FindAnchor(name)
     end
     if unit then self.Anchors[name] = unit end
     return unit
-end
-
-local function flatDistance(a, b)
-    local dx, dz = a.x - b.x, a.z - b.z
-    return math.sqrt(dx * dx + dz * dz)
 end
 
 -- 选中的可喂物（#127）：先看选中格的物品——鱼获按个体倍率、普通物品按物品表基础价，烤过的按烤熟价；
@@ -292,6 +312,54 @@ function Mgr:Feed(player, data, anchor, point, seq, operation)
     return true
 end
 
+-- #254 抢救目标解析：UserId 由客户端给，玩家身份与目标相位只由服务端判定。
+function Mgr:ResolveDownedTarget(userId)
+    local survival, vitals = self.Survival, self.Vitals
+    if not survival or not vitals then return nil end
+    local target = survival:PlayerByUserId(userId)
+    if not target or not vitals:IsDowned(target) then return nil end
+    return target
+end
+
+-- #254 发起他人抢救：请求先经 MgrSave 的持久操作身份（请求号即幂等键）落一次，
+-- 重复与重连重放同一请求号只回放原结果，不再发起第二次抢救；相位守卫另管并发抢占。
+-- 真正的血量结算在生存状态机到期后经 MgrVitals:Rescue 统一接缝完成。
+function Mgr:RescueDowned(player, data, target, point, seq, operation)
+    local survival = self.Survival
+    if not survival then
+        self:Reply(player, { action = 'Rescue', ok = false, reason = 'unavailable', seq = seq })
+        return false
+    end
+    local can, reason = survival:CanRescue(target, player)
+    if not can then
+        self:Reply(player, { action = 'Rescue', ok = false, reason = reason, seq = seq,
+            targetUserId = target.UserId })
+        return false
+    end
+    if self.Save and operation then
+        -- 先受理（改相位），再把受理结果落进持久操作记录：重放同一请求号时回放同一份结果，
+        -- 不会第二次发起抢救，也不会因为目标已被救起而给出与首次不同的答复。
+        local started, why = survival:BeginRescue(target, player)
+        local accepted = { ok = started == true, action = 'Rescue', targetUserId = target.UserId, reason = why }
+        return execute(self, player, data, operation, function()
+            return accepted
+        end, function(written, result, op)
+            if not written then
+                if started then survival:CancelRescue(self.Survival:GetState(target), 'settle-failed') end
+                self:Reply(player, { action = 'Rescue', ok = false, reason = tostring(result), seq = seq })
+                return
+            end
+            result.operation = op
+            print('[MgrInteract] 抢救受理', player.UserId, op.id, result.ok and 'ok' or tostring(result.reason))
+            self:Reply(player, result)
+        end)
+    end
+    local started, why = survival:BeginRescue(target, player)
+    self:Reply(player, { action = 'Rescue', ok = started == true, reason = why, seq = seq,
+        targetUserId = target.UserId, operation = operation })
+    return started == true
+end
+
 -- 处理一次交互请求；持久模式返回是否接收，最终结果经 InteractResult 回包。
 function Mgr:Handle(player, payload)
     if type(payload) ~= 'table' then return false end
@@ -306,14 +374,14 @@ function Mgr:Handle(player, payload)
     local operation
     if self.Save then
         local replayed
-        operation, replayed = resolve(self, player, data, payload)
+        operation, replayed = resolve(self, player, data, payload, entry.RequestKey)
         if not operation then return replayed end
     end
     local last = self.LastSeq[player.UserId]
     if last and seq <= last then return false end
     local point, anchor
     if entry.Resolve then
-        point, anchor = entry.Resolve(self, player)
+        point, anchor = entry.Resolve(self, player, payload)
     else
         point = entry.Cfg()
         anchor = self:InRange(player, point)

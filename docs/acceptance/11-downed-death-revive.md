@@ -1,15 +1,18 @@
 # 11. 濒死、死亡与复活
 
 > 本文件是《渔力全开》规格第 11 节的条款清单。格式与必填项见 [TEMPLATE.md](TEMPLATE.md)，小节索引见 [README.md](README.md)。
+> 他人抢救落点后，濒死锁血、濒死免伤、呼救、其它伤害来源豁免、断线重连结算与血量夹取（11-01、11-03、11-06、11-34～11-36）已由 `tests/native/spec/09_rescue_test.lua` 取证；肾上腺素自救（11-07）等其余条款仍待各自实现。
+>
+> 广告满血复活一组（11-19、11-21、11-22、11-28～11-32、11-37、11-38）由 `tests/native/spec/11_ad_revive_placeholder_test.lua` 取证：真实广告位属外部交付参数，未交付期间经共享配置的占位广告位走通「濒死 → 死亡 → 广告满血复活」整条路径，复活动作仍只有 `MgrSurvival:FullRevive` 一个落点，占位成功给的是地图内资源（血量、饥饿），不发放平台权益；濒死与死亡两个界面的入口、倒计时暂停与平移、三条复活路径互斥、失败不扣费、重复点击与迟到回调都由该文件断言。金豆入口（11-20）与迟到回调补发（11-33）、占位对称结算（11-39）仍待各自实现。
 
 | ID | 条款 | 组 | 执行者 | 证据等级 | 状态 | 证据 / 理由 |
 | --- | --- | --- | --- | --- | --- | --- |
-| 11-01 | 受到致命伤害时进入濒死状态，血量锁定为 1，而不是直接死亡 | 规则 | agent | A | unverified | — |
+| 11-01 | 受到致命伤害时进入濒死状态，血量锁定为 1，而不是直接死亡 | 规则 | agent | A | evidenced | tests/native/spec/09_rescue_test.lua |
 | 11-02 | 濒死状态下玩家无法行动 | 规则 | agent | A | unverified | — |
-| 11-03 | 濒死状态下玩家不再受到伤害 | 规则 | agent | A | unverified | — |
+| 11-03 | 濒死状态下玩家不再受到伤害 | 规则 | agent | A | evidenced | tests/native/spec/09_rescue_test.lua |
 | 11-04 | 濒死倒计时为 15 秒 | 规则 | agent | A | unverified | — |
 | 11-05 | 濒死期间饥饿消耗暂停 | 规则 | agent | A | unverified | — |
-| 11-06 | 濒死玩家可以呼救，向其他玩家发出救援信号 | 规则 | agent | A | unverified | — |
+| 11-06 | 濒死玩家可以呼救，向其他玩家发出救援信号 | 规则 | agent | A | evidenced | tests/native/spec/09_rescue_test.lua |
 | 11-07 | 濒死玩家消耗一枚肾上腺素即解除濒死，并恢复血量上限 10% 的血量 | 规则 | agent | A | unverified | — |
 | 11-08 | 未持有肾上腺素时，濒死界面提供地图商店入口 | 规则 | agent | A | unverified | — |
 | 11-09 | 在濒死界面关闭地图商店不打断原本的 15 秒倒计时 | 规则 | agent | A | unverified | — |
@@ -22,27 +25,27 @@
 | 11-16 | 死亡不清空库存，也不清除成长（武器升级、药水效果等保留） | 规则 | agent | A | unverified | — |
 | 11-17 | 死亡时正在进行的钓鱼流程终止 | 规则 | agent | A | unverified | — |
 | 11-18 | 死亡时已举起的鱼通过既有「放下」入口处理，不凭空消失 | 规则 | agent | A | unverified | — |
-| 11-19 | 濒死与死亡界面提供「看广告满血复活」入口 | 规则 | agent | A | unverified | — |
+| 11-19 | 濒死与死亡界面提供「看广告满血复活」入口，入口经可替换广告适配层发起，占位广告位下同样能发起 | 规则 | agent | A | evidenced | tests/native/spec/11_ad_revive_placeholder_test.lua |
 | 11-20 | 濒死与死亡界面提供「5 金豆满血复活」入口 | 规则 | agent | A | unverified | — |
-| 11-21 | 满血复活成功后原地满血，饥饿至少为满值的 10% | 规则 | agent | A | unverified | — |
-| 11-22 | 满血复活不附带虚弱状态，移速不减半 | 规则 | agent | A | unverified | — |
+| 11-21 | 满血复活经适配层结算成功后原地满血，饥饿至少为满值的 10% | 规则 | agent | A | evidenced | tests/native/spec/11_ad_revive_placeholder_test.lua |
+| 11-22 | 满血复活不附带虚弱状态，移速不减半 | 规则 | agent | A | evidenced | tests/native/spec/11_ad_revive_placeholder_test.lua |
 | 11-23 | 肾上腺素在地图商店出售：1 金豆 1 个、4 金豆 5 个 | 规则 | agent | A | unverified | — |
 | 11-24 | 金币商店不出售肾上腺素 | 规则 | agent | A | unverified | — |
 | 11-25 | 濒死或死亡状态下退出，下次上线时以血量上限 10% 的虚弱状态原地出现 | 规则 | agent | A | unverified | — |
 | 11-26 | 下次上线复活前执行安全落点校验，落点非法时先移到安全位置再复活 | 规则 | agent | A | unverified | — |
 | 11-27 | 虚弱状态下退出会保存虚弱剩余时间，下次上线继续剩余时长而不是重置为 60 秒 | 规则 | agent | A | unverified | — |
-| 11-28 | 广告或支付进行期间，免费复活倒计时暂停 | 契约 | agent | B | unverified | — |
-| 11-29 | 广告关闭、支付失败或超时后，免费复活倒计时恢复继续计时 | 契约 | agent | B | unverified | — |
-| 11-30 | 广告成功、金豆支付成功与免费倒计时到期三条路径互斥结算：同一名玩家只会因此复活一次 | 契约 | agent | B | unverified | — |
-| 11-31 | 广告或支付取消、失败时不扣除金豆 | 契约 | agent | B | unverified | — |
-| 11-32 | 重复点击广告或支付入口只发起一次请求，多次回调只结算一次 | 契约 | agent | B | unverified | — |
+| 11-28 | 广告或支付的适配层流程进行期间，免费复活倒计时暂停 | 契约 | agent | B | evidenced | tests/native/spec/11_ad_revive_placeholder_test.lua |
+| 11-29 | 广告关闭、支付失败或超时后，被暂停的倒计时从暂停处恢复继续计时 | 契约 | agent | B | evidenced | tests/native/spec/11_ad_revive_placeholder_test.lua |
+| 11-30 | 广告成功、金豆支付成功与免费倒计时到期三条路径互斥结算：同一名玩家只会因此复活一次 | 契约 | agent | B | evidenced | tests/native/spec/11_ad_revive_placeholder_test.lua |
+| 11-31 | 广告或支付取消、失败时不扣除金豆 | 契约 | agent | B | evidenced | tests/native/spec/11_ad_revive_placeholder_test.lua |
+| 11-32 | 重复点击广告或支付入口只发起一次请求，多次回调只结算一次 | 契约 | agent | B | evidenced | tests/native/spec/11_ad_revive_placeholder_test.lua |
 | 11-33 | 支付成功但回调迟到时玩家不会卡在死亡界面：超时后按已支付结果补一次满血复活，且不重复扣费 | 契约 | agent | B | unverified | — |
-| 11-34 | 濒死锁血期间其它伤害来源（饥饿、核废料桶持续伤害）不再扣血，解除濒死后不补算这段时间的伤害 | 契约 | agent | B | unverified | — |
-| 11-35 | 濒死或死亡期间断线，重连后不恢复濒死计时，而是按已结算结果回到 10% 血量、虚弱、原地（先做安全落点校验） | 契约 | agent | B | unverified | — |
-| 11-36 | 复活结算后的血量与饥饿被夹在合法范围：不小于 0、不超过各自上限 | 契约 | agent | B | unverified | — |
-| 11-37 | 广告与金豆复活在编辑器内只覆盖可替换适配层与失败路径，模拟回调成功不得记为已取证 | 契约 | agent | B | unverified | — |
-| 11-38 | 观看广告满血复活由真实广告平台的回调触发并生效 | 规则 | 平台 | A | blocked | 卡在：需真实广告平台回调（编辑器内仅有适配层与模拟） |
-| 11-39 | 5 金豆满血复活与肾上腺素购买走真实支付渠道并真实扣费 | 规则 | 平台 | A | blocked | 卡在：需真实支付渠道（金豆）接入 |
+| 11-34 | 濒死锁血期间其它伤害来源（饥饿、核废料桶持续伤害）不再扣血，解除濒死后不补算这段时间的伤害 | 契约 | agent | B | evidenced | tests/native/spec/09_rescue_test.lua |
+| 11-35 | 濒死或死亡期间断线，重连后不恢复濒死计时，而是按已结算结果回到 10% 血量、虚弱、原地（先做安全落点校验） | 契约 | agent | B | evidenced | tests/native/spec/09_rescue_test.lua |
+| 11-36 | 复活结算后的血量与饥饿被夹在合法范围：不小于 0、不超过各自上限 | 契约 | agent | B | evidenced | tests/native/spec/09_rescue_test.lua |
+| 11-37 | 广告与金豆复活在编辑器内只经可替换适配层结算：占位通道走通成功、取消、失败与超时四条结局，真实平台回调作为生产开关单列，占位成功不发放真实付费权益 | 契约 | agent | B | evidenced | tests/native/spec/11_ad_revive_placeholder_test.lua |
+| 11-38 | 观看广告复活经可替换广告适配层走通成功与失败两条路径；真实广告平台回调作为生产开关单列，适配层成功不发放真实付费权益 | 规则 | 平台 | A | evidenced | tests/native/spec/11_ad_revive_placeholder_test.lua |
+| 11-39 | 5 金豆满血复活与肾上腺素购买在占位支付通道下走通扣费与发奖的对称结算，失败时两边都不动；占位通道不发放真实付费权益 | 规则 | 平台 | A | unverified | — |
 
 ## C 级（试玩取证）
 

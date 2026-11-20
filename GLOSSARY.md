@@ -171,3 +171,13 @@ _Avoid_: 图册、catalog
 
 **Records / 纪录**：某种鱼在所有玩家中的最大重量及保持者。
 _Avoid_: 极限重量、排名（指纪录时）、ranking、leaderboard
+
+## 验收与范围
+
+**Gameplay implementation / 玩法实现**：能让一条验收条款成立的三端业务代码——`client/`、`common/`、`server/` 下的业务模块与共享配置。条目的真源是[实现覆盖表](docs/acceptance/coverage.md)。
+_Avoid_: 实现范围、代码范围、实现度、implementation coverage
+
+**Business scope / 业务范围**：质量工具与架构图度量的源码集合，不含任何 `packages/` 子树；机器真源是根目录 `uml-quality.json` 与 `policy.edn`，决策见 [ADR-0021](docs/adr/0021-packages-outside-business-scope.md)、范围口径见 [ADR-0029](docs/adr/0029-scope-completeness-and-placeholder-first.md)、用法见[开发工作流](docs/agents/workflow.md)。
+_Avoid_: 玩法实现、交付范围、scope（单独使用时）
+
+两个词不混用：问「这条玩家规则由哪段代码负责」用玩法实现；问「质量工具量哪些文件」用业务范围。

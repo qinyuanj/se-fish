@@ -15,7 +15,8 @@ local fs = require("tests.support.fs_fixture")
 local lfs = require("lfs")
 
 -- 63：#214 审查修复把商品行子节点的两处建点（图片 / 文字各一支）合成一处驱动表建点，client 40 → 39
-local SITES = 63
+-- 64：#253 队伍界面 client/ScreenHandlers/ScreenParty.lua 的 create() 是新建点，client 39 → 40
+local SITES = 64
 local SITE_ROOTS = { "client", "common", "server" }
 local REF_ROOTS = { "client", "common", "server", "tests", "tools" }
 local REMOVED = { "FXUtil", "WeldTo", "MarkPointPart", "CreateHPBar" }

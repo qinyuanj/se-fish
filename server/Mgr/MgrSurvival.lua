@@ -43,10 +43,18 @@ end
 function Mgr:SendState(state)
     local c = cfg()
     local payload = { phase = state.phase }
-    if state.phase == 'downed' then payload.endsAt = state.downedAt + c.DownedSec
+    if state.phase == 'downed' or state.phase == 'rescuing' then
+        payload.endsAt = state.downedAt + c.DownedSec
     elseif state.phase == 'dead' then payload.endsAt = state.deadAt + c.DeadSec end
     if state.weakUntil then payload.weakUntil = state.weakUntil end
+    if state.phase == 'rescuing' and state.rescue then
+        payload.rescuerUserId = state.rescue.by.UserId
+        payload.rescueEndsAt = state.rescue.endAt
+    end
     if state.platform then payload.platformPending = state.platform.mode end -- 平台复活流程在飞：倒计时暂停
+    -- #254 只读相位属性：其他玩家的交互气泡复用这一份服务端状态，不新增通信通道。
+    local okAttr, attrErr = pcall(function() state.player:SetAttribute('SurvivalPhase', state.phase) end)
+    if not okAttr then print('[MgrSurvival] 相位属性写入失败', state.player.UserId, tostring(attrErr)) end
     REUtil:GetRE('SurvivalState'):FireClient(state.player, payload)
     self:Mirror(state) -- 状态每变一次，离线标记跟着落一次
 end
@@ -111,6 +119,7 @@ end
 
 function Mgr:RescueDowned(state, vitalState)
     if not state or state.phase ~= 'downed' or not self.Vitals then return false end
+    state.rescue = nil
     local health = math.floor(self.Vitals:MaxHealthOf(state.player) * cfg().ReviveHealthPercent / 100)
     if not self.Vitals:ApplyRevive(vitalState, health) then return false end
     state.phase = 'alive'
@@ -119,6 +128,103 @@ function Mgr:RescueDowned(state, vitalState)
     print('[MgrSurvival] 抢救', state.player.UserId, 'health=' .. tostring(health))
     self:SendState(state)
     return true
+end
+
+-- #254 他人抢救：濒死 → 抢救中 → 恢复/回濒死，全程只有这一处推进相位。
+-- 发起只校验服务端身份与位置；真正改血量仍由 MgrVitals:Rescue → ApplyRevive 唯一入口完成，
+-- 本模块不直接写 Controller.Health。相位回到 downed 再过接缝，保证 RescueDowned 的守卫成立。
+local function positionOf(player)
+    local ok, pos = pcall(function() return player.Character and player.Character.Position end)
+    if ok and pos then return pos end
+end
+
+local function horizontalDistance(a, b)
+    if not a or not b then return math.huge end
+    local dx, dz = a.x - b.x, a.z - b.z
+    return math.sqrt(dx * dx + dz * dz)
+end
+
+-- 只读查玩家：交互入口按 UserId 找目标，不能由客户端自报角色对象。
+function Mgr:PlayerByUserId(userId)
+    local state = userId and self.States[userId]
+    return state and state.player or nil
+end
+
+-- 只读预检：不改任何状态，供交互入口在落持久操作身份之前先判一次。
+function Mgr:CanRescue(target, rescuer)
+    local state = self:GetState(target)
+    if not state or state.phase ~= 'downed' then return false, 'not-downed' end
+    if state.rescue then return false, 'busy' end
+    -- #262：广告满血复活在飞时不接受抢救，两条解除濒死的路径不交错（互斥结算由相位与 platform 标记守住）
+    if state.platform then return false, 'busy' end
+    local rescuerState = self:GetState(rescuer)
+    if not rescuerState then return false, 'no-rescuer' end
+    if rescuerState.phase ~= 'alive' then return false, 'rescuer-downed' end
+    local from, to = positionOf(rescuer), positionOf(target)
+    if not from or not to then return false, 'no-position' end
+    if horizontalDistance(from, to) > GameCfg.Rescue.Range then return false, 'too-far' end
+    return true
+end
+
+function Mgr:BeginRescue(target, rescuer)
+    local state = self:GetState(target)
+    local can, reason = self:CanRescue(target, rescuer)
+    if not can then return false, reason end
+    local r = GameCfg.Rescue
+    local from = positionOf(rescuer)
+    local now = self:Now()
+    state.rescue = { by = rescuer, startedAt = now, endAt = now + r.DurationSec,
+        startPos = from, health = healthOf(rescuer) }
+    state.phase = 'rescuing'
+    print('[MgrSurvival] 抢救开始', target.UserId, rescuer.UserId)
+    self:SendState(state)
+    return true
+end
+
+-- silent = true 时只清字段、不下发：调用方紧接着就写新的相位并广播一次（EnterDead 不再先发一份 downed）。
+function Mgr:CancelRescue(state, reason, silent)
+    if not state or not state.rescue then return false end
+    state.rescue = nil
+    if state.phase == 'rescuing' then state.phase = 'downed' end
+    print('[MgrSurvival] 抢救打断', state.player.UserId, tostring(reason))
+    if not silent then self:SendState(state) end
+    return true
+end
+
+-- 计时到期：回到濒死相位再走 MgrVitals:Rescue 统一接缝，接口拒绝则留在濒死。
+function Mgr:FinishRescue(state)
+    local rescue = state and state.rescue
+    if not rescue or state.phase ~= 'rescuing' then return false end
+    state.rescue = nil
+    state.phase = 'downed'
+    local vitalState = self.Vitals and self.Vitals:GetState(state.player)
+    if not vitalState then self:SendState(state) return false end
+    local ok = self.Vitals:Rescue(state.player, rescue.by) == true
+    if not ok then self:SendState(state) end
+    return ok
+end
+
+-- 抢救中的打断与到期推进；倒计时仍是原来的濒死倒计时，不因开始抢救而重置。
+function Mgr:UpdateRescue(state, now)
+    local rescue = state.rescue
+    if not rescue then return false end
+    local rescuer = rescue.by
+    local rescuerState = self:GetState(rescuer)
+    if not rescuerState or rescuerState.phase ~= 'alive' then return self:CancelRescue(state, 'rescuer-downed') end
+    local r = GameCfg.Rescue
+    local from, to = positionOf(rescuer), positionOf(state.player)
+    if not from or not to then return self:CancelRescue(state, 'no-position') end
+    if r.InterruptMoveMeters and r.InterruptMoveMeters > 0
+        and horizontalDistance(from, rescue.startPos) > r.InterruptMoveMeters then
+        return self:CancelRescue(state, 'moved')
+    end
+    if r.InterruptOnDamage then
+        local health = healthOf(rescuer)
+        if health and rescue.health and health < rescue.health then
+            return self:CancelRescue(state, 'damaged')
+        end
+    end
+    if now >= rescue.endAt then return self:FinishRescue(state) end
 end
 
 -- #128 生命接缝：状态查询 / 锁血 / 致命拦截 / 抢救 / 漏网死亡通知。
@@ -290,17 +396,33 @@ end
 -- 状态推进：濒死倒计时到转死亡；死亡倒计时到按虚弱复活结算一次。
 -- 漏网死亡（engineDeath）额外盯引擎抢先复活：Vitals 死亡标记已消（旧 Revive 跑过）或血量回正，
 -- 立即修正为虚弱复活——原生自动复活一旦发生，不能留下满血。锁血路径血停在 1，不看血量。
+-- 濒死到点转死亡：抢救中先撤销抢救，再走同一个相位写入点。
+function Mgr:EnterDead(state, now)
+    -- 抢救中断不是单独一帧状态：撤销抢救后直接写死亡相位，只广播一次 dead（不再先发 downed）。
+    self:CancelRescue(state, 'timeout', true)
+    self.Modifier:ClearTarget(state.player, true)
+    state.phase = 'dead'
+    state.downedAt = nil
+    state.deadAt = now
+    print('[MgrSurvival] 死亡', state.player.UserId)
+    self:SendState(state)
+end
+
 function Mgr:Update()
     local now = self:Now()
     local c = cfg()
     for _, state in pairs(self.States) do
-        if state.phase == 'downed' and not state.adrenalineFlying and now - state.downedAt >= c.DownedSec then
-            self.Modifier:ClearTarget(state.player, true)
-            state.phase = 'dead'
-            state.downedAt = nil
-            state.deadAt = now
-            print('[MgrSurvival] 死亡', state.player.UserId)
-            self:SendState(state)
+        if state.phase == 'rescuing' then
+            if now - state.downedAt >= c.DownedSec then
+                self:EnterDead(state, now)
+            else
+                self:UpdateRescue(state, now)
+            end
+        elseif state.phase == 'downed' and not state.adrenalineFlying and not state.platform
+            and now - state.downedAt >= c.DownedSec then
+            -- 广告流程在飞（#262）时濒死倒计时同样冻结：倒计时由回调结算或恢复（downedAt 平移暂停时长）；
+            -- 否则玩家会在看广告的途中被判死亡
+            self:EnterDead(state, now)
         elseif state.phase == 'dead' and state.recovering then
             self:TryRecover(state) -- 离线恢复等落账，不走死亡倒计时
         elseif state.phase == 'dead' and state.platform then
@@ -349,6 +471,8 @@ function Mgr:UseAdrenaline(player, payload)
     local state = self:GetState(player)
     if not state or state.phase ~= 'downed' then return fail('not-downed') end
     if state.adrenalineFlying then return fail('busy') end
+    -- #262：广告满血复活在飞时不接受自救，两条解除濒死的路径不交错（成功与免费倒计时仍互斥结算）
+    if state.platform then return fail('busy') end
     local itemId = cfg().AdrenalineItemId
     if data:ItemCount(itemId) < 1 then
         if self.Platform and self.Platform.OpenAdrenalineShop then
@@ -383,15 +507,23 @@ function Mgr:UseAdrenaline(player, payload)
     return true
 end
 
--- 满血复活（#147 平台复活成功回调：广告 / 5 金豆）：MaxHealth、饥饿至少 10%、不带虚弱（虚弱只属于
--- 免费复活；死于虚弱期的也一并清掉）。与免费虚弱复活共用 phase=='dead' 守卫 + ApplyRevive 单点，
--- 所以任一方先结算后另一方自然失效，每轮死亡只产生一个复活结果。
+-- 满血复活（#147 / #262 平台复活成功回调：广告 / 5 金豆）：MaxHealth、饥饿至少 10%、不带虚弱（虚弱
+-- 只属于免费复活；死于虚弱期的也一并清掉）。与免费虚弱复活共用 ApplyRevive 单点 + 相位守卫，
+-- 所以任一方先结算后另一方自然失效，每轮濒死 / 死亡只产生一个复活结果。
+-- 相位（#262）：死亡与濒死都可由这里结算——11-19 要求濒死与死亡界面都有广告满血复活入口，
+-- 复活动作仍只有这一个落点；濒死结算顺带撤掉在飞的抢救与濒死倒计时。
 function Mgr:FullRevive(state, mode)
-    if not state or state.phase ~= 'dead' then return false end
+    if not state then return false end
+    local fromDowned = state.phase == 'downed' or state.phase == 'rescuing'
+    if not fromDowned and state.phase ~= 'dead' then return false end
     local vitalState = self.Vitals and self.Vitals:GetState(state.player)
     if not vitalState then return false end
     local minHunger = math.floor(GameCfg.Vitals.MaxHunger * cfg().ReviveHungerPercent / 100)
     if not self.Vitals:ApplyRevive(vitalState, self.Vitals:MaxHealthOf(state.player), minHunger) then return false end
+    if fromDowned then
+        state.rescue = nil
+        state.downedAt = nil
+    end
     state.phase = 'alive'
     state.deadAt = nil
     state.engineDeath = nil
@@ -402,22 +534,30 @@ function Mgr:FullRevive(state, mode)
     return true
 end
 
--- 平台流程未成功（取消 / 失败 / 超时）：免费倒计时从暂停处继续，deadAt 平移暂停时长
-function Mgr:ResumeDeadCountdown(state, platform)
+-- 平台流程未成功（取消 / 失败 / 超时）：被暂停的那条倒计时从暂停处继续——起点平移暂停时长，
+-- 既不重置成满格，也不提前到期。死亡（免费复活倒计时）与濒死（濒死倒计时）共用这一处。
+function Mgr:ResumeCountdown(state, platform)
+    local paused = math.max(0, self:Now() - platform.startedAt)
     if state.phase == 'dead' and state.deadAt then
-        state.deadAt = state.deadAt + math.max(0, self:Now() - platform.startedAt)
+        state.deadAt = state.deadAt + paused
+    elseif (state.phase == 'downed' or state.phase == 'rescuing') and state.downedAt then
+        state.downedAt = state.downedAt + paused
     end
     self:SendState(state)
 end
 
--- 平台满血复活（#147，GameSpec「广告满血复活 / 5 金豆满血复活」）：只在死亡相位可发起。
--- 拉起平台 flow 期间免费倒计时暂停；回调按 platform 标记对象核对，只有当前 flow 的第一个回调生效：
--- 成功 → FullRevive；取消 / 失败 / 超时 → 恢复倒计时（平移暂停时长）；迟到 / 旧 flow 回调忽略。
--- 平台不可用（生产未配置）明确回包 unavailable，倒计时不暂停。
+-- 平台满血复活（#147 / #262，GameSpec「广告满血复活 / 5 金豆满血复活」+ 11-19）：
+-- 广告在濒死与死亡两个相位都可发起，金豆仍只走死亡相位（11-20 归另一单）；活动相位拒绝。
+-- 拉起平台 flow 期间被暂停的那条倒计时冻结（濒死 15 秒 / 免费复活 30 秒）；回调按 platform 标记
+-- 对象核对，只有当前 flow 的第一个回调生效：成功 → FullRevive；取消 / 失败 / 超时 → 恢复倒计时
+-- （平移暂停时长）；迟到 / 旧 flow 回调忽略。
+-- 平台不可用（真实广告位与占位广告位都没交付）明确回包 unavailable，倒计时不暂停。
 function Mgr:PlatformRevive(player, payload)
     local seq = type(payload) == 'table' and payload.seq or nil
     local function fail(reason)
-        self:Reply(player, { seq = seq, ok = false, action = 'FullRevive', reason = reason })
+        -- #249：占位通道被闸门挡住时把「未开放」文案随回执带下去（其余原因沿用客户端映射）
+        self:Reply(player, { seq = seq, ok = false, action = 'FullRevive', reason = reason,
+            text = reason == 'not_open' and GameCfg.Platform.NotOpenText or nil })
         return false
     end
     if type(payload) ~= 'table' then return false end
@@ -427,7 +567,10 @@ function Mgr:PlatformRevive(player, payload)
     local mode = payload.mode
     if mode ~= 'ad' and mode ~= 'goods' then return fail('invalid') end
     local state = self:GetState(player)
-    if not state or state.phase ~= 'dead' then return fail('not-dead') end
+    if not state then return fail('not-revivable') end
+    if state.phase ~= 'dead' and state.phase ~= 'downed' then return fail('not-revivable') end
+    -- 金豆满血复活（11-20）仍只走死亡相位：本单只把广告入口开到濒死（11-19）
+    if state.phase == 'downed' and mode ~= 'ad' then return fail('not-dead') end
     if state.recovering then return fail('recovering') end
     if state.platform then return fail('busy') end
     if not self.Platform then return fail('unavailable') end
@@ -444,9 +587,9 @@ function Mgr:PlatformRevive(player, payload)
         if outcome == 'success' then
             print('[MgrSurvival] 平台复活成功回调未能结算（待 #148 对账）', player.UserId, mode)
         end
-        self:ResumeDeadCountdown(state, platform)
+        self:ResumeCountdown(state, platform)
         self:Reply(player, { seq = seq, ok = false, action = 'FullRevive',
-            reason = outcome == 'success' and 'not-dead' or tostring(outcome) })
+            reason = outcome == 'success' and 'not-revivable' or tostring(outcome) })
     end
     -- 先挂标记再拉起：平台同步回调（测试 flow 立即结算）也能被当前 flow 识别
     state.platform = platform
@@ -461,7 +604,7 @@ function Mgr:PlatformRevive(player, payload)
         return fail(reason or 'unavailable')
     end
     if state.platform == platform then
-        print('[MgrSurvival] 平台复活流程开始，免费倒计时暂停', player.UserId, mode)
+        print('[MgrSurvival] 平台复活流程开始，复活倒计时暂停（' .. state.phase .. '）', player.UserId, mode)
         self:SendState(state)
     end
     return true

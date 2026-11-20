@@ -38,12 +38,18 @@ function World:setUp()
   self.changed.globals = true
   self.oldDebug = GameCfg.Debug
   self.changed.debug = true
+  -- #261 占位支付通道开关也是共享配置：用例会临时关掉它以取证「无可用支付通道」，逐例还原
+  self.oldPlaceholder = GameCfg.Platform.Placeholder.Enabled
+  self.oldPlaceholderAllowInPublish = GameCfg.Platform.Placeholder.AllowInPublish
+  self.changed.placeholder = true
   self.oldGoodsIds = {}
   self.changed.goodsIds = true
   for key, row in pairs(GameCfg.Platform.Goods) do
     self.oldGoodsIds[key] = row.goodsId
   end
   GameCfg.Debug = { Enabled = true } -- 未配置商品走 pending flow + 测试驱动器
+  -- #249 占位闸门：调试构建里占位面优先于测试驱动器，本夹具要的是测试驱动器，所以显式关掉占位通道
+  GameCfg.Platform.Placeholder.Enabled = false
   self.now = 1000
   self.values, self.queue, self.events = {}, {}, {}
   local env = self
@@ -163,6 +169,10 @@ function World:tearDown()
     end
     if self.changed.debug then
       GameCfg.Debug = self.oldDebug
+    end
+    if self.changed.placeholder then
+      GameCfg.Platform.Placeholder.Enabled = self.oldPlaceholder
+      GameCfg.Platform.Placeholder.AllowInPublish = self.oldPlaceholderAllowInPublish
     end
     if self.changed.goodsIds then
       for key, row in pairs(GameCfg.Platform.Goods) do

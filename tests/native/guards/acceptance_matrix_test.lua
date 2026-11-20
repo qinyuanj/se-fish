@@ -72,6 +72,27 @@ describe('验收矩阵门禁', function()
     end
   end)
 
+  it('真实实现覆盖表：已贯通小节的非试玩条款没有空落点', function()
+    local matrix = real_matrix()
+    assert.is_not_nil(matrix.coverage, '读不到实现覆盖表：' .. Acceptance.COVERAGE)
+    local landed = {}
+    for _, row in ipairs(matrix.coverage.rows) do
+      assert.is_truthy(row.landing ~= nil and row.landing ~= '' and row.landing ~= '—',
+        '覆盖表里的 ' .. row.id .. ' 没有代码落点')
+      landed[row.id] = true
+    end
+    for _, section in ipairs(Acceptance.COVERAGE_SECTIONS) do
+      for _, shard in ipairs(matrix.by_section[section] or {}) do
+        for _, clause in ipairs(shard.clauses) do
+          if clause.executor ~= '试玩' then
+            assert.is_truthy(landed[clause.id],
+              '第 ' .. section .. ' 节的 ' .. clause.id .. ' 是已贯通小节里的非试玩条款，却没登记代码落点')
+          end
+        end
+      end
+    end
+  end)
+
   it('真实基线与当前值同向：已取证不低于基线，遗留测试不高于基线', function()
     local matrix = real_matrix()
     assert.is_not_nil(matrix.baseline, matrix.baseline_error)
@@ -103,6 +124,46 @@ describe('验收矩阵门禁', function()
       local ok, found, text = verify()
       assert.is_false(ok)
       assert.same({ 'evidence_missing' }, found, text)
+    end)
+
+    it('evidenced 条款的证据在 spec 车道就绿', function()
+      local ok, found, text = verify()
+      assert.is_true(ok, text)
+      assert.same({}, found)
+    end)
+
+    it('evidenced 条款只拿实现自检当证据就红', function()
+      fixture.patch(root, fixture.shard(3), fixture.EVIDENCE, fixture.COVERAGE_TEST)
+      local ok, found, text = verify()
+      assert.is_false(ok)
+      assert.same({ 'evidence_not_clause_assertion' }, found, text)
+      assert.is_truthy(text:find('路径不符', 1, true), '没有 spec/probes 路径时消息要写清是路径不符：' .. text)
+    end)
+
+    it('spec 车道的证据文件正文里没有条款号就红', function()
+      -- 路径落在 spec 车道、文件也存在，但正文里没有 3-02：路径前缀只是车道，内容才是证据。
+      fs.write_file(root .. '/' .. fixture.EVIDENCE, '-- 夹具证据文件：正文里没写条款号。\n')
+      local ok, found, text = verify()
+      assert.is_false(ok)
+      assert.same({ 'evidence_not_clause_assertion' }, found, text)
+      assert.is_truthy(text:find('文件里没有条款号', 1, true),
+        '文件存在但没有条款号时消息要写清是文件里没有条款号：' .. text)
+    end)
+
+    it('换成另一份正文带条款号的 spec 文件就绿', function()
+      fs.write_file(root .. '/tests/native/spec/other_test.lua', '-- 夹具：条款 3-02 的断言。\n')
+      fixture.patch(root, fixture.shard(3), fixture.EVIDENCE, 'tests/native/spec/other_test.lua')
+      local ok, found, text = verify()
+      assert.is_true(ok, text)
+      assert.same({}, found)
+    end)
+
+    it('条款号按完整 ID 认：9-12 不认 19-12、09-12 与 9-120', function()
+      assert.is_true(Acceptance.clause_mentioned('-- 条款 9-12：断言', '9-12'))
+      assert.is_true(Acceptance.clause_mentioned('9-12 的断言', '9-12'))
+      assert.is_false(Acceptance.clause_mentioned('-- 条款 19-12：断言', '9-12'))
+      assert.is_false(Acceptance.clause_mentioned('-- 条款 09-12：断言', '9-12'))
+      assert.is_false(Acceptance.clause_mentioned('-- 条款 9-120：断言', '9-12'))
     end)
 
     it('已取证计数低于基线就红', function()
@@ -140,6 +201,46 @@ describe('验收矩阵门禁', function()
       local after_ok, after_found, after_text = verify()
       assert.is_true(after_ok, after_text)
       assert.same({}, after_found)
+    end)
+
+    it('覆盖表的代码落点写成破折号就红', function()
+      fixture.patch(root, Acceptance.COVERAGE,
+        '| 1-01 | server/Mgr/MgrPlatform.lua |', '| 1-01 | — |')
+      local ok, found, text = verify()
+      assert.is_false(ok)
+      assert.same({ 'coverage_landing_missing' }, found, text)
+    end)
+
+    it('覆盖表的代码落点是不存在的文件就红', function()
+      fixture.patch(root, Acceptance.COVERAGE,
+        '| 1-02 | server/Mgr/MgrPlatform.lua |', '| 1-02 | server/Mgr/GonePlatform.lua |')
+      local ok, found, text = verify()
+      assert.is_false(ok)
+      assert.same({ 'coverage_landing_path' }, found, text)
+    end)
+
+    it('已贯通小节里的非试玩条款漏登记就红', function()
+      fixture.patch(root, Acceptance.COVERAGE,
+        '\n| 1-02 | server/Mgr/MgrPlatform.lua | — | 缺 | 缺 | 缺 | 缺 | B |', '')
+      local ok, found, text = verify()
+      assert.is_false(ok)
+      assert.same({ 'coverage_clause_missing' }, found, text)
+    end)
+
+    it('覆盖表的等级与矩阵不一致就红', function()
+      fixture.patch(root, Acceptance.COVERAGE,
+        '| 缺 | 缺 | 缺 | 缺 | B |', '| 缺 | 缺 | 缺 | 缺 | A |')
+      local ok, found, text = verify()
+      assert.is_false(ok)
+      assert.same({ 'coverage_level' }, found, text)
+    end)
+
+    it('覆盖表的关联测试是不存在的文件就红', function()
+      fixture.patch(root, Acceptance.COVERAGE, 'tests/native/alpha_test.lua',
+        'tests/native/gone_test.lua')
+      local ok, found, text = verify()
+      assert.is_false(ok)
+      assert.same({ 'coverage_test_path' }, found, text)
     end)
 
     it('blocked 少了「卡在：」就红', function()
@@ -203,8 +304,11 @@ describe('验收矩阵门禁', function()
     end)
 
     it('少一份分片就红', function()
-      assert(fs.exists(root .. '/' .. fixture.shard(12)))
-      os.remove(root .. '/' .. fixture.shard(12))
+      -- 用第 19 节：它的分片删掉后覆盖表也按现存分片重派生，否则已登记的 19-xx 会连带命中
+      -- coverage_clause_unknown，就不再是单规则用例（#264 起第 1～19 节全部进了 COVERAGE_SECTIONS）。
+      assert(fs.exists(root .. '/' .. fixture.shard(19)))
+      os.remove(root .. '/' .. fixture.shard(19))
+      fixture.sync_coverage(root)
       -- 索引跟着分片重算，避免同时命中 index_stale：本用例只问「缺分片」这一条规则。
       fixture.sync_index(root)
       local ok, found, text = verify()
@@ -236,14 +340,14 @@ describe('验收矩阵门禁', function()
     end)
 
     it('条款 ID 跳号就红', function()
-      fixture.patch(root, fixture.shard(6), '| 6-01 |', '| 6-03 |')
+      fixture.patch(root, fixture.shard(19), '| 19-01 |', '| 19-03 |')
       local ok, found, text = verify()
       assert.is_false(ok)
       assert.same({ 'id_sequence' }, found, text)
     end)
 
     it('条款 ID 的节号与所在分片不一致就红', function()
-      fixture.patch(root, fixture.shard(6), '| 6-01 |', '| 07-01 |')
+      fixture.patch(root, fixture.shard(19), '| 19-01 |', '| 07-01 |')
       local ok, found, text = verify()
       assert.is_false(ok)
       assert.same({ 'clause_id' }, found, text)

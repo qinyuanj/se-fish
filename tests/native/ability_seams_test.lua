@@ -156,6 +156,8 @@ describe('TestFishAbilitySeams', function()
         }
         package.loaded['server.Mgr.MgrFishUnit'] = nil
         ctx.mgr = assert(loadfile('server/Mgr/MgrFishUnit.lua'))()
+        -- 目标裁决适配层按生产接线（server/main.lua）注入
+        ctx.mgr.AiTarget = require('server.Mgr.MgrAiTarget')
         ctx.mgr.World = _G.game:GetService('World')
         ctx.mgr.Vitals = {
             CanTakeDamage = function() return true end,

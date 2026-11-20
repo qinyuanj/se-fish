@@ -1,8 +1,28 @@
 -- 通关成就以本地存档为交付队列；平台只设置绝对进度，不递增。
 -- 平台ID未交付/平台不可用时保留本地完成标记，重进后继续补交；仅确认完成后落已送达标记。
 -- API：SE ArchiveService 服务端 SetAchievementProgress / IsAchievementCompleted（当前实例meta已核）。
+-- 平台成就 ID 只来自共享配置：真实 ID 交付后只改 PlatformId；未交付时用 PlaceholderId 在调试构建里
+-- 走通「查询 → 提交」补交路径，且永不落已送达——占位不宣称平台已授予（ADR-0029 生产开关 3）。
 local GameCfg=require('common.GameCfg')
 local Mgr={RetryAt={},Busy={}}
+
+-- 正整数才算交付；真实 ID 优先，其次占位 ID；两个都没有时只留本地标记、不碰平台。
+local function positiveId(value)
+    return type(value)=='number' and value>0 and value==math.floor(value) and value or nil
+end
+
+local function target(definition)
+    local real=positiveId(definition and definition.PlatformId)
+    if real then return real,false end
+    local placeholder=positiveId(definition and definition.PlaceholderId)
+    if placeholder then return placeholder,true end
+    return nil,false
+end
+
+local function debugEnabled()
+    local debug=GameCfg.Debug
+    return debug~=nil and debug.Enabled==true
+end
 
 function Mgr:Confirm(player,data,key)
     if self.PlayerData:GetDataInst(player)~=data or self.Busy[player.UserId] then return end
@@ -39,17 +59,20 @@ function Mgr:Update()
         if data and data.Inited and not self.Busy[player.UserId]
             and now>=(self.RetryAt[player.UserId] or 0) then
             for key,definition in pairs(GameCfg.Achievements) do
-                local id=definition.PlatformId
+                local id,placeholder=target(definition)
+                -- 占位 ID 只在调试构建里走平台调用：生产构建不拿占位 ID 去问或去写平台。
+                if placeholder and not debugEnabled() then id=nil end
                 if data.Extra.achievements and data.Extra.achievements[key]
                     and not (data.Extra.achievementDelivered and data.Extra.achievementDelivered[key])
-                    and type(id)=='number' and id>0 and id==math.floor(id) then
+                    and id then
                     self.RetryAt[player.UserId]=now+GameCfg.AchievementDelivery.RetrySec
                     if self.Archive then
                         local ok,done=pcall(self.Archive.IsAchievementCompleted,self.Archive,player,id)
                         if not ok then
                             print('[MgrAchievements] 平台查询失败，保留补交',player.UserId,key,tostring(done))
                         elseif done==true then
-                            self:Confirm(player,data,key)
+                            -- 占位 ID 的「已完成」不是本成就的授予：只保留补交，不落已送达。
+                            if not placeholder then self:Confirm(player,data,key) end
                         elseif done==false then
                             local sent,err=pcall(self.Archive.SetAchievementProgress,self.Archive,player,id,1)
                             if not sent then print('[MgrAchievements] 平台提交失败，保留补交',player.UserId,key,tostring(err)) end

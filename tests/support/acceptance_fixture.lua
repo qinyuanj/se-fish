@@ -13,6 +13,11 @@ M.EVIDENCE = 'tests/native/spec/demo_test.lua'
 -- 会被 fast ∪ full 发现、且不属于 spec 车道的遗留测试（两条）。
 M.LEGACY = { 'tests/native/alpha_test.lua', 'tests/native/slow/beta_test.lua' }
 
+-- 实现覆盖表（ADR-0029 第五节）：夹具登记第 1 节的两条非试玩条款（1-01 A、1-02 B），
+-- 1-03 是试玩条款，按设计不登记。落点与关联测试都真实存在，起点即绿。
+M.COVERAGE_LANDING = 'server/Mgr/MgrPlatform.lua'
+M.COVERAGE_TEST = M.LEGACY[1]
+
 function M.shard(section)
   return string.format('%s/%02d-fixture.md', Acceptance.DIR, section)
 end
@@ -75,6 +80,39 @@ local function busted_body()
   }, '\n')
 end
 
+local function coverage_body(bodies)
+  local lines = {
+    '# 夹具实现覆盖表',
+    '',
+    '> 夹具：八列与 docs/acceptance/coverage.md 一致。',
+    '',
+    '| 条款 | 代码落点 | 关联测试 | 正常流程 | 失败流程 | 退出重进 | 存档恢复 | 等级 |',
+    '| --- | --- | --- | --- | --- | --- | --- | --- |',
+  }
+  -- 覆盖表从分片正文派生：已贯通小节里每条非试玩条款都要有一行，等级照抄分片那一格。
+  -- 这样「改坏分片的 ID」这类用例不会顺带把覆盖表也判红——门禁仍然只报被改坏的那一类；
+  -- 新增已贯通小节也不必再改夹具，节号取 Acceptance.COVERAGE_SECTIONS。
+  local seen = {}
+  for _, section in ipairs(Acceptance.COVERAGE_SECTIONS) do
+    -- 传了 bodies 就以它为准：缺的那份（例如这一节的分片被删掉）按空处理，不拿模板补回来。
+    local body = bodies and (bodies[section] or '') or shard_body(section)
+    for line in body:gmatch('[^\n]+') do
+      local cells = {}
+      for cell in line:gmatch('[^|]+') do cells[#cells + 1] = cell:match('^%s*(.-)%s*$') end
+      local id, executor, level, status = cells[1], cells[4], cells[5], cells[6]
+      if id and id:match('^%d+%-%d%d$') and executor ~= '试玩' and not seen[id] then
+        seen[id] = true
+        -- 卡在外部依赖或划出范围的条款没有可跑的关联测试，按格式写全角破折号。
+        local tests = (status == 'blocked' or status == 'out-of-scope') and '—' or M.COVERAGE_TEST
+        lines[#lines + 1] = string.format('| %s | %s | %s | 缺 | 缺 | 缺 | 缺 | %s |',
+          id, M.COVERAGE_LANDING, tests, level)
+      end
+    end
+  end
+  lines[#lines + 1] = ''
+  return table.concat(lines, '\n')
+end
+
 local function readme_body()
   return table.concat({
     '# 夹具验收矩阵索引',
@@ -103,7 +141,10 @@ function M.build(root)
   for _, path in ipairs(M.LEGACY) do
     fs.write_file(root .. '/' .. path, '-- 夹具遗留测试：不跑，只用来数发现结果。\n')
   end
-  fs.write_file(root .. '/' .. M.EVIDENCE, '-- 夹具证据文件：存在即可。\n')
+  -- 证据文件正文要带条款号：门禁除了看路径在不在 spec 车道，还看文件里有没有这条条款的 ID。
+  fs.write_file(root .. '/' .. M.EVIDENCE, '-- 夹具证据文件：条款 3-02 的断言落在这里。\n')
+  fs.write_file(root .. '/' .. Acceptance.COVERAGE, coverage_body())
+  fs.write_file(root .. '/' .. M.COVERAGE_LANDING, '-- 夹具代码落点：存在即算有落点。\n')
   fs.write_file(root .. '/tests/native/helper.lua', '-- 夹具助手：不是测试文件。\n')
   fs.write_file(root .. '/tests/native/notes.md', '不是测试文件。\n')
   -- 生成块与基线由扫描结果算出来，夹具起步即幂等、即全绿。
@@ -118,6 +159,15 @@ function M.sync_index(root)
   assert(body, err)
   fs.write_file(root .. '/' .. Acceptance.INDEX, body)
   return body
+end
+
+--- 按现存分片重派生覆盖表：删掉某节分片后同步一次，免得「条款不在矩阵里」盖住「缺分片」那一类。
+function M.sync_coverage(root)
+  local bodies = {}
+  for _, section in ipairs(Acceptance.COVERAGE_SECTIONS) do
+    bodies[section] = fs.slurp(root .. '/' .. M.shard(section))
+  end
+  fs.write_file(root .. '/' .. Acceptance.COVERAGE, coverage_body(bodies))
 end
 
 function M.sync_baseline(root, override)
@@ -136,6 +186,15 @@ function M.patch(root, relative, from, to)
   local first, last = body:find(from, 1, true)
   assert(first, string.format('夹具里找不到要替换的片段 %q（%s）', from, relative))
   fs.write_file(path, body:sub(1, first - 1) .. to .. body:sub(last + 1))
+  -- 改的是分片正文就把覆盖表按改后的分片重派生：否则改坏条款 ID 会顺带触发覆盖表的
+  -- 「条款不在矩阵里 / 已贯通小节缺条款」，被改坏的那一类反而淹没在噪声里。
+  if relative:match('^docs/acceptance/%d%d%-') then
+    local bodies = {}
+    for _, section in ipairs(Acceptance.COVERAGE_SECTIONS) do
+      bodies[section] = assert(fs.slurp(root .. '/' .. M.shard(section)))
+    end
+    fs.write_file(root .. '/' .. Acceptance.COVERAGE, coverage_body(bodies))
+  end
 end
 
 return M

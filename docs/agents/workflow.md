@@ -7,6 +7,7 @@
 - **se-fish**：本图的 Lua 源码仓库。
 - **Business scope / 业务范围**：质量工具与架构图共用的源码集合，不含任何 `packages/` 子树；机器真源是根目录 `uml-quality.json` 与 `policy.edn`，决策见 [ADR-0021](../adr/0021-packages-outside-business-scope.md)。
   _Avoid_: 业务树、指标采集范围、mutation 范围、scope（单独使用时）
+  与**玩法实现**（三端业务代码）不是一回事，两者不混用，见 [ADR-0029](../adr/0029-scope-completeness-and-placeholder-first.md) 第二节。
 - **Checkout / 仓库检出**：本仓的 git 工作树（含 worktree），是唯一跑 Lua、测试与工具链的地方；仓库内路径一律相对、`/` 分隔，离开仓库写正斜杠加盘符。
   _Avoid_: 开发端、本机、repo copy
 - **Host directory / 宿主目录**：编辑器 `code init` 绑定的本地 Lua 工程目录，根有 `eggy.json`，是部署目的地；与仓库检出分别管理，两者只经 `deploy` 与 `sync` 往来。路径与绑定方式见下方「工具链」。

@@ -81,9 +81,9 @@ describe('TestKingCrabCombat', function()
         -- 逃跑打断：乱刺进行中逃跑时限到，清招式、收预警、直线逃脱不再结算
         local fish = drop(env)
         env.mgr:Update()
-        env.now = 0.4
+        env.now = 0.7
         env.mgr:Update()
-        assert.are.equal(1, #env.vitalsCalls) -- 0.4 结算第一刺（起手帧只是预警）
+        assert.are.equal(1, #env.vitalsCalls) -- 0.5 起手 + 0.2 第一刺（起手帧只是预警）
         assert.is_not.is_nil(fish.Move)
         env.now = 180
         env.mgr:Update()
@@ -99,20 +99,20 @@ describe('TestKingCrabCombat', function()
 
     it('test_jab_combo_six_strikes_every_five_seconds_once_per_slot', function()
         -- 乱刺节奏：5 秒一轮、左右各 3 下、间隔 0.2、每下 15；起手帧是预警不结算，
-        -- 六刺在 0.2、0.4、0.6、0.8、1.0、1.2 秒各结算一次（1.2 秒第六刺与收招同帧，先结算再收招）。
+        -- 0.5 秒起手后六刺在 0.7、0.9、1.1、1.3、1.5、1.7 秒各结算一次（末刺与收招同帧，先结算再收招）。
         -- 同一刺段重复帧不重复结算；掉帧只补当前刺段不追溯。
         local fish = drop(env)
         env.mgr:Update()
         assert.are.equal('jab', fish.Move.Name)
         assert.are.equal(0, #env.vitalsCalls, '起手帧只是预警')
-        for i, t in ipairs({ 0.2, 0.4, 0.6, 0.8, 1.0, 1.2 }) do
+        for i, t in ipairs({ 0.7, 0.9, 1.1, 1.3, 1.5, 1.7 }) do
             env.now = t
             env.mgr:Update()
             env.mgr:Update() -- 同一刺段重复帧不重复结算
             assert.are.equal(i, #env.vitalsCalls, '第 ' .. i .. ' 刺')
             assert.are.equal(15, env.vitalsCalls[#env.vitalsCalls][3])
         end
-        assert.is_nil(fish.Move, '1.2 秒第六刺结算即收招')
+        assert.is_nil(fish.Move, '1.7 秒第六刺结算即收招')
         assert.are.equal('clear', env.notices[#env.notices].kind)
         env.now = 4.99
         env.mgr:Update()
@@ -120,7 +120,7 @@ describe('TestKingCrabCombat', function()
         env.now = 5
         env.mgr:Update()
         assert.are.equal(6, #env.vitalsCalls, '第二轮起手帧只是预警')
-        env.now = 5.2
+        env.now = 5.7
         env.mgr:Update()
         assert.are.equal(7, #env.vitalsCalls)
         -- 掉帧大 dt：一轮只补当前刺段，不追溯历史
@@ -133,9 +133,9 @@ describe('TestKingCrabCombat', function()
         -- 移除打断：乱刺进行中鱼被打死清场，预警收起不再结算
         local fish = drop(env)
         env.mgr:Update()
-        env.now = 0.4
+        env.now = 0.7
         env.mgr:Update()
-        assert.are.equal(1, #env.vitalsCalls) -- 起手帧只是预警，0.4 第一刺
+        assert.are.equal(1, #env.vitalsCalls) -- 起手帧只是预警，0.7 第一刺
         env.mgr:Remove(fish)
         assert.are.equal('clear', env.notices[#env.notices].kind)
         assert.are.equal('gone', env.notices[#env.notices].reason)

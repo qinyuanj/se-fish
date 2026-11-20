@@ -130,6 +130,27 @@ function Mgr:NoteWrite(userId, snapshot, reason)
         'bytes=' .. ledger.Bytes, 'writes=' .. ledger.Writes, 'ops=' .. ledger.OperationCount)
 end
 
+function Mgr:RestoreLanding(userId, player, data, session)
+    if not self:IsCurrent(userId, session, data) then return end
+    local point, corrected = data:ResolveSafePoint()
+    if not corrected or not point then return end
+    local function teleport(character)
+        local ok, err = pcall(function()
+            local pos = Vector3.New(point.x, point.y, point.z)
+            if character.SetPosition then character:SetPosition(pos) else character.Position = pos end
+        end)
+        if not ok then print('[MgrSave] 安全落点恢复失败', userId, tostring(err)) end
+    end
+    if player.Character then teleport(player.Character) return end
+    if not player.CharacterAdded then return end
+    local connection
+    connection = player.CharacterAdded:Connect(function(character)
+        if self.Sessions[userId] ~= session then connection:Disconnect() return end
+        teleport(character)
+        connection:Disconnect()
+    end)
+end
+
 function Mgr:LoadInto(player, data)
     local userId = player.UserId
     local previous = self:Session(userId)
@@ -189,6 +210,7 @@ function Mgr:LoadInto(player, data)
             end
             s.State, s.Revision, s.Epoch = 'ready', claimed.meta.revision, claimed.meta.epoch
             if not data:CompleteLoad(claimed) then self:Fail(userId, s, '恢复数据无效') return end
+            self:RestoreLanding(userId, player, data, s)
             self:NoteWrite(userId, claimed, status == 'missing' and 'new' or 'load')
             player:SetAttribute('SaveState', 'ready')
             print('[MgrSave] ready', userId, s.Token, 'coin=' .. claimed.coin, 'sequence=' .. claimed.meta.sequence)
