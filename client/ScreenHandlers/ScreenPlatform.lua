@@ -4,6 +4,9 @@
 --   * Grant：购买发货落账提示（满格溢出的件数落在面前地上）；Purchase/CoinShop 失败给可读原因；
 --   * TestFlow：调试构建的测试 flow 开/关——显示「成功 / 取消 / 失败」驱动按钮，上行 PlatformTestAction；
 --     生产构建服务端既不建测试 flow 也拒绝驱动器，这组按钮不会出现；
+--   * PlaceholderFlow：占位支付通道的确认面板（#261，生产开关）——显示商品与占位价目、注明
+--     「不发放真实付费权益」，确认/取消上行 PlatformAction{action='PlaceholderOutcome'}；服务端 open=false 时收起；
+--   * CoinShop / CoinGrant：金币页报价（按服务端占位汇率渲染）与到账提示；点选上行 BuyCoin；
 --   * _G.PlatformShop.Open：地图商店金币页入口（ScreenShop:OpenPlatformShop），上行 OpenCoinShop。
 -- 节点全部运行时创建（data/ 只读）；创建失败只记日志，不阻塞主流程。
 local GameCfg = require('common.GameCfg')
@@ -52,6 +55,9 @@ function Panel:Clear()
     OwnedUnits.Clear(self)
     self.Nodes = {}
     self.Offers = nil
+    self.OfferMode = nil
+    self.OfferUnit = nil
+    self.Flow = nil
 end
 
 function Panel:Button(parent, name, x, y, w, h, text, onClick)
@@ -90,6 +96,19 @@ function Panel:BuildNodes()
         self:Button(offers, 'BtnPlatformOffersClose', 0, 80, 200, 50, '关闭',
             function() self:SetVisible('PlatformOffers', false) end)
     end
+    -- 占位支付通道的确认面板：生产构建唯一的购买面（调试构建走测试驱动器）
+    local placeholder = self:Create('EUIImage', root, 'PlatformPlaceholder', cx - 300, cy - 320, 600, 260, {
+        Image = ColorBlockImage, Color = Color.New(0, 0, 0, 210), Visible = false })
+    if placeholder then
+        self:Create('EUITextLabel', placeholder, 'PlatformPlaceholderTitle', 0, -90, 600, 50, {
+            Text = cfg().Placeholder.Label, FontSize = 28, TextColor = Color.New(255, 255, 255, 255) })
+        self:Create('EUITextLabel', placeholder, 'PlatformPlaceholderNotice', 0, -35, 580, 40, {
+            Text = cfg().Placeholder.Notice, FontSize = 20, TextColor = Color.New(255, 200, 200, 255) })
+        self:Button(placeholder, 'BtnPlatformPlaceholderConfirm', -160, 40, 260, 80, '确认支付',
+            function() self:ConfirmFlow('success') end)
+        self:Button(placeholder, 'BtnPlatformPlaceholderCancel', 160, 40, 260, 80, '取消',
+            function() self:ConfirmFlow('cancel') end)
+    end
     local driver = self:Create('EUIImage', root, 'PlatformTestDriver', resolution.x - 360, 260, 340, 200, {
         Image = ColorBlockImage, Color = Color.New(80, 0, 0, 180), Visible = false })
     if driver then
@@ -104,17 +123,25 @@ function Panel:BuildNodes()
     return true
 end
 
--- 两份报价：按服务端回包渲染（价目以服务端 GameCfg.Platform.Goods 为准）
-function Panel:ShowOffers(offers)
+-- 报价面板：goods 模式按金豆价目渲染（价目以服务端 GameCfg.Platform.Goods 为准），
+-- coin 模式按占位汇率渲染（价目与汇率以服务端 GameCfg.Platform.Placeholder.CoinPage 为准）。
+function Panel:ShowOffers(offers, mode, unit)
     self.Offers = type(offers) == 'table' and offers or {}
+    self.OfferMode = mode or 'goods'
+    self.OfferUnit = unit
     for index = 1, 2 do
         local offer = self.Offers[index]
         self:SetVisible('BtnPlatformOffer' .. index, offer ~= nil)
         local label = self.Nodes['BtnPlatformOffer' .. index .. 'Text']
         if offer and label then
             pcall(function()
-                label.Text = string.format('%s（%d%s）', offer.name or offer.key, offer.beans or 0,
-                    cfg().BeanCurrency)
+                if self.OfferMode == 'coin' then
+                    label.Text = string.format('%s（%d%s → %d%s）', offer.name or offer.key,
+                        offer.price or 0, unit or '', offer.coin or 0, cfg().BeanCurrency)
+                else
+                    label.Text = string.format('%s（%d%s）', offer.name or offer.key, offer.beans or 0,
+                        cfg().BeanCurrency)
+                end
             end)
         end
     end
@@ -125,7 +152,42 @@ function Panel:Buy(index)
     local offer = self.Offers and self.Offers[index]
     if not offer then return false end
     self:SetVisible('PlatformOffers', false)
-    REUtil:GetRE('PlatformAction'):FireServer({ action = 'Purchase', goods = offer.key })
+    local action = self.OfferMode == 'coin' and 'BuyCoin' or 'Purchase'
+    REUtil:GetRE('PlatformAction'):FireServer({ action = action, goods = offer.key })
+    return true
+end
+
+-- 占位确认面板：服务端说 open 就按回包里的商品与价目显示，收起时清掉挂着的 flow
+function Panel:ShowPlaceholder(payload)
+    local open = payload.open == true
+    self.Flow = open and payload or nil
+    local title = self.Nodes.PlatformPlaceholderTitle
+    if title then
+        local name = payload.name or payload.key or ''
+        local text
+        if payload.kind == 'coin' then
+            text = string.format('%s：%s %d%s → %d%s', cfg().Placeholder.Label, name,
+                payload.price or 0, payload.currency or '', payload.coin or 0, cfg().BeanCurrency)
+        elseif payload.beans then
+            text = string.format('%s：%s %d%s', cfg().Placeholder.Label, name, payload.beans,
+                cfg().BeanCurrency)
+        else
+            text = string.format('%s：%s', cfg().Placeholder.Label, name)
+        end
+        pcall(function() title.Text = text end)
+    end
+    local label = self.Nodes.PlatformPlaceholderNotice
+    if label then
+        pcall(function() label.Text = payload.notice or cfg().Placeholder.Notice end)
+    end
+    self:SetVisible('PlatformPlaceholder', open)
+end
+
+function Panel:ConfirmFlow(outcome)
+    if not self.Flow then return false end
+    self.Flow = nil
+    self:SetVisible('PlatformPlaceholder', false)
+    REUtil:GetRE('PlatformAction'):FireServer({ action = 'PlaceholderOutcome', outcome = outcome })
     return true
 end
 
@@ -149,6 +211,17 @@ function Panel:NoteResult(result)
                 title.Text = cfg().TestDriverTitle .. (result.open and ('：' .. tostring(result.key)) or '')
             end)
         end
+    elseif action == 'PlaceholderFlow' then
+        self:ShowPlaceholder(result)
+    elseif action == 'CoinShop' then
+        if result.ok then
+            self:ShowOffers(result.offers, 'coin', result.currency)
+        else
+            notice(reasonText(result.reason))
+        end
+    elseif action == 'CoinGrant' and result.ok then
+        notice(string.format('到账 %d%s（%s）', result.coin or 0, cfg().BeanCurrency,
+            tostring(result.name or result.goods)))
     elseif action == 'AdrenalineShop' then
         if result.ok then self:ShowOffers(result.offers) else notice(cfg().UnavailableText) end
     elseif action == 'Grant' and result.ok then

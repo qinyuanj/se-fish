@@ -71,25 +71,34 @@ describe('条款 16-04 / 16-06 / 16-07：物品食用规则', function()
     end)
 
     it('食物、极品食物与鱼饵可食用，恢复或扣减按恢复百分比生效', function()
-        local checked = 0
+        -- 负恢复项（如 item119）会真的扣血，扣到 0 之后 CanAct 就拒绝一切进食——所以每件物品
+        -- 各用一个新玩家，并把物品按 ID 排序，用例结果不随 pairs 的遍历顺序或进程哈希种子漂移。
+        local ids = {}
         for id, item in pairs(GameCfg.Items.Definitions) do
-            if EDIBLE[item.Type] then
-                checked = checked + 1
-                assert.is_true(env.Vitals:CanEat(env.player, id), '可食用类别被拒：' .. id)
-                env.Vitals:SetHunger(env.player, 100)
-                local before = env.Vitals:GetState(env.player).hunger
-                local damages = #env.player.Character.Controller.damages
-                assert.is_true(env.Vitals:Eat(env.player, id), '可食用类别吃不下：' .. id)
-                local after = env.Vitals:GetState(env.player).hunger
-                if item.EatPercent > 0 then
-                    assert.is_true(after > before, '正恢复没有回饥饿：' .. id)
-                elseif item.EatPercent < 0 then
-                    assert.is_true(after < before, '负恢复没有扣饥饿：' .. id)
-                    assert.is_true(#env.player.Character.Controller.damages > damages, '负恢复没有扣血：' .. id)
-                else
-                    assert.are.equal(before, after, '零恢复改动了饥饿：' .. id)
-                end
+            if EDIBLE[item.Type] then ids[#ids + 1] = id end
+        end
+        table.sort(ids)
+        local checked = 0
+        for _, id in ipairs(ids) do
+            local item = GameCfg.Items.Definitions[id]
+            local player = newPlayer(7100 + checked)
+            env.Vitals:OnPlayerAdded(player)
+            checked = checked + 1
+            assert.is_true(env.Vitals:CanEat(player, id), '可食用类别被拒：' .. id)
+            env.Vitals:SetHunger(player, 100)
+            local before = env.Vitals:GetState(player).hunger
+            local damages = #player.Character.Controller.damages
+            assert.is_true(env.Vitals:Eat(player, id), '可食用类别吃不下：' .. id)
+            local after = env.Vitals:GetState(player).hunger
+            if item.EatPercent > 0 then
+                assert.is_true(after > before, '正恢复没有回饥饿：' .. id)
+            elseif item.EatPercent < 0 then
+                assert.is_true(after < before, '负恢复没有扣饥饿：' .. id)
+                assert.is_true(#player.Character.Controller.damages > damages, '负恢复没有扣血：' .. id)
+            else
+                assert.are.equal(before, after, '零恢复改动了饥饿：' .. id)
             end
+            env.Vitals:OnPlayerRemoving(player)
         end
         assert.is_true(checked > 0, '物品表里没有可食用项')
     end)
