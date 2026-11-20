@@ -638,6 +638,22 @@ local function check_shards(matrix, add)
               shard.path, clause.line)
           end
         end
+        -- 条款断言车道：evidenced/accepted 的 agent 条款必须至少有一条 tests/native/spec 或 tests/probes 证据。
+        if #paths > 0 and (clause.status == 'evidenced' or clause.status == 'accepted')
+            and clause.executor == 'agent' then
+          local clause_assertion = false
+          for _, path in ipairs(paths) do
+            if path:match('^tests/native/spec/') or path:match('^tests/probes/') then
+              clause_assertion = true
+              break
+            end
+          end
+          if not clause_assertion then
+            add('evidence_not_clause_assertion', string.format(
+              '%s 标为 %s，但证据列没有 tests/native/spec/ 或 tests/probes/ 下的条款断言（现写的是 %q）',
+              clause.id, clause.status, evidence), shard.path, clause.line)
+          end
+        end
         -- accepted 另要人背书：路径后面必须跟（签署：@用户名 YYYY-MM-DD）。
         if clause.status == 'accepted' and not M.signed(evidence) then
           add('accepted_signature', string.format(
