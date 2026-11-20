@@ -359,28 +359,28 @@
 | 12-10 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/shrimp_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 12-11 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/shrimp_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 12-12 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/shrimp_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 12-13 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/shrimp_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 12-14 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/shrimp_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 12-13 | common/cfg/BossMoves.lua、common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/spec/12_boss_moves_ranged_dive_test.lua | 有 | 缺 | 缺 | 缺 | A |
+| 12-14 | common/cfg/BossMoves.lua、common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/spec/12_boss_moves_ranged_dive_test.lua | 有 | 缺 | 缺 | 缺 | A |
 | 12-15 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/king_crab_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 12-16 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/king_crab_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 12-17 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/crab_boss_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 12-18 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/crab_boss_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 12-19 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/crab_boss_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 12-20 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/forest_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 12-21 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/forest_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 12-21 | common/cfg/BossMoves.lua、common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/spec/12_boss_moves_ranged_dive_test.lua | 有 | 缺 | 缺 | 缺 | A |
 | 12-22 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/forest_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 12-23 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/forest_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 12-24 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/forest_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 12-24 | common/cfg/BossMoves.lua、common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/spec/12_boss_moves_ranged_dive_test.lua | 有 | 缺 | 缺 | 缺 | A |
 | 12-25 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/beach_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 12-26 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/beach_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 12-26 | common/cfg/BossMoves.lua、common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/spec/12_boss_moves_ranged_dive_test.lua | 有 | 缺 | 缺 | 缺 | A |
 | 12-27 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/beach_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 12-28 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/beach_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 12-28 | common/cfg/BossMoves.lua、common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/spec/12_boss_moves_ranged_dive_test.lua | 有 | 缺 | 缺 | 缺 | A |
 | 12-29 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/beach_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 12-30 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/beach_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 12-31 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua、common/FlightPath.lua | tests/native/reef_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 12-32 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua、common/FlightPath.lua | tests/native/reef_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 12-33 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua、common/FlightPath.lua | tests/native/reef_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 12-34 | common/GameCfg.lua、common/cfg/BossMoves.lua | tests/native/reef_combat_test.lua | 缺 | 缺 | 缺 | 缺 | B |
+| 12-30 | common/cfg/BossMoves.lua、common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/spec/12_boss_moves_ranged_dive_test.lua | 有 | 缺 | 缺 | 缺 | A |
+| 12-31 | common/cfg/BossMoves.lua、common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/spec/12_boss_moves_ranged_dive_test.lua | 有 | 缺 | 缺 | 缺 | A |
+| 12-32 | common/cfg/BossMoves.lua、common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/spec/12_boss_moves_ranged_dive_test.lua | 有 | 缺 | 缺 | 缺 | A |
+| 12-33 | common/cfg/BossMoves.lua、common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/spec/12_boss_moves_ranged_dive_test.lua | 有 | 缺 | 缺 | 缺 | A |
+| 12-34 | common/cfg/BossMoves.lua、common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/spec/12_boss_moves_ranged_dive_test.lua | 有 | 缺 | 缺 | 缺 | B |
 | 12-35 | common/cfg/BossMoves.lua、server/Mgr/MgrFishUnit.lua | tests/native/spec/12_boss_moves_phase_test.lua | 有 | 缺 | 缺 | 缺 | A |
 | 12-36 | common/cfg/BossMoves.lua、common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/spec/12_boss_moves_phase_test.lua | 有 | 缺 | 缺 | 缺 | A |
 | 12-37 | common/cfg/BossMoves.lua、server/Mgr/MgrFishUnit.lua | tests/native/spec/12_boss_moves_phase_test.lua | 有 | 缺 | 缺 | 缺 | A |
@@ -399,6 +399,12 @@
 第 12 节先建逐招表，再用火山岛首领哥斯拉贯通「配置 → 服务端调度 → 客户端预警 → 断言」：
 12-04、12-05、12-39～12-46 已由 tests/native/spec/12_boss_moves_test.lua 走 MgrFishUnit 的业务入口取证；
 其余条款的落点与关联测试都是实现自检，状态仍是 unverified。
+
+远程与俯冲组（#258）另由 tests/native/spec/12_boss_moves_ranged_dive_test.lua 走同一业务入口取证：
+小白龙雨云 / 俯冲、剑鱼与三头鲨高跃、海象直线突击、虎鲸虎啸 / 鲸跃、白头鹰俯冲、
+风神翼龙投掷 / 追踪俯冲共 11 条（12-13、12-14、12-21、12-24、12-26、12-28、12-30、12-31～12-34）。
+断言改逐招表哨兵值后观察服务端结算，证明表是唯一数值来源；预警载荷带落点、范围与投送方式，
+伤害只由服务端在锁定落点结算，测试进程没有加载客户端命中代码。
 
 阶段与复合组（#259）另有一组 A/B 证据：沧龙用逐招表的 patrol / leap / head / bite / contact 五行区分绕岛巡航、命中段与叼走过程接触段，哥斯拉的阶段阈值单独放在 `M.Phases`（普通招式表仍是 `M.Rows`），由 tests/native/spec/12_boss_moves_phase_test.lua 走 MgrFishUnit 的业务入口断言移速上限、砸击/甩头、最近岛中心目标、叼走入海、两段伤害与同帧阈值优先；四类证据只勾「正常流程」，失败 / 退出重进 / 存档恢复仍缺。
 
