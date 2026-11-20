@@ -181,6 +181,36 @@ describe('条款 9 PK 伤害过滤', function()
     assert.same(300, b.Character.Controller.Health)
   end)
 
+  -- 失败方式：区域快照没解析出来时，鱼塘免伤悄悄失效（fail-open）会让区内非同队玩家互秒。
+  it('9-13 区域快照缺失时玩家互伤保守拒绝并留日志', function()
+    local a = join(1, vec(6.26, 5.01, -0.71))
+    local b = join(2, vec(5, 6, -9))
+    local snapshot, scene = env.vitals.ZoneMarkers, env.cfg.Zones[1].Scene
+    env.vitals.ZoneMarkers, env.cfg.Zones[1].Scene = { Zones = {} }, nil
+    local printed, rawPrint = {}, print
+    _G.print = function(...)
+      local parts = {}
+      for index = 1, select('#', ...) do parts[index] = tostring((select(index, ...))) end
+      printed[#printed + 1] = table.concat(parts, ' ')
+    end
+    local ok, actual = hit(a, b, 'gun', 45)
+    local blockedHealth = b.Character.Controller.Health
+    -- 同一口径下鱼攻击不受这条兜底影响（9-16）。
+    local fishHit = hit({ Id = 91, Body = { UnitId = 91 }, Receiver = {} }, b, 'fishAttack', 10)
+    _G.print = rawPrint
+    env.vitals.ZoneMarkers, env.cfg.Zones[1].Scene = snapshot, scene
+    assert.is_false(ok, '区域未解析时玩家间伤害必须拒伤')
+    assert.is_nil(actual)
+    assert.same(300, blockedHealth)
+    assert.is_true(fishHit, '区域缺失不该挡住鱼对玩家的伤害')
+    assert.same(290, b.Character.Controller.Health)
+    local logged = false
+    for _, line in ipairs(printed) do
+      if line:find('MgrPkFilter', 1, true) then logged = true end
+    end
+    assert.is_true(logged, '保守拒伤要留下日志')
+  end)
+
   it('9-14：鱼塘外非同队玩家攻击扣血，同队仍免伤', function()
     local a = join(3, vec(241, 6, 0))
     local b = join(4, vec(242, 6, 0))

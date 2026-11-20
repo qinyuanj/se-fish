@@ -274,6 +274,34 @@ describe('条款 18 存档会话与结算身份', function()
     assert.same(0, rejoined.teleports)
   end)
 
+  -- 18-24（review #249-4）：发奖走同一条持久操作协议，同一身份重试只补回执、不再发一次。
+  it('发奖重放只回执、只发一次', function()
+    local uid = 5205
+    local player, data = ready(uid)
+    env.platform = assert(loadfile('server/Mgr/MgrPlatform.lua'))()
+    env.platform.Save, env.platform.PlayerData = env.save, env.players
+    local itemId = env.cfg.Platform.Goods.adrenaline1.itemId
+    local before = #storeSnapshot(uid).meta.operations
+
+    assert.is_true(env.platform:GrantGoods(player, 'adrenaline1', 1))
+    drain()
+    local first = lastReply('PlatformResult').payload
+    assert.is_true(first.ok, tostring(first.reason))
+    assert.is_not_nil(first.operation, '回执要带可重试的操作身份')
+    assert.same(1, first.granted)
+    assert.same(1, data:ItemCount(itemId))
+    assert.same(before + 1, #storeSnapshot(uid).meta.operations)
+
+    assert.is_true(env.platform:GrantGoods(player, 'adrenaline1', 1, first.operation))
+    drain()
+    local replay = lastReply('PlatformResult').payload
+    assert.is_true(replay.ok)
+    assert.same(first.operation.id, replay.operation.id, '重放认得原操作身份')
+    assert.same(1, replay.granted, '回执仍是原来那一次发放')
+    assert.same(1, data:ItemCount(itemId), '重放不得重复发奖')
+    assert.same(before + 1, #storeSnapshot(uid).meta.operations, '重放不得再记一笔发放')
+  end)
+
   it('个人持久状态逐项保存与恢复', function()
     local uid = 5209
     local snapshot = seedSnapshot(uid)
