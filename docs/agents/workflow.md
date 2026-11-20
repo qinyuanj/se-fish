@@ -38,7 +38,7 @@ Lua 命令使用 **Lua 5.4**，命令名统一 `lua`，执行前用 `lua -v` 核
 - 图上 `client|common|server` 三棵树覆盖整个**业务范围**：各端 `packages/` 按真实命名空间建类，不设外部节点（`policy.edn` 不写 `:foreign`，`:exclude` 只排除 `_trigger`）。viewer 从 `.metrics/crap.edn` 与 `.metrics/mutate/*.edn` 加载指标；缺少任一指标的类卡片为红色。包内类不跑 mutation 基线，因缺快照显红并拉低端级聚合分数，属已接受的代价，理由见 [ADR-0010](../adr/0010-packages-as-business-code.md)。标准工具的环境准备（含 crapper 要求的 cluacov 1.0.0）按 dsh-uml-viewer 插件文档由人完成。
 - **标准 quality 分发**：根目录 `uml-quality.json`（版本管理）只含 `standardTools`：`sourceRoots` 为三端 `client`、`common`、`server`，`exclude` 为 `server/_trigger`，`mutatorOptions` 为 `--busted-task fast`（每个变异体只跑 fast 车道）。插件的 `uml_crap`、`uml_mutate`、`uml_dry` 读这里的范围；业务范围只在这里声明一次，CRAP、mutation、DRY 与架构图口径一致。CLI 不包装质量工具。
 - `target/` 放覆盖率与 mutation worker，属于忽略的临时产物；`.metrics/` 保留质量快照并纳入版本管理。无函数定义的配置或转发模块不生成 mutation 快照；当前工具不测试模块顶层语句。
-- **实机验收在 Windows 原生**：full／fast、coverage 与 CRAP 的实机数据都来自这台 Windows 机器上的仓库检出。**macOS 未实机验证，没有实机数据**。本仓没有任何 CI 配置（历史上也从未有），不新增 CI：全部检查都在本机跑。
+- **Windows 原生**：full／fast、coverage 与 CRAP 的标准环境是 Windows。PR 与 `main` 的 full 由 GitHub Actions `windows-latest` 执行（见 [ADR-0025](../adr/0025-windows-pr-full-test-gate.md)）；coverage 与 CRAP 的实机数据仍来自本机仓库检出。**macOS 未实机验证，没有实机数据**。
 
 **worktree 起手式。** 新建 worktree 后在其根执行一次：
 
@@ -79,12 +79,12 @@ lua tools/cli.lua worktree-init
 - **先列失败方式**：确需单独测试某个系统时，先列出所有可能失败的方式，再写代码；代码写完后不补写单测。
 - **局部开发、全量收尾**：开发期间用 `lua tools/cli.lua test` 验证；业务功能仍按需试玩，收尾执行下面的全部检查。
 - **可复现取证**：每次试玩保留可重跑的触发步骤（`input` 命令、探针文件）与对应证据（`log grep` 命中行、截图路径）。
-- **只写有失败方式的用例**：用例分五类——①行为（分支、边界、失败路径）、②跨真源守卫（`data/` ↔ `GameCfg` ↔ 代码里的 id 引用、表间绑定）、③复述（断言等价于把实现或配置再写一遍）、④重复覆盖（同一行为在多个文件各测一遍）、⑤基架自测（只保护 `tests/support/` 夹具或 `tools/` 工具本身）。只写 ①②；③④⑤不写，遇到就删，删时记一行「原来拦住哪种失败 / 删掉后由谁接手」。门禁型（`arch_policy_test`、`eggy_json_guard_test` 这类挡仓库不变量的）不在此列。
+- **只写有失败方式的用例**：用例分五类——①行为（分支、边界、失败路径）、②跨真源守卫（`data/` ↔ `GameCfg` ↔ 代码里的 id 引用、表间绑定）、③复述（断言等价于把实现或配置再写一遍）、④重复覆盖（同一行为在多个文件各测一遍）、⑤基架自测（只保护 `tests/support/` 夹具或 `tools/` 工具本身）。只写 ①②；③④⑤不写，遇到就删，删时记一行「原来拦住哪种失败 / 删掉后由谁接手」。门禁型（`arch_policy_test`、`eggy_json_guard_test` 这类挡仓库不变量的）不在此列。共享夹具若复刻反直觉的宿主行为，可设独立契约门禁，但必须同时有业务用例消费；否则仍按⑤删除。
 - **按文件算耗时，不按用例算**：九成用例短于 busted 的一个计时 tick（15.6 ms），删单条用例几乎不减墙钟——减时间靠删或合并**文件**、降低用例里的循环规模。参数矩阵用两两覆盖（每对因子取值至少配过一次）而不是全组合。断言消息只在失败分支里拼（`if not cond then fail(fmt, ...) end`），写在断言参数里等于每个通过的断言都付一次 `string.format` 的钱（`main_hud_layout_test` 实测 2825 ms → 176 ms）。
 
 ## 完成判据
 
-代码改动按顺序执行，全部通过才算完成。本仓没有提交时自动检查，也没有 CI：下表每一项都由 agent 显式执行。质量工具由人运行，见表后的「人工验收」。
+代码改动按顺序执行，全部通过才算完成。本仓没有提交时自动检查；PR 与 `main` 推送由 [test.yml](../../.github/workflows/test.yml) 自动运行 full，check-run context `full`（PR 界面显示 `test / full`）是 `main` 的 required status check（见 [ADR-0025](../adr/0025-windows-pr-full-test-gate.md)）。下表其余每一项仍由 agent 显式执行，质量工具由人运行，见表后的「人工验收」。
 
 | 检查 | 通过条件 |
 |---|---|

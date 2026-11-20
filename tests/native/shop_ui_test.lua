@@ -4,21 +4,9 @@
 -- 金币页平台不可用时伪成功或卡死（不可返回）、失败提示缺 limit/level/金币页引导。
 local GameCfg = require('common.GameCfg')
 local OwnedUnits = require('common.OwnedUnits')
+local Eui = require('tests.support.eui_double')
 
-local function signal()
-    local listeners = {}
-    return {
-        Connect = function(_, fn)
-            listeners[#listeners + 1] = fn
-            return { Disconnect = function()
-                for i, cb in ipairs(listeners) do
-                    if cb == fn then table.remove(listeners, i) break end
-                end
-            end }
-        end,
-        Fire = function(_, ...) for _, fn in ipairs(listeners) do fn(...) end end,
-    }
-end
+local signal = Eui.Signal
 
 -- luassert 没有 fail()：只在失败分支拼消息（通过的断言不付一次 string.format 的钱）
 local function fail(fmt, ...) error(string.format(fmt, ...), 0) end
@@ -189,42 +177,9 @@ describe("钓场商店界面（#216 固定骨架 / #217 行与选中 / #218 详�
         ctx.previousHandler = package.loaded['client.ScreenHandlers.ScreenShop']
         _G.LocalMsgNotice = function(msg) ctx.notices[#ctx.notices + 1] = msg end
         package.loaded['client.ScreenHandlers.ScreenShop'] = nil
-        -- 假 EUI 节点：Children 按引擎口径记子节点；FindFirstChild 支持深查（生产按名字从 RootNode 取骨架节点），
-        -- 销毁按引擎口径递归（EUI 节点 Destroy 带走子节点，所以行内子节点不必单独登记）。
-        -- 引擎还把 Disabled = true 与触摸联动（#235 的 bug：空态禁用关掉触摸后没人再打开，按钮成了死图）：
-        -- 节点自己不存值、全经 __newindex 落到 fields，这样每次都复刻「写 Disabled 顺带关触摸」。
+        -- 共享夹具复刻 EUI 的属性副作用、层级查询与递归销毁；契约见 eui_double_test。
         local function newNode(name, kind, parent)
-            local fields = { Name = name, Kind = kind, Visible = true, Text = '', Children = {},
-                OnClicked = signal() }
-            local node = setmetatable({}, {
-                __index = fields,
-                __newindex = function(_, key, value)
-                    if key == 'Disabled' and value == true then fields.TouchEnabled = false end
-                    fields[key] = value
-                end,
-            })
-            function fields:FindFirstChild(child, recursive)
-                local hit = self.Children[child]
-                if hit or not recursive then return hit end
-                for _, candidate in pairs(self.Children) do
-                    hit = candidate:FindFirstChild(child, true)
-                    if hit then return hit end
-                end
-            end
-            function fields:Destroy()
-                self.Destroyed = true
-                -- 真引擎销毁会同时把节点从父节点子表里摘掉；不摘会让「复用行」按名找回死节点
-                if self.Parent and self.Parent.Children[self.Name] == self then
-                    self.Parent.Children[self.Name] = nil
-                end
-                local children = self.Children
-                self.Children = {}
-                for _, child in pairs(children) do child:Destroy() end
-            end
-            if parent then
-                node.Parent = parent
-                parent.Children[name] = node
-            end
+            local node = Eui.Node{ Name = name, Kind = kind, Parent = parent }
             if name then ctx.nodes[name] = node end
             return node
         end
@@ -437,7 +392,7 @@ describe("钓场商店界面（#216 固定骨架 / #217 行与选中 / #218 详�
         ctx.nodes.ShopRow2.OnClicked:Fire()  -- 钓具页第 2 行 = 钓虾竿（编号 12）
         assert.same({}, ctx.commands)
         assert.same(2, ctx.handler:View().selected)
-        ctx.nodes.BtnShopBuyDetail.OnClicked:Fire()
+        assert.is_true(Eui.Click(ctx.nodes.BtnShopBuyDetail))
         assert.same({ { action = 'Buy', number = 12, seq = 1 } }, ctx.commands)
         -- 升级行走同一条入口与同一个购买键（编号 41 = 弹容量升级1，200 金币）：这里测的是下单入口，
         -- 余额调到买得起——买不起时按钮会就地变成「去地图商店」（#219），下单路径另有用例覆盖。
@@ -445,7 +400,7 @@ describe("钓场商店界面（#216 固定骨架 / #217 行与选中 / #218 详�
         ctx.events.ItemBarState.OnClientEvent:Fire({})
         ctx.handler:SetPage('升级')
         assert.is_true(ctx.handler:Select(rowIndexOf(ctx.handler:View(), 41)))
-        ctx.nodes.BtnShopBuyDetail.OnClicked:Fire()
+        assert.is_true(Eui.Click(ctx.nodes.BtnShopBuyDetail))
         assert.same(41, ctx.commands[2].number)
         assert.is_nil(ctx.commands[2].itemId)
         assert.same(2, ctx.commands[2].seq)
@@ -468,7 +423,7 @@ describe("钓场商店界面（#216 固定骨架 / #217 行与选中 / #218 详�
         assert.same('coin', detail.buyAction)
         assert.is_true(detail.buyEnabled)                 -- 引导是可点的入口，不是灰按钮
         assert.same(texts.GoPlatformShop, ctx.nodes.LabelShopBuyDetail.Text)
-        ctx.nodes.BtnShopBuyDetail.OnClicked:Fire()
+        assert.is_true(Eui.Click(ctx.nodes.BtnShopBuyDetail))
         assert.same({}, ctx.commands)                     -- 这一步没有发出购买请求
         local view = ctx.handler:View()
         assert.same(GameCfg.Shop.Pages[#GameCfg.Shop.Pages], view.page) -- 就地落到金币页
@@ -481,7 +436,7 @@ describe("钓场商店界面（#216 固定骨架 / #217 行与选中 / #218 详�
         assert.is_true(ctx.handler:Select(1))
         assert.same(texts.Buy, ctx.handler:View().detail.buyText)
         assert.same(texts.Buy, ctx.nodes.LabelShopBuyDetail.Text)
-        ctx.nodes.BtnShopBuyDetail.OnClicked:Fire()
+        assert.is_true(Eui.Click(ctx.nodes.BtnShopBuyDetail))
         assert.same({ { action = 'Buy', number = 11, seq = 1 } }, ctx.commands)
         -- 买完余额只剩 1 金币（服务端回包 coinAfter）：按钮当场变回引导，不再发出必被拒的购买
         ctx.commands = {}
@@ -560,7 +515,7 @@ describe("钓场商店界面（#216 固定骨架 / #217 行与选中 / #218 详�
         assert.is_true(ctx.nodes.BtnShopBuyDetail.Disabled)
         assert.is_false(ctx.nodes.BtnShopBuyDetail.TouchEnabled) -- 没商品可谈：点下去只会静默，不接收触摸
         ctx.commands = {}
-        ctx.nodes.BtnShopBuyDetail.OnClicked:Fire() -- 空态点购买按钮不发请求
+        assert.is_false(Eui.Click(ctx.nodes.BtnShopBuyDetail)) -- 空态不命中，也不发请求
         assert.same({}, ctx.commands)
     end)
 
@@ -597,7 +552,7 @@ describe("钓场商店界面（#216 固定骨架 / #217 行与选中 / #218 详�
         assert.is_false(leap.purchasable)
         local index = rowIndexOf(view, 51) -- 近战武器升级1：限购 1 次
         assert.is_true(ctx.handler:Select(index))
-        ctx.nodes.BtnShopBuyDetail.OnClicked:Fire()
+        assert.is_true(Eui.Click(ctx.nodes.BtnShopBuyDetail))
         assert.same(1, #ctx.commands)
         ctx.events.ShopResult.OnClientEvent:Fire({ ok = true, number = 51, kind = 'melee', level = 1, price = 50 })
         local after = ctx.handler:View()
@@ -626,7 +581,7 @@ describe("钓场商店界面（#216 固定骨架 / #217 行与选中 / #218 详�
         assert.same('需 7 级摊位', ctx.nodes.LabelShopBuyDetail.Text)
         assert.is_true(ctx.nodes.BtnShopBuyDetail.Disabled)
         ctx.commands = {}
-        ctx.nodes.BtnShopBuyDetail.OnClicked:Fire() -- 点了：本地拒绝、同一条文案，不发请求
+        assert.is_true(Eui.Click(ctx.nodes.BtnShopBuyDetail)) -- 点了：本地拒绝、同一条文案，不发请求
         assert.same({}, ctx.commands)
         assert.same({ ctx.localShop.FailText.stand }, ctx.notices)
     end)
@@ -637,7 +592,7 @@ describe("钓场商店界面（#216 固定骨架 / #217 行与选中 / #218 详�
         ctx.handler:SetPage('升级')
         local index = rowIndexOf(ctx.handler:View(), 51)
         assert.is_true(ctx.handler:Select(index))
-        ctx.nodes.BtnShopBuyDetail.OnClicked:Fire()
+        assert.is_true(Eui.Click(ctx.nodes.BtnShopBuyDetail))
         assert.same(1, #ctx.commands)
         ctx.events.ShopResult.OnClientEvent:Fire({ ok = false, reason = 'coin', number = 51 })
         local view = ctx.handler:View()
