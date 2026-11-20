@@ -13,6 +13,7 @@ local FlightPath = require('common.FlightPath')
 local CarryMount = require('common.CarryMount')
 local BossPhase = require('common.BossPhase')
 local GarBiteNotice = require('common.GarBiteNotice')
+local BossMoves = require('common.cfg.BossMoves')
 local FishBehaviors = require('server.FishBehaviors')
 
 -- AbilityAPI 懒加载：MgrFishUnit 被大量单测用假 game 加载，顶层 require 会连带跑技能包
@@ -1788,11 +1789,18 @@ function Mgr:UpdateBossPhase(fish, now, pos)
         fx, fz = fx or 0, fz or 1
         self:Face(fish,fx,fz)
         local attackCfg = GameCfg.Ability.BossPhase.Attacks[state.Pending.Name]
+        -- #256 预警的形状、标签与宽度取自逐招表（common/cfg/BossMoves.lua），不在这里按招式名写 if：
+        -- 改预警只改表；表里 Warning.Kind = 'none' 的招式不起手，也就不广播预警。
+        local row = BossMoves.Get(BossMoves.KeyOf(GameCfg.Fish[fish.FishId], fish.FishId),
+            state.Pending.Name)
         fish.BossWarn = { Origin = {x=pos.x,y=pos.y,z=pos.z}, Facing = {x=fx,z=fz}, Target = target }
-        local notice = GarBiteNotice.Lock(fish.Id,pos,fx,fz,attackCfg.Range,0,attackCfg.WindupSec)
-        notice.move = state.Pending.Name == 'breath' and 'bossBreath' or 'bossStomp'
-        notice.shape, notice.width = state.Pending.Name == 'breath' and 'line' or 'circle', attackCfg.Width
-        publishBite(self,notice)
+        if not row or row.Warning.Kind ~= 'none' then
+            local notice = GarBiteNotice.Lock(fish.Id,pos,fx,fz,attackCfg.Range,0,attackCfg.WindupSec)
+            notice.move = row and row.Warning.Notice or 'bossStomp'
+            notice.shape, notice.width = row and row.Warning.Shape or 'circle',
+                (row and row.Warning.Width) or attackCfg.Width
+            publishBite(self,notice)
+        end
     end
     if fish.Carry then self:UpdateCarry(fish,now); return end
     if not events.Attack then return end

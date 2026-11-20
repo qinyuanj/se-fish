@@ -4,6 +4,7 @@ local ContentFish = require('common.cfg.Fish')
 local ContentShop = require('common.cfg.Shop')
 local ContentLottery = require('common.cfg.Lottery')
 local ContentBlindbox = require('common.cfg.Blindbox')
+local BossMoves = require('common.cfg.BossMoves')
 local FishCatch = require('common.FishCatch')
 
 -- 钓鱼区 ID 用于内容与后续场景锚点；存档旧值在 LegacyZoneIdMap 中解析。
@@ -1099,13 +1100,10 @@ GameCfg.Ability = {
             water = { 'bite' },
             enraged = { 'claw', 'tail', 'breath', 'stomp' },
         },
-        Attacks = {
-            claw = { IntervalSec = 2, Damage = 50, Range = 4 },   -- 表内 2 秒爪击（基础攻击 50）
-            tail = { IntervalSec = 6, Damage = 50, Range = 5 },   -- 表内每 6 秒甩尾
-            breath = { IntervalSec = 30, Range = 10, Width = 2, OneShot = true, WindupSec = 1.5 }, -- 正前 10 米秒杀；2米宽灰盒可躲避
-            bite = { IntervalSec = 2, Range = 2.5 },                -- 入水后的咬击：伤害取阶段条目的 BiteDamage
-            stomp = { IntervalSec = 2, Damage = 150, Range = 10, WindupSec = 0.8 }, -- 正文独立跺脚
-        },
+        -- 招式数值不在此处另写一份：#256 起唯一来源是 common/cfg/BossMoves.lua 的逐招表，
+        -- 这里只把哥斯拉的行折成阶段机消费的形态（间隔 / 伤害 / 起手 / 走廊宽度）。
+        -- 改动招式数值请改逐招表；本表的行集合就是 §12 的招式并集（12-05）。
+        Attacks = BossMoves.AttackTable('godzilla'),
         -- 走阶段机的鱼种（键为 GameCfg.Fish 的 Id）。本单只登记哥斯拉；
         -- 正式接入由 #144 决定是加 Combat 标签还是建「首领」注册表（本单不改 common/cfg/Fish.lua）。
         Species = { fish56Boss = true },
