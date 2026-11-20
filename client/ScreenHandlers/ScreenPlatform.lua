@@ -165,14 +165,17 @@ function Panel:ShowPlaceholder(payload)
     if title then
         local name = payload.name or payload.key or ''
         local text
+        -- 占位广告与占位支付各用各的标签：通道不同，「不发放真实付费权益」的说明也不同
+        local label = payload.kind == 'ad'
+            and (cfg().Placeholder.AdsLabel or cfg().Placeholder.Label) or cfg().Placeholder.Label
         if payload.kind == 'coin' then
-            text = string.format('%s：%s %d%s → %d%s', cfg().Placeholder.Label, name,
+            text = string.format('%s：%s %d%s → %d%s', label, name,
                 payload.price or 0, payload.currency or '', payload.coin or 0, cfg().BeanCurrency)
         elseif payload.beans then
-            text = string.format('%s：%s %d%s', cfg().Placeholder.Label, name, payload.beans,
+            text = string.format('%s：%s %d%s', label, name, payload.beans,
                 cfg().BeanCurrency)
         else
-            text = string.format('%s：%s', cfg().Placeholder.Label, name)
+            text = string.format('%s：%s', label, name)
         end
         pcall(function() title.Text = text end)
     end

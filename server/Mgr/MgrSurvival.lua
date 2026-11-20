@@ -154,6 +154,8 @@ function Mgr:CanRescue(target, rescuer)
     local state = self:GetState(target)
     if not state or state.phase ~= 'downed' then return false, 'not-downed' end
     if state.rescue then return false, 'busy' end
+    -- #262：广告满血复活在飞时不接受抢救，两条解除濒死的路径不交错（互斥结算由相位与 platform 标记守住）
+    if state.platform then return false, 'busy' end
     local rescuerState = self:GetState(rescuer)
     if not rescuerState then return false, 'no-rescuer' end
     if rescuerState.phase ~= 'alive' then return false, 'rescuer-downed' end
@@ -412,7 +414,10 @@ function Mgr:Update()
             else
                 self:UpdateRescue(state, now)
             end
-        elseif state.phase == 'downed' and not state.adrenalineFlying and now - state.downedAt >= c.DownedSec then
+        elseif state.phase == 'downed' and not state.adrenalineFlying and not state.platform
+            and now - state.downedAt >= c.DownedSec then
+            -- 广告流程在飞（#262）时濒死倒计时同样冻结：倒计时由回调结算或恢复（downedAt 平移暂停时长）；
+            -- 否则玩家会在看广告的途中被判死亡
             self:EnterDead(state, now)
         elseif state.phase == 'dead' and state.recovering then
             self:TryRecover(state) -- 离线恢复等落账，不走死亡倒计时
@@ -462,6 +467,8 @@ function Mgr:UseAdrenaline(player, payload)
     local state = self:GetState(player)
     if not state or state.phase ~= 'downed' then return fail('not-downed') end
     if state.adrenalineFlying then return fail('busy') end
+    -- #262：广告满血复活在飞时不接受自救，两条解除濒死的路径不交错（成功与免费倒计时仍互斥结算）
+    if state.platform then return fail('busy') end
     local itemId = cfg().AdrenalineItemId
     if data:ItemCount(itemId) < 1 then
         if self.Platform and self.Platform.OpenAdrenalineShop then
@@ -496,15 +503,23 @@ function Mgr:UseAdrenaline(player, payload)
     return true
 end
 
--- 满血复活（#147 平台复活成功回调：广告 / 5 金豆）：MaxHealth、饥饿至少 10%、不带虚弱（虚弱只属于
--- 免费复活；死于虚弱期的也一并清掉）。与免费虚弱复活共用 phase=='dead' 守卫 + ApplyRevive 单点，
--- 所以任一方先结算后另一方自然失效，每轮死亡只产生一个复活结果。
+-- 满血复活（#147 / #262 平台复活成功回调：广告 / 5 金豆）：MaxHealth、饥饿至少 10%、不带虚弱（虚弱
+-- 只属于免费复活；死于虚弱期的也一并清掉）。与免费虚弱复活共用 ApplyRevive 单点 + 相位守卫，
+-- 所以任一方先结算后另一方自然失效，每轮濒死 / 死亡只产生一个复活结果。
+-- 相位（#262）：死亡与濒死都可由这里结算——11-19 要求濒死与死亡界面都有广告满血复活入口，
+-- 复活动作仍只有这一个落点；濒死结算顺带撤掉在飞的抢救与濒死倒计时。
 function Mgr:FullRevive(state, mode)
-    if not state or state.phase ~= 'dead' then return false end
+    if not state then return false end
+    local fromDowned = state.phase == 'downed' or state.phase == 'rescuing'
+    if not fromDowned and state.phase ~= 'dead' then return false end
     local vitalState = self.Vitals and self.Vitals:GetState(state.player)
     if not vitalState then return false end
     local minHunger = math.floor(GameCfg.Vitals.MaxHunger * cfg().ReviveHungerPercent / 100)
     if not self.Vitals:ApplyRevive(vitalState, self.Vitals:MaxHealthOf(state.player), minHunger) then return false end
+    if fromDowned then
+        state.rescue = nil
+        state.downedAt = nil
+    end
     state.phase = 'alive'
     state.deadAt = nil
     state.engineDeath = nil
@@ -515,18 +530,24 @@ function Mgr:FullRevive(state, mode)
     return true
 end
 
--- 平台流程未成功（取消 / 失败 / 超时）：免费倒计时从暂停处继续，deadAt 平移暂停时长
-function Mgr:ResumeDeadCountdown(state, platform)
+-- 平台流程未成功（取消 / 失败 / 超时）：被暂停的那条倒计时从暂停处继续——起点平移暂停时长，
+-- 既不重置成满格，也不提前到期。死亡（免费复活倒计时）与濒死（濒死倒计时）共用这一处。
+function Mgr:ResumeCountdown(state, platform)
+    local paused = math.max(0, self:Now() - platform.startedAt)
     if state.phase == 'dead' and state.deadAt then
-        state.deadAt = state.deadAt + math.max(0, self:Now() - platform.startedAt)
+        state.deadAt = state.deadAt + paused
+    elseif (state.phase == 'downed' or state.phase == 'rescuing') and state.downedAt then
+        state.downedAt = state.downedAt + paused
     end
     self:SendState(state)
 end
 
--- 平台满血复活（#147，GameSpec「广告满血复活 / 5 金豆满血复活」）：只在死亡相位可发起。
--- 拉起平台 flow 期间免费倒计时暂停；回调按 platform 标记对象核对，只有当前 flow 的第一个回调生效：
--- 成功 → FullRevive；取消 / 失败 / 超时 → 恢复倒计时（平移暂停时长）；迟到 / 旧 flow 回调忽略。
--- 平台不可用（生产未配置）明确回包 unavailable，倒计时不暂停。
+-- 平台满血复活（#147 / #262，GameSpec「广告满血复活 / 5 金豆满血复活」+ 11-19）：
+-- 广告在濒死与死亡两个相位都可发起，金豆仍只走死亡相位（11-20 归另一单）；活动相位拒绝。
+-- 拉起平台 flow 期间被暂停的那条倒计时冻结（濒死 15 秒 / 免费复活 30 秒）；回调按 platform 标记
+-- 对象核对，只有当前 flow 的第一个回调生效：成功 → FullRevive；取消 / 失败 / 超时 → 恢复倒计时
+-- （平移暂停时长）；迟到 / 旧 flow 回调忽略。
+-- 平台不可用（真实广告位与占位广告位都没交付）明确回包 unavailable，倒计时不暂停。
 function Mgr:PlatformRevive(player, payload)
     local seq = type(payload) == 'table' and payload.seq or nil
     local function fail(reason)
@@ -540,7 +561,10 @@ function Mgr:PlatformRevive(player, payload)
     local mode = payload.mode
     if mode ~= 'ad' and mode ~= 'goods' then return fail('invalid') end
     local state = self:GetState(player)
-    if not state or state.phase ~= 'dead' then return fail('not-dead') end
+    if not state then return fail('not-revivable') end
+    if state.phase ~= 'dead' and state.phase ~= 'downed' then return fail('not-revivable') end
+    -- 金豆满血复活（11-20）仍只走死亡相位：本单只把广告入口开到濒死（11-19）
+    if state.phase == 'downed' and mode ~= 'ad' then return fail('not-dead') end
     if state.recovering then return fail('recovering') end
     if state.platform then return fail('busy') end
     if not self.Platform then return fail('unavailable') end
@@ -557,9 +581,9 @@ function Mgr:PlatformRevive(player, payload)
         if outcome == 'success' then
             print('[MgrSurvival] 平台复活成功回调未能结算（待 #148 对账）', player.UserId, mode)
         end
-        self:ResumeDeadCountdown(state, platform)
+        self:ResumeCountdown(state, platform)
         self:Reply(player, { seq = seq, ok = false, action = 'FullRevive',
-            reason = outcome == 'success' and 'not-dead' or tostring(outcome) })
+            reason = outcome == 'success' and 'not-revivable' or tostring(outcome) })
     end
     -- 先挂标记再拉起：平台同步回调（测试 flow 立即结算）也能被当前 flow 识别
     state.platform = platform

@@ -86,15 +86,19 @@ describe('TestReviveCallback', function()
         end
     end)
 
-    -- 相位守卫：活动/濒死不能发起平台复活，不拉起平台、不回包成功
-    it('test_full_revive_rejected_outside_dead_phase', function()
+    -- 相位守卫：#262 起濒死相位打开广告入口（11-19），活动相位仍拒绝、金豆仍只走死亡相位（11-20）。
+    -- 用例名由 test_full_revive_rejected_outside_dead_phase 改来：语义变了，名字不能再骗人。
+    it('test_full_revive_phase_guard', function()
         assert.is_false(f.s:PlatformRevive(f.player, { action = 'FullRevive', mode = 'goods', seq = 1 }))
-        assert.same('not-dead', f:lastResult().reason)
+        assert.same('not-revivable', f:lastResult().reason)
         f:ctrl().Health = 50
         f.v:ApplyHit(f.v:NewHit(f.attacker, 'fishAttack'), f.player, 100) -- 濒死
         assert.same('downed', f.s:Phase(f.player))
-        assert.is_false(f.s:PlatformRevive(f.player, { action = 'FullRevive', mode = 'ad', seq = 2 }))
+        assert.is_false(f.s:PlatformRevive(f.player, { action = 'FullRevive', mode = 'goods', seq = 2 }))
+        assert.same('not-dead', f:lastResult().reason)
         assert.same({}, f.platform.calls)
+        assert.is_true(f.s:PlatformRevive(f.player, { action = 'FullRevive', mode = 'ad', seq = 3 }))
+        assert.same('ad', f.platform.calls[1].kind)
     end)
 
     -- 5 金豆商品成功回调：同一单点满血复活，走 Purchase('reviveFull')
