@@ -82,9 +82,9 @@
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 9-01 | server/Mgr/MgrVitals.lua、server/AbilityBehaviors/melee_hit.lua | tests/native/vitals_test.lua、tests/native/combat_behavior_test.lua | 缺 | 缺 | 缺 | 缺 | B |
 | 9-02 | server/Mgr/MgrParty.lua、server/main.lua | tests/native/spec/09_party_authority_test.lua | 缺 | 有 | 缺 | 缺 | A |
-| 9-03 | server/Mgr/MgrVitals.lua、server/Mgr/MgrSurvival.lua | tests/native/revive_callback_test.lua、tests/native/survival_test.lua | 缺 | 缺 | 缺 | 缺 | B |
+| 9-03 | server/Mgr/MgrSurvival.lua、server/Mgr/MgrVitals.lua、server/Mgr/MgrInteract.lua | tests/native/spec/09_rescue_test.lua | 缺 | 有 | 缺 | 缺 | B |
 | 9-04 | server/Mgr/MgrFishUnit.lua、server/Mgr/MgrLoot.lua、server/Mgr/MgrFerry.lua | tests/native/fish_lift_test.lua、tests/native/ferry_test.lua | 缺 | 缺 | 缺 | 缺 | B |
-| 9-05 | server/Mgr/MgrVitals.lua、server/Mgr/MgrSave.lua | tests/native/vitals_test.lua、tests/native/save_test.lua | 缺 | 缺 | 缺 | 缺 | B |
+| 9-05 | server/Mgr/MgrSurvival.lua、server/Mgr/MgrSave.lua、server/Mgr/MgrInteract.lua | tests/native/spec/09_rescue_test.lua | 有 | 有 | 有 | 缺 | B |
 | 9-06 | server/Mgr/MgrParty.lua、common/GameCfg.lua | tests/native/spec/09_party_authority_test.lua | 有 | 有 | 缺 | 缺 | A |
 | 9-07 | server/Mgr/MgrParty.lua、common/GameCfg.lua | tests/native/spec/09_party_authority_test.lua | 有 | 有 | 缺 | 缺 | A |
 | 9-08 | server/Mgr/MgrParty.lua、common/GameCfg.lua | tests/native/spec/09_party_authority_test.lua | 有 | 有 | 缺 | 缺 | B |
@@ -96,8 +96,8 @@
 | 9-14 | server/Mgr/MgrVitals.lua、common/GameCfg.lua | tests/native/vitals_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 9-15 | server/Mgr/MgrVitals.lua | tests/native/vitals_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 9-16 | server/Mgr/MgrVitals.lua、common/GameCfg.lua | tests/native/vitals_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 9-17 | server/Mgr/MgrSurvival.lua、server/Mgr/MgrVitals.lua | tests/native/survival_test.lua、tests/native/revive_callback_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 9-18 | server/Mgr/MgrSurvival.lua、server/Mgr/MgrVitals.lua | tests/native/survival_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 9-17 | server/Mgr/MgrInteract.lua、server/Mgr/MgrSurvival.lua、client/LocalInteract.lua | tests/native/spec/09_rescue_test.lua | 有 | 有 | 缺 | 缺 | A |
+| 9-18 | server/Mgr/MgrSurvival.lua、server/Mgr/MgrVitals.lua、common/GameCfg.lua | tests/native/spec/09_rescue_test.lua | 有 | 缺 | 缺 | 缺 | A |
 | 9-19 | server/Mgr/MgrParty.lua、common/GameCfg.lua、client/ScreenHandlers/ScreenParty.lua | tests/native/spec/09_party_authority_test.lua、tests/native/spec/09_party_hud_test.lua | 有 | 有 | 缺 | 缺 | A |
 | 9-20 | client/ScreenHandlers/ScreenParty.lua、client/MgrGameUI.lua、server/Mgr/MgrParty.lua | tests/native/spec/09_party_hud_test.lua | 有 | 有 | 缺 | 缺 | A |
 | 9-21 | client/ScreenHandlers/ScreenParty.lua、server/Mgr/MgrParty.lua | tests/native/spec/09_party_hud_test.lua | 有 | 有 | 缺 | 缺 | A |
@@ -105,7 +105,7 @@
 
 第 9 节由小队子单先贯通：9-02、9-06～9-11、9-19～9-22 的代码落点是 `server/Mgr/MgrParty.lua`（服务端唯一权威的归属与名单）
 与 `client/ScreenHandlers/ScreenParty.lua`（队友血量与邀请倒计时），证据是两份 spec 断言。
-9-01、9-12～9-16 的落点是既有伤害入口，免伤判定与证据归 PK 子单；9-03、9-17、9-18 归抢救子单。
+9-01、9-12～9-16 的落点是既有伤害入口，免伤判定与证据归 PK 子单；9-03、9-17、9-18 已由抢救子单取证。
 三者共用同一份矩阵小节，因此本表一次登记到位，四类证据只勾已经真取到的那几栏。
 
 ### 第 12 节 精英与首领行为（48 条）
@@ -228,7 +228,55 @@
 | 18-31 | server/Mgr/MgrSave.lua、server/Data/PlayerData.lua | tests/native/spec/18_session_settlement_contract_test.lua | 有 | 有 | 有 | 有 | B |
 | 18-32 | server/main.lua、server/Mgr/MgrPlayerData.lua | tests/native/player_leave_rejoin_test.lua | 缺 | 缺 | 缺 | 缺 | B |
 
+### 第 11 节 濒死、死亡与复活（39 条非试玩条款）
+
+| 条款 | 代码落点 | 关联测试 | 正常流程 | 失败流程 | 退出重进 | 存档恢复 | 等级 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 11-01 | server/Mgr/MgrVitals.lua、server/Mgr/MgrSurvival.lua | tests/native/spec/09_rescue_test.lua | 有 | 缺 | 缺 | 缺 | A |
+| 11-02 | server/Mgr/MgrSurvival.lua、client/ScreenHandlers/ScreenSurvival.lua | tests/native/survival_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 11-03 | server/Mgr/MgrVitals.lua、server/Mgr/MgrSurvival.lua | tests/native/spec/09_rescue_test.lua | 缺 | 有 | 缺 | 缺 | A |
+| 11-04 | common/GameCfg.lua、server/Mgr/MgrSurvival.lua | tests/native/survival_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 11-05 | server/Mgr/MgrVitals.lua、server/Mgr/MgrSurvival.lua | tests/native/survival_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 11-06 | server/Mgr/MgrSurvival.lua、common/GameCfg.lua | tests/native/spec/09_rescue_test.lua | 有 | 缺 | 缺 | 缺 | A |
+| 11-07 | server/Mgr/MgrSurvival.lua、server/Mgr/MgrPlayerData.lua | tests/native/survival_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 11-08 | client/ScreenHandlers/ScreenSurvival.lua、server/Mgr/MgrPlatform.lua | tests/native/platform_screens_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 11-09 | client/ScreenHandlers/ScreenSurvival.lua、server/Mgr/MgrSurvival.lua | tests/native/survival_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 11-10 | server/Mgr/MgrSurvival.lua、common/GameCfg.lua | tests/native/survival_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 11-11 | server/Mgr/MgrSurvival.lua、common/GameCfg.lua | tests/native/survival_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 11-12 | server/Mgr/MgrSurvival.lua、server/Mgr/MgrVitals.lua、common/GameCfg.lua | tests/native/survival_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 11-13 | server/Mgr/MgrSurvival.lua、server/Mgr/MgrVitals.lua、common/GameCfg.lua | tests/native/survival_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 11-14 | server/Mgr/MgrSurvival.lua、server/Mgr/MgrModifier.lua、common/GameCfg.lua | tests/native/survival_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 11-15 | server/Mgr/MgrVitals.lua、server/Mgr/MgrSurvival.lua | tests/native/survival_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 11-16 | server/Mgr/MgrPlayerData.lua、server/Mgr/MgrSave.lua、server/Mgr/MgrSurvival.lua | tests/native/spec/18_session_settlement_contract_test.lua | 缺 | 缺 | 缺 | 有 | A |
+| 11-17 | server/Mgr/MgrReelIn.lua、server/Mgr/MgrFishUnit.lua、server/Mgr/MgrSurvival.lua | tests/native/fish_lift_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 11-18 | server/Mgr/MgrFishCarrier.lua、server/Mgr/MgrFishUnit.lua、server/Mgr/MgrSurvival.lua | tests/native/fish_lift_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 11-19 | client/ScreenHandlers/ScreenSurvival.lua、server/Mgr/MgrPlatform.lua | tests/native/platform_screens_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 11-20 | client/ScreenHandlers/ScreenSurvival.lua、server/Mgr/MgrPlatform.lua、server/Mgr/MgrShop.lua | tests/native/platform_screens_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 11-21 | server/Mgr/MgrSurvival.lua、server/Mgr/MgrPlatform.lua | tests/native/revive_callback_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 11-22 | server/Mgr/MgrSurvival.lua、server/Mgr/MgrModifier.lua | tests/native/revive_callback_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 11-23 | common/cfg/Shop.lua、server/Mgr/MgrShop.lua | tests/native/shop_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 11-24 | common/cfg/Shop.lua、server/Mgr/MgrShop.lua | tests/native/shop_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 11-25 | server/Mgr/MgrSurvival.lua、server/Mgr/MgrSave.lua、server/Data/PlayerData.lua | tests/native/spec/09_rescue_test.lua | 缺 | 缺 | 有 | 有 | A |
+| 11-26 | server/Mgr/MgrFerry.lua、server/Mgr/MgrSurvival.lua、server/Data/PlayerData.lua | tests/native/spec/18_session_settlement_contract_test.lua | 缺 | 缺 | 有 | 有 | A |
+| 11-27 | server/Mgr/MgrSurvival.lua、server/Mgr/MgrModifier.lua、server/Data/PlayerData.lua | tests/native/survival_test.lua | 缺 | 缺 | 有 | 有 | A |
+| 11-28 | server/Mgr/MgrSurvival.lua、server/Mgr/MgrPlatform.lua | tests/native/revive_callback_test.lua | 缺 | 缺 | 缺 | 缺 | B |
+| 11-29 | server/Mgr/MgrSurvival.lua、server/Mgr/MgrPlatform.lua | tests/native/revive_callback_test.lua | 缺 | 缺 | 缺 | 缺 | B |
+| 11-30 | server/Mgr/MgrSurvival.lua、server/Mgr/MgrPlatform.lua | tests/native/revive_callback_test.lua | 有 | 有 | 缺 | 缺 | B |
+| 11-31 | server/Mgr/MgrPlatform.lua、server/Mgr/MgrSave.lua | tests/native/platform_seam_test.lua | 缺 | 有 | 缺 | 缺 | B |
+| 11-32 | server/Mgr/MgrSurvival.lua、common/RateLimit.lua | tests/native/revive_callback_test.lua | 缺 | 有 | 缺 | 缺 | B |
+| 11-33 | server/Mgr/MgrSurvival.lua、server/Mgr/MgrPlatform.lua | tests/native/revive_callback_test.lua | 缺 | 缺 | 缺 | 缺 | B |
+| 11-34 | server/Mgr/MgrVitals.lua、server/Mgr/MgrSurvival.lua、common/GameCfg.lua | tests/native/spec/09_rescue_test.lua | 缺 | 有 | 缺 | 缺 | B |
+| 11-35 | server/Mgr/MgrSurvival.lua、server/Mgr/MgrSave.lua、server/Data/PlayerData.lua | tests/native/spec/09_rescue_test.lua | 缺 | 缺 | 有 | 有 | B |
+| 11-36 | server/Mgr/MgrVitals.lua、server/Mgr/MgrSurvival.lua | tests/native/spec/09_rescue_test.lua | 有 | 缺 | 缺 | 缺 | B |
+| 11-37 | server/Mgr/MgrPlatform.lua、common/GameCfg.lua | tests/native/platform_seam_test.lua | 缺 | 有 | 缺 | 缺 | B |
+| 11-38 | server/Mgr/MgrPlatform.lua、common/GameCfg.lua | tests/native/platform_seam_test.lua | 缺 | 有 | 缺 | 缺 | A |
+| 11-39 | server/Mgr/MgrPlatform.lua、server/Mgr/MgrSave.lua、common/GameCfg.lua | tests/native/platform_seam_test.lua | 缺 | 有 | 缺 | 缺 | A |
+
+第 11 节由 #254 抢救子单整节登记：11-01、11-03、11-06、11-34、11-35、11-36 的证据走 `tests/native/spec/09_rescue_test.lua`
+（致命伤害锁血、濒死免伤、呼救、其它伤害来源豁免、断线重连结算与血量夹取）；其余条款的代码落点与关联测试是实现自检，
+状态仍是 unverified，等各自实现与断言。抢救耗时与打断规则的占位值集中在 `common/GameCfg.lua` 的 `GameCfg.Rescue`，
+带 [未查证] 标记，待决题见 docs/to-questionnaire-策划案内部矛盾.md。
 ## 三、待登记小节
 
-第 2～4、6～15、17、19 节尚未登记。按依赖顺序逐节扩大，每节登记时同时补齐该节的代码落点与既有测试，
+第 2～4、6～8、10、13～15、17、19 节尚未登记。按依赖顺序逐节扩大，每节登记时同时补齐该节的代码落点与既有测试，
 并把该节加进 `tools/acceptance.lua` 的 `M.COVERAGE_SECTIONS`。

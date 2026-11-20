@@ -2,7 +2,7 @@
 
 > 本文件是《渔力全开》规格第 9 节的条款清单。格式与必填项见 [TEMPLATE.md](TEMPLATE.md)，小节索引见 [README.md](README.md)。
 > 本节按组物理分开成**四张表**：**契约**是接口与共享世界必须成立的接缝，**规则**是可与实现解耦的玩法判定，**功能**是需要新建的小队系统与队伍界面，最后的 **C 级（试玩取证）** 小节专收只能用试玩观察取证的条款（按证据等级而不是按组划分）。
-> 本节按 [ADR-0029](../adr/0029-scope-completeness-and-placeholder-first.md) 的范围口径执行：规格内的条款没有永久出界。小队已落地并取证（9-02、9-06～9-11、9-19～9-22，证据在 `tests/native/spec/09_party_authority_test.lua` 与 `tests/native/spec/09_party_hud_test.lua`）；伤害入口相关条款（9-01、9-12～9-16）与抢救条款（9-03、9-17、9-18）的落点已登记在[实现覆盖表](coverage.md)，取证归各自的子单；C 级小节里的可读性条款按试玩口径写 `blocked`。
+> 本节按 [ADR-0029](../adr/0029-scope-completeness-and-placeholder-first.md) 的范围口径执行：规格内的条款没有永久出界。小队已落地并取证（9-02、9-06～9-11、9-19～9-22，证据在 `tests/native/spec/09_party_authority_test.lua` 与 `tests/native/spec/09_party_hud_test.lua`）；伤害入口相关条款（9-01、9-12～9-16）的落点已登记在[实现覆盖表](coverage.md)，取证归各自的子单；抢救条款（9-03、9-17、9-18）已由 `tests/native/spec/09_rescue_test.lua` 走 InteractAction / SurvivalAction 业务入口取证；C 级小节里的可读性条款按试玩口径写 `blocked`。
 
 ## 契约
 
@@ -10,7 +10,7 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | 9-01 | 伤害结算只走统一的伤害入口，队友免伤、鱼塘免伤与安全区豁免都作为该入口内的判定分支接入，不另写一套单人伤害路径 | 契约 | agent | B | unverified | — |
 | 9-02 | 玩家身份（含所属小队）只由服务端维护，客户端无法通过请求改写自己或他人的队伍归属 | 契约 | agent | A | evidenced | tests/native/spec/09_party_authority_test.lua |
-| 9-03 | 濒死、抢救中、恢复与死亡之间的状态转换只经同一个抢救状态转换接口完成，抢救不能绕过该接口直接改血量或濒死标记 | 契约 | agent | B | unverified | — |
+| 9-03 | 濒死、抢救中、恢复与死亡之间的状态转换只经同一个抢救状态转换接口完成，抢救不能绕过该接口直接改血量或濒死标记 | 契约 | agent | B | evidenced | tests/native/spec/09_rescue_test.lua |
 | 9-04 | 多人同场时活鱼、地面物品、摆渡与设施仍是共享世界里的同一份权威副本，不因当前单人开发而改成按玩家各存一份 | 契约 | agent | B | unverified | — |
 | 9-05 | 伤害、抢救与队伍变更在重复请求、同时触发和断线重连下都只结算一次，重放同一请求不产生第二次效果 | 契约 | agent | B | unverified | — |
 
@@ -29,8 +29,8 @@
 | 9-14 | 鱼塘以外的钓鱼区，非同队玩家之间的攻击正常造成伤害 | 规则 | agent | A | unverified | — |
 | 9-15 | PK 的开启不以在线人数达到 8 为条件，人数不足时同一条判定规则仍然成立 | 规则 | agent | A | unverified | — |
 | 9-16 | 安全区只约束玩家之间的伤害，不阻止鱼对玩家造成伤害 | 规则 | agent | A | unverified | — |
-| 9-17 | 其他玩家可以抢救濒死玩家，濒死者不必只靠本人使用肾上腺素解除 | 规则 | agent | A | unverified | — |
-| 9-18 | 他人抢救成功后，濒死玩家恢复血量上限的 10% | 规则 | agent | A | unverified | — |
+| 9-17 | 其他玩家可以抢救濒死玩家，濒死者不必只靠本人使用肾上腺素解除 | 规则 | agent | A | evidenced | tests/native/spec/09_rescue_test.lua |
+| 9-18 | 他人抢救成功后，濒死玩家恢复血量上限的 10% | 规则 | agent | A | evidenced | tests/native/spec/09_rescue_test.lua |
 
 ## 功能
 
