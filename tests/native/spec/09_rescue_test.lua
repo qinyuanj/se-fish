@@ -229,6 +229,7 @@ describe('条款 9/11 他人抢救', function()
     local localPlayer = { UserId = 41, Character = { Position = vec(0, 0, 0) },
       PlayerGui = { EuiManager = { CreateSceneNodeAtPosition = function(_, position)
         local node = { Position = position, Visible = false }
+        function node:Destroy() self.Destroyed = true end
         env.clientNodes.RescueRoot = node
         return node
       end } } }
@@ -249,6 +250,13 @@ describe('条款 9/11 他人抢救', function()
     assert.same(42, sent[#sent].payload.targetUserId)
     assert.same(before + 1, sent[#sent].payload.seq, '与喂食共用递增 seq')
 
+    -- 抢救开始后相位变 'rescuing'：气泡保持显示，施救途中不凭空消失（旧写法这里恒为不可见）。
+    target.GetAttribute = function(_, key) return key == 'SurvivalPhase' and 'rescuing' or nil end
+    client:Update()
+    assert.is_true(env.clientNodes.RescueRoot.Visible, '抢救中气泡保持显示')
+    target.GetAttribute = function(_, key) return key == 'SurvivalPhase' and 'downed' or nil end
+    client:Update()
+
     target.Character.Position = vec(5, 0, 0)
     client:Update()
     assert.is_false(env.clientNodes.RescueRoot.Visible, '走出 2 米后收起气泡')
@@ -256,6 +264,32 @@ describe('条款 9/11 他人抢救', function()
     target.GetAttribute = function() return 'alive' end
     client:Update()
     assert.is_false(env.clientNodes.RescueRoot.Visible, '被救起后收起气泡')
+
+    -- 离场（下线 / 换区）：气泡节点整棵拆掉，不是只藏起来留成看不见的残留单位。
+    env.clientPlayers = { localPlayer }
+    client:Update()
+    assert.is_true(env.clientNodes.RescueRoot.Destroyed, '离场玩家的抢救气泡要销毁，不只 Visible=false')
+  end)
+
+  -- 11-03（review #249-10）：抢救中濒死倒计时到点，撤销抢救不再先播一份 downed，转死亡只广播一次。
+  it('11-03 抢救中到点转死亡只广播一次 dead', function()
+    local downed = join(7081, 0)
+    local rescuer = join(7082, 1)
+    down(downed)
+    -- 把抢救时长拉长到濒死倒计时之后：抢救还没结束，濒死倒计时先到点。
+    local savedDuration = GameCfg.Rescue.DurationSec
+    GameCfg.Rescue.DurationSec = GameCfg.Survival.DownedSec + 5
+    request(rescuer, { target = 'downedPlayer', action = 'Rescue', targetUserId = downed.UserId, seq = 1 })
+    GameCfg.Rescue.DurationSec = savedDuration
+    assert.same('rescuing', env.s:Phase(downed), '抢救先开始')
+    local before = #(env.sent.SurvivalState or {})
+    advance(GameCfg.Survival.DownedSec + 0.1)
+    local phases = {}
+    for index = before + 1, #(env.sent.SurvivalState or {}) do
+      phases[#phases + 1] = env.sent.SurvivalState[index].payload.phase
+    end
+    assert.same('dead', env.s:Phase(downed))
+    assert.same({ 'dead' }, phases, '撤销抢救不再先播一份 downed，转死亡只广播一次')
   end)
 
   -- 9-18 / 11-36：恢复量取被救者的成长上限 10%，夹在上限内。
