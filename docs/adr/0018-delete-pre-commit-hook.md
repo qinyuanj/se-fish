@@ -1,6 +1,6 @@
 # 0018 删除 pre-commit hook，提交时不再自动检查
 
-**Status**: accepted（修改 [ADR-0017](0017-windows-native-only.md) 中「唯一非 Windows 原生例外」一条，该例外随之消失）
+**Status**: accepted（本地 hook 决定仍有效；「不新增 CI」后果由 [ADR-0025](0025-windows-pr-full-test-gate.md) 修改）
 
 本仓此前在 `tools/hooks/pre-commit` 里做两件事：对暂存区每个 `.lua` 取暂存内容做 `loadfile`，以及暂存区含 `.lua`/`.busted` 时经 CLI 跑 `lua tools/cli.lua test fast`。它是全仓唯一的提交时自动检查，也是 [ADR-0017](0017-windows-native-only.md) 里唯一的非 Windows 原生例外（`#!/bin/sh`，由 Git for Windows 执行）。
 
@@ -16,7 +16,7 @@
 
 ## 后果
 
-- 本仓**没有任何提交时自动检查，也没有 CI**（历来没有，且不新增）。提交前是否跑 `test fast` 由 agent 与人自行执行；完成判据表里的每一项都由 agent 显式执行。
+- 本仓**没有任何提交时自动检查**。提交前是否跑 `test fast` 由 agent 与人自行执行；PR 与 `main` 推送的 full 检查后来由 [ADR-0025](0025-windows-pr-full-test-gate.md) 引入，其余完成判据仍由 agent 显式执行。
 - [ADR-0017](0017-windows-native-only.md) 的「唯一非 Windows 原生例外」消失：仓库里不再有任何 `#!/bin/sh` 脚本。
 - `tools/hooks/` 目录整体删除。
 - 坏提交（含语法错）可以静默进分支，直到下一次有人跑 `test fast` 才发现。这是明确认领的代价。
