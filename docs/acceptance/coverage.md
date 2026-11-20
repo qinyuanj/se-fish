@@ -108,6 +108,63 @@
 9-01、9-12～9-16 的落点是既有伤害入口，免伤判定与证据归 PK 子单；9-03、9-17、9-18 归抢救子单。
 三者共用同一份矩阵小节，因此本表一次登记到位，四类证据只勾已经真取到的那几栏。
 
+### 第 12 节 精英与首领行为（48 条）
+
+| 条款 | 代码落点 | 关联测试 | 正常流程 | 失败流程 | 退出重进 | 存档恢复 | 等级 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 12-01 | common/cfg/BossMoves.lua、common/GameCfg.lua | tests/native/spec/12_boss_moves_test.lua | 有 | 缺 | 缺 | 缺 | A |
+| 12-02 | common/cfg/BossMoves.lua | tests/native/spec/12_boss_moves_test.lua | 有 | 缺 | 缺 | 缺 | A |
+| 12-03 | common/cfg/BossMoves.lua | tests/native/spec/12_boss_moves_test.lua | 有 | 缺 | 缺 | 缺 | A |
+| 12-04 | common/cfg/BossMoves.lua、server/Mgr/MgrFishUnit.lua | tests/native/spec/12_boss_moves_test.lua | 有 | 缺 | 缺 | 缺 | A |
+| 12-05 | common/cfg/BossMoves.lua | tests/native/spec/12_boss_moves_test.lua | 有 | 缺 | 缺 | 缺 | A |
+| 12-06 | server/Mgr/MgrFishUnit.lua、common/GameCfg.lua | tests/native/boss_bait_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 12-07 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/eel_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 12-08 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua、common/GarBiteNotice.lua | tests/native/gar_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 12-09 | server/Mgr/MgrFishUnit.lua | tests/native/gar_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 12-10 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/shrimp_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 12-11 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/shrimp_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 12-12 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/shrimp_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 12-13 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/shrimp_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 12-14 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/shrimp_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 12-15 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/king_crab_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 12-16 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/king_crab_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 12-17 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/crab_boss_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 12-18 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/crab_boss_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 12-19 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/crab_boss_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 12-20 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/forest_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 12-21 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/forest_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 12-22 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/forest_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 12-23 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/forest_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 12-24 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/forest_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 12-25 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/beach_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 12-26 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/beach_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 12-27 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/beach_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 12-28 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/beach_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 12-29 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/beach_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 12-30 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/beach_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 12-31 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua、common/FlightPath.lua | tests/native/reef_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 12-32 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua、common/FlightPath.lua | tests/native/reef_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 12-33 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua、common/FlightPath.lua | tests/native/reef_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 12-34 | common/GameCfg.lua、common/cfg/BossMoves.lua | tests/native/reef_combat_test.lua | 缺 | 缺 | 缺 | 缺 | B |
+| 12-35 | common/cfg/Fish.lua、server/Mgr/MgrFishUnit.lua | tests/native/volcano_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 12-36 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | tests/native/volcano_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 12-37 | server/Mgr/MgrFishUnit.lua | tests/native/volcano_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 12-38 | server/Mgr/MgrFishUnit.lua、common/GameCfg.lua | tests/native/volcano_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 12-39 | common/cfg/Fish.lua、common/cfg/BossMoves.lua | tests/native/spec/12_boss_moves_test.lua | 有 | 缺 | 缺 | 缺 | A |
+| 12-40 | common/cfg/BossMoves.lua、common/BossPhase.lua | tests/native/spec/12_boss_moves_test.lua | 有 | 缺 | 缺 | 缺 | A |
+| 12-41 | common/cfg/BossMoves.lua、server/Mgr/MgrFishUnit.lua | tests/native/spec/12_boss_moves_test.lua | 有 | 缺 | 缺 | 缺 | A |
+| 12-42 | common/cfg/BossMoves.lua、server/Mgr/MgrFishUnit.lua | tests/native/spec/12_boss_moves_test.lua | 有 | 缺 | 缺 | 缺 | A |
+| 12-43 | common/GameCfg.lua、common/BossPhase.lua、server/Mgr/MgrFishUnit.lua | tests/native/spec/12_boss_moves_test.lua | 有 | 缺 | 缺 | 缺 | A |
+| 12-44 | common/GameCfg.lua、common/BossPhase.lua、server/Mgr/MgrFishUnit.lua | tests/native/spec/12_boss_moves_test.lua | 有 | 缺 | 缺 | 缺 | A |
+| 12-45 | common/BossPhase.lua、server/Mgr/MgrFishUnit.lua | tests/native/spec/12_boss_moves_test.lua | 有 | 缺 | 缺 | 缺 | B |
+| 12-46 | common/cfg/BossMoves.lua | tests/native/spec/12_boss_moves_test.lua | 有 | 缺 | 缺 | 缺 | A |
+| 12-47 | common/GameCfg.lua、server/Mgr/MgrFishUnit.lua | — | 缺 | 缺 | 缺 | 缺 | A |
+| 12-48 | common/GameCfg.lua | — | 缺 | 缺 | 缺 | 缺 | A |
+
+第 12 节先建逐招表，再用火山岛首领哥斯拉贯通「配置 → 服务端调度 → 客户端预警 → 断言」：
+12-04、12-05、12-39～12-46 已由 tests/native/spec/12_boss_moves_test.lua 走 MgrFishUnit 的业务入口取证；
+其余条款的落点与关联测试都是实现自检，状态仍是 unverified。
+
 ### 第 16 节 物品基础数据（17 条）
 
 | 条款 | 代码落点 | 关联测试 | 正常流程 | 失败流程 | 退出重进 | 存档恢复 | 等级 |

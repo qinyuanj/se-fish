@@ -1,14 +1,15 @@
 # 12. 精英与首领行为
 
 > 本文件是《渔力全开》规格第 12 节的条款清单。格式与必填项见 [TEMPLATE.md](TEMPLATE.md)，小节索引见 [README.md](README.md)。
+> 逐招表（每招的伤害来源映射、冷却调度、预警与单人躲避窗口）在 [`common/cfg/BossMoves.lua`](../../common/cfg/BossMoves.lua)，一招一行；首只贯通「配置 → 服务端调度 → 客户端预警 → 断言」的首领是火山岛的哥斯拉。
 
 | ID | 条款 | 组 | 执行者 | 证据等级 | 状态 | 证据 / 理由 |
 | --- | --- | --- | --- | --- | --- | --- |
 | 12-01 | 同一招式在正文与表中给出不同数值时，以表内数值为准 | 规则 | agent | A | unverified | — |
 | 12-02 | 表中基础攻击列只约束该鱼的基础攻击，不作为覆盖同鱼其他独立招式伤害的依据 | 规则 | agent | A | unverified | — |
 | 12-03 | 表中未给出参数的独立招式沿用正文数值，不因表缺列而删除该招式 | 规则 | agent | A | unverified | — |
-| 12-04 | 表中未明确的命中次数、轨迹、预警与效果持续时间属实现期配置细化，须先形成可复验样例 | 规则 | agent | A | unverified | — |
-| 12-05 | 实现期细化不得暗中增加新招式，本节列出的招式集合之外不新增攻击 | 规则 | agent | A | unverified | — |
+| 12-04 | 表中未明确的命中次数、轨迹、预警与效果持续时间属实现期配置细化，须先形成可复验样例 | 规则 | agent | A | evidenced | tests/native/spec/12_boss_moves_test.lua |
+| 12-05 | 实现期细化不得暗中增加新招式，本节列出的招式集合之外不新增攻击 | 规则 | agent | A | evidenced | tests/native/spec/12_boss_moves_test.lua |
 | 12-06 | 精英与首领只在被召出并放下后进入战斗态，本节不新设召唤入口（出场沿用首领饵与信物兑换，见 §4、§8） | 规则 | agent | A | unverified | — |
 | 12-07 | 电鳗移速 6，5 米内每秒放电一次、每次 10，持续 5 秒，之后睡眠 10 秒且睡眠中可受击 | 规则 | agent | A | unverified | — |
 | 12-08 | 鳄雀鳝追咬伤害 30、间隔 1.5 秒 | 规则 | agent | A | unverified | — |
@@ -42,14 +43,14 @@
 | 12-36 | 沧龙每 15 秒跃起砸击，落地后甩头 | 规则 | agent | A | unverified | — |
 | 12-37 | 沧龙绕岛巡航，咬最近的岛中心玩家，并可将玩家叼走入海 | 规则 | agent | A | unverified | — |
 | 12-38 | 沧龙咬中伤害 300 与过程接触伤害 150 分属两个判定段，不合并成一段 | 规则 | agent | A | unverified | — |
-| 12-39 | 哥斯拉血量 25000 | 规则 | agent | A | unverified | — |
-| 12-40 | 哥斯拉每 2 秒爪击（基础攻击 50）、每 6 秒甩尾、每 30 秒原子吐息 | 规则 | agent | A | unverified | — |
-| 12-41 | 哥斯拉保留正文跺脚招式及其对应范围 | 规则 | agent | A | unverified | — |
-| 12-42 | 哥斯拉原子吐息命中正前方 10 米内的目标即秒杀，该数值优先于正文重叠招式的旧数值 | 规则 | agent | A | unverified | — |
-| 12-43 | 哥斯拉血量低于 60% 入水，切换沧龙式攻击，咬中伤害 1000 | 规则 | agent | A | unverified | — |
-| 12-44 | 哥斯拉血量低于 20% 重新上岸，伤害 +50%、吐息改为每 10 秒 | 规则 | agent | A | unverified | — |
-| 12-45 | 哥斯拉的阶段切换优先于普通招式循环，阈值达成时立即进入对应阶段 | 契约 | agent | B | unverified | — |
-| 12-46 | 正文末尾孤立的「追踪攻击 260」缺招式归属，不据此新增攻击 | 规则 | agent | A | unverified | — |
+| 12-39 | 哥斯拉血量 25000 | 规则 | agent | A | evidenced | tests/native/spec/12_boss_moves_test.lua |
+| 12-40 | 哥斯拉每 2 秒爪击（基础攻击 50）、每 6 秒甩尾、每 30 秒原子吐息 | 规则 | agent | A | evidenced | tests/native/spec/12_boss_moves_test.lua |
+| 12-41 | 哥斯拉保留正文跺脚招式及其对应范围 | 规则 | agent | A | evidenced | tests/native/spec/12_boss_moves_test.lua |
+| 12-42 | 哥斯拉原子吐息命中正前方 10 米内的目标即秒杀，该数值优先于正文重叠招式的旧数值 | 规则 | agent | A | evidenced | tests/native/spec/12_boss_moves_test.lua |
+| 12-43 | 哥斯拉血量低于 60% 入水，切换沧龙式攻击，咬中伤害 1000 | 规则 | agent | A | evidenced | tests/native/spec/12_boss_moves_test.lua |
+| 12-44 | 哥斯拉血量低于 20% 重新上岸，伤害 +50%、吐息改为每 10 秒 | 规则 | agent | A | evidenced | tests/native/spec/12_boss_moves_test.lua |
+| 12-45 | 哥斯拉的阶段切换优先于普通招式循环，阈值达成时立即进入对应阶段 | 契约 | agent | B | evidenced | tests/native/spec/12_boss_moves_test.lua |
+| 12-46 | 正文末尾孤立的「追踪攻击 260」缺招式归属，不据此新增攻击 | 规则 | agent | A | evidenced | tests/native/spec/12_boss_moves_test.lua |
 | 12-47 | 若秒杀、招式并集或逃跑时限导致正常金币路线无法通关，必须提交数值调整及复验结果 | 规则 | agent | A | unverified | — |
 | 12-48 | 通关难度不得通过改成付费或稀有大奖前置来调节 | 规则 | agent | A | unverified | — |
 
