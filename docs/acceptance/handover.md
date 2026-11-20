@@ -42,15 +42,16 @@
 
 ## 三、满屏 `unverified` 是正常状态
 
-当前盘面（2026-11-20，`lua tools/cli.lua acceptance --check` 实测）：523 条条款，`unverified` 465、`evidenced` 2、`accepted` 0、`blocked` 56、`out-of-scope` 0。
+当前盘面（2026-11-20，#249 落地后 `lua tools/cli.lua acceptance --check` 实测）：523 条条款，`unverified` 321、`evidenced` 146、`accepted` 0、`blocked` 56、`out-of-scope` 0。
 
-这是**只建框架、不铺取证**的结果，不是业务没做完的判决书，也不是框架没做完：
+这是**业务代码已贯通、证据按条款逐条补**的结果：
 
 - 框架的完成判据是第七节的八条，其中**没有任何一条**是「矩阵里没有 `unverified`」。
-- 445 条 `unverified` 是这份账的价值本身——它把「未知」写成了可数的行，让下一个人不必读代码去猜哪里没做完。
-- 56 条 `blocked` **只剩一个原因**：55 条 C 级条款要编辑器试玩，加上 9-23 这条随小队系统排期后一并取证的界面可读性条款。外部依赖不再是阻塞理由——它们改记成 [ADR-0029](../adr/0029-scope-completeness-and-placeholder-first.md) 的生产开关，相应条款改 `unverified` 并按占位口径取证。
+- 321 条 `unverified` 是这份账的价值本身——它把「未知」写成了可数的行，让下一个人不必读代码去猜哪里没做完。
+- 56 条 `blocked` **只剩一个原因**：全部是 C 级条款，要编辑器试玩才能取证；含随小队系统一并观察的界面可读性 9-23。试玩恢复后整批取证（#267）。外部依赖不再是阻塞理由——它们改记成 [ADR-0029](../adr/0029-scope-completeness-and-placeholder-first.md) 的生产开关，相应条款按占位口径取证。
 - `out-of-scope` 归零：规格内没有永久出界（ADR-0029 第一节）。词表里保留这个值，但《渔力全开》的条款一律不用它。
-- 两条 `evidenced` 是样板：[7-11](07-economy-and-shop.md) 商店限购与 [1-12](01-overview-and-scope.md) 适配层失败路径。它们证明「一条真实条款可以由一条走业务入口的断言转成 `evidenced`」，仅此而已，不代表第 7 节或第 1 节做完了。
+- 146 条 `evidenced` 由 24 份 `tests/native/spec/` 断言与两份可重跑探针支撑；覆盖表 19 个小节逐节登记代码落点与关联测试，未登记落点数为 0。门禁现在要求「证据文件正文必须出现该条款号」，路径对而文件里没条款号同样判红。
+- 双棘轮基线已抬到 `evidenced 146 / legacyTests 142`；再往上只增不减。
 
 什么时候才该紧张：`evidenced` 少于基线（门禁会先红）、或某条 `accepted` 没有「签署：@某人 日期」。**`evidenced` 也不等于业务上线**：它只等于「有一条能重跑的断言在守这句话」，要人背书才升 `accepted`。
 
