@@ -128,12 +128,15 @@ GameCfg.Survival = {
     DeadTitle = '你已经死了！倒计时结束后虚弱复活。',
     AdrenalineText = '给自己一针肾上腺素',
     CallHelpText = '向队友呼救',
-    FreeReviveText = '免费满血复活',
+    -- #262 广告满血复活入口（11-19）：「看广告」是玩家可观察的入口形态，广告位本身在
+    -- GameCfg.Platform.Ads 与 GameCfg.Platform.Placeholder.Ads 里，这里只有文案。
+    AdReviveText = '看广告满血复活',
     PaidReviveText = '5金豆满血复活',
     NoAdrenalineText = '没有肾上腺素，可前往地图商店购买',
     PlatformPendingText = '平台复活即将开放，请等待倒计时虚弱复活',
-    -- #147 平台复活 flow 在飞：免费倒计时暂停期间的提示；取消/失败/超时后倒计时从暂停处继续
-    PlatformWaitText = '平台处理中，免费复活倒计时已暂停',
+    -- #147/#262 平台复活 flow 在飞：被暂停的那条倒计时（濒死 15 秒或免费复活 30 秒，
+    -- 两条都经 PlatformRevive 的同一处暂停分支）期间的提示；取消/失败/超时后从暂停处继续
+    PlatformWaitText = '平台处理中，复活倒计时已暂停',
     PlatformResumeText = '未完成满血复活，免费复活倒计时继续',
     WeakText = '虚弱中：移动速度减半',
     UnavailableText = '操作暂时不可用，请稍后再试',
@@ -638,7 +641,10 @@ GameCfg.Platform = {
         adrenaline1 = { beans = 1, count = 1, name = '肾上腺素', itemId = GameCfg.Survival.AdrenalineItemId },
         adrenaline5 = { beans = 4, count = 5, name = '肾上腺素×5', itemId = GameCfg.Survival.AdrenalineItemId },
     },
-    -- 激励广告：广告看完发放商品奖励（ShowRewardedVideoAd 的 goodsId 语义），goodsId/adTag 未交付
+    -- 激励广告：广告看完发放商品奖励（ShowRewardedVideoAd 的 goodsId 语义），goodsId/adTag 未交付。
+    -- #262：广告位是外部交付参数（生产开关，ADR-0029 第四节第 2 项）。未交付期间由
+    -- GameCfg.Platform.Placeholder.Ads 的占位广告位走通同一条路径；真实广告位到位后只替换那行参数，
+    -- PlatformRevive / ShowAd 的判定与回包一行不动。
     Ads = {
         revive = { name = '广告满血复活' },
     },
@@ -676,9 +682,14 @@ GameCfg.Platform.Placeholder = {
         adrenaline1 = 'placeholder.goods.adrenaline.single',
         adrenaline5 = 'placeholder.goods.adrenaline.five',
     },
+    -- #262 占位广告位：广告复活（11-19、11-37、11-38）在真实广告位交付前走这里。
+    -- 占位只拉起编辑器内的确认面板，不拉起真实广告、不发放任何平台权益；成功结算给的是
+    -- 地图内资源（血量与饥饿），不是平台商品。参数与文案集中在本表，判定代码不认商品字面量。
     Ads = {
         revive = 'placeholder.ad.revive',
     },
+    AdsLabel = '占位广告通道',
+    AdsNotice = '占位广告通道：不发放真实付费权益',
     -- 金币页（钓场商店第 4 页，GameSpec §7）：真实汇率与商品 ID 由平台后台交付；
     -- 占位按「每 1 个展示货币单位到账 CoinPerUnit 金币」计价，到账金币 = price × CoinPerUnit。
     CoinPage = {

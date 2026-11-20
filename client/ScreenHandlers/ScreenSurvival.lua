@@ -1,8 +1,9 @@
 -- 生存状态客户端蒙版（#131 T10）：服端按状态变化广播 SurvivalState
 -- （phase + 服务端时刻的 endsAt / weakUntil），这里只做展示与上行交互：
 -- 濒死 / 死亡居中大字 + 倒计时条，虚弱底部提示，肾上腺素按钮在濒死时可用。
--- #147 死亡相位额外两枚平台满血复活按钮（广告 / 5 金豆）：发起后服务端暂停免费倒计时并在
--- SurvivalState 带 platformPending，这里改显等待文案、隐藏按钮；结局以服务端回包为准。
+-- #147 平台满血复活按钮：#262 起广告入口在濒死与死亡两个相位都出现（11-19：濒死界面右并排
+-- 「看广告满血复活」，死亡界面左广告右 5 金豆），发起后服务端暂停那条倒计时并在 SurvivalState
+-- 带 platformPending，这里改显等待文案、隐藏按钮；结局以服务端回包为准。
 -- 正常状态整个面板隐藏；任何节点创建失败都只记日志，不阻塞主流程。
 local GameCfg = require('common.GameCfg')
 local OwnedUnits = require('common.OwnedUnits')
@@ -55,8 +56,10 @@ function Panel:Tick()
         local key = self.Phase == 'dead' and 'DeadTitle' or 'DownedTitle'
         local base = self.Phase == 'rescuing' and GameCfg.Rescue.RescuingTitle or GameCfg.Survival[key]
         local text = base .. '（' .. left .. ' 秒）'
-        -- 平台流程在飞：服务端已冻结倒计时，显示等待文案而不是会误导的走秒
-        if self.Phase == 'dead' and self.PlatformPending then text = GameCfg.Survival.PlatformWaitText end
+        -- 平台流程在飞：服务端已冻结倒计时（死亡或濒死那条），显示等待文案而不是会误导的走秒
+        if self.PlatformPending and (self.Phase == 'dead' or self.Phase == 'downed') then
+            text = GameCfg.Survival.PlatformWaitText
+        end
         if self.Title then pcall(function() self.Title.Text = text end) end
     end
     if self.WeakUntil then
@@ -92,10 +95,23 @@ function Panel:SetPhase(state)
                 or GameCfg.Survival[phase == 'dead' and 'DeadTitle' or 'DownedTitle']
         end)
     end
-    if self.AdrenalineBtn then pcall(function() self.AdrenalineBtn.Visible = phase == 'downed' end) end
-    local canRevive = phase == 'dead' and not self.PlatformPending
-    for _, btn in ipairs({ self.AdReviveBtn, self.PaidReviveBtn }) do
-        pcall(function() btn.Visible = canRevive end)
+    -- 广告流程在飞时自救先收起：两条解除濒死的路径不交错（服务端同样拒 busy）
+    if self.AdrenalineBtn then
+        pcall(function()
+            self.AdrenalineBtn.Visible = phase == 'downed' and not self.PlatformPending
+        end)
+    end
+    -- 广告满血复活在濒死与死亡两个界面都有入口（11-19）；金豆满血复活仍只在死亡界面（11-20）。
+    -- 濒死相位里自救与广告并排（左自救、右广告），死亡相位里广告与金豆并排（左广告、右金豆）。
+    local canRevive = (phase == 'downed' or phase == 'dead') and not self.PlatformPending
+    if self.AdReviveBtn then
+        pcall(function()
+            self.AdReviveBtn.Position = Vector2.New(phase == 'downed' and 330 or 10, 20)
+            self.AdReviveBtn.Visible = canRevive
+        end)
+    end
+    if self.PaidReviveBtn then
+        pcall(function() self.PaidReviveBtn.Visible = canRevive and phase == 'dead' end)
     end
     if enteringDead then notice(GameCfg.Survival.CallHelpText) end
     self:Tick() -- 立即渲染一次，不空一个心跳帧
@@ -134,6 +150,7 @@ function Panel:Start()
         ['fail'] = GameCfg.Survival.PlatformResumeText,
         ['timeout'] = GameCfg.Survival.PlatformResumeText,
         ['not-dead'] = '',
+        ['not-revivable'] = '',
     }
     local okRoot, root = pcall(function()
         local eui = game:GetService('Players').LocalPlayer.PlayerGui.EuiManager
@@ -152,18 +169,18 @@ function Panel:Start()
     self.Banner = banner
     self.Title = create('EUITextLabel', banner, 'SurvivalTitle', 0, -80, 640, 80, {
         Text = '', FontSize = 48, TextColor = Color.New(255, 80, 80, 255), LocalZOrder = 1 })
-    local btn = create('EUIButton', banner, 'SurvivalAdrenaline', 140, 20, 360, 80, {
+    local btn = create('EUIButton', banner, 'SurvivalAdrenaline', 10, 20, 300, 80, {
         ButtonText = '', NormalImage = ColorBlockImage, PressImage = ColorBlockImage,
         Color = Color.New(230, 120, 40, 255), Visible = false })
     btn.TouchEnabled = true
     self.AdrenalineBtn = btn
-    create('EUITextLabel', btn, 'SurvivalAdrenalineText', 0, 0, 360, 80, {
+    create('EUITextLabel', btn, 'SurvivalAdrenalineText', 0, 0, 300, 80, {
         Text = GameCfg.Survival.AdrenalineText, FontSize = 32,
         TextColor = Color.New(255, 255, 255, 255), LocalZOrder = 1 })
     if btn.OnClicked then
         btn.OnClicked:Connect(function() self:Send('UseAdrenaline') end)
     end
-    -- 死亡相位两枚平台满血复活按钮（左广告、右 5 金豆），并排在肾上腺素按钮同一行
+    -- 两枚平台满血复活按钮，与肾上腺素按钮同一行：濒死 = 自救 + 广告，死亡 = 广告 + 5 金豆
     local function reviveButton(name, x, text, color, mode)
         local node = create('EUIButton', banner, name, x, 20, 300, 80, {
             ButtonText = '', NormalImage = ColorBlockImage, PressImage = ColorBlockImage,
@@ -174,7 +191,7 @@ function Panel:Start()
         if node.OnClicked then node.OnClicked:Connect(function() self:Send('FullRevive', mode) end) end
         return node
     end
-    self.AdReviveBtn = reviveButton('SurvivalAdRevive', 10, GameCfg.Survival.FreeReviveText,
+    self.AdReviveBtn = reviveButton('SurvivalAdRevive', 10, GameCfg.Survival.AdReviveText,
         Color.New(60, 150, 90, 255), 'ad')
     self.PaidReviveBtn = reviveButton('SurvivalPaidRevive', 330, GameCfg.Survival.PaidReviveText,
         Color.New(210, 160, 40, 255), 'goods')

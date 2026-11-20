@@ -6,6 +6,9 @@
 -- #261 占位支付通道（ADR-0029 第三、四节）：真实商品 ID / 金币汇率未交付期间，同一适配层按共享配置
 -- GameCfg.Platform.Placeholder 建「占位 flow」，由客户端占位确认结算，把金币页购买与地图盲盒的完整路径走通；
 -- 占位路径不调用真实平台、不发真实付费权益，真实通道（无可信订单身份）继续关闭。真实参数到位只换配置。
+-- #262 占位广告位同理：真实广告位（Platform.Ads.revive 的 goodsId/adTag）未交付期间，广告满血复活经
+-- Placeholder.Ads.revive 建同一种占位 flow，成功结算交给 MgrSurvival 的 FullRevive 发地图内资源，
+-- 不发任何平台权益；真实广告位到位后只替换那行参数。
 -- 已知平台边界（不宣称已解决，归 #148 真实验收）：
 --   * GoodsPurchaseCompleted 只有 goodsId/goodsNum/player，没有订单 ID，官方教程禁止拼 UserId+goodsId
 --     防重——缺可信交付身份时忽略真实信号，配置 goodsId 也不放行；订单适配/补发/对账归#148；
@@ -111,16 +114,18 @@ local function notifyPlaceholder(mgr, player, flow, open)
     local page = config.CoinPage or {}
     local offer = flow.kind == 'coin' and coinOffer(flow.coin) or nil
     local row = flow.goods and cfg().Goods[flow.goods] or nil
+    -- #262 广告通道有自己的「不发放真实付费权益」提示：占位支付与占位广告各说各的通道
+    local adRow = flow.kind == 'ad' and flow.ad and cfg().Ads[flow.ad] or nil
     local ok, err = pcall(mgr.Reply, mgr, player, {
         ok = true, action = 'PlaceholderFlow', open = open, kind = flow.kind,
         key = offer and offer.key or flow.goods or flow.ad, goodsId = flow.goodsId,
         purpose = flow.purpose,
-        name = offer and offer.name or (row and row.name),
+        name = (offer and offer.name) or (row and row.name) or (adRow and adRow.name),
         beans = row and row.beans,
         price = offer and offer.price,
         coin = offer and coinAmount(offer),
-        currency = offer and page.Unit or (row and cfg().BeanCurrency),
-        notice = config.Notice,
+        currency = (offer and page.Unit) or (row and cfg().BeanCurrency),
+        notice = (flow.kind == 'ad' and config.AdsNotice) or config.Notice,
     })
     if not ok then print('[MgrPlatform] 占位通道通知失败', player.UserId, tostring(err)) end
 end
@@ -282,9 +287,11 @@ function Mgr:GrantCoin(player, key)
     end)
 end
 
--- 占位通道的确认 / 取消：只结算占位 flow（调试驱动器结算不到它，反之亦然）
+-- 占位通道的确认 / 取消 / 失败：只结算占位 flow（调试驱动器结算不到它，反之亦然）。
+-- #262：'fail' 是激励广告的真实结局之一（平台 failEvent 不保证触发），占位通道也要能走通失败路径
+-- （ADR-0029 第三节第 2 条「成功与失败两条路径都要能走通」）；客户端确认面板只发前两种。
 function Mgr:ResolvePlaceholder(player, outcome)
-    if outcome ~= 'success' and outcome ~= 'cancel' then return false end
+    if outcome ~= 'success' and outcome ~= 'cancel' and outcome ~= 'fail' then return false end
     local flow = player and self.Flows[player.UserId]
     if not flow or flow.player ~= player or not flow.placeholder then return false end
     resolve(self, player, flow, outcome, { placeholder = true })

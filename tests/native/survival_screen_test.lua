@@ -116,12 +116,13 @@ describe('TestScreenSurvival', function()
         assert.is_false(ctx.nodes['SurvivalWeak'].Visible)
     end)
 
-    -- #147 平台满血复活：死亡相位才显示广告 / 5 金豆两枚按钮，上行带 mode；
-    -- platformPending 期间隐藏按钮并显示等待文案（倒计时已被服务端冻结）
+    -- #147 平台满血复活：#262 起广告入口在濒死与死亡相位都显示（11-19），金豆入口仍只在死亡相位（11-20），
+    -- 上行带 mode；platformPending 期间隐藏按钮并显示等待文案（倒计时已被服务端冻结）
     it('test_dead_phase_offers_platform_revive_buttons', function()
         local cfg = GameCfg.Survival
         ctx.events.SurvivalState.OnClientEvent:Fire({ phase = 'downed', endsAt = 1015 })
-        assert.is_false(ctx.nodes['SurvivalAdRevive'].Visible) -- 濒死没有平台复活
+        assert.is_true(ctx.nodes['SurvivalAdRevive'].Visible) -- 濒死界面右并排广告入口
+        assert.is_false(ctx.nodes['SurvivalPaidRevive'].Visible) -- 金豆入口仍只在死亡相位
         ctx.events.SurvivalState.OnClientEvent:Fire({ phase = 'dead', endsAt = 1040 })
         assert.is_true(ctx.nodes['SurvivalAdRevive'].Visible)
         assert.is_true(ctx.nodes['SurvivalPaidRevive'].Visible)
