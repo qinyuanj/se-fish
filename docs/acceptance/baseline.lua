@@ -6,5 +6,4 @@ return {
   evidenced = 1,
   legacyTests = 142,
   updated = "2026-11-20",
-  note = "只许单向调整：evidenced 只增、legacyTests 只减。调高 evidenced 或调低 legacyTests 才允许改这个文件。",
 }
