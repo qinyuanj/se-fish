@@ -1,5 +1,8 @@
 -- 条款 17-17（docs/acceptance/17-tutorial-story-platform.md）：平台成就使用共享配置里的占位 ID
 -- 走通完成与补交路径；真实成就 ID 由平台侧交付后只替换配置。
+-- 同时是条款 13-18（平台成就 ID 未交付时保留本地完成标记并支持重复补交）的证据之一：
+-- it「生产构建不向平台写占位 ID：本地完成标记留着」证明完成标记本地保留，
+-- it「调试构建里占位 ID 走通『完成 → 查询 → 提交』补交路径」证明可重复补交。
 -- 只走业务入口：server/main.lua 的 MgrMap 注册的 MgrAchievements（通关成就的交付队列）＋ MgrPlayerData
 -- （玩家数据实例）＋ MgrSave（持久操作协议），按 main.lua 的接线注入同一份协作关系。引擎边界
 -- （ArchiveService 平台成就接口、Players、World 时钟）与存档写入用替身；**不执行 main.lua 本体**：它一开头

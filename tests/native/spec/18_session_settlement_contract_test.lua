@@ -175,6 +175,8 @@ describe('条款 18 存档会话与结算身份', function()
     end
   end)
 
+  -- 条款 18-20（旧会话的异步回调不覆盖新会话存档）、18-21（写档不只以 UpdateAsync 返回的快照为准）、
+  -- 18-22（每次写档校验会话与版本，不一致时拒绝写入）。
   it('旧会话快照与未知版本都不得覆盖新会话存档', function()
     local uid = 5201
     local old = seedSnapshot(uid)
@@ -203,6 +205,8 @@ describe('条款 18 存档会话与结算身份', function()
     assert.same(stored.meta.revision, storeSnapshot(uid).meta.revision)
   end)
 
+  -- 条款 18-23（扣费操作带可重试的操作身份，重放不重复扣费）、
+  -- 18-24（结算操作带可重试的操作身份，重放不重复发奖：航班与 operation 记账只落一次）。
   it('船票结算的正常、失败与重放只落一次账', function()
     local uid = 5202
     local player, data = ready(uid)
@@ -229,6 +233,7 @@ describe('条款 18 存档会话与结算身份', function()
     assert.same(before + 1, #storeSnapshot(uid).meta.operations, '重放不得再次扣票或记账')
   end)
 
+  -- 条款 18-23 / 18-24 的失败流程：写档失败时船票不扣、航班不开、不回成功包，两边都不落地。
   it('写档失败时不扣船票、不开航班，也不回成功包', function()
     local uid = 5203
     local player, data = ready(uid)
@@ -247,6 +252,8 @@ describe('条款 18 存档会话与结算身份', function()
     assert.is_false(failed ~= nil and failed.ok == true)
   end)
 
+  -- 条款 18-13（尚未结算的操作在重进后据此恢复结算）、18-23 / 18-24 的退出重进流程
+  -- （重放旧 operation 只回执，不重复扣费也不重复发奖）。
   it('退出重进后重放旧操作只回执不重复结算', function()
     local uid = 5204
     local player, data = ready(uid)
@@ -274,6 +281,9 @@ describe('条款 18 存档会话与结算身份', function()
     assert.same(0, rejoined.teleports)
   end)
 
+  -- 条款 18-04（升级/购买/药水次数）、18-05（血量与饥饿）、18-06（濒死与死亡标记）、
+  -- 18-07（图鉴个人重量）、18-08（任务进度与剧情已读）、18-09（到达集合）、
+  -- 18-11（盲盒保底计数）、18-12（成就及其进度）：逐项经写档、读档往返后仍成立。
   it('个人持久状态逐项保存与恢复', function()
     local uid = 5209
     local snapshot = seedSnapshot(uid)
@@ -322,6 +332,10 @@ describe('条款 18 存档会话与结算身份', function()
     assert.is_true(restored.extra.achievements.final)
   end)
 
+  -- 条款 18-01（金币与全部库存条目，含鱼饵）、18-02（每件物品的实例倍率与烤制状态）、
+  -- 18-10（当前钓鱼区与安全落点：落点写回 extra.travel.safePoint，非法落点回退到同区安全点）、
+  -- 18-16（v1 旧档升级为新版结构且保留已有财产）、18-17（新增字段按明确默认值填充）、
+  -- 18-05 的重连分支（虚弱剩余时间经 MgrSurvival 公开入口继续生效）、18-31（记录落点不合法时恢复到同区安全点）。
   it('重进恢复合法落点与虚弱剩余时间，旧档升级保留财产补默认值', function()
     local uid = 5205
     local snapshot = seedSnapshot(uid)
@@ -367,6 +381,7 @@ describe('条款 18 存档会话与结算身份', function()
     assert.same(37, applied, '重连后虚弱剩余时间继续生效')
   end)
 
+  -- 条款 18-18（版本未知或读取失败时保留原档、不写空档）、18-19（存档就绪前的可变操作被拒）。
   it('未知版本读档保留原档，不写空档；未就绪前结算请求被拒', function()
     local uid = 5207
     local broken = seedSnapshot(uid)
@@ -391,6 +406,7 @@ describe('条款 18 存档会话与结算身份', function()
     drain()
   end)
 
+  -- 条款 18-27（共享的活鱼与地面物品不进入个人存档）。
   it('共享世界状态不进入个人存档', function()
     local uid = 5206
     local player, data = ready(uid)

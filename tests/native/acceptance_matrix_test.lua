@@ -137,6 +137,33 @@ describe('验收矩阵门禁', function()
       local ok, found, text = verify()
       assert.is_false(ok)
       assert.same({ 'evidence_not_clause_assertion' }, found, text)
+      assert.is_truthy(text:find('路径不符', 1, true), '没有 spec/probes 路径时消息要写清是路径不符：' .. text)
+    end)
+
+    it('spec 车道的证据文件正文里没有条款号就红', function()
+      -- 路径落在 spec 车道、文件也存在，但正文里没有 3-02：路径前缀只是车道，内容才是证据。
+      fs.write_file(root .. '/' .. fixture.EVIDENCE, '-- 夹具证据文件：正文里没写条款号。\n')
+      local ok, found, text = verify()
+      assert.is_false(ok)
+      assert.same({ 'evidence_not_clause_assertion' }, found, text)
+      assert.is_truthy(text:find('文件里没有条款号', 1, true),
+        '文件存在但没有条款号时消息要写清是文件里没有条款号：' .. text)
+    end)
+
+    it('换成另一份正文带条款号的 spec 文件就绿', function()
+      fs.write_file(root .. '/tests/native/spec/other_test.lua', '-- 夹具：条款 3-02 的断言。\n')
+      fixture.patch(root, fixture.shard(3), fixture.EVIDENCE, 'tests/native/spec/other_test.lua')
+      local ok, found, text = verify()
+      assert.is_true(ok, text)
+      assert.same({}, found)
+    end)
+
+    it('条款号按完整 ID 认：9-12 不认 19-12、09-12 与 9-120', function()
+      assert.is_true(Acceptance.clause_mentioned('-- 条款 9-12：断言', '9-12'))
+      assert.is_true(Acceptance.clause_mentioned('9-12 的断言', '9-12'))
+      assert.is_false(Acceptance.clause_mentioned('-- 条款 19-12：断言', '9-12'))
+      assert.is_false(Acceptance.clause_mentioned('-- 条款 09-12：断言', '9-12'))
+      assert.is_false(Acceptance.clause_mentioned('-- 条款 9-120：断言', '9-12'))
     end)
 
     it('已取证计数低于基线就红', function()
