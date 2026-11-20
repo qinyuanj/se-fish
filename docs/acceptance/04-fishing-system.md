@@ -9,12 +9,12 @@
 | 4-03 | 有效落水后约 3 秒按配置抽鱼，抽取结果由服务端给出 | 规则 | agent | B | unverified | — |
 | 4-04 | 本次抽取没抽到鱼时，本次钓鱼结束并提示重新抛竿，已扣的鱼饵不返还 | 规则 | agent | A | unverified | — |
 | 4-05 | 上钩时同时给出文字提示、收线按钮呼吸高亮与一次提示音 | 规则 | agent | A | unverified | — |
-| 4-06 | 收线进度从 50% 起步 | 规则 | agent | A | unverified | — |
-| 4-07 | 收线进度每秒下降 5%，每次点收线按钮上升 5% | 规则 | agent | A | unverified | — |
+| 4-06 | 收线进度从 50% 起步 | 规则 | agent | A | evidenced | tests/native/spec/04_fishing_reel_rules_test.lua |
+| 4-07 | 收线进度每秒下降 5%，每次点收线按钮上升 5% | 规则 | agent | A | evidenced | tests/native/spec/04_fishing_reel_rules_test.lua |
 | 4-08 | 所有鱼共用同一套收线难度，不按鱼种调整衰减或增益 | 规则 | agent | A | unverified | — |
 | 4-09 | 进度条本身不可点击，只有收线按钮能改变进度 | 规则 | agent | A | unverified | — |
 | 4-10 | 收线中被商店、背包、图鉴挡住时进度照常下降，关闭这些界面不触发脱钩 | 规则 | agent | B | unverified | — |
-| 4-11 | 进度降到 0 即脱钩，本次钓鱼结束，玩家要再操作收竿才回到可抛竿状态 | 规则 | agent | A | unverified | — |
+| 4-11 | 进度降到 0 即脱钩，本次钓鱼结束，玩家要再操作收竿才回到可抛竿状态 | 规则 | agent | A | evidenced | tests/native/spec/04_fishing_reel_rules_test.lua |
 | 4-12 | 进度到 100% 播放上岸动作，鱼顶在头上，操作按钮变成「放下」 | 规则 | agent | A | unverified | — |
 | 4-13 | 主动放下后鱼按品级行动：普通与极品逃跑，精英与首领进入战斗 | 规则 | agent | A | unverified | — |
 | 4-14 | 普通抽取的候选集同时受三项筛选：所在钓鱼区、鱼竿等级不低于表中要求、鱼饵匹配 | 规则 | agent | A | unverified | — |
