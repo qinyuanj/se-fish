@@ -32,6 +32,7 @@ local MgrMap = {
     MgrSurvival = require("server.Mgr.MgrSurvival"),
     MgrWeapon = require("server.Mgr.MgrWeapon"),
     MgrSpecialItem = require("server.Mgr.MgrSpecialItem"),
+    MgrParty = require("server.Mgr.MgrParty"),
     MgrCompendium = require("server.Mgr.MgrCompendium"),
     MgrRecords = require("server.Mgr.MgrRecords"),
     MgrAchievements = require("server.Mgr.MgrAchievements"),
@@ -195,6 +196,12 @@ MgrMap.MgrSpecialItem.Vitals = MgrMap.MgrVitals
 MgrMap.MgrSpecialItem.PlayerData = MgrMap.MgrPlayerData
 MgrMap.MgrSpecialItem.FishUnit = MgrMap.MgrFishUnit
 MgrMap.MgrFerry.SpecialItem = MgrMap.MgrSpecialItem
+
+-- #253 小队：归属、名单与人数由本管理器唯一维护（客户端请求只表达意图）；队伍界面读的血量
+-- 走 MgrVitals 的只读快照。队友免伤判定归 PK/抢救子单，本单不改伤害入口。
+MgrMap.MgrParty.PlayerData = MgrMap.MgrPlayerData
+MgrMap.MgrParty.Save = MgrMap.MgrSave
+MgrMap.MgrParty.Vitals = MgrMap.MgrVitals
 
 -- 存档就绪前不创建 Vitals/Ability 等玩家状态；退出先撤销就绪标记，再清理管理器。
 local ActivePlayers = {}

@@ -21,6 +21,8 @@ local LocalLottery = require("client.LocalLottery")
 local ScreenLottery = require("client.ScreenHandlers.ScreenLottery")
 local ScreenFerry = require("client.ScreenHandlers.ScreenFerry")
 local ScreenSurvival = require("client.ScreenHandlers.ScreenSurvival")
+-- #253 小队 HUD：队友血量与组队邀请倒计时（运行时自绘）
+local ScreenParty = require("client.ScreenHandlers.ScreenParty")
 -- #137 烧烤文字泡与烤炉进度面板（运行时自绘，不经 MgrGameUI）
 local ScreenGrill = require("client.ScreenHandlers.ScreenGrill")
 -- #147 T26 盲盒与平台购买（肾上腺素报价、测试支付驱动、金币页入口）界面
@@ -58,6 +60,7 @@ Task:Spawn(function() ScreenLottery:Start() end)
 Task:Spawn(function() LocalLottery:Start() end)
 Task:Spawn(function() ScreenFerry:Start() end)
 Task:Spawn(function() ScreenSurvival:Start() end)
+Task:Spawn(function() ScreenParty:Start() end)
 Task:Spawn(function() ScreenGrill:Start() end)
 Task:Spawn(function() ScreenBlindbox:Start() end)
 Task:Spawn(function() ScreenPlatform:Start() end)

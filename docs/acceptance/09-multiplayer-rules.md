@@ -2,14 +2,14 @@
 
 > 本文件是《渔力全开》规格第 9 节的条款清单。格式与必填项见 [TEMPLATE.md](TEMPLATE.md)，小节索引见 [README.md](README.md)。
 > 本节按组物理分开成**四张表**：**契约**是接口与共享世界必须成立的接缝，**规则**是可与实现解耦的玩法判定，**功能**是需要新建的小队系统与队伍界面，最后的 **C 级（试玩取证）** 小节专收只能用试玩观察取证的条款（按证据等级而不是按组划分）。
-> 本节按 [ADR-0029](../adr/0029-scope-completeness-and-placeholder-first.md) 的范围口径执行：规格内的条款没有永久出界，功能组每条保持 `unverified` 并按依赖排期；C 级小节里的可读性条款按试玩口径写 `blocked`；契约与规则组本轮初始状态一律 `unverified`，证据列写全角破折号。
+> 本节按 [ADR-0029](../adr/0029-scope-completeness-and-placeholder-first.md) 的范围口径执行：规格内的条款没有永久出界。小队已落地并取证（9-02、9-06～9-11、9-19～9-22，证据在 `tests/native/spec/09_party_authority_test.lua` 与 `tests/native/spec/09_party_hud_test.lua`）；伤害入口相关条款（9-01、9-12～9-16）与抢救条款（9-03、9-17、9-18）的落点已登记在[实现覆盖表](coverage.md)，取证归各自的子单；C 级小节里的可读性条款按试玩口径写 `blocked`。
 
 ## 契约
 
 | ID | 条款 | 组 | 执行者 | 证据等级 | 状态 | 证据 / 理由 |
 | --- | --- | --- | --- | --- | --- | --- |
 | 9-01 | 伤害结算只走统一的伤害入口，队友免伤、鱼塘免伤与安全区豁免都作为该入口内的判定分支接入，不另写一套单人伤害路径 | 契约 | agent | B | unverified | — |
-| 9-02 | 玩家身份（含所属小队）只由服务端维护，客户端无法通过请求改写自己或他人的队伍归属 | 契约 | agent | A | unverified | — |
+| 9-02 | 玩家身份（含所属小队）只由服务端维护，客户端无法通过请求改写自己或他人的队伍归属 | 契约 | agent | A | evidenced | tests/native/spec/09_party_authority_test.lua |
 | 9-03 | 濒死、抢救中、恢复与死亡之间的状态转换只经同一个抢救状态转换接口完成，抢救不能绕过该接口直接改血量或濒死标记 | 契约 | agent | B | unverified | — |
 | 9-04 | 多人同场时活鱼、地面物品、摆渡与设施仍是共享世界里的同一份权威副本，不因当前单人开发而改成按玩家各存一份 | 契约 | agent | B | unverified | — |
 | 9-05 | 伤害、抢救与队伍变更在重复请求、同时触发和断线重连下都只结算一次，重放同一请求不产生第二次效果 | 契约 | agent | B | unverified | — |
@@ -18,12 +18,12 @@
 
 | ID | 条款 | 组 | 执行者 | 证据等级 | 状态 | 证据 / 理由 |
 | --- | --- | --- | --- | --- | --- | --- |
-| 9-06 | 一支小队最多 3 名玩家，第 4 名玩家无论走邀请还是接受邀请都加不进队伍 | 规则 | agent | A | unverified | — |
-| 9-07 | 只有在与目标玩家距离 2 米以内时才能发起组队邀请，超出距离的邀请被拒绝且不产生待处理邀请 | 规则 | agent | A | unverified | — |
-| 9-08 | 邀请发出后 10 秒内未被处理即按拒绝结算，超时后接受邀请不生效、队伍组成不变 | 规则 | agent | B | unverified | — |
-| 9-09 | 队员离线后自动退出小队，小队名单里不再保留该玩家，人数按减一重算 | 规则 | agent | B | unverified | — |
-| 9-10 | 小队人数少于 2 人时解散，剩余玩家回到无队伍状态 | 规则 | agent | A | unverified | — |
-| 9-11 | 队员可以主动离队，离队后立即不再享有该小队的免伤 | 规则 | agent | A | unverified | — |
+| 9-06 | 一支小队最多 3 名玩家，第 4 名玩家无论走邀请还是接受邀请都加不进队伍 | 规则 | agent | A | evidenced | tests/native/spec/09_party_authority_test.lua |
+| 9-07 | 只有在与目标玩家距离 2 米以内时才能发起组队邀请，超出距离的邀请被拒绝且不产生待处理邀请 | 规则 | agent | A | evidenced | tests/native/spec/09_party_authority_test.lua |
+| 9-08 | 邀请发出后 10 秒内未被处理即按拒绝结算，超时后接受邀请不生效、队伍组成不变 | 规则 | agent | B | evidenced | tests/native/spec/09_party_authority_test.lua |
+| 9-09 | 队员离线后自动退出小队，小队名单里不再保留该玩家，人数按减一重算 | 规则 | agent | B | evidenced | tests/native/spec/09_party_authority_test.lua |
+| 9-10 | 小队人数少于 2 人时解散，剩余玩家回到无队伍状态 | 规则 | agent | A | evidenced | tests/native/spec/09_party_authority_test.lua |
+| 9-11 | 队员可以主动离队，离队后立即不再享有该小队的免伤 | 规则 | agent | A | evidenced | tests/native/spec/09_party_authority_test.lua |
 | 9-12 | 同队玩家之间的攻击不造成任何伤害，近战、枪械与范围伤害都按 0 结算 | 规则 | agent | A | unverified | — |
 | 9-13 | 鱼塘区内任意两名玩家之间都免伤，不论是否同队 | 规则 | agent | A | unverified | — |
 | 9-14 | 鱼塘以外的钓鱼区，非同队玩家之间的攻击正常造成伤害 | 规则 | agent | A | unverified | — |
@@ -36,15 +36,15 @@
 
 | ID | 条款 | 组 | 执行者 | 证据等级 | 状态 | 证据 / 理由 |
 | --- | --- | --- | --- | --- | --- | --- |
-| 9-19 | 小队系统：组队、邀请、接受与拒绝、主动离队、解散的服务端判定与队伍名单维护 | 功能 | agent | A | unverified | — |
-| 9-20 | 队伍界面：在 HUD 上显示本队队友及每名队友的当前血量 | 功能 | agent | A | unverified | — |
-| 9-21 | 收到组队邀请时的界面提示与 10 秒倒计时展示 | 功能 | agent | A | unverified | — |
-| 9-22 | 队伍归属进入存档，断线重连后按原队伍状态或明确的解散结果恢复 | 功能 | agent | B | unverified | — |
+| 9-19 | 小队系统：组队、邀请、接受与拒绝、主动离队、解散的服务端判定与队伍名单维护 | 功能 | agent | A | evidenced | tests/native/spec/09_party_authority_test.lua |
+| 9-20 | 队伍界面：在 HUD 上显示本队队友及每名队友的当前血量 | 功能 | agent | A | evidenced | tests/native/spec/09_party_hud_test.lua、client/ScreenHandlers/ScreenParty.lua |
+| 9-21 | 收到组队邀请时的界面提示与 10 秒倒计时展示 | 功能 | agent | A | evidenced | tests/native/spec/09_party_hud_test.lua |
+| 9-22 | 队伍归属进入存档，断线重连后按原队伍状态或明确的解散结果恢复 | 功能 | agent | B | evidenced | tests/native/spec/09_party_authority_test.lua |
 
 ## C 级（试玩取证）
 
 | ID | 条款 | 组 | 执行者 | 证据等级 | 状态 | 证据 / 理由 |
 | --- | --- | --- | --- | --- | --- | --- |
-| 9-23 | 队伍界面上的队友头像与血量在实机分辨率下可读，不与左上角自身血量重叠 | 功能 | 试玩 | C | blocked | 卡在：需编辑器试玩取证（业务代码完成后整批进行；队伍界面随小队系统排期后同一会话覆盖 9-20…9-23） |
+| 9-23 | 队伍界面上的队友头像与血量在实机分辨率下可读，不与左上角自身血量重叠 | 功能 | 试玩 | C | blocked | 卡在：需编辑器试玩取证（小队业务代码与 9-20～9-22 已完成，试玩恢复后同一会话复核队友头像与血量在实机分辨率下的可读性） |
 | 9-24 | 2 米邀请的操作距离在场景里够用：不需要贴到重合，也不会误选到旁边经过的玩家 | 规则 | 试玩 | C | blocked | 卡在：需编辑器试玩取证（业务代码完成后整批进行） |
 | 9-25 | 玩家能凭场景与提示分辨当前处于免伤区还是可 PK 区，边界不产生错误预期 | 规则 | 试玩 | C | blocked | 卡在：需编辑器试玩取证（业务代码完成后整批进行） |
