@@ -5,6 +5,10 @@
 --   1. 真实矩阵不绿（分片缺、词表越界、证据路径不存在、索引与分片不一致、棘轮被反向推动）；
 --   2. 改坏一处却不红（门禁睡着了），或红的地方不对（判错的规则）；
 --   3. 条款断言车道被算进遗留测试（spec 断言一多，遗留棘轮就没法只减）。
+-- 已知缺口（有 finding kind、但夹具还没逐条造坏过的）：spec_sections、spec_unreadable、
+-- shard_unreadable、shard_title、clause_cells、index_unreadable、busted_unreadable、
+-- baseline_unreadable。它们都由同一个 M.scan → M.check 管道产出，先靠真实矩阵与上面这些用例守着；
+-- 补夹具时照本文件的写法：只改坏一处，断言 kinds 精确等于那一条。
 local Acceptance = require('tools.acceptance')
 local fs = require('tests.support.fs_fixture')
 local fixture = require('tests.support.acceptance_fixture')
@@ -159,6 +163,45 @@ describe('验收矩阵门禁', function()
       assert.same({ 'spec_issue_ref' }, found, text)
     end)
 
+    -- 工单编号的四种写法都要认：井号加数字、空白夹着的 # 46、中文「工单46」、英文 issue 46。
+    for _, sample in ipairs({ '#123', '# 46', '工单46', 'issue 46' }) do
+      it('GameSpec 里的工单编号写法 ' .. sample .. ' 也判红', function()
+        fixture.patch(root, Acceptance.SPEC, '正文。', '正文（见 ' .. sample .. '）。')
+        local ok, found, text = verify()
+        assert.is_false(ok)
+        assert.same({ 'spec_issue_ref' }, found, text)
+      end)
+    end
+
+    it('分片里塞一个工单编号也判红（台账不是分片，另有历史单号）', function()
+      fixture.patch(root, fixture.shard(4), '夹具条款：第 4 节第一条', '夹具条款：第 4 节第一条（工单46）')
+      local ok, found, text = verify()
+      assert.is_false(ok)
+      assert.same({ 'spec_issue_ref' }, found, text)
+    end)
+
+    it('Markdown 标题不是工单编号：## 1. 概述 与 # 12. 标题 都不命中', function()
+      assert.same({}, Acceptance.issue_refs('## 1. 概述与范围'))
+      assert.same({}, Acceptance.issue_refs('# 12. 精英与首领行为'))
+      assert.same({}, Acceptance.issue_refs('| 9-07 | 只有距离 2 米内才能发起组队邀请 |'))
+    end)
+
+    it('条款写成不可判的措辞就红', function()
+      fixture.patch(root, fixture.shard(5), '夹具条款：第 5 节第一条', '夹具条款：第 5 节第一条，结果正常。')
+      local ok, found, text = verify()
+      assert.is_false(ok)
+      assert.same({ 'vague_wording' }, found, text)
+    end)
+
+    it('accepted 的证据列没有签署格式就红', function()
+      fixture.patch(root, fixture.shard(3), '| A | evidenced |', '| A | accepted |')
+      -- 生成块里 evidenced 与 accepted 是两列，改了状态要先同步索引，本用例只问签署这一条规则。
+      fixture.sync_index(root)
+      local ok, found, text = verify()
+      assert.is_false(ok)
+      assert.same({ 'accepted_signature' }, found, text)
+    end)
+
     it('少一份分片就红', function()
       assert(fs.exists(root .. '/' .. fixture.shard(12)))
       os.remove(root .. '/' .. fixture.shard(12))
@@ -197,6 +240,43 @@ describe('验收矩阵门禁', function()
       local ok, found, text = verify()
       assert.is_false(ok)
       assert.same({ 'id_sequence' }, found, text)
+    end)
+
+    it('条款 ID 的节号与所在分片不一致就红', function()
+      fixture.patch(root, fixture.shard(6), '| 6-01 |', '| 07-01 |')
+      local ok, found, text = verify()
+      assert.is_false(ok)
+      assert.same({ 'clause_id' }, found, text)
+    end)
+
+    it('分片节号超出规格小节数就红', function()
+      fs.write_file(root .. '/' .. fixture.shard(Acceptance.SPEC_SECTIONS + 1), table.concat({
+        '# ' .. (Acceptance.SPEC_SECTIONS + 1) .. '. 夹具小节外多出的一节',
+        '',
+        '| ID | 条款 | 组 | 执行者 | 证据等级 | 状态 | 证据 / 理由 |',
+        '| --- | --- | --- | --- | --- | --- | --- |',
+        string.format('| %d-01 | 夹具条款：超出规格的那条 | 规则 | agent | A | unverified | — |',
+          Acceptance.SPEC_SECTIONS + 1),
+        '',
+      }, '\n'))
+      fixture.sync_index(root)
+      local ok, found, text = verify()
+      assert.is_false(ok)
+      assert.same({ 'shard_unknown' }, found, text)
+    end)
+
+    it('README 缺少生成块标记就红', function()
+      fixture.patch(root, Acceptance.INDEX, Acceptance.BEGIN_MARK, '')
+      local ok, found, text = verify()
+      assert.is_false(ok)
+      assert.same({ 'index_markers' }, found, text)
+    end)
+
+    it('基线字段不是 0 以上整数就红', function()
+      fixture.sync_baseline(root, { evidenced = 1.5 })
+      local ok, found, text = verify()
+      assert.is_false(ok)
+      assert.same({ 'baseline_shape' }, found, text)
     end)
 
     it('多一份同节分片就红', function()

@@ -34,7 +34,23 @@ M.VOCABULARY = {
 -- 状态词表再暴露一份：计数、缺口密度与棘轮都按它逐项列。
 M.STATUS = M.VOCABULARY.status
 
-M.BASELINE_NOTE = '只许单向调整：evidenced 只增、legacyTests 只减。调高 evidenced 或调低 legacyTests 才允许改这个文件。'
+-- 禁用措辞（TEMPLATE 6.1）：这些词把「判不了」伪装成断言。
+-- 只认**独立成句**的用法——词后紧跟句读或到结尾才算命中；「正常流程」「可行走」这类构词不算，
+-- 否则会误伤既有条款（1-18 就写着「连通可行走」）。
+M.VAGUE_WORDS = { '正确', '合理', '符合预期', '手感要好', '可行', '正常' }
+local CLAUSE_PUNCT = ' 	，。；、：！？（）「」'
+
+-- accepted 的证据列必须带人签署（TEMPLATE 第四节）：路径（签署：@用户名 YYYY-MM-DD）。
+M.SIGNATURE = '（签署：@%S+ %d%d%d%d%-%d%d%-%d%d）'
+
+-- 工单编号的四种常见写法：规格与分片都不得出现，台账按设计带历史单号（它不是分片，另算）。
+-- 注意别误伤 Markdown 标题：'## 1. 概述' 的井号后面跟着另一个井号，'%s#%s%d+' 不成立。
+M.ISSUE_PATTERNS = {
+  { pattern = '#%d+' },
+  { pattern = '%s#%s%d+' },
+  { pattern = '工单%s*#?%s*%d+' },
+  { pattern = 'issue%s*#?%s*%d+', lower = true },
+}
 
 -- 列的语义固定：条款行必须恰好七格，顺序与表头一致。
 local COLUMNS = {
@@ -60,6 +76,11 @@ end
 
 local function trim(text)
   return (text:match('^%s*(.-)%s*$'))
+end
+
+-- 违反项的唯一构造点：kind 是对外契约（夹具与文档按它断言、引用），四处手拼容易拼漏字段。
+function M.finding(kind, message, path, line)
+  return { kind = kind, message = message, path = path, line = line }
 end
 
 local function in_vocabulary(list, value)
@@ -148,19 +169,60 @@ function M.spec_sections(body)
   return sections
 end
 
--- 规格全文禁止出现工单编号（井号加数字）：规格不引用单据，矩阵才是唯一待办面。
+-- 工单编号：规格与分片都不许出现（写单号等于把待办留在单据里，矩阵才是唯一待办面）。
+-- 四种写法见 M.ISSUE_PATTERNS；同一处被两种模式同时命中时只报一次。
 function M.issue_refs(body)
   local out = {}
   each_line(body, function(number, line)
-    local from = 1
-    while true do
-      local first, last = line:find('#%d+', from)
-      if not first then break end
-      out[#out + 1] = { line = number, text = line:sub(first, last) }
-      from = last + 1
+    local covered = {}
+    local lower = line:lower()
+    for _, entry in ipairs(M.ISSUE_PATTERNS) do
+      local text = entry.lower and lower or line
+      local from = 1
+      while true do
+        local first, last = text:find(entry.pattern, from)
+        if not first then break end
+        local overlapped = false
+        for _, span in ipairs(covered) do
+          if first <= span[2] and last >= span[1] then
+            overlapped = true
+            break
+          end
+        end
+        if not overlapped then
+          covered[#covered + 1] = { first, last }
+          out[#out + 1] = { line = number, text = trim(line:sub(first, last)) }
+        end
+        from = last + 1
+      end
     end
   end)
   return out
+end
+
+-- 禁用措辞命中：只认独立成句（后接句读或到结尾），见 M.VAGUE_WORDS 的注释。
+function M.vague_hits(cell)
+  local hits = {}
+  if type(cell) ~= 'string' then return hits end
+  for _, word in ipairs(M.VAGUE_WORDS) do
+    local from = 1
+    while true do
+      local first, last = cell:find(word, from, true)
+      if not first then break end
+      local following = cell:sub(last + 1, last + 1)
+      if following == '' or CLAUSE_PUNCT:find(following, 1, true) then
+        hits[#hits + 1] = word
+        break
+      end
+      from = last + 1
+    end
+  end
+  return hits
+end
+
+-- accepted 的人签署：证据列里必须有一段「（签署：@用户名 YYYY-MM-DD）」。
+function M.signed(cell)
+  return type(cell) == 'string' and cell:find(M.SIGNATURE) ~= nil
 end
 
 -- 条款行 = 表格行且首格形如 'N-NN'；表头、分隔行与别处的表都不算条款行。
@@ -207,29 +269,26 @@ function M.shard_files(root)
   return out
 end
 
--- 基线文件是纯 Lua 表，可 dofile；读法与读 .busted 一致（load 空环境执行，不信任输入）。
-function M.read_baseline(root)
-  local body = read_text(root, M.BASELINE)
-  if not body then return nil, '读不到 ' .. M.BASELINE end
-  local chunk, err = load(body, '@' .. M.BASELINE, 't', {})
-  if not chunk then return nil, M.BASELINE .. ' 不是纯 Lua 数据文件: ' .. tostring(err) end
+-- 基线文件与 .busted 都是纯 Lua 表，可 dofile：load 到空环境执行，不信任输入。
+-- 两处原本是同形的两份实现，合并到这里；读不到时的措辞由 missing 参数给（两处不同）。
+local function read_lua_table(root, relative, missing)
+  local body = read_text(root, relative)
+  if not body then return nil, missing end
+  local chunk, err = load(body, '@' .. relative, 't', {})
+  if not chunk then return nil, relative .. ' 不是纯 Lua 数据文件: ' .. tostring(err) end
   local ok, values = pcall(chunk)
   if not ok or type(values) ~= 'table' then
-    return nil, M.BASELINE .. ' 求值失败: ' .. tostring(values)
+    return nil, relative .. ' 求值失败: ' .. tostring(values)
   end
   return values
 end
 
+function M.read_baseline(root)
+  return read_lua_table(root, M.BASELINE, '读不到 ' .. M.BASELINE)
+end
+
 function M.read_busted(root)
-  local body = read_text(root, M.BUSTED)
-  if not body then return nil, '读不到根目录 ' .. M.BUSTED end
-  local chunk, err = load(body, '@' .. M.BUSTED, 't', {})
-  if not chunk then return nil, M.BUSTED .. ' 不是纯 Lua 数据文件: ' .. tostring(err) end
-  local ok, values = pcall(chunk)
-  if not ok or type(values) ~= 'table' then
-    return nil, M.BUSTED .. ' 求值失败: ' .. tostring(values)
-  end
-  return values
+  return read_lua_table(root, M.BUSTED, '读不到根目录 ' .. M.BUSTED)
 end
 
 -- 车道参数与 busted 同口径：任务继承 _all；pattern 缺省 _spec、recursive 缺省 true。
@@ -354,9 +413,9 @@ end
 
 -- 扫描：只读仓库，不判红。判红全部在 M.check，夹具才能拿同一份扫描结果换输入反复判定。
 function M.scan(root)
-  local matrix = { root = root, shards = {}, by_section = {}, problems = {} }
+  local matrix = { root = root, shards = {}, by_section = {}, problems = {}, shard_refs = {} }
   local function problem(kind, message, path, line)
-    matrix.problems[#matrix.problems + 1] = { kind = kind, message = message, path = path, line = line }
+    matrix.problems[#matrix.problems + 1] = M.finding(kind, message, path, line)
   end
 
   local spec_body = read_text(root, M.SPEC)
@@ -376,6 +435,12 @@ function M.scan(root)
       matrix.shards[#matrix.shards + 1] = shard
       matrix.by_section[entry.section] = matrix.by_section[entry.section] or {}
       table.insert(matrix.by_section[entry.section], shard)
+      -- 分片里也不许出现工单编号。legacy-ledger.md 按设计带历史单号，但它不带两位数字前缀，
+      -- 本来就不是分片（见 M.shard_files），不在这里排除。
+      for _, ref in ipairs(M.issue_refs(body)) do
+        ref.path = entry.path
+        matrix.shard_refs[#matrix.shard_refs + 1] = ref
+      end
     end
   end
 
@@ -410,15 +475,8 @@ local function is_c_section(heading)
   return type(heading) == 'string' and heading:find('C 级', 1, true) ~= nil
 end
 
-function M.check(matrix)
-  local findings = {}
-  local function add(kind, message, path, line)
-    findings[#findings + 1] = { kind = kind, message = message, path = path, line = line }
-  end
-
-  for _, item in ipairs(matrix.problems) do add(item.kind, item.message, item.path, item.line) end
-
-  -- 规格小节：数量、编号连续，且全文不得出现工单编号。
+-- 规格：小节数与编号连续，且全篇不得出现工单编号。
+local function check_spec(matrix, add)
   local sections = matrix.spec.sections
   if #sections ~= M.SPEC_SECTIONS then
     add('spec_sections', string.format('%s 应有 %d 个「## N. 」小节，实际 %d 个',
@@ -433,8 +491,10 @@ function M.check(matrix)
   for _, ref in ipairs(matrix.spec.refs) do
     add('spec_issue_ref', '规格不得出现工单编号 ' .. ref.text, M.SPEC, ref.line)
   end
+end
 
-  -- 分片覆盖：恰好一份 / 每个规格小节，节号连续 1..SPEC_SECTIONS。
+-- 分片：先核覆盖（每节恰好一份），再逐份核标题、七格、词表、ID 连续、证据列与措辞。
+local function check_shards(matrix, add)
   for number = 1, M.SPEC_SECTIONS do
     local list = matrix.by_section[number]
     if not list or #list == 0 then
@@ -455,6 +515,11 @@ function M.check(matrix)
       add('shard_unknown', string.format('分片 %s 的节号 %d 超出规格小节数 %d',
         shard.path, number, M.SPEC_SECTIONS), shard.path)
     end
+  end
+
+  -- 分片里也不得出现工单编号：条款的依据只能写在矩阵里，不靠单据号。
+  for _, ref in ipairs(matrix.shard_refs) do
+    add('spec_issue_ref', '分片不得出现工单编号 ' .. ref.text, ref.path, ref.line)
   end
 
   -- 每份分片：标题、条款七格、封闭词表、ID 连续不跳号不重复、证据列按状态。
@@ -490,6 +555,12 @@ function M.check(matrix)
         end
       end
 
+      -- 禁用措辞（TEMPLATE 6.1）：判不了真假的词不该当成断言，命中即判红。
+      for _, word in ipairs(M.vague_hits(clause.text)) do
+        add('vague_wording', string.format('%s 的条款用了不可判的措辞「%s」：改写成可观察的条件与结果',
+          clause.id, word), shard.path, clause.line)
+      end
+
       -- 证据等级与所在小节对齐：C 级条款只住「## C 级」小节，C 级小节只装 C 级条款。
       -- 不要求 C 小节在文件末尾，也不要求每个分片都有 C 小节（第 18 节就没有）。
       if in_vocabulary(M.VOCABULARY.level, clause.level) then
@@ -516,6 +587,12 @@ function M.check(matrix)
               shard.path, clause.line)
           end
         end
+        -- accepted 另要人背书：路径后面必须跟（签署：@用户名 YYYY-MM-DD）。
+        if clause.status == 'accepted' and not M.signed(evidence) then
+          add('accepted_signature', string.format(
+            '%s 标为 accepted，证据列必须带人签署「（签署：@用户名 YYYY-MM-DD）」（现写的是 %q）',
+            clause.id, evidence), shard.path, clause.line)
+        end
       elseif clause.status == 'blocked' then
         local rest = evidence:match('^卡在：%s*(.*)$')
         if not rest or rest == '' then
@@ -540,8 +617,10 @@ function M.check(matrix)
       end
     end
   end
+end
 
-  -- 索引：生成块必须与分片算出来的表一字不差；手改数字即判红。
+-- 索引：生成块必须与分片算出来的表一字不差；手改数字即判红。
+local function check_index(matrix, add)
   if matrix.index.body then
     if not matrix.index.block then
       add('index_markers', string.format('%s 缺少生成块标记（%s / %s）',
@@ -551,8 +630,10 @@ function M.check(matrix)
         M.INDEX)
     end
   end
+end
 
-  -- 双棘轮：已取证只增、遗留测试只减；基线本身读不出来也是红。
+-- 双棘轮：已取证只增、遗留测试只减；基线本身读不出来也是红。
+local function check_ratchet(matrix, add)
   local baseline = matrix.baseline
   if not baseline then
     add('baseline_unreadable', matrix.baseline_error or ('读不到 ' .. M.BASELINE), M.BASELINE)
@@ -571,6 +652,23 @@ function M.check(matrix)
         legacy, #matrix.lanes.legacy), M.BUSTED)
     end
   end
+end
+
+-- 门禁总判：四类规则各在自己的函数里，这里只编排、最后统一排序。
+-- finding 的 kind 字符串是对外契约（夹具按它精确断言、文档按它引用），名字一个都不许改。
+function M.check(matrix)
+  local findings = {}
+  local function add(kind, message, path, line)
+    findings[#findings + 1] = M.finding(kind, message, path, line)
+  end
+
+  for _, item in ipairs(matrix.problems) do
+    findings[#findings + 1] = M.finding(item.kind, item.message, item.path, item.line)
+  end
+  check_spec(matrix, add)
+  check_shards(matrix, add)
+  check_index(matrix, add)
+  check_ratchet(matrix, add)
 
   table.sort(findings, function(a, b)
     local left, right = a.path or '', b.path or ''
@@ -622,7 +720,6 @@ function M.rewrite(body, block)
 end
 
 function M.render_baseline(values)
-  local note = values.note or M.BASELINE_NOTE
   return table.concat({
     '-- 双棘轮的基线（#243）：由 `lua tools/cli.lua acceptance --update-baseline` 写入，只许单向调整。',
     '-- evidenced（已取证条款数 = evidenced + accepted）只增：调低就是悄悄丢掉已验收的能力。',
@@ -632,14 +729,13 @@ function M.render_baseline(values)
     '  evidenced = ' .. tostring(values.evidenced) .. ',',
     '  legacyTests = ' .. tostring(values.legacyTests) .. ',',
     '  updated = "' .. tostring(values.updated) .. '",',
-    '  note = "' .. note .. '",',
     '}',
     '',
   }, '\n')
 end
 
 -- 基线只能朝单向改：evidenced 抬、legacyTests 降。返回文本或 nil, 'refuse'|'unsupported', 原因。
-function M.next_baseline(matrix, today)
+function M.next_baseline(matrix)
   local baseline = matrix.baseline
   if not baseline then return nil, 'unsupported', matrix.baseline_error or ('读不到 ' .. M.BASELINE) end
   local legacy = matrix.lanes.legacy
@@ -656,8 +752,7 @@ function M.next_baseline(matrix, today)
   return M.render_baseline({
     evidenced = evidenced,
     legacyTests = #legacy,
-    updated = today or os.date('!%Y-%m-%d'),
-    note = baseline.note,
+    updated = os.date('!%Y-%m-%d'),
   })
 end
 
