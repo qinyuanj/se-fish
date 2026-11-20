@@ -149,15 +149,26 @@ function Mgr:PlayerByUserId(userId)
     return state and state.player or nil
 end
 
-function Mgr:BeginRescue(target, rescuer)
+-- 只读预检：不改任何状态，供交互入口在落持久操作身份之前先判一次。
+function Mgr:CanRescue(target, rescuer)
     local state = self:GetState(target)
-    if not state or state.phase ~= 'downed' or state.rescue then return false, 'busy' end
+    if not state or state.phase ~= 'downed' then return false, 'not-downed' end
+    if state.rescue then return false, 'busy' end
     local rescuerState = self:GetState(rescuer)
-    if not rescuerState or rescuerState.phase ~= 'alive' then return false, 'rescuer-downed' end
-    local r = GameCfg.Rescue
+    if not rescuerState then return false, 'no-rescuer' end
+    if rescuerState.phase ~= 'alive' then return false, 'rescuer-downed' end
     local from, to = positionOf(rescuer), positionOf(target)
     if not from or not to then return false, 'no-position' end
-    if horizontalDistance(from, to) > r.Range then return false, 'too-far' end
+    if horizontalDistance(from, to) > GameCfg.Rescue.Range then return false, 'too-far' end
+    return true
+end
+
+function Mgr:BeginRescue(target, rescuer)
+    local state = self:GetState(target)
+    local can, reason = self:CanRescue(target, rescuer)
+    if not can then return false, reason end
+    local r = GameCfg.Rescue
+    local from = positionOf(rescuer)
     local now = self:Now()
     state.rescue = { by = rescuer, startedAt = now, endAt = now + r.DurationSec,
         startPos = from, health = healthOf(rescuer) }

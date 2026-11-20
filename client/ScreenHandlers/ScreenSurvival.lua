@@ -50,9 +50,9 @@ local REVIVE_TEXT = {} -- 平台满血复活（action = 'FullRevive'）的失败
 
 -- 倒计时 / 提示刷新（RunService 驱动）；时间为负按 0 处理，等服端广播撤板
 function Panel:Tick()
-    if self.Phase == 'downed' or self.Phase == 'dead' then
+    if self.Phase == 'downed' or self.Phase == 'rescuing' or self.Phase == 'dead' then
         local left = math.max(0, math.ceil((self.EndsAt or 0) - self:Now()))
-        local key = self.Phase == 'downed' and 'DownedTitle' or 'DeadTitle'
+        local key = self.Phase == 'dead' and 'DeadTitle' or 'DownedTitle'
         local base = self.Phase == 'rescuing' and GameCfg.Rescue.RescuingTitle or GameCfg.Survival[key]
         local text = base .. '（' .. left .. ' 秒）'
         -- 平台流程在飞：服务端已冻结倒计时，显示等待文案而不是会误导的走秒

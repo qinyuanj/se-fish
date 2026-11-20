@@ -325,15 +325,43 @@ function Mgr:ResolveDownedTarget(userId)
     return target
 end
 
--- #254 发起他人抢救：只把「请求已受理」写进持久操作身份，实际结算由生存状态机到期后
--- 经 Vitals:Rescue 统一接缝完成。相位守卫与操作身份一起拦住重复、并发与重连重放。
+-- #254 发起他人抢救：请求先经 MgrSave 的持久操作身份（请求号即幂等键）落一次，
+-- 重复与重连重放同一请求号只回放原结果，不再发起第二次抢救；相位守卫另管并发抢占。
+-- 真正的血量结算在生存状态机到期后经 MgrVitals:Rescue 统一接缝完成。
 function Mgr:RescueDowned(player, data, target, point, seq, operation)
-    local ok, reason
-    if self.Survival then ok, reason = self.Survival:BeginRescue(target, player)
-    else ok, reason = false, 'unavailable' end
-    self:Reply(player, { action = 'Rescue', ok = ok, reason = reason, seq = seq,
+    local survival = self.Survival
+    if not survival then
+        self:Reply(player, { action = 'Rescue', ok = false, reason = 'unavailable', seq = seq })
+        return false
+    end
+    local can, reason = survival:CanRescue(target, player)
+    if not can then
+        self:Reply(player, { action = 'Rescue', ok = false, reason = reason, seq = seq,
+            targetUserId = target.UserId })
+        return false
+    end
+    if self.Save and operation then
+        -- 先受理（改相位），再把受理结果落进持久操作记录：重放同一请求号时回放同一份结果，
+        -- 不会第二次发起抢救，也不会因为目标已被救起而给出与首次不同的答复。
+        local started, why = survival:BeginRescue(target, player)
+        local accepted = { ok = started == true, action = 'Rescue', targetUserId = target.UserId, reason = why }
+        return execute(self, player, data, operation, function()
+            return accepted
+        end, function(written, result, op)
+            if not written then
+                if started then survival:CancelRescue(self.Survival:GetState(target), 'settle-failed') end
+                self:Reply(player, { action = 'Rescue', ok = false, reason = tostring(result), seq = seq })
+                return
+            end
+            result.operation = op
+            print('[MgrInteract] 抢救受理', player.UserId, op.id, result.ok and 'ok' or tostring(result.reason))
+            self:Reply(player, result)
+        end)
+    end
+    local started, why = survival:BeginRescue(target, player)
+    self:Reply(player, { action = 'Rescue', ok = started == true, reason = why, seq = seq,
         targetUserId = target.UserId, operation = operation })
-    return ok
+    return started == true
 end
 
 -- 处理一次交互请求；持久模式返回是否接收，最终结果经 InteractResult 回包。

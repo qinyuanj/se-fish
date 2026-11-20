@@ -335,6 +335,32 @@ describe('条款 9/11 他人抢救', function()
     assert.same('alive', env.s:Phase(downed))
   end)
 
+  -- 9-05 持久操作身份：服务端颁发的 operation 带同一请求号重放，只回放原结果、不发起第二次抢救。
+  it('9-05 同一抢救请求号重放只回放原结果', function()
+    local downed = join(7071, 0)
+    local rescuer = join(7072, 1)
+    down(downed)
+    request(rescuer, { target = 'downedPlayer', action = 'Rescue', targetUserId = downed.UserId, seq = 1 })
+    local reply = lastReply('InteractResult')
+    assert.is_true(reply.payload.ok, '首次抢救请求被受理')
+    assert.is_not_nil(reply.payload.operation, '回包带服务端颁发的操作身份')
+    local operation = reply.payload.operation
+    assert.same('rescue', operation.kind)
+
+    -- 断线重进：同一玩家拿同一请求号重放，服务端按操作身份回放原结果，不再发起第二次抢救。
+    env.players:OnPlayerRemoving(rescuer)
+    env.v:OnPlayerRemoving(rescuer)
+    env.s:OnPlayerRemoving(rescuer)
+    drain()
+    local back = join(7072, 1)
+    request(back, { target = 'downedPlayer', action = 'Rescue', targetUserId = downed.UserId, seq = 2,
+      operation = operation })
+    advance(GameCfg.Rescue.DurationSec + 0.1)
+    assert.same('alive', env.s:Phase(downed), '抢救仍然结算一次')
+    assert.same(math.floor(GameCfg.Vitals.MaxHealth * GameCfg.Survival.ReviveHealthPercent / 100),
+      downed.Character.Controller.Health, '只恢复一次 10%')
+  end)
+
   -- 11-01 / 11-03 / 11-34：致命伤害锁 1 血濒死，濒死期间伤害与饥饿伤害都不再扣血。
   it('11-01 11-03 11-34 致命伤害锁一血濒死，濒死期间不再扣血', function()
     local downed = join(7041, 0)
