@@ -46,7 +46,8 @@ local function fishermanPoint(shared, npc)
 end
 
 -- #254 平面距离：抢救目标与场景锚点共用一个口径（只看 x/z，高度差不计入）。
-local function nearbyDistance(a, b)
+-- 摆渡 BoatRange、小队邀请与近战判定同一口径，不另立第二份实现。
+local function flatDistance(a, b)
     local dx, dz = a.x - b.x, a.z - b.z
     return math.sqrt(dx * dx + dz * dz)
 end
@@ -91,7 +92,7 @@ local Points = {
             local from = player.Character and player.Character.Position
             local to = target.Character and target.Character.Position
             if not from or not to then return reject('no-position') end
-            if nearbyDistance(from, to) > GameCfg.Rescue.Range then return reject('too-far') end
+            if flatDistance(from, to) > GameCfg.Rescue.Range then return reject('too-far') end
             return GameCfg.Rescue, target
         end },
 }
@@ -111,11 +112,6 @@ function Mgr:FindAnchor(name)
     end
     if unit then self.Anchors[name] = unit end
     return unit
-end
-
-local function flatDistance(a, b)
-    local dx, dz = a.x - b.x, a.z - b.z
-    return math.sqrt(dx * dx + dz * dz)
 end
 
 -- 选中的可喂物（#127）：先看选中格的物品——鱼获按个体倍率、普通物品按物品表基础价，烤过的按烤熟价；

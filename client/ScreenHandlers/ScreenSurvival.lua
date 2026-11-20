@@ -152,7 +152,8 @@ function Panel:Start()
         ['not-dead'] = '',
         ['not-revivable'] = '',
     }
-    local okRoot, root = pcall(function()
+    -- EUI 根节点与设备分辨率各自从接口取（与 ScreenGrill 同形），不再从根节点的下标里猜分辨率。
+    local okRoot, root, resolution = pcall(function()
         local eui = game:GetService('Players').LocalPlayer.PlayerGui.EuiManager
         return eui and eui:GetRootNode(), eui and eui:GetDeviceResolution()
     end)
@@ -162,9 +163,9 @@ function Panel:Start()
     end
     -- 重建前先清空上一轮节点：Start 重入不叠第二套蒙版。
     self:Clear()
-    local resolution = root[2] or { x = 1920, y = 1080 }
+    resolution = resolution or { x = 1920, y = 1080 }
     local cx, cy = resolution.x / 2, resolution.y / 2
-    local banner = create('EUIImage', root[1], 'SurvivalBanner', cx - 320, cy - 90, 640, 180, {
+    local banner = create('EUIImage', root, 'SurvivalBanner', cx - 320, cy - 90, 640, 180, {
         Color = Color.New(0, 0, 0, 160), Image = ColorBlockImage, Visible = false })
     self.Banner = banner
     self.Title = create('EUITextLabel', banner, 'SurvivalTitle', 0, -80, 640, 80, {
@@ -195,7 +196,7 @@ function Panel:Start()
         Color.New(60, 150, 90, 255), 'ad')
     self.PaidReviveBtn = reviveButton('SurvivalPaidRevive', 330, GameCfg.Survival.PaidReviveText,
         Color.New(210, 160, 40, 255), 'goods')
-    self.WeakLabel = create('EUITextLabel', root[1], 'SurvivalWeak', cx - 320, resolution.y - 200, 640, 60, {
+    self.WeakLabel = create('EUITextLabel', root, 'SurvivalWeak', cx - 320, resolution.y - 200, 640, 60, {
         Text = '', FontSize = 30, TextColor = Color.New(200, 200, 255, 255), Visible = false })
     REUtil:GetRE('SurvivalState').OnClientEvent:Connect(function(state) self:SetPhase(state) end)
     REUtil:GetRE('SurvivalResult').OnClientEvent:Connect(function(result) self:OnResult(result) end)

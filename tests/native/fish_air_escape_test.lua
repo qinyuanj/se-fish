@@ -91,6 +91,8 @@ function FishAirEscape:setUp()
     self.carrier = require('server.Mgr.MgrFishCarrier')
     self.carrier.DamagePublisher = function() end
     self.mgr = require('server.Mgr.MgrFishUnit')
+    -- 目标裁决适配层按生产接线（server/main.lua）由入口注入
+    self.mgr.AiTarget = require('server.Mgr.MgrAiTarget')
     self.mgr:Start()
     self.loot = require('server.Mgr.MgrLoot')
     self.loot.FishUnit = self.mgr

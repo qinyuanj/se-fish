@@ -22,7 +22,9 @@ describe('条款 9 队伍界面', function()
   local ctx
 
   before_each(function()
+    -- 分辨率故意不与兜底值相同：布局真的按 GetDeviceResolution 算，丢掉分辨率这条断言会红。
     ctx = { now = 1000, nodes = {}, events = {}, heartbeats = signal(), sent = {},
+      resolution = { x = 1280, y = 720 },
       saved = { game = rawget(_G, 'game'), Vector2 = rawget(_G, 'Vector2'),
         Color = rawget(_G, 'Color'), LocalMsgNotice = rawget(_G, 'LocalMsgNotice'),
         reutil = package.loaded['common.REUtil'] } }
@@ -44,8 +46,9 @@ describe('条款 9 队伍界面', function()
       end
       if name == 'Players' then
         return { LocalPlayer = { PlayerGui = { EuiManager = {
-          GetRootNode = function() return { env.root or {} } end,
-          GetDeviceResolution = function() return { x = 1920, y = 1080 } end,
+          -- 生产按接口取根节点本体与分辨率（不再从根节点下标里猜），夹具同形
+          GetRootNode = function() return env.root or {} end,
+          GetDeviceResolution = function() return env.resolution or { x = 1920, y = 1080 } end,
         } } } }
       end
       if name == 'RunService' then return { Heartbeat = env.heartbeats } end
@@ -89,6 +92,13 @@ describe('条款 9 队伍界面', function()
     assert.same('30/300', view.rows[2].healthText)
 
     assert.is_true(ctx.nodes['PartyRoot'].Visible)
+    -- 布局按 GetDeviceResolution 的分辨率算：分辨率被丢掉（旧写法从根节点下标里取）时这里会退回 1920 宽
+    local hud = require('common.GameCfg').Party.HUD
+    assert.same(1280 - hud.RowWidth - hud.MarginRight, ctx.nodes['PartyRoot'].Position.x,
+      '队友栏贴右边缘的位置必须按设备分辨率算')
+    assert.same(hud.MarginTop, ctx.nodes['PartyRoot'].Position.y)
+    assert.same((1280 - hud.InviteWidth) / 2, ctx.nodes['PartyInvite'].Position.x,
+      '邀请面板水平居中必须按设备分辨率算')
     assert.same('乙', ctx.nodes['PartyMember1Name'].Text)
     assert.same('120/300', ctx.nodes['PartyMember1Health'].Text)
     -- 血条按当前血量占上限的比例画：120/300 = 40%

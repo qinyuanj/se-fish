@@ -90,6 +90,8 @@ function M.new(zoneIndex)
         OnServerEvent = signal(), OnClientEvent = signal() } end }
     env.carrier = require('server.Mgr.MgrFishCarrier')
     env.mgr = require('server.Mgr.MgrFishUnit')
+    -- 目标裁决适配层按生产接线（server/main.lua）由入口注入，MgrFishUnit 自身不再 require 它。
+    env.mgr.AiTarget = require('server.Mgr.MgrAiTarget')
     env.vitals = require('server.Mgr.MgrVitals')
     env.vitals:Start()
     env.mgr.Vitals = env.vitals

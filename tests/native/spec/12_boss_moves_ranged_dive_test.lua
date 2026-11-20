@@ -198,7 +198,7 @@ describe('第 12 节 远程与俯冲组逐招表', function()
         local fish = drop('fish39Elite', 5)
         local notice = untilLock('charge', 41)
         local row = BossMoves.Get('walrus', 'charge')
-        assert.same(row.Warning.Shape, notice.shape, '直线突击的预警形状与表不符')
+        assert.same(row.Warning.Kind, notice.shape, '直线突击的预警形状与表不符')
         assert.same(row.Schedule.Distance, notice.range, '走廊长度与表不符')
         assert.is_false(hasHit(121), '突击起手帧不得结算')
         local facing = fish.Facing or { x = 0, z = 1 }

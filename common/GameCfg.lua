@@ -152,6 +152,7 @@ GameCfg.Rescue = {
     PromptText = '抢救',
     RescuingTitle = '正在抢救…',
     Range = 2,                   -- 规格原文：2 米内（场景平面距离）
+    BubbleHeight = 1.2,          -- [未查证] 抢救气泡在濒死者脚底上方的高度（与钓鱼佬文字泡同量级）
     DurationSec = 2,             -- [未查证] 抢救耗时占位值
     InterruptMoveMeters = 1,     -- [未查证] 施救者离开濒死者超过此距离打断
     InterruptOnDamage = true,    -- [未查证] 施救者受击是否打断
@@ -181,6 +182,8 @@ GameCfg.Party = {
         InviteTop = 24,
         InviteText = '收到了组队邀请',
         InviteCountdownText = '秒后自动拒绝',
+        AcceptText = '接受',
+        DeclineText = '拒绝',
         DisbandText = '小队已解散',
         LeftText = '你已离开小队',
         RestoredText = '已回到原来的小队',
@@ -693,6 +696,8 @@ GameCfg.Platform.Placeholder = {
     AdsNotice = '占位广告通道：不发放真实付费权益',
     -- 金币页（钓场商店第 4 页，GameSpec §7）：真实汇率与商品 ID 由平台后台交付；
     -- 占位按「每 1 个展示货币单位到账 CoinPerUnit 金币」计价，到账金币 = price × CoinPerUnit。
+    -- 金币页到账提示（ScreenPlatform 的 CoinGrant 回执）：到账金币数 / 展示货币 / 商品名
+    CoinGrantText = '到账 %d%s（%s）',
     CoinPage = {
         Unit = '元',
         CoinPerUnit = 100, -- [未查证] 占位汇率：1 元到账 100 金币

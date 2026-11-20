@@ -57,7 +57,8 @@ end
 function Panel:Send(action, extra)
     local payload = { action = action }
     for key, value in pairs(extra or {}) do payload[key] = value end
-    pcall(function() REUtil:GetRE('PartyAction'):FireServer(payload) end)
+    local ok, err = pcall(function() REUtil:GetRE('PartyAction'):FireServer(payload) end)
+    if not ok then print('[ScreenParty] 行动请求发送失败', tostring(action), tostring(err)) end
 end
 
 local NOTICE = {}   -- 服务端一次性事件 → 界面文案，未映射的安静跳过
@@ -119,29 +120,32 @@ function Panel:RenderInvite()
     if not panel then return end
     local left = self:InviteRemaining()
     local visible = left ~= nil and left > 0
-    pcall(function()
+    local ok, err = pcall(function()
         panel.Root.Visible = visible
         if visible then
             panel.Text.Text = (self.InviteFrom or '队友') .. hud().InviteText
             panel.Countdown.Text = tostring(left) .. hud().InviteCountdownText
         end
     end)
+    if not ok then print('[ScreenParty] 邀请提示渲染失败', tostring(err)) end
 end
 
 function Panel:Render()
     if not self.Root then return end
     local teammates = self.Teammates
-    pcall(function() self.Root.Visible = self.PartyState == 'party' end)
+    local shown, showErr = pcall(function() self.Root.Visible = self.PartyState == 'party' end)
+    if not shown then print('[ScreenParty] 队友栏显隐失败', tostring(showErr)) end
     for index, row in ipairs(self.Rows) do
         local member = teammates[index]
         local visible = member ~= nil and self.PartyState == 'party'
-        pcall(function()
+        local ok, err = pcall(function()
             row.Root.Visible = visible
             if not visible then return end
             row.Name.Text = member.name
             row.Health.Text = healthText(member)
             row.Fill.Size = Vector2.New(healthWidth(member), hud().BarHeight)
         end)
+        if not ok then print('[ScreenParty] 队友行渲染失败', index, tostring(err)) end
     end
     self:RenderInvite()
 end
@@ -190,7 +194,8 @@ function Panel:Start()
         ['unknown-action'] = '',
     }
     UnavailableText = hud().UnavailableText
-    local okRoot, root = pcall(function()
+    -- EUI 根节点与设备分辨率各自从接口取：分辨率不再从根节点的下标里猜（夹具也不再来迁就形状）。
+    local okRoot, root, resolution = pcall(function()
         local eui = game:GetService('Players').LocalPlayer.PlayerGui.EuiManager
         return eui and eui:GetRootNode(), eui and eui:GetDeviceResolution()
     end)
@@ -200,10 +205,10 @@ function Panel:Start()
     end
     -- 重建前先清空上一轮节点：Start 重入不叠第二套队友栏。
     self:Clear()
-    local resolution = root[2] or { x = 1920, y = 1080 }
+    resolution = resolution or { x = 1920, y = 1080 }
     local width, height = hud().RowWidth, hud().RowHeight
     -- 右侧竖排，避开左上角自身血量（布局参数见 GameCfg.Party.HUD）。
-    self.Root = create('EUILayout', root[1], 'PartyRoot',
+    self.Root = create('EUILayout', root, 'PartyRoot',
         resolution.x - width - hud().MarginRight, hud().MarginTop, width, height * hud().MaxRows, { Visible = false })
     for index = 1, hud().MaxRows do
         local top = (index - 1) * height
@@ -219,17 +224,17 @@ function Panel:Start()
                 Text = '', FontSize = 20, TextColor = Color.New(235, 235, 235, 255), LocalZOrder = 1 })
         self.Rows[index] = { Root = row, Name = name, Bar = bar, Fill = fill, Health = health }
     end
-    local invite = create('EUILayout', root[1], 'PartyInvite',
+    local invite = create('EUILayout', root, 'PartyInvite',
         (resolution.x - hud().InviteWidth) / 2, hud().InviteTop, hud().InviteWidth, hud().InviteHeight, { Visible = false })
     local inviteText = create('EUITextLabel', invite, 'PartyInviteText', 0, 0, hud().InviteWidth, 48, {
         Text = hud().InviteText, FontSize = 24, TextColor = Color.New(255, 255, 255, 255), LocalZOrder = 1 })
     local countdown = create('EUITextLabel', invite, 'PartyInviteCountdown', 0, 32, hud().InviteWidth, 24, {
         Text = '', FontSize = 20, TextColor = Color.New(255, 220, 140, 255), LocalZOrder = 1 })
     local accept = create('EUIButton', invite, 'PartyInviteAccept', hud().InviteWidth - 180, 56, 80, 32, {
-        ButtonText = '接受', NormalImage = ColorBlockImage, PressImage = ColorBlockImage,
+        ButtonText = hud().AcceptText, NormalImage = ColorBlockImage, PressImage = ColorBlockImage,
         Color = Color.New(60, 150, 90, 255) })
     local decline = create('EUIButton', invite, 'PartyInviteDecline', hud().InviteWidth - 90, 56, 80, 32, {
-        ButtonText = '拒绝', NormalImage = ColorBlockImage, PressImage = ColorBlockImage,
+        ButtonText = hud().DeclineText, NormalImage = ColorBlockImage, PressImage = ColorBlockImage,
         Color = Color.New(150, 60, 60, 255) })
     for _, button in ipairs({ accept, decline }) do
         button.TouchEnabled = true
@@ -247,7 +252,8 @@ function Panel:Start()
     self.Connections[#self.Connections + 1] =
         game:GetService('RunService').Heartbeat:Connect(function() self:Tick() end)
     -- ready/snapshot 握手：进图、重连与界面重开都主动拉一次当前归属，迟到的客户端也能补齐。
-    pcall(function() REUtil:GetRE('PartyStateRequest'):FireServer() end)
+    local okSync, syncErr = pcall(function() REUtil:GetRE('PartyStateRequest'):FireServer() end)
+    if not okSync then print('[ScreenParty] 队伍状态请求发送失败', tostring(syncErr)) end
 end
 
 return Panel

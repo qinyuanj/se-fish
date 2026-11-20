@@ -15,8 +15,8 @@ local BossPhase = require('common.BossPhase')
 local GarBiteNotice = require('common.GarBiteNotice')
 local BossMoves = require('common.cfg.BossMoves')
 local FishBehaviors = require('server.FishBehaviors')
--- #260 目标选择唯一裁决口（业务侧适配层）；它只读消费官方 AI 包，不写 Controller 位移。
-local AiTarget = require('server.Mgr.MgrAiTarget')
+-- #260 目标选择唯一裁决口（业务侧适配层，server/Mgr/MgrAiTarget.lua）只由 server/main.lua 注入到
+-- MgrFishUnit.AiTarget：本模块不 require 它，避免模块加载期就把官方 AI 包连带拖进来。
 
 -- AbilityAPI 懒加载：MgrFishUnit 被大量单测用假 game 加载，顶层 require 会连带跑技能包
 -- （包内 api.lua 加载时要 RunService:IsServer()），把无关用例拖挂。
@@ -553,7 +553,7 @@ end
 -- 其余候选（6-29 累计有效伤害优先、无记录取最近）交给适配层排序并登记到官方 AI 管理器。
 -- 本函数只返回玩家与坐标，不碰移动：位移仍归 FishBehaviors / FlightPath / BossPhase。
 function Mgr:ChooseTarget(fish, pos, params)
-    local adapter = self.AiTarget or AiTarget
+    local adapter = self.AiTarget
     local override = fish.TargetOverride
     if override then
         local valid, cp = self:IsTargetValid(override, pos, params)
@@ -753,7 +753,7 @@ function Mgr:StartMove(fish, name, pos, target, tpos, now, duration, range, shap
     -- #258 本组招式预警的形状与落点口径只认逐招表；客户端拿到的载荷能分辨落点与危险区。
     local row = BossMoves.Get(BossMoves.KeyOf(GameCfg.Fish[fish.FishId], fish.FishId), name)
     if row and row.Delivery and row.Warning.Kind ~= 'none' then
-        payload.shape = row.Warning.Shape or payload.shape
+        payload.shape = row.Warning.Kind or payload.shape
         payload.notice, payload.delivery, payload.landing = row.Warning.Notice, row.Delivery, row.Landing
         payload.width = row.Warning.Width
         payload.landingPoint = fish.Move.Destination or fish.Move.Center
@@ -1684,7 +1684,7 @@ function Mgr:StartAirAttack(fish, kind, pos, now)
     -- #258 投掷 / 追踪俯冲各自取表里那一行：预警点就是服务端结算的锁定落点。
     local row = BossMoves.Get(fish.FishId, dive and 'dive' or 'throw')
     if row and row.Delivery and row.Warning.Kind ~= 'none' then
-        payload.shape = row.Warning.Shape or payload.shape
+        payload.shape = row.Warning.Kind or payload.shape
         payload.notice, payload.delivery, payload.landing = row.Warning.Notice, row.Delivery, row.Landing
         payload.landingPoint = attack.Center
     end
@@ -1875,7 +1875,7 @@ function Mgr:UpdateBossPhase(fish, now, pos)
         if not row or row.Warning.Kind ~= 'none' then
             local notice = GarBiteNotice.Lock(fish.Id,pos,fx,fz,attackCfg.Range,0,attackCfg.WindupSec)
             notice.move = row and row.Warning.Notice or 'bossStomp'
-            notice.shape, notice.width = row and row.Warning.Shape or 'circle',
+            notice.shape, notice.width = row and row.Warning.Kind or 'circle',
                 (row and row.Warning.Width) or attackCfg.Width
             publishBite(self,notice)
         end
