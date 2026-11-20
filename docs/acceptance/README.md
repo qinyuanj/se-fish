@@ -50,7 +50,7 @@
 | [8](08-npc-exchange-ferry.md) | NPC、兑换与摆渡 | 41 | 34 | 0 | 0 | 7 | 0 | 100% |
 | [9](09-multiplayer-rules.md) | 多人规则 | 25 | 2 | 20 | 0 | 3 | 0 | 20% |
 | [10](10-grilling.md) | 烧烤 | 28 | 15 | 10 | 0 | 3 | 0 | 64% |
-| [11](11-downed-death-revive.md) | 濒死、死亡与复活 | 42 | 33 | 6 | 0 | 3 | 0 | 86% |
+| [11](11-downed-death-revive.md) | 濒死、死亡与复活 | 42 | 23 | 16 | 0 | 3 | 0 | 62% |
 | [12](12-elite-boss-behavior.md) | 精英与首领行为 | 55 | 13 | 35 | 0 | 7 | 0 | 36% |
 | [13](13-compendium-achievements.md) | 图鉴与成就 | 18 | 9 | 7 | 0 | 2 | 0 | 61% |
 | [14](14-lottery.md) | 抽奖机 | 28 | 15 | 8 | 0 | 5 | 0 | 71% |
@@ -59,7 +59,7 @@
 | [17](17-tutorial-story-platform.md) | 新手任务、剧情与平台边界 | 22 | 20 | 2 | 0 | 0 | 0 | 91% |
 | [18](18-save-and-recovery.md) | 存档与恢复契约 | 32 | 9 | 23 | 0 | 0 | 0 | 28% |
 | [19](19-acceptance-criteria.md) | 验收口径 | 19 | 13 | 0 | 0 | 6 | 0 | 100% |
-| 合计 | — | 523 | 334 | 133 | 0 | 56 | 0 | 75% |
+| 合计 | — | 523 | 324 | 143 | 0 | 56 | 0 | 73% |
 
-已取证（evidenced + accepted）133 / 523；缺口密度 75% =（unverified + blocked + out-of-scope）÷ 条款数，其中 out-of-scope 占 0%。
+已取证（evidenced + accepted）143 / 523；缺口密度 73% =（unverified + blocked + out-of-scope）÷ 条款数，其中 out-of-scope 占 0%。
 <!-- END GENERATED: acceptance-counts -->
