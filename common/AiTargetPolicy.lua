@@ -16,7 +16,8 @@ function M.Order(candidates)
     table.sort(ranked, function(a, b)
         if a.damage ~= b.damage then return a.damage > b.damage end
         if a.distance ~= b.distance then return a.distance < b.distance end
-        return tostring(a.userId) < tostring(b.userId)
+        -- 同分同距按 UserId 数值裁决（不是字符串序：'100' < '91' 会颠倒），保证确定性。
+        return (tonumber(a.userId) or math.huge) < (tonumber(b.userId) or math.huge)
     end)
     return ranked
 end

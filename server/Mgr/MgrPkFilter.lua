@@ -35,6 +35,14 @@ local function makePkDamageFilter()
         for _, config in ipairs(GameCfg.Zones or {}) do
             if config.Id == 'fishPond' then
                 local zone = snapshot and snapshot[config.Id] or config.Scene
+                -- 区域几何取不到时保守拒伤（fail-closed）：宁可临时挡下玩家互伤，
+                -- 也不让鱼塘免伤在快照缺失时悄悄失效。鱼/场景目标不受这条兜底影响。
+                if not (zone and zone.Boundary) then
+                    if target.UserId == nil then return true end
+                    print('[MgrPkFilter] 鱼塘区域未解析，玩家间伤害按拒伤处理',
+                        tostring(source.UserId), tostring(target.UserId))
+                    return false
+                end
                 local sourcePos, targetPos = positionOf(source), positionOf(target)
                 if insideFishPond(sourcePos, zone) and insideFishPond(targetPos, zone) then
                     return false

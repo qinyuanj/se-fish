@@ -30,7 +30,8 @@ describe('第 6 节 官方 AI 目标选择接线（哥斯拉贯通）', function
 
     local function vec(x, y, z) return env.vec(x, y, z) end
 
-    local function addRival()
+    -- 候选玩家：UserId 自选（并列裁决要按号码大小分辨真假），血量足够大不让爪击打死。
+    local function spawn(userId)
         local controller = { Health = 100000, MaxHealth = 100000,
             HealthChanged = env.signal(), Died = env.signal() }
         function controller:TakeDamage(d)
@@ -38,12 +39,17 @@ describe('第 6 节 官方 AI 目标选择接线（哥斯拉贯通）', function
             self.HealthChanged:Fire(self.Health)
             if self.Health == 0 then self.Died:Fire() end
         end
-        env.rival = { UserId = 3702, Character = { Controller = controller, Position = vec(0, 0, 0),
+        local player = { UserId = userId, Character = { Controller = controller, Position = vec(0, 0, 0),
             Rotation = _G.Quaternion.FromEulerAngles() }, CharacterAdded = env.signal(),
             CharacterRemoving = env.signal(), SetAttribute = function() end }
-        env.players[2] = env.rival
-        env.vitals:OnPlayerAdded(env.rival)
-        env.mgr:OnPlayerAdded(env.rival)
+        env.players[#env.players + 1] = player
+        env.vitals:OnPlayerAdded(player)
+        env.mgr:OnPlayerAdded(player)
+        return player
+    end
+
+    local function addRival()
+        env.rival = spawn(3702)
     end
 
     local function place(fish, player, distance)
@@ -115,6 +121,24 @@ describe('第 6 节 官方 AI 目标选择接线（哥斯拉贯通）', function
         assert.same(env.rival.Character, officialFocus(fish), '无伤害记录时应选最近玩家')
     end)
 
+    -- 6-29（review #249-10）：伤害与距离都打平时按 UserId 数值裁决，不是字符串序
+    -- （91 与 100：数值 91 更小，字符串序 '100' < '91' 会选反）。
+    it('条款 6-29：同伤害同距离按 UserId 数值裁决', function()
+        local fish = dropBoss()
+        place(fish, env.player, 20)
+        place(fish, env.rival, 22)
+        local low, high = spawn(91), spawn(100)
+        local p = fish.Carrier.Body.Position
+        low.Character.Position = vec(p.x + 2, p.y, p.z)
+        high.Character.Position = vec(p.x - 2, p.y, p.z)
+        env:advance(0.2)
+        assert.same(low.Character, officialFocus(fish), '同伤害同距离时没有按 UserId 数值裁决')
+        local ranked = require('server.Mgr.MgrAiTarget').Policy.Order({
+            { player = high, damage = 0, distance = 4 },
+            { player = low, damage = 0, distance = 4 } })
+        assert.same(91, ranked[1].player.UserId, '名次表首项不是号码更小的玩家')
+    end)
+
     it('条款 6-30：死亡与离线的玩家不参与选择', function()
         local fish = dropBoss()
         place(fish, env.player, 3)
@@ -132,6 +156,25 @@ describe('第 6 节 官方 AI 目标选择接线（哥斯拉贯通）', function
         env.players[2] = nil
         env:advance(0.6)
         assert.is_nil(officialFocus(fish), '离线玩家仍被选中')
+
+        -- 濒死：生命接缝拒伤（与 MgrSurvival:Hooks 同语义），累计伤害最高也不参与选择。
+        -- 断言读业务裁决口 ChooseTarget：官方包只在目标单位失效时清焦点，血量锁 1 的濒死者
+        -- 单位仍然有效，不能拿镜面焦点当「没被选中」的证据。
+        local wounded = spawn(3703)
+        place(fish, wounded, 2)
+        local pos = fish.Carrier.Body.Position
+        assert.same(wounded, (env.mgr:ChooseTarget(fish, pos)), '新玩家应接替成为目标')
+        env.mgr:NoteDamage(fish, wounded, 900)
+        env.vitals:SetLifeHooks({
+            LifeStatus = function(state)
+                if state.player == wounded then return 'downed' end
+                return state.dead and 'dead' or 'alive'
+            end,
+            -- 与 MgrVitals 默认钩子同语义：濒死外仍要挡死亡（覆盖钩子不能把死亡判定漏掉）。
+            CanTakeDamage = function(state) return state.player ~= wounded and not state.dead end,
+        })
+        assert.is_nil((env.mgr:ChooseTarget(fish, pos)), '濒死玩家仍被选中')
+        assert.is_nil(fish.Threat[wounded], '濒死玩家的伤害记录没有清除')
     end)
 
     it('条款 6-31：特殊招式指定目标优先于自动伤害排序，失效后回到自动目标', function()
@@ -204,5 +247,197 @@ describe('接线验收：属性与效果投影一致', function()
         assert.near(0.7, modifier:GetMoveMultiplier(player), 1e-9, '霜冻减速不是 30%')
         assert.is_true(modifier:Apply(nil, player, 'frost'), '重复霜冻应刷新持续')
         assert.near(0.7, modifier:GetMoveMultiplier(player), 1e-9, '霜冻效果叠加了')
+    end)
+end)
+
+-- 6-30 的「离开战斗范围」只在飞行鱼上成立：UpdateFlying 用 Flight.AggroRange 做候选过滤。
+-- 业务入口：SpawnLanded + Drop 放下白头鹰，逐帧 Update 推进；只观察官方 AI 持有的焦点。
+describe('第 6 节 6-30：离开战斗范围的玩家退出飞行鱼目标', function()
+    local env
+    local savedRemote
+
+    local function vec(x, y, z) return env.vec(x, y, z) end
+    local function focus(fish) return require('server.Mgr.MgrAiTarget'):Focus(fish) end
+
+    before_each(function()
+        savedRemote = rawget(_G, 'RemoteEvent')
+        env = Islet.new(6)
+        _G.RemoteEvent = { New = function() return { OnServerEvent = {
+            Connect = function() return { Disconnect = function() end } end } } end }
+        for _, name in ipairs({ 'server.Mgr.MgrAiTarget', 'server.packages.official_ai_feature.api',
+            'server.packages.official_ai_feature.official_ai_feature',
+            'server.packages.official_ai_feature.behavior_runtime',
+            'server.packages.official_ai_feature.ability_bridge' }) do
+            package.loaded[name] = nil
+        end
+        local p = Islet.shoreDryPoint(6)
+        env.player.Character.Position = vec(p.x, p.y, p.z)
+    end)
+
+    after_each(function()
+        env:tearDown()
+        _G.RemoteEvent = savedRemote
+    end)
+
+    -- 断言读业务裁决口与自研轨迹目标：官方包只在目标单位失效时清焦点，站得远但仍然有效的
+    -- 玩家会留在镜面焦点里，不能拿它当「没被选为目标」的证据。
+    it('条款 6-30：离开索敌半径的玩家不再被飞行鱼锁定', function()
+        local fish = env:drop('fish47Elite')
+        fish.Carrier.Receiver.Parent = env.world
+        assert.is_not_nil(fish.Flight, '精英鱼应在空中飞行')
+        local p = fish.Carrier.Body.Position
+        env.player.Character.Position = vec(p.x + 5, p.y, p.z)
+        env:advance(0.3)
+        assert.same(env.player.Character, focus(fish), '索敌半径内的玩家应被锁定')
+        assert.is_not_nil(fish.Flight.Target, '索敌半径内应给轨迹一个追击点')
+
+        -- 走出 Flight.AggroRange：候选过滤在外，业务裁决无目标，轨迹不再追这个玩家。
+        local range = GameCfg.Ability.Flight.AggroRange
+        local at = fish.Carrier.Body.Position
+        env.player.Character.Position = vec(at.x + range + 20, at.y, at.z)
+        env:advance(env.now + 0.2) -- advance 收的是绝对时刻
+        assert.is_nil((env.mgr:ChooseTarget(fish, fish.Carrier.Body.Position, { AggroRange = range })),
+            '离开战斗范围仍被选为目标')
+        assert.is_nil(fish.Flight.Target, '离开战斗范围后轨迹仍在追玩家')
+    end)
+end)
+
+-- review #249-6：起手时长统一按 BossMoves.KeyOf 反查逐招行（与预警广播同一条行），
+-- 不再按字面鱼键硬取；取不到时调用方按 0 退化，不 nil 崩。
+describe('第 6 节：逐招表按 KeyOf 反查', function()
+    local BossMoves = require('common.cfg.BossMoves')
+
+    it('逐招行按 KeyOf 反查，预警与起手时长同源', function()
+        assert.is_true(#BossMoves.Rows > 0)
+        -- 有 Combat 标签的鱼：KeyOf 就是标签；没有标签时退回鱼种 Id。
+        local crab = assert(GameCfg.Fish.fish23Elite)
+        assert.same('kingCrab', BossMoves.KeyOf(crab, crab.Id))
+        assert.same('fishPlain', BossMoves.KeyOf({ Id = 'fishPlain' }, 'fishPlain'))
+        assert.same('fishPlain', BossMoves.KeyOf(nil, 'fishPlain'))
+        -- 走逐招表起手时长的三族鱼：KeyOf 必须取到行，预警广播与起手时长读同一格数值。
+        for _, key in ipairs({ 'kingCrab', 'crabBoss', 'eel' }) do
+            local rows = BossMoves.ForFish(key)
+            assert.is_true(#rows > 0, '逐招行缺族：' .. key)
+            for _, row in ipairs(rows) do
+                assert.same(row, BossMoves.Get(key, row.Move), '逐招行取不到：' .. key .. '.' .. row.Move)
+                local warning = assert(BossMoves.WarningOf(key, row.Move),
+                    '预警取不到：' .. key .. '.' .. row.Move)
+                assert.same(row.Warning.WindupSec, warning.WindupSec, '起手时长与预警不是同一行数值')
+            end
+        end
+        -- 缺行退化：取不到返回 nil，调用方按 0 / 空表兜底，不再按字面鱼键硬取。
+        assert.is_nil(BossMoves.Get('noSuchFish', 'noSuchMove'))
+        assert.same('noSuchFish', BossMoves.KeyOf(nil, 'noSuchFish'))
+    end)
+
+    it('起手时长与预警广播取的是同一行', function()
+        -- 帝王蟹的鱼种 Id 是 fish23Elite，逐招行键是它的 Combat 标签 kingCrab；
+        -- 按字面鱼键硬取会落空，按 KeyOf 才取到广播预警用的同一行。
+        local species = assert(GameCfg.Fish.fish23Elite)
+        local key = BossMoves.KeyOf(species, species.Id)
+        assert.same('kingCrab', key)
+        assert.same(BossMoves.WarningOf(key, 'jab').WindupSec, BossMoves.Get(key, 'jab').Warning.WindupSec)
+        assert.is_nil(BossMoves.Get(species.Id, 'jab'), '按鱼种 Id 硬取应当落空，这正是要修的字面鱼键')
+    end)
+end)
+
+-- 6-26：霜之新星（枪械大奖特效）经武器命中业务入口挂 3 秒霜冻，重复命中只刷新不叠加。
+-- 业务入口：MgrWeapon:Attack；效果由真 MgrModifier + 真 modifier_system 持有，
+-- 预设键取 GameCfg.Ability.ModifierPresets（不用测试替身）。只替引擎边界：射线、角色、RE、时钟。
+describe('接线验收：霜之新星命中经武器入口挂霜冻（6-26）', function()
+    local ctx
+    local function v3(x, y, z) return { x = x, y = y, z = z } end
+
+    before_each(function()
+        -- 起始时钟不为 0：枪械射速按「上次开火时刻」算，0 会被当成刚开过枪（冷却中）。
+        ctx = { now = 100, sent = {}, saved = { game = rawget(_G, 'game'), vector = rawget(_G, 'Vector3'),
+            reutil = rawget(_G, 'REUtil'), re = package.loaded['common.REUtil'] } }
+        local env = ctx
+        _G.Vector3 = { New = function(x, y, z) return v3(x, y, z) end }
+        _G.game = { GetService = function(_, name)
+            if name == 'World' then return { GetServerTime = function() return env.now end } end
+            if name == 'PhysicsService' then return { Raycast = function() return env.rayHit end } end
+            if name == 'Players' then
+                return { GetPlayers = function() return { env.player } end,
+                    GetPlayerFromCharacter = function(_, character)
+                        if character == env.target.Character then return env.target end
+                        return nil
+                    end }
+            end
+            return {}
+        end }
+        package.loaded['common.REUtil'] = nil
+        _G.REUtil = { GetRE = function(_, name)
+            env.sent[name] = env.sent[name] or {}
+            local record = env.sent[name]
+            local function signal()
+                return { Connect = function() return { Disconnect = function() end } end }
+            end
+            return { OnServerEvent = signal(), OnClientEvent = signal(),
+                FireClient = function(_, payload) record[#record + 1] = payload end }
+        end }
+
+        env.player = { UserId = 91, Character = { Position = v3(0, 0, 0),
+            Rotation = { GetForward = function() return v3(0, 0, 1) end } } }
+        env.rt = require('tests.support.modifier_runtime').New(100)
+        env.modifier = env.rt:loadModifier()
+        env.modifier.Presets = nil -- 走 GameCfg.Ability.ModifierPresets 的真实预设键
+        env.refreshed = 0
+        env.modifier.Ability = { RefreshMoveSpeed = function() env.refreshed = env.refreshed + 1; return true end }
+        -- 目标角色用引擎替身单位：modifier_system 的容器按单位建，真实角色也是单位对象。
+        local character = env.rt.unit('character')
+        character.Controller = { Health = 300, MaxHealth = 300 }
+        character.Position = v3(0, 0, 5)
+        env.target = { UserId = 92, Character = character }
+        env.rayHit = { Instance = env.target.Character, Position = v3(0, 0, 5) }
+        env.data = { GetItemBarSnapshot = function()
+                return { held = { kind = 'weapon', id = 'item163' }, weapons = { item163 = 1 } }
+            end, MagazineSize = function(_, base) return base end }
+        env.weapon = assert(loadfile('server/Mgr/MgrWeapon.lua'))()
+        env.weapon.PlayerData = { GetDataInst = function() return env.data end }
+        env.weapon.Attr = { WeaponDamageScale = function() return 1 end }
+        env.weapon.Vitals = { CanAct = function() return true end,
+            NewHit = function(_, source, category)
+                return { source = source, sourcePlayer = source, category = category }
+            end,
+            ApplyHit = function(_, hit, target, amount)
+                if target ~= env.target then return false end
+                env.damage = (env.damage or 0) + amount
+                return true
+            end }
+        env.weapon.Modifier = env.modifier
+    end)
+
+    after_each(function()
+        if not ctx then return end
+        _G.game, _G.Vector3, _G.REUtil = ctx.saved.game, ctx.saved.vector, ctx.saved.reutil
+        package.loaded['common.REUtil'] = ctx.saved.re
+        ctx = nil
+    end)
+
+    it('条款 6-26：命中挂 3 秒霜冻，减速 30%，重复命中只刷新不叠加', function()
+        assert.is_truthy(GameCfg.Ability.ModifierPresets.frost, '霜冻预设键应由共享配置给出')
+        local gcfg = GameCfg.Ability.Guns.item163
+        local hit = ctx.weapon:Attack(ctx.player, v3(0, 0, 1))
+        assert.is_true(hit and hit.ok, '武器命中入口没有结算成功')
+        assert.same(gcfg.Damage, ctx.damage, '枪伤没走统一伤害入口')
+        assert.same(3, ctx.modifier:GetRemaining(ctx.target, 'frost'), '命中后霜冻不是 3 秒')
+        assert.near(0.7, ctx.modifier:GetMoveMultiplier(ctx.target), 1e-9, '霜冻减速不是 30%')
+        assert.is_true(ctx.refreshed > 0, '减速投影没有跟着刷新移速')
+
+        -- 1 秒后再命中：只把剩余时间刷回 3 秒，不叠成两层 / 6 秒。
+        ctx.rt.wait(1)
+        ctx.now = ctx.now + 1.1
+        assert.same(2, ctx.modifier:GetRemaining(ctx.target, 'frost'), '霜冻剩余时间没有随时钟走')
+        assert.is_true(ctx.weapon:Attack(ctx.player, v3(0, 0, 1)).ok, '第二次命中结算失败')
+        assert.same(3, ctx.modifier:GetRemaining(ctx.target, 'frost'), '重复命中应刷新到 3 秒而不是叠加')
+        assert.near(0.7, ctx.modifier:GetMoveMultiplier(ctx.target), 1e-9, '霜冻效果叠加了')
+    end)
+
+    it('条款 6-26：脱靶不挂霜冻（特效只在伤害被接受后挂）', function()
+        ctx.rayHit = nil
+        assert.is_true(ctx.weapon:Attack(ctx.player, v3(0, 0, 1)).ok, '未命中也应正常回执')
+        assert.same(0, ctx.modifier:GetRemaining(ctx.target, 'frost'), '脱靶仍挂了霜冻')
+        assert.is_nil(ctx.damage)
     end)
 end)

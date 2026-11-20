@@ -255,6 +255,16 @@ describe('条款 9 小队权威状态', function()
     assert.same('no-invite', lastReply('PartyResult').payload.reason, '超时后接受不生效')
     assert.is_nil(env.party:PartyIdOf(d), '超时后队伍组成不变')
     assert.is_nil(env.party:PartyIdOf(c))
+
+    -- 同一帧窗口：还没轮到 Update 清扫，到点的邀请在 Accept 里同样被拒（不靠清扫兜底）。
+    local e = join(6415, vec(0, 0, 0), '戊')
+    local f = join(6416, vec(1, 0, 0), '己')
+    request(e, { action = 'Invite', targetUserId = f.UserId })
+    assert.is_truthy(env.party:SnapshotOf(f).invite)
+    env.now = env.now + 10
+    request(f, { action = 'Accept' })
+    assert.same('expired', lastReply('PartyResult').payload.reason, '到点但未清扫的邀请也不放行')
+    assert.is_nil(env.party:PartyIdOf(f), '到点邀请不产生新队伍')
   end)
 
   -- 9-09 + 9-10：离线自动离队、人数重算；少于 2 人解散并给出明确的解散结果。
@@ -383,5 +393,73 @@ describe('条款 9 小队权威状态', function()
     assert.is_nil(env.party:PartyIdOf(again), '原小队已散，不恢复到不存在的小队')
     assert.same('disbanded', lastState(again).notice, '给出明确的解散结果')
     assert.same(0, env.players:GetDataInst(again).Extra.party.id, '归属落回无队伍')
+  end)
+
+  -- 9-22（review #249-9）：原队伍还在但满员，回执是「满员」，不与「原队已散」混成一句话。
+  it('9-22 原队伍满员时给出 full，保留归属等下次恢复', function()
+    local a = join(6471, vec(0, 0, 0), '甲')
+    local b = join(6472, vec(1, 0, 0), '乙')
+    local x = join(6473, vec(0, 0, 1), '丙')
+    request(a, { action = 'Invite', targetUserId = b.UserId })
+    request(b, { action = 'Accept' })
+    request(a, { action = 'Invite', targetUserId = x.UserId })
+    request(x, { action = 'Accept' })
+    local id = env.party:PartyIdOf(a)
+    leave(x)
+    assert.same(id, storeSnapshot(x.UserId).extra.party.id, '离线保留归属')
+    assert.same(2, #env.party:Members(a))
+
+    local d = join(6474, vec(1, 0, 1), '丁')
+    request(a, { action = 'Invite', targetUserId = d.UserId })
+    request(d, { action = 'Accept' })
+    assert.same(3, #env.party:Members(a), '离线期间队伍被新人填满')
+
+    local back = newPlayer(6473, vec(0, 0, 1), '丙')
+    env.players:OnPlayerAdded(back)
+    drain()
+    env.party:OnPlayerAdded(back)
+    drain()
+    assert.is_nil(env.party:PartyIdOf(back), '满员的原队伍回不去')
+    assert.same('full', lastState(back).notice, '回执是满员，不是解散')
+    assert.is_not_nil(id)
+    assert.same(id, env.players:GetDataInst(back).Extra.party.id, '队伍还在，归属保留')
+  end)
+
+  -- 9-22（review #249-5）：队伍号只在一轮开服里唯一，存档带会话纪元；跨开服同号不恢复。
+  it('9-22 跨开服同号时按原队已散结算，不塞进本轮陌生队伍', function()
+    local a = join(6481, vec(0, 0, 0), '甲')
+    local b = join(6482, vec(1, 0, 0), '乙')
+    env.party.Epoch = 'session-1' -- 钉住本轮纪元，存档带着它落盘
+    request(a, { action = 'Invite', targetUserId = b.UserId })
+    request(b, { action = 'Accept' })
+    local savedId = env.party:PartyIdOf(a)
+    assert.same('session-1', env.players:GetDataInst(a).Extra.party.epoch, '存档带上写入时的会话纪元')
+    leave(a)
+    assert.same(savedId, storeSnapshot(a.UserId).extra.party.id, '离线保留号码')
+    assert.same('session-1', storeSnapshot(a.UserId).extra.party.epoch, '离线保留纪元')
+
+    -- 换一轮开服：新管理器的 NextId 从 0 重来，丙丁组出的队伍很可能正是同一个号码。
+    local restarted = assert(loadfile('server/Mgr/MgrParty.lua'))()
+    restarted.PlayerData, restarted.Save, restarted.Vitals = env.players, env.save, env.party.Vitals
+    restarted.Epoch = 'session-2'
+    local function joinOn(manager, userId, position, name)
+      local player = newPlayer(userId, position, name)
+      env.players:OnPlayerAdded(player)
+      drain()
+      manager:OnPlayerAdded(player)
+      drain()
+      return player
+    end
+    local c = joinOn(restarted, 6483, vec(0, 0, 0), '丙')
+    local d = joinOn(restarted, 6484, vec(1, 0, 0), '丁')
+    assert.is_true(restarted:Invite(c, d.UserId))
+    assert.is_true(restarted:Accept(d), '本轮新队伍组起来')
+    assert.same(savedId, restarted:PartyIdOf(c), '新队伍复用了同一个号码')
+
+    local back = joinOn(restarted, 6481, vec(0, 0, 0), '甲')
+    assert.is_nil(restarted:PartyIdOf(back), '旧档的号码不能把玩家恢复进本轮陌生队伍')
+    assert.same('disbanded', lastState(back).notice, '按原队已散结算')
+    assert.same(0, env.players:GetDataInst(back).Extra.party.id, '归属落回无队伍')
+    assert.same(savedId, restarted:PartyIdOf(c), '本轮队伍不受影响')
   end)
 end)

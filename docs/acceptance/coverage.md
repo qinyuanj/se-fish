@@ -196,11 +196,11 @@
 | 6-23 | common/cfg/Items.lua、common/GameCfg.lua | tests/native/cfg_fish_items_test.lua、tests/native/prize_weapon_effect_test.lua、tests/native/prize_weapon_cfg_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 6-24 | server/Mgr/MgrWeapon.lua、common/cfg/Items.lua、server/AbilityBehaviors/melee_hit.lua、server/Mgr/MgrModifier.lua、common/GameCfg.lua | tests/native/prize_weapon_effect_test.lua、tests/native/weapon_system_test.lua、tests/native/status_effect_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 6-25 | server/Mgr/MgrWeapon.lua、common/cfg/Items.lua、server/AbilityBehaviors/melee_hit.lua、server/Mgr/MgrModifier.lua、common/GameCfg.lua | tests/native/prize_weapon_effect_test.lua、tests/native/weapon_system_test.lua、tests/native/status_effect_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 6-26 | server/Mgr/MgrWeapon.lua、common/cfg/Items.lua、server/AbilityBehaviors/melee_hit.lua、server/Mgr/MgrModifier.lua、server/Mgr/MgrAttr.lua | tests/native/prize_weapon_effect_test.lua、tests/native/weapon_system_test.lua、tests/native/status_effect_test.lua、tests/native/spec/06_ai_target_test.lua | 有 | 缺 | 缺 | 缺 | A |
+| 6-26 | server/Mgr/MgrWeapon.lua、common/cfg/Items.lua、server/AbilityBehaviors/melee_hit.lua、server/Mgr/MgrModifier.lua、server/Mgr/MgrAttr.lua | tests/native/prize_weapon_effect_test.lua、tests/native/weapon_system_test.lua、tests/native/status_effect_test.lua、tests/native/spec/06_ai_target_test.lua | 有 | 有 | 缺 | 缺 | A |
 | 6-27 | server/Mgr/MgrWeapon.lua、common/cfg/Items.lua、server/AbilityBehaviors/melee_hit.lua、server/Mgr/MgrModifier.lua、common/GameCfg.lua | tests/native/prize_weapon_effect_test.lua、tests/native/weapon_system_test.lua、tests/native/status_effect_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 6-28 | common/cfg/Items.lua、server/Mgr/MgrWeapon.lua、common/GameCfg.lua | tests/native/prize_weapon_effect_test.lua、tests/native/weapon_system_test.lua、tests/native/prize_weapon_cfg_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 6-29 | server/Mgr/MgrAi.lua、server/Mgr/MgrFishUnit.lua、server/Mgr/MgrAiTarget.lua、common/AiTargetPolicy.lua | tests/native/ai_migration_test.lua、tests/native/spec/06_ai_target_test.lua | 有 | 有 | 缺 | 缺 | A |
-| 6-30 | server/Mgr/MgrAi.lua、server/Mgr/MgrFishUnit.lua、server/Mgr/MgrAiTarget.lua | tests/native/ai_migration_test.lua、tests/native/spec/06_ai_target_test.lua | 缺 | 有 | 缺 | 缺 | A |
+| 6-30 | server/Mgr/MgrAi.lua、server/Mgr/MgrFishUnit.lua、server/Mgr/MgrAiTarget.lua、common/AiTargetPolicy.lua | tests/native/ai_migration_test.lua、tests/native/spec/06_ai_target_test.lua | 有 | 有 | 缺 | 缺 | A |
 | 6-31 | server/Mgr/MgrAi.lua、common/BossPhase.lua、server/Mgr/MgrFishUnit.lua、server/Mgr/MgrAiTarget.lua | tests/native/ai_migration_test.lua、tests/native/spec/06_ai_target_test.lua | 有 | 有 | 缺 | 缺 | A |
 | 6-32 | server/Mgr/MgrVitals.lua、server/Mgr/MgrWeapon.lua | tests/native/combat_base_test.lua、tests/native/damage_float_test.lua | 缺 | 缺 | 缺 | 缺 | B |
 | 6-33 | common/DamageNotice.lua、client/DamageFloat.lua、server/Mgr/MgrVitals.lua | tests/native/combat_base_test.lua、tests/native/damage_float_test.lua | 缺 | 缺 | 缺 | 缺 | B |
@@ -305,7 +305,7 @@
 | 9-19 | server/Mgr/MgrParty.lua、common/GameCfg.lua、client/ScreenHandlers/ScreenParty.lua | tests/native/spec/09_party_authority_test.lua、tests/native/spec/09_party_hud_test.lua | 有 | 有 | 缺 | 缺 | A |
 | 9-20 | client/ScreenHandlers/ScreenParty.lua、client/MgrGameUI.lua、server/Mgr/MgrParty.lua | tests/native/spec/09_party_hud_test.lua | 有 | 有 | 缺 | 缺 | A |
 | 9-21 | client/ScreenHandlers/ScreenParty.lua、server/Mgr/MgrParty.lua | tests/native/spec/09_party_hud_test.lua | 有 | 有 | 缺 | 缺 | A |
-| 9-22 | server/Mgr/MgrParty.lua、server/Data/PlayerData.lua、server/Mgr/MgrSave.lua | tests/native/spec/09_party_authority_test.lua | 缺 | 缺 | 有 | 有 | B |
+| 9-22 | server/Mgr/MgrParty.lua、server/Data/PlayerData.lua、server/Mgr/MgrSave.lua、client/ScreenHandlers/ScreenParty.lua、common/GameCfg.lua | tests/native/spec/09_party_authority_test.lua、tests/native/spec/09_party_hud_test.lua | 有 | 有 | 有 | 有 | B |
 
 第 9 节由小队子单先贯通：9-02、9-06～9-11、9-19～9-22 的代码落点是 `server/Mgr/MgrParty.lua`（服务端唯一权威的归属与名单）
 与 `client/ScreenHandlers/ScreenParty.lua`（队友血量与邀请倒计时），证据是两份 spec 断言。
@@ -573,7 +573,7 @@
 | 18-21 | server/Mgr/MgrSave.lua | tests/native/spec/18_session_settlement_contract_test.lua | 有 | 有 | 缺 | 有 | B |
 | 18-22 | server/Mgr/MgrSave.lua | tests/native/spec/18_session_settlement_contract_test.lua | 有 | 有 | 缺 | 有 | B |
 | 18-23 | server/Mgr/MgrSave.lua、server/Mgr/MgrShop.lua | tests/native/spec/18_session_settlement_contract_test.lua | 有 | 有 | 有 | 有 | B |
-| 18-24 | server/Mgr/MgrSave.lua、server/Mgr/MgrFerry.lua | tests/native/spec/18_session_settlement_contract_test.lua | 有 | 有 | 有 | 有 | B |
+| 18-24 | server/Mgr/MgrSave.lua、server/Mgr/MgrFerry.lua、server/Mgr/MgrPlatform.lua | tests/native/spec/18_session_settlement_contract_test.lua | 有 | 有 | 有 | 有 | B |
 | 18-25 | server/Mgr/MgrFerry.lua、server/Mgr/MgrSave.lua | tests/native/ferry_test.lua | 缺 | 缺 | 缺 | 缺 | B |
 | 18-26 | server/Mgr/MgrPlatform.lua | — | 缺 | 缺 | 缺 | 缺 | B |
 | 18-27 | server/Data/PlayerData.lua、server/Mgr/MgrLoot.lua | tests/native/spec/18_session_settlement_contract_test.lua | 有 | 缺 | 缺 | 有 | B |

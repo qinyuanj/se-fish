@@ -176,6 +176,7 @@ function Panel:Start()
         ['disbanded'] = hud().DisbandText,
         ['left'] = hud().LeftText,
         ['restored'] = hud().RestoredText,
+        ['full'] = hud().RestoreFullText,
         ['joined'] = '',
     }
     REASON = {
@@ -184,6 +185,7 @@ function Panel:Start()
         ['offline'] = hud().OfflineText,
         ['target-in-party'] = hud().TargetInPartyText,
         ['no-invite'] = hud().NoInviteText,
+        ['expired'] = hud().NoInviteText,
         ['invalid-target'] = hud().NoInviteText,
         ['unknown-action'] = '',
     }

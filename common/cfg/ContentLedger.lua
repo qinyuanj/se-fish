@@ -11,7 +11,7 @@ return {
         ['carp'] = { source = '钓鱼表!R3', implemented = true, path = 'server/Mgr/MgrFishUnit.lua' },
         ['catfish'] = { source = '钓鱼表!R6', implemented = true, path = 'server/Mgr/MgrFishUnit.lua' },
         ['crayfish'] = { source = '钓鱼表!R18', implemented = true, path = 'server/Mgr/MgrFishUnit.lua' },
-        ['eel'] = { source = '钓鱼表!R14', implemented = false },
+        ['eel'] = { source = '钓鱼表!R14', implemented = true, path = 'server/Mgr/MgrFishUnit.lua' },
         ['fish15Elite'] = { source = '钓鱼表!R28', implemented = true, path = 'server/Mgr/MgrFishUnit.lua' },
         ['fish16Boss'] = { source = '钓鱼表!R29', implemented = true, path = 'server/Mgr/MgrFishUnit.lua' },
         ['fish23Elite'] = { source = '钓鱼表!R42', implemented = true, path = 'server/Mgr/MgrFishUnit.lua' },

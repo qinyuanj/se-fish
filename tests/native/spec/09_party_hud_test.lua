@@ -156,12 +156,25 @@ describe('条款 9 队伍界面', function()
     assert.same(require('common.GameCfg').Party.HUD.TooFarText, ctx.notices[#ctx.notices])
     ctx.events.PartyResult.OnClientEvent:Fire({ action = 'Invite', ok = false, reason = 'full' })
     assert.same(require('common.GameCfg').Party.HUD.FullText, ctx.notices[#ctx.notices])
+    -- 到期但还没清扫的邀请：拒绝原因是 expired，文案与「邀请已失效」一致。
+    ctx.events.PartyResult.OnClientEvent:Fire({ action = 'Accept', ok = false, reason = 'expired' })
+    assert.same(require('common.GameCfg').Party.HUD.NoInviteText, ctx.notices[#ctx.notices])
     -- 未映射的原因给通用失败文案；成功回执不打扰玩家
     local count = #(ctx.notices or {})
     ctx.events.PartyResult.OnClientEvent:Fire({ action = 'Accept', ok = false, reason = 'weird' })
     assert.same(require('common.GameCfg').Party.HUD.UnavailableText, ctx.notices[#ctx.notices])
     ctx.events.PartyResult.OnClientEvent:Fire({ action = 'Accept', ok = true })
     assert.same(count + 1, #ctx.notices, '成功回执不弹提示')
+  end)
+
+  -- 9-22：原队伍满员的恢复回执与「原队已散」文案不同（review #249-9）。
+  it('9-22 原队伍满员与队伍已散的通知文案不同', function()
+    local hud = require('common.GameCfg').Party.HUD
+    push({ state = 'none', members = {}, notice = 'full' })
+    assert.same(hud.RestoreFullText, ctx.notices[#ctx.notices])
+    push({ state = 'none', members = {}, notice = 'disbanded' })
+    assert.same(hud.DisbandText, ctx.notices[#ctx.notices])
+    assert.is_true(hud.RestoreFullText ~= hud.DisbandText)
   end)
 
   -- 接线：handler 按 AGENTS.md 登记进 ScreenHandlerLoaders，并由客户端入口启动。

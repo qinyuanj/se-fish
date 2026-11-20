@@ -299,14 +299,18 @@ function Mgr:ResolvePlaceholder(player, outcome)
 end
 
 -- 占格商品测试发货（持久操作，#123 协议）；真实信号不进入此路径。
-function Mgr:GrantGoods(player, goodsKey, num)
+-- requestId 可传上一次回执里的 operation：同一操作身份重试只回执、不再发一次（18-24）。
+-- 不传时按本会话的发货序号新开一笔。
+function Mgr:GrantGoods(player, goodsKey, num, requestId)
     local row = cfg().Goods[goodsKey]
     if not row or not row.itemId then return false end
     local data = self.PlayerData and self.PlayerData:GetDataInst(player)
     if not data or not self.Save then return false end
-    self.GrantSeq[player.UserId] = (self.GrantSeq[player.UserId] or 0) + 1
-    local operation, mode = self.Save:ResolveRequest(player, data, 'platform:grant',
-        self.GrantSeq[player.UserId])
+    if requestId == nil then
+        self.GrantSeq[player.UserId] = (self.GrantSeq[player.UserId] or 0) + 1
+        requestId = self.GrantSeq[player.UserId]
+    end
+    local operation, mode = self.Save:ResolveRequest(player, data, 'platform:grant', requestId)
     if not operation then
         if mode == 'pending' then
             local queue = self.PendingGrants[player.UserId]
@@ -322,7 +326,7 @@ function Mgr:GrantGoods(player, goodsKey, num)
         return false
     end
     local total = row.count * math.max(1, num or 1)
-    return self.Save:Execute(player, data, operation, function(draft)
+    local executed = self.Save:Execute(player, data, operation, function(draft)
         local granted = 0
         for _ = 1, total do
             if not draft:AddItem(row.itemId) then break end -- 空格不够发几件是几件，余下落地
@@ -338,8 +342,9 @@ function Mgr:GrantGoods(player, goodsKey, num)
         print('[MgrPlatform] 发货落账', player.UserId, goodsKey,
             'granted=' .. tostring(result.granted), 'overflow=' .. tostring(result.overflow))
         if self.PlayerData.SendItemBar then self.PlayerData:SendItemBar(player) end
+        -- 回执带操作身份：客户端在没收到回执时可用它原样重试，服务端只补回执。
         self:Reply(player, { ok = true, action = 'Grant', goods = goodsKey,
-            granted = result.granted, overflow = result.overflow })
+            granted = result.granted, overflow = result.overflow, operation = operation })
         -- 满格溢出落地（与盲盒同一口径，计入全区预算）；无 Loot 注入时只记日志留对账线索
         if result.overflow > 0 then
             local origin = player.Character and player.Character.Position
@@ -353,6 +358,7 @@ function Mgr:GrantGoods(player, goodsKey, num)
             end
         end
     end)
+    return executed, operation
 end
 
 -- 购买完成信号（真实平台回调；测试里可直接调用）：goodsId → 商品/广告行。
