@@ -174,3 +174,39 @@ describe("字面量 require 的包内模块", function()
     assert.is_true(file_exists(path), path .. " 不存在（AbilityAPI 按字面量 require 它）")
   end)
 end)
+-- 管理器登记：新增 server/Mgr/*.lua 没进 server/main.lua 的 MgrMap，管理器永远收不到
+-- Start / OnPlayerAdded / OnPlayerRemoving / Update（AGENTS.md 的修改边界）。
+-- 无生命周期的工厂表不进 MgrMap，但必须以 require(...).Make 在入口显式装配，不能成为死模块。
+describe("管理器登记", function()
+  it("test_every_manager_is_registered_in_mgr_map", function()
+    local src = assert(fs.slurp("server/main.lua"), "读不到 server/main.lua")
+    local body = assert(src:match("local MgrMap = (%b{})"), "找不到 local MgrMap 表")
+    local registered = {}
+    for key, mod in body:gmatch("([%w_]+)%s*=%s*require%s*%(%s*[\"']server%.Mgr%.([%w_]+)[\"']%s*%)") do
+      registered[key] = mod
+    end
+    local factories = {}
+    for name in src:gmatch("require%s*%(%s*[\"']server%.Mgr%.([%w_]+)[\"']%s*%)%.Make") do
+      factories[name] = true
+    end
+    local expected = {}
+    for _, name in ipairs(fs.list_dir("server/Mgr")) do
+      local base = name:match("^(%w+)%.lua$")
+      if base then expected[base] = true end
+    end
+    local problems = {}
+    for name in pairs(expected) do
+      if not registered[name] and not factories[name] then
+        problems[#problems + 1] = "server/Mgr/" .. name .. ".lua 没进 MgrMap，也未作为 .Make 工厂装配"
+      end
+    end
+    for key, mod in pairs(registered) do
+      if key ~= mod then problems[#problems + 1] = "MgrMap." .. key .. " 装的是 server.Mgr." .. mod end
+    end
+    for key in pairs(registered) do
+      if not expected[key] then problems[#problems + 1] = "MgrMap." .. key .. " 没有对应文件" end
+    end
+    table.sort(problems)
+    assert.same({}, problems)
+  end)
+end)

@@ -22,7 +22,9 @@ M.SPEC_SECTIONS = 19
 
 -- 条款断言车道：这些车道里的文件是「条款取证」，不是「实现自检」，不计入遗留测试。
 -- ROOT 仍从 .busted 读，不另写一套目录规则；新增这类车道时在这里登记一行。
-M.NON_LEGACY_LANES = { 'spec' }
+-- 不计入遗留测试的车道：条款断言（spec）与门禁型（guards）。两者都是只读仓库、挡不变量的用例，
+-- 不是待清理的债务；新增门禁型把文件放进 tests/native/guards/ 即可，不必改基线，也不必维护白名单。
+M.NON_LEGACY_LANES = { 'spec', 'guards' }
 
 -- 四列取值是封闭词表（docs/acceptance/TEMPLATE.md 第三节）。
 M.VOCABULARY = {
@@ -405,7 +407,7 @@ function M.lane_files(root, config, name)
   return files
 end
 
--- 遗留测试：fast ∪ full 车道会发现的文件，剔除条款断言车道（M.NON_LEGACY_LANES）的 ROOT。
+-- 遗留测试：fast ∪ full 车道会发现的文件，剔除 M.NON_LEGACY_LANES 里各车道的 ROOT。
 -- ROOT、pattern、recursive 全部来自 .busted，所以车道定义改一处这里就跟着变，不会各写一套。
 function M.legacy_tests(root, config)
   local order, seen = {}, {}

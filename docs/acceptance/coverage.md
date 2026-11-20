@@ -664,7 +664,7 @@ docs/to-questionnaire-策划案内部矛盾.md。金豆入口（11-20）、迟�
 | 19-11 | server/Mgr/MgrSave.lua、server/Mgr/MgrPlatform.lua | tests/native/spec/01_platform_adapter_failure_test.lua、tests/native/save_foundation_test.lua | 缺 | 有 | 缺 | 缺 | A |
 | 19-12 | server/main.lua、server/Mgr/MgrParty.lua、server/Mgr/MgrPkFilter.lua、server/Mgr/MgrInteract.lua | tests/native/spec/19_multiplayer_local_link_test.lua、tests/native/spec/01_capacity_local_link_test.lua、tests/probes/local_link_runtime.lua | 有 | 有 | 有 | 有 | B |
 | 19-13 | server/Mgr/MgrPlatform.lua、common/GameCfg.lua | tests/native/spec/17_platform_boundary_placeholder_test.lua、tests/native/spec/11_ad_revive_placeholder_test.lua | 有 | 有 | 缺 | 缺 | A |
-| 19-14 | tools/acceptance.lua、tools/cli.lua、server/Mgr/MgrPlatform.lua、common/GameCfg.lua | tests/native/acceptance_matrix_test.lua、tests/native/cli_entry_test.lua | 缺 | 缺 | 缺 | 缺 | B |
+| 19-14 | tools/acceptance.lua、tools/cli.lua、server/Mgr/MgrPlatform.lua、common/GameCfg.lua | tests/native/guards/acceptance_matrix_test.lua、tests/native/cli_entry_test.lua | 缺 | 缺 | 缺 | 缺 | B |
 
 第 19 节由 #264 整节登记：19-01～19-06 是数量与结构的静态口径，落点在共享配置，四类证据列都还空着；
 19-08 的可重跑探针已就位（`tests/probes/forest_island.lua`、`tests/probes/lottery_runtime.lua`、`tests/probes/local_link_runtime.lua`），
