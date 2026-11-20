@@ -13,6 +13,11 @@ M.EVIDENCE = 'tests/native/spec/demo_test.lua'
 -- 会被 fast ∪ full 发现、且不属于 spec 车道的遗留测试（两条）。
 M.LEGACY = { 'tests/native/alpha_test.lua', 'tests/native/slow/beta_test.lua' }
 
+-- 实现覆盖表（ADR-0029 第五节）：夹具登记第 1 节的两条非试玩条款（1-01 A、1-02 B），
+-- 1-03 是试玩条款，按设计不登记。落点与关联测试都真实存在，起点即绿。
+M.COVERAGE_LANDING = 'server/Mgr/MgrPlatform.lua'
+M.COVERAGE_TEST = M.LEGACY[1]
+
 function M.shard(section)
   return string.format('%s/%02d-fixture.md', Acceptance.DIR, section)
 end
@@ -75,6 +80,20 @@ local function busted_body()
   }, '\n')
 end
 
+local function coverage_body()
+  return table.concat({
+    '# 夹具实现覆盖表',
+    '',
+    '> 夹具：八列与 docs/acceptance/coverage.md 一致。',
+    '',
+    '| 条款 | 代码落点 | 关联测试 | 正常流程 | 失败流程 | 退出重进 | 存档恢复 | 等级 |',
+    '| --- | --- | --- | --- | --- | --- | --- | --- |',
+    string.format('| 1-01 | %s | %s | 缺 | 缺 | 缺 | 缺 | A |', M.COVERAGE_LANDING, M.COVERAGE_TEST),
+    string.format('| 1-02 | %s | — | 缺 | 缺 | 缺 | 缺 | B |', M.COVERAGE_LANDING),
+    '',
+  }, '\n')
+end
+
 local function readme_body()
   return table.concat({
     '# 夹具验收矩阵索引',
@@ -104,6 +123,8 @@ function M.build(root)
     fs.write_file(root .. '/' .. path, '-- 夹具遗留测试：不跑，只用来数发现结果。\n')
   end
   fs.write_file(root .. '/' .. M.EVIDENCE, '-- 夹具证据文件：存在即可。\n')
+  fs.write_file(root .. '/' .. Acceptance.COVERAGE, coverage_body())
+  fs.write_file(root .. '/' .. M.COVERAGE_LANDING, '-- 夹具代码落点：存在即算有落点。\n')
   fs.write_file(root .. '/tests/native/helper.lua', '-- 夹具助手：不是测试文件。\n')
   fs.write_file(root .. '/tests/native/notes.md', '不是测试文件。\n')
   -- 生成块与基线由扫描结果算出来，夹具起步即幂等、即全绿。
