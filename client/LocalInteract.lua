@@ -11,7 +11,7 @@ local Util = require('common.Util')
 local Dialogue = require('common.NpcDialogue')
 
 local Bubble = require('client.InteractionBubble')
-local LocalInteract = { Seq = 0, Bubbles = {}, Models = {} }
+local LocalInteract = { Seq = 0, Bubbles = {}, Models = {}, RescueBubbles = {} }
 
 -- 缩放脉冲参数：PulseFrames 帧内按 sin 曲线放大到 1+PulseAmp 再还原（帧率相关，表现层可接受）
 local PulseFrames = 20
@@ -32,6 +32,75 @@ function LocalInteract:Feed(index)
     self.Seq = self.Seq + 1
     self.FeedIndex = index
     REUtil:GetRE('InteractAction'):FireServer({ target = 'fisherman', action = 'Feed', seq = self.Seq })
+end
+
+-- #254 他人抢救：与喂食共用 InteractAction 通道和同一条递增 seq；目标 UserId 只作服务端复验线索。
+function LocalInteract:Rescue(userId)
+    self.Seq = self.Seq + 1
+    REUtil:GetRE('InteractAction'):FireServer({ target = GameCfg.Rescue.Target, action = GameCfg.Rescue.Action,
+        targetUserId = userId, seq = self.Seq })
+end
+
+-- 濒死玩家的服务端相位写在角色属性上；气泡按相位显隐，不另建通信通道。
+function LocalInteract:EnsureRescueBubble(player)
+    local userId = player.UserId
+    if self.RescueBubbles[userId] then return self.RescueBubbles[userId] end
+    local eui = Players.LocalPlayer and Players.LocalPlayer.PlayerGui and Players.LocalPlayer.PlayerGui.EuiManager
+    local pos = player.Character and player.Character.Position
+    if not eui or not pos then return nil end
+    local ok, node = pcall(eui.CreateSceneNodeAtPosition, eui,
+        Vector3.New(pos.x, pos.y + GameCfg.Interact.Fisherman.BubbleHeight, pos.z))
+    if not ok or not node then
+        print('[LocalInteract] 抢救气泡创建失败', tostring(node))
+        return nil
+    end
+    local button = self:Button(node, 'BtnRescue' .. userId, GameCfg.Rescue.PromptText, 0,
+        function() self:Rescue(userId) end)
+    if not button then return nil end
+    node.Visible = false
+    self.RescueBubbles[userId] = { Node = node, Position = pos }
+    return self.RescueBubbles[userId]
+end
+
+function LocalInteract:UpdateRescuePrompts()
+    local me = Players.LocalPlayer
+    local pos = me and me.Character and me.Character.Position
+    local players = Players.GetPlayers and Players:GetPlayers() or {}
+    local present = {}
+    for _, player in ipairs(players) do
+        present[player.UserId] = true
+        local entry = self.RescueBubbles[player.UserId]
+        local phase = player.GetAttribute and player:GetAttribute('SurvivalPhase') or nil
+        local visible = false
+        if player ~= me and (phase == 'downed' or phase == 'rescuing') and pos then
+            local target = player.Character and player.Character.Position
+            if target then
+                local dx, dz = pos.x - target.x, pos.z - target.z
+                visible = phase == 'downed' and dx * dx + dz * dz <= GameCfg.Rescue.Range * GameCfg.Rescue.Range
+            end
+        end
+        if visible then
+            entry = self:EnsureRescueBubble(player)
+            if entry then
+                -- 濒死玩家可能被推动或缓慢滑落，气泡每帧跟到脚下
+                local target = player.Character.Position
+                entry.Position = target
+                pcall(function() entry.Node.Position = Vector3.New(target.x,
+                    target.y + GameCfg.Interact.Fisherman.BubbleHeight, target.z) end)
+            end
+        end
+        if entry then
+            local ok, err = pcall(function() entry.Node.Visible = visible end)
+            if not ok then print('[LocalInteract] 抢救气泡显隐失败', tostring(err)) end
+        end
+    end
+    -- 离场玩家（下线、换区）的气泡立即收起，等下次同 UserId 重连再重建
+    for userId, entry in pairs(self.RescueBubbles) do
+        if not present[userId] then
+            pcall(function() entry.Node.Visible = false end)
+            self.RescueBubbles[userId] = nil
+        end
+    end
 end
 
 function LocalInteract:Create(anchor, suffix, zoneId, index)
@@ -103,6 +172,7 @@ end
 
 function LocalInteract:Update()
     self:UpdatePulse()
+    self:UpdateRescuePrompts()
     local character = Players.LocalPlayer and Players.LocalPlayer.Character
     local pos = character and character.Position
     local radius = BodyScale.InteractionRadius(character, GameCfg.Interact.Fisherman.Radius)
