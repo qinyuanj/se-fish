@@ -20,8 +20,8 @@ jobs:
         uses: step-security/msvc-dev-cmd@v1
       - name: 安装 Lua 5.4.6 与 LuaRocks 3.12.2
         run: |
-          python -m pip install hererocks==0.25.1
-          python -m hererocks .hererocks --lua "@v5.4.6" --luarocks 3.12.2
+          python -m pip install "hererocks @ https://github.com/luarocks/hererocks/archive/ec31d070ae0076415c0175a2006b29496494d37a.zip"
+          python -m hererocks .hererocks --lua 5.4.6 --luarocks 3.12.2 --target vs
           "$(Resolve-Path .hererocks/bin)" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
       - name: 安装 Busted 2.3.0
         run: luarocks install busted 2.3.0-1

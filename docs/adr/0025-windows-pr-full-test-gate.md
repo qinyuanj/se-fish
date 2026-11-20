@@ -7,7 +7,7 @@ PR #237 的修复有能红的守卫和完整宿主证据，但 GitHub 没有任�
 决定：
 
 - 新增 `.github/workflows/test.yml`，在 PR 与 `main` 推送上运行同一个 `test / full` 检查，并将它设为 `main` 的 required status check。
-- runner 固定 `windows-latest`，遵守 [ADR-0017](0017-windows-native-only.md) 的 Windows 原生唯一测试环境；用 hererocks 0.25.1 从官方 git 标签 `@v5.4.6` 安装 Lua 5.4.6（该版本的发行版安装只支持到 5.4.4），再安装 LuaRocks 3.12.2、Busted 2.3.0-1，与当前仓库检出所用版本一致。`gh-actions-luarocks` 会在 Windows 直接执行 Unix `configure`，不采用。
+- runner 固定 `windows-latest`，遵守 [ADR-0017](0017-windows-native-only.md) 的 Windows 原生唯一测试环境；用固定提交 `ec31d070` 的 hererocks 在 `--target vs` 下安装 Lua 5.4.6、LuaRocks 3.12.2，再安装 Busted 2.3.0-1，与当前仓库检出所用版本一致。固定提交同时锁定安装器源码；`gh-actions-luarocks` 会在 Windows 直接执行 Unix `configure`，不采用。
 - 测试入口仍是 `lua tools/cli.lua test full`，不新增第二套测试命令或 Linux 专用兼容层。
 - CI 只替代「提交后是否记得跑 full」这一机械步骤。部署、strict validate、宿主试玩、真实设备验收仍按开发工作流逐项执行，不因 full 变绿而省略。
 
