@@ -14,7 +14,7 @@
 | 7-08 | 高等级商店兼容售卖所有最低商店等级不高于当前等级的商品 | 规则 | agent | A | unverified | — |
 | 7-09 | 钓场商店分为钓具、武器、升级、金币四个分页 | 规则 | agent | A | unverified | — |
 | 7-10 | 商品表去掉已作废的编号 27（背包升级 7）后共 50 条，每条落实编号、最低商店等级、分页、价格金币与每人上限 | 规则 | agent | A | unverified | — |
-| 7-11 | 每人上限为 1 的商品每档只能购买一次；上限为 0 表示不限购 | 规则 | agent | A | unverified | — |
+| 7-11 | 每人上限为 1 的商品每档只能购买一次；上限为 0 表示不限购 | 规则 | agent | A | evidenced | tests/native/spec/07_shop_purchase_limit_test.lua |
 | 7-12 | 首领饵不列入商店售卖，只能通过信物兑换获得 | 规则 | agent | A | unverified | — |
 | 7-13 | 当地新解锁的商品在商店中置顶显示 | 规则 | agent | A | unverified | — |
 | 7-14 | 同一组商品在多次打开商店后保持稳定排序，不随机重排 | 规则 | agent | A | unverified | — |
