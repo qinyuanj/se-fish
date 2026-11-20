@@ -94,7 +94,8 @@ local function coverage_body(bodies)
   -- 新增已贯通小节也不必再改夹具，节号取 Acceptance.COVERAGE_SECTIONS。
   local seen = {}
   for _, section in ipairs(Acceptance.COVERAGE_SECTIONS) do
-    local body = bodies and bodies[section] or shard_body(section)
+    -- 传了 bodies 就以它为准：缺的那份（例如这一节的分片被删掉）按空处理，不拿模板补回来。
+    local body = bodies and (bodies[section] or '') or shard_body(section)
     for line in body:gmatch('[^\n]+') do
       local cells = {}
       for cell in line:gmatch('[^|]+') do cells[#cells + 1] = cell:match('^%s*(.-)%s*$') end
@@ -157,6 +158,15 @@ function M.sync_index(root)
   assert(body, err)
   fs.write_file(root .. '/' .. Acceptance.INDEX, body)
   return body
+end
+
+--- 按现存分片重派生覆盖表：删掉某节分片后同步一次，免得「条款不在矩阵里」盖住「缺分片」那一类。
+function M.sync_coverage(root)
+  local bodies = {}
+  for _, section in ipairs(Acceptance.COVERAGE_SECTIONS) do
+    bodies[section] = fs.slurp(root .. '/' .. M.shard(section))
+  end
+  fs.write_file(root .. '/' .. Acceptance.COVERAGE, coverage_body(bodies))
 end
 
 function M.sync_baseline(root, override)

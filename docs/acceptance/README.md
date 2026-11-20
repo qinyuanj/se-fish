@@ -40,7 +40,7 @@
 
 | 节 | 标题 | 条款数 | unverified | evidenced | accepted | blocked | out-of-scope | 缺口密度 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| [1](01-overview-and-scope.md) | 概述与范围 | 19 | 13 | 1 | 0 | 5 | 0 | 95% |
+| [1](01-overview-and-scope.md) | 概述与范围 | 19 | 11 | 3 | 0 | 5 | 0 | 84% |
 | [2](02-player-attributes.md) | 玩家属性 | 18 | 17 | 0 | 0 | 1 | 0 | 100% |
 | [3](03-inventory-and-controls.md) | 持有与操作 | 25 | 22 | 0 | 0 | 3 | 0 | 100% |
 | [4](04-fishing-system.md) | 钓鱼系统 | 31 | 25 | 3 | 0 | 3 | 0 | 90% |
@@ -58,8 +58,8 @@
 | [16](16-item-base-data.md) | 物品基础数据 | 17 | 14 | 3 | 0 | 0 | 0 | 82% |
 | [17](17-tutorial-story-platform.md) | 新手任务、剧情与平台边界 | 22 | 20 | 2 | 0 | 0 | 0 | 91% |
 | [18](18-save-and-recovery.md) | 存档与恢复契约 | 32 | 9 | 23 | 0 | 0 | 0 | 28% |
-| [19](19-acceptance-criteria.md) | 验收口径 | 19 | 13 | 0 | 0 | 6 | 0 | 100% |
-| 合计 | — | 523 | 324 | 143 | 0 | 56 | 0 | 73% |
+| [19](19-acceptance-criteria.md) | 验收口径 | 19 | 12 | 1 | 0 | 6 | 0 | 95% |
+| 合计 | — | 523 | 321 | 146 | 0 | 56 | 0 | 72% |
 
-已取证（evidenced + accepted）143 / 523；缺口密度 73% =（unverified + blocked + out-of-scope）÷ 条款数，其中 out-of-scope 占 0%。
+已取证（evidenced + accepted）146 / 523；缺口密度 72% =（unverified + blocked + out-of-scope）÷ 条款数，其中 out-of-scope 占 0%。
 <!-- END GENERATED: acceptance-counts -->

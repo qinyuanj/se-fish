@@ -29,7 +29,7 @@
 | 1-01 | AGENTS.md、docs/GameSpec.md | — | 缺 | 缺 | 缺 | 缺 | A |
 | 1-02 | server/main.lua、server/Mgr/MgrPlayer.lua | tests/native/player_leave_rejoin_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 1-03 | server/main.lua、server/Mgr/MgrPlayer.lua、server/Mgr/MgrSave.lua | tests/native/player_leave_rejoin_test.lua、tests/native/fixture_lifecycle_test.lua | 缺 | 缺 | 缺 | 缺 | B |
-| 1-04 | server/main.lua、server/Mgr/MgrPlayer.lua | tests/native/fixture_lifecycle_test.lua | 缺 | 缺 | 缺 | 缺 | B |
+| 1-04 | server/main.lua、server/Mgr/MgrPlayer.lua | tests/native/spec/01_capacity_local_link_test.lua、tests/probes/local_link_runtime.lua、tests/native/fixture_lifecycle_test.lua | 有 | 有 | 有 | 有 | B |
 | 1-05 | common/GameCfg.lua、common/cfg/Shop.lua、common/cfg/Fish.lua | tests/native/shop_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 1-06 | server/Mgr/MgrShop.lua、server/Mgr/MgrFishUnit.lua、common/cfg/Shop.lua | tests/native/shop_test.lua、tests/native/fish_loot_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 1-07 | server/Data/PlayerData.lua、server/Mgr/MgrPlayerData.lua | tests/native/save_test.lua | 缺 | 缺 | 缺 | 缺 | A |
@@ -39,8 +39,8 @@
 | 1-11 | server/Mgr/MgrPlatform.lua、client/ScreenHandlers/ScreenPlatform.lua | tests/native/platform_seam_test.lua、tests/native/platform_screens_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 1-12 | server/Mgr/MgrPlatform.lua、server/Mgr/MgrSave.lua | tests/native/spec/01_platform_adapter_failure_test.lua | 缺 | 有 | 缺 | 缺 | A |
 | 1-13 | server/Mgr/MgrPlatform.lua | tests/native/platform_seam_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 1-14 | common/cfg/PlaceholderAssets.lua | tests/native/placeholder_assets_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 1-15 | common/cfg/PlaceholderAssets.lua、server/FishBehaviors.lua | tests/native/placeholder_assets_test.lua、tests/native/fish_lift_test.lua | 缺 | 缺 | 缺 | 缺 | C |
+| 1-14 | common/cfg/PlaceholderAssets.lua、common/GameCfg.lua | tests/native/spec/01_placeholder_asset_visual_test.lua、tests/native/placeholder_assets_test.lua | 有 | 缺 | 缺 | 缺 | A |
+| 1-15 | common/cfg/PlaceholderAssets.lua、server/FishBehaviors.lua | tests/native/spec/01_placeholder_asset_visual_test.lua、tests/native/placeholder_assets_test.lua、tests/native/fish_lift_test.lua | 有 | 缺 | 缺 | 缺 | C |
 | 1-16 | common/cfg/Shop.lua、common/GameCfg.lua | tests/native/shop_test.lua、tests/native/quest_test.lua | 缺 | 缺 | 缺 | 缺 | C |
 | 1-17 | server/FishBehaviors.lua、server/Mgr/MgrFishUnit.lua | tests/native/fish_carrier_test.lua、tests/native/fish_air_escape_test.lua | 缺 | 缺 | 缺 | 缺 | C |
 | 1-18 | common/ZoneMarkers.lua、server/Mgr/MgrInteract.lua | tests/native/zone_layout_plan_test.lua | 缺 | 缺 | 缺 | 缺 | C |
@@ -640,7 +640,34 @@
 docs/to-questionnaire-策划案内部矛盾.md。金豆入口（11-20）、迟到回调补发（11-33）与占位对称结算（11-39）不归本单，
 仍是 unverified，四类证据列只勾该断言真正跑过的场景。
 
+### 第 19 节 验收口径（19 条，其中 19-14～19-19 是 C 级试玩条款）
+
+| 条款 | 代码落点 | 关联测试 | 正常流程 | 失败流程 | 退出重进 | 存档恢复 | 等级 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 19-01 | common/cfg/Fish.lua | tests/native/cfg_fish_items_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 19-02 | common/cfg/Items.lua | tests/native/cfg_fish_items_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 19-03 | common/cfg/Shop.lua | tests/native/cfg_shop_lottery_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 19-04 | common/cfg/Lottery.lua | tests/native/cfg_shop_lottery_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 19-05 | common/cfg/Blindbox.lua | tests/native/blindbox_draw_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 19-06 | common/GameCfg.lua、common/ZoneMarkers.lua | tests/native/ferry_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 19-07 | server/Mgr/MgrSurvival.lua、server/Mgr/MgrPlatform.lua | tests/native/revive_callback_test.lua、tests/native/spec/09_rescue_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 19-08 | server/Mgr/MgrLottery.lua、tests/probes/lottery_runtime.lua、tests/probes/local_link_runtime.lua | tests/native/lottery_draw_test.lua | 有 | 缺 | 缺 | 缺 | B |
+| 19-09 | docs/acceptance/README.md、docs/acceptance/evidence-levels.md、tools/acceptance.lua | — | 缺 | 缺 | 缺 | 缺 | A |
+| 19-10 | server/Mgr/MgrSave.lua、server/Data/PlayerData.lua、docs/acceptance/coverage.md | tests/native/save_test.lua、tests/native/spec/18_session_settlement_contract_test.lua | 缺 | 缺 | 缺 | 有 | A |
+| 19-11 | server/Mgr/MgrSave.lua、server/Mgr/MgrPlatform.lua | tests/native/spec/01_platform_adapter_failure_test.lua、tests/native/save_foundation_test.lua | 缺 | 有 | 缺 | 缺 | A |
+| 19-12 | server/main.lua、server/Mgr/MgrParty.lua、server/Mgr/MgrPkFilter.lua、server/Mgr/MgrInteract.lua | tests/native/spec/19_multiplayer_local_link_test.lua、tests/native/spec/01_capacity_local_link_test.lua、tests/probes/local_link_runtime.lua | 有 | 有 | 有 | 有 | B |
+| 19-13 | tools/acceptance.lua、tools/cli.lua | tests/native/acceptance_matrix_test.lua、tests/native/cli_entry_test.lua | 有 | 缺 | 缺 | 缺 | B |
+
+第 19 节由 #264 整节登记：19-01～19-06 是数量与结构的静态口径，落点在共享配置，四类证据列都还空着；
+19-08 的可重跑探针已就位（`tests/probes/forest_island.lua`、`tests/probes/lottery_runtime.lua`、`tests/probes/local_link_runtime.lua`），
+所以「正常流程」勾 `有`，其余三栏留 `缺`。19-12 的证据是 `tests/native/spec/19_multiplayer_local_link_test.lua`：
+八条以上虚拟连接同时在线时小队免伤、野外 PK、鱼塘安全区、共享地面实例只结算一次、施救者断线中止抢救与重连不补结算各自成立；
+夹具结论只证代码路径，真实多人结论仍是生产开关，不用它替代。19-13 的四类证据只勾「正常流程」——
+门禁全绿只证明代码路径完整，不作为发布依据。19-14～19-19 是 C 级试玩条款，不进覆盖表。
+
 ## 三、待登记小节
 
-第 19 节尚未登记。按依赖顺序逐节扩大，每节登记时同时补齐该节的代码落点与既有测试，
-并把该节加进 `tools/acceptance.lua` 的 `M.COVERAGE_SECTIONS`；第 11 节已登记完毕（#254 抢救组整节 + #262 广告复活组）。
+已无待登记小节：第 1～19 节全部登记，`tools/acceptance.lua` 的 `M.COVERAGE_SECTIONS` 跟着补到 19；
+第 11 节由 #254（抢救）与 #262（广告复活）两组登记完毕。下一节扩大时仍按同一节奏：
+先把该节非试玩条款的代码落点与既有测试补齐，再加进 `M.COVERAGE_SECTIONS`。
+
