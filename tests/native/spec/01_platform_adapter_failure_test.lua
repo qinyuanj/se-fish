@@ -74,7 +74,8 @@ describe('条款 1-12：适配层失败路径', function()
     before_each(function()
         assert_wiring()
         restore = { Debug = GameCfg.Debug, game = rawget(_G, 'game'), REUtil = rawget(_G, 'REUtil'),
-            MgrPlayerData = rawget(_G, 'MgrPlayerData') }
+            MgrPlayerData = rawget(_G, 'MgrPlayerData'),
+            PlaceholderEnabled = GameCfg.Platform.Placeholder.Enabled }
         GameCfg.Debug = { Enabled = true }
         env = { now = 1000, values = {}, queue = {}, events = {}, replies = {} }
         local store = {
@@ -126,6 +127,7 @@ describe('条款 1-12：适配层失败路径', function()
             rawset(_G, 'REUtil', restore.REUtil)
             rawset(_G, 'MgrPlayerData', restore.MgrPlayerData)
             GameCfg.Debug = restore.Debug
+            GameCfg.Platform.Placeholder.Enabled = restore.PlaceholderEnabled
         end
         env, restore = nil, nil
     end)
@@ -174,7 +176,10 @@ describe('条款 1-12：适配层失败路径', function()
     it('unavailable_entry_replies_reason_and_keeps_account_untouched', function()
         persistReady()
         local coin = env.data.Data.FishCoin
-        -- 金币页汇率与商品 ID 未交付（ADR-0029 生产开关）：入口明确不可用，不建 flow、不发权益。
+        -- 金币页汇率与商品 ID 未交付、占位通道也关闭（ADR-0029 生产开关）：
+        -- 入口明确不可用，不建 flow、不发权益。占位通道开着时的购买与到账另见
+        -- tests/native/spec/07_coin_page_placeholder_test.lua。
+        GameCfg.Platform.Placeholder.Enabled = false
         assert.is_false(env.platform:OpenCoinShop(env.player))
         local last = replies('CoinShop')[#replies('CoinShop')]
         assert.is_table(last)
