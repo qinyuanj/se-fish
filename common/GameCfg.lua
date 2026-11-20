@@ -250,10 +250,12 @@ GameCfg.Records = {
     MaxRetries = 3,              -- 写失败重试次数（重试走 CAS，过期候选不会盖掉更新的纪录）
     RetryDelaySec = 1,           -- 重试退避（秒）
     RequestCooldownSec = 0.2,    -- 单玩家纪录查询限频
+    -- 13-08 / 13-17：「没有纪录」与「读不到」在内部是两种状态（前者可写、后者既不写也不对账），
+    -- 但对玩家只显示同一句「未取得数据」——不出现重量或保持者，不拿占位值冒充纪录。
     Texts = {
         Format = '全服纪录：%.2f kg（%s）',
-        Missing = '全服纪录：暂无',
-        Unavailable = '全服纪录：暂不可用',
+        Missing = '全服纪录：未取得数据',
+        Unavailable = '全服纪录：未取得数据',
     },
 }
 
@@ -505,7 +507,12 @@ end
 -- 最终成就（#127 第七区，GameSpec §8.1「哥斯拉头 → 通关成就」）：兑换产物是 'achievement.<id>'
 -- 时写进 Extra.achievements[<id>]（不占道具格，重进照旧保留），这里只给客户端提示用的名字。
 GameCfg.Achievements = {
-    final = { Name = '通关成就', PlatformId = nil }, -- 平台后台ID未交付，本地先完成、保留补交。
+    -- 平台成就 ID 只在这里换（13-12、17-17）：真实 ID 由平台侧交付后只改 PlatformId，玩法判定不动。
+    -- PlatformId 留 nil = 平台侧未交付：本地先记完成，每个重试窗口重走补交判定（13-18）。
+    -- PlaceholderId 只在调试构建（GameCfg.Debug.Enabled）里走通「查询 → 提交」路径，且永不落「已送达」：
+    -- 平台对占位 ID 的回答不代表本成就已授予（ADR-0029 生产开关 3「占位不宣称平台已授予」）。
+    -- [未查证] 占位值待平台侧确认，见 docs/to-questionnaire-策划案内部矛盾.md。
+    final = { Name = '通关成就', PlatformId = nil, PlaceholderId = 390001 },
 }
 -- 图鉴只读快照：打开时刷新，保持打开时补取盲盒/信物兑换后的权威状态。
 GameCfg.Compendium = { RefreshSec = 3, RootPollSec = 0.5, RequestCooldownSec = 0.2 }
@@ -584,6 +591,9 @@ GameCfg.Platform = {
         revive = { name = '广告满血复活' },
     },
     UnavailableText = '平台功能暂不可用，请稍后再试',
+    -- 17-18 分享任务：平台分享能力未开通时走明确占位入口（回包带原因与可读文案），
+    -- 不让玩家点了没反应。开放情况作为生产开关单列：真实能力交付后只改这里，判定不动。
+    Share = { Enabled = false, UnavailableText = '分享功能暂未开放' },
     -- 平台流程失败原因 → 玩家可读文案（客户端 ScreenPlatform / ScreenBlindbox 共用）
     ReasonText = {
         busy = '已有一笔平台购买正在处理，请稍候',

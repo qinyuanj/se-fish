@@ -101,15 +101,15 @@ describe("全服纪录纯逻辑（common/Records）", function()
   end)
 
   it("test_state_and_text_never_fabricate_a_record", function()
-    -- 文案：有纪录/暂无/暂不可用三态分开，不可用不等于没有纪录
+    -- 文案：有纪录/没有纪录/读不到三态在 state 上分开；13-08、13-17 要求后两种对玩家都只显示「未取得数据」
     local ok = Records.State(Records.Entry(1234, 42, "张三"))
     assert.same("ok", ok.state)
     assert.same(12.34, ok.weight)
     assert.same("全服纪录：12.34 kg（张三）", Records.Describe(ok))
     assert.same({ state = "missing" }, Records.State(nil))
-    assert.same("全服纪录：暂无", Records.Describe({ state = "missing" }))
-    assert.same("全服纪录：暂不可用", Records.Describe({ state = "unavailable" }))
-    assert.same("全服纪录：暂不可用", Records.Describe(nil), "未知状态按不可用展示，不当作暂无")
+    assert.same("全服纪录：未取得数据", Records.Describe({ state = "missing" }))
+    assert.same("全服纪录：未取得数据", Records.Describe({ state = "unavailable" }))
+    assert.same("全服纪录：未取得数据", Records.Describe(nil), "未知状态按未取得数据展示，不展示纪录")
   end)
 
   it("test_string_and_legacy_identity_tiebreak_has_a_stable_total_order", function()
@@ -395,7 +395,7 @@ describe("全服纪录端到端（MgrRecords × MgrCompendium × MgrSave）", fu
   end)
 
   it("test_platform_failure_keeps_personal_compendium_and_shows_no_fake_record", function()
-    -- 平台不可用：个人图鉴照常记账，纪录一律报「暂不可用」，不显示伪纪录
+    -- 平台不可用：个人图鉴照常记账，纪录一律报「未取得数据」（13-17），不显示伪纪录
     local player = env:join(32, "乙")
     env.recordsFail = true
     env.comp:RecordLanding(player, { fishId = "goldfish", mult = 2, reelSerial = 1 })
@@ -415,7 +415,7 @@ describe("全服纪录端到端（MgrRecords × MgrCompendium × MgrSave）", fu
     end)
     env:drain()
     assert.same("unavailable", seen.state)
-    assert.same("全服纪录：暂不可用", Records.Describe(seen))
+    assert.same("全服纪录：未取得数据", Records.Describe(seen))
     assert.is_nil(seen.scaled)
     -- 个人图鉴的快照不掺全服纪录字段，读不到纪录也不会污染个人数据
     assert.same(1, view.total)
@@ -696,7 +696,7 @@ describe("全服纪录服务层（MgrRecords × RecordsAdapter）", function()
   end)
 
   it("test_failed_read_is_unavailable_not_missing", function()
-    -- 读失败：如实说「暂不可用」，不许说成「暂无纪录」，也不许显示数字
+    -- 读失败：state 上仍与「没有纪录」分开（不许说成没有纪录），玩家看到「未取得数据」，不显示数字
     local seen
     env.mgr:Read("goldfish", function(state)
       seen = state
@@ -712,7 +712,7 @@ describe("全服纪录服务层（MgrRecords × RecordsAdapter）", function()
     assert.same("unavailable", seen.state)
     assert.is_nil(seen.scaled)
     assert.same("throttled", seen.error)
-    assert.same("全服纪录：暂不可用", Records.Describe(seen))
+    assert.same("全服纪录：未取得数据", Records.Describe(seen))
     -- 负缓存：短时间内重复请求不再打平台
     local calls = env.readCalls
     env.mgr:Read("goldfish", function(state)
@@ -817,6 +817,6 @@ describe("全服纪录服务层（MgrRecords × RecordsAdapter）", function()
   it("test_state_before_any_read_is_unavailable", function()
     -- 冷启动（还没读过）也按「暂不可用」，绝不当作「暂无纪录」
     assert.same("unavailable", env.mgr:State("goldfish").state)
-    assert.same("全服纪录：暂不可用", Records.Describe(env.mgr:State("goldfish")))
+    assert.same("全服纪录：未取得数据", Records.Describe(env.mgr:State("goldfish")))
   end)
 end)
