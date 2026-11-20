@@ -102,6 +102,21 @@ function Mgr:MaxHealthOf(player)
     return cfg().MaxHealth
 end
 
+-- #253 只读血量快照：给队伍界面等服务端快照转手用，与 WriteHealth 同源读同一个 Controller。
+-- 不改判定、不参与伤害入口（ApplyDamage / ApplyHit / CanTakeDamage 一行不动）。
+function Mgr:SnapshotHealth(player)
+    local state = self:GetState(player)
+    if not state then return nil, nil end
+    local health = healthOf(state)
+    if health == nil then health = state.baseline end
+    if type(health) ~= 'number' or health ~= health or math.abs(health) >= math.huge then
+        health = nil
+    else
+        health = math.max(0, math.floor(health))
+    end
+    return health, self:MaxHealthOf(player)
+end
+
 function Mgr:CanTakeDamage(player, hit)
     local state = self:GetState(player)
     if not state then return false end

@@ -18,6 +18,7 @@ local ScreenHandlerLoaders = {
     ScreenLottery = function() return require("client.ScreenHandlers.ScreenLottery") end,
     ScreenMain = function() return require("client.ScreenHandlers.ScreenMain") end,
     ScreenMsg = function() return require("client.ScreenHandlers.ScreenMsg") end,
+    ScreenParty = function() return require("client.ScreenHandlers.ScreenParty") end,
     ScreenPlatform = function() return require("client.ScreenHandlers.ScreenPlatform") end,
     ScreenShop = function() return require("client.ScreenHandlers.ScreenShop") end,
     ScreenSurvival = function() return require("client.ScreenHandlers.ScreenSurvival") end,

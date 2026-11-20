@@ -277,9 +277,10 @@ describe('验收矩阵门禁', function()
     end)
 
     it('少一份分片就红', function()
-      -- 用第 7 节：它不在 M.COVERAGE_SECTIONS 里，删掉它只会命中「缺分片」，不会连带覆盖表判红。
-      assert(fs.exists(root .. '/' .. fixture.shard(7)))
-      os.remove(root .. '/' .. fixture.shard(7))
+      -- 用第 11 节：它不在 M.COVERAGE_SECTIONS 里，删掉它只会命中「缺分片」，不会连带覆盖表判红。
+      -- （第 7 节已登记覆盖表，删它的分片还会连带 coverage_clause_unknown，不再是单规则用例。）
+      assert(fs.exists(root .. '/' .. fixture.shard(11)))
+      os.remove(root .. '/' .. fixture.shard(11))
       -- 索引跟着分片重算，避免同时命中 index_stale：本用例只问「缺分片」这一条规则。
       fixture.sync_index(root)
       local ok, found, text = verify()

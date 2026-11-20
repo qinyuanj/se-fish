@@ -39,17 +39,17 @@
 | 12-32 | 风神翼龙飞行移速 20、每 4 秒投掷一次、落地范围 5 米 | 规则 | agent | A | evidenced | tests/native/spec/12_boss_moves_ranged_dive_test.lua |
 | 12-33 | 风神翼龙每 20 秒追踪俯冲一次 | 规则 | agent | A | evidenced | tests/native/spec/12_boss_moves_ranged_dive_test.lua |
 | 12-34 | 风神翼龙投掷与俯冲的独立伤害（正文 100 与 260）须经能力样例核对映射，不得因表只给通用攻击 35 而静默丢弃 | 规则 | agent | B | evidenced | tests/native/spec/12_boss_moves_ranged_dive_test.lua |
-| 12-35 | 沧龙移速 13 | 规则 | agent | A | unverified | — |
-| 12-36 | 沧龙每 15 秒跃起砸击，落地后甩头 | 规则 | agent | A | unverified | — |
-| 12-37 | 沧龙绕岛巡航，咬最近的岛中心玩家，并可将玩家叼走入海 | 规则 | agent | A | unverified | — |
-| 12-38 | 沧龙咬中伤害 300 与过程接触伤害 150 分属两个判定段，不合并成一段 | 规则 | agent | A | unverified | — |
+| 12-35 | 沧龙移速 13 | 规则 | agent | A | evidenced | tests/native/spec/12_boss_moves_phase_test.lua |
+| 12-36 | 沧龙每 15 秒跃起砸击，落地后甩头 | 规则 | agent | A | evidenced | tests/native/spec/12_boss_moves_phase_test.lua |
+| 12-37 | 沧龙绕岛巡航，咬最近的岛中心玩家，并可将玩家叼走入海 | 规则 | agent | A | evidenced | tests/native/spec/12_boss_moves_phase_test.lua |
+| 12-38 | 沧龙咬中伤害 300 与过程接触伤害 150 分属两个判定段，不合并成一段 | 规则 | agent | A | evidenced | tests/native/spec/12_boss_moves_phase_test.lua |
 | 12-39 | 哥斯拉血量 25000 | 规则 | agent | A | evidenced | tests/native/spec/12_boss_moves_test.lua |
 | 12-40 | 哥斯拉每 2 秒爪击（基础攻击 50）、每 6 秒甩尾、每 30 秒原子吐息 | 规则 | agent | A | evidenced | tests/native/spec/12_boss_moves_test.lua |
 | 12-41 | 哥斯拉保留正文跺脚招式及其对应范围 | 规则 | agent | A | evidenced | tests/native/spec/12_boss_moves_test.lua |
 | 12-42 | 哥斯拉原子吐息命中正前方 10 米内的目标即秒杀，该数值优先于正文重叠招式的旧数值 | 规则 | agent | A | evidenced | tests/native/spec/12_boss_moves_test.lua |
 | 12-43 | 哥斯拉血量低于 60% 入水，切换沧龙式攻击，咬中伤害 1000 | 规则 | agent | A | evidenced | tests/native/spec/12_boss_moves_test.lua |
 | 12-44 | 哥斯拉血量低于 20% 重新上岸，伤害 +50%、吐息改为每 10 秒 | 规则 | agent | A | evidenced | tests/native/spec/12_boss_moves_test.lua |
-| 12-45 | 哥斯拉的阶段切换优先于普通招式循环，阈值达成时立即进入对应阶段 | 契约 | agent | B | evidenced | tests/native/spec/12_boss_moves_test.lua |
+| 12-45 | 哥斯拉的阶段切换优先于普通招式循环，阈值达成时立即进入对应阶段 | 契约 | agent | B | evidenced | tests/native/spec/12_boss_moves_test.lua、tests/native/spec/12_boss_moves_phase_test.lua |
 | 12-46 | 正文末尾孤立的「追踪攻击 260」缺招式归属，不据此新增攻击 | 规则 | agent | A | evidenced | tests/native/spec/12_boss_moves_test.lua |
 | 12-47 | 若秒杀、招式并集或逃跑时限导致正常金币路线无法通关，必须提交数值调整及复验结果 | 规则 | agent | A | unverified | — |
 | 12-48 | 通关难度不得通过改成付费或稀有大奖前置来调节 | 规则 | agent | A | unverified | — |
