@@ -6,6 +6,9 @@
 -- #261 占位支付通道（ADR-0029 第三、四节）：真实商品 ID / 金币汇率未交付期间，同一适配层按共享配置
 -- GameCfg.Platform.Placeholder 建「占位 flow」，由客户端占位确认结算，把金币页购买与地图盲盒的完整路径走通；
 -- 占位路径不调用真实平台、不发真实付费权益，真实通道（无可信订单身份）继续关闭。真实参数到位只换配置。
+-- #249 统一闸门（ADR-0029 第四节第 9 项）：占位支付 / 广告 / 分享共用 placeholderAllowed()——
+-- 默认只在调试构建（GameCfg.Debug.Enabled）可用，发布构建必须显式打开 Placeholder.AllowInPublish；
+-- 闸门关闭时占位动作一律拒绝、不发任何物品与权益，回执写 reason='not_open' + NotOpenText（「未开放」）。
 -- #262 占位广告位同理：真实广告位（Platform.Ads.revive 的 goodsId/adTag）未交付期间，广告满血复活经
 -- Placeholder.Ads.revive 建同一种占位 flow，成功结算交给 MgrSurvival 的 FullRevive 发地图内资源，
 -- 不发任何平台权益；真实广告位到位后只替换那行参数。
@@ -52,9 +55,28 @@ local function placeholder()
     return type(config) == 'table' and config or nil
 end
 
-local function placeholderEnabled()
+-- #249 占位通道统一闸门（支付 / 广告 / 分享共用）：参数配好（Enabled）只是前提，
+-- 还要过构建闸门——调试构建直接可用，发布构建必须显式 AllowInPublish（默认 false）。
+-- 机器可查的断言：tests/native/spec/17_platform_boundary_placeholder_test.lua 的「发布构建闸门」
+-- 用例与 tests/native/spec/11_ad_revive_placeholder_test.lua 的同名用例（条款 19-13）。
+local function placeholderConfigured()
     local config = placeholder()
     return config ~= nil and config.Enabled == true
+end
+
+local function placeholderAllowed()
+    if not placeholderConfigured() then return false end
+    if debugEnabled() then return true end
+    return placeholder().AllowInPublish == true
+end
+
+-- 通道关掉时的回执口径：占位通道被闸门挡住说「未开放」，参数没配说「暂不可用」
+local function closedReason()
+    return placeholderConfigured() and 'not_open' or 'unavailable'
+end
+
+local function closedText(reason)
+    return reason == 'not_open' and cfg().NotOpenText or cfg().UnavailableText
 end
 
 -- 金币页报价行：占位汇率与占位商品 ID 都在这张表里
@@ -149,9 +171,9 @@ end
 function Mgr:CanPurchase(player, goodsKey)
     if type(cfg().Goods[goodsKey]) ~= 'table' then return false, 'invalid' end
     if debugEnabled() then return true end
-    -- 生产构建：真实通道仍关闭（无可信订单/交付身份），占位通道按共享配置放行
-    if placeholderEnabled() and placeholderGoodsId('goods', goodsKey) then return true end
-    return false, 'unavailable'
+    -- 生产构建：真实通道仍关闭（无可信订单/交付身份），占位通道按闸门与共享配置放行
+    if placeholderAllowed() and placeholderGoodsId('goods', goodsKey) then return true end
+    return false, closedReason()
 end
 
 -- intent = { kind='purchase', goods=key } / { kind='ad', ad=key } / { kind='coin', coin=key }；
@@ -165,16 +187,15 @@ local function openFlow(self, player, intent, onResult)
         or (intent.kind == 'ad' and cfg().Ads[key] or cfg().Goods[key])
     if type(row) ~= 'table' then return false, 'invalid' end
     local label, goodsId
-    if debugEnabled() then
-        label = '测试' -- 本地测试 flow 永不调用真实平台
-    elseif placeholderEnabled() then
+    -- #249 占位面优先：闸门允许（调试构建，或发布构建显式 AllowInPublish）时走占位通道；
+    -- 调试构建里没有该键的占位参数时回落到测试驱动器（本地测试 flow 永不调用真实平台）。
+    if placeholderAllowed() then
         -- #148 尚无可信订单/交付身份：真实通道关闭，只有共享配置里的占位商品 ID 能开通道
         goodsId = placeholderGoodsId(intent.kind, key)
-        if not goodsId then return false, 'unavailable' end
-        label = '占位'
-    else
-        return false, 'unavailable'
+        if goodsId then label = '占位' end
     end
+    if not label and debugEnabled() then label = '测试' end
+    if not label then return false, closedReason() end
     self.NextFlowId = self.NextFlowId + 1
     local now = self:Now()
     local flow = { id = self.NextFlowId, player = player, kind = intent.kind, goods = intent.goods,
@@ -212,9 +233,10 @@ end
 -- 未配置且非 Debug → 明确回包不可用（客户端展示「平台复活即将开放」口径）
 function Mgr:OpenAdrenalineShop(player)
     local rows = cfg().Goods
-    local available = debugEnabled()
-    if not available then
-        self:Reply(player, { ok = false, action = 'AdrenalineShop', reason = 'unavailable' })
+    -- #249：调试构建走测试驱动器，发布构建要求占位通道闸门打开；两者都没有就明确回「未开放」
+    if not (debugEnabled() or placeholderAllowed()) then
+        local reason = closedReason()
+        self:Reply(player, { ok = false, action = 'AdrenalineShop', reason = reason, text = closedText(reason) })
         return false
     end
     self:Reply(player, { ok = true, action = 'AdrenalineShop', offers = {
@@ -231,8 +253,9 @@ end
 function Mgr:OpenCoinShop(player)
     local config = placeholder()
     local page = config and config.CoinPage
-    if not placeholderEnabled() or type(page) ~= 'table' or type(page.Offers) ~= 'table' then
-        self:Reply(player, { ok = false, action = 'CoinShop', reason = 'unavailable' })
+    if not placeholderAllowed() or type(page) ~= 'table' or type(page.Offers) ~= 'table' then
+        local reason = closedReason()
+        self:Reply(player, { ok = false, action = 'CoinShop', reason = reason, text = closedText(reason) })
         return false
     end
     local offers = {}
@@ -392,9 +415,17 @@ function Mgr:Share(player, purpose)
     if type(player) ~= 'table' or player.UserId == nil then return false, 'invalid' end
     local share = cfg().Share or {}
     -- 未开通（占位）与「配置已打开但真实能力还没接」都明确回不可用，不伪装成已分享。
-    local reason = share.Enabled == true and 'unavailable' or 'placeholder'
-    self:Reply(player, { ok = false, action = 'Share', purpose = purpose, reason = reason,
-        text = share.UnavailableText })
+    -- #249：分享与支付 / 广告共用同一道占位闸门——闸门关闭时连占位入口也不可用，
+    -- 但仍要给可读回执（reason='not_open' + 「未开放」），不能点上没反应。
+    local reason
+    if share.Enabled ~= true and not placeholderAllowed() then
+        reason = closedReason()
+    else
+        reason = share.Enabled == true and 'unavailable' or 'placeholder'
+    end
+    local text = share.UnavailableText
+    if reason == 'not_open' then text = cfg().NotOpenText end
+    self:Reply(player, { ok = false, action = 'Share', purpose = purpose, reason = reason, text = text })
     return false, reason
 end
 
@@ -407,7 +438,15 @@ function Mgr:HandleAction(player, payload)
         self:Share(player, payload.purpose)
         return true
     end
-    if payload.action == 'BuyCoin' then return self:PurchaseCoin(player, payload.goods) end
+    if payload.action == 'BuyCoin' then
+        local opened, reason = self:PurchaseCoin(player, payload.goods)
+        if not opened then
+            reason = reason or 'invalid'
+            self:Reply(player, { ok = false, action = 'BuyCoin', goods = payload.goods,
+                reason = reason, text = closedText(reason) })
+        end
+        return opened
+    end
     if payload.action == 'PlaceholderOutcome' then
         return self:ResolvePlaceholder(player, payload.outcome)
     end
@@ -416,13 +455,20 @@ function Mgr:HandleAction(player, payload)
         local row = cfg().Goods[goodsKey]
         -- 客户端只能直接发起占格商品（肾上腺素）购买；盲盒/复活由对应管理器服务端发起
         if not row or not row.itemId then return false end
-        return self:Purchase(player, goodsKey, 'adrenaline', function(outcome)
+        local opened, reason = self:Purchase(player, goodsKey, 'adrenaline', function(outcome)
             if outcome == 'success' then
                 self:GrantGoods(player, goodsKey, 1)
             else
                 self:Reply(player, { ok = false, action = 'Purchase', goods = goodsKey, reason = outcome })
             end
         end)
+        -- 开不出通道时给可读回执（「未开放」/「暂不可用」），不静默失败
+        if not opened then
+            reason = reason or 'unavailable'
+            self:Reply(player, { ok = false, action = 'Purchase', goods = goodsKey,
+                reason = reason, text = closedText(reason) })
+        end
+        return opened
     end
     return false
 end

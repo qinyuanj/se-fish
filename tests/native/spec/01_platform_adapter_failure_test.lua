@@ -77,6 +77,9 @@ describe('条款 1-12：适配层失败路径', function()
             MgrPlayerData = rawget(_G, 'MgrPlayerData'),
             PlaceholderEnabled = GameCfg.Platform.Placeholder.Enabled }
         GameCfg.Debug = { Enabled = true }
+        -- #249 占位闸门：调试构建里占位面优先于测试驱动器，本文件取证的是适配层失败路径的测试 flow，
+        -- 显式关掉占位通道（占位通道自身见 spec/07、spec/11、spec/17）。
+        GameCfg.Platform.Placeholder.Enabled = false
         env = { now = 1000, values = {}, queue = {}, events = {}, replies = {} }
         local store = {
             GetAsync = function(_, key) return env.values[key] end,

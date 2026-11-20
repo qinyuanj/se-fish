@@ -96,8 +96,10 @@ describe('条款 7-25 / 7-16 金币页占位购买与到账', function()
         assert_wiring()
         saved = { Debug = GameCfg.Debug, REUtil = rawget(_G, 'REUtil'), game = rawget(_G, 'game'),
             PlaceholderEnabled = GameCfg.Platform.Placeholder.Enabled }
-        -- 生产构建：占位通道必须自己走通，不能靠调试构建的测试驱动器
-        GameCfg.Debug = { Enabled = false }
+        -- #249 占位闸门：占位通道只在调试构建（或发布构建显式 AllowInPublish）下可用。
+        -- 本文件显式打开调试开关，证的是「占位路径可用」，不是「发布构建可用」——
+        -- 发布构建默认关闭的那条断言在 spec/17 的平台边界用例里。
+        GameCfg.Debug = { Enabled = true }
         GameCfg.Platform.Placeholder.Enabled = true
         ctx = { now = 1000, queue = {}, attributes = {} }
         ctx.re = channels()
