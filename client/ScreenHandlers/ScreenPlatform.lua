@@ -64,7 +64,8 @@ end
 function Panel:Button(parent, name, x, y, w, h, text, onClick)
     local button = self:Create('EUIButton', parent, name, x, y, w, h, {
         ButtonText = '', NormalImage = ColorBlockImage, PressImage = ColorBlockImage,
-        Color = Color.New(54, 100, 140, 255) })
+        -- #174 #16：EUIButton 没有 Color 属性（读回 nil），底色走 ButtonNormalColor（与图鉴入口同色）
+        ButtonNormalColor = Color.New(54, 100, 140, 255) })
     if not button then return nil end
     button.TouchEnabled = true
     self:Create('EUITextLabel', button, name .. 'Text', 0, 0, w, h, {
