@@ -217,6 +217,11 @@ describe('条款 9/11 他人抢救', function()
     local other = join(7004, 1)
     request(other, { target = 'downedPlayer', action = 'Rescue', targetUserId = downed.UserId, seq = 1 })
     assert.is_false(lastReply('InteractResult').payload.ok, '已有施救者时并发请求被拒')
+    assert.same('busy', lastReply('InteractResult').payload.reason, '抢救中并发请求回 busy（#271，客户端据此刻提示）')
+
+    -- #271：同一施救者再点一次气泡，真实服务端路径也必须回 busy，而不是 not-downed
+    request(rescuer, { target = 'downedPlayer', action = 'Rescue', targetUserId = downed.UserId, seq = 2 })
+    assert.same('busy', lastReply('InteractResult').payload.reason, '抢救中重复点击回 busy')
 
     advance(GameCfg.Rescue.DurationSec + 0.1)
     assert.same('alive', env.s:Phase(downed))
@@ -270,6 +275,18 @@ describe('条款 9/11 他人抢救', function()
     env.clientPlayers = { localPlayer }
     client:Update()
     assert.is_true(env.clientNodes.RescueRoot.Destroyed, '离场玩家的抢救气泡要销毁，不只 Visible=false')
+  end)
+
+  -- #271：抢救中气泡保持可点（#254 口径），重复点击被服务端 busy 拒绝；
+  -- 回执必须给玩家可见提示，不能静默，否则玩家会以为点击没生效。
+  it('9-17 客户端抢救 busy 回执给出正在抢救中提示', function()
+    local notices = {}
+    _G.LocalMsgNotice = function(msg) notices[#notices + 1] = msg end
+    local client = assert(loadfile('client/LocalInteract.lua'))()
+    local ok, err = pcall(client.OnResult, client, { action = 'Rescue', ok = false, reason = 'busy' })
+    _G.LocalMsgNotice = nil
+    assert.is_true(ok, tostring(err))
+    assert.same({ '正在抢救中' }, notices)
   end)
 
   it('9-17 客户端按钮创建失败会销毁抢救气泡根节点', function()

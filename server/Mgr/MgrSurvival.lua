@@ -150,13 +150,24 @@ function Mgr:PlayerByUserId(userId)
     return state and state.player or nil
 end
 
+-- 只读：抢救中也算濒死未解除（#271），交互入口据此把重复点击交给 CanRescue 判 busy，
+-- 而不是按 IsDowned 把目标滤掉、误报 not-downed；相位口径只在本模块出现。
+function Mgr:IsRescuing(player)
+    local state = self:GetState(player)
+    return state ~= nil and state.phase == 'rescuing'
+end
+
 -- 只读预检：不改任何状态，供交互入口在落持久操作身份之前先判一次。
 function Mgr:CanRescue(target, rescuer)
     local state = self:GetState(target)
-    if not state or state.phase ~= 'downed' then return false, 'not-downed' end
-    if state.rescue then return false, 'busy' end
+    if not state then return false, 'not-downed' end
+    -- #271：抢救中（含在飞的 rescue）要回 busy，客户端据此提示「正在抢救中」；
+    -- 若先判 phase ~= 'downed'，重复点击会被吞成 not-downed，玩家得不到回执。
+    if state.phase == 'rescuing' or state.rescue then return false, 'busy' end
+    if state.phase ~= 'downed' then return false, 'not-downed' end
     -- #262：广告满血复活在飞时不接受抢救，两条解除濒死的路径不交错（互斥结算由相位与 platform 标记守住）
-    if state.platform then return false, 'busy' end
+    -- busy 专指「抢救中」（#271 客户端据此提示）；平台复活有它自己的等待文案，不能共用同一句
+    if state.platform then return false, 'platform-busy' end
     local rescuerState = self:GetState(rescuer)
     if not rescuerState then return false, 'no-rescuer' end
     if rescuerState.phase ~= 'alive' then return false, 'rescuer-downed' end
