@@ -129,7 +129,7 @@ function MainHudLayout.Compute(input)
     status.CoinIcon = rect(coinX, ringY, COIN_ICON, COIN_ICON)
     status.CoinLabel = rect(coinX + COIN_ICON / 2 + 8 + COIN_LABEL_W / 2, ringY, COIN_LABEL_W, COIN_LABEL_H)
 
-    -- 右上入口组：警告键左侧一行，从左到右 图鉴｜商店（预留，暂无按钮）｜盲盒
+    -- 右上入口组：警告键左侧一行，从左到右 图鉴｜地图商店｜盲盒（#275 起 ShopEntry 由平台面板消费）
     local entryY = H - 105
     local entryRight = left(zone.WarningKey) - GAP
     local entries = {

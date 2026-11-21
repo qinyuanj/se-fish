@@ -362,6 +362,50 @@ describe('平台购买界面（ScreenPlatform）', function()
     assert.same({ action = 'OpenCoinShop' }, sent(env, 'PlatformAction')[1])
   end)
 
+  -- #275：主 HUD 右上常驻「地图商店」。失败方式：
+  --   1. 入口不在布局预留的 ShopEntry 上，或文字不是「地图商店」（玩家看不见这颗按钮）；
+  --   2. 点击走了另一条打开路径（另发请求、打开钓场商店），而不是金币页同一条 PlatformShop.Open；
+  --   3. 平台能力缺失或打开失败时没有金币页同款失败文案，或把失败记成已打开、拆掉入口。
+  it('test_hud_map_shop_entry_sits_on_reserved_slot_and_opens_coin_shop', function()
+    local layout = require('client.MainHudLayout').Compute({ width = 1920, height = 1080 }).Rects
+    local rect = layout.ShopEntry
+    local compendium, blindbox = layout.CompendiumEntry, layout.BlindboxEntry
+    local entry = env.nodes.BtnMapShopEntry
+    assert.is_not_nil(entry, '主 HUD 应有地图商店入口')
+    assert.same('地图商店', env.nodes.BtnMapShopEntryText.Text)
+    assert.equal(entry.Parent, env.nodes.BtnMapShopEntryText.Parent)
+    assert.same(entry.Position, env.nodes.BtnMapShopEntryText.Position)
+    assert.same(entry.Size, env.nodes.BtnMapShopEntryText.Size)
+    assert.same({ x = rect.x, y = rect.y }, { x = entry.Position.x, y = entry.Position.y })
+    assert.same({ x = rect.w, y = rect.h }, { x = entry.Size.x, y = entry.Size.y })
+    assert.is_true(compendium.x < rect.x and rect.x < blindbox.x, '从左到右应为图鉴、地图商店、盲盒')
+
+    local before = #sent(env, 'PlatformAction')
+    entry.OnClicked:Fire()
+    local actions = sent(env, 'PlatformAction')
+    assert.same(before + 1, #actions)
+    assert.same({ action = 'OpenCoinShop' }, actions[#actions])
+  end)
+
+  it('test_hud_map_shop_entry_reports_existing_failure_and_stays', function()
+    local entry = env.nodes.BtnMapShopEntry
+    assert.is_not_nil(entry)
+    local texts = require('client.LocalShop').ShopText
+
+    rawset(_G, 'PlatformShop', nil)
+    entry.OnClicked:Fire()
+    assert.same(texts.PlatformUnavailable, env.notices[#env.notices])
+    assert.same(0, #sent(env, 'PlatformAction'))
+    assert.is_not_true(entry.Destroyed, '失败后入口仍在')
+
+    rawset(_G, 'PlatformShop', { Open = function() error('平台未接入') end })
+    entry.OnClicked:Fire()
+    assert.same(texts.PlatformOpenFailed, env.notices[#env.notices])
+    assert.is_falsy(env.notices[#env.notices]:find('平台未接入', 1, true))
+    assert.same(0, #sent(env, 'PlatformAction'))
+    assert.is_not_true(entry.Destroyed)
+  end)
+
   it('test_test_driver_only_follows_test_flow_notices', function()
     assert.is_false(env.nodes.PlatformTestDriver.Visible)
     fire({ ok = true, action = 'TestFlow', open = true, key = 'blindboxTen' })

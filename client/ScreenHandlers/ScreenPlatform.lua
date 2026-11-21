@@ -7,12 +7,13 @@
 --   * PlaceholderFlow：占位支付通道的确认面板（#261，生产开关）——显示商品与占位价目、注明
 --     「不发放真实付费权益」，确认/取消上行 PlatformAction{action='PlaceholderOutcome'}；服务端 open=false 时收起；
 --   * CoinShop / CoinGrant：金币页报价（按服务端占位汇率渲染）与到账提示；点选上行 BuyCoin；
---   * _G.PlatformShop.Open：地图商店金币页入口（ScreenShop:OpenPlatformShop），上行 OpenCoinShop。
+--   * _G.PlatformShop.Open：地图商店金币页入口（ScreenShop:OpenPlatformShop 与主 HUD BtnMapShopEntry 共用），上行 OpenCoinShop。HUD 按钮常驻在布局的 ShopEntry，经 OpenFromHud 调用 Open；平台能力缺失或打开失败用金币页同款文案，按钮留在 HUD 上。
 -- 节点全部运行时创建（data/ 只读）；创建失败只记日志，不阻塞主流程。
 local GameCfg = require('common.GameCfg')
 local OwnedUnits = require('common.OwnedUnits')
 local REUtil = require('common.REUtil')
 local GameUI = require('client.GameUI')
+local MainHudLayout = require('client.MainHudLayout')
 
 local ColorBlockImage = 'official://image/11017'
 
@@ -84,6 +85,19 @@ function Panel:BuildNodes()
     self:Clear()
     local resolution = GameUI:GetEuiManager():GetDeviceResolution() or { x = 1920, y = 1080 }
     local cx, cy = resolution.x / 2, resolution.y / 2
+    -- #275：主 HUD 右上入口组的预留矩形。坐标是中心点，与图鉴入口同一口径。
+    local entry = MainHudLayout.Compute({ width = resolution.x, height = resolution.y }).Rects.ShopEntry
+    local button = self:Button(root, 'BtnMapShopEntry', entry.x, entry.y, entry.w, entry.h,
+        '', function() self:OpenFromHud() end)
+    -- 按钮下的文字子节点试玩不渲染（#174）。标签挂到同一父节点、同位同尺寸，与图鉴、盲盒入口一致。
+    if button then
+        local label = self:Create('EUITextLabel', root, 'BtnMapShopEntryText', entry.x, entry.y, entry.w, entry.h, {
+            Text = '地图商店', FontSize = 26, TextColor = Color.New(255, 255, 255, 255), LocalZOrder = 1 })
+        if label then
+            label.TextHorizontalAlignment = 1
+            label.TextVerticalAlignment = 1
+        end
+    end
     local offers = self:Create('EUIImage', root, 'PlatformOffers', cx - 300, cy + 120, 600, 220, {
         Image = ColorBlockImage, Color = Color.New(0, 0, 0, 180), Visible = false })
     if offers then
@@ -201,6 +215,24 @@ end
 -- 地图商店金币页入口（ScreenShop:OpenPlatformShop 经 rawget(_G, 'PlatformShop') 调用）
 function Panel:Open()
     REUtil:GetRE('PlatformAction'):FireServer({ action = 'OpenCoinShop' })
+end
+
+-- 主 HUD 入口与金币页同一条打开路径。平台能力缺失或打开抛错时用金币页现有文案，
+-- 错误串只进日志；按钮不拆，也不把失败记成已打开。
+function Panel:OpenFromHud()
+    local texts = require('client.LocalShop').ShopText
+    local platform = rawget(_G, 'PlatformShop')
+    if type(platform) ~= 'table' or type(platform.Open) ~= 'function' then
+        notice(texts.PlatformUnavailable)
+        return false
+    end
+    local ok, err = pcall(function() platform:Open() end)
+    if not ok then
+        print('[ScreenPlatform] 打开地图商店失败', tostring(err))
+        notice(texts.PlatformOpenFailed)
+        return false
+    end
+    return true
 end
 
 function Panel:NoteResult(result)
