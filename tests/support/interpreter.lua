@@ -9,12 +9,11 @@
 local M = {}
 
 -- 往回最多找 8 个负下标：够覆盖已知启动形态，又不会误取到更早的命令行参数。
-M.MAX_BACK = 8
+local MAX_BACK = 8
 
 -- 像解释器的条目：不是启动选项（不以 - 开头），且当前真的读得到。
 -- 判据不写死 ".exe"，否则非 Windows 上会伪失败。
--- 导出给需要自己扫一遍 arg 的回归用，免得它们重抄判据、再把上界写死。
-function M.looks_like_exe(value)
+local function looks_like_exe(value)
   if type(value) ~= "string" or value == "" or value:match("^%-") then
     return false
   end
@@ -26,15 +25,11 @@ function M.looks_like_exe(value)
   return true
 end
 
--- args 省略时取当前进程的 arg；找不到就回落 "lua"（交给 PATH）。
-function M.path(args)
-  args = args or arg
-  if type(args) ~= "table" then
-    return "lua"
-  end
-  for index = -1, -M.MAX_BACK, -1 do
-    if M.looks_like_exe(args[index]) then
-      return args[index]
+-- 找不到就回落 "lua"（交给 PATH）。
+function M.path()
+  for index = -1, -MAX_BACK, -1 do
+    if looks_like_exe(arg[index]) then
+      return arg[index]
     end
   end
   return "lua"
