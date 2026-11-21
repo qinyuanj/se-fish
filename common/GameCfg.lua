@@ -151,6 +151,7 @@ GameCfg.Rescue = {
     Action = 'Rescue',
     PromptText = '抢救',
     RescuingTitle = '正在抢救…',
+    BusyText = '正在抢救中',       -- #271 重复点击被 busy 拒绝时的回执提示
     Range = 2,                   -- 规格原文：2 米内（场景平面距离）
     BubbleHeight = 1.2,          -- [未查证] 抢救气泡在濒死者脚底上方的高度（与钓鱼佬文字泡同量级）
     DurationSec = 2,             -- [未查证] 抢救耗时占位值

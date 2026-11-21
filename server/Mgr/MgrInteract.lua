@@ -317,7 +317,10 @@ function Mgr:ResolveDownedTarget(userId)
     local survival, vitals = self.Survival, self.Vitals
     if not survival or not vitals then return nil end
     local target = survival:PlayerByUserId(userId)
-    if not target or not vitals:IsDowned(target) then return nil end
+    if not target then return nil end
+    -- #271：rescuing 仍是濒死未解除，放行给 CanRescue 判 busy；在这里按 IsDowned 滤掉会把重复点击误报成 not-downed
+    if survival:IsRescuing(target) then return target end
+    if not vitals:IsDowned(target) then return nil end
     return target
 end
 

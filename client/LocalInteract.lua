@@ -204,30 +204,44 @@ function LocalInteract:Update()
     end
 end
 
+-- InteractResult 回包统一入口；抢救与喂食共用通道，按 action 分派。
+function LocalInteract:OnResult(result)
+    if type(result) ~= 'table' then return end
+    if result.action == GameCfg.Rescue.Action then
+        -- #271：抢救中重复点击被 busy 拒绝时给可见回执；其余抢救回执靠气泡与相位显隐表达，不弹钓鱼佬文案
+        if not result.ok and result.reason == 'busy' then notice(GameCfg.Rescue.BusyText) end
+        return
+    end
+    self:OnFishermanResult(result)
+end
+
+function LocalInteract:OnFishermanResult(result)
+    if result.ok then
+        if result.achievement then
+            -- 第七区最终成就（#127）：产物不占格，回包只给成就 id，名字查 GameCfg.Achievements
+            local achievement = GameCfg.Achievements[result.achievement]
+            notice('达成' .. (achievement and achievement.Name or tostring(result.achievement)))
+        elseif type(result.exchange) == 'table' then
+            -- 信物兑换（#87）：回包带兑换双方 id，按物品表名字拼提示；吃动作脉冲与金币喂食相同
+            local defs = GameCfg.Items.Definitions
+            local from = defs[result.exchange.from]
+            local to = defs[result.exchange.to]
+            notice('用' .. (from and from.Name or tostring(result.exchange.from))
+                .. '换得' .. (to and to.Name or tostring(result.exchange.to)) .. ' x1')
+        else
+            notice('钓鱼佬吃得很香，金币 +' .. tostring(result.coins))
+        end
+        self:StartPulse()
+    elseif result.reason == 'nothing' then
+        notice('先选中要喂的鱼获或鱼饵')
+    elseif result.reason == 'full' then
+        notice('格子满了，钓鱼佬不肯换')
+    end
+end
+
 function LocalInteract:Start()
     REUtil:GetRE('InteractResult').OnClientEvent:Connect(function(result)
-        if type(result) ~= 'table' then return end
-        if result.ok then
-            if result.achievement then
-                -- 第七区最终成就（#127）：产物不占格，回包只给成就 id，名字查 GameCfg.Achievements
-                local achievement = GameCfg.Achievements[result.achievement]
-                notice('达成' .. (achievement and achievement.Name or tostring(result.achievement)))
-            elseif type(result.exchange) == 'table' then
-                -- 信物兑换（#87）：回包带兑换双方 id，按物品表名字拼提示；吃动作脉冲与金币喂食相同
-                local defs = GameCfg.Items.Definitions
-                local from = defs[result.exchange.from]
-                local to = defs[result.exchange.to]
-                notice('用' .. (from and from.Name or tostring(result.exchange.from))
-                    .. '换得' .. (to and to.Name or tostring(result.exchange.to)) .. ' x1')
-            else
-                notice('钓鱼佬吃得很香，金币 +' .. tostring(result.coins))
-            end
-            self:StartPulse()
-        elseif result.reason == 'nothing' then
-            notice('先选中要喂的鱼获或鱼饵')
-        elseif result.reason == 'full' then
-            notice('格子满了，钓鱼佬不肯换')
-        end
+        self:OnResult(result)
     end)
     -- 按区分派（#127）：七区各一个钓鱼佬；未建区的锚点取不到时只记日志
     for index, npc in ipairs(GameCfg.Interact.Fishermen) do
