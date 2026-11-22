@@ -15,7 +15,7 @@
 - **部署树**：镜像进宿主目录的仓库根 `client/`、`common/`、`server/`；仓库根其余内容不部署。宿主内不归本仓库管理的内容由 `sync` 回灌，镜像粒度与操作细节见下方「工具链」。
   _Avoid_: 源码树（指仓库全部时）
 - **quality gate**：质量工具（CRAP、mutation、DRY）的结果处理规则：由 dsh-uml-viewer 插件自带的标准工具发布快照与结果记录（`validResult`、实际退出码），指标只出报告，不设门槛。
-- **Busted migration**：全部 Lua 测试改写为原生 Busted、移除 LuaUnit 依赖及桥接层的迁移，决策见 [ADR-0002](../adr/0002-native-busted-migration.md)，当前车道与运行约定见下方「工具链」。
+- **Busted migration**：全部 Lua 测试改写为原生 Busted、移除 LuaUnit 依赖及桥接层的迁移，当前车道与运行约定见下方「工具链」。
 
 ## 工具链
 
@@ -49,11 +49,11 @@ Lua 命令使用 **Lua 5.4**，命令名统一 `lua`，执行前用 `lua -v` 核
 
 **架构图（dsh-uml-viewer）。** 根目录 `policy.edn` 描述三端模块树、排除目录与隐藏模块（`:exclude`、`:omit`），`docs/uml/se-fish.edn` 是生成的依赖图（不要手编）。 六层职责与依赖方向见 [架构分层与依赖门禁](../architecture.md)，唯一分层声明在 `tools/arch_policy.lua`；`tests/native/guards/arch_policy_test.lua` 随 fast/full 阻止未分类、反向依赖、业务环、`:levels` 漂移及声明残留（源码已删、声明仍在）。
 
-- 看图与图上操作用 DSH 的 dsh-uml-viewer 插件面板，插件自带二进制与质量工具，无需在项目里安装；面板请求的处理规则（质量 → `uml_ir` → `uml_display` 的顺序、`validResult` 校验等）由插件在打开面板的会话里注入，以注入规则为准；决策见 [ADR-0016](../adr/0016-dsh-uml-viewer-plugin.md)。修改三端代码或 `policy.edn` 后用插件工具 `uml_ir` 重新生成图。
+- 看图与图上操作用 DSH 的 dsh-uml-viewer 插件面板，插件自带二进制与质量工具，无需在项目里安装；面板请求的处理规则（质量 → `uml_ir` → `uml_display` 的顺序、`validResult` 校验等）由插件在打开面板的会话里注入，以注入规则为准。修改三端代码或 `policy.edn` 后用插件工具 `uml_ir` 重新生成图。
 - 图上 `client|common|server` 三棵树覆盖**业务范围**；所有 `packages/` 子树退出业务范围，业务对包的 `require` 在图上收成外部椭圆，见 [ADR-0021](../adr/0021-packages-outside-business-scope.md)。viewer 从 `.metrics/crap.edn` 与 `.metrics/mutate/*.edn` 加载指标；缺少任一指标的类卡片为红色。标准工具的环境准备（含 crapper 要求的 cluacov 1.0.0）按 dsh-uml-viewer 插件文档由人完成。
 - **标准 quality 分发**：根目录 `uml-quality.json`（版本管理）的 `standardTools` 是质量工具范围与选项的机器真源，`policy.edn` 是架构图的机器真源；两者按 [ADR-0021](../adr/0021-packages-outside-business-scope.md) 保持同一业务范围，本文不复制排除清单。插件的 `uml_crap`、`uml_mutate`、`uml_dry` 读取质量工具配置，CRAP、mutation、DRY 与架构图口径一致。CLI 不包装质量工具。
 - `target/` 放覆盖率与 mutation worker，属于忽略的临时产物；`.metrics/` 保留质量快照并纳入版本管理。无函数定义的配置或转发模块不生成 mutation 快照；当前工具不测试模块顶层语句。
-- **Windows 原生**：full／fast、coverage 与 CRAP 的标准环境是 Windows。PR 与 `main` 的 full 由 GitHub Actions `windows-latest` 执行（见 [ADR-0025](../adr/0025-windows-pr-full-test-gate.md)）；coverage 与 CRAP 的实机数据仍来自本机仓库检出。**macOS 未实机验证，没有实机数据**。
+- **Windows 原生**：full／fast、coverage 与 CRAP 的标准环境是 Windows。PR 与 `main` 的 full 由 GitHub Actions `windows-latest` 执行；coverage 与 CRAP 的实机数据仍来自本机仓库检出。**macOS 未实机验证，没有实机数据**。
 
 **worktree 起手式。** 新建 worktree 后在其根执行一次：
 
@@ -67,7 +67,7 @@ lua tools/cli.lua worktree-init
 
 **美术资产（Meshy MCP + 无头 Blender）。** Blender 与 Meshy 的接入与用法见 [Blender 与 Meshy 使用](art-pipeline.md)，尺寸口径见 [ADR-0004](../adr/0004-fish-asset-scale.md)。唯一的 MCP 是 Meshy，注册与密钥接法见 [Blender 与 Meshy 使用](art-pipeline.md#前端配置)。Blender 不接 MCP，只经 `blender` 子命令无头执行（[ADR-0009](../adr/0009-blender-headless-only.md)）。资产本体不进本仓，正式资产走编辑器导入。
 
-**蛋仔技能与注入（teamai 接入）。** 蛋仔 SE 技能和 SessionStart 注入由团队仓 `eggy/teamai-netease` 分发（[ADR-0015](../adr/0015-eggitor-ai-resources-team-repo-maintained.md)），接入前提、验收与排错以团队仓 `INSTALL-AGENT.md` 为准。本仓检出：
+**蛋仔技能与注入（teamai 接入）。** 蛋仔 SE 技能和 SessionStart 注入由团队仓 `eggy/teamai-netease` 分发，接入前提、验收与排错以团队仓 `INSTALL-AGENT.md` 为准。本仓检出：
 
 - 本目录接团队项目 `eggy-se`，teamai 只接 Codex：`teamai projects set eggy-se` 后 `teamai pull --force`（新检出用 `teamai init <团队仓> --scope workspace --agent codex --project eggy-se`）。技能装进 `.codex/skills/`，注入 hook 写进 `.codex/hooks.json`。
 - hook 直接调 `node`，用的是 Codex 进程的 PATH：启动 Codex 的终端里 `node` 必须在 PATH 上。
@@ -99,7 +99,7 @@ lua tools/cli.lua worktree-init
 
 ## 完成判据
 
-代码改动按顺序执行，全部通过才算完成。本仓没有提交时自动检查；PR 与 `main` 推送由 [test.yml](../../.github/workflows/test.yml) 自动运行 full，check-run context `full`（PR 界面显示 `test / full`）是 `main` 的 required status check（见 [ADR-0025](../adr/0025-windows-pr-full-test-gate.md)）。下表其余每一项仍由 agent 显式执行，质量工具由人运行，见表后的「人工验收」。
+代码改动按顺序执行，全部通过才算完成。本仓没有提交时自动检查；PR 与 `main` 推送由 [test.yml](../../.github/workflows/test.yml) 自动运行 full，check-run context `full`（PR 界面显示 `test / full`）是 `main` 的 required status check。下表其余每一项仍由 agent 显式执行，质量工具由人运行，见表后的「人工验收」。
 
 | 检查 | 通过条件 |
 |---|---|

@@ -92,7 +92,7 @@ local function write_file(root, relative, body)
 end
 
 -- 内部函数以「nil, 原因」报错时走这里：原因印到 stderr，退出码由调用方定，绝不静默退 1。
--- 关键文件读不出来或写不下去都属于「前提不可用」（ADR-0011 的 3），不是「矩阵校验不通过」（1）。
+-- 关键文件读不出来或写不下去都属于「前提不可用」（退出码 3），不是「矩阵校验不通过」（1）。
 local function failed(message, code)
   io.stderr:write('acceptance: ' .. tostring(message) .. '\n')
   return code

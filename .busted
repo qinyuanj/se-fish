@@ -1,4 +1,4 @@
--- Busted 车道配置（#81 建立；#93 全量切换后是唯一的 Lua 测试入口，ADR 0002）。
+-- Busted 车道配置（#81 建立；#93 全量切换后是唯一的 Lua 测试入口）。
 -- fast 为日常车道（tests/native 加 tests/native/guards）；full 追加 tests/native/slow 与 tests/native/spec（#243），是收尾车道。
 -- spec 是条款断言车道：每条断言对应 docs/acceptance/ 的一条条款，只走业务入口黑盒断言；
 -- 它随 full 跑，但**不算遗留测试**（tools/acceptance.lua 的 NON_LEGACY_LANES 按这里的 ROOT 剔除）。

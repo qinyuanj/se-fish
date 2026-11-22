@@ -158,7 +158,7 @@ describe("TestDeployOwnedTargets", function()
 end)
 
 -- 退出码约定（#145）：interop 或 editor-cli.exe 推导失败属平台不可用，退 3；
--- ADR 0008 的「编辑器没装 → 打印跳过」仍退 0。编辑器收尾走真实模块，只桩接缝层。
+-- 「编辑器没装 → 打印跳过」仍退 0。编辑器收尾走真实模块，只桩接缝层。
 describe("TestDeployExitCodes", function()
   local saved, deploy, world, err_text
   -- 编辑器收尾走真实模块、只桩接缝层：deploy 与 editor_finalize 共用 tools.seam（#189）。

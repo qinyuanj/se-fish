@@ -5,7 +5,7 @@
 > 所有数字都标明来源（runner 内部计时 或 外部 wall 计时）与命令；制品见第 9 节。
 > **测量环境**：测量期间蛋仔编辑器客户端 `client` 进程未运行。编辑器跑地图时同一套件实测慢约 2×（`client` 进程占满 CPU），任何后续基线与本次对比前须先确认编辑器状态，否则没有可比性。
 > **文件名**：本报告写于 `qa-slot` 改名之前，文中的 `acceptance_slot_*` 即现在的 `qa_slot_*`，数字不受影响。
-> **已过时项**：文中反复出现的 pre-commit hook（`tools/hooks/pre-commit`）已随 [ADR-0018](adr/0018-delete-pre-commit-hook.md) 删除，`slow/pre_commit_hook_test.lua`（15.016 s / 12 用例）一并移除；本仓现在没有任何提交时的自动检查。
+> **已过时项**：文中反复出现的 pre-commit hook（`tools/hooks/pre-commit`）已删除，`slow/pre_commit_hook_test.lua`（15.016 s / 12 用例）一并移除；本仓现在没有任何提交时的自动检查。
 >
 > **已过时项（2026-11-20）**：`arch_policy_test`、`eggy_json_guard_test`、`static_require_test`、`acceptance_matrix_test` 已迁到 `tests/native/guards/`（guards 门禁车道，随 fast 与 full 跑、不计入验收基线的遗留测试数）。第 4~7 节与两份 CSV 的行**保持提交 `4eb7b67` 的原样未改**——那描述的是当时的仓库，改路径会把历史写成没发生过的事。读旧路径时按 `tests/native/<同名文件>` 对应到新位置即可，数字不受影响。
 >
@@ -39,7 +39,7 @@
 | fast 车道 | `lua tools/cli.lua test fast` | `tests/native` + `tests/native/guards` | 日常开发 |
 | full 车道 | `lua tools/cli.lua test full` | fast + `tests/native/slow` + `tests/native/spec` | 收尾、完成判据 |
 | default（裸 `busted`） | `busted` | 与 full 相同 | crapper 列测试文件时读 default |
-| 提交时闸门 | 无 | — | pre-commit hook 已随 [ADR-0018](adr/0018-delete-pre-commit-hook.md) 删除；PR 与 main 推送由 `.github/workflows/test.yml` 跑 `test full`（[ADR-0025](adr/0025-windows-pr-full-test-gate.md)） |
+| 提交时闸门 | 无 | — | pre-commit hook 已删除；PR 与 main 推送由 `.github/workflows/test.yml` 跑 `test full` |
 | 覆盖率 | `busted --run=full --coverage` | 与 full 相同 + LuaCov | crapper（人工在插件面板发起） |
 
 车道由根目录 `.busted` 定义，关键项：`ROOT` 白名单（列 `tests/native`、`tests/native/guards`、`tests/native/slow` 与 `tests/native/spec`，`recursive = false`，后三者因此不会被 fast 的 `tests/native` 吞掉）、`pattern = "_test"`、`helper = "tests/native/helper.lua"`、`sort-files = true`、`auto-insulate = true`、`output = "plainTerminal"`。
@@ -68,7 +68,7 @@
 
 ### 1.3 哪些"检查"不算测试（本报告不跑）
 
-- **自动闸门只有 CI**：PR 与 `main` 推送由 `test.yml` 跑 `test full`（[ADR-0025](../adr/0025-windows-pr-full-test-gate.md)）；提交时不做任何自动检查（[ADR-0018](../adr/0018-delete-pre-commit-hook.md) 删掉了 pre-commit hook）。
+- **自动闸门只有 CI**：PR 与 `main` 推送由 `test.yml` 跑 `test full`；提交时不做任何自动检查（pre-commit hook 已删除）。
 - **质量工具** `uml_crap` / `uml_mutate` / `uml_dry`：由人在 dsh-uml-viewer 插件面板发起，不进 CLI、不进 hook。本次只测了它们的底层跑法（full + 覆盖率）。
 - **构建/同步/编辑器操作**（`deploy`、`sync`、`acceptance-slot`、`ability-presets`、试玩 E2E、`code validate`）：会改宿主目录或依赖编辑器在线，**不是测试**，本次不跑（见第 8 节）。
 - **`tests/probes/` 的 55 个探针**：手工探针，`.busted` 的 ROOT 白名单把它们排除在任何车道外。
