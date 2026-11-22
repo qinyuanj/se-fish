@@ -48,6 +48,9 @@ __pycache__/
 /luacov.stats.out
 /luacov.report.out
 
+# ===== 个人学习材料（game_api 课程产物，不入库）=====
+/learn/
+
 # 以下区块由 magpie 增删，手改会被覆盖；条目已被 /.agents/ 覆盖，只作 magpie 的登记。
 # >>> magpie: library skills placed here (magpie adds and removes these lines) >>>
 /.agents/skills/blender-addon-development
