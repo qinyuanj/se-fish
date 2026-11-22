@@ -187,13 +187,24 @@ describe('条款 14：抽奖机数值规则', function()
   end)
 
   -- 14-09：三同大奖按表逐档对应——小白龙斧头组、蟹老板枪械组各五选一，
+  -- 逐格断言组内全部五件（斧头组 item157..161、枪械组 item162..166）；
   -- 虎鲸 / 风神翼龙 / 哥斯拉分别发变大药水 item168 / 风神之翼 item169 / 哥斯拉 item170
   -- （匕首组见上一条 14-04，加速药水见 lottery_settle_test）。每档都实际抽取、经业务入口断言。
   -- 失败方式：某一档映射错大奖组、武器组不再五选一、或物品档错发成别档物品。
   it('14-09 三同大奖按表逐档对应（斧头组、枪械组、变大药水、风神之翼、哥斯拉）', function()
     local cases = {
-      { name = '小白龙·斧头组', rolls = { 23, 23, 23, 2 }, kind = 'weapon', itemId = 'item158' },
-      { name = '蟹老板·枪械组', rolls = { 43, 43, 43, 1 }, kind = 'weapon', itemId = 'item162' },
+      -- 小白龙·斧头组五选一：逐格（第 4 个 roll = 组内格位 1..5）
+      { name = '小白龙·银斧', rolls = { 23, 23, 23, 1 }, kind = 'weapon', itemId = 'item157' },
+      { name = '小白龙·金斧', rolls = { 23, 23, 23, 2 }, kind = 'weapon', itemId = 'item158' },
+      { name = '小白龙·炽焰战斧', rolls = { 23, 23, 23, 3 }, kind = 'weapon', itemId = 'item159' },
+      { name = '小白龙·血吼', rolls = { 23, 23, 23, 4 }, kind = 'weapon', itemId = 'item160' },
+      { name = '小白龙·无坚不摧之力', rolls = { 23, 23, 23, 5 }, kind = 'weapon', itemId = 'item161' },
+      -- 蟹老板·枪械组五选一：逐格
+      { name = '蟹老板·沙漠之鹰', rolls = { 43, 43, 43, 1 }, kind = 'weapon', itemId = 'item162' },
+      { name = '蟹老板·霜之新星', rolls = { 43, 43, 43, 2 }, kind = 'weapon', itemId = 'item163' },
+      { name = '蟹老板·雷霆之力', rolls = { 43, 43, 43, 3 }, kind = 'weapon', itemId = 'item164' },
+      { name = '蟹老板·黄金AK47', rolls = { 43, 43, 43, 4 }, kind = 'weapon', itemId = 'item165' },
+      { name = '蟹老板·连发火箭筒', rolls = { 43, 43, 43, 5 }, kind = 'weapon', itemId = 'item166' },
       { name = '虎鲸·变大药水', rolls = { 77, 77, 77 }, kind = 'item', itemId = 'item168' },
       { name = '风神翼龙·风神之翼', rolls = { 91, 91, 91 }, kind = 'item', itemId = 'item169' },
       { name = '哥斯拉', rolls = { 96, 96, 96 }, kind = 'item', itemId = 'item170' },
