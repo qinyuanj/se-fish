@@ -7,7 +7,8 @@ local GameCfg = require('common.GameCfg')
 local OwnedUnits = require('common.OwnedUnits')
 local REUtil = require('common.REUtil')
 
-local Panel = { Teammates = {}, PartyState = 'none', Rows = {}, Connections = {} }
+local Panel = {}
+Panel.__index = Panel
 
 local function hud() return GameCfg.Party.HUD end
 
@@ -15,7 +16,7 @@ local function notice(message)
     if _G.LocalMsgNotice then _G.LocalMsgNotice(message) end
 end
 
-local function create(kind, parent, name, x, y, width, height, props)
+local function create(nodes, kind, parent, name, x, y, width, height, props)
     props = props or {}
     props.Parent = parent
     props.Name = name
@@ -23,9 +24,10 @@ local function create(kind, parent, name, x, y, width, height, props)
     props.Size = Vector2.New(width, height)
     local node = game:GetService('World'):CreateUnit(kind, props)
     if not node then error('队伍界面节点创建失败：' .. name) end
+    nodes[#nodes + 1] = node
     node.TouchEnabled = false
     node.SwallowTouchEnabled = false
-    return OwnedUnits.Track(Panel, node)
+    return node
 end
 
 local function healthText(member)
@@ -43,8 +45,15 @@ end
 
 ---销毁上一轮建的全部节点并复位自持引用（幂等）。
 function Panel:Clear()
+    for _, connection in ipairs(self.Connections) do
+        local ok, err = pcall(function() connection:Disconnect() end)
+        if not ok then print('[ScreenParty] 断开监听失败', tostring(err)) end
+    end
+    self.Connections = {}
     OwnedUnits.Clear(self)
     self.Root, self.InvitePanel, self.Rows = nil, nil, {}
+    self.PartyState, self.PartyId, self.Teammates = 'none', nil, {}
+    self.InviteFrom, self.InviteUntil = nil, nil
 end
 
 function Panel:Now()
@@ -203,60 +212,74 @@ function Panel:Start()
         return eui and eui:GetRootNode(), eui and eui:GetDeviceResolution()
     end)
     if not okRoot or not root then
+        if #self.Connections == 0 then self:Clear() end
         print('[ScreenParty] EUI 未就绪，跳过建面板', tostring(root))
         return
     end
-    -- 重建前先清空上一轮节点：Start 重入不叠第二套队友栏。
-    self:Clear()
     resolution = resolution or { x = 1920, y = 1080 }
     local width, height = hud().RowWidth, hud().RowHeight
-    -- 右侧竖排，避开左上角自身血量（布局参数见 GameCfg.Party.HUD）。
-    self.Root = create('EUILayout', root, 'PartyRoot',
-        resolution.x - width - hud().MarginRight, hud().MarginTop, width, height * hud().MaxRows, { Visible = false })
-    for index = 1, hud().MaxRows do
-        local top = (index - 1) * height
-        local row = create('EUILayout', self.Root, 'PartyMember' .. index, 0, top, width, height, { Visible = false })
-        local name = create('EUITextLabel', row, 'PartyMember' .. index .. 'Name', 0, 0, width, 24, {
-            Text = '', FontSize = 20, TextColor = Color.New(235, 235, 235, 255), LocalZOrder = 1 })
-        local bar = create('EUILayout', row, 'PartyMember' .. index .. 'Bar', 0, 28, hud().BarWidth, hud().BarHeight, {
-            Visible = true })
-        local fill = create('EUIImage', bar, 'PartyMember' .. index .. 'Fill', 0, 0, 0, hud().BarHeight, {
-            Image = hud().ColorBlockImage, Color = Color.New(230, 60, 60, 255), LocalZOrder = 1 })
-        local health = create('EUITextLabel', row, 'PartyMember' .. index .. 'Health',
-            hud().BarWidth + 8, 24, width - hud().BarWidth - 8, 24, {
+    local candidate = { Nodes = {} }
+    local built, buildErr = pcall(function()
+        -- 右侧竖排，避开左上角自身血量（布局参数见 GameCfg.Party.HUD）。
+        candidate.Root = create(candidate.Nodes, 'EUILayout', root, 'PartyRoot',
+            resolution.x - width - hud().MarginRight, hud().MarginTop, width, height * hud().MaxRows, { Visible = false })
+        candidate.Rows = {}
+        for index = 1, hud().MaxRows do
+            local top = (index - 1) * height
+            local row = create(candidate.Nodes, 'EUILayout', candidate.Root, 'PartyMember' .. index, 0, top, width, height, { Visible = false })
+            local name = create(candidate.Nodes, 'EUITextLabel', row, 'PartyMember' .. index .. 'Name', 0, 0, width, 24, {
                 Text = '', FontSize = 20, TextColor = Color.New(235, 235, 235, 255), LocalZOrder = 1 })
-        self.Rows[index] = { Root = row, Name = name, Bar = bar, Fill = fill, Health = health }
-    end
-    local invite = create('EUILayout', root, 'PartyInvite',
-        (resolution.x - hud().InviteWidth) / 2, hud().InviteTop, hud().InviteWidth, hud().InviteHeight, { Visible = false })
-    local inviteText = create('EUITextLabel', invite, 'PartyInviteText', 0, 0, hud().InviteWidth, 48, {
-        Text = hud().InviteText, FontSize = 24, TextColor = Color.New(255, 255, 255, 255), LocalZOrder = 1 })
-    local countdown = create('EUITextLabel', invite, 'PartyInviteCountdown', 0, 32, hud().InviteWidth, 24, {
-        Text = '', FontSize = 20, TextColor = Color.New(255, 220, 140, 255), LocalZOrder = 1 })
-    local accept = create('EUIButton', invite, 'PartyInviteAccept', hud().InviteWidth - 180, 56, 80, 32, {
-        ButtonText = hud().AcceptText, NormalImage = hud().ColorBlockImage, PressImage = hud().ColorBlockImage,
-        Color = Color.New(60, 150, 90, 255) })
-    local decline = create('EUIButton', invite, 'PartyInviteDecline', hud().InviteWidth - 90, 56, 80, 32, {
-        ButtonText = hud().DeclineText, NormalImage = hud().ColorBlockImage, PressImage = hud().ColorBlockImage,
-        Color = Color.New(150, 60, 60, 255) })
-    for _, button in ipairs({ accept, decline }) do
-        button.TouchEnabled = true
-        if button.OnClicked then
-            local action = button == accept and 'Accept' or 'Decline'
-            button.OnClicked:Connect(function() self:Send(action) end)
+            local bar = create(candidate.Nodes, 'EUILayout', row, 'PartyMember' .. index .. 'Bar', 0, 28, hud().BarWidth, hud().BarHeight, {
+                Visible = true })
+            local fill = create(candidate.Nodes, 'EUIImage', bar, 'PartyMember' .. index .. 'Fill', 0, 0, 0, hud().BarHeight, {
+                Image = hud().ColorBlockImage, Color = Color.New(230, 60, 60, 255), LocalZOrder = 1 })
+            local health = create(candidate.Nodes, 'EUITextLabel', row, 'PartyMember' .. index .. 'Health',
+                hud().BarWidth + 8, 24, width - hud().BarWidth - 8, 24, {
+                    Text = '', FontSize = 20, TextColor = Color.New(235, 235, 235, 255), LocalZOrder = 1 })
+            candidate.Rows[index] = { Root = row, Name = name, Bar = bar, Fill = fill, Health = health }
         end
+        local invite = create(candidate.Nodes, 'EUILayout', root, 'PartyInvite',
+            (resolution.x - hud().InviteWidth) / 2, hud().InviteTop, hud().InviteWidth, hud().InviteHeight, { Visible = false })
+        local inviteText = create(candidate.Nodes, 'EUITextLabel', invite, 'PartyInviteText', 0, 0, hud().InviteWidth, 48, {
+            Text = hud().InviteText, FontSize = 24, TextColor = Color.New(255, 255, 255, 255), LocalZOrder = 1 })
+        local countdown = create(candidate.Nodes, 'EUITextLabel', invite, 'PartyInviteCountdown', 0, 32, hud().InviteWidth, 24, {
+            Text = '', FontSize = 20, TextColor = Color.New(255, 220, 140, 255), LocalZOrder = 1 })
+        local accept = create(candidate.Nodes, 'EUIButton', invite, 'PartyInviteAccept', hud().InviteWidth - 180, 56, 80, 32, {
+            ButtonText = hud().AcceptText, NormalImage = hud().ColorBlockImage, PressImage = hud().ColorBlockImage,
+            Color = Color.New(60, 150, 90, 255) })
+        local decline = create(candidate.Nodes, 'EUIButton', invite, 'PartyInviteDecline', hud().InviteWidth - 90, 56, 80, 32, {
+            ButtonText = hud().DeclineText, NormalImage = hud().ColorBlockImage, PressImage = hud().ColorBlockImage,
+            Color = Color.New(150, 60, 60, 255) })
+        candidate.InvitePanel = { Root = invite, Text = inviteText, Countdown = countdown }
+        candidate.Buttons = { accept, decline }
+    end)
+    if not built then
+        for _, node in ipairs(candidate.Nodes) do pcall(function() node:Destroy() end) end
+        print('[ScreenParty] 建面板失败，保留上一轮', tostring(buildErr))
+        return
     end
-    self.InvitePanel = { Root = invite, Text = inviteText, Countdown = countdown }
-    self.Connections = self.Connections or {}
+    self:Clear()
+    self.Root, self.InvitePanel, self.Rows = candidate.Root, candidate.InvitePanel, candidate.Rows
+    for _, node in ipairs(candidate.Nodes) do OwnedUnits.Track(self, node) end
+    candidate.Nodes = {}
     self.Connections[#self.Connections + 1] =
         REUtil:GetRE('PartyState').OnClientEvent:Connect(function(state) self:NoteState(state) end)
     self.Connections[#self.Connections + 1] =
         REUtil:GetRE('PartyResult').OnClientEvent:Connect(function(result) self:NoteResult(result) end)
     self.Connections[#self.Connections + 1] =
         game:GetService('RunService').Heartbeat:Connect(function() self:Tick() end)
+    local accept, decline = candidate.Buttons[1], candidate.Buttons[2]
+    for _, button in ipairs({ accept, decline }) do
+        button.TouchEnabled = true
+        if button.OnClicked then
+            local action = button == accept and 'Accept' or 'Decline'
+            self.Connections[#self.Connections + 1] =
+                button.OnClicked:Connect(function() self:Send(action) end)
+        end
+    end
     -- ready/snapshot 握手：进图、重连与界面重开都主动拉一次当前归属，迟到的客户端也能补齐。
     local okSync, syncErr = pcall(function() REUtil:GetRE('PartyStateRequest'):FireServer() end)
     if not okSync then print('[ScreenParty] 队伍状态请求发送失败', tostring(syncErr)) end
 end
 
-return Panel
+return setmetatable({ Teammates = {}, PartyState = 'none', Rows = {}, Connections = {} }, Panel)

@@ -64,21 +64,27 @@ function MgrGameUI:OpenScreen(screenName, passBy, useAnim)
     local screenHandler = MgrGameUI:GetScreen(screenName)
     if not screenHandler then return end
 
-    if not screenHandler.RootNode.Visible then
-      
+    local root = screenHandler.RootNode
+    local animationGeneration = (screenHandler.AnimationGeneration or 0) + 1
+    screenHandler.AnimationGeneration = animationGeneration
+    screenHandler.AnimOpen = nil
+    screenHandler.AnimClosing = nil
+    if not root.Visible then
         if useAnim then
-            screenHandler.RootNode.Opacity = 0
-            screenHandler.RootNode.Visible = true
+            root.Opacity = 0
+            root.Visible = true
             local duration = 0.5
             screenHandler.AnimOpen = true
-            screenHandler.RootNode:TweenOpacity(1, Enums.EasingDirection.Out, Enums.EasingStyle.Quad, duration, true, function()
+            root:TweenOpacity(1, Enums.EasingDirection.Out, Enums.EasingStyle.Quad, duration, true, function()
+                if screenHandler.RootNode ~= root
+                    or screenHandler.AnimationGeneration ~= animationGeneration then return end
                 screenHandler.AnimOpen = nil
-                screenHandler.RootNode.Opacity = 1
+                root.Opacity = 1
             end)
 
         else
-            screenHandler.RootNode.Opacity = 1
-            screenHandler.RootNode.Visible = true
+            root.Opacity = 1
+            root.Visible = true
         end
     end
 
@@ -92,17 +98,25 @@ function MgrGameUI:CloseScreen(screenName, useAnim)
     local screenHandler = MgrGameUI:GetScreen(screenName)
     if not screenHandler then return end
 
-    if screenHandler.RootNode.Visible then
+    local root = screenHandler.RootNode
+    local animationGeneration = (screenHandler.AnimationGeneration or 0) + 1
+    screenHandler.AnimationGeneration = animationGeneration
+    screenHandler.AnimOpen = nil
+    screenHandler.AnimClosing = nil
+    if root.Visible then
         if useAnim then
-            screenHandler.RootNode.Opacity = 1
+            root.Opacity = 1
             local duration = 0.5
             screenHandler.AnimClosing = true
-            screenHandler.RootNode:TweenOpacity(0, Enums.EasingDirection.Out, Enums.EasingStyle.Quad, true, function()
-                screenHandler.RootNode.Visible = false 
+            root:TweenOpacity(0, Enums.EasingDirection.Out, Enums.EasingStyle.Quad, duration, true, function()
+                if screenHandler.RootNode ~= root
+                    or screenHandler.AnimationGeneration ~= animationGeneration then return end
+                root.Visible = false
                 screenHandler.AnimClosing = false
             end)
+        else
+            root.Visible = false
         end
-        screenHandler.RootNode.Visible = false
     end
 
     curShowMap[screenName] = nil

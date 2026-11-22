@@ -27,7 +27,8 @@ describe("道具栏的界面侧", function()
     -- 与旧 LuaUnit 的每例 setUp/tearDown 同级成对：整屏假环境逐例重建，
     -- ScreenMain 逐例重载以清掉模块级状态。
     before_each(function()
-        ctx = { nodes = {}, created = {}, commands = {}, events = {} }
+        ctx = { nodes = {}, created = {}, commands = {}, events = {},
+            now = 100, delays = {}, attributeSignals = {} }
         ctx.previous = { game = _G.game, Vector2 = _G.Vector2, Color = _G.Color,
             REUtil = _G.REUtil, GameUI = _G.GameUI, MgrGameUI = _G.MgrGameUI }
         ctx.previousAttack = package.loaded['client.LocalAttackButton']
@@ -47,7 +48,20 @@ describe("道具栏的界面侧", function()
             ctx.created[#ctx.created + 1] = node
             return node
         end
-        _G.game = { GetService = function(_, name) if name == 'World' then return world end end }
+        _G.game = { GetService = function(_, name)
+            if name == 'World' then return world end
+            if name == 'Players' then return { LocalPlayer = {
+                GetAttribute = function() return 0 end,
+                GetAttributeChangedSignal = function(_, key)
+                    ctx.attributeSignals[key] = ctx.attributeSignals[key] or signal()
+                    return ctx.attributeSignals[key]
+                end,
+            } } end
+            if name == 'Task' then return { Delay = function(_, seconds, callback)
+                ctx.delays[#ctx.delays + 1] = { seconds = seconds, callback = callback }
+            end } end
+        end }
+        function world:GetServerTime() return ctx.now end
         _G.Vector2 = { New = function(x, y) return { x = x, y = y } end }
         _G.Color = { New = function(...) return { ... } end }
         _G.GameUI = { GetEuiManager = function() return {
@@ -55,7 +69,8 @@ describe("道具栏的界面侧", function()
         } end, GetUIRoot = function() return ctx.uiRoot end }
         _G.REUtil = { GetRE = function(_, name)
             if not ctx.events[name] then
-                ctx.events[name] = { OnClientEvent = signal(), FireServer = function(_, payload)
+                ctx.events[name] = { OnClientEvent = signal(), Requests = 0, FireServer = function(_, payload)
+                    ctx.events[name].Requests = ctx.events[name].Requests + 1
                     if name == 'ItemBarAction' then ctx.commands[#ctx.commands + 1] = payload end
                 end }
             end
@@ -366,5 +381,49 @@ describe("道具栏的界面侧", function()
             assert.same(1, label.TextHorizontalAlignment, name)
             assert.same(1, label.TextVerticalAlignment, name)
         end
+    end)
+
+    it('test_root_replacement_keeps_operation_sequence_and_special_state', function()
+        ctx.events.SpecialItemState.OnClientEvent:Fire({ effect = 'godzilla', breathRemaining = 5 })
+        ctx.states:Fire({ slots = {}, bait = { worm = 1 }, selectedSlot = 1 })
+        ctx.handler.IsOpen = true
+        ctx.handler:Operate({ op = 'eat', slot = 1 })
+        assert.same(1, ctx.commands[1].seq)
+
+        ctx.currentRoot = { Name = 'ScreenMain', Visible = true,
+            FindFirstChild = function() return nil end }
+        ctx.handler.RootNode = ctx.currentRoot
+        ctx.handler:Init()
+        ctx.handler.IsOpen = true
+        for _, delayed in ipairs(ctx.delays) do delayed.callback() end
+        assert.same(1, ctx.attributeSignals.FishCoin:Count(), 'A 的根 Delay 不得再给 B 安装属性监听')
+        assert.same(1, ctx.attributeSignals.Health:Count())
+
+        ctx.states:Fire({ slots = {}, bait = { worm = 0 } })
+        assert.is_false(ctx.nodes.CastFailureHint.Visible, '换根后的首个空蚯蚓快照不得补发从有到无提示')
+        assert.same('吐息冷却 5秒', ctx.nodes.BtnItemActionLabel.Text)
+        ctx.now = 104
+        ctx.handler:ShowCast()
+        assert.same('吐息冷却 1秒', ctx.nodes.BtnItemActionLabel.Text)
+
+        ctx.handler:Operate({ op = 'eat', slot = 1 })
+        assert.same(2, ctx.commands[2].seq, '换根后操作序号必须连续递增')
+
+        ctx.handler:CloseScreen()
+        ctx.handler.IsOpen = true
+        ctx.handler:Operate({ op = 'eat', slot = 1 })
+        assert.same(3, ctx.commands[3].seq, 'Close 后操作序号仍连续递增')
+
+        ctx.delays = {}
+        ctx.handler:OpenScreen()
+        local combat = ctx.events.RequestFishCombat
+        local immediate = combat.Requests
+        ctx.handler:CloseScreen()
+        ctx.handler:OpenScreen()
+        assert.same(immediate + 1, combat.Requests, '重复 Open 仍立即补取一次')
+        for _, delayed in ipairs(ctx.delays) do
+            if delayed.seconds == 0.6 then delayed.callback() end
+        end
+        assert.same(immediate + 2, combat.Requests, '只有最新 Open 的 0.6 秒补取生效')
     end)
 end)

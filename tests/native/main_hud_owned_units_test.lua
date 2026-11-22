@@ -12,7 +12,9 @@
 --   4. 每次长按瞄准留下的登记记录不回收 → 一局下来登记表只增不减。
 local OwnedUnits = require('common.OwnedUnits')
 
-local GLOBALS = { 'game', 'Vector2', 'Color', 'REUtil', 'GameUI', 'MgrGameUI', 'LocalReelIn' }
+local GLOBALS = { 'game', 'Vector2', 'Color', 'REUtil', 'GameUI', 'MgrGameUI', 'LocalReelIn', 'print' }
+
+local cleanupFaults = {}
 
 local function signal()
     local listeners = {}
@@ -20,12 +22,14 @@ local function signal()
         Connect = function(_, fn)
             listeners[#listeners + 1] = fn
             return { Disconnect = function()
+                if cleanupFaults.disconnect then error('injected disconnect failure', 0) end
                 for i, cb in ipairs(listeners) do
                     if cb == fn then table.remove(listeners, i) break end
                 end
             end }
         end,
         Fire = function(_, ...) for _, fn in ipairs(listeners) do fn(...) end end,
+        Count = function() return #listeners end,
     }
 end
 
@@ -42,12 +46,14 @@ local function setUp()
     _G.MgrGameUI = { SetCustomControlUI = function() end, GetScreen = function() end, CloseScreen = function() end }
     local world = { Created = ctx.created }
     function world:CreateUnit(kind, attrs)
+        if ctx.failCreate == attrs.Name then error('injected init failure', 0) end
         local node = { Kind = kind, Destroys = 0, OnClicked = signal(),
             OnTouchBegan = signal(), OnTouchEnded = signal() }
         for key, value in pairs(attrs) do node[key] = value end
         function node:Destroy()
             self.Destroyed = true
             self.Destroys = self.Destroys + 1
+            if ctx.failDestroy == self.Name then error('injected rollback destroy failure', 0) end
         end
         if node.Name then ctx.nodes[node.Name] = node end
         ctx.created[#ctx.created + 1] = node
@@ -157,5 +163,96 @@ describe('主界面 HUD 的节点归属（#209）', function()
         assert.same(1, overlay.Destroys) -- 只拆一次（重复销毁在真引擎里会报错）
         assert.same(0, OwnedUnits.Count(ctx.handler.AimOwner))
         assert.same(0, OwnedUnits.Count(ctx.handler))
+    end)
+
+    it('test_partial_init_rolls_back_listeners_and_preserves_original_error', function()
+        ctx = setUp()
+        ctx.handler:Cleanup()
+        ctx.failCreate = 'QuestBackground'
+        ctx.failDestroy = 'ItemBarIcon1'
+        local logs = {}
+        _G.print = function(...) logs[#logs + 1] = table.concat({ ... }, '	') end
+
+        local ok, err = pcall(function() ctx.handler:Init() end)
+        assert.is_false(ok)
+        assert.same('injected init failure', err)
+        assert.same(0, ctx.states:Count(), '失败 Init 的 ItemBarState 监听必须回滚')
+        assert.same(0, OwnedUnits.Count(ctx.handler), '失败 Init 不得继续持有部分节点')
+        assert.matches('injected rollback destroy failure', table.concat(logs, '\n'), 1, true)
+
+        ctx.failCreate = nil
+        ctx.failDestroy = nil
+        ctx.handler:Init()
+        assert.same(1, ctx.states:Count(), '回滚后重试应只有当前一组监听')
+    end)
+
+    it('test_cleanup_continues_after_close_failure_and_records_it', function()
+        ctx = setUp()
+        ctx.handler.CloseScreen = function() error('injected close failure', 0) end
+        local logs = {}
+        _G.print = function(...) logs[#logs + 1] = table.concat({ ... }, '	') end
+
+        ctx.handler:Cleanup()
+        assert.same(0, ctx.states:Count(), 'CloseScreen 失败后仍须断开根监听')
+        assert.same(0, OwnedUnits.Count(ctx.handler), 'CloseScreen 失败后仍须销毁根节点')
+        assert.matches('injected close failure', table.concat(logs, '\n'), 1, true)
+    end)
+
+    it('test_cleanup_records_every_stage_failure_and_continues', function()
+        local DamageFloat = require('client.DamageFloat')
+        local savedClear, savedOwnedClear = DamageFloat.Clear, OwnedUnits.Clear
+        local function restoreStages()
+            DamageFloat.Clear = savedClear
+            OwnedUnits.Clear = savedOwnedClear
+            cleanupFaults.disconnect = nil
+        end
+        local stages = {
+            { name = '浮动表现', message = 'injected float failure',
+                arm = function() DamageFloat.Clear = function() error('injected float failure', 0) end end },
+            { name = '攻击键', message = 'injected attack failure',
+                arm = function() package.loaded['client.LocalAttackButton'].Destroy =
+                    function() error('injected attack failure', 0) end end },
+            { name = '连接', message = 'injected disconnect failure', before = true,
+                arm = function() cleanupFaults.disconnect = true end,
+                later = function() return OwnedUnits.Count(ctx.handler) == 0 end },
+            { name = 'OwnedUnits', message = 'injected owned units failure',
+                arm = function() OwnedUnits.Clear = function() error('injected owned units failure', 0) end end },
+        }
+        local logs = {}
+        _G.print = function(...) logs[#logs + 1] = table.concat({ ... }, '	') end
+
+        for _, stage in ipairs(stages) do
+            restoreStages()
+            ctx = setUp()
+            stage.arm()
+            local ok, err = pcall(function() ctx.handler:Cleanup() end)
+            assert.is_true(ok, stage.name .. ' 失败不得传给 Cleanup 调用方: ' .. tostring(err))
+            if stage.later then
+                assert.is_true(stage.later(), stage.name .. ' 失败后后续清理阶段必须完成')
+            else
+                assert.same(0, ctx.states:Count(), stage.name .. ' 失败后仍须断开根监听')
+                if stage.name ~= 'OwnedUnits' then
+                    assert.same(0, OwnedUnits.Count(ctx.handler), stage.name .. ' 失败后仍须清空节点登记')
+                end
+            end
+            assert.matches(stage.message, table.concat(logs, '\n'), 1, true)
+            tearDown(ctx)
+            ctx = nil
+        end
+
+        restoreStages()
+        ctx = setUp()
+        DamageFloat.Clear = function() error('injected float failure', 0) end
+        package.loaded['client.LocalAttackButton'].Destroy =
+            function() error('injected attack failure', 0) end
+        cleanupFaults.disconnect = true
+        OwnedUnits.Clear = function() error('injected owned units failure', 0) end
+        local ok, err = pcall(function() ctx.handler:Cleanup() end)
+        restoreStages()
+        assert.is_true(ok, '多个清理阶段失败不得聚合成调用方错误: ' .. tostring(err))
+        local report = table.concat(logs, '\n')
+        for _, stage in ipairs(stages) do
+            assert.matches(stage.message, report, 1, true)
+        end
     end)
 end)

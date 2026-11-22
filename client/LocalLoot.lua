@@ -6,7 +6,7 @@ local GameCfg = require('common.GameCfg')
 local BodyScale = require('common.BodyScale')
 local REUtil = require('common.REUtil')
 
-local LocalLoot = { Nodes = {} }
+local LocalLoot = { Nodes = {}, Generation = 0 }
 
 local Bubble = require('client.InteractionBubble')
 local Players = game:GetService('Players')
@@ -19,7 +19,9 @@ end
 function LocalLoot:Clear(id)
     local entry = self.Nodes[id]
     self.Nodes[id] = nil
-    if entry then pcall(function() entry.Node:Destroy() end) end
+    if not entry then return end
+    local ok, err = pcall(function() entry.Node:Destroy() end)
+    if not ok then print('[LocalLoot] 拾取文字泡销毁失败', id, tostring(err)) end
 end
 
 function LocalLoot:Create(loot)
@@ -82,15 +84,51 @@ function LocalLoot:Update(dt)
     end
 end
 
+function LocalLoot:Disconnect(connections)
+    for index = #connections, 1, -1 do
+        local connection = connections[index]
+        connections[index] = nil
+        if connection then pcall(function() connection:Disconnect() end) end
+    end
+end
+
 function LocalLoot:Start()
-    REUtil:GetRE('LootState').OnClientEvent:Connect(function(list) self:Show(list) end)
-    REUtil:GetRE('LootResult').OnClientEvent:Connect(function(result)
-        if type(result) == 'table' and result.reason == 'full' and _G.LocalMsgNotice then
-            _G.LocalMsgNotice('背包已满')
-        end
+    if self.Active then return end
+    self.Generation = self.Generation + 1
+    local generation = self.Generation
+    local connections = {}
+    local ok, err = pcall(function()
+        connections[1] = REUtil:GetRE('LootState').OnClientEvent:Connect(function(list)
+            if self.Generation ~= generation then return end
+            self:Show(list)
+        end)
+        connections[2] = REUtil:GetRE('LootResult').OnClientEvent:Connect(function(result)
+            if self.Generation ~= generation then return end
+            if type(result) == 'table' and result.reason == 'full' and _G.LocalMsgNotice then
+                _G.LocalMsgNotice('背包已满')
+            end
+        end)
+        connections[3] = game:GetService('RunService').Heartbeat:Connect(function(dt)
+            if self.Generation ~= generation then return end
+            self:Update(dt)
+        end)
+        -- 请求失败前先退出本代：宿主可能在 FireServer 抛错前同步回快照。
+        self.Generation = self.Generation + 1
+        local requested, requestErr = pcall(function()
+            REUtil:GetRE('RequestLoot'):FireServer()
+        end)
+        if requested then self.Generation = generation else error(requestErr, 0) end
     end)
-    game:GetService('RunService').Heartbeat:Connect(function(dt) self:Update(dt) end)
-    REUtil:GetRE('RequestLoot'):FireServer()
+    if not ok then
+        -- 成功才进入活动态；失败仍显式回到未启动，避免中途置真后重试被直接吞掉。
+        self.Active = false
+        self.Connections = nil
+        self.Generation = self.Generation + 1
+        self:Disconnect(connections)
+        error(err, 0)
+    end
+    self.Connections = connections
+    self.Active = true
 end
 
 return LocalLoot

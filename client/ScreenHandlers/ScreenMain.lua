@@ -1176,16 +1176,29 @@ function ScreenHandler:Listen(source, callback)
 end
 
 function ScreenHandler:Cleanup()
-    DamageFloat:Clear()
-    FishCombatLabel:Clear()
-    self:CloseScreen()
-    LocalAttackButton:Destroy()
-    for _, connection in ipairs(self.Connections or {}) do connection:Disconnect() end
+    local rootGeneration = self.BoundRootNode or self.RootNode
+    local function continueAfterFailure(stage, fn)
+        local ok, err = pcall(fn)
+        if not ok then
+            print('[ScreenMain] 清理失败', stage, tostring(rootGeneration), tostring(err))
+        end
+    end
+    continueAfterFailure('浮动表现', function()
+        DamageFloat:Clear()
+        FishCombatLabel:Clear()
+    end)
+    continueAfterFailure('CloseScreen', function() self:CloseScreen() end)
+    continueAfterFailure('攻击键', function() LocalAttackButton:Destroy() end)
+    continueAfterFailure('连接', function()
+        for _, connection in ipairs(self.Connections or {}) do connection:Disconnect() end
+    end)
     -- #209：本界面建的全部节点都记在所有者名下，这里一次清空；私有表不再参与销毁。
     -- 瞄准拾取层挂在自己的所有者名下（AIM_OWNER）：关屏时若没走到 EndAim（例如收尾前半段抛错），
     -- 这里兜底把它拆掉，全屏拦截按钮不会留在 UIRoot 上继续吃点击。
-    OwnedUnits.Clear(AIM_OWNER)
-    OwnedUnits.Clear(self)
+    continueAfterFailure('OwnedUnits', function()
+        OwnedUnits.Clear(AIM_OWNER)
+        OwnedUnits.Clear(self)
+    end)
     self.Connections = nil
     self.Slots = nil
     self.ItemBarSlotPos = nil
@@ -1197,7 +1210,7 @@ function ScreenHandler:Cleanup()
     self.PopupDismiss = nil
     self.OpenPopup = nil
     self.DragSource = nil
-    self.OpSeq = nil
+    -- OpSeq 属于玩家会话，不是当前 RootNode：Close 与换根都继续递增。
     self.UIRoot = nil
     self.LastOperateOperation = nil
     self.BackpackButton = nil
@@ -1262,6 +1275,15 @@ function ScreenHandler:Init()
         if self.BoundRootNode == self.RootNode then return end
         self:Cleanup()
     end
+    local ok, err = pcall(function()
+        self:_initializeRoot()
+    end)
+    if ok then return end
+    self:Cleanup()
+    error(err, 0)
+end
+
+function ScreenHandler:_initializeRoot()
     local euiMgr = _G.GameUI:GetEuiManager()
     if not euiMgr then return end
     local resolution = euiMgr:GetDeviceResolution()

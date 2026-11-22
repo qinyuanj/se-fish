@@ -13,7 +13,7 @@ local moduleNames = { 'common.Util', 'client.GameUI',
   'client.ScreenHandlers.ScreenMain', 'client.LocalReelIn' }
 
 -- game 与 REUtil 由夹具 setUp/tearDown 负责，这里只快照其余的全局。
-local globalNames = { 'Vector2', 'Vector3', 'Color', 'GameUI', 'LocalReelIn', 'MgrGameUI' }
+local globalNames = { 'Vector2', 'Vector3', 'Color', 'GameUI', 'LocalReelIn', 'MgrGameUI', 'Enums' }
 
 describe('收线界面表现（ScreenMain × LocalReelIn × MgrGameUI）', function()
   local env
@@ -438,5 +438,46 @@ describe('收线界面表现（ScreenMain × LocalReelIn × MgrGameUI）', funct
     env.events.CastState.OnClientEvent:Fire(state)
     assert.is_false(env.nodes.CastSplashHint.Visible)
     assert.is_true(env.nodes.CastFloat.Visible)
+  end)
+
+  it('test_stale_tween_callbacks_do_not_rewrite_reopened_or_replaced_root', function()
+    _G.Enums = { EasingDirection = { Out = 1 }, EasingStyle = { Quad = 2 } }
+    local tweens = {}
+    local function fakeTween(root)
+      function root:TweenOpacity(endOpacity, direction, style, time, override, callback)
+        tweens[#tweens + 1] = { root = self, endOpacity = endOpacity, time = time,
+          override = override, callback = callback }
+      end
+    end
+    local rootA = env.root
+    fakeTween(rootA)
+
+    rootA.Visible = true
+    env.ui:CloseScreen('ScreenMain', true)
+    local closeA1 = tweens[#tweens]
+    assert.same(0.5, closeA1.time)
+    assert.is_true(closeA1.override)
+    assert.is_function(closeA1.callback)
+    assert.is_true(rootA.Visible, '动画关闭在本代回调前仍保持可见')
+    closeA1.callback()
+    assert.is_false(rootA.Visible, '本代关闭回调才隐藏当前根')
+    rootA.Visible = true
+
+    env.ui:OpenScreen('ScreenMain', true)
+    local openA = tweens[#tweens]
+    closeA1.callback()
+    assert.is_true(rootA.Visible, '旧 Close 回调不得隐藏重新打开的 A')
+
+    env.ui:CloseScreen('ScreenMain', true)
+    local closeA2 = tweens[#tweens]
+    local rootB = { Visible = false, Name = 'ScreenMain', FindFirstChild = function() return nil end }
+    fakeTween(rootB)
+    env.root = rootB
+    env.ui:OpenScreen('ScreenMain', true)
+    rootB.Opacity = 0.25
+    openA.callback()
+    closeA2.callback()
+    assert.same(0.25, rootB.Opacity, 'A 的 Open 回调不得改写 B 的透明度')
+    assert.is_true(rootB.Visible, 'A 的 Close 回调不得隐藏 B')
   end)
 end)

@@ -136,6 +136,18 @@ describe('摆渡界面（ScreenFerry）', function()
     restore = nil
   end)
 
+  it('test_stale_terminal_does_not_clear_or_announce_a_new_operation', function()
+    local state = env.events.FerryState.OnClientEvent
+    local route = env.routes[1]
+    state:Fire({ phase = 'countdown', routeId = route.Id, operation = '1:1', seconds = 5 })
+    state:Fire({ phase = 'countdown', routeId = route.Id, operation = '2:4', seconds = 8 })
+    state:Fire({ phase = 'cancelled', routeId = route.Id, operation = '1:1', reason = 'payer_left' })
+    env.handler:UpdateCountdown(1)
+    assert.same('前往虾池 7 秒', env.nodes.FerryCountdown.Text)
+    assert.is_true(env.nodes.FerryCountdown.Visible)
+    assert.same({}, env.notices)
+  end)
+
   it('test_countdown_is_per_route_and_label_follows_the_soonest', function()
     -- 倒计时按航线各记各的；倒计时条显示最近的一班并写明目的区
     local state = env.events.FerryState.OnClientEvent
@@ -257,6 +269,55 @@ describe('摆渡界面（ScreenFerry）', function()
     assert.is_false(leg.Node.Visible)
   end)
 
+  it('test_shared_terminal_only_clears_matching_countdown_without_notice', function()
+    local state, result = env.events.FerryState.OnClientEvent, env.events.FerryResult.OnClientEvent
+    local route = env.routes[1]
+    state:Fire({ phase = 'countdown', routeId = route.Id, operation = '1:1', seconds = 5 })
+    state:Fire({ phase = 'countdown', routeId = route.Id, operation = '2:4', seconds = 8 })
+    state:Fire({ phase = 'departed', routeId = route.Id, operation = '1:1' })
+    state:Fire({ phase = 'cancelled', routeId = route.Id, operation = '1:1', reason = 'empty' })
+    env.handler:UpdateCountdown(1)
+    assert.same('前往虾池 7 秒', env.nodes.FerryCountdown.Text)
+    assert.same({}, env.notices)
+    state:Fire({ phase = 'departed', routeId = route.Id, operation = '2:4' })
+    assert.is_nil(env.handler.Countdowns[route.Id])
+    state:Fire({ phase = 'countdown', routeId = route.Id, operation = '3:1', seconds = 4 })
+    state:Fire({ phase = 'cancelled', routeId = route.Id, operation = '3:1', reason = 'anchor' })
+    assert.is_nil(env.handler.Countdowns[route.Id])
+    assert.same({}, env.notices)
+    result:Fire({ ok = true, action = 'Board', routeId = route.Id })
+    result:Fire({ ok = false, action = 'Board', routeId = route.Id, reason = 'not_aboard' })
+    result:Fire({ ok = false, action = 'Board', routeId = route.Id, reason = 'anchor' })
+    result:Fire({ ok = false, action = 'Board', routeId = route.Id, reason = 'interrupted' })
+    result:Fire({ ok = false, action = 'Board', routeId = route.Id, reason = 'teleport' })
+    result:Fire({ ok = false, action = 'Return', routeId = route.Id, reason = 'teleport' })
+    assert.same({
+      '已经到虾池了', '没赶上船，船票已退', '航班取消，船票已退',
+      '上次航班已取消，船票已退', '传送失败，船票已退', '传送失败，金币已退',
+    }, env.notices)
+  end)
+
+  it('test_personal_results_name_arrival_and_refund_without_claiming_shared_refund', function()
+    local state, result = env.events.FerryState.OnClientEvent, env.events.FerryResult.OnClientEvent
+    local route = env.routes[1]
+    state:Fire({ phase = 'countdown', routeId = route.Id, operation = '1:1', seconds = 5 })
+    state:Fire({ phase = 'cancelled', routeId = route.Id, operation = '1:1', reason = 'anchor' })
+    assert.is_nil(env.handler.Countdowns[route.Id])
+    assert.same({}, env.notices)
+    result:Fire({ ok = true, action = 'Board', routeId = route.Id, operation = { id = '1:1' } })
+    assert.same('已经到虾池了', env.notices[#env.notices])
+    result:Fire({ ok = false, action = 'Board', routeId = route.Id, reason = 'not_aboard' })
+    assert.same('没赶上船，船票已退', env.notices[#env.notices])
+    result:Fire({ ok = false, action = 'Board', routeId = route.Id, reason = 'anchor' })
+    assert.same('航班取消，船票已退', env.notices[#env.notices])
+    result:Fire({ ok = false, action = 'Board', routeId = route.Id, reason = 'interrupted' })
+    assert.same('上次航班已取消，船票已退', env.notices[#env.notices])
+    result:Fire({ ok = false, action = 'Board', routeId = route.Id, reason = 'teleport' })
+    assert.same('传送失败，船票已退', env.notices[#env.notices])
+    result:Fire({ ok = false, action = 'Return', routeId = route.Id, reason = 'teleport' })
+    assert.same('传送失败，金币已退', env.notices[#env.notices])
+  end)
+
   it('test_notices_name_the_route_and_its_destination', function()
     -- 状态与回包提示都带目的区；返程回的是出发区，失败原因各有对应提示
     local state, result = env.events.FerryState.OnClientEvent, env.events.FerryResult.OnClientEvent
@@ -264,9 +325,8 @@ describe('摆渡界面（ScreenFerry）', function()
     state:Fire({ phase = 'countdown', routeId = routeA.Id, seconds = 5 })
     state:Fire({ phase = 'departed', routeId = routeA.Id })
     assert.is_nil(env.handler.Countdowns[routeA.Id])
-    assert.same('已经到虾池了', env.notices[#env.notices])
     state:Fire({ phase = 'cancelled', routeId = routeB.Id })
-    assert.same('前往蟹湖的航班取消，船票已退', env.notices[#env.notices])
+    assert.same({}, env.notices)
     result:Fire({ ok = true, action = 'Board', routeId = routeA.Id, seconds = 5 })
     assert.same('船票已交，5 秒后开船', env.notices[#env.notices])
     result:Fire({ ok = true, action = 'Return', routeId = routeA.Id, price = 10 })

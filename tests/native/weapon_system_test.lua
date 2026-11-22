@@ -415,7 +415,7 @@ describe('TestMgrWeaponThrow', function()
             Rotation = { GetForward = function() return { x = 0, y = 0, z = 1 } end } } }
     end
     before_each(function()
-        saved = { game = rawget(_G, 'game'), re = rawget(_G, 'REUtil'),
+        saved = { game = rawget(_G, 'game'), re = rawget(_G, 'REUtil'), print = rawget(_G, 'print'),
             api = package.loaded['server.AbilityAPI'] }
         ctx = { now = 2000, replies = {}, applied = {}, spawnedFish = {}, order = 0, launches = {},
             visuals = {} }
@@ -432,8 +432,10 @@ describe('TestMgrWeaponThrow', function()
         _G.game = { GetService = function(_, name)
             if name == 'World' then return { GetServerTime = function() return ctx.now end,
                 CreateUnit = function(_, unitType, values)
-                    ctx.visuals[#ctx.visuals + 1] = { unitType = unitType, name = values and values.Name }
-                    return { Destroy = function() end, Position = { x = 0, y = 0, z = 0 } }
+                    local unit = { destroyCount = 0, Position = { x = 0, y = 0, z = 0 } }
+                    unit.Destroy = function() unit.destroyCount = unit.destroyCount + 1 end
+                    ctx.visuals[#ctx.visuals + 1] = { unitType = unitType, name = values and values.Name, unit = unit }
+                    return unit
                 end } end
             if name == 'Players' then return { GetPlayers = function() return { ctx.player, ctx.other } end,
                 GetPlayerFromCharacter = function() return nil end } end
@@ -474,6 +476,7 @@ describe('TestMgrWeaponThrow', function()
         _G.game = saved.game
         _G.REUtil = saved.re
         package.loaded['server.AbilityAPI'] = saved.api
+        _G.print = saved.print
     end)
 
     local function giveExplosive(data, itemId, count)
@@ -548,6 +551,128 @@ describe('TestMgrWeaponThrow', function()
         assert.same(0, #ctx.mgr.Flying)
         assert.same(3, #ctx.spawnedFish) -- 落水保底鱼
         assert.same(1, ctx.data:ItemCount('item143')) -- Launch 不经存档协议，本用例直接发射不扣
+    end)
+
+    it('test_expiry_destroy_failure_logs_and_settles_once', function()
+        ctx.player.Character.Position = { x = -11.75, y = 2, z = -28 }
+        ctx.other.Character.Position = { x = -11.75, y = 2.183, z = -12.25 }
+        local waterLanding = { x = -11.75, y = 2.183, z = -12.25 }
+        ctx.mgr.Random = function(a, b) if a and b then return a end return 0.5 end
+        ctx.mgr:Launch(ctx.player, 'item143', waterLanding)
+        local visual = ctx.visuals[1].unit
+        visual.Destroy = function()
+            visual.destroyCount = visual.destroyCount + 1
+            error('destroy-denied')
+        end
+        local logs = {}
+        _G.print = function(...)
+            local fields = {}
+            for i = 1, select('#', ...) do fields[i] = tostring(select(i, ...)) end
+            logs[#logs + 1] = table.concat(fields, '\t')
+        end
+
+        ctx.now = 2000 + GameCfg.Ability.Throw.FlightSec + 0.01
+        ctx.mgr:Update()
+        local fishAfterExpiry, hitsAfterExpiry = #ctx.spawnedFish, #ctx.applied
+        ctx.mgr:Update()
+
+        assert.same(1, visual.destroyCount)
+        assert.same(3, fishAfterExpiry)
+        assert.is_true(hitsAfterExpiry > 0)
+        assert.same(fishAfterExpiry, #ctx.spawnedFish)
+        assert.same(hitsAfterExpiry, #ctx.applied)
+        local log = table.concat(logs, '\n')
+        assert.is_truthy(log:find('[MgrWeapon]', 1, true))
+        assert.is_truthy(log:find('视觉销毁失败', 1, true))
+        assert.is_truthy(log:find('77', 1, true))
+        assert.is_truthy(log:find('item143', 1, true))
+        assert.is_truthy(log:find('destroy-denied', 1, true))
+    end)
+
+    it('test_visual_creation_failure_still_settles_once', function()
+        ctx.player.Character.Position = { x = -11.75, y = 2, z = -28 }
+        ctx.other.Character.Position = { x = -11.75, y = 2.183, z = -12.25 }
+        local waterLanding = { x = -11.75, y = 2.183, z = -12.25 }
+        ctx.mgr.Random = function(a, b) if a and b then return a end return 0.5 end
+        local oldGet = _G.game.GetService
+        local function failCreate(createUnit)
+            _G.game.GetService = function(_, name)
+                if name == 'World' then
+                    local world = oldGet(_, name)
+                    return setmetatable({ CreateUnit = createUnit }, { __index = world })
+                end
+                return oldGet(_, name)
+            end
+            ctx.now = 2000
+            ctx.spawnedFish, ctx.applied = {}, {}
+            ctx.mgr:Launch(ctx.player, 'item143', waterLanding)
+            ctx.now = 2000 + GameCfg.Ability.Throw.FlightSec - 0.01
+            ctx.mgr:Update()
+            assert.same(0, #ctx.spawnedFish)
+            assert.same(0, #ctx.applied)
+            ctx.now = 2000 + GameCfg.Ability.Throw.FlightSec + 0.01
+            ctx.mgr:Update()
+            local fishAfterExpiry, hitsAfterExpiry = #ctx.spawnedFish, #ctx.applied
+            ctx.mgr:Update()
+            assert.same(3, fishAfterExpiry)
+            assert.is_true(hitsAfterExpiry > 0)
+            assert.same(fishAfterExpiry, #ctx.spawnedFish)
+            assert.same(hitsAfterExpiry, #ctx.applied)
+        end
+        failCreate(function() return nil end)
+        failCreate(function() error(setmetatable({ message = 'create-denied' }, { __tostring = function(e) return e.message end })) end)
+    end)
+
+    it('test_removed_thrower_keeps_original_flight_isolated', function()
+        ctx.player.Character.Position = { x = -11.75, y = 2, z = -28 }
+        ctx.other.Character.Position = { x = 0, y = 2, z = 0 }
+        local waterLanding = { x = -11.75, y = 2.183, z = -12.25 }
+        local landLanding = { x = 0, y = 2, z = 10 }
+        ctx.mgr.Random = function(a, b) if a and b then return a end return 0.5 end
+        ctx.mgr:Launch(ctx.player, 'item143', waterLanding)
+        ctx.mgr:Launch(ctx.other, 'item144', landLanding)
+        ctx.other.Character.Position = { x = -11.75, y = 2.183, z = -12.25 }
+        ctx.mgr:OnPlayerRemoving(ctx.player)
+
+        ctx.now = 2000 + GameCfg.Ability.Throw.FlightSec - 0.01
+        ctx.mgr:Update()
+        assert.same(0, #ctx.spawnedFish)
+        assert.same(0, #ctx.applied)
+        assert.same(0, ctx.visuals[1].unit.destroyCount)
+        assert.same(0, ctx.visuals[2].unit.destroyCount)
+
+        ctx.now = 2000 + GameCfg.Ability.Throw.FlightSec + 0.01
+        ctx.mgr:Update()
+        local fishAfterExpiry, hitsAfterExpiry = #ctx.spawnedFish, #ctx.applied
+        ctx.mgr:Update()
+        assert.same(3, fishAfterExpiry)
+        assert.same(4, hitsAfterExpiry)
+        local playerHits = 0
+        for _, hit in ipairs(ctx.applied) do
+            assert.same(50, hit.amount)
+            if hit.target == ctx.other then playerHits = playerHits + 1 end
+        end
+        assert.same(1, playerHits)
+        assert.same(1, ctx.visuals[1].unit.destroyCount)
+        assert.same(1, ctx.visuals[2].unit.destroyCount)
+        assert.same(fishAfterExpiry, #ctx.spawnedFish)
+        assert.same(hitsAfterExpiry, #ctx.applied)
+    end)
+
+    it('test_failed_blast_fish_does_not_roll_back_or_retry_damage', function()
+        ctx.player.Character.Position = { x = -11.75, y = 2, z = -28 }
+        ctx.other.Character.Position = { x = -11.75, y = 2.183, z = -12.25 }
+        local waterLanding = { x = -11.75, y = 2.183, z = -12.25 }
+        ctx.mgr.FishUnit.SpawnBlastFish = function() error('blast-fish-denied') end
+        ctx.mgr:Launch(ctx.player, 'item143', waterLanding)
+        ctx.now = 2000 + GameCfg.Ability.Throw.FlightSec + 0.01
+        ctx.mgr:Update()
+        local hitsAfterExpiry = #ctx.applied
+        ctx.mgr:Update()
+        assert.same(0, #ctx.spawnedFish)
+        assert.is_true(hitsAfterExpiry > 0)
+        assert.same(hitsAfterExpiry, #ctx.applied)
+        assert.same(1, ctx.visuals[1].unit.destroyCount)
     end)
 
     -- #212：同屏两发在飞时，投掷物名字必须各自可区分。原来全服都叫 ThrowProjectile，
