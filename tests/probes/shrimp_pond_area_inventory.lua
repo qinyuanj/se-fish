@@ -3,7 +3,7 @@
 --   editor-cli exec --file tests/probes/shrimp_pond_area_inventory.lua --expect-edit-mode --timeout 120 --json
 --   editor-cli log grep SHRIMPAREA102 --platform editor --context 0 --max-matches 400 --json
 --
--- 用途：回答 ADR 0003 施工前置第 1 条 —— 旧虾池是否仍有水面实体（配置注释称有一块 pos.y=4.2 的
+-- 用途：回答虾池施工前置第 1 条（区模板口径见 ADR-0013，原 ADR-0003 已并入）—— 旧虾池是否仍有水面实体（配置注释称有一块 pos.y=4.2 的
 --   深水预设，#65 基线说 02 区子树里没有）。基线探针只走区根子树，这里改按类型全量枚举，
 --   不管单位挂在哪个父级，只要位置落进拓宽后的范围（外扩 10 米）就列出来，并给出完整父级路径。
 -- 口径同 zone_baseline_inventory.lua：只读；不枚举 Script / PresetLink；不用 World:GetDescendants()。
