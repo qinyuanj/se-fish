@@ -1,5 +1,3 @@
--- 礁石岛收线的来源灰盒：企鹅出水，其余自空中拉向玩家；与界面显隐无关。
--- CastState 仅描述表现，活鱼/奖励仍由服务端上岸结算；脱钩/收竿/死亡清除本地实体。
 local GameCfg = require('common.GameCfg')
 local Visual = {}
 local function point(p)
@@ -33,7 +31,6 @@ function Visual:Show(state)
         ModelColor1=Color.New(fish.VisualColor[1],fish.VisualColor[2],fish.VisualColor[3],fish.VisualColor[4]) })
     if not ok or not body then print('[LocalCastSource] 创建来源失败',tostring(body)); return end
     self.Body,self.State=body,state
-    -- LinkEffectUnit 的 Position/EndPosition 在本地存根公开；不依赖不存在的 StartBindUnit。
     local lineOk,line=pcall(world.CreateUnit,world,'LinkEffectUnit',{
         Name='CastSourceLine_'..tostring(state.castId),EffectId=GameCfg.Casting.LineEffect,
         Position=Vector3.New(p.x,p.y,p.z),EndPosition=Vector3.New(p.x,p.y,p.z) })

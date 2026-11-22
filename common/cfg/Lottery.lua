@@ -1,4 +1,3 @@
--- 三轴独立同权重；恰好两同按实际投入价值返金币，三同优先，仅给对应大奖。
 return {
     Axes = 3,
     PairRule = 'exactlyTwo',

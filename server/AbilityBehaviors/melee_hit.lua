@@ -1,21 +1,10 @@
--- 本图挥砍行为，基于官方 ability_system/anchors/melee_hit.lua（导入版本 9382ad8）。
--- 官方代码向 TakeDamage 多传 owner；本图受击体的 BaseController 只接受 damage，
--- 多传实参会报 framecore1::Instance 类型告警。保留官方命中、动画及回收行为。
---技能系统 - server锚点逻辑：melee_hit（Constant：命中盒/武器随锚点生命周期回收）
--- 点火时（可选）在施法者武器插槽挂武器模型 + 播上半身动画，并生成命中盒（TriggerUnit）
--- 捕获目标，命中造成伤害/击退/命中特效。
--- 命中盒与武器随锚点生命周期回收：Duration 到时 / 施法结束 / 施法打断 / 锚点销毁
--- → 锚点 Duration 必须 > 0。
 
 local SwingRegistry = require("server.SwingRegistry")
 
 local M = { Services = {} }
 
--- #212：每次挥击的实例序号（模块内自增，不建全局计数器）。武器挂点与命中盒的名字都带它，
--- 同一玩家连击时才不会短暂并存两个同名兄弟节点、按名查到哪个不确定。
 local SwingSeq = 0
 
--- 硬编码常量
 local TRIGGER_BOX_PREFAB_ID = 57450
 local HIT_SFX_LIFETIME = 1.0
 local HITTABLE_UNIT_TYPES = {
@@ -45,14 +34,12 @@ local function _getYaw(unit)
 	return 0.0
 end
 
--- 本地空间偏移（+Z=朝向, +X=右侧, +Y=上）旋转到世界空间
 local function _rotateYaw(vec, yaw)
 	local c = math.cos(yaw)
 	local s = math.sin(yaw)
 	return Vector3.New(vec.x * c + vec.z * s, vec.y, -vec.x * s + vec.z * c)
 end
 
--- sync_facing=true：命中盒朝向跟随 owner yaw；false：世界绝对方向
 local function _getAreaTransform(owner, offset, sync_facing)
 	local owner_pos = _getPosition(owner)
 	if not owner_pos then
@@ -75,7 +62,6 @@ local function _safeScale(scale, fallback)
 	return scale
 end
 
--- 欧拉角（度）→ 四元数（ZXY）
 local function _eulerDegToQuat(v)
 	if not v then
 		return Quaternion.FromEulerAngles(0, 0, 0)
@@ -117,8 +103,6 @@ local function _applyDamage(target, damage, owner, hit)
 	if not damage or damage == 0.0 or not hit then
 		return false
 	end
-	-- #128：本图业务伤害不直接碰 Controller。鱼受击体与玩家角色都经根 Vitals 的命中身份结算；
-	-- 同一判定段对同一目标的重放由入口拒绝，未解析到业务目标时不做旧式直扣。
 	if M.Services.FishCarrier:ResolveCarrier(target) then
 		return (M.Services.Vitals:ApplyHit(hit, target, damage))
 	end
@@ -199,7 +183,6 @@ function M.Attach(anchor_script, services)
 	if not RunService:IsServer() then
 		return
 	end
-	-- 命中盒/武器随锚点生命周期回收，Duration=0（Instant）将无法回收
 	if (anchor_script:GetAttribute("Duration") or 0) <= 0 then
 		print("[melee_hit] WARNING: Duration 必须 > 0（命中盒随锚点生命周期回收）")
 		return
@@ -209,7 +192,6 @@ function M.Attach(anchor_script, services)
 		return
 	end
 
-	-- 本次点火私有状态（AnchorStart 重建）
 	local state = nil
 
 	local function _cleanup()
@@ -228,8 +210,6 @@ function M.Attach(anchor_script, services)
 			end)
 		end
 		state.tu = nil
-		-- 武器实际存在 state.weapon_unit / state.weapon_mount（见下方创建处），
-		-- 之前写成 mount_ref / unit_ref，字段名不匹配 → 永远销毁不到。
 		if state.weapon_mount and state.weapon_mount.UnitId then
 			pcall(function()
 				state.weapon_mount:Destroy()
@@ -246,7 +226,7 @@ function M.Attach(anchor_script, services)
 	end
 
 	start_sig:Connect(function()
-		_cleanup() -- 防御：上一轮未正常终结时先回收
+		_cleanup()
 		state = {}
 		SwingSeq = SwingSeq + 1
 		local swing_seq = SwingSeq
@@ -257,9 +237,6 @@ function M.Attach(anchor_script, services)
 			return
 		end
 
-		-- #129：玩家挥砍只认服务端登记（MgrWeapon 按 GameCfg 表登记伤害/射程）；
-		-- 未登记（伪造 RequestCast）不建命中盒、不结算伤害，只播表现。非玩家单位（鱼类施法）
-		-- 没有登记概念，沿用预设属性。
 		local player = game:GetService("Players"):GetPlayerFromCharacter(owner)
 		local swing = nil
 		if player then
@@ -278,11 +255,10 @@ function M.Attach(anchor_script, services)
 			if not swing then
 				return
 			end
-			-- 命中盒随登记射程：offset z=range/2（盒中心在面前半程），scale z=range，宽/高 2 米
 			hit_box_offset = Vector3.New(0, 1, swing.range / 2)
 			hit_box_scale = Vector3.New(2, 2, swing.range)
 			hit_damage = swing.damage
-			state.effect = swing.effect -- #139 近战大奖特效（毒/灼烧），命中成功后应用
+			state.effect = swing.effect
 		end
 		if player then
 			hit_damage = M.Services.GM:GetMeleeDamage(player, hit_damage)
@@ -303,7 +279,6 @@ function M.Attach(anchor_script, services)
 
 		local World = game:GetService("World")
 
-		-- 武器模型：SkeletalSocketMount 挂插槽 + CreateAsset 生成
 		if weapon_prefab ~= "" then
 			local weapon_mount = World:CreateUnit("SkeletalSocketMount", {
 				Name = "ToolMount_" .. tostring(owner.UnitId) .. "_" .. tostring(swing_seq),
@@ -349,13 +324,10 @@ function M.Attach(anchor_script, services)
 			end
 		end
 
-		-- 上半身挥击动画（播完自停，无需回收）
 		if anim_id ~= "" and owner.Animator then
 			pcall(function()
 					local track = owner.Animator:LoadAnimation(anim_id)
 					if track then
-						-- 引擎没有 AnimationFilterType.UpperBody（只有 Head/Trunk/LeftArm/RightArm/LeftLeg/RightLeg 位），
-						-- 取 nil 会让引擎赋值报错并被 pcall 吞掉 → track:Play 不执行 → 没动作。上半身用位掩码 30。
 						track.FilterType = 30
 						track.Looped = false
 						track:Play(0.05, 1, 1)
@@ -363,7 +335,6 @@ function M.Attach(anchor_script, services)
 			end)
 		end
 
-		-- 命中盒（随锚点生命周期回收）
 		local hit_map = {}
 		local center, yaw = _getAreaTransform(owner, hit_box_offset, sync_facing)
 		if not center then
@@ -402,13 +373,11 @@ function M.Attach(anchor_script, services)
 			if tid then
 				hit_map[tid] = true
 			end
-			-- 命中：先经统一入口结算；被安全区 / 状态规则拦下时不击退也不播命中特效
 			if _applyDamage(target, hit_damage, owner, state and state.hit) then
 				print("[melee_hit] 命中 uid=" .. tostring(player and player.UserId or owner.UnitId),
 					"target=" .. tostring(tid), "damage=" .. tostring(hit_damage))
 				_applyHitPower(target, hit_power, owner)
 				_createHitSfx(anchor_script, target)
-				-- #139：伤害被统一入口接受后才挂特效；hit_map 去重保证一次判定段对同一目标只挂一次
 				local modifier = M.Services.Modifier
 				if player and state and state.effect and modifier.ApplyWeaponEffect then
 					local ok, err = pcall(modifier.ApplyWeaponEffect, modifier, player, target, state.effect)
@@ -421,7 +390,6 @@ function M.Attach(anchor_script, services)
 			process_hit(other_unit)
 		end)
 
-		-- 捕获创建时已在区域内的单位
 		local Physics = game:GetService("PhysicsService")
 		if Physics and Physics.GetPartsInPart then
 			local init_units = Physics:GetPartsInPart(tu)
@@ -433,7 +401,6 @@ function M.Attach(anchor_script, services)
 		end
 	end)
 
-	-- 随锚点生命周期回收：Duration 到时 / 施法结束 / 施法打断 / 锚点销毁
 	for _, name in ipairs({ "AnchorEnd", "AnchorBreak", "AnchorStop" }) do
 		local sig = anchor_script:FindFirstChild(name)
 		if sig then

@@ -1,4 +1,3 @@
--- #53 官方指令只作用于真实受击体；轨迹交接先取消模式，再归还本体写入权。
 local AiAPI = require('server.packages.official_ai_feature.api')
 local BehaviorRuntime = require('server.packages.official_ai_feature.behavior_runtime')
 local Mgr = { AiAPI = AiAPI, States = {} }

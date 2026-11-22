@@ -1,4 +1,3 @@
--- 历史探针兼容入口；正式玩法经MgrAttr/AttrModel，不再独立实现永久成长公式。
 local Model = require('common.AttrModel')
 local GameCfg = require('common.GameCfg')
 local M = {}

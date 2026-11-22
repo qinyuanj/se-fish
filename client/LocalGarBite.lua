@@ -1,6 +1,3 @@
--- 鳄雀鳝头部攻击预警（#134）：只消费服务端 GarBiteNotice，在鱼身中点按锁定的头部朝向贴地摆红色指示器，
--- 咬出 / 咬空 / 取消 / 鱼没了（clear）或超时后收起。纯表现，判定与伤害都在服务端 MgrFishUnit。
--- 特效用官方「扇形指示器-红色」（GameCfg.FishCombat.gar.Warning）：箭头与环形波纹提示锁定朝向和范围。
 local GameCfg = require('common.GameCfg')
 local GarBiteNotice = require('common.GarBiteNotice')
 
@@ -46,8 +43,6 @@ function LocalGarBite:Show(payload)
     local placed, err = pcall(function()
         effect.Position = Vector3.New(p.x, p.y + c.GroundOffset, p.z)
         effect.Rotation = Quaternion.FromEulerAngles(0, payload.yaw + c.EffectYawOffset, 0)
-        -- 等比缩放：技能包 Sector/CirclePointer 对 7189/7187 写 y=0，但 7190 在技能包里从未实例化，
-        -- y=0 对它是否仍可见无证据；等比缩放不会压成零厚度，贴地特效也仍是平的。
         effect.Scale = Vector3.New(scale, scale, scale)
         if line then
             local fx,fz = math.sin(payload.yaw),math.cos(payload.yaw)
@@ -83,7 +78,6 @@ function LocalGarBite:Show(payload)
         end
     end
     if payload.move == 'rain' then
-        -- 暴雨是独立表现，方向指示器只表达危险范围；两者共用本招收尾生命周期。
         local rainOk, rainUnits = pcall(world.CreateAsset, world, GameCfg.FishCombat.dragon.RainEffect)
         local rain = rainOk and type(rainUnits) == 'table' and rainUnits[1] or nil
         if rain then
@@ -102,7 +96,6 @@ function LocalGarBite:Show(payload)
         end
     end
     self.Active[fishId] = entry
-    -- 兜底：clear 丢失（迟加入 / 断线）时按预警时长收起；新一轮预警已替换则不动
     local task = game:GetService('Task')
     if task and task.Delay then
         task:Delay(payload.duration + c.GraceSec, function()

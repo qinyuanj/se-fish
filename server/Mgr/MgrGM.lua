@@ -1,8 +1,3 @@
--- GM 发放（#47，#28 规格）：服务端单点裁决，只在 GameCfg.Debug.Enabled 打开时接受请求。
--- 客户端发 GMAction{action, target, ...}；target 缺省是发起者自己，给数字 UserId 则发给在线的那名玩家，
--- 查不到就失败、不落到别人身上。加 / 扣币走 PlayerData:AddCoin / SpendCoin 这一唯一入口（扣不成负数），
--- 发物品走 PlayerData:GrantItem 按物品表的 Container 路由（鱼竿进道具栏、蚯蚓进鱼饵库存）。
--- 设血量 / 饥饿度（#53）走 MgrVitals:SetHealth / SetHunger。
 local GameCfg = require('common.GameCfg')
 
 local Mgr = { AttackBonuses = {} }
@@ -69,7 +64,6 @@ function Mgr:Item(data, payload)
     return true
 end
 
--- 设血量 / 饥饿度（#53）：走 MgrVitals 的同名入口（调低血量经 ApplyDamage 单点），越界值拒绝
 function Mgr:SetHealth(_, payload, target)
     return self.Vitals ~= nil and self.Vitals:SetHealth(target, payload.value)
 end
@@ -97,7 +91,6 @@ function Mgr:GetAttack()
     return true
 end
 
--- 处理一次 GM 请求；发放成功返回 true
 function Mgr:Handle(player, payload)
     if not (GameCfg.Debug and GameCfg.Debug.Enabled) then
         print('[MgrGM] 调试开关关闭，拒绝', player and player.UserId)

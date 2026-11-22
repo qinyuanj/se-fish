@@ -10,10 +10,6 @@ ScreenHandler.UINodeMap = {}
 local World = game:GetService("World")
 local Players = game:GetService("Players")
 local PassBy = nil
---{
---  Msg:string
---  CallBack:function(yesNo)
---}
 
 function ScreenHandler:Init()
     self.Inited = true

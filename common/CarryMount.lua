@@ -1,14 +1,3 @@
--- #132 T11 高风险能力原型 · 能力 C：巡航叼人的挂点附着、携带跟随与释放。
--- 数值来源：GameSpec §12（沧龙绕岛咬最近岛中心玩家、咬中 300、叼走入海）。
--- 配置见 GameCfg.Ability.Carry。
---
--- 服务端语义：宿主（沧龙）用 SkeletalSocketMount 挂点带着玩家走，位置由服务端每帧写回，
--- 所以「跟随」不是父子关系而是每帧校验：
---   * 挂点不穿出：挂点位移必须清空宿主与携带物的身体（中心距 ≥ 两者半高之和，球形间隙近似）；
---   * 挂点坐标随宿主位姿与体型：位置 = 宿主位置 + 绕 Y 旋转后的挂点位移，位移由 BodyScale 放大；
---   * 携带跟随：偏出容差才整段钳回挂点（容差内不动它，否则每帧纠正会抖）；
---   * 越界与坏值：超抓取距离不叼、无挂点不叼；目标位置出现 NaN/inf 立即释放并给有限落点。
--- 真机挂点是否穿模、玩家是否被甩出仍需编辑器窗口试玩，见 issue #132 待办清单。
 local GameCfg = require('common.GameCfg')
 
 local M = {}
@@ -44,8 +33,6 @@ function M.Length(offset)
     return math.sqrt(num(offset.x) ^ 2 + num(offset.y) ^ 2 + num(offset.z) ^ 2)
 end
 
----挂点位移净化：中心距不足「宿主半高 + 携带物半高」就沿原方向推出去。
----零位移没有方向可用时用 +z（宿主正前方）兜底，而不是产出 NaN 方向。
 ---@param offset table { x, y, z }
 ---@param hostHalf number 宿主半高
 ---@param carriedHalf number 携带物半高
@@ -60,7 +47,6 @@ function M.SafeOffset(offset, hostHalf, carriedHalf)
     return { Offset = { x = safe.x * k, y = safe.y * k, z = safe.z * k }, Corrected = true }
 end
 
----挂点世界坐标：宿主位置 + 绕 Y 轴 yaw（弧度）旋转后的挂点位移。
 ---@param host table 宿主位置
 ---@param offset table 挂点位移（1 倍体型下的基准值 × 体型倍率）
 ---@param yaw number 宿主朝向（弧度）
@@ -78,7 +64,6 @@ function M.MountPoint(host, offset, yaw)
     }
 end
 
----释放落点：宿主前方 DropForward 米、离地 DropHeight 米（不会跟着宿主继续飞）。
 function M.DropPoint(host, yaw, groundY, carryCfg)
     carryCfg = carryCfg or cfg()
     host = host or { x = 0, y = 0, z = 0 }
@@ -90,7 +75,6 @@ function M.DropPoint(host, yaw, groundY, carryCfg)
     }
 end
 
----新建携带状态。host 是宿主（沧龙）位置，groundY 是所在地面的高度（释放落点用）。
 ---@param carryCfg? table
 ---@param host? table
 ---@param yaw? number
@@ -114,12 +98,10 @@ end
 
 function M.InRange(state, target)
     if isBadPoint(target) then return false end
-    -- 只比水平距离：宿主常在十几米高空，按三维距离永远叼不到站地上的玩家
     local dx, dz = target.x - state.Host.x, target.z - state.Host.z
     return math.sqrt(dx * dx + dz * dz) <= state.Cfg.GrabRange
 end
 
----叼起目标。
 ---@return table { Ok, Reason?, Damage? }
 function M.Attach(state, target, now)
     if type(state.Cfg.Socket) ~= 'string' or state.Cfg.Socket == '' then
@@ -136,7 +118,6 @@ function M.Attach(state, target, now)
     return { Ok = true, Damage = state.Cfg.GrabDamage, Position = state.Mount }
 end
 
----释放携带，返回落点。重复释放是空操作（不会把玩家扔两次）。
 function M.Release(state, now, reason)
     if not state.Carried then return { Ok = false, Reason = 'notCarrying' } end
     state.Carried = false
@@ -147,7 +128,6 @@ function M.Release(state, now, reason)
     return { Ok = true, Reason = reason or 'manual', DropPoint = drop, Position = drop }
 end
 
----携带跟随：偏出容差才钳回挂点；目标位置出现坏值时释放而不是把 NaN 写回玩家。
 ---@return table { Position?, Snapped?, Released?, Reason? }
 function M.Follow(state, targetPos, now, dt)
     if not state.Carried then return { Position = nil } end
@@ -164,7 +144,6 @@ function M.Follow(state, targetPos, now, dt)
     return { Position = targetPos, Snapped = false }
 end
 
----每帧推进：超时自动释放，否则回到挂点。
 ---@return table { Released, Reason?, DropPoint?, Position? }
 function M.Step(state, now, dt)
     state.Stats.Frames = state.Stats.Frames + 1

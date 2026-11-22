@@ -1,18 +1,4 @@
--- 水判定（M0-V1 转正）。语义来源：原型分支 prototype/water-judgment 的 server/ProtoWater.lua
--- 里的 MakeMathJudge（issue #12 结案结论），这里把它补成正式模块 + 配置校验。
---
--- 为什么是纯数学：本图的水是 WaterCircle1/2 两个水材质渲染 WorldUnit，
--- CanQuery=true 但没有命中几何——水中心的垂直射线先撞 TGUnitFish 触发器（顶面 y≈6.77），
--- 排掉触发器后撞的是大地板（y=2.0），全程碰不到水圈。300 次调用实测：
--- 数学 0.12ms / 射线 6.21ms / 球形重叠 2.73ms（#12 W-3），30Hz 逻辑帧下数学判定可忽略。
---
--- 现有水区沿用 HalfXZ 正方形；#125 待建长方形使用 HalfX/HalfZ（两者都必须提供）。
--- 水平边与水面高度均含等号；坐标与尺寸必须有限，Id 不得重复。
---   abs(pos.x - center.x) <= halfX and abs(pos.z - center.z) <= halfZ and pos.y <= surfaceY
---
--- 只读 pos 的 x/y/z，不调用任何引擎 API：Vector3 与普通 table 都能直接传，
--- 所以这组纯函数能在宿主机 lua 单测里跑（tests/native/water_judge_test.lua）。
---
+-- 水圈 CanQuery=true 但没有可命中几何：垂直射线只能命中鱼触发器或地板，不能依赖射线判水。
 -- 配置见 GameCfg.Water.Zones。HalfXZ 直接写运行时该水区的半边尺寸：运行时读到的 Size 已含
 -- Scale，配置时再乘缩放会翻倍（#12 W-4）。取值与溯源见 issue #25 的 M0 模块线台账（评论 9862）。
 
@@ -22,7 +8,6 @@ local function finite(value)
     return type(value) == 'number' and value == value and math.abs(value) < math.huge
 end
 
--- 中心只用到 x/z（y 留作场景溯源），HalfXZ / SurfaceY 都是米。
 local function checkZone(index, zone)
     local where = "MathWaterJudge.Build: 第 " .. index .. " 个水区"
 
@@ -54,7 +39,6 @@ local function checkZone(index, zone)
     end
 end
 
--- 单个水区的判定：原型 MakeMathJudge 的语义。
 function MathWaterJudge.InZone(zone, pos)
     local center = zone.Center
     return math.abs(pos.x - center.x) <= (zone.HalfX or zone.HalfXZ)
@@ -62,7 +46,6 @@ function MathWaterJudge.InZone(zone, pos)
         and pos.y <= zone.SurfaceY
 end
 
--- 多区查询：按配置顺序返回第一个命中的水区（同心水圈时命中排在前面的那个）。
 function MathWaterJudge.HitZone(zones, pos)
     for i = 1, #zones do
         if MathWaterJudge.InZone(zones[i], pos) then
@@ -72,8 +55,6 @@ function MathWaterJudge.HitZone(zones, pos)
     return nil
 end
 
--- 装配期建判定器：配置配错在这里一次性报出来，不静默退化成「永远不在水里」。
--- 返回 function(pos) -> zone|nil，命中给水区表（zone.Id 用于日志与按水区选鱼表）。
 function MathWaterJudge.Build(zones)
     if type(zones) ~= "table" or #zones == 0 then
         error("MathWaterJudge.Build: 水区配置为空")
@@ -90,7 +71,6 @@ function MathWaterJudge.Build(zones)
     end
 end
 
--- 朝水方向（#164）：在给定水域里找平面上最近的矩形点，返回单位向量 dx, dz；已在水里或无水域返回 nil。
 function MathWaterJudge.Toward(zones, pos)
     local best, bestX, bestZ
     for _, zone in ipairs(zones) do
@@ -106,8 +86,6 @@ function MathWaterJudge.Toward(zones, pos)
     return bestX / length, bestZ / length
 end
 
--- 输入为只读现场快照：每项含 Name、Position={x,y,z}，不在模块内获取 Service。
--- EntitiesMatch 只说明实体名/坐标匹配；保存、sync、碰撞和试玩始终单列未验证，不提供总就绪值。
 function MathWaterJudge.InspectScene(zones, snapshot)
     local byName = {}
     for _, entity in ipairs(snapshot) do

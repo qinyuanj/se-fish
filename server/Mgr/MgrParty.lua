@@ -1,8 +1,3 @@
--- §9 多人规则（#253 小队）：小队归属、名单与人数是只由服务端维护的权威状态。
--- 客户端只能表达意图（邀请谁、接受、拒绝、离队）：请求里的 partyId / members / owner 一律不读，
--- 归属与名单只由本管理器判定，写进玩家存档的 extra.party.id，重连时按它恢复或给出明确的解散结果。
--- 邀请 2 米、10 秒未处理按拒绝、3 人上限、离线自动离队、少于 2 人解散、主动离队立即生效。
--- 伤害入口一行不动：队友免伤的证据归 PK/抢救子单，这里只提供 SameParty 接缝给后续判定用。
 local GameCfg = require('common.GameCfg')
 
 local Mgr = { Parties = {}, PartyOf = {}, Invites = {}, Online = {}, HealthCache = {}, NextId = 0, Epoch = nil }
@@ -25,7 +20,6 @@ end
 
 local function re(name) return _G.REUtil:GetRE(name) end
 
--- 邀请距离按场景平面距离（与摆渡 BoatRange、近战判定同一口径），高度差不算进 2 米。
 local function flatDistance(a, b)
     if not a or not b then return nil end
     local dx, dz = a.x - b.x, a.z - b.z
@@ -48,7 +42,6 @@ function Mgr:PartyIdOf(player)
     if id and self.Parties[id] then return id end
 end
 
--- 名单按加入顺序；只返回在线成员（离线成员在 OnPlayerRemoving 时已经离队）。
 function Mgr:Members(player)
     local party = self.Parties[self:PartyIdOf(player) or 0]
     if not party then return {} end
@@ -65,7 +58,6 @@ function Mgr:Count(player)
     return party and #party.Members or 0
 end
 
--- 队友判定的唯一接缝：免伤等规则从这里取结论，不自己维护第二份归属。
 function Mgr:SameParty(a, b)
     local id = a and self:PartyIdOf(a)
     return id ~= nil and b ~= nil and self:PartyIdOf(b) == id
@@ -82,8 +74,6 @@ function Mgr:DataOf(player)
     return data
 end
 
--- 服务端会话纪元：本轮开服发的队伍号都带它。与 MgrLoot.DeliveryEpoch 同口径
--- （开服时刻 + 随机数），只用来分辨「号码是不是这一轮发的」，不是鉴权秘密。
 function Mgr:SessionEpoch()
     if not self.Epoch then
         local ok, value = pcall(function() return game:GetService('World'):GetServerTime() end)
@@ -93,8 +83,6 @@ function Mgr:SessionEpoch()
     return self.Epoch
 end
 
--- 归属写进存档的持久字段；落账交给 MgrSave 的自动存档与离场快照，这里只改权威值。
--- 队伍号旁同时记纪元：NextId 每轮开服从 0 自增，只凭裸号码会把旧档玩家恢复进陌生队伍。
 function Mgr:SavePartyId(player, id)
     local data = self:DataOf(player)
     if not data or type(data.Extra) ~= 'table' then
@@ -108,7 +96,6 @@ function Mgr:SavePartyId(player, id)
     return true
 end
 
--- 存档里的队伍归属：号码 + 写入时的会话纪元（旧档没有纪元，返回 nil）。
 function Mgr:SavedParty(player)
     local data = self:DataOf(player)
     local party = data and data.Extra and data.Extra.party
@@ -126,7 +113,6 @@ end
 
 function Mgr:AddMember(party, player)
     if self.PartyOf[player.UserId] then return false, 'already-in-party' end
-    -- 先写归属再提交内存成员关系；写档失败时这名玩家从未占队名额。
     local ok, reason = self:SavePartyId(player, party.Id)
     if not ok then return false, reason or 'save-failed' end
     party.Members[#party.Members + 1] = player.UserId
@@ -163,7 +149,6 @@ local function healthRows(self, member)
     return health, maxHealth
 end
 
--- 快照就是界面与本单断言的唯一读面：无队伍 state='none'，有队伍带上每名在线成员的血量。
 function Mgr:SnapshotOf(player, notice)
     local snapshot = { state = 'none', members = {} }
     local invite = self.Invites[player.UserId]
@@ -214,7 +199,6 @@ function Mgr:Reply(player, action, ok, reason)
     return ok, reason
 end
 
--- 邀请：2 米内、双方队伍都有空位、目标还没有队伍。邀请只记在服务端，客户端拿不到可写的名额。
 function Mgr:Invite(player, targetUserId)
     if type(targetUserId) ~= 'number' or targetUserId ~= math.floor(targetUserId)
         or targetUserId <= 0 or targetUserId == player.UserId then
@@ -222,30 +206,25 @@ function Mgr:Invite(player, targetUserId)
     end
     local target = self.Online[targetUserId]
     if not target then return false, 'offline' end
-    -- 目标已在别的队伍里时拒绝邀请（不隐式替他换队，见 docs/to-questionnaire 的待决题）。
     if self:PartyIdOf(target) then return false, 'target-in-party' end
     if self:Count(player) >= cfg().MaxMembers then return false, 'full' end
     local mine, theirs = positionOf(player), positionOf(target)
     if not mine or not theirs then return false, 'no-position' end
     if flatDistance(mine, theirs) > cfg().InviteRange then return false, 'too-far' end
-    -- 同一目标只留最新一条待处理邀请：旧邀请随新邀请作废，避免两条邀请各记一个名额。
     local at = now()
     self.Invites[targetUserId] = { From = player.UserId, At = at, ExpiresAt = at + cfg().InviteTimeoutSec }
     self:Push(target)
     return true
 end
 
--- 接受：只认服务端记下的那条邀请；客户端自报的 fromUserId 只用来核对，不参与选队。
 function Mgr:Accept(player, fromUserId)
     local invite = self.Invites[player.UserId]
     if not invite then return false, 'no-invite' end
-    -- 拒绝收场只有一件事：清掉这条待处理邀请、推一次状态、把原因回给调用方。
     local function drop(reason)
         self.Invites[player.UserId] = nil
         self:Push(player)
         return false, reason
     end
-    -- 到期判定与 Update 的清扫同一口径：不等 Update 的同一帧窗口里到点的邀请也不放行。
     if now() >= invite.ExpiresAt then return drop('expired') end
     if fromUserId ~= nil and fromUserId ~= invite.From then return false, 'stale' end
     local inviter = self.Online[invite.From]
@@ -267,7 +246,6 @@ function Mgr:Accept(player, fromUserId)
     local ok, reason = self:AddMember(party, player)
     if not ok then
         if created then
-            -- 新队是两名成员的一次提交：第二人失败时，邀请人的内存与存档归属都回滚。
             self:RemoveMember(party, inviter)
             self.Parties[party.Id] = nil
             local restored, restoreReason = self:SavePartyId(inviter, 0)
@@ -289,7 +267,6 @@ function Mgr:Decline(player)
 end
 
 function Mgr:Disband(party, notice, skipUserId)
-    -- 先清完全部存档归属再提交内存解散；中途失败时恢复此前已清的值，成员关系不动。
     local saved = {}
     for _, userId in ipairs(party.Members) do
         local member = self.Online[userId]
@@ -313,14 +290,10 @@ function Mgr:Disband(party, notice, skipUserId)
         self.HealthCache[userId] = nil
         self:Push(member, notice)
     end
-    -- #249：解散也走一次满员等待的重试——等着的那批人的原队已经不在，
-    -- 让他们当场拿到「原队已散」的明确结果，归属落回无队伍，而不是把悬空归属留到下次重连。
     self:RetryRestore(skipUserId)
     return true
 end
 
--- reason = 'offline' 时保留存档里的归属，重连才有「恢复原队伍」；主动离队立即落回无队伍。
--- #249：离队会空出位置，末尾统一重试一次「满员等待」的玩家（见 RetryRestore，条款 9-22）。
 function Mgr:Leave(player, reason)
     local party = self.Parties[self:PartyIdOf(player) or 0]
     if not party then
@@ -334,16 +307,13 @@ function Mgr:Leave(player, reason)
     local _, removedIndex = self:RemoveMember(party, player)
     local notice = reason == 'offline' and nil or 'left'
     if #party.Members < cfg().MinMembers then
-        -- Disband 末尾自己会重试一次满员等待，这里不再重复
         local ok, saveReason = self:Disband(party, 'disbanded', player.UserId)
         if not ok then
-            -- 主动离队可完整回滚；离线玩家仍须移除，不能用内存队伍阻止引擎离场。
             if reason ~= 'offline' then
                 restoreMember(self, party, player, removedIndex)
                 local restored, restoreReason = self:SavePartyId(player, party.Id)
                 if not restored then logFailure('回滚主动离队成员', player, restoreReason or '存档不可用') end
             end
-            -- 主动分支推送回滚后的完整名单；离线分支推送移除离线者后的剩余名单，共用一次。
             self:PushParty(party)
             return false, saveReason
         end
@@ -370,8 +340,6 @@ function Mgr:Handle(player, payload)
     return self:Reply(player, action, ok, reason)
 end
 
--- 血量不是入队时的一次性快照：周期读取 Vitals，变化时向整队推送，未变化不广播。
--- 这是 Vitals 自身 HealthChanged 属性同步之外的队伍 HUD 通道，伤害、治疗与复活都走同一读面。
 function Mgr:SyncHealth(time)
     if self.NextHealthSyncAt and time < self.NextHealthSyncAt then return end
     self.NextHealthSyncAt = time + cfg().HealthSyncIntervalSec
@@ -392,7 +360,6 @@ function Mgr:SyncHealth(time)
     for _, party in pairs(dirty) do self:PushParty(party) end
 end
 
--- 超时结算：过期邀请按拒绝处理，双方界面都收到状态刷新，之后再接受不生效。
 function Mgr:Update()
     local time = now()
     local expired = {}
@@ -410,9 +377,6 @@ function Mgr:Update()
     self:SyncHealth(time)
 end
 
--- 重连恢复：存档里的小队号还在、纪元是本轮的、那支队伍也还在（有队友在线、未满）就回到原队伍；
--- 号码对不上本轮纪元（上一轮开服的号）或队伍已经不在（离线自动离队后解散了）就把归属落回无队伍，
--- 并明确告诉玩家解散结果；队伍还在但满员给 'full'，与「原队已散」区分。
 function Mgr:Restore(player)
     local saved, epoch = self:SavedParty(player)
     if not saved then return nil end
@@ -425,8 +389,6 @@ function Mgr:Restore(player)
             self:PushParty(party, 'restored')
             return 'restored'
         end
-        -- 原队伍还在、只是满了：保留归属，等下一次空位——Leave / Disband 末尾的 RetryRestore
-        -- 会替这名玩家重试（9-22）；回执与文案与解散分开。
         return 'full'
     end
     local ok = self:SavePartyId(player, 0)
@@ -434,10 +396,6 @@ function Mgr:Restore(player)
     return 'disbanded'
 end
 
--- #249 满员等待的重试时机（review：原注释写「下次有位置再谈恢复」却没有后续时机）：
--- 有存档归属、当前无队伍、且在线的玩家，在 Leave / Disband 空出位置（或队伍消失）之后各自重试一次。
--- skipUserId 排除正在离场的那名玩家：OnPlayerRemoving 里 Online 还没清，不能把他又恢复回队伍。
--- 重试仍失败（原队已散）时 Restore 自己把归属落回无队伍；满员仍返回 'full'，等下一次空位。
 function Mgr:RetryRestore(skipUserId)
     local waiting = {}
     for userId, player in pairs(self.Online) do
@@ -446,13 +404,12 @@ function Mgr:RetryRestore(skipUserId)
             waiting[#waiting + 1] = player
         end
     end
-    -- pairs 无序：按 UserId 排序，恢复顺序与回执顺序可复现
     table.sort(waiting, function(a, b) return a.UserId < b.UserId end)
     local restored = 0
     for _, player in ipairs(waiting) do
         local result = self:Restore(player)
         if result == 'restored' then
-            restored = restored + 1 -- Restore 内部已 PushParty(party, 'restored')
+            restored = restored + 1
         elseif result == 'disbanded' or result == 'save-failed' then
             self:Push(player, result)
         end
@@ -488,7 +445,6 @@ function Mgr:Start()
         self.Connections[#self.Connections + 1] = re(name).OnServerEvent:Connect(handler)
     end
     bind('PartyAction', function(player, payload)
-        -- 与其它交互同口径的限频：连点不会把服务端判定跑成批处理。
         if _G.REUtil.CheckRECD and _G.REUtil:CheckRECD(player, 'PartyAction', cfg().ActionCooldownSec) then return end
         self:Handle(player, payload)
     end)

@@ -1,7 +1,3 @@
--- #260 目标选择适配层：业务 Policy.Order 按累计有效伤害裁决，官方 AI 管理器只登记结果。
--- 上游 searchEnemy 写死最近距离且会写 Controller 位移，优先级权重/焦点接口均为预留，不能宣称官方裁决。
--- SetFocus 仅把业务名次、优先级与焦点登记到官方运行态供观察；登记失败不阻断业务目标，但完整记录日志。
--- 不调用 SearchEnemy / ChaseTarget，移动、飞行与轨迹仍由 FishBehaviors / FlightPath 自研模块拥有。
 local GameCfg = require('common.GameCfg')
 local Policy = require('common.AiTargetPolicy')
 
@@ -16,7 +12,6 @@ end
 
 local function loadAPI(fish, unit)
     if AiAPI == nil then
-        -- 大量单测用假 game 加载业务模块；官方包在加载时要引擎服务，故延迟到真正登记时再取。
         local ok, module = pcall(require, 'server.packages.official_ai_feature.api')
         if not ok then
             logFailure('RequireOfficialAPI', fish, unit, nil, module)
@@ -44,7 +39,6 @@ local function receiver(fish)
     return carrier and carrier.Receiver or nil
 end
 
---- 官方 AI 管理器持有的运行态（只读观察，不在这里另存一份目标）。
 function Mgr:State(fish)
     local unit = receiver(fish)
     if not unit then
@@ -73,7 +67,6 @@ local function clearFocus(fish, unit, apiTable)
     if not ok then logFailure('ClearOfficialFocus', fish, unit, nil, err) end
 end
 
---- 只登记业务已经裁决的目标与名次；失败返回 false，由调用方决定是否继续业务目标。
 function Mgr:SetFocus(fish, player, ranked)
     local unit = receiver(fish)
     if not unit then
@@ -110,7 +103,6 @@ function Mgr:SetFocus(fish, player, ranked)
     return true
 end
 
---- 业务伤害优先裁决是唯一目标来源；官方登记只作观察，失败不改变业务名次。
 function Mgr:Select(fish, candidates)
     local ranked = self.Policy.Order(candidates)
     self:SetFocus(fish, ranked[1] and ranked[1].player or nil, ranked)

@@ -25,7 +25,6 @@ end
 function ctrl:TweenRotate(unit)
     local RotateSpd = unit:GetAttribute("RegRotate")
     if not RotateSpd then return end
-    --local DelayTime = unit:GetAttribute("DelayTime")
     local connection = nil
 
     local rv = unit.Rotation:GetVectorV()
@@ -53,9 +52,7 @@ function ctrl:TweenPosition(unit)
     
     local tweenInfo = TweenInfo.New(Time, EasingStyle.Linear, EasingDirection.InOut, Loop, IsReverse, DelayTime)
     local goal = { Position = unit.Position + offsetPos}
-    -- 创建 Tween 对象
     local tween = TweenService:Create(unit, tweenInfo, goal)
-    -- 播放 Tween
     if tween then
         tween:Play()
     end

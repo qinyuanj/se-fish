@@ -3,7 +3,6 @@ local Task = game:GetService("Task")
 local RunService = game:GetService("RunService")
 local World = game:GetService("World")
 local REUtil = require("common.REUtil")
---local NotificationService = game:GetService("NotificationService")
 
 function Util:WaitForChild(rootObj, childName, waitTime)
 	if not rootObj then
@@ -14,7 +13,6 @@ function Util:WaitForChild(rootObj, childName, waitTime)
 	while rootObj and costTime < waitTime do
 		local childObj = rootObj:FindFirstChild(childName, rootObj == World)
 		if childObj then 
-			--print("[ShaoTest] WaitForChild break", childObj, costTime)
 			return childObj
 		 end
 		Task:Wait(0.033) 
@@ -26,7 +24,6 @@ function Util:WaitForChild(rootObj, childName, waitTime)
 end	
 
 function Util:MsgNotice(player, msg, duration, textColor)
-	--NotificationService:ShowTips(msg, player, duration)
 	if RunService:IsServer() then
 		REUtil:GetRE("MsgNoticeRE"):FireClient(player, msg, duration, textColor)
 		return
@@ -41,7 +38,6 @@ function Util:MsgNotice(player, msg, duration, textColor)
 end
 
 function Util:GlobalMsgNotice(msg, duration, textColor)
-	--work in server
 	if RunService:IsClient() then
 		print("GlobalMsgNotice 只在服务端调用")
 		return
@@ -58,20 +54,6 @@ if RunService:IsClient() then
 	end)
 end
 
---[[
-function Util:MsgMarquee(player, msg)
-	NotificationService:ShowMarquee(msg, player)
-end
-
-function Util:GlobalMarquee(msg)
-	--work in server
-	if RunService:IsClient() then
-		REUtil:GetRE("GlobalMarquee"):FireServer(msg)
-		return
-	end
-	NotificationService:ShowMarquee(msg)
-end
---]]
 
 if RunService:IsServer() then
 	REUtil:GetRE("GlobalMarquee").OnServerEvent:Connect(function(p, msg) 
@@ -99,7 +81,6 @@ function Util:SplitString(inputstr, sep)
         t[i] = str
         i = i + 1
     end
-	--print("[Util] SplitString rst = ", t)
 	return t
 end
 
@@ -119,21 +100,20 @@ end
 local NumWithStrMap = {
 	{
 		Str = "K",
-		Value = 1000,		--千
+		Value = 1000,
 	},
 	{
 		Str = "M",
-		Value = 1000000,	--百万
+		Value = 1000000,
 	},
 	{
 		Str = "B",
-		Value = 1000000000,	--十亿
+		Value = 1000000000,
 	},
 }
 
---简化大数字
 function Util:DesignNumber(value, keepNum)
-	if value < 0 then return tostring(value) end --简单排除负数
+	if value < 0 then return tostring(value) end
 
 	local curNumInfo = nil
 	for i, info in ipairs(NumWithStrMap) do

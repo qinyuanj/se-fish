@@ -1,12 +1,7 @@
--- 钓场商店（#48/#90/#123）：Buy / UpgradeStorage 都由服务端复验范围、白名单、容量与价格。
--- 注入 Save 时只改隔离 draft，扣费与结果同键落账后才发布库存、回包与任务事实。
--- 请求 seq 按服务端会话和业务通道去重；响应中的 operation 支持原身份重试，只回历史结果。
--- 未注入 Save 的独立纯逻辑模式保留原有同步结算与 LastSeq 去重。
 local GameCfg = require('common.GameCfg')
 
 local Mgr = { LastSeq = {} }
 
--- 同通道相同 seq 重放原结果；完整 operation 可跨重连重试，身份校验归 Save。
 local function resolve(mgr, player, data, payload)
     local requestId = payload.operation
     if requestId ~= nil and type(requestId) ~= 'table' then return nil, false end
@@ -36,14 +31,12 @@ function Mgr:Reply(player, payload)
     _G.REUtil:GetRE('ShopResult'):FireClient(player, payload)
 end
 
--- 当前摊位等级下上架的商品；不在白名单或等级不够返回 nil
 function Mgr:FindGoods(itemId, level)
     for _, goods in ipairs(GameCfg.Shop.Goods) do
         if goods.ItemId == itemId and goods.MinShopLevel <= level then return goods end
     end
 end
 
--- #130：按货架行编号查上架商品（升级行无 itemKey，编号是稳定购买键）；编号非法或等级不够返回 nil
 function Mgr:FindGoodsByNumber(number, level)
     if type(number) ~= 'number' or number ~= math.floor(number) or number < 1 then return nil end
     for _, goods in ipairs(GameCfg.Shop.Goods) do
@@ -51,7 +44,6 @@ function Mgr:FindGoodsByNumber(number, level)
     end
 end
 
--- 玩家站在哪个摊位旁：返回 Stands 行（含 Level），不在任何摊位返回 nil
 function Mgr:StandFor(player)
     local shop = GameCfg.Shop
     for _, stand in ipairs(shop.Stands) do
@@ -69,8 +61,6 @@ function Mgr:Fail(player, itemId, reason, number)
     return false
 end
 
--- 结算一次购买（live/draft 通用，#130）：限购复验、扣款、发货或升级、购买计数一次落地。
--- 价格一律取货架行（服务端定价，客户端传价忽略）；返回 result 或 nil, reason。
 local function settlePurchase(draft, goods)
     if (goods.PurchaseLimit or 0) > 0 and draft:PurchaseCount(goods.Number) >= goods.PurchaseLimit then
         return nil, 'limit'
@@ -108,7 +98,6 @@ function Mgr:Buy(player, data, itemId, number, seq, operation)
     if number ~= nil then goods = self:FindGoodsByNumber(number, stand.Level)
     else goods = self:FindGoods(itemId, stand.Level) end
     if not goods then return self:Fail(player, itemId, 'item', number) end
-    -- 快速预检（live 状态）；持久模式仍在隔离 draft 上复验，结果以 draft 结算为准
     if (goods.PurchaseLimit or 0) > 0 and data:PurchaseCount(goods.Number) >= goods.PurchaseLimit then
         return self:Fail(player, itemId, 'limit', number)
     end
@@ -144,7 +133,6 @@ function Mgr:Buy(player, data, itemId, number, seq, operation)
         '-' .. tostring(goods.Price), 'FishCoin=' .. tostring(data.Data.FishCoin))
     self.PlayerData:SendItemBar(player)
     self:Reply(player, result)
-    -- 新手任务事实（#51）：玩家 + 严格递增的请求序号即这次购买的唯一 eventId
     if self.Quest then
         self.Quest:Notify('Buy', player, { itemId = result.itemId, number = result.number,
             eventId = 'shop:' .. tostring(player.UserId) .. ':' .. tostring(seq) })
@@ -152,8 +140,6 @@ function Mgr:Buy(player, data, itemId, number, seq, operation)
     return true
 end
 
--- 旧扩容通道的货架行（#130 code-review）：与新升级行同口径——逐级一次、摊位最低等级、限购计数，
--- 避免旧 action='UpgradeStorage' 绕过新货架等级/限购。返回行或 nil, reason。
 local function backpackRow(data, standLevel)
     local spec = GameCfg.Shop.UpgradeKinds.backpack
     local nextLevel = data:ShopUpgradeLevel('backpack') + 1
@@ -225,7 +211,6 @@ function Mgr:Handle(player, payload)
     if last and seq <= last then return false end
     self.LastSeq[player.UserId] = seq
     if payload.action == 'UpgradeStorage' then return self:Upgrade(player, data, operation) end
-    -- #130：购买键支持 itemId（旧路径）或货架行编号 number（升级行唯一键）；两者取 number
     local itemId, number = payload.itemId, payload.number
     if number ~= nil then
         if type(number) ~= 'number' or number ~= math.floor(number) or number < 1

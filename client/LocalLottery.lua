@@ -1,7 +1,3 @@
--- 抽奖机入口（#138 T17，GameSpec §14）：每区一台抽奖机（GameCfg.Lottery.MachineAnchors 的
--- Z*_Lottery 场景实体）一个文字泡「极品食物换大奖」，本地角色在 Radius 米内（只看 x/z）才显示，
--- 点击打开 ScreenLottery；走出所有抽奖机范围自动关窗。锚点未摆放（编辑器侧还没建实体）只记日志，
--- 不影响其余入口。结算与发奖全部在服务端（MgrLottery），这里只负责入口与开关窗。
 local GameCfg = require('common.GameCfg')
 local BodyScale = require('common.BodyScale')
 local OwnedUnits = require('common.OwnedUnits')
@@ -25,7 +21,7 @@ function LocalLottery:CreateBubble(anchor)
         Parent = node, Name = 'BtnLotteryEnter', Position = Vector2.New(0, 0), Size = Vector2.New(360, 72),
     })
     if okBtn and btn then
-        OwnedUnits.Track(self, btn) -- 气泡按钮归本模块所有，Clear 时销毁
+        OwnedUnits.Track(self, btn)
         btn.ButtonText = ''
         btn.NormalImage = SquareButtonImage
         btn.PressImage = SquareButtonImage
@@ -39,7 +35,7 @@ function LocalLottery:CreateBubble(anchor)
             Text = cfg.HintText, FontSize = 26, TextColor = Color.New(255, 255, 255, 255),
         })
         if okLabel and label then
-            OwnedUnits.Track(self, label) -- 气泡文字同上
+            OwnedUnits.Track(self, label)
             label.TouchEnabled = false
             label.SwallowTouchEnabled = false
             label.LocalZOrder = 1
@@ -52,8 +48,6 @@ function LocalLottery:CreateBubble(anchor)
     return node
 end
 
----关闭本模块建的全部入口气泡（幂等）：销毁名下按钮与文字，再销毁气泡根节点，登记表归空。
--- 气泡根节点是 EUI 场景节点（不在建点清单里），随气泡一起显式销毁，不留看不见的残留。
 function LocalLottery:Clear()
     OwnedUnits.Clear(self)
     for _, bubble in ipairs(self.Bubbles) do
@@ -97,7 +91,7 @@ function LocalLottery:Update()
 end
 
 function LocalLottery:Start()
-    self:Clear() -- 重建语义：重复启动先拆上一轮的入口气泡，不叠第二套
+    self:Clear()
     for _, name in ipairs(GameCfg.Lottery.MachineAnchors()) do
         local anchor = Util:WaitForChild(World, name)
         if anchor then

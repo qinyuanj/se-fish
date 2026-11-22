@@ -1,4 +1,3 @@
--- 场景气泡共用按钮与文字层；节点均由调用方的场景根持有，随根隐藏和销毁。
 local Style = require('common.GameCfg').InteractionBubble
 local World = game:GetService('World')
 local Bubble = {}

@@ -1,23 +1,3 @@
--- 平台适配管理器（#147 T26，GameSpec §7/§11/§15，docs/技术难点识别.md §4）：
--- 商品购买（金豆价目）与激励广告的唯一服务端入口，业务（盲盒 / 满血复活 / 肾上腺素）只依赖本模块。
--- 真实商品 ID / 广告标签 / 金币汇率是商业化后台交付参数（#148）：未交付时一切购买入口明确不可用、
--- 不发付费权益；Debug 开关打开时同一路径转为「pending flow + 测试驱动器（PlatformTestAction）结算」，
--- 生产构建（GameCfg.Debug.Enabled=false）测试驱动器整体拒绝，不存在伪造支付成功的入口。
--- #261 占位支付通道（ADR-0029 第三、四节）：真实商品 ID / 金币汇率未交付期间，同一适配层按共享配置
--- GameCfg.Platform.Placeholder 建「占位 flow」，由客户端占位确认结算，把金币页购买与地图盲盒的完整路径走通；
--- 占位路径不调用真实平台、不发真实付费权益，真实通道（无可信订单身份）继续关闭。真实参数到位只换配置。
--- #249 统一闸门（ADR-0029 第四节第 9 项）：占位支付 / 广告 / 分享共用 placeholderAllowed()——
--- 默认只在调试构建（GameCfg.Debug.Enabled）可用，发布构建必须显式打开 Placeholder.AllowInPublish；
--- 闸门关闭时占位动作一律拒绝、不发任何物品与权益，回执写 reason='not_open' + NotOpenText（「未开放」）。
--- #262 占位广告位同理：真实广告位（Platform.Ads.revive 的 goodsId/adTag）未交付期间，广告满血复活经
--- Placeholder.Ads.revive 建同一种占位 flow，成功结算交给 MgrSurvival 的 FullRevive 发地图内资源，
--- 不发任何平台权益；真实广告位到位后只替换那行参数。
--- 已知平台边界（不宣称已解决，归 #148 真实验收）：
---   * GoodsPurchaseCompleted 只有 goodsId/goodsNum/player，没有订单 ID，官方教程禁止拼 UserId+goodsId
---     防重——缺可信交付身份时忽略真实信号，配置 goodsId 也不放行；订单适配/补发/对账归#148；
---   * 购买没有取消 / 失败事件，广告 failEvent 也不保证触发：flow 统一按 FlowTimeoutSec 超时兜底结算；
---   * ShowGoodsPurchasePanel 的 showTime 语义未查证，调用不传；广告成功以平台发放商品奖励
---     （同一 GoodsPurchaseCompleted 信号）为准，真实事件名接线未查证。
 local GameCfg = require('common.GameCfg')
 
 local Mgr = { Flows = {}, GrantSeq = {}, CoinSeq = {}, PendingGrants = {}, NextFlowId = 0 }
@@ -44,21 +24,15 @@ local function debugEnabled()
     return GameCfg.Debug and GameCfg.Debug.Enabled == true
 end
 
--- 商品行已交付后台 ID 才可用真实购买
 local function configured(row)
     return type(row) == 'table' and type(row.goodsId) == 'string' and row.goodsId ~= ''
 end
 
--- #261 占位参数是共享配置里的一张表（生产开关）：真实商品 ID / 汇率交付后只替换它，判定不动。
 local function placeholder()
     local config = cfg().Placeholder
     return type(config) == 'table' and config or nil
 end
 
--- #249 占位通道统一闸门（支付 / 广告 / 分享共用）：参数配好（Enabled）只是前提，
--- 还要过构建闸门——调试构建直接可用，发布构建必须显式 AllowInPublish（默认 false）。
--- 机器可查的断言：tests/native/spec/17_platform_boundary_placeholder_test.lua 的「发布构建闸门」
--- 用例与 tests/native/spec/11_ad_revive_placeholder_test.lua 的同名用例（条款 19-13）。
 local function placeholderConfigured()
     local config = placeholder()
     return config ~= nil and config.Enabled == true
@@ -70,7 +44,6 @@ local function placeholderAllowed()
     return placeholder().AllowInPublish == true
 end
 
--- 通道关掉时的回执口径：占位通道被闸门挡住说「未开放」，参数没配说「暂不可用」
 local function closedReason()
     return placeholderConfigured() and 'not_open' or 'unavailable'
 end
@@ -79,7 +52,6 @@ local function closedText(reason)
     return reason == 'not_open' and cfg().NotOpenText or cfg().UnavailableText
 end
 
--- 金币页报价行：占位汇率与占位商品 ID 都在这张表里
 local function coinOffer(key)
     local config = placeholder()
     local page = config and config.CoinPage
@@ -90,7 +62,6 @@ local function coinOffer(key)
     end
 end
 
--- 到账金币 = 单价 × 占位汇率；汇率换成真值只改配置，这一行不动
 local function coinAmount(offer)
     local config = placeholder()
     local unit = config and config.CoinPage and config.CoinPage.CoinPerUnit
@@ -99,7 +70,6 @@ local function coinAmount(offer)
     return math.floor(offer.price * unit + 0.5)
 end
 
--- 占位商品 ID：goods / ad / coin 三类键各查各的表；未配置返回 nil（占位通道也不放行）
 local function placeholderGoodsId(kind, key)
     local config = placeholder()
     if not config or type(key) ~= 'string' then return nil end
@@ -120,9 +90,6 @@ function Mgr:HasFlow(player)
     return flow ~= nil and flow.player == player
 end
 
--- 结算在飞 flow：清空后回调 onResult(outcome, payload)，回调报错只记日志
--- 测试 flow（Debug 构建、未走真实平台）开 / 关时通知客户端显示或收起测试驱动按钮；
--- 生产构建不会建测试 flow，所以这条通知在生产不出现
 local function notifyTestFlow(mgr, player, flow, open)
     if flow.real then return end
     local ok, err = pcall(mgr.Reply, mgr, player, { ok = true, action = 'TestFlow', open = open,
@@ -130,13 +97,11 @@ local function notifyTestFlow(mgr, player, flow, open)
     if not ok then print('[MgrPlatform] 测试 flow 通知失败', player.UserId, tostring(err)) end
 end
 
--- 占位通道开 / 关时通知客户端显示或收起占位确认面板（生产构建的唯一购买面）
 local function notifyPlaceholder(mgr, player, flow, open)
     local config = placeholder() or {}
     local page = config.CoinPage or {}
     local offer = flow.kind == 'coin' and coinOffer(flow.coin) or nil
     local row = flow.goods and cfg().Goods[flow.goods] or nil
-    -- #262 广告通道有自己的「不发放真实付费权益」提示：占位支付与占位广告各说各的通道
     local adRow = flow.kind == 'ad' and flow.ad and cfg().Ads[flow.ad] or nil
     local ok, err = pcall(mgr.Reply, mgr, player, {
         ok = true, action = 'PlaceholderFlow', open = open, kind = flow.kind,
@@ -167,18 +132,13 @@ local function resolve(mgr, player, flow, outcome, payload)
     end
 end
 
--- 这件商品当前有没有可结算的通道：调试构建看测试 flow，生产构建看占位通道
 function Mgr:CanPurchase(player, goodsKey)
     if type(cfg().Goods[goodsKey]) ~= 'table' then return false, 'invalid' end
     if debugEnabled() then return true end
-    -- 生产构建：真实通道仍关闭（无可信订单/交付身份），占位通道按闸门与共享配置放行
     if placeholderAllowed() and placeholderGoodsId('goods', goodsKey) then return true end
     return false, closedReason()
 end
 
--- intent = { kind='purchase', goods=key } / { kind='ad', ad=key } / { kind='coin', coin=key }；
--- onResult(outcome, payload)。流程分三类：调试构建建测试 flow（测试驱动器结算）、
--- 生产构建建占位 flow（占位确认结算，不发真实付费权益）、真实通道（无可信交付身份）继续关闭。
 local function openFlow(self, player, intent, onResult)
     if not player or not player.UserId then return false, 'invalid' end
     if self:HasFlow(player) then return false, 'busy' end
@@ -187,10 +147,7 @@ local function openFlow(self, player, intent, onResult)
         or (intent.kind == 'ad' and cfg().Ads[key] or cfg().Goods[key])
     if type(row) ~= 'table' then return false, 'invalid' end
     local label, goodsId
-    -- #249 占位面优先：闸门允许（调试构建，或发布构建显式 AllowInPublish）时走占位通道；
-    -- 调试构建里没有该键的占位参数时回落到测试驱动器（本地测试 flow 永不调用真实平台）。
     if placeholderAllowed() then
-        -- #148 尚无可信订单/交付身份：真实通道关闭，只有共享配置里的占位商品 ID 能开通道
         goodsId = placeholderGoodsId(intent.kind, key)
         if goodsId then label = '占位' end
     end
@@ -209,17 +166,14 @@ local function openFlow(self, player, intent, onResult)
     return true
 end
 
--- 购买一件商品；onResult('success', { goodsId, num }) 或 ('cancel'/'fail'/'timeout')
 function Mgr:Purchase(player, goodsKey, purpose, onResult)
     return openFlow(self, player, { kind = 'purchase', goods = goodsKey, purpose = purpose }, onResult)
 end
 
--- 播放激励广告；onResult 口径同上（成功载荷来自平台发放的商品奖励信号）
 function Mgr:ShowAd(player, adKey, purpose, onResult)
     return openFlow(self, player, { kind = 'ad', ad = adKey, purpose = purpose }, onResult)
 end
 
--- 业务主动取消（如免费复活抢先结算）：清 flow 不回调，返回是否有 flow 被清
 function Mgr:CancelFlow(player)
     if not self:HasFlow(player) then return false end
     print('[MgrPlatform] flow 被业务取消', player.UserId)
@@ -229,11 +183,8 @@ function Mgr:CancelFlow(player)
     return true
 end
 
--- 肾上腺素购买入口（MgrSurvival 濒死无药时拉起）：两份报价由客户端选择后各自走 Purchase；
--- 未配置且非 Debug → 明确回包不可用（客户端展示「平台复活即将开放」口径）
 function Mgr:OpenAdrenalineShop(player)
     local rows = cfg().Goods
-    -- #249：调试构建走测试驱动器，发布构建要求占位通道闸门打开；两者都没有就明确回「未开放」
     if not (debugEnabled() or placeholderAllowed()) then
         local reason = closedReason()
         self:Reply(player, { ok = false, action = 'AdrenalineShop', reason = reason, text = closedText(reason) })
@@ -248,8 +199,6 @@ function Mgr:OpenAdrenalineShop(player)
     return true
 end
 
--- 地图商店金币页（ScreenShop 入口）：真实汇率与真实商品 ID 未交付时，用共享配置的占位汇率与
--- 占位商品 ID 走通报价 → 购买 → 到账；占位关闭（或未配置）时明确不可用。
 function Mgr:OpenCoinShop(player)
     local config = placeholder()
     local page = config and config.CoinPage
@@ -268,7 +217,6 @@ function Mgr:OpenCoinShop(player)
     return true
 end
 
--- 金币页购买：经同一条平台流程收费，成功才到账（失败/取消/超时不到账，也不扣金币余额）
 function Mgr:PurchaseCoin(player, key)
     if not coinOffer(key) then return false end
     return openFlow(self, player, { kind = 'coin', coin = key, purpose = 'coinpage' }, function(outcome)
@@ -278,9 +226,6 @@ function Mgr:PurchaseCoin(player, key)
     end)
 end
 
--- 金币页到账（持久操作，#123 协议）：只入账、不扣金币余额（金币页商品不参与金币扣减结算）。
--- requestId 可传上一次回执里的 operation：同一操作身份重试只补回执、不再入账一次（18-24）；
--- 不传时按本会话的到账序号新开一笔。
 function Mgr:GrantCoin(player, key, requestId)
     local offer = coinOffer(key)
     local amount = coinAmount(offer)
@@ -310,16 +255,12 @@ function Mgr:GrantCoin(player, key, requestId)
         end
         print('[MgrPlatform] 金币到账落账', player.UserId, key,
             'coinBefore=' .. tostring(result.coinBefore), 'coinAfter=' .. tostring(result.coinAfter))
-        -- 回执带操作身份：客户端在没收到回执时可用它原样重试，服务端只补回执、不再入账一次。
         self:Reply(player, { ok = true, action = 'CoinGrant', goods = key, name = result.name,
             coin = result.coin, coinBefore = result.coinBefore, coinAfter = result.coinAfter,
             operation = operation })
     end)
 end
 
--- 占位通道的确认 / 取消 / 失败：只结算占位 flow（调试驱动器结算不到它，反之亦然）。
--- #262：'fail' 是激励广告的真实结局之一（平台 failEvent 不保证触发），占位通道也要能走通失败路径
--- （ADR-0029 第三节第 2 条「成功与失败两条路径都要能走通」）；客户端确认面板只发前两种。
 function Mgr:ResolvePlaceholder(player, outcome)
     if outcome ~= 'success' and outcome ~= 'cancel' and outcome ~= 'fail' then return false end
     local flow = player and self.Flows[player.UserId]
@@ -328,9 +269,6 @@ function Mgr:ResolvePlaceholder(player, outcome)
     return true
 end
 
--- 占格商品测试发货（持久操作，#123 协议）；真实信号不进入此路径。
--- requestId 可传上一次回执里的 operation：同一操作身份重试只回执、不再发一次（18-24）。
--- 不传时按本会话的发货序号新开一笔。
 function Mgr:GrantGoods(player, goodsKey, num, requestId)
     local row = cfg().Goods[goodsKey]
     if not row or not row.itemId then return false end
@@ -359,7 +297,7 @@ function Mgr:GrantGoods(player, goodsKey, num, requestId)
     local executed = self.Save:Execute(player, data, operation, function(draft)
         local granted = 0
         for _ = 1, total do
-            if not draft:AddItem(row.itemId) then break end -- 空格不够发几件是几件，余下落地
+            if not draft:AddItem(row.itemId) then break end
             granted = granted + 1
         end
         return { ok = true, goods = goodsKey, itemId = row.itemId, total = total, granted = granted,
@@ -372,10 +310,8 @@ function Mgr:GrantGoods(player, goodsKey, num, requestId)
         print('[MgrPlatform] 发货落账', player.UserId, goodsKey,
             'granted=' .. tostring(result.granted), 'overflow=' .. tostring(result.overflow))
         if self.PlayerData.SendItemBar then self.PlayerData:SendItemBar(player) end
-        -- 回执带操作身份：客户端在没收到回执时可用它原样重试，服务端只补回执。
         self:Reply(player, { ok = true, action = 'Grant', goods = goodsKey,
             granted = result.granted, overflow = result.overflow, operation = operation })
-        -- 满格溢出落地（与盲盒同一口径，计入全区预算）；无 Loot 注入时只记日志留对账线索
         if result.overflow > 0 then
             local origin = player.Character and player.Character.Position
             for _ = 1, result.overflow do
@@ -391,15 +327,11 @@ function Mgr:GrantGoods(player, goodsKey, num, requestId)
     return executed, operation
 end
 
--- 购买完成信号（真实平台回调；测试里可直接调用）：goodsId → 商品/广告行。
--- 无可信订单/flow代次，不能匹配在飞flow，也不能按未关联信号发货。
 function Mgr:OnGoodsPurchaseCompleted(goodsId, num, player)
     -- 公开信号无订单身份，旧单/重复单无法与当前 flow 安全关联，保持关闭。
     print('[MgrPlatform] 缺可信交付身份，忽略真实购买信号', tostring(goodsId))
 end
 
--- 仅测试可用的回调驱动器：生产构建整体拒绝（验收：生产不能进入测试支付成功入口）。
--- Debug 开时把 outcome（success/cancel/fail）结算到调用者当前在飞 flow。
 function Mgr:HandleTestAction(player, payload)
     if not debugEnabled() then
         print('[MgrPlatform] 生产构建拒绝测试驱动器', player and player.UserId)
@@ -410,20 +342,14 @@ function Mgr:HandleTestAction(player, payload)
         return false
     end
     local flow = player and self.Flows[player.UserId]
-    -- 占位 flow 只由占位确认结算；测试驱动器碰不到它（反之亦然）
     if not flow or flow.player ~= player or flow.placeholder then return false end
     resolve(self, player, flow, payload.outcome, { driver = true })
     return true
 end
 
--- 17-18 分享任务入口：平台分享能力未开通时给明确占位回包，不静默吞掉（点了没反应）。
--- 真实分享能力由平台侧交付后替换共享配置并接真实回调，判定不动；占位不发任何权益。
 function Mgr:Share(player, purpose)
     if type(player) ~= 'table' or player.UserId == nil then return false, 'invalid' end
     local share = cfg().Share or {}
-    -- 未开通（占位）与「配置已打开但真实能力还没接」都明确回不可用，不伪装成已分享。
-    -- #249：分享与支付 / 广告共用同一道占位闸门——闸门关闭时连占位入口也不可用，
-    -- 但仍要给可读回执（reason='not_open' + 「未开放」），不能点上没反应。
     local reason
     if share.Enabled ~= true and not placeholderAllowed() then
         reason = closedReason()
@@ -436,7 +362,6 @@ function Mgr:Share(player, purpose)
     return false, reason
 end
 
--- 客户端平台操作通道：打开肾上腺素 / 金币购买入口，或发起肾上腺素购买
 function Mgr:HandleAction(player, payload)
     if type(payload) ~= 'table' then return false end
     if payload.action == 'OpenAdrenaline' then return self:OpenAdrenalineShop(player) end
@@ -460,7 +385,6 @@ function Mgr:HandleAction(player, payload)
     if payload.action == 'Purchase' then
         local goodsKey = payload.goods
         local row = cfg().Goods[goodsKey]
-        -- 客户端只能直接发起占格商品（肾上腺素）购买；盲盒/复活由对应管理器服务端发起
         if not row or not row.itemId then return false end
         local opened, reason = self:Purchase(player, goodsKey, 'adrenaline', function(outcome)
             if outcome == 'success' then
@@ -469,7 +393,6 @@ function Mgr:HandleAction(player, payload)
                 self:Reply(player, { ok = false, action = 'Purchase', goods = goodsKey, reason = outcome })
             end
         end)
-        -- 开不出通道时给可读回执（「未开放」/「暂不可用」），不静默失败
         if not opened then
             reason = reason or 'unavailable'
             self:Reply(player, { ok = false, action = 'Purchase', goods = goodsKey,
@@ -493,7 +416,7 @@ function Mgr:Update()
             if self:GrantGoods(queue.player, job.goods, job.num) then
                 table.remove(queue.jobs, 1)
             else
-                self.PendingGrants[userId] = nil -- 存档不可用：记日志保线索，不无限重试
+                self.PendingGrants[userId] = nil
                 print('[MgrPlatform] 发货重试放弃（待对账）', userId, job.goods)
             end
         else

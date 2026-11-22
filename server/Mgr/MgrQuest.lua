@@ -1,8 +1,3 @@
--- 新手任务管理器（#40）：已确认的任务事实排队写 Extra.quest，落账之后才发布。
--- 发送方只在自己的玩法成功之后调用，payload 带 itemId 与服务端生成的唯一 eventId（拾饵 = 鱼饵 id，
--- 喂食 / 购买 = 玩家 + 请求序号）；任务不反查玩法系统、不发奖励。
--- 状态变化时写玩家属性 QuestStep / QuestText，并经 QuestState 下发 {step, total, count, need, text, done, notice}；
--- notice 只在推进那一次带，客户端用消息条提示下一步。
 local GameCfg = require('common.GameCfg')
 local QuestSteps = require('common.QuestSteps')
 
@@ -73,7 +68,6 @@ function Mgr:Publish(player, notice)
     })
 end
 
--- 收到一条玩法事实；计数返回 true
 function Mgr:Notify(kind, player, payload)
     if self.Save and self.PlayerData then
         self:RefreshCommitted(player, self.PlayerData:GetDataInst(player))
@@ -85,14 +79,12 @@ function Mgr:Notify(kind, player, payload)
         local queue = self.Queues[player.UserId]
         if queue.leaving then return false end
         local data = self.PlayerData and self.PlayerData:GetDataInst(player)
-        -- 任务落账或其他业务写档期间真实 data 暂时 Inited=false；已就绪会话的事实仍可排队。
         if not data and queue and self.Save:Status(player.UserId).loadState == 'ready'
             and queue.data.Player == player then data = queue.data end
         if not data then return false end
         local eventId = payload.eventId
         if type(eventId) ~= 'string' or #eventId < 1 or #eventId > 160 then return false end
         local candidate = QuestSteps.Restore(c.Steps, queue.tail or state)
-        -- 运行时拾饵/抛竿序号会重新开始；以持久 epoch 隔开新的合法玩法事实。
         local fact = { kind = kind, itemId = payload.itemId, category = payload.category,
             eventId = tostring(data.SaveMeta.epoch) .. ':' .. eventId, count = payload.count }
         if not QuestSteps.Apply(c.Steps, candidate, fact) then return false end
@@ -189,8 +181,6 @@ function Mgr:Drain(player)
     if not accepted then queue.writing = false end
 end
 
--- 入口先排空已受理的事实再销毁 PlayerData；避免最后一只蚯蚓的事实还在队里就退出丢进度。
--- 写失败仍按 Save 屏障退出，不把未确认的进度写成成功。
 function Mgr:FlushBeforeLeave(player, done)
     local queue = player and self.Queues[player.UserId]
     if not self.Save or not queue or queue.player ~= player or queue.failed

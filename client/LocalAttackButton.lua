@@ -1,6 +1,3 @@
--- 右手武器的 1 号操作位，由 ScreenMain 持有，独立于道具操作位。
--- #129：点按 / 连发 / 换弹全部经服务端 MgrWeapon 权威结算（WeaponAction 通道）。
--- 客户端不再直接 RequestCast：伤害由服务端按 GameCfg 表登记挥砍，伪造客户端包不产生伤害。
 local Players = game:GetService("Players")
 local World = game:GetService("World")
 local GameCfg = require("common.GameCfg")
@@ -8,8 +5,6 @@ local Gesture = require("client.PressGesture")
 local WeaponAim = require('client.WeaponAim')
 local LocalAttackButton = {}
 
--- 当前装备的武器 id：手持武器优先，其次已选武器，库存为 0 的不算；都没有返回 nil。
--- 攻击键语义与主界面武器栏（#180）共用这一处判定
 function LocalAttackButton.EquippedWeapon(state)
     local weapons = type(state) == "table" and type(state.weapons) == "table" and state.weapons or {}
     local held = type(state) == "table" and state.held or nil
@@ -21,7 +16,6 @@ function LocalAttackButton.EquippedWeapon(state)
     return nil
 end
 
--- ScreenMain 每次快照刷新时同步装备状态：决定点按语义（攻击/连发）与长按语义（换弹）
 function LocalAttackButton:SetEquipped(state)
     self.EquippedId = LocalAttackButton.EquippedWeapon(state)
     self.EquippedGun = nil
@@ -36,7 +30,6 @@ function LocalAttackButton:SetEquipped(state)
     end
 end
 
--- rect：主界面布局模块给的攻击键占位（中心点 + 尺寸，原点左下、Y 向上），本模块不再自定坐标（#179）
 function LocalAttackButton:Start(parent, rect)
     if self.Root == parent and self.Container then return end
     self:Destroy()
@@ -79,7 +72,6 @@ function LocalAttackButton:Start(parent, rect)
         self.PressConns[#self.PressConns + 1] = btn.OnTouchBegan:Connect(function() self:OnPressBegin() end)
         self.PressConns[#self.PressConns + 1] = btn.OnTouchEnded:Connect(function() self:OnPressEnd() end)
     else
-        -- 触摸信号缺失时退回点按（连发/长按换弹不可用）
         self.ClickConn = btn.OnClicked:Connect(function() self:RequestAttack() end)
     end
     local runService = game:GetService("RunService")
@@ -102,7 +94,6 @@ function LocalAttackButton:Visible()
         and self.Root and self.Root.Visible
 end
 
--- 隐藏主界面或操作区时，不得发起攻击/换弹
 function LocalAttackButton:CanOperate()
     return self:Visible() and Players.LocalPlayer and Players.LocalPlayer.Character
 end
@@ -119,15 +110,12 @@ function LocalAttackButton:OnPressEnd()
     if not self.Gesture then return end
     local result = self.Gesture:End(World:GetServerTime())
     if result == "tap" then
-        -- 连发枪按住期间已由 Tick 开火，点按不再补一枪
         if not self.AutoFired then self:RequestAttack() end
     elseif result == "long" and self.EquippedGun and not self.AutoFireGun then
-        -- 长按=手动换弹（连发枪靠空匣自动换弹，长按不抢）
         self:RequestReload()
     end
 end
 
--- 按住连发：Auto 枪按票面射速持续请求，射速/弹量以服务端为准
 function LocalAttackButton:Tick()
     if not self.Pressing or not self:CanOperate() then return end
     local now = World:GetServerTime()

@@ -1,5 +1,3 @@
--- 属性唯一投影接缝：存档仍归PlayerData，attr_rule持有五类运行期分量。
--- 业务键避开vendor ControllerAttrMap：分量重算不写引擎，中间值不会污染生命/移速。
 local AttrAPI = require('server.packages.attr_rule.api')
 local Model = require('common.AttrModel')
 local BodyScale = require('common.BodyScale')

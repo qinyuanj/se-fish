@@ -1,20 +1,3 @@
--- 鱼获与共享地面实例管理器（#43、#126 T05）：
--- 鱼载体死亡单点（MgrFishCarrier:SubscribeDied）里向活鱼管理器取走被打死的鱼，在地面生成一份携带鱼种与
--- 个体倍率的鱼获；鱼获静止、不参与物理、不消失，被拾取即销毁。拾取走道具栏动作通道
--- （ItemBarAction{action='Pickup', value=<lootId>}），服务端复验目标、距离、空格；先删记录再发放，
--- 重放与多人争抢都只发一份。鱼获列表经 LootState 广播给客户端画「拾取」文字泡。
--- 固定点位鱼饵（#45）共用这套记录、广播与拾取复验：Kind='bait'，拾取进 Bait 计数库存（不占格），
--- 成功后该点位 RespawnSec 秒刷新一份新的（新 id，旧 id 重放无效）；鱼获（Kind='fish'）不刷新、不消失。
--- 分区上限回收（#91/#126，GameSpec §6.5）：掉落物按落点归入最近的**钓鱼区**（Water.Zones[*].ZoneId），
--- 同区的多块水域（鱼塘两个水圈与池壁拼接条）共用一份 PerZoneCap 预算；超上限最旧的进入待回收：
--- 可见性来回闪烁 FlashBeforeRecycleSec 秒后销毁；待回收不计入区总量（但另有 PendingCap 封顶，见
--- EnforcePending）、仍可拾取，拾取即取消回收。点位鱼饵不占区上限。
--- 主动丢弃（#124 契约、#126 落地）：Kind='item' 承载信物/首领饵/船票/鱼饵/武器/烤鱼等一切可丢弃品，
--- 实例属性（个体倍率 Mult、烤制状态 Cooked）随地面实例走，拾回按物品表的容器原样还原（鱼饵回计数、
--- 武器回武器库存、其余回道具栏/背包）。三段式：PrepareDrop 预留（校验身份/库存/位置，并**先生成隐藏实例**）
--- → 调用方扣件 → CommitDrop 上屏并入区队列；CancelDrop 释放预留。生成在扣件之前，实例建不出来就整体
--- 不成立（#124 遗留边界）；CommitDrop 若发现实例已失（件已扣），把物品按原属性退回库存（补偿只做一次）。
--- 盲盒满格溢出一类「不经先扣后落」的来源复用 SpawnItem 直接落地。
 local GameCfg = require('common.GameCfg')
 local BodyScale = require('common.BodyScale')
 local MathWaterJudge = require('common.MathWaterJudge')
@@ -39,7 +22,6 @@ function Mgr:Reply(player, payload)
     _G.REUtil:GetRE('LootResult'):FireClient(player, payload)
 end
 
--- warn = 该件在 30 秒预警期内（待回收），客户端据此闪文字泡
 function Mgr:Snapshot()
     local list = {}
     for _, loot in pairs(self.Loots) do
@@ -52,14 +34,12 @@ function Mgr:Snapshot()
     return list
 end
 
--- 销毁世界单位：失败只记日志，不改变业务结果（回收另有重试路径）
 local function destroyUnit(unit, why, id)
     local ok, err = pcall(function() unit:Destroy() end)
     if not ok then print('[MgrLoot] 实例销毁失败', why, tostring(id), tostring(err)) end
     return ok
 end
 
--- 从 pos 上方往下探地；探不到就用原高度
 function Mgr:Ground(pos)
     local c = cfg()
     local physics = game:GetService('PhysicsService')
@@ -95,7 +75,6 @@ function Mgr:OnCarrierDied(carrier)
     end
 end
 
--- 落点归入所在区（区域标记边界）；边界外才退回水平距离最近的水域所属区。同区多块水域共用一份预算
 function Mgr:RegionAt(pos)
     for _, zone in ipairs(GameCfg.Zones) do
         local bounds = zone.Scene and zone.Scene.Boundary
@@ -113,7 +92,6 @@ function Mgr:RegionAt(pos)
     return best and (best.ZoneId or best.Id) or nil
 end
 
--- 分区计数与峰值台账（#126 验收③：连续大量生成时用日志证明活跃/待回收有界）
 function Mgr:Stats(zoneId)
     local stat = self.ZoneStats[zoneId]
     if not stat then
@@ -134,7 +112,6 @@ function Mgr:NotePeak(zoneId)
     end
 end
 
--- 掉落物计入所属区 FIFO 队列，并立刻执行上限检查
 function Mgr:Track(loot)
     local zoneId = self:RegionAt(loot.Position)
     if not zoneId then return end
@@ -148,7 +125,6 @@ function Mgr:Track(loot)
     self:EnforceCap(zoneId)
 end
 
--- 从区队列与待回收里摘除（拾取成功时调用）；按显式下标遍历，避免某一边为空时 ipairs 提前中止
 function Mgr:Untrack(loot)
     local zoneId = loot.ZoneId
     self.Recycling[loot.Id] = nil
@@ -164,7 +140,6 @@ function Mgr:Untrack(loot)
     if zoneId then self:NotePeak(zoneId) end
 end
 
--- 超上限时把最旧的掉落物移入待回收（不计入区总量，闪烁后销毁）
 function Mgr:EnforceCap(zoneId)
     local queue = self.ZoneQueues[zoneId]
     local cap = cfg().PerZoneCap
@@ -190,8 +165,6 @@ function Mgr:MarkRecycling(loot)
         'after=' .. tostring(cfg().FlashBeforeRecycleSec) .. 's')
 end
 
--- 预警期也有上限：待回收件不算 PerZoneCap，不封顶则「活跃 200 + 预警无限」仍会涨；
--- 超过 PendingCap 时立刻回收最旧的预警件（跳过剩余预警），单区总量恒 ≤ PerZoneCap + PendingCap
 function Mgr:EnforcePending(zoneId)
     local pending = self.PendingQueues[zoneId]
     local cap = cfg().PendingCap
@@ -205,7 +178,6 @@ function Mgr:EnforcePending(zoneId)
     end
 end
 
--- 回收一件：销毁世界单位、摘记录与计时；销毁失败保留记录、按 RecycleRetrySec 后重试，不报成功
 function Mgr:Recycle(id, why)
     local loot = self.Loots[id]
     if not loot then
@@ -248,7 +220,7 @@ function Mgr:Spawn(fishId, mult, pos, itemId)
         Position = position,
         RenderMeshId = 'official://mesh/' .. tostring(species.Model),
         ModelColor1 = Color.New(species.VisualColor[1], species.VisualColor[2], species.VisualColor[3], species.VisualColor[4]),
-        BodyType = 1, -- Enums.BodyType.Static
+        BodyType = 1,
         PhysicsActive = false,
         GravityEnabled = false,
         CanCollide = false,
@@ -271,7 +243,6 @@ local function distance(a, b)
     return math.sqrt(dx * dx + dy * dy + dz * dz)
 end
 
--- 掉落物外观：鱼获用鱼种模型，其余（信物/鱼饵/武器/船票/烤鱼）用通用落物外观
 function Mgr:MeshOf(itemId)
     local species = GameCfg.Fish[itemId]
     if species and species.Model then return 'official://mesh/' .. tostring(species.Model) end
@@ -285,7 +256,6 @@ function Mgr:MeshOf(itemId)
     return cfg().ItemMesh, Vector3.New(scale, scale, scale)
 end
 
--- 建一份掉落物实例（含世界单位）但不登记：预留期不进 Loots / 区队列 / 快照，外部也拾不到
 local function createLoot(self, itemId, mult, cooked, position)
     self.NextId = self.NextId + 1
     local id = self.NextId
@@ -295,12 +265,12 @@ local function createLoot(self, itemId, mult, cooked, position)
         Name = 'ItemDrop_' .. tostring(id),
         Position = position,
         RenderMeshId = mesh,
-        BodyType = 1, -- Enums.BodyType.Static
+        BodyType = 1,
         PhysicsActive = false,
         GravityEnabled = false,
         CanCollide = false,
         Liftable = false,
-        ModelVisible = false, -- 预留期隐藏；上屏（Live）才显示
+        ModelVisible = false,
     }
     if scale then values.Scale = scale end
     local item = GameCfg.Items.Definitions[itemId]
@@ -314,7 +284,6 @@ local function createLoot(self, itemId, mult, cooked, position)
     return { Id = id, Kind = 'item', ItemId = itemId, Mult = mult, Cooked = cooked, Position = position, Unit = unit }
 end
 
--- 上屏：登记、进区队列（含 FIFO 回收）、显示模型、广播
 function Mgr:Live(loot)
     self.Loots[loot.Id] = loot
     local ok, err = pcall(function() loot.Unit.ModelVisible = true end)
@@ -325,7 +294,6 @@ function Mgr:Live(loot)
     return loot
 end
 
--- 满格落地入口（#126）：不经「先扣后落」的来源（盲盒等）直接在一处生成地面实例，保留倍率与烤制状态
 function Mgr:SpawnItem(itemId, mult, cooked, pos)
     if type(itemId) ~= 'string' or not GameCfg.Items.Definitions[itemId] then return nil, 'bad-item' end
     if type(pos) ~= 'table' or type(pos.x) ~= 'number' or type(pos.z) ~= 'number' then return nil, 'bad-position' end
@@ -335,8 +303,6 @@ function Mgr:SpawnItem(itemId, mult, cooked, pos)
     return self:Live(loot)
 end
 
--- #147 同服务器稳定交付键保留成功凭据，即使实体已拾取/回收也不再生成。
--- 不把此内存凭据当跨服务器订单幂等；旧世界未知交付保持待对账。
 function Mgr:SpawnDelivery(key, itemId, mult, cooked, pos)
     self.Deliveries = self.Deliveries or {}
     if self.Deliveries[key] then return self.Deliveries[key] end
@@ -345,7 +311,6 @@ function Mgr:SpawnDelivery(key, itemId, mult, cooked, pos)
     return loot, reason
 end
 
--- 「丢弃落物」payload 校验：物品表里有定义、倍率与烤制值在存档允许范围
 local function validated(drop)
     if type(drop) ~= 'table' then return nil, 'bad-item' end
     local itemId = drop.itemId
@@ -353,14 +318,12 @@ local function validated(drop)
     local mult = drop.mult
     if mult ~= nil and (type(mult) ~= 'number' or mult < 1 or mult > 2) then return nil, 'bad-item' end
     local cooked = drop.cooked
-    -- 烤制倍率（#137）：烧烤下降段取出可以是 (0, 1) 的数值；0/负数（烤糊产物）不进库存也不落地
     if cooked ~= nil and (type(cooked) ~= 'number' or cooked <= 0 or cooked ~= cooked or cooked >= math.huge) then
         return nil, 'bad-item'
     end
     return { itemId = itemId, mult = mult, cooked = cooked }
 end
 
--- 库存校验：丢弃的必须是玩家真实持有的一件（给了格号就核格号，否则核道具栏/背包、武器、鱼饵计数）
 local function owns(data, drop)
     if type(drop.slot) == 'number' and drop.slot == math.floor(drop.slot) then
         local snapshot = data:GetItemBarSnapshot()
@@ -380,8 +343,6 @@ local function forwardOf(character)
     return fx or 0, fz or 0
 end
 
--- 丢弃预留（#124 契约：PrepareDrop(player, drop) -> reservation|nil, reason）。
--- 校验失败一律不生成、调用方也就不会扣件；生成失败同样在此返回 spawn-failed（先建后扣，没有半成品）。
 function Mgr:PrepareDrop(player, drop)
     local data = self.PlayerData and self.PlayerData:GetDataInst(player)
     if not data then return nil, 'not-ready' end
@@ -391,7 +352,6 @@ function Mgr:PrepareDrop(player, drop)
     local character = player.Character
     local origin = character and character.Position
     if not origin then return nil, 'no-character' end
-    -- 同一玩家只保留一个未结算预留：旧预留（上一次请求没走完）先释放，避免叠加隐藏实例
     local previous = self.Reserved[player.UserId]
     if previous then
         print('[MgrLoot] 丢弃预留被顶替，释放旧的', player.UserId, previous.Loot.ItemId)
@@ -408,7 +368,6 @@ function Mgr:PrepareDrop(player, drop)
     return reservation
 end
 
--- 发放：按物品表容器把一件落物放进玩家库存（共享地面实例 → 库存的唯一路径）
 function Mgr:Give(data, itemId, mult, cooked, count)
     local definition = GameCfg.Items.Definitions[itemId]
     if not definition then return false end
@@ -419,7 +378,6 @@ function Mgr:Give(data, itemId, mult, cooked, count)
     return data:AddItem(itemId, mult, cooked)
 end
 
--- 补偿（#124 遗留边界）：实例已失而件已扣，把物品按原实例属性退回库存；一次预留只补偿一次
 function Mgr:Refund(player, reservation)
     local loot = reservation.Loot
     local data = self.PlayerData and self.PlayerData:GetDataInst(player)
@@ -433,8 +391,6 @@ function Mgr:Refund(player, reservation)
     return false, 'spawn-failed'
 end
 
--- 丢弃提交（#124 契约：CommitDrop(player, reservation, drop) -> ok, reason）。
--- 只在调用方已经扣件之后调用：成功即上屏并入区队列；重复调用不生成第二份；实例已失则退回库存。
 function Mgr:CommitDrop(player, reservation, drop)
     if type(reservation) ~= 'table' or reservation.Player ~= player or type(reservation.Loot) ~= 'table' then
         return false, 'bad-reservation'
@@ -459,7 +415,6 @@ function Mgr:CommitDrop(player, reservation, drop)
     return true
 end
 
--- 释放预留（持久写失败 / 请求被拒 / 玩家离开）：销毁隐藏实例，幂等
 function Mgr:CancelDrop(player, reservation, drop)
     if type(reservation) ~= 'table' or reservation.Player ~= player or type(reservation.Loot) ~= 'table' then
         return false
@@ -477,7 +432,6 @@ function Mgr:OnPlayerRemoving(player)
     if reservation then self:CancelDrop(player, reservation) end
 end
 
--- 拾取：谁先到谁得；成功返回 true。满格回一句提示并保留地上的掉落物
 function Mgr:Pickup(player, id)
     if type(id) ~= 'number' or id ~= math.floor(id) then return false end
     local loot = self.Loots[id]
@@ -486,7 +440,6 @@ function Mgr:Pickup(player, id)
     local pos = character and character.Position
     if not data or not pos then return false end
     if distance(pos, loot.Position) > BodyScale.InteractionRadius(character, cfg().PickupRadius) + cfg().PickupSlack then return false end
-    -- 唯一领取者：先摘记录再发放，重放 / 抢拾都拿不到第二份；发放失败放回，留给下一位
     self.Loots[id] = nil
     if loot.Kind == 'bait' then return self:GiveBait(player, data, loot) end
     if not self:Give(data, loot.ItemId, loot.Mult, loot.Cooked, loot.Count) then
@@ -517,7 +470,6 @@ function Mgr:GiveBait(player, data, loot)
         spot.RespawnAt = self:Now() + GameCfg.BaitSpots.RespawnSec
     end
     print('[MgrLoot] 拾饵', player.UserId, loot.ItemId, loot.Count, 'spot=' .. tostring(loot.SpotId), 'loot=' .. tostring(loot.Id))
-    -- 新手任务事实（#51）：鱼饵 id 全局唯一、每份只能被拾一次，用作 eventId
     if self.Quest then
         self.Quest:Notify('PickBait', player, { itemId = loot.ItemId, count = loot.Count, eventId = 'loot:' .. tostring(loot.Id) })
     end
@@ -531,7 +483,6 @@ function Mgr:Now()
     return game:GetService('World'):GetServerTime()
 end
 
--- 在点位生成一份鱼饵；该点位已有一份就不生成
 function Mgr:SpawnBait(spotCfg)
     local spot = self.Spots[spotCfg.Id]
     if not spot or spot.LootId then return nil end
@@ -558,7 +509,7 @@ function Mgr:SpawnBait(spotCfg)
         Position = position,
         RenderMeshId = c.Mesh,
         Scale = Vector3.New(c.Scale, c.Scale, c.Scale),
-        BodyType = 1, -- Enums.BodyType.Static
+        BodyType = 1,
         PhysicsActive = false,
         GravityEnabled = false,
         CanCollide = false,
@@ -614,7 +565,6 @@ function Mgr:Update()
             expired = expired or {}
             expired[#expired + 1] = id
         elseif now >= entry.NextFlash then
-            -- 服务端驱动闪烁：可见性按固定间隔来回切换（WorldUnit 的可见性是 ModelVisible）
             local loot = self.Loots[id]
             if loot then
                 entry.Visible = not entry.Visible

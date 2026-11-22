@@ -1,10 +1,5 @@
--- #122 物品全量基线。source 使用原 xlsx 物理行号（含表头）；BasePrice 仅为回收价。
--- 旧 ID 保留，新 ID 固定为 item + 物品表编号；SourceIdMap 供商店、奖池等按源表关联。
--- 实现标记收在 common/cfg/ContentLedger.lua；特殊道具 169/170 随 #140 接入，其余新增行为仍由后续任务实现。
--- SourceDescription 保留原表备注，不作为已实现效果；无图标的新物品不编造资产引用。
 return {
     Definitions = {
-        -- 鱼塘鱼获
         tilapia = { Id = 'tilapia', SourceId = 1, Name = '罗非鱼', Type = '食物', BasePrice = 3, source = '物品表!R2', EatPercent = 15, Icon = 'official://image/11164' },
         carp = { Id = 'carp', SourceId = 2, Name = '鲤鱼', Type = '食物', BasePrice = 4, source = '物品表!R3', EatPercent = 20, Icon = 'official://image/11164' },
         knifeFish = { Id = 'knifeFish', SourceId = 3, Name = '刀鱼', Type = '食物', BasePrice = 5, source = '物品表!R4', EatPercent = 20, Icon = 'official://image/11164' },
@@ -21,7 +16,6 @@ return {
         garMeat = { Id = 'garMeat', SourceId = 14, Name = '鳄雀鳝鱼肉', Type = '食物', BasePrice = 15, source = '物品表!R15', EatPercent = 100, Icon = 'official://image/13008' },
         eelHead = { Id = 'eelHead', SourceId = 15, Name = '电鳗头', Type = '极品食物', BasePrice = 10, source = '物品表!R16', EatPercent = 50, Icon = 'official://image/11164' },
         garHead = { Id = 'garHead', SourceId = 16, Name = '鳄雀鳝鱼头', Type = '极品食物', BasePrice = 20, source = '物品表!R17', EatPercent = 100, Icon = 'official://image/11164' },
-        -- 虾池鱼获
         shrimp = { Id = 'shrimp', SourceId = 17, Name = '虾米', Type = '食物', BasePrice = 4, source = '物品表!R18', EatPercent = 15, Icon = 'official://image/11164' },
         riverShrimp = { Id = 'riverShrimp', SourceId = 18, Name = '沼虾', Type = '食物', BasePrice = 10, source = '物品表!R19', EatPercent = 20, Icon = 'official://image/11164' },
         crayfish = { Id = 'crayfish', SourceId = 19, Name = '小龙虾', Type = '食物', BasePrice = 12, source = '物品表!R20', EatPercent = 20, Icon = 'official://image/11164' },
@@ -38,7 +32,6 @@ return {
         item30 = { Id = 'item30', SourceId = 30, Name = '龙角', Type = '食物', BasePrice = 75, source = '物品表!R31', EatPercent = 100 },
         item31 = { Id = 'item31', SourceId = 31, Name = '虾尾', Type = '极品食物', BasePrice = 50, source = '物品表!R32', EatPercent = 50 },
         item32 = { Id = 'item32', SourceId = 32, Name = '龙筋', Type = '极品食物', BasePrice = 100, source = '物品表!R33', EatPercent = 100 },
-        -- 蟹湖鱼获
         item33 = { Id = 'item33', SourceId = 33, Name = '蟛蜞', Type = '食物', BasePrice = 5, source = '物品表!R34', EatPercent = 15 },
         item34 = { Id = 'item34', SourceId = 34, Name = '寄居蟹', Type = '食物', BasePrice = 10, source = '物品表!R35', EatPercent = 20 },
         item35 = { Id = 'item35', SourceId = 35, Name = '大闸蟹', Type = '食物', BasePrice = 20, source = '物品表!R36', EatPercent = 20 },
@@ -55,7 +48,6 @@ return {
         item46 = { Id = 'item46', SourceId = 46, Name = '蟹钳', Type = '食物', BasePrice = 150, source = '物品表!R47', EatPercent = 100 },
         item47 = { Id = 'item47', SourceId = 47, Name = '蟹壳', Type = '极品食物', BasePrice = 100, source = '物品表!R48', EatPercent = 50 },
         item48 = { Id = 'item48', SourceId = 48, Name = '蟹眼', Type = '极品食物', BasePrice = 200, source = '物品表!R49', EatPercent = 100 },
-        -- 树林岛鱼获
         item49 = { Id = 'item49', SourceId = 49, Name = '海胆', Type = '食物', BasePrice = 10, source = '物品表!R50', EatPercent = 15 },
         item50 = { Id = 'item50', SourceId = 50, Name = '比目鱼', Type = '食物', BasePrice = 20, source = '物品表!R51', EatPercent = 20 },
         item51 = { Id = 'item51', SourceId = 51, Name = '三文鱼', Type = '食物', BasePrice = 40, source = '物品表!R52', EatPercent = 20 },
@@ -72,7 +64,6 @@ return {
         item62 = { Id = 'item62', SourceId = 62, Name = '鱼翅', Type = '食物', BasePrice = 300, source = '物品表!R63', EatPercent = 100 },
         item63 = { Id = 'item63', SourceId = 63, Name = '鱼剑', Type = '极品食物', BasePrice = 200, source = '物品表!R64', EatPercent = 50 },
         item64 = { Id = 'item64', SourceId = 64, Name = '三联鲨鱼头', Type = '极品食物', BasePrice = 500, source = '物品表!R65', SourceName = '三连鲨鱼头', DecisionSource = '策划案已确认结论.md#Q10', EatPercent = 100 },
-        -- 沙滩岛鱼获
         item65 = { Id = 'item65', SourceId = 65, Name = '海参', Type = '食物', BasePrice = 100, source = '物品表!R66', EatPercent = 15 },
         item66 = { Id = 'item66', SourceId = 66, Name = '海兔', Type = '食物', BasePrice = 150, source = '物品表!R67', EatPercent = 20 },
         item67 = { Id = 'item67', SourceId = 67, Name = '海马', Type = '食物', BasePrice = 200, source = '物品表!R68', EatPercent = 20 },
@@ -89,7 +80,6 @@ return {
         item78 = { Id = 'item78', SourceId = 78, Name = '虎爪', Type = '食物', BasePrice = 1000, source = '物品表!R79', EatPercent = 100 },
         item79 = { Id = 'item79', SourceId = 79, Name = '海象尾', Type = '极品食物', BasePrice = 800, source = '物品表!R80', EatPercent = 50 },
         item80 = { Id = 'item80', SourceId = 80, Name = '虎头', Type = '极品食物', BasePrice = 1500, source = '物品表!R81', EatPercent = 100 },
-        -- 礁石岛鱼获
         item81 = { Id = 'item81', SourceId = 81, Name = '巨脉蜻蜓', Type = '食物', BasePrice = 200, source = '物品表!R82', EatPercent = 15 },
         item82 = { Id = 'item82', SourceId = 82, Name = '企鹅', Type = '食物', BasePrice = 250, source = '物品表!R83', EatPercent = 20 },
         item83 = { Id = 'item83', SourceId = 83, Name = '飞鱼', Type = '食物', BasePrice = 300, source = '物品表!R84', EatPercent = 20 },
@@ -106,7 +96,6 @@ return {
         item94 = { Id = 'item94', SourceId = 94, Name = '翼龙之翼', Type = '食物', BasePrice = 1500, source = '物品表!R95', EatPercent = 100 },
         item95 = { Id = 'item95', SourceId = 95, Name = '鹰头', Type = '极品食物', BasePrice = 1500, source = '物品表!R96', EatPercent = 50 },
         item96 = { Id = 'item96', SourceId = 96, Name = '翼龙头', Type = '极品食物', BasePrice = 2000, source = '物品表!R97', EatPercent = 100 },
-        -- 火山岛鱼获
         item97 = { Id = 'item97', SourceId = 97, Name = '章鱼', Type = '食物', BasePrice = 500, source = '物品表!R98', EatPercent = 15 },
         item98 = { Id = 'item98', SourceId = 98, Name = '海星', Type = '食物', BasePrice = 600, source = '物品表!R99', EatPercent = 20 },
         item99 = { Id = 'item99', SourceId = 99, Name = '海绵', Type = '食物', BasePrice = 700, source = '物品表!R100', EatPercent = 20 },
@@ -123,7 +112,6 @@ return {
         item110 = { Id = 'item110', SourceId = 110, Name = '哥斯拉爪', Type = '食物', BasePrice = 5000, source = '物品表!R111', EatPercent = 100 },
         item111 = { Id = 'item111', SourceId = 111, Name = '沧龙尾', Type = '极品食物', BasePrice = 4000, source = '物品表!R112', SourceName = '沧龙头', DecisionSource = '策划案已确认结论.md#Q10', EatPercent = 50 },
         item112 = { Id = 'item112', SourceId = 112, Name = '哥斯拉头', Type = '极品食物', BasePrice = 10000, source = '物品表!R113', EatPercent = 100 },
-        -- 普通鱼饵
         worm = { Id = 'worm', SourceId = 113, Name = '蚯蚓', Type = '鱼饵', BasePrice = 1, source = '物品表!R114', EatPercent = 5, Container = 'bait', Icon = 'official://image/14066' },
         sausage = { Id = 'sausage', SourceId = 114, Name = '香肠', Type = '鱼饵', BasePrice = 2, source = '物品表!R115', EatPercent = 5, Container = 'bait', Icon = 'official://image/14066' },
         item115 = { Id = 'item115', SourceId = 115, Name = '鲱鱼罐头', Type = '鱼饵', BasePrice = 3, source = '物品表!R116', EatPercent = 5, Container = 'bait' },
@@ -131,7 +119,6 @@ return {
         item117 = { Id = 'item117', SourceId = 117, Name = '椰子', Type = '鱼饵', BasePrice = 5, source = '物品表!R118', EatPercent = 5, Container = 'bait' },
         item118 = { Id = 'item118', SourceId = 118, Name = '小海龟', Type = '鱼饵', BasePrice = 6, source = '物品表!R119', EatPercent = 5, Container = 'bait' },
         item119 = { Id = 'item119', SourceId = 119, Name = '科技假饵', Type = '鱼饵', BasePrice = 7, source = '物品表!R120', EatPercent = -20, Container = 'bait' },
-        -- 首领饵
         duck = { Id = 'duck', SourceId = 120, Name = '鸭子', Type = '鱼饵', BasePrice = 10, source = '物品表!R121', EatPercent = 10, BossBait = true, Icon = 'official://image/11154' },
         item121 = { Id = 'item121', SourceId = 121, Name = '夜明珠', Type = '鱼饵', BasePrice = 100, source = '物品表!R122', EatPercent = -20, BossBait = true },
         item122 = { Id = 'item122', SourceId = 122, Name = '绿色钞票', Type = '鱼饵', BasePrice = 100, source = '物品表!R123', EatPercent = -10, BossBait = true },
@@ -139,7 +126,6 @@ return {
         item124 = { Id = 'item124', SourceId = 124, Name = '海豹', Type = '鱼饵', BasePrice = 50, source = '物品表!R125', EatPercent = 40, BossBait = true },
         item125 = { Id = 'item125', SourceId = 125, Name = '羊', Type = '鱼饵', BasePrice = 75, source = '物品表!R126', EatPercent = 40, BossBait = true },
         item126 = { Id = 'item126', SourceId = 126, Name = '核废料桶', Type = '鱼饵', BasePrice = 100, source = '物品表!R127', EatPercent = -99, BossBait = true },
-        -- 鱼竿
         starterRod = { Id = 'starterRod', SourceId = 127, Name = '新手鱼竿', Type = '鱼竿', BasePrice = 3, source = '物品表!R128', Level = 1, Icon = 'official://image/12024' },
         shrimpRod = { Id = 'shrimpRod', SourceId = 128, Name = '钓虾竿', Type = '鱼竿', BasePrice = 6, source = '物品表!R129', Level = 2, Icon = 'official://image/12024' },
         crabRod = { Id = 'crabRod', SourceId = 129, Name = '捕蟹竿', Type = '鱼竿', BasePrice = 13, source = '物品表!R130', Level = 3, Icon = 'official://image/12024' },
@@ -147,7 +133,6 @@ return {
         proRod = { Id = 'proRod', SourceId = 131, Name = '专业鱼竿', Type = '鱼竿', BasePrice = 50, source = '物品表!R132', Level = 5, Icon = 'official://image/12024' },
         airforceRod = { Id = 'airforceRod', SourceId = 132, Name = '空军之竿', Type = '鱼竿', BasePrice = 100, source = '物品表!R133', Level = 6, Icon = 'official://image/12024' },
         unscientificRod = { Id = 'unscientificRod', SourceId = 133, Name = '不科学鱼竿', Type = '鱼竿', BasePrice = 250, source = '物品表!R134', Level = 7, Icon = 'official://image/12024' },
-        -- 商店武器与爆炸物
         item134 = { Id = 'item134', SourceId = 134, Name = '指虎', Type = '近战武器', BasePrice = 13, source = '物品表!R135' },
         item135 = { Id = 'item135', SourceId = 135, Name = '匕首', Type = '近战武器', BasePrice = 25, source = '物品表!R136' },
         item136 = { Id = 'item136', SourceId = 136, Name = '斧头', Type = '近战武器', BasePrice = 50, source = '物品表!R137' },
@@ -160,14 +145,12 @@ return {
         item143 = { Id = 'item143', SourceId = 143, Name = '鞭炮', Type = '爆炸物', BasePrice = 12, source = '物品表!R144' },
         item144 = { Id = 'item144', SourceId = 144, Name = '手雷', Type = '爆炸物', BasePrice = 25, source = '物品表!R145' },
         item145 = { Id = 'item145', SourceId = 145, Name = '炸药', Type = '爆炸物', BasePrice = 50, source = '物品表!R146' },
-        -- 船票
         shrimpTicket = { Id = 'shrimpTicket', SourceId = 146, Name = '虾池船票', Type = '过关道具', BasePrice = 1, source = '物品表!R147', SourceName = '虾池车票', DecisionSource = 'GLOSSARY.md#船票', Icon = 'official://image/14105' },
         item147 = { Id = 'item147', SourceId = 147, Name = '蟹湖船票', Type = '过关道具', BasePrice = 1, source = '物品表!R148', SourceName = '蟹湖车票', DecisionSource = 'GLOSSARY.md#船票' },
         item148 = { Id = 'item148', SourceId = 148, Name = '树林岛船票', Type = '过关道具', BasePrice = 1, source = '物品表!R149' },
         item149 = { Id = 'item149', SourceId = 149, Name = '沙滩岛船票', Type = '过关道具', BasePrice = 1, source = '物品表!R150' },
         item150 = { Id = 'item150', SourceId = 150, Name = '礁石岛船票', Type = '过关道具', BasePrice = 1, source = '物品表!R151' },
         item151 = { Id = 'item151', SourceId = 151, Name = '火山岛船票', Type = '过关道具', BasePrice = 1, source = '物品表!R152' },
-        -- 独立武器大奖
         item152 = { Id = 'item152', SourceId = 152, Name = '淬毒匕首', Type = '近战武器', BasePrice = 1, source = '物品表!R153', SourceDescription = '近战武器，对命中目标造成15点伤害，攻击间隔0.5秒。命中目标每秒受到1点中毒伤害，持续3秒。中毒最多叠加5层。' },
         item153 = { Id = 'item153', SourceId = 153, Name = '秘银匕首', Type = '近战武器', BasePrice = 1, source = '物品表!R154', SourceDescription = '近战武器，对命中目标造成18点伤害，攻击间隔0.5秒。' },
         item154 = { Id = 'item154', SourceId = 154, Name = '黄金匕首', Type = '近战武器', BasePrice = 1, source = '物品表!R155', SourceDescription = '近战武器，对命中目标造成18点伤害，攻击间隔0.5秒。' },
@@ -183,7 +166,6 @@ return {
         item164 = { Id = 'item164', SourceId = 164, Name = '雷霆之力', Type = '远程武器', BasePrice = 1, source = '物品表!R165', SourceDescription = '手枪，对命中目标造成10点伤害，射击间隔1秒。基础弹容量10，命中目标麻痹无法行动，持续0.5秒。麻痹效果不叠加。' },
         item165 = { Id = 'item165', SourceId = 165, Name = '黄金AK47', Type = '远程武器', BasePrice = 1, source = '物品表!R166', SourceDescription = '自动步枪，对命中目标造成30点伤害，射击间隔0.2秒。基础弹容量30。' },
         item166 = { Id = 'item166', SourceId = 166, Name = '连发火箭筒', Type = '远程武器', BasePrice = 1, source = '物品表!R167', SourceDescription = '火箭筒，对命中目标造成500点伤害。周围5米范围收到100点爆炸伤害，射击间隔1秒。基础弹容量10。' },
-        -- 属性、特殊与自救道具
         item167 = { Id = 'item167', SourceId = 167, Name = '加速药水', Type = '属性道具', BasePrice = 1, source = '物品表!R168', SourceDescription = '吃掉增加移动速度，最多吃20个' },
         item168 = { Id = 'item168', SourceId = 168, Name = '变大药水', Type = '属性道具', BasePrice = 1, source = '物品表!R169', SourceDescription = '抽奖获得，吃掉增加体型和血量，最多吃10个' },
         item169 = { Id = 'item169', SourceId = 169, Name = '风神之翼', Type = '特殊道具', BasePrice = 1, source = '物品表!R170', SourceDescription = '抽奖获得，使用时可以飞行' },

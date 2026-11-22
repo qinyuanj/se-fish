@@ -1,5 +1,3 @@
--- 鳄雀鳝头部攻击预警通知协议（#134）：服务端锁定朝向起咬时广播 lock，咬出 / 咬空 / 取消 / 鱼没了时广播 clear。
--- 只传可序列化字段；判定与伤害都在服务端，客户端只据此画贴地预警。
 local GarBiteNotice = { EventName = 'GarBiteNotice' }
 
 local function finite(v)

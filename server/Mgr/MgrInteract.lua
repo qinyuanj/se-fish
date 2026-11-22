@@ -1,9 +1,3 @@
--- 喂食即回收（#127）：选中格是本区**未烤**信物时优先走本区链 1:1 兑换；其余选中物品按物品表
--- 基础价 × 实例倍率结金币（烤过的按烤熟价 ×1.5），选中的鱼饵按 Fishing.BaitPrice 每只结。
--- 先复验身份、目标、距离与选中态；背包里的东西不能借喂食绕过转入规则。
--- 注入 Save 后只改隔离 draft，持久成功才回包、推库存、报任务与播动画（#123）。
--- 同会话 seq 重放或携带响应中的完整 operation 重试只回原结果；旧身份淘汰后拒绝。
--- 未注入 Save 的独立纯逻辑模式保留同步结算；「对话」是纯客户端台词。
 local GameCfg = require('common.GameCfg')
 local BodyScale = require('common.BodyScale')
 
@@ -11,7 +5,6 @@ local Mgr = { LastSeq = {}, Anchors = {} }
 
 local ITEM_BAR = GameCfg.Items.ContainerId.ItemBar
 
--- 同通道相同 seq 重放原结果；完整 operation 可跨重连重试，身份校验归 Save。
 local function resolve(mgr, player, data, payload, kind)
     local requestId = payload.operation
     if requestId ~= nil and type(requestId) ~= 'table' then return nil, false end
@@ -36,8 +29,6 @@ local function itemCount(data, itemId)
     return data.Data.Bait[itemId] or data:ItemCount(itemId)
 end
 
--- 七区钓鱼佬（#127）：共享表现参数（Radius/Slack/BubbleHeight/DialogText/BaitPrice）
--- 与本区锚点、本区兑换链合成一个完整交互点。每次请求现取共享表，配置热改与测试替身都即时生效。
 local function fishermanPoint(shared, npc)
     local point = {}
     for key, value in pairs(shared) do point[key] = value end
@@ -45,14 +36,11 @@ local function fishermanPoint(shared, npc)
     return point
 end
 
--- #254 平面距离：抢救目标与场景锚点共用一个口径（只看 x/z，高度差不计入）。
--- 摆渡 BoatRange、小队邀请与近战判定同一口径，不另立第二份实现。
 local function flatDistance(a, b)
     local dx, dz = a.x - b.x, a.z - b.z
     return math.sqrt(dx * dx + dz * dz)
 end
 
--- 选中并实际可用的道具栏格（#127）：兑换与回收都只看选中的这一格，不看背包
 local function selectedEntry(data)
     local items = data.Data.Containers[ITEM_BAR]
     local slot = data.Data.SelectedSlot
@@ -60,15 +48,12 @@ local function selectedEntry(data)
     if entry and entry.count > 0 then return slot, entry end
 end
 
--- 烤制标记（#127 / #137）：旧布尔写在存档格位的 saved.cooked 上；烧烤取出的数值倍率在
--- entry.cooked / saved.k（GameCfg.Items.CookRate 统一读取）。烤过的信物只售卖，不再走兑换
 local function isCooked(entry)
     return GameCfg.Items.CookRate(entry) ~= nil
 end
 
 local Points = {
     fisherman = { Cfg = function() return GameCfg.Interact.Fisherman end, Actions = { Feed = 'Feed' },
-        -- 按区分派（#127）：范围内命中哪个区的钓鱼佬就用哪个区的锚点与兑换链
         Resolve = function(mgr, player)
             local shared = GameCfg.Interact.Fisherman
             for _, npc in ipairs(GameCfg.Interact.Fishermen) do
@@ -77,7 +62,6 @@ local Points = {
                 if anchor then return fishermanPoint(shared, npc), anchor end
             end
         end },
-    -- #254 他人抢救复用本交互通道：目标由服务端按 UserId 解析，距离与濒死相位在此复验。
     downedPlayer = { Cfg = function() return GameCfg.Rescue end, RequestKey = 'rescue',
         Actions = { Rescue = 'RescueDowned' },
         Resolve = function(mgr, player, payload)
@@ -114,9 +98,6 @@ function Mgr:FindAnchor(name)
     return unit
 end
 
--- 选中的可喂物（#127）：先看选中格的物品——鱼获按个体倍率、普通物品按物品表基础价，烤过的按烤熟价；
--- 选中格空或表里没有时才退回选中的鱼饵（计数库存，每只 BaitPrice）。
--- 返回 金币数, 扣除回调, 日志描述, 物品 id, 类别（fish 鱼获 / item 普通物品 / bait 鱼饵）
 local function saleable(data, point)
     local slot, entry = selectedEntry(data)
     if entry then
@@ -136,8 +117,6 @@ local function saleable(data, point)
     end
 end
 
--- 角色是否在交互点 point 的水平范围内（只看 x/z）；在就返回命中的锚点单位。
--- point 带 AnchorName（单锚点，商店/摆渡复用同一套复验）或 AnchorNames（多锚点，#90 起）
 function Mgr:InRange(player, point)
     local character = player and player.Character
     local pos = character and character.Position
@@ -152,9 +131,7 @@ function Mgr:InRange(player, point)
 end
 
 function Mgr:PlayEat(anchor, point)
-    -- 模型无动画时 EatAnimation 留空，直接跳过（吃动作改由客户端缩放脉冲表现）
     if not point.EatAnimation then return end
-    -- 引擎单位读不存在的成员可能直接报错，所以连读取也包进 pcall
     local okRead, play = pcall(function() return anchor.PlayAnimation end)
     if not okRead or not play then
         print('[MgrInteract] 钓鱼佬没有可播放的动画，跳过吃动作')
@@ -164,8 +141,6 @@ function Mgr:PlayEat(anchor, point)
     if not ok then print('[MgrInteract] 吃动作播放失败', tostring(err)) end
 end
 
--- 兑换产物的两种形态（#127，GameSpec §8.1）：'achievement.<id>' 落到 Extra.achievements（不占格），
--- 其余字符串是物品表 id。前缀口径与 common/ContentValidation.lua 的 'achievement.final' 特例一致。
 local function productOf(product)
     if type(product) ~= 'string' then return nil end
     local achievement = product:match('^achievement%.(.+)$')
@@ -173,7 +148,6 @@ local function productOf(product)
     return { itemId = product }
 end
 
--- 选中的本区信物（#87 / #127）：选中格是本区未烤信物时返回 { slot, tokenId, product }
 local function exchangeable(data, point)
     local slot, entry = selectedEntry(data)
     local product = entry and not isCooked(entry) and point.Exchange and point.Exchange[entry.itemId]
@@ -181,9 +155,6 @@ local function exchangeable(data, point)
     return { slot = slot, tokenId = entry.itemId, product = product }
 end
 
--- 兑换交付（#127）：先扣掉选中信物（释放这一格），再按**交付后的容量**校验并发放；
--- 最终容量不足时回退且不扣物品——使用本次交付释放的格位是合法的（1:1 兑换总能落回这一格）。
--- 目标既可以是真 PlayerData，也可以是 #123 的隔离 draft（draft 失败时整份草案被丢弃，这里的回退是防御）。
 local function deliver(target, exchange, product)
     local items = target.Data.Containers[ITEM_BAR]
     local kept = items[exchange.slot]
@@ -203,8 +174,6 @@ local function deliver(target, exchange, product)
     return true
 end
 
--- 信物兑换（#87 / #127）：扣除与发放一次落地，不给金币、不报任务事实。
--- 同步模式补一次 UpdateData 让选中态归位、属性与库存同步；operation 重放只回原结果（#123）
 function Mgr:Exchange(player, data, anchor, point, exchange, operation)
     if self.Save and self.Save:IsPaused(player.UserId) then
         self:Reply(player, { ok = false, reason = '临时本局暂停信物兑换，请先保存到存档' })
@@ -300,11 +269,8 @@ function Mgr:Feed(player, data, anchor, point, seq, operation)
     if not data:AddCoin(coins, spend, 'feed') then return false end
     print('[MgrInteract] 喂食', player.UserId, what, '+' .. tostring(coins), 'FishCoin=' .. tostring(data.Data.FishCoin))
     self.PlayerData:SendItemBar(player)
-    -- 回包字段与持久模式保持一致，便于同一套客户端与用例覆盖两种模式
     self:Reply(player, { ok = true, action = 'Feed', coins = coins, itemId = itemId, category = category })
     self:PlayEat(anchor, point)
-    -- 新手任务事实（#51 / #52）：序号每人严格递增、只结算一次，玩家 + 序号即这次喂食的唯一 eventId；
-    -- category 区分鱼获（fish，只能来自本人拾取进道具栏）与普通物品（item）/鱼饵（bait）
     if self.Quest then
         self.Quest:Notify('Feed', player, { itemId = itemId, category = category,
             eventId = 'feed:' .. tostring(player.UserId) .. ':' .. tostring(seq) })
@@ -312,21 +278,16 @@ function Mgr:Feed(player, data, anchor, point, seq, operation)
     return true
 end
 
--- #254 抢救目标解析：UserId 由客户端给，玩家身份与目标相位只由服务端判定。
 function Mgr:ResolveDownedTarget(userId)
     local survival, vitals = self.Survival, self.Vitals
     if not survival or not vitals then return nil end
     local target = survival:PlayerByUserId(userId)
     if not target then return nil end
-    -- #271：rescuing 仍是濒死未解除，放行给 CanRescue 判 busy；在这里按 IsDowned 滤掉会把重复点击误报成 not-downed
     if survival:IsRescuing(target) then return target end
     if not vitals:IsDowned(target) then return nil end
     return target
 end
 
--- #254 发起他人抢救：请求先经 MgrSave 的持久操作身份（请求号即幂等键）落一次，
--- 重复与重连重放同一请求号只回放原结果，不再发起第二次抢救；相位守卫另管并发抢占。
--- 真正的血量结算在生存状态机到期后经 MgrVitals:Rescue 统一接缝完成。
 function Mgr:RescueDowned(player, data, target, point, seq, operation)
     local survival = self.Survival
     if not survival then
@@ -340,8 +301,6 @@ function Mgr:RescueDowned(player, data, target, point, seq, operation)
         return false
     end
     if self.Save and operation then
-        -- 先受理（改相位），再把受理结果落进持久操作记录：重放同一请求号时回放同一份结果，
-        -- 不会第二次发起抢救，也不会因为目标已被救起而给出与首次不同的答复。
         local started, why = survival:BeginRescue(target, player)
         local accepted = { ok = started == true, action = 'Rescue', targetUserId = target.UserId, reason = why }
         return execute(self, player, data, operation, function()
@@ -363,7 +322,6 @@ function Mgr:RescueDowned(player, data, target, point, seq, operation)
     return started == true
 end
 
--- 处理一次交互请求；持久模式返回是否接收，最终结果经 InteractResult 回包。
 function Mgr:Handle(player, payload)
     if type(payload) ~= 'table' then return false end
     local entry = Points[payload.target]

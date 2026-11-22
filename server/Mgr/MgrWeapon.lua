@@ -1,32 +1,12 @@
--- T08 武器系统（#129）：空手 / 近战 / 枪械 / 弹匣 / 投掷炸鱼的服务端权威结算。
--- 接缝（只使用、不改协议）：
---   伤害一律经 #128 MgrVitals 命中身份入口（NewHit + ApplyHit，鱼经 FishCarrier.ResolveCarrier）；
---   武器库存用 #124 PlayerData 独立武器库存（GetItemBarSnapshot，装备=held 优先、selectedWeapon 兜底）；
---   投掷消耗走 #123 MgrSave 操作协议（ResolveRequest + Execute，成功回调里才发飞行物）。
--- 设计要点：
---   近战伤害不经预设属性：攻击前按 GameCfg.Ability 表向 SwingRegistry 登记挥砍（伤害/射程），
---   melee_hit 行为取用登记值结算——伪造 RequestCast 与旧的 25 伤害残留被结构性堵住。
---   枪械状态按 (userId, weaponId) 墙钟记录：fireAt 限射速、{ammo, reloadUntil} 管弹匣；
---   手动/自动换弹均 2 秒、到期惰性补满，切枪换不来别的枪的时间线，重开会话弹匣自然回满
---   （弹匣不进 #123 快照，装备/选中由存档恢复，与 #123 契约一致）。
---   投掷落点水平钳到票面 20 米；水中先按钓表行（RodLevel==1 且 Grade=='normal'）权重抽 3–5 条
---   保底鱼（结构排除首领/精英/极品），再按 5 米半径结算伤害；爆炸不伤投掷者自己。
 local GameCfg = require('common.GameCfg')
 local MathWaterJudge = require('common.MathWaterJudge')
 local AbilityAPI = require('server.AbilityAPI')
 local SwingRegistry = require('server.SwingRegistry')
 
--- AnimTracks：角色 → { 动画 ID → track }，弱键，角色重生换新对象后旧表随 GC 回收
 local Mgr = { States = {}, Flying = {}, AnimTracks = setmetatable({}, { __mode = 'k' }) }
--- #212：投掷物实例序号。模块内自增，不建全局计数器；名字带它，同屏多发在飞时才可区分
--- （原先全服同名 ThrowProjectile，按名查到的是哪一发不确定）。
 Mgr.ThrowSeq = 0
 
--- 投掷物视觉占位网格：与 melee_hit 命中盒同款平台级资源（issue #8 实测可用），
--- 编辑器冻结期间不做资源预设，后续可在编辑器里换成正式爆炸物模型（见 issue #129 编辑器待办）。
 local THROW_VISUAL_MESH = 57450
--- #172 出手动作：上半身位掩码 30（Head|Trunk|LeftArm|RightArm；运行时 Enums.AnimationFilterType
--- 没有 UpperBody 成员，见 play_body_animation.lua），优先级取 AnimationPriority.Action 的值 2（未实测）
 local ATTACK_ANIM_FILTER = 30
 local ATTACK_ANIM_PRIORITY = 2
 
@@ -60,7 +40,6 @@ function Mgr:MeleeIndex()
     return nil
 end
 
--- 当前装备武器：手持（held.kind=='weapon' 且库存有效）优先，其次选中武器；都没有返回 nil（空手）
 function Mgr:EquippedWeapon(data)
     local snap = data and data.GetItemBarSnapshot and data:GetItemBarSnapshot()
     if not snap then return nil end
@@ -73,7 +52,6 @@ function Mgr:EquippedWeapon(data)
     return nil
 end
 
--- 选中格是爆炸物时返回 { slot=, itemId= }（爆炸物在普通道具栏，不占武器库存）
 function Mgr:SelectedExplosive(data)
     local snap = data and data.GetItemBarSnapshot and data:GetItemBarSnapshot()
     local slot = snap and snap.selectedSlot
@@ -97,8 +75,6 @@ function Mgr:Fail(player, action, reason, extra)
     return self:Reply(player, payload)
 end
 
--- 同一角色同一动画复用 track：自动枪 0.15 秒一发，每发 LoadAnimation 会不停堆 track。
--- 优先级赋值单独保护：运行时不认时只记日志，照样播
 function Mgr:AttackTrack(character, anim)
     local tracks = self.AnimTracks[character]
     if not tracks then
@@ -116,7 +92,6 @@ function Mgr:AttackTrack(character, anim)
     return track
 end
 
--- 出手成功后才调；动作只是表现，Animator 缺失或播放异常只记日志，不影响结算
 function Mgr:PlayAttackAnim(player, anim)
     local character = player.Character
     if not (anim and character and character.Animator) then return false end
@@ -127,7 +102,6 @@ function Mgr:PlayAttackAnim(player, anim)
     return ok
 end
 
--- ===== 攻击入口 =====
 
 function Mgr:Attack(player, aim)
     if self.Vitals and not self.Vitals:CanAct(player) then
@@ -158,8 +132,6 @@ function Mgr:CastMelee(player)
     return cast == true
 end
 
--- 空手（weaponId=nil）与近战武器共用挥砍预设（纯表现），伤害/射程来自登记值；
--- 近战武器吃近战升级（#130 按基础线性叠加），空手不加成
 function Mgr:AttackMelee(player, weaponId, data)
     local mcfg = weaponId and acfg().MeleeWeapons[weaponId] or acfg().Unarmed
     if not mcfg then return self:Fail(player, 'attack', 'bad-weapon', { weapon = weaponId }) end
@@ -171,7 +143,6 @@ function Mgr:AttackMelee(player, weaponId, data)
     end
     local scale = weaponId and self.Attr:WeaponDamageScale(player, 'melee') or 1
     local damage = mcfg.Damage * scale
-    -- #139：近战大奖的特效（毒/灼烧）随挥砍登记传给 melee_hit，命中成功后才应用
     if not SwingRegistry.StageSwing(player.UserId, { damage = damage, range = mcfg.Range, effect = mcfg.Effect }) then
         return self:Fail(player, 'attack', 'swing-unavailable', { weapon = weaponId })
     end
@@ -198,7 +169,6 @@ function Mgr:MagState(state, weaponId, magazine)
     return mag
 end
 
--- 换弹完成检查：到期惰性补满（读状态前都过一次）
 function Mgr:RefreshMag(mag, magazine, now)
     if mag.reloadUntil and now >= mag.reloadUntil then
         mag.reloadUntil = nil
@@ -209,7 +179,6 @@ end
 function Mgr:AttackGun(player, weaponId, gcfg, data, aim)
     local now = self:Now()
     local state = self:GetState(player.UserId)
-    -- #130：弹容升级向上取整（PlayerData:MagazineSize），0 级即基础值
     local magazine = data and data.MagazineSize and data:MagazineSize(gcfg.Magazine) or gcfg.Magazine
     local scale = self.Attr:WeaponDamageScale(player, 'ranged')
     local mag = self:MagState(state, weaponId, magazine)
@@ -221,7 +190,6 @@ function Mgr:AttackGun(player, weaponId, gcfg, data, aim)
         return self:Fail(player, 'attack', 'cooldown', { weapon = weaponId })
     end
     if mag.ammo <= 0 then
-        -- 空匣自动换弹（与手动同口径 2 秒），备弹无限所以一定补满
         mag.reloadUntil = now + acfg().GunShared.ReloadSec
         print('[MgrWeapon] 空匣自动换弹', player.UserId, weaponId,
             'until=' .. tostring(mag.reloadUntil))
@@ -241,7 +209,6 @@ function Mgr:AttackGun(player, weaponId, gcfg, data, aim)
             local ok = self.Vitals:ApplyHit(hit, target, damage)
             appliedAny = appliedAny or ok == true
         end
-        -- #139：枪械大奖特效（霜冻/麻痹）只在伤害被统一入口接受后挂；脱靶与被拒（安全区等）不挂
         if appliedAny and gcfg.Effect and self.Modifier and self.Modifier.ApplyWeaponEffect then
             local ok, err = pcall(self.Modifier.ApplyWeaponEffect, self.Modifier, player, target, gcfg.Effect)
             if not ok then print('[MgrWeapon] 武器特效应用失败', weaponId, tostring(err)) end
@@ -253,7 +220,6 @@ function Mgr:AttackGun(player, weaponId, gcfg, data, aim)
         print('[MgrWeapon] 枪击未命中', player.UserId, weaponId, 'ammo=' .. tostring(mag.ammo))
     end
     if gcfg.Splash and hitPos then
-        -- 火箭筒两段都只归远程升级（不乘爆炸物升级，不双加成）
         local splashHit = self.Vitals:NewHit(player, 'weapon')
         local splashDamage = gcfg.Splash.Damage * scale
         local damaged = self:RadialDamage(hitPos, gcfg.Splash.Radius, splashDamage,
@@ -283,8 +249,6 @@ function Mgr:Reload(player)
         reloadSec = acfg().GunShared.ReloadSec })
 end
 
--- 枪械 hitscan：角色朝向前方 GunShared.Range 米，首命中分类（玩家 / 鱼 / 墙）。
--- 墙与未命中不结算直伤（火箭筒另有落点溅射）。
 function Mgr:Vec3(x, y, z)
     if Vector3 then return Vector3.New(x, y, z) end
     return { x = x, y = y, z = z }
@@ -325,13 +289,10 @@ function Mgr:GunHit(player, gcfg, aim)
         local carrier = self.FishCarrier:ResolveCarrier(hit.Instance)
         if carrier then return carrier, hitPos end
     end
-    return nil, hitPos -- 墙 / 场景
+    return nil, hitPos
 end
 
--- ===== 投掷 / 爆炸 =====
 
--- 落点解析：无 target 朝向前方直接投 20 米；有 target（长按选点）水平钳到票面射程；
--- 落点在任意水区 (x,z) 内算落水，水面高度取该水区 SurfaceY。
 function Mgr:ResolveTarget(player, target)
     local character = player.Character
     local pos = character and character.Position
@@ -370,8 +331,6 @@ function Mgr:WaterZoneAt(x, z)
     return nil
 end
 
--- 保底鱼候选：钓表行 RodLevel==票面（1 级）且鱼种 Grade=='normal'——
--- 首领（boss）/精英（elite）/极品（rare）被结构性排除，普通投掷召唤不出首领。
 function Mgr:BlastCandidates(rows)
     local out = {}
     local rod = acfg().Throw.FishRodLevel
@@ -395,7 +354,6 @@ function Mgr:PickBlastFish(candidates, random)
     return candidates[#candidates] and candidates[#candidates].id or nil
 end
 
--- 水中爆炸：先生成 3–5 条当地 1 级普通鱼，再算伤害（鱼也会被炸，死亡走 Loot/任务流）
 function Mgr:SpawnBlastFish(zone, landing, player)
     local rows = GameCfg.Casting.Zones[zone.Id]
     local candidates = self:BlastCandidates(rows)
@@ -417,7 +375,6 @@ function Mgr:SpawnBlastFish(zone, landing, player)
     return count
 end
 
--- 径向伤害：5 米内玩家与活鱼经统一命中入口结算；skip 可以是单个目标或目标数组（投掷者/直伤目标）
 function Mgr:RadialDamage(center, radius, amount, hit, skip)
     if not self.Vitals or not hit or not center then return 0 end
     local skipSet = nil
@@ -456,7 +413,6 @@ end
 function Mgr:Detonate(player, itemId, landing, zone)
     local ecfg = acfg().Explosives[itemId]
     if not ecfg or not landing then return 0 end
-    -- #130：爆炸物升级按基础线性叠加（投掷爆炸结算唯一消费点）
     local data = self.PlayerData and self.PlayerData:GetDataInst(player)
     local scale = self.Attr:WeaponDamageScale(player, 'explosive')
     local damage = ecfg.Damage * scale
@@ -477,7 +433,6 @@ function Mgr:Detonate(player, itemId, landing, zone)
     return damaged
 end
 
--- ===== 投掷消耗（#123 协议） =====
 
 function Mgr:Throw(player, payload)
     if self.Vitals and not self.Vitals:CanAct(player) then
@@ -509,7 +464,6 @@ function Mgr:Throw(player, payload)
         return true
     end
     if not self.Save then
-        -- 无存档环境（纯逻辑/测试）：直接在活数据上恰减 1 件
         local container = data.Data.Containers[GameCfg.Items.ContainerId.ItemBar]
         local it = container and container[slot]
         if not it or it.count <= 0 or it.itemId ~= itemId then
@@ -527,8 +481,6 @@ function Mgr:Throw(player, payload)
         self:Reply(player, { ok = true, action = 'throw', itemId = itemId, slot = slot })
         return true
     end
-    -- 持久模式：消费与结果同键落账，成功回调里才发飞行物；重放只回历史结果
-    -- （operation 身份必须是协议下发的表，与 MgrShop 同款校验）
     local requestId = payload.operation
     if requestId ~= nil and type(requestId) ~= 'table' then
         self:Fail(player, 'throw', 'bad-operation')
@@ -537,7 +489,7 @@ function Mgr:Throw(player, payload)
     if requestId == nil then requestId = payload.seq end
     local operation, mode = self.Save:ResolveRequest(player, data, 'throw', requestId)
     if not operation then
-        if mode == 'replay' then return true end -- 协议层已回包（理论不可达，resolve 返回 replay 时必有 operation）
+        if mode == 'replay' then return true end
         self:Fail(player, 'throw', 'unavailable')
         return true
     end
@@ -546,7 +498,7 @@ function Mgr:Throw(player, payload)
             function(ok, result)
                 if ok then
                     result.operation = operation
-                    self:Reply(player, result) -- 原结果重放，不再发射
+                    self:Reply(player, result)
                 end
             end)
         return accepted == true
@@ -570,11 +522,10 @@ function Mgr:Throw(player, payload)
         print('[MgrWeapon] 投掷落账', player.UserId, operation.id, itemId, 'slot=' .. tostring(slot))
         self.PlayerData:SendItemBar(player)
         self:Reply(player, result)
-        self:Launch(player, itemId, target) -- 世界侧效果只在落账成功后发生
+        self:Launch(player, itemId, target)
     end) == true
 end
 
--- ===== 飞行物 =====
 
 function Mgr:FlightPosition(flight, t)
     local from, to = flight.from, flight.landing
@@ -614,7 +565,6 @@ function Mgr:Launch(player, itemId, target)
         from = character and character.Position or nil,
         landing = landing, zone = zone,
         startAt = self:Now(), flightSec = flightSec }
-    -- CreateUnit 抛错会清掉 pcall 的配置缓存；飞行时间和起点都提前固定。
     flight.visual = self:CreateThrowVisual(player, itemId, flight)
     self.Flying[#self.Flying + 1] = flight
     self:PlayAttackAnim(player, acfg().Throw.Anim)
@@ -651,9 +601,7 @@ function Mgr:Update()
     end
 end
 
--- ===== 施法守卫与 RE =====
 
--- 近战槽的玩家施法必须有登记挥挡（MgrWeapon 每次攻击前登记）；鱼等非玩家单位不受限
 function Mgr:CastGuard(unit, index)
     if index ~= self:MeleeIndex() then return true end
     local players = game:GetService('Players')

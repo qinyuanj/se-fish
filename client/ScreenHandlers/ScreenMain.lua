@@ -10,20 +10,13 @@ local OwnedUnits = require('common.OwnedUnits')
 
 local ScreenHandler = { UINodes = {}, UINodeMap = {} }
 
--- #209：本界面建出来的节点一律登记在所有者名下，关屏时 OwnedUnits.Clear(self) 一次拆完，
--- 私有桶不再是生命周期的第二套答案。瞄准拾取层例外——它每次长按建一个、松开立刻拆，
--- 挂在主界面名下的话 EndAim 拆过一次登记表还留着它，关屏时会再拆一遍（登记表没有「取消登记」），
--- 所以它有自己的所有者。
 local AIM_OWNER = {}
--- 导出这个所有者：测试与排查要按「瞄准拾取层」这一个桶数节点，和主界面名下的登记分开算。
 ScreenHandler.AimOwner = AIM_OWNER
 
 function ScreenHandler:Action(action, value)
     _G.REUtil:GetRE('ItemBarAction'):FireServer({ action = action, value = value })
 end
 
--- #124 两步操作（吃/丢弃/攻击）：每次请求带单调 seq，服务端回包带 operation 身份，
--- 断线重试可凭 seq 或原 identity 续发，重复结算由服务端操作日志挡掉。
 function ScreenHandler:Operate(payload)
     self.OpSeq = (self.OpSeq or 0) + 1
     payload.seq = self.OpSeq
@@ -31,8 +24,6 @@ function ScreenHandler:Operate(payload)
     _G.REUtil:GetRE('ItemBarAction'):FireServer(payload)
 end
 
--- #124 双向拖拽：触摸起点记源格，抬起位置命中其他格发 MoveSlot；
--- 原地（点击）与拖出格区都不发请求，容器与槽位由服务端复验。
 function ScreenHandler:bindDrag(btn, container, index)
     if not btn.OnTouchBegan or not btn.OnTouchEnded then return end
     self:Listen(btn.OnTouchBegan, function(touch)
@@ -72,8 +63,6 @@ function ScreenHandler:SlotAtPosition(pos)
     return nil
 end
 
--- ===== #129 投掷（爆炸物槽位手势：点按=直接投 20 米，长按=瞄准选点） =====
--- 手势与冷却统一使用服务器时刻；SE 沙盒不提供 os
 local function nowSec()
     return World.GetServerTime and World:GetServerTime() or 0
 end
@@ -88,7 +77,6 @@ function ScreenHandler:IsExplosiveSlot(index)
     return definition ~= nil and definition.Type == '爆炸物'
 end
 
--- 槽位按压手势：OnClicked 与手势都会响应一次点按，用标志位保证只消费一次
 function ScreenHandler:BindSlotGesture(btn, index)
     if not btn.OnTouchBegan or not btn.OnTouchEnded then return end
     self:Listen(btn.OnTouchBegan, function(touch)
@@ -106,7 +94,7 @@ function ScreenHandler:BindSlotGesture(btn, index)
             touch and touch.EndedPosition or nil)
         if result == 'tap' then
             self.ThrowHandled = { index = index, valid = true }
-            self:ThrowExplosive(index, nil) -- 直接投：朝向前方票面 20 米
+            self:ThrowExplosive(index, nil)
         elseif result == 'long' then
             self.ThrowHandled = { index = index, valid = true }
             self:BeginAim(index)
@@ -123,7 +111,6 @@ function ScreenHandler:ConsumeThrowClick(index)
     return false
 end
 
--- 投掷消耗持久物，走 #124 同款单调 seq：服务端按 #123 协议幂等去重
 function ScreenHandler:ThrowExplosive(slot, target)
     self.WeaponSeq = (self.WeaponSeq or 0) + 1
     local payload = { action = 'throw', slot = slot, seq = self.WeaponSeq }
@@ -132,7 +119,6 @@ function ScreenHandler:ThrowExplosive(slot, target)
     _G.REUtil:GetRE('WeaponAction'):FireServer(payload)
 end
 
--- 长按进入瞄准：全屏拾取层，点哪里投哪里（落点服务端再钳到 20 米内）
 function ScreenHandler:BeginAim(slot)
     self:EndAim()
     if not self.UIRoot or not self.EuiResolution then return end
@@ -156,7 +142,6 @@ function ScreenHandler:PickAim(touch)
     local slot = self.AimSlot
     self:EndAim()
     if not slot or not pos then return end
-    -- [未查证：ScreenPointToRay 的 depth 语义按射线长度处理]，无命中时回退直接投掷
     local target
     local ok, ray = pcall(function()
         local camera = game:GetService('CameraService')
@@ -174,11 +159,10 @@ function ScreenHandler:PickAim(touch)
 end
 
 function ScreenHandler:EndAim()
-    OwnedUnits.Clear(AIM_OWNER) -- 拾取层名下的节点一次拆完；这一轮没建就是空操作
+    OwnedUnits.Clear(AIM_OWNER)
     self.AimSlot = nil
 end
 
--- 快照里某种鱼饵的库存，缺失或非数字按 0（鱼饵栏文字、候选格、「蚯蚓用尽」共用这一处）
 local function baitStock(state, id)
     local bait = type(state) == 'table' and type(state.bait) == 'table' and state.bait or {}
     local count = id ~= nil and bait[id] or nil
@@ -189,7 +173,6 @@ local function wormCount(state)
     return baitStock(state, GameCfg.Items.Id.Worm)
 end
 
--- 服务端确认手持的道具栏格号（手持的不是道具栏格时为 nil）
 local function heldSlot(state)
     local held = type(state) == 'table' and state.held
     return type(held) == 'table' and held.kind == 'slot' and held.slot or nil
@@ -197,12 +180,11 @@ end
 
 function ScreenHandler:Show(state)
     if type(state) ~= 'table' or type(state.slots) ~= 'table' then return end
-    -- #180「蚯蚓用尽」：只在蚯蚓从有到无的那一次快照报，开局即 0 或一直是 0 都不报
     local depleted = self.Snapshot ~= nil and wormCount(self.Snapshot) > 0 and wormCount(state) <= 0
     self.Snapshot = state
-    LocalAttackButton:SetEquipped(state) -- #129：攻击按钮语义随装备走（攻击/射击/连发/换弹）
+    LocalAttackButton:SetEquipped(state)
     local capacity = state.slotCount or GameCfg.Items.ItemBarSlots
-    self:ApplyLayout(capacity, nil) -- #179：开放格数变化时按布局重排装备栏
+    self:ApplyLayout(capacity, nil)
     for index, slot in ipairs(self.Slots or {}) do
         local entry = state.slots[index]
         local definition = entry and GameCfg.Items.Definitions[entry.itemId]
@@ -214,7 +196,6 @@ function ScreenHandler:Show(state)
             local tint = definition.IconColor
             slot.Icon.Color = Color.New(tint[1], tint[2], tint[3], tint[4])
         end
-        -- #137：烤过的物品名字加前缀；CookRate 统一口径（含旧布尔档 saved.cooked==true）
         slot.Label.Text = definition
             and ((GameCfg.Items.CookRate(entry) ~= nil and GameCfg.Grill.CookedPrefix or '') .. definition.Name) or ''
         slot.Label.Visible = index <= capacity and definition ~= nil
@@ -223,8 +204,6 @@ function ScreenHandler:Show(state)
         slot.Background.ButtonNormalColor = index == state.selectedSlot
             and Color.New(36, 130, 94, 255) or Color.New(54, 100, 140, 255)
     end
-    -- 鱼饵（蚯蚓、香肠、鸭子、动态鱼饵）与武器的选择、吃蚯蚓都在武器栏 / 鱼饵栏弹窗里（#180）；
-    -- 选中格食物的两步进食在道具按钮上（#181）
     self:ShowCoin(state.coin)
     self:ShowCast()
     local selected = state.selectedSlot and state.slots[state.selectedSlot]
@@ -237,7 +216,6 @@ function ScreenHandler:Show(state)
     if depleted then self:ShowCastFailure({ reason = 'wormDepleted' }) end
 end
 
--- 上钩提示（#54）：同一收线会话只触发一次；提示音缺失或播放失败时只保留文字与高亮
 function ScreenHandler:StartHookAlert(session)
     if session == nil or session == self.AlertedSession then return end
     self.AlertedSession = session
@@ -253,7 +231,6 @@ function ScreenHandler:StartHookAlert(session)
         or ('音效缺失，只保留文字与高亮 ' .. tostring(err)))
 end
 
--- 选中格里能吃的物品（配了 EatPercent 的鱼获），没有返回 nil
 function ScreenHandler:SelectedFood()
     local state = self.Snapshot
     local slot = state and state.selectedSlot
@@ -267,7 +244,6 @@ local function readVital(player, key, default)
     return value and math.floor(value) or default
 end
 
--- 球上文字前缀（术语见 GLOSSARY「饥饿度」）
 local HEALTH_PREFIX, HUNGER_PREFIX = '血 ', '饥饿度 '
 
 local function vitalPercent(value, maximum)
@@ -281,7 +257,6 @@ local function updateStarving(self, health, hunger)
     self:UpdateStarveFx()
 end
 
--- 血球 / 饥饿度球（#53）：数值只读服务端写的玩家属性 Health / MaxHealth / Hunger / MaxHunger
 function ScreenHandler:ShowVitals()
     if not self.HealthRing then return end
     local player = game:GetService('Players').LocalPlayer
@@ -309,7 +284,6 @@ local function flashVisible(self, now, config)
     return self.Starving == true and math.floor(now / config.FlashPeriodSec) % 2 == 0
 end
 
--- 饥饿归零期间：四边红框按 FlashPeriodSec 亮灭，WarnText 每 WarnIntervalSec 秒提示一次（不刷屏）
 function ScreenHandler:UpdateStarveFx()
     if not self.FlashEdges then return end
     local c = GameCfg.Vitals
@@ -319,7 +293,6 @@ function ScreenHandler:UpdateStarveFx()
     if self.Starving then warnStarving(self, now, c) end
 end
 
--- 金币 HUD（#47）：接回场景既有的 ImageCoin / LabelCoin，以服务端同步的 FishCoin 属性为准
 function ScreenHandler:ShowCoin(value)
     if not self.LabelCoin then return end
     if type(value) ~= 'number' then
@@ -330,7 +303,6 @@ function ScreenHandler:ShowCoin(value)
     self.LabelCoin.Text = tostring(math.floor(tonumber(value) or 0))
 end
 
--- 按列数折行（中文按一字一列，ASCII 也按整列算，宁宽勿溢）
 local function wrapColumns(text, columns)
     local out, count = {}, 0
     for character in text:gmatch('[%z\1-\127\194-\244][\128-\191]*') do
@@ -345,8 +317,6 @@ local function wrapColumns(text, columns)
     return table.concat(out)
 end
 
--- 新手任务追踪条（#51，#179 改到左侧任务区）：「新手任务 步号/总数：文案（计数）」按追踪条宽度折行，
--- 以服务端 QuestState 为准；推进那一次带 notice，走既有消息条提示下一步
 function ScreenHandler:ShowQuest(state)
     if not self.QuestLabel or type(state) ~= 'table' or type(state.text) ~= 'string' then return end
     local columns = math.max(1, math.floor(self.QuestLabel.Size.x / self.QuestLabel.FontSize))
@@ -356,8 +326,6 @@ function ScreenHandler:ShowQuest(state)
     if type(state.notice) == 'string' and _G.LocalMsgNotice then _G.LocalMsgNotice(state.notice) end
 end
 
--- 折叠 / 展开（#179）：折叠状态 QuestCollapsed 只存在客户端处理器上，不发服务端、不进存档；
--- 重进界面（Cleanup）不清它，任务文字刷新也不改它
 function ScreenHandler:RenderQuest()
     if not self.QuestLabel then return end
     local shown = self.QuestShown == true
@@ -403,25 +371,18 @@ function ScreenHandler:HideDialogue()
     self.DialoguePayload = nil
 end
 
--- 服务端会发的抛竿阶段（#133 增补 unhooked：脱钩后线还在水里）。白名单外的回包一律丢弃，
--- 免得迟到 / 旧回包把界面拉回一个不存在的状态。
 local CAST_PHASES = { idle = true, cast = true, hooked = true, landed = true, unhooked = true }
 
--- 线还在水里的阶段：还没上钩的 cast，与鱼已脱钩但没收竿的 unhooked；都按「收竿」一次收回
 local function lineStillOut(phase)
     return phase == 'cast' or phase == 'unhooked'
 end
 
--- 选中格是不是鱼竿（物品表配了 Level）
 local function selectedRod(state)
     local entry = state and state.selectedSlot and state.slots[state.selectedSlot]
     local definition = entry and GameCfg.Items.Definitions[entry.itemId]
     return definition ~= nil and type(definition.Level) == 'number'
 end
 
--- 道具按钮（#181）：显示与点击共用同一份优先级判定，避免两边各判一套而不一致。
--- 特殊道具（空闲）> 上钩 > 鱼线在外 > 上岸停留 > 手持鱼获 > 手持食物 > 手持鱼竿 > 其他。
--- 「空闲」指没有抛竿且头上没顶着鱼：顶着鱼时先放下（沿用 #140 起的显示语义）。
 function ScreenHandler:ItemActionMode()
     local phase = self.CastState and self.CastState.phase or 'idle'
     local drop = phase == 'idle' and self.CastState ~= nil and self.CastState.holding ~= nil
@@ -442,7 +403,6 @@ local function foodActionText(self)
 end
 
 local function castActionColor(phase, now, alert)
-    -- 上岸停留期间按钮灰化（#37），其余时候用常规底色
     if not now then
         return phase == 'landed' and Color.New(120, 120, 120, 255)
             or Color.New(54, 100, 140, 255)
@@ -459,19 +419,11 @@ local function fireCast(action, extra)
     _G.REUtil:GetRE('CastAction'):FireServer(payload)
 end
 
--- 原子吐息冷却剩余秒数（本地按服务端权威剩余秒数起的倒计时），不在冷却时为 0
 local function breathLeft(self)
     return self.BreathCooldownUntil and (self.BreathCooldownUntil - World:GetServerTime()) or 0
 end
 
--- 道具按钮各档（#181）：文字、可点、点击、长按集中在一张表里，显示、点击与长按都只经 itemAction 分派。
--- text / enabled 为常量或 function(self, active)；enabled 之外还要求界面开着；visible 缺省为真；
--- click / pressBegan 缺省表示不响应。
--- #140 特殊道具：空闲且服务端生效效果（SpecialItemState.effect）存在时，
--- 道具按钮从钓鱼语义切换为「长按飞行」（风神之翼）/「原子吐息」（哥斯拉）；
--- 冷却用本地墙钟倒计时展示（服务端每次状态推送带来权威剩余秒数）。
 local SPECIAL_ACTIONS = {
-    -- 风神之翼：长按升空、松开缓降（松开在 OnTouchEnded 里按效果发送）；点击不做事
     wings = {
         text = '长按飞行', enabled = true,
         pressBegan = function()
@@ -489,7 +441,6 @@ local SPECIAL_ACTIONS = {
         end,
     },
 }
--- 服务端只会下发上面两种效果；万一是别的，按钮可见但文字、可点保持原样（text / enabled 为 nil）
 local UNKNOWN_SPECIAL = {}
 
 local ITEM_ACTIONS = {
@@ -506,7 +457,6 @@ local ITEM_ACTIONS = {
     lineOut = { text = '收竿', enabled = true, click = function() fireCast('Reel') end },
     landed = { text = '已上岸', enabled = false },
     drop = { text = '放下', enabled = true, click = function() fireCast('Drop') end },
-    -- 两步进食（#53/#124）：首次只切手持，服务端快照确认手持该格后再点才真吃
     food = {
         text = foodActionText, enabled = true,
         click = function(self)
@@ -521,7 +471,6 @@ local ITEM_ACTIONS = {
             fireCast('Cast', { slot = slot, itemId = self.Snapshot.slots[slot].itemId })
         end,
     },
-    -- 其他：按钮隐藏；强行点击时给「请重新选择鱼竿」
     none = {
         text = '使用', enabled = false, visible = false,
         click = function(self)
@@ -558,7 +507,6 @@ end
 
 local function castProgress(self, reel, active)
     local result = reel and reel.LastResult
-    -- 收线中显示本地反馈并平滑追平权威进度（#38）；其余时候显示最后一次权威值
     return active and reel.DisplayProgress and reel:DisplayProgress()
         or result and self.CastState and result.session == self.CastState.reelSession and result.progress or 50
 end
@@ -580,9 +528,8 @@ local function showCastFeedback(self, phase, active, alerting, progress)
     end
 end
 
--- 上方提示区的临时提示通道（HintTransient）：抛竿失败与客户端状态提示共用，白名单外的 reason 丢弃
 local castFailureText = {
-    wormDepleted = '蚯蚓用尽', -- #180：客户端按库存快照判定，服务端不发
+    wormDepleted = '蚯蚓用尽',
     invalidLanding = '落点不在可钓水域，请重新抛竿',
     noFish = '本次没有鱼上钩，请重新抛竿',
     holding = '先放下鱼再抛竿',
@@ -594,8 +541,6 @@ local castFailureText = {
     cannotAct = '现在无法行动，等恢复后再试',
 }
 
--- 只做提示、不算抛竿失败的 reason：不打断「等待上钩」、入水提示与浮标，新抛竿也不清掉它
--- （抛竿一刻扣掉最后一只蚯蚓时，库存快照与「已入水」的先后不定）
 local noticeOnly = { wormDepleted = true }
 
 function ScreenHandler:ShowCastFailure(result)
@@ -611,7 +556,6 @@ function ScreenHandler:ShowCastFailure(result)
     print('[ScreenMain] ' .. (notice and '临时提示' or '抛竿失败'), result.reason, text)
 end
 
--- 新的抛竿反馈到来时清掉旧的失败提示；只做提示的（如蚯蚓用尽）留到自然消失
 local function clearCastFailure(self)
     if self.FailureNotice then return end
     self.FailureUntil = nil
@@ -657,11 +601,9 @@ function ScreenHandler:ShowCast()
     local reel = _G.LocalReelIn
     local active = self.IsOpen and phase == 'hooked' and reel
         and reel.SessionId == self.CastState.reelSession
-    self:ApplyLayout(nil, active == true) -- #179：收线期间「结束收线」按布局占位
-    -- 上钩提示（#54）：本收线会话的前 DurationSec 秒按钮呼吸式高亮、文字改为提示语
+    self:ApplyLayout(nil, active == true)
     local now = active == true and self.HookAlertUntil ~= nil and World:GetServerTime()
     local alerting = now and now < self.HookAlertUntil
-    -- #140：空闲且特殊道具生效时按钮让给飞行 / 吐息；钓鱼各阶段保持钓鱼语义
     showItemAction(self, self:ItemActionMode(), phase, active, alerting and now)
     local progress = castProgress(self, reel, active)
     if type(progress) ~= 'number' or progress ~= progress then progress = 50 end
@@ -670,7 +612,6 @@ function ScreenHandler:ShowCast()
     self:UpdateCastFeedback()
 end
 
--- #209：建点的第一个参数是所有者，建完即登记；销毁只看 OwnedUnits.Clear(owner)，不再分桶记账。
 local function button(owner, parent, name, x, y, width)
     local btn = OwnedUnits.Track(owner, World:CreateUnit('EUIButton', {
         Parent = parent, Name = name,
@@ -691,7 +632,6 @@ local function overlay(owner, parent, name, x, y, width, height, text, size, col
         Position = Vector2.New(x, y), Size = Vector2.New(width, height),
         Text = text, FontSize = size, TextColor = color,
     }))
-    -- #174 #18：按钮与提示文字在自身框内水平、垂直居中（枚举 Center = 1，同 LocalAttackButton）
     label.TextHorizontalAlignment = 1
     label.TextVerticalAlignment = 1
     label.TouchEnabled = false
@@ -710,14 +650,12 @@ local function passive(node)
     return node
 end
 
--- 文字列数：中文按一字一列，ASCII 也按整列算（同 wrapColumns，宁宽勿溢）
 local function columnsOf(text)
     local count = 0
     for _ in text:gmatch('[%z\1-\127\194-\244][\128-\191]*') do count = count + 1 end
     return count
 end
 
--- 球上文字字号：按满值时最长的文字（如「饥饿度 300」）放得进球宽来定，最大 20
 local VITAL_FONT_MAX = 20
 local function vitalFontSize(width, c)
     local longest = math.max(columnsOf(HEALTH_PREFIX .. tostring(c.MaxHealth)),
@@ -725,7 +663,6 @@ local function vitalFontSize(width, c)
     return math.max(1, math.min(VITAL_FONT_MAX, math.floor(width / longest)))
 end
 
--- 左上状态区血球 / 饥饿度球（#53，#179 位置取自布局模块）与四边红框；图片用途见 GameCfg.Vitals
 function ScreenHandler:BuildVitals(root, resolution, layout)
     local c = GameCfg.Vitals
     local rings = {
@@ -768,10 +705,8 @@ function ScreenHandler:BuildVitals(root, resolution, layout)
     end
 end
 
--- #174 #13：背包打开时收起面板覆盖区内的固定键、装备栏两格与文字标签；关闭后按当前快照恢复
 function ScreenHandler:ApplyBackpackOcclusion()
     local hidden = self.BackpackOpen == true
-    -- #180：开着的弹窗随背包打开直接关闭，关背包时不复活
     if hidden and self.OpenPopup then self:ClosePopup() end
     local fixed = {
         { self.BtnDiscard, self.BtnDiscardLabel },
@@ -791,7 +726,6 @@ function ScreenHandler:ApplyBackpackOcclusion()
         slot.Count.Visible = slot.Count.Visible and not hidden
     end
     if not hidden then
-        -- 恢复既有显隐规则：道具按钮交给 ShowCast，丢弃键按快照重算，装备栏两格按快照重刷
         self:ShowCast()
         local selected = self.Snapshot and self.Snapshot.selectedSlot
             and self.Snapshot.slots and self.Snapshot.slots[self.Snapshot.selectedSlot]
@@ -822,7 +756,6 @@ function ScreenHandler:ShowBackpack()
         slot.Button.Visible = visible
         slot.Button.TouchEnabled = visible and definition ~= nil
         slot.Label.Visible = visible
-        -- #137：烤过的物品名字加前缀；CookRate 统一口径（含旧布尔档 saved.cooked==true）
         slot.Label.Text = definition
             and ((GameCfg.Items.CookRate(entry) ~= nil and GameCfg.Grill.CookedPrefix or '') .. definition.Name) or '空'
         slot.Button.ButtonNormalColor = index == self.SelectedBackpackSlot
@@ -842,13 +775,9 @@ function ScreenHandler:ShowBackpack()
     else
         self.MoveLabel.Text = '转入道具栏'
     end
-    -- #174 #13：背包面板盖住的鱼饵键、武器条与文字标签一起隐藏，点面板不会点到下层；
-    -- 放在 ShowBackpack 末尾，关闭时恢复逻辑能看到刚重算的道具栏显隐
     self:ApplyBackpackOcclusion()
 end
 
--- #179：背包按钮在底部装备栏（随道具栏格数重排，见 ApplyLayout）；面板位置取自布局模块，
--- 面板内部排版不变：标题、背包格、转入按钮都按面板中心的固定偏移摆放
 function ScreenHandler:BuildBackpack(root, layout)
     local entry, panelRect = layout.Rects.BackpackButton, layout.Panels.BackpackPanel
     local center, cy = panelRect.x, panelRect.y
@@ -862,7 +791,6 @@ function ScreenHandler:BuildBackpack(root, layout)
     self.BackpackPanel = button(self, root, 'BackpackPanel', center, cy, panelRect.w)
     self.BackpackPanel.Size = Vector2.New(panelRect.w, panelRect.h)
     self.BackpackPanel.TouchEnabled = false
-    -- #174 #14：面板用深色，背包格用浅色，空格不再只剩一个「空」字
     self.BackpackPanel.ButtonNormalColor = Color.New(30, 46, 66, 240)
     self.BackpackTitle = overlay(self, root, 'BackpackTitle', center, cy + 290, 700, 48,
         '选择背包物品，再转入道具栏', 28, Color.New(255, 255, 255, 255))
@@ -909,12 +837,6 @@ local function place(node, r)
     node.Size = Vector2.New(r.w, r.h)
 end
 
--- ===== #180 武器栏、鱼饵栏单格与弹窗 =====
--- 底部装备栏里各占一格，显示当前选中的那一种；点开在该格正上方弹出一排候选格（位置取自布局模块）。
--- 同一时间最多开一个弹窗（OpenPopup = 'Weapon' | 'Bait' | nil）；点候选格或弹窗外空白处关闭。
--- 叠放：空白关闭层 4 < 弹窗底板 5 < 栏位与候选格 6 < 文字 7；对话框 20–22 仍在最上。
--- 控件名：WeaponBar / WeaponBarLabel、BaitBar / BaitBarLabel、WeaponPopup / BaitPopup（底板）、
--- <种类>PopupCell_<键> / <种类>PopupLabel_<键>（键：武器 id、鱼饵 id、NoBait、EatWorm）、PopupDismiss。
 local SELECTED_COLOR = { 36, 130, 94, 255 }
 local NORMAL_COLOR = { 54, 100, 140, 255 }
 local DISABLED_COLOR = { 120, 120, 120, 255 }
@@ -925,14 +847,11 @@ local function itemName(id)
     return definition and definition.Name or tostring(id)
 end
 
--- 候选格 / 栏位文字：名字按格宽折行，带数量时另起一行「×N」
 local function cellText(name, count, width)
     local text = wrapColumns(name, math.max(1, math.floor(width / CELL_FONT)))
     return count and (text .. '\n×' .. tostring(count)) or text
 end
 
--- 武器候选：全部持有的武器（库存为 0 的也列出，置灰），按 id 排序；选中 = 切换手持
--- （按武器 id 发起攻击类 Operate，服务端据此切换手持，与原平铺武器行一致）
 local function weaponCandidates(self, state)
     local weapons = type(state.weapons) == 'table' and state.weapons or {}
     local ids = {}
@@ -949,8 +868,6 @@ local function weaponCandidates(self, state)
     return list
 end
 
--- 鱼饵候选：蚯蚓、香肠、鸭子（固定列出，库存为 0 置灰）、其余动态鱼饵（库存 > 0 才列，按 id 排序）、
--- 「不挂鱼饵」、「吃蚯蚓」（蚯蚓为 0 置灰）。命令与原平铺按钮一致：SelectBait id / SelectBait（nil）/ EatBait worm
 local function baitCandidates(self, state)
     local ids = GameCfg.Items.Id
     local fixed = { ids.Worm, ids.Sausage, ids.Duck }
@@ -984,8 +901,6 @@ function ScreenHandler:BuildEquipBars(root, layout)
     local w, h = self.EuiResolution.x, self.EuiResolution.y
     self.PopupDismiss = button(self, root, 'PopupDismiss', w / 2, h / 2, w)
     self.PopupDismiss.Size = Vector2.New(w, h)
-    -- 只接点击、不挡画面：带色块图时引擎不认颜色 alpha，会把整屏盖成深色（#178 试玩实测），
-    -- 所以去掉图片并全透明；去图后仍可点中（同轮试玩实测点空白可关闭）
     self.PopupDismiss.NormalImage = ''
     self.PopupDismiss.PressImage = ''
     self.PopupDismiss.DisableImage = ''
@@ -1015,7 +930,6 @@ function ScreenHandler:BuildEquipBars(root, layout)
     end
 end
 
--- 候选格按键惰性创建、复用；点击时按当前快照重新取候选，置灰的不响应
 function ScreenHandler:PopupCell(kind, key)
     local pool = self.PopupPool[kind]
     if pool[key] then return pool[key] end
@@ -1088,7 +1002,6 @@ function ScreenHandler:RenderPopup()
             or candidate.selected and SELECTED_COLOR or NORMAL_COLOR)
         cell.Label.Visible = true
     end
-    -- 底板 = 候选格外包框四边外扩 4
     local plateRect = MainHudLayout.Bounds(rects, 4)
     if plateRect then
         local plate = self.PopupPlates[kind]
@@ -1097,7 +1010,6 @@ function ScreenHandler:RenderPopup()
     end
 end
 
--- 栏位文字：武器栏 = 当前手持或已选武器（没有就空格）；鱼饵栏 = 当前鱼饵及数量，或「不挂鱼饵」
 function ScreenHandler:RenderEquipBars(state)
     if not self.EquipBars then return end
     local weapon, bar = LocalAttackButton.EquippedWeapon(state), self.EquipBars.Weapon
@@ -1113,7 +1025,6 @@ function ScreenHandler:RenderEquipBars(state)
     self:RenderPopup()
 end
 
--- 道具栏格：底板占满格子，图标、名字、数量按格子尺寸比例落在格内
 local function placeSlot(slot, r)
     local x, y, w, h = r.x, r.y, r.w, r.h
     slot.Background.Position = Vector2.New(x, y)
@@ -1126,8 +1037,6 @@ local function placeSlot(slot, r)
     slot.Count.Size = Vector2.New(w * 0.32, h * 0.32)
 end
 
--- 编辑器摆放的节点（金币图标 / 文字）：运行时改到布局给的位置，锚点统一按中心
--- [未查证：编辑器节点的默认 Anchor；显式设为 (0.5, 0.5) 与布局的中心点口径一致]
 local function placeEditorNode(node, r)
     if not node then return end
     local ok, err = pcall(function() node.Anchor = Vector2.New(0.5, 0.5) end)
@@ -1135,8 +1044,6 @@ local function placeEditorNode(node, r)
     place(node, r)
 end
 
--- #179：随输入变化的常驻控件（装备栏一行、右侧操作区）按主界面布局模块重排。
--- slots / reeling 传 nil 表示沿用上一次；输入不变时不重算（收线期间 ShowCast 逐帧调用）。
 function ScreenHandler:ApplyLayout(slots, reeling)
     local key, resolution = self.LayoutKey, self.EuiResolution
     if not key or not resolution then return end
@@ -1161,12 +1068,11 @@ function ScreenHandler:ApplyLayout(slots, reeling)
         place(bar.Button, r[kind .. 'Bar'])
         place(bar.Label, r[kind .. 'Bar'])
     end
-    if self.OpenPopup then self:RenderPopup() end -- 候选行跟着栏位走
+    if self.OpenPopup then self:RenderPopup() end
     place(self.BtnItemAction, r.ItemAction)
     place(self.BtnItemActionLabel, r.ItemAction)
     place(self.BtnDiscard, r.Discard)
     place(self.BtnDiscardLabel, r.Discard)
-    -- 不在收线期间时布局不给「结束收线」占位（按钮本就隐藏），保留上一次的位置
     place(self.BtnReelClose, r.ReelClose)
     place(self.BtnReelCloseLabel, r.ReelClose)
 end
@@ -1192,9 +1098,6 @@ function ScreenHandler:Cleanup()
     continueAfterFailure('连接', function()
         for _, connection in ipairs(self.Connections or {}) do connection:Disconnect() end
     end)
-    -- #209：本界面建的全部节点都记在所有者名下，这里一次清空；私有表不再参与销毁。
-    -- 瞄准拾取层挂在自己的所有者名下（AIM_OWNER）：关屏时若没走到 EndAim（例如收尾前半段抛错），
-    -- 这里兜底把它拆掉，全屏拦截按钮不会留在 UIRoot 上继续吃点击。
     continueAfterFailure('OwnedUnits', function()
         OwnedUnits.Clear(AIM_OWNER)
         OwnedUnits.Clear(self)
@@ -1210,7 +1113,6 @@ function ScreenHandler:Cleanup()
     self.PopupDismiss = nil
     self.OpenPopup = nil
     self.DragSource = nil
-    -- OpSeq 属于玩家会话，不是当前 RootNode：Close 与换根都继续递增。
     self.UIRoot = nil
     self.LastOperateOperation = nil
     self.BackpackButton = nil
@@ -1291,8 +1193,6 @@ function ScreenHandler:_initializeRoot()
     local root = self.RootNode
     DamageFloat:Bind(root, resolution)
     FishCombatLabel:Bind(root, resolution)
-    -- #179：主界面常驻控件的位置一律取自布局模块。首次按道具栏满格、收线期间计算，
-    -- 让「结束收线」也有初始位置；快照到达后 ApplyLayout 按实际格数重排
     local count = GameCfg.Items.ItemBarSlots
     local layout = MainHudLayout.Compute({ width = resolution.x, height = resolution.y,
         itemBarSlots = count, reeling = true })
@@ -1330,7 +1230,7 @@ function ScreenHandler:_initializeRoot()
         self:bindDrag(background, GameCfg.Items.ContainerId.ItemBar, index)
         self:BindSlotGesture(background, index)
         self:Listen(background.OnClicked, function()
-            if self:ConsumeThrowClick(index) then return end -- 爆炸物已由手势消费本次点击
+            if self:ConsumeThrowClick(index) then return end
             self:Action('SelectSlot', index)
         end)
     end
@@ -1356,7 +1256,6 @@ function ScreenHandler:_initializeRoot()
             btn.Size.x, btn.Size.y, entry[3], 30, Color.New(255, 255, 255, 255))
         self[entry[1]] = label
     end
-    -- 上方提示区：上钩 / 等待提示同位（互斥显示），入水提示与收线进度同位，临时提示单独一行
     local primary, secondary, transient = rects.HintPrimary, rects.HintSecondary, rects.HintTransient
     self.HookHint = overlay(self, root, 'HookHint', primary.x, primary.y, primary.w, primary.h,
         '', 32, Color.New(255, 220, 40, 255))
@@ -1376,7 +1275,6 @@ function ScreenHandler:_initializeRoot()
         self.CastFailureHint, self.CastFailureMark }) do
         node.Visible = false
     end
-    -- #179 左侧任务区：追踪条（#174 #1 深色半透明底板 + 折行文字）与折叠 / 展开按钮
     local questPanel, questToggle = rects.QuestPanel, rects.QuestToggle
     self.QuestBackground = passive(OwnedUnits.Track(self, World:CreateUnit('EUIImage', {
         Parent = root, Name = 'QuestBackground',
@@ -1405,7 +1303,6 @@ function ScreenHandler:_initializeRoot()
         Color = Color.New(22, 38, 54, 250),
     }))
     panel.TouchEnabled, panel.SwallowTouchEnabled, panel.LocalZOrder = true, true, 20
-    -- #174 #11：主界面原点左下、Y 向上——标题在上、正文居中、按钮在下
     self.DialogueTitle = overlay(self, root, 'DialogueTitle', cx, cy + 120, width - 50, 50,
         '', 30, Color.New(255, 225, 130, 255))
     self.DialogueBody = overlay(self, root, 'DialogueBody', cx, cy - 10, width - 80, 130,
@@ -1464,13 +1361,11 @@ function ScreenHandler:_initializeRoot()
     end)
     self.BtnDiscard.Visible = false
     self.BtnDiscardLabel.Visible = false
-    -- 点击与长按按 ItemActionMode 查道具按钮表（ITEM_ACTIONS / SPECIAL_ACTIONS），与显示同源
     self:Listen(self.BtnItemAction.OnClicked, function()
         if not self.IsOpen then return end
         local click = itemAction(self, self:ItemActionMode()).click
         if click then click(self) end
     end)
-    -- #140 风神之翼：长按升空、松开缓降（按下 / 松开成对发送，服务端以调和为准）
     if self.BtnItemAction.OnTouchBegan and self.BtnItemAction.OnTouchEnded then
         self:Listen(self.BtnItemAction.OnTouchBegan, function()
             if not self.IsOpen then return end
@@ -1489,7 +1384,6 @@ function ScreenHandler:_initializeRoot()
         end
     end)
     self:Listen(_G.REUtil:GetRE('ItemBarState').OnClientEvent, function(state) self:Show(state) end)
-    -- #140 特殊道具状态：按钮语义随服务端生效效果切换；冷却按权威剩余秒数起本地倒计时
     self:Listen(_G.REUtil:GetRE('SpecialItemState').OnClientEvent, function(state)
         if type(state) ~= 'table' then return end
         self.SpecialEffect = state.effect
@@ -1500,8 +1394,7 @@ function ScreenHandler:_initializeRoot()
         end
         if self.BtnItemAction then self:ShowCast() end
     end)
-    _G.REUtil:GetRE('SpecialItemStateRequest'):FireServer() -- 安装状态监听后补取可能丢失的首包
-    -- #140 特殊道具回包：冷却 / 未变身 / 未装备翅膀等失败给具体提示
+    _G.REUtil:GetRE('SpecialItemStateRequest'):FireServer()
     self:Listen(_G.REUtil:GetRE('SpecialItemResult').OnClientEvent, function(result)
         if type(result) ~= 'table' or result.ok ~= false then return end
         local hints = { cooldown = '原子吐息冷却中', ['not-godzilla'] = '需要选中哥斯拉变身',
@@ -1511,11 +1404,9 @@ function ScreenHandler:_initializeRoot()
             _G.LocalMsgNotice(hints[result.reason] or ('操作失败 ' .. tostring(result.reason)))
         end
     end)
-    -- #124 操作回包：失败给具体提示；operation 身份随回包带回，凭它可跨重连重试
     self:Listen(_G.REUtil:GetRE('ItemBarResult').OnClientEvent, function(result)
         if type(result) ~= 'table' or result.ok ~= false then return end
         self.LastOperateOperation = result.operation or self.LastOperateOperation
-        -- #129：武器已手持时再点武器列表=出击（结算在 MgrWeapon，伤害以服务端为准）
         if result.reason == 'combat-pending' then
             _G.REUtil:GetRE('WeaponAction'):FireServer(WeaponAim:AttackPayload())
             return
@@ -1528,7 +1419,6 @@ function ScreenHandler:_initializeRoot()
             _G.LocalMsgNotice(hints[result.reason] or ('操作失败 ' .. tostring(result.reason)))
         end
     end)
-    -- #129 武器结算回包：换弹/空匣/冷却/投掷校验失败给具体提示
     self:Listen(_G.REUtil:GetRE('WeaponResult').OnClientEvent, function(result)
         if type(result) ~= 'table' or result.ok ~= false then return end
         local hints = { ['cannot-act'] = '现在不能攻击', unavailable = '武器未就绪',
@@ -1556,8 +1446,6 @@ function ScreenHandler:_initializeRoot()
             return
         end
         if not CAST_PHASES[state.phase] then return end
-        -- #133：界面被别的界面盖住只是表现问题——收线继续由服务端权威推进，回流后照旧显示，
-        -- 所以这里不再因为「界面没开」就去取消收线会话。
         if not self.IsOpen then return end
         if waitingCast(state) then
             if self.AlertedCastId and state.castId < self.AlertedCastId then return end
@@ -1590,7 +1478,6 @@ function ScreenHandler:_initializeRoot()
         if self.IsOpen then FishCombatLabel:Apply(payload) end
     end)
     self:Listen(_G.REUtil:GetRE('QuestState').OnClientEvent, function(state) self:ShowQuest(state) end)
-    -- 未交付正式 Story 资源时保留阅读界面，由玩家明确确认已读。
     self:Listen(_G.REUtil:GetRE('StoryNotice').OnClientEvent, function(payload)
         self:ShowDialogue(payload)
     end)
@@ -1607,12 +1494,10 @@ function ScreenHandler:_initializeRoot()
     self:Listen(_G.REUtil:GetRE('ReelInRE').OnClientEvent, function()
         self:ShowCast()
     end)
-    -- 追平要 150–200ms 内连续变化，服务端 100ms 一报不够平滑，收线中逐帧刷新进度条
     local runService = game:GetService('RunService')
     if runService and runService.Heartbeat then
         self:Listen(runService.Heartbeat, function()
             if self.ReelBar and self.ReelBar.Visible then self:ShowCast() end
-            -- #140：吐息冷却中逐帧刷新倒计时文案
             if self.BreathCooldownUntil and self.SpecialEffect == 'godzilla' then
                 if self.BreathCooldownUntil > World:GetServerTime() then
                     self:ShowCast()
@@ -1627,7 +1512,6 @@ function ScreenHandler:_initializeRoot()
             FishCombatLabel:Update()
         end)
     end
-    -- 进图早期注册 FishCoin 属性监听不稳定，延迟后再挂
     local task = game:GetService('Task')
     if task and task.Delay then
         task:Delay(1, function()
@@ -1650,7 +1534,6 @@ function ScreenHandler:OpenScreen()
     FishCombatLabel:Bind(self.RootNode, self.EuiResolution)
     self.IsOpen = true
     LocalAttackButton:SetOpen(true)
-    -- #133 重开界面不需要通知收线客户端：会话与进度一直在，界面只是重新显示
     self:ShowCast()
     self:ShowCoin()
     self:ShowVitals()
@@ -1659,7 +1542,6 @@ function ScreenHandler:OpenScreen()
     _G.REUtil:GetRE('RequestCastState'):FireServer()
     _G.REUtil:GetRE('RequestQuest'):FireServer()
     _G.REUtil:GetRE('RequestFishCombat'):FireServer()
-    -- 重开可能落在服务端快照限频窗内；延后补取，并让旧界面的请求失效。
     local combatRequest = {}
     self.CombatRequest = combatRequest
     local task = game:GetService('Task')
@@ -1670,7 +1552,6 @@ function ScreenHandler:OpenScreen()
             end
         end)
     end
-    -- 开场对话（#54）：服务端每名玩家本局只播一次，重开界面不重播
     _G.REUtil:GetRE('RequestStory'):FireServer()
 end
 
@@ -1680,14 +1561,12 @@ function ScreenHandler:CloseScreen()
     DamageFloat:Clear()
     FishCombatLabel:Clear()
     self.IsOpen = false
-    -- 临时提示状态整体收尾（Cleanup 经由这里），重开 / 重进不带上一轮的「只做提示」标志
     self.FailureUntil = nil
     self.FailureLanding = nil
     self.FailureNotice = nil
     self:EndAim()
-    self:ClosePopup() -- #180：界面被盖住时弹窗不留到重开
+    self:ClosePopup()
     LocalAttackButton:SetOpen(false)
-    -- #133 遮挡只影响表现：不主动收线，待发点击先 flush，会话与进度留给重开时接着显示
     if _G.LocalReelIn then _G.LocalReelIn:Suspend() end
     self.CastState = nil
     self.SplashUntil = nil

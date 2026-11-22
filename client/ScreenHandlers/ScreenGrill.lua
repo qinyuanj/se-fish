@@ -1,11 +1,3 @@
--- 烧烤客户端（#137 T16，策划案烧烤段）：三区起每个烧烤锚点（GameCfg.Grill.Points，#125 场景合同）
--- 上方一个「烧烤」文字泡，2 米内可见。点击开烤；烤的是信物时服务端先回 token-warn，
--- 这里提示「失去兑换与抽奖资格」并在确认窗口期内再点才带 confirm=true 上行。
--- 烤炉弹窗是运行时自绘面板（不走 EUI 预制，与 ScreenSurvival 同理）：显示物品、已烤时间与
--- 当前倍率（两位小数，曲线见 common/GrillCurve.lua），倍率只是本地预告——结算以服务端
--- World:GetServerTime() 为准，快慢帧不改变收益。「取出」上行 Takeout；烤糊由服务端推
--- GrillState{state='burnt'} 撤板并提示「你的鱼烤糊了！」。
--- 不经 MgrGameUI 加载（没有同名 EUI 节点），由 client/main.lua Task:Spawn 直接启动（同 ScreenFerry）。
 local GameCfg = require('common.GameCfg')
 local BodyScale = require('common.BodyScale')
 local GrillCurve = require('common.GrillCurve')
@@ -19,7 +11,7 @@ local Players = game:GetService('Players')
 
 local Panel = { Seq = 0, Bubbles = {}, Session = nil, ArmedUntil = 0 }
 
-local ColorBlockImage = 'official://image/11017' -- 官方正方形纯色块（ScreenSurvival 同款约定）
+local ColorBlockImage = 'official://image/11017'
 
 local function cfg()
     return GameCfg.Grill
@@ -42,8 +34,6 @@ local function create(kind, parent, name, x, y, width, height, props)
     return OwnedUnits.Track(Panel, node)
 end
 
----销毁烧烤界面建的全部节点与气泡根（幂等，#211）：面板节点走归属登记，销毁不从别的表枚举。
--- 气泡根是 EUI 场景节点（不在建点台账里），随 Clear 一起销毁，不留看不见的残留。
 function Panel:Clear()
     OwnedUnits.Clear(self)
     for _, bubble in ipairs(self.Bubbles) do
@@ -74,7 +64,6 @@ local function itemName(itemId)
     return definition and definition.Name or tostring(itemId or '')
 end
 
--- 弹窗显隐与静态内容；进度数字由 Tick 每帧刷
 function Panel:ShowPanel()
     if self.Root then pcall(function() self.Root.Visible = true end) end
     local session = self.Session
@@ -88,7 +77,6 @@ function Panel:HidePanel()
     if self.Root then pcall(function() self.Root.Visible = false end) end
 end
 
--- 帧刷新：已烤秒数与当前倍率（两位小数）；ready 会话用服务端冻结倍率
 function Panel:Tick()
     local session = self.Session
     if not session or not self.Root or not self.Root.Visible then return end
@@ -102,7 +90,6 @@ function Panel:Tick()
     end
 end
 
--- 点击「烧烤」气泡：有会话就弹窗同步进度；没会话发开烤（信物确认期内带 confirm）
 function Panel:ClickGrill()
     if self.Session and (self.Session.state == 'cooking' or self.Session.state == 'ready') then
         self:Send('Query')
@@ -132,7 +119,7 @@ function Panel:OnResult(result)
     local reason = result.reason
     if reason == 'token-warn' then
         notice(cfg().TokenWarnText)
-        self.ArmedUntil = self:Now() + 5 -- 确认窗口：5 秒内再点才真烤信物
+        self.ArmedUntil = self:Now() + 5
     elseif reason == 'no-fish' then
         notice(cfg().NoFishText)
     elseif reason == 'full' then
@@ -142,7 +129,7 @@ function Panel:OnResult(result)
         self.Session = nil
         self:HidePanel()
     elseif reason == 'busy' then
-        self:Send('Query') -- 已有自己的一炉：弹窗看进度
+        self:Send('Query')
         self:ShowPanel()
     elseif reason == 'no-session' or reason == 'not-alive' then
         self.Session = nil
@@ -166,7 +153,6 @@ function Panel:OnState(state)
     end
 end
 
--- 每个烧烤锚点一个「烧烤」文字泡，本地角色 2 米内才显示
 function Panel:CreateBubble(anchor, suffix)
     local player = Players.LocalPlayer
     local eui = player and player.PlayerGui and player.PlayerGui.EuiManager
@@ -211,7 +197,6 @@ function Panel:BuildPanel()
         print('[ScreenGrill] EUI 未就绪，跳过建面板')
         return
     end
-    -- 重建前先清空上一轮的节点（面板与气泡根）：Start 重入或部分成功后重建不叠第二套面板。
     self:Clear()
     local size = resolution or { x = 1920, y = 1080 }
     local cx, cy = size.x / 2, size.y / 2

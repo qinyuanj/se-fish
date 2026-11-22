@@ -1,4 +1,3 @@
--- 鱼受伤跳字：只消费服务端确认的扣血通知；节点由 ScreenMain 持有并随界面清理。
 local GameCfg = require('common.GameCfg')
 local DamageFloat = { Active = {}, Pool = {}, Sequence = {}, PendingCleanup = {} }
 local cfg = GameCfg.DamageFloat

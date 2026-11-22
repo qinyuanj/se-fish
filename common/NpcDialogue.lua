@@ -1,4 +1,3 @@
--- 七区钓鱼佬说明：物品名、兑换产物、烧烤点与航线从当前配置读取，避免文案另维护一套信物链。
 local GameCfg = require('common.GameCfg')
 local Dialogue = {}
 

@@ -1,4 +1,3 @@
--- 五类属性的存档/会话态投影；只产分量，不持有第二份成长权威值。
 local GameCfg = require('common.GameCfg')
 local BodyScale = require('common.BodyScale')
 local M = {}

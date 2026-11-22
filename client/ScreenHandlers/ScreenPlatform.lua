@@ -1,14 +1,3 @@
--- 平台购买客户端面板（#147 T26）：只消费服务端 PlatformResult 回包并上行 PlatformAction，不做本地结算。
---   * AdrenalineShop：濒死无药时服务端拉起的肾上腺素两份报价（1 金豆 ×1 / 4 金豆 ×5），点选后上行
---     Purchase；不可用（商品 ID 未交付且生产构建）明确提示，不伪成功；
---   * Grant：购买发货落账提示（满格溢出的件数落在面前地上）；Purchase/CoinShop 失败给可读原因；
---   * TestFlow：调试构建的测试 flow 开/关——显示「成功 / 取消 / 失败」驱动按钮，上行 PlatformTestAction；
---     生产构建服务端既不建测试 flow 也拒绝驱动器，这组按钮不会出现；
---   * PlaceholderFlow：占位支付通道的确认面板（#261，生产开关）——显示商品与占位价目、注明
---     「不发放真实付费权益」，确认/取消上行 PlatformAction{action='PlaceholderOutcome'}；服务端 open=false 时收起；
---   * CoinShop / CoinGrant：金币页报价（按服务端占位汇率渲染）与到账提示；点选上行 BuyCoin；
---   * _G.PlatformShop.Open：地图商店金币页入口（ScreenShop:OpenPlatformShop 与主 HUD BtnMapShopEntry 共用），上行 OpenCoinShop。HUD 按钮常驻在布局的 ShopEntry，经 OpenFromHud 调用 Open；平台能力缺失或打开失败用金币页同款文案，按钮留在 HUD 上。
--- 节点全部运行时创建（data/ 只读）；创建失败只记日志，不阻塞主流程。
 local GameCfg = require('common.GameCfg')
 local OwnedUnits = require('common.OwnedUnits')
 local REUtil = require('common.REUtil')
@@ -51,7 +40,6 @@ function Panel:Create(kind, parent, name, x, y, w, h, props)
     return OwnedUnits.Track(self, node)
 end
 
----销毁平台界面建的全部节点并复位查找表（幂等，#211）：销毁只走归属登记，不从 Nodes 枚举。
 function Panel:Clear()
     OwnedUnits.Clear(self)
     self.Nodes = {}
@@ -64,7 +52,6 @@ end
 function Panel:Button(parent, name, x, y, w, h, text, onClick)
     local button = self:Create('EUIButton', parent, name, x, y, w, h, {
         ButtonText = '', NormalImage = ColorBlockImage, PressImage = ColorBlockImage,
-        -- #174 #16：EUIButton 没有 Color 属性（读回 nil），底色走 ButtonNormalColor（与图鉴入口同色）
         ButtonNormalColor = Color.New(54, 100, 140, 255) })
     if not button then return nil end
     button.TouchEnabled = true
@@ -82,15 +69,12 @@ end
 function Panel:BuildNodes()
     local root = GameUI:GetUIRoot()
     if not root then return false end
-    -- 重建前先清空上一轮尝试建出的节点：重试循环里一次只成功一半后再试，不叠重复报价 / 驱动面板。
     self:Clear()
     local resolution = GameUI:GetEuiManager():GetDeviceResolution() or { x = 1920, y = 1080 }
     local cx, cy = resolution.x / 2, resolution.y / 2
-    -- #275：主 HUD 右上入口组的预留矩形。坐标是中心点，与图鉴入口同一口径。
     local entry = MainHudLayout.Compute({ width = resolution.x, height = resolution.y }).Rects.ShopEntry
     local button = self:Button(root, 'BtnMapShopEntry', entry.x, entry.y, entry.w, entry.h,
         '', function() self:OpenFromHud() end)
-    -- 按钮下的文字子节点试玩不渲染（#174）。标签挂到同一父节点、同位同尺寸，与图鉴、盲盒入口一致。
     if button then
         local label = self:Create('EUITextLabel', root, 'BtnMapShopEntryText', entry.x, entry.y, entry.w, entry.h, {
             Text = '地图商店', FontSize = 26, TextColor = Color.New(255, 255, 255, 255), LocalZOrder = 1 })
@@ -111,7 +95,6 @@ function Panel:BuildNodes()
         self:Button(offers, 'BtnPlatformOffersClose', 0, 80, 200, 50, '关闭',
             function() self:SetVisible('PlatformOffers', false) end)
     end
-    -- 占位支付通道的确认面板：生产构建唯一的购买面（调试构建走测试驱动器）
     local placeholder = self:Create('EUIImage', root, 'PlatformPlaceholder', cx - 300, cy - 320, 600, 260, {
         Image = ColorBlockImage, Color = Color.New(0, 0, 0, 210), Visible = false })
     if placeholder then
@@ -138,8 +121,6 @@ function Panel:BuildNodes()
     return true
 end
 
--- 报价面板：goods 模式按金豆价目渲染（价目以服务端 GameCfg.Platform.Goods 为准），
--- coin 模式按占位汇率渲染（价目与汇率以服务端 GameCfg.Platform.Placeholder.CoinPage 为准）。
 function Panel:ShowOffers(offers, mode, unit)
     self.Offers = type(offers) == 'table' and offers or {}
     self.OfferMode = mode or 'goods'
@@ -172,7 +153,6 @@ function Panel:Buy(index)
     return true
 end
 
--- 占位确认面板：服务端说 open 就按回包里的商品与价目显示，收起时清掉挂着的 flow
 function Panel:ShowPlaceholder(payload)
     local open = payload.open == true
     self.Flow = open and payload or nil
@@ -180,7 +160,6 @@ function Panel:ShowPlaceholder(payload)
     if title then
         local name = payload.name or payload.key or ''
         local text
-        -- 占位广告与占位支付各用各的标签：通道不同，「不发放真实付费权益」的说明也不同
         local label = payload.kind == 'ad'
             and (cfg().Placeholder.AdsLabel or cfg().Placeholder.Label) or cfg().Placeholder.Label
         if payload.kind == 'coin' then
@@ -213,13 +192,10 @@ function Panel:Drive(outcome)
     REUtil:GetRE('PlatformTestAction'):FireServer({ action = 'ResolveFlow', outcome = outcome })
 end
 
--- 地图商店金币页入口（ScreenShop:OpenPlatformShop 经 rawget(_G, 'PlatformShop') 调用）
 function Panel:Open()
     REUtil:GetRE('PlatformAction'):FireServer({ action = 'OpenCoinShop' })
 end
 
--- 主 HUD 入口与金币页同一条打开路径。平台能力缺失或打开抛错时用金币页现有文案，
--- 错误串只进日志；按钮不拆，也不把失败记成已打开。
 function Panel:OpenFromHud()
     local texts = require('client.LocalShop').ShopText
     local platform = rawget(_G, 'PlatformShop')

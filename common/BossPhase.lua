@@ -1,16 +1,3 @@
--- #132 T11 高风险能力原型 · 能力 D：首领分阶段状态机。
--- 数值来源：GameSpec §12 哥斯拉（25000 血；每 2 秒爪击 50、每 6 秒甩尾 50、正前 10 米原子吐息秒杀；
--- 低于 60% 入水、改咬击 1000；低于 20% 重新上岸、伤害 +50%、吐息改为每 10 秒）。
--- 配置见 GameCfg.Ability.BossPhase。
---
--- 阶段与攻击的确定性契约（真机动画与命中仍须编辑器窗口试玩，见 issue #132 待办清单）：
---   * 阈值只升级不倒退：低于 60% 入水、低于 20% 狂暴；正好 60%/20% 不切（正文是「低于」）；
---     回血不退回上一阶段——避免在阈值线上反复横跳，是否允许倒退待策划确认。
---   * 一帧跨两个阈值只进最终合法阶段，中间被跳过的阶段记进 Log[i].Skipped 与 Stats.Skipped，
---     不补演中间阶段的招式、也不漏掉最终阶段。
---   * 攻击按阶段招式集（AttackSets）与固定书写顺序取唯一一个到期招式，同一帧最多落地一个。
---   * 失目标：不出招；起手中的吐息立即撤销并重新计时（目标回来不能白赚一次秒杀）。
---   * 死亡：撤销起手、清空待发，之后不再有任何攻击落地；打断只计一次。
 local GameCfg = require('common.GameCfg')
 
 local M = {}
@@ -36,7 +23,6 @@ local function now_(v)
     return v
 end
 
--- 阶段链：normal → 各阈值（配置里按百分比降序 = 升级顺序）
 local function chain(bossCfg)
     local list = { { Phase = 'normal' } }
     for _, threshold in ipairs(bossCfg.Thresholds) do
@@ -53,7 +39,6 @@ local function phaseIndex(bossCfg, phase)
     return 1
 end
 
--- 当前阶段条目（normal 没有专属条目）
 local function phaseEntry(state)
     local list = chain(state.Cfg)
     return list[phaseIndex(state.Cfg, state.Phase)]
@@ -64,7 +49,6 @@ local function attackSet(state)
     return set or state.Cfg.AttackSets.normal
 end
 
--- 招式间隔：狂暴阶段的吐息用阶段条目的 10 秒，其余用 Attacks 里的基准值
 local function intervalOf(state, name)
     local entry = phaseEntry(state)
     if name == 'breath' and entry and not isBadNumber(entry.BreathIntervalSec) then
@@ -75,7 +59,6 @@ local function intervalOf(state, name)
     return attack.IntervalSec
 end
 
--- 招式伤害：入水咬击取阶段条目的 BiteDamage；狂暴阶段整体 ×(1 + DamageBonusPercent/100)
 local function damageOf(state, name)
     local entry = phaseEntry(state)
     local attack = state.Cfg.Attacks[name] or {}
@@ -98,7 +81,6 @@ local function resetCooldowns(state, now)
     state.Pending = nil
 end
 
--- 水平距离：吐息是「正前 10 米」，宿主与目标常不在同一高度
 local function withinRange(state, name)
     local attack = state.Cfg.Attacks[name]
     if not attack or isBadNumber(attack.Range) then return true end
@@ -107,7 +89,6 @@ local function withinRange(state, name)
     return math.sqrt(dx * dx + dz * dz) <= attack.Range
 end
 
----新建首领阶段状态。
 ---@param bossCfg? table
 ---@param now? number
 ---@param pos? table 首领位置（吐息射程判定用）
@@ -132,7 +113,6 @@ function M.PercentOf(health, maxHealth)
     return percent
 end
 
----推进一帧。
 ---@param state table
 ---@param now number
 ---@param dt number
@@ -144,7 +124,6 @@ function M.Update(state, now, dt, input)
     state.Stats.Frames = state.Stats.Frames + 1
     local events = { Phase = state.Phase, Percent = state.Percent, Interrupted = false }
 
-    -- 死亡：起手撤销、待发清空，之后不再有任何攻击
     if input.Alive == false then
         if state.Pending then
             events.Interrupted = true
@@ -161,7 +140,6 @@ function M.Update(state, now, dt, input)
     state.Target = isPoint(input.Target) and copy(input.Target) or nil
     if isPoint(input.Pos) then state.Pos = copy(input.Pos) end
 
-    -- 血量 → 阶段（只升级；一帧跨多个阈值只记最终阶段，被跳过的记进 Skipped）
     local percent = M.PercentOf(input.Health, input.MaxHealth)
     if percent then
         state.Percent = percent
@@ -191,7 +169,6 @@ function M.Update(state, now, dt, input)
     events.Phase = state.Phase
     events.Percent = state.Percent
 
-    -- 失目标：撤销起手并重新计时（目标回来不能立刻落地一次秒杀）
     if state.Pending and not state.Target then
         local name = state.Pending.Name
         state.Pending = nil
@@ -203,7 +180,6 @@ function M.Update(state, now, dt, input)
     end
     if not state.Target then return events end
 
-    -- 起手完成后落地（原子吐息是秒杀，没有数值伤害）
     if state.Pending then
         if now >= state.Pending.ReadyAt then
             local pending = state.Pending
@@ -214,7 +190,6 @@ function M.Update(state, now, dt, input)
         return events
     end
 
-    -- 取本帧唯一一个到期招式（按 AttackSets 的书写顺序，保证确定性）
     for _, name in ipairs(attackSet(state)) do
         local readyAt = state.Cooldown[name] or 0
         if now >= readyAt and withinRange(state, name) then
@@ -233,7 +208,6 @@ function M.Update(state, now, dt, input)
     return events
 end
 
----记录一次落地的攻击（供探针与台账取「攻击序列」）。
 function M.Land(state, now, attack)
     local landed = { At = now, Name = attack.Name, Damage = attack.Damage, Lethal = attack.Lethal == true }
     state.Stats.Attacks = state.Stats.Attacks + 1
@@ -241,7 +215,6 @@ function M.Land(state, now, attack)
     return landed
 end
 
----当前阶段是否在起手（探针/调试用）。
 function M.Winding(state)
     return state.Pending ~= nil
 end

@@ -1,7 +1,3 @@
--- 抽奖机抽样纯逻辑（#138 T17，GameSpec §14）：三轴独立按同一权重抽样；三同优先仅得对应大奖，
--- 恰好两同得投入价值 × 对应倍数的金币，无两同无奖励。武器组三同在组内五件中均匀随机一件
--- （策划案「5 种全随机获得 1 种」）；大奖实例行为归 #139/#140，这里只决定发放哪一件。
--- 只抽样与判奖，不碰库存/金币/存档；随机数经 rng(n)（返回 1..n 均匀整数）注入，默认 math.random。
 local GameCfg = require('common.GameCfg')
 
 local LotteryDraw = {}
@@ -14,7 +10,6 @@ local function patterns()
     return GameCfg.Lottery.Patterns
 end
 
--- 单轴：roll 取 1..总权重均匀整数，按累计权重划区间；rng 越界/非数返回 nil（配置或注入事故）
 function LotteryDraw.RollAxis(rng)
     local list = patterns()
     local total = 0
@@ -29,7 +24,6 @@ function LotteryDraw.RollAxis(rng)
     return nil
 end
 
--- 三轴独立抽样：返回 { 左, 右, 中 } 三个图案编号；任一轴抽样失败返回 nil
 function LotteryDraw.RollAxes(rng)
     local source = rngOf(rng)
     local axes = {}
@@ -41,7 +35,6 @@ function LotteryDraw.RollAxes(rng)
     return axes
 end
 
--- 判奖：三同优先（GameCfg.Lottery.TripleRule='tripleFirst'），恰两同（PairRule='exactlyTwo'）取相同一对的图案
 function LotteryDraw.Evaluate(axes)
     if type(axes) ~= 'table' then return { outcome = 'none' } end
     local a, b, c = axes[1], axes[2], axes[3]
@@ -53,7 +46,6 @@ function LotteryDraw.Evaluate(axes)
     return { outcome = 'none' }
 end
 
--- 武器组五选一：组内 itemKeys 均匀随机一件；非 weaponChoice 大奖返回 nil
 function LotteryDraw.ChooseWeapon(pattern, rng)
     local reward = type(pattern) == 'table' and pattern.tripleReward
     if type(reward) ~= 'table' or reward.kind ~= 'weaponChoice' then return nil end

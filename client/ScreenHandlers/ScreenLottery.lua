@@ -1,10 +1,3 @@
--- 抽奖机界面（#138 T17，GameSpec §14 与策划案抽奖段）：全部节点运行时创建（编辑器侧没有
--- ScreenLottery 预设节点，data/ 只读），根节点名 ScreenLottery 挂 UIRoot，由 MgrGameUI 按名开关。
--- 投注框显示当前选中道具栏格的极品食物与实际价值（含个体倍率，与服务端 SalePrice 同口径）；
--- 结果以服务端 LotteryResult 为准：axes 决定停轴图案，客户端不抽样。滚动 SpinSec 秒后按
--- 左→右→中间隔 AxisStopIntervalSec 停轴；动画期间与等待回包期间抽奖按钮忽略重复点击；
--- 同 operation.id 的重播回调不重置动画；关窗中断动画但保留已落账结果，重开直接展示；
--- recovered（断线重进补推）直接展示不播动画。开奖后不必关窗即可选下一件继续抽。
 local GameCfg = require('common.GameCfg')
 local Eligibility = require('common.LotteryEligibility')
 local OwnedUnits = require('common.OwnedUnits')
@@ -26,7 +19,6 @@ local FailText = {
     slot = '请先选中一件极品食物',
 }
 
--- 停轴顺序可配（GameCfg.Lottery.AxisOrder）：轴名 → 界面节点 / result.axes 下标（1 左 2 右 3 中）
 local ReelNodeByAxis = { left = 'LabelReelLeft', right = 'LabelReelRight', middle = 'LabelReelMiddle' }
 local AxisIndexByName = { left = 1, right = 2, middle = 3 }
 
@@ -72,7 +64,6 @@ local function createNode(self, kind, name, x, y, w, h, props)
     return OwnedUnits.Track(self, node)
 end
 
--- 取节点：优先自建登记表（运行时创建的节点都在），编辑器预设场景兜底 FindFirstChild
 function ScreenHandler:Node(name)
     local node = self.UINodeMap[name]
     if node then return node end
@@ -87,8 +78,6 @@ function ScreenHandler:Node(name)
     return nil
 end
 
----销毁本界面建的全部节点并复位查找表（幂等，#211）：清空后不再拿着已销毁的节点。
--- 销毁只走归属登记，不从 UINodeMap 枚举；查找表、根节点与监听一并复位，重新 BuildNodes + Init 即重建。
 function ScreenHandler:Clear()
     OwnedUnits.Clear(self)
     for _, connection in ipairs(self.Connections or {}) do connection:Disconnect() end
@@ -99,16 +88,12 @@ function ScreenHandler:Clear()
     self.Inited = nil
 end
 
--- 运行时建全部节点；UIRoot 未就绪时有限重试，仍拿不到只记日志（与既有界面同级风险）
 function ScreenHandler:BuildNodes()
     local root = GameUI:GetUIRoot()
     if not root then
         print('[ScreenLottery] UIRoot 未就绪，抽奖界面不可用')
         return false
     end
-    -- 重建前先清空上一轮的节点（#211 的 Clear）：重试循环里一次只成功一半后再试，不叠出重复节点。
-    -- 已有的 Init 监听指向的正是要销毁的节点，Clear 一并复位；重试跑在开屏之前，正常路径这里还没有监听，
-    -- 之后的 Init 由 MgrGameUI 的 Inited 守卫按新根节点重新跑一遍。
     self:Clear()
     local resolution = GameUI:GetEuiManager():GetDeviceResolution()
     local x, y = resolution.x / 2, resolution.y / 2
@@ -121,7 +106,6 @@ function ScreenHandler:BuildNodes()
         return false
     end
     layout.Visible = false
-    -- 界面根也是本界面的建点，与子节点一起登记
     self.RootNode = OwnedUnits.Track(self, layout)
     createNode(self, 'EUITextLabel', 'LabelLotteryTitle', x, y - 250, 400, 60,
         { Text = '抽奖机', FontSize = 40, TextColor = Color.New(255, 255, 255, 255) })
@@ -152,7 +136,6 @@ function ScreenHandler:BuildNodes()
         local reward = pattern.tripleReward
         local prize
         if reward.kind == 'weaponChoice' then
-            -- 武器组三同大奖文案用组名（匕首/斧头/枪械），不枚举组内五件
             local group = ({ '匕首', '斧头', '枪械' })[pattern.number] or '武器'
             prize = '随机' .. group .. '一把'
         else
@@ -168,14 +151,12 @@ function ScreenHandler:BuildNodes()
     return true
 end
 
--- 当前投注：道具栏选中格的 entry（快照口径，含 mult/cooked）
 function ScreenHandler:BetEntry()
     local snapshot = self.Snapshot
     local slot = snapshot and snapshot.selectedSlot
     return slot and snapshot.slots and snapshot.slots[slot] or nil, slot
 end
 
--- 可抽奖：非动画、非等待回包、选中格是合格极品食物
 function ScreenHandler:DrawEnabled()
     if self.Spinning or self.Awaiting then return false end
     local entry = self:BetEntry()
@@ -217,7 +198,6 @@ function ScreenHandler:Draw()
     return true
 end
 
--- 三轴直接落到结果图案（恢复/重展示用，不播动画）
 function ScreenHandler:SettleReels(result)
     local reelNames = { 'LabelReelLeft', 'LabelReelRight', 'LabelReelMiddle' }
     for axis = 1, 3 do
@@ -245,8 +225,6 @@ function ScreenHandler:ShowResult(result)
     self:RefreshBet()
 end
 
--- LotteryResult 回包：失败给提示；同 operation.id 重播不重置动画与展示；
--- recovered（断线重进补推）直接展示；正常结果进入停轴动画。
 function ScreenHandler:NoteResult(result)
     if type(result) ~= 'table' then return end
     if not result.ok then
@@ -256,7 +234,6 @@ function ScreenHandler:NoteResult(result)
         return
     end
     local operationId = result.operation and result.operation.id
-    -- 同 operation.id 重播一律忽略：动画中途或已展示都不重置（#123 重放只回原结果）
     if operationId and operationId == self.LastOperationId then return end
     if operationId then self.LastOperationId = operationId end
     self.LastResult = result
@@ -264,7 +241,6 @@ function ScreenHandler:NoteResult(result)
         self:ShowResult(result)
         return
     end
-    -- 回包已到：解除等待闩锁，动画期由 Spinning 挡重复点击
     self.Awaiting = false
     self.AwaitingElapsed = nil
     self.Spinning = { t = 0, stopped = { false, false, false }, result = result }
@@ -281,10 +257,6 @@ function ScreenHandler:AxisStopped(axis)
     return self.LastResult ~= nil and self.ResultShown == true
 end
 
--- 停轴动画推进（Heartbeat 驱动；测试直接调用）：滚动 SpinSec 秒后按 AxisOrder 顺序每隔
--- AxisStopIntervalSec 停一轴，停轴图案永远取服务端回包 axes，动画不决定奖项。
--- 附带回包超时兜底：Awaiting 期间服务端可能静默丢弃（限频/存档 pending 窗口），
--- 超过 ResultTimeoutSec 自动解锁并提示，避免闩锁永久卡死界面。
 function ScreenHandler:UpdateAnim(dt)
     if type(dt) ~= 'number' then return end
     if self.Awaiting then
@@ -360,21 +332,18 @@ end
 function ScreenHandler:OpenScreen()
     self.IsOpen = true
     self:RefreshBet()
-    -- 关窗中断动画不丢结果：重开时直接展示最近一次的已落账结果，不重播动画
     if self.LastResult and not self.Spinning then self:ShowResult(self.LastResult) end
 end
 
 function ScreenHandler:CloseScreen()
     self.IsOpen = false
-    self.Spinning = nil -- 动画只是表现；结果早已服务端落账
+    self.Spinning = nil
 end
 
 function ScreenHandler:Start()
     REUtil:GetRE('LotteryResult').OnClientEvent:Connect(function(result) self:NoteResult(result) end)
     REUtil:GetRE('ItemBarState').OnClientEvent:Connect(function(state) self:NoteItemBar(state) end)
     game:GetService('RunService').Heartbeat:Connect(function(dt) self:UpdateAnim(dt) end)
-    -- 断线恢复主动拉取（照 RequestItemBar 握手先例）：服务端 OnPlayerAdded 的补推可能早于
-    -- 客户端连接而丢失；这里连上回包通道后请求一次，服务端按操作日志补推 recovered 结果
     REUtil:GetRE('LotteryStateRequest'):FireServer()
     local task = game:GetService('Task')
     task:Spawn(function()

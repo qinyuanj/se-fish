@@ -1,5 +1,4 @@
 -- 相机中央瞄准：公开 CameraService:ViewportPointToRay 的 x/y 是 [0,1]，Ray.Direction 为 Vector3。
--- 只发送方向；射线起点、长度、阻挡与伤害全部由服务端决定。
 local Aim = {}
 function Aim:AttackPayload()
     local payload = {action='attack'}

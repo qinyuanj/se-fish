@@ -25,18 +25,14 @@ local function percent(mult)
     return math.floor(mult * 100 + 0.5)
 end
 
--- 个体重量（kg，保留两位小数）= 基础重量 × 倍率
 function FishCatch.Weight(species, mult)
     return math.floor(species.BaseWeight * percent(mult) + 0.5 + 1e-9) / 100
 end
 
--- 出售价（整数金币，向下取整）= floor(基础出售价 × 倍率)，倍率缺省 1（#27 / #44）
 function FishCatch.Price(species, mult)
     return math.floor(species.BasePrice * percent(mult or 1) / 100 + 1e-9)
 end
 
--- 烤制价（整数金币，向下取整）= floor(基础出售价 × 倍率 × 烤制倍率)，倍率缺省 1；
--- 烤制倍率缺省烤熟价 1.5（GameSpec §4.3 / #127），#137 烧烤取出的实际倍率由调用方传入
 function FishCatch.CookedPrice(species, mult, rate)
     return math.floor(species.BasePrice * percent(mult or 1) / 100 * (rate or 1.5) + 1e-9)
 end
