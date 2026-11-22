@@ -462,8 +462,12 @@ function Mgr:Detonate(player, itemId, landing, zone)
     local damage = ecfg.Damage * scale
     local hit = self.Vitals and self.Vitals:NewHit(player, 'explosive')
     if zone then
-        local count = self:SpawnBlastFish(zone, landing, player)
-        print('[MgrWeapon] 爆炸落水', zone.Id, itemId, '保底鱼=' .. tostring(count))
+        local spawned, countOrErr = pcall(function() return self:SpawnBlastFish(zone, landing, player) end)
+        if spawned then
+            print('[MgrWeapon] 爆炸落水', zone.Id, itemId, '保底鱼=' .. tostring(countOrErr))
+        else
+            print('[MgrWeapon] 爆炸落水保底鱼失败', zone.Id, itemId, tostring(countOrErr))
+        end
     end
     local radius = acfg().Throw.ExplosionRadius
     local damaged = self:RadialDamage(landing, radius, damage, hit, player)
@@ -587,12 +591,14 @@ function Mgr:CreateThrowVisual(player, itemId, flight)
     self.ThrowSeq = self.ThrowSeq + 1
     local name = 'ThrowProjectile_' .. tostring(player and player.UserId or 'unknown')
         .. '_' .. tostring(self.ThrowSeq)
+    local position = self:FlightPosition(flight, 0)
+    local scale = self:Vec3(1, 1, 1)
     local ok, visual = pcall(function()
         return game:GetService('World'):CreateUnit('TriggerUnit', {
             Name = name,
             PhysicsMeshId = THROW_VISUAL_MESH,
-            Position = self:FlightPosition(flight, 0),
-            Scale = self:Vec3(1, 1, 1),
+            Position = position,
+            Scale = scale,
         })
     end)
     if ok and visual then return visual end
@@ -603,10 +609,12 @@ end
 function Mgr:Launch(player, itemId, target)
     local landing, zone = self:ResolveTarget(player, target)
     local character = player.Character
+    local flightSec = acfg().Throw.FlightSec or 0.8
     local flight = { player = player, itemId = itemId,
         from = character and character.Position or nil,
         landing = landing, zone = zone,
-        startAt = self:Now(), flightSec = acfg().Throw.FlightSec or 0.8 }
+        startAt = self:Now(), flightSec = flightSec }
+    -- CreateUnit 抛错会清掉 pcall 的配置缓存；飞行时间和起点都提前固定。
     flight.visual = self:CreateThrowVisual(player, itemId, flight)
     self.Flying[#self.Flying + 1] = flight
     self:PlayAttackAnim(player, acfg().Throw.Anim)
@@ -629,7 +637,13 @@ function Mgr:Update()
         local t = (now - flight.startAt) / (flight.flightSec or 0.8)
         if t >= 1 then
             table.remove(self.Flying, i)
-            if flight.visual then pcall(function() flight.visual:Destroy() end) end
+            if flight.visual then
+                local destroyed, destroyErr = pcall(function() flight.visual:Destroy() end)
+                if not destroyed then
+                    print('[MgrWeapon] 视觉销毁失败', flight.player and flight.player.UserId,
+                        flight.itemId, tostring(destroyErr))
+                end
+            end
             self:Detonate(flight.player, flight.itemId, flight.landing, flight.zone)
         else
             self:StepVisual(flight, math.max(0, t))

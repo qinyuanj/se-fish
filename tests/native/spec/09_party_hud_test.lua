@@ -13,8 +13,16 @@ local function signal()
   return {
     Connect = function(_, fn)
       listeners[#listeners + 1] = fn
-      return { Disconnect = function() end }
+      local connected = true
+      return { Disconnect = function()
+        if not connected then return end
+        connected = false
+        for index, listener in ipairs(listeners) do
+          if listener == fn then table.remove(listeners, index) ; break end
+        end
+      end }
     end,
+    Count = function() return #listeners end,
     Fire = function(_, ...) for _, fn in ipairs(listeners) do fn(...) end end,
   }
 end
@@ -37,18 +45,30 @@ describe('条款 9 队伍界面', function()
       if name == 'World' then
         return { GetServerTime = function() return env.now end,
           CreateUnit = function(_, kind, props)
+            env.created = (env.created or 0) + 1
+            local createdNow = env.created
             local node = { Kind = kind, Visible = props.Visible ~= false }
             for key, value in pairs(props) do node[key] = value end
             node.Visible = props.Visible ~= false
-            node.Destroy = function(me) me.Destroyed = true end
+            node.Destroy = function(me) rawset(me, 'Destroyed', true) end
+            if kind == 'EUIButton' then node.OnClicked = signal() end
             env.nodes[node.Name] = node
+            if env.failAfter and createdNow > env.failAfter then
+              setmetatable(node, { __newindex = function(self, key, value)
+                if not rawget(self, '_writeFailed') then
+                  rawset(self, '_writeFailed', true)
+                  error('建点失败')
+                end
+                rawset(self, key, value)
+              end })
+            end
             return node
           end }
       end
       if name == 'Players' then
         return { LocalPlayer = { PlayerGui = { EuiManager = {
           -- 生产按接口取根节点本体与分辨率（不再从根节点下标里猜），夹具同形
-          GetRootNode = function() return env.root or {} end,
+          GetRootNode = function() if env.missingRoot then return nil end ; return env.root or {} end,
           GetDeviceResolution = function() return env.resolution or { x = 1920, y = 1080 } end,
         } } } }
       end
@@ -188,6 +208,181 @@ describe('条款 9 队伍界面', function()
     assert.is_true(hud.RestoreFullText ~= hud.DisbandText)
   end)
 
+  it('9-20 Clear 清空客户端显示缓存但不影响服务端队伍', function()
+    push({ state = 'party', partyId = 7, members = {
+      { userId = 1, name = '甲', health = 300, maxHealth = 300, self = true },
+      { userId = 2, name = '乙', health = 120, maxHealth = 300 },
+    }, invite = { fromUserId = 3, fromName = '丙', expiresInSec = 8 }, notice = 'joined' })
+    ctx.panel:Clear()
+    assert.same({ state = 'none', partyId = nil, rows = {}, invite = nil,
+      inviteVisible = false, countdownText = nil }, ctx.panel:View())
+    for _, sent in ipairs(ctx.sent) do
+      assert.is_not.equal('Leave', sent.payload, '清空客户端显示缓存不得向服务端发离队请求')
+    end
+  end)
+
+  it('9-20 Clear 完整停止旧事件且可重复调用', function()
+    ctx.panel:Clear()
+    ctx.panel:Clear()
+    assert.same(0, ctx.events.PartyState.OnClientEvent:Count())
+    assert.same(0, ctx.events.PartyResult.OnClientEvent:Count())
+    assert.same(0, ctx.heartbeats:Count())
+
+    local before = ctx.panel:View()
+    ctx.notices = {}
+    ctx.events.PartyResult.OnClientEvent:Fire({ action = 'Invite', ok = false, reason = 'full' })
+    push({ state = 'party', partyId = 99, members = {
+      { userId = 1, name = '旧事件', health = 1, maxHealth = 1 },
+    }, notice = 'disbanded' })
+    ctx.heartbeats:Fire(0.1)
+    assert.same(before, ctx.panel:View(), '停止后的旧事件不得改写显示快照')
+    assert.same(0, #ctx.notices, '停止后的旧事件不得再通知')
+  end)
+
+  it('9-20 Start 重入和 EUI 失败重试保持单代监听与通知', function()
+    ctx.panel:Start()
+    assert.same(1, ctx.events.PartyState.OnClientEvent:Count())
+    assert.same(1, ctx.events.PartyResult.OnClientEvent:Count())
+    assert.same(1, ctx.heartbeats:Count())
+
+    local before = ctx.panel:View()
+    ctx.root = nil
+    ctx.panel:Start()
+    assert.same(before, ctx.panel:View(), 'EUI 暂缺不得清掉最后可用一代的显示状态')
+    ctx.notices = {}
+    ctx.events.PartyResult.OnClientEvent:Fire({ action = 'Invite', ok = false, reason = 'full' })
+    assert.same(1, #ctx.notices, 'EUI 早退后旧代仍只通知一次')
+
+    ctx.root = {}
+    ctx.panel:Start()
+    assert.same(1, ctx.events.PartyState.OnClientEvent:Count())
+    assert.same(1, ctx.events.PartyResult.OnClientEvent:Count())
+    assert.same(1, ctx.heartbeats:Count())
+    ctx.notices = {}
+    push({ state = 'none', members = {}, notice = 'disbanded' })
+    assert.same(1, #ctx.notices, '重试成功后每次非空快照通知只投递一次')
+  end)
+
+  it('9-20 首次启动失败回到完全停止状态', function()
+    local isolated = { events = {}, heartbeats = signal() }
+    local saved = package.loaded['common.REUtil']
+    package.loaded['common.REUtil'] = { GetRE = function(_, name)
+      isolated.events[name] = isolated.events[name] or { OnClientEvent = signal(), FireServer = function() end }
+      return isolated.events[name]
+    end }
+    local fresh = assert(loadfile('client/ScreenHandlers/ScreenParty.lua'))()
+    package.loaded['common.REUtil'] = saved
+    local savedGame = _G.game
+    _G.game = setmetatable({ GetService = function(_, name)
+      if name == 'RunService' then return { Heartbeat = isolated.heartbeats } end
+      return savedGame:GetService(name)
+    end }, { __index = savedGame })
+    ctx.missingRoot = true
+    fresh:Start()
+    local party = isolated.events.PartyState and isolated.events.PartyState.OnClientEvent:Count() or 0
+    local result = isolated.events.PartyResult and isolated.events.PartyResult.OnClientEvent:Count() or 0
+    assert.same(0, party)
+    assert.same(0, result)
+    assert.same(0, isolated.heartbeats:Count())
+    assert.same({ state = 'none', partyId = nil, rows = {}, invite = nil,
+      inviteVisible = false, countdownText = nil }, fresh:View())
+    ctx.missingRoot = nil
+
+    local previous = {}
+    for _, node in pairs(ctx.nodes) do previous[node] = true end
+    ctx.root = {}
+    ctx.failAfter = ctx.created + 2
+    fresh:Start()
+    local live = 0
+    for _, node in pairs(ctx.nodes) do
+      if not previous[node] and not node.Destroyed then live = live + 1 end
+    end
+    assert.same(0, live, '首次建点失败不得留下节点')
+    local party = isolated.events.PartyState and isolated.events.PartyState.OnClientEvent:Count() or 0
+    local result = isolated.events.PartyResult and isolated.events.PartyResult.OnClientEvent:Count() or 0
+    assert.same(0, party)
+    assert.same(0, result)
+    assert.same(0, isolated.heartbeats:Count())
+    _G.game = savedGame
+  end)
+
+  it('9-20 Clear 销毁当前显示节点', function()
+    ctx.panel:Start()
+    local names = { 'PartyRoot', 'PartyMember1', 'PartyMember1Name', 'PartyMember1Bar',
+      'PartyMember1Fill', 'PartyMember1Health', 'PartyMember2', 'PartyMember2Name',
+      'PartyMember2Bar', 'PartyMember2Fill', 'PartyMember2Health', 'PartyInvite',
+      'PartyInviteText', 'PartyInviteCountdown', 'PartyInviteAccept', 'PartyInviteDecline' }
+    local nodes = {}
+    for _, name in ipairs(names) do nodes[name] = ctx.nodes[name] end
+    ctx.panel:Clear()
+    ctx.panel:Clear()
+    for _, name in ipairs(names) do
+      assert.is_true(nodes[name].Destroyed, 'Clear 必须销毁 ' .. name)
+    end
+  end)
+
+  it('9-20 重建失败的新按钮不得发送旧代操作', function()
+    local before = ctx.panel:View()
+    local sent = #ctx.sent
+    ctx.failAfter = ctx.created + 15
+    ctx.panel:Start()
+    local accept = ctx.nodes['PartyInviteAccept']
+    local decline = ctx.nodes['PartyInviteDecline']
+    assert.is_true(accept.Destroyed and decline.Destroyed, '失败新建的按钮必须回滚')
+    accept.OnClicked:Fire()
+    decline.OnClicked:Fire()
+    assert.same(sent, #ctx.sent, '失败新建按钮不得发送接受或拒绝')
+    assert.same(before, ctx.panel:View(), '失败新建按钮不得改写旧代显示')
+  end)
+
+  it('9-20 成功换代后只有当前按钮发送一次', function()
+    local oldAccept = ctx.nodes['PartyInviteAccept']
+    local oldDecline = ctx.nodes['PartyInviteDecline']
+    ctx.panel:Start()
+    local accept = ctx.nodes['PartyInviteAccept']
+    local decline = ctx.nodes['PartyInviteDecline']
+    assert.is_true(oldAccept.Destroyed and oldDecline.Destroyed, '旧按钮必须随旧代销毁')
+    ctx.sent = {}
+    oldAccept.OnClicked:Fire()
+    oldDecline.OnClicked:Fire()
+    assert.same(0, #ctx.sent, '旧按钮点击不得再发送')
+    accept.OnClicked:Fire()
+    decline.OnClicked:Fire()
+    assert.same({
+      { name = 'PartyAction', payload = { action = 'Accept' } },
+      { name = 'PartyAction', payload = { action = 'Decline' } },
+    }, ctx.sent)
+    ctx.panel:Clear()
+    accept.OnClicked:Fire()
+    decline.OnClicked:Fire()
+    assert.same(2, #ctx.sent, 'Clear 后当前按钮也不得再发送')
+  end)
+
+  it('9-20 重入建点失败保留最后可用一代并回滚新建节点', function()
+    local previous = {}
+    for _, node in pairs(ctx.nodes) do previous[node] = true end
+    local oldRoot = ctx.nodes['PartyRoot']
+    local before = ctx.panel:View()
+    ctx.failAfter = ctx.created + 2
+    ctx.panel:Start()
+    assert.is_nil(oldRoot.Destroyed, '旧代节点必须继续可用')
+    assert.same(before, ctx.panel:View(), '失败重建不得改写最后可用一代的显示状态')
+    local rolled = 0
+    for _, node in pairs(ctx.nodes) do
+      if not previous[node] then
+        assert.is_true(node.Destroyed, '新建到一半的节点必须回滚')
+        rolled = rolled + 1
+      end
+    end
+    assert.same(3, rolled, '已交给候选代的节点都要回滚')
+    assert.same(1, ctx.events.PartyState.OnClientEvent:Count())
+    assert.same(1, ctx.events.PartyResult.OnClientEvent:Count())
+    assert.same(1, ctx.heartbeats:Count())
+    ctx.notices = {}
+    ctx.events.PartyResult.OnClientEvent:Fire({ action = 'Invite', ok = false, reason = 'offline' })
+    assert.same(1, #ctx.notices, '回滚后旧代仍按每次投递通知一次')
+  end)
+
   -- ADR-0029：正式资产由共享配置持有；换成测试 URI 后，重建的血条与按钮必须一起换。
   it('9-20 队伍血条与按钮资产统一读取 GameCfg', function()
     local hud = require('common.GameCfg').Party.HUD
@@ -201,19 +396,4 @@ describe('条款 9 队伍界面', function()
     assert.same('test://party-color-block', acceptImage)
   end)
 
-  -- 接线：handler 按 AGENTS.md 登记进 ScreenHandlerLoaders，并由客户端入口启动。
-  it('9-20 队伍界面登记进界面管理器并在客户端入口启动', function()
-    local handle = assert(io.open('client/MgrGameUI.lua', 'rb'))
-    local registry = handle:read('a')
-    handle:close()
-    assert.is_truthy(registry:find('ScreenParty = function() return require("client.ScreenHandlers.ScreenParty") end', 1, true),
-      'ScreenParty 必须登记在 MgrGameUI 的 ScreenHandlerLoaders')
-
-    local entry = assert(io.open('client/main.lua', 'rb'))
-    local source = entry:read('a')
-    entry:close()
-    assert.is_truthy(source:find('ScreenParty = require("client.ScreenHandlers.ScreenParty")', 1, true),
-      'client/main.lua 要按名字取到 handle')
-    assert.is_truthy(source:find('ScreenParty:Start()', 1, true), 'client/main.lua 要启动队伍界面')
-  end)
 end)

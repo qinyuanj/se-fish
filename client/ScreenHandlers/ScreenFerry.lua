@@ -17,7 +17,7 @@ local Bubble = require('client.InteractionBubble')
 local World = game:GetService('World')
 local Players = game:GetService('Players')
 
-local ScreenFerry = { Seq = 0, Legs = {}, Countdowns = {} }
+local ScreenFerry = { Seq = 0, Legs = {}, Countdowns = {}, CountdownOperations = {} }
 
 -- 倒计时条按需建、按需拆，跟航线文字泡各归各的所有者：挂在 ScreenFerry 名下时，
 -- HideCountdown 只能用 Clear 清整张表，将来别的建点一起登记就会被误拆。
@@ -138,6 +138,7 @@ function ScreenFerry:UpdateCountdown(dt)
         local remaining = left - step
         if remaining <= 0 then
             self.Countdowns[routeId] = nil
+            self.CountdownOperations[routeId] = nil
         else
             self.Countdowns[routeId] = remaining
             if not soonestLeft or remaining < soonestLeft then soonest, soonestLeft = routeId, remaining end
@@ -164,12 +165,11 @@ function ScreenFerry:OnState(state)
     end
     if state.phase == 'countdown' then
         self.Countdowns[routeId] = tonumber(state.seconds) or 5
-    elseif state.phase == 'departed' then
+        self.CountdownOperations[routeId] = state.operation
+    elseif state.phase == 'departed' or state.phase == 'cancelled' then
+        if self.CountdownOperations[routeId] ~= state.operation then return end
         self.Countdowns[routeId] = nil
-        notice('已经到' .. self:ZoneName(routeId) .. '了')
-    elseif state.phase == 'cancelled' then
-        self.Countdowns[routeId] = nil
-        notice('前往' .. self:ZoneName(routeId) .. '的航班取消，船票已退')
+        self.CountdownOperations[routeId] = nil
     end
 end
 
@@ -177,7 +177,11 @@ function ScreenFerry:OnResult(result)
     if type(result) ~= 'table' then return end
     if result.ok then
         if result.action == 'Board' then
-            notice('船票已交，' .. tostring(result.seconds) .. ' 秒后开船')
+            if result.seconds == nil then
+                notice('已经到' .. self:ZoneName(result.routeId) .. '了')
+            else
+                notice('船票已交，' .. tostring(result.seconds) .. ' 秒后开船')
+            end
         elseif result.action == 'Return' then
             notice('已经回到' .. self:ZoneName(result.routeId, 'Return') .. '，金币 -' .. tostring(result.price))
         end
@@ -190,7 +194,10 @@ function ScreenFerry:OnResult(result)
         range = '离船太远了',
         sailing = '这条航线已经在倒计时了，等下一班',
         pending = '上一趟摆渡还没结清，稍后再试',
-        teleport = '传送失败，金币已退',
+        teleport = result.action == 'Board' and '传送失败，船票已退' or '传送失败，金币已退',
+        not_aboard = '没赶上船，船票已退',
+        anchor = '航班取消，船票已退',
+        interrupted = '上次航班已取消，船票已退',
     }
     notice(reasons[result.reason] or '摆渡暂时不可用')
 end

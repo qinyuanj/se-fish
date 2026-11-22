@@ -2,7 +2,8 @@
 -- 伪造 / 未登记的 id 直接拒收，越界与缺票缺币各自拒绝且不动账。
 -- 每条航线有自己的航班状态（Flights[routeId]）与自己的交票写入（BoardPending[routeId]），
 -- 不同航线互不占用倒计时；同一条航线倒计时中再交票拒绝且不扣。
--- 去程一人交 1 张票、倒计时（5 秒）后带走 BoatRange 内的所有人（搭便船合法、未赶上不退票）；
+-- 去程一人交 1 张票、倒计时（5 秒）后带走 BoatRange 内的所有人（搭便船合法）；
+-- 交票人未上船退票且不记到达，船上传送失败按 teleport 退票；无人送达时共享原因为 empty。
 -- 返程按人付 10 × 3^(到达区序 − 2) 金币、立即传送。
 -- #123：交票与返程扣款先经 Save.Execute 持久，再发布倒计时或传送。传送和存储不能原子提交：
 -- 收费同时保存恢复记录，完成或补偿用独立幂等操作落账；未确认的跨会话记录只退款，不重放传送。
@@ -91,6 +92,7 @@ function Mgr:Board(player, data, route, operation)
     local point = route.Outbound
     if self:PendingFlight(route.Id) then return self:Fail(player, 'Board', 'sailing') end
     if not self.Interact:InRange(player, point) then return self:Fail(player, 'Board', 'range') end
+    local session = self.Save.Sessions[player.UserId]
     local flight = { player = player, operation = operation.id, routeId = route.Id }
     self.BoardPending[route.Id] = flight
     local accepted, reason = self:Settle(player, data, 'ferry:board', function(draft)
@@ -100,13 +102,14 @@ function Mgr:Board(player, data, route, operation)
         return { ok = true, action = 'Board', routeId = route.Id, seconds = point.CountdownSec,
             operation = operation }
     end, function(ok, result)
-        if self.BoardPending[route.Id] ~= flight then return end
+        if self.BoardPending[route.Id] ~= flight or not self.Save:IsCurrent(player.UserId, session, data) then return end
         self.BoardPending[route.Id] = nil
         if not ok then self:Fail(player, 'Board', result) return end
         self.Flights[route.Id] = { player = player, operation = operation.id, routeId = route.Id,
             DepartAt = self.World:GetServerTime() + point.CountdownSec }
         print('[MgrFerry] 船票落账，开船倒计时', player.UserId, route.Id, operation.id)
-        self:Broadcast({ phase = 'countdown', routeId = route.Id, seconds = point.CountdownSec })
+        self:Broadcast({ phase = 'countdown', routeId = route.Id, operation = flight.operation,
+            seconds = point.CountdownSec })
         self:Reply(player, result)
     end, operation)
     if not accepted and self.BoardPending[route.Id] == flight then
@@ -222,8 +225,8 @@ function Mgr:Handle(player, payload)
     return self[method](self, player, data, route, operation)
 end
 
--- 倒计时到点：带走船上所有人（搭便船）；没赶上船的留在原地，船票不退。
--- 锚点缺失属场景配置事故：这条航线取消并把船票退给交票人
+-- 倒计时到点：带走船上所有人（搭便船）。交票人未上船退票且不记到达；
+-- 船上传送失败按 teleport 退票。锚点缺失或无人送达都取消航班并退票。
 function Mgr:Depart(route, flight)
     local point = route.Outbound
     local anchor = self.Interact:FindAnchor(point.AnchorName)
@@ -241,32 +244,41 @@ function Mgr:Depart(route, flight)
                 end
             end
         end
-        self:Broadcast({ phase = 'cancelled', routeId = route.Id })
+        self:Broadcast({ phase = 'cancelled', routeId = route.Id, operation = flight.operation,
+            reason = 'anchor' })
         return
     end
     local payer = flight.player
+    local deliveredCount = 0
     for _, player in ipairs(self:OnlinePlayers()) do
         local data = self.PlayerData:GetDataInst(player)
         local pos = player.Character and player.Character.Position
         local aboard = pos and flatDistance(pos, center) <= point.BoatRange
         if data and data.Inited and not self.Save:IsPaused(player.UserId) then
             local delivered = aboard and self:Teleport(player, point.Destination)
+            if delivered then deliveredCount = deliveredCount + 1 end
             if player == payer and data.Extra.recovery.ferry then
                 local record = data.Extra.recovery.ferry
                 if delivered then record.zone = point.Zone end
-                -- 未赶上船照常消费；角色在船上但传送失败才补偿。
-                self:FinishTravel(player, data, record, not aboard or delivered, 'teleport', function() end)
+                -- 只有实际送达才记到达；未上船退票，船上传送失败另按 teleport 退票。
+                local reason = not delivered and (aboard and 'teleport' or 'not_aboard') or nil
+                self:FinishTravel(player, data, record, delivered, reason,
+                    function(ok, result) if ok then self:Reply(player, result) end end)
             elseif delivered then
                 self:Settle(player, data, 'ferry:ride', function(draft)
                     draft:SetZone(point.Zone)
                     markArrival(draft, point.Zone)
                     return { ok = true, action = 'Board', routeId = route.Id }
-                end, function() end)
+                end, function(ok, result) if ok then self:Reply(player, result) end end)
             end
             if delivered then print('[MgrFerry] 送达', player.UserId, route.Id, point.Zone) end
         end
     end
-    self:Broadcast({ phase = 'departed', routeId = route.Id })
+    if deliveredCount == 0 then
+        self:Broadcast({ phase = 'cancelled', routeId = route.Id, operation = flight.operation, reason = 'empty' })
+    else
+        self:Broadcast({ phase = 'departed', routeId = route.Id, operation = flight.operation })
+    end
 end
 
 -- 收起未完成记录（掉线、待确认）：交票人退款、返程退款，一次写入清记录。
@@ -310,6 +322,20 @@ function Mgr:Start()
     end)
 end
 
+function Mgr:OnPlayerAdded(player)
+    self.World = self.World or game:GetService('World')
+    local now = self.World:GetServerTime()
+    for _, route in ipairs(GameCfg.Ferry.Routes) do
+        local flight = self.Flights[route.Id]
+        if flight and flight.DepartAt and now < flight.DepartAt then
+            _G.REUtil:GetRE('FerryState'):FireClient(player, {
+                phase = 'countdown', routeId = route.Id, operation = flight.operation,
+                seconds = flight.DepartAt - now,
+            })
+        end
+    end
+end
+
 function Mgr:OnPlayerRemoving(player)
     self.LastSeq[player.UserId] = nil
     self.Recoveries[player.UserId] = nil
@@ -320,7 +346,8 @@ function Mgr:OnPlayerRemoving(player)
     for routeId, flight in pairs(self.Flights) do
         if flight.player == player then
             self.Flights[routeId] = nil
-            self:Broadcast({ phase = 'cancelled', routeId = routeId })
+            self:Broadcast({ phase = 'cancelled', routeId = routeId, operation = flight.operation,
+                reason = 'payer_left' })
         end
     end
 end
