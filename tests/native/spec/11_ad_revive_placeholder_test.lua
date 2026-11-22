@@ -292,6 +292,30 @@ describe('条款 11 广告满血复活（占位广告位）', function()
     assert.same(hunger, env.s:GetState(player).hunger, '闸门关闭时不得补饥饿')
   end)
 
+  -- 重开侧（与上一条闸门用例配对）：发布构建显式打开 AllowInPublish 后，广告复活恢复可用——
+  -- 经 SurvivalAction 业务入口能拉起占位广告 flow，看完广告满血复活。
+  -- 失败方式：闸门打开后广告复活仍被拒、或不复活 / 不回血。
+  it('19-13 发布构建显式打开 AllowInPublish 后广告复活恢复可用', function()
+    GameCfg.Debug.Enabled = false
+    GameCfg.Platform.Placeholder.Enabled = true
+    GameCfg.Platform.Placeholder.AllowInPublish = true
+    local player = join(7103)
+    down(player)
+    adRequest(player, 1)
+    local flow = flowOpen()
+    assert.is_not_nil(flow, '显式开放后广告复活应能拉起占位广告流程')
+    assert.same('ad', flow.kind)
+    assert.same(GameCfg.Platform.Placeholder.Ads.revive, flow.goodsId,
+      '广告位参数必须来自共享配置的占位广告位')
+    assert.is_true(confirm(player, 'success'))
+    assert.same('alive', env.s:Phase(player), '显式开放后广告成功要复活')
+    assert.same(GameCfg.Vitals.MaxHealth, ctrl(player).Health, '满血复活必须是血量上限')
+    local result = lastPayload('SurvivalResult')
+    assert.is_true(result.ok)
+    assert.same('FullRevive', result.action)
+    assert.same('ad', result.mode)
+  end)
+
   -- 11-19：濒死与死亡两个相位都能发起广告满血复活；入口只经可替换广告适配层，活动相位拒绝。
   it('11-19 濒死与死亡相位都能发起占位广告复活，活动相位被拒', function()
     local player = join(7101)

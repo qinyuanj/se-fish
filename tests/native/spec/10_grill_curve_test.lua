@@ -249,4 +249,27 @@ describe('条款 10：烧烤倍率与会话规则', function()
     assert.is_nil(burned[9508], '3 米外的玩家不吃伤害')
     assert.are.equal('burnt', player.state.state, '操作者收到烤糊状态')
   end)
+
+  -- 10-11 边界：判定点是 elapsed >= BurnSec（4.5 秒整已糊，4.5 秒前未糊，见 common/GrillCurve.lua）。
+  -- 失败方式：边界写成 > 或 <，4.5 秒整不糊 / 4.5 秒前就糊。
+  it('10-11 4.5 秒整已烤糊、4.5 秒前尚未烤糊', function()
+    -- 4.5 秒前（BurnSec - 0.25 秒）取出仍成功，倍率尚未归零
+    local beforePlayer, beforeData = join(9510)
+    giveSelected(beforeData, FISH, 1)
+    assert.is_true(act(beforePlayer, { action = 'Start' }).ok)
+    advance(GameCfg.Grill.BurnSec - 0.25)
+    local taken = act(beforePlayer, { action = 'Takeout' })
+    assert.is_true(taken.ok, '4.5 秒前取出不该判烤糊')
+    assert.is_true(taken.rate > 0, '4.5 秒前倍率还没降到 0')
+    -- 4.5 秒整：烤糊、会话结束、状态 burnt，事后取不出东西
+    local player, data = join(9511)
+    giveSelected(data, FISH, 1)
+    assert.is_true(act(player, { action = 'Start' }).ok)
+    advance(GameCfg.Grill.BurnSec)
+    assert.is_nil(ctx.mgr:GetSession(player), '4.5 秒整会话要结束')
+    assert.are.equal('burnt', player.state.state, '4.5 秒整要判烤糊')
+    assert.are.equal(0, countItem(data, FISH), '4.5 秒整的鱼获要损毁')
+    local after = act(player, { action = 'Takeout' })
+    assert.is_false(after.ok, '烤糊后没有可取出的东西')
+  end)
 end)
