@@ -4,6 +4,20 @@
 local seam = require("tools.seam")
 local fs = require("tests.support.fs_fixture")
 
+local temp_dirs = {}
+local function make_temp_dir()
+  local dir = fs.temp_dir()
+  temp_dirs[#temp_dirs + 1] = dir
+  return dir
+end
+
+after_each(function()
+  for i = #temp_dirs, 1, -1 do
+    fs.rmrf(temp_dirs[i])
+    temp_dirs[i] = nil
+  end
+end)
+
 local BS = string.char(92)
 local CRLF = string.char(13) .. string.char(10)
 
@@ -25,7 +39,7 @@ end)
 
 describe("TestSeamFilesystemProbes", function()
   it("enumerates entries and files, ensures dirs and absolutizes", function()
-    local dir = fs.temp_dir()
+    local dir = make_temp_dir()
     fs.write_file(dir .. "/root.txt", "r")
     fs.write_file(dir .. "/sub/a.txt", "a")
     fs.write_file(dir .. "/sub/deep/b.txt", "b")
@@ -56,7 +70,7 @@ describe("TestSeamFilesystemProbes", function()
   it("raises a readable error when a directory exists but cannot be listed", function()
     local lfs = require("lfs")
     local real = lfs.dir
-    local dir = fs.temp_dir()
+    local dir = make_temp_dir()
     lfs.dir = function() error("stub: 拒绝访问") end
     local ok_entries, err_entries = pcall(seam.list_entries, dir)
     local ok_files, err_files = pcall(seam.list_files, dir)
@@ -116,7 +130,7 @@ describe("TestSeamWhich", function()
   end)
 
   it("rejects a fake shell that prints nothing, accepts one that prints a version", function()
-    local dir = fs.temp_dir()
+    local dir = make_temp_dir()
     fs.write_file(dir .. "/foo.bat", "@echo off" .. CRLF)
     fs.write_file(dir .. "/bar.bat", "@echo off" .. CRLF .. "echo 9.9.9" .. CRLF)
     local saved = os.getenv
@@ -137,7 +151,7 @@ describe("TestSeamSpawn", function()
   it("passes arguments verbatim through cmd quoting", function()
     local lua = fs.find_on_path("lua")
     assert.is_not_nil(lua, "PATH 上应有 lua")
-    local dir = fs.temp_dir()
+    local dir = make_temp_dir()
     local script = dir .. "/echo_argv.lua"
     fs.write_file(script, echo_argv_script())
     local out = dir .. "/args.txt"
@@ -155,7 +169,7 @@ describe("TestSeamSpawn", function()
 
   it("sets env vars and working directory for the child", function()
     local lua = fs.find_on_path("lua")
-    local dir = fs.temp_dir()
+    local dir = make_temp_dir()
     fs.write_file(dir .. "/marker.txt", "here")
     local out = dir .. "/env.txt"
     local probe = 'io.write((os.getenv("SEAM_PROBE") or "nil") .. "|" .. (io.open("marker.txt") and "cwd-ok" or "cwd-bad"))'
@@ -180,7 +194,7 @@ describe("TestSeamCapture", function()
   it("captures stdout, stderr and the exit code from argv", function()
     local lua = fs.find_on_path("lua")
     assert.is_not_nil(lua, "PATH 上应有 lua")
-    local dir = fs.temp_dir()
+    local dir = make_temp_dir()
     local code, out = seam.capture({
       argv = { lua, "-e", 'io.write("out 值"); io.stderr:write("err 值"); os.exit(2)' },
       tmp_dir = dir,
@@ -192,14 +206,14 @@ describe("TestSeamCapture", function()
 
   it("removes its temporary output file", function()
     local lua = fs.find_on_path("lua")
-    local dir = fs.temp_dir()
+    local dir = make_temp_dir()
     assert.are.equal(0, seam.capture({ argv = { lua, "-e", "print(1)" }, tmp_dir = dir }))
     assert.are.same({}, fs.list_dir(dir))
   end)
 
   it("runs the child in the requested directory", function()
     local lua = fs.find_on_path("lua")
-    local dir = fs.temp_dir()
+    local dir = make_temp_dir()
     fs.write_file(dir .. "/marker.txt", "here")
     local code, out = seam.capture({
       argv = { lua, "-e", 'io.write(io.open("marker.txt") and "cwd-ok" or "cwd-bad")' },
@@ -213,7 +227,7 @@ end)
 
 describe("TestSeamRemove", function()
   it("recursively removes a directory tree and tolerates a missing target", function()
-    local dir = fs.temp_dir()
+    local dir = make_temp_dir()
     local tree = dir .. "/tree"
     fs.write_file(tree .. "/a.txt", "a")
     fs.write_file(tree .. "/sub/b.txt", "b")
@@ -233,7 +247,7 @@ describe("TestSeamMirror", function()
   end)
 
   it("mirrors a directory tree with robocopy", function()
-    local root = fs.temp_dir()
+    local root = make_temp_dir()
     local src = root .. "/src"
     local dst = root .. "/dst"
     fs.write_file(src .. "/a.txt", "hello")

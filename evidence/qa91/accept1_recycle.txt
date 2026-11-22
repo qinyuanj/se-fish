@@ -1,2 +1,0 @@
-[03:01:11.812] [info/server] "[MgrLoot] 回收"	"shrimp"	"loot=6"	"zone=ShrimpPool"
-[03:03:54.365] [info/server] "[MgrLoot] 回收"	"shrimp"	"loot=7"	"zone=ShrimpPool"
