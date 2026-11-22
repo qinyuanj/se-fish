@@ -2,7 +2,7 @@
 
 本文件由 `docs/agents/workflow.md` 的同名一节整体搬出；workflow.md 原地只留一行指针。条目按主题排列，新增实测接在相关条目之后。
 
-**通用用法读技能。** CLI 定位、`status` 字段、code 命令组与判脏、日志子命令、截图通道、EUI 与场景命令的用法以团队技能 `eggy-se-editor-cli`（含 references）为准，本节只留项目实测、技能没写到的坑，以及与本图口径或实测结果不同的地方。技能与本节或 CLI `--help` 冲突时以后两者为准；通用勘误提 PR 改团队仓 SE 副本（[ADR-0015](../adr/0015-eggitor-ai-resources-team-repo-maintained.md)）。实测版本 0.20.12～0.20.13，另标注者除外。
+**通用用法读技能。** CLI 定位、`status` 字段、code 命令组与判脏、日志子命令、截图通道、EUI 与场景命令的用法以团队技能 `eggy-se-editor-cli`（含 references）为准，本节只留项目实测、技能没写到的坑，以及与本图口径或实测结果不同的地方。技能与本节或 CLI `--help` 冲突时以后两者为准；通用勘误提 PR 改团队仓 SE 副本。实测版本 0.20.12～0.20.13，另标注者除外。
 
 - **试玩闸门例外**：技能的判脏例外只列 `unit_scripts/`；`.agents/` 同样算干净（agent 配置，不进地图，`deploy` 也不清理），取证时点名。
 - **试玩就绪**：`status.ready` 是「编辑器可编辑地图」，试玩中为 `false`，等它永远等不到。判据是 `in_game_runtime == true` 且 `editor_state == "playing"`，或 `input state` 有玩家坐标。

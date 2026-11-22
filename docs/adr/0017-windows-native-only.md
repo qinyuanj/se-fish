@@ -1,8 +1,8 @@
 # 0017 放弃 WSL，本仓改为 Windows native only
 
-**Status**: accepted（取代 [ADR-0008](0008-wsl-development-windows-deploy.md)；ADR-0009、ADR-0011 的接缝引用已随之改链）
+**Status**: accepted（取代原 WSL 开发/Windows 部署方案；[ADR-0009](0009-blender-headless-only.md) 的接缝引用已随之改链）
 
-> **后续变更（ADR-0018 追加）**：`tools/acceptance_slot.lua` 后来改名 `tools/qa_slot.lua`；「唯一例外是 git 自带的 sh」所指的 `tools/hooks/pre-commit`、`tools/hooks/shim` 已随 [ADR-0018](0018-delete-pre-commit-hook.md) 一并删除，本仓现在没有任何非 Windows 原生的入口。下面「slow 车道的五条护栏」里的 `blender_transport` 已移入新增的 `art` 车道（[ADR-0019](0019-art-lane-optional.md)），不再随 `slow` 跑。
+> **后续变更**：`tools/acceptance_slot.lua` 后来改名 `tools/qa_slot.lua`；「唯一例外是 git 自带的 sh」所指的 `tools/hooks/pre-commit`、`tools/hooks/shim` 已整体删除，本仓现在没有任何非 Windows 原生的入口。下面「slow 车道的五条护栏」里的 `blender_transport` 已移入新增的 `art` 车道，不再随 `slow` 跑。
 
 本机已无 WSL 开发端，agent 与人工都在 Windows 原生环境里工作（仓库检出在 `D:`，编辑器与宿主目录在 `C:`）。而当前工具链在 Windows 上是**整体不可执行**的，不是"需要装点东西"：`tools/wsl_seam.lua` 用 POSIX 命令实现文件系统探测，而 Lua 的 `os.execute` 在 Windows 上走 `cmd.exe`。实测（2026-11-15）：
 
@@ -22,11 +22,11 @@
 
 备选方案（拒绝）：
 
-1. **WSL 与 Windows 双轨并存**（加 `is_windows()` 分支、接缝双实现）：重新制造"测试到底跑在哪个实现上"说不清的问题，正是 ADR-0008 当年用"只支持 WSL"拒掉的那一类。
+1. **WSL 与 Windows 双轨并存**（加 `is_windows()` 分支、接缝双实现）：重新制造"测试到底跑在哪个实现上"说不清的问题，正是当年采用"只支持 WSL"时拒掉的那一类。
 2. **用 PowerShell 包装文件操作**（`rmdir /s /q`、`Move-Item -Force`）：为一次目录删除把 PowerShell 拉回工具链，而 PowerShell 入口正是 #118–#121 刚退役的；且每次起进程的引号与开销都要另付。
 3. **依赖 MSYS/Git Bash 作为开发 shell**（保留 sh 命令与单引号规则）：等于把"要装 Git Bash 并让它当 shell"变成隐性前提，而本机 agent 的 shell 与 Lua 的 `os.execute` 并不是同一个 shell。
 4. **保留带版本号后缀的解释器别名**：为不改文档给每台机器加一层骗人的间接层；这类别名的存在理由本来就是"WSL 上裸 `lua` 可能是 5.1"。
-5. **改写 ADR-0008 正文**：会洗掉"当年为什么只留 WSL、拒掉了哪三条备选"这段推理，而这正是现在要被推翻的东西。
+5. **原地改写原 WSL 方案正文**：会洗掉"当年为什么只留 WSL、拒掉了哪三条备选"这段推理，而这正是现在要被推翻的东西。
 
 后果：
 
@@ -36,4 +36,4 @@
 - 文档面：`docs/agents/workflow.md`、`docs/agents/art-pipeline.md`、`GLOSSARY.md`、`docs/architecture.md`、`docs/packages-reference.md`、`AGENTS.md` 与 ADR-0009/0011 改口径；历史 ADR（0007、0014 等）正文里的 WSL 字样**不追改**。
 - 本仓无 CI（历史上也从未有 `.github/`），故无 CI 改动项。
 
-**历史与不撤销的部分**：上一次方向相反的迁移是 2026-10-22 的 #115/#116（`12ce496`、`3e78c25`、`5e2d70f`），同期 #118–#121 删除了 `uml.ps1` 与 `tools/quality/*.ps1`。本次是回程，但**这两件事都不撤销**：质量工具仍归 dsh-uml-viewer 插件，不复活 PowerShell 质量入口；ADR-0008 的三条备选（保留 Windows 检出、rsync 写盘、在 WSL 装编辑器）今天依然不采纳，只是 WSL 已整体退出。
+**历史与不撤销的部分**：上一次方向相反的迁移是 2026-10-22 的 #115/#116（`12ce496`、`3e78c25`、`5e2d70f`），同期 #118–#121 删除了 `uml.ps1` 与 `tools/quality/*.ps1`。本次是回程，但**这两件事都不撤销**：质量工具仍归 dsh-uml-viewer 插件，不复活 PowerShell 质量入口；原 WSL 方案拒掉的三条备选（保留 Windows 检出、rsync 写盘、在 WSL 装编辑器）今天依然不采纳，只是 WSL 已整体退出。

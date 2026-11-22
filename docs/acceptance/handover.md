@@ -10,7 +10,7 @@
 
 **规格说「是什么」，矩阵说「验到哪一步」，证据说「凭什么说验到了」，门禁说「这本账还可信吗」。**
 
-从规格到重跑是一条直路：`docs/GameSpec.md` 按 19 个小节写规格 → `docs/acceptance/` 一节一份分片，把每一句能独立判真假的规格写成一条**条款**（本轮 525 条），每条七列：ID、条款、组、执行者、证据等级、状态、证据·理由 → 状态只有五个值（`unverified`、`evidenced`、`accepted`、`blocked`、`out-of-scope`，最后一个本规格不用，见 [ADR-0029](../adr/0029-scope-completeness-and-placeholder-first.md) 第一节）→ 证据分三档（A 走业务入口的黑盒断言、B 可重跑的时序探针、C 编辑器试玩）→ 已取证的行必须在证据列写一个**真实存在**的仓库相对路径，让人照着那一行就能重跑 → 整本账由 `lua tools/cli.lua acceptance --check` 机器核对，它随 fast 车道跑；红一格会让 `test fast` 变红，从而在 PR 的 required check 上拦住（本仓**没有**提交时自动检查，pre-commit hook 已按 ADR-0018 删除）。
+从规格到重跑是一条直路：`docs/GameSpec.md` 按 19 个小节写规格 → `docs/acceptance/` 一节一份分片，把每一句能独立判真假的规格写成一条**条款**（本轮 525 条），每条七列：ID、条款、组、执行者、证据等级、状态、证据·理由 → 状态只有五个值（`unverified`、`evidenced`、`accepted`、`blocked`、`out-of-scope`，最后一个本规格不用，见 [ADR-0029](../adr/0029-scope-completeness-and-placeholder-first.md) 第一节）→ 证据分三档（A 走业务入口的黑盒断言、B 可重跑的时序探针、C 编辑器试玩）→ 已取证的行必须在证据列写一个**真实存在**的仓库相对路径，让人照着那一行就能重跑 → 整本账由 `lua tools/cli.lua acceptance --check` 机器核对，它随 fast 车道跑；红一格会让 `test fast` 变红，从而在 PR 的 required check 上拦住（本仓**没有**提交时自动检查，pre-commit hook 已删除）。
 
 | 层 | 落在哪 | 它回答 | 谁能改 |
 | --- | --- | --- | --- |

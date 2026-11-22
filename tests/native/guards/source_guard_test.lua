@@ -6,7 +6,7 @@
 --   4. 业务代码 require 引擎存根 EggyAPI / EggyEditorAPI → 类型存根被当模块加载；
 --   5. 业务代码出现 io / os / package / debug 调用 → SE 沙盒里这些是 nil，调用即崩；
 --   6. 可重入口（OpenScreen / CloseScreen / Init）里 Connect 不存句柄 → 每次开窗叠一个监听。
--- 三端 packages/ 是整包交付的外来件（ADR-0005），不吃第 5、6 条；第 2、3 条照查（包按原始字节交付，路径同样不能错）。
+-- 三端 packages/ 是整包交付的外来件（ADR-0021），不吃第 5、6 条；第 2、3 条照查（包按原始字节交付，路径同样不能错）。
 -- 与同目录 static_require_test.lua 的分工：那边管「按名加载的登记表」（界面 handler、锚点行为、MgrMap），
 -- 这边只管源码文本的卫生，所以两边各自独立，改登记表不必动这里。
 local fs = require("tests.support.fs_fixture")
