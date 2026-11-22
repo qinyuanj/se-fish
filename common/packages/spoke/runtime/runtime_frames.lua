@@ -12,6 +12,9 @@ Handle.__index = Handle
 
 --- Pushes a frame and returns a handle to it.
 function RuntimeFrames.push(runtime, frame)
+  if #runtime.frames == 0 then
+    runtime._entry_count = runtime._entry_count + 1
+  end
   frame = frame or {}
   frame.type = frame.type or frame.kind or "None"
   frame.kind = frame.kind or frame.type

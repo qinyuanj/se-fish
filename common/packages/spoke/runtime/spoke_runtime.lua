@@ -12,6 +12,7 @@ local SpokeRuntime = {
   frames = {},
   _frame_aux = {},
   _clock = 0,
+  _entry_count = 0,
   _scheduled_trees = nil,
   _boosted_trees = {},
   _hold_count = 0,
@@ -182,6 +183,7 @@ function SpokeRuntime._reset_for_tests()
   SpokeRuntime.frames = {}
   SpokeRuntime._frame_aux = {}
   SpokeRuntime._clock = 0
+  SpokeRuntime._entry_count = 0
   TreeQueue.drain(SpokeRuntime._scheduled_trees)
   SpokeRuntime._boosted_trees = {}
   SpokeRuntime._hold_count = 0

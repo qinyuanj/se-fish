@@ -40,7 +40,7 @@ SpokeRuntime 与工具类型不在门面上，需要时深 require：
 - `SpokeRuntime.batch(fn)` 只暂停 Auto flush；nested batch 仅最外层 release 排空。fn 抛错时也必须 release，再向调用方重抛；普通订阅通知等同步副作用不属于 batch 的合并范围。
 - 跨树先按较小 flush layer，再按 spawn timestamp。高优先级树可嵌套 flush；新建且优先级不低于当前树的树，仅在创建 frame 存活期间获得 scoped boost，同级既有树不能相互递归嵌套。
 - Manual 与 Auto 可共存；Manual 驱动结束后，Runtime 仍按相同规则交付已 pending 的 Auto 工作。
-- Runtime 有 100 次跨树调度振荡 guard，超限后记录并清空 pending Auto 树；单树有 1000 次 coordinate regression guard，超限后 fault/stop。它们检测顺序回退，不保证拦住单个计算持续自我激发。
+- Runtime 有 100 次跨树调度振荡 guard，超限后记录并清空 pending Auto 树。每个 Ticker（含 SpokeTree）默认有 1000 次 loop guard：同一 host entry 内 coordinate regression 或同一非 Ticker 重入会累计，队列排空或返回宿主后清零，重复推进嵌套 Ticker 不累计；超限后 fault/stop，因此也能拦住单个计算持续自我激发。bootstrap 中用 `s:loop_guard(n)` 配置，`n <= 0` 关闭。
 
 ## 坐标与 Dock
 
