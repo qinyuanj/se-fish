@@ -18,12 +18,12 @@
     {
       "id": 2,
       "name": "driver-and-scope-boundaries",
-      "prompt": "为了统一设计，我想把 spoke 仓库里的 SpokePool 和 ReadOnlyList 也引入这个项目，并让所有 Auto 树挂到 EVENT.REPEAT_TIMEOUT 每帧 flush。请给出落地方案。",
+      "prompt": "为了统一设计，我想把 spoke 仓库里的 SpokePool 和 ReadOnlyList 也引入这个项目，并让所有 Auto 树挂到 RunService.Heartbeat 每帧 flush。请给出落地方案。",
       "expected_output": "识别这些要求与库的实际公共面和 Auto 语义冲突，把帧节拍与池化都留在消费方，并说明要改变库行为必须回 spoke 仓库。",
       "files": [],
       "expectations": [
         "指出 SpokePool、ReadOnlyList 不在本版本公共面（api 导出的 13 个类）里，也不属于分发内容，不在 common/packages/spoke/ 里自行补。",
-        "拒绝把 Auto 树改成 EVENT.REPEAT_TIMEOUT 每帧 flush，并解释 Auto 是同步 inline flush、核心不读取宿主全局也不注册宿主计时器。",
+        "拒绝把 Auto 树改成 RunService.Heartbeat 每帧 flush，并解释 Auto 是同步 inline flush、核心不读取宿主全局也不注册宿主计时器。",
         "把帧节拍需求落到消费方 Manual 树（SpokeTree.spawn_manual 加 tick / flush）和消费方自己的节拍驱动上。",
         "池化只在有具体性能测量时由消费方项目实现，不放进包树。",
         "引用 spoke 仓库 docs/spec.md 与 ADR 0002、0003、0004 的适用依据，说明改变库行为要先回 spoke 仓库改规格与验收；未覆盖的点明确标为未核对。"

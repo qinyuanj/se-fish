@@ -20,6 +20,8 @@ TickerPorts.__index = TickerPorts
 local TickContext = {}
 TickContext.__index = TickContext
 
+local DEFAULT_MAX_PASSES = 1000
+
 local function identity(value)
   return value
 end
@@ -90,6 +92,10 @@ function Ticker:init(builder)
   self._paused = false
   self._is_ticking = false
   self._in_on_tick = false
+  self._last_ticked = nil
+  self._pass_count = 0
+  self._max_passes = DEFAULT_MAX_PASSES
+  self._guard_entry = -1
   self._bootstrap_active = true
   local ticker_builder = setmetatable({
     _builder = builder,
@@ -175,6 +181,38 @@ function Ticker:peek_next()
   return self._pending:peek_min()
 end
 
+local function reset_loop_guard(ticker)
+  ticker._last_ticked = nil
+  ticker._pass_count = 0
+end
+
+-- Count backwards steps within one host entry. A repeated nested ticker is
+-- making progress through its own queue, so only its inner guard applies.
+local function check_loop_guard(ticker, next_epoch)
+  local entry = SpokeRuntime._entry_count
+  if entry ~= ticker._guard_entry then
+    ticker._guard_entry = entry
+    reset_loop_guard(ticker)
+  end
+  if ticker._last_ticked then
+    local went_backwards
+    if ticker._last_ticked == next_epoch then
+      went_backwards = not next_epoch._is_ticker
+    else
+      went_backwards = ticker._last_ticked:compare_to(next_epoch) > 0
+    end
+    if went_backwards then
+      ticker._pass_count = ticker._pass_count + 1
+    end
+  end
+  ticker._last_ticked = next_epoch
+  if ticker._max_passes > 0 and ticker._pass_count > ticker._max_passes then
+    -- An OnTick callback may catch the error and continue with a fresh budget.
+    reset_loop_guard(ticker)
+    error("Exceed oscillation limit - possible infinite loop", 0)
+  end
+end
+
 function Ticker:tick_next()
   if not self._in_on_tick then
     error("tick_next() must be called from within an on_tick block", 2)
@@ -183,8 +221,12 @@ function Ticker:tick_next()
     error("Ticker has no pending epochs", 2)
   end
   self._did_continue = true
+  check_loop_guard(self, self._pending:peek_min())
   local epoch = self._pending:remove_min()
   epoch:_tick()
+  if not self:has_pending() then
+    reset_loop_guard(self)
+  end
   return epoch
 end
 
@@ -237,6 +279,13 @@ function TickerBuilder:on_tick(fn)
     error("TickerBuilder:on_tick expects a function", 2)
   end
   self._ticker._on_tick[#self._ticker._on_tick + 1] = fn
+end
+
+-- Set the backwards-step budget before tick_next faults. Zero or less disables
+-- the guard; the default is 1000.
+function TickerBuilder:loop_guard(max_passes)
+  self:_assert_bootstrap()
+  self._ticker._max_passes = max_passes
 end
 
 function TickerBuilder:ports()

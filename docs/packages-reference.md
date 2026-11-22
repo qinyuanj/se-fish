@@ -77,7 +77,7 @@
 | 用途 | 响应式运行时与生命周期管理（Epoch / Ticker / SpokeTree / Dock / Trigger / State / Effect / Memo / Phase） |
 | 落位 | `common/packages/spoke/`，门面 `require("common.packages.spoke.api")` |
 | 上游 | 同级仓库 `spoke` |
-| 上游 commit | `7605d7bfe401859c681aa7802836ca14353dcb95`（2026-11-19）；纯拷贝，一次同步记一个 SHA；库与 `.dsh/skills/spoke/` 技能必须同源 |
+| 上游 commit | `ae94f086cb3eac8b51445483d819a3d648ce1db3`（2026-11-22）；纯拷贝，一次同步记一个 SHA；库与 `.dsh/skills/spoke/` 技能必须同源 |
 | 升级 | 从上游检出整体重拷 `common/packages/spoke/` 与技能，再更新本表 SHA |
 | 约束 | 不就地修改包内文件；不搬上游 `tests/`；不改写上游技能 |
 
@@ -88,10 +88,12 @@
 | 用途 | SE 宿主装配：树随 `Unit.Destroying` 销毁（先翻 `is_alive` 再 detach）、带树名前缀的 logger、`State<boolean> is_alive` |
 | 落位 | `common/packages/spoke_eggy/`，门面 `require("common.packages.spoke_eggy.api")`；不进核心 `api.lua` 的 13 类 |
 | 上游 | 同 `spoke` 仓，与核心包同一次同步 |
-| 上游 commit | 与 `spoke` 相同：`7605d7bfe401859c681aa7802836ca14353dcb95`（2026-11-19） |
+| 上游 commit | 与 `spoke` 相同：`ae94f086cb3eac8b51445483d819a3d648ce1db3`（2026-11-22） |
 | 依赖 | 只 require `common.packages.spoke.*`（门面与 `runtime.spoke_error`）；核心不反向 require |
 | 升级 | 与 `spoke` 一起整体重拷，不单独记 SHA |
 | 约束 | 不就地修改；不搬上游 `tests/host/spoke_eggy_spec.lua`，加载与生命周期由 `tests/probes/spoke_eggy_load.lua` 覆盖 |
+
+2026-11-22 从 `7605d7b` 同步到 `7f77843`：包内只动四个 runtime 文件，技能只动 `references/runtime.md`。Ticker 接入上游 1.3.2 的 loop guard（同一 host entry 内累计顺序回退与同一非 Ticker 重入，队列排空或返回宿主后清零，默认 1000 次，bootstrap 用 `s:loop_guard(n)` 调整、`n <= 0` 关闭），`SpokeTree` 的 flush 不再自己数回退，改由 `Ticker.tick_next` 统一判，因此单个计算持续自我激发也能拦住；`SpokeRuntime` 增加 `_entry_count` 供 guard 划分 host entry。`spoke_eggy/api.lua` 与其余技能文件字节未变。同日再同步到 `ae94f08`（上游 [#34](https://github.com/qinyuanj/spoke/issues/34) 修复、[#35](https://github.com/qinyuanj/spoke/pull/35) 合入）：技能 `evals/evals.json` 第 21、26 行的节拍示例由原点版 `EVENT.REPEAT_TIMEOUT` 改为 SE 的 `RunService.Heartbeat`，包内文件无变化。
 
 ## 架构图上的位置
 
