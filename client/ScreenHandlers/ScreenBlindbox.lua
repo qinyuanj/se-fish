@@ -1,10 +1,3 @@
--- 盲盒界面（#147 T26，GameSpec §15）：右上角「盲盒」入口开关面板，单抽 10 金豆 / 十连 90 金豆。
--- 结果以服务端 BlindboxResult 为准（服务端先收费、逐抽结算并落账），客户端不抽样。
--- 满格按区落地的「落地前提示」：按 ItemBarState 快照数空格，放不下本次抽数时第一次点击只提示
--- （FullNoticeText），同一抽数再点一次才上行；服务端仍按实际空格逐件决定入库或落地。
--- 等待回包期间忽略重复点击，超过 ResultTimeoutSec（含平台支付等待）保留请求身份查询并提示；
--- 同 operation.id 的重放回包不重复展示；保底计数经 BlindboxStateRequest 握手与每次结果刷新。
--- 节点全部运行时创建（data/ 只读），创建失败只记日志。
 local GameCfg = require('common.GameCfg')
 local OwnedUnits = require('common.OwnedUnits')
 local REUtil = require('common.REUtil')
@@ -42,7 +35,6 @@ function Screen:Create(kind, parent, name, x, y, w, h, props)
         print('[ScreenBlindbox] 节点创建失败', name, tostring(node))
         return nil
     end
-    -- 部分节点类型不接受创建期 Anchor，补一次显式赋值
     pcall(function() node.Anchor = Vector2.New(0, 0) end)
     if kind == 'EUITextLabel' then
         node.TouchEnabled = false
@@ -52,7 +44,6 @@ function Screen:Create(kind, parent, name, x, y, w, h, props)
     return OwnedUnits.Track(self, node)
 end
 
----销毁盲盒界面建的全部节点并复位查找表（幂等，#211）：销毁只走归属登记，不从 Nodes 枚举。
 function Screen:Clear()
     OwnedUnits.Clear(self)
     self.Nodes = {}
@@ -87,12 +78,9 @@ end
 function Screen:BuildNodes()
     local root = GameUI:GetUIRoot()
     if not root then return false end
-    -- 重建前先清空上一轮尝试建出的节点：重试循环里一次只成功一半后再试，不叠重复入口 / 面板。
     self:Clear()
     local resolution = GameUI:GetEuiManager():GetDeviceResolution() or { x = 1920, y = 1080 }
     local cx, cy = resolution.x / 2, resolution.y / 2
-    -- #179：入口在主界面布局的右上入口组，不再压在引擎跳跃键上；本界面节点 Anchor=(0,0)，
-    -- 布局给的中心矩形换成左下角坐标
     local entry = MainHudLayout.Compute({ width = resolution.x, height = resolution.y }).Rects.BlindboxEntry
     local entryX, entryY = MainHudLayout.BottomLeft(entry)
     self:Button(root, 'BtnBlindboxEntry', entryX, entryY, entry.w, entry.h, cfg().HintText,
@@ -100,13 +88,11 @@ function Screen:BuildNodes()
     local panel = self:Create('EUIImage', root, 'ScreenBlindbox', cx, cy, 900, 600, {
         Image = ColorBlockImage, Color = Color.New(20, 20, 40, 220), Visible = false })
     if not panel then return false end
-    -- 面板自身是根节点子级，恢复中心锚点，让 (cx,cy) 落在屏幕正中；子节点仍按左下原点
     panel.Anchor = Vector2.New(0.5, 0.5)
     self.Panel = panel
     local single = GameCfg.Platform.Goods.blindboxSingle
     local ten = GameCfg.Platform.Goods.blindboxTen
     local bean = GameCfg.Platform.BeanCurrency
-    -- #174 #17：面板子节点按父节点左下角原点布局，Y 向上；标题最高、按钮最低，全部落在面板内
     self:Create('EUITextLabel', panel, 'LabelBlindboxTitle', 150, 500, 600, 60, {
         Text = cfg().HintText, FontSize = 40, TextColor = Color.New(255, 255, 255, 255) })
     self:Create('EUITextLabel', panel, 'LabelBlindboxPity', 50, 430, 800, 50, {
@@ -132,7 +118,6 @@ function Screen:Toggle()
     self:SetOpen(not self.IsOpen)
 end
 
--- 保底奖品名：内容表 Pity.prizeItemKeys 在 Entries 里查 itemName
 local function prizeNames()
     local names = {}
     for _, key in ipairs(cfg().Pity.prizeItemKeys or {}) do
@@ -149,7 +134,6 @@ function Screen:RefreshPity()
         self.Pity or 0, left, prizeNames()))
 end
 
--- 道具栏 + 背包空格数（快照口径）；没有快照返回 nil（不拦截，服务端照常按实际空格落地）
 function Screen:FreeSlots()
     local snapshot = self.Snapshot
     if type(snapshot) ~= 'table' then return nil end
@@ -168,7 +152,6 @@ function Screen:Draw(count)
     if self.Awaiting then return false end
     local free = self:FreeSlots()
     if free and free < count and self.ConfirmFull ~= count then
-        -- 落地前提示：同一抽数再点一次确认
         self.ConfirmFull = count
         notice(cfg().FullNoticeText)
         self:SetText('LabelBlindboxResult', cfg().FullNoticeText .. '\n再点一次确认抽取')
@@ -211,7 +194,6 @@ function Screen:NoteResult(result)
     if self.Awaiting and result.seq and result.seq ~= self.RequestSeq then return end
     if result.requestId then
         self.RequestId = result.requestId
-        -- 当前请求收到服务端关联后接管原未决意图；无关迟到回包已在上方过滤。
         if result.deliveryPending and result.originalSeq then self.RequestSeq = result.originalSeq end
     end
     if not result.ok then
@@ -232,7 +214,7 @@ function Screen:NoteResult(result)
     local operationId = result.operation and result.operation.id
     if operationId and operationId == self.LastOperationId and result.deliveryPending == self.LastDeliveryPending then
         self.Awaiting, self.AwaitingElapsed = false, nil
-        return -- 重放回包：原结果已展示过
+        return
     end
     self.LastOperationId = operationId
     self.LastDeliveryPending = result.deliveryPending
@@ -245,7 +227,6 @@ function Screen:NoteResult(result)
     end
 end
 
--- 回包超时兜底（Heartbeat 驱动；测试直接调用）：服务端可能静默丢弃（限频 / 旧序号）
 function Screen:UpdateAwait(dt)
     if not self.Awaiting or type(dt) ~= 'number' then return end
     self.AwaitingElapsed = (self.AwaitingElapsed or 0) + dt
@@ -264,7 +245,7 @@ function Screen:Start()
     REUtil:GetRE('BlindboxResult').OnClientEvent:Connect(function(result) self:NoteResult(result) end)
     REUtil:GetRE('ItemBarState').OnClientEvent:Connect(function(state) self:NoteItemBar(state) end)
     game:GetService('RunService').Heartbeat:Connect(function(dt) self:UpdateAwait(dt) end)
-    REUtil:GetRE('BlindboxStateRequest'):FireServer() -- 重进握手：拉当前保底计数
+    REUtil:GetRE('BlindboxStateRequest'):FireServer()
     local task = game:GetService('Task')
     task:Spawn(function()
         for _ = 1, 50 do

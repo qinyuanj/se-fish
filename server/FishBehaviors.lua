@@ -1,4 +1,3 @@
--- #53 全部已有战斗行为的唯一分发；官方移动与业务轨迹在 MgrAi 交接。
 local Behaviors = {}
 local methods = {
     kingCrab = 'UpdateKingCrabCombat', crabBoss = 'UpdateCrabBossCombat',

@@ -38,8 +38,6 @@ function Mgr:Reply(session, action, accepted, q)
         progress = session.Progress.Progress, accepted = accepted, q = q })
 end
 
--- lineOut：自然脱钩（收线到 0、进度归零）时线还在水里，交给 Cast 停在 unhooked；主动收竿 / 打断
--- 走的是同一个 outcome 名（都是「脱钩」），区别只在收不收竿，所以由调用方显式给出，不能由 outcome 推。
 function Mgr:Finish(session, outcome, notify, lineOut)
     if self.Sessions[session.Player.UserId] ~= session then return end
     self.Sessions[session.Player.UserId] = nil
@@ -75,7 +73,6 @@ function Mgr:Close(player, payload)
     self:Finish(session, session.Progress.Result or 'unhooked')
 end
 
--- T10（#131）：濒死/死亡打断收线，与 Died / CharacterRemoving 同语义（unhooked）
 function Mgr:Interrupt(player)
     local session = player and self.Sessions[player.UserId]
     if session and session.Player == player then self:Finish(session, 'unhooked') end

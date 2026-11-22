@@ -1,8 +1,3 @@
--- #132 T11 高风险能力原型 · 能力 A：三倍体型的纯逻辑与派生量契约。
--- 数值来源：GameSpec §2（体型 1 倍起、变大药水每个 +0.2 倍、上限 3 倍；血量 300 起、每个 +20%、上限 900）。
--- 本模块不碰引擎：只把「药水数 → 倍率/血量」和「倍率 → 胶囊高/相机距离/交互距离/挂点位移」算清楚，
--- 供 server/AbilityAPI.lua 的 SetScale 接缝与挂点装配消费；服务端单位与真机表现不在本模块职责内。
--- 失败方式与覆盖见 tests/native/ability_proto_test.lua 顶部的清单。
 local GameCfg = require('common.GameCfg')
 
 local M = {}
@@ -15,8 +10,6 @@ local function isBadNumber(v)
     return type(v) ~= 'number' or v ~= v or v == math.huge or v == -math.huge
 end
 
--- 药水数量净化：只接受非负整数；其余（负数、小数、非数、NaN、inf）一律按 0 个处理，
--- 不让「用了几个药水」这种外部输入把体型带偏。
 local function potionCount(potions, maxPotions)
     if isBadNumber(potions) or potions < 0 then return 0 end
     local whole = math.floor(potions)
@@ -24,12 +17,10 @@ local function potionCount(potions, maxPotions)
     return whole
 end
 
----药水数 → 目标体型与血量上限
 ---@param potions any 变大药水个数（非法值按 0 处理）
 ---@return table { Scale, Health, Potions, Capped, MaxScale, MaxHealth }
 function M.Plan(potions)
     local c = cfg()
-    -- 上限由配置推导而不是写死：MaxPotions 与 (Max-Base)/Step 取小，改配置时两条不会各自漂移
     local stepsByScale = math.floor((c.Max - c.Base) / c.Step + 1e-9)
     local maxPotions = math.min(c.MaxPotions, stepsByScale)
     local count = potionCount(potions, maxPotions)
@@ -44,7 +35,6 @@ function M.Plan(potions)
     }
 end
 
----倍率净化：NaN / inf / ≤0 / 非数回落 1 倍，超上限夹到上限
 ---@param scale any
 ---@return number
 function M.Sanitize(scale)
@@ -60,9 +50,6 @@ local function positiveOrZero(v)
     return v
 end
 
----体型派生量：三倍体型下的胶囊高、相机距离、交互距离与挂点位移。
----挂点必须一起放大，否则挂件会陷进放大的身体（真机「挂点不穿出」的前置条件，见 issue #132）。
----@param scale number 净化前的倍率
 ---@param base? table { CapsuleHeight, CameraDistance, InteractRange, SocketOffset={x,y,z} }
 ---@return table { Scale, CapsuleHeight, CameraDistance, InteractRange, SocketOffset? }
 function M.Derive(scale, base)
@@ -86,7 +73,6 @@ function M.Derive(scale, base)
     return derived
 end
 
--- 客户端表现与服务端复验共用派生范围；容差由调用方按原规格另外加。
 function M.InteractionRadius(character, baseRadius)
     if not character or not character.GetAttribute then return baseRadius end
     local range = character:GetAttribute('InteractRange')

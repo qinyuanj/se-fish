@@ -1,4 +1,3 @@
--- #123：读档失败关闭入口；全部玩家键写入校验持久会话和修订，关键操作与结果同键落账。
 local GameCfg = require('common.GameCfg')
 local PlayerData = require('server.Data.PlayerData')
 local Mgr = { Ledger = {}, Pending = {}, Flying = {}, Sessions = {}, Waiters = {}, NextAutosaveAt = nil }
@@ -71,7 +70,6 @@ end
 function Mgr:Finish(userId)
     self.Flying[userId] = nil
     if self.Pending[userId] then
-        -- 仅重试等待才会留下队首；失败后的显式请求仍需收到结果。
         if self.Pending[userId].RetryRounds then return end
         self:Drain(userId)
         return
@@ -117,7 +115,6 @@ function Mgr:EstimateSize(value)
     return total
 end
 function Mgr:WithinBudget(snapshot)
-    -- 粗估不是精确 JSON 字节数；留足余量，实际平台上限仍以真 DataStore 回包为准。
     return self:EstimateSize(snapshot) <= 256 * 1024
 end
 function Mgr:NoteWrite(userId, snapshot, reason)
@@ -158,7 +155,6 @@ function Mgr:LoadInto(player, data)
         previous.Data.Inited, previous.Data.LoadState = false, 'stale'
     end
     self.Counter = (self.Counter or 0) + 1
-    -- 会话 token 仅用于 fencing/请求命名空间，不作为鉴权秘密；存储回读仍须核对 epoch/revision。
     local s = { Current = self.QaSlot, Next = self.QaSlot, Paused = false,
         State = 'pending', Player = player, Data = data,
         Token = tostring(userId) .. ':' .. tostring(self.Counter) .. ':' .. tostring({}) .. ':' .. tostring(math.random()) }
@@ -218,15 +214,12 @@ function Mgr:LoadInto(player, data)
             if self.OnReady then self.OnReady(player, data) end
         end)
     end
-    -- 旧会话正在选槽时，等它选完再读档，避免槽位竞争。
-    -- 闭包捕获 s/data，等待期间若重进替换会话，IsCurrent 会拒绝执行。
     if previous.SlotChoosing then
         previous.SlotWaiters = previous.SlotWaiters or {}
         table.insert(previous.SlotWaiters, load)
     else load() end
 end
 
--- 每个 job 的写身份在重试间固定；即使写成功而回包丢失，也只认可同一次结果。
 function Mgr:WriteJob(userId, job)
     local s = job.Session
     if self.Sessions[userId] ~= s then return false, 'stale' end
@@ -255,7 +248,6 @@ function Mgr:WriteJob(userId, job)
         return false, 'conflict'
     end
     s.Revision = value.meta.revision
-    -- #123：平台回包（DataStore 读回）会给列表补 __count，进内存前剥掉，下一次 Serialize 才不会再写回库。
     if s.Data and s.Data.Player == s.Player then
         s.Data.SaveMeta = PlayerData.StripArrayMeta(value.meta, 'stored.meta')
     end
@@ -315,7 +307,6 @@ function Mgr:Enqueue(userId, snapshot, reason, done)
     return true
 end
 function Mgr:Save(userId, snapshot, reason) return self:Enqueue(userId, snapshot, reason) end
--- 兼容旧调用点：只承诺快照 CAS，不把事后快照包装成跨会话幂等结算。
 function Mgr:Commit(userId, snapshot, reason) return self:Enqueue(userId, snapshot, reason) end
 
 function Mgr:ResolveRequest(player, data, kind, requestId)
@@ -511,7 +502,6 @@ end
 function Mgr:ReleaseSession(userId, player)
     local s = self.Sessions[userId]
     if not s or player and s.Player ~= player then return end
-    -- 离场快照先排空，仍保留会话 fencing；重进替换会话后旧 job 自动失效。
     s.Leaving = true
     self:AfterIdle(userId, function() if self.Sessions[userId] == s then self.Sessions[userId] = nil end end)
 end
@@ -544,7 +534,6 @@ function Mgr:Start()
                     if data then self:Save(player.UserId, data:Serialize(), 'shutdown') end
                 end
             end
-            -- 有限等待；失败记录保持可观察，不声称关服时保证网络成功。
             for _ = 1, 25 do
                 if next(self.Pending) == nil and next(self.Flying) == nil then return end
                 for userId in pairs(self.Pending) do self:Drain(userId) end

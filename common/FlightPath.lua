@@ -1,14 +1,3 @@
--- #132 T11 高风险能力原型 · 能力 B：飞行、俯冲与巡航的纯逻辑与边界契约。
--- 数值来源：GameSpec §12（白头鹰/风神翼龙 飞行移速 20、每 20 秒俯冲；沧龙 每 15 秒跃起；沧龙移速 13）、
--- #125 场景合同（Scene.Boundary 的 MinX/MaxX/MinZ/MaxZ/BottomY/TopY/MaxFlightHeight=20）与
--- GameSpec §8.2「钓鱼区间不能徒步、游泳或借飞行越界」。配置见 GameCfg.Ability.Flight。
---
--- 本模块只管轨迹与三种防护，不碰引擎：
---   * 钳制：每帧把位置夹回本区围栏与高度上限，越界写进 ClampLog（探针的关键量）；
---   * 一帧过大：dt 超过 MaxStepSec 就截断，补算不能一帧跨过围栏；
---   * NaN / 漂移：位置与速度里出现 NaN/inf 时退回上一个合法点并清零速度；单帧位移超过
---     「速度 × 最大步长 × 2 + DriftTolerance」视为被外力顶飞，同样整段钳回。
--- 真机表现（撞墙、贴地、俯冲命中）仍须编辑器窗口试玩，见 issue #132 待办清单。
 local GameCfg = require('common.GameCfg')
 
 local M = {}
@@ -29,8 +18,6 @@ local function copy(p)
     return { x = p.x, y = p.y, z = p.z }
 end
 
----钓鱼区场景合同 → 飞行边界；GroundY 取安全点高度（地面），CeilingY 是地面 + 飞行高度上限。
----场景或围栏缺失时返回 nil（调用方必须放弃飞行，不能无边界乱飞）。
 ---@param scene? table GameCfg.Zones[i].Scene
 ---@param flightCfg? table GameCfg.Ability.Flight
 ---@return table? bounds { MinX, MaxX, MinZ, MaxZ, BottomY, TopY, GroundY, CeilingY, MaxHeight }
@@ -55,7 +42,6 @@ function M.BoundsOf(scene, flightCfg)
     }
 end
 
----新建一个飞行状态。bounds 必须来自 BoundsOf（无边界不飞）。
 ---@param bounds table
 ---@param flightCfg? table
 ---@param profile? table 鱼种飞行档案 { CruiseHeight, DiveIntervalSec, Speed, Mode, Center, Radius, DiveDamage }
@@ -80,7 +66,6 @@ function M.New(bounds, flightCfg, profile, start, now)
     }
 end
 
----设定俯冲目标（玩家位置）；传 nil 表示没有目标，只巡航不俯冲。
 function M.SetTarget(state, target)
     state.Target = (type(target) == 'table' and not isBadPoint(target)) and copy(target) or nil
 end
@@ -93,7 +78,6 @@ function M.CruiseHeight(state)
     return state.Profile.CruiseHeight or state.Cfg.CruiseHeight
 end
 
--- 围栏与高度上限钳制：逐轴夹回并把第一次越界写进 ClampLog（确定性：按 x/y/z 顺序）。
 local function clampToBounds(state)
     local b, p = state.Bounds, state.Pos
     local clamped = 0
@@ -116,12 +100,10 @@ local function clampToBounds(state)
     return clamped
 end
 
--- 单步位移上限：速度 × 最大步长 × 2 + DriftTolerance；超过就是被顶飞，不是自己走的
 local function driftLimit(state, dt)
     return M.Speed(state) * state.Cfg.MaxStepSec * 2 + state.Cfg.DriftTolerance
 end
 
--- 巡航：朝目标飞或绕 Center 圆周（无目标），高度保持在地面 + CruiseHeight
 local function updateCruise(state, dt, now, events)
     local profile, c = state.Profile, state.Cfg
     local cruiseY = state.Bounds.GroundY + M.CruiseHeight(state)
@@ -130,7 +112,6 @@ local function updateCruise(state, dt, now, events)
     if state.Target then
         dx, dz = state.Target.x - state.Pos.x, state.Target.z - state.Pos.z
     else
-        -- 绕岛巡航：沿半径 Radius 的圆周推进，方向由 Angle 决定
         state.Angle = state.Angle + (profile.TurnRate or 0.2) * dt
         local spot = { x = state.Center.x + math.cos(state.Angle) * state.Radius,
             z = state.Center.z + math.sin(state.Angle) * state.Radius }
@@ -142,7 +123,7 @@ local function updateCruise(state, dt, now, events)
     else
         state.Vel.x, state.Vel.z = 0, 0
     end
-    state.Vel.y = (cruiseY - state.Pos.y) * 2 -- 回到巡航高度（比例控制，够用即可）
+    state.Vel.y = (cruiseY - state.Pos.y) * 2
     if state.Vel.y > c.ClimbSpeed then state.Vel.y = c.ClimbSpeed end
     if state.Vel.y < -c.ClimbSpeed then state.Vel.y = -c.ClimbSpeed end
     if state.Target and now >= state.NextDiveAt then
@@ -189,7 +170,6 @@ local function updateClimb(state, dt, now, events)
     return speed
 end
 
--- 跃起（沧龙「每 15 秒高高跃起，砸击玩家」）：抛物线上升再落回水面高度
 local function updateLeap(state, dt, now, events)
     local c = state.Cfg
     local apex = state.Profile.LeapHeight or c.LeapHeight
@@ -207,7 +187,6 @@ local function updateLeap(state, dt, now, events)
     return M.Speed(state)
 end
 
----推进一帧。
 ---@param state table
 ---@param now number World:GetServerTime()
 ---@param dt number 帧间隔
@@ -216,14 +195,12 @@ function M.Step(state, now, dt)
     local events = { nan = false, drift = false, clamped = 0, dive = false }
     if isBadNumber(now) then now = state.LastAt or 0 end
     state.LastAt = now
-    -- dt：非法归零；超过最大步长就截断（补算不得一帧跨过围栏）
     if isBadNumber(dt) or dt < 0 then dt = 0 end
     if dt > state.Cfg.MaxStepSec then
         dt = state.Cfg.MaxStepSec
         state.Stats.StepTruncations = state.Stats.StepTruncations + 1
         events.truncated = true
     end
-    -- NaN / inf：位置或速度任一坏值都退回上一合法点并清零速度，本帧不再推进
     if isBadPoint(state.Pos) or isBadPoint(state.Vel) then
         state.Pos = copy(state.Last)
         state.Vel = { x = 0, y = 0, z = 0 }
@@ -233,7 +210,6 @@ function M.Step(state, now, dt)
         events.phase = state.Phase
         return events
     end
-    -- 漂移：上一帧到本帧的位移超过允许值，说明不是自己走的 → 整段钳回
     local dx, dy, dz = state.Pos.x - state.Last.x, state.Pos.y - state.Last.y, state.Pos.z - state.Last.z
     if math.sqrt(dx * dx + dy * dy + dz * dz) > driftLimit(state, dt) then
         state.Pos = copy(state.Last)
@@ -260,7 +236,7 @@ function M.Step(state, now, dt)
             speed = M.Speed(state)
         elseif state.Phase == 'leap' then
             speed = updateLeap(state, dt, now, events)
-            dt = 0 -- 跃起的 y 由抛物线直接给，不再积分
+            dt = 0
         else
             speed = M.Speed(state)
         end

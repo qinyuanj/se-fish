@@ -1,25 +1,14 @@
--- 活鱼单位管理器（#37 起）：上岸结算交来的活鱼在这里登记，M2 在此之上接抓举 / 放下 / 逃脱 / 死亡。
--- 一条活鱼只记上钩时定下的鱼种与个体倍率；重量、售价随取随算（FishCatch.Weight / Price），不存快照。
--- 抓举（#41）：上岸即由服务端原生 Lift(鱼本体)，只认服务端鱼本体的
--- OnLiftedBegin，回调里立刻建骨骼挂点并把鱼挂进去；举着期间不改 BodyType（引擎已切 Kinematic）。
--- 放下 / 逃脱（#42）：主动放下、OnLiftedEnd、持有者死亡走同一条幂等 Release——回世界、落在面前、
--- Kinematic 朝最近水区跑；只按 (x,z) 判入水，入水即销毁、无收益。不调 Throw。
 local GameCfg = require('common.GameCfg')
 local FishCatch = require('common.FishCatch')
 local MathWaterJudge = require('common.MathWaterJudge')
 local MgrFishCarrier = require('server.Mgr.MgrFishCarrier')
--- #132 T11 原型：飞行/俯冲、叼人、首领分阶段的纯逻辑。本文件只做引擎驱动（读坐标、写位置、结算伤害）。
 local FlightPath = require('common.FlightPath')
 local CarryMount = require('common.CarryMount')
 local BossPhase = require('common.BossPhase')
 local GarBiteNotice = require('common.GarBiteNotice')
 local BossMoves = require('common.cfg.BossMoves')
 local FishBehaviors = require('server.FishBehaviors')
--- #260 目标选择唯一裁决口（业务侧适配层，server/Mgr/MgrAiTarget.lua）只由 server/main.lua 注入到
--- MgrFishUnit.AiTarget：本模块不 require 它，避免模块加载期就把官方 AI 包连带拖进来。
 
--- AbilityAPI 懒加载：MgrFishUnit 被大量单测用假 game 加载，顶层 require 会连带跑技能包
--- （包内 api.lua 加载时要 RunService:IsServer()），把无关用例拖挂。
 local function abilityApi()
     return require('server.AbilityAPI')
 end
@@ -55,9 +44,6 @@ local function readPosition(unit)
     end
 end
 
--- #136 蟹湖节拍初始化：Release 放下与帝王蟹眩晕醒来共用，两处必须一致
--- （漏一项就会出现醒来后双击 / 冲撞 / 旋转节拍错位）。JabAt / PinchAt 从 -1 起，
--- 让放下或醒来后的首次进距立刻起手，避免与引擎时间推进错位。
 local function resetCrabRhythm(fish, now, params)
     if params.ActiveSec then fish.ActiveUntil = now + params.ActiveSec end
     fish.JabAt = -1
@@ -72,7 +58,6 @@ local function noCollide(unit, other)
     end
 end
 
--- 碰撞隔离：鱼本体不和任何玩家、别的鱼本体与受击体互推（M18-2 漂移 / 顶飞 / NaN 的来源）
 function Mgr:Isolate(fish)
     local body = fish.Carrier.Body
     for _, player in ipairs(self:Players()) do noCollide(body, player.Character) end
@@ -96,7 +81,6 @@ function Mgr:Players()
     return service and service:GetPlayers() or {}
 end
 
--- 在 position 生成一条归属 player 的待举起活鱼并立即发起抓举；载体建不出来返回 nil 与原因
 function Mgr:SpawnLanded(player, catch, position)
     local species = catch and GameCfg.Fish[catch.fishId]
     if not player or not species or type(catch.mult) ~= 'number' then return nil, 'bad-catch' end
@@ -115,7 +99,6 @@ function Mgr:SpawnLanded(player, catch, position)
     local fish = { Id = self.NextId, Owner = player, FishId = catch.fishId, Mult = catch.mult,
         Carrier = carrier, State = Mgr.State.AwaitLift, Anchor = position, LiftAttempts = 0, Threat = {} }
     self.Fish[fish.Id] = fish
-    -- 受击体是带 Controller 的 EggyUnit，不关掉会被 Lift() 当成身前目标抓走
     if carrier.Receiver and carrier.Receiver.Controller then
         pcall(function() carrier.Receiver.Controller.LiftedEnabled = false end)
     end
@@ -133,8 +116,6 @@ function Mgr:SpawnLanded(player, catch, position)
     return fish
 end
 
--- #129 爆炸保底鱼：与 SpawnLanded 同款载体，但不接抓举（Wild 状态），到期即消失；
--- 归属投掷者（Owner），被打死走统一 Loot / 任务流
 function Mgr:SpawnBlastFish(fishId, mult, position, owner)
     local species = GameCfg.Fish[fishId]
     if not species or type(mult) ~= 'number' or not position then return nil, 'bad-fish' end
@@ -155,7 +136,6 @@ function Mgr:SpawnBlastFish(fishId, mult, position, owner)
         Carrier = carrier, State = Mgr.State.Wild, Anchor = position,
         WildUntil = self:Now() + ttl, Threat = {} }
     self.Fish[fish.Id] = fish
-    -- 受击体是带 Controller 的 EggyUnit，不关掉会被 Lift() 当成身前目标抓走
     if carrier.Receiver and carrier.Receiver.Controller then
         pcall(function() carrier.Receiver.Controller.LiftedEnabled = false end)
     end
@@ -163,7 +143,6 @@ function Mgr:SpawnBlastFish(fishId, mult, position, owner)
     return fish
 end
 
--- 发起一次服务端抓举：主人手上有鱼、鱼已不是待抓、次数用完都不调（Lift 不幂等）
 function Mgr:RequestLift(fish)
     local owner = fish.Owner
     if fish.State ~= Mgr.State.AwaitLift or self.Held[owner.UserId]
@@ -172,14 +151,12 @@ function Mgr:RequestLift(fish)
     if not controller then return false end
     fish.LiftAttempts = fish.LiftAttempts + 1
     fish.LiftAt = self:Now()
-    -- 不依赖身前目标搜索：鱼的受击体与场景单位可能干扰搜索，明确抓取本次上岸的鱼。
     -- SE 实测 Lift 的指定目标支持 WorldUnit；仍由原生 OnLiftedBegin 确认成功。
     local ok, err = pcall(function() controller:Lift(fish.Carrier.Body) end)
     if not ok then print('[MgrFishUnit] Lift 调用失败', owner.UserId, tostring(err)) end
     return ok
 end
 
--- 抓举者：回调带了角色就按角色找玩家；没带就认正在等抓举确认的主人
 function Mgr:ResolveLifter(fish, liftunit)
     if liftunit == nil then return fish.LiftAt and fish.Owner or nil end
     if fish.Owner.Character == liftunit then return fish.Owner end
@@ -226,12 +203,10 @@ function Mgr:HeldInfo(player)
     return fish and { fishId = fish.FishId, mult = fish.Mult } or nil
 end
 
--- 举着鱼时不能抛竿：2 号位此时是「放下」
 function Mgr:CanCast(player)
     return self:GetHeld(player) == nil
 end
 
--- 主动放下：只有持有者能放自己头上的鱼
 function Mgr:Drop(player)
     local fish = self:GetHeld(player)
     return fish ~= nil and self:Release(fish, 'drop')
@@ -243,7 +218,6 @@ local function flatDirection(x, z)
     return x / length, z / length
 end
 
--- 离 (x,z) 最近的水域方向（单位向量）：只看鱼所在区的水域，免得朝隔壁区的水撞空气墙；不在任何区内时看全图
 local function towardWater(pos)
     local waters = GameCfg.Water.Zones
     for _, zone in ipairs(GameCfg.Zones) do
@@ -265,7 +239,6 @@ local function inWater(pos)
     end
 end
 
--- #139：鱼移速唯一读取点乘武器持续效果（霜冻 0.7 / 麻痹 0，MgrAbility:FishSpeedFactor）；效果口故障按 1。
 function Mgr:Speed(fish)
     local species = GameCfg.Fish[fish.FishId]
     local speed = species and species.Speed or cfg().EscapeSpeed
@@ -294,7 +267,6 @@ function Mgr:SetHeading(fish, x, z)
     return true
 end
 
--- 释放举着的鱼（放下 / 抓举结束 / 持有者死亡）：只处理一次，之后重复触发都是空操作
 function Mgr:Release(fish, reason)
     if self.Fish[fish.Id] ~= fish or fish.State ~= Mgr.State.Held then return false end
     if self.Ai then self.Ai:Custom(fish) end
@@ -320,7 +292,7 @@ function Mgr:Release(fish, reason)
         end)
     end
     pcall(function()
-        body.BodyType = 2 -- Enums.BodyType.Kinematic：由脚本给速度驱动（V4）
+        body.BodyType = 2
         body.AngularVelocity = Vector3.New(0, 0, 0)
     end)
     local now = self:Now()
@@ -331,9 +303,7 @@ function Mgr:Release(fish, reason)
     fish.RayAt = now
     local pos = readPosition(body) or origin
     local species = GameCfg.Fish[fish.FishId]
-    -- 普通/极品鱼无论上钩来源都直接逃水；飞行战斗与时限只用于特殊鱼种。
     if species.Grade ~= 'normal' and species.Grade ~= 'rare' and self:FlightProfile(fish.FishId) then
-        -- #132 T11 原型：飞行鱼放下后起飞（俯冲由 UpdateFlying 驱动，空中仍可被 #128 的受击体打到）
         fish.FleeAt = now + (species.EscapeSec or 180)
         body.LinearVelocity = Vector3.New(0, 0, 0)
         if not self:StartFlight(fish, now) then
@@ -341,7 +311,6 @@ function Mgr:Release(fish, reason)
             self:SetHeading(fish, towardWater(pos))
         end
     elseif self:BossPhaseEnabled(fish.FishId) then
-        -- #132 T11 原型：分阶段首领放下后进战斗（阶段机由 UpdateCombat 分支驱动）
         fish.State = Mgr.State.Combat
         fish.FleeAt = now + (species.EscapeSec or 300)
         fish.CombatPosition = pos
@@ -357,7 +326,6 @@ function Mgr:Release(fish, reason)
         fish.CombatRotation = body.Rotation
         body.LinearVelocity = Vector3.New(0, 0, 0)
         if GameCfg.FishCombat and GameCfg.FishCombat[species.Combat] then
-            -- 首领近战（#88 / #134）：由 UpdateChase 在目标进入咬距时锁定朝向起咬，每口前都有完整预警
             fish.BiteAim = nil
             if species.Combat == 'shrimp' or species.Combat == 'dragon' then
                 local params = GameCfg.FishCombat[species.Combat]
@@ -365,19 +333,14 @@ function Mgr:Release(fish, reason)
                 fish.SpecialAt = now + (params.SpecialSec or 0)
                 fish.Combo = 0
             elseif species.Combat == 'kingCrab' or species.Combat == 'crabBoss' then
-                -- #136 蟹湖：帝王蟹活动计时；蟹老板冲撞 / 旋转 / 双击各自的节拍。
-                -- 与眩晕醒来共用 resetCrabRhythm，字段清单只有一处。
                 resetCrabRhythm(fish, now, GameCfg.FishCombat[species.Combat])
             elseif species.Combat == 'swordfish' or species.Combat == 'shark' then
-                -- #141 树林岛精英 / 首领：准备跳跃节拍；RollSlot 供三头鲨翻滚接触去重。
                 local params = GameCfg.FishCombat[species.Combat]
                 fish.JumpAt = now + params.JumpIntervalSec
                 fish.RollSlot = -1
             elseif species.Combat == 'walrus' then
-                -- #142 海象：突击节拍（甩头无独立节拍，进身即甩）
                 fish.ChargeAt = now + GameCfg.FishCombat[species.Combat].ChargeSec
             elseif species.Combat == 'orca' then
-                -- #142 虎鲸：四招节拍互斥（鲸跃 > 虎啸 > 甩尾 > 爪）
                 local params = GameCfg.FishCombat[species.Combat]
                 fish.JumpAt = now + params.JumpIntervalSec
                 fish.RoarAt = now + params.RoarSec
@@ -392,7 +355,6 @@ function Mgr:Release(fish, reason)
         self:SetHeading(fish, towardWater(pos))
     end
     print('[MgrFishUnit] 放下', holder and holder.UserId, reason, fish.FishId, 'fish=' .. tostring(fish.Id))
-    -- 新手任务「丢在岸上」事实（#52）：只认持有者主动放下且落点不在水区；抓举结束 / 死亡松手、水里放下都不算
     if reason == 'drop' and holder and self.Quest and not (pos and inWater(pos)) then
         self.NextFactId = (self.NextFactId or 0) + 1
         self.Quest:Notify('DropShore', holder, { itemId = fish.FishId,
@@ -426,8 +388,6 @@ local function trimOldest(self, list, extra, keep, why)
     end
 end
 
--- 在逃上限：先按触发者每人 ≤ PerPlayerEscapeCap，再按全局 ≤ 在线人数 × GlobalEscapePerPlayer；
--- 都从最旧的清，刚放下的那条（keep）不清。每人 1 条先清过，全局超限时触发者已没有别的旧鱼可清
 function Mgr:EnforceEscapeCap(trigger, keep)
     local c = cfg()
     if trigger then
@@ -441,7 +401,6 @@ function Mgr:EnforceEscapeCap(trigger, keep)
     trimOldest(self, list, #list - #self:Players() * c.GlobalEscapePerPlayer, keep, '全局上限')
 end
 
--- 探墙射线的排除表：所有玩家角色、所有鱼本体与受击体
 function Mgr:RayExclusions()
     local list = {}
     for _, player in ipairs(self:Players()) do
@@ -465,7 +424,6 @@ local function passThrough(unit)
     return okCollide and collide == false
 end
 
--- 前方 RayDistance 米内有实体墙返回 true；穿透物加进排除表重投，最多 RayRetries 次
 function Mgr:WallAhead(fish, pos)
     local heading = fish.Heading
     if not heading or not RaycastParams then return false end
@@ -487,7 +445,6 @@ function Mgr:WallAhead(fish, pos)
     return false
 end
 
--- 在逃：坐标异常就移除，(x,z) 进水即销毁；每 TurnSec 重新朝水，RayHz 探墙，撞墙左转 90°
 function Mgr:UpdateEscaping(fish, now)
     local pos = readPosition(fish.Carrier.Body)
     if not pos then
@@ -501,8 +458,6 @@ function Mgr:UpdateEscaping(fish, now)
         self:Remove(fish)
         return
     end
-    -- 精英逃跑时锁定直线；不走普通鱼的转向与避墙。
-    -- 持续效果可在两次转向之间应用/到期，每帧按当前效果刷新直线速度。
     if fish.Heading and fish.AppliedSpeed ~= self:Speed(fish) then
         self:SetHeading(fish, fish.Heading.x, fish.Heading.z)
     end
@@ -520,8 +475,6 @@ function Mgr:UpdateEscaping(fish, now)
     end
 end
 
--- 首领追咬（#88 / #128）：目标优先取本场累计有效伤害最高的玩家，无记录时取最近目标；
--- 濒死 / 死亡 / 离线目标立即从仇恨与特殊覆盖里清掉。咬人经 MgrVitals 命中入口，不直接碰 Controller。
 function Mgr:IsTargetValid(player, pos, params)
     if not player or not self.Vitals or not self.Vitals:CanTakeDamage(player) then return false end
     local character = player.Character
@@ -549,9 +502,6 @@ function Mgr:SetTargetOverride(fish, player)
     return true
 end
 
--- #260 6-31 指定目标优先，6-30 合法性由 IsTargetValid 守门；6-29 由业务 Policy.Order 按伤害裁决。
--- 官方 AI 管理器只登记结果；登记失败不阻断业务目标，但适配层必须记录完整失败日志。
--- 本函数只返回玩家与坐标，不碰移动：位移仍归 FishBehaviors / FlightPath / BossPhase。
 function Mgr:ChooseTarget(fish, pos, params)
     local adapter = self.AiTarget
     local override = fish.TargetOverride
@@ -572,7 +522,6 @@ function Mgr:ChooseTarget(fish, pos, params)
                 damage = fish.Threat and fish.Threat[player] or 0, distance = distanceSq(pos, cp) }
         end
     end
-    -- 离开战斗范围 / 濒死 / 死亡的玩家同时从仇恨账本清掉，避免回血后再被旧伤害拉回目标。
     if fish.Threat then
         for player in pairs(fish.Threat) do
             if not present[player] or not self:IsTargetValid(player, pos, params) then
@@ -585,8 +534,6 @@ function Mgr:ChooseTarget(fish, pos, params)
     return top and top.player or nil, top and top.pos or nil
 end
 
--- #134 头部攻击：头部区 = 以鱼身中点为圆心 BiteRange 内、与朝向夹角 < HeadHalfAngleDeg；
--- 其余（正侧面、后半圆）是后身，绕后即咬空。与中点重合时没有方向，按贴脸算进头部区。
 function Mgr.InHeadZone(pos, facing, tpos, params)
     local dx, dz = tpos.x - pos.x, tpos.z - pos.z
     local d2 = dx * dx + dz * dz
@@ -601,7 +548,6 @@ local function withinBite(pos, tpos, params)
     return dx * dx + dz * dz <= params.BiteRange * params.BiteRange
 end
 
--- 点到线段的最短水平距离平方（#141 翻滚接触：判定玩家是否落在本帧「真实滚动段」上）。
 local function segmentDistanceSq(px, pz, ax, az, bx, bz)
     local dx, dz = bx - ax, bz - az
     local lenSq = dx * dx + dz * dz
@@ -615,7 +561,6 @@ local function segmentDistanceSq(px, pz, ax, az, bx, bz)
     return ex * ex + ez * ez
 end
 
--- 预警广播（common/GarBiteNotice）；推送失败只记日志，不打断追咬。测试可替换本方法取载荷。
 function Mgr:PublishBite(payload)
     GarBiteNotice.Publish(payload)
 end
@@ -625,7 +570,6 @@ local function publishBite(self, payload)
     if not ok then print('[MgrFishUnit] 首领咬预警推送失败', payload.kind, 'fish=' .. tostring(payload.fishId), tostring(err)) end
 end
 
--- 朝向：服务端以 fish.Facing（水平单位向量）为准，并写 body.Rotation 让头朝向在各端可见
 function Mgr:Face(fish, fx, fz, params)
     if not fx then return end
     fish.Facing = { x = fx, z = fz }
@@ -635,14 +579,12 @@ function Mgr:Face(fish, fx, fz, params)
     if not ok then print('[MgrFishUnit] 首领转向失败', 'fish=' .. tostring(fish.Id), tostring(err)) end
 end
 
--- 收起当前预警（咬出 / 咬空 / 取消 / 鱼没了）；无预警时空操作
 function Mgr:EndBite(fish, reason)
     if not fish.BiteAim then return end
     fish.BiteAim = nil
     publishBite(self, GarBiteNotice.Clear(fish.Id, reason))
 end
 
--- 锁定朝向起咬：朝向对准目标后不再转，BiteCooldownSec 后结算
 function Mgr:LockBite(fish, target, pos, tpos, now, params)
     if self.Ai then self.Ai:Custom(fish) end
     local fx, fz = flatDirection(tpos.x - pos.x, tpos.z - pos.z)
@@ -670,7 +612,6 @@ function Mgr:UpdateChase(fish, now, pos, params)
     if aim then
         local valid, apos = self:IsTargetValid(aim.Target, pos, params)
         if not valid or not withinBite(pos, apos, params) then
-            -- 预警中目标濒死 / 离线 / 走出咬距：取消本口，下面重新选目标
             self:EndBite(fish, 'cancel')
         else
             pcall(function() body.LinearVelocity = Vector3.New(0, 0, 0) end)
@@ -708,7 +649,6 @@ function Mgr:UpdateChase(fish, now, pos, params)
     self:LockBite(fish, target, pos, tpos, now, params)
 end
 
--- #135 每招只持有一个权威 Move；清理先摘掉它，重复帧不能再次结算。
 function Mgr:EndMove(fish, reason)
     if not fish.Move then return end
     fish.Move, fish.MoveName = nil, nil
@@ -716,9 +656,6 @@ function Mgr:EndMove(fish, reason)
     self:PublishCombat(fish)
 end
 
--- shape 可覆盖预警形状：'circle' 发整圆（halfAngleDeg=180）。默认前向 90° 扇形；
--- 真实伤害区不是前向扇形时必须整圆覆盖（#141 鲸跃 / #142 虎啸径向、甩尾身后半圆），
--- 宁可前向超警（安全方向）不得欠警真实危险区。
 function Mgr:StartMove(fish, name, pos, target, tpos, now, duration, range, shape)
     if self.Ai and not self.Ai:Custom(fish) then return false end
     fish.OfficialRollFrom, fish.RollFrom = nil, nil
@@ -732,10 +669,8 @@ function Mgr:StartMove(fish, name, pos, target, tpos, now, duration, range, shap
     local facing = fish.Facing or { x = 0, z = 1 }
     local warningPos = (name == 'dive' or name == 'jump') and fish.Move.Destination or pos
     warningPos = warningPos or pos
-    -- #257 预警与命中分离：形状 / 起手 / 范围只取逐招表行，命中调度仍用 duration 与 params。
     local species = GameCfg.Fish[fish.FishId]
     local warning = species and BossMoves.WarningOf(BossMoves.KeyOf(species, fish.FishId), name) or nil
-    -- 表内 Range 是命中半径；冲锋类走廊半径由调用方传更大的 range，宁可超警不欠警。
     local warningRange = warning and math.max(range or 0, warning.Range or 0) or range
     local warningSec = warning and warning.WindupSec and warning.WindupSec > 0 and warning.WindupSec or duration
     local payload = GarBiteNotice.Lock(fish.Id, warningPos, facing.x, facing.z, warningRange, 90, warningSec)
@@ -750,7 +685,6 @@ function Mgr:StartMove(fish, name, pos, target, tpos, now, duration, range, shap
         payload.shape = 'cone'
     end
     if warning and warning.Notice then payload.notice = warning.Notice end
-    -- #258 本组招式预警的形状与落点口径只认逐招表；客户端拿到的载荷能分辨落点与危险区。
     local row = BossMoves.Get(BossMoves.KeyOf(GameCfg.Fish[fish.FishId], fish.FishId), name)
     if row and row.Delivery and row.Warning.Kind ~= 'none' then
         payload.shape = row.Warning.Kind or payload.shape
@@ -792,17 +726,15 @@ function Mgr:UpdateShrimpCombat(fish, now, pos, params, combat)
     end
     local move = fish.Move
     if combat == 'dragon' and now >= fish.SpecialAt and (not move or move.Name == 'peck') then
-        -- 正常帧按首次放下的30秒节拍；大dt不补发多周期，当前周期仍完整执行两招。
         fish.SpecialAt = now + params.SpecialSec
         if not self:StartMove(fish, 'rain', pos, nil, nil, now, params.RainSec, params.RainRadius) then return end
         fish.Move.LastTick = 0
         move = fish.Move
     end
     if move then
-        dt = 0 -- 预警与施法耗时不能折算成追击位移。
+        dt = 0
         body.LinearVelocity = Vector3.New(0, 0, 0)
         if move.Name == 'rain' then
-            -- 不补历史tick：掉帧时只按当前范围结算一次，持续期固定不延长。
             local tick = math.min(params.RainSec, math.floor(now - move.At))
             if tick > move.LastTick then
                 move.LastTick = tick
@@ -884,10 +816,6 @@ function Mgr:UpdateShrimpCombat(fish, now, pos, params, combat)
     self:StartMove(fish, name, pos, target, tp, now, params.BiteCooldownSec, params.BiteRange)
 end
 
--- #136 / #141 / #142 战斗共用的帧骨架：#136 帝王蟹 / 蟹老板复用帧首与追击推进，
--- #141 / #142 剑鱼 / 三头鲨 / 海象 / 虎鲸另复用锁头招推进与起手调度。
--- 帧首：清速度（位移只走 Position 步进），按上一战斗帧间隔取 dt；招式期间也刷新 CombatStepAt，
--- 收招后首帧 dt 只是一帧间隔，不把预警耗时折算成位移。
 local function beginCombatFrame(fish, now)
     fish.Carrier.Body.LinearVelocity = Vector3.New(0, 0, 0)
     local dt = math.max(0, now - (fish.CombatStepAt or now))
@@ -895,10 +823,6 @@ local function beginCombatFrame(fish, now)
     return dt
 end
 
--- 追击推进：转向目标，按 Speed × dt 平移且不越过咬距边沿。位移经 pcall 写入，
--- 失败记「<鱼名>追击位移失败」与鱼标识、错误内容并返回 false（不结算任何接触）。
--- skipIdle 为真时零步长不写位置、返回 false（三头鲨：原地不算翻滚）。
--- plainId 为真时鱼标识按 #136 旧格式直写 fish.Id，否则带 'fish=' 前缀（#141/#142 格式）。
 local function chaseStep(self, fish, pos, tpos, dt, params, label, skipIdle, plainId)
     if self.Ai then
         local target = self:ChooseTarget(fish, pos, params)
@@ -926,8 +850,6 @@ local function chaseStep(self, fish, pos, tpos, dt, params, label, skipIdle, pla
     return moved
 end
 
--- 锁头近战招（剑鱼挥头 / 三头鲨扫头 / 海象甩头）推进：目标失效或走出咬距即取消、返回 false，
--- 交由调用方本帧重新调度；预警未满返回 true；到点收招（理由同招名），头部区内才按 damage 结算。
 local function advanceHeadMove(self, fish, move, now, pos, params, damage)
     local valid, tp = self:IsTargetValid(move.Target, pos, params)
     if not valid or not withinBite(pos, tp, params) then
@@ -942,8 +864,6 @@ local function advanceHeadMove(self, fish, move, now, pos, params, damage)
     return true
 end
 
--- 通用近身起手调度：无目标空过；咬距内起手 name 招（预警 windup 秒、范围 BiteRange）；
--- 否则追击推进。返回 true 表示本帧追击位移成功（调用方据此结算接触）。
 local function engageOrChase(self, fish, now, pos, params, dt, name, windup, label, skipIdle)
     local target, tpos = self:ChooseTarget(fish, pos, params)
     if not target then
@@ -957,8 +877,6 @@ local function engageOrChase(self, fish, now, pos, params, dt, name, windup, lab
     return chaseStep(self, fish, pos, tpos, dt, params, label, skipIdle)
 end
 
--- 逐招表起手时长：鱼键经 BossMoves.KeyOf 反查（与预警广播同一口径），缺行 / 缺字段按 0 退化，
--- 不让一只表外鱼把整帧战斗更新打崩（review #249-6）。
 local function bossWindup(fish, move)
     local row = BossMoves.Get(BossMoves.KeyOf(GameCfg.Fish[fish.FishId], fish.FishId), move) or {}
     local warning = row.Warning
@@ -966,20 +884,11 @@ local function bossWindup(fish, move)
     return type(windup) == 'number' and windup or 0
 end
 
--- #136 帝王蟹：放下即锁定最近目标起手乱刺；每轮左右钳各 JabsPerSide 下、每下间隔
--- JabStepSec、每下 JabDamage。同一刺段（0.2 秒槽）只结算一次；掉帧大 dt 只补当前槽不追溯。
--- 一轮结束招式清除、预警收起，下一轮 JabAt + JabIntervalSec 后重新起手；活动 ActiveSec 秒
--- 眩晕 StunSec 秒（眩晕由通用 stunned 分支处理，醒来重置节拍）。
 function Mgr:UpdateKingCrabCombat(fish, now, pos, params)
-    -- 追击步长与帧率解耦：dt 取上一战斗帧间隔（与虾池 UpdateShrimpCombat 同口径）；
-    -- 招式期间每帧也刷新 CombatStepAt，收招后首帧 dt 只是一帧间隔，不累积折算成位移。
     local dt = beginCombatFrame(fish, now)
     local move = fish.Move
     if move then
         if move.Name ~= 'jab' then return end
-        -- 起手帧（now <= At）是预警帧，不结算；槽 k 在 At + (k+1) × JabStepSec 起结算，
-        -- 钳与钳之间完整隔一个 JabStepSec；StrikeAt = At + 钳数 × step，末槽（第 6 钳）
-        -- 与收招同帧：先结算末钳再收招。掉帧只补当前槽不追溯。
         local elapsed = now - move.At
         local windup = bossWindup(fish, 'jab')
         local slot = elapsed <= windup and -1 or math.min(params.JabsPerSide * 2 - 1,
@@ -1006,23 +915,16 @@ function Mgr:UpdateKingCrabCombat(fish, now, pos, params)
         chaseStep(self, fish, pos, tp, dt, params, '帝王蟹', nil, true)
         return
     end
-    -- 起手乱刺：预警时长 = 钳数 × JabStepSec（起手帧 + 每钳一个间隔），
-    -- 收招帧（now == StrikeAt）先结算末钳再收招。
     fish.JabAt = now + params.JabIntervalSec
     self:StartMove(fish, 'jab', pos, target, tp, now,
         bossWindup(fish, 'jab') + params.JabStepSec * params.JabsPerSide * 2, params.BiteRange)
 end
 
--- #136 蟹老板：三招互斥——双击（pinch）、冲撞（charge）、旋转（spin）。
--- 节拍：SpecialAt（旋转，每 25 秒）、ChargeAt（冲撞，每 30 秒）、PinchAt（双击，冷却 4 秒）。
--- 旋转 / 冲撞优先级高于双击；旋转优先级高于冲撞（旋转持续期跨过冲撞节拍时冲撞被压住）。
 function Mgr:UpdateCrabBossCombat(fish, now, pos, params)
-    -- 追击步长与帧率解耦：dt 取上一战斗帧间隔（与帝王蟹 / 虾池同口径）。
     local dt = beginCombatFrame(fish, now)
     local move = fish.Move
     if move then
         if move.Name == 'pinch' then
-            -- 双击第 k 击在起手后 k × PinchStepSec 秒起结算
             local elapsed = now - move.At
             local windup = bossWindup(fish, 'pinch')
             local strike = elapsed <= windup and 0 or math.min(params.PinchStrikes,
@@ -1039,7 +941,6 @@ function Mgr:UpdateCrabBossCombat(fish, now, pos, params)
             self:EndMove(fish, 'pinch-end')
             return
         elseif move.Name == 'charge' then
-            -- 冲撞窗口内命中一次（窗口内只结算一次，不按帧重复）
             if not move.HitDone and now >= move.At + bossWindup(fish, 'charge') then
                 local target, tp = self:ChooseTarget(fish, pos, params)
                 if target and tp and (tp.x - pos.x)^2 + (tp.z - pos.z)^2 <= params.ChargeRange^2 then
@@ -1051,7 +952,6 @@ function Mgr:UpdateCrabBossCombat(fish, now, pos, params)
             self:EndMove(fish, 'charge-end')
             return
         elseif move.Name == 'spin' then
-            -- 每秒槽一次碰触：同一秒槽同一玩家只结算一次（秒槽记在 move 上）
             local tick = math.min(params.SpinDurationSec,
                 math.max(0, math.floor(now - move.At)))
             if tick > (move.LastTick or 0) then
@@ -1069,7 +969,6 @@ function Mgr:UpdateCrabBossCombat(fish, now, pos, params)
         end
         return
     end
-    -- 无招式时按节拍起新招：旋转 > 冲撞 > 双击
     local target, tp = self:ChooseTarget(fish, pos, params)
     if not target then
         if self.Ai then self.Ai:Custom(fish) end
@@ -1091,13 +990,10 @@ function Mgr:UpdateCrabBossCombat(fish, now, pos, params)
             bossWindup(fish, 'pinch') + params.PinchStepSec * params.PinchStrikes, params.BiteRange)
         return
     end
-    -- 追击
     if not withinBite(pos, tp, params) then
         chaseStep(self, fish, pos, tp, dt, params, '蟹老板', nil, true)
     end
 end
--- #141 树林岛精英 / 首领：高跃共用弹道与落地范围伤害。
--- 落点方向由 math.random 决定（表现细化 [未查证]），落地伤害按参数表 JumpDamage / JumpRadius。
 function Mgr:StartJump(fish, now, pos, params)
     fish.JumpAt = now + params.JumpIntervalSec
     local rng = math.random
@@ -1107,7 +1003,6 @@ function Mgr:StartJump(fish, now, pos, params)
     self:StartMove(fish, 'jump', pos, nil, dest, now, params.JumpSec, params.JumpRadius)
 end
 
--- 腾空弧线：水平线性插值到落点，高度按 sin(进度×π) 抬起；到点结算一次落地范围伤害。
 function Mgr:AdvanceJump(fish, now, pos, params)
     local body = fish.Carrier.Body
     local move = fish.Move
@@ -1134,8 +1029,6 @@ function Mgr:AdvanceJump(fish, now, pos, params)
     end
 end
 
--- 剑鱼：翻滚追击 + 左右挥头（SwingDamage）+ 周期高跃。
--- 挥头起手即锁定朝向（StartMove），预警期间不转头，绕后落空；起手时长取 SwingCooldownSec（配置细化）。
 function Mgr:UpdateSwordfishCombat(fish, now, pos, params)
     local dt = beginCombatFrame(fish, now)
     local move = fish.Move
@@ -1153,7 +1046,6 @@ function Mgr:UpdateSwordfishCombat(fish, now, pos, params)
     engageOrChase(self, fish, now, pos, params, dt, 'swing', params.SwingCooldownSec, '剑鱼')
 end
 
--- 三头鲨：翻滚追击（贴身接触伤害 RollDamage，独立段，同一秒槽每玩家只结算一次）+ 扫头（SweepDamage）+ 周期高跃。
 function Mgr:UpdateSharkCombat(fish, now, pos, params)
     local dt = beginCombatFrame(fish, now)
     local move = fish.Move
@@ -1171,7 +1063,6 @@ function Mgr:UpdateSharkCombat(fish, now, pos, params)
     if not engageOrChase(self, fish, now, pos, params, dt, 'sweep', params.SweepCooldownSec, '三头鲨', true) then
         return
     end
-    -- 成功移动后用实际滚动线段判接触；每玩家独立去重，不消耗本秒其它玩家的接触机会。
     local actual = readPosition(fish.Carrier.Body)
     pos = (self.Ai and fish.RollFrom) or pos
     if not actual or not pos or (actual.x == pos.x and actual.z == pos.z) then return end
@@ -1187,9 +1078,6 @@ function Mgr:UpdateSharkCombat(fish, now, pos, params)
     end
 end
 
--- #142 海象突击推进：ChargeWindupSec 预警段站定（朝向已锁定不跟踪；目标倒下 / 离线即取消），
--- 随后按起手锁定朝向直线冲刺 ChargeDistance。位移逐帧 pcall，失败即取消招式、不按预定路径结算；
--- 接触用「DashFrom → 本帧实际位置」的真实冲锋路径线段判定（#141 口径），每玩家只结算一次。
 function Mgr:AdvanceWalrusCharge(fish, now, pos, params)
     local body = fish.Carrier.Body
     local move = fish.Move
@@ -1232,9 +1120,6 @@ function Mgr:AdvanceWalrusCharge(fish, now, pos, params)
     end
 end
 
--- #142 海象：甩头（SwingDamage，起手即锁定朝向，预警期间不转头、绕后落空）+ 40 秒直线突击
--- （ChargeSec 周期，冲锋 ChargeDistance，对撞到的玩家一次 ChargeDamage）。
--- 突击优先级高于甩头；两招互斥（单 Move 权威）。追击位移失败记日志、不结算。
 function Mgr:UpdateWalrusCombat(fish, now, pos, params)
     local dt = beginCombatFrame(fish, now)
     local move = fish.Move
@@ -1255,9 +1140,6 @@ function Mgr:UpdateWalrusCombat(fish, now, pos, params)
         return
     end
         fish.ChargeAt = now + params.ChargeSec
-        -- #142 双轴审查 P2：预警半径必须覆盖真实危险区（20 米冲锋走廊），
-        -- 不能只给接触距离 2.5 米（欠警）。前向扇形随锁头朝向覆盖走廊，
-        -- 走廊两侧之外属横向超警（安全方向）。
         if not self:StartMove(fish, 'charge', pos, target, tp, now,
             params.ChargeWindupSec + params.ChargeDistance / params.ChargeSpeed,
             params.ChargeDistance) then return end
@@ -1268,13 +1150,6 @@ function Mgr:UpdateWalrusCombat(fish, now, pos, params)
     engageOrChase(self, fish, now, pos, params, dt, 'swing', params.SwingCooldownSec, '海象')
 end
 
--- #142 虎鲸四招并集、互斥不丢（单 Move 权威；鲸跃 > 虎啸 > 甩尾 > 爪）：
--- 爪击（claw）：进身（咬距内头部区）触发，ClawDamage / ClawCooldownSec=2 秒；
--- 虎啸（roar）：RoarSec=10 秒远程虎头炮，RoarDamage=30（未给伤的独立基础披露细化），
---   结算取锁定目标的直线距离（不看头部区）；甩尾（tail）：TailSec=10 秒，对身后
---   TailRadius 内全部玩家 TailDamage=160（面朝目标的反侧，绕后有效）；鲸跃（jump）：
---   复用 StartJump / AdvanceJump（25 秒、随机 15 米外、10 米范围 240）。
--- 每招起手即重置自己的下一拍，进行中的招式目标倒下 / 离线即取消，均不结算。
 function Mgr:UpdateOrcaCombat(fish, now, pos, params)
     local dt = beginCombatFrame(fish, now)
     local move = fish.Move
@@ -1284,7 +1159,6 @@ function Mgr:UpdateOrcaCombat(fish, now, pos, params)
             return
         end
         if now < move.StrikeAt - 1e-9 then
-            -- 预警中目标倒下 / 离线：取消本招，不结算
             local valid = self:IsTargetValid(move.Target, pos, params)
             if not valid then self:EndMove(fish, 'cancel') end
             return
@@ -1322,7 +1196,6 @@ function Mgr:UpdateOrcaCombat(fish, now, pos, params)
         end
         return
     end
-    -- 无招式：按优先级起新招；每招起手即重置自己的下一拍（互斥不丢）
     if now >= (fish.JumpAt or math.huge) then
         self:StartJump(fish, now, pos, params)
         return
@@ -1334,15 +1207,11 @@ function Mgr:UpdateOrcaCombat(fish, now, pos, params)
     end
     if now >= (fish.RoarAt or math.huge) then
         fish.RoarAt = now + params.RoarSec
-        -- #142 双轴审查 P2：虎啸只按锁定目标的径向距离结算，预警发整圆（range=RoarRange）
-        -- 与真实危险区一致；前向 90° 扇形对目标身后 / 侧向的其他人欠警。
         self:StartMove(fish, 'roar', pos, target, tp, now, params.RoarWindupSec, params.RoarRange, 'circle')
         return
     end
     if now >= (fish.TailAt or math.huge) then
         fish.TailAt = now + params.TailSec
-        -- #142 双轴审查 P2：甩尾真实伤害区是身后 TailRadius 半圆，前向 90° 扇形盖不住
-        -- 180° 半圆且方向性误导；整圆覆盖（前向超警属安全方向）。
         self:StartMove(fish, 'tail', pos, target, tp, now, params.TailWindupSec, params.TailRadius, 'circle')
         return
     end
@@ -1356,7 +1225,6 @@ function Mgr:UpdateOrcaCombat(fish, now, pos, params)
     end
 end
 
--- 战斗只在首次放下后计时；逃跑时限优先于攻击和睡眠。
 function Mgr:UpdateCombat(fish, now)
     local body = fish.Carrier.Body
     local pos = readPosition(body)
@@ -1368,7 +1236,6 @@ function Mgr:UpdateCombat(fish, now)
     local moveName = fish.Move and fish.Move.Name
     local diving = moveName == 'dive'
     local jumping = moveName == 'jump'
-    -- 俯冲（dragon）与高跃（#141 swordfish / shark）腾空期间不算落水，避免空中误判逃脱。
     local airborne = (diving or jumping) and pos.y > fish.Move.Center.y + 0.1
     if now >= fish.FleeAt or (not airborne and inWater(pos) and not (fish.Phase and fish.Phase.Phase == 'water')) then
         if diving or jumping then
@@ -1394,7 +1261,6 @@ function Mgr:UpdateCombat(fish, now)
         return
     end
     self:RefreshMovingCombat(fish, now)
-    -- #139 麻痹（雷霆之力）：就地停住，本帧不追咬/不施法/不起招；逃跑时限仍在上面优先结算
     if self.Ability and self.Ability.FishParalyzed then
         local ok, paralyzed = pcall(self.Ability.FishParalyzed, self.Ability, fish)
         if ok and paralyzed then
@@ -1402,8 +1268,6 @@ function Mgr:UpdateCombat(fish, now)
             return
         end
     end
-    -- #136 蟹湖眩晕：shrimp/dragon 的 stunned 由 UpdateShrimpCombat 专属分支处理，
-    -- 帝王蟹在这里醒转并重置节拍；蟹老板无眩晕机制，不会进入该分支。
     local combat = GameCfg.Fish[fish.FishId].Combat
     if fish.State == 'stunned' and combat == 'kingCrab' then
         body.LinearVelocity = Vector3.New(0, 0, 0)
@@ -1413,15 +1277,12 @@ function Mgr:UpdateCombat(fish, now)
         if params then resetCrabRhythm(fish, now, params) end
         self:PublishCombat(fish)
     end
-    -- #132 T11 原型：分阶段首领走自己的状态机（阈值切换 → 招式集 → 咬中叼人）
     if self:BossPhaseEnabled(fish.FishId) then
         self:UpdateBossPhase(fish, now, pos)
         return
     end
-    -- 首领近战（#88）不走技能装配与睡眠，追咬由 UpdateChase 驱动
     local chase = GameCfg.FishCombat and GameCfg.FishCombat[combat]
     if chase then
-        -- #258 远程与俯冲段的参数来自逐招表，FishCombat 只提供表里未列的近战 / 表现字段。
         local key = BossMoves.KeyOf(GameCfg.Fish[fish.FishId], fish.FishId)
         FishBehaviors.Step(self, fish, now, pos, BossMoves.CombatParams(chase, key), combat)
         return
@@ -1429,9 +1290,6 @@ function Mgr:UpdateCombat(fish, now)
     self:UpdateEel(fish, now, GameCfg.Ability.FishAbilities[combat])
 end
 
--- #134 精英鱼（电鳗 180 秒 / 鳄雀鳝 300 秒共用）战斗状态广播：FishCombatState 只读快照，
--- 客户端据此画逃跑时限条，电鳗另显放电次数与睡眠倒计时；权威状态只在服务端。
--- 原地不动的技能型精英只在状态切换时发；会移动的追咬型首领按 MovingRefreshSec 限频补发坐标。
 function Mgr:CombatPayload(fish, gone)
     if gone then return { id = fish.Id, state = 'gone' } end
     local entry = GameCfg.Ability.FishAbilities[GameCfg.Fish[fish.FishId].Combat]
@@ -1443,7 +1301,6 @@ function Mgr:CombatPayload(fish, gone)
         position = pos and { x = pos.x, y = pos.y, z = pos.z } }
 end
 
--- 会移动的精英（无技能表条目）限频补发坐标，头顶逃跑条跟着鱼走。
 function Mgr:RefreshMovingCombat(fish, now)
     if GameCfg.Ability.FishAbilities[GameCfg.Fish[fish.FishId].Combat] then return end
     if now < (fish.CombatRefreshAt or 0) then return end
@@ -1465,7 +1322,6 @@ function Mgr:PublishCombat(fish, gone)
     if not ok then print('[MgrFishUnit] 战斗状态广播失败', 'fish=' .. tostring(fish.Id), tostring(err)) end
 end
 
--- 迟加入 / 重开界面的只读快照：逐条回发当前仍在战斗的技能型精英；按玩家限频。
 function Mgr:StartCombatChannel()
     if self.CombatRequestConn or not game:GetService('RunService') then return end
     local REUtil = require('common.REUtil')
@@ -1481,9 +1337,6 @@ function Mgr:StartCombatChannel()
     end)
 end
 
--- #134 / #257 电鳗：Combat →（首次起手）Attacking，每 interval 起一次放电预警，
--- 起手 windup（逐招表）后 CastFish 放电；共 DischargeCount 次，最后一次再满一个间隔入睡 SleepSec。
--- 预警与结算分离：广播来自逐招表，伤害只在服务端 CastFish 点火时结算。
 function Mgr:UpdateEel(fish, now, entry)
     local body = fish.Carrier.Body
     body.Position = fish.CombatPosition
@@ -1532,7 +1385,7 @@ function Mgr:UpdateEel(fish, now, entry)
         notice.move, notice.shape, notice.notice = 'discharge', warning.Shape, warning.Notice
         publishBite(self, notice)
         fish.DischargeAt, fish.WarnAt = now + windup, now + interval
-        self:PublishCombat(fish) -- 起手也属于战斗态变化，客户端标签同步
+        self:PublishCombat(fish)
         return
     end
     local castOk, casted = true, false
@@ -1541,7 +1394,7 @@ function Mgr:UpdateEel(fish, now, entry)
         print('[MgrFishUnit] 电鳗施法异常', 'fish=' .. tostring(fish.Id), tostring(casted))
     end
     if not castOk or not casted then
-        fish.DischargeAt = now -- 施法被拒：不计数、不重发预警，下帧重试
+        fish.DischargeAt = now
         if not fish.CastRejected then
             fish.CastRejected = true
             print('[MgrFishUnit] 电鳗施法未成功，下帧重试', 'fish=' .. tostring(fish.Id), 'done=' .. tostring(done))
@@ -1561,12 +1414,6 @@ function Mgr:FlailEel(fish, now, entry)
     end
 end
 
--- ============================================================================================
--- #132 T11 高风险能力原型：飞行 / 俯冲、叼人、首领分阶段。
--- 纯逻辑（边界钳制、挂点净空与跟随、阈值状态机）在 common/FlightPath.lua、common/CarryMount.lua、
--- common/BossPhase.lua；本段只做引擎驱动：读坐标、写位置、经 MgrVitals 结算伤害。
--- 本单未试玩：真机贴地/撞墙、玩家被叼走的手感、首领动画驱动都待编辑器窗口（见 issue #132 待办清单）。
--- ============================================================================================
 
 local function zoneScene(zoneId)
     for _, zone in ipairs(GameCfg.Zones or {}) do
@@ -1574,11 +1421,9 @@ local function zoneScene(zoneId)
     end
 end
 
----该鱼种是否走飞行（GameCfg.Ability.Flight.Species 按鱼种 Id 登记）
 function Mgr:FlightProfile(fishId)
     local species = GameCfg.Ability.Flight.Species
     if species and species[fishId] then
-        -- #258 飞行鱼的投掷 / 俯冲伤害与节拍以逐招表为准，档案只是缺省值。
         return BossMoves.CombatParams(species[fishId], fishId)
     end
     local fish = GameCfg.Fish[fishId]
@@ -1588,18 +1433,14 @@ function Mgr:FlightProfile(fishId)
     end
 end
 
----该鱼种是否走分阶段首领（GameCfg.Ability.BossPhase.Species 按鱼种 Id 登记）
 function Mgr:BossPhaseEnabled(fishId)
     local species = GameCfg.Ability.BossPhase.Species
     return type(species) == 'table' and species[fishId] == true
 end
 
----飞行边界：优先本区场景合同（#125 的 Scene.Boundary），缺失时用配置兜底围栏；
----两者都拿不到就不飞（返回 nil），绝不无边界乱飞。
 function Mgr:FlightBounds(fishId, position)
     local species = GameCfg.Fish[fishId]
     local scene = species and zoneScene(species.ZoneId)
-    -- 首领饵不限水域：边界按当前上岸地块，不能按鱼种出生区把首领传去远处。
     if position and species and species.ZoneId == 'reefIsland' then
         for _, zone in ipairs(GameCfg.Zones) do
             local boundary = zone.Scene and zone.Scene.Boundary
@@ -1617,7 +1458,6 @@ function Mgr:FlightBounds(fishId, position)
     return FlightPath.BoundsOf({ Boundary = fallback, SafePoint = { x = 0, y = 0, z = 0 } }, GameCfg.Ability.Flight)
 end
 
----起飞：建立飞行状态并切 State.Flying。没有档案或没有边界时返回 false（调用方回落普通逃脱）。
 function Mgr:StartFlight(fish, now)
     if self.Ai then self.Ai:Custom(fish) end
     local profile = self:FlightProfile(fish.FishId)
@@ -1632,19 +1472,17 @@ function Mgr:StartFlight(fish, now)
         self:StartAquatic(fish, now)
     end
     if GameCfg.Fish[fish.FishId].ZoneId == 'reefIsland' then
-        fish.Flight.NextDiveAt = math.huge -- 礁石岛由预警→锁点→命中流程驱动，禁用无预警原型俯冲。
+        fish.Flight.NextDiveAt = math.huge
         fish.NextReefDiveAt = now + (profile.DiveIntervalSec or math.huge)
         fish.NextThrowAt = now + (profile.ThrowIntervalSec or math.huge)
         fish.AirAttacks = {}
         self:PublishCombat(fish)
     end
-    -- 飞行期间由脚本给速度驱动：Kinematic 不受重力影响（与在逃鱼同口径，BodyType=2 见本文件 280 行注释）
     pcall(function() fish.Carrier.Body.BodyType = 2 end)
     print('[MgrFishUnit] 起飞', fish.FishId, 'fish=' .. tostring(fish.Id))
     return true
 end
 
----结束飞行，回落到既有的在逃逻辑（入水即销毁）。
 function Mgr:ExitFlight(fish, now, reason)
     self:EndAirAttacks(fish, reason)
     fish.Flight = nil
@@ -1662,7 +1500,6 @@ function Mgr:ExitFlight(fish, now, reason)
     print('[MgrFishUnit] 结束飞行', reason or '', fish.FishId, 'fish=' .. tostring(fish.Id))
 end
 
--- 每次招式独立预警编号，投掷与俯冲并发时不覆盖；负数与普通鱼预警编号分离。
 function Mgr:StartAirAttack(fish, kind, pos, now)
     local flight, profile = GameCfg.Ability.Flight, fish.Flight.Profile
     self.NextAirAttackId = (self.NextAirAttackId or 0) + 1
@@ -1681,7 +1518,6 @@ function Mgr:StartAirAttack(fish, kind, pos, now)
     local payload = GarBiteNotice.Lock(attack.Id, attack.Center, 0, 1, attack.Radius, 180, duration)
     payload.shape, payload.move, payload.ownerFishId = 'circle', kind, fish.Id
     payload.flightOrigin = attack.Origin
-    -- #258 投掷 / 追踪俯冲各自取表里那一行：预警点就是服务端结算的锁定落点。
     local row = BossMoves.Get(fish.FishId, dive and 'dive' or 'throw')
     if row and row.Delivery and row.Warning.Kind ~= 'none' then
         payload.shape = row.Warning.Kind or payload.shape
@@ -1700,13 +1536,12 @@ function Mgr:EndAirAttacks(fish, reason)
     fish.AirAttacks = nil
 end
 
--- 只认起手时锁定的落点；每次更新至多发一招，暂停后的大dt不补发多轮伤害。
 function Mgr:UpdateAirAttacks(fish, targetPos, now)
     local state, flight = fish.Flight, GameCfg.Ability.Flight
     if not fish.AirAttacks then return false end
     for kind, attack in pairs(fish.AirAttacks) do
         if now >= attack.StrikeAt - 1e-8 then
-            fish.AirAttacks[kind] = nil -- 先消费，再结算，重复事件不能重复扣血。
+            fish.AirAttacks[kind] = nil
             local hit = false
             for _, player in ipairs(self:Players()) do
                 local valid, cp = self:IsTargetValid(player, attack.Center)
@@ -1744,7 +1579,6 @@ function Mgr:UpdateAirAttacks(fish, targetPos, now)
     return true
 end
 
----飞行/俯冲每帧：轨迹与钳制由 FlightPath 保证，这里只把结果写回引擎并结算俯冲命中。
 function Mgr:UpdateFlying(fish, now)
     local state = fish.Flight
     local body = fish.Carrier.Body
@@ -1774,7 +1608,6 @@ function Mgr:UpdateFlying(fish, now)
         return
     end
     local flight = GameCfg.Ability.Flight
-    -- 空中受击由 #128 链路自己处理（受击体照常可打，伤害进 Threat），飞行只影响移动
     local target, tpos = self:ChooseTarget(fish, pos, { AggroRange = flight.AggroRange })
     FlightPath.SetTarget(state, tpos)
     local dt = math.max(0, now - (fish.FlightAt or now))
@@ -1786,7 +1619,6 @@ function Mgr:UpdateFlying(fish, now)
     end
     local diving = self:UpdateAirAttacks(fish, tpos, now)
     local events = diving and {} or FlightPath.Step(state, now, dt)
-    -- 位置写回是飞行能不能动的关键：写失败只打一次日志（每帧打会刷屏），速度是只读镜像，失败就算了
     local moved, moveErr = pcall(function()
         body.Position = Vector3.New(state.Pos.x, state.Pos.y, state.Pos.z)
     end)
@@ -1802,7 +1634,6 @@ function Mgr:UpdateFlying(fish, now)
     if events.dive then
         fish.DiveActive = true
     elseif fish.DiveActive and state.Phase == 'climb' then
-        -- 俯冲触底那一刻：目标还在命中半径内才算砸到
         fish.DiveActive = false
         if target and tpos then
             local dx, dz = tpos.x - state.Pos.x, tpos.z - state.Pos.z
@@ -1813,7 +1644,6 @@ function Mgr:UpdateFlying(fish, now)
     end
 end
 
----统一的鱼攻击结算口（走 #128 的 MgrVitals，不直接碰 Controller）。
 function Mgr:Hit(fish, target, damage, kind)
     if not target or not self.Vitals or type(damage) ~= 'number' or damage <= 0 then return false end
     local hit = self.Vitals:NewHit(fish, 'fishAttack')
@@ -1824,7 +1654,6 @@ function Mgr:Hit(fish, target, damage, kind)
     return applied == true
 end
 
----首领分阶段每帧：血量阈值 → 阶段，阶段招式集 → 落地伤害；咬中即叼人（沧龙式）。
 function Mgr:UpdateBossPhase(fish, now, pos)
     if self.Ai then self.Ai:Custom(fish) end
     local state = fish.Phase
@@ -1867,8 +1696,6 @@ function Mgr:UpdateBossPhase(fish, now, pos)
         fx, fz = fx or 0, fz or 1
         self:Face(fish,fx,fz)
         local attackCfg = GameCfg.Ability.BossPhase.Attacks[state.Pending.Name]
-        -- #256 预警的形状、标签与宽度取自逐招表（common/cfg/BossMoves.lua），不在这里按招式名写 if：
-        -- 改预警只改表；表里 Warning.Kind = 'none' 的招式不起手，也就不广播预警。
         local row = BossMoves.Get(BossMoves.KeyOf(GameCfg.Fish[fish.FishId], fish.FishId),
             state.Pending.Name)
         fish.BossWarn = { Origin = {x=pos.x,y=pos.y,z=pos.z}, Facing = {x=fx,z=fz}, Target = target }
@@ -1918,7 +1745,6 @@ function Mgr:UpdateBossPhase(fish, now, pos)
     end
     if attack.Name == 'bite' and target and tpos and CarryMount.InRange(
         CarryMount.New(GameCfg.Ability.Carry, pos, fish.Yaw or 0, now), tpos) then
-        -- 咬中即叼走：伤害只在 GrabPlayer 里结算一次，避免「咬一下扣两次血」
         self:GrabPlayer(fish, target, now, attack.Damage)
         return
     end
@@ -1932,7 +1758,6 @@ function Mgr:EndBossAttack(fish, reason)
     publishBite(self,GarBiteNotice.Clear(fish.Id,reason or 'gone'))
 end
 
--- 水中巡航、跃起锁定落点、咬中叼回当前水域；与飞行原型共享鱼的唯一位置拥有权。
 function Mgr:StartAquatic(fish, now)
     local pos = readPosition(fish.Carrier.Body)
     local scene
@@ -2001,7 +1826,6 @@ function Mgr:UpdateAquatic(fish, now)
                     self:Hit(fish,player,cfg.LeapDamage,'leap')
                 end
             end
-            -- 命中可能同步触发死亡、移除或阶段切换，旧跳跃到此必须失效。
             if self.Fish[fish.Id] ~= fish or fish.Aquatic ~= state
                 or (fish.Phase and fish.Phase.Phase) ~= phase then return end
             local valid,cp=self:IsTargetValid(leap.Target,p)
@@ -2019,11 +1843,8 @@ function Mgr:UpdateAquatic(fish, now)
             fish.BossWarn={Target=leap.Target}
             publishBite(self,n)
         end
-    elseif state.HeadAt then
-        -- 等待落地甩头预警，携带分支不改变其锁定位置与结算时间。
-    else
+    elseif not state.HeadAt then
         if now>=state.NextLeapAt then
-            -- 正文指定距离岛中心最近玩家；不让武器仇恨覆盖此招的选择。
             local target,tpos,best
             local center=state.Scene.SafePoint
             for _, player in ipairs(self:Players()) do
@@ -2053,8 +1874,6 @@ function Mgr:UpdateAquatic(fish, now)
     self:RefreshMovingCombat(fish,now)
 end
 
----叼人：宿主挂点上建挂点单位，玩家位置每帧写回挂点（不 parent 玩家，见下方说明）。
----@param damage? number 咬中伤害（缺省用 GameCfg.Ability.Carry.GrabDamage）
 function Mgr:GrabPlayer(fish, target, now, damage)
     if fish.Carry then return false end
     local carryCfg = GameCfg.Ability.Carry
@@ -2071,15 +1890,11 @@ function Mgr:GrabPlayer(fish, target, now, damage)
     end
     fish.Carry = state
     self:Hit(fish, target, damage or carryCfg.GrabDamage, 'bite')
-    -- 统一伤害可能同步触发死亡回调；致命咬击不能随后重建携带挂点。
     if fish.Carry ~= state or not self:IsTargetValid(target, pos) then
         if fish.Carry == state then self:ReleaseCarried(fish, nil, 'gone') end
         return false
     end
-    -- 咬中这一下就是本次伤害，过程接触从下一个间隔才起算，避免同帧扣两次
     fish.ContactAt = now
-    -- 挂点只建不挂：把玩家角色 parent 到挂点下会不会打断控制器/相机本单未试玩（[未查证]），
-    -- 所以位置由服务端每帧写回（CarryMount.Follow），挂点留着给真机试玩时验证 parent 模式。
     local ok, attached = pcall(function()
         return abilityApi().AttachToSocket(self.World, nil, fish.Carrier.Body, carryCfg.Socket, state.Offset)
     end)
@@ -2092,7 +1907,6 @@ function Mgr:GrabPlayer(fish, target, now, damage)
     return true
 end
 
----携带每帧：超时/目标消失即释放；过程接触按固定节奏补伤害。
 function Mgr:UpdateCarry(fish, now)
     local state = fish.Carry
     local carryCfg = GameCfg.Ability.Carry
@@ -2121,7 +1935,6 @@ function Mgr:UpdateCarry(fish, now)
             target.Character.Position = Vector3.New(followed.Position.x, followed.Position.y, followed.Position.z)
         end)
     end
-    -- 过程接触伤害（GameSpec §12「叼走过程接触 150」）：固定节奏，不按帧
     if carryCfg.ContactDamage and now - (fish.ContactAt or 0) >= (carryCfg.ContactIntervalSec or 1) then
         fish.ContactAt = now
         self:Hit(fish, target, carryCfg.ContactDamage, 'carry')
@@ -2139,7 +1952,6 @@ function Mgr:UpdateCarry(fish, now)
     end
 end
 
----释放被叼走的玩家：把玩家放到前方落点，销毁挂点。重复调用是空操作。
 function Mgr:ReleaseCarried(fish, dropPoint, reason)
     local state = fish.Carry
     if not state then return false end
@@ -2167,8 +1979,6 @@ function Mgr:FindByCarrier(carrier)
     end
 end
 
--- 鱼被打死（#43）：举着的先解除抓举（挂点销毁、持有者空手），鱼获位置取持有者脚下；
--- 其余状态取鱼本体位置。随后移除活鱼，返回 {fishId, mult, position}，只会成功一次
 function Mgr:TakeKilled(fish)
     if not fish or self.Fish[fish.Id] ~= fish then return nil end
     local holder = fish.State == Mgr.State.Held and fish.Holder or nil
@@ -2178,8 +1988,6 @@ function Mgr:TakeKilled(fish)
     print('[MgrFishUnit] 被打死', fish.FishId, fish.Mult, holder and ('held by ' .. tostring(holder.UserId)) or fish.State,
         'fish=' .. tostring(fish.Id))
     if holder and self.Cast then self.Cast:PushState(holder) end
-    -- 新手任务「打死」事实（#52）：引擎 Died / TakeDamage 不带攻击者，服务端能确认的归属是鱼的主人（上岸者），
-    -- 只推进这一名玩家；TakeKilled 对一条鱼只成功一次，鱼 id 即唯一 eventId
     if fish.Owner and self.Quest then
         self.Quest:Notify('Kill', fish.Owner, { itemId = fish.FishId, eventId = 'kill:' .. tostring(fish.Id) })
     end
@@ -2208,10 +2016,9 @@ function Mgr:Remove(fish)
     self:EndBossAttack(fish, 'gone')
     self:EndAirAttacks(fish, 'gone')
     if self.Ai then self.Ai:Remove(fish) end
-    -- #132 T11：鱼被打死/清场时先把叼着的玩家放下来（否则玩家会跟着一条死鱼卡在空中）
     if fish.Carry then self:ReleaseCarried(fish, nil, 'died') end
-    self:EndBite(fish, 'gone') -- #134：死亡或清场时收起咬预警
-    if fish.DischargeAt then publishBite(self, GarBiteNotice.Clear(fish.Id, 'gone')) end -- #257 放电预警
+    self:EndBite(fish, 'gone')
+    if fish.DischargeAt then publishBite(self, GarBiteNotice.Clear(fish.Id, 'gone')) end
     self:EndMove(fish, 'gone')
     fish.WakeAt, fish.MoveName = nil, nil
     self.Fish[fish.Id] = nil
@@ -2225,7 +2032,6 @@ function Mgr:Remove(fish)
     fish.Mount = nil
 end
 
--- 待抓的鱼钉在生成点：偏离超过容差或坐标变 NaN 就拉回并清速度
 function Mgr:Stabilize(fish)
     local body = fish.Carrier.Body
     local anchor = fish.Anchor
@@ -2246,7 +2052,6 @@ function Mgr:Start()
     self.World = game:GetService('World')
     local now = self:Now()
     for _, fish in pairs(self.Fish) do
-        -- Stop 已取消旧预警；重启以完整冷却恢复现存礁石飞行鱼，不补历史攻击。
         if fish.Flight and not fish.AirAttacks and GameCfg.Fish[fish.FishId].ZoneId == 'reefIsland' then
             local profile = fish.Flight.Profile
             fish.AirAttacks = {}
@@ -2290,7 +2095,6 @@ function Mgr:Stop()
     self.CombatRequestConn = nil
 end
 
--- 持有者死亡：放鱼进逃脱，并打断还在抛竿的会话（上钩后的断线由 MgrReelIn 处理）；道具栏不动
 function Mgr:OnDied(player)
     for _, fish in pairs(self.Fish) do
         if fish.BossWarn and fish.BossWarn.Target == player then
@@ -2335,8 +2139,6 @@ function Mgr:OnPlayerAdded(player)
     self:WatchCharacter(player, player.Character)
 end
 
--- 主人离线：还没被举起的鱼与举在他头上的鱼一并清掉，避免场上留下无主的鱼和挂点；
--- 已在逃的鱼留在场上，在线人数变少后由 Update 里的全局上限收
 function Mgr:OnPlayerRemoving(player)
     self:ClearLinks(player)
     local held = self:GetHeld(player)
@@ -2361,7 +2163,6 @@ function Mgr:OnPlayerRemoving(player)
     end
 end
 
--- 控制只由效果口判定；中断先收预警、释放携带，不补历史伤害。
 function Mgr:AiControlled(fish, now)
     if not self.Ai then return false end
     local controlled = self.Ai.Stopped == true
@@ -2420,29 +2221,29 @@ function Mgr:Update()
         local aiFailed = self.Ai and not self.Ai:Sync(fish)
         if aiFailed then self:Remove(fish) end
         local controlled = not aiFailed and self:AiControlled(fish, now)
-        if aiFailed then
-            -- 撤销指令后已回收载体，本帧不能继续结算。
-        elseif controlled and not (fish.FleeAt and now >= fish.FleeAt) then
-            -- 到期逃脱仍交既有生命周期优先结算。
-        elseif fish.State == Mgr.State.AwaitLift then
-            self:Stabilize(fish)
-            if fish.LiftAt and now - fish.LiftAt >= cfg().LiftConfirmSec then
-                if not self:RequestLift(fish) and fish.LiftAttempts >= cfg().LiftAttempts and not fish.LiftGaveUp then
-                    fish.LiftGaveUp = true
-                    print('[MgrFishUnit] 抓举未确认，放弃重试', fish.Owner.UserId, 'fish=' .. tostring(fish.Id))
+        local canUpdate = not aiFailed
+            and (not controlled or (fish.FleeAt ~= nil and now >= fish.FleeAt))
+        if canUpdate then
+            if fish.State == Mgr.State.AwaitLift then
+                self:Stabilize(fish)
+                if fish.LiftAt and now - fish.LiftAt >= cfg().LiftConfirmSec then
+                    if not self:RequestLift(fish) and fish.LiftAttempts >= cfg().LiftAttempts and not fish.LiftGaveUp then
+                        fish.LiftGaveUp = true
+                        print('[MgrFishUnit] 抓举未确认，放弃重试', fish.Owner.UserId, 'fish=' .. tostring(fish.Id))
+                    end
                 end
+            elseif fish.State == Mgr.State.Wild then
+                if fish.WildUntil and now >= fish.WildUntil then
+                    print('[MgrFishUnit] 爆炸保底鱼到期消失', fish.FishId, 'fish=' .. tostring(fish.Id))
+                    self:Remove(fish)
+                end
+            elseif fish.State == Mgr.State.Escaping then
+                self:UpdateEscaping(fish, now)
+            elseif fish.State == Mgr.State.Flying then
+                self:UpdateFlying(fish, now)
+            elseif fish.FleeAt then
+                self:UpdateCombat(fish, now)
             end
-        elseif fish.State == Mgr.State.Wild then
-            if fish.WildUntil and now >= fish.WildUntil then
-                print('[MgrFishUnit] 爆炸保底鱼到期消失', fish.FishId, 'fish=' .. tostring(fish.Id))
-                self:Remove(fish)
-            end
-        elseif fish.State == Mgr.State.Escaping then
-            self:UpdateEscaping(fish, now)
-        elseif fish.State == Mgr.State.Flying then
-            self:UpdateFlying(fish, now)
-        elseif fish.FleeAt then
-            self:UpdateCombat(fish, now)
         end
     end
     self:EnforceEscapeCap(nil)

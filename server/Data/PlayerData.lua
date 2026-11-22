@@ -26,10 +26,6 @@ local function isArrayMarker(key, value)
     return key == ARRAY_MARKER_KEY and integer(value, 0)
 end
 
--- 深拷贝并剥离列表长度标记：长度一律以剥离后实际整数键个数为准，绝不信任 __count；
--- 两者不一致时记一行日志（标记被篡改或数据被截断都要留痕），随后仍按实际条数走原有严格校验。
--- seen 按递归栈进出（同 serializable）：共享子表照常复制，只有真循环才退回原引用——
--- Migrate 的入参已先过 serializable 拒绝循环，MgrSave 侧入参是 DataStore 解码树，这里只是防御。
 local function stripArrayMeta(value, path, seen)
     if type(value) ~= 'table' then return value end
     seen = seen or {}
@@ -54,8 +50,6 @@ local function stripArrayMeta(value, path, seen)
 end
 PlayerData.StripArrayMeta = stripArrayMeta
 
--- 安全落点（#249/§18）：坐标只来自本区场景标记与角色当前位置，个人存档只留 x/y/z 三个数；
--- 共享世界的活鱼、地面实例永远不进这张表。场景未解析时保留旧值，不猜测坐标。
 local function zoneScene(zoneId)
     for _, zone in ipairs(GameCfg.Zones or {}) do
         if zone.Id == zoneId then return zone.Scene end
@@ -72,7 +66,6 @@ local function insideBoundary(point, bounds)
         and point.z > bounds.MinZ and point.z < bounds.MaxZ
 end
 
--- 返回落点与「是否改过」；改过就表示存档里的落点非法，重进时要由 MgrSave 送回同区安全点。
 function PlayerData:ResolveSafePoint()
     local scene = zoneScene(GameCfg.ResolveZoneId(self.Data.Zone))
     if not scene or not scene.Boundary or not finitePoint(scene.SafePoint) then return nil, false end
@@ -85,7 +78,6 @@ function PlayerData:ResolveSafePoint()
     return fallback, true
 end
 
--- 每次写档前镜像角色当前位置：只有落在本区边界内才覆盖，越界留旧安全点或场景安全点。
 function PlayerData:NoteSafePoint()
     if not self.Inited then return end
     local scene = zoneScene(GameCfg.ResolveZoneId(self.Data.Zone))
@@ -98,7 +90,6 @@ function PlayerData:NoteSafePoint()
     end
 end
 
--- 扩展字段仅承载持久状态；库存、成长、任务等系统由各子单接入。
 local function defaults(zone)
     return {
         inventory = { weapons = {}, magazines = {}, selection = { slot = nil, bait = nil,
@@ -109,12 +100,10 @@ local function defaults(zone)
         collection = { weights = {}, unlocked = {} }, quest = { step = 1, count = 0 },
         story = { read = {} }, travel = { arrived = {}, zone = GameCfg.ResolveZoneId(zone), safePoint = {} },
         lottery = { pity = 0 }, achievements = {}, recovery = {}, cooldowns = {},
-        -- #253 队伍归属：0 = 无队伍；进队写小队号，主动离队立即清零，离线保留给重连恢复。
         party = { id = 0 },
     }
 end
 
--- 拒绝非序列化值、循环、过深和非有限数，不能把损坏扩展字段静默丢弃。
 local function serializable(value, seen, depth)
     local kind = type(value)
     if kind == 'number' then return value == value and math.abs(value) < math.huge end
@@ -146,7 +135,6 @@ function PlayerData.New(player, onItemBarChanged)
     return setmetatable({ Player = player, Inited = false, OnItemBarChanged = onItemBarChanged }, PlayerData)
 end
 
--- 进图白送只在调试开关打开时发放（#49）；重复 Init 不会重置已有库存。
 function PlayerData:Init(waitForLoad)
     if not self.Player or self.Inited then return end
     if waitForLoad then self.LoadState = 'pending' return end
@@ -177,7 +165,6 @@ function PlayerData:Init(waitForLoad)
         SelectedBait = nil,
         SelectedWeapon = nil,
         Progress = {},
-        -- 当前区域（#89 摆渡写入，#92 存档用）：开局在 HomeZone（第一钓鱼区）
         Zone = GameCfg.Ferry.HomeZone,
     }
     self.Extra = defaults(self.Data.Zone)
@@ -202,7 +189,6 @@ end
 function PlayerData:Migrate(snapshot)
     if type(snapshot) ~= 'table' or (snapshot.v ~= 1 and snapshot.v ~= 2)
         or not serializable(snapshot, {}, 0) then return nil, '未知版本或不可序列化数据' end
-    -- 平台列表标记先剥离再校验；剥掉的只有 __count，下面的严格校验一条不放松。
     local saved = stripArrayMeta(snapshot, 'save')
     if not integer(saved.coin, 0) or not integer(saved.up, 0, #GameCfg.Items.UpgradePrices)
         or type(saved.zone) ~= 'string' or saved.zone == '' or type(saved.bait) ~= 'table' then
@@ -250,14 +236,11 @@ function PlayerData:Migrate(snapshot)
             or type(meta.operations) ~= 'table' or #meta.operations > 64 or type(extra) ~= 'table' then
             return nil, '持久身份损坏'
         end
-        -- #253 新增的队伍字段：旧档没有就按「无队伍」补默认，不让新增字段掀掉整份存档；
-        -- 其余扩展字段仍然严格，缺一个都算损坏。
         if extra.party == nil then extra.party = defaults(saved.zone).party end
         for name in pairs(defaults(saved.zone)) do
             if type(extra[name]) ~= 'table' then return nil, '扩展字段缺失 ' .. name end
         end
         if not integer(extra.party.id, 0) then return nil, '队伍字段损坏' end
-        -- 队伍号旁的会话纪元是后加的可选字段：旧档没有按「无纪元」处理，类型不对才算坏档。
         if extra.party.epoch ~= nil and type(extra.party.epoch) ~= 'string' then
             return nil, '队伍纪元损坏'
         end
@@ -272,7 +255,6 @@ function PlayerData:Migrate(snapshot)
             if not def or def.Type ~= '近战武器' and def.Type ~= '远程武器'
                 or not integer(count, 1) then return nil, '武器库存损坏' end
         end
-        -- #130 成长字段：升级等级不超上限、购买次数为整数（键统一为行编号字符串）
         local growth = extra.growth
         if type(growth.upgrades) ~= 'table' or type(growth.purchases) ~= 'table' then
             return nil, '成长字段损坏'
@@ -302,9 +284,6 @@ function PlayerData:IsValidSave(snapshot)
     return self:Migrate(snapshot) ~= nil
 end
 
--- 存档序列化（#92）：最小集——金币、道具栏/背包物品（含格子位置与个体倍率）、鱼饵计数、
--- 升级等级、当前区域；v 版本号预留扩展（图鉴/升级/药水随各自系统进存档）。
--- 键名缩写为体积考量：bar/bp=道具栏/背包格位表（i=格号 id=物品 n=件数 m=倍率）、up=升级等级。
 function PlayerData:Serialize()
     if not self.Inited then return nil end
     self:NoteSafePoint()
@@ -340,7 +319,6 @@ function PlayerData:Serialize()
     }
 end
 
--- 先完整校验，再一次恢复；未知版本与坏档不会部分覆盖内存财产。
 function PlayerData:ApplySave(snapshot)
     if not self.Inited then return false end
     local saved, reason = self:Migrate(snapshot)
@@ -385,7 +363,6 @@ function PlayerData:BackpackCapacity()
     return capacity
 end
 
--- GM 局部补丁先在副本上校验最终容量，再一次替换权威状态。
 function PlayerData:ApplyGMPatch(patch)
     if not self.Inited or type(patch) ~= 'table' then return false, '状态尚未就绪' end
     local function int(n, min, max)
@@ -467,7 +444,6 @@ function PlayerData:GetItemBarSnapshot()
     for itemId, count in pairs(self.Data.Bait) do
         bait[itemId] = count
     end
-    -- 首领饵（#88）只展示道具栏件数；背包中的首领饵提示先转入，不能直接挂饵（#124）
     local bosses = {}
     for itemId in pairs(GameCfg.Casting.BossBait or {}) do bosses[#bosses + 1] = itemId end
     table.sort(bosses)
@@ -499,8 +475,6 @@ function PlayerData:SelectSlot(index)
     return true
 end
 
--- 切手持与实际使用分两次：首次仅切手持（held），再次才算使用；同目标再点取消。
--- held 的权威存储是 extra.inventory.selection.held（随存档持久化）。
 function PlayerData:HoldSlot(index)
     if not self.Inited or type(index) ~= 'number' or index ~= math.floor(index)
         or index < 1 or index > self:ItemBarCapacity() then return false end
@@ -515,7 +489,6 @@ function PlayerData:HoldSlot(index)
     return true
 end
 
--- 槽位/武器失效（丢弃、吃掉、耗尽、移动换物）时清空手持，避免悬空；读档恢复后同样校验。
 function PlayerData:SanitizeHeld()
     local held = self.Extra.inventory.selection.held
     if held.kind == 'slot' then
@@ -537,8 +510,6 @@ local function isWeapon(itemId)
     return definition ~= nil and (definition.Type == '近战武器' or definition.Type == '远程武器')
 end
 
--- 商店升级等级（#130）：背包沿用 Data.UpgradeLevel，其余按种类存 extra.growth.upgrades；
--- 读取侧永不报错，未初始化/损坏一律按 0 级处理。
 function PlayerData:ShopUpgradeLevel(kind)
     if kind == 'backpack' then
         return self.Inited and self.Data.UpgradeLevel or 0
@@ -548,7 +519,6 @@ function PlayerData:ShopUpgradeLevel(kind)
     return integer(level, 0) and level or 0
 end
 
--- 商店行已购次数（#130，extra.growth.purchases 以行编号字符串为键）；未初始化按 0 次。
 function PlayerData:PurchaseCount(number)
     if not self.Inited or not integer(number, 1) then return 0 end
     return self.Extra.growth.purchases[tostring(number)] or 0
@@ -561,8 +531,6 @@ function PlayerData:NotePurchase(number)
     return true
 end
 
--- 逐级校验（#130）：必须恰好升一级；满级后返回 'max'，越级/重复返回 'level'，未知行返回 'bad'。
--- 只校验不生效；生效走 ApplyShopUpgrade，由 MgrShop 与扣款同一事务编排。
 function PlayerData:CanShopUpgrade(upgrade)
     if type(upgrade) ~= 'table' or type(upgrade.kind) ~= 'string' then return false, 'bad' end
     local spec = GameCfg.Shop.UpgradeKinds[upgrade.kind]
@@ -573,7 +541,6 @@ function PlayerData:CanShopUpgrade(upgrade)
     return true
 end
 
--- 生效：调用方须先过 CanShopUpgrade；结果与扣款/计数同一次落账（MgrShop 编排）。
 function PlayerData:ApplyShopUpgrade(upgrade)
     local ok = self:CanShopUpgrade(upgrade)
     if not ok then return false end
@@ -585,7 +552,6 @@ function PlayerData:ApplyShopUpgrade(upgrade)
     return true
 end
 
--- 武器加成查询（#130，按基础线性叠加；弹容/未知种类返回基础值）
 function PlayerData:WeaponDamageScale(kind)
     if not self.Inited then return 1 end
     return GameCfg.Shop.DamageScale(kind, self:ShopUpgradeLevel(kind)) or 1
@@ -596,7 +562,6 @@ function PlayerData:MagazineSize(base)
     return GameCfg.Shop.MagazineSize(base, self:ShopUpgradeLevel('magazine'))
 end
 
--- 武器独立计数，不占普通格；只收物品表里的近战/远程武器。
 function PlayerData:GrantWeapon(itemId, count)
     if not self.Inited or not isWeapon(itemId)
         or not integer(count, 1) then return false end
@@ -610,7 +575,6 @@ function PlayerData:WeaponCount(itemId)
     return self.Inited and self.Data.Weapons[itemId] or 0
 end
 
--- 已吃药水累计（#124，上限规则见 GameCfg.Items.PotionLimits）；属性效果由属性系统接入。
 function PlayerData:PotionCount(itemId)
     return self.Inited and self.Extra.growth.potions[itemId] or 0
 end
@@ -638,7 +602,6 @@ function PlayerData:SelectWeapon(itemId)
     return true
 end
 
--- 武器手持：独立库存校验，不占格；同武器再点取消。
 function PlayerData:HoldWeapon(itemId)
     if not self.Inited then return false end
     local held = self.Extra.inventory.selection.held
@@ -651,7 +614,6 @@ function PlayerData:HoldWeapon(itemId)
     return true
 end
 
--- 钓鱼结束后归位：该格仍是鱼竿才选中它（不像 SelectSlot 那样切换取消）
 function PlayerData:RestoreSlot(index)
     if not self.Inited or type(index) ~= 'number' then return false end
     local entry = self.Data.Containers[GameCfg.Items.ContainerId.ItemBar][index]
@@ -665,14 +627,12 @@ local function hasBait(data, itemId)
     return type(count) == 'number' and count >= 1
 end
 
--- 写入当前区域（#89 摆渡，#92 存档读取）；只接受非空字符串
 function PlayerData:SetZone(zone)
     if not self.Inited or type(zone) ~= 'string' or zone == '' then return false end
     self:UpdateData(function(data) data.Zone = zone end, false)
     return true
 end
 
--- 道具栏里某物品的件数；首领饵只从这里使用（#124）
 function PlayerData:ItemBarItemCount(itemId)
     if not self.Inited then return 0 end
     local total = 0
@@ -682,7 +642,6 @@ function PlayerData:ItemBarItemCount(itemId)
     return total
 end
 
--- 道具栏 + 背包里某物品的总件数（每格一件，不堆叠）
 function PlayerData:ItemCount(itemId)
     if not self.Inited then return 0 end
     local total = 0
@@ -694,7 +653,6 @@ function PlayerData:ItemCount(itemId)
     return total
 end
 
--- 从道具栏扣 1 件某物品；首领饵只接受道具栏（#124），其他系统另有明确例外时由调用方说明。
 function PlayerData:ConsumeItemBarItem(itemId)
     if not self.Inited then return false end
     local items = self.Data.Containers[GameCfg.Items.ContainerId.ItemBar]
@@ -710,7 +668,6 @@ function PlayerData:ConsumeItemBarItem(itemId)
     return false
 end
 
--- 濒死自救例外：从道具栏（优先）或背包扣 1 件某物品；普通调用仍走 ConsumeItemBarItem。
 function PlayerData:ConsumeItem(itemId)
     if not self.Inited then return false end
     for _, container in ipairs({
@@ -731,7 +688,6 @@ function PlayerData:ConsumeItem(itemId)
     return false
 end
 
--- 可挂饵判定：普通鱼饵 Bait 计数 ≥1；首领饵必须在道具栏有 1 件（#124）
 function PlayerData:HasBait(itemId)
     if not self.Inited or type(itemId) ~= 'string' then return false end
     if hasBait(self.Data, itemId) then return true end
@@ -758,7 +714,6 @@ function PlayerData:EatBait(itemId)
     return true
 end
 
--- 吃掉选中的道具栏格（#53）：只吃物品表配了 EatPercent 的物品（鱼获），吃掉整格；返回被吃的物品 id
 function PlayerData:EatSlot(index)
     if not self.Inited or type(index) ~= 'number' or index ~= self.Data.SelectedSlot then return nil end
     local items = self.Data.Containers[GameCfg.Items.ContainerId.ItemBar]
@@ -775,7 +730,6 @@ function PlayerData:ConsumeSelectedBait()
     if not self.Inited then return false, nil end
     local itemId = self.Data.SelectedBait
     if not itemId then return true, nil end
-    -- 首领饵占道具栏格（#88）：抛竿一刻扣 1 只，钓出首领后消耗，脱钩 / 逃脱不返还
     local bossBait = GameCfg.Casting.BossBait
     if bossBait and bossBait[itemId] then
         if self:ConsumeItemBarItem(itemId) then return true, itemId end
@@ -794,9 +748,6 @@ function PlayerData:ConsumeSelectedBait()
     return true, itemId
 end
 
--- 优先填道具栏，再填背包；满格时不改动库存。
--- cooked 是烤制状态（#126 落物实例属性，技术难点 §5「个体倍率与烤制倍率」）：随物品实例走，
--- 打包进存档槽位的 k 字段（Serialize 复用 entry.saved），拾回/移动/读档都不丢。
 function PlayerData:AddItem(itemId, mult, cooked)
     if not self.Inited or type(itemId) ~= 'string' then return false end
     for _, container in ipairs({
@@ -818,7 +769,6 @@ function PlayerData:AddItem(itemId, mult, cooked)
     return false
 end
 
--- 鱼饵进计数库存（#45）：不占道具栏格、没有满格限制；只收物品表里已有的鱼饵
 function PlayerData:AddBait(itemId, count)
     local definition = type(itemId) == 'string' and GameCfg.Items.Definitions[itemId]
     if not self.Inited or not definition or definition.Container ~= GameCfg.Items.ContainerId.Bait
@@ -829,13 +779,11 @@ function PlayerData:AddBait(itemId, count)
     return true
 end
 
--- 能否整批放下（#47 / #48）：鱼饵计数没有上限，其余每件占一格；返回 true 或 false, 原因（bad / full）
 function PlayerData:CanGrant(itemId, count)
     local definition = type(itemId) == 'string' and GameCfg.Items.Definitions[itemId]
     if not self.Inited or not definition or type(count) ~= 'number' or count < 1
         or count ~= math.floor(count) then return false, 'bad' end
     if definition.Container == GameCfg.Items.ContainerId.Bait then return true end
-    -- 武器走独立库存不占格（#124），满格也能购买
     if isWeapon(itemId) then return true end
     local free = 0
     for _, container in ipairs({
@@ -851,8 +799,6 @@ function PlayerData:CanGrant(itemId, count)
     return true
 end
 
--- 按物品表的 Container 放进对应容器（#47）：鱼饵加计数，武器进独立计数（#124），
--- 其余每件占一格；空格不够一件都不发
 function PlayerData:GrantItem(itemId, count)
     if isWeapon(itemId) then return self:GrantWeapon(itemId, count) end
     local ok, reason = self:CanGrant(itemId, count)
@@ -868,8 +814,6 @@ local function isPositiveInt(n)
     return type(n) == 'number' and n >= 1 and n == math.floor(n)
 end
 
--- 金币唯一写入口（#44 / #47）：喂食、购买、GM 都经这里，余额不会为负；apply 在同一次更新里
--- 扣掉换钱的物品或发放买到的物品，与金币一起落地并同步 FishCoin。每笔按收入 / 支出打日志供对账
 function PlayerData:ChangeCoin(delta, apply, reason)
     if not self.Inited then return false end
     local balance = self.Data.FishCoin + delta
@@ -896,8 +840,6 @@ function PlayerData:SpendCoin(amount, apply, reason)
     return self:ChangeCoin(-amount, apply, reason)
 end
 
--- 信物兑换（#87，GameSpec §8.1）：把道具栏 slot 格的信物换成 product x1。空格不够（被换的这格不算空格，
--- 与「背包与道具栏全满时拒绝」一致）就拒绝、不消耗；扣除与发放一次落地，发放失败回滚被扣的格。
 function PlayerData:ExchangeSlot(slot, product)
     local items = self.Inited and self.Data.Containers[GameCfg.Items.ContainerId.ItemBar]
     local kept = type(slot) == 'number' and items and items[slot]
@@ -916,7 +858,6 @@ function PlayerData:ExchangeSlot(slot, product)
     return true
 end
 
--- 双向拖拽只接受两个合法格位；交换同一实例，保留倍率和未识别的存档字段。
 function PlayerData:MoveSlot(from, index, target, slot)
     if not self.Inited then return false end
     local ids = GameCfg.Items.ContainerId
@@ -988,7 +929,7 @@ end
 
 function PlayerData:UpdateData(updateCallBack, doSync)
     if not self.Inited or not updateCallBack then return end
-    self.Touched = true -- 仅供调试观察；读档屏障不再用它跳过旧财产
+    self.Touched = true
     updateCallBack(self.Data)
     self.Revision = (self.Revision or 0) + 1
     local selected = self.Data.SelectedSlot
@@ -1017,9 +958,6 @@ function PlayerData:Destroy()
     self.Revision = nil
 end
 
--- #149 T28：个人最大重量的整数化读数（图鉴收集口径 extra.collection.weights）。
--- 只加读数，供全服纪录对账（MgrRecords:Reconcile）；不改 #133 的存储与写入语义
--- （weights 仍是两位小数，Extra.collection 结构不动）。
 function PlayerData:PersonalBestScaled(fishId)
     if not self.Inited or type(fishId) ~= 'string' then return nil end
     local bag = self.Extra and self.Extra.collection

@@ -1,4 +1,3 @@
--- 服务端伤害通知协议：只传可序列化的目标编号、真实扣血和受伤时世界位置。
 local DamageNotice = {}
 
 function DamageNotice.Publish(payload)

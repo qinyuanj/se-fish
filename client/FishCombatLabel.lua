@@ -1,6 +1,3 @@
--- #134 精英鱼头顶状态字：只消费服务端 FishCombatState 广播，显示逃跑时限条（电鳗 180 / 鳄雀鳝 300），
--- 电鳗另显放电次数与睡眠倒计时。
--- 节点挂在 ScreenMain 根节点下，随界面 Bind / Clear；倒计时按服务端时间与结束时刻计算，不在本地推进状态。
 local GameCfg = require('common.GameCfg')
 local FishCombatLabel = { Labels = {} }
 local cfg = GameCfg.FishCombatLabel
@@ -17,7 +14,6 @@ function FishCombatLabel.Valid(payload)
         and payload.escapeSec > 0 and type(p) == 'table' and finite(p.x) and finite(p.y) and finite(p.z)
 end
 
--- 纯函数：由快照与服务端时间得出文字；到逃跑时限返回 nil（服务端随后广播 escaping）。
 function FishCombatLabel.Text(payload, now)
     local left = payload.fleeAt - now
     if left <= 0 then return nil end

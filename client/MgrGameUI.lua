@@ -6,8 +6,6 @@ local OpenScreenRE = REUtil:GetRE("OpenScreenRE")
 local CloseScreenRE = REUtil:GetRE("CloseScreenRE")
 local curShowMap = {}
 
--- 界面 handler 登记表：键是 EUI 节点名（与 ScreenHandlers/ 下文件同名），值按需加载 handler。
--- 用字面量 require 而非拼路径，依赖才能被静态解析；新增 handler 须在此登记。
 local ScreenHandlerLoaders = {
     DialogNoticeConfirm = function() return require("client.ScreenHandlers.DialogNoticeConfirm") end,
     ScreenBlindbox = function() return require("client.ScreenHandlers.ScreenBlindbox") end,
@@ -162,7 +160,6 @@ function MgrGameUI:HideLiftButton()
     pcall(function() StarterGui:SetCoreGuiEnabled(Enums.CoreGuiType.LiftButton, false) end)
 end
 
--- 原生血条与 ScreenMain 自绘血球重复（#53），关掉；SetCoreGuiEnabled(All) 会把它重新打开，之后要再关一次
 function MgrGameUI:HideNativeHealth()
     pcall(function() StarterGui:SetCoreGuiEnabled(Enums.CoreGuiType.Health, false) end)
 end

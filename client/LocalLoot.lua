@@ -1,7 +1,3 @@
--- 鱼获「拾取」文字泡（#43）：按服务端广播的鱼获列表在每份鱼获上方建场景 UI 按钮，
--- 本地角色在 PickupRadius 米内才显示；点击只发请求（ItemBarAction{action='Pickup'}），结果以服务端回包为准。
--- 预警闪烁（#126）：快照里 warn=true 的件进入 30 秒回收预警，文字泡按 GameCfg.Loot.FlashIntervalSec
--- 与服务端模型的可见性同节奏闪；预警期内拾取仍被服务端接受，闪到亮的那半拍照常可点。
 local GameCfg = require('common.GameCfg')
 local BodyScale = require('common.BodyScale')
 local REUtil = require('common.REUtil')
@@ -57,7 +53,6 @@ function LocalLoot:Show(list)
     end
 end
 
--- 预警件的显隐：按配置间隔交替，不额外依赖服务端每帧广播（服务端模型同步在闪）
 function LocalLoot:BlinkTick(entry, dt)
     local interval = GameCfg.Loot.FlashIntervalSec or 0.5
     entry.Blink = (entry.Blink or 0) + (dt or 0)
@@ -112,7 +107,6 @@ function LocalLoot:Start()
             if self.Generation ~= generation then return end
             self:Update(dt)
         end)
-        -- 请求失败前先退出本代：宿主可能在 FireServer 抛错前同步回快照。
         self.Generation = self.Generation + 1
         local requested, requestErr = pcall(function()
             REUtil:GetRE('RequestLoot'):FireServer()
@@ -120,7 +114,6 @@ function LocalLoot:Start()
         if requested then self.Generation = generation else error(requestErr, 0) end
     end)
     if not ok then
-        -- 成功才进入活动态；失败仍显式回到未启动，避免中途置真后重试被直接吞掉。
         self.Active = false
         self.Connections = nil
         self.Generation = self.Generation + 1

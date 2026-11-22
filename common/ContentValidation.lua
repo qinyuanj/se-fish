@@ -1,5 +1,3 @@
--- 纯配置检查；不依赖引擎服务。返回的每项错误都带原始表行或规则来源。
--- #251 实现标记的唯一真源是 common/cfg/ContentLedger.lua：内容表不存状态，加载期不改写。
 local Validate = {}
 local Ledger = require('common.cfg.ContentLedger')
 
@@ -8,8 +6,6 @@ local function nonnegative(value) return type(value) == 'number' and value >= 0 
 local function integer(value) return type(value) == 'number' and value % 1 == 0 end
 local function count(map) local n = 0; for _ in pairs(map or {}) do n = n + 1 end; return n end
 
--- 实现标记只在纯台账登记：内容表没有状态，加载期也不改写；这里只核对两边是否一致。
--- 反向不一致直接判红：false 却留着代码落点，或 true 却没有落点。
 local function check_ledger(cfg, fail, activeGoods)
     local groups = {
         Fish = { rows = cfg.Fish, key = function(row) return row.Id end },

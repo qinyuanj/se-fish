@@ -19,7 +19,6 @@ function REUtil:GetRE(eventName)
     return targetRE
 end
 
---CD拦截成功Return true 
 function REUtil:CheckRECD(player, reName, duration)
     if not duration then duration = 1 end
 

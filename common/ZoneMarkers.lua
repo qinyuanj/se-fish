@@ -1,5 +1,3 @@
--- 区域标记启动解析（ADR-0013）：按稳定名称读取七区标记，全部校验通过后一次性发布本轮快照。
--- 标记名全图唯一且须位于所属区目录之下；目录层级只用于整理，不参与查找。
 local GameCfg = require('common.GameCfg')
 
 local ZoneMarkers = { Ready = false, Zones = {} }
@@ -34,7 +32,6 @@ local function waterOrder(name, prefix)
     return suffix:match('^%d+$') and tonumber(suffix) or nil
 end
 
--- 全图名称计数 + 区内名称表：缺失、重名、跨区摆放都在这里拒绝。
 local function catalog(world)
     local counts = {}
     for _, unit in ipairs(world:GetDescendants()) do
@@ -120,7 +117,6 @@ local function copyPoint(pointValue)
     return { x = pointValue.x, y = pointValue.y, z = pointValue.z }
 end
 
--- 命名合同：每区必须存在的稳定标记名（不含按前缀枚举的水域）。渔夫、商店、摆渡沿用各自配置里的锚点名。
 function ZoneMarkers.Contract(cfg)
     cfg = cfg or GameCfg
     local entries = {}

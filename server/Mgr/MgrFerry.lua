@@ -1,15 +1,3 @@
--- #127 T06 六条航线摆渡：请求必须带航线 id，锚点、目的地、船票与票价全部由这条航线给出；
--- 伪造 / 未登记的 id 直接拒收，越界与缺票缺币各自拒绝且不动账。
--- 每条航线有自己的航班状态（Flights[routeId]）与自己的交票写入（BoardPending[routeId]），
--- 不同航线互不占用倒计时；同一条航线倒计时中再交票拒绝且不扣。
--- 去程一人交 1 张票、倒计时（5 秒）后带走 BoatRange 内的所有人（搭便船合法）；
--- 交票人未上船退票且不记到达，船上传送失败按 teleport 退票；无人送达时共享原因为 empty。
--- 返程按人付 10 × 3^(到达区序 − 2) 金币、立即传送。
--- #123：交票与返程扣款先经 Save.Execute 持久，再发布倒计时或传送。传送和存储不能原子提交：
--- 收费同时保存恢复记录，完成或补偿用独立幂等操作落账；未确认的跨会话记录只退款，不重放传送。
--- 扣费、搭载、到达（Extra.travel.arrived）与恢复结果都落进存档，重进后仍可验证。
--- FerryAction{action='Board'|'Return', routeId, seq, requestId?}；跨会话 requestId 为 FerryResult.operation。
--- 锚点缺失取消航班退票；交票人在倒计时中掉线同样取消该航线航班。
 local GameCfg = require('common.GameCfg')
 
 local Mgr = { LastSeq = {}, Recoveries = {}, ReturnPending = {}, Flights = {}, BoardPending = {} }
@@ -19,8 +7,6 @@ local function flatDistance(a, b)
     return math.sqrt(dx * dx + dz * dz)
 end
 
--- 到达记录（#127）：每区一份到达计数，跟落点一起写进 draft.Extra.travel.arrived；
--- 重放只回原结果不再执行，所以同一趟不会重复计数。
 local function markArrival(draft, zone)
     local arrived = draft.Extra.travel.arrived
     arrived[zone] = (arrived[zone] or 0) + 1
@@ -40,20 +26,16 @@ function Mgr:Fail(player, action, reason)
     return false
 end
 
--- 在线玩家枚举是测试替身的注入点（试玩里就是 Players:GetPlayers()）
 function Mgr:OnlinePlayers()
     return game:GetService('Players'):GetPlayers()
 end
 
--- 传送单个玩家到配置落点；角色缺失或引擎拒绝都不算成功
 function Mgr:Teleport(player, dest)
     local character = player and player.Character
     if not character then
         print('[MgrFerry] 传送失败', player and player.UserId, '角色缺失')
         return false
     end
-    -- #140 T19：传送前通知特殊道具结束飞行（摆渡不得把关重力 / 滞空带到新区）；
-    -- 钩子失败不阻断传送（恢复由 MgrSpecialItem 下一帧调和兜底）。
     if self.SpecialItem then
         pcall(function() self.SpecialItem:OnTeleport(player) end)
     end
@@ -69,7 +51,6 @@ function Mgr:Teleport(player, dest)
     return ok
 end
 
--- 所有财产变更只写 Save 的隔离 draft；同步拒绝仍返回 false，异步接纳返回 true。
 function Mgr:Settle(player, data, kind, transform, done, operation)
     operation = operation or self.Save:NextOperation(player, kind)
     if not operation then return false, 'save' end
@@ -83,7 +64,6 @@ function Mgr:Settle(player, data, kind, transform, done, operation)
     return accepted and outcome ~= false, reason
 end
 
--- 这条航线上是否有一位玩家正在交票落账（返回航班对象，没有就 nil）
 function Mgr:PendingFlight(routeId)
     return self.BoardPending[routeId] or self.Flights[routeId]
 end
@@ -119,7 +99,6 @@ function Mgr:Board(player, data, route, operation)
     return accepted
 end
 
--- 外部传送结果与补偿各自落账，退款只能改 draft，记录清除与退款是同一次写入。
 function Mgr:FinishTravel(player, data, record, delivered, reason, done)
     return self:Settle(player, data, delivered and 'ferry:confirm' or 'ferry:refund', function(draft)
         local pending = draft.Extra.recovery.ferry
@@ -180,8 +159,6 @@ end
 
 local Actions = { Board = 'Board', Return = 'ReturnBack' }
 
--- 序号契约与 MgrInteract 一致：每人严格递增，重放与旧序号不结算。
--- 航线 id 在取存档之前先校验：查不到这条航线，后面的一切（NPC、目的地、船票）都无从谈起。
 function Mgr:Handle(player, payload)
     if type(payload) ~= 'table' then return false end
     local method = Actions[payload.action]
@@ -198,7 +175,6 @@ function Mgr:Handle(player, payload)
     local operation, status = self.Save:ResolveRequest(player, data, kind, payload.requestId or seq)
     if not operation then return self:Fail(player, payload.action, status) end
     if status == 'replay' then
-        -- 旧客户端的 seq 重放仍拒绝；显式 requestId 只回历史包，不重新启动外部权益。
         if payload.requestId == nil then return false end
         local flight = self:PendingFlight(route.Id)
         local active = flight and flight.player == player and flight.operation == operation.id
@@ -225,8 +201,6 @@ function Mgr:Handle(player, payload)
     return self[method](self, player, data, route, operation)
 end
 
--- 倒计时到点：带走船上所有人（搭便船）。交票人未上船退票且不记到达；
--- 船上传送失败按 teleport 退票。锚点缺失或无人送达都取消航班并退票。
 function Mgr:Depart(route, flight)
     local point = route.Outbound
     local anchor = self.Interact:FindAnchor(point.AnchorName)
@@ -260,7 +234,6 @@ function Mgr:Depart(route, flight)
             if player == payer and data.Extra.recovery.ferry then
                 local record = data.Extra.recovery.ferry
                 if delivered then record.zone = point.Zone end
-                -- 只有实际送达才记到达；未上船退票，船上传送失败另按 teleport 退票。
                 local reason = not delivered and (aboard and 'teleport' or 'not_aboard') or nil
                 self:FinishTravel(player, data, record, delivered, reason,
                     function(ok, result) if ok then self:Reply(player, result) end end)
@@ -281,7 +254,6 @@ function Mgr:Depart(route, flight)
     end
 end
 
--- 收起未完成记录（掉线、待确认）：交票人退款、返程退款，一次写入清记录。
 function Mgr:Recover(player, data)
     local record = data.Extra.recovery.ferry
     if not record then return false end

@@ -1,5 +1,3 @@
--- 七区图鉴：收集、个人最大钓取重量与唯一通关状态由服务端快照提供。
--- 普通/极品使用各自稳定 ID；盲盒只解锁，未钓取时不推算重量。
 local GameCfg = require('common.GameCfg')
 local OwnedUnits = require('common.OwnedUnits')
 local Records = require('common.Records')
@@ -12,7 +10,6 @@ local Screen = { Page = 1, Seq = 0, RecordSeq = 0, Nodes = {},
 local grades = { normal = '普通', rare = '极品', elite = '精英', boss = '首领' }
 local rank = { normal = 1, rare = 2, elite = 3, boss = 4 }
 
--- 公开显示快照，同时供可重跑客户端验收探针读取，不改变收集数据。
 function Screen:View()
     local zone = GameCfg.Zones[self.Page] or GameCfg.Zones[1]
     local state = self.State or {}
@@ -96,7 +93,6 @@ function Screen:Create(kind, parent, name, x, y, width, height, props)
         print('[ScreenCompendium] 创建节点失败', name, tostring(node))
         return nil
     end
-    -- 按名查找表只服务于定位与更新（SetText / Render）；生命周期归归属登记。
     self.Nodes[name] = node
     return OwnedUnits.Track(self, node)
 end
@@ -116,7 +112,6 @@ function Screen:Button(parent, name, x, y, width, height, text, callback)
         TouchEnabled = true, SwallowTouchEnabled = true,
     })
     if not node then return end
-    -- 与钓场商店一致：文字和按钮同级。引擎实例下按钮子标签不显示，不能当作文字容器。
     self:Label(parent, name .. 'Text', x, y, width - 10, height, text, 24)
     self.NodeConnections[#self.NodeConnections + 1] = node.OnClicked:Connect(callback)
     return node
@@ -166,7 +161,6 @@ end
 function Screen:SetPage(page)
     if type(page) ~= 'number' or page ~= math.floor(page) or not GameCfg.Zones[page] then return false end
     self.Page, self.SelectedId, self.RecordState = page, nil, nil
-    -- 使上一页尚未返回的纪录查询失效。
     self.RecordSeq = self.RecordSeq + 1
     self:Render()
     return true
@@ -189,8 +183,6 @@ function Screen:CloseScreen()
     self.RecordSeq = self.RecordSeq + 1
 end
 
--- 节点属于本 handler；切换 UIRoot 或重启时撤销旧按钮连接，再清空登记表销毁全部运行时节点。
--- 销毁来源只有归属登记（#210）：不再从按名查找表枚举，也不再逐个点名销毁。
 function Screen:ClearNodes()
     for _, connection in ipairs(self.NodeConnections or {}) do connection:Disconnect() end
     self.NodeConnections = {}
@@ -209,7 +201,6 @@ function Screen:BuildNodes(uiRoot)
     local resolution = manager and manager:GetDeviceResolution()
     if not resolution then return false end
     local scale = math.min(1, (resolution.x - 40) / 1180, (resolution.y - 40) / 840)
-    -- #179：入口在主界面布局的右上入口组（与道具栏格数无关，按默认输入取）
     local entry = MainHudLayout.Compute({ width = resolution.x, height = resolution.y }).Rects.CompendiumEntry
     self.EntryNode = self:Button(uiRoot, 'BtnCompendiumEntry', entry.x, entry.y,
         entry.w, entry.h, '图鉴', function()
@@ -233,7 +224,6 @@ function Screen:BuildNodes(uiRoot)
     end
     self:Label(panel, 'LabelCompendiumAchievement', 590, 685, 1120, 40, '', 24)
     for i = 1, 14 do
-        -- 左列：六条普通与精英；右列：六条极品与首领，品级不混排。
         local left = i <= 6 or i == 13
         local row = i <= 6 and i - 1 or i <= 12 and i - 7 or 6
         local x, y = left and 300 or 880, 630 - row * 66
@@ -252,8 +242,8 @@ function Screen:BuildNodes(uiRoot)
     self:Label(panel, 'LabelCompendiumRecord', 590, 125, 1100, 45, '', 24)
     self:Label(panel, 'LabelCompendiumHint', 590, 65, 1100, 45, '', 22)
     if self.BuildFailed then self:ClearNodes() self.UIRoot = nil return false end
-    _G.MgrGameUI:GetScreen('ScreenCompendium') -- 由界面管理器绑定与初始化 handler
-    _G.MgrGameUI:CloseScreen('ScreenCompendium') -- Root 更换后同时清除管理器旧的已打开状态
+    _G.MgrGameUI:GetScreen('ScreenCompendium')
+    _G.MgrGameUI:CloseScreen('ScreenCompendium')
     return true
 end
 

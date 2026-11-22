@@ -1,12 +1,3 @@
--- #149 T28 全服纪录的平台适配器：把 DataStore 访问收敛到这一层，便于替换与失败注入。
--- 真实 DataStore 的限流、错误码文本与跨服可见性在编辑器内**不可实测**（归 T27），这里只保证：
---   1. 一切平台调用都被 pcall 包住，失败翻译成稳定的错误类别（unavailable/throttled/timeout/unknown），
---      调用方据此降级，不会把「读不到」当成「没有纪录」；
---   2. 保持者三元组用 UpdateAsync 的 CAS 变换写入：并发时由变换函数看到当前值再决定，
---      跨服竞态由 Records.Wins 的确定性规则裁决，不是「谁最后写谁赢」；
---   3. 这里不重试（重试、退避与合并写入归 MgrRecords，写频才好观测与压测）。
--- 测试用内存假实现替换（MgrRecords.Adapter 可注入），语义必须与本文件的 CAS 一致：
--- decide(current) 返回 nil 表示放弃本次更新，此时不产生任何写入。
 local GameCfg = require('common.GameCfg')
 local Records = require('common.Records')
 
@@ -14,8 +5,6 @@ local Adapter = {}
 
 local function cfg() return GameCfg.Records end
 
--- 错误分类：真实错误码文本未查证（[未查证]，技术难点 §5 只给了错误码没有文案），
--- 所以只按关键字粗分，认不出一律 'unknown'——调用方对这几类都走同一条降级路径。
 local function classify(err)
     local text = tostring(err):lower()
     if text:find('throttl', 1, true) or text:find('limit', 1, true) or text:find('429', 1, true) then
@@ -25,7 +14,6 @@ local function classify(err)
     return 'unknown'
 end
 
--- 取服务只做一次；不可用时返回 nil，调用方按「暂不可用」处理，不写假值。
 function Adapter:Store()
     if self.Checked then return self.Holder end
     self.Checked = true

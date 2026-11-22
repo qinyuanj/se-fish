@@ -1,14 +1,10 @@
--- 仅调试地图显示的 GM 面板；按钮只发送固定参数，余额与结果以服务端同步为准。
 local GameCfg = require('common.GameCfg')
 local OwnedUnits = require('common.OwnedUnits')
 local GameUI = require('client.GameUI')
 local REUtil = require('common.REUtil')
 
--- 生命周期只认归属登记（#210）：建完 Track、Destroy 时 Clear，不再自持节点表。
 local Panel = { Connections = {} }
 
--- 官方正方形纯色块（120×120），配合 Color 叠色成任意底色；不设 Image 时 EUIImage/EUIButton
--- 会渲染默认椭圆贴图，被深色染色后成为遮挡面板的黑色异形块（本面板曾因此不可读）。
 local ColorBlockImage = 'official://image/11017'
 
 local FishPageSize = 6
@@ -47,8 +43,6 @@ local function listen(self, signal, callback)
     self.Connections[#self.Connections + 1] = signal:Connect(callback)
 end
 
--- 所有节点都挂 root、用屏幕绝对坐标（与 ScreenMain 一致）；EUIImage 子节点的坐标系
--- 不是相对父中心，嵌套会错位，且 EUIButton 的 ButtonText 在自定义贴图下不渲染。
 local function create(self, kind, parent, name, x, y, width, height, props)
     props = props or {}
     props.Parent = parent
@@ -68,14 +62,12 @@ local function label(self, parent, name, text, x, y, width, height, fontSize)
     })
     node.TouchEnabled = false
     node.SwallowTouchEnabled = false
-    -- 盖在背景与按钮色块之上
     node.LocalZOrder = 1
     return node
 end
 
 local function button(self, parent, name, x, y, width, height, callback)
     local node = create(self, 'EUIButton', parent, name, x, y, width, height, {
-        -- 显式正方形纯色块，避免默认椭圆贴图；暖橙色系，与 Gameplay 蓝系区分，明示"这是开发工具"
         ButtonText = '',
         NormalImage = ColorBlockImage,
         PressImage = ColorBlockImage,
@@ -298,10 +290,8 @@ function Panel:Build(root, resolution, player)
     self.SlotPage = 0
     self.StateNodes = {}
     local width = 560
-    -- 右对齐：面板中心距右边缘 16px，最小不小于半宽+16
     local right = math.max(width / 2 + 16, resolution.x - width / 2 - 16)
     local top = resolution.y - 105
-    -- 标题、三行状态与反馈；每组增加分组标题和按钮行。
     local height = 784
     for _, group in ipairs(Groups) do
         height = height + 62 + math.ceil(#group.actions / 2) * 96
@@ -315,13 +305,11 @@ function Panel:Build(root, resolution, player)
     local centerY = top - (82 + height / 2) * scale
     self.Background = create(self, 'EUIImage', root, 'GM面板', right, centerY, width, height, {
         Image = ColorBlockImage,
-        -- 深色半透明底，白字可读；纯色块叠色，不用默认椭圆图避免黑色异形遮挡
         Color = Color.New(49, 20, 16, 240),
     })
     self.Background.TouchEnabled = false
     self.Background.SwallowTouchEnabled = false
     self.PanelNodes[#self.PanelNodes + 1] = self.Background
-    -- 面板内元素：relX/relY 是相对面板中心的偏移，换算成屏幕坐标后挂 root
     local function relY(value) return centerY + value * scale end
     local topRow = height / 2 - 52
     local title = label(self, root, 'GM标题', '调试操作', right, relY(topRow), width - 24, 56, 44)
@@ -450,7 +438,6 @@ function Panel:Build(root, resolution, player)
     self.SlotDetails = stateLabel('GM格位明细', '等待状态同步', left, actionsY - 340, 245, 245, 21)
     stateLabel('GM暂存提示', '应用后暂停自动保存；正常玩法进度也不落档。\n'
         .. '重进图前须保存，否则本局改动丢失。', right, actionsY - 510, width - 24, 70, 22)
-    -- 默认收起，避免遮挡游戏画面；IsOpen 在 Build 里显式初始化
     self.IsOpen = false
     for _, node in ipairs(self.PanelNodes) do node.Visible = false end
     listen(self, REUtil:GetRE('ItemBarState').OnClientEvent, function(snapshot) self:ShowState(snapshot) end)
@@ -483,7 +470,6 @@ end
 
 function Panel:Destroy()
     for _, connection in ipairs(self.Connections) do connection:Disconnect() end
-    -- 先断连接再整体销毁：清空幂等，失败路径（Build 中途出错）与正常收尾共用同一条路。
     OwnedUnits.Clear(self)
     self.Connections = {}
     self.PanelNodes = {}

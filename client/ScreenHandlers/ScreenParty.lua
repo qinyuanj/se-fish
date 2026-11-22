@@ -1,8 +1,3 @@
--- 队伍界面（#253，§9 多人规则「队伍界面：在 HUD 上显示本队队友及每名队友的当前血量」
--- 「收到组队邀请时的界面提示与 10 秒倒计时展示」）。
--- 只按服务端 PartyState 快照渲染：队友名单、当前血量与邀请剩余秒数全部来自服务端，
--- 上行只发意图（接受 / 拒绝 / 离队 / 拉一次状态），本地不做任何入队、解散或免伤判定。
--- 布局数值集中在 GameCfg.Party.HUD（[未查证]，见 docs/to-questionnaire-策划案内部矛盾.md）。
 local GameCfg = require('common.GameCfg')
 local OwnedUnits = require('common.OwnedUnits')
 local REUtil = require('common.REUtil')
@@ -43,7 +38,6 @@ local function healthWidth(member)
     return hud().BarWidth * math.max(0, math.min(1, ratio))
 end
 
----销毁上一轮建的全部节点并复位自持引用（幂等）。
 function Panel:Clear()
     for _, connection in ipairs(self.Connections) do
         local ok, err = pcall(function() connection:Disconnect() end)
@@ -72,8 +66,8 @@ function Panel:Send(action, extra)
     if not ok then print('[ScreenParty] 行动请求发送失败', tostring(action), tostring(err)) end
 end
 
-local NOTICE = {}   -- 服务端一次性事件 → 界面文案，未映射的安静跳过
-local REASON = {}   -- 请求被拒的原因 → 界面文案，未映射的给通用失败文案
+local NOTICE = {}
+local REASON = {}
 local UnavailableText = ''
 
 function Panel:NoteNotice(code)
@@ -81,7 +75,6 @@ function Panel:NoteNotice(code)
     if text and text ~= '' then notice(text) end
 end
 
----服务端回执：成功不打扰玩家（状态会自己推过来），失败给一句能照做的原因。
 function Panel:NoteResult(result)
     if type(result) ~= 'table' or result.ok then return false end
     local text = REASON[result.reason]
@@ -90,14 +83,12 @@ function Panel:NoteResult(result)
     return true
 end
 
----收服务端快照：结构不对整包拒绝，绝不用坏包清掉上一份可信状态。
 function Panel:NoteState(state)
     if type(state) ~= 'table' then return false end
     if state.state ~= 'none' and state.state ~= 'party' then return false end
     if type(state.members) ~= 'table' then return false end
     local teammates = {}
     for _, member in ipairs(state.members) do
-        -- 血量允许缺失（队友还没出生时服务端没有读数）：名单照常收下，血量显示占位。
         if type(member) ~= 'table' or type(member.userId) ~= 'number' or type(member.name) ~= 'string'
             or (member.health ~= nil and type(member.health) ~= 'number')
             or (member.maxHealth ~= nil and type(member.maxHealth) ~= 'number') then return false end
@@ -161,7 +152,6 @@ function Panel:Render()
     self:RenderInvite()
 end
 
----倒计时按服务端剩余秒数本地走；到 0 立即撤板，等服端下一次快照确认按拒绝结算。
 function Panel:Tick()
     if not self.InviteUntil then return end
     if self:InviteRemaining() <= 0 then
@@ -171,7 +161,6 @@ function Panel:Tick()
     self:RenderInvite()
 end
 
----公开显示快照：界面当前展示的队友与邀请，供探针与条款断言读取，不改任何状态。
 function Panel:View()
     local rows = {}
     for index, member in ipairs(self.Teammates) do
@@ -206,7 +195,6 @@ function Panel:Start()
         ['unknown-action'] = '',
     }
     UnavailableText = hud().UnavailableText
-    -- EUI 根节点与设备分辨率各自从接口取：分辨率不再从根节点的下标里猜（夹具也不再来迁就形状）。
     local okRoot, root, resolution = pcall(function()
         local eui = game:GetService('Players').LocalPlayer.PlayerGui.EuiManager
         return eui and eui:GetRootNode(), eui and eui:GetDeviceResolution()
@@ -220,7 +208,6 @@ function Panel:Start()
     local width, height = hud().RowWidth, hud().RowHeight
     local candidate = { Nodes = {} }
     local built, buildErr = pcall(function()
-        -- 右侧竖排，避开左上角自身血量（布局参数见 GameCfg.Party.HUD）。
         candidate.Root = create(candidate.Nodes, 'EUILayout', root, 'PartyRoot',
             resolution.x - width - hud().MarginRight, hud().MarginTop, width, height * hud().MaxRows, { Visible = false })
         candidate.Rows = {}
@@ -277,7 +264,6 @@ function Panel:Start()
                 button.OnClicked:Connect(function() self:Send(action) end)
         end
     end
-    -- ready/snapshot 握手：进图、重连与界面重开都主动拉一次当前归属，迟到的客户端也能补齐。
     local okSync, syncErr = pcall(function() REUtil:GetRE('PartyStateRequest'):FireServer() end)
     if not okSync then print('[ScreenParty] 队伍状态请求发送失败', tostring(syncErr)) end
 end

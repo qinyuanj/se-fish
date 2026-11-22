@@ -1,7 +1,3 @@
---local RunService = game:GetService("RunService")
---if RunService.EnableDeveloperMode() then
---    debug.start_debugger()
---end
 
 local Task = game:GetService("Task")
 local RunService = game:GetService("RunService")
@@ -39,15 +35,12 @@ local MgrMap = {
     MgrGrill = require("server.Mgr.MgrGrill"),
     MgrPlatform = require("server.Mgr.MgrPlatform"),
     MgrBlindbox = require("server.Mgr.MgrBlindbox"),
-    -- #153 官方包接入骨架：属性 / 效果 / 生物AI 的装配点，当前仅 Start 占位，玩法接线另开任务。
     MgrAttr = require("server.Mgr.MgrAttr"),
     MgrModifier = require("server.Mgr.MgrModifier"),
     MgrAi = require("server.Mgr.MgrAi"),
     MgrAiTarget = require("server.Mgr.MgrAiTarget"),
 }
 
--- 锚点行为只接收入口注入的协作管理器，不再反向 require server.Mgr。
--- MgrAbility.Start 再把同一份依赖交给 AbilityAPI，保留入口测试替换管理器的接缝。
 MgrMap.MgrAbility.BehaviorServices = {
     Vitals = MgrMap.MgrVitals,
     FishCarrier = MgrMap.MgrFishCarrier,
@@ -86,7 +79,6 @@ MgrMap.MgrQuest.Save = MgrMap.MgrSave
 MgrMap.MgrStory.PlayerData = MgrMap.MgrPlayerData
 MgrMap.MgrStory.Save = MgrMap.MgrSave
 MgrMap.MgrInteract.Save = MgrMap.MgrSave
--- #254 他人抢救：交互入口只读生存状态、经 Vitals 的统一 Rescue 接缝结算，不反向 require 管理器。
 MgrMap.MgrInteract.Vitals = MgrMap.MgrVitals
 MgrMap.MgrInteract.Survival = MgrMap.MgrSurvival
 MgrMap.MgrAchievements.PlayerData = MgrMap.MgrPlayerData
@@ -95,28 +87,17 @@ MgrMap.MgrFerry.Save = MgrMap.MgrSave
 MgrMap.MgrShop.Save = MgrMap.MgrSave
 MgrMap.MgrFerry.Save = MgrMap.MgrSave
 MgrMap.MgrSave.PlayerData = MgrMap.MgrPlayerData
---- #138 T17 抽奖机：结算走 #123 持久操作协议（扣物/发奖与结果同键落账），距离复验复用
---- MgrInteract 的锚点范围判定；断线重进由 OnPlayerAdded 补推最近一次抽奖结果（仅展示）。
 MgrMap.MgrLottery.PlayerData = MgrMap.MgrPlayerData
 MgrMap.MgrLottery.Save = MgrMap.MgrSave
 MgrMap.MgrLottery.Interact = MgrMap.MgrInteract
---- #133 图鉴写入：上岸事实经 MgrCompendium 记进 extra.collection，写入走 #123 持久操作协议，
---- 所以条目与个人最大重量和操作日志同键落账、重进保留；只有上岸这一个写入口（击杀与掉落走 MgrLoot）。
 MgrMap.MgrCompendium.Save = MgrMap.MgrSave
 MgrMap.MgrCompendium.PlayerData = MgrMap.MgrPlayerData
 MgrMap.MgrCompendium.Quest = MgrMap.MgrQuest
 MgrMap.MgrCast.Compendium = MgrMap.MgrCompendium
 
---- #149 T28 全服纪录：上岸经 MgrCompendium 的「刷新个人纪录」回调通知 MgrRecords，
---- 由它做合并窗口写入（DataStore 三元组 CAS）；图鉴查询（RecordsRequest RE）由 MgrRecords 受理并回
---- RecordsState，平台读不到时报「暂不可用」而不是伪纪录；查询顺带对账（个人纪录更高时补交）。
 MgrMap.MgrCompendium.Records = MgrMap.MgrRecords
 MgrMap.MgrRecords.PlayerData = MgrMap.MgrPlayerData
 
---- #147 T26 平台功能本地接缝：商品购买/广告的唯一服务端入口是 MgrPlatform（真实商品 ID
---- 未交付时入口明确不可用，Debug 开时 pending flow + 测试驱动器结算，生产构建拒绝驱动器）；
---- 盲盒结算（MgrBlindbox）先经平台购买 flow 收费，成功才在 #123 持久操作里逐抽发奖并写回
---- 保底计数（Extra.lottery.pity），满格溢出经 MgrLoot 按区落地。
 MgrMap.MgrPlatform.Save = MgrMap.MgrSave
 MgrMap.MgrPlatform.PlayerData = MgrMap.MgrPlayerData
 MgrMap.MgrPlatform.Loot = MgrMap.MgrLoot
@@ -124,23 +105,13 @@ MgrMap.MgrBlindbox.Save = MgrMap.MgrSave
 MgrMap.MgrBlindbox.PlayerData = MgrMap.MgrPlayerData
 MgrMap.MgrBlindbox.Platform = MgrMap.MgrPlatform
 MgrMap.MgrBlindbox.Loot = MgrMap.MgrLoot
---- 平台复活（广告 / 5 金豆满血复活）与濒死无药拉起肾上腺素购买入口都经 MgrPlatform。
 MgrMap.MgrSurvival.Platform = MgrMap.MgrPlatform
 
--- #128 战斗接线：统一伤害入口的依赖单向注入在这里完成。
--- Vitals 需要鱼受击体解析（ApplyHit 的鱼分支）；Ability / FishUnit / Cast 需要玩家生命状态
--- （施法守卫、追咬结算、动作互斥）；鱼受击体的有效伤害经 DamageListener 回报仇恨。
--- 契约：DamageListener(carrier, actual, hit) 中 hit.sourcePlayer 是服务端登记的玩家来源身份，
--- 只有玩家武器伤害才累计仇恨；鱼攻击（fishAttack）来源不是玩家，自然不记。
 MgrMap.MgrAbility.Vitals = MgrMap.MgrVitals
 MgrMap.MgrFishUnit.Vitals = MgrMap.MgrVitals
--- #132 T11 三倍体型：吃药水成功后由 MgrPlayerData 就地重算体型（唯一消费口，幂等）。
 MgrMap.MgrPlayerData.Ability = MgrMap.MgrAbility
--- #139 大奖成长：MgrAbility 读存档药水数、读虚弱标记，是移速/血量上限的唯一计算处；
--- 虚弱进出经 SpeedWriter 回到它整体重算；麻痹经 Vitals.ActGuard 统一封锁攻击/投掷/钓鱼/进食。
 MgrMap.MgrAbility.PlayerData = MgrMap.MgrPlayerData
 MgrMap.MgrAbility.Survival = MgrMap.MgrSurvival
--- 官方属性与五效果只有一个投影入口，组合倍率在 Modifier 内合成一次。
 MgrMap.MgrAttr.PlayerData = MgrMap.MgrPlayerData
 MgrMap.MgrAttr.Vitals = MgrMap.MgrVitals
 MgrMap.MgrAttr.MoveMultiplierProvider = function(player) return MgrMap.MgrModifier:GetMoveMultiplier(player) end
@@ -153,7 +124,6 @@ MgrMap.MgrModifier.Ability = MgrMap.MgrAbility
 MgrMap.MgrModifier.Vitals = MgrMap.MgrVitals
 MgrMap.MgrAbility.Ai = MgrMap.MgrAi
 MgrMap.MgrFishUnit.Ai = MgrMap.MgrAi
--- #260 目标选择适配层：只在服务端裁决并登记到官方 AI 管理器，客户端没有目标选择入口。
 MgrMap.MgrFishUnit.AiTarget = MgrMap.MgrAiTarget
 MgrMap.MgrAi.FishUnit = MgrMap.MgrFishUnit
 MgrMap.MgrSurvival.SpeedWriter = MgrMap.MgrAbility
@@ -161,7 +131,6 @@ MgrMap.MgrVitals.ActGuard = function(player) return not MgrMap.MgrAbility:IsPara
 MgrMap.MgrVitals.MaxHealthProvider = function(player) return MgrMap.MgrAttr:MaxHealth(player) end
 MgrMap.MgrVitals.FishCarrier = MgrMap.MgrFishCarrier
 MgrMap.MgrCast.Vitals = MgrMap.MgrVitals
--- #131 生存恢复：经 #128 预留的 LifeHooks 接管濒死/死亡，依赖单向注入在这里完成。
 MgrMap.MgrSurvival.Vitals = MgrMap.MgrVitals
 MgrMap.MgrSurvival.FishUnit = MgrMap.MgrFishUnit
 MgrMap.MgrSurvival.ReelIn = MgrMap.MgrReelIn
@@ -176,47 +145,31 @@ MgrMap.MgrFishCarrier.DamageListener = function(carrier, actual, hit)
     end
 end
 
--- #129 武器系统接线：近战/枪械/投掷结算经统一伤害入口（Vitals）与鱼受击体解析（FishCarrier）；
--- 武器库存/装备读 PlayerData，投掷消耗走 Save 持久协议，爆炸保底鱼生成进 FishUnit。
--- Update（投掷飞行物推进）由 HandleTimeUpdate 心跳统一驱动，Start 注册 WeaponAction 通道与挥砍施法守卫。
 MgrMap.MgrWeapon.Vitals = MgrMap.MgrVitals
 MgrMap.MgrWeapon.PlayerData = MgrMap.MgrPlayerData
 MgrMap.MgrWeapon.FishUnit = MgrMap.MgrFishUnit
 MgrMap.MgrWeapon.FishCarrier = MgrMap.MgrFishCarrier
 MgrMap.MgrWeapon.Save = MgrMap.MgrSave
-MgrMap.MgrWeapon.Modifier = MgrMap.MgrModifier -- #139 枪械大奖特效直接由效果管理器应用
+MgrMap.MgrWeapon.Modifier = MgrMap.MgrModifier
 
--- #137 烧烤接线：会话物品进出走 #123 持久协议（Save+PlayerData），烤糊伤害经统一伤害入口
--- （Vitals）；满格时物品不入地、会话转 ready 保留冻结倍率，腾出格位后重试原倍率发还。
--- 离开前结算挂在下面 HandlePlayerRemoving 里 MgrSurvival 终镜像之后、MgrPlayerData 序列化之前。
 MgrMap.MgrGrill.Vitals = MgrMap.MgrVitals
 MgrMap.MgrGrill.PlayerData = MgrMap.MgrPlayerData
 MgrMap.MgrGrill.Save = MgrMap.MgrSave
 
--- #140 T19 特殊道具：选中调和每帧对齐「期望 × CanAct」，切换/丢弃/死亡/复活/摆渡/重进
--- 全走调和恢复；吐息结算经统一伤害入口（Vitals），摆渡前由 MgrFerry:Teleport 通知结束飞行。
 MgrMap.MgrSpecialItem.Vitals = MgrMap.MgrVitals
 MgrMap.MgrSpecialItem.PlayerData = MgrMap.MgrPlayerData
 MgrMap.MgrSpecialItem.FishUnit = MgrMap.MgrFishUnit
 MgrMap.MgrFerry.SpecialItem = MgrMap.MgrSpecialItem
 
--- #253 小队：归属、名单与人数由本管理器唯一维护（客户端请求只表达意图）；队伍界面读的血量
--- 走 MgrVitals 的只读快照。队友免伤判定归 PK/抢救子单，本单不改伤害入口。
 MgrMap.MgrParty.PlayerData = MgrMap.MgrPlayerData
 MgrMap.MgrParty.Save = MgrMap.MgrSave
 MgrMap.MgrParty.Vitals = MgrMap.MgrVitals
 
--- #255 PK 伤害过滤：统一入口的 DamageFilter 只读注入进来的权威接缝。
--- 小队归属每次判定都问 MgrParty（离队即刻失效）；鱼塘边界读 ZoneMarkers 快照；
--- 鱼攻击不解析成玩家来源，因此安全区不挡鱼。
--- 过滤器是工厂表不是管理器：不进 MgrMap（那里只放有生命周期的管理器，入口会逐项
--- 索引 Start/Update），在这里装配一次，缺失即启动报错而不是静默放行。
 local makePkDamageFilter = require("server.Mgr.MgrPkFilter").Make
 MgrMap.MgrVitals.ZoneMarkers = ZoneMarkers
 MgrMap.MgrVitals.Party = MgrMap.MgrParty
 MgrMap.MgrVitals.DamageFilter = makePkDamageFilter()
 
--- 存档就绪前不创建 Vitals/Ability 等玩家状态；退出先撤销就绪标记，再清理管理器。
 local ActivePlayers = {}
 local CurrentPlayers = {}
 local LeavingPlayers = {}
@@ -232,8 +185,6 @@ MgrMap.MgrSave.OnReady = function(player, data)
         or MgrMap.MgrPlayerData:GetDataInst(player) ~= data or ActivePlayers[player.UserId] == player then return end
     if not Started then ReadyQueue[player.UserId] = { player, data } return end
     ActivePlayers[player.UserId] = player
-    -- 这些管理器直接操作角色与生命状态，先于依赖它们的其他管理器初始化。
-    -- MgrSurvival 紧随 MgrVitals：离线恢复要读 Vitals 状态并把控制器血量锁回 1。
     for _, name in ipairs({ 'MgrAttr', 'MgrPlayer', 'MgrVitals', 'MgrModifier', 'MgrSurvival', 'MgrAbility', 'MgrFishUnit' }) do
         invoke(name, MgrMap[name], 'OnPlayerAdded', player)
     end
@@ -248,7 +199,6 @@ end
 local function HandlePlayerAdded(player)
     local leaving = LeavingPlayers[player.UserId]
     if leaving then
-        -- 同一 UserId 的新读档不能抢占尚未落账的旧会话；只接纳最后一次重进。
         leaving.Waiting = player
         player:SetAttribute('SaveState', 'pending')
         return
@@ -258,7 +208,6 @@ local function HandlePlayerAdded(player)
 end
 
 local function ContinuePlayerRemoving(player, leaving)
-    -- 回调绑定这次离场，重复回调与迟到事件不能清理新会话。
     if LeavingPlayers[player.UserId] ~= leaving or leaving.Cleaned then return end
     local function resume() ContinuePlayerRemoving(player, leaving) end
     if MgrMap.MgrQuest:FlushBeforeLeave(player, resume) then return end
@@ -266,9 +215,7 @@ local function ContinuePlayerRemoving(player, leaving)
     leaving.Cleaned = true
     local active = ActivePlayers[player.UserId] == player
     if active then ActivePlayers[player.UserId] = nil end
-    -- 终镜像必须先于 MgrPlayerData 的 SaveLeaving 序列化，离线标记才是最新的
     if active then invoke('MgrSurvival', MgrMap.MgrSurvival, 'BeforeLeave', player) end
-    -- #137：烧烤会话同样要在序列化前结算一次（放回烤鱼或转待恢复标记），不复制不吞物
     if active then invoke('MgrGrill', MgrMap.MgrGrill, 'BeforeLeave', player) end
     if active then invoke('MgrSpecialItem', MgrMap.MgrSpecialItem, 'BeforeLeave', player) end
     invoke('MgrPlayerData', MgrMap.MgrPlayerData, 'OnPlayerRemoving', player)
@@ -277,7 +224,6 @@ local function ContinuePlayerRemoving(player, leaving)
             if name ~= 'MgrPlayerData' then invoke(name, mgr, 'OnPlayerRemoving', player) end
         end
     end
-    -- SaveLeaving/ReleaseSession 登记后仍须排空最终快照，才能让新会话认领同一存档键。
     MgrMap.MgrSave:AfterIdle(player.UserId, function()
         if LeavingPlayers[player.UserId] ~= leaving then return end
         LeavingPlayers[player.UserId], CurrentPlayers[player.UserId] = nil, nil
@@ -320,7 +266,6 @@ end
 
 Players.PlayerAdded:Connect(HandlePlayerAdded)
 Players.PlayerRemoving:Connect(HandlePlayerRemoving)
---处理玩家在事件注册之前就加入的情况
 local plst = Players:GetPlayers()
 for _, player in pairs(plst)  do
     HandlePlayerAdded(player)

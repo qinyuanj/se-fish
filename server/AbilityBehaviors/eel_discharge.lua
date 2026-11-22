@@ -1,5 +1,3 @@
--- 电鳗放电：每次锚点点火只结算一次，对球形范围内所有活着的玩家扣血。
--- 不按鱼主人或小队过滤；非玩家受击体不会被放电误伤。#128 起伤害经统一命中身份。
 local M = { Services = {} }
 
 function M.Discharge(owner, radius, damage, hit)

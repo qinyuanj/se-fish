@@ -1,4 +1,3 @@
--- 五效果的业务装配：层数、持续与到期归 modifier_system；这里只保存 DOT 相位和末次业务来源。
 local ModifierAPI = require('server.packages.modifier_system.api')
 local GameCfg = require('common.GameCfg')
 local Mgr = { ModifierAPI = ModifierAPI, Targets = {}, Characters = {}, Departing = {}, WeakCarry = {} }
@@ -38,7 +37,6 @@ function Mgr:Drain(entry, kind, st)
     while st.nextTickAt and st.nextTickAt <= now and st.nextTickAt <= finish do
         if entry.carrier and entry.carrier.Dead then return end
         if self.Targets[entry.key] ~= entry or entry.effects[kind] ~= st then return end
-        -- 先推进相位，伤害回调重入不能重复结算本跳。
         st.nextTickAt = st.nextTickAt + cfg.TickSec
         if self.Vitals then
             local hit = self.Vitals:NewHit(st.source, 'dot')
@@ -64,7 +62,6 @@ function Mgr:Apply(source, target, kind, seconds)
         self.Targets[key] = entry
     end
     local old = entry.effects[kind]
-    -- 先补齐旧实例到期边界，避免同帧重获继承已过期层数。
     if old and self:Now() >= old.entity:GetAttribute('EndTime') then
         self:Drain(entry, kind, old)
         self.ModifierAPI.RemoveModifier(old.entity)

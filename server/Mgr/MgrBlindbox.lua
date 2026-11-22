@@ -1,5 +1,3 @@
--- #147 盲盒：收费意图先持久化，成功后重新分配操作序号；奖品/收集/保底同事务落账。
--- 溢出保留持久待交付记录，按服务器生命周期和稳定交付键落地；跨世界未知交付不自动补发，归#148对账。
 local GameCfg = require('common.GameCfg')
 local BlindboxDraw = require('common.BlindboxDraw')
 local Mgr = { LastSeq = {}, Working = {}, Outcomes = {} }
@@ -14,7 +12,6 @@ function Mgr:Reply(player, payload)
     if payload.seq == nil then payload.seq = self.ReplySeq and self.ReplySeq[player.UserId] end
     _G.REUtil:GetRE('BlindboxResult'):FireClient(player, payload)
 end
--- 仅裁剪无待交付权益的终态；查询不存在的身份只能过期，绝不重新购买。
 local function prune(b)
     local keep = {}
     for key, i in pairs(b.intents) do
@@ -53,7 +50,6 @@ function Mgr:Settle(draft, count, key)
     return { ok = true, action = 'Draw', count = count, draws = draws,
         pityBefore = before, pityAfter = after, grounded = grounded, operation = { id = key } }
 end
--- 每次写入临执行时重新分配序号；同步拒绝显式回包，权益仍在持久意图中等待重试。
 function Mgr:Write(player, kind, transform, done)
     local id = player.UserId
     if self.Working[id] then return false, 'pending' end
@@ -82,7 +78,7 @@ function Mgr:Publish(player, result, key)
     result.deliveryPending = pending
     local intent = data and bag(data).intents[key]
     result.seq, result.requestId = intent and intent.seq, key
-    if pending then result.grounded = 0 end -- 尚未实际交付，不能声称已落地
+    if pending then result.grounded = 0 end
     self:Reply(player, result)
     self.PlayerData:SendItemBar(player)
 end
@@ -141,7 +137,7 @@ function Mgr:Pump(player)
             end
         end)
         return
-        end -- 旧世界记录留待对账，继续检查当前世界交付
+        end
     end
 end
 function Mgr:Handle(player, payload)

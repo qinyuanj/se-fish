@@ -1,5 +1,3 @@
--- 服务端体型投影的相机表现；CameraUnit.Distance签名见EggyAPI.lua。
--- 引擎预设相机是否接受该写入仍待最终人工试玩；其他模块改相机后让出拥有权。
 local BodyScale = require('common.BodyScale')
 local GameCfg = require('common.GameCfg')
 local M = {}

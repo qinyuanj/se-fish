@@ -1,5 +1,3 @@
--- #40：正式完成/跳过以及兜底的明确已读操作，落账到 Extra.story.read 后才确认。
--- 未配置正式 Story 资源时展示可保留阅读的对话，不自动把公告当成已读。
 local GameCfg = require('common.GameCfg')
 
 local Mgr = { States = {}, Requested = {}, Connections = {} }

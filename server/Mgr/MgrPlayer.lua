@@ -61,7 +61,6 @@ function Mgr:OnPlayerRemoving(player)
 			v:Disconnect()
 		end	
 	end
-	-- 在此处执行清理逻辑，例如移除玩家相关的 UI、数据或资源
 end
 
 function Mgr:Update(deltaTime)

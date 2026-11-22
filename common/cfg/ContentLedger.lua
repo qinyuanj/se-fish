@@ -1,7 +1,3 @@
--- #251 实现标记纯台账：五张内容表的实现状态只有这一份真源。
--- 纯记录：不 require 业务模块、不在加载期改写内容表、不作为运行期开关。
--- implemented=false 时不得有 path；implemented=true 时 path 必须是真实业务文件。
--- 一致性由 common/ContentValidation.lua 在快速车道校验，原始表行用 source 回查。
 return {
     Fish = {
         ['alligatorGar'] = { source = '钓鱼表!R15', implemented = true, path = 'server/Mgr/MgrFishUnit.lua' },
