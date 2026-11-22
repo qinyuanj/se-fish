@@ -181,4 +181,41 @@ describe('条款 17-18：分享任务的占位入口', function()
         assert.same('PlaceholderFlow', opened.action)
         assert.is_true(opened.open)
     end)
+
+    -- 重开侧（与上一条闸门用例配对）：显式打开 AllowInPublish 后，分享与占位广告也恢复可用——
+    -- 分享不再以「未开放」拒绝，回到占位入口自身的原因与文案；占位广告能开出占位 flow。
+    -- 闸门是显式开关，不是把占位通道焊死。
+    -- 失败方式（先列后写）：
+    --   0. 闸门打开后分享仍报「未开放」，或占位广告仍开不出 flow；
+    --   1. 放开的占位路径顺手发了真实权益（金币或商品件数变化）。
+    it('19-13 发布构建显式打开 AllowInPublish 后分享与占位广告恢复可用', function()
+        GameCfg.Debug.Enabled = false
+        GameCfg.Platform.Placeholder.Enabled = true
+        GameCfg.Platform.Placeholder.AllowInPublish = true
+        local coin = env.data.Data.FishCoin
+        local itemId = GameCfg.Survival.AdrenalineItemId
+        local before = env.data:ItemCount(itemId)
+        -- 分享：不再以「未开放」拒绝，回到占位入口自身的原因与文案；仍不发真实权益
+        assert.is_true(env.platform:HandleAction(env.player, { action = 'Share', purpose = 'tutorial' }))
+        local share = lastReply()
+        assert.is_table(share)
+        assert.same('Share', share.action)
+        assert.is_false(share.ok)
+        assert.same('placeholder', share.reason, '显式开放后分享应回到占位入口，而不是「未开放」')
+        assert.same(GameCfg.Platform.Share.UnavailableText, share.text)
+        assert.same(coin, env.data.Data.FishCoin, '占位分享不得改金币')
+        assert.same(before, env.data:ItemCount(itemId), '占位分享不得发物品')
+        -- 占位广告：能开出占位 flow，参数来自共享配置的占位广告位
+        assert.is_true(env.platform:ShowAd(env.player, 'revive', 'revive', function() end),
+            '显式开放后占位广告应能开出 flow')
+        local flow = lastReply()
+        assert.same('PlaceholderFlow', flow.action)
+        assert.is_true(flow.open)
+        assert.same('ad', flow.kind)
+        assert.same(GameCfg.Platform.Placeholder.Ads.revive, flow.goodsId,
+            '占位广告位参数必须来自共享配置')
+        assert.is_true(env.platform:HasFlow(env.player))
+        -- 收起 flow，避免影响同一用例后续断言
+        assert.is_true(env.platform:ResolvePlaceholder(env.player, 'cancel'))
+    end)
 end)
