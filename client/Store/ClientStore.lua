@@ -59,7 +59,7 @@ local DEFAULT_CHANNELS = {
   "CloseScreenRE",
 }
 
-local function clone_value(value, depth)
+local function freeze_snapshot(value, depth, label)
   if type(value) ~= "table" then
     return value
   end
@@ -68,9 +68,25 @@ local function clone_value(value, depth)
   end
   local copy = {}
   for k, v in pairs(value) do
-    copy[k] = clone_value(v, depth + 1)
+    copy[k] = freeze_snapshot(v, depth + 1, label)
   end
-  return copy
+  return setmetatable({}, {
+    __index = copy,
+    __newindex = function(_, key)
+      error((label or "ClientStore.Snapshot") .. " 为只读快照，禁止修改字段: " .. tostring(key), 2)
+    end,
+    __pairs = function()
+      return pairs(copy)
+    end,
+    __len = function()
+      return #copy
+    end,
+    __metatable = false,
+  })
+end
+
+local function clone_value(value, depth)
+  return freeze_snapshot(value, depth or 0, "ClientStore.Snapshot")
 end
 
 local function freeze_table(fields, label)
@@ -146,7 +162,7 @@ local function sanitize_position(pos)
   if not Number.IsFiniteNumber(x) or not Number.IsFiniteNumber(y) or not Number.IsFiniteNumber(z) then
     return nil, false
   end
-  return { x = x, y = y, z = z }, true
+  return freeze_snapshot({ x = x, y = y, z = z }, 0, "ClientStore.position"), true
 end
 
 local function resolve_zone(pos, zones)
@@ -176,12 +192,12 @@ local function normalize_survival(payload)
   if type(phase) ~= "string" or not VALID_SURVIVAL_PHASES[phase] then
     return nil
   end
-  return {
+  return freeze_snapshot({
     phase = phase,
     endsAt = Number.IsFiniteNumber(payload.endsAt) and payload.endsAt or nil,
     weakUntil = Number.IsFiniteNumber(payload.weakUntil) and payload.weakUntil or nil,
     platformPending = payload.platformPending and true or nil,
-  }
+  }, 0, "ClientStore.survival")
 end
 
 local function normalize_party(payload)
@@ -232,13 +248,13 @@ local function normalize_party(payload)
       expiresInSec = payload.invite.expiresInSec,
     }
   end
-  return {
+  return freeze_snapshot({
     state = payload.state,
     partyId = payload.partyId,
     members = members,
     invite = invite,
     notice = type(payload.notice) == "string" and payload.notice or nil,
-  }
+  }, 0, "ClientStore.party")
 end
 
 local function normalize_table_snapshot(payload)
@@ -259,13 +275,11 @@ local function default_host()
     end,
     heartbeat = RunService.Heartbeat,
     get_server_time = function()
-      local ok, now = pcall(function()
-        return World:GetServerTime()
-      end)
+      local ok, now = pcall(function() return World:GetServerTime() end) -- 宿主时钟未就绪或异常时安全降级为 dt 步进
       return ok and now or nil
     end,
     get_local_position = function()
-      local ok, pos = pcall(function()
+      local ok, pos = pcall(function() -- 角色销毁/切换瞬态读取 Position 可能抛错，安全忽略等待下一帧
         local player = Players.LocalPlayer
         local character = player and player.Character
         return character and character.Position or nil
@@ -296,12 +310,12 @@ function ClientStore.new(options)
   local states = {
     connected = State.new("ClientStore.connected", false),
     item_bar = State.new("ClientStore.item_bar", nil),
-    survival = State.new("ClientStore.survival", { phase = "alive" }),
-    party = State.new("ClientStore.party", { state = "none", members = {} }),
+    survival = State.new("ClientStore.survival", freeze_snapshot({ phase = "alive" }, 0, "ClientStore.survival")),
+    party = State.new("ClientStore.party", freeze_snapshot({ state = "none", members = {} }, 0, "ClientStore.party")),
     cast = State.new("ClientStore.cast", nil),
     special_item = State.new("ClientStore.special_item", nil),
     fish_combat = State.new("ClientStore.fish_combat", nil),
-    loot = State.new("ClientStore.loot", {}),
+    loot = State.new("ClientStore.loot", freeze_snapshot({}, 0, "ClientStore.loot")),
     quest = State.new("ClientStore.quest", nil),
     story = State.new("ClientStore.story", nil),
     ferry = State.new("ClientStore.ferry", nil),
@@ -313,7 +327,7 @@ function ClientStore.new(options)
     zone_name = State.new("ClientStore.zone_name", nil),
     active_modal = State.new("ClientStore.active_modal", nil),
     modal_payload = State.new("ClientStore.modal_payload", nil),
-    overlays = State.new("ClientStore.overlays", {}),
+    overlays = State.new("ClientStore.overlays", freeze_snapshot({}, 0, "ClientStore.overlays")),
   }
 
   local on_server_event = Trigger.new("ClientStore.on_server_event")
@@ -455,19 +469,19 @@ function ClientStore.new(options)
       end
     end
     next_overlays[overlay_id] = flag and true or nil
-    states.overlays:set(next_overlays)
+    states.overlays:set(freeze_snapshot(next_overlays, 0, "ClientStore.overlays"))
   end
 
   function writer:reset_session(reason)
     SpokeRuntime.batch(function()
       states.connected:set(false)
       states.item_bar:set(nil)
-      states.survival:set({ phase = "alive" })
-      states.party:set({ state = "none", members = {} })
+      states.survival:set(freeze_snapshot({ phase = "alive" }, 0, "ClientStore.survival"))
+      states.party:set(freeze_snapshot({ state = "none", members = {} }, 0, "ClientStore.party"))
       states.cast:set(nil)
       states.special_item:set(nil)
       states.fish_combat:set(nil)
-      states.loot:set({})
+      states.loot:set(freeze_snapshot({}, 0, "ClientStore.loot"))
       states.quest:set(nil)
       states.story:set(nil)
       states.ferry:set(nil)
@@ -479,7 +493,7 @@ function ClientStore.new(options)
       states.zone_name:set(nil)
       states.active_modal:set(nil)
       states.modal_payload:set(nil)
-      states.overlays:set({})
+      states.overlays:set(freeze_snapshot({}, 0, "ClientStore.overlays"))
       on_reconnect:invoke({ reason = reason or "reset" })
     end)
   end
@@ -527,14 +541,13 @@ function ClientStore.new(options)
           return
         end
         local now = type(get_server_time) == "function" and get_server_time() or nil
-        SpokeRuntime.batch(function()
-          self:step_clock(dt, now)
-          if type(get_local_position) == "function" then
-            local pos = get_local_position()
-            local zones = type(get_zones) == "function" and get_zones() or nil
-            self:update_spatial(pos, zones)
-          end
-        end)
+        -- 先独立步进时钟（保留跨多秒时 SpokeClock 逐秒 batch 排空语义），再原子更新空间传感状态
+        self:step_clock(dt, now)
+        if type(get_local_position) == "function" then
+          local pos = get_local_position()
+          local zones = type(get_zones) == "function" and get_zones() or nil
+          self:update_spatial(pos, zones)
+        end
       end)
       connections[#connections + 1] = hb_conn
     end

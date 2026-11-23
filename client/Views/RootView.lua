@@ -50,18 +50,21 @@ local function default_create_node(kind, props)
 end
 
 local function destroy_node_safely(node)
-  if node == nil or node.Destroyed then
+  if node == nil then
     return
   end
-  if type(node.Destroy) == "function" then
-    node:Destroy()
+  local ok_flag, destroyed = pcall(function() return node.Destroyed end) -- 真机 Unit userdata 无 Destroyed 字段，仅测试双暴露
+  if ok_flag and destroyed then
+    return
   end
+  pcall(function() node:Destroy() end) -- 宿主节点可能已随父级销毁失效，忽略重复销毁异常
 end
 
 local function disconnect_safely(conn)
-  if conn ~= nil and type(conn.Disconnect) == "function" then
-    conn:Disconnect()
+  if conn == nil then
+    return
   end
+  pcall(function() conn:Disconnect() end) -- 宿主连接可能已随节点销毁自动断开，忽略重复断开异常
 end
 
 ---@param root_node table 宿主根 UI 节点（须带 Destroying 信号）

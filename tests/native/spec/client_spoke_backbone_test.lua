@@ -102,7 +102,32 @@ describe("客户端 Spoke 主干契约（#296）", function()
       assert.equals(10, store.clock.now())
       writer:open_modal("shop", { stand = "fishPond" })
       assert.equals("shop", store.active_modal:now())
-      assert.same({ stand = "fishPond" }, store.modal_payload:now())
+      assert.equals("fishPond", store.modal_payload:now().stand)
+
+      -- 视图侧禁止就地篡改嵌套快照/位置/蒙版表，且不污染内部状态
+      writer:set_overlay("aim", true)
+      writer:update_spatial({ x = 10, y = 2, z = 5 }, {
+        fishPond = { Boundary = { MinX = -50, MaxX = 50, MinZ = -50, MaxZ = 50 } },
+      })
+      writer:ingest_event("PartyState", {
+        state = "party",
+        partyId = 3,
+        members = { { userId = 1, name = "甲", health = 300, maxHealth = 300 } },
+      })
+
+      assert.has_error(function() store.survival:now().phase = "dead" end)
+      assert.has_error(function() store.overlays:now().aim = false end)
+      assert.has_error(function() store.overlays:now().injected = true end)
+      assert.has_error(function() store.position:now().x = 999 end)
+      assert.has_error(function() store.modal_payload:now().stand = "hacked" end)
+      assert.has_error(function() store.party:now().members[1].health = 0 end)
+
+      assert.equals("alive", store.survival:now().phase)
+      assert.is_true(store.overlays:now().aim)
+      assert.is_nil(store.overlays:now().injected)
+      assert.equals(10, store.position:now().x)
+      assert.equals("fishPond", store.modal_payload:now().stand)
+      assert.equals(300, store.party:now().members[1].health)
     end)
 
     it("宿主绑定一次性连接下行 RemoteEvent 与 Heartbeat，归一化写入并在单次 batch 内同步位置与钓鱼区", function()
@@ -223,6 +248,28 @@ describe("客户端 Spoke 主干契约（#296）", function()
       assert.same({ x = 150, zone_id = "shrimpPond", zone_name = "虾池" }, spatial_renders[#spatial_renders])
       assert.equals(3, #spatial_renders)
 
+      -- 卡顿单帧跨多秒：SpokeClock 须逐秒排空，前一秒卸载的 Phase 在后续整秒不再误跑
+      local ticking = spoke.State.new("ticking", true)
+      local ticks_left = 2
+      local phase_secs = {}
+      local countdown_tree = spoke.SpokeTree.spawn("StutterCountdown", spoke.Effect.new(function(s)
+        s:phase("ActiveCountdown", ticking, function(ps)
+          ps:subscribe(store.clock.on_second, function(sec)
+            phase_secs[#phase_secs + 1] = sec
+            ticks_left = ticks_left - 1
+            if ticks_left <= 0 then
+              ticking:set(false)
+            end
+          end)
+        end)
+      end))
+      server_now = 106.0
+      heartbeat:Fire(4.0)
+      assert.equals(106, store.clock.second:now())
+      assert.is_false(ticking:now())
+      assert.same({ 103, 104 }, phase_secs)
+      countdown_tree:dispose()
+
       -- 3) 释放宿主绑定后断开全部连接，后续事件不再写入仓库
       binding:dispose()
       binding:dispose() -- 幂等
@@ -232,11 +279,11 @@ describe("客户端 Spoke 主干契约（#296）", function()
 
       remote_events.SurvivalState.OnClientEvent:Fire({ phase = "dead", endsAt = 150 })
       char_pos = { x = 0, y = 0, z = 0 }
-      server_now = 105.0
-      heartbeat:Fire(3.0)
+      server_now = 110.0
+      heartbeat:Fire(4.0)
       assert.equals("downed", store.survival:now().phase)
       assert.equals("shrimpPond", store.zone_id:now())
-      assert.equals(102, store.clock.second:now())
+      assert.equals(106, store.clock.second:now())
 
       tree:dispose()
     end)
@@ -528,12 +575,150 @@ describe("客户端 Spoke 主干契约（#296）", function()
       end
     end)
 
-    it("client/main.lua 已接入 SpokeClock、ClientStore 与 RootView 主干", function()
-      local fs = require("tests.support.fs_fixture")
-      local src = assert(fs.slurp("client/main.lua"), "读不到 client/main.lua")
-      assert.is_truthy(src:find("common.SpokeClock", 1, true))
-      assert.is_truthy(src:find("client.Store.ClientStore", 1, true))
-      assert.is_truthy(src:find("client.Views.RootView", 1, true))
+    it("client/main.lua 在宿主测试双下真实装配只读 ClientSpoke、绑定事件传感并挂载 RootView", function()
+      local stub_modules = {
+        "common.ZoneMarkers",
+        "common.REUtil",
+        "client.GameUI",
+        "client.LocalMgrUtil",
+        "client.LocalMotorUnitCtrl",
+        "client.LocalReelIn",
+        "client.LocalLoot",
+        "client.LocalInteract",
+        "client.LocalGM",
+        "client.LocalShop",
+        "client.LocalLottery",
+        "client.ScreenHandlers.ScreenLottery",
+        "client.ScreenHandlers.ScreenFerry",
+        "client.ScreenHandlers.ScreenSurvival",
+        "client.ScreenHandlers.ScreenParty",
+        "client.ScreenHandlers.ScreenGrill",
+        "client.ScreenHandlers.ScreenBlindbox",
+        "client.ScreenHandlers.ScreenPlatform",
+        "client.ScreenHandlers.ScreenCompendium",
+        "client.LocalGarBite",
+        "client.LocalCastSource",
+        "client.LocalAttr",
+        "client.packages.ability_system.api",
+        "client.Store.ClientStore",
+        "client.Views.RootView",
+      }
+      local saved_loaded = {}
+      for _, name in ipairs(stub_modules) do
+        saved_loaded[name] = package.loaded[name]
+      end
+      local saved_globals = {
+        game = rawget(_G, "game"),
+        MgrGameUI = rawget(_G, "MgrGameUI"),
+        LocalReelIn = rawget(_G, "LocalReelIn"),
+        ClientSpoke = rawget(_G, "ClientSpoke"),
+      }
+
+      local heartbeat = Eui.Signal()
+      local remote_events = {}
+      local server_now = 50.0
+      local char_pos = { x = 12, y = 2, z = 8 }
+      local ui_root = Eui.Node({ Name = "MainUIRoot" })
+      local zones = {
+        fishPond = { Boundary = { MinX = -50, MaxX = 50, MinZ = -50, MaxZ = 50 } },
+      }
+      local noop = function() end
+      local noop_module = { Start = noop }
+
+      local ok, err = pcall(function()
+        package.loaded["common.ZoneMarkers"] = { Start = noop, Zones = zones }
+        package.loaded["common.REUtil"] = {
+          GetRE = function(_, name)
+            if not remote_events[name] then
+              remote_events[name] = { OnClientEvent = Eui.Signal() }
+            end
+            return remote_events[name]
+          end,
+        }
+        package.loaded["client.GameUI"] = {
+          GetUIRoot = function() return ui_root end,
+        }
+        package.loaded["client.packages.ability_system.api"] = { StartClientLifecycle = noop }
+        for _, name in ipairs({
+          "client.LocalMgrUtil", "client.LocalMotorUnitCtrl", "client.LocalReelIn",
+          "client.LocalLoot", "client.LocalInteract", "client.LocalGM",
+          "client.LocalShop", "client.LocalLottery",
+          "client.ScreenHandlers.ScreenLottery", "client.ScreenHandlers.ScreenFerry",
+          "client.ScreenHandlers.ScreenSurvival", "client.ScreenHandlers.ScreenParty",
+          "client.ScreenHandlers.ScreenGrill", "client.ScreenHandlers.ScreenBlindbox",
+          "client.ScreenHandlers.ScreenPlatform", "client.ScreenHandlers.ScreenCompendium",
+          "client.LocalGarBite", "client.LocalCastSource", "client.LocalAttr",
+        }) do
+          package.loaded[name] = noop_module
+        end
+        -- 强制重新加载真实 ClientStore 以绑定到 stub 后的 ZoneMarkers / REUtil
+        package.loaded["client.Store.ClientStore"] = nil
+        package.loaded["client.Views.RootView"] = nil
+
+        _G.MgrGameUI = {
+          HideLiftButton = noop,
+          HideNativeHealth = noop,
+          OpenScreen = noop,
+          StartGM = noop,
+        }
+        _G.ClientSpoke = nil
+        _G.game = {
+          GetService = function(_, name)
+            if name == "Task" then
+              return {
+                Spawn = function(_, fn) fn() end,
+                Delay = noop,
+                Wait = noop,
+              }
+            end
+            if name == "World" then
+              return { GetServerTime = function() return server_now end }
+            end
+            if name == "RunService" then
+              return { Heartbeat = heartbeat }
+            end
+            if name == "Players" then
+              return { LocalPlayer = { Character = { Position = char_pos } } }
+            end
+            return {}
+          end,
+        }
+
+        assert(loadfile("client/main.lua"))()
+
+        -- 验证仅暴露只读侧 Store 与 Clock，不暴露 writer
+        assert.is_table(_G.ClientSpoke)
+        assert.is_nil(_G.ClientSpoke.writer)
+        assert.is_nil(_G.ClientSpoke.Writer)
+        local cs = _G.ClientSpoke.Store
+        assert.has_error(function() cs.survival = {} end)
+        assert.has_error(function() cs.survival:now().phase = "dead" end)
+        assert.equals(50, _G.ClientSpoke.Clock.second:now())
+
+        -- 验证下行远程事件与 Heartbeat 传感均已接通
+        remote_events.ItemBarState.OnClientEvent:Fire({ coins = 321 })
+        assert.equals(321, cs.item_bar:now().coins)
+        server_now = 51.0
+        heartbeat:Fire(1.0)
+        assert.equals(51, cs.clock.second:now())
+        assert.equals("fishPond", cs.zone_id:now())
+        assert.equals("鱼塘", cs.zone_name:now())
+
+        -- 验证 RootView 已挂载到根 UI 节点并在销毁时自动清理
+        assert.equals(1, ui_root.Destroying:Count())
+        ui_root:Destroy()
+        assert.equals(0, ui_root.Destroying:Count())
+      end)
+
+      for name, value in pairs(saved_loaded) do
+        package.loaded[name] = value
+      end
+      for name, value in pairs(saved_globals) do
+        _G[name] = value
+      end
+      if not ok then
+        error(err, 0)
+      end
     end)
   end)
 end)
