@@ -14,22 +14,6 @@
 local function vec(x, y, z) return { x = x, y = y, z = z } end
 local GameCfg = require('common.GameCfg')
 
-local WIRING = {
-  'MgrMap.MgrInteract.PlayerData = MgrMap.MgrPlayerData',
-  'MgrMap.MgrInteract.Save = MgrMap.MgrSave',
-  'MgrMap.MgrInteract.Vitals = Life',
-  'MgrMap.MgrInteract.Survival = Life',
-  'local Life = WorldRuntime.life',
-}
-local function assert_wiring()
-  local handle = assert(io.open('server/main.lua', 'rb'), '读不到 server/main.lua')
-  local source = handle:read('a')
-  handle:close()
-  for _, line in ipairs(WIRING) do
-    assert.is_truthy(source:find(line, 1, true), 'server/main.lua 里找不到接线：' .. line)
-  end
-end
-
 local function signal()
   local slots = {}
   return {
@@ -101,7 +85,6 @@ describe('条款 9/11 他人抢救', function()
   end
 
   before_each(function()
-    assert_wiring()
     env = { cfg = GameCfg, now = 100, queue = {}, sent = {}, re = {}, values = {} }
     env.cfg.Debug = { Enabled = false }
     env.cfg.Save.QaSlot = ''
@@ -170,16 +153,17 @@ describe('条款 9/11 他人抢救', function()
     env.PlayerData = require('server.Data.PlayerData')
     env.save = assert(loadfile('server/Mgr/MgrSave.lua'))()
     env.players = assert(loadfile('server/Mgr/MgrPlayerData.lua'))()
+    env.players.Save, env.save.PlayerData = env.save, env.players
     env.lifeHost = require('tests.support.life_host').start({
       now = env.now or 100, remote = re, player_data = env.players, save = env.save,
+      bind_interact_action = function(dispatch)
+        re:GetRE("InteractAction").OnServerEvent:Connect(function(player, payload)
+          dispatch(player, payload)
+        end)
+      end,
     })
     env.v = env.lifeHost.runtime.life
     env.s = env.v
-    env.interact = assert(loadfile('server/Mgr/MgrInteract.lua'))()
-    env.players.Save, env.save.PlayerData = env.save, env.players
-    env.interact.PlayerData, env.interact.Save = env.players, env.save
-    env.interact.Vitals, env.interact.Survival = env.v, env.v
-    env.interact:Start()
   end)
 
   after_each(function()
@@ -219,88 +203,6 @@ describe('条款 9/11 他人抢救', function()
     assert.same('alive', env.s:Phase(downed))
     request(join(7005, 1), { target = 'downedPlayer', action = 'Rescue', targetUserId = downed.UserId, seq = 1 })
     assert.is_false(lastReply('InteractResult').payload.ok, '已恢复的目标不能再次被救')
-  end)
-
-  -- 9-17 客户端：抢救提示复用现有 InteractionBubble 与 InteractAction 通道，不另造入口。
-  it('9-17 客户端复用交互气泡发起抢救', function()
-    env.clientNodes = {}
-    local localPlayer = { UserId = 41, Character = { Position = vec(0, 0, 0) },
-      PlayerGui = { EuiManager = { CreateSceneNodeAtPosition = function(_, position)
-        local node = { Position = position, Visible = false }
-        function node:Destroy() self.Destroyed = true end
-        env.clientNodes.RescueRoot = node
-        return node
-      end } } }
-    env.playersService.LocalPlayer = localPlayer
-    local target = { UserId = 42, Character = { Position = vec(1, 0, 0) },
-      GetAttribute = function(_, key) return key == 'SurvivalPhase' and 'downed' or nil end }
-    env.clientPlayers = { localPlayer, target }
-    local client = assert(loadfile('client/LocalInteract.lua'))()
-    client:Update()
-    assert.is_true(env.clientNodes.RescueRoot.Visible, '2 米内的濒死玩家显示抢救气泡')
-
-    local sent = env.sent.InteractAction or {}
-    local before = #sent
-    env.clientNodes.BtnRescue42.OnClicked:Fire()
-    assert.same(before + 1, #sent, '点击气泡只发一次交互请求')
-    assert.same('downedPlayer', sent[#sent].payload.target)
-    assert.same('Rescue', sent[#sent].payload.action)
-    assert.same(42, sent[#sent].payload.targetUserId)
-    assert.same(before + 1, sent[#sent].payload.seq, '与喂食共用递增 seq')
-
-    -- 抢救开始后相位变 'rescuing'：气泡保持显示，施救途中不凭空消失（旧写法这里恒为不可见）。
-    target.GetAttribute = function(_, key) return key == 'SurvivalPhase' and 'rescuing' or nil end
-    client:Update()
-    assert.is_true(env.clientNodes.RescueRoot.Visible, '抢救中气泡保持显示')
-    target.GetAttribute = function(_, key) return key == 'SurvivalPhase' and 'downed' or nil end
-    client:Update()
-
-    target.Character.Position = vec(5, 0, 0)
-    client:Update()
-    assert.is_false(env.clientNodes.RescueRoot.Visible, '走出 2 米后收起气泡')
-    target.Character.Position = vec(1, 0, 0)
-    target.GetAttribute = function() return 'alive' end
-    client:Update()
-    assert.is_false(env.clientNodes.RescueRoot.Visible, '被救起后收起气泡')
-
-    -- 离场（下线 / 换区）：气泡节点整棵拆掉，不是只藏起来留成看不见的残留单位。
-    env.clientPlayers = { localPlayer }
-    client:Update()
-    assert.is_true(env.clientNodes.RescueRoot.Destroyed, '离场玩家的抢救气泡要销毁，不只 Visible=false')
-  end)
-
-  -- #271：抢救中气泡保持可点（#254 口径），重复点击被服务端 busy 拒绝；
-  -- 回执必须给玩家可见提示，不能静默，否则玩家会以为点击没生效。
-  it('9-17 客户端抢救 busy 回执给出正在抢救中提示', function()
-    local notices = {}
-    _G.LocalMsgNotice = function(msg) notices[#notices + 1] = msg end
-    local client = assert(loadfile('client/LocalInteract.lua'))()
-    local ok, err = pcall(client.OnResult, client, { action = 'Rescue', ok = false, reason = 'busy' })
-    _G.LocalMsgNotice = nil
-    assert.is_true(ok, tostring(err))
-    assert.same({ '正在抢救中' }, notices)
-  end)
-
-  it('9-17 客户端按钮创建失败会销毁抢救气泡根节点', function()
-    env.clientNodes = {}
-    local root
-    local localPlayer = { UserId = 41, Character = { Position = vec(0, 0, 0) },
-      PlayerGui = { EuiManager = { CreateSceneNodeAtPosition = function(_, position)
-        root = { Position = position, Visible = false }
-        function root:Destroy() self.Destroyed = true end
-        return root
-      end } } }
-    env.playersService.LocalPlayer = localPlayer
-    env.clientPlayers = { localPlayer, { UserId = 42, Character = { Position = vec(1, 0, 0) },
-      GetAttribute = function(_, key) return key == 'SurvivalPhase' and 'downed' or nil end } }
-    local client = assert(loadfile('client/LocalInteract.lua'))()
-    client.Button = function() return nil end
-
-    client:Update()
-
-    assert.is_not_nil(root)
-    assert.is_true(root.Destroyed, '按钮创建失败后不能泄漏已创建的根节点')
-    assert.is_nil(client.RescueBubbles[42], '创建失败的气泡不能进入管理表')
   end)
 
   -- 11-03（review #249-10）：抢救中濒死倒计时到点，撤销抢救不再先播一份 downed，转死亡只广播一次。

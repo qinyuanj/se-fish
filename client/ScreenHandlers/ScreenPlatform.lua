@@ -197,7 +197,7 @@ function Panel:Open()
 end
 
 function Panel:OpenFromHud()
-    local texts = require('client.LocalShop').ShopText
+    local texts = require('client.Views.ShopView').ShopText
     local platform = rawget(_G, 'PlatformShop')
     if type(platform) ~= 'table' or type(platform.Open) ~= 'function' then
         notice(texts.PlatformUnavailable)

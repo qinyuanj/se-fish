@@ -390,7 +390,7 @@ describe('平台购买界面（ScreenPlatform）', function()
   it('test_hud_map_shop_entry_reports_existing_failure_and_stays', function()
     local entry = env.nodes.BtnMapShopEntry
     assert.is_not_nil(entry)
-    local texts = require('client.LocalShop').ShopText
+    local texts = require('client.Views.ShopView').ShopText
 
     rawset(_G, 'PlatformShop', nil)
     entry.OnClicked:Fire()

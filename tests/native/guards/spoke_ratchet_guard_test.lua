@@ -31,11 +31,11 @@ local PACKAGE_SNAPSHOTS = {
 
 -- 三类存量债务水位线（只减不增；每个垂直切片完成后单调下调对应数值直至归零）。
 local DEBT_WATERMARKS = {
-  -- #302/#309/#310 合并后实测：OwnedUnits 33、旧债务裸 Connect 68、MgrMap 17。
+  -- #311 删除商店/钓鱼佬双端旧模块后实测：OwnedUnits 25、旧债务裸 Connect 57、MgrMap 15。
   -- 水位只减不增；后续切片应继续下降，不能为通过门禁调高。
-  owned_units_calls = 33,
-  legacy_raw_connects = 68,
-  mgr_map_members = 17,
+  owned_units_calls = 25,
+  legacy_raw_connects = 57,
+  mgr_map_members = 15,
 }
 
 local BUSINESS_ROOTS = { "client", "common", "server" }
@@ -321,11 +321,11 @@ describe("Spoke 原生重构机械棘轮守卫", function()
         { from = "server.World.PlayerTree", to = "server.Mgr.MgrVitals" },
         { from = "server.World.PlayerTree", to = "server.AbilityAPI" },
         { from = "server.World.PlayerTree", to = "common.OwnedUnits" },
-        { from = "client.Store.ClientStore", to = "client.LocalInteract" },
+        { from = "client.Store.ClientStore", to = "client.LocalLoot" },
         { from = "client.Store.ClientStore", to = "client.Views.RootView" },
         { from = "client.Views.RootView", to = "client.MgrGameUI" },
         { from = "client.Views.RootView", to = "client.ScreenHandlers.ScreenMain" },
-        { from = "client.Views.ReelOverlayView", to = "client.LocalInteract" },
+        { from = "client.Views.ReelOverlayView", to = "client.LocalLottery" },
         { from = "client.Views.RootView", to = "common.OwnedUnits" },
         { from = "common.SpokeClock", to = "common.OwnedUnits" },
       }

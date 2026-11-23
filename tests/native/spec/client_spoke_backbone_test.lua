@@ -579,13 +579,12 @@ describe("客户端 Spoke 主干契约（#296）", function()
       local stub_modules = {
         "common.ZoneMarkers",
         "common.REUtil",
+        "common.Util",
         "client.GameUI",
         "client.LocalMgrUtil",
         "client.LocalMotorUnitCtrl",
         "client.LocalLoot",
-        "client.LocalInteract",
         "client.LocalGM",
-        "client.LocalShop",
         "client.LocalLottery",
         "client.ScreenHandlers.ScreenLottery",
         "client.ScreenHandlers.ScreenFerry",
@@ -619,6 +618,7 @@ describe("客户端 Spoke 主干契约（#296）", function()
       local char_pos = { x = 12, y = 2, z = 8 }
       local ui_root = Eui.Node({ Name = "MainUIRoot" })
       local created_hud_nodes = {}
+      local mounted_view
       local zones = {
         fishPond = { Boundary = { MinX = -50, MaxX = 50, MinZ = -50, MaxZ = 50 } },
       }
@@ -646,10 +646,10 @@ describe("客户端 Spoke 主干契约（#296）", function()
         package.loaded["client.GameUI"] = game_ui_stub
         _G.GameUI = game_ui_stub
         package.loaded["client.packages.ability_system.api"] = { StartClientLifecycle = noop }
+        package.loaded["common.Util"] = nil
         for _, name in ipairs({
           "client.LocalMgrUtil", "client.LocalMotorUnitCtrl",
-          "client.LocalLoot", "client.LocalInteract", "client.LocalGM",
-          "client.LocalShop", "client.LocalLottery",
+          "client.LocalLoot", "client.LocalGM", "client.LocalLottery",
           "client.ScreenHandlers.ScreenLottery", "client.ScreenHandlers.ScreenFerry",
           "client.ScreenHandlers.ScreenParty",
           "client.ScreenHandlers.ScreenBlindbox",
@@ -663,6 +663,12 @@ describe("客户端 Spoke 主干契约（#296）", function()
         package.loaded["client.Views.RootView"] = nil
         package.loaded["client.Views.CameraZoomView"] = nil
         package.loaded["client.Views.MainHudVitalsView"] = nil
+        local root_view_module = require("client.Views.RootView")
+        local real_mount = root_view_module.mount
+        root_view_module.mount = function(...)
+          mounted_view = real_mount(...)
+          return mounted_view
+        end
         package.loaded["client.Views.GrillView"] = nil
 
         _G.MgrGameUI = {
@@ -684,6 +690,7 @@ describe("客户端 Spoke 主干契约（#296）", function()
             if name == "World" then
               return {
                 GetServerTime = function() return server_now end,
+                FindFirstChild = function() return nil end,
                 CreateUnit = function(_, kind, props)
                   props = props or {}
                   local node = Eui.Node({
@@ -700,10 +707,12 @@ describe("客户端 Spoke 主干契约（#296）", function()
               }
             end
             if name == "RunService" then
-              return { Heartbeat = heartbeat }
+              return { Heartbeat = heartbeat, IsClient = function() return true end, IsServer = function() return false end }
             end
             if name == "Players" then
-              return { LocalPlayer = { Character = { Position = char_pos } } }
+              local players = { LocalPlayer = { Character = { Position = char_pos } } }
+              players.GetPlayers = function() return { players.LocalPlayer } end
+              return players
             end
             return {}
           end,
@@ -730,6 +739,8 @@ describe("客户端 Spoke 主干契约（#296）", function()
         assert.equals("鱼塘", cs.zone_name:now())
 
         -- 验证 RootView 与 MainHudVitalsView 已挂载到根 UI 节点并在销毁时自动清理
+        assert.is_not_nil(mounted_view)
+        assert.is_nil(mounted_view.root.fault, tostring(mounted_view.root.fault))
         assert.is_true(#created_hud_nodes > 0)
         assert.equals(1, ui_root.Destroying:Count())
         ui_root:Destroy()

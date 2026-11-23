@@ -28,7 +28,8 @@ local lfs = require("lfs")
 -- #309 旧活鱼驱动迁入 server/World/FishTree 等公开宿主。
 -- #310 烧烤视图改由 RootView 统一建点，删除 ScreenGrill 自己的 1 处建点。
 -- #302 抛竿/收线迁入统一生命周期并删除旧模块；合并后实测 client 29 / common 2 / server 26。
-local SITES = 57
+-- #311 商店/钓鱼佬视图统一挂 RootView，删除旧客户端 4 处建点；实测 client 25 / common 2 / server 26。
+local SITES = 53
 local SITE_ROOTS = { "client", "common", "server" }
 local REF_ROOTS = { "client", "common", "server", "tests", "tools" }
 local REMOVED = { "FXUtil", "WeldTo", "MarkPointPart", "CreateHPBar" }

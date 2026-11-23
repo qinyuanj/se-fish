@@ -24,6 +24,8 @@
 --   旧 setUp/tearDown 逐例映射为 before_each/after_each（Debug 开关逐案例还原，不看前例遗留）；
 --   lu.assertNotEquals 是深不等，映射为 assert.are_not.same；lu.assertNotNil → is_not_nil。
 local RandomGuard = require("tests.support.random_guard")
+local Host = require("tests.support.shop_feed_host")
+local GameCfg = require("common.GameCfg")
 
 local function newPlayer(id)
   local player = { UserId = id, Attrs = {}, Character = { Position = { x = 0, y = 0, z = 0 } } }
@@ -87,6 +89,12 @@ local function newWorld()
         }
         return true
       end,
+      RecordFact = function(_, draft, kind, payload)
+        sink.facts[#sink.facts + 1] = {
+          kind = kind, player = draft.Player, itemId = payload.itemId, eventId = payload.eventId,
+        }
+        return true
+      end,
     }
   end
 
@@ -99,6 +107,7 @@ local function newWorld()
   end
 
   function env:cleanup()
+    if self.host then self.host:shutdown() self.host = nil end
     self.cfg.Debug = self.savedDebug
   end
 
@@ -186,26 +195,18 @@ describe("新手任务九步（MgrQuest × QuestSteps × 玩法事实）", funct
   end)
 
   it("test_feed_notifies_each_success_with_distinct_ids", function()
-    local data = env:makeData(0)
+    env.host = Host.start({ quest = env:spyQuest() })
+    local player, data = env.host:join(1, GameCfg.Interact.Fishermen[1].AnchorNames[1])
     data.Data.Bait.worm = 2
     data:SelectBait("worm")
-    local interact = assert(loadfile("server/Mgr/MgrInteract.lua"))()
-    interact.PlayerData = {
-      GetDataInst = function()
-        return data
-      end,
-      SendItemBar = function() end,
-    }
-    interact.InRange = function()
-      return {}
+    local function feed(seq)
+      local reply = env.host:send(player, "InteractAction", { target = "fisherman", action = "Feed", seq = seq })
+      return reply and reply.ok or false
     end
-    interact.Reply = function() end
-    interact.PlayEat = function() end
-    interact.Quest = env:spyQuest()
-    assert.is_true(interact:Handle(env.a, { target = "fisherman", action = "Feed", seq = 1 }))
-    assert.is_false(interact:Handle(env.a, { target = "fisherman", action = "Feed", seq = 1 }))
-    assert.is_true(interact:Handle(env.a, { target = "fisherman", action = "Feed", seq = 2 }))
-    assert.is_false(interact:Handle(env.a, { target = "fisherman", action = "Feed", seq = 3 })) -- 没有可喂物
+    assert.is_true(feed(1))
+    assert.is_true(feed(1), "重放回原结果但不重复记任务")
+    assert.is_true(feed(2))
+    assert.is_false(feed(3)) -- 没有可喂物
     assert.same(2, #env.facts)
     assert.same({ "Feed", "worm" }, { env.facts[1].kind, env.facts[1].itemId })
     assert.is_not_nil(env.facts[1].eventId)
@@ -351,34 +352,26 @@ describe("新手任务九步（MgrQuest × QuestSteps × 玩法事实）", funct
   end)
 
   it("test_shop_notifies_only_on_success", function()
-    local data = env:makeData(5)
-    local shop = assert(loadfile("server/Mgr/MgrShop.lua"))()
-    shop.PlayerData = {
-      GetDataInst = function()
-        return data
-      end,
-      SendItemBar = function() end,
-    }
-    env.inRange = false
-    shop.Interact = {
-      InRange = function()
-        return env.inRange
-      end,
-    }
-    shop.Reply = function() end
-    shop.Quest = env:spyQuest()
-    shop:Handle(env.a, { action = "Buy", itemId = "starterRod", seq = 1 })
+    env.host = Host.start({ quest = env:spyQuest() })
+    local player, data = env.host:join(1, GameCfg.Shop.Stands[1].AnchorName)
+    data.Data.FishCoin = 5
+    local function buy(itemId, seq)
+      local reply = env.host:send(player, "ShopAction", { action = "Buy", itemId = itemId, seq = seq })
+      return reply and reply.ok or false
+    end
+    player.Character.Position.x = 100000
+    assert.is_false(buy("starterRod", 1))
     assert.same(0, #env.facts)
-    env.inRange = true
-    assert.is_true(shop:Handle(env.a, { action = "Buy", itemId = "starterRod", seq = 2 }))
-    assert.is_false(shop:Handle(env.a, { action = "Buy", itemId = "starterRod", seq = 2 }))
-    assert.is_false(shop:Handle(env.a, { action = "Buy", itemId = "starterRod", seq = 3 })) -- 余额 0
+    player.Character.Position.x = 0
+    assert.is_true(buy("starterRod", 2))
+    assert.is_true(buy("starterRod", 2), "重放回原结果但不重复记任务")
+    assert.is_false(buy("starterRod", 3)) -- 余额 0
     assert.same(1, #env.facts)
     assert.same("Buy", env.facts[1].kind)
     assert.same("starterRod", env.facts[1].itemId)
     assert.is_not_nil(env.facts[1].eventId)
     data.Data.FishCoin = 1
-    assert.is_true(shop:Handle(env.a, { action = "Buy", itemId = "worm", seq = 4 }))
+    assert.is_true(buy("worm", 4))
     assert.are_not.same(env.facts[2].eventId, env.facts[1].eventId)
   end)
 

@@ -7,7 +7,7 @@
 --   5. 幂等错：同 seq 重复点击双扣、operation 重放重发奖、断线重进恢复时又发一次；
 --   6. 持久化错：写库失败却把结果发布给玩家；结果未先落账就回包；
 --   7. 校验缺失：不在抽奖机旁也能抽；payload 畸形导致报错而不是拒绝。
--- seam：MgrLottery:Handle / OnPlayerAdded；真实 PlayerData、MgrPlayerData、MgrSave、MgrInteract，
+-- seam：MgrLottery:Handle / OnPlayerAdded；真实 PlayerData、MgrPlayerData、MgrSave、InteractionPoints，
 --   替换引擎边界（game / REUtil / DataStore）；随机数经 MgrLottery.Random 注入（系统边界）。
 -- 迁移说明：案例按旧 LuaUnit 实际执行序（方法名字典序）逐个 it 注册；随机数走模块字段注入，
 --   未替换 math.random，仍逐案例还原全局随机函数。
@@ -147,10 +147,9 @@ local function newWorld()
   }
   env.save = assert(loadfile("server/Mgr/MgrSave.lua"))()
   env.players = assert(loadfile("server/Mgr/MgrPlayerData.lua"))()
-  env.interact = assert(loadfile("server/Mgr/MgrInteract.lua"))()
+  env.interact = require("server.World.InteractionPoints")
   env.lottery = assert(loadfile("server/Mgr/MgrLottery.lua"))()
   env.players.Save, env.save.PlayerData = env.save, env.players
-  env.interact.PlayerData, env.interact.Save = env.players, env.save
   env.lottery.PlayerData, env.lottery.Save, env.lottery.Interact = env.players, env.save, env.interact
   env.rolls = {}
   env.lottery.Random = function()
@@ -166,7 +165,7 @@ local function newWorld()
   return env
 end
 
-describe("抽奖机服务端结算（MgrLottery × MgrSave × MgrInteract）", function()
+describe("抽奖机服务端结算（MgrLottery × MgrSave × InteractionPoints）", function()
   local env
   before_each(function()
     env = newWorld()
@@ -272,7 +271,7 @@ describe("抽奖机服务端结算（MgrLottery × MgrSave × MgrInteract）", f
     assert.is_true(env.data:AddItem("carp")) -- 普通食物
     assert.is_true(env.data:AddItem("item7", nil, 1.5)) -- 烤鱼（烤制倍率字段，#137 最小约定）
     assert.is_true(env.data:AddItem("item31"))
-    -- 烤过信物：存档格位的 saved.cooked 布尔标记（同 MgrInteract 权威口径）
+    -- 烤过信物：存档格位的 saved.cooked 布尔标记（同 PlayerFisherman 权威口径）
     env.data.Data.Containers[ITEM_BAR][3].saved = { cooked = true }
     env:persistReady()
     for slot, reason in ipairs({ "not-premium", "cooked", "cooked" }) do

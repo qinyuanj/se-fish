@@ -394,6 +394,9 @@ function ClientStore.new(options)
     zone_name = State.new("ClientStore.zone_name", nil),
     vitals = State.new("ClientStore.vitals", default_vitals(), vitals_equals),
     coin = State.new("ClientStore.coin", 0),
+    shop = State.new("ClientStore.shop", freeze_snapshot({
+      purchases = {}, upgradeLevels = {}, upgradeLevel = 0,
+    }, 0, "ClientStore.shop")),
     local_character = State.new("ClientStore.local_character", nil),
     camera_distance = State.new("ClientStore.camera_distance", nil),
     hud_visible = State.new("ClientStore.hud_visible", true),
@@ -442,6 +445,7 @@ function ClientStore.new(options)
     zone_name = readonly_signal(states.zone_name, "ClientStore.zone_name"),
     vitals = readonly_signal(states.vitals, "ClientStore.vitals"),
     coin = readonly_signal(states.coin, "ClientStore.coin"),
+    shop = readonly_signal(states.shop, "ClientStore.shop"),
     local_character = readonly_signal(states.local_character, "ClientStore.local_character"),
     camera_distance = readonly_signal(states.camera_distance, "ClientStore.camera_distance"),
     hud_visible = readonly_signal(states.hud_visible, "ClientStore.hud_visible"),
@@ -493,6 +497,24 @@ function ClientStore.new(options)
     local cloned = clone_value(payload, 0)
     SpokeRuntime.batch(function()
       states.connected:set(true)
+      if channel == "ShopResult" and type(payload) == "table" then
+        local previous = states.shop:now()
+        local purchases, upgrade_levels = {}, {}
+        for key, value in pairs(previous.purchases or {}) do purchases[key] = value end
+        for key, value in pairs(previous.upgradeLevels or {}) do upgrade_levels[key] = value end
+        local upgrade_level = previous.upgradeLevel or 0
+        if payload.ok then
+          if payload.number then purchases[payload.number] = (purchases[payload.number] or 0) + 1 end
+          if payload.kind and payload.level then
+            upgrade_levels[payload.kind] = math.max(upgrade_levels[payload.kind] or 0, payload.level)
+          end
+          if payload.action == "UpgradeStorage" and payload.level then upgrade_level = payload.level end
+        end
+        states.shop:set(freeze_snapshot({
+          purchases = purchases, upgradeLevels = upgrade_levels, upgradeLevel = upgrade_level,
+        }, 0, "ClientStore.shop"))
+        if Number.IsFiniteNumber(payload.coinAfter) then states.coin:set(math.floor(payload.coinAfter)) end
+      end
       on_server_event:invoke({ channel = channel, payload = cloned })
     end)
     return true

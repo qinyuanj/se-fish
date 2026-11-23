@@ -18,6 +18,8 @@ local ModifierLeaf = require("server.World.ModifierLeaf")
 local AbilityLeaf = require("server.World.AbilityLeaf")
 local PlayerWeapon = require("server.World.PlayerWeapon")
 local PlayerGrill = require("server.World.PlayerGrill")
+local PlayerShop = require("server.World.PlayerShop")
+local PlayerFisherman = require("server.World.PlayerFisherman")
 local SwingRegistry = require("server.SwingRegistry")
 local PkDamageFilter = require("server.World.PkDamageFilter")
 local FishTree = require("server.World.FishTree")
@@ -95,6 +97,8 @@ function ServerRuntime.new(opts)
 
   local weapon_sessions = {}
   local grill_handles = {}
+  local shop_handles = {}
+  local fisherman_handles = {}
   local entity_modifiers = nil
   if opts.entity_modifiers then
     local em_opts = type(opts.entity_modifiers) == "table" and opts.entity_modifiers or {}
@@ -201,6 +205,22 @@ function ServerRuntime.new(opts)
 
   function runtime:is_leaving(user_id)
     return leaving_players[user_id] ~= nil
+  end
+
+  -- 服务端真机探针与 RE 绑定共用的公开命令入口；不暴露会话内部句柄。
+  function runtime:dispatch_interact(actor, payload)
+    if self:is_leaving(actor and actor.UserId) then return false end
+    if type(payload) == "table" and payload.target == GameCfg.Rescue.Target then
+      return self.life:RescueAction(actor, payload)
+    end
+    local fisherman = fisherman_handles[actor and actor.UserId]
+    return fisherman and fisherman.handle(actor, payload) or false
+  end
+
+  function runtime:dispatch_shop(actor, payload)
+    if self:is_leaving(actor and actor.UserId) then return false end
+    local shop = shop_handles[actor and actor.UserId]
+    return shop and shop.handle(actor, payload) or false
   end
 
   function runtime:step(dt, now)
@@ -412,6 +432,28 @@ function ServerRuntime.new(opts)
         if grill_handles[user_id] == grill then grill_handles[user_id] = nil end
       end)
     end)
+    player_tree:mount_phase("alive", "shop", function(scope)
+      local shop = PlayerShop.mount(scope, player_tree, {
+        remote = opts.remote,
+        save = opts.save,
+        quest = opts.quest,
+      })
+      shop_handles[user_id] = shop
+      scope:on_cleanup(function()
+        if shop_handles[user_id] == shop then shop_handles[user_id] = nil end
+      end)
+    end)
+    player_tree:mount_phase("alive", "fisherman", function(scope)
+      local fisherman = PlayerFisherman.mount(scope, player_tree, {
+        remote = opts.remote,
+        save = opts.save,
+        quest = opts.quest,
+      })
+      fisherman_handles[user_id] = fisherman
+      scope:on_cleanup(function()
+        if fisherman_handles[user_id] == fisherman then fisherman_handles[user_id] = nil end
+      end)
+    end)
     if player_tree.set_damage_filter and runtime._damage_filter then
       player_tree:set_damage_filter(runtime._damage_filter())
     end
@@ -446,6 +488,22 @@ function ServerRuntime.new(opts)
           local fishing = player_tree and player_tree.fishing
           if not fishing then return false end
           return fishing:reel(kind, payload)
+        end)
+      end
+    end
+    if not runtime._fisherman_bound then
+      runtime._fisherman_bound = true
+      if type(opts.bind_interact_action) == "function" then
+        opts.bind_interact_action(function(actor, payload)
+          return runtime:dispatch_interact(actor, payload)
+        end)
+      end
+    end
+    if not runtime._shop_bound then
+      runtime._shop_bound = true
+      if type(opts.bind_shop_action) == "function" then
+        opts.bind_shop_action(function(actor, payload)
+          return runtime:dispatch_shop(actor, payload)
         end)
       end
     end
@@ -921,6 +979,74 @@ function ServerRuntime.new(opts)
     local tree = tree_of(player)
     if not tree then return nil end
     return { player = player, phase = tree.states.life_phase:now(), tree = tree }
+  end
+
+  function life:RescueAction(player, payload)
+    if type(payload) ~= "table" or payload.action ~= GameCfg.Rescue.Action then return false end
+    local seq = payload.seq
+    if type(seq) ~= "number" or seq ~= math.floor(seq) or seq < 1 or seq > 2147483647 then return false end
+    local function reply(result)
+      if opts.remote and type(opts.remote.GetRE) == "function" then
+        opts.remote:GetRE("InteractResult"):FireClient(player, result)
+      end
+      return result
+    end
+    if type(payload.targetUserId) ~= "number" then
+      reply({ action = "Rescue", ok = false, reason = "invalid", seq = seq })
+      return false
+    end
+    local data = opts.player_data and opts.player_data:GetDataInst(player)
+    local save = opts.save
+    if not data or not save then return false end
+    local request_id = payload.operation
+    if request_id ~= nil and type(request_id) ~= "table" then return false end
+    if request_id == nil then request_id = seq end
+    local operation, mode = save:ResolveRequest(player, data, "rescue", request_id)
+    if not operation then return false end
+    if mode == "replay" then
+      return save:Execute(player, data, operation, function() return nil, "expired" end,
+        function(ok, result)
+          if ok then result.operation = operation reply(result) end
+        end) == true
+    end
+    local target = nil
+    for _, candidate in pairs(active_players) do
+      if candidate.UserId == payload.targetUserId then target = candidate break end
+    end
+    local target_tree = target and player_trees[target.UserId]
+    local phase = target_tree and target_tree.states.life_phase:now()
+    if not target or (phase ~= "downed" and phase ~= "rescuing") then
+      reply({ action = "Rescue", ok = false, reason = "not-downed", seq = seq, targetUserId = payload.targetUserId })
+      return false
+    end
+    local from = player.Character and player.Character.Position
+    local to = target.Character and target.Character.Position
+    if not from or not to then
+      reply({ action = "Rescue", ok = false, reason = "no-position", seq = seq, targetUserId = target.UserId })
+      return false
+    end
+    local dx, dz = from.x - to.x, from.z - to.z
+    if math.sqrt(dx * dx + dz * dz) > GameCfg.Rescue.Range then
+      reply({ action = "Rescue", ok = false, reason = "too-far", seq = seq, targetUserId = target.UserId })
+      return false
+    end
+    local can, reason = self:CanRescue(target, player)
+    if not can then
+      reply({ action = "Rescue", ok = false, reason = reason, seq = seq, targetUserId = target.UserId })
+      return false
+    end
+    local started, why = self:BeginRescue(target, player)
+    return save:Execute(player, data, operation, function()
+      return { ok = started == true, action = "Rescue", targetUserId = target.UserId, reason = why }
+    end, function(written, result)
+      if not written then
+        if started then self:CancelRescue(self:GetState(target)) end
+        reply({ action = "Rescue", ok = false, reason = tostring(result), seq = seq, targetUserId = target.UserId })
+        return
+      end
+      result.operation = operation
+      reply(result)
+    end) == true
   end
 
   function life:CanRescue(target, rescuer)

@@ -60,10 +60,9 @@ local function newWorld()
   }
   env.save = assert(loadfile('server/Mgr/MgrSave.lua'))()
   env.players = assert(loadfile('server/Mgr/MgrPlayerData.lua'))()
-  env.interact = assert(loadfile('server/Mgr/MgrInteract.lua'))()
+  env.interact = require('server.World.InteractionPoints')
   env.lottery = assert(loadfile('server/Mgr/MgrLottery.lua'))()
   env.players.Save, env.save.PlayerData = env.save, env.players
-  env.interact.PlayerData, env.interact.Save = env.players, env.save
   env.lottery.PlayerData, env.lottery.Save, env.lottery.Interact = env.players, env.save, env.interact
   env.rolls = {}
   env.lottery.Random = function()

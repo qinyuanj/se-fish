@@ -6,7 +6,7 @@ local cfg = require('common.GameCfg')
 local units = require('server.World.FishTree')
 local pd = require('server.Mgr.MgrPlayerData')
 local weapons = require('server.Mgr.MgrWeapon')
-local interact = require('server.Mgr.MgrInteract')
+local ServerRuntime = require('server.World.ServerRuntime')
 local ferry = require('server.Mgr.MgrFerry')
 local world, task = game:GetService('World'), game:GetService('Task')
 local player = game:GetService('Players'):GetPlayers()[1]
@@ -30,7 +30,8 @@ local snap = data:GetItemBarSnapshot()
 local slot = snap.selectedSlot and snap.slots[snap.selectedSlot]
 if slot and (slot.itemId == 'item47' or slot.itemId == 'item48') then
     log('兑换请求', slot.itemId)
-    interact:Handle(player, { target = 'fisherman', action = 'Feed', seq = rt.seq })
+    local runtime = ServerRuntime.current and ServerRuntime.current()
+    if runtime then runtime:dispatch_interact(player, { target = 'fisherman', action = 'Feed', seq = rt.seq }) end
 end
 -- 外部选择rt.routeId后可重跑：日志记录实际航线与扣款，不默认移动玩家。
 if rt.routeId then
