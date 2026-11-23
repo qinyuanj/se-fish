@@ -6,11 +6,7 @@ local GameCfg = require("common.GameCfg")
 local AbilityAPI = require("server.AbilityAPI")
 local AbilityPackageAPI = require("server.packages.ability_system.api")
 
-local Mgr = { PendingFishCleanup = {} }
-
-Mgr.Managers = {}
-Mgr.CharacterSignals = {}
-Mgr.SpeedBase = {}
+local Mgr = { PendingFishCleanup = {}, SpeedBase = {} }
 
 local EQUIP_RETRY_INTERVAL = 0.1
 local EQUIP_RETRY_COUNT = 50
@@ -65,57 +61,6 @@ local function createAnchor(abilityScript, entry)
         return nil
 	end
 	return anchor
-end
-
-local function characterReadable(character)
-	local ok, err = pcall(function()
-		return character:GetChildren()
-	end)
-	if not ok then
-		print("[MgrAbility] 角色已不可读，放弃装备: " .. tostring(err))
-	end
-	return ok
-end
-
--- 管理器就绪需要等：管理器脚本 Attach 之后才会打上 AbilityManager 标签，
--- 而 AddAbility 靠这个标签反查管理器，早于此会拿不到。
-local function equip(character, entry)
-	Task:Spawn(function()
-		for _ = 1, EQUIP_RETRY_COUNT do
-			if not characterReadable(character) then
-				return
-			end
-			local abilityScript = AbilityPackageAPI.AddAbility(character, entry.AssetId, entry.Index)
-			if abilityScript then
-				if entry.CdSec then abilityScript:SetAttribute("CdTime", entry.CdSec) end
-				if entry.CastSec then abilityScript:SetAttribute("CastTime", entry.CastSec) end
-				if entry.Anchor then
-					createAnchor(abilityScript, entry)
-				end
-				return
-			end
-			Task:Wait(EQUIP_RETRY_INTERVAL)
-		end
-		print("[MgrAbility] 装备技能超时: " .. tostring(entry.AssetId))
-	end)
-end
-
-local function setUpPlayer(mgr, player, character)
-	if not character then
-		return
-	end
-	local manager = createManager(character, GameCfg.Ability.ManagerPreset)
-	if not manager then
-		return
-	end
-	mgr.Managers[player.UserId] = manager
-
-	local initialAbilities = GameCfg.Ability.InitialAbilities or {}
-	for _, entry in ipairs(initialAbilities) do
-		if entry.AssetId and entry.AssetId ~= "" then
-			equip(character, entry)
-		end
-	end
 end
 
 function Mgr:RemoveFish(fish)
@@ -294,31 +239,15 @@ function Mgr:Start()
 end
 
 function Mgr:OnPlayerAdded(player)
-	if self.CharacterSignals[player.UserId] then
-		return
-	end
-
-	self.CharacterSignals[player.UserId] = player.CharacterAdded:Connect(function(character)
-		setUpPlayer(self, player, character)
-		self:CaptureBaseSpeed(player)
-		self:ApplyGrowth(player)
-	end)
-
-	if player.Character then
-		setUpPlayer(self, player, player.Character)
+	-- 玩家角色能力管理器挂载与角色生命周期监听已迁至 PlayerTree / AbilityLeaf；
+	-- 此处仅保留过渡期成长首刷兼容（供未接入 ServerRuntime 的单测或延迟就绪路径）。
+	if self.Attr and player and player.Character then
 		self:CaptureBaseSpeed(player)
 		self:ApplyGrowth(player)
 	end
 end
 
 function Mgr:OnPlayerRemoving(player)
-	local signal = self.CharacterSignals[player.UserId]
-	if signal then
-		signal:Disconnect()
-		self.CharacterSignals[player.UserId] = nil
-	end
-
-	self.Managers[player.UserId] = nil
 	if self.PendingGrowth then self.PendingGrowth[player.UserId] = nil end
 	if self.PendingSpeed then self.PendingSpeed[player.UserId] = nil end
 	self.SpeedBase[player.UserId] = nil

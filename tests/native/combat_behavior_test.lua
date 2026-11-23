@@ -139,7 +139,7 @@ describe('TestMainCombatWiring', function()
             'MgrMap.MgrAbility.BehaviorServices = {',
             'Vitals = MgrMap.MgrVitals',
             'FishCarrier = MgrMap.MgrFishCarrier',
-            'Modifier = MgrMap.MgrModifier',
+            'Modifier = ModifierBridge',
             'GM = MgrMap.MgrGM',
             'MgrMap.MgrFishCarrier.DamageListener',
             -- 有效鱼受击伤害要回报仇恨：监听里必须经 FindByCarrier 找回鱼并 NoteDamage

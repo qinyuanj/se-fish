@@ -12,6 +12,9 @@ local Number = require("common.Number")
 local SpokeClock = require("common.SpokeClock")
 local SharedWorldTree = require("server.World.SharedWorldTree")
 local PlayerTree = require("server.World.PlayerTree")
+local AttrLeaf = require("server.World.AttrLeaf")
+local ModifierLeaf = require("server.World.ModifierLeaf")
+local AbilityLeaf = require("server.World.AbilityLeaf")
 
 local ServerRuntime = {}
 local current_runtime = nil
@@ -64,9 +67,24 @@ function ServerRuntime.new(opts)
   local leaving_players = {}
   local ready_queue = {}
 
+  local entity_modifiers = nil
+  if opts.entity_modifiers then
+    local em_opts = type(opts.entity_modifiers) == "table" and opts.entity_modifiers or {}
+    entity_modifiers = ModifierLeaf.create_entity_store({
+      modifier_api = em_opts.modifier_api,
+      presets = em_opts.presets,
+      now = function()
+        return clock.now()
+      end,
+      on_dot_tick = em_opts.on_dot_tick,
+      on_error = em_opts.on_error,
+    })
+  end
+
   local runtime = {
     clock = clock,
     world = nil,
+    entity_modifiers = entity_modifiers,
     _started = false,
   }
 
@@ -108,6 +126,10 @@ function ServerRuntime.new(opts)
     return player_trees[user_id]
   end
 
+  function runtime:get_entity_modifiers()
+    return entity_modifiers
+  end
+
   function runtime:is_leaving(user_id)
     return leaving_players[user_id] ~= nil
   end
@@ -118,6 +140,9 @@ function ServerRuntime.new(opts)
     end
     local valid_now = now ~= nil and Number.IsFiniteNumber(now) and now or nil
     clock:step(dt, valid_now)
+    if entity_modifiers then
+      entity_modifiers:step(clock.now())
+    end
   end
 
   function runtime:on_player_added(player)
@@ -163,14 +188,58 @@ function ServerRuntime.new(opts)
     end
 
     local world = self:start()
+    local effects_opts = nil
+    if type(opts.player_effects) == "table" or opts.modifier_leaf then
+      effects_opts = {}
+      if type(opts.player_effects) == "table" then
+        for k, v in pairs(opts.player_effects) do
+          effects_opts[k] = v
+        end
+      end
+      if opts.modifier_leaf and effects_opts.on_mount_modifier_leaf == nil then
+        local ml_opts = type(opts.modifier_leaf) == "table" and opts.modifier_leaf or nil
+        effects_opts.on_mount_modifier_leaf = ModifierLeaf.make_slot_mounter(ml_opts)
+      end
+    end
+
+    local mounts = nil
+    local base_mounts = type(opts.player_mounts) == "table" and opts.player_mounts or nil
+    if base_mounts or opts.attr_leaf or opts.ability_leaf then
+      mounts = {}
+      if base_mounts then
+        for k, v in pairs(base_mounts) do
+          mounts[k] = v
+        end
+      end
+      local base_leaves = base_mounts and base_mounts.leaves
+      if opts.attr_leaf or opts.ability_leaf then
+        mounts.leaves = function(s, pt)
+          if opts.attr_leaf then
+            local al_opts = type(opts.attr_leaf) == "table" and opts.attr_leaf or nil
+            AttrLeaf.mount(s, pt, al_opts)
+          end
+          if opts.ability_leaf then
+            local ab_opts = type(opts.ability_leaf) == "table" and opts.ability_leaf or nil
+            AbilityLeaf.mount(s, pt, ab_opts)
+          end
+          if type(base_leaves) == "function" then
+            base_leaves(s, pt)
+          end
+        end
+      end
+    end
+
     local player_tree = PlayerTree.spawn({
       player = player,
       data = data,
       clock = clock,
       world = world,
       logger = opts.logger,
+      create_unit = opts.create_unit,
+      on_item_bar_state = opts.on_item_bar_state,
+      effects = effects_opts,
       on_leave_finalize = opts.on_leave_finalize,
-      mounts = opts.player_mounts,
+      mounts = mounts,
     })
     active_players[user_id] = player
     player_trees[user_id] = player_tree
@@ -216,6 +285,16 @@ function ServerRuntime.new(opts)
     -- 离场三步协议 Step 2：同步 dispose() 按逆序拆除全部在场资源与局部信号连接。
     if player_tree then
       player_tree:dispose()
+    end
+
+    -- 清理离场玩家施加给其他玩家或活鱼/非玩家实体的持续效果，防止离线来源继续 DoT。
+    for _, other_tree in pairs(player_trees) do
+      if other_tree and type(other_tree.clear_modifiers_by_source) == "function" then
+        other_tree:clear_modifiers_by_source(player)
+      end
+    end
+    if entity_modifiers then
+      entity_modifiers:clear_by_source(player)
     end
 
     -- 离场三步协议 Step 3：宿主执行离线保存序列化与异步排空栅栏。
@@ -282,6 +361,9 @@ function ServerRuntime.new(opts)
     end
     if self.world then
       self.world:dispose()
+    end
+    if entity_modifiers then
+      entity_modifiers:clear_all()
     end
     current_players = {}
     active_players = {}

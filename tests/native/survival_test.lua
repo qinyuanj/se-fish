@@ -921,7 +921,7 @@ describe('TestSurvivalTakeover', function()
         assert.matches('MgrMap.MgrSurvival.Save = MgrMap.MgrSave', src, nil, true)
         assert.matches('MgrMap.MgrVitals:SetLifeHooks(MgrMap.MgrSurvival:Hooks())', src, nil, true)
         -- 就绪批次与离开顺序：Survival 紧随 Vitals；终镜像先于 SaveLeaving 序列化
-        assert.matches("'MgrAttr', 'MgrPlayer', 'MgrVitals', 'MgrModifier', 'MgrSurvival', 'MgrAbility', 'MgrFishUnit'", src, nil, true)
+        assert.matches("'MgrPlayer', 'MgrVitals', 'MgrSurvival', 'MgrAbility', 'MgrFishUnit'", src, nil, true)
         assert.matches([[invoke('MgrSurvival', MgrMap.MgrSurvival, 'BeforeLeave', player)]], src, nil, true)
     end)
 

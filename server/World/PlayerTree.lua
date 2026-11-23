@@ -40,6 +40,26 @@ local function deep_copy(value)
   return out
 end
 
+local function deep_equal(a, b)
+  if a == b then
+    return true
+  end
+  if type(a) ~= "table" or type(b) ~= "table" then
+    return false
+  end
+  for k, v in pairs(a) do
+    if not deep_equal(v, b[k]) then
+      return false
+    end
+  end
+  for k in pairs(b) do
+    if a[k] == nil then
+      return false
+    end
+  end
+  return true
+end
+
 local function is_non_negative_int(value)
   return Number.IsFiniteNumber(value) and value >= 0 and value == math.floor(value)
 end
@@ -254,6 +274,7 @@ function PlayerTree.spawn(opts)
     cooldowns = State.new("PlayerTree.cooldowns", deep_copy(raw_cooldowns)),
     save_version = State.new("PlayerTree.save_version", 0),
     character = State.new("PlayerTree.character", ok_char and initial_character or nil),
+    held_rod_retry = State.new("PlayerTree.held_rod_retry", 0),
     -- Stage 2: 持续效果与属性修饰输入
     base_speed = State.new("PlayerTree.base_speed", nil),
     is_weak = State.new("PlayerTree.is_weak", (raw_survival.weakRemaining or 0) > 0),
@@ -431,6 +452,37 @@ function PlayerTree.spawn(opts)
       s:export("world", opts.world)
     end
 
+    -- 托管玩家角色生命周期信号（CharacterAdded / CharacterRemoving），树销毁时对称断开，零泄漏。
+    local ok_added_sig, added_sig = pcall(function() return player.CharacterAdded end) -- 兼容引擎 userdata 或精简替身对象
+    if ok_added_sig and added_sig ~= nil and added_sig.Connect ~= nil then
+      local ok_conn, conn_added = pcall(added_sig.Connect, added_sig, function(character)
+        if not handle:is_disposed() then
+          states.character:set(character)
+        end
+      end) -- 兼容只读/异常信号对象
+      if ok_conn and conn_added ~= nil then
+        s:on_cleanup(function()
+          pcall(conn_added.Disconnect, conn_added) -- 玩家或信号可能已随引擎卸载
+        end)
+      end
+    end
+
+    local ok_rem_sig, rem_sig = pcall(function() return player.CharacterRemoving end) -- 兼容引擎 userdata 或精简替身对象
+    if ok_rem_sig and rem_sig ~= nil and rem_sig.Connect ~= nil then
+      local ok_conn, conn_rem = pcall(rem_sig.Connect, rem_sig, function(character)
+        if not handle:is_disposed() then
+          if character == nil or states.character:now() == character then
+            states.character:set(nil)
+          end
+        end
+      end) -- 兼容只读/异常信号对象
+      if ok_conn and conn_rem ~= nil then
+        s:on_cleanup(function()
+          pcall(conn_rem.Disconnect, conn_rem) -- 玩家或信号可能已随引擎卸载
+        end)
+      end
+    end
+
     -- 1. 存档与库存（SaveInventory）
     s:effect("Stage1:SaveInventory", function(s1)
       memos.item_bar_capacity = s1:memo("ItemBarCapacity", function(ms)
@@ -559,6 +611,11 @@ function PlayerTree.spawn(opts)
         log_error("[PlayerTree]", msg)
       end,
     })
+
+    -- 树底扩展叶子挂点（供 ServerRuntime 挂载 AttrLeaf / AbilityLeaf 等官方包纯输出叶子）。
+    if type(mounts.leaves) == "function" then
+      mounts.leaves(s, handle)
+    end
 
     -- 树底：单批合并同步节点（等待 Stage1..4 初始化完成后绑定 memos.item_bar_snapshot 与单批合并 Reaction）。
     s:effect("Stage5:StateSync", function(sb)
@@ -754,6 +811,96 @@ function PlayerTree.spawn(opts)
 
   function handle:set_character(character)
     states.character:set(character)
+    return true
+  end
+
+  --- 将外部（过渡期 PlayerData）最新字段单批同步进 PlayerTree Stage 1 状态，仅变更项触发下游重算。
+  ---@param source_data? table
+  function handle:sync_from_data(source_data)
+    if self:is_disposed() then
+      return false
+    end
+    local src = type(source_data) == "table" and source_data or data
+    if type(src) ~= "table" then
+      return false
+    end
+    local d = type(src.Data) == "table" and src.Data or {}
+    local c = type(d.Containers) == "table" and d.Containers or {}
+    local extra = type(src.Extra) == "table" and src.Extra or {}
+    local inv = type(extra.inventory) == "table" and extra.inventory or {}
+    local sel = type(inv.selection) == "table" and inv.selection or {}
+    local growth = type(extra.growth) == "table" and extra.growth or {}
+    local potions = type(growth.potions) == "table" and growth.potions or {}
+    local upgrades = type(growth.upgrades) == "table" and growth.upgrades or {}
+    local cds = type(extra.cooldowns) == "table" and extra.cooldowns or {}
+
+    SpokeRuntime.batch(function()
+      local next_coin = d.FishCoin or 0
+      if states.coin:now() ~= next_coin then states.coin:set(next_coin) end
+
+      local next_zone = d.Zone or states.zone_id:now()
+      if states.zone_id:now() ~= next_zone then states.zone_id:set(next_zone) end
+
+      local next_upgrade = d.UpgradeLevel or 0
+      if states.upgrade_level:now() ~= next_upgrade then states.upgrade_level:set(next_upgrade) end
+
+      local next_item_bar = c[container_ids.ItemBar] or {}
+      if not deep_equal(states.item_bar:now(), next_item_bar) then
+        states.item_bar:set(deep_copy(next_item_bar))
+      end
+
+      local next_backpack = c[container_ids.Backpack] or {}
+      if not deep_equal(states.backpack:now(), next_backpack) then
+        states.backpack:set(deep_copy(next_backpack))
+      end
+
+      local next_weapons = d.Weapons or inv.weapons or {}
+      if not deep_equal(states.weapons:now(), next_weapons) then
+        states.weapons:set(deep_copy(next_weapons))
+      end
+
+      local next_bait = d.Bait or {}
+      if not deep_equal(states.bait:now(), next_bait) then
+        states.bait:set(deep_copy(next_bait))
+      end
+
+      local next_slot = d.SelectedSlot
+      if states.selected_slot:now() ~= next_slot then states.selected_slot:set(next_slot) end
+
+      local next_bait_sel = d.SelectedBait
+      if states.selected_bait:now() ~= next_bait_sel then states.selected_bait:set(next_bait_sel) end
+
+      local next_weapon_sel = d.SelectedWeapon
+      if states.selected_weapon:now() ~= next_weapon_sel then states.selected_weapon:set(next_weapon_sel) end
+
+      local next_held = normalize_held(sel.held)
+      if not deep_equal(states.held:now(), next_held) then
+        states.held:set(next_held)
+      end
+
+      local next_big = potions.item168 or 0
+      if states.potion_big_count:now() ~= next_big then states.potion_big_count:set(next_big) end
+
+      local next_speed = potions.item167 or 0
+      if states.potion_speed_count:now() ~= next_speed then states.potion_speed_count:set(next_speed) end
+
+      if not deep_equal(states.shop_upgrades:now(), upgrades) then
+        states.shop_upgrades:set(deep_copy(upgrades))
+      end
+
+      if not deep_equal(states.cooldowns:now(), cds) then
+        states.cooldowns:set(deep_copy(cds))
+      end
+
+      local ok_ch, ch = pcall(function() return player.Character end) -- 兼容引擎 userdata 玩家
+      if ok_ch and states.character:now() ~= ch then
+        states.character:set(ch)
+      end
+
+      if handle._held_rod_failed then
+        states.held_rod_retry:set(states.held_rod_retry:now() + 1)
+      end
+    end)
     return true
   end
 
