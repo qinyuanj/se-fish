@@ -5,6 +5,7 @@
 local spoke = require("common.packages.spoke.api")
 local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
 local SpokeClock = require("common.SpokeClock")
+local BodyScale = require("common.BodyScale")
 local GameCfg = require("common.GameCfg")
 local Number = require("common.Number")
 local ZoneMarkers = require("common.ZoneMarkers")
@@ -146,6 +147,47 @@ local function position_equals(a, b)
   return a.x == b.x and a.y == b.y and a.z == b.z
 end
 
+local function vitals_equals(a, b)
+  if a == b then
+    return true
+  end
+  if type(a) ~= "table" or type(b) ~= "table" then
+    return false
+  end
+  return a.health == b.health
+    and a.maxHealth == b.maxHealth
+    and a.hunger == b.hunger
+    and a.maxHunger == b.maxHunger
+end
+
+local function default_vitals()
+  local c = GameCfg.Vitals
+  return freeze_snapshot({
+    health = c.MaxHealth,
+    maxHealth = c.MaxHealth,
+    hunger = c.MaxHunger,
+    maxHunger = c.MaxHunger,
+  }, 0, "ClientStore.vitals")
+end
+
+local function sanitize_vital_field(raw, fallback)
+  if Number.IsFiniteNumber(raw) then
+    return math.floor(raw)
+  end
+  return fallback
+end
+
+local function normalize_camera_distance(raw)
+  if not Number.IsFiniteNumber(raw) or raw <= 0 then
+    return nil
+  end
+  local base = GameCfg.Ability.BodyScale.CameraDistance
+  if not Number.IsFiniteNumber(base) or base <= 0 then
+    return nil
+  end
+  return BodyScale.Derive(BodyScale.Sanitize(raw / base)).CameraDistance
+end
+
 local function sanitize_position(pos)
   if pos == nil then
     return nil, true
@@ -278,6 +320,16 @@ local function default_host()
       local ok, now = pcall(function() return World:GetServerTime() end) -- 宿主时钟未就绪或异常时安全降级为 dt 步进
       return ok and now or nil
     end,
+    get_local_player = function()
+      return Players.LocalPlayer
+    end,
+    get_local_character = function()
+      local ok, character = pcall(function() -- 角色销毁/切换瞬态读取 Character 可能抛错，安全忽略等待下一帧
+        local player = Players.LocalPlayer
+        return player and player.Character or nil
+      end)
+      return ok and character or nil
+    end,
     get_local_position = function()
       local ok, pos = pcall(function() -- 角色销毁/切换瞬态读取 Position 可能抛错，安全忽略等待下一帧
         local player = Players.LocalPlayer
@@ -285,6 +337,21 @@ local function default_host()
         return character and character.Position or nil
       end)
       return ok and pos or nil
+    end,
+    read_player_attr = function(player, key)
+      if player == nil then return nil end
+      local ok, val = pcall(function() return player:GetAttribute(key) end) -- 宿主玩家属性读取异常时安全回退
+      return ok and val or nil
+    end,
+    read_char_attr = function(character, key)
+      if character == nil then return nil end
+      local ok, val = pcall(function() return character:GetAttribute(key) end) -- 角色销毁瞬态读取属性可能抛错，安全回退
+      return ok and val or nil
+    end,
+    get_player_attr_signal = function(player, key)
+      if player == nil then return nil end
+      local ok, sig = pcall(function() return player:GetAttributeChangedSignal(key) end) -- 兼容未实现属性信号的环境
+      return ok and sig or nil
     end,
     get_zones = function()
       return ZoneMarkers.Zones
@@ -325,6 +392,11 @@ function ClientStore.new(options)
     position = State.new("ClientStore.position", nil, position_equals),
     zone_id = State.new("ClientStore.zone_id", nil),
     zone_name = State.new("ClientStore.zone_name", nil),
+    vitals = State.new("ClientStore.vitals", default_vitals(), vitals_equals),
+    coin = State.new("ClientStore.coin", 0),
+    local_character = State.new("ClientStore.local_character", nil),
+    camera_distance = State.new("ClientStore.camera_distance", nil),
+    hud_visible = State.new("ClientStore.hud_visible", true),
     active_modal = State.new("ClientStore.active_modal", nil),
     modal_payload = State.new("ClientStore.modal_payload", nil),
     overlays = State.new("ClientStore.overlays", freeze_snapshot({}, 0, "ClientStore.overlays")),
@@ -368,6 +440,11 @@ function ClientStore.new(options)
     position = readonly_signal(states.position, "ClientStore.position"),
     zone_id = readonly_signal(states.zone_id, "ClientStore.zone_id"),
     zone_name = readonly_signal(states.zone_name, "ClientStore.zone_name"),
+    vitals = readonly_signal(states.vitals, "ClientStore.vitals"),
+    coin = readonly_signal(states.coin, "ClientStore.coin"),
+    local_character = readonly_signal(states.local_character, "ClientStore.local_character"),
+    camera_distance = readonly_signal(states.camera_distance, "ClientStore.camera_distance"),
+    hud_visible = readonly_signal(states.hud_visible, "ClientStore.hud_visible"),
     active_modal = readonly_signal(states.active_modal, "ClientStore.active_modal"),
     modal_payload = readonly_signal(states.modal_payload, "ClientStore.modal_payload"),
     overlays = readonly_signal(states.overlays, "ClientStore.overlays"),
@@ -405,6 +482,9 @@ function ClientStore.new(options)
       SpokeRuntime.batch(function()
         states.connected:set(true)
         entry.state:set(normalized)
+        if channel == "ItemBarState" and Number.IsFiniteNumber(payload.coin) then
+          states.coin:set(math.floor(payload.coin))
+        end
         on_server_event:invoke({ channel = channel, payload = normalized })
       end)
       return true
@@ -430,6 +510,47 @@ function ClientStore.new(options)
       states.zone_name:set(zone_name)
     end)
     return true
+  end
+
+  function writer:set_coin(value)
+    if not Number.IsFiniteNumber(value) then
+      return false
+    end
+    states.coin:set(math.floor(value))
+    return true
+  end
+
+  function writer:update_vitals(input)
+    if type(input) ~= "table" then
+      return false
+    end
+    local cur = states.vitals:now()
+    local next_vitals = freeze_snapshot({
+      health = sanitize_vital_field(input.health, cur.health),
+      maxHealth = sanitize_vital_field(input.maxHealth, cur.maxHealth),
+      hunger = sanitize_vital_field(input.hunger, cur.hunger),
+      maxHunger = sanitize_vital_field(input.maxHunger, cur.maxHunger),
+    }, 0, "ClientStore.vitals")
+    SpokeRuntime.batch(function()
+      states.vitals:set(next_vitals)
+      if Number.IsFiniteNumber(input.coin) then
+        states.coin:set(math.floor(input.coin))
+      end
+    end)
+    return true
+  end
+
+  function writer:update_camera_target(character, raw_distance)
+    local normalized = character ~= nil and normalize_camera_distance(raw_distance) or nil
+    SpokeRuntime.batch(function()
+      states.local_character:set(character)
+      states.camera_distance:set(normalized)
+    end)
+    return true
+  end
+
+  function writer:set_hud_visible(flag)
+    states.hud_visible:set(flag == true)
   end
 
   function writer:open_modal(modal_id, payload)
@@ -491,6 +612,11 @@ function ClientStore.new(options)
       states.position:set(nil)
       states.zone_id:set(nil)
       states.zone_name:set(nil)
+      states.vitals:set(default_vitals())
+      states.coin:set(0)
+      states.local_character:set(nil)
+      states.camera_distance:set(nil)
+      states.hud_visible:set(true)
       states.active_modal:set(nil)
       states.modal_payload:set(nil)
       states.overlays:set(freeze_snapshot({}, 0, "ClientStore.overlays"))
@@ -531,23 +657,116 @@ function ClientStore.new(options)
       end
     end
 
+    local player_attr_conns = {}
+    local bound_player = nil
+
+    local function clear_player_attr_conns()
+      for i = #player_attr_conns, 1, -1 do
+        local conn = player_attr_conns[i]
+        player_attr_conns[i] = nil
+        if conn and type(conn.Disconnect) == "function" then
+          conn:Disconnect()
+        end
+      end
+      bound_player = nil
+    end
+
+    local read_player_attr = resolved.read_player_attr
+    local get_player_attr_signal = resolved.get_player_attr_signal
+
+    local function sync_player_vitals(player, include_coin)
+      if player == nil or type(read_player_attr) ~= "function" then
+        return
+      end
+      local c = GameCfg.Vitals
+      local raw_health = tonumber(read_player_attr(player, "Health"))
+      local raw_max_health = tonumber(read_player_attr(player, "MaxHealth"))
+      local raw_hunger = tonumber(read_player_attr(player, "Hunger"))
+      local raw_max_hunger = tonumber(read_player_attr(player, "MaxHunger"))
+      local raw_coin = include_coin and tonumber(read_player_attr(player, "FishCoin")) or nil
+      self:update_vitals({
+        health = Number.IsFiniteNumber(raw_health) and raw_health or c.MaxHealth,
+        maxHealth = Number.IsFiniteNumber(raw_max_health) and raw_max_health or c.MaxHealth,
+        hunger = Number.IsFiniteNumber(raw_hunger) and raw_hunger or c.MaxHunger,
+        maxHunger = Number.IsFiniteNumber(raw_max_hunger) and raw_max_hunger or c.MaxHunger,
+        coin = Number.IsFiniteNumber(raw_coin) and raw_coin or nil,
+      })
+    end
+
+    local function ensure_player_bound(player)
+      if player == bound_player then
+        return
+      end
+      clear_player_attr_conns()
+      if player == nil then
+        return
+      end
+      bound_player = player
+      if type(get_player_attr_signal) == "function" then
+        local coin_sig = get_player_attr_signal(player, "FishCoin")
+        if coin_sig and type(coin_sig.Connect) == "function" then
+          local conn = coin_sig:Connect(function()
+            if disposed or bound_player ~= player then
+              return
+            end
+            local raw = type(read_player_attr) == "function" and tonumber(read_player_attr(player, "FishCoin")) or nil
+            if Number.IsFiniteNumber(raw) then
+              self:set_coin(raw)
+            end
+          end)
+          player_attr_conns[#player_attr_conns + 1] = conn
+        end
+        for _, key in ipairs({ "Health", "MaxHealth", "Hunger", "MaxHunger" }) do
+          local sig = get_player_attr_signal(player, key)
+          if sig and type(sig.Connect) == "function" then
+            local conn = sig:Connect(function()
+              if disposed or bound_player ~= player then
+                return
+              end
+              sync_player_vitals(player, false)
+            end)
+            player_attr_conns[#player_attr_conns + 1] = conn
+          end
+        end
+      end
+      sync_player_vitals(player, true)
+    end
+
+    local get_local_player = resolved.get_local_player
+    if type(get_local_player) == "function" then
+      ensure_player_bound(get_local_player())
+    end
+
     local heartbeat = resolved.heartbeat
     if heartbeat and type(heartbeat.Connect) == "function" then
       local get_server_time = resolved.get_server_time
       local get_local_position = resolved.get_local_position
+      local get_local_character = resolved.get_local_character
+      local read_char_attr = resolved.read_char_attr
       local get_zones = resolved.get_zones
       local hb_conn = heartbeat:Connect(function(dt)
         if disposed then
           return
         end
-        local now = type(get_server_time) == "function" and get_server_time() or nil
-        -- 先独立步进时钟（保留跨多秒时 SpokeClock 逐秒 batch 排空语义），再原子更新空间传感状态
-        self:step_clock(dt, now)
-        if type(get_local_position) == "function" then
-          local pos = get_local_position()
-          local zones = type(get_zones) == "function" and get_zones() or nil
-          self:update_spatial(pos, zones)
+        if type(get_local_player) == "function" then
+          ensure_player_bound(get_local_player())
         end
+        local now = type(get_server_time) == "function" and get_server_time() or nil
+        -- 先独立步进时钟（保留跨多秒时 SpokeClock 逐秒 batch 排空语义），再原子更新空间与相机传感状态
+        self:step_clock(dt, now)
+        SpokeRuntime.batch(function()
+          if type(get_local_position) == "function" then
+            local pos = get_local_position()
+            local zones = type(get_zones) == "function" and get_zones() or nil
+            self:update_spatial(pos, zones)
+          end
+          if type(get_local_character) == "function" then
+            local character = get_local_character()
+            local raw_dist = (character ~= nil and type(read_char_attr) == "function")
+              and read_char_attr(character, "CameraDistance") or nil
+            self:update_camera_target(character, raw_dist)
+          end
+        end)
       end)
       connections[#connections + 1] = hb_conn
     end
@@ -561,6 +780,7 @@ function ClientStore.new(options)
       if active_binding == self then
         active_binding = nil
       end
+      clear_player_attr_conns()
       for i = #connections, 1, -1 do
         local conn = connections[i]
         connections[i] = nil
