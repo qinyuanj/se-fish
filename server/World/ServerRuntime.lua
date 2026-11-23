@@ -502,7 +502,7 @@ function ServerRuntime.new(opts)
 
   function life:NewHit(source, category)
     hit_seq = hit_seq + 1
-    local source_player = player_from_unit(source)
+    local source_player = tree_of(source) and source or player_from_unit(source)
     return {
       id = hit_seq,
       source = source,

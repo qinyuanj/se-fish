@@ -98,6 +98,11 @@ function M.start(opts)
   runtime:mark_started()
   local host = { runtime = runtime, clock = clock, events = events, remote = remote }
   function host:add(player, data)
+    if type(player.SetAttribute) ~= "function" then
+      player.attrs = player.attrs or {}
+      function player:SetAttribute(key, value) self.attrs[key] = value end
+      function player:GetAttribute(key) return self.attrs[key] end
+    end
     data = data or PlayerData.New(player)
     if not data.Inited then data:Init() end
     data.LoadState = "ready"

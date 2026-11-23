@@ -70,7 +70,7 @@ describe('条款 9 PK 伤害过滤', function()
     local player = newPlayer(userId, position)
     env.players:OnPlayerAdded(player)
     env.party:OnPlayerAdded(player)
-    env.vitals:OnPlayerAdded(player)
+    env.lifeHost:add(player)
     drain()
     return player
   end
@@ -135,7 +135,8 @@ describe('条款 9 PK 伤害过滤', function()
     env.zones = assert(loadfile('tests/support/zone_fixtures.lua'))()
     env.cfg = env.zones.Load()
     env.party = assert(loadfile('server/Mgr/MgrParty.lua'))()
-    env.vitals = assert(loadfile('server/Mgr/MgrVitals.lua'))()
+    env.lifeHost = require('tests.support.life_host').start({ now = 0, remote = re })
+    env.vitals = env.lifeHost.runtime.life
     env.players = assert(loadfile('server/Mgr/MgrPlayerData.lua'))()
     env.save = assert(loadfile('server/Mgr/MgrSave.lua'))()
     env.players.Save, env.save.PlayerData = env.save, env.players
@@ -144,9 +145,7 @@ describe('条款 9 PK 伤害过滤', function()
     -- 生产装配：过滤接缝与区域真源都经 mgr 注入，不缓存队伍归属。
     env.vitals.Party = env.party
     env.vitals.ZoneMarkers = require('common.ZoneMarkers')
-    env.vitals.DamageFilter = function(hit, target, mgr) return env.filter(hit, target, mgr) end
-    env.vitals.DamagePublisher = function() end
-    env.vitals.Now = function() return env.now end
+    env.vitals:SetDamageFilter(function(hit, target, mgr) return env.filter(hit, target, mgr) end)
     -- 9-12（review #249）：武器管理器照 main.lua 的接线装进同一套环境（伤害仍只经统一入口）。
     -- AbilityAPI 在装载时要引擎的 RemoteEvent 全局：补替身并清模块缓存，避免复用别的用例的上下文。
     env.remoteEvent, env.abilityModule, env.swingModule =
@@ -162,7 +161,6 @@ describe('条款 9 PK 伤害过滤', function()
     env.weapon.Now = function() return env.now end
     env.weapon.Vec3 = function(x, y, z) return vec(x, y, z) end
     env.party:Start()
-    env.vitals:Start()
   end)
 
   after_each(function()
