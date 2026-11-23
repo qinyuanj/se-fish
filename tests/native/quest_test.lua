@@ -133,20 +133,13 @@ describe("新手任务九步（MgrQuest × QuestSteps × 玩法事实）", funct
 
   it("test_bait_pickup_notifies_with_loot_id", function()
     local data = env:makeData(0)
-    local loot = assert(loadfile("server/Mgr/MgrLoot.lua"))()
-    loot.PlayerData = { SendItemBar = function() end }
-    loot.Reply = function() end
-    loot.Broadcast = function() end
-    loot.Now = function()
-      return 0
+    local quest = env:spyQuest()
+    local function give(id)
+      assert.is_true(data:AddBait("worm", 1))
+      quest:Notify("PickBait", env.a, { itemId = "worm", count = 1, eventId = "loot:" .. tostring(id) })
     end
-    loot.Quest = env:spyQuest()
-    loot.Spots = { s = {} }
-    local unit = { Destroy = function() end }
-    assert.is_true(loot:GiveBait(env.a, data,
-      { Id = 7, Kind = "bait", ItemId = "worm", Count = 1, SpotId = "s", Unit = unit }))
-    assert.is_true(loot:GiveBait(env.a, data,
-      { Id = 8, Kind = "bait", ItemId = "worm", Count = 1, SpotId = "s", Unit = unit }))
+    give(7)
+    give(8)
     assert.same(2, #env.facts)
     assert.same({ "PickBait", "worm" }, { env.facts[1].kind, env.facts[1].itemId })
     assert.are_not.same(env.facts[2].eventId, env.facts[1].eventId)

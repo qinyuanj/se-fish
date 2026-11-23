@@ -31,9 +31,11 @@ local PACKAGE_SNAPSHOTS = {
 
 -- 三类存量债务水位线（只减不增；每个垂直切片完成后单调下调对应数值直至归零）。
 local DEBT_WATERMARKS = {
+  -- #301 删除地面物品旧模块：MgrLoot 裸 Connect 1、LocalLoot 3、InteractionBubble 仍被其他屏使用故保留；
+  -- OwnedUnits 调用数本切片地面路径原本为 0，水位不降。MgrMap 去掉 MgrLoot 后 26。
   owned_units_calls = 35,
-  legacy_raw_connects = 106,
-  mgr_map_members = 27,
+  legacy_raw_connects = 102,
+  mgr_map_members = 26,
 }
 
 local BUSINESS_ROOTS = { "client", "common", "server" }
@@ -319,7 +321,7 @@ describe("Spoke 原生重构机械棘轮守卫", function()
         { from = "server.World.PlayerTree", to = "server.Mgr.MgrVitals" },
         { from = "server.World.PlayerTree", to = "server.AbilityAPI" },
         { from = "server.World.PlayerTree", to = "common.OwnedUnits" },
-        { from = "client.Store.ClientStore", to = "client.LocalLoot" },
+        { from = "client.Store.ClientStore", to = "client.LocalInteract" },
         { from = "client.Store.ClientStore", to = "client.Views.RootView" },
         { from = "client.Views.RootView", to = "client.MgrGameUI" },
         { from = "client.Views.RootView", to = "client.ScreenHandlers.ScreenMain" },

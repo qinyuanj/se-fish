@@ -120,17 +120,22 @@ function World:setUp()
   self.players.Save, self.save.PlayerData = self.save, self.players
   self.platform.Save, self.platform.PlayerData = self.save, self.players
   self.blindbox.Save, self.blindbox.PlayerData, self.blindbox.Platform = self.save, self.players, self.platform
+  local ServerRuntime = require("server.World.ServerRuntime")
+  local SpokeClock = require("common.SpokeClock")
+  self.runtime = ServerRuntime.new({
+    clock = SpokeClock.new(self.now), initial_now = self.now,
+    remote = _G.REUtil,
+    player_data = self.players,
+    create_unit = function()
+      return { Destroyed = false, Destroy = function(unit) unit.Destroyed = true end }
+    end,
+    bait_spots = { Enabled = false },
+  })
+  self.runtime:start()
+  self.runtime:mark_started()
+  ServerRuntime.set_current(self.runtime)
   self.blindbox.Loot = {
     DeliveryEpoch = "test-world",
-    SpawnDelivery = function(_, key, itemId, mult, cooked, pos)
-      env.delivered = env.delivered or {}
-      if env.delivered[key] then
-        return env.delivered[key]
-      end
-      local loot = env.blindbox.Loot:SpawnItem(itemId, mult, cooked, pos)
-      env.delivered[key] = loot
-      return loot
-    end,
     SpawnItem = function(_, itemId, mult, cooked, pos)
       env.spawned[#env.spawned + 1] = { itemId = itemId, mult = mult, cooked = cooked, pos = pos }
       return { Id = "loot" .. #env.spawned }
@@ -163,6 +168,9 @@ end
 
 --- 恢复全局与配置；setUp 半途失败时按已记录的改动项恢复，未改的跳过。
 function World:tearDown()
+  if self.runtime then self.runtime:shutdown() end
+  local ServerRuntime = require("server.World.ServerRuntime")
+  if ServerRuntime.current and ServerRuntime.current() == self.runtime then ServerRuntime.set_current(nil) end
   if self.changed then
     if self.changed.globals then
       _G.game, _G.REUtil = self.oldGame, self.oldRE

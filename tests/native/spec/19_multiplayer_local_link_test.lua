@@ -98,7 +98,7 @@ describe('条款 19-12 本地连接夹具下的多人代码路径', function()
 
     players[1].Character.Position = at(ARENA, 0)
     players[2].Character.Position = at(ARENA, 0.5)
-    assert.is_true(link:Pickup(players[1], loot.Id), '第一个人拾取失败')
+    assert.is_true(link:Pickup(players[1], loot.id or loot.Id), '第一个人拾取失败')
     assert.is_false(link:Pickup(players[2], loot.Id), '第二个人还能拾到同一份')
     assert.same(0, #link:LootSnapshot())
     local okCount = 0

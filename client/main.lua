@@ -13,7 +13,9 @@ local MainHudBackpackView = require("client.Views.MainHudBackpackView")
 local MainHudItemBarView = require("client.Views.MainHudItemBarView")
 local MainHudActionButtonsView = require("client.Views.MainHudActionButtonsView")
 local SurvivalOverlayView = require("client.Views.SurvivalOverlayView")
+local GroundLootView = require("client.Views.GroundLootView")
 local ScreenMain = require("client.ScreenHandlers.ScreenMain")
+local REUtil = require("common.REUtil")
 local GameUI = require("client.GameUI")
 
 local LocalMgrUtil = require("client.LocalMgrUtil")
@@ -115,6 +117,14 @@ Task:Spawn(function()
             },
             overlays = {
                 survival = SurvivalOverlayView.spec(),
+                aim_pickup = GroundLootView.aim_spec(),
+            },
+            docks = {
+                ground_loot = GroundLootView.bubble_spec({
+                    send = function(payload)
+                        REUtil:GetRE('ItemBarAction'):FireServer(payload)
+                    end,
+                }),
             },
         })
     else
@@ -127,7 +137,6 @@ _G.MgrGameUI:HideNativeHealth()
 
 local LocalMotorUnitCtrl = require("client.LocalMotorUnitCtrl")
 local LocalReelIn = require("client.LocalReelIn")
-local LocalLoot = require("client.LocalLoot")
 local LocalInteract = require("client.LocalInteract")
 local LocalGM = require("client.LocalGM")
 local LocalShop = require("client.LocalShop")
@@ -152,7 +161,6 @@ Task:Spawn(function()
     _G.LocalReelIn = LocalReelIn
     LocalReelIn:Start()
     _G.MgrGameUI:OpenScreen('ScreenMain')
-    LocalLoot:Start()
     LocalGM:Start()
     _G.MgrGameUI:StartGM()
 end)

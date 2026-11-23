@@ -137,16 +137,22 @@ describe("盲盒服务端结算（MgrBlindbox × MgrSave × MgrPlatform）", fun
   end)
 
   it("test_loot_delivery_key_remains_consumed_after_entity_disappears", function()
-    local loot = assert(loadfile("server/Mgr/MgrLoot.lua"))()
-    local calls = 0
-    loot.SpawnItem = function()
-      calls = calls + 1
-      return { Id = 99 }
-    end
-    assert.same({ Id = 99 }, loot:SpawnDelivery("paid:1", "item7", 1, nil, {}))
-    loot.Loots[99] = nil -- 已被拾取/回收，不能因实体消失重发
-    assert.same({ Id = 99 }, loot:SpawnDelivery("paid:1", "item7", 1, nil, {}))
-    assert.same(1, calls)
+    local ServerRuntime = require("server.World.ServerRuntime")
+    local SpokeClock = require("common.SpokeClock")
+    local clock = SpokeClock.new(1)
+    local runtime = ServerRuntime.new({
+      clock = clock, initial_now = 1,
+      remote = { GetRE = function() return { FireAllClients = function() end, FireClient = function() end, OnServerEvent = { Connect = function() return { Disconnect = function() end } end } } end, CheckRECD = function() return false end },
+      create_unit = function() local u = { Destroyed = false } function u:Destroy() self.Destroyed = true end return u end,
+      bait_spots = { RespawnSec = 15, Spots = {} },
+    })
+    runtime:start()
+    local world = runtime:get_world()
+    local first = world:place_delivery("paid:1", "fishPond", { kind = "item", itemId = "item7", count = 1, x = 1, y = 0, z = 1 })
+    local again = world:place_delivery("paid:1", "fishPond", { kind = "item", itemId = "item7", count = 1, x = 9, y = 0, z = 9 })
+    assert.same(first.Id, again.Id)
+    assert.equals(1, #world:ground_snapshot().list)
+    runtime:shutdown()
   end)
 
   it("test_malformed_payloads_rejected", function()

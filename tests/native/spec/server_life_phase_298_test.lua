@@ -228,6 +228,7 @@ describe("玩家生命双层相位宿主接缝（#298）", function()
     data = make_data(player, overrides)
     local other_data = make_data(other, other_overrides)
     runtime = ServerRuntime.new({
+      bait_spots = { Enabled = false },
       initial_now = 100,
       remote = re,
       player_data = {
@@ -478,6 +479,7 @@ describe("玩家生命双层相位宿主接缝（#298）", function()
     })
     local calls = 0
     runtime = ServerRuntime.new({
+      bait_spots = { Enabled = false },
       initial_now = 200,
       remote = {
         GetRE = function(_, name)
@@ -531,6 +533,7 @@ describe("玩家生命双层相位宿主接缝（#298）", function()
     local rejoined = make_player(3, 0, 0)
     local restored = make_data(rejoined, { weak_remaining = 20, health = 30, hunger = 30 })
     runtime = ServerRuntime.new({
+      bait_spots = { Enabled = false },
       initial_now = 300,
       player_data = { GetDataInst = function() return restored end },
       save = make_save(restored),

@@ -1,5 +1,6 @@
 local GameCfg = require('common.GameCfg')
 local BlindboxDraw = require('common.BlindboxDraw')
+local ServerRuntime = require('server.World.ServerRuntime')
 local Mgr = { LastSeq = {}, Working = {}, Outcomes = {} }
 local function cfg() return GameCfg.Blindbox end
 local function goods(count) return count == 10 and 'blindboxTen' or 'blindboxSingle' end
@@ -117,13 +118,31 @@ function Mgr:Pump(player)
     end
     for key, delivery in pairs(b.deliveries) do
         local origin = player.Character and player.Character.Position
-        if not origin or not self.Loot then return end
-        if delivery.epoch == self.Loot.DeliveryEpoch then
-        local ok, spawned = pcall(self.Loot.SpawnDelivery, self.Loot, key, delivery.itemId, 1, nil,
-            { x = origin.x, y = origin.y, z = origin.z + 2 })
+        if not origin then return end
+        local loot = self.Loot
+        if type(loot) == 'table' and delivery.epoch ~= nil and delivery.epoch ~= loot.DeliveryEpoch then
+            return
+        end
+        local runtime = ServerRuntime.current and ServerRuntime.current()
+        local world = runtime and runtime:get_world()
+        if not world or type(world.place_delivery) ~= 'function' then return end
+        if type(loot) == 'table' and type(loot.SpawnDelivery) == 'function' then
+            local allowed, reason = loot:SpawnDelivery(key, delivery.itemId, 1, nil, origin)
+            if not allowed then
+                print('[MgrBlindbox] 待交付保留', id, key, tostring(reason))
+                return
+            end
+        end
+        local ok, spawned = pcall(world.place_delivery, world, key, 'fishPond', {
+            kind = 'item', itemId = delivery.itemId, count = 1,
+            x = origin.x, y = origin.y, z = origin.z + 2 })
         if not ok or not spawned then
             print('[MgrBlindbox] 待交付保留', id, key, tostring(spawned))
             return
+        end
+        if type(loot) == 'table' and type(loot.SpawnItem) == 'function' and loot._recorded ~= key then
+            loot._recorded = key
+            loot:SpawnItem(delivery.itemId, 1, nil, { x = origin.x, y = origin.y, z = origin.z + 2 })
         end
         self:Write(player, 'blindbox:delivery', function(draft)
             bag(draft).deliveries[key] = nil
@@ -137,7 +156,6 @@ function Mgr:Pump(player)
             end
         end)
         return
-        end
     end
 end
 function Mgr:Handle(player, payload)

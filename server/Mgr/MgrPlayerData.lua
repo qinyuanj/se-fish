@@ -1,5 +1,6 @@
 local PlayerData = require('server.Data.PlayerData')
 local GameCfg = require('common.GameCfg')
+local ServerRuntime = require('server.World.ServerRuntime')
 local Mgr = {}
 local DataMap = {}
 
@@ -74,10 +75,9 @@ function Mgr:Operate(player, data, payload)
         if operation then result.operation = operation end
         _G.REUtil:GetRE('ItemBarResult'):FireClient(player, result)
     end
-    local function cancelDrop(reservation, drop)
-        if reservation and self.Loot and self.Loot.CancelDrop then
-            pcall(function() self.Loot:CancelDrop(player, reservation, drop) end)
-        end
+    local function worldOf()
+        local runtime = ServerRuntime.current and ServerRuntime.current()
+        return runtime and runtime:get_world()
     end
     local op = payload.op
     local weapon = payload.weapon
@@ -101,8 +101,7 @@ function Mgr:Operate(player, data, payload)
         end
         entry = items[slot]
     end
-    local dropApi = op == 'discard' and self.Loot
-        and type(self.Loot.PrepareDrop) == 'function' and type(self.Loot.CommitDrop) == 'function'
+    local dropApi = op == 'discard' and worldOf() and type(worldOf().try_drop) == 'function'
     local drop = op == 'discard' and entry
         and { itemId = entry.itemId, mult = entry.mult, cooked = entry.cooked, slot = slot } or nil
     local function precheck()
@@ -120,24 +119,17 @@ function Mgr:Operate(player, data, payload)
     local heldNow = data.Extra.inventory.selection.held
     local willDrop = op == 'discard' and heldNow.kind == 'slot' and heldNow.slot == slot
     local function reserveDrop()
-        if not willDrop then return true, nil end
-        if not dropApi then return true, nil end
-        local reservation, reason = self.Loot:PrepareDrop(player, drop)
-        if not reservation then
-            finish({ ok = false, op = 'discard', reason = 'drop-rejected' })
-            return false, tostring(reason)
-        end
-        return true, reservation
+        return true, nil
     end
-    local function commitDrop(reservation)
-        if not reservation then return true end
-        local committed, failure = self.Loot:CommitDrop(player, reservation, drop)
-        if committed then return true end
-        if tostring(failure) == 'spawn-failed' then
-            print('[MgrPlayerData] 丢弃落物未上屏，物品已退回', player.UserId, tostring(drop.itemId))
-            return false
+    local function commitDrop()
+        if op ~= 'discard' or not willDrop then return true end
+        local world = worldOf()
+        if not world or type(world.try_drop) ~= 'function' then return false end
+        local ok = world:try_drop(player, GameCfg.Items.ContainerId.ItemBar, slot)
+        if not ok then
+            print('[MgrPlayerData] 丢弃未落到地面', player.UserId, tostring(drop and drop.itemId))
         end
-        return true
+        return ok
     end
     local function settleEffects(result)
         if op == 'eat' and result.itemId and result.action ~= 'potion' and self.Vitals then
@@ -168,11 +160,6 @@ function Mgr:Operate(player, data, payload)
         if not heldEntry or heldEntry.count <= 0 then return nil, 'empty' end
         if op == 'discard' then
             if not dropApi then return nil, 'drop-unavailable' end
-            target:UpdateData(function(d)
-                local it = d.Containers[GameCfg.Items.ContainerId.ItemBar][slot]
-                if it.count > 1 then it.count = it.count - 1
-                else d.Containers[GameCfg.Items.ContainerId.ItemBar][slot] = nil end
-            end, true)
             return { ok = true, op = 'discard', held = false, itemId = heldEntry.itemId }
         end
         local definition = GameCfg.Items.Definitions[heldEntry.itemId]
@@ -217,11 +204,10 @@ function Mgr:Operate(player, data, payload)
         local accepted, failure = self.Save:Execute(player, data, operation, transform,
             function(written, result)
                 if not written then
-                    cancelDrop(reservation, drop)
                     finish({ ok = false, reason = tostring(result) })
                     return
                 end
-                if not commitDrop(reservation) then
+                if not commitDrop() then
                     finish({ ok = false, op = 'discard', reason = 'drop-rejected' })
                     return
                 end
@@ -229,7 +215,6 @@ function Mgr:Operate(player, data, payload)
                 finish(result)
             end)
         if not accepted then
-            cancelDrop(reservation, drop)
             finish({ ok = false, reason = tostring(failure) })
         end
         return
@@ -239,11 +224,10 @@ function Mgr:Operate(player, data, payload)
     if not reserved then return end
     local result, reason = transform(data)
     if not result then
-        cancelDrop(reservation, drop)
         finish({ ok = false, op = op, reason = reason })
         return
     end
-    if not commitDrop(reservation) then
+    if not commitDrop() then
         finish({ ok = false, op = 'discard', reason = 'drop-rejected' })
         return
     end
@@ -274,9 +258,15 @@ function Mgr:Start()
         local data = self:GetDataInst(player)
         if not data or type(payload) ~= 'table' then return end
         local action = payload.action
-        if action == 'Pickup' then
-            if self.Loot and not _G.REUtil:CheckRECD(player, 'ItemBarAction', GameCfg.Items.ActionCooldownSec) then
-                self.Loot:Pickup(player, payload.value)
+        if action == 'Pickup' or action == 'Drop' then
+            if _G.REUtil:CheckRECD(player, 'ItemBarAction', GameCfg.Items.ActionCooldownSec) then return end
+            local runtime = ServerRuntime.current and ServerRuntime.current()
+            local world = runtime and runtime:get_world()
+            if not world then return end
+            if action == 'Pickup' and type(world.try_pickup) == 'function' then
+                world:try_pickup(player, payload.value)
+            elseif action == 'Drop' and type(world.try_drop) == 'function' then
+                world:try_drop(player, payload.container, payload.index)
             end
             return
         end
