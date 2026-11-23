@@ -160,9 +160,12 @@ describe('TestFishLift', function()
         fish.Carrier.Body.OnLiftedBegin:Fire(env.player.Character)
         env.mgr:OnPlayerRemoving(env.player)
         assert.is_nil(env.mgr:GetHeld(env.player))
-        assert.are.equal(1, #env.despawned)
+        -- #309：离场先让鱼落地，按品种期限离场，而不是直接删鱼。
+        assert.are.equal(0, #env.despawned)
         assert.is_true(env:mounts()[1].Destroyed)
+        env.now = 10
         env.mgr:Update()
+        assert.are.equal(1, #env.despawned)
     end)
 
     it('test_unconfirmed_lift_retries_after_confirm_window_with_cap', function()

@@ -7,7 +7,7 @@
 --   5. unhooked 阶段重复收竿回包两次、或再次抛竿被受理。
 -- it 名字沿用旧方法名，注册顺序 = LuaUnit sortedPairs 的实际执行顺序。
 
-local moduleNames = { 'common.REUtil', 'server.Mgr.MgrPlayerData', 'server.Mgr.MgrFishUnit' }
+local moduleNames = { 'common.REUtil', 'server.Mgr.MgrPlayerData', 'server.World.FishTree' }
 
 -- #231 夹具语义见 tests/support/reel_env.lua 顶部。
 local Reel = require('tests.support.reel_env')
@@ -41,7 +41,7 @@ describe('脱钩后收回鱼线（MgrCast × MgrReelIn）', function()
       GetDataInst = function(_, player) return player == env.player and env.data or nil end,
       SendItemBar = function() end,
     }
-    package.loaded['server.Mgr.MgrFishUnit'] = {
+    package.loaded['server.World.FishTree'] = {
       CanCast = function() return true end,
       HeldInfo = function() end,
       SpawnLanded = function(_, player, opts)

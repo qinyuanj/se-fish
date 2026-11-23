@@ -31,11 +31,11 @@ local PACKAGE_SNAPSHOTS = {
 
 -- 三类存量债务水位线（只减不增；每个垂直切片完成后单调下调对应数值直至归零）。
 local DEBT_WATERMARKS = {
-  -- #310 删除烧烤旧模块：MgrGrill 裸 Connect 1、ScreenGrill 裸 Connect 5、ScreenGrill 的 OwnedUnits 调用 2。
-  -- MgrMap 去掉 MgrGrill 后 23。
+  -- #309 删除活鱼、载体与 AI 旧模块；#310 删除烧烤旧模块。
+  -- 两侧水位取更低值，MgrMap 同时去掉四个活鱼成员与 MgrGrill。
   owned_units_calls = 33,
-  legacy_raw_connects = 89,
-  mgr_map_members = 23,
+  legacy_raw_connects = 85,
+  mgr_map_members = 19,
 }
 
 local BUSINESS_ROOTS = { "client", "common", "server" }

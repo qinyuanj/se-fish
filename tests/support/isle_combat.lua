@@ -11,8 +11,8 @@ local Cfg = require('common.GameCfg')
 
 local M = {}
 
-local MODULES = { 'server.Mgr.MgrFishCarrier', 'server.Mgr.MgrFishUnit',
-    'common.REUtil', 'client.LocalGarBite', 'client.LocalCastSource' }
+local MODULES = { 'server.World.FishCarrier', 'server.World.FishTree',
+    'common.REUtil', 'client.Views.GarBiteWarning', 'client.LocalCastSource' }
 local GLOBALS = { 'game', 'Vector3', 'Quaternion', 'REUtil', 'Color', 'RemoteEvent' }
 
 local function signal()
@@ -89,10 +89,10 @@ function M.new(zoneIndex)
         FireAllClients = function(_, p) if name == 'GarBiteNotice' then env.notices[#env.notices + 1] = p end end,
         FireClient = function(_, player, p) if name == 'CastState' then env.castStates[#env.castStates + 1] = p end end,
         OnServerEvent = signal(), OnClientEvent = signal() } end }
-    env.carrier = require('server.Mgr.MgrFishCarrier')
-    env.mgr = require('server.Mgr.MgrFishUnit')
+    env.carrier = require('server.World.FishCarrier')
+    env.mgr = require('server.World.FishTree')
     -- 目标裁决适配层按生产接线（server/main.lua）由入口注入，MgrFishUnit 自身不再 require 它。
-    env.mgr.AiTarget = require('server.Mgr.MgrAiTarget')
+    env.mgr.AiTarget = require('server.World.FishAiTarget')
     local LifeHost = require('tests.support.life_host')
     env.lifeHost = LifeHost.start({ now = 0, fish_carrier = env.carrier })
     env.vitals = env.lifeHost.runtime.life

@@ -26,7 +26,7 @@ function M:setUp()
     FishLift.setUp(self)
     local env = self
     self.diedSubs = {}
-    package.loaded['server.Mgr.MgrFishCarrier'].SubscribeDied = function(_, fn)
+    package.loaded['server.World.FishCarrier'].SubscribeDied = function(_, fn)
         env.diedSubs[#env.diedSubs + 1] = fn
         return true
     end

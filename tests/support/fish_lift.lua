@@ -32,7 +32,7 @@ function M:setUp()
     self.saved = { game = rawget(_G, 'game'), Vector3 = rawget(_G, 'Vector3'),
         RaycastParams = rawget(_G, 'RaycastParams') }
     self.modules = {}
-    for _, name in ipairs({ 'server.Mgr.MgrFishCarrier', 'server.Mgr.MgrFishUnit' }) do
+    for _, name in ipairs({ 'server.World.FishCarrier', 'server.World.FishTree' }) do
         self.modules[name] = package.loaded[name]
     end
     self.now = 0
@@ -65,7 +65,7 @@ function M:setUp()
         function unit:AddNoCollisionPairWithUnit(other) self.Pairs[other] = true end
         return unit
     end
-    package.loaded['server.Mgr.MgrFishCarrier'] = {
+    package.loaded['server.World.FishCarrier'] = {
         Spawn = function(_, opts)
             local carrier = { Opts = opts, Body = body(opts.Position),
                 Receiver = { UnitId = 'r' .. tostring(#env.spawned + 1), Controller = { LiftedEnabled = true } } }
@@ -74,10 +74,10 @@ function M:setUp()
         end,
         Despawn = function(_, carrier) env.despawned[#env.despawned + 1] = carrier end,
     }
-    package.loaded['server.Mgr.MgrFishUnit'] = nil
-    self.mgr = assert(loadfile('server/Mgr/MgrFishUnit.lua'))()
+    package.loaded['server.World.FishTree'] = nil
+    self.mgr = assert(loadfile('server/World/FishTree.lua'))()
     -- 目标裁决适配层由入口注入（生产见 server/main.lua）；夹具照生产接线补上，不走模块内 require。
-    self.mgr.AiTarget = require('server.Mgr.MgrAiTarget')
+    self.mgr.AiTarget = require('server.World.FishAiTarget')
     self.pushed = {}
     self.mgr.Cast = { PushState = function(_, player) env.pushed[#env.pushed + 1] = player end }
     self.mgr:Start()
@@ -103,7 +103,7 @@ function M:tearDown()
     -- 即使 setUp 只走到一半也恢复已保存的进程状态；Stop 失败最后传播。
     local ok, err = pcall(function() if self.mgr then self.mgr:Stop() end end)
     if self.modules then
-        for _, name in ipairs({ 'server.Mgr.MgrFishCarrier', 'server.Mgr.MgrFishUnit' }) do
+        for _, name in ipairs({ 'server.World.FishCarrier', 'server.World.FishTree' }) do
             package.loaded[name] = self.modules[name]
         end
     end

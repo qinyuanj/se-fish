@@ -16,6 +16,7 @@ local AttackView = require("client.Views.AttackView")
 local WeaponAim = require("client.WeaponAim")
 local SurvivalOverlayView = require("client.Views.SurvivalOverlayView")
 local GroundLootView = require("client.Views.GroundLootView")
+local FishCombatView = require("client.Views.FishCombatView")
 local GrillView = require("client.Views.GrillView")
 local ScreenMain = require("client.ScreenHandlers.ScreenMain")
 local REUtil = require("common.REUtil")
@@ -149,6 +150,8 @@ Task:Spawn(function()
                         REUtil:GetRE('ItemBarAction'):FireServer(payload)
                     end,
                 }),
+                fish_combat = FishCombatView.bar_spec(),
+                fish_warning = FishCombatView.warning_spec(),
             },
         })
     else
@@ -171,7 +174,6 @@ local ScreenParty = require("client.ScreenHandlers.ScreenParty")
 local ScreenBlindbox = require("client.ScreenHandlers.ScreenBlindbox")
 local ScreenPlatform = require("client.ScreenHandlers.ScreenPlatform")
 local ScreenCompendium = require('client.ScreenHandlers.ScreenCompendium')
-local LocalGarBite = require("client.LocalGarBite")
 local LocalCastSource = require('client.LocalCastSource')
 
 local AbilityAPI = require("client.packages.ability_system.api")
@@ -187,7 +189,6 @@ Task:Spawn(function()
     LocalGM:Start()
     _G.MgrGameUI:StartGM()
 end)
-Task:Spawn(function() LocalGarBite:Start() end)
 Task:Spawn(function() LocalCastSource:Start() end)
 Task:Spawn(function() LocalInteract:Start() end)
 Task:Spawn(function() LocalShop:Start() end)

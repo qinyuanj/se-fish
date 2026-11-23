@@ -182,7 +182,7 @@ describe('TestReefCombat', function()
 
     -- 客户端预警：投掷表现建下落体，clear 必须销毁它（不留在场景里）。
     it('test_throw_client_displays_falling_body_and_clear_destroys_it', function()
-        local warn = require('client.LocalGarBite')
+        local warn = require('tests.support.gar_bite_warning')
         warn:Start()
         local n = require('common.GarBiteNotice')
         local p = n.Lock(-37, { x = 0, y = 6, z = 0 }, 0, 1, 5, 180, 1.2)
