@@ -31,7 +31,6 @@ local MgrMap = {
     MgrFerry = require("server.Mgr.MgrFerry"),
     MgrSave = require("server.Mgr.MgrSave"),
     MgrWeapon = require("server.Mgr.MgrWeapon"),
-    MgrSpecialItem = require("server.Mgr.MgrSpecialItem"),
     MgrParty = require("server.Mgr.MgrParty"),
     MgrCompendium = require("server.Mgr.MgrCompendium"),
     MgrRecords = require("server.Mgr.MgrRecords"),
@@ -375,10 +374,6 @@ MgrMap.MgrGrill.Vitals = nil
 MgrMap.MgrGrill.PlayerData = MgrMap.MgrPlayerData
 MgrMap.MgrGrill.Save = MgrMap.MgrSave
 
-MgrMap.MgrSpecialItem.Vitals = nil
-MgrMap.MgrSpecialItem.PlayerData = MgrMap.MgrPlayerData
-MgrMap.MgrSpecialItem.FishUnit = MgrMap.MgrFishUnit
-MgrMap.MgrFerry.SpecialItem = MgrMap.MgrSpecialItem
 
 MgrMap.MgrParty.PlayerData = MgrMap.MgrPlayerData
 MgrMap.MgrParty.Save = MgrMap.MgrSave
@@ -434,6 +429,9 @@ WorldRuntime = ServerRuntime.new({
     save = MgrMap.MgrSave,
     platform = MgrMap.MgrPlatform,
     fish_carrier = MgrMap.MgrFishCarrier,
+    fish_units = function()
+        return MgrMap.MgrFishUnit and MgrMap.MgrFishUnit.Fish or {}
+    end,
     create_unit = function(unit_type, props)
         return WorldService:CreateUnit(unit_type, props)
     end,
@@ -483,7 +481,6 @@ WorldRuntime = ServerRuntime.new({
     end,
     on_leave_finalize = function(_, player)
         invoke('MgrGrill', MgrMap.MgrGrill, 'BeforeLeave', player)
-        invoke('MgrSpecialItem', MgrMap.MgrSpecialItem, 'BeforeLeave', player)
     end,
     on_player_removing = function(player, active)
         invoke('MgrPlayerData', MgrMap.MgrPlayerData, 'OnPlayerRemoving', player)
@@ -510,7 +507,6 @@ MgrMap.MgrFishUnit.Vitals = Life
 MgrMap.MgrCast.Vitals = Life
 MgrMap.MgrWeapon.Vitals = Life
 MgrMap.MgrGrill.Vitals = Life
-MgrMap.MgrSpecialItem.Vitals = Life
 MgrMap.MgrParty.Vitals = Life
 
 MgrMap.MgrPlayerData.OnSyncPlayerTree = function(player, data, forcePush)

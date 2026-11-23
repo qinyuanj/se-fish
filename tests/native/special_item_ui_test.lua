@@ -5,7 +5,7 @@
 --   1. 特殊效果生效时按钮语义不变（还显示「抛竿」/ 还可抛竿），或钓鱼阶段被特殊道具抢按钮；
 --   2. 风神之翼：按下不发 fly holding=true、松开发不出 holding=false（升 / 降指令丢失）；
 --   3. 哥斯拉：点击不发 breath；冷却中按钮仍可点或不显示剩余秒数；
---   4. SpecialItemResult 失败原因不提示玩家；
+--   4. SpecialItemResult 失败原因提示改由统一动作视图宿主接缝覆盖，见 client_special_item_299_test；
 --   5. 效果清空后按钮不回到钓鱼语义（残留「长按飞行」/「原子吐息」）。
 -- seam：RE SpecialItemState / SpecialItemResult 入站，SpecialItemAction 出站，
 --       BtnItemAction 的 OnClicked / OnTouchBegan / OnTouchEnded。
@@ -158,12 +158,6 @@ describe('TestSpecialItemUI', function()
         end)
         _G.os = previousOs
         assert(ok, err)
-    end)
-
-    -- 失败方式 4：失败回包给玩家具体提示
-    it('test_failure_result_notifies_with_hint', function()
-        ctx.events.SpecialItemResult.OnClientEvent:Fire({ ok = false, action = 'breath', reason = 'cooldown' })
-        assert.same({ '原子吐息冷却中' }, ctx.notices)
     end)
 
     -- 失败方式 1：钓鱼阶段（线已抛出）不被特殊道具抢按钮

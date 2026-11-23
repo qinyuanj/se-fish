@@ -14,6 +14,7 @@ local spoke = require("common.packages.spoke.api")
 local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
 local PlayerEffects = require("server.World.PlayerEffects")
 local PlayerLife = require("server.World.PlayerLife")
+local SpecialItemPhase = require("server.World.SpecialItemPhase")
 local HeldRodLeaf = require("server.World.HeldRodLeaf")
 
 local SpokeTree = spoke.SpokeTree
@@ -575,8 +576,16 @@ function PlayerTree.spawn(opts)
       end)
 
       -- 外层存活相位：仅跟随 is_alive，麻痹不退出此相位。
+      -- 风神之翼 / 哥斯拉子相位挂在这里：切槽仍在存活内调和，濒死、死亡与离场随相位拆卸。
       s3:phase("AlivePhase", memos.is_alive, function(ps)
         mount_phase_dock(ps, phase_slots.alive, "alive")
+        SpecialItemPhase.mount(ps, handle, {
+          remote = opts.remote,
+          create_unit = opts.create_unit,
+          players = opts.players,
+          fish_units = opts.fish_units,
+          fish_carrier = opts.fish_carrier,
+        })
       end)
 
       -- 濒死相位：内嵌 platform_pending 门控的倒计时子相位。
@@ -1046,6 +1055,13 @@ function PlayerTree.spawn(opts)
     local finish = handle._life_finish
     handle._life_finish = nil
     finish()
+  end
+
+  if type(handle._pending_leave_finalizers) == "table" then
+    for _, fn in ipairs(handle._pending_leave_finalizers) do
+      handle:register_leave_finalizer(fn)
+    end
+    handle._pending_leave_finalizers = nil
   end
 
   return handle

@@ -18,7 +18,6 @@ describe("TestPlaceholderAssets", function()
         game = rawget(_G, 'game'), Vector3 = rawget(_G, 'Vector3'),
         wing = GameCfg.Ability.SpecialItem.Wings.AppearanceAssetId,
         godzilla = GameCfg.Ability.SpecialItem.Godzilla.AppearanceAssetId,
-        specialItem = package.loaded['server.Mgr.MgrSpecialItem'],
       },
     }
   end)
@@ -27,7 +26,6 @@ describe("TestPlaceholderAssets", function()
     _G.game, _G.Vector3 = env.saved.game, env.saved.Vector3
     GameCfg.Ability.SpecialItem.Wings.AppearanceAssetId = env.saved.wing
     GameCfg.Ability.SpecialItem.Godzilla.AppearanceAssetId = env.saved.godzilla
-    package.loaded['server.Mgr.MgrSpecialItem'] = env.saved.specialItem
     env = nil
   end)
 
@@ -49,44 +47,6 @@ describe("TestPlaceholderAssets", function()
     for id, fish in pairs(GameCfg.Fish) do assert.is_not_nil(fish.VisualColor, id) end
   end)
 
-  -- 特殊道具占位模型生命周期：模型失败时挂点反向清理；恢复时模型与挂点都销毁。
-  it("test_special_placeholder_cleans_up_on_create_failure_and_restore", function()
-    GameCfg.Ability.SpecialItem.Wings.AppearanceAssetId = nil
-    GameCfg.Ability.SpecialItem.Godzilla.AppearanceAssetId = nil
-    _G.Vector3 = { New = function(x, y, z) return { x = x, y = y, z = z } end }
-    local created = {}
-    local failModel = true
-    _G.game = { GetService = function(_, name)
-      if name == 'World' then
-        return {
-          GetServerTime = function() return 1000 end,
-          CreateUnit = function(_, unitType, values)
-            if failModel and unitType == 'WorldUnit' then error('no-model') end
-            local unit = { UnitType = unitType, Name = values.Name,
-              Destroy = function(self) self.Destroyed = true end }
-            created[#created + 1] = unit
-            return unit
-          end,
-        }
-      end
-      return {}
-    end }
-    package.loaded['server.Mgr.MgrSpecialItem'] = nil
-    local mgr = assert(loadfile('server/Mgr/MgrSpecialItem.lua'))()
-    local player = { UserId = 1, Character = { Controller = { GravityEnabled = true } } }
-    local state = mgr:GetState(player)
-
-    assert.is_false(mgr:Apply(player, state, 'wings'))
-    assert.is_true(created[1].Destroyed)
-    assert.is_nil(state.placeholderMount)
-    assert.is_nil(state.placeholderModel)
-
-    state.failures = nil
-    failModel = false
-    assert.is_true(mgr:Apply(player, state, 'wings'))
-    assert.are.equal(3, #created)
-    assert.is_true(mgr:Restore(player, state))
-    assert.is_true(created[2].Destroyed)
-    assert.is_true(created[3].Destroyed)
-  end)
+  -- 特殊道具占位模型的失败清理与恢复已迁到存活相位宿主接缝
+  -- tests/native/spec/server_special_item_299_test.lua。
 end)

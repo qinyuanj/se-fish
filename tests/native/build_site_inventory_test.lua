@@ -22,7 +22,8 @@ local lfs = require("lfs")
 -- 60：#297-C1 主 HUD 武器/鱼饵浮层与背包面板切流至 Spoke 视图（复用 RootView 统一建点），剥离 ScreenMain 1 处建点，client 38 → 37
 -- 58：#297-C2 主 HUD 底部道具栏、拖拽与爆炸物瞄准切流至 Spoke 视图，剥离 ScreenMain 动态格位与瞄准遮罩 2 处建点（含循环内多节点建点），client 37 → 35
 -- 57：#298 生存蒙版改挂 RootView 统一建点，删除 ScreenSurvival 自己的 1 处建点，client 35 → 34
-local SITES = 57
+-- 55：#299 删除 MgrSpecialItem 的两处占位外观建点，改由入口已有 create_unit 托管，server 19 → 17
+local SITES = 55
 local SITE_ROOTS = { "client", "common", "server" }
 local REF_ROOTS = { "client", "common", "server", "tests", "tools" }
 local REMOVED = { "FXUtil", "WeldTo", "MarkPointPart", "CreateHPBar" }
