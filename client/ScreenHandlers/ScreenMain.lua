@@ -2,7 +2,6 @@ local World = game:GetService('World')
 local GameCfg = require('common.GameCfg')
 local LocalAttackButton = require('client.LocalAttackButton')
 local WeaponAim = require('client.WeaponAim')
-local PressGesture = require('client.PressGesture')
 local DamageFloat = require('client.DamageFloat')
 local FishCombatLabel = require('client.FishCombatLabel')
 local MainHudLayout = require('client.MainHudLayout')
@@ -10,150 +9,11 @@ local OwnedUnits = require('common.OwnedUnits')
 
 local ScreenHandler = { UINodes = {}, UINodeMap = {} }
 
-local AIM_OWNER = {}
-ScreenHandler.AimOwner = AIM_OWNER
-
-function ScreenHandler:Action(action, value)
-    _G.REUtil:GetRE('ItemBarAction'):FireServer({ action = action, value = value })
-end
-
 function ScreenHandler:Operate(payload)
     self.OpSeq = (self.OpSeq or 0) + 1
     payload.seq = self.OpSeq
     payload.action = 'Operate'
     _G.REUtil:GetRE('ItemBarAction'):FireServer(payload)
-end
-
-function ScreenHandler:bindDrag(btn, container, index)
-    if not btn.OnTouchBegan or not btn.OnTouchEnded then return end
-    self:Listen(btn.OnTouchBegan, function(touch)
-        self.DragSource = { container = container, index = index,
-            began = touch and touch.BeganPosition }
-    end)
-    self:Listen(btn.OnTouchEnded, function(touch)
-        local source = self.DragSource
-        self.DragSource = nil
-        if not source or source.container ~= container or source.index ~= index then return end
-        local ended = touch and touch.EndedPosition
-        if not ended or not source.began then return end
-        if math.abs(ended.x - source.began.x) < 10 and math.abs(ended.y - source.began.y) < 10 then return end
-        local target = self:SlotAtPosition(ended)
-        if not target or target.container == source.container and target.index == source.index then return end
-        self:Action('MoveSlot', { from = source.container, index = source.index,
-            target = target.container, slot = target.index })
-    end)
-end
-
-function ScreenHandler:SlotAtPosition(pos)
-    if type(pos) ~= 'table' or type(pos.x) ~= 'number' or type(pos.y) ~= 'number' then return nil end
-    for index, p in ipairs(self.ItemBarSlotPos or {}) do
-        local slot = self.Slots and self.Slots[index]
-        if slot and slot.Background.Visible
-            and math.abs(pos.x - p.x) <= p.hw and math.abs(pos.y - p.y) <= p.hh then
-            return { container = GameCfg.Items.ContainerId.ItemBar, index = index }
-        end
-    end
-    return nil
-end
-
-local function nowSec()
-    return World.GetServerTime and World:GetServerTime() or 0
-end
-
-function ScreenHandler:SlotDefinition(index)
-    local entry = self.Snapshot and self.Snapshot.slots[index]
-    return entry and GameCfg.Items.Definitions[entry.itemId] or nil
-end
-
-function ScreenHandler:IsExplosiveSlot(index)
-    local definition = self:SlotDefinition(index)
-    return definition ~= nil and definition.Type == '爆炸物'
-end
-
-function ScreenHandler:BindSlotGesture(btn, index)
-    if not btn.OnTouchBegan or not btn.OnTouchEnded then return end
-    self:Listen(btn.OnTouchBegan, function(touch)
-        self.SlotPress = { index = index, gesture = PressGesture.New({
-            LongPressSec = GameCfg.Ability.Throw.LongPressSec }) }
-        self.SlotPress.gesture:Begin(nowSec(),
-            touch and touch.BeganPosition or nil)
-    end)
-    self:Listen(btn.OnTouchEnded, function(touch)
-        local press = self.SlotPress
-        if not press or press.index ~= index then return end
-        self.SlotPress = nil
-        if not self:IsExplosiveSlot(index) then return end
-        local result = press.gesture:End(nowSec(),
-            touch and touch.EndedPosition or nil)
-        if result == 'tap' then
-            self.ThrowHandled = { index = index, valid = true }
-            self:ThrowExplosive(index, nil)
-        elseif result == 'long' then
-            self.ThrowHandled = { index = index, valid = true }
-            self:BeginAim(index)
-        end
-    end)
-end
-
-function ScreenHandler:ConsumeThrowClick(index)
-    local handled = self.ThrowHandled
-    if handled and handled.index == index and handled.valid then
-        handled.valid = false
-        return true
-    end
-    return false
-end
-
-function ScreenHandler:ThrowExplosive(slot, target)
-    self.WeaponSeq = (self.WeaponSeq or 0) + 1
-    local payload = { action = 'throw', slot = slot, seq = self.WeaponSeq }
-    if type(target) == 'table' then payload.target = target end
-    print('[ScreenMain] 投掷 slot=' .. tostring(slot) .. ' seq=' .. tostring(self.WeaponSeq))
-    _G.REUtil:GetRE('WeaponAction'):FireServer(payload)
-end
-
-function ScreenHandler:BeginAim(slot)
-    self:EndAim()
-    if not self.UIRoot or not self.EuiResolution then return end
-    self.AimSlot = slot
-    local resolution = self.EuiResolution
-    local overlay = OwnedUnits.Track(AIM_OWNER, World:CreateUnit('EUIButton', {
-        Parent = self.UIRoot, Name = 'ThrowAimOverlay',
-        Position = Vector2.New(resolution.x / 2, resolution.y / 2),
-        Size = Vector2.New(resolution.x, resolution.y),
-    }))
-    if not overlay then self.AimSlot = nil return end
-    overlay.ButtonText = ''
-    pcall(function() overlay.ButtonNormalColor = Color.New(30, 40, 30, 40) end)
-    pcall(function() overlay.ButtonPressColor = Color.New(30, 40, 30, 60) end)
-    if _G.LocalMsgNotice then _G.LocalMsgNotice('点击屏幕选择投掷落点') end
-    self:Listen(overlay.OnTouchEnded, function(touch) self:PickAim(touch) end)
-end
-
-function ScreenHandler:PickAim(touch)
-    local pos = touch and touch.EndedPosition
-    local slot = self.AimSlot
-    self:EndAim()
-    if not slot or not pos then return end
-    local target
-    local ok, ray = pcall(function()
-        local camera = game:GetService('CameraService')
-        return camera and camera:ScreenPointToRay(pos.x, pos.y,
-            GameCfg.Ability.Throw.Range * 2)
-    end)
-    if ok and ray and ray.Origin and ray.Direction then
-        local physics = game:GetService('PhysicsService')
-        local hit = physics and physics.Raycast
-            and physics:Raycast(ray.Origin, ray.Direction, nil)
-        local p = hit and hit.Position
-        if p then target = { x = p.x, y = p.y, z = p.z } end
-    end
-    self:ThrowExplosive(slot, target)
-end
-
-function ScreenHandler:EndAim()
-    OwnedUnits.Clear(AIM_OWNER)
-    self.AimSlot = nil
 end
 
 local function baitStock(state, id)
@@ -178,25 +38,6 @@ function ScreenHandler:Show(state)
     LocalAttackButton:SetEquipped(state)
     local capacity = state.slotCount or GameCfg.Items.ItemBarSlots
     self:ApplyLayout(capacity, nil)
-    for index, slot in ipairs(self.Slots or {}) do
-        local entry = state.slots[index]
-        local definition = entry and GameCfg.Items.Definitions[entry.itemId]
-        slot.Background.Visible = index <= capacity
-        slot.Background.TouchEnabled = index <= capacity
-        slot.Icon.Visible = index <= capacity and definition ~= nil
-        if definition then
-            slot.Icon.Image = definition.Icon
-            local tint = definition.IconColor
-            slot.Icon.Color = Color.New(tint[1], tint[2], tint[3], tint[4])
-        end
-        slot.Label.Text = definition
-            and ((GameCfg.Items.CookRate(entry) ~= nil and GameCfg.Grill.CookedPrefix or '') .. definition.Name) or ''
-        slot.Label.Visible = index <= capacity and definition ~= nil
-        slot.Count.Text = definition and tostring(entry.count) or ''
-        slot.Count.Visible = index <= capacity and definition ~= nil
-        slot.Background.ButtonNormalColor = index == state.selectedSlot
-            and Color.New(36, 130, 94, 255) or Color.New(54, 100, 140, 255)
-    end
     self:ShowCast()
     local selected = state.selectedSlot and state.slots[state.selectedSlot]
     self.BtnDiscard.Visible = selected ~= nil
@@ -597,21 +438,6 @@ function ScreenHandler:ApplyBackpackOcclusion()
         if label then label.Visible = not hidden end
     end
     local state = self.Snapshot
-    for index, slot in ipairs(self.Slots or {}) do
-        if state and type(state.slots) == 'table' then
-            local capacity = state.slotCount or GameCfg.Items.ItemBarSlots
-            local entry = state.slots[index]
-            local hasItem = index <= capacity and entry ~= nil and GameCfg.Items.Definitions[entry.itemId] ~= nil
-            slot.Background.Visible = not hidden and index <= capacity
-            slot.Background.TouchEnabled = not hidden and index <= capacity
-            slot.Icon.Visible = not hidden and hasItem
-            slot.Label.Visible = not hidden and hasItem
-            slot.Count.Visible = not hidden and hasItem
-        else
-            slot.Label.Visible = slot.Label.Visible and not hidden
-            slot.Count.Visible = slot.Count.Visible and not hidden
-        end
-    end
     if not hidden then
         self:ShowCast()
         local selected = state and state.selectedSlot
@@ -627,18 +453,6 @@ local function place(node, r)
     node.Size = Vector2.New(r.w, r.h)
 end
 
-local function placeSlot(slot, r)
-    local x, y, w, h = r.x, r.y, r.w, r.h
-    slot.Background.Position = Vector2.New(x, y)
-    slot.Background.Size = Vector2.New(w, h)
-    slot.Icon.Position = Vector2.New(x, y + h * 0.1)
-    slot.Icon.Size = Vector2.New(w * 0.6, h * 0.6)
-    slot.Label.Position = Vector2.New(x, y - h * 0.34)
-    slot.Label.Size = Vector2.New(w, h * 0.28)
-    slot.Count.Position = Vector2.New(x + w * 0.33, y + h * 0.33)
-    slot.Count.Size = Vector2.New(w * 0.32, h * 0.32)
-end
-
 function ScreenHandler:ApplyLayout(slots, reeling)
     local key, resolution = self.LayoutKey, self.EuiResolution
     if not key or not resolution then return end
@@ -650,13 +464,6 @@ function ScreenHandler:ApplyLayout(slots, reeling)
         itemBarSlots = slots, reeling = reeling })
     self.HudLayout = layout
     local r = layout.Rects
-    for index, slot in ipairs(self.Slots or {}) do
-        local cell = layout.ItemBarSlots[index]
-        if cell then
-            placeSlot(slot, cell)
-            self.ItemBarSlotPos[index] = { x = cell.x, y = cell.y, hw = cell.w / 2, hh = cell.h / 2 }
-        end
-    end
     place(self.BtnItemAction, r.ItemAction)
     place(self.BtnItemActionLabel, r.ItemAction)
     place(self.BtnDiscard, r.Discard)
@@ -687,14 +494,10 @@ function ScreenHandler:Cleanup()
         for _, connection in ipairs(self.Connections or {}) do connection:Disconnect() end
     end)
     continueAfterFailure('OwnedUnits', function()
-        OwnedUnits.Clear(AIM_OWNER)
         OwnedUnits.Clear(self)
     end)
     self.Connections = nil
-    self.Slots = nil
-    self.ItemBarSlotPos = nil
     self.BackpackOpen = false
-    self.DragSource = nil
     self.UIRoot = nil
     self.LastOperateOperation = nil
     self.BtnDiscard = nil
@@ -755,36 +558,7 @@ function ScreenHandler:_initializeRoot()
         itemBarSlots = count, reeling = true })
     self.HudLayout = layout
     local rects = layout.Rects
-    self.Slots = {}
-    self.ItemBarSlotPos = {}
     self.Connections = {}
-    for index = 1, count do
-        local cell = layout.ItemBarSlots[index]
-        local background = button(self, root, 'ItemBarSlot' .. index, cell.x, cell.y, cell.w)
-        local icon = OwnedUnits.Track(self, World:CreateUnit('EUIImage', {
-            Parent = root, Name = 'ItemBarIcon' .. index,
-            Position = Vector2.New(cell.x, cell.y), Size = Vector2.New(cell.w, cell.h),
-        }))
-        icon.TouchEnabled = false
-        icon.SwallowTouchEnabled = false
-        icon.LocalZOrder = 1
-        icon.Visible = false
-        local label = overlay(self, root, 'ItemBarLabel' .. index, cell.x, cell.y, cell.w, cell.h,
-            '', 18, Color.New(255, 255, 255, 255))
-        local amount = overlay(self, root, 'ItemBarAmount' .. index, cell.x, cell.y, cell.w, cell.h,
-            '', 20, Color.New(255, 220, 40, 255))
-        label.Visible = false
-        amount.Visible = false
-        self.Slots[index] = { Background = background, Icon = icon, Label = label, Count = amount }
-        placeSlot(self.Slots[index], cell)
-        self.ItemBarSlotPos[index] = { x = cell.x, y = cell.y, hw = cell.w / 2, hh = cell.h / 2 }
-        self:bindDrag(background, GameCfg.Items.ContainerId.ItemBar, index)
-        self:BindSlotGesture(background, index)
-        self:Listen(background.OnClicked, function()
-            if self:ConsumeThrowClick(index) then return end
-            self:Action('SelectSlot', index)
-        end)
-    end
     self.UIRoot = root
     self.BackpackOpen = self.BackpackOpen == true
     local discard = rects.Discard
@@ -1107,7 +881,6 @@ function ScreenHandler:CloseScreen()
     self.FailureUntil = nil
     self.FailureLanding = nil
     self.FailureNotice = nil
-    self:EndAim()
     LocalAttackButton:SetOpen(false)
     if _G.LocalReelIn then _G.LocalReelIn:Suspend() end
     self.CastState = nil

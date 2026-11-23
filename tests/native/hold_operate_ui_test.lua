@@ -5,6 +5,7 @@ local spoke = require('common.packages.spoke.api')
 local ClientStore = require('client.Store.ClientStore')
 local RootView = require('client.Views.RootView')
 local MainHudEquipPopups = require('client.Views.MainHudEquipPopups')
+local MainHudItemBarView = require('client.Views.MainHudItemBarView')
 
 local function signal()
     local listeners = {}
@@ -89,6 +90,7 @@ describe("持有操作的界面侧", function()
         ctx.hudView = RootView.mount(ctx.spokeRoot, ctx.store, {
             create_node = function(kind, attrs) return world:CreateUnit(kind, attrs) end,
             hud = {
+                MainHudItemBarView.spec({}),
                 MainHudEquipPopups.spec({
                     open_popup = ctx.openPopup,
                     send_operate = function(payload) ctx.handler:Operate(payload) end,
