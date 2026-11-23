@@ -21,11 +21,14 @@ M.policy = {
         'common.FlightPath', 'common.GameCfg', 'common.GrillCurve', 'common.LotteryDraw',
         'common.LotteryEligibility', 'common.MathWaterJudge', 'common.NpcDialogue', 'common.Number',
         'common.OwnedUnits', 'common.QuestSteps', 'common.RateLimit', 'common.Records',
-        'common.ReelDisplay', 'common.ReelProgress', 'common.SpecialItem', 'common.Vitals',
-        'common.ZoneMarkers',
+        'common.ReelDisplay', 'common.ReelProgress', 'common.SpecialItem', 'common.SpokeClock',
+        'common.Vitals', 'common.ZoneMarkers',
       },
     },
     {
+      -- ADR-0032 预留命名空间：只读响应式客户端状态仓库（#296 迁入），归属 L3 支撑层，
+      -- 天然禁止反向依赖 L2 的 client.Views / ScreenHandlers / Local*。
+      reserved_ids = { 'client.Store' },
       modules = {
         'client.DamageFloat', 'client.FishCombatLabel', 'client.GameUI', 'client.InteractionBubble',
         'client.MainHudLayout', 'client.PressGesture', 'client.WeaponAim',
@@ -36,6 +39,8 @@ M.policy = {
     },
     {
       ids = { 'server.Mgr', 'server.AbilityBehaviors', 'client.ScreenHandlers' },
+      -- ADR-0032 预留命名空间：服务端 Spoke 树与客户端 Spoke 视图树（#295/#296 迁入）。
+      reserved_ids = { 'server.World', 'client.Views' },
       modules = {
         'server.AbilityAPI', 'client.MgrGameUI',
         'client.LocalAttackButton', 'client.LocalAttr', 'client.LocalCastSource', 'client.LocalGM',
@@ -53,6 +58,22 @@ M.policy = {
     -- 正式代码引用测试夹具会把假数据带进产物（曾生成 108 条假锚点）。
     { name = 'no_test_imports', from = { '^client%.', '^common%.', '^server%.', '^tools%.' },
       to = { '^tests%.' } },
+    -- ADR-0032 单向棘轮：新 Spoke 命名空间严禁反向 require 存量旧债务模块。
+    {
+      name = 'spoke_no_legacy_reverse_dep',
+      from = {
+        '^common%.SpokeClock$',
+        '^server%.World$', '^server%.World%.',
+        '^client%.Store$', '^client%.Store%.',
+        '^client%.Views$', '^client%.Views%.',
+      },
+      to = {
+        '^common%.OwnedUnits$',
+        '^server%.Mgr$', '^server%.Mgr%.',
+        '^server%.AbilityAPI$', '^server%.AbilityBehaviors$', '^server%.AbilityBehaviors%.',
+        '^client%.MgrGameUI$', '^client%.ScreenHandlers$', '^client%.ScreenHandlers%.', '^client%.Local',
+      },
+    },
   },
 }
 
@@ -69,6 +90,11 @@ local function classify(policy, id)
       if id == module then return rank - 1, module end
     end
     for _, prefix in ipairs(group.ids or {}) do
+      if id == prefix or id:sub(1, #prefix + 1) == prefix .. '.' then
+        return rank - 1, prefix
+      end
+    end
+    for _, prefix in ipairs(group.reserved_ids or {}) do
       if id == prefix or id:sub(1, #prefix + 1) == prefix .. '.' then
         return rank - 1, prefix
       end
@@ -380,6 +406,7 @@ function M.levels_edn(policy)
   for _, group in ipairs(policy.levels) do
     local ids = {}
     for _, id in ipairs(group.ids or {}) do ids[#ids + 1] = id end
+    for _, id in ipairs(group.reserved_ids or {}) do ids[#ids + 1] = id end
     for _, id in ipairs(group.modules or {}) do ids[#ids + 1] = id end
     groups[#groups + 1] = '[:' .. table.concat(ids, ' :') .. ']'
   end
