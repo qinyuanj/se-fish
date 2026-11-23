@@ -394,6 +394,7 @@ end
 local function optionalPackage(loader)
     local ok, api = pcall(loader) -- 离线最小测试替身未提供官方包依赖的引擎服务时降级跳过叶子挂载
     if ok and type(api) == "table" then return api end
+    print("[server.main] 官方包加载降级", tostring(api))
     return nil
 end
 

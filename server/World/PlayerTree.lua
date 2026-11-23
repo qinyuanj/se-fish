@@ -295,6 +295,7 @@ function PlayerTree.spawn(opts)
   local last_synced_coin = nil
   local last_pushed_snapshot = nil
   local stage1_dirty = false
+  local syncing_from_data = false
   local weak_touched = (raw_survival.weakRemaining or 0) > 0
   local survival_dirty = false
 
@@ -626,9 +627,11 @@ function PlayerTree.spawn(opts)
         if session_alive:now() == false then
           return
         end
-        stage1_dirty = true
         sync_fish_coin_attribute(states.coin:now())
-        mirror_stage1_to_data()
+        if not syncing_from_data then
+          stage1_dirty = true
+          mirror_stage1_to_data()
+        end
         states.save_version:set(states.save_version:now() + 1)
 
         local snapshot = memos.item_bar_snapshot:now()
@@ -834,7 +837,11 @@ function PlayerTree.spawn(opts)
     local upgrades = type(growth.upgrades) == "table" and growth.upgrades or {}
     local cds = type(extra.cooldowns) == "table" and extra.cooldowns or {}
 
-    SpokeRuntime.batch(function()
+    local prev_syncing = syncing_from_data
+    if src == data then
+      syncing_from_data = true
+    end
+    local ok_batch, batch_err = pcall(SpokeRuntime.batch, function()
       local next_coin = d.FishCoin or 0
       if states.coin:now() ~= next_coin then states.coin:set(next_coin) end
 
@@ -900,7 +907,11 @@ function PlayerTree.spawn(opts)
       if handle._held_rod_failed then
         states.held_rod_retry:set(states.held_rod_retry:now() + 1)
       end
-    end)
+    end) -- 保证异常时也能还原 syncing_from_data 保护标志
+    syncing_from_data = prev_syncing
+    if not ok_batch then
+      error(batch_err, 0)
+    end
     return true
   end
 

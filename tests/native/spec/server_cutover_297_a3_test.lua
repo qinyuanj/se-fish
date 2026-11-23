@@ -248,6 +248,27 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
     assert.equals(1, #dot_hits)
     assert.are.equal(fish, dot_hits[1].target)
 
+    -- sync_from_data(d1) 不得触发反向 mirror_stage1_to_data 覆写替换 d1 内部子表引用
+    local ref_item_bar = d1.Data.Containers.itemBar
+    local ref_bait = d1.Data.Bait
+    local ref_weapons = d1.Data.Weapons
+    local ref_held = d1.Extra.inventory.selection.held
+    local ref_potions = d1.Extra.growth.potions
+    local ref_upgrades = d1.Extra.growth.upgrades
+    local ref_cooldowns = d1.Extra.cooldowns
+    d1.Data.FishCoin = 321
+    d1.Extra.growth.potions.item168 = 3
+    assert.is_true(pt1:sync_from_data(d1))
+    assert.equals(321, pt1.states.coin:now())
+    assert.equals(480, pt1.memos.max_health:now())
+    assert.are.equal(ref_item_bar, d1.Data.Containers.itemBar)
+    assert.are.equal(ref_bait, d1.Data.Bait)
+    assert.are.equal(ref_weapons, d1.Data.Weapons)
+    assert.are.equal(ref_held, d1.Extra.inventory.selection.held)
+    assert.are.equal(ref_potions, d1.Extra.growth.potions)
+    assert.are.equal(ref_upgrades, d1.Extra.growth.upgrades)
+    assert.are.equal(ref_cooldowns, d1.Extra.cooldowns)
+
     -- 玩家离场：三步协议拆除全部资源、连接、能力守卫，并清理其对活鱼施加的毒
     rt:on_player_removing(p1)
     assert.is_nil(rt:get_player_tree(9001))
@@ -268,14 +289,282 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
     rt:shutdown()
   end)
 
-  it("server/main.lua 已彻底淘汰 MgrAttr 与 MgrModifier 并接通 Spoke 桥接与同步回调", function()
-    local handle = assert(io.open("server/main.lua", "rb"))
-    local src = handle:read("*a")
-    handle:close()
-    assert.is_nil(src:find("server.Mgr.MgrAttr", 1, true))
-    assert.is_nil(src:find("server.Mgr.MgrModifier", 1, true))
-    assert.is_truthy(src:find("AttrLeaf", 1, true))
-    assert.is_truthy(src:find("MgrMap.MgrPlayerData.OnSyncPlayerTree", 1, true))
-    assert.is_truthy(src:find("entity_modifiers", 1, true))
+  describe("真实加载 server/main.lua 端到端接线验证", function()
+    local saved
+    local runtime
+
+    before_each(function()
+      saved = {
+        game = rawget(_G, "game"),
+        REUtil = rawget(_G, "REUtil"),
+        MgrUtil = rawget(_G, "MgrUtil"),
+        MgrPlayerData = rawget(_G, "MgrPlayerData"),
+        Vector3 = rawget(_G, "Vector3"),
+        Color = rawget(_G, "Color"),
+        Debug = GameCfg.Debug,
+        slot = GameCfg.Save.QaSlot,
+      }
+      GameCfg.Debug = { Enabled = true, InitialGrants = saved.Debug.InitialGrants }
+      GameCfg.Save.QaSlot = ""
+      runtime = nil
+    end)
+
+    after_each(function()
+      if runtime and runtime.shutdown then
+        runtime:shutdown()
+      end
+      _G.game = saved.game
+      _G.REUtil = saved.REUtil
+      _G.MgrUtil = saved.MgrUtil
+      _G.MgrPlayerData = saved.MgrPlayerData
+      _G.Vector3 = saved.Vector3
+      _G.Color = saved.Color
+      GameCfg.Debug = saved.Debug
+      GameCfg.Save.QaSlot = saved.slot
+      saved = nil
+      runtime = nil
+    end)
+
+    it("真实运行 server/main.lua：ServerRuntime.current 就绪、OnSyncPlayerTree 驱动持竿、AttrBridge/ModifierBridge 含麻痹与活鱼 DoT 端到端生效", function()
+      local now = 200
+      local tasks, values, created_units, errors, mgrs = {}, {}, {}, {}, {}
+      local players_list = {}
+      local players_service = {
+        PlayerAdded = make_signal(),
+        PlayerRemoving = make_signal(),
+        GetPlayers = function() return players_list end,
+        GetPlayerFromCharacter = function(_, unit)
+          for _, p in ipairs(players_list) do
+            if p.Character == unit then return p end
+          end
+          return nil
+        end,
+      }
+      local heartbeat = make_signal()
+      local store = {
+        GetAsync = function(_, key) return values[key] end,
+        UpdateAsync = function(_, key, transform)
+          local value = transform(values[key])
+          if value then values[key] = value end
+          return value
+        end,
+      }
+
+      _G.Vector3 = { New = function(x, y, z) return { x = x, y = y, z = z } end }
+      _G.Color = { New = function(...) return { ... } end }
+      _G.game = {
+        BindToClose = function() end,
+        GetService = function(_, name)
+          if name == "Task" then
+            return {
+              Spawn = function(_, fn) tasks[#tasks + 1] = fn end,
+              Wait = function() end,
+            }
+          end
+          if name == "Players" then return players_service end
+          if name == "RunService" then return { Heartbeat = heartbeat, IsServer = function() return true end } end
+          if name == "World" then
+            return {
+              GetServerTime = function() return now end,
+              CreateUnit = function(_, kind, props)
+                local u = { Kind = kind, Parent = props.Parent, Destroyed = false }
+                function u:Destroy() self.Destroyed = true end
+                created_units[#created_units + 1] = u
+                return u
+              end,
+              CreateAsset = function(_, preset)
+                local u = { Preset = preset, Destroyed = false, attrs = {} }
+                function u:Destroy() self.Destroyed = true end
+                function u:SetAttribute(k, v) self.attrs[k] = v end
+                function u:GetAttribute(k) return self.attrs[k] end
+                function u:FindFirstChild() return nil end
+                return { u }
+              end,
+            }
+          end
+          if name == "DataStoreService" then return { GetDataStore = function() return store end } end
+          return {}
+        end,
+      }
+      local re_map = {}
+      _G.REUtil = {
+        CheckRECD = function() return false end,
+        GetRE = function(_, name)
+          if not re_map[name] then
+            re_map[name] = { OnServerEvent = make_signal(), FireClient = function() end }
+          end
+          return re_map[name]
+        end,
+      }
+
+      local attr_units, attr_values = {}, {}
+      local attr_api_stub = {
+        Enums = { AttrComponentType = { Base = 1, BaseExtra = 2, Ratio = 3, Bonus = 4 } },
+        Funcs = {
+          GetAttrConfig = function() return nil end,
+          GetAttrUnit = function(ch) return attr_units[ch] end,
+          EnsureAttrUnit = function(ch)
+            if not attr_units[ch] then
+              local u = { destroyed = false }
+              function u:Destroy() self.destroyed = true; attr_units[ch] = nil end
+              attr_units[ch] = u
+            end
+            return attr_units[ch]
+          end,
+          SetAttrComponent = function(ch, key, comp, val)
+            attr_values[ch] = attr_values[ch] or {}
+            attr_values[ch][key] = attr_values[ch][key] or { 0, 0, 0, 0 }
+            attr_values[ch][key][comp] = val
+            return true
+          end,
+          GetAttr = function(ch, key)
+            local c = attr_values[ch] and attr_values[ch][key] or { 0, 0, 0, 0 }
+            return (c[1] + c[2]) * (1 + c[3]) + c[4]
+          end,
+        },
+      }
+      local active_mods = {}
+      local modifier_api_stub = {
+        Enums = { CreateResult = { Added = "Added", Reobtained = "Reobtained" } },
+        AddModifier = function(owner, preset, cfg)
+          assert.equals(0, cfg.removeMode)
+          active_mods[owner] = active_mods[owner] or {}
+          local ent = active_mods[owner][preset] or { owner = owner, preset = preset }
+          active_mods[owner][preset] = ent
+          return "Added"
+        end,
+        GetUnitModifiers = function(owner, preset)
+          local ent = active_mods[owner] and active_mods[owner][preset]
+          return ent and { ent } or {}
+        end,
+        RemoveModifier = function(ent)
+          if active_mods[ent.owner] and active_mods[ent.owner][ent.preset] == ent then
+            active_mods[ent.owner][ent.preset] = nil
+          end
+        end,
+      }
+      local ability_api_stub = {
+        AddAbility = function() return { SetAttribute = function() end } end,
+        StopAbility = function() end,
+        CastAbility = function() return true end,
+      }
+
+      local sandbox
+      sandbox = setmetatable({
+        print = function(...)
+          local parts = { ... }
+          if parts[1] == "[server.main]" then
+            errors[#errors + 1] = parts
+          end
+        end,
+        require = function(path)
+          if path == "server.MgrUtil" then return { Start = function() end } end
+          if path == "common.ZoneMarkers" then return { Start = function() end } end
+          if path == "server.packages.attr_rule.api" then return attr_api_stub end
+          if path == "server.packages.modifier_system.api" then return modifier_api_stub end
+          if path == "server.packages.ability_system.api" then return ability_api_stub end
+          if path == "server.AbilityAPI" then
+            if not mgrs._AbilityAPI then
+              mgrs._AbilityAPI = assert(loadfile("server/AbilityAPI.lua", "t", sandbox))()
+            end
+            return mgrs._AbilityAPI
+          end
+          local name = path:match("^server%.Mgr%.(.*)$")
+          if not name then return require(path) end
+          if not mgrs[name] then
+            if name == "MgrSave" or name == "MgrPlayerData" or name == "MgrVitals" or name == "MgrAbility" then
+              mgrs[name] = assert(loadfile("server/Mgr/" .. name .. ".lua", "t", sandbox))()
+            else
+              mgrs[name] = {}
+            end
+          end
+          return mgrs[name]
+        end,
+      }, { __index = _G })
+
+      mgrs.MgrPkFilter = { Make = function() return function() return true end end }
+      mgrs.MgrSurvival = { Hooks = function() return {} end }
+
+      runtime = assert(loadfile("server/main.lua", "t", sandbox))()
+      assert.are.equal(runtime, ServerRuntime.current())
+      assert.is_not_nil(runtime:get_entity_modifiers())
+
+      local function drain()
+        local steps = 0
+        while #tasks > 0 do
+          steps = steps + 1
+          assert(steps < 100, "异步任务未收敛")
+          table.remove(tasks, 1)()
+        end
+        assert.same({}, errors)
+      end
+
+      local c = { Health = 300, MaxHealth = 300, WalkSpeed = 7, HealthChanged = make_signal(), Died = make_signal(), OnReborn = make_signal() }
+      local ch = { Name = "MainHero", attrs = {}, scale = 1, Controller = c }
+      function ch:GetAttribute(k) return self.attrs[k] end
+      function ch:SetAttribute(k, v) self.attrs[k] = v end
+      function ch:SetScale(v) self.scale = v.x end
+      function ch:GetChildren() return {} end
+      local p = { UserId = 9101, attrs = {}, Character = ch, CharacterAdded = make_signal(), CharacterRemoving = make_signal() }
+      function p:SetAttribute(k, v) self.attrs[k] = v end
+      players_list[1] = p
+
+      players_service.PlayerAdded:Fire(p)
+      drain()
+
+      local pt = runtime:get_player_tree(9101)
+      assert.is_not_nil(pt)
+      assert.is_true(#p.CharacterAdded.handlers >= 1)
+
+      -- 经 ItemBarAction 选中鱼竿 -> MgrPlayerData:SendItemBar -> OnSyncPlayerTree -> HeldRodLeaf 建点
+      re_map.ItemBarAction.OnServerEvent:Fire(p, { action = "SelectSlot", value = 1 })
+      assert.equals(2, #created_units)
+      assert.is_false(created_units[1].Destroyed)
+      assert.is_false(created_units[2].Destroyed)
+
+      -- AttrBridge 经 MgrAbility / MgrVitals 真实生效
+      local data = mgrs.MgrPlayerData:GetDataInst(p)
+      data.Extra.growth.potions.item168 = 2
+      data.Extra.growth.potions.item167 = 5
+      assert.is_true(mgrs.MgrAbility:ApplyGrowth(p).Ok)
+      assert.equals(420, mgrs.MgrVitals.MaxHealthProvider(p))
+      assert.near(1.4, ch.scale, 1e-9)
+      assert.near(10.5, c.WalkSpeed, 1e-9)
+
+      -- ModifierBridge：玩家麻痹阻塞 CanAct 与移速，Heartbeat 推进 0.5s 恢复
+      assert.is_true(mgrs.MgrAbility.Modifier:ApplyWeaponEffect(p, p, { Kind = "paralyze" }))
+      assert.is_false(mgrs.MgrVitals:CanAct(p))
+      assert.equals(0, c.WalkSpeed)
+      now = now + 0.5
+      heartbeat:Fire(0.5)
+      assert.is_true(mgrs.MgrVitals:CanAct(p))
+      assert.near(10.5, c.WalkSpeed, 1e-9)
+
+      -- ModifierBridge：活鱼挂毒经 Heartbeat 推进触发 MgrVitals:ApplyHit DoT
+      local dot_hits = {}
+      local orig_apply_hit = mgrs.MgrVitals.ApplyHit
+      mgrs.MgrVitals.ApplyHit = function(self, hit, target, amount)
+        dot_hits[#dot_hits + 1] = { target = target, amount = amount, category = hit.category }
+        return true
+      end
+      local fish_body = make_character("MainFish", 5)
+      local fish = { Id = 88, Carrier = { Receiver = fish_body, Dead = false } }
+      assert.is_true(mgrs.MgrWeapon.Modifier:ApplyWeaponEffect(p, fish, { Kind = "poison" }))
+      now = now + 1.0
+      heartbeat:Fire(1.0)
+      assert.equals(1, #dot_hits)
+      assert.are.equal(fish, dot_hits[1].target)
+      assert.equals("dot", dot_hits[1].category)
+      mgrs.MgrVitals.ApplyHit = orig_apply_hit
+
+      -- 离场后：连接断开、左手持竿销毁、活鱼毒效果按来源清理
+      players_service.PlayerRemoving:Fire(p)
+      drain()
+      assert.is_nil(runtime:get_player_tree(9101))
+      assert.equals(0, #p.CharacterAdded.handlers)
+      assert.is_true(created_units[1].Destroyed)
+      assert.is_true(created_units[2].Destroyed)
+      assert.equals(0, mgrs.MgrAbility.Modifier:GetRemaining(fish, "poison"))
+    end)
   end)
 end)

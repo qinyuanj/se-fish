@@ -162,11 +162,9 @@ describe('TestMeleeHitEntry', function()
             gm = package.loaded['server.Mgr.MgrGM'],
             vendorApi = package.loaded['server.packages.ability_system.api'],
             api = package.loaded['server.AbilityAPI'],
-            modifier = package.loaded['server.Mgr.MgrModifier'],
             swing = package.loaded['server.SwingRegistry'],
         }
         package.loaded['server.packages.ability_system.api'] = {}
-        package.loaded['server.Mgr.MgrModifier'] = {}
         ctx = { controllerCalls = 0, hits = {}, swingStaged = {}, created = {} }
         _G.Vector3 = { New = vec }
         _G.Quaternion = { FromEulerAngles = function(x, y, z) return { x = x, y = y, z = z } end }
@@ -203,8 +201,8 @@ describe('TestMeleeHitEntry', function()
         package.loaded['server.Mgr.MgrGM'] = { GetMeleeDamage = function(_, _, damage) return damage end }
         ctx.services = { Vitals = package.loaded['server.Mgr.MgrVitals'],
             FishCarrier = package.loaded['server.Mgr.MgrFishCarrier'], GM = package.loaded['server.Mgr.MgrGM'],
-            Modifier = package.loaded['server.Mgr.MgrModifier'] }
-        for _, name in ipairs({ 'server.Mgr.MgrVitals', 'server.Mgr.MgrFishCarrier', 'server.Mgr.MgrGM', 'server.Mgr.MgrModifier' }) do
+            Modifier = {} }
+        for _, name in ipairs({ 'server.Mgr.MgrVitals', 'server.Mgr.MgrFishCarrier', 'server.Mgr.MgrGM' }) do
             package.loaded[name] = setmetatable({}, { __index = function()
                 error('近战行为不应再加载上层管理器: ' .. name) end })
         end
@@ -231,7 +229,6 @@ describe('TestMeleeHitEntry', function()
         package.loaded['server.Mgr.MgrFishCarrier'] = saved.carrier
         package.loaded['server.Mgr.MgrGM'] = saved.gm
         package.loaded['server.AbilityAPI'] = saved.api
-        package.loaded['server.Mgr.MgrModifier'] = saved.modifier
         package.loaded['server.SwingRegistry'] = saved.swing
         package.loaded['server.packages.ability_system.api'] = saved.vendorApi
     end)

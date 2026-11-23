@@ -6,7 +6,7 @@ local GameCfg = require("common.GameCfg")
 local AbilityAPI = require("server.AbilityAPI")
 local AbilityPackageAPI = require("server.packages.ability_system.api")
 
-local Mgr = { PendingFishCleanup = {}, SpeedBase = {} }
+local Mgr = { PendingFishCleanup = {} }
 
 local EQUIP_RETRY_INTERVAL = 0.1
 local EQUIP_RETRY_COUNT = 50
@@ -170,11 +170,6 @@ function Mgr:ApplyBodyScale(player)
 end
 
 
-local function controllerOf(player)
-	local character = player and player.Character
-	return character and character.Controller
-end
-
 function Mgr:CaptureBaseSpeed(player)
 	return self.Attr:CaptureBaseSpeed(player)
 end
@@ -250,7 +245,6 @@ end
 function Mgr:OnPlayerRemoving(player)
 	if self.PendingGrowth then self.PendingGrowth[player.UserId] = nil end
 	if self.PendingSpeed then self.PendingSpeed[player.UserId] = nil end
-	self.SpeedBase[player.UserId] = nil
 end
 
 function Mgr:Update(deltaTime)
