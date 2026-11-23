@@ -11,9 +11,9 @@ local RECDCheckMap = {}
 function REUtil:GetRE(eventName)
     local targetRE = REUtil.REMap[eventName]
     if not targetRE then 
-        targetRE = game:CreateRemoteEvent(eventName)
+        targetRE = RemoteEvent.New(eventName)
         REUtil.REMap[eventName] = targetRE
-        print("[REUtil] CreateRemoteEvent", eventName)
+        print("[REUtil] RemoteEvent.New", eventName)
     end
     
     return targetRE

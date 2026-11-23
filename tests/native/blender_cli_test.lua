@@ -370,10 +370,14 @@ describe("TestBlenderCliUsage", function()
 end)
 
 describe("TestBlenderCliHelp", function()
-  after_each(function() fs.rmrf(REPO .. "/tmp/blender-cli-help") end)
+  local dir
+  after_each(function()
+    fs.rmrf(dir)
+    dir = nil
+  end)
 
   it("test_cli_help_lists_blender_subcommand", function()
-    local dir = fs.temp_dir()
+    dir = fs.temp_dir()
     local out = dir .. "/help.txt"
     local code = seam.spawn({
       argv = { interpreter.path(), REPO .. "/tools/cli.lua", "--help" },

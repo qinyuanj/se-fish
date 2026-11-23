@@ -12,7 +12,7 @@
 -- 进程当前目录不改：deploy / sync 等按当前目录读写，与之前一致。
 --
 -- 退出码：0 成功 / 1 业务失败 / 2 用法错误（未知子命令、模块加载失败、未知参数）/
---         3 外部工具不可用（busted / editor-cli / Blender / robocopy 缺失）。
+--         3 外部工具不可用（busted / editor-cli / Blender / robocopy / curl 缺失）。
 -- test 不原样透传 busted 的退出码（那是失败数加错误数，恰好 3 个失败会撞上退出码 3）：
 -- busted 非 0 一律收成 1。
 -- 「编辑器没装或没打开本图 → 打印跳过并返回 0」不受退出码 3 影响。
@@ -22,8 +22,7 @@
 --   - quality / uml：质量工具由 dsh-uml-viewer 插件面板发起（uml_crap / uml_mutate / uml_dry），CLI 不包装。
 --   - 内部模块：部署 / 同步计划（deploy_plan、sync_plan）、接缝（seam）、
 --     宿主目录定位（eggy_workspace）、编辑器收尾（editor_finalize）、退出码约定（exit_code）——只供子命令调用。
---   - 一次性离线脚本：内容校验（validate_content）、锚点探针生成（gen_config_anchor_probe）、
---     基线转换（baseline_csv）。
+--   - 一次性离线脚本：内容校验（validate_content）、锚点探针生成（gen_config_anchor_probe）。
 -- 新工具是否挂路由：人或 agent 日常反复调用的才挂；其余按上面归类留在模块里。
 
 -- 解释器预检必须最先做；整个文件只用 5.1 也能解析的语法，否则旧解释器连提示都打不出来。
@@ -40,10 +39,12 @@ M.commands = {
   { name = "acceptance", mod = "tools.acceptance_cli", summary = "验收矩阵校验：acceptance [--check|--write|--update-baseline]，缺省 --check" },
   { name = "deploy", mod = "tools.deploy", summary = "仓库三端一级子树镜像进编辑器宿主目录（robocopy /MIR + 编辑器收尾）" },
   { name = "sync",   mod = "tools.sync",   summary = "从宿主回同步配置 / API 存根 / data/" },
+  { name = "docs", mod = "tools.docs", summary = "同步并离线检索 SE 官方手册：docs sync [api <页面>] / docs search <查询>" },
   { name = "qa-slot", mod = "tools.qa_slot", summary = "查看、新建或切换 QA 存档槽（试玩前需 deploy）" },
   { name = "ability-presets", mod = "tools.ability_presets", summary = "重建技能包的编辑器侧预设（复制官方模板、刷壳与属性、回写 GameCfg key）" },
   { name = "blender", mod = "tools.blender", summary = "在 Windows 侧无头 Blender 执行脚本（唯一 Blender 入口，透传 JSON 与退出码）" },
-  { name = "worktree-init", mod = "tools.worktree_init", summary = "把新 worktree 补齐到能跑 test full（复制上游 blender-* skill；幂等）" },
+  { name = "worktree-init", mod = "tools.worktree_init", summary = "把新 worktree 补齐到能跑 test full（复制上游 blender-* skill、安装 pre-commit；幂等）" },
+  { name = "git-hook-init", mod = "tools.git_hooks", summary = "安装本地 pre-commit（提交前运行 test guards；幂等且不覆盖其他 hook）" },
   { name = "screenshot", mod = "tools.screenshot", summary = "抓画面存 PNG（缺省后台 PrintWindow，窗口被遮挡也能取当前帧）；--info 只报显示路径与选中的窗口" },
 }
 
@@ -92,7 +93,7 @@ local function usage()
   lines[#lines + 1] = "  0 成功"
   lines[#lines + 1] = "  1 业务失败（含测试失败：busted 的任何非 0 退出码都收成 1）"
   lines[#lines + 1] = "  2 用法错误（未知子命令、模块加载失败、未知参数）"
-  lines[#lines + 1] = "  3 外部工具不可用（busted / editor-cli / Blender / robocopy 缺失）"
+  lines[#lines + 1] = "  3 外部工具不可用（busted / editor-cli / Blender / robocopy / curl 缺失）"
   lines[#lines + 1] = ""
   lines[#lines + 1] = "  lua tools/cli.lua <子命令> --help   子命令帮助"
   return table.concat(lines, "\n") .. "\n"

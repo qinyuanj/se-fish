@@ -1,4 +1,5 @@
 local GameCfg = require('common.GameCfg')
+local Number = require('common.Number')
 
 local M = {}
 
@@ -7,7 +8,7 @@ local function cfg()
 end
 
 local function isBadNumber(v)
-    return type(v) ~= 'number' or v ~= v or v == math.huge or v == -math.huge
+    return not Number.IsFiniteNumber(v)
 end
 
 local function isBadPoint(p)

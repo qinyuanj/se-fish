@@ -68,6 +68,7 @@ describe("TestDeployCli", function()
     rmrf(HOST)
     rmrf(FAKE_REPO)
     rmrf(EMPTY_BIN)
+    rmrf(REPO .. "/tmp/deploy-transport-test")
     os.remove(OUT)
     out, code = nil, nil
   end)

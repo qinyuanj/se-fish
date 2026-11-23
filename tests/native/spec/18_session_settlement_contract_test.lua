@@ -117,7 +117,7 @@ describe('条款 18 存档会话与结算身份', function()
       if name == 'World' then return { GetServerTime = function() return env.now end } end
       if name == 'Players' then return { GetPlayers = function() return {} end } end
       if name == 'RunService' then return { IsServer = function() return false end } end
-    end, CreateRemoteEvent = function() return signal() end }
+    end }
 
     local reStub = {
       GetRE = function(_, name)

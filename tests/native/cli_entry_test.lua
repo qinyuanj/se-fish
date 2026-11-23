@@ -149,3 +149,163 @@ describe("TestCliEntryRepoRoot", function()
     assert.is_truthy(out:find("worktree-init", 1, true))
   end)
 end)
+
+describe("TestDocsCli", function()
+  local docs = require("tools.docs")
+  local fixture = require("tests.support.docs_fixture")
+  local sha256 = require("tools.sha256")
+  local DOCROOT = fs.temp_dir()
+  local responses
+  local original_which, original_capture, original_rename
+
+  local function run(args)
+    local stdout, stderr = {}, {}
+    local real_stdout, real_stderr = io.stdout, io.stderr
+    io.stdout = { write = function(self, text) stdout[#stdout + 1] = tostring(text); return self end }
+    io.stderr = { write = function(self, text) stderr[#stderr + 1] = tostring(text); return self end }
+    local ok, code = pcall(docs.main, args, { repo_root = DOCROOT })
+    io.stdout, io.stderr = real_stdout, real_stderr
+    assert.is_true(ok, tostring(code))
+    return code, table.concat(stdout), table.concat(stderr)
+  end
+
+  local function cache_file(relative)
+    return DOCROOT .. "/.toolcache/se-manual/" .. relative
+  end
+
+  before_each(function()
+    responses = fixture.responses()
+    original_which, original_capture, original_rename = seam.which, seam.capture, os.rename
+    seam.which = function(name)
+      assert.are.equal("curl", name)
+      return "offline-curl"
+    end
+    seam.capture = function(spec)
+      local url = spec.argv[#spec.argv]
+      local body = responses[url]
+      if body == false then return 22, "模拟 HTTP 失败" end
+      if not body then return 22, "夹具没有该 URL: " .. url end
+      return 0, body
+    end
+  end)
+
+  after_each(function()
+    seam.which, seam.capture = original_which, original_capture
+    os.rename = original_rename
+    fs.rmrf(DOCROOT)
+  end)
+
+  it("test_sha256_matches_standard_vectors", function()
+    assert.are.equal("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", sha256.hex(""))
+    assert.are.equal("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", sha256.hex("abc"))
+    assert.are.equal("248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1",
+      sha256.hex("abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq"))
+  end)
+
+  it("test_sync_caches_core_documents_with_traceable_metadata", function()
+    local code, out, err = run({ "sync" })
+    assert.are.equal(0, code, err)
+    for number = 0, 22 do
+      local path = cache_file("lua/" .. string.format("%02d", number) .. "-fixture.txt")
+      assert.is_true(fs.exists(path), path)
+    end
+    assert.are.equal(26, #seam.list_files(DOCROOT .. "/.toolcache/se-manual"))
+
+    local tutorial = fs.slurp(cache_file("lua/08-fixture.txt"))
+    assert.is_truthy(tutorial:find("source: " .. fixture.SITE .. "lua/08-fixture.html", 1, true))
+    assert.matches("fetched_at: %d%d%d%d%-%d%d%-%d%dT%d%d:%d%d:%d%dZ", tutorial)
+    assert.matches("sha256: %x+", tutorial)
+    assert.matches("client_ready_retry 与 <Server> & Client", tutorial, 1, true)
+    assert.is_nil(tutorial:find("<p>", 1, true))
+
+    local changelog = fs.slurp(cache_file("game_api/changelog/changelog_20261119.txt"))
+    assert.matches("changelog_version: 20261119", changelog, 1, true)
+    local previous_hash = changelog:match("sha256: (%x+)")
+    local repeated_code, repeated_out = run({ "sync" })
+    assert.are.equal(0, repeated_code)
+    assert.matches("内容未变化", repeated_out, 1, true)
+    assert.are.equal(previous_hash, fs.slurp(cache_file("game_api/changelog/changelog_20261119.txt")):match("sha256: (%x+)"))
+    assert.matches("已刷新元数据", out .. repeated_out, 1, true)
+  end)
+
+  it("test_on_demand_api_and_search_use_only_local_official_cache", function()
+    assert.are.equal(0, run({ "sync" }))
+    local code, out, err = run({ "sync", "api", "RemoteEvent" })
+    assert.are.equal(0, code, err)
+    local cached = fs.slurp(cache_file("game_api/classes/RemoteEvent.txt"))
+    assert.matches("FireServer 参数必须是 <table>。", cached, 1, true)
+    assert.matches("RemoteEvent:FireServer%(player%)", cached)
+
+    fs.write_file(DOCROOT .. "/outside/Roblox.txt", "FireServer 来自 Roblox，不应被检索")
+    seam.which = function() error("离线检索不应查找 curl") end
+    seam.capture = function() error("离线检索不应访问网络") end
+    local search_code, search_out, search_err = run({ "search", "fireservice" })
+    assert.are.equal(0, search_code, search_err)
+    assert.matches("0 条命中", search_out, 1, true)
+    search_code, search_out, search_err = run({ "search", "firesERVER" })
+    assert.are.equal(0, search_code, search_err)
+    assert.matches(".toolcache/se%-manual/game_api/classes/RemoteEvent%.txt:%d+", search_out)
+    assert.matches("来源: " .. fixture.REMOTE_EVENT, search_out, 1, true)
+    assert.is_nil(search_out:find("Roblox", 1, true))
+  end)
+
+  it("test_network_and_parse_failures_preserve_every_old_document", function()
+    assert.are.equal(0, run({ "sync" }))
+    local before = {}
+    for _, relative in ipairs(seam.list_files(DOCROOT .. "/.toolcache/se-manual")) do
+      before[relative] = fs.slurp(cache_file(relative))
+    end
+
+    responses[fixture.SITE .. "lua/08-fixture.html"] = "<html><body>格式已变化</body></html>"
+    local code, _, err = run({ "sync" })
+    assert.are.equal(1, code)
+    assert.matches("解析失败", err, 1, true)
+    assert.matches("旧缓存未被", err, 1, true)
+    for relative, body in pairs(before) do assert.are.equal(body, fs.slurp(cache_file(relative)), relative) end
+
+    responses = fixture.responses()
+    responses[fixture.SITE .. "lua/22-fixture.html"] = false
+    code, _, err = run({ "sync" })
+    assert.are.equal(1, code)
+    assert.matches("curl 退出码 22", err, 1, true)
+    for relative, body in pairs(before) do assert.are.equal(body, fs.slurp(cache_file(relative)), relative) end
+  end)
+
+  it("test_write_failure_rolls_back_the_whole_core_batch", function()
+    assert.are.equal(0, run({ "sync" }))
+    local before = {}
+    for _, relative in ipairs(seam.list_files(DOCROOT .. "/.toolcache/se-manual")) do
+      before[relative] = fs.slurp(cache_file(relative))
+    end
+    responses[fixture.SITE .. "lua/00-fixture.html"] = responses[fixture.SITE .. "lua/00-fixture.html"]
+      :gsub("第 00 章官方正文", "尚未成功提交的新正文")
+    local target = cache_file("lua/08-fixture.txt")
+    os.rename = function(source, destination)
+      if destination == target and source:match("%.new$") then return nil, "模拟第 08 章替换失败" end
+      return original_rename(source, destination)
+    end
+    local code, _, err = run({ "sync" })
+    os.rename = original_rename
+    assert.are.equal(1, code)
+    assert.matches("模拟第 08 章替换失败", err, 1, true)
+    assert.matches("已回滚本批已替换文件", err, 1, true)
+    for relative, body in pairs(before) do assert.are.equal(body, fs.slurp(cache_file(relative)), relative) end
+  end)
+
+  it("test_missing_cache_and_curl_have_actionable_errors", function()
+    local code, _, err = run({ "search", "RemoteEvent" })
+    assert.are.equal(1, code)
+    assert.matches("请先运行 lua tools/cli.lua docs sync", err, 1, true)
+
+    code, _, err = run({ "sync", "api", "RemoteEvent" })
+    assert.are.equal(1, code)
+    assert.matches("本地没有 API 总索引", err, 1, true)
+
+    seam.which = function() return nil end
+    code, _, err = run({ "sync" })
+    assert.are.equal(3, code)
+    assert.matches("找不到 curl", err, 1, true)
+    assert.are.equal(2, run({ "sync", "unexpected" }))
+    assert.are.equal(2, run({ "search" }))
+  end)
+end)

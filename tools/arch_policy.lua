@@ -19,7 +19,7 @@ M.policy = {
         'common.AiTargetPolicy', 'common.AttrGrowth', 'common.AttrModel', 'common.BlindboxDraw', 'common.BodyScale',
         'common.BossPhase', 'common.CarryMount', 'common.ContentValidation', 'common.FishCatch',
         'common.FlightPath', 'common.GameCfg', 'common.GrillCurve', 'common.LotteryDraw',
-        'common.LotteryEligibility', 'common.MathWaterJudge', 'common.NpcDialogue',
+        'common.LotteryEligibility', 'common.MathWaterJudge', 'common.NpcDialogue', 'common.Number',
         'common.OwnedUnits', 'common.QuestSteps', 'common.RateLimit', 'common.Records',
         'common.ReelDisplay', 'common.ReelProgress', 'common.SpecialItem', 'common.Vitals',
         'common.ZoneMarkers',

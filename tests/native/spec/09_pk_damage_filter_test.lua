@@ -124,7 +124,7 @@ describe('条款 9 PK 伤害过滤', function()
         if not target then return nil end
         return { Instance = target.Character, Position = env.shotAt or { x = 0, y = 0, z = 0 } }
       end } end
-    end, CreateRemoteEvent = function() return signal() end }
+    end }
     local re = { GetRE = function(_, name)
       env.re[name] = env.re[name] or { OnServerEvent = signal(), OnClientEvent = signal(),
         FireClient = function() end, FireAllClients = function() end, FireServer = function() end }

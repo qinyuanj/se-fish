@@ -9,6 +9,7 @@
 -- （lfs+io 递归），不再调用 cp -R / mv / rm。
 local seam = require("tools.seam")
 local exit_code = require("tools.exit_code")
+local git_hooks = require("tools.git_hooks")
 
 local M = {}
 
@@ -21,6 +22,7 @@ function M.usage()
     "  把 worktree 补齐到能跑 lua tools/cli.lua test full；重复执行只跳过已有条目。",
     "  --root         目标检出根，默认当前目录",
     "  --skills-from  上游 skill 来源，默认宿主侧 magpie 资源库（由 USERPROFILE 推导）",
+    "  同时安装提交前运行 test guards 的 pre-commit；已有其他 hook 时拒绝覆盖。",
     "  不为质量工具做准备；质量工具由 dsh-uml-viewer 插件自带。",
   }, "\n") .. "\n"
 end
@@ -128,6 +130,12 @@ function M.run(opts)
       io.stdout:write("复制 skill: " .. dst .. "\n")
     end
   end
+  local hook, result, code = git_hooks.install(opts.root)
+  if not hook then
+    io.stderr:write("worktree-init: " .. tostring(result) .. "\n")
+    return code or 1
+  end
+  io.stdout:write((result == "unchanged" and "跳过 pre-commit（已安装）: " or "安装 pre-commit: ") .. hook .. "\n")
   return 0
 end
 

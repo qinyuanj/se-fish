@@ -1,5 +1,6 @@
 -- 引擎原地复活不换角色，也不触发 CharacterAdded，因此必须轮询同一 Controller 的 Health。
 local GameCfg = require('common.GameCfg')
+local Number = require('common.Number')
 local Vitals = require('common.Vitals')
 local DamageNotice = require('common.DamageNotice')
 
@@ -11,7 +12,7 @@ local function cfg()
 end
 
 local function isInt(n)
-    return type(n) == 'number' and n == math.floor(n)
+    return Number.IsFiniteNumber(n) and n == math.floor(n)
 end
 
 function Mgr:Now()
@@ -155,7 +156,7 @@ function Mgr:RefreshMaxHealth(player)
 end
 
 local function isBadNumber(v)
-    return type(v) ~= 'number' or v ~= v or v == math.huge or v == -math.huge
+    return not Number.IsFiniteNumber(v)
 end
 
 local function readPosition(unit)

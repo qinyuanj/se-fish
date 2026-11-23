@@ -1,4 +1,5 @@
 local GameCfg = require('common.GameCfg')
+local Number = require('common.Number')
 
 local Mgr = { LastSeq = {} }
 
@@ -38,7 +39,7 @@ function Mgr:FindGoods(itemId, level)
 end
 
 function Mgr:FindGoodsByNumber(number, level)
-    if type(number) ~= 'number' or number ~= math.floor(number) or number < 1 then return nil end
+    if not Number.IsFiniteNumber(number) or number ~= math.floor(number) or number < 1 then return nil end
     for _, goods in ipairs(GameCfg.Shop.Goods) do
         if goods.Number == number and goods.MinShopLevel <= level then return goods end
     end

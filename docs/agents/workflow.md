@@ -23,6 +23,7 @@ Lua 命令使用 **Lua 5.4**，命令名统一 `lua`，执行前用 `lua -v` 核
 
 - `lua tools/cli.lua deploy`：将三端一级子树字节镜像到宿主目录（经 `tools/seam.lua` 调用 `robocopy /MIR`，镜像前打印将被删掉的宿主多余文件；宿主三端根下仓库已删的散文件或子树同样先删）；robocopy 缺失时在镜像前以退出码 3 失败。编辑器开着本图时执行 validate → 有差异时 `code push` → `code diff` 复核，push 后仍不一致才返回失败。三端内本地已删的地图文件用 `code push --delete --yes` 删掉；三端外的地图独有文件（`temp/` 等编辑器生成物）只提示保留，两类同时出现时不推送（#167）。跨接缝约定见 [ADR-0017](../adr/0017-windows-native-only.md)。
 - `lua tools/cli.lua sync`：将宿主目录的 API 存根、`data/` 回灌仓库；`eggy.json` 不回灌，见下方「编辑器工程 ≠ 仓库检出」；三端 `packages/` 由仓库管理，也不回灌。
+- `lua tools/cli.lua docs sync`：显式同步 SE 官方手册到已忽略的 `.toolcache/se-manual/`，覆盖 `lua/00–22`、教程与 API 总索引及 API 索引所列最新 changelog；`docs sync api <类型名或官方 URL>` 按需加入一个 `game_api` 成员页。每个纯文本文件头记录官方 URL、UTC 拉取时间与正文的 SHA-256，日志另记官网文件名提供的版本；所有核心页面下载并解析成功后才写入，失败保留旧缓存。`lua tools/cli.lua docs search <查询>` 只检索本地缓存、无需网络或编辑器，命中给出本地文件行号与官方来源 URL；缓存为空时先跑 `docs sync`，精确成员详情仍可走 `editor-cli api get` / 官方单页兜底。同步依赖 PATH 上的 `curl`，检索不依赖它。
 - `lua tools/cli.lua blender <脚本.py> [--blend <输入.blend>] [-- <脚本参数>...]`：在本机无头 Blender 里执行脚本，是唯一的 Blender 入口；`--which` 核对将用的 Blender，`--expr` 执行内联代码。路径写正斜杠 Windows 形式（`C:/...`）或仓库内相对路径；用法见 [Blender 与 Meshy 使用](art-pipeline.md)，决策见 [ADR-0009](../adr/0009-blender-headless-only.md)。
 - `lua tools/cli.lua screenshot [--window <标题子串>] [--screen] [--out <文件.png>]`：取证画面的统一入口，替代 editor-cli 的 `screenshot`。缺省走**后台抓屏**——`PrintWindow` + `PW_RENDERFULLCONTENT` 直接读窗口表面，目标窗口被遮挡、不在前台也不影响取帧；`--screen` 或 `--rect X,Y,W,H` 才走桌面合成（`CopyFromScreen`），那时窗口必须在最前面，被盖住抓到的是遮挡物。缺省取景是编辑器主窗口（`client.exe` 进程里面积最大的窗口），试玩时游戏视口就在它里面；`--window <子串>` 按标题挑，取面积最大的一条。选窗一律排除 `WS_EX_LAYERED` 的辅助表面——Qt 的 `Qt5QWindowToolSaveBits` 这类窗口标题也叫 `client`，却什么都不画（#185）。输出落 `tmp/`。加 `--info` 不抓图，只报屏幕列表、选中的目标窗口（标题、进程、尺寸）、所在显示器与「虚拟屏 / 非虚拟屏 / 不确定」判定，判据是该屏适配器是否挂在 PCI 总线上（`PCI\` 开头为真实显卡）。**判帧新旧只能连拍比 md5**：先确认两帧尺寸一致，再比 md5，尺寸变了的那组作废重采；单帧有效证明不了帧是新的。
 - `lua tools/cli.lua acceptance [--check|--write|--update-baseline]`：验收矩阵的统一校验入口（#243），矩阵入口见 [条款矩阵](../acceptance/README.md)（接手先读 [交接说明](../acceptance/handover.md)），判定逻辑在 `tools/acceptance.lua`。缺省 `--check` 核对一件事——**矩阵是不是一本可信的账**：19 个规格小节各恰好一份分片、四列取值在封闭词表内、条款 ID 连续不跳号、`blocked` 写了卡在谁、`out-of-scope` 写了理由、`evidenced`/`accepted` 的每个仓库相对路径真实存在、`docs/GameSpec.md` 全文无工单编号、README 生成块与分片一致，以及两道单向棘轮（已取证数不低于 `docs/acceptance/baseline.lua`，遗留测试数不高于它）。`--write` 按分片重写索引的生成块（幂等）；`--update-baseline` 把基线抬到当前值，只许 evidenced 抬、legacyTests 降，反方向退 2。同一份判定随 fast 车道跑（`tests/native/guards/acceptance_matrix_test.lua`），手改索引、写不存在的证据路径、调低基线都会在下次提交时变红。
@@ -99,7 +100,7 @@ lua tools/cli.lua worktree-init
 
 ## 完成判据
 
-代码改动按顺序执行，全部通过才算完成。本仓没有提交时自动检查；PR 与 `main` 推送由 [test.yml](../../.github/workflows/test.yml) 自动运行 full，check-run context `full`（PR 界面显示 `test / full`）是 `main` 的 required status check。下表其余每一项仍由 agent 显式执行，质量工具由人运行，见表后的「人工验收」。
+代码改动按顺序执行，全部通过才算完成。新 checkout 执行 `lua tools/cli.lua worktree-init` 会安装本地 `pre-commit`，已有 checkout 可单独执行 `lua tools/cli.lua git-hook-init`；提交前自动运行 `lua tools/cli.lua test guards`，重复安装幂等，已有不同 hook 不覆盖。PR 与 `main` 推送由 [test.yml](../../.github/workflows/test.yml) 自动运行 full，check-run context `full`（PR 界面显示 `test / full`）是 `main` 的 required status check。下表其余每一项仍由 agent 显式执行，质量工具由人运行，见表后的「人工验收」。
 
 | 检查 | 通过条件 |
 |---|---|

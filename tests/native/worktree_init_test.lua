@@ -5,6 +5,7 @@
 -- Windows 原生（#191）：临时目录用 fs_fixture.temp_dir（仓库 tmp/），落盘/枚举/删除走纯 Lua；
 -- 复制失败的注入用 seam.list_entries 桩（fast 车道整模块桩接缝的口径，不靠 chmod）。
 local init = require("tools.worktree_init")
+local git_hooks = require("tools.git_hooks")
 local seam = require("tools.seam")
 local fs = require("tests.support.fs_fixture")
 local write_file, slurp, exists = fs.write_file, fs.slurp, fs.exists
@@ -13,6 +14,7 @@ local ROOT = fs.temp_dir()
 local LIB = ROOT .. "/library"
 local WT_PARENT = ROOT .. "/wt-parent"
 local WT = WT_PARENT .. "/se-fish"
+local HOOK = ROOT .. "/git-common/hooks/pre-commit"
 
 local function stream()
   local s = { text = "" }
@@ -40,7 +42,14 @@ local function entries(dir) return fs.list_dir(dir) end
 describe("TestWorktreeInit", function()
   before_each(function()
     saved_out, saved_err = io.stdout, io.stderr
-    saved_seam = { list_entries = seam.list_entries, magpie_library = seam.magpie_library }
+    saved_seam = { list_entries = seam.list_entries, magpie_library = seam.magpie_library,
+      which = seam.which, capture = seam.capture }
+    seam.which = function(name) return name == "git" and "git" or nil end
+    seam.capture = function(spec)
+      assert.are.same({ "git", "rev-parse", "--path-format=absolute", "--git-path", "hooks/pre-commit" }, spec.argv)
+      assert.are.equal(WT, spec.cwd)
+      return 0, HOOK .. "\n"
+    end
     fs.rmrf(ROOT)
     for _, name in ipairs({ "blender-core", "blender-rendering", "tdd" }) do
       write_file(LIB .. "/" .. name .. "/SKILL.md", name .. "\n")
@@ -61,6 +70,8 @@ describe("TestWorktreeInit", function()
     assert.are.equal("blender-rendering\n", slurp(WT .. "/.agents/skills/blender-rendering/SKILL.md"))
     -- 只复制 blender-*，资源库里的其他 skill 不进来。
     assert.is_false(exists(WT .. "/.agents/skills/tdd"))
+    assert.are.equal(git_hooks.HOOK_BODY, slurp(HOOK))
+    assert.matches("lua tools/cli.lua test guards", slurp(HOOK), 1, true)
   end)
 
   -- 质量工具交给 dsh-uml-viewer 插件自带的标准工具后，新 worktree 不需要任何质量工具准备：
@@ -74,6 +85,25 @@ describe("TestWorktreeInit", function()
     assert.is_nil(out.text:find("tools/quality", 1, true))
     assert.is_nil(out.text:find("acceptance4lua", 1, true))
     assert.are.equal("", err.text)
+  end)
+
+  it("test_existing_different_hook_is_not_overwritten", function()
+    write_file(HOOK, "#!/bin/sh\necho local-hook\n")
+    assert.are.equal(1, run())
+    assert.are.equal("#!/bin/sh\necho local-hook\n", slurp(HOOK))
+    assert.matches("拒绝覆盖", err.text, 1, true)
+  end)
+
+  it("test_standalone_hook_init_is_idempotent", function()
+    assert.are.equal(0, run(), err.text)
+    out, err = stream(), stream()
+    io.stdout, io.stderr = out, err
+    local ok, code = pcall(git_hooks.main, { "--root", WT })
+    io.stdout, io.stderr = saved_out, saved_err
+    assert(ok, tostring(code))
+    assert.are.equal(0, code, err.text)
+    assert.matches("已安装", out.text, 1, true)
+    assert.are.equal(git_hooks.HOOK_BODY, slurp(HOOK))
   end)
 
   it("test_second_run_is_noop_and_keeps_existing_entries", function()

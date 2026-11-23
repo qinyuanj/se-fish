@@ -253,3 +253,39 @@ describe('TestPlayerLeaveRejoin', function()
     end)
 end)
 
+describe('远程事件公开创建入口（common/REUtil）', function()
+    local saved
+    local MODULE = 'common.REUtil'
+
+    before_each(function()
+        saved = {
+            game = rawget(_G, 'game'), remote = rawget(_G, 'RemoteEvent'),
+            reutil = rawget(_G, 'REUtil'), loaded = package.loaded[MODULE],
+        }
+        package.loaded[MODULE] = nil
+        _G.game = { GetService = function(_, name)
+            if name == 'World' then return { GetServerTime = function() return 1 end } end
+            if name == 'RunService' then return { IsServer = function() return false end } end
+        end }
+    end)
+
+    after_each(function()
+        _G.game, _G.RemoteEvent, _G.REUtil = saved.game, saved.remote, saved.reutil
+        package.loaded[MODULE] = saved.loaded
+    end)
+
+    it('test_creates_by_public_api_and_reuses_same_name', function()
+        local calls, events = {}, {}
+        _G.RemoteEvent = { New = function(name)
+            calls[#calls + 1] = name
+            events[name] = events[name] or { name = name }
+            return events[name]
+        end }
+        local REUtil = require(MODULE)
+        local first = REUtil:GetRE('ShopResult')
+        assert.are.equal(events['ShopResult'], first)
+        assert.are.equal(first, REUtil:GetRE('ShopResult'))
+        assert.are.same({ 'ShopResult' }, calls)
+    end)
+end)
+

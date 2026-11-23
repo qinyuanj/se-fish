@@ -203,7 +203,7 @@ describe('条款 11 广告满血复活（占位广告位）', function()
       if name == 'Players' then return { GetPlayers = function() return {} end } end
       if name == 'RunService' then return { IsServer = function() return true end,
         IsClient = function() return false end, Heartbeat = signal() } end
-    end, CreateRemoteEvent = function() return signal() end }
+    end }
     local function reStub(name)
       env.sent[name] = env.sent[name] or {}
       if not env.re[name] then
