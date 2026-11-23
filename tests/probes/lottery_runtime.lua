@@ -32,47 +32,25 @@ end
 local function quantity(label, value) print(string.format('K %s = %s', label, tostring(value))) end
 
 local GameCfg = require('common.GameCfg')
+local EconomyWorld = require('tests.support.economy_world')
 local ITEM_BAR = GameCfg.Items.ContainerId.ItemBar
 
--- ===== 引擎边界（照 tests/native/lottery_settle_test.lua）=====
-local env = { values = {}, queue = {}, events = {} }
-local store = {
-    GetAsync = function(_, key) return env.values[key] end,
-    UpdateAsync = function(_, key, transform)
-        local value = transform(env.values[key])
-        if value then env.values[key] = value end
-        return value
+local world = EconomyWorld.new()
+local data = world.data
+local seq = 0
+-- 仅做旧探针脚本兼容：Random 仍写入运行时公开注入点，Settle 则改为完整上行与落账。
+local lottery = setmetatable({}, {
+    __newindex = function(self, key, value)
+        if key == 'Random' then world.randomOverride = value else rawset(self, key, value) end
     end,
-    SetAsync = function(_, key, value) env.values[key] = value end,
-}
-local anchor = { Position = { x = 0, y = 0, z = 0 } }
-local player
-_G.game = { GetService = function(_, name)
-    if name == 'Task' then return { Spawn = function(_, fn) env.queue[#env.queue + 1] = fn end,
-        Wait = function() end } end
-    if name == 'DataStoreService' then return { GetDataStore = function() return store end } end
-    if name == 'World' then return { GetServerTime = function() return 100 end,
-        FindFirstChild = function() return anchor end } end
-    if name == 'Players' then return { GetPlayers = function() return { player } end } end
-end }
-_G.REUtil = { GetRE = function(_, name) return { FireClient = function(_, _, value)
-    env.events[#env.events + 1] = { name = name, value = value }
-end } end }
-
-local function signal()
-    return { Connect = function() return { Disconnect = function() end } end }
+})
+function lottery:Settle(_, slot)
+    seq = seq + 1
+    assert(world:lotteryAction({ action = 'Draw', slot = slot, seq = seq }))
+    local result = world:lastResult('LotteryResult')
+    assert(result and result.ok, result and result.reason or '无回包')
+    return result
 end
-
-local save = assert(loadfile('server/Mgr/MgrSave.lua'))()
-local players = assert(loadfile('server/Mgr/MgrPlayerData.lua'))()
-local lottery = assert(loadfile('server/Mgr/MgrLottery.lua'))()
-players.Save, save.PlayerData = save, players
-lottery.PlayerData, lottery.Save = players, save
-player = { UserId = 13802, Character = { Position = { x = 0, y = 0, z = 0 } },
-    CharacterAdded = signal(), CharacterRemoving = signal(), SetAttribute = function() end }
-players:OnPlayerAdded(player)
-while #env.queue > 0 do table.remove(env.queue, 1)() end
-local data = players:GetDataInst(player)
 
 -- ===== 第一节：正常路径真实抽样（2 万次）=====
 local N = 20000
@@ -217,4 +195,5 @@ for i, p in ipairs(patterns) do
 end
 
 print(string.format('--- 探针合计：%d 通过，%d 失败 ---', Pass, Fail))
+world:tearDown()
 os.exit(Fail == 0 and 0 or 1)

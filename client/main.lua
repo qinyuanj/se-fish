@@ -19,6 +19,13 @@ local SurvivalOverlayView = require("client.Views.SurvivalOverlayView")
 local GroundLootView = require("client.Views.GroundLootView")
 local FishCombatView = require("client.Views.FishCombatView")
 local GrillView = require("client.Views.GrillView")
+local LotteryView = require("client.Views.LotteryView")
+local BlindboxView = require("client.Views.BlindboxView")
+local PlatformShopView = require("client.Views.PlatformShopView")
+local LotteryInteraction = require("client.Views.LotteryInteraction")
+local MainHudLayout = require("client.MainHudLayout")
+local Util = require("common.Util")
+local FerryView = require("client.Views.FerryView")
 local ReelOverlayView = require("client.Views.ReelOverlayView")
 local CastSourceView = require("client.Views.CastSourceView")
 local ShopView = require("client.Views.ShopView")
@@ -93,8 +100,47 @@ Task:Spawn(function()
         ui_root = GameUI:GetUIRoot()
     end
     if ui_root then
+        _G.PlatformShop = {
+            Open = function()
+                client_store_writer:open_modal("platform")
+                REUtil:GetRE("PlatformAction"):FireServer({ action = "OpenCoinShop" })
+            end,
+        }
         RootView.mount(ui_root, client_store, {
             services = {
+                open_modal = function(id, payload) client_store_writer:open_modal(id, payload) end,
+                close_modal = function(id) client_store_writer:close_modal(id) end,
+                send_lottery = function(payload) REUtil:GetRE("LotteryAction"):FireServer(payload) end,
+                send_blindbox = function(payload) REUtil:GetRE("BlindboxAction"):FireServer(payload) end,
+                send_platform = function(payload) REUtil:GetRE("PlatformAction"):FireServer(payload) end,
+                request_blindbox_state = function() REUtil:GetRE("BlindboxStateRequest"):FireServer() end,
+                local_character = function()
+                    return Players.LocalPlayer and Players.LocalPlayer.Character or nil
+                end,
+                find_lottery_anchor = function(name) return Util:WaitForChild(World, name) end,
+                create_lottery_scene_node = function(preset, anchor, offset)
+                    return GameUI:CreateSceneNode(preset, anchor, offset)
+                end,
+                hud_entry_rect = function(name)
+                    local resolution = GameUI:GetEuiManager():GetDeviceResolution() or { x = 1920, y = 1080 }
+                    return MainHudLayout.Compute({ width = resolution.x, height = resolution.y }).Rects[name]
+                end,
+                send_ferry = function(payload)
+                    REUtil:GetRE("FerryAction"):FireServer(payload)
+                end,
+                create_scene_node = function(position, name)
+                    local player = Players.LocalPlayer
+                    local eui = player and player.PlayerGui and player.PlayerGui.EuiManager
+                    if not eui then error("摆渡场景节点创建时 EUI 未就绪", 2) end
+                    local node = eui:CreateSceneNodeAtPosition(position)
+                    node.Name = name
+                    return node
+                end,
+                get_device_resolution = function()
+                    local player = Players.LocalPlayer
+                    local eui = player and player.PlayerGui and player.PlayerGui.EuiManager
+                    return eui and eui:GetDeviceResolution() or { x = 1920, y = 1080 }
+                end,
                 send_grill = function(payload)
                     REUtil:GetRE("GrillAction"):FireServer(payload)
                 end,
@@ -181,6 +227,9 @@ Task:Spawn(function()
                 }),
                 AttackView.spec(),
                 GrillView.spec(),
+                BlindboxView.entry_spec(),
+                PlatformShopView.entry_spec(),
+                FerryView.spec(),
                 CastSourceView.spec(),
                 MainHudActionButtonsView.spec({
                     backpack_open = hud_backpack_open,
@@ -212,9 +261,15 @@ Task:Spawn(function()
                 confirm = FishermanView.confirm_modal_spec(),
             },
             overlays = {
+                lottery_interaction = LotteryInteraction.spec(),
                 survival = SurvivalOverlayView.spec(),
                 aim_pickup = GroundLootView.aim_spec(),
                 reel = ReelOverlayView.spec({ controller = hud_reel }),
+            },
+            modals = {
+                lottery = LotteryView.modal_spec(),
+                blindbox = BlindboxView.modal_spec(),
+                platform = PlatformShopView.modal_spec(),
             },
             docks = {
                 shop = ShopView.bubble_spec({ anchors = (function()
@@ -245,6 +300,7 @@ Task:Spawn(function()
                         REUtil:GetRE('ItemBarAction'):FireServer(payload)
                     end,
                 }),
+                ferry = FerryView.legs_spec(),
                 fish_combat = FishCombatView.bar_spec(),
                 fish_warning = FishCombatView.warning_spec(),
             },
@@ -259,12 +315,7 @@ _G.MgrGameUI:HideNativeHealth()
 
 local LocalMotorUnitCtrl = require("client.LocalMotorUnitCtrl")
 local LocalGM = require("client.LocalGM")
-local LocalLottery = require("client.LocalLottery")
-local ScreenLottery = require("client.ScreenHandlers.ScreenLottery")
-local ScreenFerry = require("client.ScreenHandlers.ScreenFerry")
 local ScreenParty = require("client.ScreenHandlers.ScreenParty")
-local ScreenBlindbox = require("client.ScreenHandlers.ScreenBlindbox")
-local ScreenPlatform = require("client.ScreenHandlers.ScreenPlatform")
 local ScreenCompendium = require('client.ScreenHandlers.ScreenCompendium')
 
 
@@ -280,12 +331,7 @@ Task:Spawn(function()
     _G.MgrGameUI:StartGM()
 end)
 
-Task:Spawn(function() ScreenLottery:Start() end)
-Task:Spawn(function() LocalLottery:Start() end)
-Task:Spawn(function() ScreenFerry:Start() end)
 Task:Spawn(function() ScreenParty:Start() end)
-Task:Spawn(function() ScreenBlindbox:Start() end)
-Task:Spawn(function() ScreenPlatform:Start() end)
 Task:Spawn(function() ScreenCompendium:Start() end)
 Task:Delay(1, function() 
     _G.MgrGameUI:OpenScreen("ScreenMsg")

@@ -12,7 +12,7 @@
 --   抛竿   CastProbe:Cast / :Reel / :Drop           （CastAction 的处理函数）
 --   收线   ReelProbe:Accept {s, n, q}             （ReelInRE）
 --   攻击   MgrWeapon:Attack                       （WeaponAction.attack）
---   摆渡   MgrFerry:Handle {action='Board', routeId, seq}
+--   摆渡   FerryRoute:Handle {action='Board', routeId, seq}
 --   买匕首 ServerRuntime:dispatch_shop {action='Buy', number=25, seq}（钓场商店 Level1 摊位，itemKey item135）
 --   装备   data:SelectWeapon('item135')（必要时 data:HoldWeapon），用 MgrWeapon:EquippedWeapon 复核
 --   整理   data:MoveToItemBar / data:MoveSlot(from, index, target, slot)（背包/道具栏满时的合法换格）
@@ -69,7 +69,7 @@ local function findGoodsByNumber(number, level)
 end
 local MgrFishUnit = require('server.World.FishTree')
 local MgrWeapon = require('server.Mgr.MgrWeapon')
-local MgrFerry = require('server.Mgr.MgrFerry')
+local Ferry = ground() and ground().ferry
 
 local Task = game:GetService('Task')
 local World = game:GetService('World')
@@ -522,8 +522,8 @@ local function validate(data)
     fn('ReelProbe:', ReelProbe, 'Accept')
     need('MgrFishUnit.Fish', type(MgrFishUnit.Fish) == 'table')
     fn('MgrWeapon:', MgrWeapon, 'Attack') fn('MgrWeapon:', MgrWeapon, 'EquippedWeapon')
-    fn('MgrFerry:', MgrFerry, 'Handle')
-    need('MgrFerry.LastSeq', type(MgrFerry.LastSeq) == 'table')
+    fn('FerryRoute:', Ferry, 'Handle')
+    need('FerryRoute.LastSeq', type(Ferry.LastSeq) == 'table')
     for _, name in ipairs({ 'SelectSlot', 'SelectBait', 'SelectWeapon', 'HoldWeapon', 'MoveSlot', 'MoveToItemBar',
         'ItemCount', 'WeaponCount', 'GetItemBarSnapshot', 'ItemBarCapacity', 'BackpackCapacity' }) do
         need('data:' .. name, type(data[name]) == 'function')
@@ -757,7 +757,7 @@ local function step()
         focus(data, nil)
         local wait = needNear({ route.Outbound.AnchorName }, route.Outbound.Radius, route.Outbound.Slack, '摆渡上船')
         if wait then return wait end
-        local ok = MgrFerry:Handle(player, { action = 'Board', routeId = route.Id, seq = nextSeq(MgrFerry) })
+        local ok = Ferry:Handle(player, { action = 'Board', routeId = route.Id, seq = nextSeq(Ferry) })
         say('FERRY', 'Board accepted=' .. tostring(ok))
         RT.pendingUntil = now() + route.Outbound.CountdownSec + 2
         return 'wait', 1

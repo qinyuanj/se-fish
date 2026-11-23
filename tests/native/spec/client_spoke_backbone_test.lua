@@ -585,13 +585,13 @@ describe("客户端 Spoke 主干契约（#296）", function()
         "client.LocalMotorUnitCtrl",
         "client.LocalLoot",
         "client.LocalGM",
-        "client.LocalLottery",
-        "client.ScreenHandlers.ScreenLottery",
-        "client.ScreenHandlers.ScreenFerry",
         "client.ScreenHandlers.ScreenParty",
-        "client.ScreenHandlers.ScreenBlindbox",
-        "client.ScreenHandlers.ScreenPlatform",
         "client.ScreenHandlers.ScreenCompendium",
+        "client.Views.LotteryView",
+        "client.Views.BlindboxView",
+        "client.Views.PlatformShopView",
+        "client.Views.LotteryInteraction",
+        "client.Views.FerryView",
         "client.Views.GarBiteWarning",
         "client.packages.ability_system.api",
         "client.Store.ClientStore",
@@ -610,6 +610,7 @@ describe("客户端 Spoke 主干契约（#296）", function()
         GameUI = rawget(_G, "GameUI"),
         MgrGameUI = rawget(_G, "MgrGameUI"),
         ClientSpoke = rawget(_G, "ClientSpoke"),
+        PlatformShop = rawget(_G, "PlatformShop"),
       }
 
       local heartbeat = Eui.Signal()
@@ -649,15 +650,20 @@ describe("客户端 Spoke 主干契约（#296）", function()
         package.loaded["common.Util"] = nil
         for _, name in ipairs({
           "client.LocalMgrUtil", "client.LocalMotorUnitCtrl",
-          "client.LocalLoot", "client.LocalGM", "client.LocalLottery",
-          "client.ScreenHandlers.ScreenLottery", "client.ScreenHandlers.ScreenFerry",
-          "client.ScreenHandlers.ScreenParty",
-          "client.ScreenHandlers.ScreenBlindbox",
-          "client.ScreenHandlers.ScreenPlatform", "client.ScreenHandlers.ScreenCompendium",
+          "client.LocalLoot", "client.LocalGM",
+          "client.ScreenHandlers.ScreenParty", "client.ScreenHandlers.ScreenCompendium",
           "client.Views.GarBiteWarning",
         }) do
           package.loaded[name] = noop_module
         end
+        local empty_spec = function() return { name = "EconomyEntry", mount = noop } end
+        local empty_modal = function() return noop end
+        package.loaded["client.Views.LotteryView"] = { modal_spec = empty_modal }
+        package.loaded["client.Views.BlindboxView"] = { entry_spec = empty_spec, modal_spec = empty_modal }
+        package.loaded["client.Views.PlatformShopView"] = { entry_spec = empty_spec, modal_spec = empty_modal }
+        package.loaded["client.Views.LotteryInteraction"] = { spec = empty_spec }
+        package.loaded["client.Views.FerryView"] = { spec = empty_spec, legs_spec = empty_spec }
+
         -- 强制重新加载真实 ClientStore / Views 以绑定到 stub 后的 ZoneMarkers / REUtil
         package.loaded["client.Store.ClientStore"] = nil
         package.loaded["client.Views.RootView"] = nil
@@ -707,7 +713,11 @@ describe("客户端 Spoke 主干契约（#296）", function()
               }
             end
             if name == "RunService" then
-              return { Heartbeat = heartbeat, IsClient = function() return true end, IsServer = function() return false end }
+              return {
+                Heartbeat = heartbeat,
+                IsClient = function() return true end,
+                IsServer = function() return false end,
+              }
             end
             if name == "Players" then
               local players = { LocalPlayer = { Character = { Position = char_pos } } }

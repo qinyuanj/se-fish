@@ -699,8 +699,8 @@ function PlayerLife.mount(s3, player_tree, opts)
       local item_id = survival_cfg.AdrenalineItemId
       local count = type(inst.ItemCount) == "function" and inst:ItemCount(item_id) or 0
       if count < 1 then
-        if platform_api and type(platform_api.OpenAdrenalineShop) == "function" then
-          pcall(platform_api.OpenAdrenalineShop, platform_api, player)
+        if platform_api and type(platform_api.ShopAction) == "function" then
+          pcall(platform_api.ShopAction, player, { action = "OpenAdrenaline" })
         end
         return fail("no-adrenaline")
       end

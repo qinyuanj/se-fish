@@ -6,7 +6,7 @@
 --   4. 发货错：GoodsPurchaseCompleted 匹配 pending flow 却不结算；未配置商品的信号也发货；
 --      发货不走持久操作（重进丢失）；信号重复到达时伪防重吞掉真实购买（订单身份未查证，不拼 UserId+goodsId 防重）；
 --   5. 生命周期错：玩家离开残留 flow，重进后旧回调改新会话；payload 畸形直接报错而不是拒绝。
--- seam：MgrPlatform:Purchase / ShowAd / OpenAdrenalineShop / OpenCoinShop / Update / HandleTestAction +
+-- seam：MgrPlatform:Purchase / ShowAd / Update / HandleTestAction + ServerRuntime 商店入口；
 --   GoodsPurchaseCompleted 订阅入口；引擎边界（CommodityService / AdvertisementService / World 时钟 /
 --   DataStore / RE）全部替身，真实 MgrSave + MgrPlayerData 验证发货落账。
 -- 注意：真实平台无订单 ID、购买无取消/失败事件（docs/技术难点识别.md §4），本地接缝只做
@@ -14,6 +14,7 @@
 -- it 名字沿用旧方法名，注册顺序 = LuaUnit sortedPairs 的实际执行顺序。
 
 local GameCfg = require('common.GameCfg')
+local EconomyWorld = require('tests.support.economy_world')
 
 local globalNames = { 'game', 'REUtil', 'MgrPlayerData' }
 
@@ -166,24 +167,22 @@ describe('平台适配层（MgrPlatform）', function()
   -- 肾上腺素五连装：4 金豆发 5 个
   it('test_adrenaline_five_pack_grants_five', function()
     GameCfg.Platform.Goods.adrenaline5.goodsId = 'goodsAdr5'
-    persistReady()
-    env.platform:HandleAction(env.player, { action = 'Purchase', goods = 'adrenaline5' })
-    env.platform:HandleTestAction(env.player, { action = 'ResolveFlow', outcome = 'success' })
-    drain()
-    assert.same(5, env.data:ItemCount(GameCfg.Survival.AdrenalineItemId))
+    local shop = EconomyWorld.new()
+    assert.is_true(shop:platformAction({ action = 'Purchase', goods = 'adrenaline5', seq = 1 }))
+    shop:resolvePlatform('success')
+    assert.same(5, shop.data:ItemCount(GameCfg.Survival.AdrenalineItemId))
+    shop:tearDown()
   end)
 
   -- 肾上腺素发货走持久操作：重进读档仍在
   it('test_adrenaline_grant_survives_reconnect', function()
     GameCfg.Platform.Goods.adrenaline1.goodsId = 'goodsAdr1'
-    persistReady()
-    env.platform:HandleAction(env.player, { action = 'Purchase', goods = 'adrenaline1' })
-    env.platform:HandleTestAction(env.player, { action = 'ResolveFlow', outcome = 'success' })
-    drain()
-    env.players:OnPlayerAdded(env.player) -- 重进读档
-    drain()
-    local restored = env.players:GetDataInst(env.player)
-    assert.same(1, restored:ItemCount(GameCfg.Survival.AdrenalineItemId))
+    local shop = EconomyWorld.new()
+    assert.is_true(shop:platformAction({ action = 'Purchase', goods = 'adrenaline1', seq = 1 }))
+    shop:resolvePlatform('success')
+    shop:reconnect()
+    assert.same(1, shop.data:ItemCount(GameCfg.Survival.AdrenalineItemId))
+    shop:tearDown()
   end)
 
   -- 已配置商品 + 服务可达：走真实面板，flow 等 GoodsPurchaseCompleted
@@ -315,16 +314,18 @@ describe('平台适配层（MgrPlatform）', function()
 
   -- OpenAdrenalineShop / OpenCoinShop：未配置时明确回包不可用，不伪成功
   it('test_shop_entries_reply_unavailable_when_unconfigured', function()
+    local shop = EconomyWorld.new()
     GameCfg.Debug = { Enabled = false }
     GameCfg.Platform.Placeholder.Enabled = false
-    env.platform:OpenAdrenalineShop(env.player)
-    env.platform:OpenCoinShop(env.player)
-    local replies = messages('PlatformResult')
+    assert.is_false(shop:platformAction({ action = 'OpenAdrenaline' }))
+    assert.is_false(shop:platformAction({ action = 'OpenCoinShop' }))
+    local replies = shop:messages('PlatformResult')
     assert.same(2, #replies)
     for _, reply in ipairs(replies) do
       assert.is_false(reply.ok)
       assert.same('unavailable', reply.reason)
     end
+    shop:tearDown()
   end)
 
   -- 信号不串号：别人的购买完成不解我的 flow；不同商品的信号不解 flow

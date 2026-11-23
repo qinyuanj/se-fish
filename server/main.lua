@@ -14,24 +14,20 @@ local ServerRuntime = require("server.World.ServerRuntime")
 local AttrLeaf = require("server.World.AttrLeaf")
 local FishCarrier = require("server.World.FishCarrier")
 local FishAi = require("server.World.FishAi")
-local InteractionPoints = require("server.World.InteractionPoints")
 
 local MgrMap = {
     MgrPlayer = require("server.Mgr.MgrPlayer"),
     MgrPlayerData = require("server.Mgr.MgrPlayerData"),
     MgrAbility = require("server.Mgr.MgrAbility"),
     MgrGM = require("server.Mgr.MgrGM"),
-    MgrLottery = require("server.Mgr.MgrLottery"),
     MgrQuest = require("server.Mgr.MgrQuest"),
     MgrStory = require("server.Mgr.MgrStory"),
-    MgrFerry = require("server.Mgr.MgrFerry"),
     MgrSave = require("server.Mgr.MgrSave"),
     MgrParty = require("server.Mgr.MgrParty"),
     MgrCompendium = require("server.Mgr.MgrCompendium"),
     MgrRecords = require("server.Mgr.MgrRecords"),
     MgrAchievements = require("server.Mgr.MgrAchievements"),
     MgrPlatform = require("server.Mgr.MgrPlatform"),
-    MgrBlindbox = require("server.Mgr.MgrBlindbox"),
 }
 
 local WorldRuntime
@@ -292,8 +288,6 @@ MgrMap.MgrPlayerData.Quest = MgrMap.MgrQuest
 MgrMap.MgrPlayerData.Vitals = nil
 MgrMap.MgrGM.Vitals = nil
 MgrMap.MgrGM.Save = MgrMap.MgrSave
-MgrMap.MgrFerry.PlayerData = MgrMap.MgrPlayerData
-MgrMap.MgrFerry.Interact = InteractionPoints
 MgrMap.MgrPlayerData.Save = MgrMap.MgrSave
 MgrMap.MgrQuest.PlayerData = MgrMap.MgrPlayerData
 MgrMap.MgrQuest.Save = MgrMap.MgrSave
@@ -301,12 +295,7 @@ MgrMap.MgrStory.PlayerData = MgrMap.MgrPlayerData
 MgrMap.MgrStory.Save = MgrMap.MgrSave
 MgrMap.MgrAchievements.PlayerData = MgrMap.MgrPlayerData
 MgrMap.MgrAchievements.Save = MgrMap.MgrSave
-MgrMap.MgrFerry.Save = MgrMap.MgrSave
-MgrMap.MgrFerry.Save = MgrMap.MgrSave
 MgrMap.MgrSave.PlayerData = MgrMap.MgrPlayerData
-MgrMap.MgrLottery.PlayerData = MgrMap.MgrPlayerData
-MgrMap.MgrLottery.Save = MgrMap.MgrSave
-MgrMap.MgrLottery.Interact = InteractionPoints
 MgrMap.MgrCompendium.Save = MgrMap.MgrSave
 MgrMap.MgrCompendium.PlayerData = MgrMap.MgrPlayerData
 MgrMap.MgrCompendium.Quest = MgrMap.MgrQuest
@@ -316,9 +305,6 @@ MgrMap.MgrRecords.PlayerData = MgrMap.MgrPlayerData
 
 MgrMap.MgrPlatform.Save = MgrMap.MgrSave
 MgrMap.MgrPlatform.PlayerData = MgrMap.MgrPlayerData
-MgrMap.MgrBlindbox.Save = MgrMap.MgrSave
-MgrMap.MgrBlindbox.PlayerData = MgrMap.MgrPlayerData
-MgrMap.MgrBlindbox.Platform = MgrMap.MgrPlatform
 
 MgrMap.MgrAbility.Vitals = nil
 MgrMap.MgrPlayerData.Ability = MgrMap.MgrAbility
@@ -381,11 +367,19 @@ WorldRuntime = ServerRuntime.new({
     remote = _G.REUtil,
     player_data = MgrMap.MgrPlayerData,
     save = MgrMap.MgrSave,
+    interact = MgrMap.MgrInteract,
     platform = MgrMap.MgrPlatform,
     fish_carrier = FishCarrier,
     compendium = MgrMap.MgrCompendium,
     quest = MgrMap.MgrQuest,
     random = math.random,
+    delivery_epoch = tostring({}),
+    lottery_in_range = function(player)
+        local cfg = GameCfg.Lottery
+        return MgrMap.MgrInteract:InRange(player, {
+            AnchorNames = cfg.MachineAnchors(), Radius = cfg.Radius, Slack = cfg.Slack,
+        })
+    end,
     fish_units = function()
         return WorldRuntime and WorldRuntime.fish_host.Fish or {}
     end,
@@ -398,6 +392,11 @@ WorldRuntime = ServerRuntime.new({
         local event = _G.REUtil:GetRE("WeaponAction")
         event.OnServerEvent:Connect(function(player, payload)
             if _G.REUtil:CheckRECD(player, "WeaponAction", GameCfg.Ability.GunShared.ActionCooldownSec) then return end
+            dispatch(player, payload)
+        end)
+    end,
+    bind_ferry_action = function(dispatch)
+        _G.REUtil:GetRE("FerryAction").OnServerEvent:Connect(function(player, payload)
             dispatch(player, payload)
         end)
     end,
@@ -419,6 +418,24 @@ WorldRuntime = ServerRuntime.new({
         _G.REUtil:GetRE("InteractAction").OnServerEvent:Connect(function(player, payload)
             if _G.REUtil:CheckRECD(player, "InteractAction", GameCfg.Items.ActionCooldownSec) then return end
             dispatch(player, payload)
+        end)
+    end,
+    bind_lottery_action = function(dispatch)
+        _G.REUtil:GetRE("LotteryAction").OnServerEvent:Connect(function(player, payload)
+            if _G.REUtil:CheckRECD(player, "LotteryAction", GameCfg.Lottery.ActionCooldownSec) then return end
+            dispatch(player, payload)
+        end)
+        _G.REUtil:GetRE("LotteryStateRequest").OnServerEvent:Connect(function(player)
+            if WorldRuntime then WorldRuntime:lottery_state(player) end
+        end)
+    end,
+    bind_blindbox_action = function(dispatch)
+        _G.REUtil:GetRE("BlindboxAction").OnServerEvent:Connect(function(player, payload)
+            if _G.REUtil:CheckRECD(player, "BlindboxAction", GameCfg.Blindbox.ActionCooldownSec) then return end
+            dispatch(player, payload)
+        end)
+        _G.REUtil:GetRE("BlindboxStateRequest").OnServerEvent:Connect(function(player)
+            if WorldRuntime then WorldRuntime:blindbox_state(player) end
         end)
     end,
     bind_cast_action = function(dispatch)
@@ -568,6 +585,10 @@ local function HandleTimeUpdate(deltaTime)
             pcall(function() mgr:Update(deltaTime) end)
         end
     end
+end
+
+MgrMap.MgrPlatform.ShopAction = function(player, payload)
+    return WorldRuntime:platform_shop_action(player, payload)
 end
 
 local function GameStart()

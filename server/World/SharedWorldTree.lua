@@ -6,6 +6,7 @@
 local GameCfg = require("common.GameCfg")
 local spoke = require("common.packages.spoke.api")
 local GroundLoot = require("server.World.GroundLoot")
+local FerryRoute = require("server.World.FerryRoute")
 
 local SpokeTree = spoke.SpokeTree
 local Effect = spoke.Effect
@@ -87,6 +88,14 @@ function SharedWorldTree.spawn(opts)
     remote = opts.remote,
     bait_spots = opts.bait_spots,
     logger = opts.logger,
+    lookup_tree = opts.lookup_tree,
+  })
+  FerryRoute.mount(handle, {
+    remote = opts.remote,
+    player_data = opts.player_data,
+    save = opts.save,
+    interact = opts.interact,
+    players_service = opts.players_service,
     lookup_tree = opts.lookup_tree,
   })
 

@@ -13,6 +13,7 @@
 --   3. 拒绝或超时后玩家金币被扣（「不扣费」被破坏）；
 --   4. 适配层不可用时仍建立 flow 或发放权益（把不可用伪装成成功）。
 local GameCfg = require('common.GameCfg')
+local EconomyWorld = require('tests.support.economy_world')
 
 -- 前提守卫：本文件复现的是 main.lua 的接线，而不是自造一套协作关系。
 local WIRING = {
@@ -138,59 +139,57 @@ describe('条款 1-12：适配层失败路径', function()
     local itemId = GameCfg.Survival.AdrenalineItemId
 
     it('timeout_replies_clear_reason_without_charge_or_grant', function()
-        persistReady()
-        local coin = env.data.Data.FishCoin
-        -- 从客户端入口进：平台操作通道收到 Purchase 后由 MgrPlatform 建立 pending flow。
-        assert.is_true(env.platform:HandleAction(env.player,
-            { action = 'Purchase', goods = 'adrenaline1' }))
-        env.now = env.now + (GameCfg.Platform.FlowTimeoutSec or 0) + 1
-        env.platform:Update()
-        drain()
-
-        local last = replies('Purchase')[#replies('Purchase')]
+        GameCfg.Platform.Goods.adrenaline1.goodsId = 'goodsAdr1'
+        local shop = EconomyWorld.new()
+        local coin = shop.data.Data.FishCoin
+        assert.is_true(shop:platformAction({ action = 'Purchase', goods = 'adrenaline1', seq = 1 }))
+        shop.now = shop.now + (GameCfg.Platform.FlowTimeoutSec or 0) + 1
+        shop.platform:Update()
+        shop:drain()
+        local last = shop:lastResult('PlatformResult')
         assert.is_table(last)
         assert.is_false(last.ok)
         assert.same('Purchase', last.action)
         assert.same('adrenaline1', last.goods)
         assert.same('timeout', last.reason)
-        -- 不扣费、不发放：玩家金币与库存件数都不动。
-        assert.same(coin, env.data.Data.FishCoin)
-        assert.same(0, env.data:ItemCount(itemId))
-        assert.is_false(env.platform:HasFlow(env.player))
+        assert.same(coin, shop.data.Data.FishCoin)
+        assert.same(0, shop.data:ItemCount(itemId))
+        assert.is_false(shop.platform:HasFlow(shop.player))
+        shop:tearDown()
     end)
 
     it('fail_replies_clear_reason_without_charge_or_grant', function()
-        persistReady()
-        local coin = env.data.Data.FishCoin
-        assert.is_true(env.platform:HandleAction(env.player,
-            { action = 'Purchase', goods = 'adrenaline1' }))
-        assert.is_true(env.platform:HandleTestAction(env.player,
-            { action = 'ResolveFlow', outcome = 'fail' }))
-        drain()
-
-        local last = replies('Purchase')[#replies('Purchase')]
+        GameCfg.Platform.Goods.adrenaline1.goodsId = 'goodsAdr1'
+        local shop = EconomyWorld.new()
+        local coin = shop.data.Data.FishCoin
+        assert.is_true(shop:platformAction({ action = 'Purchase', goods = 'adrenaline1', seq = 1 }))
+        shop:resolvePlatform('fail')
+        local last = shop:lastResult('PlatformResult')
         assert.is_table(last)
         assert.is_false(last.ok)
+        assert.same('Purchase', last.action)
+        assert.same('adrenaline1', last.goods)
         assert.same('fail', last.reason)
-        assert.same(coin, env.data.Data.FishCoin)
-        assert.same(0, env.data:ItemCount(itemId))
+        assert.same(coin, shop.data.Data.FishCoin)
+        assert.same(0, shop.data:ItemCount(itemId))
+        assert.is_false(shop.platform:HasFlow(shop.player))
+        shop:tearDown()
     end)
 
+
     it('unavailable_entry_replies_reason_and_keeps_account_untouched', function()
-        persistReady()
-        local coin = env.data.Data.FishCoin
-        -- 金币页汇率与商品 ID 未交付、占位通道也关闭（ADR-0029 生产开关）：
-        -- 入口明确不可用，不建 flow、不发权益。占位通道开着时的购买与到账另见
-        -- tests/native/spec/07_coin_page_placeholder_test.lua。
         GameCfg.Platform.Placeholder.Enabled = false
-        assert.is_false(env.platform:OpenCoinShop(env.player))
-        local last = replies('CoinShop')[#replies('CoinShop')]
+        local shop = EconomyWorld.new()
+        local coin = shop.data.Data.FishCoin
+        assert.is_false(shop:platformAction({ action = 'OpenCoinShop' }))
+        local last = shop:lastResult('PlatformResult')
         assert.is_table(last)
         assert.is_false(last.ok)
         assert.same('CoinShop', last.action)
         assert.same('unavailable', last.reason)
-        assert.is_false(env.platform:HasFlow(env.player))
-        assert.same(coin, env.data.Data.FishCoin)
-        assert.same(0, env.data:ItemCount(itemId))
+        assert.is_false(shop.platform:HasFlow(shop.player))
+        assert.same(coin, shop.data.Data.FishCoin)
+        assert.same(0, shop.data:ItemCount(itemId))
+        shop:tearDown()
     end)
 end)

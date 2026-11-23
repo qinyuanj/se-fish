@@ -20,6 +20,9 @@ local PlayerWeapon = require("server.World.PlayerWeapon")
 local PlayerGrill = require("server.World.PlayerGrill")
 local PlayerShop = require("server.World.PlayerShop")
 local PlayerFisherman = require("server.World.PlayerFisherman")
+local PlayerLottery = require("server.World.PlayerLottery")
+local PlayerBlindbox = require("server.World.PlayerBlindbox")
+local PlayerPlatformShop = require("server.World.PlayerPlatformShop")
 local SwingRegistry = require("server.SwingRegistry")
 local PkDamageFilter = require("server.World.PkDamageFilter")
 local FishTree = require("server.World.FishTree")
@@ -99,6 +102,9 @@ function ServerRuntime.new(opts)
   local grill_handles = {}
   local shop_handles = {}
   local fisherman_handles = {}
+  local lottery_sessions = {}
+  local blindbox_sessions = {}
+  local platform_shop_sessions = {}
   local entity_modifiers = nil
   if opts.entity_modifiers then
     local em_opts = type(opts.entity_modifiers) == "table" and opts.entity_modifiers or {}
@@ -142,11 +148,24 @@ function ServerRuntime.new(opts)
       create_unit = opts.create_unit,
       remote = opts.remote,
       bait_spots = opts.bait_spots,
+      player_data = opts.player_data,
+      save = opts.save,
+      interact = opts.interact,
+      players_service = opts.players_service,
       lookup_tree = function(player)
         if type(player) ~= "table" then return nil end
         return player_trees[player.UserId]
       end,
     })
+    if not self._ferry_bound then
+      self._ferry_bound = true
+      if type(opts.bind_ferry_action) == "function" then
+        opts.bind_ferry_action(function(actor, payload)
+          local ferry = self.world and self.world.ferry
+          return ferry and ferry:Handle(actor, payload) or false
+        end)
+      end
+    end
     return self.world
   end
 
@@ -232,6 +251,12 @@ function ServerRuntime.new(opts)
     for _, weapon in pairs(weapon_sessions) do
       if type(weapon.step) == "function" then weapon:step(clock.now()) end
     end
+    for _, blindbox in pairs(blindbox_sessions) do
+      if type(blindbox.step) == "function" then blindbox.step() end
+    end
+    for _, shop in pairs(platform_shop_sessions) do
+      if type(shop.step) == "function" then shop.step() end
+    end
     if entity_modifiers then
       entity_modifiers:step(clock.now())
     end
@@ -258,6 +283,7 @@ function ServerRuntime.new(opts)
       return
     end
     current_players[user_id] = player
+    if self.world and self.world.ferry then self.world.ferry:OnPlayerAdded(player) end
     safe_call(opts.logger, "on_player_join_start", opts.on_player_join_start, player)
   end
 
@@ -325,6 +351,27 @@ function ServerRuntime.new(opts)
           end
         end
       end
+    end
+
+    -- 支付与待交付恢复属于整个玩家会话，不随 alive 相位中断；抽奖会话则在 alive 内单独挂载。
+    local base_actions = base_mounts and base_mounts.actions
+    mounts.actions = function(s, pt)
+      if type(base_actions) == "function" then base_actions(s, pt) end
+      local delivery_epoch = opts.delivery_epoch or tostring(world)
+      local blindbox = PlayerBlindbox.mount(s, pt, {
+        remote = opts.remote, save = opts.save, platform = opts.platform,
+        world = world, random = opts.random, delivery_epoch = delivery_epoch,
+      })
+      blindbox_sessions[user_id] = blindbox
+      local shop = PlayerPlatformShop.mount(s, pt, {
+        remote = opts.remote, save = opts.save, platform = opts.platform,
+        world = world, delivery_epoch = delivery_epoch,
+      })
+      platform_shop_sessions[user_id] = shop
+      s:on_cleanup(function()
+        if blindbox_sessions[user_id] == blindbox then blindbox_sessions[user_id] = nil end
+        if platform_shop_sessions[user_id] == shop then platform_shop_sessions[user_id] = nil end
+      end)
     end
 
     local tree_data = data
@@ -454,6 +501,16 @@ function ServerRuntime.new(opts)
         if fisherman_handles[user_id] == fisherman then fisherman_handles[user_id] = nil end
       end)
     end)
+    player_tree:mount_phase("alive", "lottery", function(scope)
+      local lottery = PlayerLottery.mount(scope, player_tree, {
+        remote = opts.remote, save = opts.save, random = opts.random,
+        in_range = opts.lottery_in_range,
+      })
+      lottery_sessions[user_id] = lottery
+      scope:on_cleanup(function()
+        if lottery_sessions[user_id] == lottery then lottery_sessions[user_id] = nil end
+      end)
+    end)
     if player_tree.set_damage_filter and runtime._damage_filter then
       player_tree:set_damage_filter(runtime._damage_filter())
     end
@@ -504,6 +561,25 @@ function ServerRuntime.new(opts)
       if type(opts.bind_shop_action) == "function" then
         opts.bind_shop_action(function(actor, payload)
           return runtime:dispatch_shop(actor, payload)
+        end)
+      end
+    end
+    if not runtime._economy_bound then
+      runtime._economy_bound = true
+      if type(opts.bind_lottery_action) == "function" then
+        opts.bind_lottery_action(function(actor, payload)
+          if runtime:is_leaving(actor and actor.UserId) then return false end
+          local lottery = lottery_sessions[actor and actor.UserId]
+          if lottery and type(lottery.handle) == "function" then return lottery.handle(actor, payload) end
+          return false
+        end)
+      end
+      if type(opts.bind_blindbox_action) == "function" then
+        opts.bind_blindbox_action(function(actor, payload)
+          if runtime:is_leaving(actor and actor.UserId) then return false end
+          local blindbox = blindbox_sessions[actor and actor.UserId]
+          if blindbox and type(blindbox.handle) == "function" then return blindbox.handle(actor, payload) end
+          return false
         end)
       end
     end
@@ -612,6 +688,7 @@ function ServerRuntime.new(opts)
     end
     leaving = { cleaned = false, waiting = nil }
     leaving_players[user_id] = leaving
+    if self.world and self.world.ferry then self.world.ferry:OnPlayerRemoving(player) end
     fish_host:OnPlayerRemoving(player)
     self:_publish_fish()
     local queued = ready_queue[user_id]
@@ -710,6 +787,43 @@ function ServerRuntime.new(opts)
     if not is_valid_player(player) then return end
     local held = fish_host:GetHeld(player)
     if held then fish_host:Release(held, "life") end
+  end
+
+  function runtime:lottery_action(player, payload)
+    if runtime:is_leaving(player and player.UserId) then return false end
+    local lottery = lottery_sessions[player and player.UserId]
+    if not lottery or type(lottery.handle) ~= "function" then return false end
+    return lottery.handle(player, payload)
+  end
+
+  function runtime:blindbox_action(player, payload)
+    if runtime:is_leaving(player and player.UserId) then return false end
+    local blindbox = blindbox_sessions[player and player.UserId]
+    if not blindbox or type(blindbox.handle) ~= "function" then return false end
+    return blindbox.handle(player, payload)
+  end
+
+  function runtime:lottery_state(player)
+    if runtime:is_leaving(player and player.UserId) then return false end
+    local lottery = lottery_sessions[player and player.UserId]
+    if not lottery or type(lottery.push_state) ~= "function" then return false end
+    lottery.push_state()
+    return true
+  end
+
+  function runtime:blindbox_state(player)
+    if runtime:is_leaving(player and player.UserId) then return false end
+    local blindbox = blindbox_sessions[player and player.UserId]
+    if not blindbox or type(blindbox.push_state) ~= "function" then return false end
+    blindbox.push_state()
+    return true
+  end
+
+  function runtime:platform_shop_action(player, payload)
+    if runtime:is_leaving(player and player.UserId) then return false end
+    local shop = platform_shop_sessions[player and player.UserId]
+    if not shop or type(shop.handle) ~= "function" then return false end
+    return shop.handle(player, payload)
   end
 
   function runtime:receive_landed(player, catch)

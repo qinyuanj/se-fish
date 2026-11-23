@@ -7,7 +7,8 @@ local units = require('server.World.FishTree')
 local pd = require('server.Mgr.MgrPlayerData')
 local weapons = require('server.Mgr.MgrWeapon')
 local ServerRuntime = require('server.World.ServerRuntime')
-local ferry = require('server.Mgr.MgrFerry')
+local runtime = ServerRuntime.current()
+local ferry = runtime and runtime:get_world().ferry
 local world, task = game:GetService('World'), game:GetService('Task')
 local player = game:GetService('Players'):GetPlayers()[1]
 if not player then print('CRAB136 ABORT 没有玩家') return end
