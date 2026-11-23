@@ -17,6 +17,7 @@ local AttrLeaf = require("server.World.AttrLeaf")
 local ModifierLeaf = require("server.World.ModifierLeaf")
 local AbilityLeaf = require("server.World.AbilityLeaf")
 local PlayerWeapon = require("server.World.PlayerWeapon")
+local PlayerGrill = require("server.World.PlayerGrill")
 local SwingRegistry = require("server.SwingRegistry")
 local PkDamageFilter = require("server.World.PkDamageFilter")
 local FishTree = require("server.World.FishTree")
@@ -93,6 +94,7 @@ function ServerRuntime.new(opts)
   local ready_queue = {}
 
   local weapon_sessions = {}
+  local grill_handles = {}
   local entity_modifiers = nil
   if opts.entity_modifiers then
     local em_opts = type(opts.entity_modifiers) == "table" and opts.entity_modifiers or {}
@@ -355,6 +357,31 @@ function ServerRuntime.new(opts)
         if weapon_sessions[user_id] == weapon then weapon_sessions[user_id] = nil end
       end)
     end)
+    player_tree:mount_phase("alive", "grill", function(scope)
+      local grill = PlayerGrill.mount(scope, player_tree, {
+        remote = opts.remote,
+        save = opts.save,
+        world = opts.world_service,
+        create_unit = opts.create_unit,
+        players = function()
+          local list = {}
+          for _, active in pairs(active_players) do
+            list[#list + 1] = active
+          end
+          return list
+        end,
+        new_hit = function(source, category)
+          return runtime.life:NewHit(source, category)
+        end,
+        apply_hit = function(hit, target, amount)
+          return runtime.life:ApplyHit(hit, target, amount)
+        end,
+      })
+      grill_handles[user_id] = grill
+      scope:on_cleanup(function()
+        if grill_handles[user_id] == grill then grill_handles[user_id] = nil end
+      end)
+    end)
     if player_tree.set_damage_filter and runtime._damage_filter then
       player_tree:set_damage_filter(runtime._damage_filter())
     end
@@ -371,6 +398,19 @@ function ServerRuntime.new(opts)
       if type(opts.register_cast_guard) == "function" then
         opts.register_cast_guard(function(unit, index)
           return runtime.life:WeaponCastGuard(unit, index)
+        end)
+      end
+    end
+    if not runtime._grill_bound then
+      runtime._grill_bound = true
+      if type(opts.bind_grill_action) == "function" then
+        opts.bind_grill_action(function(actor, payload)
+          if runtime:is_leaving(actor and actor.UserId) then return false end
+          local grill = grill_handles[actor and actor.UserId]
+          if grill and type(grill.handle) == "function" then
+            return grill.handle(actor, payload)
+          end
+          return false
         end)
       end
     end

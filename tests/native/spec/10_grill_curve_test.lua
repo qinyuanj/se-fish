@@ -6,9 +6,9 @@
 --   10-11 4.5 秒没取出就烤糊损毁、从烧烤点消失；10-12 烤糊瞬间对周围 3 米玩家各 30 点伤害；
 --   10-13 烤糊时向操作者提示「烤糊」；10-14 取出后放回可用格位并保持选中；
 --   10-15 烤过的鱼不可再次放入烧烤点。
--- 只走业务入口：玩家 GrillAction 经 MgrGrill 注册的远程事件进来，断言落在下发给玩家的
+-- 只走业务入口：玩家 GrillAction 经 PlayerGrill 宿主绑定进来，断言落在下发给玩家的
 -- GrillResult / GrillState 上。引擎边界（World 时钟与锚点、Players、Task、DataStore、RE）用替身；
--- 伤害走 Vitals 接缝替身，只记「谁被打了多少」，不替它算血量。
+-- 伤害经生命公开入口落到 Controller 替身，只记「谁被打了多少」。
 -- 失败方式（先列后写）：
 --   1. 曲线不是分段线性的（1 / 2.25 / 3.5 秒读数错位），或曲线读的是帧数不是服务器时刻；
 --   2. 取出后倍率还在涨，或物品回不到格位、不保持选中；
@@ -42,7 +42,7 @@ describe('条款 10：烧烤倍率与会话规则', function()
   end
 
   before_each(function()
-    ctx = { values = {}, queue = {}, now = 1000, events = {}, hits = {}, hitSeq = 0, seq = 0, list = {} }
+    ctx = { values = {}, queue = {}, now = 1000, events = {}, hits = {}, seq = 0, list = {} }
     ctx.oldGame, ctx.oldRE = _G.game, _G.REUtil
     ctx.oldDebug = GameCfg.Debug
     GameCfg.Debug = { Enabled = false }
@@ -78,35 +78,40 @@ describe('条款 10：烧烤倍率与会话规则', function()
       end
       return ctx.events[name]
     end }
+    ctx.events.GrillAction = { OnServerEvent = signal(), FireClient = function() end }
     ctx.PlayerData = assert(loadfile('server/Data/PlayerData.lua'))()
     ctx.save = assert(loadfile('server/Mgr/MgrSave.lua'))()
-    ctx.mgr = assert(loadfile('server/Mgr/MgrGrill.lua'))()
-    ctx.mgr.FindAnchor = function(_, name)
-      if name == GameCfg.Zones[3].Scene.GrillName then
-        return { Name = name, Position = ctx.anchorPos }
-      end
-    end
+    ctx.ServerRuntime = assert(loadfile('server/World/ServerRuntime.lua'))()
     ctx.datas = {}
-    ctx.mgr.PlayerData = {
-      GetDataInst = function(_, player) return ctx.datas[player.UserId] end,
-      SendItemBar = function() end,
-    }
-    ctx.mgr.Vitals = {
-      CanAct = function() return true end,
-      NewHit = function(_, source, category)
-        ctx.hitSeq = ctx.hitSeq + 1
-        return { id = ctx.hitSeq, source = source, category = category, targets = {} }
+    ctx.runtime = ctx.ServerRuntime.new({
+      initial_now = ctx.now,
+      remote = _G.REUtil,
+      player_data = { GetDataInst = function(_, player) return ctx.datas[player.UserId] end },
+      save = ctx.save,
+      players_service = { GetPlayers = function() return ctx.list end },
+      world_service = {
+        FindFirstChild = function(_, name)
+          if name == GameCfg.Zones[3].Scene.GrillName then
+            return { Name = name, Position = ctx.anchorPos }
+          end
+        end,
+      },
+      create_unit = function(kind, props)
+        return { kind = kind, Name = props and props.Name,
+          Destroy = function(self) self.Destroyed = true end }
       end,
-      ApplyHit = function(_, hit, target, amount)
-        if hit.targets[target.UserId] then return false end
-        hit.targets[target.UserId] = true
-        ctx.hits[#ctx.hits + 1] = { id = hit.id, category = hit.category, userId = target.UserId,
-          amount = amount }
-        return true, amount
+      bind_grill_action = function(dispatch)
+        ctx.events.GrillAction.OnServerEvent:Connect(function(player, payload)
+          dispatch(player, payload)
+        end)
       end,
-    }
-    ctx.mgr.Save = ctx.save
-    ctx.mgr:Start()
+    })
+    ctx.runtime:start()
+    ctx.runtime:mark_started()
+    ctx.mgr = { GetSession = function(_, player)
+      local state = player.state and player.state.state
+      return (state == 'cooking' or state == 'ready') and player.state or nil
+    end }
   end)
 
   after_each(function()
@@ -118,7 +123,12 @@ describe('条款 10：烧烤倍率与会话规则', function()
   local function join(id, atGrill)
     local player = { UserId = id, Name = 'p' .. id, attrs = {}, CharacterAdded = signal(),
       Character = { Position = { x = ctx.anchorPos.x + (atGrill == false and 100 or 1),
-        y = ctx.anchorPos.y, z = ctx.anchorPos.z }, Size = { y = 2 } } }
+        y = ctx.anchorPos.y, z = ctx.anchorPos.z }, Size = { y = 2 },
+        Controller = { Health = GameCfg.Vitals.MaxHealth,
+          TakeDamage = function(self, amount)
+            self.Health = math.max(0, self.Health - amount)
+            ctx.hits[#ctx.hits + 1] = { category = 'grillBurn', userId = id, amount = amount }
+          end } } }
     function player:SetAttribute(key, value) self.attrs[key] = value end
     local data = ctx.PlayerData.New(player)
     data:Init(true)
@@ -126,7 +136,9 @@ describe('条款 10：烧烤倍率与会话规则', function()
     drain()
     ctx.datas[id] = data
     ctx.list[#ctx.list + 1] = player
-    ctx.mgr:OnPlayerAdded(player)
+    ctx.runtime:on_player_added(player)
+    ctx.runtime:on_save_ready(player, data)
+    drain()
     return player, data
   end
 
@@ -140,13 +152,19 @@ describe('条款 10：烧烤倍率与会话规则', function()
 
   local function advance(seconds)
     ctx.now = ctx.now + seconds
-    ctx.mgr:Update()
+    ctx.runtime.clock:advance(seconds)
     drain()
   end
 
   local function giveSelected(data, itemId, mult, cooked)
     assert.is_true(data:AddItem(itemId, mult, cooked))
     assert.is_true(data:SelectSlot(1))
+    local owner = nil
+    for _, player in ipairs(ctx.list) do
+      if ctx.datas[player.UserId] == data then owner = player break end
+    end
+    local tree = owner and ctx.runtime:get_player_tree(owner.UserId)
+    if tree then tree:sync_from_data(data) end
   end
 
   local function countItem(data, itemId)

@@ -33,7 +33,6 @@ local MgrMap = {
     MgrCompendium = require("server.Mgr.MgrCompendium"),
     MgrRecords = require("server.Mgr.MgrRecords"),
     MgrAchievements = require("server.Mgr.MgrAchievements"),
-    MgrGrill = require("server.Mgr.MgrGrill"),
     MgrPlatform = require("server.Mgr.MgrPlatform"),
     MgrBlindbox = require("server.Mgr.MgrBlindbox"),
 }
@@ -333,11 +332,6 @@ MgrMap.MgrAbility.Attr = AttrBridge
 MgrMap.MgrAbility.Modifier = ModifierBridge
 MgrMap.MgrCast.Vitals = nil
 
-MgrMap.MgrGrill.Vitals = nil
-MgrMap.MgrGrill.PlayerData = MgrMap.MgrPlayerData
-MgrMap.MgrGrill.Save = MgrMap.MgrSave
-
-
 MgrMap.MgrParty.PlayerData = MgrMap.MgrPlayerData
 MgrMap.MgrParty.Save = MgrMap.MgrSave
 MgrMap.MgrParty.Vitals = nil
@@ -403,6 +397,14 @@ WorldRuntime = ServerRuntime.new({
         local event = _G.REUtil:GetRE("WeaponAction")
         event.OnServerEvent:Connect(function(player, payload)
             if _G.REUtil:CheckRECD(player, "WeaponAction", GameCfg.Ability.GunShared.ActionCooldownSec) then return end
+            dispatch(player, payload)
+        end)
+    end,
+    bind_grill_action = function(dispatch)
+        local event = _G.REUtil:GetRE("GrillAction")
+        event.OnServerEvent:Connect(function(player, payload)
+            if type(payload) ~= "table" then return end
+            if _G.REUtil:CheckRECD(player, "GrillAction", GameCfg.Items.ActionCooldownSec) then return end
             dispatch(player, payload)
         end)
     end,
@@ -474,9 +476,6 @@ WorldRuntime = ServerRuntime.new({
         if MgrMap.MgrStory:FlushBeforeLeave(player, resume) then return true end
         return false
     end,
-    on_leave_finalize = function(_, player)
-        invoke('MgrGrill', MgrMap.MgrGrill, 'BeforeLeave', player)
-    end,
     on_player_removing = function(player, active)
         invoke('MgrPlayerData', MgrMap.MgrPlayerData, 'OnPlayerRemoving', player)
         if active then
@@ -516,7 +515,6 @@ MgrMap.MgrInteract.Survival = Life
 MgrMap.MgrAbility.Vitals = Life
 MgrMap.MgrAbility.BehaviorServices.Vitals = Life
 MgrMap.MgrCast.Vitals = Life
-MgrMap.MgrGrill.Vitals = Life
 MgrMap.MgrParty.Vitals = Life
 
 MgrMap.MgrPlayerData.OnSyncPlayerTree = function(player, data, forcePush)
