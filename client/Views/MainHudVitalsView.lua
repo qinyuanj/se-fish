@@ -5,6 +5,7 @@
 
 local spoke = require("common.packages.spoke.api")
 local GameCfg = require("common.GameCfg")
+local Number = require("common.Number")
 local MainHudLayout = require("client.MainHudLayout")
 
 local State = spoke.State
@@ -46,7 +47,7 @@ local function vital_percent(value, maximum)
 end
 
 local function default_get_resolution()
-  local ok, res = pcall(function() -- 宿主 EUI 管理器未就绪时安全回退默认分辨率
+  local ok, x, y = pcall(function() -- 宿主 EUI 管理器未就绪或 Vector2 userdata 读取异常时安全回退默认分辨率
     local game_ui = rawget(_G, "GameUI")
     local eui_mgr = game_ui and game_ui:GetEuiManager() or nil
     if eui_mgr == nil and game ~= nil then
@@ -54,10 +55,14 @@ local function default_get_resolution()
       local lp = players and players.LocalPlayer
       eui_mgr = lp and lp.PlayerGui and lp.PlayerGui.EuiManager or nil
     end
-    return eui_mgr and eui_mgr:GetDeviceResolution() or nil
+    local res = eui_mgr and eui_mgr:GetDeviceResolution() or nil
+    if type(res) ~= "table" and type(res) ~= "userdata" then
+      return nil, nil
+    end
+    return res.x, res.y
   end)
-  if ok and type(res) == "table" and type(res.x) == "number" and type(res.y) == "number" then
-    return { x = res.x, y = res.y }
+  if ok and Number.IsFiniteNumber(x) and Number.IsFiniteNumber(y) and x > 0 and y > 0 then
+    return { x = x, y = y }
   end
   return { x = 1920, y = 1080 }
 end
@@ -69,10 +74,10 @@ local function default_notify(text)
 end
 
 local function find_editor_node(root, name)
-  if root == nil or type(root.FindFirstChild) ~= "function" then
+  if root == nil then
     return nil
   end
-  local ok, node = pcall(function() return root:FindFirstChild(name, true) end) -- 兼容只读节点或测试双查找实现
+  local ok, node = pcall(function() return root:FindFirstChild(name, true) end) -- 兼容引擎 userdata 方法代理与测试双查找实现
   return ok and node or nil
 end
 
