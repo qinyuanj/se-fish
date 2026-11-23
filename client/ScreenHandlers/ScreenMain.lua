@@ -26,11 +26,6 @@ local function wormCount(state)
     return baitStock(state, GameCfg.Items.Id.Worm)
 end
 
-local function heldSlot(state)
-    local held = type(state) == 'table' and state.held
-    return type(held) == 'table' and held.kind == 'slot' and held.slot or nil
-end
-
 function ScreenHandler:Show(state)
     if type(state) ~= 'table' or type(state.slots) ~= 'table' then return end
     local depleted = self.Snapshot ~= nil and wormCount(self.Snapshot) > 0 and wormCount(state) <= 0
@@ -39,11 +34,6 @@ function ScreenHandler:Show(state)
     local capacity = state.slotCount or GameCfg.Items.ItemBarSlots
     self:ApplyLayout(capacity, nil)
     self:ShowCast()
-    local selected = state.selectedSlot and state.slots[state.selectedSlot]
-    self.BtnDiscard.Visible = selected ~= nil
-    self.BtnDiscardLabel.Visible = selected ~= nil
-    self.BtnDiscardLabel.Text = selected and heldSlot(state) == state.selectedSlot
-        and '确认丢弃' or '丢弃选中物'
     self:ApplyBackpackOcclusion()
     if depleted then self:ShowCastFailure({ reason = 'wormDepleted' }) end
 end
@@ -61,14 +51,6 @@ function ScreenHandler:StartHookAlert(session)
     end
     print('[ScreenMain] 上钩提示', tostring(session), ok and ('音效 ' .. alert.Sound)
         or ('音效缺失，只保留文字与高亮 ' .. tostring(err)))
-end
-
-function ScreenHandler:SelectedFood()
-    local state = self.Snapshot
-    local slot = state and state.selectedSlot
-    local entry = slot and state.slots[slot]
-    local definition = entry and GameCfg.Items.Definitions[entry.itemId]
-    if definition and type(definition.EatPercent) == 'number' then return entry, slot end
 end
 
 local function wrapColumns(text, columns)
@@ -140,138 +122,6 @@ function ScreenHandler:HideDialogue()
 end
 
 local CAST_PHASES = { idle = true, cast = true, hooked = true, landed = true, unhooked = true }
-
-local function lineStillOut(phase)
-    return phase == 'cast' or phase == 'unhooked'
-end
-
-local function selectedRod(state)
-    local entry = state and state.selectedSlot and state.slots[state.selectedSlot]
-    local definition = entry and GameCfg.Items.Definitions[entry.itemId]
-    return definition ~= nil and type(definition.Level) == 'number'
-end
-
-function ScreenHandler:ItemActionMode()
-    local phase = self.CastState and self.CastState.phase or 'idle'
-    local drop = phase == 'idle' and self.CastState ~= nil and self.CastState.holding ~= nil
-    if phase == 'idle' and not drop and self.SpecialEffect then return 'special' end
-    if phase == 'hooked' then return 'hooked' end
-    if lineStillOut(phase) then return 'lineOut' end
-    if phase == 'landed' then return 'landed' end
-    if drop then return 'drop' end
-    if self:SelectedFood() then return 'food' end
-    if selectedRod(self.Snapshot) then return 'rod' end
-    return 'none'
-end
-
-local function foodActionText(self)
-    local food, foodSlot = self:SelectedFood()
-    local name = GameCfg.Items.Definitions[food.itemId].Name
-    return heldSlot(self.Snapshot) == foodSlot and ('吃' .. name) or ('手持' .. name)
-end
-
-local function castActionColor(phase, now, alert)
-    if not now then
-        return phase == 'landed' and Color.New(120, 120, 120, 255)
-            or Color.New(54, 100, 140, 255)
-    end
-    local k = (math.sin(now * 2 * math.pi / alert.BreathPeriodSec) + 1) / 2
-    local h = alert.HighlightColor
-    return Color.New(math.floor(54 + (h[1] - 54) * k),
-        math.floor(100 + (h[2] - 100) * k), math.floor(140 + (h[3] - 140) * k), h[4])
-end
-
-local function fireCast(action, extra)
-    local payload = { action = action }
-    for key, value in pairs(extra or {}) do payload[key] = value end
-    _G.REUtil:GetRE('CastAction'):FireServer(payload)
-end
-
-local function breathLeft(self)
-    return self.BreathCooldownUntil and (self.BreathCooldownUntil - World:GetServerTime()) or 0
-end
-
-local SPECIAL_ACTIONS = {
-    wings = {
-        text = '长按飞行', enabled = true,
-        pressBegan = function()
-            _G.REUtil:GetRE('SpecialItemAction'):FireServer({ action = 'fly', holding = true })
-        end,
-    },
-    godzilla = {
-        text = function(self)
-            local left = breathLeft(self)
-            return left > 0 and string.format('吐息冷却 %d秒', math.ceil(left)) or '原子吐息'
-        end,
-        enabled = function(self) return breathLeft(self) <= 0 end,
-        click = function(self)
-            if breathLeft(self) <= 0 then _G.REUtil:GetRE('SpecialItemAction'):FireServer({ action = 'breath' }) end
-        end,
-    },
-}
-local UNKNOWN_SPECIAL = {}
-
-local ITEM_ACTIONS = {
-    hooked = {
-        text = '点击收线',
-        enabled = function(_, active) return active == true end,
-        click = function(self)
-            if _G.LocalReelIn.SessionId == self.CastState.reelSession then
-                _G.LocalReelIn:Click()
-                self:ShowCast()
-            end
-        end,
-    },
-    lineOut = { text = '收竿', enabled = true, click = function() fireCast('Reel') end },
-    landed = { text = '已上岸', enabled = false },
-    drop = { text = '放下', enabled = true, click = function() fireCast('Drop') end },
-    food = {
-        text = foodActionText, enabled = true,
-        click = function(self)
-            local _, slot = self:SelectedFood()
-            self:Operate({ op = 'eat', slot = slot })
-        end,
-    },
-    rod = {
-        text = '抛竿', enabled = true,
-        click = function(self)
-            local slot = self.Snapshot.selectedSlot
-            fireCast('Cast', { slot = slot, itemId = self.Snapshot.slots[slot].itemId })
-        end,
-    },
-    none = {
-        text = '使用', enabled = false, visible = false,
-        click = function(self)
-            if not self.Snapshot then return end
-            self.FailureUntil = nil
-            self.FailureLanding = nil
-            self:ShowCast()
-            self:ShowCastFailure({ reason = 'invalidRod' })
-        end,
-    },
-}
-
-local function itemAction(self, mode)
-    if mode == 'special' then return SPECIAL_ACTIONS[self.SpecialEffect] or UNKNOWN_SPECIAL end
-    return ITEM_ACTIONS[mode]
-end
-
-local function resolve(value, self, active)
-    if type(value) == 'function' then return value(self, active) end
-    return value
-end
-
-local function showItemAction(self, mode, phase, active, alertNow)
-    local entry = itemAction(self, mode)
-    local visible = entry.visible ~= false
-    self.BtnItemAction.Visible = visible
-    self.BtnItemActionLabel.Visible = visible
-    self.BtnItemAction.ButtonNormalColor = castActionColor(phase, alertNow, GameCfg.HookAlert)
-    local enabled = resolve(entry.enabled, self, active)
-    if enabled ~= nil then self.BtnItemAction.TouchEnabled = self.IsOpen == true and enabled == true end
-    local text = resolve(entry.text, self, active)
-    if text ~= nil then self.BtnItemActionLabel.Text = text end
-end
 
 local function castProgress(self, reel, active)
     local result = reel and reel.LastResult
@@ -364,15 +214,20 @@ function ScreenHandler:UpdateCastFeedback()
 end
 
 function ScreenHandler:ShowCast()
-    if not self.BtnItemAction then return end
     local phase = self.CastState and self.CastState.phase or 'idle'
     local reel = _G.LocalReelIn
-    local active = self.IsOpen and phase == 'hooked' and reel
+    local active = self.IsOpen == true and phase == 'hooked' and reel ~= nil
         and reel.SessionId == self.CastState.reelSession
+    if self.LastReelActive ~= active then
+        self.LastReelActive = active
+        if type(self.OnReelActiveChanged) == 'function' then
+            self.OnReelActiveChanged(active)
+        end
+    end
+    if not self.BtnReelClose and not self.ReelBar and not self.HookHint then return end
     self:ApplyLayout(nil, active == true)
     local now = active == true and self.HookAlertUntil ~= nil and World:GetServerTime()
     local alerting = now and now < self.HookAlertUntil
-    showItemAction(self, self:ItemActionMode(), phase, active, alerting and now)
     local progress = castProgress(self, reel, active)
     if type(progress) ~= 'number' or progress ~= progress then progress = 50 end
     progress = math.max(0, math.min(100, progress))
@@ -425,25 +280,15 @@ end
 
 function ScreenHandler:ApplyBackpackOcclusion()
     local hidden = self.BackpackOpen == true
-    local fixed = {
-        { self.BtnDiscard, self.BtnDiscardLabel },
-        { self.BtnItemAction, self.BtnItemActionLabel }, { self.BtnReelClose, self.BtnReelCloseLabel },
-    }
-    for _, pair in ipairs(fixed) do
-        local btn, label = pair[1], pair[2]
-        if btn then
-            btn.Visible = not hidden
-            btn.TouchEnabled = not hidden
-        end
-        if label then label.Visible = not hidden end
+    if self.BtnReelClose then
+        self.BtnReelClose.Visible = not hidden
+        self.BtnReelClose.TouchEnabled = not hidden
     end
-    local state = self.Snapshot
+    if self.BtnReelCloseLabel then
+        self.BtnReelCloseLabel.Visible = not hidden
+    end
     if not hidden then
         self:ShowCast()
-        local selected = state and state.selectedSlot
-            and state.slots and state.slots[state.selectedSlot]
-        if self.BtnDiscard then self.BtnDiscard.Visible = selected ~= nil end
-        if self.BtnDiscardLabel then self.BtnDiscardLabel.Visible = selected ~= nil end
     end
 end
 
@@ -464,10 +309,6 @@ function ScreenHandler:ApplyLayout(slots, reeling)
         itemBarSlots = slots, reeling = reeling })
     self.HudLayout = layout
     local r = layout.Rects
-    place(self.BtnItemAction, r.ItemAction)
-    place(self.BtnItemActionLabel, r.ItemAction)
-    place(self.BtnDiscard, r.Discard)
-    place(self.BtnDiscardLabel, r.Discard)
     place(self.BtnReelClose, r.ReelClose)
     place(self.BtnReelCloseLabel, r.ReelClose)
 end
@@ -500,12 +341,9 @@ function ScreenHandler:Cleanup()
     self.BackpackOpen = false
     self.UIRoot = nil
     self.LastOperateOperation = nil
-    self.BtnDiscard = nil
-    self.BtnItemAction = nil
+    self.LastReelActive = nil
     self.BtnReelClose = nil
     self.BtnReelCloseLabel = nil
-    self.BtnDiscardLabel = nil
-    self.BtnItemActionLabel = nil
     self.HookHint = nil
     self.CastFloat = nil
     self.CastFailureMark = nil
@@ -561,25 +399,13 @@ function ScreenHandler:_initializeRoot()
     self.Connections = {}
     self.UIRoot = root
     self.BackpackOpen = self.BackpackOpen == true
-    local discard = rects.Discard
-    self.BtnDiscard = button(self, root, 'ItemDiscard', discard.x, discard.y, discard.w)
-    local action, reelClose = rects.ItemAction, rects.ReelClose
-    self.BtnItemAction = button(self, root, 'ItemAction2', action.x, action.y, action.w)
+    local reelClose = rects.ReelClose
     self.BtnReelClose = button(self, root, 'ReelClose', reelClose.x, reelClose.y, reelClose.w)
-    place(self.BtnDiscard, discard)
-    place(self.BtnItemAction, action)
     place(self.BtnReelClose, reelClose)
-    local labels = {
-        { 'BtnReelCloseLabel', self.BtnReelClose, '结束收线' },
-        { 'BtnDiscardLabel', self.BtnDiscard, '丢弃选中物' },
-        { 'BtnItemActionLabel', self.BtnItemAction, '抛竿' },
-    }
-    for _, entry in ipairs(labels) do
-        local btn = entry[2]
-        local label = overlay(self, root, entry[1], btn.Position.x, btn.Position.y,
-            btn.Size.x, btn.Size.y, entry[3], 30, Color.New(255, 255, 255, 255))
-        self[entry[1]] = label
-    end
+    self.BtnReelCloseLabel = overlay(self, root, 'BtnReelCloseLabel',
+        self.BtnReelClose.Position.x, self.BtnReelClose.Position.y,
+        self.BtnReelClose.Size.x, self.BtnReelClose.Size.y,
+        '结束收线', 30, Color.New(255, 255, 255, 255))
     local primary, secondary, transient = rects.HintPrimary, rects.HintSecondary, rects.HintTransient
     self.HookHint = overlay(self, root, 'HookHint', primary.x, primary.y, primary.w, primary.h,
         '', 32, Color.New(255, 220, 40, 255))
@@ -673,50 +499,13 @@ function ScreenHandler:_initializeRoot()
         node.SwallowTouchEnabled = false
         node.Visible = false
     end
-    self.BtnItemAction.TouchEnabled = false
-    self.BtnItemAction.Visible = false
-    self.BtnItemActionLabel.Visible = false
     self.BtnReelClose.Visible = false
     self.BtnReelCloseLabel.Visible = false
     self:Listen(self.BtnReelClose.OnClicked, function()
         _G.LocalReelIn:Close()
         self:ShowCast()
     end)
-    self.BtnDiscard.Visible = false
-    self.BtnDiscardLabel.Visible = false
-    self:Listen(self.BtnItemAction.OnClicked, function()
-        if not self.IsOpen then return end
-        local click = itemAction(self, self:ItemActionMode()).click
-        if click then click(self) end
-    end)
-    if self.BtnItemAction.OnTouchBegan and self.BtnItemAction.OnTouchEnded then
-        self:Listen(self.BtnItemAction.OnTouchBegan, function()
-            if not self.IsOpen then return end
-            local pressBegan = itemAction(self, self:ItemActionMode()).pressBegan
-            if pressBegan then pressBegan(self) end
-        end)
-        self:Listen(self.BtnItemAction.OnTouchEnded, function()
-            if self.SpecialEffect == 'wings' then
-                _G.REUtil:GetRE('SpecialItemAction'):FireServer({ action = 'fly', holding = false })
-            end
-        end)
-    end
-    self:Listen(self.BtnDiscard.OnClicked, function()
-        if self.Snapshot and self.Snapshot.selectedSlot then
-            self:Operate({ op = 'discard', slot = self.Snapshot.selectedSlot })
-        end
-    end)
     self:Listen(_G.REUtil:GetRE('ItemBarState').OnClientEvent, function(state) self:Show(state) end)
-    self:Listen(_G.REUtil:GetRE('SpecialItemState').OnClientEvent, function(state)
-        if type(state) ~= 'table' then return end
-        self.SpecialEffect = state.effect
-        if type(state.breathRemaining) == 'number' and state.breathRemaining > 0 then
-            self.BreathCooldownUntil = World:GetServerTime() + state.breathRemaining
-        else
-            self.BreathCooldownUntil = nil
-        end
-        if self.BtnItemAction then self:ShowCast() end
-    end)
     _G.REUtil:GetRE('SpecialItemStateRequest'):FireServer()
     self:Listen(_G.REUtil:GetRE('SpecialItemResult').OnClientEvent, function(result)
         if type(result) ~= 'table' or result.ok ~= false then return end
@@ -821,14 +610,6 @@ function ScreenHandler:_initializeRoot()
     if runService and runService.Heartbeat then
         self:Listen(runService.Heartbeat, function()
             if self.ReelBar and self.ReelBar.Visible then self:ShowCast() end
-            if self.BreathCooldownUntil and self.SpecialEffect == 'godzilla' then
-                if self.BreathCooldownUntil > World:GetServerTime() then
-                    self:ShowCast()
-                else
-                    self.BreathCooldownUntil = nil
-                    self:ShowCast()
-                end
-            end
             if self.CastFloat and self.IsOpen then self:UpdateCastFeedback() end
             DamageFloat:Update()
             FishCombatLabel:Update()

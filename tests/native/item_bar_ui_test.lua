@@ -1,12 +1,14 @@
 -- #86 迁移（原 tests/gameplay/item_bar_ui_test.lua）：道具栏界面的节点生成、状态刷新与重进清理。
 -- 接缝：ScreenMain 处理器 + ItemBarState 客户端事件。
 local MainHudLayout = require('client.MainHudLayout')
+local SpokeClock = require('common.SpokeClock')
 local spoke = require('common.packages.spoke.api')
 local ClientStore = require('client.Store.ClientStore')
 local RootView = require('client.Views.RootView')
 local MainHudEquipPopups = require('client.Views.MainHudEquipPopups')
 local MainHudBackpackView = require('client.Views.MainHudBackpackView')
 local MainHudItemBarView = require('client.Views.MainHudItemBarView')
+local MainHudActionButtonsView = require('client.Views.MainHudActionButtonsView')
 
 -- 弹窗候选格的文字按格宽折行（#180），比较时去掉换行
 local function plain(text) return (tostring(text or ''):gsub('\n', '')) end
@@ -95,7 +97,8 @@ describe("道具栏的界面侧", function()
             if name == 'ScreenMain' then return ctx.currentRoot end
         end }
         ctx.handler:Init()
-        ctx.store, ctx.writer = ClientStore.new({ initial_now = ctx.now })
+        ctx.clock = SpokeClock.new(ctx.now)
+        ctx.store, ctx.writer = ClientStore.new({ clock = ctx.clock })
         ctx.hostBinding = ctx.writer:bind_host({
             get_re = function(name) return _G.REUtil:GetRE(name) end,
         })
@@ -107,6 +110,10 @@ describe("道具栏的界面侧", function()
             create_node = function(kind, attrs) return world:CreateUnit(kind, attrs) end,
             hud = {
                 MainHudItemBarView.spec({ backpack_open = ctx.backpackOpen }),
+                MainHudActionButtonsView.spec({
+                    backpack_open = ctx.backpackOpen,
+                    send_operate = function(payload) ctx.handler:Operate(payload) end,
+                }),
                 MainHudEquipPopups.spec({
                     open_popup = ctx.openPopup,
                     backpack_open = ctx.backpackOpen,
@@ -264,8 +271,8 @@ describe("道具栏的界面侧", function()
         -- pcall 包住主体：模块缓存改写后即使断言失败也要恢复，再抛错让本例失败。
         local ok, err = pcall(function()
             local mgr = assert(loadfile('client/MgrGameUI.lua'))()
-            local oldRoot, oldButton = ctx.currentRoot, ctx.nodes.ItemDiscard
-            local oldLabel = ctx.nodes.BtnDiscardLabel
+            local oldRoot, oldButton = ctx.currentRoot, ctx.nodes.QuestToggle
+            local oldLabel = ctx.nodes.QuestToggleLabel
             assert.equal(oldRoot, mgr:GetScreen('ScreenMain').RootNode)
             assert.equal(oldRoot, mgr:GetScreen('ScreenMain').RootNode)
             assert.same(1, ctx.states:Count())
@@ -277,14 +284,15 @@ describe("道具栏的界面侧", function()
             assert.is_true(oldLabel.Destroyed)
             assert.same(0, oldButton.OnClicked:Count())
             assert.same(1, ctx.states:Count())
-            local newButton = ctx.nodes.ItemDiscard
-            ctx.states:Fire({ slots = { [1] = { itemId = 'carp', count = 1 } }, selectedSlot = 1, bait = {} })
+            local newButton = ctx.nodes.QuestToggle
             assert.is_not.equal(newButton, oldButton)
+            ctx.events.QuestState.OnClientEvent:Fire({ text = '新手任务 1/5：去钓鱼' })
+            assert.is_true(ctx.nodes.QuestLabel.Visible)
             oldButton.OnClicked:Fire()
-            assert.same(0, #ctx.commands)
+            assert.is_true(ctx.nodes.QuestLabel.Visible)
             newButton.OnClicked:Fire()
-            assert.same(1, #ctx.commands)
-            local newLabel = ctx.nodes.BtnDiscardLabel
+            assert.is_false(ctx.nodes.QuestLabel.Visible)
+            local newLabel = ctx.nodes.QuestToggleLabel
             ctx.handler:Cleanup()
             assert.same(0, ctx.states:Count())
             assert.is_true(newButton.Destroyed)
@@ -441,6 +449,7 @@ describe("道具栏的界面侧", function()
         assert.is_false(ctx.nodes.CastFailureHint.Visible, '换根后的首个空蚯蚓快照不得补发从有到无提示')
         assert.same('吐息冷却 5秒', ctx.nodes.BtnItemActionLabel.Text)
         ctx.now = 104
+        ctx.clock:step(4, 104)
         ctx.handler:ShowCast()
         assert.same('吐息冷却 1秒', ctx.nodes.BtnItemActionLabel.Text)
 

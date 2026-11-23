@@ -9,6 +9,11 @@
 --   5. 效果清空后按钮不回到钓鱼语义（残留「长按飞行」/「原子吐息」）。
 -- seam：RE SpecialItemState / SpecialItemResult 入站，SpecialItemAction 出站，
 --       BtnItemAction 的 OnClicked / OnTouchBegan / OnTouchEnded。
+local SpokeClock = require('common.SpokeClock')
+local ClientStore = require('client.Store.ClientStore')
+local RootView = require('client.Views.RootView')
+local MainHudActionButtonsView = require('client.Views.MainHudActionButtonsView')
+
 local function signal()
     local listeners = {}
     return {
@@ -30,10 +35,12 @@ describe('TestSpecialItemUI', function()
     before_each(function()
         previous = { game = rawget(_G, 'game'), Vector2 = rawget(_G, 'Vector2'), Color = rawget(_G, 'Color'),
             REUtil = rawget(_G, 'REUtil'), GameUI = rawget(_G, 'GameUI'), MgrGameUI = rawget(_G, 'MgrGameUI'),
+            LocalReelIn = rawget(_G, 'LocalReelIn'),
             notice = rawget(_G, 'LocalMsgNotice'),
             attack = package.loaded['client.LocalAttackButton'] }
         package.loaded['client.LocalAttackButton'] = nil
         _G.MgrGameUI = { SetCustomControlUI = function() end }
+        _G.LocalReelIn = { SetSession = function() end, Clear = function() end, Suspend = function() end }
         ctx = { nodes = {}, created = {}, commands = {}, snapshotRequests = 0, events = {}, notices = {} }
         ctx.now = 100
         ctx.heartbeat = signal()
@@ -74,6 +81,14 @@ describe('TestSpecialItemUI', function()
             end
             return ctx.events[name]
         end }
+        ctx.clock = SpokeClock.new(ctx.now)
+        ctx.store, ctx.writer = ClientStore.new({ clock = ctx.clock })
+        ctx.hostBinding = ctx.writer:bind_host({
+            get_re = function(name) return _G.REUtil:GetRE(name) end,
+        })
+        ctx.heartbeat:Connect(function()
+            ctx.clock:step(0, ctx.now)
+        end)
         ctx.handler = assert(loadfile('client/ScreenHandlers/ScreenMain.lua'))()
         ctx.handler.RootNode = {
             Name = 'ScreenMain',
@@ -85,12 +100,22 @@ describe('TestSpecialItemUI', function()
         end }
         ctx.handler:Init()
         ctx.handler.IsOpen = true
+        ctx.spokeRoot = { Name = 'UIRoot', Destroying = signal(),
+            FindFirstChild = function(_, name) return ctx.nodes[name] end }
+        ctx.hudView = RootView.mount(ctx.spokeRoot, ctx.store, {
+            create_node = function(kind, attrs) return world:CreateUnit(kind, attrs) end,
+            hud = {
+                MainHudActionButtonsView.spec({}),
+            },
+        })
     end)
     after_each(function()
+        if ctx and ctx.hudView then ctx.hudView:dispose() end
+        if ctx and ctx.hostBinding then ctx.hostBinding:dispose() end
         require('client.LocalAttackButton'):Destroy()
         package.loaded['client.LocalAttackButton'] = previous.attack
         _G.LocalMsgNotice = previous.notice
-        for _, key in ipairs({ 'game', 'Vector2', 'Color', 'REUtil', 'GameUI', 'MgrGameUI' }) do
+        for _, key in ipairs({ 'game', 'Vector2', 'Color', 'REUtil', 'GameUI', 'MgrGameUI', 'LocalReelIn' }) do
             _G[key] = previous[key]
         end
     end)
@@ -143,7 +168,7 @@ describe('TestSpecialItemUI', function()
 
     -- 失败方式 1：钓鱼阶段（线已抛出）不被特殊道具抢按钮
     it('test_fishing_phase_keeps_reel_semantics_over_special_effect', function()
-        ctx.handler.CastState = { phase = 'cast' }
+        ctx.events.CastState.OnClientEvent:Fire({ phase = 'cast' })
         pushState({ effect = 'godzilla', airborne = false, breathRemaining = 0 })
         assert.same('收竿', ctx.nodes.BtnItemActionLabel.Text)
         ctx.nodes.ItemAction2.OnClicked:Fire()

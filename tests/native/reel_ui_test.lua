@@ -8,6 +8,10 @@
 -- #231 夹具语义见 tests/support/reel_env.lua 顶部。
 
 local Reel = require('tests.support.reel_env')
+local spoke = require('common.packages.spoke.api')
+local ClientStore = require('client.Store.ClientStore')
+local RootView = require('client.Views.RootView')
+local MainHudActionButtonsView = require('client.Views.MainHudActionButtonsView')
 
 local moduleNames = { 'common.Util', 'client.GameUI',
   'client.ScreenHandlers.ScreenMain', 'client.LocalReelIn' }
@@ -57,16 +61,46 @@ describe('收线界面表现（ScreenMain × LocalReelIn × MgrGameUI）', funct
     } end, GetUIRoot = function() return uiRoot end }
     package.loaded['common.Util'] = {}
     package.loaded['client.GameUI'] = _G.GameUI
+    env.store, env.writer = ClientStore.new({ initial_now = env.now })
+    env.hostBinding = env.writer:bind_host({
+      get_re = function(name) return _G.REUtil:GetRE(name) end,
+    })
+    env.reelActive = spoke.State.new('Test.hud_reel_active', false)
     env.reel = assert(loadfile('client/LocalReelIn.lua'))()
     _G.LocalReelIn = env.reel
     env.reel:Start()
     env.handler = assert(loadfile('client/ScreenHandlers/ScreenMain.lua'))()
+    env.handler.OnOpenChanged = function(is_open)
+      env.writer:set_hud_visible(is_open)
+    end
+    env.handler.OnReelActiveChanged = function(active)
+      env.reelActive:set(active == true)
+    end
+    env.spokeRoot = { Name = 'UIRoot', Destroying = Reel.signal(),
+      FindFirstChild = function(_, name) return env.nodes[name] end }
+    env.hudView = RootView.mount(env.spokeRoot, env.store, {
+      create_node = function(kind, attrs) return env.world:CreateUnit(kind, attrs) end,
+      hud = {
+        MainHudActionButtonsView.spec({
+          reel_active = env.reelActive,
+          send_operate = function(payload) env.handler:Operate(payload) end,
+          on_reel_click = function(session_id)
+            if _G.LocalReelIn and _G.LocalReelIn.SessionId == session_id then
+              _G.LocalReelIn:Click()
+              if env.handler.Inited then env.handler:ShowCast() end
+            end
+          end,
+        }),
+      },
+    })
     package.loaded['client.ScreenHandlers.ScreenMain'] = env.handler
     env.ui = assert(loadfile('client/MgrGameUI.lua'))()
     env.ui:OpenScreen('ScreenMain')
   end)
 
   after_each(function()
+    if env and env.hudView then env.hudView:dispose() end
+    if env and env.hostBinding then env.hostBinding:dispose() end
     for _, name in ipairs(moduleNames) do
       package.loaded[name] = restore[name]
     end
