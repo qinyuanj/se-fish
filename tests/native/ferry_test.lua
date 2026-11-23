@@ -1,24 +1,10 @@
--- 迁移自 tests/gameplay/ferry_test.lua（#85）；行为契约原文见 #89、#127、#125、#123、#140、#92。
--- #89 摆渡（GameSpec §8.3 已确认细则）+ #127 T06 七区六航线：请求带航线 id，锚点、目的地、
--- 船票与票价都由这条航线给出；六条航线各有独立航班状态，不同航线互不占用倒计时。
--- 去程一人交 1 张船票、5 秒倒计时后带走 BoatRange 内的所有玩家（搭便船合法）；
--- 返程按人付 10 × 3^(到达区序 − 2) 金币、立即传送；区域写入 PlayerData.Data.Zone、
--- 到达写入 Extra.travel.arrived（#92 存档用）。
--- 失败方式（先列后写）：
---   1. 没船票也能开船，或船票扣了却不开船、一次乘船扣两张票；倒计时中同一航线再交票被吞（应拒绝且不扣）；
---   2. 伪造 / 未登记的航线 id 也能开船，或换一条航线就被另一条的倒计时挡住（应各走各的）；
---   3. 倒计时没结束就传送，或到点不传送；到点只带走交票人（搭便船失败），或把船范围外的玩家也带走；
---   4. 返程不验金币 / 金币不足也传送 / 一人付费两人回家 / 传送失败不退款；
---   5. 落点不是本航线配置的目的地，或 Zone / 到达记录没更新；
---   6. seq 重放 / 旧序号重复结算（重复扣票扣金币）；
---   7. 船范围内有角色缺失的玩家时整个传送崩掉，其余玩家也走不了。
--- #123 失败方式：持久化前扣费/倒计时/传送/成功回包；并发交票；存储失败重试双扣；
--- 传送异常裸退款；取消航班退款无身份；断线后的恢复记录丢失；requestId 跨会话重放。
--- seam：Handle + Update 生命周期，真实 MgrSave/PlayerData，仅替换引擎和 DataStore 边界。
--- it 名字沿用旧方法名，注册顺序 = LuaUnit sortedPairs 的实际执行顺序。
-
-local moduleNames = { 'common.GameCfg', 'common.REUtil',
-  'server.Mgr.MgrPlayerData', 'server.Data.PlayerData' }
+-- #313 服务端摆渡宿主接缝（ADR-0032 / #292 Testing Decisions）。
+-- 六条航线独立计时：一张船票开启精确 5 秒倒计时，BoatRange 内未交票玩家搭便船；
+-- 返程按人支付 10 × 3^(到达区序 − 2) 金币并立即传送；Zone 与到达记录随存档原子更新。
+-- 失败方式：扣票未开船、重复扣票/扣款、倒计时提前或残留、范围外乘客被带走、
+-- 金币不足仍传送、传送失败未持久退款、迟到回调污染新会话、旧航班覆盖新航班。
+-- 接缝：ServerRuntime 玩家进出、FerryAction 上行、SpokeClock 步进、真实 MgrSave/PlayerData、
+-- FerryResult/FerryState 下行与角色位置。不读取航线 State、Effect 或私有拓扑。
 
 local function vec(x, y, z) return { x = x, y = y, z = z } end
 
@@ -29,37 +15,49 @@ local function signal()
       slots[#slots + 1] = fn
       return { Disconnect = function() end }
     end,
-    Fire = function(_, ...) for _, fn in ipairs(slots) do fn(...) end end,
+    Fire = function(_, ...)
+      local result
+      for _, fn in ipairs(slots) do result = fn(...) end
+      return result
+    end,
   }
 end
 
--- 假角色：SetPosition 搬动 Position；记录传送次数
 local function newPlayer(userId, x, y, z)
-  local player = { UserId = userId, teleports = 0 }
+  local player = { UserId = userId, teleports = 0, attrs = {} }
+  player.CharacterAdded = signal()
+  player.CharacterRemoving = signal()
   player.Character = {
     Position = vec(x, y, z),
+    Size = { y = 2 },
+    Controller = { Health = 100 },
     SetPosition = function(self, pos)
       self.Position = pos
       player.teleports = player.teleports + 1
     end,
   }
-  player.SetAttribute = function() end
+  player.SetAttribute = function(self, key, value) self.attrs[key] = value end
   return player
 end
 
-describe('摆渡（MgrFerry × MgrSave × PlayerData）', function()
+describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
   local env
   local restore
 
   before_each(function()
-    -- 快照先于任何改动：before_each 中途失败时 after_each 仍能还原。
     restore = {
       game = rawget(_G, 'game'), Vector3 = rawget(_G, 'Vector3'), REUtilG = rawget(_G, 'REUtil'),
+      modules = {},
     }
-    for _, name in ipairs(moduleNames) do
-      restore[name] = package.loaded[name]
+    for name, value in pairs(package.loaded) do
+      if name == 'common.GameCfg' or name == 'common.REUtil'
+          or name == 'server.Data.PlayerData' or name == 'server.Mgr.MgrPlayerData'
+          or name:match('^server%.World%.') then
+        restore.modules[name] = value
+        package.loaded[name] = nil
+      end
     end
-    env = { now = 100, sent = {}, broadcasts = {}, values = {}, queue = {},
+    env = { now = 100, sent = {}, broadcasts = {}, events = {}, values = {}, queue = {},
       defer = false, writeFailure = false, loseReply = false }
     env.cfg = require('tests.support.zone_fixtures').Load()
     env.cfg.Debug = { Enabled = false }
@@ -67,47 +65,44 @@ describe('摆渡（MgrFerry × MgrSave × PlayerData）', function()
     env.route = env.routes[1]
     _G.Vector3 = { New = vec }
 
-    -- PlayerData 在模块加载时抓住 GameCfg 实例（进图白送看那一刻的 Debug），
-    -- 这里重载一次让本用例的玩家绑到「Debug 关闭」的那份配置上，库存完全由用例自己摆
     package.loaded['server.Data.PlayerData'] = nil
-    local PlayerDataClass = require('server.Data.PlayerData')
-    env.PlayerDataClass = PlayerDataClass
-    -- 锚点坐标全部取自 #125 场景合同（Zones[].Scene.Entities 的 Ferry 实体），用例不另造坐标
+    env.PlayerDataClass = require('server.Data.PlayerData')
     env.anchors = {}
     for _, zone in ipairs(env.cfg.Zones) do
       for _, entity in ipairs(zone.Scene.Entities) do
         if entity.Role == 'Ferry' then
-          env.anchors[entity.Name] = {
-            Position = vec(entity.Position.x, entity.Position.y, entity.Position.z),
-          }
+          env.anchors[entity.Name] = { Position = vec(entity.Position.x, entity.Position.y, entity.Position.z) }
         end
       end
     end
     local boat = env.anchors[env.route.Outbound.AnchorName].Position
     local safePoint = env.cfg.Zones[1].Scene.SafePoint
     env.players = {
-      newPlayer(1, boat.x, boat.y, boat.z),            -- 船边（去程锚点上）
-      newPlayer(2, boat.x + 1, boat.y, boat.z + 1.5),  -- 船边搭便船
-      newPlayer(3, safePoint.x, safePoint.y, safePoint.z), -- 出生点，离船太远
+      newPlayer(1, boat.x, boat.y, boat.z),
+      newPlayer(2, boat.x + 1, boat.y, boat.z + 1.5),
+      newPlayer(3, safePoint.x, safePoint.y, safePoint.z),
     }
     env.data = {}
     for _, player in ipairs(env.players) do
-      env.data[player.UserId] = PlayerDataClass.New(player, function() end)
+      env.data[player.UserId] = env.PlayerDataClass.New(player, function() end)
       env.data[player.UserId]:Init()
     end
 
     local reStub = {
       GetRE = function(_, name)
         env.sent[name] = env.sent[name] or {}
-        return {
-          OnServerEvent = signal(),
-          FireClient = function(_, player, payload)
-            env.sent[name][#env.sent[name] + 1] = { userId = player.UserId, payload = payload }
-          end,
-          FireAllClients = function(_, payload)
-            env.broadcasts[#env.broadcasts + 1] = payload
-          end,
-        }
+        if not env.events[name] then
+          env.events[name] = {
+            OnServerEvent = signal(),
+            FireClient = function(_, player, payload)
+              env.sent[name][#env.sent[name] + 1] = { userId = player.UserId, payload = payload }
+            end,
+            FireAllClients = function(_, payload)
+              if name == 'FerryState' then env.broadcasts[#env.broadcasts + 1] = payload end
+            end,
+          }
+        end
+        return env.events[name]
       end,
       CheckRECD = function() return false end,
     }
@@ -118,9 +113,8 @@ describe('摆渡（MgrFerry × MgrSave × PlayerData）', function()
       SendItemBar = function() end,
     }
 
-    env.mgr = assert(loadfile('server/Mgr/MgrFerry.lua'))()
+    env.mgr = {}
     env.mgr.World = { GetServerTime = function() return env.now end }
-    -- 锚点用场景合同里的名字登记；InRange 复刻「Radius+Slack 内（只看 x/z）」契约
     env.mgr.Interact = {
       FindAnchor = function(_, name) return env.anchors[name] end,
       InRange = function(_, player, point)
@@ -158,16 +152,61 @@ describe('摆渡（MgrFerry × MgrSave × PlayerData）', function()
     env.save = assert(loadfile('server/Mgr/MgrSave.lua'))()
     env.mgr.Save = env.save
     for _, player in ipairs(env.players) do env.save:LoadInto(player, env.data[player.UserId]) end
+
+    local ServerRuntime = require('server.World.ServerRuntime')
+    env.runtime = ServerRuntime.new({
+      initial_now = env.now,
+      zones = env.cfg.Zones,
+      remote = reStub,
+      player_data = env.mgr.PlayerData,
+      save = env.save,
+      interact = env.mgr.Interact,
+      players_service = _G.game:GetService('Players'),
+      world_service = env.mgr.World,
+      on_item_bar_state = function() end,
+      bind_ferry_action = function(dispatch)
+        reStub:GetRE('FerryAction').OnServerEvent:Connect(function(player, payload)
+          return dispatch(player, payload)
+        end)
+      end,
+    })
+    function env.mgr:Handle(player, payload)
+      if not self.Save then return false end
+      self:Update()
+      return reStub:GetRE('FerryAction').OnServerEvent:Fire(player, payload) == true
+    end
+    function env.mgr:Update()
+      local dt = math.max(0, env.now - env.runtime.clock.now())
+      env.runtime:step(dt, env.now)
+    end
+    function env.mgr:OnPlayerAdded(player)
+      self:Update()
+      env.runtime:on_player_added(player)
+      env.runtime:on_save_ready(player, env.data[player.UserId])
+    end
+    function env.mgr:OnPlayerRemoving(player)
+      env.runtime:on_player_removing(player)
+    end
+    env.runtime:start()
+    env.runtime:mark_started()
+    for _, player in ipairs(env.players) do env.mgr:OnPlayerAdded(player) end
   end)
 
   after_each(function()
-    package.loaded['common.GameCfg'] = restore and restore.GameCfg
-    package.loaded['common.REUtil'] = restore and restore.REUtil
-    package.loaded['server.Mgr.MgrPlayerData'] = restore and restore.MgrPlayerData
-    package.loaded['server.Data.PlayerData'] = restore and restore.DataClass
-    _G.game = restore and restore.game
-    _G.Vector3 = restore and restore.Vector3
-    _G.REUtil = restore and restore.REUtilG
+    if env and env.runtime then env.runtime:shutdown() end
+    for name in pairs(package.loaded) do
+      if name == 'common.GameCfg' or name == 'common.REUtil'
+          or name == 'server.Data.PlayerData' or name == 'server.Mgr.MgrPlayerData'
+          or name:match('^server%.World%.') then
+        package.loaded[name] = nil
+      end
+    end
+    if restore then
+      for name, value in pairs(restore.modules) do package.loaded[name] = value end
+      _G.game = restore.game
+      _G.Vector3 = restore.Vector3
+      _G.REUtil = restore.REUtilG
+    end
     env = nil
     restore = nil
   end)
@@ -193,7 +232,6 @@ describe('摆渡（MgrFerry × MgrSave × PlayerData）', function()
     return env.mgr:Handle(env.players[userId], { action = 'Return', routeId = route.Id, seq = seq })
   end
 
-  -- 站到某条腿的锚点旁（可给 x/z 偏移）；坐标取自 #125 场景合同
   local function standAt(userId, name, offsetX, offsetZ)
     local anchor = env.anchors[name]
     assert.message('场景合同里没有这条摆渡锚点 ' .. tostring(name)).is_not_nil(anchor)
@@ -845,22 +883,19 @@ describe('摆渡（MgrFerry × MgrSave × PlayerData）', function()
   end)
 
   it('test_teleport_notifies_special_item_before_moving', function()
-    -- #299：传送前经当前玩家树公开边界结束特殊道具飞行；没有树时传送照旧。
+    -- #299：经真实玩家树公开边界结束特殊道具，再执行返程传送。
     local calls = {}
-    local runtime = {
-      get_player_tree = function()
-        return { suspend_special_item = function() calls[#calls + 1] = 1 end }
-      end,
-    }
-    local ServerRuntime = require('server.World.ServerRuntime')
-    local previous = ServerRuntime.current()
-    ServerRuntime.set_current(runtime)
-    local dest = { x = 100, y = 6, z = 100 }
-    local ok = env.mgr:Teleport(env.players[1], dest)
-    ServerRuntime.set_current(previous)
-    assert.is_true(ok)
+    standAt(1, env.route.Return.AnchorName)
+    env.data[1]:AddCoin(env.route.Return.Price)
+    local tree = assert(env.runtime:get_player_tree(1))
+    local suspend = tree.suspend_special_item
+    tree.suspend_special_item = function(self)
+      calls[#calls + 1] = 1
+      return suspend(self)
+    end
+    assert.is_true(back(1, 1))
     assert.same({ 1 }, calls)
-    assert.same(100, env.players[1].Character.Position.x)
+    assert.same(env.route.Return.Destination.x, env.players[1].Character.Position.x)
   end)
 
   it('test_zone_defaults_to_home', function()

@@ -18,8 +18,8 @@ function LotteryInteraction.spec()
         return type(services.local_character) == "function" and services.local_character() or nil
       end
       local function create_scene(preset, anchor, offset)
-        if type(services.create_scene_node) ~= "function" then return nil end
-        local ok, node = pcall(services.create_scene_node, preset, anchor, offset)
+        if type(services.create_lottery_scene_node) ~= "function" then return nil end
+        local ok, node = pcall(services.create_lottery_scene_node, preset, anchor, offset)
         if not ok or not node then
           print("[LotteryInteraction] 文字泡预设创建失败", tostring(node))
           return nil

@@ -9,7 +9,6 @@ local curShowMap = {}
 local ScreenHandlerLoaders = {
     DialogNoticeConfirm = function() return require("client.ScreenHandlers.DialogNoticeConfirm") end,
     ScreenCompendium = function() return require("client.ScreenHandlers.ScreenCompendium") end,
-    ScreenFerry = function() return require("client.ScreenHandlers.ScreenFerry") end,
     ScreenGM = function() return require("client.ScreenHandlers.ScreenGM") end,
     ScreenMain = function() return require("client.ScreenHandlers.ScreenMain") end,
     ScreenMsg = function() return require("client.ScreenHandlers.ScreenMsg") end,

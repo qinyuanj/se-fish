@@ -39,6 +39,7 @@ local function coin_amount(offer)
 end
 local function bag(data)
   local extra = data.Extra
+  if type(extra) ~= "table" then extra = {}; data.Extra = extra end
   local value = extra.platformShop
   if type(value) ~= "table" then
     value = {}

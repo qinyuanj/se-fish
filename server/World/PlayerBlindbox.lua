@@ -9,7 +9,10 @@ local PlayerBlindbox = {}
 local function cfg() return GameCfg.Blindbox end
 local function goods(count) return count == 10 and "blindboxTen" or "blindboxSingle" end
 local function bag(data)
-  local value = data.Extra.lottery
+  local extra = data.Extra
+  if type(extra) ~= "table" then extra = {}; data.Extra = extra end
+  local value = extra.lottery
+  if type(value) ~= "table" then value = {}; extra.lottery = value end
   value.intents, value.deliveries = value.intents or {}, value.deliveries or {}
   return value
 end

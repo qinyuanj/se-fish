@@ -24,7 +24,6 @@ local MgrMap = {
     MgrShop = require("server.Mgr.MgrShop"),
     MgrQuest = require("server.Mgr.MgrQuest"),
     MgrStory = require("server.Mgr.MgrStory"),
-    MgrFerry = require("server.Mgr.MgrFerry"),
     MgrSave = require("server.Mgr.MgrSave"),
     MgrParty = require("server.Mgr.MgrParty"),
     MgrCompendium = require("server.Mgr.MgrCompendium"),
@@ -296,8 +295,6 @@ MgrMap.MgrPlayerData.Quest = MgrMap.MgrQuest
 MgrMap.MgrPlayerData.Vitals = nil
 MgrMap.MgrGM.Vitals = nil
 MgrMap.MgrGM.Save = MgrMap.MgrSave
-MgrMap.MgrFerry.PlayerData = MgrMap.MgrPlayerData
-MgrMap.MgrFerry.Interact = MgrMap.MgrInteract
 MgrMap.MgrPlayerData.Save = MgrMap.MgrSave
 MgrMap.MgrQuest.PlayerData = MgrMap.MgrPlayerData
 MgrMap.MgrQuest.Save = MgrMap.MgrSave
@@ -308,9 +305,7 @@ MgrMap.MgrInteract.Vitals = nil
 MgrMap.MgrInteract.Survival = nil
 MgrMap.MgrAchievements.PlayerData = MgrMap.MgrPlayerData
 MgrMap.MgrAchievements.Save = MgrMap.MgrSave
-MgrMap.MgrFerry.Save = MgrMap.MgrSave
 MgrMap.MgrShop.Save = MgrMap.MgrSave
-MgrMap.MgrFerry.Save = MgrMap.MgrSave
 MgrMap.MgrSave.PlayerData = MgrMap.MgrPlayerData
 MgrMap.MgrCompendium.Save = MgrMap.MgrSave
 MgrMap.MgrCompendium.PlayerData = MgrMap.MgrPlayerData
@@ -383,6 +378,7 @@ WorldRuntime = ServerRuntime.new({
     remote = _G.REUtil,
     player_data = MgrMap.MgrPlayerData,
     save = MgrMap.MgrSave,
+    interact = MgrMap.MgrInteract,
     platform = MgrMap.MgrPlatform,
     fish_carrier = FishCarrier,
     compendium = MgrMap.MgrCompendium,
@@ -407,6 +403,11 @@ WorldRuntime = ServerRuntime.new({
         local event = _G.REUtil:GetRE("WeaponAction")
         event.OnServerEvent:Connect(function(player, payload)
             if _G.REUtil:CheckRECD(player, "WeaponAction", GameCfg.Ability.GunShared.ActionCooldownSec) then return end
+            dispatch(player, payload)
+        end)
+    end,
+    bind_ferry_action = function(dispatch)
+        _G.REUtil:GetRE("FerryAction").OnServerEvent:Connect(function(player, payload)
             dispatch(player, payload)
         end)
     end,

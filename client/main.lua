@@ -24,6 +24,7 @@ local PlatformShopView = require("client.Views.PlatformShopView")
 local LotteryInteraction = require("client.Views.LotteryInteraction")
 local MainHudLayout = require("client.MainHudLayout")
 local Util = require("common.Util")
+local FerryView = require("client.Views.FerryView")
 local ReelOverlayView = require("client.Views.ReelOverlayView")
 local CastSourceView = require("client.Views.CastSourceView")
 local ScreenMain = require("client.ScreenHandlers.ScreenMain")
@@ -103,12 +104,28 @@ Task:Spawn(function()
                     return Players.LocalPlayer and Players.LocalPlayer.Character or nil
                 end,
                 find_lottery_anchor = function(name) return Util:WaitForChild(World, name) end,
-                create_scene_node = function(preset, anchor, offset)
+                create_lottery_scene_node = function(preset, anchor, offset)
                     return GameUI:CreateSceneNode(preset, anchor, offset)
                 end,
                 hud_entry_rect = function(name)
                     local resolution = GameUI:GetEuiManager():GetDeviceResolution() or { x = 1920, y = 1080 }
                     return MainHudLayout.Compute({ width = resolution.x, height = resolution.y }).Rects[name]
+                end,
+                send_ferry = function(payload)
+                    REUtil:GetRE("FerryAction"):FireServer(payload)
+                end,
+                create_scene_node = function(position, name)
+                    local player = Players.LocalPlayer
+                    local eui = player and player.PlayerGui and player.PlayerGui.EuiManager
+                    if not eui then error("摆渡场景节点创建时 EUI 未就绪", 2) end
+                    local node = eui:CreateSceneNodeAtPosition(position)
+                    node.Name = name
+                    return node
+                end,
+                get_device_resolution = function()
+                    local player = Players.LocalPlayer
+                    local eui = player and player.PlayerGui and player.PlayerGui.EuiManager
+                    return eui and eui:GetDeviceResolution() or { x = 1920, y = 1080 }
                 end,
                 send_grill = function(payload)
                     REUtil:GetRE("GrillAction"):FireServer(payload)
@@ -151,6 +168,7 @@ Task:Spawn(function()
                 GrillView.spec(),
                 BlindboxView.entry_spec(),
                 PlatformShopView.entry_spec(),
+                FerryView.spec(),
                 CastSourceView.spec(),
                 MainHudActionButtonsView.spec({
                     backpack_open = hud_backpack_open,
@@ -193,6 +211,7 @@ Task:Spawn(function()
                         REUtil:GetRE('ItemBarAction'):FireServer(payload)
                     end,
                 }),
+                ferry = FerryView.legs_spec(),
                 fish_combat = FishCombatView.bar_spec(),
                 fish_warning = FishCombatView.warning_spec(),
             },
@@ -209,7 +228,6 @@ local LocalMotorUnitCtrl = require("client.LocalMotorUnitCtrl")
 local LocalInteract = require("client.LocalInteract")
 local LocalGM = require("client.LocalGM")
 local LocalShop = require("client.LocalShop")
-local ScreenFerry = require("client.ScreenHandlers.ScreenFerry")
 local ScreenParty = require("client.ScreenHandlers.ScreenParty")
 local ScreenCompendium = require('client.ScreenHandlers.ScreenCompendium')
 
@@ -228,7 +246,6 @@ end)
 
 Task:Spawn(function() LocalInteract:Start() end)
 Task:Spawn(function() LocalShop:Start() end)
-Task:Spawn(function() ScreenFerry:Start() end)
 Task:Spawn(function() ScreenParty:Start() end)
 Task:Spawn(function() ScreenCompendium:Start() end)
 Task:Delay(1, function() 

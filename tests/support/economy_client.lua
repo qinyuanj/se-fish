@@ -28,7 +28,7 @@ function M.new(options)
       notify = function(text) table.insert(env.notices, text) end,
       local_character = function() return options.character end,
       find_lottery_anchor = function(name) return options.anchors and options.anchors[name] or nil end,
-      create_scene_node = function(_, anchor)
+      create_lottery_scene_node = function(_, anchor)
         local node = Eui.Node({ Name = "LotteryBubble" .. tostring(#env.sceneNodes + 1), Visible = false })
         node.Anchor = anchor
         env.sceneNodes[#env.sceneNodes + 1] = node
