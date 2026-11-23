@@ -36,7 +36,7 @@
 | 1-08 | server/World/FishTree.lua、server/World/GroundLoot.lua、server/World/FerryRoute.lua | tests/native/fish_lift_test.lua、tests/native/ferry_test.lua | 缺 | 缺 | 缺 | 缺 | B |
 | 1-09 | server/Mgr/MgrSave.lua、common/RateLimit.lua | tests/native/rate_limit_test.lua、tests/native/economy_persistence_test.lua | 缺 | 缺 | 缺 | 缺 | B |
 | 1-10 | server/World/PlayerWeapon.lua、server/World/PlayerLife.lua | tests/native/weapon_system_test.lua、tests/native/spec/server_life_phase_298_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 1-11 | server/Mgr/MgrPlatform.lua、client/ScreenHandlers/ScreenPlatform.lua | tests/native/platform_seam_test.lua、tests/native/platform_screens_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 1-11 | server/Mgr/MgrPlatform.lua、client/Views/PlatformShopView.lua | tests/native/platform_seam_test.lua、tests/native/platform_screens_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 1-12 | server/Mgr/MgrPlatform.lua、server/Mgr/MgrSave.lua | tests/native/spec/01_platform_adapter_failure_test.lua | 缺 | 有 | 缺 | 缺 | A |
 | 1-13 | server/Mgr/MgrPlatform.lua | tests/native/platform_seam_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 1-14 | common/cfg/PlaceholderAssets.lua、common/GameCfg.lua | tests/native/spec/01_placeholder_asset_visual_test.lua、tests/native/placeholder_assets_test.lua | 有 | 缺 | 缺 | 缺 | A |
@@ -129,7 +129,7 @@
 | 4-20 | common/FishCatch.lua | tests/native/cfg_fish_items_test.lua、tests/native/fish_loot_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 4-21 | common/FishCatch.lua | tests/native/cfg_fish_items_test.lua、tests/native/fish_loot_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 4-22 | common/FishCatch.lua、server/World/PlayerGrill.lua | tests/native/cfg_fish_items_test.lua、tests/native/fish_loot_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 4-23 | server/Mgr/MgrLottery.lua、common/LotteryDraw.lua | tests/native/lottery_settle_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 4-23 | server/World/PlayerLottery.lua、common/LotteryDraw.lua | tests/native/lottery_settle_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 4-24 | server/World/FishTree.lua、common/GameCfg.lua | tests/native/fish_escape_test.lua、tests/native/fish_carrier_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 4-25 | server/World/FishTree.lua、common/GameCfg.lua | tests/native/fish_escape_test.lua、tests/native/fish_carrier_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 4-26 | server/World/FishTree.lua、common/GameCfg.lua | tests/native/fish_escape_test.lua、tests/native/fish_carrier_test.lua | 缺 | 缺 | 缺 | 缺 | A |
@@ -193,7 +193,7 @@
 | 6-19 | server/World/PlayerWeapon.lua、server/World/AttrLeaf.lua、common/AttrModel.lua | tests/native/prize_weapon_effect_test.lua、tests/native/spec/server_special_item_299_test.lua、tests/native/prize_growth_wiring_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 6-20 | server/World/SpecialItemPhase.lua、common/SpecialItem.lua、common/AttrModel.lua、server/World/AttrLeaf.lua | tests/native/prize_weapon_effect_test.lua、tests/native/spec/server_special_item_299_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 6-21 | common/cfg/Items.lua、common/cfg/Lottery.lua、common/GameCfg.lua | tests/native/cfg_fish_items_test.lua、tests/native/prize_weapon_effect_test.lua、tests/native/prize_weapon_cfg_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 6-22 | server/Mgr/MgrLottery.lua、common/LotteryDraw.lua、common/cfg/Lottery.lua | tests/native/prize_weapon_effect_test.lua、tests/native/lottery_draw_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 6-22 | server/World/PlayerLottery.lua、common/LotteryDraw.lua、common/cfg/Lottery.lua | tests/native/prize_weapon_effect_test.lua、tests/native/lottery_draw_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 6-23 | common/cfg/Items.lua、common/GameCfg.lua | tests/native/cfg_fish_items_test.lua、tests/native/prize_weapon_effect_test.lua、tests/native/prize_weapon_cfg_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 6-24 | server/World/PlayerWeapon.lua、common/cfg/Items.lua、server/AbilityBehaviors/melee_hit.lua、server/World/ModifierLeaf.lua、common/GameCfg.lua | tests/native/prize_weapon_effect_test.lua、tests/native/weapon_system_test.lua、tests/native/status_effect_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 6-25 | server/World/PlayerWeapon.lua、common/cfg/Items.lua、server/AbilityBehaviors/melee_hit.lua、server/World/ModifierLeaf.lua、common/GameCfg.lua | tests/native/prize_weapon_effect_test.lua、tests/native/weapon_system_test.lua、tests/native/status_effect_test.lua | 缺 | 缺 | 缺 | 缺 | A |
@@ -212,9 +212,9 @@
 
 | 条款 | 代码落点 | 关联测试 | 正常流程 | 失败流程 | 退出重进 | 存档恢复 | 等级 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 7-01 | server/Mgr/MgrInteract.lua、server/Mgr/MgrLottery.lua | tests/native/feed_exchange_test.lua、tests/native/lottery_settle_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 7-01 | server/Mgr/MgrInteract.lua、server/World/PlayerLottery.lua | tests/native/feed_exchange_test.lua、tests/native/lottery_settle_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 7-02 | server/Mgr/MgrShop.lua、server/World/FerryRoute.lua | tests/native/shop_test.lua、tests/native/ferry_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 7-03 | server/Mgr/MgrBlindbox.lua、common/BlindboxDraw.lua | tests/native/blindbox_settle_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 7-03 | server/World/PlayerBlindbox.lua、common/BlindboxDraw.lua | tests/native/blindbox_settle_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 7-04 | common/GameCfg.lua、server/Mgr/MgrPlatform.lua | tests/native/platform_seam_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 7-05 | server/Mgr/MgrShop.lua | tests/native/shop_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 7-06 | server/Mgr/MgrInteract.lua、server/World/GroundLoot.lua | tests/native/feed_exchange_test.lua、tests/native/loot_recycle_test.lua | 缺 | 缺 | 缺 | 缺 | A |
@@ -227,7 +227,7 @@
 | 7-13 | server/Mgr/MgrShop.lua、client/ScreenHandlers/ScreenShop.lua | tests/native/shop_ui_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 7-14 | server/Mgr/MgrShop.lua、client/ScreenHandlers/ScreenShop.lua | tests/native/shop_ui_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 7-15 | client/ScreenHandlers/ScreenShop.lua | tests/native/shop_ui_test.lua | 缺 | 有 | 缺 | 缺 | A |
-| 7-16 | server/Mgr/MgrPlatform.lua、client/ScreenHandlers/ScreenPlatform.lua、common/GameCfg.lua | tests/native/spec/07_coin_page_placeholder_test.lua | 有 | 有 | 缺 | 缺 | A |
+| 7-16 | server/Mgr/MgrPlatform.lua、client/Views/PlatformShopView.lua、common/GameCfg.lua | tests/native/spec/07_coin_page_placeholder_test.lua | 有 | 有 | 缺 | 缺 | A |
 | 7-17 | server/Mgr/MgrShop.lua、server/Mgr/MgrSave.lua、server/Data/PlayerData.lua | tests/native/spec/07_shop_settlement_atomic_test.lua | 有 | 有 | 缺 | 缺 | A |
 | 7-18 | server/Mgr/MgrSave.lua、server/Mgr/MgrShop.lua | tests/native/spec/18_session_settlement_contract_test.lua | 缺 | 缺 | 有 | 缺 | B |
 | 7-19 | server/Mgr/MgrShop.lua、server/Data/PlayerData.lua | tests/native/spec/07_shop_purchase_limit_test.lua | 缺 | 有 | 缺 | 缺 | B |
@@ -235,7 +235,7 @@
 | 7-21 | server/Mgr/MgrSave.lua、server/Data/PlayerData.lua | tests/native/economy_persistence_test.lua | 缺 | 缺 | 缺 | 有 | B |
 | 7-22 | server/Data/PlayerData.lua、client/ScreenHandlers/ScreenShop.lua | tests/native/shop_ui_test.lua | 缺 | 缺 | 缺 | 缺 | B |
 | 7-23 | server/Data/PlayerData.lua、server/Mgr/MgrShop.lua、server/World/FerryRoute.lua | tests/native/economy_persistence_test.lua | 缺 | 缺 | 缺 | 缺 | B |
-| 7-24 | client/ScreenHandlers/ScreenShop.lua、client/ScreenHandlers/ScreenPlatform.lua | tests/native/shop_ui_test.lua | 缺 | 有 | 缺 | 缺 | B |
+| 7-24 | client/ScreenHandlers/ScreenShop.lua、client/Views/PlatformShopView.lua | tests/native/shop_ui_test.lua | 缺 | 有 | 缺 | 缺 | B |
 | 7-25 | common/GameCfg.lua、server/Mgr/MgrPlatform.lua | tests/native/spec/07_coin_page_placeholder_test.lua | 有 | 有 | 缺 | 缺 | A |
 
 第 7 节的 7-16、7-17、7-25 已由适配层与商店结算的公开入口取证：金币页占位购买「先开通道、确认才到账」，
@@ -336,7 +336,7 @@
 | 10-13 | client/Views/GrillView.lua、server/World/PlayerGrill.lua | tests/native/grill_test.lua、tests/native/spec/10_grill_curve_test.lua | 缺 | 有 | 缺 | 缺 | A |
 | 10-14 | server/World/PlayerGrill.lua | tests/native/grill_test.lua、tests/native/spec/10_grill_curve_test.lua | 有 | 缺 | 缺 | 缺 | A |
 | 10-15 | server/World/PlayerGrill.lua | tests/native/grill_test.lua、tests/native/spec/10_grill_curve_test.lua | 缺 | 有 | 缺 | 缺 | A |
-| 10-16 | server/Mgr/MgrLottery.lua、common/LotteryEligibility.lua | tests/native/lottery_eligibility_test.lua、tests/native/grill_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 10-16 | server/World/PlayerLottery.lua、common/LotteryEligibility.lua | tests/native/lottery_eligibility_test.lua、tests/native/grill_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 10-17 | server/Mgr/MgrInteract.lua、server/World/PlayerGrill.lua | tests/native/feed_exchange_test.lua、tests/native/grill_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 10-18 | server/World/PlayerGrill.lua | tests/native/grill_test.lua | 缺 | 缺 | 缺 | 缺 | B |
 | 10-19 | server/World/PlayerGrill.lua | tests/native/grill_test.lua | 缺 | 缺 | 缺 | 缺 | B |
@@ -426,7 +426,7 @@
 | 13-06 | server/Mgr/MgrCompendium.lua、server/Data/PlayerData.lua | tests/native/compendium_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 13-07 | client/ScreenHandlers/ScreenCompendium.lua、server/Mgr/MgrRecords.lua、common/Records.lua | tests/native/spec/13_record_display_placeholder_test.lua | 有 | 缺 | 缺 | 缺 | A |
 | 13-08 | client/ScreenHandlers/ScreenCompendium.lua、server/Mgr/MgrRecords.lua、common/Records.lua | tests/native/spec/13_record_display_placeholder_test.lua | 有 | 缺 | 缺 | 缺 | A |
-| 13-09 | server/Mgr/MgrCompendium.lua、server/Mgr/MgrBlindbox.lua、server/Mgr/MgrInteract.lua | tests/native/compendium_test.lua | 缺 | 缺 | 缺 | 缺 | B |
+| 13-09 | server/Mgr/MgrCompendium.lua、server/World/PlayerBlindbox.lua、server/Mgr/MgrInteract.lua | tests/native/compendium_test.lua | 缺 | 缺 | 缺 | 缺 | B |
 | 13-10 | server/Mgr/MgrInteract.lua、common/GameCfg.lua、server/Mgr/MgrAchievements.lua | tests/native/exchange_zones_127_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 13-11 | server/Mgr/MgrCompendium.lua、server/Mgr/MgrInteract.lua | tests/native/compendium_test.lua、tests/native/exchange_zones_127_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 13-12 | server/Mgr/MgrAchievements.lua、common/GameCfg.lua | tests/native/spec/13_achievement_delivery_placeholder_test.lua | 有 | 缺 | 有 | 有 | B |
@@ -443,54 +443,54 @@
 
 | 条款 | 代码落点 | 关联测试 | 正常流程 | 失败流程 | 退出重进 | 存档恢复 | 等级 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 14-01 | common/GameCfg.lua、server/Mgr/MgrLottery.lua | tests/native/lottery_settle_test.lua、tests/native/lottery_draw_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 14-02 | common/LotteryEligibility.lua、server/Mgr/MgrLottery.lua | tests/native/lottery_eligibility_test.lua、tests/native/lottery_ui_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 14-01 | common/GameCfg.lua、server/World/PlayerLottery.lua | tests/native/lottery_settle_test.lua、tests/native/lottery_draw_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 14-02 | common/LotteryEligibility.lua、server/World/PlayerLottery.lua | tests/native/lottery_eligibility_test.lua、tests/native/lottery_ui_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 14-03 | common/LotteryDraw.lua、common/cfg/Lottery.lua | tests/native/lottery_settle_test.lua、tests/native/lottery_draw_test.lua、tests/native/spec/14_lottery_rules_test.lua | 有 | 缺 | 缺 | 缺 | A |
-| 14-04 | common/LotteryDraw.lua、server/Mgr/MgrLottery.lua | tests/native/lottery_settle_test.lua、tests/native/lottery_draw_test.lua、tests/native/spec/14_lottery_rules_test.lua | 有 | 缺 | 缺 | 缺 | A |
-| 14-05 | common/LotteryDraw.lua、server/Mgr/MgrLottery.lua | tests/native/lottery_settle_test.lua、tests/native/lottery_draw_test.lua、tests/native/spec/14_lottery_rules_test.lua | 有 | 缺 | 缺 | 缺 | A |
+| 14-04 | common/LotteryDraw.lua、server/World/PlayerLottery.lua | tests/native/lottery_settle_test.lua、tests/native/lottery_draw_test.lua、tests/native/spec/14_lottery_rules_test.lua | 有 | 缺 | 缺 | 缺 | A |
+| 14-05 | common/LotteryDraw.lua、server/World/PlayerLottery.lua | tests/native/lottery_settle_test.lua、tests/native/lottery_draw_test.lua、tests/native/spec/14_lottery_rules_test.lua | 有 | 缺 | 缺 | 缺 | A |
 | 14-06 | common/LotteryDraw.lua、common/cfg/Lottery.lua | tests/native/lottery_settle_test.lua、tests/native/lottery_draw_test.lua、tests/native/spec/14_lottery_rules_test.lua | 有 | 缺 | 缺 | 缺 | A |
 | 14-07 | common/cfg/Lottery.lua、common/LotteryDraw.lua | tests/native/lottery_settle_test.lua、tests/native/lottery_draw_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 14-08 | common/cfg/Lottery.lua、common/LotteryDraw.lua | tests/native/lottery_settle_test.lua、tests/native/lottery_draw_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 14-09 | common/LotteryDraw.lua、server/Mgr/MgrLottery.lua | tests/native/lottery_settle_test.lua、tests/native/lottery_draw_test.lua、tests/native/spec/14_lottery_rules_test.lua | 有 | 缺 | 缺 | 缺 | A |
-| 14-10 | common/LotteryDraw.lua、server/Mgr/MgrLottery.lua | tests/native/lottery_settle_test.lua、tests/native/lottery_draw_test.lua、tests/native/spec/14_lottery_rules_test.lua | 有 | 缺 | 缺 | 缺 | A |
-| 14-11 | common/GameCfg.lua、client/ScreenHandlers/ScreenLottery.lua | tests/native/lottery_local_test.lua、tests/native/lottery_ui_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 14-12 | server/Mgr/MgrLottery.lua、server/Mgr/MgrSave.lua | tests/native/lottery_settle_test.lua | 缺 | 缺 | 缺 | 缺 | B |
-| 14-13 | server/Mgr/MgrLottery.lua | tests/native/lottery_settle_test.lua、tests/native/lottery_draw_test.lua、tests/native/spec/14_lottery_rules_test.lua | 有 | 缺 | 缺 | 缺 | A |
-| 14-14 | server/Mgr/MgrLottery.lua、server/Data/PlayerData.lua | tests/native/lottery_settle_test.lua、tests/native/lottery_ui_test.lua | 缺 | 缺 | 缺 | 缺 | B |
-| 14-15 | server/Mgr/MgrLottery.lua、server/Data/PlayerData.lua | tests/native/lottery_settle_test.lua、tests/native/lottery_draw_test.lua、tests/native/spec/14_lottery_rules_test.lua | 有 | 缺 | 缺 | 缺 | A |
-| 14-16 | client/ScreenHandlers/ScreenLottery.lua | tests/native/lottery_eligibility_test.lua、tests/native/lottery_ui_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 14-17 | server/Mgr/MgrLottery.lua、server/Mgr/MgrSave.lua | tests/native/lottery_settle_test.lua | 缺 | 缺 | 缺 | 缺 | B |
-| 14-18 | server/Mgr/MgrLottery.lua、server/Mgr/MgrSave.lua | tests/native/lottery_settle_test.lua | 缺 | 缺 | 缺 | 缺 | B |
-| 14-19 | server/Mgr/MgrLottery.lua、server/Mgr/MgrSave.lua | tests/native/lottery_settle_test.lua | 缺 | 缺 | 缺 | 缺 | B |
+| 14-09 | common/LotteryDraw.lua、server/World/PlayerLottery.lua | tests/native/lottery_settle_test.lua、tests/native/lottery_draw_test.lua、tests/native/spec/14_lottery_rules_test.lua | 有 | 缺 | 缺 | 缺 | A |
+| 14-10 | common/LotteryDraw.lua、server/World/PlayerLottery.lua | tests/native/lottery_settle_test.lua、tests/native/lottery_draw_test.lua、tests/native/spec/14_lottery_rules_test.lua | 有 | 缺 | 缺 | 缺 | A |
+| 14-11 | common/GameCfg.lua、client/Views/LotteryView.lua | tests/native/lottery_local_test.lua、tests/native/lottery_ui_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 14-12 | server/World/PlayerLottery.lua、server/Mgr/MgrSave.lua | tests/native/lottery_settle_test.lua | 缺 | 缺 | 缺 | 缺 | B |
+| 14-13 | server/World/PlayerLottery.lua | tests/native/lottery_settle_test.lua、tests/native/lottery_draw_test.lua、tests/native/spec/14_lottery_rules_test.lua | 有 | 缺 | 缺 | 缺 | A |
+| 14-14 | server/World/PlayerLottery.lua、server/Data/PlayerData.lua | tests/native/lottery_settle_test.lua、tests/native/lottery_ui_test.lua | 缺 | 缺 | 缺 | 缺 | B |
+| 14-15 | server/World/PlayerLottery.lua、server/Data/PlayerData.lua | tests/native/lottery_settle_test.lua、tests/native/lottery_draw_test.lua、tests/native/spec/14_lottery_rules_test.lua | 有 | 缺 | 缺 | 缺 | A |
+| 14-16 | client/Views/LotteryView.lua | tests/native/lottery_eligibility_test.lua、tests/native/lottery_ui_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 14-17 | server/World/PlayerLottery.lua、server/Mgr/MgrSave.lua | tests/native/lottery_settle_test.lua | 缺 | 缺 | 缺 | 缺 | B |
+| 14-18 | server/World/PlayerLottery.lua、server/Mgr/MgrSave.lua | tests/native/lottery_settle_test.lua | 缺 | 缺 | 缺 | 缺 | B |
+| 14-19 | server/World/PlayerLottery.lua、server/Mgr/MgrSave.lua | tests/native/lottery_settle_test.lua | 缺 | 缺 | 缺 | 缺 | B |
 | 14-20 | common/SpecialItem.lua、server/World/SpecialItemPhase.lua | tests/native/spec/server_special_item_299_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 14-21 | common/SpecialItem.lua、common/FlightPath.lua | tests/native/spec/server_special_item_299_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 14-22 | common/SpecialItem.lua、server/World/SpecialItemPhase.lua | tests/native/spec/server_special_item_299_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 14-23 | common/SpecialItem.lua、common/BossPhase.lua | tests/native/spec/server_special_item_299_test.lua | 缺 | 缺 | 缺 | 缺 | B |
 
-图案权重与两同倍数在 common/cfg/Lottery.lua，抽样与判奖在 common/LotteryDraw.lua，扣物发奖与落位在 MgrLottery。
+图案权重与两同倍数在 common/cfg/Lottery.lua，抽样与判奖在 common/LotteryDraw.lua，扣物发奖与落位在 PlayerLottery。
 
 ### 第 15 节 地图盲盒（18 条）
 
 | 条款 | 代码落点 | 关联测试 | 正常流程 | 失败流程 | 退出重进 | 存档恢复 | 等级 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 15-01 | common/GameCfg.lua、server/Mgr/MgrBlindbox.lua | tests/native/spec/15_blindbox_placeholder_settlement_test.lua | 有 | 缺 | 缺 | 缺 | A |
-| 15-02 | common/GameCfg.lua、server/Mgr/MgrBlindbox.lua | tests/native/blindbox_draw_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 15-01 | common/GameCfg.lua、server/World/PlayerBlindbox.lua | tests/native/spec/15_blindbox_placeholder_settlement_test.lua | 有 | 缺 | 缺 | 缺 | A |
+| 15-02 | common/GameCfg.lua、server/World/PlayerBlindbox.lua | tests/native/blindbox_draw_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 15-03 | common/BlindboxDraw.lua、common/GameCfg.lua | tests/native/blindbox_draw_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 15-04 | server/Data/PlayerData.lua、server/Mgr/MgrBlindbox.lua | tests/native/blindbox_settle_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 15-05 | server/World/GroundLoot.lua、server/Mgr/MgrBlindbox.lua | tests/native/blindbox_settle_test.lua | 缺 | 有 | 缺 | 缺 | A |
+| 15-04 | server/Data/PlayerData.lua、server/World/PlayerBlindbox.lua | tests/native/blindbox_settle_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 15-05 | server/World/GroundLoot.lua、server/World/PlayerBlindbox.lua | tests/native/blindbox_settle_test.lua | 缺 | 有 | 缺 | 缺 | A |
 | 15-06 | server/World/GroundLoot.lua | tests/native/loot_drop_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 15-07 | server/Mgr/MgrBlindbox.lua、client/ScreenHandlers/ScreenBlindbox.lua | tests/native/platform_screens_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 15-07 | server/World/PlayerBlindbox.lua、client/Views/BlindboxView.lua | tests/native/platform_screens_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 15-08 | server/Data/PlayerData.lua | tests/native/blindbox_settle_test.lua | 缺 | 有 | 缺 | 缺 | B |
 | 15-09 | common/BlindboxDraw.lua、common/GameCfg.lua | tests/native/spec/15_blindbox_placeholder_settlement_test.lua、tests/native/blindbox_draw_test.lua | 有 | 缺 | 缺 | 缺 | A |
 | 15-10 | common/BlindboxDraw.lua、common/GameCfg.lua | tests/native/spec/15_blindbox_placeholder_settlement_test.lua | 有 | 缺 | 缺 | 缺 | A |
 | 15-11 | common/BlindboxDraw.lua、common/GameCfg.lua | tests/native/spec/15_blindbox_placeholder_settlement_test.lua | 有 | 缺 | 缺 | 缺 | A |
-| 15-12 | server/Mgr/MgrBlindbox.lua、server/Mgr/MgrSave.lua | tests/native/blindbox_settle_test.lua | 缺 | 缺 | 缺 | 缺 | B |
+| 15-12 | server/World/PlayerBlindbox.lua、server/Mgr/MgrSave.lua | tests/native/blindbox_settle_test.lua | 缺 | 缺 | 缺 | 缺 | B |
 | 15-13 | common/GameCfg.lua、common/BlindboxDraw.lua | tests/native/blindbox_draw_test.lua、tests/native/cfg_shop_lottery_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 15-14 | common/GameCfg.lua、common/BlindboxDraw.lua | tests/native/blindbox_draw_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 15-15 | server/Mgr/MgrBlindbox.lua、server/Mgr/MgrSave.lua | tests/native/blindbox_settle_test.lua | 缺 | 缺 | 有 | 缺 | B |
-| 15-16 | server/Mgr/MgrBlindbox.lua、server/World/GroundLoot.lua | tests/native/blindbox_settle_test.lua | 缺 | 缺 | 缺 | 有 | B |
-| 15-17 | common/GameCfg.lua、server/Mgr/MgrBlindbox.lua | tests/native/content_validation_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 15-21 | common/GameCfg.lua、server/Mgr/MgrPlatform.lua、client/ScreenHandlers/ScreenPlatform.lua | tests/native/spec/15_blindbox_placeholder_settlement_test.lua | 有 | 有 | 缺 | 缺 | A |
+| 15-15 | server/World/PlayerBlindbox.lua、server/Mgr/MgrSave.lua | tests/native/blindbox_settle_test.lua | 缺 | 缺 | 有 | 缺 | B |
+| 15-16 | server/World/PlayerBlindbox.lua、server/World/GroundLoot.lua | tests/native/blindbox_settle_test.lua | 缺 | 缺 | 缺 | 有 | B |
+| 15-17 | common/GameCfg.lua、server/World/PlayerBlindbox.lua | tests/native/content_validation_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 15-21 | common/GameCfg.lua、server/Mgr/MgrPlatform.lua、client/Views/BlindboxView.lua | tests/native/spec/15_blindbox_placeholder_settlement_test.lua | 有 | 有 | 缺 | 缺 | A |
 
 第 15 节的 15-01、15-09～15-11、15-21 已由占位支付通道的公开入口取证（价目 10 / 90 金豆同一通道收费、
 确认前不发奖、取消与超时不到账、第 50 抽强制保底、大奖清零计数）。15-21 原挂 C 级试玩口径，
@@ -565,7 +565,7 @@
 | 18-08 | server/Mgr/MgrQuest.lua、server/Mgr/MgrStory.lua | tests/native/spec/18_session_settlement_contract_test.lua | 有 | 缺 | 缺 | 有 | B |
 | 18-09 | server/World/FerryRoute.lua、server/Data/PlayerData.lua | tests/native/spec/18_session_settlement_contract_test.lua | 有 | 缺 | 缺 | 有 | B |
 | 18-10 | server/Data/PlayerData.lua、server/Mgr/MgrSave.lua | tests/native/spec/18_session_settlement_contract_test.lua | 有 | 有 | 有 | 有 | B |
-| 18-11 | server/Mgr/MgrBlindbox.lua、server/Data/PlayerData.lua | tests/native/spec/18_session_settlement_contract_test.lua | 有 | 缺 | 缺 | 有 | B |
+| 18-11 | server/World/PlayerBlindbox.lua、server/Data/PlayerData.lua | tests/native/spec/18_session_settlement_contract_test.lua | 有 | 缺 | 缺 | 有 | B |
 | 18-12 | server/Mgr/MgrAchievements.lua、server/Data/PlayerData.lua | tests/native/spec/18_session_settlement_contract_test.lua | 有 | 缺 | 缺 | 有 | B |
 | 18-13 | server/Mgr/MgrSave.lua、server/World/FerryRoute.lua | tests/native/spec/18_session_settlement_contract_test.lua | 有 | 有 | 有 | 有 | B |
 | 18-14 | server/World/PlayerWeapon.lua、server/Data/PlayerData.lua | — | 缺 | 缺 | 缺 | 缺 | B |
@@ -582,7 +582,7 @@
 | 18-25 | server/World/FerryRoute.lua、server/Mgr/MgrSave.lua | tests/native/ferry_test.lua | 缺 | 缺 | 缺 | 缺 | B |
 | 18-26 | server/Mgr/MgrPlatform.lua | — | 缺 | 缺 | 缺 | 缺 | B |
 | 18-27 | server/Data/PlayerData.lua、server/World/GroundLoot.lua | tests/native/spec/18_session_settlement_contract_test.lua | 有 | 缺 | 缺 | 有 | B |
-| 18-28 | server/Mgr/MgrLottery.lua、server/Mgr/MgrSave.lua | tests/native/lottery_settle_test.lua | 缺 | 缺 | 缺 | 缺 | B |
+| 18-28 | server/World/PlayerLottery.lua、server/Mgr/MgrSave.lua | tests/native/lottery_settle_test.lua | 缺 | 缺 | 缺 | 缺 | B |
 | 18-29 | server/Mgr/MgrInteract.lua、server/Mgr/MgrSave.lua | tests/native/economy_persistence_test.lua | 缺 | 缺 | 缺 | 缺 | B |
 | 18-30 | server/World/PlayerGrill.lua、server/main.lua | tests/native/grill_test.lua | 缺 | 缺 | 缺 | 缺 | B |
 | 18-31 | server/Mgr/MgrSave.lua、server/Data/PlayerData.lua | tests/native/spec/18_session_settlement_contract_test.lua | 有 | 有 | 有 | 有 | B |
@@ -658,7 +658,7 @@ docs/to-questionnaire-策划案内部矛盾.md。金豆入口（11-20）、迟�
 | 19-05 | common/cfg/Blindbox.lua | tests/native/blindbox_draw_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 19-06 | common/GameCfg.lua、common/ZoneMarkers.lua | tests/native/ferry_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 19-07 | server/World/PlayerLife.lua、server/Mgr/MgrPlatform.lua | tests/native/spec/11_ad_revive_placeholder_test.lua、tests/native/spec/09_rescue_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 19-08 | server/Mgr/MgrLottery.lua、tests/probes/lottery_runtime.lua、tests/probes/local_link_runtime.lua | tests/native/lottery_draw_test.lua | 有 | 缺 | 缺 | 缺 | B |
+| 19-08 | server/World/PlayerLottery.lua、tests/probes/lottery_runtime.lua、tests/probes/local_link_runtime.lua | tests/native/lottery_draw_test.lua | 有 | 缺 | 缺 | 缺 | B |
 | 19-09 | docs/acceptance/README.md、docs/acceptance/evidence-levels.md、tools/acceptance.lua | — | 缺 | 缺 | 缺 | 缺 | A |
 | 19-10 | server/Mgr/MgrSave.lua、server/Data/PlayerData.lua、docs/acceptance/coverage.md | tests/native/save_test.lua、tests/native/spec/18_session_settlement_contract_test.lua | 缺 | 缺 | 缺 | 有 | A |
 | 19-11 | server/Mgr/MgrSave.lua、server/Mgr/MgrPlatform.lua | tests/native/spec/01_platform_adapter_failure_test.lua、tests/native/save_foundation_test.lua | 缺 | 有 | 缺 | 缺 | A |

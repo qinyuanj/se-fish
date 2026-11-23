@@ -1,7 +1,6 @@
 local GameCfg = require('common.GameCfg')
-local ServerRuntime = require('server.World.ServerRuntime')
 
-local Mgr = { Flows = {}, GrantSeq = {}, CoinSeq = {}, PendingGrants = {}, NextFlowId = 0 }
+local Mgr = { Flows = {}, NextFlowId = 0 }
 
 local function cfg()
     return GameCfg.Platform
@@ -189,82 +188,9 @@ function Mgr:CancelFlow(player)
     return true
 end
 
-function Mgr:OpenAdrenalineShop(player)
-    local rows = cfg().Goods
-    if not (debugEnabled() or placeholderAllowed()) then
-        local reason = closedReason()
-        self:Reply(player, { ok = false, action = 'AdrenalineShop', reason = reason, text = closedText(reason) })
-        return false
-    end
-    self:Reply(player, { ok = true, action = 'AdrenalineShop', offers = {
-        { key = 'adrenaline1', beans = rows.adrenaline1.beans, count = rows.adrenaline1.count,
-            name = rows.adrenaline1.name },
-        { key = 'adrenaline5', beans = rows.adrenaline5.beans, count = rows.adrenaline5.count,
-            name = rows.adrenaline5.name },
-    } })
-    return true
-end
-
-function Mgr:OpenCoinShop(player)
-    local config = placeholder()
-    local page = config and config.CoinPage
-    if not placeholderAllowed() or type(page) ~= 'table' or type(page.Offers) ~= 'table' then
-        local reason = closedReason()
-        self:Reply(player, { ok = false, action = 'CoinShop', reason = reason, text = closedText(reason) })
-        return false
-    end
-    local offers = {}
-    for _, offer in ipairs(page.Offers) do
-        offers[#offers + 1] = { key = offer.key, goodsId = offer.goodsId, name = offer.name,
-            price = offer.price, coin = coinAmount(offer) }
-    end
-    self:Reply(player, { ok = true, action = 'CoinShop', offers = offers, rate = page.CoinPerUnit,
-        currency = page.Unit, notice = config.Notice })
-    return true
-end
-
-function Mgr:PurchaseCoin(player, key)
-    if not coinOffer(key) then return false end
-    return openFlow(self, player, { kind = 'coin', coin = key, purpose = 'coinpage' }, function(outcome)
-        if outcome == 'success' then return self:GrantCoin(player, key) end
-        self:Reply(player, { ok = false, action = 'BuyCoin', goods = key, reason = outcome })
-        return false
-    end)
-end
-
-function Mgr:GrantCoin(player, key, requestId)
-    local offer = coinOffer(key)
-    local amount = coinAmount(offer)
-    if not amount then return false end
-    local data = self.PlayerData and self.PlayerData:GetDataInst(player)
-    if not data or not self.Save then return false end
-    if requestId == nil then
-        self.CoinSeq[player.UserId] = (self.CoinSeq[player.UserId] or 0) + 1
-        requestId = self.CoinSeq[player.UserId]
-    end
-    local operation, mode = self.Save:ResolveRequest(player, data, 'platform:coin', requestId)
-    if not operation then
-        print('[MgrPlatform] 金币到账被拒', player.UserId, key, tostring(mode))
-        self:Reply(player, { ok = false, action = 'BuyCoin', goods = key, reason = mode or 'pending' })
-        return false
-    end
-    return self.Save:Execute(player, data, operation, function(draft)
-        local before = draft.Data.FishCoin
-        if not draft:AddCoin(amount, nil, 'coinpage:' .. key) then return nil, 'coin' end
-        return { ok = true, goods = key, name = offer.name, coin = amount,
-            coinBefore = before, coinAfter = draft.Data.FishCoin }
-    end, function(written, result)
-        if not written then
-            print('[MgrPlatform] 金币到账未落账', player.UserId, key, tostring(result))
-            self:Reply(player, { ok = false, action = 'BuyCoin', goods = key, reason = result })
-            return
-        end
-        print('[MgrPlatform] 金币到账落账', player.UserId, key,
-            'coinBefore=' .. tostring(result.coinBefore), 'coinAfter=' .. tostring(result.coinAfter))
-        self:Reply(player, { ok = true, action = 'CoinGrant', goods = key, name = result.name,
-            coin = result.coin, coinBefore = result.coinBefore, coinAfter = result.coinAfter,
-            operation = operation })
-    end)
+function Mgr:OpenCoinFlow(player, key, onResult)
+    if not coinOffer(key) or type(onResult) ~= 'function' then return false end
+    return openFlow(self, player, { kind = 'coin', coin = key, purpose = 'coinpage' }, onResult)
 end
 
 function Mgr:ResolvePlaceholder(player, outcome)
@@ -273,66 +199,6 @@ function Mgr:ResolvePlaceholder(player, outcome)
     if not flow or flow.player ~= player or not flow.placeholder then return false end
     resolve(self, player, flow, outcome, { placeholder = true })
     return true
-end
-
-function Mgr:GrantGoods(player, goodsKey, num, requestId)
-    local row = cfg().Goods[goodsKey]
-    if not row or not row.itemId then return false end
-    local data = self.PlayerData and self.PlayerData:GetDataInst(player)
-    if not data or not self.Save then return false end
-    if requestId == nil then
-        self.GrantSeq[player.UserId] = (self.GrantSeq[player.UserId] or 0) + 1
-        requestId = self.GrantSeq[player.UserId]
-    end
-    local operation, mode = self.Save:ResolveRequest(player, data, 'platform:grant', requestId)
-    if not operation then
-        if mode == 'pending' then
-            local queue = self.PendingGrants[player.UserId]
-            if not queue or queue.player ~= player then
-                queue = { player = player, jobs = {} }
-                self.PendingGrants[player.UserId] = queue
-            end
-            queue.jobs[#queue.jobs + 1] = { goods = goodsKey, num = num }
-            print('[MgrPlatform] 发货排队', player.UserId, goodsKey)
-            return true
-        end
-        print('[MgrPlatform] 发货被拒', player.UserId, goodsKey, tostring(mode))
-        return false
-    end
-    local total = row.count * math.max(1, num or 1)
-    local executed = self.Save:Execute(player, data, operation, function(draft)
-        local granted = 0
-        for _ = 1, total do
-            if not draft:AddItem(row.itemId) then break end
-            granted = granted + 1
-        end
-        return { ok = true, goods = goodsKey, itemId = row.itemId, total = total, granted = granted,
-            overflow = total - granted }
-    end, function(written, result)
-        if not written then
-            print('[MgrPlatform] 发货未落账', player.UserId, goodsKey, tostring(result))
-            return
-        end
-        print('[MgrPlatform] 发货落账', player.UserId, goodsKey,
-            'granted=' .. tostring(result.granted), 'overflow=' .. tostring(result.overflow))
-        if self.PlayerData.SendItemBar then self.PlayerData:SendItemBar(player) end
-        self:Reply(player, { ok = true, action = 'Grant', goods = goodsKey,
-            granted = result.granted, overflow = result.overflow, operation = operation })
-        if result.overflow > 0 then
-            local origin = player.Character and player.Character.Position
-            for _ = 1, result.overflow do
-                local runtime = ServerRuntime.current and ServerRuntime.current()
-                local world = runtime and runtime:get_world()
-                local spawned = world and origin and world:place_ground_item('fishPond', {
-                    kind = 'item', itemId = row.itemId, count = 1,
-                    x = origin.x, y = origin.y, z = origin.z + 2 })
-                if not spawned then
-                    print('[MgrPlatform] 溢出落地失败（待对账）', player.UserId, row.itemId)
-                end
-            end
-        end
-    end)
-    return executed, operation
 end
 
 function Mgr:OnGoodsPurchaseCompleted(goodsId, num, player)
@@ -372,41 +238,16 @@ end
 
 function Mgr:HandleAction(player, payload)
     if type(payload) ~= 'table' then return false end
-    if payload.action == 'OpenAdrenaline' then return self:OpenAdrenalineShop(player) end
-    if payload.action == 'OpenCoinShop' then return self:OpenCoinShop(player) end
+    if self.ShopAction and (payload.action == 'OpenAdrenaline' or payload.action == 'OpenCoinShop'
+        or payload.action == 'Purchase' or payload.action == 'BuyCoin' or payload.action == 'Query') then
+        return self.ShopAction(player, payload)
+    end
     if payload.action == 'Share' then
         self:Share(player, payload.purpose)
         return true
     end
-    if payload.action == 'BuyCoin' then
-        local opened, reason = self:PurchaseCoin(player, payload.goods)
-        if not opened then
-            reason = reason or 'invalid'
-            self:Reply(player, { ok = false, action = 'BuyCoin', goods = payload.goods,
-                reason = reason, text = closedText(reason) })
-        end
-        return opened
-    end
     if payload.action == 'PlaceholderOutcome' then
         return self:ResolvePlaceholder(player, payload.outcome)
-    end
-    if payload.action == 'Purchase' then
-        local goodsKey = payload.goods
-        local row = cfg().Goods[goodsKey]
-        if not row or not row.itemId then return false end
-        local opened, reason = self:Purchase(player, goodsKey, 'adrenaline', function(outcome)
-            if outcome == 'success' then
-                self:GrantGoods(player, goodsKey, 1)
-            else
-                self:Reply(player, { ok = false, action = 'Purchase', goods = goodsKey, reason = outcome })
-            end
-        end)
-        if not opened then
-            reason = reason or 'unavailable'
-            self:Reply(player, { ok = false, action = 'Purchase', goods = goodsKey,
-                reason = reason, text = closedText(reason) })
-        end
-        return opened
     end
     return false
 end
@@ -418,26 +259,10 @@ function Mgr:Update()
             resolve(self, flow.player, flow, 'timeout') -- 平台无取消/失败事件，超时是唯一兜底
         end
     end
-    for userId, queue in pairs(self.PendingGrants) do
-        if queue.player and #queue.jobs > 0 then
-            local job = queue.jobs[1]
-            if self:GrantGoods(queue.player, job.goods, job.num) then
-                table.remove(queue.jobs, 1)
-            else
-                self.PendingGrants[userId] = nil
-                print('[MgrPlatform] 发货重试放弃（待对账）', userId, job.goods)
-            end
-        else
-            self.PendingGrants[userId] = nil
-        end
-    end
 end
 
 function Mgr:OnPlayerRemoving(player)
     self.Flows[player.UserId] = nil
-    self.GrantSeq[player.UserId] = nil
-    self.CoinSeq[player.UserId] = nil
-    self.PendingGrants[player.UserId] = nil
 end
 
 function Mgr:Start()
