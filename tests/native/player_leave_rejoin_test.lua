@@ -65,12 +65,11 @@ describe('TestPlayerLeaveRejoin', function()
     local function assertRejoined(p)
         assert.same('ready', p.attrs.SaveState)
         assert.is_not_nil(env.data:GetDataInst(p))
-        local state = env.vitals:GetState(p)
-        assert.are.equal(p, state.player)
-        assert.is_true(state.bound)
-        assert.same(1, #p.Character.Controller.Died.handlers)
-        assert.same(0, #env.a.CharacterAdded.handlers)
-        assert.same(0, #env.a.Character.Controller.Died.handlers)
+        local life = env.runtime and env.runtime.life
+        local state = life and life:GetState(p)
+        assert.are.equal(p, state and state.player)
+        assert.same('alive', life:LifeStatus(p))
+        assert.is_true(life:CanAct(p))
     end
 
     -- 逐例夹具：旧 LuaUnit 每例跑 setUp/tearDown，这里同样用 before_each/after_each。
@@ -128,6 +127,10 @@ describe('TestPlayerLeaveRejoin', function()
         _G.REUtil = { GetRE = function() return {
             OnServerEvent = signal(), FireClient = function() end,
         } end }
+        _G.RemoteEvent = { New = function() return {
+            OnServerEvent = signal(), OnClientEvent = signal(),
+            FireServer = function() end, FireClient = function() end,
+        } end }
         local attr_api_stub = {
             Enums = { AttrComponentType = { Base = 1, BaseExtra = 2, Ratio = 3, Bonus = 4 } },
             Funcs = {
@@ -149,11 +152,11 @@ describe('TestPlayerLeaveRejoin', function()
             StopAbility = function() end,
             CastAbility = function() return true end,
         }
-        for _, name in ipairs({ 'MgrSave', 'MgrPlayerData', 'MgrQuest', 'MgrStory', 'MgrVitals' }) do
+        for _, name in ipairs({ 'MgrSave', 'MgrPlayerData', 'MgrQuest', 'MgrStory' }) do
             env.mgrs[name] = assert(loadfile('server/Mgr/' .. name .. '.lua'))()
         end
-        env.save, env.data, env.quest, env.story, env.vitals =
-            env.mgrs.MgrSave, env.mgrs.MgrPlayerData, env.mgrs.MgrQuest, env.mgrs.MgrStory, env.mgrs.MgrVitals
+        env.save, env.data, env.quest, env.story =
+            env.mgrs.MgrSave, env.mgrs.MgrPlayerData, env.mgrs.MgrQuest, env.mgrs.MgrStory
         local sandbox = setmetatable({
             print = function(...)
                 local parts = { ... }
@@ -182,6 +185,7 @@ describe('TestPlayerLeaveRejoin', function()
         env.mgrs.MgrSurvival = { Hooks = function() return {} end }
         env.mgrs.MgrAbility = { IsParalyzed = function() return false end }
         assert(loadfile('server/main.lua', 't', sandbox))()
+        env.runtime = require('server.World.ServerRuntime').current()
         env.a = join(560)
         drain()
     end)
@@ -194,14 +198,14 @@ describe('TestPlayerLeaveRejoin', function()
     end)
 
     it('test_dead_old_vitals_does_not_block_new_living_player', function()
-        env.a.Character.Controller:TakeDamage(300)
-        assert.is_false(env.vitals:CanAct(env.a))
+        env.runtime.life:ApplyHit(env.runtime.life:NewHit(nil, 'fishAttack'), env.a, 999)
+        assert.is_false(env.runtime.life:CanAct(env.a))
         fact('worm:dead')
         env.players.PlayerRemoving:Fire(env.a)
         local b = join(env.a.UserId)
         drain()
         assertRejoined(b)
-        assert.is_true(env.vitals:CanAct(b))
+        assert.is_true(env.runtime.life:CanAct(b))
     end)
 
     it('test_final_leave_snapshot_is_drained_before_new_claim', function()
@@ -278,7 +282,7 @@ describe('TestPlayerLeaveRejoin', function()
         drain()
         assert.is_nil(env.data:GetDataInst(b))
         assert.is_nil(env.save.Sessions[b.UserId])
-        assert.is_nil(env.vitals:GetState(b))
+        assert.is_nil(env.runtime.life:GetState(b))
         local c = join(env.a.UserId)
         drain()
         env.a = c
