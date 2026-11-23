@@ -107,11 +107,8 @@ describe('主界面 HUD 的节点归属（#209）', function()
 
     it('test_cleanup_destroys_and_unregisters_every_hud_node', function()
         ctx = setUp()
-        -- 走一遍惰性建点：两个弹窗的候选格都是点开才建，不点就漏掉这批建点
         ctx.states:Fire({ slots = {}, slotCount = 4, bait = { worm = 2, sausage = 1 },
             weapons = { item134 = 1 }, backpackCount = 5 })
-        ctx.nodes.WeaponBar.OnClicked:Fire()
-        ctx.nodes.BaitBar.OnClicked:Fire()
         -- 世界建了多少个节点，主界面名下就该有多少个：漏登记或多登记都在这里露出
         assert.same(#ctx.created, OwnedUnits.Count(ctx.handler))
         ctx.handler:Cleanup()

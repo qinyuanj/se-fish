@@ -16,6 +16,9 @@
 --   7. 选中的既非鱼竿也非食物：按钮仍可见可点；强行点击不给「请重新选择鱼竿」提示；
 --   8. 「结束收线」被并入道具按钮或不再出现；攻击键被改动。
 local GameCfg = require('common.GameCfg')
+local ClientStore = require('client.Store.ClientStore')
+local RootView = require('client.Views.RootView')
+local MainHudBackpackView = require('client.Views.MainHudBackpackView')
 
 local NAME = setmetatable({}, { __index = function(_, id) return GameCfg.Items.Definitions[id].Name end })
 
@@ -89,10 +92,26 @@ local function setUp()
     ctx.handler.RootNode = { Name = 'ScreenMain', FindFirstChild = function() return nil end }
     ctx.handler:Init()
     ctx.handler.IsOpen = true
+    ctx.store, ctx.writer = ClientStore.new({ initial_now = ctx.now })
+    ctx.hostBinding = ctx.writer:bind_host({
+        get_re = function(name) return _G.REUtil:GetRE(name) end,
+    })
+    ctx.spokeRoot = { Name = 'UIRoot', Destroying = signal(),
+        FindFirstChild = function(_, name) return ctx.nodes[name] end }
+    ctx.hudView = RootView.mount(ctx.spokeRoot, ctx.store, {
+        create_node = function(kind, attrs) return world:CreateUnit(kind, attrs) end,
+        hud = {
+            MainHudBackpackView.spec({
+                on_open_changed = function(is_open) ctx.handler:SetBackpackOpen(is_open) end,
+            }),
+        },
+    })
     return ctx
 end
 
 local function tearDown(ctx)
+    if ctx.hudView then ctx.hudView:dispose() end
+    if ctx.hostBinding then ctx.hostBinding:dispose() end
     require('client.LocalAttackButton'):Destroy()
     package.loaded['client.LocalAttackButton'] = ctx.previousAttack
     for _, key in ipairs(GLOBALS) do _G[key] = ctx.previous[key] end

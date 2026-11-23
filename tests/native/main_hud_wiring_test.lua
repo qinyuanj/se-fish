@@ -15,9 +15,12 @@
 --  10. 数值到上限（如「饥饿度 300」）时文字超出文字框被截断，或两颗球的文字框互叠、压住金币。
 local MainHudLayout = require('client.MainHudLayout')
 local GameCfg = require('common.GameCfg')
+local spoke = require('common.packages.spoke.api')
 local ClientStore = require('client.Store.ClientStore')
 local RootView = require('client.Views.RootView')
 local MainHudVitalsView = require('client.Views.MainHudVitalsView')
+local MainHudEquipPopups = require('client.Views.MainHudEquipPopups')
+local MainHudBackpackView = require('client.Views.MainHudBackpackView')
 
 local function signal()
     local listeners = {}
@@ -85,11 +88,20 @@ local function setUp(height)
     ctx.nodes.ImageCoin = { Name = 'ImageCoin', Position = { x = 864, y = 1145 }, Size = { x = 80, y = 80 } }
     ctx.nodes.LabelCoin = { Name = 'LabelCoin', Position = { x = 960, y = 1145 }, Size = { x = 200, y = 60 } }
     ctx.store, ctx.writer = ClientStore.new({ initial_now = ctx.now })
+    ctx.hostBinding = ctx.writer:bind_host({
+        get_re = function(name) return _G.REUtil:GetRE(name) end,
+    })
     ctx.writer:update_vitals({
         health = attributes.Health, maxHealth = attributes.MaxHealth,
         hunger = attributes.Hunger, maxHunger = attributes.MaxHunger,
         coin = attributes.FishCoin,
     })
+    ctx.backpackOpen = spoke.State.new('Test.hud_backpack_open', false)
+    ctx.openPopup = spoke.State.new('Test.hud_open_popup', nil)
+    ctx.handler = assert(loadfile('client/ScreenHandlers/ScreenMain.lua'))()
+    ctx.handler.RootNode = { Name = 'ScreenMain', FindFirstChild = function(_, name) return ctx.nodes[name] end }
+    ctx.handler:Init()
+    ctx.handler.IsOpen = true
     ctx.spokeRoot = { Name = 'UIRoot', Destroying = signal(),
         FindFirstChild = function(_, name) return ctx.nodes[name] end }
     ctx.vitalsView = RootView.mount(ctx.spokeRoot, ctx.store, {
@@ -98,17 +110,26 @@ local function setUp(height)
             MainHudVitalsView.spec({
                 get_resolution = function() return { x = 1920, y = height } end,
             }),
+            MainHudEquipPopups.spec({
+                get_resolution = function() return { x = 1920, y = height } end,
+                open_popup = ctx.openPopup,
+                backpack_open = ctx.backpackOpen,
+                send_operate = function(payload) ctx.handler:Operate(payload) end,
+            }),
+            MainHudBackpackView.spec({
+                get_resolution = function() return { x = 1920, y = height } end,
+                backpack_open = ctx.backpackOpen,
+                open_popup = ctx.openPopup,
+                on_open_changed = function(is_open) ctx.handler:SetBackpackOpen(is_open) end,
+            }),
         },
     })
-    ctx.handler = assert(loadfile('client/ScreenHandlers/ScreenMain.lua'))()
-    ctx.handler.RootNode = { Name = 'ScreenMain', FindFirstChild = function(_, name) return ctx.nodes[name] end }
-    ctx.handler:Init()
-    ctx.handler.IsOpen = true
     return ctx
 end
 
 local function tearDown(ctx)
     if ctx.vitalsView then ctx.vitalsView:dispose() end
+    if ctx.hostBinding then ctx.hostBinding:dispose() end
     require('client.LocalAttackButton'):Destroy()
     package.loaded['client.LocalAttackButton'] = ctx.previousAttack
     for _, key in ipairs(GLOBALS) do _G[key] = ctx.previous[key] end
@@ -156,7 +177,9 @@ describe('主界面接线（布局模块）', function()
             assertAt(ctx.nodes.CastWaitHint, r.HintPrimary, 'CastWaitHint')
             assertAt(ctx.nodes.CastSplashHint, r.HintSecondary, 'CastSplashHint')
             assertAt(ctx.nodes.CastFailureHint, r.HintTransient, 'CastFailureHint')
+            ctx.nodes.BtnBackpack.OnClicked:Fire()
             assertAt(ctx.nodes.BackpackPanel, layout.Panels.BackpackPanel, 'BackpackPanel')
+            ctx.nodes.BtnBackpack.OnClicked:Fire()
             assert.same({ x = r.HintSecondary.x, y = r.HintSecondary.y },
                 { x = ctx.nodes.ReelProgress.Position.x, y = ctx.nodes.ReelProgress.Position.y })
             -- 按钮文字与按钮同位同尺寸

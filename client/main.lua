@@ -3,10 +3,14 @@ ZoneMarkers.Start()
 
 local Number = require("common.Number")
 local SpokeClock = require("common.SpokeClock")
+local spoke = require("common.packages.spoke.api")
 local ClientStore = require("client.Store.ClientStore")
 local RootView = require("client.Views.RootView")
 local CameraZoomView = require("client.Views.CameraZoomView")
 local MainHudVitalsView = require("client.Views.MainHudVitalsView")
+local MainHudEquipPopups = require("client.Views.MainHudEquipPopups")
+local MainHudBackpackView = require("client.Views.MainHudBackpackView")
+local ScreenMain = require("client.ScreenHandlers.ScreenMain")
 local GameUI = require("client.GameUI")
 
 local LocalMgrUtil = require("client.LocalMgrUtil")
@@ -23,6 +27,22 @@ local client_store, client_store_writer = ClientStore.new({ clock = client_clock
 client_store_writer:bind_host()
 _G.ClientSpoke = { Store = client_store, Clock = client_store.clock }
 
+local hud_backpack_open = spoke.State.new("ClientMain.hud_backpack_open", false)
+local hud_open_popup = spoke.State.new("ClientMain.hud_open_popup", nil)
+
+local function send_hud_operate(payload)
+    if type(ScreenMain.Operate) == "function" then
+        ScreenMain:Operate(payload)
+    end
+end
+
+ScreenMain.OnOpenChanged = function(is_open)
+    if not is_open then
+        hud_open_popup:set(nil)
+    end
+    client_store_writer:set_hud_visible(is_open)
+end
+
 Task:Spawn(function()
     local waited = 0
     local ui_root = GameUI:GetUIRoot()
@@ -36,6 +56,20 @@ Task:Spawn(function()
             hud = {
                 CameraZoomView.spec(),
                 MainHudVitalsView.spec(),
+                MainHudEquipPopups.spec({
+                    open_popup = hud_open_popup,
+                    backpack_open = hud_backpack_open,
+                    send_operate = send_hud_operate,
+                }),
+                MainHudBackpackView.spec({
+                    backpack_open = hud_backpack_open,
+                    open_popup = hud_open_popup,
+                    on_open_changed = function(is_open)
+                        if type(ScreenMain.SetBackpackOpen) == "function" then
+                            ScreenMain:SetBackpackOpen(is_open)
+                        end
+                    end,
+                }),
             },
         })
     else
