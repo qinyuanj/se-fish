@@ -26,9 +26,9 @@ M.policy = {
       },
     },
     {
-      -- ADR-0032 预留命名空间：只读响应式客户端状态仓库（#296 迁入），归属 L3 支撑层，
+      -- ADR-0032 客户端只读响应式状态仓库（#296），归属 L3 支撑层，
       -- 天然禁止反向依赖 L2 的 client.Views / ScreenHandlers / Local*。
-      reserved_ids = { 'client.Store' },
+      ids = { 'client.Store' },
       modules = {
         'client.DamageFloat', 'client.FishCombatLabel', 'client.GameUI', 'client.InteractionBubble',
         'client.MainHudLayout', 'client.PressGesture', 'client.WeaponAim',
@@ -38,9 +38,9 @@ M.policy = {
       },
     },
     {
-      ids = { 'server.Mgr', 'server.AbilityBehaviors', 'client.ScreenHandlers' },
-      -- ADR-0032 预留命名空间：服务端 Spoke 树与客户端 Spoke 视图树（#295/#296 迁入）。
-      reserved_ids = { 'server.World', 'client.Views' },
+      ids = { 'server.Mgr', 'server.AbilityBehaviors', 'client.ScreenHandlers', 'client.Views' },
+      -- ADR-0032 预留命名空间：服务端 Spoke 树（#295 迁入）。
+      reserved_ids = { 'server.World' },
       modules = {
         'server.AbilityAPI', 'client.MgrGameUI',
         'client.LocalAttackButton', 'client.LocalAttr', 'client.LocalCastSource', 'client.LocalGM',
