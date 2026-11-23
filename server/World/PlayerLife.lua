@@ -79,9 +79,14 @@ function PlayerLife.mount(s3, player_tree, opts)
   local survival_cfg = GameCfg.Survival
   local vitals_cfg = GameCfg.Vitals
   local rescue_cfg = GameCfg.Rescue
+  local platform_api = opts.platform
+  local save_api = opts.save
+  local player_data = opts.player_data
+  local remote = opts.remote
   local raw = {}
-  if type(data) == "table" and type(data.Extra) == "table" and type(data.Extra.survival) == "table" then
-    raw = data.Extra.survival
+  local seeded = player_data and type(player_data.GetDataInst) == "function" and select(2, pcall(player_data.GetDataInst, player_data, player)) or data
+  if type(seeded) == "table" and type(seeded.Extra) == "table" and type(seeded.Extra.survival) == "table" then
+    raw = seeded.Extra.survival
   end
 
   local now0 = clock.now()
@@ -96,10 +101,6 @@ function PlayerLife.mount(s3, player_tree, opts)
   local action_seq = 0
   local damage_filter = nil
   local fish_carrier = opts.fish_carrier
-  local platform_api = opts.platform
-  local save_api = opts.save
-  local player_data = opts.player_data
-  local remote = opts.remote
   local help_index = 0
   local last_help_at = nil
   local adrenaline_flying = false
@@ -109,20 +110,32 @@ function PlayerLife.mount(s3, player_tree, opts)
   local growth_writer = opts.growth_writer
   local on_downed = opts.on_downed
 
+  local current_data
+  local function live_data()
+    local inst = current_data()
+    if type(inst) == "table" then return inst end
+    return data
+  end
+
   local function mark_table()
-    if type(data) ~= "table" then return nil end
-    if type(data.Extra) ~= "table" then data.Extra = {} end
-    if type(data.Extra.survival) ~= "table" then data.Extra.survival = {} end
-    return data.Extra.survival
+    local inst = live_data()
+    if type(inst) ~= "table" then return nil end
+    if type(inst.Extra) ~= "table" then inst.Extra = {} end
+    if type(inst.Extra.survival) ~= "table" then inst.Extra.survival = {} end
+    return inst.Extra.survival
   end
 
   local function max_health()
+    if type(opts.max_health_of) == "function" then
+      local ok, value = pcall(opts.max_health_of, player)
+      if ok and finite_number(value) and value >= 1 then return math.floor(value) end
+    end
     local value = memos.max_health and memos.max_health:now() or vitals_cfg.MaxHealth
     if not finite_number(value) or value < 1 then return vitals_cfg.MaxHealth end
     return math.floor(value)
   end
 
-  local function current_data()
+  function current_data()
     if player_data and type(player_data.GetDataInst) == "function" then
       local ok, inst = pcall(player_data.GetDataInst, player_data, player)
       if ok and type(inst) == "table" then return inst end
@@ -553,6 +566,10 @@ function PlayerLife.mount(s3, player_tree, opts)
     return true
   end
 
+  function player_tree:cancel_rescue()
+    return cancel_rescue()
+  end
+
   local function update_rescue(now)
     local current = rescue:now()
     if not current then return end
@@ -880,6 +897,12 @@ function PlayerLife.mount(s3, player_tree, opts)
     end
     player_tree:register_leave_finalizer(function()
       publish()
+      local inst = current_data()
+      local mark = mark_table()
+      if type(inst) == "table" and inst ~= data and type(mark) == "table" then
+        if type(inst.Extra) ~= "table" then inst.Extra = {} end
+        inst.Extra.survival = mark
+      end
     end)
   end
 

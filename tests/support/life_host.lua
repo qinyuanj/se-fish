@@ -85,13 +85,14 @@ function M.start(opts)
     clock = clock,
     initial_now = now,
     remote = remote,
-    player_data = { GetDataInst = function(_, player) return data_of[player.UserId] end },
+    player_data = opts.player_data or { GetDataInst = function(_, player) return data_of[player.UserId] end },
     save = opts.save,
     platform = opts.platform,
     fish_carrier = opts.fish_carrier,
     speed_writer = opts.speed_writer,
     growth_writer = opts.growth_writer,
     on_player_downed = opts.on_player_downed,
+    max_health_of = opts.max_health_of,
     players = function() return players end,
   })
   runtime:start()

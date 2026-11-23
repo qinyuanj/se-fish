@@ -407,7 +407,7 @@ function PlayerTree.spawn(opts)
       extra.survival.health = states.health:now()
       extra.survival.hunger = states.hunger:now()
       local phase = states.life_phase:now()
-      extra.survival.dying = phase == "downed"
+      extra.survival.dying = phase == "downed" or phase == "rescuing"
       extra.survival.dead = phase == "dead"
     end
     if type(handle.get_modifier_remaining) == "function" then
@@ -431,7 +431,6 @@ function PlayerTree.spawn(opts)
   local function run_finalizers()
     if finalized then return end
     finalized = true
-    mirror_to_data()
     for _, entry in ipairs(finalizers) do
       if entry.active then
         local ok, err = pcall(entry.fn, handle, player, data) -- 隔离单个离场回调异常，保证其余终镜像与收尾继续执行
@@ -440,6 +439,7 @@ function PlayerTree.spawn(opts)
         end
       end
     end
+    mirror_to_data()
     if type(opts.on_leave_finalize) == "function" then
       local ok, err = pcall(opts.on_leave_finalize, handle, player, data) -- 隔离宿主离场回调异常，避免阻断后续 dispose 协议
       if not ok then
@@ -607,6 +607,7 @@ function PlayerTree.spawn(opts)
         players = opts.players,
         speed_writer = opts.speed_writer,
         growth_writer = opts.growth_writer,
+        max_health_of = opts.max_health_of,
         on_downed = opts.on_downed,
       })
 

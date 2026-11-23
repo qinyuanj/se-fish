@@ -236,9 +236,14 @@ function ServerRuntime.new(opts)
       end
     end
 
+    local tree_data = data
+    if opts.player_data and type(opts.player_data.GetDataInst) == "function" then
+      local ok, inst = pcall(opts.player_data.GetDataInst, opts.player_data, player)
+      if ok and type(inst) == "table" then tree_data = inst end
+    end
     local player_tree = PlayerTree.spawn({
       player = player,
-      data = data,
+      data = tree_data,
       clock = clock,
       world = world,
       logger = opts.logger,
@@ -256,6 +261,7 @@ function ServerRuntime.new(opts)
       damage_context = function() return runtime.life end,
       speed_writer = opts.speed_writer,
       growth_writer = opts.growth_writer,
+      max_health_of = function(player) return runtime._max_health_of and runtime._max_health_of(player) end,
       on_downed = opts.on_player_downed,
       lookup_tree = function(user_id)
         return player_trees[user_id]
@@ -407,6 +413,7 @@ function ServerRuntime.new(opts)
 
   local hit_seq = 0
   local damage_filter = nil
+  runtime._max_health_of = opts.max_health_of
   runtime.life = {}
   local life = runtime.life
 
@@ -481,6 +488,10 @@ function ServerRuntime.new(opts)
   end
 
   function life:MaxHealthOf(player)
+    if type(runtime._max_health_of) == "function" then
+      local ok, value = pcall(runtime._max_health_of, player)
+      if ok and Number.IsFiniteNumber(value) and value >= 1 then return math.floor(value) end
+    end
     local tree = tree_of(player)
     local value = tree and tree.memos.max_health and tree.memos.max_health:now()
     if Number.IsFiniteNumber(value) and value >= 1 then return math.floor(value) end
@@ -566,7 +577,9 @@ function ServerRuntime.new(opts)
   function life:CanRescue(target, rescuer)
     local tree = tree_of(target)
     if not tree or type(tree._accept_rescue) ~= "function" then return false, "not-downed" end
-    if tree.states.life_phase:now() ~= "downed" then return false, "not-downed" end
+    local phase = tree.states.life_phase:now()
+    if phase == "rescuing" then return false, "busy" end
+    if phase ~= "downed" then return false, "not-downed" end
     return true
   end
 
@@ -578,11 +591,8 @@ function ServerRuntime.new(opts)
 
   function life:CancelRescue(state)
     local tree = state and tree_of(state.player or state)
-    if tree and tree.states.life_phase:now() == "rescuing" then
-      tree.states.life_phase:set("downed")
-      return true
-    end
-    return false
+    if not tree or type(tree.cancel_rescue) ~= "function" then return false end
+    return tree:cancel_rescue() == true
   end
 
   function life:RequestAction(player, kind)
