@@ -4,6 +4,7 @@
 
 local GameCfg = require('common.GameCfg')
 local Mgr = require('server.Mgr.MgrPlayerData')
+local ServerRuntime = require('server.World.ServerRuntime')
 
 local function signal()
   local callbacks = {}
@@ -58,8 +59,36 @@ describe('鱼竿外观挂载（MgrPlayerData）', function()
     env.player = { UserId = 34001, Character = { Name = 'Eggy' },
       CharacterAdded = signal(), CharacterRemoving = signal() }
     function env.player:SetAttribute() end
+    env.runtime = ServerRuntime.new({
+      create_unit = function(kind, props)
+        return world:CreateUnit(kind, props)
+      end,
+      on_player_join_start = function(p)
+        Mgr:OnPlayerAdded(p)
+      end,
+      is_player_data_current = function(p, data)
+        return Mgr:GetDataInst(p) == data
+      end,
+      on_player_removing = function(p)
+        Mgr:OnPlayerRemoving(p)
+      end,
+    })
+    env.runtime:start()
+    env.runtime:mark_started()
+    Mgr.OnSyncPlayerTree = function(p, data)
+      local pt = env.runtime:get_player_tree(p.UserId)
+      if pt then pt:sync_from_data(data) end
+    end
+    env.join = function(p)
+      env.runtime:on_player_added(p)
+      local data = Mgr:GetDataInst(p)
+      if data then env.runtime:on_save_ready(p, data) end
+    end
+    env.leave = function(p)
+      env.runtime:on_player_removing(p)
+    end
     Mgr:Start()
-    Mgr:OnPlayerAdded(env.player)
+    env.join(env.player)
   end)
 
   after_each(function()
@@ -67,9 +96,13 @@ describe('鱼竿外观挂载（MgrPlayerData）', function()
     if restore then
       require('common.GameCfg').Debug = restore.GrantDebug
     end
+    if env and env.runtime then
+      env.runtime:shutdown()
+    end
     if env and env.player then
       Mgr:OnPlayerRemoving(env.player)
     end
+    Mgr.OnSyncPlayerTree = nil
     if restore then
       _G.game = restore.game
       _G.Vector3 = restore.Vector3
@@ -87,12 +120,12 @@ describe('鱼竿外观挂载（MgrPlayerData）', function()
   it('test_disconnect_and_partial_spawn_failure_cleanup', function()
     select(1)
     local mount, model = env.created[1], env.created[2]
-    Mgr:OnPlayerRemoving(env.player)
+    env.leave(env.player)
     assert.is_true(mount.Destroyed)
     assert.is_true(model.Destroyed)
     env.player.CharacterAdded:Fire({ Name = 'late' })
     assert.same(2, #env.created)
-    Mgr:OnPlayerAdded(env.player)
+    env.join(env.player)
     env.failKind = 'WorldUnit'
     select(1)
     assert.is_true(env.created[3].Destroyed)
@@ -139,7 +172,7 @@ describe('鱼竿外观挂载（MgrPlayerData）', function()
     local other = { UserId = 34002, Character = { Name = 'Other' },
       CharacterAdded = signal(), CharacterRemoving = signal() }
     function other:SetAttribute() end
-    Mgr:OnPlayerAdded(other)
+    env.join(other)
     select(1)
     env.events.ItemBarAction.OnServerEvent:Fire(other, { action = 'SelectSlot', value = 1 })
     assert.same(4, #env.created)
@@ -148,7 +181,7 @@ describe('鱼竿外观挂载（MgrPlayerData）', function()
     select(1)
     assert.is_true(env.created[1].Destroyed)
     assert.is_false(env.created[3].Destroyed)
-    Mgr:OnPlayerRemoving(other)
+    env.leave(other)
     assert.is_true(env.created[3].Destroyed)
   end)
 

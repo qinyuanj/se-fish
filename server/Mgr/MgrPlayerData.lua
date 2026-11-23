@@ -2,82 +2,17 @@ local PlayerData = require('server.Data.PlayerData')
 local GameCfg = require('common.GameCfg')
 local Mgr = {}
 local DataMap = {}
-local RodMounts = {}
-local CharacterLinks = {}
 
 function Mgr:GetDataInst(player)
     local data = player and DataMap[player.UserId]
     if data and data.Player == player and data.Inited and data.LoadState == 'ready' then return data end
 end
 
-function Mgr:ClearHeldRod(player, character)
-    local held = RodMounts[player.UserId]
-    if not held or (character and held.Character ~= character) then return end
-    RodMounts[player.UserId] = nil
-    if held.Model then pcall(function() held.Model:Destroy() end) end
-    if held.Mount then pcall(function() held.Mount:Destroy() end) end
-end
-
-function Mgr:RefreshHeldRod(player, character)
-    local data = self:GetDataInst(player)
-    if not data then return end
-    character = character or player.Character
-    local selected = data.Data.SelectedSlot
-    local heldSelection = data.Extra.inventory.selection.held
-    local slot = heldSelection and heldSelection.kind == 'slot' and heldSelection.slot or nil
-    slot = heldSelection.kind ~= nil and slot or selected
-    local entry = slot and data.Data.Containers[GameCfg.Items.ContainerId.ItemBar][slot]
-    local itemId = entry and entry.count > 0 and entry.itemId or nil
-    local item = itemId and GameCfg.Items.Definitions[itemId]
-    if not item or item.Type ~= '鱼竿' then
-        itemId = heldSelection and heldSelection.kind == 'weapon' and heldSelection.id or nil
-        item = itemId and GameCfg.Items.Definitions[itemId]
-    end
-    local shouldHold = character and item and item.Visual and item.Visual.Socket
-    if not shouldHold then
-        self:ClearHeldRod(player)
-        return
-    end
-    local held = RodMounts[player.UserId]
-    if held and held.Character == character and held.ItemId == itemId then return end
-    self:ClearHeldRod(player)
-    local cfg = item.Type == '鱼竿' and GameCfg.Items.RodVisual or item.Visual
-    local world = game:GetService('World')
-    local okMount, mount = pcall(world.CreateUnit, world, 'SkeletalSocketMount', {
-        Name = 'HeldRodMount_' .. tostring(player.UserId),
-        Parent = character,
-        SocketName = cfg.Socket,
-    })
-    if not okMount or not mount then
-        print('[MgrPlayerData] 左手挂点创建失败', player.UserId, mount)
-        return
-    end
-    local okModel, model = pcall(world.CreateUnit, world, 'WorldUnit', {
-        Name = 'HeldRod_' .. tostring(player.UserId),
-        Parent = mount,
-        RenderMeshId = cfg.Mesh,
-        Scale = Vector3.New(cfg.Scale.x, cfg.Scale.y, cfg.Scale.z),
-        PhysicsActive = false,
-        CanCollide = false,
-        CanTouch = false,
-        CanTrigger = false,
-        CanQuery = false,
-        ModelVisible = true,
-        ModelColor1 = Color.New(item.IconColor[1], item.IconColor[2], item.IconColor[3], item.IconColor[4]),
-    })
-    if not okModel or not model then
-        pcall(function() mount:Destroy() end)
-        print('[MgrPlayerData] 左手鱼竿模型创建失败', player.UserId, model)
-        return
-    end
-    RodMounts[player.UserId] = { Character = character, ItemId = itemId, Mount = mount, Model = model }
-end
-
 function Mgr:SendItemBar(player)
     local data = self:GetDataInst(player)
     if not data then return end
     if self.Vitals and self.Vitals.RefreshHeldDamage then self.Vitals:RefreshHeldDamage(player, data) end
-    self:RefreshHeldRod(player)
+    if self.OnSyncPlayerTree then self.OnSyncPlayerTree(player, data) end
     _G.REUtil:GetRE('ItemBarState'):FireClient(player, data:GetItemBarSnapshot())
 end
 
@@ -91,27 +26,12 @@ function Mgr:OnPlayerAdded(player)
     DataMap[player.UserId] = data
     data:Init(self.Save ~= nil)
     if self.Save then self.Save:LoadInto(player, data) end
-    CharacterLinks[player.UserId] = {
-        Added = player.CharacterAdded:Connect(function(character)
-            if self:GetDataInst(player) then self:RefreshHeldRod(player, character) end
-        end),
-        Removing = player.CharacterRemoving:Connect(function(character)
-            if self:GetDataInst(player) then self:ClearHeldRod(player, character) end
-        end),
-    }
     self:SendItemBar(player)
 end
 
 function Mgr:OnPlayerRemoving(player)
     local data = DataMap[player.UserId]
     if data and data.Player == player then
-        local links = CharacterLinks[player.UserId]
-        CharacterLinks[player.UserId] = nil
-        if links then
-            links.Added:Disconnect()
-            links.Removing:Disconnect()
-        end
-        self:ClearHeldRod(player)
         DataMap[player.UserId] = nil
         if self.Save then self.Save:SaveLeaving(player, data) end
         data:Destroy()

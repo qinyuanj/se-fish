@@ -5,7 +5,7 @@
 -- 因此旧套件没有 setUp/tearDown、原生侧同样不需要逐例恢复。
 -- describe/it 名沿用旧类名与方法名，案例顺序沿用旧 LuaUnit 的字典序执行序。
 local function fixture(logs)
-    local all, cache = {}, {}
+    local all = {}
     local world = {}
     local function unit(kind, parent)
         local u = { Parent = parent, attrs = {}, Controller = kind == 'Character' and { WalkSpeed = 7, MaxHealth = 100, Health = 100 } or nil }
@@ -18,20 +18,23 @@ local function fixture(logs)
         function u:SetScale(v) self.scale = v.x end
         all[#all + 1] = u return u
     end
-    function world:CreateAsset() return { unit('Script', world) } end
-    local env = setmetatable({ game = { GetService = function() return world end }, Vector3 = { New = function(x, y, z) return { x = x, y = y, z = z } end } }, { __index = _G })
-    if logs then env.print = function(...) local values = { ... }; for i, v in ipairs(values) do values[i] = tostring(v) end logs[#logs + 1] = table.concat(values, ' ') end end
-    env.require = function(name)
-        if cache[name] then return cache[name] end
-        cache[name] = assert(loadfile(name:gsub('%.', '/') .. '.lua', 't', env))() return cache[name]
+    local logFn = nil
+    if logs then
+        logFn = function(...)
+            local values = { ... }
+            for i, v in ipairs(values) do values[i] = tostring(v) end
+            logs[#logs + 1] = table.concat(values, ' ')
+        end
     end
-    local mgr = env.require('server.Mgr.MgrAttr')
     local player = { UserId = 51, Character = unit('Character', world) }
     local data = { body = 2, speed = 3, level = 2 }
     function data:PotionCount(id) return id == 'item167' and self.speed or self.body end
     function data:ShopUpgradeLevel() return self.level end
-    mgr.PlayerData = { GetDataInst = function() return data end }
-    mgr.MoveMultiplierProvider = function() return 0.35 end
+    local mgr = require('tests.support.attr_runtime').New(
+        { GetDataInst = function() return data end },
+        function() return 0.35 end,
+        { log = logFn }
+    )
     return mgr, player, data, all, unit, world
 end
 
@@ -115,7 +118,7 @@ describe('TestAttrMigration', function()
         local before = #logs
         mgr:Update()
         assert.same(before + 1, #logs)
-        assert.matches('[MgrAttr] 属性重试失败 51', logs[#logs], nil, true)
+        assert.matches('[AttrLeaf] 属性重试失败 51', logs[#logs], nil, true)
         assert.matches('vendor-owner-unavailable', logs[#logs], nil, true)
         mgr:Update()
         assert.same(before + 1, #logs)

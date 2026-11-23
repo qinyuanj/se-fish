@@ -77,38 +77,19 @@ local function engine()
     return e
 end
 
--- #52：业务入口使用真实根 API；替身只提供单位、时钟与伤害边界。
+-- #52：业务入口使用真实 Spoke PlayerEffects + ModifierLeaf + 真实官方包；替身只提供单位、时钟与伤害边界。
 local function business(run)
-    local e = engine()
-    local savedGame, savedRemote = _G.game, _G.RemoteEvent
-    local saved = {}
-    for name, value in pairs(package.loaded) do
-        if name:find('modifier_system', 1, true) or name == 'server.packages.modifier_system.api' then
-            saved[name] = value; package.loaded[name] = nil
-        end
-    end
-    _G.game, _G.RemoteEvent = e.game, e.remote
-    local ok, err = pcall(function()
-        local env = setmetatable({}, { __index = _G })
-        local modifier = assert(loadfile('server/Mgr/MgrModifier.lua', 't', env))()
-        modifier.Presets = { poison = 'test:poison', burn = 'test:burn', frost = 'test:frost',
-            paralyze = 'test:paralyze', weak = 'test:weak' }
-        local player = { UserId = 52001, Character = e.unit('character') }
-        local hits = {}
-        modifier.Vitals = {
-            NewHit = function(_, source, category) return { source = source, category = category } end,
-            ApplyHit = function(_, hit, target, amount)
-                hits[#hits + 1] = { source = hit.source, target = target, amount = amount, category = hit.category }
-            end,
-        }
-        run(e, modifier, player, hits)
-    end)
-    _G.game, _G.RemoteEvent = savedGame, savedRemote
-    for name in pairs(package.loaded) do
-        if name:find('modifier_system', 1, true) or name == 'server.packages.modifier_system.api' then package.loaded[name] = nil end
-    end
-    for name, value in pairs(saved) do package.loaded[name] = value end
-    if not ok then error(err, 0) end
+    local runtime = require('tests.support.modifier_runtime').New(100)
+    local modifier = runtime.loadModifier()
+    local player = { UserId = 52001, Character = runtime.unit('character') }
+    local hits = {}
+    modifier.Vitals = {
+        NewHit = function(_, source, category) return { source = source, category = category } end,
+        ApplyHit = function(_, hit, target, amount)
+            hits[#hits + 1] = { source = hit.source, target = target, amount = amount, category = hit.category }
+        end,
+    }
+    run(runtime, modifier, player, hits)
 end
 
 describe("TestModifierProbe", function()
@@ -216,7 +197,7 @@ describe("TestModifierProbe", function()
     mgr.Vitals = {
       NewHit = function(_, source, category) return { source = source, category = category } end,
       ApplyHit = function(_, hit, ref, amount)
-        hits[#hits + 1] = { source = hit.source, category = hit.category, target = ref, amount = amount, at = clock }
+        hits[#hits + 1] = { source = hit.source, category = hit.category, target = ref, amount = amount, at = runtime.now }
       end,
     }
     local source, source2 = {}, {}

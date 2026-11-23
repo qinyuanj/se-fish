@@ -105,8 +105,14 @@ function HeldRodLeaf.mount(s, player_tree, opts)
       return
     end
 
+    local retry_sig = player_tree.states and player_tree.states.held_rod_retry
+    if retry_sig then
+      local _ = es:d(retry_sig)
+    end
+
     local character = es:d(character_sig)
     local item_id = es:d(item_sig)
+    player_tree._held_rod_failed = false
     if character == nil or type(item_id) ~= "string" then
       return
     end
@@ -118,6 +124,7 @@ function HeldRodLeaf.mount(s, player_tree, opts)
     local mount, model, err = HeldRodLeaf.create_visual(opts.create_unit, player_tree.user_id, character, item_id)
     if not mount or not model then
       if err and err ~= "no-visual" and err ~= "invalid-args" then
+        player_tree._held_rod_failed = true
         if type(opts.on_error) == "function" then
           opts.on_error("[HeldRodLeaf] 左手持竿投影失败: " .. tostring(err))
         else
