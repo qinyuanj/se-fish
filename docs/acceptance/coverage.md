@@ -128,7 +128,7 @@
 | 4-19 | common/FishCatch.lua | tests/native/cfg_fish_items_test.lua、tests/native/fish_loot_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 4-20 | common/FishCatch.lua | tests/native/cfg_fish_items_test.lua、tests/native/fish_loot_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 4-21 | common/FishCatch.lua | tests/native/cfg_fish_items_test.lua、tests/native/fish_loot_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 4-22 | common/FishCatch.lua、server/Mgr/MgrGrill.lua | tests/native/cfg_fish_items_test.lua、tests/native/fish_loot_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 4-22 | common/FishCatch.lua、server/World/PlayerGrill.lua | tests/native/cfg_fish_items_test.lua、tests/native/fish_loot_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 4-23 | server/Mgr/MgrLottery.lua、common/LotteryDraw.lua | tests/native/lottery_settle_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 4-24 | server/Mgr/MgrFishCarrier.lua、common/GameCfg.lua | tests/native/fish_escape_test.lua、tests/native/fish_carrier_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 4-25 | server/Mgr/MgrFishCarrier.lua、common/GameCfg.lua | tests/native/fish_escape_test.lua、tests/native/fish_carrier_test.lua | 缺 | 缺 | 缺 | 缺 | A |
@@ -249,7 +249,7 @@
 | 8-02 | server/Mgr/MgrInteract.lua、common/cfg/Items.lua | tests/native/feed_exchange_test.lua、tests/native/exchange_zones_127_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 8-03 | server/Mgr/MgrInteract.lua、server/Data/PlayerData.lua | tests/native/feed_exchange_test.lua、tests/native/exchange_zones_127_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 8-04 | server/Mgr/MgrInteract.lua、common/GameCfg.lua | tests/native/feed_exchange_test.lua、tests/native/exchange_zones_127_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 8-05 | server/Mgr/MgrInteract.lua、server/Mgr/MgrGrill.lua | tests/native/feed_exchange_test.lua、tests/native/exchange_zones_127_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 8-05 | server/Mgr/MgrInteract.lua、server/World/PlayerGrill.lua | tests/native/feed_exchange_test.lua、tests/native/exchange_zones_127_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 8-06 | common/GameCfg.lua、common/ContentValidation.lua | tests/native/feed_exchange_test.lua、tests/native/exchange_zones_127_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 8-07 | server/Mgr/MgrInteract.lua、common/GameCfg.lua | tests/native/feed_exchange_test.lua、tests/native/exchange_zones_127_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 8-08 | server/Mgr/MgrInteract.lua、common/GameCfg.lua | tests/native/feed_exchange_test.lua、tests/native/exchange_zones_127_test.lua | 缺 | 缺 | 缺 | 缺 | A |
@@ -322,32 +322,32 @@
 | 条款 | 代码落点 | 关联测试 | 正常流程 | 失败流程 | 退出重进 | 存档恢复 | 等级 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 10-01 | common/GameCfg.lua、common/ZoneMarkers.lua | tests/native/grill_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 10-02 | server/Mgr/MgrGrill.lua | tests/native/grill_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 10-03 | server/Mgr/MgrGrill.lua | tests/native/grill_test.lua、tests/native/spec/10_grill_curve_test.lua | 缺 | 有 | 缺 | 缺 | A |
-| 10-04 | server/Mgr/MgrGrill.lua | tests/native/grill_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 10-05 | server/Mgr/MgrGrill.lua | tests/native/grill_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 10-02 | server/World/PlayerGrill.lua | tests/native/grill_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 10-03 | server/World/PlayerGrill.lua | tests/native/grill_test.lua、tests/native/spec/10_grill_curve_test.lua | 缺 | 有 | 缺 | 缺 | A |
+| 10-04 | server/World/PlayerGrill.lua | tests/native/grill_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 10-05 | server/World/PlayerGrill.lua | tests/native/grill_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 10-06 | common/GrillCurve.lua、common/GameCfg.lua | tests/native/grill_test.lua、tests/native/spec/10_grill_curve_test.lua | 有 | 缺 | 缺 | 缺 | A |
 | 10-07 | common/GrillCurve.lua、common/GameCfg.lua | tests/native/grill_test.lua、tests/native/spec/10_grill_curve_test.lua | 有 | 缺 | 缺 | 缺 | A |
 | 10-08 | common/GrillCurve.lua、common/GameCfg.lua | tests/native/grill_test.lua、tests/native/spec/10_grill_curve_test.lua | 有 | 缺 | 缺 | 缺 | A |
-| 10-09 | client/ScreenHandlers/ScreenGrill.lua、common/GrillCurve.lua | tests/native/grill_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 10-10 | server/Mgr/MgrGrill.lua、common/GrillCurve.lua | tests/native/grill_test.lua、tests/native/spec/10_grill_curve_test.lua | 有 | 缺 | 缺 | 缺 | A |
-| 10-11 | server/Mgr/MgrGrill.lua、common/GrillCurve.lua | tests/native/grill_test.lua、tests/native/spec/10_grill_curve_test.lua | 缺 | 有 | 缺 | 缺 | A |
-| 10-12 | server/Mgr/MgrGrill.lua、server/World/PlayerLife.lua | tests/native/grill_test.lua、tests/native/spec/10_grill_curve_test.lua | 缺 | 有 | 缺 | 缺 | A |
-| 10-13 | client/ScreenHandlers/ScreenGrill.lua、server/Mgr/MgrGrill.lua | tests/native/grill_test.lua、tests/native/spec/10_grill_curve_test.lua | 缺 | 有 | 缺 | 缺 | A |
-| 10-14 | server/Mgr/MgrGrill.lua | tests/native/grill_test.lua、tests/native/spec/10_grill_curve_test.lua | 有 | 缺 | 缺 | 缺 | A |
-| 10-15 | server/Mgr/MgrGrill.lua | tests/native/grill_test.lua、tests/native/spec/10_grill_curve_test.lua | 缺 | 有 | 缺 | 缺 | A |
+| 10-09 | client/Views/GrillView.lua、common/GrillCurve.lua | tests/native/grill_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 10-10 | server/World/PlayerGrill.lua、common/GrillCurve.lua | tests/native/grill_test.lua、tests/native/spec/10_grill_curve_test.lua | 有 | 缺 | 缺 | 缺 | A |
+| 10-11 | server/World/PlayerGrill.lua、common/GrillCurve.lua | tests/native/grill_test.lua、tests/native/spec/10_grill_curve_test.lua | 缺 | 有 | 缺 | 缺 | A |
+| 10-12 | server/World/PlayerGrill.lua、server/World/PlayerLife.lua | tests/native/grill_test.lua、tests/native/spec/10_grill_curve_test.lua | 缺 | 有 | 缺 | 缺 | A |
+| 10-13 | client/Views/GrillView.lua、server/World/PlayerGrill.lua | tests/native/grill_test.lua、tests/native/spec/10_grill_curve_test.lua | 缺 | 有 | 缺 | 缺 | A |
+| 10-14 | server/World/PlayerGrill.lua | tests/native/grill_test.lua、tests/native/spec/10_grill_curve_test.lua | 有 | 缺 | 缺 | 缺 | A |
+| 10-15 | server/World/PlayerGrill.lua | tests/native/grill_test.lua、tests/native/spec/10_grill_curve_test.lua | 缺 | 有 | 缺 | 缺 | A |
 | 10-16 | server/Mgr/MgrLottery.lua、common/LotteryEligibility.lua | tests/native/lottery_eligibility_test.lua、tests/native/grill_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 10-17 | server/Mgr/MgrInteract.lua、server/Mgr/MgrGrill.lua | tests/native/feed_exchange_test.lua、tests/native/grill_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 10-18 | server/Mgr/MgrGrill.lua | tests/native/grill_test.lua | 缺 | 缺 | 缺 | 缺 | B |
-| 10-19 | server/Mgr/MgrGrill.lua | tests/native/grill_test.lua | 缺 | 缺 | 缺 | 缺 | B |
-| 10-20 | server/Mgr/MgrGrill.lua | tests/native/grill_test.lua | 缺 | 缺 | 缺 | 缺 | B |
-| 10-21 | server/Mgr/MgrGrill.lua、server/Mgr/MgrSave.lua | tests/native/grill_test.lua | 缺 | 缺 | 缺 | 缺 | B |
-| 10-22 | server/Mgr/MgrGrill.lua、server/World/PlayerLife.lua | tests/native/grill_test.lua | 缺 | 缺 | 缺 | 缺 | B |
-| 10-23 | server/Mgr/MgrGrill.lua、server/Mgr/MgrSave.lua | tests/native/grill_test.lua | 缺 | 缺 | 缺 | 缺 | B |
-| 10-24 | server/Mgr/MgrGrill.lua、server/Data/PlayerData.lua | tests/native/grill_test.lua | 缺 | 缺 | 缺 | 缺 | B |
-| 10-25 | server/Mgr/MgrGrill.lua、server/Data/PlayerData.lua | tests/native/grill_test.lua | 缺 | 缺 | 缺 | 缺 | B |
+| 10-17 | server/Mgr/MgrInteract.lua、server/World/PlayerGrill.lua | tests/native/feed_exchange_test.lua、tests/native/grill_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 10-18 | server/World/PlayerGrill.lua | tests/native/grill_test.lua | 缺 | 缺 | 缺 | 缺 | B |
+| 10-19 | server/World/PlayerGrill.lua | tests/native/grill_test.lua | 缺 | 缺 | 缺 | 缺 | B |
+| 10-20 | server/World/PlayerGrill.lua | tests/native/grill_test.lua | 缺 | 缺 | 缺 | 缺 | B |
+| 10-21 | server/World/PlayerGrill.lua、server/Mgr/MgrSave.lua | tests/native/grill_test.lua | 缺 | 缺 | 缺 | 缺 | B |
+| 10-22 | server/World/PlayerGrill.lua、server/World/PlayerLife.lua | tests/native/grill_test.lua | 缺 | 缺 | 缺 | 缺 | B |
+| 10-23 | server/World/PlayerGrill.lua、server/Mgr/MgrSave.lua | tests/native/grill_test.lua | 缺 | 缺 | 缺 | 缺 | B |
+| 10-24 | server/World/PlayerGrill.lua、server/Data/PlayerData.lua | tests/native/grill_test.lua | 缺 | 缺 | 缺 | 缺 | B |
+| 10-25 | server/World/PlayerGrill.lua、server/Data/PlayerData.lua | tests/native/grill_test.lua | 缺 | 缺 | 缺 | 缺 | B |
 
-倍率曲线是纯函数 common/GrillCurve.lua，计时由 MgrGrill 按 World:GetServerTime 的投入时长一次算出，不按帧累加。
+倍率曲线是纯函数 common/GrillCurve.lua，计时由 PlayerGrill 按服务器时钟的投入时长一次算出，不按帧累加。
 
 ### 第 12 节 精英与首领行为（48 条）
 
@@ -584,7 +584,7 @@
 | 18-27 | server/Data/PlayerData.lua、server/World/GroundLoot.lua | tests/native/spec/18_session_settlement_contract_test.lua | 有 | 缺 | 缺 | 有 | B |
 | 18-28 | server/Mgr/MgrLottery.lua、server/Mgr/MgrSave.lua | tests/native/lottery_settle_test.lua | 缺 | 缺 | 缺 | 缺 | B |
 | 18-29 | server/Mgr/MgrInteract.lua、server/Mgr/MgrSave.lua | tests/native/economy_persistence_test.lua | 缺 | 缺 | 缺 | 缺 | B |
-| 18-30 | server/Mgr/MgrGrill.lua、server/main.lua | tests/native/grill_test.lua | 缺 | 缺 | 缺 | 缺 | B |
+| 18-30 | server/World/PlayerGrill.lua、server/main.lua | tests/native/grill_test.lua | 缺 | 缺 | 缺 | 缺 | B |
 | 18-31 | server/Mgr/MgrSave.lua、server/Data/PlayerData.lua | tests/native/spec/18_session_settlement_contract_test.lua | 有 | 有 | 有 | 有 | B |
 | 18-32 | server/main.lua、server/Mgr/MgrPlayerData.lua | tests/native/player_leave_rejoin_test.lua | 缺 | 缺 | 缺 | 缺 | B |
 

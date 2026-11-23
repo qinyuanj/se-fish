@@ -591,7 +591,6 @@ describe("客户端 Spoke 主干契约（#296）", function()
         "client.ScreenHandlers.ScreenLottery",
         "client.ScreenHandlers.ScreenFerry",
         "client.ScreenHandlers.ScreenParty",
-        "client.ScreenHandlers.ScreenGrill",
         "client.ScreenHandlers.ScreenBlindbox",
         "client.ScreenHandlers.ScreenPlatform",
         "client.ScreenHandlers.ScreenCompendium",
@@ -656,7 +655,7 @@ describe("客户端 Spoke 主干契约（#296）", function()
           "client.LocalShop", "client.LocalLottery",
           "client.ScreenHandlers.ScreenLottery", "client.ScreenHandlers.ScreenFerry",
           "client.ScreenHandlers.ScreenParty",
-          "client.ScreenHandlers.ScreenGrill", "client.ScreenHandlers.ScreenBlindbox",
+          "client.ScreenHandlers.ScreenBlindbox",
           "client.ScreenHandlers.ScreenPlatform", "client.ScreenHandlers.ScreenCompendium",
           "client.LocalGarBite", "client.LocalCastSource",
         }) do
@@ -667,6 +666,7 @@ describe("客户端 Spoke 主干契约（#296）", function()
         package.loaded["client.Views.RootView"] = nil
         package.loaded["client.Views.CameraZoomView"] = nil
         package.loaded["client.Views.MainHudVitalsView"] = nil
+        package.loaded["client.Views.GrillView"] = nil
 
         _G.MgrGameUI = {
           HideLiftButton = noop,
