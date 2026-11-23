@@ -466,7 +466,8 @@ function PlayerLife.mount(s3, player_tree, opts)
       if type(current) == "function" then filter = current end
     end
     if type(filter) == "function" then
-      local ok, allowed = pcall(filter, hit, player, player_tree)
+      local context = opts.damage_context and opts.damage_context() or player_tree
+      local ok, allowed = pcall(filter, hit, player, context)
       if not ok or allowed ~= true then return false end
     end
     if hit.targets[player.UserId] then return false end

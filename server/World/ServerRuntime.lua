@@ -253,6 +253,7 @@ function ServerRuntime.new(opts)
       platform = opts.platform,
       fish_carrier = opts.fish_carrier,
       damage_filter = runtime._damage_filter,
+      damage_context = function() return runtime.life end,
       speed_writer = opts.speed_writer,
       growth_writer = opts.growth_writer,
       on_downed = opts.on_player_downed,
@@ -440,6 +441,17 @@ function ServerRuntime.new(opts)
   function life:IsDowned(player)
     local phase = self:LifeStatus(player)
     return phase == "downed" or phase == "rescuing"
+  end
+
+  function life:IsRescuing(player)
+    return self:LifeStatus(player) == "rescuing"
+  end
+
+  function life:PlayerByUserId(user_id)
+    for _, player in pairs(active_players) do
+      if player.UserId == user_id then return player end
+    end
+    return nil
   end
 
   function life:IsDead(player)
