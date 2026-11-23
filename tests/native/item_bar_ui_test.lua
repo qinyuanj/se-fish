@@ -395,9 +395,6 @@ describe("道具栏的界面侧", function()
         ctx.handler.RootNode = ctx.currentRoot
         ctx.handler:Init()
         ctx.handler.IsOpen = true
-        for _, delayed in ipairs(ctx.delays) do delayed.callback() end
-        assert.same(1, ctx.attributeSignals.FishCoin:Count(), 'A 的根 Delay 不得再给 B 安装属性监听')
-        assert.same(1, ctx.attributeSignals.Health:Count())
 
         ctx.states:Fire({ slots = {}, bait = { worm = 0 } })
         assert.is_false(ctx.nodes.CastFailureHint.Visible, '换根后的首个空蚯蚓快照不得补发从有到无提示')

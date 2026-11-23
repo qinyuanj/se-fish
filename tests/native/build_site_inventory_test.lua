@@ -17,7 +17,8 @@ local lfs = require("lfs")
 -- 63：#214 审查修复把商品行子节点的两处建点（图片 / 文字各一支）合成一处驱动表建点，client 40 → 39
 -- 64：#253 队伍界面 client/ScreenHandlers/ScreenParty.lua 的 create() 是新建点，client 39 → 40
 -- 65：#296 客户端 Spoke 根视图树 client/Views/RootView.lua 统一动态 UI 建点，client 40 → 41
-local SITES = 65
+-- 62：#297-B2 主 HUD 左上状态区迁入 client/Views/MainHudVitalsView.lua（复用 RootView 统一建点），剥离 ScreenMain 3 处建点，client 41 → 38
+local SITES = 62
 local SITE_ROOTS = { "client", "common", "server" }
 local REF_ROOTS = { "client", "common", "server", "tests", "tools" }
 local REMOVED = { "FXUtil", "WeldTo", "MarkPointPart", "CreateHPBar" }

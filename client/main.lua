@@ -6,6 +6,7 @@ local SpokeClock = require("common.SpokeClock")
 local ClientStore = require("client.Store.ClientStore")
 local RootView = require("client.Views.RootView")
 local CameraZoomView = require("client.Views.CameraZoomView")
+local MainHudVitalsView = require("client.Views.MainHudVitalsView")
 local GameUI = require("client.GameUI")
 
 local LocalMgrUtil = require("client.LocalMgrUtil")
@@ -34,6 +35,7 @@ Task:Spawn(function()
         RootView.mount(ui_root, client_store, {
             hud = {
                 CameraZoomView.spec(),
+                MainHudVitalsView.spec(),
             },
         })
     else

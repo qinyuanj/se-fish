@@ -602,6 +602,7 @@ describe("客户端 Spoke 主干契约（#296）", function()
         "client.Store.ClientStore",
         "client.Views.RootView",
         "client.Views.CameraZoomView",
+        "client.Views.MainHudVitalsView",
       }
       local saved_loaded = {}
       for _, name in ipairs(stub_modules) do
@@ -609,6 +610,9 @@ describe("客户端 Spoke 主干契约（#296）", function()
       end
       local saved_globals = {
         game = rawget(_G, "game"),
+        Vector2 = rawget(_G, "Vector2"),
+        Color = rawget(_G, "Color"),
+        GameUI = rawget(_G, "GameUI"),
         MgrGameUI = rawget(_G, "MgrGameUI"),
         LocalReelIn = rawget(_G, "LocalReelIn"),
         ClientSpoke = rawget(_G, "ClientSpoke"),
@@ -619,6 +623,7 @@ describe("客户端 Spoke 主干契约（#296）", function()
       local server_now = 50.0
       local char_pos = { x = 12, y = 2, z = 8 }
       local ui_root = Eui.Node({ Name = "MainUIRoot" })
+      local created_hud_nodes = {}
       local zones = {
         fishPond = { Boundary = { MinX = -50, MaxX = 50, MinZ = -50, MaxZ = 50 } },
       }
@@ -626,6 +631,8 @@ describe("客户端 Spoke 主干契约（#296）", function()
       local noop_module = { Start = noop }
 
       local ok, err = pcall(function()
+        _G.Vector2 = { New = function(x, y) return { x = x, y = y } end }
+        _G.Color = { New = function(...) return { ... } end }
         package.loaded["common.ZoneMarkers"] = { Start = noop, Zones = zones }
         package.loaded["common.REUtil"] = {
           GetRE = function(_, name)
@@ -635,9 +642,14 @@ describe("客户端 Spoke 主干契约（#296）", function()
             return remote_events[name]
           end,
         }
-        package.loaded["client.GameUI"] = {
+        local game_ui_stub = {
           GetUIRoot = function() return ui_root end,
+          GetEuiManager = function()
+            return { GetDeviceResolution = function() return { x = 1920, y = 1080 } end }
+          end,
         }
+        package.loaded["client.GameUI"] = game_ui_stub
+        _G.GameUI = game_ui_stub
         package.loaded["client.packages.ability_system.api"] = { StartClientLifecycle = noop }
         for _, name in ipairs({
           "client.LocalMgrUtil", "client.LocalMotorUnitCtrl", "client.LocalReelIn",
@@ -651,9 +663,11 @@ describe("客户端 Spoke 主干契约（#296）", function()
         }) do
           package.loaded[name] = noop_module
         end
-        -- 强制重新加载真实 ClientStore 以绑定到 stub 后的 ZoneMarkers / REUtil
+        -- 强制重新加载真实 ClientStore / Views 以绑定到 stub 后的 ZoneMarkers / REUtil
         package.loaded["client.Store.ClientStore"] = nil
         package.loaded["client.Views.RootView"] = nil
+        package.loaded["client.Views.CameraZoomView"] = nil
+        package.loaded["client.Views.MainHudVitalsView"] = nil
 
         _G.MgrGameUI = {
           HideLiftButton = noop,
@@ -672,7 +686,22 @@ describe("客户端 Spoke 主干契约（#296）", function()
               }
             end
             if name == "World" then
-              return { GetServerTime = function() return server_now end }
+              return {
+                GetServerTime = function() return server_now end,
+                CreateUnit = function(_, kind, props)
+                  props = props or {}
+                  local node = Eui.Node({
+                    Name = props.Name or (kind .. "_" .. tostring(#created_hud_nodes + 1)),
+                    Kind = kind,
+                    Parent = props.Parent,
+                    Visible = props.Visible,
+                    Text = props.Text,
+                    TouchEnabled = props.TouchEnabled,
+                  })
+                  created_hud_nodes[#created_hud_nodes + 1] = node
+                  return node
+                end,
+              }
             end
             if name == "RunService" then
               return { Heartbeat = heartbeat }
@@ -704,10 +733,14 @@ describe("客户端 Spoke 主干契约（#296）", function()
         assert.equals("fishPond", cs.zone_id:now())
         assert.equals("鱼塘", cs.zone_name:now())
 
-        -- 验证 RootView 已挂载到根 UI 节点并在销毁时自动清理
+        -- 验证 RootView 与 MainHudVitalsView 已挂载到根 UI 节点并在销毁时自动清理
+        assert.is_true(#created_hud_nodes > 0)
         assert.equals(1, ui_root.Destroying:Count())
         ui_root:Destroy()
         assert.equals(0, ui_root.Destroying:Count())
+        for _, node in ipairs(created_hud_nodes) do
+          assert.is_true(node.Destroyed, "根 UI 销毁后不得残留主 HUD 节点: " .. tostring(node.Name))
+        end
       end)
 
       for name, value in pairs(saved_loaded) do
