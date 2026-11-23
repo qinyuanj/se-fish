@@ -32,6 +32,15 @@ _G.ClientSpoke = { Store = client_store, Clock = client_store.clock }
 local hud_backpack_open = spoke.State.new("ClientMain.hud_backpack_open", false)
 local hud_open_popup = spoke.State.new("ClientMain.hud_open_popup", nil)
 local hud_reel_active = spoke.State.new("ClientMain.hud_reel_active", false)
+local hud_drop_resolvers = {}
+
+local function resolve_item_bar_drop(pos)
+    return hud_drop_resolvers.backpack and hud_drop_resolvers.backpack(pos) or nil
+end
+
+local function resolve_backpack_drop(pos)
+    return hud_drop_resolvers.item_bar and hud_drop_resolvers.item_bar(pos) or nil
+end
 
 local function send_hud_operate(payload)
     if type(ScreenMain.Operate) == "function" then
@@ -70,6 +79,10 @@ Task:Spawn(function()
                 }),
                 MainHudItemBarView.spec({
                     backpack_open = hud_backpack_open,
+                    resolve_drop_target = resolve_item_bar_drop,
+                    on_drop_resolver = function(fn)
+                        hud_drop_resolvers.item_bar = fn
+                    end,
                 }),
                 MainHudActionButtonsView.spec({
                     backpack_open = hud_backpack_open,
@@ -88,6 +101,10 @@ Task:Spawn(function()
                 MainHudBackpackView.spec({
                     backpack_open = hud_backpack_open,
                     open_popup = hud_open_popup,
+                    resolve_drop_target = resolve_backpack_drop,
+                    on_drop_resolver = function(fn)
+                        hud_drop_resolvers.backpack = fn
+                    end,
                     on_open_changed = function(is_open)
                         if type(ScreenMain.SetBackpackOpen) == "function" then
                             ScreenMain:SetBackpackOpen(is_open)

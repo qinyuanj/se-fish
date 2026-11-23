@@ -189,11 +189,111 @@ describe("Spoke 主 HUD 右侧动作键视图（#297-B3b1）", function()
     assert.equals("吐息冷却 3秒", lbl_action.Text)
     assert.is_false(btn_action.TouchEnabled)
 
-    env.writer:step_clock(2.5, 102.5)
+    -- 1Hz on_second 逐秒更新吐息冷却文案，满 3 秒后恢复可用
+    env.writer:step_clock(1, 101)
+    assert.equals("吐息冷却 2秒", lbl_action.Text)
+    assert.is_false(btn_action.TouchEnabled)
+    env.writer:step_clock(1, 102)
+    assert.equals("吐息冷却 1秒", lbl_action.Text)
+    assert.is_false(btn_action.TouchEnabled)
+    env.writer:step_clock(1, 103)
     assert.equals("原子吐息", lbl_action.Text)
     assert.is_true(btn_action.TouchEnabled)
 
     env.view:dispose()
+  end)
+
+  it("上钩高亮闪烁仅在活跃窗口内原地更新按钮颜色，绝不触发 ActionButtonsProjection Effect 重跑", function()
+    local layout_reads = 0
+    local custom_layout = State.new("Test.action_layout", MainHudLayout.Compute({
+      width = 1920,
+      height = 1080,
+      itemBarSlots = 4,
+    }))
+    local tracked_layout = {
+      now = function()
+        return custom_layout:now()
+      end,
+      subscribe = function(_, fn)
+        return custom_layout:subscribe(fn)
+      end,
+      unsubscribe = function(_, fn)
+        custom_layout:unsubscribe(fn)
+      end,
+    }
+
+    local store, writer = ClientStore.new({ initial_now = 100 })
+    local root_node = Eui.Node({ Name = "UIRoot" })
+    local nodes = {}
+    local discard_visible_writes = 0
+
+    local function create_node(kind, props)
+      local node = Eui.Node({
+        Name = props.Name,
+        Kind = kind,
+        Parent = props.Parent,
+        Visible = props.Visible,
+        Text = props.Text,
+        TouchEnabled = props.TouchEnabled,
+      })
+      if kind == "EUIButton" then
+        node.OnTouchBegan = Eui.Signal()
+        node.OnTouchEnded = Eui.Signal()
+      end
+      for k, v in pairs(props) do
+        if k ~= "Parent" and k ~= "Name" then
+          node[k] = v
+        end
+      end
+      if node.Name == "ItemDiscard" then
+        local mt = getmetatable(node)
+        local orig_newindex = mt.__newindex
+        mt.__newindex = function(tbl, key, val)
+          if key == "Visible" then
+            discard_visible_writes = discard_visible_writes + 1
+          end
+          return orig_newindex(tbl, key, val)
+        end
+      end
+      nodes[node.Name] = node
+      return node
+    end
+
+    local view = RootView.mount(root_node, store, {
+      create_node = create_node,
+      hud = {
+        MainHudActionButtonsView.spec({
+          get_resolution = function() return { x = 1920, y = 1080 } end,
+          layout = tracked_layout,
+        }),
+      },
+    })
+    assert.is_nil(view.root.fault)
+
+    writer:ingest_event("CastState", { phase = "hooked", reelSession = 99 })
+    local btn_action = nodes.ItemAction2
+    local writes_before_frames = discard_visible_writes
+    local color_t0 = btn_action.ButtonNormalColor
+
+    -- 推进多帧闪烁：按钮颜色原地变化，但 ActionButtonsProjection 不得重跑（ItemDiscard.Visible 写入次数为 0）
+    local quarter_period = GameCfg.HookAlert.BreathPeriodSec / 4
+    writer:step_clock(quarter_period, 100 + quarter_period)
+    local color_t1 = btn_action.ButtonNormalColor
+    assert.equals(writes_before_frames, discard_visible_writes, "on_frame 闪烁不得重建/重跑 ActionButtonsProjection Effect")
+    assert.is_not.same(color_t0, color_t1)
+    assert.same(color_t1, btn_action.ButtonPressColor)
+
+    writer:step_clock(quarter_period, 100 + quarter_period * 2)
+    assert.equals(writes_before_frames, discard_visible_writes)
+
+    -- 超过高亮时长后恢复常态颜色并退出闪烁 Phase，同样不触发 ActionButtonsProjection 重跑
+    writer:step_clock(GameCfg.HookAlert.DurationSec + 0.5, 100 + GameCfg.HookAlert.DurationSec + 1)
+    assert.equals(writes_before_frames, discard_visible_writes)
+    assert.same({ 54, 100, 140, 255 }, btn_action.ButtonNormalColor)
+    assert.same({ 42, 82, 118, 255 }, btn_action.ButtonPressColor)
+    assert.equals(0, layout_reads)
+
+    view:dispose()
   end)
 
   it("点击 ItemDiscard / ItemAction2 经默认 RE 通道发送 Operate 丢弃/吃、CastAction 与 SpecialItemAction", function()

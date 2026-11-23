@@ -14,6 +14,9 @@ local ClientStore = require("client.Store.ClientStore")
 local RootView = require("client.Views.RootView")
 local MainHudBackpackView = require("client.Views.MainHudBackpackView")
 local MainHudEquipPopups = require("client.Views.MainHudEquipPopups")
+local MainHudItemBarView = require("client.Views.MainHudItemBarView")
+local MainHudVitalsView = require("client.Views.MainHudVitalsView")
+local MainHudActionButtonsView = require("client.Views.MainHudActionButtonsView")
 
 local State = spoke.State
 
@@ -60,6 +63,10 @@ describe("Spoke 主 HUD 背包入口与背包面板视图（#297-B3c）", functi
         Text = props.Text,
         TouchEnabled = props.TouchEnabled,
       })
+      if kind == "EUIButton" then
+        node.OnTouchBegan = Eui.Signal()
+        node.OnTouchEnded = Eui.Signal()
+      end
       for k, v in pairs(props) do
         if k ~= "Parent" and k ~= "Name" then
           node[k] = v
@@ -413,6 +420,255 @@ describe("Spoke 主 HUD 背包入口与背包面板视图（#297-B3c）", functi
     for _, node in ipairs(env.created) do
       assert.is_true(node.Destroyed, "根 UI 销毁后节点不得残留: " .. tostring(node.Name))
       assert.equals(0, node.OnClicked:Count(), "根 UI 销毁后信号连接必须归零: " .. tostring(node.Name))
+      if node.OnTouchBegan then
+        assert.equals(0, node.OnTouchBegan:Count(), "根 UI 销毁后 OnTouchBegan 连接必须归零: " .. tostring(node.Name))
+      end
+      if node.OnTouchEnded then
+        assert.equals(0, node.OnTouchEnded:Count(), "根 UI 销毁后 OnTouchEnded 连接必须归零: " .. tostring(node.Name))
+      end
     end
+  end)
+
+  it("支持背包内换格与道具栏↔背包双向跨容器拖拽发送 MoveSlot", function()
+    local store, writer = ClientStore.new({ initial_now = 100 })
+    local root_node = Eui.Node({ Name = "UIRoot" })
+    local nodes = {}
+    local actions = {}
+    local backpack_open = State.new("Test.drag_backpack_open", false)
+    local resolvers = {}
+
+    local function create_node(kind, props)
+      local node = Eui.Node({
+        Name = props.Name,
+        Kind = kind,
+        Parent = props.Parent,
+        Visible = props.Visible,
+        Text = props.Text,
+        TouchEnabled = props.TouchEnabled,
+      })
+      if kind == "EUIButton" then
+        node.OnTouchBegan = Eui.Signal()
+        node.OnTouchEnded = Eui.Signal()
+      end
+      for k, v in pairs(props) do
+        if k ~= "Parent" and k ~= "Name" then
+          node[k] = v
+        end
+      end
+      nodes[node.Name] = node
+      return node
+    end
+
+    local function send_action(action, value)
+      actions[#actions + 1] = { action = action, value = value }
+    end
+
+    local view = RootView.mount(root_node, store, {
+      create_node = create_node,
+      hud = {
+        MainHudItemBarView.spec({
+          get_resolution = function() return { x = 1920, y = 1080 } end,
+          backpack_open = backpack_open,
+          send_action = send_action,
+          resolve_drop_target = function(pos)
+            return resolvers.backpack and resolvers.backpack(pos) or nil
+          end,
+          on_drop_resolver = function(fn)
+            resolvers.item_bar = fn
+          end,
+        }),
+        MainHudBackpackView.spec({
+          get_resolution = function() return { x = 1920, y = 1080 } end,
+          backpack_open = backpack_open,
+          send_action = send_action,
+          resolve_drop_target = function(pos)
+            return resolvers.item_bar and resolvers.item_bar(pos) or nil
+          end,
+          on_drop_resolver = function(fn)
+            resolvers.backpack = fn
+          end,
+        }),
+      },
+    })
+    assert.is_nil(view.root.fault)
+
+    writer:ingest_event("ItemBarState", {
+      slotCount = 4,
+      slots = {
+        [1] = { itemId = ITEM_ROD, count = 1 },
+      },
+      backpackCount = 5,
+      backpack = {
+        [1] = { itemId = ITEM_FISH, count = 1 },
+      },
+    })
+
+    -- 展开背包：底部道具栏保持可见
+    assert.is_true(Eui.Click(nodes.BtnBackpack))
+    assert.is_true(nodes.ItemBarSlot1.Visible)
+    assert.is_true(nodes.BackpackSlot1.Visible)
+
+    local bp1 = nodes.BackpackSlot1.Position
+    local bp3 = nodes.BackpackSlot3.Position
+    local ib1 = nodes.ItemBarSlot1.Position
+    local ib2 = nodes.ItemBarSlot2.Position
+
+    -- 1. 背包内互换格位：背包 1 -> 背包 3
+    nodes.BackpackSlot1.OnTouchBegan:Fire({ BeganPosition = { x = bp1.x, y = bp1.y } })
+    nodes.BackpackSlot1.OnTouchEnded:Fire({ EndedPosition = { x = bp3.x, y = bp3.y } })
+    assert.same({
+      action = "MoveSlot",
+      value = {
+        from = GameCfg.Items.ContainerId.Backpack,
+        index = 1,
+        target = GameCfg.Items.ContainerId.Backpack,
+        slot = 3,
+      },
+    }, actions[1])
+
+    -- 2. 背包 -> 道具栏：背包 1 -> 道具栏 2
+    nodes.BackpackSlot1.OnTouchBegan:Fire({ BeganPosition = { x = bp1.x, y = bp1.y } })
+    nodes.BackpackSlot1.OnTouchEnded:Fire({ EndedPosition = { x = ib2.x, y = ib2.y } })
+    assert.same({
+      action = "MoveSlot",
+      value = {
+        from = GameCfg.Items.ContainerId.Backpack,
+        index = 1,
+        target = GameCfg.Items.ContainerId.ItemBar,
+        slot = 2,
+      },
+    }, actions[2])
+
+    -- 3. 道具栏 -> 背包：道具栏 1 -> 背包 3
+    nodes.ItemBarSlot1.OnTouchBegan:Fire({ BeganPosition = { x = ib1.x, y = ib1.y } })
+    nodes.ItemBarSlot1.OnTouchEnded:Fire({ EndedPosition = { x = bp3.x, y = bp3.y } })
+    assert.same({
+      action = "MoveSlot",
+      value = {
+        from = GameCfg.Items.ContainerId.ItemBar,
+        index = 1,
+        target = GameCfg.Items.ContainerId.Backpack,
+        slot = 3,
+      },
+    }, actions[3])
+
+    view:dispose()
+    assert.is_nil(resolvers.item_bar)
+    assert.is_nil(resolvers.backpack)
+  end)
+
+  it("关屏 hud_visible=false 时全主 HUD 常驻与展开节点零残留隐藏，重新开屏恢复", function()
+    local store, writer = ClientStore.new({ initial_now = 100 })
+    local root_node = Eui.Node({ Name = "UIRoot" })
+    local screen_main = Eui.Node({ Name = "ScreenMain", Parent = root_node })
+    local nodes = {
+      ImageCoin = Eui.Node({ Name = "ImageCoin", Parent = screen_main }),
+      LabelCoin = Eui.Node({ Name = "LabelCoin", Parent = screen_main }),
+    }
+    local backpack_open = State.new("Test.hide_backpack_open", false)
+    local open_popup = State.new("Test.hide_open_popup", nil)
+
+    local function create_node(kind, props)
+      local node = Eui.Node({
+        Name = props.Name,
+        Kind = kind,
+        Parent = props.Parent,
+        Visible = props.Visible,
+        Text = props.Text,
+        TouchEnabled = props.TouchEnabled,
+      })
+      if kind == "EUIButton" then
+        node.OnTouchBegan = Eui.Signal()
+        node.OnTouchEnded = Eui.Signal()
+      end
+      for k, v in pairs(props) do
+        if k ~= "Parent" and k ~= "Name" then
+          node[k] = v
+        end
+      end
+      nodes[node.Name] = node
+      return node
+    end
+
+    local view = RootView.mount(root_node, store, {
+      create_node = create_node,
+      hud = {
+        MainHudVitalsView.spec({
+          get_resolution = function() return { x = 1920, y = 1080 } end,
+          notify = function() end,
+        }),
+        MainHudEquipPopups.spec({
+          get_resolution = function() return { x = 1920, y = 1080 } end,
+          open_popup = open_popup,
+          backpack_open = backpack_open,
+        }),
+        MainHudItemBarView.spec({
+          get_resolution = function() return { x = 1920, y = 1080 } end,
+          backpack_open = backpack_open,
+        }),
+        MainHudActionButtonsView.spec({
+          get_resolution = function() return { x = 1920, y = 1080 } end,
+          backpack_open = backpack_open,
+        }),
+        MainHudBackpackView.spec({
+          get_resolution = function() return { x = 1920, y = 1080 } end,
+          backpack_open = backpack_open,
+          open_popup = open_popup,
+        }),
+      },
+    })
+    assert.is_nil(view.root.fault)
+
+    writer:update_vitals({ health = 100, maxHealth = 100, hunger = 0, maxHunger = 100 })
+    writer:ingest_event("ItemBarState", {
+      slotCount = 3,
+      selectedSlot = 1,
+      slots = { [1] = { itemId = ITEM_ROD, count = 1 } },
+      backpackCount = 5,
+      backpack = { [1] = { itemId = ITEM_FISH, count = 1 } },
+      weapons = { [WEAPON_KNIFE] = 1 },
+      selectedWeapon = WEAPON_KNIFE,
+    })
+
+    -- 打开背包面板后执行关屏
+    assert.is_true(Eui.Click(nodes.BtnBackpack))
+    local panel = nodes.BackpackPanel
+    assert.is_not_nil(panel)
+
+    writer:set_hud_visible(false)
+
+    -- 全部常驻主 HUD 节点必须隐藏，且展开的背包面板必须销毁
+    assert.is_true(panel.Destroyed)
+    for _, name in ipairs({
+      "ImageCoin", "LabelCoin",
+      "HealthRingBg", "HealthRing", "HealthText",
+      "HungerRingBg", "HungerRing", "HungerText",
+      "FlashTop", "FlashBottom", "FlashLeft", "FlashRight",
+      "WeaponBar", "WeaponBarLabel", "BaitBar", "BaitBarLabel",
+      "ItemBarSlot1", "ItemBarIcon1", "ItemBarLabel1", "ItemBarAmount1",
+      "ItemDiscard", "BtnDiscardLabel", "ItemAction2", "BtnItemActionLabel",
+      "BtnBackpack", "LabelBackpack",
+    }) do
+      assert.is_false(nodes[name].Visible, "关屏后节点不得残留可见: " .. name)
+    end
+    assert.is_false(nodes.BtnBackpack.TouchEnabled)
+    assert.is_false(nodes.ItemBarSlot1.TouchEnabled)
+
+    -- 收起背包并重新开屏：常驻 HUD 节点全部恢复可见
+    backpack_open:set(false)
+    writer:set_hud_visible(true)
+    for _, name in ipairs({
+      "ImageCoin", "LabelCoin",
+      "HealthRingBg", "HealthRing", "HealthText",
+      "HungerRingBg", "HungerRing", "HungerText",
+      "WeaponBar", "BaitBar",
+      "ItemBarSlot1", "ItemBarIcon1",
+      "ItemDiscard", "ItemAction2",
+      "BtnBackpack", "LabelBackpack",
+    }) do
+      assert.is_true(nodes[name].Visible, "重新开屏后节点应恢复可见: " .. name)
+    end
+
+    view:dispose()
   end)
 end)

@@ -311,7 +311,7 @@ function MainHudEquipPopups.mount(s, ctx, options)
     )
     equip_bars[bar_kind] = { button = btn, label = label }
     ctx.connect(s, btn.OnClicked, function()
-      if backpack_open:now() then
+      if ctx.store.hud_visible:now() == false or backpack_open:now() then
         return
       end
       local cur = open_popup:now()
@@ -319,12 +319,14 @@ function MainHudEquipPopups.mount(s, ctx, options)
     end)
   end
 
-  -- 2. 响应式排版、文案与高亮投影（武器栏 / 鱼饵栏）
+  -- 2. 响应式排版、文案与高亮投影（武器栏 / 鱼饵栏，显隐对齐 store.hud_visible）
   s:effect("EquipBarsProjection", function(es)
     local state = es:d(ctx.store.item_bar)
+    local hud_visible = es:d(ctx.store.hud_visible) ~= false
     local layout = es:d(layout_sig) or compute_layout(resolution, state)
     local open_kind = es:d(open_popup)
     local bp_open = es:d(backpack_open)
+    local show_bars = hud_visible and not bp_open
 
     local weapon_bar = equip_bars.Weapon
     local bait_bar = equip_bars.Bait
@@ -341,18 +343,20 @@ function MainHudEquipPopups.mount(s, ctx, options)
       or cell_text("不挂鱼饵", nil, layout.Rects.BaitBar.w)
 
     for kind, bar in pairs(equip_bars) do
-      bar.button.Visible = not bp_open
-      bar.button.TouchEnabled = not bp_open
-      bar.label.Visible = not bp_open
+      bar.button.Visible = show_bars
+      bar.button.TouchEnabled = show_bars
+      bar.label.Visible = show_bars
       bar.button.ButtonNormalColor = make_color(
-        (not bp_open and open_kind == kind) and COLORS.SELECTED or COLORS.NORMAL
+        (show_bars and open_kind == kind) and COLORS.SELECTED or COLORS.NORMAL
       )
     end
   end)
 
-  -- 3. 武器/鱼饵展开浮层 Phase（仅在浮层打开且背包未打开时挂载，关闭即零残留销毁）
+  -- 3. 武器/鱼饵展开浮层 Phase（仅在主 HUD 可见、浮层打开且背包未打开时挂载，关闭或关屏即零残留销毁）
   local popup_active = s:memo("EquipPopupActive", function(ms)
-    return ms:d(open_popup) ~= nil and not ms:d(backpack_open)
+    return ms:d(ctx.store.hud_visible) ~= false
+      and ms:d(open_popup) ~= nil
+      and not ms:d(backpack_open)
   end)
 
   s:phase("EquipPopupPhase", popup_active, function(ps)

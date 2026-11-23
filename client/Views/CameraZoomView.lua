@@ -2,9 +2,12 @@
 -- 订阅只读 ClientStore 的本地角色与归一化 CameraDistance，按角色体型缩放更新 MainCamera.Distance；
 -- 若检测到玩家或其它系统手动修改过相机距离则自动让权，角色更换或作用域清理时恢复初始距离。
 
+local spoke = require("common.packages.spoke.api")
 local BodyScale = require("common.BodyScale")
 local GameCfg = require("common.GameCfg")
 local Number = require("common.Number")
+
+local State = spoke.State
 
 local CameraZoomView = {}
 
@@ -92,7 +95,7 @@ function CameraZoomView.new_controller()
   return ctrl
 end
 
---- 挂载到 RootView / Spoke 作用域：响应角色与目标距离变化，并在每帧检测手动改距让权；清理时恢复原始距离。
+--- 挂载到 RootView / Spoke 作用域：响应角色与目标距离变化，并在活跃 Phase 内检测手动改距让权；清理时恢复原始距离。
 ---@param s table EffectBuilder
 ---@param ctx table { store, clock, ... }
 ---@param options table|nil { get_camera?: fun(): any }
@@ -100,6 +103,7 @@ function CameraZoomView.mount(s, ctx, options)
   options = options or {}
   local get_camera = options.get_camera or default_get_camera
   local ctrl = CameraZoomView.new_controller()
+  local yielded_state = State.new("CameraZoomView.yielded", false)
   local last_error = nil
 
   local function sync(character, distance)
@@ -115,6 +119,10 @@ function CameraZoomView.mount(s, ctx, options)
     else
       last_error = nil
     end
+    local next_yielded = ctrl.yielded == true
+    if yielded_state:now() ~= next_yielded then
+      yielded_state:set(next_yielded)
+    end
   end
 
   s:effect("CameraZoomProjection", function(es)
@@ -123,11 +131,21 @@ function CameraZoomView.mount(s, ctx, options)
     sync(character, distance)
   end)
 
-  if ctx.clock ~= nil and ctx.clock.on_frame ~= nil then
-    s:subscribe(ctx.clock.on_frame, function()
-      sync(ctx.store.local_character:now(), ctx.store.camera_distance:now())
-    end)
-  end
+  -- 仅在主界面可见、存在本地角色且尚未让权的活跃 Phase 内按需订阅 on_frame，避免根作用域常驻空转
+  local watch_active = s:memo("CameraZoomWatchActive", function(ms)
+    local hud_visible = ctx.store.hud_visible == nil or ms:d(ctx.store.hud_visible) ~= false
+    local character = ms:d(ctx.store.local_character)
+    local yielded = ms:d(yielded_state)
+    return hud_visible and character ~= nil and not yielded
+  end)
+
+  s:phase("CameraZoomWatchPhase", watch_active, function(ps)
+    if ctx.clock ~= nil and ctx.clock.on_frame ~= nil then
+      ps:subscribe(ctx.clock.on_frame, function()
+        sync(ctx.store.local_character:now(), ctx.store.camera_distance:now())
+      end)
+    end
+  end)
 
   s:on_cleanup(function()
     ctrl:release()

@@ -141,4 +141,50 @@ describe("ClientStore 属性汇聚与 CameraZoomView（#297-B）", function()
     assert.is_false(view.is_alive:now())
     assert.equals(12, camera.Distance)
   end)
+
+  it("CameraZoomView 仅在活跃 Phase 内订阅 on_frame，关屏、无角色或让权后停止逐帧空转", function()
+    local store, writer = ClientStore.new({ initial_now = 0 })
+    local root_node = Eui.Node({ Name = "UIRoot" })
+    local char = { Name = "Hero" }
+    local camera = { Distance = 8, TrackingUnit = char }
+    local camera_reads = 0
+
+    local view = RootView.mount(root_node, store, {
+      hud = {
+        CameraZoomView.spec({
+          get_camera = function()
+            camera_reads = camera_reads + 1
+            return camera
+          end,
+        }),
+      },
+    })
+    assert.is_nil(view.root.fault)
+
+    -- 1) 初始无角色：推进多帧不应触发 on_frame 空转
+    local reads_init = camera_reads
+    writer:step_clock(0.016, 0.016)
+    writer:step_clock(0.016, 0.032)
+    assert.equals(reads_init, camera_reads)
+
+    -- 2) 绑定角色后活跃期订阅 on_frame；关屏 hud_visible=false 后自动退订停止空转
+    writer:update_camera_target(char, 26)
+    assert.equals(26, camera.Distance)
+    writer:set_hud_visible(false)
+    local reads_hidden = camera_reads
+    writer:step_clock(0.016, 0.048)
+    writer:step_clock(0.016, 0.064)
+    assert.equals(reads_hidden, camera_reads)
+
+    -- 3) 恢复开屏后重新进入活跃期，手动改距触发让权后立即退订停止空转
+    writer:set_hud_visible(true)
+    camera.Distance = 15
+    writer:step_clock(0.016, 0.080)
+    local reads_yielded = camera_reads
+    writer:step_clock(0.016, 0.096)
+    writer:step_clock(0.016, 0.112)
+    assert.equals(reads_yielded, camera_reads)
+
+    view:dispose()
+  end)
 end)

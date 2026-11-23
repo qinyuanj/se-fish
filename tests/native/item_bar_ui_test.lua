@@ -378,9 +378,12 @@ describe("道具栏的界面侧", function()
             assert.is_false(ctx.nodes[name].Visible, name)
         end
         for _, name in ipairs({ 'BaitBarLabel', 'WeaponBarLabel', 'BtnItemActionLabel',
-            'BtnDiscardLabel', 'ItemBarLabel1' }) do
+            'BtnDiscardLabel' }) do
             assert.is_false(ctx.nodes[name].Visible, name)
         end
+        -- 展开背包时保留底部道具栏可见，支持道具栏↔背包双向拖拽
+        assert.is_true(ctx.nodes.ItemBarSlot1.Visible)
+        assert.is_true(ctx.nodes.ItemBarLabel1.Visible)
         assert.is_false(ctx.nodes.BaitBar.TouchEnabled)
         assert.is_false(ctx.nodes.WeaponPopupCell_sword.TouchEnabled)
         ctx.nodes.BtnBackpack.OnClicked:Fire()
