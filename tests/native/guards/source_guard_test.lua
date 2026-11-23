@@ -240,9 +240,25 @@ describe("三端源码守卫", function()
       end
       local next_function = code:find("\nfunction%s", last + 1)
       local body = code:sub(last + 1, next_function)
-      if not body:find("self%s*%.%s*LastSeq%f[^%w_]") or not body:find("nil%f[^%w_]") then
-        return { path .. " 的 OnPlayerRemoving 没有清理 self.LastSeq" }
+      local cleared = false
+      for line in (body .. "\n"):gmatch("([^\n]*)\n") do
+        for statement in line:gmatch("[^;]+") do
+          local from = 1
+          while true do
+            local equal = statement:find("=", from, true)
+            if not equal then break end
+            if statement:sub(equal + 1, equal + 1) ~= "="
+                and not statement:sub(equal - 1, equal - 1):match("[=~<>]") then
+              local lhs, rhs = statement:sub(1, equal - 1), statement:sub(equal + 1)
+              if lhs:find("self%s*%.%s*LastSeq%f[^%w_]") and rhs:find("nil%f[^%w_]") then
+                cleared = true
+              end
+            end
+            from = equal + 1
+          end
+        end
       end
+      if not cleared then return { path .. " 的 OnPlayerRemoving 没有给 self.LastSeq 赋 nil" } end
       return {}
     end)
   end)

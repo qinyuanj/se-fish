@@ -6,7 +6,8 @@ local function normalize(path)
   local parts = {}
   for part in path:gmatch('[^/]+') do
     if part == '..' then
-      if #parts > 0 then table.remove(parts) end
+      if #parts == 0 or parts[#parts] == '..' then return nil end
+      table.remove(parts)
     elseif part ~= '.' then
       parts[#parts + 1] = part
     end
@@ -50,7 +51,7 @@ describe('文档相对链接守卫', function()
             and not path:match('^[/\\]') then
           path = path:gsub('%%(%x%x)', function(hex) return string.char(tonumber(hex, 16)) end)
           local resolved = normalize((dir == '' and '' or dir .. '/') .. path)
-          if not is_ignored(resolved, roots) and not lfs.attributes(resolved) then
+          if not resolved or (not is_ignored(resolved, roots) and not lfs.attributes(resolved)) then
             local position = assert(src:find(target, 1, true))
             local line = select(2, src:sub(1, position):gsub('\n', '')) + 1
             bad[#bad + 1] = file .. ':' .. line .. ' -> ' .. target

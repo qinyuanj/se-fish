@@ -60,8 +60,12 @@ function M.install(root)
   local partial = path .. '.partial'
   local file = io.open(partial, 'wb')
   if not file then return nil, '无法写入 pre-commit 临时文件: ' .. partial, 1 end
-  file:write(M.HOOK_BODY)
-  file:close()
+  local write_ok, write_err = file:write(M.HOOK_BODY)
+  local close_ok, close_err = file:close()
+  if not write_ok or close_ok == nil then
+    os.remove(partial)
+    return nil, '写入 pre-commit 失败: ' .. tostring(write_err or close_err), 1
+  end
   local ok, rename_err = os.rename(partial, path)
   if not ok then
     os.remove(partial)

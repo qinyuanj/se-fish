@@ -217,14 +217,34 @@ local function core_urls(lua_html, api_html)
   return urls, nil, latest_url, latest_version
 end
 
+local function rollback_documents(applied)
+  for index = #applied, 1, -1 do
+    local item = applied[index]
+    if item.previous == nil then
+      os.remove(item.path)
+    else
+      local ok, err = replace_file(item.path, item.previous)
+      if not ok then return nil, item.path .. "：" .. tostring(err) end
+    end
+  end
+  return true
+end
+
 local function commit_documents(root, documents)
   local cache = root .. "/" .. CACHE_REL
+  local applied = {}
   for _, document in ipairs(documents) do
     local path = cache .. "/" .. document.relative
     local previous = read_file(path)
     document.changed = not previous or previous:match("sha256: (%x+)") ~= document.hash
     local ok, err = replace_file(path, document.body)
-    if not ok then return nil, "写入缓存失败 " .. path .. "：" .. tostring(err) end
+    if not ok then
+      local rolled_back, rollback_err = rollback_documents(applied)
+      local message = "写入缓存失败 " .. path .. "：" .. tostring(err)
+      if rolled_back then return nil, message .. "；已回滚本批已替换文件" end
+      return nil, message .. "；回滚失败 " .. tostring(rollback_err)
+    end
+    applied[#applied + 1] = { path = path, previous = previous }
     io.stdout:write(string.format("%s %s\n", document.changed and "已更新" or "内容未变化（已刷新元数据）", CACHE_REL .. "/" .. document.relative))
   end
   return true

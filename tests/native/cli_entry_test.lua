@@ -156,7 +156,7 @@ describe("TestDocsCli", function()
   local sha256 = require("tools.sha256")
   local DOCROOT = fs.temp_dir()
   local responses
-  local original_which, original_capture
+  local original_which, original_capture, original_rename
 
   local function run(args)
     local stdout, stderr = {}, {}
@@ -175,7 +175,7 @@ describe("TestDocsCli", function()
 
   before_each(function()
     responses = fixture.responses()
-    original_which, original_capture = seam.which, seam.capture
+    original_which, original_capture, original_rename = seam.which, seam.capture, os.rename
     seam.which = function(name)
       assert.are.equal("curl", name)
       return "offline-curl"
@@ -191,6 +191,7 @@ describe("TestDocsCli", function()
 
   after_each(function()
     seam.which, seam.capture = original_which, original_capture
+    os.rename = original_rename
     fs.rmrf(DOCROOT)
   end)
 
@@ -267,6 +268,27 @@ describe("TestDocsCli", function()
     code, _, err = run({ "sync" })
     assert.are.equal(1, code)
     assert.matches("curl 退出码 22", err, 1, true)
+    for relative, body in pairs(before) do assert.are.equal(body, fs.slurp(cache_file(relative)), relative) end
+  end)
+
+  it("test_write_failure_rolls_back_the_whole_core_batch", function()
+    assert.are.equal(0, run({ "sync" }))
+    local before = {}
+    for _, relative in ipairs(seam.list_files(DOCROOT .. "/.toolcache/se-manual")) do
+      before[relative] = fs.slurp(cache_file(relative))
+    end
+    responses[fixture.SITE .. "lua/00-fixture.html"] = responses[fixture.SITE .. "lua/00-fixture.html"]
+      :gsub("第 00 章官方正文", "尚未成功提交的新正文")
+    local target = cache_file("lua/08-fixture.txt")
+    os.rename = function(source, destination)
+      if destination == target and source:match("%.new$") then return nil, "模拟第 08 章替换失败" end
+      return original_rename(source, destination)
+    end
+    local code, _, err = run({ "sync" })
+    os.rename = original_rename
+    assert.are.equal(1, code)
+    assert.matches("模拟第 08 章替换失败", err, 1, true)
+    assert.matches("已回滚本批已替换文件", err, 1, true)
     for relative, body in pairs(before) do assert.are.equal(body, fs.slurp(cache_file(relative)), relative) end
   end)
 
