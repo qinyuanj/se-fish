@@ -115,6 +115,7 @@ function M.start(opts)
     return data
   end
   function host:advance(seconds)
+    if type(opts.before_advance) == "function" then opts.before_advance() end
     clock:advance(seconds)
     return self
   end

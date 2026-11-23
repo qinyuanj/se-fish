@@ -97,8 +97,7 @@ describe('条款 11 广告满血复活（占位广告位）', function()
     local player = newPlayer(userId)
     env.players:OnPlayerAdded(player)
     drain()
-    env.v:OnPlayerAdded(player)
-    env.s:OnPlayerAdded(player)
+    env.lifeHost:add(player)
     drain()
     return player
   end
@@ -109,9 +108,8 @@ describe('条款 11 广告满血复活（占位广告位）', function()
   end
 
   local function advance(seconds)
-    env.now = env.now + seconds
-    env.s:Update()
-    env.v:Update()
+    env.lifeHost:advance(seconds)
+    env.now = env.lifeHost.clock.now()
     drain()
   end
 
@@ -155,7 +153,7 @@ describe('条款 11 广告满血复活（占位广告位）', function()
   end
 
   local function hunger(player)
-    return env.v:GetState(player).hunger
+    return player:GetAttribute('Hunger')
   end
 
   local function minHunger()
@@ -228,22 +226,18 @@ describe('条款 11 广告满血复活（占位广告位）', function()
     env.PlayerData = require('server.Data.PlayerData')
     env.save = assert(loadfile('server/Mgr/MgrSave.lua'))()
     env.players = assert(loadfile('server/Mgr/MgrPlayerData.lua'))()
-    env.v = assert(loadfile('server/Mgr/MgrVitals.lua'))()
-    env.s = assert(loadfile('server/Mgr/MgrSurvival.lua'))()
     env.platform = assert(loadfile('server/Mgr/MgrPlatform.lua'))()
     env.players.Save, env.save.PlayerData = env.save, env.players
-    env.v.PlayerData = env.players
-    env.s.Vitals, env.s.PlayerData, env.s.Save = env.v, env.players, env.save
     env.platform.Save, env.platform.PlayerData = env.save, env.players
     env.platform.Now = function() return env.now end
-    env.s.Modifier = { ClearTarget = function() end, Clear = function() end,
-      Apply = function() return true end, GetRemaining = function() return 0 end }
-    env.s.SpeedWriter = { ApplyGrowth = function() return { Ok = true } end,
-      RefreshMoveSpeed = function() return true end }
-    env.s.Platform = env.platform
-    env.v:SetLifeHooks(env.s:Hooks())
+    env.lifeHost = require('tests.support.life_host').start({
+      now = env.now or 100, remote = re, player_data = env.players, save = env.save,
+      platform = env.platform,
+      before_advance = function() drain() end,
+    })
+    env.v = env.lifeHost.runtime.life
+    env.s = env.v
     env.platform:Start()
-    env.s:Start()
   end)
 
   after_each(function()
@@ -274,8 +268,7 @@ describe('条款 11 广告满血复活（占位广告位）', function()
     GameCfg.Platform.Placeholder.AllowInPublish = false
     local player = join(7101)
     down(player)
-    local state = env.s:GetState(player)
-    local hunger = state.hunger
+    local beforeHunger = hunger(player)
     local health = player.Character.Controller.Health
     adRequest(player, 1)
     local refused = lastPayload('SurvivalResult')
@@ -287,7 +280,7 @@ describe('条款 11 广告满血复活（占位广告位）', function()
     assert.is_false(env.platform:HasFlow(player), '闸门关闭时不得建平台 flow')
     assert.same('downed', env.s:Phase(player), '闸门关闭时不得复活')
     assert.same(health, player.Character.Controller.Health, '闸门关闭时不得回血')
-    assert.same(hunger, env.s:GetState(player).hunger, '闸门关闭时不得补饥饿')
+    assert.same(beforeHunger, hunger(player), '闸门关闭时不得补饥饿')
   end)
 
   -- 重开侧（与上一条闸门用例配对）：发布构建显式打开 AllowInPublish 后，广告复活恢复可用——
@@ -333,7 +326,7 @@ describe('条款 11 广告满血复活（占位广告位）', function()
     assert.same('revive', downedFlow.purpose)
     assert.same(GameCfg.Platform.Placeholder.Ads.revive, downedFlow.goodsId,
       '广告位参数必须来自共享配置的占位广告位')
-    assert.same('ad', env.s:GetState(player).platform.mode)
+    assert.same('ad', lastPayload('SurvivalState').platformPending)
 
     assert.is_true(confirm(player, 'cancel'))
     assert.same('downed', env.s:Phase(player), '取消后仍在濒死相位')
@@ -353,14 +346,14 @@ describe('条款 11 广告满血复活（占位广告位）', function()
       down(player)
       if entry == 'dead' then advance(GameCfg.Survival.DownedSec) end
       assert.same(entry, env.s:Phase(player))
-      env.v:GetState(player).hunger = 0 -- 复活前饿空：满血复活也要把饥饿抬到 10%
+      assert.is_true(env.v:SetHunger(player, 0)) -- 复活前饿空：满血复活也要把饥饿抬到 10%
       adRequest(player, 1)
       assert.is_not_nil(flowOpen(), entry .. ' 入口没有拉起广告流程')
       confirm(player, 'success')
       assert.same('alive', env.s:Phase(player), entry .. ' 入口的广告成功没有复活')
       assert.same(GameCfg.Vitals.MaxHealth, ctrl(player).Health, '满血复活必须是血量上限而不是 10%')
       assert.is_true(hunger(player) >= minHunger(), '复活后饥饿低于上限的 10%')
-      assert.is_nil(env.s:GetState(player).weakUntil, '满血复活不带虚弱')
+      assert.is_nil(lastPayload('SurvivalState').weakUntil, '满血复活不带虚弱')
       assert.same(10, ctrl(player).WalkSpeed, '满血复活不减移速')
       local result = lastPayload('SurvivalResult')
       assert.is_true(result.ok)
@@ -368,7 +361,7 @@ describe('条款 11 广告满血复活（占位广告位）', function()
       assert.same('ad', result.mode)
       -- 复活后免费倒计时不再结算第二次
       local healthAfter = ctrl(player).Health
-      advance(999)
+      advance(GameCfg.Survival.DeadSec + 0.1)
       assert.same('alive', env.s:Phase(player))
       assert.same(healthAfter, ctrl(player).Health)
       assert.same(1, reviveResultsFor(player))
@@ -404,12 +397,16 @@ describe('条款 11 广告满血复活（占位广告位）', function()
 
   -- 广告流程的三种非成功结局：取消 / 失败直接结算，超时由适配层兜底
   local function spendFlow(player, outcome)
+    local function catchUp(delta)
+      env.lifeHost:advance(delta)
+      env.now = env.lifeHost.clock.now()
+    end
     if outcome == 'timeout' then
-      env.now = env.now + GameCfg.Platform.FlowTimeoutSec
+      catchUp(GameCfg.Platform.FlowTimeoutSec)
       env.platform:Update()
       drain()
     else
-      env.now = env.now + 7 -- 广告流程花了 7 秒
+      catchUp(7) -- 广告流程花了 7 秒，倒计时时钟一起走
       platformAction(player, { action = 'PlaceholderOutcome', outcome = outcome })
     end
   end
@@ -429,6 +426,7 @@ describe('条款 11 广告满血复活（占位广告位）', function()
       advance(GameCfg.Survival.DownedSec - 1)
       assert.same('downed', env.s:Phase(player), outcome .. '：濒死倒计时没有平移（提前死亡）')
       advance(1.1)
+      print('DBG after', outcome, env.s:Phase(player), env.lifeHost.clock.now())
       assert.same('dead', env.s:Phase(player), outcome .. '：濒死倒计时没有恢复')
       -- 死亡相位的免费倒计时同样平移
       adRequest(player, 2)
@@ -450,7 +448,7 @@ describe('条款 11 广告满血复活（占位广告位）', function()
     adRequest(adPlayer, 1)
     confirm(adPlayer, 'success')
     assert.same('alive', env.s:Phase(adPlayer))
-    advance(999)
+    advance(GameCfg.Survival.DeadSec + 0.1)
     assert.same(GameCfg.Vitals.MaxHealth, ctrl(adPlayer).Health)
     assert.same(1, reviveResultsFor(adPlayer))
 
@@ -575,7 +573,7 @@ describe('条款 11 广告满血复活（占位广告位）', function()
     local result = lastPayload('SurvivalResult')
     assert.is_false(result.ok)
     assert.same('unavailable', result.reason)
-    assert.is_nil(env.s:GetState(player).platform, '不可用时不得进入倒计时暂停')
+    assert.is_nil(lastPayload('SurvivalState').platformPending, '不可用时不得进入倒计时暂停')
     assert.is_nil(flowOpen(), '不可用时不得开占位广告通道')
     advance(GameCfg.Survival.DownedSec + 0.1)
     assert.same('dead', env.s:Phase(player), '不可用时濒死倒计时照常走')
@@ -625,15 +623,29 @@ describe('条款 11 广告复活入口（客户端）', function()
       } } } } end
       if name == 'RunService' then return { Heartbeat = env.heartbeats } end
     end }
-    package.loaded['common.REUtil'] = { GetRE = function(_, name)
-      if not env.events[name] then env.events[name] = {
-        OnClientEvent = signal(),
-        FireServer = function(_, payload) env.requests[#env.requests + 1] = payload end,
-      } end
-      return env.events[name]
-    end }
-    ctx.panel = assert(loadfile('client/ScreenHandlers/ScreenSurvival.lua'))()
-    ctx.panel:Start()
+    local ClientStore = require('client.Store.ClientStore')
+    local RootView = require('client.Views.RootView')
+    local SurvivalOverlayView = require('client.Views.SurvivalOverlayView')
+    ctx.store, ctx.writer = ClientStore.new({ initial_now = ctx.now })
+    ctx.events.SurvivalState = { OnClientEvent = { Fire = function(_, state)
+      ctx.writer:ingest_event('SurvivalState', state)
+    end } }
+    ctx.view = RootView.mount({ Name = 'UIRoot', Destroying = signal() }, ctx.store, {
+      overlays = { survival = SurvivalOverlayView.spec() },
+      services = {
+        send_survival = function(payload) ctx.requests[#ctx.requests + 1] = payload end,
+        now = function() return ctx.now end,
+        notify = function(text) ctx.notices[#ctx.notices + 1] = text end,
+        resolution = { x = 1920, y = 1080 },
+      },
+      create_node = function(kind, props)
+        local node = { Kind = kind, Visible = true, OnClicked = signal(), Text = '' }
+        for key, value in pairs(props or {}) do node[key] = value end
+        node.Destroy = function(me) me.Destroyed = true end
+        ctx.nodes[node.Name] = node
+        return node
+      end,
+    })
   end)
 
   after_each(function()
@@ -657,8 +669,8 @@ describe('条款 11 广告复活入口（客户端）', function()
     assert.is_true(ctx.nodes['SurvivalAdRevive'].Visible)
     assert.is_true(ctx.nodes['SurvivalPaidRevive'].Visible)
     ctx.events.SurvivalState.OnClientEvent:Fire({ phase = 'alive' })
-    assert.is_false(ctx.nodes['SurvivalAdRevive'].Visible)
-    assert.is_false(ctx.nodes['SurvivalPaidRevive'].Visible)
+    assert.is_true(ctx.nodes['SurvivalAdRevive'].Destroyed, '活着时广告入口必须拆掉')
+    assert.is_true(ctx.nodes['SurvivalPaidRevive'].Destroyed, '活着时金豆入口必须拆掉')
   end)
 
   -- 11-19 / 11-28：广告入口上行仍是既有的 SurvivalAction{action='FullRevive'}，播放期间按钮收起并显示等待文案。

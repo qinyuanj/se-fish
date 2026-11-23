@@ -106,6 +106,7 @@ function PlayerLife.mount(s3, player_tree, opts)
   local adrenaline_flying = false
   local recover_flying = false
   local last_hunger_sec = math.floor(now0)
+  local rescue_sec = math.floor(now0)
   local speed_writer = opts.speed_writer
   local growth_writer = opts.growth_writer
   local on_downed = opts.on_downed
@@ -639,10 +640,19 @@ function PlayerLife.mount(s3, player_tree, opts)
   local function resume_platform(pending)
     local paused = math.max(0, clock.now() - (pending.startedAt or clock.now()))
     local phase = states.life_phase:now()
+    local now = clock.now()
+    local function reopen(deadline)
+      if not deadline then return end
+      local sec = math.floor(deadline)
+      if sec < rescue_sec then rescue_sec = sec end
+    end
     if phase == "dead" and dead_until:now() then
       dead_until:set(dead_until:now() + paused)
+      if now + 1e-9 >= dead_until:now() then weak_revive() else reopen(dead_until:now()) end
     elseif (phase == "downed" or phase == "rescuing") and downed_until:now() then
       downed_until:set(downed_until:now() + paused)
+      if now + 1e-9 >= downed_until:now() then enter_dead(false) else reopen(downed_until:now()) end
+      if player.UserId == 7124 then print('DBG reopen', clock.now(), downed_until:now(), rescue_sec) end
     end
     publish()
   end
@@ -739,7 +749,12 @@ function PlayerLife.mount(s3, player_tree, opts)
           platform:set(nil)
           states.platform_pending:set(false)
         end
-        return fail(reason or "unavailable")
+        local why = reason or "unavailable"
+        local platform_cfg = GameCfg.Platform or {}
+        local text = why == "not_open" and platform_cfg.NotOpenText
+          or why == "unavailable" and platform_cfg.UnavailableText or nil
+        return reply({ seq = seq, ok = false, action = payload.action, mode = payload.mode,
+          reason = why, text = text })
       end
       publish()
       return
@@ -789,6 +804,8 @@ function PlayerLife.mount(s3, player_tree, opts)
     if player_tree:is_disposed() or player_tree.session_alive:now() == false then return end
     local now = clock.now()
     local phase = states.life_phase:now()
+    if phase ~= "alive" then last_hunger_sec = math.floor(now) end
+    if platform:now() and phase ~= "alive" then return end
     if phase == "alive" and not recovering:now() then
       local sec = math.floor(now)
       if sec > last_hunger_sec then
@@ -808,17 +825,17 @@ function PlayerLife.mount(s3, player_tree, opts)
       local health = read_health(player)
       if health and health <= 0 then enter_dead(true) end
     elseif phase == "rescuing" then
-      if downed_until:now() and now + 1e-9 >= downed_until:now() and not platform:now() then
+      if downed_until:now() and now + 1e-9 >= downed_until:now() then
         enter_dead(false)
       end
     elseif phase == "downed" then
-      if not platform:now() and not adrenaline_flying and downed_until:now() and now + 1e-9 >= downed_until:now() then
+      if not adrenaline_flying and downed_until:now() and now + 1e-9 >= downed_until:now() then
         enter_dead(false)
       end
     elseif phase == "dead" then
       if recovering:now() then
         try_recover()
-      elseif not platform:now() and dead_until:now() and now + 1e-9 >= dead_until:now() then
+      elseif dead_until:now() and now + 1e-9 >= dead_until:now() then
         weak_revive()
       end
     end
@@ -829,15 +846,31 @@ function PlayerLife.mount(s3, player_tree, opts)
     if not weak then apply_walk() end
   end)
 
-  local rescue_sec = math.floor(clock.now())
   s3:subscribe(clock.on_second, function(sec)
     if sec <= rescue_sec then return end
+    if platform:now() and states.life_phase:now() ~= "alive" then
+      rescue_sec = sec - 1
+      return
+    end
     rescue_sec = sec
     on_second()
   end)
   s3:subscribe(clock.on_frame, function(frame)
-    if states.life_phase:now() ~= "rescuing" then return end
     local now = frame and frame.now or clock.now()
+    local phase = states.life_phase:now()
+    if not platform:now() then
+      if phase == "downed" and not adrenaline_flying and downed_until:now()
+          and now + 1e-9 >= downed_until:now() then
+        enter_dead(false)
+        return
+      end
+      if phase == "dead" and not recovering:now() and dead_until:now()
+          and now + 1e-9 >= dead_until:now() then
+        weak_revive()
+        return
+      end
+    end
+    if phase ~= "rescuing" then return end
     local current = rescue:now()
     if not current then return end
     local rescuer = current.by
