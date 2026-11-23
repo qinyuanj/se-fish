@@ -104,6 +104,13 @@ function ServerRuntime.new(opts)
       logger = opts.logger,
       on_mount_zone = opts.on_mount_zone,
       on_mount_world = opts.on_mount_world,
+      create_unit = opts.create_unit,
+      remote = opts.remote,
+      bait_spots = opts.bait_spots,
+      lookup_tree = function(player)
+        if type(player) ~= "table" then return nil end
+        return player_trees[player.UserId]
+      end,
     })
     return self.world
   end

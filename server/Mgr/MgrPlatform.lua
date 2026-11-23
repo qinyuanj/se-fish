@@ -1,4 +1,5 @@
 local GameCfg = require('common.GameCfg')
+local ServerRuntime = require('server.World.ServerRuntime')
 
 local Mgr = { Flows = {}, GrantSeq = {}, CoinSeq = {}, PendingGrants = {}, NextFlowId = 0 }
 
@@ -320,9 +321,11 @@ function Mgr:GrantGoods(player, goodsKey, num, requestId)
         if result.overflow > 0 then
             local origin = player.Character and player.Character.Position
             for _ = 1, result.overflow do
-                local spawned = self.Loot and origin
-                    and self.Loot:SpawnItem(row.itemId, nil, nil,
-                        { x = origin.x, y = origin.y, z = origin.z + 2 })
+                local runtime = ServerRuntime.current and ServerRuntime.current()
+                local world = runtime and runtime:get_world()
+                local spawned = world and origin and world:place_ground_item('fishPond', {
+                    kind = 'item', itemId = row.itemId, count = 1,
+                    x = origin.x, y = origin.y, z = origin.z + 2 })
                 if not spawned then
                     print('[MgrPlatform] 溢出落地失败（待对账）', player.UserId, row.itemId)
                 end

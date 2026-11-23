@@ -21,7 +21,6 @@ local MgrMap = {
     MgrReelIn = require("server.Mgr.MgrReelIn"),
     MgrFishCarrier = require("server.Mgr.MgrFishCarrier"),
     MgrFishUnit = require("server.Mgr.MgrFishUnit"),
-    MgrLoot = require("server.Mgr.MgrLoot"),
     MgrInteract = require("server.Mgr.MgrInteract"),
     MgrGM = require("server.Mgr.MgrGM"),
     MgrShop = require("server.Mgr.MgrShop"),
@@ -290,15 +289,11 @@ MgrMap.MgrReelIn.Cast = MgrMap.MgrCast
 MgrMap.MgrCast.FishUnit = MgrMap.MgrFishUnit
 MgrMap.MgrFishUnit.Cast = MgrMap.MgrCast
 MgrMap.MgrFishUnit.Ability = MgrMap.MgrAbility
-MgrMap.MgrLoot.FishUnit = MgrMap.MgrFishUnit
-MgrMap.MgrLoot.PlayerData = MgrMap.MgrPlayerData
-MgrMap.MgrPlayerData.Loot = MgrMap.MgrLoot
 MgrMap.MgrInteract.PlayerData = MgrMap.MgrPlayerData
 MgrMap.MgrGM.PlayerData = MgrMap.MgrPlayerData
 MgrMap.MgrGM.Cast = MgrMap.MgrCast
 MgrMap.MgrShop.PlayerData = MgrMap.MgrPlayerData
 MgrMap.MgrShop.Interact = MgrMap.MgrInteract
-MgrMap.MgrLoot.Quest = MgrMap.MgrQuest
 MgrMap.MgrInteract.Quest = MgrMap.MgrQuest
 MgrMap.MgrShop.Quest = MgrMap.MgrQuest
 MgrMap.MgrPlayerData.Quest = MgrMap.MgrQuest
@@ -336,11 +331,9 @@ MgrMap.MgrRecords.PlayerData = MgrMap.MgrPlayerData
 
 MgrMap.MgrPlatform.Save = MgrMap.MgrSave
 MgrMap.MgrPlatform.PlayerData = MgrMap.MgrPlayerData
-MgrMap.MgrPlatform.Loot = MgrMap.MgrLoot
 MgrMap.MgrBlindbox.Save = MgrMap.MgrSave
 MgrMap.MgrBlindbox.PlayerData = MgrMap.MgrPlayerData
 MgrMap.MgrBlindbox.Platform = MgrMap.MgrPlatform
-MgrMap.MgrBlindbox.Loot = MgrMap.MgrLoot
 
 MgrMap.MgrAbility.Vitals = nil
 MgrMap.MgrFishUnit.Vitals = nil
@@ -445,6 +438,7 @@ WorldRuntime = ServerRuntime.new({
     create_unit = function(unit_type, props)
         return WorldService:CreateUnit(unit_type, props)
     end,
+    bait_spots = { Enabled = false },
     on_item_bar_state = function(player, snapshot)
         _G.REUtil:GetRE('ItemBarState'):FireClient(player, snapshot)
     end,

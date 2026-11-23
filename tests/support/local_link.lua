@@ -39,8 +39,6 @@ M.WIRING = {
     'MgrMap.MgrInteract.Save = MgrMap.MgrSave',
     'MgrMap.MgrInteract.Vitals = Life',
     'MgrMap.MgrInteract.Survival = Life',
-    'MgrMap.MgrLoot.PlayerData = MgrMap.MgrPlayerData',
-    'MgrMap.MgrPlayerData.Loot = MgrMap.MgrLoot',
     'local Life = WorldRuntime.life',
     'WorldRuntime.life:SetDamageFilter(pkDamageFilter)',
 }
@@ -56,9 +54,9 @@ end
 
 -- 就绪顺序照 server/main.lua 的 OnReady：先操作角色与生命状态的那批，再其余管理器。
 local READY_FIRST = { 'Vitals', 'Survival' }
-local READY_REST = { 'Party', 'Interact', 'Loot' }
+local READY_REST = { 'Party', 'Interact' }
 -- 离场顺序照 ContinuePlayerRemoving：终镜像先于序列化，序列化先于其余管理器的 OnPlayerRemoving。
-local LEAVING_REST = { 'Vitals', 'Survival', 'Party', 'Interact', 'Loot' }
+local LEAVING_REST = { 'Vitals', 'Survival', 'Party', 'Interact' }
 
 -- 前向声明：M:Start 与 handleAdded 的读档回调都转发到它（实现见下方连接生命周期段）。
 local onReady
@@ -186,7 +184,6 @@ function M.new(opts)
         PlayerData = assert(loadfile('server/Mgr/MgrPlayerData.lua'))(),
         Party = assert(loadfile('server/Mgr/MgrParty.lua'))(),
         Interact = assert(loadfile('server/Mgr/MgrInteract.lua'))(),
-        Loot = assert(loadfile('server/Mgr/MgrLoot.lua'))(),
     }
     local mgr = env.managers
     env.filter = function()
@@ -200,9 +197,6 @@ function M.new(opts)
     mgr.PlayerData.Save = mgr.Save
     mgr.Party.PlayerData, mgr.Party.Save = mgr.PlayerData, mgr.Save
     mgr.Interact.PlayerData, mgr.Interact.Save = mgr.PlayerData, mgr.Save
-    mgr.Loot.PlayerData = mgr.PlayerData
-    -- 道具栏动作通道里的 Pickup 由 MgrPlayerData 转给 MgrLoot（main.lua 的同一条接线）。
-    mgr.PlayerData.Loot = mgr.Loot
     -- #255 生产接线：统一伤害入口的过滤函数由 MgrPkFilter 工厂实例化，只读注入的权威接缝。
     env.lifeHost = require('tests.support.life_host').start({
       now = env.now, remote = re, player_data = mgr.PlayerData, save = mgr.Save,
@@ -409,19 +403,28 @@ end
 
 --- 共享地面实例：不经过库存，直接在世界里落一份（盲盒溢出、丢弃补偿同一入口）。
 function M:Loot(itemId, position, mult)
-    return self.managers.Loot:SpawnItem(itemId, mult or 1, nil, position)
+    local world = self.lifeHost and self.lifeHost.runtime:get_world()
+    if not world then return nil end
+    local ok = world:place_ground_item('fishPond', {
+        kind = 'item', itemId = itemId, count = 1, mult = mult or 1,
+        x = position.x, y = position.y or 0, z = position.z,
+    })
+    if not ok then return nil end
+    local row = world:ground_snapshot().list[#world:ground_snapshot().list]
+    if row then row.Id = row.id end
+    return row
 end
 
-function M:LootSnapshot() return self.managers.Loot:Snapshot() end
+function M:LootSnapshot()
+    local world = self.lifeHost and self.lifeHost.runtime:get_world()
+    return world and world:ground_snapshot().list or {}
+end
 
---- 拾取：走客户端同一条道具栏动作通道；返回这次请求是否结算成功。
 function M:Pickup(player, lootId)
-    local before = #(self.sent.LootResult or {})
-    self:Request('ItemBarAction', player, { action = 'Pickup', value = lootId })
-    local list = self.sent.LootResult or {}
-    if #list <= before then return false end
-    local reply = list[#list]
-    return reply.payload ~= nil and reply.payload.ok == true
+    local world = self.lifeHost and self.lifeHost.runtime:get_world()
+    if not world then return false end
+    local ok = world:try_pickup(player, lootId)
+    return ok == true
 end
 
 --- 存档快照：MgrSave 的键与值，读档就绪后可核对「服务端没丢状态」。

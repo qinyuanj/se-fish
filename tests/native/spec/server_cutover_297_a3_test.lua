@@ -179,6 +179,7 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
 
     local created_units, dot_hits = {}, {}
     local rt = ServerRuntime.new({
+      bait_spots = { Enabled = false },
       initial_now = 100,
       create_unit = function(kind, props)
         local u = { Kind = kind, Parent = props.Parent, Destroyed = false }

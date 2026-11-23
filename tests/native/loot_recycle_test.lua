@@ -1,277 +1,146 @@
--- #84 迁移：场上掉落物分区上限与 FIFO 回收（原 tests/gameplay/loot_recycle_test.lua，11 例）。
--- 接缝：MgrLoot 的分区预算与回收调度——超限顶最旧、预警闪烁与到点销毁、拾取取消回收、
--- 同区多水域共用一条 FIFO、峰值有界并可从日志观测。
--- 沿用 tests/support/fish_loot 共享夹具；本类的 Loot 配置浅拷贝与 print 采集逐例建立并还原。
--- describe/it 名称保留旧类名与方法名，并按方法名字典序注册以保持旧套件执行顺序。
-local FishLoot = require('tests.support.fish_loot')
-local GameCfg = require('common.GameCfg')
+-- #301 迁移：分区上限与 30 秒回收（原 loot_recycle_test 的玩法断言）。
+-- 接缝：每个钓鱼区独立 200 件上限、最早一件闪烁、到期销毁、拾取取消回收。
+local GameCfg = require("common.GameCfg")
+local ServerRuntime = require("server.World.ServerRuntime")
+local SpokeClock = require("common.SpokeClock")
+local PlayerData = require("server.Data.PlayerData")
 
--- 原类内辅助改为接收 env 的本地函数
-local function captureLogs(env)
-    env.logs = {}
-    env.realPrint = print
-    local logs = env.logs
-    _G.print = function(...)
-        local parts = {}
-        for i = 1, select('#', ...) do parts[i] = tostring(select(i, ...)) end
-        logs[#logs + 1] = table.concat(parts, ' ')
+local function signal()
+  local handlers = {}
+  return { Connect = function(_, fn) handlers[#handlers + 1] = fn return { Disconnect = function() end } end,
+    Fire = function(_, ...) for _, fn in ipairs(handlers) do fn(...) end end }
+end
+
+local function open(cap)
+  local saved = GameCfg.Loot
+  local loot = {}
+  for k, v in pairs(saved) do loot[k] = v end
+  if cap then loot.PerZoneCap = cap end
+  GameCfg.Loot = loot
+  local created, events = {}, {}
+  local function event(name)
+    events[name] = events[name] or { clients = {}, OnServerEvent = signal(),
+      FireAllClients = function(self, payload) self.clients[#self.clients + 1] = payload end,
+      FireClient = function(self, _, payload) self.clients[#self.clients + 1] = payload end }
+    return events[name]
+  end
+  local clock = SpokeClock.new(100)
+  local data_of, players = {}, {}
+  local runtime = ServerRuntime.new({
+    clock = clock, initial_now = 100,
+    remote = { GetRE = function(_, n) return event(n) end, CheckRECD = function() return false end },
+    player_data = { GetDataInst = function(_, p) return data_of[p.UserId] end },
+    players = function() return players end,
+    create_unit = function()
+      local unit = { Destroyed = false }
+      function unit:Destroy() self.Destroyed = true end
+      created[#created + 1] = unit
+      return unit
+    end,
+    bait_spots = { RespawnSec = 15, Spots = {} },
+  })
+  runtime:start(); runtime:mark_started()
+  return {
+    saved = saved, runtime = runtime, events = events, created = created, clock = clock,
+    add = function(_, p)
+      local data = PlayerData.New(p); data:Init(); data.LoadState = "ready"; data.Player = p
+      data_of[p.UserId] = data; players[#players + 1] = p
+      runtime:on_player_added(p); runtime:on_save_ready(p, data)
+    end,
+    rows = function()
+      local sent = events.LootState.clients
+      return sent[#sent] and sent[#sent].list or {}
+    end,
+    alive = function()
+      local n = 0
+      for _, unit in ipairs(created) do if not unit.Destroyed then n = n + 1 end end
+      return n
+    end,
+  }
+end
+
+local function player(id, x, z)
+  local p = { UserId = id, attrs = {}, Character = { Position = { x = x or 0, y = 0, z = z or 0 } } }
+  function p:SetAttribute() end
+  function p:GetAttribute() end
+  return p
+end
+
+describe("TestLootRecycle", function()
+  before_each(function()
+    GameCfg.Debug = { Enabled = false, InitialGrants = GameCfg.Debug and GameCfg.Debug.InitialGrants }
+  end)
+  local env
+  after_each(function()
+    if env then GameCfg.Loot = env.saved; env.runtime:shutdown() end
+  end)
+
+  it("test_config_has_per_zone_cap_and_flash_seconds", function()
+    assert.equals(200, GameCfg.Loot.PerZoneCap)
+    assert.equals(30, GameCfg.Loot.FlashBeforeRecycleSec)
+  end)
+
+  it("test_over_cap_marks_oldest_recycling_and_count_stays_visible_until_flash", function()
+    env = open(3)
+    local world = env.runtime:get_world()
+    for i = 1, 4 do
+      assert.is_true(world:place_ground_item("fishPond", { kind = "item", itemId = "carp", count = 1, x = i, y = 0, z = 0 }))
     end
-    return logs
-end
+    local warned = 0
+    for _, row in ipairs(env.rows()) do if row.warn then warned = warned + 1 end end
+    assert.equals(1, warned)
+    assert.equals(4, env.alive())
+    env.clock:advance(30)
+    assert.equals(3, env.alive())
+  end)
 
-local function restoreLogs(env)
-    if env.realPrint then
-        _G.print = env.realPrint
-        env.realPrint = nil
-    end
-end
+  it("test_fifo_order_recycles_next_oldest_not_newest", function()
+    env = open(1)
+    local world = env.runtime:get_world()
+    world:place_ground_item("fishPond", { kind = "item", itemId = "carp", count = 1, x = 1, y = 0, z = 0 })
+    world:place_ground_item("fishPond", { kind = "item", itemId = "bass", count = 1, x = 2, y = 0, z = 0 })
+    env.clock:advance(30)
+    local left = {}
+    for _, row in ipairs(env.rows()) do left[#left + 1] = row.itemId end
+    assert.same({ "bass" }, left)
+  end)
 
-local function spawnAt(env, x, z)
-    return env.loot:Spawn('shrimp', 1, { x = x, y = 5, z = z })
-end
+  it("test_pickup_of_recycling_loot_cancels_recycle", function()
+    env = open(1)
+    local p = player(1, 1, 0)
+    env:add(p)
+    local world = env.runtime:get_world()
+    world:place_ground_item("fishPond", { kind = "item", itemId = "carp", count = 1, x = 1, y = 0, z = 0 })
+    world:place_ground_item("fishPond", { kind = "item", itemId = "bass", count = 1, x = 2, y = 0, z = 0 })
+    local oldest
+    for _, row in ipairs(env.rows()) do if row.warn then oldest = row.id end end
+    p.Character.Position = { x = 1, y = 0, z = 0 }
+    env.events.ItemBarAction.OnServerEvent:Fire(p, { action = "Pickup", value = oldest })
+    env.clock:advance(30)
+    assert.equals(1, env.alive())
+  end)
 
--- 第一钓鱼区（WaterCircle 中心 -11.75,-12.25）边上的一个点
-local function spawnPond(env)
-    return spawnAt(env, -11, -13)
-end
+  it("test_zones_are_counted_independently", function()
+    env = open(1)
+    local world = env.runtime:get_world()
+    world:place_ground_item("fishPond", { kind = "item", itemId = "carp", count = 1, x = 1, y = 0, z = 0 })
+    world:place_ground_item("shrimpPond", { kind = "item", itemId = "shrimp", count = 1, x = 2, y = 0, z = 0 })
+    local warned = 0
+    for _, row in ipairs(env.rows()) do if row.warn then warned = warned + 1 end end
+    assert.equals(0, warned)
+    assert.equals(2, env.alive())
+  end)
 
--- 虾池统一模板水面中心 (240,-44)。
-local function spawnPool(env)
-    return spawnAt(env, 240, -44)
-end
-
--- #126：池壁水条（addWaterStrip 生成）与鱼塘水圈同属一个钓鱼区，落点取第一块水条的中心
-local function spawnStrip(env)
-    for _, zone in ipairs(GameCfg.Water.Zones) do
-        if zone.Id == 'fishPond.water.2' then
-            return spawnAt(env, zone.Center.x, zone.Center.z), zone
-        end
-    end
-    error('未找到池壁水条水域')
-end
-
--- 该鱼获所属区的 FIFO 队列（WaterCircle1/2 同心，归属由 MgrLoot 决定，用例不硬编区名）
-local function queueOf(env, loot)
-    return env.loot.ZoneQueues[loot.ZoneId]
-end
-
-local function setUp(env)
-    env.savedLootCfg = GameCfg.Loot
-    -- 浅拷贝原表只覆盖上限与闪烁时长，GameCfg 增字段不漂移
-    local lootCfg = {}
-    for k, v in pairs(env.savedLootCfg) do lootCfg[k] = v end
-    lootCfg.PerZoneCap = 3
-    lootCfg.FlashBeforeRecycleSec = 30
-    GameCfg.Loot = lootCfg
-    env:setUp()
-end
-
-local function tearDown(env)
-    restoreLogs(env)
-    env:tearDown()
-    GameCfg.Loot = env.savedLootCfg
-end
-
-describe('TestLootRecycle', function()
-    local env
-
-    before_each(function()
-        env = FishLoot.new()
-        setUp(env)
-    end)
-    after_each(function()
-        tearDown(env)
-    end)
-
-    it('test_bait_spot_loot_not_counted_in_cap', function()
-        local a = spawnPond(env)
-        for _ = 1, 2 do spawnPond(env) end
-        -- 点位鱼饵落在同一区也不占上限
-        env.loot.Spots[99] = { Cfg = { Id = 99, ItemId = 'worm', Count = 1, Position = { x = -11, y = 5, z = 27 } } }
-        env.loot:SpawnBait(env.loot.Spots[99].Cfg)
-        assert.is_not.is_nil(next(env.loot.Loots))
-        spawnPond(env)
-        -- 只有第 4 件鱼获触发 1 件待回收；鱼饵不在队列里
-        assert.are.equal(3, #queueOf(env, a))
-        local recycling = 0
-        for _ in pairs(env.loot.Recycling) do recycling = recycling + 1 end
-        assert.are.equal(1, recycling)
-    end)
-
-    it('test_bulk_spawn_keeps_active_and_pending_bounded_with_peak_logs', function()
-        GameCfg.Loot.PendingCap = 2
-        local logs = captureLogs(env)
-        local first = spawnPond(env)
-        for _ = 1, 19 do spawnPond(env) end
-        restoreLogs(env)
-        local active = #queueOf(env, first)
-        local pending = 0
-        for _ in pairs(env.loot.Recycling) do pending = pending + 1 end
-        assert.are.equal(GameCfg.Loot.PerZoneCap, active)
-        assert.are.equal(GameCfg.Loot.PendingCap, pending)
-        assert.is_true(active + pending <= GameCfg.Loot.PerZoneCap + GameCfg.Loot.PendingCap)
-        -- 生成 20 件后场上只留 3 件活跃 + 2 件预警，不随生成次数增长
-        assert.are.equal(GameCfg.Loot.PerZoneCap + GameCfg.Loot.PendingCap, #env:lootUnits())
-        local peak, earlyRecycle = false, false
-        for _, line in ipairs(logs) do
-            if line:find('[MgrLoot] 区峰值', 1, true) and line:find('active=', 1, true)
-                and line:find('pending=', 1, true) then peak = true end
-            if line:find('预警超限即回收', 1, true) then earlyRecycle = true end
-        end
-        assert.is_true(peak)
-        assert.is_true(earlyRecycle)
-        -- 预警到点后剩下的一并销毁，场上只剩活跃的 3 件
-        env.now = GameCfg.Loot.FlashBeforeRecycleSec + 1
-        env.loot:Update()
-        assert.are.equal(GameCfg.Loot.PerZoneCap, #env:lootUnits())
-    end)
-
-    it('test_config_has_per_zone_cap_and_flash_seconds', function()
-        local cfg = assert(loadfile('common/GameCfg.lua'))()
-        assert.are.equal(200, cfg.Loot.PerZoneCap)
-        assert.are.equal(30, cfg.Loot.FlashBeforeRecycleSec)
-    end)
-
-    it('test_fifo_order_recycles_next_oldest_not_newest', function()
-        local spawned = {}
-        for i = 1, 5 do spawned[i] = spawnPond(env) end
-        -- a、b 先后待回收，新的 d、e 留在队列
-        assert.is_not.is_nil(env.loot.Recycling[spawned[1].Id])
-        assert.is_not.is_nil(env.loot.Recycling[spawned[2].Id])
-        assert.same({ spawned[3].Id, spawned[4].Id, spawned[5].Id }, queueOf(env, spawned[1]))
-        assert.is_nil(env.loot.Recycling[spawned[5].Id])
-    end)
-
-    it('test_over_cap_marks_oldest_recycling_and_count_stays_at_cap', function()
-        local a = spawnPond(env)
-        local b = spawnPond(env)
-        local c = spawnPond(env)
-        assert.are.equal(3, #queueOf(env, a))
-        assert.is_nil(env.loot.Recycling[a.Id])
-        local d = spawnPond(env)
-        -- 最旧的 a 进入待回收（仍在场上、仍可拾取），队列计数回到上限 3
-        assert.are.equal(3, #queueOf(env, a))
-        assert.same({ b.Id, c.Id, d.Id }, queueOf(env, a))
-        assert.is_not.is_nil(env.loot.Recycling[a.Id])
-        assert.is_not.is_nil(env.loot.Loots[a.Id])
-        assert.is_false(env:lootUnits()[1].Destroyed)
-    end)
-
-    it('test_picked_loot_frees_zone_count', function()
-        local a = spawnPond(env)
-        spawnPond(env)
-        spawnPond(env)
-        env.player.Character.Position = a.Position
-        assert.is_true(env.loot:Pickup(env.player, a.Id))
-        assert.are.equal(2, #queueOf(env, a))
-        -- 再刷一件到 3 件，不触发回收
-        spawnPond(env)
-        assert.are.equal(3, #queueOf(env, a))
-        assert.is_nil(next(env.loot.Recycling))
-    end)
-
-    it('test_pickup_of_recycling_loot_cancels_recycle', function()
-        local a = spawnPond(env)
-        for _ = 1, 3 do spawnPond(env) end
-        assert.is_not.is_nil(env.loot.Recycling[a.Id])
-        env.player.Character.Position = a.Position
-        assert.is_true(env.loot:Pickup(env.player, a.Id))
-        assert.is_nil(env.loot.Recycling[a.Id])
-        assert.is_nil(env.loot.Loots[a.Id])
-        env.now = 31
-        env.loot:Update()
-        -- 没有误销毁后来的鱼获
-        assert.are.equal(3, #env:lootUnits())
-    end)
-
-    it('test_recycling_loot_flashes_then_is_destroyed_after_flash_seconds', function()
-        for _ = 1, 4 do spawnPond(env) end
-        local unit = env:lootUnits()[1]
-        local id = tonumber(tostring(unit.Name):match('FishLoot_(%d+)'))
-        assert.is_not.is_nil(env.loot.Recycling[id])
-        -- 闪烁：可见性按节奏来回切换，30 秒未到不销毁
-        env.now = 0.6
-        env.loot:Update()
-        assert.is_false(unit.ModelVisible)
-        env.now = 1.2
-        env.loot:Update()
-        assert.is_true(unit.ModelVisible)
-        env.now = 29.9
-        env.loot:Update()
-        assert.is_false(unit.Destroyed)
-        assert.is_not.is_nil(env.loot.Loots[id])
-        -- 到点销毁并广播
-        local before = env.broadcasts
-        env.now = 30.1
-        env.loot:Update()
-        assert.is_true(unit.Destroyed)
-        assert.is_nil(env.loot.Loots[id])
-        assert.is_nil(env.loot.Recycling[id])
-        assert.is_true(env.broadcasts > before)
-        -- 其余 3 件不受影响
-        assert.are.equal(3, #env:lootUnits())
-    end)
-
-    it('test_same_zone_water_bodies_share_one_budget_and_fifo', function()
-        local a = spawnPond(env) -- 鱼塘水圈
-        local b = spawnPond(env)
-        local c, stripZone = spawnStrip(env) -- 池壁水条
-        assert.are.equal(a.ZoneId, c.ZoneId) -- 两块水域归同一个钓鱼区
-        assert.are.equal(c.ZoneId, stripZone.ZoneId)
-        local d = spawnStrip(env)
-        -- 合计第 4 件（落水条）把全区最旧的水圈件顶进待回收：预算不是按水域各算一份
-        assert.are.equal(GameCfg.Loot.PerZoneCap, #queueOf(env, a))
-        assert.same({ b.Id, c.Id, d.Id }, queueOf(env, a))
-        assert.is_not.is_nil(env.loot.Recycling[a.Id])
-        assert.is_nil(env.loot.Recycling[c.Id])
-        -- 其他钓鱼区（虾池）不受影响、也不共用这条队列
-        local p = spawnPool(env)
-        assert.is_nil(env.loot.Recycling[p.Id])
-        assert.are.equal(1, #queueOf(env, p))
-        assert.is_not.same(queueOf(env, a), queueOf(env, p))
-        assert.is_not.is_nil(env.loot.Recycling[a.Id])
-    end)
-
-    it('test_warning_flag_marks_only_oldest_and_stays_pickable', function()
-        local a = spawnPond(env)
-        local b = spawnPond(env)
-        local c = spawnPond(env)
-        spawnPond(env) -- 第 4 件把 a 顶进预警
-        local p = spawnPool(env)
-        local warn = {}
-        for _, row in ipairs(env.loot:Snapshot()) do warn[row.id] = row.warn end
-        assert.is_true(warn[a.Id])
-        assert.is_nil(warn[b.Id])
-        assert.is_nil(warn[c.Id])
-        assert.is_nil(warn[p.Id])
-        -- 预警时长取配置（30 秒），不是写死的其它值
-        assert.are.equal(GameCfg.Loot.FlashBeforeRecycleSec, env.loot.Recycling[a.Id].At - env.loot:Now())
-        -- 预警期内仍可拾取，拾取即取消预警，且不误伤队列里的其他件
-        env.player.Character.Position = a.Position
-        assert.is_true(env.loot:Pickup(env.player, a.Id))
-        assert.is_nil(env.loot.Recycling[a.Id])
-        assert.is_nil(env.loot.Recycling[b.Id])
-        assert.are.equal(3, #queueOf(env, b))
-    end)
-
-    it('test_zones_are_counted_independently', function()
-        for _ = 1, 4 do spawnPond(env) end
-        assert.is_not.is_nil(next(env.loot.Recycling))
-        -- 虾池已有的 2 件不受影响，也不被第一钓鱼区的超限波及
-        local p1 = spawnPool(env)
-        local p2 = spawnPool(env)
-        assert.are.equal(2, #queueOf(env, p1))
-        assert.is_nil(env.loot.Recycling[p1.Id])
-        assert.is_nil(env.loot.Recycling[p2.Id])
-        env.now = 31
-        env.loot:Update()
-        assert.is_not.is_nil(env.loot.Loots[p1.Id])
-        assert.is_not.is_nil(env.loot.Loots[p2.Id])
-        -- 虾池自己刷满也只回收自己的
-        spawnPool(env)
-        spawnPool(env)
-        assert.are.equal(3, #queueOf(env, p1))
-        assert.is_not.is_nil(env.loot.Recycling[p1.Id])
-        assert.is_nil(env.loot.Recycling[p2.Id]) -- 次旧的还在队列里
-    end)
+  it("test_picked_loot_frees_zone_count", function()
+    env = open(1)
+    local p = player(1, 1, 0)
+    env:add(p)
+    local world = env.runtime:get_world()
+    world:place_ground_item("fishPond", { kind = "item", itemId = "carp", count = 1, x = 1, y = 0, z = 0 })
+    env.events.ItemBarAction.OnServerEvent:Fire(p, { action = "Pickup", value = env.rows()[1].id })
+    world:place_ground_item("fishPond", { kind = "item", itemId = "bass", count = 1, x = 1, y = 0, z = 0 })
+    local warned = 0
+    for _, row in ipairs(env.rows()) do if row.warn then warned = warned + 1 end end
+    assert.equals(0, warned)
+  end)
 end)

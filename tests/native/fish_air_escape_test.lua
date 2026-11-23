@@ -7,7 +7,7 @@ local WaterJudge = require('common.MathWaterJudge')
 
 local AIR_IDS = { 'item81', 'item83', 'item84', 'item85', 'item86',
     'item87', 'item89', 'item90', 'item91', 'item92' }
-local MODULES = { 'server.Mgr.MgrFishCarrier', 'server.Mgr.MgrFishUnit', 'server.Mgr.MgrLoot' }
+local MODULES = { 'server.Mgr.MgrFishCarrier', 'server.Mgr.MgrFishUnit' }
 
 local function signal()
     local slots = {}
@@ -94,10 +94,40 @@ function FishAirEscape:setUp()
     -- 目标裁决适配层按生产接线（server/main.lua）由入口注入
     self.mgr.AiTarget = require('server.Mgr.MgrAiTarget')
     self.mgr:Start()
-    self.loot = require('server.Mgr.MgrLoot')
-    self.loot.FishUnit = self.mgr
-    self.loot.Broadcast = function() end
-    self.carrier:SubscribeDied(function(carrier) self.loot:OnCarrierDied(carrier) end)
+    local ServerRuntime = require('server.World.ServerRuntime')
+    local SpokeClock = require('common.SpokeClock')
+    self.runtime = ServerRuntime.new({
+        clock = SpokeClock.new(self.now), initial_now = self.now,
+        remote = { GetRE = function() return { FireAllClients = function() end, FireClient = function() end, OnServerEvent = { Connect = function() return { Disconnect = function() end } end } } end, CheckRECD = function() return false end },
+        create_unit = function(_, props)
+            local unit = { Destroyed = false, Position = props.Position, ItemId = nil }
+            function unit:Destroy() self.Destroyed = true end
+            return unit
+        end,
+        bait_spots = { Enabled = false, Spots = {} },
+    })
+    self.runtime:start()
+    self.runtime:mark_started()
+    ServerRuntime.set_current(self.runtime)
+    self.loot = { Loots = {} }
+    self.carrier:SubscribeDied(function(carrier)
+        local fish = self.mgr:FindByCarrier(carrier)
+        local killed = fish and self.mgr:TakeKilled(fish)
+        if not killed then return end
+        local ok, placed = self.runtime:get_world():on_carrier_killed({
+            fishId = killed.fishId, mult = killed.mult, position = killed.position, zoneId = 'reefIsland',
+        })
+        if not ok then return end
+        for _, id in ipairs(placed) do
+            local row
+            for _, item in ipairs(self.runtime:get_world():ground_snapshot().list) do
+                if item.id == id then row = item end
+            end
+            if row then
+                self.loot.Loots[id] = { FishId = killed.fishId, ItemId = row.itemId, Mult = row.mult, Position = { x = row.x, y = row.y, z = row.z } }
+            end
+        end
+    end)
 end
 
 function FishAirEscape:tearDown()
@@ -105,6 +135,11 @@ function FishAirEscape:tearDown()
     if self.mgr then
         for _, fish in pairs(self.mgr.Fish) do self.mgr:Remove(fish) end
         self.mgr:Stop()
+    end
+    if self.runtime then
+        self.runtime:shutdown()
+        local runtimeApi = require('server.World.ServerRuntime')
+        if runtimeApi.current and runtimeApi.current() == self.runtime then runtimeApi.set_current(nil) end
     end
     for _, name in ipairs(MODULES) do package.loaded[name] = self.modules[name] end
     _G.game = self.saved.game

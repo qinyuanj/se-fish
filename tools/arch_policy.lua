@@ -43,7 +43,7 @@ M.policy = {
       modules = {
         'server.AbilityAPI', 'client.MgrGameUI',
         'client.LocalCastSource', 'client.LocalGM',
-        'client.LocalGarBite', 'client.LocalInteract', 'client.LocalLoot', 'client.LocalLottery',
+        'client.LocalGarBite', 'client.LocalInteract', 'client.LocalLottery',
         'client.LocalMgrUtil', 'client.LocalMotorUnitCtrl', 'client.LocalReelIn', 'client.LocalShop',
       },
     },

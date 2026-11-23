@@ -314,7 +314,7 @@ describe("全服纪录端到端（MgrRecords × MgrCompendium × MgrSave）", fu
     -- 源码级：只有上岸入账调用 NoteLanding，击杀/掉落/商店都不引用纪录
     local callers = {}
     for _, path in ipairs({
-      "server/Mgr/MgrCompendium.lua", "server/Mgr/MgrLoot.lua",
+      "server/Mgr/MgrCompendium.lua", "server/World/GroundLoot.lua",
       "server/Mgr/MgrShop.lua", "server/Mgr/MgrFishUnit.lua",
     }) do
       local source = readSource(path)

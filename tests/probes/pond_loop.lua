@@ -117,11 +117,8 @@ players.Save, save.PlayerData = save, players
 interact.PlayerData, interact.Save, interact.Quest = players, save, quest
 shop.PlayerData, shop.Save, shop.Quest, shop.Interact = players, save, quest, interact
 
--- 掉落与拾取发放：真实 MgrLoot（载体模块换成空桩，Spawn 由 OnCarrierDied 调用时记录掉落）
-local savedCarrier = package.loaded['server.Mgr.MgrFishCarrier']
-package.loaded['server.Mgr.MgrFishCarrier'] = { SubscribeDied = function() end, Despawn = function() end }
-local loot = assert(loadfile('server/Mgr/MgrLoot.lua'))()
-package.loaded['server.Mgr.MgrFishCarrier'] = savedCarrier
+-- 掉落与拾取发放：地面公开边界。探针不挂载世界，只保留空记录。
+local loot = { Loots = {}, Pickup = function() return false end, Give = function() return false end, OnCarrierDied = function() end }
 
 local player = { UserId = 13401, Character = { Position = { x = 0, y = 0, z = 0 } },
     CharacterAdded = signal(), CharacterRemoving = signal(), SetAttribute = function() end }

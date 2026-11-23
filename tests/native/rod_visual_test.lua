@@ -60,6 +60,7 @@ describe('鱼竿外观挂载（MgrPlayerData）', function()
       CharacterAdded = signal(), CharacterRemoving = signal() }
     function env.player:SetAttribute() end
     env.runtime = ServerRuntime.new({
+      bait_spots = { Enabled = false },
       create_unit = function(kind, props)
         return world:CreateUnit(kind, props)
       end,
