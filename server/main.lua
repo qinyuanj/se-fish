@@ -187,6 +187,30 @@ function AttrBridge:MaxHealth(player)
     return GameCfg.Vitals.MaxHealth
 end
 
+function AttrBridge:RefreshMaxHealth(player)
+    local pt = syncPlayerTree(player)
+    if not pt or not pt.memos or not pt.memos.max_health then return false, "no-player-tree" end
+    local cap = pt.memos.max_health:now()
+    if not Number.IsFiniteNumber(cap) or cap < 1 then return false, "bad-max" end
+    cap = math.floor(cap)
+    local character = pt.states.character:now()
+    local controller = character and character.Controller
+    if not controller then return false, "no-controller" end
+    local ok, err = pcall(function()
+        controller.MaxHealth = cap
+        if type(controller.Health) == "number" and controller.Health > cap then
+            controller.Health = cap
+        end
+    end)
+    if not ok then return false, tostring(err) end
+    local life = WorldRuntime and WorldRuntime.life
+    local current = pt.states.health:now()
+    if life and Number.IsFiniteNumber(current) and current > cap then
+        life:SetHealth(player, cap)
+    end
+    return true
+end
+
 function AttrBridge:RefreshMoveSpeed(player)
     local pt = syncPlayerTree(player)
     if not pt then return false, "no-player-tree" end
@@ -216,10 +240,8 @@ function AttrBridge:ApplyGrowth(player)
     local applied = self:ApplyBodyScale(player)
     local errors = {}
     if not applied.Ok then errors[#errors + 1] = tostring(applied.Error) end
-    if MgrMap.MgrVitals and (not MgrMap.MgrVitals.GetState or MgrMap.MgrVitals:GetState(player)) then
-        local called, ok, err = pcall(MgrMap.MgrVitals.RefreshMaxHealth, MgrMap.MgrVitals, player) -- 隔离旧 MgrVitals 刷新异常
-        if not called or not ok then errors[#errors + 1] = "MaxHealth:" .. tostring(called and err or ok) end
-    end
+    local okHealth, healthErr = self:RefreshMaxHealth(player)
+    if not okHealth then errors[#errors + 1] = "MaxHealth:" .. tostring(healthErr) end
     local okSpeed, speedErr = self:RefreshMoveSpeed(player)
     if not okSpeed then errors[#errors + 1] = tostring(speedErr) end
     applied.Ok = #errors == 0

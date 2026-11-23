@@ -7,7 +7,7 @@ local platform = require('server.Mgr.MgrPlatform')
 local blindbox = require('server.Mgr.MgrBlindbox')
 local players = require('server.Mgr.MgrPlayerData')
 local save = require('server.Mgr.MgrSave')
-local survival = require('server.Mgr.MgrSurvival')
+local ServerRuntime = require('server.World.ServerRuntime')
 local world, task = game:GetService('World'), game:GetService('Task')
 local p = game:GetService('Players'):GetPlayers()[1]
 if not p then print('PLATFORM147 ABORT 无玩家') return end
@@ -49,6 +49,7 @@ task:Spawn(function()
     cfg.Debug.Enabled = old
     log('生产守卫', tostring(ok), tostring(why), '测试驱动=' .. tostring(driven))
     assert(not ok and why == 'unavailable' and not driven)
-    log('复活入口状态', survival:Phase(p))
+    local life = ServerRuntime.current() and ServerRuntime.current().life
+    log('复活入口状态', life and life:Phase(p) or 'no-life')
     log('DONE 本地模拟取证；真实平台归#148')
 end)

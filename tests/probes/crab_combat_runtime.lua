@@ -27,7 +27,7 @@ if fish then
                                 fish.WakeAt, world:GetServerTime() - started)
                             last = name
                         end
-                        if require('server.Mgr.MgrVitals'):CanAct(player) then
+                        if require('server.World.ServerRuntime').current().life:CanAct(player) then
                             local fp = fish.Carrier.Body.Position
                             if fish.State ~= 'stunned' and name ~= 'spin' then
                                 local forward = fish.Carrier.Body.Rotation:GetForward()
@@ -53,7 +53,7 @@ if fish then
                         local fp = fish.Carrier.Body.Position
                         local forward = fish.Carrier.Body.Rotation:GetForward()
                         local character = player.Character
-                        if character and character.Controller and require('server.Mgr.MgrVitals'):CanAct(player) then
+                        if character and character.Controller and require('server.World.ServerRuntime').current().life:CanAct(player) then
                             character.Position = Vector3.New(fp.x - forward.x * 1.5, fp.y, fp.z - forward.z * 1.5)
                             character.Rotation = fish.Carrier.Body.Rotation
                         end

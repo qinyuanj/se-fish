@@ -182,7 +182,6 @@ describe('TestPlayerLeaveRejoin', function()
         }, { __index = _G })
         -- 仅为与本问题无关的生命/能力接缝提供确定返回值。
         env.mgrs.MgrPkFilter = { Make = function() return function() return true end end }
-        env.mgrs.MgrSurvival = { Hooks = function() return {} end }
         env.mgrs.MgrAbility = { IsParalyzed = function() return false end }
         assert(loadfile('server/main.lua', 't', sandbox))()
         env.runtime = require('server.World.ServerRuntime').current()
