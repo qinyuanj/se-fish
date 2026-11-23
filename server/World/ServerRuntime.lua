@@ -72,6 +72,15 @@ end
 ---@param opts? table
 function ServerRuntime.new(opts)
   opts = type(opts) == "table" and opts or {}
+  local player_data = opts.player_data
+  local save = opts.save
+  local platform = opts.platform
+  local default_player_data = player_data and player_data.SpokeHost == true or false
+  local default_save = save and save.SpokeHost == true or false
+  local default_platform = platform and platform.SpokeHost == true or false
+  opts.player_data = player_data
+  opts.save = save
+  opts.platform = platform
 
   local initial_now = Number.IsFiniteNumber(opts.initial_now) and opts.initial_now or 0
   local clock = opts.clock or SpokeClock.new(initial_now)
@@ -128,6 +137,77 @@ function ServerRuntime.new(opts)
     fish_host = fish_host,
     _started = false,
   }
+  if not opts.cast then
+    fish_host.Cast = {
+      PushState = function(_, player) return runtime:push_cast_state(player) end,
+      Abort = function(_, player) return runtime:abort_cast(player) end,
+      SetNextFish = function(_, player, fish_id) return runtime:set_next_fish(player, fish_id) end,
+    }
+  end
+
+  -- 持续效果只沿 PlayerTree 或非玩家实体存储路由，供活鱼技能和官方锚点共用。
+  local function player_tree_of(target)
+    if not target then return nil end
+    local ok_uid, uid = pcall(function() return target.UserId end)
+    if ok_uid and uid ~= nil then return player_trees[uid] end
+    for player, tree in pairs(player_trees) do
+      if player == target or player.Character == target then return tree end
+    end
+    return nil
+  end
+
+  local function entity_target(target)
+    if not target then return nil end
+    local ok_carrier, carrier = pcall(function() return target.Carrier end)
+    if ok_carrier and carrier then return target end
+    local carrier_host = opts.fish_carrier
+    local resolved = carrier_host and carrier_host.ResolveCarrier and carrier_host:ResolveCarrier(target)
+    return resolved or target
+  end
+
+  local modifier_service = {}
+  function modifier_service:Apply(source, target, kind, seconds)
+    local tree = player_tree_of(target)
+    if tree then return tree:apply_modifier(kind, { duration = seconds, source = source }) end
+    if entity_modifiers then return entity_modifiers:apply(source, entity_target(target), kind, seconds) end
+    return false, "no-effect-owner"
+  end
+  function modifier_service:ApplyWeaponEffect(source, target, effect)
+    return self:Apply(source, target, type(effect) == "table" and effect.Kind or nil)
+  end
+  function modifier_service:GetRemaining(target, kind)
+    local tree = player_tree_of(target)
+    if tree then return tree:get_modifier_remaining(kind) end
+    if entity_modifiers then return entity_modifiers:get_remaining(entity_target(target), kind) end
+    return 0
+  end
+  function modifier_service:IsControlled(target)
+    local tree = player_tree_of(target)
+    if tree then return tree.states.is_paralyzed:now() == true end
+    if entity_modifiers then return entity_modifiers:is_controlled(entity_target(target)) end
+    return false
+  end
+  function modifier_service:GetMoveMultiplier(target)
+    local tree = player_tree_of(target)
+    if tree then return tree.memos.move_multiplier:now() end
+    if entity_modifiers then return entity_modifiers:get_move_multiplier(entity_target(target)) end
+    return 1
+  end
+  function modifier_service:Clear(target, kind)
+    local tree = player_tree_of(target)
+    if tree then return tree:clear_modifier(kind) end
+    if entity_modifiers then return entity_modifiers:clear(entity_target(target), kind) end
+    return false
+  end
+  function modifier_service:ClearTarget(target, keepWeak)
+    local tree = player_tree_of(target)
+    if tree then tree:clear_all_modifiers(keepWeak) return end
+    if entity_modifiers then entity_modifiers:clear_target(entity_target(target)) end
+  end
+  function modifier_service:Update()
+    if entity_modifiers then entity_modifiers:step(clock.now()) end
+  end
+
   fish_host.Quest = {
     Notify = function(_, kind, owner, fact) return runtime:notify_quest(kind, owner, fact) end,
   }
@@ -200,6 +280,12 @@ function ServerRuntime.new(opts)
           if squad and squad.Online[actor and actor.UserId] == actor then squad:Push(actor) end
         end)
       end
+    end
+    if default_player_data then safe_call(opts.logger, "player_data_start", function() player_data:Start() end) end
+    if default_save then safe_call(opts.logger, "save_start", function() save:Start() end) end
+    if default_platform then safe_call(opts.logger, "platform_start", function() platform:Start() end) end
+    if opts.fish_ability and type(opts.fish_ability.Start) == "function" then
+      safe_call(opts.logger, "fish_ability_start", function() opts.fish_ability:Start() end)
     end
     return self.world
   end
@@ -299,6 +385,11 @@ function ServerRuntime.new(opts)
     end
     local valid_now = now ~= nil and Number.IsFiniteNumber(now) and now or nil
     clock:step(dt, valid_now)
+    if default_save and type(save.Update) == "function" then safe_call(opts.logger, "save_update", function() save:Update() end) end
+    if default_platform and type(platform.Update) == "function" then safe_call(opts.logger, "platform_update", function() platform:Update() end) end
+    if opts.fish_ability and type(opts.fish_ability.Update) == "function" then
+      safe_call(opts.logger, "fish_ability_update", function() opts.fish_ability:Update(dt) end)
+    end
     for _, weapon in pairs(weapon_sessions) do
       if type(weapon.step) == "function" then weapon:step(clock.now()) end
     end
@@ -335,7 +426,11 @@ function ServerRuntime.new(opts)
     end
     current_players[user_id] = player
     if self.world and self.world.ferry then self.world.ferry:OnPlayerAdded(player) end
-    safe_call(opts.logger, "on_player_join_start", opts.on_player_join_start, player)
+    if type(opts.on_player_join_start) == "function" then
+      safe_call(opts.logger, "on_player_join_start", opts.on_player_join_start, player)
+    elseif default_player_data then
+      safe_call(opts.logger, "player_data_added", function() player_data:OnPlayerAdded(player) end)
+    end
   end
 
   function runtime:on_save_ready(player, data)
@@ -348,9 +443,9 @@ function ServerRuntime.new(opts)
     end
     if type(opts.is_player_data_current) == "function" then
       local current_ok = safe_call(opts.logger, "is_player_data_current", opts.is_player_data_current, player, data)
-      if not current_ok then
-        return nil
-      end
+      if not current_ok then return nil end
+    elseif default_player_data and player_data:GetDataInst(player) ~= data then
+      return nil
     end
     if active_players[user_id] == player then
       return player_trees[user_id]
@@ -730,7 +825,14 @@ function ServerRuntime.new(opts)
     end
 
     -- 离场三步协议 Step 3：宿主执行离线保存序列化与异步排空栅栏。
-    safe_call(opts.logger, "on_player_removing", opts.on_player_removing, player, was_active)
+    if type(opts.on_player_removing) == "function" then
+      safe_call(opts.logger, "on_player_removing", opts.on_player_removing, player, was_active)
+    else
+      if default_player_data then safe_call(opts.logger, "player_data_removing", function() player_data:OnPlayerRemoving(player) end) end
+      if default_platform and type(platform.OnPlayerRemoving) == "function" then
+        safe_call(opts.logger, "platform_removing", function() platform:OnPlayerRemoving(player) end)
+      end
+    end
 
     local function finish_drain()
       if leaving_players[user_id] ~= leaving then
@@ -747,6 +849,8 @@ function ServerRuntime.new(opts)
 
     if type(opts.after_idle) == "function" then
       opts.after_idle(user_id, finish_drain)
+    elseif default_save then
+      save:AfterIdle(user_id, finish_drain)
     else
       finish_drain()
     end
@@ -1294,6 +1398,36 @@ function ServerRuntime.new(opts)
 
   runtime._damage_filter = function()
     return damage_filter
+  end
+
+  if default_player_data then
+    player_data.Runtime = runtime
+    player_data.Save = save
+    player_data.Vitals = runtime.life
+    player_data.Quest = { Notify = function(_, kind, owner, fact) return runtime:notify_quest(kind, owner, fact) end }
+    player_data.Ability = {
+      ApplyGrowth = function(_, player)
+        local tree = player_trees[player.UserId]
+        local data = player_data:GetDataInst(player)
+        if not tree or not data then return { Ok = false } end
+        tree:sync_from_data(data)
+        return { Ok = true }
+      end,
+    }
+  end
+  if default_save then
+    if default_player_data then save.PlayerData = player_data end
+    save.OnReady = function(player, data) runtime:on_save_ready(player, data) end
+  end
+  if default_platform then
+    if default_save then platform.Save = save end
+    if default_player_data then platform.PlayerData = player_data end
+  end
+  if opts.fish_ability then
+    opts.fish_ability.Modifier = modifier_service
+    opts.fish_ability.Vitals = runtime.life
+    opts.fish_ability.Ai = opts.fish_ai
+    opts.fish_ability.BehaviorServices = { Vitals = runtime.life, Modifier = modifier_service, GM = PlayerGM }
   end
 
   return runtime

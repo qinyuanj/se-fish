@@ -61,15 +61,6 @@ if RunService:IsServer() then
 	end)
 end
 
-function Util:PopNoticeConfirm(msg, callBack)
-	if RunService:IsServer() then
-		print("[Util] PopConfirmYesNo Client only!")
-		return
-	end
-
-	_G.MgrGameUI:OpenScreen("DialogNoticeConfirm", {Msg = msg, CallBack = callBack},true)
-end
-
 function Util:SplitString(inputstr, sep) 
 	if sep == nil then
         sep = "%s"

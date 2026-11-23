@@ -73,7 +73,7 @@ describe('虾池最小内容（水区 / 鱼表 / 商店 / 钓鱼佬 / 抛竿）'
       game = rawget(_G, 'game'),
       GameCfg = package.loaded['common.GameCfg'],
       REUtil = package.loaded['common.REUtil'],
-      MgrPlayerData = package.loaded['server.Mgr.MgrPlayerData'],
+      MgrPlayerData = package.loaded['server.PlayerDataHost'],
       MgrFishUnit = package.loaded['server.World.FishTree'],
     }
     env = { replies = {}, sent = {}, seq = 0, now = 0 }
@@ -91,7 +91,7 @@ describe('虾池最小内容（水区 / 鱼表 / 商店 / 钓鱼佬 / 抛竿）'
     if env and env.host then env.host:shutdown() end
     package.loaded['common.GameCfg'] = restore and restore.GameCfg
     package.loaded['common.REUtil'] = restore and restore.REUtil
-    package.loaded['server.Mgr.MgrPlayerData'] = restore and restore.MgrPlayerData
+    package.loaded['server.PlayerDataHost'] = restore and restore.MgrPlayerData
     package.loaded['server.World.FishTree'] = restore and restore.MgrFishUnit
     _G.game = restore and restore.game
     env = nil

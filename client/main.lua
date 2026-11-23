@@ -37,19 +37,15 @@ local StoryView = require("client.Views.StoryView")
 local GMView = require("client.Views.GMView")
 local SquadView = require("client.Views.SquadView")
 local Util = require("common.Util")
-local ScreenMain = require("client.ScreenHandlers.ScreenMain")
 local REUtil = require("common.REUtil")
 local GameUI = require("client.GameUI")
-
-local LocalMgrUtil = require("client.LocalMgrUtil")
-LocalMgrUtil:Start()
 
 local Task = game:GetService("Task")
 local World = game:GetService("World")
 local Players = game:GetService("Players")
 
 -- 客户端 Spoke 响应式主干（ADR-0032 / #296）：
--- 写侧仅由 L1 入口持有并绑定宿主下行事件与空间传感器；_G.ClientSpoke 仅暴露只读侧给过渡期旧界面。
+-- 写侧仅由 L1 入口持有并绑定宿主下行事件与空间传感器；对外只暴露统一只读状态仓库。
 local ok_now, initial_now = pcall(function() return World:GetServerTime() end) -- 启动瞬间宿主时钟可能未就绪，异常时安全回退 0
 local client_clock = SpokeClock.new(ok_now and Number.IsFiniteNumber(initial_now) and initial_now or 0)
 local client_store, client_store_writer = ClientStore.new({ clock = client_clock })
@@ -67,7 +63,6 @@ _G.ClientSpoke = { Store = client_store, Clock = client_store.clock }
 
 local hud_backpack_open = spoke.State.new("ClientMain.hud_backpack_open", false)
 local hud_open_popup = spoke.State.new("ClientMain.hud_open_popup", nil)
-local hud_reel_active = spoke.State.new("ClientMain.hud_reel_active", false)
 local hud_reel = {}
 local hud_drop_resolvers = {}
 local fisherman_shared = {}
@@ -103,20 +98,9 @@ local function resolve_backpack_drop(pos)
 end
 
 local function send_hud_operate(payload)
-    if type(ScreenMain.Operate) == "function" then
-        ScreenMain:Operate(payload)
-    end
-end
-
-ScreenMain.OnOpenChanged = function(is_open)
-    if not is_open then
-        hud_open_popup:set(nil)
-    end
-    client_store_writer:set_hud_visible(is_open)
-end
-
-ScreenMain.OnReelActiveChanged = function(active)
-    hud_reel_active:set(active == true)
+    payload.seq = next_action_seq()
+    payload.action = "Operate"
+    REUtil:GetRE("ItemBarAction"):FireServer(payload)
 end
 
 Task:Spawn(function()
@@ -277,7 +261,6 @@ Task:Spawn(function()
                 CastSourceView.spec(),
                 MainHudActionButtonsView.spec({
                     backpack_open = hud_backpack_open,
-                    reel_active = hud_reel_active,
                     send_operate = send_hud_operate,
                     on_reel_click = function(session_id)
                         if type(hud_reel.click) == "function" then
@@ -291,11 +274,6 @@ Task:Spawn(function()
                     resolve_drop_target = resolve_backpack_drop,
                     on_drop_resolver = function(fn)
                         hud_drop_resolvers.backpack = fn
-                    end,
-                    on_open_changed = function(is_open)
-                        if type(ScreenMain.SetBackpackOpen) == "function" then
-                            ScreenMain:SetBackpackOpen(is_open)
-                        end
                     end,
                 }),
             },
@@ -359,10 +337,9 @@ Task:Spawn(function()
     end
 end)
 
-_G.MgrGameUI:HideLiftButton()
-_G.MgrGameUI:HideNativeHealth()
-
-local LocalMotorUnitCtrl = require("client.LocalMotorUnitCtrl")
+local StarterGui = game:GetService("StarterGui")
+pcall(function() StarterGui:SetCoreGuiEnabled(Enums.CoreGuiType.LiftButton, false) end)
+pcall(function() StarterGui:SetCoreGuiEnabled(Enums.CoreGuiType.Health, false) end)
 
 
 local AbilityAPI = require("client.packages.ability_system.api")
@@ -370,10 +347,6 @@ if AbilityAPI then
     AbilityAPI.StartClientLifecycle()
 end
 
-Task:Spawn(function() 
-    LocalMotorUnitCtrl:Start()
-    _G.MgrGameUI:OpenScreen('ScreenMain')
-    REUtil:GetRE("RequestQuest"):FireServer()
-    REUtil:GetRE("RequestStory"):FireServer()
-end)
+REUtil:GetRE("RequestQuest"):FireServer()
+REUtil:GetRE("RequestStory"):FireServer()
 

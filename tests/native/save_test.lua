@@ -12,7 +12,7 @@
 --   9. 读档竞态：读档返回前玩家已操作，旧档灌入吞掉新操作（Touched 会话锁）。
 -- it 按旧 LuaUnit 的方法名字典序注册，保持与旧套件一致的案例顺序。
 -- 夹具必须恢复三样：共享配置（GameCfg.Debug / Save.QaSlot，槽位由 helper 建基线、
--- 案例内改动在本例结束时还原）、模块缓存 package.loaded['server.Mgr.MgrSave']、全局 _G.game。
+-- 案例内改动在本例结束时还原）、模块缓存 package.loaded['server.SaveHost']、全局 _G.game。
 local GameCfg = require('common.GameCfg')
 
 -- 假 DataStore：内存表 + 可注入失败次数与 CAS 冲突次数
@@ -55,8 +55,8 @@ describe('TestSave', function()
         savedDebug = GameCfg.Debug
         savedSlot = GameCfg.Save.QaSlot
         savedGame = rawget(_G, 'game')
-        savedSaveModule = package.loaded['server.Mgr.MgrSave']
-        package.loaded['server.Mgr.MgrSave'] = nil
+        savedSaveModule = package.loaded['server.SaveHost']
+        package.loaded['server.SaveHost'] = nil
         GameCfg.Debug = { Enabled = true, InitialGrants = savedDebug.InitialGrants }
         GameCfg.Save.QaSlot = ''
         env = { cfg = GameCfg, ops = {}, waits = {}, players = {}, dataInsts = {}, spawnQueue = {} }
@@ -90,7 +90,7 @@ describe('TestSave', function()
             end,
             BindToClose = function(_, cb) env.boundClose = cb end,
         }
-        env.save = assert(loadfile('server/Mgr/MgrSave.lua'))()
+        env.save = assert(loadfile('server/SaveHost.lua'))()
         env.syncs = 0
         env.save.PlayerData = {
             SendItemBar = function() env.syncs = env.syncs + 1 end,
@@ -112,7 +112,7 @@ describe('TestSave', function()
     after_each(function()
         GameCfg.Save.QaSlot = savedSlot
         GameCfg.Debug = savedDebug
-        package.loaded['server.Mgr.MgrSave'] = savedSaveModule
+        package.loaded['server.SaveHost'] = savedSaveModule
         _G.game = savedGame
         savedDebug, savedSlot, savedGame, savedSaveModule = nil, nil, nil, nil
         env = nil
@@ -122,7 +122,7 @@ describe('TestSave', function()
         assert.same('u1', env.save:Key(1))
         env.cfg.Save.QaSlot = 'qa-first'
         assert.same('u1', env.save:Key(1)) -- 本局内修改配置不改变写入目标
-        local another = assert(loadfile('server/Mgr/MgrSave.lua'))()
+        local another = assert(loadfile('server/SaveHost.lua'))()
         assert.same('u1:qa:qa-first', another:Key(1))
         env.cfg.Save.QaSlot = 'qa-second'
         assert.same('u1:qa:qa-first', another:Key(1))
@@ -233,7 +233,7 @@ describe('TestSave', function()
 
     it('test_invalid_qa_slot_fails_before_any_key_is_used', function()
         env.cfg.Save.QaSlot = false
-        local another = assert(loadfile('server/Mgr/MgrSave.lua'))()
+        local another = assert(loadfile('server/SaveHost.lua'))()
         assert.has_error(function() another:Key(1) end)
         env.cfg.Save.QaSlot = '../unsafe'
         assert.has_error(function() another:Key(1) end)

@@ -15,7 +15,7 @@
 -- PlayerData/Save 替身 + 内存 DataStore）、PlayerData 存档字段（k 倍率往返）、双端入口接线断言。
 -- 说明：describe 按旧 LuaUnit 的执行顺序登记（类名字节序、其内方法字节序），保持案例顺序一致。
 -- 随机数：烤糊倍率与伤害由服务器时刻（假 World.GetServerTime）一次算出，烤位取场景锚点而非随机点位；
--- 链路上唯一的 math.random 是 MgrSave 的一次性会话 Token 字符串（server/Mgr/MgrSave.lua:143，仅做
+-- 链路上唯一的 math.random 是 MgrSave 的一次性会话 Token 字符串（server/SaveHost.lua:143，仅做
 -- fencing 命名空间），不参与任何断言，因此无需固定或恢复随机数函数。
 local GameCfg = require('common.GameCfg')
 local Curve = require('common.GrillCurve')
@@ -187,7 +187,7 @@ describe("吃通道传递烤制倍率", function()
         end }
         ctx.player = { UserId = 9102, Character = { Name = 'Eggy' },
             CharacterAdded = signal(), CharacterRemoving = signal(), SetAttribute = function() end }
-        ctx.mgr = assert(loadfile('server/Mgr/MgrPlayerData.lua'))()
+        ctx.mgr = assert(loadfile('server/PlayerDataHost.lua'))()
         ctx.mgr.Vitals = { CanEat = function() return true end,
             Eat = function(_, player, itemId, rate)
                 ctx.eaten[#ctx.eaten + 1] = { itemId = itemId, rate = rate }

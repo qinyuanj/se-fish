@@ -3,9 +3,9 @@
 -- 不预置保底计数、不清库存；模拟成功单抽会正常发奖并推进持久计数，按真实权重 RNG 抽样。
 -- flow 失败/成功走公开 HandleTestAction；超时由单测/feature 脚本化时钟覆盖。
 local cfg = require('common.GameCfg')
-local platform = require('server.Mgr.MgrPlatform')
-local players = require('server.Mgr.MgrPlayerData')
-local save = require('server.Mgr.MgrSave')
+local platform = require('server.PlatformHost')
+local players = require('server.PlayerDataHost')
+local save = require('server.SaveHost')
 local ServerRuntime = require('server.World.ServerRuntime')
 local world, task = game:GetService('World'), game:GetService('Task')
 local p = game:GetService('Players'):GetPlayers()[1]

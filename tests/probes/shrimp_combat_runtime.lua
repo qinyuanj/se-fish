@@ -46,7 +46,7 @@ if fish then
             end
             if _G.Shrimp135Attack then
                 local weapons = require('server.Mgr.MgrWeapon')
-                local data = require('server.Mgr.MgrPlayerData'):GetDataInst(player)
+                local data = require('server.PlayerDataHost'):GetDataInst(player)
                 local world, task = game:GetService('World'), game:GetService('Task')
                 local started = world:GetServerTime()
                 print('SHRIMP135_INPUT', '主动定位并面向目标；真实攻击，不改血量/时间', data:WeaponDamageScale('melee'))

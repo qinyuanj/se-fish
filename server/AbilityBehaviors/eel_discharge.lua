@@ -1,3 +1,6 @@
+local HostSignal = require("common.HostSignal")
+local spoke_eggy = require("common.packages.spoke_eggy.api")
+
 local M = { Services = {} }
 
 function M.Discharge(owner, radius, damage, hit)
@@ -27,18 +30,15 @@ function M.Attach(anchor, services)
     if services then M.Services = services end
     local start = anchor:FindFirstChild('AnchorStart')
     if not start then error('[EelDischarge] 缺少 AnchorStart') end
-    local connection = start:Connect(function()
-        local ability = anchor.Parent
-        local manager = ability and ability.Parent
-        local owner = manager and manager.Parent
-        if not owner or not owner.Controller or owner.Controller.Health <= 0 then return end
-        M.Discharge(owner, anchor:GetAttribute('DischargeRadius'), anchor:GetAttribute('DischargeDamage'))
-    end)
-    local destroying
-    destroying = anchor.Destroying:Connect(function()
-        connection:Disconnect()
-        destroying:Disconnect()
-    end)
+    return spoke_eggy.behaviour(anchor, function(scope)
+        HostSignal.connect(scope, start, function()
+            local ability = anchor.Parent
+            local manager = ability and ability.Parent
+            local owner = manager and manager.Parent
+            if not owner or not owner.Controller or owner.Controller.Health <= 0 then return end
+            M.Discharge(owner, anchor:GetAttribute('DischargeRadius'), anchor:GetAttribute('DischargeDamage'))
+        end)
+    end, { name = 'EelDischarge' })
 end
 
 return M

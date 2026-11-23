@@ -139,8 +139,8 @@ describe('条款 9 PK 伤害过滤', function()
     end
     env.lifeHost = require('tests.support.life_host').start({ now = 0, remote = re })
     env.vitals = env.lifeHost.runtime.life
-    env.players = assert(loadfile('server/Mgr/MgrPlayerData.lua'))()
-    env.save = assert(loadfile('server/Mgr/MgrSave.lua'))()
+    env.players = assert(loadfile('server/PlayerDataHost.lua'))()
+    env.save = assert(loadfile('server/SaveHost.lua'))()
     env.players.Save, env.save.PlayerData = env.save, env.players
     env.filter = require('server.World.PkDamageFilter').make({
       party = env.party, zone_markers = require('common.ZoneMarkers'), zones = env.cfg.Zones,

@@ -106,8 +106,8 @@ function Host.start(options)
   }
 
   package.loaded["server.Data.PlayerData"] = nil
-  host.save = assert(loadfile("server/Mgr/MgrSave.lua"))()
-  host.player_data = assert(loadfile("server/Mgr/MgrPlayerData.lua"))()
+  host.save = assert(loadfile("server/SaveHost.lua"))()
+  host.player_data = assert(loadfile("server/PlayerDataHost.lua"))()
   host.save.PlayerData = host.player_data
   host.player_data.Save = host.save
   host.runtime = ServerRuntime.new({

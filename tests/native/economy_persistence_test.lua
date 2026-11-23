@@ -111,8 +111,8 @@ describe('TestEconomyPersistence', function()
             end,
             CheckRECD = function() return false end,
         }
-        env.save = assert(loadfile('server/Mgr/MgrSave.lua'))()
-        env.players = assert(loadfile('server/Mgr/MgrPlayerData.lua'))()
+        env.save = assert(loadfile('server/SaveHost.lua'))()
+        env.players = assert(loadfile('server/PlayerDataHost.lua'))()
         env.quest = {
             OnPlayerAdded = function() end,
             OnPlayerRemoving = function() end,

@@ -1,6 +1,6 @@
 local GameCfg = require('common.GameCfg')
 local PlayerData = require('server.Data.PlayerData')
-local Mgr = { Ledger = {}, Pending = {}, Flying = {}, Sessions = {}, Waiters = {}, NextAutosaveAt = nil }
+local SaveHost = { SpokeHost = true, Ledger = {}, Pending = {}, Flying = {}, Sessions = {}, Waiters = {}, NextAutosaveAt = nil }
 local function cfg() return GameCfg.Save end
 local function task() return game:GetService('Task') end
 local function copy(value)
@@ -19,12 +19,12 @@ end
 local function callback(label, userId, fn, ...)
     if not fn then return end
     local ok, err = pcall(fn, ...)
-    if not ok then print('[MgrSave] 回调失败', label, userId, tostring(err)) end
+    if not ok then print('[SaveHost] 回调失败', label, userId, tostring(err)) end
 end
 local function validSlot(slot)
     return type(slot) == 'string' and #slot >= 1 and #slot <= 40 and slot:match('^[%w_-]+$') ~= nil
 end
-function Mgr:Key(userId)
+function SaveHost:Key(userId)
     if not self.SlotPinned then
         local slot = cfg().QaSlot
         assert(slot == nil or slot == '' or validSlot(slot), 'QA 存档槽须为 1—40 位字母、数字、下划线或连字符')
@@ -34,40 +34,40 @@ function Mgr:Key(userId)
     local slot = session and session.Current or self.QaSlot
     return cfg().KeyPrefix .. tostring(userId) .. (slot ~= '' and ':qa:' .. slot or '')
 end
-function Mgr:Session(userId)
+function SaveHost:Session(userId)
     self:Key(userId)
     if not self.Sessions[userId] then
         self.Sessions[userId] = { Current = self.QaSlot, Next = self.QaSlot, Paused = false }
     end
     return self.Sessions[userId]
 end
-function Mgr:Status(userId)
+function SaveHost:Status(userId)
     local s = self:Session(userId)
     return { currentSlot = s.Current, nextSlot = s.Next, autosavePaused = s.Paused,
         loadState = s.State or 'pending', error = s.Error, revision = s.Revision, epoch = s.Epoch }
 end
-function Mgr:IsPaused(userId)
+function SaveHost:IsPaused(userId)
     local s = self.Sessions[userId]
     return not s or s.State ~= 'ready' or s.Paused or s.Transition or false
 end
-function Mgr:IsCurrent(userId, session, data)
+function SaveHost:IsCurrent(userId, session, data)
     return self.Sessions[userId] == session and session.Data == data and data.Player == session.Player
 end
-function Mgr:Fail(userId, session, reason)
+function SaveHost:Fail(userId, session, reason)
     if self.Sessions[userId] ~= session then return end
     session.State, session.Error = 'failed', reason
     if session.Data then
         session.Data.LoadState, session.Data.Inited = 'failed', false
         if session.Data.Player then session.Data.Player:SetAttribute('SaveState', 'failed') end
     end
-    print('[MgrSave] 读写屏障关闭', userId, tostring(session.Token), reason)
+    print('[SaveHost] 读写屏障关闭', userId, tostring(session.Token), reason)
 end
-function Mgr:AfterIdle(userId, fn)
+function SaveHost:AfterIdle(userId, fn)
     if not self.Flying[userId] and not self.Pending[userId] then callback('AfterIdle', userId, fn) return end
     self.Waiters[userId] = self.Waiters[userId] or {}
     table.insert(self.Waiters[userId], fn)
 end
-function Mgr:Finish(userId)
+function SaveHost:Finish(userId)
     self.Flying[userId] = nil
     if self.Pending[userId] then
         if self.Pending[userId].RetryRounds then return end
@@ -78,27 +78,27 @@ function Mgr:Finish(userId)
     self.Waiters[userId] = nil
     for _, fn in ipairs(callbacks) do callback('AfterIdle', userId, fn) end
 end
-function Mgr:GetStore()
+function SaveHost:GetStore()
     if self.StoreChecked then return self.Store end
     self.StoreChecked = true
     local ok, store = pcall(function() return game:GetService('DataStoreService'):GetDataStore(cfg().Store) end)
     if not ok or not store then
-        print('[MgrSave] DataStore 不可用，保持读档失败屏障', tostring(store))
+        print('[SaveHost] DataStore 不可用，保持读档失败屏障', tostring(store))
         return nil
     end
     self.Store = store
     return store
 end
-function Mgr:WithRetry(label, fn)
+function SaveHost:WithRetry(label, fn)
     for attempt = 1, cfg().MaxRetries do
         local ok, value = pcall(fn)
         if ok then return true, value end
-        print('[MgrSave]', label, '失败', attempt, tostring(value))
+        print('[SaveHost]', label, '失败', attempt, tostring(value))
         if attempt < cfg().MaxRetries then task():Wait(cfg().RetryDelaySec) end
     end
     return false, nil
 end
-function Mgr:Load(userId)
+function SaveHost:Load(userId)
     local store = self:GetStore()
     if not store then return nil, 'failed' end
     local key = self:Key(userId)
@@ -106,7 +106,7 @@ function Mgr:Load(userId)
     if not ok then return nil, 'failed' end
     return value, value == nil and 'missing' or 'found'
 end
-function Mgr:EstimateSize(value)
+function SaveHost:EstimateSize(value)
     if type(value) == 'string' then return #value end
     if type(value) == 'number' then return 8 end
     if type(value) ~= 'table' then return 1 end
@@ -114,20 +114,20 @@ function Mgr:EstimateSize(value)
     for k, v in pairs(value) do total = total + self:EstimateSize(k) + self:EstimateSize(v) + 2 end
     return total
 end
-function Mgr:WithinBudget(snapshot)
+function SaveHost:WithinBudget(snapshot)
     return self:EstimateSize(snapshot) <= 256 * 1024
 end
-function Mgr:NoteWrite(userId, snapshot, reason)
+function SaveHost:NoteWrite(userId, snapshot, reason)
     local ledger = self.Ledger[userId] or { Writes = 0 }
     ledger.Writes, ledger.Bytes = ledger.Writes + 1, self:EstimateSize(snapshot)
     ledger.LastReason, ledger.Revision = reason, snapshot.meta.revision
     ledger.OperationCount = #snapshot.meta.operations
     self.Ledger[userId] = ledger
-    print('[MgrSave] 落账', userId, reason, 'revision=' .. ledger.Revision,
+    print('[SaveHost] 落账', userId, reason, 'revision=' .. ledger.Revision,
         'bytes=' .. ledger.Bytes, 'writes=' .. ledger.Writes, 'ops=' .. ledger.OperationCount)
 end
 
-function Mgr:RestoreLanding(userId, player, data, session)
+function SaveHost:RestoreLanding(userId, player, data, session)
     if not self:IsCurrent(userId, session, data) then return end
     local point, corrected = data:ResolveSafePoint()
     if not corrected or not point then return end
@@ -136,7 +136,7 @@ function Mgr:RestoreLanding(userId, player, data, session)
             local pos = Vector3.New(point.x, point.y, point.z)
             if character.SetPosition then character:SetPosition(pos) else character.Position = pos end
         end)
-        if not ok then print('[MgrSave] 安全落点恢复失败', userId, tostring(err)) end
+        if not ok then print('[SaveHost] 安全落点恢复失败', userId, tostring(err)) end
     end
     if player.Character then teleport(player.Character) return end
     if not player.CharacterAdded then return end
@@ -148,7 +148,7 @@ function Mgr:RestoreLanding(userId, player, data, session)
     end)
 end
 
-function Mgr:LoadInto(player, data)
+function SaveHost:LoadInto(player, data)
     local userId = player.UserId
     local previous = self:Session(userId)
     if previous.Data and previous.Data ~= data then
@@ -209,7 +209,7 @@ function Mgr:LoadInto(player, data)
             self:RestoreLanding(userId, player, data, s)
             self:NoteWrite(userId, claimed, status == 'missing' and 'new' or 'load')
             player:SetAttribute('SaveState', 'ready')
-            print('[MgrSave] ready', userId, s.Token, 'coin=' .. claimed.coin, 'sequence=' .. claimed.meta.sequence)
+            print('[SaveHost] ready', userId, s.Token, 'coin=' .. claimed.coin, 'sequence=' .. claimed.meta.sequence)
             if self.OnReady then self.OnReady(player, data) end
             if self.PlayerData then self.PlayerData:SendItemBar(player, true) end
         end)
@@ -220,7 +220,7 @@ function Mgr:LoadInto(player, data)
     else load() end
 end
 
-function Mgr:WriteJob(userId, job)
+function SaveHost:WriteJob(userId, job)
     local s = job.Session
     if self.Sessions[userId] ~= s then return false, 'stale' end
     if not job.BaseRevision then
@@ -262,7 +262,7 @@ local function appendJob(current, job)
     last.After = job
     return current
 end
-function Mgr:Drain(userId)
+function SaveHost:Drain(userId)
     if self.Flying[userId] then return end
     self.Flying[userId] = true
     task():Spawn(function()
@@ -277,7 +277,7 @@ function Mgr:Drain(userId)
                     self.Pending[userId] = job
                     break
                 end
-                print('[MgrSave] 写档重试耗尽，关闭会话', userId, job.Reason)
+                print('[SaveHost] 写档重试耗尽，关闭会话', userId, job.Reason)
                 self:Fail(userId, job.Session, '写档重试耗尽')
             end
             callback('写入结果', userId, job.Done, ok, result)
@@ -295,7 +295,7 @@ function Mgr:Drain(userId)
         self:Finish(userId)
     end)
 end
-function Mgr:Enqueue(userId, snapshot, reason, done)
+function SaveHost:Enqueue(userId, snapshot, reason, done)
     local s = self.Sessions[userId]
     if not s or s.State ~= 'ready' or s.Paused or s.Transition or not self:GetStore()
         or not s.Data or not s.Data.Inited or not snapshot or not s.Data:IsValidSave(snapshot)
@@ -306,10 +306,10 @@ function Mgr:Enqueue(userId, snapshot, reason, done)
     self:Drain(userId)
     return true
 end
-function Mgr:Save(userId, snapshot, reason) return self:Enqueue(userId, snapshot, reason) end
-function Mgr:Commit(userId, snapshot, reason) return self:Enqueue(userId, snapshot, reason) end
+function SaveHost:Save(userId, snapshot, reason) return self:Enqueue(userId, snapshot, reason) end
+function SaveHost:Commit(userId, snapshot, reason) return self:Enqueue(userId, snapshot, reason) end
 
-function Mgr:ResolveRequest(player, data, kind, requestId)
+function SaveHost:ResolveRequest(player, data, kind, requestId)
     local userId = player and player.UserId
     local s = userId and self.Sessions[userId]
     if not s or not self:IsCurrent(userId, s, data) or s.State ~= 'ready'
@@ -342,7 +342,7 @@ function Mgr:ResolveRequest(player, data, kind, requestId)
 end
 
 -- 身份由服务端颁发，调用者必须保留原身份重试；不能把客户端自报 id 当凭证。
-function Mgr:NextOperation(player, kind)
+function SaveHost:NextOperation(player, kind)
     local s = self.Sessions[player.UserId]
     if not s or s.Player ~= player or self:IsPaused(player.UserId) or not s.Data.Inited
         or type(kind) ~= 'string' or #kind < 1 or #kind > 80 then return nil end
@@ -352,7 +352,7 @@ end
 
 -- transform 只改隔离 draft 并返回可序列化结果；外部实体交接由调用方在成功回调按操作身份确认。
 -- 扣费、发奖、恢复记录和结果一次落在同键，失败时 draft 不向玩家发布。
-function Mgr:Execute(player, data, operation, transform, done)
+function SaveHost:Execute(player, data, operation, transform, done)
     local userId, s = player.UserId, self.Sessions[player.UserId]
     if not s or not self:IsCurrent(userId, s, data) or s.State ~= 'ready' or not data.Inited
         or type(operation) ~= 'table' or type(operation.sequence) ~= 'number'
@@ -383,7 +383,7 @@ function Mgr:Execute(player, data, operation, transform, done)
         local ok, result, reason = pcall(transform, draft)
         if not ok or type(result) ~= 'table' then
             s.Transition = false
-            print('[MgrSave] 结算拒绝', userId, operation.id, operation.kind, tostring(result), tostring(reason))
+            print('[SaveHost] 结算拒绝', userId, operation.id, operation.kind, tostring(result), tostring(reason))
             callback('结算拒绝', userId, done, false, ok and reason or tostring(result))
             return
         end
@@ -408,7 +408,7 @@ function Mgr:Execute(player, data, operation, transform, done)
                     data.Inited = true
                     data:ApplySave(value)
                     data:PublishItemBar()
-                    print('[MgrSave] operation', userId, operation.id, operation.kind,
+                    print('[SaveHost] operation', userId, operation.id, operation.kind,
                         'coinBefore=' .. snapshot.coin, 'coinAfter=' .. value.coin,
                         'bar=' .. #value.bar, 'bp=' .. #value.bp)
                     callback('结算完成', userId, done, true, copy(result))
@@ -423,7 +423,7 @@ function Mgr:Execute(player, data, operation, transform, done)
     return true
 end
 
-function Mgr:ApplyTemporary(userId, data, patch, done)
+function SaveHost:ApplyTemporary(userId, data, patch, done)
     local s = self:Session(userId)
     if s.Transition or s.State ~= 'ready' or not self:IsCurrent(userId, s, data) then
         return false, '存档尚未就绪'
@@ -440,7 +440,7 @@ function Mgr:ApplyTemporary(userId, data, patch, done)
     end)
     return accepted, failure
 end
-function Mgr:SaveExplicit(userId, data, done)
+function SaveHost:SaveExplicit(userId, data, done)
     local s = self:Session(userId)
     if s.Transition or s.State ~= 'ready' or not self:IsCurrent(userId, s, data) then return false, '存档尚未就绪' end
     s.Transition = true
@@ -460,7 +460,7 @@ function Mgr:SaveExplicit(userId, data, done)
     end)
     return true
 end
-function Mgr:ReadExplicit(userId, data, done)
+function SaveHost:ReadExplicit(userId, data, done)
     local s = self:Session(userId)
     if s.Transition or s.State ~= 'ready' or not self:IsCurrent(userId, s, data) then return false, '存档尚未就绪' end
     s.Transition = true
@@ -480,7 +480,7 @@ function Mgr:ReadExplicit(userId, data, done)
     end)
     return true
 end
-function Mgr:SelectNextSlot(userId, slot, done)
+function SaveHost:SelectNextSlot(userId, slot, done)
     if slot ~= '' and not validSlot(slot) then return false, '存档槽须为 1—40 位字母、数字、下划线或连字符' end
     local s, store = self:Session(userId), self:GetStore()
     if s.SlotChoosing or not store then return false, '槽选择进行中或服务不可用' end
@@ -499,18 +499,18 @@ function Mgr:SelectNextSlot(userId, slot, done)
     end)
     return true
 end
-function Mgr:ReleaseSession(userId, player)
+function SaveHost:ReleaseSession(userId, player)
     local s = self.Sessions[userId]
     if not s or player and s.Player ~= player then return end
     s.Leaving = true
     self:AfterIdle(userId, function() if self.Sessions[userId] == s then self.Sessions[userId] = nil end end)
 end
-function Mgr:SaveLeaving(player, data)
+function SaveHost:SaveLeaving(player, data)
     local s = self.Sessions[player.UserId]
     if not s or s.Player ~= player or s.Data ~= data then return end
     if data and data.Inited then self:Save(player.UserId, data:Serialize(), 'leave') end
 end
-function Mgr:Update()
+function SaveHost:Update()
     for userId in pairs(self.Pending) do self:Drain(userId) end
     local now = game:GetService('World'):GetServerTime()
     local interval = cfg().AutosaveSec
@@ -525,7 +525,7 @@ function Mgr:Update()
         end
     end
 end
-function Mgr:Start()
+function SaveHost:Start()
     local ok, err = pcall(function()
         game:BindToClose(function()
             if self.PlayerData then
@@ -539,9 +539,9 @@ function Mgr:Start()
                 for userId in pairs(self.Pending) do self:Drain(userId) end
                 task():Wait(1)
             end
-            print('[MgrSave] 关服刷新未排空，请核对台账')
+            print('[SaveHost] 关服刷新未排空，请核对台账')
         end)
     end)
-    if not ok then print('[MgrSave] BindToClose 绑定失败', tostring(err)) end
+    if not ok then print('[SaveHost] BindToClose 绑定失败', tostring(err)) end
 end
-return Mgr
+return SaveHost

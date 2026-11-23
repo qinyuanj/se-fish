@@ -6,7 +6,7 @@
 
 本 ADR 决定**不在旧管理器外壳上零敲碎打地包 Spoke**，而是直接从 [GameSpec](../GameSpec.md) 的玩法语义重新设计基于 Spoke Runtime 的目标架构，将既有命令式生命周期代码一律视作可淘汰债务，通过单向棘轮逐步切换。
 
-它部分取代 [ADR-0026](0026-no-global-unit-factory.md) 中以 `OwnedUnits.lua` 为唯一单位回收方案的决定：新代码与已迁移切片改由 Spoke 作用域 `on_cleanup` 负责销毁，`OwnedUnits.lua` 进入只减不增的淘汰轨道（原 ADR-0026 的单位命名规范与「不建全局单位工厂、不新增第四套事件桥」继续有效）。
+它部分取代 [ADR-0026](0026-no-global-unit-factory.md) 中以 `OwnedUnits.lua` 为唯一单位回收方案的决定：新代码与已迁移切片改由 Spoke 作用域 `on_cleanup` 负责销毁，`OwnedUnits.lua` 已在 #316 删除（原 ADR-0026 的单位命名规范与「不建全局单位工厂、不新增第四套事件桥」继续有效）。
 
 ## 决定
 
@@ -67,7 +67,7 @@
    - **第一批切片（玩家生命与状态调和）**：属性/药水/升级 + 生命/饥饿/濒死/死亡/复活 + 特殊道具（风神之翼/哥斯拉）+ 客户端生存蒙版与主 HUD 血球/道具栏；
    - **第二批切片（核心钓鱼与活鱼）**：抛竿/咬钩/收线 + 活鱼与首领三阶段 + 地面掉落与鱼饵刷新点；
    - **第三批切片（设施、经济与多人）**：烧烤、抽奖机、钓鱼佬/钓场商店/摆渡、小队与抢救气泡、图鉴/纪录/盲盒/新手任务。
-3. **机械棘轮门禁**：在 `tests/native/guards/source_guard_test.lua` 为旧债务（`OwnedUnits.` 调用数、旧式裸 `:Connect(` 数、`MgrMap` 成员数）设立只减不增的水位线断言，随每个垂直切片下调，归零后删除 `common/OwnedUnits.lua` 与旧入口分发。
+3. **机械棘轮门禁**：在 `tests/native/guards/spoke_ratchet_guard_test.lua` 为旧债务（`OwnedUnits.` 调用数、旧式裸 `:Connect(` 数、`MgrMap` 成员数）设立只减不增的水位线断言。#316 已将三类水位全部降为 0，并删除 `common/OwnedUnits.lua` 与旧入口分发；守卫继续阻止回归。
 
 ## 拒绝的方案
 

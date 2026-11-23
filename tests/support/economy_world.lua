@@ -121,9 +121,9 @@ function M.new()
     CheckRECD = function() return false end,
   }
 
-  env.save = assert(loadfile("server/Mgr/MgrSave.lua"))()
-  env.players = assert(loadfile("server/Mgr/MgrPlayerData.lua"))()
-  env.platform = assert(loadfile("server/Mgr/MgrPlatform.lua"))()
+  env.save = assert(loadfile("server/SaveHost.lua"))()
+  env.players = assert(loadfile("server/PlayerDataHost.lua"))()
+  env.platform = assert(loadfile("server/PlatformHost.lua"))()
   env.players.Save, env.save.PlayerData = env.save, env.players
   env.platform.Save, env.platform.PlayerData = env.save, env.players
   env.platform.Now = function() return env.now end

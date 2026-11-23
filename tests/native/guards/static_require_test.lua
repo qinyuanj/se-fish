@@ -1,6 +1,6 @@
--- 按名字加载模块的两处入口（MgrGameUI:GetScreen、AbilityAPI.AttachAnchor）改用登记表 + 字面量 require，
+-- AbilityAPI.AttachAnchor 的按名加载入口使用登记表 + 字面量 require，
 -- 架构图扫描器才能解析出依赖。失败方式先列：
---   1. 新增界面 handler 或锚点行为文件却没登记 → 按名加载时报"未登记"；
+--   1. 新增锚点行为文件却没登记 → 按名加载时报"未登记"；
 --   2. GameCfg 新配的锚点行为没登记 → 挂接时报"锚点行为模块不可用"；
 --   3. 登记的模块文件被删或包升级改名 → 运行时 require 失败；
 --   4. 登记键与模块文件名不一致 → 按名加载到别的模块；
@@ -13,7 +13,6 @@
 
 local fs = require("tests.support.fs_fixture")
 
-local SCREEN_DIR = "client/ScreenHandlers"
 local LOCAL_BEHAVIOR_DIR = "server/AbilityBehaviors"
 local PACKAGE_ANCHOR_DIR = "server/packages/ability_system/anchors"
 
@@ -83,18 +82,6 @@ local function configured_anchor_behaviors()
 end
 
 describe("按名字加载的模块登记", function()
-  it("test_screen_registry_matches_handler_files", function()
-    local src = read_file("client/MgrGameUI.lua")
-    local registry = registry_of(src, "ScreenHandlerLoaders")
-    local expected = {}
-    for _, name in ipairs(lua_module_names(SCREEN_DIR)) do
-      expected[name] = "client.ScreenHandlers." .. name
-    end
-    assert.same(expected, registry)
-    assert_registry_resolves(registry)
-    assert_no_dynamic_require(src, "client/MgrGameUI.lua")
-  end)
-
   it("test_anchor_registry_covers_behavior_files_and_config", function()
     local src = read_file("server/AbilityAPI.lua")
     local registry = registry_of(src, "AnchorBehaviorLoaders")
@@ -136,21 +123,6 @@ describe("未登记名字的失败路径", function()
     saved = nil
   end)
 
-  it("test_unregistered_screen_name_errors", function()
-    save({ "game", "MgrGameUI" }, { "client.GameUI", "common.REUtil" })
-    _G.game = { GetService = function() return {} end }
-    local node = { Name = "NoSuchScreen" }
-    package.loaded["client.GameUI"] = { GetUIRoot = function()
-      return { FindFirstChild = function() return node end }
-    end }
-    package.loaded["common.REUtil"] = { GetRE = function()
-      return { OnClientEvent = { Connect = function() end } }
-    end }
-    local mgr = assert(loadfile("client/MgrGameUI.lua"))()
-    assert.error_matches(function() mgr:GetScreen("NoSuchScreen") end,
-      "界面 handler 未登记: NoSuchScreen", nil, true)
-  end)
-
   it("test_unregistered_anchor_behavior_errors", function()
     local vendor = "server.packages.ability_system.api"
     local anchorLogic = "server.packages.ability_system.anchor_logic"
@@ -174,39 +146,17 @@ describe("字面量 require 的包内模块", function()
     assert.is_true(file_exists(path), path .. " 不存在（AbilityAPI 按字面量 require 它）")
   end)
 end)
--- 管理器登记：新增 server/Mgr/*.lua 没进 server/main.lua 的 MgrMap，管理器永远收不到
--- Start / OnPlayerAdded / OnPlayerRemoving / Update（AGENTS.md 的修改边界）。
--- 无生命周期的工厂表不进 MgrMap，但必须以 require(...).Make 在入口显式装配，不能成为死模块。
-describe("管理器登记", function()
-  it("test_every_manager_is_registered_in_mgr_map", function()
+-- L1 宿主在唯一组合根显式注入；ServerRuntime 不再依赖旧管理器表。
+describe("宿主组合", function()
+  it("test_spoke_hosts_are_explicitly_composed_without_mgr_map", function()
     local src = assert(fs.slurp("server/main.lua"), "读不到 server/main.lua")
-    local body = assert(src:match("local MgrMap = (%b{})"), "找不到 local MgrMap 表")
-    local registered = {}
-    for key, mod in body:gmatch("([%w_]+)%s*=%s*require%s*%(%s*[\"']server%.Mgr%.([%w_]+)[\"']%s*%)") do
-      registered[key] = mod
+    for _, name in ipairs({ "PlayerDataHost", "SaveHost", "PlatformHost", "FishAbility" }) do
+      assert.is_truthy(src:find('require("server.' .. name .. '")', 1, true), name .. " 未在组合根加载")
     end
-    local factories = {}
-    for name in src:gmatch("require%s*%(%s*[\"']server%.Mgr%.([%w_]+)[\"']%s*%)%.Make") do
-      factories[name] = true
-    end
-    local expected = {}
-    for _, name in ipairs(fs.list_dir("server/Mgr")) do
-      local base = name:match("^(%w+)%.lua$")
-      if base then expected[base] = true end
-    end
-    local problems = {}
-    for name in pairs(expected) do
-      if not registered[name] and not factories[name] then
-        problems[#problems + 1] = "server/Mgr/" .. name .. ".lua 没进 MgrMap，也未作为 .Make 工厂装配"
-      end
-    end
-    for key, mod in pairs(registered) do
-      if key ~= mod then problems[#problems + 1] = "MgrMap." .. key .. " 装的是 server.Mgr." .. mod end
-    end
-    for key in pairs(registered) do
-      if not expected[key] then problems[#problems + 1] = "MgrMap." .. key .. " 没有对应文件" end
-    end
-    table.sort(problems)
-    assert.same({}, problems)
+    assert.is_nil(src:find("MgrMap", 1, true), "server/main.lua 不得恢复 MgrMap")
+    assert.is_truthy(src:find("player_data = PlayerDataHost", 1, true))
+    assert.is_truthy(src:find("save = SaveHost", 1, true))
+    assert.is_truthy(src:find("platform = PlatformHost", 1, true))
+    assert.is_truthy(src:find("fish_ability = FishAbility", 1, true))
   end)
 end)

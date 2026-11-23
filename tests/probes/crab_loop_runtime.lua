@@ -4,7 +4,7 @@
 -- 若已拥有信物，在本区钓鱼佬旁选中信物后重跑会执行Feed；摆渡使用正常Board请求。
 local cfg = require('common.GameCfg')
 local units = require('server.World.FishTree')
-local pd = require('server.Mgr.MgrPlayerData')
+local pd = require('server.PlayerDataHost')
 local weapons = require('server.Mgr.MgrWeapon')
 local ServerRuntime = require('server.World.ServerRuntime')
 local runtime = ServerRuntime.current()

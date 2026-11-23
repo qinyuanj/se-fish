@@ -125,7 +125,7 @@ describe("服务端商店与钓鱼佬原子事务（#311）", function()
       end,
     }
     ctx.PlayerData = assert(loadfile("server/Data/PlayerData.lua"))()
-    ctx.save = assert(loadfile("server/Mgr/MgrSave.lua"))()
+    ctx.save = assert(loadfile("server/SaveHost.lua"))()
     ctx.runtime = ServerRuntime.new({
       initial_now = 1000,
       remote = _G.REUtil,

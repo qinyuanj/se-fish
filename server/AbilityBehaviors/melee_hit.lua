@@ -1,5 +1,7 @@
 
 local SwingRegistry = require("server.SwingRegistry")
+local HostSignal = require("common.HostSignal")
+local spoke_eggy = require("common.packages.spoke_eggy.api")
 
 local M = { Services = {} }
 
@@ -192,6 +194,7 @@ function M.Attach(anchor_script, services)
 		return
 	end
 
+	return spoke_eggy.behaviour(anchor_script, function(scope)
 	local state = nil
 
 	local function _cleanup()
@@ -225,7 +228,8 @@ function M.Attach(anchor_script, services)
 		state = nil
 	end
 
-	start_sig:Connect(function()
+	scope:on_cleanup(_cleanup)
+	HostSignal.connect(scope, start_sig, function()
 		_cleanup()
 		state = {}
 		SwingSeq = SwingSeq + 1
@@ -386,7 +390,7 @@ function M.Attach(anchor_script, services)
 			end
 		end
 
-		state.enter_conn = tu.OnTriggerEnter:Connect(function(other_unit)
+		state.enter_conn = HostSignal.listen(tu.OnTriggerEnter, function(other_unit)
 			process_hit(other_unit)
 		end)
 
@@ -404,12 +408,10 @@ function M.Attach(anchor_script, services)
 	for _, name in ipairs({ "AnchorEnd", "AnchorBreak", "AnchorStop" }) do
 		local sig = anchor_script:FindFirstChild(name)
 		if sig then
-			sig:Connect(_cleanup)
+			HostSignal.connect(scope, sig, _cleanup)
 		end
 	end
-	if anchor_script.Destroying then
-		anchor_script.Destroying:Connect(_cleanup)
-	end
+	end, { name = "melee_hit" })
 end
 
 return M

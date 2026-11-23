@@ -1,9 +1,9 @@
 -- 迁移自 tests/gameplay/rod_visual_test.lua（#85）。
--- 被测接缝：server.Mgr.MgrPlayerData 选中鱼竿时服务端挂载物（鱼竿外观）的生成与清理。
+-- 被测接缝：server.PlayerDataHost 选中鱼竿时服务端挂载物（鱼竿外观）的生成与清理。
 -- it 名字沿用旧方法名，注册顺序 = LuaUnit sortedPairs 的实际执行顺序。
 
 local GameCfg = require('common.GameCfg')
-local Mgr = require('server.Mgr.MgrPlayerData')
+local Mgr = require('server.PlayerDataHost')
 local ServerRuntime = require('server.World.ServerRuntime')
 
 local function signal()
@@ -19,7 +19,7 @@ local function signal()
   }
 end
 
-describe('鱼竿外观挂载（MgrPlayerData）', function()
+describe('鱼竿外观挂载（PlayerDataHost）', function()
   local env
   local restore
 
@@ -60,6 +60,7 @@ describe('鱼竿外观挂载（MgrPlayerData）', function()
       CharacterAdded = signal(), CharacterRemoving = signal() }
     function env.player:SetAttribute() end
     env.runtime = ServerRuntime.new({
+      player_data = Mgr,
       bait_spots = { Enabled = false },
       create_unit = function(kind, props)
         return world:CreateUnit(kind, props)
@@ -67,24 +68,9 @@ describe('鱼竿外观挂载（MgrPlayerData）', function()
       on_item_bar_state = function(p, snapshot)
         _G.REUtil:GetRE('ItemBarState'):FireClient(p, snapshot)
       end,
-      on_player_join_start = function(p)
-        Mgr:OnPlayerAdded(p)
-      end,
-      is_player_data_current = function(p, data)
-        return Mgr:GetDataInst(p) == data
-      end,
-      on_player_removing = function(p)
-        Mgr:OnPlayerRemoving(p)
-      end,
     })
     env.runtime:start()
     env.runtime:mark_started()
-    Mgr.OnSyncPlayerTree = function(p, data, forcePush)
-      local pt = env.runtime:get_player_tree(p.UserId)
-      if not pt then return false end
-      pt:sync_from_data(data, forcePush and { force_push = true } or nil)
-      return true
-    end
     env.join = function(p)
       env.runtime:on_player_added(p)
       local data = Mgr:GetDataInst(p)
@@ -93,7 +79,6 @@ describe('鱼竿外观挂载（MgrPlayerData）', function()
     env.leave = function(p)
       env.runtime:on_player_removing(p)
     end
-    Mgr:Start()
     env.join(env.player)
   end)
 
@@ -108,8 +93,7 @@ describe('鱼竿外观挂载（MgrPlayerData）', function()
     if env and env.player then
       Mgr:OnPlayerRemoving(env.player)
     end
-    Mgr.OnSyncPlayerTree = nil
-    if restore then
+      if restore then
       _G.game = restore.game
       _G.Vector3 = restore.Vector3
       _G.Color = restore.Color
@@ -138,6 +122,7 @@ describe('鱼竿外观挂载（MgrPlayerData）', function()
     assert.same(3, #env.created)
     env.failKind = nil
     Mgr:SendItemBar(env.player)
+    Mgr:SyncPlayerTree(env.player)
     assert.same(5, #env.created)
     assert.is_false(env.created[4].Destroyed)
     assert.is_false(env.created[5].Destroyed)
@@ -169,6 +154,7 @@ describe('鱼竿外观挂载（MgrPlayerData）', function()
     Mgr:GetDataInst(env.player):UpdateData(function(data)
       data.Containers[GameCfg.Items.ContainerId.ItemBar][1].count = 0
     end, true)
+    Mgr:SyncPlayerTree(env.player)
     assert.is_true(env.created[3].Destroyed)
     assert.is_true(env.created[4].Destroyed)
     assert.is_nil(env.player.lastState.selectedSlot)
@@ -216,6 +202,7 @@ describe('鱼竿外观挂载（MgrPlayerData）', function()
     assert.is_false(model.PhysicsActive)
     assert.is_false(model.CanCollide)
     Mgr:SendItemBar(env.player)
+    Mgr:SyncPlayerTree(env.player)
     assert.same(2, #env.created)
     select(1)
     assert.is_true(mount.Destroyed)
