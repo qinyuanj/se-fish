@@ -9,6 +9,8 @@ local BossPhase = require('common.BossPhase')
 local GarBiteNotice = require('common.GarBiteNotice')
 local BossMoves = require('common.cfg.BossMoves')
 local FishBehaviors = require('server.FishBehaviors')
+local spoke = require('common.packages.spoke.api')
+local SpokeTree, Effect, State = spoke.SpokeTree, spoke.Effect, spoke.State
 
 -- #309 L2 不反向依赖 L1：叼人挂点由入口注入 server.AbilityAPI。
 local function abilityApi(self)
@@ -96,6 +98,168 @@ function Mgr:Players()
     return players and players:GetPlayers() or {}
 end
 
+function Mgr:SetState(fish, value)
+    fish.State = value
+    if fish.StateSignal and fish.StateSignal:now() ~= value then
+        fish.StateSignal:set(value)
+    end
+end
+
+function Mgr:FrameClock()
+    if not self.Clock then
+        -- 直接宿主仍可泵一个共享 Trigger；每条鱼由自己的 Auto 树订阅，Update 不再逐鱼调度。
+        self.Clock = { on_frame = spoke.Trigger.new('FishHostFrame') }
+    end
+    return self.Clock
+end
+
+local function lifePhase(state)
+    if state == Mgr.State.AwaitLift or state == Mgr.State.Held then return 'lifted' end
+    if state == Mgr.State.Escaping then return 'escaping' end
+    if state == Mgr.State.Wild then return 'wild' end
+    return 'combat'
+end
+
+function Mgr:UpdateFish(fish, now)
+    if self.Fish[fish.Id] ~= fish then return end
+    now = now or self:Now()
+    if self.Ai and not MgrFishCarrier:SyncAiPosition(fish.Carrier) then
+        self:Remove(fish)
+        return
+    end
+    local controlled = self:AiControlled(fish, now)
+    local canUpdate = not controlled or (fish.FleeAt ~= nil and now >= fish.FleeAt)
+    if not canUpdate then return end
+    if fish.State == Mgr.State.AwaitLift then
+        self:Stabilize(fish)
+        if fish.LiftAt and now - fish.LiftAt >= cfg().LiftConfirmSec then
+            if not self:RequestLift(fish) and fish.LiftAttempts >= cfg().LiftAttempts and not fish.LiftGaveUp then
+                fish.LiftGaveUp = true
+                print('[MgrFishUnit] 抓举未确认，放弃重试', fish.Owner.UserId, 'fish=' .. tostring(fish.Id))
+            end
+        end
+    elseif fish.State == Mgr.State.Wild then
+        if fish.WildUntil and now >= fish.WildUntil then
+            print('[MgrFishUnit] 爆炸保底鱼到期消失', fish.FishId, 'fish=' .. tostring(fish.Id))
+            self:Remove(fish)
+        end
+    elseif fish.State == Mgr.State.Escaping then
+        self:UpdateEscaping(fish, now)
+    elseif fish.State == Mgr.State.Flying then
+        self:UpdateFlying(fish, now)
+    elseif fish.FleeAt then
+        self:UpdateCombat(fish, now)
+    end
+end
+
+function Mgr:MountAiProjection(fish, s, phase)
+    local projection = self.AiProjection
+    if not projection then return end
+    local active = s:memo('OfficialAiActive', function(ms)
+        local value = ms:d(phase)
+        return value == 'combat' or value == 'escaping'
+    end)
+    s:effect('OfficialAiLeaf', function(es)
+        if not es:d(active) then return end
+        local started = false
+        local function start()
+            if started or self.Fish[fish.Id] ~= fish then return end
+            local ok, result = pcall(projection.start, projection, fish.Id)
+            if ok and result == true then
+                started = true
+                return
+            end
+            local err = ok and 'start returned false' or result
+            if self.Logger and type(self.Logger.error) == 'function' then
+                self.Logger.error('[FishTree] operation=AiStart', 'fish=' .. tostring(fish.Id), tostring(err))
+            else
+                print('[FishTree] operation=AiStart', 'fish=' .. tostring(fish.Id), tostring(err))
+            end
+        end
+        start()
+        es:subscribe(self:FrameClock().on_frame, start)
+        es:on_cleanup(function()
+            if not started or type(projection.stop) ~= 'function' then return end
+            local ok, err = pcall(projection.stop, projection, fish.Id)
+            if not ok then
+                if self.Logger and type(self.Logger.error) == 'function' then
+                    self.Logger.error('[FishTree] operation=AiStop', 'fish=' .. tostring(fish.Id), tostring(err))
+                else
+                    print('[FishTree] operation=AiStop', 'fish=' .. tostring(fish.Id), tostring(err))
+                end
+            end
+        end)
+    end)
+end
+
+function Mgr:SpawnTree(fish)
+    fish.StateSignal = State.new('FishState:' .. tostring(fish.Id), fish.State)
+    fish.HolderTreeState = State.new('HolderTree:' .. tostring(fish.Id), nil)
+    local host = self
+    local root = Effect.new('FishTree:' .. tostring(fish.Id), function(s)
+        -- 根清理最先声明、最后执行：相位与 AI 叶子拆完后，再统一回收载体和宿主信号。
+        s:on_cleanup(function() host:CleanupFish(fish) end)
+        local phase = s:memo('FishLifePhase', function(ms)
+            return lifePhase(ms:d(fish.StateSignal))
+        end)
+        local lifted = s:memo('IsLifted', function(ms) return ms:d(phase) == 'lifted' end)
+        local combat = s:memo('IsCombat', function(ms) return ms:d(phase) == 'combat' end)
+        local escaping = s:memo('IsEscaping', function(ms) return ms:d(phase) == 'escaping' end)
+        local wild = s:memo('IsWild', function(ms) return ms:d(phase) == 'wild' end)
+
+        s:phase('LiftedPhase', lifted, function(ps)
+            ps:effect('HolderAlive', function(es)
+                local holder_tree = es:d(fish.HolderTreeState)
+                fish.HolderTree = holder_tree
+                if not holder_tree or fish.State ~= Mgr.State.Held then return end
+                local alive = holder_tree.memos and holder_tree.memos.is_alive
+                local session = holder_tree.session_alive
+                if not alive or not session then return end
+                if not es:d(alive) or not es:d(session) then
+                    host:Release(fish, session:now() == false and 'leave' or 'life')
+                end
+            end)
+            ps:subscribe(host:FrameClock().on_frame, function(frame)
+                host:UpdateFish(fish, frame and frame.now)
+            end)
+            ps:on_cleanup(function()
+                if fish.Mount then pcall(function() fish.Mount:Destroy() end) end
+                fish.Mount = nil
+            end)
+        end)
+        s:phase('CombatPhase', combat, function(ps)
+            ps:subscribe(host:FrameClock().on_frame, function(frame)
+                host:UpdateFish(fish, frame and frame.now)
+            end)
+            ps:on_cleanup(function()
+                local gone = host.Fish[fish.Id] ~= fish
+                local reason = gone and 'gone' or 'phase'
+                host:EndBossAttack(fish, reason)
+                host:EndAirAttacks(fish, reason)
+                host:EndBite(fish, reason)
+                host:EndMove(fish, reason)
+                if fish.Carry then host:ReleaseCarried(fish, nil, gone and 'died' or 'phase') end
+            end)
+        end)
+        s:phase('EscapingPhase', escaping, function(ps)
+            ps:subscribe(host:FrameClock().on_frame, function(frame)
+                host:UpdateFish(fish, frame and frame.now)
+            end)
+            ps:on_cleanup(function()
+                host:EndMove(fish, host.Fish[fish.Id] == fish and 'phase' or 'gone')
+            end)
+        end)
+        s:phase('WildPhase', wild, function(ps)
+            ps:subscribe(host:FrameClock().on_frame, function(frame)
+                host:UpdateFish(fish, frame and frame.now)
+            end)
+        end)
+        host:MountAiProjection(fish, s, phase)
+    end)
+    fish.Tree = SpokeTree.spawn('FishTree:' .. tostring(fish.Id), root)
+    return fish.Tree
+end
+
 function Mgr:SpawnLanded(player, catch, position)
     local species = catch and GameCfg.Fish[catch.fishId]
     if not player or not species or type(catch.mult) ~= 'number' then return nil, 'bad-catch' end
@@ -119,6 +283,7 @@ function Mgr:SpawnLanded(player, catch, position)
         pcall(function() carrier.Receiver.Controller.LiftedEnabled = false end)
     end
     self:Isolate(fish)
+    self:SpawnTree(fish)
     local body = carrier.Body
     if body and body.OnLiftedBegin then
         local beginConn = body.OnLiftedBegin:Connect(function(liftunit) self:OnLifted(fish, liftunit) end)
@@ -156,6 +321,7 @@ function Mgr:SpawnBlastFish(fishId, mult, position, owner)
         pcall(function() carrier.Receiver.Controller.LiftedEnabled = false end)
     end
     self:Isolate(fish)
+    self:SpawnTree(fish)
     return fish
 end
 
@@ -202,8 +368,10 @@ function Mgr:OnLifted(fish, liftunit)
         return
     end
     fish.Mount = mount
-    fish.State = Mgr.State.Held
     fish.Holder = holder
+    self:SetState(fish, Mgr.State.Held)
+    fish.HolderTree = self.GetPlayerTree and self:GetPlayerTree(holder) or nil
+    if fish.HolderTreeState then fish.HolderTreeState:set(fish.HolderTree) end
     self.Held[holder.UserId] = fish
     pcall(function() fish.Carrier.Body.Parent = mount end)
     print('[MgrFishUnit] 举起', holder.UserId, fish.FishId, fish.Mult, 'fish=' .. tostring(fish.Id))
@@ -312,7 +480,7 @@ function Mgr:Release(fish, reason)
         body.AngularVelocity = Vector3.New(0, 0, 0)
     end)
     local now = self:Now()
-    fish.State = Mgr.State.Escaping
+    self:SetState(fish, Mgr.State.Escaping)
     fish.EscapeAt = now
     fish.EscapeBy = holder
     fish.TurnAt = now + cfg().TurnSec
@@ -327,7 +495,7 @@ function Mgr:Release(fish, reason)
             self:SetHeading(fish, towardWater(pos))
         end
     elseif self:BossPhaseEnabled(fish.FishId) then
-        fish.State = Mgr.State.Combat
+        self:SetState(fish, Mgr.State.Combat)
         fish.FleeAt = now + (species.EscapeSec or 300)
         fish.CombatPosition = pos
         fish.CombatRotation = body.Rotation
@@ -336,7 +504,7 @@ function Mgr:Release(fish, reason)
         fish.Yaw = 0
         body.LinearVelocity = Vector3.New(0, 0, 0)
     elseif species.Combat then
-        fish.State = Mgr.State.Combat
+        self:SetState(fish, Mgr.State.Combat)
         fish.FleeAt = now + species.EscapeSec
         fish.CombatPosition = pos
         fish.CombatRotation = body.Rotation
@@ -369,6 +537,11 @@ function Mgr:Release(fish, reason)
         self:PublishCombat(fish)
     elseif pos then
         self:SetHeading(fish, towardWater(pos))
+    end
+    if reason == 'leave' then
+        fish.FleeAt = now + (species.EscapeSec or 1)
+        fish.Owner = nil
+        fish.Holder = nil
     end
     print('[MgrFishUnit] 放下', holder and holder.UserId, reason, fish.FishId, 'fish=' .. tostring(fish.Id))
     if reason == 'drop' and holder and self.Quest and not (pos and inWater(pos)) then
@@ -1272,7 +1445,7 @@ function Mgr:UpdateCombat(fish, now)
         self:ReleaseCarried(fish, nil, 'timeout')
         fish.Aquatic = nil
         fish.WakeAt, fish.MoveName = nil, nil
-        fish.State = Mgr.State.Escaping
+        self:SetState(fish, Mgr.State.Escaping)
         fish.StraightEscape = true
         if fish.CombatRotation then body.Rotation = fish.CombatRotation end
         self:SetHeading(fish, towardWater(pos))
@@ -1365,7 +1538,7 @@ function Mgr:UpdateEel(fish, now, entry)
     if fish.State == Mgr.State.Sleeping then
         if now < fish.WakeAt then return end
         if fish.CombatRotation then body.Rotation = fish.CombatRotation end
-        fish.State = Mgr.State.Combat
+        self:SetState(fish, Mgr.State.Combat)
         fish.WakeAt = nil
         fish.Discharges = 0
         fish.WarnAt, fish.DischargeAt = nil, nil
@@ -1382,7 +1555,7 @@ function Mgr:UpdateEel(fish, now, entry)
         if fish.CombatRotation and Quaternion then
             body.Rotation = fish.CombatRotation * Quaternion.FromEulerAngles(0, 0, entry.SleepRollRadians)
         end
-        fish.State = Mgr.State.Sleeping
+        self:SetState(fish, Mgr.State.Sleeping)
         fish.WakeAt = now + entry.SleepSec
         fish.WarnAt = nil
         publishBite(self, GarBiteNotice.Clear(fish.Id, 'sleep'))
@@ -1487,7 +1660,7 @@ function Mgr:StartFlight(fish, now)
     if not profile or not bounds then return false end
     fish.Flight = FlightPath.New(bounds, GameCfg.Ability.Flight, profile, pos, now)
     fish.FlightAt = now
-    fish.State = Mgr.State.Flying
+    self:SetState(fish, Mgr.State.Flying)
     fish.DiveActive = false
     if fish.FishId == 'fish55Elite' then
         self:StartAquatic(fish, now)
@@ -1509,7 +1682,7 @@ function Mgr:ExitFlight(fish, now, reason)
     fish.Flight = nil
     fish.DiveActive = false
     if self.Fish[fish.Id] ~= fish then return end
-    fish.State = Mgr.State.Escaping
+    self:SetState(fish, Mgr.State.Escaping)
     fish.StraightEscape = true
     self:PublishCombat(fish, true)
     fish.EscapeAt = now
@@ -2035,8 +2208,9 @@ function Mgr:Price(fish)
     return FishCatch.Price(GameCfg.Fish[fish.FishId], fish.Mult)
 end
 
-function Mgr:Remove(fish)
-    if not fish or self.Fish[fish.Id] ~= fish then return end
+function Mgr:CleanupFish(fish)
+    if not fish or fish.Cleaned then return end
+    fish.Cleaned = true
     self:EndBossAttack(fish, 'gone')
     self:EndAirAttacks(fish, 'gone')
     if self.Ai then self.Ai:Remove(fish) end
@@ -2054,6 +2228,13 @@ function Mgr:Remove(fish)
     MgrFishCarrier:Despawn(fish.Carrier)
     if fish.Mount then pcall(function() fish.Mount:Destroy() end) end
     fish.Mount = nil
+end
+
+function Mgr:Remove(fish)
+    if not fish or fish.Cleaned then return end
+    self.Fish[fish.Id] = nil
+    if fish.Tree and fish.Tree.is_detached ~= true then fish.Tree:dispose() end
+    self:CleanupFish(fish)
 end
 
 function Mgr:Stabilize(fish)
@@ -2136,8 +2317,7 @@ function Mgr:OnDied(player)
             if current.Move and current.Move.Target == player then self:EndMove(current, 'gone') end
         end
     end
-    local fish = self:GetHeld(player)
-    if fish then self:Release(fish, 'died') end
+    -- 持鱼释放由 LiftedPhase 只读观察 PlayerTree.memos.is_alive，不由玩家回调命令式驱动。
     if self.Cast and self.Cast.Abort then self.Cast:Abort(player) end
 end
 
@@ -2165,14 +2345,6 @@ end
 
 function Mgr:OnPlayerRemoving(player)
     self:ClearLinks(player)
-    local held = self:GetHeld(player)
-    if held then
-        self:Release(held, 'leave')
-        local species = GameCfg.Fish[held.FishId]
-        held.FleeAt = held.FleeAt or (self:Now() + (species and species.EscapeSec or 1))
-        held.Holder = nil
-        held.Owner = nil
-    end
     for _, fish in pairs(self.Fish) do
         if self.Ai then
             self.Ai:Custom(fish)
@@ -2191,7 +2363,7 @@ function Mgr:OnPlayerRemoving(player)
     for _, fish in ipairs(self:GetFish(player)) do
         if fish.State == Mgr.State.AwaitLift then
             local species = GameCfg.Fish[fish.FishId]
-            fish.State = Mgr.State.Escaping
+            self:SetState(fish, Mgr.State.Escaping)
             fish.EscapeAt = self:Now()
             fish.FleeAt = self:Now() + (species and species.EscapeSec or 1)
             fish.Owner = nil
@@ -2253,36 +2425,8 @@ function Mgr:AiControlled(fish, now)
 end
 
 function Mgr:Update()
-    local now = self:Now()
-    for _, fish in pairs(self.Fish) do
-        local aiFailed = self.Ai and not self.Ai:Sync(fish)
-        if aiFailed then self:Remove(fish) end
-        local controlled = not aiFailed and self:AiControlled(fish, now)
-        local canUpdate = not aiFailed
-            and (not controlled or (fish.FleeAt ~= nil and now >= fish.FleeAt))
-        if canUpdate then
-            if fish.State == Mgr.State.AwaitLift then
-                self:Stabilize(fish)
-                if fish.LiftAt and now - fish.LiftAt >= cfg().LiftConfirmSec then
-                    if not self:RequestLift(fish) and fish.LiftAttempts >= cfg().LiftAttempts and not fish.LiftGaveUp then
-                        fish.LiftGaveUp = true
-                        print('[MgrFishUnit] 抓举未确认，放弃重试', fish.Owner.UserId, 'fish=' .. tostring(fish.Id))
-                    end
-                end
-            elseif fish.State == Mgr.State.Wild then
-                if fish.WildUntil and now >= fish.WildUntil then
-                    print('[MgrFishUnit] 爆炸保底鱼到期消失', fish.FishId, 'fish=' .. tostring(fish.Id))
-                    self:Remove(fish)
-                end
-            elseif fish.State == Mgr.State.Escaping then
-                self:UpdateEscaping(fish, now)
-            elseif fish.State == Mgr.State.Flying then
-                self:UpdateFlying(fish, now)
-            elseif fish.FleeAt then
-                self:UpdateCombat(fish, now)
-            end
-        end
-    end
+    -- 只泵宿主帧事件；各 FishTree 的 Trigger 订阅按树隔离执行，本函数不遍历或推进单鱼。
+    self:FrameClock().on_frame:invoke({ dt = 0, now = self:Now() })
     self:EnforceEscapeCap(nil)
 end
 

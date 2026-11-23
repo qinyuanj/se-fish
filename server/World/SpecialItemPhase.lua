@@ -8,6 +8,7 @@ local GameCfg = require("common.GameCfg")
 local FlightPath = require("common.FlightPath")
 local Number = require("common.Number")
 local SpecialItem = require("common.SpecialItem")
+local State = require("common.packages.spoke.api").State
 
 local SpecialItemPhase = {}
 
@@ -107,6 +108,8 @@ function SpecialItemPhase.mount(ps, player_tree, opts)
   local published_breath = nil
   local failures = {}
   local restoring = false
+  local selected_phase = State.new("SpecialItemPhase.selected", nil)
+  local cleanup_active = State.new("SpecialItemPhase.cleanup_active", false)
   local cleanup_character = nil
 
   local function now()
@@ -253,9 +256,11 @@ function SpecialItemPhase.mount(ps, player_tree, opts)
     if gravity_off then set_gravity(true) end
     if wing_bind_id or skin_applied or gravity_off or placeholder_mount or placeholder_model then
       restoring = true
+      cleanup_active:set(true)
       return false
     end
     restoring = false
+    cleanup_active:set(false)
     effect = nil
     appearance = nil
     return true
@@ -326,6 +331,7 @@ function SpecialItemPhase.mount(ps, player_tree, opts)
     end
     effect = desired
     restoring = false
+    cleanup_active:set(false)
     return true
   end
 
@@ -595,35 +601,73 @@ function SpecialItemPhase.mount(ps, player_tree, opts)
         flight_ground_y = nil
       end
     end
-    reconcile()
+    local desired = desired_effect()
+    if selected_phase:now() ~= desired then
+      selected_phase:set(desired)
+    else
+      reconcile()
+    end
   end)
 
-  ps:subscribe(clock.on_frame, function(frame)
-    if (player_tree.tree and player_tree.tree.is_detached == true) or player_tree.session_alive:now() == false then return end
-    local dt = frame and frame.dt or 0
-    local current = frame and frame.now or now()
-    if restoring then
-      if current + 1e-9 >= retry_after and retries < CLEANUP_RETRIES then
-        retries = retries + 1
-        retry_after = current + CLEANUP_RETRY_SEC
-        for key, failure in pairs(failures) do
-          if failure.next_at and failure.next_at <= current + 1e-9 then failures[key] = nil end
-        end
-        reconcile()
+  local function retry_cleanup(current)
+    if current + 1e-9 >= retry_after and retries < CLEANUP_RETRIES then
+      retries = retries + 1
+      retry_after = current + CLEANUP_RETRY_SEC
+      for key, failure in pairs(failures) do
+        if failure.next_at and failure.next_at <= current + 1e-9 then failures[key] = nil end
       end
-      mirror_cooldown()
-      return
+      reconcile()
     end
-    retries = 0
-    reconcile()
     mirror_cooldown()
-    local step = dt
-    while step > 1e-9 do
-      local slice = math.min(step, cfg().Wings.MaxStepSec)
-      update_flight(slice)
-      step = step - slice
-    end
-    update_breath(current)
+  end
+
+  local wings_selected = ps:memo("WingsSelected", function(ms)
+    return ms:d(selected_phase) == "wings"
+  end)
+  local godzilla_selected = ps:memo("GodzillaSelected", function(ms)
+    return ms:d(selected_phase) == "godzilla"
+  end)
+  local cleanup_selected = ps:memo("SpecialCleanupSelected", function(ms)
+    return ms:d(selected_phase) == nil and ms:d(cleanup_active)
+  end)
+
+  ps:phase("WingsPhase", wings_selected, function(wings)
+    reconcile()
+    wings:subscribe(clock.on_frame, function(frame)
+      if player_tree.session_alive:now() == false then return end
+      local current = frame and frame.now or now()
+      if restoring then retry_cleanup(current) return end
+      retries = 0
+      reconcile()
+      mirror_cooldown()
+      local step = frame and frame.dt or 0
+      while step > 1e-9 do
+        local slice = math.min(step, cfg().Wings.MaxStepSec)
+        update_flight(slice)
+        step = step - slice
+      end
+    end)
+    wings:on_cleanup(function() restore() publish() end)
+  end)
+
+  ps:phase("GodzillaPhase", godzilla_selected, function(godzilla)
+    reconcile()
+    godzilla:subscribe(clock.on_frame, function(frame)
+      if player_tree.session_alive:now() == false then return end
+      local current = frame and frame.now or now()
+      if restoring then retry_cleanup(current) return end
+      retries = 0
+      reconcile()
+      mirror_cooldown()
+      update_breath(current)
+    end)
+    godzilla:on_cleanup(function() restore() publish() end)
+  end)
+
+  ps:phase("CleanupPhase", cleanup_selected, function(cleanup)
+    cleanup:subscribe(clock.on_frame, function(frame)
+      retry_cleanup(frame and frame.now or now())
+    end)
   end)
 
   ps:on_cleanup(function()

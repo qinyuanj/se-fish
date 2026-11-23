@@ -91,7 +91,12 @@ function ServerRuntime.new(opts)
   local fish_order = {}
   local next_fish_id = 0
   local fish_host = FishTree.new()
-  local ai_started = {}
+  fish_host.Clock = clock
+  fish_host.AiProjection = opts.ai
+  fish_host.Logger = opts.logger
+  fish_host.GetPlayerTree = function(_, player)
+    return type(player) == "table" and player_trees[player.UserId] or nil
+  end
   fish_host.CreateUnit = opts.create_unit
   fish_host.World = opts.world_service
   fish_host.Cast = opts.cast
@@ -402,7 +407,7 @@ function ServerRuntime.new(opts)
     if entity_modifiers then
       entity_modifiers:step(clock.now())
     end
-    fish_host:Update()
+    fish_host:EnforceEscapeCap(nil)
     runtime:_publish_fish()
   end
 
@@ -895,10 +900,6 @@ function ServerRuntime.new(opts)
     for index, value in ipairs(fish_order) do
       if value == id then table.remove(fish_order, index) break end
     end
-    if ai_started[id] then
-      ai_started[id] = nil
-      if opts.ai and type(opts.ai.stop) == "function" then pcall(opts.ai.stop, opts.ai, id) end
-    end
     if fish_host.Fish[fish.Id] == fish then fish_host:Remove(fish) end
   end
 
@@ -948,10 +949,6 @@ function ServerRuntime.new(opts)
           gone[#gone + 1] = id
         else
           local row = fish_row(fish)
-          if opts.ai and (row.phase == "combat" or row.phase == "escape") and not ai_started[id] then
-            ai_started[id] = true
-            if type(opts.ai.start) == "function" then pcall(opts.ai.start, opts.ai, id) end
-          end
           list[#list + 1] = row
           if type(row.warning) == "table" then
             warnings[#warnings + 1] = row.warning
@@ -966,12 +963,6 @@ function ServerRuntime.new(opts)
     if event and type(event.FireAllClients) == "function" then
       pcall(function() event:FireAllClients({ list = list, warnings = warnings }) end) -- 下行失败不回滚权威活鱼
     end
-  end
-
-  local function release_fish_for(player)
-    if not is_valid_player(player) then return end
-    local held = fish_host:GetHeld(player)
-    if held then fish_host:Release(held, "life") end
   end
 
   function runtime:lottery_action(player, payload)
@@ -1246,11 +1237,6 @@ function ServerRuntime.new(opts)
 
   function life:ApplyDamage(player, amount, hit)
     local ok = self:ApplyHit(hit or self:NewHit(nil, "damage"), player, amount)
-    local tree = tree_of(player)
-    if tree and tree.states.life_phase:now() ~= "alive" then
-      release_fish_for(player)
-      runtime:_publish_fish()
-    end
     return ok
   end
 
@@ -1262,7 +1248,12 @@ function ServerRuntime.new(opts)
       return self:ApplyDamage(player, current - value, self:NewHit(nil, "gm"))
     end
     local controller = player.Character and player.Character.Controller
-    if controller then pcall(function() controller.Health = value end) end
+    if not controller then return false end
+    local ok, err = pcall(function() controller.Health = value end)
+    if not ok then
+      print("[ServerRuntime] operation=SetHealth", "player=" .. tostring(player.UserId), tostring(err))
+      return false
+    end
     tree.states.health:set(value)
     return true
   end

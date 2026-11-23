@@ -1,5 +1,6 @@
 -- 举鱼共享夹具：仅提供环境方法，不注册测试案例。
 local M = {}
+local State = require('common.packages.spoke.api').State
 
 --- 建一个空世界壳；调用方随后 :setUp() 搭世界、:tearDown() 拆除
 --- （与 blindbox_world / revive_world 同一构造/拆除入口名）。
@@ -73,9 +74,33 @@ function M:setUp()
             return carrier
         end,
         Despawn = function(_, carrier) env.despawned[#env.despawned + 1] = carrier end,
+        SyncAiPosition = function(_, carrier)
+            if not carrier.AiOwnsMovement then return true end
+            local p, offset = carrier.Receiver.Position, carrier.ReceiverOffset or vec(0, 0, 0)
+            if not p or p.x ~= p.x or p.y ~= p.y or p.z ~= p.z then return false end
+            carrier.Body.Position = vec(p.x - offset.x, p.y - offset.y, p.z - offset.z)
+            return true
+        end,
     }
     package.loaded['server.World.FishTree'] = nil
     self.mgr = assert(loadfile('server/World/FishTree.lua'))()
+    -- 直接 FishTree 宿主也提供公开 PlayerTree 读模型，跨树释放不走生产回退。
+    self.holder_trees = {}
+    self.mgr.GetPlayerTree = function(_, player)
+        return player and self.holder_trees[player.UserId] or nil
+    end
+    local died = self.mgr.OnDied
+    self.mgr.OnDied = function(host, player)
+        local tree = player and self.holder_trees[player.UserId]
+        if tree then tree.memos.is_alive:set(false) end
+        return died(host, player)
+    end
+    local removing = self.mgr.OnPlayerRemoving
+    self.mgr.OnPlayerRemoving = function(host, player)
+        local tree = player and self.holder_trees[player.UserId]
+        if tree then tree.session_alive:set(false) end
+        return removing(host, player)
+    end
     -- 目标裁决适配层由入口注入（生产见 server/main.lua）；夹具照生产接线补上，不走模块内 require。
     self.mgr.AiTarget = require('server.World.FishAiTarget')
     self.pushed = {}
@@ -93,6 +118,10 @@ function M:newPlayer(id, position)
             env.lifts[#env.lifts + 1] = character
         end } }
     local player = { UserId = id, Character = character, CharacterAdded = signal(), CharacterRemoving = signal() }
+    local tree = { session_alive = State.new('Fixture.session_alive', true) }
+    tree.memos = { is_alive = State.new('Fixture.is_alive', true) }
+    self.holder_trees[id] = tree
+    character.Controller.Died:Connect(function() tree.memos.is_alive:set(false) end)
     self.players[#self.players + 1] = player
     self.mgr:OnPlayerAdded(player)
     return player

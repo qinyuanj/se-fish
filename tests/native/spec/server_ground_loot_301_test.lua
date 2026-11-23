@@ -404,4 +404,16 @@ describe("钓鱼区地面物品与鱼饵刷新（#301 服务端宿主）", funct
     assert.equals(0, env:alive_units())
     assert.is_nil(row and row._unused)
   end)
+
+  it("SharedWorldTree 销毁后 RequestLoot 与 ItemBarAction 连接全部断开", function()
+    local env = host()
+    local player = make_player(10, 0, 0)
+    env:add(player)
+    env.events.RequestLoot.OnServerEvent:Fire(player)
+    local before = #env.events.LootState.clients
+    env:shutdown()
+    env.events.RequestLoot.OnServerEvent:Fire(player)
+    env.events.ItemBarAction.OnServerEvent:Fire(player, { action = "Pickup", value = "1" })
+    assert.equals(before, #env.events.LootState.clients)
+  end)
 end)
