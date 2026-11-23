@@ -163,7 +163,7 @@ describe("服务端烧烤点宿主接缝（#310）", function()
       end,
     }
     ctx.PlayerData = assert(loadfile("server/Data/PlayerData.lua"))()
-    ctx.save = assert(loadfile("server/Mgr/MgrSave.lua"))()
+    ctx.save = assert(loadfile("server/SaveHost.lua"))()
     ctx.runtime = ServerRuntime.new({
       initial_now = 1000,
       remote = _G.REUtil,

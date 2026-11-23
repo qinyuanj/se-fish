@@ -130,8 +130,8 @@ describe('条款 18 存档会话与结算身份', function()
     _G.REUtil = reStub
     package.loaded['server.Data.PlayerData'] = nil
     env.PlayerData = require('server.Data.PlayerData')
-    env.save = assert(loadfile('server/Mgr/MgrSave.lua'))()
-    env.players = assert(loadfile('server/Mgr/MgrPlayerData.lua'))()
+    env.save = assert(loadfile('server/SaveHost.lua'))()
+    env.players = assert(loadfile('server/PlayerDataHost.lua'))()
     env.players.Save, env.save.PlayerData = env.save, env.players
     env.ferry = { OnlinePlayers = function() return {} end }
     env.anchors = {}

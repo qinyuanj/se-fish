@@ -80,7 +80,7 @@ describe('条款 10：烧烤倍率与会话规则', function()
     end }
     ctx.events.GrillAction = { OnServerEvent = signal(), FireClient = function() end }
     ctx.PlayerData = assert(loadfile('server/Data/PlayerData.lua'))()
-    ctx.save = assert(loadfile('server/Mgr/MgrSave.lua'))()
+    ctx.save = assert(loadfile('server/SaveHost.lua'))()
     ctx.ServerRuntime = assert(loadfile('server/World/ServerRuntime.lua'))()
     ctx.datas = {}
     ctx.runtime = ctx.ServerRuntime.new({

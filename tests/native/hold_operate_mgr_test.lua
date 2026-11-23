@@ -3,7 +3,7 @@
 -- 分发不写回包客户端无从重试、绕开 Vitals 直接扣食。
 -- 接缝：MgrPlayerData:Handle 请求入口。
 local GameCfg = require('common.GameCfg')
-local Mgr = require('server.Mgr.MgrPlayerData')
+local Mgr = require('server.PlayerDataHost')
 
 local function signal()
     local callbacks = {}

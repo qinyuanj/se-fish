@@ -1,25 +1,33 @@
 local PlayerData = require('server.Data.PlayerData')
 local GameCfg = require('common.GameCfg')
-local ServerRuntime = require('server.World.ServerRuntime')
-local Mgr = {}
+local PlayerDataHost = { SpokeHost = true }
 local DataMap = {}
 
-function Mgr:GetDataInst(player)
+function PlayerDataHost:GetDataInst(player)
     local data = player and DataMap[player.UserId]
     if data and data.Player == player and data.Inited and data.LoadState == 'ready' then return data end
 end
 
-function Mgr:SendItemBar(player, forcePush)
+function PlayerDataHost:SendItemBar(player, forcePush)
     local data = self:GetDataInst(player)
     if not data then return end
     if self.Vitals and self.Vitals.RefreshHeldDamage then self.Vitals:RefreshHeldDamage(player, data) end
-    if self.OnSyncPlayerTree and self.OnSyncPlayerTree(player, data, forcePush) then
-        return
+    local tree = self.Runtime and self.Runtime:get_player_tree(player.UserId)
+    if tree then
+        if forcePush then return self:SyncPlayerTree(player, true) end
+        return false -- 普通变更由所属操作/事务同步，树底统一推送，禁止双通道。
     end
     _G.REUtil:GetRE('ItemBarState'):FireClient(player, data:GetItemBarSnapshot())
 end
 
-function Mgr:OnPlayerAdded(player)
+function PlayerDataHost:SyncPlayerTree(player, forcePush)
+    local tree = self.Runtime and self.Runtime:get_player_tree(player.UserId)
+    local data = self:GetDataInst(player)
+    if not tree or not data then return false end
+    return tree:sync_from_data(data, forcePush and { force_push = true } or nil)
+end
+
+function PlayerDataHost:OnPlayerAdded(player)
     local current = DataMap[player.UserId]
     if current and current.Player == player then return end
     if current then self:OnPlayerRemoving(current.Player) end
@@ -32,7 +40,7 @@ function Mgr:OnPlayerAdded(player)
     self:SendItemBar(player)
 end
 
-function Mgr:OnPlayerRemoving(player)
+function PlayerDataHost:OnPlayerRemoving(player)
     local data = DataMap[player.UserId]
     if data and data.Player == player then
         DataMap[player.UserId] = nil
@@ -70,13 +78,13 @@ local function eatSlot(mgr, player, data, value)
     if itemId then mgr.Vitals:Eat(player, itemId, cooked) end
 end
 
-function Mgr:Operate(player, data, payload)
+function PlayerDataHost:Operate(player, data, payload)
     local function finish(result, operation)
         if operation then result.operation = operation end
         _G.REUtil:GetRE('ItemBarResult'):FireClient(player, result)
     end
     local function worldOf()
-        local runtime = ServerRuntime.current and ServerRuntime.current()
+        local runtime = self.Runtime
         return runtime and runtime:get_world()
     end
     local op = payload.op
@@ -127,7 +135,7 @@ function Mgr:Operate(player, data, payload)
         if not world or type(world.try_drop) ~= 'function' then return false end
         local ok = world:try_drop(player, GameCfg.Items.ContainerId.ItemBar, slot)
         if not ok then
-            print('[MgrPlayerData] 丢弃未落到地面', player.UserId, tostring(drop and drop.itemId))
+            print('[PlayerDataHost] 丢弃未落到地面', player.UserId, tostring(drop and drop.itemId))
         end
         return ok
     end
@@ -139,7 +147,7 @@ function Mgr:Operate(player, data, payload)
         if result.action == 'potion' and apply then
             local ok, applied = pcall(apply, self.Ability, player)
             if not ok or not applied.Ok then
-                print('[MgrPlayerData] 成长应用失败', player.UserId, tostring(applied))
+                print('[PlayerDataHost] 成长应用失败', player.UserId, tostring(applied))
             end
         end
     end
@@ -242,9 +250,10 @@ local function notifyEquippedBait(mgr, player, method, value)
         eventId = 'bait:' .. tostring(player.UserId) .. ':' .. tostring(mgr.NextFactId) })
 end
 
-function Mgr:Start()
+function PlayerDataHost:Start()
     _G.REUtil:GetRE('RequestItemBar').OnServerEvent:Connect(function(player)
-        self:SendItemBar(player, true)
+        local tree = self.Runtime and self.Runtime:get_player_tree(player.UserId)
+        if tree then self:SyncPlayerTree(player, true) else self:SendItemBar(player, true) end
     end)
     local actions = {
         SelectSlot = 'SelectSlot',
@@ -260,7 +269,7 @@ function Mgr:Start()
         local action = payload.action
         if action == 'Pickup' or action == 'Drop' then
             if _G.REUtil:CheckRECD(player, 'ItemBarAction', GameCfg.Items.ActionCooldownSec) then return end
-            local runtime = ServerRuntime.current and ServerRuntime.current()
+            local runtime = self.Runtime
             local world = runtime and runtime:get_world()
             if not world then return end
             if action == 'Pickup' and type(world.try_pickup) == 'function' then
@@ -279,7 +288,7 @@ function Mgr:Start()
                 and type(slot) == 'number' and slot == math.floor(slot) and slot >= 1
             if not valid then return end
             if _G.REUtil:CheckRECD(player, 'ItemBarAction', GameCfg.Items.ActionCooldownSec) then return end
-            if data:MoveSlot(from, index, target, slot) then self:SendItemBar(player) end
+            if data:MoveSlot(from, index, target, slot) then self:SendItemBar(player) self:SyncPlayerTree(player) end
             return
         end
         if action == 'Operate' then
@@ -294,18 +303,20 @@ function Mgr:Start()
         if _G.REUtil:CheckRECD(player, 'ItemBarAction', GameCfg.Items.ActionCooldownSec) then return end
         if method == 'EatBait' then
             eatBait(self, player, data, value)
+            self:SyncPlayerTree(player)
             return
         end
         if method == 'EatSlot' then
             eatSlot(self, player, data, value)
+            self:SyncPlayerTree(player)
             return
         end
         if data[method](data, value) then
             self:SendItemBar(player)
+            self:SyncPlayerTree(player)
             notifyEquippedBait(self, player, method, value)
         end
     end)
 end
 
-_G.MgrPlayerData = Mgr
-return Mgr
+return PlayerDataHost

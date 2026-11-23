@@ -6,7 +6,7 @@ local GameCfg = require("common.GameCfg")
 local AbilityAPI = require("server.AbilityAPI")
 local AbilityPackageAPI = require("server.packages.ability_system.api")
 
-local Mgr = { PendingFishCleanup = {} }
+local FishAbility = { PendingFishCleanup = {} }
 
 local EQUIP_RETRY_INTERVAL = 0.1
 local EQUIP_RETRY_COUNT = 50
@@ -15,7 +15,7 @@ local function createManager(character, presetKey)
 	local assets = World:CreateAsset(presetKey)
 	local manager = assets and assets[1]
 	if not manager then
-		print("[MgrAbility] 技能管理器预设创建失败: " .. tostring(presetKey))
+		print("[FishAbility] 技能管理器预设创建失败: " .. tostring(presetKey))
 		return nil
 	end
 	manager.Parent = character
@@ -34,7 +34,7 @@ local function applyAnchorAttributes(anchor, attrs, presetKey)
 		end
 		local ok, err = pcall(anchor.SetAttribute, anchor, key, value)
 		if not ok then
-			print("[MgrAbility] 锚点属性覆盖失败: " .. tostring(presetKey) .. " " .. tostring(key) .. " " .. tostring(err))
+			print("[FishAbility] 锚点属性覆盖失败: " .. tostring(presetKey) .. " " .. tostring(key) .. " " .. tostring(err))
             return false
 		end
 	end
@@ -45,7 +45,7 @@ local function createAnchor(abilityScript, entry)
 	local assets = World:CreateAsset(entry.Anchor)
 	local anchor = assets and assets[1]
 	if not anchor then
-		print("[MgrAbility] 锚点预设创建失败: " .. tostring(entry.Anchor))
+		print("[FishAbility] 锚点预设创建失败: " .. tostring(entry.Anchor))
 		return nil
 	end
 	anchor.Parent = abilityScript
@@ -55,27 +55,27 @@ local function createAnchor(abilityScript, entry)
     end
 	local ok, err = pcall(AbilityAPI.AttachAnchor, anchor, entry.AnchorBehavior)
 	if not ok or err ~= true then
-		print("[MgrAbility] 锚点挂接失败: " .. tostring(err))
+		print("[FishAbility] 锚点挂接失败: " .. tostring(err))
         local removed, removeError = pcall(function() anchor:Destroy() end)
-        if not removed then print('[MgrAbility] 回收失败锚点', tostring(removeError)) end
+        if not removed then print('[FishAbility] 回收失败锚点', tostring(removeError)) end
         return nil
 	end
 	return anchor
 end
 
-function Mgr:RemoveFish(fish)
+function FishAbility:RemoveFish(fish)
     if self.Modifier then self.Modifier:ClearTarget(fish) end
     local record = fish.AbilityRecord
     if not record then return end
     record.Cancelled = true
     if record.Ready then
         local ok, err = pcall(AbilityPackageAPI.StopAbility, record.Receiver, record.Entry.Index)
-        if not ok then print('[MgrAbility] 停止鱼技能失败', fish.Id, tostring(err)) end
+        if not ok then print('[FishAbility] 停止鱼技能失败', fish.Id, tostring(err)) end
     end
     local ok, err = pcall(function() record.Manager:Destroy() end)
     if not ok then
         if not self.PendingFishCleanup[fish] then
-            print('[MgrAbility] 回收鱼技能管理器失败，将重试', fish.Id, tostring(err))
+            print('[FishAbility] 回收鱼技能管理器失败，将重试', fish.Id, tostring(err))
         end
         self.PendingFishCleanup[fish] = true
         return
@@ -84,7 +84,7 @@ function Mgr:RemoveFish(fish)
     fish.AbilityRecord = nil
 end
 
-function Mgr:EquipFish(fish)
+function FishAbility:EquipFish(fish)
     if fish.AbilityRecord then return true end
     local species = GameCfg.Fish[fish.FishId]
     local entry = GameCfg.Ability.FishAbilities[species.Combat]
@@ -111,39 +111,39 @@ function Mgr:EquipFish(fish)
                 })
                 if not anchor then self:RemoveFish(fish) return end
                 record.Ready = true
-                print('[MgrAbility] 电鳗技能就绪', fish.Id)
+                print('[FishAbility] 电鳗技能就绪', fish.Id)
                 return
             end
             Task:Wait(EQUIP_RETRY_INTERVAL)
         end
         if not record.Cancelled then
-            print('[MgrAbility] 电鳗技能装配超时', fish.Id)
+            print('[FishAbility] 电鳗技能装配超时', fish.Id)
             self:RemoveFish(fish)
         end
         end)
         if not ok then
-            print('[MgrAbility] 电鳗技能装配失败', fish.Id, tostring(err))
+            print('[FishAbility] 电鳗技能装配失败', fish.Id, tostring(err))
             self:RemoveFish(fish)
         end
     end)
     return true
 end
 
-function Mgr:CastFish(fish)
+function FishAbility:CastFish(fish)
     local record = fish.AbilityRecord
     if not record or not record.Ready or record.Cancelled or fish.Carrier.Dead then return false end
     if self.Ai then return self.Ai:CastFish(fish) end
     return AbilityAPI.CastAbility(record.Receiver, record.Entry.Index)
 end
 
-function Mgr:CanCast(unit)
+function FishAbility:CanCast(unit)
 	local player = unit and unit.UserId and unit or nil
 	if not player and unit then
 		local players = game:GetService("Players")
 		if players and players.GetPlayerFromCharacter then
 			local ok, found = pcall(players.GetPlayerFromCharacter, players, unit)
 			if ok then player = found
-			else print('[MgrAbility] 玩家解析失败', tostring(found)) end
+			else print('[FishAbility] 玩家解析失败', tostring(found)) end
 		end
 	end
 	if not player then return true end
@@ -151,7 +151,7 @@ function Mgr:CanCast(unit)
 	return self.Vitals:CanAct(player)
 end
 
-function Mgr:PotionCount(player, itemId)
+function FishAbility:PotionCount(player, itemId)
 	if not self.PlayerData or not self.PlayerData.GetDataInst then return 0 end
 	local ok, count = pcall(function()
 		local data = self.PlayerData:GetDataInst(player)
@@ -161,33 +161,33 @@ function Mgr:PotionCount(player, itemId)
 	return 0
 end
 
-function Mgr:BodyPlan(player)
+function FishAbility:BodyPlan(player)
 	return self.Attr:BodyPlan(player)
 end
 
-function Mgr:ApplyBodyScale(player)
+function FishAbility:ApplyBodyScale(player)
 	return self.Attr:ApplyBodyScale(player)
 end
 
 
-function Mgr:CaptureBaseSpeed(player)
+function FishAbility:CaptureBaseSpeed(player)
 	return self.Attr:CaptureBaseSpeed(player)
 end
 
-function Mgr:MaxHealth(player)
+function FishAbility:MaxHealth(player)
 	return self.Attr:MaxHealth(player)
 end
 
 local function queueSpeed(self, player, err)
 	self.PendingSpeed = self.PendingSpeed or {}
 	if not self.PendingSpeed[player.UserId] then
-		print('[MgrAbility] 移速写入失败', player.UserId, tostring(err))
+		print('[FishAbility] 移速写入失败', player.UserId, tostring(err))
 	end
 	self.PendingSpeed[player.UserId] = player
 	return false, tostring(err)
 end
 
-function Mgr:RefreshMoveSpeed(player)
+function FishAbility:RefreshMoveSpeed(player)
 	local ok, err = self.Attr:RefreshMoveSpeed(player)
 	if not ok then
 		return queueSpeed(self, player, err)
@@ -196,7 +196,7 @@ function Mgr:RefreshMoveSpeed(player)
 	return true
 end
 
-function Mgr:ApplyGrowth(player)
+function FishAbility:ApplyGrowth(player)
 	local applied = self.Attr:ApplyGrowth(player)
 	local retryGrowth = not applied.Ok
 	if retryGrowth then
@@ -207,33 +207,33 @@ function Mgr:ApplyGrowth(player)
 end
 
 
-function Mgr:Now()
+function FishAbility:Now()
 	local ok, now = pcall(function() return World:GetServerTime() end)
 	return ok and now or 0
 end
 
-function Mgr:UpdateEffects()
+function FishAbility:UpdateEffects()
 	return self.Modifier:Update()
 end
 
-function Mgr:IsParalyzed(player)
+function FishAbility:IsParalyzed(player)
 	return self.Modifier:IsControlled(player)
 end
 
-function Mgr:FishSpeedFactor(fish)
+function FishAbility:FishSpeedFactor(fish)
 	return self.Modifier:GetMoveMultiplier(fish)
 end
 
-function Mgr:FishParalyzed(fish)
+function FishAbility:FishParalyzed(fish)
 	return self.Modifier:IsControlled(fish)
 end
 
-function Mgr:Start()
+function FishAbility:Start()
 	AbilityAPI.BehaviorServices = self.BehaviorServices
 	AbilityAPI.SetCastGuard(function(unit, index) return self:CanCast(unit) end)
 end
 
-function Mgr:OnPlayerAdded(player)
+function FishAbility:OnPlayerAdded(player)
 	-- 玩家角色能力管理器挂载与角色生命周期监听已迁至 PlayerTree / AbilityLeaf；
 	-- 角色就绪时补做一次成长与血量上限首刷。
 	if player and player.Character then
@@ -242,12 +242,12 @@ function Mgr:OnPlayerAdded(player)
 	end
 end
 
-function Mgr:OnPlayerRemoving(player)
+function FishAbility:OnPlayerRemoving(player)
 	if self.PendingGrowth then self.PendingGrowth[player.UserId] = nil end
 	if self.PendingSpeed then self.PendingSpeed[player.UserId] = nil end
 end
 
-function Mgr:Update(deltaTime)
+function FishAbility:Update(deltaTime)
     for fish in pairs(self.PendingFishCleanup) do self:RemoveFish(fish) end
     local retrySpeed = {}
     for uid, player in pairs(self.PendingSpeed or {}) do retrySpeed[uid] = player end
@@ -257,4 +257,4 @@ function Mgr:Update(deltaTime)
     for _, player in pairs(self.PendingGrowth or {}) do self:ApplyGrowth(player) end
 end
 
-return Mgr
+return FishAbility

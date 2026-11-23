@@ -33,7 +33,8 @@ local lfs = require("lfs")
 -- 合并 #311 删除旧商店/钓鱼佬 4 处建点；实测 client 18 / common 2 / server 26。
 -- #314 小队 HUD 复用 RootView 统一建点，删除旧队伍界面自己的 1 处建点。
 -- #315 图鉴、GM 与消息改由 RootView 统一建点，删除旧客户端四处建点；合并后实测 client 13 / common 2 / server 26。
-local SITES = 41
+-- #316 删除 MgrGameUI、ScreenMain 与本地控制壳，复用 RootView 统一建点；实测 client 9 / common 2 / server 26。
+local SITES = 37
 local SITE_ROOTS = { "client", "common", "server" }
 local REF_ROOTS = { "client", "common", "server", "tests", "tools" }
 local REMOVED = { "FXUtil", "WeldTo", "MarkPointPart", "CreateHPBar" }

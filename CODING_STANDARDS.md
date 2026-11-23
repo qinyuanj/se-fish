@@ -6,7 +6,7 @@
 
 接入管理器、界面、技能包，或修改配置、导出物时，先查 [AGENTS.md 的修改边界](AGENTS.md#修改边界)；命名和玩家文案查 [GLOSSARY.md](GLOSSARY.md)。
 
-**已机检，审查时不必逐条比对**：`require` 的工程前缀与大小写、禁止加载 `EggyAPI.lua` 等引擎存根、禁用 `io`/`os`/`package`/`debug`（三端业务代码，`packages/` 是上游整包拷贝、不在其列）、远程事件只经 `REUtil` 用公开 `RemoteEvent.New` 创建、单端专属 Service / `Players.LocalPlayer` 不跨端、`LastSeq` 随玩家离场清理、`server/Mgr/*.lua` 与 `MgrMap` 登记一致、可重入口不泄漏监听（[guards/source_guard_test](tests/native/guards/source_guard_test.lua)），以及界面 handler、锚点行为与 `MgrMap` 的登记一致（[guards/static_require_test](tests/native/guards/static_require_test.lua)）；三端依赖方向、循环依赖与禁止引用测试夹具（[guards/arch_policy_test](tests/native/guards/arch_policy_test.lua)）。
+**已机检，审查时不必逐条比对**：`require` 的工程前缀与大小写、禁止加载 `EggyAPI.lua` 等引擎存根、禁用 `io`/`os`/`package`/`debug`（三端业务代码，`packages/` 是上游整包拷贝、不在其列）、远程事件只经 `REUtil` 用公开 `RemoteEvent.New` 创建、单端专属 Service / `Players.LocalPlayer` 不跨端、`LastSeq` 随玩家离场清理、服务端宿主由 `server/main.lua` 显式组合、可重入口不泄漏监听（[guards/source_guard_test](tests/native/guards/source_guard_test.lua)），以及 Spoke 宿主组合与锚点行为登记一致（[guards/static_require_test](tests/native/guards/static_require_test.lua)）；三端依赖方向、循环依赖与禁止引用测试夹具（[guards/arch_policy_test](tests/native/guards/arch_policy_test.lua)）。
 
 ## API 与运行端
 

@@ -33,9 +33,9 @@ local PACKAGE_SNAPSHOTS = {
 local DEBT_WATERMARKS = {
   -- 合并 #314/#315 后实测：OwnedUnits 5、旧债务裸 Connect 19、MgrMap 5。
   -- 水位只减不增；后续切片应继续下降，不能为通过门禁调高。
-  owned_units_calls = 5,
-  legacy_raw_connects = 19,
-  mgr_map_members = 5,
+  owned_units_calls = 0,
+  legacy_raw_connects = 0,
+  mgr_map_members = 0,
 }
 
 local BUSINESS_ROOTS = { "client", "common", "server" }
@@ -298,30 +298,28 @@ describe("Spoke 原生重构机械棘轮守卫", function()
           "common.packages.spoke.api",
           "server.Data.PlayerData",
           "server.World.PlayerTree",
-          "server.Mgr.MgrVitals",
+          "server.AbilityBehaviors.melee_hit",
           "client.GameUI",
           "client.Store.ClientStore",
           "client.Views.RootView",
-          "client.ScreenHandlers.ScreenMain",
+          "server.AbilityAPI",
         },
         edges = {
           { from = "common.SpokeClock", to = "common.packages.spoke.api" },
           { from = "server.World.PlayerTree", to = "common.SpokeClock" },
           { from = "server.World.PlayerTree", to = "server.Data.PlayerData" },
-          { from = "server.Mgr.MgrVitals", to = "server.World.PlayerTree" },
+          { from = "server.AbilityBehaviors.melee_hit", to = "server.World.PlayerTree" },
           { from = "client.Store.ClientStore", to = "common.SpokeClock" },
           { from = "client.Views.RootView", to = "client.Store.ClientStore" },
           { from = "client.Views.RootView", to = "client.GameUI" },
-          { from = "client.ScreenHandlers.ScreenMain", to = "client.Store.ClientStore" },
+          { from = "server.AbilityAPI", to = "server.World.PlayerTree" },
         },
       })
       assert.is_true(valid.ok, valid.message)
 
       local invalid_edges = {
-        { from = "server.World.PlayerTree", to = "server.Mgr.MgrVitals" },
+        { from = "server.World.PlayerTree", to = "server.AbilityBehaviors.melee_hit" },
         { from = "server.World.PlayerTree", to = "server.AbilityAPI" },
-        { from = "server.World.PlayerTree", to = "common.OwnedUnits" },
-        { from = "client.Store.ClientStore", to = "client.LocalLoot" },
         { from = "client.Store.ClientStore", to = "client.Views.RootView" },
         { from = "client.Views.RootView", to = "client.MgrGameUI" },
         { from = "client.Views.RootView", to = "client.ScreenHandlers.ScreenMain" },

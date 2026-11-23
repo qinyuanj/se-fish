@@ -132,13 +132,13 @@ describe('TestMainCombatWiring', function()
     it('test_combat_managers_are_wired_to_unified_entry', function()
         local src = readSource('server/main.lua') .. '\n' .. readSource('server/World/ServerRuntime.lua')
         for _, needle in ipairs({
-            'MgrMap.MgrAbility.Vitals = Life',
+            'opts.fish_ability.Vitals = runtime.life',
             'function runtime:damage_fish',
-            'MgrMap.MgrAbility.BehaviorServices = {',
-            'Vitals = Life',
-            'local Life = WorldRuntime.life',
+            'opts.fish_ability.BehaviorServices = {',
+            'Vitals = runtime.life',
+            'local fishHost = WorldRuntime.fish_host',
             'local FishTree = require("server.World.FishTree")',
-            'Modifier = ModifierBridge',
+            'Modifier = modifier_service',
             'GM = PlayerGM',
             'function runtime:receive_landed',
         }) do
@@ -236,7 +236,8 @@ describe('TestMeleeHitEntry', function()
         function anchor:FindFirstChild(name) return self[name] end
         function anchor:GetAttribute(name) return attrs[name] end
         local behavior = assert(loadfile('server/AbilityBehaviors/melee_hit.lua'))()
-        behavior.Attach(anchor, ctx.services)
+        anchor.behaviour = behavior.Attach(anchor, ctx.services)
+        assert.is_nil(anchor.behaviour.root.fault)
         return anchor
     end
 

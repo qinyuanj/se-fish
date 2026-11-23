@@ -21,8 +21,8 @@
 
 ## 修改边界
 
-- **管理器**：新增服务端管理器须加入 `server/main.lua` 的 `MgrMap`，由入口统一分发 `Start` / `OnPlayerAdded` / `OnPlayerRemoving` / `Update`。
-- **界面**：handler 放在 `client/ScreenHandlers/`，文件名与 EUI 节点同名，并在 `MgrGameUI` 的 `ScreenHandlerLoaders` 登记，供 `GetScreen` 按节点名加载。
+- **服务端宿主**：宿主服务放在 `server/` 对应职责模块，标记 `SpokeHost = true` 并由 `server/main.lua` 显式注入 `ServerRuntime`；运行时统一管理启动、玩家加入/离场、帧更新与清理，不恢复 `MgrMap`。
+- **界面**：视图放在 `client/Views/`，由 `RootView` 的 Spoke 视图树统一建点和清理，经 `ClientStore` 读取状态；不恢复 `MgrGameUI` 或旧 `ScreenHandlers` 双轨入口。
 - **共享配置**：数值配置集中在 `common/GameCfg.lua`；技能配置在 `GameCfg.Ability`。
 - **生成内容**：`data/` 只读，修改须回编辑器重新导出，再用 `sync` 回灌；`unit_scripts/` 由引擎生成，不在本仓库管理。
 

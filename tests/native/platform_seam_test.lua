@@ -1,5 +1,5 @@
 -- 迁移自 tests/gameplay/platform_seam_test.lua（#91）；行为契约原文见 #147 T26、docs/技术难点识别.md §4。
--- #147 T26 平台适配层（server/Mgr/MgrPlatform.lua）失败方式先列：
+-- #147 T26 平台适配层（server/PlatformHost.lua）失败方式先列：
 --   1. 可用性口径错：商品未配置（goodsId 空）却放行购买；Debug 关闭却还能进测试支付成功入口；
 --   2. 流程并发错：同一玩家第二个在飞购买/广告被接受（应 busy），或回调串到别人的 flow；
 --   3. 回调路由错：成功/取消/失败/超时没有各归各的 onResult；超时不触发（免费复活倒计时无法恢复）；
@@ -57,7 +57,7 @@ describe('平台适配层（MgrPlatform）', function()
     -- 商品 goodsId 是共享配置表的字段：快照原值，after_each 逐个还原（不是换表，避免突变泄漏）。
     -- GameCfg.Debug / Save.QaSlot 由 helper 的根级快照兜底，但本夹具把 Debug 换成新表，
     -- 这里再显式快照一次，保证 after_each 幂等（不依赖根级 hook 的执行时机）。
-    -- _G.MgrPlayerData 是 server/Mgr/MgrPlayerData.lua 装载时写下的模块全局，旧单进程 runner 里
+    -- _G.MgrPlayerData 是 server/PlayerDataHost.lua 装载时写下的模块全局，旧单进程 runner 里
     -- 它跨套件长存；原生逐例隔离后必须快照并还原，否则同一 chunk 的实例会泄漏到后续案例。
     -- #261 占位支付通道也是共享配置：用例会临时关掉它以取证「无可用通道」，逐例还原。
     restore = { Debug = GameCfg.Debug, PlaceholderEnabled = GameCfg.Platform.Placeholder.Enabled,
@@ -117,9 +117,9 @@ describe('平台适配层（MgrPlatform）', function()
       end, OnServerEvent = signal() }
     end })
     -- loadfile 每次得到全新的管理器实例表，避免 Mgr.Flows / DataMap 跨案例残留。
-    env.save = assert(loadfile('server/Mgr/MgrSave.lua'))()
-    env.players = assert(loadfile('server/Mgr/MgrPlayerData.lua'))()
-    env.platform = assert(loadfile('server/Mgr/MgrPlatform.lua'))()
+    env.save = assert(loadfile('server/SaveHost.lua'))()
+    env.players = assert(loadfile('server/PlayerDataHost.lua'))()
+    env.platform = assert(loadfile('server/PlatformHost.lua'))()
     env.players.Save, env.save.PlayerData = env.save, env.players
     env.platform.Save, env.platform.PlayerData = env.save, env.players
     env.platform.Now = function() return env.now end

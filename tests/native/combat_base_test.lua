@@ -216,7 +216,7 @@ describe('TestMgrAbilityActionGuard', function()
         local api = { SetCastGuard = function(fn) guard = fn end }
         package.loaded['server.AbilityAPI'] = api
         _G.game = { GetService = function() return {} end }
-        local mgr = assert(loadfile('server/Mgr/MgrAbility.lua'))()
+        local mgr = assert(loadfile('server/FishAbility.lua'))()
         local blocked, free = player(1), player(2)
         local host = require('tests.support.life_host').start({ now = 100 })
         host:add(blocked)

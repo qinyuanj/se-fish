@@ -26,7 +26,7 @@
 
 local GameCfg = require('common.GameCfg')
 local MathWaterJudge = require('common.MathWaterJudge')
-local MgrPlayerData = require('server.Mgr.MgrPlayerData')
+local MgrPlayerData = require('server.PlayerDataHost')
 local ServerRuntime = require('server.World.ServerRuntime')
 local function ground()
     local runtime = ServerRuntime.current and ServerRuntime.current()
@@ -51,7 +51,7 @@ local MgrLoot = {
     end,
 }
 local InteractionPoints = require('server.World.InteractionPoints')
-local MgrSave = require('server.Mgr.MgrSave')
+local MgrSave = require('server.SaveHost')
 local function runtimeCommand(name, player, payload)
     local runtime = ServerRuntime.current and ServerRuntime.current()
     return runtime and runtime[name](runtime, player, payload) or false

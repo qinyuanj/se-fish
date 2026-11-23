@@ -2,8 +2,8 @@
 -- 用 exec -p server --file 执行；临时修改会话内成长计数后恢复，不代表真实存档重进验收。
 -- 不自动发奖、不提交存档、不模拟多人；拾取/钓鱼/摆渡及真实枪击/挥砍另列真机遗留。
 local cfg = require('common.GameCfg')
-local ability = require('server.Mgr.MgrAbility')
-local pd = require('server.Mgr.MgrPlayerData')
+local ability = require('server.FishAbility')
+local pd = require('server.PlayerDataHost')
 local ServerRuntime = require('server.World.ServerRuntime')
 local players, task = game:GetService('Players'), game:GetService('Task')
 local player = players:GetPlayers()[1]

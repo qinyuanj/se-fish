@@ -51,7 +51,7 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
     }
     for name, value in pairs(package.loaded) do
       if name == 'common.GameCfg' or name == 'common.REUtil'
-          or name == 'server.Data.PlayerData' or name == 'server.Mgr.MgrPlayerData'
+          or name == 'server.Data.PlayerData' or name == 'server.PlayerDataHost'
           or name:match('^server%.World%.') then
         restore.modules[name] = value
         package.loaded[name] = nil
@@ -108,7 +108,7 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
     }
     package.loaded['common.REUtil'] = reStub
     _G.REUtil = reStub
-    package.loaded['server.Mgr.MgrPlayerData'] = {
+    package.loaded['server.PlayerDataHost'] = {
       GetDataInst = function(_, player) return env.data[player.UserId] end,
       SendItemBar = function() end,
     }
@@ -126,7 +126,7 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
         return anchor
       end,
     }
-    env.mgr.PlayerData = package.loaded['server.Mgr.MgrPlayerData']
+    env.mgr.PlayerData = package.loaded['server.PlayerDataHost']
     env.mgr.OnlinePlayers = function() return env.players end
     env.store = {
       GetAsync = function(_, key) return env.values[key] end,
@@ -149,7 +149,7 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
       if name == 'Players' then return { GetPlayers = function() return env.players end } end
       if name == 'DataStoreService' then return { GetDataStore = function() return env.store end } end
     end }
-    env.save = assert(loadfile('server/Mgr/MgrSave.lua'))()
+    env.save = assert(loadfile('server/SaveHost.lua'))()
     env.mgr.Save = env.save
     for _, player in ipairs(env.players) do env.save:LoadInto(player, env.data[player.UserId]) end
 
@@ -196,7 +196,7 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
     if env and env.runtime then env.runtime:shutdown() end
     for name in pairs(package.loaded) do
       if name == 'common.GameCfg' or name == 'common.REUtil'
-          or name == 'server.Data.PlayerData' or name == 'server.Mgr.MgrPlayerData'
+          or name == 'server.Data.PlayerData' or name == 'server.PlayerDataHost'
           or name:match('^server%.World%.') then
         package.loaded[name] = nil
       end

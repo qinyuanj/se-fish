@@ -5,13 +5,13 @@
 -- 不证明真实容量，也不证明真实多人行为；真实平台容量与真实多人结论是生产开关，由平台/人另行签署，
 -- 夹具结论不替代它。用例与探针里不得把夹具通过写成「容量已验收」「多人已验收」。
 --
--- 只走业务入口：管理器公开方法（MgrMap 上登记的那批）与已登记 RemoteEvent 的 OnServerEvent；
+-- 只走业务入口：宿主公开方法与已登记 RemoteEvent 的 OnServerEvent；
 -- 不加生产代码分支、不读管理器私有表。引擎边界（Task / World / DataStoreService / Players /
 -- RunService / PhysicsService / Vector3 / Vector2 / Color / REUtil）用替身，Close 时逐项还原。
 --
 -- 与 server/main.lua 的接线一一对应：WIRING 逐行核对，接线一改这里先红（先红再改夹具，别让夹具漂走）。
--- 加载的管理器是 main.lua MgrMap 的子集：MgrPlayerData / MgrSave / MgrVitals / MgrSurvival /
--- SquadDock / PkDamageFilter / ServerRuntime / MgrLoot。没加载的管理器（任务、剧情、烧烤、特殊道具等）
+-- 加载的宿主是组合根的子集：PlayerDataHost / SaveHost / MgrVitals / MgrSurvival /
+-- SquadDock / PkDamageFilter / ServerRuntime / MgrLoot。未加载的服务（任务、剧情、烧烤、特殊道具等）
 -- 在 main.lua 里也有 OnPlayerAdded / BeforeLeave 钩子，它们的路径不在本夹具声明的覆盖范围里。
 -- MgrLoot 只用于共享地面实例（SpawnItem / Pickup / Snapshot），**不调 Start**：点位鱼饵刷新
 -- 与区上限回收由 MgrLoot 自己的用例覆盖，连接夹具不替它起刷新区。
@@ -30,18 +30,22 @@ end
 
 -- 复现的接线：每行都是 server/main.lua 的原文子串，缺一行就说明生产装配变了。
 M.WIRING = {
-    'MgrMap.MgrPlayerData.Save = MgrMap.MgrSave',
-    'MgrMap.MgrPlayerData.Vitals = Life',
+    'player_data = PlayerDataHost',
+    'save = SaveHost',
+    'Vitals = runtime.life',
     'bind_party_action = function(dispatch)',
     'bind_party_state_request = function(dispatch)',
     'bind_interact_action = function(dispatch)',
-    'local Life = WorldRuntime.life',
+    'local fishHost = WorldRuntime.fish_host',
 }
 
 function M.assert_wiring()
     local handle = assert(io.open('server/main.lua', 'rb'), '读不到 server/main.lua')
     local source = handle:read('a')
     handle:close()
+    local runtime_handle = assert(io.open('server/World/ServerRuntime.lua', 'rb'), '读不到 server/World/ServerRuntime.lua')
+    source = source .. '\n' .. runtime_handle:read('a')
+    runtime_handle:close()
     for _, line in ipairs(M.WIRING) do
         assert(source:find(line, 1, true), 'server/main.lua 里找不到接线：' .. line)
     end
@@ -175,8 +179,8 @@ function M.new(opts)
     package.loaded['server.Data.PlayerData'] = nil
     env.PlayerData = require('server.Data.PlayerData')
     env.managers = {
-        Save = assert(loadfile('server/Mgr/MgrSave.lua'))(),
-        PlayerData = assert(loadfile('server/Mgr/MgrPlayerData.lua'))(),
+        Save = assert(loadfile('server/SaveHost.lua'))(),
+        PlayerData = assert(loadfile('server/PlayerDataHost.lua'))(),
         Party = {},
     }
     local mgr = env.managers

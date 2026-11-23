@@ -1,8 +1,8 @@
 -- 条款 17-18（docs/acceptance/17-tutorial-story-platform.md）：分享任务在平台能力未开放时走明确占位路径，
 -- 不出现点了没反应的入口；平台开放情况作为生产开关。
--- 只走业务入口：server/main.lua 的 MgrMap 注册的 MgrPlatform（平台能力的唯一服务端入口），按 main.lua 的
+-- 只走业务入口：server/main.lua 组合的 PlatformHost（平台能力的唯一服务端入口），按 main.lua 的
 -- 接线注入 MgrPlayerData 与 MgrSave；引擎边界（CommodityService / AdvertisementService / World 时钟 / RE 通道）
--- 全部替身。**不执行 main.lua 本体**：它一开头就要完整引擎服务，所以照 MgrMap 的接线手工装配，再读 main.lua
+-- 全部替身。**不执行 main.lua 本体**：它一开头就要完整引擎服务，所以按组合根的接线装配，再读 main.lua
 -- 源码核对那几条接线确实存在（见 WIRING）。
 -- 只断言玩家可观察的结果：Share 回包（客户端据此显示占位文案）与玩家数据快照（金币、库存件数）。
 -- 失败方式（先列后写）：
@@ -14,9 +14,10 @@ local GameCfg = require('common.GameCfg')
 local EconomyWorld = require('tests.support.economy_world')
 
 local WIRING = {
-    'MgrPlatform = require("server.Mgr.MgrPlatform"),',
-    'MgrMap.MgrPlatform.Save = MgrMap.MgrSave',
-    'MgrMap.MgrPlatform.PlayerData = MgrMap.MgrPlayerData',
+    'local PlatformHost = require("server.PlatformHost")',
+    'save = SaveHost',
+    'platform = PlatformHost',
+    'player_data = PlayerDataHost',
 }
 
 local function assert_wiring()
@@ -64,7 +65,7 @@ describe('条款 17-18：分享任务的占位入口', function()
         env.player = { UserId = 26303, SetAttribute = function() end }
         env.data = assert(loadfile('server/Data/PlayerData.lua'))().New(env.player, function() end)
         env.data:Init()
-        env.platform = assert(loadfile('server/Mgr/MgrPlatform.lua'))()
+        env.platform = assert(loadfile('server/PlatformHost.lua'))()
         env.platform.PlayerData = { GetDataInst = function(_, player) return player == env.player and env.data end,
             SendItemBar = function() end }
         env.platform.Save = { NextOperation = function() return { id = '26303:1' } end,

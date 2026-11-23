@@ -113,7 +113,7 @@ describe('TestSaveArrayMeta', function()
             if name == 'World' then return { GetServerTime = function() return 100 end } end
             if name == 'Players' then return { GetPlayers = function() return {} end } end
         end }
-        env.save = assert(loadfile('server/Mgr/MgrSave.lua'))()
+        env.save = assert(loadfile('server/SaveHost.lua'))()
     end)
     after_each(function()
         _G.game = savedGame

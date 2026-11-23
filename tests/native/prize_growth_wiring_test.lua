@@ -128,7 +128,7 @@ describe('TestPrizeGrowthPotion', function()
     before_each(function()
         ctx = { debug = GameCfg.Debug, oldREUtil = _G.REUtil, events = {}, growth = {}, bodyOnly = {} }
         local state = ctx
-        ctx.mgr = require('server.Mgr.MgrPlayerData')
+        ctx.mgr = require('server.PlayerDataHost')
         GameCfg.Debug = { Enabled = false }
         _G.REUtil = { CheckRECD = function() return false end, GetRE = function(_, name)
             if not state.events[name] then
@@ -227,12 +227,12 @@ describe('TestPrizeGrowthWiring', function()
         local file = assert(io.open('server/main.lua', 'r'))
         local src = file:read('*a')
         file:close()
-        assert.matches('MgrMap.MgrAbility.PlayerData = MgrMap.MgrPlayerData', src, nil, true)
-        assert.matches('local Life = WorldRuntime.life', src, nil, true)
+        assert.matches('player_data = PlayerDataHost', src, nil, true)
+        assert.matches('fish_ability = FishAbility', src, nil, true)
         assert.matches('bind_weapon_action = function(dispatch)', src, nil, true)
         assert.matches('modifier_leaf = { modifier_api = modifierPackageApi }', src, nil, true)
         assert.matches('entity_modifiers = {', src, nil, true)
-        assert.matches('MgrMap.MgrAbility.Vitals = Life', src, nil, true)
+        assert.matches('fishHost.Vitals = WorldRuntime.life', src, nil, true)
     end)
 end)
 

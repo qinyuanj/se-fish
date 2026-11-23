@@ -48,7 +48,7 @@ describe('TestMeleeHitEffect', function()
             vitals = package.loaded['server.Mgr.MgrVitals'],
             carrier = package.loaded['server.World.FishCarrier'],
             gm = package.loaded['server.World.PlayerGM'],
-            ability = package.loaded['server.Mgr.MgrAbility'],
+            ability = package.loaded['server.FishAbility'],
             api = package.loaded['server.AbilityAPI'], swing = package.loaded['server.SwingRegistry'] }
         ctx = { effects = {}, hitsApplied = {} }
         ctx.owner = { UnitId = 1, Position = vec(0, 0, 0) }
@@ -68,7 +68,7 @@ describe('TestMeleeHitEffect', function()
         }
         package.loaded['server.World.FishCarrier'] = { ResolveCarrier = function() return nil end }
         package.loaded['server.World.PlayerGM'] = { GetMeleeDamage = function(_, _, d) return d end }
-        package.loaded['server.Mgr.MgrAbility'] = { ApplyWeaponEffect = function()
+        package.loaded['server.FishAbility'] = { ApplyWeaponEffect = function()
             error('近战特效不应再经 MgrAbility 转发')
         end }
         local modifierStub = { ApplyWeaponEffect = function(_, source, target, effect)
@@ -88,6 +88,7 @@ describe('TestMeleeHitEffect', function()
         end
         ctx.anchorStart = sig()
         local anchor = {
+            Destroying = sig(),
             GetAttribute = function(_, name)
                 if name == 'Duration' then return 0.3 end
                 return nil
@@ -118,7 +119,8 @@ describe('TestMeleeHitEffect', function()
             return nil
         end }
         ctx.behavior = assert(loadfile('server/AbilityBehaviors/melee_hit.lua'))()
-        ctx.behavior.Attach(anchor, ctx.services)
+        ctx.behaviour = ctx.behavior.Attach(anchor, ctx.services)
+        assert.is_nil(ctx.behaviour.root.fault)
     end)
     after_each(function()
         _G.game = saved.game
@@ -127,7 +129,7 @@ describe('TestMeleeHitEffect', function()
         package.loaded['server.Mgr.MgrVitals'] = saved.vitals
         package.loaded['server.World.FishCarrier'] = saved.carrier
         package.loaded['server.World.PlayerGM'] = saved.gm
-        package.loaded['server.Mgr.MgrAbility'] = saved.ability
+        package.loaded['server.FishAbility'] = saved.ability
         package.loaded['server.AbilityAPI'] = saved.api
         package.loaded['server.SwingRegistry'] = saved.swing
     end)

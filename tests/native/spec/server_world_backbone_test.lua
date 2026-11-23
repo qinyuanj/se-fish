@@ -824,6 +824,7 @@ describe("服务端入口接线：server/main.lua 宿主测试双端到端集成
     saved = {
       game = rawget(_G, "game"),
       REUtil = rawget(_G, "REUtil"),
+      reutil = package.loaded["common.REUtil"],
       MgrUtil = rawget(_G, "MgrUtil"),
       MgrPlayerData = rawget(_G, "MgrPlayerData"),
       Vector3 = rawget(_G, "Vector3"),
@@ -849,6 +850,7 @@ describe("服务端入口接线：server/main.lua 宿主测试双端到端集成
     end
     _G.game = saved.game
     _G.REUtil = saved.REUtil
+    package.loaded["common.REUtil"] = saved.reutil
     _G.MgrUtil = saved.MgrUtil
     _G.MgrPlayerData = saved.MgrPlayerData
     _G.Vector3 = saved.Vector3
@@ -899,7 +901,7 @@ describe("服务端入口接线：server/main.lua 宿主测试双端到端集成
           }
         end
         if name == "Players" then return players_service end
-        if name == "RunService" then return { Heartbeat = heartbeat, IsServer = function() return true end } end
+        if name == "RunService" then return { Heartbeat = heartbeat, IsServer = function() return true end, IsClient = function() return false end } end
         if name == "World" then
           return {
             GetServerTime = function() return now end,
@@ -910,7 +912,7 @@ describe("服务端入口接线：server/main.lua 宿主测试双端到端集成
         if name == "DataStoreService" then return { GetDataStore = function() return store end } end
       end,
     }
-    _G.REUtil = {
+    local remote_util = {
       GetRE = function(_, name)
         if not remote_events[name] then
           remote_events[name] = { OnServerEvent = make_signal(), FireClient = function() end }
@@ -941,11 +943,12 @@ describe("服务端入口接线：server/main.lua 宿主测试双端到端集成
       CastAbility = function() return true end,
     }
 
-    for _, name in ipairs({ "MgrSave", "MgrPlayerData" }) do
-      mgrs[name] = assert(loadfile("server/Mgr/" .. name .. ".lua"))()
-    end
-    mgrs.MgrPkFilter = { Make = function() return function() return true end end }
-    mgrs.MgrAbility = { IsParalyzed = function() return false end }
+    mgrs.SaveHost = assert(loadfile("server/SaveHost.lua"))()
+    mgrs.PlayerDataHost = assert(loadfile("server/PlayerDataHost.lua"))()
+    mgrs.PlatformHost = {}
+    mgrs.FishAbility = { Start = function() end, Update = function() end }
+    _G.REUtil = remote_util
+    package.loaded["common.REUtil"] = remote_util
 
     local sandbox = setmetatable({
       print = function(...)
@@ -955,17 +958,17 @@ describe("服务端入口接线：server/main.lua 宿主测试双端到端集成
         end
       end,
       require = function(path)
+        if path == "common.REUtil" then return remote_util end
         if path == "server.MgrUtil" then return { Start = function() end } end
         if path == "common.ZoneMarkers" then return { Start = function() end } end
         if path == "server.packages.attr_rule.api" then return attr_api_stub end
         if path == "server.packages.modifier_system.api" then return modifier_api_stub end
         if path == "server.packages.ability_system.api" then return ability_api_stub end
-        local name = path:match("^server%.Mgr%.(.*)$")
-        if not name then return require(path) end
-        if not mgrs[name] then
-          mgrs[name] = {}
-        end
-        return mgrs[name]
+        if path == "server.SaveHost" then return mgrs.SaveHost end
+        if path == "server.PlayerDataHost" then return mgrs.PlayerDataHost end
+        if path == "server.PlatformHost" then return mgrs.PlatformHost end
+        if path == "server.FishAbility" then return mgrs.FishAbility end
+        return require(path)
       end,
     }, { __index = _G })
 
@@ -994,7 +997,8 @@ describe("服务端入口接线：server/main.lua 宿主测试双端到端集成
 
     local function make_host_player(uid)
       local c = { Health = 300, MaxHealth = 300, HealthChanged = make_signal(), Died = make_signal(), OnReborn = make_signal() }
-      local p = { UserId = uid, attrs = {}, CharacterAdded = make_signal(), CharacterRemoving = make_signal(), Character = { Controller = c } }
+      local character = { Controller = c, SetScale = function() end }
+      local p = { UserId = uid, attrs = {}, CharacterAdded = make_signal(), CharacterRemoving = make_signal(), Character = character }
       function p:SetAttribute(k, v) self.attrs[k] = v end
       return p
     end
@@ -1033,7 +1037,7 @@ describe("服务端入口接线：server/main.lua 宿主测试双端到端集成
     assert.equals(1, #local_sig.handlers)
 
     -- 变更金币并触发离场 + 同账号立即重进
-    mgrs.MgrPlayerData:GetDataInst(p1):AddCoin(42)
+    mgrs.PlayerDataHost:GetDataInst(p1):AddCoin(42)
     players_service.PlayerRemoving:Fire(p1)
     local p2 = make_host_player(6001)
     players_service.PlayerAdded:Fire(p2)
@@ -1056,6 +1060,6 @@ describe("服务端入口接线：server/main.lua 宿主测试双端到端集成
     assert.is_not_nil(pt2)
     assert.are_not.equal(pt1, pt2)
     assert.equals(42, pt2.states.coin:now())
-    assert.equals(42, mgrs.MgrPlayerData:GetDataInst(p2).Data.FishCoin)
+    assert.equals(42, mgrs.PlayerDataHost:GetDataInst(p2).Data.FishCoin)
   end)
 end)

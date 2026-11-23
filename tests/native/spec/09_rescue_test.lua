@@ -67,8 +67,7 @@ describe('条款 9/11 他人抢救', function()
   local function join(userId, x)
     local player = newPlayer(userId, x)
     env.players:OnPlayerAdded(player)
-    drain()
-    env.lifeHost:add(player)
+    env.lifeHost:add(player, env.players:GetDataInst(player))
     drain()
     return player
   end
@@ -151,8 +150,8 @@ describe('条款 9/11 他人抢救', function()
 
     package.loaded['server.Data.PlayerData'] = nil
     env.PlayerData = require('server.Data.PlayerData')
-    env.save = assert(loadfile('server/Mgr/MgrSave.lua'))()
-    env.players = assert(loadfile('server/Mgr/MgrPlayerData.lua'))()
+    env.save = assert(loadfile('server/SaveHost.lua'))()
+    env.players = assert(loadfile('server/PlayerDataHost.lua'))()
     env.players.Save, env.save.PlayerData = env.save, env.players
     env.lifeHost = require('tests.support.life_host').start({
       now = env.now or 100, remote = re, player_data = env.players, save = env.save,

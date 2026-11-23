@@ -2,7 +2,7 @@
 -- #56 失败方式（先列后写）：
 -- 任务事实/剧情已读未落账就替换会话；旧死亡状态和角色连接残留；最终离场快照被新认领取消；
 -- 重复离场/迟到清理误删新会话；等待玩家已离开或被再次重进替换仍被接纳；跨玩家阻塞；失败后卡住。
--- 接缝：真实 main/Save/PlayerData/Quest/Story/Vitals；替换引擎边界和无关管理器。
+-- 接缝：真实 main/SaveHost/PlayerDataHost/Quest/Story/Vitals；替换引擎边界和无关宿主服务。
 -- it 按旧 LuaUnit 的方法名字典序注册，保持与旧套件一致的案例顺序。
 -- assertIs(state.player, p) 要求对象身份：全仓无 __eq 元方法（已检索确认），故 Lua 的 == 即身份，映射 are.equal。
 local GameCfg = require('common.GameCfg')
@@ -77,13 +77,12 @@ describe('TestPlayerLeaveRejoin', function()
     -- 因此夹具中途抛错时 after_each 仍能完整还原，不把失败泄漏给后续案例。
     before_each(function()
         saved.game, saved.REUtil = rawget(_G, 'game'), rawget(_G, 'REUtil')
-        saved.MgrUtil, saved.MgrPlayerData = rawget(_G, 'MgrUtil'), rawget(_G, 'MgrPlayerData')
         saved.Vector3, saved.Color = rawget(_G, 'Vector3'), rawget(_G, 'Color')
         saved.Debug, saved.slot = GameCfg.Debug, GameCfg.Save.QaSlot
         GameCfg.Debug, GameCfg.Save.QaSlot = { Enabled = false }, ''
         _G.Vector3 = { New = function(x, y, z) return { x = x, y = y, z = z } end }
         _G.Color = { New = function(...) return { ... } end }
-        env = { tasks = {}, values = {}, errors = {}, cleanups = {}, mgrs = {} }
+        env = { tasks = {}, values = {}, errors = {}, cleanups = {} }
         env.players = {
             PlayerAdded = signal(),
             PlayerRemoving = signal(),
@@ -115,7 +114,7 @@ describe('TestPlayerLeaveRejoin', function()
                     Spawn = function(_, fn) env.tasks[#env.tasks + 1] = fn end, Wait = function() end,
                 } end
                 if name == 'Players' then return env.players end
-                if name == 'RunService' then return { Heartbeat = env.heartbeat, IsServer = function() return true end } end
+                if name == 'RunService' then return { Heartbeat = env.heartbeat, IsServer = function() return true end, IsClient = function() return false end } end
                 if name == 'World' then return {
                     GetServerTime = function() return 100 end,
                     CreateUnit = function() return make_dummy_unit() end,
@@ -156,10 +155,8 @@ describe('TestPlayerLeaveRejoin', function()
             StopAbility = function() end,
             CastAbility = function() return true end,
         }
-        for _, name in ipairs({ 'MgrSave', 'MgrPlayerData' }) do
-            env.mgrs[name] = assert(loadfile('server/Mgr/' .. name .. '.lua'))()
-        end
-        env.save, env.data = env.mgrs.MgrSave, env.mgrs.MgrPlayerData
+        env.save = assert(loadfile('server/SaveHost.lua'))()
+        env.data = assert(loadfile('server/PlayerDataHost.lua'))()
         env.quest = {
             Notify = function(_, kind, player, payload) return env.runtime:notify_quest(kind, player, payload) end,
             GetState = function(_, player) return env.data:GetDataInst(player).Extra.quest end,
@@ -175,28 +172,20 @@ describe('TestPlayerLeaveRejoin', function()
                 if path == 'server.packages.attr_rule.api' then return attr_api_stub end
                 if path == 'server.packages.modifier_system.api' then return modifier_api_stub end
                 if path == 'server.packages.ability_system.api' then return ability_api_stub end
-                local name = path:match('^server%.Mgr%.(.*)$')
-                if not name then return require(path) end
-                if not env.mgrs[name] then
-                    env.mgrs[name] = {
-                        OnPlayerRemoving = function(_, p)
-                            env.cleanups[#env.cleanups + 1] = { name = name, player = p }
-                        end,
-                    }
-                end
-                return env.mgrs[name]
+                if path == 'server.SaveHost' then return env.save end
+                if path == 'server.PlayerDataHost' then return env.data end
+                if path == 'server.PlatformHost' then return {} end
+                if path == 'server.FishAbility' then return { Start = function() end, Update = function() end } end
+                return require(path)
             end,
         }, { __index = _G })
-        -- 仅为与本问题无关的生命/能力接缝提供确定返回值。
-        env.mgrs.MgrPkFilter = { Make = function() return function() return true end end }
-        env.mgrs.MgrAbility = { IsParalyzed = function() return false end }
         assert(loadfile('server/main.lua', 't', sandbox))()
         env.runtime = require('server.World.ServerRuntime').current()
         env.a = join(560)
         drain()
     end)
     after_each(function()
-        _G.game, _G.REUtil, _G.MgrUtil, _G.MgrPlayerData = saved.game, saved.REUtil, saved.MgrUtil, saved.MgrPlayerData
+        _G.game, _G.REUtil = saved.game, saved.REUtil
         _G.Vector3, _G.Color = saved.Vector3, saved.Color
         GameCfg.Debug, GameCfg.Save.QaSlot = saved.Debug, saved.slot
         saved = {}

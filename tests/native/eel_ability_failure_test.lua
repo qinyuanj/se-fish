@@ -35,7 +35,7 @@ describe('TestEelAbilityFailure', function()
         ctx.vendor = { AddAbility = function() error('add-failed') end }
         package.loaded['server.packages.ability_system.api'] = ctx.vendor
         package.loaded['server.AbilityAPI'] = ctx.api
-        ctx.mgr = assert(loadfile('server/Mgr/MgrAbility.lua'))()
+        ctx.mgr = assert(loadfile('server/FishAbility.lua'))()
         ctx.fish = { Id = 1, FishId = 'eel', Carrier = { Receiver = {} } }
     end)
     after_each(function()

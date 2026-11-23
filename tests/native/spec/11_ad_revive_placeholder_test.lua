@@ -1,5 +1,5 @@
 -- 条款 11 广告满血复活（占位广告位与濒死路径）：docs/acceptance/11-downed-death-revive.md
--- 只走业务入口黑盒：SurvivalAction / PlatformAction 两个 RE 的服务端 OnServerEvent，配合 MgrMap 公开管理器
+-- 只走业务入口黑盒：SurvivalAction / PlatformAction 两个 RE 的服务端 OnServerEvent，配合宿主公开方法
 -- 方法（PlatformRevive / FullRevive / Update 的暂停分支）；客户端入口走 ScreenSurvival 的 SurvivalState
 -- 广播渲染（EUI 替身）。复活动作只有 FullRevive 一个落点，广告不另造复活路径。
 -- 失败方式（先列后写）：
@@ -16,11 +16,10 @@ local function vec(x, y, z) return { x = x, y = y, z = z } end
 local GameCfg = require('common.GameCfg')
 
 local WIRING = {
-  'platform = MgrMap.MgrPlatform',
-  'save = MgrMap.MgrSave',
-  'MgrMap.MgrPlatform.Save = MgrMap.MgrSave',
-  'MgrMap.MgrPlatform.PlayerData = MgrMap.MgrPlayerData',
-  'local Life = WorldRuntime.life',
+  'platform = PlatformHost',
+  'save = SaveHost',
+  'player_data = PlayerDataHost',
+  'local fishHost = WorldRuntime.fish_host',
 }
 local function assert_wiring()
   local handle = assert(io.open('server/main.lua', 'rb'), '读不到 server/main.lua')
@@ -96,8 +95,7 @@ describe('条款 11 广告满血复活（占位广告位）', function()
   local function join(userId)
     local player = newPlayer(userId)
     env.players:OnPlayerAdded(player)
-    drain()
-    env.lifeHost:add(player)
+    env.lifeHost:add(player, env.players:GetDataInst(player))
     drain()
     return player
   end
@@ -224,9 +222,9 @@ describe('条款 11 广告满血复活（占位广告位）', function()
 
     package.loaded['server.Data.PlayerData'] = nil
     env.PlayerData = require('server.Data.PlayerData')
-    env.save = assert(loadfile('server/Mgr/MgrSave.lua'))()
-    env.players = assert(loadfile('server/Mgr/MgrPlayerData.lua'))()
-    env.platform = assert(loadfile('server/Mgr/MgrPlatform.lua'))()
+    env.save = assert(loadfile('server/SaveHost.lua'))()
+    env.players = assert(loadfile('server/PlayerDataHost.lua'))()
+    env.platform = assert(loadfile('server/PlatformHost.lua'))()
     env.players.Save, env.save.PlayerData = env.save, env.players
     env.platform.Save, env.platform.PlayerData = env.save, env.players
     env.platform.Now = function() return env.now end

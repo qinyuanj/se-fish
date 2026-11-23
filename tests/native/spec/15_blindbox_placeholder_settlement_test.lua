@@ -18,12 +18,10 @@ local BlindboxWorld = require('tests.support.blindbox_world')
 local RandomGuard = require('tests.support.random_guard')
 
 local WIRING = {
-    'save = MgrMap.MgrSave,',
-    'platform = MgrMap.MgrPlatform,',
-    'player_data = MgrMap.MgrPlayerData,',
+    'save = SaveHost,',
+    'platform = PlatformHost,',
+    'player_data = PlayerDataHost,',
     'bind_blindbox_action = function(dispatch)',
-    'MgrMap.MgrPlatform.Save = MgrMap.MgrSave',
-    'MgrMap.MgrPlatform.PlayerData = MgrMap.MgrPlayerData',
 }
 
 local function assert_wiring()

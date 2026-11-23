@@ -3,13 +3,13 @@
 --   16-06 除食物、极品食物、鱼饵与药水外，其余类别不能走普通食用；
 --   16-07 食用恢复百分比可为负值，负值表示食用后扣减而非恢复。
 -- 只走业务入口：PlayerTree 的生命宿主（血量 / 饥饿的唯一写入口）
--- 与 MgrPlayerData（玩家数据）；引擎边界用替身。断言只看玩家可观察的饥饿、血量与能否食用。
+-- 与 PlayerDataHost（玩家数据）；引擎边界用替身。断言只看玩家可观察的饥饿、血量与能否食用。
 local GameCfg = require('common.GameCfg')
 
 -- 前提守卫：本文件复现的是 main.lua 的接线，而不是自造一套协作关系。
 local WIRING = {
-    'local Life = WorldRuntime.life',
-    'MgrPlayerData = require("server.Mgr.MgrPlayerData")',
+    'local fishHost = WorldRuntime.fish_host',
+    'local PlayerDataHost = require("server.PlayerDataHost")',
 }
 
 local function assert_wiring()

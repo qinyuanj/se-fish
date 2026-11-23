@@ -314,8 +314,8 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
       saved = {
         game = rawget(_G, "game"),
         REUtil = rawget(_G, "REUtil"),
+        reutil = package.loaded["common.REUtil"],
         MgrUtil = rawget(_G, "MgrUtil"),
-        MgrPlayerData = rawget(_G, "MgrPlayerData"),
         Vector3 = rawget(_G, "Vector3"),
         Color = rawget(_G, "Color"),
         RemoteEvent = rawget(_G, "RemoteEvent"),
@@ -333,8 +333,8 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
       end
       _G.game = saved.game
       _G.REUtil = saved.REUtil
+      package.loaded["common.REUtil"] = saved.reutil
       _G.MgrUtil = saved.MgrUtil
-      _G.MgrPlayerData = saved.MgrPlayerData
       _G.Vector3 = saved.Vector3
       _G.Color = saved.Color
       _G.RemoteEvent = saved.RemoteEvent
@@ -344,7 +344,7 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
       runtime = nil
     end)
 
-    it("真实运行 server/main.lua：ServerRuntime.current 就绪、OnSyncPlayerTree 驱动持竿、AttrBridge/ModifierBridge 含麻痹与活鱼 DoT 端到端生效", function()
+    it("真实运行 server/main.lua：ServerRuntime.current 就绪、PlayerDataHost 驱动持竿、AttrBridge/ModifierBridge 含麻痹与活鱼 DoT 端到端生效", function()
       local now = 200
       local tasks, values, created_units, errors, mgrs = {}, {}, {}, {}, {}
       local players_list = {}
@@ -385,7 +385,7 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
             }
           end
           if name == "Players" then return players_service end
-          if name == "RunService" then return { Heartbeat = heartbeat, IsServer = function() return true end } end
+          if name == "RunService" then return { Heartbeat = heartbeat, IsServer = function() return true end, IsClient = function() return false end } end
           if name == "World" then
             return {
               GetServerTime = function() return now end,
@@ -411,7 +411,7 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
       }
       local re_map = {}
       local item_bar_pushes = {}
-      _G.REUtil = {
+      local remote_util = {
         CheckRECD = function() return false end,
         GetRE = function(_, name)
           if not re_map[name] then
@@ -493,6 +493,7 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
           end
         end,
         require = function(path)
+          if path == "common.REUtil" then return remote_util end
           if path == "server.MgrUtil" then return { Start = function() end } end
           if path == "common.ZoneMarkers" then return { Start = function() end } end
           if path == "server.packages.attr_rule.api" then return attr_api_stub end
@@ -504,21 +505,19 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
             end
             return mgrs._AbilityAPI
           end
-          local name = path:match("^server%.Mgr%.(.*)$")
-          if not name then return require(path) end
-          if not mgrs[name] then
-            if name == "MgrSave" or name == "MgrPlayerData" or name == "MgrAbility" then
-              mgrs[name] = assert(loadfile("server/Mgr/" .. name .. ".lua", "t", sandbox))()
-            else
-              mgrs[name] = {}
-            end
+          if path == "server.SaveHost" or path == "server.PlayerDataHost" or path == "server.FishAbility" then
+            local name = path:match("([%w_]+)$")
+            if not mgrs[name] then mgrs[name] = assert(loadfile(path:gsub("%.", "/") .. ".lua", "t", sandbox))() end
+            return mgrs[name]
           end
-          return mgrs[name]
+          if path == "server.PlatformHost" then return {} end
+          return require(path)
         end,
       }, { __index = _G })
 
-      mgrs.MgrPkFilter = { Make = function() return function() return true end end }
 
+      _G.REUtil = remote_util
+      package.loaded["common.REUtil"] = remote_util
       runtime = assert(loadfile("server/main.lua", "t", sandbox))()
       assert.are.equal(runtime, ServerRuntime.current())
       assert.is_not_nil(runtime:get_entity_modifiers())
@@ -553,7 +552,7 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
       assert.equals(1, #item_bar_pushes)
       assert.are.equal(p, item_bar_pushes[1].player)
 
-      -- 经 ItemBarAction 选中鱼竿 -> MgrPlayerData:SendItemBar -> OnSyncPlayerTree -> 树底合并推送（仅 +1 次，无双发）与 HeldRodLeaf 建点
+      -- 经 ItemBarAction 选中鱼竿 -> PlayerDataHost 同步 -> 树底合并推送（仅 +1 次，无双发）与 HeldRodLeaf 建点
       re_map.ItemBarAction.OnServerEvent:Fire(p, { action = "SelectSlot", value = 1 })
       assert.equals(2, #item_bar_pushes)
       assert.equals(1, item_bar_pushes[2].payload.selectedSlot)
@@ -566,18 +565,18 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
       assert.equals(3, #item_bar_pushes)
       assert.equals(1, item_bar_pushes[3].payload.selectedSlot)
 
-      -- 单次 SpokeRuntime.batch 内多次状态变更与 SendItemBar 调用最终只合并触发 1 次 ItemBarState:FireClient
+      -- 单次 SpokeRuntime.batch 内多次宿主同步最终只合并触发 1 次 ItemBarState:FireClient
       local before_batch_pushes = #item_bar_pushes
-      local data = mgrs.MgrPlayerData:GetDataInst(p)
+      local data = mgrs.PlayerDataHost:GetDataInst(p)
       SpokeRuntime.batch(function()
         pt:set_coin(888)
         pt:set_upgrade_level(1)
         data.Data.FishCoin = 888
         data.Data.UpgradeLevel = 1
         data.Data.SelectedSlot = nil
-        mgrs.MgrPlayerData:SendItemBar(p)
+        mgrs.PlayerDataHost:SyncPlayerTree(p)
         data.Data.FishCoin = 999
-        mgrs.MgrPlayerData:SendItemBar(p)
+        mgrs.PlayerDataHost:SyncPlayerTree(p)
       end)
       assert.equals(before_batch_pushes + 1, #item_bar_pushes)
       assert.equals(999, item_bar_pushes[#item_bar_pushes].payload.coin)
@@ -589,13 +588,13 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
       -- AttrBridge 经 MgrAbility / PlayerTree 真实生效
       data.Extra.growth.potions.item168 = 2
       data.Extra.growth.potions.item167 = 5
-      assert.is_true(mgrs.MgrAbility:ApplyGrowth(p).Ok)
+      assert.is_true(mgrs.FishAbility:ApplyGrowth(p).Ok)
       assert.equals(420, runtime.life:MaxHealthOf(p))
       assert.near(1.4, ch.scale, 1e-9)
       assert.near(10.5, c.WalkSpeed, 1e-9)
 
       -- ModifierBridge：玩家麻痹阻塞 CanAct 与移速，Heartbeat 推进 0.5s 恢复
-      assert.is_true(mgrs.MgrAbility.Modifier:ApplyWeaponEffect(p, p, { Kind = "paralyze" }))
+      assert.is_true(mgrs.FishAbility.Modifier:ApplyWeaponEffect(p, p, { Kind = "paralyze" }))
       assert.is_false(runtime.life:CanAct(p))
       assert.equals(0, c.WalkSpeed)
       now = now + 0.5
@@ -627,7 +626,7 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
       assert.equals(0, #p.CharacterAdded.handlers)
       assert.is_true(created_units[1].Destroyed)
       assert.is_true(created_units[2].Destroyed)
-      assert.equals(0, mgrs.MgrAbility.Modifier:GetRemaining(fish, "poison"))
+      assert.equals(0, mgrs.FishAbility.Modifier:GetRemaining(fish, "poison"))
     end)
   end)
 end)
