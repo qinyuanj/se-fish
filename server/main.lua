@@ -23,7 +23,6 @@ local MgrMap = {
     MgrQuest = require("server.Mgr.MgrQuest"),
     MgrStory = require("server.Mgr.MgrStory"),
     MgrSave = require("server.Mgr.MgrSave"),
-    MgrParty = require("server.Mgr.MgrParty"),
     MgrCompendium = require("server.Mgr.MgrCompendium"),
     MgrRecords = require("server.Mgr.MgrRecords"),
     MgrAchievements = require("server.Mgr.MgrAchievements"),
@@ -312,16 +311,6 @@ MgrMap.MgrAbility.PlayerData = MgrMap.MgrPlayerData
 MgrMap.MgrAbility.Attr = AttrBridge
 MgrMap.MgrAbility.Modifier = ModifierBridge
 
-MgrMap.MgrParty.PlayerData = MgrMap.MgrPlayerData
-MgrMap.MgrParty.Save = MgrMap.MgrSave
-MgrMap.MgrParty.Vitals = nil
-
-local PkDamageFilter = require("server.World.PkDamageFilter")
-local pkDamageFilter = PkDamageFilter.make({
-    party = MgrMap.MgrParty,
-    zone_markers = ZoneMarkers,
-})
-
 local function invoke(name, mgr, method, ...)
     if not mgr[method] then return end
     local ok, err = pcall(mgr[method], mgr, ...)
@@ -386,13 +375,24 @@ WorldRuntime = ServerRuntime.new({
     physics = game:GetService("PhysicsService"),
     players_service = Players,
     world_service = WorldService,
-    party = MgrMap.MgrParty,
     zone_markers = ZoneMarkers,
     bind_weapon_action = function(dispatch)
         local event = _G.REUtil:GetRE("WeaponAction")
         event.OnServerEvent:Connect(function(player, payload)
             if _G.REUtil:CheckRECD(player, "WeaponAction", GameCfg.Ability.GunShared.ActionCooldownSec) then return end
             dispatch(player, payload)
+        end)
+    end,
+    bind_party_action = function(dispatch)
+        _G.REUtil:GetRE("PartyAction").OnServerEvent:Connect(function(player, payload)
+            if _G.REUtil:CheckRECD(player, "PartyAction", GameCfg.Party.ActionCooldownSec) then return end
+            dispatch(player, payload)
+        end)
+    end,
+    bind_party_state_request = function(dispatch)
+        _G.REUtil:GetRE("PartyStateRequest").OnServerEvent:Connect(function(player)
+            if _G.REUtil:CheckRECD(player, "PartyStateRequest", GameCfg.Party.StateCooldownSec) then return end
+            dispatch(player)
         end)
     end,
     bind_ferry_action = function(dispatch)
@@ -535,7 +535,6 @@ WorldRuntime = ServerRuntime.new({
     end,
 })
 ServerRuntime.set_current(WorldRuntime)
-WorldRuntime.life:SetDamageFilter(pkDamageFilter)
 local Life = WorldRuntime.life
 -- #309 活鱼公开宿主接线：不再注册 MgrFishUnit/MgrFishCarrier/MgrAi。
 local fishHost = WorldRuntime.fish_host
@@ -557,7 +556,6 @@ MgrMap.MgrPlayerData.Vitals = Life
 MgrMap.MgrGM.Vitals = Life
 MgrMap.MgrAbility.Vitals = Life
 MgrMap.MgrAbility.BehaviorServices.Vitals = Life
-MgrMap.MgrParty.Vitals = Life
 
 MgrMap.MgrPlayerData.OnSyncPlayerTree = function(player, data, forcePush)
     local pt = WorldRuntime:get_player_tree(player.UserId)

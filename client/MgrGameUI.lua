@@ -11,7 +11,6 @@ local ScreenHandlerLoaders = {
     ScreenGM = function() return require("client.ScreenHandlers.ScreenGM") end,
     ScreenMain = function() return require("client.ScreenHandlers.ScreenMain") end,
     ScreenMsg = function() return require("client.ScreenHandlers.ScreenMsg") end,
-    ScreenParty = function() return require("client.ScreenHandlers.ScreenParty") end,
 }
 
 function MgrGameUI:GetScreen(screenName)

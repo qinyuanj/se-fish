@@ -152,6 +152,7 @@ function ServerRuntime.new(opts)
       save = opts.save,
       interact = opts.interact,
       players_service = opts.players_service,
+      session_epoch = opts.session_epoch or opts.delivery_epoch,
       lookup_tree = function(player)
         if type(player) ~= "table" then return nil end
         return player_trees[player.UserId]
@@ -163,6 +164,22 @@ function ServerRuntime.new(opts)
         opts.bind_ferry_action(function(actor, payload)
           local ferry = self.world and self.world.ferry
           return ferry and ferry:Handle(actor, payload) or false
+        end)
+      end
+    end
+    if not self._party_bound then
+      self._party_bound = true
+      if type(opts.bind_party_action) == "function" then
+        opts.bind_party_action(function(actor, payload)
+          if self:is_leaving(actor and actor.UserId) then return false end
+          local squad = self.world and self.world.squad
+          return squad and squad:Handle(actor, payload) or false
+        end)
+      end
+      if type(opts.bind_party_state_request) == "function" then
+        opts.bind_party_state_request(function(actor)
+          local squad = self.world and self.world.squad
+          if squad and squad.Online[actor and actor.UserId] == actor then squad:Push(actor) end
         end)
       end
     end
@@ -420,6 +437,7 @@ function ServerRuntime.new(opts)
     })
     active_players[user_id] = player
     player_trees[user_id] = player_tree
+    if self.world and self.world.squad then self.world.squad:OnPlayerAdded(player) end
     SwingRegistry.SetClock(function() return clock.now() end)
     player_tree:mount_phase("alive", "weapon", function(scope)
       local weapon = PlayerWeapon.mount(scope, player_tree, {
@@ -616,6 +634,9 @@ function ServerRuntime.new(opts)
     end
 
     leaving.cleaned = true
+    if runtime.world and runtime.world.squad then
+      safe_call(opts.logger, "小队离场退队", function() runtime.world.squad:OnPlayerRemoving(player) end)
+    end
     local was_active = active_players[user_id] == player
     if was_active then
       active_players[user_id] = nil
@@ -922,7 +943,12 @@ function ServerRuntime.new(opts)
   local damage_filter = opts.damage_filter
   if damage_filter == nil then
     damage_filter = PkDamageFilter.make({
-      party = opts.party,
+      party = {
+        SameParty = function(_, source, target)
+          local squad = runtime.world and runtime.world.squad
+          return squad and squad:SameParty(source, target) or false
+        end,
+      },
       zone_markers = opts.zone_markers,
       zones = opts.zones,
     })

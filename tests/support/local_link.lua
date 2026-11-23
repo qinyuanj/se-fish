@@ -11,7 +11,7 @@
 --
 -- 与 server/main.lua 的接线一一对应：WIRING 逐行核对，接线一改这里先红（先红再改夹具，别让夹具漂走）。
 -- 加载的管理器是 main.lua MgrMap 的子集：MgrPlayerData / MgrSave / MgrVitals / MgrSurvival /
--- MgrParty / MgrPkFilter / ServerRuntime / MgrLoot。没加载的管理器（任务、剧情、烧烤、特殊道具等）
+-- SquadDock / PkDamageFilter / ServerRuntime / MgrLoot。没加载的管理器（任务、剧情、烧烤、特殊道具等）
 -- 在 main.lua 里也有 OnPlayerAdded / BeforeLeave 钩子，它们的路径不在本夹具声明的覆盖范围里。
 -- MgrLoot 只用于共享地面实例（SpawnItem / Pickup / Snapshot），**不调 Start**：点位鱼饵刷新
 -- 与区上限回收由 MgrLoot 自己的用例覆盖，连接夹具不替它起刷新区。
@@ -32,12 +32,10 @@ end
 M.WIRING = {
     'MgrMap.MgrPlayerData.Save = MgrMap.MgrSave',
     'MgrMap.MgrPlayerData.Vitals = Life',
-    'MgrMap.MgrParty.PlayerData = MgrMap.MgrPlayerData',
-    'MgrMap.MgrParty.Save = MgrMap.MgrSave',
-    'MgrMap.MgrParty.Vitals = Life',
+    'bind_party_action = function(dispatch)',
+    'bind_party_state_request = function(dispatch)',
     'bind_interact_action = function(dispatch)',
     'local Life = WorldRuntime.life',
-    'WorldRuntime.life:SetDamageFilter(pkDamageFilter)',
 }
 
 function M.assert_wiring()
@@ -51,9 +49,9 @@ end
 
 -- 就绪顺序照 server/main.lua 的 OnReady：先操作角色与生命状态的那批，再其余管理器。
 local READY_FIRST = { 'Vitals', 'Survival' }
-local READY_REST = { 'Party' }
+local READY_REST = {}
 -- 离场顺序照 ContinuePlayerRemoving：终镜像先于序列化，序列化先于其余管理器的 OnPlayerRemoving。
-local LEAVING_REST = { 'Vitals', 'Survival', 'Party' }
+local LEAVING_REST = { 'Vitals', 'Survival' }
 
 -- 前向声明：M:Start 与 handleAdded 的读档回调都转发到它（实现见下方连接生命周期段）。
 local onReady
@@ -179,7 +177,7 @@ function M.new(opts)
     env.managers = {
         Save = assert(loadfile('server/Mgr/MgrSave.lua'))(),
         PlayerData = assert(loadfile('server/Mgr/MgrPlayerData.lua'))(),
-        Party = assert(loadfile('server/Mgr/MgrParty.lua'))(),
+        Party = {},
     }
     local mgr = env.managers
     env.filter = function()
@@ -191,7 +189,14 @@ function M.new(opts)
 
     mgr.Save.PlayerData = mgr.PlayerData
     mgr.PlayerData.Save = mgr.Save
-    mgr.Party.PlayerData, mgr.Party.Save = mgr.PlayerData, mgr.Save
+    function mgr.Party:SameParty(a, b)
+        local squad = env.lifeHost and env.lifeHost.runtime.world.squad
+        return squad and squad:SameParty(a, b) or false
+    end
+    function mgr.Party:Count(player)
+        local squad = env.lifeHost and env.lifeHost.runtime.world.squad
+        return squad and squad:Count(player) or 0
+    end
     -- #255 生产接线：统一伤害入口的过滤函数由 MgrPkFilter 工厂实例化，只读注入的权威接缝。
     env.lifeHost = require('tests.support.life_host').start({
       now = env.now, remote = re, player_data = mgr.PlayerData, save = mgr.Save,
@@ -204,7 +209,6 @@ function M.new(opts)
     mgr.Vitals = env.lifeHost.runtime.life
     mgr.Survival = mgr.Vitals
     mgr.PlayerData.Vitals = mgr.Vitals
-    mgr.Party.Vitals = mgr.Vitals
     mgr.Vitals.Party = mgr.Party
     mgr.Vitals.ZoneMarkers = ZoneMarkers
     mgr.Vitals:SetDamageFilter(env.filter())
@@ -238,7 +242,7 @@ function M:Start()
     -- 读档就绪回调：main.lua 用 MgrSave.OnReady 分发第一批管理器的 OnPlayerAdded，
     -- 这里接同一个入口，而不是自己另写一套「加入后初始化」。
     self.managers.Save.OnReady = function(player, data) onReady(self, player, data) end
-    for _, name in ipairs({ 'Save', 'PlayerData', 'Party' }) do
+    for _, name in ipairs({ 'Save', 'PlayerData' }) do
         local manager = self.managers[name]
         if manager.Start then manager.Start(manager) end
     end

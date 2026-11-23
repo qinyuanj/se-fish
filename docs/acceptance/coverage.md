@@ -287,16 +287,16 @@
 | 条款 | 代码落点 | 关联测试 | 正常流程 | 失败流程 | 退出重进 | 存档恢复 | 等级 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 9-01 | server/World/PlayerLife.lua、server/World/PkDamageFilter.lua、server/main.lua | tests/native/spec/09_pk_damage_filter_test.lua | 有 | 有 | 缺 | 缺 | B |
-| 9-02 | server/Mgr/MgrParty.lua、server/main.lua | tests/native/spec/09_party_authority_test.lua | 缺 | 有 | 缺 | 缺 | A |
+| 9-02 | server/World/SquadDock.lua、server/main.lua | tests/native/spec/server_squad_314_test.lua | 缺 | 有 | 缺 | 缺 | A |
 | 9-03 | server/World/PlayerLife.lua、server/World/PlayerLife.lua、server/World/PlayerFisherman.lua | tests/native/spec/09_rescue_test.lua | 缺 | 有 | 缺 | 缺 | B |
 | 9-04 | server/World/FishTree.lua、server/World/GroundLoot.lua、server/World/FerryRoute.lua | tests/native/fish_lift_test.lua、tests/native/ferry_test.lua | 缺 | 缺 | 缺 | 缺 | B |
 | 9-05 | server/World/PlayerLife.lua、server/Mgr/MgrSave.lua、server/World/PlayerFisherman.lua | tests/native/spec/09_rescue_test.lua | 有 | 有 | 有 | 缺 | B |
-| 9-06 | server/Mgr/MgrParty.lua、common/GameCfg.lua | tests/native/spec/09_party_authority_test.lua | 有 | 有 | 缺 | 缺 | A |
-| 9-07 | server/Mgr/MgrParty.lua、common/GameCfg.lua | tests/native/spec/09_party_authority_test.lua | 有 | 有 | 缺 | 缺 | A |
-| 9-08 | server/Mgr/MgrParty.lua、common/GameCfg.lua | tests/native/spec/09_party_authority_test.lua | 有 | 有 | 缺 | 缺 | B |
-| 9-09 | server/Mgr/MgrParty.lua、common/GameCfg.lua | tests/native/spec/09_party_authority_test.lua | 有 | 缺 | 有 | 缺 | B |
-| 9-10 | server/Mgr/MgrParty.lua、common/GameCfg.lua | tests/native/spec/09_party_authority_test.lua | 有 | 缺 | 有 | 缺 | A |
-| 9-11 | server/Mgr/MgrParty.lua、common/GameCfg.lua | tests/native/spec/09_party_authority_test.lua | 有 | 缺 | 缺 | 缺 | A |
+| 9-06 | server/World/SquadDock.lua、common/GameCfg.lua | tests/native/spec/server_squad_314_test.lua | 有 | 有 | 缺 | 缺 | A |
+| 9-07 | server/World/SquadDock.lua、common/GameCfg.lua | tests/native/spec/server_squad_314_test.lua | 有 | 有 | 缺 | 缺 | A |
+| 9-08 | server/World/SquadDock.lua、common/GameCfg.lua | tests/native/spec/server_squad_314_test.lua | 有 | 有 | 缺 | 缺 | B |
+| 9-09 | server/World/SquadDock.lua、common/GameCfg.lua | tests/native/spec/server_squad_314_test.lua | 有 | 缺 | 有 | 缺 | B |
+| 9-10 | server/World/SquadDock.lua、common/GameCfg.lua | tests/native/spec/server_squad_314_test.lua | 有 | 缺 | 有 | 缺 | A |
+| 9-11 | server/World/SquadDock.lua、common/GameCfg.lua | tests/native/spec/server_squad_314_test.lua | 有 | 缺 | 缺 | 缺 | A |
 | 9-12 | server/World/PlayerLife.lua、server/World/PkDamageFilter.lua、server/main.lua | tests/native/spec/09_pk_damage_filter_test.lua | 有 | 有 | 缺 | 缺 | A |
 | 9-13 | server/World/PlayerLife.lua、server/World/PkDamageFilter.lua、common/ZoneMarkers.lua | tests/native/spec/09_pk_damage_filter_test.lua | 有 | 有 | 缺 | 缺 | A |
 | 9-14 | server/World/PlayerLife.lua、server/World/PkDamageFilter.lua、common/ZoneMarkers.lua | tests/native/spec/09_pk_damage_filter_test.lua | 有 | 有 | 缺 | 缺 | A |
@@ -304,13 +304,13 @@
 | 9-16 | server/World/PlayerLife.lua、server/World/PkDamageFilter.lua、server/World/FishTree.lua | tests/native/spec/09_pk_damage_filter_test.lua | 有 | 有 | 缺 | 缺 | A |
 | 9-17 | server/World/PlayerFisherman.lua、server/World/PlayerLife.lua、client/Views/FishermanView.lua | tests/native/spec/09_rescue_test.lua | 有 | 有 | 缺 | 缺 | A |
 | 9-18 | server/World/PlayerLife.lua、server/World/PlayerLife.lua、common/GameCfg.lua | tests/native/spec/09_rescue_test.lua | 有 | 缺 | 缺 | 缺 | A |
-| 9-19 | server/Mgr/MgrParty.lua、common/GameCfg.lua、client/ScreenHandlers/ScreenParty.lua | tests/native/spec/09_party_authority_test.lua、tests/native/spec/09_party_hud_test.lua | 有 | 有 | 缺 | 缺 | A |
-| 9-20 | client/ScreenHandlers/ScreenParty.lua、client/MgrGameUI.lua、server/Mgr/MgrParty.lua | tests/native/spec/09_party_hud_test.lua | 有 | 有 | 缺 | 缺 | A |
-| 9-21 | client/ScreenHandlers/ScreenParty.lua、server/Mgr/MgrParty.lua | tests/native/spec/09_party_hud_test.lua | 有 | 有 | 缺 | 缺 | A |
-| 9-22 | server/Mgr/MgrParty.lua、server/Data/PlayerData.lua、server/Mgr/MgrSave.lua、client/ScreenHandlers/ScreenParty.lua、common/GameCfg.lua | tests/native/spec/09_party_authority_test.lua、tests/native/spec/09_party_hud_test.lua | 有 | 有 | 有 | 有 | B |
+| 9-19 | server/World/SquadDock.lua、common/GameCfg.lua、client/Views/SquadView.lua | tests/native/spec/server_squad_314_test.lua、tests/native/spec/client_squad_314_test.lua | 有 | 有 | 缺 | 缺 | A |
+| 9-20 | client/Views/SquadView.lua、client/main.lua、server/World/SquadDock.lua | tests/native/spec/client_squad_314_test.lua | 有 | 有 | 缺 | 缺 | A |
+| 9-21 | client/Views/SquadView.lua、server/World/SquadDock.lua | tests/native/spec/client_squad_314_test.lua | 有 | 有 | 缺 | 缺 | A |
+| 9-22 | server/World/SquadDock.lua、server/Data/PlayerData.lua、server/Mgr/MgrSave.lua、client/Views/SquadView.lua、common/GameCfg.lua | tests/native/spec/server_squad_314_test.lua、tests/native/spec/client_squad_314_test.lua | 有 | 有 | 有 | 有 | B |
 
-第 9 节由小队子单先贯通：9-02、9-06～9-11、9-19～9-22 的代码落点是 `server/Mgr/MgrParty.lua`（服务端唯一权威的归属与名单）
-与 `client/ScreenHandlers/ScreenParty.lua`（队友血量与邀请倒计时），证据是两份 spec 断言。
+第 9 节由小队子单先贯通：9-02、9-06～9-11、9-19～9-22 的代码落点是 `server/World/SquadDock.lua`（服务端唯一权威的归属与名单）
+与 `client/Views/SquadView.lua`（队友血量与邀请倒计时），证据是两份 spec 断言。
 9-01、9-12～9-16 经统一伤害入口与 PK 过滤接缝落地，spec 断言覆盖同队全武器免伤、鱼塘豁免、鱼塘外 PK、人数不足与鱼攻击；
 9-12 除统一入口的类别遍历外，另从 `server/World/PlayerWeapon.lua` 真实发起一次枪击（弹道只替身引擎边界）：
 同队命中被挡成 0 伤害，离队后同一把枪照常结算——这样「近战 / 枪械 / 范围都按 0」不再只靠贴 category 标签；
@@ -662,7 +662,7 @@ docs/to-questionnaire-策划案内部矛盾.md。金豆入口（11-20）、迟�
 | 19-09 | docs/acceptance/README.md、docs/acceptance/evidence-levels.md、tools/acceptance.lua | — | 缺 | 缺 | 缺 | 缺 | A |
 | 19-10 | server/Mgr/MgrSave.lua、server/Data/PlayerData.lua、docs/acceptance/coverage.md | tests/native/save_test.lua、tests/native/spec/18_session_settlement_contract_test.lua | 缺 | 缺 | 缺 | 有 | A |
 | 19-11 | server/Mgr/MgrSave.lua、server/Mgr/MgrPlatform.lua | tests/native/spec/01_platform_adapter_failure_test.lua、tests/native/save_foundation_test.lua | 缺 | 有 | 缺 | 缺 | A |
-| 19-12 | server/main.lua、server/Mgr/MgrParty.lua、server/World/PkDamageFilter.lua、server/World/PlayerFisherman.lua | tests/native/spec/19_multiplayer_local_link_test.lua、tests/native/spec/01_capacity_local_link_test.lua、tests/probes/local_link_runtime.lua | 有 | 有 | 有 | 有 | B |
+| 19-12 | server/main.lua、server/World/SquadDock.lua、server/World/PkDamageFilter.lua、server/World/PlayerFisherman.lua | tests/native/spec/19_multiplayer_local_link_test.lua、tests/native/spec/01_capacity_local_link_test.lua、tests/probes/local_link_runtime.lua | 有 | 有 | 有 | 有 | B |
 | 19-13 | server/Mgr/MgrPlatform.lua、common/GameCfg.lua | tests/native/spec/17_platform_boundary_placeholder_test.lua、tests/native/spec/11_ad_revive_placeholder_test.lua | 有 | 有 | 缺 | 缺 | A |
 | 19-14 | tools/acceptance.lua、tools/cli.lua、server/Mgr/MgrPlatform.lua、common/GameCfg.lua | tests/native/guards/acceptance_matrix_test.lua、tests/native/cli_entry_test.lua | 缺 | 缺 | 缺 | 缺 | B |
 
