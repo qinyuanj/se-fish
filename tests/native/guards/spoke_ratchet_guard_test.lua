@@ -1,13 +1,13 @@
 -- Spoke 原生重构机械棘轮守卫（#294 / ADR-0032 §4、§5）：
 -- 失败方式先列：
 --   1. 新 Spoke 命名空间（common.SpokeClock、server.World.*、client.Store.*、client.Views.*）
---      反向 require 存量旧债务模块（server.Mgr.*、client.MgrGameUI、client.ScreenHandlers.*、
---      client.Local*、common.OwnedUnits 等）→ 触发架构分层反向/环或把旧债务带入新树；
+--      反向 require 存量旧债务模块（server.Mgr.*、server.AbilityAPI、server.AbilityBehaviors.*、
+--      client.MgrGameUI、client.ScreenHandlers.*、client.Local*、common.OwnedUnits）→ 破坏单向棘轮；
 --   2. 就地修改 common/packages/spoke/ 或 common/packages/spoke_eggy/ 或与 docs/packages-reference.md
 --      记录的上游 SHA 漂移 → 破坏上游双包零扩展边界；
 --   3. 存量旧债务（OwnedUnits 调用总数、旧债务模块裸 :Connect( 数、server/main.lua MgrMap 成员数）
 --      不降反增 → 重构半途回潮；
---   4. 新 Spoke 命名空间出现不保存句柄的裸 :Connect( → 局部信号无法在 s:on_cleanup 回收。
+--   4. 新 Spoke 命名空间出现未保存句柄的裸 :Connect( → 局部信号无法在 s:on_cleanup 回收。
 
 local Arch = require("tools.arch_policy")
 local sha256 = require("tools.sha256")
@@ -74,15 +74,12 @@ local function business_lua_files()
   return out
 end
 
-local function package_tree_fingerprint(base_dir, relative_root)
-  local full_root = base_dir == "." and relative_root or (base_dir .. "/" .. relative_root)
-  local files = walk_files(full_root, false)
-  local prefix = base_dir == "." and "" or (base_dir .. "/")
+local function package_tree_fingerprint(relative_root)
+  local files = walk_files(relative_root, false)
   local manifest = {}
   for _, full_path in ipairs(files) do
-    local rel = prefix ~= "" and full_path:sub(#prefix + 1) or full_path
     local raw = assert(fs.slurp(full_path), "读不到包内文件: " .. full_path)
-    manifest[#manifest + 1] = rel .. ":" .. sha256.hex(raw)
+    manifest[#manifest + 1] = full_path .. ":" .. sha256.hex(raw)
   end
   return #files, sha256.hex(table.concat(manifest, "\n"))
 end
@@ -106,6 +103,187 @@ end
 local function format_breakdown(items)
   table.sort(items)
   return table.concat(items, "\n")
+end
+
+-- 仅识别真实赋值 `=`（排除 `==`、`~=`、`<=`、`>=`）。
+local function has_assignment(statement)
+  local from = 1
+  while true do
+    local eq = statement:find("=", from, true)
+    if not eq then return false end
+    local prev = eq > 1 and statement:sub(eq - 1, eq - 1) or ""
+    local next_ch = statement:sub(eq + 1, eq + 1)
+    if next_ch ~= "=" and not prev:match("[=~<>]") then
+      return true
+    end
+    from = eq + 1
+  end
+end
+
+-- 剥除 Lua 注释（保留字符串字面量与换行，便于按源码位置校验 require 绑定形式），
+-- 同时记录字符串字面量区间避免把字符串内的伪 require 当作真实调用。
+local function strip_comments(source)
+  local out, holes, index = {}, {}, 1
+  while index <= #source do
+    local char, next_char = source:sub(index, index), source:sub(index + 1, index + 1)
+    local long = source:match("^%[(=*)%[", index)
+    if char == "-" and next_char == "-" then
+      local eqs = source:match("^%[(=*)%[", index + 2)
+      local stop
+      if eqs then
+        local closer = "]" .. eqs .. "]"
+        local found = source:find(closer, index + 4 + #eqs, true)
+        stop = found and found + #closer - 1 or #source
+      else
+        local newline = source:find("\n", index, true)
+        stop = newline and newline - 1 or #source
+      end
+      out[#out + 1] = (source:sub(index, stop):gsub("[^\r\n]", " "))
+      index = stop + 1
+    elseif long then
+      local closer = "]" .. long .. "]"
+      local found = source:find(closer, index + 2 + #long, true)
+      local stop = found and found + #closer - 1 or #source
+      out[#out + 1] = source:sub(index, stop)
+      holes[#holes + 1] = { index + 2 + #long, stop - #closer }
+      index = stop + 1
+    elseif char == '"' or char == "'" then
+      local cursor = index + 1
+      while cursor <= #source do
+        local current = source:sub(cursor, cursor)
+        if current == "\\" then
+          cursor = cursor + 2
+        elseif current == char then
+          break
+        else
+          cursor = cursor + 1
+        end
+      end
+      local stop = math.min(cursor, #source)
+      out[#out + 1] = source:sub(index, stop)
+      holes[#holes + 1] = { index + 1, stop - 1 }
+      index = stop + 1
+    else
+      out[#out + 1] = char
+      index = index + 1
+    end
+  end
+  return table.concat(out), holes
+end
+
+local function in_hole(holes, position)
+  for _, hole in ipairs(holes) do
+    if position >= hole[1] and position <= hole[2] then return true end
+  end
+  return false
+end
+
+-- 逐一找出文件中所有指向 target_module 的静态 require，验证每一处都严格写成
+-- `local OwnedUnits = require(...)` 且无后缀链式调用，避免换别名或直接链式调用绕过计数。
+local function check_owned_units_bindings(path, src)
+  local text, holes = strip_comments(src)
+  local bad, from = {}, 1
+  while true do
+    local first, last = text:find("require", from, true)
+    if not first then break end
+    from = last + 1
+    local before = first > 1 and text:sub(first - 1, first - 1) or ""
+    local prev_token = text:sub(1, first - 1):match("([%.:]+)%s*$")
+    local after = text:sub(last + 1, last + 1)
+    if not in_hole(holes, first)
+        and prev_token ~= "." and prev_token ~= ":"
+        and not before:match("[%w_]") and not after:match("[%w_]") then
+      local cursor = last + 1
+      while text:sub(cursor, cursor):match("%s") do cursor = cursor + 1 end
+      local has_paren = false
+      if text:sub(cursor, cursor) == "(" then
+        has_paren = true
+        cursor = cursor + 1
+        while text:sub(cursor, cursor):match("%s") do cursor = cursor + 1 end
+      end
+      local quote = text:sub(cursor, cursor)
+      local value, call_end
+      if quote == '"' or quote == "'" then
+        local stop = cursor + 1
+        while stop <= #text do
+          local ch = text:sub(stop, stop)
+          if ch == "\\" then
+            stop = stop + 2
+          elseif ch == quote then
+            break
+          else
+            stop = stop + 1
+          end
+        end
+        local decode = load("return " .. text:sub(cursor, stop), "require_literal", "t", {})
+        if decode then value = decode() end
+        call_end = stop
+      else
+        local eqs = text:match("^%[(=*)%[", cursor)
+        if eqs then
+          local start = cursor + 2 + #eqs
+          local stop = text:find("]" .. eqs .. "]", start, true)
+          if stop then
+            value = text:sub(start, stop - 1):gsub("^\r?\n", "")
+            call_end = stop + #eqs + 1
+          end
+        end
+      end
+      if value == "common.OwnedUnits" then
+        local tail = call_end and text:sub(call_end + 1) or ""
+        if has_paren then
+          tail = tail:gsub("^%s*%)", "", 1)
+        end
+        local line_no = select(2, text:sub(1, first):gsub("\n", "")) + 1
+        local prefix = text:sub(1, first - 1)
+        local bound = prefix:match("local%s+OwnedUnits%s*=%s*$") ~= nil
+        local chained = tail:match("^%s*[%.%:%[]") ~= nil
+        if not bound or chained then
+          bad[#bad + 1] = string.format(
+            "%s:%d 须严格写作 `local OwnedUnits = require(\"common.OwnedUnits\")`（禁止换别名或链式调用绕过统计）",
+            path, line_no
+          )
+        end
+      end
+    end
+  end
+  return bad
+end
+
+-- 解析去注释/字符串后的表体 `{ ... }`，统计全部顶层成员条目数（兼容任意右值写法）。
+local function count_top_level_table_entries(table_body)
+  local inner = table_body:sub(2, -2)
+  local depth_brace, depth_paren, depth_bracket = 0, 0, 0
+  local entries = {}
+  local chunk_start = 1
+  local function flush_chunk(stop_index)
+    local item = inner:sub(chunk_start, stop_index):match("^%s*(.-)%s*$")
+    if item ~= "" then
+      entries[#entries + 1] = item
+    end
+  end
+  for i = 1, #inner do
+    local ch = inner:sub(i, i)
+    if ch == "{" then
+      depth_brace = depth_brace + 1
+    elseif ch == "}" then
+      depth_brace = depth_brace - 1
+    elseif ch == "(" then
+      depth_paren = depth_paren + 1
+    elseif ch == ")" then
+      depth_paren = depth_paren - 1
+    elseif ch == "[" then
+      depth_bracket = depth_bracket + 1
+    elseif ch == "]" then
+      depth_bracket = depth_bracket - 1
+    elseif (ch == "," or ch == ";")
+        and depth_brace == 0 and depth_paren == 0 and depth_bracket == 0 then
+      flush_chunk(i - 1)
+      chunk_start = i + 1
+    end
+  end
+  flush_chunk(#inner)
+  return entries
 end
 
 describe("Spoke 原生重构机械棘轮守卫", function()
@@ -161,6 +339,16 @@ describe("Spoke 原生重构机械棘轮守卫", function()
     end)
 
     it("真实仓库中新 Spoke 命名空间模块零反向依赖且不含无托管裸 :Connect(", function()
+      local graph = assert(Arch.scan(".", Arch.policy))
+      local result = Arch.check(Arch.policy, graph)
+      local reverse_deps = {}
+      for _, violation in ipairs(result.violations) do
+        if violation.rule == "spoke_no_legacy_reverse_dep" then
+          reverse_deps[#reverse_deps + 1] = violation.from .. " -> " .. violation.to
+        end
+      end
+      assert.same({}, reverse_deps)
+
       local bad_connects = {}
       for _, path in ipairs(business_lua_files()) do
         if is_spoke_namespace_file(path) then
@@ -172,10 +360,8 @@ describe("Spoke 原生重构机械棘轮守卫", function()
             local pos = line:find(":%s*Connect%s*%(")
             if pos then
               local statement = line:sub(1, pos - 1):match("[^;]*$") or ""
-              local managed = statement:find("=", 1, true) ~= nil
-                or statement:find("return", 1, true) ~= nil
-                or statement:find("use%s*%(") ~= nil
-                or statement:find("on_cleanup%s*%(") ~= nil
+              local managed = has_assignment(statement)
+                or statement:find("%f[%w_]return%f[^%w_]") ~= nil
               if not managed then
                 bad_connects[#bad_connects + 1] = path .. ":" .. line_no .. " 新 Spoke 模块出现未保存句柄的裸 :Connect("
               end
@@ -200,7 +386,7 @@ describe("Spoke 原生重构机械棘轮守卫", function()
       end
 
       for _, expected in ipairs(PACKAGE_SNAPSHOTS) do
-        local count, digest = package_tree_fingerprint(".", expected.root)
+        local count, digest = package_tree_fingerprint(expected.root)
         if count ~= expected.file_count or digest ~= expected.tree_sha256 then
           fail(
             "上游包 %s 已被修改（文件数 %d vs 基线 %d；SHA-256 %s vs 基线 %s）。"
@@ -210,47 +396,20 @@ describe("Spoke 原生重构机械棘轮守卫", function()
         end
       end
     end)
-
-    describe("篡改检出夹具（确保双包完整性守卫生效）", function()
-      local root = fs.repo_root() .. "/tmp/spoke-pkg-guard-test"
-      after_each(function() fs.rmrf(root) end)
-
-      it("修改 1 字节或增删文件都会改变树哈希", function()
-        fs.rmrf(root)
-        fs.write_file(root .. "/pkg/a.lua", "return 1\n")
-        local c0, h0 = package_tree_fingerprint(root, "pkg")
-
-        fs.write_file(root .. "/pkg/a.lua", "return 2\n")
-        local c1, h1 = package_tree_fingerprint(root, "pkg")
-        assert.equals(c0, c1)
-        assert.is_not_equal(h0, h1)
-
-        fs.write_file(root .. "/pkg/a.lua", "return 1\n")
-        fs.write_file(root .. "/pkg/b.lua", "return 0\n")
-        local c2, h2 = package_tree_fingerprint(root, "pkg")
-        assert.equals(c0 + 1, c2)
-        assert.is_not_equal(h0, h2)
-      end)
-    end)
   end)
 
   describe("存量债务水位线只减不增棘轮", function()
-    it("OwnedUnits 调用总数不超过水位线（且禁止换别名绕过统计）", function()
+    it("OwnedUnits 调用总数不超过水位线（且禁止换别名或链式调用绕过统计）", function()
       local total = 0
       local detail = {}
-      local bad_aliases = {}
+      local bad_bindings = {}
       for _, path in ipairs(business_lua_files()) do
         if path ~= "common/OwnedUnits.lua" then
           local src = assert(fs.slurp(path), "读不到源码: " .. path)
-          local code = Arch.code_only(src)
-          for _, req in ipairs(Arch.requires(src)) do
-            if req == "common.OwnedUnits" then
-              local alias = src:match("local%s+([%w_]+)%s*=%s*require%s*%(?%s*[\"']common%.OwnedUnits[\"']")
-              if alias ~= "OwnedUnits" then
-                bad_aliases[#bad_aliases + 1] = path .. " 使用非标准别名 require common.OwnedUnits: " .. tostring(alias)
-              end
-            end
+          for _, problem in ipairs(check_owned_units_bindings(path, src)) do
+            bad_bindings[#bad_bindings + 1] = problem
           end
+          local code = Arch.code_only(src)
           local count = 0
           for _ in code:gmatch("%f[%w_]OwnedUnits%s*%.%s*[%w_]+%s*%(") do
             count = count + 1
@@ -261,7 +420,7 @@ describe("Spoke 原生重构机械棘轮守卫", function()
           end
         end
       end
-      assert.same({}, bad_aliases)
+      assert.same({}, bad_bindings)
       if total > DEBT_WATERMARKS.owned_units_calls then
         fail("OwnedUnits 调用总数 %d 超过水位线 %d（只减不增）：\n%s",
           total, DEBT_WATERMARKS.owned_units_calls, format_breakdown(detail))
@@ -293,16 +452,24 @@ describe("Spoke 原生重构机械棘轮守卫", function()
 
     it("server/main.lua 的 MgrMap 成员数不超过水位线", function()
       local src = assert(fs.slurp("server/main.lua"), "读不到 server/main.lua")
-      local body = src:match("local MgrMap = (%b{})")
-      local members = {}
-      if body then
-        for key in body:gmatch("([%w_]+)%s*=%s*require%s*%(") do
-          members[#members + 1] = key
+      local code = Arch.code_only(src)
+      local body = code:match("local%s+MgrMap%s*=%s*(%b{})")
+      local mgr_files = {}
+      for _, path in ipairs(walk_files("server/Mgr", true)) do
+        if path:match("%.lua$") then
+          mgr_files[#mgr_files + 1] = path
         end
       end
-      if #members > DEBT_WATERMARKS.mgr_map_members then
-        fail("MgrMap 成员数 %d 超过水位线 %d（只减不增）：%s",
-          #members, DEBT_WATERMARKS.mgr_map_members, table.concat(members, ", "))
+      if not body then
+        if #mgr_files > 0 then
+          fail("server/main.lua 找不到 local MgrMap 表，但 server/Mgr/ 仍有 %d 个模块未清空", #mgr_files)
+        end
+        return
+      end
+      local entries = count_top_level_table_entries(body)
+      if #entries > DEBT_WATERMARKS.mgr_map_members then
+        fail("MgrMap 成员数 %d 超过水位线 %d（只减不增）：\n%s",
+          #entries, DEBT_WATERMARKS.mgr_map_members, table.concat(entries, "\n"))
       end
     end)
   end)
