@@ -31,11 +31,11 @@ local PACKAGE_SNAPSHOTS = {
 
 -- 三类存量债务水位线（只减不增；每个垂直切片完成后单调下调对应数值直至归零）。
 local DEBT_WATERMARKS = {
-  -- #315 删除旧双端后实测：OwnedUnits 7、旧债务裸 Connect 24、MgrMap 6。
+  -- 合并 #314/#315 后实测：OwnedUnits 5、旧债务裸 Connect 19、MgrMap 5。
   -- 水位只减不增；后续切片应继续下降，不能为通过门禁调高。
-  owned_units_calls = 7,
-  legacy_raw_connects = 24,
-  mgr_map_members = 6,
+  owned_units_calls = 5,
+  legacy_raw_connects = 19,
+  mgr_map_members = 5,
 }
 
 local BUSINESS_ROOTS = { "client", "common", "server" }

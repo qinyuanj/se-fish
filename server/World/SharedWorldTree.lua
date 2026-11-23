@@ -7,6 +7,7 @@ local GameCfg = require("common.GameCfg")
 local spoke = require("common.packages.spoke.api")
 local GroundLoot = require("server.World.GroundLoot")
 local FerryRoute = require("server.World.FerryRoute")
+local SquadDock = require("server.World.SquadDock")
 
 local SpokeTree = spoke.SpokeTree
 local Effect = spoke.Effect
@@ -97,6 +98,13 @@ function SharedWorldTree.spawn(opts)
     interact = opts.interact,
     players_service = opts.players_service,
     lookup_tree = opts.lookup_tree,
+  })
+  SquadDock.mount(handle, {
+    remote = opts.remote,
+    player_data = opts.player_data,
+    lookup_tree = opts.lookup_tree,
+    session_epoch = opts.session_epoch,
+    logger = opts.logger,
   })
 
   function handle:get_zone(zone_id)

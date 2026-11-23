@@ -104,6 +104,15 @@ end
 describe("武器攻击换弹与 PK 过滤宿主接缝（#300）", function()
   local runtime, events, player, other, data, casts, rays, ray_hit
 
+  local function squad_action(actor, payload)
+    events.PartyAction.OnServerEvent:Fire(actor, payload)
+  end
+
+  local function make_squad()
+    squad_action(player, { action = "Invite", targetUserId = other.UserId })
+    squad_action(other, { action = "Accept" })
+  end
+
   local function boot(overrides, other_overrides)
     events = {}
     local re = {
@@ -124,6 +133,7 @@ describe("武器攻击换弹与 PK 过滤宿主接缝（#300）", function()
     }
     re:GetRE("WeaponAction")
     re:GetRE("WeaponResult")
+    re:GetRE("PartyAction")
     player = make_player(1, overrides and overrides.px or 0, overrides and overrides.pz or 0)
     other = make_player(2, other_overrides and other_overrides.px or 4, other_overrides and other_overrides.pz or 0)
     data = make_data(player, overrides)
@@ -165,12 +175,10 @@ describe("武器攻击换弹与 PK 过滤宿主接缝（#300）", function()
           return 0
         end,
       },
-      party = {
-        SameParty = function(_, a, b)
-          return a and b and a._party ~= nil and a._party == b._party
-        end,
-      },
       zone_markers = require("common.ZoneMarkers"),
+      bind_party_action = function(dispatch)
+        events.PartyAction.OnServerEvent:Connect(function(actor, payload) dispatch(actor, payload) end)
+      end,
       bind_weapon_action = function(dispatch)
         events.WeaponAction.OnServerEvent:Connect(function(actor, payload)
           dispatch(actor, payload)
@@ -305,9 +313,9 @@ describe("武器攻击换弹与 PK 过滤宿主接缝（#300）", function()
     assert.is_true(life:ApplyHit(life:NewHit(player, "gun"), other, 20))
     assert.same(GameCfg.Vitals.MaxHealth - 20, other.Character.Controller.Health)
 
-    player._party, other._party = "squad", "squad"
+    make_squad()
     assert.is_false(life:ApplyHit(life:NewHit(player, "melee"), other, 20))
-    player._party = nil
+    squad_action(player, { action = "Leave" })
     assert.is_true(life:ApplyHit(life:NewHit(player, "melee"), other, 20))
 
     local fish = { Id = 91 }
@@ -323,12 +331,12 @@ describe("武器攻击换弹与 PK 过滤宿主接缝（#300）", function()
       held = { kind = "weapon", id = "item164" },
     }, { px = 242, pz = 0 })
     ray_hit = { Instance = other.Character, Position = { x = 242, y = 2, z = 0 } }
-    player._party, other._party = "squad", "squad"
+    make_squad()
     attack({ x = 1, y = 0, z = 0 })
     local target = runtime:get_player_tree(other.UserId)
     assert.same(0, target:get_modifier_remaining("paralyze"))
 
-    player._party = nil
+    squad_action(player, { action = "Leave" })
     runtime.clock:advance(1)
     attack({ x = 1, y = 0, z = 0 })
     assert.is_true(target:get_modifier_remaining("paralyze") > 0)

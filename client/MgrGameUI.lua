@@ -8,7 +8,6 @@ local curShowMap = {}
 
 local ScreenHandlerLoaders = {
     ScreenMain = function() return require("client.ScreenHandlers.ScreenMain") end,
-    ScreenParty = function() return require("client.ScreenHandlers.ScreenParty") end,
 }
 
 function MgrGameUI:GetScreen(screenName)

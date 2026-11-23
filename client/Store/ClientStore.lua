@@ -265,11 +265,15 @@ local function normalize_party(payload)
     if member.maxHealth ~= nil and not Number.IsFiniteNumber(member.maxHealth) then
       return nil
     end
+    if member.phase ~= nil and not VALID_SURVIVAL_PHASES[member.phase] then
+      return nil
+    end
     members[i] = {
       userId = member.userId,
       name = member.name,
       health = member.health,
       maxHealth = member.maxHealth,
+      phase = member.phase or "alive",
       self = member.self == true or nil,
     }
   end
@@ -284,10 +288,14 @@ local function normalize_party(payload)
         or payload.invite.expiresInSec < 0 then
       return nil
     end
+    if payload.invite.expiresAt ~= nil and not Number.IsFiniteNumber(payload.invite.expiresAt) then
+      return nil
+    end
     invite = {
       fromUserId = payload.invite.fromUserId,
       fromName = type(payload.invite.fromName) == "string" and payload.invite.fromName or nil,
       expiresInSec = payload.invite.expiresInSec,
+      expiresAt = payload.invite.expiresAt,
     }
   end
   return freeze_snapshot({

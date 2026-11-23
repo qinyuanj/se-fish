@@ -198,6 +198,7 @@ function FishermanView.rescue_state(options)
     rows = State.new("FishermanView.rescue_rows", {}),
     get_players = options.get_players,
     get_local_player = options.get_local_player,
+    is_squad_member = options.is_squad_member,
   }
 end
 
@@ -214,7 +215,8 @@ function FishermanView.rescue_driver_spec(shared)
           for _, player in ipairs(players) do
             local phase = player and player.GetAttribute and player:GetAttribute("SurvivalPhase") or nil
             local target = player and player.Character and player.Character.Position
-            if player ~= me and (phase == "downed" or phase == "rescuing") and target then
+            local squad_owned = type(shared.is_squad_member) == "function" and shared.is_squad_member(player and player.UserId)
+            if player ~= me and not squad_owned and (phase == "downed" or phase == "rescuing") and target then
               local dx, dz = position.x - target.x, position.z - target.z
               if dx * dx + dz * dz <= GameCfg.Rescue.Range * GameCfg.Rescue.Range then
                 list[#list + 1] = { userId = player.UserId, position = target }

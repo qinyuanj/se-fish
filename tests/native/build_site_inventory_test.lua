@@ -15,7 +15,7 @@ local fs = require("tests.support.fs_fixture")
 local lfs = require("lfs")
 
 -- 63：#214 审查修复把商品行子节点的两处建点（图片 / 文字各一支）合成一处驱动表建点，client 40 → 39
--- 64：#253 队伍界面 client/ScreenHandlers/ScreenParty.lua 的 create() 是新建点，client 39 → 40
+-- 64：#253 旧队伍界面的 create() 是新建点，client 39 → 40（该旧界面已由 #314 删除）
 -- 65：#296 客户端 Spoke 根视图树 client/Views/RootView.lua 统一动态 UI 建点，client 40 → 41
 -- 62：#297-B2 主 HUD 左上状态区迁入 client/Views/MainHudVitalsView.lua（复用 RootView 统一建点），剥离 ScreenMain 3 处建点，client 41 → 38
 -- 61：#297-A3 左手持竿投影迁入 HeldRodLeaf，剥离 MgrPlayerData 2 处建点，在 server/main.lua 注入 1 处统一 create_unit，server 净减 1
@@ -31,8 +31,9 @@ local lfs = require("lfs")
 -- #313 倒计时改由 RootView 统一建点，删除 ScreenFerry 自己的 1 处建点，client 29 → 28。
 -- #312 三类经济与场景视图复用 RootView，删除旧双端模块后实测 client 22 / common 2 / server 26。
 -- 合并 #311 删除旧商店/钓鱼佬 4 处建点；实测 client 18 / common 2 / server 26。
--- #315 图鉴、GM 与消息改由 RootView 统一建点，删除旧客户端四处建点；实测 client 14 / common 2 / server 26。
-local SITES = 42
+-- #314 小队 HUD 复用 RootView 统一建点，删除旧队伍界面自己的 1 处建点。
+-- #315 图鉴、GM 与消息改由 RootView 统一建点，删除旧客户端四处建点；合并后实测 client 13 / common 2 / server 26。
+local SITES = 41
 local SITE_ROOTS = { "client", "common", "server" }
 local REF_ROOTS = { "client", "common", "server", "tests", "tools" }
 local REMOVED = { "FXUtil", "WeldTo", "MarkPointPart", "CreateHPBar" }

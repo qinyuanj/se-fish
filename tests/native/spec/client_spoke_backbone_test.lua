@@ -584,7 +584,6 @@ describe("客户端 Spoke 主干契约（#296）", function()
         "client.LocalMgrUtil",
         "client.LocalMotorUnitCtrl",
         "client.LocalLoot",
-        "client.ScreenHandlers.ScreenParty",
         "client.Views.LotteryView",
         "client.Views.BlindboxView",
         "client.Views.PlatformShopView",
@@ -649,7 +648,6 @@ describe("客户端 Spoke 主干契约（#296）", function()
         for _, name in ipairs({
           "client.LocalMgrUtil", "client.LocalMotorUnitCtrl",
           "client.LocalLoot",
-          "client.ScreenHandlers.ScreenParty",
           "client.Views.GarBiteWarning",
         }) do
           package.loaded[name] = noop_module

@@ -96,7 +96,16 @@ function M.start(opts)
     players = function() return players end,
     damage_filter = opts.damage_filter or function() return true end,
     bait_spots = opts.bait_spots or { Enabled = false },
+    session_epoch = opts.session_epoch,
+    zones = opts.zones,
+    zone_markers = opts.zone_markers,
     bind_interact_action = opts.bind_interact_action,
+    bind_party_action = opts.bind_party_action or function(dispatch)
+      remote:GetRE("PartyAction").OnServerEvent:Connect(function(player, payload) dispatch(player, payload) end)
+    end,
+    bind_party_state_request = opts.bind_party_state_request or function(dispatch)
+      remote:GetRE("PartyStateRequest").OnServerEvent:Connect(function(player) dispatch(player) end)
+    end,
   })
   runtime:start()
   runtime:mark_started()
