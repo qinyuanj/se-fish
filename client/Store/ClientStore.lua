@@ -674,7 +674,7 @@ function ClientStore.new(options)
     local read_player_attr = resolved.read_player_attr
     local get_player_attr_signal = resolved.get_player_attr_signal
 
-    local function sync_player_vitals_and_coin(player)
+    local function sync_player_vitals(player, include_coin)
       if player == nil or type(read_player_attr) ~= "function" then
         return
       end
@@ -683,7 +683,7 @@ function ClientStore.new(options)
       local raw_max_health = tonumber(read_player_attr(player, "MaxHealth"))
       local raw_hunger = tonumber(read_player_attr(player, "Hunger"))
       local raw_max_hunger = tonumber(read_player_attr(player, "MaxHunger"))
-      local raw_coin = tonumber(read_player_attr(player, "FishCoin"))
+      local raw_coin = include_coin and tonumber(read_player_attr(player, "FishCoin")) or nil
       self:update_vitals({
         health = Number.IsFiniteNumber(raw_health) and raw_health or c.MaxHealth,
         maxHealth = Number.IsFiniteNumber(raw_max_health) and raw_max_health or c.MaxHealth,
@@ -723,13 +723,13 @@ function ClientStore.new(options)
               if disposed or bound_player ~= player then
                 return
               end
-              sync_player_vitals_and_coin(player)
+              sync_player_vitals(player, false)
             end)
             player_attr_conns[#player_attr_conns + 1] = conn
           end
         end
       end
-      sync_player_vitals_and_coin(player)
+      sync_player_vitals(player, true)
     end
 
     local get_local_player = resolved.get_local_player

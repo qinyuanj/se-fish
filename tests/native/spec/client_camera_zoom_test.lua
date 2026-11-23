@@ -72,6 +72,17 @@ describe("ClientStore 属性汇聚与 CameraZoomView（#297-B）", function()
     remote_events.ItemBarState.OnClientEvent:Fire({ slots = {}, coin = 250 })
     assert.equals(250, store.coin:now())
 
+    -- 后续 Health / Hunger 属性信号触发时，不得用陈旧 attrs.FishCoin(99) 回退已更新的 store.coin(250)
+    attrs.Hunger = 44
+    attr_signals.Hunger:Fire()
+    assert.equals(44, store.vitals:now().hunger)
+    assert.equals(250, store.coin:now())
+
+    attrs.Health = 175
+    attr_signals.Health:Fire()
+    assert.equals(175, store.vitals:now().health)
+    assert.equals(250, store.coin:now())
+
     -- Heartbeat 同步 local_character 与归一化 camera_distance
     heartbeat:Fire(0.016)
     assert.equals(character, store.local_character:now())
