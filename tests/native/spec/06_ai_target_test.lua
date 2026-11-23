@@ -29,7 +29,6 @@ end
 
 describe('第 6 节 官方 AI 目标选择接线（哥斯拉贯通）', function()
     local env
-    local savedExtra
 
     local function vec(x, y, z) return env.vec(x, y, z) end
 
@@ -72,10 +71,7 @@ describe('第 6 节 官方 AI 目标选择接线（哥斯拉贯通）', function
     end
 
     before_each(function()
-        savedExtra = { remote = rawget(_G, 'RemoteEvent') }
         env = Islet.new(7)
-        _G.RemoteEvent = { New = function() return { OnServerEvent = {
-            Connect = function() return { Disconnect = function() end } end } } end }
         for _, name in ipairs({ 'server.Mgr.MgrAiTarget', 'server.packages.official_ai_feature.api',
             'server.packages.official_ai_feature.official_ai_feature',
             'server.packages.official_ai_feature.behavior_runtime',
@@ -91,7 +87,6 @@ describe('第 6 节 官方 AI 目标选择接线（哥斯拉贯通）', function
 
     after_each(function()
         env:tearDown()
-        _G.RemoteEvent = savedExtra.remote
     end)
 
     it('条款 6-29：业务按累计有效伤害裁决，结果登记到官方 AI 管理器', function()
@@ -362,16 +357,12 @@ end)
 -- 业务入口：SpawnLanded + Drop 放下白头鹰，逐帧 Update 推进；只观察官方 AI 持有的焦点。
 describe('第 6 节 6-30：离开战斗范围的玩家退出飞行鱼目标', function()
     local env
-    local savedRemote
 
     local function vec(x, y, z) return env.vec(x, y, z) end
     local function focus(fish) return require('server.Mgr.MgrAiTarget'):Focus(fish) end
 
     before_each(function()
-        savedRemote = rawget(_G, 'RemoteEvent')
         env = Islet.new(6)
-        _G.RemoteEvent = { New = function() return { OnServerEvent = {
-            Connect = function() return { Disconnect = function() end } end } } end }
         for _, name in ipairs({ 'server.Mgr.MgrAiTarget', 'server.packages.official_ai_feature.api',
             'server.packages.official_ai_feature.official_ai_feature',
             'server.packages.official_ai_feature.behavior_runtime',
@@ -385,7 +376,6 @@ describe('第 6 节 6-30：离开战斗范围的玩家退出飞行鱼目标', fu
 
     after_each(function()
         env:tearDown()
-        _G.RemoteEvent = savedRemote
     end)
 
     -- 断言读业务裁决口与自研轨迹目标：官方包只在目标单位失效时清焦点，站得远但仍然有效的

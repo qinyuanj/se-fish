@@ -29,10 +29,8 @@ describe('第 12 节 首领逐招表（哥斯拉）', function()
     local savedExtra
 
     before_each(function()
-        savedExtra = { remote = rawget(_G, 'RemoteEvent'), ability = package.loaded['server.AbilityAPI'] }
+        savedExtra = { ability = package.loaded['server.AbilityAPI'] }
         env = Islet.new(7)
-        _G.RemoteEvent = { New = function() return { OnServerEvent = {
-            Connect = function() return { Disconnect = function() end } end } } end }
         package.loaded['server.AbilityAPI'] = nil
         local p = Islet.shoreDryPoint(7)
         env.player.Character.Position = env.vec(p.x, p.y, p.z)
@@ -40,7 +38,6 @@ describe('第 12 节 首领逐招表（哥斯拉）', function()
 
     after_each(function()
         env:tearDown()
-        _G.RemoteEvent = savedExtra.remote
         package.loaded['server.AbilityAPI'] = savedExtra.ability
     end)
 

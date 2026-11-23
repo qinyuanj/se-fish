@@ -28,22 +28,18 @@ local function idOf(combat)
 end
 
 describe('第 12 节 逐招表（近战与范围组）', function()
-    local env, savedRemote, savedAbility, hp
+    local env, savedAbility, hp
 
     before_each(function()
-        savedRemote = rawget(_G, 'RemoteEvent')
         savedAbility = package.loaded['server.AbilityAPI']
         env = Islet.new(1)
         env.player.Character.Controller.Health = 100000 -- 长时间节拍断言不被 300 血上限截断
-        _G.RemoteEvent = { New = function() return { OnServerEvent = {
-            Connect = function() return { Disconnect = function() end } end } } end }
         package.loaded['server.AbilityAPI'] = nil
         hp = function() return env.player.Character.Controller.Health end
     end)
 
     after_each(function()
         env:tearDown()
-        _G.RemoteEvent = savedRemote
         package.loaded['server.AbilityAPI'] = savedAbility
     end)
 

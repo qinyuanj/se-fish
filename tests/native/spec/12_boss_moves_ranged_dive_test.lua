@@ -51,21 +51,17 @@ local ALL_MOVES = {
 }
 
 describe('第 12 节 远程与俯冲组逐招表', function()
-    local env, restore, hits, savedRemote, savedAbility
+    local env, restore, hits, savedAbility
 
     before_each(function()
         restore, hits = {}, {}
-        savedRemote = rawget(_G, 'RemoteEvent')
         savedAbility = package.loaded['server.AbilityAPI']
-        _G.RemoteEvent = { New = function() return { OnServerEvent = {
-            Connect = function() return { Disconnect = function() end } end } } end }
         package.loaded['server.AbilityAPI'] = nil
     end)
 
     after_each(function()
         for index = #restore, 1, -1 do restore[index]() end
         if env then env:tearDown() end
-        _G.RemoteEvent = savedRemote
         package.loaded['server.AbilityAPI'] = savedAbility
         env = nil
     end)
