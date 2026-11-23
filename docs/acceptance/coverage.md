@@ -95,7 +95,7 @@
 | 3-15 | server/Mgr/MgrCast.lua、server/Mgr/MgrPlayerData.lua | tests/native/item_bar_test.lua、tests/native/item_bar_flow_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 3-16 | server/World/PlayerLife.lua | tests/native/spec/server_life_phase_298_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 3-17 | server/Mgr/MgrPlayerData.lua、client/LocalAttackButton.lua | tests/native/hold_operate_mgr_test.lua、tests/native/item_bar_flow_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 3-18 | server/Mgr/MgrSpecialItem.lua、common/SpecialItem.lua | tests/native/special_item_mgr_test.lua、tests/native/hold_operate_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 3-18 | server/World/SpecialItemPhase.lua、common/SpecialItem.lua | tests/native/spec/server_special_item_299_test.lua、tests/native/hold_operate_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 3-19 | server/Mgr/MgrPlayerData.lua、server/World/GroundLoot.lua | tests/native/loot_drop_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 3-20 | server/World/GroundLoot.lua | tests/native/loot_drop_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 3-21 | server/World/GroundLoot.lua、server/Data/PlayerData.lua | tests/native/loot_recycle_test.lua | 缺 | 缺 | 缺 | 缺 | A |
@@ -189,9 +189,9 @@
 | 6-15 | common/cfg/Shop.lua、server/Mgr/MgrShop.lua、server/Mgr/MgrWeapon.lua、common/AttrModel.lua、server/World/AttrLeaf.lua | tests/native/prize_growth_wiring_test.lua、tests/native/shop_test.lua、tests/native/attr_migration_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 6-16 | common/cfg/Shop.lua、server/Mgr/MgrShop.lua、server/Mgr/MgrWeapon.lua、common/AttrModel.lua、server/World/AttrLeaf.lua | tests/native/prize_growth_wiring_test.lua、tests/native/shop_test.lua、tests/native/attr_migration_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 6-17 | server/Mgr/MgrShop.lua、server/Mgr/MgrWeapon.lua、common/AttrModel.lua、server/World/AttrLeaf.lua | tests/native/prize_growth_wiring_test.lua、tests/native/shop_test.lua、tests/native/attr_migration_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 6-18 | server/Mgr/MgrWeapon.lua、server/Mgr/MgrShop.lua、common/AttrModel.lua、server/World/AttrLeaf.lua | tests/native/prize_weapon_effect_test.lua、tests/native/special_item_mgr_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 6-19 | server/Mgr/MgrWeapon.lua、server/World/AttrLeaf.lua、common/AttrModel.lua | tests/native/prize_weapon_effect_test.lua、tests/native/special_item_mgr_test.lua、tests/native/prize_growth_wiring_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 6-20 | server/Mgr/MgrSpecialItem.lua、common/SpecialItem.lua、common/AttrModel.lua、server/World/AttrLeaf.lua | tests/native/prize_weapon_effect_test.lua、tests/native/special_item_mgr_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 6-18 | server/Mgr/MgrWeapon.lua、server/Mgr/MgrShop.lua、common/AttrModel.lua、server/World/AttrLeaf.lua | tests/native/prize_weapon_effect_test.lua、tests/native/spec/server_special_item_299_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 6-19 | server/Mgr/MgrWeapon.lua、server/World/AttrLeaf.lua、common/AttrModel.lua | tests/native/prize_weapon_effect_test.lua、tests/native/spec/server_special_item_299_test.lua、tests/native/prize_growth_wiring_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 6-20 | server/World/SpecialItemPhase.lua、common/SpecialItem.lua、common/AttrModel.lua、server/World/AttrLeaf.lua | tests/native/prize_weapon_effect_test.lua、tests/native/spec/server_special_item_299_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 6-21 | common/cfg/Items.lua、common/cfg/Lottery.lua、common/GameCfg.lua | tests/native/cfg_fish_items_test.lua、tests/native/prize_weapon_effect_test.lua、tests/native/prize_weapon_cfg_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 6-22 | server/Mgr/MgrLottery.lua、common/LotteryDraw.lua、common/cfg/Lottery.lua | tests/native/prize_weapon_effect_test.lua、tests/native/lottery_draw_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 6-23 | common/cfg/Items.lua、common/GameCfg.lua | tests/native/cfg_fish_items_test.lua、tests/native/prize_weapon_effect_test.lua、tests/native/prize_weapon_cfg_test.lua | 缺 | 缺 | 缺 | 缺 | A |
@@ -462,10 +462,10 @@
 | 14-17 | server/Mgr/MgrLottery.lua、server/Mgr/MgrSave.lua | tests/native/lottery_settle_test.lua | 缺 | 缺 | 缺 | 缺 | B |
 | 14-18 | server/Mgr/MgrLottery.lua、server/Mgr/MgrSave.lua | tests/native/lottery_settle_test.lua | 缺 | 缺 | 缺 | 缺 | B |
 | 14-19 | server/Mgr/MgrLottery.lua、server/Mgr/MgrSave.lua | tests/native/lottery_settle_test.lua | 缺 | 缺 | 缺 | 缺 | B |
-| 14-20 | common/SpecialItem.lua、server/Mgr/MgrSpecialItem.lua | tests/native/special_item_mgr_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 14-21 | common/SpecialItem.lua、common/FlightPath.lua | tests/native/special_item_mgr_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 14-22 | common/SpecialItem.lua、server/Mgr/MgrSpecialItem.lua | tests/native/special_item_mgr_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 14-23 | common/SpecialItem.lua、common/BossPhase.lua | tests/native/special_item_mgr_test.lua | 缺 | 缺 | 缺 | 缺 | B |
+| 14-20 | common/SpecialItem.lua、server/World/SpecialItemPhase.lua | tests/native/spec/server_special_item_299_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 14-21 | common/SpecialItem.lua、common/FlightPath.lua | tests/native/spec/server_special_item_299_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 14-22 | common/SpecialItem.lua、server/World/SpecialItemPhase.lua | tests/native/spec/server_special_item_299_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 14-23 | common/SpecialItem.lua、common/BossPhase.lua | tests/native/spec/server_special_item_299_test.lua | 缺 | 缺 | 缺 | 缺 | B |
 
 图案权重与两同倍数在 common/cfg/Lottery.lua，抽样与判奖在 common/LotteryDraw.lua，扣物发奖与落位在 MgrLottery。
 
@@ -504,7 +504,7 @@
 | 16-02 | common/cfg/Items.lua | tests/native/cfg_fish_items_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 16-03 | common/cfg/Items.lua | tests/native/cfg_fish_items_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 16-04 | common/cfg/Items.lua、server/World/PlayerLife.lua | tests/native/spec/16_item_base_data_test.lua、tests/native/spec/server_life_phase_298_test.lua | 有 | 缺 | 缺 | 缺 | A |
-| 16-05 | common/cfg/Items.lua、server/Mgr/MgrSpecialItem.lua | tests/native/special_item_mgr_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 16-05 | common/cfg/Items.lua、server/World/SpecialItemPhase.lua | tests/native/spec/server_special_item_299_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 16-06 | common/cfg/Items.lua、server/World/PlayerLife.lua | tests/native/spec/16_item_base_data_test.lua、tests/native/spec/server_life_phase_298_test.lua | 缺 | 有 | 缺 | 缺 | A |
 | 16-07 | common/cfg/Items.lua、server/World/PlayerLife.lua | tests/native/spec/16_item_base_data_test.lua、tests/native/spec/server_life_phase_298_test.lua | 有 | 缺 | 缺 | 缺 | A |
 | 16-08 | common/cfg/Items.lua、common/ContentValidation.lua | tests/native/content_validation_test.lua | 缺 | 缺 | 缺 | 缺 | A |

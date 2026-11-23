@@ -1,4 +1,5 @@
 local GameCfg = require('common.GameCfg')
+local ServerRuntime = require('server.World.ServerRuntime')
 
 local Mgr = { LastSeq = {}, Recoveries = {}, ReturnPending = {}, Flights = {}, BoardPending = {} }
 
@@ -36,8 +37,9 @@ function Mgr:Teleport(player, dest)
         print('[MgrFerry] 传送失败', player and player.UserId, '角色缺失')
         return false
     end
-    if self.SpecialItem then
-        pcall(function() self.SpecialItem:OnTeleport(player) end)
+    local tree = ServerRuntime.current() and ServerRuntime.current():get_player_tree(player.UserId)
+    if tree and type(tree.suspend_special_item) == "function" then
+        pcall(tree.suspend_special_item, tree)
     end
     local ok, err = pcall(function()
         local pos = Vector3.New(dest.x, dest.y, dest.z)

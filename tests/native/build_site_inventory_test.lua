@@ -23,7 +23,8 @@ local lfs = require("lfs")
 -- 58：#297-C2 主 HUD 底部道具栏、拖拽与爆炸物瞄准切流至 Spoke 视图，剥离 ScreenMain 动态格位与瞄准遮罩 2 处建点（含循环内多节点建点），client 37 → 35
 -- 57：#298 生存蒙版改挂 RootView 统一建点，删除 ScreenSurvival 自己的 1 处建点，client 35 → 34
 -- 54：#301 地面物品改由 GroundLoot 的 on_cleanup 销毁，不再单独登记建点；删除 MgrLoot 3 处，57 → 54
-local SITES = 54
+-- 52：#299 再删除 MgrSpecialItem 的两处占位外观建点，改由入口已有 create_unit 托管
+local SITES = 52
 local SITE_ROOTS = { "client", "common", "server" }
 local REF_ROOTS = { "client", "common", "server", "tests", "tools" }
 local REMOVED = { "FXUtil", "WeldTo", "MarkPointPart", "CreateHPBar" }
@@ -83,7 +84,7 @@ local function breakdown(per_root)
 end
 
 describe("运行期建点台账", function()
-  it("三端运行期建点数与 #206 台账同为 54 个", function()
+  it("三端运行期建点数与 #206 台账同为 52 个", function()
     local total, per_root = count_sites()
     if total ~= SITES then
       fail("运行期建点 %d 个，台账与本守卫断言 %d 个（%s）。新增或删除建点要同步 #206 台账与本计数。",

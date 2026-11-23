@@ -544,6 +544,23 @@ function MainHudActionButtonsView.mount(s, ctx, options)
     end)
   end
 
+  s:subscribe(ctx.store.on_server_event, function(event)
+    if type(event) ~= "table" or event.channel ~= "SpecialItemResult" then return end
+    local result = event.payload
+    if type(result) ~= "table" or result.ok ~= false then return end
+    local hints = {
+      cooldown = "原子吐息冷却中",
+      ["not-godzilla"] = "需要选中哥斯拉变身",
+      ["not-wings"] = "需要选中风神之翼",
+      ["not-alive"] = "现在不能行动",
+      ["no-character"] = "角色未就绪",
+    }
+    local notify = ctx.services and ctx.services.notify
+    if type(notify) == "function" then
+      notify(hints[result.reason] or ("操作失败 " .. tostring(result.reason)))
+    end
+  end)
+
   s:on_cleanup(function()
     if flying_held then
       flying_held = false

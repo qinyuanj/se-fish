@@ -1,7 +1,7 @@
 -- #90 迁移：特殊道具纯逻辑（原 tests/gameplay/special_item_test.lua，7 例）。
 -- describe / it 名沿用旧类名与方法名；注册顺序 = 旧套件实际执行顺序（LuaUnit 按 `类名.方法名` 全局字典序）。
 -- 本文件是纯逻辑用例，不改全局、不改模块缓存、不改配置，因此没有需要恢复的时间或随机替换；
--- 服务端接缝（MgrSpecialItem 的选中调和、飞行驱动、吐息结算、冷却镜像）见 tests/native/special_item_mgr_test.lua。
+-- 服务端宿主接缝见 tests/native/spec/server_special_item_299_test.lua。
 --
 -- 测试接缝（写明）：
 --   * Desired(itemId)：选中槽物品 → 期望生效效果（'wings'|'godzilla'|nil），
