@@ -1,7 +1,3 @@
--- Tick requests: deciding whether an epoch may ask to be ticked, and routing
--- that request to whoever schedules it (its ticker, the runtime, or its tree).
---
--- Split out of epoch.lua so the scheduling decision reads in one place.
 local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
 
 local EpochScheduling = {}
@@ -20,10 +16,6 @@ local function is_scheduler(target)
   return target ~= nil and type(target._schedule) == "function"
 end
 
--- A root tree must be routed to the runtime scheduler (like
--- Ticker:_request_upstream); inserting the tree into its own pending heap would
--- tick it as if it were a plain epoch (compare_to/_tick on itself). Manual trees
--- are driven explicitly, so a self-tick request has nothing to do.
 local function route(epoch)
   if is_scheduler(epoch._ticker) then
     epoch._ticker:_schedule(epoch)
@@ -36,7 +28,6 @@ local function route(epoch)
   end
 end
 
---- Builds the epoch's `_request_tick` closure, bound to that epoch for life.
 function EpochScheduling.make_request_tick(epoch)
   return function()
     if not can_request_tick(epoch) then

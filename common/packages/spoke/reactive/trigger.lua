@@ -97,7 +97,6 @@ function Trigger:unsubscribe(fn)
   self:_unsub_by_fn(fn)
 end
 
--- The dispatch list is reused between events to avoid allocating per invoke.
 local function reset_dispatch_list(trigger)
   local list = trigger._dispatch_list
   if list == nil then
@@ -111,7 +110,6 @@ local function reset_dispatch_list(trigger)
   return list
 end
 
--- A throwing subscriber is reported and never stops the remaining subscribers.
 local function invoke_subscriber(fn, payload)
   local ok, err = pcall(function()
     fn(payload)
@@ -123,8 +121,6 @@ end
 
 function Trigger:_dispatch(payload)
   local dispatch_list = reset_dispatch_list(self)
-  -- Snapshot the callable at dispatch start so tombstoning a slot mid-dispatch
-  -- does not suppress its call for this event (upstream copies structs by value).
   for _, sub in ipairs(self._subs) do
     dispatch_list[#dispatch_list + 1] = sub.fn
   end

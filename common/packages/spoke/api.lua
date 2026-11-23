@@ -1,9 +1,3 @@
--- Public facade for spoke: require("common.packages.spoke.api") returns an aggregate table
--- of the 13 public classes (#2 decision). SpokeRuntime and the utility types
--- (Heap, PackedTreeCoords, SpokeException, ...) stay internal; deep requires
--- are not blocked — tests and advanced usage can still reach the modules
--- directly under common/packages/spoke/runtime/ and common/packages/spoke/reactive/.
-
 local Epoch = require("common.packages.spoke.runtime.epoch")
 local Ticker = require("common.packages.spoke.runtime.ticker")
 local SpokeTree = require("common.packages.spoke.runtime.spoke_tree")
@@ -20,14 +14,12 @@ local Phase = require("common.packages.spoke.reactive.phase")
 local EffectBuilder = require("common.packages.spoke.reactive.effect_builder")
 
 return {
-  -- Runtime layer
   Epoch = Epoch,
   Ticker = Ticker,
   SpokeTree = SpokeTree,
   Dock = Dock,
   LambdaEpoch = LambdaEpoch,
   SpokeHandle = SpokeHandle,
-  -- Reactive layer
   Trigger = Trigger,
   State = State,
   Effect = Effect,

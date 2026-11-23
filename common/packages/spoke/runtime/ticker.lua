@@ -46,7 +46,6 @@ local function run_on_tick_callbacks(ticker)
   end
 end
 
--- A pass must either advance the queue (tick_next) or park it (pause).
 local function assert_pass_advanced(ticker)
   if not ticker._did_continue and not ticker._paused then
     error("Ticker must tick_next() or pause() during on_tick")
@@ -59,7 +58,6 @@ local function request_next_pass(ticker)
   end
 end
 
--- One pass of the ticker's on_tick callbacks.
 local function run_on_tick_pass(ticker)
   run_on_tick_callbacks(ticker)
   assert_pass_advanced(ticker)
@@ -72,9 +70,6 @@ local function make_tick_block(ticker)
       return
     end
     ticker._did_continue = false
-    -- _is_ticking is set by Epoch:_tick for the whole tick frame (upstream
-    -- isTicking), so rollback-phase schedules are absorbed by this pass;
-    -- _in_on_tick guards tick_next()'s "must be inside on_tick" rule.
     ticker._in_on_tick = true
     local tick_ok, tick_error = xpcall(run_on_tick_pass, identity, ticker)
     ticker._in_on_tick = false
@@ -139,9 +134,6 @@ local function is_live(node)
   return not (node.is_detached or node.fault)
 end
 
--- Only the first pending epoch has to wake the ticker upstream: later ones join
--- a pass that is already scheduled, and a ticking or paused ticker will drain
--- them itself.
 local function should_request_upstream(ticker, had_pending)
   return not ticker._is_ticking
     and not had_pending
@@ -186,8 +178,6 @@ local function reset_loop_guard(ticker)
   ticker._pass_count = 0
 end
 
--- Count backwards steps within one host entry. A repeated nested ticker is
--- making progress through its own queue, so only its inner guard applies.
 local function check_loop_guard(ticker, next_epoch)
   local entry = SpokeRuntime._entry_count
   if entry ~= ticker._guard_entry then
@@ -207,7 +197,6 @@ local function check_loop_guard(ticker, next_epoch)
   end
   ticker._last_ticked = next_epoch
   if ticker._max_passes > 0 and ticker._pass_count > ticker._max_passes then
-    -- An OnTick callback may catch the error and continue with a fresh budget.
     reset_loop_guard(ticker)
     error("Exceed oscillation limit - possible infinite loop", 0)
   end
@@ -281,8 +270,6 @@ function TickerBuilder:on_tick(fn)
   self._ticker._on_tick[#self._ticker._on_tick + 1] = fn
 end
 
--- Set the backwards-step budget before tick_next faults. Zero or less disables
--- the guard; the default is 1000.
 function TickerBuilder:loop_guard(max_passes)
   self:_assert_bootstrap()
   self._ticker._max_passes = max_passes

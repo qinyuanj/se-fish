@@ -15,19 +15,15 @@ function State.new(...)
   local equals = nil
 
   if arg_count == 0 then
-    -- State.new()
     initial = nil
   elseif arg_count == 1 then
-    -- State.new(initial) where a single string is the initial value, not a name
     initial = args[1]
   elseif arg_count >= 2 then
     if type(args[1]) == "string" then
-      -- State.new(name, initial [, equals])
       name = args[1]
       initial = args[2]
       equals = args[3]
     else
-      -- State.new(initial, equals)
       initial = args[1]
       equals = args[2]
     end

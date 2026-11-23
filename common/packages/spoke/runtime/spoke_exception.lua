@@ -11,10 +11,6 @@ function SpokeException.new(message, cause, epoch, phase, stack_snapshot)
       phase = phase,
     },
   }
-  -- The eggy host sandbox does not guarantee the debug library; guard like
-  -- spoke_error.lua does so fault wrapping never crashes on its own path.
-  -- SE keeps the equivalent global `traceback`, so the guard also falls back to it
-  -- (same shape as spoke_error.lua).
   local capture = type(debug) == "table" and debug.traceback or traceback
   local stack_trace = type(capture) == "function" and capture("", 3) or nil
   return setmetatable({

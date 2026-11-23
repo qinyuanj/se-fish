@@ -1,16 +1,8 @@
--- The runtime's virtual call stack: the frames pushed around every Init, Tick,
--- Dock and Bootstrap window, and the handles that let a caller act when its own
--- frame pops.
---
--- Split out of spoke_runtime.lua. The frame state stays on the runtime table so
--- `SpokeRuntime.frames` remains the single observable stack; these functions
--- take that runtime as their first argument.
 local RuntimeFrames = {}
 
 local Handle = {}
 Handle.__index = Handle
 
---- Pushes a frame and returns a handle to it.
 function RuntimeFrames.push(runtime, frame)
   if #runtime.frames == 0 then
     runtime._entry_count = runtime._entry_count + 1
@@ -33,7 +25,6 @@ function RuntimeFrames.push(runtime, frame)
   }, Handle)
 end
 
---- Pops the top frame and runs whatever was registered for its pop.
 function RuntimeFrames.pop(runtime)
   local frames = runtime.frames
   local index = #frames
@@ -51,7 +42,6 @@ function RuntimeFrames.pop(runtime)
   end
 end
 
---- A copy of the current stack, safe to keep past the frames' lifetimes.
 function RuntimeFrames.snapshot(runtime)
   local snapshot = {}
   for index, frame in ipairs(runtime.frames) do
@@ -65,7 +55,6 @@ function RuntimeFrames.snapshot(runtime)
   return snapshot
 end
 
---- A handle to the top frame, or nil when the stack is empty.
 function RuntimeFrames.current_handle(runtime)
   local index = #runtime.frames
   if index == 0 then
@@ -79,8 +68,6 @@ function RuntimeFrames.current_handle(runtime)
   }, Handle)
 end
 
--- A handle is alive while its slot still holds the very frame it was made for;
--- the version guards against a later frame reusing the slot.
 function Handle:is_alive()
   local runtime = self._runtime
   local aux = runtime._frame_aux[self._index]
@@ -100,7 +87,6 @@ function Handle:frame()
   return nil
 end
 
---- Runs `fn` when this frame pops, or immediately if it already has.
 function Handle:on_pop_self(fn)
   if type(fn) ~= "function" then
     error("SpokeRuntime frame action must be a function", 2)

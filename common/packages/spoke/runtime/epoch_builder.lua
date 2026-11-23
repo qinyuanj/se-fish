@@ -1,9 +1,3 @@
--- EpochBuilder: the `s` handle an epoch receives inside its Init and Tick
--- windows. Every mutation it offers records an attachment on the owning epoch,
--- which Epoch tears down in reverse order (see epoch.lua).
---
--- Split out of epoch.lua so the builder surface and the epoch lifecycle can be
--- read and tested apart from each other.
 local SpokeHandle = require("common.packages.spoke.runtime.spoke_handle")
 local SpokeError = require("common.packages.spoke.runtime.spoke_error")
 local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
@@ -11,10 +5,6 @@ local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
 local EpochBuilder = {}
 EpochBuilder.__index = EpochBuilder
 
--- Where a structural log goes when the tree exports no logger. Epoch re-points
--- this at its own overridable Epoch._log hook when it loads; keeping it as a
--- registered sink rather than a require means this module does not depend on
--- the epoch lifecycle it serves.
 local log_sink = function(message)
   SpokeError.log(message)
 end
@@ -108,17 +98,11 @@ function EpochBuilder:ports()
   return self._ports
 end
 
--- Port of upstream EpochBuilder.Log: mount a LambdaEpoch child so the log is a
--- visible structural node in the tree, and emit the message together with the
--- current tree trace. LambdaEpoch is required lazily because it extends Epoch,
--- which loads this module.
 local function emit_log(log_s, message)
   local SpokeIntrospect = require("common.packages.spoke.runtime.spoke_introspect")
   local found, logger = log_s:try_import("logger")
   local text = tostring(message) .. "\n\n"
     .. SpokeIntrospect.tree_trace(SpokeRuntime.snapshot_frames())
-  -- Intentionally swallow logger errors on both paths: a failing logger must
-  -- not fault the epoch that merely emitted a structural log record.
   pcall(function()
     if found and type(logger) == "table" and type(logger.log) == "function" then
       logger:log(text)
@@ -144,8 +128,6 @@ function EpochBuilder:export(key, value)
   return value
 end
 
--- Walks the epoch's own attachments newest-first, then each ancestor's
--- attachments up to the point where this epoch was attached to it.
 function EpochBuilder:try_import(key)
   assert_active(self)
   assert_export_key(key)

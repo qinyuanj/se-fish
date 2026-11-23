@@ -2,10 +2,6 @@ local Computation = require("common.packages.spoke.reactive.computation")
 local Dock = require("common.packages.spoke.runtime.dock")
 local SpokeHandle = require("common.packages.spoke.runtime.spoke_handle")
 
--- DSL-style builders passed into effect blocks and memo selectors. They are
--- only valid while the owning block is executing; the underlying Epoch builder
--- is sealed when the window closes, and every method re-checks that seal.
-
 local EffectBuilder = {}
 EffectBuilder.__index = EffectBuilder
 
@@ -21,7 +17,6 @@ local function assert_active(builder)
   end
 end
 
--- Trigger-shape normalization lives on Computation (shared with Memo/Phase).
 local collect_triggers = Computation._collect_triggers
 
 function EffectBuilder.new(add_dynamic, epoch_builder)
@@ -31,15 +26,12 @@ function EffectBuilder.new(add_dynamic, epoch_builder)
   }, EffectBuilder)
 end
 
--- Dynamically adds a signal dependency to the block and returns its current
--- value. The block re-runs when the signal changes.
 function EffectBuilder:d(signal)
   assert_active(self)
   self._add_dynamic(signal)
   return signal:now()
 end
 
--- Subscribes to the trigger and owns the handle for the current run.
 function EffectBuilder:subscribe(trigger, fn)
   assert_active(self)
   if trigger == nil then
@@ -83,13 +75,6 @@ function EffectBuilder:log(message)
   self._s:log(message)
 end
 
--- Nested factories: attach a child reactive epoch with bound lifetime. Each
--- accepts an optional leading name and trailing triggers (varargs or array).
--- The Effect/Reaction/Memo/Phase modules are required lazily because they are
--- ported after this module.
-
--- Memo and Reaction share one argument shape: (block [, triggers]) or
--- (name, block [, triggers]).
 local function call_block_factory(builder, class, a, b, ...)
   if type(a) == "string" then
     return builder:call(class.new(a, b, collect_triggers(...)))
@@ -132,9 +117,6 @@ function EffectBuilder:dock(name)
   assert_active(self)
   return self:call(Dock.new(name))
 end
-
--- MemoBuilder is intentionally narrow, matching upstream: a Memo is a pure
--- derived value, not an attachment-building scope.
 
 function MemoBuilder.new(add_dynamic, epoch_builder)
   return setmetatable({

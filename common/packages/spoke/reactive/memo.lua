@@ -4,13 +4,8 @@ local EffectBuilder = require("common.packages.spoke.reactive.effect_builder")
 
 local MemoBuilder = EffectBuilder.MemoBuilder
 
--- Trigger-shape normalization lives on Computation (shared with Effect/Phase).
 local collect_triggers = Computation._collect_triggers
 
--- A computed reactive value which updates when any of its triggers fire.
--- The selector receives a MemoBuilder, returns a raw Lua value, and runs once
--- on mount and again when dependencies change. The result is stored in an
--- internal State so equal recomputed values do not notify downstream.
 local Memo = Computation.extend("Memo", {
   constructor = function(self, selector, ...)
     if selector ~= nil and type(selector) ~= "function" then

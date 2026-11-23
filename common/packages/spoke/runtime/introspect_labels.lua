@@ -1,13 +1,5 @@
--- How epochs and frames are labelled in a trace: the type name, the frame kind,
--- the fault suffix, and the frame indices an epoch appears at.
---
--- Split out of spoke_introspect.lua so both the frame trace and the tree trace
--- render names the same way.
 local IntrospectLabels = {}
 
--- SE server Lua sandbox may not expose the standard `rawequal` function.
--- Frame/epoch identity is what matters here; epochs never overload __eq, so
--- `==` behaves as raw equality in practice.
 local rawequal = rawequal or function(a, b) return a == b end
 
 function IntrospectLabels.frame_kind(frame)
@@ -22,7 +14,6 @@ function IntrospectLabels.epoch_type_name(epoch)
   if type(metatable) ~= "table" then
     return "<unknown>"
   end
-  -- Base Epoch has no _default_name; every extended class sets one.
   return metatable._default_name or "Epoch"
 end
 
@@ -40,7 +31,6 @@ function IntrospectLabels.append_fault_suffix(label, epoch)
   return label
 end
 
---- An epoch's tree-trace label, prefixed with the frame indices it occupies.
 function IntrospectLabels.frame_epoch_label(epoch, frames)
   local indices = {}
   for index, frame in ipairs(frames) do
