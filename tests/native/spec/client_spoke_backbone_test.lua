@@ -598,10 +598,10 @@ describe("客户端 Spoke 主干契约（#296）", function()
         "client.ScreenHandlers.ScreenCompendium",
         "client.LocalGarBite",
         "client.LocalCastSource",
-        "client.LocalAttr",
         "client.packages.ability_system.api",
         "client.Store.ClientStore",
         "client.Views.RootView",
+        "client.Views.CameraZoomView",
       }
       local saved_loaded = {}
       for _, name in ipairs(stub_modules) do
@@ -647,7 +647,7 @@ describe("客户端 Spoke 主干契约（#296）", function()
           "client.ScreenHandlers.ScreenSurvival", "client.ScreenHandlers.ScreenParty",
           "client.ScreenHandlers.ScreenGrill", "client.ScreenHandlers.ScreenBlindbox",
           "client.ScreenHandlers.ScreenPlatform", "client.ScreenHandlers.ScreenCompendium",
-          "client.LocalGarBite", "client.LocalCastSource", "client.LocalAttr",
+          "client.LocalGarBite", "client.LocalCastSource",
         }) do
           package.loaded[name] = noop_module
         end

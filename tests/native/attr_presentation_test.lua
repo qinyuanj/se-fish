@@ -1,41 +1,39 @@
--- #89 迁移（原 tests/gameplay/attr_presentation_test.lua）：
+-- #89 迁移（原 tests/gameplay/attr_presentation_test.lua），#297-B 迁入 Spoke CameraZoomView：
 -- 失败方式：派生范围无消费者、非法复制属性扩大距离、相机覆盖其他模式、角色重建残留。
--- 接缝：BodyScale.InteractionRadius、LocalAttr.Refresh/Stop、MgrInteract.InRange。
--- 三个模块都经 loadfile 取全新实例（不经 require，不污染 package.loaded），
--- 旧套件没有 setUp/tearDown，因此逐例不需要 before_each/after_each 恢复全局。
--- describe/it 名沿用旧类名与方法名，案例顺序沿用旧 LuaUnit 的字典序执行序。
+-- 接缝：BodyScale.InteractionRadius、CameraZoomView.new_controller、MgrInteract.InRange。
 describe('TestAttrPresentation', function()
-    -- 相机刷新尊重其他拥有者，Stop 时恢复
+    -- 相机刷新尊重其他拥有者，清理时恢复
     it('test_camera_rebuild_restores_old_camera_and_uses_new_character_projection', function()
-        local mgr = assert(loadfile('client/LocalAttr.lua'))()
+        local CameraZoomView = require('client.Views.CameraZoomView')
+        local ctrl = CameraZoomView.new_controller()
         local first = { GetAttribute = function() return 39 end }
         local second = { GetAttribute = function() return 13 end }
         local camera = { Distance = 8, TrackingUnit = first }
-        assert.is_true(mgr:Refresh(first, camera))
+        assert.is_true(ctrl:refresh(first, camera))
         camera.TrackingUnit = second
-        assert.is_true(mgr:Refresh(second, camera))
+        assert.is_true(ctrl:refresh(second, camera))
         assert.same(13, camera.Distance)
-        mgr:Stop()
+        ctrl:release()
         assert.same(8, camera.Distance)
     end)
 
-    -- 相机刷新尊重外部改动（他人拥有）并在 Stop 后恢复；重新加载的实例不残留上一份
+    -- 相机刷新尊重外部改动（他人拥有）并在清理后恢复；新实例不残留上一份
     it('test_camera_refresh_respects_other_owner_and_restores_on_stop', function()
-        local env = setmetatable({}, { __index = _G })
-        local mgr = assert(loadfile('client/LocalAttr.lua', 't', env))()
+        local CameraZoomView = require('client.Views.CameraZoomView')
+        local ctrl = CameraZoomView.new_controller()
         local character = { GetAttribute = function() return 52 end }
         local camera = { Distance = 8, TrackingUnit = character }
-        assert.is_true(mgr:Refresh(character, camera))
+        assert.is_true(ctrl:refresh(character, camera))
         assert.same(39, camera.Distance)
         camera.Distance = 12
-        assert.is_false(mgr:Refresh(character, camera))
+        assert.is_false(ctrl:refresh(character, camera))
         assert.same(12, camera.Distance)
-        mgr:Stop()
+        ctrl:release()
         assert.same(12, camera.Distance)
-        local fresh = assert(loadfile('client/LocalAttr.lua', 't', env))()
+        local fresh = CameraZoomView.new_controller()
         camera.Distance = 8
-        assert.is_true(fresh:Refresh(character, camera))
-        fresh:Stop()
+        assert.is_true(fresh:refresh(character, camera))
+        fresh:release()
         assert.same(8, camera.Distance)
     end)
 

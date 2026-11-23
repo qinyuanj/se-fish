@@ -5,6 +5,7 @@ local Number = require("common.Number")
 local SpokeClock = require("common.SpokeClock")
 local ClientStore = require("client.Store.ClientStore")
 local RootView = require("client.Views.RootView")
+local CameraZoomView = require("client.Views.CameraZoomView")
 local GameUI = require("client.GameUI")
 
 local LocalMgrUtil = require("client.LocalMgrUtil")
@@ -30,7 +31,11 @@ Task:Spawn(function()
         ui_root = GameUI:GetUIRoot()
     end
     if ui_root then
-        RootView.mount(ui_root, client_store)
+        RootView.mount(ui_root, client_store, {
+            hud = {
+                CameraZoomView.spec(),
+            },
+        })
     else
         print("[client.main] 等待 EUI 根节点超时，跳过 Spoke 根视图树挂载")
     end
@@ -56,7 +61,6 @@ local ScreenPlatform = require("client.ScreenHandlers.ScreenPlatform")
 local ScreenCompendium = require('client.ScreenHandlers.ScreenCompendium')
 local LocalGarBite = require("client.LocalGarBite")
 local LocalCastSource = require('client.LocalCastSource')
-local LocalAttr = require('client.LocalAttr')
 
 local AbilityAPI = require("client.packages.ability_system.api")
 if AbilityAPI then
@@ -74,7 +78,6 @@ Task:Spawn(function()
 end)
 Task:Spawn(function() LocalGarBite:Start() end)
 Task:Spawn(function() LocalCastSource:Start() end)
-Task:Spawn(function() LocalAttr:Start() end)
 Task:Spawn(function() LocalInteract:Start() end)
 Task:Spawn(function() LocalShop:Start() end)
 Task:Spawn(function() ScreenLottery:Start() end)
