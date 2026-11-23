@@ -19,7 +19,8 @@ local lfs = require("lfs")
 -- 65：#296 客户端 Spoke 根视图树 client/Views/RootView.lua 统一动态 UI 建点，client 40 → 41
 -- 62：#297-B2 主 HUD 左上状态区迁入 client/Views/MainHudVitalsView.lua（复用 RootView 统一建点），剥离 ScreenMain 3 处建点，client 41 → 38
 -- 61：#297-A3 左手持竿投影迁入 HeldRodLeaf，剥离 MgrPlayerData 2 处建点，在 server/main.lua 注入 1 处统一 create_unit，server 净减 1
-local SITES = 61
+-- 60：#297-C1 主 HUD 武器/鱼饵浮层与背包面板切流至 Spoke 视图（复用 RootView 统一建点），剥离 ScreenMain 1 处建点，client 38 → 37
+local SITES = 60
 local SITE_ROOTS = { "client", "common", "server" }
 local REF_ROOTS = { "client", "common", "server", "tests", "tools" }
 local REMOVED = { "FXUtil", "WeldTo", "MarkPointPart", "CreateHPBar" }
