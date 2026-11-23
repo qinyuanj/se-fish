@@ -13,7 +13,7 @@ local M = {}
 
 local MODULES = { 'server.Mgr.MgrFishCarrier', 'server.Mgr.MgrFishUnit', 'server.Mgr.MgrVitals',
     'common.REUtil', 'client.LocalGarBite', 'client.LocalCastSource' }
-local GLOBALS = { 'game', 'Vector3', 'Quaternion', 'REUtil', 'Color' }
+local GLOBALS = { 'game', 'Vector3', 'Quaternion', 'REUtil', 'Color', 'RemoteEvent' }
 
 local function signal()
     local slots = {}
@@ -84,7 +84,8 @@ function M.new(zoneIndex)
         if name == 'World' then return env.world end
         if name == 'RunService' then return { IsServer = function() return true end, Heartbeat = env.heartbeat } end
         if name == 'Players' then return { GetPlayers = function() return env.players end, PlayerRemoving = signal() } end
-    end, CreateRemoteEvent = function(_, name) return {
+    end }
+    _G.RemoteEvent = { New = function(name) return {
         FireAllClients = function(_, p) if name == 'GarBiteNotice' then env.notices[#env.notices + 1] = p end end,
         FireClient = function(_, player, p) if name == 'CastState' then env.castStates[#env.castStates + 1] = p end end,
         OnServerEvent = signal(), OnClientEvent = signal() } end }

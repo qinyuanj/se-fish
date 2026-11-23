@@ -146,7 +146,7 @@ describe('条款 9/11 他人抢救', function()
       if name == 'Players' then return env.playersService end
       if name == 'RunService' then return { IsServer = function() return false end,
         IsClient = function() return true end, Heartbeat = signal() } end
-    end, CreateRemoteEvent = function() return signal() end }
+    end }
     local function reStub(name)
       env.sent[name] = env.sent[name] or {}
       if not env.re[name] then

@@ -307,3 +307,15 @@ describe("TestRateLimitWindow", function()
     assert.same(10, win:Admit(1.0, 10))
   end)
 end)
+
+describe('共享有限数校验（common/Number）', function()
+  it('test_accepts_only_finite_numbers', function()
+    local Number = require('common.Number')
+    for _, value in ipairs({ 0, -1, 1.5, math.maxinteger, math.mininteger }) do
+      assert.is_true(Number.IsFiniteNumber(value), tostring(value))
+    end
+    for _, value in ipairs({ 0 / 0, math.huge, -math.huge, '1', true, {}, nil }) do
+      assert.is_false(Number.IsFiniteNumber(value), tostring(value))
+    end
+  end)
+end)

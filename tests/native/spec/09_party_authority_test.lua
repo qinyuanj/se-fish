@@ -150,7 +150,7 @@ describe('条款 9 小队权威状态', function()
       if name == 'World' then return { GetServerTime = function() return env.now end } end
       if name == 'Players' then return { GetPlayers = function() return {} end } end
       if name == 'RunService' then return { IsServer = function() return false end } end
-    end, CreateRemoteEvent = function() return signal() end }
+    end }
 
     local function reStub(name)
       env.sent[name] = env.sent[name] or {}

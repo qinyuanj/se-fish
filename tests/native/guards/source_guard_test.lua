@@ -183,4 +183,67 @@ describe("三端源码守卫", function()
       return bad
     end)
   end)
+
+  it("test_remote_event_creation_stays_inside_reutil", function()
+    scan(business_files(), function(path, src)
+      local code, bad = Arch.code_only(src), {}
+      local old = code:find("game%s*:%s*CreateRemoteEvent%s*%(")
+      if old then
+        bad[#bad + 1] = path .. ":" .. line_of(code, old) .. " 使用未公开 game:CreateRemoteEvent"
+      end
+      if path ~= "common/REUtil.lua" then
+        local direct = code:find("RemoteEvent%s*%.%s*New%s*%(")
+        if direct then
+          bad[#bad + 1] = path .. ":" .. line_of(code, direct) .. " 绕过 REUtil 直接调用 RemoteEvent.New"
+        end
+      end
+      return bad
+    end)
+  end)
+
+  it("test_realm_specific_services_stay_on_their_realm", function()
+    local banned = {
+      client = { DataStoreService = true, MemoryStoreService = true },
+      server = { UserInputService = true },
+    }
+    scan(business_files(), function(path, src)
+      local realm = path:match("^([^/]+)/")
+      if not banned[realm] then return {} end
+      local code, bad, from = Arch.code_only(src), {}, 1
+      while true do
+        local first, last = code:find("GetService%s*%(", from)
+        if not first then break end
+        local service = src:sub(first):match("^GetService%s*%(%s*['\"]([^'\"]+)['\"]")
+        if service and banned[realm][service] then
+          bad[#bad + 1] = path .. ":" .. line_of(code, first) .. " 在 " .. realm .. " 使用 " .. service
+        end
+        from = last + 1
+      end
+      if realm == "server" then
+        local local_player = code:find("Players%s*%.%s*LocalPlayer%f[^%w_]")
+        if local_player then
+          bad[#bad + 1] = path .. ":" .. line_of(code, local_player) .. " 在 server 访问 Players.LocalPlayer"
+        end
+      end
+      return bad
+    end)
+  end)
+
+  it("test_last_seq_is_cleared_on_player_removing", function()
+    scan(business_files(), function(path, src)
+      if not path:match("^server/Mgr/[^/]+%.lua$") then return {} end
+      local code = Arch.code_only(src)
+      if not code:find("self%s*%.%s*LastSeq%f[^%w_]") then return {} end
+      local first, last = code:find("function%s+Mgr%s*:%s*OnPlayerRemoving%s*%b()")
+      if not first then
+        return { path .. " 使用 self.LastSeq 但没有 OnPlayerRemoving" }
+      end
+      local next_function = code:find("\nfunction%s", last + 1)
+      local body = code:sub(last + 1, next_function)
+      if not body:find("self%s*%.%s*LastSeq%f[^%w_]") or not body:find("nil%f[^%w_]") then
+        return { path .. " 的 OnPlayerRemoving 没有清理 self.LastSeq" }
+      end
+      return {}
+    end)
+  end)
 end)

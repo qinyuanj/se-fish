@@ -1,4 +1,5 @@
 local GameCfg = require('common.GameCfg')
+local Number = require('common.Number')
 local FishCatch = require('common.FishCatch')
 local MathWaterJudge = require('common.MathWaterJudge')
 local MgrFishCarrier = require('server.Mgr.MgrFishCarrier')
@@ -34,7 +35,7 @@ function Mgr:Now()
 end
 
 local function isBadNumber(v)
-    return type(v) ~= 'number' or v ~= v or v == math.huge or v == -math.huge
+    return not Number.IsFiniteNumber(v)
 end
 
 local function readPosition(unit)

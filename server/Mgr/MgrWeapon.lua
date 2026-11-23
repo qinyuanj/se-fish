@@ -1,4 +1,5 @@
 local GameCfg = require('common.GameCfg')
+local Number = require('common.Number')
 local MathWaterJudge = require('common.MathWaterJudge')
 local AbilityAPI = require('server.AbilityAPI')
 local SwingRegistry = require('server.SwingRegistry')
@@ -12,7 +13,7 @@ local ATTACK_ANIM_PRIORITY = 2
 
 local function acfg() return GameCfg.Ability end
 local function isBadNumber(v)
-    return type(v) ~= 'number' or v ~= v or v == math.huge or v == -math.huge
+    return not Number.IsFiniteNumber(v)
 end
 local function distance2D(a, b)
     local dx, dz = a.x - b.x, a.z - b.z

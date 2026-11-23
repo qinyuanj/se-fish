@@ -1,5 +1,6 @@
 
 local GameCfg = require("common.GameCfg")
+local Number = require("common.Number")
 local DamageNotice = require("common.DamageNotice")
 
 local Mgr = {}
@@ -15,13 +16,7 @@ Mgr.Subscribers = {}
 
 
 local function isPositiveNumber(v)
-	if type(v) ~= "number" then
-		return false
-	end
-	if v ~= v or v == math.huge or v == -math.huge then
-		return false
-	end
-	return v > 0
+	return Number.IsFiniteNumber(v) and v > 0
 end
 
 local function resolveMaxHealth(opts, cfg)

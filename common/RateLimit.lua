@@ -1,4 +1,6 @@
 
+local Number = require('common.Number')
+
 local RateLimit = {}
 
 RateLimit.Result = { Ok = "ok", Dropped = "dropped" }
@@ -10,13 +12,8 @@ RateLimit.Reason = {
 
 RateLimit.PAYLOAD_FIELDS = { "s", "n", "q" }
 
--- Lua 5.4 的 math.floor(0/0) 返回 NaN；NaN 会毒化 UsedCount/Remaining 并让比较恒为 false，必须显式拒绝。
-local function isFiniteNumber(value)
-    return type(value) == "number"
-        and value == value
-        and value ~= math.huge
-        and value ~= -math.huge
-end
+-- NaN 会毒化 UsedCount/Remaining 并让比较恒为 false，必须显式拒绝。
+local isFiniteNumber = Number.IsFiniteNumber
 
 local function checkSessionId(sessionId, where)
     if type(sessionId) ~= "string" or sessionId == "" then

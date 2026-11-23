@@ -178,7 +178,6 @@ function M.new(opts)
                 return { IsServer = function() return true end, Heartbeat = signal() }
             end
         end,
-        CreateRemoteEvent = function() return signal() end,
         BindToClose = function() end,
     }
     local re = { GetRE = function(_, name) return reStub(name) end, CheckRECD = function() return false end }

@@ -99,7 +99,7 @@ lua tools/cli.lua worktree-init
 
 ## 完成判据
 
-代码改动按顺序执行，全部通过才算完成。本仓没有提交时自动检查；PR 与 `main` 推送由 [test.yml](../../.github/workflows/test.yml) 自动运行 full，check-run context `full`（PR 界面显示 `test / full`）是 `main` 的 required status check。下表其余每一项仍由 agent 显式执行，质量工具由人运行，见表后的「人工验收」。
+代码改动按顺序执行，全部通过才算完成。新 checkout 执行 `lua tools/cli.lua worktree-init` 会安装本地 `pre-commit`，已有 checkout 可单独执行 `lua tools/cli.lua git-hook-init`；提交前自动运行 `lua tools/cli.lua test guards`，重复安装幂等，已有不同 hook 不覆盖。PR 与 `main` 推送由 [test.yml](../../.github/workflows/test.yml) 自动运行 full，check-run context `full`（PR 界面显示 `test / full`）是 `main` 的 required status check。下表其余每一项仍由 agent 显式执行，质量工具由人运行，见表后的「人工验收」。
 
 | 检查 | 通过条件 |
 |---|---|
