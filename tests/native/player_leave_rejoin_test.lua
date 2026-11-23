@@ -124,9 +124,13 @@ describe('TestPlayerLeaveRejoin', function()
                 if name == 'DataStoreService' then return { GetDataStore = function() return env.store end } end
             end,
         }
-        _G.REUtil = { GetRE = function() return {
-            OnServerEvent = signal(), FireClient = function() end,
-        } end }
+        _G.REUtil = { GetRE = function(_, name)
+            env.remotes = env.remotes or {}
+            if not env.remotes[name] then
+                env.remotes[name] = { OnServerEvent = signal(), FireClient = function() end }
+            end
+            return env.remotes[name]
+        end, CheckRECD = function() return false end }
         _G.RemoteEvent = { New = function() return {
             OnServerEvent = signal(), OnClientEvent = signal(),
             FireServer = function() end, FireClient = function() end,
@@ -152,11 +156,14 @@ describe('TestPlayerLeaveRejoin', function()
             StopAbility = function() end,
             CastAbility = function() return true end,
         }
-        for _, name in ipairs({ 'MgrSave', 'MgrPlayerData', 'MgrQuest', 'MgrStory' }) do
+        for _, name in ipairs({ 'MgrSave', 'MgrPlayerData' }) do
             env.mgrs[name] = assert(loadfile('server/Mgr/' .. name .. '.lua'))()
         end
-        env.save, env.data, env.quest, env.story =
-            env.mgrs.MgrSave, env.mgrs.MgrPlayerData, env.mgrs.MgrQuest, env.mgrs.MgrStory
+        env.save, env.data = env.mgrs.MgrSave, env.mgrs.MgrPlayerData
+        env.quest = {
+            Notify = function(_, kind, player, payload) return env.runtime:notify_quest(kind, player, payload) end,
+            GetState = function(_, player) return env.data:GetDataInst(player).Extra.quest end,
+        }
         local sandbox = setmetatable({
             print = function(...)
                 local parts = { ... }
@@ -223,7 +230,6 @@ describe('TestPlayerLeaveRejoin', function()
         fact('worm:2')
         local old = env.save.Sessions[env.a.UserId]
         env.players.PlayerRemoving:Fire(env.a)
-        local late = env.quest.Queues[env.a.UserId].leave
         local b = join(env.a.UserId)
         assert.are.equal(old, env.save.Sessions[env.a.UserId])
         assert.same('pending', b.attrs.SaveState)
@@ -232,7 +238,6 @@ describe('TestPlayerLeaveRejoin', function()
         assert.same(2, env.quest:GetState(b).count)
         assert.same(2, env.values.u560.extra.quest.count)
         local current = env.save.Sessions[b.UserId]
-        late()
         env.players.PlayerRemoving:Fire(env.a)
         assert.are.equal(current, env.save.Sessions[b.UserId])
         assertRejoined(b)
@@ -260,9 +265,11 @@ describe('TestPlayerLeaveRejoin', function()
     end)
 
     it('test_story_read_waiting_for_quest_survives_rejoin', function()
-        env.story:Begin(env.a)
+        assert.same(1, #env.remotes.RequestStory.OnServerEvent.handlers)
+        assert.same(1, #env.remotes.StoryRead.OnServerEvent.handlers)
+        env.remotes.RequestStory.OnServerEvent:Fire(env.a, {})
         fact('worm:story')
-        assert.is_true(env.story:Complete(env.a, env.story.States[env.a.UserId].readKey, 'read'))
+        env.remotes.StoryRead.OnServerEvent:Fire(env.a, { action = 'read', readKey = GameCfg.Story.ReadKey or 'opening' })
         env.players.PlayerRemoving:Fire(env.a)
         local b = join(env.a.UserId)
         drain()

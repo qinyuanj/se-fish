@@ -47,7 +47,7 @@ describe('TestMeleeHitEffect', function()
             Quaternion = rawget(_G, 'Quaternion'),
             vitals = package.loaded['server.Mgr.MgrVitals'],
             carrier = package.loaded['server.World.FishCarrier'],
-            gm = package.loaded['server.Mgr.MgrGM'],
+            gm = package.loaded['server.World.PlayerGM'],
             ability = package.loaded['server.Mgr.MgrAbility'],
             api = package.loaded['server.AbilityAPI'], swing = package.loaded['server.SwingRegistry'] }
         ctx = { effects = {}, hitsApplied = {} }
@@ -67,7 +67,7 @@ describe('TestMeleeHitEffect', function()
             end,
         }
         package.loaded['server.World.FishCarrier'] = { ResolveCarrier = function() return nil end }
-        package.loaded['server.Mgr.MgrGM'] = { GetMeleeDamage = function(_, _, d) return d end }
+        package.loaded['server.World.PlayerGM'] = { GetMeleeDamage = function(_, _, d) return d end }
         package.loaded['server.Mgr.MgrAbility'] = { ApplyWeaponEffect = function()
             error('近战特效不应再经 MgrAbility 转发')
         end }
@@ -80,9 +80,9 @@ describe('TestMeleeHitEffect', function()
             local s = ctx.swing; ctx.swing = nil; return s
         end }
         ctx.services = { Vitals = package.loaded['server.Mgr.MgrVitals'],
-            FishCarrier = package.loaded['server.World.FishCarrier'], GM = package.loaded['server.Mgr.MgrGM'],
+            FishCarrier = package.loaded['server.World.FishCarrier'], GM = package.loaded['server.World.PlayerGM'],
             Modifier = modifierStub }
-        for _, name in ipairs({ 'server.Mgr.MgrVitals', 'server.World.FishCarrier', 'server.Mgr.MgrGM' }) do
+        for _, name in ipairs({ 'server.Mgr.MgrVitals', 'server.World.FishCarrier', 'server.World.PlayerGM' }) do
             package.loaded[name] = setmetatable({}, { __index = function()
                 error('近战行为不应再加载上层管理器: ' .. name) end })
         end
@@ -126,7 +126,7 @@ describe('TestMeleeHitEffect', function()
         _G.Quaternion = saved.Quaternion
         package.loaded['server.Mgr.MgrVitals'] = saved.vitals
         package.loaded['server.World.FishCarrier'] = saved.carrier
-        package.loaded['server.Mgr.MgrGM'] = saved.gm
+        package.loaded['server.World.PlayerGM'] = saved.gm
         package.loaded['server.Mgr.MgrAbility'] = saved.ability
         package.loaded['server.AbilityAPI'] = saved.api
         package.loaded['server.SwingRegistry'] = saved.swing

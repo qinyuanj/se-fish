@@ -1,7 +1,7 @@
 -- 条款 5-01 / 5-03（docs/acceptance/05-zone-fish-data.md）：
 --   5-01 鱼种表恰好 98 条记录，分属七个区（鱼塘、虾池、蟹湖、树林岛、沙滩岛、礁石岛、火山岛），每区 14 条；
 --   5-03 品级只取普通、极品、精英、首领四种，每区恰好 6 条普通、6 条极品、1 条精英、1 条首领。
--- 只走客户端公开入口：ScreenCompendium:View() 是图鉴界面的公开显示快照，玩家翻七页看到的就是它。
+-- 只走客户端公开入口：CompendiumView.page_spec() 是图鉴界面的公开显示快照，玩家翻七页看到的就是它。
 -- 视图从运行期 GameCfg 派生行、品级与总数，所以断言直接落在玩家可见的七区图鉴上，不引用内部函数。
 local function count(map)
   local n = 0
@@ -28,7 +28,7 @@ describe('条款 5-01：七区鱼种数量', function()
     _G.Vector2 = { New = function(x, y) return { x = x, y = y } end }
     _G.Color = { New = function(...) return { ... } end }
     _G.MgrGameUI = {}
-    env.Screen = require('client.ScreenHandlers.ScreenCompendium')
+    env.Screen = require('client.Views.CompendiumView')
   end)
 
   after_each(function()
@@ -40,8 +40,7 @@ describe('条款 5-01：七区鱼种数量', function()
   it('七页各 14 条，总数 98，区名不重复', function()
     local zones, total = {}, nil
     for page = 1, 7 do
-      env.Screen.Page = page
-      local view = env.Screen:View()
+      local view = env.Screen.page_spec(page)
       total = view.total
       assert.are.equal(14, #view.entries, '第 ' .. page .. ' 页不是 14 条')
       assert.is_truthy(view.zone, '第 ' .. page .. ' 页没有区名')
@@ -54,8 +53,7 @@ describe('条款 5-01：七区鱼种数量', function()
 
   it('每区恰好 6 普通、6 极品、1 精英、1 首领', function()
     for page = 1, 7 do
-      env.Screen.Page = page
-      local view = env.Screen:View()
+      local view = env.Screen.page_spec(page)
       local grades = {}
       for _, entry in ipairs(view.entries) do
         grades[entry.grade] = (grades[entry.grade] or 0) + 1

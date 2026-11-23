@@ -584,9 +584,7 @@ describe("客户端 Spoke 主干契约（#296）", function()
         "client.LocalMgrUtil",
         "client.LocalMotorUnitCtrl",
         "client.LocalLoot",
-        "client.LocalGM",
         "client.ScreenHandlers.ScreenParty",
-        "client.ScreenHandlers.ScreenCompendium",
         "client.Views.LotteryView",
         "client.Views.BlindboxView",
         "client.Views.PlatformShopView",
@@ -633,7 +631,7 @@ describe("客户端 Spoke 主干契约（#296）", function()
         package.loaded["common.REUtil"] = {
           GetRE = function(_, name)
             if not remote_events[name] then
-              remote_events[name] = { OnClientEvent = Eui.Signal() }
+              remote_events[name] = { OnClientEvent = Eui.Signal(), FireServer = noop }
             end
             return remote_events[name]
           end,
@@ -650,8 +648,8 @@ describe("客户端 Spoke 主干契约（#296）", function()
         package.loaded["common.Util"] = nil
         for _, name in ipairs({
           "client.LocalMgrUtil", "client.LocalMotorUnitCtrl",
-          "client.LocalLoot", "client.LocalGM",
-          "client.ScreenHandlers.ScreenParty", "client.ScreenHandlers.ScreenCompendium",
+          "client.LocalLoot",
+          "client.ScreenHandlers.ScreenParty",
           "client.Views.GarBiteWarning",
         }) do
           package.loaded[name] = noop_module

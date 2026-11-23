@@ -17,6 +17,11 @@ local PlayerLife = require("server.World.PlayerLife")
 local SpecialItemPhase = require("server.World.SpecialItemPhase")
 local FishingPhase = require("server.World.FishingPhase")
 local HeldRodLeaf = require("server.World.HeldRodLeaf")
+local PlayerCompendium = require("server.World.PlayerCompendium")
+local PlayerQuest = require("server.World.PlayerQuest")
+local PlayerStory = require("server.World.PlayerStory")
+local PlayerAchievements = require("server.World.PlayerAchievements")
+local PlayerGM = require("server.World.PlayerGM")
 
 local SpokeTree = spoke.SpokeTree
 local Effect = spoke.Effect
@@ -528,6 +533,19 @@ function PlayerTree.spawn(opts)
       end)
 
       docks.save_inventory = s1:dock("SaveInventoryDock")
+      -- #315：图鉴、任务、剧情、成就与 GM 都属于存档就绪后的单玩家会话。
+      -- 仅在完整服务端宿主挂载；精简 PlayerTree 测试双仍可注入各自公开替身。
+      if opts.save and opts.player_data and _G.REUtil then
+        local session_opts = {
+          player = player, clock = clock, save = opts.save, player_data = opts.player_data,
+          records = opts.records,
+        }
+        PlayerQuest.mount(s1, handle, session_opts)
+        PlayerCompendium.mount(s1, handle, session_opts)
+        PlayerStory.mount(s1, handle, session_opts)
+        PlayerAchievements.mount(s1, handle, session_opts)
+        PlayerGM.mount(s1, handle, session_opts)
+      end
       if type(mounts.save_inventory) == "function" then
         mounts.save_inventory(s1, handle)
       end
@@ -593,8 +611,8 @@ function PlayerTree.spawn(opts)
           world = opts.world_service,
           create_unit = opts.create_unit,
           fish_unit = opts.fish_unit,
-          compendium = opts.compendium,
-          quest = opts.quest,
+          compendium = opts.compendium or handle.compendium,
+          quest = opts.quest or handle.quest,
           random = opts.random,
         })
       end)

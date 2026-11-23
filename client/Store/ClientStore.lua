@@ -392,6 +392,8 @@ function ClientStore.new(options)
     platform_result = State.new("ClientStore.platform_result", nil),
     compendium = State.new("ClientStore.compendium", nil),
     records = State.new("ClientStore.records", nil),
+    message = State.new("ClientStore.message", nil),
+    gm_result = State.new("ClientStore.gm_result", nil),
     position = State.new("ClientStore.position", nil, position_equals),
     zone_id = State.new("ClientStore.zone_id", nil),
     zone_name = State.new("ClientStore.zone_name", nil),
@@ -411,6 +413,20 @@ function ClientStore.new(options)
   local on_server_event = Trigger.new("ClientStore.on_server_event")
   local on_reconnect = Trigger.new("ClientStore.on_reconnect")
 
+  local function normalize_compendium(payload)
+    if type(payload) ~= "table" then return nil end
+    for _, key in ipairs({ "unlocked", "weights", "catches" }) do
+      if payload[key] ~= nil and type(payload[key]) ~= "table" then return nil end
+    end
+    if payload.total ~= nil and not Number.IsFiniteNumber(payload.total) then return nil end
+    return normalize_table_snapshot(payload)
+  end
+
+  local function normalize_records(payload)
+    if type(payload) ~= "table" or type(payload.fishId) ~= "string" or payload.fishId == "" then return nil end
+    return normalize_table_snapshot(payload)
+  end
+
   local snapshot_handlers = {
     ItemBarState = { state = states.item_bar, normalize = normalize_table_snapshot },
     SurvivalState = { state = states.survival, normalize = normalize_survival },
@@ -426,8 +442,9 @@ function ClientStore.new(options)
     LotteryResult = { state = states.lottery_result, normalize = normalize_table_snapshot },
     BlindboxResult = { state = states.blindbox_result, normalize = normalize_table_snapshot },
     PlatformResult = { state = states.platform_result, normalize = normalize_table_snapshot },
-    CompendiumState = { state = states.compendium, normalize = normalize_table_snapshot },
-    RecordsState = { state = states.records, normalize = normalize_table_snapshot },
+    CompendiumState = { state = states.compendium, normalize = normalize_compendium },
+    RecordsState = { state = states.records, normalize = normalize_records },
+    GMResult = { state = states.gm_result, normalize = normalize_table_snapshot },
   }
 
   local store = freeze_table({
@@ -449,6 +466,8 @@ function ClientStore.new(options)
     platform_result = readonly_signal(states.platform_result, "ClientStore.platform_result"),
     compendium = readonly_signal(states.compendium, "ClientStore.compendium"),
     records = readonly_signal(states.records, "ClientStore.records"),
+    message = readonly_signal(states.message, "ClientStore.message"),
+    gm_result = readonly_signal(states.gm_result, "ClientStore.gm_result"),
     position = readonly_signal(states.position, "ClientStore.position"),
     zone_id = readonly_signal(states.zone_id, "ClientStore.zone_id"),
     zone_name = readonly_signal(states.zone_name, "ClientStore.zone_name"),
@@ -467,6 +486,7 @@ function ClientStore.new(options)
 
   local writer = {}
   local active_binding = nil
+  local snapshot_seq = {}
 
   function writer:set_connected(flag)
     states.connected:set(flag == true)
@@ -488,13 +508,27 @@ function ClientStore.new(options)
     end
     local entry = snapshot_handlers[channel]
     if entry ~= nil then
+      if (channel == "CompendiumState" or channel == "RecordsState") and type(payload) == "table"
+        and Number.IsFiniteNumber(payload.seq) and Number.IsFiniteNumber(snapshot_seq[channel])
+        and payload.seq <= snapshot_seq[channel] then return false end
       local normalized = entry.normalize(payload)
       if normalized == nil then
         return false
       end
+      if type(payload) == "table" and Number.IsFiniteNumber(payload.seq) then snapshot_seq[channel] = payload.seq end
       SpokeRuntime.batch(function()
         states.connected:set(true)
         entry.state:set(normalized)
+        if channel == "QuestState" and type(normalized.notice) == "string" and normalized.notice ~= "" then
+          states.message:set(freeze_snapshot({ text = normalized.notice }, 0, "ClientStore.message"))
+        end
+        if channel == "StoryState" and normalized.read == true and states.active_modal:now() == "story" then
+          local current = states.modal_payload:now()
+          if type(current) ~= "table" or current.readKey == nil or current.readKey == normalized.readKey then
+            states.active_modal:set(nil)
+            states.modal_payload:set(nil)
+          end
+        end
         if channel == "ItemBarState" and Number.IsFiniteNumber(payload.coin) then
           states.coin:set(math.floor(payload.coin))
         end
@@ -506,6 +540,12 @@ function ClientStore.new(options)
     local cloned = clone_value(payload, 0)
     SpokeRuntime.batch(function()
       states.connected:set(true)
+      if channel == "StoryNotice" and type(cloned) == "table" then
+        local story = freeze_snapshot(cloned, 0, "ClientStore.story")
+        states.story:set(story)
+        states.active_modal:set("story")
+        states.modal_payload:set(story)
+      end
       if channel == "ShopResult" and type(payload) == "table" then
         local previous = states.shop:now()
         local purchases, upgrade_levels = {}, {}
@@ -595,6 +635,11 @@ function ClientStore.new(options)
     end)
   end
 
+  function writer:show_notice(text)
+    local value = text == nil and "" or tostring(text)
+    states.message:set(freeze_snapshot({ text = value }, 0, "ClientStore.message"))
+  end
+
   function writer:close_modal(expected_id)
     if expected_id ~= nil and states.active_modal:now() ~= expected_id then
       return
@@ -627,6 +672,7 @@ function ClientStore.new(options)
   function writer:reset_session(reason)
     SpokeRuntime.batch(function()
       states.connected:set(false)
+      snapshot_seq = {}
       states.item_bar:set(nil)
       states.survival:set(freeze_snapshot({ phase = "alive" }, 0, "ClientStore.survival"))
       states.party:set(freeze_snapshot({ state = "none", members = {} }, 0, "ClientStore.party"))
@@ -653,6 +699,12 @@ function ClientStore.new(options)
       states.hud_visible:set(true)
       states.active_modal:set(nil)
       states.modal_payload:set(nil)
+      states.compendium:set(nil)
+      states.records:set(nil)
+      states.quest:set(nil)
+      states.story:set(nil)
+      states.message:set(nil)
+      states.gm_result:set(nil)
       states.overlays:set(freeze_snapshot({}, 0, "ClientStore.overlays"))
       on_reconnect:invoke({ reason = reason or "reset" })
     end)

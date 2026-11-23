@@ -93,7 +93,7 @@ end
 
 function Mgr:Handle(player, payload)
     if not (GameCfg.Debug and GameCfg.Debug.Enabled) then
-        print('[MgrGM] 调试开关关闭，拒绝', player and player.UserId)
+        print('[PlayerGM] 调试开关关闭，拒绝', player and player.UserId)
         self:Reply(player, { ok = false, action = type(payload) == 'table' and payload.action or nil,
             reason = '调试开关已关闭' })
         return false
@@ -132,7 +132,7 @@ function Mgr:Handle(player, payload)
     end
     local ok, reason = false, '请求或目标无效'
     if data then ok, reason = self[method](self, data, payload, target) end
-    print('[MgrGM]', ok and '发放' or '拒绝', player and player.UserId, '->', target and target.UserId,
+    print('[PlayerGM]', ok and '发放' or '拒绝', player and player.UserId, '->', target and target.UserId,
         tostring(payload.action), tostring(payload.amount or payload.itemId or payload.value or payload.scene or payload.fishId), tostring(payload.count or ''))
     if ok and method ~= 'NextFish' and method ~= 'AddAttack' and method ~= 'GetAttack' then
         self.PlayerData:SendItemBar(target)
@@ -143,14 +143,29 @@ function Mgr:Handle(player, payload)
     return ok
 end
 
-function Mgr:Start()
-    _G.REUtil:GetRE('GMAction').OnServerEvent:Connect(function(player, payload)
-        if _G.REUtil:CheckRECD(player, 'GMAction', GameCfg.Items.ActionCooldownSec) then
-            self:Reply(player, { ok = false, action = type(payload) == 'table' and payload.action or nil,
-                reason = '操作过于频繁' })
-            return
-        end
-        self:Handle(player, payload)
+
+
+
+local function managed_connect(scope, signal, callback)
+    local connection = signal:Connect(callback)
+    scope:on_cleanup(function() connection:Disconnect() end)
+end
+
+-- 入口只配置一次公开 GM 服务；攻击加成仍按 UserId 隔离并随对应玩家树清理。
+function Mgr.configure(opts)
+    Mgr.PlayerData, Mgr.Save, Mgr.Cast, Mgr.Vitals = opts.player_data, opts.save, opts.cast, opts.vitals
+end
+
+function Mgr.mount(scope, player_tree, opts)
+    local player = opts.player
+    player_tree.gm = Mgr
+    managed_connect(scope, _G.REUtil:GetRE('GMAction').OnServerEvent, function(actor, payload)
+        if actor ~= player or _G.REUtil:CheckRECD(actor, 'GMAction', GameCfg.Items.ActionCooldownSec) then return end
+        Mgr:Handle(actor, payload)
+    end)
+    scope:on_cleanup(function()
+        Mgr:OnPlayerRemoving(player)
+        if player_tree.gm == Mgr then player_tree.gm = nil end
     end)
 end
 

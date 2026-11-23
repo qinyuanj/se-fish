@@ -2,7 +2,7 @@
 -- #123 失败方式先列：持久化前扣发/回包/任务/动画；写失败或回包丢失重复结算；
 -- pending/failed 可操作；同身份重放改变结果；重连 seq 复位串账；日志淘汰后旧身份重新发奖；
 -- 兑换满格、购买余额不足、扩容上限被绕过；Save 注入后遗漏现有业务校验。
--- seam：Interact/Shop:Handle；真实 PlayerData、MgrPlayerData、MgrSave、MgrQuest，替换引擎边界。
+-- seam：Interact/Shop:Handle；真实 PlayerData、MgrPlayerData、MgrSave、PlayerData.Extra.quest，替换引擎边界。
 -- it 按旧 LuaUnit 的方法名字典序注册，保持与旧套件一致的案例顺序。
 -- 断言映射：assertEquals 的 table 深比较由 assert.same 承接（标量退化为 ==，与旧实现一致）；
 -- assertTrue/assertFalse 严格 true/false → is_true/is_false；assertNil/assertNotNil → is_nil/is_not_nil；
@@ -96,19 +96,38 @@ describe('TestEconomyPersistence', function()
                 FindFirstChild = function() return env.anchor end } end
             if name == 'Players' then return { GetPlayers = function() return { env.player } end } end
         end }
-        _G.REUtil = { GetRE = function(_, name) return { FireClient = function(_, player, value)
-            env.events[#env.events + 1] = { name = name, player = player, value = value }
-        end } end }
+        _G.REUtil = {
+            GetRE = function(_, name)
+                env.remotes = env.remotes or {}
+                if not env.remotes[name] then
+                    env.remotes[name] = {
+                        OnServerEvent = { Connect = function() return { Disconnect = function() end } end },
+                        FireClient = function(_, player, value)
+                            env.events[#env.events + 1] = { name = name, player = player, value = value }
+                        end,
+                    }
+                end
+                return env.remotes[name]
+            end,
+            CheckRECD = function() return false end,
+        }
         env.save = assert(loadfile('server/Mgr/MgrSave.lua'))()
         env.players = assert(loadfile('server/Mgr/MgrPlayerData.lua'))()
-        env.quest = assert(loadfile('server/Mgr/MgrQuest.lua'))()
+        env.quest = {
+            OnPlayerAdded = function() end,
+            OnPlayerRemoving = function() end,
+            GetState = function()
+                local data = env.players:GetDataInst(env.player)
+                return data and data.Extra.quest or { step = 1, count = 0 }
+            end,
+        }
         env.players.Save, env.save.PlayerData = env.save, env.players
         env.runtime = ServerRuntime.new({
             clock = SpokeClock.new(100), remote = _G.REUtil,
             on_item_bar_state = function(player, snapshot)
                 _G.REUtil:GetRE('ItemBarState'):FireClient(player, snapshot)
             end,
-            save = env.save, player_data = env.players, quest = env.quest,
+            save = env.save, player_data = env.players,
             players = function() return { env.player } end,
             players_service = _G.game:GetService('Players'), world_service = _G.game:GetService('World'),
             bind_shop_action = function(dispatch) env.shop_action = dispatch end,

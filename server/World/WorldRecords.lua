@@ -26,7 +26,7 @@ end
 
 local function reject(self, player, fishId, detail, reason)
     self.Stats.Rejected = self.Stats.Rejected + 1
-    print('[MgrRecords] 全服纪录拒收', player and player.UserId, tostring(fishId), detail, tostring(reason))
+    print('[WorldRecords] 全服纪录拒收', player and player.UserId, tostring(fishId), detail, tostring(reason))
     return false, reason
 end
 
@@ -109,12 +109,12 @@ function Mgr:Flush(fishId)
         if pending.attempts > cfg().MaxRetries then
             self.Stats.Dropped = self.Stats.Dropped + 1
             self.Pending[fishId] = nil
-            print('[MgrRecords] 全服纪录提交放弃（重试耗尽）', fishId, entry.w, entry.u, tostring(kind))
+            print('[WorldRecords] 全服纪录提交放弃（重试耗尽）', fishId, entry.w, entry.u, tostring(kind))
             return
         end
         self.Stats.Retries = self.Stats.Retries + 1
         pending.dueAt = now() + cfg().RetryDelaySec
-        print('[MgrRecords] 全服纪录提交失败，稍后重试', fishId, entry.w, entry.u, tostring(kind))
+        print('[WorldRecords] 全服纪录提交失败，稍后重试', fishId, entry.w, entry.u, tostring(kind))
     end)
 end
 
@@ -155,7 +155,7 @@ function Mgr:Read(fishId, done)
         else
             local previous = self.Cache[fishId]
             self:CacheSet(fishId, previous and previous.entry or nil, kind)
-            print('[MgrRecords] 全服纪录读取失败', fishId, tostring(kind))
+            print('[WorldRecords] 全服纪录读取失败', fishId, tostring(kind))
         end
         local state = self:State(fishId)
         for _, callback in ipairs(waiters) do callback(state) end
@@ -192,12 +192,29 @@ function Mgr:Reconcile(player, state)
     self:NoteLanding(player, state.fishId, Records.Unscale(best))
 end
 
-function Mgr:Start()
-    local re = _G.REUtil:GetRE('RecordsRequest')
-    re.OnServerEvent:Connect(function(player, payload)
+local function managed_connect(scope, signal, callback)
+    local connection = signal:Connect(callback)
+    scope:on_cleanup(function() connection:Disconnect() end)
+end
+
+-- 全服纪录挂在 SharedWorldTree；DataStore UpdateAsync 仍是唯一写入边界。
+function Mgr.mount(scope, world, opts)
+    local adapter = setmetatable({ Checked = false, Holder = nil }, { __index = Adapter })
+    local session = setmetatable({
+        Adapter = adapter, Cache = {}, Pending = {}, Reading = {}, LastSeq = {},
+        Stats = { Writes = 0, Merged = 0, Failures = 0, Retries = 0, Dropped = 0, Rejected = 0 },
+        PlayerData = opts.player_data,
+    }, { __index = Mgr })
+    world.records = session
+    managed_connect(scope, _G.REUtil:GetRE('RecordsRequest').OnServerEvent, function(player, payload)
         if _G.REUtil:CheckRECD(player, 'RecordsRequest', cfg().RequestCooldownSec) then return end
-        self:Handle(player, payload)
+        session:Handle(player, payload)
     end)
+    scope:subscribe(world.clock.on_frame, function() session:Update() end)
+    scope:on_cleanup(function()
+        if world.records == session then world.records = nil end
+    end)
+    return session
 end
 
 return Mgr

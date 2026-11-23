@@ -27,6 +27,8 @@ local SwingRegistry = require("server.SwingRegistry")
 local PkDamageFilter = require("server.World.PkDamageFilter")
 local FishTree = require("server.World.FishTree")
 local FishAiTarget = require("server.World.FishAiTarget")
+local WorldRecords = require("server.World.WorldRecords")
+local PlayerGM = require("server.World.PlayerGM")
 
 local ServerRuntime = {}
 local current_runtime = nil
@@ -83,7 +85,6 @@ function ServerRuntime.new(opts)
   local ai_started = {}
   fish_host.CreateUnit = opts.create_unit
   fish_host.World = opts.world_service
-  fish_host.Quest = opts.quest
   fish_host.Cast = opts.cast
   fish_host.Ai = opts.fish_ai
   fish_host.AiTarget = opts.fish_ai_target or FishAiTarget
@@ -127,6 +128,18 @@ function ServerRuntime.new(opts)
     fish_host = fish_host,
     _started = false,
   }
+  fish_host.Quest = {
+    Notify = function(_, kind, owner, fact) return runtime:notify_quest(kind, owner, fact) end,
+  }
+  PlayerGM.configure({
+    player_data = opts.player_data,
+    save = opts.save,
+    cast = { SetNextFish = function(_, target, fishId) return runtime:set_next_fish(target, fishId) end },
+    vitals = {
+      SetHealth = function(_, target, value) return runtime.life:SetHealth(target, value) end,
+      SetHunger = function(_, target, value) return runtime.life:SetHunger(target, value) end,
+    },
+  })
 
   fish_host.OnKilled = function(killed)
     local world = runtime.world
@@ -144,7 +157,12 @@ function ServerRuntime.new(opts)
       zones = opts.zones,
       logger = opts.logger,
       on_mount_zone = opts.on_mount_zone,
-      on_mount_world = opts.on_mount_world,
+      on_mount_world = function(scope, world)
+        if _G.REUtil then
+          WorldRecords.mount(scope, world, { player_data = opts.player_data })
+        end
+        if type(opts.on_mount_world) == "function" then opts.on_mount_world(scope, world) end
+      end,
       create_unit = opts.create_unit,
       remote = opts.remote,
       bait_spots = opts.bait_spots,
@@ -191,6 +209,22 @@ function ServerRuntime.new(opts)
 
   function runtime:get_player_tree(user_id)
     return player_trees[user_id]
+  end
+
+  -- 钓鱼、活鱼与宿主规格共用的领域事件入口；不暴露 PlayerTree 内部拓扑。
+  function runtime:record_landing(player, event)
+    if self:is_leaving(player and player.UserId) then return false, "leaving" end
+    local tree = player and player_trees[player.UserId]
+    local compendium = tree and tree.compendium
+    if not compendium then return false, "unavailable" end
+    return compendium:RecordLanding(player, event)
+  end
+
+  function runtime:notify_quest(kind, player, payload)
+    if self:is_leaving(player and player.UserId) then return false end
+    local tree = player and player_trees[player.UserId]
+    local quest = tree and tree.quest
+    return quest and quest:Notify(kind, player, payload) or false
   end
 
   function runtime:push_cast_state(player)
@@ -388,6 +422,7 @@ function ServerRuntime.new(opts)
       create_unit = opts.create_unit,
       world_service = opts.world_service,
       fish_unit = opts.fish_unit or fish_host,
+      records = world and world.records,
       compendium = opts.compendium,
       quest = opts.quest,
       random = opts.random,
@@ -483,7 +518,7 @@ function ServerRuntime.new(opts)
       local shop = PlayerShop.mount(scope, player_tree, {
         remote = opts.remote,
         save = opts.save,
-        quest = opts.quest,
+        quest = player_tree.quest or opts.quest,
       })
       shop_handles[user_id] = shop
       scope:on_cleanup(function()
@@ -494,7 +529,7 @@ function ServerRuntime.new(opts)
       local fisherman = PlayerFisherman.mount(scope, player_tree, {
         remote = opts.remote,
         save = opts.save,
-        quest = opts.quest,
+        quest = player_tree.quest or opts.quest,
       })
       fisherman_handles[user_id] = fisherman
       scope:on_cleanup(function()
@@ -603,6 +638,31 @@ function ServerRuntime.new(opts)
     local user_id = player.UserId
     if leaving_players[user_id] ~= leaving or leaving.cleaned then
       return
+    end
+
+    local progress_tree = player_trees[user_id]
+    if progress_tree then
+      local expected, finished, collecting = 0, 0, true
+      local function one_done()
+        finished = finished + 1
+        if not collecting and expected > 0 and finished >= expected then
+          continue_removing(player, leaving)
+        end
+      end
+      if progress_tree.compendium and progress_tree.compendium:FlushBeforeLeave(player, one_done) then
+        expected = expected + 1
+      end
+      if progress_tree.quest and progress_tree.quest:FlushBeforeLeave(player, one_done) then
+        expected = expected + 1
+      end
+      if progress_tree.story and progress_tree.story:FlushBeforeLeave(player, one_done) then
+        expected = expected + 1
+      end
+      collecting = false
+      if expected > 0 then
+        if finished < expected then return end
+        if finished > expected then return end
+      end
     end
 
     if type(opts.flush_before_leave) == "function" then

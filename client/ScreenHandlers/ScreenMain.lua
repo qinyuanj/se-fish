@@ -49,74 +49,6 @@ function ScreenHandler:StartHookAlert(session)
         or ('音效缺失，只保留文字与高亮 ' .. tostring(err)))
 end
 
-local function wrapColumns(text, columns)
-    local out, count = {}, 0
-    for character in text:gmatch('[%z\1-\127\194-\244][\128-\191]*') do
-        if character == '\n' then
-            count = 0
-        else
-            if count >= columns then out[#out + 1], count = '\n', 0 end
-            count = count + 1
-        end
-        out[#out + 1] = character
-    end
-    return table.concat(out)
-end
-
-function ScreenHandler:ShowQuest(state)
-    if not self.QuestLabel or type(state) ~= 'table' or type(state.text) ~= 'string' then return end
-    local columns = math.max(1, math.floor(self.QuestLabel.Size.x / self.QuestLabel.FontSize))
-    self.QuestLabel.Text = wrapColumns(state.text, columns)
-    self.QuestShown = true
-    self:RenderQuest()
-    if type(state.notice) == 'string' and _G.LocalMsgNotice then _G.LocalMsgNotice(state.notice) end
-end
-
-function ScreenHandler:RenderQuest()
-    if not self.QuestLabel then return end
-    local shown = self.QuestShown == true
-    local expanded = shown and not self.QuestCollapsed
-    self.QuestLabel.Visible = expanded
-    if self.QuestBackground then self.QuestBackground.Visible = expanded end
-    if self.QuestToggle then
-        self.QuestToggle.Visible = shown
-        self.QuestToggle.TouchEnabled = shown
-        self.QuestToggleLabel.Visible = shown
-        self.QuestToggleLabel.Text = self.QuestCollapsed and '展开任务' or '收起任务'
-    end
-end
-
-function ScreenHandler:ShowDialogue(payload)
-    if type(payload) ~= 'table' or not self.DialogueNodes then return end
-    local lines = payload.lines
-    if type(lines) ~= 'table' or #lines == 0 then return end
-    for _, line in ipairs(lines) do if type(line) ~= 'string' then return end end
-    self.DialoguePayload, self.DialoguePage = payload, 1
-    for _, node in ipairs(self.DialogueNodes) do node.Visible = true end
-    self:ShowDialoguePage()
-end
-
-function ScreenHandler:ShowDialoguePage()
-    local payload = self.DialoguePayload
-    if not payload then return end
-    self.DialogueTitle.Text = (payload.title or '钓鱼佬') .. '  ' .. self.DialoguePage .. '/' .. #payload.lines
-    local wrapped, count = {}, 0
-    for character in payload.lines[self.DialoguePage]:gmatch('[%z\1-\127\194-\244][\128-\191]*') do
-        wrapped[#wrapped + 1] = character
-        count = character == '\n' and 0 or count + 1
-        if count >= self.DialogueColumns then wrapped[#wrapped + 1], count = '\n', 0 end
-    end
-    self.DialogueBody.Text = table.concat(wrapped)
-    self.DialogueNext.TouchEnabled = self.DialoguePage < #payload.lines
-    self.DialogueRead.TouchEnabled = true
-    self.DialogueReadLabel.Text = payload.readKey and '已读，开始钓鱼' or '知道了'
-end
-
-function ScreenHandler:HideDialogue()
-    for _, node in ipairs(self.DialogueNodes or {}) do node.Visible = false end
-    self.DialoguePayload = nil
-end
-
 local CAST_PHASES = { idle = true, cast = true, hooked = true, landed = true, unhooked = true }
 
 local function castProgress(self, reel, active)
@@ -344,17 +276,10 @@ function ScreenHandler:Cleanup()
     self.CastSplashHint = nil
     self.SplashUntil = nil
     self.AlertedCastId = nil
-    self.QuestLabel = nil
-    self.QuestBackground = nil
-    self.DialogueNodes = nil
-    self.DialoguePayload = nil
     self.ReelBar = nil
     self.ReelBarBg = nil
     self.HudLayout = nil
     self.LayoutKey = nil
-    self.QuestToggle = nil
-    self.QuestToggleLabel = nil
-    self.QuestShown = nil
     self.Snapshot = nil
     self.CastState = nil
     self.BoundRootNode = nil
@@ -415,64 +340,6 @@ function ScreenHandler:_initializeRoot()
         self.CastFailureHint, self.CastFailureMark }) do
         node.Visible = false
     end
-    local questPanel, questToggle = rects.QuestPanel, rects.QuestToggle
-    self.QuestBackground = passive(OwnedUnits.Track(self, World:CreateUnit('EUIImage', {
-        Parent = root, Name = 'QuestBackground',
-        Position = Vector2.New(questPanel.x, questPanel.y), Size = Vector2.New(questPanel.w, questPanel.h),
-        Image = 'official://image/11017', Color = Color.New(16, 24, 34, 180),
-    })))
-    self.QuestBackground.Visible = false
-    self.QuestLabel = overlay(self, root, 'QuestLabel', questPanel.x, questPanel.y, questPanel.w - 20,
-        questPanel.h - 12, '', 24, Color.New(255, 255, 255, 255))
-    self.QuestLabel.Visible = false
-    self.QuestToggle = button(self, root, 'QuestToggle', questToggle.x, questToggle.y, questToggle.w)
-    place(self.QuestToggle, questToggle)
-    self.QuestToggleLabel = overlay(self, root, 'QuestToggleLabel', questToggle.x, questToggle.y,
-        questToggle.w, questToggle.h, '收起任务', 22, Color.New(255, 255, 255, 255))
-    self:Listen(self.QuestToggle.OnClicked, function()
-        self.QuestCollapsed = not self.QuestCollapsed
-        self:RenderQuest()
-    end)
-    self:RenderQuest()
-    local cx, cy = resolution.x / 2, resolution.y / 2
-    local width = math.min(1000, resolution.x - 60)
-    self.DialogueColumns = math.max(12, math.floor((width - 80) / 26))
-    local panel = OwnedUnits.Track(self, World:CreateUnit('EUIImage', {
-        Parent = root, Name = 'DialogueBackground', Position = Vector2.New(cx, cy),
-        Size = Vector2.New(width, 360), Image = 'official://image/11017',
-        Color = Color.New(22, 38, 54, 250),
-    }))
-    panel.TouchEnabled, panel.SwallowTouchEnabled, panel.LocalZOrder = true, true, 20
-    self.DialogueTitle = overlay(self, root, 'DialogueTitle', cx, cy + 120, width - 50, 50,
-        '', 30, Color.New(255, 225, 130, 255))
-    self.DialogueBody = overlay(self, root, 'DialogueBody', cx, cy - 10, width - 80, 130,
-        '', 26, Color.New(255, 255, 255, 255))
-    self.DialogueNext = button(self, root, 'DialogueNext', cx - 160, cy - 115, 260)
-    self.DialogueRead = button(self, root, 'DialogueRead', cx + 160, cy - 115, 300)
-    local nextLabel = overlay(self, root, 'DialogueNextLabel', cx - 160, cy - 115, 260, 80,
-        '下一段', 26, Color.New(255, 255, 255, 255))
-    self.DialogueReadLabel = overlay(self, root, 'DialogueReadLabel', cx + 160, cy - 115, 300, 80,
-        '已读，开始钓鱼', 26, Color.New(255, 255, 255, 255))
-    self.DialogueNodes = { panel, self.DialogueTitle, self.DialogueBody,
-        self.DialogueNext, self.DialogueRead, nextLabel, self.DialogueReadLabel }
-    for _, node in ipairs(self.DialogueNodes) do
-        if node ~= panel then node.LocalZOrder = 21 end
-        if node == nextLabel or node == self.DialogueReadLabel then node.LocalZOrder = 22 end
-        node.Visible = false
-    end
-    self:Listen(self.DialogueNext.OnClicked, function()
-        if not self.DialoguePayload or self.DialoguePage >= #self.DialoguePayload.lines then return end
-        self.DialoguePage = self.DialoguePage + 1
-        self:ShowDialoguePage()
-    end)
-    self:Listen(self.DialogueRead.OnClicked, function()
-        local payload = self.DialoguePayload
-        if not payload then return end
-        if not payload.readKey then return self:HideDialogue() end
-        self.DialogueReadLabel.Text = '保存已读中…'
-        self.DialogueRead.TouchEnabled = false
-        _G.REUtil:GetRE('StoryRead'):FireServer({ action = 'read', readKey = payload.readKey })
-    end)
     self.ReelBarBg = OwnedUnits.Track(self, World:CreateUnit('EUIImage', {
         Parent = root, Name = 'ReelProgressBg',
         Position = Vector2.New(secondary.x, secondary.y), Size = Vector2.New(400, 36),
@@ -559,20 +426,6 @@ function ScreenHandler:_initializeRoot()
     self:Listen(_G.REUtil:GetRE('DamageNotice').OnClientEvent, function(payload)
         if self.IsOpen then DamageFloat:Show(payload) end
     end)
-    self:Listen(_G.REUtil:GetRE('QuestState').OnClientEvent, function(state) self:ShowQuest(state) end)
-    self:Listen(_G.REUtil:GetRE('StoryNotice').OnClientEvent, function(payload)
-        self:ShowDialogue(payload)
-    end)
-    self:Listen(_G.REUtil:GetRE('StoryState').OnClientEvent, function(payload)
-        if type(payload) == 'table' and payload.read == true and self.DialoguePayload
-            and payload.readKey == self.DialoguePayload.readKey then
-            self:HideDialogue()
-        elseif type(payload) == 'table' and payload.read == false and self.DialoguePayload
-            and payload.readKey == self.DialoguePayload.readKey then
-            self.DialogueBody.Text = payload.text or '已读尚未保存'
-            self.DialogueReadLabel.Text = '稍后重进再试'
-        end
-    end)
     self:Listen(_G.REUtil:GetRE('ReelInRE').OnClientEvent, function()
         self:ShowCast()
     end)
@@ -600,7 +453,6 @@ function ScreenHandler:OpenScreen()
     _G.REUtil:GetRE('SpecialItemStateRequest'):FireServer()
     _G.REUtil:GetRE('RequestItemBar'):FireServer()
     _G.REUtil:GetRE('RequestCastState'):FireServer()
-    _G.REUtil:GetRE('RequestQuest'):FireServer()
     _G.REUtil:GetRE('RequestFishCombat'):FireServer()
     local combatRequest = {}
     self.CombatRequest = combatRequest
@@ -612,11 +464,9 @@ function ScreenHandler:OpenScreen()
             end
         end)
     end
-    _G.REUtil:GetRE('RequestStory'):FireServer()
 end
 
 function ScreenHandler:CloseScreen()
-    self:HideDialogue()
     self.CombatRequest = nil
     DamageFloat:Clear()
     self.IsOpen = false

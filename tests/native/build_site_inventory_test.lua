@@ -31,7 +31,8 @@ local lfs = require("lfs")
 -- #313 倒计时改由 RootView 统一建点，删除 ScreenFerry 自己的 1 处建点，client 29 → 28。
 -- #312 三类经济与场景视图复用 RootView，删除旧双端模块后实测 client 22 / common 2 / server 26。
 -- 合并 #311 删除旧商店/钓鱼佬 4 处建点；实测 client 18 / common 2 / server 26。
-local SITES = 46
+-- #315 图鉴、GM 与消息改由 RootView 统一建点，删除旧客户端四处建点；实测 client 14 / common 2 / server 26。
+local SITES = 42
 local SITE_ROOTS = { "client", "common", "server" }
 local REF_ROOTS = { "client", "common", "server", "tests", "tools" }
 local REMOVED = { "FXUtil", "WeldTo", "MarkPointPart", "CreateHPBar" }

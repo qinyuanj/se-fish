@@ -31,11 +31,11 @@ local PACKAGE_SNAPSHOTS = {
 
 -- 三类存量债务水位线（只减不增；每个垂直切片完成后单调下调对应数值直至归零）。
 local DEBT_WATERMARKS = {
-  -- 合并 #311/#312/#313 删除旧双端后实测：OwnedUnits 13、旧债务裸 Connect 37、MgrMap 12。
+  -- #315 删除旧双端后实测：OwnedUnits 7、旧债务裸 Connect 24、MgrMap 6。
   -- 水位只减不增；后续切片应继续下降，不能为通过门禁调高。
-  owned_units_calls = 13,
-  legacy_raw_connects = 37,
-  mgr_map_members = 12,
+  owned_units_calls = 7,
+  legacy_raw_connects = 24,
+  mgr_map_members = 6,
 }
 
 local BUSINESS_ROOTS = { "client", "common", "server" }
@@ -325,7 +325,7 @@ describe("Spoke 原生重构机械棘轮守卫", function()
         { from = "client.Store.ClientStore", to = "client.Views.RootView" },
         { from = "client.Views.RootView", to = "client.MgrGameUI" },
         { from = "client.Views.RootView", to = "client.ScreenHandlers.ScreenMain" },
-        { from = "client.Views.ReelOverlayView", to = "client.LocalGM" },
+        { from = "client.Views.ReelOverlayView", to = "client.LocalMotorUnitCtrl" },
         { from = "client.Views.RootView", to = "common.OwnedUnits" },
         { from = "common.SpokeClock", to = "common.OwnedUnits" },
       }

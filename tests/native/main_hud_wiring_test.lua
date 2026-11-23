@@ -1,6 +1,6 @@
 -- #179 主界面接线：代表性控件的位置等于布局模块输出；任务追踪条折叠只在客户端本地。
 -- 接缝：ScreenMain 处理器 + ItemBarState / CastState / QuestState 客户端事件 + 假 World 替身；
--- 图鉴入口经 ScreenCompendium:BuildNodes(uiRoot)。
+-- 图鉴入口由 CompendiumView 提供；任务布局由 GuideView 提供。
 --
 -- 动手前列出的失败方式：
 --   1. 某个 Build 步骤仍写死坐标，换分辨率后与布局输出不一致；
@@ -22,6 +22,7 @@ local MainHudVitalsView = require('client.Views.MainHudVitalsView')
 local MainHudEquipPopups = require('client.Views.MainHudEquipPopups')
 local MainHudBackpackView = require('client.Views.MainHudBackpackView')
 local AttackView = require('client.Views.AttackView')
+local GuideView = require('client.Views.GuideView')
 local MainHudItemBarView = require('client.Views.MainHudItemBarView')
 local MainHudActionButtonsView = require('client.Views.MainHudActionButtonsView')
 local ReelOverlayView = require('client.Views.ReelOverlayView')
@@ -123,6 +124,7 @@ local function setUp(height)
                 backpack_open = ctx.backpackOpen,
             }),
             AttackView.spec(),
+            GuideView.spec({ get_resolution = function() return { x = 1920, y = height } end }),
             MainHudActionButtonsView.spec({
                 get_resolution = function() return { x = 1920, y = height } end,
                 backpack_open = ctx.backpackOpen,
@@ -242,54 +244,6 @@ describe('主界面接线（布局模块）', function()
         assert.is_true(close.Destroyed)
     end)
 
-    it('test_quest_toggle_collapses_locally_and_survives_refresh', function()
-        ctx = setUp(1080)
-        local quest = ctx.events.QuestState.OnClientEvent
-        assert.is_false(ctx.nodes.QuestToggle.Visible) -- 还没有任务文字时不占位
-        quest:Fire({ text = '新手任务 1/9：拾取 5 只蚯蚓（0/5）' })
-        assert.is_true(ctx.nodes.QuestLabel.Visible)
-        assert.is_true(ctx.nodes.QuestToggle.Visible)
-        assert.same('收起任务', ctx.nodes.QuestToggleLabel.Text)
-        local before = #ctx.sent
-        ctx.nodes.QuestToggle.OnClicked:Fire()
-        assert.same(before, #ctx.sent, '折叠不发往服务端')
-        assert.is_false(ctx.nodes.QuestLabel.Visible)
-        assert.is_false(ctx.nodes.QuestBackground.Visible)
-        assert.is_true(ctx.nodes.QuestToggle.Visible)
-        assert.same('展开任务', ctx.nodes.QuestToggleLabel.Text)
-        -- 推进时的新任务文字不会把折叠的追踪条重新展开
-        quest:Fire({ text = '新手任务 2/9：喂钓鱼佬吃 5 只蚯蚓（0/5）' })
-        assert.is_false(ctx.nodes.QuestLabel.Visible)
-        -- 换根节点重进后折叠状态仍在（客户端本地）
-        ctx.handler.RootNode = { Name = 'ScreenMain', FindFirstChild = function() return nil end }
-        ctx.handler:Init()
-        ctx.handler.IsOpen = true
-        ctx.events.QuestState.OnClientEvent:Fire({ text = '新手任务 2/9：喂钓鱼佬吃 5 只蚯蚓（0/5）' })
-        assert.is_false(ctx.nodes.QuestLabel.Visible)
-        assert.same('展开任务', ctx.nodes.QuestToggleLabel.Text)
-        local afterReentry = #ctx.sent
-        ctx.nodes.QuestToggle.OnClicked:Fire()
-        assert.is_true(ctx.nodes.QuestLabel.Visible)
-        assert.is_true(ctx.nodes.QuestBackground.Visible)
-        assert.same(afterReentry, #ctx.sent, '展开也不发往服务端')
-    end)
-
-    it('test_quest_text_wraps_inside_panel', function()
-        ctx = setUp(886)
-        local text = '新手任务 6/9：上钩后连续点击收线，将鱼钓上岸（0/1）'
-        ctx.events.QuestState.OnClientEvent:Fire({ text = text })
-        local label = ctx.nodes.QuestLabel
-        assert.is_true(label.Size.x <= 1920 / 4)
-        local lines = 0
-        for line in (label.Text .. '\n'):gmatch('(.-)\n') do
-            lines = lines + 1
-            assert.is_true(utf8.len(line) * label.FontSize <= label.Size.x, line)
-        end
-        assert.is_true(lines >= 2)
-        assert.is_true(lines * label.FontSize <= label.Size.y)
-        assert.same(text, (label.Text:gsub('\n', '')))
-    end)
-
     it('test_hunger_text_uses_glossary_term', function()
         ctx = setUp(1080)
         assert.same('饥饿度 60', ctx.nodes.HungerText.Text)
@@ -321,44 +275,6 @@ describe('主界面接线（布局模块）', function()
             end
             assert.is_false(overlaps(health, hunger), '血量与饥饿度文字框互叠')
             assert.is_false(overlaps(hunger, ctx.nodes.ImageCoin), '饥饿度文字压住金币图标')
-        end)
-    end
-end)
-
-describe('右上入口组接线（图鉴入口）', function()
-    local saved
-    before_each(function()
-        saved = { loaded = {}, globals = {} }
-        for _, key in ipairs({ 'game', 'Vector2', 'Color', 'MgrGameUI' }) do saved.globals[key] = rawget(_G, key) end
-        for _, name in ipairs({ 'client.GameUI', 'common.REUtil' }) do saved.loaded[name] = package.loaded[name] end
-    end)
-    after_each(function()
-        for key, value in pairs(saved.globals) do rawset(_G, key, value) end
-        for _, name in ipairs({ 'client.GameUI', 'common.REUtil' }) do package.loaded[name] = saved.loaded[name] end
-    end)
-
-    for _, height in ipairs({ 886, 1440 }) do
-        it('test_compendium_entry_follows_layout_' .. height, function()
-            local nodes = {}
-            local world = { CreateUnit = function(_, _, attrs)
-                local node = { OnClicked = signal(), Destroy = function() end }
-                for key, value in pairs(attrs) do node[key] = value end
-                nodes[node.Name] = node
-                return node
-            end }
-            rawset(_G, 'game', { GetService = function(_, name) if name == 'World' then return world end end })
-            rawset(_G, 'Vector2', { New = function(x, y) return { x = x, y = y } end })
-            rawset(_G, 'Color', { New = function(...) return { ... } end })
-            rawset(_G, 'MgrGameUI', { GetScreen = function() end, CloseScreen = function() end })
-            package.loaded['client.GameUI'] = { GetEuiManager = function() return {
-                GetDeviceResolution = function() return { x = 1920, y = height } end } end,
-                GetUIRoot = function() return {} end }
-            package.loaded['common.REUtil'] = { GetRE = function() return { OnClientEvent = signal(),
-                FireServer = function() end } end }
-            local screen = assert(loadfile('client/ScreenHandlers/ScreenCompendium.lua'))()
-            assert.is_true(screen:BuildNodes({ Name = 'UIRoot' }))
-            local rect = layoutFor(height, 2, false).Rects.CompendiumEntry
-            assertAt(nodes.BtnCompendiumEntry, rect, 'BtnCompendiumEntry')
         end)
     end
 end)

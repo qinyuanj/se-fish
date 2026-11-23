@@ -41,7 +41,7 @@
 | 1-13 | server/Mgr/MgrPlatform.lua | tests/native/platform_seam_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 1-14 | common/cfg/PlaceholderAssets.lua、common/GameCfg.lua | tests/native/spec/01_placeholder_asset_visual_test.lua、tests/native/placeholder_assets_test.lua | 有 | 缺 | 缺 | 缺 | A |
 | 1-15 | common/cfg/PlaceholderAssets.lua、server/FishBehaviors.lua | tests/native/spec/01_placeholder_asset_visual_test.lua、tests/native/placeholder_assets_test.lua、tests/native/fish_lift_test.lua | 有 | 缺 | 缺 | 缺 | C |
-| 1-16 | common/cfg/Shop.lua、common/GameCfg.lua | tests/native/shop_test.lua、tests/native/quest_test.lua | 缺 | 缺 | 缺 | 缺 | C |
+| 1-16 | common/cfg/Shop.lua、common/GameCfg.lua | tests/native/shop_test.lua、tests/native/spec/server_progress_315_test.lua | 缺 | 缺 | 缺 | 缺 | C |
 | 1-17 | server/FishBehaviors.lua、server/World/FishTree.lua | tests/native/fish_carrier_test.lua、tests/native/fish_air_escape_test.lua | 缺 | 缺 | 缺 | 缺 | C |
 | 1-18 | common/ZoneMarkers.lua、server/World/PlayerFisherman.lua | tests/native/zone_layout_plan_test.lua | 缺 | 缺 | 缺 | 缺 | C |
 | 1-19 | common/ZoneMarkers.lua、common/BodyScale.lua | tests/native/zone_scene_125_test.lua | 缺 | 缺 | 缺 | 缺 | C |
@@ -418,24 +418,24 @@
 
 | 条款 | 代码落点 | 关联测试 | 正常流程 | 失败流程 | 退出重进 | 存档恢复 | 等级 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 13-01 | common/cfg/Fish.lua、client/ScreenHandlers/ScreenCompendium.lua | tests/native/compendium_test.lua、tests/native/compendium_ui_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 13-02 | client/ScreenHandlers/ScreenCompendium.lua、common/GameCfg.lua | tests/native/compendium_ui_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 13-03 | client/ScreenHandlers/ScreenCompendium.lua | tests/native/compendium_ui_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 13-04 | server/Mgr/MgrCompendium.lua、server/World/FishingPhase.lua、server/World/FishTree.lua | tests/native/compendium_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 13-05 | server/Mgr/MgrCompendium.lua | tests/native/compendium_test.lua | 缺 | 缺 | 缺 | 缺 | B |
-| 13-06 | server/Mgr/MgrCompendium.lua、server/Data/PlayerData.lua | tests/native/compendium_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 13-07 | client/ScreenHandlers/ScreenCompendium.lua、server/Mgr/MgrRecords.lua、common/Records.lua | tests/native/spec/13_record_display_placeholder_test.lua | 有 | 缺 | 缺 | 缺 | A |
-| 13-08 | client/ScreenHandlers/ScreenCompendium.lua、server/Mgr/MgrRecords.lua、common/Records.lua | tests/native/spec/13_record_display_placeholder_test.lua | 有 | 缺 | 缺 | 缺 | A |
-| 13-09 | server/Mgr/MgrCompendium.lua、server/World/PlayerBlindbox.lua、server/World/PlayerFisherman.lua | tests/native/compendium_test.lua | 缺 | 缺 | 缺 | 缺 | B |
-| 13-10 | server/World/PlayerFisherman.lua、common/GameCfg.lua、server/Mgr/MgrAchievements.lua | tests/native/exchange_zones_127_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 13-11 | server/Mgr/MgrCompendium.lua、server/World/PlayerFisherman.lua | tests/native/compendium_test.lua、tests/native/exchange_zones_127_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 13-12 | server/Mgr/MgrAchievements.lua、common/GameCfg.lua | tests/native/spec/13_achievement_delivery_placeholder_test.lua | 有 | 缺 | 有 | 有 | B |
-| 13-13 | server/Mgr/MgrAchievements.lua | tests/native/spec/13_achievement_delivery_placeholder_test.lua | 有 | 缺 | 有 | 有 | B |
-| 13-14 | server/Mgr/MgrAchievements.lua、server/Mgr/MgrSave.lua | tests/native/spec/13_achievement_delivery_placeholder_test.lua | 有 | 有 | 缺 | 缺 | B |
-| 13-17 | server/Mgr/MgrRecords.lua、server/Data/RecordsAdapter.lua、common/Records.lua、client/ScreenHandlers/ScreenCompendium.lua | tests/native/spec/13_record_display_placeholder_test.lua、tests/native/records_test.lua | 缺 | 有 | 缺 | 缺 | B |
-| 13-18 | server/Mgr/MgrAchievements.lua、common/GameCfg.lua | tests/native/spec/13_achievement_delivery_placeholder_test.lua、tests/native/spec/17_platform_achievement_id_test.lua | 有 | 有 | 有 | 有 | B |
+| 13-01 | common/cfg/Fish.lua、client/Views/CompendiumView.lua | tests/native/spec/server_progress_315_test.lua、tests/native/spec/client_progress_315_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 13-02 | client/Views/CompendiumView.lua、common/GameCfg.lua | tests/native/spec/client_progress_315_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 13-03 | client/Views/CompendiumView.lua | tests/native/spec/client_progress_315_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 13-04 | server/World/PlayerCompendium.lua、server/World/FishingPhase.lua、server/World/FishTree.lua | tests/native/spec/server_progress_315_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 13-05 | server/World/PlayerCompendium.lua | tests/native/spec/server_progress_315_test.lua | 缺 | 缺 | 缺 | 缺 | B |
+| 13-06 | server/World/PlayerCompendium.lua、server/Data/PlayerData.lua | tests/native/spec/server_progress_315_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 13-07 | client/Views/CompendiumView.lua、server/World/WorldRecords.lua、common/Records.lua | tests/native/spec/client_progress_315_test.lua | 有 | 缺 | 缺 | 缺 | A |
+| 13-08 | client/Views/CompendiumView.lua、server/World/WorldRecords.lua、common/Records.lua | tests/native/spec/client_progress_315_test.lua | 有 | 缺 | 缺 | 缺 | A |
+| 13-09 | server/World/PlayerCompendium.lua、server/World/PlayerBlindbox.lua、server/World/PlayerFisherman.lua | tests/native/spec/server_progress_315_test.lua | 缺 | 缺 | 缺 | 缺 | B |
+| 13-10 | server/World/PlayerFisherman.lua、common/GameCfg.lua、server/World/PlayerAchievements.lua | tests/native/exchange_zones_127_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 13-11 | server/World/PlayerCompendium.lua、server/World/PlayerFisherman.lua | tests/native/spec/server_progress_315_test.lua、tests/native/exchange_zones_127_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 13-12 | server/World/PlayerAchievements.lua、common/GameCfg.lua | tests/native/spec/server_progress_315_test.lua | 有 | 缺 | 有 | 有 | B |
+| 13-13 | server/World/PlayerAchievements.lua | tests/native/spec/server_progress_315_test.lua | 有 | 缺 | 有 | 有 | B |
+| 13-14 | server/World/PlayerAchievements.lua、server/Mgr/MgrSave.lua | tests/native/spec/server_progress_315_test.lua | 有 | 有 | 缺 | 缺 | B |
+| 13-17 | server/World/WorldRecords.lua、server/Data/RecordsAdapter.lua、common/Records.lua、client/Views/CompendiumView.lua | tests/native/spec/client_progress_315_test.lua、tests/native/records_test.lua | 缺 | 有 | 缺 | 缺 | B |
+| 13-18 | server/World/PlayerAchievements.lua、common/GameCfg.lua | tests/native/spec/server_progress_315_test.lua、tests/native/spec/server_progress_315_test.lua | 有 | 有 | 有 | 有 | B |
 
-第 13 节的 13-07、13-08、13-17 由图鉴客户端与服务端纪录查询的公开入口取证：`tests/native/spec/13_record_display_placeholder_test.lua`
+第 13 节的 13-07、13-08、13-17 由图鉴客户端与服务端纪录查询的公开入口取证：`tests/native/spec/client_progress_315_test.lua`
 翻到「没有纪录」与「纪录服务未接入」两种回包，断言该列只显示「未取得数据」、不出现任何数字与保持者；13-12～13-14、13-18 由
 成就交付队列取证。13-15、13-16 是试玩条款，不在本表登记。
 
@@ -526,26 +526,26 @@
 
 | 条款 | 代码落点 | 关联测试 | 正常流程 | 失败流程 | 退出重进 | 存档恢复 | 等级 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 17-01 | common/GameCfg.lua、server/Mgr/MgrQuest.lua | tests/native/quest_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 17-02 | common/GameCfg.lua、server/Mgr/MgrQuest.lua | tests/native/quest_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 17-03 | server/Mgr/MgrQuest.lua | tests/native/quest_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 17-04 | server/Mgr/MgrQuest.lua、server/Mgr/MgrSave.lua、server/Data/PlayerData.lua | tests/native/quest_test.lua、tests/native/save_test.lua | 缺 | 缺 | 缺 | 缺 | B |
-| 17-05 | server/Mgr/MgrQuest.lua | tests/native/quest_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 17-06 | common/GameCfg.lua、server/Mgr/MgrPlayerData.lua | tests/native/gm_panel_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 17-07 | common/GameCfg.lua、common/cfg/Shop.lua、server/World/PlayerShop.lua | tests/native/quest_test.lua、tests/native/shop_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 17-08 | server/Mgr/MgrStory.lua、client/ScreenHandlers/ScreenMain.lua | tests/native/guide_persistence_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 17-09 | server/Mgr/MgrStory.lua、client/ScreenHandlers/ScreenMain.lua | tests/native/guide_persistence_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 17-10 | server/Mgr/MgrStory.lua、server/Data/PlayerData.lua | tests/native/guide_persistence_test.lua | 缺 | 缺 | 缺 | 缺 | B |
-| 17-11 | common/NpcDialogue.lua、server/Mgr/MgrStory.lua | — | 缺 | 缺 | 缺 | 缺 | A |
-| 17-12 | common/NpcDialogue.lua、server/Mgr/MgrStory.lua | — | 缺 | 缺 | 缺 | 缺 | A |
-| 17-13 | common/NpcDialogue.lua、server/Mgr/MgrStory.lua | — | 缺 | 缺 | 缺 | 缺 | A |
-| 17-14 | server/Mgr/MgrStory.lua | — | 缺 | 缺 | 缺 | 缺 | B |
+| 17-01 | common/GameCfg.lua、server/World/PlayerQuest.lua | tests/native/spec/server_progress_315_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 17-02 | common/GameCfg.lua、server/World/PlayerQuest.lua | tests/native/spec/server_progress_315_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 17-03 | server/World/PlayerQuest.lua | tests/native/spec/server_progress_315_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 17-04 | server/World/PlayerQuest.lua、server/Mgr/MgrSave.lua、server/Data/PlayerData.lua | tests/native/spec/server_progress_315_test.lua、tests/native/save_test.lua | 缺 | 缺 | 缺 | 缺 | B |
+| 17-05 | server/World/PlayerQuest.lua | tests/native/spec/server_progress_315_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 17-06 | common/GameCfg.lua、server/Mgr/MgrPlayerData.lua | tests/native/spec/client_progress_315_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 17-07 | common/GameCfg.lua、common/cfg/Shop.lua、server/World/PlayerShop.lua | tests/native/spec/server_progress_315_test.lua、tests/native/shop_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 17-08 | server/World/PlayerStory.lua、client/Views/StoryView.lua | tests/native/spec/server_progress_315_test.lua、tests/native/spec/client_progress_315_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 17-09 | server/World/PlayerStory.lua、client/Views/StoryView.lua | tests/native/spec/server_progress_315_test.lua、tests/native/spec/client_progress_315_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 17-10 | server/World/PlayerStory.lua、server/Data/PlayerData.lua | tests/native/spec/server_progress_315_test.lua、tests/native/spec/client_progress_315_test.lua | 缺 | 缺 | 缺 | 缺 | B |
+| 17-11 | common/NpcDialogue.lua、server/World/PlayerStory.lua | — | 缺 | 缺 | 缺 | 缺 | A |
+| 17-12 | common/NpcDialogue.lua、server/World/PlayerStory.lua | — | 缺 | 缺 | 缺 | 缺 | A |
+| 17-13 | common/NpcDialogue.lua、server/World/PlayerStory.lua | — | 缺 | 缺 | 缺 | 缺 | A |
+| 17-14 | server/World/PlayerStory.lua | — | 缺 | 缺 | 缺 | 缺 | B |
 | 17-15 | server/World/PlayerShop.lua、server/Mgr/MgrPlatform.lua、common/GameCfg.lua | tests/native/shop_test.lua、tests/native/platform_seam_test.lua | 缺 | 缺 | 缺 | 缺 | B |
 | 17-16 | server/Mgr/MgrPlatform.lua、common/GameCfg.lua | tests/native/platform_seam_test.lua | 缺 | 缺 | 缺 | 缺 | B |
-| 17-17 | server/Mgr/MgrAchievements.lua、common/GameCfg.lua | tests/native/spec/17_platform_achievement_id_test.lua | 有 | 有 | 缺 | 缺 | B |
+| 17-17 | server/World/PlayerAchievements.lua、common/GameCfg.lua | tests/native/spec/server_progress_315_test.lua | 有 | 有 | 缺 | 缺 | B |
 | 17-18 | server/Mgr/MgrPlatform.lua、common/GameCfg.lua | tests/native/spec/17_platform_boundary_placeholder_test.lua | 有 | 有 | 缺 | 缺 | B |
 | 17-19 | common/cfg/PlaceholderAssets.lua | tests/native/placeholder_assets_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 17-20 | server/Mgr/MgrPlatform.lua、server/Mgr/MgrRecords.lua | tests/native/platform_seam_test.lua、tests/native/records_test.lua | 缺 | 缺 | 缺 | 缺 | B |
+| 17-20 | server/Mgr/MgrPlatform.lua、server/World/WorldRecords.lua | tests/native/platform_seam_test.lua、tests/native/records_test.lua | 缺 | 缺 | 缺 | 缺 | B |
 | 17-21 | server/Mgr/MgrPlatform.lua、common/GameCfg.lua | tests/native/platform_seam_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 17-22 | server/Mgr/MgrPlatform.lua、common/GameCfg.lua | tests/native/platform_seam_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 
@@ -561,12 +561,12 @@
 | 18-04 | server/Data/PlayerData.lua、server/World/PlayerShop.lua | tests/native/spec/18_session_settlement_contract_test.lua | 有 | 缺 | 缺 | 有 | B |
 | 18-05 | server/Data/PlayerData.lua、server/World/PlayerLife.lua | tests/native/spec/18_session_settlement_contract_test.lua | 有 | 缺 | 有 | 有 | B |
 | 18-06 | server/World/PlayerLife.lua、server/Data/PlayerData.lua | tests/native/spec/18_session_settlement_contract_test.lua | 有 | 缺 | 缺 | 有 | B |
-| 18-07 | server/Mgr/MgrCompendium.lua、server/Data/PlayerData.lua | tests/native/spec/18_session_settlement_contract_test.lua | 有 | 缺 | 缺 | 有 | B |
-| 18-08 | server/Mgr/MgrQuest.lua、server/Mgr/MgrStory.lua | tests/native/spec/18_session_settlement_contract_test.lua | 有 | 缺 | 缺 | 有 | B |
+| 18-07 | server/World/PlayerCompendium.lua、server/Data/PlayerData.lua | tests/native/spec/18_session_settlement_contract_test.lua | 有 | 缺 | 缺 | 有 | B |
+| 18-08 | server/World/PlayerQuest.lua、server/World/PlayerStory.lua | tests/native/spec/18_session_settlement_contract_test.lua | 有 | 缺 | 缺 | 有 | B |
 | 18-09 | server/World/FerryRoute.lua、server/Data/PlayerData.lua | tests/native/spec/18_session_settlement_contract_test.lua | 有 | 缺 | 缺 | 有 | B |
 | 18-10 | server/Data/PlayerData.lua、server/Mgr/MgrSave.lua | tests/native/spec/18_session_settlement_contract_test.lua | 有 | 有 | 有 | 有 | B |
 | 18-11 | server/World/PlayerBlindbox.lua、server/Data/PlayerData.lua | tests/native/spec/18_session_settlement_contract_test.lua | 有 | 缺 | 缺 | 有 | B |
-| 18-12 | server/Mgr/MgrAchievements.lua、server/Data/PlayerData.lua | tests/native/spec/18_session_settlement_contract_test.lua | 有 | 缺 | 缺 | 有 | B |
+| 18-12 | server/World/PlayerAchievements.lua、server/Data/PlayerData.lua | tests/native/spec/18_session_settlement_contract_test.lua | 有 | 缺 | 缺 | 有 | B |
 | 18-13 | server/Mgr/MgrSave.lua、server/World/FerryRoute.lua | tests/native/spec/18_session_settlement_contract_test.lua | 有 | 有 | 有 | 有 | B |
 | 18-14 | server/World/PlayerWeapon.lua、server/Data/PlayerData.lua | — | 缺 | 缺 | 缺 | 缺 | B |
 | 18-15 | server/World/PlayerWeapon.lua、server/Mgr/MgrSave.lua | tests/native/weapon_system_test.lua | 缺 | 缺 | 缺 | 缺 | B |

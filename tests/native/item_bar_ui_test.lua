@@ -10,6 +10,8 @@ local MainHudBackpackView = require('client.Views.MainHudBackpackView')
 local MainHudItemBarView = require('client.Views.MainHudItemBarView')
 local MainHudActionButtonsView = require('client.Views.MainHudActionButtonsView')
 local AttackView = require('client.Views.AttackView')
+local GuideView = require('client.Views.GuideView')
+local StoryView = require('client.Views.StoryView')
 
 -- 弹窗候选格的文字按格宽折行（#180），比较时去掉换行
 local function plain(text) return (tostring(text or ''):gsub('\n', '')) end
@@ -126,7 +128,9 @@ describe("道具栏的界面侧", function()
                     open_popup = ctx.openPopup,
                     on_open_changed = function(is_open) ctx.handler:SetBackpackOpen(is_open) end,
                 }),
+                GuideView.spec(),
             },
+            modals = { story = StoryView.modal_spec() },
         })
     end)
 
@@ -275,8 +279,8 @@ describe("道具栏的界面侧", function()
         -- pcall 包住主体：模块缓存改写后即使断言失败也要恢复，再抛错让本例失败。
         local ok, err = pcall(function()
             local mgr = assert(loadfile('client/MgrGameUI.lua'))()
-            local oldRoot, oldButton = ctx.currentRoot, ctx.nodes.QuestToggle
-            local oldLabel = ctx.nodes.QuestToggleLabel
+            local oldRoot, oldButton = ctx.currentRoot, ctx.nodes.ReelClose
+            local oldLabel = ctx.nodes.BtnReelCloseLabel
             assert.equal(oldRoot, mgr:GetScreen('ScreenMain').RootNode)
             assert.equal(oldRoot, mgr:GetScreen('ScreenMain').RootNode)
             assert.same(1, ctx.states:Count())
@@ -288,15 +292,9 @@ describe("道具栏的界面侧", function()
             assert.is_true(oldLabel.Destroyed)
             assert.same(0, oldButton.OnClicked:Count())
             assert.same(1, ctx.states:Count())
-            local newButton = ctx.nodes.QuestToggle
+            local newButton = ctx.nodes.ReelClose
             assert.is_not.equal(newButton, oldButton)
-            ctx.events.QuestState.OnClientEvent:Fire({ text = '新手任务 1/5：去钓鱼' })
-            assert.is_true(ctx.nodes.QuestLabel.Visible)
-            oldButton.OnClicked:Fire()
-            assert.is_true(ctx.nodes.QuestLabel.Visible)
-            newButton.OnClicked:Fire()
-            assert.is_false(ctx.nodes.QuestLabel.Visible)
-            local newLabel = ctx.nodes.QuestToggleLabel
+            local newLabel = ctx.nodes.BtnReelCloseLabel
             ctx.handler:Cleanup()
             assert.same(0, ctx.states:Count())
             assert.is_true(newButton.Destroyed)
@@ -359,6 +357,7 @@ describe("道具栏的界面侧", function()
 
     -- #174 #11：主界面原点左下、Y 向上——标题在上、正文居中、按钮在下
     it("test_dialogue_layout_y_up_title_above_body_above_buttons", function()
+        ctx.writer:open_modal('story', { title = '钓鱼佬', lines = { '第一段', '第二段' }, readKey = 'opening' })
         local title, body = ctx.nodes.DialogueTitle, ctx.nodes.DialogueBody
         assert.is_true(title.Position.y > body.Position.y)
         for _, name in ipairs({ 'DialogueNext', 'DialogueRead', 'DialogueNextLabel', 'DialogueReadLabel' }) do
@@ -429,6 +428,7 @@ describe("道具栏的界面侧", function()
 
     -- #174 #18：overlay 生成的按钮文字水平、垂直居中
     it("test_button_labels_center_aligned", function()
+        ctx.writer:open_modal('story', { title = '钓鱼佬', lines = { '第一段', '第二段' }, readKey = 'opening' })
         ctx.states:Fire({ slots = {}, bait = { worm = 1 }, weapons = { sword = 1 } })
         ctx.nodes.WeaponBar.OnClicked:Fire()
         for _, name in ipairs({ 'BaitBarLabel', 'WeaponBarLabel', 'BtnItemActionLabel', 'LabelBackpack',
