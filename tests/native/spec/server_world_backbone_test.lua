@@ -863,6 +863,7 @@ describe("服务端入口接线：server/main.lua 宿主测试双端到端集成
   it("真实 server/main.lua 启动唯一 SharedWorldTree、Heartbeat 驱动 SpokeClock、存档就绪生成 PlayerTree 并执行离场三步协议与重进排空", function()
     local now = 100
     local tasks, values, errors, mgrs = {}, {}, {}, {}
+    local remote_events = {}
     local order = {}
     local players_service = {
       PlayerAdded = make_signal(),
@@ -910,8 +911,11 @@ describe("服务端入口接线：server/main.lua 宿主测试双端到端集成
       end,
     }
     _G.REUtil = {
-      GetRE = function()
-        return { OnServerEvent = make_signal(), FireClient = function() end }
+      GetRE = function(_, name)
+        if not remote_events[name] then
+          remote_events[name] = { OnServerEvent = make_signal(), FireClient = function() end }
+        end
+        return remote_events[name]
       end,
     }
 
@@ -971,6 +975,9 @@ describe("服务端入口接线：server/main.lua 宿主测试双端到端集成
     local world = runtime:get_world()
     assert.is_not_nil(world)
     assert.equals(7, #world.zone_list)
+    assert.is_not_nil(world.ferry)
+    assert.is_not_nil(remote_events.FerryAction)
+    assert.equals(1, #remote_events.FerryAction.OnServerEvent.handlers)
     assert.equals(100, runtime.clock.now())
 
     -- Heartbeat 每帧驱动 SpokeClock，SharedWorldTree 正常接收 1 Hz 推进

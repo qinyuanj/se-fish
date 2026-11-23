@@ -10,7 +10,6 @@ local ScreenHandlerLoaders = {
     DialogNoticeConfirm = function() return require("client.ScreenHandlers.DialogNoticeConfirm") end,
     ScreenBlindbox = function() return require("client.ScreenHandlers.ScreenBlindbox") end,
     ScreenCompendium = function() return require("client.ScreenHandlers.ScreenCompendium") end,
-    ScreenFerry = function() return require("client.ScreenHandlers.ScreenFerry") end,
     ScreenGM = function() return require("client.ScreenHandlers.ScreenGM") end,
     ScreenLottery = function() return require("client.ScreenHandlers.ScreenLottery") end,
     ScreenMain = function() return require("client.ScreenHandlers.ScreenMain") end,
