@@ -138,11 +138,24 @@ function ServerRuntime.new(opts)
       create_unit = opts.create_unit,
       remote = opts.remote,
       bait_spots = opts.bait_spots,
+      player_data = opts.player_data,
+      save = opts.save,
+      interact = opts.interact,
+      players_service = opts.players_service,
       lookup_tree = function(player)
         if type(player) ~= "table" then return nil end
         return player_trees[player.UserId]
       end,
     })
+    if not self._ferry_bound then
+      self._ferry_bound = true
+      if type(opts.bind_ferry_action) == "function" then
+        opts.bind_ferry_action(function(actor, payload)
+          local ferry = self.world and self.world.ferry
+          return ferry and ferry:Handle(actor, payload) or false
+        end)
+      end
+    end
     return self.world
   end
 
@@ -238,6 +251,7 @@ function ServerRuntime.new(opts)
       return
     end
     current_players[user_id] = player
+    if self.world and self.world.ferry then self.world.ferry:OnPlayerAdded(player) end
     safe_call(opts.logger, "on_player_join_start", opts.on_player_join_start, player)
   end
 
@@ -554,6 +568,7 @@ function ServerRuntime.new(opts)
     end
     leaving = { cleaned = false, waiting = nil }
     leaving_players[user_id] = leaving
+    if self.world and self.world.ferry then self.world.ferry:OnPlayerRemoving(player) end
     fish_host:OnPlayerRemoving(player)
     self:_publish_fish()
     local queued = ready_queue[user_id]

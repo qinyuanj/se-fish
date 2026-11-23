@@ -18,6 +18,7 @@ local SurvivalOverlayView = require("client.Views.SurvivalOverlayView")
 local GroundLootView = require("client.Views.GroundLootView")
 local FishCombatView = require("client.Views.FishCombatView")
 local GrillView = require("client.Views.GrillView")
+local FerryView = require("client.Views.FerryView")
 local ReelOverlayView = require("client.Views.ReelOverlayView")
 local CastSourceView = require("client.Views.CastSourceView")
 local ScreenMain = require("client.ScreenHandlers.ScreenMain")
@@ -29,6 +30,7 @@ LocalMgrUtil:Start()
 
 local Task = game:GetService("Task")
 local World = game:GetService("World")
+local Players = game:GetService("Players")
 
 -- 客户端 Spoke 响应式主干（ADR-0032 / #296）：
 -- 写侧仅由 L1 入口持有并绑定宿主下行事件与空间传感器；_G.ClientSpoke 仅暴露只读侧给过渡期旧界面。
@@ -80,6 +82,22 @@ Task:Spawn(function()
     if ui_root then
         RootView.mount(ui_root, client_store, {
             services = {
+                send_ferry = function(payload)
+                    REUtil:GetRE("FerryAction"):FireServer(payload)
+                end,
+                create_scene_node = function(position, name)
+                    local player = Players.LocalPlayer
+                    local eui = player and player.PlayerGui and player.PlayerGui.EuiManager
+                    if not eui then error("摆渡场景节点创建时 EUI 未就绪", 2) end
+                    local node = eui:CreateSceneNodeAtPosition(position)
+                    node.Name = name
+                    return node
+                end,
+                get_device_resolution = function()
+                    local player = Players.LocalPlayer
+                    local eui = player and player.PlayerGui and player.PlayerGui.EuiManager
+                    return eui and eui:GetDeviceResolution() or { x = 1920, y = 1080 }
+                end,
                 send_grill = function(payload)
                     REUtil:GetRE("GrillAction"):FireServer(payload)
                 end,
@@ -119,6 +137,7 @@ Task:Spawn(function()
                 }),
                 AttackView.spec(),
                 GrillView.spec(),
+                FerryView.spec(),
                 CastSourceView.spec(),
                 MainHudActionButtonsView.spec({
                     backpack_open = hud_backpack_open,
@@ -155,6 +174,7 @@ Task:Spawn(function()
                         REUtil:GetRE('ItemBarAction'):FireServer(payload)
                     end,
                 }),
+                ferry = FerryView.legs_spec(),
                 fish_combat = FishCombatView.bar_spec(),
                 fish_warning = FishCombatView.warning_spec(),
             },
@@ -173,7 +193,6 @@ local LocalGM = require("client.LocalGM")
 local LocalShop = require("client.LocalShop")
 local LocalLottery = require("client.LocalLottery")
 local ScreenLottery = require("client.ScreenHandlers.ScreenLottery")
-local ScreenFerry = require("client.ScreenHandlers.ScreenFerry")
 local ScreenParty = require("client.ScreenHandlers.ScreenParty")
 local ScreenBlindbox = require("client.ScreenHandlers.ScreenBlindbox")
 local ScreenPlatform = require("client.ScreenHandlers.ScreenPlatform")
@@ -196,7 +215,6 @@ Task:Spawn(function() LocalInteract:Start() end)
 Task:Spawn(function() LocalShop:Start() end)
 Task:Spawn(function() ScreenLottery:Start() end)
 Task:Spawn(function() LocalLottery:Start() end)
-Task:Spawn(function() ScreenFerry:Start() end)
 Task:Spawn(function() ScreenParty:Start() end)
 Task:Spawn(function() ScreenBlindbox:Start() end)
 Task:Spawn(function() ScreenPlatform:Start() end)
