@@ -14,6 +14,20 @@ package.path = table.concat({
   package.path,
 }, ";")
 
+-- 引擎 Vector3 是生产公开类型；测试进程未启动编辑器时由共享夹具提供同形构造器。
+if rawget(_G, "Vector3") == nil then
+  local vector_mt = {
+    __add = function(a, b) return _G.Vector3.New(a.x + b.x, a.y + b.y, a.z + b.z) end,
+    __sub = function(a, b) return _G.Vector3.New(a.x - b.x, a.y - b.y, a.z - b.z) end,
+    __mul = function(a, b)
+      if type(a) == "number" then return _G.Vector3.New(a * b.x, a * b.y, a * b.z) end
+      return _G.Vector3.New(a.x * b, a.y * b, a.z * b)
+    end,
+  }
+  vector_mt.__index = { Length = function(self) return math.sqrt(self.x ^ 2 + self.y ^ 2 + self.z ^ 2) end }
+  _G.Vector3 = { New = function(x, y, z) return setmetatable({ x = x, y = y, z = z }, vector_mt) end }
+end
+
 local baseline = require("tests.support.baseline")
 baseline.apply()
 

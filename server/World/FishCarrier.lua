@@ -101,6 +101,26 @@ function Mgr:SyncPosition(carrier, targetPosition)
 	syncReceiver(carrier, targetPosition)
 end
 
+-- FishTree 已下达移动命令后，宿主只镜像受击体坐标；官方包不反向写玩法状态。
+function Mgr:SyncAiPosition(carrier)
+	if not carrier or not carrier.AiOwnsMovement then return true end
+	local ok, err = pcall(function()
+		local p = carrier.Receiver.Position
+		for _, key in ipairs({ 'x', 'y', 'z' }) do
+			local value = p and p[key]
+			assert(Number.IsFiniteNumber(value), '受击体坐标异常：' .. key)
+		end
+		local offset = carrier.ReceiverOffset or Vector3.New(0, 0, 0)
+		carrier.Body.Position = Vector3.New(p.x - offset.x, p.y - offset.y, p.z - offset.z)
+		carrier.Body.LinearVelocity = Vector3.New(0, 0, 0)
+	end)
+	if not ok then
+		carrier.AiOwnsMovement = false
+		print('[FishCarrier] operation=SyncAiPosition', carrier.Body and carrier.Body.UnitId, tostring(err))
+	end
+	return ok
+end
+
 -- 实测（M18 台账 §11.3）：致命那一下引擎**只发 `Died`、不发 `HealthChanged`**，所以两条都要接。
 -- 通知前把 Controller 的真血量同步回记录：致命一击时 Died 早于 HealthChanged，
 -- 订阅者若读 carrier.Health 会看到上一档的值（实测读到 25 而不是 0）。

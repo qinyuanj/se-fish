@@ -607,4 +607,45 @@ describe("玩家生命双层相位宿主接缝（#298）", function()
     assert.equals(1, player.Character.Controller.Health)
     assert.equals("downed", life:LifeStatus(player))
   end)
+
+  it("控制器写入失败不提交 SetHealth 或虚弱复活的权威状态", function()
+    boot()
+    local life = runtime.life
+    local tree = runtime:get_player_tree(player.UserId)
+    local original = player.Character.Controller
+    local denied = setmetatable({}, {
+      __index = original,
+      __newindex = function(_, key, _)
+        if key == "Health" then error("controller write denied") end
+      end,
+    })
+    player.Character.Controller = denied
+    local before = tree.states.health:now()
+    assert.is_false(life:SetHealth(player, before + 1))
+    assert.equals(before, tree.states.health:now())
+    assert.equals("alive", life:LifeStatus(player))
+
+    player.Character.Controller = original
+    assert.is_true(tree:apply_hit(tree:new_hit(other, "fishAttack"), player, 9999))
+    runtime.clock:advance(GameCfg.Survival.DownedSec)
+    assert.equals("dead", life:LifeStatus(player))
+    player.Character.Controller = denied
+    runtime.clock:advance(GameCfg.Survival.DeadSec)
+    assert.equals("dead", life:LifeStatus(player))
+    assert.equals(1, tree.states.health:now())
+  end)
+
+  it("SurvivalAction 的 seq 先排除 NaN 与正负无穷再做整数范围校验", function()
+    boot()
+    local tree = runtime:get_player_tree(player.UserId)
+    assert.is_true(tree:apply_hit(tree:new_hit(other, "fishAttack"), player, 9999))
+    for _, seq in ipairs({ math.huge, -math.huge, 0 / 0 }) do
+      local before = #(events.SurvivalResult and events.SurvivalResult.clients or {})
+      events.SurvivalAction.OnServerEvent:Fire(player, { action = "UseAdrenaline", seq = seq })
+      local result = events.SurvivalResult.clients[before + 1]
+      assert.is_not_nil(result)
+      assert.is_false(result.value.ok)
+      assert.equals("invalid", result.value.reason)
+    end
+  end)
 end)

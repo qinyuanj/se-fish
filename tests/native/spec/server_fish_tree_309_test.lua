@@ -81,12 +81,6 @@ local function make_data(player)
 end
 
 local function ensure_engine()
-  if rawget(_G, "Vector3") == nil then
-    local mt = {
-      __add = function(a, b) return setmetatable({ x = a.x + b.x, y = a.y + b.y, z = a.z + b.z }, getmetatable(a)) end,
-    }
-    _G.Vector3 = { New = function(x, y, z) return setmetatable({ x = x, y = y, z = z }, mt) end }
-  end
   if rawget(_G, "Quaternion") == nil then
     _G.Quaternion = { FromEulerAngles = function()
       return { GetForward = function() return { x = 0, y = 0, z = 1 } end }
@@ -97,12 +91,12 @@ local function ensure_engine()
   end
 end
 
-local function boot()
+local function boot(overrides)
   ensure_engine()
   local units = {}
   local seq = 0
   local ai = { started = {}, stopped = {} }
-  local runtime = ServerRuntime.new({
+  local options = {
     initial_now = 1000,
     remote = {
       GetRE = function()
@@ -153,7 +147,9 @@ local function boot()
       end,
       command = function() return true end,
     },
-  })
+  }
+  for key, value in pairs(overrides or {}) do options[key] = value end
+  local runtime = ServerRuntime.new(options)
   runtime:start()
   runtime:mark_started()
   return runtime, units, ai
@@ -316,5 +312,31 @@ describe("活鱼树宿主接缝（#309）", function()
     local left = runtime:fish_snapshot()
     assert.equals(1, #left)
     assert.equals(rows[2].id, left[1].id)
+  end)
+
+  it("官方 AI 启动失败会记录且后续帧重试，清理仍对称注销", function()
+    local attempts, logs = 0, {}
+    local runtime = boot({
+      logger = { error = function(...) logs[#logs + 1] = table.concat({ ... }, " ") end },
+      ai = {
+        start = function()
+          attempts = attempts + 1
+          return attempts > 1
+        end,
+        stop = function() end,
+        command = function() return true end,
+      },
+    })
+    local player = make_player(9)
+    join(runtime, player)
+    assert.is_true(runtime:receive_landed(player, { fishId = "bass", mult = 1, x = 10, y = 2, z = -18 }))
+    assert.is_true(runtime:drop_fish(player))
+    runtime:step(0, 1000)
+    runtime:step(0.1, 1000.1)
+    assert.is_true(attempts >= 2, "启动失败不得提前标记 ai_started")
+    assert.is_true(#logs >= 1, "启动失败必须留下模块、操作、对象和错误日志")
+    local fish = runtime:fish_snapshot()[1]
+    assert.is_true(runtime:damage_fish(fish.id, fish.maxHealth))
+    assert.equals(0, #runtime:fish_snapshot())
   end)
 end)

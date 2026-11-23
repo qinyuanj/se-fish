@@ -179,14 +179,18 @@ function PlayerLife.mount(s3, player_tree, opts)
   local function set_controller_health(value)
     local controller = controller_of(player)
     if not controller then
-      states.health:set(value)
+      print("[PlayerLife] operation=SetControllerHealth", "player=" .. tostring(player.UserId), "error=no-controller")
       return false
     end
-    local ok = pcall(function() controller.Health = value end)
+    local ok, err = pcall(function() controller.Health = value end)
+    if not ok then
+      print("[PlayerLife] operation=SetControllerHealth", "player=" .. tostring(player.UserId), tostring(err))
+      return false
+    end
     local read = read_health(player)
     noticed_health = read or value
     states.health:set(read or value)
-    return ok
+    return true
   end
 
   local function write_vitals()
@@ -329,6 +333,7 @@ function PlayerLife.mount(s3, player_tree, opts)
       hunger = min_hunger
     end
     hunger = math.max(0, math.min(vitals_cfg.MaxHunger, math.floor(hunger)))
+    if not set_controller_health(next_health) then return false end
     SpokeRuntime.batch(function()
       states.hunger:set(hunger)
       states.life_phase:set("alive")
@@ -339,7 +344,6 @@ function PlayerLife.mount(s3, player_tree, opts)
       states.platform_pending:set(false)
       recovering:set(false)
       engine_death:set(false)
-      set_controller_health(next_health)
     end)
     if with_weak then
       player_tree:apply_modifier("weak", { duration = survival_cfg.WeakSec })
@@ -678,7 +682,6 @@ function PlayerLife.mount(s3, player_tree, opts)
     elseif (phase == "downed" or phase == "rescuing") and downed_until:now() then
       downed_until:set(downed_until:now() + paused)
       if now + 1e-9 >= downed_until:now() then enter_dead(false) else reopen(downed_until:now()) end
-      if player.UserId == 7124 then print('DBG reopen', clock.now(), downed_until:now(), rescue_sec) end
     end
     publish()
   end
@@ -690,7 +693,7 @@ function PlayerLife.mount(s3, player_tree, opts)
       reply({ seq = seq, ok = false, action = payload.action, mode = payload.mode, reason = reason })
     end
     if payload.action == "UseAdrenaline" then
-      if type(seq) ~= "number" or seq ~= math.floor(seq) or seq < 1 then return fail("invalid") end
+      if not finite_number(seq) or seq ~= math.floor(seq) or seq < 1 then return fail("invalid") end
       local inst = current_data()
       if states.life_phase:now() ~= "downed" or platform:now() or adrenaline_flying then
         return fail("not-downed")
@@ -730,7 +733,7 @@ function PlayerLife.mount(s3, player_tree, opts)
       return
     end
     if payload.action == "FullRevive" then
-      if type(seq) ~= "number" or seq ~= math.floor(seq) or seq < 1 then return fail("invalid") end
+      if not finite_number(seq) or seq ~= math.floor(seq) or seq < 1 then return fail("invalid") end
       local mode = payload.mode
       if mode ~= "ad" and mode ~= "goods" then return fail("invalid") end
       local phase = states.life_phase:now()
@@ -814,9 +817,12 @@ function PlayerLife.mount(s3, player_tree, opts)
     if ok and event and event.OnServerEvent and type(event.OnServerEvent.Connect) == "function" then
       local conn
       conn = event.OnServerEvent:Connect(function(sender, payload)
-        if sender == player and not player_tree:is_disposed() then
-          on_action(payload)
+        if sender ~= player or player_tree:is_disposed() or type(payload) ~= "table" then return end
+        if type(remote.CheckRECD) == "function"
+            and remote:CheckRECD(player, "SurvivalAction", GameCfg.Items.ActionCooldownSec) then
+          return
         end
+        on_action(payload)
       end)
       s3:on_cleanup(function()
         if conn and type(conn.Disconnect) == "function" then

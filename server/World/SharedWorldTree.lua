@@ -81,16 +81,20 @@ function SharedWorldTree.spawn(opts)
     if type(opts.on_mount_world) == "function" then
       opts.on_mount_world(s, handle)
     end
+    -- 子 Effect 按声明顺序在根 Init 后运行：此时七个区的 Dock 已建好，GroundLoot 才能初始补货。
+    s:effect("GroundLoot", function(gs)
+      GroundLoot.mount(handle, {
+        scope = gs,
+        create_unit = opts.create_unit,
+        remote = opts.remote,
+        bait_spots = opts.bait_spots,
+        logger = opts.logger,
+        lookup_tree = opts.lookup_tree,
+      })
+    end)
   end)
 
   handle.tree = SpokeTree.spawn("SharedWorldTree", root, services)
-  GroundLoot.mount(handle, {
-    create_unit = opts.create_unit,
-    remote = opts.remote,
-    bait_spots = opts.bait_spots,
-    logger = opts.logger,
-    lookup_tree = opts.lookup_tree,
-  })
   FerryRoute.mount(handle, {
     remote = opts.remote,
     player_data = opts.player_data,

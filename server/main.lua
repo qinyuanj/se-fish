@@ -180,6 +180,8 @@ WorldRuntime = ServerRuntime.new({
     end,
     bind_ferry_action = function(dispatch)
         _G.REUtil:GetRE("FerryAction").OnServerEvent:Connect(function(player, payload)
+            if type(payload) ~= "table" then return end
+            if _G.REUtil:CheckRECD(player, "FerryAction", GameCfg.Items.ActionCooldownSec) then return end
             dispatch(player, payload)
         end)
     end,
@@ -209,6 +211,7 @@ WorldRuntime = ServerRuntime.new({
             dispatch(player, payload)
         end)
         _G.REUtil:GetRE("LotteryStateRequest").OnServerEvent:Connect(function(player)
+            if _G.REUtil:CheckRECD(player, "LotteryStateRequest", GameCfg.Lottery.ActionCooldownSec) then return end
             if WorldRuntime then WorldRuntime:lottery_state(player) end
         end)
     end,
@@ -218,22 +221,30 @@ WorldRuntime = ServerRuntime.new({
             dispatch(player, payload)
         end)
         _G.REUtil:GetRE("BlindboxStateRequest").OnServerEvent:Connect(function(player)
+            if _G.REUtil:CheckRECD(player, "BlindboxStateRequest", GameCfg.Blindbox.ActionCooldownSec) then return end
             if WorldRuntime then WorldRuntime:blindbox_state(player) end
         end)
     end,
     bind_cast_action = function(dispatch)
         _G.REUtil:GetRE("CastAction").OnServerEvent:Connect(function(player, payload)
+            if type(payload) ~= "table" then return end
+            if _G.REUtil:CheckRECD(player, "CastAction", GameCfg.Items.ActionCooldownSec) then return end
             dispatch(player, payload)
         end)
         _G.REUtil:GetRE("RequestCastState").OnServerEvent:Connect(function(player)
+            if _G.REUtil:CheckRECD(player, "RequestCastState", GameCfg.Items.ActionCooldownSec) then return end
             dispatch(player, { action = "Request" })
         end)
     end,
     bind_reel_action = function(dispatch)
         _G.REUtil:GetRE("ReelInRE").OnServerEvent:Connect(function(player, payload)
+            if type(payload) ~= "table" then return end
+            if _G.REUtil:CheckRECD(player, "ReelInRE", GameCfg.Items.ActionCooldownSec) then return end
             dispatch(player, "click", payload)
         end)
         _G.REUtil:GetRE("CloseReelIn").OnServerEvent:Connect(function(player, payload)
+            if type(payload) ~= "table" then return end
+            if _G.REUtil:CheckRECD(player, "CloseReelIn", GameCfg.Items.ActionCooldownSec) then return end
             dispatch(player, "close", payload)
         end)
     end,
@@ -248,7 +259,7 @@ WorldRuntime = ServerRuntime.new({
             local host = WorldRuntime and WorldRuntime.fish_host
             local fish = host and host.Fish[fish_id]
             if not fish then return false end
-            return FishAi:Sync(fish) ~= false
+            return FishAi:Attach(fish) == true
         end,
         stop = function(_, fish_id)
             local host = WorldRuntime and WorldRuntime.fish_host

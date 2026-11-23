@@ -23,11 +23,7 @@ local function copy_row(row)
 end
 
 local function vec3(x, y, z)
-  if Vector3 and type(Vector3.New) == "function" then
-    local ok, value = pcall(Vector3.New, x, y, z) -- 测试双可能没有引擎 Vector3，失败时退回普通表
-    if ok and value ~= nil then return value end
-  end
-  return { x = x, y = y, z = z }
+  return Vector3.New(x, y, z)
 end
 
 local function read_pos(pos)
@@ -199,13 +195,14 @@ end
 
 function GroundLoot.mount(world, opts)
   opts = type(opts) == "table" and opts or {}
+  local scope = assert(opts.scope, "GroundLoot 必须由 SharedWorldTree 根作用域持有")
   local clock = world.clock
   local create_unit = opts.create_unit
   local zones = world.zones or {}
-  local spots_cfg = opts.bait_spots or GameCfg.BaitSpots or { Spots = {}, RespawnSec = 15 }
+  local spots_cfg = opts.bait_spots or GameCfg.BaitSpots
   local cap = GameCfg.Loot.PerZoneCap
   local flash_sec = GameCfg.Loot.FlashBeforeRecycleSec
-  local respawn_sec = spots_cfg.RespawnSec or 15
+  local respawn_sec = spots_cfg.RespawnSec or GameCfg.BaitSpots.RespawnSec
 
   local records = {}
   local order = {}
@@ -307,10 +304,10 @@ function GroundLoot.mount(world, opts)
       local unit = nil
       if type(create_unit) == "function" then
         local mesh = row.kind == "bait" and spots_cfg.Mesh or GameCfg.Loot.ItemMesh
-        local scale = row.kind == "bait" and (spots_cfg.Scale or 0.3) or (GameCfg.Loot.ItemScale or 0.3)
+        local scale = row.kind == "bait" and (spots_cfg.Scale or GameCfg.BaitSpots.Scale) or GameCfg.Loot.ItemScale
         unit = create_unit("WorldUnit", {
           Name = (row.kind == "bait" and "BaitSpot_" or "GroundLoot_") .. id,
-          Position = vec3(x, y + (GameCfg.Loot.Height or 0), z),
+          Position = vec3(x, y + GameCfg.Loot.Height, z),
           RenderMeshId = mesh,
           Scale = vec3(scale, scale, scale),
           PhysicsActive = false,
@@ -424,13 +421,9 @@ function GroundLoot.mount(world, opts)
     if #expired > 0 then publish() end
   end
 
-  if world.tree and type(world.tree.main) == "table" and type(world.tree.main.effect) == "function" then
-    world.tree.main:effect("GroundLootClock", function(es)
-      es:subscribe(clock.on_second, on_second)
-    end)
-  elseif clock.on_second and type(clock.on_second.subscribe) == "function" then
-    clock.on_second:subscribe(on_second)
-  end
+  scope:effect("GroundLootClock", function(es)
+    es:subscribe(clock.on_second, on_second)
+  end)
 
   function world:place_ground_item(zone_id, spec)
     if world:is_disposed() then return false end
@@ -469,33 +462,49 @@ function GroundLoot.mount(world, opts)
   local function ensure_events()
     local remote = opts.remote
     if type(remote) ~= "table" or type(remote.GetRE) ~= "function" then return end
-    local action = remote:GetRE("ItemBarAction")
-    if action and action.OnServerEvent and type(action.OnServerEvent.Connect) == "function" and not world._ground_action_bound then
-      world._ground_action_bound = action.OnServerEvent:Connect(function(player, payload)
-        if type(payload) ~= "table" then return end
-        if payload.action == "Pickup" then
-          world:try_pickup(player, payload.value)
-        elseif payload.action == "Drop" then
-          world:try_drop(player, payload.container, payload.index)
+    scope:effect("GroundLootRemote", function(es)
+      local function allow(player, channel)
+        local tree = lookup_tree(player)
+        if world:is_disposed() or not tree or tree:is_disposed() then return false end
+        if type(remote.CheckRECD) == "function"
+            and remote:CheckRECD(player, channel, GameCfg.Items.ActionCooldownSec) then
+          return false
         end
-      end)
-    end
-    local request = remote:GetRE("RequestLoot")
-    if request and request.OnServerEvent and type(request.OnServerEvent.Connect) == "function" and not world._ground_request_bound then
-      world._ground_request_bound = request.OnServerEvent:Connect(function(player)
-        local list = {}
-        for _, id in ipairs(order) do
-          local row = records[id]
-          if row then
-            list[#list + 1] = { id = row.id, kind = row.kind, itemId = row.itemId, x = row.x, y = row.y, z = row.z, warn = row.warn == true, spotId = row.spotId, zoneId = row.zoneId }
+        return true
+      end
+      local action = remote:GetRE("ItemBarAction")
+      if action and action.OnServerEvent and type(action.OnServerEvent.Connect) == "function" then
+        local conn = action.OnServerEvent:Connect(function(player, payload)
+          if type(payload) ~= "table" then return end
+          if payload.action ~= "Pickup" and payload.action ~= "Drop" then return end
+          if not allow(player, "ItemBarAction") then return end
+          if payload.action == "Pickup" then
+            world:try_pickup(player, payload.value)
+          else
+            world:try_drop(player, payload.container, payload.index)
           end
-        end
-        local state = remote:GetRE("LootState")
-        if state and type(state.FireClient) == "function" then
-          state:FireClient(player, { list = list })
-        end
-      end)
-    end
+        end)
+        es:on_cleanup(function() conn:Disconnect() end)
+      end
+      local request = remote:GetRE("RequestLoot")
+      if request and request.OnServerEvent and type(request.OnServerEvent.Connect) == "function" then
+        local conn = request.OnServerEvent:Connect(function(player)
+          if not allow(player, "RequestLoot") then return end
+          local list = {}
+          for _, id in ipairs(order) do
+            local row = records[id]
+            if row then
+              list[#list + 1] = { id = row.id, kind = row.kind, itemId = row.itemId, x = row.x, y = row.y, z = row.z, warn = row.warn == true, spotId = row.spotId, zoneId = row.zoneId }
+            end
+          end
+          local state = remote:GetRE("LootState")
+          if state and type(state.FireClient) == "function" then
+            state:FireClient(player, { list = list })
+          end
+        end)
+        es:on_cleanup(function() conn:Disconnect() end)
+      end
+    end)
   end
   ensure_events()
 
@@ -613,7 +622,7 @@ function GroundLoot.mount(world, opts)
         count = taken.count,
         mult = taken.mult,
         cooked = taken.cooked,
-        x = x + (GameCfg.Loot.DropOffset or 0),
+        x = x + GameCfg.Loot.DropOffset,
         y = y,
         z = z,
       })

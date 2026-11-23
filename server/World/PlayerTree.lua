@@ -534,7 +534,7 @@ function PlayerTree.spawn(opts)
 
       docks.save_inventory = s1:dock("SaveInventoryDock")
       -- #315：图鉴、任务、剧情、成就与 GM 都属于存档就绪后的单玩家会话。
-      -- 仅在完整服务端宿主挂载；精简 PlayerTree 测试双仍可注入各自公开替身。
+      -- 完整服务端宿主在入口显式初始化 REUtil；独立 PlayerTree 宿主不隐式创建远程连接。
       if opts.save and opts.player_data and _G.REUtil then
         local session_opts = {
           player = player, clock = clock, save = opts.save, player_data = opts.player_data,
