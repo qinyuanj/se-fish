@@ -1,6 +1,14 @@
 -- #86 迁移（原 tests/gameplay/item_bar_ui_test.lua）：道具栏界面的节点生成、状态刷新与重进清理。
 -- 接缝：ScreenMain 处理器 + ItemBarState 客户端事件。
 local MainHudLayout = require('client.MainHudLayout')
+local SpokeClock = require('common.SpokeClock')
+local spoke = require('common.packages.spoke.api')
+local ClientStore = require('client.Store.ClientStore')
+local RootView = require('client.Views.RootView')
+local MainHudEquipPopups = require('client.Views.MainHudEquipPopups')
+local MainHudBackpackView = require('client.Views.MainHudBackpackView')
+local MainHudItemBarView = require('client.Views.MainHudItemBarView')
+local MainHudActionButtonsView = require('client.Views.MainHudActionButtonsView')
 
 -- 弹窗候选格的文字按格宽折行（#180），比较时去掉换行
 local function plain(text) return (tostring(text or ''):gsub('\n', '')) end
@@ -36,10 +44,12 @@ describe("道具栏的界面侧", function()
         _G.MgrGameUI = { SetCustomControlUI = function() end }
         local world = { Created = ctx.created }
         function world:CreateUnit(kind, attrs)
-            local node = { Kind = kind, OnClicked = signal() }
+            local node = { Kind = kind, OnClicked = signal(), OnTouchBegan = signal(), OnTouchEnded = signal() }
             for key, value in pairs(attrs) do node[key] = value end
             function node:Destroy()
                 self.Destroyed = true
+                self.Visible = false
+                self.TouchEnabled = false
                 for _, child in ipairs(world.Created) do
                     if child.Parent == self then child:Destroy() end
                 end
@@ -87,10 +97,41 @@ describe("道具栏的界面侧", function()
             if name == 'ScreenMain' then return ctx.currentRoot end
         end }
         ctx.handler:Init()
+        ctx.clock = SpokeClock.new(ctx.now)
+        ctx.store, ctx.writer = ClientStore.new({ clock = ctx.clock })
+        ctx.hostBinding = ctx.writer:bind_host({
+            get_re = function(name) return _G.REUtil:GetRE(name) end,
+        })
+        ctx.backpackOpen = spoke.State.new('Test.hud_backpack_open', false)
+        ctx.openPopup = spoke.State.new('Test.hud_open_popup', nil)
+        ctx.spokeRoot = { Name = 'UIRoot', Destroying = signal(),
+            FindFirstChild = function(_, name) return ctx.nodes[name] end }
+        ctx.hudView = RootView.mount(ctx.spokeRoot, ctx.store, {
+            create_node = function(kind, attrs) return world:CreateUnit(kind, attrs) end,
+            hud = {
+                MainHudItemBarView.spec({ backpack_open = ctx.backpackOpen }),
+                MainHudActionButtonsView.spec({
+                    backpack_open = ctx.backpackOpen,
+                    send_operate = function(payload) ctx.handler:Operate(payload) end,
+                }),
+                MainHudEquipPopups.spec({
+                    open_popup = ctx.openPopup,
+                    backpack_open = ctx.backpackOpen,
+                    send_operate = function(payload) ctx.handler:Operate(payload) end,
+                }),
+                MainHudBackpackView.spec({
+                    backpack_open = ctx.backpackOpen,
+                    open_popup = ctx.openPopup,
+                    on_open_changed = function(is_open) ctx.handler:SetBackpackOpen(is_open) end,
+                }),
+            },
+        })
     end)
 
     -- 攻击按钮逐例销毁，全局与模块缓存恢复；setUp 中途失败也照样清理。
     after_each(function()
+        if ctx.hudView then ctx.hudView:dispose() end
+        if ctx.hostBinding then ctx.hostBinding:dispose() end
         require('client.LocalAttackButton'):Destroy()
         package.loaded['client.LocalAttackButton'] = ctx.previousAttack
         for _, key in ipairs({ 'game', 'Vector2', 'Color', 'REUtil', 'GameUI', 'MgrGameUI' }) do
@@ -102,10 +143,10 @@ describe("道具栏的界面侧", function()
         ctx.states:Fire({ slots = { [1] = { itemId = 'starterRod', count = 1 } }, slotCount = 2,
             backpack = { [1] = { itemId = 'bass', count = 1 } }, backpackCount = 5, bait = {} })
         assert.is_true(ctx.nodes.ItemBarSlot2.Visible)
-        assert.is_false(ctx.nodes.ItemBarSlot3.Visible)
+        assert.is_nil(ctx.nodes.ItemBarSlot3, '开放 2 格时第 3 格不挂载')
         ctx.nodes.BtnBackpack.OnClicked:Fire()
         assert.is_true(ctx.nodes.BackpackSlot1.Visible)
-        assert.is_false(ctx.nodes.BackpackSlot6.Visible)
+        assert.is_nil(ctx.nodes.BackpackSlot6)
         ctx.nodes.BackpackSlot1.OnClicked:Fire()
         assert.is_true(ctx.nodes.BtnMoveToItemBar.TouchEnabled)
         ctx.nodes.BtnMoveToItemBar.OnClicked:Fire()
@@ -117,7 +158,7 @@ describe("道具栏的界面侧", function()
     end)
 
     it("test_empty_and_depleted_state_refresh", function()
-        ctx.states:Fire({ slots = {}, bait = { worm = 0 } })
+        ctx.states:Fire({ slots = {}, slotCount = 8, bait = { worm = 0 } })
         assert.is_false(ctx.nodes.ItemBarIcon1.Visible)
         assert.is_false(ctx.nodes.ItemBarLabel1.Visible)
         assert.is_false(ctx.nodes.ItemBarAmount1.Visible)
@@ -143,14 +184,15 @@ describe("道具栏的界面侧", function()
     end)
 
     it("test_fixed_slots_bait_and_action_placement", function()
+        ctx.states:Fire({ slots = {}, slotCount = 8, bait = {} })
         for index = 1, 8 do assert.is_not_nil(ctx.nodes['ItemBarSlot' .. index]) end
         assert.is_nil(ctx.nodes.ItemBarSlot9)
         local slot = ctx.nodes.ItemBarSlot1
         for _, name in ipairs({ 'ItemBarIcon1', 'ItemBarLabel1', 'ItemBarAmount1' }) do
-            assert.equal(ctx.handler.RootNode, ctx.nodes[name].Parent)
+            assert.equal(ctx.spokeRoot, ctx.nodes[name].Parent)
             assert.is_false(ctx.nodes[name].TouchEnabled)
             assert.is_false(ctx.nodes[name].SwallowTouchEnabled)
-            assert.same(1, ctx.nodes[name].LocalZOrder)
+            assert.is_true(ctx.nodes[name].LocalZOrder >= 1, name) -- 文字与图标盖在格底之上
         end
         -- #179：格子位置与尺寸取自布局模块，图标、名字、数量都落在格内（坐标接线见 main_hud_wiring_test）
         for _, name in ipairs({ 'ItemBarIcon1', 'ItemBarLabel1', 'ItemBarAmount1' }) do
@@ -165,7 +207,7 @@ describe("道具栏的界面侧", function()
         for labelName, buttonName in pairs({ BtnDiscardLabel = 'ItemDiscard',
             BtnItemActionLabel = 'ItemAction2', BaitBarLabel = 'BaitBar', WeaponBarLabel = 'WeaponBar' }) do
             local label, button = ctx.nodes[labelName], ctx.nodes[buttonName]
-            assert.equal(ctx.handler.RootNode, label.Parent)
+            assert.equal(button.Parent, label.Parent)
             assert.same(button.Position, label.Position)
             assert.same(button.Size, label.Size)
             assert.is_false(label.TouchEnabled)
@@ -212,6 +254,10 @@ describe("道具栏的界面侧", function()
     end)
 
     it("test_reentry_cleans_old_root_and_listeners", function()
+        ctx.hudView:dispose()
+        ctx.hudView = nil
+        ctx.hostBinding:dispose()
+        ctx.hostBinding = nil
         local originals = {
             ['common.Util'] = package.loaded['common.Util'],
             ['common.REUtil'] = package.loaded['common.REUtil'],
@@ -225,8 +271,8 @@ describe("道具栏的界面侧", function()
         -- pcall 包住主体：模块缓存改写后即使断言失败也要恢复，再抛错让本例失败。
         local ok, err = pcall(function()
             local mgr = assert(loadfile('client/MgrGameUI.lua'))()
-            local oldRoot, oldButton = ctx.currentRoot, ctx.nodes.ItemBarSlot1
-            local oldIcon, oldLabel = ctx.nodes.ItemBarIcon1, ctx.nodes.BaitBarLabel
+            local oldRoot, oldButton = ctx.currentRoot, ctx.nodes.QuestToggle
+            local oldLabel = ctx.nodes.QuestToggleLabel
             assert.equal(oldRoot, mgr:GetScreen('ScreenMain').RootNode)
             assert.equal(oldRoot, mgr:GetScreen('ScreenMain').RootNode)
             assert.same(1, ctx.states:Count())
@@ -235,21 +281,21 @@ describe("道具栏的界面侧", function()
                 FindFirstChild = function() return nil end }
             mgr:GetScreen('ScreenMain')
             assert.is_true(oldButton.Destroyed)
-            assert.is_true(oldIcon.Destroyed)
             assert.is_true(oldLabel.Destroyed)
             assert.same(0, oldButton.OnClicked:Count())
             assert.same(1, ctx.states:Count())
-            local newButton = ctx.nodes.ItemBarSlot1
+            local newButton = ctx.nodes.QuestToggle
             assert.is_not.equal(newButton, oldButton)
+            ctx.events.QuestState.OnClientEvent:Fire({ text = '新手任务 1/5：去钓鱼' })
+            assert.is_true(ctx.nodes.QuestLabel.Visible)
             oldButton.OnClicked:Fire()
-            assert.same(0, #ctx.commands)
+            assert.is_true(ctx.nodes.QuestLabel.Visible)
             newButton.OnClicked:Fire()
-            assert.same(1, #ctx.commands)
-            local newIcon, newLabel = ctx.nodes.ItemBarIcon1, ctx.nodes.BaitBarLabel
+            assert.is_false(ctx.nodes.QuestLabel.Visible)
+            local newLabel = ctx.nodes.QuestToggleLabel
             ctx.handler:Cleanup()
             assert.same(0, ctx.states:Count())
             assert.is_true(newButton.Destroyed)
-            assert.is_true(newIcon.Destroyed)
             assert.is_true(newLabel.Destroyed)
             ctx.handler:Destroy()
         end)
@@ -332,9 +378,12 @@ describe("道具栏的界面侧", function()
             assert.is_false(ctx.nodes[name].Visible, name)
         end
         for _, name in ipairs({ 'BaitBarLabel', 'WeaponBarLabel', 'BtnItemActionLabel',
-            'BtnDiscardLabel', 'ItemBarLabel1' }) do
+            'BtnDiscardLabel' }) do
             assert.is_false(ctx.nodes[name].Visible, name)
         end
+        -- 展开背包时保留底部道具栏可见，支持道具栏↔背包双向拖拽
+        assert.is_true(ctx.nodes.ItemBarSlot1.Visible)
+        assert.is_true(ctx.nodes.ItemBarLabel1.Visible)
         assert.is_false(ctx.nodes.BaitBar.TouchEnabled)
         assert.is_false(ctx.nodes.WeaponPopupCell_sword.TouchEnabled)
         ctx.nodes.BtnBackpack.OnClicked:Fire()
@@ -351,8 +400,11 @@ describe("道具栏的界面侧", function()
 
     -- #174 #14：背包格底色与面板有区分；#1：任务条带深色半透明底板
     it("test_backpack_slot_color_differs_and_quest_has_backplate", function()
-        assert.is_not.same(ctx.nodes.BackpackPanel.ButtonNormalColor,
+        ctx.states:Fire({ slots = {}, backpack = {}, backpackCount = 5, bait = {} })
+        ctx.nodes.BtnBackpack.OnClicked:Fire()
+        assert.is_not.same(ctx.nodes.BackpackPanel.Color,
             ctx.nodes.BackpackSlot1.ButtonNormalColor)
+        ctx.nodes.BtnBackpack.OnClicked:Fire()
         local plate = ctx.nodes.QuestBackground
         assert.is_not_nil(plate)
         assert.is_false(plate.TouchEnabled)
@@ -395,14 +447,12 @@ describe("道具栏的界面侧", function()
         ctx.handler.RootNode = ctx.currentRoot
         ctx.handler:Init()
         ctx.handler.IsOpen = true
-        for _, delayed in ipairs(ctx.delays) do delayed.callback() end
-        assert.same(1, ctx.attributeSignals.FishCoin:Count(), 'A 的根 Delay 不得再给 B 安装属性监听')
-        assert.same(1, ctx.attributeSignals.Health:Count())
 
         ctx.states:Fire({ slots = {}, bait = { worm = 0 } })
         assert.is_false(ctx.nodes.CastFailureHint.Visible, '换根后的首个空蚯蚓快照不得补发从有到无提示')
         assert.same('吐息冷却 5秒', ctx.nodes.BtnItemActionLabel.Text)
         ctx.now = 104
+        ctx.clock:step(4, 104)
         ctx.handler:ShowCast()
         assert.same('吐息冷却 1秒', ctx.nodes.BtnItemActionLabel.Text)
 

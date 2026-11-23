@@ -15,6 +15,14 @@
 --  10. 数值到上限（如「饥饿度 300」）时文字超出文字框被截断，或两颗球的文字框互叠、压住金币。
 local MainHudLayout = require('client.MainHudLayout')
 local GameCfg = require('common.GameCfg')
+local spoke = require('common.packages.spoke.api')
+local ClientStore = require('client.Store.ClientStore')
+local RootView = require('client.Views.RootView')
+local MainHudVitalsView = require('client.Views.MainHudVitalsView')
+local MainHudEquipPopups = require('client.Views.MainHudEquipPopups')
+local MainHudBackpackView = require('client.Views.MainHudBackpackView')
+local MainHudItemBarView = require('client.Views.MainHudItemBarView')
+local MainHudActionButtonsView = require('client.Views.MainHudActionButtonsView')
 
 local function signal()
     local listeners = {}
@@ -42,7 +50,7 @@ local function setUp(height)
     _G.MgrGameUI = { SetCustomControlUI = function() end, GetScreen = function() end, CloseScreen = function() end }
     local world = { Created = ctx.created }
     function world:CreateUnit(kind, attrs)
-        local node = { Kind = kind, OnClicked = signal() }
+        local node = { Kind = kind, OnClicked = signal(), OnTouchBegan = signal(), OnTouchEnded = signal() }
         for key, value in pairs(attrs) do node[key] = value end
         function node:Destroy()
             self.Destroyed = true
@@ -81,14 +89,58 @@ local function setUp(height)
     -- 编辑器摆放的金币节点：ScreenMain 的直接子节点，运行时按名查找
     ctx.nodes.ImageCoin = { Name = 'ImageCoin', Position = { x = 864, y = 1145 }, Size = { x = 80, y = 80 } }
     ctx.nodes.LabelCoin = { Name = 'LabelCoin', Position = { x = 960, y = 1145 }, Size = { x = 200, y = 60 } }
+    ctx.store, ctx.writer = ClientStore.new({ initial_now = ctx.now })
+    ctx.hostBinding = ctx.writer:bind_host({
+        get_re = function(name) return _G.REUtil:GetRE(name) end,
+    })
+    ctx.writer:update_vitals({
+        health = attributes.Health, maxHealth = attributes.MaxHealth,
+        hunger = attributes.Hunger, maxHunger = attributes.MaxHunger,
+        coin = attributes.FishCoin,
+    })
+    ctx.backpackOpen = spoke.State.new('Test.hud_backpack_open', false)
+    ctx.openPopup = spoke.State.new('Test.hud_open_popup', nil)
     ctx.handler = assert(loadfile('client/ScreenHandlers/ScreenMain.lua'))()
     ctx.handler.RootNode = { Name = 'ScreenMain', FindFirstChild = function(_, name) return ctx.nodes[name] end }
     ctx.handler:Init()
     ctx.handler.IsOpen = true
+    ctx.spokeRoot = { Name = 'UIRoot', Destroying = signal(),
+        FindFirstChild = function(_, name) return ctx.nodes[name] end }
+    ctx.vitalsView = RootView.mount(ctx.spokeRoot, ctx.store, {
+        create_node = function(kind, attrs) return world:CreateUnit(kind, attrs) end,
+        hud = {
+            MainHudVitalsView.spec({
+                get_resolution = function() return { x = 1920, y = height } end,
+            }),
+            MainHudEquipPopups.spec({
+                get_resolution = function() return { x = 1920, y = height } end,
+                open_popup = ctx.openPopup,
+                backpack_open = ctx.backpackOpen,
+                send_operate = function(payload) ctx.handler:Operate(payload) end,
+            }),
+            MainHudItemBarView.spec({
+                get_resolution = function() return { x = 1920, y = height } end,
+                backpack_open = ctx.backpackOpen,
+            }),
+            MainHudActionButtonsView.spec({
+                get_resolution = function() return { x = 1920, y = height } end,
+                backpack_open = ctx.backpackOpen,
+                send_operate = function(payload) ctx.handler:Operate(payload) end,
+            }),
+            MainHudBackpackView.spec({
+                get_resolution = function() return { x = 1920, y = height } end,
+                backpack_open = ctx.backpackOpen,
+                open_popup = ctx.openPopup,
+                on_open_changed = function(is_open) ctx.handler:SetBackpackOpen(is_open) end,
+            }),
+        },
+    })
     return ctx
 end
 
 local function tearDown(ctx)
+    if ctx.vitalsView then ctx.vitalsView:dispose() end
+    if ctx.hostBinding then ctx.hostBinding:dispose() end
     require('client.LocalAttackButton'):Destroy()
     package.loaded['client.LocalAttackButton'] = ctx.previousAttack
     for _, key in ipairs(GLOBALS) do _G[key] = ctx.previous[key] end
@@ -136,7 +188,9 @@ describe('主界面接线（布局模块）', function()
             assertAt(ctx.nodes.CastWaitHint, r.HintPrimary, 'CastWaitHint')
             assertAt(ctx.nodes.CastSplashHint, r.HintSecondary, 'CastSplashHint')
             assertAt(ctx.nodes.CastFailureHint, r.HintTransient, 'CastFailureHint')
+            ctx.nodes.BtnBackpack.OnClicked:Fire()
             assertAt(ctx.nodes.BackpackPanel, layout.Panels.BackpackPanel, 'BackpackPanel')
+            ctx.nodes.BtnBackpack.OnClicked:Fire()
             assert.same({ x = r.HintSecondary.x, y = r.HintSecondary.y },
                 { x = ctx.nodes.ReelProgress.Position.x, y = ctx.nodes.ReelProgress.Position.y })
             -- 按钮文字与按钮同位同尺寸
@@ -164,9 +218,15 @@ describe('主界面接线（布局模块）', function()
         local eight = layoutFor(1080, 8, false)
         for i = 1, 8 do assertAt(ctx.nodes['ItemBarSlot' .. i], eight.Rects['ItemBarSlot' .. i], 'slot' .. i) end
         assertAt(ctx.nodes.BtnBackpack, eight.Rects.BackpackButton, 'BtnBackpack @8')
-        -- 拖拽命中表随之更新：新位置命中对应格
-        local hit = ctx.handler:SlotAtPosition({ x = eight.Rects.ItemBarSlot8.x, y = eight.Rects.ItemBarSlot8.y })
-        assert.same(8, hit and hit.index)
+        -- 拖拽命中表随之更新：从格 1 拖到新位置的格 8 发出 MoveSlot
+        local before = #ctx.sent
+        local slot8 = eight.Rects.ItemBarSlot8
+        ctx.nodes.ItemBarSlot1.OnTouchBegan:Fire({ BeganPosition = { x = 0, y = 0 } })
+        ctx.nodes.ItemBarSlot1.OnTouchEnded:Fire({ EndedPosition = { x = slot8.x, y = slot8.y } })
+        local sent = ctx.sent[before + 1]
+        assert.is_not_nil(sent)
+        assert.same('MoveSlot', sent.payload.action)
+        assert.same(8, sent.payload.value.slot)
     end)
 
     it('test_reel_close_uses_reeling_layout_clear_of_attack', function()
@@ -231,13 +291,15 @@ describe('主界面接线（布局模块）', function()
 
     it('test_hunger_text_uses_glossary_term', function()
         ctx = setUp(1080)
-        ctx.handler:ShowVitals()
         assert.same('饥饿度 60', ctx.nodes.HungerText.Text)
         assert.same('血 80', ctx.nodes.HealthText.Text)
-        local file = assert(io.open('client/ScreenHandlers/ScreenMain.lua', 'r'))
-        local source = file:read('*a')
-        file:close()
-        assert.is_nil(source:find("'饥饿 '", 1, true))
+        for _, path in ipairs({ 'client/Views/MainHudVitalsView.lua', 'client/ScreenHandlers/ScreenMain.lua' }) do
+            local file = assert(io.open(path, 'r'))
+            local source = file:read('*a')
+            file:close()
+            assert.is_nil(source:find("'饥饿 '", 1, true), path)
+            assert.is_nil(source:find('"饥饿 "', 1, true), path)
+        end
     end)
 
     -- 文字宽度按「一字一列、ASCII 也按整列」估算（同任务条折行口径，宁宽勿溢）
@@ -245,9 +307,10 @@ describe('主界面接线（布局模块）', function()
         it('test_vital_texts_fit_at_max_values_' .. height, function()
             ctx = setUp(height)
             local c = GameCfg.Vitals
-            ctx.attributes.Health, ctx.attributes.MaxHealth = c.MaxHealth, c.MaxHealth
-            ctx.attributes.Hunger, ctx.attributes.MaxHunger = c.MaxHunger, c.MaxHunger
-            ctx.handler:ShowVitals()
+            ctx.writer:update_vitals({
+                health = c.MaxHealth, maxHealth = c.MaxHealth,
+                hunger = c.MaxHunger, maxHunger = c.MaxHunger,
+            })
             local health, hunger = ctx.nodes.HealthText, ctx.nodes.HungerText
             assert.same('饥饿度 ' .. c.MaxHunger, hunger.Text)
             for _, label in ipairs({ health, hunger }) do

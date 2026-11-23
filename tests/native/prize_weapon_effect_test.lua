@@ -49,7 +49,6 @@ describe('TestMeleeHitEffect', function()
             carrier = package.loaded['server.Mgr.MgrFishCarrier'],
             gm = package.loaded['server.Mgr.MgrGM'],
             ability = package.loaded['server.Mgr.MgrAbility'],
-            modifier = package.loaded['server.Mgr.MgrModifier'],
             api = package.loaded['server.AbilityAPI'], swing = package.loaded['server.SwingRegistry'] }
         ctx = { effects = {}, hitsApplied = {} }
         ctx.owner = { UnitId = 1, Position = vec(0, 0, 0) }
@@ -72,7 +71,7 @@ describe('TestMeleeHitEffect', function()
         package.loaded['server.Mgr.MgrAbility'] = { ApplyWeaponEffect = function()
             error('近战特效不应再经 MgrAbility 转发')
         end }
-        package.loaded['server.Mgr.MgrModifier'] = { ApplyWeaponEffect = function(_, source, target, effect)
+        local modifierStub = { ApplyWeaponEffect = function(_, source, target, effect)
             ctx.effects[#ctx.effects + 1] = { source = source, target = target, effect = effect }
             return true
         end }
@@ -82,8 +81,8 @@ describe('TestMeleeHitEffect', function()
         end }
         ctx.services = { Vitals = package.loaded['server.Mgr.MgrVitals'],
             FishCarrier = package.loaded['server.Mgr.MgrFishCarrier'], GM = package.loaded['server.Mgr.MgrGM'],
-            Modifier = package.loaded['server.Mgr.MgrModifier'] }
-        for _, name in ipairs({ 'server.Mgr.MgrVitals', 'server.Mgr.MgrFishCarrier', 'server.Mgr.MgrGM', 'server.Mgr.MgrModifier' }) do
+            Modifier = modifierStub }
+        for _, name in ipairs({ 'server.Mgr.MgrVitals', 'server.Mgr.MgrFishCarrier', 'server.Mgr.MgrGM' }) do
             package.loaded[name] = setmetatable({}, { __index = function()
                 error('近战行为不应再加载上层管理器: ' .. name) end })
         end
@@ -129,7 +128,6 @@ describe('TestMeleeHitEffect', function()
         package.loaded['server.Mgr.MgrFishCarrier'] = saved.carrier
         package.loaded['server.Mgr.MgrGM'] = saved.gm
         package.loaded['server.Mgr.MgrAbility'] = saved.ability
-        package.loaded['server.Mgr.MgrModifier'] = saved.modifier
         package.loaded['server.AbilityAPI'] = saved.api
         package.loaded['server.SwingRegistry'] = saved.swing
     end)

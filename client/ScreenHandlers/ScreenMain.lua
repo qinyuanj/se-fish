@@ -2,7 +2,6 @@ local World = game:GetService('World')
 local GameCfg = require('common.GameCfg')
 local LocalAttackButton = require('client.LocalAttackButton')
 local WeaponAim = require('client.WeaponAim')
-local PressGesture = require('client.PressGesture')
 local DamageFloat = require('client.DamageFloat')
 local FishCombatLabel = require('client.FishCombatLabel')
 local MainHudLayout = require('client.MainHudLayout')
@@ -10,157 +9,11 @@ local OwnedUnits = require('common.OwnedUnits')
 
 local ScreenHandler = { UINodes = {}, UINodeMap = {} }
 
-local AIM_OWNER = {}
-ScreenHandler.AimOwner = AIM_OWNER
-
-function ScreenHandler:Action(action, value)
-    _G.REUtil:GetRE('ItemBarAction'):FireServer({ action = action, value = value })
-end
-
 function ScreenHandler:Operate(payload)
     self.OpSeq = (self.OpSeq or 0) + 1
     payload.seq = self.OpSeq
     payload.action = 'Operate'
     _G.REUtil:GetRE('ItemBarAction'):FireServer(payload)
-end
-
-function ScreenHandler:bindDrag(btn, container, index)
-    if not btn.OnTouchBegan or not btn.OnTouchEnded then return end
-    self:Listen(btn.OnTouchBegan, function(touch)
-        self.DragSource = { container = container, index = index,
-            began = touch and touch.BeganPosition }
-    end)
-    self:Listen(btn.OnTouchEnded, function(touch)
-        local source = self.DragSource
-        self.DragSource = nil
-        if not source or source.container ~= container or source.index ~= index then return end
-        local ended = touch and touch.EndedPosition
-        if not ended or not source.began then return end
-        if math.abs(ended.x - source.began.x) < 10 and math.abs(ended.y - source.began.y) < 10 then return end
-        local target = self:SlotAtPosition(ended)
-        if not target or target.container == source.container and target.index == source.index then return end
-        self:Action('MoveSlot', { from = source.container, index = source.index,
-            target = target.container, slot = target.index })
-    end)
-end
-
-function ScreenHandler:SlotAtPosition(pos)
-    if type(pos) ~= 'table' or type(pos.x) ~= 'number' or type(pos.y) ~= 'number' then return nil end
-    for index, p in ipairs(self.ItemBarSlotPos or {}) do
-        local slot = self.Slots and self.Slots[index]
-        if slot and slot.Background.Visible
-            and math.abs(pos.x - p.x) <= p.hw and math.abs(pos.y - p.y) <= p.hh then
-            return { container = GameCfg.Items.ContainerId.ItemBar, index = index }
-        end
-    end
-    for index, p in ipairs(self.BackpackSlotPos or {}) do
-        local entry = self.BackpackSlots and self.BackpackSlots[index]
-        if entry and entry.Button.Visible
-            and math.abs(pos.x - p.x) <= 47 and math.abs(pos.y - p.y) <= 45 then
-            return { container = GameCfg.Items.ContainerId.Backpack, index = index }
-        end
-    end
-    return nil
-end
-
-local function nowSec()
-    return World.GetServerTime and World:GetServerTime() or 0
-end
-
-function ScreenHandler:SlotDefinition(index)
-    local entry = self.Snapshot and self.Snapshot.slots[index]
-    return entry and GameCfg.Items.Definitions[entry.itemId] or nil
-end
-
-function ScreenHandler:IsExplosiveSlot(index)
-    local definition = self:SlotDefinition(index)
-    return definition ~= nil and definition.Type == '爆炸物'
-end
-
-function ScreenHandler:BindSlotGesture(btn, index)
-    if not btn.OnTouchBegan or not btn.OnTouchEnded then return end
-    self:Listen(btn.OnTouchBegan, function(touch)
-        self.SlotPress = { index = index, gesture = PressGesture.New({
-            LongPressSec = GameCfg.Ability.Throw.LongPressSec }) }
-        self.SlotPress.gesture:Begin(nowSec(),
-            touch and touch.BeganPosition or nil)
-    end)
-    self:Listen(btn.OnTouchEnded, function(touch)
-        local press = self.SlotPress
-        if not press or press.index ~= index then return end
-        self.SlotPress = nil
-        if not self:IsExplosiveSlot(index) then return end
-        local result = press.gesture:End(nowSec(),
-            touch and touch.EndedPosition or nil)
-        if result == 'tap' then
-            self.ThrowHandled = { index = index, valid = true }
-            self:ThrowExplosive(index, nil)
-        elseif result == 'long' then
-            self.ThrowHandled = { index = index, valid = true }
-            self:BeginAim(index)
-        end
-    end)
-end
-
-function ScreenHandler:ConsumeThrowClick(index)
-    local handled = self.ThrowHandled
-    if handled and handled.index == index and handled.valid then
-        handled.valid = false
-        return true
-    end
-    return false
-end
-
-function ScreenHandler:ThrowExplosive(slot, target)
-    self.WeaponSeq = (self.WeaponSeq or 0) + 1
-    local payload = { action = 'throw', slot = slot, seq = self.WeaponSeq }
-    if type(target) == 'table' then payload.target = target end
-    print('[ScreenMain] 投掷 slot=' .. tostring(slot) .. ' seq=' .. tostring(self.WeaponSeq))
-    _G.REUtil:GetRE('WeaponAction'):FireServer(payload)
-end
-
-function ScreenHandler:BeginAim(slot)
-    self:EndAim()
-    if not self.UIRoot or not self.EuiResolution then return end
-    self.AimSlot = slot
-    local resolution = self.EuiResolution
-    local overlay = OwnedUnits.Track(AIM_OWNER, World:CreateUnit('EUIButton', {
-        Parent = self.UIRoot, Name = 'ThrowAimOverlay',
-        Position = Vector2.New(resolution.x / 2, resolution.y / 2),
-        Size = Vector2.New(resolution.x, resolution.y),
-    }))
-    if not overlay then self.AimSlot = nil return end
-    overlay.ButtonText = ''
-    pcall(function() overlay.ButtonNormalColor = Color.New(30, 40, 30, 40) end)
-    pcall(function() overlay.ButtonPressColor = Color.New(30, 40, 30, 60) end)
-    if _G.LocalMsgNotice then _G.LocalMsgNotice('点击屏幕选择投掷落点') end
-    self:Listen(overlay.OnTouchEnded, function(touch) self:PickAim(touch) end)
-end
-
-function ScreenHandler:PickAim(touch)
-    local pos = touch and touch.EndedPosition
-    local slot = self.AimSlot
-    self:EndAim()
-    if not slot or not pos then return end
-    local target
-    local ok, ray = pcall(function()
-        local camera = game:GetService('CameraService')
-        return camera and camera:ScreenPointToRay(pos.x, pos.y,
-            GameCfg.Ability.Throw.Range * 2)
-    end)
-    if ok and ray and ray.Origin and ray.Direction then
-        local physics = game:GetService('PhysicsService')
-        local hit = physics and physics.Raycast
-            and physics:Raycast(ray.Origin, ray.Direction, nil)
-        local p = hit and hit.Position
-        if p then target = { x = p.x, y = p.y, z = p.z } end
-    end
-    self:ThrowExplosive(slot, target)
-end
-
-function ScreenHandler:EndAim()
-    OwnedUnits.Clear(AIM_OWNER)
-    self.AimSlot = nil
 end
 
 local function baitStock(state, id)
@@ -173,11 +26,6 @@ local function wormCount(state)
     return baitStock(state, GameCfg.Items.Id.Worm)
 end
 
-local function heldSlot(state)
-    local held = type(state) == 'table' and state.held
-    return type(held) == 'table' and held.kind == 'slot' and held.slot or nil
-end
-
 function ScreenHandler:Show(state)
     if type(state) ~= 'table' or type(state.slots) ~= 'table' then return end
     local depleted = self.Snapshot ~= nil and wormCount(self.Snapshot) > 0 and wormCount(state) <= 0
@@ -185,34 +33,8 @@ function ScreenHandler:Show(state)
     LocalAttackButton:SetEquipped(state)
     local capacity = state.slotCount or GameCfg.Items.ItemBarSlots
     self:ApplyLayout(capacity, nil)
-    for index, slot in ipairs(self.Slots or {}) do
-        local entry = state.slots[index]
-        local definition = entry and GameCfg.Items.Definitions[entry.itemId]
-        slot.Background.Visible = index <= capacity
-        slot.Background.TouchEnabled = index <= capacity
-        slot.Icon.Visible = index <= capacity and definition ~= nil
-        if definition then
-            slot.Icon.Image = definition.Icon
-            local tint = definition.IconColor
-            slot.Icon.Color = Color.New(tint[1], tint[2], tint[3], tint[4])
-        end
-        slot.Label.Text = definition
-            and ((GameCfg.Items.CookRate(entry) ~= nil and GameCfg.Grill.CookedPrefix or '') .. definition.Name) or ''
-        slot.Label.Visible = index <= capacity and definition ~= nil
-        slot.Count.Text = definition and tostring(entry.count) or ''
-        slot.Count.Visible = index <= capacity and definition ~= nil
-        slot.Background.ButtonNormalColor = index == state.selectedSlot
-            and Color.New(36, 130, 94, 255) or Color.New(54, 100, 140, 255)
-    end
-    self:ShowCoin(state.coin)
     self:ShowCast()
-    local selected = state.selectedSlot and state.slots[state.selectedSlot]
-    self.BtnDiscard.Visible = selected ~= nil
-    self.BtnDiscardLabel.Visible = selected ~= nil
-    self.BtnDiscardLabel.Text = selected and heldSlot(state) == state.selectedSlot
-        and '确认丢弃' or '丢弃选中物'
-    self:RenderEquipBars(state)
-    self:ShowBackpack()
+    self:ApplyBackpackOcclusion()
     if depleted then self:ShowCastFailure({ reason = 'wormDepleted' }) end
 end
 
@@ -229,78 +51,6 @@ function ScreenHandler:StartHookAlert(session)
     end
     print('[ScreenMain] 上钩提示', tostring(session), ok and ('音效 ' .. alert.Sound)
         or ('音效缺失，只保留文字与高亮 ' .. tostring(err)))
-end
-
-function ScreenHandler:SelectedFood()
-    local state = self.Snapshot
-    local slot = state and state.selectedSlot
-    local entry = slot and state.slots[slot]
-    local definition = entry and GameCfg.Items.Definitions[entry.itemId]
-    if definition and type(definition.EatPercent) == 'number' then return entry, slot end
-end
-
-local function readVital(player, key, default)
-    local value = tonumber(player:GetAttribute(key))
-    return value and math.floor(value) or default
-end
-
-local HEALTH_PREFIX, HUNGER_PREFIX = '血 ', '饥饿度 '
-
-local function vitalPercent(value, maximum)
-    return maximum > 0 and math.max(0, math.min(100, value * 100 / maximum)) or 0
-end
-
-local function updateStarving(self, health, hunger)
-    local starving = hunger <= 0 and health > 0
-    if starving and not self.Starving then self.NextWarnAt = nil end
-    self.Starving = starving
-    self:UpdateStarveFx()
-end
-
-function ScreenHandler:ShowVitals()
-    if not self.HealthRing then return end
-    local player = game:GetService('Players').LocalPlayer
-    if not player then return end
-    local c = GameCfg.Vitals
-    local health = readVital(player, 'Health', c.MaxHealth)
-    local maxHealth = readVital(player, 'MaxHealth', c.MaxHealth)
-    local hunger = readVital(player, 'Hunger', c.MaxHunger)
-    local maxHunger = readVital(player, 'MaxHunger', c.MaxHunger)
-    self.HealthRing.Percent = vitalPercent(health, maxHealth)
-    self.HungerRing.Percent = vitalPercent(hunger, maxHunger)
-    self.HealthText.Text = HEALTH_PREFIX .. tostring(health)
-    self.HungerText.Text = HUNGER_PREFIX .. tostring(hunger)
-    updateStarving(self, health, hunger)
-end
-
-local function warnStarving(self, now, config)
-    if self.NextWarnAt and now < self.NextWarnAt then return end
-    self.NextWarnAt = now + config.WarnIntervalSec
-    if _G.LocalMsgNotice then _G.LocalMsgNotice(config.WarnText) end
-    print('[ScreenMain] 饥饿提示', config.WarnText)
-end
-
-local function flashVisible(self, now, config)
-    return self.Starving == true and math.floor(now / config.FlashPeriodSec) % 2 == 0
-end
-
-function ScreenHandler:UpdateStarveFx()
-    if not self.FlashEdges then return end
-    local c = GameCfg.Vitals
-    local now = World:GetServerTime()
-    local on = flashVisible(self, now, c)
-    for _, edge in ipairs(self.FlashEdges) do edge.Visible = on end
-    if self.Starving then warnStarving(self, now, c) end
-end
-
-function ScreenHandler:ShowCoin(value)
-    if not self.LabelCoin then return end
-    if type(value) ~= 'number' then
-        local players = game:GetService('Players')
-        local player = players and players.LocalPlayer
-        value = player and player:GetAttribute('FishCoin')
-    end
-    self.LabelCoin.Text = tostring(math.floor(tonumber(value) or 0))
 end
 
 local function wrapColumns(text, columns)
@@ -372,138 +122,6 @@ function ScreenHandler:HideDialogue()
 end
 
 local CAST_PHASES = { idle = true, cast = true, hooked = true, landed = true, unhooked = true }
-
-local function lineStillOut(phase)
-    return phase == 'cast' or phase == 'unhooked'
-end
-
-local function selectedRod(state)
-    local entry = state and state.selectedSlot and state.slots[state.selectedSlot]
-    local definition = entry and GameCfg.Items.Definitions[entry.itemId]
-    return definition ~= nil and type(definition.Level) == 'number'
-end
-
-function ScreenHandler:ItemActionMode()
-    local phase = self.CastState and self.CastState.phase or 'idle'
-    local drop = phase == 'idle' and self.CastState ~= nil and self.CastState.holding ~= nil
-    if phase == 'idle' and not drop and self.SpecialEffect then return 'special' end
-    if phase == 'hooked' then return 'hooked' end
-    if lineStillOut(phase) then return 'lineOut' end
-    if phase == 'landed' then return 'landed' end
-    if drop then return 'drop' end
-    if self:SelectedFood() then return 'food' end
-    if selectedRod(self.Snapshot) then return 'rod' end
-    return 'none'
-end
-
-local function foodActionText(self)
-    local food, foodSlot = self:SelectedFood()
-    local name = GameCfg.Items.Definitions[food.itemId].Name
-    return heldSlot(self.Snapshot) == foodSlot and ('吃' .. name) or ('手持' .. name)
-end
-
-local function castActionColor(phase, now, alert)
-    if not now then
-        return phase == 'landed' and Color.New(120, 120, 120, 255)
-            or Color.New(54, 100, 140, 255)
-    end
-    local k = (math.sin(now * 2 * math.pi / alert.BreathPeriodSec) + 1) / 2
-    local h = alert.HighlightColor
-    return Color.New(math.floor(54 + (h[1] - 54) * k),
-        math.floor(100 + (h[2] - 100) * k), math.floor(140 + (h[3] - 140) * k), h[4])
-end
-
-local function fireCast(action, extra)
-    local payload = { action = action }
-    for key, value in pairs(extra or {}) do payload[key] = value end
-    _G.REUtil:GetRE('CastAction'):FireServer(payload)
-end
-
-local function breathLeft(self)
-    return self.BreathCooldownUntil and (self.BreathCooldownUntil - World:GetServerTime()) or 0
-end
-
-local SPECIAL_ACTIONS = {
-    wings = {
-        text = '长按飞行', enabled = true,
-        pressBegan = function()
-            _G.REUtil:GetRE('SpecialItemAction'):FireServer({ action = 'fly', holding = true })
-        end,
-    },
-    godzilla = {
-        text = function(self)
-            local left = breathLeft(self)
-            return left > 0 and string.format('吐息冷却 %d秒', math.ceil(left)) or '原子吐息'
-        end,
-        enabled = function(self) return breathLeft(self) <= 0 end,
-        click = function(self)
-            if breathLeft(self) <= 0 then _G.REUtil:GetRE('SpecialItemAction'):FireServer({ action = 'breath' }) end
-        end,
-    },
-}
-local UNKNOWN_SPECIAL = {}
-
-local ITEM_ACTIONS = {
-    hooked = {
-        text = '点击收线',
-        enabled = function(_, active) return active == true end,
-        click = function(self)
-            if _G.LocalReelIn.SessionId == self.CastState.reelSession then
-                _G.LocalReelIn:Click()
-                self:ShowCast()
-            end
-        end,
-    },
-    lineOut = { text = '收竿', enabled = true, click = function() fireCast('Reel') end },
-    landed = { text = '已上岸', enabled = false },
-    drop = { text = '放下', enabled = true, click = function() fireCast('Drop') end },
-    food = {
-        text = foodActionText, enabled = true,
-        click = function(self)
-            local _, slot = self:SelectedFood()
-            self:Operate({ op = 'eat', slot = slot })
-        end,
-    },
-    rod = {
-        text = '抛竿', enabled = true,
-        click = function(self)
-            local slot = self.Snapshot.selectedSlot
-            fireCast('Cast', { slot = slot, itemId = self.Snapshot.slots[slot].itemId })
-        end,
-    },
-    none = {
-        text = '使用', enabled = false, visible = false,
-        click = function(self)
-            if not self.Snapshot then return end
-            self.FailureUntil = nil
-            self.FailureLanding = nil
-            self:ShowCast()
-            self:ShowCastFailure({ reason = 'invalidRod' })
-        end,
-    },
-}
-
-local function itemAction(self, mode)
-    if mode == 'special' then return SPECIAL_ACTIONS[self.SpecialEffect] or UNKNOWN_SPECIAL end
-    return ITEM_ACTIONS[mode]
-end
-
-local function resolve(value, self, active)
-    if type(value) == 'function' then return value(self, active) end
-    return value
-end
-
-local function showItemAction(self, mode, phase, active, alertNow)
-    local entry = itemAction(self, mode)
-    local visible = entry.visible ~= false
-    self.BtnItemAction.Visible = visible
-    self.BtnItemActionLabel.Visible = visible
-    self.BtnItemAction.ButtonNormalColor = castActionColor(phase, alertNow, GameCfg.HookAlert)
-    local enabled = resolve(entry.enabled, self, active)
-    if enabled ~= nil then self.BtnItemAction.TouchEnabled = self.IsOpen == true and enabled == true end
-    local text = resolve(entry.text, self, active)
-    if text ~= nil then self.BtnItemActionLabel.Text = text end
-end
 
 local function castProgress(self, reel, active)
     local result = reel and reel.LastResult
@@ -596,15 +214,20 @@ function ScreenHandler:UpdateCastFeedback()
 end
 
 function ScreenHandler:ShowCast()
-    if not self.BtnItemAction then return end
     local phase = self.CastState and self.CastState.phase or 'idle'
     local reel = _G.LocalReelIn
-    local active = self.IsOpen and phase == 'hooked' and reel
+    local active = self.IsOpen == true and phase == 'hooked' and reel ~= nil
         and reel.SessionId == self.CastState.reelSession
+    if self.LastReelActive ~= active then
+        self.LastReelActive = active
+        if type(self.OnReelActiveChanged) == 'function' then
+            self.OnReelActiveChanged(active)
+        end
+    end
+    if not self.BtnReelClose and not self.ReelBar and not self.HookHint then return end
     self:ApplyLayout(nil, active == true)
     local now = active == true and self.HookAlertUntil ~= nil and World:GetServerTime()
     local alerting = now and now < self.HookAlertUntil
-    showItemAction(self, self:ItemActionMode(), phase, active, alerting and now)
     local progress = castProgress(self, reel, active)
     if type(progress) ~= 'number' or progress ~= progress then progress = 50 end
     progress = math.max(0, math.min(100, progress))
@@ -650,184 +273,22 @@ local function passive(node)
     return node
 end
 
-local function columnsOf(text)
-    local count = 0
-    for _ in text:gmatch('[%z\1-\127\194-\244][\128-\191]*') do count = count + 1 end
-    return count
-end
-
-local VITAL_FONT_MAX = 20
-local function vitalFontSize(width, c)
-    local longest = math.max(columnsOf(HEALTH_PREFIX .. tostring(c.MaxHealth)),
-        columnsOf(HUNGER_PREFIX .. tostring(c.MaxHunger)))
-    return math.max(1, math.min(VITAL_FONT_MAX, math.floor(width / longest)))
-end
-
-function ScreenHandler:BuildVitals(root, resolution, layout)
-    local c = GameCfg.Vitals
-    local rings = {
-        { 'Health', layout.Rects.HealthRing, c.HealthRing, c.HealthColor },
-        { 'Hunger', layout.Rects.HungerRing, c.HungerRing, c.HungerColor },
-    }
-    for _, spec in ipairs(rings) do
-        local name, r = spec[1], spec[2]
-        local bg = passive(OwnedUnits.Track(self, World:CreateUnit('EUIImage', {
-            Parent = root, Name = name .. 'RingBg',
-            Position = Vector2.New(r.x, r.y), Size = Vector2.New(r.w, r.h), Image = c.RingBg,
-        })))
-        local ring = passive(OwnedUnits.Track(self, World:CreateUnit('EUIProgressTimer', {
-            Parent = root, Name = name .. 'Ring',
-            Position = Vector2.New(r.x, r.y), Size = Vector2.New(r.w, r.h), Image = spec[3], Percent = 100,
-        })))
-        ring.Color = color(spec[4])
-        ring.LocalZOrder = 1
-        local text = overlay(self, root, name .. 'Text', r.x, r.y, r.w, 40, '', vitalFontSize(r.w, c),
-            Color.New(255, 255, 255, 255))
-        text.LocalZOrder = 2
-        self[name .. 'Ring'] = ring
-        self[name .. 'Text'] = text
-    end
-    local t, w, h = c.FlashThickness, resolution.x, resolution.y
-    local edges = {
-        { 'FlashTop', w / 2, h - t / 2, w, t }, { 'FlashBottom', w / 2, t / 2, w, t },
-        { 'FlashLeft', t / 2, h / 2, t, h }, { 'FlashRight', w - t / 2, h / 2, t, h },
-    }
-    self.FlashEdges = {}
-    for _, spec in ipairs(edges) do
-        local edge = passive(OwnedUnits.Track(self, World:CreateUnit('EUIImage', {
-            Parent = root, Name = spec[1],
-            Position = Vector2.New(spec[2], spec[3]), Size = Vector2.New(spec[4], spec[5]), Image = c.FlashImage,
-        })))
-        edge.Color = color(c.FlashColor)
-        edge.LocalZOrder = 3
-        edge.Visible = false
-        self.FlashEdges[#self.FlashEdges + 1] = edge
-    end
+function ScreenHandler:SetBackpackOpen(is_open)
+    self.BackpackOpen = is_open == true
+    self:ApplyBackpackOcclusion()
 end
 
 function ScreenHandler:ApplyBackpackOcclusion()
     local hidden = self.BackpackOpen == true
-    if hidden and self.OpenPopup then self:ClosePopup() end
-    local fixed = {
-        { self.BtnDiscard, self.BtnDiscardLabel },
-        { self.BtnItemAction, self.BtnItemActionLabel }, { self.BtnReelClose, self.BtnReelCloseLabel },
-    }
-    for _, entry in pairs(self.EquipBars or {}) do fixed[#fixed + 1] = { entry.Button, entry.Label } end
-    for _, pair in ipairs(fixed) do
-        local btn, label = pair[1], pair[2]
-        if btn then
-            btn.Visible = not hidden
-            btn.TouchEnabled = not hidden
-        end
-        if label then label.Visible = not hidden end
+    if self.BtnReelClose then
+        self.BtnReelClose.Visible = not hidden
+        self.BtnReelClose.TouchEnabled = not hidden
     end
-    for _, slot in ipairs(self.Slots or {}) do
-        slot.Label.Visible = slot.Label.Visible and not hidden
-        slot.Count.Visible = slot.Count.Visible and not hidden
+    if self.BtnReelCloseLabel then
+        self.BtnReelCloseLabel.Visible = not hidden
     end
     if not hidden then
         self:ShowCast()
-        local selected = self.Snapshot and self.Snapshot.selectedSlot
-            and self.Snapshot.slots and self.Snapshot.slots[self.Snapshot.selectedSlot]
-        self.BtnDiscard.Visible = selected ~= nil
-        self.BtnDiscardLabel.Visible = selected ~= nil
-        if self.Snapshot then self:RenderEquipBars(self.Snapshot) end
-    end
-end
-
-function ScreenHandler:ShowBackpack()
-    if not self.BackpackButton or not self.Snapshot then return end
-    local state = self.Snapshot
-    if type(state.backpackCount) ~= 'number' then return end
-    self.BackpackLabel.Text = '背包 ' .. tostring(state.backpackCount) .. ' 格'
-    self.BackpackPanel.Visible = self.BackpackOpen == true
-    self.BackpackTitle.Visible = self.BackpackOpen == true
-    for index, slot in ipairs(self.Slots or {}) do
-        slot.Background.Visible = not self.BackpackOpen and index <= state.slotCount
-        slot.Background.TouchEnabled = slot.Background.Visible
-        slot.Icon.Visible = slot.Icon.Visible and not self.BackpackOpen
-        slot.Label.Visible = slot.Label.Visible and not self.BackpackOpen
-        slot.Count.Visible = slot.Count.Visible and not self.BackpackOpen
-    end
-    for index, slot in ipairs(self.BackpackSlots) do
-        local visible = self.BackpackOpen == true and index <= state.backpackCount
-        local entry = state.backpack and state.backpack[index]
-        local definition = entry and GameCfg.Items.Definitions[entry.itemId]
-        slot.Button.Visible = visible
-        slot.Button.TouchEnabled = visible and definition ~= nil
-        slot.Label.Visible = visible
-        slot.Label.Text = definition
-            and ((GameCfg.Items.CookRate(entry) ~= nil and GameCfg.Grill.CookedPrefix or '') .. definition.Name) or '空'
-        slot.Button.ButtonNormalColor = index == self.SelectedBackpackSlot
-            and Color.New(36, 130, 94, 255) or Color.New(120, 168, 200, 255)
-    end
-    local entry = state.backpack and state.backpack[self.SelectedBackpackSlot]
-    self.MoveButton.Visible = self.BackpackOpen == true and entry ~= nil
-    self.MoveLabel.Visible = self.MoveButton.Visible
-    self.MoveButton.TouchEnabled = self.MoveButton.Visible
-    local free = false
-    for index = 1, state.slotCount do
-        if not state.slots[index] then free = true break end
-    end
-    if self.BackpackOpen and entry and not free then
-        self.MoveLabel.Text = '道具栏已满'
-        self.MoveButton.TouchEnabled = false
-    else
-        self.MoveLabel.Text = '转入道具栏'
-    end
-    self:ApplyBackpackOcclusion()
-end
-
-function ScreenHandler:BuildBackpack(root, layout)
-    local entry, panelRect = layout.Rects.BackpackButton, layout.Panels.BackpackPanel
-    local center, cy = panelRect.x, panelRect.y
-    self.BackpackOpen = false
-    self.BackpackSlots = {}
-    self.BackpackSlotPos = {}
-    self.BackpackButton = button(self, root, 'BtnBackpack', entry.x, entry.y, entry.w)
-    self.BackpackButton.Size = Vector2.New(entry.w, entry.h)
-    self.BackpackLabel = overlay(self, root, 'LabelBackpack', entry.x, entry.y, entry.w, entry.h,
-        '背包', 22, Color.New(255, 255, 255, 255))
-    self.BackpackPanel = button(self, root, 'BackpackPanel', center, cy, panelRect.w)
-    self.BackpackPanel.Size = Vector2.New(panelRect.w, panelRect.h)
-    self.BackpackPanel.TouchEnabled = false
-    self.BackpackPanel.ButtonNormalColor = Color.New(30, 46, 66, 240)
-    self.BackpackTitle = overlay(self, root, 'BackpackTitle', center, cy + 290, 700, 48,
-        '选择背包物品，再转入道具栏', 28, Color.New(255, 255, 255, 255))
-    for index = 1, GameCfg.Items.MaxBackpackSlots do
-        local col, row = (index - 1) % 8, math.floor((index - 1) / 8)
-        local x, y = center - 350 + col * 100, cy + 200 - row * 100
-        local btn = button(self, root, 'BackpackSlot' .. index, x, y, 95)
-        btn.Size = Vector2.New(95, 90)
-        btn.ButtonNormalColor = Color.New(120, 168, 200, 255)
-        local label = overlay(self, root, 'BackpackLabel' .. index, x, y, 95, 80,
-            '', 19, Color.New(255, 255, 255, 255))
-        self.BackpackSlots[index] = { Button = btn, Label = label }
-        self.BackpackSlotPos[index] = { x = x, y = y }
-        self:bindDrag(btn, GameCfg.Items.ContainerId.Backpack, index)
-        self:Listen(btn.OnClicked, function()
-            self.SelectedBackpackSlot = index
-            self:ShowBackpack()
-        end)
-    end
-    self.MoveButton = button(self, root, 'BtnMoveToItemBar', center, cy - 310, 330)
-    self.MoveLabel = overlay(self, root, 'LabelMoveToItemBar', center, cy - 310, 330, 70,
-        '转入道具栏', 26, Color.New(255, 255, 255, 255))
-    self:Listen(self.BackpackButton.OnClicked, function()
-        self.BackpackOpen = not self.BackpackOpen
-        self.SelectedBackpackSlot = nil
-        if self.Snapshot then self:Show(self.Snapshot) end
-    end)
-    self:Listen(self.MoveButton.OnClicked, function()
-        if self.SelectedBackpackSlot then self:Action('MoveToItemBar', self.SelectedBackpackSlot) end
-    end)
-    self.BackpackPanel.Visible = false
-    self.BackpackTitle.Visible = false
-    self.MoveButton.Visible = false
-    self.MoveLabel.Visible = false
-    for _, slot in ipairs(self.BackpackSlots) do
-        slot.Button.Visible = false
-        slot.Label.Visible = false
     end
 end
 
@@ -835,213 +296,6 @@ local function place(node, r)
     if not node or not r then return end
     node.Position = Vector2.New(r.x, r.y)
     node.Size = Vector2.New(r.w, r.h)
-end
-
-local SELECTED_COLOR = { 36, 130, 94, 255 }
-local NORMAL_COLOR = { 54, 100, 140, 255 }
-local DISABLED_COLOR = { 120, 120, 120, 255 }
-local CELL_FONT = 18
-
-local function itemName(id)
-    local definition = GameCfg.Items.Definitions[id]
-    return definition and definition.Name or tostring(id)
-end
-
-local function cellText(name, count, width)
-    local text = wrapColumns(name, math.max(1, math.floor(width / CELL_FONT)))
-    return count and (text .. '\n×' .. tostring(count)) or text
-end
-
-local function weaponCandidates(self, state)
-    local weapons = type(state.weapons) == 'table' and state.weapons or {}
-    local ids = {}
-    for id, count in pairs(weapons) do
-        if type(count) == 'number' then ids[#ids + 1] = id end
-    end
-    table.sort(ids)
-    local equipped = LocalAttackButton.EquippedWeapon(state)
-    local list = {}
-    for _, id in ipairs(ids) do
-        list[#list + 1] = { key = id, name = itemName(id), count = weapons[id], enabled = weapons[id] > 0,
-            selected = id == equipped, choose = function() self:Operate({ op = 'attack', weapon = id }) end }
-    end
-    return list
-end
-
-local function baitCandidates(self, state)
-    local ids = GameCfg.Items.Id
-    local fixed = { ids.Worm, ids.Sausage, ids.Duck }
-    local dynamic, isFixed = {}, {}
-    for _, id in ipairs(fixed) do isFixed[id] = true end
-    for id in pairs(type(state.bait) == 'table' and state.bait or {}) do
-        if not isFixed[id] and baitStock(state, id) > 0 then dynamic[#dynamic + 1] = id end
-    end
-    table.sort(dynamic)
-    local list = {}
-    local function add(id)
-        local count = baitStock(state, id)
-        list[#list + 1] = { key = id, name = itemName(id), count = count, enabled = count > 0,
-            selected = state.selectedBait == id, choose = function() self:Action('SelectBait', id) end }
-    end
-    for _, id in ipairs(fixed) do add(id) end
-    for _, id in ipairs(dynamic) do add(id) end
-    list[#list + 1] = { key = 'NoBait', name = '不挂鱼饵', enabled = true, selected = state.selectedBait == nil,
-        choose = function() self:Action('SelectBait') end }
-    list[#list + 1] = { key = 'EatWorm', name = '吃蚯蚓', enabled = wormCount(state) > 0,
-        choose = function() self:Action('EatBait', ids.Worm) end }
-    return list
-end
-
-local POPUP_CANDIDATES = { Weapon = weaponCandidates, Bait = baitCandidates }
-
-function ScreenHandler:BuildEquipBars(root, layout)
-    self.EquipBars = {}
-    self.PopupPool = {}
-    self.PopupPlates = {}
-    local w, h = self.EuiResolution.x, self.EuiResolution.y
-    self.PopupDismiss = button(self, root, 'PopupDismiss', w / 2, h / 2, w)
-    self.PopupDismiss.Size = Vector2.New(w, h)
-    self.PopupDismiss.NormalImage = ''
-    self.PopupDismiss.PressImage = ''
-    self.PopupDismiss.DisableImage = ''
-    self.PopupDismiss.ButtonNormalColor = Color.New(0, 0, 0, 0)
-    self.PopupDismiss.ButtonPressColor = Color.New(0, 0, 0, 0)
-    self.PopupDismiss.LocalZOrder = 4
-    self.PopupDismiss.Visible = false
-    self.PopupDismiss.TouchEnabled = false
-    self:Listen(self.PopupDismiss.OnClicked, function() self:ClosePopup() end)
-    for _, kind in ipairs({ 'Weapon', 'Bait' }) do
-        local r = layout.Rects[kind .. 'Bar']
-        local btn = button(self, root, kind .. 'Bar', r.x, r.y, r.w)
-        place(btn, r)
-        btn.LocalZOrder = 6
-        local label = overlay(self, root, kind .. 'BarLabel', r.x, r.y, r.w, r.h, '', CELL_FONT, Color.New(255, 255, 255, 255))
-        label.LocalZOrder = 7
-        self.EquipBars[kind] = { Button = btn, Label = label }
-        self:Listen(btn.OnClicked, function() self:TogglePopup(kind) end)
-        local plate = passive(OwnedUnits.Track(self, World:CreateUnit('EUIImage', {
-            Parent = root, Name = kind .. 'Popup', Position = Vector2.New(r.x, r.y), Size = Vector2.New(r.w, r.h),
-            Image = 'official://image/11017', Color = Color.New(16, 24, 34, 200),
-        })))
-        plate.LocalZOrder = 5
-        plate.Visible = false
-        self.PopupPlates[kind] = plate
-        self.PopupPool[kind] = {}
-    end
-end
-
-function ScreenHandler:PopupCell(kind, key)
-    local pool = self.PopupPool[kind]
-    if pool[key] then return pool[key] end
-    local btn = button(self, self.UIRoot, kind .. 'PopupCell_' .. key, 0, 0, 80)
-    btn.LocalZOrder = 6
-    local label = overlay(self, self.UIRoot, kind .. 'PopupLabel_' .. key, 0, 0, 80, 80, '', CELL_FONT,
-        Color.New(255, 255, 255, 255))
-    label.LocalZOrder = 7
-    self:Listen(btn.OnClicked, function() self:ChoosePopup(kind, key) end)
-    pool[key] = { Button = btn, Label = label }
-    return pool[key]
-end
-
-function ScreenHandler:PopupCandidates(kind)
-    local state = self.Snapshot
-    return state and POPUP_CANDIDATES[kind](self, state) or {}
-end
-
-function ScreenHandler:TogglePopup(kind)
-    if self.BackpackOpen then return end
-    self.OpenPopup = self.OpenPopup ~= kind and kind or nil
-    self:RenderPopup()
-end
-
-function ScreenHandler:ClosePopup()
-    self.OpenPopup = nil
-    self:RenderPopup()
-end
-
-function ScreenHandler:ChoosePopup(kind, key)
-    if self.OpenPopup ~= kind then return end
-    for _, candidate in ipairs(self:PopupCandidates(kind)) do
-        if candidate.key == key then
-            if not candidate.enabled then return end
-            candidate.choose()
-            break
-        end
-    end
-    self:ClosePopup()
-end
-
-function ScreenHandler:RenderPopup()
-    if not self.PopupPool then return end
-    for kind, pool in pairs(self.PopupPool) do
-        for _, cell in pairs(pool) do
-            cell.Button.Visible = false
-            cell.Button.TouchEnabled = false
-            cell.Label.Visible = false
-        end
-        self.PopupPlates[kind].Visible = false
-    end
-    local kind = self.OpenPopup
-    local open = kind ~= nil and self.HudLayout ~= nil
-    self.PopupDismiss.Visible = open
-    self.PopupDismiss.TouchEnabled = open
-    for barKind, bar in pairs(self.EquipBars) do
-        bar.Button.ButtonNormalColor = color(barKind == kind and SELECTED_COLOR or NORMAL_COLOR)
-    end
-    if not open then return end
-    local list = self:PopupCandidates(kind)
-    local rects = MainHudLayout.PopupCells(self.HudLayout, kind, #list)
-    for i, candidate in ipairs(list) do
-        local r, cell = rects[i], self:PopupCell(kind, candidate.key)
-        place(cell.Button, r)
-        place(cell.Label, r)
-        cell.Label.Text = cellText(candidate.name, candidate.count, r.w)
-        cell.Button.Visible = true
-        cell.Button.TouchEnabled = candidate.enabled
-        cell.Button.ButtonNormalColor = color(not candidate.enabled and DISABLED_COLOR
-            or candidate.selected and SELECTED_COLOR or NORMAL_COLOR)
-        cell.Label.Visible = true
-    end
-    local plateRect = MainHudLayout.Bounds(rects, 4)
-    if plateRect then
-        local plate = self.PopupPlates[kind]
-        place(plate, plateRect)
-        plate.Visible = true
-    end
-end
-
-function ScreenHandler:RenderEquipBars(state)
-    if not self.EquipBars then return end
-    local weapon, bar = LocalAttackButton.EquippedWeapon(state), self.EquipBars.Weapon
-    bar.Label.Text = weapon and cellText(itemName(weapon), nil, bar.Button.Size.x) or ''
-    local baitId, baitBar = state.selectedBait, self.EquipBars.Bait
-    baitBar.Label.Text = baitId and cellText(itemName(baitId), baitStock(state, baitId), baitBar.Button.Size.x)
-        or cellText('不挂鱼饵', nil, baitBar.Button.Size.x)
-    for _, entry in pairs(self.EquipBars) do
-        entry.Button.Visible = not self.BackpackOpen
-        entry.Button.TouchEnabled = not self.BackpackOpen
-        entry.Label.Visible = not self.BackpackOpen
-    end
-    self:RenderPopup()
-end
-
-local function placeSlot(slot, r)
-    local x, y, w, h = r.x, r.y, r.w, r.h
-    slot.Background.Position = Vector2.New(x, y)
-    slot.Background.Size = Vector2.New(w, h)
-    slot.Icon.Position = Vector2.New(x, y + h * 0.1)
-    slot.Icon.Size = Vector2.New(w * 0.6, h * 0.6)
-    slot.Label.Position = Vector2.New(x, y - h * 0.34)
-    slot.Label.Size = Vector2.New(w, h * 0.28)
-    slot.Count.Position = Vector2.New(x + w * 0.33, y + h * 0.33)
-    slot.Count.Size = Vector2.New(w * 0.32, h * 0.32)
-end
-
-local function placeEditorNode(node, r)
-    if not node then return end
-    local ok, err = pcall(function() node.Anchor = Vector2.New(0.5, 0.5) end)
-    if not ok then print('[ScreenMain] 设置节点锚点失败', tostring(node.Name), tostring(err)) end
-    place(node, r)
 end
 
 function ScreenHandler:ApplyLayout(slots, reeling)
@@ -1055,24 +309,6 @@ function ScreenHandler:ApplyLayout(slots, reeling)
         itemBarSlots = slots, reeling = reeling })
     self.HudLayout = layout
     local r = layout.Rects
-    for index, slot in ipairs(self.Slots or {}) do
-        local cell = layout.ItemBarSlots[index]
-        if cell then
-            placeSlot(slot, cell)
-            self.ItemBarSlotPos[index] = { x = cell.x, y = cell.y, hw = cell.w / 2, hh = cell.h / 2 }
-        end
-    end
-    place(self.BackpackButton, r.BackpackButton)
-    place(self.BackpackLabel, r.BackpackButton)
-    for kind, bar in pairs(self.EquipBars or {}) do
-        place(bar.Button, r[kind .. 'Bar'])
-        place(bar.Label, r[kind .. 'Bar'])
-    end
-    if self.OpenPopup then self:RenderPopup() end
-    place(self.BtnItemAction, r.ItemAction)
-    place(self.BtnItemActionLabel, r.ItemAction)
-    place(self.BtnDiscard, r.Discard)
-    place(self.BtnDiscardLabel, r.Discard)
     place(self.BtnReelClose, r.ReelClose)
     place(self.BtnReelCloseLabel, r.ReelClose)
 end
@@ -1099,35 +335,15 @@ function ScreenHandler:Cleanup()
         for _, connection in ipairs(self.Connections or {}) do connection:Disconnect() end
     end)
     continueAfterFailure('OwnedUnits', function()
-        OwnedUnits.Clear(AIM_OWNER)
         OwnedUnits.Clear(self)
     end)
     self.Connections = nil
-    self.Slots = nil
-    self.ItemBarSlotPos = nil
-    self.BackpackSlots = nil
-    self.BackpackSlotPos = nil
-    self.EquipBars = nil
-    self.PopupPool = nil
-    self.PopupPlates = nil
-    self.PopupDismiss = nil
-    self.OpenPopup = nil
-    self.DragSource = nil
+    self.BackpackOpen = false
     self.UIRoot = nil
     self.LastOperateOperation = nil
-    self.BackpackButton = nil
-    self.BackpackPanel = nil
-    self.BackpackLabel = nil
-    self.BackpackTitle = nil
-    self.MoveButton = nil
-    self.MoveLabel = nil
-    self.SelectedBackpackSlot = nil
-    self.BtnDiscard = nil
-    self.BtnItemAction = nil
+    self.LastReelActive = nil
     self.BtnReelClose = nil
     self.BtnReelCloseLabel = nil
-    self.BtnDiscardLabel = nil
-    self.BtnItemActionLabel = nil
     self.HookHint = nil
     self.CastFloat = nil
     self.CastFailureMark = nil
@@ -1141,17 +357,8 @@ function ScreenHandler:Cleanup()
     self.QuestBackground = nil
     self.DialogueNodes = nil
     self.DialoguePayload = nil
-    self.HealthRing = nil
-    self.HungerRing = nil
-    self.HealthText = nil
-    self.HungerText = nil
-    self.FlashEdges = nil
-    self.Starving = nil
-    self.NextWarnAt = nil
     self.ReelBar = nil
     self.ReelBarBg = nil
-    self.LabelCoin = nil
-    self.ImageCoin = nil
     self.HudLayout = nil
     self.LayoutKey = nil
     self.QuestToggle = nil
@@ -1161,15 +368,6 @@ function ScreenHandler:Cleanup()
     self.CastState = nil
     self.BoundRootNode = nil
     self.Inited = false
-end
-
-local function listenPlayerAttributes(self, player)
-    self:Listen(player:GetAttributeChangedSignal('FishCoin'), function() self:ShowCoin() end)
-    self:ShowCoin()
-    for _, key in ipairs({ 'Health', 'MaxHealth', 'Hunger', 'MaxHunger' }) do
-        self:Listen(player:GetAttributeChangedSignal(key), function() self:ShowVitals() end)
-    end
-    self:ShowVitals()
 end
 
 function ScreenHandler:Init()
@@ -1198,64 +396,16 @@ function ScreenHandler:_initializeRoot()
         itemBarSlots = count, reeling = true })
     self.HudLayout = layout
     local rects = layout.Rects
-    self.LabelCoin = root:FindFirstChild('LabelCoin', true)
-    self.ImageCoin = root:FindFirstChild('ImageCoin', true)
-    if self.LabelCoin then self.LabelCoin.Visible = true else print('[ScreenMain] 找不到 LabelCoin 节点') end
-    if self.ImageCoin then self.ImageCoin.Visible = true end
-    placeEditorNode(self.ImageCoin, rects.CoinIcon)
-    placeEditorNode(self.LabelCoin, rects.CoinLabel)
-    self.Slots = {}
-    self.ItemBarSlotPos = {}
     self.Connections = {}
-    for index = 1, count do
-        local cell = layout.ItemBarSlots[index]
-        local background = button(self, root, 'ItemBarSlot' .. index, cell.x, cell.y, cell.w)
-        local icon = OwnedUnits.Track(self, World:CreateUnit('EUIImage', {
-            Parent = root, Name = 'ItemBarIcon' .. index,
-            Position = Vector2.New(cell.x, cell.y), Size = Vector2.New(cell.w, cell.h),
-        }))
-        icon.TouchEnabled = false
-        icon.SwallowTouchEnabled = false
-        icon.LocalZOrder = 1
-        icon.Visible = false
-        local label = overlay(self, root, 'ItemBarLabel' .. index, cell.x, cell.y, cell.w, cell.h,
-            '', 18, Color.New(255, 255, 255, 255))
-        local amount = overlay(self, root, 'ItemBarAmount' .. index, cell.x, cell.y, cell.w, cell.h,
-            '', 20, Color.New(255, 220, 40, 255))
-        label.Visible = false
-        amount.Visible = false
-        self.Slots[index] = { Background = background, Icon = icon, Label = label, Count = amount }
-        placeSlot(self.Slots[index], cell)
-        self.ItemBarSlotPos[index] = { x = cell.x, y = cell.y, hw = cell.w / 2, hh = cell.h / 2 }
-        self:bindDrag(background, GameCfg.Items.ContainerId.ItemBar, index)
-        self:BindSlotGesture(background, index)
-        self:Listen(background.OnClicked, function()
-            if self:ConsumeThrowClick(index) then return end
-            self:Action('SelectSlot', index)
-        end)
-    end
     self.UIRoot = root
-    self:BuildBackpack(root, layout)
-    self:BuildEquipBars(root, layout)
-    local discard = rects.Discard
-    self.BtnDiscard = button(self, root, 'ItemDiscard', discard.x, discard.y, discard.w)
-    local action, reelClose = rects.ItemAction, rects.ReelClose
-    self.BtnItemAction = button(self, root, 'ItemAction2', action.x, action.y, action.w)
+    self.BackpackOpen = self.BackpackOpen == true
+    local reelClose = rects.ReelClose
     self.BtnReelClose = button(self, root, 'ReelClose', reelClose.x, reelClose.y, reelClose.w)
-    place(self.BtnDiscard, discard)
-    place(self.BtnItemAction, action)
     place(self.BtnReelClose, reelClose)
-    local labels = {
-        { 'BtnReelCloseLabel', self.BtnReelClose, '结束收线' },
-        { 'BtnDiscardLabel', self.BtnDiscard, '丢弃选中物' },
-        { 'BtnItemActionLabel', self.BtnItemAction, '抛竿' },
-    }
-    for _, entry in ipairs(labels) do
-        local btn = entry[2]
-        local label = overlay(self, root, entry[1], btn.Position.x, btn.Position.y,
-            btn.Size.x, btn.Size.y, entry[3], 30, Color.New(255, 255, 255, 255))
-        self[entry[1]] = label
-    end
+    self.BtnReelCloseLabel = overlay(self, root, 'BtnReelCloseLabel',
+        self.BtnReelClose.Position.x, self.BtnReelClose.Position.y,
+        self.BtnReelClose.Size.x, self.BtnReelClose.Size.y,
+        '结束收线', 30, Color.New(255, 255, 255, 255))
     local primary, secondary, transient = rects.HintPrimary, rects.HintSecondary, rects.HintTransient
     self.HookHint = overlay(self, root, 'HookHint', primary.x, primary.y, primary.w, primary.h,
         '', 32, Color.New(255, 220, 40, 255))
@@ -1333,7 +483,6 @@ function ScreenHandler:_initializeRoot()
         self.DialogueRead.TouchEnabled = false
         _G.REUtil:GetRE('StoryRead'):FireServer({ action = 'read', readKey = payload.readKey })
     end)
-    self:BuildVitals(root, resolution, layout)
     self.ReelBarBg = OwnedUnits.Track(self, World:CreateUnit('EUIImage', {
         Parent = root, Name = 'ReelProgressBg',
         Position = Vector2.New(secondary.x, secondary.y), Size = Vector2.New(400, 36),
@@ -1350,50 +499,13 @@ function ScreenHandler:_initializeRoot()
         node.SwallowTouchEnabled = false
         node.Visible = false
     end
-    self.BtnItemAction.TouchEnabled = false
-    self.BtnItemAction.Visible = false
-    self.BtnItemActionLabel.Visible = false
     self.BtnReelClose.Visible = false
     self.BtnReelCloseLabel.Visible = false
     self:Listen(self.BtnReelClose.OnClicked, function()
         _G.LocalReelIn:Close()
         self:ShowCast()
     end)
-    self.BtnDiscard.Visible = false
-    self.BtnDiscardLabel.Visible = false
-    self:Listen(self.BtnItemAction.OnClicked, function()
-        if not self.IsOpen then return end
-        local click = itemAction(self, self:ItemActionMode()).click
-        if click then click(self) end
-    end)
-    if self.BtnItemAction.OnTouchBegan and self.BtnItemAction.OnTouchEnded then
-        self:Listen(self.BtnItemAction.OnTouchBegan, function()
-            if not self.IsOpen then return end
-            local pressBegan = itemAction(self, self:ItemActionMode()).pressBegan
-            if pressBegan then pressBegan(self) end
-        end)
-        self:Listen(self.BtnItemAction.OnTouchEnded, function()
-            if self.SpecialEffect == 'wings' then
-                _G.REUtil:GetRE('SpecialItemAction'):FireServer({ action = 'fly', holding = false })
-            end
-        end)
-    end
-    self:Listen(self.BtnDiscard.OnClicked, function()
-        if self.Snapshot and self.Snapshot.selectedSlot then
-            self:Operate({ op = 'discard', slot = self.Snapshot.selectedSlot })
-        end
-    end)
     self:Listen(_G.REUtil:GetRE('ItemBarState').OnClientEvent, function(state) self:Show(state) end)
-    self:Listen(_G.REUtil:GetRE('SpecialItemState').OnClientEvent, function(state)
-        if type(state) ~= 'table' then return end
-        self.SpecialEffect = state.effect
-        if type(state.breathRemaining) == 'number' and state.breathRemaining > 0 then
-            self.BreathCooldownUntil = World:GetServerTime() + state.breathRemaining
-        else
-            self.BreathCooldownUntil = nil
-        end
-        if self.BtnItemAction then self:ShowCast() end
-    end)
     _G.REUtil:GetRE('SpecialItemStateRequest'):FireServer()
     self:Listen(_G.REUtil:GetRE('SpecialItemResult').OnClientEvent, function(result)
         if type(result) ~= 'table' or result.ok ~= false then return end
@@ -1498,27 +610,9 @@ function ScreenHandler:_initializeRoot()
     if runService and runService.Heartbeat then
         self:Listen(runService.Heartbeat, function()
             if self.ReelBar and self.ReelBar.Visible then self:ShowCast() end
-            if self.BreathCooldownUntil and self.SpecialEffect == 'godzilla' then
-                if self.BreathCooldownUntil > World:GetServerTime() then
-                    self:ShowCast()
-                else
-                    self.BreathCooldownUntil = nil
-                    self:ShowCast()
-                end
-            end
             if self.CastFloat and self.IsOpen then self:UpdateCastFeedback() end
-            if self.Starving then self:UpdateStarveFx() end
             DamageFloat:Update()
             FishCombatLabel:Update()
-        end)
-    end
-    local task = game:GetService('Task')
-    if task and task.Delay then
-        task:Delay(1, function()
-            if not self.Inited or self.BoundRootNode ~= root then return end
-            local player = game:GetService('Players').LocalPlayer
-            if not player then return end
-            listenPlayerAttributes(self, player)
         end)
     end
     LocalAttackButton:Start(root, rects.AttackControl)
@@ -1533,10 +627,11 @@ function ScreenHandler:OpenScreen()
     DamageFloat:Bind(self.RootNode, self.EuiResolution)
     FishCombatLabel:Bind(self.RootNode, self.EuiResolution)
     self.IsOpen = true
+    if type(self.OnOpenChanged) == 'function' then
+        self.OnOpenChanged(true)
+    end
     LocalAttackButton:SetOpen(true)
     self:ShowCast()
-    self:ShowCoin()
-    self:ShowVitals()
     _G.REUtil:GetRE('SpecialItemStateRequest'):FireServer()
     _G.REUtil:GetRE('RequestItemBar'):FireServer()
     _G.REUtil:GetRE('RequestCastState'):FireServer()
@@ -1561,11 +656,12 @@ function ScreenHandler:CloseScreen()
     DamageFloat:Clear()
     FishCombatLabel:Clear()
     self.IsOpen = false
+    if type(self.OnOpenChanged) == 'function' then
+        self.OnOpenChanged(false)
+    end
     self.FailureUntil = nil
     self.FailureLanding = nil
     self.FailureNotice = nil
-    self:EndAim()
-    self:ClosePopup()
     LocalAttackButton:SetOpen(false)
     if _G.LocalReelIn then _G.LocalReelIn:Suspend() end
     self.CastState = nil

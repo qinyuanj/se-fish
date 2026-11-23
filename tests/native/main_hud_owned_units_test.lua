@@ -7,9 +7,7 @@
 --   1. 某个建点建完没登记 → 关屏后它还在场上（私有桶已经不兜底了）；
 --   2. 清空没走登记表、清的不是这个所有者、或同一个节点登记了两次 → 关屏后登记表仍非空，
 --      登记表自己成了泄漏源；
---   3. 短命的瞄准拾取层挂在主界面名下、又在 EndAim 先拆一次 → 关屏时同一个节点被拆第二遍
---      （真引擎里重复销毁会报错）；
---   4. 每次长按瞄准留下的登记记录不回收 → 一局下来登记表只增不减。
+--   （#297-C2 起瞄准拾取层归 MainHudItemBarView，其节点归属由 spec/client_main_hud_item_bar_test 守）。
 local OwnedUnits = require('common.OwnedUnits')
 
 local GLOBALS = { 'game', 'Vector2', 'Color', 'REUtil', 'GameUI', 'MgrGameUI', 'LocalReelIn', 'print' }
@@ -107,11 +105,8 @@ describe('主界面 HUD 的节点归属（#209）', function()
 
     it('test_cleanup_destroys_and_unregisters_every_hud_node', function()
         ctx = setUp()
-        -- 走一遍惰性建点：两个弹窗的候选格都是点开才建，不点就漏掉这批建点
         ctx.states:Fire({ slots = {}, slotCount = 4, bait = { worm = 2, sausage = 1 },
             weapons = { item134 = 1 }, backpackCount = 5 })
-        ctx.nodes.WeaponBar.OnClicked:Fire()
-        ctx.nodes.BaitBar.OnClicked:Fire()
         -- 世界建了多少个节点，主界面名下就该有多少个：漏登记或多登记都在这里露出
         assert.same(#ctx.created, OwnedUnits.Count(ctx.handler))
         ctx.handler:Cleanup()
@@ -123,53 +118,12 @@ describe('主界面 HUD 的节点归属（#209）', function()
         end
     end)
 
-    it('test_aim_overlay_destroyed_once_without_leaving_registry_trail', function()
-        ctx = setUp()
-        local hudNodes = OwnedUnits.Count(ctx.handler)
-        local overlays = {}
-        for index = 1, 3 do
-            ctx.handler:BeginAim(1)
-            local overlay = ctx.created[#ctx.created]
-            assert.same('ThrowAimOverlay', overlay.Name)
-            -- 拾取层是立刻回收的单例：活着时也不挂在主界面名下，否则 EndAim 拆过之后
-            -- 登记表还留着它，关屏时得再拆一遍（登记表没有「取消登记」）
-            assert.same(hudNodes, OwnedUnits.Count(ctx.handler))
-            ctx.handler:EndAim()
-            assert.is_true(overlay.Destroyed, '瞄准结束后拾取层应立刻销毁')
-            overlays[index] = overlay
-        end
-        ctx.handler:Cleanup()
-        for _, overlay in ipairs(overlays) do
-            if overlay.Destroys ~= 1 then
-                assert.is_true(false, '瞄准拾取层被销毁 ' .. overlay.Destroys .. ' 次，应为 1 次')
-            end
-        end
-        assert.same(0, OwnedUnits.Count(ctx.handler))
-    end)
-
-    it('test_cleanup_reclaims_aim_overlay_left_by_mid_aim_close', function()
-        ctx = setUp()
-        local hudNodes = OwnedUnits.Count(ctx.handler)
-        -- 关屏路径没走到 EndAim（Cleanup 前半段抛错时就会这样）：拾取层得由 Cleanup 自己回收，
-        -- 否则全屏拦截按钮会留在 UIRoot 上继续吃点击
-        ctx.handler.CloseScreen = function() end
-        ctx.handler:BeginAim(1)
-        local overlay = ctx.created[#ctx.created]
-        assert.same('ThrowAimOverlay', overlay.Name)
-        assert.same(hudNodes, OwnedUnits.Count(ctx.handler)) -- 拾取层不挂在主界面名下
-        assert.same(1, OwnedUnits.Count(ctx.handler.AimOwner))
-        ctx.handler:Cleanup() -- 瞄准中途关屏，不调 EndAim
-        assert.is_true(overlay.Destroyed, '关屏后瞄准拾取层必须被销毁')
-        assert.same(1, overlay.Destroys) -- 只拆一次（重复销毁在真引擎里会报错）
-        assert.same(0, OwnedUnits.Count(ctx.handler.AimOwner))
-        assert.same(0, OwnedUnits.Count(ctx.handler))
-    end)
 
     it('test_partial_init_rolls_back_listeners_and_preserves_original_error', function()
         ctx = setUp()
         ctx.handler:Cleanup()
         ctx.failCreate = 'QuestBackground'
-        ctx.failDestroy = 'ItemBarIcon1'
+        ctx.failDestroy = 'ReelClose'
         local logs = {}
         _G.print = function(...) logs[#logs + 1] = table.concat({ ... }, '	') end
 

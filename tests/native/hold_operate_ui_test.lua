@@ -1,6 +1,13 @@
 -- #86 迁移（原 tests/gameplay/hold_operate_ui_test.lua，#124 客户端失败方式）：
 -- 首点即消费、拖拽取消仍发请求、失败无提示、武器/饵不随快照更新、
--- 重进后拖拽与两步状态串味。接缝：ScreenMain 拖拽/操作入口。
+-- 重进后拖拽与两步状态串味。接缝：ScreenMain 拖拽/操作入口 + Spoke 装备浮层视图。
+local spoke = require('common.packages.spoke.api')
+local ClientStore = require('client.Store.ClientStore')
+local RootView = require('client.Views.RootView')
+local MainHudEquipPopups = require('client.Views.MainHudEquipPopups')
+local MainHudItemBarView = require('client.Views.MainHudItemBarView')
+local MainHudActionButtonsView = require('client.Views.MainHudActionButtonsView')
+
 local function signal()
     local listeners = {}
     return {
@@ -38,6 +45,8 @@ describe("持有操作的界面侧", function()
             for key, value in pairs(attrs) do node[key] = value end
             function node:Destroy()
                 self.Destroyed = true
+                self.Visible = false
+                self.TouchEnabled = false
                 for _, child in ipairs(world.Created) do
                     if child.Parent == self then child:Destroy() end
                 end
@@ -72,10 +81,32 @@ describe("持有操作的界面侧", function()
             if name == 'ScreenMain' then return ctx.currentRoot end
         end }
         ctx.handler:Init()
+        ctx.store, ctx.writer = ClientStore.new({ initial_now = 100 })
+        ctx.hostBinding = ctx.writer:bind_host({
+            get_re = function(name) return _G.REUtil:GetRE(name) end,
+        })
+        ctx.openPopup = spoke.State.new('Test.hud_open_popup', nil)
+        ctx.spokeRoot = { Name = 'UIRoot', Destroying = signal(),
+            FindFirstChild = function(_, name) return ctx.nodes[name] end }
+        ctx.hudView = RootView.mount(ctx.spokeRoot, ctx.store, {
+            create_node = function(kind, attrs) return world:CreateUnit(kind, attrs) end,
+            hud = {
+                MainHudItemBarView.spec({}),
+                MainHudActionButtonsView.spec({
+                    send_operate = function(payload) ctx.handler:Operate(payload) end,
+                }),
+                MainHudEquipPopups.spec({
+                    open_popup = ctx.openPopup,
+                    send_operate = function(payload) ctx.handler:Operate(payload) end,
+                }),
+            },
+        })
     end)
 
     -- 攻击按钮逐例销毁，全局与模块缓存恢复；setUp 中途失败也照样清理。
     after_each(function()
+        if ctx.hudView then ctx.hudView:dispose() end
+        if ctx.hostBinding then ctx.hostBinding:dispose() end
         require('client.LocalAttackButton'):Destroy()
         package.loaded['client.LocalAttackButton'] = ctx.previousAttack
         for _, key in ipairs({ 'game', 'Vector2', 'Color', 'REUtil', 'GameUI', 'MgrGameUI',
@@ -84,18 +115,16 @@ describe("持有操作的界面侧", function()
         end
     end)
 
-    -- 双向拖拽：道具栏格拖到背包格发 MoveSlot；原地按下抬起（点击）与拖出界都不发。
+    -- 道具栏格位间拖拽：从格 1 拖到格 2 发 MoveSlot；原地按下抬起（点击）与拖出界都不发。
     it("test_drag_between_containers_sends_move_slot", function()
-        ctx.states:Fire({ slots = { [1] = { itemId = 'carp', count = 1 } }, slotCount = 2,
-            backpack = { [1] = { itemId = 'bass', count = 1 } }, backpackCount = 5, bait = {} })
-        ctx.nodes.BtnBackpack.OnClicked:Fire()
-        assert.is_true(ctx.nodes.BackpackSlot1.Visible)
+        ctx.states:Fire({ slots = { [1] = { itemId = 'carp', count = 1 }, [2] = { itemId = 'bass', count = 1 } },
+            slotCount = 2, backpack = {}, backpackCount = 5, bait = {} })
         local from = ctx.nodes.ItemBarSlot1.Position
-        local to = ctx.nodes.BackpackSlot1.Position
+        local to = ctx.nodes.ItemBarSlot2.Position
         ctx.nodes.ItemBarSlot1.OnTouchBegan:Fire({ BeganPosition = { x = from.x, y = from.y } })
         ctx.nodes.ItemBarSlot1.OnTouchEnded:Fire({ EndedPosition = { x = to.x, y = to.y } })
         assert.same({ action = 'MoveSlot',
-            value = { from = 'itemBar', index = 1, target = 'backpack', slot = 1 } },
+            value = { from = 'itemBar', index = 1, target = 'itemBar', slot = 2 } },
             ctx.commands[#ctx.commands])
         local before = #ctx.commands
         -- 原地点击：位移不足，不发 MoveSlot（SelectSlot 仍由 OnClicked 通道发）
@@ -103,8 +132,8 @@ describe("持有操作的界面侧", function()
         ctx.nodes.ItemBarSlot2.OnTouchEnded:Fire({ EndedPosition = { x = 2, y = 2 } })
         assert.same(before, #ctx.commands)
         -- 拖出任何格子：取消，不发
-        ctx.nodes.BackpackSlot1.OnTouchBegan:Fire({ BeganPosition = { x = to.x, y = to.y } })
-        ctx.nodes.BackpackSlot1.OnTouchEnded:Fire({ EndedPosition = { x = 5, y = 5 } })
+        ctx.nodes.ItemBarSlot1.OnTouchBegan:Fire({ BeganPosition = { x = from.x, y = from.y } })
+        ctx.nodes.ItemBarSlot1.OnTouchEnded:Fire({ EndedPosition = { x = 5, y = 5 } })
         assert.same(before, #ctx.commands)
     end)
 

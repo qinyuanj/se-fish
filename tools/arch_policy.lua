@@ -21,11 +21,14 @@ M.policy = {
         'common.FlightPath', 'common.GameCfg', 'common.GrillCurve', 'common.LotteryDraw',
         'common.LotteryEligibility', 'common.MathWaterJudge', 'common.NpcDialogue', 'common.Number',
         'common.OwnedUnits', 'common.QuestSteps', 'common.RateLimit', 'common.Records',
-        'common.ReelDisplay', 'common.ReelProgress', 'common.SpecialItem', 'common.Vitals',
-        'common.ZoneMarkers',
+        'common.ReelDisplay', 'common.ReelProgress', 'common.SpecialItem', 'common.SpokeClock',
+        'common.Vitals', 'common.ZoneMarkers',
       },
     },
     {
+      -- ADR-0032 客户端只读响应式状态仓库（#296），归属 L3 支撑层，
+      -- 天然禁止反向依赖 L2 的 client.Views / ScreenHandlers / Local*。
+      ids = { 'client.Store' },
       modules = {
         'client.DamageFloat', 'client.FishCombatLabel', 'client.GameUI', 'client.InteractionBubble',
         'client.MainHudLayout', 'client.PressGesture', 'client.WeaponAim',
@@ -35,10 +38,11 @@ M.policy = {
       },
     },
     {
-      ids = { 'server.Mgr', 'server.AbilityBehaviors', 'client.ScreenHandlers' },
+      -- ADR-0032 服务端 Spoke 树（#295）与客户端 Spoke 视图树（#296）归属 L2。
+      ids = { 'server.Mgr', 'server.AbilityBehaviors', 'client.ScreenHandlers', 'client.Views', 'server.World' },
       modules = {
         'server.AbilityAPI', 'client.MgrGameUI',
-        'client.LocalAttackButton', 'client.LocalAttr', 'client.LocalCastSource', 'client.LocalGM',
+        'client.LocalAttackButton', 'client.LocalCastSource', 'client.LocalGM',
         'client.LocalGarBite', 'client.LocalInteract', 'client.LocalLoot', 'client.LocalLottery',
         'client.LocalMgrUtil', 'client.LocalMotorUnitCtrl', 'client.LocalReelIn', 'client.LocalShop',
       },
@@ -53,6 +57,22 @@ M.policy = {
     -- 正式代码引用测试夹具会把假数据带进产物（曾生成 108 条假锚点）。
     { name = 'no_test_imports', from = { '^client%.', '^common%.', '^server%.', '^tools%.' },
       to = { '^tests%.' } },
+    -- ADR-0032 单向棘轮：新 Spoke 命名空间严禁反向 require 存量旧债务模块。
+    {
+      name = 'spoke_no_legacy_reverse_dep',
+      from = {
+        '^common%.SpokeClock$',
+        '^server%.World$', '^server%.World%.',
+        '^client%.Store$', '^client%.Store%.',
+        '^client%.Views$', '^client%.Views%.',
+      },
+      to = {
+        '^common%.OwnedUnits$',
+        '^server%.Mgr$', '^server%.Mgr%.',
+        '^server%.AbilityAPI$', '^server%.AbilityBehaviors$', '^server%.AbilityBehaviors%.',
+        '^client%.MgrGameUI$', '^client%.ScreenHandlers$', '^client%.ScreenHandlers%.', '^client%.Local',
+      },
+    },
   },
 }
 

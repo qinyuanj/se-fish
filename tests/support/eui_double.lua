@@ -7,20 +7,32 @@ function M.Signal()
   local listeners = {}
   return {
     Connect = function(_, fn)
-      listeners[#listeners + 1] = fn
-      return { Disconnect = function()
-        for i, callback in ipairs(listeners) do
-          if callback == fn then table.remove(listeners, i) break end
-        end
-      end }
+      local entry = { fn = fn, active = true }
+      listeners[#listeners + 1] = entry
+      return {
+        Disconnect = function()
+          if not entry.active then return end
+          entry.active = false
+          for i, item in ipairs(listeners) do
+            if item == entry then table.remove(listeners, i) break end
+          end
+        end,
+      }
+    end,
+    Count = function()
+      return #listeners
     end,
     Fire = function(_, ...)
-      for _, callback in ipairs(listeners) do callback(...) end
+      local snapshot = {}
+      for i = 1, #listeners do snapshot[i] = listeners[i] end
+      for _, item in ipairs(snapshot) do
+        if item.active then item.fn(...) end
+      end
     end,
   }
 end
 
--- spec: { Name?, Kind?, Parent?, Children?, Visible?=true, Text?, TouchEnabled?, OnClicked? }。
+-- spec: { Name?, Kind?, Parent?, Children?, Visible?=true, Text?, TouchEnabled?, OnClicked?, Destroying? }。
 -- Disabled 由调用方显式写入，避免构造参数掩盖属性写入顺序。
 function M.Node(spec)
   spec = spec or {}
@@ -29,9 +41,13 @@ function M.Node(spec)
     Kind = spec.Kind,
     Visible = spec.Visible ~= false,
     Text = spec.Text or '',
+    Anchor = spec.Anchor or { x = 0.5, y = 0.5 },
+    Position = spec.Position,
+    Size = spec.Size,
     Children = spec.Children or {},
     TouchEnabled = spec.TouchEnabled,
     OnClicked = spec.OnClicked or M.Signal(),
+    Destroying = spec.Destroying or M.Signal(),
   }
   local node = setmetatable({}, {
     __index = fields,
@@ -51,12 +67,16 @@ function M.Node(spec)
   end
 
   function fields:Destroy()
+    if self.Destroyed then return end
     self.Destroyed = true
-    if self.Parent and self.Parent.Children[self.Name] == self then
-      self.Parent.Children[self.Name] = nil
+    local parent = self.Parent
+    if parent and parent.Children and parent.Children[self.Name] == self then
+      parent.Children[self.Name] = nil
     end
+    self.Parent = nil
     local children = self.Children
     self.Children = {}
+    self.Destroying:Fire()
     for _, child in pairs(children) do child:Destroy() end
   end
 

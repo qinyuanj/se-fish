@@ -16,6 +16,11 @@
 --   7. 选中的既非鱼竿也非食物：按钮仍可见可点；强行点击不给「请重新选择鱼竿」提示；
 --   8. 「结束收线」被并入道具按钮或不再出现；攻击键被改动。
 local GameCfg = require('common.GameCfg')
+local spoke = require('common.packages.spoke.api')
+local ClientStore = require('client.Store.ClientStore')
+local RootView = require('client.Views.RootView')
+local MainHudBackpackView = require('client.Views.MainHudBackpackView')
+local MainHudActionButtonsView = require('client.Views.MainHudActionButtonsView')
 
 local NAME = setmetatable({}, { __index = function(_, id) return GameCfg.Items.Definitions[id].Name end })
 
@@ -85,14 +90,45 @@ local function setUp()
         Click = function() ctx.clicks = ctx.clicks + 1 end,
         Close = function() end,
     }
+    ctx.store, ctx.writer = ClientStore.new({ initial_now = ctx.now })
+    ctx.hostBinding = ctx.writer:bind_host({
+        get_re = function(name) return _G.REUtil:GetRE(name) end,
+    })
+    ctx.backpackOpen = spoke.State.new('Test.hud_backpack_open', false)
+    ctx.reelActive = spoke.State.new('Test.hud_reel_active', false)
     ctx.handler = assert(loadfile('client/ScreenHandlers/ScreenMain.lua'))()
+    ctx.handler.OnReelActiveChanged = function(active) ctx.reelActive:set(active == true) end
     ctx.handler.RootNode = { Name = 'ScreenMain', FindFirstChild = function() return nil end }
     ctx.handler:Init()
     ctx.handler.IsOpen = true
+    ctx.spokeRoot = { Name = 'UIRoot', Destroying = signal(),
+        FindFirstChild = function(_, name) return ctx.nodes[name] end }
+    ctx.hudView = RootView.mount(ctx.spokeRoot, ctx.store, {
+        create_node = function(kind, attrs) return world:CreateUnit(kind, attrs) end,
+        hud = {
+            MainHudActionButtonsView.spec({
+                backpack_open = ctx.backpackOpen,
+                reel_active = ctx.reelActive,
+                send_operate = function(payload) ctx.handler:Operate(payload) end,
+                on_reel_click = function(session_id)
+                    if _G.LocalReelIn.SessionId == session_id then
+                        _G.LocalReelIn:Click()
+                        ctx.handler:ShowCast()
+                    end
+                end,
+            }),
+            MainHudBackpackView.spec({
+                backpack_open = ctx.backpackOpen,
+                on_open_changed = function(is_open) ctx.handler:SetBackpackOpen(is_open) end,
+            }),
+        },
+    })
     return ctx
 end
 
 local function tearDown(ctx)
+    if ctx.hudView then ctx.hudView:dispose() end
+    if ctx.hostBinding then ctx.hostBinding:dispose() end
     require('client.LocalAttackButton'):Destroy()
     package.loaded['client.LocalAttackButton'] = ctx.previousAttack
     for _, key in ipairs(GLOBALS) do _G[key] = ctx.previous[key] end
@@ -249,7 +285,7 @@ describe('道具按钮合并（#181）', function()
             ctx.sent[#ctx.sent])
     end)
 
-    -- 失败方式 7：选中的既非鱼竿也非食物（船票），按钮不出现；强行点击给「请重新选择鱼竿」
+    -- 失败方式 7：选中的既非鱼竿也非食物（船票），按钮不出现且禁点，点击不发命令；服务端返回 invalidRod 时仍提示「请重新选择鱼竿」
     it('test_other_item_hides_button_and_forced_click_hints_invalid_rod', function()
         ctx = setUp()
         push('ItemBarState', selecting('item147'))
@@ -260,6 +296,7 @@ describe('道具按钮合并（#181）', function()
         click()
         assert.same({}, sentNames(ctx, sent))
         assert.same(0, #ctx.commands)
+        push('CastState', { result = { reason = 'invalidRod' } })
         assert.is_true(ctx.nodes.CastFailureHint.Visible)
         assert.same('请重新选择鱼竿', ctx.nodes.CastFailureHint.Text)
     end)

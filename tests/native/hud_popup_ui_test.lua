@@ -18,6 +18,12 @@
 --  12. 重进界面后弹窗节点或监听残留。
 local MainHudLayout = require('client.MainHudLayout')
 local GameCfg = require('common.GameCfg')
+local spoke = require('common.packages.spoke.api')
+local ClientStore = require('client.Store.ClientStore')
+local RootView = require('client.Views.RootView')
+local MainHudEquipPopups = require('client.Views.MainHudEquipPopups')
+local MainHudBackpackView = require('client.Views.MainHudBackpackView')
+local MainHudActionButtonsView = require('client.Views.MainHudActionButtonsView')
 
 -- 玩家可见名取自物品表；折行只为放进 80 宽的格子，比较文字时去掉换行
 local NAME = setmetatable({}, { __index = function(_, id) return GameCfg.Items.Definitions[id].Name end })
@@ -51,10 +57,12 @@ local function setUp(height)
     _G.MgrGameUI = { SetCustomControlUI = function() end }
     local world = { Created = ctx.created }
     function world:CreateUnit(kind, attrs)
-        local node = { Kind = kind, OnClicked = signal() }
+        local node = { Kind = kind, Visible = true, OnClicked = signal() }
         for key, value in pairs(attrs) do node[key] = value end
         function node:Destroy()
             self.Destroyed = true
+            self.Visible = false
+            self.TouchEnabled = false
             for _, child in ipairs(world.Created) do
                 if child.Parent == self then child:Destroy() end
             end
@@ -86,14 +94,54 @@ local function setUp(height)
     end }
     _G.LocalReelIn = { SetSession = function() end, Clear = function() end, Suspend = function() end }
     ctx.states = _G.REUtil:GetRE('ItemBarState').OnClientEvent
+    ctx.store, ctx.writer = ClientStore.new({ initial_now = ctx.now })
+    ctx.hostBinding = ctx.writer:bind_host({
+        get_re = function(name) return _G.REUtil:GetRE(name) end,
+    })
+    ctx.backpackOpen = spoke.State.new('Test.hud_backpack_open', false)
+    ctx.openPopup = spoke.State.new('Test.hud_open_popup', nil)
     ctx.handler = assert(loadfile('client/ScreenHandlers/ScreenMain.lua'))()
+    ctx.handler.OnOpenChanged = function(is_open)
+        if not is_open then ctx.openPopup:set(nil) end
+        ctx.writer:set_hud_visible(is_open)
+    end
     ctx.handler.RootNode = { Name = 'ScreenMain', FindFirstChild = function() return nil end }
     ctx.handler:Init()
     ctx.handler.IsOpen = true
+    function ctx.mountHud()
+        if ctx.hudView then ctx.hudView:dispose() end
+        ctx.spokeRoot = { Name = 'UIRoot', Destroying = signal(),
+            FindFirstChild = function(_, name) return ctx.nodes[name] end }
+        ctx.hudView = RootView.mount(ctx.spokeRoot, ctx.store, {
+            create_node = function(kind, attrs) return world:CreateUnit(kind, attrs) end,
+            hud = {
+                MainHudEquipPopups.spec({
+                    get_resolution = function() return { x = 1920, y = ctx.height } end,
+                    open_popup = ctx.openPopup,
+                    backpack_open = ctx.backpackOpen,
+                    send_operate = function(payload) ctx.handler:Operate(payload) end,
+                }),
+                MainHudActionButtonsView.spec({
+                    get_resolution = function() return { x = 1920, y = ctx.height } end,
+                    backpack_open = ctx.backpackOpen,
+                    send_operate = function(payload) ctx.handler:Operate(payload) end,
+                }),
+                MainHudBackpackView.spec({
+                    get_resolution = function() return { x = 1920, y = ctx.height } end,
+                    backpack_open = ctx.backpackOpen,
+                    open_popup = ctx.openPopup,
+                    on_open_changed = function(is_open) ctx.handler:SetBackpackOpen(is_open) end,
+                }),
+            },
+        })
+    end
+    ctx.mountHud()
     return ctx
 end
 
 local function tearDown(ctx)
+    if ctx.hudView then ctx.hudView:dispose() end
+    if ctx.hostBinding then ctx.hostBinding:dispose() end
     require('client.LocalAttackButton'):Destroy()
     package.loaded['client.LocalAttackButton'] = ctx.previousAttack
     for _, key in ipairs(GLOBALS) do _G[key] = ctx.previous[key] end
@@ -242,7 +290,7 @@ describe('武器栏、鱼饵栏与弹窗（#180）', function()
     it('test_only_one_popup_open_and_blank_click_closes', function()
         ctx = setUp(1080)
         ctx.states:Fire({ slots = {}, bait = { worm = 1 }, weapons = { item134 = 1 } })
-        assert.is_false(ctx.nodes.PopupDismiss.Visible)
+        assert.is_nil(ctx.nodes.PopupDismiss)
         ctx.nodes.WeaponBar.OnClicked:Fire()
         assert.is_true(ctx.nodes.WeaponPopup.Visible)
         assert.is_true(ctx.nodes.PopupDismiss.Visible)
@@ -292,7 +340,7 @@ describe('武器栏、鱼饵栏与弹窗（#180）', function()
         assertAt(ctx.nodes.BaitPopupCell_NoBait, six[5], 'NoBait @5')
         assert.same(NAME.worm .. '×1', plain(ctx.nodes.BaitPopupLabel_worm.Text))
         -- 武器库存归零：仍在候选行里，改为置灰
-        ctx.handler:ClosePopup()
+        ctx.nodes.PopupDismiss.OnClicked:Fire()
         ctx.states:Fire({ slots = {}, bait = {}, weapons = { item134 = 1 } })
         ctx.nodes.WeaponBar.OnClicked:Fire()
         assert.is_true(ctx.nodes.WeaponPopupCell_item134.TouchEnabled)
@@ -365,6 +413,7 @@ describe('武器栏、鱼饵栏与弹窗（#180）', function()
         local old = { cell = ctx.nodes.WeaponPopupCell_item134, label = ctx.nodes.WeaponPopupLabel_item134,
             plate = ctx.nodes.WeaponPopup, dismiss = ctx.nodes.PopupDismiss, bar = ctx.nodes.WeaponBar }
         -- 换根节点重进：旧节点全部销毁、旧监听断开，新界面没有开着的弹窗
+        ctx.mountHud()
         ctx.handler.RootNode = { Name = 'ScreenMain', FindFirstChild = function() return nil end }
         ctx.handler:Init()
         ctx.handler.IsOpen = true
