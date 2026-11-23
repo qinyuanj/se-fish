@@ -38,9 +38,9 @@ M.policy = {
       },
     },
     {
-      ids = { 'server.Mgr', 'server.AbilityBehaviors', 'client.ScreenHandlers' },
-      -- ADR-0032 预留命名空间：服务端 Spoke 树与客户端 Spoke 视图树（#295/#296 迁入）。
-      reserved_ids = { 'server.World', 'client.Views' },
+      ids = { 'server.Mgr', 'server.AbilityBehaviors', 'client.ScreenHandlers', 'server.World' },
+      -- ADR-0032 预留命名空间：客户端 Spoke 视图树（#296 迁入）。
+      reserved_ids = { 'client.Views' },
       modules = {
         'server.AbilityAPI', 'client.MgrGameUI',
         'client.LocalAttackButton', 'client.LocalAttr', 'client.LocalCastSource', 'client.LocalGM',

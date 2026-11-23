@@ -2,10 +2,13 @@
 local Task = game:GetService("Task")
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
+local WorldService = game:GetService("World")
 local ZoneMarkers = require("common.ZoneMarkers")
 ZoneMarkers.Start()
 MgrUtil = require("server.MgrUtil")
 MgrUtil:Start()
+local Number = require("common.Number")
+local ServerRuntime = require("server.World.ServerRuntime")
 
 local MgrMap = {
     MgrPlayer = require("server.Mgr.MgrPlayer"),
@@ -170,96 +173,90 @@ MgrMap.MgrVitals.ZoneMarkers = ZoneMarkers
 MgrMap.MgrVitals.Party = MgrMap.MgrParty
 MgrMap.MgrVitals.DamageFilter = makePkDamageFilter()
 
-local ActivePlayers = {}
-local CurrentPlayers = {}
-local LeavingPlayers = {}
-local Started = false
-local ReadyQueue = {}
 local function invoke(name, mgr, method, ...)
     if not mgr[method] then return end
     local ok, err = pcall(mgr[method], mgr, ...)
     if not ok then print('[server.main]', name, method, tostring(err)) end
 end
-MgrMap.MgrSave.OnReady = function(player, data)
-    if CurrentPlayers[player.UserId] ~= player or LeavingPlayers[player.UserId]
-        or MgrMap.MgrPlayerData:GetDataInst(player) ~= data or ActivePlayers[player.UserId] == player then return end
-    if not Started then ReadyQueue[player.UserId] = { player, data } return end
-    ActivePlayers[player.UserId] = player
-    for _, name in ipairs({ 'MgrAttr', 'MgrPlayer', 'MgrVitals', 'MgrModifier', 'MgrSurvival', 'MgrAbility', 'MgrFishUnit' }) do
-        invoke(name, MgrMap[name], 'OnPlayerAdded', player)
+
+local function serverNow()
+    if WorldService and WorldService.GetServerTime then
+        local ok, now = pcall(WorldService.GetServerTime, WorldService) -- 兼容引擎早期阶段或离线替身未提供 GetServerTime
+        if ok and Number.IsFiniteNumber(now) then return now end
     end
-    for name, mgr in pairs(MgrMap) do
-        if name ~= 'MgrPlayerData' and name ~= 'MgrPlayer' and name ~= 'MgrVitals'
-            and name ~= 'MgrSurvival' and name ~= 'MgrAbility' and name ~= 'MgrFishUnit'
-            and name ~= 'MgrAttr' and name ~= 'MgrModifier' then
-            invoke(name, mgr, 'OnPlayerAdded', player)
-        end
-    end
-end
-local function HandlePlayerAdded(player)
-    local leaving = LeavingPlayers[player.UserId]
-    if leaving then
-        leaving.Waiting = player
-        player:SetAttribute('SaveState', 'pending')
-        return
-    end
-    CurrentPlayers[player.UserId] = player
-    invoke('MgrPlayerData', MgrMap.MgrPlayerData, 'OnPlayerAdded', player)
+    return nil
 end
 
-local function ContinuePlayerRemoving(player, leaving)
-    if LeavingPlayers[player.UserId] ~= leaving or leaving.Cleaned then return end
-    local function resume() ContinuePlayerRemoving(player, leaving) end
-    if MgrMap.MgrQuest:FlushBeforeLeave(player, resume) then return end
-    if MgrMap.MgrStory:FlushBeforeLeave(player, resume) then return end
-    leaving.Cleaned = true
-    local active = ActivePlayers[player.UserId] == player
-    if active then ActivePlayers[player.UserId] = nil end
-    if active then invoke('MgrSurvival', MgrMap.MgrSurvival, 'BeforeLeave', player) end
-    if active then invoke('MgrGrill', MgrMap.MgrGrill, 'BeforeLeave', player) end
-    if active then invoke('MgrSpecialItem', MgrMap.MgrSpecialItem, 'BeforeLeave', player) end
-    invoke('MgrPlayerData', MgrMap.MgrPlayerData, 'OnPlayerRemoving', player)
-    if active then
-        for name, mgr in pairs(MgrMap) do
-            if name ~= 'MgrPlayerData' then invoke(name, mgr, 'OnPlayerRemoving', player) end
+-- Spoke 服务端运行时主干（ADR-0032 / #295）：过渡期旧管理器接缝全部由此 L1 入口以回调注入。
+local WorldRuntime = ServerRuntime.new({
+    initial_now = serverNow() or 0,
+    on_player_join_start = function(player)
+        invoke('MgrPlayerData', MgrMap.MgrPlayerData, 'OnPlayerAdded', player)
+    end,
+    is_player_data_current = function(player, data)
+        return MgrMap.MgrPlayerData:GetDataInst(player) == data
+    end,
+    on_player_ready = function(player)
+        for _, name in ipairs({ 'MgrAttr', 'MgrPlayer', 'MgrVitals', 'MgrModifier', 'MgrSurvival', 'MgrAbility', 'MgrFishUnit' }) do
+            invoke(name, MgrMap[name], 'OnPlayerAdded', player)
         end
-    end
-    MgrMap.MgrSave:AfterIdle(player.UserId, function()
-        if LeavingPlayers[player.UserId] ~= leaving then return end
-        LeavingPlayers[player.UserId], CurrentPlayers[player.UserId] = nil, nil
-        if leaving.Waiting then HandlePlayerAdded(leaving.Waiting) end
-    end)
+        for name, mgr in pairs(MgrMap) do
+            if name ~= 'MgrPlayerData' and name ~= 'MgrPlayer' and name ~= 'MgrVitals'
+                and name ~= 'MgrSurvival' and name ~= 'MgrAbility' and name ~= 'MgrFishUnit'
+                and name ~= 'MgrAttr' and name ~= 'MgrModifier' then
+                invoke(name, mgr, 'OnPlayerAdded', player)
+            end
+        end
+    end,
+    flush_before_leave = function(player, resume)
+        if MgrMap.MgrQuest:FlushBeforeLeave(player, resume) then return true end
+        if MgrMap.MgrStory:FlushBeforeLeave(player, resume) then return true end
+        return false
+    end,
+    on_leave_finalize = function(_, player)
+        invoke('MgrSurvival', MgrMap.MgrSurvival, 'BeforeLeave', player)
+        invoke('MgrGrill', MgrMap.MgrGrill, 'BeforeLeave', player)
+        invoke('MgrSpecialItem', MgrMap.MgrSpecialItem, 'BeforeLeave', player)
+    end,
+    on_player_removing = function(player, active)
+        invoke('MgrPlayerData', MgrMap.MgrPlayerData, 'OnPlayerRemoving', player)
+        if active then
+            for name, mgr in pairs(MgrMap) do
+                if name ~= 'MgrPlayerData' then invoke(name, mgr, 'OnPlayerRemoving', player) end
+            end
+        end
+    end,
+    after_idle = function(userId, done)
+        MgrMap.MgrSave:AfterIdle(userId, done)
+    end,
+})
+ServerRuntime.set_current(WorldRuntime)
+
+MgrMap.MgrSave.OnReady = function(player, data)
+    WorldRuntime:on_save_ready(player, data)
+end
+
+local function HandlePlayerAdded(player)
+    WorldRuntime:on_player_added(player)
 end
 
 local function HandlePlayerRemoving(player)
-    local leaving = LeavingPlayers[player.UserId]
-    if leaving then
-        if leaving.Waiting == player then leaving.Waiting = nil end
-        return
-    end
-    if CurrentPlayers[player.UserId] ~= player then return end
-    leaving = {}
-    LeavingPlayers[player.UserId] = leaving
-    local queued = ReadyQueue[player.UserId]
-    if queued and queued[1] == player then ReadyQueue[player.UserId] = nil end
-    ContinuePlayerRemoving(player, leaving)
+    WorldRuntime:on_player_removing(player)
 end
 
 local function HandleTimeUpdate(deltaTime)
+    WorldRuntime:step(deltaTime, serverNow())
     for k, mgr in pairs(MgrMap) do
         if mgr.Update then
             pcall(function() mgr:Update(deltaTime) end)
         end
     end
-end 
+end
 
 local function GameStart()
+    WorldRuntime:start()
     for name, mgr in pairs(MgrMap) do invoke(name, mgr, 'Start') end
-    Started = true
-    for userId, entry in pairs(ReadyQueue) do
-        ReadyQueue[userId] = nil
-        MgrMap.MgrSave.OnReady(entry[1], entry[2])
-    end
+    WorldRuntime:mark_started()
 end
 
 
@@ -273,3 +270,5 @@ end
 
 GameStart()
 RunService.Heartbeat:Connect(HandleTimeUpdate)
+
+return WorldRuntime
