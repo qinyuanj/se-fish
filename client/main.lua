@@ -18,6 +18,8 @@ local SurvivalOverlayView = require("client.Views.SurvivalOverlayView")
 local GroundLootView = require("client.Views.GroundLootView")
 local FishCombatView = require("client.Views.FishCombatView")
 local GrillView = require("client.Views.GrillView")
+local ReelOverlayView = require("client.Views.ReelOverlayView")
+local CastSourceView = require("client.Views.CastSourceView")
 local ScreenMain = require("client.ScreenHandlers.ScreenMain")
 local REUtil = require("common.REUtil")
 local GameUI = require("client.GameUI")
@@ -39,6 +41,7 @@ _G.ClientSpoke = { Store = client_store, Clock = client_store.clock }
 local hud_backpack_open = spoke.State.new("ClientMain.hud_backpack_open", false)
 local hud_open_popup = spoke.State.new("ClientMain.hud_open_popup", nil)
 local hud_reel_active = spoke.State.new("ClientMain.hud_reel_active", false)
+local hud_reel = {}
 local hud_drop_resolvers = {}
 
 local function resolve_item_bar_drop(pos)
@@ -94,6 +97,10 @@ Task:Spawn(function()
                     local payload = WeaponAim:AttackPayload()
                     return payload and payload.aim or nil
                 end,
+                reel = hud_reel,
+                create_unit = function(kind, props)
+                    return World:CreateUnit(kind, props)
+                end,
             },
             hud = {
                 CameraZoomView.spec(),
@@ -112,17 +119,14 @@ Task:Spawn(function()
                 }),
                 AttackView.spec(),
                 GrillView.spec(),
+                CastSourceView.spec(),
                 MainHudActionButtonsView.spec({
                     backpack_open = hud_backpack_open,
                     reel_active = hud_reel_active,
                     send_operate = send_hud_operate,
                     on_reel_click = function(session_id)
-                        local reel = rawget(_G, "LocalReelIn")
-                        if type(reel) == "table" and reel.SessionId == session_id and type(reel.Click) == "function" then
-                            reel:Click()
-                            if ScreenMain.Inited then
-                                ScreenMain:ShowCast()
-                            end
+                        if type(hud_reel.click) == "function" then
+                            hud_reel.click(session_id)
                         end
                     end,
                 }),
@@ -143,6 +147,7 @@ Task:Spawn(function()
             overlays = {
                 survival = SurvivalOverlayView.spec(),
                 aim_pickup = GroundLootView.aim_spec(),
+                reel = ReelOverlayView.spec({ controller = hud_reel }),
             },
             docks = {
                 ground_loot = GroundLootView.bubble_spec({
@@ -163,7 +168,6 @@ _G.MgrGameUI:HideLiftButton()
 _G.MgrGameUI:HideNativeHealth()
 
 local LocalMotorUnitCtrl = require("client.LocalMotorUnitCtrl")
-local LocalReelIn = require("client.LocalReelIn")
 local LocalInteract = require("client.LocalInteract")
 local LocalGM = require("client.LocalGM")
 local LocalShop = require("client.LocalShop")
@@ -174,7 +178,7 @@ local ScreenParty = require("client.ScreenHandlers.ScreenParty")
 local ScreenBlindbox = require("client.ScreenHandlers.ScreenBlindbox")
 local ScreenPlatform = require("client.ScreenHandlers.ScreenPlatform")
 local ScreenCompendium = require('client.ScreenHandlers.ScreenCompendium')
-local LocalCastSource = require('client.LocalCastSource')
+
 
 local AbilityAPI = require("client.packages.ability_system.api")
 if AbilityAPI then
@@ -183,13 +187,11 @@ end
 
 Task:Spawn(function() 
     LocalMotorUnitCtrl:Start()
-    _G.LocalReelIn = LocalReelIn
-    LocalReelIn:Start()
     _G.MgrGameUI:OpenScreen('ScreenMain')
     LocalGM:Start()
     _G.MgrGameUI:StartGM()
 end)
-Task:Spawn(function() LocalCastSource:Start() end)
+
 Task:Spawn(function() LocalInteract:Start() end)
 Task:Spawn(function() LocalShop:Start() end)
 Task:Spawn(function() ScreenLottery:Start() end)

@@ -18,9 +18,7 @@ local FishAi = require("server.World.FishAi")
 local MgrMap = {
     MgrPlayer = require("server.Mgr.MgrPlayer"),
     MgrPlayerData = require("server.Mgr.MgrPlayerData"),
-    MgrCast = require("server.Mgr.MgrCast"),
     MgrAbility = require("server.Mgr.MgrAbility"),
-    MgrReelIn = require("server.Mgr.MgrReelIn"),
     MgrInteract = require("server.Mgr.MgrInteract"),
     MgrGM = require("server.Mgr.MgrGM"),
     MgrShop = require("server.Mgr.MgrShop"),
@@ -278,17 +276,25 @@ MgrMap.MgrAbility.BehaviorServices = {
     GM = MgrMap.MgrGM,
 }
 
-MgrMap.MgrCast.ReelIn = MgrMap.MgrReelIn
-MgrMap.MgrReelIn.Cast = MgrMap.MgrCast
+-- #302 的抛竿/收线由 PlayerTree 存活相位拥有；这里仅保留 GM 与 FishTree 的公开桥接。
+local CastBridge = {}
+function CastBridge:PushState(player)
+    return WorldRuntime and WorldRuntime:push_cast_state(player) or false
+end
+function CastBridge:Abort(player)
+    return WorldRuntime and WorldRuntime:abort_cast(player) or false
+end
+function CastBridge:SetNextFish(player, fishId)
+    return WorldRuntime and WorldRuntime:set_next_fish(player, fishId) or false
+end
 MgrMap.MgrInteract.PlayerData = MgrMap.MgrPlayerData
 MgrMap.MgrGM.PlayerData = MgrMap.MgrPlayerData
-MgrMap.MgrGM.Cast = MgrMap.MgrCast
+MgrMap.MgrGM.Cast = CastBridge
 MgrMap.MgrShop.PlayerData = MgrMap.MgrPlayerData
 MgrMap.MgrShop.Interact = MgrMap.MgrInteract
 MgrMap.MgrInteract.Quest = MgrMap.MgrQuest
 MgrMap.MgrShop.Quest = MgrMap.MgrQuest
 MgrMap.MgrPlayerData.Quest = MgrMap.MgrQuest
-MgrMap.MgrCast.Quest = MgrMap.MgrQuest
 MgrMap.MgrPlayerData.Vitals = nil
 MgrMap.MgrGM.Vitals = nil
 MgrMap.MgrGM.Save = MgrMap.MgrSave
@@ -314,7 +320,6 @@ MgrMap.MgrLottery.Interact = MgrMap.MgrInteract
 MgrMap.MgrCompendium.Save = MgrMap.MgrSave
 MgrMap.MgrCompendium.PlayerData = MgrMap.MgrPlayerData
 MgrMap.MgrCompendium.Quest = MgrMap.MgrQuest
-MgrMap.MgrCast.Compendium = MgrMap.MgrCompendium
 
 MgrMap.MgrCompendium.Records = MgrMap.MgrRecords
 MgrMap.MgrRecords.PlayerData = MgrMap.MgrPlayerData
@@ -330,7 +335,6 @@ MgrMap.MgrPlayerData.Ability = MgrMap.MgrAbility
 MgrMap.MgrAbility.PlayerData = MgrMap.MgrPlayerData
 MgrMap.MgrAbility.Attr = AttrBridge
 MgrMap.MgrAbility.Modifier = ModifierBridge
-MgrMap.MgrCast.Vitals = nil
 
 MgrMap.MgrParty.PlayerData = MgrMap.MgrPlayerData
 MgrMap.MgrParty.Save = MgrMap.MgrSave
@@ -388,6 +392,13 @@ WorldRuntime = ServerRuntime.new({
     player_data = MgrMap.MgrPlayerData,
     save = MgrMap.MgrSave,
     platform = MgrMap.MgrPlatform,
+    fish_carrier = FishCarrier,
+    compendium = MgrMap.MgrCompendium,
+    quest = MgrMap.MgrQuest,
+    random = math.random,
+    fish_units = function()
+        return WorldRuntime and WorldRuntime.fish_host.Fish or {}
+    end,
     physics = game:GetService("PhysicsService"),
     players_service = Players,
     world_service = WorldService,
@@ -406,6 +417,22 @@ WorldRuntime = ServerRuntime.new({
             if type(payload) ~= "table" then return end
             if _G.REUtil:CheckRECD(player, "GrillAction", GameCfg.Items.ActionCooldownSec) then return end
             dispatch(player, payload)
+        end)
+    end,
+    bind_cast_action = function(dispatch)
+        _G.REUtil:GetRE("CastAction").OnServerEvent:Connect(function(player, payload)
+            dispatch(player, payload)
+        end)
+        _G.REUtil:GetRE("RequestCastState").OnServerEvent:Connect(function(player)
+            dispatch(player, { action = "Request" })
+        end)
+    end,
+    bind_reel_action = function(dispatch)
+        _G.REUtil:GetRE("ReelInRE").OnServerEvent:Connect(function(player, payload)
+            dispatch(player, "click", payload)
+        end)
+        _G.REUtil:GetRE("CloseReelIn").OnServerEvent:Connect(function(player, payload)
+            dispatch(player, "close", payload)
         end)
     end,
     ability = { CastAbility = AbilityAPI.CastAbility },
@@ -493,8 +520,7 @@ WorldRuntime.life:SetDamageFilter(pkDamageFilter)
 local Life = WorldRuntime.life
 -- #309 活鱼公开宿主接线：不再注册 MgrFishUnit/MgrFishCarrier/MgrAi。
 local fishHost = WorldRuntime.fish_host
-MgrMap.MgrCast.FishUnit = fishHost
-fishHost.Cast = MgrMap.MgrCast
+fishHost.Cast = CastBridge
 fishHost.Ability = MgrMap.MgrAbility
 fishHost.AbilityApi = AbilityAPI
 fishHost.Quest = MgrMap.MgrQuest
@@ -514,7 +540,6 @@ MgrMap.MgrInteract.Vitals = Life
 MgrMap.MgrInteract.Survival = Life
 MgrMap.MgrAbility.Vitals = Life
 MgrMap.MgrAbility.BehaviorServices.Vitals = Life
-MgrMap.MgrCast.Vitals = Life
 MgrMap.MgrParty.Vitals = Life
 
 MgrMap.MgrPlayerData.OnSyncPlayerTree = function(player, data, forcePush)

@@ -24,6 +24,7 @@ local MainHudBackpackView = require('client.Views.MainHudBackpackView')
 local AttackView = require('client.Views.AttackView')
 local MainHudItemBarView = require('client.Views.MainHudItemBarView')
 local MainHudActionButtonsView = require('client.Views.MainHudActionButtonsView')
+local ReelOverlayView = require('client.Views.ReelOverlayView')
 
 local function signal()
     local listeners = {}
@@ -40,7 +41,7 @@ local function signal()
     }
 end
 
-local GLOBALS = { 'game', 'Vector2', 'Color', 'REUtil', 'GameUI', 'MgrGameUI', 'LocalReelIn' }
+local GLOBALS = { 'game', 'Vector2', 'Color', 'REUtil', 'GameUI', 'MgrGameUI' }
 
 local function setUp(height)
     local ctx = { nodes = {}, created = {}, sent = {}, events = {}, now = 100, height = height }
@@ -83,8 +84,6 @@ local function setUp(height)
         end
         return ctx.events[name]
     end }
-    _G.LocalReelIn = { SetSession = function(self, session) self.SessionId = session end,
-        Clear = function() end, Suspend = function() end }
     -- 编辑器摆放的金币节点：ScreenMain 的直接子节点，运行时按名查找
     ctx.nodes.ImageCoin = { Name = 'ImageCoin', Position = { x = 864, y = 1145 }, Size = { x = 80, y = 80 } }
     ctx.nodes.LabelCoin = { Name = 'LabelCoin', Position = { x = 960, y = 1145 }, Size = { x = 200, y = 60 } }
@@ -107,6 +106,8 @@ local function setUp(height)
         FindFirstChild = function(_, name) return ctx.nodes[name] end }
     ctx.vitalsView = RootView.mount(ctx.spokeRoot, ctx.store, {
         create_node = function(kind, attrs) return world:CreateUnit(kind, attrs) end,
+        services = { reel = {}, send_reel = function() end, send_close = function() end },
+        overlays = { reel = ReelOverlayView.spec() },
         hud = {
             MainHudVitalsView.spec({
                 get_resolution = function() return { x = 1920, y = height } end,
@@ -228,17 +229,17 @@ describe('主界面接线（布局模块）', function()
         assert.same(8, sent.payload.value.slot)
     end)
 
-    it('test_reel_close_uses_reeling_layout_clear_of_attack', function()
+    it('test_reel_overlay_close_is_owned_and_cleaned_by_root_view', function()
         ctx = setUp(886)
         ctx.events.ItemBarState.OnClientEvent:Fire({ slots = {}, slotCount = 2, bait = {}, backpackCount = 5,
             weapons = { item136 = 1 }, held = { kind = 'weapon', id = 'item136' } })
         ctx.events.CastState.OnClientEvent:Fire({ phase = 'hooked', reelSession = 's1' })
-        local close = ctx.nodes.ReelClose
+        local close = ctx.nodes.BtnReelClose
+        assert.is_not_nil(close)
         assert.is_true(close.Visible)
-        assertAt(close, layoutFor(886, 2, true).Rects.ReelClose, 'ReelClose')
-        assert.same(close.Position, ctx.nodes.BtnReelCloseLabel.Position)
-        assert.is_false(overlaps(close, ctx.nodes.AttackControl))
-        assert.is_false(overlaps(close, ctx.nodes.ItemAction2))
+        assert.is_true(ctx.nodes.BtnReelCloseLabel.Visible)
+        ctx.events.CastState.OnClientEvent:Fire({ phase = 'unhooked', castId = 1 })
+        assert.is_true(close.Destroyed)
     end)
 
     it('test_quest_toggle_collapses_locally_and_survives_refresh', function()

@@ -211,9 +211,8 @@ end
 
 function ScreenHandler:ShowCast()
     local phase = self.CastState and self.CastState.phase or 'idle'
-    local reel = _G.LocalReelIn
-    local active = self.IsOpen == true and phase == 'hooked' and reel ~= nil
-        and reel.SessionId == self.CastState.reelSession
+    -- 收线条由 ReelOverlayView 统一承载，旧 ScreenMain 只保留抛竿提示。
+    local active = false
     if self.LastReelActive ~= active then
         self.LastReelActive = active
         if type(self.OnReelActiveChanged) == 'function' then
@@ -221,13 +220,11 @@ function ScreenHandler:ShowCast()
         end
     end
     if not self.BtnReelClose and not self.ReelBar and not self.HookHint then return end
-    self:ApplyLayout(nil, active == true)
-    local now = active == true and self.HookAlertUntil ~= nil and World:GetServerTime()
-    local alerting = now and now < self.HookAlertUntil
-    local progress = castProgress(self, reel, active)
+    self:ApplyLayout(nil, false)
+    local progress = castProgress(self, nil, active)
     if type(progress) ~= 'number' or progress ~= progress then progress = 50 end
     progress = math.max(0, math.min(100, progress))
-    showCastFeedback(self, phase, active, alerting, progress)
+    showCastFeedback(self, phase, active, false, progress)
     self:UpdateCastFeedback()
 end
 
@@ -495,7 +492,6 @@ function ScreenHandler:_initializeRoot()
     self.BtnReelClose.Visible = false
     self.BtnReelCloseLabel.Visible = false
     self:Listen(self.BtnReelClose.OnClicked, function()
-        _G.LocalReelIn:Close()
         self:ShowCast()
     end)
     self:Listen(_G.REUtil:GetRE('ItemBarState').OnClientEvent, function(state) self:Show(state) end)
@@ -531,7 +527,6 @@ function ScreenHandler:_initializeRoot()
             if state.phase == 'idle' and state.castId
                 and self.CastState and self.CastState.castId == state.castId then
                 self.SplashUntil = nil
-                _G.LocalReelIn:Clear(self.CastState and self.CastState.reelSession)
                 self.CastState = state
                 self:ShowCast()
             end
@@ -556,10 +551,7 @@ function ScreenHandler:_initializeRoot()
             if not state.snapshot or state.phase ~= 'idle' then clearCastFailure(self) end
         end
         if state.phase == 'hooked' then
-            _G.LocalReelIn:SetSession(state.reelSession)
             self:StartHookAlert(state.reelSession)
-        else
-            _G.LocalReelIn:Clear(self.CastState and self.CastState.reelSession)
         end
         self.CastState = state
         self:ShowCast()
@@ -596,7 +588,6 @@ function ScreenHandler:_initializeRoot()
     self.BoundRootNode = root
     self.Inited = true
     self.IsOpen = false
-    if _G.LocalReelIn then _G.LocalReelIn:Suspend() end
 end
 
 function ScreenHandler:OpenScreen()
@@ -635,7 +626,6 @@ function ScreenHandler:CloseScreen()
     self.FailureUntil = nil
     self.FailureLanding = nil
     self.FailureNotice = nil
-    if _G.LocalReelIn then _G.LocalReelIn:Suspend() end
     self.CastState = nil
     self.SplashUntil = nil
     self:ShowCast()

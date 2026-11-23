@@ -195,21 +195,11 @@ local function cast_action_color(phase, alert_now)
 end
 
 local function default_is_reel_active(cast)
-  if type(cast) ~= "table" or cast.phase ~= "hooked" then
-    return false
-  end
-  local reel = rawget(_G, "LocalReelIn")
-  if type(reel) == "table" then
-    return reel.SessionId ~= nil and reel.SessionId == cast.reelSession
-  end
-  return cast.reelSession ~= nil
+  return type(cast) == "table" and cast.phase == "hooked" and cast.reelSession ~= nil
 end
 
-local function default_on_reel_click(session_id)
-  local reel = rawget(_G, "LocalReelIn")
-  if type(reel) == "table" and reel.SessionId == session_id and type(reel.Click) == "function" then
-    reel:Click()
-  end
+local function default_on_reel_click(_session_id)
+  -- L1 入口通过 options.on_reel_click 注入 ReelOverlayView 控制器。
 end
 
 --- 挂载右侧动作键（ItemDiscard 与 ItemAction2）。

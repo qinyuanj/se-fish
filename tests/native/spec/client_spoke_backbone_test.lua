@@ -582,7 +582,6 @@ describe("客户端 Spoke 主干契约（#296）", function()
         "client.GameUI",
         "client.LocalMgrUtil",
         "client.LocalMotorUnitCtrl",
-        "client.LocalReelIn",
         "client.LocalLoot",
         "client.LocalInteract",
         "client.LocalGM",
@@ -595,7 +594,6 @@ describe("客户端 Spoke 主干契约（#296）", function()
         "client.ScreenHandlers.ScreenPlatform",
         "client.ScreenHandlers.ScreenCompendium",
         "client.Views.GarBiteWarning",
-        "client.LocalCastSource",
         "client.packages.ability_system.api",
         "client.Store.ClientStore",
         "client.Views.RootView",
@@ -612,7 +610,6 @@ describe("客户端 Spoke 主干契约（#296）", function()
         Color = rawget(_G, "Color"),
         GameUI = rawget(_G, "GameUI"),
         MgrGameUI = rawget(_G, "MgrGameUI"),
-        LocalReelIn = rawget(_G, "LocalReelIn"),
         ClientSpoke = rawget(_G, "ClientSpoke"),
       }
 
@@ -650,14 +647,14 @@ describe("客户端 Spoke 主干契约（#296）", function()
         _G.GameUI = game_ui_stub
         package.loaded["client.packages.ability_system.api"] = { StartClientLifecycle = noop }
         for _, name in ipairs({
-          "client.LocalMgrUtil", "client.LocalMotorUnitCtrl", "client.LocalReelIn",
+          "client.LocalMgrUtil", "client.LocalMotorUnitCtrl",
           "client.LocalLoot", "client.LocalInteract", "client.LocalGM",
           "client.LocalShop", "client.LocalLottery",
           "client.ScreenHandlers.ScreenLottery", "client.ScreenHandlers.ScreenFerry",
           "client.ScreenHandlers.ScreenParty",
           "client.ScreenHandlers.ScreenBlindbox",
           "client.ScreenHandlers.ScreenPlatform", "client.ScreenHandlers.ScreenCompendium",
-          "client.Views.GarBiteWarning", "client.LocalCastSource",
+          "client.Views.GarBiteWarning",
         }) do
           package.loaded[name] = noop_module
         end
