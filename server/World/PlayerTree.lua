@@ -35,8 +35,13 @@ local function assert_clock(clock)
   end
 end
 
+local function is_valid_player(player)
+  local kind = type(player)
+  return (kind == "table" or kind == "userdata") and player.UserId ~= nil
+end
+
 local function assert_ready_player_data(player, data)
-  if type(player) ~= "table" or player.UserId == nil then
+  if not is_valid_player(player) then
     error("PlayerTree.spawn 需要有效的 player 对象（含 UserId）", 3)
   end
   if type(data) ~= "table" then
@@ -140,7 +145,7 @@ function PlayerTree.spawn(opts)
 
   local function log_error(tag, err)
     if opts.logger and type(opts.logger.error) == "function" then
-      pcall(opts.logger.error, opts.logger, tag .. ": " .. tostring(err))
+      pcall(opts.logger.error, opts.logger, tag .. ": " .. tostring(err)) -- logger 异常不得中断业务清理与终镜像
     else
       print(tag, player.UserId, tostring(err))
     end

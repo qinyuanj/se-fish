@@ -24,6 +24,11 @@ function ServerRuntime.set_current(rt)
   current_runtime = rt
 end
 
+local function is_valid_player(player)
+  local kind = type(player)
+  return (kind == "table" or kind == "userdata") and player.UserId ~= nil
+end
+
 local function safe_call(logger, label, fn, ...)
   if type(fn) ~= "function" then
     return nil
@@ -31,7 +36,7 @@ local function safe_call(logger, label, fn, ...)
   local ok, r1, r2 = pcall(fn, ...)
   if not ok then
     if logger and type(logger.error) == "function" then
-      pcall(logger.error, logger, label .. ": " .. tostring(r1))
+      pcall(logger.error, logger, label .. ": " .. tostring(r1)) -- logger 异常不得中断业务回调调度
     else
       print("[ServerRuntime]", label, tostring(r1))
     end
@@ -51,7 +56,8 @@ end
 function ServerRuntime.new(opts)
   opts = type(opts) == "table" and opts or {}
 
-  local clock = opts.clock or SpokeClock.new(opts.initial_now or 0)
+  local initial_now = Number.IsFiniteNumber(opts.initial_now) and opts.initial_now or 0
+  local clock = opts.clock or SpokeClock.new(initial_now)
   local current_players = {}
   local active_players = {}
   local player_trees = {}
@@ -115,15 +121,15 @@ function ServerRuntime.new(opts)
   end
 
   function runtime:on_player_added(player)
-    if type(player) ~= "table" or player.UserId == nil then
+    if not is_valid_player(player) then
       return
     end
     local user_id = player.UserId
     local leaving = leaving_players[user_id]
     if leaving then
       leaving.waiting = player
-      if type(player.SetAttribute) == "function" then
-        pcall(player.SetAttribute, player, "SaveState", "pending")
+      if player.SetAttribute ~= nil then
+        pcall(player.SetAttribute, player, "SaveState", "pending") -- 兼容可能不含或只读 SetAttribute 的引擎/替身对象
       end
       return
     end
@@ -132,7 +138,7 @@ function ServerRuntime.new(opts)
   end
 
   function runtime:on_save_ready(player, data)
-    if type(player) ~= "table" or player.UserId == nil then
+    if not is_valid_player(player) then
       return nil
     end
     local user_id = player.UserId
@@ -157,7 +163,6 @@ function ServerRuntime.new(opts)
     end
 
     local world = self:start()
-    active_players[user_id] = player
     local player_tree = PlayerTree.spawn({
       player = player,
       data = data,
@@ -167,6 +172,7 @@ function ServerRuntime.new(opts)
       on_leave_finalize = opts.on_leave_finalize,
       mounts = opts.player_mounts,
     })
+    active_players[user_id] = player
     player_trees[user_id] = player_tree
 
     safe_call(opts.logger, "on_player_ready", opts.on_player_ready, player, data, player_tree)
@@ -236,7 +242,7 @@ function ServerRuntime.new(opts)
   end
 
   function runtime:on_player_removing(player)
-    if type(player) ~= "table" or player.UserId == nil then
+    if not is_valid_player(player) then
       return
     end
     local user_id = player.UserId

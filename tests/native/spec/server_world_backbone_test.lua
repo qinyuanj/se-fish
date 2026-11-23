@@ -534,6 +534,34 @@ describe("服务端 Spoke 主干：ServerRuntime 离场三步协议、排空栅�
     assert.is_true(pt2:is_disposed())
   end)
 
+  it("启动时非有限 initial_now 降级为 0 且接受非裸表形态（元表代理 / userdata 协议）的玩家对象", function()
+    local ServerRuntime = require("server.World.ServerRuntime")
+    local logger = silent_logger()
+
+    local rt_nan = ServerRuntime.new({ initial_now = 0 / 0, logger = logger })
+    assert.equals(0, rt_nan.clock.now())
+    local rt_inf = ServerRuntime.new({ initial_now = math.huge, logger = logger })
+    assert.equals(0, rt_inf.clock.now())
+
+    -- 验证经 __index 读取 UserId / SetAttribute 的代理对象（与引擎 userdata 成员访问口径一致）
+    rt_nan:start()
+    rt_nan:mark_started()
+    local proxy_player = setmetatable({}, {
+      __index = function(_, key)
+        if key == "UserId" then return 3099 end
+        if key == "SetAttribute" then return function() end end
+      end,
+    })
+    rt_nan:on_player_added(proxy_player)
+    rt_nan:on_save_ready(proxy_player, make_ready_data(proxy_player, { coin = 7 }))
+    assert.is_not_nil(rt_nan:get_player_tree(3099))
+    assert.equals(7, rt_nan:get_player_tree(3099).states.coin:now())
+    rt_nan:on_player_removing(proxy_player)
+    assert.is_nil(rt_nan:get_player_tree(3099))
+    rt_nan:shutdown()
+    rt_inf:shutdown()
+  end)
+
   it("离场三步协议严格按顺序执行，并在同账号重进期间通过排空栅栏防脏读与覆盖写入", function()
     local ServerRuntime = require("server.World.ServerRuntime")
     local logger = silent_logger()

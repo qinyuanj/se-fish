@@ -7,6 +7,7 @@ local ZoneMarkers = require("common.ZoneMarkers")
 ZoneMarkers.Start()
 MgrUtil = require("server.MgrUtil")
 MgrUtil:Start()
+local Number = require("common.Number")
 local ServerRuntime = require("server.World.ServerRuntime")
 
 local MgrMap = {
@@ -180,8 +181,8 @@ end
 
 local function serverNow()
     if WorldService and WorldService.GetServerTime then
-        local ok, now = pcall(WorldService.GetServerTime, WorldService)
-        if ok and type(now) == "number" then return now end
+        local ok, now = pcall(WorldService.GetServerTime, WorldService) -- 兼容引擎早期阶段或离线替身未提供 GetServerTime
+        if ok and Number.IsFiniteNumber(now) then return now end
     end
     return nil
 end
