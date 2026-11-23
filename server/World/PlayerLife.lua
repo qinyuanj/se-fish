@@ -175,6 +175,7 @@ function PlayerLife.mount(s3, player_tree, opts)
     return false
   end
 
+  local noticed_health
   local function set_controller_health(value)
     local controller = controller_of(player)
     if not controller then
@@ -183,6 +184,7 @@ function PlayerLife.mount(s3, player_tree, opts)
     end
     local ok = pcall(function() controller.Health = value end)
     local read = read_health(player)
+    noticed_health = read or value
     states.health:set(read or value)
     return ok
   end
@@ -379,6 +381,8 @@ function PlayerLife.mount(s3, player_tree, opts)
     return revive_to(percent_health(), nil, false)
   end
 
+  local publish_notice
+  local suppress_health_note = false
   local function apply_damage(amount, hit)
     local phase = states.life_phase:now()
     if phase ~= "alive" or recovering:now() then return false end
@@ -386,37 +390,47 @@ function PlayerLife.mount(s3, player_tree, opts)
     local before = read_health(player)
     if before == nil then before = states.health:now() end
     if not finite_number(before) then return false end
+    suppress_health_note = true
+    local function finish(ok, actual)
+      suppress_health_note = false
+      noticed_health = read_health(player)
+      return ok, actual
+    end
     if before - amount <= 0 then
       enter_downed()
-      return true, math.max(0, before - 1)
+      publish_notice(before - 1, hit)
+      return finish(true, math.max(0, before - 1))
     end
     local controller = controller_of(player)
     if controller and type(controller.TakeDamage) == "function" then
       local ok = pcall(function() controller:TakeDamage(amount) end)
-      if not ok then return false end
+      if not ok then return finish(false) end
     end
     local after = read_health(player)
     if after == nil then after = before - amount end
     if after <= 0 then
       enter_downed()
-      return true, math.max(0, before - 1)
+      publish_notice(before - 1, hit)
+      return finish(true, math.max(0, before - 1))
     end
     states.health:set(after)
     write_vitals()
-    if not finite_number(before) or after >= before then return false end
-    local actual = before - after
-    if remote and type(remote.GetRE) == "function" and actual > 0 then
-      local event = remote:GetRE("DamageNotice")
-      if event and type(event.FireAllClients) == "function" then
-        pcall(event.FireAllClients, event, {
-          amount = actual,
-          category = hit and hit.category,
-          targetUserId = player.UserId,
-          position = player.Character and player.Character.Position,
-        })
-      end
+    if after >= before then return finish(false) end
+    publish_notice(before - after, hit)
+    return finish(true, before - after)
+  end
+
+  function publish_notice(actual, hit)
+    if not (remote and type(remote.GetRE) == "function") or not (actual > 0) then return end
+    local event = remote:GetRE("DamageNotice")
+    if event and type(event.FireAllClients) == "function" then
+      pcall(event.FireAllClients, event, {
+        amount = actual,
+        category = hit and hit.category,
+        targetUserId = player.UserId,
+        position = player.Character and player.Character.Position,
+      })
     end
-    return true, actual
   end
 
   local function resolve_player(target)
@@ -911,7 +925,26 @@ function PlayerLife.mount(s3, player_tree, opts)
     end
   end)
 
+  noticed_health = read_health(player)
+  local function note_health(next_health)
+    local before = noticed_health
+    noticed_health = next_health
+    if suppress_health_note then return end
+    if not finite_number(before) or not finite_number(next_health) or next_health >= before then return end
+    if states.life_phase:now() ~= "alive" then return end
+    publish_notice(before - next_health)
+  end
   local controller = controller_of(player)
+  if controller and controller.HealthChanged and type(controller.HealthChanged.Connect) == "function" then
+    local conn
+    conn = controller.HealthChanged:Connect(function(next_health)
+      if player_tree:is_disposed() then return end
+      note_health(next_health)
+    end)
+    s3:on_cleanup(function()
+      if conn and conn.Disconnect then pcall(conn.Disconnect, conn) end
+    end)
+  end
   if controller and controller.Died and type(controller.Died.Connect) == "function" then
     local conn
     conn = controller.Died:Connect(function()

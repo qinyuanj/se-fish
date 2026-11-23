@@ -558,4 +558,47 @@ describe("玩家生命双层相位宿主接缝（#298）", function()
     assert.is_false(result.value.ok)
     assert.equals("no-adrenaline", result.value.reason)
   end)
+
+  it("扣血只广播一次实际差额，治疗、回满和致命锁血不另报", function()
+    boot()
+    local life = runtime.life
+    local function notices()
+      local rows = {}
+      for _, row in ipairs(events.DamageNotice and events.DamageNotice.clients or {}) do
+        rows[#rows + 1] = row.value
+      end
+      return rows
+    end
+    assert.same({}, notices())
+    assert.is_true(life:SetHealth(player, 200))
+    local sent = notices()
+    assert.equals(1, #sent)
+    assert.equals(100, sent[1].amount)
+    assert.equals(player.UserId, sent[1].targetUserId)
+    assert.is_true(life:SetHealth(player, 300))
+    assert.is_true(life:Eat(player, "goldfish"))
+    assert.equals(1, #notices())
+    local controller = player.Character.Controller
+    controller.Health = controller.Health - 2.4
+    controller.HealthChanged:Fire(controller.Health)
+    sent = notices()
+    assert.equals(2, #sent)
+    assert.near(2.4, sent[2].amount, 0.00001)
+    controller.HealthChanged:Fire(controller.Health)
+    assert.equals(2, #notices())
+    assert.is_true(life:SetHunger(player, 0))
+    runtime:step(1)
+    sent = notices()
+    assert.equals(3, #sent)
+    assert.equals(GameCfg.Vitals.StarveDamagePerSec, sent[3].amount)
+    assert.is_true(life:SetHealth(player, 4))
+    local before = #notices()
+    local tree = runtime:get_player_tree(player.UserId)
+    assert.is_true(tree:apply_hit(tree:new_hit(other, "fishAttack"), player, 100))
+    sent = notices()
+    assert.equals(before + 1, #sent)
+    assert.equals(3, sent[#sent].amount, "致命一击锁 1 血，只报被扣掉的差额")
+    assert.equals(1, player.Character.Controller.Health)
+    assert.equals("downed", life:LifeStatus(player))
+  end)
 end)
