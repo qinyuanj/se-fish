@@ -35,12 +35,6 @@ local function setUp()
     local ctx = { nodes = {}, created = {}, events = {}, now = 100 }
     ctx.previous = {}
     for _, key in ipairs(GLOBALS) do ctx.previous[key] = rawget(_G, key) end
-    -- 攻击键模块是别的所有者（自己建、自己拆），本单只验主界面：换成空壳，
-    -- ctx.created 里就只剩下主界面建的节点，断言「一个不剩」才不含混。
-    ctx.previousAttack = package.loaded['client.LocalAttackButton']
-    package.loaded['client.LocalAttackButton'] = { Start = function() end, Destroy = function() end,
-        SetOpen = function() end, SetEquipped = function() end,
-        EquippedWeapon = function() return nil end }
     _G.MgrGameUI = { SetCustomControlUI = function() end, GetScreen = function() end, CloseScreen = function() end }
     local world = { Created = ctx.created }
     function world:CreateUnit(kind, attrs)
@@ -91,7 +85,6 @@ local function setUp()
 end
 
 local function tearDown(ctx)
-    package.loaded['client.LocalAttackButton'] = ctx.previousAttack
     for _, key in ipairs(GLOBALS) do _G[key] = ctx.previous[key] end
 end
 
@@ -163,9 +156,6 @@ describe('主界面 HUD 的节点归属（#209）', function()
         local stages = {
             { name = '浮动表现', message = 'injected float failure',
                 arm = function() DamageFloat.Clear = function() error('injected float failure', 0) end end },
-            { name = '攻击键', message = 'injected attack failure',
-                arm = function() package.loaded['client.LocalAttackButton'].Destroy =
-                    function() error('injected attack failure', 0) end end },
             { name = '连接', message = 'injected disconnect failure', before = true,
                 arm = function() cleanupFaults.disconnect = true end,
                 later = function() return OwnedUnits.Count(ctx.handler) == 0 end },
@@ -197,8 +187,6 @@ describe('主界面 HUD 的节点归属（#209）', function()
         restoreStages()
         ctx = setUp()
         DamageFloat.Clear = function() error('injected float failure', 0) end
-        package.loaded['client.LocalAttackButton'].Destroy =
-            function() error('injected attack failure', 0) end
         cleanupFaults.disconnect = true
         OwnedUnits.Clear = function() error('injected owned units failure', 0) end
         local ok, err = pcall(function() ctx.handler:Cleanup() end)

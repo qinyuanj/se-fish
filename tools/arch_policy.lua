@@ -42,7 +42,7 @@ M.policy = {
       ids = { 'server.Mgr', 'server.AbilityBehaviors', 'client.ScreenHandlers', 'client.Views', 'server.World' },
       modules = {
         'server.AbilityAPI', 'client.MgrGameUI',
-        'client.LocalAttackButton', 'client.LocalCastSource', 'client.LocalGM',
+        'client.LocalCastSource', 'client.LocalGM',
         'client.LocalGarBite', 'client.LocalInteract', 'client.LocalLoot', 'client.LocalLottery',
         'client.LocalMgrUtil', 'client.LocalMotorUnitCtrl', 'client.LocalReelIn', 'client.LocalShop',
       },

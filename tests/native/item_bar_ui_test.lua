@@ -9,6 +9,7 @@ local MainHudEquipPopups = require('client.Views.MainHudEquipPopups')
 local MainHudBackpackView = require('client.Views.MainHudBackpackView')
 local MainHudItemBarView = require('client.Views.MainHudItemBarView')
 local MainHudActionButtonsView = require('client.Views.MainHudActionButtonsView')
+local AttackView = require('client.Views.AttackView')
 
 -- 弹窗候选格的文字按格宽折行（#180），比较时去掉换行
 local function plain(text) return (tostring(text or ''):gsub('\n', '')) end
@@ -39,8 +40,6 @@ describe("道具栏的界面侧", function()
             now = 100, delays = {}, attributeSignals = {} }
         ctx.previous = { game = _G.game, Vector2 = _G.Vector2, Color = _G.Color,
             REUtil = _G.REUtil, GameUI = _G.GameUI, MgrGameUI = _G.MgrGameUI }
-        ctx.previousAttack = package.loaded['client.LocalAttackButton']
-        package.loaded['client.LocalAttackButton'] = nil
         _G.MgrGameUI = { SetCustomControlUI = function() end }
         local world = { Created = ctx.created }
         function world:CreateUnit(kind, attrs)
@@ -104,13 +103,16 @@ describe("道具栏的界面侧", function()
         })
         ctx.backpackOpen = spoke.State.new('Test.hud_backpack_open', false)
         ctx.openPopup = spoke.State.new('Test.hud_open_popup', nil)
-        ctx.spokeRoot = { Name = 'UIRoot', Destroying = signal(),
-            FindFirstChild = function(_, name) return ctx.nodes[name] end }
+        ctx.spokeRoot = ctx.handler.RootNode
+        ctx.spokeRoot.Destroying = signal()
+        ctx.spokeRoot.Children = ctx.spokeRoot.Children or {}
+        function ctx.spokeRoot:FindFirstChild(name) return ctx.nodes[name] end
         ctx.hudView = RootView.mount(ctx.spokeRoot, ctx.store, {
             create_node = function(kind, attrs) return world:CreateUnit(kind, attrs) end,
             hud = {
                 MainHudItemBarView.spec({ backpack_open = ctx.backpackOpen }),
-                MainHudActionButtonsView.spec({
+                AttackView.spec(),
+            MainHudActionButtonsView.spec({
                     backpack_open = ctx.backpackOpen,
                     send_operate = function(payload) ctx.handler:Operate(payload) end,
                 }),
@@ -132,8 +134,6 @@ describe("道具栏的界面侧", function()
     after_each(function()
         if ctx.hudView then ctx.hudView:dispose() end
         if ctx.hostBinding then ctx.hostBinding:dispose() end
-        require('client.LocalAttackButton'):Destroy()
-        package.loaded['client.LocalAttackButton'] = ctx.previousAttack
         for _, key in ipairs({ 'game', 'Vector2', 'Color', 'REUtil', 'GameUI', 'MgrGameUI' }) do
             _G[key] = ctx.previous[key]
         end
@@ -184,7 +184,8 @@ describe("道具栏的界面侧", function()
     end)
 
     it("test_fixed_slots_bait_and_action_placement", function()
-        ctx.states:Fire({ slots = {}, slotCount = 8, bait = {} })
+        ctx.states:Fire({ slots = {}, slotCount = 8, bait = {},
+            weapons = { item136 = 1 }, held = { kind = 'weapon', id = 'item136' } })
         for index = 1, 8 do assert.is_not_nil(ctx.nodes['ItemBarSlot' .. index]) end
         assert.is_nil(ctx.nodes.ItemBarSlot9)
         local slot = ctx.nodes.ItemBarSlot1
@@ -222,7 +223,10 @@ describe("道具栏的界面侧", function()
         assert.is_false(ctx.nodes.ItemAction2.TouchEnabled)
         assert.equal(ctx.handler.RootNode, ctx.nodes.AttackControl.Parent)
         assert.equal(ctx.nodes.AttackControl, ctx.nodes.BtnAttack.Parent)
+        ctx.handler.OnOpenChanged = function(open) ctx.writer:set_hud_visible(open) end
+        ctx.handler:CloseScreen()
         assert.is_false(ctx.nodes.BtnAttack.TouchEnabled)
+        ctx.handler:OpenScreen()
         ctx.states:Fire({ slots = { [1] = { itemId = 'starterRod', count = 1 } },
             bait = { worm = 10 }, selectedSlot = 1 })
         assert.is_true(ctx.nodes.ItemBarIcon1.Visible)

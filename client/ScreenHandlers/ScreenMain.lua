@@ -1,7 +1,5 @@
 local World = game:GetService('World')
 local GameCfg = require('common.GameCfg')
-local LocalAttackButton = require('client.LocalAttackButton')
-local WeaponAim = require('client.WeaponAim')
 local DamageFloat = require('client.DamageFloat')
 local FishCombatLabel = require('client.FishCombatLabel')
 local MainHudLayout = require('client.MainHudLayout')
@@ -30,7 +28,6 @@ function ScreenHandler:Show(state)
     if type(state) ~= 'table' or type(state.slots) ~= 'table' then return end
     local depleted = self.Snapshot ~= nil and wormCount(self.Snapshot) > 0 and wormCount(state) <= 0
     self.Snapshot = state
-    LocalAttackButton:SetEquipped(state)
     local capacity = state.slotCount or GameCfg.Items.ItemBarSlots
     self:ApplyLayout(capacity, nil)
     self:ShowCast()
@@ -330,7 +327,6 @@ function ScreenHandler:Cleanup()
         FishCombatLabel:Clear()
     end)
     continueAfterFailure('CloseScreen', function() self:CloseScreen() end)
-    continueAfterFailure('攻击键', function() LocalAttackButton:Destroy() end)
     continueAfterFailure('连接', function()
         for _, connection in ipairs(self.Connections or {}) do connection:Disconnect() end
     end)
@@ -520,7 +516,6 @@ function ScreenHandler:_initializeRoot()
         if type(result) ~= 'table' or result.ok ~= false then return end
         self.LastOperateOperation = result.operation or self.LastOperateOperation
         if result.reason == 'combat-pending' then
-            _G.REUtil:GetRE('WeaponAction'):FireServer(WeaponAim:AttackPayload())
             return
         end
         local hints = { empty = '物品已不在格子里', ['cannot-eat'] = '现在不能吃',
@@ -529,17 +524,6 @@ function ScreenHandler:_initializeRoot()
             ['bad-weapon'] = '没有这件武器', ['bad-slot'] = '格子不存在', ['unknown-op'] = '未知操作' }
         if _G.LocalMsgNotice then
             _G.LocalMsgNotice(hints[result.reason] or ('操作失败 ' .. tostring(result.reason)))
-        end
-    end)
-    self:Listen(_G.REUtil:GetRE('WeaponResult').OnClientEvent, function(result)
-        if type(result) ~= 'table' or result.ok ~= false then return end
-        local hints = { ['cannot-act'] = '现在不能攻击', unavailable = '武器未就绪',
-            cooldown = '出手太快', reloading = '换弹中', empty = '弹匣已空，自动换弹',
-            ['not-a-gun'] = '手持的不是枪械', ['mag-full'] = '弹匣是满的',
-            ['bad-slot'] = '格子不存在', ['bad-throwable'] = '这个不能投掷',
-            ['bad-target'] = '落点无效', ['bad-weapon'] = '武器未配置' }
-        if _G.LocalMsgNotice then
-            _G.LocalMsgNotice(hints[result.reason] or ('武器操作失败 ' .. tostring(result.reason)))
         end
     end)
     self:Listen(_G.REUtil:GetRE('CastState').OnClientEvent, function(state)
@@ -615,7 +599,6 @@ function ScreenHandler:_initializeRoot()
             FishCombatLabel:Update()
         end)
     end
-    LocalAttackButton:Start(root, rects.AttackControl)
     self.LayoutKey = { slots = count, reeling = true }
     self.BoundRootNode = root
     self.Inited = true
@@ -630,7 +613,6 @@ function ScreenHandler:OpenScreen()
     if type(self.OnOpenChanged) == 'function' then
         self.OnOpenChanged(true)
     end
-    LocalAttackButton:SetOpen(true)
     self:ShowCast()
     _G.REUtil:GetRE('SpecialItemStateRequest'):FireServer()
     _G.REUtil:GetRE('RequestItemBar'):FireServer()
@@ -662,7 +644,6 @@ function ScreenHandler:CloseScreen()
     self.FailureUntil = nil
     self.FailureLanding = nil
     self.FailureNotice = nil
-    LocalAttackButton:SetOpen(false)
     if _G.LocalReelIn then _G.LocalReelIn:Suspend() end
     self.CastState = nil
     self.SplashUntil = nil

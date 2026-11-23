@@ -22,7 +22,7 @@ end
 local WIRING = {
   'WorldRuntime.life:SetDamageFilter(pkDamageFilter)',
   'MgrMap.MgrParty.Vitals = Life',
-  'local pkDamageFilter = makePkDamageFilter()',
+  'local pkDamageFilter = PkDamageFilter.make({',
 }
 
 local function assert_wiring()
@@ -141,7 +141,9 @@ describe('条款 9 PK 伤害过滤', function()
     env.save = assert(loadfile('server/Mgr/MgrSave.lua'))()
     env.players.Save, env.save.PlayerData = env.save, env.players
     env.party.PlayerData, env.party.Save, env.party.Vitals = env.players, env.save, env.vitals
-    env.filter = assert(loadfile('server/Mgr/MgrPkFilter.lua'))().Make()
+    env.filter = require('server.World.PkDamageFilter').make({
+      party = env.party, zone_markers = require('common.ZoneMarkers'), zones = env.cfg.Zones,
+    })
     -- 生产装配：过滤接缝与区域真源都经 mgr 注入，不缓存队伍归属。
     env.vitals.Party = env.party
     env.vitals.ZoneMarkers = require('common.ZoneMarkers')
@@ -154,12 +156,17 @@ describe('条款 9 PK 伤害过滤', function()
       return { OnServerEvent = { Connect = function() return { Disconnect = function() end } end } }
     end }
     package.loaded['server.AbilityAPI'], package.loaded['server.SwingRegistry'] = nil, nil
-    env.weapon = assert(loadfile('server/Mgr/MgrWeapon.lua'))()
-    env.weapon.Vitals = env.vitals
-    env.weapon.Attr = { WeaponDamageScale = function() return 1 end }
-    env.weapon.PlayerData = { GetDataInst = function() return {} end }
-    env.weapon.Now = function() return env.now end
-    env.weapon.Vec3 = function(x, y, z) return vec(x, y, z) end
+    env.weapon = {
+      AttackGun = function(_, player, weapon_id, _, _, aim)
+        local tree = env.lifeHost.runtime:get_player_tree(player.UserId)
+        tree:sync_from_data({
+          Player = player, Inited = true, LoadState = 'ready',
+          Data = { FishCoin = 0, Zone = 'fishPond', Weapons = { [weapon_id] = 1 }, Containers = {} },
+          Extra = { growth = { potions = {}, upgrades = {} }, inventory = { selection = { held = { kind = 'weapon', id = weapon_id } } }, survival = {} },
+        })
+        return env.lifeHost.runtime.life:WeaponAction(player, { action = 'attack', aim = aim })
+      end,
+    }
     env.party:Start()
   end)
 
@@ -214,6 +221,7 @@ describe('条款 9 PK 伤害过滤', function()
     request(a, 'Leave', {})
     assert.is_false(env.party:SameParty(a, b))
     env.now = env.now + gun.IntervalSec + 1
+    env.lifeHost.runtime.clock:advance(gun.IntervalSec + 1)
     env.weapon:AttackGun(a, 'item137', gun, {}, vec(1, 0, 0))
     assert.same(300 - gun.Damage, b.Character.Controller.Health, '离队后同一把枪照常结算')
   end)
@@ -254,7 +262,7 @@ describe('条款 9 PK 伤害过滤', function()
     assert.same(245, b.Character.Controller.Health)
     local logged = false
     for _, line in ipairs(printed) do
-      if line:find('MgrPkFilter', 1, true) then logged = true end
+      if line:find('PkDamageFilter', 1, true) then logged = true end
     end
     assert.is_true(logged, '区域缺失的放行兜底要留下日志')
   end)

@@ -21,6 +21,7 @@ local ClientStore = require('client.Store.ClientStore')
 local RootView = require('client.Views.RootView')
 local MainHudBackpackView = require('client.Views.MainHudBackpackView')
 local MainHudActionButtonsView = require('client.Views.MainHudActionButtonsView')
+local AttackView = require('client.Views.AttackView')
 
 local NAME = setmetatable({}, { __index = function(_, id) return GameCfg.Items.Definitions[id].Name end })
 
@@ -45,8 +46,6 @@ local function setUp()
     local ctx = { nodes = {}, created = {}, commands = {}, sent = {}, events = {}, now = 100, clicks = 0 }
     ctx.previous = {}
     for _, key in ipairs(GLOBALS) do ctx.previous[key] = rawget(_G, key) end
-    ctx.previousAttack = package.loaded['client.LocalAttackButton']
-    package.loaded['client.LocalAttackButton'] = nil
     _G.MgrGameUI = { SetCustomControlUI = function() end }
     local world = { Created = ctx.created }
     function world:CreateUnit(kind, attrs)
@@ -101,11 +100,14 @@ local function setUp()
     ctx.handler.RootNode = { Name = 'ScreenMain', FindFirstChild = function() return nil end }
     ctx.handler:Init()
     ctx.handler.IsOpen = true
-    ctx.spokeRoot = { Name = 'UIRoot', Destroying = signal(),
-        FindFirstChild = function(_, name) return ctx.nodes[name] end }
+    ctx.spokeRoot = ctx.handler.RootNode
+    ctx.spokeRoot.Destroying = signal()
+    ctx.spokeRoot.Children = ctx.spokeRoot.Children or {}
+    function ctx.spokeRoot:FindFirstChild(name) return ctx.nodes[name] end
     ctx.hudView = RootView.mount(ctx.spokeRoot, ctx.store, {
         create_node = function(kind, attrs) return world:CreateUnit(kind, attrs) end,
         hud = {
+            AttackView.spec(),
             MainHudActionButtonsView.spec({
                 backpack_open = ctx.backpackOpen,
                 reel_active = ctx.reelActive,
@@ -129,8 +131,6 @@ end
 local function tearDown(ctx)
     if ctx.hudView then ctx.hudView:dispose() end
     if ctx.hostBinding then ctx.hostBinding:dispose() end
-    require('client.LocalAttackButton'):Destroy()
-    package.loaded['client.LocalAttackButton'] = ctx.previousAttack
     for _, key in ipairs(GLOBALS) do _G[key] = ctx.previous[key] end
 end
 
@@ -223,7 +223,10 @@ describe('道具按钮合并（#181）', function()
         click()
         assert.same(1, ctx.clicks)
         assert.same({}, sentNames(ctx, sent))
-        push('ItemBarState', selecting('starterRod'))
+        local equipped = selecting('starterRod')
+        equipped.weapons = { item136 = 1 }
+        equipped.held = { kind = 'weapon', id = 'item136' }
+        push('ItemBarState', equipped)
         assert.same('点击收线', label())
         click()
         assert.same(2, ctx.clicks)

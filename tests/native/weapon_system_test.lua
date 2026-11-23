@@ -144,10 +144,10 @@ describe('TestMainWeaponWiring', function()
 
     it('test_main_registers_and_wires_mgr_weapon', function()
         local src = readSource('server/main.lua')
-        assert.matches('MgrWeapon = require("server.Mgr.MgrWeapon")', src, nil, true)
-        assert.matches('MgrMap.MgrWeapon.Vitals = Life', src, nil, true)
-        assert.matches('MgrMap.MgrWeapon.PlayerData = MgrMap.MgrPlayerData', src, nil, true)
-        assert.matches('MgrMap.MgrWeapon.FishUnit = MgrMap.MgrFishUnit', src, nil, true)
+        assert.matches('bind_weapon_action = function(dispatch)', src, nil, true)
+        assert.matches('fish_unit = MgrMap.MgrFishUnit', src, nil, true)
+        assert.matches('PkDamageFilter.make', src, nil, true)
+        assert.matches('register_cast_guard = registerCastGuard', src, nil, true)
     end)
 end)
 
@@ -441,7 +441,7 @@ describe('TestMgrWeaponThrow', function()
                 GetPlayerFromCharacter = function() return nil end } end
             return nil
         end }
-        ctx.mgr = assert(loadfile('server/Mgr/MgrWeapon.lua'))()
+        ctx.mgr = assert(loadfile('tests/support/weapon_mgr_double.lua'))()
         ctx.data = PlayerData.New({ UserId = 77, SetAttribute = function() end })
         ctx.data:Init()
         ctx.mgr.PlayerData = { GetDataInst = function() return ctx.data end,
@@ -1020,7 +1020,7 @@ describe('TestWeaponPersistence', function()
         local re = PlayerData.New({ UserId = 129, SetAttribute = function() end })
         re:Init()
         assert.is_true(re:ApplySave(snapshot))
-        local mgr = assert(loadfile('server/Mgr/MgrWeapon.lua'))()
+        local mgr = assert(loadfile('tests/support/weapon_mgr_double.lua'))()
         mgr.PlayerData = { GetDataInst = function() return re end }
         assert.same('item137', mgr:EquippedWeapon(re)) -- 选中武器重进恢复
         local mag = mgr:MagState(mgr:GetState(129), 'item137', GameCfg.Ability.Guns.item137.Magazine)

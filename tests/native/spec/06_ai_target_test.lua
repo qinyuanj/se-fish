@@ -486,7 +486,7 @@ describe('接线验收：霜之新星命中经武器入口挂霜冻（6-26）', 
         env.data = { GetItemBarSnapshot = function()
                 return { held = { kind = 'weapon', id = 'item163' }, weapons = { item163 = 1 } }
             end, MagazineSize = function(_, base) return base end }
-        env.weapon = assert(loadfile('server/Mgr/MgrWeapon.lua'))()
+        env.weapon = assert(loadfile('tests/support/weapon_mgr_double.lua'))()
         env.weapon.PlayerData = { GetDataInst = function() return env.data end }
         env.weapon.Attr = { WeaponDamageScale = function() return 1 end }
         env.weapon.Vitals = { CanAct = function() return true end,

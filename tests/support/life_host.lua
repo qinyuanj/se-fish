@@ -94,6 +94,7 @@ function M.start(opts)
     on_player_downed = opts.on_player_downed,
     max_health_of = opts.max_health_of,
     players = function() return players end,
+    damage_filter = opts.damage_filter or function() return true end,
   })
   runtime:start()
   runtime:mark_started()

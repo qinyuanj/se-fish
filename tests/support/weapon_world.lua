@@ -67,7 +67,7 @@ function M:setUp()
         end
         return nil
     end }
-    ctx.mgr = assert(loadfile('server/Mgr/MgrWeapon.lua'))()
+    ctx.mgr = assert(loadfile('tests/support/weapon_mgr_double.lua'))()
     ctx.data = PlayerData.New({ UserId = 42, SetAttribute = function() end })
     ctx.data:Init()
     ctx.mgr.PlayerData = { GetDataInst = function() return ctx.data end,

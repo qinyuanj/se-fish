@@ -601,7 +601,7 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
       end
       local fish_body = make_character("MainFish", 5)
       local fish = { Id = 88, Carrier = { Receiver = fish_body, Dead = false } }
-      assert.is_true(mgrs.MgrWeapon.Modifier:ApplyWeaponEffect(p, fish, { Kind = "poison" }))
+      assert.is_true(runtime:get_entity_modifiers():apply_weapon_effect(p, fish, { Kind = "poison" }))
       now = now + 1.0
       heartbeat:Fire(1.0)
       assert.equals(1, #dot_hits)

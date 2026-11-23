@@ -21,6 +21,7 @@ local RootView = require('client.Views.RootView')
 local MainHudVitalsView = require('client.Views.MainHudVitalsView')
 local MainHudEquipPopups = require('client.Views.MainHudEquipPopups')
 local MainHudBackpackView = require('client.Views.MainHudBackpackView')
+local AttackView = require('client.Views.AttackView')
 local MainHudItemBarView = require('client.Views.MainHudItemBarView')
 local MainHudActionButtonsView = require('client.Views.MainHudActionButtonsView')
 
@@ -45,8 +46,6 @@ local function setUp(height)
     local ctx = { nodes = {}, created = {}, sent = {}, events = {}, now = 100, height = height }
     ctx.previous = {}
     for _, key in ipairs(GLOBALS) do ctx.previous[key] = rawget(_G, key) end
-    ctx.previousAttack = package.loaded['client.LocalAttackButton']
-    package.loaded['client.LocalAttackButton'] = nil
     _G.MgrGameUI = { SetCustomControlUI = function() end, GetScreen = function() end, CloseScreen = function() end }
     local world = { Created = ctx.created }
     function world:CreateUnit(kind, attrs)
@@ -122,6 +121,7 @@ local function setUp(height)
                 get_resolution = function() return { x = 1920, y = height } end,
                 backpack_open = ctx.backpackOpen,
             }),
+            AttackView.spec(),
             MainHudActionButtonsView.spec({
                 get_resolution = function() return { x = 1920, y = height } end,
                 backpack_open = ctx.backpackOpen,
@@ -141,8 +141,6 @@ end
 local function tearDown(ctx)
     if ctx.vitalsView then ctx.vitalsView:dispose() end
     if ctx.hostBinding then ctx.hostBinding:dispose() end
-    require('client.LocalAttackButton'):Destroy()
-    package.loaded['client.LocalAttackButton'] = ctx.previousAttack
     for _, key in ipairs(GLOBALS) do _G[key] = ctx.previous[key] end
 end
 
@@ -169,7 +167,8 @@ describe('主界面接线（布局模块）', function()
         it('test_representative_controls_follow_layout_' .. height, function()
             ctx = setUp(height)
             ctx.events.ItemBarState.OnClientEvent:Fire({ slots = {}, slotCount = 2, bait = {},
-                backpackCount = 5 })
+                backpackCount = 5, weapons = { item136 = 1 },
+                held = { kind = 'weapon', id = 'item136' } })
             local layout = layoutFor(height, 2, false)
             local r = layout.Rects
             assertAt(ctx.nodes.HealthRing, r.HealthRing, 'HealthRing')
@@ -231,7 +230,8 @@ describe('主界面接线（布局模块）', function()
 
     it('test_reel_close_uses_reeling_layout_clear_of_attack', function()
         ctx = setUp(886)
-        ctx.events.ItemBarState.OnClientEvent:Fire({ slots = {}, slotCount = 2, bait = {}, backpackCount = 5 })
+        ctx.events.ItemBarState.OnClientEvent:Fire({ slots = {}, slotCount = 2, bait = {}, backpackCount = 5,
+            weapons = { item136 = 1 }, held = { kind = 'weapon', id = 'item136' } })
         ctx.events.CastState.OnClientEvent:Fire({ phase = 'hooked', reelSession = 's1' })
         local close = ctx.nodes.ReelClose
         assert.is_true(close.Visible)
