@@ -315,7 +315,7 @@ describe("全服纪录端到端（MgrRecords × MgrCompendium × MgrSave）", fu
     local callers = {}
     for _, path in ipairs({
       "server/Mgr/MgrCompendium.lua", "server/World/GroundLoot.lua",
-      "server/Mgr/MgrShop.lua", "server/Mgr/MgrFishUnit.lua",
+      "server/Mgr/MgrShop.lua", "server/World/FishTree.lua",
     }) do
       local source = readSource(path)
       assert.is_not_nil(source, path)

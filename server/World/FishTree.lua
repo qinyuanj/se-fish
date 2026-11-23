@@ -2,7 +2,7 @@ local GameCfg = require('common.GameCfg')
 local Number = require('common.Number')
 local FishCatch = require('common.FishCatch')
 local MathWaterJudge = require('common.MathWaterJudge')
-local MgrFishCarrier = require('server.Mgr.MgrFishCarrier')
+local MgrFishCarrier = require('server.World.FishCarrier')
 local FlightPath = require('common.FlightPath')
 local CarryMount = require('common.CarryMount')
 local BossPhase = require('common.BossPhase')
@@ -10,11 +10,25 @@ local GarBiteNotice = require('common.GarBiteNotice')
 local BossMoves = require('common.cfg.BossMoves')
 local FishBehaviors = require('server.FishBehaviors')
 
-local function abilityApi()
-    return require('server.AbilityAPI')
+-- #309 L2 不反向依赖 L1：叼人挂点由入口注入 server.AbilityAPI。
+local function abilityApi(self)
+    return self.AbilityApi
 end
 
 local Mgr = { Fish = {}, NextId = 0, Held = {}, Links = {} }
+
+local function service(name)
+    local host = rawget(_G, 'game')
+    if not host then return nil end
+    return host:GetService(name)
+end
+
+local function createUnit(self, kind, props)
+    if self.CreateUnit then return self.CreateUnit(kind, props) end
+    local world = self.World or service('World')
+    if not world then return nil end
+    return world:CreateUnit(kind, props)
+end
 
 Mgr.State = { AwaitLift = 'awaitLift', Held = 'held', Escaping = 'escaping',
     Combat = 'combat', Attacking = 'attacking', Sleeping = 'sleeping', Wild = 'wild',
@@ -30,7 +44,7 @@ local function distanceSq(pos, cp)
 end
 
 function Mgr:Now()
-    local world = self.World or game:GetService('World')
+    local world = self.World or service('World')
     return world:GetServerTime()
 end
 
@@ -78,14 +92,15 @@ function Mgr:IsolateCharacter(character)
 end
 
 function Mgr:Players()
-    local service = game:GetService('Players')
-    return service and service:GetPlayers() or {}
+    local players = service('Players')
+    return players and players:GetPlayers() or {}
 end
 
 function Mgr:SpawnLanded(player, catch, position)
     local species = catch and GameCfg.Fish[catch.fishId]
     if not player or not species or type(catch.mult) ~= 'number' then return nil, 'bad-catch' end
     local carrier, err = MgrFishCarrier:Spawn({
+        CreateUnit = self.CreateUnit,
         Position = position,
         FishId = catch.fishId,
         MaxHealth = species.Health,
@@ -106,9 +121,8 @@ function Mgr:SpawnLanded(player, catch, position)
     self:Isolate(fish)
     local body = carrier.Body
     if body and body.OnLiftedBegin then
-        fish.Conns = {
-            body.OnLiftedBegin:Connect(function(liftunit) self:OnLifted(fish, liftunit) end),
-        }
+        local beginConn = body.OnLiftedBegin:Connect(function(liftunit) self:OnLifted(fish, liftunit) end)
+        fish.Conns = { beginConn }
         if body.OnLiftedEnd then
             fish.Conns[#fish.Conns + 1] = body.OnLiftedEnd:Connect(function() self:Release(fish, 'liftEnd') end)
         end
@@ -121,6 +135,7 @@ function Mgr:SpawnBlastFish(fishId, mult, position, owner)
     local species = GameCfg.Fish[fishId]
     if not species or type(mult) ~= 'number' or not position then return nil, 'bad-fish' end
     local carrier, err = MgrFishCarrier:Spawn({
+        CreateUnit = self.CreateUnit,
         Position = position,
         FishId = fishId,
         MaxHealth = species.Health,
@@ -175,8 +190,8 @@ function Mgr:OnLifted(fish, liftunit)
         return
     end
     local offset = cfg().LiftSocketOffset
-    local world = self.World or game:GetService('World')
-    local ok, mount = pcall(world.CreateUnit, world, 'SkeletalSocketMount', {
+    local world = self.World or service('World')
+    local ok, mount = pcall(createUnit, self, 'SkeletalSocketMount', {
         Name = 'FishMount_' .. tostring(fish.Id),
         Parent = character,
         SocketName = cfg().LiftSocket,
@@ -274,7 +289,7 @@ function Mgr:Release(fish, reason)
     local holder = fish.Holder
     if holder and self.Held[holder.UserId] == fish then self.Held[holder.UserId] = nil end
     local body = fish.Carrier.Body
-    local world = self.World or game:GetService('World')
+    local world = self.World or service('World')
     local character = holder and holder.Character
     local origin = character and readPosition(character) or readPosition(body)
     local fx, fz
@@ -428,7 +443,7 @@ end
 function Mgr:WallAhead(fish, pos)
     local heading = fish.Heading
     if not heading or not RaycastParams then return false end
-    local physics = game:GetService('PhysicsService')
+    local physics = service('PhysicsService')
     if not physics then return false end
     local distance = cfg().RayDistance
     local params = RaycastParams.New()
@@ -447,6 +462,11 @@ function Mgr:WallAhead(fish, pos)
 end
 
 function Mgr:UpdateEscaping(fish, now)
+    -- 战斗超时会先转 StraightEscape，由入水清理；这里只处理落地/飞行回落的期限。
+    if fish.FleeAt and now >= fish.FleeAt and not fish.StraightEscape then
+        self:Remove(fish)
+        return
+    end
     local pos = readPosition(fish.Carrier.Body)
     if not pos then
         print('[MgrFishUnit] 在逃的鱼坐标异常，移除', 'fish=' .. tostring(fish.Id))
@@ -1324,7 +1344,7 @@ function Mgr:PublishCombat(fish, gone)
 end
 
 function Mgr:StartCombatChannel()
-    if self.CombatRequestConn or not game:GetService('RunService') then return end
+    if self.CombatRequestConn or not service('RunService') then return end
     local REUtil = require('common.REUtil')
     self.CombatRE = REUtil:GetRE('FishCombatState')
     self.CombatRequestConn = REUtil:GetRE('RequestFishCombat').OnServerEvent:Connect(function(player)
@@ -1897,7 +1917,9 @@ function Mgr:GrabPlayer(fish, target, now, damage)
     end
     fish.ContactAt = now
     local ok, attached = pcall(function()
-        return abilityApi().AttachToSocket(self.World, nil, fish.Carrier.Body, carryCfg.Socket, state.Offset)
+        local api = abilityApi(self)
+        if not api then return nil end
+        return api.AttachToSocket(self.World, nil, fish.Carrier.Body, carryCfg.Socket, state.Offset)
     end)
     if ok and attached and attached.Ok then
         fish.CarryMount = attached.Mount
@@ -1963,7 +1985,8 @@ function Mgr:ReleaseCarried(fish, dropPoint, reason)
     fish.Carry = nil
     fish.ContactAt = nil
     if fish.CarryMount then
-        pcall(abilityApi().DetachFromSocket, fish.CarryMount)
+        local api = abilityApi(self)
+        if api then pcall(api.DetachFromSocket, fish.CarryMount) end
         fish.CarryMount = nil
     end
     if target and target.Character and drop then
@@ -2050,7 +2073,7 @@ end
 
 function Mgr:Start()
     if self.Ai then self.Ai:Start() end
-    self.World = game:GetService('World')
+    self.World = service('World')
     local now = self:Now()
     for _, fish in pairs(self.Fish) do
         if fish.Flight and not fish.AirAttacks and GameCfg.Fish[fish.FishId].ZoneId == 'reefIsland' then
@@ -2143,7 +2166,13 @@ end
 function Mgr:OnPlayerRemoving(player)
     self:ClearLinks(player)
     local held = self:GetHeld(player)
-    if held then self:Remove(held) end
+    if held then
+        self:Release(held, 'leave')
+        local species = GameCfg.Fish[held.FishId]
+        held.FleeAt = held.FleeAt or (self:Now() + (species and species.EscapeSec or 1))
+        held.Holder = nil
+        held.Owner = nil
+    end
     for _, fish in pairs(self.Fish) do
         if self.Ai then
             self.Ai:Custom(fish)
@@ -2160,7 +2189,14 @@ function Mgr:OnPlayerRemoving(player)
         if fish.TargetOverride == player then fish.TargetOverride = nil end
     end
     for _, fish in ipairs(self:GetFish(player)) do
-        if fish.State == Mgr.State.AwaitLift then self:Remove(fish) end
+        if fish.State == Mgr.State.AwaitLift then
+            local species = GameCfg.Fish[fish.FishId]
+            fish.State = Mgr.State.Escaping
+            fish.EscapeAt = self:Now()
+            fish.FleeAt = self:Now() + (species and species.EscapeSec or 1)
+            fish.Owner = nil
+            fish.Holder = nil
+        end
     end
 end
 
@@ -2248,6 +2284,38 @@ function Mgr:Update()
         end
     end
     self:EnforceEscapeCap(nil)
+end
+
+-- #309 公开宿主：每个 ServerRuntime 持有独立实例，模块表本身仍兼容原生测试夹具。
+-- 这里只增加实例化与伤害入口；战斗规则沿用 BossMoves/BossPhase 的既有实现。
+function Mgr.new()
+  local host = { Fish = {}, NextId = 0, Held = {}, Links = {} }
+  return setmetatable(host, { __index = Mgr })
+end
+
+function Mgr:DamageFish(fish, amount)
+  if type(fish) ~= 'table' or self.Fish[fish.Id] ~= fish then return false end
+  if type(amount) ~= 'number' or amount <= 0 or amount ~= amount then return false end
+  local carrier = fish.Carrier
+  if not carrier then return false end
+  local health = (carrier.Health or 0) - amount
+  if health < 0 then health = 0 end
+  carrier.Health = health
+  if carrier.Controller then
+    pcall(function() carrier.Controller.Health = health end)
+  end
+  if health <= 0 then
+    local killed = self:TakeKilled(fish)
+    if killed and type(self.OnKilled) == 'function' then
+      self.OnKilled({
+        fishId = killed.fishId,
+        mult = killed.mult,
+        zoneId = GameCfg.Fish[killed.fishId] and GameCfg.Fish[killed.fishId].ZoneId or nil,
+        position = killed.position,
+      })
+    end
+  end
+  return true
 end
 
 return Mgr

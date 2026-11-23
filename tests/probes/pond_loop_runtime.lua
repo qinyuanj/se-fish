@@ -54,7 +54,7 @@ local MgrInteract = require('server.Mgr.MgrInteract')
 local MgrShop = require('server.Mgr.MgrShop')
 local MgrCast = require('server.Mgr.MgrCast')
 local MgrReelIn = require('server.Mgr.MgrReelIn')
-local MgrFishUnit = require('server.Mgr.MgrFishUnit')
+local MgrFishUnit = require('server.World.FishTree')
 local MgrWeapon = require('server.Mgr.MgrWeapon')
 local MgrFerry = require('server.Mgr.MgrFerry')
 

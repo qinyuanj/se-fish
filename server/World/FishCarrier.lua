@@ -165,8 +165,11 @@ end
 
 function Mgr:Attach(body, opts)
 	opts = opts or {}
-	local World = game:GetService("World")
-	if not body or not World then
+	local World = rawget(_G, "game") and game:GetService("World") or nil
+	local createUnit = opts.CreateUnit or function(kind, props)
+		return World and World:CreateUnit(kind, props) or nil
+	end
+	if not body or not createUnit then
 		return nil
 	end
 
@@ -175,7 +178,7 @@ function Mgr:Attach(body, opts)
 
 	-- 受击体：与鱼本体同名的受击点。EggyUnit + EnableController 是引擎里唯一「脚本能建、
 	-- 又带 Controller」的单位类型（WorldUnit 挂不上 Controller，#32 的根因）。
-	local receiver = World:CreateUnit("EggyUnit", {
+	local receiver = createUnit("EggyUnit", {
 		Name = Mgr.RECEIVER_NAME .. "_" .. tostring(body.UnitId),
 		Parent = body,
 		Position = pos + (opts.ReceiverOffset or Vector3.New(0, 0, 0)),
@@ -235,8 +238,11 @@ end
 ---@return Table? carrier, string? 失败原因
 function Mgr:Spawn(opts)
 	opts = opts or {}
-	local World = game:GetService("World")
-	if not World then
+	local World = rawget(_G, "game") and game:GetService("World") or nil
+	local createUnit = opts.CreateUnit or function(kind, props)
+		return World and World:CreateUnit(kind, props) or nil
+	end
+	if not createUnit then
 		return nil, "no-world"
 	end
 	local mesh = resolveMesh(opts)
@@ -275,7 +281,7 @@ function Mgr:Spawn(opts)
 		values.AngularDamping = opts.AngularDamping
 	end
 
-	local body = World:CreateUnit("WorldUnit", values)
+	local body = createUnit("WorldUnit", values)
 	if not body then
 		return nil, "body-create-failed"
 	end
@@ -331,6 +337,11 @@ function Mgr:Despawn(carrier)
 	if carrier.Body and carrier.Body.UnitId then
 		self.Carriers[carrier.Body.UnitId] = nil
 	end
+	pcall(function()
+		if carrier.Receiver then
+			carrier.Receiver:Destroy()
+		end
+	end)
 	pcall(function()
 		if carrier.Body then
 			carrier.Body:Destroy()

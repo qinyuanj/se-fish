@@ -30,7 +30,7 @@ M.policy = {
       -- 天然禁止反向依赖 L2 的 client.Views / ScreenHandlers / Local*。
       ids = { 'client.Store' },
       modules = {
-        'client.DamageFloat', 'client.FishCombatLabel', 'client.GameUI', 'client.InteractionBubble',
+        'client.DamageFloat', 'client.GameUI', 'client.InteractionBubble',
         'client.MainHudLayout', 'client.PressGesture', 'client.WeaponAim',
         'server.FishBehaviors', 'server.MgrUtil',
         'common.DamageNotice', 'common.GarBiteNotice', 'common.REUtil',
@@ -43,7 +43,7 @@ M.policy = {
       modules = {
         'server.AbilityAPI', 'client.MgrGameUI',
         'client.LocalCastSource', 'client.LocalGM',
-        'client.LocalGarBite', 'client.LocalInteract', 'client.LocalLottery',
+        'client.LocalInteract', 'client.LocalLottery',
         'client.LocalMgrUtil', 'client.LocalMotorUnitCtrl', 'client.LocalReelIn', 'client.LocalShop',
       },
     },

@@ -12,6 +12,8 @@ local GameCfg = require("common.GameCfg")
 local AbilityAPI = require("server.AbilityAPI")
 local ServerRuntime = require("server.World.ServerRuntime")
 local AttrLeaf = require("server.World.AttrLeaf")
+local FishCarrier = require("server.World.FishCarrier")
+local FishAi = require("server.World.FishAi")
 
 local MgrMap = {
     MgrPlayer = require("server.Mgr.MgrPlayer"),
@@ -19,8 +21,6 @@ local MgrMap = {
     MgrCast = require("server.Mgr.MgrCast"),
     MgrAbility = require("server.Mgr.MgrAbility"),
     MgrReelIn = require("server.Mgr.MgrReelIn"),
-    MgrFishCarrier = require("server.Mgr.MgrFishCarrier"),
-    MgrFishUnit = require("server.Mgr.MgrFishUnit"),
     MgrInteract = require("server.Mgr.MgrInteract"),
     MgrGM = require("server.Mgr.MgrGM"),
     MgrShop = require("server.Mgr.MgrShop"),
@@ -33,11 +33,8 @@ local MgrMap = {
     MgrCompendium = require("server.Mgr.MgrCompendium"),
     MgrRecords = require("server.Mgr.MgrRecords"),
     MgrAchievements = require("server.Mgr.MgrAchievements"),
-    MgrGrill = require("server.Mgr.MgrGrill"),
     MgrPlatform = require("server.Mgr.MgrPlatform"),
     MgrBlindbox = require("server.Mgr.MgrBlindbox"),
-    MgrAi = require("server.Mgr.MgrAi"),
-    MgrAiTarget = require("server.Mgr.MgrAiTarget"),
 }
 
 local WorldRuntime
@@ -70,10 +67,8 @@ local function resolveEntityTarget(target)
     if not target then return nil end
     local okCarrier, carrier = pcall(function() return target.Carrier end) -- 兼容引擎 userdata 读取 Carrier
     if okCarrier and carrier then return target end
-    if MgrMap.MgrFishCarrier and MgrMap.MgrFishCarrier.ResolveCarrier then
-        local resolved = MgrMap.MgrFishCarrier:ResolveCarrier(target)
-        if resolved then return { Carrier = resolved, Ref = target } end
-    end
+    local resolved = FishCarrier:ResolveCarrier(target)
+    if resolved then return resolved end
     return target
 end
 
@@ -279,16 +274,12 @@ end
 
 MgrMap.MgrAbility.BehaviorServices = {
     Vitals = nil,
-    FishCarrier = MgrMap.MgrFishCarrier,
     Modifier = ModifierBridge,
     GM = MgrMap.MgrGM,
 }
 
 MgrMap.MgrCast.ReelIn = MgrMap.MgrReelIn
 MgrMap.MgrReelIn.Cast = MgrMap.MgrCast
-MgrMap.MgrCast.FishUnit = MgrMap.MgrFishUnit
-MgrMap.MgrFishUnit.Cast = MgrMap.MgrCast
-MgrMap.MgrFishUnit.Ability = MgrMap.MgrAbility
 MgrMap.MgrInteract.PlayerData = MgrMap.MgrPlayerData
 MgrMap.MgrGM.PlayerData = MgrMap.MgrPlayerData
 MgrMap.MgrGM.Cast = MgrMap.MgrCast
@@ -298,7 +289,6 @@ MgrMap.MgrInteract.Quest = MgrMap.MgrQuest
 MgrMap.MgrShop.Quest = MgrMap.MgrQuest
 MgrMap.MgrPlayerData.Quest = MgrMap.MgrQuest
 MgrMap.MgrCast.Quest = MgrMap.MgrQuest
-MgrMap.MgrFishUnit.Quest = MgrMap.MgrQuest
 MgrMap.MgrPlayerData.Vitals = nil
 MgrMap.MgrGM.Vitals = nil
 MgrMap.MgrGM.Save = MgrMap.MgrSave
@@ -336,29 +326,11 @@ MgrMap.MgrBlindbox.PlayerData = MgrMap.MgrPlayerData
 MgrMap.MgrBlindbox.Platform = MgrMap.MgrPlatform
 
 MgrMap.MgrAbility.Vitals = nil
-MgrMap.MgrFishUnit.Vitals = nil
 MgrMap.MgrPlayerData.Ability = MgrMap.MgrAbility
 MgrMap.MgrAbility.PlayerData = MgrMap.MgrPlayerData
 MgrMap.MgrAbility.Attr = AttrBridge
 MgrMap.MgrAbility.Modifier = ModifierBridge
-MgrMap.MgrAbility.Ai = MgrMap.MgrAi
-MgrMap.MgrFishUnit.Ai = MgrMap.MgrAi
-MgrMap.MgrFishUnit.AiTarget = MgrMap.MgrAiTarget
-MgrMap.MgrAi.FishUnit = MgrMap.MgrFishUnit
 MgrMap.MgrCast.Vitals = nil
-MgrMap.MgrFishCarrier.DamageListener = function(carrier, actual, hit)
-    local fish = carrier and MgrMap.MgrFishUnit:FindByCarrier(carrier)
-    local attacker = hit and hit.sourcePlayer
-    if fish and attacker and type(actual) == 'number' and actual > 0 then
-        MgrMap.MgrFishUnit:NoteDamage(fish, attacker, actual)
-    end
-end
-
-
-MgrMap.MgrGrill.Vitals = nil
-MgrMap.MgrGrill.PlayerData = MgrMap.MgrPlayerData
-MgrMap.MgrGrill.Save = MgrMap.MgrSave
-
 
 MgrMap.MgrParty.PlayerData = MgrMap.MgrPlayerData
 MgrMap.MgrParty.Save = MgrMap.MgrSave
@@ -416,11 +388,6 @@ WorldRuntime = ServerRuntime.new({
     player_data = MgrMap.MgrPlayerData,
     save = MgrMap.MgrSave,
     platform = MgrMap.MgrPlatform,
-    fish_carrier = MgrMap.MgrFishCarrier,
-    fish_unit = MgrMap.MgrFishUnit,
-    fish_units = function()
-        return MgrMap.MgrFishUnit and MgrMap.MgrFishUnit.Fish or {}
-    end,
     physics = game:GetService("PhysicsService"),
     players_service = Players,
     world_service = WorldService,
@@ -433,11 +400,37 @@ WorldRuntime = ServerRuntime.new({
             dispatch(player, payload)
         end)
     end,
+    bind_grill_action = function(dispatch)
+        local event = _G.REUtil:GetRE("GrillAction")
+        event.OnServerEvent:Connect(function(player, payload)
+            if type(payload) ~= "table" then return end
+            if _G.REUtil:CheckRECD(player, "GrillAction", GameCfg.Items.ActionCooldownSec) then return end
+            dispatch(player, payload)
+        end)
+    end,
     ability = { CastAbility = AbilityAPI.CastAbility },
     register_cast_guard = registerCastGuard,
     create_unit = function(unit_type, props)
         return WorldService:CreateUnit(unit_type, props)
     end,
+    -- #309 官方 AI 叶子：注册/注销只沿 FishTree 公开宿主单向进入包适配层。
+    ai = {
+        start = function(_, fish_id)
+            local host = WorldRuntime and WorldRuntime.fish_host
+            local fish = host and host.Fish[fish_id]
+            if not fish then return false end
+            return FishAi:Sync(fish) ~= false
+        end,
+        stop = function(_, fish_id)
+            local host = WorldRuntime and WorldRuntime.fish_host
+            local fish = host and host.Fish[fish_id]
+            if fish then FishAi:Remove(fish) end
+            return true
+        end,
+        command = function(_, fish, ...)
+            return FishAi:Command(fish, ...)
+        end,
+    },
     bait_spots = { Enabled = false },
     on_item_bar_state = function(player, snapshot)
         _G.REUtil:GetRE('ItemBarState'):FireClient(player, snapshot)
@@ -468,12 +461,12 @@ WorldRuntime = ServerRuntime.new({
         return MgrMap.MgrPlayerData:GetDataInst(player) == data
     end,
     on_player_ready = function(player)
-        for _, name in ipairs({ 'MgrPlayer', 'MgrAbility', 'MgrFishUnit' }) do
+        for _, name in ipairs({ 'MgrPlayer', 'MgrAbility' }) do
             invoke(name, MgrMap[name], 'OnPlayerAdded', player)
         end
         for name, mgr in pairs(MgrMap) do
             if name ~= 'MgrPlayerData' and name ~= 'MgrPlayer'
-                and name ~= 'MgrAbility' and name ~= 'MgrFishUnit' then
+                and name ~= 'MgrAbility' then
                 invoke(name, mgr, 'OnPlayerAdded', player)
             end
         end
@@ -482,9 +475,6 @@ WorldRuntime = ServerRuntime.new({
         if MgrMap.MgrQuest:FlushBeforeLeave(player, resume) then return true end
         if MgrMap.MgrStory:FlushBeforeLeave(player, resume) then return true end
         return false
-    end,
-    on_leave_finalize = function(_, player)
-        invoke('MgrGrill', MgrMap.MgrGrill, 'BeforeLeave', player)
     end,
     on_player_removing = function(player, active)
         invoke('MgrPlayerData', MgrMap.MgrPlayerData, 'OnPlayerRemoving', player)
@@ -501,15 +491,30 @@ WorldRuntime = ServerRuntime.new({
 ServerRuntime.set_current(WorldRuntime)
 WorldRuntime.life:SetDamageFilter(pkDamageFilter)
 local Life = WorldRuntime.life
+-- #309 活鱼公开宿主接线：不再注册 MgrFishUnit/MgrFishCarrier/MgrAi。
+local fishHost = WorldRuntime.fish_host
+MgrMap.MgrCast.FishUnit = fishHost
+fishHost.Cast = MgrMap.MgrCast
+fishHost.Ability = MgrMap.MgrAbility
+fishHost.AbilityApi = AbilityAPI
+fishHost.Quest = MgrMap.MgrQuest
+fishHost.Vitals = Life
+fishHost.Ai = FishAi
+FishAi.FishUnit = fishHost
+MgrMap.MgrAbility.Ai = FishAi
+FishCarrier.DamageListener = function(carrier, actual, hit)
+    local fish = carrier and fishHost:FindByCarrier(carrier)
+    local attacker = hit and hit.sourcePlayer
+    if fish and attacker then fishHost:NoteDamage(fish, attacker, actual) end
+end
+FishAi:Start()
 MgrMap.MgrPlayerData.Vitals = Life
 MgrMap.MgrGM.Vitals = Life
 MgrMap.MgrInteract.Vitals = Life
 MgrMap.MgrInteract.Survival = Life
 MgrMap.MgrAbility.Vitals = Life
 MgrMap.MgrAbility.BehaviorServices.Vitals = Life
-MgrMap.MgrFishUnit.Vitals = Life
 MgrMap.MgrCast.Vitals = Life
-MgrMap.MgrGrill.Vitals = Life
 MgrMap.MgrParty.Vitals = Life
 
 MgrMap.MgrPlayerData.OnSyncPlayerTree = function(player, data, forcePush)

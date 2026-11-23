@@ -7,7 +7,7 @@ local WaterJudge = require('common.MathWaterJudge')
 
 local AIR_IDS = { 'item81', 'item83', 'item84', 'item85', 'item86',
     'item87', 'item89', 'item90', 'item91', 'item92' }
-local MODULES = { 'server.Mgr.MgrFishCarrier', 'server.Mgr.MgrFishUnit' }
+local MODULES = { 'server.World.FishCarrier', 'server.World.FishTree' }
 
 local function signal()
     local slots = {}
@@ -88,11 +88,11 @@ function FishAirEscape:setUp()
         if name == 'World' then return env.world end
         if name == 'Players' then return { GetPlayers = function() return { env.player } end } end
     end }
-    self.carrier = require('server.Mgr.MgrFishCarrier')
+    self.carrier = require('server.World.FishCarrier')
     self.carrier.DamagePublisher = function() end
-    self.mgr = require('server.Mgr.MgrFishUnit')
+    self.mgr = require('server.World.FishTree')
     -- 目标裁决适配层按生产接线（server/main.lua）由入口注入
-    self.mgr.AiTarget = require('server.Mgr.MgrAiTarget')
+    self.mgr.AiTarget = require('server.World.FishAiTarget')
     self.mgr:Start()
     local ServerRuntime = require('server.World.ServerRuntime')
     local SpokeClock = require('common.SpokeClock')

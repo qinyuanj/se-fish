@@ -29,7 +29,7 @@ local function vec(x, y, z)
 end
 
 local moduleNames = { 'common.REUtil', 'server.Mgr.MgrPlayerData',
-  'server.Mgr.MgrFishCarrier', 'server.Mgr.MgrFishUnit' }
+  'server.World.FishCarrier', 'server.World.FishTree' }
 
 describe('上岸结算（MgrCast × MgrFishUnit × MgrFishCarrier）', function()
   local env
@@ -70,7 +70,7 @@ describe('上岸结算（MgrCast × MgrFishUnit × MgrFishCarrier）', function(
       SendItemBar = function() env.sentBars = env.sentBars + 1 end,
     }
     env.carrierOk = true
-    package.loaded['server.Mgr.MgrFishCarrier'] = {
+    package.loaded['server.World.FishCarrier'] = {
       Spawn = function(_, opts)
         if not env.carrierOk then return nil, 'body-create-failed' end
         local carrier = { Opts = opts, Body = { UnitId = #env.spawned + 1 } }
@@ -79,9 +79,9 @@ describe('上岸结算（MgrCast × MgrFishUnit × MgrFishCarrier）', function(
       end,
       Despawn = function(_, carrier) env.despawned[#env.despawned + 1] = carrier end,
     }
-    package.loaded['server.Mgr.MgrFishUnit'] = nil
-    env.fishUnit = assert(loadfile('server/Mgr/MgrFishUnit.lua'))()
-    package.loaded['server.Mgr.MgrFishUnit'] = env.fishUnit
+    package.loaded['server.World.FishTree'] = nil
+    env.fishUnit = assert(loadfile('server/World/FishTree.lua'))()
+    package.loaded['server.World.FishTree'] = env.fishUnit
     env.reel = assert(loadfile('server/Mgr/MgrReelIn.lua'))()
     env.cast = assert(loadfile('server/Mgr/MgrCast.lua'))()
     env.cast.ReelIn = env.reel
@@ -276,8 +276,11 @@ describe('上岸结算（MgrCast × MgrFishUnit × MgrFishCarrier）', function(
     env.fishUnit:OnPlayerRemoving(env.player)
     assert.is_nil(env.cast.Sessions[env.player.UserId])
     assert.same(0, #env.fishUnit:GetFish(env.player))
-    assert.same(1, #env.despawned)
+    -- #309：上岸等待中的鱼落地，普通鱼 1 秒后由公开宿主清理。
+    assert.same(0, #env.despawned)
     env.now = 5
+    env.fishUnit:Update()
+    assert.same(1, #env.despawned)
     env.cast:Update()
   end)
 
@@ -395,6 +398,6 @@ describe('管理器接线（server/main.lua 与配置）', function()
   end)
 
   it('test_fish_unit_is_registered', function()
-    assert.matches('MgrFishUnit = require', read('server/main.lua'), 1, true)
+    assert.matches('FishTree = require', read('server/World/ServerRuntime.lua'), 1, true)
   end)
 end)

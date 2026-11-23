@@ -31,11 +31,11 @@ local PACKAGE_SNAPSHOTS = {
 
 -- 三类存量债务水位线（只减不增；每个垂直切片完成后单调下调对应数值直至归零）。
 local DEBT_WATERMARKS = {
-  -- #301 删除地面物品旧模块：MgrLoot 裸 Connect 1、LocalLoot 3、InteractionBubble 仍被其他屏使用故保留；
-  -- OwnedUnits 调用数本切片地面路径原本为 0，水位不降。MgrMap 去掉 MgrLoot 后 26。
-  owned_units_calls = 35,
-  legacy_raw_connects = 95,
-  mgr_map_members = 24,
+  -- #309 删除活鱼、载体与 AI 旧模块；#310 删除烧烤旧模块。
+  -- 两侧水位取更低值，MgrMap 同时去掉四个活鱼成员与 MgrGrill。
+  owned_units_calls = 33,
+  legacy_raw_connects = 85,
+  mgr_map_members = 19,
 }
 
 local BUSINESS_ROOTS = { "client", "common", "server" }

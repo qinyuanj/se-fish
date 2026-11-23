@@ -18,7 +18,7 @@ describe('TestAiMigration', function()
             if name == 'server.packages.official_ai_feature.behavior_runtime' then return env.runtime.behavior end
             return require(name)
         end }, { __index = _G })
-        env.mgr = assert(loadfile('server/Mgr/MgrAi.lua', 't', e))()
+        env.mgr = assert(loadfile('server/World/FishAi.lua', 't', e))()
         env.unit = env.runtime.newUnit(5301)
         env.fish = { Id = 1, Carrier = { Receiver = env.unit, Body = env.runtime.newUnit(5302) } }
     end)

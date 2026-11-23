@@ -40,7 +40,7 @@ describe('TestFishStatusGate', function()
 
     before_each(function()
         ctx = { saved = { game = rawget(_G, 'game'), Vector3 = rawget(_G, 'Vector3'),
-            unit = package.loaded['server.Mgr.MgrFishUnit'] } }
+            unit = package.loaded['server.World.FishTree'] } }
         ctx.now = 10
         local state = ctx
         _G.Vector3 = { New = vec }
@@ -49,8 +49,8 @@ describe('TestFishStatusGate', function()
             if name == 'Players' then return { GetPlayers = function() return {} end } end
             return {}
         end }
-        package.loaded['server.Mgr.MgrFishUnit'] = nil
-        ctx.mgr = assert(loadfile('server/Mgr/MgrFishUnit.lua'))()
+        package.loaded['server.World.FishTree'] = nil
+        ctx.mgr = assert(loadfile('server/World/FishTree.lua'))()
         ctx.factor, ctx.paralyzed = 1, false
         ctx.mgr.Ability = {
             FishSpeedFactor = function() return state.factor end,
@@ -63,7 +63,7 @@ describe('TestFishStatusGate', function()
         if ctx and ctx.saved then
             _G.game = ctx.saved.game
             _G.Vector3 = ctx.saved.Vector3
-            package.loaded['server.Mgr.MgrFishUnit'] = ctx.saved.unit
+            package.loaded['server.World.FishTree'] = ctx.saved.unit
         end
     end)
 

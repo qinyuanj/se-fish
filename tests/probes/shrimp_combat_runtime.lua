@@ -1,6 +1,6 @@
 -- #135 独立战斗夹具：从真实SpawnLanded/Drop入口生成指定600/1200血鱼，用于招式表现取证。
 -- 明确不作为自然抽鱼/从零经济证明；不修改血量、时间、玩家库存或奖励裁决。
-local units = require('server.Mgr.MgrFishUnit')
+local units = require('server.World.FishTree')
 local player = game:GetService('Players'):GetPlayers()[1]
 if not player or not player.Character then return end
 local id = _G.Shrimp135Species or 'fish15Elite'

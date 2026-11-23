@@ -25,7 +25,10 @@ local lfs = require("lfs")
 -- 55：#300 攻击键改挂 RootView 统一建点，删除 LocalAttackButton 自己的 4 处建点；投掷物视觉复用 main 注入建点，client 34 → 30
 -- 53：#299 删除 MgrSpecialItem 的两处占位外观建点，改由入口已有 create_unit 托管
 -- 50：#301 地面物品改由 GroundLoot 的 on_cleanup 销毁，删除 MgrLoot 3 处建点
-local SITES = 50
+-- #309 旧活鱼驱动迁入 server/World/FishTree 等公开宿主。
+-- #310 烧烤视图改由 RootView 统一建点，删除 ScreenGrill 自己的 1 处建点。
+-- 旧客户端战斗标签与咬钩预警仅保留为 tests/support 测试驱动，不计入生产建点。
+local SITES = 54
 local SITE_ROOTS = { "client", "common", "server" }
 local REF_ROOTS = { "client", "common", "server", "tests", "tools" }
 local REMOVED = { "FXUtil", "WeldTo", "MarkPointPart", "CreateHPBar" }
@@ -85,7 +88,7 @@ local function breakdown(per_root)
 end
 
 describe("运行期建点台账", function()
-  it("三端运行期建点数与 #206 台账同为 52 个", function()
+  it("三端运行期建点数与 #206 台账一致", function()
     local total, per_root = count_sites()
     if total ~= SITES then
       fail("运行期建点 %d 个，台账与本守卫断言 %d 个（%s）。新增或删除建点要同步 #206 台账与本计数。",

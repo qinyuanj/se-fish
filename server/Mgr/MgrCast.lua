@@ -3,9 +3,17 @@ local MathWaterJudge = require('common.MathWaterJudge')
 local FishCatch = require('common.FishCatch')
 local MgrPlayerData = require('server.Mgr.MgrPlayerData')
 local REUtil = require('common.REUtil')
-local MgrFishUnit = require('server.Mgr.MgrFishUnit')
 
-local Mgr = { Sessions = {}, NextFish = {}, NextFishSerial = 0, FishUnit = MgrFishUnit }
+local Mgr = { Sessions = {}, NextFish = {}, NextFishSerial = 0 }
+
+-- #309 公开活鱼宿主：优先使用运行时实例，测试夹具可直接注入 self.FishUnit。
+local function fishHost(self)
+    if self.FishUnit then return self.FishUnit end
+    local ServerRuntime = require('server.World.ServerRuntime')
+    local runtime = ServerRuntime.current and ServerRuntime.current() or nil
+    if runtime and runtime.fish_host then return runtime.fish_host end
+    return require('server.World.FishTree')
+end
 MathWaterJudge.Build(GameCfg.Water.Zones)
 
 local function selectedRod(data, payload)
@@ -38,7 +46,7 @@ local function castLanding(character)
 end
 
 function Mgr:SendState(player, session, snapshot)
-    local holding = self.FishUnit and self.FishUnit:HeldInfo(player) or nil
+    local holding = fishHost(self):HeldInfo(player)
     local species = session and session.fishId and GameCfg.Fish[session.fishId]
     local source = species and species.CatchSource or 'water'
     local landing = session and session.landing
@@ -86,7 +94,7 @@ function Mgr:Cast(player, payload)
         self:SendFailure(player, 'cannotAct')
         return
     end
-    if self.FishUnit and not self.FishUnit:CanCast(player) then
+    if not fishHost(self):CanCast(player) then
         self:SendFailure(player, 'holding')
         return
     end
@@ -159,7 +167,7 @@ function Mgr:EndSession(player, current, notify, reason)
     if reason then
         REUtil:GetRE('CastState'):FireClient(player, {
             phase = 'idle', castId = current.session.castId, result = { reason = reason },
-            holding = self.FishUnit and self.FishUnit:HeldInfo(player) or nil,
+            holding = fishHost(self):HeldInfo(player),
         })
     else
         self:SendState(player)
@@ -180,9 +188,10 @@ function Mgr:Reel(player)
 end
 
 function Mgr:Drop(player)
-    if not self.FishUnit or not self.FishUnit:GetHeld(player) then return end
+    local host = fishHost(self)
+    if not host:GetHeld(player) then return end
     if REUtil:CheckRECD(player, 'CastAction', GameCfg.Casting.ActionCooldownSec) then return end
-    self.FishUnit:Drop(player)
+    host:Drop(player)
 end
 
 function Mgr:Abort(player)
@@ -241,7 +250,25 @@ function Mgr:Land(player, session)
         dz = GameCfg.Casting.LandingOffset * forward.z / length
     end
     local position = Vector3.New(origin.x + dx, origin.y + GameCfg.Casting.LandingHeight, origin.z + dz)
-    local fish, err = self.FishUnit:SpawnLanded(player, { fishId = session.fishId, mult = session.mult }, position)
+    local ServerRuntime = require("server.World.ServerRuntime")
+    local runtime = ServerRuntime.current and ServerRuntime.current() or nil
+    local fish, err
+    if runtime and type(runtime.receive_landed) == "function" then
+        local accepted, fish_id = runtime:receive_landed(player, {
+            fishId = session.fishId,
+            mult = session.mult,
+            zoneId = session.zoneId,
+            x = position.x, y = position.y, z = position.z,
+        })
+        fish = accepted and { Id = fish_id } or nil
+        err = accepted and nil or fish_id
+    else
+        local host = fishHost(self)
+        fish, err = host:SpawnLanded(player, {
+            fishId = session.fishId,
+            mult = session.mult,
+        }, position)
+    end
     if fish then
         local forced = session.forcedFishSerial and self.NextFish[player.UserId]
         if forced and forced.serial == session.forcedFishSerial then self.NextFish[player.UserId] = nil end
