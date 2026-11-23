@@ -21,6 +21,7 @@ local RootView = require('client.Views.RootView')
 local MainHudVitalsView = require('client.Views.MainHudVitalsView')
 local MainHudEquipPopups = require('client.Views.MainHudEquipPopups')
 local MainHudBackpackView = require('client.Views.MainHudBackpackView')
+local MainHudItemBarView = require('client.Views.MainHudItemBarView')
 
 local function signal()
     local listeners = {}
@@ -48,7 +49,7 @@ local function setUp(height)
     _G.MgrGameUI = { SetCustomControlUI = function() end, GetScreen = function() end, CloseScreen = function() end }
     local world = { Created = ctx.created }
     function world:CreateUnit(kind, attrs)
-        local node = { Kind = kind, OnClicked = signal() }
+        local node = { Kind = kind, OnClicked = signal(), OnTouchBegan = signal(), OnTouchEnded = signal() }
         for key, value in pairs(attrs) do node[key] = value end
         function node:Destroy()
             self.Destroyed = true
@@ -115,6 +116,10 @@ local function setUp(height)
                 open_popup = ctx.openPopup,
                 backpack_open = ctx.backpackOpen,
                 send_operate = function(payload) ctx.handler:Operate(payload) end,
+            }),
+            MainHudItemBarView.spec({
+                get_resolution = function() return { x = 1920, y = height } end,
+                backpack_open = ctx.backpackOpen,
             }),
             MainHudBackpackView.spec({
                 get_resolution = function() return { x = 1920, y = height } end,
@@ -207,9 +212,15 @@ describe('主界面接线（布局模块）', function()
         local eight = layoutFor(1080, 8, false)
         for i = 1, 8 do assertAt(ctx.nodes['ItemBarSlot' .. i], eight.Rects['ItemBarSlot' .. i], 'slot' .. i) end
         assertAt(ctx.nodes.BtnBackpack, eight.Rects.BackpackButton, 'BtnBackpack @8')
-        -- 拖拽命中表随之更新：新位置命中对应格
-        local hit = ctx.handler:SlotAtPosition({ x = eight.Rects.ItemBarSlot8.x, y = eight.Rects.ItemBarSlot8.y })
-        assert.same(8, hit and hit.index)
+        -- 拖拽命中表随之更新：从格 1 拖到新位置的格 8 发出 MoveSlot
+        local before = #ctx.sent
+        local slot8 = eight.Rects.ItemBarSlot8
+        ctx.nodes.ItemBarSlot1.OnTouchBegan:Fire({ BeganPosition = { x = 0, y = 0 } })
+        ctx.nodes.ItemBarSlot1.OnTouchEnded:Fire({ EndedPosition = { x = slot8.x, y = slot8.y } })
+        local sent = ctx.sent[before + 1]
+        assert.is_not_nil(sent)
+        assert.same('MoveSlot', sent.payload.action)
+        assert.same(8, sent.payload.value.slot)
     end)
 
     it('test_reel_close_uses_reeling_layout_clear_of_attack', function()

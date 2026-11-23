@@ -10,6 +10,7 @@ local CameraZoomView = require("client.Views.CameraZoomView")
 local MainHudVitalsView = require("client.Views.MainHudVitalsView")
 local MainHudEquipPopups = require("client.Views.MainHudEquipPopups")
 local MainHudBackpackView = require("client.Views.MainHudBackpackView")
+local MainHudItemBarView = require("client.Views.MainHudItemBarView")
 local ScreenMain = require("client.ScreenHandlers.ScreenMain")
 local GameUI = require("client.GameUI")
 
@@ -60,6 +61,9 @@ Task:Spawn(function()
                     open_popup = hud_open_popup,
                     backpack_open = hud_backpack_open,
                     send_operate = send_hud_operate,
+                }),
+                MainHudItemBarView.spec({
+                    backpack_open = hud_backpack_open,
                 }),
                 MainHudBackpackView.spec({
                     backpack_open = hud_backpack_open,
