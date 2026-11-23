@@ -1,38 +1,17 @@
 # Issue tracker：GitHub
 
-本仓库的开发任务、缺陷、验收台账与过程产物统一在 GitHub `qinyuanj/se-fish` 跟踪，使用 GitHub CLI `gh`。执行时显式指定 `-R qinyuanj/se-fish`，避免按本地 remote 推断到其他仓库。
+单据在 GitHub `qinyuanj/se-fish`，用 `gh`。每次带 `-R qinyuanj/se-fish`。动手前 `gh api user --jq .login` 须为 `qinyuanj`。
 
-> **工单已清空，验收面改为 [条款矩阵](../acceptance/README.md)**：待办不再由 issue 承载，"哪里没做完"的唯一答案是 `docs/acceptance/` 下的条款与状态。新建工单前先判断这件事该不该落成条款——能落成条款的走 [TEMPLATE.md](../acceptance/TEMPLATE.md) 的受控入口，已关闭旧单的未完成项去向见 [legacy-ledger.md](../acceptance/legacy-ledger.md)。
+> **工单已清空，验收面改为 [条款矩阵](../acceptance/README.md)**。能落成条款的走 [TEMPLATE.md](../acceptance/TEMPLATE.md)，已关闭旧单的未完成项见 [legacy-ledger.md](../acceptance/legacy-ledger.md)。
 
-## 操作
+## 本仓和 `gh` 默认的差别
 
-- **核对身份**：`gh api user --jq .login`；本项目使用 `qinyuanj`。
-- **建 issue**：`gh issue create -R qinyuanj/se-fish --title "标题" --body-file "<正文.md>"`。
-- **读 issue（含评论）**：`gh issue view <编号> -R qinyuanj/se-fish --json title,body,labels,state,comments`。必须带 `--json`：本机 gh 2.45 下，凡不带 `--json` 的 `gh issue view`（含加 `--comments` 的写法）都会去查已下线的 Projects (classic) 字段，报 GraphQL 错误而取不到单。
-- **列 issue**：`gh issue list -R qinyuanj/se-fish --state all --label ready-for-agent`。
-- **评论**：`gh issue comment <编号> -R qinyuanj/se-fish --body-file "<正文.md>"`。
-- **打 / 摘标签**：`gh issue edit <编号> -R qinyuanj/se-fish --add-label "..." --remove-label "..."`。
-- **指派 / 取消指派**：`gh issue edit <编号> -R qinyuanj/se-fish --add-assignee <用户名> --remove-assignee <用户名>`。
-- **关闭**：先评论验收结果，再执行 `gh issue close <编号> -R qinyuanj/se-fish --reason completed`；不再计划处理用 `--reason "not planned"`。
-- **PR**：用 `gh pr`；GitHub PR 与 issue 共用编号空间，读取前确认对象类型。
+- 多行正文写 UTF-8 文件，用 `--body-file` 提交，再回读正文、标签和状态。正文文件按 [开发工作流](workflow.md) 的临时产物处理。
+- 本机 gh 2.45：`gh issue view` 不带 `--json`（含 `--comments`）会去查已下线的 Projects (classic)，GraphQL 报错、单取不回来。读单带 `--json title,body,labels,state,comments`。
+- 关闭前先评论验收结果，再 `gh issue close <编号> -R qinyuanj/se-fish --reason completed`；不再处理用 `--reason "not planned"`。PR 与 issue 共用编号，读之前先确认类型。
 
-多行正文写入 UTF-8 临时文件，用 `--body-file` 提交；提交后回读确认正文、标签和状态。过程产物贴到对应 issue 评论；临时正文文件与其他临时产物同一口径，放仓库 `tmp/`（已 gitignored），无需清理（见 [开发工作流](workflow.md#工具链)）。
+skill 要求「发布到 issue tracker」时在本仓库建 issue，默认 `ready-for-agent`，除非另有指示。标签见 [triage-labels.md](triage-labels.md)。
 
-## 跟踪与迁移
+## Wayfinding
 
-skill 要求“发布到 issue tracker”时，在 `qinyuanj/se-fish` 建 GitHub issue；默认打 `ready-for-agent`，除非另有指示。标签含义见 `triage-labels.md`，使用前查询实际标签。
-
-skill 要求“取出相关 ticket”时，用上面「读 issue」的命令。
-
-迁移旧单据时，先在 GitHub 建单并回读，再给旧单据评论 GitHub 链接并关闭。迁移关闭不表示缺陷已修复。旧平台编号与 GitHub 编号不能直接互换；通过标题和内容核对对应关系，历史引用注明原平台。
-
-## 依赖与 Wayfinding
-
-- **地图**：一张 issue，正文放 Notes / Decisions-so-far / Fog，使用 `wayfinder:map` 标签。
-- **子 ticket**：正文顶部写 `Part of #<地图编号>`，使用 `wayfinder:<类型>` 标签（`research` / `prototype` / `grilling` / `task`）；被认领后指派给驱动的开发者。
-- **阻塞**：在 GitHub 中记录依赖。使用原生关系前，核对当前 API 与仓库权限，通过 `gh api` 操作；不可用时在正文顶部写 `Blocked by #<编号>`。所有 blocker 关闭后才可推进。
-- **frontier**：读取地图及其子 ticket，排除仍被阻塞或已有 assignee 的项，按地图顺序取第一个。
-- **认领**：`gh issue edit <编号> -R qinyuanj/se-fish --add-assignee @me`，作为会话首次写操作。
-- **结案**：先评论答案及验收结果，再关闭；在地图正文的 Decisions-so-far 中追加结论。
-
-使用 `wayfinder:*` 标签前先查询仓库标签；缺失时按任务需要创建。
+地图、`wayfinder:*`、frontier、认领、结案的形状见 wayfinder 技能。本机 gh 2.45 没有原生 sub-issue 与 blocking：子 ticket 正文顶部写 `Part of #<地图编号>`，阻塞写 `Blocked by #<编号>`，blocker 都关闭才推进。认领是会话第一次写：`gh issue edit <编号> -R qinyuanj/se-fish --add-assignee @me`。结案后把一句结论追加到地图的 Decisions-so-far。`wayfinder:*` 用前先查标签，没有就建。

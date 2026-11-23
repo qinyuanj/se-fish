@@ -11,7 +11,7 @@
 - **技术方案**：先读 `docs/技术难点识别.md`；策划案内部矛盾与数值缺口一律记在 [`docs/to-questionnaire-策划案内部矛盾.md`](docs/to-questionnaire-策划案内部矛盾.md)（未定的题），定案后移进 [策划案已确认结论](docs/策划案已确认结论.md)。
 - **编码与审查**：编写或审查 SE 业务 Lua 前，读 `CODING_STANDARDS.md`。
 - **开发工作流**：修改代码、运行测试、同步宿主或操作编辑器前，以及整理过程产物时，读 `docs/agents/workflow.md`。
-- **截图**：取证统一走 `lua tools/cli.lua screenshot`——缺省后台抓屏（PrintWindow），目标窗口被遮挡也能取到当前帧；取证前先跑 `--info` 判显示路径，判帧新旧连拍比 md5。editor-cli 的 `screenshot` 只作备选，细节见 `docs/agents/editor-cli.md`「截图」条。
+- **截图**：取证统一走 `lua tools/cli.lua screenshot`，细节见 `docs/agents/editor-cli.md`「截图」条。
 - **架构导航**：需要模块依赖全景、评估改动影响或从图上操作时，打开 dsh-uml-viewer 插件面板；图由根目录 `policy.edn` 生成到 `docs/uml/se-fish.edn`（不要手编），操作规则由插件注入。
 - **架构分层**：新增模块、调整模块职责或依赖方向前，读 `docs/architecture.md`；层归属与门禁唯一声明在 `tools/arch_policy.lua`。
 - **spoke 运行时**：写或评审调用 `common.packages.spoke.*` 或 `common.packages.spoke_eggy.*` 的代码前，读 `.dsh/skills/spoke/`（库与技能都是上游 spoke 仓库的整包拷贝，两边都不就地修改）；宿主包独立成包、依赖单向，见 [ADR-0024](docs/adr/0024-introduce-spoke-eggy-host-package.md)。技能 `references/eggy-integration.md` 允许消费方自选 submodule 或纯拷贝：本仓取纯拷贝，SHA 记账在 [packages 参考](docs/packages-reference.md)。
