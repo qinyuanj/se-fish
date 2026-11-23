@@ -97,6 +97,7 @@ function RootView.mount(root_node, store, options)
       root_node = root_node,
       store = store,
       clock = store.clock,
+      services = services,
       is_alive = self.is_alive,
     }
 

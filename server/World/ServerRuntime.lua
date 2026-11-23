@@ -8,6 +8,7 @@
 --   5. 维护同账号重进排空栅栏（leaving.waiting），防止提前读旧档或覆盖正在落盘的数据。
 -- 本模块归属 L2（server.World），零反向依赖存量旧债务模块；过渡接缝全部由 L1 入口以回调注入。
 
+local GameCfg = require("common.GameCfg")
 local Number = require("common.Number")
 local SpokeClock = require("common.SpokeClock")
 local SharedWorldTree = require("server.World.SharedWorldTree")
@@ -85,6 +86,7 @@ function ServerRuntime.new(opts)
     clock = clock,
     world = nil,
     entity_modifiers = entity_modifiers,
+    platform = opts.platform,
     _started = false,
   }
 
@@ -245,9 +247,30 @@ function ServerRuntime.new(opts)
       effects = effects_opts,
       on_leave_finalize = opts.on_leave_finalize,
       mounts = mounts,
+      remote = opts.remote,
+      save = opts.save,
+      player_data = opts.player_data,
+      platform = opts.platform,
+      fish_carrier = opts.fish_carrier,
+      speed_writer = opts.speed_writer,
+      growth_writer = opts.growth_writer,
+      on_downed = opts.on_player_downed,
+      lookup_tree = function(user_id)
+        return player_trees[user_id]
+      end,
+      players = function()
+        local list = {}
+        for _, active in pairs(active_players) do
+          list[#list + 1] = active
+        end
+        return list
+      end,
     })
     active_players[user_id] = player
     player_trees[user_id] = player_tree
+    if player_tree.set_damage_filter and runtime._damage_filter then
+      player_tree:set_damage_filter(runtime._damage_filter())
+    end
 
     safe_call(opts.logger, "on_player_ready", opts.on_player_ready, player, data, player_tree)
     return player_tree
@@ -378,6 +401,175 @@ function ServerRuntime.new(opts)
     if current_runtime == self then
       current_runtime = nil
     end
+  end
+
+  local hit_seq = 0
+  local damage_filter = nil
+  runtime.life = {}
+  local life = runtime.life
+
+  local function tree_of(player)
+    if type(player) ~= "table" or player.UserId == nil then return nil end
+    local tree = player_trees[player.UserId]
+    if tree and not tree:is_disposed() then return tree end
+    return nil
+  end
+
+  local function player_from_unit(unit)
+    if type(unit) ~= "table" then return nil end
+    for _, player in pairs(active_players) do
+      if player == unit or player.Character == unit then return player end
+    end
+    return nil
+  end
+
+  function life:GetTree(player)
+    return tree_of(player)
+  end
+
+  function life:PlayerFromUnit(unit)
+    return player_from_unit(unit)
+  end
+
+  function life:LifeStatus(player)
+    local tree = tree_of(player)
+    return tree and tree.states.life_phase:now() or nil
+  end
+
+  function life:IsDowned(player)
+    local phase = self:LifeStatus(player)
+    return phase == "downed" or phase == "rescuing"
+  end
+
+  function life:IsDead(player)
+    return self:LifeStatus(player) == "dead"
+  end
+
+  function life:CanAct(player)
+    local tree = tree_of(player)
+    return tree ~= nil and tree.memos.can_act:now() == true
+  end
+
+  function life:CanTakeDamage(player)
+    return self:LifeStatus(player) == "alive"
+  end
+
+  function life:CanEat(player, item_id)
+    local tree = tree_of(player)
+    if not tree or tree.memos.can_act:now() ~= true then return false end
+    local definition = type(item_id) == "string" and GameCfg.Items.Definitions[item_id]
+    return type(definition) == "table" and type(definition.EatPercent) == "number"
+  end
+
+  function life:Eat(player, item_id, cook_rate)
+    local tree = tree_of(player)
+    if not tree then return false end
+    return tree:eat(item_id, cook_rate)
+  end
+
+  function life:MaxHealthOf(player)
+    local tree = tree_of(player)
+    local value = tree and tree.memos.max_health and tree.memos.max_health:now()
+    if Number.IsFiniteNumber(value) and value >= 1 then return math.floor(value) end
+    return GameCfg.Vitals.MaxHealth
+  end
+
+  function life:SnapshotHealth(player)
+    local tree = tree_of(player)
+    if not tree then return nil, nil end
+    return math.max(0, math.floor(tree.states.health:now())), self:MaxHealthOf(player)
+  end
+
+  function life:SetDamageFilter(filter)
+    damage_filter = filter
+    for _, tree in pairs(player_trees) do
+      if tree.set_damage_filter then tree:set_damage_filter(filter) end
+    end
+  end
+
+  function life:NewHit(source, category)
+    hit_seq = hit_seq + 1
+    local source_player = player_from_unit(source)
+    return {
+      id = hit_seq,
+      source = source,
+      category = category,
+      sourcePlayer = source_player,
+      targets = {},
+    }
+  end
+
+  function life:ApplyHit(hit, target, amount)
+    local player = tree_of(target) and target or player_from_unit(target)
+    local tree = tree_of(player) or tree_of(hit and hit.sourcePlayer)
+    if not tree then return false end
+    return tree:apply_hit(hit, target, amount)
+  end
+
+  function life:ApplyDamage(player, amount, hit)
+    return self:ApplyHit(hit or self:NewHit(nil, "damage"), player, amount)
+  end
+
+  function life:SetHealth(player, value)
+    local tree = tree_of(player)
+    if not tree or not Number.IsFiniteNumber(value) then return false end
+    local current = tree.states.health:now()
+    if value < current then
+      return self:ApplyDamage(player, current - value, self:NewHit(nil, "gm"))
+    end
+    local controller = player.Character and player.Character.Controller
+    if controller then pcall(function() controller.Health = value end) end
+    tree.states.health:set(value)
+    return true
+  end
+
+  function life:SetHunger(player, value)
+    local tree = tree_of(player)
+    if not tree or not Number.IsFiniteNumber(value) then return false end
+    local clamped = math.max(0, math.min(GameCfg.Vitals.MaxHunger, math.floor(value)))
+    tree.states.hunger:set(clamped)
+    return true
+  end
+
+  function life:Phase(player)
+    return self:LifeStatus(player)
+  end
+
+  function life:GetState(player)
+    local tree = tree_of(player)
+    if not tree then return nil end
+    return { player = player, phase = tree.states.life_phase:now(), tree = tree }
+  end
+
+  function life:CanRescue(target, rescuer)
+    local tree = tree_of(target)
+    if not tree or type(tree._accept_rescue) ~= "function" then return false, "not-downed" end
+    if tree.states.life_phase:now() ~= "downed" then return false, "not-downed" end
+    return true
+  end
+
+  function life:BeginRescue(target, rescuer)
+    local rescuer_tree = tree_of(rescuer)
+    if not rescuer_tree then return false, "no-rescuer" end
+    return rescuer_tree:begin_rescue(target)
+  end
+
+  function life:CancelRescue(state)
+    local tree = state and tree_of(state.player or state)
+    if tree and tree.states.life_phase:now() == "rescuing" then
+      tree.states.life_phase:set("downed")
+      return true
+    end
+    return false
+  end
+
+  function life:RequestAction(player, kind)
+    local tree = tree_of(player)
+    return tree ~= nil and tree:request_action(kind) == true
+  end
+
+  runtime._damage_filter = function()
+    return damage_filter
   end
 
   return runtime

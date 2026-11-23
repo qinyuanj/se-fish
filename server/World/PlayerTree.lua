@@ -13,6 +13,7 @@ local Number = require("common.Number")
 local spoke = require("common.packages.spoke.api")
 local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
 local PlayerEffects = require("server.World.PlayerEffects")
+local PlayerLife = require("server.World.PlayerLife")
 local HeldRodLeaf = require("server.World.HeldRodLeaf")
 
 local SpokeTree = spoke.SpokeTree
@@ -594,6 +595,19 @@ function PlayerTree.spawn(opts)
         end)
       end)
 
+      PlayerLife.mount(s3, handle, {
+        remote = opts.remote,
+        save = opts.save,
+        player_data = opts.player_data,
+        platform = opts.platform,
+        fish_carrier = opts.fish_carrier,
+        lookup_tree = opts.lookup_tree,
+        players = opts.players,
+        speed_writer = opts.speed_writer,
+        growth_writer = opts.growth_writer,
+        on_downed = opts.on_downed,
+      })
+
       docks.survival = s3:dock("SurvivalDock")
       if type(mounts.survival) == "function" then
         mounts.survival(s3, handle)
@@ -1023,6 +1037,12 @@ function PlayerTree.spawn(opts)
 
   function handle:fault()
     return self.tree.fault
+  end
+
+  if type(handle._life_finish) == "function" then
+    local finish = handle._life_finish
+    handle._life_finish = nil
+    finish()
   end
 
   return handle

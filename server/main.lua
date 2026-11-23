@@ -27,11 +27,9 @@ local MgrMap = {
     MgrShop = require("server.Mgr.MgrShop"),
     MgrLottery = require("server.Mgr.MgrLottery"),
     MgrQuest = require("server.Mgr.MgrQuest"),
-    MgrVitals = require("server.Mgr.MgrVitals"),
     MgrStory = require("server.Mgr.MgrStory"),
     MgrFerry = require("server.Mgr.MgrFerry"),
     MgrSave = require("server.Mgr.MgrSave"),
-    MgrSurvival = require("server.Mgr.MgrSurvival"),
     MgrWeapon = require("server.Mgr.MgrWeapon"),
     MgrSpecialItem = require("server.Mgr.MgrSpecialItem"),
     MgrParty = require("server.Mgr.MgrParty"),
@@ -261,7 +259,7 @@ function AttrBridge:WeaponDamageScale(player, kind)
 end
 
 MgrMap.MgrAbility.BehaviorServices = {
-    Vitals = MgrMap.MgrVitals,
+    Vitals = nil,
     FishCarrier = MgrMap.MgrFishCarrier,
     Modifier = ModifierBridge,
     GM = MgrMap.MgrGM,
@@ -286,9 +284,8 @@ MgrMap.MgrShop.Quest = MgrMap.MgrQuest
 MgrMap.MgrPlayerData.Quest = MgrMap.MgrQuest
 MgrMap.MgrCast.Quest = MgrMap.MgrQuest
 MgrMap.MgrFishUnit.Quest = MgrMap.MgrQuest
-MgrMap.MgrPlayerData.Vitals = MgrMap.MgrVitals
-MgrMap.MgrVitals.PlayerData = MgrMap.MgrPlayerData
-MgrMap.MgrGM.Vitals = MgrMap.MgrVitals
+MgrMap.MgrPlayerData.Vitals = nil
+MgrMap.MgrGM.Vitals = nil
 MgrMap.MgrGM.Save = MgrMap.MgrSave
 MgrMap.MgrFerry.PlayerData = MgrMap.MgrPlayerData
 MgrMap.MgrFerry.Interact = MgrMap.MgrInteract
@@ -298,8 +295,8 @@ MgrMap.MgrQuest.Save = MgrMap.MgrSave
 MgrMap.MgrStory.PlayerData = MgrMap.MgrPlayerData
 MgrMap.MgrStory.Save = MgrMap.MgrSave
 MgrMap.MgrInteract.Save = MgrMap.MgrSave
-MgrMap.MgrInteract.Vitals = MgrMap.MgrVitals
-MgrMap.MgrInteract.Survival = MgrMap.MgrSurvival
+MgrMap.MgrInteract.Vitals = nil
+MgrMap.MgrInteract.Survival = nil
 MgrMap.MgrAchievements.PlayerData = MgrMap.MgrPlayerData
 MgrMap.MgrAchievements.Save = MgrMap.MgrSave
 MgrMap.MgrFerry.Save = MgrMap.MgrSave
@@ -324,33 +321,19 @@ MgrMap.MgrBlindbox.Save = MgrMap.MgrSave
 MgrMap.MgrBlindbox.PlayerData = MgrMap.MgrPlayerData
 MgrMap.MgrBlindbox.Platform = MgrMap.MgrPlatform
 MgrMap.MgrBlindbox.Loot = MgrMap.MgrLoot
-MgrMap.MgrSurvival.Platform = MgrMap.MgrPlatform
 
-MgrMap.MgrAbility.Vitals = MgrMap.MgrVitals
-MgrMap.MgrFishUnit.Vitals = MgrMap.MgrVitals
+MgrMap.MgrAbility.Vitals = nil
+MgrMap.MgrFishUnit.Vitals = nil
 MgrMap.MgrPlayerData.Ability = MgrMap.MgrAbility
 MgrMap.MgrAbility.PlayerData = MgrMap.MgrPlayerData
-MgrMap.MgrAbility.Survival = MgrMap.MgrSurvival
 MgrMap.MgrAbility.Attr = AttrBridge
 MgrMap.MgrWeapon.Attr = AttrBridge
-MgrMap.MgrVitals.Attr = AttrBridge
 MgrMap.MgrAbility.Modifier = ModifierBridge
-MgrMap.MgrSurvival.Modifier = ModifierBridge
 MgrMap.MgrAbility.Ai = MgrMap.MgrAi
 MgrMap.MgrFishUnit.Ai = MgrMap.MgrAi
 MgrMap.MgrFishUnit.AiTarget = MgrMap.MgrAiTarget
 MgrMap.MgrAi.FishUnit = MgrMap.MgrFishUnit
-MgrMap.MgrSurvival.SpeedWriter = MgrMap.MgrAbility
-MgrMap.MgrVitals.ActGuard = function(player) return not MgrMap.MgrAbility:IsParalyzed(player) end
-MgrMap.MgrVitals.MaxHealthProvider = function(player) return AttrBridge:MaxHealth(player) end
-MgrMap.MgrVitals.FishCarrier = MgrMap.MgrFishCarrier
-MgrMap.MgrCast.Vitals = MgrMap.MgrVitals
-MgrMap.MgrSurvival.Vitals = MgrMap.MgrVitals
-MgrMap.MgrSurvival.FishUnit = MgrMap.MgrFishUnit
-MgrMap.MgrSurvival.ReelIn = MgrMap.MgrReelIn
-MgrMap.MgrSurvival.PlayerData = MgrMap.MgrPlayerData
-MgrMap.MgrSurvival.Save = MgrMap.MgrSave
-MgrMap.MgrVitals:SetLifeHooks(MgrMap.MgrSurvival:Hooks())
+MgrMap.MgrCast.Vitals = nil
 MgrMap.MgrFishCarrier.DamageListener = function(carrier, actual, hit)
     local fish = carrier and MgrMap.MgrFishUnit:FindByCarrier(carrier)
     local attacker = hit and hit.sourcePlayer
@@ -359,30 +342,28 @@ MgrMap.MgrFishCarrier.DamageListener = function(carrier, actual, hit)
     end
 end
 
-MgrMap.MgrWeapon.Vitals = MgrMap.MgrVitals
+MgrMap.MgrWeapon.Vitals = nil
 MgrMap.MgrWeapon.PlayerData = MgrMap.MgrPlayerData
 MgrMap.MgrWeapon.FishUnit = MgrMap.MgrFishUnit
 MgrMap.MgrWeapon.FishCarrier = MgrMap.MgrFishCarrier
 MgrMap.MgrWeapon.Save = MgrMap.MgrSave
 MgrMap.MgrWeapon.Modifier = ModifierBridge
 
-MgrMap.MgrGrill.Vitals = MgrMap.MgrVitals
+MgrMap.MgrGrill.Vitals = nil
 MgrMap.MgrGrill.PlayerData = MgrMap.MgrPlayerData
 MgrMap.MgrGrill.Save = MgrMap.MgrSave
 
-MgrMap.MgrSpecialItem.Vitals = MgrMap.MgrVitals
+MgrMap.MgrSpecialItem.Vitals = nil
 MgrMap.MgrSpecialItem.PlayerData = MgrMap.MgrPlayerData
 MgrMap.MgrSpecialItem.FishUnit = MgrMap.MgrFishUnit
 MgrMap.MgrFerry.SpecialItem = MgrMap.MgrSpecialItem
 
 MgrMap.MgrParty.PlayerData = MgrMap.MgrPlayerData
 MgrMap.MgrParty.Save = MgrMap.MgrSave
-MgrMap.MgrParty.Vitals = MgrMap.MgrVitals
+MgrMap.MgrParty.Vitals = nil
 
 local makePkDamageFilter = require("server.Mgr.MgrPkFilter").Make
-MgrMap.MgrVitals.ZoneMarkers = ZoneMarkers
-MgrMap.MgrVitals.Party = MgrMap.MgrParty
-MgrMap.MgrVitals.DamageFilter = makePkDamageFilter()
+local pkDamageFilter = makePkDamageFilter()
 
 local function invoke(name, mgr, method, ...)
     if not mgr[method] then return end
@@ -417,15 +398,20 @@ if type(AbilityAPI.AddCastGuard) == "function" then
 end
 
 local function applyDotHit(target, damage, source)
-    if MgrMap.MgrVitals and MgrMap.MgrVitals.NewHit and MgrMap.MgrVitals.ApplyHit then
-        local hit = MgrMap.MgrVitals:NewHit(source, "dot")
-        MgrMap.MgrVitals:ApplyHit(hit, target, damage)
+    local life = WorldRuntime and WorldRuntime.life
+    if life then
+        life:ApplyHit(life:NewHit(source, "dot"), target, damage)
     end
 end
 
 -- Spoke 服务端运行时主干（ADR-0032 / #295、#297）：装配官方包叶子投影与过渡期 L1 回调接缝。
 WorldRuntime = ServerRuntime.new({
     initial_now = serverNow() or 0,
+    remote = _G.REUtil,
+    player_data = MgrMap.MgrPlayerData,
+    save = MgrMap.MgrSave,
+    platform = MgrMap.MgrPlatform,
+    fish_carrier = MgrMap.MgrFishCarrier,
     create_unit = function(unit_type, props)
         return WorldService:CreateUnit(unit_type, props)
     end,
@@ -458,12 +444,12 @@ WorldRuntime = ServerRuntime.new({
         return MgrMap.MgrPlayerData:GetDataInst(player) == data
     end,
     on_player_ready = function(player)
-        for _, name in ipairs({ 'MgrPlayer', 'MgrVitals', 'MgrSurvival', 'MgrAbility', 'MgrFishUnit' }) do
+        for _, name in ipairs({ 'MgrPlayer', 'MgrAbility', 'MgrFishUnit' }) do
             invoke(name, MgrMap[name], 'OnPlayerAdded', player)
         end
         for name, mgr in pairs(MgrMap) do
-            if name ~= 'MgrPlayerData' and name ~= 'MgrPlayer' and name ~= 'MgrVitals'
-                and name ~= 'MgrSurvival' and name ~= 'MgrAbility' and name ~= 'MgrFishUnit' then
+            if name ~= 'MgrPlayerData' and name ~= 'MgrPlayer'
+                and name ~= 'MgrAbility' and name ~= 'MgrFishUnit' then
                 invoke(name, mgr, 'OnPlayerAdded', player)
             end
         end
@@ -474,7 +460,6 @@ WorldRuntime = ServerRuntime.new({
         return false
     end,
     on_leave_finalize = function(_, player)
-        invoke('MgrSurvival', MgrMap.MgrSurvival, 'BeforeLeave', player)
         invoke('MgrGrill', MgrMap.MgrGrill, 'BeforeLeave', player)
         invoke('MgrSpecialItem', MgrMap.MgrSpecialItem, 'BeforeLeave', player)
     end,
@@ -491,6 +476,20 @@ WorldRuntime = ServerRuntime.new({
     end,
 })
 ServerRuntime.set_current(WorldRuntime)
+WorldRuntime.life:SetDamageFilter(pkDamageFilter)
+local Life = WorldRuntime.life
+MgrMap.MgrPlayerData.Vitals = Life
+MgrMap.MgrGM.Vitals = Life
+MgrMap.MgrInteract.Vitals = Life
+MgrMap.MgrInteract.Survival = Life
+MgrMap.MgrAbility.Vitals = Life
+MgrMap.MgrAbility.BehaviorServices.Vitals = Life
+MgrMap.MgrFishUnit.Vitals = Life
+MgrMap.MgrCast.Vitals = Life
+MgrMap.MgrWeapon.Vitals = Life
+MgrMap.MgrGrill.Vitals = Life
+MgrMap.MgrSpecialItem.Vitals = Life
+MgrMap.MgrParty.Vitals = Life
 
 MgrMap.MgrPlayerData.OnSyncPlayerTree = function(player, data, forcePush)
     local pt = WorldRuntime:get_player_tree(player.UserId)

@@ -12,6 +12,7 @@ local MainHudEquipPopups = require("client.Views.MainHudEquipPopups")
 local MainHudBackpackView = require("client.Views.MainHudBackpackView")
 local MainHudItemBarView = require("client.Views.MainHudItemBarView")
 local MainHudActionButtonsView = require("client.Views.MainHudActionButtonsView")
+local SurvivalOverlayView = require("client.Views.SurvivalOverlayView")
 local ScreenMain = require("client.ScreenHandlers.ScreenMain")
 local GameUI = require("client.GameUI")
 
@@ -112,6 +113,9 @@ Task:Spawn(function()
                     end,
                 }),
             },
+            overlays = {
+                survival = SurvivalOverlayView.spec(),
+            },
         })
     else
         print("[client.main] 等待 EUI 根节点超时，跳过 Spoke 根视图树挂载")
@@ -130,7 +134,6 @@ local LocalShop = require("client.LocalShop")
 local LocalLottery = require("client.LocalLottery")
 local ScreenLottery = require("client.ScreenHandlers.ScreenLottery")
 local ScreenFerry = require("client.ScreenHandlers.ScreenFerry")
-local ScreenSurvival = require("client.ScreenHandlers.ScreenSurvival")
 local ScreenParty = require("client.ScreenHandlers.ScreenParty")
 local ScreenGrill = require("client.ScreenHandlers.ScreenGrill")
 local ScreenBlindbox = require("client.ScreenHandlers.ScreenBlindbox")
@@ -160,7 +163,6 @@ Task:Spawn(function() LocalShop:Start() end)
 Task:Spawn(function() ScreenLottery:Start() end)
 Task:Spawn(function() LocalLottery:Start() end)
 Task:Spawn(function() ScreenFerry:Start() end)
-Task:Spawn(function() ScreenSurvival:Start() end)
 Task:Spawn(function() ScreenParty:Start() end)
 Task:Spawn(function() ScreenGrill:Start() end)
 Task:Spawn(function() ScreenBlindbox:Start() end)
