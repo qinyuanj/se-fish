@@ -38,7 +38,7 @@ describe('首领饵必出首领（PlayerData × MgrCast）', function()
       GameCfg = package.loaded['common.GameCfg'],
       RE = package.loaded['common.REUtil'],
       PlayerData = package.loaded['server.Mgr.MgrPlayerData'],
-      FishUnit = package.loaded['server.Mgr.MgrFishUnit'],
+      FishUnit = package.loaded['server.World.FishTree'],
     }
     env = { now = 0, sent = {} }
     env.cfg = require('tests.support.zone_fixtures').Load()
@@ -64,7 +64,7 @@ describe('首领饵必出首领（PlayerData × MgrCast）', function()
       GetDataInst = function(_, p) return p == env.player and env.data or nil end,
       SendItemBar = function() end,
     }
-    package.loaded['server.Mgr.MgrFishUnit'] = {
+    package.loaded['server.World.FishTree'] = {
       HeldInfo = function() return nil end,
       CanCast = function() return true end,
     }
@@ -77,7 +77,7 @@ describe('首领饵必出首领（PlayerData × MgrCast）', function()
     package.loaded['common.GameCfg'] = restore and restore.GameCfg
     package.loaded['common.REUtil'] = restore and restore.RE
     package.loaded['server.Mgr.MgrPlayerData'] = restore and restore.PlayerData
-    package.loaded['server.Mgr.MgrFishUnit'] = restore and restore.FishUnit
+    package.loaded['server.World.FishTree'] = restore and restore.FishUnit
     _G.game = restore and restore.game
     env = nil
     restore = nil

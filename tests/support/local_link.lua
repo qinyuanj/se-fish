@@ -99,7 +99,7 @@ function M.new(opts)
             game = rawget(_G, 'game'), Vector3 = rawget(_G, 'Vector3'), Vector2 = rawget(_G, 'Vector2'),
             Color = rawget(_G, 'Color'), REUtil = rawget(_G, 'REUtil'), task = rawget(_G, 'task'),
             reutil = package.loaded['common.REUtil'], playerdata = package.loaded['server.Data.PlayerData'],
-            carrier = package.loaded['server.Mgr.MgrFishCarrier'],
+            carrier = package.loaded['server.World.FishCarrier'],
         },
     }
 
@@ -449,7 +449,7 @@ function M:Close()
     _G.Color, _G.REUtil, _G.task = saved.Color, saved.REUtil, saved.task
     package.loaded['common.REUtil'] = saved.reutil
     package.loaded['server.Data.PlayerData'] = saved.playerdata
-    package.loaded['server.Mgr.MgrFishCarrier'] = saved.carrier
+    package.loaded['server.World.FishCarrier'] = saved.carrier
     self.saved, self.queue, self.re, self.sent = nil, {}, {}, {}
     return self
 end

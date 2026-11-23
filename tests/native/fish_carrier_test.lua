@@ -1,13 +1,13 @@
--- #84 迁移：鱼载体伤害接口 server/Mgr/MgrFishCarrier.lua（原 tests/gameplay/fish_carrier_test.lua，7 + 16 + 5 例）。
+-- #84 迁移：鱼载体伤害接口 server/World/FishCarrier.lua（原 tests/gameplay/fish_carrier_test.lua，7 + 16 + 5 例）。
 -- 三块接缝：1) 血量/模型号解析纯函数；2) 假引擎驱动 Spawn → 挨打 → Update 跟随 → Despawn 全链路；
 -- 3) 接缝守卫（源码文本校对）：受击体 EnableController、不 require 包内模块、MgrMap 注册、官方 melee_hit 契约。
 -- 假引擎只在被测函数执行期间挂上（withFakeEngine），测完恢复 _G，不影响别的文件；
 -- Busted 案例体在沙箱 _ENV 里，业务模块读的是真 _G，因此引擎全局必须 rawset 到 _G。
 -- describe/it 名称保留旧类名与方法名，按类名字典序 + 方法名字典序注册以保持旧套件执行顺序。
-local MgrFishCarrier = require('server.Mgr.MgrFishCarrier')
+local MgrFishCarrier = require('server.World.FishCarrier')
 local GameCfg = require('common.GameCfg')
 
-local CARRIER_PATH = 'server/Mgr/MgrFishCarrier.lua'
+local CARRIER_PATH = 'server/World/FishCarrier.lua'
 local MAIN_PATH = 'server/main.lua'
 local MELEE_HIT_PATH = 'server/packages/ability_system/anchors/melee_hit.lua'
 
@@ -526,9 +526,12 @@ describe('TestFishCarrierSeam', function()
 
   it('test_manager_is_registered_in_the_mgr_map', function()
     -- 不进 MgrMap 就没有 Start/Update，受击体也不会跟着鱼走
-    local src = readSource(MAIN_PATH)
-    assert.is_true(contains(src, 'MgrFishCarrier = require("server.Mgr.MgrFishCarrier")'),
-      'server/main.lua 的 MgrMap 必须注册 MgrFishCarrier')
+    local runtime = readSource('server/World/ServerRuntime.lua')
+    local host = readSource('server/World/FishTree.lua')
+    assert.is_true(contains(runtime, 'require("server.World.FishTree")'),
+      'ServerRuntime 必须持有 FishTree 公开宿主')
+    assert.is_true(contains(host, "require('server.World.FishCarrier')"),
+      'FishTree 必须挂接 FishCarrier 受击体')
   end)
 
   it('test_module_does_not_require_the_vendor_package', function()
@@ -542,7 +545,7 @@ describe('TestFishCarrierSeam', function()
     -- #32 的唯一接缝：没有这句，包内 _applyDamage 找不到 target.Controller，伤害静默归零
     local src = readSource(CARRIER_PATH)
     assert.is_true(contains(src, 'EnableController = true'), '受击体必须带 EnableController = true')
-    assert.is_true(contains(src, 'CreateUnit("EggyUnit"'), '受击体必须是带 Controller 的单位类型')
+    assert.is_true(contains(src, 'createUnit("EggyUnit"'), '受击体必须是带 Controller 的单位类型')
   end)
 
   it('test_vendor_contract_is_still_controller_take_damage', function()

@@ -253,7 +253,7 @@ describe('TestFishCombatLabel', function()
 
     before_each(function()
         env = {}
-        env.label = assert(loadfile('client/FishCombatLabel.lua'))()
+        env.label = assert(loadfile('client/Views/FishCombatLabel.lua'))()
         env.base = { id = 1, fishId = 'eel', fleeAt = 180, escapeSec = 180, discharges = 3, dischargeCount = 5,
             position = { x = 0, y = 0, z = 0 } }
     end)

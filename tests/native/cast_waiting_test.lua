@@ -28,7 +28,7 @@ describe('抛竿与等待上钩（MgrCast）', function()
       game = _G.game,
       RE = package.loaded['common.REUtil'],
       Data = package.loaded['server.Mgr.MgrPlayerData'],
-      Fish = package.loaded['server.Mgr.MgrFishUnit'],
+      Fish = package.loaded['server.World.FishTree'],
     }
     env = { now = 0, events = {}, states = {}, facts = {}, cooldown = false, canCast = true, consumeCount = 0 }
     _G.game = { GetService = function(_, name)
@@ -42,7 +42,7 @@ describe('抛竿与等待上钩（MgrCast）', function()
       end
       return env.events[name]
     end, CheckRECD = function() return env.cooldown end }
-    package.loaded['server.Mgr.MgrFishUnit'] = {
+    package.loaded['server.World.FishTree'] = {
       CanCast = function() return env.canCast end, HeldInfo = function() end,
     }
     env.player = { UserId = 110, SetAttribute = function() end, Character = {
@@ -63,6 +63,11 @@ describe('抛竿与等待上钩（MgrCast）', function()
       SendItemBar = function() end,
     }
     env.cast = assert(loadfile('server/Mgr/MgrCast.lua'))()
+    -- #309 公开宿主接缝：本套件只替换 SpawnLanded，其余持有查询保持空实现。
+    env.cast.FishUnit = package.loaded['server.World.FishTree']
+    env.cast.FishUnit.GetHeld = function() return nil end
+    env.cast.FishUnit.Drop = function() return false end
+    env.cast.FishUnit.SpawnLanded = function() return nil, 'no-fish-host' end
     env.reel = assert(loadfile('server/Mgr/MgrReelIn.lua'))()
     env.reel.Cast = env.cast
     env.cast.ReelIn = env.reel
@@ -82,7 +87,7 @@ describe('抛竿与等待上钩（MgrCast）', function()
     end
     package.loaded['common.REUtil'] = restore and restore.RE
     package.loaded['server.Mgr.MgrPlayerData'] = restore and restore.Data
-    package.loaded['server.Mgr.MgrFishUnit'] = restore and restore.Fish
+    package.loaded['server.World.FishTree'] = restore and restore.Fish
     _G.game = restore and restore.game
     env = nil
     restore = nil

@@ -1,7 +1,6 @@
 local World = game:GetService('World')
 local GameCfg = require('common.GameCfg')
 local DamageFloat = require('client.DamageFloat')
-local FishCombatLabel = require('client.FishCombatLabel')
 local MainHudLayout = require('client.MainHudLayout')
 local OwnedUnits = require('common.OwnedUnits')
 
@@ -324,7 +323,6 @@ function ScreenHandler:Cleanup()
     end
     continueAfterFailure('浮动表现', function()
         DamageFloat:Clear()
-        FishCombatLabel:Clear()
     end)
     continueAfterFailure('CloseScreen', function() self:CloseScreen() end)
     continueAfterFailure('连接', function()
@@ -386,7 +384,6 @@ function ScreenHandler:_initializeRoot()
     self.EuiResolution = resolution
     local root = self.RootNode
     DamageFloat:Bind(root, resolution)
-    FishCombatLabel:Bind(root, resolution)
     local count = GameCfg.Items.ItemBarSlots
     local layout = MainHudLayout.Compute({ width = resolution.x, height = resolution.y,
         itemBarSlots = count, reeling = true })
@@ -570,9 +567,6 @@ function ScreenHandler:_initializeRoot()
     self:Listen(_G.REUtil:GetRE('DamageNotice').OnClientEvent, function(payload)
         if self.IsOpen then DamageFloat:Show(payload) end
     end)
-    self:Listen(_G.REUtil:GetRE('FishCombatState').OnClientEvent, function(payload)
-        if self.IsOpen then FishCombatLabel:Apply(payload) end
-    end)
     self:Listen(_G.REUtil:GetRE('QuestState').OnClientEvent, function(state) self:ShowQuest(state) end)
     self:Listen(_G.REUtil:GetRE('StoryNotice').OnClientEvent, function(payload)
         self:ShowDialogue(payload)
@@ -596,7 +590,6 @@ function ScreenHandler:_initializeRoot()
             if self.ReelBar and self.ReelBar.Visible then self:ShowCast() end
             if self.CastFloat and self.IsOpen then self:UpdateCastFeedback() end
             DamageFloat:Update()
-            FishCombatLabel:Update()
         end)
     end
     self.LayoutKey = { slots = count, reeling = true }
@@ -608,7 +601,6 @@ end
 
 function ScreenHandler:OpenScreen()
     DamageFloat:Bind(self.RootNode, self.EuiResolution)
-    FishCombatLabel:Bind(self.RootNode, self.EuiResolution)
     self.IsOpen = true
     if type(self.OnOpenChanged) == 'function' then
         self.OnOpenChanged(true)
@@ -636,7 +628,6 @@ function ScreenHandler:CloseScreen()
     self:HideDialogue()
     self.CombatRequest = nil
     DamageFloat:Clear()
-    FishCombatLabel:Clear()
     self.IsOpen = false
     if type(self.OnOpenChanged) == 'function' then
         self.OnOpenChanged(false)

@@ -19,6 +19,8 @@ local AbilityLeaf = require("server.World.AbilityLeaf")
 local PlayerWeapon = require("server.World.PlayerWeapon")
 local SwingRegistry = require("server.SwingRegistry")
 local PkDamageFilter = require("server.World.PkDamageFilter")
+local FishTree = require("server.World.FishTree")
+local FishAiTarget = require("server.World.FishAiTarget")
 
 local ServerRuntime = {}
 local current_runtime = nil
@@ -68,6 +70,25 @@ function ServerRuntime.new(opts)
   local current_players = {}
   local active_players = {}
   local player_trees = {}
+  local fish_trees = {}
+  local fish_order = {}
+  local next_fish_id = 0
+  local fish_host = FishTree.new()
+  local ai_started = {}
+  fish_host.CreateUnit = opts.create_unit
+  fish_host.World = opts.world_service
+  fish_host.Quest = opts.quest
+  fish_host.Cast = opts.cast
+  fish_host.Ai = opts.fish_ai
+  fish_host.AiTarget = opts.fish_ai_target or FishAiTarget
+  fish_host.AbilityApi = opts.ability_api
+  fish_host.Ability = opts.fish_ability
+  fish_host.Now = function() return clock.now() end
+  fish_host.Players = function()
+    local list = {}
+    for _, active in pairs(active_players) do list[#list + 1] = active end
+    return list
+  end
   local leaving_players = {}
   local ready_queue = {}
 
@@ -91,8 +112,16 @@ function ServerRuntime.new(opts)
     world = nil,
     entity_modifiers = entity_modifiers,
     platform = opts.platform,
+    fish_host = fish_host,
     _started = false,
   }
+
+  fish_host.OnKilled = function(killed)
+    local world = runtime.world
+    if world and type(world.on_carrier_killed) == "function" then
+      world:on_carrier_killed(killed)
+    end
+  end
 
   function runtime:start()
     if self.world and not self.world:is_disposed() then
@@ -159,6 +188,8 @@ function ServerRuntime.new(opts)
     if entity_modifiers then
       entity_modifiers:step(clock.now())
     end
+    fish_host:Update()
+    runtime:_publish_fish()
   end
 
   function runtime:on_player_added(player)
@@ -435,11 +466,162 @@ function ServerRuntime.new(opts)
     end
     leaving = { cleaned = false, waiting = nil }
     leaving_players[user_id] = leaving
+    fish_host:OnPlayerRemoving(player)
+    self:_publish_fish()
     local queued = ready_queue[user_id]
     if queued and queued[1] == player then
       ready_queue[user_id] = nil
     end
     continue_removing(player, leaving)
+  end
+
+  local function holder_tree_of(player)
+    if type(player) ~= "table" then return nil end
+    return player_trees[player.UserId]
+  end
+
+  local function drop_fish_record(id)
+    local fish = fish_trees[id]
+    if fish == nil then return end
+    fish_trees[id] = nil
+    for index, value in ipairs(fish_order) do
+      if value == id then table.remove(fish_order, index) break end
+    end
+    if ai_started[id] then
+      ai_started[id] = nil
+      if opts.ai and type(opts.ai.stop) == "function" then pcall(opts.ai.stop, opts.ai, id) end
+    end
+    if fish_host.Fish[fish.Id] == fish then fish_host:Remove(fish) end
+  end
+
+  local function fish_row(fish)
+    local species = GameCfg.Fish[fish.FishId] or {}
+    local state = fish.State
+    local phase = "lifted"
+    if state == FishTree.State.Escaping then
+      phase = "escape"
+    elseif state == FishTree.State.Wild then
+      phase = "wild"
+    elseif state ~= FishTree.State.AwaitLift and state ~= FishTree.State.Held then
+      phase = "combat"
+    end
+    local health = fish.Carrier and fish.Carrier.Health or species.Health
+    local maxHealth = species.Health or 0
+    local ratio = maxHealth > 0 and (health or 0) / maxHealth or 0
+    local bossPhase = nil
+    if fish.FishId == "fish56Boss" then
+      bossPhase = ratio > 0.6 and "land" or (ratio > 0.2 and "water" or "enraged")
+    end
+    local lifted = state == FishTree.State.AwaitLift or state == FishTree.State.Held
+    return {
+      id = fish.Id,
+      fishId = fish.FishId,
+      name = species.Name,
+      mult = fish.Mult,
+      zoneId = species.ZoneId,
+      phase = phase,
+      bossPhase = bossPhase,
+      grounded = not lifted,
+      health = health,
+      maxHealth = maxHealth,
+      label = fish.MoveName or (phase == "combat" and "战斗" or (phase == "escape" and "逃脱" or "举鱼")),
+      warning = fish.Warning,
+      holderId = fish.Holder and fish.Holder.UserId or nil,
+      ownerId = fish.Owner and fish.Owner.UserId or nil,
+    }
+  end
+
+  function runtime:_publish_fish()
+    local list, warnings, gone = {}, {}, {}
+    for _, id in ipairs(fish_order) do
+      local fish = fish_trees[id]
+      if fish ~= nil then
+        if fish_host.Fish[fish.Id] ~= fish then
+          gone[#gone + 1] = id
+        else
+          local row = fish_row(fish)
+          if opts.ai and (row.phase == "combat" or row.phase == "escape") and not ai_started[id] then
+            ai_started[id] = true
+            if type(opts.ai.start) == "function" then pcall(opts.ai.start, opts.ai, id) end
+          end
+          list[#list + 1] = row
+          if type(row.warning) == "table" then
+            warnings[#warnings + 1] = row.warning
+          end
+        end
+      end
+    end
+    for _, id in ipairs(gone) do drop_fish_record(id) end
+    local remote = opts.remote
+    if type(remote) ~= "table" or type(remote.GetRE) ~= "function" then return end
+    local event = remote:GetRE("FishCombatState")
+    if event and type(event.FireAllClients) == "function" then
+      pcall(function() event:FireAllClients({ list = list, warnings = warnings }) end) -- 下行失败不回滚权威活鱼
+    end
+  end
+
+  local function release_fish_for(player)
+    if not is_valid_player(player) then return end
+    local held = fish_host:GetHeld(player)
+    if held then fish_host:Release(held, "life") end
+  end
+
+  function runtime:receive_landed(player, catch)
+    if not is_valid_player(player) or type(catch) ~= "table" then return false, "bad" end
+    if self:is_leaving(player.UserId) then return false, "leaving" end
+    local holder = holder_tree_of(player)
+    if holder == nil or holder:is_disposed() then return false, "no-holder" end
+    local position = catch.position or catch.Position
+      or { x = catch.x, y = catch.y, z = catch.z }
+    local fish, err = fish_host:SpawnLanded(player, {
+      fishId = catch.fishId,
+      mult = catch.mult,
+    }, position)
+    if fish == nil then return false, err end
+    next_fish_id = next_fish_id + 1
+    local id = fish.Id
+    fish_trees[id] = fish
+    fish_order[#fish_order + 1] = id
+    self:_publish_fish()
+    return true, id
+  end
+
+  function runtime:drop_fish(player)
+    if not is_valid_player(player) then return false end
+    local dropped = fish_host:Drop(player) == true
+    self:_publish_fish()
+    return dropped
+  end
+
+  function runtime:fish_snapshot(user_id)
+    local list = {}
+    for _, id in ipairs(fish_order) do
+      local fish = fish_trees[id]
+      if fish and fish_host.Fish[fish.Id] == fish then
+        local row = fish_row(fish)
+        if user_id == nil or row.holderId == user_id or row.ownerId == user_id then
+          list[#list + 1] = row
+        end
+      end
+    end
+    return list
+  end
+
+  function runtime:damage_fish(id, amount)
+    local fish = fish_trees[id]
+    if fish == nil then return false end
+    local ok = fish_host:DamageFish(fish, amount)
+    self:_publish_fish()
+    return ok
+  end
+
+  function runtime:fault_fish(id, reason)
+    local fish = fish_trees[id]
+    if fish == nil then return false end
+    fish.Fault = reason or "fish"
+    drop_fish_record(id)
+    self:_publish_fish()
+    return true
   end
 
   function runtime:shutdown()
@@ -457,6 +639,9 @@ function ServerRuntime.new(opts)
         pt:dispose()
       end
     end
+    local fish_ids = {}
+    for id in pairs(fish_trees) do fish_ids[#fish_ids + 1] = id end
+    for _, id in ipairs(fish_ids) do drop_fish_record(id) end
     if self.world then
       self.world:dispose()
     end
@@ -484,6 +669,7 @@ function ServerRuntime.new(opts)
   end
   runtime._max_health_of = opts.max_health_of
   runtime.life = {}
+  fish_host.Vitals = runtime.life
   local life = runtime.life
 
   local function tree_of(player)
@@ -609,7 +795,13 @@ function ServerRuntime.new(opts)
   end
 
   function life:ApplyDamage(player, amount, hit)
-    return self:ApplyHit(hit or self:NewHit(nil, "damage"), player, amount)
+    local ok = self:ApplyHit(hit or self:NewHit(nil, "damage"), player, amount)
+    local tree = tree_of(player)
+    if tree and tree.states.life_phase:now() ~= "alive" then
+      release_fish_for(player)
+      runtime:_publish_fish()
+    end
+    return ok
   end
 
   function life:SetHealth(player, value)

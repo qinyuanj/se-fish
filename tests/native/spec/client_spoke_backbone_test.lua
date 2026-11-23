@@ -595,7 +595,7 @@ describe("客户端 Spoke 主干契约（#296）", function()
         "client.ScreenHandlers.ScreenBlindbox",
         "client.ScreenHandlers.ScreenPlatform",
         "client.ScreenHandlers.ScreenCompendium",
-        "client.LocalGarBite",
+        "client.Views.GarBiteWarning",
         "client.LocalCastSource",
         "client.packages.ability_system.api",
         "client.Store.ClientStore",
@@ -658,7 +658,7 @@ describe("客户端 Spoke 主干契约（#296）", function()
           "client.ScreenHandlers.ScreenParty",
           "client.ScreenHandlers.ScreenGrill", "client.ScreenHandlers.ScreenBlindbox",
           "client.ScreenHandlers.ScreenPlatform", "client.ScreenHandlers.ScreenCompendium",
-          "client.LocalGarBite", "client.LocalCastSource",
+          "client.Views.GarBiteWarning", "client.LocalCastSource",
         }) do
           package.loaded[name] = noop_module
         end

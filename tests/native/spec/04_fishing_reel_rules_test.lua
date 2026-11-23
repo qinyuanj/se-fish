@@ -45,7 +45,7 @@ describe('条款 4：收线进度规则', function()
   before_each(function()
     restore = {
       data = package.loaded['server.Mgr.MgrPlayerData'],
-      fish = package.loaded['server.Mgr.MgrFishUnit'],
+      fish = package.loaded['server.World.FishTree'],
     }
     env = Reel.new('server')
     env:setUp()
@@ -76,7 +76,7 @@ describe('条款 4：收线进度规则', function()
       GetDataInst = function(_, player) return player == env.a and env.data end,
       SendItemBar = function() end,
     }
-    package.loaded['server.Mgr.MgrFishUnit'] = {
+    package.loaded['server.World.FishTree'] = {
       CanCast = function() return true end,
       HeldInfo = function() end,
     }
@@ -99,7 +99,7 @@ describe('条款 4：收线进度规则', function()
       env:tearDown()
     end
     package.loaded['server.Mgr.MgrPlayerData'] = restore and restore.data
-    package.loaded['server.Mgr.MgrFishUnit'] = restore and restore.fish
+    package.loaded['server.World.FishTree'] = restore and restore.fish
   end)
 
   -- 4-06：上钩那一刻玩家看到的进度就是 50%。

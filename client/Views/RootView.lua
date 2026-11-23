@@ -28,6 +28,9 @@ local function readonly_item_signal(state)
     now = function()
       return state:now()
     end,
+    d = function(_, reader)
+      return reader:d(state)
+    end,
     subscribe = function(_, fn)
       return state:subscribe(fn)
     end,
