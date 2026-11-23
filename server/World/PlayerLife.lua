@@ -374,7 +374,19 @@ function PlayerLife.mount(s3, player_tree, opts)
     states.health:set(after)
     write_vitals()
     if not finite_number(before) or after >= before then return false end
-    return true, before - after
+    local actual = before - after
+    if remote and type(remote.GetRE) == "function" and actual > 0 then
+      local event = remote:GetRE("DamageNotice")
+      if event and type(event.FireAllClients) == "function" then
+        pcall(event.FireAllClients, event, {
+          amount = actual,
+          category = hit and hit.category,
+          targetUserId = player.UserId,
+          position = player.Character and player.Character.Position,
+        })
+      end
+    end
+    return true, actual
   end
 
   local function resolve_player(target)
@@ -399,8 +411,12 @@ function PlayerLife.mount(s3, player_tree, opts)
     }
   end
 
+  function player_tree:resolve_hit_source(hit)
+    return type(hit) == "table" and hit.sourcePlayer or nil
+  end
+
   function player_tree:set_damage_filter(filter)
-    damage_filter = filter
+    damage_filter = type(filter) == "function" and filter or nil
   end
 
   function player_tree:apply_hit(hit, target, amount)
@@ -423,11 +439,18 @@ function PlayerLife.mount(s3, player_tree, opts)
     if not (opts.lookup_tree and target and opts.lookup_tree(target.UserId)) then
       target_player = resolve_player(target) or target
     end
+    if (not target_player or target_player.UserId == nil) and type(opts.players) == "function" then
+      for _, candidate in ipairs(opts.players()) do
+        if candidate == target or candidate.Character == target then
+          target_player = candidate
+          break
+        end
+      end
+    end
     if not target_player or target_player.UserId == nil then return false end
-    if hit.targets[target_player.UserId] then return false end
     if hit.sourcePlayer then
       local source_tree = opts.lookup_tree and opts.lookup_tree(hit.sourcePlayer.UserId)
-      if not source_tree then return false end
+      if not source_tree and target_player ~= player then return false end
     end
     local tree = opts.lookup_tree and opts.lookup_tree(target_player.UserId) or nil
     if tree ~= player_tree then
@@ -436,10 +459,17 @@ function PlayerLife.mount(s3, player_tree, opts)
       end
       return false
     end
-    if damage_filter then
-      local ok, allowed = pcall(damage_filter, hit, player, player_tree)
+    if damage_filter == false then damage_filter = nil end
+    local filter = damage_filter
+    if filter == nil and opts.damage_filter then
+      local current = opts.damage_filter()
+      if type(current) == "function" then filter = current end
+    end
+    if type(filter) == "function" then
+      local ok, allowed = pcall(filter, hit, player, player_tree)
       if not ok or allowed ~= true then return false end
     end
+    if hit.targets[player.UserId] then return false end
     local applied, actual = apply_damage(amount, hit)
     if applied then hit.targets[player.UserId] = true end
     return applied, actual

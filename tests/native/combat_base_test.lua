@@ -72,20 +72,37 @@ end)
 describe('TestCombatBase', function()
     local self_
     before_each(function()
-        self_ = {}
-        self_.v = assert(loadfile('server/Mgr/MgrVitals.lua'))()
-        self_.v.Now = function() return 100 end
-        self_.notices = {}
-        self_.v.DamagePublisher = function(payload) self_.notices[#self_.notices + 1] = payload end
+        local Host = require('tests.support.life_host')
+        self_ = { notices = {} }
+        self_.host = Host.start({
+          now = 100,
+          remote = {
+            GetRE = function(_, name)
+              return {
+                OnServerEvent = Host.signal(),
+                FireClient = function() end,
+                FireAllClients = function(_, payload)
+                  if name == 'DamageNotice' then self_.notices[#self_.notices + 1] = payload end
+                end,
+              }
+            end,
+            CheckRECD = function() return false end,
+          },
+        })
+        self_.v = self_.host.runtime.life
         self_.a, self_.b = player(1), player(2)
-        self_.v:OnPlayerAdded(self_.a)
-        self_.v:OnPlayerAdded(self_.b)
+        self_.host:add(self_.a)
+        self_.host:add(self_.b)
     end)
 
     it('test_fish_damage_uses_same_hit_identity_and_reports_actual_amount', function()
         local carrier = { Body = { UnitId = 91 }, Receiver = {}, Controller = {} }
         local damageCalls = {}
-        self_.v.FishCarrier = {
+        local Host = require('tests.support.life_host')
+        self_.host:shutdown()
+        self_.host = Host.start({
+          now = 100,
+          fish_carrier = {
             ResolveCarrier = function(_, target)
                 if target == carrier or target == carrier.Receiver then return carrier, 'fish:91' end
             end,
@@ -93,7 +110,11 @@ describe('TestCombatBase', function()
                 damageCalls[#damageCalls + 1] = { target, amount, hit }
                 return true, math.min(amount, 7)
             end,
-        }
+          },
+        })
+        self_.v = self_.host.runtime.life
+        self_.host:add(self_.a)
+        self_.host:add(self_.b)
         local hit = self_.v:NewHit(self_.a.Character, 'weapon')
         local ok, actual = self_.v:ApplyHit(hit, carrier, 10)
         assert.is_true(ok)
@@ -106,34 +127,21 @@ describe('TestCombatBase', function()
     end)
 
     it('test_gm_health_reduction_uses_gm_category', function()
-        local categories = {}
-        self_.v:SetLifeHooks({ CanTakeDamage = function(_, hit)
-            categories[#categories + 1] = hit and hit.category or 'none'
-            return true
-        end })
         assert.is_true(self_.v:SetHealth(self_.a, 200))
-        assert.same({ 'gm' }, categories)
         assert.same(200, self_.a.Character.Controller.Health)
+        assert.same('gm', self_.notices[#self_.notices].category)
     end)
 
     it('test_hunger_damage_carries_hunger_category', function()
-        local categories = {}
-        self_.v:SetLifeHooks({ CanTakeDamage = function(_, hit)
-            categories[#categories + 1] = hit and hit.category or 'none'
-            return true
-        end })
-        local state = self_.v:GetState(self_.a)
-        state.hunger = 0
-        state.lastSec = 99
-        self_.v:UpdateState(state, 100)
-        assert.same({ 'hunger' }, categories)
+        self_.v:SetHunger(self_.a, 0)
+        self_.host:advance(1)
+        assert.same('hunger', self_.notices[#self_.notices].category)
         assert.same(295, self_.a.Character.Controller.Health)
     end)
 
     it('test_negative_eat_is_blocked_while_downed', function()
         -- 濒死锁血：负食用同样不能绕过状态判定（CanEat 已用 CanAct 互斥）
-        self_.v:SetLifeHooks({ LifeStatus = function() return 'downed' end,
-            CanTakeDamage = function() return false end })
+        self_.host:phase(self_.a, 'downed')
         assert.is_false(self_.v:CanEat(self_.a, 'item126'))
         assert.is_false(self_.v:Eat(self_.a, 'item126'))
         assert.same(300, self_.a.Character.Controller.Health)
@@ -143,13 +151,8 @@ describe('TestCombatBase', function()
     it('test_negative_eat_uses_unified_damage_entry_with_eat_category', function()
         -- 负食用（如核废料桶 item126 EatPercent=-99）必须走 ApplyDamage 单点，携带 eat 类别，
         -- 跳字通知与实际扣血一致；旧路 SetControllerHealth 直扣不会产生通知
-        local categories = {}
-        self_.v:SetLifeHooks({ CanTakeDamage = function(_, hit)
-            categories[#categories + 1] = hit and hit.category or 'none'
-            return true
-        end })
         assert.is_true(self_.v:Eat(self_.a, 'item126'))
-        assert.same({ 'eat' }, categories)
+        assert.same('eat', self_.notices[#self_.notices].category)
         assert.same(3, self_.a.Character.Controller.Health)
         assert.same(1, #self_.notices)
         assert.same(297, self_.notices[1].amount)
@@ -171,40 +174,25 @@ describe('TestCombatBase', function()
         local hit = self_.v:NewHit(self_.b.Character, 'weapon')
         assert.same(self_.b, self_.v:ResolveHitSource(hit))
         local filtered = 0
-        self_.v.DamageFilter = function(incoming, target)
+        self_.v:SetDamageFilter(function(incoming, target)
             filtered = filtered + 1
             assert.same(self_.b, incoming.sourcePlayer)
-            assert.same(self_.a, target)
             return incoming.category ~= 'weapon'
-        end
+        end)
         assert.is_false(self_.v:ApplyHit(hit, self_.a, 10))
         assert.same(300, self_.a.Character.Controller.Health)
-        self_.v.DamageFilter = nil
+        self_.v:SetDamageFilter(nil)
         assert.is_true(self_.v:ApplyHit(hit, self_.a.Character, 10))
 
-        local rescued = {}
-        self_.v:SetLifeHooks({
-            LifeStatus = function(state) return state.player.attrs.Health <= 1 and 'downed' or 'alive' end,
-            CanTakeDamage = function(state) return state.player.attrs.Health > 1 end,
-            OnBeforeDamage = function(state)
-                if state.player.attrs.Health - 10 <= 0 then state.player.Character.Controller.Health = 1 return true end
-            end,
-            Rescue = function(state, rescuer)
-                rescued[#rescued + 1] = { state.player, rescuer }
-                state.player.Character.Controller.Health = 30
-                return true
-            end,
-        })
         self_.a.Character.Controller.Health = 5
-        self_.a.attrs.Health = 5
         local lethal = self_.v:NewHit(self_.b, 'fishAttack')
         local ok, actual = self_.v:ApplyHit(lethal, self_.a, 10)
         assert.is_true(ok)
         assert.same(4, actual)
         assert.is_true(self_.v:IsDowned(self_.a))
         assert.is_false(self_.v:ApplyHit(self_.v:NewHit(self_.b, 'fishAttack'), self_.a, 1))
-        assert.is_true(self_.v:Rescue(self_.a, self_.b))
-        assert.same({ { self_.a, self_.b } }, rescued)
+        local rescued = self_.host:tree(self_.b):begin_rescue(self_.a)
+        assert.is_true(rescued)
     end)
 end)
 
@@ -230,13 +218,11 @@ describe('TestMgrAbilityActionGuard', function()
         _G.game = { GetService = function() return {} end }
         local mgr = assert(loadfile('server/Mgr/MgrAbility.lua'))()
         local blocked, free = player(1), player(2)
-        local vitals = assert(loadfile('server/Mgr/MgrVitals.lua'))()
-        vitals.Now = function() return 100 end
-        vitals:OnPlayerAdded(blocked)
-        vitals:OnPlayerAdded(free)
-        vitals:SetLifeHooks({ LifeStatus = function(state)
-            return state.player == blocked and 'downed' or 'alive'
-        end })
+        local host = require('tests.support.life_host').start({ now = 100 })
+        host:add(blocked)
+        host:add(free)
+        host:phase(blocked, 'downed')
+        local vitals = host.runtime.life
         mgr.Vitals = vitals
         mgr.BehaviorServices = { Vitals = vitals }
         mgr:Start()

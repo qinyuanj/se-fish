@@ -16,13 +16,11 @@ local function vec(x, y, z) return { x = x, y = y, z = z } end
 local GameCfg = require('common.GameCfg')
 
 local WIRING = {
-  'MgrMap.MgrSurvival.Platform = MgrMap.MgrPlatform',
-  'MgrMap.MgrSurvival.Vitals = MgrMap.MgrVitals',
-  'MgrMap.MgrSurvival.Modifier = ModifierBridge',
-  'MgrMap.MgrSurvival.Save = MgrMap.MgrSave',
+  'platform = MgrMap.MgrPlatform',
+  'save = MgrMap.MgrSave',
   'MgrMap.MgrPlatform.Save = MgrMap.MgrSave',
   'MgrMap.MgrPlatform.PlayerData = MgrMap.MgrPlayerData',
-  'MgrMap.MgrVitals:SetLifeHooks(MgrMap.MgrSurvival:Hooks())',
+  'local Life = WorldRuntime.life',
 }
 local function assert_wiring()
   local handle = assert(io.open('server/main.lua', 'rb'), '读不到 server/main.lua')

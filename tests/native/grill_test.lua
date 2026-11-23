@@ -253,23 +253,19 @@ describe("吃烤鱼的恢复量", function()
         _G.game = { GetService = function(_, name)
             if name == 'World' then return { GetServerTime = function() return ctx.now end } end
         end }
-        ctx.vitals = assert(loadfile('server/Mgr/MgrVitals.lua'))()
-        local c = { Health = 100, MaxHealth = 300, HealthChanged = signal(), Died = signal(),
-            OnReborn = signal() }
-        function c:TakeDamage(n) self.Health = math.max(0, self.Health - n) end
-        ctx.controller = c
-        ctx.player = { UserId = 9101, attrs = {}, CharacterAdded = signal(),
-            Character = { Controller = c, Position = { x = 0, y = 0, z = 0 }, Size = { y = 2 } } }
-        function ctx.player:SetAttribute(k, v) self.attrs[k] = v end
-        ctx.vitals:OnPlayerAdded(ctx.player)
-        ctx.vitals:GetState(ctx.player).hunger = 0 -- 从空饥饿看恢复量
+        local Host = require('tests.support.life_host')
+        ctx.host = Host.start({ now = 500 })
+        ctx.vitals = ctx.host.runtime.life
+        ctx.player = Host.player(9101)
+        ctx.player.Character.Controller.Health = 100
+        ctx.controller = ctx.player.Character.Controller
+        ctx.host:add(ctx.player)
+        ctx.vitals:SetHunger(ctx.player, 0) -- 从空饥饿看恢复量
     end)
 
     -- 玩家与引擎全局逐例恢复；setUp 中途失败也照样清理。
     after_each(function()
-        if ctx.vitals then
-            if ctx.player then ctx.vitals:OnPlayerRemoving(ctx.player) end
-        end
+        if ctx.host then ctx.host:shutdown() end
         _G.game = ctx.oldGame
     end)
 
@@ -277,27 +273,27 @@ describe("吃烤鱼的恢复量", function()
     -- 烤熟 1.5 倍 → 恢复 75%（225 饥饿）；未烤 → 50%（150）；下降段 0.5 倍 → 25%（75）
     it("test_eat_restores_scaled_by_cook_rate", function()
         assert.is_true(ctx.vitals:Eat(ctx.player, 'eelHead', 1.5))
-        assert.same(225, ctx.vitals:GetState(ctx.player).hunger)
+        assert.same(225, ctx.host:tree(ctx.player).states.hunger:now())
         assert.same(300, ctx.controller.Health, '100 + 225 封顶 300')
 
-        local state = ctx.vitals:GetState(ctx.player)
-        state.hunger = 0
+        local tree = ctx.host:tree(ctx.player)
+        ctx.vitals:SetHunger(ctx.player, 0)
         ctx.controller.Health = 100
         assert.is_true(ctx.vitals:Eat(ctx.player, 'eelHead'))
-        assert.same(150, state.hunger, '未烤按原恢复量')
+        assert.same(150, tree.states.hunger:now(), '未烤按原恢复量')
         assert.same(250, ctx.controller.Health)
 
-        state.hunger = 0
+        ctx.vitals:SetHunger(ctx.player, 0)
         ctx.controller.Health = 100
         assert.is_true(ctx.vitals:Eat(ctx.player, 'eelHead', 0.5))
-        assert.same(75, state.hunger, '下降段取出恢复量打折')
+        assert.same(75, tree.states.hunger:now(), '下降段取出恢复量打折')
         assert.same(175, ctx.controller.Health)
     end)
 
     -- 非法倍率按未烤处理，不能吃时（死亡）照旧拒绝
     it("test_eat_with_bad_rate_falls_back_to_plain", function()
         assert.is_true(ctx.vitals:Eat(ctx.player, 'eelHead', -1))
-        assert.same(150, ctx.vitals:GetState(ctx.player).hunger)
+        assert.same(150, ctx.host:tree(ctx.player).states.hunger:now())
     end)
 end)
 
@@ -873,7 +869,7 @@ describe("烧烤的接线", function()
         local src = file:read('*a')
         file:close()
         assert.matches('MgrGrill = require("server.Mgr.MgrGrill")', src, nil, true)
-        assert.matches('MgrMap.MgrGrill.Vitals = MgrMap.MgrVitals', src, nil, true)
+        assert.matches('MgrMap.MgrGrill.Vitals = Life', src, nil, true)
         assert.matches('MgrMap.MgrGrill.PlayerData = MgrMap.MgrPlayerData', src, nil, true)
         assert.matches('MgrMap.MgrGrill.Save = MgrMap.MgrSave', src, nil, true)
         assert.is_nil(src:find('MgrMap.MgrGrill.Loot'), '满格走 ready 冻结重试，不接 MgrLoot')

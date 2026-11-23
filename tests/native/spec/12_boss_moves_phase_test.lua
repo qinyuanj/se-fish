@@ -68,14 +68,14 @@ describe('第 12 节 阶段与复合组（沧龙 / 哥斯拉）', function()
         local peer = { UserId = 3803, SetAttribute = function() end,
             Character = { Controller = controller, Position = position } }
         env.players[2] = peer
-        env.vitals:OnPlayerAdded(peer)
+        env.lifeHost:add(peer)
         controller.Health = 100000
         return peer
     end
 
     local function dropPeer()
         local peer = env.players[2]
-        if peer then env.vitals:OnPlayerRemoving(peer) end
+        if peer then env.lifeHost.runtime:on_player_removing(peer) end
         env.players[2] = nil
     end
 

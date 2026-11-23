@@ -601,6 +601,7 @@ function PlayerTree.spawn(opts)
         player_data = opts.player_data,
         platform = opts.platform,
         fish_carrier = opts.fish_carrier,
+        damage_filter = opts.damage_filter,
         lookup_tree = opts.lookup_tree,
         players = opts.players,
         speed_writer = opts.speed_writer,

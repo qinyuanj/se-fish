@@ -17,10 +17,9 @@ local GameCfg = require('common.GameCfg')
 local WIRING = {
   'MgrMap.MgrInteract.PlayerData = MgrMap.MgrPlayerData',
   'MgrMap.MgrInteract.Save = MgrMap.MgrSave',
-  'MgrMap.MgrInteract.Vitals = MgrMap.MgrVitals',
-  'MgrMap.MgrInteract.Survival = MgrMap.MgrSurvival',
-  'MgrMap.MgrSurvival.Vitals = MgrMap.MgrVitals',
-  'MgrMap.MgrVitals:SetLifeHooks(MgrMap.MgrSurvival:Hooks())',
+  'MgrMap.MgrInteract.Vitals = Life',
+  'MgrMap.MgrInteract.Survival = Life',
+  'local Life = WorldRuntime.life',
 }
 local function assert_wiring()
   local handle = assert(io.open('server/main.lua', 'rb'), '读不到 server/main.lua')

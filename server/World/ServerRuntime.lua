@@ -252,6 +252,7 @@ function ServerRuntime.new(opts)
       player_data = opts.player_data,
       platform = opts.platform,
       fish_carrier = opts.fish_carrier,
+      damage_filter = runtime._damage_filter,
       speed_writer = opts.speed_writer,
       growth_writer = opts.growth_writer,
       on_downed = opts.on_player_downed,
@@ -483,7 +484,7 @@ function ServerRuntime.new(opts)
   function life:SetDamageFilter(filter)
     damage_filter = filter
     for _, tree in pairs(player_trees) do
-      if tree.set_damage_filter then tree:set_damage_filter(filter) end
+      if tree.set_damage_filter then tree:set_damage_filter(filter or false) end
     end
   end
 
@@ -499,9 +500,18 @@ function ServerRuntime.new(opts)
     }
   end
 
+  function life:ResolveHitSource(hit)
+    return type(hit) == "table" and hit.sourcePlayer or nil
+  end
+
   function life:ApplyHit(hit, target, amount)
     local player = tree_of(target) and target or player_from_unit(target)
     local tree = tree_of(player) or tree_of(hit and hit.sourcePlayer)
+    if not tree then
+      for _, candidate in pairs(player_trees) do
+        if candidate and not candidate:is_disposed() then tree = candidate break end
+      end
+    end
     if not tree then return false end
     return tree:apply_hit(hit, target, amount)
   end

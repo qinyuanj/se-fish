@@ -20,9 +20,9 @@ local function signal()
 end
 
 local WIRING = {
-  'MgrMap.MgrVitals.DamageFilter = makePkDamageFilter()',
-  'MgrMap.MgrVitals.Party = MgrMap.MgrParty',
-  'MgrMap.MgrVitals.ZoneMarkers = ZoneMarkers',
+  'WorldRuntime.life:SetDamageFilter(pkDamageFilter)',
+  'MgrMap.MgrParty.Vitals = Life',
+  'local pkDamageFilter = makePkDamageFilter()',
 }
 
 local function assert_wiring()

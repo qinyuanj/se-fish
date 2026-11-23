@@ -25,7 +25,7 @@ local WIRING = {
   'MgrMap.MgrSave.PlayerData = MgrMap.MgrPlayerData',
   'MgrMap.MgrFerry.PlayerData = MgrMap.MgrPlayerData',
   'MgrMap.MgrFerry.Save = MgrMap.MgrSave',
-  'MgrMap.MgrSurvival.Save = MgrMap.MgrSave',
+  'save = MgrMap.MgrSave',
 }
 local function assert_wiring()
   local handle = assert(io.open('server/main.lua', 'rb'), '读不到 server/main.lua')

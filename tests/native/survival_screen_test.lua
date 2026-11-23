@@ -94,8 +94,8 @@ describe('TestScreenSurvival', function()
         local f = assert(io.open('client/main.lua', 'r'))
         local src = f:read('*a')
         f:close()
-        assert.matches('ScreenSurvival = require("client.ScreenHandlers.ScreenSurvival")', src, nil, true)
-        assert.matches('ScreenSurvival:Start()', src, nil, true)
+        assert.matches('SurvivalOverlayView = require("client.Views.SurvivalOverlayView")', src, nil, true)
+        assert.matches('survival = SurvivalOverlayView.spec()', src, nil, true)
     end)
 
     -- 同一组节点随相位复用：濒死 → 死亡 → 活动（虚弱）

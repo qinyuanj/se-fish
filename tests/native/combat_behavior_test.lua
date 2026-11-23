@@ -132,12 +132,11 @@ describe('TestMainCombatWiring', function()
     it('test_combat_managers_are_wired_to_unified_entry', function()
         local src = readSource('server/main.lua')
         for _, needle in ipairs({
-            'MgrMap.MgrAbility.Vitals = MgrMap.MgrVitals',
-            'MgrMap.MgrFishUnit.Vitals = MgrMap.MgrVitals',
-            'MgrMap.MgrVitals.FishCarrier = MgrMap.MgrFishCarrier',
-            'MgrMap.MgrCast.Vitals = MgrMap.MgrVitals',
+            'MgrMap.MgrAbility.Vitals = Life',
+            'MgrMap.MgrFishUnit.Vitals = Life',
             'MgrMap.MgrAbility.BehaviorServices = {',
-            'Vitals = MgrMap.MgrVitals',
+            'Vitals = Life',
+            'local Life = WorldRuntime.life',
             'FishCarrier = MgrMap.MgrFishCarrier',
             'Modifier = ModifierBridge',
             'GM = MgrMap.MgrGM',
