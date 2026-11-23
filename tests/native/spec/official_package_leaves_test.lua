@@ -223,6 +223,18 @@ local function make_userdata_proxy(backing)
 end
 
 describe("AttrLeaf：attr_rule 官方包单向叶子投影", function()
+  local saved_vec3
+
+  before_each(function()
+    saved_vec3 = rawget(_G, "Vector3")
+    _G.Vector3 = { New = function(x, y, z) return { x = x, y = y, z = z } end }
+  end)
+
+  after_each(function()
+    _G.Vector3 = saved_vec3
+    saved_vec3 = nil
+  end)
+
   it("单向写入七个属性键四分量与角色表现，并在角色重建与树销毁时仅销毁新建 AttrUnit", function()
     local attr_api, make_unit, world = make_real_attr_sandbox()
     local clock = SpokeClock.new(100)
@@ -473,6 +485,18 @@ describe("ModifierLeaf：modifier_system 单向叶子投影与活鱼辅助接口
 end)
 
 describe("AbilityLeaf：ability_system 单向叶子投影、can_act 门控与 userdata 兼容", function()
+  local saved_vec3
+
+  before_each(function()
+    saved_vec3 = rawget(_G, "Vector3")
+    _G.Vector3 = { New = function(x, y, z) return { x = x, y = y, z = z } end }
+  end)
+
+  after_each(function()
+    _G.Vector3 = saved_vec3
+    saved_vec3 = nil
+  end)
+
   it("挂载能力管理器并装配 InitialAbilities（含延迟就绪重试）、can_act 拦截施法，角色更换与树销毁对称停止并销毁", function()
     local clock = SpokeClock.new(100)
     local created_managers = {}

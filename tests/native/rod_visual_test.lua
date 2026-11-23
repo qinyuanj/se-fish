@@ -63,6 +63,9 @@ describe('鱼竿外观挂载（MgrPlayerData）', function()
       create_unit = function(kind, props)
         return world:CreateUnit(kind, props)
       end,
+      on_item_bar_state = function(p, snapshot)
+        _G.REUtil:GetRE('ItemBarState'):FireClient(p, snapshot)
+      end,
       on_player_join_start = function(p)
         Mgr:OnPlayerAdded(p)
       end,
@@ -75,9 +78,11 @@ describe('鱼竿外观挂载（MgrPlayerData）', function()
     })
     env.runtime:start()
     env.runtime:mark_started()
-    Mgr.OnSyncPlayerTree = function(p, data)
+    Mgr.OnSyncPlayerTree = function(p, data, forcePush)
       local pt = env.runtime:get_player_tree(p.UserId)
-      if pt then pt:sync_from_data(data) end
+      if not pt then return false end
+      pt:sync_from_data(data, forcePush and { force_push = true } or nil)
+      return true
     end
     env.join = function(p)
       env.runtime:on_player_added(p)

@@ -6,6 +6,7 @@
 --   4. server/main.lua 未移除旧 MgrAttr / MgrModifier 或未将 MgrPlayerData 同步接线至 PlayerTree。
 
 local GameCfg = require("common.GameCfg")
+local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
 local ServerRuntime = require("server.World.ServerRuntime")
 
 local function make_signal()
@@ -97,6 +98,21 @@ local function make_character(name, walk_speed)
 end
 
 describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼效果存储", function()
+  local saved_vec3, saved_color
+
+  before_each(function()
+    saved_vec3 = rawget(_G, "Vector3")
+    saved_color = rawget(_G, "Color")
+    _G.Vector3 = { New = function(x, y, z) return { x = x, y = y, z = z } end }
+    _G.Color = { New = function(...) return { ... } end }
+  end)
+
+  after_each(function()
+    _G.Vector3 = saved_vec3
+    _G.Color = saved_color
+    saved_vec3, saved_color = nil, nil
+  end)
+
   it("统一装配 AttrLeaf / ModifierLeaf / AbilityLeaf / HeldRodLeaf 与 entity_modifiers，离场后全量零残留", function()
     local attr_units, attr_values = {}, {}
     local attr_api = {
@@ -387,11 +403,19 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
         end,
       }
       local re_map = {}
+      local item_bar_pushes = {}
       _G.REUtil = {
         CheckRECD = function() return false end,
         GetRE = function(_, name)
           if not re_map[name] then
-            re_map[name] = { OnServerEvent = make_signal(), FireClient = function() end }
+            re_map[name] = {
+              OnServerEvent = make_signal(),
+              FireClient = function(_, target_player, payload)
+                if name == "ItemBarState" then
+                  item_bar_pushes[#item_bar_pushes + 1] = { player = target_player, payload = payload }
+                end
+              end,
+            }
           end
           return re_map[name]
         end,
@@ -515,15 +539,44 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
       local pt = runtime:get_player_tree(9101)
       assert.is_not_nil(pt)
       assert.is_true(#p.CharacterAdded.handlers >= 1)
+      -- 存档就绪首推经 PlayerTree 树底 on_item_bar_state 严格下发 1 次（无双发）
+      assert.equals(1, #item_bar_pushes)
+      assert.are.equal(p, item_bar_pushes[1].player)
 
-      -- 经 ItemBarAction 选中鱼竿 -> MgrPlayerData:SendItemBar -> OnSyncPlayerTree -> HeldRodLeaf 建点
+      -- 经 ItemBarAction 选中鱼竿 -> MgrPlayerData:SendItemBar -> OnSyncPlayerTree -> 树底合并推送（仅 +1 次，无双发）与 HeldRodLeaf 建点
       re_map.ItemBarAction.OnServerEvent:Fire(p, { action = "SelectSlot", value = 1 })
+      assert.equals(2, #item_bar_pushes)
+      assert.equals(1, item_bar_pushes[2].payload.selectedSlot)
       assert.equals(2, #created_units)
       assert.is_false(created_units[1].Destroyed)
       assert.is_false(created_units[2].Destroyed)
 
-      -- AttrBridge 经 MgrAbility / MgrVitals 真实生效
+      -- RequestItemBar 主动拉取经 PlayerTree 强制推送 1 次
+      re_map.RequestItemBar.OnServerEvent:Fire(p)
+      assert.equals(3, #item_bar_pushes)
+      assert.equals(1, item_bar_pushes[3].payload.selectedSlot)
+
+      -- 单次 SpokeRuntime.batch 内多次状态变更与 SendItemBar 调用最终只合并触发 1 次 ItemBarState:FireClient
+      local before_batch_pushes = #item_bar_pushes
       local data = mgrs.MgrPlayerData:GetDataInst(p)
+      SpokeRuntime.batch(function()
+        pt:set_coin(888)
+        pt:set_upgrade_level(1)
+        data.Data.FishCoin = 888
+        data.Data.UpgradeLevel = 1
+        data.Data.SelectedSlot = nil
+        mgrs.MgrPlayerData:SendItemBar(p)
+        data.Data.FishCoin = 999
+        mgrs.MgrPlayerData:SendItemBar(p)
+      end)
+      assert.equals(before_batch_pushes + 1, #item_bar_pushes)
+      assert.equals(999, item_bar_pushes[#item_bar_pushes].payload.coin)
+      assert.equals(1, item_bar_pushes[#item_bar_pushes].payload.upgradeLevel)
+      assert.is_nil(item_bar_pushes[#item_bar_pushes].payload.selectedSlot)
+      -- 重新选回鱼竿格以维持后续测试预期
+      re_map.ItemBarAction.OnServerEvent:Fire(p, { action = "SelectSlot", value = 1 })
+
+      -- AttrBridge 经 MgrAbility / MgrVitals 真实生效
       data.Extra.growth.potions.item168 = 2
       data.Extra.growth.potions.item167 = 5
       assert.is_true(mgrs.MgrAbility:ApplyGrowth(p).Ok)

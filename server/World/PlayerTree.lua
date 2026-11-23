@@ -314,7 +314,7 @@ function PlayerTree.spawn(opts)
 
   local function log_error(tag, err)
     if opts.logger and type(opts.logger.error) == "function" then
-      pcall(opts.logger.error, opts.logger, tag .. ": " .. tostring(err)) -- logger 异常不得中断业务清理与终镜像
+      pcall(opts.logger.error, opts.logger, tag .. " (uid=" .. tostring(player.UserId) .. "): " .. tostring(err)) -- logger 异常不得中断业务清理与终镜像
     else
       print(tag, player.UserId, tostring(err))
     end
@@ -324,11 +324,16 @@ function PlayerTree.spawn(opts)
     if coin == last_synced_coin then
       return
     end
-    last_synced_coin = coin
-    local ok_has, set_attr = pcall(function() return player.SetAttribute end) -- 兼容引擎 userdata 或只读替身对象
-    if ok_has and type(set_attr) == "function" then
-      pcall(set_attr, player, "FishCoin", coin) -- 兼容引擎 userdata 属性写入异常
+    local ok_has, set_attr = pcall(function() return player.SetAttribute end) -- 兼容引擎 userdata 读取 SetAttribute 成员
+    if not ok_has or type(set_attr) ~= "function" then
+      return
     end
+    local ok_set, err = pcall(set_attr, player, "FishCoin", coin)
+    if not ok_set then
+      log_error("[PlayerTree] sync_fish_coin_attribute 失败", err)
+      return
+    end
+    last_synced_coin = coin
   end
 
   local function mirror_stage1_to_data()
@@ -819,7 +824,8 @@ function PlayerTree.spawn(opts)
 
   --- 将外部（过渡期 PlayerData）最新字段单批同步进 PlayerTree Stage 1 状态，仅变更项触发下游重算。
   ---@param source_data? table
-  function handle:sync_from_data(source_data)
+  ---@param sync_opts? { force_push?: boolean }
+  function handle:sync_from_data(source_data, sync_opts)
     if self:is_disposed() then
       return false
     end
@@ -837,6 +843,7 @@ function PlayerTree.spawn(opts)
     local upgrades = type(growth.upgrades) == "table" and growth.upgrades or {}
     local cds = type(extra.cooldowns) == "table" and extra.cooldowns or {}
 
+    local prev_pushed_snapshot = last_pushed_snapshot
     local prev_syncing = syncing_from_data
     if src == data then
       syncing_from_data = true
@@ -911,6 +918,9 @@ function PlayerTree.spawn(opts)
     syncing_from_data = prev_syncing
     if not ok_batch then
       error(batch_err, 0)
+    end
+    if type(sync_opts) == "table" and sync_opts.force_push == true and last_pushed_snapshot == prev_pushed_snapshot then
+      handle:push_item_bar_state()
     end
     return true
   end

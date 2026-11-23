@@ -25,7 +25,7 @@
 - `common.GameCfg` 含配置解析与玩法计算，归 L4；纯配置内容归 L5 的 `common.cfg`。
 - `server.AbilityAPI` 与本图技能行为同属 L2。行为需要的 `Vitals`、`FishCarrier`、`GM`、`Modifier` 由 `server/main.lua` 通过 `AbilityAPI.BehaviorServices` 注入，行为不得反向 `require server.Mgr`。
 - `server.SwingRegistry` 独立持有带 TTL、一次性消费的挥砍登记，`MgrWeapon` 与 `melee_hit` 共同依赖它。时钟异常时拒绝登记与消费；失效读取、施法失败及玩家退出时清除登记，施法失败回复失败。
-- 武器持续效果由 `MgrModifier` 直接实现，近战行为与枪击不经过 `MgrAbility` 转发。
+- 武器持续效果由 `server/World/ModifierLeaf.lua`（经 `PlayerTree`/`PlayerEffects` 与 `entity_modifiers`）实现，近战行为与枪击不经过 `MgrAbility` 转发。
 - Spoke 原生重构单向棘轮（[ADR-0032](adr/0032-spoke-native-lifecycle-architecture.md)）：`common.SpokeClock` 归 L4、`client.Store` 归 L3、`server.World` 与 `client.Views` 归 L2；新 Spoke 命名空间严禁反向 `require` 存量旧债务模块（`server.Mgr`、`server.AbilityAPI`、`server.AbilityBehaviors`、`client.MgrGameUI`、`client.ScreenHandlers`、`client.Local*`、`common.OwnedUnits`）。
 
 ## 可执行门禁

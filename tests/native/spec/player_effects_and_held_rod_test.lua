@@ -280,6 +280,21 @@ describe("PlayerEffects：持续效果计时与层数主权", function()
 end)
 
 describe("HeldRodLeaf：左手持竿外观纯输出与 on_cleanup 对称销毁", function()
+  local saved_vec3, saved_color
+
+  before_each(function()
+    saved_vec3 = rawget(_G, "Vector3")
+    saved_color = rawget(_G, "Color")
+    _G.Vector3 = { New = function(x, y, z) return { x = x, y = y, z = z } end }
+    _G.Color = { New = function(...) return { ... } end }
+  end)
+
+  after_each(function()
+    _G.Vector3 = saved_vec3
+    _G.Color = saved_color
+    saved_vec3, saved_color = nil, nil
+  end)
+
   it("持竿/切换手持/角色重建/dispose 均对称创建并逆序销毁模型与挂点，模型失败自动回滚挂点", function()
     local created = {}
     local destroyed = {}

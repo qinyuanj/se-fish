@@ -93,11 +93,6 @@ local function classify(policy, id)
         return rank - 1, prefix
       end
     end
-    for _, prefix in ipairs(group.reserved_ids or {}) do
-      if id == prefix or id:sub(1, #prefix + 1) == prefix .. '.' then
-        return rank - 1, prefix
-      end
-    end
   end
 end
 
@@ -405,7 +400,6 @@ function M.levels_edn(policy)
   for _, group in ipairs(policy.levels) do
     local ids = {}
     for _, id in ipairs(group.ids or {}) do ids[#ids + 1] = id end
-    for _, id in ipairs(group.reserved_ids or {}) do ids[#ids + 1] = id end
     for _, id in ipairs(group.modules or {}) do ids[#ids + 1] = id end
     groups[#groups + 1] = '[:' .. table.concat(ids, ' :') .. ']'
   end
