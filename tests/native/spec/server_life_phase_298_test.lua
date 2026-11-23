@@ -228,6 +228,7 @@ describe("玩家生命双层相位宿主接缝（#298）", function()
     data = make_data(player, overrides)
     local other_data = make_data(other, other_overrides)
     runtime = ServerRuntime.new({
+      damage_filter = function() return true end,
       bait_spots = { Enabled = false },
       initial_now = 100,
       remote = re,

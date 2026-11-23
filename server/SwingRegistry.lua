@@ -3,7 +3,15 @@ local M = {}
 local SWING_TTL_SEC = 1.5
 local SWING_FUTURE_SKEW_SEC = 0.5
 local swings = {}
+local clock_now = nil
+function M.SetClock(now)
+    clock_now = type(now) == 'function' and now or nil
+end
 local function swingClock()
+    if clock_now then
+        local ok, now = pcall(clock_now)
+        if ok and type(now) == 'number' and now == now and math.abs(now) < math.huge then return now end
+    end
     local ok, now = pcall(function() return game:GetService('World'):GetServerTime() end)
     if ok and type(now) == 'number' and now == now and math.abs(now) < math.huge then return now end
     print('[SwingRegistry] 读取服务端时钟失败', tostring(now))

@@ -1,3 +1,4 @@
+-- 武器管理器测试替身：只供仍以旧方法名驱动的原生用例使用，生产入口不再加载。
 local GameCfg = require('common.GameCfg')
 local Number = require('common.Number')
 local MathWaterJudge = require('common.MathWaterJudge')

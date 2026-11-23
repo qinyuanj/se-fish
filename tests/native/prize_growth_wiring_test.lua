@@ -15,6 +15,9 @@
 -- 模块缓存（package.loaded 的 MgrFishUnit 与 common.REUtil）与配置（GameCfg.Debug）逐例恢复，
 -- after_each 对未完成的 before_each 幂等。describe 顺序沿用旧执行序（类名字典序）。
 local GameCfg = require('common.GameCfg')
+local ClientStore = require('client.Store.ClientStore')
+local RootView = require('client.Views.RootView')
+local AttackView = require('client.Views.AttackView')
 
 local function signal()
     local callbacks = {}
@@ -226,7 +229,9 @@ describe('TestPrizeGrowthWiring', function()
         file:close()
         assert.matches('MgrMap.MgrAbility.PlayerData = MgrMap.MgrPlayerData', src, nil, true)
         assert.matches('local Life = WorldRuntime.life', src, nil, true)
-        assert.matches('MgrMap.MgrWeapon.Modifier = ModifierBridge', src, nil, true)
+        assert.matches('bind_weapon_action = function(dispatch)', src, nil, true)
+        assert.matches('modifier_leaf = { modifier_api = modifierPackageApi }', src, nil, true)
+        assert.matches('entity_modifiers = {', src, nil, true)
         assert.matches('MgrMap.MgrAbility.Vitals = Life', src, nil, true)
     end)
 end)
@@ -238,33 +243,66 @@ describe('TestPrizeRocketInput', function()
     -- 旧案例在测试体末尾手工还原 game/REUtil；断言失败会跳过还原。
     -- 逐例 before_each/after_each 后，替换的全局无论成败都恢复。
     before_each(function()
-        ctx = { oldGame = _G.game, oldRE = _G.REUtil, now = 0, requests = {} }
+        ctx = { oldGame = _G.game, oldRE = _G.REUtil, now = 0, requests = {}, nodes = {} }
+        ctx.heartbeat = signal()
         local state = ctx
         _G.game = { GetService = function(_, name)
             if name == 'World' then return { GetServerTime = function() return state.now end } end
+            if name == 'RunService' then return { Heartbeat = state.heartbeat } end
             if name == 'Players' then return { LocalPlayer = { Character = {} } } end
         end }
-        _G.REUtil = { GetRE = function() return { FireServer = function(_, p)
-            state.requests[#state.requests + 1] = p.action end } end }
-        ctx.button = assert(loadfile('client/LocalAttackButton.lua'))()
-        ctx.button.Gesture = require('client.PressGesture').New({ LongPressSec = 0.5 })
-        ctx.button.Root, ctx.button.Container, ctx.button.IsOpen = { Visible = true }, { Visible = true }, true
-        ctx.button:SetEquipped({ selectedWeapon = 'item166', weapons = { item166 = 1 } })
+        local store, writer = ClientStore.new({ initial_now = 0 })
+        writer:set_hud_visible(true)
+        local root = { Name = 'UIRoot', Destroying = signal(), Children = {},
+            FindFirstChild = function(_, name) return state.nodes[name] end }
+        ctx.view = RootView.mount(root, store, {
+            services = {
+                send_weapon = function(payload)
+                    state.requests[#state.requests + 1] = payload.action
+                end,
+                now = function() return state.now end,
+            },
+            create_node = function(_, props)
+                local node = {
+                    Name = props and props.Name,
+                    Parent = props and props.Parent,
+                    Text = props and (props.Text or props.ButtonText) or '',
+                    OnTouchBegan = signal(),
+                    OnTouchEnded = signal(),
+                    OnClicked = signal(),
+                    TouchEnabled = false,
+                    Visible = true,
+                }
+                state.nodes[node.Name] = node
+                if node.Parent and node.Parent.Children then node.Parent.Children[node.Name] = node end
+                return node
+            end,
+            hud = { AttackView.spec() },
+        })
+        writer:ingest_event('ItemBarState', {
+            weapons = { item166 = 1 },
+            held = { kind = 'weapon', id = 'item166' },
+            slots = {},
+        })
     end)
 
     after_each(function()
-        if ctx then
-            _G.game, _G.REUtil = ctx.oldGame, ctx.oldRE
-        end
+        if ctx and ctx.view then ctx.view:dispose() end
+        if ctx then _G.game, _G.REUtil = ctx.oldGame, ctx.oldRE end
     end)
 
     it('test_long_press_rocket_requests_repeated_attacks', function()
-        ctx.button:OnPressBegin()
-        ctx.button:Tick()
-        ctx.now = 0.9; ctx.button:Tick()
-        ctx.now = 1; ctx.button:Tick()
-        ctx.now = 2; ctx.button:Tick()
-        ctx.button:OnPressEnd()
+        ctx.nodes.BtnAttack.OnTouchBegan:Fire()
+        local function tick(now)
+            ctx.now = now
+            ctx.heartbeat:Fire()
+        end
+        tick(0)
+        tick(0.9)
+        tick(1)
+        tick(2)
+        ctx.nodes.BtnAttack.OnTouchEnded:Fire()
+        assert.same(1, GameCfg.Ability.Guns.item166.IntervalSec)
         assert.same({ 'attack', 'attack', 'attack' }, ctx.requests)
     end)
 end)

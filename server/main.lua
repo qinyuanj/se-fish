@@ -29,7 +29,6 @@ local MgrMap = {
     MgrStory = require("server.Mgr.MgrStory"),
     MgrFerry = require("server.Mgr.MgrFerry"),
     MgrSave = require("server.Mgr.MgrSave"),
-    MgrWeapon = require("server.Mgr.MgrWeapon"),
     MgrParty = require("server.Mgr.MgrParty"),
     MgrCompendium = require("server.Mgr.MgrCompendium"),
     MgrRecords = require("server.Mgr.MgrRecords"),
@@ -341,7 +340,6 @@ MgrMap.MgrFishUnit.Vitals = nil
 MgrMap.MgrPlayerData.Ability = MgrMap.MgrAbility
 MgrMap.MgrAbility.PlayerData = MgrMap.MgrPlayerData
 MgrMap.MgrAbility.Attr = AttrBridge
-MgrMap.MgrWeapon.Attr = AttrBridge
 MgrMap.MgrAbility.Modifier = ModifierBridge
 MgrMap.MgrAbility.Ai = MgrMap.MgrAi
 MgrMap.MgrFishUnit.Ai = MgrMap.MgrAi
@@ -356,12 +354,6 @@ MgrMap.MgrFishCarrier.DamageListener = function(carrier, actual, hit)
     end
 end
 
-MgrMap.MgrWeapon.Vitals = nil
-MgrMap.MgrWeapon.PlayerData = MgrMap.MgrPlayerData
-MgrMap.MgrWeapon.FishUnit = MgrMap.MgrFishUnit
-MgrMap.MgrWeapon.FishCarrier = MgrMap.MgrFishCarrier
-MgrMap.MgrWeapon.Save = MgrMap.MgrSave
-MgrMap.MgrWeapon.Modifier = ModifierBridge
 
 MgrMap.MgrGrill.Vitals = nil
 MgrMap.MgrGrill.PlayerData = MgrMap.MgrPlayerData
@@ -372,8 +364,11 @@ MgrMap.MgrParty.PlayerData = MgrMap.MgrPlayerData
 MgrMap.MgrParty.Save = MgrMap.MgrSave
 MgrMap.MgrParty.Vitals = nil
 
-local makePkDamageFilter = require("server.Mgr.MgrPkFilter").Make
-local pkDamageFilter = makePkDamageFilter()
+local PkDamageFilter = require("server.World.PkDamageFilter")
+local pkDamageFilter = PkDamageFilter.make({
+    party = MgrMap.MgrParty,
+    zone_markers = ZoneMarkers,
+})
 
 local function invoke(name, mgr, method, ...)
     if not mgr[method] then return end
@@ -422,9 +417,24 @@ WorldRuntime = ServerRuntime.new({
     save = MgrMap.MgrSave,
     platform = MgrMap.MgrPlatform,
     fish_carrier = MgrMap.MgrFishCarrier,
+    fish_unit = MgrMap.MgrFishUnit,
     fish_units = function()
         return MgrMap.MgrFishUnit and MgrMap.MgrFishUnit.Fish or {}
     end,
+    physics = game:GetService("PhysicsService"),
+    players_service = Players,
+    world_service = WorldService,
+    party = MgrMap.MgrParty,
+    zone_markers = ZoneMarkers,
+    bind_weapon_action = function(dispatch)
+        local event = _G.REUtil:GetRE("WeaponAction")
+        event.OnServerEvent:Connect(function(player, payload)
+            if _G.REUtil:CheckRECD(player, "WeaponAction", GameCfg.Ability.GunShared.ActionCooldownSec) then return end
+            dispatch(player, payload)
+        end)
+    end,
+    ability = { CastAbility = AbilityAPI.CastAbility },
+    register_cast_guard = registerCastGuard,
     create_unit = function(unit_type, props)
         return WorldService:CreateUnit(unit_type, props)
     end,
@@ -499,7 +509,6 @@ MgrMap.MgrAbility.Vitals = Life
 MgrMap.MgrAbility.BehaviorServices.Vitals = Life
 MgrMap.MgrFishUnit.Vitals = Life
 MgrMap.MgrCast.Vitals = Life
-MgrMap.MgrWeapon.Vitals = Life
 MgrMap.MgrGrill.Vitals = Life
 MgrMap.MgrParty.Vitals = Life
 

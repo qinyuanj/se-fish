@@ -52,8 +52,6 @@ local function setUp(height)
         height = height or 1080 }
     ctx.previous = {}
     for _, key in ipairs(GLOBALS) do ctx.previous[key] = rawget(_G, key) end
-    ctx.previousAttack = package.loaded['client.LocalAttackButton']
-    package.loaded['client.LocalAttackButton'] = nil
     _G.MgrGameUI = { SetCustomControlUI = function() end }
     local world = { Created = ctx.created }
     function world:CreateUnit(kind, attrs)
@@ -142,8 +140,6 @@ end
 local function tearDown(ctx)
     if ctx.hudView then ctx.hudView:dispose() end
     if ctx.hostBinding then ctx.hostBinding:dispose() end
-    require('client.LocalAttackButton'):Destroy()
-    package.loaded['client.LocalAttackButton'] = ctx.previousAttack
     for _, key in ipairs(GLOBALS) do _G[key] = ctx.previous[key] end
 end
 

@@ -16,6 +16,9 @@ local PlayerTree = require("server.World.PlayerTree")
 local AttrLeaf = require("server.World.AttrLeaf")
 local ModifierLeaf = require("server.World.ModifierLeaf")
 local AbilityLeaf = require("server.World.AbilityLeaf")
+local PlayerWeapon = require("server.World.PlayerWeapon")
+local SwingRegistry = require("server.SwingRegistry")
+local PkDamageFilter = require("server.World.PkDamageFilter")
 
 local ServerRuntime = {}
 local current_runtime = nil
@@ -68,6 +71,7 @@ function ServerRuntime.new(opts)
   local leaving_players = {}
   local ready_queue = {}
 
+  local weapon_sessions = {}
   local entity_modifiers = nil
   if opts.entity_modifiers then
     local em_opts = type(opts.entity_modifiers) == "table" and opts.entity_modifiers or {}
@@ -149,6 +153,9 @@ function ServerRuntime.new(opts)
     end
     local valid_now = now ~= nil and Number.IsFiniteNumber(now) and now or nil
     clock:step(dt, valid_now)
+    for _, weapon in pairs(weapon_sessions) do
+      if type(weapon.step) == "function" then weapon:step(clock.now()) end
+    end
     if entity_modifiers then
       entity_modifiers:step(clock.now())
     end
@@ -216,15 +223,14 @@ function ServerRuntime.new(opts)
       end
     end
 
-    local mounts = nil
+    local mounts = {}
     local base_mounts = type(opts.player_mounts) == "table" and opts.player_mounts or nil
-    if base_mounts or opts.attr_leaf or opts.ability_leaf then
-      mounts = {}
-      if base_mounts then
-        for k, v in pairs(base_mounts) do
-          mounts[k] = v
-        end
+    if base_mounts then
+      for k, v in pairs(base_mounts) do
+        mounts[k] = v
       end
+    end
+    if opts.attr_leaf or opts.ability_leaf or base_mounts then
       local base_leaves = base_mounts and base_mounts.leaves
       if opts.attr_leaf or opts.ability_leaf then
         mounts.leaves = function(s, pt)
@@ -284,11 +290,59 @@ function ServerRuntime.new(opts)
     })
     active_players[user_id] = player
     player_trees[user_id] = player_tree
+    SwingRegistry.SetClock(function() return clock.now() end)
+    player_tree:mount_phase("alive", "weapon", function(scope)
+      local weapon = PlayerWeapon.mount(scope, player_tree, {
+        remote = opts.remote,
+        save = opts.save,
+        physics = opts.physics,
+        players_service = opts.players_service,
+        ability = opts.ability,
+        fish_unit = opts.fish_unit,
+        fish_carrier = opts.fish_carrier,
+        world = opts.world_service,
+        random = opts.random,
+        new_hit = function(source, category)
+          return runtime.life:NewHit(source, category)
+        end,
+        apply_hit = function(hit, target, amount)
+          return runtime.life:ApplyHit(hit, target, amount)
+        end,
+        apply_effect = function(source, target, kind)
+          local target_tree = player_trees[target and target.UserId]
+          if target_tree and type(target_tree.apply_modifier) == "function" then
+            return target_tree:apply_modifier(kind, { source = source })
+          end
+          if entity_modifiers then
+            return entity_modifiers:apply(source, target, kind)
+          end
+          return false
+        end,
+      })
+      weapon_sessions[user_id] = weapon
+      scope:on_cleanup(function()
+        if weapon_sessions[user_id] == weapon then weapon_sessions[user_id] = nil end
+      end)
+    end)
     if player_tree.set_damage_filter and runtime._damage_filter then
       player_tree:set_damage_filter(runtime._damage_filter())
     end
 
     safe_call(opts.logger, "on_player_ready", opts.on_player_ready, player, data, player_tree)
+    if not runtime._weapon_bound then
+      runtime._weapon_bound = true
+      if type(opts.bind_weapon_action) == "function" then
+        opts.bind_weapon_action(function(actor, payload)
+          if runtime:is_leaving(actor and actor.UserId) then return false end
+          return runtime.life:WeaponAction(actor, payload)
+        end)
+      end
+      if type(opts.register_cast_guard) == "function" then
+        opts.register_cast_guard(function(unit, index)
+          return runtime.life:WeaponCastGuard(unit, index)
+        end)
+      end
+    end
     return player_tree
   end
 
@@ -420,7 +474,14 @@ function ServerRuntime.new(opts)
   end
 
   local hit_seq = 0
-  local damage_filter = nil
+  local damage_filter = opts.damage_filter
+  if damage_filter == nil then
+    damage_filter = PkDamageFilter.make({
+      party = opts.party,
+      zone_markers = opts.zone_markers,
+      zones = opts.zones,
+    })
+  end
   runtime._max_health_of = opts.max_health_of
   runtime.life = {}
   local life = runtime.life
@@ -606,6 +667,23 @@ function ServerRuntime.new(opts)
   function life:RequestAction(player, kind)
     local tree = tree_of(player)
     return tree ~= nil and tree:request_action(kind) == true
+  end
+
+  function life:WeaponAction(player, payload)
+    local tree = tree_of(player)
+    if not tree then return false end
+    local weapon = weapon_sessions[player.UserId]
+    if not weapon or type(weapon.handle) ~= "function" then return false end
+    return weapon:handle(payload) == true
+  end
+
+  function life:WeaponCastGuard(unit, index)
+    for _, weapon in pairs(weapon_sessions) do
+      if type(weapon.guard) == "function" and weapon:guard(unit, index) ~= true then
+        return false
+      end
+    end
+    return true
   end
 
   runtime._damage_filter = function()

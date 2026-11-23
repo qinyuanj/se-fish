@@ -186,7 +186,12 @@ function M.new(opts)
         Interact = assert(loadfile('server/Mgr/MgrInteract.lua'))(),
     }
     local mgr = env.managers
-    env.filter = assert(loadfile('server/Mgr/MgrPkFilter.lua'))().Make
+    env.filter = function()
+        return require('server.World.PkDamageFilter').make({
+            party = mgr.Party,
+            zone_markers = require('common.ZoneMarkers'),
+        })
+    end
 
     mgr.Save.PlayerData = mgr.PlayerData
     mgr.PlayerData.Save = mgr.Save

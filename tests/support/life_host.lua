@@ -94,7 +94,8 @@ function M.start(opts)
     on_player_downed = opts.on_player_downed,
     max_health_of = opts.max_health_of,
     players = function() return players end,
-    bait_spots = { Enabled = false },
+    damage_filter = opts.damage_filter or function() return true end,
+    bait_spots = opts.bait_spots or { Enabled = false },
   })
   runtime:start()
   runtime:mark_started()

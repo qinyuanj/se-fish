@@ -34,8 +34,6 @@ describe("持有操作的界面侧", function()
         ctx.previous = { game = _G.game, Vector2 = _G.Vector2, Color = _G.Color,
             REUtil = _G.REUtil, GameUI = _G.GameUI, MgrGameUI = _G.MgrGameUI,
             LocalMsgNotice = _G.LocalMsgNotice }
-        ctx.previousAttack = package.loaded['client.LocalAttackButton']
-        package.loaded['client.LocalAttackButton'] = nil
         _G.MgrGameUI = { SetCustomControlUI = function() end }
         _G.LocalMsgNotice = function(text) ctx.notices[#ctx.notices + 1] = text end
         local world = { Created = ctx.created }
@@ -107,8 +105,6 @@ describe("持有操作的界面侧", function()
     after_each(function()
         if ctx.hudView then ctx.hudView:dispose() end
         if ctx.hostBinding then ctx.hostBinding:dispose() end
-        require('client.LocalAttackButton'):Destroy()
-        package.loaded['client.LocalAttackButton'] = ctx.previousAttack
         for _, key in ipairs({ 'game', 'Vector2', 'Color', 'REUtil', 'GameUI', 'MgrGameUI',
             'LocalMsgNotice' }) do
             _G[key] = ctx.previous[key]

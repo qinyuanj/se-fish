@@ -169,6 +169,7 @@ describe("风神之翼与哥斯拉存活相位宿主接缝（#299）", function(
     data = make_data(player, item_id)
     other_data = make_data(other, other_item)
     runtime = ServerRuntime.new({
+      damage_filter = function() return true end,
       initial_now = 1000,
       remote = re,
       player_data = {

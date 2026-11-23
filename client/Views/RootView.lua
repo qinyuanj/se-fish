@@ -90,6 +90,7 @@ function RootView.mount(root_node, store, options)
     end
   end
   services.store = store
+  services.root_node = root_node
   services.clock = store.clock
 
   local behaviour = spoke_eggy.behaviour(root_node, function(s, self)

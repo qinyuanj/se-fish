@@ -12,6 +12,8 @@ local MainHudEquipPopups = require("client.Views.MainHudEquipPopups")
 local MainHudBackpackView = require("client.Views.MainHudBackpackView")
 local MainHudItemBarView = require("client.Views.MainHudItemBarView")
 local MainHudActionButtonsView = require("client.Views.MainHudActionButtonsView")
+local AttackView = require("client.Views.AttackView")
+local WeaponAim = require("client.WeaponAim")
 local SurvivalOverlayView = require("client.Views.SurvivalOverlayView")
 local GroundLootView = require("client.Views.GroundLootView")
 local ScreenMain = require("client.ScreenHandlers.ScreenMain")
@@ -72,6 +74,22 @@ Task:Spawn(function()
     end
     if ui_root then
         RootView.mount(ui_root, client_store, {
+            services = {
+                send_weapon = function(payload)
+                    local event = _G.REUtil and _G.REUtil:GetRE("WeaponAction")
+                    if event and type(event.FireServer) == "function" then
+                        event:FireServer(payload)
+                    end
+                end,
+                notify = function(text)
+                    local notice = rawget(_G, "LocalMsgNotice")
+                    if type(notice) == "function" then notice(text) end
+                end,
+                aim_direction = function()
+                    local payload = WeaponAim:AttackPayload()
+                    return payload and payload.aim or nil
+                end,
+            },
             hud = {
                 CameraZoomView.spec(),
                 MainHudVitalsView.spec(),
@@ -87,6 +105,7 @@ Task:Spawn(function()
                         hud_drop_resolvers.item_bar = fn
                     end,
                 }),
+                AttackView.spec(),
                 MainHudActionButtonsView.spec({
                     backpack_open = hud_backpack_open,
                     reel_active = hud_reel_active,

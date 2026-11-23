@@ -230,7 +230,7 @@ describe('TestPrizeWeaponEffect', function()
             if name == 'PhysicsService' then return { Raycast = function() return ctx.rayHit end } end
             return nil
         end }
-        ctx.mgr = assert(loadfile('server/Mgr/MgrWeapon.lua'))()
+        ctx.mgr = assert(loadfile('tests/support/weapon_mgr_double.lua'))()
         ctx.data = PlayerData.New({ UserId = 13921, SetAttribute = function() end })
         ctx.data:Init()
         ctx.mgr.PlayerData = { GetDataInst = function() return ctx.data end,
