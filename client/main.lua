@@ -30,6 +30,11 @@ local ReelOverlayView = require("client.Views.ReelOverlayView")
 local CastSourceView = require("client.Views.CastSourceView")
 local ShopView = require("client.Views.ShopView")
 local FishermanView = require("client.Views.FishermanView")
+local CompendiumView = require("client.Views.CompendiumView")
+local GuideView = require("client.Views.GuideView")
+local MessageView = require("client.Views.MessageView")
+local StoryView = require("client.Views.StoryView")
+local GMView = require("client.Views.GMView")
 local SquadView = require("client.Views.SquadView")
 local Util = require("common.Util")
 local ScreenMain = require("client.ScreenHandlers.ScreenMain")
@@ -49,6 +54,15 @@ local ok_now, initial_now = pcall(function() return World:GetServerTime() end) -
 local client_clock = SpokeClock.new(ok_now and Number.IsFiniteNumber(initial_now) and initial_now or 0)
 local client_store, client_store_writer = ClientStore.new({ clock = client_clock })
 client_store_writer:bind_host()
+_G.LocalMsgNotice = function(text) client_store_writer:show_notice(text) end
+local function send_gm(payload) REUtil:GetRE("GMAction"):FireServer(payload) end
+_G.GM = {
+    Coin = function(amount, target) send_gm({ action = "Coin", amount = amount, target = target }) end,
+    Item = function(itemId, count, target) send_gm({ action = "Item", itemId = itemId, count = count or 1, target = target }) end,
+    SetHealth = function(value, target) send_gm({ action = "SetHealth", value = value, target = target }) end,
+    SetHunger = function(value, target) send_gm({ action = "SetHunger", value = value, target = target }) end,
+    NextFish = function(fishId, target) send_gm({ action = "NextFish", fishId = fishId, target = target }) end,
+}
 _G.ClientSpoke = { Store = client_store, Clock = client_store.clock }
 
 local hud_backpack_open = spoke.State.new("ClientMain.hud_backpack_open", false)
@@ -74,6 +88,7 @@ local squad_rescue_view_state = SquadView.rescue_state({
     get_local_player = function() return Players.LocalPlayer end,
 })
 local action_seq = 0
+local compendium_seq, records_seq = 0, 0
 local function next_action_seq()
     action_seq = action_seq + 1
     return action_seq
@@ -126,6 +141,16 @@ Task:Spawn(function()
                 send_lottery = function(payload) REUtil:GetRE("LotteryAction"):FireServer(payload) end,
                 send_blindbox = function(payload) REUtil:GetRE("BlindboxAction"):FireServer(payload) end,
                 send_platform = function(payload) REUtil:GetRE("PlatformAction"):FireServer(payload) end,
+                send_story = function(payload) REUtil:GetRE("StoryRead"):FireServer(payload) end,
+                send_gm = send_gm,
+                request_compendium = function()
+                    compendium_seq = compendium_seq + 1
+                    REUtil:GetRE("CompendiumRequest"):FireServer({ seq = compendium_seq })
+                end,
+                request_records = function(fishId)
+                    records_seq = records_seq + 1
+                    REUtil:GetRE("RecordsRequest"):FireServer({ fishId = fishId, seq = records_seq })
+                end,
                 request_blindbox_state = function() REUtil:GetRE("BlindboxStateRequest"):FireServer() end,
                 local_character = function()
                     return Players.LocalPlayer and Players.LocalPlayer.Character or nil
@@ -200,10 +225,7 @@ Task:Spawn(function()
                         event:FireServer(payload)
                     end
                 end,
-                notify = function(text)
-                    local notice = rawget(_G, "LocalMsgNotice")
-                    if type(notice) == "function" then notice(text) end
-                end,
+                notify = function(text) client_store_writer:show_notice(text) end,
                 aim_direction = function()
                     local payload = WeaponAim:AttackPayload()
                     return payload and payload.aim or nil
@@ -244,6 +266,10 @@ Task:Spawn(function()
                     end,
                 }),
                 AttackView.spec(),
+                GuideView.spec(),
+                MessageView.spec(),
+                CompendiumView.entry_spec(),
+                GMView.entry_spec(),
                 GrillView.spec(),
                 BlindboxView.entry_spec(),
                 PlatformShopView.entry_spec(),
@@ -288,6 +314,9 @@ Task:Spawn(function()
                 lottery = LotteryView.modal_spec(),
                 blindbox = BlindboxView.modal_spec(),
                 platform = PlatformShopView.modal_spec(),
+                compendium = CompendiumView.modal_spec(),
+                story = StoryView.modal_spec(),
+                gm = GMView.modal_spec(),
             },
             docks = {
                 shop = ShopView.bubble_spec({ anchors = (function()
@@ -334,8 +363,6 @@ _G.MgrGameUI:HideLiftButton()
 _G.MgrGameUI:HideNativeHealth()
 
 local LocalMotorUnitCtrl = require("client.LocalMotorUnitCtrl")
-local LocalGM = require("client.LocalGM")
-local ScreenCompendium = require('client.ScreenHandlers.ScreenCompendium')
 
 
 local AbilityAPI = require("client.packages.ability_system.api")
@@ -346,15 +373,7 @@ end
 Task:Spawn(function() 
     LocalMotorUnitCtrl:Start()
     _G.MgrGameUI:OpenScreen('ScreenMain')
-    LocalGM:Start()
-    _G.MgrGameUI:StartGM()
+    REUtil:GetRE("RequestQuest"):FireServer()
+    REUtil:GetRE("RequestStory"):FireServer()
 end)
-
-Task:Spawn(function() ScreenCompendium:Start() end)
-Task:Delay(1, function() 
-    _G.MgrGameUI:OpenScreen("ScreenMsg")
-end)
-
-
-
 

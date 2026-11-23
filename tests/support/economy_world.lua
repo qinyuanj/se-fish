@@ -48,16 +48,28 @@ function M.new()
   GameCfg.Platform.Placeholder.Enabled = false
 
   env.values, env.queue, env.events, env.rolls = {}, {}, {}, {}
+  env.recordReads, env.recordWrites = 0, 0
+  env.requestSeq = {}
+  env.channels, env.online_players = {}, {}
+  env.archive = { completed = false, queries = {}, submissions = {} }
   env.inRange = true
   env.now = 1000
   env.goodsSignal = signal()
   local store = {
     GetAsync = function(_, key)
-      if env.failReads then error("测试读档失败") end
+      if key:sub(1, 4) == "rec:" then env.recordReads = env.recordReads + 1 end
+      if env.failReads or (key:sub(1, 4) == "rec:" and env.failRecordReads) then error("测试读档失败") end
       return env.values[key]
     end,
     UpdateAsync = function(_, key, transform)
-      if env.failWrites then error("测试写档失败") end
+      if key:sub(1, 4) == "rec:" then
+        env.recordWrites = env.recordWrites + 1
+        if env.recordWriteFailures and env.recordWriteFailures > 0 then
+          env.recordWriteFailures = env.recordWriteFailures - 1
+          error("测试纪录写入失败")
+        end
+      end
+      if env.failWrites or (key:sub(1, 4) == "rec:" and env.failRecordWrites) then error("测试写档失败") end
       local value = transform(env.values[key])
       if value then env.values[key] = value end
       return value
@@ -76,7 +88,19 @@ function M.new()
       elseif name == "World" then
         return { GetServerTime = function() return env.now end }
       elseif name == "Players" then
-        return { GetPlayers = function() return {} end }
+        return { GetPlayers = function() return env.online_players end }
+      elseif name == "ArchiveService" then
+        return {
+          IsAchievementCompleted = function(_, player, id)
+            if env.archive.queryError then error("archive query failed") end
+            env.archive.queries[#env.archive.queries + 1] = { player = player, id = id }
+            return env.archive.completed
+          end,
+          SetAchievementProgress = function(_, player, id, value)
+            if env.archive.submitError then error("archive submit failed") end
+            env.archive.submissions[#env.archive.submissions + 1] = { player = player, id = id, value = value }
+          end,
+        }
       elseif name == "CommodityService" then
         return { ShowGoodsPurchasePanel = function() end, GoodsPurchaseCompleted = env.goodsSignal }
       end
@@ -84,12 +108,15 @@ function M.new()
   }
   _G.REUtil = {
     GetRE = function(_, name)
-      return {
-        FireClient = function(_, player, value)
-          env.events[#env.events + 1] = { name = name, player = player, value = value }
-        end,
-        OnServerEvent = signal(),
-      }
+      if not env.channels[name] then
+        env.channels[name] = {
+          FireClient = function(_, player, value)
+            env.events[#env.events + 1] = { name = name, player = player, value = value }
+          end,
+          OnServerEvent = signal(),
+        }
+      end
+      return env.channels[name]
     end,
     CheckRECD = function() return false end,
   }
@@ -145,6 +172,7 @@ function M.new()
   env.platform:Start()
 
   env.player = make_player(1472)
+  env.online_players = { env.player }
   env.runtime:on_player_added(env.player)
   env.players:OnPlayerAdded(env.player)
   env:drain()
@@ -167,6 +195,66 @@ function World:tearDown()
   GameCfg.Platform.Placeholder.Enabled = self.oldPlaceholder
   GameCfg.Platform.Placeholder.AllowInPublish = self.oldAllowPlaceholder
   for key, row in pairs(GameCfg.Platform.Goods) do row.goodsId = self.oldGoodsIds[key] end
+end
+
+function World:addPlayer(id, name)
+  local player = make_player(id)
+  player.Name = name or player.Name
+  self.online_players[#self.online_players + 1] = player
+  self.runtime:on_player_added(player)
+  self.players:OnPlayerAdded(player)
+  self:drain()
+  return player, self.players:GetDataInst(player)
+end
+
+function World:usePlayer(player)
+  self.player = player
+  self.data = self.players:GetDataInst(player)
+  return self.data
+end
+
+function World:fire(name, payload, player)
+  local channel = self.channels[name]
+  assert(channel and channel.OnServerEvent, "宿主远程频道不存在: " .. tostring(name))
+  channel.OnServerEvent:Fire(player or self.player, payload)
+end
+
+function World:saved(userId)
+  return self.values[GameCfg.Save.KeyPrefix .. tostring(userId)]
+end
+
+function World:request(name, payload)
+  local channel = self.channels[name]
+  assert(channel and channel.OnServerEvent, "宿主远程频道不存在: " .. tostring(name))
+  if (name == "CompendiumRequest" or name == "RecordsRequest") and type(payload) == "table" and payload.seq == nil then
+    self.requestSeq[name] = (self.requestSeq[name] or 0) + 1
+    local copy = {}
+    for key, value in pairs(payload) do copy[key] = value end
+    copy.seq = self.requestSeq[name]
+    payload = copy
+  end
+  channel.OnServerEvent:Fire(self.player, payload)
+  self:drain()
+end
+
+function World:landing(fishId, mult, reelSerial)
+  local accepted, reason = self.runtime:record_landing(self.player, {
+    fishId = fishId, mult = mult, reelSerial = reelSerial,
+  })
+  self:drain()
+  return accepted, reason
+end
+
+function World:notify(kind, payload)
+  local accepted = self.runtime:notify_quest(kind, self.player, payload)
+  self:drain()
+  return accepted
+end
+
+function World:advance(seconds)
+  self.now = self.now + seconds
+  self.runtime:step(seconds, self.now)
+  self:drain()
 end
 
 function World:messages(name)
@@ -277,6 +365,7 @@ function World:reconnect()
   self.players:OnPlayerRemoving(old)
   self:drain()
   self.player = make_player(old.UserId, old.Character)
+  self.online_players = { self.player }
   self.runtime:on_player_added(self.player)
   self.players:OnPlayerAdded(self.player)
   self:drain()

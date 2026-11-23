@@ -61,7 +61,7 @@ function Mgr:Publish(player, notice)
         player:SetAttribute('QuestStep', state.step)
         player:SetAttribute('QuestText', text)
     end)
-    if not ok then print('[MgrQuest] 属性发布失败', player.UserId, tostring(err)) end
+    if not ok then print('[PlayerQuest] 属性发布失败', player.UserId, tostring(err)) end
     self:Send(player, {
         step = state.step, total = #c.Steps, count = state.count, need = current and current.Need or 0,
         text = text, done = current == nil, notice = notice,
@@ -101,9 +101,9 @@ function Mgr:Notify(kind, player, payload)
         local finished = c.Steps[state.step - 1]
         local nextStep = c.Steps[state.step]
         notice = nextStep and string.format(c.NextNotice, nextStep.Text) or c.DoneText
-        print('[MgrQuest] 完成', player.UserId, 'step=' .. tostring(state.step - 1), finished.Kind, tostring(payload.eventId))
+        print('[PlayerQuest] 完成', player.UserId, 'step=' .. tostring(state.step - 1), finished.Kind, tostring(payload.eventId))
     else
-        print('[MgrQuest] 计数', player.UserId, 'step=' .. tostring(state.step), kind,
+        print('[PlayerQuest] 计数', player.UserId, 'step=' .. tostring(state.step), kind,
             tostring(state.count) .. '/' .. tostring(c.Steps[state.step].Need), tostring(payload.eventId))
     end
     self:Publish(player, notice)
@@ -152,7 +152,7 @@ function Mgr:Drain(player)
         if self.Queues[player.UserId] ~= queue then return end
         queue.writing = false
         if not written then
-            print('[MgrQuest] 任务未落账', player.UserId, tostring(result))
+            print('[PlayerQuest] 任务未落账', player.UserId, tostring(result))
             queue.failed = true
             local leave = queue.leave
             queue.leave = nil
@@ -167,7 +167,7 @@ function Mgr:Drain(player)
             local nextStep = c.Steps[restored.step]
             notice = nextStep and string.format(c.NextNotice, nextStep.Text) or c.DoneText
         end
-        print('[MgrQuest] 任务落账', player.UserId, 'step=' .. restored.step,
+        print('[PlayerQuest] 任务落账', player.UserId, 'step=' .. restored.step,
             'count=' .. restored.count, fact.eventId)
         self:Publish(player, notice)
         if #queue.events == 0 then queue.tail = nil end
@@ -189,7 +189,7 @@ function Mgr:FlushBeforeLeave(player, done)
     if self.Save:Status(player.UserId).autosavePaused then
         queue.failed = true
         queue.leave = nil
-        print('[MgrQuest] 保存已暂停，离场放弃未落账事实', player.UserId)
+        print('[PlayerQuest] 保存已暂停，离场放弃未落账事实', player.UserId)
         return false
     end
     queue.leaving, queue.leave = true, done
@@ -208,6 +208,33 @@ function Mgr:Start()
         self:OnPlayerAdded(player)
         self:Publish(player)
     end)
+end
+
+
+local function managed_connect(scope, signal, callback)
+    local connection = signal:Connect(callback)
+    scope:on_cleanup(function() connection:Disconnect() end)
+end
+
+-- 任务状态在存档就绪后与玩家树同生共死；事实写入仍使用 MgrSave 的同一原子 draft。
+function Mgr.mount(scope, player_tree, opts)
+    local player = opts.player
+    local session = setmetatable({
+        States = {}, Players = {}, Queues = {}, PlayerData = opts.player_data, Save = opts.save,
+    }, { __index = Mgr })
+    player_tree.quest = session
+    session:OnPlayerAdded(player)
+    managed_connect(scope, _G.REUtil:GetRE('RequestQuest').OnServerEvent, function(actor)
+        if actor ~= player or _G.REUtil:CheckRECD(actor, 'RequestQuest', 0.5) then return end
+        session:OnPlayerAdded(actor)
+        session:Publish(actor)
+    end)
+    scope:subscribe(opts.clock.on_frame, function() session:Drain(player) end)
+    scope:on_cleanup(function()
+        session:OnPlayerRemoving(player)
+        if player_tree.quest == session then player_tree.quest = nil end
+    end)
+    return session
 end
 
 return Mgr

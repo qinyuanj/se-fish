@@ -7,10 +7,7 @@ local CloseScreenRE = REUtil:GetRE("CloseScreenRE")
 local curShowMap = {}
 
 local ScreenHandlerLoaders = {
-    ScreenCompendium = function() return require("client.ScreenHandlers.ScreenCompendium") end,
-    ScreenGM = function() return require("client.ScreenHandlers.ScreenGM") end,
     ScreenMain = function() return require("client.ScreenHandlers.ScreenMain") end,
-    ScreenMsg = function() return require("client.ScreenHandlers.ScreenMsg") end,
 }
 
 function MgrGameUI:GetScreen(screenName)
@@ -162,13 +159,6 @@ function MgrGameUI:SetControlUI(visible)
     for k, v in pairs(AllCustomUINodeMap) do
         k.Visible = visible
     end
-end
-
-function MgrGameUI:StartGM()
-    local GameCfg = require('common.GameCfg')
-    if not (GameCfg.Debug and GameCfg.Debug.Enabled) then return end
-    local handler = require('client.ScreenHandlers.ScreenGM')
-    if handler then handler:Start() end
 end
 
 _G.MgrGameUI = MgrGameUI

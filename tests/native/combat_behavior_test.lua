@@ -7,7 +7,7 @@
 -- 迁移纪律：
 --   * 旧 setUp/tearDown 的替身（全局引擎 + 4 个 package.loaded 管理器模块）改成逐案例 before_each/after_each，
 --     快照在夹具动作之前取，恢复在案例失败时也执行（Busted 的 after_each 在 before_each 抛错后仍跑）；
---   * MgrVitals / MgrFishCarrier / MgrGM / server.AbilityAPI 都以模块缓存桩注入，行为在
+--   * MgrVitals / MgrFishCarrier / PlayerGM / server.AbilityAPI 都以模块缓存桩注入，行为在
 --     server/AbilityBehaviors/melee_hit.lua 与 eel_discharge.lua 这两个公开接缝上观察，不伸手进实现；
 --   * server/main.lua 的接线守卫读源码断言：assertStrContains 的 plain 子串语义用
 --     assert.matches(needle, haystack, nil, true) 保留（`.` 在 Lua pattern 里是任意字符，不能当 pattern 跑）。
@@ -139,7 +139,7 @@ describe('TestMainCombatWiring', function()
             'local Life = WorldRuntime.life',
             'local FishTree = require("server.World.FishTree")',
             'Modifier = ModifierBridge',
-            'GM = MgrMap.MgrGM',
+            'GM = PlayerGM',
             'function runtime:receive_landed',
         }) do
             assert.message('server/main.lua 缺接线：' .. needle).matches(needle, src, nil, true)
@@ -155,7 +155,7 @@ describe('TestMeleeHitEntry', function()
             game = rawget(_G, 'game'), Vector3 = rawget(_G, 'Vector3'), Quaternion = rawget(_G, 'Quaternion'),
             vitals = package.loaded['server.Mgr.MgrVitals'],
             carrier = package.loaded['server.World.FishCarrier'],
-            gm = package.loaded['server.Mgr.MgrGM'],
+            gm = package.loaded['server.World.PlayerGM'],
             vendorApi = package.loaded['server.packages.ability_system.api'],
             api = package.loaded['server.AbilityAPI'],
             swing = package.loaded['server.SwingRegistry'],
@@ -194,11 +194,11 @@ describe('TestMeleeHitEntry', function()
         package.loaded['server.World.FishCarrier'] = {
             ResolveCarrier = function(_, target) return target == ctx.target and ctx.carrier or nil end,
         }
-        package.loaded['server.Mgr.MgrGM'] = { GetMeleeDamage = function(_, _, damage) return damage end }
+        package.loaded['server.World.PlayerGM'] = { GetMeleeDamage = function(_, _, damage) return damage end }
         ctx.services = { Vitals = package.loaded['server.Mgr.MgrVitals'],
-            FishCarrier = package.loaded['server.World.FishCarrier'], GM = package.loaded['server.Mgr.MgrGM'],
+            FishCarrier = package.loaded['server.World.FishCarrier'], GM = package.loaded['server.World.PlayerGM'],
             Modifier = {} }
-        for _, name in ipairs({ 'server.Mgr.MgrVitals', 'server.World.FishCarrier', 'server.Mgr.MgrGM' }) do
+        for _, name in ipairs({ 'server.Mgr.MgrVitals', 'server.World.FishCarrier', 'server.World.PlayerGM' }) do
             package.loaded[name] = setmetatable({}, { __index = function()
                 error('近战行为不应再加载上层管理器: ' .. name) end })
         end
@@ -223,7 +223,7 @@ describe('TestMeleeHitEntry', function()
         _G.Quaternion = saved.Quaternion
         package.loaded['server.Mgr.MgrVitals'] = saved.vitals
         package.loaded['server.World.FishCarrier'] = saved.carrier
-        package.loaded['server.Mgr.MgrGM'] = saved.gm
+        package.loaded['server.World.PlayerGM'] = saved.gm
         package.loaded['server.AbilityAPI'] = saved.api
         package.loaded['server.SwingRegistry'] = saved.swing
         package.loaded['server.packages.ability_system.api'] = saved.vendorApi

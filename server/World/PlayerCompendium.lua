@@ -97,9 +97,27 @@ function Mgr:RecordLanding(player, event)
     return true
 end
 
+local function finish_leave(queue)
+    if queue and queue.leaving and not queue.writing and #queue.events == 0 then
+        local done = queue.leave
+        queue.leave = nil
+        if done then done() end
+    end
+end
+
+function Mgr:FlushBeforeLeave(player, done)
+    local queue = player and self.Queues[player.UserId]
+    if not queue or queue.player ~= player or (#queue.events == 0 and not queue.writing) then return false end
+    queue.leaving, queue.leave = true, done
+    self:Drain(player)
+    finish_leave(queue)
+    return true
+end
+
 function Mgr:Drain(player)
     local queue = self.Queues[player.UserId]
-    if not queue or queue.player ~= player or #queue.events == 0 then return end
+    if not queue or queue.player ~= player or queue.writing then return end
+    if #queue.events == 0 then finish_leave(queue) return end
     local data = self.PlayerData and self.PlayerData:GetDataInst(player)
     if not data then return end
     local onlyEvent = #queue.events == 1
@@ -108,13 +126,15 @@ function Mgr:Drain(player)
     if not operation then
         if mode ~= 'pending' then
             table.remove(queue.events, 1)
+            finish_leave(queue)
             return onlyEvent and mode or nil
         end
         return
     end
     table.remove(queue.events, 1)
-    if mode == 'replay' then return onlyEvent and 'replay' or nil end
+    if mode == 'replay' then finish_leave(queue) return onlyEvent and 'replay' or nil end
     local weight = self:Weight(event.fishId, event.mult)
+    queue.writing = true
     self.Save:Execute(player, data, operation, function(draft)
         if self.Quest and self.Quest.RecordFact then
             self.Quest:RecordFact(draft, 'Land', { itemId = event.fishId,
@@ -122,17 +142,20 @@ function Mgr:Drain(player)
         end
         return apply(draft, event, weight)
     end, function(written, result)
+        queue.writing = false
         if not written then
-            print('[MgrCompendium] 图鉴未落账', player.UserId, event.fishId, tostring(result))
+            finish_leave(queue)
+            print('[PlayerCompendium] 图鉴未落账', player.UserId, event.fishId, tostring(result))
             return
         end
-        print('[MgrCompendium] 图鉴', player.UserId, result.fishId,
+        print('[PlayerCompendium] 图鉴', player.UserId, result.fishId,
             'weight=' .. tostring(result.weight), 'best=' .. tostring(result.best),
             'count=' .. tostring(result.count), 'total=' .. tostring(result.total))
         if self.Quest and self.Quest.RefreshCommitted then self.Quest:RefreshCommitted(player, data) end
         if result.record and self.Records then
             self.Records:NoteLanding(player, result.fishId, result.weight)
         end
+        finish_leave(queue)
     end)
 end
 
@@ -145,6 +168,32 @@ function Mgr:OnPlayerRemoving(player)
     if queue and queue.player == player then self.Queues[player.UserId] = nil end
     local request = self.LastSeq[player.UserId]
     if request and request.player == player then self.LastSeq[player.UserId] = nil end
+end
+
+
+local function managed_connect(scope, signal, callback)
+    local connection = signal:Connect(callback)
+    scope:on_cleanup(function() connection:Disconnect() end)
+end
+
+-- 图鉴会话由 PlayerTree Stage 1 拥有；队列、查询去重与存档生命周期随玩家树销毁。
+function Mgr.mount(scope, player_tree, opts)
+    local player = opts.player
+    local session = setmetatable({
+        Queues = {}, LastSeq = {}, PlayerData = opts.player_data, Save = opts.save,
+        Quest = player_tree.quest, Records = opts.records,
+    }, { __index = Mgr })
+    player_tree.compendium = session
+    managed_connect(scope, _G.REUtil:GetRE('CompendiumRequest').OnServerEvent, function(actor, payload)
+        if actor ~= player or _G.REUtil:CheckRECD(actor, 'CompendiumRequest', GameCfg.Compendium.RequestCooldownSec) then return end
+        session:Handle(actor, payload)
+    end)
+    scope:subscribe(opts.clock.on_frame, function() session:Drain(player) end)
+    scope:on_cleanup(function()
+        session:OnPlayerRemoving(player)
+        if player_tree.compendium == session then player_tree.compendium = nil end
+    end)
+    return session
 end
 
 return Mgr

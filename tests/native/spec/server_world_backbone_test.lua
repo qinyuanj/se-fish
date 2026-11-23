@@ -941,7 +941,7 @@ describe("服务端入口接线：server/main.lua 宿主测试双端到端集成
       CastAbility = function() return true end,
     }
 
-    for _, name in ipairs({ "MgrSave", "MgrPlayerData", "MgrQuest", "MgrStory" }) do
+    for _, name in ipairs({ "MgrSave", "MgrPlayerData" }) do
       mgrs[name] = assert(loadfile("server/Mgr/" .. name .. ".lua"))()
     end
     mgrs.MgrPkFilter = { Make = function() return function() return true end end }

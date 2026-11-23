@@ -32,11 +32,11 @@ function Mgr:Confirm(player,data,key)
         end,function(ok,result)
             if self.PlayerData:GetDataInst(player)~=data then return end
             self.Busy[player.UserId]=nil
-            if not ok then print('[MgrAchievements] 平台确认落账失败',player.UserId,key,tostring(result)) end
+            if not ok then print('[PlayerAchievements] 平台确认落账失败',player.UserId,key,tostring(result)) end
         end)
         if not accepted and self.PlayerData:GetDataInst(player)==data then
             self.Busy[player.UserId]=nil
-            print('[MgrAchievements] 平台确认暂不能落账，保留补交',player.UserId,key,tostring(reason))
+            print('[PlayerAchievements] 平台确认暂不能落账，保留补交',player.UserId,key,tostring(reason))
         end
     else
         data.Extra.achievementDelivered=data.Extra.achievementDelivered or {}
@@ -62,12 +62,12 @@ function Mgr:Update()
                     if self.Archive then
                         local ok,done=pcall(self.Archive.IsAchievementCompleted,self.Archive,player,id)
                         if not ok then
-                            print('[MgrAchievements] 平台查询失败，保留补交',player.UserId,key,tostring(done))
+                            print('[PlayerAchievements] 平台查询失败，保留补交',player.UserId,key,tostring(done))
                         elseif done==true then
                             if not placeholder then self:Confirm(player,data,key) end
                         elseif done==false then
                             local sent,err=pcall(self.Archive.SetAchievementProgress,self.Archive,player,id,1)
-                            if not sent then print('[MgrAchievements] 平台提交失败，保留补交',player.UserId,key,tostring(err)) end
+                            if not sent then print('[PlayerAchievements] 平台提交失败，保留补交',player.UserId,key,tostring(err)) end
                         end
                     end
                 end
@@ -84,6 +84,27 @@ function Mgr:Start()
     self.World=game:GetService('World')
     self.Players=game:GetService('Players')
     self.Archive=game:GetService('ArchiveService')
+end
+
+
+-- 成就补交由玩家树的 SpokeClock 驱动；本地完成标记先于平台交付，失败保留补交。
+function Mgr.mount(scope, player_tree, opts)
+    local player = opts.player
+    local ok, archive = pcall(function() return game:GetService('ArchiveService') end)
+    local session = setmetatable({
+        Busy = {}, RetryAt = {}, PlayerData = opts.player_data, Save = opts.save,
+        Players = { GetPlayers = function() return { player } end },
+        World = { GetServerTime = function() return opts.clock.now() end },
+        Archive = ok and archive or nil,
+    }, { __index = Mgr })
+    player_tree.achievements = session
+    scope:subscribe(opts.clock.on_second, function() session:Update() end)
+    scope:on_cleanup(function()
+        session:OnPlayerRemoving(player)
+        if player_tree.achievements == session then player_tree.achievements = nil end
+    end)
+    session:Update()
+    return session
 end
 
 return Mgr

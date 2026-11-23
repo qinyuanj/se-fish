@@ -15,7 +15,7 @@ function Mgr:Fallback(player, state, reason)
     if state.phase ~= 'pending' then return end
     state.phase = 'fallback'
     state.deadline = nil
-    print('[MgrStory] 降级 开场剧情', player.UserId, '原因=' .. tostring(reason),
+    print('[PlayerStory] 降级 开场剧情', player.UserId, '原因=' .. tostring(reason),
         '影响=展示可读对话，正式剧情表现留待资源验收')
     self:SendFallback(player)
 end
@@ -49,13 +49,13 @@ function Mgr:Begin(player)
     if not self.Service then return self:Fallback(player, state, 'StoryService 不可用') end
     local ok, err = pcall(function() self.Service:StartStory(player, storyId) end)
     if not ok then return self:Fallback(player, state, 'StartStory 报错 ' .. tostring(err)) end
-    print('[MgrStory] StartStory', player.UserId, storyId)
+    print('[PlayerStory] StartStory', player.UserId, storyId)
     if state.phase == 'pending' then state.deadline = self:Now() + cfg().StartTimeoutSec end
 end
 
 function Mgr:OnSignal(name, player, storyId)
     local state = player and self.States[player.UserId]
-    print('[MgrStory]', name, player and player.UserId, tostring(storyId), state and state.phase)
+    print('[PlayerStory]', name, player and player.UserId, tostring(storyId), state and state.phase)
     if not state or state.player ~= player or storyId ~= cfg().StoryId or storyId == nil then return end
     if name == 'OnStoryStart' and state.phase == 'pending' then
         state.phase = 'started'
@@ -88,14 +88,14 @@ function Mgr:PersistRead(player, state)
         end
     end
     local data = self.PlayerData and self.PlayerData:GetDataInst(player)
-    if self.Save and not data then return true end
+    if self.Save and not data then return false end
     if not self.Save then
         state.phase = 'read'
         _G.REUtil:GetRE('StoryState'):FireClient(player, { read = true, readKey = state.readKey })
         return true
     end
     local operation = self.Save:NextOperation(player, 'story-read')
-    if not operation then return true end
+    if not operation then return false end
     local previousPhase = state.phase
     state.phase = 'saving'
     local accepted = self.Save:Execute(player, data, operation, function(draft)
@@ -107,7 +107,7 @@ function Mgr:PersistRead(player, state)
         if not written then
             state.phase = previousPhase
             state.failed = true
-            print('[MgrStory] 已读未落账', player.UserId, tostring(result))
+            print('[PlayerStory] 已读未落账', player.UserId, tostring(result))
             _G.REUtil:GetRE('StoryState'):FireClient(player, {
                 read = false, readKey = state.readKey, text = '已读尚未保存，请稍后重进再试。',
             })
@@ -117,7 +117,7 @@ function Mgr:PersistRead(player, state)
             return
         end
         state.phase, state.completeSource, state.deadline = 'read', nil, nil
-        print('[MgrStory] 已读落账', player.UserId, state.readKey)
+        print('[PlayerStory] 已读落账', player.UserId, state.readKey)
         _G.REUtil:GetRE('StoryState'):FireClient(player, result)
         local leave = state.leave
         state.leave = nil
@@ -133,11 +133,20 @@ function Mgr:FlushBeforeLeave(player, done)
         or not state.completeSource or self.Save:Status(player.UserId).loadState ~= 'ready' then return false end
     if self.Save:Status(player.UserId).autosavePaused then
         state.failed, state.leave = true, nil
-        print('[MgrStory] 保存已暂停，离场保留未读', player.UserId)
+        print('[PlayerStory] 保存已暂停，离场保留未读', player.UserId)
         return false
     end
     state.leave = done
-    if state.phase ~= 'saving' then self:PersistRead(player, state) end
+    local function attempt()
+        state.retrying = nil
+        if self.States[player.UserId] ~= state or not state.leave or state.phase == 'saving' then return end
+        if self:PersistRead(player, state) or state.failed or not state.leave then return end
+        if not state.retrying then
+            state.retrying = true
+            game:GetService('Task'):Spawn(attempt)
+        end
+    end
+    attempt()
     return true
 end
 
@@ -183,7 +192,7 @@ function Mgr:Start()
     self.World = game:GetService('World')
     local ok, service = pcall(function() return game:GetService('StoryService') end)
     self.Service = ok and service or nil
-    if not ok then print('[MgrStory] StoryService 不可用', tostring(service)) end
+    if not ok then print('[PlayerStory] StoryService 不可用', tostring(service)) end
     if self.Service then
         for _, name in ipairs({ 'OnStoryStart', 'OnStoryEnd', 'OnStorySkip' }) do
             local signal = self.Service[name]
@@ -203,6 +212,50 @@ function Mgr:Start()
             or _G.REUtil:CheckRECD(player, 'StoryRead', 0.5) then return end
         self:Complete(player, payload.readKey, 'read')
     end)
+end
+
+
+local function managed_connect(scope, signal, callback)
+    local connection = signal:Connect(callback)
+    scope:on_cleanup(function() connection:Disconnect() end)
+end
+
+-- 剧情服务与已读请求均挂在玩家树作用域；正式资源不可用时仍投影可读对话。
+function Mgr.mount(scope, player_tree, opts)
+    local player = opts.player
+    local session = setmetatable({
+        States = {}, Requested = {}, Connections = {}, PlayerData = opts.player_data, Save = opts.save,
+        World = { GetServerTime = function() return opts.clock.now() end },
+    }, { __index = Mgr })
+    local ok, service = pcall(function() return game:GetService('StoryService') end)
+    session.Service = ok and service or nil
+    player_tree.story = session
+    if session.Service then
+        for _, name in ipairs({ 'OnStoryStart', 'OnStoryEnd', 'OnStorySkip' }) do
+            local signal = session.Service[name]
+            if signal then
+                managed_connect(scope, signal, function(actor, storyId)
+                    if actor == player then session:OnSignal(name, actor, storyId) end
+                end)
+            end
+        end
+    end
+    managed_connect(scope, _G.REUtil:GetRE('RequestStory').OnServerEvent, function(actor)
+        if actor ~= player or _G.REUtil:CheckRECD(actor, 'RequestStory', 0.5) then return end
+        session:Begin(actor)
+    end)
+    managed_connect(scope, _G.REUtil:GetRE('StoryRead').OnServerEvent, function(actor, payload)
+        if actor ~= player or type(payload) ~= 'table' or payload.action ~= 'read'
+            or type(payload.readKey) ~= 'string' or _G.REUtil:CheckRECD(actor, 'StoryRead', 0.5) then return end
+        session:Complete(actor, payload.readKey, 'read')
+    end)
+    scope:subscribe(opts.clock.on_frame, function() session:Update() end)
+    session:Begin(player)
+    scope:on_cleanup(function()
+        session:OnPlayerRemoving(player)
+        if player_tree.story == session then player_tree.story = nil end
+    end)
+    return session
 end
 
 return Mgr

@@ -14,18 +14,13 @@ local ServerRuntime = require("server.World.ServerRuntime")
 local AttrLeaf = require("server.World.AttrLeaf")
 local FishCarrier = require("server.World.FishCarrier")
 local FishAi = require("server.World.FishAi")
+local PlayerGM = require("server.World.PlayerGM")
 
 local MgrMap = {
     MgrPlayer = require("server.Mgr.MgrPlayer"),
     MgrPlayerData = require("server.Mgr.MgrPlayerData"),
     MgrAbility = require("server.Mgr.MgrAbility"),
-    MgrGM = require("server.Mgr.MgrGM"),
-    MgrQuest = require("server.Mgr.MgrQuest"),
-    MgrStory = require("server.Mgr.MgrStory"),
     MgrSave = require("server.Mgr.MgrSave"),
-    MgrCompendium = require("server.Mgr.MgrCompendium"),
-    MgrRecords = require("server.Mgr.MgrRecords"),
-    MgrAchievements = require("server.Mgr.MgrAchievements"),
     MgrPlatform = require("server.Mgr.MgrPlatform"),
 }
 
@@ -267,7 +262,7 @@ end
 MgrMap.MgrAbility.BehaviorServices = {
     Vitals = nil,
     Modifier = ModifierBridge,
-    GM = MgrMap.MgrGM,
+    GM = PlayerGM,
 }
 
 -- #302 的抛竿/收线由 PlayerTree 存活相位拥有；这里仅保留 GM 与 FishTree 的公开桥接。
@@ -281,26 +276,14 @@ end
 function CastBridge:SetNextFish(player, fishId)
     return WorldRuntime and WorldRuntime:set_next_fish(player, fishId) or false
 end
-MgrMap.MgrGM.PlayerData = MgrMap.MgrPlayerData
-MgrMap.MgrGM.Cast = CastBridge
-MgrMap.MgrPlayerData.Quest = MgrMap.MgrQuest
+MgrMap.MgrPlayerData.Quest = {
+    Notify = function(_, kind, player, payload)
+        return WorldRuntime and WorldRuntime:notify_quest(kind, player, payload) or false
+    end,
+}
 MgrMap.MgrPlayerData.Vitals = nil
-MgrMap.MgrGM.Vitals = nil
-MgrMap.MgrGM.Save = MgrMap.MgrSave
 MgrMap.MgrPlayerData.Save = MgrMap.MgrSave
-MgrMap.MgrQuest.PlayerData = MgrMap.MgrPlayerData
-MgrMap.MgrQuest.Save = MgrMap.MgrSave
-MgrMap.MgrStory.PlayerData = MgrMap.MgrPlayerData
-MgrMap.MgrStory.Save = MgrMap.MgrSave
-MgrMap.MgrAchievements.PlayerData = MgrMap.MgrPlayerData
-MgrMap.MgrAchievements.Save = MgrMap.MgrSave
-MgrMap.MgrSave.PlayerData = MgrMap.MgrPlayerData
-MgrMap.MgrCompendium.Save = MgrMap.MgrSave
-MgrMap.MgrCompendium.PlayerData = MgrMap.MgrPlayerData
-MgrMap.MgrCompendium.Quest = MgrMap.MgrQuest
-
-MgrMap.MgrCompendium.Records = MgrMap.MgrRecords
-MgrMap.MgrRecords.PlayerData = MgrMap.MgrPlayerData
+MgrMap.MgrSave.PlayerData = MgrMap.MgrPlayerData -- 存档就绪后经 PlayerData 强制首推一次，并启用统一自动存档
 
 MgrMap.MgrPlatform.Save = MgrMap.MgrSave
 MgrMap.MgrPlatform.PlayerData = MgrMap.MgrPlayerData
@@ -359,8 +342,6 @@ WorldRuntime = ServerRuntime.new({
     interact = MgrMap.MgrInteract,
     platform = MgrMap.MgrPlatform,
     fish_carrier = FishCarrier,
-    compendium = MgrMap.MgrCompendium,
-    quest = MgrMap.MgrQuest,
     random = math.random,
     delivery_epoch = tostring({}),
     lottery_in_range = function(player)
@@ -517,11 +498,6 @@ WorldRuntime = ServerRuntime.new({
             end
         end
     end,
-    flush_before_leave = function(player, resume)
-        if MgrMap.MgrQuest:FlushBeforeLeave(player, resume) then return true end
-        if MgrMap.MgrStory:FlushBeforeLeave(player, resume) then return true end
-        return false
-    end,
     on_player_removing = function(player, active)
         invoke('MgrPlayerData', MgrMap.MgrPlayerData, 'OnPlayerRemoving', player)
         if active then
@@ -541,7 +517,6 @@ local fishHost = WorldRuntime.fish_host
 fishHost.Cast = CastBridge
 fishHost.Ability = MgrMap.MgrAbility
 fishHost.AbilityApi = AbilityAPI
-fishHost.Quest = MgrMap.MgrQuest
 fishHost.Vitals = Life
 fishHost.Ai = FishAi
 FishAi.FishUnit = fishHost
@@ -553,7 +528,6 @@ FishCarrier.DamageListener = function(carrier, actual, hit)
 end
 FishAi:Start()
 MgrMap.MgrPlayerData.Vitals = Life
-MgrMap.MgrGM.Vitals = Life
 MgrMap.MgrAbility.Vitals = Life
 MgrMap.MgrAbility.BehaviorServices.Vitals = Life
 
