@@ -12,7 +12,7 @@
 
 **约束**（[S0]、[S1]）：使用 SE 公开 API，核对成员签名、对象类型和运行端；查询结果可能为空时先判空；位置、碰撞、文本等成员须从具有该能力的具体类型访问，普通 table 不能替代引擎数据类型；沙盒的 `getmetatable` 只接受 table。`game`、`Enums`、`Vector3`、`Color`、`Quaternion`、`CFrame`、`RemoteEvent` 是全局入口；`EggyAPI.lua` 只是类型存根。common 模块在双端独立运行，table 修改不会自动跨端同步，普通 Lua 变量也不提供跨对局持久化。
 
-**项目规则**：新增或变更 API 调用时，先查当前官方知识库（`editor-cli docs search "<原始问题>" --docset game-api --limit 3`），再以官方 Game API 的类型、签名、运行端与废弃状态为准；本地参考或旧 SDK 只用于定位关键词。签名、语义与运行端都有依据才算查清，未查到的名称标 `[未查证]`，不作为已可用接口交付。文档与实例不一致时记录并验证；CLI 命中的编辑时 `editor:GetService(...)` 示例不能用于玩法运行时。
+**项目规则**：新增或变更 API 调用时，先运行 `lua tools/cli.lua docs search <查询>` 查本地 SE 官方缓存；缓存为空先 `docs sync`，缺少的成员页用 `docs sync api <类型名或官方 URL>` 按需同步后再查。缓存没有所需的精确成员详情时，走 `editor-cli api get <名字>` / 官方 `game_api` 单页兜底，并与本地 `EggyAPI.lua` 存根核对版本差异，不用通用 Web 搜索结果替代官方依据。签名、语义与运行端都有依据才算查清，未查到的名称标 `[未查证]`，不作为已可用接口交付。文档与实例不一致时记录并验证；CLI 命中的编辑时 `editor:GetService(...)` 示例不能用于玩法运行时。
 
 ## 模块与状态归属
 
@@ -39,7 +39,7 @@
 **项目规则**（依据 [S8]）：
 
 - 通过 [REUtil](common/REUtil.lua) 获取已有事件，双端共用事件名与协议定义；修改旧的多实参消息时，同时迁移发送端与接收端。
-- 服务端按五层校验：身份 → 类型 → 频率 → 业务条件 → 结果下发（[RateLimit](common/RateLimit.lua) 管滑动窗，`CheckRECD` 是每通道固定窗口的粗拦截），全部通过后才改权威状态；限频不替代其他校验。数值字段须经 [Number.IsFiniteNumber](common/Number.lua) 排除 `NaN` 与 `±math.huge`，再做整数、范围等业务判断。
+- 服务端按五层校验：身份 → 类型 → 频率 → 业务条件 → 结果下发（[RateLimit](common/RateLimit.lua) 管滑动窗，`CheckRECD` 是每通道固定窗口的粗拦截），全部通过后才改权威状态；限频不替代其他校验。
 - 客户端先监听响应，再发请求；收到快照先检查结构，再更新显示。需要覆盖迟加入或重连时，提供只读、幂等的 ready / snapshot 握手。
 - 玩家离开时清理按玩家保存的限频表和临时请求状态。
 
