@@ -1,6 +1,6 @@
 # 0026 运行期单位不建全局工厂，只定四条规则
 
-**Status**: accepted
+**Status**: partially superseded by [ADR-0032](0032-spoke-native-lifecycle-architecture.md)（其中「以 `OwnedUnits.lua` 作为运行期单位回收唯一方案」的决定由 ADR-0032 接管：新代码与已迁移的 Spoke 切片改为在建点同一作用域通过 `s:on_cleanup` 销毁单位，`OwnedUnits.lua` 转入棘轮淘汰债务；其余「不建全局单位工厂、不建统一挂载容器、命名规范、不新增第四套事件桥」继续有效）
 
 **Unit / 单位**：引擎对象树中的对象本体，可由编辑器预置或 `CreateUnit` 创建。Unit 不等于游戏实体：一个游戏实体可含多个单位，界面节点也是单位。运行期建点清单见 #206 台账。
   _Avoid_: 对象、实体、game object、object（指单位时）
