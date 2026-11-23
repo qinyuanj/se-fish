@@ -234,10 +234,13 @@ function PlayerLife.mount(s3, player_tree, opts)
     end
   end
 
-  local function apply_walk()
+  local function apply_walk(base_override)
     local controller = controller_of(player)
     if not controller then return end
-    local base = memos.walk_speed and memos.walk_speed:now()
+    local base = base_override
+    if not finite_number(base) or base <= 0 then
+      base = memos.walk_speed and memos.walk_speed:now()
+    end
     if not finite_number(base) or base <= 0 then
       local read = read_health(player) and nil
       local ok, current = pcall(function() return controller.WalkSpeed end)
@@ -262,10 +265,23 @@ function PlayerLife.mount(s3, player_tree, opts)
   end
 
   local function reapply_growth()
+    local controller = controller_of(player)
+    local before
+    if controller then
+      local ok, current = pcall(function() return controller.WalkSpeed end)
+      if ok then before = current end
+    end
     if type(growth_writer) == "function" then
       pcall(growth_writer, player)
     end
-    apply_walk()
+    local grown
+    if controller and type(growth_writer) == "function" then
+      local ok, current = pcall(function() return controller.WalkSpeed end)
+      if ok and finite_number(current) and current > 0 and current ~= before then
+        grown = current
+      end
+    end
+    apply_walk(grown)
   end
 
   local function clear_combat_effects()
