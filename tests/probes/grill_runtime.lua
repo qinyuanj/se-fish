@@ -1,4 +1,4 @@
--- #137 烧烤真实试玩探针：只走公开请求（MgrGrill:Handle 与正常格位选择），不改时间/坐标。
+-- #137 烧烤真实试玩探针：只走公开请求（GrillAction 与正常格位选择），不改时间/坐标。
 -- 前置：玩家背包或道具栏里有未烤鱼获（食物/极品食物）；最好另有一条未烤信物演示确认流程；
 -- 人站在三区起任一烧烤点 2.5 米内。GM 发放与传送只是环境准备，烤的流程全走真实通道。
 -- 试玩就绪后：editor-cli exec -p server --file <本文件绝对路径> --json。
@@ -7,7 +7,6 @@
 -- 场景 B：非信物鱼开烤后不取出，等烤糊：burnt 推送、烤糊前后血量差（3 米内 30）、只损毁一次。
 -- 注意：开烤/取出经 #123 持久协议，会话在异步落账回调里建立，所以全程在协程里轮询等待。
 local cfg = require('common.GameCfg')
-local grill = require('server.Mgr.MgrGrill')
 local pd = require('server.Mgr.MgrPlayerData')
 local curve = require('common.GrillCurve')
 local world, task = game:GetService('World'), game:GetService('Task')
@@ -23,7 +22,21 @@ local tag = 'G137-' .. tostring(math.floor(world:GetServerTime()))
 local function log(...) print('GRILL137', tag, ...) end
 local function nextSeq() rt.seq = rt.seq + 1 return rt.seq end
 
-local anchorName, anchor = grill:InRange(player)
+local function nearest_grill()
+    local pos = player.Character and player.Character.Position
+    if not pos then return nil end
+    for _, point in ipairs(cfg.Grill.Points) do
+        local ok, unit = pcall(world.FindFirstChild, world, point.AnchorName, true)
+        local center = ok and unit and unit.Position
+        if center then
+            local dx, dz = pos.x - center.x, pos.z - center.z
+            if dx * dx + dz * dz <= (cfg.Grill.Radius + cfg.Grill.Slack) ^ 2 then
+                return point.AnchorName, unit
+            end
+        end
+    end
+end
+local anchorName, anchor = nearest_grill()
 if not anchor then
     log('ABORT 不在烧烤点范围内，请先走到三区起任一烧烤点 2.5 米内再跑探针')
     return
@@ -31,7 +44,7 @@ end
 log('烤位', anchorName, tostring(anchor.Position))
 
 local function isToken(itemId)
-    for _, chain in ipairs(cfg.Content.Exchanges) do -- 与 MgrGrill 同一判定表
+    for _, chain in ipairs(cfg.Content.Exchanges) do -- 与 PlayerGrill 同一判定表
         if chain.EliteToken == itemId or chain.BossToken == itemId then return true end
     end
     return false -- 显式返回：尾调用展开会把「无返回值」变成 tostring() 零参数报错
@@ -76,8 +89,9 @@ end
 -- 轮询等会话建立（持久协议异步回调）；返回会话或 nil
 local function waitSession()
     for _ = 1, 30 do
-        local session = grill:GetSession(player)
-        if session then return session end
+        if player.grill_state and player.grill_state.state == 'cooking' then
+            return player.grill_state
+        end
         task:Wait(0.1)
     end
 end
@@ -90,12 +104,12 @@ if not entryA then log('ABORT 没有未烤鱼获，请先钓鱼') return end
 selectEntry(cidA, idxA)
 log('场景A 投入', entryA.itemId, 'mult=' .. tostring(entryA.mult), 'token=' .. tostring(tokenA))
 if tokenA then
-    grill:Handle(player, { action = 'Start', seq = nextSeq() })
+    _G.REUtil:GetRE('GrillAction'):FireServer({ action = 'Start', seq = nextSeq() })
     log('场景A 信物未确认请求已发（期望 token-warn 且不扣物）')
     task:Wait(0.3)
     log('场景A 信物仍在库存', data:ItemCount(entryA.itemId))
 end
-grill:Handle(player, { action = 'Start', seq = nextSeq(), confirm = true })
+_G.REUtil:GetRE('GrillAction'):FireServer({ action = 'Start', seq = nextSeq(), confirm = true })
 
 task:Spawn(function()
     local session = waitSession()
@@ -104,7 +118,7 @@ task:Spawn(function()
     local startedAt = session.startedAt
     local waitA = 2 - (world:GetServerTime() - startedAt)
     if waitA > 0 then task:Wait(waitA) end
-    grill:Handle(player, { action = 'Takeout', seq = nextSeq() })
+    _G.REUtil:GetRE('GrillAction'):FireServer({ action = 'Takeout', seq = nextSeq() })
     task:Wait(0.5) -- 取出同样是异步落账
     local elapsed = world:GetServerTime() - startedAt
     local back = findCooked(entryA.itemId)
@@ -119,7 +133,7 @@ task:Spawn(function()
     if not entryB then log('场景B 跳过：没有第二条未烤的非信物鱼获') log('观察结束') return end
     selectEntry(cidB, idxB)
     log('场景B 投入', entryB.itemId)
-    grill:Handle(player, { action = 'Start', seq = nextSeq() })
+    _G.REUtil:GetRE('GrillAction'):FireServer({ action = 'Start', seq = nextSeq() })
     local sessionB = waitSession()
     if not sessionB then log('场景B ABORT 开烤未成立') log('观察结束') return end
     local before = health()
@@ -130,7 +144,7 @@ task:Spawn(function()
     local after = health()
     log('场景B 烤糊后', '血量后=' .. tostring(after),
         '差值=' .. tostring(before and after and (before - after)),
-        '会话=' .. tostring(grill:GetSession(player) and '仍在' or '已清'),
+        '会话=' .. tostring(player.grill_state and player.grill_state.state or '已清'),
         '库存残留=' .. tostring(data:ItemCount(entryB.itemId)),
         '待恢复=' .. tostring(data.Extra.recovery.grill ~= nil))
     log('观察结束')

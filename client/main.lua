@@ -16,6 +16,7 @@ local AttackView = require("client.Views.AttackView")
 local WeaponAim = require("client.WeaponAim")
 local SurvivalOverlayView = require("client.Views.SurvivalOverlayView")
 local GroundLootView = require("client.Views.GroundLootView")
+local GrillView = require("client.Views.GrillView")
 local ScreenMain = require("client.ScreenHandlers.ScreenMain")
 local REUtil = require("common.REUtil")
 local GameUI = require("client.GameUI")
@@ -75,6 +76,9 @@ Task:Spawn(function()
     if ui_root then
         RootView.mount(ui_root, client_store, {
             services = {
+                send_grill = function(payload)
+                    REUtil:GetRE("GrillAction"):FireServer(payload)
+                end,
                 send_weapon = function(payload)
                     local event = _G.REUtil and _G.REUtil:GetRE("WeaponAction")
                     if event and type(event.FireServer) == "function" then
@@ -106,6 +110,7 @@ Task:Spawn(function()
                     end,
                 }),
                 AttackView.spec(),
+                GrillView.spec(),
                 MainHudActionButtonsView.spec({
                     backpack_open = hud_backpack_open,
                     reel_active = hud_reel_active,
@@ -163,7 +168,6 @@ local LocalLottery = require("client.LocalLottery")
 local ScreenLottery = require("client.ScreenHandlers.ScreenLottery")
 local ScreenFerry = require("client.ScreenHandlers.ScreenFerry")
 local ScreenParty = require("client.ScreenHandlers.ScreenParty")
-local ScreenGrill = require("client.ScreenHandlers.ScreenGrill")
 local ScreenBlindbox = require("client.ScreenHandlers.ScreenBlindbox")
 local ScreenPlatform = require("client.ScreenHandlers.ScreenPlatform")
 local ScreenCompendium = require('client.ScreenHandlers.ScreenCompendium')
@@ -191,7 +195,6 @@ Task:Spawn(function() ScreenLottery:Start() end)
 Task:Spawn(function() LocalLottery:Start() end)
 Task:Spawn(function() ScreenFerry:Start() end)
 Task:Spawn(function() ScreenParty:Start() end)
-Task:Spawn(function() ScreenGrill:Start() end)
 Task:Spawn(function() ScreenBlindbox:Start() end)
 Task:Spawn(function() ScreenPlatform:Start() end)
 Task:Spawn(function() ScreenCompendium:Start() end)
