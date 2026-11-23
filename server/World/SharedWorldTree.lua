@@ -5,6 +5,7 @@
 
 local GameCfg = require("common.GameCfg")
 local spoke = require("common.packages.spoke.api")
+local GroundLoot = require("server.World.GroundLoot")
 
 local SpokeTree = spoke.SpokeTree
 local Effect = spoke.Effect
@@ -81,6 +82,13 @@ function SharedWorldTree.spawn(opts)
   end)
 
   handle.tree = SpokeTree.spawn("SharedWorldTree", root, services)
+  GroundLoot.mount(handle, {
+    create_unit = opts.create_unit,
+    remote = opts.remote,
+    bait_spots = opts.bait_spots,
+    logger = opts.logger,
+    lookup_tree = opts.lookup_tree,
+  })
 
   function handle:get_zone(zone_id)
     return zones[zone_id]

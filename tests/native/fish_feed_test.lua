@@ -98,7 +98,7 @@ describe('向钓鱼佬喂食换金币（MgrInteract）', function()
   it('test_fish_coin_has_single_write_entry', function()
     local writers = 0
     for _, path in ipairs({ 'server/Data/PlayerData.lua', 'server/Mgr/MgrInteract.lua',
-      'server/Mgr/MgrPlayerData.lua', 'server/Mgr/MgrLoot.lua' }) do
+      'server/Mgr/MgrPlayerData.lua', 'server/World/GroundLoot.lua' }) do
       local file = assert(io.open(path, 'r'))
       local text = file:read('a')
       file:close()

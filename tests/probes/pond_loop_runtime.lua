@@ -27,7 +27,29 @@
 local GameCfg = require('common.GameCfg')
 local MathWaterJudge = require('common.MathWaterJudge')
 local MgrPlayerData = require('server.Mgr.MgrPlayerData')
-local MgrLoot = require('server.Mgr.MgrLoot')
+local ServerRuntime = require('server.World.ServerRuntime')
+local function ground()
+    local runtime = ServerRuntime.current and ServerRuntime.current()
+    return runtime and runtime:get_world()
+end
+local MgrLoot = {
+    Loots = setmetatable({}, { __pairs = function()
+        local world = ground()
+        local list = world and world:ground_snapshot().list or {}
+        local index = 0
+        return function()
+            index = index + 1
+            local row = list[index]
+            if not row then return nil end
+            return row.id, { Id = row.id, Kind = row.kind, ItemId = row.itemId, SpotId = row.spotId,
+                Position = { x = row.x, y = row.y, z = row.z } }
+        end
+    end }),
+    Pickup = function(_, player, id)
+        local world = ground()
+        return world and world:try_pickup(player, id) or false
+    end,
+}
 local MgrInteract = require('server.Mgr.MgrInteract')
 local MgrShop = require('server.Mgr.MgrShop')
 local MgrCast = require('server.Mgr.MgrCast')

@@ -174,8 +174,8 @@ describe("图鉴写入（MgrCompendium × MgrSave × PlayerData）", function()
   end)
 
   it("test_kills_and_drops_never_enter_the_compendium", function()
-    -- 击杀与三份掉落是 MgrLoot 的事：图鉴只有 RecordLanding 这一个写入口
-    for _, path in ipairs({ "server/Mgr/MgrFishUnit.lua", "server/Mgr/MgrLoot.lua" }) do
+    -- 击杀与地面掉落不写图鉴：图鉴只有 RecordLanding 这一个写入口
+    for _, path in ipairs({ "server/Mgr/MgrFishUnit.lua", "server/World/GroundLoot.lua" }) do
       assert.is_not_nil(read(path), path)
       assert.is_nil(read(path):find("Compendium", 1, true), path)
     end
