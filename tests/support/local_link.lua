@@ -31,23 +31,18 @@ end
 -- 复现的接线：每行都是 server/main.lua 的原文子串，缺一行就说明生产装配变了。
 M.WIRING = {
     'MgrMap.MgrPlayerData.Save = MgrMap.MgrSave',
-    'MgrMap.MgrPlayerData.Vitals = MgrMap.MgrVitals',
+    'MgrMap.MgrPlayerData.Vitals = Life',
     'MgrMap.MgrParty.PlayerData = MgrMap.MgrPlayerData',
     'MgrMap.MgrParty.Save = MgrMap.MgrSave',
-    'MgrMap.MgrParty.Vitals = MgrMap.MgrVitals',
+    'MgrMap.MgrParty.Vitals = Life',
     'MgrMap.MgrInteract.PlayerData = MgrMap.MgrPlayerData',
     'MgrMap.MgrInteract.Save = MgrMap.MgrSave',
-    'MgrMap.MgrInteract.Vitals = MgrMap.MgrVitals',
-    'MgrMap.MgrInteract.Survival = MgrMap.MgrSurvival',
-    'MgrMap.MgrSurvival.Vitals = MgrMap.MgrVitals',
-    'MgrMap.MgrSurvival.PlayerData = MgrMap.MgrPlayerData',
-    'MgrMap.MgrSurvival.Save = MgrMap.MgrSave',
+    'MgrMap.MgrInteract.Vitals = Life',
+    'MgrMap.MgrInteract.Survival = Life',
     'MgrMap.MgrLoot.PlayerData = MgrMap.MgrPlayerData',
     'MgrMap.MgrPlayerData.Loot = MgrMap.MgrLoot',
-    'MgrMap.MgrVitals.Party = MgrMap.MgrParty',
-    'MgrMap.MgrVitals.ZoneMarkers = ZoneMarkers',
-    'MgrMap.MgrVitals.DamageFilter = makePkDamageFilter()',
-    'MgrMap.MgrVitals:SetLifeHooks(MgrMap.MgrSurvival:Hooks())',
+    'local Life = WorldRuntime.life',
+    'WorldRuntime.life:SetDamageFilter(pkDamageFilter)',
 }
 
 function M.assert_wiring()
@@ -189,8 +184,6 @@ function M.new(opts)
     env.managers = {
         Save = assert(loadfile('server/Mgr/MgrSave.lua'))(),
         PlayerData = assert(loadfile('server/Mgr/MgrPlayerData.lua'))(),
-        Vitals = assert(loadfile('server/Mgr/MgrVitals.lua'))(),
-        Survival = assert(loadfile('server/Mgr/MgrSurvival.lua'))(),
         Party = assert(loadfile('server/Mgr/MgrParty.lua'))(),
         Interact = assert(loadfile('server/Mgr/MgrInteract.lua'))(),
         Loot = assert(loadfile('server/Mgr/MgrLoot.lua'))(),
@@ -199,27 +192,24 @@ function M.new(opts)
     env.filter = assert(loadfile('server/Mgr/MgrPkFilter.lua'))().Make
 
     mgr.Save.PlayerData = mgr.PlayerData
-    mgr.PlayerData.Save, mgr.PlayerData.Vitals = mgr.Save, mgr.Vitals
-    mgr.Vitals.PlayerData = mgr.PlayerData
-    mgr.Survival.Vitals, mgr.Survival.PlayerData, mgr.Survival.Save = mgr.Vitals, mgr.PlayerData, mgr.Save
-    -- 官方属性 / 效果包在本夹具外：给生存状态机可控的空实现（不参与连接生命周期）
-    mgr.Survival.Modifier = { ClearTarget = function() end, Clear = function() end,
-        Apply = function() return true end, GetRemaining = function() return 0 end }
-    mgr.Survival.SpeedWriter = { ApplyGrowth = function() return { Ok = true } end,
-        RefreshMoveSpeed = function() return true end }
-    mgr.Party.PlayerData, mgr.Party.Save, mgr.Party.Vitals = mgr.PlayerData, mgr.Save, mgr.Vitals
+    mgr.PlayerData.Save = mgr.Save
+    mgr.Party.PlayerData, mgr.Party.Save = mgr.PlayerData, mgr.Save
     mgr.Interact.PlayerData, mgr.Interact.Save = mgr.PlayerData, mgr.Save
-    mgr.Interact.Vitals, mgr.Interact.Survival = mgr.Vitals, mgr.Survival
     mgr.Loot.PlayerData = mgr.PlayerData
     -- 道具栏动作通道里的 Pickup 由 MgrPlayerData 转给 MgrLoot（main.lua 的同一条接线）。
     mgr.PlayerData.Loot = mgr.Loot
     -- #255 生产接线：统一伤害入口的过滤函数由 MgrPkFilter 工厂实例化，只读注入的权威接缝。
-    mgr.Vitals.ZoneMarkers = ZoneMarkers
+    env.lifeHost = require('tests.support.life_host').start({
+      now = env.now, remote = re, player_data = mgr.PlayerData, save = mgr.Save,
+    })
+    mgr.Vitals = env.lifeHost.runtime.life
+    mgr.Survival = mgr.Vitals
+    mgr.PlayerData.Vitals = mgr.Vitals
+    mgr.Party.Vitals = mgr.Vitals
+    mgr.Interact.Vitals, mgr.Interact.Survival = mgr.Vitals, mgr.Vitals
     mgr.Vitals.Party = mgr.Party
-    mgr.Vitals.DamageFilter = env.filter()
-    mgr.Vitals.DamagePublisher = function() end
-    mgr.Vitals.FishCarrier = nil
-    mgr.Vitals:SetLifeHooks(mgr.Survival:Hooks())
+    mgr.Vitals.ZoneMarkers = ZoneMarkers
+    mgr.Vitals:SetDamageFilter(env.filter())
 
     env.player = function(self, userId, position, name) return newPlayer(self, userId, position, name) end
     return setmetatable(env, { __index = M })
@@ -238,8 +228,8 @@ end
 function M:Advance(seconds)
     self.now = self.now + (seconds or 0)
     if self.started then
-        self.managers.Survival:Update()
-        self.managers.Vitals:Update()
+        self.lifeHost.clock:advance(seconds or 0)
+        self.now = self.lifeHost.clock.now()
         self.managers.Save:Update()
     end
     return self:Tick()
@@ -250,7 +240,7 @@ function M:Start()
     -- 读档就绪回调：main.lua 用 MgrSave.OnReady 分发第一批管理器的 OnPlayerAdded，
     -- 这里接同一个入口，而不是自己另写一套「加入后初始化」。
     self.managers.Save.OnReady = function(player, data) onReady(self, player, data) end
-    for _, name in ipairs({ 'Save', 'PlayerData', 'Vitals', 'Survival', 'Party', 'Interact' }) do
+    for _, name in ipairs({ 'Save', 'PlayerData', 'Party', 'Interact' }) do
         local manager = self.managers[name]
         if manager.Start then manager.Start(manager) end
     end
@@ -272,6 +262,7 @@ onReady = function(env, player, data)
     end
     if not env.started then env.ready[userId] = { player, data } return end
     env.active[userId] = player
+    env.lifeHost:add(player, data)
     for _, name in ipairs(READY_FIRST) do
         local manager = env.managers[name]
         if manager.OnPlayerAdded then manager:OnPlayerAdded(player) end
@@ -299,7 +290,7 @@ local function continueRemoving(env, player, leaving)
     leaving.Cleaned = true
     local active = env.active[player.UserId] == player
     if active then env.active[player.UserId] = nil end
-    if active then env.managers.Survival:BeforeLeave(player) end
+    if active then env.lifeHost:remove(player) end
     env.managers.PlayerData:OnPlayerRemoving(player)
     if active then
         for _, name in ipairs(LEAVING_REST) do

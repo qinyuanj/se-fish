@@ -127,8 +127,13 @@ local function resolve(mgr, player, flow, outcome, payload)
     notifyFlow(mgr, player, flow, false)
     print('[MgrPlatform] flow 结算', player.UserId, flow.kind, tostring(flow.goods or flow.ad), outcome)
     if type(flow.onResult) == 'function' then
-        local ok, err = pcall(flow.onResult, outcome, payload)
-        if not ok then print('[MgrPlatform] flow 回调失败', player.UserId, tostring(err)) end
+        local callback = flow.onResult
+        local function deliver()
+            local ok, err = pcall(callback, outcome, payload)
+            if not ok then print('[MgrPlatform] flow 回调失败', player.UserId, tostring(err)) end
+        end
+        local task = game and game.GetService and game:GetService('Task')
+        if task and type(task.Spawn) == 'function' then task:Spawn(deliver) else deliver() end
     end
 end
 

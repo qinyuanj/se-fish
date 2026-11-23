@@ -931,16 +931,10 @@ describe("服务端入口接线：server/main.lua 宿主测试双端到端集成
       CastAbility = function() return true end,
     }
 
-    for _, name in ipairs({ "MgrSave", "MgrPlayerData", "MgrQuest", "MgrStory", "MgrVitals" }) do
+    for _, name in ipairs({ "MgrSave", "MgrPlayerData", "MgrQuest", "MgrStory" }) do
       mgrs[name] = assert(loadfile("server/Mgr/" .. name .. ".lua"))()
     end
     mgrs.MgrPkFilter = { Make = function() return function() return true end end }
-    mgrs.MgrSurvival = {
-      Hooks = function() return {} end,
-      BeforeLeave = function(_, player)
-        order[#order + 1] = "before_leave:survival:" .. tostring(player.UserId)
-      end,
-    }
     mgrs.MgrGrill = {
       BeforeLeave = function(_, player)
         order[#order + 1] = "before_leave:grill:" .. tostring(player.UserId)
@@ -1050,7 +1044,6 @@ describe("服务端入口接线：server/main.lua 宿主测试双端到端集成
     -- 验证 Step 1（BeforeLeave 终镜像）严格先于 Step 2（dispose 逆序清理）
     local idx = {}
     for i, item in ipairs(order) do idx[item] = i end
-    assert.is_true(idx["before_leave:survival:6001"] < idx["dispose_cleanup:6001"])
     assert.is_true(idx["before_leave:grill:6001"] < idx["dispose_cleanup:6001"])
     assert.is_true(idx["before_leave:special:6001"] < idx["dispose_cleanup:6001"])
 

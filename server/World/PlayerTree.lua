@@ -13,6 +13,7 @@ local Number = require("common.Number")
 local spoke = require("common.packages.spoke.api")
 local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
 local PlayerEffects = require("server.World.PlayerEffects")
+local PlayerLife = require("server.World.PlayerLife")
 local HeldRodLeaf = require("server.World.HeldRodLeaf")
 
 local SpokeTree = spoke.SpokeTree
@@ -406,7 +407,7 @@ function PlayerTree.spawn(opts)
       extra.survival.health = states.health:now()
       extra.survival.hunger = states.hunger:now()
       local phase = states.life_phase:now()
-      extra.survival.dying = phase == "downed"
+      extra.survival.dying = phase == "downed" or phase == "rescuing"
       extra.survival.dead = phase == "dead"
     end
     if type(handle.get_modifier_remaining) == "function" then
@@ -430,7 +431,6 @@ function PlayerTree.spawn(opts)
   local function run_finalizers()
     if finalized then return end
     finalized = true
-    mirror_to_data()
     for _, entry in ipairs(finalizers) do
       if entry.active then
         local ok, err = pcall(entry.fn, handle, player, data) -- 隔离单个离场回调异常，保证其余终镜像与收尾继续执行
@@ -439,6 +439,7 @@ function PlayerTree.spawn(opts)
         end
       end
     end
+    mirror_to_data()
     if type(opts.on_leave_finalize) == "function" then
       local ok, err = pcall(opts.on_leave_finalize, handle, player, data) -- 隔离宿主离场回调异常，避免阻断后续 dispose 协议
       if not ok then
@@ -593,6 +594,22 @@ function PlayerTree.spawn(opts)
           mount_phase_dock(cs, phase_slots.dead_countdown, "dead_countdown")
         end)
       end)
+
+      PlayerLife.mount(s3, handle, {
+        remote = opts.remote,
+        save = opts.save,
+        player_data = opts.player_data,
+        platform = opts.platform,
+        fish_carrier = opts.fish_carrier,
+        damage_filter = opts.damage_filter,
+        damage_context = opts.damage_context,
+        lookup_tree = opts.lookup_tree,
+        players = opts.players,
+        speed_writer = opts.speed_writer,
+        growth_writer = opts.growth_writer,
+        max_health_of = opts.max_health_of,
+        on_downed = opts.on_downed,
+      })
 
       docks.survival = s3:dock("SurvivalDock")
       if type(mounts.survival) == "function" then
@@ -1023,6 +1040,12 @@ function PlayerTree.spawn(opts)
 
   function handle:fault()
     return self.tree.fault
+  end
+
+  if type(handle._life_finish) == "function" then
+    local finish = handle._life_finish
+    handle._life_finish = nil
+    finish()
   end
 
   return handle

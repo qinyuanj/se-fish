@@ -45,7 +45,7 @@ describe('第 6 节 官方 AI 目标选择接线（哥斯拉贯通）', function
             Rotation = _G.Quaternion.FromEulerAngles() }, CharacterAdded = env.signal(),
             CharacterRemoving = env.signal(), SetAttribute = function() end }
         env.players[#env.players + 1] = player
-        env.vitals:OnPlayerAdded(player)
+        env.lifeHost:add(player)
         env.mgr:OnPlayerAdded(player)
         return player
     end
@@ -268,14 +268,8 @@ describe('第 6 节 官方 AI 目标选择接线（哥斯拉贯通）', function
         local pos = fish.Carrier.Body.Position
         assert.same(wounded, (env.mgr:ChooseTarget(fish, pos)), '新玩家应接替成为目标')
         env.mgr:NoteDamage(fish, wounded, 900)
-        env.vitals:SetLifeHooks({
-            LifeStatus = function(state)
-                if state.player == wounded then return 'downed' end
-                return state.dead and 'dead' or 'alive'
-            end,
-            -- 与 MgrVitals 默认钩子同语义：濒死外仍要挡死亡（覆盖钩子不能把死亡判定漏掉）。
-            CanTakeDamage = function(state) return state.player ~= wounded and not state.dead end,
-        })
+        env.vitals:ApplyHit(env.vitals:NewHit(nil, 'fishAttack'), wounded, 1000000)
+        assert.equals('downed', env.vitals:LifeStatus(wounded))
         assert.is_nil((env.mgr:ChooseTarget(fish, pos)), '濒死玩家仍被选中')
         assert.is_nil(fish.Threat[wounded], '濒死玩家的伤害记录没有清除')
     end)

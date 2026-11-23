@@ -243,10 +243,21 @@ function AttrLeaf.mount(s, player_tree, opts)
 
       -- 3. 移速（PlayerWalkSpeed）及 character.Controller.WalkSpeed 投影
       if attrs.PlayerWalkSpeed then
+        local prior_speed
+        local controller = character.Controller
+        if controller then
+          local ok_prior, current = pcall(function() return controller.WalkSpeed end)
+          if ok_prior then prior_speed = current end
+        end
         local ok, walk_speed = AttrLeaf.project_components(attr_api, character, "PlayerWalkSpeed", attrs.PlayerWalkSpeed)
         if not ok then
           record_err("PlayerWalkSpeed", walk_speed)
+          player_tree.walk_projection_rejected = true
+          if controller and prior_speed ~= nil then
+            pcall(function() controller.WalkSpeed = prior_speed end)
+          end
         else
+          player_tree.walk_projection_rejected = false
           local clamped_speed = Number.IsFiniteNumber(walk_speed) and math.max(0, walk_speed) or 0
           summary.values.PlayerWalkSpeed = clamped_speed
           local ok_spd, spd_err = AttrLeaf.apply_walk_speed(character, clamped_speed)

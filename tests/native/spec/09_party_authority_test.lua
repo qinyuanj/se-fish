@@ -30,7 +30,7 @@ local WIRING = {
   'MgrParty = require("server.Mgr.MgrParty")',
   'MgrMap.MgrParty.PlayerData = MgrMap.MgrPlayerData',
   'MgrMap.MgrParty.Save = MgrMap.MgrSave',
-  'MgrMap.MgrParty.Vitals = MgrMap.MgrVitals',
+  'MgrMap.MgrParty.Vitals = Life',
 }
 local function assert_wiring()
   local handle = assert(io.open('server/main.lua', 'rb'), '读不到 server/main.lua')

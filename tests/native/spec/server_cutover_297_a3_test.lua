@@ -496,7 +496,7 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
           local name = path:match("^server%.Mgr%.(.*)$")
           if not name then return require(path) end
           if not mgrs[name] then
-            if name == "MgrSave" or name == "MgrPlayerData" or name == "MgrVitals" or name == "MgrAbility" then
+            if name == "MgrSave" or name == "MgrPlayerData" or name == "MgrAbility" then
               mgrs[name] = assert(loadfile("server/Mgr/" .. name .. ".lua", "t", sandbox))()
             else
               mgrs[name] = {}
@@ -507,7 +507,6 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
       }, { __index = _G })
 
       mgrs.MgrPkFilter = { Make = function() return function() return true end end }
-      mgrs.MgrSurvival = { Hooks = function() return {} end }
 
       runtime = assert(loadfile("server/main.lua", "t", sandbox))()
       assert.are.equal(runtime, ServerRuntime.current())
@@ -576,27 +575,27 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
       -- 重新选回鱼竿格以维持后续测试预期
       re_map.ItemBarAction.OnServerEvent:Fire(p, { action = "SelectSlot", value = 1 })
 
-      -- AttrBridge 经 MgrAbility / MgrVitals 真实生效
+      -- AttrBridge 经 MgrAbility / PlayerTree 真实生效
       data.Extra.growth.potions.item168 = 2
       data.Extra.growth.potions.item167 = 5
       assert.is_true(mgrs.MgrAbility:ApplyGrowth(p).Ok)
-      assert.equals(420, mgrs.MgrVitals.MaxHealthProvider(p))
+      assert.equals(420, runtime.life:MaxHealthOf(p))
       assert.near(1.4, ch.scale, 1e-9)
       assert.near(10.5, c.WalkSpeed, 1e-9)
 
       -- ModifierBridge：玩家麻痹阻塞 CanAct 与移速，Heartbeat 推进 0.5s 恢复
       assert.is_true(mgrs.MgrAbility.Modifier:ApplyWeaponEffect(p, p, { Kind = "paralyze" }))
-      assert.is_false(mgrs.MgrVitals:CanAct(p))
+      assert.is_false(runtime.life:CanAct(p))
       assert.equals(0, c.WalkSpeed)
       now = now + 0.5
       heartbeat:Fire(0.5)
-      assert.is_true(mgrs.MgrVitals:CanAct(p))
+      assert.is_true(runtime.life:CanAct(p))
       assert.near(10.5, c.WalkSpeed, 1e-9)
 
       -- ModifierBridge：活鱼挂毒经 Heartbeat 推进触发 MgrVitals:ApplyHit DoT
       local dot_hits = {}
-      local orig_apply_hit = mgrs.MgrVitals.ApplyHit
-      mgrs.MgrVitals.ApplyHit = function(self, hit, target, amount)
+      local orig_apply_hit = runtime.life.ApplyHit
+      runtime.life.ApplyHit = function(self, hit, target, amount)
         dot_hits[#dot_hits + 1] = { target = target, amount = amount, category = hit.category }
         return true
       end
@@ -608,7 +607,7 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
       assert.equals(1, #dot_hits)
       assert.are.equal(fish, dot_hits[1].target)
       assert.equals("dot", dot_hits[1].category)
-      mgrs.MgrVitals.ApplyHit = orig_apply_hit
+      runtime.life.ApplyHit = orig_apply_hit
 
       -- 离场后：连接断开、左手持竿销毁、活鱼毒效果按来源清理
       players_service.PlayerRemoving:Fire(p)
