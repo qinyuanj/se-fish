@@ -204,7 +204,6 @@ function ScreenHandler:Show(state)
         slot.Background.ButtonNormalColor = index == state.selectedSlot
             and Color.New(36, 130, 94, 255) or Color.New(54, 100, 140, 255)
     end
-    self:ShowCoin(state.coin)
     self:ShowCast()
     local selected = state.selectedSlot and state.slots[state.selectedSlot]
     self.BtnDiscard.Visible = selected ~= nil
@@ -237,70 +236,6 @@ function ScreenHandler:SelectedFood()
     local entry = slot and state.slots[slot]
     local definition = entry and GameCfg.Items.Definitions[entry.itemId]
     if definition and type(definition.EatPercent) == 'number' then return entry, slot end
-end
-
-local function readVital(player, key, default)
-    local value = tonumber(player:GetAttribute(key))
-    return value and math.floor(value) or default
-end
-
-local HEALTH_PREFIX, HUNGER_PREFIX = '血 ', '饥饿度 '
-
-local function vitalPercent(value, maximum)
-    return maximum > 0 and math.max(0, math.min(100, value * 100 / maximum)) or 0
-end
-
-local function updateStarving(self, health, hunger)
-    local starving = hunger <= 0 and health > 0
-    if starving and not self.Starving then self.NextWarnAt = nil end
-    self.Starving = starving
-    self:UpdateStarveFx()
-end
-
-function ScreenHandler:ShowVitals()
-    if not self.HealthRing then return end
-    local player = game:GetService('Players').LocalPlayer
-    if not player then return end
-    local c = GameCfg.Vitals
-    local health = readVital(player, 'Health', c.MaxHealth)
-    local maxHealth = readVital(player, 'MaxHealth', c.MaxHealth)
-    local hunger = readVital(player, 'Hunger', c.MaxHunger)
-    local maxHunger = readVital(player, 'MaxHunger', c.MaxHunger)
-    self.HealthRing.Percent = vitalPercent(health, maxHealth)
-    self.HungerRing.Percent = vitalPercent(hunger, maxHunger)
-    self.HealthText.Text = HEALTH_PREFIX .. tostring(health)
-    self.HungerText.Text = HUNGER_PREFIX .. tostring(hunger)
-    updateStarving(self, health, hunger)
-end
-
-local function warnStarving(self, now, config)
-    if self.NextWarnAt and now < self.NextWarnAt then return end
-    self.NextWarnAt = now + config.WarnIntervalSec
-    if _G.LocalMsgNotice then _G.LocalMsgNotice(config.WarnText) end
-    print('[ScreenMain] 饥饿提示', config.WarnText)
-end
-
-local function flashVisible(self, now, config)
-    return self.Starving == true and math.floor(now / config.FlashPeriodSec) % 2 == 0
-end
-
-function ScreenHandler:UpdateStarveFx()
-    if not self.FlashEdges then return end
-    local c = GameCfg.Vitals
-    local now = World:GetServerTime()
-    local on = flashVisible(self, now, c)
-    for _, edge in ipairs(self.FlashEdges) do edge.Visible = on end
-    if self.Starving then warnStarving(self, now, c) end
-end
-
-function ScreenHandler:ShowCoin(value)
-    if not self.LabelCoin then return end
-    if type(value) ~= 'number' then
-        local players = game:GetService('Players')
-        local player = players and players.LocalPlayer
-        value = player and player:GetAttribute('FishCoin')
-    end
-    self.LabelCoin.Text = tostring(math.floor(tonumber(value) or 0))
 end
 
 local function wrapColumns(text, columns)
@@ -650,61 +585,6 @@ local function passive(node)
     return node
 end
 
-local function columnsOf(text)
-    local count = 0
-    for _ in text:gmatch('[%z\1-\127\194-\244][\128-\191]*') do count = count + 1 end
-    return count
-end
-
-local VITAL_FONT_MAX = 20
-local function vitalFontSize(width, c)
-    local longest = math.max(columnsOf(HEALTH_PREFIX .. tostring(c.MaxHealth)),
-        columnsOf(HUNGER_PREFIX .. tostring(c.MaxHunger)))
-    return math.max(1, math.min(VITAL_FONT_MAX, math.floor(width / longest)))
-end
-
-function ScreenHandler:BuildVitals(root, resolution, layout)
-    local c = GameCfg.Vitals
-    local rings = {
-        { 'Health', layout.Rects.HealthRing, c.HealthRing, c.HealthColor },
-        { 'Hunger', layout.Rects.HungerRing, c.HungerRing, c.HungerColor },
-    }
-    for _, spec in ipairs(rings) do
-        local name, r = spec[1], spec[2]
-        local bg = passive(OwnedUnits.Track(self, World:CreateUnit('EUIImage', {
-            Parent = root, Name = name .. 'RingBg',
-            Position = Vector2.New(r.x, r.y), Size = Vector2.New(r.w, r.h), Image = c.RingBg,
-        })))
-        local ring = passive(OwnedUnits.Track(self, World:CreateUnit('EUIProgressTimer', {
-            Parent = root, Name = name .. 'Ring',
-            Position = Vector2.New(r.x, r.y), Size = Vector2.New(r.w, r.h), Image = spec[3], Percent = 100,
-        })))
-        ring.Color = color(spec[4])
-        ring.LocalZOrder = 1
-        local text = overlay(self, root, name .. 'Text', r.x, r.y, r.w, 40, '', vitalFontSize(r.w, c),
-            Color.New(255, 255, 255, 255))
-        text.LocalZOrder = 2
-        self[name .. 'Ring'] = ring
-        self[name .. 'Text'] = text
-    end
-    local t, w, h = c.FlashThickness, resolution.x, resolution.y
-    local edges = {
-        { 'FlashTop', w / 2, h - t / 2, w, t }, { 'FlashBottom', w / 2, t / 2, w, t },
-        { 'FlashLeft', t / 2, h / 2, t, h }, { 'FlashRight', w - t / 2, h / 2, t, h },
-    }
-    self.FlashEdges = {}
-    for _, spec in ipairs(edges) do
-        local edge = passive(OwnedUnits.Track(self, World:CreateUnit('EUIImage', {
-            Parent = root, Name = spec[1],
-            Position = Vector2.New(spec[2], spec[3]), Size = Vector2.New(spec[4], spec[5]), Image = c.FlashImage,
-        })))
-        edge.Color = color(c.FlashColor)
-        edge.LocalZOrder = 3
-        edge.Visible = false
-        self.FlashEdges[#self.FlashEdges + 1] = edge
-    end
-end
-
 function ScreenHandler:ApplyBackpackOcclusion()
     local hidden = self.BackpackOpen == true
     if hidden and self.OpenPopup then self:ClosePopup() end
@@ -1037,13 +917,6 @@ local function placeSlot(slot, r)
     slot.Count.Size = Vector2.New(w * 0.32, h * 0.32)
 end
 
-local function placeEditorNode(node, r)
-    if not node then return end
-    local ok, err = pcall(function() node.Anchor = Vector2.New(0.5, 0.5) end)
-    if not ok then print('[ScreenMain] 设置节点锚点失败', tostring(node.Name), tostring(err)) end
-    place(node, r)
-end
-
 function ScreenHandler:ApplyLayout(slots, reeling)
     local key, resolution = self.LayoutKey, self.EuiResolution
     if not key or not resolution then return end
@@ -1141,17 +1014,8 @@ function ScreenHandler:Cleanup()
     self.QuestBackground = nil
     self.DialogueNodes = nil
     self.DialoguePayload = nil
-    self.HealthRing = nil
-    self.HungerRing = nil
-    self.HealthText = nil
-    self.HungerText = nil
-    self.FlashEdges = nil
-    self.Starving = nil
-    self.NextWarnAt = nil
     self.ReelBar = nil
     self.ReelBarBg = nil
-    self.LabelCoin = nil
-    self.ImageCoin = nil
     self.HudLayout = nil
     self.LayoutKey = nil
     self.QuestToggle = nil
@@ -1161,15 +1025,6 @@ function ScreenHandler:Cleanup()
     self.CastState = nil
     self.BoundRootNode = nil
     self.Inited = false
-end
-
-local function listenPlayerAttributes(self, player)
-    self:Listen(player:GetAttributeChangedSignal('FishCoin'), function() self:ShowCoin() end)
-    self:ShowCoin()
-    for _, key in ipairs({ 'Health', 'MaxHealth', 'Hunger', 'MaxHunger' }) do
-        self:Listen(player:GetAttributeChangedSignal(key), function() self:ShowVitals() end)
-    end
-    self:ShowVitals()
 end
 
 function ScreenHandler:Init()
@@ -1198,12 +1053,6 @@ function ScreenHandler:_initializeRoot()
         itemBarSlots = count, reeling = true })
     self.HudLayout = layout
     local rects = layout.Rects
-    self.LabelCoin = root:FindFirstChild('LabelCoin', true)
-    self.ImageCoin = root:FindFirstChild('ImageCoin', true)
-    if self.LabelCoin then self.LabelCoin.Visible = true else print('[ScreenMain] 找不到 LabelCoin 节点') end
-    if self.ImageCoin then self.ImageCoin.Visible = true end
-    placeEditorNode(self.ImageCoin, rects.CoinIcon)
-    placeEditorNode(self.LabelCoin, rects.CoinLabel)
     self.Slots = {}
     self.ItemBarSlotPos = {}
     self.Connections = {}
@@ -1333,7 +1182,6 @@ function ScreenHandler:_initializeRoot()
         self.DialogueRead.TouchEnabled = false
         _G.REUtil:GetRE('StoryRead'):FireServer({ action = 'read', readKey = payload.readKey })
     end)
-    self:BuildVitals(root, resolution, layout)
     self.ReelBarBg = OwnedUnits.Track(self, World:CreateUnit('EUIImage', {
         Parent = root, Name = 'ReelProgressBg',
         Position = Vector2.New(secondary.x, secondary.y), Size = Vector2.New(400, 36),
@@ -1507,18 +1355,8 @@ function ScreenHandler:_initializeRoot()
                 end
             end
             if self.CastFloat and self.IsOpen then self:UpdateCastFeedback() end
-            if self.Starving then self:UpdateStarveFx() end
             DamageFloat:Update()
             FishCombatLabel:Update()
-        end)
-    end
-    local task = game:GetService('Task')
-    if task and task.Delay then
-        task:Delay(1, function()
-            if not self.Inited or self.BoundRootNode ~= root then return end
-            local player = game:GetService('Players').LocalPlayer
-            if not player then return end
-            listenPlayerAttributes(self, player)
         end)
     end
     LocalAttackButton:Start(root, rects.AttackControl)
@@ -1535,8 +1373,6 @@ function ScreenHandler:OpenScreen()
     self.IsOpen = true
     LocalAttackButton:SetOpen(true)
     self:ShowCast()
-    self:ShowCoin()
-    self:ShowVitals()
     _G.REUtil:GetRE('SpecialItemStateRequest'):FireServer()
     _G.REUtil:GetRE('RequestItemBar'):FireServer()
     _G.REUtil:GetRE('RequestCastState'):FireServer()

@@ -15,6 +15,9 @@
 --  10. 数值到上限（如「饥饿度 300」）时文字超出文字框被截断，或两颗球的文字框互叠、压住金币。
 local MainHudLayout = require('client.MainHudLayout')
 local GameCfg = require('common.GameCfg')
+local ClientStore = require('client.Store.ClientStore')
+local RootView = require('client.Views.RootView')
+local MainHudVitalsView = require('client.Views.MainHudVitalsView')
 
 local function signal()
     local listeners = {}
@@ -81,6 +84,22 @@ local function setUp(height)
     -- 编辑器摆放的金币节点：ScreenMain 的直接子节点，运行时按名查找
     ctx.nodes.ImageCoin = { Name = 'ImageCoin', Position = { x = 864, y = 1145 }, Size = { x = 80, y = 80 } }
     ctx.nodes.LabelCoin = { Name = 'LabelCoin', Position = { x = 960, y = 1145 }, Size = { x = 200, y = 60 } }
+    ctx.store, ctx.writer = ClientStore.new({ initial_now = ctx.now })
+    ctx.writer:update_vitals({
+        health = attributes.Health, maxHealth = attributes.MaxHealth,
+        hunger = attributes.Hunger, maxHunger = attributes.MaxHunger,
+        coin = attributes.FishCoin,
+    })
+    ctx.spokeRoot = { Name = 'UIRoot', Destroying = signal(),
+        FindFirstChild = function(_, name) return ctx.nodes[name] end }
+    ctx.vitalsView = RootView.mount(ctx.spokeRoot, ctx.store, {
+        create_node = function(kind, attrs) return world:CreateUnit(kind, attrs) end,
+        hud = {
+            MainHudVitalsView.spec({
+                get_resolution = function() return { x = 1920, y = height } end,
+            }),
+        },
+    })
     ctx.handler = assert(loadfile('client/ScreenHandlers/ScreenMain.lua'))()
     ctx.handler.RootNode = { Name = 'ScreenMain', FindFirstChild = function(_, name) return ctx.nodes[name] end }
     ctx.handler:Init()
@@ -89,6 +108,7 @@ local function setUp(height)
 end
 
 local function tearDown(ctx)
+    if ctx.vitalsView then ctx.vitalsView:dispose() end
     require('client.LocalAttackButton'):Destroy()
     package.loaded['client.LocalAttackButton'] = ctx.previousAttack
     for _, key in ipairs(GLOBALS) do _G[key] = ctx.previous[key] end
@@ -231,13 +251,15 @@ describe('主界面接线（布局模块）', function()
 
     it('test_hunger_text_uses_glossary_term', function()
         ctx = setUp(1080)
-        ctx.handler:ShowVitals()
         assert.same('饥饿度 60', ctx.nodes.HungerText.Text)
         assert.same('血 80', ctx.nodes.HealthText.Text)
-        local file = assert(io.open('client/ScreenHandlers/ScreenMain.lua', 'r'))
-        local source = file:read('*a')
-        file:close()
-        assert.is_nil(source:find("'饥饿 '", 1, true))
+        for _, path in ipairs({ 'client/Views/MainHudVitalsView.lua', 'client/ScreenHandlers/ScreenMain.lua' }) do
+            local file = assert(io.open(path, 'r'))
+            local source = file:read('*a')
+            file:close()
+            assert.is_nil(source:find("'饥饿 '", 1, true), path)
+            assert.is_nil(source:find('"饥饿 "', 1, true), path)
+        end
     end)
 
     -- 文字宽度按「一字一列、ASCII 也按整列」估算（同任务条折行口径，宁宽勿溢）
@@ -245,9 +267,10 @@ describe('主界面接线（布局模块）', function()
         it('test_vital_texts_fit_at_max_values_' .. height, function()
             ctx = setUp(height)
             local c = GameCfg.Vitals
-            ctx.attributes.Health, ctx.attributes.MaxHealth = c.MaxHealth, c.MaxHealth
-            ctx.attributes.Hunger, ctx.attributes.MaxHunger = c.MaxHunger, c.MaxHunger
-            ctx.handler:ShowVitals()
+            ctx.writer:update_vitals({
+                health = c.MaxHealth, maxHealth = c.MaxHealth,
+                hunger = c.MaxHunger, maxHunger = c.MaxHunger,
+            })
             local health, hunger = ctx.nodes.HealthText, ctx.nodes.HungerText
             assert.same('饥饿度 ' .. c.MaxHunger, hunger.Text)
             for _, label in ipairs({ health, hunger }) do
