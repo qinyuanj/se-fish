@@ -1,10 +1,40 @@
 local ZoneMarkers = require("common.ZoneMarkers")
 ZoneMarkers.Start()
 
+local Number = require("common.Number")
+local SpokeClock = require("common.SpokeClock")
+local ClientStore = require("client.Store.ClientStore")
+local RootView = require("client.Views.RootView")
+local GameUI = require("client.GameUI")
+
 local LocalMgrUtil = require("client.LocalMgrUtil")
 LocalMgrUtil:Start()
 
 local Task = game:GetService("Task")
+local World = game:GetService("World")
+
+-- 客户端 Spoke 响应式主干（ADR-0032 / #296）：
+-- 写侧仅由 L1 入口持有并绑定宿主下行事件与空间传感器；_G.ClientSpoke 仅暴露只读侧给过渡期旧界面。
+local ok_now, initial_now = pcall(function() return World:GetServerTime() end) -- 启动瞬间宿主时钟可能未就绪，异常时安全回退 0
+local client_clock = SpokeClock.new(ok_now and Number.IsFiniteNumber(initial_now) and initial_now or 0)
+local client_store, client_store_writer = ClientStore.new({ clock = client_clock })
+client_store_writer:bind_host()
+_G.ClientSpoke = { Store = client_store, Clock = client_store.clock }
+
+Task:Spawn(function()
+    local waited = 0
+    local ui_root = GameUI:GetUIRoot()
+    while not ui_root and waited < 30 do
+        Task:Wait(0.05)
+        waited = waited + 0.05
+        ui_root = GameUI:GetUIRoot()
+    end
+    if ui_root then
+        RootView.mount(ui_root, client_store)
+    else
+        print("[client.main] 等待 EUI 根节点超时，跳过 Spoke 根视图树挂载")
+    end
+end)
 
 _G.MgrGameUI:HideLiftButton()
 _G.MgrGameUI:HideNativeHealth()
