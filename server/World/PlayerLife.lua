@@ -250,15 +250,10 @@ function PlayerLife.mount(s3, player_tree, opts)
         base = current
       end
     end
-    local weak = player_tree.get_modifier_remaining and player_tree:get_modifier_remaining("weak") or 0
     local paralyzed = states.is_paralyzed:now() == true
     local speed = base
     if finite_number(base) then
-      if paralyzed then
-        speed = 0
-      elseif weak > 0 then
-        speed = base * survival_cfg.WeakSpeedScale
-      end
+      if paralyzed then speed = 0 end
       pcall(function() controller.WalkSpeed = speed end)
     end
     if type(speed_writer) == "function" then
@@ -872,8 +867,9 @@ function PlayerLife.mount(s3, player_tree, opts)
   end
 
   s3:effect("WeakSpeedWatch", function(es)
-    local weak = es:d(states.is_weak)
-    if not weak then apply_walk() end
+    es:d(states.is_weak)
+    es:d(memos.walk_speed)
+    apply_walk()
   end)
 
   s3:subscribe(clock.on_second, function(sec)

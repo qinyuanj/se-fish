@@ -274,57 +274,51 @@ describe('TestWeakSpeedRouting', function()
     local ctx
 
     before_each(function()
-        ctx = { savedGame = rawget(_G, 'game'), now = 50, refreshes = {} }
-        local state = ctx
-        _G.game = { GetService = function(_, name)
-            if name == 'World' then return { GetServerTime = function() return state.now end } end
-            return {}
-        end }
-        -- REUtil 顶层按 RunService 注册服务端事件；单独跑本文件时用最小桩，不依赖其他用例先加载
-        ctx.savedRE = package.loaded['common.REUtil']
-        package.loaded['common.REUtil'] = ctx.savedRE or { GetRE = function()
-            return { OnServerEvent = signal(), FireClient = function() end } end,
-            CheckRECD = function() return false end }
-        ctx.s = assert(loadfile('server/Mgr/MgrSurvival.lua'))()
-        require('tests.support.modifier_runtime').AttachSurvival(ctx.s, function() return state.now end)
-        ctx.controller = { WalkSpeed = 21 } -- 已吃 20 个加速
-        ctx.player = { UserId = 13962, Character = { Controller = ctx.controller } }
-        ctx.state = { player = ctx.player, phase = 'alive' }
-        ctx.s.States[ctx.player.UserId] = ctx.state
-        ctx.s.SpeedWriter = { RefreshMoveSpeed = function(_, player)
-            local st = state.s:GetState(player)
-            state.refreshes[#state.refreshes + 1] = { player = player, weak = state.s.Modifier:GetRemaining(player, 'weak') > 0 }
-        end }
+        ctx = { refreshes = {} }
+        ctx.controller = { WalkSpeed = 21,
+            Health = 300, MaxHealth = 300,
+            HealthChanged = signal(), Died = signal() }
+        ctx.player = { UserId = 13962, attrs = {},
+            CharacterAdded = signal(), CharacterRemoving = signal(),
+            Character = { Controller = ctx.controller },
+            SetAttribute = function(self, key, value) self.attrs[key] = value end,
+            GetAttribute = function(self, key) return self.attrs[key] end }
+        ctx.host = require('tests.support.life_host').start({
+            now = 50,
+            speed_writer = function(player, speed)
+                ctx.refreshes[#ctx.refreshes + 1] = { player = player, speed = speed }
+            end,
+        })
+        ctx.host:add(ctx.player)
+        ctx.tree = ctx.host:tree(ctx.player)
     end)
 
     after_each(function()
-        if ctx then
-            _G.game = ctx.savedGame
-            package.loaded['common.REUtil'] = ctx.savedRE
-        end
+        if ctx and ctx.host then ctx.host:shutdown() end
     end)
 
-    -- 虚弱进出都走唯一写口，且退出时先清标记再重算
+    -- 虚弱进出都走唯一写口，移速由生命树按半速重算
     it('test_weak_enter_and_exit_route_to_single_writer', function()
-        ctx.s:ApplyWeak(ctx.state, 60)
-        assert.same({ { player = ctx.player, weak = true } }, ctx.refreshes)
-        assert.message('Survival 不再私写 WalkSpeed').same(21, ctx.controller.WalkSpeed)
-        ctx.s:ClearWeak(ctx.state)
-        assert.same(3, #ctx.refreshes)
-        assert.message('退出虚弱先清标记再重算，否则唯一计算口仍按虚弱算').is_false(ctx.refreshes[2].weak)
-        assert.same(21, ctx.controller.WalkSpeed)
-        assert.is_nil(ctx.state.weakUntil)
+        assert.is_true(ctx.tree:apply_modifier('weak', { duration = 60 }) == true)
+        assert.same(ctx.player, ctx.refreshes[1].player)
+        assert.near(10.5, ctx.controller.WalkSpeed, 1e-8)
+        ctx.tree:clear_modifier('weak')
+        assert.is_true(#ctx.refreshes >= 2)
+        assert.near(21, ctx.controller.WalkSpeed, 1e-8)
+        assert.equals(0, ctx.tree:get_modifier_remaining('weak'))
     end)
 
-    -- 缺速度写口仍只创建官方效果；不启用旧半速兜底。
+    -- 缺速度写口时虚弱仍是唯一状态，移速由生命树自己重算。
     it('test_without_writer_keeps_modifier_as_single_state_owner', function()
-        ctx.s.SpeedWriter = nil
-        ctx.s.Modifier.Ability = nil
-        ctx.s:ApplyWeak(ctx.state, 60)
-        assert.same(60, ctx.s.Modifier:GetRemaining(ctx.player, 'weak'))
-        assert.same(21, ctx.controller.WalkSpeed)
-        ctx.s:ClearWeak(ctx.state)
-        assert.same(0, ctx.s.Modifier:GetRemaining(ctx.player, 'weak'))
-        assert.same(21, ctx.controller.WalkSpeed)
+        ctx.host:shutdown()
+        ctx.host = require('tests.support.life_host').start({ now = 50 })
+        ctx.host:add(ctx.player)
+        ctx.tree = ctx.host:tree(ctx.player)
+        assert.is_true(ctx.tree:apply_modifier('weak', { duration = 60 }) == true)
+        assert.is_true(ctx.tree:get_modifier_remaining('weak') > 59)
+        assert.near(10.5, ctx.controller.WalkSpeed, 1e-8)
+        ctx.tree:clear_modifier('weak')
+        assert.equals(0, ctx.tree:get_modifier_remaining('weak'))
+        assert.near(21, ctx.controller.WalkSpeed, 1e-8)
     end)
 end)
