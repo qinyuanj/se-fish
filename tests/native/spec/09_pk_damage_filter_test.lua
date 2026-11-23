@@ -20,9 +20,8 @@ local function signal()
 end
 
 local WIRING = {
-  'WorldRuntime.life:SetDamageFilter(pkDamageFilter)',
-  'MgrMap.MgrParty.Vitals = Life',
-  'local pkDamageFilter = PkDamageFilter.make({',
+  'bind_party_action = function(dispatch)',
+  'bind_party_state_request = function(dispatch)',
 }
 
 local function assert_wiring()
@@ -69,7 +68,6 @@ describe('条款 9 PK 伤害过滤', function()
   local function join(userId, position)
     local player = newPlayer(userId, position)
     env.players:OnPlayerAdded(player)
-    env.party:OnPlayerAdded(player)
     env.lifeHost:add(player)
     drain()
     return player
@@ -134,13 +132,16 @@ describe('条款 9 PK 伤害过滤', function()
     -- 真区域解析：鱼塘边界来自与生产同一条 ZoneMarkers 路径，不写死坐标。
     env.zones = assert(loadfile('tests/support/zone_fixtures.lua'))()
     env.cfg = env.zones.Load()
-    env.party = assert(loadfile('server/Mgr/MgrParty.lua'))()
+    env.party = {}
+    function env.party:SameParty(a, b)
+      local squad = env.lifeHost and env.lifeHost.runtime.world.squad
+      return squad and squad:SameParty(a, b) or false
+    end
     env.lifeHost = require('tests.support.life_host').start({ now = 0, remote = re })
     env.vitals = env.lifeHost.runtime.life
     env.players = assert(loadfile('server/Mgr/MgrPlayerData.lua'))()
     env.save = assert(loadfile('server/Mgr/MgrSave.lua'))()
     env.players.Save, env.save.PlayerData = env.save, env.players
-    env.party.PlayerData, env.party.Save, env.party.Vitals = env.players, env.save, env.vitals
     env.filter = require('server.World.PkDamageFilter').make({
       party = env.party, zone_markers = require('common.ZoneMarkers'), zones = env.cfg.Zones,
     })
@@ -167,7 +168,6 @@ describe('条款 9 PK 伤害过滤', function()
         return env.lifeHost.runtime.life:WeaponAction(player, { action = 'attack', aim = aim })
       end,
     }
-    env.party:Start()
   end)
 
   after_each(function()

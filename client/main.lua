@@ -30,6 +30,7 @@ local ReelOverlayView = require("client.Views.ReelOverlayView")
 local CastSourceView = require("client.Views.CastSourceView")
 local ShopView = require("client.Views.ShopView")
 local FishermanView = require("client.Views.FishermanView")
+local SquadView = require("client.Views.SquadView")
 local Util = require("common.Util")
 local ScreenMain = require("client.ScreenHandlers.ScreenMain")
 local REUtil = require("common.REUtil")
@@ -57,6 +58,18 @@ local hud_reel = {}
 local hud_drop_resolvers = {}
 local fisherman_shared = {}
 local rescue_view_state = FishermanView.rescue_state({
+    get_players = function() return Players:GetPlayers() end,
+    get_local_player = function() return Players.LocalPlayer end,
+    is_squad_member = function(user_id)
+        local party = client_store.party:now()
+        if party.state ~= "party" then return false end
+        for _, row in ipairs(party.members) do
+            if not row.self and row.userId == user_id then return true end
+        end
+        return false
+    end,
+})
+local squad_rescue_view_state = SquadView.rescue_state({
     get_players = function() return Players:GetPlayers() end,
     get_local_player = function() return Players.LocalPlayer end,
 })
@@ -145,6 +158,9 @@ Task:Spawn(function()
                     REUtil:GetRE("GrillAction"):FireServer(payload)
                 end,
                 next_seq = next_action_seq,
+                send_party = function(payload)
+                    REUtil:GetRE("PartyAction"):FireServer(payload)
+                end,
                 send_shop = function(payload)
                     REUtil:GetRE("ShopAction"):FireServer(payload)
                 end,
@@ -212,6 +228,8 @@ Task:Spawn(function()
                     end)(),
                 }),
                 FishermanView.rescue_driver_spec(rescue_view_state),
+                SquadView.hud_spec(),
+                SquadView.rescue_driver_spec(squad_rescue_view_state),
                 MainHudVitalsView.spec(),
                 MainHudEquipPopups.spec({
                     open_popup = hud_open_popup,
@@ -295,6 +313,8 @@ Task:Spawn(function()
                     return rows
                 end)() }),
                 rescue = FishermanView.rescue_bubble_spec(rescue_view_state),
+                squad_members = SquadView.member_spec(),
+                squad_rescue = SquadView.rescue_bubble_spec(squad_rescue_view_state),
                 ground_loot = GroundLootView.bubble_spec({
                     send = function(payload)
                         REUtil:GetRE('ItemBarAction'):FireServer(payload)
@@ -315,7 +335,6 @@ _G.MgrGameUI:HideNativeHealth()
 
 local LocalMotorUnitCtrl = require("client.LocalMotorUnitCtrl")
 local LocalGM = require("client.LocalGM")
-local ScreenParty = require("client.ScreenHandlers.ScreenParty")
 local ScreenCompendium = require('client.ScreenHandlers.ScreenCompendium')
 
 
@@ -331,7 +350,6 @@ Task:Spawn(function()
     _G.MgrGameUI:StartGM()
 end)
 
-Task:Spawn(function() ScreenParty:Start() end)
 Task:Spawn(function() ScreenCompendium:Start() end)
 Task:Delay(1, function() 
     _G.MgrGameUI:OpenScreen("ScreenMsg")
