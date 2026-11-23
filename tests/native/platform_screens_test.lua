@@ -1,459 +1,156 @@
--- 迁移自 tests/gameplay/platform_screens_test.lua（#91）；行为契约原文见 #147 T26。
--- #147 T26 盲盒与平台购买客户端（client/ScreenHandlers/ScreenBlindbox、ScreenPlatform）失败方式先列：
---   1. 单抽 / 十连上行抽数或 seq 错，按钮价目与 GameCfg.Platform.Goods（10 / 90 金豆）不一致；
---   2. 满格落地前不提示就直接上行；提示后无法确认；空格够时也被拦；
---   3. 等待回包期间重复点击重复上行；回包丢失后界面永久卡死（超时不解锁）；
---   4. 同 operation.id 的重放回包重复展示 / 覆盖已展示结果；
---   5. 保底计数不随 State 握手（重进）与抽取结果刷新，大奖名不是内容表的保底奖品；
---   6. 不可用 / 取消 / 失败 / 超时没有玩家可读提示；
---   7. 测试驱动按钮在非测试 flow（生产）出现，或 flow 结束后不收起；驱动上行不是 PlatformTestAction；
---   8. 肾上腺素报价不按服务端回包渲染；购买上行错商品；发货溢出不告知落地件数；
---   9. client/main.lua 未启动两个界面。
--- seam：替换 game / REUtil / EUI 边界，直接调 handler 公共方法与 RE 回包；超时用 UpdateAwait(dt) 推进。
--- 两个旧类 TestScreenBlindbox / TestScreenPlatform 各自一个 describe，
--- 注册顺序 = LuaUnit 类名字典序 + 类内 sortedPairs 的实际执行顺序。
+-- 盲盒与地图商店界面宿主规格（#312）：真实 ClientStore + RootView + Views。
+local GameCfg = require("common.GameCfg")
+local ClientWorld = require("tests.support.economy_client")
 
--- GameUI 是真实 client.GameUI 装载时写下的模块全局（_G.GameUI），旧单进程 runner 里它跨套件长存；
--- 原生逐例隔离后纳入快照面，跑完不留下新全局。
-local OwnedUnits = require('common.OwnedUnits')
-local globalNames = { 'game', 'Vector2', 'Color', 'REUtil', 'LocalMsgNotice', 'PlatformShop', 'GameUI' }
-local moduleNames = { 'common.GameCfg', 'common.REUtil', 'client.GameUI' }
-
-local function signal()
-  local listeners = {}
-  return {
-    Connect = function(_, fn)
-      listeners[#listeners + 1] = fn
-      return { Disconnect = function() end }
-    end,
-    Fire = function(_, ...) for _, fn in ipairs(listeners) do fn(...) end end,
-  }
-end
-
--- 每例重建客户端边界夹具。返回 env 与一个只做「还原」的闭包，供 after_each 幂等调用。
-local function setUpClient()
-  local env = { previous = {}, previousLoaded = {}, nodes = {}, created = {}, commands = {}, notices = {}, events = {} }
-  for _, key in ipairs(globalNames) do
-    env.previous[key] = rawget(_G, key)
-  end
-  for _, name in ipairs(moduleNames) do
-    env.previousLoaded[name] = package.loaded[name]
-    package.loaded[name] = nil
-  end
-  env.cfg = require('common.GameCfg')
-  local world = {}
-  function world:CreateUnit(kind, attrs)
-    local node = { Kind = kind, OnClicked = signal(), Visible = true }
-    for key, value in pairs(attrs) do node[key] = value end
-    node.Destroy = function(me) me.Destroyed = true end
-    if node.Name then env.nodes[node.Name] = node end
-    env.created[#env.created + 1] = node
-    return node
-  end
-  function world:FindFirstChild() return nil end
-  local root = { Name = 'UIRoot', FindFirstChild = function() return nil end }
-  local eui = { GetRootNode = function() return root end,
-    GetDeviceResolution = function() return { x = 1920, y = 1080 } end }
-  env.heartbeat = signal()
-  rawset(_G, 'LocalMsgNotice', function(msg) env.notices[#env.notices + 1] = msg end)
-  rawset(_G, 'Vector2', { New = function(x, y) return { x = x, y = y } end })
-  rawset(_G, 'Color', { New = function(...) return { ... } end })
-  rawset(_G, 'game', { GetService = function(_, name)
-    if name == 'World' then return world end
-    if name == 'Players' then return { LocalPlayer = { PlayerGui = { EuiManager = eui }, UserId = 7 } } end
-    if name == 'RunService' then return { Heartbeat = env.heartbeat,
-      IsClient = function() return true end, IsServer = function() return false end } end
-    if name == 'Task' then return { Spawn = function(_, fn) fn() end, Wait = function() end } end
-  end })
-  local reStub = { GetRE = function(_, name)
-    if not env.events[name] then
-      env.events[name] = {
-        OnClientEvent = signal(),
-        FireServer = function(_, payload)
-          env.commands[#env.commands + 1] = { name = name, payload = payload }
-        end,
-      }
-    end
-    return env.events[name]
-  end }
-  package.loaded['common.REUtil'] = reStub
-  rawset(_G, 'REUtil', reStub)
-
-  env.restore = function()
-    for _, key in ipairs(globalNames) do
-      rawset(_G, key, env.previous[key])
-    end
-    for _, name in ipairs(moduleNames) do
-      package.loaded[name] = env.previousLoaded[name]
-    end
-  end
-  return env
-end
-
-local function sent(env, name)
-  local out = {}
-  for _, command in ipairs(env.commands) do
-    if command.name == name then out[#out + 1] = command.payload or {} end
-  end
-  return out
-end
-
--- 道具栏 + 背包快照：free 个空格（其余占满）
-local function snapshotWithFree(free)
-  local slots, backpack = {}, {}
-  for index = 1, 5 do slots[index] = { itemId = 'item1', count = 1 } end
-  for index = 1, 10 do backpack[index] = { itemId = 'item1', count = 1 } end
-  for index = 1, free do backpack[index] = nil end
-  return { slots = slots, slotCount = 5, backpack = backpack, backpackCount = 10 }
-end
-
-describe('盲盒界面（ScreenBlindbox）', function()
+describe("盲盒与地图商店界面（#312 RootView 宿主）", function()
   local env
+  before_each(function() env = ClientWorld.new() end)
+  after_each(function() if env then env:cleanup(); env = nil end end)
 
-  before_each(function()
-    -- 快照先于任何改动：夹具中途失败时 after_each 仍能还原。
-    env = setUpClient()
-    env.screen = assert(loadfile('client/ScreenHandlers/ScreenBlindbox.lua'))()
-    env.screen:Start()
+  local function open_blindbox()
+    env:open("blindbox")
+  end
+  local function blindbox_result(extra)
+    local value = { ok = true, seq = 1, pityAfter = 1, draws = { { itemKey = "item7", itemName = "极品罗非鱼" } }, operation = { id = "op-1" } }
+    for key, item in pairs(extra or {}) do value[key] = item end
+    return value
+  end
+
+  it("test_awaiting_blocks_repeat_clicks_and_times_out_with_original_query", function()
+    open_blindbox()
+    env:click("BtnBlindboxSingle")
+    env:click("BtnBlindboxTen")
+    assert.same(1, #env.sent.blindbox)
+    env:step(GameCfg.Blindbox.ResultTimeoutSec - 1)
+    assert.same(1, #env.sent.blindbox)
+    env:step(1)
+    assert.same(2, #env.sent.blindbox)
+    assert.same("Query", env.sent.blindbox[2].action)
+    assert.matches("原请求", env.notices[#env.notices])
   end)
 
-  after_each(function()
-    if env and env.restore then env.restore() end
+  it("test_buttons_show_platform_prices_and_send_counts", function()
+    open_blindbox()
+    assert.matches(tostring(GameCfg.Platform.Goods.blindboxSingle.beans), env:child("BtnBlindboxSingle").Text)
+    assert.matches(tostring(GameCfg.Platform.Goods.blindboxTen.beans), env:child("BtnBlindboxTen").Text)
+    env:click("BtnBlindboxTen")
+    assert.same({ action = "Draw", count = 10, seq = 1 }, env.sent.blindbox[1])
+  end)
+
+  it("test_failures_have_readable_notices_and_unlock", function()
+    open_blindbox()
+    env:click("BtnBlindboxSingle")
+    env:ingest("BlindboxResult", { ok = false, seq = 1, reason = "cancel" })
+    assert.is_true(env:child("BtnBlindboxSingle").TouchEnabled)
+    assert.is_true(#env.notices > 0)
+    env:click("BtnBlindboxSingle")
+    assert.same(2, env.sent.blindbox[2].seq)
+  end)
+
+  it("test_full_inventory_warns_before_landing_and_second_click_confirms", function()
+    env:bar({
+      slotCount = 1, slots = { { itemId = "item7", count = 1 } },
+      backpackCount = 1, backpack = { { itemId = "item7", count = 1 } },
+    })
+    open_blindbox()
+    env:click("BtnBlindboxSingle")
+    assert.same(0, #env.sent.blindbox)
+    assert.matches("已满", env:child("LabelBlindboxResult").Text)
+    env:click("BtnBlindboxSingle")
+    assert.same(1, #env.sent.blindbox)
+  end)
+
+  it("test_old_response_cannot_unlock_new_request", function()
+    open_blindbox()
+    env:click("BtnBlindboxSingle")
+    env:ingest("BlindboxResult", { ok = false, seq = 1, reason = "cancel" })
+    env:click("BtnBlindboxTen")
+    env:ingest("BlindboxResult", blindbox_result({ seq = 1 }))
+    assert.is_false(env:child("BtnBlindboxTen").TouchEnabled)
+    env:ingest("BlindboxResult", blindbox_result({ seq = 2, operation = { id = "op-2" } }))
+    assert.is_true(env:child("BtnBlindboxTen").TouchEnabled)
+  end)
+
+  it("test_pending_adopts_original_identity_after_lost_state", function()
+    open_blindbox()
+    env:click("BtnBlindboxSingle")
+    env:ingest("BlindboxResult", {
+      ok = false, seq = 1, originalSeq = 1, requestId = "req-1",
+      reason = "busy", deliveryPending = true,
+    })
+    env:step(GameCfg.Blindbox.ResultTimeoutSec)
+    assert.same({ action = "Query", count = 1, seq = 1, requestId = "req-1" }, env.sent.blindbox[2])
+  end)
+
+  it("test_result_shows_draws_updates_pity_and_ignores_replay", function()
+    open_blindbox()
+    env:ingest("BlindboxResult", blindbox_result({ recovered = true }))
+    local text = env:child("LabelBlindboxResult").Text
+    assert.matches("极品罗非鱼", text)
+    assert.matches("已连续 1 次", env:child("LabelBlindboxPity").Text)
+    env:ingest("BlindboxResult", blindbox_result({ pityAfter = 9, draws = { { itemKey = "item31" } } }))
+    assert.same(text, env:child("LabelBlindboxResult").Text)
+    assert.matches("已连续 1 次", env:child("LabelBlindboxPity").Text)
+  end)
+
+  it("test_entry_opens_panel_and_handshakes_state", function()
+    assert.is_true(env:click("BtnBlindboxEntry"))
+    assert.same("blindbox", env.store.active_modal:now())
+    assert.same(1, env.sent.blindbox_state)
+    env:ingest("BlindboxResult", { ok = true, action = "State", pity = 3 })
+    assert.matches("已连续 3 次", env:child("LabelBlindboxPity").Text)
+  end)
+
+  it("test_state_handshake_refreshes_pity_with_content_prize_names", function()
+    open_blindbox()
+    env:ingest("BlindboxResult", { ok = true, action = "State", pity = 0 })
+    assert.matches("大奖", env:child("LabelBlindboxPity").Text)
+    assert.matches("极品", env:child("LabelBlindboxPity").Text)
+  end)
+
+  it("test_blindbox_clear_and_rebuild_do_not_stack_nodes_or_listeners", function()
+    open_blindbox()
+    local panel, button = env:child("ScreenBlindbox"), env:child("BtnBlindboxSingle")
+    env:click("BtnBlindboxClose")
+    env:open("blindbox")
+    assert.is_true(panel.Destroyed)
+    assert.same(0, button.OnClicked:Count())
+    assert.are_not.equal(panel, env:child("ScreenBlindbox"))
+  end)
+
+  it("test_adrenaline_offers_render_server_prices_and_buy_selected_goods", function()
+    env:open("platform")
+    env:ingest("PlatformResult", { ok = true, action = "AdrenalineShop", offers = {
+      { key = "adrenaline1", name = "肾上腺素", beans = 1 },
+      { key = "adrenaline5", name = "肾上腺素×5", beans = 4 },
+    } })
+    assert.matches("4", env:child("BtnPlatformOffer_adrenaline5").ButtonText)
+    env:click("BtnPlatformOffer_adrenaline5")
+    assert.same({ action = "Purchase", goods = "adrenaline5", seq = 1 }, env.sent.platform[1])
+    assert.is_false(env:child("BtnPlatformOffer_adrenaline5").Visible)
+  end)
+
+  it("test_hud_map_shop_entry_opens_coin_shop", function()
+    assert.is_true(env:click("BtnMapShopEntry"))
+    assert.same("platform", env.store.active_modal:now())
+    assert.same({ action = "OpenCoinShop" }, env.sent.platform[1])
+  end)
+
+  it("test_unavailable_and_failures_are_readable_and_grant_reports_overflow", function()
+    env:open("platform")
+    env:ingest("PlatformResult", { ok = false, reason = "unavailable" })
+    assert.matches("不可用", env:child("LabelPlatformResult").Text)
+    env:ingest("PlatformResult", { ok = true, action = "Grant", goods = "adrenaline5", overflow = 2 })
+    assert.matches("2 件落在面前地上", env:child("LabelPlatformResult").Text)
+  end)
+
+  it("test_platform_clear_and_rebuild_do_not_stack_nodes_or_listeners", function()
+    env:open("platform")
+    local panel, button = env:child("ScreenPlatform"), env:child("BtnPlatformClose")
+    env:cleanup()
+    assert.is_true(panel.Destroyed)
+    assert.is_true(button.Destroyed)
+    assert.same(0, button.OnClicked:Count())
     env = nil
-  end)
-
-  local function fireItemBar(state)
-    env.events.ItemBarState.OnClientEvent:Fire(state)
-  end
-
-  local function fireResult(result)
-    env.events.BlindboxResult.OnClientEvent:Fire(result)
-  end
-
-  it('test_awaiting_blocks_repeat_clicks_and_times_out', function()
-    fireItemBar(snapshotWithFree(15))
-    assert.is_true(env.screen:Draw(1))
-    assert.is_false(env.screen:Draw(1))
-    assert.same(1, #sent(env, 'BlindboxAction'))
-    env.heartbeat:Fire(env.cfg.Blindbox.ResultTimeoutSec - 1)
-    assert.is_false(env.screen:Draw(1)) -- 支付等待中仍锁
-    env.heartbeat:Fire(1)
-    assert.matches('超时', env.notices[#env.notices], 1, true)
-    assert.is_false(env.screen:Draw(1))
-    assert.same('Query', sent(env, 'BlindboxAction')[2].action)
-    assert.same(1, sent(env, 'BlindboxAction')[2].seq)
-  end)
-
-  it('test_buttons_show_platform_prices_and_send_counts', function()
-    assert.matches('10金豆', env.nodes.BtnBlindboxSingleText.Text, 1, true)
-    assert.matches('90金豆', env.nodes.BtnBlindboxTenText.Text, 1, true)
-    fireItemBar(snapshotWithFree(10))
-    env.nodes.BtnBlindboxSingle.OnClicked:Fire()
-    fireResult({ ok = true, operation = { id = 'op1' }, pityAfter = 1,
-      draws = { { itemKey = 'item1', itemName = '甲' } }, grounded = 0 })
-    env.nodes.BtnBlindboxTen.OnClicked:Fire()
-    local draws = sent(env, 'BlindboxAction')
-    assert.same({ action = 'Draw', count = 1, seq = 1 }, draws[1])
-    assert.same({ action = 'Draw', count = 10, seq = 2 }, draws[2])
-  end)
-
-  it('test_failures_have_readable_notices_and_unlock', function()
-    fireItemBar(snapshotWithFree(15))
-    env.screen:Draw(1)
-    fireResult({ ok = false, reason = 'unavailable' })
-    assert.same(env.cfg.Blindbox.UnavailableText, env.notices[#env.notices])
-    assert.is_true(env.screen:Draw(1)) -- 失败即解锁
-    for _, reason in ipairs({ 'cancel', 'fail', 'timeout', 'pending', 'busy' }) do
-      fireResult({ ok = false, reason = reason })
-      assert.same(env.cfg.Platform.ReasonText[reason], env.notices[#env.notices])
-    end
-  end)
-
-  it('test_full_inventory_warns_before_landing_and_second_click_confirms', function()
-    fireItemBar(snapshotWithFree(3))
-    assert.is_true(env.screen:Draw(1)) -- 3 个空格够单抽：不拦
-    fireResult({ ok = true, operation = { id = 'op1' }, pityAfter = 1, draws = {}, grounded = 0 })
-    assert.is_false(env.screen:Draw(10)) -- 放不下十连：先提示
-    assert.same(env.cfg.Blindbox.FullNoticeText, env.notices[#env.notices])
-    assert.same(1, #sent(env, 'BlindboxAction'))
-    assert.is_true(env.screen:Draw(10)) -- 同一抽数再点确认
-    assert.same(10, sent(env, 'BlindboxAction')[2].count)
-  end)
-
-  it('test_old_response_cannot_unlock_new_request', function()
-    fireItemBar(snapshotWithFree(15))
-    env.screen:Draw(1)
-    fireResult({ ok = false, reason = 'cancel', seq = 1 })
-    env.screen:Draw(1)
-    fireResult({ ok = true, seq = 1, operation = { id = 'old' }, draws = {} })
-    assert.is_true(env.screen.Awaiting)
-    assert.same(2, env.screen.Seq)
-  end)
-
-  it('test_pending_adopts_original_identity_after_lost_state', function()
-    fireItemBar(snapshotWithFree(15))
-    env.screen.Seq = 1 -- State 握手丢失，新请求撞上原未决意图
-    env.screen:Draw(1)
-    fireResult({ ok = false, reason = 'busy', seq = 2, originalSeq = 1,
-      requestId = 'original', deliveryPending = true })
-    env.heartbeat:Fire(env.cfg.Blindbox.ResultTimeoutSec)
-    local query = sent(env, 'BlindboxAction')[2]
-    assert.same(1, query.seq)
-    assert.same('original', query.requestId)
-    fireResult({ ok = true, seq = 1, requestId = 'original', operation = { id = 'original' }, draws = {} })
-    assert.is_false(env.screen.Awaiting)
-    assert.is_true(env.screen:Draw(1))
-  end)
-
-  it('test_result_shows_draws_updates_pity_and_ignores_replay', function()
-    fireItemBar(snapshotWithFree(15))
-    env.screen:Draw(10)
-    fireResult({ ok = true, operation = { id = 'op9' }, pityBefore = 45, pityAfter = 0, grounded = 2,
-      draws = { { itemName = '鲫鱼' }, { itemName = '极品美人鱼', jackpot = true, guaranteed = true },
-        { itemName = '鲤鱼', landed = true } } })
-    local text = env.nodes.LabelBlindboxResult.Text
-    assert.matches('极品美人鱼（保底）', text, 1, true)
-    assert.matches('鲤鱼（落在地上）', text, 1, true)
-    assert.matches('2 件物品落在面前地上', env.notices[#env.notices], 1, true)
-    assert.matches('已连续 0 次', env.nodes.LabelBlindboxPity.Text, 1, true)
-    local noticeCount = #env.notices
-    env.nodes.LabelBlindboxResult.Text = 'kept'
-    fireResult({ ok = true, operation = { id = 'op9' }, pityAfter = 0, grounded = 2, draws = {} })
-    assert.same('kept', env.nodes.LabelBlindboxResult.Text) -- 重放不覆盖
-    assert.same(noticeCount, #env.notices)
-  end)
-
-  it('test_start_handshakes_state_and_entry_toggles_panel', function()
-    assert.same(1, #sent(env, 'BlindboxStateRequest')) -- 重进握手
-    assert.is_false(env.nodes.ScreenBlindbox.Visible)
-    env.nodes.BtnBlindboxEntry.OnClicked:Fire()
-    assert.is_true(env.nodes.ScreenBlindbox.Visible)
-    assert.same(2, #sent(env, 'BlindboxStateRequest')) -- 开面板再拉一次计数
-    env.nodes.BtnBlindboxClose.OnClicked:Fire()
-    assert.is_false(env.nodes.ScreenBlindbox.Visible)
-  end)
-
-  -- #179：入口位置取自主界面布局模块的右上入口组；盲盒节点 Anchor=(0,0)，Position 是左下角
-  it('test_entry_position_from_main_hud_layout', function()
-    local rect = require('client.MainHudLayout').Compute({ width = 1920, height = 1080, itemBarSlots = 2 })
-      .Rects.BlindboxEntry
-    local entry = env.nodes.BtnBlindboxEntry
-    assert.same({ x = rect.x - rect.w / 2, y = rect.y - rect.h / 2 }, entry.Position)
-    assert.same({ x = rect.w, y = rect.h }, entry.Size)
-    assert.same(entry.Position, env.nodes.BtnBlindboxEntryText.Position)
-  end)
-
-  it('test_state_handshake_refreshes_pity_with_content_prize_names', function()
-    fireResult({ ok = true, action = 'State', pity = 49, guaranteeAt = 50 })
-    local text = env.nodes.LabelBlindboxPity.Text
-    assert.matches('已连续 49 次', text, 1, true)
-    assert.matches('再抽 1 次', text, 1, true)
-    assert.matches('极品美人鱼', text, 1, true) -- 内容表 Pity.prizeItemKeys → 名字
-    assert.matches('极品蛇颈龙', text, 1, true)
-  end)
-
-  -- #174 #16/#17：按钮用 ButtonNormalColor；面板子节点按父节点左下角原点布局，Y 向上，
-  -- 子节点坐标与尺寸都落在面板尺寸以内，文字与按钮同位、居中。
-  it('test_buttons_use_normal_color_and_panel_children_inside_bounds', function()
-    for _, name in ipairs({ 'BtnBlindboxEntry', 'BtnBlindboxSingle', 'BtnBlindboxTen', 'BtnBlindboxClose' }) do
-      local button = env.nodes[name]
-      assert.is_nil(button.Color, name)
-      assert.is_not_nil(button.ButtonNormalColor, name)
-      local label = env.nodes[name .. 'Text']
-      -- 文字挂按钮父节点、与按钮同位同尺寸（EUIButton 下文字子节点不渲染）
-      assert.equal(button.Parent, label.Parent, name)
-      assert.same(button.Position, label.Position, name)
-      assert.same(button.Size, label.Size, name)
-      assert.same(1, label.TextHorizontalAlignment, name)
-      assert.same(1, label.TextVerticalAlignment, name)
-    end
-    local panel = env.nodes.ScreenBlindbox
-    assert.same({ x = 0.5, y = 0.5 }, panel.Anchor, 'panel centered on screen')
-    -- 引擎子节点按父节点左下角算坐标（Anchor=0,0），按钮与文字都落在父面板尺寸内
-    for _, name in ipairs({ 'LabelBlindboxTitle', 'LabelBlindboxPity', 'LabelBlindboxResult',
-      'BtnBlindboxSingle', 'BtnBlindboxTen', 'BtnBlindboxClose' }) do
-      local node = env.nodes[name]
-      assert.equal(panel, node.Parent, name)
-      assert.same({ x = 0, y = 0 }, node.Anchor, name .. ' anchor')
-      assert.is_true(node.Position.x >= 0, name .. ' x>=0')
-      assert.is_true(node.Position.y >= 0, name .. ' y>=0')
-      assert.is_true(node.Position.x + node.Size.x <= panel.Size.x, name .. ' right')
-      assert.is_true(node.Position.y + node.Size.y <= panel.Size.y, name .. ' top')
-    end
-    -- Y 向上：标题最高，保底其次，按钮最低
-    assert.is_true(env.nodes.LabelBlindboxTitle.Position.y > env.nodes.LabelBlindboxPity.Position.y)
-    assert.is_true(env.nodes.LabelBlindboxPity.Position.y > env.nodes.BtnBlindboxSingle.Position.y)
-    assert.is_true(env.nodes.LabelBlindboxResult.Position.y > env.nodes.BtnBlindboxSingle.Position.y)
-    -- 单抽左、十连中、关闭右
-    assert.is_true(env.nodes.BtnBlindboxSingle.Position.x < env.nodes.BtnBlindboxTen.Position.x)
-    assert.is_true(env.nodes.BtnBlindboxTen.Position.x < env.nodes.BtnBlindboxClose.Position.x)
-  end)
-
-  -- #211：节点一律登记到归属登记，清空只走登记表，不再从 Nodes 枚举
-  it('test_clear_destroys_every_registered_node_and_resets_lookup', function()
-    -- 入口按钮与文字 + 面板 + 面板内 9 个：数本轮夹具实际收到的建点，不写死
-    assert.same(#env.created, OwnedUnits.Count(env.screen))
-    env.screen:Clear()
-    assert.same(0, OwnedUnits.Count(env.screen))
-    for name, node in pairs(env.nodes) do
-      if not node.Destroyed then
-        assert.is_true(false, name .. ' 建过但清空后没销毁')
-      end
-    end
-    assert.same({}, env.screen.Nodes)
-    assert.is_nil(env.screen.Panel)
-    env.screen:Clear() -- 幂等：重复清空不报错
-    assert.same(0, OwnedUnits.Count(env.screen))
-  end)
-
-  -- 重建前先清空：重试循环里上一轮部分成功建出的入口 / 面板不叠到第二轮上
-  it('test_build_nodes_rebuild_does_not_stack_previous_attempt', function()
-    local firstEntry = env.nodes.BtnBlindboxEntry
-    local before = #env.created
-    assert.is_true(env.screen:BuildNodes())
-    assert.is_true(firstEntry.Destroyed, '上一轮入口按钮应被拆掉')
-    assert.not_equal(firstEntry, env.nodes.BtnBlindboxEntry)
-    assert.same(#env.created - before, OwnedUnits.Count(env.screen)) -- 登记表只留新一轮
-  end)
-end)
-
-describe('平台购买界面（ScreenPlatform）', function()
-  local env
-
-  before_each(function()
-    env = setUpClient()
-    env.panel = assert(loadfile('client/ScreenHandlers/ScreenPlatform.lua'))()
-    env.panel:Start()
-  end)
-
-  after_each(function()
-    if env and env.restore then env.restore() end
-    env = nil
-  end)
-
-  local function fire(result)
-    env.events.PlatformResult.OnClientEvent:Fire(result)
-  end
-
-  it('test_adrenaline_offers_render_server_prices_and_buy_selected_goods', function()
-    fire({ ok = true, action = 'AdrenalineShop', offers = {
-      { key = 'adrenaline1', name = '肾上腺素', beans = 1 },
-      { key = 'adrenaline5', name = '肾上腺素×5', beans = 4 } } })
-    assert.is_true(env.nodes.PlatformOffers.Visible)
-    assert.same('肾上腺素×5（4金豆）', env.nodes.BtnPlatformOffer2Text.Text)
-    env.nodes.BtnPlatformOffer2.OnClicked:Fire()
-    assert.same({ action = 'Purchase', goods = 'adrenaline5' }, sent(env, 'PlatformAction')[1])
-    assert.is_false(env.nodes.PlatformOffers.Visible)
-  end)
-
-  it('test_client_main_starts_both_screens', function()
-    local file = assert(io.open('client/main.lua', 'r'))
-    local src = file:read('a')
-    file:close()
-    assert.matches('require("client.ScreenHandlers.ScreenBlindbox")', src, 1, true)
-    assert.matches('ScreenBlindbox:Start()', src, 1, true)
-    assert.matches('require("client.ScreenHandlers.ScreenPlatform")', src, 1, true)
-    assert.matches('ScreenPlatform:Start()', src, 1, true)
-  end)
-
-  it('test_coin_shop_entry_is_global_for_screen_shop', function()
-    assert.are.equal(env.panel, rawget(_G, 'PlatformShop'))
-    env.panel:Open()
-    assert.same({ action = 'OpenCoinShop' }, sent(env, 'PlatformAction')[1])
-  end)
-
-  -- #275：主 HUD 右上常驻「地图商店」。失败方式：
-  --   1. 入口不在布局预留的 ShopEntry 上，或文字不是「地图商店」（玩家看不见这颗按钮）；
-  --   2. 点击走了另一条打开路径（另发请求、打开钓场商店），而不是金币页同一条 PlatformShop.Open；
-  --   3. 平台能力缺失或打开失败时没有金币页同款失败文案，或把失败记成已打开、拆掉入口。
-  it('test_hud_map_shop_entry_sits_on_reserved_slot_and_opens_coin_shop', function()
-    local layout = require('client.MainHudLayout').Compute({ width = 1920, height = 1080 }).Rects
-    local rect = layout.ShopEntry
-    local compendium, blindbox = layout.CompendiumEntry, layout.BlindboxEntry
-    local entry = env.nodes.BtnMapShopEntry
-    assert.is_not_nil(entry, '主 HUD 应有地图商店入口')
-    assert.same('地图商店', env.nodes.BtnMapShopEntryText.Text)
-    assert.equal(entry.Parent, env.nodes.BtnMapShopEntryText.Parent)
-    assert.same(entry.Position, env.nodes.BtnMapShopEntryText.Position)
-    assert.same(entry.Size, env.nodes.BtnMapShopEntryText.Size)
-    assert.same({ x = rect.x, y = rect.y }, { x = entry.Position.x, y = entry.Position.y })
-    assert.same({ x = rect.w, y = rect.h }, { x = entry.Size.x, y = entry.Size.y })
-    assert.is_true(compendium.x < rect.x and rect.x < blindbox.x, '从左到右应为图鉴、地图商店、盲盒')
-
-    local before = #sent(env, 'PlatformAction')
-    entry.OnClicked:Fire()
-    local actions = sent(env, 'PlatformAction')
-    assert.same(before + 1, #actions)
-    assert.same({ action = 'OpenCoinShop' }, actions[#actions])
-  end)
-
-  it('test_hud_map_shop_entry_reports_existing_failure_and_stays', function()
-    local entry = env.nodes.BtnMapShopEntry
-    assert.is_not_nil(entry)
-    local texts = require('client.LocalShop').ShopText
-
-    rawset(_G, 'PlatformShop', nil)
-    entry.OnClicked:Fire()
-    assert.same(texts.PlatformUnavailable, env.notices[#env.notices])
-    assert.same(0, #sent(env, 'PlatformAction'))
-    assert.is_not_true(entry.Destroyed, '失败后入口仍在')
-
-    rawset(_G, 'PlatformShop', { Open = function() error('平台未接入') end })
-    entry.OnClicked:Fire()
-    assert.same(texts.PlatformOpenFailed, env.notices[#env.notices])
-    assert.is_falsy(env.notices[#env.notices]:find('平台未接入', 1, true))
-    assert.same(0, #sent(env, 'PlatformAction'))
-    assert.is_not_true(entry.Destroyed)
-  end)
-
-  it('test_test_driver_only_follows_test_flow_notices', function()
-    assert.is_false(env.nodes.PlatformTestDriver.Visible)
-    fire({ ok = true, action = 'TestFlow', open = true, key = 'blindboxTen' })
-    assert.is_true(env.nodes.PlatformTestDriver.Visible)
-    assert.matches('blindboxTen', env.nodes.PlatformTestDriverTitle.Text, 1, true)
-    env.nodes.BtnPlatformTest_success.OnClicked:Fire()
-    assert.same({ action = 'ResolveFlow', outcome = 'success' }, sent(env, 'PlatformTestAction')[1])
-    fire({ ok = true, action = 'TestFlow', open = false })
-    assert.is_false(env.nodes.PlatformTestDriver.Visible)
-  end)
-
-  it('test_unavailable_and_failures_are_readable_and_grant_reports_overflow', function()
-    fire({ ok = false, action = 'AdrenalineShop', reason = 'unavailable' })
-    assert.same(env.cfg.Platform.UnavailableText, env.notices[#env.notices])
-    assert.is_not_true(env.nodes.PlatformOffers.Visible)
-    fire({ ok = false, action = 'Purchase', goods = 'adrenaline1', reason = 'cancel' })
-    assert.same(env.cfg.Platform.ReasonText.cancel, env.notices[#env.notices])
-    fire({ ok = true, action = 'Grant', goods = 'adrenaline5', overflow = 2 })
-    assert.matches('肾上腺素×5', env.notices[#env.notices], 1, true)
-    assert.matches('2 件落在面前地上', env.notices[#env.notices], 1, true)
-  end)
-
-  -- #211：同上，清空后报价面板撤销、查找表复位，销毁不再自持表
-  it('test_clear_destroys_every_registered_node_and_resets_lookup', function()
-    env.panel:ShowOffers({ { key = 'adrenaline1', name = '肾上腺素', beans = 1 } })
-    assert.is_not_nil(env.panel.Offers)
-    -- 报价面板 8 个 + 测试驱动面板 8 个：数本轮夹具实际收到的建点，不写死
-    assert.same(#env.created, OwnedUnits.Count(env.panel))
-    env.panel:Clear()
-    assert.same(0, OwnedUnits.Count(env.panel))
-    for name, node in pairs(env.nodes) do
-      if not node.Destroyed then
-        assert.is_true(false, name .. ' 建过但清空后没销毁')
-      end
-    end
-    assert.same({}, env.panel.Nodes)
-    assert.is_nil(env.panel.Offers)
-    env.panel:Clear() -- 幂等：重复清空不报错
-    assert.same(0, OwnedUnits.Count(env.panel))
-  end)
-
-  -- 同上：重建不叠重复节点
-  it('test_build_nodes_rebuild_does_not_stack_previous_attempt', function()
-    local firstOffers = env.nodes.PlatformOffers
-    local before = #env.created
-    assert.is_true(env.panel:BuildNodes())
-    assert.is_true(firstOffers.Destroyed, '上一轮报价面板应被拆掉')
-    assert.not_equal(firstOffers, env.nodes.PlatformOffers)
-    assert.same(#env.created - before, OwnedUnits.Count(env.panel)) -- 登记表只留新一轮
   end)
 end)

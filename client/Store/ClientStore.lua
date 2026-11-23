@@ -387,6 +387,9 @@ function ClientStore.new(options)
     story = State.new("ClientStore.story", nil),
     ferry = State.new("ClientStore.ferry", nil),
     grill = State.new("ClientStore.grill", nil),
+    lottery_result = State.new("ClientStore.lottery_result", nil),
+    blindbox_result = State.new("ClientStore.blindbox_result", nil),
+    platform_result = State.new("ClientStore.platform_result", nil),
     compendium = State.new("ClientStore.compendium", nil),
     records = State.new("ClientStore.records", nil),
     position = State.new("ClientStore.position", nil, position_equals),
@@ -417,6 +420,9 @@ function ClientStore.new(options)
     StoryState = { state = states.story, normalize = normalize_table_snapshot },
     FerryState = { state = states.ferry, normalize = normalize_table_snapshot },
     GrillState = { state = states.grill, normalize = normalize_table_snapshot },
+    LotteryResult = { state = states.lottery_result, normalize = normalize_table_snapshot },
+    BlindboxResult = { state = states.blindbox_result, normalize = normalize_table_snapshot },
+    PlatformResult = { state = states.platform_result, normalize = normalize_table_snapshot },
     CompendiumState = { state = states.compendium, normalize = normalize_table_snapshot },
     RecordsState = { state = states.records, normalize = normalize_table_snapshot },
   }
@@ -435,6 +441,9 @@ function ClientStore.new(options)
     story = readonly_signal(states.story, "ClientStore.story"),
     ferry = readonly_signal(states.ferry, "ClientStore.ferry"),
     grill = readonly_signal(states.grill, "ClientStore.grill"),
+    lottery_result = readonly_signal(states.lottery_result, "ClientStore.lottery_result"),
+    blindbox_result = readonly_signal(states.blindbox_result, "ClientStore.blindbox_result"),
+    platform_result = readonly_signal(states.platform_result, "ClientStore.platform_result"),
     compendium = readonly_signal(states.compendium, "ClientStore.compendium"),
     records = readonly_signal(states.records, "ClientStore.records"),
     position = readonly_signal(states.position, "ClientStore.position"),
@@ -607,6 +616,9 @@ function ClientStore.new(options)
       states.story:set(nil)
       states.ferry:set(nil)
       states.grill:set(nil)
+      states.lottery_result:set(nil)
+      states.blindbox_result:set(nil)
+      states.platform_result:set(nil)
       states.compendium:set(nil)
       states.records:set(nil)
       states.position:set(nil)

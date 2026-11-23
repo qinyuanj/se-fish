@@ -1,3 +1,4 @@
+local EconomyWorld = require('tests.support.economy_world')
 -- 条款 18（docs/acceptance/18-save-and-recovery.md）：会话 fencing、版本校验、重连落点与虚弱恢复、
 -- 个人/共享状态隔离、旧档升级，以及摆渡结算的可重试操作身份。
 -- 只走业务入口：进入的是 server/main.lua 的 MgrMap 注册管理器——MgrPlayerData / MgrSave / MgrFerry /
@@ -281,31 +282,38 @@ describe('条款 18 存档会话与结算身份', function()
 
   -- 18-24（review #249-4）：发奖走同一条持久操作协议，同一身份重试只补回执、不再发一次。
   it('发奖重放只回执、只发一次', function()
-    local uid = 5205
-    local player, data = ready(uid)
-    env.platform = assert(loadfile('server/Mgr/MgrPlatform.lua'))()
-    env.platform.Save, env.platform.PlayerData = env.save, env.players
+    local shop = EconomyWorld.new()
+    local uid = shop.player.UserId
     local itemId = env.cfg.Platform.Goods.adrenaline1.itemId
-    local before = #storeSnapshot(uid).meta.operations
+    local function snapshot() return shop.values[env.cfg.Save.KeyPrefix .. tostring(uid)] end
+    local before = #snapshot().meta.operations
 
-    assert.is_true(env.platform:GrantGoods(player, 'adrenaline1', 1))
-    drain()
-    local first = lastReply('PlatformResult').payload
+    env.cfg.Debug = { Enabled = true }
+    env.cfg.Platform.Placeholder.Enabled = false
+    assert.is_true(shop:platformAction({ action = 'Purchase', goods = 'adrenaline1', seq = 1 }))
+    local opened = shop:lastResult('PlatformResult')
+    assert.is_not_nil(opened, '购买必须有支付回包')
+    assert.same('TestFlow', opened.action, tostring(opened.reason))
+    assert.is_true(opened.open)
+    shop:resolvePlatform('success')
+    local first = shop:lastResult('PlatformResult')
     assert.is_true(first.ok, tostring(first.reason))
-    assert.is_not_nil(first.operation, '回执要带可重试的操作身份')
+    assert.is_not_nil(first.requestId, '回执要带可重试的请求身份')
     assert.same(1, first.granted)
-    assert.same(1, data:ItemCount(itemId))
-    assert.same(before + 1, #storeSnapshot(uid).meta.operations)
+    assert.same(1, shop.data:ItemCount(itemId))
+    assert.same(before + 3, #snapshot().meta.operations, '支付意图、已支付与发奖各落一笔')
 
-    assert.is_true(env.platform:GrantGoods(player, 'adrenaline1', 1, first.operation))
-    drain()
-    local replay = lastReply('PlatformResult').payload
+    shop:clearEvents()
+    assert.is_true(shop:platformAction({ action = 'Query', seq = 2, requestId = first.requestId }))
+    local replay = shop:lastResult('PlatformResult')
     assert.is_true(replay.ok)
-    assert.same(first.operation.id, replay.operation.id, '重放认得原操作身份')
+    assert.same(first.requestId, replay.requestId, '重放认得原请求身份')
     assert.same(1, replay.granted, '回执仍是原来那一次发放')
-    assert.same(1, data:ItemCount(itemId), '重放不得重复发奖')
-    assert.same(before + 1, #storeSnapshot(uid).meta.operations, '重放不得再记一笔发放')
+    assert.same(1, shop.data:ItemCount(itemId), '重放不得重复发奖')
+    assert.same(before + 3, #snapshot().meta.operations, '重放不得再记一笔发放')
+    shop:tearDown()
   end)
+
 
   -- 条款 18-04（升级/购买/药水次数）、18-05（血量与饥饿）、18-06（濒死与死亡标记）、
   -- 18-07（图鉴个人重量）、18-08（任务进度与剧情已读）、18-09（到达集合）、

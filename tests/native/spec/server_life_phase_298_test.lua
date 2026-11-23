@@ -249,7 +249,9 @@ describe("玩家生命双层相位宿主接缝（#298）", function()
           self.pending = on_result
           return true
         end,
-        OpenAdrenalineShop = function() return true end,
+        ShopAction = function(_, payload)
+          return type(payload) == "table" and payload.action == "OpenAdrenaline"
+        end,
         finish = function(self, outcome)
           local cb = self.pending
           self.pending = nil

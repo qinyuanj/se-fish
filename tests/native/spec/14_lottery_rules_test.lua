@@ -8,9 +8,8 @@
 --   14-10 两同金币按投入物已确定的整数售价计算；
 --   14-13 两同金币直接入账户，不落到世界物品；
 --   14-15 三同的武器大奖进入独立武器库存，不占道具栏或背包格。
--- 只走业务入口：MgrLottery:Handle 是 server/main.lua 的 MgrMap 注册管理器收玩家 LotteryAction 的入口，
--- 断言落在它回给玩家的 LotteryResult 上。引擎边界（DataStore、Task、World、Players、RE）用替身，
--- 随机数经管理器自己的 Random 注入点给定。
+-- 只走 ServerRuntime 的 LotteryAction 业务入口，断言落在 LotteryResult 回包上。
+-- 引擎边界（DataStore、Task、World、Players、RE）用替身，随机数经运行时注入点给定。
 -- 权重表（common/cfg/Lottery.lua）：22/20/18/16/14/5/5，合计 100，累计边界 22、42、60、76、90、95、100。
 -- 失败方式（先列后写）：
 --   1. 三个轴不是各抽各的，或某一轴换了权重表；
@@ -19,95 +18,25 @@
 --   4. 无两同也发奖，或金币不直接入账户而是生成世界物品；
 --   5. 武器大奖占道具格而不是进独立武器库存。
 local GameCfg = require('common.GameCfg')
+local EconomyWorld = require('tests.support.economy_world')
 
 local ITEM_BAR = GameCfg.Items.ContainerId.ItemBar
 
+-- 只替换宿主搭建；请求、存档、回执均走 #312 ServerRuntime 公开接缝。
 local function newWorld()
-  local env = {}
-  env.oldGame, env.oldRE = _G.game, _G.REUtil
-  env.oldDebug = GameCfg.Debug
-  GameCfg.Debug = { Enabled = false }
-  env.values, env.queue, env.events = {}, {}, {}
-  env.store = {
-    GetAsync = function(_, key) return env.values[key] end,
-    UpdateAsync = function(_, key, transform)
-      local value = transform(env.values[key])
-      if value then env.values[key] = value end
-      return value
-    end,
-    SetAsync = function(_, key, value) env.values[key] = value end,
-  }
-  env.anchor = { Position = { x = 0, y = 0, z = 0 } }
-  _G.game = {
-    GetService = function(_, name)
-      if name == 'Task' then
-        return { Spawn = function(_, fn) env.queue[#env.queue + 1] = fn end, Wait = function() end }
-      end
-      if name == 'DataStoreService' then return { GetDataStore = function() return env.store end } end
-      if name == 'World' then
-        return { GetServerTime = function() return 100 end,
-          FindFirstChild = function() return env.anchor end }
-      end
-      if name == 'Players' then return { GetPlayers = function() return { env.player } end } end
-    end,
-  }
-  _G.REUtil = {
-    GetRE = function(_, name)
-      return { FireClient = function(_, _, value)
-        env.events[#env.events + 1] = { name = name, value = value }
-      end }
-    end,
-  }
-  env.save = assert(loadfile('server/Mgr/MgrSave.lua'))()
-  env.players = assert(loadfile('server/Mgr/MgrPlayerData.lua'))()
-  env.interact = assert(loadfile('server/Mgr/MgrInteract.lua'))()
-  env.lottery = assert(loadfile('server/Mgr/MgrLottery.lua'))()
-  env.players.Save, env.save.PlayerData = env.save, env.players
-  env.interact.PlayerData, env.interact.Save = env.players, env.save
-  env.lottery.PlayerData, env.lottery.Save, env.lottery.Interact = env.players, env.save, env.interact
-  env.rolls = {}
-  env.lottery.Random = function()
-    local roll = table.remove(env.rolls, 1)
-    assert(roll, '测试脚本的随机数序列用完了')
-    return roll
-  end
-
-  function env:drain() while #env.queue > 0 do table.remove(env.queue, 1)() end end
-  function env:join()
-    local signal = { Connect = function() return { Disconnect = function() end } end }
-    env.player = { UserId = 901, Character = { Position = { x = 0, y = 0, z = 0 } },
-      CharacterAdded = signal, CharacterRemoving = signal, SetAttribute = function() end }
-    env.players:OnPlayerAdded(env.player)
-    -- OnPlayerAdded 是异步读档：把排队的回调放完才有数据实例。
-    env:drain()
-    env.data = assert(env.players:GetDataInst(env.player))
-  end
-  function env:cleanup()
-    _G.game, _G.REUtil = self.oldGame, self.oldRE
-    GameCfg.Debug = self.oldDebug
-  end
-  function env:ready()
-    assert(env.save:SaveExplicit(env.player.UserId, env.data, function(ok) assert(ok) end))
-    env:drain()
-    env.events = {}
-  end
-  -- 发一件极品食物到道具栏 1 号格并落账（先落账再抽，与玩家实际顺序一致）
+  local env = EconomyWorld.new()
+  function env:join() end
+  function env:cleanup() self:tearDown() end
   function env:bet(itemId, mult)
-    assert(env.data:AddItem(itemId, mult))
-    env:ready()
+    self:givePremium(itemId, mult)
+    self:persistReady()
   end
   function env:draw(seq)
-    local accepted = env.lottery:Handle(env.player, { action = 'Draw', slot = 1, seq = seq })
-    env:drain()
-    local reply
-    for _, event in ipairs(env.events) do
-      if event.name == 'LotteryResult' then reply = event.value end
-    end
-    return accepted, reply
+    local accepted = self:lotteryDraw(1, seq)
+    return accepted, self:lastResult('LotteryResult')
   end
   return env
 end
-
 -- 极品罗非鱼 item7 基础价 3（tests/native/lottery_settle_test.lua 注释与物品表同源）
 local PREMIUM = 'item7'
 
