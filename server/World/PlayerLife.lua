@@ -237,6 +237,7 @@ function PlayerLife.mount(s3, player_tree, opts)
   end
 
   local function apply_walk(base_override)
+    if player_tree.walk_projection_rejected then return end
     local controller = controller_of(player)
     if not controller then return end
     local base = base_override
@@ -868,7 +869,8 @@ function PlayerLife.mount(s3, player_tree, opts)
 
   s3:effect("WeakSpeedWatch", function(es)
     es:d(states.is_weak)
-    es:d(memos.walk_speed)
+    es:d(states.is_frost)
+    es:d(states.is_paralyzed)
     apply_walk()
   end)
 
