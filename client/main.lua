@@ -11,6 +11,7 @@ local MainHudVitalsView = require("client.Views.MainHudVitalsView")
 local MainHudEquipPopups = require("client.Views.MainHudEquipPopups")
 local MainHudBackpackView = require("client.Views.MainHudBackpackView")
 local MainHudItemBarView = require("client.Views.MainHudItemBarView")
+local MainHudActionButtonsView = require("client.Views.MainHudActionButtonsView")
 local ScreenMain = require("client.ScreenHandlers.ScreenMain")
 local GameUI = require("client.GameUI")
 
@@ -30,6 +31,7 @@ _G.ClientSpoke = { Store = client_store, Clock = client_store.clock }
 
 local hud_backpack_open = spoke.State.new("ClientMain.hud_backpack_open", false)
 local hud_open_popup = spoke.State.new("ClientMain.hud_open_popup", nil)
+local hud_reel_active = spoke.State.new("ClientMain.hud_reel_active", false)
 
 local function send_hud_operate(payload)
     if type(ScreenMain.Operate) == "function" then
@@ -42,6 +44,10 @@ ScreenMain.OnOpenChanged = function(is_open)
         hud_open_popup:set(nil)
     end
     client_store_writer:set_hud_visible(is_open)
+end
+
+ScreenMain.OnReelActiveChanged = function(active)
+    hud_reel_active:set(active == true)
 end
 
 Task:Spawn(function()
@@ -64,6 +70,20 @@ Task:Spawn(function()
                 }),
                 MainHudItemBarView.spec({
                     backpack_open = hud_backpack_open,
+                }),
+                MainHudActionButtonsView.spec({
+                    backpack_open = hud_backpack_open,
+                    reel_active = hud_reel_active,
+                    send_operate = send_hud_operate,
+                    on_reel_click = function(session_id)
+                        local reel = rawget(_G, "LocalReelIn")
+                        if type(reel) == "table" and reel.SessionId == session_id and type(reel.Click) == "function" then
+                            reel:Click()
+                            if ScreenMain.Inited then
+                                ScreenMain:ShowCast()
+                            end
+                        end
+                    end,
                 }),
                 MainHudBackpackView.spec({
                     backpack_open = hud_backpack_open,

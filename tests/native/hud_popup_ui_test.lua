@@ -23,6 +23,7 @@ local ClientStore = require('client.Store.ClientStore')
 local RootView = require('client.Views.RootView')
 local MainHudEquipPopups = require('client.Views.MainHudEquipPopups')
 local MainHudBackpackView = require('client.Views.MainHudBackpackView')
+local MainHudActionButtonsView = require('client.Views.MainHudActionButtonsView')
 
 -- 玩家可见名取自物品表；折行只为放进 80 宽的格子，比较文字时去掉换行
 local NAME = setmetatable({}, { __index = function(_, id) return GameCfg.Items.Definitions[id].Name end })
@@ -117,6 +118,11 @@ local function setUp(height)
                 MainHudEquipPopups.spec({
                     get_resolution = function() return { x = 1920, y = ctx.height } end,
                     open_popup = ctx.openPopup,
+                    backpack_open = ctx.backpackOpen,
+                    send_operate = function(payload) ctx.handler:Operate(payload) end,
+                }),
+                MainHudActionButtonsView.spec({
+                    get_resolution = function() return { x = 1920, y = ctx.height } end,
                     backpack_open = ctx.backpackOpen,
                     send_operate = function(payload) ctx.handler:Operate(payload) end,
                 }),

@@ -123,7 +123,7 @@ describe('主界面 HUD 的节点归属（#209）', function()
         ctx = setUp()
         ctx.handler:Cleanup()
         ctx.failCreate = 'QuestBackground'
-        ctx.failDestroy = 'ItemDiscard'
+        ctx.failDestroy = 'ReelClose'
         local logs = {}
         _G.print = function(...) logs[#logs + 1] = table.concat({ ... }, '	') end
 

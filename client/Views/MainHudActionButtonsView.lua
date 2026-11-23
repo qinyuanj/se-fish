@@ -84,7 +84,7 @@ local function make_button(ctx, scope, name, rect)
   btn.ButtonNormalColor = make_color(COLORS.NORMAL)
   btn.ButtonPressColor = make_color(COLORS.PRESS)
   btn.ButtonDisableColor = make_color(COLORS.DISABLED)
-  btn.LocalZOrder = 6
+  btn.LocalZOrder = 0
   return btn
 end
 
@@ -102,7 +102,7 @@ local function make_label(ctx, scope, name, rect, text)
   label.TouchEnabled = false
   label.SwallowTouchEnabled = false
   label.Visible = false
-  label.LocalZOrder = 7
+  label.LocalZOrder = 1
   return label
 end
 

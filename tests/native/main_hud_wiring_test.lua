@@ -22,6 +22,7 @@ local MainHudVitalsView = require('client.Views.MainHudVitalsView')
 local MainHudEquipPopups = require('client.Views.MainHudEquipPopups')
 local MainHudBackpackView = require('client.Views.MainHudBackpackView')
 local MainHudItemBarView = require('client.Views.MainHudItemBarView')
+local MainHudActionButtonsView = require('client.Views.MainHudActionButtonsView')
 
 local function signal()
     local listeners = {}
@@ -120,6 +121,11 @@ local function setUp(height)
             MainHudItemBarView.spec({
                 get_resolution = function() return { x = 1920, y = height } end,
                 backpack_open = ctx.backpackOpen,
+            }),
+            MainHudActionButtonsView.spec({
+                get_resolution = function() return { x = 1920, y = height } end,
+                backpack_open = ctx.backpackOpen,
+                send_operate = function(payload) ctx.handler:Operate(payload) end,
             }),
             MainHudBackpackView.spec({
                 get_resolution = function() return { x = 1920, y = height } end,

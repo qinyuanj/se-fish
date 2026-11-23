@@ -6,6 +6,7 @@ local ClientStore = require('client.Store.ClientStore')
 local RootView = require('client.Views.RootView')
 local MainHudEquipPopups = require('client.Views.MainHudEquipPopups')
 local MainHudItemBarView = require('client.Views.MainHudItemBarView')
+local MainHudActionButtonsView = require('client.Views.MainHudActionButtonsView')
 
 local function signal()
     local listeners = {}
@@ -91,6 +92,9 @@ describe("持有操作的界面侧", function()
             create_node = function(kind, attrs) return world:CreateUnit(kind, attrs) end,
             hud = {
                 MainHudItemBarView.spec({}),
+                MainHudActionButtonsView.spec({
+                    send_operate = function(payload) ctx.handler:Operate(payload) end,
+                }),
                 MainHudEquipPopups.spec({
                     open_popup = ctx.openPopup,
                     send_operate = function(payload) ctx.handler:Operate(payload) end,
