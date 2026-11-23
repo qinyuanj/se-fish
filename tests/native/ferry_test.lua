@@ -845,12 +845,20 @@ describe('摆渡（MgrFerry × MgrSave × PlayerData）', function()
   end)
 
   it('test_teleport_notifies_special_item_before_moving', function()
-    -- #140 T19：传送前必须通知特殊道具结束飞行（摆渡不得把关重力/滞空带到新区）；
-    -- 未注入 SpecialItem 时传送照旧（其余用例即此路径的回归）。
+    -- #299：传送前经当前玩家树公开边界结束特殊道具飞行；没有树时传送照旧。
     local calls = {}
-    env.mgr.SpecialItem = { OnTeleport = function(_, player) calls[#calls + 1] = player.UserId end }
+    local runtime = {
+      get_player_tree = function()
+        return { suspend_special_item = function() calls[#calls + 1] = 1 end }
+      end,
+    }
+    local ServerRuntime = require('server.World.ServerRuntime')
+    local previous = ServerRuntime.current()
+    ServerRuntime.set_current(runtime)
     local dest = { x = 100, y = 6, z = 100 }
-    assert.is_true(env.mgr:Teleport(env.players[1], dest))
+    local ok = env.mgr:Teleport(env.players[1], dest)
+    ServerRuntime.set_current(previous)
+    assert.is_true(ok)
     assert.same({ 1 }, calls)
     assert.same(100, env.players[1].Character.Position.x)
   end)
