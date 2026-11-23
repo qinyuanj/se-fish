@@ -139,10 +139,8 @@ describe('条款 18 存档会话与结算身份', function()
     env.save = assert(loadfile('server/Mgr/MgrSave.lua'))()
     env.players = assert(loadfile('server/Mgr/MgrPlayerData.lua'))()
     env.ferry = assert(loadfile('server/Mgr/MgrFerry.lua'))()
-    env.survival = assert(loadfile('server/Mgr/MgrSurvival.lua'))()
     env.players.Save, env.save.PlayerData = env.save, env.players
     env.ferry.Save, env.ferry.PlayerData = env.save, env.players
-    env.survival.Save, env.survival.PlayerData = env.save, env.players
     env.ferry.World = { GetServerTime = function() return env.now end }
     env.ferry.OnlinePlayers = function() return {} end
     env.anchors = {}
@@ -393,21 +391,19 @@ describe('条款 18 存档会话与结算身份', function()
     assert.same(vec(safe.x, safe.y, safe.z), env.savedLanding, '非法记录落点须回到同区安全点')
     assert.same(vec(safe.x, safe.y, safe.z), data.Extra.travel.safePoint)
 
-    -- v2 档的虚弱剩余时间经 MgrSurvival 的公开入口恢复。
+    -- v2 档的虚弱剩余时间经 PlayerTree 的公开入口恢复。
     local v2 = seedSnapshot(uid)
     v2.extra.survival.weakRemaining = 37
     v2.extra.travel.safePoint = { x = safe.x, y = safe.y, z = safe.z }
-    local player = ready(uid, vec(safe.x, safe.y, safe.z), v2)
-    local applied
-    env.survival.Modifier = {
-      Apply = function(_, _, _, _, seconds) applied = seconds return true end,
-      GetRemaining = function() return applied or 0 end,
-      Clear = function() end,
-      ClearTarget = function() end,
-    }
-    env.survival.SpeedWriter = { RefreshMoveSpeed = function() end }
-    env.survival:OnPlayerAdded(player)
-    assert.same(37, applied, '重连后虚弱剩余时间继续生效')
+    local player, data = ready(uid, vec(safe.x, safe.y, safe.z), v2)
+    local host = require('tests.support.life_host').start({
+      now = env.now, player_data = env.players, save = env.save,
+    })
+    host:add(player, data)
+    local tree = host:tree(player)
+    assert.is_true(tree:get_modifier_remaining('weak') > 36, '重连后虚弱剩余时间继续生效')
+    assert.is_true(tree:get_modifier_remaining('weak') <= 37)
+    host:shutdown()
   end)
 
   -- 条款 18-18（版本未知或读取失败时保留原档、不写空档）、18-19（存档就绪前的可变操作被拒）。
