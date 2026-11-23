@@ -394,7 +394,7 @@ function PlayerTree.spawn(opts)
     if type(opts.on_item_bar_state) ~= "function" then
       return
     end
-    local ok, err = pcall(opts.on_item_bar_state, player, deep_copy(snapshot), handle)
+    local ok, err = pcall(opts.on_item_bar_state, player, deep_copy(snapshot), handle) -- 隔离外围推送回调异常，防止打断树状态同步
     if not ok then
       log_error("[PlayerTree] on_item_bar_state 回调失败", err)
     end
@@ -406,14 +406,14 @@ function PlayerTree.spawn(opts)
     mirror_to_data()
     for _, entry in ipairs(finalizers) do
       if entry.active then
-        local ok, err = pcall(entry.fn, handle, player, data)
+        local ok, err = pcall(entry.fn, handle, player, data) -- 隔离单个离场回调异常，保证其余终镜像与收尾继续执行
         if not ok then
           log_error("[PlayerTree] 离场终镜像回调失败", err)
         end
       end
     end
     if type(opts.on_leave_finalize) == "function" then
-      local ok, err = pcall(opts.on_leave_finalize, handle, player, data)
+      local ok, err = pcall(opts.on_leave_finalize, handle, player, data) -- 隔离宿主离场回调异常，避免阻断后续 dispose 协议
       if not ok then
         log_error("[PlayerTree] on_leave_finalize 失败", err)
       end
