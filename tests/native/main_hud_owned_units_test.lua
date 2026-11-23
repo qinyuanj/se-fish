@@ -10,7 +10,7 @@
 --   （#297-C2 起瞄准拾取层归 MainHudItemBarView，其节点归属由 spec/client_main_hud_item_bar_test 守）。
 local OwnedUnits = require('common.OwnedUnits')
 
-local GLOBALS = { 'game', 'Vector2', 'Color', 'REUtil', 'GameUI', 'MgrGameUI', 'LocalReelIn', 'print' }
+local GLOBALS = { 'game', 'Vector2', 'Color', 'REUtil', 'GameUI', 'MgrGameUI', 'print' }
 
 local cleanupFaults = {}
 
@@ -70,8 +70,6 @@ local function setUp()
         end
         return ctx.events[name]
     end }
-    _G.LocalReelIn = { SetSession = function() end, Clear = function() end,
-        Suspend = function() end, Close = function() end }
     -- 编辑器摆放的金币节点：ScreenMain 的直接子节点，运行时按名查找，不算脚本建点
     ctx.nodes.ImageCoin = { Name = 'ImageCoin', Position = { x = 864, y = 1145 }, Size = { x = 80, y = 80 } }
     ctx.nodes.LabelCoin = { Name = 'LabelCoin', Position = { x = 960, y = 1145 }, Size = { x = 200, y = 60 } }

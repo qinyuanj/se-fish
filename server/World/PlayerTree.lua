@@ -15,6 +15,7 @@ local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
 local PlayerEffects = require("server.World.PlayerEffects")
 local PlayerLife = require("server.World.PlayerLife")
 local SpecialItemPhase = require("server.World.SpecialItemPhase")
+local FishingPhase = require("server.World.FishingPhase")
 local HeldRodLeaf = require("server.World.HeldRodLeaf")
 
 local SpokeTree = spoke.SpokeTree
@@ -586,6 +587,16 @@ function PlayerTree.spawn(opts)
           fish_units = opts.fish_units,
           fish_carrier = opts.fish_carrier,
         })
+        -- 抛竿、上钩、收线、举鱼嵌在存活内：麻痹不卸载，濒死、死亡与离场随相位逆序拆线。
+        handle.fishing = FishingPhase.mount(ps, handle, {
+          remote = opts.remote,
+          world = opts.world_service,
+          create_unit = opts.create_unit,
+          fish_unit = opts.fish_unit,
+          compendium = opts.compendium,
+          quest = opts.quest,
+          random = opts.random,
+        })
       end)
 
       -- 濒死相位：内嵌 platform_pending 门控的倒计时子相位。
@@ -1063,6 +1074,9 @@ function PlayerTree.spawn(opts)
     end
     handle._pending_leave_finalizers = nil
   end
+
+  -- 存档在 spawn 前就写好的选中饵、道具栏要进树，否则存活相位读到的是空库存。
+  handle:sync_from_data(data)
 
   return handle
 end

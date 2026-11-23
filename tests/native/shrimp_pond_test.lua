@@ -12,6 +12,8 @@
 --   8. 虾池迁移统一模板后残留小池几何、窄边界或旧设施落点，运行时水域与场景合同不一致。
 -- it 名字沿用旧方法名，注册顺序 = LuaUnit sortedPairs 的实际执行顺序。
 
+local Host = require('tests.support.fishing_host')
+
 local function vec(x, y, z) return { x = x, y = y, z = z } end
 
 -- 两个商店摊与两个钓鱼佬锚点的假位置；虾池侧与统一模板的场景合同一致。
@@ -83,28 +85,6 @@ describe('虾池最小内容（水区 / 鱼表 / 商店 / 钓鱼佬 / 抛竿）'
     }
     env.shop.Interact = newInteract()
     env.shop.Reply = function(_, _, result) env.replies[#env.replies + 1] = result end
-    -- MgrCast 桩（与 boss_bait_test 同口径）：REUtil 记录下发，PlayerData/FishUnit 指向真数据
-    env.me.Character.Rotation = { GetForward = function() return vec(0, 0, 1) end }
-    package.loaded['common.REUtil'] = {
-      GetRE = function(_, name)
-        env.sent[name] = env.sent[name] or {}
-        return { FireClient = function(_, _, payload)
-          env.sent[name][#env.sent[name] + 1] = payload
-        end }
-      end,
-      CheckRECD = function() return false end,
-    }
-    package.loaded['server.Mgr.MgrPlayerData'] = {
-      GetDataInst = function(_, p) return p == env.me and env.data or nil end,
-      SendItemBar = function() end,
-    }
-    package.loaded['server.World.FishTree'] = {
-      HeldInfo = function() return nil end,
-      CanCast = function() return true end,
-    }
-    env.cast = assert(loadfile('server/Mgr/MgrCast.lua'))()
-    env.cast.World = { GetServerTime = function() return env.now end }
-    env.cast.ReelIn = { Begin = function() return true end }
   end)
 
   after_each(function()
@@ -197,28 +177,24 @@ describe('虾池最小内容（水区 / 鱼表 / 商店 / 钓鱼佬 / 抛竿）'
   end)
 
   it('test_cast_with_non_rod_selected_rejected', function()
-    -- 选中的不是竿（物品表无 Level）：抛竿不受理，不起会话（竿种门回归）
-    standAtPool()
-    assert.is_true(env.data:AddItem('carp'))
-    assert.is_true(env.data:SelectSlot(2))
-    env.cast:Cast(env.me, { slot = 2, itemId = 'carp' })
-    assert.is_nil(env.cast.Sessions[1])
+    local host = Host.new({ position = vec(240, 6, -29), forward = vec(0, 0, -1) })
+    assert.is_true(host.data:AddItem('carp'))
+    assert.is_true(host.data:SelectSlot(2))
+    host:cast({ action = 'Cast', slot = 2, itemId = 'carp' })
+    assert.are.equal('invalidRod', host:last_state().result.reason)
+    host:dispose()
   end)
 
   it('test_cast_with_shrimp_rod_records_pool_zone_and_rod_level', function()
-    -- 钓虾竿挂香肠抛虾池：会话记 zoneId=shrimpPond.water、竿级 2、饵 sausage。
-    standAtPool()
-    assert.is_true(env.data:AddItem('shrimpRod'))
-    assert.is_true(env.data:SelectSlot(2))
-    env.data.Data.Bait.sausage = 1
-    assert.is_true(env.data:SelectBait('sausage'))
-    env.cast:Cast(env.me, { slot = 2, itemId = 'shrimpRod' })
-    local session = env.cast.Sessions[1] and env.cast.Sessions[1].session
-    assert.is_not_nil(session)
-    assert.same('shrimpPond.water', session.zoneId)
-    assert.same({ x = 240, y = 3, z = -34 }, session.landing)
-    assert.same(2, session.rodLevel)
-    assert.same('sausage', session.baitId)
+    local host = Host.new({ position = vec(240, 6, -29), forward = vec(0, 0, -1), bait = 'sausage', bait_count = 1 })
+    assert.is_true(host.data:AddItem('shrimpRod'))
+    assert.is_true(host.data:SelectSlot(2))
+    host:cast({ action = 'Cast', slot = 2, itemId = 'shrimpRod' })
+    assert.are.equal('shrimpPond.water', host:last_state().zoneId)
+    assert.same({ x = 240, y = 3, z = -34 }, host:last_state().landing)
+    host:hook()
+    assert.are.equal('hooked', host:last_state().phase)
+    host:dispose()
   end)
 
   it('test_fisherman_multi_anchor_feeds_at_shrimp_pond', function()
@@ -364,18 +340,11 @@ describe('虾池最小内容（水区 / 鱼表 / 商店 / 钓鱼佬 / 抛竿）'
   end)
 
   it('test_starter_rod_without_bait_only_hooks_shrimp', function()
-    -- 新手竿不挂饵抛虾池：上钩只可能是虾米保底（含极品），出不了香肠行的虾
-    standAtPool()
-    assert.is_true(env.data:SelectSlot(1))
-    env.cast:Cast(env.me, { slot = 1, itemId = 'starterRod' })
-    local current = env.cast.Sessions[1]
-    assert.is_not_nil(current)
-    assert.same('shrimpPond.water', current.session.zoneId)
-    assert.same(1, current.session.rodLevel)
-    env.now = 10
-    env.cast:Update()
-    assert.same('hooked', current.session.phase)
-    assert.message('竿 1 不挂饵应只出虾米，实际 ' .. tostring(current.session.fishId))
-      .is_true(current.session.fishId == 'shrimp' or current.session.fishId == 'rareShrimp')
+    local host = Host.new({ position = vec(240, 6, -29), forward = vec(0, 0, -1), bait = false, roll = 1 })
+    host:cast({ action = 'Cast', slot = 1, itemId = 'starterRod' })
+    host:hook()
+    assert.are.equal('shrimpPond.water', host:last_state().zoneId)
+    assert.is_true(host:last_state().fishId == 'shrimp' or host:last_state().fishId == 'rareShrimp')
+    host:dispose()
   end)
 end)

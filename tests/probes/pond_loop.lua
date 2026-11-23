@@ -327,7 +327,7 @@ local function castOnce()
     local slot = ensureBar('duck')
     local fishId
     if slot then
-        -- 首领饵：抛竿一刻从道具栏扣 1 只（等价于 MgrCast 扣首领饵；背包里的先按 MoveSlot 挪回道具栏）
+        -- 首领饵：抛竿一刻从道具栏扣 1 只（等价于 FishingPhase 扣首领饵；背包里的先按 MoveSlot 挪回道具栏）
         data:UpdateData(function(d) d.Containers[ITEM_BAR][slot] = nil end, true)
         fishId = GameCfg.Casting.BossBait.duck
     else

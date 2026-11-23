@@ -9,8 +9,8 @@
 --   选中   data:SelectSlot / data:SelectBait      （ItemBarAction 的同名方法）
 --   喂食   MgrInteract:Handle {target='fisherman', action='Feed', seq}
 --   买竿   MgrShop:Handle {action='Buy', itemId='starterRod', seq}
---   抛竿   MgrCast:Cast / :Reel / :Drop           （CastAction 的处理函数）
---   收线   MgrReelIn:Accept {s, n, q}             （ReelInRE）
+--   抛竿   CastProbe:Cast / :Reel / :Drop           （CastAction 的处理函数）
+--   收线   ReelProbe:Accept {s, n, q}             （ReelInRE）
 --   攻击   MgrWeapon:Attack                       （WeaponAction.attack）
 --   摆渡   MgrFerry:Handle {action='Board', routeId, seq}
 --   买匕首 MgrShop:Handle {action='Buy', number=25, seq}（钓场商店 Level1 摊位，itemKey item135）
@@ -52,8 +52,6 @@ local MgrLoot = {
 }
 local MgrInteract = require('server.Mgr.MgrInteract')
 local MgrShop = require('server.Mgr.MgrShop')
-local MgrCast = require('server.Mgr.MgrCast')
-local MgrReelIn = require('server.Mgr.MgrReelIn')
 local MgrFishUnit = require('server.World.FishTree')
 local MgrWeapon = require('server.Mgr.MgrWeapon')
 local MgrFerry = require('server.Mgr.MgrFerry')
@@ -103,6 +101,49 @@ RT.flanked, RT.ignore = RT.flanked or {}, RT.ignore or {}
 RT.unreachableLoot = RT.unreachableLoot or {}
 local TAG = RT.tag
 local uid = player.UserId
+
+-- #302：只经 ServerRuntime 的公开钓鱼句柄发动作；CastState 下行是唯一会话观察口。
+local REUtil = require('common.REUtil')
+local function fishingFor(target)
+    local runtime = ServerRuntime.current and ServerRuntime.current()
+    local tree = runtime and runtime:get_player_tree(target and target.UserId)
+    return tree and tree.fishing or nil
+end
+local CastProbe = {}
+local ReelProbe = {}
+RT.castStateHook = RT.castStateHook or { states = {} }
+local stateHook = RT.castStateHook
+stateHook.uid = uid
+local castEvent = REUtil:GetRE('CastState')
+if stateHook.event ~= castEvent then
+    stateHook.event = castEvent
+    stateHook.originalFireClient = castEvent.FireClient
+    castEvent.FireClient = function(self, target, payload)
+        if target and target.UserId == stateHook.uid then
+            stateHook.states[target.UserId] = payload and payload.phase ~= 'idle' and { session = payload } or nil
+        end
+        return stateHook.originalFireClient(self, target, payload)
+    end
+end
+CastProbe.Sessions = setmetatable({}, { __index = function(_, key) return stateHook.states[key] end })
+function CastProbe:Cast(target, payload)
+    local fishing = fishingFor(target)
+    return fishing and fishing:cast(payload) or false
+end
+function CastProbe:Reel(target)
+    local fishing = fishingFor(target)
+    return fishing and fishing:cast({ action = 'Reel' }) or false
+end
+function CastProbe:Drop(target)
+    local fishing = fishingFor(target)
+    return fishing and fishing:cast({ action = 'Drop' }) or false
+end
+function ReelProbe:Accept(target, payload)
+    local fishing = fishingFor(target)
+    return fishing and fishing:reel('click', payload) or false
+end
+local currentRuntime = ServerRuntime.current and ServerRuntime.current()
+if currentRuntime then currentRuntime:push_cast_state(player) end
 
 local function say(kind, ...)
     print('PONDLOOP', TAG, string.format('t=%.1f', now() - RT.t0), kind, ...)
@@ -459,9 +500,9 @@ local function validate(data)
     fn('MgrLoot:', MgrLoot, 'Pickup') need('MgrLoot.Loots', type(MgrLoot.Loots) == 'table')
     for _, name in ipairs({ 'Handle', 'InRange', 'FindAnchor' }) do fn('MgrInteract:', MgrInteract, name) end
     fn('MgrShop:', MgrShop, 'Handle') fn('MgrShop:', MgrShop, 'FindGoodsByNumber')
-    for _, name in ipairs({ 'Cast', 'Reel', 'Drop' }) do fn('MgrCast:', MgrCast, name) end
-    need('MgrCast.Sessions', type(MgrCast.Sessions) == 'table')
-    fn('MgrReelIn:', MgrReelIn, 'Accept')
+    for _, name in ipairs({ 'Cast', 'Reel', 'Drop' }) do fn('CastProbe:', CastProbe, name) end
+    need('CastProbe.Sessions', type(CastProbe.Sessions) == 'table')
+    fn('ReelProbe:', ReelProbe, 'Accept')
     need('MgrFishUnit.Fish', type(MgrFishUnit.Fish) == 'table')
     fn('MgrWeapon:', MgrWeapon, 'Attack') fn('MgrWeapon:', MgrWeapon, 'EquippedWeapon')
     fn('MgrFerry:', MgrFerry, 'Handle')
@@ -493,7 +534,7 @@ local function validate(data)
     return true
 end
 
--- 抛竿落点预判：与 MgrCast.castLanding 同公式，只用于决定是否提示走位
+-- 抛竿落点预判：与 CastProbe.castLanding 同公式，只用于决定是否提示走位
 local function predictLanding()
     local character = player.Character
     if not character or not character.Position or not character.Rotation then return nil end
@@ -533,7 +574,7 @@ local function castRod(data, useDuck)
         return pause('落点不在水里(' .. (lx and (fmt(lx) .. ',' .. fmt(lz)) or 'nil') .. ')，站到抛竿位并朝 -x 走入',
             CAST_SPOT, '抛竿位（面朝 -x）')
     end
-    MgrCast:Cast(player, { action = 'Cast', slot = slot, itemId = entry.itemId })
+    CastProbe:Cast(player, { action = 'Cast', slot = slot, itemId = entry.itemId })
     RT.counts.cast = RT.counts.cast + 1
     say('CAST', 'bait=' .. bait, 'water=' .. tostring(water.Id))
     return 'wait', 0.4
@@ -543,7 +584,7 @@ local function reelClick(current)
     local session = current.session
     if RT.reelFor ~= session.reelSession then RT.reelFor, RT.reelQ = session.reelSession, 0 end
     RT.reelQ = RT.reelQ + 1
-    MgrReelIn:Accept(player, { s = session.reelSession, n = 2, q = RT.reelQ })
+    ReelProbe:Accept(player, { s = session.reelSession, n = 2, q = RT.reelQ })
 end
 
 -- ========== 鱼与战利品 ==========
@@ -710,7 +751,7 @@ local function step()
     -- 1 鱼的处理：举着的鱼放下（目标鱼放下后打，其余任其逃脱）；存活目标鱼持续攻击
     local held, live = myFish()
     if held then
-        local landedSession = MgrCast.Sessions[uid]
+        local landedSession = CastProbe.Sessions[uid]
         local rs = landedSession and landedSession.session
         if rs and rs.phase == 'landed' and RT.landedFor ~= rs.reelSession then
             RT.landedFor = rs.reelSession
@@ -732,7 +773,7 @@ local function step()
         if flat(charPos(), LAND_STAND) > 1 then
             return pause('先把鱼带到陆地再放下', LAND_STAND, '陆地放鱼 ' .. held.FishId)
         end
-        MgrCast:Drop(player)
+        CastProbe:Drop(player)
         RT.combatSince = now()
         if target then
             say('DROP', 'target', held.FishId)
@@ -821,7 +862,7 @@ local function step()
 
     -- 3 有首领饵就必钓首领
     local hasDuck = data:ItemCount(chain.BossBait) >= 1
-    local session = MgrCast.Sessions[uid]
+    local session = CastProbe.Sessions[uid]
     if session then
         local phase = session.session.phase
         if phase == 'hooked' then
@@ -842,7 +883,7 @@ local function step()
             end
             return 'wait', 0.5
         elseif phase == 'unhooked' then
-            MgrCast:Reel(player)
+            CastProbe:Reel(player)
             say('REEL-IN', 'unhooked 收竿')
             return 'wait', 0.4
         end

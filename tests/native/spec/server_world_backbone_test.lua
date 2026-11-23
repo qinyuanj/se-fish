@@ -828,6 +828,7 @@ describe("服务端入口接线：server/main.lua 宿主测试双端到端集成
       MgrPlayerData = rawget(_G, "MgrPlayerData"),
       Vector3 = rawget(_G, "Vector3"),
       Color = rawget(_G, "Color"),
+      RemoteEvent = rawget(_G, "RemoteEvent"),
       Debug = GameCfg.Debug,
       slot = GameCfg.Save.QaSlot,
     }
@@ -835,6 +836,10 @@ describe("服务端入口接线：server/main.lua 宿主测试双端到端集成
     GameCfg.Save.QaSlot = ""
     _G.Vector3 = { New = function(x, y, z) return { x = x, y = y, z = z } end }
     _G.Color = { New = function(...) return { ... } end }
+    _G.RemoteEvent = { New = function()
+      return { OnServerEvent = make_signal(), OnClientEvent = make_signal(), FireServer = function() end,
+        FireClient = function() end }
+    end }
     runtime = nil
   end)
 
@@ -848,6 +853,7 @@ describe("服务端入口接线：server/main.lua 宿主测试双端到端集成
     _G.MgrPlayerData = saved.MgrPlayerData
     _G.Vector3 = saved.Vector3
     _G.Color = saved.Color
+    _G.RemoteEvent = saved.RemoteEvent
     GameCfg.Debug = saved.Debug
     GameCfg.Save.QaSlot = saved.slot
     saved = nil

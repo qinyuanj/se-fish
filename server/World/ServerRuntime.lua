@@ -170,6 +170,31 @@ function ServerRuntime.new(opts)
     return player_trees[user_id]
   end
 
+  function runtime:push_cast_state(player)
+    local tree = player and player_trees[player.UserId]
+    if tree and tree.fishing and type(tree.fishing.push_state) == "function" then
+      tree.fishing.push_state()
+      return true
+    end
+    return false
+  end
+
+  function runtime:abort_cast(player)
+    local tree = player and player_trees[player.UserId]
+    if tree and tree.fishing and type(tree.fishing.abort) == "function" then
+      return tree.fishing.abort() == true
+    end
+    return false
+  end
+
+  function runtime:set_next_fish(player, fish_id)
+    local tree = player and player_trees[player.UserId]
+    if tree and tree.fishing and type(tree.fishing.set_next_fish) == "function" then
+      return tree.fishing.set_next_fish(fish_id) == true
+    end
+    return false
+  end
+
   function runtime:get_entity_modifiers()
     return entity_modifiers
   end
@@ -294,6 +319,11 @@ function ServerRuntime.new(opts)
       world = world,
       logger = opts.logger,
       create_unit = opts.create_unit,
+      world_service = opts.world_service,
+      fish_unit = opts.fish_unit or fish_host,
+      compendium = opts.compendium,
+      quest = opts.quest,
+      random = opts.random,
       on_item_bar_state = opts.on_item_bar_state,
       effects = effects_opts,
       on_leave_finalize = opts.on_leave_finalize,
@@ -398,6 +428,24 @@ function ServerRuntime.new(opts)
       if type(opts.register_cast_guard) == "function" then
         opts.register_cast_guard(function(unit, index)
           return runtime.life:WeaponCastGuard(unit, index)
+        end)
+      end
+      if type(opts.bind_cast_action) == "function" then
+        opts.bind_cast_action(function(actor, payload)
+          if runtime:is_leaving(actor and actor.UserId) then return false end
+          local player_tree = player_trees[actor and actor.UserId]
+          local fishing = player_tree and player_tree.fishing
+          if not fishing then return false end
+          return fishing:cast(payload)
+        end)
+      end
+      if type(opts.bind_reel_action) == "function" then
+        opts.bind_reel_action(function(actor, kind, payload)
+          if runtime:is_leaving(actor and actor.UserId) then return false end
+          local player_tree = player_trees[actor and actor.UserId]
+          local fishing = player_tree and player_tree.fishing
+          if not fishing then return false end
+          return fishing:reel(kind, payload)
         end)
       end
     end

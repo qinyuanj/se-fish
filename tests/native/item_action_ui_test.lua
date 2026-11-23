@@ -40,7 +40,7 @@ local function signal()
     }
 end
 
-local GLOBALS = { 'game', 'Vector2', 'Vector3', 'Color', 'REUtil', 'GameUI', 'MgrGameUI', 'LocalReelIn' }
+local GLOBALS = { 'game', 'Vector2', 'Vector3', 'Color', 'REUtil', 'GameUI', 'MgrGameUI' }
 
 local function setUp()
     local ctx = { nodes = {}, created = {}, commands = {}, sent = {}, events = {}, now = 100, clicks = 0 }
@@ -82,13 +82,6 @@ local function setUp()
         end
         return ctx.events[name]
     end }
-    _G.LocalReelIn = {
-        SetSession = function(self, session) self.SessionId = session end,
-        Clear = function(self) self.SessionId = nil end,
-        Suspend = function() end,
-        Click = function() ctx.clicks = ctx.clicks + 1 end,
-        Close = function() end,
-    }
     ctx.store, ctx.writer = ClientStore.new({ initial_now = ctx.now })
     ctx.hostBinding = ctx.writer:bind_host({
         get_re = function(name) return _G.REUtil:GetRE(name) end,
@@ -110,13 +103,12 @@ local function setUp()
             AttackView.spec(),
             MainHudActionButtonsView.spec({
                 backpack_open = ctx.backpackOpen,
-                reel_active = ctx.reelActive,
+                is_reel_active = function(cast)
+                    return type(cast) == 'table' and cast.phase == 'hooked' and cast.reelSession ~= nil
+                end,
                 send_operate = function(payload) ctx.handler:Operate(payload) end,
                 on_reel_click = function(session_id)
-                    if _G.LocalReelIn.SessionId == session_id then
-                        _G.LocalReelIn:Click()
-                        ctx.handler:ShowCast()
-                    end
+                    if session_id ~= nil then ctx.clicks = ctx.clicks + 1 end
                 end,
             }),
             MainHudBackpackView.spec({
@@ -231,9 +223,8 @@ describe('道具按钮合并（#181）', function()
         click()
         assert.same(2, ctx.clicks)
         assert.same({}, sentNames(ctx, sent))
-        -- 「结束收线」仍是独立的临时按钮，攻击键照旧是攻击
-        assert.is_true(ctx.nodes.ReelClose.Visible)
-        assert.same('结束收线', ctx.nodes.BtnReelCloseLabel.Text)
+        -- 收线覆盖层由 RootView 另行挂载；ScreenMain 的旧临时按钮保持隐藏。
+        assert.is_false(ctx.nodes.ReelClose.Visible)
         assert.same('攻击', ctx.nodes.AttackLabel.Text)
     end)
 

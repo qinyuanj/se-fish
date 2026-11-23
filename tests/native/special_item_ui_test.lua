@@ -35,10 +35,8 @@ describe('TestSpecialItemUI', function()
     before_each(function()
         previous = { game = rawget(_G, 'game'), Vector2 = rawget(_G, 'Vector2'), Color = rawget(_G, 'Color'),
             REUtil = rawget(_G, 'REUtil'), GameUI = rawget(_G, 'GameUI'), MgrGameUI = rawget(_G, 'MgrGameUI'),
-            LocalReelIn = rawget(_G, 'LocalReelIn'),
             notice = rawget(_G, 'LocalMsgNotice') }
         _G.MgrGameUI = { SetCustomControlUI = function() end }
-        _G.LocalReelIn = { SetSession = function() end, Clear = function() end, Suspend = function() end }
         ctx = { nodes = {}, created = {}, commands = {}, snapshotRequests = 0, events = {}, notices = {} }
         ctx.now = 100
         ctx.heartbeat = signal()
@@ -111,7 +109,7 @@ describe('TestSpecialItemUI', function()
         if ctx and ctx.hudView then ctx.hudView:dispose() end
         if ctx and ctx.hostBinding then ctx.hostBinding:dispose() end
         _G.LocalMsgNotice = previous.notice
-        for _, key in ipairs({ 'game', 'Vector2', 'Color', 'REUtil', 'GameUI', 'MgrGameUI', 'LocalReelIn' }) do
+        for _, key in ipairs({ 'game', 'Vector2', 'Color', 'REUtil', 'GameUI', 'MgrGameUI' }) do
             _G[key] = previous[key]
         end
     end)

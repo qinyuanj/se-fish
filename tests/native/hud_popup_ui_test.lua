@@ -45,7 +45,7 @@ local function signal()
     }
 end
 
-local GLOBALS = { 'game', 'Vector2', 'Vector3', 'Color', 'REUtil', 'GameUI', 'MgrGameUI', 'LocalReelIn' }
+local GLOBALS = { 'game', 'Vector2', 'Vector3', 'Color', 'REUtil', 'GameUI', 'MgrGameUI' }
 
 local function setUp(height)
     local ctx = { nodes = {}, created = {}, commands = {}, sent = {}, events = {}, now = 100,
@@ -90,7 +90,6 @@ local function setUp(height)
         end
         return ctx.events[name]
     end }
-    _G.LocalReelIn = { SetSession = function() end, Clear = function() end, Suspend = function() end }
     ctx.states = _G.REUtil:GetRE('ItemBarState').OnClientEvent
     ctx.store, ctx.writer = ClientStore.new({ initial_now = ctx.now })
     ctx.hostBinding = ctx.writer:bind_host({
