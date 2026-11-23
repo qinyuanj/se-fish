@@ -96,6 +96,7 @@ function M.start(opts)
     players = function() return players end,
     damage_filter = opts.damage_filter or function() return true end,
     bait_spots = opts.bait_spots or { Enabled = false },
+    bind_interact_action = opts.bind_interact_action,
   })
   runtime:start()
   runtime:mark_started()

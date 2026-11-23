@@ -19,9 +19,7 @@ local MgrMap = {
     MgrPlayer = require("server.Mgr.MgrPlayer"),
     MgrPlayerData = require("server.Mgr.MgrPlayerData"),
     MgrAbility = require("server.Mgr.MgrAbility"),
-    MgrInteract = require("server.Mgr.MgrInteract"),
     MgrGM = require("server.Mgr.MgrGM"),
-    MgrShop = require("server.Mgr.MgrShop"),
     MgrQuest = require("server.Mgr.MgrQuest"),
     MgrStory = require("server.Mgr.MgrStory"),
     MgrSave = require("server.Mgr.MgrSave"),
@@ -284,13 +282,8 @@ end
 function CastBridge:SetNextFish(player, fishId)
     return WorldRuntime and WorldRuntime:set_next_fish(player, fishId) or false
 end
-MgrMap.MgrInteract.PlayerData = MgrMap.MgrPlayerData
 MgrMap.MgrGM.PlayerData = MgrMap.MgrPlayerData
 MgrMap.MgrGM.Cast = CastBridge
-MgrMap.MgrShop.PlayerData = MgrMap.MgrPlayerData
-MgrMap.MgrShop.Interact = MgrMap.MgrInteract
-MgrMap.MgrInteract.Quest = MgrMap.MgrQuest
-MgrMap.MgrShop.Quest = MgrMap.MgrQuest
 MgrMap.MgrPlayerData.Quest = MgrMap.MgrQuest
 MgrMap.MgrPlayerData.Vitals = nil
 MgrMap.MgrGM.Vitals = nil
@@ -300,12 +293,8 @@ MgrMap.MgrQuest.PlayerData = MgrMap.MgrPlayerData
 MgrMap.MgrQuest.Save = MgrMap.MgrSave
 MgrMap.MgrStory.PlayerData = MgrMap.MgrPlayerData
 MgrMap.MgrStory.Save = MgrMap.MgrSave
-MgrMap.MgrInteract.Save = MgrMap.MgrSave
-MgrMap.MgrInteract.Vitals = nil
-MgrMap.MgrInteract.Survival = nil
 MgrMap.MgrAchievements.PlayerData = MgrMap.MgrPlayerData
 MgrMap.MgrAchievements.Save = MgrMap.MgrSave
-MgrMap.MgrShop.Save = MgrMap.MgrSave
 MgrMap.MgrSave.PlayerData = MgrMap.MgrPlayerData
 MgrMap.MgrCompendium.Save = MgrMap.MgrSave
 MgrMap.MgrCompendium.PlayerData = MgrMap.MgrPlayerData
@@ -416,6 +405,18 @@ WorldRuntime = ServerRuntime.new({
         event.OnServerEvent:Connect(function(player, payload)
             if type(payload) ~= "table" then return end
             if _G.REUtil:CheckRECD(player, "GrillAction", GameCfg.Items.ActionCooldownSec) then return end
+            dispatch(player, payload)
+        end)
+    end,
+    bind_shop_action = function(dispatch)
+        _G.REUtil:GetRE("ShopAction").OnServerEvent:Connect(function(player, payload)
+            if _G.REUtil:CheckRECD(player, "ShopAction", GameCfg.Items.ActionCooldownSec) then return end
+            dispatch(player, payload)
+        end)
+    end,
+    bind_interact_action = function(dispatch)
+        _G.REUtil:GetRE("InteractAction").OnServerEvent:Connect(function(player, payload)
+            if _G.REUtil:CheckRECD(player, "InteractAction", GameCfg.Items.ActionCooldownSec) then return end
             dispatch(player, payload)
         end)
     end,
@@ -554,8 +555,6 @@ end
 FishAi:Start()
 MgrMap.MgrPlayerData.Vitals = Life
 MgrMap.MgrGM.Vitals = Life
-MgrMap.MgrInteract.Vitals = Life
-MgrMap.MgrInteract.Survival = Life
 MgrMap.MgrAbility.Vitals = Life
 MgrMap.MgrAbility.BehaviorServices.Vitals = Life
 MgrMap.MgrParty.Vitals = Life

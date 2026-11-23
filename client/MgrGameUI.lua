@@ -7,13 +7,11 @@ local CloseScreenRE = REUtil:GetRE("CloseScreenRE")
 local curShowMap = {}
 
 local ScreenHandlerLoaders = {
-    DialogNoticeConfirm = function() return require("client.ScreenHandlers.DialogNoticeConfirm") end,
     ScreenCompendium = function() return require("client.ScreenHandlers.ScreenCompendium") end,
     ScreenGM = function() return require("client.ScreenHandlers.ScreenGM") end,
     ScreenMain = function() return require("client.ScreenHandlers.ScreenMain") end,
     ScreenMsg = function() return require("client.ScreenHandlers.ScreenMsg") end,
     ScreenParty = function() return require("client.ScreenHandlers.ScreenParty") end,
-    ScreenShop = function() return require("client.ScreenHandlers.ScreenShop") end,
 }
 
 function MgrGameUI:GetScreen(screenName)

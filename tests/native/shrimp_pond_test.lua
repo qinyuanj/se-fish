@@ -41,6 +41,12 @@ local function newInteract()
   }
 end
 
+local function findGoods(itemId, level)
+  for _, goods in ipairs(require('common.GameCfg').Shop.Goods) do
+    if goods.ItemId == itemId and goods.MinShopLevel <= level then return goods end
+  end
+end
+
 local function collectSelectable(rows, rodLevel, baitId)
   local FishCatch = require('common.FishCatch')
   local total = 0
@@ -73,21 +79,16 @@ describe('虾池最小内容（水区 / 鱼表 / 商店 / 钓鱼佬 / 抛竿）'
     env = { replies = {}, sent = {}, seq = 0, now = 0 }
     env.cfg = require('tests.support.zone_fixtures').Load()
     -- 与 shop_test 同一口径：吃 #49 调试白送的起始库存（鱼竿第 1 格、蚯蚓若干）
-    env.cfg.Debug = { Enabled = true, InitialGrants = env.cfg.Debug.InitialGrants }
-    local PlayerData = assert(loadfile('server/Data/PlayerData.lua'))()
-    env.me = { UserId = 1, Character = { Position = vec(0, 2, 2) }, SetAttribute = function() end }
-    env.data = PlayerData.New(env.me)
-    env.data:Init()
-    env.shop = assert(loadfile('server/Mgr/MgrShop.lua'))()
-    env.shop.PlayerData = {
-      GetDataInst = function(_, p) return p == env.me and env.data or nil end,
-      SendItemBar = function() end,
-    }
-    env.shop.Interact = newInteract()
-    env.shop.Reply = function(_, _, result) env.replies[#env.replies + 1] = result end
+    local initial_grants = env.cfg.Debug.InitialGrants
+    local ShopFeedHost = require('tests.support.shop_feed_host')
+    env.host = ShopFeedHost.start({ positions = ANCHORS })
+    env.cfg.Debug = { Enabled = true, InitialGrants = initial_grants }
+    env.me, env.data = env.host:join(1, 'TGUnitShop')
+    env.replies = env.host.results[1].ShopResult
   end)
 
   after_each(function()
+    if env and env.host then env.host:shutdown() end
     package.loaded['common.GameCfg'] = restore and restore.GameCfg
     package.loaded['common.REUtil'] = restore and restore.REUtil
     package.loaded['server.Mgr.MgrPlayerData'] = restore and restore.MgrPlayerData
@@ -99,7 +100,8 @@ describe('虾池最小内容（水区 / 鱼表 / 商店 / 钓鱼佬 / 抛竿）'
 
   local function buy(itemId)
     env.seq = env.seq + 1
-    return env.shop:Handle(env.me, { action = 'Buy', itemId = itemId, seq = env.seq })
+    local reply = env.host:send(env.me, 'ShopAction', { action = 'Buy', itemId = itemId, seq = env.seq })
+    return reply and reply.ok or false
   end
 
   local function lastReason()
@@ -204,18 +206,11 @@ describe('虾池最小内容（水区 / 鱼表 / 商店 / 钓鱼佬 / 抛竿）'
     assert.same('fishPond', env.cfg.Interact.Fishermen[1].ZoneId)
     assert.same({ 'TGUnitFishShrimp' }, env.cfg.Interact.Fishermen[2].AnchorNames)
     assert.same('shrimpPond', env.cfg.Interact.Fishermen[2].ZoneId)
-    _G.game = { GetService = function() return {} end }
-    local mgr = assert(loadfile('server/Mgr/MgrInteract.lua'))()
-    mgr.FindAnchor = function(_, name)
-      local pos = ANCHORS[name]
-      return pos and { Name = name, Position = pos } or nil
+    local replies = env.host.results[1].InteractResult
+    local function feed(seq)
+      local reply = env.host:send(env.me, 'InteractAction', { target = 'fisherman', action = 'Feed', seq = seq })
+      return reply and reply.ok or false
     end
-    local replies = {}
-    mgr.PlayerData = {
-      GetDataInst = function() return env.data end,
-      SendItemBar = function() end,
-    }
-    mgr.Reply = function(_, _, payload) replies[#replies + 1] = payload end
     -- 站在虾池钓鱼佬旁：选中一格沼虾喂出 10 金（BasePrice × 倍率 1）
     moveTo('TGUnitFishShrimp')
     assert.is_true(env.data:AddItem('riverShrimp'))
@@ -225,7 +220,7 @@ describe('虾池最小内容（水区 / 鱼表 / 商店 / 钓鱼佬 / 抛竿）'
       if entry and entry.itemId == 'riverShrimp' then slot = index end
     end
     assert.is_true(env.data:SelectSlot(slot))
-    assert.is_true(mgr:Handle(env.me, { target = 'fisherman', action = 'Feed', seq = 1 }))
+    assert.is_true(feed(1))
     assert.same(10, env.data.Data.FishCoin)
     assert.is_true(replies[#replies].ok)
     -- 一区钓鱼佬旁同样可用（按区分派：各自只认本区锚点，互不借用）
@@ -236,7 +231,7 @@ describe('虾池最小内容（水区 / 鱼表 / 商店 / 钓鱼佬 / 抛竿）'
       if entry and entry.itemId == 'carp' then slot = index end
     end
     assert.is_true(env.data:SelectSlot(slot))
-    assert.is_true(mgr:Handle(env.me, { target = 'fisherman', action = 'Feed', seq = 2 }))
+    assert.is_true(feed(2))
     assert.same(14, env.data.Data.FishCoin)
   end)
 
@@ -334,9 +329,9 @@ describe('虾池最小内容（水区 / 鱼表 / 商店 / 钓鱼佬 / 抛竿）'
     assert.is_true(buy('shrimpRod'))
     assert.same(0, env.data.Data.FishCoin)
     assert.same('shrimpRod', env.data:GetItemBarSnapshot().slots[2].itemId)
-    assert.is_not_nil(env.shop:FindGoods('shrimpRod', 2))
-    assert.is_nil(env.shop:FindGoods('shrimpRod', 1))
-    assert.is_nil(env.shop:FindGoods('sausage', 1))
+    assert.is_not_nil(findGoods('shrimpRod', 2))
+    assert.is_nil(findGoods('shrimpRod', 1))
+    assert.is_nil(findGoods('sausage', 1))
   end)
 
   it('test_starter_rod_without_bait_only_hooks_shrimp', function()

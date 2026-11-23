@@ -8,6 +8,7 @@
 --   6. 鱼竿进了鱼饵库存、蚯蚓占了道具栏格；
 --   7. 失败时不回失败原因（客户端无从提示），成功后不推送库存（HUD 与库存不一致）。
 local GameCfg = require('common.GameCfg')
+local Host = require('tests.support.shop_feed_host')
 
 describe("钓场商店购买", function()
     local ctx
@@ -15,35 +16,39 @@ describe("钓场商店购买", function()
     -- 与旧 LuaUnit 的每例 setUp/tearDown 同级成对。
     -- #49：进图白送只在调试开关下发放，这些用例沿用它的起始库存（鱼竿在第 1 格、蚯蚓若干）。
     before_each(function()
-        ctx = { replies = {}, synced = 0, seq = 0, inRange = true }
+        ctx = { seq = 0 }
         ctx.savedGrantDebug = GameCfg.Debug
+        ctx.host = Host.start()
         GameCfg.Debug = { Enabled = true, InitialGrants = ctx.savedGrantDebug.InitialGrants }
         ctx.cfg = GameCfg
         ctx.savedShop = ctx.cfg.Shop
-        local PlayerData = assert(loadfile('server/Data/PlayerData.lua'))()
-        ctx.me = { UserId = 1, Character = { Position = { x = 0, y = 0, z = 0 } }, SetAttribute = function() end }
-        ctx.data = PlayerData.New(ctx.me)
-        ctx.data:Init()
-        ctx.shop = assert(loadfile('server/Mgr/MgrShop.lua'))()
-        ctx.shop.PlayerData = {
-            GetDataInst = function(_, p) return p == ctx.me and ctx.data or nil end,
-            SendItemBar = function() ctx.synced = ctx.synced + 1 end,
-        }
-        ctx.shop.Interact = { InRange = function() return ctx.inRange end }
-        ctx.shop.Reply = function(_, _, result) ctx.replies[#ctx.replies + 1] = result end
+        ctx.me, ctx.data = ctx.host:join(1, GameCfg.Shop.Stands[1].AnchorName)
+        ctx.replies = ctx.host.results[1].ShopResult
     end)
 
     -- 调试开关与商店表逐例恢复；setUp 中途失败也照样清理。
     after_each(function()
-        GameCfg.Debug = ctx.savedGrantDebug
+        ctx.host:shutdown()
         ctx.cfg.Shop = ctx.savedShop
     end)
+
+    local function send(payload)
+        local reply = ctx.host:send(ctx.me, 'ShopAction', payload)
+        return reply and reply.ok or false
+    end
 
     local function buy(itemId, extra)
         ctx.seq = ctx.seq + 1
         local payload = { action = 'Buy', itemId = itemId, seq = ctx.seq }
         for k, v in pairs(extra or {}) do payload[k] = v end
-        return ctx.shop:Handle(ctx.me, payload)
+        return send(payload)
+    end
+
+    local function find_goods(item_id, level)
+        for _, goods in ipairs(GameCfg.Shop.Goods) do
+            if goods.ItemId == item_id and goods.MinShopLevel <= level then return goods end
+        end
+        return nil
     end
 
     local function lastReason()
@@ -56,7 +61,7 @@ describe("钓场商店购买", function()
         ctx.seq = ctx.seq + 1
         local payload = { action = 'Buy', number = number, seq = ctx.seq }
         for k, v in pairs(extra or {}) do payload[k] = v end
-        return ctx.shop:Handle(ctx.me, payload)
+        return send(payload)
     end
 
     -- 客户端带的价格不采用（编号路径同样忽略）
@@ -91,6 +96,7 @@ describe("钓场商店购买", function()
     end)
 
     it("test_buy_rod_and_worm_into_their_containers", function()
+        local synced = ctx.host.sync_counts and ctx.host.sync_counts[1] or 0
         ctx.data:AddCoin(6, nil, 'test')
         local worms = ctx.data.Data.Bait.worm
         assert.is_true(buy('starterRod'))
@@ -102,7 +108,7 @@ describe("钓场商店购买", function()
         assert.same(worms + 1, ctx.data.Data.Bait.worm)
         assert.is_nil(ctx.data:GetItemBarSnapshot().slots[3])
         assert.is_true(ctx.replies[#ctx.replies].ok)
-        assert.same(2, ctx.synced)
+        assert.same(synced + 2, ctx.host.sync_counts[1])
     end)
 
     -- 升级行购买：扣款 + 逐级生效 + 响应带名称；重复购买走限购拒绝且不扣钱
@@ -145,8 +151,9 @@ describe("钓场商店购买", function()
 
     -- 逐级链路与逐级价格（7 级摊位）：近战/远程/弹容/爆炸物满级
     it("test_full_level_chains_and_step_prices", function()
-        ctx.cfg.Shop = setmetatable({ Stands = { { AnchorName = 'TGUnitShop7', Level = 7 } } },
+        ctx.cfg.Shop = setmetatable({ Stands = { { AnchorName = 'Z7_Shop', Level = 7 } } },
             { __index = ctx.savedShop })
+        ctx.me.Character.Position.x = ctx.host.anchors.Z7_Shop.Position.x
         ctx.data:AddCoin(35000, nil, 'test')
         for _, number in ipairs({ 51, 50, 49, 48, 47, 46, 45 }) do assert.is_true(buyNumber(number)) end
         assert.same(7, ctx.data:ShopUpgradeLevel('melee'))
@@ -183,49 +190,49 @@ describe("钓场商店购买", function()
         ctx.data:AddCoin(10000, nil, 'test')
         -- 1 级摊位逐级扩容成功，且把行 33（背包升级1）计入购买次数
         ctx.seq = ctx.seq + 1
-        assert.is_true(ctx.shop:Handle(ctx.me, { action = 'UpgradeStorage', seq = ctx.seq }))
+        assert.is_true(send({ action = 'UpgradeStorage', seq = ctx.seq }))
         assert.same(1, ctx.data.Data.UpgradeLevel)
         assert.same(1, ctx.data:PurchaseCount(33))
         assert.same(9900, ctx.data.Data.FishCoin)
         -- 限购：级别回滚后行 33 仍计数 1/1 → 'limit' 且不扣钱
         ctx.data.Data.UpgradeLevel = 0
         ctx.seq = ctx.seq + 1
-        assert.is_false(ctx.shop:Handle(ctx.me, { action = 'UpgradeStorage', seq = ctx.seq }))
+        assert.is_false(send({ action = 'UpgradeStorage', seq = ctx.seq }))
         assert.same('limit', lastReason())
         assert.same(9900, ctx.data.Data.FishCoin)
         -- 摊位等级门槛：1 级摊位已升 1 级，下一级（行 32）需 2 级摊位 → 'level'
         ctx.data.Data.UpgradeLevel = 1
         ctx.data.Extra.growth.purchases['33'] = 0
         ctx.seq = ctx.seq + 1
-        assert.is_false(ctx.shop:Handle(ctx.me, { action = 'UpgradeStorage', seq = ctx.seq }))
+        assert.is_false(send({ action = 'UpgradeStorage', seq = ctx.seq }))
         assert.same('level', lastReason())
         -- 满级：6 级后再扩 → 'max'
         ctx.data.Data.UpgradeLevel = 6
         ctx.seq = ctx.seq + 1
-        assert.is_false(ctx.shop:Handle(ctx.me, { action = 'UpgradeStorage', seq = ctx.seq }))
+        assert.is_false(send({ action = 'UpgradeStorage', seq = ctx.seq }))
         assert.same('max', lastReason())
     end)
 
     -- 畸形请求：既无 itemId 也无 number、编号非整数，直接拒绝
     it("test_malformed_number_requests_are_rejected", function()
-        assert.is_false(ctx.shop:Handle(ctx.me, { action = 'Buy', seq = 1 }))
-        assert.is_false(ctx.shop:Handle(ctx.me, { action = 'Buy', number = 1.5, seq = 2 }))
-        assert.is_false(ctx.shop:Handle(ctx.me, { action = 'Buy', number = -1, seq = 3 }))
-        assert.is_false(ctx.shop:Handle(ctx.me, { action = 'Buy', number = 51 }))
+        assert.is_false(send({ action = 'Buy', seq = 1 }))
+        assert.is_false(send({ action = 'Buy', number = 1.5, seq = 2 }))
+        assert.is_false(send({ action = 'Buy', number = -1, seq = 3 }))
+        assert.is_false(send({ action = 'Buy', number = 51 }))
     end)
 
     it("test_malformed_requests_are_rejected", function()
         ctx.data:AddCoin(5, nil, 'test')
-        assert.is_false(ctx.shop:Handle(ctx.me, 'Buy'))
-        assert.is_false(ctx.shop:Handle(ctx.me, { action = 'Sell', itemId = 'worm', seq = 100 }))
-        assert.is_false(ctx.shop:Handle(ctx.me, { action = 'Buy', itemId = 'worm', seq = 1.5 }))
-        assert.is_false(ctx.shop:Handle(ctx.me, { action = 'Buy', itemId = 'worm' }))
+        assert.is_false(send('Buy'))
+        assert.is_false(send({ action = 'Sell', itemId = 'worm', seq = 100 }))
+        assert.is_false(send({ action = 'Buy', itemId = 'worm', seq = 1.5 }))
+        assert.is_false(send({ action = 'Buy', itemId = 'worm' }))
         assert.same(5, ctx.data.Data.FishCoin)
     end)
 
     it("test_out_of_range_is_rejected", function()
         ctx.data:AddCoin(5, nil, 'test')
-        ctx.inRange = false
+        ctx.me.Character.Position.x = 100000
         assert.is_false(buy('starterRod'))
         assert.same('range', lastReason())
         assert.same(5, ctx.data.Data.FishCoin)
@@ -248,8 +255,8 @@ describe("钓场商店购买", function()
         ctx.data:AddCoin(15, nil, 'test')
         assert.is_true(buy('starterRod'))
         local replay = { action = 'Buy', itemId = 'starterRod', seq = ctx.seq }
-        assert.is_false(ctx.shop:Handle(ctx.me, replay))
-        assert.is_false(ctx.shop:Handle(ctx.me, { action = 'Buy', itemId = 'starterRod', seq = ctx.seq - 1 }))
+        assert.is_true(send(replay), '同操作重放返回原成功结果但不重复结算')
+        assert.is_false(send({ action = 'Buy', itemId = 'starterRod', seq = ctx.seq - 1 }))
         assert.same(10, ctx.data.Data.FishCoin)
         assert.is_true(buy('starterRod'))
         assert.same(5, ctx.data.Data.FishCoin)
@@ -278,39 +285,40 @@ describe("钓场商店购买", function()
             assert.same(level, goods.MinShopLevel, id) -- 第 N 钓鱼区起售竿级 N（GameSpec §4.5）
         end
         -- 一区摊等级 1：只有新手鱼竿可购（虾池摊等级 2 的购买路径见 shrimp_pond_test）
-        assert.is_not_nil(ctx.shop:FindGoods('starterRod', 1))
-        for level = 2, 7 do assert.is_nil(ctx.shop:FindGoods(rods[level], 1), rods[level]) end
+        assert.is_not_nil(find_goods('starterRod', 1))
+        for level = 2, 7 do assert.is_nil(find_goods(rods[level], 1), rods[level]) end
     end)
 
     it("test_upgrade_is_authoritative_and_replay_does_not_charge_again", function()
         ctx.data:AddCoin(100, nil, 'test')
         ctx.seq = ctx.seq + 1
         local request = { action = 'UpgradeStorage', seq = ctx.seq, price = 0 }
-        assert.is_true(ctx.shop:Handle(ctx.me, request))
+        assert.is_true(send(request))
         assert.same(0, ctx.data.Data.FishCoin)
         assert.same(3, ctx.data:GetItemBarSnapshot().slotCount)
         assert.same(10, ctx.data:GetItemBarSnapshot().backpackCount)
-        assert.is_false(ctx.shop:Handle(ctx.me, request))
+        assert.is_true(send(request), '扩容重放返回原成功结果但不重复扣款')
         assert.same(3, ctx.data:GetItemBarSnapshot().slotCount)
         assert.same(0, ctx.data.Data.FishCoin)
     end)
 
     it("test_upgrade_rejects_insufficient_coin_and_range", function()
-        ctx.inRange = false
+        ctx.me.Character.Position.x = 100000
         ctx.seq = ctx.seq + 1
-        assert.is_false(ctx.shop:Handle(ctx.me, { action = 'UpgradeStorage', seq = ctx.seq }))
+        assert.is_false(send({ action = 'UpgradeStorage', seq = ctx.seq }))
         assert.same('range', lastReason())
-        ctx.inRange = true
+        ctx.me.Character.Position.x = 0
         ctx.seq = ctx.seq + 1
-        assert.is_false(ctx.shop:Handle(ctx.me, { action = 'UpgradeStorage', seq = ctx.seq }))
+        assert.is_false(send({ action = 'UpgradeStorage', seq = ctx.seq }))
         assert.same('coin', lastReason())
         assert.same(2, ctx.data:GetItemBarSnapshot().slotCount)
     end)
 
     -- 越级购买拒绝且不扣钱
     it("test_upgrade_rejects_skip_without_charge", function()
-        ctx.cfg.Shop = setmetatable({ Stands = { { AnchorName = 'TGUnitShop7', Level = 7 } } },
+        ctx.cfg.Shop = setmetatable({ Stands = { { AnchorName = 'Z7_Shop', Level = 7 } } },
             { __index = ctx.savedShop })
+        ctx.me.Character.Position.x = ctx.host.anchors.Z7_Shop.Position.x
         ctx.data:AddCoin(1000, nil, 'test')
         assert.is_false(buyNumber(50)) -- 近战 2 级，未买过 1 级
         assert.same('level', lastReason())

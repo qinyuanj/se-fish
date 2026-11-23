@@ -19,7 +19,7 @@
 --  11. 攒匕首钱存在经济阻塞（某些自然抽样下永远攒不够），或跳过匕首直接空手挑战电鳗（没验证武器成长）。
 --
 -- 模拟边界（逐条标注在输出里）：
---   * 业务模块用真实代码：MgrSave / MgrPlayerData / MgrInteract / MgrShop / MgrQuest（经济与兑换）、
+--   * 业务模块用真实代码：MgrSave / MgrPlayerData / ServerRuntime / PlayerShop / PlayerFisherman（经济与兑换）、
 --     MgrLoot:Give / OnCarrierDied（拾取发放与掉落）、MgrFishUnit（电鳗 / 鳄雀鳝战斗状态机）、
 --     FishCatch（抽鱼与倍率）、LotteryEligibility（极品资格）。
 --   * 引擎边界是假的：场景锚点、物理射线、技能施放（CastFish 只计数）、玩家命中（按武器间隔扣载体血量）。
@@ -71,62 +71,24 @@ local function makeRng(seed)
 end
 local rng = makeRng(SIM.Seed)
 
--- ===== 经济环境（照 economy_persistence_test 的引擎边界）=====
-local ENV = { values = {}, queue = {}, events = {} }
+-- ===== 经济环境：与原生行为测试共用真实 ServerRuntime 宿主 =====
+-- 本探针不验证走位，沿用旧假场景的共址锚点；时钟与步行耗时仍是模拟值。
 local oldDebug = GameCfg.Debug
-GameCfg.Debug = { Enabled = false }
-local store = {
-    GetAsync = function(_, key) return ENV.values[key] end,
-    UpdateAsync = function(_, key, transform)
-        local value = transform(ENV.values[key])
-        if value then ENV.values[key] = value end
-        return value
-    end,
-    SetAsync = function(_, key, value) ENV.values[key] = value end,
-}
-local anchor = { Position = { x = 0, y = 0, z = 0 }, PlayAnimation = function() end }
-local function signal()
-    return { Connect = function() return { Disconnect = function() end } end }
+local Host = require('tests.support.shop_feed_host')
+local positions = {}
+for _, stand in ipairs(GameCfg.Shop.Stands) do positions[stand.AnchorName] = { x = 0, y = 0, z = 0 } end
+for _, npc in ipairs(GameCfg.Interact.Fishermen) do
+    for _, name in ipairs(npc.AnchorNames) do positions[name] = { x = 0, y = 0, z = 0 } end
 end
-local economyGame = { GetService = function(_, name)
-    if name == 'Task' then return { Spawn = function(_, fn) ENV.queue[#ENV.queue + 1] = fn end, Wait = function() end } end
-    if name == 'DataStoreService' then return { GetDataStore = function() return store end } end
-    if name == 'World' then return { GetServerTime = function() return 100 + Clock end,
-        FindFirstChild = function() return anchor end } end
-    if name == 'Players' then return { GetPlayers = function() return { ENV.player } end } end
-end }
-_G.game = economyGame
-local function fire(name, player, value) ENV.events[#ENV.events + 1] = { name = name, player = player, value = value } end
-_G.REUtil = { GetRE = function(_, name) return {
-    FireClient = function(_, player, value) fire(name, player, value) end,
-    FireAllClients = function(_, value) fire(name, nil, value) end,
-} end }
-local function drain() while #ENV.queue > 0 do table.remove(ENV.queue, 1)() end end
-local function lastResult(name)
-    for i = #ENV.events, 1, -1 do
-        if ENV.events[i].name == name then return ENV.events[i].value end
-    end
-end
-
-local save = assert(loadfile('server/Mgr/MgrSave.lua'))()
-local players = assert(loadfile('server/Mgr/MgrPlayerData.lua'))()
-local interact = assert(loadfile('server/Mgr/MgrInteract.lua'))()
-local shop = assert(loadfile('server/Mgr/MgrShop.lua'))()
-local quest = assert(loadfile('server/Mgr/MgrQuest.lua'))()
-players.Save, save.PlayerData = save, players
-interact.PlayerData, interact.Save, interact.Quest = players, save, quest
-shop.PlayerData, shop.Save, shop.Quest, shop.Interact = players, save, quest, interact
+local host = Host.start({ positions = positions })
+local economyGame = _G.game
+local save, players = host.save, host.player_data
+local function drain() host:drain() end
 
 -- 掉落与拾取发放：地面公开边界。探针不挂载世界，只保留空记录。
 local loot = { Loots = {}, Pickup = function() return false end, Give = function() return false end, OnCarrierDied = function() end }
 
-local player = { UserId = 13401, Character = { Position = { x = 0, y = 0, z = 0 } },
-    CharacterAdded = signal(), CharacterRemoving = signal(), SetAttribute = function() end }
-ENV.player = player
-players:OnPlayerAdded(player)
-quest:OnPlayerAdded(player)
-drain()
-local data = players:GetDataInst(player)
+local player, data = host:join(13401, GameCfg.Interact.Fishermen[1].AnchorNames[1])
 
 -- ===== 1. 新档检查 =====
 local ITEM_BAR = GameCfg.Items.ContainerId.ItemBar
@@ -175,16 +137,16 @@ local Stats = { coinsEarned = 0, coinsSpent = 0, baitPicked = 0, casts = 0, catc
 
 local function feedSelected(what)
     local before = data.Data.FishCoin or 0
-    interact:Handle(player, { target = 'fisherman', action = 'Feed', seq = nextSeq() })
+    host:send(player, 'InteractAction', { target = 'fisherman', action = 'Feed', seq = nextSeq() })
     drain()
-    local result = lastResult('InteractResult') or {}
+    local result = host:last(player, 'InteractResult') or {}
     local gained = (data.Data.FishCoin or 0) - before
     if gained > 0 then Stats.coinsEarned = Stats.coinsEarned + gained end
     return result, gained
 end
 local function buy(itemId)
     local before = data.Data.FishCoin or 0
-    shop:Handle(player, { action = 'Buy', itemId = itemId, seq = nextSeq() })
+    host:send(player, 'ShopAction', { action = 'Buy', itemId = itemId, seq = nextSeq() })
     drain()
     local spent = before - (data.Data.FishCoin or 0)
     if spent > 0 then Stats.coinsSpent = Stats.coinsSpent + spent end
@@ -732,6 +694,7 @@ quantity('个人最大重量（kg）', Stats.maxWeight .. ' ' .. tostring(Stats.
 quantity('极品命中次数', Stats.premium)
 quantity('持有船票', data:ItemCount('shrimpTicket'))
 
+host:shutdown()
 GameCfg.Debug = oldDebug
 print(string.format('== 探针结果：%d 通过 / %d 失败', Pass, Fail))
 print('说明：离线模拟只证明逻辑自洽；命中、走位、收线耗时为模拟判定，不能当真机验收。')

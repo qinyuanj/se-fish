@@ -11,6 +11,8 @@
 -- it 按旧 LuaUnit 的方法名字典序注册，保持与旧套件一致的案例顺序。
 -- assertStrContains / assertNotStrContains 均未传 isPattern，即 plain 子串，映射 matches 的第 4 参 true。
 local GameCfg = require('common.GameCfg')
+local ServerRuntime = require('server.World.ServerRuntime')
+local SpokeClock = require('common.SpokeClock')
 
 describe('TestGuidePersistence', function()
     local env
@@ -18,19 +20,49 @@ describe('TestGuidePersistence', function()
 
     -- 类内辅助（旧 TestGuidePersistence:join / :drain / :rejoin / :messages / :fact）
     -- 改为接收闭包 env 的本地函数，避免在 describe 加载期往尚未赋值的 env 上挂方法。
+    local drain
     local function join(userId)
+        local controller = { Health = GameCfg.Vitals.MaxHealth, MaxHealth = GameCfg.Vitals.MaxHealth,
+            WalkSpeed = 16, HealthChanged = env.signal, Died = env.signal, OnReborn = env.signal }
         env.player = { UserId = userId or 4040, CharacterAdded = env.signal, CharacterRemoving = env.signal,
-            SetAttribute = function() end }
+            Character = { Position = { x = 0, y = 0, z = 0 }, Size = { y = 2 }, Controller = controller },
+            SetAttribute = function(self, key, value) self.attrs = self.attrs or {} self.attrs[key] = value end,
+            GetAttribute = function(self, key) return self.attrs and self.attrs[key] end }
         env.players:OnPlayerAdded(env.player)
+        if env.runtime then
+            drain()
+            env.runtime:on_player_added(env.player)
+            local data = env.players:GetDataInst(env.player)
+            if data then env.runtime:on_save_ready(env.player, data) end
+        end
     end
 
-    local function drain()
+    drain = function()
         while #env.tasks > 0 do table.remove(env.tasks, 1)() end
+    end
+
+    local function mount_runtime()
+        env.runtime = ServerRuntime.new({
+            clock = SpokeClock.new(100), remote = _G.REUtil,
+            on_item_bar_state = function(player, snapshot)
+                _G.REUtil:GetRE('ItemBarState'):FireClient(player, snapshot)
+            end,
+            save = env.save, player_data = env.players, quest = env.quest,
+            players = function() return { env.player } end,
+            players_service = _G.game:GetService('Players'), world_service = _G.game:GetService('World'),
+            bind_shop_action = function(dispatch) env.shop_action = dispatch end,
+            bind_interact_action = function(dispatch) env.interact_action = dispatch end,
+        })
+        env.runtime:start()
+        env.runtime:mark_started()
+        env.runtime:on_player_added(env.player)
+        env.runtime:on_save_ready(env.player, env.players:GetDataInst(env.player))
     end
 
     local function rejoin()
         env.quest:OnPlayerRemoving(env.player)
         env.story:OnPlayerRemoving(env.player)
+        if env.runtime then env.runtime:on_player_removing(env.player) end
         env.players:OnPlayerRemoving(env.player)
         drain()
         join()
@@ -74,7 +106,8 @@ describe('TestGuidePersistence', function()
             if name == 'Task' then return { Spawn = function(_, fn) env.tasks[#env.tasks + 1] = fn end,
                 Wait = function() end } end
             if name == 'DataStoreService' then return { GetDataStore = function() return env.store end } end
-            if name == 'World' then return { GetServerTime = function() return 100 end } end
+            if name == 'World' then return { GetServerTime = function() return 100 end,
+                FindFirstChild = function() return { Position = { x = 0, y = 0, z = 0 } } end } end
             if name == 'Players' then return { GetPlayers = function() return { env.player } end } end
         end }
         _G.REUtil = { GetRE = function(_, name) return {
@@ -134,12 +167,10 @@ describe('TestGuidePersistence', function()
             return {}
         end, function() end)
         drain()
-        local interact = assert(loadfile('server/Mgr/MgrInteract.lua'))()
-        interact.Save, interact.PlayerData, interact.Quest = env.save, env.players, env.quest
+        mount_runtime()
         env.failQuestWrite = true
         for i = 1, 5 do
-            assert.is_true(interact:Feed(env.player, data, {}, GameCfg.Interact.Fisherman, i,
-                env.save:NextOperation(env.player, 'interact')))
+            assert.is_true(env.interact_action(env.player, { target = 'fisherman', action = 'Feed', seq = i }))
             drain()
         end
         env.failQuestWrite = false
@@ -342,12 +373,9 @@ describe('TestGuidePersistence', function()
             return {}
         end, function() end)
         drain()
-        local shop = assert(loadfile('server/Mgr/MgrShop.lua'))()
-        shop.Save, shop.PlayerData, shop.Quest = env.save, env.players, env.quest
-        shop.Interact = { InRange = function() return true end }
+        mount_runtime()
         env.failQuestWrite = true
-        assert.is_true(shop:Buy(env.player, data, 'starterRod', nil, 1,
-            env.save:NextOperation(env.player, 'shop')))
+        assert.is_true(env.shop_action(env.player, { action = 'Buy', itemId = 'starterRod', seq = 1 }))
         drain()
         env.failQuestWrite = false
         rejoin()

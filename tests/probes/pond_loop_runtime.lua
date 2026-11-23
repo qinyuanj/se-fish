@@ -7,13 +7,13 @@
 -- 只走正常业务意图：与客户端事件处理函数同一入口
 --   拾饵   MgrLoot:Pickup(player, id)            （ItemBarAction.Pickup 的处理函数）
 --   选中   data:SelectSlot / data:SelectBait      （ItemBarAction 的同名方法）
---   喂食   MgrInteract:Handle {target='fisherman', action='Feed', seq}
---   买竿   MgrShop:Handle {action='Buy', itemId='starterRod', seq}
+--   喂食   ServerRuntime:dispatch_interact {target='fisherman', action='Feed', seq}
+--   买竿   ServerRuntime:dispatch_shop {action='Buy', itemId='starterRod', seq}
 --   抛竿   CastProbe:Cast / :Reel / :Drop           （CastAction 的处理函数）
 --   收线   ReelProbe:Accept {s, n, q}             （ReelInRE）
 --   攻击   MgrWeapon:Attack                       （WeaponAction.attack）
 --   摆渡   FerryRoute:Handle {action='Board', routeId, seq}
---   买匕首 MgrShop:Handle {action='Buy', number=25, seq}（钓场商店 Level1 摊位，itemKey item135）
+--   买匕首 ServerRuntime:dispatch_shop {action='Buy', number=25, seq}（钓场商店 Level1 摊位，itemKey item135）
 --   装备   data:SelectWeapon('item135')（必要时 data:HoldWeapon），用 MgrWeapon:EquippedWeapon 复核
 --   整理   data:MoveToItemBar / data:MoveSlot(from, index, target, slot)（背包/道具栏满时的合法换格）
 -- 成长：正常击杀卖鱼；空手追鱼失败时可拾免费蚯蚓喂食攒匕首（50），买到并装备后再打电鳗/鳄雀鳝。
@@ -50,8 +50,23 @@ local MgrLoot = {
         return world and world:try_pickup(player, id) or false
     end,
 }
-local MgrInteract = require('server.Mgr.MgrInteract')
-local MgrShop = require('server.Mgr.MgrShop')
+local InteractionPoints = require('server.World.InteractionPoints')
+local MgrSave = require('server.Mgr.MgrSave')
+local function runtimeCommand(name, player, payload)
+    local runtime = ServerRuntime.current and ServerRuntime.current()
+    return runtime and runtime[name](runtime, player, payload) or false
+end
+local interact = { Handle = function(_, player, payload)
+    return runtimeCommand('dispatch_interact', player, payload)
+end }
+local shop = { Handle = function(_, player, payload)
+    return runtimeCommand('dispatch_shop', player, payload)
+end }
+local function findGoodsByNumber(number, level)
+    for _, goods in ipairs(GameCfg.Shop.Goods) do
+        if goods.Number == number and goods.MinShopLevel <= level then return goods end
+    end
+end
 local MgrFishUnit = require('server.World.FishTree')
 local MgrWeapon = require('server.Mgr.MgrWeapon')
 local Ferry = ground() and ground().ferry
@@ -201,7 +216,7 @@ local function standPoint(anchorPos)
 end
 
 local function anchorPos(name)
-    local unit = MgrInteract:FindAnchor(name)
+    local unit = InteractionPoints:FindAnchor(name)
     return unit and unit.Position
 end
 
@@ -218,7 +233,7 @@ local function pause(reason, point, label)
 end
 
 local function inRangeOf(names, radius, slack)
-    return MgrInteract:InRange(player, { AnchorNames = names, Radius = radius, Slack = slack })
+    return InteractionPoints:InRange(player, { AnchorNames = names, Radius = radius, Slack = slack })
 end
 
 -- 去某个 NPC 锚点：不在范围内返回 pause，在范围内返回 nil
@@ -322,6 +337,11 @@ local function focus(data, slot)
 end
 
 local function nextSeq(mgr) return ((mgr.LastSeq[uid]) or 0) + 1 end
+local function nextShopFeedSeq(kind)
+    local key = kind .. 'Seq'
+    RT[key] = (RT[key] or 0) + 1
+    return RT[key]
+end
 
 -- ========== 交易落账观测 ==========
 -- Handle 返回 true 只表示请求被接受，结果随 Save:Execute 异步落账。feed/buy 计确认到账数，feedTry/buyTry 计尝试数；
@@ -358,10 +378,7 @@ local function settledBy(kind, b, a)
 end
 
 local function savePaused()
-    for _, mgr in ipairs({ MgrInteract, MgrShop }) do
-        if mgr.Save and mgr.Save:IsPaused(uid) then return true end
-    end
-    return false
+    return MgrSave:IsPaused(uid)
 end
 
 -- 发出请求后调用：计尝试；accepted 才登记 pendingOp
@@ -440,7 +457,7 @@ local function feed(data, label)
     if wait then return wait end
     local itemId = selectedItem(data)
     local before = ledger(data, itemId)
-    local ok = MgrInteract:Handle(player, { target = 'fisherman', action = 'Feed', seq = nextSeq(MgrInteract) })
+    local ok = interact:Handle(player, { target = 'fisherman', action = 'Feed', seq = nextShopFeedSeq('feed') })
     say('FEED', label, 'accepted=' .. tostring(ok), 'item=' .. tostring(itemId), ledgerText(before))
     beginOp('feed', label, data, ok, itemId, before)
     return 'wait', SETTLE_SEC
@@ -451,14 +468,14 @@ local function buyRod(data)
     local wait = needNear({ stand.AnchorName }, GameCfg.Shop.Radius, GameCfg.Shop.Slack, '钓场商店买竿')
     if wait then return wait end
     local before = ledger(data)
-    local ok = MgrShop:Handle(player, { action = 'Buy', itemId = 'starterRod', seq = nextSeq(MgrShop) })
+    local ok = shop:Handle(player, { action = 'Buy', itemId = 'starterRod', seq = nextShopFeedSeq('shop') })
     say('BUY', 'starterRod', 'accepted=' .. tostring(ok), ledgerText(before))
     beginOp('rod', 'starterRod', data, ok, nil, before)
     return 'wait', SETTLE_SEC
 end
 
 local function daggerPrice()
-    local goods = MgrShop:FindGoodsByNumber(DAGGER.Number, DAGGER.MinLevel)
+    local goods = findGoodsByNumber(DAGGER.Number, DAGGER.MinLevel)
     return goods and goods.Price
 end
 
@@ -469,7 +486,7 @@ local function buyDagger(data)
     local wait = needNear({ stand.AnchorName }, GameCfg.Shop.Radius, GameCfg.Shop.Slack, '钓场商店买匕首')
     if wait then return wait end
     local before = ledger(data)
-    local ok = MgrShop:Handle(player, { action = 'Buy', number = DAGGER.Number, seq = nextSeq(MgrShop) })
+    local ok = shop:Handle(player, { action = 'Buy', number = DAGGER.Number, seq = nextShopFeedSeq('shop') })
     say('BUY', 'dagger#' .. DAGGER.Number, 'accepted=' .. tostring(ok), ledgerText(before), 'price=' .. tostring(daggerPrice()))
     -- daggerTries 只在 accepted 且超时未到账时由 settleOp 累加，到账后清零
     beginOp('dagger', 'dagger#' .. DAGGER.Number, data, ok, nil, before)
@@ -498,17 +515,15 @@ local function validate(data)
     local function fn(label, mod, name) need(label .. name, type(mod) == 'table' and type(mod[name]) == 'function') end
     fn('MgrPlayerData:', MgrPlayerData, 'GetDataInst') fn('MgrPlayerData:', MgrPlayerData, 'SendItemBar')
     fn('MgrLoot:', MgrLoot, 'Pickup') need('MgrLoot.Loots', type(MgrLoot.Loots) == 'table')
-    for _, name in ipairs({ 'Handle', 'InRange', 'FindAnchor' }) do fn('MgrInteract:', MgrInteract, name) end
-    fn('MgrShop:', MgrShop, 'Handle') fn('MgrShop:', MgrShop, 'FindGoodsByNumber')
+    for _, name in ipairs({ 'InRange', 'FindAnchor' }) do fn('InteractionPoints:', InteractionPoints, name) end
+    fn('interact:', interact, 'Handle') fn('shop:', shop, 'Handle')
     for _, name in ipairs({ 'Cast', 'Reel', 'Drop' }) do fn('CastProbe:', CastProbe, name) end
     need('CastProbe.Sessions', type(CastProbe.Sessions) == 'table')
     fn('ReelProbe:', ReelProbe, 'Accept')
     need('MgrFishUnit.Fish', type(MgrFishUnit.Fish) == 'table')
     fn('MgrWeapon:', MgrWeapon, 'Attack') fn('MgrWeapon:', MgrWeapon, 'EquippedWeapon')
     fn('FerryRoute:', Ferry, 'Handle')
-    for _, m in ipairs({ { 'MgrInteract', MgrInteract }, { 'MgrShop', MgrShop } }) do
-        need(m[1] .. '.LastSeq', type(m[2].LastSeq) == 'table')
-    end
+    need('FerryRoute.LastSeq', type(Ferry.LastSeq) == 'table')
     for _, name in ipairs({ 'SelectSlot', 'SelectBait', 'SelectWeapon', 'HoldWeapon', 'MoveSlot', 'MoveToItemBar',
         'ItemCount', 'WeaponCount', 'GetItemBarSnapshot', 'ItemBarCapacity', 'BackpackCapacity' }) do
         need('data:' .. name, type(data[name]) == 'function')
@@ -519,7 +534,7 @@ local function validate(data)
     need('data.Data.Bait', type(data.Data.Bait) == 'table')
     need('data.Extra.inventory.selection.held', type(data.Extra) == 'table' and type(data.Extra.inventory) == 'table'
         and type(data.Extra.inventory.selection) == 'table' and type(data.Extra.inventory.selection.held) == 'table')
-    local goods = type(MgrShop.FindGoodsByNumber) == 'function' and MgrShop:FindGoodsByNumber(DAGGER.Number, DAGGER.MinLevel)
+    local goods = findGoodsByNumber(DAGGER.Number, DAGGER.MinLevel)
     need('商店编号 25 = item135', goods and goods.ItemId == DAGGER.Id and type(goods.Price) == 'number')
     need('GameCfg.Ability.MeleeWeapons.item135', GameCfg.Ability.MeleeWeapons and GameCfg.Ability.MeleeWeapons[DAGGER.Id] ~= nil)
     need('GameCfg.Ability.Unarmed', GameCfg.Ability.Unarmed ~= nil)

@@ -21,6 +21,7 @@ local GameCfg = require('common.GameCfg')
 local Curve = require('common.GrillCurve')
 local PlayerData = require('server.Data.PlayerData')
 local LotteryEligibility = require('common.LotteryEligibility')
+local ShopFeedHost = require('tests.support.shop_feed_host')
 
 local function signal()
     local handlers = {}
@@ -300,46 +301,22 @@ describe("回收烤鱼的金币结算", function()
     local ctx
 
     before_each(function()
-        ctx = { anchors = {}, replies = {}, seq = 0 }
-        ctx.savedGame = _G.game
-        ctx.savedCfg = package.loaded['common.GameCfg']
-        -- 换一份私有配置副本：用例改 Debug 不污染其它 spec。
-        ctx.cfg = require('tests.support.zone_fixtures').Load()
-        ctx.cfg.Debug = { Enabled = false }
-        ctx.PlayerData = assert(loadfile('server/Data/PlayerData.lua'))()
-        ctx.player = { UserId = 1, Character = { Position = vec(0, 0, 0) },
-            SetAttribute = function() end }
-        for index, zone in ipairs(ctx.cfg.Zones) do
-            for _, entity in ipairs(zone.Scene.Entities) do
-                if entity.Role == 'Fisherman' then
-                    local name = ctx.cfg.Interact.Fishermen[index].AnchorNames[1]
-                    ctx.anchors[name] = { Name = name, Position = entity.Position }
-                end
-            end
-        end
-        ctx.mgr = assert(loadfile('server/Mgr/MgrInteract.lua'))()
-        ctx.mgr.FindAnchor = function(_, name) return ctx.anchors[name] end
-        ctx.mgr.PlayerData = {
-            GetDataInst = function(_, p) return p == ctx.player and ctx.data or nil end,
-            SendItemBar = function() end,
-        }
-        ctx.mgr.Reply = function(_, p, payload) ctx.replies[#ctx.replies + 1] = payload end
-        ctx.data = ctx.PlayerData.New(ctx.player)
-        ctx.data:Init()
-        local name = ctx.cfg.Interact.Fishermen[1].AnchorNames[1]
-        local center = ctx.anchors[name].Position
-        ctx.player.Character.Position = vec(center.x + 1, center.y, center.z)
+        ctx = { seq = 0 }
+        ctx.cfg = GameCfg
+        ctx.host = ShopFeedHost.start()
+        ctx.player, ctx.data = ctx.host:join(1, GameCfg.Interact.Fishermen[1].AnchorNames[1])
+        ctx.replies = ctx.host.results[1].InteractResult
     end)
 
     -- 配置模块缓存与全局逐例恢复；setUp 中途失败也照样清理。
     after_each(function()
-        package.loaded['common.GameCfg'] = ctx.savedCfg
-        _G.game = ctx.savedGame
+        ctx.host:shutdown()
     end)
 
     local function feed()
         ctx.seq = ctx.seq + 1
-        return ctx.mgr:Handle(ctx.player, { target = 'fisherman', action = 'Feed', seq = ctx.seq })
+        local reply = ctx.host:send(ctx.player, 'InteractAction', { target = 'fisherman', action = 'Feed', seq = ctx.seq })
+        return reply and reply.ok or false
     end
 
     local function lastReply()
