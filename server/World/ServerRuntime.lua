@@ -269,6 +269,7 @@ function ServerRuntime.new(opts)
       growth_writer = opts.growth_writer,
       max_health_of = function(player) return runtime._max_health_of and runtime._max_health_of(player) end,
       on_downed = opts.on_player_downed,
+      fish_units = opts.fish_units,
       lookup_tree = function(user_id)
         return player_trees[user_id]
       end,
