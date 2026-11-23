@@ -16,6 +16,7 @@ local State = spoke.State
 local MainHudBackpackView = {}
 
 local BUTTON_IMAGE = "official://image/11017"
+local DRAG_THRESHOLD_PX = 10
 local SLOT_COLUMNS = 8
 local SLOT_STEP_X = 100
 local SLOT_STEP_Y = 100
@@ -44,6 +45,28 @@ local function make_passive(node)
   node.TouchEnabled = false
   node.SwallowTouchEnabled = false
   return node
+end
+
+local function read_xy(pos)
+  if type(pos) ~= "table" and type(pos) ~= "userdata" then
+    return nil
+  end
+  local ok, x, y = pcall(function() return pos.x, pos.y end) -- 兼容 Vector2 userdata 坐标读取，异常时视为无效
+  if ok and Number.IsFiniteNumber(x) and Number.IsFiniteNumber(y) then
+    return { x = x, y = y }
+  end
+  return nil
+end
+
+local function read_touch_pos(touch, field)
+  if type(touch) ~= "table" and type(touch) ~= "userdata" then
+    return nil
+  end
+  local ok, pos = pcall(function() return touch[field] end) -- 兼容引擎 Touch userdata 字段读取，异常时视为无坐标
+  if not ok then
+    return nil
+  end
+  return read_xy(pos)
 end
 
 local function place(node, rect)
@@ -176,7 +199,7 @@ end
 --- 挂载常驻背包入口按钮与展开态背包面板（Phase + Dock）。
 ---@param s table EffectBuilder
 ---@param ctx table RootView 上下文 { root_node, store, clock, create_node, own_node, connect }
----@param options table|nil { get_resolution?, send_action?, backpack_open?, open_popup?, on_open_changed?, layout? }
+---@param options table|nil { get_resolution?, send_action?, backpack_open?, open_popup?, on_open_changed?, resolve_drop_target?, on_drop_resolver?, layout? }
 function MainHudBackpackView.mount(s, ctx, options)
   options = options or {}
   local get_resolution = options.get_resolution or default_get_resolution
@@ -190,11 +213,44 @@ function MainHudBackpackView.mount(s, ctx, options)
   local external_open = options.backpack_open ~= nil
   local open_popup = options.open_popup
   local on_open_changed = options.on_open_changed
+  local resolve_drop_target = options.resolve_drop_target
+  local on_drop_resolver = options.on_drop_resolver
   local selected_slot = State.new("MainHudBackpackView.selected_slot", nil)
+  local active_slot_rects = {}
 
   local layout_sig = options.layout or s:memo("BackpackLayout", function(ms)
     return compute_layout(resolution, ms:d(ctx.store.item_bar))
   end)
+
+  local function resolve_own_slot(pos)
+    if pos == nil or ctx.store.hud_visible:now() == false or backpack_open:now() ~= true then
+      return nil
+    end
+    for index, rect in pairs(active_slot_rects) do
+      if math.abs(pos.x - rect.x) <= rect.hw and math.abs(pos.y - rect.y) <= rect.hh then
+        return { container = GameCfg.Items.ContainerId.Backpack, index = index }
+      end
+    end
+    return nil
+  end
+
+  local function slot_at_position(pos)
+    if pos == nil or ctx.store.hud_visible:now() == false then
+      return nil
+    end
+    local own = resolve_own_slot(pos)
+    if own ~= nil then
+      return own
+    end
+    if type(resolve_drop_target) == "function" then
+      return resolve_drop_target(pos)
+    end
+    return nil
+  end
+
+  if type(on_drop_resolver) == "function" then
+    on_drop_resolver(resolve_own_slot)
+  end
 
   local function set_backpack_open(flag)
     local next_open = flag == true
@@ -205,11 +261,15 @@ function MainHudBackpackView.mount(s, ctx, options)
     backpack_open:set(next_open)
   end
 
-  if external_open then
-    s:on_cleanup(function()
+  s:on_cleanup(function()
+    if type(on_drop_resolver) == "function" then
+      on_drop_resolver(nil)
+    end
+    active_slot_rects = {}
+    if external_open then
       backpack_open:set(false)
-    end)
-  end
+    end
+  end)
 
   local initial_layout = (options.layout ~= nil and options.layout:now())
     or compute_layout(resolution, ctx.store.item_bar:now())
@@ -226,18 +286,25 @@ function MainHudBackpackView.mount(s, ctx, options)
   )
 
   ctx.connect(s, btn_backpack.OnClicked, function()
+    if ctx.store.hud_visible:now() == false then
+      return
+    end
     set_backpack_open(not backpack_open:now())
   end)
 
-  -- 2. 常驻入口排版与容量文案投影
+  -- 2. 常驻入口排版、关屏显隐与容量文案投影
   s:effect("BackpackEntryProjection", function(es)
     local state = es:d(ctx.store.item_bar)
+    local hud_visible = es:d(ctx.store.hud_visible) ~= false
     local layout = es:d(layout_sig) or compute_layout(resolution, state)
     local is_open = es:d(backpack_open) == true
 
     place(btn_backpack, layout.Rects.BackpackButton)
     place(label_backpack, layout.Rects.BackpackButton)
-    btn_backpack.ButtonNormalColor = make_color(is_open and COLORS.SELECTED or COLORS.NORMAL)
+    btn_backpack.Visible = hud_visible
+    btn_backpack.TouchEnabled = hud_visible
+    label_backpack.Visible = hud_visible
+    btn_backpack.ButtonNormalColor = make_color((hud_visible and is_open) and COLORS.SELECTED or COLORS.NORMAL)
 
     if type(state) == "table" and Number.IsFiniteNumber(state.backpackCount) then
       label_backpack.Text = "背包 " .. tostring(math.floor(state.backpackCount)) .. " 格"
@@ -257,8 +324,12 @@ function MainHudBackpackView.mount(s, ctx, options)
     end
   end)
 
-  -- 4. 展开态背包面板 Phase（关闭、重连或根 UI 销毁即零残留销毁全部节点与连接）
-  s:phase("BackpackPanelPhase", backpack_open, function(ps)
+  -- 4. 展开态背包面板 Phase（关闭、关屏、重连或根 UI 销毁即零残留销毁全部节点与连接）
+  local panel_active = s:memo("BackpackPanelActive", function(ms)
+    return ms:d(ctx.store.hud_visible) ~= false and ms:d(backpack_open) == true
+  end)
+
+  s:phase("BackpackPanelPhase", panel_active, function(ps)
     local cur_layout = layout_sig:now() or compute_layout(resolution, ctx.store.item_bar:now())
     local panel_rect = cur_layout.Panels.BackpackPanel
     local cx, cy = panel_rect.x, panel_rect.y
@@ -317,8 +388,13 @@ function MainHudBackpackView.mount(s, ctx, options)
 
     local slot_dock = ps:dock("BackpackSlots")
     local slot_entries = {}
+    local drag_source = nil
+    local drag_handled = nil
     ps:on_cleanup(function()
       slot_entries = {}
+      active_slot_rects = {}
+      drag_source = nil
+      drag_handled = nil
       selected_slot:set(nil)
     end)
 
@@ -355,6 +431,7 @@ function MainHudBackpackView.mount(s, ctx, options)
         local dock_key = tostring(slot_index)
         seen[dock_key] = true
         local x, y = slot_position(p_rect, slot_index)
+        active_slot_rects[slot_index] = { x = x, y = y, hw = SLOT_W / 2, hh = SLOT_H / 2 }
         local display = item_display_name(backpack[slot_index])
         local slot_data = {
           index = slot_index,
@@ -369,7 +446,7 @@ function MainHudBackpackView.mount(s, ctx, options)
           existing.state:set(slot_data)
         else
           local item_state = State.new("BackpackSlotState:" .. dock_key, slot_data)
-          slot_entries[dock_key] = { state = item_state }
+          slot_entries[dock_key] = { state = item_state, index = slot_index }
           slot_dock:call(dock_key, Effect.new("BackpackSlotNode:" .. dock_key, function(cs)
             local init = item_state:now()
             local btn = make_button(
@@ -383,8 +460,60 @@ function MainHudBackpackView.mount(s, ctx, options)
               init.x, init.y, SLOT_W, SLOT_LABEL_H,
               init.text, 19, make_color(COLORS.WHITE), 12
             )
+            if btn.OnTouchBegan ~= nil and btn.OnTouchEnded ~= nil then
+              ctx.connect(cs, btn.OnTouchBegan, function(touch)
+                if ctx.store.hud_visible:now() == false then
+                  return
+                end
+                local latest = item_state:now()
+                if not latest.has_item then
+                  return
+                end
+                drag_source = {
+                  container = GameCfg.Items.ContainerId.Backpack,
+                  index = latest.index,
+                  began = read_touch_pos(touch, "BeganPosition"),
+                }
+              end)
+
+              ctx.connect(cs, btn.OnTouchEnded, function(touch)
+                local source = drag_source
+                drag_source = nil
+                if ctx.store.hud_visible:now() == false then
+                  return
+                end
+                local latest = item_state:now()
+                if source == nil
+                  or source.container ~= GameCfg.Items.ContainerId.Backpack
+                  or source.index ~= latest.index then
+                  return
+                end
+                local ended = read_touch_pos(touch, "EndedPosition")
+                if ended == nil or source.began == nil then
+                  return
+                end
+                if math.abs(ended.x - source.began.x) < DRAG_THRESHOLD_PX
+                  and math.abs(ended.y - source.began.y) < DRAG_THRESHOLD_PX then
+                  return
+                end
+                local target = slot_at_position(ended)
+                if target ~= nil and (target.container ~= source.container or target.index ~= source.index) then
+                  drag_handled = { index = latest.index, valid = true }
+                  send_action("MoveSlot", {
+                    from = source.container,
+                    index = source.index,
+                    target = target.container,
+                    slot = target.index,
+                  })
+                end
+              end)
+            end
             ctx.connect(cs, btn.OnClicked, function()
               local latest = item_state:now()
+              if drag_handled ~= nil and drag_handled.index == latest.index and drag_handled.valid then
+                drag_handled.valid = false
+                return
+              end
               if not latest.has_item then
                 return
               end
@@ -407,15 +536,16 @@ function MainHudBackpackView.mount(s, ctx, options)
       end
 
       local to_drop = {}
-      for dock_key in pairs(slot_entries) do
+      for dock_key, entry in pairs(slot_entries) do
         if not seen[dock_key] then
-          to_drop[#to_drop + 1] = dock_key
+          to_drop[#to_drop + 1] = { key = dock_key, index = entry.index }
         end
       end
-      table.sort(to_drop)
-      for _, dock_key in ipairs(to_drop) do
-        slot_entries[dock_key] = nil
-        slot_dock:drop(dock_key)
+      table.sort(to_drop, function(a, b) return a.key < b.key end)
+      for _, item in ipairs(to_drop) do
+        slot_entries[item.key] = nil
+        active_slot_rects[item.index] = nil
+        slot_dock:drop(item.key)
       end
 
       -- 转入道具栏按钮显示与满格保护
@@ -437,6 +567,7 @@ function MainHudBackpackView.mount(s, ctx, options)
   return {
     backpack_open = backpack_open,
     selected_slot = selected_slot,
+    resolve_slot_at = resolve_own_slot,
   }
 end
 

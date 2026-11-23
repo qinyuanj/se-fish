@@ -53,10 +53,6 @@ local function destroy_node_safely(node)
   if node == nil then
     return
   end
-  local ok_flag, destroyed = pcall(function() return node.Destroyed end) -- 真机 Unit userdata 无 Destroyed 字段，仅测试双暴露
-  if ok_flag and destroyed then
-    return
-  end
   pcall(function() node:Destroy() end) -- 宿主节点可能已随父级销毁失效，忽略重复销毁异常
 end
 
@@ -106,8 +102,21 @@ function RootView.mount(root_node, store, options)
 
     function ctx.own_node(scope, node)
       if node ~= nil then
+        local destroyed = false
+        local ok_sig, destroying_sig = pcall(function() return node.Destroying end) -- 宿主节点可能不暴露 Destroying 信号，按无信号处理
+        local destroying_conn = nil
+        if ok_sig and destroying_sig ~= nil and type(destroying_sig.Connect) == "function" then
+          destroying_conn = destroying_sig:Connect(function()
+            destroyed = true
+          end)
+        end
         scope:on_cleanup(function()
-          destroy_node_safely(node)
+          disconnect_safely(destroying_conn)
+          destroying_conn = nil
+          if not destroyed then
+            destroyed = true
+            destroy_node_safely(node)
+          end
         end)
       end
       return node

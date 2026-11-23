@@ -325,7 +325,7 @@ describe("Spoke 主 HUD 底部道具栏视图（#297-B3b2）", function()
     env.view:dispose()
   end)
 
-  it("backpack_open 展开时隐藏底部道具栏与瞄准遮罩，收起后恢复显示", function()
+  it("backpack_open 展开时保留底部道具栏可见并取消瞄准遮罩；hud_visible=false 关屏时全隐藏", function()
     local backpack_open = State.new("Test.itembar_backpack_open", false)
     local env = mount_hud({
       height = 1080,
@@ -349,9 +349,20 @@ describe("Spoke 主 HUD 底部道具栏视图（#297-B3b2）", function()
     local overlay = env.nodes.ThrowAimOverlay
     assert.is_not_nil(overlay)
 
-    -- 展开背包：隐藏所有槽位与子元素、禁点，同时销毁瞄准遮罩
+    -- 展开背包：取消瞄准遮罩，同时保留底部道具栏可见可交互（支持道具栏↔背包双向拖拽）
     backpack_open:set(true)
     assert.is_true(overlay.Destroyed)
+    for i = 1, 3 do
+      assert.is_true(env.nodes["ItemBarSlot" .. i].Visible)
+      assert.is_true(env.nodes["ItemBarSlot" .. i].TouchEnabled)
+    end
+    assert.is_true(env.nodes.ItemBarIcon1.Visible)
+    assert.is_true(env.nodes.ItemBarLabel1.Visible)
+    assert.is_true(env.nodes.ItemBarAmount1.Visible)
+    assert.is_false(env.nodes.ItemBarIcon2.Visible)
+
+    -- 关屏（hud_visible=false）：底部道具栏全部隐藏并禁点
+    env.writer:set_hud_visible(false)
     for i = 1, 3 do
       assert.is_false(env.nodes["ItemBarSlot" .. i].Visible)
       assert.is_false(env.nodes["ItemBarSlot" .. i].TouchEnabled)
@@ -360,7 +371,8 @@ describe("Spoke 主 HUD 底部道具栏视图（#297-B3b2）", function()
       assert.is_false(env.nodes["ItemBarAmount" .. i].Visible)
     end
 
-    -- 收起背包：槽位恢复可见可点，有物品格恢复图标与文字
+    -- 重新开屏：槽位恢复可见可点，有物品格恢复图标与文字
+    env.writer:set_hud_visible(true)
     backpack_open:set(false)
     assert.is_true(env.nodes.ItemBarSlot1.Visible)
     assert.is_true(env.nodes.ItemBarSlot1.TouchEnabled)

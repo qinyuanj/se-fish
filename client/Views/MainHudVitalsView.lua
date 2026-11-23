@@ -85,10 +85,7 @@ local function place_editor_node(node, rect)
   if node == nil or rect == nil then
     return
   end
-  local ok, err = pcall(function() node.Anchor = Vector2.New(0.5, 0.5) end) -- 兼容未暴露 Anchor 字段的测试双节点
-  if not ok then
-    print("[MainHudVitalsView] 设置节点锚点失败", tostring(node.Name), tostring(err))
-  end
+  node.Anchor = Vector2.New(0.5, 0.5)
   node.Position = Vector2.New(rect.x, rect.y)
   node.Size = Vector2.New(rect.w, rect.h)
 end
@@ -151,7 +148,7 @@ function MainHudVitalsView.mount(s, ctx, options)
   }
   for _, spec in ipairs(specs) do
     local r = spec.rect
-    make_passive(ctx.create_node(s, "EUIImage", {
+    local bg = make_passive(ctx.create_node(s, "EUIImage", {
       Name = spec.key .. "RingBg",
       Position = Vector2.New(r.x, r.y),
       Size = Vector2.New(r.w, r.h),
@@ -170,7 +167,7 @@ function MainHudVitalsView.mount(s, ctx, options)
       ctx, s, spec.key .. "Text", r.x, r.y, r.w, 40, "",
       vital_font_size(r.w, cfg), Color.New(255, 255, 255, 255), 2
     )
-    rings[spec.key] = { ring = ring, text = text }
+    rings[spec.key] = { bg = bg, ring = ring, text = text }
   end
 
   -- 3. 4 条饥饿红边（默认隐藏；仅在饥饿 Phase 活跃期间订阅时钟闪烁）
@@ -197,7 +194,28 @@ function MainHudVitalsView.mount(s, ctx, options)
 
   local is_starving = State.new("MainHudVitalsView.is_starving", false)
 
-  -- 4. 血量与饥饿度响应式投影
+  -- 4. 主 HUD 关屏显隐对齐 store.hud_visible
+  s:effect("VitalsVisibilityProjection", function(es)
+    local visible = es:d(ctx.store.hud_visible) ~= false
+    if label_coin ~= nil then
+      label_coin.Visible = visible
+    end
+    if image_coin ~= nil then
+      image_coin.Visible = visible
+    end
+    for _, entry in pairs(rings) do
+      entry.bg.Visible = visible
+      entry.ring.Visible = visible
+      entry.text.Visible = visible
+    end
+    if not visible then
+      for _, edge in ipairs(flash_edges) do
+        edge.Visible = false
+      end
+    end
+  end)
+
+  -- 5. 血量与饥饿度响应式投影
   s:effect("VitalsProjection", function(es)
     local v = es:d(ctx.store.vitals)
     local health = v and v.health or cfg.MaxHealth
@@ -211,8 +229,12 @@ function MainHudVitalsView.mount(s, ctx, options)
     is_starving:set(hunger <= 0 and health > 0)
   end)
 
-  -- 5. 饥饿红边闪烁与节流提示（短寿命活跃 Phase，脱离饥饿立即退订并隐藏）
-  s:phase("StarvingFx", is_starving, function(ps)
+  -- 6. 饥饿红边闪烁与节流提示（仅在主 HUD 可见且饥饿时挂载，关屏或脱离饥饿立即退订并隐藏）
+  local starving_fx_active = s:memo("StarvingFxActive", function(ms)
+    return ms:d(is_starving) and ms:d(ctx.store.hud_visible) ~= false
+  end)
+
+  s:phase("StarvingFx", starving_fx_active, function(ps)
     local next_warn_at = nil
 
     local function update_fx()
@@ -237,7 +259,7 @@ function MainHudVitalsView.mount(s, ctx, options)
     end)
   end)
 
-  -- 6. 金币响应式投影
+  -- 7. 金币响应式投影
   s:effect("CoinProjection", function(es)
     local coin = es:d(ctx.store.coin)
     if label_coin ~= nil then

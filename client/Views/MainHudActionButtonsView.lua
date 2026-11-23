@@ -258,14 +258,12 @@ function MainHudActionButtonsView.mount(s, ctx, options)
   local btn_action = make_button(ctx, s, "ItemAction2", initial_layout.Rects.ItemAction)
   local label_action = make_label(ctx, s, "BtnItemActionLabel", initial_layout.Rects.ItemAction, "抛竿")
 
-  -- 2. 原子吐息冷却与上钩呼吸高亮计时（仅在活跃期订阅 clock.on_frame）
+  -- 2. 原子吐息冷却（1Hz on_second）与上钩呼吸高亮（活跃期 on_frame 原地改色，绝不重建 Effect）
   local breath_until = nil
-  local breath_tick = State.new("MainHudActionButtonsView.breath_tick", 0)
   local breath_active = State.new("MainHudActionButtonsView.breath_active", false)
 
   local alerted_session = nil
   local hook_alert_until = nil
-  local hook_tick = State.new("MainHudActionButtonsView.hook_tick", 0)
   local hook_alert_active = State.new("MainHudActionButtonsView.hook_alert_active", false)
 
   local flying_held = false
@@ -294,6 +292,44 @@ function MainHudActionButtonsView.mount(s, ctx, options)
     return is_reel_active_fn(cast) == true
   end
 
+  local function apply_breath_ui()
+    if not is_interactive() then
+      return
+    end
+    local mode, _, special_effect = resolve_mode(
+      ctx.store.item_bar:now(),
+      ctx.store.cast:now(),
+      ctx.store.special_item:now()
+    )
+    if mode ~= "special" or special_effect ~= "godzilla" then
+      return
+    end
+    local left = breath_remaining()
+    label_action.Text = left > 0 and string.format("吐息冷却 %d秒", math.ceil(left)) or "原子吐息"
+    btn_action.TouchEnabled = left <= 0
+  end
+
+  local function apply_hook_alert_color()
+    if not is_interactive() then
+      return
+    end
+    local cast = ctx.store.cast:now()
+    local mode, phase = resolve_mode(
+      ctx.store.item_bar:now(),
+      cast,
+      ctx.store.special_item:now()
+    )
+    if mode ~= "hooked" then
+      return
+    end
+    local reel_flag = current_reel_active(cast)
+    local now = ctx.clock.now()
+    local alert_now = (reel_flag and hook_alert_until ~= nil and now < hook_alert_until) and now or nil
+    local normal_color = cast_action_color(phase, alert_now)
+    btn_action.ButtonNormalColor = normal_color
+    btn_action.ButtonPressColor = alert_now ~= nil and normal_color or make_color(COLORS.PRESS)
+  end
+
   s:effect("BreathCooldownSync", function(es)
     local special_item = es:d(ctx.store.special_item)
     if type(special_item) == "table"
@@ -309,12 +345,12 @@ function MainHudActionButtonsView.mount(s, ctx, options)
   end)
 
   s:phase("BreathCooldownPhase", breath_active, function(ps)
-    ps:subscribe(ctx.clock.on_frame, function()
+    ps:subscribe(ctx.clock.on_second, function()
       if breath_until == nil or ctx.clock.now() >= breath_until then
         breath_until = nil
         breath_active:set(false)
       end
-      breath_tick:set(breath_tick:now() + 1)
+      apply_breath_ui()
     end)
   end)
 
@@ -335,16 +371,20 @@ function MainHudActionButtonsView.mount(s, ctx, options)
   end)
 
   s:phase("HookAlertPhase", hook_alert_active, function(ps)
+    apply_hook_alert_color()
     ps:subscribe(ctx.clock.on_frame, function()
       if hook_alert_until == nil or ctx.clock.now() >= hook_alert_until then
         hook_alert_until = nil
         hook_alert_active:set(false)
       end
-      hook_tick:set(hook_tick:now() + 1)
+      apply_hook_alert_color()
+    end)
+    ps:on_cleanup(function()
+      apply_hook_alert_color()
     end)
   end)
 
-  -- 3. 响应式投影：排版、遮挡隐藏、文案、可用态与按钮颜色
+  -- 3. 响应式投影：排版、遮挡隐藏、文案、可用态与按钮颜色（不依赖高频帧状态）
   s:effect("ActionButtonsProjection", function(es)
     local item_bar = es:d(ctx.store.item_bar)
     local cast = es:d(ctx.store.cast)
@@ -353,8 +393,6 @@ function MainHudActionButtonsView.mount(s, ctx, options)
     local occluded = backpack_open ~= nil and es:d(backpack_open) == true
     local layout = es:d(layout_sig) or compute_layout(resolution, item_bar)
     local reel_flag = reel_active_sig ~= nil and (es:d(reel_active_sig) == true) or is_reel_active_fn(cast) == true
-    es:d(breath_tick)
-    es:d(hook_tick)
 
     place(btn_discard, layout.Rects.Discard)
     place(label_discard, layout.Rects.Discard)
@@ -422,10 +460,12 @@ function MainHudActionButtonsView.mount(s, ctx, options)
     local now = ctx.clock.now()
     local alert_now = (mode == "hooked" and reel_flag and hook_alert_until ~= nil and now < hook_alert_until)
       and now or nil
+    local normal_color = cast_action_color(phase, alert_now)
 
     btn_action.Visible = visible
     label_action.Visible = visible
-    btn_action.ButtonNormalColor = cast_action_color(phase, alert_now)
+    btn_action.ButtonNormalColor = normal_color
+    btn_action.ButtonPressColor = alert_now ~= nil and normal_color or make_color(COLORS.PRESS)
     if enabled ~= nil then
       btn_action.TouchEnabled = enabled == true
     end

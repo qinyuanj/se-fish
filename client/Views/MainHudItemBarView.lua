@@ -226,6 +226,7 @@ function MainHudItemBarView.mount(s, ctx, options)
 
   local on_aim_begin = options.on_aim_begin
   local resolve_drop_target = options.resolve_drop_target
+  local on_drop_resolver = options.on_drop_resolver
   local resolve_aim_target = options.resolve_aim_target or default_resolve_aim_target
   local notify = options.notify or default_notify
 
@@ -257,7 +258,26 @@ function MainHudItemBarView.mount(s, ctx, options)
   local slot_press = nil
   local throw_handled = nil
 
+  local function resolve_own_slot(pos)
+    if pos == nil or ctx.store.hud_visible:now() == false then
+      return nil
+    end
+    for index, rect in pairs(slot_rects) do
+      if math.abs(pos.x - rect.x) <= rect.hw and math.abs(pos.y - rect.y) <= rect.hh then
+        return { container = GameCfg.Items.ContainerId.ItemBar, index = index }
+      end
+    end
+    return nil
+  end
+
+  if type(on_drop_resolver) == "function" then
+    on_drop_resolver(resolve_own_slot)
+  end
+
   s:on_cleanup(function()
+    if type(on_drop_resolver) == "function" then
+      on_drop_resolver(nil)
+    end
     slot_entries = {}
     slot_rects = {}
     drag_source = nil
@@ -283,13 +303,12 @@ function MainHudItemBarView.mount(s, ctx, options)
   end
 
   local function slot_at_position(pos)
-    if pos == nil or backpack_open:now() == true then
+    if pos == nil or ctx.store.hud_visible:now() == false then
       return nil
     end
-    for index, rect in pairs(slot_rects) do
-      if math.abs(pos.x - rect.x) <= rect.hw and math.abs(pos.y - rect.y) <= rect.hh then
-        return { container = GameCfg.Items.ContainerId.ItemBar, index = index }
-      end
+    local own = resolve_own_slot(pos)
+    if own ~= nil then
+      return own
     end
     if type(resolve_drop_target) == "function" then
       return resolve_drop_target(pos)
@@ -297,21 +316,24 @@ function MainHudItemBarView.mount(s, ctx, options)
     return nil
   end
 
-  -- 1. 底部道具栏动态格位同步（扩容增量挂载、缩容自动卸载、背包展开遮挡隐藏）
+  -- 1. 底部道具栏动态格位同步（扩容增量挂载、缩容自动卸载、关屏隐藏；展开背包时保留可见以支持双向拖拽）
   s:effect("ItemBarSlotsSync", function(es)
     local state = es:d(ctx.store.item_bar)
+    local hud_visible = es:d(ctx.store.hud_visible) ~= false
     local layout = es:d(layout_sig) or compute_layout(resolution, state)
     local bp_open = es:d(backpack_open) == true
     local capacity = clamp_slot_count(state)
     local slots = type(state) == "table" and type(state.slots) == "table" and state.slots or {}
     local selected_slot = type(state) == "table" and state.selectedSlot or nil
 
-    if bp_open then
+    if not hud_visible then
       drag_source = nil
       slot_press = nil
       if aim_slot:now() ~= nil then
         aim_slot:set(nil)
       end
+    elseif bp_open and aim_slot:now() ~= nil then
+      aim_slot:set(nil)
     end
 
     local seen = {}
@@ -330,7 +352,7 @@ function MainHudItemBarView.mount(s, ctx, options)
       local slot_data = {
         index = slot_index,
         cell = cell,
-        visible = not bp_open,
+        visible = hud_visible,
         selected = selected_slot == slot_index,
         has_item = def ~= nil,
         icon = def ~= nil and def.Icon or nil,
@@ -379,7 +401,7 @@ function MainHudItemBarView.mount(s, ctx, options)
           local nodes = { background = background, icon = icon, label = label, count = count }
 
           ctx.connect(cs, background.OnTouchBegan, function(touch)
-            if backpack_open:now() == true then
+            if ctx.store.hud_visible:now() == false then
               return
             end
             local began = read_touch_pos(touch, "BeganPosition")
@@ -398,9 +420,13 @@ function MainHudItemBarView.mount(s, ctx, options)
           ctx.connect(cs, background.OnTouchEnded, function(touch)
             local ended = read_touch_pos(touch, "EndedPosition")
 
-            -- 拖拽换格判定
+            -- 拖拽换格判定（支持道具栏内换格及跨容器拖入背包）
             local source = drag_source
             drag_source = nil
+            if ctx.store.hud_visible:now() == false then
+              slot_press = nil
+              return
+            end
             if source ~= nil and source.container == GameCfg.Items.ContainerId.ItemBar
               and source.index == slot_index and ended ~= nil and source.began ~= nil then
               if math.abs(ended.x - source.began.x) >= DRAG_THRESHOLD_PX
@@ -441,7 +467,7 @@ function MainHudItemBarView.mount(s, ctx, options)
           end)
 
           ctx.connect(cs, background.OnClicked, function()
-            if backpack_open:now() == true then
+            if ctx.store.hud_visible:now() == false then
               return
             end
             if consume_throw_click(slot_index) then
@@ -494,9 +520,11 @@ function MainHudItemBarView.mount(s, ctx, options)
     end
   end)
 
-  -- 2. 爆炸物长按瞄准全屏遮罩 Phase（选点投掷、背包展开、重连或根 UI 销毁即零残留销毁）
+  -- 2. 爆炸物长按瞄准全屏遮罩 Phase（选点投掷、背包展开、关屏、重连或根 UI 销毁即零残留销毁）
   local aim_active = s:memo("ThrowAimActive", function(ms)
-    return ms:d(aim_slot) ~= nil and not ms:d(backpack_open)
+    return ms:d(ctx.store.hud_visible) ~= false
+      and ms:d(aim_slot) ~= nil
+      and not ms:d(backpack_open)
   end)
 
   s:phase("ThrowAimPhase", aim_active, function(ps)
@@ -527,6 +555,7 @@ function MainHudItemBarView.mount(s, ctx, options)
   return {
     aim_slot = aim_slot,
     backpack_open = backpack_open,
+    resolve_slot_at = resolve_own_slot,
   }
 end
 
