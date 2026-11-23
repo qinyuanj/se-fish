@@ -27,7 +27,8 @@ local lfs = require("lfs")
 -- 50：#301 地面物品改由 GroundLoot 的 on_cleanup 销毁，删除 MgrLoot 3 处建点
 -- #309 旧活鱼驱动迁入 server/World/FishTree 等公开宿主。
 -- #310 烧烤视图改由 RootView 统一建点，删除 ScreenGrill 自己的 1 处建点。
-local SITES = 56
+-- 旧客户端战斗标签与咬钩预警仅保留为 tests/support 测试驱动，不计入生产建点。
+local SITES = 54
 local SITE_ROOTS = { "client", "common", "server" }
 local REF_ROOTS = { "client", "common", "server", "tests", "tools" }
 local REMOVED = { "FXUtil", "WeldTo", "MarkPointPart", "CreateHPBar" }

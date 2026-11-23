@@ -1,5 +1,5 @@
 -- 迁移自 tests/gameplay/gar_bite_warning_test.lua（#85）；行为契约原文见 #134、#141。
--- #134 鳄雀鳝上钩预警客户端表现（client/Views/GarBiteWarning.lua）。
+-- #134 鳄雀鳝上钩预警客户端表现（tests/support/gar_bite_warning.lua）。
 -- 只测纯表现层自身能坏的生命周期；摆放坐标 / 旋转 / 缩放是否正确只能试玩看，不在这里复刻公式。
 -- 失败方式：
 --   1. 同一条鱼连续起咬叠出多个特效，或 clear 后特效不收；
@@ -7,7 +7,7 @@
 --   3. 非法载荷（NaN 坐标）进引擎；CreateAsset 失败后本条鱼后续预警再也出不来。
 -- it 名字沿用旧方法名，注册顺序 = LuaUnit sortedPairs 的实际执行顺序。
 
-describe('鳄雀鳝上钩预警表现（LocalGarBite）', function()
+describe('鳄雀鳝上钩预警表现（GarBiteWarning）', function()
   local env
   local restore
 
@@ -17,10 +17,10 @@ describe('鳄雀鳝上钩预警表现（LocalGarBite）', function()
       game = rawget(_G, 'game'),
       Vector3 = rawget(_G, 'Vector3'),
       Quaternion = rawget(_G, 'Quaternion'),
-      LocalGarBite = package.loaded['client.Views.GarBiteWarning'],
+      LocalGarBite = package.loaded['tests.support.gar_bite_warning'],
     }
     env = { effects = {}, delays = {}, fail = false }
-    package.loaded['client.Views.GarBiteWarning'] = nil
+    package.loaded['tests.support.gar_bite_warning'] = nil
     _G.Vector3 = { New = function(x, y, z) return { x = x, y = y, z = z } end }
     _G.Quaternion = { FromEulerAngles = function(x, y, z) return { x = x, y = y, z = z } end }
     _G.game = { GetService = function(_, name)
@@ -32,13 +32,13 @@ describe('鳄雀鳝上钩预警表现（LocalGarBite）', function()
       end } end
       if name == 'Task' then return { Delay = function(_, sec, fn) env.delays[#env.delays + 1] = { sec, fn } end } end
     end }
-    env.warn = require('client.Views.GarBiteWarning')
+    env.warn = require('tests.support.gar_bite_warning')
     env.N = require('common.GarBiteNotice')
     env.cfg = require('common.GameCfg').FishCombat.gar
   end)
 
   after_each(function()
-    package.loaded['client.Views.GarBiteWarning'] = restore and restore.LocalGarBite
+    package.loaded['tests.support.gar_bite_warning'] = restore and restore.LocalGarBite
     if restore then
       _G.game, _G.Vector3, _G.Quaternion = restore.game, restore.Vector3, restore.Quaternion
     end

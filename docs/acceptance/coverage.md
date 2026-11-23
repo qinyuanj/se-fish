@@ -200,13 +200,13 @@
 | 6-26 | server/World/PlayerWeapon.lua、common/cfg/Items.lua、server/AbilityBehaviors/melee_hit.lua、server/World/ModifierLeaf.lua、server/World/AttrLeaf.lua | tests/native/prize_weapon_effect_test.lua、tests/native/weapon_system_test.lua、tests/native/status_effect_test.lua、tests/native/spec/06_ai_target_test.lua | 有 | 有 | 缺 | 缺 | A |
 | 6-27 | server/World/PlayerWeapon.lua、common/cfg/Items.lua、server/AbilityBehaviors/melee_hit.lua、server/World/ModifierLeaf.lua、common/GameCfg.lua | tests/native/prize_weapon_effect_test.lua、tests/native/weapon_system_test.lua、tests/native/status_effect_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 6-28 | common/cfg/Items.lua、server/World/PlayerWeapon.lua、common/GameCfg.lua | tests/native/prize_weapon_effect_test.lua、tests/native/weapon_system_test.lua、tests/native/prize_weapon_cfg_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 6-29 | server/World/AiLeaf.lua、server/World/FishTree.lua、server/World/AiLeaf.lua、common/AiTargetPolicy.lua | tests/native/ai_migration_test.lua、tests/native/spec/06_ai_target_test.lua | 有 | 有 | 缺 | 缺 | A |
-| 6-30 | server/World/AiLeaf.lua、server/World/FishTree.lua、server/World/AiLeaf.lua、common/AiTargetPolicy.lua | tests/native/ai_migration_test.lua、tests/native/spec/06_ai_target_test.lua | 有 | 有 | 缺 | 缺 | A |
-| 6-31 | server/World/AiLeaf.lua、common/BossPhase.lua、server/World/FishTree.lua、server/World/AiLeaf.lua | tests/native/ai_migration_test.lua、tests/native/spec/06_ai_target_test.lua | 有 | 有 | 缺 | 缺 | A |
+| 6-29 | server/World/FishAi.lua、server/World/FishTree.lua、server/World/FishAi.lua、common/AiTargetPolicy.lua | tests/native/ai_migration_test.lua、tests/native/spec/06_ai_target_test.lua | 有 | 有 | 缺 | 缺 | A |
+| 6-30 | server/World/FishAi.lua、server/World/FishTree.lua、server/World/FishAi.lua、common/AiTargetPolicy.lua | tests/native/ai_migration_test.lua、tests/native/spec/06_ai_target_test.lua | 有 | 有 | 缺 | 缺 | A |
+| 6-31 | server/World/FishAi.lua、common/BossPhase.lua、server/World/FishTree.lua、server/World/FishAi.lua | tests/native/ai_migration_test.lua、tests/native/spec/06_ai_target_test.lua | 有 | 有 | 缺 | 缺 | A |
 | 6-32 | server/World/PlayerLife.lua、server/World/PlayerWeapon.lua | tests/native/combat_base_test.lua、tests/native/damage_float_test.lua | 缺 | 缺 | 缺 | 缺 | B |
 | 6-33 | common/DamageNotice.lua、client/DamageFloat.lua、server/World/PlayerLife.lua | tests/native/combat_base_test.lua、tests/native/damage_float_test.lua | 缺 | 缺 | 缺 | 缺 | B |
 | 6-34 | server/World/PlayerLife.lua、server/World/PlayerLife.lua | tests/native/combat_base_test.lua、tests/native/damage_float_test.lua | 缺 | 缺 | 缺 | 缺 | B |
-| 6-38 | server/World/AiLeaf.lua、common/AiTargetPolicy.lua、common/GameCfg.lua | — | 缺 | 缺 | 缺 | 缺 | A |
+| 6-38 | server/World/FishAi.lua、common/AiTargetPolicy.lua、common/GameCfg.lua | — | 缺 | 缺 | 缺 | 缺 | A |
 
 ### 第 7 节 经济与钓场商店（25 条）
 
