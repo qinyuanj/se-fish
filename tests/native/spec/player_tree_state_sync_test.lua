@@ -93,6 +93,21 @@ local function make_ready_data(player, overrides)
 end
 
 describe("PlayerTree #297-A1b：单批合并推送、属性即时重算与存档镜像", function()
+  local saved_vec3, saved_color
+
+  before_each(function()
+    saved_vec3 = rawget(_G, "Vector3")
+    saved_color = rawget(_G, "Color")
+    _G.Vector3 = { New = function(x, y, z) return { x = x, y = y, z = z } end }
+    _G.Color = { New = function(...) return { ... } end }
+  end)
+
+  after_each(function()
+    _G.Vector3 = saved_vec3
+    _G.Color = saved_color
+    saved_vec3, saved_color = nil, nil
+  end)
+
   it("单次 SpokeRuntime.batch 内多次库存/金币/药水/升级变更只合并推送 1 次 ItemBarState 并同步属性与镜像", function()
     local clock = SpokeClock.new(100)
     local char = make_character(8)
@@ -344,5 +359,47 @@ describe("PlayerTree #297-A1b：单批合并推送、属性即时重算与存档
     -- Step 2 同步 dispose 后零残留
     pt:dispose()
     assert.is_true(pt:is_disposed())
+  end)
+
+  it("FishCoin 属性写入失败时记录含玩家标识的日志且不推进缓存，后续恢复后可重试成功", function()
+    local clock = SpokeClock.new(500)
+    local fail_once = true
+    local logs = {}
+    local attrs = {}
+    local player = {
+      UserId = 9105,
+      Character = make_character(7),
+      SetAttribute = function(_, key, value)
+        if key == "FishCoin" and fail_once then
+          error("mock-attr-write-fail")
+        end
+        attrs[key] = value
+      end,
+    }
+    local data = make_ready_data(player, { coin = 50 })
+    local pt = PlayerTree.spawn({
+      player = player,
+      data = data,
+      clock = clock,
+      logger = {
+        error = function(_, msg)
+          logs[#logs + 1] = msg
+        end,
+      },
+    })
+
+    assert.is_nil(attrs.FishCoin)
+    assert.equals(1, #logs)
+    assert.matches("sync_fish_coin_attribute", logs[1], nil, true)
+    assert.matches("9105", logs[1], nil, true)
+    assert.matches("mock-attr-write-fail", logs[1], nil, true)
+
+    -- 恢复后触发同值状态刷新（如切区），因失败未写入 last_synced_coin，应重试写入成功
+    fail_once = false
+    assert.is_true(pt:set_zone("shrimpPond"))
+    assert.equals(50, attrs.FishCoin)
+    assert.equals(1, #logs)
+
+    pt:dispose()
   end)
 end)

@@ -8,11 +8,13 @@ function Mgr:GetDataInst(player)
     if data and data.Player == player and data.Inited and data.LoadState == 'ready' then return data end
 end
 
-function Mgr:SendItemBar(player)
+function Mgr:SendItemBar(player, forcePush)
     local data = self:GetDataInst(player)
     if not data then return end
     if self.Vitals and self.Vitals.RefreshHeldDamage then self.Vitals:RefreshHeldDamage(player, data) end
-    if self.OnSyncPlayerTree then self.OnSyncPlayerTree(player, data) end
+    if self.OnSyncPlayerTree and self.OnSyncPlayerTree(player, data, forcePush) then
+        return
+    end
     _G.REUtil:GetRE('ItemBarState'):FireClient(player, data:GetItemBarSnapshot())
 end
 
@@ -258,7 +260,7 @@ end
 
 function Mgr:Start()
     _G.REUtil:GetRE('RequestItemBar').OnServerEvent:Connect(function(player)
-        self:SendItemBar(player)
+        self:SendItemBar(player, true)
     end)
     local actions = {
         SelectSlot = 'SelectSlot',

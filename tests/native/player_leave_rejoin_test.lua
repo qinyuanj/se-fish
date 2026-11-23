@@ -79,10 +79,18 @@ describe('TestPlayerLeaveRejoin', function()
     before_each(function()
         saved.game, saved.REUtil = rawget(_G, 'game'), rawget(_G, 'REUtil')
         saved.MgrUtil, saved.MgrPlayerData = rawget(_G, 'MgrUtil'), rawget(_G, 'MgrPlayerData')
+        saved.Vector3, saved.Color = rawget(_G, 'Vector3'), rawget(_G, 'Color')
         saved.Debug, saved.slot = GameCfg.Debug, GameCfg.Save.QaSlot
         GameCfg.Debug, GameCfg.Save.QaSlot = { Enabled = false }, ''
+        _G.Vector3 = { New = function(x, y, z) return { x = x, y = y, z = z } end }
+        _G.Color = { New = function(...) return { ... } end }
         env = { tasks = {}, values = {}, errors = {}, cleanups = {}, mgrs = {} }
-        env.players = { PlayerAdded = signal(), PlayerRemoving = signal(), GetPlayers = function() return {} end }
+        env.players = {
+            PlayerAdded = signal(),
+            PlayerRemoving = signal(),
+            GetPlayers = function() return {} end,
+            GetPlayerFromCharacter = function() return nil end,
+        }
         env.heartbeat = signal()
         env.store = {
             GetAsync = function(_, key) return env.values[key] end,
@@ -93,6 +101,14 @@ describe('TestPlayerLeaveRejoin', function()
                 return value
             end,
         }
+        local function make_dummy_unit()
+            local u = { attrs = {}, destroyed = false }
+            function u:Destroy() self.destroyed = true end
+            function u:SetAttribute(k, v) self.attrs[k] = v end
+            function u:GetAttribute(k) return self.attrs[k] end
+            function u:FindFirstChild() return nil end
+            return u
+        end
         _G.game = {
             BindToClose = function() end,
             GetService = function(_, name)
@@ -100,14 +116,39 @@ describe('TestPlayerLeaveRejoin', function()
                     Spawn = function(_, fn) env.tasks[#env.tasks + 1] = fn end, Wait = function() end,
                 } end
                 if name == 'Players' then return env.players end
-                if name == 'RunService' then return { Heartbeat = env.heartbeat } end
-                if name == 'World' then return { GetServerTime = function() return 100 end } end
+                if name == 'RunService' then return { Heartbeat = env.heartbeat, IsServer = function() return true end } end
+                if name == 'World' then return {
+                    GetServerTime = function() return 100 end,
+                    CreateUnit = function() return make_dummy_unit() end,
+                    CreateAsset = function() return { make_dummy_unit() } end,
+                } end
                 if name == 'DataStoreService' then return { GetDataStore = function() return env.store end } end
             end,
         }
         _G.REUtil = { GetRE = function() return {
             OnServerEvent = signal(), FireClient = function() end,
         } end }
+        local attr_api_stub = {
+            Enums = { AttrComponentType = { Base = 1, BaseExtra = 2, Ratio = 3, Bonus = 4 } },
+            Funcs = {
+                GetAttrConfig = function() return nil end,
+                GetAttrUnit = function() return nil end,
+                EnsureAttrUnit = function() return make_dummy_unit() end,
+                SetAttrComponent = function() return true end,
+                GetAttr = function() return 0 end,
+            },
+        }
+        local modifier_api_stub = {
+            Enums = { CreateResult = { Added = 'Added', Reobtained = 'Reobtained' } },
+            AddModifier = function() return 'Added' end,
+            GetUnitModifiers = function() return {} end,
+            RemoveModifier = function() end,
+        }
+        local ability_api_stub = {
+            AddAbility = function() return { SetAttribute = function() end } end,
+            StopAbility = function() end,
+            CastAbility = function() return true end,
+        }
         for _, name in ipairs({ 'MgrSave', 'MgrPlayerData', 'MgrQuest', 'MgrStory', 'MgrVitals' }) do
             env.mgrs[name] = assert(loadfile('server/Mgr/' .. name .. '.lua'))()
         end
@@ -121,6 +162,9 @@ describe('TestPlayerLeaveRejoin', function()
             require = function(path)
                 if path == 'server.MgrUtil' then return { Start = function() end } end
                 if path == 'common.ZoneMarkers' then return { Start = function() end } end
+                if path == 'server.packages.attr_rule.api' then return attr_api_stub end
+                if path == 'server.packages.modifier_system.api' then return modifier_api_stub end
+                if path == 'server.packages.ability_system.api' then return ability_api_stub end
                 local name = path:match('^server%.Mgr%.(.*)$')
                 if not name then return require(path) end
                 if not env.mgrs[name] then
@@ -133,20 +177,17 @@ describe('TestPlayerLeaveRejoin', function()
                 return env.mgrs[name]
             end,
         }, { __index = _G })
-        -- 仅为与本问题无关的生命/属性/能力接缝提供确定返回值。
+        -- 仅为与本问题无关的生命/能力接缝提供确定返回值。
         env.mgrs.MgrPkFilter = { Make = function() return function() return true end end }
         env.mgrs.MgrSurvival = { Hooks = function() return {} end }
         env.mgrs.MgrAbility = { IsParalyzed = function() return false end }
-        env.mgrs.MgrAttr = {
-            MaxHealth = function() return 300 end,
-            ProjectHunger = function(_, _, value) return true, value end,
-        }
         assert(loadfile('server/main.lua', 't', sandbox))()
         env.a = join(560)
         drain()
     end)
     after_each(function()
         _G.game, _G.REUtil, _G.MgrUtil, _G.MgrPlayerData = saved.game, saved.REUtil, saved.MgrUtil, saved.MgrPlayerData
+        _G.Vector3, _G.Color = saved.Vector3, saved.Color
         GameCfg.Debug, GameCfg.Save.QaSlot = saved.Debug, saved.slot
         saved = {}
         env = nil

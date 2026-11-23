@@ -51,10 +51,8 @@ local function resolvePlayer(target)
     if not target then return nil end
     local okUid, uid = pcall(function() return target.UserId end) -- 兼容引擎 userdata 对象读取 UserId
     if okUid and uid ~= nil then return target end
-    if Players and Players.GetPlayerFromCharacter then
-        local okFind, found = pcall(Players.GetPlayerFromCharacter, Players, target) -- 兼容离线替身无 GetPlayerFromCharacter
-        if okFind and found then return found end
-    end
+    local okFind, found = pcall(Players.GetPlayerFromCharacter, Players, target) -- 兼容引擎 userdata 传入非角色对象
+    if okFind and found then return found end
     return nil
 end
 
@@ -232,8 +230,17 @@ function AttrBridge:ApplyGrowth(player)
 end
 
 function AttrBridge:RefreshAfterRevive(player)
-    local ok, result = pcall(self.ApplyGrowth, self, player) -- 复活期角色可能延迟就绪
-    return ok and type(result) == "table" and result.Ok == true
+    local uid = player and player.UserId
+    local ok, result = pcall(self.ApplyGrowth, self, player)
+    if not ok then
+        print('[server.main.AttrBridge]', 'RefreshAfterRevive', uid, tostring(result))
+        return false
+    end
+    if type(result) ~= "table" or result.Ok ~= true then
+        print('[server.main.AttrBridge]', 'RefreshAfterRevive', uid, tostring(type(result) == "table" and result.Error or result))
+        return false
+    end
+    return true
 end
 
 function AttrBridge:ProjectHunger(player, value)
@@ -384,23 +391,14 @@ local function invoke(name, mgr, method, ...)
 end
 
 local function serverNow()
-    if WorldService and WorldService.GetServerTime then
-        local ok, now = pcall(WorldService.GetServerTime, WorldService) -- 兼容引擎早期阶段或离线替身未提供 GetServerTime
-        if ok and Number.IsFiniteNumber(now) then return now end
-    end
+    local ok, now = pcall(WorldService.GetServerTime, WorldService) -- 引擎早期阶段可能未就绪
+    if ok and Number.IsFiniteNumber(now) then return now end
     return nil
 end
 
-local function optionalPackage(loader)
-    local ok, api = pcall(loader) -- 离线最小测试替身未提供官方包依赖的引擎服务时降级跳过叶子挂载
-    if ok and type(api) == "table" then return api end
-    print("[server.main] 官方包加载降级", tostring(api))
-    return nil
-end
-
-local attrPackageApi = optionalPackage(function() return require("server.packages.attr_rule.api") end)
-local modifierPackageApi = optionalPackage(function() return require("server.packages.modifier_system.api") end)
-local abilityPackageApi = optionalPackage(function() return require("server.packages.ability_system.api") end)
+local attrPackageApi = require("server.packages.attr_rule.api")
+local modifierPackageApi = require("server.packages.modifier_system.api")
+local abilityPackageApi = require("server.packages.ability_system.api")
 
 local activeCastGuards = {}
 local function registerCastGuard(guard)
@@ -431,25 +429,28 @@ WorldRuntime = ServerRuntime.new({
     create_unit = function(unit_type, props)
         return WorldService:CreateUnit(unit_type, props)
     end,
+    on_item_bar_state = function(player, snapshot)
+        _G.REUtil:GetRE('ItemBarState'):FireClient(player, snapshot)
+    end,
     player_effects = {
         on_dot_tick = function(pt, _kind, damage, source)
             applyDotHit(pt.player, damage, source)
         end,
     },
-    attr_leaf = attrPackageApi and { attr_api = attrPackageApi } or nil,
-    modifier_leaf = modifierPackageApi and { modifier_api = modifierPackageApi } or nil,
-    ability_leaf = abilityPackageApi and {
+    attr_leaf = { attr_api = attrPackageApi },
+    modifier_leaf = { modifier_api = modifierPackageApi },
+    ability_leaf = {
         ability_api = abilityPackageApi,
         attach_anchor = AbilityAPI.AttachAnchor,
         register_cast_guard = registerCastGuard,
-    } or nil,
-    entity_modifiers = modifierPackageApi and {
+    },
+    entity_modifiers = {
         modifier_api = modifierPackageApi,
         on_dot_tick = function(target, _kind, damage, source)
             local ref = type(target) == "table" and target.Ref or target
             applyDotHit(ref, damage, source)
         end,
-    } or nil,
+    },
     on_player_join_start = function(player)
         invoke('MgrPlayerData', MgrMap.MgrPlayerData, 'OnPlayerAdded', player)
     end,
@@ -491,9 +492,11 @@ WorldRuntime = ServerRuntime.new({
 })
 ServerRuntime.set_current(WorldRuntime)
 
-MgrMap.MgrPlayerData.OnSyncPlayerTree = function(player, data)
+MgrMap.MgrPlayerData.OnSyncPlayerTree = function(player, data, forcePush)
     local pt = WorldRuntime:get_player_tree(player.UserId)
-    if pt then pt:sync_from_data(data) end
+    if not pt then return false end
+    pt:sync_from_data(data, forcePush and { force_push = true } or nil)
+    return true
 end
 
 MgrMap.MgrSave.OnReady = function(player, data)

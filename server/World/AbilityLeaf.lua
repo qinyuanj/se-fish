@@ -19,10 +19,7 @@ local function is_object(value)
 end
 
 local function make_vec3(v)
-  if Vector3 and Vector3.New then
-    return Vector3.New(v.x or 0, v.y or 0, v.z or 0)
-  end
-  return { x = v.x or 0, y = v.y or 0, z = v.z or 0 }
+  return Vector3.New(v.x or 0, v.y or 0, v.z or 0)
 end
 
 local function default_ability_api()

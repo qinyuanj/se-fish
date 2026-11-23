@@ -153,8 +153,13 @@ function ServerRuntime.new(opts)
     local leaving = leaving_players[user_id]
     if leaving then
       leaving.waiting = player
-      if player.SetAttribute ~= nil then
-        pcall(player.SetAttribute, player, "SaveState", "pending") -- 兼容可能不含或只读 SetAttribute 的引擎/替身对象
+      local ok, err = pcall(player.SetAttribute, player, "SaveState", "pending")
+      if not ok then
+        if opts.logger and type(opts.logger.error) == "function" then
+          pcall(opts.logger.error, opts.logger, "on_player_added:SetAttribute (uid=" .. tostring(user_id) .. "): " .. tostring(err)) -- logger 异常不得中断入场排队
+        else
+          print("[ServerRuntime]", "on_player_added:SetAttribute", user_id, tostring(err))
+        end
       end
       return
     end

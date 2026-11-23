@@ -826,11 +826,15 @@ describe("服务端入口接线：server/main.lua 宿主测试双端到端集成
       REUtil = rawget(_G, "REUtil"),
       MgrUtil = rawget(_G, "MgrUtil"),
       MgrPlayerData = rawget(_G, "MgrPlayerData"),
+      Vector3 = rawget(_G, "Vector3"),
+      Color = rawget(_G, "Color"),
       Debug = GameCfg.Debug,
       slot = GameCfg.Save.QaSlot,
     }
     GameCfg.Debug = { Enabled = false }
     GameCfg.Save.QaSlot = ""
+    _G.Vector3 = { New = function(x, y, z) return { x = x, y = y, z = z } end }
+    _G.Color = { New = function(...) return { ... } end }
     runtime = nil
   end)
 
@@ -842,6 +846,8 @@ describe("服务端入口接线：server/main.lua 宿主测试双端到端集成
     _G.REUtil = saved.REUtil
     _G.MgrUtil = saved.MgrUtil
     _G.MgrPlayerData = saved.MgrPlayerData
+    _G.Vector3 = saved.Vector3
+    _G.Color = saved.Color
     GameCfg.Debug = saved.Debug
     GameCfg.Save.QaSlot = saved.slot
     saved = nil
@@ -856,6 +862,7 @@ describe("服务端入口接线：server/main.lua 宿主测试双端到端集成
       PlayerAdded = make_signal(),
       PlayerRemoving = make_signal(),
       GetPlayers = function() return {} end,
+      GetPlayerFromCharacter = function() return nil end,
     }
     local heartbeat = make_signal()
     local store = {
@@ -866,6 +873,14 @@ describe("服务端入口接线：server/main.lua 宿主测试双端到端集成
         return value
       end,
     }
+    local function make_dummy_unit()
+      local u = { attrs = {}, destroyed = false }
+      function u:Destroy() self.destroyed = true end
+      function u:SetAttribute(k, v) self.attrs[k] = v end
+      function u:GetAttribute(k) return self.attrs[k] end
+      function u:FindFirstChild() return nil end
+      return u
+    end
 
     _G.game = {
       BindToClose = function() end,
@@ -877,8 +892,14 @@ describe("服务端入口接线：server/main.lua 宿主测试双端到端集成
           }
         end
         if name == "Players" then return players_service end
-        if name == "RunService" then return { Heartbeat = heartbeat } end
-        if name == "World" then return { GetServerTime = function() return now end } end
+        if name == "RunService" then return { Heartbeat = heartbeat, IsServer = function() return true end } end
+        if name == "World" then
+          return {
+            GetServerTime = function() return now end,
+            CreateUnit = function() return make_dummy_unit() end,
+            CreateAsset = function() return { make_dummy_unit() } end,
+          }
+        end
         if name == "DataStoreService" then return { GetDataStore = function() return store end } end
       end,
     }
@@ -886,6 +907,28 @@ describe("服务端入口接线：server/main.lua 宿主测试双端到端集成
       GetRE = function()
         return { OnServerEvent = make_signal(), FireClient = function() end }
       end,
+    }
+
+    local attr_api_stub = {
+      Enums = { AttrComponentType = { Base = 1, BaseExtra = 2, Ratio = 3, Bonus = 4 } },
+      Funcs = {
+        GetAttrConfig = function() return nil end,
+        GetAttrUnit = function() return nil end,
+        EnsureAttrUnit = function() return make_dummy_unit() end,
+        SetAttrComponent = function() return true end,
+        GetAttr = function() return 0 end,
+      },
+    }
+    local modifier_api_stub = {
+      Enums = { CreateResult = { Added = "Added", Reobtained = "Reobtained" } },
+      AddModifier = function() return "Added" end,
+      GetUnitModifiers = function() return {} end,
+      RemoveModifier = function() end,
+    }
+    local ability_api_stub = {
+      AddAbility = function() return { SetAttribute = function() end } end,
+      StopAbility = function() end,
+      CastAbility = function() return true end,
     }
 
     for _, name in ipairs({ "MgrSave", "MgrPlayerData", "MgrQuest", "MgrStory", "MgrVitals" }) do
@@ -909,10 +952,6 @@ describe("服务端入口接线：server/main.lua 宿主测试双端到端集成
       end,
     }
     mgrs.MgrAbility = { IsParalyzed = function() return false end }
-    mgrs.MgrAttr = {
-      MaxHealth = function() return 300 end,
-      ProjectHunger = function(_, _, value) return true, value end,
-    }
 
     local sandbox = setmetatable({
       print = function(...)
@@ -924,6 +963,9 @@ describe("服务端入口接线：server/main.lua 宿主测试双端到端集成
       require = function(path)
         if path == "server.MgrUtil" then return { Start = function() end } end
         if path == "common.ZoneMarkers" then return { Start = function() end } end
+        if path == "server.packages.attr_rule.api" then return attr_api_stub end
+        if path == "server.packages.modifier_system.api" then return modifier_api_stub end
+        if path == "server.packages.ability_system.api" then return ability_api_stub end
         local name = path:match("^server%.Mgr%.(.*)$")
         if not name then return require(path) end
         if not mgrs[name] then

@@ -210,8 +210,8 @@ function Mgr:LoadInto(player, data)
             self:NoteWrite(userId, claimed, status == 'missing' and 'new' or 'load')
             player:SetAttribute('SaveState', 'ready')
             print('[MgrSave] ready', userId, s.Token, 'coin=' .. claimed.coin, 'sequence=' .. claimed.meta.sequence)
-            if self.PlayerData then self.PlayerData:SendItemBar(player) end
             if self.OnReady then self.OnReady(player, data) end
+            if self.PlayerData then self.PlayerData:SendItemBar(player, true) end
         end)
     end
     if previous.SlotChoosing then

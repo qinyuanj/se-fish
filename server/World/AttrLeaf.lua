@@ -22,10 +22,7 @@ local function is_object(value)
 end
 
 local function make_vec3(x, y, z)
-  if Vector3 and Vector3.New then
-    return Vector3.New(x, y, z)
-  end
-  return { x = x, y = y, z = z }
+  return Vector3.New(x, y, z)
 end
 
 local function default_attr_api()

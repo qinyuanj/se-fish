@@ -7,17 +7,11 @@ local GameCfg = require("common.GameCfg")
 local HeldRodLeaf = {}
 
 local function make_vec3(scale)
-  if Vector3 and Vector3.New then
-    return Vector3.New(scale.x, scale.y, scale.z)
-  end
-  return { x = scale.x, y = scale.y, z = scale.z }
+  return Vector3.New(scale.x, scale.y, scale.z)
 end
 
 local function make_color(rgba)
-  if Color and Color.New then
-    return Color.New(rgba[1], rgba[2], rgba[3], rgba[4])
-  end
-  return { rgba[1], rgba[2], rgba[3], rgba[4] }
+  return Color.New(rgba[1], rgba[2], rgba[3], rgba[4])
 end
 
 --- 解析当前应投影到左手的视觉物品 ID（鱼竿优先，其次手持带 Visual.Socket 的武器）。

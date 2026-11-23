@@ -235,8 +235,8 @@ end
 
 function Mgr:OnPlayerAdded(player)
 	-- 玩家角色能力管理器挂载与角色生命周期监听已迁至 PlayerTree / AbilityLeaf；
-	-- 此处仅保留过渡期成长首刷兼容（供未接入 ServerRuntime 的单测或延迟就绪路径）。
-	if self.Attr and player and player.Character then
+	-- 角色就绪时补做一次成长与血量上限首刷。
+	if player and player.Character then
 		self:CaptureBaseSpeed(player)
 		self:ApplyGrowth(player)
 	end
