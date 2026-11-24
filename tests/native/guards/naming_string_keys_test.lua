@@ -105,10 +105,12 @@ local Actions = { board = "Board" }
 
   it("test_repo_has_no_unexempted_old_name_strings", function()
     local bad, reason = guard.scan(fs.repo_root())
-    assert.is_truthy(bad, reason)
-    local lines = {}
-    for _, item in ipairs(bad) do lines[#lines + 1] = item.where .. " " .. item.literal .. " -> " .. item.new_name end
-    assert.equals(0, #bad, "旧名字符串键：\n" .. table.concat(lines, "\n"))
+    if not bad then assert.is_truthy(bad, reason) end
+    if #bad > 0 then
+      local lines = {}
+      for _, item in ipairs(bad) do lines[#lines + 1] = item.where .. " " .. item.literal .. " -> " .. item.new_name end
+      assert.equals(0, #bad, "旧名字符串键：\n" .. table.concat(lines, "\n"))
+    end
   end)
 
   it("test_empty_scan_root_is_not_a_green_pass", function()
@@ -126,15 +128,17 @@ local k = "routeId"
 local h = rawget(tbl, "maxHealth")
 rawset(tbl, "LongPressSec", 1)
 local mh = rawget(tbl, "MaxHealth")
+local f = tbl["fishId"]
 local z = rawget(_G, "REUtil")
 local t = fish["ActiveUntil"]
 ]], {})
-    assert.equals(5, #bad)
+    assert.equals(6, #bad)
     assert.equals("upgradeLevel", bad[1].literal)
     assert.equals("routeId", bad[2].literal)
     assert.equals("maxHealth", bad[3].literal)
     assert.equals("LongPressSec", bad[4].literal)
     assert.equals("MaxHealth", bad[5].literal)
+    assert.equals("fishId", bad[6].literal)
   end)
 
   it("test_mapping_data_is_unique_and_snake_case", function()
@@ -143,17 +147,15 @@ local t = fish["ActiveUntil"]
     assert.same({ "x" }, conflicts)
     assert.equals(449, #names.l3a)
     assert.equals(45, #names.l3b)
-    assert.equals(18, #names.post_l3)
+    assert.equals(33, #names.post_l3)
     assert.equals(0, #guard.find_duplicate_old_names(names))
     assert.equals(0, #guard.find_duplicate_new_names(names))
-    for _, row in ipairs(names.l3a) do
-      assert.is_truthy(row.new_name:match("^[a-z0-9][a-z0-9_]*$"), row.old_name .. " -> " .. row.new_name)
-    end
-    for _, row in ipairs(names.l3b) do
-      assert.is_truthy(row.new_name:match("^[a-z0-9][a-z0-9_]*$"), row.old_name .. " -> " .. row.new_name)
-    end
-    for _, row in ipairs(names.post_l3) do
-      assert.is_truthy(row.new_name:match("^[a-z0-9][a-z0-9_]*$"), row.old_name .. " -> " .. row.new_name)
+    for _, layer in ipairs({ "l3a", "l3b", "post_l3" }) do
+      for _, row in ipairs(names[layer]) do
+        if not row.new_name:match("^[a-z0-9][a-z0-9_]*$") then
+          assert.is_truthy(false, row.old_name .. " -> " .. row.new_name)
+        end
+      end
     end
   end)
 end)

@@ -6,7 +6,7 @@
 | --- | --- | --- |
 | `l3a_renames.txt` | 449 个「旧标识符 新标识符」 | L3a 提交 `b3a1855` 的改名清单；含注释/docs 口径 |
 | `l3b_renames.txt` | 45 个方法名「旧 新」 | L3b 提交 `9685b9e` 的改名清单 |
-| `post_l3_renames.txt` | 18 个 L3 之后迁移的「旧 新」 | PR #345 与 ADR-0037 L4d 收尾键（仅用于旧名字符串守卫，不参与 L3a/L3b 历史重放） |
+| `post_l3_renames.txt` | 33 个 L3 之后迁移或纳入字符串守卫的「旧 新」 | PR #345 与 ADR-0037 L4d 收尾键（仅用于旧名字符串守卫，不参与 L3a/L3b 历史重放） |
 | `l3b_keydefs.txt` | L3b 逐处字符串键/官方词定义清单（文件:行 + 上下文） | `tools/naming` 提升前的 `l3b_keydefs.txt`，保留作 grep 索引 |
 | `string_key_exemptions.txt` | 旧名字符串守卫的逐条豁免（path<TAB>旧名<TAB>理由） | #337 逐条确认的官方/协议点 |
 

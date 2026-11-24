@@ -1,14 +1,29 @@
-# L3 之后已完成迁移的高危旧名（PR #345 / ADR-0037 L4d）
+# L3 之后已完成迁移或已纳入字符串守卫的旧名（PR #345 / ADR-0037 L4d）
 # 仅用于 tools/naming_guard.lua 旧名字符串守卫，不参与 L3a/L3b 历史重放。
 Active active
+AddFish add_fish
+AddItem add_item
+BackpackCapacity backpack_capacity
 BindCombatChannel bind_combat_channel
 CallBack callback
+CheckZone check_zone
 CombatRE combat_re
+DropItem drop_item
+GetItem get_item
+GetReelState get_reel_state
+GetUiRoot get_ui_root
+HeadHeight head_height
+InteractRange interact_range
+ItemBarCapacity item_bar_capacity
 LastReason last_reason
 LongPressSec long_press_sec
+MaxHunger max_hunger
+MoveSlot move_slot
 Msg msg
 Ref ref
 Root root
+SafePoint safe_point
+fishId fish_id
 maxHealth max_health
 maxHunger max_hunger
 readKey read_key

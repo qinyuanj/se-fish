@@ -97,11 +97,11 @@ function M.main(args, env)
   if mode == "check" then
     local ok, bad, reason = pcall(guard.scan, target, env.repo_root)
     if not ok then
-      io.stderr:write("naming: " .. tostring(bad) .. "\n")
+      io.stderr:write(string.format("naming: guard.scan(%s) 失败：%s\n", target, tostring(bad)))
       return 2
     end
     if not bad then
-      io.stderr:write("naming: " .. tostring(reason) .. "\n")
+      io.stderr:write(string.format("naming: guard.scan(%s) 失败：%s\n", target, tostring(reason)))
       return 2
     end
     for _, item in ipairs(bad) do

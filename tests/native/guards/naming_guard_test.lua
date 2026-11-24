@@ -60,7 +60,9 @@ describe("命名门禁", function()
       assert.is_truthy(lfs.attributes(root, "mode"), root .. " 不存在")
       scan(root, root, bad)
     end
-    assert.equals(0, #bad, "以下路径不是 snake_case：\n" .. table.concat(bad, "\n"))
+    if #bad > 0 then
+      assert.equals(0, #bad, "以下路径不是 snake_case：\n" .. table.concat(bad, "\n"))
+    end
   end)
 end)
 
@@ -100,7 +102,9 @@ describe("模块表命名", function()
         end
       end
     end
-    assert.equals(0, #bad, "模块表绑定不是 PascalCase：\n" .. table.concat(bad, "\n"))
+    if #bad > 0 then
+      assert.equals(0, #bad, "模块表绑定不是 PascalCase：\n" .. table.concat(bad, "\n"))
+    end
   end)
 
   it("test_pascal_judgement_accepts_types_rejects_values", function()
@@ -199,8 +203,10 @@ describe("方法与配置段命名", function()
         bad[#bad + 1] = item.key .. "  首次出现 " .. item.where
       end
     end
-    table.sort(bad)
-    assert.same({}, bad, "新写的 PascalCase 方法名或 GameCfg 段名（ADR-0034 L3 / ADR-0037）：\n" .. table.concat(bad, "\n"))
+    if #bad > 0 then
+      table.sort(bad)
+      assert.same({}, bad, "新写的 PascalCase 方法名或 GameCfg 段名（ADR-0034 L3 / ADR-0037）：\n" .. table.concat(bad, "\n"))
+    end
   end)
 end)
 
