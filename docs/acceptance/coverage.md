@@ -101,7 +101,7 @@
 | 3-21 | server/World/GroundLoot.lua、server/Data/PlayerData.lua | tests/native/loot_recycle_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 3-22 | server/Data/PlayerData.lua、server/SaveHost.lua | tests/native/economy_persistence_test.lua | 缺 | 缺 | 缺 | 缺 | B |
 
-道具栏与背包容量、升级价在 common/GameCfg.lua 的 Items 段，升级入口是 MgrShop 的 UpgradeStorage；格位进出与选中/手持分离由 MgrPlayerData 与 PlayerData 共同持有。
+道具栏与背包容量、升级价在 common/GameCfg.lua 的 Items 段，升级入口是 PlayerShop 的 UpgradeStorage；格位进出与选中/手持分离由 PlayerDataHost 与 PlayerData 共同持有。
 
 ### 第 4 节 钓鱼系统（28 条）
 
@@ -280,7 +280,7 @@
 | 8-33 | server/World/FerryRoute.lua、server/SaveHost.lua | tests/native/ferry_test.lua | 缺 | 缺 | 缺 | 缺 | B |
 | 8-34 | server/World/GroundLoot.lua、common/GameCfg.lua | tests/native/loot_recycle_test.lua | 缺 | 缺 | 缺 | 缺 | B |
 
-返程票价由 GameCfg.Ferry.Routes 按区号生成（10×3^(区号−2)），兑换表在 GameCfg.Content.Exchanges；掉落预算与回收在 MgrLoot。
+返程票价由 GameCfg.Ferry.Routes 按区号生成（10×3^(区号−2)），兑换表在 GameCfg.Content.Exchanges；掉落预算与回收在 GroundLoot。
 
 ### 第 9 节 多人规则（25 条，其中 9-23～9-25 是 C 级试玩条款）
 
@@ -403,7 +403,7 @@
 | 12-48 | common/GameCfg.lua | — | 缺 | 缺 | 缺 | 缺 | A |
 
 第 12 节先建逐招表，再用火山岛首领哥斯拉贯通「配置 → 服务端调度 → 客户端预警 → 断言」：
-12-04、12-05、12-39～12-46 已由 tests/native/spec/12_boss_moves_test.lua 走 MgrFishUnit 的业务入口取证；
+12-04、12-05、12-39～12-46 已由 tests/native/spec/12_boss_moves_test.lua 走 FishTree 的业务入口取证；
 其余条款的落点与关联测试都是实现自检，状态仍是 unverified。
 
 远程与俯冲组（#258）另由 tests/native/spec/12_boss_moves_ranged_dive_test.lua 走同一业务入口取证：
@@ -412,7 +412,7 @@
 断言改逐招表哨兵值后观察服务端结算，证明表是唯一数值来源；预警载荷带落点、范围与投送方式，
 伤害只由服务端在锁定落点结算，测试进程没有加载客户端命中代码。
 
-阶段与复合组（#259）另有一组 A/B 证据：沧龙用逐招表的 patrol / leap / head / bite / contact 五行区分绕岛巡航、命中段与叼走过程接触段，哥斯拉的阶段阈值单独放在 `M.Phases`（普通招式表仍是 `M.Rows`），由 tests/native/spec/12_boss_moves_phase_test.lua 走 MgrFishUnit 的业务入口断言移速上限、砸击/甩头、最近岛中心目标、叼走入海、两段伤害与同帧阈值优先；四类证据只勾「正常流程」，失败 / 退出重进 / 存档恢复仍缺。
+阶段与复合组（#259）另有一组 A/B 证据：沧龙用逐招表的 patrol / leap / head / bite / contact 五行区分绕岛巡航、命中段与叼走过程接触段，哥斯拉的阶段阈值单独放在 `M.Phases`（普通招式表仍是 `M.Rows`），由 tests/native/spec/12_boss_moves_phase_test.lua 走 FishTree 的业务入口断言移速上限、砸击/甩头、最近岛中心目标、叼走入海、两段伤害与同帧阈值优先；四类证据只勾「正常流程」，失败 / 退出重进 / 存档恢复仍缺。
 
 ### 第 13 节 图鉴与成就（16 条）
 
@@ -518,7 +518,7 @@
 | 16-16 | common/cfg/Items.lua、common/cfg/PlaceholderAssets.lua | tests/native/placeholder_assets_test.lua | 缺 | 缺 | 缺 | 缺 | B |
 | 16-17 | common/cfg/Items.lua、common/GameCfg.lua | tests/native/cfg_fish_items_test.lua | 缺 | 缺 | 缺 | 缺 | B |
 
-第 16 节的 16-04、16-06、16-07 已由服务端 MgrVitals 的公开食用入口取证：食物 / 极品食物 / 鱼饵全部可吃，
+第 16 节的 16-04、16-06、16-07 已由服务端 PlayerLife（ServerRuntime.life）的公开食用入口取证：食物 / 极品食物 / 鱼饵全部可吃，
 其余类别一律拒绝；负恢复项吃后扣饥饿并扣血。16-13 的「实现标记只有一份真源」由 common/cfg/ContentLedger.lua
 与 common/ContentValidation.lua 的一致性门禁守住。
 

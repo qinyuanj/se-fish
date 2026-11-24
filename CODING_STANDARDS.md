@@ -4,9 +4,9 @@
 
 **约束**指官方公开契约；**项目规则**指本仓库采用的工程做法。教程里的命名、示例数值和完整生命周期方法集不作为额外要求。
 
-接入管理器、界面、技能包，或修改配置、导出物时，先查 [AGENTS.md 的修改边界](AGENTS.md#修改边界)；命名和玩家文案查 [GLOSSARY.md](GLOSSARY.md)。
+接入服务端宿主、界面、技能包，或修改配置、导出物时，先查 [AGENTS.md 的修改边界](AGENTS.md#修改边界)；命名和玩家文案查 [GLOSSARY.md](GLOSSARY.md)。
 
-**已机检，审查时不必逐条比对**：`require` 的工程前缀与大小写、禁止加载 `EggyAPI.lua` 等引擎存根、禁用 `io`/`os`/`package`/`debug`（三端业务代码，`packages/` 是上游整包拷贝、不在其列）、远程事件只经 `REUtil` 用公开 `RemoteEvent.New` 创建、单端专属 Service / `Players.LocalPlayer` 不跨端、`LastSeq` 随玩家离场清理、服务端宿主由 `server/main.lua` 显式组合、可重入口不泄漏监听（[guards/source_guard_test](tests/native/guards/source_guard_test.lua)），以及 Spoke 宿主组合与锚点行为登记一致（[guards/static_require_test](tests/native/guards/static_require_test.lua)）；三端依赖方向、循环依赖与禁止引用测试夹具（[guards/arch_policy_test](tests/native/guards/arch_policy_test.lua)）。
+**已机检，审查时不必逐条比对**：`require` 的工程前缀与大小写、禁止加载 `EggyAPI.lua` 等引擎存根、禁用 `io`/`os`/`package`/`debug`（三端业务代码，`packages/` 是上游整包拷贝、不在其列）、远程事件只经 `REUtil` 用公开 `RemoteEvent.New` 创建、单端专属 Service / `Players.LocalPlayer` 不跨端、可重入口不泄漏监听（[guards/source_guard_test](tests/native/guards/source_guard_test.lua)）；服务端 Spoke 宿主由 `server/main.lua` 显式组合（无 `MgrMap`）与锚点行为登记一致（[guards/static_require_test](tests/native/guards/static_require_test.lua)）；三端依赖方向、循环依赖与禁止引用测试夹具（[guards/arch_policy_test](tests/native/guards/arch_policy_test.lua)）。
 
 ## API 与运行端
 
@@ -21,7 +21,7 @@
 - server 持有权威玩法状态（校验、结算、存储）；client 处理输入、UI、相机和本地表现；common 放双端配置、协议与可共用逻辑。客户端提交操作意图，服务端判定血量、奖励和存档等结果。
 - `main.lua` 组装模块、分发生命周期，业务逻辑归对应模块；依赖用 `local X = require(...)` 显式取得并保持单向，需要协调多个模块时由入口注入。
 - 模块加载阶段只定义表、函数和必要的通信协议；事件绑定、UI 创建、玩家读取和玩法启动放进显式生命周期入口。纯配置模块加载时不获取 Service。
-- 入口先处理已在线玩家、再分发 `Start`（见 [server/main.lua](server/main.lua)），因此 `OnPlayerAdded` 不能依赖 `Start` 已执行；管理器以 `pairs` 遍历，跨管理器的初始化依赖须显式安排。
+- 入口先接入已在线玩家、再启动 `ServerRuntime`（见 [server/main.lua](server/main.lua)），因此玩家入场钩子不能依赖启动回调已执行；服务端宿主与 Spoke 树按显式顺序装配与拉起，跨模块初始化依赖由入口与运行时显式安排。
 - `pcall` 的业务失败要记录模块、操作、必要对象标识和错误内容，再按业务返回或清理，不能继续报告成功；包裹可能不存在的 UI/引擎 API 时允许忽略错误，同一行注明理由。
 
 ## 跨端通信
@@ -50,7 +50,7 @@
 **项目规则**（依据 [S6]、[S19]）：
 
 - 事件连接、Timer、异步任务、临时对象和玩家状态都指定拥有者与收尾入口；只实现实际需要的初始化、启动、重置、销毁职责。
-- 每局只跑一次的监听（`Start`）可以不存句柄；可重入口（`OpenScreen` / `CloseScreen` / `Init` / 重建节点）里的连接必须存句柄，并在关闭或重建时断开，避免叠加。
+- 每局只跑一次的监听（`Start`）可以不存句柄；可重入口（`Init` / 视图挂载或重建节点）里的连接必须由 Spoke scope 托管或存句柄并在关闭/重建时断开，避免叠加。
 - 初始化或启动中途失败时，按依赖反向清理已成功的部分；再次启动不应残留上一轮的连接、计时器或临时状态。
 - 延迟回调执行前重新确认对象与流程仍有效；可重播流程用代次或等效机制使旧任务失效，防止上一轮回调修改新一轮状态。
 - 关键结果由显式状态与去重控制，不依赖同帧事件的隐含顺序；触碰等可重复事件按业务去重，计数用整数，倒计时按结束时间计算或用越界判断结束。
