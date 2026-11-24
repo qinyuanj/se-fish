@@ -1,16 +1,7 @@
--- Walking and rendering an epoch tree for a trace: the structural hooks every
--- epoch exposes, the roots reachable from a set of frames, and the indented
--- depth-first dump.
---
--- Split out of spoke_introspect.lua, which assembles the full trace text.
 local IntrospectLabels = require("common.packages.spoke.runtime.introspect_labels")
 
 local IntrospectTree = {}
 
--- Direct children of an epoch, delegated to the internal _get_children hook
--- (Dock overrides it to walk slot children). Every real Epoch provides the
--- hook, so there is deliberately no attachment-walking fallback; duck-typed
--- callers without the hook simply contribute no children.
 function IntrospectTree.get_children(epoch, store)
   store = store or {}
   if type(epoch._get_children) == "function" then
@@ -64,7 +55,6 @@ local function root_of(epoch)
   end
 end
 
---- The distinct topmost roots reachable from the epochs on the frame stack.
 function IntrospectTree.roots_from_frames(frames)
   local epochs = collect_distinct(frames, function(frame)
     return frame.epoch
@@ -80,7 +70,6 @@ function IntrospectTree.total_nodes(roots)
   return total
 end
 
---- The indented depth-first dump of every root, one epoch per line.
 function IntrospectTree.render(roots, frames)
   local lines = {}
   local function render_epoch(epoch, depth)

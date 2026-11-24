@@ -1,10 +1,5 @@
--- Epoch class construction: how an epoch instance is initialized and how a
--- subclass table is defined. Shared by Epoch.extend and Ticker.extend so both
--- inherit exactly the same instance rules.
 local EpochClass = {}
 
---- Builds an instance of `class`. A leading string argument names the epoch;
---- the rest are forwarded to the class constructor.
 function EpochClass.new_instance(class, ...)
   local self = setmetatable({
     name = class._default_name or "Epoch",
@@ -28,7 +23,6 @@ function EpochClass.new_instance(class, ...)
   return self
 end
 
---- Defines a subclass of `parent` carrying `definition`'s members.
 function EpochClass.define(parent, name, definition, tostring_fn)
   local class = {
     _default_name = name,

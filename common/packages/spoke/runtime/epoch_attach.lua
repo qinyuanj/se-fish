@@ -1,15 +1,8 @@
--- The steps of attaching an epoch: linking it into its tree, publishing the
--- services it was spawned with, running its Init block, and opening the tick
--- window that later ticks roll back to.
---
--- Split out of epoch.lua; Epoch:_attach orchestrates these in order.
 local PackedTreeCoords = require("common.packages.spoke.runtime.packed_tree_coords")
 local EpochBuilder = require("common.packages.spoke.runtime.epoch_builder")
 
 local EpochAttach = {}
 
--- An epoch attached to a parent inherits its position from it; a root epoch
--- starts a tree of its own.
 local function import_index_of(parent)
   if parent then
     return #parent._attachments - 1
@@ -41,8 +34,6 @@ local function tree_of(epoch, parent, tree)
   return epoch
 end
 
---- Fixes the epoch's position: parent, branch index, depth, coordinate, the
---- ticker that schedules it and the tree that owns it.
 function EpochAttach.link_into_tree(epoch, parent, index, ticker, tree)
   epoch._parent = parent
   epoch._coord_index = index
@@ -57,8 +48,6 @@ function EpochAttach.link_into_tree(epoch, parent, index, ticker, tree)
   epoch._is_pending = false
 end
 
---- Services arrive as a keyed table; they are exported in a stable order so an
---- epoch's attachment indices do not depend on table iteration order.
 function EpochAttach.export_services(epoch, services)
   if not services then
     return
@@ -78,19 +67,14 @@ function EpochAttach.export_services(epoch, services)
   end
 end
 
---- Runs the epoch's Init block and validates what it returned.
 function EpochAttach.invoke_init(epoch, builder)
   local init_result = epoch:init(builder)
   if init_result ~= nil and type(init_result) ~= "function" then
-    -- Fail fast at attach time instead of surfacing as an obscure
-    -- "attempt to call" error on the first tick.
     error("Epoch init must return a tick function or nil, got " .. type(init_result), 0)
   end
   return init_result
 end
 
---- Marks where Init ended, so each tick rolls back exactly the tick-scoped
---- attachments and the epoch sorts by its tick cursor from now on.
 function EpochAttach.open_tick_window(epoch)
   epoch._tick_index = #epoch._attachments
   epoch._tick_cursor = epoch._coords:extend(epoch._tick_index)

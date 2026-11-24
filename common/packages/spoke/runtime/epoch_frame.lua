@@ -1,9 +1,3 @@
--- Frame scaffolding shared by an epoch's Init and Tick windows: push a runtime
--- frame, run the body with a fresh builder, and turn a thrown value into the
--- epoch's fault.
---
--- Split out of epoch.lua so the lifecycle bookkeeping reads separately from the
--- epoch's own state transitions.
 local SpokeException = require("common.packages.spoke.runtime.spoke_exception")
 local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
 local EpochBuilder = require("common.packages.spoke.runtime.epoch_builder")
@@ -26,8 +20,6 @@ function EpochFrame.wrap_fault(epoch, phase, error_value)
     SpokeRuntime.snapshot_frames())
 end
 
---- Runs `body(builder)` inside a pushed runtime frame. The caller owns the
---- matching SpokeRuntime.pop() so it can act on the result first.
 function EpochFrame.run(epoch, phase, body)
   epoch._frame_depth = epoch._frame_depth + 1
   local frame = SpokeRuntime.push({
@@ -48,8 +40,6 @@ function EpochFrame.run(epoch, phase, body)
   return ok, result, frame
 end
 
---- A detach asked for while the frame was open runs once the frame pops.
---- Reports whether such a request was pending.
 function EpochFrame.settle_detach_request(epoch, frame)
   if not epoch._detach_requested then
     return false
@@ -61,7 +51,6 @@ function EpochFrame.settle_detach_request(epoch, frame)
   return true
 end
 
---- Records the fault, releases the frame, and rethrows it to the caller.
 function EpochFrame.fail(epoch, phase, frame, error_value)
   epoch.fault = EpochFrame.wrap_fault(epoch, phase, error_value)
   EpochFrame.settle_detach_request(epoch, frame)

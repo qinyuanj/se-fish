@@ -1,7 +1,3 @@
--- SpokeIntrospect: structural introspection for debugging reactive trees,
--- porting upstream SpokeIntrospect's TreeTrace/FrameTrace rendering. The
--- epoch hooks (_get_children / _get_parent) already exist on every epoch;
--- this module is the user-facing renderer built on them.
 local IntrospectLabels = require("common.packages.spoke.runtime.introspect_labels")
 local IntrospectTree = require("common.packages.spoke.runtime.introspect_tree")
 
@@ -14,9 +10,6 @@ local TREE_SIZE_THRESHOLD = 50
 SpokeIntrospect.get_children = IntrospectTree.get_children
 SpokeIntrospect.get_parent = IntrospectTree.get_parent
 
--- Frame trace: one numbered line per frame, outermost first, 0-based and
--- right-aligned to the digit count of the frame count. Accepts the snapshot
--- from SpokeRuntime.snapshot_frames().
 function SpokeIntrospect.stack_trace(frames)
   frames = frames or {}
   if #frames == 0 then
@@ -38,12 +31,8 @@ function SpokeIntrospect.stack_trace(frames)
   return table.concat(lines, "\n")
 end
 
--- Compatibility alias kept for callers of the original #35 implementation;
--- both names render the same numbered frame lines.
 SpokeIntrospect.frame_trace = SpokeIntrospect.stack_trace
 
--- A big tree is summarized rather than dumped: the trace is a debugging aid,
--- not a serialization format.
 local function tree_section(roots, frames)
   local total_nodes = IntrospectTree.total_nodes(roots)
   if total_nodes > TREE_SIZE_THRESHOLD then
@@ -52,8 +41,6 @@ local function tree_section(roots, frames)
   return IntrospectTree.render(roots, frames)
 end
 
--- Tree trace: a header, the frame trace, a second header, then a DFS dump of
--- every topmost root reachable from the frame epochs.
 function SpokeIntrospect.tree_trace(frames)
   frames = frames or {}
   if #frames == 0 then

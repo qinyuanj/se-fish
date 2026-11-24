@@ -17,12 +17,10 @@ Epoch._log = function(message, error_value)
   SpokeError.log(message, error_value)
 end
 
--- Resolved at call time so a host (or a test) can replace Epoch._log_error.
 local function fallback_log(message, error_value)
   Epoch._log_error(message, error_value)
 end
 
--- The builder emits structural logs through Epoch's own hook.
 EpochBuilder.set_log_sink(function(message)
   Epoch._log(message)
 end)
@@ -35,15 +33,11 @@ function Epoch.extend(name, definition)
   return EpochClass.define(Epoch, name, definition, Epoch.__tostring)
 end
 
--- Internal class-construction seam used by Ticker and SpokeTree. Keeping it on
--- Epoch lets those modules inherit the exact instance initialization rules.
 Epoch._new_instance = EpochClass.new_instance
 
 function Epoch:init()
   return nil
 end
-
--- Ordering -------------------------------------------------------------------
 
 local function compare_across_trees(epoch, other)
   if epoch._tree and type(epoch._tree.compare_to) == "function" then
@@ -56,11 +50,7 @@ local function both_cursors_valid(epoch, other)
   return epoch._tick_cursor:is_valid() and other._tick_cursor:is_valid()
 end
 
--- Base comparison implementation, kept as a separate method so callers can
--- reach epoch ordering through a colon call even when a subclass (SpokeTree)
--- overrides compare_to with a scheduler-specific contract. Upstream tests
--- express the same dispatch with `(epoch as Epoch).CompareTo(other)`.
-function Epoch:_compare_to(other)
+function Epoch:compare_to(other)
   if self._tree ~= other._tree then
     return compare_across_trees(self, other)
   end
@@ -70,15 +60,9 @@ function Epoch:_compare_to(other)
   return EpochCursor.compare(self, other)
 end
 
-function Epoch:compare_to(other)
-  return self:_compare_to(other)
-end
-
 function Epoch:__tostring()
   return self.name or "Epoch"
 end
-
--- Attach ---------------------------------------------------------------------
 
 function Epoch:_attach(parent, index, ticker, services, tree)
   if self._attached then
@@ -105,8 +89,6 @@ function Epoch:_attach(parent, index, ticker, services, tree)
   end
   SpokeRuntime.pop()
 end
-
--- Teardown -------------------------------------------------------------------
 
 function Epoch:_detach_from(index)
   EpochTeardown.release_from(self, index, fallback_log)
@@ -137,17 +119,12 @@ function Epoch:detach()
   self:_perform_detach()
 end
 
--- Tick -----------------------------------------------------------------------
-
 function Epoch:_tick()
   if self.is_detached or self.fault then
     return
   end
   self._is_pending = false
   if self._is_ticker then
-    -- Upstream isTicking spans the whole Tick frame, including the rollback
-    -- cleanup at the top; schedules made there must not re-request upstream
-    -- (the current pass absorbs them).
     self._is_ticking = true
   end
 
@@ -165,8 +142,6 @@ function Epoch:_tick()
   SpokeRuntime.pop()
 end
 
--- Coordinates ----------------------------------------------------------------
-
 function Epoch:_refresh_coords()
   self._coords = EpochCursor.resolve_coords(self)
   self._tick_cursor = EpochCursor.resolve_cursor(self)
@@ -181,8 +156,6 @@ function Epoch:_reindex(index)
   self._coord_index = index
   self:_refresh_coords()
 end
-
--- Accessors ------------------------------------------------------------------
 
 function Epoch:_get_parent()
   return self._parent

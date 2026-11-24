@@ -17,9 +17,6 @@ local function identity(value)
   return value
 end
 
--- Bootstrap runs inside its own runtime frame so anything the root attaches can
--- see a Bootstrap frame on the stack. An Auto tree flushes once inside that
--- frame (when the root attached cleanly) and again after it pops.
 local function run_bootstrap(tree, mode, services)
   tree._bootstrapping = true
   tree._timestamp = SpokeRuntime.next_timestamp()
@@ -61,8 +58,6 @@ local function create(name, root, mode, layer, services)
   return tree
 end
 
--- Every spawn entrypoint takes an optional leading name; without one the
--- variant's own default name is used.
 local function named_args(default_name, first, second, third)
   if type(first) == "string" then
     return first, second, third
@@ -77,8 +72,6 @@ function SpokeTree:constructor(root, mode, layer, services)
   self.flush_layer = self._flush_layer
   self._is_tree = true
   self._is_manual = self.flush_mode == "Manual"
-  -- Note: `x and nil or "flush"` would always yield "flush" (true and nil is
-  -- nil, then nil or "flush" wins); manual trees must stay inert until driven.
   self._command = not self._is_manual and "flush" or nil
   self._driving = false
   self._logger = nil
@@ -124,8 +117,6 @@ function SpokeTree:bootstrap(s)
   return self.main
 end
 
--- Trees are ordered by flush layer, then by the order they were created; the
--- runtime's own comparator adds the scoped-boost tier on top of this.
 function SpokeTree:compare_to(other)
   local by_layer = Ordering.compare(self._flush_layer, other._flush_layer)
   if by_layer ~= 0 then

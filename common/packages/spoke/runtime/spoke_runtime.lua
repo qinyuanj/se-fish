@@ -4,8 +4,6 @@ local Ordering = require("common.packages.spoke.runtime.ordering")
 local RuntimeFrames = require("common.packages.spoke.runtime.runtime_frames")
 local TreeQueue = require("common.packages.spoke.runtime.tree_queue")
 
--- Oscillation guards: how many times a flush may go backwards in queue order
--- before the runtime decides it is looping and clears what is pending.
 local MAX_FLUSH_PASSES = 100
 
 local SpokeRuntime = {
@@ -41,8 +39,6 @@ function SpokeRuntime.next_timestamp()
   return timestamp
 end
 
--- Frame stack ----------------------------------------------------------------
-
 function SpokeRuntime.push(frame)
   return RuntimeFrames.push(SpokeRuntime, frame)
 end
@@ -58,8 +54,6 @@ end
 function SpokeRuntime.current_handle()
   return RuntimeFrames.current_handle(SpokeRuntime)
 end
-
--- Scheduling -----------------------------------------------------------------
 
 function SpokeRuntime.batch(fn)
   if type(fn) ~= "function" then
@@ -84,8 +78,6 @@ function SpokeRuntime._has_pending()
   return TreeQueue.has_live_head(SpokeRuntime._scheduled_trees)
 end
 
--- A tree may only flush inside a strictly higher layer than the one currently
--- flushing; a boosted tree is allowed to flush at its own layer.
 local function may_flush_tree(tree)
   if tree._bootstrapping then
     return false
@@ -138,8 +130,6 @@ function SpokeRuntime.tick_tree(tree)
   end
 end
 
--- Flushing -------------------------------------------------------------------
-
 local function abandon_flush(tree)
   SpokeRuntime._log(
     "SpokeRuntime exceeded oscillation limit; pending trees were cleared",
@@ -177,8 +167,6 @@ function SpokeRuntime.try_flush()
   SpokeRuntime._flush_depth = SpokeRuntime._flush_depth - 1
 end
 
--- Tests and host adapters may need to discard stale global scheduler state after
--- tearing down a whole embedding. Normal callers should not need this.
 function SpokeRuntime._reset_for_tests()
   SpokeRuntime.frames = {}
   SpokeRuntime._frame_aux = {}

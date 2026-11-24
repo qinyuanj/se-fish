@@ -2,22 +2,10 @@ local Epoch = require("common.packages.spoke.runtime.epoch")
 local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
 local DockSlots = require("common.packages.spoke.runtime.dock_slots")
 
--- Dock: an Epoch with a dynamic keyed child collection. Children can be attached
--- and detached at any time, outside the Init/Tick builder windows.
---
--- NOTE: In upstream C#, Dock keys are any object (the docs use game-entity
--- instances, e.g. dock.Effect(unit, Aura(unit))). spoke deliberately
--- restricts keys to non-empty strings to match Export/Import key semantics
--- (spec §3.8). When porting C# code that uses entity instances as keys,
--- assign each entity a stable string id (e.g. tostring(entity.id)) and use
--- that instead.
-
 local function identity(value)
   return value
 end
 
--- Guards raise at level 3 so the reported position is the caller of the Dock
--- method, not the guard itself.
 local function assert_key(key)
   if type(key) ~= "string" or key == "" then
     error("Dock keys must be non-empty strings", 3)
@@ -47,7 +35,6 @@ local Dock = Epoch.extend("Dock", {
     return nil
   end,
 
-  -- Replaces whatever the key held, then files the new epoch in the next slot.
   _install = function(self, key, epoch)
     self:drop(key)
     if DockSlots.should_compact(self) then
@@ -78,13 +65,6 @@ local Dock = Epoch.extend("Dock", {
     return result
   end,
 
-  -- Port of upstream DockExtensions.Dock.Effect: attach a keyed Effect whose
-  -- lifetime follows the Dock slot; calling under an existing key detaches the
-  -- previous effect first (via call -> drop). Argument shapes match
-  -- EffectBuilder:effect: (key, block [, triggers]) or
-  -- (key, name, block [, triggers]), with triggers as varargs or one array.
-  -- The reactive modules are required lazily to avoid a require cycle
-  -- (effect_builder requires dock).
   effect = function(self, a, b, ...)
     assert_key(a)
     local Effect = require("common.packages.spoke.reactive.effect")
@@ -108,8 +88,6 @@ local Dock = Epoch.extend("Dock", {
       return
     end
 
-    -- Detaching a child from inside its own frame has to wait for that frame
-    -- to pop, or the epoch would tear down under itself.
     local handle = child._frame_handle
     if handle and handle:is_alive() then
       handle:on_pop_self(function()
@@ -128,10 +106,6 @@ local Dock = Epoch.extend("Dock", {
 
   _refresh_coords = function(self)
     Epoch._refresh_coords(self)
-    -- Dock children live outside the attachment list; compact and renumber
-    -- them like upstream Compact(reindexAll: true) so coords stay packable
-    -- even when nested docks have holes (each _reindex refreshes the child
-    -- subtree's coords).
     DockSlots.compact(self, true)
   end,
 
