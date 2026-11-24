@@ -437,7 +437,7 @@ function FerryRoute.mount(world, opts)
     end
   end
 
-  local Actions = { board = "Board", Return = "ReturnBack" }
+  local Actions = { Board = "board", Return = "return_back" }
   function handle:Handle(player, payload)
     if self.disposed or not is_valid_player(player) or type(payload) ~= "table" then return false end
     local method = Actions[payload.action]

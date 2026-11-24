@@ -1,8 +1,8 @@
 local Behaviors = {}
 local methods = {
-    kingCrab = 'UpdateKingCrabCombat', crabBoss = 'UpdateCrabBossCombat',
-    swordfish = 'UpdateSwordfishCombat', shark = 'UpdateSharkCombat',
-    walrus = 'UpdateWalrusCombat', orca = 'UpdateOrcaCombat',
+    kingCrab = 'update_king_crab_combat', crabBoss = 'update_crab_boss_combat',
+    swordfish = 'update_swordfish_combat', shark = 'update_shark_combat',
+    walrus = 'update_walrus_combat', orca = 'update_orca_combat',
 }
 function Behaviors.Step(mgr, fish, now, pos, params, combat)
     if combat == 'shrimp' or combat == 'dragon' then
