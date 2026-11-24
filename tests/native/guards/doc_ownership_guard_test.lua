@@ -13,7 +13,6 @@ local CLASSES = {
   { name = '验收', patterns = { '^docs/acceptance/' } },
   { name = '操作', patterns = {
     '^docs/agents/',
-    '^docs/official%-batch%-art%-import%.md$',
   } },
   { name = '规格', patterns = { '^docs/GameSpec%.md$' } },
   { name = '架构', patterns = { '^docs/architecture%.md$' } },
