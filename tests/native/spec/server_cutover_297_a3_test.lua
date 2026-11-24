@@ -179,6 +179,7 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
 
     local created_units, dot_hits = {}, {}
     local rt = ServerRuntime.new({
+      bait_spots = { Enabled = false },
       initial_now = 100,
       create_unit = function(kind, props)
         local u = { Kind = kind, Parent = props.Parent, Destroyed = false }
@@ -313,10 +314,11 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
       saved = {
         game = rawget(_G, "game"),
         REUtil = rawget(_G, "REUtil"),
+        reutil = package.loaded["common.REUtil"],
         MgrUtil = rawget(_G, "MgrUtil"),
-        MgrPlayerData = rawget(_G, "MgrPlayerData"),
         Vector3 = rawget(_G, "Vector3"),
         Color = rawget(_G, "Color"),
+        RemoteEvent = rawget(_G, "RemoteEvent"),
         Debug = GameCfg.Debug,
         slot = GameCfg.Save.QaSlot,
       }
@@ -331,17 +333,18 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
       end
       _G.game = saved.game
       _G.REUtil = saved.REUtil
+      package.loaded["common.REUtil"] = saved.reutil
       _G.MgrUtil = saved.MgrUtil
-      _G.MgrPlayerData = saved.MgrPlayerData
       _G.Vector3 = saved.Vector3
       _G.Color = saved.Color
+      _G.RemoteEvent = saved.RemoteEvent
       GameCfg.Debug = saved.Debug
       GameCfg.Save.QaSlot = saved.slot
       saved = nil
       runtime = nil
     end)
 
-    it("真实运行 server/main.lua：ServerRuntime.current 就绪、OnSyncPlayerTree 驱动持竿、AttrBridge/ModifierBridge 含麻痹与活鱼 DoT 端到端生效", function()
+    it("真实运行 server/main.lua：ServerRuntime.current 就绪、PlayerDataHost 驱动持竿、AttrBridge/ModifierBridge 含麻痹与活鱼 DoT 端到端生效", function()
       local now = 200
       local tasks, values, created_units, errors, mgrs = {}, {}, {}, {}, {}
       local players_list = {}
@@ -366,6 +369,10 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
         end,
       }
 
+      _G.RemoteEvent = { New = function()
+        return { OnServerEvent = make_signal(), OnClientEvent = make_signal(),
+          FireServer = function() end, FireClient = function() end, FireAllClients = function() end }
+      end }
       _G.Vector3 = { New = function(x, y, z) return { x = x, y = y, z = z } end }
       _G.Color = { New = function(...) return { ... } end }
       _G.game = {
@@ -378,7 +385,7 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
             }
           end
           if name == "Players" then return players_service end
-          if name == "RunService" then return { Heartbeat = heartbeat, IsServer = function() return true end } end
+          if name == "RunService" then return { Heartbeat = heartbeat, IsServer = function() return true end, IsClient = function() return false end } end
           if name == "World" then
             return {
               GetServerTime = function() return now end,
@@ -404,7 +411,7 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
       }
       local re_map = {}
       local item_bar_pushes = {}
-      _G.REUtil = {
+      local remote_util = {
         CheckRECD = function() return false end,
         GetRE = function(_, name)
           if not re_map[name] then
@@ -475,6 +482,10 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
 
       local sandbox
       sandbox = setmetatable({
+        RemoteEvent = { New = function()
+          return { OnServerEvent = make_signal(), OnClientEvent = make_signal(),
+            FireServer = function() end, FireClient = function() end, FireAllClients = function() end }
+        end },
         print = function(...)
           local parts = { ... }
           if parts[1] == "[server.main]" then
@@ -482,6 +493,7 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
           end
         end,
         require = function(path)
+          if path == "common.REUtil" then return remote_util end
           if path == "server.MgrUtil" then return { Start = function() end } end
           if path == "common.ZoneMarkers" then return { Start = function() end } end
           if path == "server.packages.attr_rule.api" then return attr_api_stub end
@@ -493,22 +505,19 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
             end
             return mgrs._AbilityAPI
           end
-          local name = path:match("^server%.Mgr%.(.*)$")
-          if not name then return require(path) end
-          if not mgrs[name] then
-            if name == "MgrSave" or name == "MgrPlayerData" or name == "MgrVitals" or name == "MgrAbility" then
-              mgrs[name] = assert(loadfile("server/Mgr/" .. name .. ".lua", "t", sandbox))()
-            else
-              mgrs[name] = {}
-            end
+          if path == "server.SaveHost" or path == "server.PlayerDataHost" or path == "server.FishAbility" then
+            local name = path:match("([%w_]+)$")
+            if not mgrs[name] then mgrs[name] = assert(loadfile(path:gsub("%.", "/") .. ".lua", "t", sandbox))() end
+            return mgrs[name]
           end
-          return mgrs[name]
+          if path == "server.PlatformHost" then return {} end
+          return require(path)
         end,
       }, { __index = _G })
 
-      mgrs.MgrPkFilter = { Make = function() return function() return true end end }
-      mgrs.MgrSurvival = { Hooks = function() return {} end }
 
+      _G.REUtil = remote_util
+      package.loaded["common.REUtil"] = remote_util
       runtime = assert(loadfile("server/main.lua", "t", sandbox))()
       assert.are.equal(runtime, ServerRuntime.current())
       assert.is_not_nil(runtime:get_entity_modifiers())
@@ -542,32 +551,36 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
       -- 存档就绪首推经 PlayerTree 树底 on_item_bar_state 严格下发 1 次（无双发）
       assert.equals(1, #item_bar_pushes)
       assert.are.equal(p, item_bar_pushes[1].player)
+      local bait_unit_count = #created_units
+      assert.equals(#GameCfg.BaitSpots.Spots, bait_unit_count)
+      assert.equals(1, #re_map.ItemBarAction.OnServerEvent.handlers)
+      assert.is_function(runtime.platform.ShopAction)
 
-      -- 经 ItemBarAction 选中鱼竿 -> MgrPlayerData:SendItemBar -> OnSyncPlayerTree -> 树底合并推送（仅 +1 次，无双发）与 HeldRodLeaf 建点
       re_map.ItemBarAction.OnServerEvent:Fire(p, { action = "SelectSlot", value = 1 })
       assert.equals(2, #item_bar_pushes)
       assert.equals(1, item_bar_pushes[2].payload.selectedSlot)
-      assert.equals(2, #created_units)
-      assert.is_false(created_units[1].Destroyed)
-      assert.is_false(created_units[2].Destroyed)
+      assert.equals(bait_unit_count + 2, #created_units)
+      local rod_mount = created_units[bait_unit_count + 1]
+      local rod_model = created_units[bait_unit_count + 2]
+      assert.is_false(rod_mount.Destroyed)
+      assert.is_false(rod_model.Destroyed)
 
       -- RequestItemBar 主动拉取经 PlayerTree 强制推送 1 次
       re_map.RequestItemBar.OnServerEvent:Fire(p)
       assert.equals(3, #item_bar_pushes)
       assert.equals(1, item_bar_pushes[3].payload.selectedSlot)
 
-      -- 单次 SpokeRuntime.batch 内多次状态变更与 SendItemBar 调用最终只合并触发 1 次 ItemBarState:FireClient
       local before_batch_pushes = #item_bar_pushes
-      local data = mgrs.MgrPlayerData:GetDataInst(p)
+      local data = mgrs.PlayerDataHost:GetDataInst(p)
       SpokeRuntime.batch(function()
         pt:set_coin(888)
         pt:set_upgrade_level(1)
         data.Data.FishCoin = 888
         data.Data.UpgradeLevel = 1
         data.Data.SelectedSlot = nil
-        mgrs.MgrPlayerData:SendItemBar(p)
+        mgrs.PlayerDataHost:SyncPlayerTree(p)
         data.Data.FishCoin = 999
-        mgrs.MgrPlayerData:SendItemBar(p)
+        mgrs.PlayerDataHost:SyncPlayerTree(p)
       end)
       assert.equals(before_batch_pushes + 1, #item_bar_pushes)
       assert.equals(999, item_bar_pushes[#item_bar_pushes].payload.coin)
@@ -576,48 +589,46 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
       -- 重新选回鱼竿格以维持后续测试预期
       re_map.ItemBarAction.OnServerEvent:Fire(p, { action = "SelectSlot", value = 1 })
 
-      -- AttrBridge 经 MgrAbility / MgrVitals 真实生效
       data.Extra.growth.potions.item168 = 2
       data.Extra.growth.potions.item167 = 5
-      assert.is_true(mgrs.MgrAbility:ApplyGrowth(p).Ok)
-      assert.equals(420, mgrs.MgrVitals.MaxHealthProvider(p))
+      assert.is_true(mgrs.FishAbility:ApplyGrowth(p).Ok)
+      assert.equals(420, runtime.life:MaxHealthOf(p))
       assert.near(1.4, ch.scale, 1e-9)
       assert.near(10.5, c.WalkSpeed, 1e-9)
 
-      -- ModifierBridge：玩家麻痹阻塞 CanAct 与移速，Heartbeat 推进 0.5s 恢复
-      assert.is_true(mgrs.MgrAbility.Modifier:ApplyWeaponEffect(p, p, { Kind = "paralyze" }))
-      assert.is_false(mgrs.MgrVitals:CanAct(p))
+      assert.is_true(mgrs.FishAbility.Modifier:ApplyWeaponEffect(p, ch, { Kind = "paralyze" }))
+      assert.is_false(runtime.life:CanAct(p))
       assert.equals(0, c.WalkSpeed)
       now = now + 0.5
       heartbeat:Fire(0.5)
-      assert.is_true(mgrs.MgrVitals:CanAct(p))
+      assert.is_true(runtime.life:CanAct(p))
       assert.near(10.5, c.WalkSpeed, 1e-9)
 
       -- ModifierBridge：活鱼挂毒经 Heartbeat 推进触发 MgrVitals:ApplyHit DoT
       local dot_hits = {}
-      local orig_apply_hit = mgrs.MgrVitals.ApplyHit
-      mgrs.MgrVitals.ApplyHit = function(self, hit, target, amount)
+      local orig_apply_hit = runtime.life.ApplyHit
+      runtime.life.ApplyHit = function(self, hit, target, amount)
         dot_hits[#dot_hits + 1] = { target = target, amount = amount, category = hit.category }
         return true
       end
       local fish_body = make_character("MainFish", 5)
       local fish = { Id = 88, Carrier = { Receiver = fish_body, Dead = false } }
-      assert.is_true(mgrs.MgrWeapon.Modifier:ApplyWeaponEffect(p, fish, { Kind = "poison" }))
+      assert.is_true(runtime:get_entity_modifiers():apply_weapon_effect(p, fish, { Kind = "poison" }))
       now = now + 1.0
       heartbeat:Fire(1.0)
       assert.equals(1, #dot_hits)
       assert.are.equal(fish, dot_hits[1].target)
       assert.equals("dot", dot_hits[1].category)
-      mgrs.MgrVitals.ApplyHit = orig_apply_hit
+      runtime.life.ApplyHit = orig_apply_hit
 
       -- 离场后：连接断开、左手持竿销毁、活鱼毒效果按来源清理
       players_service.PlayerRemoving:Fire(p)
       drain()
       assert.is_nil(runtime:get_player_tree(9101))
       assert.equals(0, #p.CharacterAdded.handlers)
-      assert.is_true(created_units[1].Destroyed)
-      assert.is_true(created_units[2].Destroyed)
-      assert.equals(0, mgrs.MgrAbility.Modifier:GetRemaining(fish, "poison"))
+      assert.is_true(rod_mount.Destroyed)
+      assert.is_true(rod_model.Destroyed)
+      assert.equals(0, mgrs.FishAbility.Modifier:GetRemaining(fish, "poison"))
     end)
   end)
 end)

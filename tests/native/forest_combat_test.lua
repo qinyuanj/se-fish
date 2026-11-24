@@ -67,7 +67,7 @@ describe('TestForestCombat', function()
             _G.print = savedPrint
             assert.is_true(ok, tostring(err))
             local text = table.concat(lines, '\n')
-            assert.matches('[MgrFishUnit]', text, nil, true)
+            assert.matches('[FishTree]', text, nil, true)
             assert.matches('追击位移失败', text, nil, true)
             assert.matches('fish=' .. tostring(fish.Id), text, nil, true)
             assert.matches('position-write-failed', text, nil, true)

@@ -15,6 +15,9 @@
 -- 模块缓存（package.loaded 的 MgrFishUnit 与 common.REUtil）与配置（GameCfg.Debug）逐例恢复，
 -- after_each 对未完成的 before_each 幂等。describe 顺序沿用旧执行序（类名字典序）。
 local GameCfg = require('common.GameCfg')
+local ClientStore = require('client.Store.ClientStore')
+local RootView = require('client.Views.RootView')
+local AttackView = require('client.Views.AttackView')
 
 local function signal()
     local callbacks = {}
@@ -37,7 +40,7 @@ describe('TestFishStatusGate', function()
 
     before_each(function()
         ctx = { saved = { game = rawget(_G, 'game'), Vector3 = rawget(_G, 'Vector3'),
-            unit = package.loaded['server.Mgr.MgrFishUnit'] } }
+            unit = package.loaded['server.World.FishTree'] } }
         ctx.now = 10
         local state = ctx
         _G.Vector3 = { New = vec }
@@ -46,8 +49,8 @@ describe('TestFishStatusGate', function()
             if name == 'Players' then return { GetPlayers = function() return {} end } end
             return {}
         end }
-        package.loaded['server.Mgr.MgrFishUnit'] = nil
-        ctx.mgr = assert(loadfile('server/Mgr/MgrFishUnit.lua'))()
+        package.loaded['server.World.FishTree'] = nil
+        ctx.mgr = assert(loadfile('server/World/FishTree.lua'))()
         ctx.factor, ctx.paralyzed = 1, false
         ctx.mgr.Ability = {
             FishSpeedFactor = function() return state.factor end,
@@ -60,7 +63,7 @@ describe('TestFishStatusGate', function()
         if ctx and ctx.saved then
             _G.game = ctx.saved.game
             _G.Vector3 = ctx.saved.Vector3
-            package.loaded['server.Mgr.MgrFishUnit'] = ctx.saved.unit
+            package.loaded['server.World.FishTree'] = ctx.saved.unit
         end
     end)
 
@@ -125,7 +128,7 @@ describe('TestPrizeGrowthPotion', function()
     before_each(function()
         ctx = { debug = GameCfg.Debug, oldREUtil = _G.REUtil, events = {}, growth = {}, bodyOnly = {} }
         local state = ctx
-        ctx.mgr = require('server.Mgr.MgrPlayerData')
+        ctx.mgr = require('server.PlayerDataHost')
         GameCfg.Debug = { Enabled = false }
         _G.REUtil = { CheckRECD = function() return false end, GetRE = function(_, name)
             if not state.events[name] then
@@ -224,14 +227,12 @@ describe('TestPrizeGrowthWiring', function()
         local file = assert(io.open('server/main.lua', 'r'))
         local src = file:read('*a')
         file:close()
-        assert.matches('MgrMap.MgrAbility.PlayerData = MgrMap.MgrPlayerData', src, nil, true)
-        assert.matches('MgrMap.MgrAbility.Survival = MgrMap.MgrSurvival', src, nil, true)
-        assert.matches('MgrMap.MgrSurvival.SpeedWriter = MgrMap.MgrAbility', src, nil, true)
-        assert.matches('MgrMap.MgrWeapon.Modifier = ModifierBridge', src, nil, true)
-        assert.matches('MgrMap.MgrVitals.ActGuard = function(player)', src, nil, true)
-        assert.matches('not MgrMap.MgrAbility:IsParalyzed(player)', src, nil, true)
-        assert.matches('MgrMap.MgrVitals.MaxHealthProvider = function(player)', src, nil, true)
-        assert.matches('AttrBridge:MaxHealth(player)', src, nil, true)
+        assert.matches('player_data = PlayerDataHost', src, nil, true)
+        assert.matches('fish_ability = FishAbility', src, nil, true)
+        assert.matches('bind_weapon_action = function(dispatch)', src, nil, true)
+        assert.matches('modifier_leaf = { modifier_api = modifierPackageApi }', src, nil, true)
+        assert.matches('entity_modifiers = {', src, nil, true)
+        assert.matches('fishHost.Vitals = WorldRuntime.life', src, nil, true)
     end)
 end)
 
@@ -242,33 +243,67 @@ describe('TestPrizeRocketInput', function()
     -- 旧案例在测试体末尾手工还原 game/REUtil；断言失败会跳过还原。
     -- 逐例 before_each/after_each 后，替换的全局无论成败都恢复。
     before_each(function()
-        ctx = { oldGame = _G.game, oldRE = _G.REUtil, now = 0, requests = {} }
+        ctx = { oldGame = _G.game, oldRE = _G.REUtil, now = 0, requests = {}, nodes = {} }
+        ctx.heartbeat = signal()
         local state = ctx
         _G.game = { GetService = function(_, name)
             if name == 'World' then return { GetServerTime = function() return state.now end } end
+            if name == 'RunService' then return { Heartbeat = state.heartbeat } end
             if name == 'Players' then return { LocalPlayer = { Character = {} } } end
         end }
-        _G.REUtil = { GetRE = function() return { FireServer = function(_, p)
-            state.requests[#state.requests + 1] = p.action end } end }
-        ctx.button = assert(loadfile('client/LocalAttackButton.lua'))()
-        ctx.button.Gesture = require('client.PressGesture').New({ LongPressSec = 0.5 })
-        ctx.button.Root, ctx.button.Container, ctx.button.IsOpen = { Visible = true }, { Visible = true }, true
-        ctx.button:SetEquipped({ selectedWeapon = 'item166', weapons = { item166 = 1 } })
+        local store, writer = ClientStore.new({ initial_now = 0 })
+        state.writer = writer
+        writer:set_hud_visible(true)
+        local root = { Name = 'UIRoot', Destroying = signal(), Children = {},
+            FindFirstChild = function(_, name) return state.nodes[name] end }
+        ctx.view = RootView.mount(root, store, {
+            services = {
+                send_weapon = function(payload)
+                    state.requests[#state.requests + 1] = payload.action
+                end,
+                now = function() return state.now end,
+            },
+            create_node = function(_, props)
+                local node = {
+                    Name = props and props.Name,
+                    Parent = props and props.Parent,
+                    Text = props and (props.Text or props.ButtonText) or '',
+                    OnTouchBegan = signal(),
+                    OnTouchEnded = signal(),
+                    OnClicked = signal(),
+                    TouchEnabled = false,
+                    Visible = true,
+                }
+                state.nodes[node.Name] = node
+                if node.Parent and node.Parent.Children then node.Parent.Children[node.Name] = node end
+                return node
+            end,
+            hud = { AttackView.spec() },
+        })
+        writer:ingest_event('ItemBarState', {
+            weapons = { item166 = 1 },
+            held = { kind = 'weapon', id = 'item166' },
+            slots = {},
+        })
     end)
 
     after_each(function()
-        if ctx then
-            _G.game, _G.REUtil = ctx.oldGame, ctx.oldRE
-        end
+        if ctx and ctx.view then ctx.view:dispose() end
+        if ctx then _G.game, _G.REUtil = ctx.oldGame, ctx.oldRE end
     end)
 
     it('test_long_press_rocket_requests_repeated_attacks', function()
-        ctx.button:OnPressBegin()
-        ctx.button:Tick()
-        ctx.now = 0.9; ctx.button:Tick()
-        ctx.now = 1; ctx.button:Tick()
-        ctx.now = 2; ctx.button:Tick()
-        ctx.button:OnPressEnd()
+        ctx.nodes.BtnAttack.OnTouchBegan:Fire()
+        local function tick(now)
+            ctx.now = now
+            ctx.writer:step_clock(0, now)
+        end
+        tick(0)
+        tick(0.9)
+        tick(1)
+        tick(2)
+        ctx.nodes.BtnAttack.OnTouchEnded:Fire()
+        assert.same(1, GameCfg.Ability.Guns.item166.IntervalSec)
         assert.same({ 'attack', 'attack', 'attack' }, ctx.requests)
     end)
 end)
@@ -278,57 +313,49 @@ describe('TestWeakSpeedRouting', function()
     local ctx
 
     before_each(function()
-        ctx = { savedGame = rawget(_G, 'game'), now = 50, refreshes = {} }
-        local state = ctx
-        _G.game = { GetService = function(_, name)
-            if name == 'World' then return { GetServerTime = function() return state.now end } end
-            return {}
-        end }
-        -- REUtil 顶层按 RunService 注册服务端事件；单独跑本文件时用最小桩，不依赖其他用例先加载
-        ctx.savedRE = package.loaded['common.REUtil']
-        package.loaded['common.REUtil'] = ctx.savedRE or { GetRE = function()
-            return { OnServerEvent = signal(), FireClient = function() end } end,
-            CheckRECD = function() return false end }
-        ctx.s = assert(loadfile('server/Mgr/MgrSurvival.lua'))()
-        require('tests.support.modifier_runtime').AttachSurvival(ctx.s, function() return state.now end)
-        ctx.controller = { WalkSpeed = 21 } -- 已吃 20 个加速
-        ctx.player = { UserId = 13962, Character = { Controller = ctx.controller } }
-        ctx.state = { player = ctx.player, phase = 'alive' }
-        ctx.s.States[ctx.player.UserId] = ctx.state
-        ctx.s.SpeedWriter = { RefreshMoveSpeed = function(_, player)
-            local st = state.s:GetState(player)
-            state.refreshes[#state.refreshes + 1] = { player = player, weak = state.s.Modifier:GetRemaining(player, 'weak') > 0 }
-        end }
+        ctx = { refreshes = {} }
+        ctx.controller = { WalkSpeed = 21,
+            Health = 300, MaxHealth = 300,
+            HealthChanged = signal(), Died = signal() }
+        ctx.player = { UserId = 13962, attrs = {},
+            CharacterAdded = signal(), CharacterRemoving = signal(),
+            Character = { Controller = ctx.controller },
+            SetAttribute = function(self, key, value) self.attrs[key] = value end,
+            GetAttribute = function(self, key) return self.attrs[key] end }
+        ctx.host = require('tests.support.life_host').start({
+            now = 50,
+            speed_writer = function(player, speed)
+                ctx.refreshes[#ctx.refreshes + 1] = { player = player, speed = speed }
+            end,
+        })
+        ctx.host:add(ctx.player)
+        ctx.tree = ctx.host:tree(ctx.player)
     end)
 
     after_each(function()
-        if ctx then
-            _G.game = ctx.savedGame
-            package.loaded['common.REUtil'] = ctx.savedRE
-        end
+        if ctx and ctx.host then ctx.host:shutdown() end
     end)
 
-    -- 虚弱进出都走唯一写口，且退出时先清标记再重算
     it('test_weak_enter_and_exit_route_to_single_writer', function()
-        ctx.s:ApplyWeak(ctx.state, 60)
-        assert.same({ { player = ctx.player, weak = true } }, ctx.refreshes)
-        assert.message('Survival 不再私写 WalkSpeed').same(21, ctx.controller.WalkSpeed)
-        ctx.s:ClearWeak(ctx.state)
-        assert.same(3, #ctx.refreshes)
-        assert.message('退出虚弱先清标记再重算，否则唯一计算口仍按虚弱算').is_false(ctx.refreshes[2].weak)
-        assert.same(21, ctx.controller.WalkSpeed)
-        assert.is_nil(ctx.state.weakUntil)
+        assert.is_true(ctx.tree:apply_modifier('weak', { duration = 60 }) == true)
+        assert.same(ctx.player, ctx.refreshes[1].player)
+        assert.near(10.5, ctx.controller.WalkSpeed, 1e-8)
+        ctx.tree:clear_modifier('weak')
+        assert.is_true(#ctx.refreshes >= 2)
+        assert.near(21, ctx.controller.WalkSpeed, 1e-8)
+        assert.equals(0, ctx.tree:get_modifier_remaining('weak'))
     end)
 
-    -- 缺速度写口仍只创建官方效果；不启用旧半速兜底。
     it('test_without_writer_keeps_modifier_as_single_state_owner', function()
-        ctx.s.SpeedWriter = nil
-        ctx.s.Modifier.Ability = nil
-        ctx.s:ApplyWeak(ctx.state, 60)
-        assert.same(60, ctx.s.Modifier:GetRemaining(ctx.player, 'weak'))
-        assert.same(21, ctx.controller.WalkSpeed)
-        ctx.s:ClearWeak(ctx.state)
-        assert.same(0, ctx.s.Modifier:GetRemaining(ctx.player, 'weak'))
-        assert.same(21, ctx.controller.WalkSpeed)
+        ctx.host:shutdown()
+        ctx.host = require('tests.support.life_host').start({ now = 50 })
+        ctx.host:add(ctx.player)
+        ctx.tree = ctx.host:tree(ctx.player)
+        assert.is_true(ctx.tree:apply_modifier('weak', { duration = 60 }) == true)
+        assert.is_true(ctx.tree:get_modifier_remaining('weak') > 59)
+        assert.near(10.5, ctx.controller.WalkSpeed, 1e-8)
+        ctx.tree:clear_modifier('weak')
+        assert.equals(0, ctx.tree:get_modifier_remaining('weak'))
+        assert.near(21, ctx.controller.WalkSpeed, 1e-8)
     end)
 end)

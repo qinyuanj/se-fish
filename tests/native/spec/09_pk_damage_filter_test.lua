@@ -20,9 +20,8 @@ local function signal()
 end
 
 local WIRING = {
-  'MgrMap.MgrVitals.DamageFilter = makePkDamageFilter()',
-  'MgrMap.MgrVitals.Party = MgrMap.MgrParty',
-  'MgrMap.MgrVitals.ZoneMarkers = ZoneMarkers',
+  'bind_party_action = function(dispatch)',
+  'bind_party_state_request = function(dispatch)',
 }
 
 local function assert_wiring()
@@ -69,8 +68,7 @@ describe('条款 9 PK 伤害过滤', function()
   local function join(userId, position)
     local player = newPlayer(userId, position)
     env.players:OnPlayerAdded(player)
-    env.party:OnPlayerAdded(player)
-    env.vitals:OnPlayerAdded(player)
+    env.lifeHost:add(player)
     drain()
     return player
   end
@@ -134,19 +132,23 @@ describe('条款 9 PK 伤害过滤', function()
     -- 真区域解析：鱼塘边界来自与生产同一条 ZoneMarkers 路径，不写死坐标。
     env.zones = assert(loadfile('tests/support/zone_fixtures.lua'))()
     env.cfg = env.zones.Load()
-    env.party = assert(loadfile('server/Mgr/MgrParty.lua'))()
-    env.vitals = assert(loadfile('server/Mgr/MgrVitals.lua'))()
-    env.players = assert(loadfile('server/Mgr/MgrPlayerData.lua'))()
-    env.save = assert(loadfile('server/Mgr/MgrSave.lua'))()
+    env.party = {}
+    function env.party:SameParty(a, b)
+      local squad = env.lifeHost and env.lifeHost.runtime.world.squad
+      return squad and squad:SameParty(a, b) or false
+    end
+    env.lifeHost = require('tests.support.life_host').start({ now = 0, remote = re })
+    env.vitals = env.lifeHost.runtime.life
+    env.players = assert(loadfile('server/PlayerDataHost.lua'))()
+    env.save = assert(loadfile('server/SaveHost.lua'))()
     env.players.Save, env.save.PlayerData = env.save, env.players
-    env.party.PlayerData, env.party.Save, env.party.Vitals = env.players, env.save, env.vitals
-    env.filter = assert(loadfile('server/Mgr/MgrPkFilter.lua'))().Make()
+    env.filter = require('server.World.PkDamageFilter').make({
+      party = env.party, zone_markers = require('common.ZoneMarkers'), zones = env.cfg.Zones,
+    })
     -- 生产装配：过滤接缝与区域真源都经 mgr 注入，不缓存队伍归属。
     env.vitals.Party = env.party
     env.vitals.ZoneMarkers = require('common.ZoneMarkers')
-    env.vitals.DamageFilter = function(hit, target, mgr) return env.filter(hit, target, mgr) end
-    env.vitals.DamagePublisher = function() end
-    env.vitals.Now = function() return env.now end
+    env.vitals:SetDamageFilter(function(hit, target, mgr) return env.filter(hit, target, mgr) end)
     -- 9-12（review #249）：武器管理器照 main.lua 的接线装进同一套环境（伤害仍只经统一入口）。
     -- AbilityAPI 在装载时要引擎的 RemoteEvent 全局：补替身并清模块缓存，避免复用别的用例的上下文。
     env.remoteEvent, env.abilityModule, env.swingModule =
@@ -155,14 +157,17 @@ describe('条款 9 PK 伤害过滤', function()
       return { OnServerEvent = { Connect = function() return { Disconnect = function() end } end } }
     end }
     package.loaded['server.AbilityAPI'], package.loaded['server.SwingRegistry'] = nil, nil
-    env.weapon = assert(loadfile('server/Mgr/MgrWeapon.lua'))()
-    env.weapon.Vitals = env.vitals
-    env.weapon.Attr = { WeaponDamageScale = function() return 1 end }
-    env.weapon.PlayerData = { GetDataInst = function() return {} end }
-    env.weapon.Now = function() return env.now end
-    env.weapon.Vec3 = function(x, y, z) return vec(x, y, z) end
-    env.party:Start()
-    env.vitals:Start()
+    env.weapon = {
+      AttackGun = function(_, player, weapon_id, _, _, aim)
+        local tree = env.lifeHost.runtime:get_player_tree(player.UserId)
+        tree:sync_from_data({
+          Player = player, Inited = true, LoadState = 'ready',
+          Data = { FishCoin = 0, Zone = 'fishPond', Weapons = { [weapon_id] = 1 }, Containers = {} },
+          Extra = { growth = { potions = {}, upgrades = {} }, inventory = { selection = { held = { kind = 'weapon', id = weapon_id } } }, survival = {} },
+        })
+        return env.lifeHost.runtime.life:WeaponAction(player, { action = 'attack', aim = aim })
+      end,
+    }
   end)
 
   after_each(function()
@@ -216,6 +221,7 @@ describe('条款 9 PK 伤害过滤', function()
     request(a, 'Leave', {})
     assert.is_false(env.party:SameParty(a, b))
     env.now = env.now + gun.IntervalSec + 1
+    env.lifeHost.runtime.clock:advance(gun.IntervalSec + 1)
     env.weapon:AttackGun(a, 'item137', gun, {}, vec(1, 0, 0))
     assert.same(300 - gun.Damage, b.Character.Controller.Health, '离队后同一把枪照常结算')
   end)
@@ -256,7 +262,7 @@ describe('条款 9 PK 伤害过滤', function()
     assert.same(245, b.Character.Controller.Health)
     local logged = false
     for _, line in ipairs(printed) do
-      if line:find('MgrPkFilter', 1, true) then logged = true end
+      if line:find('PkDamageFilter', 1, true) then logged = true end
     end
     assert.is_true(logged, '区域缺失的放行兜底要留下日志')
   end)

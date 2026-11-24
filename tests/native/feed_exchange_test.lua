@@ -10,45 +10,33 @@
 --   4. 扣除与发放不同步：信物扣了产物没发，或发了产物信物还在；金币被兑换改动；
 --   5. 拒绝时缺提示（reason 不是 'full'），或成功回包缺兑换双方，客户端无法给兑换提示；
 --   6. 兑换成功不播吃动作、不推送库存；未选中的信物被误当兑换物。
-local function vec(x, y, z) return { x = x, y = y, z = z } end
+local GameCfg = require('common.GameCfg')
+local Host = require('tests.support.shop_feed_host')
 
 describe("喂钓鱼佬的信物兑换", function()
     local ctx
 
     -- 与旧 LuaUnit 的每例 setUp/tearDown 同级成对。
     before_each(function()
-        ctx = { attrs = {}, plays = {}, synced = {}, replies = {}, seq = 0 }
-        ctx.savedGame = _G.game
-        ctx.savedCfg = package.loaded['common.GameCfg']
-        -- 换一份私有配置副本：用例改 Debug 不污染其它 spec。
-        ctx.cfg = require('tests.support.zone_fixtures').Load()
-        -- 关掉进图白送，库存完全由用例自己摆
-        ctx.cfg.Debug = { Enabled = false }
-        local PlayerData = assert(loadfile('server/Data/PlayerData.lua'))()
-        ctx.player = { UserId = 1, Character = { Position = vec(3, 1, 3) },
-            SetAttribute = function(_, k, v) ctx.attrs[k] = v end }
-        ctx.data = PlayerData.New(ctx.player, function() ctx.published = (ctx.published or 0) + 1 end)
-        ctx.data:Init()
-        ctx.anchor = { Name = 'TGUnitFish', Position = vec(0, 6, 0),
-            PlayAnimation = function(_, name) ctx.plays[#ctx.plays + 1] = name end }
-        ctx.mgr = assert(loadfile('server/Mgr/MgrInteract.lua'))()
-        ctx.mgr.FindAnchor = function(_, name) return name == 'TGUnitFish' and ctx.anchor or nil end
-        ctx.mgr.PlayerData = {
-            GetDataInst = function(_, p) return p == ctx.player and ctx.data or nil end,
-            SendItemBar = function(_, p) ctx.synced[#ctx.synced + 1] = p end,
-        }
-        ctx.mgr.Reply = function(_, p, payload) ctx.replies[#ctx.replies + 1] = { player = p, payload = payload } end
+        ctx = { seq = 0 }
+        ctx.cfg = GameCfg
+        ctx.host = Host.start()
+        ctx.player, ctx.data = ctx.host:join(1, GameCfg.Interact.Fishermen[1].AnchorNames[1])
+        ctx.replies = ctx.host.results[1].InteractResult
+        ctx.anchor = ctx.host.anchors[GameCfg.Interact.Fishermen[1].AnchorNames[1]]
+        ctx.anchor.plays = {}
+        ctx.plays = ctx.anchor.plays
     end)
 
     -- 配置模块缓存与全局逐例恢复；setUp 中途失败也照样清理。
     after_each(function()
-        package.loaded['common.GameCfg'] = ctx.savedCfg
-        _G.game = ctx.savedGame
+        ctx.host:shutdown()
     end)
 
     local function feed()
         ctx.seq = ctx.seq + 1
-        return ctx.mgr:Handle(ctx.player, { target = 'fisherman', action = 'Feed', seq = ctx.seq })
+        local reply = ctx.host:act(ctx.player, 'InteractAction', { target = 'fisherman', action = 'Feed', seq = ctx.seq })
+        return reply and reply.ok or false
     end
 
     -- 放入物品并返回它实际落在的容器与下标。
@@ -92,11 +80,11 @@ describe("喂钓鱼佬的信物兑换", function()
         assert.same(0, countItem('eelHead'))
         assert.same(1, countItem('duck'))
         assert.same(0, ctx.data.Data.FishCoin)
-        assert.same(0, ctx.attrs.FishCoin)
+        assert.same(0, ctx.player.attrs.FishCoin)
         assert.is_nil(ctx.data.Data.SelectedSlot)
-        assert.same({ ctx.player }, ctx.synced)
+        assert.same(1, ctx.host.sync_counts[1])
         assert.same({ ctx.cfg.Interact.Fisherman.EatAnimation }, ctx.plays)
-        local reply = ctx.replies[#ctx.replies].payload
+        local reply = ctx.replies[#ctx.replies]
         assert.is_true(reply.ok)
         assert.is_nil(reply.coins)
         assert.same({ from = 'eelHead', to = 'duck' }, reply.exchange)
@@ -114,7 +102,7 @@ describe("喂钓鱼佬的信物兑换", function()
         assert.same({ ctx.cfg.Interact.Fisherman.EatAnimation }, ctx.plays)
         local bar = ctx.data.Data.Containers.itemBar
         assert.same('duck', bar[slot] and bar[slot].itemId, '产物落进本次交付释放出的格')
-        assert.same({ from = 'eelHead', to = 'duck' }, ctx.replies[#ctx.replies].payload.exchange)
+        assert.same({ from = 'eelHead', to = 'duck' }, ctx.replies[#ctx.replies].exchange)
     end)
 
     it("test_gar_head_exchanges_for_one_shrimp_ticket", function()
@@ -124,7 +112,7 @@ describe("喂钓鱼佬的信物兑换", function()
         assert.same(0, countItem('garHead'))
         assert.same(1, countItem('shrimpTicket'))
         assert.same(0, ctx.data.Data.FishCoin)
-        assert.same({ from = 'garHead', to = 'shrimpTicket' }, ctx.replies[#ctx.replies].payload.exchange)
+        assert.same({ from = 'garHead', to = 'shrimpTicket' }, ctx.replies[#ctx.replies].exchange)
     end)
 
     -- 信物扣掉后它自己的格就是第一个空格，产物落在那里（与 AddItem「优先填道具栏」一致）

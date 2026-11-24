@@ -9,19 +9,25 @@
 -- 6. Snapshot 只回读本地成就与送达标记；平台ID缺失时只能记为缺证。
 -- Cleanup(id) 仅清本探针创建的鱼；测试过程中原有主循环持续运行。
 local Probe={Owned={}}
-local Fish=require('server.Mgr.MgrFishUnit')
-local Data=require('server.Mgr.MgrPlayerData')
+local ServerRuntime=require('server.World.ServerRuntime')
+local FishTree=require('server.World.FishTree')
+local Data=require('server.PlayerDataHost')
 local Cfg=require('common.GameCfg')
+local function fishHost()
+    local runtime=ServerRuntime.current and ServerRuntime.current()
+    return (runtime and runtime.fish_host) or FishTree
+end
 local function point(unit)
     if not unit then return nil end
     local p=unit.Position
     return p and {x=p.x,y=p.y,z=p.z}
 end
 local function log(action,id)
-    print('[volcano_probe]',action,'fish='..tostring(id),'at='..tostring(Fish:Now()))
+    print('[volcano_probe]',action,'fish='..tostring(id),'at='..tostring(fishHost():Now()))
 end
 
 function Probe.Spawn(player,species,isolated)
+    local Fish=fishHost()
     assert(isolated==true,'必须明确使用独立验收会话')
     assert(species=='fish55Elite' or species=='fish56Boss','只允许火山岛战斗目标')
     assert(player and player.Character and not Fish:GetHeld(player),'需要在线空手玩家')
@@ -35,6 +41,7 @@ function Probe.Spawn(player,species,isolated)
 end
 
 function Probe.Drop(player,id)
+    local Fish=fishHost()
     local fish=assert(Probe.Owned[id],'不是探针创建的鱼')
     assert(Fish:GetHeld(player)==fish,'原生抓举尚未确认')
     assert(Fish:Drop(player),'放下失败')
@@ -42,6 +49,7 @@ function Probe.Drop(player,id)
 end
 
 function Probe.Damage(id,amount)
+    local Fish=fishHost()
     local fish=assert(Probe.Owned[id],'不是探针创建的鱼')
     assert(Fish.Fish[id]==fish and amount>0 and amount==math.floor(amount),'目标或伤害无效')
     fish.Carrier.Receiver.Controller:TakeDamage(amount)
@@ -49,6 +57,7 @@ function Probe.Damage(id,amount)
 end
 
 function Probe.Snapshot(player,id)
+    local Fish=fishHost()
     local fish=Probe.Owned[id]
     local data=Data:GetDataInst(player)
     local result={at=Fish:Now(),exists=fish~=nil and Fish.Fish[id]==fish,
@@ -69,6 +78,7 @@ function Probe.Snapshot(player,id)
 end
 
 function Probe.Cleanup(id)
+    local Fish=fishHost()
     local fish=Probe.Owned[id]
     if fish and Fish.Fish[id]==fish then Fish:Remove(fish) end
     Probe.Owned[id]=nil

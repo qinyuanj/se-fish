@@ -95,46 +95,43 @@ end
 describe("TestModifierProbe", function()
   -- 失败方式：角色空窗镜像丢 Carry；退出重进扣离线时长；重建双计时。
   it("test_character_gap_mirrors_weak_and_leave_rejoin_preserves_online_remaining", function()
-    business(function(e, mgr, player)
-      local mark = {}
-      local env = setmetatable({ game = e.game, require = function(name)
-        if name == 'common.REUtil' then return { GetRE = function() return { FireClient = function() end } end } end
-        return require(name)
-      end }, { __index = _G })
-      local survival = assert(loadfile('server/Mgr/MgrSurvival.lua', 't', env))()
-      survival.Modifier = mgr
-      survival.PlayerData = { GetDataInst = function() return { Extra = { survival = mark } } end }
-      survival:OnPlayerAdded(player)
-      assert.is_true(survival:ApplyWeak(survival:GetState(player), 40))
-      e.wait(10)
-      mgr:OnCharacterRemoving(player)
-      player.Character:Destroy()
-      player.Character = nil
-      survival:Update()
-      assert.are.equal(30, mark.weakRemaining)
-      e.wait(20)
-      survival:Update()
-      survival:BeforeLeave(player)
-      assert.are.equal(30, mark.weakRemaining)
-      survival:OnPlayerRemoving(player)
-      mgr:OnPlayerRemoving(player)
-      assert.are.equal(0, mgr:GetRemaining(player, 'weak'))
-      e.wait(100)
-      player.Character = e.unit('rejoined-character')
-      mgr:OnPlayerAdded(player)
-      survival:OnPlayerAdded(player)
-      assert.are.equal(30, mgr:GetRemaining(player, 'weak'))
-      e.wait(5)
-      mgr:OnCharacterRemoving(player)
-      player.Character:Destroy()
-      player.Character = e.unit('rebuilt-character')
-      mgr:OnCharacterAdded(player)
-      assert.are.equal(25, mgr:GetRemaining(player, 'weak'))
-      e.wait(25)
-      survival:Update()
-      assert.are.equal(0, mgr:GetRemaining(player, 'weak'))
-      assert.are.equal(0, mark.weakRemaining)
-    end)
+    local host = require('tests.support.life_host').start({ now = 100 })
+    local player = host.player and nil
+    player = require('tests.support.life_host').player(52001)
+    local data = host:add(player)
+    local tree = host:tree(player)
+    local applied = tree:apply_modifier('weak', { duration = 40 })
+    assert.is_true(applied == true)
+    host:advance(10)
+    player.CharacterRemoving:Fire(player.Character)
+    player.Character = nil
+    host:advance(0)
+    local frozen = tree:get_modifier_remaining('weak')
+    assert.is_true(frozen <= 30 and frozen > 29)
+    host:advance(20)
+    assert.is_true(tree:get_modifier_remaining('weak') <= 30 and tree:get_modifier_remaining('weak') > 29)
+    host:remove(player)
+    local mark = data.Extra.survival
+    assert.is_true(mark.weakRemaining >= 30 and mark.weakRemaining <= 31)
+    host:advance(100)
+    player.Character = { Controller = { Health = 300, MaxHealth = 300, WalkSpeed = 16,
+      HealthChanged = require('tests.support.life_host').signal(),
+      Died = require('tests.support.life_host').signal() } }
+    host:add(player, data)
+    local again = host:tree(player)
+    local remaining = again:get_modifier_remaining('weak')
+    assert.is_true(remaining <= 30 and remaining > 29)
+    host:advance(5)
+    player.CharacterRemoving:Fire(player.Character)
+    player.Character = { Controller = { Health = 300, MaxHealth = 300, WalkSpeed = 16,
+      HealthChanged = require('tests.support.life_host').signal(),
+      Died = require('tests.support.life_host').signal() } }
+    player.CharacterAdded:Fire(player.Character)
+    local rebuilt = again:get_modifier_remaining('weak')
+    assert.is_true(rebuilt <= 25 and rebuilt > 24)
+    host:advance(25)
+    assert.equals(0, again:get_modifier_remaining('weak'))
+    host:shutdown()
   end)
 
   it("test_character_removal_snapshots_weak_before_old_owner_destruction", function()

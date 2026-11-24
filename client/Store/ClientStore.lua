@@ -141,7 +141,8 @@ local function position_equals(a, b)
   if a == b then
     return true
   end
-  if type(a) ~= "table" or type(b) ~= "table" then
+  local ta, tb = type(a), type(b)
+  if (ta ~= "table" and ta ~= "userdata") or (tb ~= "table" and tb ~= "userdata") then
     return false
   end
   return a.x == b.x and a.y == b.y and a.z == b.z
@@ -195,7 +196,7 @@ local function sanitize_position(pos)
   if type(pos) ~= "table" and type(pos) ~= "userdata" then
     return nil, false
   end
-  local ok, x, y, z = pcall(function()
+  local ok, x, y, z = pcall(function() -- 兼容引擎 Vector3 userdata 瞬态坐标读取，异常视为无效位置
     return pos.x, pos.y, pos.z
   end)
   if not ok then
@@ -265,11 +266,15 @@ local function normalize_party(payload)
     if member.maxHealth ~= nil and not Number.IsFiniteNumber(member.maxHealth) then
       return nil
     end
+    if member.phase ~= nil and not VALID_SURVIVAL_PHASES[member.phase] then
+      return nil
+    end
     members[i] = {
       userId = member.userId,
       name = member.name,
       health = member.health,
       maxHealth = member.maxHealth,
+      phase = member.phase or "alive",
       self = member.self == true or nil,
     }
   end
@@ -284,10 +289,14 @@ local function normalize_party(payload)
         or payload.invite.expiresInSec < 0 then
       return nil
     end
+    if payload.invite.expiresAt ~= nil and not Number.IsFiniteNumber(payload.invite.expiresAt) then
+      return nil
+    end
     invite = {
       fromUserId = payload.invite.fromUserId,
       fromName = type(payload.invite.fromName) == "string" and payload.invite.fromName or nil,
       expiresInSec = payload.invite.expiresInSec,
+      expiresAt = payload.invite.expiresAt,
     }
   end
   return freeze_snapshot({
@@ -297,6 +306,14 @@ local function normalize_party(payload)
     invite = invite,
     notice = type(payload.notice) == "string" and payload.notice or nil,
   }, 0, "ClientStore.party")
+end
+
+local function default_shop()
+  return freeze_snapshot({
+    purchases = {},
+    upgradeLevels = {},
+    upgradeLevel = 0,
+  }, 0, "ClientStore.shop")
 end
 
 local function normalize_table_snapshot(payload)
@@ -387,13 +404,19 @@ function ClientStore.new(options)
     story = State.new("ClientStore.story", nil),
     ferry = State.new("ClientStore.ferry", nil),
     grill = State.new("ClientStore.grill", nil),
+    lottery_result = State.new("ClientStore.lottery_result", nil),
+    blindbox_result = State.new("ClientStore.blindbox_result", nil),
+    platform_result = State.new("ClientStore.platform_result", nil),
     compendium = State.new("ClientStore.compendium", nil),
     records = State.new("ClientStore.records", nil),
+    message = State.new("ClientStore.message", nil),
+    gm_result = State.new("ClientStore.gm_result", nil),
     position = State.new("ClientStore.position", nil, position_equals),
     zone_id = State.new("ClientStore.zone_id", nil),
     zone_name = State.new("ClientStore.zone_name", nil),
     vitals = State.new("ClientStore.vitals", default_vitals(), vitals_equals),
     coin = State.new("ClientStore.coin", 0),
+    shop = State.new("ClientStore.shop", default_shop()),
     local_character = State.new("ClientStore.local_character", nil),
     camera_distance = State.new("ClientStore.camera_distance", nil),
     hud_visible = State.new("ClientStore.hud_visible", true),
@@ -405,20 +428,99 @@ function ClientStore.new(options)
   local on_server_event = Trigger.new("ClientStore.on_server_event")
   local on_reconnect = Trigger.new("ClientStore.on_reconnect")
 
+  local function normalize_compendium(payload)
+    if type(payload) ~= "table" then return nil end
+    for _, key in ipairs({ "unlocked", "weights", "catches" }) do
+      if payload[key] ~= nil and type(payload[key]) ~= "table" then return nil end
+    end
+    if payload.total ~= nil and not Number.IsFiniteNumber(payload.total) then return nil end
+    return normalize_table_snapshot(payload)
+  end
+
+  local function normalize_records(payload)
+    if type(payload) ~= "table" or type(payload.fishId) ~= "string" or payload.fishId == "" then return nil end
+    return normalize_table_snapshot(payload)
+  end
+
+  local function apply_quest_snapshot(normalized)
+    if type(normalized.notice) == "string" and normalized.notice ~= "" then
+      states.message:set(freeze_snapshot({ text = normalized.notice }, 0, "ClientStore.message"))
+    end
+  end
+
+  local function apply_story_snapshot(normalized)
+    if normalized.read == true and states.active_modal:now() == "story" then
+      local current = states.modal_payload:now()
+      if type(current) ~= "table" or current.readKey == nil or current.readKey == normalized.readKey then
+        states.active_modal:set(nil)
+        states.modal_payload:set(nil)
+      end
+    end
+  end
+
+  local function apply_item_bar_snapshot(_, payload)
+    if type(payload) == "table" and Number.IsFiniteNumber(payload.coin) then
+      states.coin:set(math.floor(payload.coin))
+    end
+  end
+
+  local function apply_story_notice(cloned)
+    if type(cloned) ~= "table" then
+      return
+    end
+    local story = freeze_snapshot(cloned, 0, "ClientStore.story")
+    states.story:set(story)
+    states.active_modal:set("story")
+    states.modal_payload:set(story)
+  end
+
+  local function apply_shop_result(_, payload)
+    if type(payload) ~= "table" then
+      return
+    end
+    local previous = states.shop:now()
+    local purchases, upgrade_levels = {}, {}
+    for key, value in pairs(previous.purchases or {}) do purchases[key] = value end
+    for key, value in pairs(previous.upgradeLevels or {}) do upgrade_levels[key] = value end
+    local upgrade_level = previous.upgradeLevel or 0
+    if payload.ok then
+      if payload.number then purchases[payload.number] = (purchases[payload.number] or 0) + 1 end
+      if payload.kind and payload.level then
+        upgrade_levels[payload.kind] = math.max(upgrade_levels[payload.kind] or 0, payload.level)
+      end
+      if payload.action == "UpgradeStorage" and payload.level then upgrade_level = payload.level end
+    end
+    states.shop:set(freeze_snapshot({
+      purchases = purchases, upgradeLevels = upgrade_levels, upgradeLevel = upgrade_level,
+    }, 0, "ClientStore.shop"))
+    if Number.IsFiniteNumber(payload.coinAfter) then
+      states.coin:set(math.floor(payload.coinAfter))
+    end
+  end
+
   local snapshot_handlers = {
-    ItemBarState = { state = states.item_bar, normalize = normalize_table_snapshot },
+    ItemBarState = { state = states.item_bar, normalize = normalize_table_snapshot, after = apply_item_bar_snapshot },
     SurvivalState = { state = states.survival, normalize = normalize_survival },
     PartyState = { state = states.party, normalize = normalize_party },
     CastState = { state = states.cast, normalize = normalize_table_snapshot },
     SpecialItemState = { state = states.special_item, normalize = normalize_table_snapshot },
     FishCombatState = { state = states.fish_combat, normalize = normalize_table_snapshot },
     LootState = { state = states.loot, normalize = normalize_table_snapshot },
-    QuestState = { state = states.quest, normalize = normalize_table_snapshot },
-    StoryState = { state = states.story, normalize = normalize_table_snapshot },
+    QuestState = { state = states.quest, normalize = normalize_table_snapshot, after = apply_quest_snapshot },
+    StoryState = { state = states.story, normalize = normalize_table_snapshot, after = apply_story_snapshot },
     FerryState = { state = states.ferry, normalize = normalize_table_snapshot },
     GrillState = { state = states.grill, normalize = normalize_table_snapshot },
-    CompendiumState = { state = states.compendium, normalize = normalize_table_snapshot },
-    RecordsState = { state = states.records, normalize = normalize_table_snapshot },
+    LotteryResult = { state = states.lottery_result, normalize = normalize_table_snapshot },
+    BlindboxResult = { state = states.blindbox_result, normalize = normalize_table_snapshot },
+    PlatformResult = { state = states.platform_result, normalize = normalize_table_snapshot },
+    CompendiumState = { state = states.compendium, normalize = normalize_compendium, ordered_seq = true },
+    RecordsState = { state = states.records, normalize = normalize_records, ordered_seq = true },
+    GMResult = { state = states.gm_result, normalize = normalize_table_snapshot },
+  }
+
+  local discrete_handlers = {
+    StoryNotice = apply_story_notice,
+    ShopResult = apply_shop_result,
   }
 
   local store = freeze_table({
@@ -435,13 +537,19 @@ function ClientStore.new(options)
     story = readonly_signal(states.story, "ClientStore.story"),
     ferry = readonly_signal(states.ferry, "ClientStore.ferry"),
     grill = readonly_signal(states.grill, "ClientStore.grill"),
+    lottery_result = readonly_signal(states.lottery_result, "ClientStore.lottery_result"),
+    blindbox_result = readonly_signal(states.blindbox_result, "ClientStore.blindbox_result"),
+    platform_result = readonly_signal(states.platform_result, "ClientStore.platform_result"),
     compendium = readonly_signal(states.compendium, "ClientStore.compendium"),
     records = readonly_signal(states.records, "ClientStore.records"),
+    message = readonly_signal(states.message, "ClientStore.message"),
+    gm_result = readonly_signal(states.gm_result, "ClientStore.gm_result"),
     position = readonly_signal(states.position, "ClientStore.position"),
     zone_id = readonly_signal(states.zone_id, "ClientStore.zone_id"),
     zone_name = readonly_signal(states.zone_name, "ClientStore.zone_name"),
     vitals = readonly_signal(states.vitals, "ClientStore.vitals"),
     coin = readonly_signal(states.coin, "ClientStore.coin"),
+    shop = readonly_signal(states.shop, "ClientStore.shop"),
     local_character = readonly_signal(states.local_character, "ClientStore.local_character"),
     camera_distance = readonly_signal(states.camera_distance, "ClientStore.camera_distance"),
     hud_visible = readonly_signal(states.hud_visible, "ClientStore.hud_visible"),
@@ -454,6 +562,7 @@ function ClientStore.new(options)
 
   local writer = {}
   local active_binding = nil
+  local snapshot_seq = {}
 
   function writer:set_connected(flag)
     states.connected:set(flag == true)
@@ -475,15 +584,23 @@ function ClientStore.new(options)
     end
     local entry = snapshot_handlers[channel]
     if entry ~= nil then
+      if entry.ordered_seq and type(payload) == "table"
+        and Number.IsFiniteNumber(payload.seq) and Number.IsFiniteNumber(snapshot_seq[channel])
+        and payload.seq <= snapshot_seq[channel] then
+        return false
+      end
       local normalized = entry.normalize(payload)
       if normalized == nil then
         return false
       end
+      if type(payload) == "table" and Number.IsFiniteNumber(payload.seq) then
+        snapshot_seq[channel] = payload.seq
+      end
       SpokeRuntime.batch(function()
         states.connected:set(true)
         entry.state:set(normalized)
-        if channel == "ItemBarState" and Number.IsFiniteNumber(payload.coin) then
-          states.coin:set(math.floor(payload.coin))
+        if entry.after ~= nil then
+          entry.after(normalized, payload)
         end
         on_server_event:invoke({ channel = channel, payload = normalized })
       end)
@@ -491,8 +608,12 @@ function ClientStore.new(options)
     end
 
     local cloned = clone_value(payload, 0)
+    local discrete = discrete_handlers[channel]
     SpokeRuntime.batch(function()
       states.connected:set(true)
+      if discrete ~= nil then
+        discrete(cloned, payload)
+      end
       on_server_event:invoke({ channel = channel, payload = cloned })
     end)
     return true
@@ -564,6 +685,11 @@ function ClientStore.new(options)
     end)
   end
 
+  function writer:show_notice(text)
+    local value = text == nil and "" or tostring(text)
+    states.message:set(freeze_snapshot({ text = value }, 0, "ClientStore.message"))
+  end
+
   function writer:close_modal(expected_id)
     if expected_id ~= nil and states.active_modal:now() ~= expected_id then
       return
@@ -596,6 +722,7 @@ function ClientStore.new(options)
   function writer:reset_session(reason)
     SpokeRuntime.batch(function()
       states.connected:set(false)
+      snapshot_seq = {}
       states.item_bar:set(nil)
       states.survival:set(freeze_snapshot({ phase = "alive" }, 0, "ClientStore.survival"))
       states.party:set(freeze_snapshot({ state = "none", members = {} }, 0, "ClientStore.party"))
@@ -607,6 +734,9 @@ function ClientStore.new(options)
       states.story:set(nil)
       states.ferry:set(nil)
       states.grill:set(nil)
+      states.lottery_result:set(nil)
+      states.blindbox_result:set(nil)
+      states.platform_result:set(nil)
       states.compendium:set(nil)
       states.records:set(nil)
       states.position:set(nil)
@@ -614,11 +744,14 @@ function ClientStore.new(options)
       states.zone_name:set(nil)
       states.vitals:set(default_vitals())
       states.coin:set(0)
+      states.shop:set(default_shop())
       states.local_character:set(nil)
       states.camera_distance:set(nil)
       states.hud_visible:set(true)
       states.active_modal:set(nil)
       states.modal_payload:set(nil)
+      states.message:set(nil)
+      states.gm_result:set(nil)
       states.overlays:set(freeze_snapshot({}, 0, "ClientStore.overlays"))
       on_reconnect:invoke({ reason = reason or "reset" })
     end)

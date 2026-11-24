@@ -1,111 +1,314 @@
--- #90 迁移期共享夹具：MgrWeapon 的服务端权威世界（武器系统本体用例与升级用例共用）。
--- 原 tests/gameplay/weapon_system_test.lua 里 TestMgrWeaponUpgrade 用
--- `TestMgrWeaponUpgrade.setUp = function(self) TestMgrWeapon.setUp(self) end` 直接复用
--- TestMgrWeapon 的夹具（LuaUnit 靠全局类名互访实现）；Busted 每个 spec 是独立 chunk、
--- describe 之间不共享实例方法，所以把这份世界搬到 support 模块，两个 describe 各开各的。
 --
--- 只替换引擎对象、时间与协作管理器（AbilityAPI 点调用桩 / REUtil / Vitals / PlayerData / FishUnit），
--- MgrWeapon 本体走 loadfile 逐案例新建，口径与旧夹具完全一致。
+local GameCfg = require('common.GameCfg')
+local SpokeClock = require('common.SpokeClock')
+local spoke = require('common.packages.spoke.api')
 local PlayerData = require('server.Data.PlayerData')
+local SwingRegistry = require('server.SwingRegistry')
+local PlayerWeapon = require('server.World.PlayerWeapon')
 
 local M = {}
 M.__index = M
 
-local function weaponPlayer(id)
-    return { UserId = id, Character = { Position = { x = 0, y = 2, z = 0 },
-        Rotation = { GetForward = function() return { x = 0, y = 0, z = 1 } end } } }
-end
-
 --- 建一个空世界壳；调用方随后 :setUp() 搭世界、:tearDown() 拆除
 --- （与 blindbox_world / revive_world 同一构造/拆除入口名）。
-function M.new()
-    return setmetatable({}, M)
+--- opts.players = { { player, data? }, ... } 可指定世界内玩家；缺省 42 / 43 两名玩家。
+function M.new(opts)
+    return setmetatable({ opts = type(opts) == 'table' and opts or {} }, M)
+end
+
+--- 引擎边界玩家替身：只给存档 Sync 需要的 SetAttribute 与武器会话读的角色位姿。
+function M.player(id)
+    return {
+        UserId = id,
+        SetAttribute = function() end,
+        Character = {
+            Position = { x = 0, y = 2, z = 0 },
+            Rotation = { GetForward = function() return { x = 0, y = 0, z = 1 } end },
+        },
+    }
+end
+
+local function state(name, value)
+    return spoke.State.new('WeaponWorld.' .. name, value)
 end
 
 function M:setUp()
     local ctx = self
-    ctx.saved = { game = rawget(_G, 'game'), re = rawget(_G, 'REUtil'),
-        api = package.loaded['server.AbilityAPI'], swing = package.loaded['server.SwingRegistry'] }
+    ctx.saved_print = rawget(_G, 'print')
     ctx.now = 1000
-    ctx.player = weaponPlayer(42)
-    ctx.other = weaponPlayer(43)
-    ctx.casts, ctx.swingStaged, ctx.replies = {}, {}, {}
-    ctx.applied, ctx.spawnedFish, ctx.order = {}, {}, 0
-    -- 挥砍登记与技能施法分开替换，均保持模块函数点调用签名
-    package.loaded['server.SwingRegistry'] = {
-        StageSwing = function(userId, swing) ctx.swingStaged[userId] = swing; return true end,
-        ClearSwing = function(userId) ctx.swingStaged[userId] = nil end,
-        PeekSwing = function(userId) return ctx.swingStaged[userId] end,
-        TakeSwing = function(userId)
-            local s = ctx.swingStaged[userId]; ctx.swingStaged[userId] = nil; return s end,
-    }
-    package.loaded['server.AbilityAPI'] = {
-        CastAbility = function(unit, index)
-            ctx.casts[#ctx.casts + 1] = { unit = unit, index = index }; return true end,
-        AddCastGuard = function(fn) ctx.castGuard = fn end,
-    }
-    _G.REUtil = {
+    ctx.clock = SpokeClock.new(ctx.now)
+    ctx.replies, ctx.applied, ctx.spawnedFish, ctx.visuals = {}, {}, {}, {}
+    ctx.casts, ctx.effects = {}, {}
+    ctx.order = 0
+    ctx.rayHit, ctx.lastRay, ctx.create_unit, ctx.random = nil, nil, nil, nil
+    ctx.applyOk = true
+    ctx.sessions, ctx.players = {}, {}
+    ctx.save = ctx.opts.save
+
+    ctx.remote = {
         GetRE = function(_, name)
-            return { OnServerEvent = { Connect = function(_, fn) ctx.reHandler = fn end },
-                FireClient = function(_, player, payload)
-                    ctx.replies[#ctx.replies + 1] = { name = name, player = player, payload = payload } end }
-        end,
-        CheckRECD = function() return nil end,
-    }
-    ctx.rayHit = nil
-    _G.game = { GetService = function(_, name)
-        if name == 'World' then return { GetServerTime = function() return ctx.now end } end
-        if name == 'Players' then return { GetPlayers = function() return { ctx.player, ctx.other } end,
-            GetPlayerFromCharacter = function(_, c)
-                if c == ctx.player.Character then return ctx.player end
-                if c == ctx.other.Character then return ctx.other end
+            return { FireClient = function(_, player, payload)
+                ctx.replies[#ctx.replies + 1] = { name = name, player = player, payload = payload }
             end }
-        end
-        if name == 'PhysicsService' then return { Raycast = function(_, o, d, p)
-            ctx.lastRay = { o = o, d = d, p = p }
-            return ctx.rayHit end }
-        end
-        return nil
-    end }
-    ctx.mgr = assert(loadfile('server/Mgr/MgrWeapon.lua'))()
-    ctx.data = PlayerData.New({ UserId = 42, SetAttribute = function() end })
-    ctx.data:Init()
-    ctx.mgr.PlayerData = { GetDataInst = function() return ctx.data end,
-        SendItemBar = function() end }
-    ctx.mgr.Attr = require('tests.support.attr_runtime').New(ctx.mgr.PlayerData)
-    ctx.mgr.Vitals = {
-        CanAct = function() return true end,
-        NewHit = function(_, source, category)
-            ctx.order = ctx.order + 1
-            return { id = ctx.order, source = source, category = category }
-        end,
-        ApplyHit = function(_, hit, target, amount)
-            ctx.order = ctx.order + 1
-            ctx.applied[#ctx.applied + 1] = { order = ctx.order, hit = hit,
-                target = target, amount = amount }
-            return true, amount
         end,
     }
-    ctx.mgr.FishUnit = { Fish = {}, SpawnBlastFish = function(_, fishId, mult, pos, owner)
-        ctx.order = ctx.order + 1
-        ctx.spawnedFish[#ctx.spawnedFish + 1] = { order = ctx.order,
-            fishId = fishId, mult = mult, pos = pos, owner = owner }
-        return { Id = #ctx.spawnedFish }
+    ctx.ability = {
+        CastAbility = function(unit, index)
+            ctx.casts[#ctx.casts + 1] = { unit = unit, index = index }
+            return true
+        end,
+    }
+    ctx.physics = { Raycast = function(...)
+        local origin, direction
+        if select('#', ...) >= 4 then
+            origin, direction = select(2, ...), select(3, ...)
+        else
+            origin, direction = select(1, ...), select(2, ...)
+        end
+        ctx.lastRay = { o = origin, d = direction }
+        return ctx.rayHit
     end }
-    ctx.mgr.FishCarrier = { ResolveCarrier = function(_, unit) return nil end }
+    ctx.players_service = {
+        GetPlayers = function() return ctx.players end,
+        GetPlayerFromCharacter = function(_, unit)
+            for _, player in ipairs(ctx.players) do
+                if player.Character == unit then return player end
+            end
+            return nil
+        end,
+    }
+    ctx.world_service = {
+        CreateUnit = function(_, unitType, values)
+            if ctx.create_unit then return ctx.create_unit(unitType, values) end
+            local unit = { destroyCount = 0, Position = { x = 0, y = 0, z = 0 } }
+            unit.Destroy = function() unit.destroyCount = unit.destroyCount + 1 end
+            ctx.visuals[#ctx.visuals + 1] = {
+                unitType = unitType, name = values and values.Name, unit = unit,
+            }
+            return unit
+        end,
+    }
+    ctx.fish_unit = {
+        Fish = {},
+        SpawnBlastFish = function(_, fishId, mult, pos, owner)
+            ctx.order = ctx.order + 1
+            ctx.spawnedFish[#ctx.spawnedFish + 1] = {
+                order = ctx.order, fishId = fishId, mult = mult, pos = pos, owner = owner,
+            }
+            local id = 1000 + #ctx.spawnedFish
+            ctx.fish_unit.Fish[id] = { Id = id, Carrier = { Body = { Position = pos } } }
+            return { Id = id }
+        end,
+    }
+    ctx.fish_carrier = { ResolveCarrier = function() return nil end }
+
+    SwingRegistry.SetClock(function() return ctx.clock.now() end)
+
+    local specs = ctx.opts.players
+    if type(specs) == 'table' and #specs > 0 then
+        for _, spec in ipairs(specs) do ctx:_add(spec.player, spec.data) end
+        ctx.player = specs[1].player
+        ctx.other = specs[2] and specs[2].player or nil
+    else
+        ctx.player = ctx.opts.player or M.player(42)
+        ctx.other = ctx.opts.other or M.player(43)
+        ctx:_add(ctx.player, ctx.opts.data)
+        ctx:_add(ctx.other)
+    end
+    ctx.data = ctx.sessions[ctx.player] and ctx.sessions[ctx.player].data or nil
 end
 
 function M:tearDown()
-    local ctx = self
-    _G.game = ctx.saved.game
-    _G.REUtil = ctx.saved.re
-    package.loaded['server.AbilityAPI'] = ctx.saved.api
-    package.loaded['server.SwingRegistry'] = ctx.saved.swing
+    for _, session in pairs(self.sessions or {}) do
+        if session.spokeTree then
+            pcall(function() session.spokeTree:dispose() end)
+        end
+        session.spokeTree = nil
+    end
+    self.sessions = {}
+    SwingRegistry.SetClock(nil)
+    if self.saved_print ~= nil then _G.print = self.saved_print end
+    if self.savedWaterZones ~= nil then
+        GameCfg.Water.Zones = self.savedWaterZones
+        self.savedWaterZones = nil
+    end
 end
 
-function M.lastReply(ctx)
-    local r = ctx.replies[#ctx.replies]
-    return r and r.payload or nil
+--- 注册一名玩家会话并挂载真实 PlayerWeapon；data 缺省时按真实存档新建。
+function M:_add(player, data)
+    local ctx = self
+    local dataInst = data or PlayerData.New(player)
+    if not dataInst.Inited then dataInst:Init() end
+    local tree = {
+        player = player,
+        data = dataInst,
+        clock = ctx.clock,
+        states = {
+            held = state('held', { kind = nil, id = nil, slot = nil }),
+            selected_weapon = state('selected_weapon', nil),
+            weapons = state('weapons', {}),
+        },
+        memos = {
+            can_act = state('can_act', true),
+            weapon_damage_scales = state('scales', { melee = 1, ranged = 1, explosive = 1 }),
+        },
+        get_item_bar_snapshot = function() return dataInst:GetItemBarSnapshot() end,
+    }
+    local session = {
+        player = player,
+        data = dataInst,
+        tree = tree,
+        opts = {
+            remote = ctx.remote,
+            save = ctx.save,
+            physics = ctx.physics,
+            players_service = ctx.players_service,
+            ability = ctx.ability,
+            fish_unit = ctx.fish_unit,
+            fish_carrier = ctx.fish_carrier,
+            world = ctx.world_service,
+            random = function(a, b)
+                local fn = ctx.random or math.random
+                return fn(a, b)
+            end,
+            new_hit = function(source, category)
+                ctx.order = ctx.order + 1
+                return { id = ctx.order, source = source, category = category }
+            end,
+            apply_hit = function(hit, target, amount)
+                ctx.order = ctx.order + 1
+                ctx.applied[#ctx.applied + 1] = {
+                    order = ctx.order, hit = hit, target = target, amount = amount,
+                }
+                return ctx.applyOk ~= false, amount
+            end,
+            apply_effect = function(source, target, kind)
+                ctx.effects[#ctx.effects + 1] = { source = source, target = target, kind = kind }
+                return true
+            end,
+        },
+    }
+    ctx.sessions[player] = session
+    ctx.players[#ctx.players + 1] = player
+    ctx:sync(player)
+    ctx:_mount(session)
+    return session
+end
+
+function M:_mount(session)
+    session.spokeTree = spoke.SpokeTree.spawn(spoke.Effect.new('WeaponWorld', function(scope)
+        session.handle = PlayerWeapon.mount(scope, session.tree, session.opts)
+    end))
+end
+
+--- 把存档最新字段投影进树状态：武器/选中/held 与三类伤害倍率（真源取 PlayerData:WeaponDamageScale，
+--- 与 PlayerEffects 的 AttrModel 派生同源）。
+function M:sync(player)
+    local session = assert(self.sessions[player], '未注册的玩家')
+    local snap = session.data:GetItemBarSnapshot()
+    session.tree.states.held:set(snap and snap.held or { kind = nil, id = nil, slot = nil })
+    session.tree.states.selected_weapon:set(snap and snap.selectedWeapon or nil)
+    session.tree.states.weapons:set(snap and snap.weapons or {})
+    local scales = {}
+    for _, kind in ipairs({ 'melee', 'ranged', 'explosive' }) do
+        scales[kind] = session.data:WeaponDamageScale(kind)
+    end
+    session.tree.memos.weapon_damage_scales:set(scales)
+end
+
+--- 推进世界时钟：投掷飞行、换弹与射速都以它为准。
+function M:advance(seconds)
+    self.now = self.now + seconds
+    self.clock:advance(seconds)
+end
+
+--- 发放并装备一把武器（存档真源 → 下一次 sync 时投影进树）。
+function M:equip(player, weaponId)
+    local data = assert(self.sessions[player], '未注册的玩家').data
+    assert(data:GrantWeapon(weaponId, 1), '发放武器失败')
+    assert(data:HoldWeapon(weaponId), '装备武器失败')
+end
+
+--- 公开入口：先同步存档投影，再驱动 PlayerWeapon 的 handle。
+function M:handle(player, payload)
+    self:sync(player)
+    return assert(self.sessions[player], '未注册的玩家').handle:handle(payload)
+end
+
+function M:attack(player, payload)
+    local message = { action = 'attack' }
+    for key, value in pairs(payload or {}) do message[key] = value end
+    self:handle(player, message)
+    return M.lastReply(self, player)
+end
+
+function M:throw(player, slot, target, extra)
+    local payload = { action = 'throw', slot = slot, target = target }
+    for key, value in pairs(extra or {}) do payload[key] = value end
+    self:handle(player, payload)
+    return M.lastReply(self, player)
+end
+
+function M:reload(player)
+    self:handle(player, { action = 'reload' })
+    return M.lastReply(self, player)
+end
+
+function M:guard(player, unit, index)
+    return assert(self.sessions[player], '未注册的玩家').handle:guard(unit, index)
+end
+
+--- 玩家离场：销毁其作用域（与 PlayerTree dispose 同一清理路径），并从 Players 服务列表移除。
+function M:removePlayer(player)
+    local session = assert(self.sessions[player], '未注册的玩家')
+    if session.spokeTree then session.spokeTree:dispose() end
+    session.spokeTree = nil
+    for index, entry in ipairs(self.players) do
+        if entry == player then
+            table.remove(self.players, index)
+            break
+        end
+    end
+end
+
+--- 用新的挂载参数重建该玩家的武器会话（例如注入存档协议桩）。
+function M:remount(player, patch)
+    local session = assert(self.sessions[player], '未注册的玩家')
+    for key, value in pairs(patch or {}) do session.opts[key] = value end
+    if session.spokeTree then session.spokeTree:dispose() end
+    self:_mount(session)
+end
+
+--- 给某名玩家的道具栏发一件爆炸物并选中它，返回槽位。失败才拼消息（避免每次通过都付拼接）。
+function M:giveExplosive(player, itemId, count)
+    local data = assert(self.sessions[player], '未注册的玩家').data
+    for _ = 1, count or 1 do
+        if not data:AddItem(itemId) then error('道具栏放不下 ' .. tostring(itemId), 2) end
+    end
+    local snap = data:GetItemBarSnapshot()
+    local slot
+    for index, entry in pairs(snap.slots) do
+        if entry.itemId == itemId then slot = index break end
+    end
+    if slot == nil then error('道具栏里没有 ' .. tostring(itemId), 2) end
+    if data.Data.SelectedSlot ~= slot and not data:SelectSlot(slot) then
+        error('选中爆炸物失败: ' .. tostring(slot), 2)
+    end
+    return slot
+end
+
+--- 替换水区表（投掷落水判定与保底鱼来源），tearDown 时恢复。
+function M:setWaterZones(zones)
+    if self.savedWaterZones == nil then self.savedWaterZones = GameCfg.Water.Zones end
+    GameCfg.Water.Zones = zones or {}
+end
+
+function M.lastReply(ctx, player)
+    for index = #ctx.replies, 1, -1 do
+        local record = ctx.replies[index]
+        if record.player == player then return record.payload end
+    end
+    return nil
 end
 
 return M

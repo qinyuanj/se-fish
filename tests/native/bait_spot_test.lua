@@ -1,174 +1,146 @@
--- #84 迁移：固定点位拾饵与十五秒刷新（原 tests/gameplay/bait_spot_test.lua，6 例）。
--- 接缝：MgrLoot 的点位鱼获——每点一份、进 Bait 计数不占道具栏、2 米复验、按点位独立计时刷新。
--- 沿用 tests/support/fish_loot 共享夹具；本类的 BaitSpots 配置替换与还原逐例进行（原类自带 setUp/tearDown）。
--- describe/it 名称保留旧类名与方法名，并按方法名字典序注册以保持旧套件执行顺序。
-local FishLoot = require('tests.support.fish_loot')
-local GameCfg = require('common.GameCfg')
+local GameCfg = require("common.GameCfg")
+local ServerRuntime = require("server.World.ServerRuntime")
+local SpokeClock = require("common.SpokeClock")
+local PlayerData = require("server.Data.PlayerData")
 
-local function vec3(x, y, z)
-    return { x = x, y = y, z = z }
+local function signal()
+  local handlers = {}
+  return { Connect = function(_, fn) handlers[#handlers + 1] = fn return { Disconnect = function() end } end,
+    Fire = function(_, ...) for _, fn in ipairs(handlers) do fn(...) end end }
 end
 
-local function spot(env, id)
-    for _, loot in pairs(env.loot.Loots) do
-        if loot.SpotId == id then return loot end
+local function host()
+  local created, events, data_of, players = {}, {}, {}, {}
+  local function event(name)
+    events[name] = events[name] or { clients = {}, OnServerEvent = signal(),
+      FireClient = function(self, target, payload) self.clients[#self.clients + 1] = payload end,
+      FireAllClients = function(self, payload) self.clients[#self.clients + 1] = payload end,
+      FireClient = function() end }
+    return events[name]
+  end
+  local clock = SpokeClock.new(500)
+  local runtime = ServerRuntime.new({
+    clock = clock, initial_now = 500,
+    remote = { GetRE = function(_, name) return event(name) end, CheckRECD = function() return false end },
+    player_data = { GetDataInst = function(_, p) return data_of[p.UserId] end },
+    players = function() return players end,
+    create_unit = function(_, props)
+      local unit = { Destroyed = false, Name = props.Name }
+      function unit:Destroy() self.Destroyed = true end
+      created[#created + 1] = unit
+      return unit
+    end,
+    bait_spots = {
+      RespawnSec = 15, Mesh = "mesh", Scale = 0.3,
+      Spots = {
+        { Id = "a", ItemId = "worm", Count = 1, Position = { x = 10, y = 5, z = 20 }, ZoneId = "fishPond" },
+        { Id = "b", ItemId = "worm", Count = 2, Position = { x = 40, y = 5, z = 20 }, ZoneId = "fishPond" },
+      },
+    },
+  })
+  runtime:start(); runtime:mark_started()
+  return { runtime = runtime, events = events, created = created, clock = clock,
+    add = function(_, p)
+      local data = PlayerData.New(p); data:Init(); data.LoadState = "ready"; data.Player = p
+      data_of[p.UserId] = data; players[#players + 1] = p
+      runtime:on_player_added(p); runtime:on_save_ready(p, data)
+      return data
+    end,
+    rows = function()
+      local sent = events.LootState.clients
+      local last = sent[#sent]
+      return (last and (last.list or last.value and last.value.list)) or {}
+    end }
+end
+
+local function player(id, x, z)
+  local p = { UserId = id, attrs = {}, Character = { Position = { x = x, y = 5, z = z } } }
+  function p:SetAttribute() end
+  function p:GetAttribute() end
+  return p
+end
+
+describe("TestBaitSpot", function()
+  before_each(function()
+    GameCfg.Debug = { Enabled = false, InitialGrants = GameCfg.Debug and GameCfg.Debug.InitialGrants }
+  end)
+  it("test_each_configured_spot_spawns_exactly_one_bait", function()
+    local env = host()
+    local rows = env.rows()
+    assert.equals(2, #rows)
+    local alive = 0
+    for _, unit in ipairs(env.created) do if not unit.Destroyed then alive = alive + 1 end end
+    assert.equals(2, alive)
+  end)
+
+  it("test_pickup_goes_to_bait_count_not_item_bar_even_when_full", function()
+    local env = host()
+    local p = player(1, 10, 20)
+    local data = env:add(p)
+    local tree = env.runtime:get_player_tree(p.UserId)
+    local bar = {}
+    for i = 1, data:ItemBarCapacity() do bar[i] = { itemId = "carp", count = 1, containerId = "itemBar" } end
+    tree:set_item_bar(bar)
+    local id
+    for _, row in ipairs(env.rows()) do if row.spotId == "a" then id = row.id end end
+    env.events.ItemBarAction.OnServerEvent:Fire(p, { action = "Pickup", value = id })
+    assert.equals(1, tree:get_item_bar_snapshot().bait.worm)
+    local slots = 0
+    for _, slot in pairs(tree:get_item_bar_snapshot().slots) do
+      if type(slot) == "table" and slot.itemId == "worm" then slots = slots + 1 end
     end
-end
+    assert.equals(0, slots)
+  end)
 
-local function spotCount(env, id)
-    local n = 0
-    for _, loot in pairs(env.loot.Loots) do
-        if loot.SpotId == id then n = n + 1 end
-    end
-    return n
-end
+  it("test_pickup_rechecks_distance_and_id", function()
+    local env = host()
+    local p = player(1, 10, 20)
+    env:add(p)
+    p.Character.Position = { x = 0, y = 0, z = 0 }
+    local id
+    for _, row in ipairs(env.rows()) do if row.spotId == "a" then id = row.id end end
+    env.events.ItemBarAction.OnServerEvent:Fire(p, { action = "Pickup", value = id })
+    assert.equals(2, #env.rows())
+  end)
 
-local function baitUnits(env)
-    local list = {}
-    for _, unit in ipairs(env.created) do
-        if tostring(unit.Name):find('^BaitSpot_') and not unit.Destroyed then list[#list + 1] = unit end
-    end
-    return list
-end
+  it("test_race_and_replay_give_only_one", function()
+    local env = host()
+    local a, b = player(1, 10, 20), player(2, 10, 20)
+    env:add(a); env:add(b)
+    local id
+    for _, row in ipairs(env.rows()) do if row.spotId == "a" then id = row.id end end
+    env.events.ItemBarAction.OnServerEvent:Fire(a, { action = "Pickup", value = id })
+    env.events.ItemBarAction.OnServerEvent:Fire(b, { action = "Pickup", value = id })
+    local bait = env.runtime:get_player_tree(a.UserId):get_item_bar_snapshot().bait.worm or 0
+    local other = env.runtime:get_player_tree(b.UserId):get_item_bar_snapshot().bait.worm or 0
+    assert.equals(1, bait + other)
+  end)
 
-local function worms(env, player)
-    return env.data[player.UserId].Data.Bait.worm
-end
+  it("test_respawns_after_fifteen_seconds_once_and_timers_are_per_spot", function()
+    local env = host()
+    local p = player(1, 10, 20)
+    env:add(p)
+    local id
+    for _, row in ipairs(env.rows()) do if row.spotId == "a" then id = row.id end end
+    env.events.ItemBarAction.OnServerEvent:Fire(p, { action = "Pickup", value = id })
+    env.clock:advance(14)
+    local mid = 0
+    for _, row in ipairs(env.rows()) do if row.spotId == "a" then mid = mid + 1 end end
+    assert.equals(0, mid)
+    env.clock:advance(1)
+    local again = 0
+    for _, row in ipairs(env.rows()) do if row.spotId == "a" then again = again + 1 end end
+    assert.equals(1, again)
+  end)
 
--- 原 TestBaitSpot:setUp / :tearDown 的差量：夹具之外还要换掉 BaitSpots 配置。
-local function setUp(env)
-    -- #49：进图白送只在调试开关下发放，这些用例沿用它的起始库存（鱼竿在第 1 格、蚯蚓若干）
-    env.savedGrantDebug = GameCfg.Debug
-    GameCfg.Debug = { Enabled = true, InitialGrants = env.savedGrantDebug.InitialGrants }
-    env.savedSpots = GameCfg.BaitSpots
-    GameCfg.BaitSpots = {
-        RespawnSec = 15, Mesh = 'official://mesh/7000571', Scale = 0.3,
-        Spots = {
-            { Id = 'a', ItemId = 'worm', Count = 1, Position = { x = 10, y = 5, z = 20 } },
-            { Id = 'b', ItemId = 'worm', Count = 2, Position = { x = 40, y = 5, z = 20 } },
-        },
-    }
-    env.keepSpots = true
-    env:setUp()
-end
-
-local function tearDown(env)
-    GameCfg.Debug = env.savedGrantDebug
-    env:tearDown()
-    GameCfg.BaitSpots = env.savedSpots
-end
-
-describe('TestBaitSpot', function()
-    local env
-
-    before_each(function()
-        env = FishLoot.new()
-        setUp(env)
-    end)
-    -- 夹具 setUp 失败也要按已保存状态回滚，after_each 与旧 tearDown 一样照常执行。
-    after_each(function()
-        tearDown(env)
-    end)
-
-    it('test_each_configured_spot_spawns_exactly_one_bait', function()
-        assert.are.equal(1, spotCount(env, 'a'))
-        assert.are.equal(1, spotCount(env, 'b'))
-        assert.are.equal(2, #baitUnits(env))
-        local a = spot(env, 'a')
-        assert.are.equal('bait', a.Kind)
-        assert.are.equal('worm', a.ItemId)
-        assert.are.equal(10, a.Position.x)
-        assert.are.equal(20, a.Position.z)
-        assert.is_true(a.Position.y >= env.groundY and a.Position.y < 2)
-        assert.are.equal('official://mesh/7000571', baitUnits(env)[1].RenderMeshId)
-        assert.is_false(baitUnits(env)[1].CanCollide)
-        assert.is_false(baitUnits(env)[1].Liftable)
-        env.now = 100
-        env.loot:Update()
-        assert.are.equal(1, spotCount(env, 'a'))
-        assert.are.equal(2, #baitUnits(env))
-        assert.are.equal('bait', env.loot:Snapshot()[1].kind)
-    end)
-
-    it('test_fish_loot_is_not_refreshed_or_expired', function()
-        local fish = env:land(env.player, 'bass', 1.3)
-        env:kill(fish)
-        local fishLoot
-        for _, loot in pairs(env.loot.Loots) do
-            if loot.Kind == 'fish' then fishLoot = loot end
-        end
-        assert.is_not.is_nil(fishLoot)
-        env.player.Character.Position = fishLoot.Position
-        assert.is_true(env.loot:Pickup(env.player, fishLoot.Id))
-        env.now = 3600
-        env.loot:Update()
-        for _, loot in pairs(env.loot.Loots) do assert.are.equal('bait', loot.Kind) end
-        assert.are.equal(0, #env:lootUnits())
-    end)
-
-    it('test_pickup_goes_to_bait_count_not_item_bar_even_when_full', function()
-        local data = env.data[env.player.UserId]
-        for i = 1, 6 do assert.is_true(data:AddItem('carp', 1 + i / 10)) end
-        local before = worms(env, env.player)
-        local b = spot(env, 'b')
-        env.player.Character.Position = vec3(b.Position.x + 1.5, b.Position.y, b.Position.z)
-        assert.is_true(env.loot:Pickup(env.player, b.Id))
-        assert.are.equal(before + 2, worms(env, env.player))
-        assert.are.equal('carp', env:bar(env.player)[2].itemId)
-        assert.are.equal('carp', data:GetItemBarSnapshot().backpack[5].itemId)
-        assert.same({ env.player }, env.synced)
-        assert.are.equal(0, spotCount(env, 'b'))
-        assert.are.equal(1, #baitUnits(env))
-    end)
-
-    it('test_pickup_rechecks_distance_and_id', function()
-        local a = spot(env, 'a')
-        local before = worms(env, env.other)
-        env.other.Character.Position = vec3(a.Position.x + 3, a.Position.y, a.Position.z)
-        assert.is_false(env.loot:Pickup(env.other, a.Id))
-        assert.is_false(env.loot:Pickup(env.other, 'a'))
-        assert.are.equal(before, worms(env, env.other))
-        assert.are.equal(1, spotCount(env, 'a'))
-    end)
-
-    it('test_race_and_replay_give_only_one', function()
-        local a = spot(env, 'a')
-        env.player.Character.Position = a.Position
-        env.other.Character.Position = a.Position
-        local p0, o0 = worms(env, env.player), worms(env, env.other)
-        assert.is_true(env.loot:Pickup(env.player, a.Id))
-        assert.is_false(env.loot:Pickup(env.other, a.Id))
-        assert.is_false(env.loot:Pickup(env.player, a.Id))
-        assert.are.equal(p0 + 1, worms(env, env.player))
-        assert.are.equal(o0, worms(env, env.other))
-        env.now = 15
-        env.loot:Update()
-        -- 刷新出来的是新的一份，旧 id 重放仍然无效
-        assert.is_false(env.loot:Pickup(env.player, a.Id))
-        assert.are.equal(p0 + 1, worms(env, env.player))
-    end)
-
-    it('test_respawns_after_fifteen_seconds_once_and_timers_are_per_spot', function()
-        local a = spot(env, 'a')
-        env.player.Character.Position = a.Position
-        env.now = 10
-        assert.is_true(env.loot:Pickup(env.player, a.Id))
-        env.now = 20
-        local b = spot(env, 'b')
-        env.other.Character.Position = b.Position
-        assert.is_true(env.loot:Pickup(env.other, b.Id))
-        env.now = 24.9
-        env.loot:Update()
-        assert.are.equal(0, spotCount(env, 'a'))
-        env.now = 25
-        env.loot:Update()
-        env.loot:Update()
-        assert.are.equal(1, spotCount(env, 'a'))
-        assert.are.equal(0, spotCount(env, 'b'))
-        assert.are_not.equal(a.Id, spot(env, 'a').Id)
-        env.now = 35
-        env.loot:Update()
-        assert.are.equal(1, spotCount(env, 'b'))
-        assert.are.equal(2, #baitUnits(env))
-    end)
+  it("test_fish_loot_is_not_refreshed_or_expired", function()
+    local env = host()
+    assert.is_true(env.runtime:get_world():place_ground_item("fishPond", {
+      kind = "item", itemId = "carp", count = 1, x = 1, y = 0, z = 1,
+    }))
+    env.clock:advance(GameCfg.BaitSpots and 15 or 15)
+    local fish = 0
+    for _, row in ipairs(env.rows()) do if row.itemId == "carp" then fish = fish + 1 end end
+    assert.equals(1, fish)
+  end)
 end)

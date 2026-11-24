@@ -1,12 +1,12 @@
 -- Spoke 主 HUD 左上状态区与金币视图（ADR-0032 / #297-B2，归属 L2 client.Views）：
 -- 挂载于 RootView 常驻 HUD 槽位，订阅只读 ClientStore.vitals / coin / clock；
 -- 负责血量环（'血 '）、饥饿环（'饥饿度 '）、4 条饥饿闪烁红边与编辑器预置金币节点（ImageCoin/LabelCoin）排版。
--- 所有动态创建的 UI 节点统一经 ctx.create_node 托管，随 on_cleanup 零残留释放，绝不使用 OwnedUnits。
 
 local spoke = require("common.packages.spoke.api")
 local GameCfg = require("common.GameCfg")
 local Number = require("common.Number")
 local MainHudLayout = require("client.MainHudLayout")
+local ViewUtil = require("client.Views.ViewUtil")
 
 local State = spoke.State
 
@@ -44,33 +44,6 @@ end
 
 local function vital_percent(value, maximum)
   return maximum > 0 and math.max(0, math.min(100, value * 100 / maximum)) or 0
-end
-
-local function default_get_resolution()
-  local ok, x, y = pcall(function() -- 宿主 EUI 管理器未就绪或 Vector2 userdata 读取异常时安全回退默认分辨率
-    local game_ui = rawget(_G, "GameUI")
-    local eui_mgr = game_ui and game_ui:GetEuiManager() or nil
-    if eui_mgr == nil and game ~= nil then
-      local players = game:GetService("Players")
-      local lp = players and players.LocalPlayer
-      eui_mgr = lp and lp.PlayerGui and lp.PlayerGui.EuiManager or nil
-    end
-    local res = eui_mgr and eui_mgr:GetDeviceResolution() or nil
-    if type(res) ~= "table" and type(res) ~= "userdata" then
-      return nil, nil
-    end
-    return res.x, res.y
-  end)
-  if ok and Number.IsFiniteNumber(x) and Number.IsFiniteNumber(y) and x > 0 and y > 0 then
-    return { x = x, y = y }
-  end
-  return { x = 1920, y = 1080 }
-end
-
-local function default_notify(text)
-  if type(_G.LocalMsgNotice) == "function" then
-    _G.LocalMsgNotice(text)
-  end
 end
 
 local function find_editor_node(root, name)
@@ -113,11 +86,10 @@ end
 ---@param options table|nil { get_resolution?, notify?, find_node? }
 function MainHudVitalsView.mount(s, ctx, options)
   options = options or {}
-  local get_resolution = options.get_resolution or default_get_resolution
-  local notify = options.notify or default_notify
+  local notify = options.notify or function(text) ViewUtil.notify(ctx, text) end
   local find_node = options.find_node or find_editor_node
 
-  local resolution = get_resolution()
+  local resolution = ViewUtil.get_resolution(ctx, options)
   local layout = MainHudLayout.Compute({
     width = resolution.x,
     height = resolution.y,

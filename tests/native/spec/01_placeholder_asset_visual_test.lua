@@ -50,7 +50,6 @@ local function assert_asset(id, where)
   assert.is_truthy(AssetIds[id], where .. ' 指向官方资产表里不存在的资源：' .. tostring(id))
 end
 
--- 世界模型写法与 server/Mgr/MgrFishCarrier.lua 的 resolveMesh 同一条规则。
 local function worldMesh(species)
   return 'official://mesh/' .. tostring(species.Model)
 end
@@ -232,9 +231,9 @@ describe('条款 1-15 七区鱼与首领的代码路径（可见 / 可打 / 可�
   before_each(function()
     env = newWorld()
     saved = installWorld(env)
-    Carrier = assert(loadfile('server/Mgr/MgrFishCarrier.lua'))()
-    package.loaded['server.Mgr.MgrFishCarrier'] = Carrier
-    Unit = assert(loadfile('server/Mgr/MgrFishUnit.lua'))()
+    Carrier = assert(loadfile('server/World/FishCarrier.lua'))()
+    package.loaded['server.World.FishCarrier'] = Carrier
+    Unit = assert(loadfile('server/World/FishTree.lua'))()
     -- Start 里做的是注入 World 与开战斗通道；战斗通道不在本断言范围，只做同一份注入。
     Unit.World = env.world
     Unit.Cast = { PushState = function() end }
@@ -244,8 +243,8 @@ describe('条款 1-15 七区鱼与首领的代码路径（可见 / 可打 / 可�
 
   after_each(function()
     restoreWorld(saved)
-    package.loaded['server.Mgr.MgrFishCarrier'] = nil
-    package.loaded['server.Mgr.MgrFishUnit'] = nil
+    package.loaded['server.World.FishCarrier'] = nil
+    package.loaded['server.World.FishTree'] = nil
     Carrier.Carriers = {}
   end)
 
@@ -269,8 +268,11 @@ describe('条款 1-15 七区鱼与首领的代码路径（可见 / 可打 / 可�
   end)
 
   it('1-15 七区的鱼与首领都能经统一伤害入口打到，血量取鱼种血量', function()
-    local vitals = assert(loadfile('server/Mgr/MgrVitals.lua'))()
-    vitals.FishCarrier = Carrier
+    local Host = require('tests.support.life_host')
+    local attacker = Host.player(7015)
+    local host = Host.start({ now = 0, fish_carrier = Carrier })
+    host:add(attacker)
+    local vitals = host.runtime.life
     local checked = 0
     for _, row in ipairs(rows) do
       local ids = { table.unpack(row.fish) }
@@ -291,6 +293,7 @@ describe('条款 1-15 七区鱼与首领的代码路径（可见 / 可打 / 可�
       end
     end
     assert.is_true(checked >= #rows + 1, '七区鱼与首领没有全部跑到')
+    host:shutdown()
   end)
 
   it('1-15 钓上来的一条鱼能举起并放下：本体回世界、状态离开举着、挂点销毁', function()

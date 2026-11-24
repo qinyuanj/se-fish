@@ -5,6 +5,9 @@
 
 local GameCfg = require("common.GameCfg")
 local spoke = require("common.packages.spoke.api")
+local GroundLoot = require("server.World.GroundLoot")
+local FerryRoute = require("server.World.FerryRoute")
+local SquadDock = require("server.World.SquadDock")
 
 local SpokeTree = spoke.SpokeTree
 local Effect = spoke.Effect
@@ -78,9 +81,35 @@ function SharedWorldTree.spawn(opts)
     if type(opts.on_mount_world) == "function" then
       opts.on_mount_world(s, handle)
     end
+    -- 子 Effect 按声明顺序在根 Init 后运行：此时七个区的 Dock 已建好，GroundLoot 才能初始补货。
+    s:effect("GroundLoot", function(gs)
+      GroundLoot.mount(handle, {
+        scope = gs,
+        create_unit = opts.create_unit,
+        remote = opts.remote,
+        bait_spots = opts.bait_spots,
+        logger = opts.logger,
+        lookup_tree = opts.lookup_tree,
+      })
+    end)
   end)
 
   handle.tree = SpokeTree.spawn("SharedWorldTree", root, services)
+  FerryRoute.mount(handle, {
+    remote = opts.remote,
+    player_data = opts.player_data,
+    save = opts.save,
+    interact = opts.interact,
+    players_service = opts.players_service,
+    lookup_tree = opts.lookup_tree,
+  })
+  SquadDock.mount(handle, {
+    remote = opts.remote,
+    player_data = opts.player_data,
+    lookup_tree = opts.lookup_tree,
+    session_epoch = opts.session_epoch,
+    logger = opts.logger,
+  })
 
   function handle:get_zone(zone_id)
     return zones[zone_id]

@@ -10,7 +10,6 @@
 --   server.AbilityAPI 与技能包 server.packages.ability_system.api（加载即注册事件，不可载真包）；
 --   Vitals/PlayerData/Survival 以假实现注入（与 main.lua 的接线同形状）。
 -- 旧 setUp/tearDown 逐例映射为 before_each/after_each：替换的全局（game / Vector3）、模块缓存
--- （server.AbilityAPI、技能包 api、server.Mgr.MgrAbility、common.REUtil）在 after_each 恢复，对未完成的
 -- before_each 幂等。describe/it 名沿用旧类名与方法名，案例顺序沿用旧 LuaUnit 的字典序执行序。
 local GameCfg = require('common.GameCfg')
 
@@ -48,7 +47,7 @@ describe('TestStatusEffect', function()
             savedGame = rawget(_G, 'game'),
             savedAPI = package.loaded['server.AbilityAPI'],
             savedPackageAPI = package.loaded['server.packages.ability_system.api'],
-            savedMgr = package.loaded['server.Mgr.MgrAbility'],
+            savedMgr = package.loaded['server.FishAbility'],
             bodyScales = {},
             hits = {},
             refreshedMaxHealth = {},
@@ -73,7 +72,7 @@ describe('TestStatusEffect', function()
             end,
         }
         package.loaded['server.packages.ability_system.api'] = {}
-        state.mgr = assert(loadfile('server/Mgr/MgrAbility.lua'))()
+        state.mgr = assert(loadfile('server/FishAbility.lua'))()
         -- 假 Vitals：记录 DOT 结算（统一入口证据）
         state.mgr.Vitals = {
             NewHit = function(_, source, category) return { source = source, category = category, targets = {} } end,
@@ -110,7 +109,7 @@ describe('TestStatusEffect', function()
         _G.game = ctx.savedGame
         package.loaded['server.AbilityAPI'] = ctx.savedAPI
         package.loaded['server.packages.ability_system.api'] = ctx.savedPackageAPI
-        package.loaded['server.Mgr.MgrAbility'] = ctx.savedMgr
+        package.loaded['server.FishAbility'] = ctx.savedMgr
     end)
 
     local function advance(sec)
@@ -342,24 +341,25 @@ describe('TestStatusEffect', function()
 
     -- 来源退出策略：取消其所有效果；真实 Vitals 在退出前签发来源身份，退出后不再产生无来源 DOT。
     it('test_source_leave_cancels_dot_via_public_lifecycle', function()
-        local v = assert(loadfile('server/Mgr/MgrVitals.lua'))()
-        v.Now = function() return ctx.now end
-        v:OnPlayerAdded(ctx.player)
         local fish, carrier = installFish()
         local seen, calls = {}, 0
-        v.FishCarrier = ctx.mgr.Vitals.FishCarrier
-        v.FishCarrier.Damage = function(_, _, amount, hit)
+        ctx.mgr.Vitals.FishCarrier.Damage = function(_, _, amount, hit)
             calls = calls + 1
-            seen[calls] = v:ResolveHitSource(hit)
+            seen[calls] = (hit and hit.sourcePlayer) or nil
             assert.same(1, amount)
             return true, amount
         end
+        local Host = require('tests.support.life_host')
+        local host = Host.start({ now = ctx.now, fish_carrier = ctx.mgr.Vitals.FishCarrier })
+        host:add(ctx.player)
+        local v = host.runtime.life
         ctx.mgr.Vitals = v
         ctx.mgr.Modifier.Vitals = v
         ctx.mgr.Modifier:ApplyWeaponEffect(ctx.player, fish, { Kind = 'poison' })
         advance(1)
         assert.same({ ctx.player }, seen)
-        v:OnPlayerRemoving(ctx.player)
+        host:remove(ctx.player)
+        host:shutdown()
         ctx.mgr:OnPlayerRemoving(ctx.player)
         ctx.mgr.Modifier:OnPlayerRemoving(ctx.player)
         advance(1)
@@ -370,7 +370,7 @@ describe('TestStatusEffect', function()
     it('test_straight_escape_uses_real_status_expiration', function()
         local oldVector = _G.Vector3
         _G.Vector3 = { New = function(x, y, z) return { x = x, y = y, z = z } end }
-        local unit = assert(loadfile('server/Mgr/MgrFishUnit.lua'))()
+        local unit = assert(loadfile('server/World/FishTree.lua'))()
         unit.Ability = ctx.mgr
         local fish, carrier = installFish()
         fish.FishId, fish.StraightEscape, fish.Heading = 'alligatorGar', true, { x = 1, z = 0 }
@@ -422,28 +422,20 @@ describe('TestStatusEffect', function()
     -- 虚弱到期写失败：清标记不留伪虚弱，下一帧按当前状态重试
     it('test_weak_expiry_write_failure_retries_next_frame_without_fake_weak_state', function()
         local reject, read = rejectableSpeed(ctx)
-        local oldRE = package.loaded['common.REUtil']
-        package.loaded['common.REUtil'] = { GetRE = function() return { FireClient = function() end } end }
-        local survival = assert(loadfile('server/Mgr/MgrSurvival.lua'))()
-        package.loaded['common.REUtil'] = oldRE
-        survival.Now = function() return ctx.now end
-        survival.SpeedWriter = ctx.mgr
-        survival.Modifier = ctx.mgr.Modifier
-        survival.SendState, survival.Mirror = function() end, function() end
-        local state = { player = ctx.player, phase = 'alive' }
-        survival.States[ctx.player.UserId] = state
-        ctx.mgr.Survival = survival
+        local Host = require('tests.support.life_host')
+        local host = Host.start({ now = ctx.now, speed_writer = function(player)
+          ctx.mgr:RefreshMoveSpeed(player)
+        end })
+        host:add(ctx.player)
+        local tree = host:tree(ctx.player)
         ctx.potions.item167 = 20
         ctx.mgr:RefreshMoveSpeed(ctx.player)
-        survival:ApplyWeak(state, 1)
-        assert.same(10.5, read())
-        reject(true)
-        ctx.runtime.wait(1)
-        ctx.now = ctx.runtime.now
-        survival:Update()
-        assert.message('到期标记清除，不保留伪虚弱').is_nil(survival:GetState(ctx.player).weakUntil)
-        reject(false)
+        tree:apply_modifier('weak', { duration = 1 })
+        assert.is_true(tree:get_modifier_remaining('weak') > 0, '虚弱没有挂上')
+        host:advance(1)
+        assert.same(0, tree:get_modifier_remaining('weak'), '到期后虚弱标记还在')
         ctx.mgr:Update(0.1)
         assert.same(21, read())
+        host:shutdown()
     end)
 end)

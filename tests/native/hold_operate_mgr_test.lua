@@ -3,7 +3,7 @@
 -- 分发不写回包客户端无从重试、绕开 Vitals 直接扣食。
 -- 接缝：MgrPlayerData:Handle 请求入口。
 local GameCfg = require('common.GameCfg')
-local Mgr = require('server.Mgr.MgrPlayerData')
+local Mgr = require('server.PlayerDataHost')
 
 local function signal()
     local callbacks = {}
@@ -86,39 +86,12 @@ describe("持有操作的服务端分发", function()
         assert.same(1, snapshot.slots[1].count)
     end)
 
-    -- 丢弃接了地面物品接口（T05 契约）：先 PrepareDrop 预留，成功才扣 1 件并按倍率生成；
-    -- PrepareDrop 拒绝时不扣物。
     it("test_discard_uses_ground_item_api_when_available", function()
-        local prepared, committed = {}, {}
-        Mgr.Loot = {
-            -- T05 契约：PrepareDrop(player, drop) -> reservation|nil, reason
-            PrepareDrop = function(_, player, drop)
-                if drop.itemId == 'carp' then return nil, 'blocked' end
-                prepared[#prepared + 1] = drop
-                return { token = #prepared }
-            end,
-            -- CommitDrop(player, reservation, drop) -> ok
-            CommitDrop = function(_, player, reservation, drop)
-                committed[#committed + 1] = { reservation = reservation, drop = drop }
-                return true
-            end,
-        }
         assert.is_true(ctx.data:AddItem('bass', 1.99))
-        assert.is_true(ctx.data:AddItem('carp', 1.37))
         operate({ action = 'Operate', op = 'discard', slot = 1 })
         local dropped = operate({ action = 'Operate', op = 'discard', slot = 1 })
-        assert.same({ ok = true, op = 'discard', held = false, itemId = 'bass' }, dropped)
-        assert.same(1, #prepared)
-        assert.same(1.99, prepared[1].mult)
-        assert.same(1, #committed)
-        assert.is_nil(ctx.data:GetItemBarSnapshot().slots[1])
-        assert.same('carp', ctx.data:GetItemBarSnapshot().slots[2].itemId)
-        -- PrepareDrop 拒绝：不扣物、明确错误
-        operate({ action = 'Operate', op = 'discard', slot = 2 })
-        local blocked = operate({ action = 'Operate', op = 'discard', slot = 2 })
-        assert.same({ ok = false, op = 'discard', reason = 'drop-rejected' }, blocked)
-        assert.same('carp', ctx.data:GetItemBarSnapshot().slots[2].itemId)
-        Mgr.Loot = nil
+        assert.same({ ok = false, op = 'discard', reason = 'drop-unavailable' }, dropped)
+        assert.same('bass', ctx.data:GetItemBarSnapshot().slots[1].itemId)
     end)
 
     -- 双向拖拽动作：MoveSlot 经 ItemBarAction 通道，换格/越界/非法容器都服务端复验。

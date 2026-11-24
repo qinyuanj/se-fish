@@ -62,7 +62,8 @@ describe('TestVolcanoCombat', function()
         assert.is_true(env.player.Character.Controller.Health > 0)
         env.now = 31.8
         env.mgr:Update()
-        assert.same(0, env.player.Character.Controller.Health)
+        assert.same(1, env.player.Character.Controller.Health)
+        assert.same('downed', env.vitals:LifeStatus(env.player))
         assert.same('clear', env.notices[#env.notices].kind)
     end)
 
@@ -76,14 +77,14 @@ describe('TestVolcanoCombat', function()
         local peer = { UserId = 3802, SetAttribute = function() end,
             Character = { Controller = controller, Position = fish.Carrier.Body.Position } }
         env.players[2] = peer
-        env.vitals:OnPlayerAdded(peer)
+        env.lifeHost:add(peer)
         controller.Health = 1000
         while env.now < 19.7 - 1e-8 do
             peer.Character.Position = fish.Carrier.Body.Position
             env.now = math.min(19.7, env.now + 0.05)
             env.mgr:Update()
         end
-        env.vitals:OnPlayerRemoving(peer)
+        env.lifeHost.runtime:on_player_removing(peer)
         env.players[2] = nil
         assert.same(850, controller.Health)
     end)
@@ -162,7 +163,8 @@ describe('TestVolcanoCombat', function()
         env:advance(15.1)
         env.now = 17.7
         env.mgr:Update()
-        assert.same(0, env.player.Character.Controller.Health)
+        assert.same(1, env.player.Character.Controller.Health)
+        assert.same('downed', env.vitals:LifeStatus(env.player))
         assert.is_nil(fish.Carry)
         assert.is_nil(fish.CarryMount)
     end)
@@ -177,13 +179,14 @@ describe('TestVolcanoCombat', function()
         end
         for _, health in ipairs({ 35, 300 }) do
             controller.Health = health
-            env.vitals:OnPlayerRemoving(env.player)
-            env.vitals:OnPlayerAdded(env.player)
+            env.lifeHost.runtime:on_player_removing(env.player)
+            env.lifeHost:add(env.player)
             controller.Health = health
             local fish = env:drop('fish55Elite')
             env:advance(env.now + 15.1)
             env:advance(env.now + 2.6)
-            assert.same(0, controller.Health)
+            assert.same(1, controller.Health)
+            assert.same('downed', env.vitals:LifeStatus(env.player))
             assert.same('clear', env.notices[#env.notices].kind)
             assert.is_nil(fish.BossWarn)
             assert.is_nil(fish.Aquatic.HeadAt)

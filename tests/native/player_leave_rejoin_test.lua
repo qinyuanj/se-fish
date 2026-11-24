@@ -2,7 +2,6 @@
 -- #56 失败方式（先列后写）：
 -- 任务事实/剧情已读未落账就替换会话；旧死亡状态和角色连接残留；最终离场快照被新认领取消；
 -- 重复离场/迟到清理误删新会话；等待玩家已离开或被再次重进替换仍被接纳；跨玩家阻塞；失败后卡住。
--- 接缝：真实 main/Save/PlayerData/Quest/Story/Vitals；替换引擎边界和无关管理器。
 -- it 按旧 LuaUnit 的方法名字典序注册，保持与旧套件一致的案例顺序。
 -- assertIs(state.player, p) 要求对象身份：全仓无 __eq 元方法（已检索确认），故 Lua 的 == 即身份，映射 are.equal。
 local GameCfg = require('common.GameCfg')
@@ -65,12 +64,11 @@ describe('TestPlayerLeaveRejoin', function()
     local function assertRejoined(p)
         assert.same('ready', p.attrs.SaveState)
         assert.is_not_nil(env.data:GetDataInst(p))
-        local state = env.vitals:GetState(p)
-        assert.are.equal(p, state.player)
-        assert.is_true(state.bound)
-        assert.same(1, #p.Character.Controller.Died.handlers)
-        assert.same(0, #env.a.CharacterAdded.handlers)
-        assert.same(0, #env.a.Character.Controller.Died.handlers)
+        local life = env.runtime and env.runtime.life
+        local state = life and life:GetState(p)
+        assert.are.equal(p, state and state.player)
+        assert.same('alive', life:LifeStatus(p))
+        assert.is_true(life:CanAct(p))
     end
 
     -- 逐例夹具：旧 LuaUnit 每例跑 setUp/tearDown，这里同样用 before_each/after_each。
@@ -78,13 +76,12 @@ describe('TestPlayerLeaveRejoin', function()
     -- 因此夹具中途抛错时 after_each 仍能完整还原，不把失败泄漏给后续案例。
     before_each(function()
         saved.game, saved.REUtil = rawget(_G, 'game'), rawget(_G, 'REUtil')
-        saved.MgrUtil, saved.MgrPlayerData = rawget(_G, 'MgrUtil'), rawget(_G, 'MgrPlayerData')
         saved.Vector3, saved.Color = rawget(_G, 'Vector3'), rawget(_G, 'Color')
         saved.Debug, saved.slot = GameCfg.Debug, GameCfg.Save.QaSlot
         GameCfg.Debug, GameCfg.Save.QaSlot = { Enabled = false }, ''
         _G.Vector3 = { New = function(x, y, z) return { x = x, y = y, z = z } end }
         _G.Color = { New = function(...) return { ... } end }
-        env = { tasks = {}, values = {}, errors = {}, cleanups = {}, mgrs = {} }
+        env = { tasks = {}, values = {}, errors = {}, cleanups = {} }
         env.players = {
             PlayerAdded = signal(),
             PlayerRemoving = signal(),
@@ -116,7 +113,7 @@ describe('TestPlayerLeaveRejoin', function()
                     Spawn = function(_, fn) env.tasks[#env.tasks + 1] = fn end, Wait = function() end,
                 } end
                 if name == 'Players' then return env.players end
-                if name == 'RunService' then return { Heartbeat = env.heartbeat, IsServer = function() return true end } end
+                if name == 'RunService' then return { Heartbeat = env.heartbeat, IsServer = function() return true end, IsClient = function() return false end } end
                 if name == 'World' then return {
                     GetServerTime = function() return 100 end,
                     CreateUnit = function() return make_dummy_unit() end,
@@ -125,8 +122,16 @@ describe('TestPlayerLeaveRejoin', function()
                 if name == 'DataStoreService' then return { GetDataStore = function() return env.store end } end
             end,
         }
-        _G.REUtil = { GetRE = function() return {
-            OnServerEvent = signal(), FireClient = function() end,
+        _G.REUtil = { GetRE = function(_, name)
+            env.remotes = env.remotes or {}
+            if not env.remotes[name] then
+                env.remotes[name] = { OnServerEvent = signal(), FireClient = function() end }
+            end
+            return env.remotes[name]
+        end, CheckRECD = function() return false end }
+        _G.RemoteEvent = { New = function() return {
+            OnServerEvent = signal(), OnClientEvent = signal(),
+            FireServer = function() end, FireClient = function() end,
         } end }
         local attr_api_stub = {
             Enums = { AttrComponentType = { Base = 1, BaseExtra = 2, Ratio = 3, Bonus = 4 } },
@@ -149,11 +154,12 @@ describe('TestPlayerLeaveRejoin', function()
             StopAbility = function() end,
             CastAbility = function() return true end,
         }
-        for _, name in ipairs({ 'MgrSave', 'MgrPlayerData', 'MgrQuest', 'MgrStory', 'MgrVitals' }) do
-            env.mgrs[name] = assert(loadfile('server/Mgr/' .. name .. '.lua'))()
-        end
-        env.save, env.data, env.quest, env.story, env.vitals =
-            env.mgrs.MgrSave, env.mgrs.MgrPlayerData, env.mgrs.MgrQuest, env.mgrs.MgrStory, env.mgrs.MgrVitals
+        env.save = assert(loadfile('server/SaveHost.lua'))()
+        env.data = assert(loadfile('server/PlayerDataHost.lua'))()
+        env.quest = {
+            Notify = function(_, kind, player, payload) return env.runtime:notify_quest(kind, player, payload) end,
+            GetState = function(_, player) return env.data:GetDataInst(player).Extra.quest end,
+        }
         local sandbox = setmetatable({
             print = function(...)
                 local parts = { ... }
@@ -165,28 +171,20 @@ describe('TestPlayerLeaveRejoin', function()
                 if path == 'server.packages.attr_rule.api' then return attr_api_stub end
                 if path == 'server.packages.modifier_system.api' then return modifier_api_stub end
                 if path == 'server.packages.ability_system.api' then return ability_api_stub end
-                local name = path:match('^server%.Mgr%.(.*)$')
-                if not name then return require(path) end
-                if not env.mgrs[name] then
-                    env.mgrs[name] = {
-                        OnPlayerRemoving = function(_, p)
-                            env.cleanups[#env.cleanups + 1] = { name = name, player = p }
-                        end,
-                    }
-                end
-                return env.mgrs[name]
+                if path == 'server.SaveHost' then return env.save end
+                if path == 'server.PlayerDataHost' then return env.data end
+                if path == 'server.PlatformHost' then return {} end
+                if path == 'server.FishAbility' then return { Start = function() end, Update = function() end } end
+                return require(path)
             end,
         }, { __index = _G })
-        -- 仅为与本问题无关的生命/能力接缝提供确定返回值。
-        env.mgrs.MgrPkFilter = { Make = function() return function() return true end end }
-        env.mgrs.MgrSurvival = { Hooks = function() return {} end }
-        env.mgrs.MgrAbility = { IsParalyzed = function() return false end }
         assert(loadfile('server/main.lua', 't', sandbox))()
+        env.runtime = require('server.World.ServerRuntime').current()
         env.a = join(560)
         drain()
     end)
     after_each(function()
-        _G.game, _G.REUtil, _G.MgrUtil, _G.MgrPlayerData = saved.game, saved.REUtil, saved.MgrUtil, saved.MgrPlayerData
+        _G.game, _G.REUtil = saved.game, saved.REUtil
         _G.Vector3, _G.Color = saved.Vector3, saved.Color
         GameCfg.Debug, GameCfg.Save.QaSlot = saved.Debug, saved.slot
         saved = {}
@@ -194,14 +192,14 @@ describe('TestPlayerLeaveRejoin', function()
     end)
 
     it('test_dead_old_vitals_does_not_block_new_living_player', function()
-        env.a.Character.Controller:TakeDamage(300)
-        assert.is_false(env.vitals:CanAct(env.a))
+        env.runtime.life:ApplyHit(env.runtime.life:NewHit(nil, 'fishAttack'), env.a, 999)
+        assert.is_false(env.runtime.life:CanAct(env.a))
         fact('worm:dead')
         env.players.PlayerRemoving:Fire(env.a)
         local b = join(env.a.UserId)
         drain()
         assertRejoined(b)
-        assert.is_true(env.vitals:CanAct(b))
+        assert.is_true(env.runtime.life:CanAct(b))
     end)
 
     it('test_final_leave_snapshot_is_drained_before_new_claim', function()
@@ -220,7 +218,6 @@ describe('TestPlayerLeaveRejoin', function()
         fact('worm:2')
         local old = env.save.Sessions[env.a.UserId]
         env.players.PlayerRemoving:Fire(env.a)
-        local late = env.quest.Queues[env.a.UserId].leave
         local b = join(env.a.UserId)
         assert.are.equal(old, env.save.Sessions[env.a.UserId])
         assert.same('pending', b.attrs.SaveState)
@@ -229,7 +226,6 @@ describe('TestPlayerLeaveRejoin', function()
         assert.same(2, env.quest:GetState(b).count)
         assert.same(2, env.values.u560.extra.quest.count)
         local current = env.save.Sessions[b.UserId]
-        late()
         env.players.PlayerRemoving:Fire(env.a)
         assert.are.equal(current, env.save.Sessions[b.UserId])
         assertRejoined(b)
@@ -257,9 +253,11 @@ describe('TestPlayerLeaveRejoin', function()
     end)
 
     it('test_story_read_waiting_for_quest_survives_rejoin', function()
-        env.story:Begin(env.a)
+        assert.same(1, #env.remotes.RequestStory.OnServerEvent.handlers)
+        assert.same(1, #env.remotes.StoryRead.OnServerEvent.handlers)
+        env.remotes.RequestStory.OnServerEvent:Fire(env.a, {})
         fact('worm:story')
-        assert.is_true(env.story:Complete(env.a, env.story.States[env.a.UserId].readKey, 'read'))
+        env.remotes.StoryRead.OnServerEvent:Fire(env.a, { action = 'read', readKey = GameCfg.Story.ReadKey or 'opening' })
         env.players.PlayerRemoving:Fire(env.a)
         local b = join(env.a.UserId)
         drain()
@@ -278,7 +276,7 @@ describe('TestPlayerLeaveRejoin', function()
         drain()
         assert.is_nil(env.data:GetDataInst(b))
         assert.is_nil(env.save.Sessions[b.UserId])
-        assert.is_nil(env.vitals:GetState(b))
+        assert.is_nil(env.runtime.life:GetState(b))
         local c = join(env.a.UserId)
         drain()
         env.a = c

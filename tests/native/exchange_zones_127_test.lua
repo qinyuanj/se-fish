@@ -15,14 +15,10 @@
 -- 保留「setup 失败仍完成清理」的行为。it 顺序沿用旧入口的方法名字典序，与迁移前逐条对账。
 -- 断言口径：旧 assertEquals 两侧同为 table 时是深比较 → assert.same；标量 → assert.are.equal。
 
+local GameCfg = require('common.GameCfg')
+local Host = require('tests.support.shop_feed_host')
+local PlayerData = require('server.Data.PlayerData')
 local function vec(x, y, z) return { x = x, y = y, z = z } end
-
--- 场景合同（#125）里的某个角色实体；钓鱼佬位置是唯一真源
-local function sceneEntity(zone, role)
-  for _, entity in ipairs(zone.Scene.Entities) do
-    if entity.Role == role then return entity end
-  end
-end
 
 describe("TestExchangeZones", function()
   local t
@@ -33,9 +29,15 @@ describe("TestExchangeZones", function()
   -- 每个区的链路用例都从干净库存开始：道具栏只有 2 格，七个区的产物会挤掉后续信物的落点。
   -- seq 不重置：同会话序号严格递增是客户端契约，重放/旧序号一律拒绝
   local function resetInventory()
-    t.data = t.PlayerData.New(t.player, function() end)
-    t.data:Init()
-    t.synced, t.replies, t.plays = {}, {}, {}
+    local fresh = PlayerData.New(t.player)
+    fresh:Init()
+    local save_meta = t.data.SaveMeta
+    t.data.Data, t.data.Extra = fresh.Data, fresh.Extra
+    t.data.SaveMeta = save_meta
+    t.data.Data.SaveMeta = save_meta
+    t.replies, t.plays = {}, {}
+    t.host.results[1].InteractResult = t.replies
+    t.host.sync_counts[1] = 0
   end
 
   -- 站到第 zoneIndex 区钓鱼佬锚点上
@@ -47,7 +49,8 @@ describe("TestExchangeZones", function()
 
   local function feed()
     t.seq = t.seq + 1
-    return t.mgr:Handle(t.player, { target = 'fisherman', action = 'Feed', seq = t.seq })
+    local reply = t.host:send(t.player, 'InteractAction', { target = 'fisherman', action = 'Feed', seq = t.seq })
+    return reply and reply.ok or false
   end
 
   local function give(itemId, mult)
@@ -69,48 +72,27 @@ describe("TestExchangeZones", function()
   end
 
   local function lastReply()
-    return t.replies[#t.replies] and t.replies[#t.replies].payload
+    return t.replies[#t.replies]
   end
 
   before_each(function()
     local env = {}
     t = env
-    env.savedGame = rawget(_G, 'game')
-    env.savedCfg = package.loaded['common.GameCfg']
-    env.cfg = require('tests.support.zone_fixtures').Load()
-    -- 关掉进图白送，库存完全由用例自己摆
-    env.cfg.Debug = { Enabled = false }
-    env.PlayerData = assert(loadfile('server/Data/PlayerData.lua'))()
-    env.attrs = {}
-    env.player = { UserId = 1, Character = { Position = vec(0, 0, 0) },
-      SetAttribute = function(_, k, v) env.attrs[k] = v end }
-    -- 七区钓鱼佬锚点：名字与位置都取 #125 场景合同
-    env.anchors = {}
+    env.cfg = GameCfg
+    env.host = Host.start()
+    env.player, env.data = env.host:join(1, GameCfg.Interact.Fishermen[1].AnchorNames[1])
+    env.anchors = env.host.anchors
     env.plays = {}
-    for index, zone in ipairs(env.cfg.Zones) do
-      local entity = sceneEntity(zone, 'Fisherman')
-      for _, name in ipairs(env.cfg.Interact.Fishermen[index].AnchorNames) do
-        env.anchors[name] = { Name = name, Position = entity.Position,
-          PlayAnimation = function(_, animation) env.plays[#env.plays + 1] = animation end }
-      end
+    for _, anchor in pairs(env.anchors) do
+      anchor.PlayAnimation = function(_, animation) env.plays[#env.plays + 1] = animation end
     end
-    env.synced = {}
-    env.replies = {}
-    env.mgr = assert(loadfile('server/Mgr/MgrInteract.lua'))()
-    env.mgr.FindAnchor = function(_, name) return env.anchors[name] end
-    env.mgr.PlayerData = {
-      GetDataInst = function(_, p) return p == env.player and env.data or nil end,
-      SendItemBar = function(_, p) env.synced[#env.synced + 1] = p end,
-    }
-    env.mgr.Reply = function(_, p, payload) env.replies[#env.replies + 1] = { player = p, payload = payload } end
     resetInventory()
     standAt(1)
     env.seq = 0
   end)
 
   after_each(function()
-    package.loaded['common.GameCfg'] = t.savedCfg
-    _G.game = t.savedGame
+    t.host:shutdown()
     t = nil
   end)
 
@@ -139,7 +121,7 @@ describe("TestExchangeZones", function()
       assert.are.equal(0, t.data.Data.FishCoin, '兑换不给金币')
       assert.is_nil(t.data.Data.SelectedSlot, '兑换后选中态要归位')
       assert.same({ from = chain.EliteToken, to = chain.BossBait }, lastReply().exchange)
-      assert.same({ t.player }, t.synced, '兑换成功后要推一次库存')
+      assert.same(1, t.host.sync_counts[1], '兑换成功后要推一次库存')
 
       local bossSlot = give(chain.BossToken)
       assert.is_true(t.data:SelectSlot(bossSlot))
@@ -153,7 +135,7 @@ describe("TestExchangeZones", function()
         assert.same({ from = chain.BossToken, to = chain.Result }, lastReply().exchange)
       end
       assert.are.equal(0, t.data.Data.FishCoin)
-      assert.same({}, t.plays, '本用例没有配吃动作，不播也不影响结算')
+      assert.same({}, t.plays, '未配置吃动作时交付仍应成交')
     end
   end)
 

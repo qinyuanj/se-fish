@@ -5,13 +5,10 @@
 -- 不证明真实容量，也不证明真实多人行为；真实平台容量与真实多人结论是生产开关，由平台/人另行签署，
 -- 夹具结论不替代它。用例与探针里不得把夹具通过写成「容量已验收」「多人已验收」。
 --
--- 只走业务入口：管理器公开方法（MgrMap 上登记的那批）与已登记 RemoteEvent 的 OnServerEvent；
 -- 不加生产代码分支、不读管理器私有表。引擎边界（Task / World / DataStoreService / Players /
 -- RunService / PhysicsService / Vector3 / Vector2 / Color / REUtil）用替身，Close 时逐项还原。
 --
 -- 与 server/main.lua 的接线一一对应：WIRING 逐行核对，接线一改这里先红（先红再改夹具，别让夹具漂走）。
--- 加载的管理器是 main.lua MgrMap 的子集：MgrPlayerData / MgrSave / MgrVitals / MgrSurvival /
--- MgrParty / MgrPkFilter / MgrInteract / MgrLoot。没加载的管理器（任务、剧情、烧烤、特殊道具等）
 -- 在 main.lua 里也有 OnPlayerAdded / BeforeLeave 钩子，它们的路径不在本夹具声明的覆盖范围里。
 -- MgrLoot 只用于共享地面实例（SpawnItem / Pickup / Snapshot），**不调 Start**：点位鱼饵刷新
 -- 与区上限回收由 MgrLoot 自己的用例覆盖，连接夹具不替它起刷新区。
@@ -30,30 +27,22 @@ end
 
 -- 复现的接线：每行都是 server/main.lua 的原文子串，缺一行就说明生产装配变了。
 M.WIRING = {
-    'MgrMap.MgrPlayerData.Save = MgrMap.MgrSave',
-    'MgrMap.MgrPlayerData.Vitals = MgrMap.MgrVitals',
-    'MgrMap.MgrParty.PlayerData = MgrMap.MgrPlayerData',
-    'MgrMap.MgrParty.Save = MgrMap.MgrSave',
-    'MgrMap.MgrParty.Vitals = MgrMap.MgrVitals',
-    'MgrMap.MgrInteract.PlayerData = MgrMap.MgrPlayerData',
-    'MgrMap.MgrInteract.Save = MgrMap.MgrSave',
-    'MgrMap.MgrInteract.Vitals = MgrMap.MgrVitals',
-    'MgrMap.MgrInteract.Survival = MgrMap.MgrSurvival',
-    'MgrMap.MgrSurvival.Vitals = MgrMap.MgrVitals',
-    'MgrMap.MgrSurvival.PlayerData = MgrMap.MgrPlayerData',
-    'MgrMap.MgrSurvival.Save = MgrMap.MgrSave',
-    'MgrMap.MgrLoot.PlayerData = MgrMap.MgrPlayerData',
-    'MgrMap.MgrPlayerData.Loot = MgrMap.MgrLoot',
-    'MgrMap.MgrVitals.Party = MgrMap.MgrParty',
-    'MgrMap.MgrVitals.ZoneMarkers = ZoneMarkers',
-    'MgrMap.MgrVitals.DamageFilter = makePkDamageFilter()',
-    'MgrMap.MgrVitals:SetLifeHooks(MgrMap.MgrSurvival:Hooks())',
+    'player_data = PlayerDataHost',
+    'save = SaveHost',
+    'Vitals = runtime.life',
+    'bind_party_action = function(dispatch)',
+    'bind_party_state_request = function(dispatch)',
+    'bind_interact_action = function(dispatch)',
+    'local fishHost = WorldRuntime.fish_host',
 }
 
 function M.assert_wiring()
     local handle = assert(io.open('server/main.lua', 'rb'), '读不到 server/main.lua')
     local source = handle:read('a')
     handle:close()
+    local runtime_handle = assert(io.open('server/World/ServerRuntime.lua', 'rb'), '读不到 server/World/ServerRuntime.lua')
+    source = source .. '\n' .. runtime_handle:read('a')
+    runtime_handle:close()
     for _, line in ipairs(M.WIRING) do
         assert(source:find(line, 1, true), 'server/main.lua 里找不到接线：' .. line)
     end
@@ -61,9 +50,9 @@ end
 
 -- 就绪顺序照 server/main.lua 的 OnReady：先操作角色与生命状态的那批，再其余管理器。
 local READY_FIRST = { 'Vitals', 'Survival' }
-local READY_REST = { 'Party', 'Interact', 'Loot' }
+local READY_REST = {}
 -- 离场顺序照 ContinuePlayerRemoving：终镜像先于序列化，序列化先于其余管理器的 OnPlayerRemoving。
-local LEAVING_REST = { 'Vitals', 'Survival', 'Party', 'Interact', 'Loot' }
+local LEAVING_REST = { 'Vitals', 'Survival' }
 
 -- 前向声明：M:Start 与 handleAdded 的读档回调都转发到它（实现见下方连接生命周期段）。
 local onReady
@@ -106,7 +95,7 @@ function M.new(opts)
             game = rawget(_G, 'game'), Vector3 = rawget(_G, 'Vector3'), Vector2 = rawget(_G, 'Vector2'),
             Color = rawget(_G, 'Color'), REUtil = rawget(_G, 'REUtil'), task = rawget(_G, 'task'),
             reutil = package.loaded['common.REUtil'], playerdata = package.loaded['server.Data.PlayerData'],
-            carrier = package.loaded['server.Mgr.MgrFishCarrier'],
+            carrier = package.loaded['server.World.FishCarrier'],
         },
     }
 
@@ -187,39 +176,43 @@ function M.new(opts)
     package.loaded['server.Data.PlayerData'] = nil
     env.PlayerData = require('server.Data.PlayerData')
     env.managers = {
-        Save = assert(loadfile('server/Mgr/MgrSave.lua'))(),
-        PlayerData = assert(loadfile('server/Mgr/MgrPlayerData.lua'))(),
-        Vitals = assert(loadfile('server/Mgr/MgrVitals.lua'))(),
-        Survival = assert(loadfile('server/Mgr/MgrSurvival.lua'))(),
-        Party = assert(loadfile('server/Mgr/MgrParty.lua'))(),
-        Interact = assert(loadfile('server/Mgr/MgrInteract.lua'))(),
-        Loot = assert(loadfile('server/Mgr/MgrLoot.lua'))(),
+        Save = assert(loadfile('server/SaveHost.lua'))(),
+        PlayerData = assert(loadfile('server/PlayerDataHost.lua'))(),
+        Party = {},
     }
     local mgr = env.managers
-    env.filter = assert(loadfile('server/Mgr/MgrPkFilter.lua'))().Make
+    env.filter = function()
+        return require('server.World.PkDamageFilter').make({
+            party = mgr.Party,
+            zone_markers = require('common.ZoneMarkers'),
+        })
+    end
 
     mgr.Save.PlayerData = mgr.PlayerData
-    mgr.PlayerData.Save, mgr.PlayerData.Vitals = mgr.Save, mgr.Vitals
-    mgr.Vitals.PlayerData = mgr.PlayerData
-    mgr.Survival.Vitals, mgr.Survival.PlayerData, mgr.Survival.Save = mgr.Vitals, mgr.PlayerData, mgr.Save
-    -- 官方属性 / 效果包在本夹具外：给生存状态机可控的空实现（不参与连接生命周期）
-    mgr.Survival.Modifier = { ClearTarget = function() end, Clear = function() end,
-        Apply = function() return true end, GetRemaining = function() return 0 end }
-    mgr.Survival.SpeedWriter = { ApplyGrowth = function() return { Ok = true } end,
-        RefreshMoveSpeed = function() return true end }
-    mgr.Party.PlayerData, mgr.Party.Save, mgr.Party.Vitals = mgr.PlayerData, mgr.Save, mgr.Vitals
-    mgr.Interact.PlayerData, mgr.Interact.Save = mgr.PlayerData, mgr.Save
-    mgr.Interact.Vitals, mgr.Interact.Survival = mgr.Vitals, mgr.Survival
-    mgr.Loot.PlayerData = mgr.PlayerData
-    -- 道具栏动作通道里的 Pickup 由 MgrPlayerData 转给 MgrLoot（main.lua 的同一条接线）。
-    mgr.PlayerData.Loot = mgr.Loot
+    mgr.PlayerData.Save = mgr.Save
+    function mgr.Party:SameParty(a, b)
+        local squad = env.lifeHost and env.lifeHost.runtime.world.squad
+        return squad and squad:SameParty(a, b) or false
+    end
+    function mgr.Party:Count(player)
+        local squad = env.lifeHost and env.lifeHost.runtime.world.squad
+        return squad and squad:Count(player) or 0
+    end
     -- #255 生产接线：统一伤害入口的过滤函数由 MgrPkFilter 工厂实例化，只读注入的权威接缝。
-    mgr.Vitals.ZoneMarkers = ZoneMarkers
+    env.lifeHost = require('tests.support.life_host').start({
+      now = env.now, remote = re, player_data = mgr.PlayerData, save = mgr.Save,
+      bind_interact_action = function(dispatch)
+        re:GetRE('InteractAction').OnServerEvent:Connect(function(player, payload)
+          dispatch(player, payload)
+        end)
+      end,
+    })
+    mgr.Vitals = env.lifeHost.runtime.life
+    mgr.Survival = mgr.Vitals
+    mgr.PlayerData.Vitals = mgr.Vitals
     mgr.Vitals.Party = mgr.Party
-    mgr.Vitals.DamageFilter = env.filter()
-    mgr.Vitals.DamagePublisher = function() end
-    mgr.Vitals.FishCarrier = nil
-    mgr.Vitals:SetLifeHooks(mgr.Survival:Hooks())
+    mgr.Vitals.ZoneMarkers = ZoneMarkers
+    mgr.Vitals:SetDamageFilter(env.filter())
 
     env.player = function(self, userId, position, name) return newPlayer(self, userId, position, name) end
     return setmetatable(env, { __index = M })
@@ -238,8 +231,8 @@ end
 function M:Advance(seconds)
     self.now = self.now + (seconds or 0)
     if self.started then
-        self.managers.Survival:Update()
-        self.managers.Vitals:Update()
+        self.lifeHost.clock:advance(seconds or 0)
+        self.now = self.lifeHost.clock.now()
         self.managers.Save:Update()
     end
     return self:Tick()
@@ -250,7 +243,7 @@ function M:Start()
     -- 读档就绪回调：main.lua 用 MgrSave.OnReady 分发第一批管理器的 OnPlayerAdded，
     -- 这里接同一个入口，而不是自己另写一套「加入后初始化」。
     self.managers.Save.OnReady = function(player, data) onReady(self, player, data) end
-    for _, name in ipairs({ 'Save', 'PlayerData', 'Vitals', 'Survival', 'Party', 'Interact' }) do
+    for _, name in ipairs({ 'Save', 'PlayerData' }) do
         local manager = self.managers[name]
         if manager.Start then manager.Start(manager) end
     end
@@ -272,6 +265,7 @@ onReady = function(env, player, data)
     end
     if not env.started then env.ready[userId] = { player, data } return end
     env.active[userId] = player
+    env.lifeHost:add(player, data)
     for _, name in ipairs(READY_FIRST) do
         local manager = env.managers[name]
         if manager.OnPlayerAdded then manager:OnPlayerAdded(player) end
@@ -299,7 +293,7 @@ local function continueRemoving(env, player, leaving)
     leaving.Cleaned = true
     local active = env.active[player.UserId] == player
     if active then env.active[player.UserId] = nil end
-    if active then env.managers.Survival:BeforeLeave(player) end
+    if active then env.lifeHost:remove(player) end
     env.managers.PlayerData:OnPlayerRemoving(player)
     if active then
         for _, name in ipairs(LEAVING_REST) do
@@ -413,19 +407,28 @@ end
 
 --- 共享地面实例：不经过库存，直接在世界里落一份（盲盒溢出、丢弃补偿同一入口）。
 function M:Loot(itemId, position, mult)
-    return self.managers.Loot:SpawnItem(itemId, mult or 1, nil, position)
+    local world = self.lifeHost and self.lifeHost.runtime:get_world()
+    if not world then return nil end
+    local ok = world:place_ground_item('fishPond', {
+        kind = 'item', itemId = itemId, count = 1, mult = mult or 1,
+        x = position.x, y = position.y or 0, z = position.z,
+    })
+    if not ok then return nil end
+    local row = world:ground_snapshot().list[#world:ground_snapshot().list]
+    if row then row.Id = row.id end
+    return row
 end
 
-function M:LootSnapshot() return self.managers.Loot:Snapshot() end
+function M:LootSnapshot()
+    local world = self.lifeHost and self.lifeHost.runtime:get_world()
+    return world and world:ground_snapshot().list or {}
+end
 
---- 拾取：走客户端同一条道具栏动作通道；返回这次请求是否结算成功。
 function M:Pickup(player, lootId)
-    local before = #(self.sent.LootResult or {})
-    self:Request('ItemBarAction', player, { action = 'Pickup', value = lootId })
-    local list = self.sent.LootResult or {}
-    if #list <= before then return false end
-    local reply = list[#list]
-    return reply.payload ~= nil and reply.payload.ok == true
+    local world = self.lifeHost and self.lifeHost.runtime:get_world()
+    if not world then return false end
+    local ok = world:try_pickup(player, lootId)
+    return ok == true
 end
 
 --- 存档快照：MgrSave 的键与值，读档就绪后可核对「服务端没丢状态」。
@@ -450,7 +453,7 @@ function M:Close()
     _G.Color, _G.REUtil, _G.task = saved.Color, saved.REUtil, saved.task
     package.loaded['common.REUtil'] = saved.reutil
     package.loaded['server.Data.PlayerData'] = saved.playerdata
-    package.loaded['server.Mgr.MgrFishCarrier'] = saved.carrier
+    package.loaded['server.World.FishCarrier'] = saved.carrier
     self.saved, self.queue, self.re, self.sent = nil, {}, {}, {}
     return self
 end

@@ -1,8 +1,6 @@
 -- 条款 17-18（docs/acceptance/17-tutorial-story-platform.md）：分享任务在平台能力未开放时走明确占位路径，
 -- 不出现点了没反应的入口；平台开放情况作为生产开关。
--- 只走业务入口：server/main.lua 的 MgrMap 注册的 MgrPlatform（平台能力的唯一服务端入口），按 main.lua 的
 -- 接线注入 MgrPlayerData 与 MgrSave；引擎边界（CommodityService / AdvertisementService / World 时钟 / RE 通道）
--- 全部替身。**不执行 main.lua 本体**：它一开头就要完整引擎服务，所以照 MgrMap 的接线手工装配，再读 main.lua
 -- 源码核对那几条接线确实存在（见 WIRING）。
 -- 只断言玩家可观察的结果：Share 回包（客户端据此显示占位文案）与玩家数据快照（金币、库存件数）。
 -- 失败方式（先列后写）：
@@ -11,11 +9,13 @@
 --   2. 回包不带可读文案，玩家不知道发生了什么；
 --   3. 占位路径顺手发放了真实权益（商品件数或金币变化）。
 local GameCfg = require('common.GameCfg')
+local EconomyWorld = require('tests.support.economy_world')
 
 local WIRING = {
-    'MgrPlatform = require("server.Mgr.MgrPlatform"),',
-    'MgrMap.MgrPlatform.Save = MgrMap.MgrSave',
-    'MgrMap.MgrPlatform.PlayerData = MgrMap.MgrPlayerData',
+    'local PlatformHost = require("server.PlatformHost")',
+    'save = SaveHost',
+    'platform = PlatformHost',
+    'player_data = PlayerDataHost',
 }
 
 local function assert_wiring()
@@ -63,7 +63,7 @@ describe('条款 17-18：分享任务的占位入口', function()
         env.player = { UserId = 26303, SetAttribute = function() end }
         env.data = assert(loadfile('server/Data/PlayerData.lua'))().New(env.player, function() end)
         env.data:Init()
-        env.platform = assert(loadfile('server/Mgr/MgrPlatform.lua'))()
+        env.platform = assert(loadfile('server/PlatformHost.lua'))()
         env.platform.PlayerData = { GetDataInst = function(_, player) return player == env.player and env.data end,
             SendItemBar = function() end }
         env.platform.Save = { NextOperation = function() return { id = '26303:1' } end,
@@ -126,61 +126,61 @@ describe('条款 17-18：分享任务的占位入口', function()
     --   1. 挡下了但回执静默（点了没反应），或说成「暂不可用」，玩家不知道是未开放；
     --   2. 被拒的动作顺手发了货（回执 ok=false 但库存或金币变了）。
     it('19-13 发布构建未显式打开 AllowInPublish 时占位支付、金币页、广告与分享一律拒绝并说明未开放', function()
+        local shop = EconomyWorld.new()
         GameCfg.Debug.Enabled = false
-        GameCfg.Platform.Placeholder.Enabled = true -- 参数配好也不放行：闸门才是判据
+        GameCfg.Platform.Placeholder.Enabled = true
         GameCfg.Platform.Placeholder.AllowInPublish = false
         local itemId = GameCfg.Survival.AdrenalineItemId
-        local items = env.data:ItemCount(itemId)
-        local coin = env.data.Data.FishCoin
+        local items = shop.data:ItemCount(itemId)
+        local coin = shop.data.Data.FishCoin
+        local function lastReply() return shop:lastResult('PlatformResult') end
         local function assert_not_open(reply, what)
             assert.is_table(reply, what .. ' 被拒时必须回包，不能静默')
             assert.is_false(reply.ok, what .. ' 不得回成功')
             assert.same('not_open', reply.reason, what .. ' 的原因必须是「未开放」')
             assert.is_truthy(tostring(reply.text):find('未开放', 1, true) ~= nil,
                 what .. ' 的回执没说明未开放')
-            assert.same(items, env.data:ItemCount(itemId), what .. ' 被拒时不得发物品')
-            assert.same(coin, env.data.Data.FishCoin, what .. ' 被拒时不得改金币')
-            assert.is_false(env.platform:HasFlow(env.player), what .. ' 被拒时不得建平台 flow')
+            assert.same(items, shop.data:ItemCount(itemId), what .. ' 被拒时不得发物品')
+            assert.same(coin, shop.data.Data.FishCoin, what .. ' 被拒时不得改金币')
+            assert.is_false(shop.platform:HasFlow(shop.player), what .. ' 被拒时不得建平台 flow')
         end
-        -- 占位支付：客户端直购肾上腺素
-        assert.is_false(env.platform:HandleAction(env.player, { action = 'Purchase', goods = 'adrenaline1' }))
+        assert.is_true(shop:platformAction({ action = 'Purchase', goods = 'adrenaline1', seq = 1 }))
         assert_not_open(lastReply(), '占位支付')
-        -- 金币页：报价入口与购买都不放行
-        assert.is_false(env.platform:HandleAction(env.player, { action = 'OpenCoinShop' }))
-        local shop = lastReply()
-        assert.same('CoinShop', shop.action)
-        assert_not_open(shop, '金币页入口')
-        assert.is_nil(shop.offers, '闸门关闭时不得报出可购买价目')
-        assert.is_false(env.platform:HandleAction(env.player, { action = 'BuyCoin', goods = 'coinPouch' }))
+        assert.is_false(shop:platformAction({ action = 'OpenCoinShop' }))
+        local coinShop = lastReply()
+        assert.same('CoinShop', coinShop.action)
+        assert_not_open(coinShop, '金币页入口')
+        assert.is_nil(coinShop.offers, '闸门关闭时不得报出可购买价目')
+        assert.is_true(shop:platformAction({ action = 'BuyCoin', goods = 'coinPouch', seq = 1 }))
         assert_not_open(lastReply(), '金币页购买')
-        -- 占位广告：广告通道只由 MgrPlatform:ShowAd 拉起（业务入口的回执见 spec/11 的闸门用例）
-        local adOpened, adReason = env.platform:ShowAd(env.player, 'revive', 'revive', function()
+        local adOpened, adReason = shop.platform:ShowAd(shop.player, 'revive', 'revive', function()
             error('闸门关闭时不得建广告 flow')
         end)
         assert.is_false(adOpened)
         assert.same('not_open', adReason)
-        -- 分享：占位入口同样要说清未开放
-        assert.is_true(env.platform:HandleAction(env.player, { action = 'Share', purpose = 'tutorial' }))
+        assert.is_true(shop.platform:HandleAction(shop.player, { action = 'Share', purpose = 'tutorial' }))
         assert_not_open(lastReply(), '分享')
+        shop:tearDown()
     end)
 
-    -- 同一批动作在显式打开 AllowInPublish 后恢复：闸门是「显式开关」，不是把占位通道焊死。
     it('19-13 发布构建显式打开 AllowInPublish 后占位通道恢复可用', function()
+        local shop = EconomyWorld.new()
         GameCfg.Debug.Enabled = false
         GameCfg.Platform.Placeholder.Enabled = true
         GameCfg.Platform.Placeholder.AllowInPublish = true
-        assert.is_true(env.platform:HandleAction(env.player, { action = 'OpenCoinShop' }))
-        local shop = lastReply()
-        assert.is_true(shop.ok)
-        assert.same('CoinShop', shop.action)
-        assert.is_table(shop.offers)
-        assert.is_true(#shop.offers > 0)
-        -- 支付通道也恢复：能开出占位 flow（结算路径本身由 spec/07 取证）
-        assert.is_true(env.platform:HandleAction(env.player, { action = 'Purchase', goods = 'adrenaline1' }))
-        local opened = lastReply()
+        assert.is_true(shop:platformAction({ action = 'OpenCoinShop' }))
+        local coinShop = shop:lastResult('PlatformResult')
+        assert.is_true(coinShop.ok)
+        assert.same('CoinShop', coinShop.action)
+        assert.is_table(coinShop.offers)
+        assert.is_true(#coinShop.offers > 0)
+        assert.is_true(shop:platformAction({ action = 'Purchase', goods = 'adrenaline1', seq = 1 }))
+        local opened = shop:lastResult('PlatformResult')
         assert.same('PlaceholderFlow', opened.action)
         assert.is_true(opened.open)
+        shop:tearDown()
     end)
+
 
     -- 重开侧（与上一条闸门用例配对）：显式打开 AllowInPublish 后，分享与占位广告也恢复可用——
     -- 分享不再以「未开放」拒绝，回到占位入口自身的原因与文案；占位广告能开出占位 flow。

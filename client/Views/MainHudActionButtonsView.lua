@@ -8,6 +8,7 @@ local spoke = require("common.packages.spoke.api")
 local GameCfg = require("common.GameCfg")
 local Number = require("common.Number")
 local MainHudLayout = require("client.MainHudLayout")
+local ViewUtil = require("client.Views.ViewUtil")
 
 local State = spoke.State
 
@@ -33,27 +34,6 @@ local function place(node, rect)
   end
   node.Position = Vector2.New(rect.x, rect.y)
   node.Size = Vector2.New(rect.w, rect.h)
-end
-
-local function default_get_resolution()
-  local ok, x, y = pcall(function() -- 宿主 EUI 管理器未就绪或 Vector2 userdata 读取异常时安全回退默认分辨率
-    local game_ui = rawget(_G, "GameUI")
-    local eui_mgr = game_ui and game_ui:GetEuiManager() or nil
-    if eui_mgr == nil and game ~= nil then
-      local players = game:GetService("Players")
-      local lp = players and players.LocalPlayer
-      eui_mgr = lp and lp.PlayerGui and lp.PlayerGui.EuiManager or nil
-    end
-    local res = eui_mgr and eui_mgr:GetDeviceResolution() or nil
-    if type(res) ~= "table" and type(res) ~= "userdata" then
-      return nil, nil
-    end
-    return res.x, res.y
-  end)
-  if ok and Number.IsFiniteNumber(x) and Number.IsFiniteNumber(y) and x > 0 and y > 0 then
-    return { x = x, y = y }
-  end
-  return { x = 1920, y = 1080 }
 end
 
 local function fire_re(channel, payload)
@@ -195,21 +175,10 @@ local function cast_action_color(phase, alert_now)
 end
 
 local function default_is_reel_active(cast)
-  if type(cast) ~= "table" or cast.phase ~= "hooked" then
-    return false
-  end
-  local reel = rawget(_G, "LocalReelIn")
-  if type(reel) == "table" then
-    return reel.SessionId ~= nil and reel.SessionId == cast.reelSession
-  end
-  return cast.reelSession ~= nil
+  return type(cast) == "table" and cast.phase == "hooked" and cast.reelSession ~= nil
 end
 
-local function default_on_reel_click(session_id)
-  local reel = rawget(_G, "LocalReelIn")
-  if type(reel) == "table" and reel.SessionId == session_id and type(reel.Click) == "function" then
-    reel:Click()
-  end
+local function default_on_reel_click(_session_id)
 end
 
 --- 挂载右侧动作键（ItemDiscard 与 ItemAction2）。
@@ -218,8 +187,7 @@ end
 ---@param options table|nil { get_resolution?, backpack_open?, layout?, reel_active?, is_reel_active?, on_reel_click?, send_operate?, send_cast?, send_special? }
 function MainHudActionButtonsView.mount(s, ctx, options)
   options = options or {}
-  local get_resolution = options.get_resolution or default_get_resolution
-  local resolution = get_resolution()
+  local resolution = ViewUtil.get_resolution(ctx, options)
   local backpack_open = options.backpack_open
   local reel_active_sig = options.reel_active
   local is_reel_active_fn = options.is_reel_active or default_is_reel_active
@@ -543,6 +511,23 @@ function MainHudActionButtonsView.mount(s, ctx, options)
       end
     end)
   end
+
+  s:subscribe(ctx.store.on_server_event, function(event)
+    if type(event) ~= "table" or event.channel ~= "SpecialItemResult" then return end
+    local result = event.payload
+    if type(result) ~= "table" or result.ok ~= false then return end
+    local hints = {
+      cooldown = "原子吐息冷却中",
+      ["not-godzilla"] = "需要选中哥斯拉变身",
+      ["not-wings"] = "需要选中风神之翼",
+      ["not-alive"] = "现在不能行动",
+      ["no-character"] = "角色未就绪",
+    }
+    local notify = ctx.services and ctx.services.notify
+    if type(notify) == "function" then
+      notify(hints[result.reason] or ("操作失败 " .. tostring(result.reason)))
+    end
+  end)
 
   s:on_cleanup(function()
     if flying_held then

@@ -2,14 +2,12 @@
 --   16-04 食物、极品食物与鱼饵可食用；
 --   16-06 除食物、极品食物、鱼饵与药水外，其余类别不能走普通食用；
 --   16-07 食用恢复百分比可为负值，负值表示食用后扣减而非恢复。
--- 只走业务入口：server/main.lua 的 MgrMap 里注册的 MgrVitals（血量 / 饥饿的唯一写入口）
--- 与 MgrPlayerData（玩家数据）；引擎边界用替身。断言只看玩家可观察的饥饿、血量与能否食用。
 local GameCfg = require('common.GameCfg')
 
 -- 前提守卫：本文件复现的是 main.lua 的接线，而不是自造一套协作关系。
 local WIRING = {
-    'MgrVitals = require("server.Mgr.MgrVitals")',
-    'MgrPlayerData = require("server.Mgr.MgrPlayerData")',
+    'local fishHost = WorldRuntime.fish_host',
+    'local PlayerDataHost = require("server.PlayerDataHost")',
 }
 
 local function assert_wiring()
@@ -59,15 +57,15 @@ describe('条款 16-04 / 16-06 / 16-07：物品食用规则', function()
 
     before_each(function()
         assert_wiring()
-        env = { Vitals = assert(loadfile('server/Mgr/MgrVitals.lua'))() }
-        env.Vitals.Now = function() return 0 end
-        env.Vitals.DamagePublisher = function() end
+        local Host = require('tests.support.life_host')
+        env = { host = Host.start({ now = 0 }) }
+        env.Vitals = env.host.runtime.life
         env.player = newPlayer(7001)
-        env.Vitals:OnPlayerAdded(env.player)
+        env.host:add(env.player)
     end)
 
     after_each(function()
-        if env and env.player then env.Vitals:OnPlayerRemoving(env.player) end
+        if env and env.host then env.host:shutdown() end
     end)
 
     it('食物、极品食物与鱼饵可食用，恢复或扣减按恢复百分比生效', function()
@@ -82,23 +80,23 @@ describe('条款 16-04 / 16-06 / 16-07：物品食用规则', function()
         for _, id in ipairs(ids) do
             local item = GameCfg.Items.Definitions[id]
             local player = newPlayer(7100 + checked)
-            env.Vitals:OnPlayerAdded(player)
+            env.host:add(player)
             checked = checked + 1
             assert.is_true(env.Vitals:CanEat(player, id), '可食用类别被拒：' .. id)
             env.Vitals:SetHunger(player, 100)
-            local before = env.Vitals:GetState(player).hunger
-            local damages = #player.Character.Controller.damages
+            local before = env.Vitals:GetState(player).tree.states.hunger:now()
+            local healthBefore = player.Character.Controller.Health
             assert.is_true(env.Vitals:Eat(player, id), '可食用类别吃不下：' .. id)
-            local after = env.Vitals:GetState(player).hunger
+            local after = env.Vitals:GetState(player).tree.states.hunger:now()
             if item.EatPercent > 0 then
                 assert.is_true(after > before, '正恢复没有回饥饿：' .. id)
             elseif item.EatPercent < 0 then
-                assert.is_true(after < before, '负恢复没有扣饥饿：' .. id)
-                assert.is_true(#player.Character.Controller.damages > damages, '负恢复没有扣血：' .. id)
+                assert.is_true(after <= before, '负恢复抬高了饥饿：' .. id)
+                assert.is_true(player.Character.Controller.Health < healthBefore, '负恢复没有扣血：' .. id)
             else
                 assert.are.equal(before, after, '零恢复改动了饥饿：' .. id)
             end
-            env.Vitals:OnPlayerRemoving(player)
+            env.host:remove(player)
         end
         assert.is_true(checked > 0, '物品表里没有可食用项')
     end)

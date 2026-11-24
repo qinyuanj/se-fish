@@ -194,7 +194,8 @@ describe('第 12 节 首领逐招表（哥斯拉）', function()
         local fish = env:drop('fish56Boss')
         stand(fish, 8) -- 正前 8 米，在吐息 10 米内
         env:advance(31.6)
-        assert.same(0, env.player.Character.Controller.Health, '吐息没有秒杀')
+        assert.same(1, env.player.Character.Controller.Health, '吐息没有把目标打进濒死')
+        assert.same('downed', env.vitals:LifeStatus(env.player))
 
         local warning = noticesBy('bossBreath')[1]
         assert.is_not_nil(warning)

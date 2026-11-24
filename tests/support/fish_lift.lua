@@ -1,5 +1,6 @@
 -- 举鱼共享夹具：仅提供环境方法，不注册测试案例。
 local M = {}
+local State = require('common.packages.spoke.api').State
 
 --- 建一个空世界壳；调用方随后 :setUp() 搭世界、:tearDown() 拆除
 --- （与 blindbox_world / revive_world 同一构造/拆除入口名）。
@@ -32,7 +33,7 @@ function M:setUp()
     self.saved = { game = rawget(_G, 'game'), Vector3 = rawget(_G, 'Vector3'),
         RaycastParams = rawget(_G, 'RaycastParams') }
     self.modules = {}
-    for _, name in ipairs({ 'server.Mgr.MgrFishCarrier', 'server.Mgr.MgrFishUnit' }) do
+    for _, name in ipairs({ 'server.World.FishCarrier', 'server.World.FishTree' }) do
         self.modules[name] = package.loaded[name]
     end
     self.now = 0
@@ -65,7 +66,7 @@ function M:setUp()
         function unit:AddNoCollisionPairWithUnit(other) self.Pairs[other] = true end
         return unit
     end
-    package.loaded['server.Mgr.MgrFishCarrier'] = {
+    package.loaded['server.World.FishCarrier'] = {
         Spawn = function(_, opts)
             local carrier = { Opts = opts, Body = body(opts.Position),
                 Receiver = { UnitId = 'r' .. tostring(#env.spawned + 1), Controller = { LiftedEnabled = true } } }
@@ -73,11 +74,34 @@ function M:setUp()
             return carrier
         end,
         Despawn = function(_, carrier) env.despawned[#env.despawned + 1] = carrier end,
+        SyncAiPosition = function(_, carrier)
+            if not carrier.AiOwnsMovement then return true end
+            local p, offset = carrier.Receiver.Position, carrier.ReceiverOffset or vec(0, 0, 0)
+            if not p or p.x ~= p.x or p.y ~= p.y or p.z ~= p.z then return false end
+            carrier.Body.Position = vec(p.x - offset.x, p.y - offset.y, p.z - offset.z)
+            return true
+        end,
     }
-    package.loaded['server.Mgr.MgrFishUnit'] = nil
-    self.mgr = assert(loadfile('server/Mgr/MgrFishUnit.lua'))()
+    package.loaded['server.World.FishTree'] = nil
+    self.mgr = assert(loadfile('server/World/FishTree.lua'))()
+    self.holder_trees = {}
+    self.mgr.GetPlayerTree = function(_, player)
+        return player and self.holder_trees[player.UserId] or nil
+    end
+    local died = self.mgr.OnDied
+    self.mgr.OnDied = function(host, player)
+        local tree = player and self.holder_trees[player.UserId]
+        if tree then tree.memos.is_alive:set(false) end
+        return died(host, player)
+    end
+    local removing = self.mgr.OnPlayerRemoving
+    self.mgr.OnPlayerRemoving = function(host, player)
+        local tree = player and self.holder_trees[player.UserId]
+        if tree then tree.session_alive:set(false) end
+        return removing(host, player)
+    end
     -- 目标裁决适配层由入口注入（生产见 server/main.lua）；夹具照生产接线补上，不走模块内 require。
-    self.mgr.AiTarget = require('server.Mgr.MgrAiTarget')
+    self.mgr.AiTarget = require('server.World.FishAiTarget')
     self.pushed = {}
     self.mgr.Cast = { PushState = function(_, player) env.pushed[#env.pushed + 1] = player end }
     self.mgr:Start()
@@ -93,6 +117,10 @@ function M:newPlayer(id, position)
             env.lifts[#env.lifts + 1] = character
         end } }
     local player = { UserId = id, Character = character, CharacterAdded = signal(), CharacterRemoving = signal() }
+    local tree = { session_alive = State.new('Fixture.session_alive', true) }
+    tree.memos = { is_alive = State.new('Fixture.is_alive', true) }
+    self.holder_trees[id] = tree
+    character.Controller.Died:Connect(function() tree.memos.is_alive:set(false) end)
     self.players[#self.players + 1] = player
     self.mgr:OnPlayerAdded(player)
     return player
@@ -103,7 +131,7 @@ function M:tearDown()
     -- 即使 setUp 只走到一半也恢复已保存的进程状态；Stop 失败最后传播。
     local ok, err = pcall(function() if self.mgr then self.mgr:Stop() end end)
     if self.modules then
-        for _, name in ipairs({ 'server.Mgr.MgrFishCarrier', 'server.Mgr.MgrFishUnit' }) do
+        for _, name in ipairs({ 'server.World.FishCarrier', 'server.World.FishTree' }) do
             package.loaded[name] = self.modules[name]
         end
     end

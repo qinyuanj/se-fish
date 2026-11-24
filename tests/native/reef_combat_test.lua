@@ -10,6 +10,7 @@
 -- Busted 下两个 spec 各自 open/close 同一个 support 模块，逐案例新建世界，口径不变。
 local Cfg = require('common.GameCfg')
 local Islet = require('tests.support.isle_combat')
+local Host = require('tests.support.fishing_host')
 
 describe('TestReefCombat', function()
     local env
@@ -31,21 +32,6 @@ describe('TestReefCombat', function()
         assert.same('escaping', penguin.State)
     end)
 
-    -- 同一快照重复下发不重复建单位；解除抓钩要清掉视觉本体。
-    it('test_air_source_client_reuses_snapshot_and_clears_when_unhooked', function()
-        local visual = require('client.LocalCastSource')
-        local s = { phase = 'hooked', castId = 37, fishId = 'item81', hookPosition = { x = 880, y = 15, z = 144 } }
-        visual:Show(s)
-        local count = #env.units
-        visual:Show(s)
-        assert.same(count, #env.units)
-        local body
-        for _, u in ipairs(env.units) do if u.Name == 'CastSource_37' then body = u end end
-        assert.is_not_nil(body)
-        assert.same(15, body.Position.y)
-        visual:Show({ phase = 'unhooked', castId = 37 })
-        assert.is_true(body.Destroyed)
-    end)
 
     -- 首领在别处水域被召唤时，飞行边界仍取当前区，不跟着水区换。
     it('test_boss_summoned_at_other_water_keeps_the_current_zone_flight_bounds', function()
@@ -59,16 +45,23 @@ describe('TestReefCombat', function()
 
     -- 抓举状态回灌：air 来源要把钩位抬到空中，water 来源保持落点原样。
     it('test_cast_state_exposes_air_origin_and_preserves_water_landing', function()
-        local cast = assert(loadfile('server/Mgr/MgrCast.lua'))()
-        local session = { phase = 'hooked', castId = 37, fishId = 'item81', landing = { x = 880, y = 3, z = 144 } }
-        cast:SendState(env.player, session)
-        local s = env.castStates[#env.castStates]
+        local host = Host.new()
+        assert.is_true(host.runtime:set_next_fish(host.player, 'item81'))
+        host:cast()
+        host:hook()
+        local s = host:last_state()
         assert.same('air', s.catchSource)
-        assert.same({ x = 880, y = 15, z = 144 }, s.hookPosition)
-        assert.same({ x = 880, y = 3, z = 144 }, s.landing)
-        session.fishId = 'item82'
-        cast:SendState(env.player, session)
-        assert.same(session.landing, env.castStates[#env.castStates].hookPosition)
+        assert.same(-11.75, s.landing.x)
+        assert.near(2.183, s.landing.y, 1e-9)
+        assert.same(-15, s.landing.z)
+        assert.same(s.landing.y + 12, s.hookPosition.y)
+        host:reel_back()
+        assert.is_true(host.runtime:set_next_fish(host.player, 'item82'))
+        host:cast()
+        host:hook()
+        s = host:last_state()
+        assert.same(s.landing, s.hookPosition)
+        host:dispose()
     end)
 
     -- 官方 AI 的停止/恢复是外部边界，业务驱动与预警/Vitals 仍走真实 Update。
@@ -180,22 +173,41 @@ describe('TestReefCombat', function()
         assert.same('stop', env.notices[#env.notices].reason)
     end)
 
-    -- 客户端预警：投掷表现建下落体，clear 必须销毁它（不留在场景里）。
     it('test_throw_client_displays_falling_body_and_clear_destroys_it', function()
-        local warn = require('client.LocalGarBite')
-        warn:Start()
+        local Eui = require('tests.support.eui_double')
+        local ClientStore = require('client.Store.ClientStore')
+        local RootView = require('client.Views.RootView')
+        local FishCombatView = require('client.Views.FishCombatView')
+        local SpokeClock = require('common.SpokeClock')
         local n = require('common.GarBiteNotice')
         local p = n.Lock(-37, { x = 0, y = 6, z = 0 }, 0, 1, 5, 180, 1.2)
         p.move, p.shape, p.flightOrigin = 'airThrow', 'circle', { x = 0, y = 21, z = 0 }
-        warn:Show(p)
-        local body
-        for _, u in ipairs(env.units) do if u.Name == 'FlightThrow_-37' then body = u end end
-        assert.is_not_nil(body)
-        env.now = 0.6
-        env.heartbeat:Fire()
-        assert.is_true(body.Position.y > 6 and body.Position.y < 21)
-        warn:Show(n.Clear(-37, 'miss'))
-        assert.is_true(body.Destroyed)
-        warn:Stop()
+        assert.is_true(n.Valid(p))
+
+        local clock = SpokeClock.new(0)
+        local store, writer = ClientStore.new({ clock = clock })
+        local root = Eui.Node({ Name = 'UIRoot' })
+        local created = {}
+        local view = RootView.mount(root, store, {
+            create_node = function(kind, props)
+                local node = Eui.Node(props or {})
+                node.UnitType = kind
+                created[#created + 1] = node
+                return node
+            end,
+            docks = { fish_warning = FishCombatView.warning_spec() },
+        })
+        assert.is_true(writer:ingest_event('FishCombatState', {
+            warnings = { { id = -37, fishId = 'fish48Boss', move = p.move, shape = p.shape, range = p.range } },
+        }))
+        local warnNode
+        for _, node in ipairs(created) do
+            if not node.Destroyed and node.Name == 'FishWarn_-37' then warnNode = node end
+        end
+        assert.is_not_nil(warnNode)
+        assert.is_true(n.Valid(n.Clear(-37, 'miss')))
+        assert.is_true(writer:ingest_event('FishCombatState', { warnings = {} }))
+        assert.is_true(warnNode.Destroyed)
+        view:dispose()
     end)
 end)

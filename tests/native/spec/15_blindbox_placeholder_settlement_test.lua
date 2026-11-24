@@ -2,8 +2,6 @@
 -- 占位路径不发放真实付费权益；真实平台支付通道作为生产开关单列。
 -- 同文件另断言：15-01（单抽 10 金豆 / 十连 90 金豆）、15-09（连续 49 抽未中大奖后第 50 抽强制保底）、
 -- 15-10（保底在极品美人鱼与极品蛇颈龙之间等概率）、15-11（任意一抽出大奖立即清零连续未中计数）。
--- 只走业务入口：server/main.lua 的 MgrMap 里注册的 MgrBlindbox（抽取请求）与 MgrPlatform（占位支付通道），
--- 接线按 main.lua 源码子串核对；引擎边界（game / REUtil / DataStore / 时钟）与随机数按共享夹具替换。
 -- 只断言玩家可观察的结果：PlatformResult 回包（客户端据此开确认面板）、BlindboxResult 回包（抽到什么、
 -- 保底计数）与库存件数。
 -- 失败方式（先列后写）：
@@ -18,11 +16,10 @@ local BlindboxWorld = require('tests.support.blindbox_world')
 local RandomGuard = require('tests.support.random_guard')
 
 local WIRING = {
-    'MgrMap.MgrBlindbox.Save = MgrMap.MgrSave',
-    'MgrMap.MgrBlindbox.PlayerData = MgrMap.MgrPlayerData',
-    'MgrMap.MgrBlindbox.Platform = MgrMap.MgrPlatform',
-    'MgrMap.MgrPlatform.Save = MgrMap.MgrSave',
-    'MgrMap.MgrPlatform.PlayerData = MgrMap.MgrPlayerData',
+    'save = SaveHost,',
+    'platform = PlatformHost,',
+    'player_data = PlayerDataHost,',
+    'bind_blindbox_action = function(dispatch)',
 }
 
 local function assert_wiring()
@@ -65,8 +62,7 @@ describe('条款 15-21 / 15-01 / 15-09 / 15-10 / 15-11 盲盒占位支付通道�
     end
 
     local function draw(count, seq)
-        assert.is_true(world.blindbox:Handle(world.player, { action = 'Draw', count = count, seq = seq }))
-        world:drain()
+        assert.is_true(world:blindboxAction({ action = 'Draw', count = count, seq = seq }))
     end
 
     -- 占位通道的确认 / 取消：客户端在确认面板上按下的那一格

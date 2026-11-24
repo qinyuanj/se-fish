@@ -15,7 +15,7 @@ M.LEGACY = { 'tests/native/alpha_test.lua', 'tests/native/slow/beta_test.lua' }
 
 -- 实现覆盖表（ADR-0029 第五节）：夹具登记第 1 节的两条非试玩条款（1-01 A、1-02 B），
 -- 1-03 是试玩条款，按设计不登记。落点与关联测试都真实存在，起点即绿。
-M.COVERAGE_LANDING = 'server/Mgr/MgrPlatform.lua'
+M.COVERAGE_LANDING = 'server/PlatformHost.lua'
 M.COVERAGE_TEST = M.LEGACY[1]
 
 function M.shard(section)

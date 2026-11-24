@@ -1,6 +1,5 @@
 -- #89 迁移（原 tests/gameplay/attr_presentation_test.lua），#297-B 迁入 Spoke CameraZoomView：
 -- 失败方式：派生范围无消费者、非法复制属性扩大距离、相机覆盖其他模式、角色重建残留。
--- 接缝：BodyScale.InteractionRadius、CameraZoomView.new_controller、MgrInteract.InRange。
 describe('TestAttrPresentation', function()
     -- 相机刷新尊重其他拥有者，清理时恢复
     it('test_camera_rebuild_restores_old_camera_and_uses_new_character_projection', function()
@@ -51,7 +50,7 @@ describe('TestAttrPresentation', function()
 
     -- 服务端判定按体型缩放半径，同时保留 slack；没有角色时拒绝
     it('test_server_range_scales_radius_but_keeps_slack_and_rejects_missing_character', function()
-        local mgr = assert(loadfile('server/Mgr/MgrInteract.lua'))()
+        local mgr = require('server.World.InteractionPoints')
         local anchor = { Position = { x = 0, z = 0 } }
         mgr.FindAnchor = function() return anchor end
         local value = require('common.BodyScale').Derive(3).InteractRange

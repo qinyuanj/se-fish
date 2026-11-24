@@ -1,7 +1,7 @@
 -- #86 迁移（原 tests/gameplay/item_bar_flow_test.lua）：道具栏动作的服务端请求流。
 -- 接缝：ItemBarAction / RequestItemBar 的 OnServerEvent 与 ItemBarState 回包。
 local GameCfg = require('common.GameCfg')
-local Mgr = require('server.Mgr.MgrPlayerData')
+local Mgr = require('server.PlayerDataHost')
 
 local function signal()
     local callbacks = {}

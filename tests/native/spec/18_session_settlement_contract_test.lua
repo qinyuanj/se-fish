@@ -1,7 +1,6 @@
+local EconomyWorld = require('tests.support.economy_world')
 -- 条款 18（docs/acceptance/18-save-and-recovery.md）：会话 fencing、版本校验、重连落点与虚弱恢复、
 -- 个人/共享状态隔离、旧档升级，以及摆渡结算的可重试操作身份。
--- 只走业务入口：进入的是 server/main.lua 的 MgrMap 注册管理器——MgrPlayerData / MgrSave / MgrFerry /
--- MgrSurvival；引擎边界（DataStore、Task、RE、World、角色）用替身。不执行 main.lua 本体。
 -- 四类证据：正常（交票落账）、失败（写档失败不扣票）、退出重进（旧会话回调失效 + 落点/虚弱恢复）、
 -- 重放（同一 operation 只结算一次）。B 级时序证据另见 tests/native/ferry_test.lua 与 save_test.lua。
 -- 失败方式（先列后写）：
@@ -16,24 +15,8 @@ local function signal()
   local slots = {}
   return {
     Connect = function(_, fn) slots[#slots + 1] = fn return { Disconnect = function() end } end,
-    Fire = function(_, ...) for _, fn in ipairs(slots) do fn(...) end end,
+    Fire = function(_, ...) local result for _, fn in ipairs(slots) do result = fn(...) end return result end,
   }
-end
-
--- 前提守卫：本文件复现的是 main.lua 的接线，接线一改先红。
-local WIRING = {
-  'MgrMap.MgrSave.PlayerData = MgrMap.MgrPlayerData',
-  'MgrMap.MgrFerry.PlayerData = MgrMap.MgrPlayerData',
-  'MgrMap.MgrFerry.Save = MgrMap.MgrSave',
-  'MgrMap.MgrSurvival.Save = MgrMap.MgrSave',
-}
-local function assert_wiring()
-  local handle = assert(io.open('server/main.lua', 'rb'), '读不到 server/main.lua')
-  local source = handle:read('a')
-  handle:close()
-  for _, line in ipairs(WIRING) do
-    assert.is_truthy(source:find(line, 1, true), 'server/main.lua 里找不到接线：' .. line)
-  end
 end
 
 local function newPlayer(userId, position)
@@ -90,11 +73,17 @@ describe('条款 18 存档会话与结算身份', function()
   end
 
   before_each(function()
-    assert_wiring()
     env = { cfg = require('tests.support.zone_fixtures').Load() }
     env.cfg.Debug = { Enabled = false }
+    env.savedWorldModules = {}
+    for name, value in pairs(package.loaded) do
+      if name:match('^server%.World%.') then
+        env.savedWorldModules[name] = value
+        package.loaded[name] = nil
+      end
+    end
     env.cfg.Save.QaSlot = ''
-    env.values, env.queue, env.sent = {}, {}, {}
+    env.values, env.queue, env.sent, env.events = {}, {}, {}, {}
     env.now, env.writeFailure = 100, false
     env.savedGame, env.savedVector, env.savedRE = rawget(_G, 'game'), rawget(_G, 'Vector3'), rawget(_G, 'REUtil')
     _G.Vector3 = { New = vec }
@@ -122,13 +111,16 @@ describe('条款 18 存档会话与结算身份', function()
     local reStub = {
       GetRE = function(_, name)
         env.sent[name] = env.sent[name] or {}
-        return {
-          FireClient = function(_, player, value)
-            env.sent[name][#env.sent[name] + 1] = { userId = player.UserId, payload = value }
-          end,
-          FireAllClients = function() end,
-          OnServerEvent = signal(),
-        }
+        if not env.events[name] then
+          env.events[name] = {
+            FireClient = function(_, player, value)
+              env.sent[name][#env.sent[name] + 1] = { userId = player.UserId, payload = value }
+            end,
+            FireAllClients = function() end,
+            OnServerEvent = signal(),
+          }
+        end
+        return env.events[name]
       end,
       CheckRECD = function() return false end,
     }
@@ -136,15 +128,10 @@ describe('条款 18 存档会话与结算身份', function()
     _G.REUtil = reStub
     package.loaded['server.Data.PlayerData'] = nil
     env.PlayerData = require('server.Data.PlayerData')
-    env.save = assert(loadfile('server/Mgr/MgrSave.lua'))()
-    env.players = assert(loadfile('server/Mgr/MgrPlayerData.lua'))()
-    env.ferry = assert(loadfile('server/Mgr/MgrFerry.lua'))()
-    env.survival = assert(loadfile('server/Mgr/MgrSurvival.lua'))()
+    env.save = assert(loadfile('server/SaveHost.lua'))()
+    env.players = assert(loadfile('server/PlayerDataHost.lua'))()
     env.players.Save, env.save.PlayerData = env.save, env.players
-    env.ferry.Save, env.ferry.PlayerData = env.save, env.players
-    env.survival.Save, env.survival.PlayerData = env.save, env.players
-    env.ferry.World = { GetServerTime = function() return env.now end }
-    env.ferry.OnlinePlayers = function() return {} end
+    env.ferry = { OnlinePlayers = function() return {} end }
     env.anchors = {}
     for _, zone in ipairs(env.cfg.Zones) do
       for _, entity in ipairs(zone.Scene.Entities) do
@@ -153,7 +140,7 @@ describe('条款 18 存档会话与结算身份', function()
         end
       end
     end
-    env.ferry.Interact = {
+    env.interact = {
       InRange = function(_, player, point)
         local anchor = env.anchors[point.AnchorName]
         local pos = player.Character and player.Character.Position
@@ -164,10 +151,37 @@ describe('条款 18 存档会话与结算身份', function()
       FindAnchor = function(_, name) return env.anchors[name] end,
     }
     env.route = env.cfg.Ferry.Routes[1]
+    local ServerRuntime = require('server.World.ServerRuntime')
+    env.runtime = ServerRuntime.new({
+      initial_now = env.now, zones = env.cfg.Zones, remote = reStub,
+      player_data = env.players, save = env.save, interact = env.interact,
+      players_service = { GetPlayers = function() return env.ferry.OnlinePlayers() end },
+      world_service = _G.game:GetService('World'),
+      bind_ferry_action = function(dispatch)
+        reStub:GetRE('FerryAction').OnServerEvent:Connect(function(player, payload)
+          return dispatch(player, payload)
+        end)
+      end,
+    })
+    function env.ferry:Update()
+      local dt = math.max(0, env.now - env.runtime.clock.now())
+      env.runtime:step(dt, env.now)
+    end
+    function env.ferry:Handle(player, payload)
+      self:Update()
+      return reStub:GetRE('FerryAction').OnServerEvent:Fire(player, payload) == true
+    end
+    env.runtime:start()
+    env.runtime:mark_started()
   end)
 
   after_each(function()
     if env then
+      if env.runtime then env.runtime:shutdown() end
+      for name in pairs(package.loaded) do
+        if name:match('^server%.World%.') then package.loaded[name] = nil end
+      end
+      for name, value in pairs(env.savedWorldModules or {}) do package.loaded[name] = value end
       _G.game = env.savedGame
       _G.Vector3 = env.savedVector
       _G.REUtil = env.savedRE
@@ -268,6 +282,7 @@ describe('条款 18 存档会话与结算身份', function()
     env.players:OnPlayerRemoving(player)
     local rejoined, fresh = ready(uid, vec(0, 5, 0))
     env.ferry.OnlinePlayers = function() return { rejoined } end
+    env.now = env.now + 1
     env.ferry:Update()
     drain()
     assert.same(1, fresh:ItemCount(env.route.Outbound.Ticket), '未完成的船票应回退一次')
@@ -283,31 +298,38 @@ describe('条款 18 存档会话与结算身份', function()
 
   -- 18-24（review #249-4）：发奖走同一条持久操作协议，同一身份重试只补回执、不再发一次。
   it('发奖重放只回执、只发一次', function()
-    local uid = 5205
-    local player, data = ready(uid)
-    env.platform = assert(loadfile('server/Mgr/MgrPlatform.lua'))()
-    env.platform.Save, env.platform.PlayerData = env.save, env.players
+    local shop = EconomyWorld.new()
+    local uid = shop.player.UserId
     local itemId = env.cfg.Platform.Goods.adrenaline1.itemId
-    local before = #storeSnapshot(uid).meta.operations
+    local function snapshot() return shop.values[env.cfg.Save.KeyPrefix .. tostring(uid)] end
+    local before = #snapshot().meta.operations
 
-    assert.is_true(env.platform:GrantGoods(player, 'adrenaline1', 1))
-    drain()
-    local first = lastReply('PlatformResult').payload
+    env.cfg.Debug = { Enabled = true }
+    env.cfg.Platform.Placeholder.Enabled = false
+    assert.is_true(shop:platformAction({ action = 'Purchase', goods = 'adrenaline1', seq = 1 }))
+    local opened = shop:lastResult('PlatformResult')
+    assert.is_not_nil(opened, '购买必须有支付回包')
+    assert.same('TestFlow', opened.action, tostring(opened.reason))
+    assert.is_true(opened.open)
+    shop:resolvePlatform('success')
+    local first = shop:lastResult('PlatformResult')
     assert.is_true(first.ok, tostring(first.reason))
-    assert.is_not_nil(first.operation, '回执要带可重试的操作身份')
+    assert.is_not_nil(first.requestId, '回执要带可重试的请求身份')
     assert.same(1, first.granted)
-    assert.same(1, data:ItemCount(itemId))
-    assert.same(before + 1, #storeSnapshot(uid).meta.operations)
+    assert.same(1, shop.data:ItemCount(itemId))
+    assert.same(before + 3, #snapshot().meta.operations, '支付意图、已支付与发奖各落一笔')
 
-    assert.is_true(env.platform:GrantGoods(player, 'adrenaline1', 1, first.operation))
-    drain()
-    local replay = lastReply('PlatformResult').payload
+    shop:clearEvents()
+    assert.is_true(shop:platformAction({ action = 'Query', seq = 2, requestId = first.requestId }))
+    local replay = shop:lastResult('PlatformResult')
     assert.is_true(replay.ok)
-    assert.same(first.operation.id, replay.operation.id, '重放认得原操作身份')
+    assert.same(first.requestId, replay.requestId, '重放认得原请求身份')
     assert.same(1, replay.granted, '回执仍是原来那一次发放')
-    assert.same(1, data:ItemCount(itemId), '重放不得重复发奖')
-    assert.same(before + 1, #storeSnapshot(uid).meta.operations, '重放不得再记一笔发放')
+    assert.same(1, shop.data:ItemCount(itemId), '重放不得重复发奖')
+    assert.same(before + 3, #snapshot().meta.operations, '重放不得再记一笔发放')
+    shop:tearDown()
   end)
+
 
   -- 条款 18-04（升级/购买/药水次数）、18-05（血量与饥饿）、18-06（濒死与死亡标记）、
   -- 18-07（图鉴个人重量）、18-08（任务进度与剧情已读）、18-09（到达集合）、
@@ -393,21 +415,18 @@ describe('条款 18 存档会话与结算身份', function()
     assert.same(vec(safe.x, safe.y, safe.z), env.savedLanding, '非法记录落点须回到同区安全点')
     assert.same(vec(safe.x, safe.y, safe.z), data.Extra.travel.safePoint)
 
-    -- v2 档的虚弱剩余时间经 MgrSurvival 的公开入口恢复。
     local v2 = seedSnapshot(uid)
     v2.extra.survival.weakRemaining = 37
     v2.extra.travel.safePoint = { x = safe.x, y = safe.y, z = safe.z }
-    local player = ready(uid, vec(safe.x, safe.y, safe.z), v2)
-    local applied
-    env.survival.Modifier = {
-      Apply = function(_, _, _, _, seconds) applied = seconds return true end,
-      GetRemaining = function() return applied or 0 end,
-      Clear = function() end,
-      ClearTarget = function() end,
-    }
-    env.survival.SpeedWriter = { RefreshMoveSpeed = function() end }
-    env.survival:OnPlayerAdded(player)
-    assert.same(37, applied, '重连后虚弱剩余时间继续生效')
+    local player, data = ready(uid, vec(safe.x, safe.y, safe.z), v2)
+    local host = require('tests.support.life_host').start({
+      now = env.now, player_data = env.players, save = env.save,
+    })
+    host:add(player, data)
+    local tree = host:tree(player)
+    assert.is_true(tree:get_modifier_remaining('weak') > 36, '重连后虚弱剩余时间继续生效')
+    assert.is_true(tree:get_modifier_remaining('weak') <= 37)
+    host:shutdown()
   end)
 
   -- 条款 18-18（版本未知或读取失败时保留原档、不写空档）、18-19（存档就绪前的可变操作被拒）。

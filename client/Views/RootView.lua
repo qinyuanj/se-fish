@@ -28,6 +28,9 @@ local function readonly_item_signal(state)
     now = function()
       return state:now()
     end,
+    d = function(_, reader)
+      return reader:d(state)
+    end,
     subscribe = function(_, fn)
       return state:subscribe(fn)
     end,
@@ -90,6 +93,7 @@ function RootView.mount(root_node, store, options)
     end
   end
   services.store = store
+  services.root_node = root_node
   services.clock = store.clock
 
   local behaviour = spoke_eggy.behaviour(root_node, function(s, self)
@@ -97,6 +101,7 @@ function RootView.mount(root_node, store, options)
       root_node = root_node,
       store = store,
       clock = store.clock,
+      services = services,
       is_alive = self.is_alive,
     }
 

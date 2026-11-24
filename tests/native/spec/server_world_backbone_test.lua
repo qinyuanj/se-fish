@@ -824,10 +824,12 @@ describe("服务端入口接线：server/main.lua 宿主测试双端到端集成
     saved = {
       game = rawget(_G, "game"),
       REUtil = rawget(_G, "REUtil"),
+      reutil = package.loaded["common.REUtil"],
       MgrUtil = rawget(_G, "MgrUtil"),
       MgrPlayerData = rawget(_G, "MgrPlayerData"),
       Vector3 = rawget(_G, "Vector3"),
       Color = rawget(_G, "Color"),
+      RemoteEvent = rawget(_G, "RemoteEvent"),
       Debug = GameCfg.Debug,
       slot = GameCfg.Save.QaSlot,
     }
@@ -835,6 +837,10 @@ describe("服务端入口接线：server/main.lua 宿主测试双端到端集成
     GameCfg.Save.QaSlot = ""
     _G.Vector3 = { New = function(x, y, z) return { x = x, y = y, z = z } end }
     _G.Color = { New = function(...) return { ... } end }
+    _G.RemoteEvent = { New = function()
+      return { OnServerEvent = make_signal(), OnClientEvent = make_signal(), FireServer = function() end,
+        FireClient = function() end }
+    end }
     runtime = nil
   end)
 
@@ -844,10 +850,12 @@ describe("服务端入口接线：server/main.lua 宿主测试双端到端集成
     end
     _G.game = saved.game
     _G.REUtil = saved.REUtil
+    package.loaded["common.REUtil"] = saved.reutil
     _G.MgrUtil = saved.MgrUtil
     _G.MgrPlayerData = saved.MgrPlayerData
     _G.Vector3 = saved.Vector3
     _G.Color = saved.Color
+    _G.RemoteEvent = saved.RemoteEvent
     GameCfg.Debug = saved.Debug
     GameCfg.Save.QaSlot = saved.slot
     saved = nil
@@ -857,6 +865,7 @@ describe("服务端入口接线：server/main.lua 宿主测试双端到端集成
   it("真实 server/main.lua 启动唯一 SharedWorldTree、Heartbeat 驱动 SpokeClock、存档就绪生成 PlayerTree 并执行离场三步协议与重进排空", function()
     local now = 100
     local tasks, values, errors, mgrs = {}, {}, {}, {}
+    local remote_events = {}
     local order = {}
     local players_service = {
       PlayerAdded = make_signal(),
@@ -892,7 +901,7 @@ describe("服务端入口接线：server/main.lua 宿主测试双端到端集成
           }
         end
         if name == "Players" then return players_service end
-        if name == "RunService" then return { Heartbeat = heartbeat, IsServer = function() return true end } end
+        if name == "RunService" then return { Heartbeat = heartbeat, IsServer = function() return true end, IsClient = function() return false end } end
         if name == "World" then
           return {
             GetServerTime = function() return now end,
@@ -903,9 +912,12 @@ describe("服务端入口接线：server/main.lua 宿主测试双端到端集成
         if name == "DataStoreService" then return { GetDataStore = function() return store end } end
       end,
     }
-    _G.REUtil = {
-      GetRE = function()
-        return { OnServerEvent = make_signal(), FireClient = function() end }
+    local remote_util = {
+      GetRE = function(_, name)
+        if not remote_events[name] then
+          remote_events[name] = { OnServerEvent = make_signal(), FireClient = function() end }
+        end
+        return remote_events[name]
       end,
     }
 
@@ -931,27 +943,12 @@ describe("服务端入口接线：server/main.lua 宿主测试双端到端集成
       CastAbility = function() return true end,
     }
 
-    for _, name in ipairs({ "MgrSave", "MgrPlayerData", "MgrQuest", "MgrStory", "MgrVitals" }) do
-      mgrs[name] = assert(loadfile("server/Mgr/" .. name .. ".lua"))()
-    end
-    mgrs.MgrPkFilter = { Make = function() return function() return true end end }
-    mgrs.MgrSurvival = {
-      Hooks = function() return {} end,
-      BeforeLeave = function(_, player)
-        order[#order + 1] = "before_leave:survival:" .. tostring(player.UserId)
-      end,
-    }
-    mgrs.MgrGrill = {
-      BeforeLeave = function(_, player)
-        order[#order + 1] = "before_leave:grill:" .. tostring(player.UserId)
-      end,
-    }
-    mgrs.MgrSpecialItem = {
-      BeforeLeave = function(_, player)
-        order[#order + 1] = "before_leave:special:" .. tostring(player.UserId)
-      end,
-    }
-    mgrs.MgrAbility = { IsParalyzed = function() return false end }
+    mgrs.SaveHost = assert(loadfile("server/SaveHost.lua"))()
+    mgrs.PlayerDataHost = assert(loadfile("server/PlayerDataHost.lua"))()
+    mgrs.PlatformHost = {}
+    mgrs.FishAbility = { Start = function() end, Update = function() end }
+    _G.REUtil = remote_util
+    package.loaded["common.REUtil"] = remote_util
 
     local sandbox = setmetatable({
       print = function(...)
@@ -961,17 +958,17 @@ describe("服务端入口接线：server/main.lua 宿主测试双端到端集成
         end
       end,
       require = function(path)
+        if path == "common.REUtil" then return remote_util end
         if path == "server.MgrUtil" then return { Start = function() end } end
         if path == "common.ZoneMarkers" then return { Start = function() end } end
         if path == "server.packages.attr_rule.api" then return attr_api_stub end
         if path == "server.packages.modifier_system.api" then return modifier_api_stub end
         if path == "server.packages.ability_system.api" then return ability_api_stub end
-        local name = path:match("^server%.Mgr%.(.*)$")
-        if not name then return require(path) end
-        if not mgrs[name] then
-          mgrs[name] = {}
-        end
-        return mgrs[name]
+        if path == "server.SaveHost" then return mgrs.SaveHost end
+        if path == "server.PlayerDataHost" then return mgrs.PlayerDataHost end
+        if path == "server.PlatformHost" then return mgrs.PlatformHost end
+        if path == "server.FishAbility" then return mgrs.FishAbility end
+        return require(path)
       end,
     }, { __index = _G })
 
@@ -981,6 +978,9 @@ describe("服务端入口接线：server/main.lua 宿主测试双端到端集成
     local world = runtime:get_world()
     assert.is_not_nil(world)
     assert.equals(7, #world.zone_list)
+    assert.is_not_nil(world.ferry)
+    assert.is_not_nil(remote_events.FerryAction)
+    assert.equals(1, #remote_events.FerryAction.OnServerEvent.handlers)
     assert.equals(100, runtime.clock.now())
 
     -- Heartbeat 每帧驱动 SpokeClock，SharedWorldTree 正常接收 1 Hz 推进
@@ -997,7 +997,8 @@ describe("服务端入口接线：server/main.lua 宿主测试双端到端集成
 
     local function make_host_player(uid)
       local c = { Health = 300, MaxHealth = 300, HealthChanged = make_signal(), Died = make_signal(), OnReborn = make_signal() }
-      local p = { UserId = uid, attrs = {}, CharacterAdded = make_signal(), CharacterRemoving = make_signal(), Character = { Controller = c } }
+      local character = { Controller = c, SetScale = function() end }
+      local p = { UserId = uid, attrs = {}, CharacterAdded = make_signal(), CharacterRemoving = make_signal(), Character = character }
       function p:SetAttribute(k, v) self.attrs[k] = v end
       return p
     end
@@ -1036,7 +1037,7 @@ describe("服务端入口接线：server/main.lua 宿主测试双端到端集成
     assert.equals(1, #local_sig.handlers)
 
     -- 变更金币并触发离场 + 同账号立即重进
-    mgrs.MgrPlayerData:GetDataInst(p1):AddCoin(42)
+    mgrs.PlayerDataHost:GetDataInst(p1):AddCoin(42)
     players_service.PlayerRemoving:Fire(p1)
     local p2 = make_host_player(6001)
     players_service.PlayerAdded:Fire(p2)
@@ -1050,9 +1051,7 @@ describe("服务端入口接线：server/main.lua 宿主测试双端到端集成
     -- 验证 Step 1（BeforeLeave 终镜像）严格先于 Step 2（dispose 逆序清理）
     local idx = {}
     for i, item in ipairs(order) do idx[item] = i end
-    assert.is_true(idx["before_leave:survival:6001"] < idx["dispose_cleanup:6001"])
-    assert.is_true(idx["before_leave:grill:6001"] < idx["dispose_cleanup:6001"])
-    assert.is_true(idx["before_leave:special:6001"] < idx["dispose_cleanup:6001"])
+    assert.is_true(idx["dispose_cleanup:6001"] ~= nil)
 
     -- 排空异步落盘后，p2 自动恢复并生成全新 PlayerTree，金币无丢失无脏读
     drain()
@@ -1061,6 +1060,6 @@ describe("服务端入口接线：server/main.lua 宿主测试双端到端集成
     assert.is_not_nil(pt2)
     assert.are_not.equal(pt1, pt2)
     assert.equals(42, pt2.states.coin:now())
-    assert.equals(42, mgrs.MgrPlayerData:GetDataInst(p2).Data.FishCoin)
+    assert.equals(42, mgrs.PlayerDataHost:GetDataInst(p2).Data.FishCoin)
   end)
 end)

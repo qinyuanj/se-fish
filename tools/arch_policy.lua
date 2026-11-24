@@ -18,33 +18,30 @@ M.policy = {
         'server.SwingRegistry',
         'common.AiTargetPolicy', 'common.AttrGrowth', 'common.AttrModel', 'common.BlindboxDraw', 'common.BodyScale',
         'common.BossPhase', 'common.CarryMount', 'common.ContentValidation', 'common.FishCatch',
-        'common.FlightPath', 'common.GameCfg', 'common.GrillCurve', 'common.LotteryDraw',
+        'common.FlightPath', 'common.GameCfg', 'common.GrillCurve', 'common.HostSignal', 'common.LotteryDraw',
         'common.LotteryEligibility', 'common.MathWaterJudge', 'common.NpcDialogue', 'common.Number',
-        'common.OwnedUnits', 'common.QuestSteps', 'common.RateLimit', 'common.Records',
+        'common.QuestSteps', 'common.RateLimit', 'common.Records',
         'common.ReelDisplay', 'common.ReelProgress', 'common.SpecialItem', 'common.SpokeClock',
         'common.Vitals', 'common.ZoneMarkers',
       },
     },
     {
       -- ADR-0032 客户端只读响应式状态仓库（#296），归属 L3 支撑层，
-      -- 天然禁止反向依赖 L2 的 client.Views / ScreenHandlers / Local*。
       ids = { 'client.Store' },
       modules = {
-        'client.DamageFloat', 'client.FishCombatLabel', 'client.GameUI', 'client.InteractionBubble',
+        'client.DamageFloat', 'client.GameUI', 'client.InteractionBubble',
         'client.MainHudLayout', 'client.PressGesture', 'client.WeaponAim',
-        'server.FishBehaviors', 'server.MgrUtil',
+        'server.FishBehaviors',
         'common.DamageNotice', 'common.GarBiteNotice', 'common.REUtil',
         'common.TeleportUtil', 'common.Util',
       },
     },
     {
       -- ADR-0032 服务端 Spoke 树（#295）与客户端 Spoke 视图树（#296）归属 L2。
-      ids = { 'server.Mgr', 'server.AbilityBehaviors', 'client.ScreenHandlers', 'client.Views', 'server.World' },
+      ids = { 'server.AbilityBehaviors', 'client.Views', 'server.World' },
       modules = {
-        'server.AbilityAPI', 'client.MgrGameUI',
-        'client.LocalAttackButton', 'client.LocalCastSource', 'client.LocalGM',
-        'client.LocalGarBite', 'client.LocalInteract', 'client.LocalLoot', 'client.LocalLottery',
-        'client.LocalMgrUtil', 'client.LocalMotorUnitCtrl', 'client.LocalReelIn', 'client.LocalShop',
+        'server.AbilityAPI',
+        'server.PlayerDataHost', 'server.SaveHost', 'server.PlatformHost', 'server.FishAbility',
       },
     },
     { modules = { 'client.main', 'server.main' } },
@@ -67,10 +64,7 @@ M.policy = {
         '^client%.Views$', '^client%.Views%.',
       },
       to = {
-        '^common%.OwnedUnits$',
-        '^server%.Mgr$', '^server%.Mgr%.',
         '^server%.AbilityAPI$', '^server%.AbilityBehaviors$', '^server%.AbilityBehaviors%.',
-        '^client%.MgrGameUI$', '^client%.ScreenHandlers$', '^client%.ScreenHandlers%.', '^client%.Local',
       },
     },
   },

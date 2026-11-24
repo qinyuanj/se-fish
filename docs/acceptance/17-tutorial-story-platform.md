@@ -20,7 +20,7 @@
 | 17-14 | 正式剧情表现是否完成，不得仅凭资源接口调用成功判定，须另有呈现证据 | 契约 | 人 | B | unverified | — |
 | 17-15 | 地图商店使用共享配置里的占位汇率与占位商品 ID 走通兑换；真实参数由平台侧交付后只替换配置，不改判定 | 契约 | 平台 | B | unverified | — |
 | 17-16 | 广告位使用共享配置里的占位标识走通广告路径；真实广告位由平台侧交付后只替换配置 | 契约 | 平台 | B | unverified | — |
-| 17-17 | 平台成就使用共享配置里的占位 ID 走通完成与补交路径；真实成就 ID 由平台侧交付后只替换配置 | 契约 | agent | B | evidenced | tests/native/spec/17_platform_achievement_id_test.lua |
+| 17-17 | 平台成就使用共享配置里的占位 ID 走通完成与补交路径；真实成就 ID 由平台侧交付后只替换配置 | 契约 | agent | B | evidenced | tests/native/spec/server_progress_315_test.lua |
 | 17-18 | 分享任务在平台能力未开放时走明确占位路径，不出现点了没反应的入口；平台开放情况作为生产开关 | 契约 | agent | B | evidenced | tests/native/spec/17_platform_boundary_placeholder_test.lua |
 | 17-19 | 正式资产 ID 交付前用共享配置里的占位资产 ID 验证玩法；占位只替换显示，不改判定参数 | 契约 | 人 | A | unverified | — |
 | 17-20 | 支付、广告与全服纪录在编辑器内只经可替换适配层，真实平台验收作为生产开关单列，不并入玩法条款 | 契约 | 平台 | B | unverified | — |

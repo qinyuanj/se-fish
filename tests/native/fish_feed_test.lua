@@ -14,48 +14,45 @@
 --   7. 吃动作失败（锚点没有动画）连带裁决失败。
 -- it 名字沿用旧方法名，注册顺序 = LuaUnit sortedPairs 的实际执行顺序。
 
+local GameCfg = require('common.GameCfg')
+local Host = require('tests.support.shop_feed_host')
 local function vec(x, y, z) return { x = x, y = y, z = z } end
 
-describe('向钓鱼佬喂食换金币（MgrInteract）', function()
+describe('向钓鱼佬喂食换金币（PlayerFisherman）', function()
   local env
   local restore
 
   before_each(function()
     -- 快照先于任何改动：before_each 中途失败时 after_each 仍能还原。
-    restore = { game = _G.game, GameCfg = package.loaded['common.GameCfg'] }
-    env = { attrs = {}, plays = {}, synced = {}, replies = {}, seq = 0 }
-    env.cfg = require('tests.support.zone_fixtures').Load()
-    -- #49：进图白送只在调试开关下发放，这里沿用它的起始库存（鱼竿在第 1 格、蚯蚓若干）
-    env.cfg.Debug = { Enabled = true, InitialGrants = env.cfg.Debug.InitialGrants }
-    local PlayerData = assert(loadfile('server/Data/PlayerData.lua'))()
-    env.player = { UserId = 1, Character = { Position = vec(3, 1, 3) },
-      SetAttribute = function(_, k, v) env.attrs[k] = v end }
-    env.stranger = { UserId = 2, Character = { Position = vec(3, 1, 3) }, SetAttribute = function() end }
-    env.data = PlayerData.New(env.player, function() env.published = (env.published or 0) + 1 end)
-    env.data:Init()
-    env.anchor = { Name = 'TGUnitFish', Position = vec(0, 6, 0),
-      PlayAnimation = function(_, name) env.plays[#env.plays + 1] = name end }
-    env.mgr = assert(loadfile('server/Mgr/MgrInteract.lua'))()
-    env.mgr.FindAnchor = function(_, name) return name == 'TGUnitFish' and env.anchor or nil end
-    env.mgr.PlayerData = {
-      GetDataInst = function(_, p) return p == env.player and env.data or nil end,
-      SendItemBar = function(_, p) env.synced[#env.synced + 1] = p end,
-    }
-    env.mgr.Reply = function(_, p, payload) env.replies[#env.replies + 1] = { player = p, payload = payload } end
+    env = { seq = 0 }
+    env.cfg = GameCfg
+    local initial_grants = GameCfg.Debug.InitialGrants
+    env.host = Host.start()
+    GameCfg.Debug = { Enabled = true, InitialGrants = initial_grants }
+    env.player, env.data = env.host:join(1, GameCfg.Interact.Fishermen[1].AnchorNames[1])
+    env.stranger = { UserId = 2, Character = { Position = vec(100, 1, 0) }, SetAttribute = function() end }
+    env.replies = env.host.results[1].InteractResult
+    env.anchor = env.host.anchors[GameCfg.Interact.Fishermen[1].AnchorNames[1]]
+    env.anchor.plays = {}
+    env.plays = env.anchor.plays
   end)
 
   after_each(function()
-    package.loaded['common.GameCfg'] = restore and restore.GameCfg
-    _G.game = restore and restore.game
+    env.host:shutdown()
     env = nil
-    restore = nil
   end)
 
   local function feed(extra)
     env.seq = env.seq + 1
     local payload = { target = 'fisherman', action = 'Feed', seq = env.seq }
     for k, v in pairs(extra or {}) do payload[k] = v end
-    return env.mgr:Handle(env.player, payload)
+    local reply = env.host:send(env.player, 'InteractAction', payload)
+    return reply and reply.ok or false
+  end
+
+  local function send(player, payload)
+    local reply = env.host:send(player, 'InteractAction', payload)
+    return reply and reply.ok or false
   end
 
   local function give(itemId, mult)
@@ -72,7 +69,7 @@ describe('向钓鱼佬喂食换金币（MgrInteract）', function()
     assert.is_true(feed())
     assert.same(before - 1, env.data.Data.Bait.worm)
     assert.same(1, env.data.Data.FishCoin)
-    assert.same(1, env.attrs.FishCoin)
+    assert.same(1, env.player.attrs.FishCoin)
     assert.is_nil(env.data.Data.Bait.bait)
     assert.is_nil(env.data.Data.Containers.bait)
   end)
@@ -84,21 +81,21 @@ describe('向钓鱼佬喂食换金币（MgrInteract）', function()
     assert.is_true(env.data:SelectSlot(slot))
     assert.is_true(feed())
     assert.same(11, env.data.Data.FishCoin)
-    assert.same(11, env.attrs.FishCoin)
+    assert.same(11, env.player.attrs.FishCoin)
     assert.is_nil(env.data.Data.Containers.itemBar[slot])
     assert.same('carp', env.data.Data.Containers.itemBar[2].itemId)
     assert.is_nil(env.data.Data.SelectedSlot)
     assert.same(env.cfg.Debug.InitialGrants[2].count, env.data.Data.Bait.worm)
-    assert.same({ env.player }, env.synced)
+    assert.same(1, env.host.sync_counts[1])
     assert.same({ env.cfg.Interact.Fisherman.EatAnimation }, env.plays)
-    assert.is_true(env.replies[#env.replies].payload.ok)
-    assert.same(11, env.replies[#env.replies].payload.coins)
+    assert.is_true(env.replies[#env.replies].ok)
+    assert.same(11, env.replies[#env.replies].coins)
   end)
 
   it('test_fish_coin_has_single_write_entry', function()
     local writers = 0
-    for _, path in ipairs({ 'server/Data/PlayerData.lua', 'server/Mgr/MgrInteract.lua',
-      'server/Mgr/MgrPlayerData.lua', 'server/Mgr/MgrLoot.lua' }) do
+    for _, path in ipairs({ 'server/Data/PlayerData.lua', 'server/World/PlayerFisherman.lua',
+      'server/PlayerDataHost.lua', 'server/World/GroundLoot.lua' }) do
       local file = assert(io.open(path, 'r'))
       local text = file:read('a')
       file:close()
@@ -149,30 +146,31 @@ describe('向钓鱼佬喂食换金币（MgrInteract）', function()
     assert.is_false(feed())             -- 什么都没选
     assert.same(0, env.data.Data.FishCoin)
     assert.same({}, env.plays)
-    assert.same('nothing', env.replies[#env.replies].payload.reason)
+    assert.same('nothing', env.replies[#env.replies].reason)
 
     env.data:SelectSlot(1)              -- 新手鱼竿（BasePrice = 3）
     assert.same(1, env.data.Data.SelectedSlot)
     assert.is_true(feed())
     assert.same(env.cfg.Items.SalePrice('starterRod'), env.data.Data.FishCoin)
     assert.is_nil(env.data.Data.Containers.itemBar[1])
-    assert.same('starterRod', env.replies[#env.replies].payload.itemId)
-    assert.same('item', env.replies[#env.replies].payload.category)
+    assert.same('starterRod', env.replies[#env.replies].itemId)
+    assert.same('item', env.replies[#env.replies].category)
   end)
 
   it('test_replayed_or_stale_seq_settles_nothing', function()
     env.data:SelectBait('worm')
-    assert.is_true(env.mgr:Handle(env.player, { target = 'fisherman', action = 'Feed', seq = 5 }))
-    assert.is_false(env.mgr:Handle(env.player, { target = 'fisherman', action = 'Feed', seq = 5 }))
-    assert.is_false(env.mgr:Handle(env.player, { target = 'fisherman', action = 'Feed', seq = 3 }))
-    assert.is_false(env.mgr:Handle(env.player, { target = 'fisherman', action = 'Feed', seq = 5.5 }))
-    assert.is_false(env.mgr:Handle(env.player, { target = 'fisherman', action = 'Feed' }))
+    assert.is_true(send(env.player, { target = 'fisherman', action = 'Feed', seq = 5 }))
+    assert.is_true(send(env.player, { target = 'fisherman', action = 'Feed', seq = 5 }), '同操作重放返回原结果但不重复入账')
+    assert.is_false(send(env.player, { target = 'fisherman', action = 'Feed', seq = 3 }))
+    assert.is_false(send(env.player, { target = 'fisherman', action = 'Feed', seq = 5.5 }))
+    assert.is_false(send(env.player, { target = 'fisherman', action = 'Feed' }))
     assert.same(1, env.data.Data.FishCoin)
-    assert.is_true(env.mgr:Handle(env.player, { target = 'fisherman', action = 'Feed', seq = 6 }))
+    assert.is_true(send(env.player, { target = 'fisherman', action = 'Feed', seq = 6 }))
     assert.same(2, env.data.Data.FishCoin)
     -- 离线重进后序号重新从头算
-    env.mgr:OnPlayerRemoving(env.player)
-    assert.is_true(env.mgr:Handle(env.player, { target = 'fisherman', action = 'Feed', seq = 1 }))
+    env.host:leave(env.player)
+    env.data = env.host:rejoin(env.player)
+    assert.is_true(send(env.player, { target = 'fisherman', action = 'Feed', seq = 1 }))
   end)
 
   it('test_selected_fish_wins_over_selected_bait', function()
@@ -188,14 +186,14 @@ describe('向钓鱼佬喂食换金币（MgrInteract）', function()
   it('test_server_rechecks_distance_target_action_and_identity', function()
     env.data:SelectBait('worm')
     local r = env.cfg.Interact.Fisherman.Radius + env.cfg.Interact.Fisherman.Slack
-    env.player.Character.Position = vec(r + 0.1, 1, 0)
+    env.player.Character.Position = vec(env.anchor.Position.x + r + 0.1, 1, 0)
     assert.is_false(feed())
-    env.player.Character.Position = vec(r - 0.1, -50, 0) -- 只看 x/z
+    env.player.Character.Position = vec(env.anchor.Position.x + r - 0.1, -50, 0)
     assert.is_false(feed({ target = 'shopkeeper' }))
     assert.is_false(feed({ action = 'Steal' }))
     assert.is_false(feed({ target = false }))
-    assert.is_false(env.mgr:Handle(env.stranger, { target = 'fisherman', action = 'Feed', seq = 99 }))
-    assert.is_false(env.mgr:Handle(env.player, 'Feed'))
+    assert.is_false(send(env.stranger, { target = 'fisherman', action = 'Feed', seq = 99 }))
+    assert.is_false(send(env.player, 'Feed'))
     assert.same(0, env.data.Data.FishCoin)
     assert.is_true(feed())
     assert.same(1, env.data.Data.FishCoin)

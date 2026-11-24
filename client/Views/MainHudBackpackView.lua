@@ -9,6 +9,7 @@ local spoke = require("common.packages.spoke.api")
 local GameCfg = require("common.GameCfg")
 local Number = require("common.Number")
 local MainHudLayout = require("client.MainHudLayout")
+local ViewUtil = require("client.Views.ViewUtil")
 
 local Effect = spoke.Effect
 local State = spoke.State
@@ -75,27 +76,6 @@ local function place(node, rect)
   end
   node.Position = Vector2.New(rect.x, rect.y)
   node.Size = Vector2.New(rect.w, rect.h)
-end
-
-local function default_get_resolution()
-  local ok, x, y = pcall(function() -- 宿主 EUI 管理器未就绪或 Vector2 userdata 读取异常时安全回退默认分辨率
-    local game_ui = rawget(_G, "GameUI")
-    local eui_mgr = game_ui and game_ui:GetEuiManager() or nil
-    if eui_mgr == nil and game ~= nil then
-      local players = game:GetService("Players")
-      local lp = players and players.LocalPlayer
-      eui_mgr = lp and lp.PlayerGui and lp.PlayerGui.EuiManager or nil
-    end
-    local res = eui_mgr and eui_mgr:GetDeviceResolution() or nil
-    if type(res) ~= "table" and type(res) ~= "userdata" then
-      return nil, nil
-    end
-    return res.x, res.y
-  end)
-  if ok and Number.IsFiniteNumber(x) and Number.IsFiniteNumber(y) and x > 0 and y > 0 then
-    return { x = x, y = y }
-  end
-  return { x = 1920, y = 1080 }
 end
 
 local function default_fire_item_bar(payload)
@@ -202,8 +182,7 @@ end
 ---@param options table|nil { get_resolution?, send_action?, backpack_open?, open_popup?, on_open_changed?, resolve_drop_target?, on_drop_resolver?, layout? }
 function MainHudBackpackView.mount(s, ctx, options)
   options = options or {}
-  local get_resolution = options.get_resolution or default_get_resolution
-  local resolution = get_resolution()
+  local resolution = ViewUtil.get_resolution(ctx, options)
 
   local send_action = options.send_action or function(action, value)
     default_fire_item_bar({ action = action, value = value })

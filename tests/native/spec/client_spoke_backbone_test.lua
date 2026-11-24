@@ -579,25 +579,17 @@ describe("客户端 Spoke 主干契约（#296）", function()
       local stub_modules = {
         "common.ZoneMarkers",
         "common.REUtil",
+        "common.Util",
         "client.GameUI",
         "client.LocalMgrUtil",
         "client.LocalMotorUnitCtrl",
-        "client.LocalReelIn",
         "client.LocalLoot",
-        "client.LocalInteract",
-        "client.LocalGM",
-        "client.LocalShop",
-        "client.LocalLottery",
-        "client.ScreenHandlers.ScreenLottery",
-        "client.ScreenHandlers.ScreenFerry",
-        "client.ScreenHandlers.ScreenSurvival",
-        "client.ScreenHandlers.ScreenParty",
-        "client.ScreenHandlers.ScreenGrill",
-        "client.ScreenHandlers.ScreenBlindbox",
-        "client.ScreenHandlers.ScreenPlatform",
-        "client.ScreenHandlers.ScreenCompendium",
-        "client.LocalGarBite",
-        "client.LocalCastSource",
+        "client.Views.LotteryView",
+        "client.Views.BlindboxView",
+        "client.Views.PlatformShopView",
+        "client.Views.LotteryInteraction",
+        "client.Views.FerryView",
+        "client.Views.GarBiteWarning",
         "client.packages.ability_system.api",
         "client.Store.ClientStore",
         "client.Views.RootView",
@@ -614,8 +606,8 @@ describe("客户端 Spoke 主干契约（#296）", function()
         Color = rawget(_G, "Color"),
         GameUI = rawget(_G, "GameUI"),
         MgrGameUI = rawget(_G, "MgrGameUI"),
-        LocalReelIn = rawget(_G, "LocalReelIn"),
         ClientSpoke = rawget(_G, "ClientSpoke"),
+        PlatformShop = rawget(_G, "PlatformShop"),
       }
 
       local heartbeat = Eui.Signal()
@@ -624,6 +616,9 @@ describe("客户端 Spoke 主干契约（#296）", function()
       local char_pos = { x = 12, y = 2, z = 8 }
       local ui_root = Eui.Node({ Name = "MainUIRoot" })
       local created_hud_nodes = {}
+      local mounted_view
+      local mounted_options
+      local fired = {}
       local zones = {
         fishPond = { Boundary = { MinX = -50, MaxX = 50, MinZ = -50, MaxZ = 50 } },
       }
@@ -637,7 +632,13 @@ describe("客户端 Spoke 主干契约（#296）", function()
         package.loaded["common.REUtil"] = {
           GetRE = function(_, name)
             if not remote_events[name] then
-              remote_events[name] = { OnClientEvent = Eui.Signal() }
+              remote_events[name] = {
+                OnClientEvent = Eui.Signal(),
+                FireServer = function(_, payload)
+                  fired[name] = fired[name] or {}
+                  fired[name][#fired[name] + 1] = payload
+                end,
+              }
             end
             return remote_events[name]
           end,
@@ -651,23 +652,35 @@ describe("客户端 Spoke 主干契约（#296）", function()
         package.loaded["client.GameUI"] = game_ui_stub
         _G.GameUI = game_ui_stub
         package.loaded["client.packages.ability_system.api"] = { StartClientLifecycle = noop }
+        package.loaded["common.Util"] = nil
         for _, name in ipairs({
-          "client.LocalMgrUtil", "client.LocalMotorUnitCtrl", "client.LocalReelIn",
-          "client.LocalLoot", "client.LocalInteract", "client.LocalGM",
-          "client.LocalShop", "client.LocalLottery",
-          "client.ScreenHandlers.ScreenLottery", "client.ScreenHandlers.ScreenFerry",
-          "client.ScreenHandlers.ScreenSurvival", "client.ScreenHandlers.ScreenParty",
-          "client.ScreenHandlers.ScreenGrill", "client.ScreenHandlers.ScreenBlindbox",
-          "client.ScreenHandlers.ScreenPlatform", "client.ScreenHandlers.ScreenCompendium",
-          "client.LocalGarBite", "client.LocalCastSource",
+          "client.LocalMgrUtil", "client.LocalMotorUnitCtrl",
+          "client.LocalLoot",
+          "client.Views.GarBiteWarning",
         }) do
           package.loaded[name] = noop_module
         end
+        local empty_spec = function() return { name = "EconomyEntry", mount = noop } end
+        local empty_modal = function() return noop end
+        package.loaded["client.Views.LotteryView"] = { modal_spec = empty_modal }
+        package.loaded["client.Views.BlindboxView"] = { entry_spec = empty_spec, modal_spec = empty_modal }
+        package.loaded["client.Views.PlatformShopView"] = { entry_spec = empty_spec, modal_spec = empty_modal }
+        package.loaded["client.Views.LotteryInteraction"] = { spec = empty_spec }
+        package.loaded["client.Views.FerryView"] = { spec = empty_spec, legs_spec = empty_spec }
+
         -- 强制重新加载真实 ClientStore / Views 以绑定到 stub 后的 ZoneMarkers / REUtil
         package.loaded["client.Store.ClientStore"] = nil
         package.loaded["client.Views.RootView"] = nil
         package.loaded["client.Views.CameraZoomView"] = nil
         package.loaded["client.Views.MainHudVitalsView"] = nil
+        local root_view_module = require("client.Views.RootView")
+        local real_mount = root_view_module.mount
+        root_view_module.mount = function(rn, st, opts)
+          mounted_options = opts
+          mounted_view = real_mount(rn, st, opts)
+          return mounted_view
+        end
+        package.loaded["client.Views.GrillView"] = nil
 
         _G.MgrGameUI = {
           HideLiftButton = noop,
@@ -688,6 +701,7 @@ describe("客户端 Spoke 主干契约（#296）", function()
             if name == "World" then
               return {
                 GetServerTime = function() return server_now end,
+                FindFirstChild = function() return nil end,
                 CreateUnit = function(_, kind, props)
                   props = props or {}
                   local node = Eui.Node({
@@ -704,10 +718,16 @@ describe("客户端 Spoke 主干契约（#296）", function()
               }
             end
             if name == "RunService" then
-              return { Heartbeat = heartbeat }
+              return {
+                Heartbeat = heartbeat,
+                IsClient = function() return true end,
+                IsServer = function() return false end,
+              }
             end
             if name == "Players" then
-              return { LocalPlayer = { Character = { Position = char_pos } } }
+              local players = { LocalPlayer = { Character = { Position = char_pos } } }
+              players.GetPlayers = function() return { players.LocalPlayer } end
+              return players
             end
             return {}
           end,
@@ -734,6 +754,27 @@ describe("客户端 Spoke 主干契约（#296）", function()
         assert.equals("鱼塘", cs.zone_name:now())
 
         -- 验证 RootView 与 MainHudVitalsView 已挂载到根 UI 节点并在销毁时自动清理
+        assert.is_not_nil(mounted_view)
+        assert.is_not_nil(mounted_options)
+        assert.is_nil(mounted_view.root.fault, tostring(mounted_view.root.fault))
+        for _, modal_id in ipairs({
+          "shop", "fisherman", "confirm", "lottery", "blindbox", "platform", "compendium", "story", "gm",
+        }) do
+          assert.is_function(mounted_options.modals[modal_id], "缺少模态弹窗挂载: " .. modal_id)
+        end
+        assert.is_function(mounted_options.services.create_scene_node_at)
+        assert.is_function(mounted_options.services.create_anchor_scene_node)
+        assert.is_function(mounted_options.services.set_overlay)
+        mounted_options.services.send_grill({ action = "Takeout" })
+        assert.equals("Takeout", fired.GrillAction[1].action)
+        assert.is_true(type(fired.GrillAction[1].seq) == "number" and fired.GrillAction[1].seq >= 1)
+        remote_events.LootState.OnClientEvent:Fire({ list = { { id = "loot-near", x = 12, y = 2, z = 8 } } })
+        mounted_options.services.set_overlay("aim_pickup", true)
+        local aim_mask = ui_root:FindFirstChild("AimPickupMask", true)
+        assert.is_not_nil(aim_mask)
+        assert.is_true(Eui.Click(aim_mask))
+        assert.same({ action = "Pickup", value = "loot-near" }, fired.ItemBarAction[#fired.ItemBarAction])
+        assert.is_nil(ui_root:FindFirstChild("AimPickupMask", true))
         assert.is_true(#created_hud_nodes > 0)
         assert.equals(1, ui_root.Destroying:Count())
         ui_root:Destroy()
@@ -752,6 +793,24 @@ describe("客户端 Spoke 主干契约（#296）", function()
       if not ok then
         error(err, 0)
       end
+    end)
+
+    it("ClientStore reset_session 完整重置 shop 状态（含 purchases/upgradeLevels/upgradeLevel）", function()
+      local ClientStore = require("client.Store.ClientStore")
+      local store, writer = ClientStore.new({ initial_now = 10 })
+      assert.is_true(writer:ingest_event("ShopResult", {
+        ok = true, action = "UpgradeStorage", number = 5, kind = "rod", level = 2, coinAfter = 88,
+      }))
+      assert.equals(1, store.shop:now().purchases[5])
+      assert.equals(2, store.shop:now().upgradeLevels.rod)
+      assert.equals(2, store.shop:now().upgradeLevel)
+      assert.equals(88, store.coin:now())
+
+      writer:reset_session("reconnect")
+      assert.same({}, store.shop:now().purchases)
+      assert.same({}, store.shop:now().upgradeLevels)
+      assert.equals(0, store.shop:now().upgradeLevel)
+      assert.equals(0, store.coin:now())
     end)
   end)
 end)

@@ -29,11 +29,28 @@ local PACKAGE_SNAPSHOTS = {
   },
 }
 
--- 三类存量债务水位线（只减不增；每个垂直切片完成后单调下调对应数值直至归零）。
 local DEBT_WATERMARKS = {
-  owned_units_calls = 37,
-  legacy_raw_connects = 117,
-  mgr_map_members = 29,
+  owned_units_calls = 0,
+  legacy_raw_connects = 0,
+  mgr_map_members = 0,
+}
+
+local REMOVED_FISH_LEGACY_FILES = {
+  "server/Mgr/MgrFishUnit.lua",
+  "server/Mgr/MgrFishCarrier.lua",
+  "server/Mgr/MgrAi.lua",
+  "server/Mgr/MgrAiTarget.lua",
+  "client/FishCombatLabel.lua",
+  "client/LocalGarBite.lua",
+}
+
+local FORBIDDEN_FISH_LEGACY_MODULES = {
+  "server.Mgr.MgrFishUnit",
+  "server.Mgr.MgrFishCarrier",
+  "server.Mgr.MgrAi",
+  "server.Mgr.MgrAiTarget",
+  "client.FishCombatLabel",
+  "client.LocalGarBite",
 }
 
 local BUSINESS_ROOTS = { "client", "common", "server" }
@@ -296,34 +313,32 @@ describe("Spoke 原生重构机械棘轮守卫", function()
           "common.packages.spoke.api",
           "server.Data.PlayerData",
           "server.World.PlayerTree",
-          "server.Mgr.MgrVitals",
+          "server.AbilityBehaviors.melee_hit",
           "client.GameUI",
           "client.Store.ClientStore",
           "client.Views.RootView",
-          "client.ScreenHandlers.ScreenMain",
+          "server.AbilityAPI",
         },
         edges = {
           { from = "common.SpokeClock", to = "common.packages.spoke.api" },
           { from = "server.World.PlayerTree", to = "common.SpokeClock" },
           { from = "server.World.PlayerTree", to = "server.Data.PlayerData" },
-          { from = "server.Mgr.MgrVitals", to = "server.World.PlayerTree" },
+          { from = "server.AbilityBehaviors.melee_hit", to = "server.World.PlayerTree" },
           { from = "client.Store.ClientStore", to = "common.SpokeClock" },
           { from = "client.Views.RootView", to = "client.Store.ClientStore" },
           { from = "client.Views.RootView", to = "client.GameUI" },
-          { from = "client.ScreenHandlers.ScreenMain", to = "client.Store.ClientStore" },
+          { from = "server.AbilityAPI", to = "server.World.PlayerTree" },
         },
       })
       assert.is_true(valid.ok, valid.message)
 
       local invalid_edges = {
-        { from = "server.World.PlayerTree", to = "server.Mgr.MgrVitals" },
+        { from = "server.World.PlayerTree", to = "server.AbilityBehaviors.melee_hit" },
         { from = "server.World.PlayerTree", to = "server.AbilityAPI" },
-        { from = "server.World.PlayerTree", to = "common.OwnedUnits" },
-        { from = "client.Store.ClientStore", to = "client.LocalLoot" },
         { from = "client.Store.ClientStore", to = "client.Views.RootView" },
         { from = "client.Views.RootView", to = "client.MgrGameUI" },
         { from = "client.Views.RootView", to = "client.ScreenHandlers.ScreenMain" },
-        { from = "client.Views.RootView", to = "client.LocalReelIn" },
+        { from = "client.Views.ReelOverlayView", to = "client.LocalMotorUnitCtrl" },
         { from = "client.Views.RootView", to = "common.OwnedUnits" },
         { from = "common.SpokeClock", to = "common.OwnedUnits" },
       }
@@ -471,6 +486,24 @@ describe("Spoke 原生重构机械棘轮守卫", function()
         fail("MgrMap 成员数 %d 超过水位线 %d（只减不增）：\n%s",
           #entries, DEBT_WATERMARKS.mgr_map_members, table.concat(entries, "\n"))
       end
+    end)
+  end)
+
+  describe("活鱼旧模块棘轮（#309）", function()
+    it("旧活鱼、载体、AI 管理器与客户端战斗标签已不可加载且业务源码零引用", function()
+      for _, path in ipairs(REMOVED_FISH_LEGACY_FILES) do
+        assert.is_false(fs.exists(path), path .. " 仍在")
+      end
+      local hits = {}
+      for _, path in ipairs(business_lua_files()) do
+        local text = fs.slurp(path) or ""
+        for _, name in ipairs(FORBIDDEN_FISH_LEGACY_MODULES) do
+          if text:find(name, 1, true) then
+            hits[#hits + 1] = path .. " -> " .. name
+          end
+        end
+      end
+      assert.equals(0, #hits, table.concat(hits, "\n"))
     end)
   end)
 end)

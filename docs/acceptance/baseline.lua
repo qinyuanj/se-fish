@@ -4,6 +4,6 @@
 -- 调高 evidenced 或调低 legacyTests 之后才允许重写本文件；反方向的 --update-baseline 直接拒绝并退 2。
 return {
   evidenced = 151,
-  legacyTests = 136,
-  updated = "2026-11-21",
+  legacyTests = 114,
+  updated = "2026-11-23",
 }

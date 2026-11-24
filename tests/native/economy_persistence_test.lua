@@ -2,7 +2,6 @@
 -- #123 失败方式先列：持久化前扣发/回包/任务/动画；写失败或回包丢失重复结算；
 -- pending/failed 可操作；同身份重放改变结果；重连 seq 复位串账；日志淘汰后旧身份重新发奖；
 -- 兑换满格、购买余额不足、扩容上限被绕过；Save 注入后遗漏现有业务校验。
--- seam：Interact/Shop:Handle；真实 PlayerData、MgrPlayerData、MgrSave、MgrQuest，替换引擎边界。
 -- it 按旧 LuaUnit 的方法名字典序注册，保持与旧套件一致的案例顺序。
 -- 断言映射：assertEquals 的 table 深比较由 assert.same 承接（标量退化为 ==，与旧实现一致）；
 -- assertTrue/assertFalse 严格 true/false → is_true/is_false；assertNil/assertNotNil → is_nil/is_not_nil；
@@ -10,6 +9,8 @@
 -- 不使用 LuaUnit 断言桥。业务模块经 loadfile 加载，其 _ENV 是真实 _G，
 -- 故 Busted 逐文件沙箱下必须写 _G.game / _G.REUtil 而不是裸赋值。
 local GameCfg = require('common.GameCfg')
+local ServerRuntime = require('server.World.ServerRuntime')
+local SpokeClock = require('common.SpokeClock')
 
 describe('TestEconomyPersistence', function()
     local env
@@ -17,15 +18,25 @@ describe('TestEconomyPersistence', function()
 
     -- 类内辅助（旧 TestEconomyPersistence:join / :drain / :clearEvents / :messages / :persistSetup）
     -- 改为闭包 env 的本地函数，避免在 describe 加载期往尚未赋值的 env 上挂方法。
+    local drain
     local function join()
         local signal = { Connect = function() return { Disconnect = function() end } end }
-        env.player = { UserId = 321, Character = { Position = { x = 0, y = 0, z = 0 } },
-            CharacterAdded = signal, CharacterRemoving = signal, SetAttribute = function() end }
+        local controller = { Health = GameCfg.Vitals.MaxHealth, MaxHealth = GameCfg.Vitals.MaxHealth,
+            WalkSpeed = 16, HealthChanged = signal, Died = signal, OnReborn = signal }
+        env.player = { UserId = 321, Character = { Position = { x = 0, y = 0, z = 0 },
+            Size = { y = 2 }, Controller = controller }, CharacterAdded = signal, CharacterRemoving = signal,
+            SetAttribute = function(self, key, value) self.attrs = self.attrs or {} self.attrs[key] = value end,
+            GetAttribute = function(self, key) return self.attrs and self.attrs[key] end }
         env.players:OnPlayerAdded(env.player)
         env.quest:OnPlayerAdded(env.player)
+        drain()
+        env.runtime:on_player_added(env.player)
+        local data = env.players:GetDataInst(env.player)
+        if data then env.runtime:on_save_ready(env.player, data) end
+        drain()
     end
 
-    local function drain()
+    drain = function()
         while #env.queue > 0 do table.remove(env.queue, 1)() end
     end
 
@@ -84,18 +95,55 @@ describe('TestEconomyPersistence', function()
                 FindFirstChild = function() return env.anchor end } end
             if name == 'Players' then return { GetPlayers = function() return { env.player } end } end
         end }
-        _G.REUtil = { GetRE = function(_, name) return { FireClient = function(_, player, value)
-            env.events[#env.events + 1] = { name = name, player = player, value = value }
-        end } end }
-        env.save = assert(loadfile('server/Mgr/MgrSave.lua'))()
-        env.players = assert(loadfile('server/Mgr/MgrPlayerData.lua'))()
-        env.interact = assert(loadfile('server/Mgr/MgrInteract.lua'))()
-        env.shop = assert(loadfile('server/Mgr/MgrShop.lua'))()
-        env.quest = assert(loadfile('server/Mgr/MgrQuest.lua'))()
+        _G.REUtil = {
+            GetRE = function(_, name)
+                env.remotes = env.remotes or {}
+                if not env.remotes[name] then
+                    env.remotes[name] = {
+                        OnServerEvent = { Connect = function() return { Disconnect = function() end } end },
+                        FireClient = function(_, player, value)
+                            env.events[#env.events + 1] = { name = name, player = player, value = value }
+                        end,
+                    }
+                end
+                return env.remotes[name]
+            end,
+            CheckRECD = function() return false end,
+        }
+        env.save = assert(loadfile('server/SaveHost.lua'))()
+        env.players = assert(loadfile('server/PlayerDataHost.lua'))()
+        env.quest = {
+            OnPlayerAdded = function() end,
+            OnPlayerRemoving = function() end,
+            GetState = function()
+                local data = env.players:GetDataInst(env.player)
+                return data and data.Extra.quest or { step = 1, count = 0 }
+            end,
+        }
         env.players.Save, env.save.PlayerData = env.save, env.players
-        env.interact.PlayerData, env.interact.Save, env.interact.Quest = env.players, env.save, env.quest
-        env.shop.PlayerData, env.shop.Save, env.shop.Quest = env.players, env.save, env.quest
-        env.shop.Interact = env.interact
+        env.runtime = ServerRuntime.new({
+            clock = SpokeClock.new(100), remote = _G.REUtil,
+            on_item_bar_state = function(player, snapshot)
+                _G.REUtil:GetRE('ItemBarState'):FireClient(player, snapshot)
+            end,
+            save = env.save, player_data = env.players,
+            players = function() return { env.player } end,
+            players_service = _G.game:GetService('Players'), world_service = _G.game:GetService('World'),
+            bind_shop_action = function(dispatch) env.shop_action = dispatch end,
+            bind_interact_action = function(dispatch) env.interact_action = dispatch end,
+        })
+        env.runtime:start()
+        env.runtime:mark_started()
+        env.shop = { Handle = function(_, player, payload) return env.shop_action(player, payload) end }
+        env.interact = {
+            Handle = function(_, player, payload) return env.interact_action(player, payload) end,
+            OnPlayerRemoving = function(_, player)
+                env.runtime:on_player_removing(player)
+                env.players:OnPlayerRemoving(player)
+                drain()
+            end,
+        }
+        env.shop.OnPlayerRemoving = env.interact.OnPlayerRemoving
         join()
         drain()
         env.data = env.players:GetDataInst(env.player)
@@ -448,7 +496,7 @@ describe('TestEconomyPersistence', function()
         assert.same({ original }, messages('ShopResult'))
         assert.same({}, messages('ItemBarState'))
         assert.same(18, env.data.Data.FishCoin)
-        assert.same(1, env.quest:GetState(env.player).count)
+        assert.same(2, env.quest:GetState(env.player).count, '重进新购买已计数，旧身份重放不得再增加')
     end)
 
     it('test_skip_level_rejected_before_persisting', function()

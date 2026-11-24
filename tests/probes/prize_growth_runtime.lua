@@ -2,10 +2,8 @@
 -- 用 exec -p server --file 执行；临时修改会话内成长计数后恢复，不代表真实存档重进验收。
 -- 不自动发奖、不提交存档、不模拟多人；拾取/钓鱼/摆渡及真实枪击/挥砍另列真机遗留。
 local cfg = require('common.GameCfg')
-local ability = require('server.Mgr.MgrAbility')
-local pd = require('server.Mgr.MgrPlayerData')
-local vitals = require('server.Mgr.MgrVitals')
-local survival = require('server.Mgr.MgrSurvival')
+local ability = require('server.FishAbility')
+local pd = require('server.PlayerDataHost')
 local ServerRuntime = require('server.World.ServerRuntime')
 local players, task = game:GetService('Players'), game:GetService('Task')
 local player = players:GetPlayers()[1]
@@ -18,12 +16,12 @@ end
 local function log(...) print('PRIZE139', '[专项探针]', ...) end
 local growth = data.Extra.growth.potions
 local oldSpeed, oldBody = growth.item167, growth.item168
-local state = survival:GetState(player)
+local life = rt.life
 local oldWeak = pt:get_modifier_remaining('weak')
 local controller = player.Character.Controller
 local function attrs(label)
     log(label, 'speed=' .. tostring(controller.WalkSpeed), 'maxHealth=' .. tostring(controller.MaxHealth),
-        'planScale=' .. tostring(ability:BodyPlan(player).Scale), 'canAct=' .. tostring(vitals:CanAct(player)))
+        'planScale=' .. tostring(ability:BodyPlan(player).Scale), 'canAct=' .. tostring(life:CanAct(player)))
 end
 for n = 152, 166 do
     local id = 'item' .. tostring(n)
@@ -42,7 +40,7 @@ task:Spawn(function()
         ability:ApplyGrowth(player)
         attrs('夹值21/11（非饮用通道）')
         growth.item167, growth.item168 = 20, 10
-        if state then survival:ApplyWeak(state, 60); attrs('虚弱'); survival:ClearWeak(state); attrs('虚弱消退') end
+        pt:apply_modifier('weak', { duration = 60 }); attrs('虚弱'); pt:clear_modifier('weak'); attrs('虚弱消退')
         for _ = 1, 6 do
             pt:apply_modifier('poison', { source = player })
             pt:apply_modifier('burn', { source = player })

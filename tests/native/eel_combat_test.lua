@@ -1,7 +1,5 @@
 -- #84 迁移：电鳗技能与战斗状态字标签（原 tests/gameplay/eel_combat_test.lua，12 + 3 例）。
 -- 接缝：MgrFishUnit 的 eel 状态机——5 次放电每秒一次、施法被拒不计数不入睡、5 次满才睡 10 秒、
--- 逃跑时限到停施法并移除技能；客户端 FishCombatLabel 纯函数按服务端载荷出字，坏载荷不建节点。
--- TestEelCombat 沿用 tests/support/fish_escape 夹具（不需要 Vitals），TestFishCombatLabel 直接 loadfile 客户端模块。
 -- Busted 案例体在沙箱 _ENV 中，写业务可见的全局（Quaternion）必须用 _G.Quaternion。
 -- describe/it 名称保留旧类名与方法名，并按方法名字典序注册以保持旧套件执行顺序。
 local GameCfg = require('common.GameCfg')
@@ -240,56 +238,122 @@ describe('TestEelCombat', function()
     end)
 end)
 
--- 客户端状态字：纯函数按服务端时间出字，坏载荷不建节点
-local function with(base, extra)
-    local t = {}
-    for k, v in pairs(base) do t[k] = v end
-    for k, v in pairs(extra) do t[k] = v end
-    return t
-end
+local Eui = require('tests.support.eui_double')
+local ClientStore = require('client.Store.ClientStore')
+local RootView = require('client.Views.RootView')
+local FishCombatView = require('client.Views.FishCombatView')
+local SpokeClock = require('common.SpokeClock')
 
 describe('TestFishCombatLabel', function()
     local env
 
+    local function mountView()
+        local clock = SpokeClock.new(90)
+        local store, writer = ClientStore.new({ clock = clock })
+        local root = Eui.Node({ Name = 'UIRoot' })
+        local created = {}
+        local view = RootView.mount(root, store, {
+            create_node = function(kind, props)
+                local node = Eui.Node(props or {})
+                node.UnitType = kind
+                created[#created + 1] = node
+                return node
+            end,
+            docks = { fish_combat = FishCombatView.bar_spec() },
+        })
+        return { root = root, writer = writer, view = view, created = created }
+    end
+
+    local function aliveByName(viewEnv, name)
+        for _, node in ipairs(viewEnv.created) do
+            if not node.Destroyed and node.Name == name then return node end
+        end
+    end
+
+    local function aliveCount(viewEnv, prefix)
+        local count = 0
+        for _, node in ipairs(viewEnv.created) do
+            if not node.Destroyed and type(node.Name) == 'string' and node.Name:find(prefix, 1, true) == 1 then
+                count = count + 1
+            end
+        end
+        return count
+    end
+
     before_each(function()
-        env = {}
-        env.label = assert(loadfile('client/FishCombatLabel.lua'))()
-        env.base = { id = 1, fishId = 'eel', fleeAt = 180, escapeSec = 180, discharges = 3, dischargeCount = 5,
-            position = { x = 0, y = 0, z = 0 } }
+        env = mountView()
     end)
     after_each(function()
+        if env and env.view then env.view:dispose() end
         env = nil
     end)
 
     it('test_crab_move_names_render_chinese_labels', function()
-        -- #136 蟹类招式中文名：帝王蟹乱刺 / 蟹老板双击、冲撞、旋转
         for move, name in pairs({ jab = '蟹钳乱刺', pinch = '蟹钳双击', charge = '冲撞', spin = '旋转' }) do
-            local text, kind = env.label.Text(with(env.base, { fishId = 'fish24Boss', state = 'combat', move = move }), 90)
-            assert.are.equal('attack', kind)
-            assert.matches(name, text, nil, true)
+            assert.is_true(env.writer:ingest_event('FishCombatState', {
+                list = {
+                    { id = 24, fishId = 'fish24Boss', name = '蟹老板', health = 1000, maxHealth = 1200,
+                      move = move, label = name },
+                },
+            }))
+            local bar = aliveByName(env, 'FishBar_24')
+            local tag = aliveByName(env, 'FishTag_24')
+            assert.is_not_nil(bar)
+            assert.are.equal('蟹老板 1000/1200', bar.Text)
+            assert.is_not_nil(tag)
+            assert.matches(name, tag.Text, nil, true)
         end
     end)
 
     it('test_text_shows_discharges_sleep_and_flee_bar', function()
-        local text, kind = env.label.Text(with(env.base, { state = 'attacking' }), 90)
-        assert.are.equal('attack', kind)
-        assert.matches('电鳗 放电 3/5', text, nil, true)
-        assert.matches('逃跑时限 [=====-----] 90 秒', text, nil, true)
-        text, kind = env.label.Text(with(env.base, { state = 'sleeping', wakeAt = 97.2 }), 90)
-        assert.are.equal('sleep', kind)
-        assert.matches('睡眠 8 秒', text, nil, true)
-        assert.is_nil(env.label.Text(with(env.base, { state = 'combat' }), 180))
-        text, kind = env.label.Text(with(env.base, { fishId = 'alligatorGar', state = 'attacking' }), 90)
-        assert.are.equal('idle', kind)
-        assert.is_nil(text:find('放电', 1, true))
+        assert.is_true(env.writer:ingest_event('FishCombatState', {
+            list = {
+                { id = 1, fishId = 'eel', name = '电鳗', health = 240, maxHealth = 300, label = '放电 3/5' },
+            },
+        }))
+        assert.are.equal('电鳗 240/300', aliveByName(env, 'FishBar_1').Text)
+        assert.are.equal('放电 3/5', aliveByName(env, 'FishTag_1').Text)
+
+        assert.is_true(env.writer:ingest_event('FishCombatState', {
+            list = {
+                { id = 1, fishId = 'eel', name = '电鳗', health = 180, maxHealth = 300, label = '睡眠 8 秒' },
+            },
+        }))
+        assert.are.equal('电鳗 180/300', aliveByName(env, 'FishBar_1').Text)
+        assert.are.equal('睡眠 8 秒', aliveByName(env, 'FishTag_1').Text)
+
+        assert.is_true(env.writer:ingest_event('FishCombatState', {
+            list = {
+                { id = 2, fishId = 'alligatorGar', name = '鳄雀鳝', health = 500, maxHealth = 500 },
+            },
+        }))
+        assert.is_nil(aliveByName(env, 'FishBar_1'))
+        assert.is_nil(aliveByName(env, 'FishTag_1'))
+        assert.are.equal('鳄雀鳝 500/500', aliveByName(env, 'FishBar_2').Text)
+        assert.is_nil(aliveByName(env, 'FishTag_2'))
+
+        assert.is_true(env.writer:ingest_event('FishCombatState', { list = {} }))
+        assert.are.equal(0, aliveCount(env, 'FishBar_'))
+        assert.are.equal(0, aliveCount(env, 'FishTag_'))
     end)
 
     it('test_valid_rejects_malformed_payloads', function()
-        assert.is_true(env.label.Valid(with(env.base, { state = 'attacking' })))
-        assert.is_true(env.label.Valid({ id = 1, state = 'gone' }))
-        assert.is_false(env.label.Valid(with(env.base, { state = 'attacking', fleeAt = 0 / 0 })))
-        assert.is_false(env.label.Valid(with(env.base, { state = 'attacking', escapeSec = 0 })))
-        assert.is_false(env.label.Valid(with(env.base, { state = 'attacking', position = 'x' })))
-        assert.is_false(env.label.Valid({ state = 'gone' }))
+        assert.is_false(env.writer:ingest_event('FishCombatState', nil))
+        assert.is_true(env.writer:ingest_event('FishCombatState', {
+            list = {
+                'bad-row',
+                { fishId = 'eel', name = '缺编号' },
+            },
+        }))
+        assert.are.equal(0, aliveCount(env, 'FishBar_'))
+        assert.are.equal(0, aliveCount(env, 'FishTag_'))
+
+        assert.is_true(env.writer:ingest_event('FishCombatState', {
+            list = {
+                { id = 7, fishId = 'eel', name = '电鳗', health = 300, maxHealth = 300, label = '战斗' },
+            },
+        }))
+        assert.are.equal(1, aliveCount(env, 'FishBar_'))
+        assert.are.equal('电鳗 300/300', aliveByName(env, 'FishBar_7').Text)
     end)
 end)

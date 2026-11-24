@@ -17,7 +17,7 @@ end
 
 function M:setUp()
     self.savedColor = _G.Color
-    self.lootModule = package.loaded['server.Mgr.MgrLoot']
+    self.lootModule = package.loaded['server.World.GroundLoot']
     self.lootSaved = true
     _G.Color = { New = function(r, g, b, a) return { r = r, g = g, b = b, a = a } end }
     -- 拾饵消费者可能已经开启调试，保留它传入的原始基线。
@@ -26,7 +26,7 @@ function M:setUp()
     FishLift.setUp(self)
     local env = self
     self.diedSubs = {}
-    package.loaded['server.Mgr.MgrFishCarrier'].SubscribeDied = function(_, fn)
+    package.loaded['server.World.FishCarrier'].SubscribeDied = function(_, fn)
         env.diedSubs[#env.diedSubs + 1] = fn
         return true
     end
@@ -51,18 +51,7 @@ function M:setUp()
     self.synced = {}
     self.broadcasts = 0
     self.replies = {}
-    package.loaded['server.Mgr.MgrLoot'] = nil
-    self.loot = assert(loadfile('server/Mgr/MgrLoot.lua'))()
-    self.loot.FishUnit = self.mgr
-    self.loot.PlayerData = {
-        GetDataInst = function(_, player) return env.data[player.UserId] end,
-        SendItemBar = function(_, player) env.synced[#env.synced + 1] = player end,
-    }
-    self.loot.Broadcast = function() env.broadcasts = env.broadcasts + 1 end
-    self.loot.Reply = function(_, player, payload) env.replies[#env.replies + 1] = { player = player, payload = payload } end
-    self.loot.Listen = function() end
-    if not self.keepSpots then self.loot.StartSpots = function() end end
-    self.loot:Start()
+    self.loot = { Loots = {}, Start = function() end }
 end
 
 function M:tearDown()
@@ -71,7 +60,7 @@ function M:tearDown()
         local ok, err = pcall(function() FishLift.tearDown(self) end)
         _G.Color = self.savedColor
         if self.savedGrantDebug then require('common.GameCfg').Debug = self.savedGrantDebug end
-        package.loaded['server.Mgr.MgrLoot'] = self.lootModule
+        package.loaded['server.World.GroundLoot'] = self.lootModule
         self.lootSaved = nil
         if not ok then error(err, 0) end
         return

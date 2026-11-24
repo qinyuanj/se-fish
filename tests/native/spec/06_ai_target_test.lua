@@ -45,7 +45,7 @@ describe('第 6 节 官方 AI 目标选择接线（哥斯拉贯通）', function
             Rotation = _G.Quaternion.FromEulerAngles() }, CharacterAdded = env.signal(),
             CharacterRemoving = env.signal(), SetAttribute = function() end }
         env.players[#env.players + 1] = player
-        env.vitals:OnPlayerAdded(player)
+        env.lifeHost:add(player)
         env.mgr:OnPlayerAdded(player)
         return player
     end
@@ -67,18 +67,18 @@ describe('第 6 节 官方 AI 目标选择接线（哥斯拉贯通）', function
     end
 
     local function officialFocus(fish)
-        return require('server.Mgr.MgrAiTarget'):Focus(fish)
+        return require('server.World.FishAiTarget'):Focus(fish)
     end
 
     before_each(function()
         env = Islet.new(7)
-        for _, name in ipairs({ 'server.Mgr.MgrAiTarget', 'server.packages.official_ai_feature.api',
+        for _, name in ipairs({ 'server.World.FishAiTarget', 'server.packages.official_ai_feature.api',
             'server.packages.official_ai_feature.official_ai_feature',
             'server.packages.official_ai_feature.behavior_runtime',
             'server.packages.official_ai_feature.ability_bridge' }) do
             package.loaded[name] = nil
         end
-        env.mgr.AiTarget = require('server.Mgr.MgrAiTarget')
+        env.mgr.AiTarget = require('server.World.FishAiTarget')
         local p = Islet.shoreDryPoint(7)
         env.player.Character.Position = vec(p.x, p.y, p.z)
         env.player.Character.Controller.Health = 100000
@@ -98,7 +98,7 @@ describe('第 6 节 官方 AI 目标选择接线（哥斯拉贯通）', function
 
         env:advance(0.2)
         assert.same(env.player.Character, officialFocus(fish), '官方 AI 管理器没有持有伤害优先目标')
-        local adapter = require('server.Mgr.MgrAiTarget')
+        local adapter = require('server.World.FishAiTarget')
         local state = adapter:State(fish)
         assert.same(GameCfg.Ability.AiTarget.PriorityMode, state.priorityMode,
             '伤害优先模式没有登记到官方 AI 管理器')
@@ -160,7 +160,7 @@ describe('第 6 节 官方 AI 目标选择接线（哥斯拉贯通）', function
         assert.same(env.player.Character.Position, cp)
 
         local text = table.concat(logs, '\n')
-        assert.is_truthy(text:find('[MgrAiTarget]', 1, true), '日志缺模块名')
+        assert.is_truthy(text:find('[FishAiTarget]', 1, true), '日志缺模块名')
         assert.is_truthy(text:find('SetFocus', 1, true), '日志缺官方登记操作名')
         assert.is_truthy(text:find(tostring(fish.Id), 1, true), '日志缺鱼标识')
         assert.is_truthy(text:find(tostring(fish.Carrier.Receiver.UnitId), 1, true), '日志缺单位标识')
@@ -177,8 +177,8 @@ describe('第 6 节 官方 AI 目标选择接线（哥斯拉贯通）', function
         local oldApi, oldPreload = package.loaded[apiName], package.preload[apiName]
         package.loaded[apiName] = nil
         package.preload[apiName] = function() error('official-api-load-failed') end
-        package.loaded['server.Mgr.MgrAiTarget'] = nil
-        env.mgr.AiTarget = require('server.Mgr.MgrAiTarget')
+        package.loaded['server.World.FishAiTarget'] = nil
+        env.mgr.AiTarget = require('server.World.FishAiTarget')
         local rawPrint = _G.print
         local logs = {}
         _G.print = function(...) logs[#logs + 1] = tostring((...)) end
@@ -190,7 +190,7 @@ describe('第 6 节 官方 AI 目标选择接线（哥斯拉贯通）', function
         assert.same(env.player, selected, '官方 API 加载失败阻断了业务伤害优先目标')
 
         local text = table.concat(logs, '\n')
-        assert.is_truthy(text:find('[MgrAiTarget]', 1, true), '日志缺模块名')
+        assert.is_truthy(text:find('[FishAiTarget]', 1, true), '日志缺模块名')
         assert.is_truthy(text:find('RequireOfficialAPI', 1, true), '日志缺官方 API 加载操作名')
         assert.is_truthy(text:find(tostring(fish.Id), 1, true), '日志缺鱼标识')
         assert.is_truthy(text:find(tostring(fish.Carrier.Receiver.UnitId), 1, true), '日志缺单位标识')
@@ -213,7 +213,7 @@ describe('第 6 节 官方 AI 目标选择接线（哥斯拉贯通）', function
         assert.is_true(ok, tostring(selected))
         assert.same(env.rival, selected, '官方焦点登记失败阻断了业务 override')
         local text = table.concat(logs, '\n')
-        assert.is_truthy(text:find('[MgrAiTarget]', 1, true), '日志缺模块名')
+        assert.is_truthy(text:find('[FishAiTarget]', 1, true), '日志缺模块名')
         assert.is_truthy(text:find('SetFocus', 1, true), '日志缺焦点注册操作名')
         assert.is_truthy(text:find(tostring(fish.Id), 1, true), '日志缺鱼标识')
         assert.is_truthy(text:find(tostring(env.rival.UserId), 1, true), '日志缺目标玩家标识')
@@ -222,7 +222,7 @@ describe('第 6 节 官方 AI 目标选择接线（哥斯拉贯通）', function
 
     it('官方状态读取失败时记录模块、操作、对象与原始错误', function()
         local fish = dropBoss()
-        local adapter = require('server.Mgr.MgrAiTarget')
+        local adapter = require('server.World.FishAiTarget')
         local runtime = require('server.packages.official_ai_feature.behavior_runtime')
         local original = runtime.getState
         runtime.getState = function() error('official-state-read-failed') end
@@ -235,7 +235,7 @@ describe('第 6 节 官方 AI 目标选择接线（哥斯拉贯通）', function
         assert.is_true(ok, tostring(state))
         assert.is_nil(state)
         local text = table.concat(logs, '\n')
-        assert.is_truthy(text:find('[MgrAiTarget]', 1, true), '日志缺模块名')
+        assert.is_truthy(text:find('[FishAiTarget]', 1, true), '日志缺模块名')
         assert.is_truthy(text:find('ReadOfficialState', 1, true), '日志缺状态读取操作名')
         assert.is_truthy(text:find(tostring(fish.Id), 1, true), '日志缺鱼标识')
         assert.is_truthy(text:find(tostring(fish.Carrier.Receiver.UnitId), 1, true), '日志缺单位标识')
@@ -268,14 +268,8 @@ describe('第 6 节 官方 AI 目标选择接线（哥斯拉贯通）', function
         local pos = fish.Carrier.Body.Position
         assert.same(wounded, (env.mgr:ChooseTarget(fish, pos)), '新玩家应接替成为目标')
         env.mgr:NoteDamage(fish, wounded, 900)
-        env.vitals:SetLifeHooks({
-            LifeStatus = function(state)
-                if state.player == wounded then return 'downed' end
-                return state.dead and 'dead' or 'alive'
-            end,
-            -- 与 MgrVitals 默认钩子同语义：濒死外仍要挡死亡（覆盖钩子不能把死亡判定漏掉）。
-            CanTakeDamage = function(state) return state.player ~= wounded and not state.dead end,
-        })
+        env.vitals:ApplyHit(env.vitals:NewHit(nil, 'fishAttack'), wounded, 1000000)
+        assert.equals('downed', env.vitals:LifeStatus(wounded))
         assert.is_nil((env.mgr:ChooseTarget(fish, pos)), '濒死玩家仍被选中')
         assert.is_nil(fish.Threat[wounded], '濒死玩家的伤害记录没有清除')
     end)
@@ -302,7 +296,7 @@ describe('第 6 节 官方 AI 目标选择接线（哥斯拉贯通）', function
         local fish = dropBoss()
         place(fish, env.player, 2)
         env:advance(1)
-        local adapter = require('server.Mgr.MgrAiTarget')
+        local adapter = require('server.World.FishAiTarget')
         local state = adapter:State(fish)
         assert.is_nil(state and state.modeName, '官方 AI 启动了移动模式，与自研轨迹双写权威')
         assert.is_not_true(fish.Carrier.AiOwnsMovement, '受击体的移动所有权被官方 AI 接管')
@@ -359,17 +353,17 @@ describe('第 6 节 6-30：离开战斗范围的玩家退出飞行鱼目标', fu
     local env
 
     local function vec(x, y, z) return env.vec(x, y, z) end
-    local function focus(fish) return require('server.Mgr.MgrAiTarget'):Focus(fish) end
+    local function focus(fish) return require('server.World.FishAiTarget'):Focus(fish) end
 
     before_each(function()
         env = Islet.new(6)
-        for _, name in ipairs({ 'server.Mgr.MgrAiTarget', 'server.packages.official_ai_feature.api',
+        for _, name in ipairs({ 'server.World.FishAiTarget', 'server.packages.official_ai_feature.api',
             'server.packages.official_ai_feature.official_ai_feature',
             'server.packages.official_ai_feature.behavior_runtime',
             'server.packages.official_ai_feature.ability_bridge' }) do
             package.loaded[name] = nil
         end
-        env.mgr.AiTarget = require('server.Mgr.MgrAiTarget')
+        env.mgr.AiTarget = require('server.World.FishAiTarget')
         local p = Islet.shoreDryPoint(6)
         env.player.Character.Position = vec(p.x, p.y, p.z)
     end)
@@ -441,7 +435,6 @@ describe('第 6 节：逐招表按 KeyOf 反查', function()
 end)
 
 -- 6-26：霜之新星（枪械大奖特效）经武器命中业务入口挂 3 秒霜冻，重复命中只刷新不叠加。
--- 业务入口：MgrWeapon:Attack；效果由真 MgrModifier + 真 modifier_system 持有，
 -- 预设键取 GameCfg.Ability.ModifierPresets（不用测试替身）。只替引擎边界：射线、角色、RE、时钟。
 describe('接线验收：霜之新星命中经武器入口挂霜冻（6-26）', function()
     local ctx
@@ -473,7 +466,7 @@ describe('接线验收：霜之新星命中经武器入口挂霜冻（6-26）', 
                 return { Connect = function() return { Disconnect = function() end } end }
             end
             return { OnServerEvent = signal(), OnClientEvent = signal(),
-                FireClient = function(_, payload) record[#record + 1] = payload end }
+                FireClient = function(_, _player, payload) record[#record + 1] = payload end }
         end }
 
         env.player = { UserId = 91, Character = { Position = v3(0, 0, 0),
@@ -492,23 +485,51 @@ describe('接线验收：霜之新星命中经武器入口挂霜冻（6-26）', 
         env.data = { GetItemBarSnapshot = function()
                 return { held = { kind = 'weapon', id = 'item163' }, weapons = { item163 = 1 } }
             end, MagazineSize = function(_, base) return base end }
-        env.weapon = assert(loadfile('server/Mgr/MgrWeapon.lua'))()
-        env.weapon.PlayerData = { GetDataInst = function() return env.data end }
-        env.weapon.Attr = { WeaponDamageScale = function() return 1 end }
-        env.weapon.Vitals = { CanAct = function() return true end,
-            NewHit = function(_, source, category)
-                return { source = source, sourcePlayer = source, category = category }
+        local SpokeClock = require('common.SpokeClock')
+        local spoke = require('common.packages.spoke.api')
+        local PlayerWeapon = require('server.World.PlayerWeapon')
+        env.clock = SpokeClock.new(env.now)
+        local heldState = spoke.State.new('AiTarget626.held', { kind = 'weapon', id = 'item163' })
+        local selectedState = spoke.State.new('AiTarget626.selected', nil)
+        local weaponsState = spoke.State.new('AiTarget626.weapons', { item163 = 1 })
+        local canActState = spoke.State.new('AiTarget626.can_act', true)
+        local scalesState = spoke.State.new('AiTarget626.scales', { melee = 1, ranged = 1, explosive = 1 })
+        local fakeTree = {
+            player = env.player, data = env.data, clock = env.clock,
+            states = { held = heldState, selected_weapon = selectedState, weapons = weaponsState },
+            memos = { can_act = canActState, weapon_damage_scales = scalesState },
+            get_item_bar_snapshot = function() return env.data:GetItemBarSnapshot() end,
+        }
+        local weaponHandle
+        env.spokeTree = spoke.SpokeTree.spawn(spoke.Effect.new('AiTarget626', function(scope)
+            weaponHandle = PlayerWeapon.mount(scope, fakeTree, {
+                remote = _G.REUtil,
+                new_hit = function(source, category)
+                    return { source = source, sourcePlayer = source, category = category }
+                end,
+                apply_hit = function(hit, target, amount)
+                    if target ~= env.target then return false end
+                    env.damage = (env.damage or 0) + amount
+                    return true
+                end,
+                apply_effect = function(source, target, kind)
+                    return env.modifier:ApplyWeaponEffect(source, target, { Kind = kind })
+                end,
+            })
+        end))
+        env.weapon = {
+            Attack = function(_, _player, aim)
+                env.clock:step(math.max(0, env.now - env.clock.now()), env.now)
+                weaponHandle:handle({ action = 'attack', aim = aim })
+                local replies = env.sent.WeaponResult
+                return replies and replies[#replies] or nil
             end,
-            ApplyHit = function(_, hit, target, amount)
-                if target ~= env.target then return false end
-                env.damage = (env.damage or 0) + amount
-                return true
-            end }
-        env.weapon.Modifier = env.modifier
+        }
     end)
 
     after_each(function()
         if not ctx then return end
+        if ctx.spokeTree then ctx.spokeTree:dispose() end
         _G.game, _G.Vector3, _G.REUtil = ctx.saved.game, ctx.saved.vector, ctx.saved.reutil
         package.loaded['common.REUtil'] = ctx.saved.re
         ctx = nil

@@ -145,26 +145,33 @@ describe('TestAttrMigration', function()
     it('test_vitals_food_and_revive_use_projected_health_and_hunger', function()
         local mgr, p, data = fixture()
         data.body = 10
-        local vitals = assert(loadfile('server/Mgr/MgrVitals.lua'))()
-        vitals.Now = function() return 100 end
-        vitals.Attr = mgr mgr.Vitals = vitals
-        vitals.MaxHealthProvider = function(player) return mgr:MaxHealth(player) end
+        local host = require('tests.support.life_host').start({
+          now = 100, growth_writer = function(player) mgr:ApplyGrowth(player) end,
+          platform = { ShowAd = function(_, _, _, _, on_result)
+            on_result('success')
+            return true
+          end },
+        })
+        host.runtime._max_health_of = function() return mgr:MaxHealth(p) end
+        host:add(p)
+        local life = host.runtime.life
         assert.is_true(mgr:ApplyGrowth(p).Ok)
-        vitals:OnPlayerAdded(p)
-        assert.same(900, p.Character.Controller.Health)
-        p.Character.Controller.Health = 300
-        assert.is_true(vitals:SetHunger(p, 100))
-        assert.is_true(vitals:Eat(p, 'goldfish'))
+        assert.same(900, life:MaxHealthOf(p))
+        assert.is_true(life:SetHealth(p, 300))
+        assert.is_true(life:SetHunger(p, 100))
+        assert.is_true(life:Eat(p, 'goldfish'))
         assert.same(570, p.Character.Controller.Health)
-        assert.same(190, vitals:GetState(p).hunger)
-        assert.same(190, mgr.AttrAPI.Funcs.GetAttr(p.Character, 'PlayerHunger'))
-        local state = vitals:GetState(p) state.dead = true
-        p.Character.scale = 1 p.Character.Controller.WalkSpeed = 7
-        vitals:Revive(state, 'test')
+        assert.same(190, p:GetAttribute('Hunger'))
+        host:phase(p, 'dead')
+        p.Character.scale = 1
+        p.Character.Controller.WalkSpeed = 7
+        host.events.SurvivalAction.OnServerEvent:Fire(p, { action = 'FullRevive', mode = 'ad', seq = 1 })
+        assert.same('alive', life:LifeStatus(p))
         assert.same(3, p.Character.scale)
         assert.near(3.185, p.Character.Controller.WalkSpeed, 1e-8)
         assert.same(900, p.Character.Controller.Health)
-        assert.same(300, mgr.AttrAPI.Funcs.GetAttr(p.Character, 'PlayerHunger'))
+        assert.same(190, p:GetAttribute('Hunger'), '满血复活只把饥饿抬到下限，不回满')
+        host:shutdown()
     end)
 
     -- 写入失败要报出来，刷新按当前投影重试

@@ -3,11 +3,23 @@
 -- 持续输出每招、伤害前后血量和收招；需玩家正常钓出鱼并放到岸上，再站到目标鱼攻击距离内。
 -- 若已拥有信物，在本区钓鱼佬旁选中信物后重跑会执行Feed；摆渡使用正常Board请求。
 local cfg = require('common.GameCfg')
-local units = require('server.Mgr.MgrFishUnit')
-local pd = require('server.Mgr.MgrPlayerData')
-local weapons = require('server.Mgr.MgrWeapon')
-local interact = require('server.Mgr.MgrInteract')
-local ferry = require('server.Mgr.MgrFerry')
+local pd = require('server.PlayerDataHost')
+local ServerRuntime = require('server.World.ServerRuntime')
+local runtime = ServerRuntime.current()
+local units = (runtime and runtime.fish_host) or require('server.World.FishTree')
+local life = runtime and runtime.life
+local ferry = runtime and runtime:get_world() and runtime:get_world().ferry
+local function equippedWeapon(d)
+    if not d then return nil end
+    local held = d.Extra and d.Extra.inventory and d.Extra.inventory.selection
+        and d.Extra.inventory.selection.held
+    if type(held) == 'table' and held.kind == 'weapon' and d:WeaponCount(held.id) > 0 then
+        return held.id
+    end
+    local selected = d.Data and d.Data.SelectedWeapon
+    if selected and d:WeaponCount(selected) > 0 then return selected end
+    return nil
+end
 local world, task = game:GetService('World'), game:GetService('Task')
 local player = game:GetService('Players'):GetPlayers()[1]
 if not player then print('SHRIMP135 ABORT 没有玩家') return end
@@ -23,14 +35,15 @@ local function ledger()
     log('库存', 'coin=' .. tostring(data.Data.FishCoin), 'zone=' .. tostring(data.Data.Zone),
         'tail=' .. data:ItemCount('item31'), 'pearl=' .. data:ItemCount('item121'),
         'tendon=' .. data:ItemCount('item32'), 'ticket=' .. data:ItemCount('item147'),
-        'weapon=' .. tostring(weapons:EquippedWeapon(data)))
+        'weapon=' .. tostring(equippedWeapon(data)))
 end
 ledger()
 local snap = data:GetItemBarSnapshot()
 local slot = snap.selectedSlot and snap.slots[snap.selectedSlot]
 if slot and (slot.itemId == 'item31' or slot.itemId == 'item32') then
     log('兑换请求', slot.itemId)
-    interact:Handle(player, { target = 'fisherman', action = 'Feed', seq = rt.seq })
+    local runtime = ServerRuntime.current and ServerRuntime.current()
+    if runtime then runtime:dispatch_interact(player, { target = 'fisherman', action = 'Feed', seq = rt.seq }) end
 end
 -- 外部选择rt.routeId后可重跑：日志记录实际航线与扣款，不默认移动玩家。
 if rt.routeId then
@@ -52,13 +65,13 @@ task:Spawn(function()
                     last[id] = state
                 end
                 local p, cp = fish.Carrier.Body.Position, player.Character and player.Character.Position
-                local weaponId = weapons:EquippedWeapon(data)
+                local weaponId = equippedWeapon(data)
                 local weapon = cfg.Ability.MeleeWeapons[weaponId]
                 -- 自然购买的金币近战武器才计正常击杀；探针不装备或赠送武器。
                 if weapon and p and cp and (p.x-cp.x)^2 + (p.z-cp.z)^2 <= weapon.Range^2 then
                     local before = fish.Carrier.Health
-                    local result = weapons:Attack(player)
-                    if result and result.ok then log('正常攻击', fish.FishId, weaponId, 'before=' .. tostring(before)) end
+                    local ok = life and life:WeaponAction(player, { action = 'attack' }) or false
+                    if ok then log('正常攻击', fish.FishId, weaponId, 'before=' .. tostring(before)) end
                 end
             end
         end

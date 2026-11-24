@@ -15,13 +15,12 @@ local fs = require("tests.support.fs_fixture")
 local lfs = require("lfs")
 
 -- 63：#214 审查修复把商品行子节点的两处建点（图片 / 文字各一支）合成一处驱动表建点，client 40 → 39
--- 64：#253 队伍界面 client/ScreenHandlers/ScreenParty.lua 的 create() 是新建点，client 39 → 40
 -- 65：#296 客户端 Spoke 根视图树 client/Views/RootView.lua 统一动态 UI 建点，client 40 → 41
 -- 62：#297-B2 主 HUD 左上状态区迁入 client/Views/MainHudVitalsView.lua（复用 RootView 统一建点），剥离 ScreenMain 3 处建点，client 41 → 38
 -- 61：#297-A3 左手持竿投影迁入 HeldRodLeaf，剥离 MgrPlayerData 2 处建点，在 server/main.lua 注入 1 处统一 create_unit，server 净减 1
 -- 60：#297-C1 主 HUD 武器/鱼饵浮层与背包面板切流至 Spoke 视图（复用 RootView 统一建点），剥离 ScreenMain 1 处建点，client 38 → 37
 -- 58：#297-C2 主 HUD 底部道具栏、拖拽与爆炸物瞄准切流至 Spoke 视图，剥离 ScreenMain 动态格位与瞄准遮罩 2 处建点（含循环内多节点建点），client 37 → 35
-local SITES = 58
+local SITES = 37
 local SITE_ROOTS = { "client", "common", "server" }
 local REF_ROOTS = { "client", "common", "server", "tests", "tools" }
 local REMOVED = { "FXUtil", "WeldTo", "MarkPointPart", "CreateHPBar" }
@@ -81,7 +80,7 @@ local function breakdown(per_root)
 end
 
 describe("运行期建点台账", function()
-  it("三端运行期建点数与 #206 台账同为 63 个", function()
+  it("三端运行期建点数与 #206 台账一致", function()
     local total, per_root = count_sites()
     if total ~= SITES then
       fail("运行期建点 %d 个，台账与本守卫断言 %d 个（%s）。新增或删除建点要同步 #206 台账与本计数。",

@@ -1,6 +1,9 @@
 -- #136 独立战斗夹具：从真实SpawnLanded/Drop入口生成帝王蟹/蟹老板，用于招式表现取证。
 -- 明确不作为自然抽鱼/从零经济证明；不修改血量、时间、玩家库存或奖励裁决。
-local units = require('server.Mgr.MgrFishUnit')
+local ServerRuntime = require('server.World.ServerRuntime')
+local runtime = ServerRuntime.current()
+local units = (runtime and runtime.fish_host) or require('server.World.FishTree')
+local life = runtime and runtime.life
 local player = game:GetService('Players'):GetPlayers()[1]
 if not player or not player.Character then return end
 local id = _G.Crab136Species or 'fish23Elite'
@@ -27,7 +30,7 @@ if fish then
                                 fish.WakeAt, world:GetServerTime() - started)
                             last = name
                         end
-                        if require('server.Mgr.MgrVitals'):CanAct(player) then
+                        if life and life:CanAct(player) then
                             local fp = fish.Carrier.Body.Position
                             if fish.State ~= 'stunned' and name ~= 'spin' then
                                 local forward = fish.Carrier.Body.Rotation:GetForward()
@@ -43,8 +46,7 @@ if fish then
                 end)
             end
             if _G.Crab136Attack then
-                local weapons = require('server.Mgr.MgrWeapon')
-                local data = require('server.Mgr.MgrPlayerData'):GetDataInst(player)
+                local data = require('server.PlayerDataHost'):GetDataInst(player)
                 local world, task = game:GetService('World'), game:GetService('Task')
                 local started = world:GetServerTime()
                 print('CRAB136_INPUT', '主动定位并面向目标；真实攻击，不改血量/时间', data:WeaponDamageScale('melee'))
@@ -53,13 +55,13 @@ if fish then
                         local fp = fish.Carrier.Body.Position
                         local forward = fish.Carrier.Body.Rotation:GetForward()
                         local character = player.Character
-                        if character and character.Controller and require('server.Mgr.MgrVitals'):CanAct(player) then
+                        if character and character.Controller and life and life:CanAct(player) then
                             character.Position = Vector3.New(fp.x - forward.x * 1.5, fp.y, fp.z - forward.z * 1.5)
                             character.Rotation = fish.Carrier.Body.Rotation
                         end
                         local before = fish.Carrier.Health
-                        local result = weapons:Attack(player)
-                        print('CRAB136_ATTACK', fish.Id, before, result and result.ok, character and character.Controller and character.Controller.Health,
+                        local ok = life and life:WeaponAction(player, { action = 'attack' }) or false
+                        print('CRAB136_ATTACK', fish.Id, before, ok, character and character.Controller and character.Controller.Health,
                             world:GetServerTime() - started)
                         task:Wait(0.5)
                     end
