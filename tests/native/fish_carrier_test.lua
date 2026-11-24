@@ -1,4 +1,3 @@
--- #84 迁移：鱼载体伤害接口 server/World/FishCarrier.lua（原 tests/gameplay/fish_carrier_test.lua，7 + 16 + 5 例）。
 -- 三块接缝：1) 血量/模型号解析纯函数；2) 假引擎驱动 Spawn → 挨打 → Update 跟随 → Despawn 全链路；
 -- 3) 接缝守卫（源码文本校对）：受击体 EnableController、不 require 包内模块、MgrMap 注册、官方 melee_hit 契约。
 -- 假引擎只在被测函数执行期间挂上（withFakeEngine），测完恢复 _G，不影响别的文件；

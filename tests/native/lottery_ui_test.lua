@@ -1,5 +1,3 @@
--- 抽奖机界面宿主规格（#312）：真实 ClientStore + RootView + LotteryView，EUI 为测试双。
--- 保留旧规格失败方式：选错投注格、客户端决定奖项、停轴顺序错、重复请求、重播动画、关窗丢结果、失败无提示。
 local GameCfg = require("common.GameCfg")
 local ClientWorld = require("tests.support.economy_client")
 

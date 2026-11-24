@@ -1,4 +1,3 @@
--- #302 客户端公共宿主：EUI 双、ClientStore、RootView 与 SpokeClock。
 local Eui = require("tests.support.eui_double")
 local ClientStore = require("client.Store.ClientStore")
 local RootView = require("client.Views.RootView")

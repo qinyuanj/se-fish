@@ -162,8 +162,6 @@ function Mgr:OnPlayerRemoving(player)
     if request and request.player == player then self.LastSeq[player.UserId] = nil end
 end
 
--- 图鉴会话由 PlayerTree Stage 1 拥有；全局 RE 按信号对象单次绑定并按 UserId O(1) 路由，
--- 队列由上岸与落账回调事件驱动，仅以秒级心跳兜底重试。
 function Mgr.mount(scope, player_tree, opts)
     local player = opts.player
     local session = setmetatable({

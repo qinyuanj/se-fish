@@ -1,4 +1,3 @@
--- 收线会话、限频与重复包：#302 公共 RemoteEvent 接缝。
 local Host = require("tests.support.fishing_host")
 
 describe("收线会话管理（ServerRuntime）", function()

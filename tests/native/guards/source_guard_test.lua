@@ -5,10 +5,7 @@
 --   3. require 到不存在的文件 → 模块改名或删除后只在运行时报错；
 --   4. 业务代码 require 引擎存根 EggyAPI / EggyEditorAPI → 类型存根被当模块加载；
 --   5. 业务代码出现 io / os / package / debug 调用 → SE 沙盒里这些是 nil，调用即崩；
---   6. 可重入口（client/Views 的 mount / *_spec，及宿主/世界模块的 mount / OnPlayerAdded / Attach / Bind / bind_host / WatchCharacter）
---      里 Connect 不存句柄 → 每次重挂载或重进叠一个监听。
 -- 三端 packages/ 是整包交付的外来件（ADR-0021），不吃第 5、6 条；第 2、3 条照查（包按原始字节交付，路径同样不能错）。
--- 与同目录 static_require_test.lua 的分工：那边管「按名加载的登记表与宿主组合」（锚点行为、ServerRuntime 宿主注入），
 -- 这边只管源码文本的卫生，所以两边各自独立，改登记表不必动这里。
 local fs = require("tests.support.fs_fixture")
 local Arch = require("tools.arch_policy")
@@ -33,7 +30,6 @@ local function is_reentrant_entry(path, name)
   return false
 end
 
--- 仅识别真实赋值 `=`（排除 `==`、`~=`、`<=`、`>=`）。
 local function has_assignment(statement)
   local from = 1
   while true do
@@ -191,8 +187,6 @@ describe("三端源码守卫", function()
   end)
 
   it("test_reentrant_entrypoints_keep_connection_handles", function()
-    -- 按函数头缩进配对结束行：覆盖 client/Views（mount / *_spec）与宿主/世界模块
-    -- （mount / OnPlayerAdded / Attach / Bind / bind_host / WatchCharacter）及其内部闭包。
     local matched_entries = 0
     scan(business_files(), function(path, src)
       local code = Arch.code_only(src)

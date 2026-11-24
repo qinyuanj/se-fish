@@ -1,6 +1,3 @@
--- #315 图鉴、纪录、新手任务、剧情、成就与 GM 服务端宿主接缝（ADR-0032 / #292 Testing Decisions）。
--- 失败方式：重复上岸重复计数；个人最大重量回退；平台失败伪造纪录；任务与业务不同批；
--- 离场排空前销毁进度；剧情已读丢失；成就重复授予；GM 在调试关闭时改状态。
 local GameCfg = require("common.GameCfg")
 local FishCatch = require("common.FishCatch")
 local EconomyWorld = require("tests.support.economy_world")
@@ -498,7 +495,6 @@ describe("服务端旧进度玩法的公开宿主等价迁移（#315）", functi
     end
     assert.same(1, replies)
 
-    -- 离场后注销路由，原玩家再发消息不触发回包也不报错，且重连仍维持单次 Connect
     world.runtime:on_player_removing(p3)
     world:drain()
     world:clearEvents()
@@ -539,7 +535,6 @@ describe("服务端旧进度玩法的公开宿主等价迁移（#315）", functi
     world:drain()
     assert.is_nil(records.LastSeq[uid], "玩家离场后 WorldRecords.LastSeq 须清理")
 
-    -- 同 UserId 重新上线后，客户端从 seq=1 重新编号应立即受理
     local back = world:addPlayer(uid, "重连玩家")
     world:usePlayer(back)
     world:clearEvents()
@@ -555,7 +550,6 @@ describe("服务端旧进度玩法的公开宿主等价迁移（#315）", functi
     assert.is_nil(require("server.World.PlayerStory").Start)
     assert.is_nil(require("server.World.PlayerAchievements").Start)
 
-    -- 推进不足 1 秒（仅触发 on_frame 不触发 on_second）不应提前触发秒级纪录刷盘，跨整秒后正常刷盘
     assert.is_true(world:landing("bass", 1.5, 99))
     local beforeWrites = world.recordWrites
     world:advance(0.2)

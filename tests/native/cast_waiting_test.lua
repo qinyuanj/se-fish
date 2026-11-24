@@ -1,4 +1,3 @@
--- 抛竿等待与拒绝路径：#302 ServerRuntime 宿主接缝。
 local GameCfg = require("common.GameCfg")
 local Host = require("tests.support.fishing_host")
 

@@ -1,6 +1,3 @@
--- #314 全局小队宿主接缝（#292 Testing Decisions）。
--- 只经 ServerRuntime 玩家进出、PartyAction/InteractAction 上行、SpokeClock 步进、
--- 存档测试双与 PartyState 下行观察；不断言私有 Effect 拓扑或旧管理器源码。
 
 local GameCfg = require("common.GameCfg")
 local ServerRuntime = require("server.World.ServerRuntime")

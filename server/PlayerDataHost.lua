@@ -16,7 +16,7 @@ function PlayerDataHost:SendItemBar(player, forcePush)
     local tree = self.Runtime and self.Runtime:get_player_tree(player.UserId)
     if tree then
         if forcePush then return self:SyncPlayerTree(player, true) end
-        return false -- 普通变更由所属操作/事务同步，树底统一推送，禁止双通道。
+        return false
     end
     _G.REUtil:GetRE('ItemBarState'):FireClient(player, data:GetItemBarSnapshot())
 end

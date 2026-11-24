@@ -1,7 +1,3 @@
--- 全局小队动态集合（ADR-0032 / #314）。
--- SharedWorldTree 持有唯一 SquadDock；每个小队子域以 Dock 维护成员，直接只读观察
--- 各成员 PlayerTree 的 health / max_health / life_phase，不依赖玩家侧命令式回调。
--- PartyAction / PartyState 是既有协议名；权威归属、邀请、恢复与回滚均只在这里判定。
 
 local GameCfg = require("common.GameCfg")
 local Number = require("common.Number")
@@ -163,7 +159,6 @@ function SquadDock.mount(world, opts)
     fire(player, "PartyResult", { action = action, ok = ok == true, reason = reason })
   end
 
-  -- 每名成员一个只读观察 Effect；成员信号在同一 Spoke 批次变化时，revision 只触发一次下发。
   local function mount_member(party, user_id)
     if not party.member_dock or party.disbanded then return end
     local key = member_effect_key(user_id)
@@ -434,7 +429,6 @@ function SquadDock.mount(world, opts)
       local ok, why = self:Disband(party, reason == "offline" and "disbanded" or "left", reason == "offline" and player.UserId or nil)
       if not ok then
         if reason == "offline" then
-          -- 引擎离场不可回滚；只阻止解散清档提交，剩余成员仍看到最新在线名单。
           self:PushParty(party)
         else
           restore_member(party, player, removed_index)

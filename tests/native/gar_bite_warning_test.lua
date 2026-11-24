@@ -1,10 +1,5 @@
 -- 迁移自 tests/gameplay/gar_bite_warning_test.lua（#85）；行为契约原文见 #134、#141。
--- 驱动真实生产模块：common/GarBiteNotice.lua（预警载荷契约）与 client/Views/FishCombatView.lua（客户端预警视图）。
 -- 失败方式：
---   1. 非法预警载荷（nil、NaN 坐标、非正射程/时长、缺 id 快照）漏过或阻塞后续预警挂载；
---   2. 同一条鱼连续锁定叠出多个节点，或撤销/根销毁后预警节点残留；
---   3. 旧轮次预警撤回误关新轮次预警；
---   4. 圆形落点与暴雨预警的共享配置口径缺失或撤销后未清理。
 
 local Eui = require('tests.support.eui_double')
 local ClientStore = require('client.Store.ClientStore')
@@ -74,7 +69,6 @@ describe('鳄雀鳝上钩预警表现（GarBiteWarning -> FishCombatView）', fu
     assert.is_false(GarBiteNotice.Valid(GarBiteNotice.Lock(5, { x = 0, y = 0, z = 0 }, 1, 0, 0, 90, 1.5)))
     assert.is_false(GarBiteNotice.Valid(GarBiteNotice.Lock(5, { x = 0, y = 0, z = 0 }, 1, 0, 2.5, 90, -1)))
 
-    -- 客户端 FishCombatView 收到坏快照或无 id 预警项时不建节点，也不阻塞后续合法预警挂载
     assert.is_false(env.writer:ingest_event('FishCombatState', nil))
     assert.is_true(env.writer:ingest_event('FishCombatState', {
       warnings = { 'bad', { fishId = 5, kind = 'lock' } },
@@ -91,7 +85,6 @@ describe('鳄雀鳝上钩预警表现（GarBiteWarning -> FishCombatView）', fu
   end)
 
   it('test_jump_circle_consumer_places_full_landing_warning_and_clears', function()
-    -- #141 圆形落点：共享配置声明官方整圆预设与 10 米基准半径，FishCombatView 挂载与撤销零残留
     local warnCfg = env.cfg.Warning
     assert.same('official://preset/7191', warnCfg.CirclePreset)
     assert.same(10, warnCfg.CircleRadius)
@@ -139,21 +132,18 @@ describe('鳄雀鳝上钩预警表现（GarBiteWarning -> FishCombatView）', fu
     assert.same(1, #aliveWarnings())
     local first = findWarning(5)
 
-    -- 同一条鱼连续重新锁定不叠出多节点
     assert.is_true(env.writer:ingest_event('FishCombatState', {
       warnings = { { id = 5, fishId = 5, kind = 'lock', yaw = math.pi } },
     }))
     assert.same(1, #aliveWarnings())
     assert.same(first, findWarning(5))
 
-    -- 撤销后唯一节点销毁，零残留
     assert.is_true(env.writer:ingest_event('FishCombatState', { warnings = {} }))
     assert.is_true(first.Destroyed)
     assert.same(0, #aliveWarnings())
   end)
 
   it('test_timeout_fallback_only_hides_its_own_round', function()
-    -- 第一轮与第二轮预警使用独立轮次键：撤回旧轮次不得误关新轮次，直到新轮次撤销或根销毁才回收
     assert.is_true(env.writer:ingest_event('FishCombatState', {
       warnings = { { id = '5:1', fishId = 5, kind = 'lock' } },
     }))
@@ -169,7 +159,6 @@ describe('鳄雀鳝上钩预警表现（GarBiteWarning -> FishCombatView）', fu
     local round2 = findWarning('5:2')
     assert.is_not_nil(round2)
 
-    -- 旧轮次超时移除：只销毁 round1，round2 仍保持存活
     assert.is_true(env.writer:ingest_event('FishCombatState', {
       warnings = { { id = '5:2', fishId = 5, kind = 'lock' } },
     }))
@@ -177,7 +166,6 @@ describe('鳄雀鳝上钩预警表现（GarBiteWarning -> FishCombatView）', fu
     assert.is_nil(round2.Destroyed)
     assert.is_not_nil(findWarning('5:2'))
 
-    -- 新轮次结束后彻底销毁
     assert.is_true(env.writer:ingest_event('FishCombatState', { warnings = {} }))
     assert.is_true(round2.Destroyed)
     assert.same(0, #aliveWarnings())

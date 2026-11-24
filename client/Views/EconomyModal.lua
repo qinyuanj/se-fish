@@ -1,4 +1,3 @@
--- 三类经济模态弹窗的轻量节点工具；所有节点与连接仍由 RootView 作用域拥有。
 local EconomyModal = {}
 
 function EconomyModal.panel(scope, ctx, name, title)

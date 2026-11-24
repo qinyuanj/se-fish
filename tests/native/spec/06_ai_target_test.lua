@@ -435,7 +435,6 @@ describe('第 6 节：逐招表按 KeyOf 反查', function()
 end)
 
 -- 6-26：霜之新星（枪械大奖特效）经武器命中业务入口挂 3 秒霜冻，重复命中只刷新不叠加。
--- 业务入口：PlayerWeapon（SpokeTree 挂载）；效果由真 MgrModifier + 真 modifier_system 持有，
 -- 预设键取 GameCfg.Ability.ModifierPresets（不用测试替身）。只替引擎边界：射线、角色、RE、时钟。
 describe('接线验收：霜之新星命中经武器入口挂霜冻（6-26）', function()
     local ctx

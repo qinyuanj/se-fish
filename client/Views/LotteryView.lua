@@ -1,4 +1,3 @@
--- 抽奖机模态弹窗：只读道具栏与 LotteryResult 投影，按钮只提交投注意图。
 local GameCfg = require("common.GameCfg")
 local Eligibility = require("common.LotteryEligibility")
 local Modal = require("client.Views.EconomyModal")

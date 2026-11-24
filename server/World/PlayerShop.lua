@@ -1,6 +1,3 @@
--- 玩家钓场商店活跃会话（#311 / ADR-0031、ADR-0032）。
--- 请求先校验摊位、货架与容量，再由 MgrSave 在隔离 draft 内一次落账；
--- 写确认后在单个 SpokeRuntime.batch 回读正式存档镜像并推送树底快照。
 local GameCfg = require("common.GameCfg")
 local Number = require("common.Number")
 local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")

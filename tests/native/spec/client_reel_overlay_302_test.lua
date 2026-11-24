@@ -1,5 +1,3 @@
--- #302 客户端收线覆盖层宿主接缝（ADR-0032 / #292 Testing Decisions）
--- 只经 EUI 双、ClientStore 下行、SpokeClock、按钮点击与 RootView 销毁观察行为。
 local Eui = require("tests.support.eui_double")
 local ClientStore = require("client.Store.ClientStore")
 local RootView = require("client.Views.RootView")

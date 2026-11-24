@@ -1,5 +1,3 @@
--- 礁石来源鱼与钓线可视化（ADR-0032 / #302）。
--- 订阅统一 ClientStore，仅在礁石鱼上钩短寿命 Phase 内挂载世界节点并订阅 on_frame，离开上钩态即销毁并退订。
 local GameCfg = require("common.GameCfg")
 local ViewUtil = require("client.Views.ViewUtil")
 
@@ -43,7 +41,6 @@ function CastSourceView.spec()
         return ok and player and player.Character or nil
       end
 
-      -- 仅在礁石鱼上钩短寿命相位挂载模型与帧同步，非上钩期零 on_frame 订阅
       scope:phase("CastSourceActivePhase", active, function(ps)
         local body, line, current = nil, nil, nil
         local function clear()

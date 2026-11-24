@@ -1,10 +1,3 @@
--- #301 瞄准拾取蒙版与地面气泡：客户端宿主接缝（ADR-0032 / #292 Testing Decisions）
--- 失败方式先列：
---   1. LootState 或本地位置变化后，范围内地面物品不建气泡、范围外仍残留气泡；
---   2. 拾取按钮不发 ItemBarAction.Pickup，或离开范围 / 物品消失 / 根 UI 销毁后节点与点击监听仍在；
---   3. 瞄准拾取蒙版在无瞄准态时仍挂着，或点击蒙版不触发 on_pick 并退出瞄准，或离开范围后蒙版残留；
---   4. 视图仍依赖已删除的 client.LocalLoot。
--- 接缝：EUI 测试双、ClientStore 下行事件与本地位置、按钮点击、节点销毁。不窥探私有 Effect 拓扑。
 
 local Eui = require("tests.support.eui_double")
 local ClientStore = require("client.Store.ClientStore")
@@ -128,19 +121,16 @@ describe("地面气泡与瞄准拾取（#301 客户端宿主）", function()
     local mask = node_named(env, "AimPickupMask")
     assert.is_not_nil(mask)
 
-    -- 点击蒙版触发拾取最近物品并自动关闭蒙版
     assert.is_true(Eui.Click(mask))
     assert.same({ { action = "Pickup", value = "near" } }, env.sent)
     assert.is_nil(node_named(env, "AimPickupMask"))
 
-    -- 再次开启蒙版后离开拾取范围自动关闭蒙版并拆掉按钮
     assert.is_true(Eui.Click(toggle))
     assert.is_not_nil(node_named(env, "AimPickupMask"))
     env.writer:update_spatial({ x = 50, y = 0, z = 50 }, {})
     assert.is_nil(node_named(env, "AimPickupMask"))
     assert.is_nil(node_named(env, "BtnAimPickup"))
 
-    -- 满包回执给玩家提示
     env.writer:ingest_event("LootResult", { ok = false, reason = "full" })
     assert.same({ "背包已满" }, env.notices)
     env.view:dispose()

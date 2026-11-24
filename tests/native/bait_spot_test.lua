@@ -1,5 +1,3 @@
--- #301 迁移：固定点位拾饵与十五秒刷新（原 bait_spot_test 的玩法断言）。
--- 接缝：SharedWorldTree 的鱼饵点、ItemBarAction 拾取、Bait 计数与 SpokeClock。
 local GameCfg = require("common.GameCfg")
 local ServerRuntime = require("server.World.ServerRuntime")
 local SpokeClock = require("common.SpokeClock")

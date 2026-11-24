@@ -1,5 +1,3 @@
--- 场景交互点公开查询（#311）：供新 Spoke 会话与尚未迁移的旧管理器共用。
--- 只负责锚点查找和体型修正后的水平距离，不持有玩法结算状态。
 local BodyScale = require("common.BodyScale")
 
 local InteractionPoints = { Anchors = {} }

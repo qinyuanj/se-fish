@@ -1,4 +1,3 @@
--- #315 消息提示 HUD：消息只是投影，不再拥有独立 ScreenMsg 生命周期。
 local Modal = require("client.Views.EconomyModal")
 local MessageView = {}
 

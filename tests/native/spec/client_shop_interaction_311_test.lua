@@ -1,5 +1,3 @@
--- #311 客户端商店与钓鱼佬宿主接缝（#292 Testing Decisions）。
--- 通过位置写侧、UI 点击、远端回执和根节点销毁观察，不读取视图私有 Effect 拓扑。
 local GameCfg = require("common.GameCfg")
 local ClientStore = require("client.Store.ClientStore")
 local RootView = require("client.Views.RootView")
@@ -251,12 +249,10 @@ describe("客户端商店弹窗与场景气泡（#311）", function()
     })
     writer:update_spatial({ x = 0, y = 0, z = 0 }, {})
     local baseline = reads
-    -- 无濒死目标时，高频 on_frame 不再扫描玩家列表
     writer:advance_clock(0.05)
     writer:advance_clock(0.05)
     assert.equals(baseline, reads)
 
-    -- 变为濒死后经 1Hz 发现，连续帧推进同一目标不重复触发 rows State 变更
     local changes = 0
     local unsub = shared.rows:subscribe(function() changes = changes + 1 end)
     target.GetAttribute = function(_, key) return key == "SurvivalPhase" and "downed" or nil end

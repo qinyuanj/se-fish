@@ -1,13 +1,3 @@
--- #310 烧烤点宿主接缝（ADR-0032 / #292 Testing Decisions）
--- 失败方式先列：
---   1. 非鱼获、已烤鱼获或未确认信物被投入并扣物；校验失败后库存与会话同时变；
---   2. 曲线不按服务器时刻一次算出（1 / 2.25 / 3.5 / 4.5 秒读数错，或按帧数累加）；
---   3. 取出后倍率继续变、不回格位、不保持选中，或烤过的鱼还能抽奖、烤过的信物还能兑换；
---   4. 4.5 秒不烤糊、烤糊后物品还在、3 米内没吃 30 点、操作者收不到烤糊，或爆炸重复；
---   5. 濒死、死亡或离场不按当前倍率结算，满格时吞物或复制，重进后烤制单位还在；
---   6. 两名玩家互相取走对方的鱼，或麻痹中断烤制。
--- 接缝：ServerRuntime 进出、GrillAction 上行、SpokeClock 步进、GrillResult / GrillState /
--- 道具栏快照 / 角色血量 / 动态单位销毁。不窥探私有 Effect 拓扑。
 
 local GameCfg = require("common.GameCfg")
 local ServerRuntime = require("server.World.ServerRuntime")
@@ -212,7 +202,6 @@ describe("服务端烧烤点宿主接缝（#310）", function()
     assert.is_true(data:AddItem(item_id, mult, cooked))
     assert.is_true(data:SelectSlot(1))
     local tree = ctx.runtime:get_player_tree(data.Player and data.Player.UserId or nil)
-    -- AddItem 写在 PlayerData 上；入树前再同步一次，保证选中格是公开库存。
     local owner = nil
     for _, player in ipairs(ctx.players) do
       if ctx.datas[player.UserId] == data then owner = player break end
@@ -527,20 +516,17 @@ describe("服务端烧烤点宿主接缝（#310）", function()
     assert.is_true(act(player, { action = "Start" }).ok)
     assert.same(baseline + 1, active_frame_subs, "进入烤制活跃相位后按需订阅 1 条 on_frame")
 
-    -- 满格冻结为 ready 时应退订 on_frame
     advance(2)
     while data:AddItem("tilapia") do end
     ctx.runtime:get_player_tree(player.UserId):sync_from_data(data)
     assert.is_false(act(player, { action = "Takeout" }).ok)
     assert.same(baseline, active_frame_subs, "满格冻结为 ready 后须退出烤制活跃相位并退订 on_frame")
 
-    -- 腾出格位取出，保持零多余订阅
     data.Data.Containers[BACKPACK][1] = nil
     ctx.runtime:get_player_tree(player.UserId):sync_from_data(data)
     assert.is_true(act(player, { action = "Takeout" }).ok)
     assert.same(baseline, active_frame_subs)
 
-    -- 开烤并到 4.5 秒烤糊后也须退订 on_frame
     data.Data.Containers[ITEM_BAR][1] = nil
     give_selected(data, FISH, 1)
     assert.is_true(act(player, { action = "Start" }).ok)

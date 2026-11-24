@@ -62,7 +62,6 @@ describe('TestVolcanoCombat', function()
         assert.is_true(env.player.Character.Controller.Health > 0)
         env.now = 31.8
         env.mgr:Update()
-        -- 致命吐息不再把血打到 0：统一入口锁 1 血并进入濒死。
         assert.same(1, env.player.Character.Controller.Health)
         assert.same('downed', env.vitals:LifeStatus(env.player))
         assert.same('clear', env.notices[#env.notices].kind)

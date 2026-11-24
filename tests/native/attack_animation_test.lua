@@ -100,7 +100,7 @@ describe('攻击动作播放', function()
     end)
 
     it('开枪播本枪动作；空匣与换弹中被拒不播', function()
-        ctx:equip(ctx.player, 'item142') -- 火箭筒 1 发
+        ctx:equip(ctx.player, 'item142')
         assert.is_true(ctx:attack(ctx.player).ok)
         ctx:advance(3)
         assert.same('empty', ctx:attack(ctx.player).reason)

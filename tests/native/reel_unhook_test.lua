@@ -1,4 +1,3 @@
--- 脱钩与生命周期中断：#302 alive Phase / RemoteEvent 接缝。
 local GameCfg = require("common.GameCfg")
 local Host = require("tests.support.fishing_host")
 

@@ -336,7 +336,6 @@ describe('TestWeakSpeedRouting', function()
         if ctx and ctx.host then ctx.host:shutdown() end
     end)
 
-    -- 虚弱进出都走唯一写口，移速由生命树按半速重算
     it('test_weak_enter_and_exit_route_to_single_writer', function()
         assert.is_true(ctx.tree:apply_modifier('weak', { duration = 60 }) == true)
         assert.same(ctx.player, ctx.refreshes[1].player)
@@ -347,7 +346,6 @@ describe('TestWeakSpeedRouting', function()
         assert.equals(0, ctx.tree:get_modifier_remaining('weak'))
     end)
 
-    -- 缺速度写口时虚弱仍是唯一状态，移速由生命树自己重算。
     it('test_without_writer_keeps_modifier_as_single_state_owner', function()
         ctx.host:shutdown()
         ctx.host = require('tests.support.life_host').start({ now = 50 })

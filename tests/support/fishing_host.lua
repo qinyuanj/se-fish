@@ -1,5 +1,3 @@
--- #302 测试宿主：只替换引擎、RemoteEvent、随机数与既有 FishUnit/图鉴/任务边界。
--- 业务路径始终是真实 ServerRuntime -> PlayerTree -> FishingPhase。
 local GameCfg = require("common.GameCfg")
 local ServerRuntime = require("server.World.ServerRuntime")
 local PlayerData = require("server.Data.PlayerData")

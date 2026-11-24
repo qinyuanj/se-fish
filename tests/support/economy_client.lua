@@ -1,4 +1,3 @@
--- #312 客户端宿主测试双：真实 ClientStore + RootView + 三个 Views，仅替换 EUI 与上行服务。
 local ClientStore = require("client.Store.ClientStore")
 local RootView = require("client.Views.RootView")
 local LotteryView = require("client.Views.LotteryView")

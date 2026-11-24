@@ -1,5 +1,3 @@
--- #314 小队 HUD 与队友抢救气泡客户端宿主接缝（#292 Testing Decisions）。
--- 只经 PartyState/PartyResult 下行、时钟、位置写侧、EUI 点击和根节点销毁观察。
 
 local GameCfg = require("common.GameCfg")
 local ClientStore = require("client.Store.ClientStore")

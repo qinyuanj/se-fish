@@ -1,4 +1,3 @@
--- #315 图鉴与全服纪录模态：98 条固定配置行、七区分页、个人最大重量与平台纪录真实投影。
 local GameCfg = require("common.GameCfg")
 local Records = require("common.Records")
 local Modal = require("client.Views.EconomyModal")

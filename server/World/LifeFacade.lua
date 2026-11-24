@@ -1,5 +1,3 @@
--- 服务端玩家生命、伤害、抢救与武器动作公开门面（ADR-0032 §2 / #298、#300）：
--- 从 ServerRuntime 拆出的内聚子模块，归属 L2（server.World），只读写活跃 PlayerTree 公开状态。
 
 local GameCfg = require("common.GameCfg")
 local Number = require("common.Number")

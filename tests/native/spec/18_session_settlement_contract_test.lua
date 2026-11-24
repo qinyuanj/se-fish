@@ -1,8 +1,6 @@
 local EconomyWorld = require('tests.support.economy_world')
 -- 条款 18（docs/acceptance/18-save-and-recovery.md）：会话 fencing、版本校验、重连落点与虚弱恢复、
 -- 个人/共享状态隔离、旧档升级，以及摆渡结算的可重试操作身份。
--- 只走业务入口：MgrPlayerData / MgrSave 与 ServerRuntime 的 SharedWorldTree 摆渡宿主；
--- 引擎边界（DataStore、Task、RE、World、角色）用替身。不执行 main.lua 本体。
 -- 四类证据：正常（交票落账）、失败（写档失败不扣票）、退出重进（旧会话回调失效 + 落点/虚弱恢复）、
 -- 重放（同一 operation 只结算一次）。B 级时序证据另见 tests/native/ferry_test.lua 与 save_test.lua。
 -- 失败方式（先列后写）：
@@ -284,7 +282,6 @@ describe('条款 18 存档会话与结算身份', function()
     env.players:OnPlayerRemoving(player)
     local rejoined, fresh = ready(uid, vec(0, 5, 0))
     env.ferry.OnlinePlayers = function() return { rejoined } end
-    -- FerryRoute 后台恢复扫描按 1Hz on_second 驱动
     env.now = env.now + 1
     env.ferry:Update()
     drain()
@@ -418,7 +415,6 @@ describe('条款 18 存档会话与结算身份', function()
     assert.same(vec(safe.x, safe.y, safe.z), env.savedLanding, '非法记录落点须回到同区安全点')
     assert.same(vec(safe.x, safe.y, safe.z), data.Extra.travel.safePoint)
 
-    -- v2 档的虚弱剩余时间经 PlayerTree 的公开入口恢复。
     local v2 = seedSnapshot(uid)
     v2.extra.survival.weakRemaining = 37
     v2.extra.travel.safePoint = { x = safe.x, y = safe.y, z = safe.z }

@@ -1,10 +1,3 @@
--- #313 服务端摆渡宿主接缝（ADR-0032 / #292 Testing Decisions）。
--- 六条航线独立计时：一张船票开启精确 5 秒倒计时，BoatRange 内未交票玩家搭便船；
--- 返程按人支付 10 × 3^(到达区序 − 2) 金币并立即传送；Zone 与到达记录随存档原子更新。
--- 失败方式：扣票未开船、重复扣票/扣款、倒计时提前或残留、范围外乘客被带走、
--- 金币不足仍传送、传送失败未持久退款、迟到回调污染新会话、旧航班覆盖新航班。
--- 接缝：ServerRuntime 玩家进出、FerryAction 上行、SpokeClock 步进、真实 MgrSave/PlayerData、
--- FerryResult/FerryState 下行与角色位置。不读取航线 State、Effect 或私有拓扑。
 
 local function vec(x, y, z) return { x = x, y = y, z = z } end
 
@@ -883,7 +876,6 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
   end)
 
   it('test_teleport_notifies_special_item_before_moving', function()
-    -- #299：经真实玩家树公开边界结束特殊道具，再执行返程传送。
     local calls = {}
     standAt(1, env.route.Return.AnchorName)
     env.data[1]:AddCoin(env.route.Return.Price)

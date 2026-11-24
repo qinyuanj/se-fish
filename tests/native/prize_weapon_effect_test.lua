@@ -6,8 +6,6 @@
 --   1. 特效武器命中后不挂效果（毒匕挥中不中毒）：swing 载荷丢 effect、枪械命中不调应用口；
 --   2. 未命中也挂效果 / 无特效武器也挂效果 / 命中被统一入口拒绝（安全区）仍挂效果；
 --   3. 近战命中盒重放（同一目标重复进盒）导致效果重复叠加超过一次判定段语义。
--- 接缝：SwingRegistry.StageSwing 载荷、PlayerWeapon 的 handle 公开入口、melee_hit 的 process_hit
---   成功分支（_applyDamage 返回 true 后直接经 Modifier 应用口应用效果）。
 --
 -- 技能包替身只提供本案例需要的施法接口，每例还原模块缓存。
 local Weapon = require('tests.support.weapon_world')
@@ -186,7 +184,6 @@ describe('TestMeleeHitEffect', function()
 end)
 
 describe('TestPrizeWeaponEffect', function()
-    -- ===== 2. PlayerWeapon：近战登记带特效、枪械命中挂特效 =====
     local ctx
     before_each(function()
         ctx = Weapon.new()
@@ -234,7 +231,7 @@ describe('TestPrizeWeaponEffect', function()
 
     -- 毒匕挥砍：登记载荷带毒特效；商店匕首不带
     it('test_melee_swing_carries_weapon_effect', function()
-        ctx:equip(ctx.player, 'item152') -- 淬毒匕首
+        ctx:equip(ctx.player, 'item152')
         assert.is_true(ctx:attack(ctx.player).ok)
         local swing = SwingRegistry.PeekSwing(ctx.player.UserId)
         assert.same(15, swing.damage)
@@ -246,7 +243,7 @@ describe('TestPrizeWeaponEffect', function()
         ctx:advance(0.5)
         ctx.data.Extra.inventory.selection.held = { kind = nil, id = nil, slot = nil }
         ctx.data.Data.SelectedWeapon = nil
-        ctx:attack(ctx.player) -- 空手也不带
+        ctx:attack(ctx.player)
         assert.is_nil(SwingRegistry.PeekSwing(ctx.player.UserId).effect)
     end)
 end)

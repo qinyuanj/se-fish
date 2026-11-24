@@ -1,9 +1,3 @@
--- #309 活鱼血条与预警：客户端宿主接缝（ADR-0032 / #292 Testing Decisions）
--- 失败方式先列：
---   1. FishCombatState 到达后不投影血条与战斗标签，或鱼消失后节点仍在；
---   2. 预警贴花不随快照出现和消失，根销毁后点击与节点残留；
---   3. 视图仍依赖已删除的 client.FishCombatLabel 或 client.LocalGarBite。
--- 接缝：EUI 测试双、ClientStore 下行事件、节点销毁。不窥探私有 Effect 拓扑。
 
 local Eui = require("tests.support.eui_double")
 local ClientStore = require("client.Store.ClientStore")

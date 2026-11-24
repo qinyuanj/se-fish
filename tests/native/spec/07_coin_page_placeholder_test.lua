@@ -1,5 +1,3 @@
--- 条款 7-25 / 7-16：金币页报价与占位支付经 ServerRuntime 原子到账，不扣本地金币。
--- 只驱动 PlatformAction、支付回包、持久化与重连；不调用 MgrPlatform 私有发奖函数。
 local GameCfg = require('common.GameCfg')
 local EconomyWorld = require('tests.support.economy_world')
 

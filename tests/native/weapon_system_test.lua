@@ -4,8 +4,6 @@
 --  TestAbilitySwingRegistry → TestMainWeaponWiring → TestMgrFishUnitBlastFish → TestMgrWeapon →
 --  TestMgrWeaponThrow → TestMgrWeaponUpgrade → TestPressGesture → TestWeaponConfig → TestWeaponPersistence）。
 -- #129 失败方式先列：见 .scratch/129/progress.md。
--- #320 起全部武器用例挂真实 server/World/PlayerWeapon.lua（tests/support/weapon_world.lua），
--- 只经公开 handle / guard 与时钟推进驱动；旧 MgrWeapon 测试双倍拷贝已删除。
 -- 验收锁定：数值与商店表/票面一致（空手 5/0.5/2，不再 25）；挥砍登记驱动命中盒与伤害；
 -- 服务端射速/弹量/换弹（2 秒）权威，切枪与重连不绕过；霰弹 5×20、火箭筒 500+5 米 100；
 -- 投掷一发一件走 #123 协议（重放不重复扣）、20 米钳制、落水 3–5 条当地 1 级普通鱼后算伤害、
@@ -18,7 +16,6 @@ local PlayerData = require('server.Data.PlayerData')
 local SwingRegistry = require('server.SwingRegistry')
 local VENDOR = 'server.packages.ability_system.api'
 
--- 只在失败时构造消息：通过时不产生任何字符串。
 local function fail(fmt, ...)
     assert.is_true(false, string.format(fmt, ...))
 end
@@ -157,7 +154,6 @@ describe('TestMainWeaponWiring', function()
     end)
 end)
 
--- ===== 爆炸保底鱼（FishTree Wild 状态） =====
 describe('TestMgrFishUnitBlastFish', function()
     local ctx
     local saved
@@ -220,7 +216,6 @@ describe('TestMgrFishUnitBlastFish', function()
     end)
 end)
 
--- ===== PlayerWeapon：空手 / 近战 / 枪械 =====
 describe('TestMgrWeapon', function()
     local ctx
     before_each(function()
@@ -254,7 +249,7 @@ describe('TestMgrWeapon', function()
         end
         ctx:advance(2)
         ctx:attack(ctx.player, { aim = { x = 0, y = 3, z = 4 } })
-        assert.same(ammo - 1, Weapon.lastReply(ctx, ctx.player).ammo) -- 非法瞄准不扣弹
+        assert.same(ammo - 1, Weapon.lastReply(ctx, ctx.player).ammo)
     end)
 
     it('test_camera_aim_payload_uses_normalized_viewport_center', function()
@@ -278,26 +273,26 @@ describe('TestMgrWeapon', function()
         end
         assert.is_not_nil(meleeIndex)
         SwingRegistry.StageSwing(ctx.player.UserId, { damage = 5, range = 2 })
-        assert.is_true(ctx:guard(ctx.player, ctx.player.Character, meleeIndex)) -- 已登记放行
+        assert.is_true(ctx:guard(ctx.player, ctx.player.Character, meleeIndex))
         SwingRegistry.ClearSwing(ctx.player.UserId)
-        assert.is_false(ctx:guard(ctx.player, ctx.player.Character, meleeIndex)) -- 近战槽无登记拒绝
-        assert.is_true(ctx:guard(ctx.player, ctx.player.Character, 1))          -- 其它槽位不受影响
-        assert.is_true(ctx:guard(ctx.player, { UnitId = 5 }, meleeIndex))       -- 非玩家单位（鱼施法）不受影响
+        assert.is_false(ctx:guard(ctx.player, ctx.player.Character, meleeIndex))
+        assert.is_true(ctx:guard(ctx.player, ctx.player.Character, 1))
+        assert.is_true(ctx:guard(ctx.player, { UnitId = 5 }, meleeIndex))
     end)
 
     it('test_fire_rate_enforced_server_side', function()
-        ctx:equip(ctx.player, 'item139') -- 冲锋枪 0.15s
+        ctx:equip(ctx.player, 'item139')
         assert.is_true(ctx:attack(ctx.player).ok)
-        ctx:advance(0.1) -- 客户端加速：0.1 < 0.15 拒绝
+        ctx:advance(0.1)
         assert.same('cooldown', ctx:attack(ctx.player).reason)
-        ctx:advance(0.06) -- 0.16 ≥ 0.15 放行（0.15 恰为浮点边界，避开）
+        ctx:advance(0.06)
         assert.is_true(ctx:attack(ctx.player).ok)
     end)
 
     it('test_gun_magazine_empties_then_auto_reload_two_seconds', function()
-        ctx:equip(ctx.player, 'item137') -- 手枪 10 发
+        ctx:equip(ctx.player, 'item137')
         for i = 1, 10 do
-            ctx:advance(1) -- 间隔 1 秒，打光 10 发
+            ctx:advance(1)
             assert.is_true(ctx:attack(ctx.player).ok)
         end
         assert.same(0, Weapon.lastReply(ctx, ctx.player).ammo)
@@ -323,14 +318,14 @@ describe('TestMgrWeapon', function()
         assert.same(0, #ctx.applied)
         ctx.rayHit = { Instance = { UnitId = 999, UnitType = 'WorldUnit', PhysicsActive = true },
             Position = { x = 0, y = 2, z = 3 } } -- 墙：不解析出玩家/鱼
-        ctx:advance(1) -- 过射速间隔再打一发
+        ctx:advance(1)
         assert.is_true(ctx:attack(ctx.player).ok)
         assert.same(0, #ctx.applied)
     end)
 
     it('test_manual_reload_two_seconds_not_bypassed_by_switching', function()
         ctx:equip(ctx.player, 'item137')
-        assert.is_true(ctx.data:GrantWeapon('item141', 1)) -- 狙击 5 发
+        assert.is_true(ctx.data:GrantWeapon('item141', 1))
         assert.is_true(ctx:attack(ctx.player).ok)
         assert.is_true(ctx:reload(ctx.player).ok)
         assert.same('reloading', ctx:reload(ctx.player).reason)
@@ -340,25 +335,25 @@ describe('TestMgrWeapon', function()
         assert.is_true(ctx:attack(ctx.player).ok)
         assert.is_true(ctx.data:HoldWeapon('item137'))
         assert.same('reloading', ctx:attack(ctx.player).reason)
-        ctx:advance(1.01) -- 手枪 2 秒换弹完成
+        ctx:advance(1.01)
         assert.is_true(ctx:attack(ctx.player).ok)
         assert.same(9, Weapon.lastReply(ctx, ctx.player).ammo)
     end)
 
     it('test_melee_interval_enforced_per_weapon_and_switching', function()
-        ctx:equip(ctx.player, 'item136') -- 斧头 40 / 1.0s / 4m
-        assert.is_true(ctx.data:GrantWeapon('item135', 1)) -- 匕首 15 / 0.5s / 3m
+        ctx:equip(ctx.player, 'item136')
+        assert.is_true(ctx.data:GrantWeapon('item135', 1))
         ctx:attack(ctx.player)
         assert.same(40, SwingRegistry.PeekSwing(ctx.player.UserId).damage)
-        ctx:attack(ctx.player) -- 间隔内连点：拒绝且不重复登记/施法
+        ctx:attack(ctx.player)
         assert.same('cooldown', Weapon.lastReply(ctx, ctx.player).reason)
         assert.same(1, #ctx.casts)
         ctx:advance(0.5)
-        assert.is_true(ctx.data:HoldWeapon('item135')) -- 切武器不绕冷却：匕首自己的时间线
+        assert.is_true(ctx.data:HoldWeapon('item135'))
         ctx:attack(ctx.player)
         assert.same(15, SwingRegistry.PeekSwing(ctx.player.UserId).damage)
         assert.same(2, #ctx.casts)
-        assert.is_true(ctx.data:HoldWeapon('item136')) -- 换回斧头：仍在 1 秒冷却内
+        assert.is_true(ctx.data:HoldWeapon('item136'))
         ctx:attack(ctx.player)
         assert.same('cooldown', Weapon.lastReply(ctx, ctx.player).reason)
         ctx:advance(0.51)
@@ -382,17 +377,17 @@ describe('TestMgrWeapon', function()
             assert.is_not.same(ctx.other, a.target)
             assert.is_not.same(ctx.player, a.target)
         end
-        assert.same(0, Weapon.lastReply(ctx, ctx.player).ammo) -- 1 发弹匣
+        assert.same(0, Weapon.lastReply(ctx, ctx.player).ammo)
     end)
 
     it('test_shotgun_five_pellets_one_shell', function()
-        ctx:equip(ctx.player, 'item138') -- 霰弹 2 发 × 5×20
+        ctx:equip(ctx.player, 'item138')
         ctx.rayHit = { Instance = ctx.other.Character, Position = { x = 0, y = 2, z = 5 } }
         ctx:attack(ctx.player)
         assert.same(5, #ctx.applied)
         for _, a in ipairs(ctx.applied) do assert.same(20, a.amount) end
         assert.same(ctx.other, ctx.applied[1].target)
-        assert.same(1, Weapon.lastReply(ctx, ctx.player).ammo) -- 一发一壳
+        assert.same(1, Weapon.lastReply(ctx, ctx.player).ammo)
     end)
 
     it('test_unarmed_attack_stages_cfg_swing_and_casts_melee', function()
@@ -408,8 +403,6 @@ describe('TestMgrWeapon', function()
 end)
 
 -- ===== 投掷 / 爆炸 =====
--- #320 后全部经公开 handle({ action = 'throw', slot, target }) 与 SpokeClock 推进驱动；
--- 投掷前先用 data:SelectSlot 选中爆炸物，落水判定读 GameCfg.Water.Zones（案例内替换、tearDown 恢复）。
 describe('TestMgrWeaponThrow', function()
     local ctx
     before_each(function()
@@ -427,20 +420,17 @@ describe('TestMgrWeaponThrow', function()
             HalfXZ = 6, SurfaceY = 2.183 } }
     end
 
-    -- 站到水圈北侧 15.75 米：目标点落在圈内，且不触发 20 米钳制
     local function standAtWater()
         ctx:setWaterZones(waterZones(-12.25))
         ctx.player.Character.Position = { x = -11.75, y = 2, z = -28 }
     end
 
     local function pickFishRoll(a, b)
-        if a and b then return a end -- 数量取下限（3 条）
+        if a and b then return a end
         return 0.5
     end
 
     it('test_blast_candidates_exclude_boss_elite_rare_and_high_rod', function()
-        -- 保底鱼只从当前竿等级（1 级）的普通鱼里抽：扫过随机序列后，
-        -- 落水产出的鱼必须全是普通且 1 级竿，极品/首领/2 级竿一条都不出现。
         local excluded = false
         for _, row in ipairs(GameCfg.Casting.Zones['shrimpPond.water']) do
             local species = GameCfg.Fish[row.Id]
@@ -500,10 +490,10 @@ describe('TestMgrWeaponThrow', function()
         local slot = ctx:giveExplosive(ctx.player, 'item143')
         ctx.random = pickFishRoll
         assert.is_true(ctx:throw(ctx.player, slot, { x = -11.75, y = 2.183, z = -12.25 }).ok)
-        assert.same(1, #ctx.visuals)                -- 出手即建投掷物视觉
-        assert.same(0, ctx.data:ItemCount('item143')) -- 经 handle 出手只扣一件
+        assert.same(1, #ctx.visuals)
+        assert.same(0, ctx.data:ItemCount('item143'))
         ctx:advance(FlightSec() + 0.01)
-        assert.same(3, #ctx.spawnedFish)            -- 落水保底鱼
+        assert.same(3, #ctx.spawnedFish)
     end)
 
     it('test_expiry_destroy_failure_logs_and_settles_once', function()
@@ -560,7 +550,6 @@ describe('TestMgrWeaponThrow', function()
             assert.is_true(hitsAfterExpiry > 0)
             assert.same(fishAfterExpiry, #ctx.spawnedFish)
             assert.same(hitsAfterExpiry, #ctx.applied)
-            -- 下一次投掷重新备货并选中
             slot = ctx:giveExplosive(ctx.player, 'item143')
         end
         failCreate(function() return nil end)
@@ -569,7 +558,6 @@ describe('TestMgrWeaponThrow', function()
     end)
 
     it('test_removed_thrower_keeps_original_flight_isolated', function()
-        -- #320 语义：投掷者离场立即销毁其未落地投掷物并取消结算，不影响其他玩家在途投掷物。
         standAtWater()
         ctx.other.Character.Position = { x = -11.75, y = 2, z = -28 }
         ctx.random = pickFishRoll
@@ -579,23 +567,23 @@ describe('TestMgrWeaponThrow', function()
         ctx:throw(ctx.other, otherSlot, { x = -11.75, y = 2.183, z = -12.25 })
 
         ctx:removePlayer(ctx.player)
-        assert.same(1, ctx.visuals[1].unit.destroyCount) -- 离场立即销毁自己的在途投掷物
-        assert.same(0, ctx.visuals[2].unit.destroyCount) -- 其他玩家的投掷物不受影响
+        assert.same(1, ctx.visuals[1].unit.destroyCount)
+        assert.same(0, ctx.visuals[2].unit.destroyCount)
 
         ctx:advance(FlightSec() - 0.01)
-        assert.same(0, #ctx.spawnedFish) -- 离场者的飞行已取消，不再结算
+        assert.same(0, #ctx.spawnedFish)
         assert.same(0, #ctx.applied)
         assert.same(0, ctx.visuals[2].unit.destroyCount)
 
         ctx:advance(0.02)
         local fishAfterExpiry, hitsAfterExpiry = #ctx.spawnedFish, #ctx.applied
         ctx:advance(1)
-        assert.same(3, fishAfterExpiry) -- 幸存者的投掷物照常落水结算
-        assert.same(3, hitsAfterExpiry) -- 3 条保底鱼各吃一发 50；投掷者自己不打
+        assert.same(3, fishAfterExpiry)
+        assert.same(3, hitsAfterExpiry)
         for _, hit in ipairs(ctx.applied) do
             assert.same(50, hit.amount)
-            assert.is_not.same(ctx.other, hit.target) -- 爆炸不结算投掷者自己
-            assert.is_not.same(ctx.player, hit.target) -- 离场者的投掷物已被取消
+            assert.is_not.same(ctx.other, hit.target)
+            assert.is_not.same(ctx.player, hit.target)
         end
         assert.same(1, ctx.visuals[2].unit.destroyCount)
         assert.same(fishAfterExpiry, #ctx.spawnedFish)
@@ -639,17 +627,16 @@ describe('TestMgrWeaponThrow', function()
 
     it('test_target_clamped_to_20m', function()
         local slot = ctx:giveExplosive(ctx.player, 'item144')
-        ctx.other.Character.Position = { x = 0, y = 2, z = 19.9 } -- 钳制后的落点 5 米内
+        ctx.other.Character.Position = { x = 0, y = 2, z = 19.9 }
         local far = Weapon.player(79)
-        far.Character.Position = { x = 0, y = 2, z = 25.1 }       -- 未钳制落点才会命中
+        far.Character.Position = { x = 0, y = 2, z = 25.1 }
         ctx.players[#ctx.players + 1] = far
         assert.is_true(ctx:throw(ctx.player, slot, { x = 0, y = 2, z = 100 }).ok)
-        -- 目标 100 米必须钳到 20 米：半程位姿 z = (0 + 20) / 2 = 10
         ctx:advance(GameCfg.Ability.Throw.FlightSec / 2)
         assert.near(10, ctx.visuals[1].unit.Position.z, 1e-9)
         ctx:advance(GameCfg.Ability.Throw.FlightSec / 2 + 0.01)
         assert.same(1, #ctx.applied)
-        assert.same(ctx.other, ctx.applied[1].target) -- 落点 20 米：19.9 命中、25.1 落空
+        assert.same(ctx.other, ctx.applied[1].target)
     end)
 
     it('test_throw_consumes_exactly_one_without_save', function()
@@ -664,7 +651,6 @@ describe('TestMgrWeaponThrow', function()
     it('test_throw_rejects_non_explosive_and_bad_slot', function()
         local slot = ctx:giveExplosive(ctx.player, 'item143', 1)
         assert.same('bad-slot', ctx:throw(ctx.player, 0, { x = 0, y = 2, z = 5 }).reason)
-        -- 越界槽位与鱼竿槽都按「不是当前选中的爆炸物」拒绝
         assert.same('bad-throwable', ctx:throw(ctx.player, 9, { x = 0, y = 2, z = 5 }).reason)
         local rodSlot
         for index, entry in pairs(ctx.data:GetItemBarSnapshot().slots) do
@@ -677,7 +663,6 @@ describe('TestMgrWeaponThrow', function()
     end)
 
     it('test_throw_replay_does_not_consume_or_launch_again', function()
-        -- 模拟存档协议：同 requestId 第二次返回 replay，只回历史结果
         local executions = 0
         local save = {
             ResolveRequest = function(_, player, data, kind, requestId)
@@ -697,7 +682,7 @@ describe('TestMgrWeaponThrow', function()
                 assert.is_true(draft:ApplySave(data:Serialize()))
                 local result = transform(draft)
                 if result then
-                    assert.is_true(data:ApplySave(draft:Serialize())) -- 模拟真实 Execute 的写回
+                    assert.is_true(data:ApplySave(draft:Serialize()))
                     done(true, result)
                 else
                     done(false, 'rejected')
@@ -712,14 +697,13 @@ describe('TestMgrWeaponThrow', function()
         assert.same(1, ctx.data:ItemCount('item143'))
         assert.same(1, #ctx.visuals)
         ctx.replayed = true
-        ctx:throw(ctx.player, slot, { x = 0, y = 2, z = 5 }, { seq = 7 }) -- 同 seq 重放
+        ctx:throw(ctx.player, slot, { x = 0, y = 2, z = 5 }, { seq = 7 })
         assert.same(1, ctx.data:ItemCount('item143')) -- 不重复扣
-        assert.same(1, #ctx.visuals)                  -- 不再发射
-        assert.same(1, executions)                    -- 新结算只一次
+        assert.same(1, #ctx.visuals)
+        assert.same(1, executions)
     end)
 
     it('test_water_detonation_spawns_3_to_5_fish_before_damage', function()
-        -- 水圈中心 (-11.75, -12.25)，HalfXZ=6，SurfaceY=2.183
         standAtWater()
         local slot = ctx:giveExplosive(ctx.player, 'item143')
         ctx.random = function(a, b)
@@ -772,9 +756,9 @@ describe('TestMgrWeaponUpgrade', function()
     -- 弹容满级 +150% 向上取整：狙击 5→13（7.5→8 逐级验证在配置层），第 14 发才空匣
     it('test_magazine_max_level_rounds_up_and_extends_ammo', function()
         ctx.data.Extra.growth.upgrades.magazine = 3
-        ctx:equip(ctx.player, 'item141') -- 狙击 5 发
+        ctx:equip(ctx.player, 'item141')
         for i = 1, 13 do
-            ctx:advance(2) -- 间隔 1.5 秒
+            ctx:advance(2)
             assert.is_true(ctx:attack(ctx.player).ok)
         end
         assert.same(0, Weapon.lastReply(ctx, ctx.player).ammo)
@@ -794,9 +778,9 @@ describe('TestMgrWeaponUpgrade', function()
         assert.same(4, swing.range)
         ctx.data.Extra.inventory.selection.held = { kind = nil, id = nil, slot = nil } -- 回到空手
         ctx.data.Data.SelectedWeapon = nil
-        ctx:advance(2) -- 过冷却
+        ctx:advance(2)
         ctx:attack(ctx.player)
-        assert.same(5, SwingRegistry.PeekSwing(ctx.player.UserId).damage) -- 空手不加成
+        assert.same(5, SwingRegistry.PeekSwing(ctx.player.UserId).damage)
     end)
 
     -- 远程满级 +50%：每发弹丸乘算（霰弹 20→30）
@@ -839,7 +823,7 @@ describe('TestMgrWeaponUpgrade', function()
         assert.is_true(ctx.data:HoldWeapon('item141'))
         ctx:advance(2)
         assert.is_true(ctx:attack(ctx.player).ok)
-        assert.same(4, Weapon.lastReply(ctx, ctx.player).ammo) -- 5 发基础弹匣
+        assert.same(4, Weapon.lastReply(ctx, ctx.player).ammo)
     end)
 end)
 
@@ -963,10 +947,10 @@ describe('TestWeaponPersistence', function()
         world:setUp()
         local ok, err = pcall(function()
             local reply = world:attack(player, { action = 'attack', aim = { x = 0, y = 0, z = 1 } })
-            assert.same('item137', reply.weapon) -- 选中武器重进恢复
-            assert.same(GameCfg.Ability.Guns.item137.Magazine - 1, reply.ammo) -- 弹匣按满匣恢复（不进 #123 快照）
+            assert.same('item137', reply.weapon)
+            assert.same(GameCfg.Ability.Guns.item137.Magazine - 1, reply.ammo)
             local saved2 = re:Serialize()
-            assert.is_nil(saved2.ammo) -- 快照 schema 未被动过：没有弹匣字段
+            assert.is_nil(saved2.ammo)
             assert.same(1, re:WeaponCount('item137'))
         end)
         world:tearDown()

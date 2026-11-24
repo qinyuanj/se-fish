@@ -160,7 +160,6 @@ describe('TestFishLift', function()
         fish.Carrier.Body.OnLiftedBegin:Fire(env.player.Character)
         env.mgr:OnPlayerRemoving(env.player)
         assert.is_nil(env.mgr:GetHeld(env.player))
-        -- #309：离场先让鱼落地，按品种期限离场，而不是直接删鱼。
         assert.are.equal(0, #env.despawned)
         assert.is_true(env:mounts()[1].Destroyed)
         env.now = 10

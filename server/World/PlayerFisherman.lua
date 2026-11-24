@@ -1,6 +1,3 @@
--- 玩家钓鱼佬喂食活跃会话（#311 / ADR-0031、ADR-0032）。
--- 选中鱼获或鱼饵先在正式状态做纯校验，再由 MgrSave 在隔离 draft 内复验并单批结算；
--- 持久操作按原身份重放，写确认后同一 SpokeRuntime.batch 同步库存、金币与快照。
 local GameCfg = require("common.GameCfg")
 local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
 local InteractionPoints = require("server.World.InteractionPoints")

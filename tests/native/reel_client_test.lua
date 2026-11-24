@@ -1,4 +1,3 @@
--- 收线输入协议：#302 RootView / ReelInRE 公共接缝。
 local Host = require("tests.support.reel_view_host")
 
 describe("客户端收线状态机（ReelOverlayView）", function()

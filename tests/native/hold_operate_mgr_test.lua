@@ -86,7 +86,6 @@ describe("持有操作的服务端分发", function()
         assert.same(1, snapshot.slots[1].count)
     end)
 
-    -- 丢弃走地面公开边界：世界未挂载时拒绝且不扣物。成功落地由 loot_drop 套件覆盖。
     it("test_discard_uses_ground_item_api_when_available", function()
         assert.is_true(ctx.data:AddItem('bass', 1.99))
         operate({ action = 'Operate', op = 'discard', slot = 1 })

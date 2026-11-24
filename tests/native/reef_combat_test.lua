@@ -32,7 +32,6 @@ describe('TestReefCombat', function()
         assert.same('escaping', penguin.State)
     end)
 
-    -- 来源视觉由 client_cast_source_302_test 的 RootView 接缝覆盖，避免重复验证同一节点生命周期。
 
     -- 首领在别处水域被召唤时，飞行边界仍取当前区，不跟着水区换。
     it('test_boss_summoned_at_other_water_keeps_the_current_zone_flight_bounds', function()
@@ -174,7 +173,6 @@ describe('TestReefCombat', function()
         assert.same('stop', env.notices[#env.notices].reason)
     end)
 
-    -- 客户端预警：真实 FishCombatView.warning_spec 收到空中投掷预警建节点，clear 撤销后销毁零残留。
     it('test_throw_client_displays_falling_body_and_clear_destroys_it', function()
         local Eui = require('tests.support.eui_double')
         local ClientStore = require('client.Store.ClientStore')

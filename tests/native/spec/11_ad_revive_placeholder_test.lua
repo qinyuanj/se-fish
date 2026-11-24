@@ -1,5 +1,4 @@
 -- 条款 11 广告满血复活（占位广告位与濒死路径）：docs/acceptance/11-downed-death-revive.md
--- 只走业务入口黑盒：SurvivalAction / PlatformAction 两个 RE 的服务端 OnServerEvent，配合宿主公开方法
 -- 方法（PlatformRevive / FullRevive / Update 的暂停分支）；客户端入口走 ScreenSurvival 的 SurvivalState
 -- 广播渲染（EUI 替身）。复活动作只有 FullRevive 一个落点，广告不另造复活路径。
 -- 失败方式（先列后写）：
@@ -344,7 +343,7 @@ describe('条款 11 广告满血复活（占位广告位）', function()
       down(player)
       if entry == 'dead' then advance(GameCfg.Survival.DownedSec) end
       assert.same(entry, env.s:Phase(player))
-      assert.is_true(env.v:SetHunger(player, 0)) -- 复活前饿空：满血复活也要把饥饿抬到 10%
+      assert.is_true(env.v:SetHunger(player, 0))
       adRequest(player, 1)
       assert.is_not_nil(flowOpen(), entry .. ' 入口没有拉起广告流程')
       confirm(player, 'success')
@@ -404,7 +403,7 @@ describe('条款 11 广告满血复活（占位广告位）', function()
       env.platform:Update()
       drain()
     else
-      catchUp(7) -- 广告流程花了 7 秒，倒计时时钟一起走
+      catchUp(7)
       platformAction(player, { action = 'PlaceholderOutcome', outcome = outcome })
     end
   end

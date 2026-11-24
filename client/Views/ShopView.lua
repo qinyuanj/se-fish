@@ -1,5 +1,3 @@
--- 钓场商店统一视图（#311）：场景气泡使用 RootView Dock，主弹窗使用互斥 Modal Phase。
--- 离开范围、切换弹窗或根节点销毁时，节点和点击监听随 Spoke 作用域对称回收。
 local GameCfg = require("common.GameCfg")
 local BodyScale = require("common.BodyScale")
 local spoke = require("common.packages.spoke.api")

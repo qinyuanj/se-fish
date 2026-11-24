@@ -1,6 +1,3 @@
--- 攻击与伤害反馈投影（#300）：订阅只读道具栏、HUD 显隐与服务端事件。
--- 攻击键只在持有武器且 HUD 可见时存在；长按连发仅在按下期间的短寿命相位订阅注入时钟；
--- 关闭、死亡或根节点销毁由视图树逆序清掉节点与连接。
 
 local GameCfg = require("common.GameCfg")
 local PressGesture = require("client.PressGesture")
@@ -155,7 +152,6 @@ function AttackView.mount(scope, ctx)
           if gun and not gun.Auto then send("reload") end
         end
       end)
-      -- 仅在按住攻击键的短寿命相位订阅注入时钟 on_frame，松开或卸载即退订
       ps:phase("AttackPressPhase", pressing, function(press_scope)
         if ctx.clock and ctx.clock.on_frame then
           press_scope:subscribe(ctx.clock.on_frame, tick)

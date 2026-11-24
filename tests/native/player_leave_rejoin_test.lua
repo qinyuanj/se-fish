@@ -2,7 +2,6 @@
 -- #56 失败方式（先列后写）：
 -- 任务事实/剧情已读未落账就替换会话；旧死亡状态和角色连接残留；最终离场快照被新认领取消；
 -- 重复离场/迟到清理误删新会话；等待玩家已离开或被再次重进替换仍被接纳；跨玩家阻塞；失败后卡住。
--- 接缝：真实 main/SaveHost/PlayerDataHost/Quest/Story/Vitals；替换引擎边界和无关宿主服务。
 -- it 按旧 LuaUnit 的方法名字典序注册，保持与旧套件一致的案例顺序。
 -- assertIs(state.player, p) 要求对象身份：全仓无 __eq 元方法（已检索确认），故 Lua 的 == 即身份，映射 are.equal。
 local GameCfg = require('common.GameCfg')

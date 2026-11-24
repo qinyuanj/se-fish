@@ -44,7 +44,6 @@ local World = game:GetService("World")
 local Players = game:GetService("Players")
 
 -- 客户端 Spoke 响应式主干（ADR-0032 / #296）：
--- 写侧仅由 L1 入口持有并绑定宿主下行事件与空间传感器；对外只暴露统一只读状态仓库。
 local ok_now, initial_now = pcall(function() return World:GetServerTime() end) -- 启动瞬间宿主时钟可能未就绪，异常时安全回退 0
 local client_clock = SpokeClock.new(ok_now and Number.IsFiniteNumber(initial_now) and initial_now or 0)
 local client_store, client_store_writer = ClientStore.new({ clock = client_clock })

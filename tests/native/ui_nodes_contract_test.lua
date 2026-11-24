@@ -1,6 +1,3 @@
--- #311 商店改为 RootView 运行期建树后，节点合同直接验证真实视图：
--- 关键控件必须存在；FindFirstChild 深查的名字必须唯一；重开不得残留旧节点。
--- data/UINodes.lua 是只读生成物，旧 ScreenShop handler 已删除，不再从 handler 反成名册。
 local GameCfg = require("common.GameCfg")
 local ClientStore = require("client.Store.ClientStore")
 local RootView = require("client.Views.RootView")

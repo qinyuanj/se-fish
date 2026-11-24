@@ -1,5 +1,4 @@
 -- 迁移自 tests/gameplay/rod_visual_test.lua（#85）。
--- 被测接缝：server.PlayerDataHost 选中鱼竿时服务端挂载物（鱼竿外观）的生成与清理。
 -- it 名字沿用旧方法名，注册顺序 = LuaUnit sortedPairs 的实际执行顺序。
 
 local GameCfg = require('common.GameCfg')

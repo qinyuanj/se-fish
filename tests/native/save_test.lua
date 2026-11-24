@@ -12,7 +12,6 @@
 --   9. 读档竞态：读档返回前玩家已操作，旧档灌入吞掉新操作（Touched 会话锁）。
 -- it 按旧 LuaUnit 的方法名字典序注册，保持与旧套件一致的案例顺序。
 -- 夹具必须恢复三样：共享配置（GameCfg.Debug / Save.QaSlot，槽位由 helper 建基线、
--- 案例内改动在本例结束时还原）、模块缓存 package.loaded['server.SaveHost']、全局 _G.game。
 local GameCfg = require('common.GameCfg')
 
 -- 假 DataStore：内存表 + 可注入失败次数与 CAS 冲突次数

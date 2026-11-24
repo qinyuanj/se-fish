@@ -1,9 +1,3 @@
--- #299 特殊道具客户端宿主接缝（ADR-0032 / #292 Testing Decisions）
--- 失败方式先列：
---   1. SpecialItemState 下行后动作键不切换为长按飞行或原子吐息；
---   2. SpecialItemResult 失败原因不经统一视图提示玩家；
---   3. 根节点销毁后失败提示订阅残留，再次下行仍弹旧提示。
--- 接缝：ClientStore 下行事件、动作按钮节点与通知回调，不窥探私有 Effect 拓扑。
 
 local Eui = require("tests.support.eui_double")
 local ClientStore = require("client.Store.ClientStore")

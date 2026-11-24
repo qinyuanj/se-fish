@@ -1,6 +1,3 @@
--- 客户端抢救驱动与抢救气泡共享模块（ADR-0032 / #311 / #314，归属 L2 client.Views）：
--- 统一非队友抢救（FishermanView）与队友抢救（SquadView）的距离筛选、值相等防重建 State 与气泡 Dock；
--- 常驻作用域零 on_frame 订阅，仅在存在濒死/抢救目标的短寿命 Phase 内按需高频追踪。
 
 local GameCfg = require("common.GameCfg")
 local spoke = require("common.packages.spoke.api")
@@ -153,7 +150,6 @@ function RescueView.driver_spec(shared, config)
         refresh()
       end)
 
-      -- 仅在存在濒死/抢救中目标的短寿命 Phase 内按需追踪目标位置与状态变化，平时零 on_frame 订阅
       scope:phase(driver_name .. "WatchPhase", watch_active, function(ps)
         ps:subscribe(ctx.clock.on_frame, refresh)
       end)

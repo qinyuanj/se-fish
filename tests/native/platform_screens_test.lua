@@ -1,4 +1,3 @@
--- 盲盒与地图商店界面宿主规格（#312）：真实 ClientStore + RootView + Views。
 local GameCfg = require("common.GameCfg")
 local ClientWorld = require("tests.support.economy_client")
 

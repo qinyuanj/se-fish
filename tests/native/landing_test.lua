@@ -1,4 +1,3 @@
--- 上岸结算与只一次副作用：#302 ServerRuntime 宿主接缝。
 local GameCfg = require("common.GameCfg")
 local Host = require("tests.support.fishing_host")
 

@@ -1,7 +1,3 @@
--- #312 服务端宿主接缝（ADR-0031、ADR-0032 / #292 Testing Decisions）。
--- 失败方式：非极品或烤鱼被投注；扣物与大奖不同批；支付重试重复扣费/发奖；
--- 满库存权益丢失；旧 epoch 交付阻断当前交付；重连后待交付重复落地。
--- 只驱动 ServerRuntime 上行、支付回包、存档与持久队列，不窥探私有 Effect 拓扑。
 local GameCfg = require("common.GameCfg")
 local EconomyWorld = require("tests.support.economy_world")
 

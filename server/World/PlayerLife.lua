@@ -1,6 +1,3 @@
--- 玩家双层生命相位（ADR-0032 §2 / #298，归属 L2 server.World）。
--- 挂在 PlayerTree Stage 3：存活消耗、濒死/死亡倒计时、平台暂停、抢救、复活、
--- 行动门控与离场终镜像。不反向依赖旧管理器。
 
 local GameCfg = require("common.GameCfg")
 local Vitals = require("common.Vitals")
@@ -258,7 +255,6 @@ function PlayerLife.mount(s3, player_tree, opts)
       base = memos.walk_speed and memos.walk_speed:now()
     end
     if not finite_number(base) or base <= 0 then
-      local read = read_health(player) and nil
       local ok, current = pcall(function() return controller.WalkSpeed end)
       if ok and finite_number(current) and current > 0 and not player_tree:get_modifier_remaining("weak") then
         base = current
@@ -825,7 +821,6 @@ function PlayerLife.mount(s3, player_tree, opts)
     end
   end
 
-  -- 宿主外围统一连接 SurvivalAction 后路由到活跃 PlayerTree，避免树内按玩家重复 Connect。
   function player_tree:handle_survival_action(payload, skip_cd)
     if player_tree:is_disposed() or type(payload) ~= "table" then return false end
     if not skip_cd and remote and type(remote.CheckRECD) == "function"
@@ -894,7 +889,6 @@ function PlayerLife.mount(s3, player_tree, opts)
     on_second()
   end)
 
-  -- 仅在非存活倒计时/抢救（短寿命相位且未被平台弹窗暂停）按需订阅 on_frame，存活常态与弹窗暂停期零 on_frame 订阅。
   local need_frame_watch = s3:memo("NeedLifeFrameWatch", function(ms)
     local phase = ms:d(states.life_phase)
     local paused = ms:d(platform)

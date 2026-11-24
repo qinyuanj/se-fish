@@ -261,7 +261,7 @@ function PlatformHost:Update()
     local now = self:Now()
     for userId, flow in pairs(self.Flows) do
         if now >= flow.deadline then
-            resolve(self, flow.player, flow, 'timeout') -- 平台无取消/失败事件，超时是唯一兜底
+            resolve(self, flow.player, flow, 'timeout')
         end
     end
 end

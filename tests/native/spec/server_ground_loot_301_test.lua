@@ -1,12 +1,3 @@
--- #301 钓鱼区地面物品、鱼饵刷新点与拾取/丢弃：服务端宿主接缝（ADR-0032 / #292 Testing Decisions）
--- 失败方式先列：
---   1. 单区地面物品超过 200 件仍全部存活，或不按 SpokeClock 整秒进入 30 秒闪烁、到期不销毁单位；
---   2. 鱼饵刷新点不按 15 秒补货、同一点位同时堆两份，或世界树销毁后动态单位仍存活；
---   3. 拾取/丢弃在容量不足、物品已被抢走或玩家不可行动时改了库存或地面；成功时不是单批原子更新；
---   4. 动态单位不在创建处 on_cleanup 销毁，或地面物品路径仍调用 OwnedUnits；
---   5. 地面快照不经合并后的 LootState 下发，或丢弃后库存与地面不一致。
--- 接缝：只经 ServerRuntime 玩家进出、RemoteEvent 上行、SpokeClock 步进、单位创建/销毁与下行载荷观察。
--- 不窥探私有 Effect 拓扑，不读 Dock 内部子节点。
 
 local GameCfg = require("common.GameCfg")
 local ServerRuntime = require("server.World.ServerRuntime")

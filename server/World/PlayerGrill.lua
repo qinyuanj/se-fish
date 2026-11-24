@@ -1,8 +1,3 @@
--- 玩家烧烤点会话（#310 / ADR-0032 §2）：挂在存活相位内的活跃烤制。
--- 投入与取出先做纯条件校验，再由 MgrSave 在单次操作里改库存与待恢复标记；
--- 成功后同一个 SpokeRuntime.batch 把结果投影回玩家树。曲线只按服务器时刻一次算出。
--- 濒死、死亡或离场卸载本相位时按当前倍率结算，并在 on_cleanup 销毁烤制单位。
--- 本模块不持有生命状态，烤糊伤害经宿主注入的公开入口。
 
 local GameCfg = require("common.GameCfg")
 local BodyScale = require("common.BodyScale")
@@ -492,7 +487,6 @@ function PlayerGrill.mount(scope, tree, opts)
     end
   end)
 
-  -- 短寿命烤制活跃相位（最多 4.5 秒）：仅在烤制进行中按需订阅 on_frame，空闲与满格冻结时零帧轮询。
   scope:phase("GrillCooking", is_cooking, function(ps)
     ps:subscribe(clock.on_frame, function(frame)
       local now = frame and frame.now or clock.now()

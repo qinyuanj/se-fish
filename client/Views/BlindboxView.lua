@@ -1,4 +1,3 @@
--- 盲盒入口与模态弹窗：只读 BlindboxResult 投影，单抽/十连只提交购买意图。
 local GameCfg = require("common.GameCfg")
 local Modal = require("client.Views.EconomyModal")
 

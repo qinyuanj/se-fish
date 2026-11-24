@@ -201,7 +201,6 @@ function Mgr:Reconcile(player, state)
     self:NoteLanding(player, state.fishId, Records.Unscale(best))
 end
 
--- 全服纪录挂在 SharedWorldTree；全局 RE 按信号对象单次绑定，DataStore UpdateAsync 仍是唯一写入边界。
 function Mgr.mount(scope, world, opts)
     local adapter = setmetatable({ Checked = false, Holder = nil }, { __index = Adapter })
     local session = setmetatable({

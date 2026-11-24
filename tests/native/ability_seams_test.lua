@@ -156,7 +156,6 @@ describe('TestFishAbilitySeams', function()
         }
         package.loaded['server.World.FishTree'] = nil
         ctx.mgr = assert(loadfile('server/World/FishTree.lua'))()
-        -- #309 L2 不反向依赖 L1：挂点 API 由入口/夹具注入。
         ctx.mgr.AbilityApi = package.loaded['server.AbilityAPI']
         -- 目标裁决适配层按生产接线（server/main.lua）注入
         ctx.mgr.AiTarget = require('server.World.FishAiTarget')

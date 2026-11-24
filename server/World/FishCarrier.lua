@@ -114,7 +114,6 @@ function Mgr:SyncPosition(carrier, targetPosition)
 	syncReceiver(carrier, targetPosition)
 end
 
--- FishTree 已下达移动命令后，宿主只镜像受击体坐标；官方包不反向写玩法状态。
 function Mgr:SyncAiPosition(carrier)
 	if not carrier or not carrier.AiOwnsMovement then return true end
 	local ok, err = pcall(function()

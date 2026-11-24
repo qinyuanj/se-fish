@@ -38,7 +38,6 @@ local ITEM_BAR = GameCfg.Items.ContainerId.ItemBar
 local world = EconomyWorld.new()
 local data = world.data
 local seq = 0
--- 仅做旧探针脚本兼容：Random 仍写入运行时公开注入点，Settle 则改为完整上行与落账。
 local lottery = setmetatable({}, {
     __newindex = function(self, key, value)
         if key == 'Random' then world.randomOverride = value else rawset(self, key, value) end

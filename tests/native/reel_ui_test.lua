@@ -1,4 +1,3 @@
--- 收线覆盖层表现：#302 RootView / EUI 节点接缝。
 local Host = require("tests.support.reel_view_host")
 
 describe("收线界面表现（RootView × ReelOverlayView）", function()

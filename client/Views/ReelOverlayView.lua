@@ -1,6 +1,3 @@
--- 客户端收线覆盖层（ADR-0032 / #302）。
--- 只依赖 ClientStore 的 CastState / ReelInRE 与 SpokeClock；节点、订阅和点击聚合均随相位销毁；
--- 活跃收线相位内按帧原地更新进度条与文案，不写高频 State、不重建 Effect。
 local GameCfg = require("common.GameCfg")
 local RateLimit = require("common.RateLimit")
 local ReelDisplay = require("common.ReelDisplay")
@@ -68,7 +65,6 @@ end
 
 function ReelOverlayView.spec(options)
   options = type(options) == "table" and options or {}
-  -- 关闭/脱钩先于服务端 CastState 返回时，也立即退出覆盖相位；新 session 自动重新打开。
   local closed = State.new("ReelOverlay.closedSession", nil)
   return {
     name = "ReelOverlay",
@@ -213,14 +209,12 @@ function ReelOverlayView.spec(options)
         if display and (payload.action == "progress" or payload.action == "started") then
           display:Authority(now_of(ctx), payload.progress, payload.q)
         end
-        -- 下行先显示权威值，下一帧再由 ReelDisplay 负责平滑追赶与衰减。
         set_progress(payload.progress)
         if payload.action == "landed" or payload.action == "unhooked" then
           clear(payload.session, false)
         end
       end)
 
-      -- 短寿命收线覆盖相位内原地刷新进度条与聚合点击，不写 State、不重建 Effect
       scope:subscribe(ctx.clock.on_frame, function()
         flush(false)
         if display then set_progress(display:Value(now_of(ctx))) end

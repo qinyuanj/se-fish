@@ -1,8 +1,3 @@
--- 钓鱼区地面物品与鱼饵刷新（ADR-0032 / #301，归属 L2 server.World）。
--- 每个钓鱼区最多 200 件地面物品；超出后最早一件进入 30 秒闪烁，到期在创建处销毁。
--- 鱼饵刷新点按 SpokeClock 15 秒补一份，同一点位不堆叠。
--- 动态单位只经建点作用域的 on_cleanup 销毁。
--- 拾取与丢弃先校验容量和行动守卫，再在单个 SpokeRuntime.batch 里改库存与地面集合。
 
 local GameCfg = require("common.GameCfg")
 local Number = require("common.Number")

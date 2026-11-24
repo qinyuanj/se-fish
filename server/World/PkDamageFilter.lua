@@ -1,5 +1,3 @@
--- PK 与安全区伤害过滤（#300）：只看本次命中的来源、目标位置与当前队伍。
--- 同队免伤沿用今天的 Party.SameParty 口径，不新建小队系统。鱼等非玩家来源不拦。
 
 local GameCfg = require("common.GameCfg")
 

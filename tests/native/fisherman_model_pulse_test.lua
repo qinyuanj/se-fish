@@ -1,4 +1,3 @@
--- #172 七区钓鱼佬模型脉冲：通过场景按钮、InteractResult、时钟和 Scale 观察，不读取表现叶子的内部状态。
 local GameCfg = require("common.GameCfg")
 local ClientStore = require("client.Store.ClientStore")
 local RootView = require("client.Views.RootView")

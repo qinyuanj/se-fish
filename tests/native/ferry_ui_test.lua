@@ -1,8 +1,3 @@
--- #313 客户端摆渡视图宿主接缝（ADR-0032 / #292 Testing Decisions）。
--- 失败方式：十二条腿缺发或串 routeId、半径外仍显示、航线倒计时互相覆盖、
--- 旧终局清掉新航班、提示目的地或退款对象错误、根销毁后节点和监听残留。
--- 接缝：FerryState/FerryResult 下行、ClientStore 空间输入、SpokeClock 步进、EUI 点击与销毁。
--- 只观察文本、节点、上行载荷和提示，不读取倒计时表或 Effect 拓扑。
 
 local Eui = require('tests.support.eui_double')
 

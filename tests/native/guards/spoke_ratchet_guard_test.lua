@@ -29,16 +29,12 @@ local PACKAGE_SNAPSHOTS = {
   },
 }
 
--- 三类存量债务水位线（只减不增；#316 完成后已全部归零，后续禁止回潮）。
 local DEBT_WATERMARKS = {
-  -- #316 清零后实测：OwnedUnits 0、旧债务裸 Connect 0、MgrMap 0。
-  -- 水位只减不增；后续不得为通过门禁调高。
   owned_units_calls = 0,
   legacy_raw_connects = 0,
   mgr_map_members = 0,
 }
 
--- #309 已清退的活鱼、载体、AI 管理器与客户端战斗标签（不可恢复或被业务源码引用）。
 local REMOVED_FISH_LEGACY_FILES = {
   "server/Mgr/MgrFishUnit.lua",
   "server/Mgr/MgrFishCarrier.lua",

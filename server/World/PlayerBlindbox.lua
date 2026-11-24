@@ -1,6 +1,3 @@
--- 盲盒单玩家支付与交付会话（#312 / ADR-0031）。
--- 持久 operation 负责各阶段落账；独立 requestId/deliveryKey 负责支付意图与外部地面交付。
--- 旧 epoch 记录仅保留不处理，绝不能中断当前 epoch 的后续交付。
 local GameCfg = require("common.GameCfg")
 local BlindboxDraw = require("common.BlindboxDraw")
 
@@ -172,7 +169,6 @@ function PlayerBlindbox.mount(scope, tree, opts)
     if not world or type(world.place_delivery) ~= "function" then return end
     for _, key in ipairs(sorted_keys(value.deliveries)) do
       local delivery = value.deliveries[key]
-      -- 旧世界记录只留作恢复证据；继续处理后续当前世界记录，修复 pairs 顺序依赖。
       if delivery.epoch == nil or delivery.epoch == opts.delivery_epoch then
         local receipt, reason = world:place_delivery(key, "fishPond", {
           kind = "item", itemId = delivery.itemId, count = 1, mult = 1,

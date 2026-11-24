@@ -2,8 +2,6 @@
 --   16-04 食物、极品食物与鱼饵可食用；
 --   16-06 除食物、极品食物、鱼饵与药水外，其余类别不能走普通食用；
 --   16-07 食用恢复百分比可为负值，负值表示食用后扣减而非恢复。
--- 只走业务入口：PlayerTree 的生命宿主（血量 / 饥饿的唯一写入口）
--- 与 PlayerDataHost（玩家数据）；引擎边界用替身。断言只看玩家可观察的饥饿、血量与能否食用。
 local GameCfg = require('common.GameCfg')
 
 -- 前提守卫：本文件复现的是 main.lua 的接线，而不是自造一套协作关系。
@@ -93,7 +91,6 @@ describe('条款 16-04 / 16-06 / 16-07：物品食用规则', function()
             if item.EatPercent > 0 then
                 assert.is_true(after > before, '正恢复没有回饥饿：' .. id)
             elseif item.EatPercent < 0 then
-                -- 负恢复走统一伤害入口：扣血，饥饿不因此上升。
                 assert.is_true(after <= before, '负恢复抬高了饥饿：' .. id)
                 assert.is_true(player.Character.Controller.Health < healthBefore, '负恢复没有扣血：' .. id)
             else

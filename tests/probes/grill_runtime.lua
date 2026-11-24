@@ -1,4 +1,3 @@
--- #137 烧烤真实试玩探针：只走公开请求（GrillAction 与正常格位选择），不改时间/坐标。
 -- 前置：玩家背包或道具栏里有未烤鱼获（食物/极品食物）；最好另有一条未烤信物演示确认流程；
 -- 人站在三区起任一烧烤点 2.5 米内。GM 发放与传送只是环境准备，烤的流程全走真实通道。
 -- 试玩就绪后：editor-cli exec -p server --file <本文件绝对路径> --json。
@@ -44,7 +43,7 @@ end
 log('烤位', anchorName, tostring(anchor.Position))
 
 local function isToken(itemId)
-    for _, chain in ipairs(cfg.Content.Exchanges) do -- 与 PlayerGrill 同一判定表
+    for _, chain in ipairs(cfg.Content.Exchanges) do
         if chain.EliteToken == itemId or chain.BossToken == itemId then return true end
     end
     return false -- 显式返回：尾调用展开会把「无返回值」变成 tostring() 零参数报错

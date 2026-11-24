@@ -1,7 +1,5 @@
 -- #84 迁移：电鳗技能与战斗状态字标签（原 tests/gameplay/eel_combat_test.lua，12 + 3 例）。
 -- 接缝：MgrFishUnit 的 eel 状态机——5 次放电每秒一次、施法被拒不计数不入睡、5 次满才睡 10 秒、
--- 逃跑时限到停施法并移除技能；客户端经 ClientStore + RootView 直测真实 FishCombatView.bar_spec，坏载荷不建节点。
--- TestEelCombat 沿用 tests/support/fish_escape 夹具（不需要 Vitals），TestFishCombatLabel 直测客户端视图模块。
 -- Busted 案例体在沙箱 _ENV 中，写业务可见的全局（Quaternion）必须用 _G.Quaternion。
 -- describe/it 名称保留旧类名与方法名，并按方法名字典序注册以保持旧套件执行顺序。
 local GameCfg = require('common.GameCfg')
@@ -240,7 +238,6 @@ describe('TestEelCombat', function()
     end)
 end)
 
--- 客户端状态投影：真实 FishTree 载荷经 ClientStore 投影到 client/Views/FishCombatView.lua
 local Eui = require('tests.support.eui_double')
 local ClientStore = require('client.Store.ClientStore')
 local RootView = require('client.Views.RootView')
@@ -325,7 +322,6 @@ describe('TestFishCombatLabel', function()
         assert.are.equal('电鳗 180/300', aliveByName(env, 'FishBar_1').Text)
         assert.are.equal('睡眠 8 秒', aliveByName(env, 'FishTag_1').Text)
 
-        -- 无招式标签的鱼只出名字与血量，不额外建 FishTag 节点；鱼消失后节点全清
         assert.is_true(env.writer:ingest_event('FishCombatState', {
             list = {
                 { id = 2, fishId = 'alligatorGar', name = '鳄雀鳝', health = 500, maxHealth = 500 },
@@ -342,7 +338,6 @@ describe('TestFishCombatLabel', function()
     end)
 
     it('test_valid_rejects_malformed_payloads', function()
-        -- 缺 id 或非表载荷不会在 FishCombatView 中建出脏节点，也不阻塞后续合法鱼投影
         assert.is_false(env.writer:ingest_event('FishCombatState', nil))
         assert.is_true(env.writer:ingest_event('FishCombatState', {
             list = {

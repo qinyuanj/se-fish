@@ -1,4 +1,3 @@
--- #315 新手任务 HUD：任务文本、深色背板与折叠按钮均由 RootView 作用域拥有。
 local MainHudLayout = require("client.MainHudLayout")
 local Modal = require("client.Views.EconomyModal")
 local ViewUtil = require("client.Views.ViewUtil")

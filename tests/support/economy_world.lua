@@ -1,5 +1,3 @@
--- #312 抽奖机、盲盒与地图商店服务端宿主测试双。
--- 只替换引擎、DataStore 与时钟；业务请求全部经 ServerRuntime 上行分发，回包经 RemoteEvent 观察。
 local GameCfg = require("common.GameCfg")
 
 local M = {}

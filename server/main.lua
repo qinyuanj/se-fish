@@ -1,4 +1,3 @@
--- 服务端唯一 Spoke 宿主入口：引擎信号只在这里翻译，玩法生命期由 ServerRuntime 持有。
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 local WorldService = game:GetService("World")
@@ -54,7 +53,6 @@ local function applyDotHit(target, damage, source)
     end
 end
 
--- 属性适配器只在 L1 组合根存在：从 PlayerTree 读取派生值，经 AttrLeaf 单向投影到引擎角色。
 local function attrTree(player)
     if not player or not WorldRuntime then return nil end
     local tree = WorldRuntime:get_player_tree(player.UserId)
@@ -140,7 +138,6 @@ local function bindRE(name, cooldown, handler, requireTable)
     end)
 end
 
--- 服务端 Spoke 运行时主干：装配官方包叶子投影与宿主事件入口。
 WorldRuntime = ServerRuntime.new({
     initial_now = serverNow() or 0,
     remote = _G.REUtil,
@@ -230,7 +227,6 @@ WorldRuntime = ServerRuntime.new({
     create_unit = function(unit_type, props)
         return WorldService:CreateUnit(unit_type, props)
     end,
-    -- #309 官方 AI 叶子：注册/注销只沿 FishTree 公开宿主单向进入包适配层。
     ai = {
         start = function(_, fish_id)
             local host = WorldRuntime and WorldRuntime.fish_host

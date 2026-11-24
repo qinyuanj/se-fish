@@ -1,10 +1,3 @@
--- #310 客户端烧烤视图宿主接缝（ADR-0032 / #292 Testing Decisions）
--- 失败方式先列：
---   1. 收到 cooking 不显示两位小数倍率与已烤秒数，或时钟推进后读数不跟着变；
---   2. 场景气泡不按距离建拆，点击不上行带正整数 seq 的 Start/Takeout/Query，或信物二次确认失效；
---   3. GrillResult 取出/满包/无鱼/烤糊提示缺失，或烤糊重复提示；
---   4. 会话结束、玩家离场或根节点销毁后面板、按钮与监听残留。
--- 接缝：EUI 测试双、ClientStore.grill/position/on_server_event、按钮上行、根节点销毁。不窥探私有 Effect 拓扑。
 
 local GameCfg = require("common.GameCfg")
 local ClientStore = require("client.Store.ClientStore")
@@ -127,18 +120,15 @@ describe("客户端烧烤视图宿主接缝（#310）", function()
     local bubble = child(root, "BtnGrill1")
     assert.is_not_nil(bubble)
 
-    -- 首次投入发送 Start + 正整数 seq
     assert.is_true(Eui.Click(bubble))
     assert.same({ action = "Start", seq = 1 }, sent[#sent])
 
-    -- 收到信物警告后 5 秒内再点自动带 confirm = true
     writer:ingest_event("GrillResult", { ok = false, reason = "token-warn" })
     assert.equals(GameCfg.Grill.TokenWarnText, notices[#notices])
     writer:advance_clock(2)
     assert.is_true(Eui.Click(bubble))
     assert.same({ action = "Start", seq = 2, confirm = true }, sent[#sent])
 
-    -- 烤制中点击关闭仅隐藏面板，再点气泡发 Query 并重新展开
     writer:ingest_event("GrillState", { state = "cooking", itemId = "carp", startedAt = 1002 })
     assert.is_not_nil(child(root, "GrillPanel"))
     assert.is_true(Eui.Click(child(root, "GrillClose")))
@@ -147,7 +137,6 @@ describe("客户端烧烤视图宿主接缝（#310）", function()
     assert.same({ action = "Query", seq = 3 }, sent[#sent])
     assert.is_not_nil(child(root, "GrillPanel"))
 
-    -- GrillResult 取出成功与失败原因提示
     writer:ingest_event("GrillResult", { ok = true, action = "Takeout", itemId = "carp", rate = 1.5 })
     assert.matches("1.50", notices[#notices], 1, true)
     writer:ingest_event("GrillResult", { ok = false, reason = "no-fish" })
@@ -155,7 +144,6 @@ describe("客户端烧烤视图宿主接缝（#310）", function()
     writer:ingest_event("GrillResult", { ok = false, reason = "full" })
     assert.equals(GameCfg.Grill.FullText, notices[#notices])
 
-    -- 离开范围销毁气泡并断开连接
     writer:update_spatial({ x = 50, y = 0, z = 50 }, {})
     assert.is_nil(child(root, "BtnGrill1"))
     assert.equals(0, bubble.OnClicked:Count())

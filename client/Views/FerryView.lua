@@ -1,7 +1,3 @@
--- 客户端摆渡视图（#313 / ADR-0032 §1）：统一挂在 RootView 的 HUD 与 Dock。
--- 六条去程、六条返程按各自锚点与交互半径投影；点击只上行 FerryAction。
--- 倒计时按 routeId 独立以截止时刻计算，仅在活跃倒计时 Phase 内订阅 1Hz 时钟原地刷新文案，零 on_frame 轮询；
--- 所有场景节点、倒计时标签和下行订阅都由所在 Spoke 作用域逆序回收。
 
 local GameCfg = require("common.GameCfg")
 local BodyScale = require("common.BodyScale")
@@ -141,7 +137,6 @@ function FerryView.mount(scope, ctx)
       render_label()
     end)
 
-    -- 仅在存在活跃航班倒计时期间按 1Hz 秒节拍原地刷新文案，零 on_frame、零 60FPS State:set
     ps:subscribe(ctx.clock.on_second, render_label)
   end)
 

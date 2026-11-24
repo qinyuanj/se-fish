@@ -1,8 +1,3 @@
--- 存活相位内的抛竿、上钩、收线与举鱼（ADR-0032 / #302）。
--- 相位按源码顺序嵌套：等待 → 上钩收线 → 举鱼保持。
--- 收线衰减只跟 SpokeClock 的整秒；点击推进受 can_act 门控。
--- 麻痹不退出本相位。离开存活、濒死、死亡或离场时，外层相位逆序清理钓线单位。
--- 鱼上岸后只把举鱼状态交到既有 FishUnit 公开边界，不在这里建 FishTree。
 
 local GameCfg = require("common.GameCfg")
 local FishCatch = require("common.FishCatch")
@@ -216,7 +211,6 @@ function FishingPhase.mount(scope, tree, opts)
       publish(deny)
       return false
     end
-    -- 槽位切换可能尚未经过下一次宿主同步，校验前先投影最新物品栏。
     if tree.sync_from_data then tree:sync_from_data(tree.data) end
     local slot, entry, definition = selected_rod(tree, payload)
     if not entry then
@@ -341,7 +335,6 @@ function FishingPhase.mount(scope, tree, opts)
       publish()
       fire_reel({ action = outcome or "unhooked", session = current_reel.id, progress = current_reel.progress.Progress })
     end
-    -- 进度归零即本次钓鱼结束：钓线随脱钩销毁，玩家回到可再抛的空闲。
     clear_session()
   end
 
@@ -413,7 +406,6 @@ function FishingPhase.mount(scope, tree, opts)
         return true
       end
     end
-    -- 先把整秒衰减落到当前秒，再积分这次点击，避免点击被同一拍的衰减抵消。
     local whole = math.floor(now)
     if (reel.decayedAt or math.floor(reel.progress.Time)) < whole then
       local from = reel.decayedAt or math.floor(reel.progress.Time)
@@ -483,7 +475,6 @@ function FishingPhase.mount(scope, tree, opts)
     if (reel.decayedAt or math.floor(reel.progress.Time)) < whole then
       local from = reel.decayedAt or math.floor(reel.progress.Time)
       reel.decayedAt = whole
-      -- 衰减只落到刚跨过的整秒，秒内余量留给宽限与在途批次。
       local outcome = reel.progress:Advance(from + (whole - from))
       if outcome then
         finish_reel(outcome, true)
@@ -505,7 +496,6 @@ function FishingPhase.mount(scope, tree, opts)
   end
 
   scope:subscribe(tree.clock.on_second, tick)
-  -- 仅在抛竿/收线宽限/短暂举鱼保持的活跃期内按需订阅 on_frame，空闲时零 on_frame 订阅。
   scope:phase("FishingActiveFrame", active_frame, function(fs)
     fs:subscribe(tree.clock.on_frame, tick)
   end)

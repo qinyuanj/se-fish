@@ -1,5 +1,4 @@
 -- #172 出手动作试玩复测（试玩服务端）：给第一个玩家发放并手持 WEAPON（'unarmed' 为空手，'throw' 为投掷鞭炮），
--- 走 ServerRuntime.life:WeaponAction（PlayerWeapon）真实出手入口，0.15 秒后读该动画 track 的 IsPlaying / TimePosition / Length。
 -- 复跑：把 WEAPON 改成要测的一类（unarmed、item134 指虎、item135 匕首、item136 斧头、item137 手枪、item138 霰弹、
 --       item139 冲锋枪、item142 火箭筒、throw）后
 --       editor-cli exec --file tests/probes/zone172_attack_anim_runtime.lua --platform server

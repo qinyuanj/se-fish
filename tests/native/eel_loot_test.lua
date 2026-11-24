@@ -1,4 +1,3 @@
--- #301 迁移：多份掉落可被他人拾取（原 eel_loot_test 的玩法断言）。
 local GameCfg = require("common.GameCfg")
 local ServerRuntime = require("server.World.ServerRuntime")
 local SpokeClock = require("common.SpokeClock")

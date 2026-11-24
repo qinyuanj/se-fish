@@ -169,7 +169,6 @@ function ServerRuntime.new(opts)
     }
   end
 
-  -- 持续效果只沿 PlayerTree 或非玩家实体存储路由，供活鱼技能和官方锚点共用。
   local function player_tree_of(target)
     if not is_object(target) then return nil end
     local ok_uid, uid = pcall(function() return target.UserId end) -- 兼容引擎 userdata 玩家或角色
@@ -428,7 +427,6 @@ function ServerRuntime.new(opts)
     return player_trees[user_id]
   end
 
-  -- 钓鱼、活鱼与宿主规格共用的领域事件入口；不暴露 PlayerTree 内部拓扑。
   function runtime:record_landing(player, event)
     if self:is_leaving(player and player.UserId) then return false, "leaving" end
     local tree = player and player_trees[player.UserId]
@@ -477,7 +475,6 @@ function ServerRuntime.new(opts)
     return leaving_players[user_id] ~= nil
   end
 
-  -- 服务端真机探针与 RE 绑定共用的公开命令入口；不暴露会话内部句柄。
   function runtime:dispatch_interact(actor, payload)
     if self:is_leaving(actor and actor.UserId) then return false end
     if type(payload) == "table" and payload.target == GameCfg.Rescue.Target then
@@ -617,7 +614,6 @@ function ServerRuntime.new(opts)
       end
     end
 
-    -- 支付与待交付恢复属于整个玩家会话，不随 alive 相位中断；抽奖会话则在 alive 内单独挂载。
     local base_actions = base_mounts and base_mounts.actions
     mounts.actions = function(s, pt)
       if type(base_actions) == "function" then base_actions(s, pt) end

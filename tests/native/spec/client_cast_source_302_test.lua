@@ -1,4 +1,3 @@
--- #302 礁石来源可视化宿主接缝：RootView × ClientStore × 世界节点工厂。
 local Eui = require("tests.support.eui_double")
 local ClientStore = require("client.Store.ClientStore")
 local RootView = require("client.Views.RootView")

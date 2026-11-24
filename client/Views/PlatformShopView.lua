@@ -1,4 +1,3 @@
--- 地图商店入口与模态弹窗：商品报价和购买结果全部来自只读 ClientStore。
 local GameCfg = require("common.GameCfg")
 local Modal = require("client.Views.EconomyModal")
 
@@ -42,7 +41,6 @@ function PlatformShopView.modal_spec()
       end
     end
 
-    -- 商品集合来自静态配置，只在模态相位内创建一次；结果变化不重建按钮和监听。
     local definitions = {}
     local page = GameCfg.Platform.Placeholder and GameCfg.Platform.Placeholder.CoinPage
     for _, offer in ipairs(page and page.Offers or {}) do definitions[#definitions + 1] = offer end

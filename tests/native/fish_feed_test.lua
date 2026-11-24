@@ -188,7 +188,7 @@ describe('向钓鱼佬喂食换金币（PlayerFisherman）', function()
     local r = env.cfg.Interact.Fisherman.Radius + env.cfg.Interact.Fisherman.Slack
     env.player.Character.Position = vec(env.anchor.Position.x + r + 0.1, 1, 0)
     assert.is_false(feed())
-    env.player.Character.Position = vec(env.anchor.Position.x + r - 0.1, -50, 0) -- 只看 x/z
+    env.player.Character.Position = vec(env.anchor.Position.x + r - 0.1, -50, 0)
     assert.is_false(feed({ target = 'shopkeeper' }))
     assert.is_false(feed({ action = 'Steal' }))
     assert.is_false(feed({ target = false }))

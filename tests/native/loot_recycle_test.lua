@@ -1,5 +1,3 @@
--- #301 迁移：分区上限与 30 秒回收（原 loot_recycle_test 的玩法断言）。
--- 接缝：每个钓鱼区独立 200 件上限、最早一件闪烁、到期销毁、拾取取消回收。
 local GameCfg = require("common.GameCfg")
 local ServerRuntime = require("server.World.ServerRuntime")
 local SpokeClock = require("common.SpokeClock")

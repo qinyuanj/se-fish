@@ -1,6 +1,3 @@
--- 玩家武器会话（#300 / ADR-0032 §2）：挂在存活相位内的换弹与主动攻击。
--- 近战仍登记一次性挥砍，由既有命中盒消费；枪械、溅射与爆炸只经生命公开入口结算。
--- 本模块不持有生命、队伍或区域状态，宿主注入时钟、物理、玩家列表与效果施加。
 
 local GameCfg = require("common.GameCfg")
 local Number = require("common.Number")
@@ -684,7 +681,6 @@ function PlayerWeapon.mount(scope, tree, opts)
     equipped = equipped_weapon(tree),
   }
 
-  -- 仅在投掷物飞行期间按需订阅 on_frame，空闲时零每帧订阅。
   scope:phase("ThrowFlightPhase", has_flights, function(fs)
     fs:subscribe(tree.clock.on_frame, function()
       step_flights(session, session.now())

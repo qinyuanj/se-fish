@@ -46,7 +46,6 @@ function M.collect(GameCfg)
     for _, point in ipairs((GameCfg.Grill or {}).Points or {}) do
         add('Grill.Points', labelByZoneId[point.ZoneId], point.AnchorName, '-')
     end
-    -- 5. 摆渡锚点（FerryRoute）：去程锚点在出发区，返程锚点在到达区
     local okRoutes, routes = pcall(function() return GameCfg.Ferry.Routes end)
     if okRoutes and routes then
         for index, route in ipairs(routes) do

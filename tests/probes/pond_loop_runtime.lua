@@ -7,14 +7,6 @@
 -- 只走正常业务意图：与客户端事件处理函数同一入口
 --   拾饵   MgrLoot:Pickup(player, id)            （ItemBarAction.Pickup 的处理函数）
 --   选中   data:SelectSlot / data:SelectBait      （ItemBarAction 的同名方法）
---   喂食   ServerRuntime:dispatch_interact {target='fisherman', action='Feed', seq}
---   买竿   ServerRuntime:dispatch_shop {action='Buy', itemId='starterRod', seq}
---   抛竿   CastProbe:Cast / :Reel / :Drop           （CastAction 的处理函数）
---   收线   ReelProbe:Accept {s, n, q}             （ReelInRE）
---   攻击   ServerRuntime.life:WeaponAction        （WeaponAction.attack）
---   摆渡   FerryRoute:Handle {action='Board', routeId, seq}
---   买匕首 ServerRuntime:dispatch_shop {action='Buy', number=25, seq}（钓场商店 Level1 摊位，itemKey item135）
---   装备   data:SelectWeapon('item135')（必要时 data:HoldWeapon），用 Weapon:EquippedWeapon 复核
 --   整理   data:MoveToItemBar / data:MoveSlot(from, index, target, slot)（背包/道具栏满时的合法换格）
 -- 成长：正常击杀卖鱼；空手追鱼失败时可拾免费蚯蚓喂食攒匕首（50），买到并装备后再打电鳗/鳄雀鳝。
 -- 战斗：对电鳗/鳄雀鳝先提示「绕后」站位（鱼身后 ≈range-0.8 米）并暂停；倒地/死亡只等待原地弱复活（免费），
@@ -149,7 +141,6 @@ RT.unreachableLoot = RT.unreachableLoot or {}
 local TAG = RT.tag
 local uid = player.UserId
 
--- #302：只经 ServerRuntime 的公开钓鱼句柄发动作；CastState 下行是唯一会话观察口。
 local REUtil = require('common.REUtil')
 local function fishingFor(target)
     local runtime = ServerRuntime.current and ServerRuntime.current()
@@ -581,7 +572,6 @@ local function validate(data)
     return true
 end
 
--- 抛竿落点预判：与 CastProbe.castLanding 同公式，只用于决定是否提示走位
 local function predictLanding()
     local character = player.Character
     if not character or not character.Position or not character.Rotation then return nil end
@@ -648,7 +638,6 @@ local function myFish()
     return held, live or prey
 end
 
--- 当前武器射程/间隔（与 PlayerWeapon 近战攻击同表）
 local function weaponStats(data)
     local id = Weapon:EquippedWeapon(data)
     local mcfg = id and GameCfg.Ability.MeleeWeapons[id] or GameCfg.Ability.Unarmed

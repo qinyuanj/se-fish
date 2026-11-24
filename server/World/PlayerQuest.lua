@@ -202,8 +202,6 @@ function Mgr:Update()
     for _, queue in pairs(self.Queues) do self:Drain(queue.player) end
 end
 
--- 任务状态在存档就绪后与玩家树同生共死；全局 RE 按信号对象单次绑定并按 UserId O(1) 路由，
--- 事实队列事件驱动即时落账，仅以秒级心跳兜底重试。
 function Mgr.mount(scope, player_tree, opts)
     local player = opts.player
     local session = setmetatable({

@@ -1,5 +1,3 @@
--- 抽奖机场景入口（#312）：订阅只读 ClientStore 空间位置与角色，场景节点与按钮由同一作用域回收。
--- 不在常驻作用域订阅 on_frame，仅在玩家移动或角色变化时增量更新气泡显隐与关闭弹窗。
 local GameCfg = require("common.GameCfg")
 local BodyScale = require("common.BodyScale")
 local Modal = require("client.Views.EconomyModal")

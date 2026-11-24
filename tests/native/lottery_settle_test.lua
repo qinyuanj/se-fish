@@ -1,5 +1,3 @@
--- 抽奖机服务端宿主规格（#312）：真实 ServerRuntime / MgrSave / MgrPlayerData。
--- 仅替换支付、时钟、存档引擎与 RemoteEvents；不加载旧 MgrLottery，也不访问会话私有字段。
 local World = require("tests.support.economy_world")
 
 describe("抽奖机服务端原子结算（#312 ServerRuntime 宿主）", function()

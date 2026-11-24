@@ -1,13 +1,3 @@
--- #302 抛竿、上钩、收线与举鱼：服务端宿主接缝（ADR-0032 / #292 Testing Decisions）
--- 失败方式先列：
---   1. 合法抛竿不消耗一次鱼饵、3 秒前上钩、或 CastState 不是等待再上钩；首领饵不强制对应首领，普通饵不按区表抽取；
---   2. 收线不从 50 起步，SpokeClock 跨整秒不按 5/秒衰减，点击不按 +5 推进；归零不脱钩，到 100 不上岸；
---   3. 180ms 宽限内的在途批次能救回，超过 ZeroAt+GraceSec 的迟到批次仍脱钩；100ms 积分窗口不把宽限叠成 280ms；
---   4. 短暂麻痹拒绝收线点击但不立刻脱钩，麻痹结束后续点仍有效；濒死、死亡、离场逆序断线并销毁钓线单位；
---   5. 进度达成只生成一条举鱼，位置在角色正前方，图鉴与 Land 任务只记一次；脱钩与手动收竿不生成鱼；
---   6. 非法落点、冷却、无饵、已在抛竿、举着鱼时拒绝且不扣饵；脱钩后线还在，收回后才能再抛。
--- 接缝：ServerRuntime 玩家进出、CastAction / ReelInRE / CloseReelIn 上行、SpokeClock 步进、
--- CastState / ReelInRE 下行、角色与单位销毁、PlayerData 饵库存。不窥探私有 Effect 拓扑。
 
 local GameCfg = require("common.GameCfg")
 local ServerRuntime = require("server.World.ServerRuntime")
@@ -139,7 +129,6 @@ describe("抛竿上钩收线举鱼宿主接缝（#302）", function()
     if overrides.position then player.Character.Position = overrides.position end
     data = PlayerData.New(player)
     data:Init()
-    -- 调试基线已发初始竿，快捷栏第二格留给首领饵。
     assert.is_true(data:SelectSlot(1))
     if overrides.bait == "duck" then
       assert.is_true(data:AddItem("duck", overrides.bait_count or 1))
@@ -238,7 +227,6 @@ describe("抛竿上钩收线举鱼宿主接缝（#302）", function()
         end)
       end,
     })
-    -- 世界建单位走 world_service，避免和 create_unit 抢同一回调。
     runtime = runtime_holder.runtime
     runtime._create_unit = runtime.create_unit
     runtime:start()

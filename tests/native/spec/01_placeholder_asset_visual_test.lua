@@ -50,7 +50,6 @@ local function assert_asset(id, where)
   assert.is_truthy(AssetIds[id], where .. ' 指向官方资产表里不存在的资源：' .. tostring(id))
 end
 
--- 世界模型写法与 server/World/FishCarrier.lua 的 resolveMesh 同一条规则。
 local function worldMesh(species)
   return 'official://mesh/' .. tostring(species.Model)
 end

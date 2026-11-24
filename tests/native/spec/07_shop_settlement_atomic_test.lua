@@ -1,5 +1,3 @@
--- 条款 7-17：一次购买在 MgrSave 隔离 draft 内同时完成扣费与发货；失败整体不落账。
--- 接缝：真实 ServerRuntime 玩家生命周期、ShopAction / ShopResult、PlayerData 与 MgrSave。
 local GameCfg = require("common.GameCfg")
 local Host = require("tests.support.shop_feed_host")
 

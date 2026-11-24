@@ -1,5 +1,3 @@
--- #312 客户端模态弹窗宿主接缝（ADR-0032 / #292 Testing Decisions）。
--- 只观察只读仓库投影、按钮上行、互斥切换和根 UI 销毁，不断言 Effect 拓扑。
 local ClientStore = require("client.Store.ClientStore")
 local RootView = require("client.Views.RootView")
 local LotteryView = require("client.Views.LotteryView")

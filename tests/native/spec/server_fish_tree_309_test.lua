@@ -1,12 +1,3 @@
--- #309 独立活鱼树：服务端宿主接缝（ADR-0032 / #292 Testing Decisions）
--- 失败方式先列：
---   1. 举鱼期间持有者放下、濒死、死亡或离场后，鱼仍悬空，不按品级落地；
---   2. 精英未满 180 秒、首领未满 300 秒就消失，或到点仍留在场上；
---   3. 哥斯拉不按 >60%、20%<hp<=60%、<=20% 切换三阶段，或阶段切换后预警/挂点/隔离/载体残留；
---   4. 击杀不经 GroundLoot 公开边界掉鱼获与信物，或仍登记 OwnedUnits；
---   5. 官方 AI 包在活鱼清理后仍保持登记，或单棵活鱼树故障拖垮玩家树与世界树。
--- 接缝：ServerRuntime 的玩家进出、收线交接、SpokeClock 步进、伤害输入、单位创建销毁与地面快照。
--- 不窥探私有 Effect 拓扑。
 
 local GameCfg = require("common.GameCfg")
 local ServerRuntime = require("server.World.ServerRuntime")
@@ -228,7 +219,6 @@ describe("活鱼树宿主接缝（#309）", function()
     runtime:step(1, 1180)
     local left = runtime:fish_snapshot()
     if #left > 0 then
-      -- 与既有战斗规则一致：到点停止攻击并转逃脱；非战斗逃脱则直接离场。
       assert.equals("escape", left[1].phase)
       assert.is_true(runtime:damage_fish(left[1].id, left[1].maxHealth))
     end

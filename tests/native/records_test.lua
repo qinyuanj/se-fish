@@ -9,7 +9,6 @@
 --   6. 延迟重试把过期候选盖到更新的纪录上；写频随上岸次数线性增长。
 --   7. 平台字符串身份被拒收，读回丢失类型或混合历史数字身份时决胜报错；
 --   8. 不同字符串玩家的查询序号/存档串扰，客户端伪造身份或重量污染权威纪录。
--- seam：common/Records 纯逻辑；原子平台接口由 server_progress_315_test 的公开宿主覆盖。
 -- 迁移说明：三个旧类按 LuaUnit 实际执行序（类名字典序 Core → Integration → Service，
 --   类内方法字典序）注册为三个 describe / 逐个 it；lu.assertNotEquals 是深不等，映射为 assert.are_not.same。
 local GameCfg = require("common.GameCfg")

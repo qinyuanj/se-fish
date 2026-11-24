@@ -203,7 +203,6 @@ describe("Spoke 主 HUD 左上状态区与金币视图（#297-B2）", function()
   end)
 
   it("分辨率读取兼容非 1080p 与代理 FindFirstChild，非法分辨率安全回退 1920x1080", function()
-    -- 1) 手机 886 分辨率经 services.get_device_resolution 正确读取，callable 代理对象作为 FindFirstChild 也能命中预置金币节点
     local store, writer = ClientStore.new({ initial_now = 10 })
     local image_coin = Eui.Node({ Name = "ImageCoin" })
     local label_coin = Eui.Node({ Name = "LabelCoin" })
@@ -239,7 +238,6 @@ describe("Spoke 主 HUD 左上状态区与金币视图（#297-B2）", function()
     assert.equals("77", label_coin.Text)
     view:dispose()
 
-    -- 2) 非法 NaN/0 分辨率安全回退 1920x1080
     local nodes_fb = {}
     local view_fb = RootView.mount(Eui.Node({ Name = "FallbackRoot" }), store, {
       services = {

@@ -757,20 +757,17 @@ describe("客户端 Spoke 主干契约（#296）", function()
         assert.is_not_nil(mounted_view)
         assert.is_not_nil(mounted_options)
         assert.is_nil(mounted_view.root.fault, tostring(mounted_view.root.fault))
-        -- 合并后的 modals 包含全部 9 个弹窗，无同名键覆写
         for _, modal_id in ipairs({
           "shop", "fisherman", "confirm", "lottery", "blindbox", "platform", "compendium", "story", "gm",
         }) do
           assert.is_function(mounted_options.modals[modal_id], "缺少模态弹窗挂载: " .. modal_id)
         end
-        -- 两类场景节点辅助分离并存，send_grill 缺 seq 自动补正整数 seq
         assert.is_function(mounted_options.services.create_scene_node_at)
         assert.is_function(mounted_options.services.create_anchor_scene_node)
         assert.is_function(mounted_options.services.set_overlay)
         mounted_options.services.send_grill({ action = "Takeout" })
         assert.equals("Takeout", fired.GrillAction[1].action)
         assert.is_true(type(fired.GrillAction[1].seq) == "number" and fired.GrillAction[1].seq >= 1)
-        -- 瞄准拾取蒙版接通真实 on_pick 与自动关闭
         remote_events.LootState.OnClientEvent:Fire({ list = { { id = "loot-near", x = 12, y = 2, z = 8 } } })
         mounted_options.services.set_overlay("aim_pickup", true)
         local aim_mask = ui_root:FindFirstChild("AimPickupMask", true)

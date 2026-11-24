@@ -1,4 +1,3 @@
--- #301 迁移：丢弃与拾取的可观察结果。两段预留已并入单批 try_drop。
 local GameCfg = require("common.GameCfg")
 local ServerRuntime = require("server.World.ServerRuntime")
 local SpokeClock = require("common.SpokeClock")

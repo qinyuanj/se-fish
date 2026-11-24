@@ -1,5 +1,3 @@
--- #311 测试侧服务端宿主：只提供玩家生命周期、RE、时钟、持久化替身和队列驱动。
--- 业务断言必须留在各测试套件；本模块不实现购买、喂食、兑换或抢救规则。
 local GameCfg = require("common.GameCfg")
 local ServerRuntime = require("server.World.ServerRuntime")
 local SpokeClock = require("common.SpokeClock")

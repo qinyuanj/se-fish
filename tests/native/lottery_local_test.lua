@@ -1,4 +1,3 @@
--- 抽奖机场景入口规格（#312）：RootView + LotteryInteraction + EUI/场景测试双。
 local GameCfg = require("common.GameCfg")
 local ClientWorld = require("tests.support.economy_client")
 

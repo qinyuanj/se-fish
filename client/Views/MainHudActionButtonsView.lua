@@ -179,7 +179,6 @@ local function default_is_reel_active(cast)
 end
 
 local function default_on_reel_click(_session_id)
-  -- L1 入口通过 options.on_reel_click 注入 ReelOverlayView 控制器。
 end
 
 --- 挂载右侧动作键（ItemDiscard 与 ItemAction2）。

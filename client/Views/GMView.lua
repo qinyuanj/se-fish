@@ -1,4 +1,3 @@
--- #315 GM 模态：保留旧调试操作，所有按钮只提交 GMAction 意图。
 local GameCfg = require("common.GameCfg")
 local Modal = require("client.Views.EconomyModal")
 local GMView = {}

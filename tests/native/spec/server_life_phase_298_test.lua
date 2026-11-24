@@ -1,18 +1,3 @@
--- #298 玩家生命双层相位：服务端宿主接缝（ADR-0032 §2 / #292 Testing Decisions）
--- 失败方式先列：
---   1. alive 期间 SpokeClock 跨过整秒不扣饥饿，或同一秒内多次 step 重复扣；饥饿归零后不按 5/秒扣血；进入濒死/死亡/离场后仍继续扣饥饿或扣血；
---   2. 道具栏或背包任意格持有 item126 且 count>0 时不按 1/秒扣血（不要求选中），或移除后仍继续扣；
---   3. 致命伤害不锁 1 血进入 downed，或濒死/死亡仍能被扣血；同一击可重复命中；安全区/同队过滤失效；
---   4. downed 15 秒不到就进 dead，到点不进；dead 30 秒不到就虚弱复活，到点不按 10% 血与至少 10% 饥饿复活并施加 60 秒半速；
---   5. 广告/金豆满血复活期间倒计时不暂停，取消/失败/超时后不从剩余秒数继续；downed 发起金豆被接受；
---   6. 0.5 秒麻痹仍允许主动攻击/投掷/收线点击/使用物品，或麻痹退出 alive、拆掉挂在存活相位上的持续会话；
---   7. 抢救不要求目标 downed、2 米内、施救者 alive；读条中移动超 1 米、施救者受击或倒地不打断；成功不恢复成长上限 10%；
---      抢救期间濒死先到期先广播 downed 再广播 dead；
---   8. 能吃无恢复百分比的物品、非 can_act 仍能吃；负百分比不同时扣饥饿并按 floor(MaxHealth * -percent / 100) 扣血；
---   9. session_alive 置假时不写出濒死（含 rescuing）/死亡/虚弱剩余秒数（向上取整、下界 0）；
---      重登 dying/dead 不走 survival:recover 后一次虚弱复活，或重复复活；仅 weakRemaining 时不按剩余秒数（上限 60）恢复；
---  10. SurvivalPhase 不写入 player attribute；SurvivalState / SurvivalResult / SurvivalAction 载荷与权限不符合现有契约。
--- 接缝：只经 ServerRuntime 玩家进出、RemoteEvent 上行、SpokeClock 步进、存档读写与下行载荷观察，不窥探私有 Effect 拓扑。
 
 local GameCfg = require("common.GameCfg")
 local ServerRuntime = require("server.World.ServerRuntime")

@@ -1,8 +1,3 @@
--- 钓鱼区去程与返程摆渡航线（#313 / ADR-0032 §1、§3）。
--- 六条 FerryRouteEpoch 分别挂在出发钓鱼区的 ferry_routes Dock 下，倒计时只由 SpokeClock 推进。
--- 交票在 MgrSave 单操作落账后，于同一 SpokeRuntime.batch 同步库存并开启航班；范围内玩家免费同行。
--- 返程按人扣金币并立即传送；传送失败或中断通过恢复记录持久退款，不做内存裸补偿。
--- 传送前只经 PlayerTree.suspend_special_item 公开边界解除飞行、变身和重力接管。
 
 local GameCfg = require("common.GameCfg")
 local spoke = require("common.packages.spoke.api")

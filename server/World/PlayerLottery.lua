@@ -1,6 +1,3 @@
--- 抽奖机单玩家活跃会话（#312 / ADR-0032）。
--- 投注资格与范围先校验，MgrSave 隔离 draft 内一次完成消耗和金币/物品/武器大奖；
--- 写确认后由 PlayerTree 单批投影库存与金币，会话随 alive 相位和离场销毁。
 local GameCfg = require("common.GameCfg")
 local Eligibility = require("common.LotteryEligibility")
 local Draw = require("common.LotteryDraw")

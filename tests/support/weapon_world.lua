@@ -1,10 +1,4 @@
--- #320 武器系统的服务端权威世界：挂载真实 server/World/PlayerWeapon.lua，
--- 树面按 PlayerTree 对武器会话的最小等价投影给出（SpokeTree 作用域 + SpokeClock + 真实 PlayerData
--- + AttrModel 武器伤害倍率），用例只经公开 handle / guard 与时钟推进驱动。
--- 原旧单例 MgrWeapon 的整份测试拷贝已随 #320 删除。
 --
--- 只替引擎与宿主边界：射线、RemoteEvent、单位创建、动画、鱼群生成与持续效果应用口；
--- 玩家离场用作用域销毁表示（与 ServerRuntime 的 PlayerTree dispose 同一条清理路径）。
 local GameCfg = require('common.GameCfg')
 local SpokeClock = require('common.SpokeClock')
 local spoke = require('common.packages.spoke.api')
@@ -51,7 +45,6 @@ function M:setUp()
     ctx.sessions, ctx.players = {}, {}
     ctx.save = ctx.opts.save
 
-    -- 回复通道：PlayerWeapon 经 opts.remote 的 WeaponResult 回执
     ctx.remote = {
         GetRE = function(_, name)
             return { FireClient = function(_, player, payload)
@@ -59,14 +52,12 @@ function M:setUp()
             end }
         end,
     }
-    -- 施法口：近战出手仍经技能包 CastAbility
     ctx.ability = {
         CastAbility = function(unit, index)
             ctx.casts[#ctx.casts + 1] = { unit = unit, index = index }
             return true
         end,
     }
-    -- 生产先按方法调用、未命中时再按模块函数补一次；两种形状都记录同一份射线
     ctx.physics = { Raycast = function(...)
         local origin, direction
         if select('#', ...) >= 4 then
@@ -97,7 +88,6 @@ function M:setUp()
             return unit
         end,
     }
-    -- 爆炸保底鱼：真实 FishTree 会把鱼登记进共享表，爆炸结算因此能看到刚生成的鱼
     ctx.fish_unit = {
         Fish = {},
         SpawnBlastFish = function(_, fishId, mult, pos, owner)

@@ -1,10 +1,3 @@
--- #300 客户端攻击与瞄准投影：客户端宿主接缝（ADR-0032 / #292 Testing Decisions）
--- 失败方式先列：
---   1. 持武器且 HUD 可见时不出现攻击键，或空手/关 HUD 仍可点击；
---   2. 点击不上行带相机瞄准的 WeaponAction；按住连发/长按换弹未走注入 SpokeClock；
---   3. WeaponResult 失败不投影玩家可读提示；DamageNotice 不投影伤害数字；
---   4. 角色死亡、HUD 关闭或根节点销毁后攻击键、提示与飘字节点及点击连接零残留。
--- 接缝：EUI 测试双、ClientStore 下行、SpokeClock 推进、按钮上行、根节点销毁。不窥探私有 Effect 拓扑。
 
 local GameCfg = require("common.GameCfg")
 local ClientStore = require("client.Store.ClientStore")
@@ -133,7 +126,6 @@ describe("客户端攻击与瞄准投影宿主接缝（#300）", function()
     local sent, notices = {}, {}
     local root = mount(store, sent, notices, { with_touch = true })
 
-    -- 自动武器按住连发，松开停止
     writer:ingest_event("ItemBarState", {
       weapons = { item139 = 1 },
       held = { kind = "weapon", id = "item139" },
@@ -151,7 +143,6 @@ describe("客户端攻击与瞄准投影宿主接缝（#300）", function()
     writer:advance_clock(1.0)
     assert.equals(2, #sent)
 
-    -- 非自动枪械长按松开触发换弹
     writer:ingest_event("ItemBarState", {
       weapons = { item137 = 1 },
       held = { kind = "weapon", id = "item137" },

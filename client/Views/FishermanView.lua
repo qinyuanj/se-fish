@@ -1,6 +1,3 @@
--- 钓鱼佬与确认弹窗统一视图（#311）。
--- 气泡按本地位置增量建拆；对话、确认与商店共用 RootView 的互斥模态相位；
--- 喂食脉冲动画挂在短寿命 Phase，非队友抢救逻辑委托 RescueView 共享模块。
 local GameCfg = require("common.GameCfg")
 local BodyScale = require("common.BodyScale")
 local Dialogue = require("common.NpcDialogue")
@@ -170,7 +167,6 @@ function FishermanView.presentation_spec(options)
         pulse_active:set(true)
       end)
 
-      -- 仅在喂食缩放脉冲动画期间（20 帧短寿命相位）订阅 on_frame，播完自动退订
       scope:phase("FishermanPulsePhase", pulse_active, function(ps)
         ps:subscribe(ctx.clock.on_frame, function()
           local left = shared.pulse_left or 0

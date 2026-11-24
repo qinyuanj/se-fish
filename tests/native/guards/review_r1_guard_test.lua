@@ -1,4 +1,3 @@
--- 集成分支 R1 结构硬项守卫；行为仍由公开宿主规格测试证明。
 local Arch = require("tools.arch_policy")
 local fs = require("tests.support.fs_fixture")
 

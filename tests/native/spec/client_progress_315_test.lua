@@ -1,5 +1,3 @@
--- #315 客户端图鉴/纪录、任务、剧情、消息与 GM 宿主接缝（ADR-0032 / #292 Testing Decisions）。
--- 只驱动下行仓库、UI 点击和根 UI 销毁，不读取私有 Effect 拓扑。
 local GameCfg = require("common.GameCfg")
 local ClientStore = require("client.Store.ClientStore")
 local RootView = require("client.Views.RootView")

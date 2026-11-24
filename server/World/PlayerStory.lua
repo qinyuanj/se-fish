@@ -188,8 +188,6 @@ function Mgr:OnPlayerRemoving(player)
     end
 end
 
--- 剧情服务与已读请求均挂在玩家树作用域；全局信号按对象单次绑定并按 UserId O(1) 路由，
--- 仅用秒级心跳检查启动超时与失败重试。
 function Mgr.mount(scope, player_tree, opts)
     local player = opts.player
     local session = setmetatable({

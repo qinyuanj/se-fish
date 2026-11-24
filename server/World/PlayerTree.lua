@@ -533,8 +533,6 @@ function PlayerTree.spawn(opts)
       end)
 
       docks.save_inventory = s1:dock("SaveInventoryDock")
-      -- #315：图鉴、任务、剧情、成就与 GM 都属于存档就绪后的单玩家会话。
-      -- 完整服务端宿主在入口显式初始化 REUtil；独立 PlayerTree 宿主不隐式创建远程连接。
       if opts.save and opts.player_data and _G.REUtil then
         local session_opts = {
           player = player, clock = clock, save = opts.save, player_data = opts.player_data,
@@ -596,7 +594,6 @@ function PlayerTree.spawn(opts)
       end)
 
       -- 外层存活相位：仅跟随 is_alive，麻痹不退出此相位。
-      -- 风神之翼 / 哥斯拉子相位挂在这里：切槽仍在存活内调和，濒死、死亡与离场随相位拆卸。
       s3:phase("AlivePhase", memos.is_alive, function(ps)
         mount_phase_dock(ps, phase_slots.alive, "alive")
         SpecialItemPhase.mount(ps, handle, {
@@ -606,7 +603,6 @@ function PlayerTree.spawn(opts)
           fish_units = opts.fish_units,
           fish_carrier = opts.fish_carrier,
         })
-        -- 抛竿、上钩、收线、举鱼嵌在存活内：麻痹不卸载，濒死、死亡与离场随相位逆序拆线。
         handle.fishing = FishingPhase.mount(ps, handle, {
           remote = opts.remote,
           world = opts.world_service,
@@ -899,7 +895,6 @@ function PlayerTree.spawn(opts)
     local upgrades = type(growth.upgrades) == "table" and growth.upgrades or {}
     local cds = type(extra.cooldowns) == "table" and extra.cooldowns or {}
 
-    -- 先完成所有数据预处理与引擎属性读取，再进入批量状态写入。
     local next_coin = d.FishCoin or 0
     local next_zone = d.Zone or states.zone_id:now()
     local next_upgrade = d.UpgradeLevel or 0
@@ -1077,7 +1072,6 @@ function PlayerTree.spawn(opts)
     handle._pending_leave_finalizers = nil
   end
 
-  -- 存档在 spawn 前就写好的选中饵、道具栏要进树，否则存活相位读到的是空库存。
   handle:sync_from_data(data)
 
   return handle

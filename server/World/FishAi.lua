@@ -1,7 +1,5 @@
 local AiAPI = require('server.packages.official_ai_feature.api')
 
--- 官方 AI 只是 FishTree 树底的单向输出叶子。
--- 仇恨、阶段、暂停和命令缓存都属于 fish.AiLeaf（由 FishTree 拥有），本模块不读取官方运行时。
 local Mgr = { AiAPI = AiAPI }
 
 local function leaf(fish)
@@ -65,7 +63,6 @@ function Mgr:Command(fish, mode, target, direction, speed, distance, range)
     if state.Mode == mode and state.Target == target and state.Direction == direction
         and state.Speed == speed and state.Distance == distance and state.Range == range
         and carrier.AiOwnsMovement then
-        -- FishTree 每帧更新自己的移动真源：到距后目标再次远离才恢复，不读取官方运行时任务。
         local resume = mode == 'chase' and state.LastDistance ~= nil and distance ~= nil
             and state.LastDistance <= distance and current_distance ~= nil and current_distance > distance
         if not resume then

@@ -12,7 +12,6 @@ local FishBehaviors = require('server.FishBehaviors')
 local spoke = require('common.packages.spoke.api')
 local SpokeTree, Effect, State = spoke.SpokeTree, spoke.Effect, spoke.State
 
--- #309 L2 不反向依赖 L1：叼人挂点由入口注入 server.AbilityAPI。
 local function abilityApi(self)
     return self.AbilityApi
 end
@@ -110,7 +109,6 @@ end
 
 function Mgr:FrameClock()
     if not self.Clock then
-        -- 直接宿主仍可泵一个共享 Trigger；每条鱼由自己的 Auto 树订阅，Update 不再逐鱼调度。
         self.Clock = { on_frame = spoke.Trigger.new('FishHostFrame') }
     end
     return self.Clock
@@ -681,7 +679,6 @@ function Mgr:WallAhead(fish, pos)
 end
 
 function Mgr:UpdateEscaping(fish, now)
-    -- 战斗超时会先转 StraightEscape，由入水清理；这里只处理落地/飞行回落的期限。
     if fish.FleeAt and now >= fish.FleeAt and not fish.StraightEscape then
         self:Remove(fish)
         return
@@ -2385,7 +2382,6 @@ function Mgr:OnDied(player)
             if current.Move and current.Move.Target == player then self:EndMove(current, 'gone') end
         end
     end
-    -- 持鱼释放由 LiftedPhase 只读观察 PlayerTree.memos.is_alive，不由玩家回调命令式驱动。
     if self.Cast and self.Cast.Abort then self.Cast:Abort(player) end
 end
 
@@ -2493,7 +2489,6 @@ function Mgr:AiControlled(fish, now)
 end
 
 function Mgr:Update()
-    -- 只泵宿主帧事件；各 FishTree 的 Trigger 订阅按树隔离执行，本函数不遍历或推进单鱼。
     self:FrameClock().on_frame:invoke({ dt = 0, now = self:Now() })
     self:EnforceEscapeCap(nil)
 end
@@ -2512,7 +2507,7 @@ function Mgr:DamageFish(fish, amount)
   if health < 0 then health = 0 end
   carrier.Health = health
   if carrier.Controller then
-    pcall(function() carrier.Controller.Health = health end) -- 同步受击体控制器血量
+    pcall(function() carrier.Controller.Health = health end)
   end
   if health <= 0 then
     self:OnCarrierDied(carrier)

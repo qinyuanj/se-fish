@@ -1,5 +1,3 @@
--- #311 商店 UI：只通过统一视图树、Store 写侧、按钮点击与远端回执观察。
--- 旧 ScreenShop 私有 View、颜色、底图和内部注册表不再作为测试接缝。
 local GameCfg = require("common.GameCfg")
 local ClientStore = require("client.Store.ClientStore")
 local RootView = require("client.Views.RootView")

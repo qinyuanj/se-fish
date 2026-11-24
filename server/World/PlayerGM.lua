@@ -10,7 +10,6 @@ local function syncTarget(self, target, data)
     local hasLiveTree = tree ~= nil and tree.player == target and not tree:is_disposed()
     if self.PlayerData and type(self.PlayerData.SendItemBar) == 'function' then
         local synced = self.PlayerData:SendItemBar(target, true)
-        -- 宿主 PlayerData 未挂载 Runtime（例如独立测试替身）时，直接同步活跃 PlayerTree。
         if hasLiveTree and not self.PlayerData.Runtime and type(tree.sync_from_data) == 'function' then
             tree:sync_from_data(data, { force_push = true })
         end
@@ -162,8 +161,6 @@ function Mgr:Handle(player, payload)
     return ok
 end
 
--- 入口只配置一次公开 GM 服务；全局 RE 按信号对象单次绑定并按 UserId O(1) 路由，
--- 攻击加成与活跃树引用随对应玩家树清理。
 function Mgr.configure(opts)
     Mgr.PlayerData, Mgr.Save, Mgr.Cast, Mgr.Vitals = opts.player_data, opts.save, opts.cast, opts.vitals
 end

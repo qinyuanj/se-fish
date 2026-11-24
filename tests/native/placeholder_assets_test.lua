@@ -47,6 +47,4 @@ describe("TestPlaceholderAssets", function()
     for id, fish in pairs(GameCfg.Fish) do assert.is_not_nil(fish.VisualColor, id) end
   end)
 
-  -- 特殊道具占位模型的失败清理与恢复已迁到存活相位宿主接缝
-  -- tests/native/spec/server_special_item_299_test.lua。
 end)

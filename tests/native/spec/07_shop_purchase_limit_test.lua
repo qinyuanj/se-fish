@@ -1,5 +1,3 @@
--- 条款 7-11：限购商品第二次拒绝且不扣款；上限 0 表示不限购。
--- 接缝：真实 ServerRuntime 玩家生命周期、ShopAction / ShopResult、PlayerData 与 MgrSave。
 local GameCfg = require("common.GameCfg")
 local Host = require("tests.support.shop_feed_host")
 

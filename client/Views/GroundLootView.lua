@@ -1,6 +1,3 @@
--- 地面物品气泡与瞄准拾取蒙版（ADR-0032 / #301，归属 L2 client.Views）。
--- 订阅只读 ClientStore 的地面快照与本地位置：范围内才建气泡，离开、消失或根销毁时由视图树拆干净。
--- 瞄准拾取开关与蒙版挂在 RootView 常驻 HUD / 覆盖相位上，退出瞄准或销毁根后零残留。
 
 local BodyScale = require("common.BodyScale")
 local GameCfg = require("common.GameCfg")

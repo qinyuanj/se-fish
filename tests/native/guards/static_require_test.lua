@@ -1,6 +1,4 @@
--- AbilityAPI.AttachAnchor 的按名加载入口使用登记表 + 字面量 require，
 -- 架构图扫描器才能解析出依赖。失败方式先列：
---   1. 新增锚点行为文件却没登记 → 按名加载时报"未登记"；
 --   2. GameCfg 新配的锚点行为没登记 → 挂接时报"锚点行为模块不可用"；
 --   3. 登记的模块文件被删或包升级改名 → 运行时 require 失败；
 --   4. 登记键与模块文件名不一致 → 按名加载到别的模块；
@@ -147,7 +145,6 @@ describe("字面量 require 的包内模块", function()
     assert.is_true(file_exists(path), path .. " 不存在（AbilityAPI 按字面量 require 它）")
   end)
 end)
--- L1 宿主在唯一组合根显式注入；ServerRuntime 不再依赖旧管理器表。
 local function discover_server_hosts()
   local hosts = {}
   for _, file in ipairs(fs.list_dir("server")) do

@@ -1,5 +1,3 @@
--- 活鱼血条、战斗标签与预警贴花（ADR-0032 / #309，归属 L2 client.Views）。
--- 只订阅 ClientStore 的 FishCombatState 投影。鱼消失、预警撤销或根销毁时由视图树拆干净。
 
 local FishCombatView = {}
 

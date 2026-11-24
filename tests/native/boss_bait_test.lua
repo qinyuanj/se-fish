@@ -1,4 +1,3 @@
--- 首领饵与鱼饵选择：#302 宿主接缝迁移。
 local GameCfg = require("common.GameCfg")
 local Host = require("tests.support.fishing_host")
 

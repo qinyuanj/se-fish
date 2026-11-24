@@ -1,6 +1,3 @@
--- 小队 HUD 与队友抢救气泡（ADR-0032 / #314）。
--- HUD/邀请/队友行/场景节点全部由 RootView 作用域托管；成员行与气泡使用 Dock 键控复用。
--- 抢救逻辑委托 RescueView 共享模块，复用 #298 的 InteractAction / GameCfg.Rescue。
 
 local GameCfg = require("common.GameCfg")
 local ViewUtil = require("client.Views.ViewUtil")

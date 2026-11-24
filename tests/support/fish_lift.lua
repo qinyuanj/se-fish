@@ -84,7 +84,6 @@ function M:setUp()
     }
     package.loaded['server.World.FishTree'] = nil
     self.mgr = assert(loadfile('server/World/FishTree.lua'))()
-    -- 直接 FishTree 宿主也提供公开 PlayerTree 读模型，跨树释放不走生产回退。
     self.holder_trees = {}
     self.mgr.GetPlayerTree = function(_, player)
         return player and self.holder_trees[player.UserId] or nil

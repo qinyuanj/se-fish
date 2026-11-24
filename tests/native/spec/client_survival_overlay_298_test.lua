@@ -1,11 +1,3 @@
--- #298 客户端生存蒙版宿主接缝（ADR-0032 / #292 Testing Decisions）
--- 失败方式先列：
---   1. SurvivalState 下行后蒙版节点名、显隐矩阵与文案不符合旧 ScreenSurvival 契约；
---   2. 按钮点击不上行 SurvivalAction（UseAdrenaline / FullRevive ad|goods，seq 递增）；
---   3. platformPending 期间标题改为平台等待文案且按钮隐藏；倒计时随时钟整秒向上取整；
---   4. 首次进入 dead 弹一次呼救文案；虚弱剩余秒数归零后自动拆 Phase 销毁 SurvivalWeak；
---   5. 退出蒙版、重连重置或根节点销毁后子节点与点击连接零残留。
--- 接缝：EUI 测试双 + ClientStore 下行事件 + 按钮上行 + 根节点销毁，不窥探私有 Effect 拓扑。
 
 local GameCfg = require("common.GameCfg")
 local ClientStore = require("client.Store.ClientStore")

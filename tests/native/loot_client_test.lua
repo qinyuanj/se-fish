@@ -1,4 +1,3 @@
--- #301 迁移：地面气泡的距离、点击与消失。
 local Eui = require("tests.support.eui_double")
 local ClientStore = require("client.Store.ClientStore")
 local RootView = require("client.Views.RootView")

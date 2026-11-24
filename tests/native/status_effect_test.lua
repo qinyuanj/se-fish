@@ -10,7 +10,6 @@
 --   server.AbilityAPI 与技能包 server.packages.ability_system.api（加载即注册事件，不可载真包）；
 --   Vitals/PlayerData/Survival 以假实现注入（与 main.lua 的接线同形状）。
 -- 旧 setUp/tearDown 逐例映射为 before_each/after_each：替换的全局（game / Vector3）、模块缓存
--- （server.AbilityAPI、技能包 api、server.FishAbility、common.REUtil）在 after_each 恢复，对未完成的
 -- before_each 幂等。describe/it 名沿用旧类名与方法名，案例顺序沿用旧 LuaUnit 的字典序执行序。
 local GameCfg = require('common.GameCfg')
 

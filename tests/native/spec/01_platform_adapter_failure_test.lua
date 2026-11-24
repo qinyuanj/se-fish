@@ -1,8 +1,5 @@
 -- 条款 1-12（docs/acceptance/01-overview-and-scope.md）：适配层的失败路径可走通：
 -- 平台拒绝或超时后给出明确提示，且不扣费、不发放。
--- 只走业务入口：PlatformHost（商品购买与激励广告）、PlayerDataHost（玩家数据）与 SaveHost（持久操作）
--- 按 server/main.lua 的组合根注入同一份协作关系；引擎边界（CommodityService / AdvertisementService / World 时钟 / DataStore / RE）
--- 全部替身。**不执行 main.lua 本体**：它一开头就要完整引擎服务，所以这里按组合根接线装配，
 -- 再读 main.lua 的源码核对那三条接线确实存在（见 WIRING）——接线一改，本文件先红，逼人复核断言。
 -- 只断言玩家可观察的结果：PlatformResult 回包载荷（客户端据此显示提示）与玩家数据快照（金币、库存件数）。
 -- 失败方式（先列后写）：

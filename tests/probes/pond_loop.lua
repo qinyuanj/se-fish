@@ -19,7 +19,6 @@
 --  11. 攒匕首钱存在经济阻塞（某些自然抽样下永远攒不够），或跳过匕首直接空手挑战电鳗（没验证武器成长）。
 --
 -- 模拟边界（逐条标注在输出里）：
---   * 业务模块用真实代码：MgrSave / MgrPlayerData / ServerRuntime / PlayerShop / PlayerFisherman（经济与兑换）、
 --     MgrLoot:Give / OnCarrierDied（拾取发放与掉落）、MgrFishUnit（电鳗 / 鳄雀鳝战斗状态机）、
 --     FishCatch（抽鱼与倍率）、LotteryEligibility（极品资格）。
 --   * 引擎边界是假的：场景锚点、物理射线、技能施放（CastFish 只计数）、玩家命中（按武器间隔扣载体血量）。
@@ -71,8 +70,6 @@ local function makeRng(seed)
 end
 local rng = makeRng(SIM.Seed)
 
--- ===== 经济环境：与原生行为测试共用真实 ServerRuntime 宿主 =====
--- 本探针不验证走位，沿用旧假场景的共址锚点；时钟与步行耗时仍是模拟值。
 local oldDebug = GameCfg.Debug
 local Host = require('tests.support.shop_feed_host')
 local positions = {}
@@ -85,7 +82,6 @@ local economyGame = _G.game
 local save, players = host.save, host.player_data
 local function drain() host:drain() end
 
--- 掉落与拾取发放：地面公开边界。探针不挂载世界，只保留空记录。
 local loot = { Loots = {}, Pickup = function() return false end, Give = function() return false end, OnCarrierDied = function() end }
 
 local player, data = host:join(13401, GameCfg.Interact.Fishermen[1].AnchorNames[1])
@@ -289,7 +285,6 @@ local function castOnce()
     local slot = ensureBar('duck')
     local fishId
     if slot then
-        -- 首领饵：抛竿一刻从道具栏扣 1 只（等价于 FishingPhase 扣首领饵；背包里的先按 MoveSlot 挪回道具栏）
         data:UpdateData(function(d) d.Containers[ITEM_BAR][slot] = nil end, true)
         fishId = GameCfg.Casting.BossBait.duck
     else

@@ -1,6 +1,3 @@
--- 烧烤场景气泡、进度与取出投影（#310）：订阅只读 GrillState、GrillResult 与时钟。
--- 场景气泡负责投入触发与信物二次确认；烤制中显示两位小数倍率，按帧原地刷新文案不重建 Effect；
--- 所有上行 GrillAction 统一携带正整数递增 seq。会话结束或根节点销毁由视图树清掉节点与连接。
 
 local BodyScale = require("common.BodyScale")
 local GameCfg = require("common.GameCfg")
@@ -170,7 +167,6 @@ function GrillView.mount(scope, ctx, options)
       render_progress(snapshot)
     end)
 
-    -- 仅在短寿命 GrillPanelPhase 活跃期内按帧原地刷新文案，不写 State、不重建 Effect
     ps:subscribe(ctx.clock.on_frame, function()
       local snapshot = ctx.store.grill:now()
       if type(snapshot) ~= "table" or snapshot.rate ~= nil then

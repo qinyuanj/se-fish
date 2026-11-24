@@ -1,6 +1,3 @@
--- 客户端视图层共享轻量工具（ADR-0032，归属 L2 client.Views）：
--- 统一设备分辨率读取、UTF-8 文本折行、引擎 table/userdata 坐标兼容与场景节点创建，
--- 避免在各 View 中重复实现或隐式访问 _G。
 
 local Number = require("common.Number")
 

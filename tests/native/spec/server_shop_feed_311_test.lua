@@ -1,6 +1,3 @@
--- #311 钓场商店与钓鱼佬宿主接缝（ADR-0031、ADR-0032 / #292 Testing Decisions）。
--- 只经 ServerRuntime 玩家进出、ShopAction / InteractAction 上行、持久化测试双与下行快照观察。
--- 不断言会话内部 Effect、State 或 Dock 拓扑。
 
 local GameCfg = require("common.GameCfg")
 local ServerRuntime = require("server.World.ServerRuntime")

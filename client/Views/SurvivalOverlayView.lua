@@ -1,5 +1,3 @@
--- 客户端生存覆盖蒙版（ADR-0032 / #298，归属 L2 client.Views）。
--- 节点名、显隐矩阵与文案沿用旧 ScreenSurvival 契约，节点由 RootView 作用域建拆。
 
 local GameCfg = require("common.GameCfg")
 local spoke = require("common.packages.spoke.api")

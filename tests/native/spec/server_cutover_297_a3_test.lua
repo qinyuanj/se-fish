@@ -551,13 +551,11 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
       -- 存档就绪首推经 PlayerTree 树底 on_item_bar_state 严格下发 1 次（无双发）
       assert.equals(1, #item_bar_pushes)
       assert.are.equal(p, item_bar_pushes[1].player)
-      -- 默认启用 #301 固定鱼饵点，且 ItemBarAction 单一监听不双触发、PlatformHost.ShopAction 已绑定
       local bait_unit_count = #created_units
       assert.equals(#GameCfg.BaitSpots.Spots, bait_unit_count)
       assert.equals(1, #re_map.ItemBarAction.OnServerEvent.handlers)
       assert.is_function(runtime.platform.ShopAction)
 
-      -- 经 ItemBarAction 选中鱼竿 -> PlayerDataHost 同步 -> 树底合并推送（仅 +1 次，无双发）与 HeldRodLeaf 建点
       re_map.ItemBarAction.OnServerEvent:Fire(p, { action = "SelectSlot", value = 1 })
       assert.equals(2, #item_bar_pushes)
       assert.equals(1, item_bar_pushes[2].payload.selectedSlot)
@@ -572,7 +570,6 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
       assert.equals(3, #item_bar_pushes)
       assert.equals(1, item_bar_pushes[3].payload.selectedSlot)
 
-      -- 单次 SpokeRuntime.batch 内多次宿主同步最终只合并触发 1 次 ItemBarState:FireClient
       local before_batch_pushes = #item_bar_pushes
       local data = mgrs.PlayerDataHost:GetDataInst(p)
       SpokeRuntime.batch(function()
@@ -592,7 +589,6 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
       -- 重新选回鱼竿格以维持后续测试预期
       re_map.ItemBarAction.OnServerEvent:Fire(p, { action = "SelectSlot", value = 1 })
 
-      -- AttrBridge 经 MgrAbility / PlayerTree 真实生效
       data.Extra.growth.potions.item168 = 2
       data.Extra.growth.potions.item167 = 5
       assert.is_true(mgrs.FishAbility:ApplyGrowth(p).Ok)
@@ -600,7 +596,6 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
       assert.near(1.4, ch.scale, 1e-9)
       assert.near(10.5, c.WalkSpeed, 1e-9)
 
-      -- ModifierBridge：传入 Character 目标（如 melee_hit）经 player_tree_of 路由到玩家树，麻痹阻塞 CanAct 与移速，Heartbeat 推进 0.5s 恢复
       assert.is_true(mgrs.FishAbility.Modifier:ApplyWeaponEffect(p, ch, { Kind = "paralyze" }))
       assert.is_false(runtime.life:CanAct(p))
       assert.equals(0, c.WalkSpeed)

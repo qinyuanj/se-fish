@@ -1,4 +1,3 @@
--- #315 开场剧情模态：保留分页、居中布局与已读协议，节点由 RootView 作用域拥有。
 local ViewUtil = require("client.Views.ViewUtil")
 local StoryView = {}
 

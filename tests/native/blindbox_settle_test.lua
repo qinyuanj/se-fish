@@ -1,5 +1,4 @@
 -- 原生 Busted（#87 迁移自 tests/gameplay/blindbox_settle_test.lua 的 TestBlindboxSettle）。
--- #147 T26 / #312 盲盒服务端结算（ServerRuntime / PlayerBlindbox）失败方式先列：
 --   1. 校验漏洞：payload 畸形（无 action/seq）、count 不是 1 或 10、同 seq 重复点击被接受；
 --   2. 扣费顺序错：没等平台购买成功就抽（先发货后扣费）；购买取消/失败/超时却照发奖或动了保底计数；
 --   3. 保底衔接错：Extra.lottery.pity 没进 draft（十连跨保底线不触发）、落账后 pity 写不回存档；
@@ -7,9 +6,7 @@
 --   5. 幂等错：同 seq 重试重复扣费/重复发奖；重进后 pity 丢失、State 握手不回包；
 --   6. 生产守卫漏：Debug 关 + 商品未配置时仍放行（应明确 unavailable 不发付费权益）；
 --   7. 并发错：购买 flow 在飞时第二抽被接受（应 busy）；flow 结算串到别的请求。
--- seam：ServerRuntime 上行、状态握手与支付回包；真实 MgrSave + MgrPlayerData +
 --   MgrPlatform（#123 持久操作协议），替换引擎边界（game / REUtil / DataStore / 时钟）；
---   随机数经 ServerRuntime 注入；GroundLoot 公开交付边界由测试双记录落地。
 -- 迁移说明：引擎边界夹具下沉到 tests/support/blindbox_world.lua（调用方各自实例化，
 --   互不共享状态）；案例按旧 LuaUnit 实际执行序（方法名字典序）逐个 it 注册。
 local GameCfg = require("common.GameCfg")
@@ -23,7 +20,6 @@ describe("盲盒服务端结算（ServerRuntime × MgrSave × MgrPlatform）", f
     world:setUp()
   end)
   after_each(function()
-    -- 逐案例恢复随机函数：本批随机经 ServerRuntime.random 注入，未替换 math.random，
     -- 但 MgrSave / MgrLoot 读全局 math.random()，故逐案例还原，杜绝泄漏到后续案例。
     RandomGuard.restore()
     if world then
@@ -128,7 +124,7 @@ describe("盲盒服务端结算（ServerRuntime × MgrSave × MgrPlatform）", f
     assert.same(1, result.grounded)
     assert.same(1, #world:groundItems())
     assert.same("item7", world:groundItems()[1].itemId)
-    assert.same(1, world:groundItems()[1].mult) -- 盲盒倍率固定 1
+    assert.same(1, world:groundItems()[1].mult)
     assert.same(1, world.data.Extra.lottery.pity) -- 落地也算抽过，计数照常推进
   end)
 
@@ -392,7 +388,7 @@ describe("盲盒服务端结算（ServerRuntime × MgrSave × MgrPlatform）", f
     local replay = world:lastResult()
     assert.is_true(replay.ok)
     assert.same("item7", replay.draws[1].itemKey)
-    assert.same(1, #world:groundItems()) -- 不重复落地
+    assert.same(1, #world:groundItems())
     assert.same(1, world.data.Extra.lottery.pity) -- 计数不重复推进
   end)
 

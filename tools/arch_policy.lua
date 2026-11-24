@@ -27,7 +27,6 @@ M.policy = {
     },
     {
       -- ADR-0032 客户端只读响应式状态仓库（#296），归属 L3 支撑层，
-      -- 天然禁止反向依赖 L2 的 client.Views。
       ids = { 'client.Store' },
       modules = {
         'client.DamageFloat', 'client.GameUI', 'client.InteractionBubble',

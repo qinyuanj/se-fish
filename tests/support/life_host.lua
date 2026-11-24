@@ -1,5 +1,3 @@
--- 测试侧生命宿主：把 PlayerTree 包成旧套件调用的公开入口。
--- 只暴露玩家可观察的行为（伤害、饥饿、进食、相位、抢救），不复刻已删除管理器的私有表。
 local PlayerData = require("server.Data.PlayerData")
 local ServerRuntime = require("server.World.ServerRuntime")
 local SpokeClock = require("common.SpokeClock")

@@ -1,6 +1,5 @@
 -- #86 迁移（原 tests/gameplay/grill_test.lua，#137 T16 烧烤）：
 -- 服务端曲线计时、取出结算、烤糊伤害与会话恢复
--- （common/GrillCurve.lua + server/World/PlayerGrill.lua + GameCfg.Grill）。
 -- 数值来源：策划案--渔力全开.docx 烧烤段与 issue #137 验收（0/2/2.5/4.5 秒边界、
 -- 烤糊 3 米 30 伤害、信物烤前提示、按玩家独立会话、关闭/死亡/断线/满格不复制不吞物）。
 -- 失败方式（先列后写）：
@@ -11,11 +10,8 @@
 --   4. 结算：关闭/死亡/断线时物品丢失或复制；满格取出吞掉可取回物；重进后倍率丢失；
 --   5. 资格：烤过的鱼还能再烤；烤过信物还能兑换/抽奖（#138 守卫）；信物未经提示直接开烤；
 --   6. 价格/恢复：烤过的鱼不按当时倍率出价；吃不按倍率恢复；倍率 <1 的存档被 Migrate 拒收。
--- 接缝：GrillCurve.Rate 纯函数、GameCfg.Grill 配置值、PlayerGrill 公开会话（注入生命公开入口/
--- PlayerData/Save 替身 + 内存 DataStore）、PlayerData 存档字段（k 倍率往返）、双端入口接线断言。
 -- 说明：describe 按旧 LuaUnit 的执行顺序登记（类名字节序、其内方法字节序），保持案例顺序一致。
 -- 随机数：烤糊倍率与伤害由服务器时刻（假 World.GetServerTime）一次算出，烤位取场景锚点而非随机点位；
--- 链路上唯一的 math.random 是 MgrSave 的一次性会话 Token 字符串（server/SaveHost.lua:143，仅做
 -- fencing 命名空间），不参与任何断言，因此无需固定或恢复随机数函数。
 local GameCfg = require('common.GameCfg')
 local Curve = require('common.GrillCurve')
@@ -260,7 +256,7 @@ describe("吃烤鱼的恢复量", function()
         ctx.player.Character.Controller.Health = 100
         ctx.controller = ctx.player.Character.Controller
         ctx.host:add(ctx.player)
-        ctx.vitals:SetHunger(ctx.player, 0) -- 从空饥饿看恢复量
+        ctx.vitals:SetHunger(ctx.player, 0)
     end)
 
     -- 玩家与引擎全局逐例恢复；setUp 中途失败也照样清理。
@@ -375,7 +371,6 @@ end)
 
 -- 切片五接线断言：双端入口与 ScreenMain 前缀渲染
 describe("烧烤的接线", function()
-    -- 接线断言：客户端烧烤视图挂进统一根视图，服务端经 GrillAction 绑定 PlayerGrill。
     it("test_client_main_starts_screen_grill", function()
         local file = assert(io.open('client/main.lua', 'r'))
         local src = file:read('*a')

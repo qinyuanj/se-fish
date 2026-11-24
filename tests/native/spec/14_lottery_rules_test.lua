@@ -8,8 +8,6 @@
 --   14-10 两同金币按投入物已确定的整数售价计算；
 --   14-13 两同金币直接入账户，不落到世界物品；
 --   14-15 三同的武器大奖进入独立武器库存，不占道具栏或背包格。
--- 只走 ServerRuntime 的 LotteryAction 业务入口，断言落在 LotteryResult 回包上。
--- 引擎边界（DataStore、Task、World、Players、RE）用替身，随机数经运行时注入点给定。
 -- 权重表（common/cfg/Lottery.lua）：22/20/18/16/14/5/5，合计 100，累计边界 22、42、60、76、90、95、100。
 -- 失败方式（先列后写）：
 --   1. 三个轴不是各抽各的，或某一轴换了权重表；
@@ -22,7 +20,6 @@ local EconomyWorld = require('tests.support.economy_world')
 
 local ITEM_BAR = GameCfg.Items.ContainerId.ItemBar
 
--- 只替换宿主搭建；请求、存档、回执均走 #312 ServerRuntime 公开接缝。
 local function newWorld()
   local env = EconomyWorld.new()
   function env:join() end

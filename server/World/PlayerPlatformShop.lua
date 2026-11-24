@@ -1,5 +1,3 @@
--- 地图商店单玩家购买与交付会话（#312 / ADR-0031）。
--- MgrPlatform 仅作为平台支付适配器注入；本模块拥有持久意图、发奖和 GroundLoot 恢复协议。
 local GameCfg = require("common.GameCfg")
 
 local PlayerPlatformShop = {}

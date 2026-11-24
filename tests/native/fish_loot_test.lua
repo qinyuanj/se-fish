@@ -1,6 +1,3 @@
--- #301 迁移：杀鱼掉落与拾取仍走可观察宿主边界（原 fish_loot_test 的玩法断言）。
--- 接缝：ServerRuntime 的地面放置、ItemBarAction 拾取、库存快照与单位销毁。
--- 鱼种表与抽签同源断言保留；不再加载已删除的 MgrLoot。
 local GameCfg = require("common.GameCfg")
 local ServerRuntime = require("server.World.ServerRuntime")
 local SpokeClock = require("common.SpokeClock")

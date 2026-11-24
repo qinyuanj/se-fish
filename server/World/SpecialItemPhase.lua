@@ -1,8 +1,3 @@
--- 风神之翼与哥斯拉存活子相位（#299 / ADR-0032 §2）。
--- 挂在 PlayerTree 存活相位内：选中道具决定外观、飞行与吐息子相位；
--- 切槽、濒死、死亡或离场时相位拆卸，on_cleanup 按逆序拆除动态单位与物理接管。
--- 0.5 秒麻痹只经 can_act 挡住主动施放，不退出存活相位，因此不解除变身或翅膀。
--- 本模块归属 L2（server.World），只依赖 common 规则与玩家树公开边界。
 
 local GameCfg = require("common.GameCfg")
 local FlightPath = require("common.FlightPath")
@@ -563,7 +558,6 @@ function SpecialItemPhase.mount(ps, player_tree, opts)
     return true
   end
 
-  -- 宿主外围统一连接 SpecialItemAction / SpecialItemStateRequest 后路由到存活相位。
   local mounted = true
   function player_tree:handle_special_item_action(payload)
     if not mounted then return false end
