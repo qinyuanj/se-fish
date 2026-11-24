@@ -94,6 +94,6 @@ lua tools/cli.lua worktree-init
 
 ## 产物归属
 
-执行过程产物（调研全文、验证台账、验收记录、开发计划）贴进对应 issue 的评论；`docs/` 只留长期参考（术语、技术难点、ADR）。`eggy-dev-plan` 默认的 `docs/plan/` 输出在本仓库改为 issue 评论。
+执行过程产物（调研全文、验证台账、验收记录、开发计划）贴进对应 issue 的评论；`docs/` 只留长期参考（术语、技术难点、ADR、跨轮复用的技术选型调查）。放进 `docs/research/` 的文档必须从 `AGENTS.md`、`docs/agents/` 或 ADR 留一条指针——没人指向的调研等于不存在，`doc_link_guard_test` 会拦下零引用的 research 文档。`eggy-dev-plan` 默认的 `docs/plan/` 输出在本仓库改为 issue 评论。
 
 **交接摘要**：写交接或续接摘要时附授权台账，逐条列「用户授权原文 → 覆盖的动作 → 已用完 / 未用」；台账里写不出原文的动作视为未授权，续接方须重新取得确认。部署、试玩、地图保存与重开不需要授权（见 [editor-cli.md](editor-cli.md)），不必入台账。
