@@ -1,4 +1,4 @@
--- Markdown 相对链接必须在当前 checkout 可定位；外部 URL、页内锚点与显式 gitignored 路径不查。
+-- Markdown 相对链接必须在当前 checkout 可定位，锚点必须能在目标文档里解析；外部 URL 与显式 gitignored 路径不查。
 local fs = require('tests.support.fs_fixture')
 local seam = require('tools.seam')
 local doc_anchor = require('tests.support.doc_anchor')

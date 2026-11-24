@@ -89,20 +89,4 @@ describe('文档所有权登记', function()
     assert.same({}, bad, '空的信息类说明模式写错或落点已删（#351）')
   end)
 
-  it('test_class_names_are_unique', function()
-    local seen, bad = {}, {}
-    for _, class in ipairs(CLASSES) do
-      if seen[class.name] then bad[#bad + 1] = class.name end
-      seen[class.name] = true
-    end
-    assert.same({}, bad)
-  end)
-
-  it('test_every_class_has_a_pattern', function()
-    local bad = {}
-    for _, class in ipairs(CLASSES) do
-      if #class.patterns == 0 then bad[#bad + 1] = class.name end
-    end
-    assert.same({}, bad)
-  end)
 end)

@@ -72,7 +72,6 @@ end
 -- opts.table_rows 与 opts.section_objects 只对代码里的锚点开放；Markdown 链接按 GitHub 规则解析。
 function M.exists(source, anchor, opts)
   opts = opts or {}
-  if not anchor or anchor == '' then return true end
   local text = '\n' .. source
   if text:find('<a id="' .. anchor .. '"', 1, true) then return true end
   local list = headings(text)
