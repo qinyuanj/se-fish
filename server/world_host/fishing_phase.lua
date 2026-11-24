@@ -302,7 +302,7 @@ function FishingPhase.mount(scope, tree, opts)
     reel = {
       id = session.reelSession,
       receiver = receiver,
-      progress = ReelProgress.New(now_of(tree), GameCfg.ReelIn),
+      progress = ReelProgress.new(now_of(tree), GameCfg.ReelIn),
       lastReport = now_of(tree),
     }
     fire_reel({

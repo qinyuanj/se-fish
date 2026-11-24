@@ -26,16 +26,16 @@ function Adapter:Store()
     return store
 end
 
-function Adapter:Key(fishId) return cfg().KeyPrefix .. fishId end
+function Adapter:key(fishId) return cfg().KeyPrefix .. fishId end
 
 -- 读一条鱼的全服纪录。返回 (ok, 三元组或 nil, 错误类别)：
 --   ok = true 且值为 nil → 服务可用，这条鱼还没有纪录（"missing"）；
 --   ok = false          → 读不到，必须按"暂不可用"处理，不能当成没有纪录。
 -- 值损坏（缺重量或缺身份）按没有纪录处理：读不出可信的三元组，就不展示，也不猜。
-function Adapter:Read(fishId)
+function Adapter:read(fishId)
     local store = self:Store()
     if not store then return false, nil, 'unavailable' end
-    local key = self:Key(fishId)
+    local key = self:key(fishId)
     local ok, value = pcall(function() return store:GetAsync(key) end)
     if not ok then return false, nil, classify(value) end
     return true, Records.valid(value), nil
@@ -47,7 +47,7 @@ end
 function Adapter:Submit(fishId, decide)
     local store = self:Store()
     if not store then return false, nil, nil, 'unavailable' end
-    local key = self:Key(fishId)
+    local key = self:key(fishId)
     local seen, won
     local ok, value = pcall(function()
         return store:UpdateAsync(key, function(current)

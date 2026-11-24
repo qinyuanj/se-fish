@@ -29,7 +29,7 @@ describe("TestExchangeZones", function()
   -- 每个区的链路用例都从干净库存开始：道具栏只有 2 格，七个区的产物会挤掉后续信物的落点。
   -- seq 不重置：同会话序号严格递增是客户端契约，重放/旧序号一律拒绝
   local function resetInventory()
-    local fresh = PlayerData.New(t.player)
+    local fresh = PlayerData.new(t.player)
     fresh:Init()
     local save_meta = t.data.SaveMeta
     t.data.Data, t.data.Extra = fresh.Data, fresh.Extra

@@ -271,7 +271,7 @@ function ZoneMarkers.resolve(world, config)
     return snapshot
 end
 
-function ZoneMarkers.Start()
+function ZoneMarkers.start()
     local world, task = game:GetService('World'), game:GetService('Task')
     local ok, snapshot = pcall(ZoneMarkers.resolve, world)
     local waited = 0

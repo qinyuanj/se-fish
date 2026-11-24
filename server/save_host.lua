@@ -24,7 +24,7 @@ end
 local function validSlot(slot)
     return type(slot) == 'string' and #slot >= 1 and #slot <= 40 and slot:match('^[%w_-]+$') ~= nil
 end
-function SaveHost:Key(userId)
+function SaveHost:key(userId)
     if not self.SlotPinned then
         local slot = cfg().QaSlot
         assert(slot == nil or slot == '' or validSlot(slot), 'QA 存档槽须为 1—40 位字母、数字、下划线或连字符')
@@ -35,13 +35,13 @@ function SaveHost:Key(userId)
     return cfg().KeyPrefix .. tostring(userId) .. (slot ~= '' and ':qa:' .. slot or '')
 end
 function SaveHost:session(userId)
-    self:Key(userId)
+    self:key(userId)
     if not self.Sessions[userId] then
         self.Sessions[userId] = { Current = self.QaSlot, Next = self.QaSlot, Paused = false }
     end
     return self.Sessions[userId]
 end
-function SaveHost:Status(userId)
+function SaveHost:status(userId)
     local s = self:session(userId)
     return { currentSlot = s.Current, nextSlot = s.Next, autosavePaused = s.Paused,
         loadState = s.State or 'pending', error = s.Error, revision = s.Revision, epoch = s.Epoch }
@@ -53,7 +53,7 @@ end
 function SaveHost:is_current(userId, session, data)
     return self.Sessions[userId] == session and session.Data == data and data.Player == session.Player
 end
-function SaveHost:Fail(userId, session, reason)
+function SaveHost:fail(userId, session, reason)
     if self.Sessions[userId] ~= session then return end
     session.State, session.Error = 'failed', reason
     if session.Data then
@@ -67,7 +67,7 @@ function SaveHost:after_idle(userId, fn)
     self.Waiters[userId] = self.Waiters[userId] or {}
     table.insert(self.Waiters[userId], fn)
 end
-function SaveHost:Finish(userId)
+function SaveHost:finish_save(userId)
     self.Flying[userId] = nil
     if self.Pending[userId] then
         if self.Pending[userId].RetryRounds then return end
@@ -101,7 +101,7 @@ end
 function SaveHost:load(userId)
     local store = self:get_store()
     if not store then return nil, 'failed' end
-    local key = self:Key(userId)
+    local key = self:key(userId)
     local ok, value = self:with_retry('读档 ' .. tostring(userId), function() return store:GetAsync(key) end)
     if not ok then return nil, 'failed' end
     return value, value == nil and 'missing' or 'found'
@@ -165,29 +165,29 @@ function SaveHost:load_into(player, data)
         task():Spawn(function()
             if not self:is_current(userId, s, data) then return end
             local store = self:get_store()
-            if not store then self:Fail(userId, s, '存档服务不可用') return end
+            if not store then self:fail(userId, s, '存档服务不可用') return end
             local okSlot, slot = self:with_retry('读取槽选择 ' .. userId, function()
                 return store:GetAsync(cfg().KeyPrefix .. userId .. ':gm-slot')
             end)
             if not self:is_current(userId, s, data) then return end
             if not okSlot or slot ~= nil and slot ~= '' and not validSlot(slot) then
-                self:Fail(userId, s, '槽选择读取失败或损坏') return
+                self:fail(userId, s, '槽选择读取失败或损坏') return
             end
             if slot ~= nil then s.Current, s.Next = slot, slot end
-            s.Key = self:Key(userId)
+            s.Key = self:key(userId)
             local loaded, status = self:load(userId)
             if not self:is_current(userId, s, data) then return end
-            if status == 'failed' then self:Fail(userId, s, '读取失败，不初始化新档') return end
+            if status == 'failed' then self:fail(userId, s, '读取失败，不初始化新档') return end
             local candidate, reason
             if loaded == nil then
-                local fresh = PlayerData.New({ UserId = userId, SetAttribute = function() end })
+                local fresh = PlayerData.new({ UserId = userId, SetAttribute = function() end })
                 fresh:Init()
                 candidate = fresh:Serialize()
             else
                 candidate, reason = data:Migrate(loaded)
             end
-            if not candidate then self:Fail(userId, s, reason) return end
-            if not self:within_budget(candidate) then self:Fail(userId, s, '存档容量超预算') return end
+            if not candidate then self:fail(userId, s, reason) return end
+            if not self:within_budget(candidate) then self:fail(userId, s, '存档容量超预算') return end
             local ok, claimed = self:with_retry('认领会话 ' .. userId, function()
                 return store:UpdateAsync(s.Key, function(current)
                     if not self:is_current(userId, s, data) then return nil end
@@ -202,10 +202,10 @@ function SaveHost:load_into(player, data)
             end)
             if not self:is_current(userId, s, data) then return end
             if not ok or not claimed or claimed.meta.session ~= s.Token then
-                self:Fail(userId, s, '会话认领失败或版本冲突') return
+                self:fail(userId, s, '会话认领失败或版本冲突') return
             end
             s.State, s.Revision, s.Epoch = 'ready', claimed.meta.revision, claimed.meta.epoch
-            if not data:CompleteLoad(claimed) then self:Fail(userId, s, '恢复数据无效') return end
+            if not data:CompleteLoad(claimed) then self:fail(userId, s, '恢复数据无效') return end
             self:restore_landing(userId, player, data, s)
             self:note_write(userId, claimed, status == 'missing' and 'new' or 'load')
             player:SetAttribute('SaveState', 'ready')
@@ -244,7 +244,7 @@ function SaveHost:write_job(userId, job)
     if self.Sessions[userId] ~= s then return false, 'stale' end
     if not ok then return false, 'retry' end
     if not value or not value.meta or value.meta.write ~= job.Id then
-        self:Fail(userId, s, '写入会话或修订冲突')
+        self:fail(userId, s, '写入会话或修订冲突')
         return false, 'conflict'
     end
     s.Revision = value.meta.revision
@@ -278,7 +278,7 @@ function SaveHost:drain(userId)
                     break
                 end
                 print('[SaveHost] 写档重试耗尽，关闭会话', userId, job.Reason)
-                self:Fail(userId, job.session, '写档重试耗尽')
+                self:fail(userId, job.session, '写档重试耗尽')
             end
             callback('写入结果', userId, job.done, ok, result)
             if not ok and result == 'retry' and job.session.State == 'failed' then
@@ -292,7 +292,7 @@ function SaveHost:drain(userId)
             end
             if job.After then self.Pending[userId] = appendJob(job.After, self.Pending[userId]) end
         end
-        self:Finish(userId)
+        self:finish_save(userId)
     end)
 end
 function SaveHost:enqueue(userId, snapshot, reason, done)
@@ -377,7 +377,7 @@ function SaveHost:execute(player, data, operation, transform, done)
     self:after_idle(userId, function()
         if not self:is_current(userId, s, data) then return end
         local snapshot = data:Serialize()
-        local draft = PlayerData.New({ UserId = userId, SetAttribute = function() end })
+        local draft = PlayerData.new({ UserId = userId, SetAttribute = function() end })
         draft:Init()
         draft:ApplySave(snapshot)
         local ok, result, reason = pcall(transform, draft)
@@ -413,7 +413,7 @@ function SaveHost:execute(player, data, operation, transform, done)
                         'bar=' .. #value.bar, 'bp=' .. #value.bp)
                     callback('结算完成', userId, done, true, copy(result))
                 else
-                    self:Fail(userId, s, '结算未确认 ' .. tostring(value))
+                    self:fail(userId, s, '结算未确认 ' .. tostring(value))
                     callback('结算失败', userId, done, false, value)
                 end
             end }
@@ -525,7 +525,7 @@ function SaveHost:update()
         end
     end
 end
-function SaveHost:Start()
+function SaveHost:start()
     local ok, err = pcall(function()
         game:BindToClose(function()
             if self.PlayerData then

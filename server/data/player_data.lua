@@ -131,7 +131,7 @@ local function hasIndividualMult(itemId)
     return false
 end
 
-function PlayerData.New(player, onItemBarChanged)
+function PlayerData.new(player, onItemBarChanged)
     return setmetatable({ Player = player, Inited = false, OnItemBarChanged = onItemBarChanged }, PlayerData)
 end
 
@@ -949,7 +949,7 @@ function PlayerData:Sync()
     self.Player:SetAttribute('FishCoin', self.Data.FishCoin)
 end
 
-function PlayerData:Destroy()
+function PlayerData:destroy()
     self.Player = nil
     self.Data = nil
     self.OnItemBarChanged = nil
@@ -963,7 +963,7 @@ function PlayerData:PersonalBestScaled(fishId)
     local bag = self.Extra and self.Extra.collection
     local weight = bag and bag.weights and bag.weights[fishId]
     if type(weight) ~= 'number' then return nil end
-    return Records.Scale(weight)
+    return Records.scale(weight)
 end
 
 return PlayerData

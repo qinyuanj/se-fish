@@ -46,7 +46,7 @@ describe("道具栏的请求流", function()
         end }
         ctx.player = { UserId = 341, attrs = {}, CharacterAdded = signal(), CharacterRemoving = signal() }
         function ctx.player:SetAttribute(key, value) self.attrs[key] = value end
-        Mgr:Start()
+        Mgr:start()
         Mgr:on_player_added(ctx.player)
     end)
 

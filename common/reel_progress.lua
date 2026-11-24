@@ -1,7 +1,7 @@
 local ReelProgress = {}
 ReelProgress.__index = ReelProgress
 
-function ReelProgress.New(now, cfg)
+function ReelProgress.new(now, cfg)
     return setmetatable({ Progress = cfg.Initial, Time = now, ZeroAt = nil,
         Result = nil, Config = cfg }, ReelProgress)
 end

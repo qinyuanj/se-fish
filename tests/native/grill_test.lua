@@ -94,7 +94,7 @@ describe("烤制值的存档字段", function()
         ctx.oldDebug = GameCfg.Debug
         GameCfg.Debug = { Enabled = false }
         ctx.player = { UserId = 73001, SetAttribute = function() end }
-        ctx.data = PlayerData.New(ctx.player)
+        ctx.data = PlayerData.new(ctx.player)
         ctx.data:Init()
     end)
 
@@ -106,7 +106,7 @@ describe("烤制值的存档字段", function()
     it("test_sub_one_rate_survives_save_roundtrip", function()
         assert.is_true(ctx.data:AddItem('bass', 1.5, 0.75))
         local snapshot = ctx.data:Serialize()
-        local restored = PlayerData.New(ctx.player)
+        local restored = PlayerData.new(ctx.player)
         restored:Init()
         assert.is_true(restored:ApplySave(snapshot))
         local entry = restored.Data.Containers[GameCfg.Items.ContainerId.ItemBar][1]
@@ -189,7 +189,7 @@ describe("吃通道传递烤制倍率", function()
                 ctx.eaten[#ctx.eaten + 1] = { itemId = itemId, rate = rate }
                 return true
             end }
-        ctx.mgr:Start()
+        ctx.mgr:start()
         ctx.mgr:on_player_added(ctx.player)
         ctx.data = ctx.mgr:get_data_inst(ctx.player)
     end)

@@ -66,7 +66,7 @@ describe("抽奖投入资格（common.lottery_eligibility × PlayerData）", fun
 
   it("test_real_inventory_entries_keep_cooked_state_through_snapshot_and_reload", function()
     local PlayerData = require("server.data.player_data")
-    local data = PlayerData.New({ UserId = 134, SetAttribute = function() end })
+    local data = PlayerData.new({ UserId = 134, SetAttribute = function() end })
     data:Init()
     assert.is_true(data:AddItem("item9", 1.42))
     assert.is_true(data:AddItem("eelHead", 1.1, 1.5))
@@ -94,7 +94,7 @@ describe("抽奖投入资格（common.lottery_eligibility × PlayerData）", fun
       end
     end
 
-    local restored = PlayerData.New({ UserId = 135, SetAttribute = function() end })
+    local restored = PlayerData.new({ UserId = 135, SetAttribute = function() end })
     restored:Init()
     assert.is_true(restored:ApplySave(data:Serialize()))
     assert.same({ true }, check(find(restored, "item9")))

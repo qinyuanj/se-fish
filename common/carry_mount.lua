@@ -29,7 +29,7 @@ local function pointDistance(a, b)
     return math.sqrt(dx * dx + dy * dy + dz * dz)
 end
 
-function M.Length(offset)
+function M.length(offset)
     if type(offset) ~= 'table' then return 0 end
     return math.sqrt(num(offset.x) ^ 2 + num(offset.y) ^ 2 + num(offset.z) ^ 2)
 end
@@ -41,7 +41,7 @@ end
 function M.safe_offset(offset, hostHalf, carriedHalf)
     local safe = { x = num(offset and offset.x), y = num(offset and offset.y), z = num(offset and offset.z) }
     local need = math.max(0, num(hostHalf)) + math.max(0, num(carriedHalf))
-    local length = M.Length(safe)
+    local length = M.length(safe)
     if length >= need and length > 0 then return { Offset = safe, Corrected = false } end
     if length <= 1e-9 then return { Offset = { x = 0, y = 0, z = need }, Corrected = true } end
     local k = need / length
@@ -80,7 +80,7 @@ end
 ---@param host? table
 ---@param yaw? number
 ---@param now? number
-function M.New(carryCfg, host, yaw, now)
+function M.new(carryCfg, host, yaw, now)
     carryCfg = carryCfg or cfg()
     host = host and copy(host) or { x = 0, y = 0, z = 0 }
     local safe = M.safe_offset(carryCfg.Offset, carryCfg.HostHalfHeight, carryCfg.CarriedHalfHeight)
@@ -104,7 +104,7 @@ function M.in_range(state, target)
 end
 
 ---@return table { Ok, Reason?, Damage? }
-function M.Attach(state, target, now)
+function M.attach(state, target, now)
     if type(state.Cfg.Socket) ~= 'string' or state.Cfg.Socket == '' then
         return { Ok = false, Reason = 'noSocket' }
     end
@@ -119,7 +119,7 @@ function M.Attach(state, target, now)
     return { Ok = true, Damage = state.Cfg.GrabDamage, Position = state.Mount }
 end
 
-function M.Release(state, now, reason)
+function M.release(state, now, reason)
     if not state.carried then return { Ok = false, Reason = 'notCarrying' } end
     state.carried = false
     state.ReleasedAt = num(now)
@@ -130,12 +130,12 @@ function M.Release(state, now, reason)
 end
 
 ---@return table { Position?, Snapped?, Released?, Reason? }
-function M.Follow(state, targetPos, now, dt)
+function M.follow(state, targetPos, now, dt)
     if not state.carried then return { Position = nil } end
     local desired = M.mount_point(state.Host, state.Offset, state.Yaw)
     state.Mount = desired
     if isBadPoint(targetPos) then
-        local released = M.Release(state, now, 'nan')
+        local released = M.release(state, now, 'nan')
         return { Position = released.drop_point, Released = true, Reason = 'nan' }
     end
     if pointDistance(targetPos, desired) > state.Cfg.FollowTolerance then
@@ -146,11 +146,11 @@ function M.Follow(state, targetPos, now, dt)
 end
 
 ---@return table { Released, Reason?, drop_point?, Position? }
-function M.Step(state, now, dt)
+function M.step(state, now, dt)
     state.Stats.Frames = state.Stats.Frames + 1
     if not state.carried then return { Released = false, Position = nil } end
     if num(now) - state.StartedAt >= state.Cfg.MaxCarrySec then
-        local released = M.Release(state, now, 'timeout')
+        local released = M.release(state, now, 'timeout')
         return { Released = true, Reason = 'timeout', drop_point = released.drop_point, Position = released.drop_point }
     end
     return { Released = false, Position = state.Mount or M.mount_point(state.Host, state.Offset, state.Yaw) }

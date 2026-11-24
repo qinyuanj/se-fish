@@ -39,7 +39,7 @@ describe("服务端商店与钓鱼佬原子事务（#311）", function()
       },
     }
     function player:SetAttribute(key, value) self.attrs[key] = value end
-    local data = ctx.PlayerData.New(player)
+    local data = ctx.PlayerData.new(player)
     data:Init(true)
     ctx.save:load_into(player, data)
     drain()
@@ -225,7 +225,7 @@ describe("服务端商店与钓鱼佬原子事务（#311）", function()
     rescuer.Character.Position.x = 102
     ctx.runtime.life:apply_hit(ctx.runtime.life:new_hit(nil, "fishAttack"), downed,
       GameCfg.Vitals.MaxHealth + 1)
-    assert.same("downed", ctx.runtime.life:Phase(downed))
+    assert.same("downed", ctx.runtime.life:phase(downed))
     local reply = act(rescuer, "InteractAction", {
       target = GameCfg.Rescue.Target,
       action = GameCfg.Rescue.Action,
@@ -233,6 +233,6 @@ describe("服务端商店与钓鱼佬原子事务（#311）", function()
     })
     assert.is_not_nil(reply)
     assert.is_true(reply.ok)
-    assert.same("rescuing", ctx.runtime.life:Phase(downed))
+    assert.same("rescuing", ctx.runtime.life:phase(downed))
   end)
 end)

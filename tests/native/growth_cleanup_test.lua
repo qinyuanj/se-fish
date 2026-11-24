@@ -24,7 +24,7 @@ describe('TestGrowthCleanup', function()
     end)
 
     local function init()
-        local data = ctx.PlayerData.New({ UserId = 1, SetAttribute = function() end })
+        local data = ctx.PlayerData.new({ UserId = 1, SetAttribute = function() end })
         data:Init()
         return data
     end

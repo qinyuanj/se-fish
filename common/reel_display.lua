@@ -5,7 +5,7 @@ local function clamp(value)
     return math.max(0, math.min(100, value))
 end
 
-function ReelDisplay.New(now, cfg)
+function ReelDisplay.new(now, cfg)
     return setmetatable({ Cfg = cfg, Auth = cfg.Initial, AuthAt = now,
         Local = cfg.Initial, LocalAt = now, Unsent = 0, InFlight = {}, Chase = nil }, ReelDisplay)
 end
@@ -21,7 +21,7 @@ function ReelDisplay:Target(now)
         + self:pending_clicks() * self.Cfg.ClickGain)
 end
 
-function ReelDisplay:Value(now)
+function ReelDisplay:value(now)
     local chase = self.Chase
     if chase then
         local alpha = (now - chase.Start) / self.Cfg.ChaseSec
@@ -40,7 +40,7 @@ function ReelDisplay:click(now)
     if self.Chase then
         self.Chase.From = self.Chase.From + gain
     else
-        self.Local, self.LocalAt = clamp(self:Value(now) + gain), now
+        self.Local, self.LocalAt = clamp(self:value(now) + gain), now
     end
 end
 
@@ -51,7 +51,7 @@ end
 
 function ReelDisplay:authority(now, progress, q)
     if type(progress) ~= 'number' or progress ~= progress then return end
-    local shown = self:Value(now)
+    local shown = self:value(now)
     local kept = {}
     for _, batch in ipairs(self.InFlight) do
         if not (q and batch.q <= q) and now - batch.At <= self.Cfg.PendingTimeoutSec then

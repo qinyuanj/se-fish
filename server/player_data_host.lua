@@ -32,7 +32,7 @@ function PlayerDataHost:on_player_added(player)
     local current = DataMap[player.UserId]
     if current and current.Player == player then return end
     if current then self:on_player_removing(current.Player) end
-    local data = PlayerData.New(player, function(owner, source)
+    local data = PlayerData.new(player, function(owner, source)
         if self:get_data_inst(owner) == source then self:send_item_bar(owner) end
     end)
     DataMap[player.UserId] = data
@@ -46,7 +46,7 @@ function PlayerDataHost:on_player_removing(player)
     if data and data.Player == player then
         DataMap[player.UserId] = nil
         if self.Save then self.Save:save_leaving(player, data) end
-        data:Destroy()
+        data:destroy()
         if self.Save then self.Save:release_session(player.UserId, player) end
     end
 end
@@ -252,7 +252,7 @@ local function notifyEquippedBait(mgr, player, method, value)
         eventId = 'bait:' .. tostring(player.UserId) .. ':' .. tostring(mgr.NextFactId) })
 end
 
-function PlayerDataHost:Start()
+function PlayerDataHost:start()
     _G.REUtil:get_re('RequestItemBar').OnServerEvent:Connect(function(player)
         if _G.REUtil:check_recd(player, 'RequestItemBar', GameCfg.Items.ActionCooldownSec) then return end
         local tree = self.Runtime and self.Runtime:get_player_tree(player.UserId)

@@ -112,7 +112,7 @@ describe('条款 1-12：适配层失败路径', function()
         env.players.Save, env.save.PlayerData = env.save, env.players
         env.platform.Save, env.platform.PlayerData = env.save, env.players
         env.platform.now = function() return env.now end
-        env.platform:Start()
+        env.platform:start()
         env.player = { UserId = 1201, Character = { Position = { x = 0, y = 0, z = 0 } },
             CharacterAdded = signal(), CharacterRemoving = signal(), SetAttribute = function() end }
         env.players:on_player_added(env.player)

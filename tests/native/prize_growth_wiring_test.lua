@@ -92,16 +92,16 @@ describe('TestFishStatusGate', function()
     it('test_speed_multiplies_status_factor', function()
         local fish = { Id = 1, FishId = 'alligatorGar' }
         local base = GameCfg.Fish.alligatorGar.Speed
-        assert.same(base, ctx.mgr:Speed(fish))
+        assert.same(base, ctx.mgr:speed(fish))
         ctx.factor = 0.7 -- 霜冻
-        assert.near(base * 0.7, ctx.mgr:Speed(fish), 1e-9)
+        assert.near(base * 0.7, ctx.mgr:speed(fish), 1e-9)
         ctx.factor = 0 -- 麻痹
-        assert.same(0, ctx.mgr:Speed(fish))
+        assert.same(0, ctx.mgr:speed(fish))
         -- 效果口故障不拖垮移动：按 1 处理
         ctx.mgr.Ability.fish_speed_factor = function() error('boom') end
-        assert.same(base, ctx.mgr:Speed(fish))
+        assert.same(base, ctx.mgr:speed(fish))
         ctx.mgr.Ability = nil
-        assert.same(base, ctx.mgr:Speed(fish))
+        assert.same(base, ctx.mgr:speed(fish))
     end)
 
     -- 直线逃跑每帧刷新状态速度：不等 TurnSec 转向
@@ -149,7 +149,7 @@ describe('TestPrizeGrowthPotion', function()
             apply_growth = function(_, p) state.growth[#state.growth + 1] = p; return { Ok = true } end,
             apply_body_scale = function(_, p) state.bodyOnly[#state.bodyOnly + 1] = p; return { Ok = true } end,
         }
-        ctx.mgr:Start()
+        ctx.mgr:start()
         ctx.mgr:on_player_added(player)
         ctx.data = ctx.mgr:get_data_inst(player)
     end)
@@ -194,7 +194,7 @@ describe('TestPrizeGrowthPotion', function()
         assert.is_true(ctx.data:GrantWeapon('item152', 1)) -- 淬毒匕首
         local snapshot = ctx.data:Serialize()
         local PlayerData = require('server.data.player_data')
-        local again = PlayerData.New({ UserId = 13961, SetAttribute = function() end })
+        local again = PlayerData.new({ UserId = 13961, SetAttribute = function() end })
         again:Init()
         assert.is_true(again:ApplySave(snapshot))
         assert.same(20, again:potion_count('item167'))

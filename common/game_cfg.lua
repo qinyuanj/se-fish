@@ -1021,6 +1021,6 @@ GameCfg.FishCombatLabel = {
 }
 
 GameCfg.PlaceholderAssets = require('common.cfg.placeholder_assets')
-GameCfg.PlaceholderAssets.Apply(GameCfg)
+GameCfg.PlaceholderAssets.apply(GameCfg)
 
 return GameCfg

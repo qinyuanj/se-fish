@@ -67,7 +67,7 @@ function M:set_up()
         return unit
     end
     package.loaded['server.world_host.fish_carrier'] = {
-        Spawn = function(_, opts)
+        spawn = function(_, opts)
             local carrier = { Opts = opts, Body = body(opts.Position),
                 Receiver = { UnitId = 'r' .. tostring(#env.spawned + 1), Controller = { LiftedEnabled = true } } }
             env.spawned[#env.spawned + 1] = carrier
@@ -104,7 +104,7 @@ function M:set_up()
     self.mgr.AiTarget = require('server.world_host.fish_ai_target')
     self.pushed = {}
     self.mgr.cast = { PushState = function(_, player) env.pushed[#env.pushed + 1] = player end }
-    self.mgr:Start()
+    self.mgr:start()
     self.player = self:new_player(7, vec(10, 2, -20))
     self.other = self:new_player(8, vec(30, 2, -20))
 end
@@ -129,7 +129,7 @@ end
 function M:tear_down()
     if not self.saved then return end
     -- 即使 set_up 只走到一半也恢复已保存的进程状态；Stop 失败最后传播。
-    local ok, err = pcall(function() if self.mgr then self.mgr:Stop() end end)
+    local ok, err = pcall(function() if self.mgr then self.mgr:stop() end end)
     if self.modules then
         for _, name in ipairs({ 'server.world_host.fish_carrier', 'server.world_host.fish_tree' }) do
             package.loaded[name] = self.modules[name]

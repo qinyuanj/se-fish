@@ -41,7 +41,7 @@ function Mgr:note_landing(player, fishId, weight)
     if not validPlayerId(player) then
         return reject(self, player, fishId, 'bad-player', 'player')
     end
-    local scaled, reason = Records.Scale(weight)
+    local scaled, reason = Records.scale(weight)
     if not scaled then
         return reject(self, player, fishId, 'weight=' .. tostring(weight), reason)
     end
@@ -122,11 +122,11 @@ function Mgr:flush(fishId)
     end)
 end
 
-function Mgr:State(fishId)
+function Mgr:state(fishId)
     local cached = self.Cache[fishId]
     if not cached then return { state = 'unavailable', fishId = fishId, error = 'cold' } end
     if cached.entry then
-        local state = Records.State(cached.entry)
+        local state = Records.state(cached.entry)
         state.fishId, state.stale = fishId, cached.failed ~= nil
         return state
     end
@@ -134,14 +134,14 @@ function Mgr:State(fishId)
     return { state = 'missing', fishId = fishId }
 end
 
-function Mgr:Read(fishId, done)
+function Mgr:read(fishId, done)
     if type(fishId) ~= 'string' or not GameCfg.Fish[fishId] then
         if done then done({ state = 'unavailable', fishId = fishId, error = 'unknown-fish' }) end
         return
     end
     local cached = self.Cache[fishId]
     if cached and self:fresh(cached) then
-        if done then done(self:State(fishId)) end
+        if done then done(self:state(fishId)) end
         return
     end
     local waiting = self.Reading[fishId]
@@ -151,7 +151,7 @@ function Mgr:Read(fishId, done)
     end
     self.Reading[fishId] = done and { done } or {}
     task():Spawn(function()
-        local ok, entry, kind = self.Adapter:Read(fishId)
+        local ok, entry, kind = self.Adapter:read(fishId)
         local waiters = self.Reading[fishId] or {}
         self.Reading[fishId] = nil
         if ok then
@@ -161,7 +161,7 @@ function Mgr:Read(fishId, done)
             self:cache_set(fishId, previous and previous.entry or nil, kind)
             print('[WorldRecords] 全服纪录读取失败', fishId, tostring(kind))
         end
-        local state = self:State(fishId)
+        local state = self:state(fishId)
         for _, callback in ipairs(waiters) do callback(state) end
     end)
 end
@@ -175,7 +175,7 @@ end
 
 -- 读到什么回什么（含 'unavailable'），绝不回客户端臆造或本地缓存里已经过期的「确定值」。
 -- seq 单调递增才受理：重放/乱序的旧包不产生第二次回包。
-function Mgr:Handle(player, payload)
+function Mgr:handle(player, payload)
     if not validPlayerId(player) or type(payload) ~= 'table' then return end
     local fishId, seq = payload.fishId, payload.seq
     if type(seq) ~= 'number' or seq ~= math.floor(seq) or seq < 1 or seq > 2147483647 then return end
@@ -184,7 +184,7 @@ function Mgr:Handle(player, payload)
     if last and (owner == nil or owner == player) and seq <= last then return end
     self.LastSeq[player.UserId] = seq
     if self.LastSeqPlayers then self.LastSeqPlayers[player.UserId] = player end
-    self:Read(fishId, function(state)
+    self:read(fishId, function(state)
         state.seq = seq
         self:reconcile(player, state)
         local re = _G.REUtil and _G.REUtil:get_re('RecordsState')
@@ -211,7 +211,7 @@ function Mgr.mount(scope, world, opts)
     world.records = session
     SignalRouter.bind_world(scope, _G.REUtil:get_re('RecordsRequest').OnServerEvent, session, function(player, payload)
         if _G.REUtil:check_recd(player, 'RecordsRequest', cfg().RequestCooldownSec) then return end
-        session:Handle(player, payload)
+        session:handle(player, payload)
     end)
     scope:subscribe(world.clock.on_second, function() session:update() end)
     scope:on_cleanup(function()

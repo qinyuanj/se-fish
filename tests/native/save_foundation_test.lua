@@ -50,7 +50,7 @@ describe('TestSaveFoundation', function()
 
     local function join(id)
         local player = { UserId = id, SetAttribute = function() end }
-        local data = PlayerData.New(player)
+        local data = PlayerData.new(player)
         data:Init(true)
         env.save:load_into(player, data)
         return player, data
@@ -148,7 +148,7 @@ describe('TestSaveFoundation', function()
     end)
 
     it('test_pending_rejects_mutation_and_snapshot_until_explicit_new_save', function()
-        local data = PlayerData.New({ UserId = 123, SetAttribute = function() end })
+        local data = PlayerData.new({ UserId = 123, SetAttribute = function() end })
         data:Init(true)
         assert.same('pending', data.LoadState)
         assert.is_false(data:AddCoin(10))
@@ -211,7 +211,7 @@ describe('TestSaveFoundation', function()
     end)
 
     it('test_v1_migrates_every_instance_and_bad_save_is_atomic', function()
-        local data = PlayerData.New({ UserId = 124, SetAttribute = function() end })
+        local data = PlayerData.new({ UserId = 124, SetAttribute = function() end })
         data:Init(true)
         local old = { v = 1, coin = 730, up = 1, zone = 'shrimpPond', bait = { worm = 9 },
             bar = { { i = 2, id = 'eelHead', n = 1, m = 1.75 } },

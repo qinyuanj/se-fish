@@ -35,14 +35,14 @@ describe('TestAttrGrowth', function()
 
     -- 血量上限委托 BodyScale 钉表，不另起公式（0 个 300、10 个 900、超限钳制）
     it('test_max_health_delegates_to_body_scale_plan', function()
-        assert.same(300, AttrGrowth.MaxHealth(0))
-        assert.same(360, AttrGrowth.MaxHealth(1))
-        assert.same(900, AttrGrowth.MaxHealth(10))
-        assert.same(900, AttrGrowth.MaxHealth(11))
-        assert.same(300, AttrGrowth.MaxHealth('x'))
+        assert.same(300, AttrGrowth.max_health(0))
+        assert.same(360, AttrGrowth.max_health(1))
+        assert.same(900, AttrGrowth.max_health(10))
+        assert.same(900, AttrGrowth.max_health(11))
+        assert.same(300, AttrGrowth.max_health('x'))
         local BodyScale = require('common.body_scale')
         for n = 0, 12 do
-            assert.same(BodyScale.plan(n).Health, AttrGrowth.MaxHealth(n))
+            assert.same(BodyScale.plan(n).Health, AttrGrowth.max_health(n))
         end
     end)
 

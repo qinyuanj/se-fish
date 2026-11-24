@@ -5,7 +5,7 @@ local GameCfg = require('common.game_cfg')
 
 local M = {}
 
-function M.New(playerData, multiplier, opts)
+function M.new(playerData, multiplier, opts)
     opts = type(opts) == 'table' and opts or {}
     local cache, all, prepared = {}, {}, {}
     local function prepare(unit, prefab)
@@ -59,7 +59,7 @@ function M.New(playerData, multiplier, opts)
         move_multiplier_provider = multiplier,
     }
 
-    function mgr:State(player)
+    function mgr:state(player)
         if player and player.Character then prepare(player.Character) end
         local state = self.States[player.UserId]
         if not state then
@@ -75,7 +75,7 @@ function M.New(playerData, multiplier, opts)
     end
 
     function mgr:capture_base_speed(player)
-        local state = self:State(player)
+        local state = self:state(player)
         if state.baseSpeed then return end
         local controller = state.character and state.character.Controller
         local speed = controller and controller.WalkSpeed
@@ -89,13 +89,13 @@ function M.New(playerData, multiplier, opts)
         return {
             bodyPotions = data and data:potion_count(GameCfg.Ability.BodyScale.PotionItem) or 0,
             speedPotions = data and data:potion_count(GameCfg.Ability.SpeedPotion.Item) or 0,
-            baseSpeed = self:State(player).baseSpeed,
+            baseSpeed = self:state(player).baseSpeed,
             moveMultiplier = mult,
         }
     end
 
     function mgr:project(player, key, components)
-        local state = self:State(player)
+        local state = self:state(player)
         if not state.character then return false, 'no-character' end
         local cfgOk, cfgErr = AttrLeaf.validate_config(self.AttrAPI, key)
         if not cfgOk then return false, cfgErr end
@@ -121,7 +121,7 @@ function M.New(playerData, multiplier, opts)
         return plan.Body
     end
 
-    function mgr:MaxHealth(player)
+    function mgr:max_health(player)
         local plan = self:plan(player)
         local ok, value = self:project(player, 'PlayerMaxHealth', plan.Attributes.PlayerMaxHealth)
         if not ok then error('[AttrLeaf] 血量上限投影失败: ' .. tostring(value)) end
@@ -149,7 +149,7 @@ function M.New(playerData, multiplier, opts)
             Ok = ok,
             Error = not ok and tostring(derivedOrErr) or nil,
             Scale = plan.Scale,
-            Health = self:MaxHealth(player),
+            Health = self:max_health(player),
             Capped = plan.Capped,
             Derived = ok and derivedOrErr or BodyScale.derive(plan.Scale),
         }
@@ -159,7 +159,7 @@ function M.New(playerData, multiplier, opts)
         local applied = self:apply_body_scale(player)
         local errors = {}
         if not applied.Ok then errors[#errors + 1] = tostring(applied.Error) end
-        if self.Vitals and (not self.Vitals.GetState or self.Vitals:GetState(player)) then
+        if self.Vitals and (not self.Vitals.get_state or self.Vitals:get_state(player)) then
             local called, ok, err = pcall(self.Vitals.refresh_max_health, self.Vitals, player) -- 隔离测试替身 Vitals 异常
             if not called or not ok then errors[#errors + 1] = 'MaxHealth:' .. tostring(called and err or ok) end
         end
@@ -188,7 +188,7 @@ function M.New(playerData, multiplier, opts)
     function mgr:refresh_after_revive(player)
         local ok, result = pcall(self.apply_growth, self, player) -- 兼容复活时角色未就绪
         if not ok or not result.Ok then
-            self:State(player).pending = true
+            self:state(player).pending = true
             logFn('[AttrLeaf] 复活属性待重试', player.UserId, tostring(ok and result.Error or result))
             return false
         end
@@ -199,7 +199,7 @@ function M.New(playerData, multiplier, opts)
         local ok, err = pcall(self.apply_growth, self, player) -- 兼容入图时角色未就绪
         if not ok or not err.Ok then
             logFn('[AttrLeaf] 初始化待重试', player.UserId, tostring(ok and err.Error or err))
-            self:State(player).pending = true
+            self:state(player).pending = true
         end
     end
 
@@ -227,7 +227,7 @@ function M.New(playerData, multiplier, opts)
         end
     end
 
-    function mgr:Start() end
+    function mgr:start() end
     return mgr, world, all
 end
 

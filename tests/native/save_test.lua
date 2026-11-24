@@ -98,7 +98,7 @@ describe('TestSave', function()
         local PlayerData = assert(loadfile('server/data/player_data.lua'))()
         env.new_data = function(userId)
             local p = { UserId = userId, SetAttribute = function() end }
-            local data = PlayerData.New(p)
+            local data = PlayerData.new(p)
             data:Init()
             env.dataInsts[p] = data
             return p, data
@@ -118,13 +118,13 @@ describe('TestSave', function()
     end)
 
     it('test_qa_slot_keeps_keys_isolated_and_pinned_for_the_session', function()
-        assert.same('u1', env.save:Key(1))
+        assert.same('u1', env.save:key(1))
         env.cfg.Save.QaSlot = 'qa-first'
-        assert.same('u1', env.save:Key(1)) -- 本局内修改配置不改变写入目标
+        assert.same('u1', env.save:key(1)) -- 本局内修改配置不改变写入目标
         local another = assert(loadfile('server/save_host.lua'))()
-        assert.same('u1:qa:qa-first', another:Key(1))
+        assert.same('u1:qa:qa-first', another:key(1))
         env.cfg.Save.QaSlot = 'qa-second'
-        assert.same('u1:qa:qa-first', another:Key(1))
+        assert.same('u1:qa:qa-first', another:key(1))
     end)
 
     it('test_apply_save_rejects_garbage_without_partial_recovery', function()
@@ -143,29 +143,29 @@ describe('TestSave', function()
         env.players = { env.me }
         env.data.Data.FishCoin = 33
         env.save:update() -- 第一次只定下一次存档时刻
-        assert.same(0, env.store.data[env.save:Key(1)].coin)
+        assert.same(0, env.store.data[env.save:key(1)].coin)
         env.now = env.now + env.cfg.Save.AutosaveSec - 1
         env.save:update() -- 还没到点
-        assert.same(0, env.store.data[env.save:Key(1)].coin)
+        assert.same(0, env.store.data[env.save:key(1)].coin)
         env.now = env.now + 1
         env.save:update() -- 到点：在线玩家落档
-        assert.same(33, env.store.data[env.save:Key(1)].coin)
+        assert.same(33, env.store.data[env.save:key(1)].coin)
         assert.same('autosave', env.save.Ledger[1].LastReason)
         -- 离场（不在线）玩家不自动存
         local stranger = { UserId = 2 }
         env.players = { stranger }
         env.now = env.now + env.cfg.Save.AutosaveSec
         env.save:update()
-        assert.is_nil(env.store.data[env.save:Key(2)])
+        assert.is_nil(env.store.data[env.save:key(2)])
     end)
 
     it('test_bind_to_close_flushes_all_online_players', function()
-        env.save:Start()
+        env.save:start()
         assert.is_not_nil(env.boundClose)
         env.players = { env.me }
         env.data.Data.FishCoin = 44
         env.boundClose()
-        assert.same(44, env.store.data[env.save:Key(1)].coin)
+        assert.same(44, env.store.data[env.save:key(1)].coin)
         assert.same('shutdown', env.save.Ledger[1].LastReason)
     end)
 
@@ -182,12 +182,12 @@ describe('TestSave', function()
         end
         assert.same(0, setOps)
         assert.is_true(updateOps >= 1)
-        assert.same(10, env.store.data[env.save:Key(1)].coin)
+        assert.same(10, env.store.data[env.save:key(1)].coin)
         -- 记账失败重试：第一次 update 失败也能补上
         env.failUpdate = 1
         env.data.Data.FishCoin = 11
         assert.is_true(env.save:commit(1, env.data:Serialize(), 'ferry:ticket'))
-        assert.same(11, env.store.data[env.save:Key(1)].coin)
+        assert.same(11, env.store.data[env.save:key(1)].coin)
     end)
 
     it('test_enqueue_merges_to_latest_snapshot_per_player', function()
@@ -205,7 +205,7 @@ describe('TestSave', function()
             assert.not_same('set', op) -- 旧快照被合并掉了，不会先 set 10
         end
         assert.same(1, updates)
-        assert.same(20, env.store.data[env.save:Key(1)].coin)
+        assert.same(20, env.store.data[env.save:key(1)].coin)
         -- 排空后队列清空，后续写入重新起一轮
         assert.is_nil(env.save.Pending[1])
         assert.is_nil(env.save.Flying[1])
@@ -233,9 +233,9 @@ describe('TestSave', function()
     it('test_invalid_qa_slot_fails_before_any_key_is_used', function()
         env.cfg.Save.QaSlot = false
         local another = assert(loadfile('server/save_host.lua'))()
-        assert.has_error(function() another:Key(1) end)
+        assert.has_error(function() another:key(1) end)
         env.cfg.Save.QaSlot = '../unsafe'
-        assert.has_error(function() another:Key(1) end)
+        assert.has_error(function() another:key(1) end)
     end)
 
     it('test_ledger_tracks_size_and_write_count', function()
@@ -258,7 +258,7 @@ describe('TestSave', function()
     it('test_load_into_applies_save_and_syncs_client', function()
         env.data.Data.FishCoin = 66
         assert.is_true(env.data:AddItem('duck'))
-        env.store.data[env.save:Key(9)] = env.data:Serialize()
+        env.store.data[env.save:key(9)] = env.data:Serialize()
         local player9, d9 = env.new_data(9)
         env.save:load_into(player9, d9)
         assert.same(66, d9.Data.FishCoin)
@@ -271,7 +271,7 @@ describe('TestSave', function()
 
     it('test_load_into_never_discards_old_property_because_of_touched_flag', function()
         env.data.Data.FishCoin = 66
-        env.store.data[env.save:Key(9)] = env.data:Serialize()
+        env.store.data[env.save:key(9)] = env.data:Serialize()
         local player9, d9 = env.new_data(9)
         d9.Touched = true
         env.save:load_into(player9, d9)
@@ -280,7 +280,7 @@ describe('TestSave', function()
     end)
 
     it('test_load_retries_then_succeeds_and_gives_up_without_touching_memory', function()
-        env.store.data[env.save:Key(1)] = env.data:Serialize()
+        env.store.data[env.save:key(1)] = env.data:Serialize()
         -- 前两次失败第三次成功
         env.failGet = 2
         local loaded = env.save:load(1)
@@ -300,11 +300,11 @@ describe('TestSave', function()
         -- 失败保留原 job 与写身份，恢复后 update 再排空。
         assert.is_true(env.save:Save(1, env.data:Serialize(), 'test'))
         assert.same(88, env.data.Data.FishCoin)
-        assert.same(0, env.store.data[env.save:Key(1)].coin)
+        assert.same(0, env.store.data[env.save:key(1)].coin)
         assert.same(env.cfg.Save.MaxRetries - 1, #env.waits)
         env.failUpdate = 0
         env.save:update()
-        assert.same(88, env.store.data[env.save:Key(1)].coin)
+        assert.same(88, env.store.data[env.save:key(1)].coin)
     end)
 
     it('test_serialize_roundtrip_restores_coin_slots_bait_upgrade_zone', function()

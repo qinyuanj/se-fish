@@ -75,13 +75,13 @@ describe("全服纪录纯逻辑（common/records）", function()
   it("test_illegal_and_overflow_weights_are_rejected", function()
     -- 非法值不猜：非数字、非正、NaN、无穷与超越上限都拒绝，绝不四舍五入成假纪录
     for _, bad in ipairs({ nil, "x", {}, true, 0, -1, 0 / 0, math.huge, -math.huge }) do
-      local scaled, reason = Records.Scale(bad)
+      local scaled, reason = Records.scale(bad)
       assert.is_nil(scaled, tostring(bad))
       assert.same("invalid", reason, tostring(bad))
     end
     local over = GameCfg.Records.MaxScaled / GameCfg.Records.Scale + 1
-    assert.is_nil(Records.Scale(over))
-    assert.same("overflow", select(2, Records.Scale(over)))
+    assert.is_nil(Records.scale(over))
+    assert.same("overflow", select(2, Records.scale(over)))
   end)
 
   it("test_platform_string_identity_round_trips_without_coercion", function()
@@ -89,7 +89,7 @@ describe("全服纪录纯逻辑（common/records）", function()
       local entry = Records.entry(1234, id, nil)
       assert.same({ w = 1234, u = id }, entry)
       assert.same(entry, Records.valid(entry))
-      assert.same(id, Records.State(entry).userId)
+      assert.same(id, Records.state(entry).userId)
       assert.same("玩家" .. id, Records.holder(entry))
     end
     assert.same({ w = 1234, u = 42 }, Records.valid({ w = 1234, u = 42 }), "历史数字保持者原样兼容")
@@ -101,11 +101,11 @@ describe("全服纪录纯逻辑（common/records）", function()
 
   it("test_state_and_text_never_fabricate_a_record", function()
     -- 文案：有纪录/没有纪录/读不到三态在 state 上分开；13-08、13-17 要求后两种对玩家都只显示「未取得数据」
-    local ok = Records.State(Records.entry(1234, 42, "张三"))
+    local ok = Records.state(Records.entry(1234, 42, "张三"))
     assert.same("ok", ok.state)
     assert.same(12.34, ok.weight)
     assert.same("全服纪录：12.34 kg（张三）", Records.describe(ok))
-    assert.same({ state = "missing" }, Records.State(nil))
+    assert.same({ state = "missing" }, Records.state(nil))
     assert.same("全服纪录：未取得数据", Records.describe({ state = "missing" }))
     assert.same("全服纪录：未取得数据", Records.describe({ state = "unavailable" }))
     assert.same("全服纪录：未取得数据", Records.describe(nil), "未知状态按未取得数据展示，不展示纪录")
@@ -128,11 +128,11 @@ describe("全服纪录纯逻辑（common/records）", function()
       { 0.01, 1 }, { 0.2, 20 }, { 0.12, 12 }, { 1, 100 }, { 0.5, 50 },
       { 12.34, 1234 }, { 99.99, 9999 }, { 1234.56, 123456 },
     }) do
-      assert.same(pair[2], Records.Scale(pair[1]), "重量 " .. tostring(pair[1]))
+      assert.same(pair[2], Records.scale(pair[1]), "重量 " .. tostring(pair[1]))
       assert.same(pair[1], Records.unscale(pair[2]), "还原必须与写入一致")
     end
     assert.same(100, GameCfg.Records.Scale)
     -- 两位小数是存储精度上限：第三位不参与存储，不产生「读回比写入更精确」的假象
-    assert.same(13, Records.Scale(0.125))
+    assert.same(13, Records.scale(0.125))
   end)
 end)

@@ -65,7 +65,7 @@ describe('TestPlayerLeaveRejoin', function()
         assert.same('ready', p.attrs.SaveState)
         assert.is_not_nil(env.data:get_data_inst(p))
         local life = env.runtime and env.runtime.life
-        local state = life and life:GetState(p)
+        local state = life and life:get_state(p)
         assert.are.equal(p, state and state.player)
         assert.same('alive', life:life_status(p))
         assert.is_true(life:can_act(p))
@@ -158,7 +158,7 @@ describe('TestPlayerLeaveRejoin', function()
         env.data = assert(loadfile('server/player_data_host.lua'))()
         env.quest = {
             notify = function(_, kind, player, payload) return env.runtime:notify_quest(kind, player, payload) end,
-            GetState = function(_, player) return env.data:get_data_inst(player).Extra.quest end,
+            get_state = function(_, player) return env.data:get_data_inst(player).Extra.quest end,
         }
         local sandbox = setmetatable({
             print = function(...)
@@ -167,14 +167,14 @@ describe('TestPlayerLeaveRejoin', function()
             end,
             require = function(path)
                 if path == 'server.MgrUtil' then return { Start = function() end } end
-                if path == 'common.zone_markers' then return { Start = function() end } end
+                if path == 'common.zone_markers' then return { start = function() end } end
                 if path == 'server.packages.attr_rule.api' then return attr_api_stub end
                 if path == 'server.packages.modifier_system.api' then return modifier_api_stub end
                 if path == 'server.packages.ability_system.api' then return ability_api_stub end
                 if path == 'server.save_host' then return env.save end
                 if path == 'server.player_data_host' then return env.data end
                 if path == 'server.platform_host' then return {} end
-                if path == 'server.fish_ability' then return { Start = function() end, update = function() end } end
+                if path == 'server.fish_ability' then return { start = function() end, update = function() end } end
                 return require(path)
             end,
         }, { __index = _G })
@@ -223,7 +223,7 @@ describe('TestPlayerLeaveRejoin', function()
         assert.same('pending', b.attrs.SaveState)
         drain()
         assertRejoined(b)
-        assert.same(2, env.quest:GetState(b).count)
+        assert.same(2, env.quest:get_state(b).count)
         assert.same(2, env.values.u560.extra.quest.count)
         local current = env.save.Sessions[b.UserId]
         env.players.PlayerRemoving:Fire(env.a)
@@ -249,7 +249,7 @@ describe('TestPlayerLeaveRejoin', function()
         drain()
         -- 旧写失败关闭屏障，新玩家仍可从最后确认的存档恢复。
         assertRejoined(b)
-        assert.same(0, env.quest:GetState(b).count)
+        assert.same(0, env.quest:get_state(b).count)
     end)
 
     it('test_story_read_waiting_for_quest_survives_rejoin', function()
@@ -276,7 +276,7 @@ describe('TestPlayerLeaveRejoin', function()
         drain()
         assert.is_nil(env.data:get_data_inst(b))
         assert.is_nil(env.save.Sessions[b.UserId])
-        assert.is_nil(env.runtime.life:GetState(b))
+        assert.is_nil(env.runtime.life:get_state(b))
         local c = join(env.a.UserId)
         drain()
         env.a = c
@@ -288,7 +288,7 @@ describe('TestPlayerLeaveRejoin', function()
         drain()
         assertRejoined(e)
         assert.is_nil(env.data:get_data_inst(d))
-        assert.same(2, env.quest:GetState(e).count)
+        assert.same(2, env.quest:get_state(e).count)
     end)
 end)
 

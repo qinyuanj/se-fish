@@ -33,7 +33,7 @@ describe("盲盒抽样纯逻辑（common/blindbox_draw）", function()
 
   it("test_bad_rng_rolls_are_rejected", function()
     for _, roll in ipairs({ 0, 1001, 1.5, "x" }) do
-      assert.is_nil(BlindboxDraw.Draw(0, scripted({ roll })), "roll=" .. tostring(roll))
+      assert.is_nil(BlindboxDraw.draw(0, scripted({ roll })), "roll=" .. tostring(roll))
     end
   end)
 
@@ -45,7 +45,7 @@ describe("盲盒抽样纯逻辑（common/blindbox_draw）", function()
   end)
 
   it("test_draw_result_carries_name_price_and_fixed_multiplier", function()
-    local draw = BlindboxDraw.Draw(0, scripted({ 5 })) -- 极品美人鱼
+    local draw = BlindboxDraw.draw(0, scripted({ 5 })) -- 极品美人鱼
     assert.same("极品美人鱼", draw.itemName)
     assert.same(1000, draw.basePrice)
     assert.same(1, draw.multiplier) -- 盲盒个体倍率固定 1
@@ -54,14 +54,14 @@ describe("盲盒抽样纯逻辑（common/blindbox_draw）", function()
   end)
 
   it("test_natural_jackpot_resets_pity", function()
-    local draw = BlindboxDraw.Draw(30, scripted({ 3 })) -- 极品美人鱼（权重区）
+    local draw = BlindboxDraw.draw(30, scripted({ 3 })) -- 极品美人鱼（权重区）
     assert.is_true(draw.jackpot)
     assert.is_false(draw.guaranteed)
     assert.same(0, draw.pityAfter)
   end)
 
   it("test_no_guarantee_before_49_misses", function()
-    local draw = BlindboxDraw.Draw(48, scripted({ 500 })) -- 权重中段普通项
+    local draw = BlindboxDraw.draw(48, scripted({ 500 })) -- 权重中段普通项
     assert.is_not_nil(draw)
     assert.is_false(draw.guaranteed)
     assert.is_false(draw.jackpot)
@@ -70,28 +70,28 @@ describe("盲盒抽样纯逻辑（common/blindbox_draw）", function()
   end)
 
   it("test_ordinary_miss_increments_pity", function()
-    local draw = BlindboxDraw.Draw(0, scripted({ 1000 })) -- 极品罗非鱼
+    local draw = BlindboxDraw.draw(0, scripted({ 1000 })) -- 极品罗非鱼
     assert.is_false(draw.jackpot)
     assert.same(1, draw.pityAfter)
   end)
 
   it("test_pity_guarantees_jackpot_on_the_50th_draw", function()
-    local draw = BlindboxDraw.Draw(49, scripted({ 1 })) -- 保底二选一取第 1 件
+    local draw = BlindboxDraw.draw(49, scripted({ 1 })) -- 保底二选一取第 1 件
     assert.is_not_nil(draw)
     assert.is_true(draw.guaranteed)
     assert.is_true(draw.jackpot)
     assert.same("item108", draw.itemKey) -- 极品美人鱼
     assert.same(49, draw.pityBefore)
     assert.same(0, draw.pityAfter) -- 大奖清零
-    local other = BlindboxDraw.Draw(49, scripted({ 2 }))
+    local other = BlindboxDraw.draw(49, scripted({ 2 }))
     assert.same("item107", other.itemKey) -- 极品蛇颈龙（等概率第二件）
     assert.is_true(other.guaranteed)
   end)
 
   it("test_pity_picks_equal_chance_between_two_jackpots", function()
-    assert.same(BlindboxCfg.Pity.prizeItemKeys[1], BlindboxDraw.Draw(49, scripted({ 1 })).itemKey)
-    assert.same(BlindboxCfg.Pity.prizeItemKeys[2], BlindboxDraw.Draw(49, scripted({ 2 })).itemKey)
-    assert.is_nil(BlindboxDraw.Draw(49, scripted({ 3 }))) -- 越界拒绝
+    assert.same(BlindboxCfg.Pity.prizeItemKeys[1], BlindboxDraw.draw(49, scripted({ 1 })).itemKey)
+    assert.same(BlindboxCfg.Pity.prizeItemKeys[2], BlindboxDraw.draw(49, scripted({ 2 })).itemKey)
+    assert.is_nil(BlindboxDraw.draw(49, scripted({ 3 }))) -- 越界拒绝
   end)
 
   it("test_ten_draws_cross_the_guarantee_line", function()
@@ -141,7 +141,7 @@ describe("盲盒抽样纯逻辑（common/blindbox_draw）", function()
       { roll = 976, itemKey = "item7" },
     }
     for _, case in ipairs(cases) do
-      local draw = BlindboxDraw.Draw(0, scripted({ case.roll }))
+      local draw = BlindboxDraw.draw(0, scripted({ case.roll }))
       assert.is_not_nil(draw, "roll=" .. case.roll)
       assert.same(case.itemKey, draw.itemKey, "roll=" .. case.roll)
     end

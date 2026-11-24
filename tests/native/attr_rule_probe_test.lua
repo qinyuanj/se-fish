@@ -100,7 +100,7 @@ describe("TestAttrRuleProbe", function()
   end)
 
   it("test_mapping_keeps_existing_growth_and_multiplicative_speed", function()
-    local map = Probe.Map({ bodyPotions = 10, speedPotions = 20, baseSpeed = 7,
+    local map = Probe.map({ bodyPotions = 10, speedPotions = 20, baseSpeed = 7,
       weak = true, frost = true, hunger = 400, damageScale = 1.5 })
     assert.are.equal(900, map.MaxHealth.Value)
     assert.near(7.35, map.WalkSpeed.Value, 1e-9)

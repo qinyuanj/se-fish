@@ -44,7 +44,7 @@ function M:set_up()
     local PlayerData = assert(loadfile('server/data/player_data.lua'))()
     for _, player in ipairs({ self.player, self.other }) do
         player.SetAttribute = function() end
-        local data = PlayerData.New(player)
+        local data = PlayerData.new(player)
         data:Init()
         self.data[player.UserId] = data
     end

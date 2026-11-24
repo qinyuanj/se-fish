@@ -124,7 +124,7 @@ function ServerRuntime.new(opts)
   fish_host.AbilityApi = opts.ability_api
   fish_host.Ability = opts.fish_ability
   fish_host.now = function() return clock.now() end
-  fish_host.Players = function()
+  fish_host.players = function()
     local list = {}
     for _, active in pairs(active_players) do list[#list + 1] = active end
     return list
@@ -197,14 +197,14 @@ function ServerRuntime.new(opts)
   end
 
   local modifier_service = {}
-  function modifier_service:Apply(source, target, kind, seconds)
+  function modifier_service:apply(source, target, kind, seconds)
     local tree = player_tree_of(target)
     if tree then return tree:apply_modifier(kind, { duration = seconds, source = source }) end
     if entity_modifiers then return entity_modifiers:apply(source, entity_target(target), kind, seconds) end
     return false, "no-effect-owner"
   end
   function modifier_service:apply_weapon_effect(source, target, effect)
-    return self:Apply(source, target, type(effect) == "table" and effect.Kind or nil)
+    return self:apply(source, target, type(effect) == "table" and effect.Kind or nil)
   end
   function modifier_service:get_remaining(target, kind)
     local tree = player_tree_of(target)
@@ -224,7 +224,7 @@ function ServerRuntime.new(opts)
     if entity_modifiers then return entity_modifiers:get_move_multiplier(entity_target(target)) end
     return 1
   end
-  function modifier_service:Clear(target, kind)
+  function modifier_service:clear(target, kind)
     local tree = player_tree_of(target)
     if tree then return tree:clear_modifier(kind) end
     if entity_modifiers then return entity_modifiers:clear(entity_target(target), kind) end
@@ -301,7 +301,7 @@ function ServerRuntime.new(opts)
       if type(opts.bind_ferry_action) == "function" then
         opts.bind_ferry_action(function(actor, payload)
           local ferry = self.world and self.world.ferry
-          return ferry and ferry:Handle(actor, payload) or false
+          return ferry and ferry:handle(actor, payload) or false
         end)
       end
     end
@@ -311,7 +311,7 @@ function ServerRuntime.new(opts)
         opts.bind_party_action(function(actor, payload)
           if self:is_leaving(actor and actor.UserId) then return false end
           local squad = self.world and self.world.squad
-          return squad and squad:Handle(actor, payload) or false
+          return squad and squad:handle(actor, payload) or false
         end)
       end
       if type(opts.bind_party_state_request) == "function" then
@@ -384,7 +384,7 @@ function ServerRuntime.new(opts)
       end
       if type(opts.bind_item_bar_action) == "function" then
         opts.bind_item_bar_action(function(actor, payload) return on_item_bar_action(actor, payload, true) end)
-      elseif opts.bind_item_bar_action ~= false and not has_method(player_data, "Start") then
+      elseif opts.bind_item_bar_action ~= false and not has_method(player_data, "start") then
         connect_re("ItemBarAction", function(actor, payload) on_item_bar_action(actor, payload, false) end)
       end
     end
@@ -394,11 +394,11 @@ function ServerRuntime.new(opts)
       end
       opts.fish_carrier:subscribe_died(carrier_died_handler)
     end
-    if has_method(player_data, "Start") then safe_call(opts.logger, "player_data_start", function() player_data:Start() end) end
-    if has_method(save, "Start") then safe_call(opts.logger, "save_start", function() save:Start() end) end
-    if has_method(platform, "Start") then safe_call(opts.logger, "platform_start", function() platform:Start() end) end
-    if has_method(opts.fish_ability, "Start") then
-      safe_call(opts.logger, "fish_ability_start", function() opts.fish_ability:Start() end)
+    if has_method(player_data, "start") then safe_call(opts.logger, "player_data_start", function() player_data:start() end) end
+    if has_method(save, "start") then safe_call(opts.logger, "save_start", function() save:start() end) end
+    if has_method(platform, "start") then safe_call(opts.logger, "platform_start", function() platform:start() end) end
+    if has_method(opts.fish_ability, "start") then
+      safe_call(opts.logger, "fish_ability_start", function() opts.fish_ability:start() end)
     end
     return self.world
   end
@@ -701,7 +701,7 @@ function ServerRuntime.new(opts)
           return runtime.life:apply_hit(hit, target, amount)
         end,
         apply_effect = function(source, target, kind)
-          return modifier_service:Apply(source, target, kind)
+          return modifier_service:apply(source, target, kind)
         end,
       })
       weapon_sessions[user_id] = weapon
@@ -1290,12 +1290,12 @@ function ServerRuntime.new(opts)
       end,
     }
   end
-  if has_method(save, "load_into") or has_method(save, "Start") then
+  if has_method(save, "load_into") or has_method(save, "start") then
     if has_method(player_data, "send_item_bar") then save.PlayerData = player_data end
     save.on_ready = function(player, data) runtime:on_save_ready(player, data) end
   end
   if type(platform) == "table" then
-    if has_method(platform, "Start") then
+    if has_method(platform, "start") then
       if type(save) == "table" then platform.Save = save end
       if type(player_data) == "table" then platform.PlayerData = player_data end
     end

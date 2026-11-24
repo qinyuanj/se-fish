@@ -18,7 +18,7 @@ describe("道具栏与鱼饵栏", function()
         ctx = {}
         ctx.savedGrantDebug = GameCfg.Debug
         GameCfg.Debug = { Enabled = true, InitialGrants = ctx.savedGrantDebug.InitialGrants }
-        ctx.data = PlayerData.New(player())
+        ctx.data = PlayerData.new(player())
         ctx.data:Init()
     end)
 
@@ -54,7 +54,7 @@ describe("道具栏与鱼饵栏", function()
             { itemId = 'carp', count = 1, containerId = GameCfg.Items.ContainerId.ItemBar },
             { itemId = 'bass', count = 1, containerId = GameCfg.Items.ContainerId.ItemBar },
         } }
-        local other = PlayerData.New(player())
+        local other = PlayerData.new(player())
         other:Init()
         GameCfg.Debug = cfg
         assert.same('bass', other:GetItemBarSnapshot().backpack[1].itemId)
@@ -149,7 +149,7 @@ describe("道具栏与鱼饵栏", function()
         local previous = _G.MgrPlayerData
         _G.MgrPlayerData = setmetatable({}, { __index = function() error('不应反查管理器') end })
         local events = {}
-        local bound = PlayerData.New(player(), function(owner, data)
+        local bound = PlayerData.new(player(), function(owner, data)
             events[#events + 1] = { owner = owner, data = data }
         end)
         -- pcall 包住主体：中途失败也要恢复 _G.MgrPlayerData，再抛错让本例失败。
@@ -160,7 +160,7 @@ describe("道具栏与鱼饵栏", function()
             assert.same(1, #events)
             assert.equal(events[1].owner, bound.Player)
             assert.equal(events[1].data, bound)
-            bound:Destroy()
+            bound:destroy()
         end)
         _G.MgrPlayerData = previous
         assert.is_true(ok, tostring(err))

@@ -84,10 +84,10 @@ describe('条款 16-04 / 16-06 / 16-07：物品食用规则', function()
             checked = checked + 1
             assert.is_true(env.Vitals:can_eat(player, id), '可食用类别被拒：' .. id)
             env.Vitals:set_hunger(player, 100)
-            local before = env.Vitals:GetState(player).tree.states.hunger:now()
+            local before = env.Vitals:get_state(player).tree.states.hunger:now()
             local healthBefore = player.Character.Controller.Health
             assert.is_true(env.Vitals:eat(player, id), '可食用类别吃不下：' .. id)
-            local after = env.Vitals:GetState(player).tree.states.hunger:now()
+            local after = env.Vitals:get_state(player).tree.states.hunger:now()
             if item.EatPercent > 0 then
                 assert.is_true(after > before, '正恢复没有回饥饿：' .. id)
             elseif item.EatPercent < 0 then

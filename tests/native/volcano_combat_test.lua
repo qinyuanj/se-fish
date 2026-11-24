@@ -95,8 +95,8 @@ describe('TestVolcanoCombat', function()
         env:drop('fish55Elite')
         env:advance(15.1)
         local controlled = true
-        env.mgr.Ai = { Pause = function() end, Custom = function() return true end, Sync = function() return true end,
-            remove = function() end, Stop = function() end }
+        env.mgr.Ai = { pause = function() end, custom = function() return true end, Sync = function() return true end,
+            remove = function() end, stop = function() end }
         env.mgr.Ability = { fish_paralyzed = function() return controlled end, remove_fish = function() end }
         env.now = 15.2
         env.mgr:update()
@@ -225,7 +225,7 @@ describe('TestVolcanoCombat', function()
     it('test_stop_cancels_aquatic_and_boss_warnings_without_ai_adapter', function()
         env:drop('fish55Elite')
         env:advance(15.1)
-        env.mgr:Stop()
+        env.mgr:stop()
         assert.same('clear', env.notices[#env.notices].kind)
         assert.same('stop', env.notices[#env.notices].reason)
     end)

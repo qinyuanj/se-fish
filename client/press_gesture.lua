@@ -6,7 +6,7 @@ local DEFAULTS = {
     MoveTolerancePx = 12,
 }
 
-function Gesture.New(opts)
+function Gesture.new(opts)
     opts = opts or {}
     local self = setmetatable({}, Gesture)
     self.LongPressSec = opts.LongPressSec or DEFAULTS.LongPressSec
@@ -21,7 +21,7 @@ local function movedFar(self, pos)
     return dx * dx + dy * dy > self.MoveTolerancePx * self.MoveTolerancePx
 end
 
-function Gesture:Begin(t, pos)
+function Gesture:begin(t, pos)
     self.Active = true
     self.StartT = t
     self.StartPos = pos and { x = pos.x, y = pos.y } or nil
@@ -40,7 +40,7 @@ function Gesture:update(t)
     return false
 end
 
-function Gesture:End(t, pos)
+function Gesture:finish(t, pos)
     if not self.Active then return nil end
     self.Active = false
     if self.LongFired then return 'long' end
@@ -49,7 +49,7 @@ function Gesture:End(t, pos)
     return 'tap'
 end
 
-function Gesture:Move(pos)
+function Gesture:move(pos)
     if not self.Active or self.LongFired then return end
     if movedFar(self, pos) then self.Canceled = true end
 end

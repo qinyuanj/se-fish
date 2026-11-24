@@ -63,7 +63,7 @@ describe("服务端烧烤点宿主接缝（#310）", function()
   end
 
   local function make_data(player)
-    local data = ctx.PlayerData.New(player)
+    local data = ctx.PlayerData.new(player)
     data:Init(true)
     ctx.save:load_into(player, data)
     drain()

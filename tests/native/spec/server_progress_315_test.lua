@@ -79,7 +79,7 @@ describe("服务端图鉴、纪录与玩家进度宿主接缝（#315）", functi
     assert.is_not_nil(world.runtime:get_player_tree(world.player.UserId))
     world:drain()
     assert.is_nil(world.runtime:get_player_tree(world.player.UserId))
-    local saved = world.values[world.save:Key(world.player.UserId)]
+    local saved = world.values[world.save:key(world.player.UserId)]
     assert.same(1, saved.extra.quest.count)
   end)
 

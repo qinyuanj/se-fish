@@ -109,7 +109,7 @@ function Mgr:get_attack()
     return true
 end
 
-function Mgr:Handle(player, payload)
+function Mgr:handle(player, payload)
     if not (GameCfg.Debug and GameCfg.Debug.Enabled) then
         print('[PlayerGM] 调试开关关闭，拒绝', player and player.UserId)
         self:reply(player, { ok = false, action = type(payload) == 'table' and payload.action or nil,
@@ -127,7 +127,7 @@ function Mgr:Handle(player, payload)
                 syncTarget(self, target, data)
             end
             self:reply(player, { ok = ok, action = payload.action, target = target.UserId,
-                reason = reason, status = self.Save:Status(target.UserId),
+                reason = reason, status = self.Save:status(target.UserId),
                 snapshot = data:GetItemBarSnapshot() })
         end
         if method == 'GetState' then finish(true) return true end
@@ -171,7 +171,7 @@ function Mgr.mount(scope, player_tree, opts)
     active_trees[player.UserId] = player_tree
     SignalRouter.bind_player(scope, _G.REUtil:get_re('GMAction').OnServerEvent, player, function(actor, payload)
         if _G.REUtil:check_recd(actor, 'GMAction', GameCfg.Items.ActionCooldownSec) then return end
-        Mgr:Handle(actor, payload)
+        Mgr:handle(actor, payload)
     end)
     scope:on_cleanup(function()
         Mgr:on_player_removing(player)

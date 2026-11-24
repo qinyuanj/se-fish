@@ -37,7 +37,7 @@ local function open()
     local p = { UserId = id, attrs = {}, Character = { Position = { x = x or 0, y = 0, z = z or 0 } } }
     function p:SetAttribute(k, v) self.attrs[k] = v end
     function p:GetAttribute(k) return self.attrs[k] end
-    local data = PlayerData.New(p); data:Init(); data.LoadState = "ready"; data.Player = p
+    local data = PlayerData.new(p); data:Init(); data.LoadState = "ready"; data.Player = p
     data_of[id] = data; players[#players + 1] = p
     runtime:on_player_added(p); runtime:on_save_ready(p, data)
     return p, data

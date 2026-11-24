@@ -47,7 +47,7 @@ if slot and (slot.itemId == 'item47' or slot.itemId == 'item48') then
 end
 -- 外部选择rt.routeId后可重跑：日志记录实际航线与扣款，不默认移动玩家。
 if rt.routeId then
-    ferry:Handle(player, { action = 'Board', routeId = rt.routeId, seq = rt.seq + 1 })
+    ferry:handle(player, { action = 'Board', routeId = rt.routeId, seq = rt.seq + 1 })
     log('摆渡请求', rt.routeId)
     rt.routeId = nil
 end

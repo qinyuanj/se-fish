@@ -128,7 +128,7 @@ describe('条款 10：烧烤倍率与会话规则', function()
             ctx.hits[#ctx.hits + 1] = { category = 'grillBurn', userId = id, amount = amount }
           end } } }
     function player:SetAttribute(key, value) self.attrs[key] = value end
-    local data = ctx.PlayerData.New(player)
+    local data = ctx.PlayerData.new(player)
     data:Init(true)
     ctx.save:load_into(player, data)
     drain()

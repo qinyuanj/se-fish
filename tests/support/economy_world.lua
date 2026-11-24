@@ -180,7 +180,7 @@ function M.new()
     return place_delivery(self, key, zoneId, spec)
   end
   ServerRuntime.set_current(env.runtime)
-  env.platform:Start()
+  env.platform:start()
 
   env.player = make_player(1472)
   env.online_players = { env.player }

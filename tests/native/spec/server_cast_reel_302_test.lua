@@ -127,7 +127,7 @@ describe("抛竿上钩收线举鱼宿主接缝（#302）", function()
     channel("RequestCastState")
     player = make_player(overrides.user_id or 1)
     if overrides.position then player.Character.Position = overrides.position end
-    data = PlayerData.New(player)
+    data = PlayerData.new(player)
     data:Init()
     assert.is_true(data:SelectSlot(1))
     if overrides.bait == "duck" then
