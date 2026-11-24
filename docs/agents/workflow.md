@@ -42,7 +42,7 @@ Lua 命令使用 **Lua 5.4**，命令名统一 `lua`，执行前用 `lua -v` 核
 - **QA save slot / QA 存档槽**：试玩验收必须使用。会话开始在试玩前执行 `lua tools/cli.lua qa-slot new`，再执行 `lua tools/cli.lua deploy`；会话内槽位固定，同槽重进不要重新 `new`。
   _Avoid_: 验收存档槽、acceptance-slot、沙盒存档、sandbox save、test save
 - `lua tools/cli.lua qa-slot off` 只切回正式存档配置，不删除任何存档。
-- **Save key / 存档 key**：拼接以 `server/Mgr/MgrSave.lua` 为实现真源。
+- **Save key / 存档 key**：拼接以 `server/save_host.lua` 为实现真源。
   _Avoid_: 存档 ID、档位号、save id
 
 **架构图（dsh-uml-viewer）。** 看图与图上操作用 DSH 的 dsh-uml-viewer 插件面板；根目录 `policy.edn` 是架构图的机器真源，生成图在 `docs/uml/se-fish.edn`（不要手编）。六层职责与依赖方向见 [架构分层与依赖门禁](../architecture.md)，层归属唯一声明在 `tools/arch_policy.lua`。修改三端代码或 `policy.edn` 后用插件工具 `uml_ir` 重新生成图；面板请求的处理顺序与 `validResult` 校验以插件注入规则为准。

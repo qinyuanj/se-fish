@@ -6,7 +6,7 @@
 
 ## 决定
 
-- 一条鱼由一个 `WorldUnit` 鱼本体和一个 `EggyUnit` 受击体组成，统一由 `server/Mgr/MgrFishCarrier.lua` 创建、登记和解析。
+- 一条鱼由一个 `WorldUnit` 鱼本体和一个 `EggyUnit` 受击体组成，统一由 `server/world_host/fish_carrier.lua` 创建、登记和解析。
 - 鱼本体负责模型、抓举、逃脱和业务轨迹；受击体负责技能命中、血量与死亡信号。业务不得再把 `Body`、`Receiver` 或 `Controller` 当作可互换目标。
 - 每个时刻只有一个位移写入口：业务轨迹拥有本体位置时，由 `MgrFishCarrier` 同步受击体；官方 AI 拥有受击体位置时，由 `MgrAi.Sync` 镜像回本体。切换模式先停止旧指令，再交换写入权。
 - `HealthChanged` 与 `Died` 都进入同一死亡收口。通知订阅者前先读取控制器真实血量，`carrier.Dead` 保证一次死亡只发布一次。

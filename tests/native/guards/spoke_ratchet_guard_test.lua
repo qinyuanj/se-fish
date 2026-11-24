@@ -35,6 +35,7 @@ local DEBT_WATERMARKS = {
   mgr_map_members = 0,
 }
 
+-- 以下两组为 #309 已删旧模块的防回潮对照清单，刻意保留旧路径/旧模块名以阻止回归，非失效引用。
 local REMOVED_FISH_LEGACY_FILES = {
   "server/Mgr/MgrFishUnit.lua",
   "server/Mgr/MgrFishCarrier.lua",
