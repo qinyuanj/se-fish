@@ -2,7 +2,7 @@
 
 **Status**: accepted（取代原 WSL 开发/Windows 部署方案；[ADR-0009](0009-blender-headless-only.md) 的接缝引用已随之改链）
 
-> **后续变更**：`tools/acceptance_slot.lua` 后来改名 `tools/qa_slot.lua`；「唯一例外是 git 自带的 sh」所指的 `tools/hooks/pre-commit`、`tools/hooks/shim` 已整体删除，本仓现在没有任何非 Windows 原生的入口。下面「slow 车道的五条护栏」里的 `blender_transport` 已移入新增的 `art` 车道，不再随 `slow` 跑。
+> **后续变更**：`tools/acceptance_slot.lua` 后来改名 `tools/qa_slot.lua`；「唯一例外是 git 自带的 sh」所指的 `tools/hooks/pre-commit`、`tools/hooks/shim` 已整体删除，本仓现在没有任何非 Windows 原生的入口。下面「slow 车道的五条护栏」里的 `blender_transport` 已移入新增的 `art` 车道，不再随 `slow` 跑。下面「本仓无 CI」那句也只反映当时的决定：`.github/workflows/test.yml` 后来建立，在 PR 与推 `main` 时跑 `full` 车道与 EmmyLua 门禁，现状以该工作流为准。
 
 本机已无 WSL 开发端，agent 与人工都在 Windows 原生环境里工作（仓库检出在 `D:`，编辑器与宿主目录在 `C:`）。而当前工具链在 Windows 上是**整体不可执行**的，不是"需要装点东西"：`tools/wsl_seam.lua` 用 POSIX 命令实现文件系统探测，而 Lua 的 `os.execute` 在 Windows 上走 `cmd.exe`。实测（2026-11-15）：
 
