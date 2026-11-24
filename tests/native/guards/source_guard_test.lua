@@ -5,9 +5,10 @@
 --   3. require 到不存在的文件 → 模块改名或删除后只在运行时报错；
 --   4. 业务代码 require 引擎存根 EggyAPI / EggyEditorAPI → 类型存根被当模块加载；
 --   5. 业务代码出现 io / os / package / debug 调用 → SE 沙盒里这些是 nil，调用即崩；
---   6. 可重入口（OpenScreen / CloseScreen / Init）里 Connect 不存句柄 → 每次开窗叠一个监听。
+--   6. 可重入口（client/Views 的 mount / *_spec，及宿主/世界模块的 mount / OnPlayerAdded / Attach / Bind / bind_host / WatchCharacter）
+--      里 Connect 不存句柄 → 每次重挂载或重进叠一个监听。
 -- 三端 packages/ 是整包交付的外来件（ADR-0021），不吃第 5、6 条；第 2、3 条照查（包按原始字节交付，路径同样不能错）。
--- 与同目录 static_require_test.lua 的分工：那边管「按名加载的登记表」（界面 handler、锚点行为、MgrMap），
+-- 与同目录 static_require_test.lua 的分工：那边管「按名加载的登记表与宿主组合」（锚点行为、ServerRuntime 宿主注入），
 -- 这边只管源码文本的卫生，所以两边各自独立，改登记表不必动这里。
 local fs = require("tests.support.fs_fixture")
 local Arch = require("tools.arch_policy")
@@ -15,7 +16,37 @@ local lfs = require("lfs")
 
 local BUSINESS_ROOTS = { "client", "common", "server" }
 local BANNED_GLOBALS = { "io", "os", "package", "debug" }
-local REENTRANT = { OpenScreen = true, CloseScreen = true, Init = true }
+local REENTRANT_ENTRIES = {
+  mount = true,
+  OnPlayerAdded = true,
+  Attach = true,
+  Bind = true,
+  bind_host = true,
+  WatchCharacter = true,
+}
+
+local function is_reentrant_entry(path, name)
+  if REENTRANT_ENTRIES[name] then return true end
+  if path:match("^client/Views/") and (name == "spec" or name:match("_spec$")) then
+    return true
+  end
+  return false
+end
+
+-- 仅识别真实赋值 `=`（排除 `==`、`~=`、`<=`、`>=`）。
+local function has_assignment(statement)
+  local from = 1
+  while true do
+    local eq = statement:find("=", from, true)
+    if not eq then return false end
+    local prev = eq > 1 and statement:sub(eq - 1, eq - 1) or ""
+    local next_ch = statement:sub(eq + 1, eq + 1)
+    if next_ch ~= "=" and not prev:match("[=~<>]") then
+      return true
+    end
+    from = eq + 1
+  end
+end
 
 local function is_dir(path)
   return lfs.attributes(path, "mode") == "directory"
@@ -160,28 +191,47 @@ describe("三端源码守卫", function()
   end)
 
   it("test_reentrant_entrypoints_keep_connection_handles", function()
-    -- 行级启发式：本仓 handler 的函数头与 end 都顶格写，所以进入可重入口后
-    -- 遇到顶格 end 或下一个 function 即为该函数结束。
+    -- 按函数头缩进配对结束行：覆盖 client/Views（mount / *_spec）与宿主/世界模块
+    -- （mount / OnPlayerAdded / Attach / Bind / bind_host / WatchCharacter）及其内部闭包。
+    local matched_entries = 0
     scan(business_files(), function(path, src)
+      local code = Arch.code_only(src)
       local bad = {}
-      local entry
+      local entry, entry_indent
       local number = 0
-      for line in (src .. "\n"):gmatch("([^\n]*)\n") do
+      for line in (code .. "\n"):gmatch("([^\n]*)\n") do
         number = number + 1
-        local opened = line:match("^function%s+[%w_.]+:(%w+)%s*%(")
+        local indent, opened = line:match("^([ \t]*)function%s+[%w_.]+[.:]([%w_]+)%s*%(")
         if opened then
-          entry = REENTRANT[opened] and opened or nil
-        elseif line:match("^end%s*$") or line:match("^function%s") then
-          entry = nil
+          if is_reentrant_entry(path, opened) then
+            entry = opened
+            entry_indent = indent
+            matched_entries = matched_entries + 1
+          elseif entry and #indent <= #entry_indent then
+            entry = nil
+            entry_indent = nil
+          end
         elseif entry then
-          local position = line:find(":Connect%s*%(")
-          if position and not line:sub(1, position - 1):find("=") then
-            bad[#bad + 1] = path .. ":" .. number .. " " .. entry .. " 里的 Connect 没存句柄"
+          local fn_indent = line:match("^([ \t]*)function%s")
+          if line:match("^" .. entry_indent .. "end%s*$")
+              or line:match("^" .. entry_indent .. "end%s*;")
+              or (fn_indent and #fn_indent <= #entry_indent) then
+            entry = nil
+            entry_indent = nil
+          else
+            local position = line:find(":%s*Connect%s*%(")
+            if position then
+              local prefix = line:sub(1, position - 1):match("[^;]*$") or ""
+              if not has_assignment(prefix) and not prefix:find("%f[%w_]return%f[^%w_]") then
+                bad[#bad + 1] = path .. ":" .. number .. " " .. entry .. " 里的 Connect 没存句柄"
+              end
+            end
           end
         end
       end
       return bad
     end)
+    assert.is_true(matched_entries > 0, "未扫到任何可重入口函数，扫描口径失效")
   end)
 
   it("test_remote_event_creation_stays_inside_reutil", function()
@@ -230,16 +280,20 @@ describe("三端源码守卫", function()
   end)
 
   it("test_last_seq_is_cleared_on_player_removing", function()
+    local checked = 0
     scan(business_files(), function(path, src)
-      if not path:match("^server/Mgr/[^/]+%.lua$") then return {} end
+      if not path:match("^server/") then return {} end
       local code = Arch.code_only(src)
       if not code:find("self%s*%.%s*LastSeq%f[^%w_]") then return {} end
-      local first, last = code:find("function%s+Mgr%s*:%s*OnPlayerRemoving%s*%b()")
+      checked = checked + 1
+      local padded = "\n" .. code
+      local first, last, indent = padded:find("\n([ \t]*)function%s+[%w_.]+%s*:%s*OnPlayerRemoving%s*%b()")
       if not first then
         return { path .. " 使用 self.LastSeq 但没有 OnPlayerRemoving" }
       end
-      local next_function = code:find("\nfunction%s", last + 1)
-      local body = code:sub(last + 1, next_function)
+      local body_end = padded:find("\n" .. indent .. "end%f[^%w_]", last + 1)
+        or padded:find("\n" .. indent .. "function%s", last + 1)
+      local body = padded:sub(last + 1, body_end)
       local cleared = false
       for line in (body .. "\n"):gmatch("([^\n]*)\n") do
         for statement in line:gmatch("[^;]+") do
@@ -261,5 +315,6 @@ describe("三端源码守卫", function()
       if not cleared then return { path .. " 的 OnPlayerRemoving 没有给 self.LastSeq 赋 nil" } end
       return {}
     end)
+    assert.is_true(checked > 0, "未扫到任何使用 self.LastSeq 的服务端模块，扫描口径失效")
   end)
 end)
