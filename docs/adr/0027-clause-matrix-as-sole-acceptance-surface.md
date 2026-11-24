@@ -1,6 +1,6 @@
 # 0027 以条款矩阵为唯一验收面；本轮只建框架，取证延后
 
-**Status**: accepted（2026-11-24 起计划迁移为功能文件，见 [#326](https://github.com/qinyuanj/se-fish/issues/326)；迁移完成前本 ADR 仍有效）
+**Status**: superseded（2026-11-24；验收面与三档证据继续有效，七列格式、双棘轮与覆盖表由 [ADR-0039](0039-acceptance-surface-as-feature-files.md) 取代）
 
 验收这件事此前散在四处：七张旧单的正文、`docs/GameSpec.md` 的段落、`tests/native/` 里没人能对上条款的用例，以及试玩截图的口头结论。想回答「第 7 节第 11 条到底验没验过」，只能把四处都翻一遍，而且每处的答案都不一样。
 
