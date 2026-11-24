@@ -322,7 +322,7 @@ describe("AttrLeaf：attr_rule 官方包单向叶子投影", function()
     local attr_api, make_unit, world = make_real_attr_sandbox()
     local clamped_api = setmetatable({
       Funcs = setmetatable({
-        get_attr_config = function(key)
+        GetAttrConfig = function(key)
           if key == "PlayerWalkSpeed" then
             return { Min = 0, Max = 10 }
           end

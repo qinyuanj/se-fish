@@ -124,7 +124,7 @@ describe('TestAttrMigration', function()
         assert.same(before + 1, #logs)
         broken = false
         local config = { Min = 0 }
-        mgr.AttrAPI.Funcs.get_attr_config = function() return config end
+        mgr.AttrAPI.Funcs.GetAttrConfig = function() return config end
         mgr:update()
         assert.same(before + 2, #logs)
         assert.matches('业务属性键不允许地图钳制配置', logs[#logs], nil, true)

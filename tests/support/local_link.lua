@@ -89,7 +89,7 @@ function M.new(opts)
     if not ZoneMarkers.Ready then ZoneFixtures.Apply(GameCfg) end
 
     local env = {
-        cfg = GameCfg, queue = {}, sent = {}, re = {}, values = {}, online = {}, created = {},
+        cfg = GameCfg, queue = {}, sent = {}, re = {}, values = {}, online_players = {}, created = {},
         now = opts.now or 1000, started = false, active = {}, current = {}, leaving = {}, ready = {},
         saved = {
             game = rawget(_G, 'game'), Vector3 = rawget(_G, 'Vector3'), Vector2 = rawget(_G, 'Vector2'),
@@ -120,7 +120,7 @@ function M.new(opts)
 
     env.playersService = { GetPlayers = function()
         local list = {}
-        for _, player in pairs(env.online) do list[#list + 1] = player end
+        for _, player in pairs(env.online_players) do list[#list + 1] = player end
         return list
     end, LocalPlayer = nil }
 
@@ -283,7 +283,7 @@ local function handleAdded(env, player)
         player:SetAttribute('SaveState', 'pending')
         return
     end
-    env.online[player.UserId] = player
+    env.online_players[player.UserId] = player
     env.current[player.UserId] = player
     env.managers.PlayerData:on_player_added(player)
 end
@@ -304,7 +304,7 @@ local function continueRemoving(env, player, leaving)
     env.managers.Save:after_idle(player.UserId, function()
         if env.leaving[player.UserId] ~= leaving then return end
         env.leaving[player.UserId], env.current[player.UserId] = nil, nil
-        env.online[player.UserId] = nil
+        env.online_players[player.UserId] = nil
         if leaving.Waiting then handleAdded(env, leaving.Waiting) end
     end)
 end
@@ -377,7 +377,7 @@ end
 
 function M:Count()
     local count = 0
-    for _, player in pairs(self.online) do
+    for _, player in pairs(self.online_players) do
         if self.active[player.UserId] == player then count = count + 1 end
     end
     return count

@@ -388,7 +388,7 @@ function ServerRuntime.new(opts)
         connect_re("ItemBarAction", function(actor, payload) on_item_bar_action(actor, payload, false) end)
       end
     end
-    if not carrier_died_handler and has_method(opts.fish_carrier, "SubscribeDied") then
+    if not carrier_died_handler and has_method(opts.fish_carrier, "subscribe_died") then
       carrier_died_handler = function(carrier)
         fish_host:on_carrier_died(carrier)
       end
@@ -496,12 +496,12 @@ function ServerRuntime.new(opts)
     end
     local valid_now = now ~= nil and Number.is_finite_number(now) and now or nil
     clock:step(dt, valid_now)
-    if has_method(save, "Update") then safe_call(opts.logger, "save_update", function() save:update() end) end
-    if has_method(platform, "Update") then safe_call(opts.logger, "platform_update", function() platform:update() end) end
-    if has_method(opts.fish_ability, "Update") then
+    if has_method(save, "update") then safe_call(opts.logger, "save_update", function() save:update() end) end
+    if has_method(platform, "update") then safe_call(opts.logger, "platform_update", function() platform:update() end) end
+    if has_method(opts.fish_ability, "update") then
       safe_call(opts.logger, "fish_ability_update", function() opts.fish_ability:update(dt) end)
     end
-    if has_method(opts.fish_carrier, "Update") then
+    if has_method(opts.fish_carrier, "update") then
       safe_call(opts.logger, "fish_carrier_update", function() opts.fish_carrier:update(dt) end)
     end
     for _, weapon in pairs(weapon_sessions) do
@@ -542,7 +542,7 @@ function ServerRuntime.new(opts)
     if self.world and self.world.ferry then self.world.ferry:on_player_added(player) end
     if type(opts.on_player_join_start) == "function" then
       safe_call(opts.logger, "on_player_join_start", opts.on_player_join_start, player)
-    elseif has_method(player_data, "OnPlayerAdded") then
+    elseif has_method(player_data, "on_player_added") then
       safe_call(opts.logger, "player_data_added", function() player_data:on_player_added(player) end)
     end
   end
@@ -558,7 +558,7 @@ function ServerRuntime.new(opts)
     if type(opts.is_player_data_current) == "function" then
       local current_ok = safe_call(opts.logger, "is_player_data_current", opts.is_player_data_current, player, data)
       if not current_ok then return nil end
-    elseif has_method(player_data, "OnPlayerAdded") and has_method(player_data, "GetDataInst")
+    elseif has_method(player_data, "on_player_added") and has_method(player_data, "get_data_inst")
         and player_data:get_data_inst(player) ~= data then
       return nil
     end
@@ -936,10 +936,10 @@ function ServerRuntime.new(opts)
     if type(opts.on_player_removing) == "function" then
       safe_call(opts.logger, "on_player_removing", opts.on_player_removing, player, was_active)
     else
-      if has_method(player_data, "OnPlayerRemoving") then
+      if has_method(player_data, "on_player_removing") then
         safe_call(opts.logger, "player_data_removing", function() player_data:on_player_removing(player) end)
       end
-      if has_method(platform, "OnPlayerRemoving") then
+      if has_method(platform, "on_player_removing") then
         safe_call(opts.logger, "platform_removing", function() platform:on_player_removing(player) end)
       end
     end
@@ -959,7 +959,7 @@ function ServerRuntime.new(opts)
 
     if type(opts.after_idle) == "function" then
       opts.after_idle(user_id, finish_drain)
-    elseif has_method(save, "AfterIdle") then
+    elseif has_method(save, "after_idle") then
       save:after_idle(user_id, finish_drain)
     else
       finish_drain()
@@ -1221,7 +1221,7 @@ function ServerRuntime.new(opts)
       end
     end
     self._core_re_bound = false
-    if carrier_died_handler and has_method(opts.fish_carrier, "UnsubscribeDied") then
+    if carrier_died_handler and has_method(opts.fish_carrier, "unsubscribe_died") then
       opts.fish_carrier:unsubscribe_died(carrier_died_handler)
       carrier_died_handler = nil
     end
@@ -1275,7 +1275,7 @@ function ServerRuntime.new(opts)
   })
   fish_host.Vitals = runtime.life
 
-  if has_method(player_data, "OnPlayerAdded") then
+  if has_method(player_data, "on_player_added") then
     player_data.Runtime = runtime
     player_data.Save = save
     player_data.Vitals = runtime.life
@@ -1290,8 +1290,8 @@ function ServerRuntime.new(opts)
       end,
     }
   end
-  if has_method(save, "LoadInto") or has_method(save, "Start") then
-    if has_method(player_data, "SendItemBar") then save.PlayerData = player_data end
+  if has_method(save, "load_into") or has_method(save, "Start") then
+    if has_method(player_data, "send_item_bar") then save.PlayerData = player_data end
     save.on_ready = function(player, data) runtime:on_save_ready(player, data) end
   end
   if type(platform) == "table" then

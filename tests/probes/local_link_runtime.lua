@@ -103,7 +103,7 @@ local function run()
 
         for round = 1, 2 do
             for index = 1, 10 do
-                local player = link.online[7000 + index]
+                local player = link.online_players[7000 + index]
                 if player then link:leave(player) end
             end
             local left = link:Count()

@@ -1,6 +1,6 @@
 -- 服务端 attr_rule 官方包单向输出叶子投影层（ADR-0032 §3 / #297-A2）：
 -- 仅作为纯输出 Leaf Sink 挂载在 PlayerTree 树底：
---   1. 校验 get_attr_config，拒绝地图 Min/Max 钳制配置；
+--   1. 校验 GetAttrConfig，拒绝地图 Min/Max 钳制配置；
 --   2. 角色作用域内 GetAttrUnit / EnsureAttrUnit，仅在新建（existing == nil）时于 on_cleanup 对称销毁；
 --   3. 单向写入 PlayerBodyScale / PlayerMaxHealth / PlayerWalkSpeed / PlayerHunger
 --      及 PlayerWeaponDamage_<melee|ranged|explosive> 四分量（Base/BaseExtra/Ratio/Bonus）；
@@ -52,7 +52,7 @@ function AttrLeaf.validate_config(attr_api, key)
   if type(attr_api) ~= "table" or type(attr_api.Funcs) ~= "table" then
     return false, "attr-api-invalid"
   end
-  local get_cfg = attr_api.Funcs.get_attr_config
+  local get_cfg = attr_api.Funcs.GetAttrConfig
   if type(get_cfg) == "function" then
     local ok, config = pcall(get_cfg, key)
     if not ok then

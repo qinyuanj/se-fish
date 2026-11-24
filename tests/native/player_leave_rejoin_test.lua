@@ -136,7 +136,7 @@ describe('TestPlayerLeaveRejoin', function()
         local attr_api_stub = {
             Enums = { AttrComponentType = { Base = 1, BaseExtra = 2, Ratio = 3, Bonus = 4 } },
             Funcs = {
-                get_attr_config = function() return nil end,
+                GetAttrConfig = function() return nil end,
                 GetAttrUnit = function() return nil end,
                 EnsureAttrUnit = function() return make_dummy_unit() end,
                 SetAttrComponent = function() return true end,

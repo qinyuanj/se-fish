@@ -118,7 +118,7 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
     local attr_api = {
       Enums = { AttrComponentType = { Base = 1, BaseExtra = 2, Ratio = 3, Bonus = 4 } },
       Funcs = {
-        get_attr_config = function() return nil end,
+        GetAttrConfig = function() return nil end,
         GetAttrUnit = function(ch) return attr_units[ch] end,
         EnsureAttrUnit = function(ch)
           if not attr_units[ch] then
@@ -432,7 +432,7 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
       local attr_api_stub = {
         Enums = { AttrComponentType = { Base = 1, BaseExtra = 2, Ratio = 3, Bonus = 4 } },
         Funcs = {
-          get_attr_config = function() return nil end,
+          GetAttrConfig = function() return nil end,
           GetAttrUnit = function(ch) return attr_units[ch] end,
           EnsureAttrUnit = function(ch)
             if not attr_units[ch] then

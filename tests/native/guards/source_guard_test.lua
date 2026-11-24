@@ -281,9 +281,9 @@ describe("三端源码守卫", function()
       if not code:find("self%s*%.%s*LastSeq%f[^%w_]") then return {} end
       checked = checked + 1
       local padded = "\n" .. code
-      local first, last, indent = padded:find("\n([ \t]*)function%s+[%w_.]+%s*:%s*OnPlayerRemoving%s*%b()")
+      local first, last, indent = padded:find("\n([ \t]*)function%s+[%w_.]+%s*:%s*on_player_removing%s*%b()")
       if not first then
-        return { path .. " 使用 self.LastSeq 但没有 OnPlayerRemoving" }
+        return { path .. " 使用 self.LastSeq 但没有 on_player_removing" }
       end
       local body_end = padded:find("\n" .. indent .. "end%f[^%w_]", last + 1)
         or padded:find("\n" .. indent .. "function%s", last + 1)
@@ -306,7 +306,7 @@ describe("三端源码守卫", function()
           end
         end
       end
-      if not cleared then return { path .. " 的 OnPlayerRemoving 没有给 self.LastSeq 赋 nil" } end
+      if not cleared then return { path .. " 的 on_player_removing 没有给 self.LastSeq 赋 nil" } end
       return {}
     end)
     assert.is_true(checked > 0, "未扫到任何使用 self.LastSeq 的服务端模块，扫描口径失效")

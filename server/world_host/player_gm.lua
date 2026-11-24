@@ -100,8 +100,8 @@ function Mgr:next_fish(_, payload, target)
     return true
 end
 
-local Actions = { coin = 'Coin', Item = 'Item', set_health = 'SetHealth', set_hunger = 'SetHunger',
-    next_fish = 'NextFish', add_attack = 'AddAttack', get_attack = 'GetAttack',
+local Actions = { Coin = 'coin', Item = 'Item', SetHealth = 'set_health', SetHunger = 'set_hunger',
+    NextFish = 'next_fish', AddAttack = 'add_attack', GetAttack = 'get_attack',
     ApplyState = 'ApplyState', SaveState = 'SaveState', ReadState = 'ReadState',
     SelectSaveSlot = 'SelectSaveSlot', GetState = 'GetState' }
 
@@ -152,11 +152,11 @@ function Mgr:Handle(player, payload)
     if data then ok, reason = self[method](self, data, payload, target) end
     print('[PlayerGM]', ok and '发放' or '拒绝', player and player.UserId, '->', target and target.UserId,
         tostring(payload.action), tostring(payload.amount or payload.itemId or payload.value or payload.scene or payload.fishId), tostring(payload.count or ''))
-    if ok and method ~= 'NextFish' and method ~= 'AddAttack' and method ~= 'GetAttack' then
+    if ok and method ~= 'next_fish' and method ~= 'add_attack' and method ~= 'get_attack' then
         syncTarget(self, target, data)
     end
     self:reply(player, { ok = ok, action = payload.action, target = target and target.UserId,
-        damage = ok and (method == 'AddAttack' or method == 'GetAttack') and self:get_melee_damage(target, BaseAttack) or nil,
+        damage = ok and (method == 'add_attack' or method == 'get_attack') and self:get_melee_damage(target, BaseAttack) or nil,
         reason = not ok and (reason or '请求未通过') or nil })
     return ok
 end

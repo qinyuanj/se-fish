@@ -79,7 +79,7 @@ function Mgr:command(fish, mode, target, direction, speed, distance, range)
         self.AiAPI.Funcs.StartAI(unit)
         self.AiAPI.Funcs.StopMove(unit, 0)
         if mode == 'direction' then
-            self.AiAPI.Funcs.move_direction(unit, direction, 0, 0)
+            self.AiAPI.Funcs.MoveDirection(unit, direction, 0, 0)
         else
             self.AiAPI.Funcs.ChaseTarget(unit, target, range or 0, distance or 0.1, 0, nil, 0, 1)
         end

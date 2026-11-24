@@ -121,7 +121,7 @@ function Probe.run(context)
         end
         -- 饥饿无 Controller 映射：先让真实包完成公式，再按业务上限钳制。
         -- (400+100)*0.5+10=260；提前夹 Base 为300则为210，断言能区分顺序。
-        assertTrue(api.Funcs.get_attr_config('Hunger') == nil, 'Hunger 已有配置，需要按实际配置重新核对业务接缝')
+        assertTrue(api.Funcs.GetAttrConfig('Hunger') == nil, 'Hunger 已有配置，需要按实际配置重新核对业务接缝')
         for _, row in ipairs({ { c.Base, 400 }, { c.BaseExtra, 100 }, { c.Ratio, -0.5 }, { c.Bonus, 10 } }) do
             assertTrue(api.Funcs.SetAttrComponent(target, 'Hunger', row[1], row[2]), '业务顺序分量写入失败')
         end
