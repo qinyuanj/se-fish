@@ -1,20 +1,20 @@
 
-local BodyScale = require("common.body_scale")
-local GameCfg = require("common.game_cfg")
-local GrillCurve = require("common.grill_curve")
+local body_scale = require("common.body_scale")
+local game_cfg = require("common.game_cfg")
+local grill_curve = require("common.grill_curve")
 local spoke = require("common.packages.spoke.api")
-local ViewUtil = require("client.views.view_util")
+local view_util = require("client.views.view_util")
 
 local State = spoke.State
 
-local GrillView = {}
+local grill_view = {}
 
 local function cfg()
-  return GameCfg.Grill
+  return game_cfg.Grill
 end
 
 local function item_name(item_id)
-  local definition = item_id and GameCfg.Items.Definitions[item_id]
+  local definition = item_id and game_cfg.Items.Definitions[item_id]
   return definition and definition.Name or tostring(item_id or "")
 end
 
@@ -34,12 +34,12 @@ local function ensure_shared(shared)
     shared.armed_until = 0
   end
   if shared.panel_hidden == nil then
-    shared.panel_hidden = State.new("GrillView.panel_hidden", false)
+    shared.panel_hidden = State.new("grill_view.panel_hidden", false)
   end
   return shared
 end
 
-function GrillView.new_shared()
+function grill_view.new_shared()
   return ensure_shared({})
 end
 
@@ -80,7 +80,7 @@ local function click_grill(ctx, shared)
   send_grill(ctx, shared, "Start", confirm)
 end
 
-function GrillView.mount(scope, ctx, options)
+function grill_view.mount(scope, ctx, options)
   options = type(options) == "table" and options or {}
   local shared = ensure_shared(options.shared or (ctx.services and ctx.services.grill_shared))
   local burnt_noticed = false
@@ -146,10 +146,10 @@ function GrillView.mount(scope, ctx, options)
       end
       local rate = snapshot.rate
       if rate == nil then
-        rate = GrillCurve.Rate(elapsed, cfg()) or 0
+        rate = grill_curve.Rate(elapsed, cfg()) or 0
       end
-      local time_text = "已烤 " .. GrillCurve.Format(elapsed) .. " 秒"
-      local rate_text = "倍率 " .. GrillCurve.Format(rate)
+      local time_text = "已烤 " .. grill_curve.Format(elapsed) .. " 秒"
+      local rate_text = "倍率 " .. grill_curve.Format(rate)
       if time_text ~= last_time_text then
         last_time_text = time_text
         time_label.Text = time_text
@@ -190,7 +190,7 @@ function GrillView.mount(scope, ctx, options)
     if state == "burnt" then
       if not burnt_noticed then
         burnt_noticed = true
-        ViewUtil.notify(ctx, cfg().BurntText)
+        view_util.notify(ctx, cfg().BurntText)
       end
     else
       burnt_noticed = false
@@ -213,23 +213,23 @@ function GrillView.mount(scope, ctx, options)
         burnt_noticed = false
         shared.panel_hidden:set(false)
       elseif result.action == "Takeout" then
-        ViewUtil.notify(ctx, cfg().CookedPrefix .. item_name(result.itemId)
-          .. "（倍率 " .. GrillCurve.Format(result.rate or 1) .. "）")
+        view_util.notify(ctx, cfg().CookedPrefix .. item_name(result.itemId)
+          .. "（倍率 " .. grill_curve.Format(result.rate or 1) .. "）")
       end
       return
     end
     local reason = result.reason
     if reason == "token-warn" then
-      ViewUtil.notify(ctx, cfg().TokenWarnText)
+      view_util.notify(ctx, cfg().TokenWarnText)
       shared.armed_until = ctx.clock.now() + 5
     elseif reason == "no-fish" then
-      ViewUtil.notify(ctx, cfg().NoFishText)
+      view_util.notify(ctx, cfg().NoFishText)
     elseif reason == "full" then
-      ViewUtil.notify(ctx, cfg().FullText)
+      view_util.notify(ctx, cfg().FullText)
     elseif reason == "burnt" then
       if not burnt_noticed then
         burnt_noticed = true
-        ViewUtil.notify(ctx, cfg().BurntText)
+        view_util.notify(ctx, cfg().BurntText)
       end
     elseif reason == "busy" then
       shared.panel_hidden:set(false)
@@ -238,16 +238,16 @@ function GrillView.mount(scope, ctx, options)
   end)
 end
 
-function GrillView.spec(options)
+function grill_view.spec(options)
   return {
     name = "Grill",
     mount = function(scope, ctx)
-      GrillView.mount(scope, ctx, options)
+      grill_view.mount(scope, ctx, options)
     end,
   }
 end
 
-function GrillView.bubble_spec(options)
+function grill_view.bubble_spec(options)
   options = type(options) == "table" and options or {}
   return {
     items = function(es, store)
@@ -257,10 +257,10 @@ function GrillView.bubble_spec(options)
       if position == nil then
         return list
       end
-      local radius = BodyScale.InteractionRadius(character, cfg().Radius)
+      local radius = body_scale.InteractionRadius(character, cfg().Radius)
       local radius_sq = radius * radius
       for index, entry in ipairs(options.anchors or {}) do
-        local dist_sq = ViewUtil.distance_sq_xz(position, entry.position)
+        local dist_sq = view_util.distance_sq_xz(position, entry.position)
         if dist_sq ~= nil and dist_sq <= radius_sq then
           list[#list + 1] = {
             index = entry.index or index,
@@ -278,7 +278,7 @@ function GrillView.bubble_spec(options)
       local shared = ensure_shared(options.shared or (ctx.services and ctx.services.grill_shared))
       local entry = item_signal:now()
       local suffix = tostring(entry.index)
-      local node = ViewUtil.create_anchor_scene_node(
+      local node = view_util.create_anchor_scene_node(
         scope, ctx, entry, cfg().BubbleHeight, "grill", "SceneNodeGrill_" .. suffix
       )
       local button = ctx.create_node(scope, "EUIButton", {
@@ -295,4 +295,4 @@ function GrillView.bubble_spec(options)
   }
 end
 
-return GrillView
+return grill_view

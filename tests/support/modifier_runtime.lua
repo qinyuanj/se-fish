@@ -1,18 +1,18 @@
--- modifier_system 离线边界：驱动真实 SpokeClock + PlayerTree + PlayerEffects + ModifierLeaf
+-- modifier_system 离线边界：驱动真实 spoke_clock + player_tree + player_effects + modifier_leaf
 -- （含活鱼 entity_store）与真实官方包 modifier_system.api；仅引擎单位、事件与 Timer 为替身。
-local GameCfg = require('common.game_cfg')
-local SpokeClock = require('common.spoke_clock')
-local PlayerTree = require('server.world_host.player_tree')
-local ModifierLeaf = require('server.world_host.modifier_leaf')
+local game_cfg = require('common.game_cfg')
+local spoke_clock = require('common.spoke_clock')
+local player_tree = require('server.world_host.player_tree')
+local modifier_leaf = require('server.world_host.modifier_leaf')
 
-local Runtime = {}
+local runtime = {}
 
 local function make_dummy_data(player)
     return {
         Player = player,
         Inited = true,
         LoadState = 'ready',
-        Data = { FishCoin = 0, Zone = 'fishPond', Containers = { itemBar = {}, backpack = {} }, Bait = {}, Weapons = {} },
+        data = { FishCoin = 0, Zone = 'fishPond', Containers = { itemBar = {}, backpack = {} }, Bait = {}, Weapons = {} },
         Extra = {
             inventory = { weapons = {}, selection = { held = {} } },
             growth = { potions = {}, upgrades = {} },
@@ -22,9 +22,9 @@ local function make_dummy_data(player)
     }
 end
 
-function Runtime.New(clock)
+function runtime.New(clock)
     local start_now = clock or 100
-    local e = { now = start_now, units = {}, timers = {}, spoke_clock = SpokeClock.new(start_now), step_hooks = {} }
+    local e = { now = start_now, units = {}, timers = {}, spoke_clock = spoke_clock.new(start_now), step_hooks = {} }
     local function signal()
         local tokens = {}
         return {
@@ -96,7 +96,7 @@ function Runtime.New(clock)
 
     local function advance_spoke_to(target_now)
         if target_now < e.spoke_clock.now() then
-            e.spoke_clock = SpokeClock.new(target_now)
+            e.spoke_clock = spoke_clock.new(target_now)
         elseif target_now > e.spoke_clock.now() then
             local dt = target_now - e.spoke_clock.now()
             e.spoke_clock:step(dt, target_now)
@@ -151,20 +151,20 @@ function Runtime.New(clock)
         }
 
         local function apply_dot(target, damage, source)
-            if mgr.Vitals and mgr.Vitals.NewHit and mgr.Vitals.ApplyHit then
-                local hit = mgr.Vitals:NewHit(source, 'dot')
-                mgr.Vitals:ApplyHit(hit, target, damage)
+            if mgr.vitals and mgr.vitals.NewHit and mgr.vitals.ApplyHit then
+                local hit = mgr.vitals:NewHit(source, 'dot')
+                mgr.vitals:ApplyHit(hit, target, damage)
             end
         end
 
         local preset_proxy = setmetatable({}, {
             __index = function(_, k)
-                local src = mgr.Presets or GameCfg.Ability.ModifierPresets or {}
+                local src = mgr.Presets or game_cfg.Ability.ModifierPresets or {}
                 return src[k]
             end,
         })
 
-        local entity_store = ModifierLeaf.create_entity_store({
+        local entity_store = modifier_leaf.create_entity_store({
             modifier_api = modifierAPI,
             presets = preset_proxy,
             now = function() return e.now end,
@@ -193,8 +193,8 @@ function Runtime.New(clock)
         local function resolve_entity(target)
             if type(target) ~= 'table' then return target end
             if target.Carrier then return target end
-            if mgr.Vitals and mgr.Vitals.FishCarrier and mgr.Vitals.FishCarrier.ResolveCarrier then
-                local carrier = mgr.Vitals.FishCarrier:ResolveCarrier(target)
+            if mgr.vitals and mgr.vitals.fish_carrier and mgr.vitals.fish_carrier.ResolveCarrier then
+                local carrier = mgr.vitals.fish_carrier:ResolveCarrier(target)
                 if carrier then return { Carrier = carrier, Ref = target } end
             end
             return target
@@ -211,7 +211,7 @@ function Runtime.New(clock)
             if existing and not existing:is_disposed() then
                 existing:dispose()
             end
-            local pt = PlayerTree.spawn({
+            local pt = player_tree.spawn({
                 player = player,
                 data = make_dummy_data(player),
                 clock = e.spoke_clock,
@@ -219,7 +219,7 @@ function Runtime.New(clock)
                     on_dot_tick = function(tree, _kind, damage, source)
                         apply_dot(tree.player, damage, source)
                     end,
-                    on_mount_modifier_leaf = ModifierLeaf.make_slot_mounter({
+                    on_mount_modifier_leaf = modifier_leaf.make_slot_mounter({
                         modifier_api = modifierAPI,
                         presets = preset_proxy,
                     }),
@@ -248,7 +248,7 @@ function Runtime.New(clock)
             local player = resolve_player(target)
             if player then
                 if not player.Character then return false, 'no-effect-owner' end
-                local presets = self.Presets or GameCfg.Ability.ModifierPresets or {}
+                local presets = self.Presets or game_cfg.Ability.ModifierPresets or {}
                 local preset = presets[kind]
                 if type(preset) ~= 'string' or preset == '' then
                     return false, 'modifier-preset-missing:' .. tostring(kind)
@@ -376,9 +376,9 @@ function Runtime.New(clock)
     return e
 end
 
--- 旧生存测试接入真实 SpokeClock + PlayerEffects + ModifierLeaf；速度投影是可观测边界，不复制效果计时。
-function Runtime.AttachSurvival(survival, now)
-    local e = Runtime.New(now())
+-- 旧生存测试接入真实 spoke_clock + player_effects + modifier_leaf；速度投影是可观测边界，不复制效果计时。
+function runtime.AttachSurvival(survival, now)
+    local e = runtime.New(now())
     local modifier = e.loadModifier()
     local syncing = false
     local function sync(player)
@@ -409,4 +409,4 @@ function Runtime.AttachSurvival(survival, now)
     return modifier
 end
 
-return Runtime
+return runtime

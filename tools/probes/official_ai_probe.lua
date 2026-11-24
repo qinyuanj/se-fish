@@ -1,6 +1,6 @@
 -- #50 服务端隔离探针；不自动加载、不挂 manager、不改正式鱼或配置。
--- 由获准的运行环境 loadfile 后调用 Probe.Run(context)，本轮禁止执行编辑器。
-local Probe = {}
+-- 由获准的运行环境 loadfile 后调用 probe.Run(context)，本轮禁止执行编辑器。
+local probe = {}
 
 local retained = {
     eel = '放电次数、睡眠、乱甩与 eel_discharge 锚点伤害',
@@ -16,22 +16,22 @@ local retained = {
 }
 
 -- 逐项遍历实际配置，包含尚未 implemented 的条目；未知行为明确标出，不能缩减范围。
-function Probe.monsterMappings(cfg)
+function probe.monsterMappings(cfg)
     local rows = {}
     local ability = cfg.Ability or {}
     for id, fish in pairs(cfg.Fish) do
         local flight = ability.Flight and ability.Flight.Species and ability.Flight.Species[id]
-        local boss = ability.BossPhase and ability.BossPhase.Species and ability.BossPhase.Species[id]
+        local boss = ability.boss_phase and ability.boss_phase.Species and ability.boss_phase.Species[id]
         local behavior, official, keep
         if boss then
             behavior, official = '阶段首领', { 'ChaseTarget', 'StopMove', 'CastAbilityByKey' }
-            keep = 'BossPhase 阈值与跳阶段、入水/上岸轨迹、吐息、叼人 CarryMount、阶段伤害'
+            keep = 'boss_phase 阈值与跳阶段、入水/上岸轨迹、吐息、叼人 carry_mount、阶段伤害'
         elseif flight then
             behavior = flight.Mode == 'leap' and '跃起携带' or '飞行俯冲'
             official = { 'StopMove', 'CastAbilityByKey' }
-            keep = 'FlightPath 三维巡航/俯冲/跃起、边界钳制、目标追踪与伤害去重'
+            keep = 'flight_path 三维巡航/俯冲/跃起、边界钳制、目标追踪与伤害去重'
             if flight.ThrowIntervalSec then keep = keep .. '、周期投掷与落地范围' end
-            if flight.Mode == 'leap' then keep = keep .. '、咬中/接触伤害、CarryMount 叼走入海与释放' end
+            if flight.Mode == 'leap' then keep = keep .. '、咬中/接触伤害、carry_mount 叼走入海与释放' end
         elseif fish.Grade == 'normal' or fish.Grade == 'rare' then
             behavior, official = '逃跑', { 'MoveToPos', 'MoveDirection', 'StopMove' }
             keep = 'MgrFishUnit 最近水域、地块边界、逃跑时限、举鱼/放下状态与逃脱结算'
@@ -53,7 +53,7 @@ function Probe.monsterMappings(cfg)
 end
 
 -- 探针入口。context 必须注入隔离对象与观测边界；Run 结束后单位与临时状态必须清理。
-function Probe.Run(context)
+function probe.Run(context)
     local c = context or {}
     assert(c.ai and c.createUnit and c.destroyUnit and c.players and c.now and c.wait and c.vector,
         'official_ai_probe 需要隔离 context 与时间/向量边界')
@@ -119,7 +119,7 @@ function Probe.Run(context)
             c.wait(0.1); observe('技能指令', 'castObserved', true)
         else missing('技能指令', '无隔离技能预设与技能观测') end
         -- 交接门卫只控制业务回调；vendor取消通过停止后再次观测证明。
-        local gate = Probe.newHandoff(ai, unit, function(p) unit:SetPosition(p) end,
+        local gate = probe.newHandoff(ai, unit, function(p) unit:SetPosition(p) end,
             function(damage) if c.applyHit then c.applyHit(damage) end end, log)
         local old = gate:Switch('official')
         ai.Funcs.MoveDirection(unit, v(1, 0, 0), 0, 0)
@@ -151,7 +151,7 @@ function Probe.Run(context)
 end
 
 -- 交接门卫：每次切换先撤销旧方写入权并停官方 AI；回调必须各自判断接收到的 token。
-function Probe.newHandoff(ai, unit, applyPosition, applyHit, log)
+function probe.newHandoff(ai, unit, applyPosition, applyHit, log)
     log = log or print
     local gate = { generation = 0, owner = nil, appliedHits = {} }
     function gate:Switch(mode)
@@ -184,4 +184,4 @@ function Probe.newHandoff(ai, unit, applyPosition, applyHit, log)
     return gate
 end
 
-return Probe
+return probe

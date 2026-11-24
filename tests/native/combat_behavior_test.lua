@@ -2,7 +2,7 @@
 -- describe / it 名沿用旧类名与方法名；注册顺序 = 旧套件实际执行顺序（LuaUnit 按 `类名.方法名` 全局字典序，
 -- 故 TestEelDischargeEntry 在前、TestMainCombatWiring 居中、TestMeleeHitEntry 在后）。
 -- #128：武器命中与电鳗范围命中必须经统一伤害入口；同一判定段重放不双扣。
--- #129：玩家挥砍只认 AbilityAPI 挥砍登记（伤害/射程来自 GameCfg 表），未登记不结算。
+-- #129：玩家挥砍只认 ability_api 挥砍登记（伤害/射程来自 game_cfg 表），未登记不结算。
 --
 -- 迁移纪律：
 --   * 旧 setUp/tearDown 的替身（全局引擎 + 4 个 package.loaded 管理器模块）改成逐案例 before_each/after_each，
@@ -10,7 +10,7 @@
 --     server/ability_behaviors/melee_hit.lua 与 eel_discharge.lua 这两个公开接缝上观察，不伸手进实现；
 --   * server/main.lua 的接线守卫读源码断言：assertStrContains 的 plain 子串语义用
 --     assert.matches(needle, haystack, nil, true) 保留（`.` 在 Lua pattern 里是任意字符，不能当 pattern 跑）。
-local GameCfg = require('common.game_cfg')
+local game_cfg = require('common.game_cfg')
 
 local function signal()
     local s = { handlers = {} }
@@ -65,10 +65,10 @@ describe('TestEelDischargeEntry', function()
         }
         ctx.inside = { UserId = 1, Character = { Position = vec(1, 0, 0), Controller = { Health = 300 } } }
         ctx.outside = { UserId = 2, Character = { Position = vec(9, 0, 0), Controller = { Health = 300 } } }
-        ctx.services = { Vitals = ctx.vitals,
-            FishCarrier = package.loaded['server.world_host.fish_carrier'] }
+        ctx.services = { vitals = ctx.vitals,
+            fish_carrier = package.loaded['server.world_host.fish_carrier'] }
         package.loaded['server.world_host.fish_carrier'] = setmetatable({}, { __index = function()
-            error('电鳗行为不应再加载 MgrFishCarrier') end })
+            error('电鳗行为不应再加载 mgr_fish_carrier') end })
         _G.game = { GetService = function(_, name)
             if name == 'Players' then return { GetPlayers = function() return { ctx.inside, ctx.outside } end } end
         end }
@@ -92,9 +92,9 @@ describe('TestEelDischargeEntry', function()
         assert.same(2, #ctx.hits)
     end)
 
-    -- #134 范围：按 GameCfg.Ability 的 5 米 / 10 伤害，边界上命中、超出与已死玩家不命中；电鳗已死锚点点火不放电。
+    -- #134 范围：按 game_cfg.Ability 的 5 米 / 10 伤害，边界上命中、超出与已死玩家不命中；电鳗已死锚点点火不放电。
     it('test_formal_radius_boundary_and_dead_targets', function()
-        local eel = GameCfg.Ability.FishAbilities.eel
+        local eel = game_cfg.Ability.FishAbilities.eel
         local behavior = assert(loadfile('server/ability_behaviors/eel_discharge.lua'))()
         behavior.Services = ctx.services
         ctx.inside.Character.Position = vec(3, 0, 4)
@@ -127,14 +127,14 @@ describe('TestMainCombatWiring', function()
     it('test_combat_managers_are_wired_to_unified_entry', function()
         local src = readSource('server/main.lua') .. '\n' .. readSource('server/world_host/server_runtime.lua')
         for _, needle in ipairs({
-            'opts.fish_ability.Vitals = runtime.life',
+            'opts.fish_ability.vitals = runtime.life',
             'function runtime:damage_fish',
             'opts.fish_ability.BehaviorServices = {',
-            'Vitals = runtime.life',
+            'vitals = runtime.life',
             'local fishHost = WorldRuntime.fish_host',
-            'local FishTree = require("server.world_host.fish_tree")',
+            'local fish_tree = require("server.world_host.fish_tree")',
             'Modifier = modifier_service',
-            'GM = PlayerGM',
+            'GM = player_gm',
             'function runtime:receive_landed',
         }) do
             assert.message('server/main.lua 缺接线：' .. needle).matches(needle, src, nil, true)
@@ -165,7 +165,7 @@ describe('TestMeleeHitEntry', function()
             TakeDamage = function() ctx.controllerCalls = ctx.controllerCalls + 1 end,
         } }
         ctx.carrier = { Receiver = ctx.target }
-        -- #129：玩家挥砍只认 AbilityAPI 登记值；测试用假登记模块，不经真实包链
+        -- #129：玩家挥砍只认 ability_api 登记值；测试用假登记模块，不经真实包链
         package.loaded['server.ability_api'] = {}
         package.loaded['server.swing_registry'] = {
             TakeSwing = function(userId)
@@ -189,8 +189,8 @@ describe('TestMeleeHitEntry', function()
             ResolveCarrier = function(_, target) return target == ctx.target and ctx.carrier or nil end,
         }
         package.loaded['server.world_host.player_gm'] = { GetMeleeDamage = function(_, _, damage) return damage end }
-        ctx.services = { Vitals = ctx.vitals,
-            FishCarrier = package.loaded['server.world_host.fish_carrier'], GM = package.loaded['server.world_host.player_gm'],
+        ctx.services = { vitals = ctx.vitals,
+            fish_carrier = package.loaded['server.world_host.fish_carrier'], GM = package.loaded['server.world_host.player_gm'],
             Modifier = {} }
         for _, name in ipairs({ 'server.world_host.fish_carrier', 'server.world_host.player_gm' }) do
             package.loaded[name] = setmetatable({}, { __index = function()

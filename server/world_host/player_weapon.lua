@@ -1,22 +1,22 @@
 
-local GameCfg = require("common.game_cfg")
-local Number = require("common.number")
-local MathWaterJudge = require("common.math_water_judge")
-local SwingRegistry = require("server.swing_registry")
+local game_cfg = require("common.game_cfg")
+local number = require("common.number")
+local math_water_judge = require("common.math_water_judge")
+local swing_registry = require("server.swing_registry")
 local State = require("common.packages.spoke.api").State
 
-local PlayerWeapon = {}
+local player_weapon = {}
 
 local ATTACK_ANIM_FILTER = 30
 local ATTACK_ANIM_PRIORITY = 2
 local THROW_VISUAL_MESH = 57450
 
 local function ability()
-  return GameCfg.Ability
+  return game_cfg.Ability
 end
 
 local function finite(value)
-  return Number.IsFiniteNumber(value)
+  return number.IsFiniteNumber(value)
 end
 
 local function vec(x, y, z)
@@ -40,7 +40,7 @@ local function reply(remote, player, payload)
 end
 
 local function fail(remote, player, action, reason, extra)
-  print("[PlayerWeapon] 拒绝", player and player.UserId, tostring(action), reason)
+  print("[player_weapon] 拒绝", player and player.UserId, tostring(action), reason)
   local payload = { ok = false, action = action, reason = reason }
   if type(extra) == "table" then
     for key, value in pairs(extra) do payload[key] = value end
@@ -107,14 +107,14 @@ local function play_anim(tracks, player, anim)
       track.Looped = false
       local priority_ok, priority_err = pcall(function() track.Priority = ATTACK_ANIM_PRIORITY end)
       if not priority_ok then
-        print("[PlayerWeapon] 出手动作优先级设置失败，按默认优先级播", tostring(anim), tostring(priority_err))
+        print("[player_weapon] 出手动作优先级设置失败，按默认优先级播", tostring(anim), tostring(priority_err))
       end
       by_character[anim] = track
     end
     track:Play(0.05, 1, 1)
   end)
   if not ok then
-    print("[PlayerWeapon] 出手动作播放失败", player.UserId, tostring(anim), tostring(err))
+    print("[player_weapon] 出手动作播放失败", player.UserId, tostring(anim), tostring(err))
   end
   return ok
 end
@@ -154,7 +154,7 @@ local function cast_melee(opts, player)
   if type(caster) ~= "function" then return false end
   local ok, cast = pcall(caster, character, index)
   if not ok then
-    print("[PlayerWeapon] 挥砍施法失败", player.UserId, tostring(cast))
+    print("[player_weapon] 挥砍施法失败", player.UserId, tostring(cast))
     return false
   end
   return cast == true
@@ -164,7 +164,7 @@ local function apply_effect(opts, source, target, effect)
   if type(effect) ~= "table" or type(effect.Kind) ~= "string" then return end
   if type(opts.apply_effect) == "function" then
     local ok, err = pcall(opts.apply_effect, source, target, effect.Kind)
-    if not ok then print("[PlayerWeapon] 武器特效应用失败", tostring(err)) end
+    if not ok then print("[player_weapon] 武器特效应用失败", tostring(err)) end
   end
 end
 
@@ -248,8 +248,8 @@ local function gun_hit(opts, player, aim)
 end
 
 local function water_zone_at(x, z)
-  for _, zone in ipairs(GameCfg.Water.Zones or {}) do
-    if MathWaterJudge.InZone(zone, { x = x, y = zone.SurfaceY, z = z }) then return zone end
+  for _, zone in ipairs(game_cfg.Water.Zones or {}) do
+    if math_water_judge.InZone(zone, { x = x, y = zone.SurfaceY, z = z }) then return zone end
   end
   return nil
 end
@@ -286,7 +286,7 @@ local function blast_candidates(rows)
   local out = {}
   local rod = ability().Throw.FishRodLevel
   for _, row in ipairs(rows or {}) do
-    local species = row.Id and GameCfg.Fish[row.Id]
+    local species = row.Id and game_cfg.Fish[row.Id]
     if species and row.RodLevel == rod and species.Grade == "normal" then
       out[#out + 1] = { id = row.Id, weight = row.DrawWeight or 1 }
     end
@@ -309,10 +309,10 @@ end
 
 local function spawn_blast_fish(opts, zone, landing, player)
   if not opts.fish_unit or type(opts.fish_unit.SpawnBlastFish) ~= "function" then return 0 end
-  local rows = GameCfg.Casting and GameCfg.Casting.Zones and GameCfg.Casting.Zones[zone.Id]
+  local rows = game_cfg.Casting and game_cfg.Casting.Zones and game_cfg.Casting.Zones[zone.Id]
   local candidates = blast_candidates(rows)
   if #candidates == 0 then
-    print("[PlayerWeapon] 爆炸落水但该水区没有 1 级普通鱼保底", zone.Id)
+    print("[player_weapon] 爆炸落水但该水区没有 1 级普通鱼保底", zone.Id)
     return 0
   end
   local throw_cfg = ability().Throw
@@ -340,15 +340,15 @@ local function detonate(session, flight)
   if flight.zone then
     local ok, err = pcall(spawn_blast_fish, session.opts, flight.zone, flight.landing, flight.player)
     if ok then
-      print("[PlayerWeapon] 爆炸落水", flight.zone.Id, flight.item_id, "保底鱼=" .. tostring(err))
+      print("[player_weapon] 爆炸落水", flight.zone.Id, flight.item_id, "保底鱼=" .. tostring(err))
     else
-      print("[PlayerWeapon] 爆炸落水保底鱼失败", flight.zone.Id, flight.item_id, tostring(err))
+      print("[player_weapon] 爆炸落水保底鱼失败", flight.zone.Id, flight.item_id, tostring(err))
     end
   end
   local hit = session.opts.new_hit and session.opts.new_hit(flight.player, "explosive") or nil
   local damaged = radial_damage(session.opts, flight.landing, ability().Throw.ExplosionRadius,
     damage, hit, flight.player)
-  print("[PlayerWeapon] 爆炸", flight.item_id, flight.zone and "water" or "land",
+  print("[player_weapon] 爆炸", flight.item_id, flight.zone and "water" or "land",
     "damage=" .. tostring(damage), "命中=" .. tostring(damaged))
   return damaged
 end
@@ -373,7 +373,7 @@ local function step_flights(session, now)
       if flight.visual then
         local destroyed, err = pcall(function() flight.visual:Destroy() end)
         if not destroyed then
-          print("[PlayerWeapon] 视觉销毁失败", flight.player and flight.player.UserId,
+          print("[player_weapon] 视觉销毁失败", flight.player and flight.player.UserId,
             flight.item_id, tostring(err))
         end
       end
@@ -398,7 +398,7 @@ local function create_visual(session, player, flight)
     Scale = vec(1, 1, 1),
   })
   if ok and visual then return visual end
-  print("[PlayerWeapon] 投掷物视觉创建失败（不影响结算）", tostring(visual))
+  print("[player_weapon] 投掷物视觉创建失败（不影响结算）", tostring(visual))
   return nil
 end
 
@@ -418,7 +418,7 @@ local function launch(session, player, item_id, target)
   session.flying[#session.flying + 1] = flight
   if session.has_flights then session.has_flights:set(true) end
   play_anim(session.tracks, player, ability().Throw.Anim)
-  print("[PlayerWeapon] 投掷", player.UserId, item_id, zone and ("落水 " .. zone.Id) or "落地")
+  print("[player_weapon] 投掷", player.UserId, item_id, zone and ("落水 " .. zone.Id) or "落地")
   return flight
 end
 
@@ -457,16 +457,16 @@ local function attack_melee(session, player, weapon_id)
   end
   local scale = weapon_id and damage_scale(session.tree, "melee") or 1
   local damage = cfg.Damage * scale
-  if not SwingRegistry.StageSwing(player.UserId, { damage = damage, range = cfg.Range, effect = cfg.Effect }) then
+  if not swing_registry.StageSwing(player.UserId, { damage = damage, range = cfg.Range, effect = cfg.Effect }) then
     return fail(session.remote, player, "attack", "swing-unavailable", { weapon = weapon_id })
   end
   session.melee_at[key] = now
   if not cast_melee(session.opts, player) then
-    SwingRegistry.ClearSwing(player.UserId)
+    swing_registry.ClearSwing(player.UserId)
     return fail(session.remote, player, "attack", "cast-failed", { weapon = weapon_id })
   end
   play_anim(session.tracks, player, cfg.Anim)
-  print("[PlayerWeapon] 挥砍发起", player.UserId, tostring(weapon_id or "unarmed"),
+  print("[player_weapon] 挥砍发起", player.UserId, tostring(weapon_id or "unarmed"),
     "damage=" .. tostring(damage), "range=" .. tostring(cfg.Range))
   return reply(session.remote, player, {
     ok = true, action = "attack", weapon = weapon_id, damage = damage, range = cfg.Range,
@@ -486,7 +486,7 @@ local function attack_gun(session, player, weapon_id, cfg, aim)
   end
   if mag.ammo <= 0 then
     mag.reload_until = now + ability().GunShared.ReloadSec
-    print("[PlayerWeapon] 空匣自动换弹", player.UserId, weapon_id)
+    print("[player_weapon] 空匣自动换弹", player.UserId, weapon_id)
     return fail(session.remote, player, "attack", "empty", { weapon = weapon_id, autoReload = true })
   end
   mag.ammo = mag.ammo - 1
@@ -504,9 +504,9 @@ local function attack_gun(session, player, weapon_id, cfg, aim)
       applied = result == true or applied
     end
     if applied then apply_effect(session.opts, player, target, cfg.Effect) end
-    print("[PlayerWeapon] 枪击命中", player.UserId, weapon_id, "ammo=" .. tostring(mag.ammo))
+    print("[player_weapon] 枪击命中", player.UserId, weapon_id, "ammo=" .. tostring(mag.ammo))
   else
-    print("[PlayerWeapon] 枪击未命中", player.UserId, weapon_id, "ammo=" .. tostring(mag.ammo))
+    print("[player_weapon] 枪击未命中", player.UserId, weapon_id, "ammo=" .. tostring(mag.ammo))
   end
   if cfg.Splash and hit_pos then
     local splash_hit = session.opts.new_hit(player, "weapon")
@@ -522,7 +522,7 @@ local function selected_explosive(tree)
   local snapshot = tree.get_item_bar_snapshot and tree:get_item_bar_snapshot() or nil
   local slot = snapshot and snapshot.selectedSlot
   local entry = slot and snapshot.slots and snapshot.slots[slot]
-  local definition = entry and GameCfg.Items.Definitions[entry.itemId]
+  local definition = entry and game_cfg.Items.Definitions[entry.itemId]
   if definition and definition.Type == "爆炸物" then
     return { slot = slot, item_id = entry.itemId }
   end
@@ -533,7 +533,7 @@ local function consume_throwable(session, player, slot, item_id, payload)
   local save = session.opts.save
   local data = session.tree.data
   if not save then
-    local container = data.Data and data.Data.Containers and data.Data.Containers[GameCfg.Items.ContainerId.ItemBar]
+    local container = data.data and data.data.Containers and data.data.Containers[game_cfg.Items.ContainerId.ItemBar]
     local entry = container and container[slot]
     if not entry or (entry.count or 0) <= 0 or entry.itemId ~= item_id then
       return fail(session.remote, player, "throw", "empty", { slot = slot })
@@ -564,14 +564,14 @@ local function consume_throwable(session, player, slot, item_id, payload)
     end) == true
   end
   return save:Execute(player, data, operation, function(draft)
-    local container = draft.Data.Containers[GameCfg.Items.ContainerId.ItemBar]
+    local container = draft.data.Containers[game_cfg.Items.ContainerId.ItemBar]
     local entry = container and container[slot]
     if not entry or (entry.count or 0) <= 0 or entry.itemId ~= item_id then return nil, "empty" end
     if type(draft.UpdateData) == "function" then
       draft:UpdateData(function(stored)
-        local current = stored.Containers[GameCfg.Items.ContainerId.ItemBar][slot]
+        local current = stored.Containers[game_cfg.Items.ContainerId.ItemBar][slot]
         if current and current.count > 1 then current.count = current.count - 1
-        else stored.Containers[GameCfg.Items.ContainerId.ItemBar][slot] = nil end
+        else stored.Containers[game_cfg.Items.ContainerId.ItemBar][slot] = nil end
       end, true)
     end
     return { ok = true, action = "throw", itemId = item_id, slot = slot }
@@ -595,7 +595,7 @@ local function on_action(session, player, payload)
       return false
     end
     if session.tree.memos.can_act:now() ~= true then
-      SwingRegistry.ClearSwing(player.UserId)
+      swing_registry.ClearSwing(player.UserId)
       fail(session.remote, player, "attack", "cannot-act")
       return true
     end
@@ -610,7 +610,7 @@ local function on_action(session, player, payload)
     elseif weapon_id and melee[weapon_id] then
       attack_melee(session, player, weapon_id)
     else
-      if weapon_id then print("[PlayerWeapon] 武器未配置攻击数值，回落空手", player.UserId, weapon_id) end
+      if weapon_id then print("[player_weapon] 武器未配置攻击数值，回落空手", player.UserId, weapon_id) end
       attack_melee(session, player, nil)
     end
     return true
@@ -630,7 +630,7 @@ local function on_action(session, player, payload)
     if mag.reload_until then return fail(session.remote, player, "reload", "reloading", { weapon = weapon_id }) and true end
     if mag.ammo >= size then return fail(session.remote, player, "reload", "mag-full", { weapon = weapon_id }) and true end
     mag.reload_until = now + ability().GunShared.ReloadSec
-    print("[PlayerWeapon] 手动换弹", player.UserId, weapon_id)
+    print("[player_weapon] 手动换弹", player.UserId, weapon_id)
     reply(session.remote, player, {
       ok = true, action = "reload", weapon = weapon_id, reloadSec = ability().GunShared.ReloadSec,
     })
@@ -662,10 +662,10 @@ local function on_action(session, player, payload)
   return false
 end
 
-function PlayerWeapon.mount(scope, tree, opts)
+function player_weapon.mount(scope, tree, opts)
   opts = type(opts) == "table" and opts or {}
   local player = tree.player
-  local has_flights = State.new("PlayerWeapon.has_flights", false)
+  local has_flights = State.new("player_weapon.has_flights", false)
   local session = {
     tree = tree,
     opts = opts,
@@ -693,21 +693,21 @@ function PlayerWeapon.mount(scope, tree, opts)
     es:d(tree.states.weapons)
     local weapon_id = equipped_weapon(tree)
     if session.equipped ~= weapon_id then
-      SwingRegistry.ClearSwing(player.UserId)
+      swing_registry.ClearSwing(player.UserId)
     end
     session.equipped = weapon_id
   end)
 
   scope:on_cleanup(function()
     clear_reload(session)
-    SwingRegistry.ClearSwing(player.UserId)
+    swing_registry.ClearSwing(player.UserId)
     session.cleaned = true
     for index = #session.flying, 1, -1 do
       local flight = session.flying[index]
       if flight.visual then
         local destroyed, err = pcall(function() flight.visual:Destroy() end)
         if not destroyed then
-          print("[PlayerWeapon] 清理阶段投掷物视觉销毁失败", player.UserId, flight.item_id, tostring(err))
+          print("[player_weapon] 清理阶段投掷物视觉销毁失败", player.UserId, flight.item_id, tostring(err))
         end
       end
       session.flying[index] = nil
@@ -726,9 +726,9 @@ function PlayerWeapon.mount(scope, tree, opts)
       end
       if owner == nil and character_of(player) == unit then owner = player end
       if owner == nil then return true end
-      return SwingRegistry.PeekSwing(owner.UserId) ~= nil
+      return swing_registry.PeekSwing(owner.UserId) ~= nil
     end,
   }
 end
 
-return PlayerWeapon
+return player_weapon

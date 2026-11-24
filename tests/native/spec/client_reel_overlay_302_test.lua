@@ -1,25 +1,25 @@
-local Eui = require("tests.support.eui_double")
-local ClientStore = require("client.store.client_store")
-local RootView = require("client.views.root_view")
-local ReelOverlayView = require("client.views.reel_overlay_view")
-local SpokeClock = require("common.spoke_clock")
+local eui = require("tests.support.eui_double")
+local client_store = require("client.store.client_store")
+local root_view = require("client.views.root_view")
+local reel_overlay_view = require("client.views.reel_overlay_view")
+local spoke_clock = require("common.spoke_clock")
 
 local function mount()
-  local clock = SpokeClock.new(20)
-  local store, writer = ClientStore.new({ clock = clock })
-  local root = Eui.Node({ Name = "UIRoot" })
+  local clock = spoke_clock.new(20)
+  local store, writer = client_store.new({ clock = clock })
+  local root = eui.Node({ Name = "UIRoot" })
   local sent, closed, created = {}, {}, {}
   local reel = {}
-  local view = RootView.mount(root, store, {
+  local view = root_view.mount(root, store, {
     services = {
       reel = reel,
       now = function() return clock.now() end,
       send_reel = function(payload) sent[#sent + 1] = payload end,
       send_close = function(payload) closed[#closed + 1] = payload end,
     },
-    overlays = { reel = ReelOverlayView.spec() },
+    overlays = { reel = reel_overlay_view.spec() },
     create_node = function(kind, props)
-      local node = Eui.Node({
+      local node = eui.Node({
         Kind = kind, Name = props and props.Name, Parent = props and props.Parent,
         Visible = props and props.Visible, Text = props and (props.Text or props.ButtonText) or "",
         Position = props and props.Position, Size = props and props.Size,
@@ -76,7 +76,7 @@ describe("客户端收线覆盖层宿主接缝（#302）", function()
     env.writer:ingest_event("CastState", { phase = "hooked", reelSession = "s1", castId = 1 })
     env.writer:ingest_event("ReelInRE", { action = "started", session = "s1", progress = 50 })
     local close = child(env, "BtnReelClose")
-    assert.is_true(Eui.Click(close))
+    assert.is_true(eui.Click(close))
     assert.are.same({ session = "s1" }, env.closed[1])
     assert.is_nil(child(env, "ReelMask"))
 

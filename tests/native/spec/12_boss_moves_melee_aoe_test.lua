@@ -2,7 +2,7 @@
 -- 覆盖 12-07 / 12-08 / 12-09 / 12-10 / 12-11 / 12-15 / 12-16 / 12-17 / 12-18 / 12-19。
 --
 -- 取证缝（用户指定）：MgrFishUnit:SpawnLanded + Drop 放下，逐帧 Update 推进服务端时钟；
--- 只观察玩家可见的三面：玩家血量、服务端 GarBiteNotice 预警载荷、鱼的战斗状态字。
+-- 只观察玩家可见的三面：玩家血量、服务端 gar_bite_notice 预警载荷、鱼的战斗状态字。
 -- 服务端权威结算；客户端 LocalGarBite 只消费这份载荷，不参与判定。
 --
 -- 失败方式（编码前列出）：
@@ -11,17 +11,17 @@
 --   3. 头部区判定失效（绕后仍咬中）/ 表外招式被排进循环；
 --   4. 活动 15 / 30 秒后的眩晕窗口被抬后或不生效。
 
-local Cfg = require('common.game_cfg')
-local Islet = require('tests.support.isle_combat')
-local BossMoves = require('common.cfg.boss_moves')
-local GarBiteNotice = require('common.gar_bite_notice')
+local cfg = require('common.game_cfg')
+local islet = require('tests.support.isle_combat')
+local boss_moves = require('common.cfg.boss_moves')
+local gar_bite_notice = require('common.gar_bite_notice')
 
 local function need(cond, fmt, ...)
     if not cond then error(string.format(fmt, ...), 2) end
 end
 
 local function idOf(combat)
-    for id, species in pairs(Cfg.Fish) do
+    for id, species in pairs(cfg.Fish) do
         if species.Combat == combat then return id end
     end
     error('逐招表的 Combat 标签没有对应鱼种：' .. combat)
@@ -32,7 +32,7 @@ describe('第 12 节 逐招表（近战与范围组）', function()
 
     before_each(function()
         savedAbility = package.loaded['server.ability_api']
-        env = Islet.new(1)
+        env = islet.new(1)
         env.player.Character.Controller.Health = 100000 -- 长时间节拍断言不被 300 血上限截断
         package.loaded['server.ability_api'] = nil
         hp = function() return env.player.Character.Controller.Health end
@@ -61,7 +61,7 @@ describe('第 12 节 逐招表（近战与范围组）', function()
     -- 预警载荷三件套必须就是逐招表那一行；命中结算走 MgrVitals，与形状无关。
     local function warningIsRow(move)
         local list = locks(move)
-        local row = BossMoves.Get(env.moveFish, move)
+        local row = boss_moves.Get(env.moveFish, move)
         assert.truthy(#list > 0, move .. ' 没有预警广播')
         for _, notice in ipairs(list) do
             assert.same(row.Warning.Kind, notice.shape, move .. ' 预警形状与表不一致')
@@ -70,7 +70,7 @@ describe('第 12 节 逐招表（近战与范围组）', function()
             if row.Warning.Width then
                 assert.same(row.Warning.Width, notice.width, move .. ' 线形预警宽度与表不一致')
             end
-            assert.is_true(GarBiteNotice.Valid(notice), move .. ' 载荷不满足客户端协议')
+            assert.is_true(gar_bite_notice.Valid(notice), move .. ' 载荷不满足客户端协议')
         end
         return list
     end
@@ -78,7 +78,7 @@ describe('第 12 节 逐招表（近战与范围组）', function()
     -- 表外招式断言：服务端广播过的招式名都在该鱼的逐招表行集合里。
     local function noMovesOutsideTable(fishKey)
         local allowed = {}
-        for _, row in ipairs(BossMoves.ForFish(fishKey)) do allowed[row.Move] = true end
+        for _, row in ipairs(boss_moves.ForFish(fishKey)) do allowed[row.Move] = true end
         for _, notice in ipairs(env.notices) do
             if notice.kind == 'lock' then
                 assert.truthy(allowed[notice.move], '表外招式：' .. tostring(notice.move))
@@ -87,8 +87,8 @@ describe('第 12 节 逐招表（近战与范围组）', function()
     end
 
     it('条款 12-07：电鳗 6 移速、5 米内每秒 10 伤害，5 次后睡 10 秒且睡眠中可受击', function()
-        local row = BossMoves.Get('eel', 'discharge')
-        assert.same(6, Cfg.Fish.eel.Speed)
+        local row = boss_moves.Get('eel', 'discharge')
+        assert.same(6, cfg.Fish.eel.Speed)
         assert.same(5, row.Range)
         assert.same(10, row.Damage.Value)
         assert.same(1, row.Schedule.Sec)
@@ -129,7 +129,7 @@ describe('第 12 节 逐招表（近战与范围组）', function()
     end)
 
     it('条款 12-08：鳄雀鳝头部追咬 30、间隔 1.5 秒', function()
-        local row = BossMoves.Get('gar', 'bite')
+        local row = boss_moves.Get('gar', 'bite')
         local id = idOf('gar')
         assert.same(30, row.Damage.Value)
         assert.same(1.5, row.Schedule.Sec)
@@ -163,7 +163,7 @@ describe('第 12 节 逐招表（近战与范围组）', function()
     end)
 
     it('条款 12-10：虾霸两下蟹钳接尾刺击飞，基础攻击 20、节拍 2 秒', function()
-        local claw, tail = BossMoves.Get('shrimp', 'claw'), BossMoves.Get('shrimp', 'tail')
+        local claw, tail = boss_moves.Get('shrimp', 'claw'), boss_moves.Get('shrimp', 'tail')
         assert.same(20, claw.Damage.Value)
         assert.same(20, tail.Damage.Value)
         assert.same(2, claw.Schedule.Sec)
@@ -183,7 +183,7 @@ describe('第 12 节 逐招表（近战与范围组）', function()
     end)
 
     it('条款 12-11：虾霸活动 15 秒眩晕 5 秒，取代旧 20 秒', function()
-        local row = BossMoves.Get('shrimp', 'claw')
+        local row = boss_moves.Get('shrimp', 'claw')
         assert.same(15, row.Schedule.ActivitySec)
         assert.same(5, row.Schedule.StunSec)
         env.moveFish = 'shrimp'
@@ -199,7 +199,7 @@ describe('第 12 节 逐招表（近战与范围组）', function()
     end)
 
     it('条款 12-15：帝王蟹每 5 秒左右各 3 下、每下 0.2 秒 15 伤害', function()
-        local row = BossMoves.Get('kingCrab', 'jab')
+        local row = boss_moves.Get('kingCrab', 'jab')
         assert.same(15, row.Damage.Value)
         assert.same(5, row.Schedule.Sec)
         assert.same(6, row.Schedule.Count)
@@ -216,7 +216,7 @@ describe('第 12 节 逐招表（近战与范围组）', function()
     end)
 
     it('条款 12-16：帝王蟹活动 30 秒眩晕 5 秒', function()
-        local row = BossMoves.Get('kingCrab', 'jab')
+        local row = boss_moves.Get('kingCrab', 'jab')
         assert.same(30, row.Schedule.ActivitySec)
         assert.same(5, row.Schedule.StunSec)
         env.moveFish = 'kingCrab'
@@ -232,7 +232,7 @@ describe('第 12 节 逐招表（近战与范围组）', function()
     end)
 
     it('条款 12-17：蟹老板正面双击 20、冷却 4 秒', function()
-        local row = BossMoves.Get('crabBoss', 'pinch')
+        local row = boss_moves.Get('crabBoss', 'pinch')
         assert.same(20, row.Damage.Value)
         assert.same(4, row.Schedule.Sec)
         env.moveFish = 'crabBoss'
@@ -247,7 +247,7 @@ describe('第 12 节 逐招表（近战与范围组）', function()
     end)
 
     it('条款 12-18：蟹老板每 30 秒冲撞一次，线形预警先于命中', function()
-        local row = BossMoves.Get('crabBoss', 'charge')
+        local row = boss_moves.Get('crabBoss', 'charge')
         assert.same(30, row.Schedule.Sec)
         assert.same(20, row.Damage.Value)
         env.moveFish = 'crabBoss'
@@ -264,7 +264,7 @@ describe('第 12 节 逐招表（近战与范围组）', function()
     end)
 
     it('条款 12-19：蟹老板每 25 秒旋转 5 秒、碰触 30，圆形预警先于首段', function()
-        local row = BossMoves.Get('crabBoss', 'spin')
+        local row = boss_moves.Get('crabBoss', 'spin')
         assert.same(25, row.Schedule.Sec)
         assert.same(5, row.Schedule.DurationSec)
         assert.same(30, row.Damage.Value)

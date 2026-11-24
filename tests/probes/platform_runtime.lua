@@ -6,14 +6,14 @@ local cfg = require('common.game_cfg')
 local platform = require('server.platform_host')
 local players = require('server.player_data_host')
 local save = require('server.save_host')
-local ServerRuntime = require('server.world_host.server_runtime')
+local server_runtime = require('server.world_host.server_runtime')
 local world, task = game:GetService('World'), game:GetService('Task')
 local p = game:GetService('Players'):GetPlayers()[1]
 if not p then print('PLATFORM147 ABORT 无玩家') return end
 local data = players:GetDataInst(p)
 if not data then print('PLATFORM147 ABORT 存档未就绪') return end
-local runtime = ServerRuntime.current()
-if not runtime then print('PLATFORM147 ABORT ServerRuntime 未就绪') return end
+local runtime = server_runtime.current()
+if not runtime then print('PLATFORM147 ABORT server_runtime 未就绪') return end
 if not cfg.Debug or cfg.Debug.Enabled ~= true then print('PLATFORM147 ABORT 调试关闭') return end
 local tag = 'P147-' .. tostring(math.floor(world:GetServerTime()))
 local function log(...) print('PLATFORM147', tag, ...) end
@@ -29,18 +29,18 @@ end
 task:Spawn(function()
     if platform:HasFlow(p) then log('ABORT 已有平台flow') return end
     local before = ((data.Extra.lottery and data.Extra.lottery.pity) or 0)
-    assert(runtime:blindbox_action(p, { action = 'Draw', count = 1, seq = seq }))
+    assert(runtime:blindbox_action(p, { action = 'draw', count = 1, seq = seq }))
     if not ready() then log('ABORT 支付意图未落账') return end
     assert(platform:HandleTestAction(p, { action = 'ResolveFlow', outcome = 'cancel' }))
     log('取消不发奖', 'pity=' .. ((data.Extra.lottery and data.Extra.lottery.pity) or 0), 'before=' .. before)
     assert(((data.Extra.lottery and data.Extra.lottery.pity) or 0) == before)
-    assert(runtime:blindbox_action(p, { action = 'Draw', count = 1, seq = seq + 1 }))
+    assert(runtime:blindbox_action(p, { action = 'draw', count = 1, seq = seq + 1 }))
     if not ready() then log('ABORT 支付意图未落账') return end
     assert(platform:HandleTestAction(p, { action = 'ResolveFlow', outcome = 'success' }))
     if not ready() then log('ABORT 单抽落账未就绪') return end
     local after = ((data.Extra.lottery and data.Extra.lottery.pity) or 0)
     log('模拟单抽落账', 'pity=' .. before .. '->' .. after)
-    assert(runtime:blindbox_action(p, { action = 'Draw', count = 1, seq = seq + 1 }))
+    assert(runtime:blindbox_action(p, { action = 'draw', count = 1, seq = seq + 1 }))
     log('原序号重试', '无新flow=' .. tostring(not platform:HasFlow(p)), 'pity=' .. ((data.Extra.lottery and data.Extra.lottery.pity) or 0))
     assert(not platform:HasFlow(p) and ((data.Extra.lottery and data.Extra.lottery.pity) or 0) == after)
     local old = cfg.Debug.Enabled
@@ -50,7 +50,7 @@ task:Spawn(function()
     cfg.Debug.Enabled = old
     log('生产守卫', tostring(ok), tostring(why), '测试驱动=' .. tostring(driven))
     assert(not ok and why == 'unavailable' and not driven)
-    local life = ServerRuntime.current() and ServerRuntime.current().life
+    local life = server_runtime.current() and server_runtime.current().life
     log('复活入口状态', life and life:Phase(p) or 'no-life')
     log('DONE 本地模拟取证；真实平台归#148')
 end)

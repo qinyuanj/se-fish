@@ -1,11 +1,11 @@
 
-local GameCfg = require("common.game_cfg")
-local ServerRuntime = require("server.world_host.server_runtime")
-local PlayerData = require("server.data.player_data")
-local ZoneFixtures = require("tests.support.zone_fixtures")
+local game_cfg = require("common.game_cfg")
+local server_runtime = require("server.world_host.server_runtime")
+local player_data = require("server.data.player_data")
+local zone_fixtures = require("tests.support.zone_fixtures")
 
-local ROD = GameCfg.Items.Id.StarterRod
-local WORM = GameCfg.Items.Id.Worm
+local ROD = game_cfg.Items.Id.StarterRod
+local WORM = game_cfg.Items.Id.Worm
 
 local function signal()
   local handlers = {}
@@ -27,8 +27,8 @@ end
 
 local function make_player(id)
   local controller = {
-    Health = GameCfg.Vitals.MaxHealth,
-    MaxHealth = GameCfg.Vitals.MaxHealth,
+    Health = game_cfg.vitals.MaxHealth,
+    MaxHealth = game_cfg.vitals.MaxHealth,
     WalkSpeed = 16,
     HealthChanged = signal(),
     Died = signal(),
@@ -127,7 +127,7 @@ describe("抛竿上钩收线举鱼宿主接缝（#302）", function()
     channel("RequestCastState")
     player = make_player(overrides.user_id or 1)
     if overrides.position then player.Character.Position = overrides.position end
-    data = PlayerData.New(player)
+    data = player_data.New(player)
     data:Init()
     assert.is_true(data:SelectSlot(1))
     if overrides.bait == "duck" then
@@ -139,7 +139,7 @@ describe("抛竿上钩收线举鱼宿主接缝（#302）", function()
     end
     local seq = 0
     local runtime_holder = {}
-    runtime_holder.runtime = ServerRuntime.new({
+    runtime_holder.runtime = server_runtime.new({
       initial_now = 1000,
       remote = re,
       player_data = {
@@ -248,7 +248,7 @@ describe("抛竿上钩收线举鱼宿主接缝（#302）", function()
   end
 
   local function hook()
-    runtime.clock:advance(GameCfg.Casting.HookDelaySec)
+    runtime.clock:advance(game_cfg.Casting.HookDelaySec)
   end
 
   local function click(session, n, q)
@@ -259,14 +259,14 @@ describe("抛竿上钩收线举鱼宿主接缝（#302）", function()
 
   it("合法抛竿消耗一次鱼饵，3 秒后上钩并按区表与倍率决定鱼", function()
     boot({ roll = 1, multiplier_roll = 150 })
-    local before = data.Data.Bait[WORM]
+    local before = data.data.Bait[WORM]
     cast()
     local waiting = last_cast()
     assert.are.equal("cast", waiting.phase)
     assert.are.equal("fishPond.water", waiting.zoneId)
-    assert.are.equal(before - 1, data.Data.Bait[WORM])
+    assert.are.equal(before - 1, data.data.Bait[WORM])
     assert.are.equal(1, alive_units("CastLine_"))
-    runtime.clock:advance(GameCfg.Casting.HookDelaySec - 0.01)
+    runtime.clock:advance(game_cfg.Casting.HookDelaySec - 0.01)
     assert.are.equal("cast", last_cast().phase)
     runtime.clock:advance(0.01)
     local hooked = last_cast()
@@ -287,7 +287,7 @@ describe("抛竿上钩收线举鱼宿主接缝（#302）", function()
     boot({ bait = "duck", bait_count = 1, roll = 1 })
     cast()
     assert.are.equal(0, data:ItemCount("duck"))
-    assert.is_nil(data.Data.SelectedBait)
+    assert.is_nil(data.data.SelectedBait)
     hook()
     assert.are.equal("alligatorGar", last_cast().fishId)
     channel("CastAction").OnServerEvent:Fire(player, { action = "Reel" })
@@ -325,7 +325,7 @@ describe("抛竿上钩收线举鱼宿主接缝（#302）", function()
     local land = 0
     for _, fact in ipairs(quests) do if fact.kind == "Land" then land = land + 1 end end
     assert.are.equal(1, land)
-    runtime.clock:advance(GameCfg.Casting.LandedHoldSec)
+    runtime.clock:advance(game_cfg.Casting.LandedHoldSec)
     assert.are.equal("idle", last_cast().phase)
   end)
 
@@ -378,13 +378,13 @@ describe("抛竿上钩收线举鱼宿主接缝（#302）", function()
     cast()
     hook()
     local before = alive_units("CastLine_")
-    runtime.life:ApplyDamage(player, GameCfg.Vitals.MaxHealth)
+    runtime.life:ApplyDamage(player, game_cfg.vitals.MaxHealth)
     assert.are.equal("idle", last_cast().phase)
     assert.are.equal(0, alive_units("CastLine_"))
 
-    player.Character.Controller.Health = GameCfg.Vitals.MaxHealth
+    player.Character.Controller.Health = game_cfg.vitals.MaxHealth
     runtime:on_player_removing(player)
-    data.Extra.survival.health = GameCfg.Vitals.MaxHealth
+    data.Extra.survival.health = game_cfg.vitals.MaxHealth
     data.Extra.survival.dying = false
     data.Extra.survival.dead = false
     data.Extra.survival.dyingRemaining = 0

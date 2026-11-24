@@ -4,16 +4,16 @@
 -- LuaUnit 靠全局类名互访实现复用；Busted 每个 spec 是独立 chunk，describe 之间不共享实例方法，
 -- 所以把这份世界搬到 support 模块，两个 spec 各开各的（与旧套件「每案例新建世界」的口径一致）。
 --
--- 只替换引擎对象、时间与 RemoteEvent，不替换业务管理器：真实 MgrFishCarrier / MgrFishUnit / MgrVitals
+-- 只替换引擎对象、时间与 RemoteEvent，不替换业务管理器：真实 mgr_fish_carrier / MgrFishUnit / MgrVitals
 -- 全部走 require，SpawnLanded / Drop / Update 与对外预警都在真实实现上观察。
 -- 因此这不是编辑器 E2E 证据。
-local Cfg = require('common.game_cfg')
+local cfg = require('common.game_cfg')
 
 local M = {}
 
 local MODULES = { 'server.world_host.fish_carrier', 'server.world_host.fish_tree',
     'common.re_util', 'client.views.GarBiteWarning' }
-local GLOBALS = { 'game', 'Vector3', 'Quaternion', 'REUtil', 'Color', 'RemoteEvent' }
+local GLOBALS = { 'game', 'Vector3', 'Quaternion', 're_util', 'Color', 'RemoteEvent' }
 
 local function signal()
     local slots = {}
@@ -32,7 +32,7 @@ end
 --- #102 现场同步后合同安全点挪到了区内侧（离本区水岸线 62.5 米），而入水/逃脱类用例的时序是按
 --- 「起点在水岸线外 32 米」调的 —— 这些用例要的只是「岸边」这个位置，所以按水岸线自己取，不借 SafePoint。
 function M.shoreDryPoint(zoneIndex)
-    local scene = Cfg.Zones[zoneIndex].Scene
+    local scene = cfg.Zones[zoneIndex].Scene
     local water = scene.Waters[1]
     local boundary = scene.Boundary
     local halfZ = water.HalfZ or water.HalfXZ or 0
@@ -75,7 +75,7 @@ function M.new(zoneIndex)
         end }
     function env.world:CreateAsset(id) return { self:CreateUnit('WorldUnit', { Name = id }) } end
     _G.Vector3 = { New = vec }
-    -- MgrFishCarrier 在有染色（species.VisualColor）时读 Color.New；旧 reef 用例从不自己设 Color，
+    -- mgr_fish_carrier 在有染色（species.VisualColor）时读 Color.New；旧 reef 用例从不自己设 Color，
     -- #90 迁移前一直是靠 damage_float 测试的全局泄漏跑通的。这里显式补替身并纳入恢复名单，
     -- 使这份夹具自洽（不改业务行为，只把缺的引擎替身补上）。
     _G.Color = { New = function(r, g, b, a) return { r = r, g = g, b = b, a = a } end }
@@ -86,17 +86,17 @@ function M.new(zoneIndex)
         if name == 'Players' then return { GetPlayers = function() return env.players end, PlayerRemoving = signal() } end
     end }
     _G.RemoteEvent = { New = function(name) return {
-        FireAllClients = function(_, p) if name == 'GarBiteNotice' then env.notices[#env.notices + 1] = p end end,
+        FireAllClients = function(_, p) if name == 'gar_bite_notice' then env.notices[#env.notices + 1] = p end end,
         FireClient = function(_, player, p) if name == 'CastState' then env.castStates[#env.castStates + 1] = p end end,
         OnServerEvent = signal(), OnClientEvent = signal() } end }
     env.carrier = require('server.world_host.fish_carrier')
     env.mgr = require('server.world_host.fish_tree')
     -- 目标裁决适配层按生产接线（server/main.lua）由入口注入，MgrFishUnit 自身不再 require 它。
     env.mgr.AiTarget = require('server.world_host.fish_ai_target')
-    local LifeHost = require('tests.support.life_host')
-    env.lifeHost = LifeHost.start({ now = 0, fish_carrier = env.carrier })
+    local life_host = require('tests.support.life_host')
+    env.lifeHost = life_host.start({ now = 0, fish_carrier = env.carrier })
     env.vitals = env.lifeHost.runtime.life
-    env.mgr.Vitals = env.vitals
+    env.mgr.vitals = env.vitals
     env.mgr:Start()
     local safe = M.shoreDryPoint(zoneIndex or 6)
     local c = { Health = 300, HealthChanged = signal(), Died = signal(), Lift = function() end }

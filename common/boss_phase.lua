@@ -1,14 +1,14 @@
-local GameCfg = require('common.game_cfg')
-local Number = require('common.number')
+local game_cfg = require('common.game_cfg')
+local number = require('common.number')
 
 local M = {}
 
 local function cfg()
-    return GameCfg.Ability.BossPhase
+    return game_cfg.Ability.boss_phase
 end
 
 local function isBadNumber(v)
-    return not Number.IsFiniteNumber(v)
+    return not number.IsFiniteNumber(v)
 end
 
 local function isPoint(p)
@@ -41,13 +41,13 @@ local function phaseIndex(bossCfg, phase)
 end
 
 local function phaseEntry(state)
-    local list = chain(state.Cfg)
-    return list[phaseIndex(state.Cfg, state.Phase)]
+    local list = chain(state.cfg)
+    return list[phaseIndex(state.cfg, state.Phase)]
 end
 
 local function attackSet(state)
-    local set = state.Cfg.AttackSets and state.Cfg.AttackSets[state.Phase]
-    return set or state.Cfg.AttackSets.normal
+    local set = state.cfg.AttackSets and state.cfg.AttackSets[state.Phase]
+    return set or state.cfg.AttackSets.normal
 end
 
 local function intervalOf(state, name)
@@ -55,14 +55,14 @@ local function intervalOf(state, name)
     if name == 'breath' and entry and not isBadNumber(entry.BreathIntervalSec) then
         return entry.BreathIntervalSec
     end
-    local attack = state.Cfg.Attacks[name]
+    local attack = state.cfg.Attacks[name]
     if not attack or isBadNumber(attack.IntervalSec) then return 1 end
     return attack.IntervalSec
 end
 
 local function damageOf(state, name)
     local entry = phaseEntry(state)
-    local attack = state.Cfg.Attacks[name] or {}
+    local attack = state.cfg.Attacks[name] or {}
     local damage = attack.Damage
     if name == 'bite' and entry and not isBadNumber(entry.BiteDamage) then
         damage = entry.BiteDamage
@@ -83,7 +83,7 @@ local function resetCooldowns(state, now)
 end
 
 local function withinRange(state, name)
-    local attack = state.Cfg.Attacks[name]
+    local attack = state.cfg.Attacks[name]
     if not attack or isBadNumber(attack.Range) then return true end
     if not state.Target then return false end
     local dx, dz = state.Target.x - state.Pos.x, state.Target.z - state.Pos.z
@@ -96,7 +96,7 @@ end
 function M.New(bossCfg, now, pos)
     bossCfg = bossCfg or cfg()
     local state = {
-        Cfg = bossCfg, Phase = 'normal', Alive = true, Target = nil, Pending = nil,
+        cfg = bossCfg, Phase = 'normal', Alive = true, Target = nil, Pending = nil,
         Percent = 100, Pos = pos and copy(pos) or { x = 0, y = 0, z = 0 },
         Cooldown = {}, Log = {}, AttackLog = {},
         Stats = { Frames = 0, Transitions = 0, Skipped = 0, Attacks = 0, Interrupts = 0 },
@@ -145,12 +145,12 @@ function M.Update(state, now, dt, input)
     if percent then
         state.Percent = percent
         local target = 1
-        for index, threshold in ipairs(state.Cfg.Thresholds) do
+        for index, threshold in ipairs(state.cfg.Thresholds) do
             if percent < threshold.Percent then target = index + 1 end
         end
-        local current = phaseIndex(state.Cfg, state.Phase)
+        local current = phaseIndex(state.cfg, state.Phase)
         if target > current then
-            local list = chain(state.Cfg)
+            local list = chain(state.cfg)
             local skipped = {}
             for index = current + 1, target - 1 do
                 skipped[#skipped + 1] = list[index].Phase
@@ -194,7 +194,7 @@ function M.Update(state, now, dt, input)
     for _, name in ipairs(attackSet(state)) do
         local readyAt = state.Cooldown[name] or 0
         if now >= readyAt and withinRange(state, name) then
-            local attack = state.Cfg.Attacks[name] or {}
+            local attack = state.cfg.Attacks[name] or {}
             if not isBadNumber(attack.WindupSec) and attack.WindupSec > 0 then
                 state.Pending = { Name = name, ReadyAt = now + attack.WindupSec,
                     Damage = damageOf(state, name), Lethal = attack.OneShot == true }

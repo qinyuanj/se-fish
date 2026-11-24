@@ -1,10 +1,10 @@
-local Util = {}
+local util = {}
 local Task = game:GetService("Task")
 local RunService = game:GetService("RunService")
 local World = game:GetService("World")
-local REUtil = require("common.re_util")
+local re_util = require("common.re_util")
 
-function Util:WaitForChild(rootObj, childName, waitTime)
+function util:WaitForChild(rootObj, childName, waitTime)
 	if not rootObj then
 		return 
 	end
@@ -19,13 +19,13 @@ function Util:WaitForChild(rootObj, childName, waitTime)
 		costTime = costTime + 0.033
 	end
 
-	print("[Util] WaitForChild time end", childName, waitTime)
+	print("[util] WaitForChild time end", childName, waitTime)
 	return
 end	
 
-function Util:MsgNotice(player, msg, duration, textColor)
+function util:MsgNotice(player, msg, duration, textColor)
 	if RunService:IsServer() then
-		REUtil:GetRE("MsgNoticeRE"):FireClient(player, msg, duration, textColor)
+		re_util:GetRE("MsgNoticeRE"):FireClient(player, msg, duration, textColor)
 		return
 	end
 
@@ -37,31 +37,31 @@ function Util:MsgNotice(player, msg, duration, textColor)
 	_G.LocalMsgNotice(msg, duration, textColor)
 end
 
-function Util:GlobalMsgNotice(msg, duration, textColor)
+function util:GlobalMsgNotice(msg, duration, textColor)
 	if RunService:IsClient() then
 		print("GlobalMsgNotice 只在服务端调用")
 		return
 	end
 
-	REUtil:GetRE("MsgNoticeRE"):FireAllClients(msg, duration, textColor)
+	re_util:GetRE("MsgNoticeRE"):FireAllClients(msg, duration, textColor)
 end
 
 if RunService:IsClient() then
 	local Players = game:GetService("Players")
 	local LocalPlayer = Players.LocalPlayer
-	REUtil:GetRE("MsgNoticeRE").OnClientEvent:Connect(function(msg, duration, textColor) 
-		Util:MsgNotice(LocalPlayer, msg, duration, textColor)
+	re_util:GetRE("MsgNoticeRE").OnClientEvent:Connect(function(msg, duration, textColor) 
+		util:MsgNotice(LocalPlayer, msg, duration, textColor)
 	end)
 end
 
 
 if RunService:IsServer() then
-	REUtil:GetRE("GlobalMarquee").OnServerEvent:Connect(function(p, msg) 
-		Util:GlobalMarquee(msg)
+	re_util:GetRE("GlobalMarquee").OnServerEvent:Connect(function(p, msg) 
+		util:GlobalMarquee(msg)
 	end)
 end
 
-function Util:SplitString(inputstr, sep) 
+function util:SplitString(inputstr, sep) 
 	if sep == nil then
         sep = "%s"
     end
@@ -75,7 +75,7 @@ function Util:SplitString(inputstr, sep)
 	return t
 end
 
-function Util:RandomDirection(detailRange, ignoreY)
+function util:RandomDirection(detailRange, ignoreY)
 	if not detailRange then
 		detailRange = 10
 	end
@@ -98,12 +98,12 @@ local NumWithStrMap = {
 		Value = 1000000,
 	},
 	{
-		Str = "B",
+		Str = "b",
 		Value = 1000000000,
 	},
 }
 
-function Util:DesignNumber(value, keepNum)
+function util:DesignNumber(value, keepNum)
 	if value < 0 then return tostring(value) end
 
 	local curNumInfo = nil
@@ -123,5 +123,5 @@ function Util:DesignNumber(value, keepNum)
 	return string.format(formatKey, value/curNumInfo.Value)
 end
 
-_G.Util = Util
-return Util
+_G.util = util
+return util

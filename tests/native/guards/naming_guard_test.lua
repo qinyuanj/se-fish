@@ -44,9 +44,9 @@ end
 
 describe("命名门禁", function()
   it("test_judge_rejects_pascal_and_camel_keeps_snake", function()
-    assert.is_true(is_bad_name("GameUI.lua", false))
-    assert.is_true(is_bad_name("worldHost.lua", false))
-    assert.is_true(is_bad_name("Views", true))
+    assert.is_true(is_bad_name("NotSnake.lua", false))
+    assert.is_true(is_bad_name("camelCase.lua", false))
+    assert.is_true(is_bad_name("BadDir", true))
     assert.is_false(is_bad_name("ability_behaviors", true))
     assert.is_false(is_bad_name("game_ui.lua", false))
     assert.is_false(is_bad_name("world_host", true))

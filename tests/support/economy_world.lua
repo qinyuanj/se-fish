@@ -1,4 +1,4 @@
-local GameCfg = require("common.game_cfg")
+local game_cfg = require("common.game_cfg")
 
 local M = {}
 local World = {}
@@ -37,7 +37,7 @@ local function make_player(id, character)
     Character = character or {
       Position = { x = 3, y = 0, z = 5 },
       Size = { y = 2 },
-      Controller = { Health = GameCfg.Vitals.MaxHealth },
+      Controller = { Health = game_cfg.vitals.MaxHealth },
     },
   }
   function player:SetAttribute(key, value) self.attrs[key] = value end
@@ -46,14 +46,14 @@ end
 
 function M.new()
   local env = setmetatable({}, World)
-  env.oldGame, env.oldRE = _G.game, _G.REUtil
-  env.oldDebug = GameCfg.Debug
-  env.oldPlaceholder = GameCfg.Platform.Placeholder.Enabled
-  env.oldAllowPlaceholder = GameCfg.Platform.Placeholder.AllowInPublish
+  env.oldGame, env.oldRE = _G.game, _G.re_util
+  env.oldDebug = game_cfg.Debug
+  env.oldPlaceholder = game_cfg.Platform.Placeholder.Enabled
+  env.oldAllowPlaceholder = game_cfg.Platform.Placeholder.AllowInPublish
   env.oldGoodsIds = {}
-  for key, row in pairs(GameCfg.Platform.Goods) do env.oldGoodsIds[key] = row.goodsId end
-  GameCfg.Debug = { Enabled = true }
-  GameCfg.Platform.Placeholder.Enabled = false
+  for key, row in pairs(game_cfg.Platform.Goods) do env.oldGoodsIds[key] = row.goodsId end
+  game_cfg.Debug = { Enabled = true }
+  game_cfg.Platform.Placeholder.Enabled = false
 
   env.values, env.queue, env.events, env.rolls = {}, {}, {}, {}
   env.recordReads, env.recordWrites = 0, 0
@@ -114,7 +114,7 @@ function M.new()
       end
     end,
   }
-  _G.REUtil = {
+  _G.re_util = {
     GetRE = function(_, name)
       if not env.channels[name] then
         env.channels[name] = {
@@ -132,18 +132,18 @@ function M.new()
   env.save = assert(loadfile("server/save_host.lua"))()
   env.players = assert(loadfile("server/player_data_host.lua"))()
   env.platform = assert(loadfile("server/platform_host.lua"))()
-  env.players.Save, env.save.PlayerData = env.save, env.players
-  env.platform.Save, env.platform.PlayerData = env.save, env.players
+  env.players.Save, env.save.player_data = env.save, env.players
+  env.platform.Save, env.platform.player_data = env.save, env.players
   env.platform.Now = function() return env.now end
 
-  local ServerRuntime = require("server.world_host.server_runtime")
-  local SpokeClock = require("common.spoke_clock")
-  env.ServerRuntime = ServerRuntime
-  env.runtime = ServerRuntime.new({
-    clock = SpokeClock.new(env.now),
+  local server_runtime = require("server.world_host.server_runtime")
+  local spoke_clock = require("common.spoke_clock")
+  env.server_runtime = server_runtime
+  env.runtime = server_runtime.new({
+    clock = spoke_clock.new(env.now),
     initial_now = env.now,
     delivery_epoch = "test-world",
-    remote = _G.REUtil,
+    remote = _G.re_util,
     save = env.save,
     platform = env.platform,
     player_data = env.players,
@@ -165,7 +165,7 @@ function M.new()
     end,
     bait_spots = { Enabled = false },
     on_item_bar_state = function(player, snapshot)
-      _G.REUtil:GetRE("ItemBarState"):FireClient(player, snapshot)
+      _G.re_util:GetRE("ItemBarState"):FireClient(player, snapshot)
     end,
     bind_lottery_action = function(dispatch) env.lotteryDispatch = dispatch end,
     bind_blindbox_action = function(dispatch) env.blindboxDispatch = dispatch end,
@@ -179,7 +179,7 @@ function M.new()
     if env.failDeliveries then return nil, "test-rejected" end
     return place_delivery(self, key, zoneId, spec)
   end
-  ServerRuntime.set_current(env.runtime)
+  server_runtime.set_current(env.runtime)
   env.platform:Start()
 
   env.player = make_player(1472)
@@ -198,14 +198,14 @@ end
 
 function World:tearDown()
   if self.runtime then self.runtime:shutdown() end
-  if self.ServerRuntime and self.ServerRuntime.current() == self.runtime then
-    self.ServerRuntime.set_current(nil)
+  if self.server_runtime and self.server_runtime.current() == self.runtime then
+    self.server_runtime.set_current(nil)
   end
-  _G.game, _G.REUtil = self.oldGame, self.oldRE
-  GameCfg.Debug = self.oldDebug
-  GameCfg.Platform.Placeholder.Enabled = self.oldPlaceholder
-  GameCfg.Platform.Placeholder.AllowInPublish = self.oldAllowPlaceholder
-  for key, row in pairs(GameCfg.Platform.Goods) do row.goodsId = self.oldGoodsIds[key] end
+  _G.game, _G.re_util = self.oldGame, self.oldRE
+  game_cfg.Debug = self.oldDebug
+  game_cfg.Platform.Placeholder.Enabled = self.oldPlaceholder
+  game_cfg.Platform.Placeholder.AllowInPublish = self.oldAllowPlaceholder
+  for key, row in pairs(game_cfg.Platform.Goods) do row.goodsId = self.oldGoodsIds[key] end
 end
 
 function World:addPlayer(id, name)
@@ -231,7 +231,7 @@ function World:fire(name, payload, player)
 end
 
 function World:saved(userId)
-  return self.values[GameCfg.Save.KeyPrefix .. tostring(userId)]
+  return self.values[game_cfg.Save.KeyPrefix .. tostring(userId)]
 end
 
 function World:request(name, payload)
@@ -304,7 +304,7 @@ function World:lotteryAction(payload, shouldDrain)
 end
 
 function World:lotteryDraw(slot, seq)
-  return self:lotteryAction({ action = "Draw", slot = slot, seq = seq })
+  return self:lotteryAction({ action = "draw", slot = slot, seq = seq })
 end
 
 function World:lotteryState()
@@ -319,7 +319,7 @@ end
 
 function World:blindboxDraw(count, seq, outcome)
   local accepted = self.blindboxDispatch and self.blindboxDispatch(self.player,
-    { action = "Draw", count = count, seq = seq }) or false
+    { action = "draw", count = count, seq = seq }) or false
   self:drain()
   if accepted and outcome then
     assert(self.platform:HandleTestAction(self.player, { action = "ResolveFlow", outcome = outcome }))
@@ -351,7 +351,7 @@ function World:platformAction(payload)
 end
 
 function World:resolvePlatform(outcome)
-  if GameCfg.Platform.Placeholder.Enabled then
+  if game_cfg.Platform.Placeholder.Enabled then
     assert(self.platform:ResolvePlaceholder(self.player, outcome))
   else
     assert(self.platform:HandleTestAction(self.player, { action = "ResolveFlow", outcome = outcome }))

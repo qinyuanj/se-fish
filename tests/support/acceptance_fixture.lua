@@ -2,7 +2,7 @@
 -- 逐项改坏再验红。夹具只写磁盘，不碰真实 docs/acceptance/；生成块与基线由 tools.acceptance 自己算，
 -- 保证夹具起点就是绿的（改坏了才红，红的不是夹具本身）。
 local fs = require('tests.support.fs_fixture')
-local Acceptance = require('tools.acceptance')
+local acceptance = require('tools.acceptance')
 
 local M = {}
 
@@ -13,18 +13,18 @@ M.EVIDENCE = 'tests/native/spec/demo_test.lua'
 -- 会被 fast ∪ full 发现、且不属于 spec 车道的遗留测试（两条）。
 M.LEGACY = { 'tests/native/alpha_test.lua', 'tests/native/slow/beta_test.lua' }
 
--- 实现覆盖表（ADR-0029 第五节）：夹具登记第 1 节的两条非试玩条款（1-01 A、1-02 B），
+-- 实现覆盖表（ADR-0029 第五节）：夹具登记第 1 节的两条非试玩条款（1-01 a、1-02 b），
 -- 1-03 是试玩条款，按设计不登记。落点与关联测试都真实存在，起点即绿。
 M.COVERAGE_LANDING = 'server/platform_host.lua'
 M.COVERAGE_TEST = M.LEGACY[1]
 
 function M.shard(section)
-  return string.format('%s/%02d-fixture.md', Acceptance.DIR, section)
+  return string.format('%s/%02d-fixture.md', acceptance.DIR, section)
 end
 
 local function spec_body()
-  local lines = { '# 夹具规格', '', '> 夹具：19 个小节，每个「## N. 」一行标题。', '' }
-  for number = 1, Acceptance.SPEC_SECTIONS do
+  local lines = { '# 夹具规格', '', '> 夹具：19 个小节，每个「## n. 」一行标题。', '' }
+  for number = 1, acceptance.SPEC_SECTIONS do
     lines[#lines + 1] = string.format('## %d. 夹具小节%d', number, number)
     lines[#lines + 1] = ''
     lines[#lines + 1] = '正文。'
@@ -43,16 +43,16 @@ local function shard_body(section)
     '',
     '| ID | 条款 | 组 | 执行者 | 证据等级 | 状态 | 证据 / 理由 |',
     '| --- | --- | --- | --- | --- | --- | --- |',
-    string.format('| %d-01 | %s：第 %d 节第一条 | 规则 | agent | A | unverified | — |',
+    string.format('| %d-01 | %s：第 %d 节第一条 | 规则 | agent | a | unverified | — |',
       section, M.SPEC_CLAUSE, section),
   }
   if section == 1 then
-    lines[#lines + 1] = '| 1-02 | 夹具条款：卡在外部依赖的那条 | 契约 | 人 | B | blocked | 卡在：夹具外部依赖 |'
+    lines[#lines + 1] = '| 1-02 | 夹具条款：卡在外部依赖的那条 | 契约 | 人 | b | blocked | 卡在：夹具外部依赖 |'
   elseif section == 2 then
-    lines[#lines + 1] = '| 2-02 | 夹具条款：划出范围的那条 | 功能 | agent | A | out-of-scope | 理由：夹具划出范围 |'
+    lines[#lines + 1] = '| 2-02 | 夹具条款：划出范围的那条 | 功能 | agent | a | out-of-scope | 理由：夹具划出范围 |'
   elseif section == 3 then
     lines[#lines + 1] = string.format(
-      '| 3-02 | 夹具条款：有证据的那条 | 规则 | agent | A | evidenced | %s |', M.EVIDENCE)
+      '| 3-02 | 夹具条款：有证据的那条 | 规则 | agent | a | evidenced | %s |', M.EVIDENCE)
   end
   if section == 1 then
     lines[#lines + 1] = ''
@@ -91,9 +91,9 @@ local function coverage_body(bodies)
   }
   -- 覆盖表从分片正文派生：已贯通小节里每条非试玩条款都要有一行，等级照抄分片那一格。
   -- 这样「改坏分片的 ID」这类用例不会顺带把覆盖表也判红——门禁仍然只报被改坏的那一类；
-  -- 新增已贯通小节也不必再改夹具，节号取 Acceptance.COVERAGE_SECTIONS。
+  -- 新增已贯通小节也不必再改夹具，节号取 acceptance.COVERAGE_SECTIONS。
   local seen = {}
-  for _, section in ipairs(Acceptance.COVERAGE_SECTIONS) do
+  for _, section in ipairs(acceptance.COVERAGE_SECTIONS) do
     -- 传了 bodies 就以它为准：缺的那份（例如这一节的分片被删掉）按空处理，不拿模板补回来。
     local body = bodies and (bodies[section] or '') or shard_body(section)
     for line in body:gmatch('[^\n]+') do
@@ -121,9 +121,9 @@ local function readme_body()
     '',
     '## 计数（脚本生成）',
     '',
-    Acceptance.BEGIN_MARK,
+    acceptance.BEGIN_MARK,
     '（占位）',
-    Acceptance.END_MARK,
+    acceptance.END_MARK,
     '',
   }, '\n')
 end
@@ -132,18 +132,18 @@ end
 function M.build(root)
   fs.rmrf(root)
   fs.mkdirp(root)
-  fs.write_file(root .. '/' .. Acceptance.SPEC, spec_body())
-  for section = 1, Acceptance.SPEC_SECTIONS do
+  fs.write_file(root .. '/' .. acceptance.SPEC, spec_body())
+  for section = 1, acceptance.SPEC_SECTIONS do
     fs.write_file(root .. '/' .. M.shard(section), shard_body(section))
   end
-  fs.write_file(root .. '/' .. Acceptance.INDEX, readme_body())
-  fs.write_file(root .. '/' .. Acceptance.BUSTED, busted_body())
+  fs.write_file(root .. '/' .. acceptance.INDEX, readme_body())
+  fs.write_file(root .. '/' .. acceptance.BUSTED, busted_body())
   for _, path in ipairs(M.LEGACY) do
     fs.write_file(root .. '/' .. path, '-- 夹具遗留测试：不跑，只用来数发现结果。\n')
   end
   -- 证据文件正文要带条款号：门禁除了看路径在不在 spec 车道，还看文件里有没有这条条款的 ID。
   fs.write_file(root .. '/' .. M.EVIDENCE, '-- 夹具证据文件：条款 3-02 的断言落在这里。\n')
-  fs.write_file(root .. '/' .. Acceptance.COVERAGE, coverage_body())
+  fs.write_file(root .. '/' .. acceptance.COVERAGE, coverage_body())
   fs.write_file(root .. '/' .. M.COVERAGE_LANDING, '-- 夹具代码落点：存在即算有落点。\n')
   fs.write_file(root .. '/tests/native/helper.lua', '-- 夹具助手：不是测试文件。\n')
   fs.write_file(root .. '/tests/native/notes.md', '不是测试文件。\n')
@@ -154,28 +154,28 @@ function M.build(root)
 end
 
 function M.sync_index(root)
-  local matrix = Acceptance.scan(root)
-  local body, err = Acceptance.rewrite(matrix.index.body or readme_body(), Acceptance.render(matrix))
+  local matrix = acceptance.scan(root)
+  local body, err = acceptance.rewrite(matrix.index.body or readme_body(), acceptance.render(matrix))
   assert(body, err)
-  fs.write_file(root .. '/' .. Acceptance.INDEX, body)
+  fs.write_file(root .. '/' .. acceptance.INDEX, body)
   return body
 end
 
 --- 按现存分片重派生覆盖表：删掉某节分片后同步一次，免得「条款不在矩阵里」盖住「缺分片」那一类。
 function M.sync_coverage(root)
   local bodies = {}
-  for _, section in ipairs(Acceptance.COVERAGE_SECTIONS) do
+  for _, section in ipairs(acceptance.COVERAGE_SECTIONS) do
     bodies[section] = fs.slurp(root .. '/' .. M.shard(section))
   end
-  fs.write_file(root .. '/' .. Acceptance.COVERAGE, coverage_body(bodies))
+  fs.write_file(root .. '/' .. acceptance.COVERAGE, coverage_body(bodies))
 end
 
 function M.sync_baseline(root, override)
-  local matrix = Acceptance.scan(root)
+  local matrix = acceptance.scan(root)
   local values = { evidenced = matrix.counts.evidenced, legacyTests = #matrix.lanes.legacy,
     updated = '2026-11-20' }
   for key, value in pairs(override or {}) do values[key] = value end
-  fs.write_file(root .. '/' .. Acceptance.BASELINE, Acceptance.render_baseline(values))
+  fs.write_file(root .. '/' .. acceptance.BASELINE, acceptance.render_baseline(values))
   return values
 end
 
@@ -190,10 +190,10 @@ function M.patch(root, relative, from, to)
   -- 「条款不在矩阵里 / 已贯通小节缺条款」，被改坏的那一类反而淹没在噪声里。
   if relative:match('^docs/acceptance/%d%d%-') then
     local bodies = {}
-    for _, section in ipairs(Acceptance.COVERAGE_SECTIONS) do
+    for _, section in ipairs(acceptance.COVERAGE_SECTIONS) do
       bodies[section] = assert(fs.slurp(root .. '/' .. M.shard(section)))
     end
-    fs.write_file(root .. '/' .. Acceptance.COVERAGE, coverage_body(bodies))
+    fs.write_file(root .. '/' .. acceptance.COVERAGE, coverage_body(bodies))
   end
 end
 

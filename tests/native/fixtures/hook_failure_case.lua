@@ -1,6 +1,6 @@
 -- 由 tests/native/hook_cleanup_test.lua 以子进程执行的故意失败夹具。
 -- 文件名故意不匹配 _test 且 fixtures/ 不在任何车道 ROOT 内，不进入 Busted 发现范围。
-local GameCfg = require("common.game_cfg")
+local game_cfg = require("common.game_cfg")
 
 local function rec(tag)
   io.stdout:write("EV:" .. tag .. "\n")
@@ -12,13 +12,13 @@ describe("outer", function()
 
   describe("pollution", function()
     it("dirties the shared config then fails", function()
-      GameCfg.Debug = { Enabled = false }
-      GameCfg.Save.QaSlot = "dirty"
+      game_cfg.Debug = { Enabled = false }
+      game_cfg.Save.QaSlot = "dirty"
       error("intentional fixture failure")
     end)
     it("observes the config restored by the helper", function()
-      rec("cfg_enabled=" .. tostring(GameCfg.Debug.Enabled))
-      rec("cfg_slot=" .. (GameCfg.Save.QaSlot == "" and "EMPTY" or GameCfg.Save.QaSlot))
+      rec("cfg_enabled=" .. tostring(game_cfg.Debug.Enabled))
+      rec("cfg_slot=" .. (game_cfg.Save.QaSlot == "" and "EMPTY" or game_cfg.Save.QaSlot))
     end)
   end)
 

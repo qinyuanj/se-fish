@@ -1,6 +1,6 @@
 
-local SwingRegistry = require("server.swing_registry")
-local HostSignal = require("common.host_signal")
+local swing_registry = require("server.swing_registry")
+local host_signal = require("common.host_signal")
 local spoke_eggy = require("common.packages.spoke_eggy.api")
 
 local M = { Services = {} }
@@ -105,13 +105,13 @@ local function _applyDamage(target, damage, owner, hit)
 	if not damage or damage == 0.0 or not hit then
 		return false
 	end
-	if M.Services.FishCarrier:ResolveCarrier(target) then
-		return (M.Services.Vitals:ApplyHit(hit, target, damage))
+	if M.Services.fish_carrier:ResolveCarrier(target) then
+		return (M.Services.vitals:ApplyHit(hit, target, damage))
 	end
 	local players = game:GetService("Players")
 	local targetPlayer = players and players.GetPlayerFromCharacter and players:GetPlayerFromCharacter(target)
 	if targetPlayer then
-		return (M.Services.Vitals:ApplyHit(hit, targetPlayer, damage))
+		return (M.Services.vitals:ApplyHit(hit, targetPlayer, damage))
 	end
 	return false
 end
@@ -178,7 +178,7 @@ end
 
 function M.Attach(anchor_script, services)
 	if services then M.Services = services end
-	for _, name in ipairs({ 'Vitals', 'FishCarrier', 'GM', 'Modifier' }) do
+	for _, name in ipairs({ 'vitals', 'fish_carrier', 'GM', 'Modifier' }) do
 		assert(M.Services[name], '[melee_hit] 缺少行为依赖: ' .. name)
 	end
 	local RunService = game:GetService("RunService")
@@ -231,7 +231,7 @@ function M.Attach(anchor_script, services)
 	end
 
 	scope:on_cleanup(_cleanup)
-	HostSignal.connect(scope, start_sig, function()
+	host_signal.connect(scope, start_sig, function()
 		_cleanup()
 		state = {}
 		SwingSeq = SwingSeq + 1
@@ -246,7 +246,7 @@ function M.Attach(anchor_script, services)
 		local player = game:GetService("Players"):GetPlayerFromCharacter(owner)
 		local swing = nil
 		if player then
-			swing = SwingRegistry.TakeSwing(player.UserId)
+			swing = swing_registry.TakeSwing(player.UserId)
 			if not swing then
 				print("[melee_hit] 玩家挥砍缺少服务端登记，只播表现不结算伤害 uid=" .. tostring(player.UserId))
 			end
@@ -269,7 +269,7 @@ function M.Attach(anchor_script, services)
 		if player then
 			hit_damage = M.Services.GM:GetMeleeDamage(player, hit_damage)
 		end
-		state.hit = M.Services.Vitals:NewHit(player or owner, "weapon")
+		state.hit = M.Services.vitals:NewHit(player or owner, "weapon")
 		local hit_power = anchor_script:GetAttribute("ABILITY_ANOSTATE_HITPOWER") or 0.0
 		local weapon_prefab = anchor_script:GetAttribute("ABILITY_ANOSTATE_USE_PERFAB") or ""
 		local anim_id = anchor_script:GetAttribute("ABILITY_ANOSTATE_ANIMKEY") or ""
@@ -393,7 +393,7 @@ function M.Attach(anchor_script, services)
 		end
 
 		swing_dock:effect("active", function(swing_scope)
-			state.enter_conn = HostSignal.connect(swing_scope, tu.OnTriggerEnter, function(other_unit)
+			state.enter_conn = host_signal.connect(swing_scope, tu.OnTriggerEnter, function(other_unit)
 				process_hit(other_unit)
 			end)
 		end)
@@ -412,7 +412,7 @@ function M.Attach(anchor_script, services)
 	for _, name in ipairs({ "AnchorEnd", "AnchorBreak", "AnchorStop" }) do
 		local sig = anchor_script:FindFirstChild(name)
 		if sig then
-			HostSignal.connect(scope, sig, _cleanup)
+			host_signal.connect(scope, sig, _cleanup)
 		end
 	end
 	end, { name = "melee_hit" })

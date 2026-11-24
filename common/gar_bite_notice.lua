@@ -1,11 +1,11 @@
-local GarBiteNotice = { EventName = 'GarBiteNotice' }
+local gar_bite_notice = { EventName = 'gar_bite_notice' }
 
 local function finite(v)
     return type(v) == 'number' and v == v and math.abs(v) < math.huge
 end
 
 ---起咬预警：fishId 为 MgrFishUnit 的鱼编号，(fx,fz) 为锁定的头部朝向（单位向量）
-function GarBiteNotice.Lock(fishId, pos, fx, fz, range, halfAngleDeg, duration)
+function gar_bite_notice.Lock(fishId, pos, fx, fz, range, halfAngleDeg, duration)
     return {
         kind = 'lock', fishId = fishId,
         position = { x = pos.x, y = pos.y, z = pos.z },
@@ -14,11 +14,11 @@ function GarBiteNotice.Lock(fishId, pos, fx, fz, range, halfAngleDeg, duration)
 end
 
 ---reason：bite（咬中）/ miss（绕后咬空）/ cancel（目标出咬距或失效）/ gone（鱼逃脱或被移除）
-function GarBiteNotice.Clear(fishId, reason)
+function gar_bite_notice.Clear(fishId, reason)
     return { kind = 'clear', fishId = fishId, reason = reason }
 end
 
-function GarBiteNotice.Valid(payload)
+function gar_bite_notice.Valid(payload)
     if type(payload) ~= 'table' or type(payload.fishId) ~= 'number' then return false end
     if payload.kind == 'clear' then return true end
     if payload.kind ~= 'lock' then return false end
@@ -28,8 +28,8 @@ function GarBiteNotice.Valid(payload)
         and finite(payload.duration) and payload.duration > 0
 end
 
-function GarBiteNotice.Publish(payload)
-    require('common.re_util'):GetRE(GarBiteNotice.EventName):FireAllClients(payload)
+function gar_bite_notice.Publish(payload)
+    require('common.re_util'):GetRE(gar_bite_notice.EventName):FireAllClients(payload)
 end
 
-return GarBiteNotice
+return gar_bite_notice

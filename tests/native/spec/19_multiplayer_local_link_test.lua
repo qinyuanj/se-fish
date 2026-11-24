@@ -14,7 +14,7 @@
 --   4. 两个人抢同一份只结算一次这条在多人连接下变成两份；
 --   5. 施救者断线后抢救照样结算，或重连后又补一次；
 --   6. 被救者恢复量不是自己的上限 10%。
-local GameCfg = require('common.game_cfg')
+local game_cfg = require('common.game_cfg')
 local Link = assert(loadfile('tests/support/local_link.lua'))()
 
 local POND = { x = 6.26, y = 5.01, z = -0.71 }
@@ -46,7 +46,7 @@ describe('条款 19-12 本地连接夹具下的多人代码路径', function()
   end
 
   local function down(player)
-    assert.is_true(link:Hit(nil, player, 'fishAttack', GameCfg.Vitals.MaxHealth + 10))
+    assert.is_true(link:Hit(nil, player, 'fishAttack', game_cfg.vitals.MaxHealth + 10))
     assert.same('downed', link:Phase(player), player.UserId .. ' 没有进入濒死')
   end
 
@@ -62,12 +62,12 @@ describe('条款 19-12 本地连接夹具下的多人代码路径', function()
 
     local okFriendly = link:Hit(players[1], players[2], 'weapon', 30)
     assert.is_false(okFriendly, '同队伤害没有免掉')
-    assert.same(GameCfg.Vitals.MaxHealth, players[2].Character.Controller.Health)
+    assert.same(game_cfg.vitals.MaxHealth, players[2].Character.Controller.Health)
 
     local okEnemy, actual = link:Hit(players[1], players[4], 'weapon', 30)
     assert.is_true(okEnemy, '野外 PK 没有结算')
     assert.same(30, actual)
-    assert.same(GameCfg.Vitals.MaxHealth - 30, players[4].Character.Controller.Health)
+    assert.same(game_cfg.vitals.MaxHealth - 30, players[4].Character.Controller.Health)
 
     -- 队伍在第 3、第 4 条连接身上也一致：不是只对建立队伍的那一对生效
     squad(players[3], players[4])
@@ -80,7 +80,7 @@ describe('条款 19-12 本地连接夹具下的多人代码路径', function()
     squad(players[1], players[2])
     assert.is_false(link:Hit(players[1], players[3], 'weapon', 30), '鱼塘里不该有玩家间伤害')
     assert.is_true(link:Hit(nil, players[3], 'fishAttack', 30), '鱼攻击在安全区也要结算')
-    assert.same(GameCfg.Vitals.MaxHealth - 30, players[3].Character.Controller.Health)
+    assert.same(game_cfg.vitals.MaxHealth - 30, players[3].Character.Controller.Health)
 
     players[1].Character.Position = at(ARENA, 0)
     players[3].Character.Position = at(ARENA, 1)
@@ -114,8 +114,8 @@ describe('条款 19-12 本地连接夹具下的多人代码路径', function()
     down(downed)
     players[6].Character.Position = at(downed.Character.Position, 1)
     rescue(players[6], downed)
-    link:Advance(GameCfg.Rescue.DurationSec + 0.1)
-    local expected = math.floor(GameCfg.Vitals.MaxHealth * GameCfg.Survival.ReviveHealthPercent / 100)
+    link:Advance(game_cfg.Rescue.DurationSec + 0.1)
+    local expected = math.floor(game_cfg.vitals.MaxHealth * game_cfg.Survival.ReviveHealthPercent / 100)
     assert.same('alive', link:Phase(downed), '抢救没有把被救者拉起来')
     assert.same(expected, downed.Character.Controller.Health, '恢复量不是被救者上限的比例')
 
@@ -125,18 +125,18 @@ describe('条款 19-12 本地连接夹具下的多人代码路径', function()
     rescue(players[8], target, 2)
     assert.same('rescuing', link:Phase(target), '抢救没有开始')
     assert.is_true(link:Leave(players[8]))
-    link:Advance(GameCfg.Rescue.DurationSec + 0.1)
+    link:Advance(game_cfg.Rescue.DurationSec + 0.1)
     assert.same('downed', link:Phase(target), '施救者断线后抢救仍结算了')
     local health = target.Character.Controller.Health
 
     local back = link:Join(5008, { position = at(target.Character.Position, 1) })
-    link:Advance(GameCfg.Rescue.DurationSec + 0.1)
+    link:Advance(game_cfg.Rescue.DurationSec + 0.1)
     assert.same('downed', link:Phase(target), '重连把中断的抢救补结算了')
     assert.same(health, target.Character.Controller.Health, '重连改了被救者的血量')
 
     players[6].Character.Position = at(target.Character.Position, 1)
     rescue(players[6], target, 3)
-    link:Advance(GameCfg.Rescue.DurationSec + 0.1)
+    link:Advance(game_cfg.Rescue.DurationSec + 0.1)
     assert.same('alive', link:Phase(target), '重连后由别人重新发起仍然救不起来')
     local online = link:Online(back)
     assert.is_true(online, '重连的连接没有回到在线')

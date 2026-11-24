@@ -3,7 +3,7 @@
 -- 俯冲与眩晕互斥、脚本化追击按 dt 位移且不越过咬距、移除与逃跑时限清招式与预警。
 -- 沿用 tests/support/fish_combat 共享夹具；describe/it 名称保留旧类名与方法名，
 -- 并按方法名字典序注册以保持旧套件执行顺序。
-local FishCombat = require('tests.support.fish_combat')
+local fish_combat = require('tests.support.fish_combat')
 
 local function drop(env, id)
     env:prepare()
@@ -21,7 +21,7 @@ describe('TestShrimpCombat', function()
     local env
 
     before_each(function()
-        env = FishCombat.new()
+        env = fish_combat.new()
         env:setUp()
     end)
     after_each(function()
@@ -172,7 +172,7 @@ describe('TestShrimpCombat', function()
         env.now = 2; env.mgr:Update()
         env.now = 4; env.mgr:Update()
         local cp = env.player.Character.Position
-        env.mgr.Vitals.ApplyHit = function() return false end
+        env.mgr.vitals.ApplyHit = function() return false end
         env.now = 6; env.mgr:Update()
         assert.same(cp, env.player.Character.Position)
         env.downed[env.player] = true

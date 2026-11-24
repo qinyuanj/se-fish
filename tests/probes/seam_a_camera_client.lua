@@ -1,4 +1,4 @@
--- #160 接缝 A 取证第 1 步（客户端）：读取当前镜头位置与焦点，供服务端探针把模型摆到镜头前。
+-- #160 接缝 a 取证第 1 步（客户端）：读取当前镜头位置与焦点，供服务端探针把模型摆到镜头前。
 -- 试玩就绪后：editor-cli exec -p client --file <本文件绝对路径>，再 log grep SEAMA_CAM 取回。
 -- 输出一行：SEAMA_CAM <相机x> <相机y> <相机z> <焦点x> <焦点y> <焦点z>
 local cam = game:GetService('CameraService').MainCamera

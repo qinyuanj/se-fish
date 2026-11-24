@@ -1,17 +1,17 @@
--- #139 [专项探针]：真实服务器上的成长、四类持续效果与十五件武器配置取证（已迁移至 Spoke ServerRuntime / PlayerTree）。
+-- #139 [专项探针]：真实服务器上的成长、四类持续效果与十五件武器配置取证（已迁移至 Spoke server_runtime / player_tree）。
 -- 用 exec -p server --file 执行；临时修改会话内成长计数后恢复，不代表真实存档重进验收。
 -- 不自动发奖、不提交存档、不模拟多人；拾取/钓鱼/摆渡及真实枪击/挥砍另列真机遗留。
 local cfg = require('common.game_cfg')
 local ability = require('server.fish_ability')
 local pd = require('server.player_data_host')
-local ServerRuntime = require('server.world_host.server_runtime')
+local server_runtime = require('server.world_host.server_runtime')
 local players, task = game:GetService('Players'), game:GetService('Task')
 local player = players:GetPlayers()[1]
 local data = player and pd:GetDataInst(player)
-local rt = ServerRuntime.current()
+local rt = server_runtime.current()
 local pt = player and rt and rt:get_player_tree(player.UserId)
 if not data or not pt or not player.Character or not player.Character.Controller then
-    print('PRIZE139 ABORT 玩家、存档或 PlayerTree 未就绪') return
+    print('PRIZE139 ABORT 玩家、存档或 player_tree 未就绪') return
 end
 local function log(...) print('PRIZE139', '[专项探针]', ...) end
 local growth = data.Extra.growth.potions

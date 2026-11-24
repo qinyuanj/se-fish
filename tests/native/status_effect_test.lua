@@ -5,13 +5,13 @@
 --   2. 霜冻/麻痹可叠加（重复命中把时间越加越长）；失效后状态残留继续生效；
 --   3. 移速多写口：成长/虚弱/霜冻/麻痹各自写 WalkSpeed，恢复顺序丢成长（#131 已知边界根因）；
 --   4. 目标离场（玩家退出/鱼移除）后状态不清理，DOT 打空目标、查询泄漏；
---   5. BodyPlan 读不存在的 player.Data 恒为 0（#132 原型死代码），存档里的药水永远不生效。
+--   5. BodyPlan 读不存在的 player.data 恒为 0（#132 原型死代码），存档里的药水永远不生效。
 -- 接缝：loadfile 取全新 MgrAbility 实例；桩 _G.game（World:GetServerTime 可控时钟、Players）、
 --   server.ability_api 与技能包 server.packages.ability_system.api（加载即注册事件，不可载真包）；
---   Vitals/PlayerData/Survival 以假实现注入（与 main.lua 的接线同形状）。
+--   vitals/player_data/Survival 以假实现注入（与 main.lua 的接线同形状）。
 -- 旧 setUp/tearDown 逐例映射为 before_each/after_each：替换的全局（game / Vector3）、模块缓存
 -- before_each 幂等。describe/it 名沿用旧类名与方法名，案例顺序沿用旧 LuaUnit 的字典序执行序。
-local GameCfg = require('common.game_cfg')
+local game_cfg = require('common.game_cfg')
 
 local function signal()
     local callbacks = {}
@@ -66,15 +66,15 @@ describe('TestStatusEffect', function()
         end }
         package.loaded['server.ability_api'] = {
             SetCastGuard = function() end,
-            SetBodyScale = function(character, scale) -- 根 AbilityAPI 为点号调用
+            SetBodyScale = function(character, scale) -- 根 ability_api 为点号调用
                 state.bodyScales[#state.bodyScales + 1] = scale
                 return { Ok = true, Scale = scale, Derived = {} }
             end,
         }
         package.loaded['server.packages.ability_system.api'] = {}
         state.mgr = assert(loadfile('server/fish_ability.lua'))()
-        -- 假 Vitals：记录 DOT 结算（统一入口证据）
-        state.mgr.Vitals = {
+        -- 假 vitals：记录 DOT 结算（统一入口证据）
+        state.mgr.vitals = {
             NewHit = function(_, source, category) return { source = source, category = category, targets = {} } end,
             ApplyHit = function(_, hit, target, amount)
                 state.hits[#state.hits + 1] = { target = target, amount = amount, category = hit.category,
@@ -82,26 +82,26 @@ describe('TestStatusEffect', function()
                 return true
             end,
             RefreshMaxHealth = function(_, player) state.refreshedMaxHealth[#state.refreshedMaxHealth + 1] = player; return true end,
-            FishCarrier = nil, -- 按需在各用例里装
+            fish_carrier = nil, -- 按需在各用例里装
         }
-        -- 假 PlayerData / Survival
-        state.mgr.PlayerData = { GetDataInst = function() return {
+        -- 假 player_data / Survival
+        state.mgr.player_data = { GetDataInst = function() return {
             PotionCount = function(_, itemId) return state.potions[itemId] or 0 end } end }
         state.mgr.Survival = { GetState = function()
             return state.weak and { weakUntil = state.now + 60 } or nil
         end }
         state.runtime = require('tests.support.modifier_runtime').New(state.now)
         state.mgr.Modifier = state.runtime.loadModifier()
-        state.mgr.Modifier.Vitals = state.mgr.Vitals
+        state.mgr.Modifier.vitals = state.mgr.vitals
         state.mgr.Modifier.Ability = state.mgr
-        state.mgr.Attr = require('tests.support.attr_runtime').New(state.mgr.PlayerData,
+        state.mgr.Attr = require('tests.support.attr_runtime').New(state.mgr.player_data,
             function(p) return state.mgr.Modifier:GetMoveMultiplier(p) end)
         local character = state.runtime.unit('character')
         character.Controller = { WalkSpeed = 7 }
         function character:SetScale(v) state.bodyScales[#state.bodyScales + 1] = v.x end
         state.player = { UserId = 13901, Character = character,
             CharacterAdded = signal(), CharacterRemoving = signal() }
-        state.mgr.Attr.Vitals = state.mgr.Vitals
+        state.mgr.Attr.vitals = state.mgr.vitals
     end)
 
     after_each(function()
@@ -122,7 +122,7 @@ describe('TestStatusEffect', function()
     local function installFish()
         local carrier = { Body = ctx.runtime.unit('fish'), Dead = false }
         local fish = { Id = 77, Carrier = carrier }
-        ctx.mgr.Vitals.FishCarrier = { ResolveCarrier = function(_, target)
+        ctx.mgr.vitals.fish_carrier = { ResolveCarrier = function(_, target)
             if target == fish or target == carrier or target == carrier.Body then return carrier end
         end }
         return fish, carrier
@@ -162,7 +162,7 @@ describe('TestStatusEffect', function()
         local bare = { UserId = 13905 }
         ctx.mgr:CaptureBaseSpeed(bare)
         ctx.mgr:RefreshMoveSpeed(bare)
-        assert.same(GameCfg.Ability.MoveSpeed.Base, ctx.mgr.Attr:State(bare).baseSpeed, '无控制器回落配置基准')
+        assert.same(game_cfg.Ability.MoveSpeed.Base, ctx.mgr.Attr:State(bare).baseSpeed, '无控制器回落配置基准')
     end)
 
     -- 刷新已过期状态视为全新（层数不继承）
@@ -230,7 +230,7 @@ describe('TestStatusEffect', function()
         ctx.mgr:Update(0.1) -- 生产心跳重试当前存档属性
         assert.same(21, c.WalkSpeed)
         assert.is_true(ctx.mgr:ApplyGrowth(ctx.player).Ok)
-        ctx.mgr.Vitals.RefreshMaxHealth = function() return false, '拒绝写MaxHealth' end
+        ctx.mgr.vitals.RefreshMaxHealth = function() return false, '拒绝写MaxHealth' end
         applied = ctx.mgr:ApplyGrowth(ctx.player)
         assert.is_false(applied.Ok)
         assert.matches('MaxHealth', tostring(applied.Error), nil, true)
@@ -248,16 +248,16 @@ describe('TestStatusEffect', function()
         assert.message('退出后不继续写控制器或刷失败日志').same(after, before)
     end)
 
-    -- 血量上限按变大药水数（委托 AttrGrowth/BodyScale）；BodyPlan 改走注入的 PlayerData
+    -- 血量上限按变大药水数（委托 attr_growth/body_scale）；BodyPlan 改走注入的 player_data
     it('test_max_health_and_body_plan_read_injected_player_data', function()
         ctx.potions.item168 = 10
         assert.same(900, ctx.mgr:MaxHealth(ctx.player))
         local plan = ctx.mgr:BodyPlan(ctx.player)
         assert.same(3, plan.Scale)
         assert.same(900, plan.Health)
-        -- #132 死代码回归：引擎玩家没有 .Data 字段也不报错、按 0 个处理
-        ctx.mgr.PlayerData = nil
-        ctx.mgr.Attr.PlayerData = nil
+        -- #132 死代码回归：引擎玩家没有 .data 字段也不报错、按 0 个处理
+        ctx.mgr.player_data = nil
+        ctx.mgr.Attr.player_data = nil
         assert.same(1, ctx.mgr:BodyPlan(ctx.player).Scale)
         assert.same(300, ctx.mgr:MaxHealth(ctx.player))
     end)
@@ -339,22 +339,22 @@ describe('TestStatusEffect', function()
         assert.message('全部失效后回到成长后速度').near(21, ctx.player.Character.Controller.WalkSpeed, 1e-9)
     end)
 
-    -- 来源退出策略：取消其所有效果；真实 Vitals 在退出前签发来源身份，退出后不再产生无来源 DOT。
+    -- 来源退出策略：取消其所有效果；真实 vitals 在退出前签发来源身份，退出后不再产生无来源 DOT。
     it('test_source_leave_cancels_dot_via_public_lifecycle', function()
         local fish, carrier = installFish()
         local seen, calls = {}, 0
-        ctx.mgr.Vitals.FishCarrier.Damage = function(_, _, amount, hit)
+        ctx.mgr.vitals.fish_carrier.Damage = function(_, _, amount, hit)
             calls = calls + 1
             seen[calls] = (hit and hit.sourcePlayer) or nil
             assert.same(1, amount)
             return true, amount
         end
-        local Host = require('tests.support.life_host')
-        local host = Host.start({ now = ctx.now, fish_carrier = ctx.mgr.Vitals.FishCarrier })
+        local host = require('tests.support.life_host')
+        local host = host.start({ now = ctx.now, fish_carrier = ctx.mgr.vitals.fish_carrier })
         host:add(ctx.player)
         local v = host.runtime.life
-        ctx.mgr.Vitals = v
-        ctx.mgr.Modifier.Vitals = v
+        ctx.mgr.vitals = v
+        ctx.mgr.Modifier.vitals = v
         ctx.mgr.Modifier:ApplyWeaponEffect(ctx.player, fish, { Kind = 'poison' })
         advance(1)
         assert.same({ ctx.player }, seen)
@@ -375,7 +375,7 @@ describe('TestStatusEffect', function()
         local fish, carrier = installFish()
         fish.FishId, fish.StraightEscape, fish.Heading = 'alligatorGar', true, { x = 1, z = 0 }
         carrier.Body.Position = { x = 9999, y = 500, z = 9999 }
-        local base = GameCfg.Fish.alligatorGar.Speed
+        local base = game_cfg.Fish.alligatorGar.Speed
         ctx.mgr.Modifier:ApplyWeaponEffect(ctx.player, fish, { Kind = 'frost' })
         ctx.mgr.Modifier:ApplyWeaponEffect(ctx.player, fish, { Kind = 'paralyze' })
         unit:UpdateEscaping(fish, ctx.now)
@@ -422,8 +422,8 @@ describe('TestStatusEffect', function()
     -- 虚弱到期写失败：清标记不留伪虚弱，下一帧按当前状态重试
     it('test_weak_expiry_write_failure_retries_next_frame_without_fake_weak_state', function()
         local reject, read = rejectableSpeed(ctx)
-        local Host = require('tests.support.life_host')
-        local host = Host.start({ now = ctx.now, speed_writer = function(player)
+        local host = require('tests.support.life_host')
+        local host = host.start({ now = ctx.now, speed_writer = function(player)
           ctx.mgr:RefreshMoveSpeed(player)
         end })
         host:add(ctx.player)

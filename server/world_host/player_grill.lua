@@ -1,18 +1,18 @@
 
-local GameCfg = require("common.game_cfg")
-local BodyScale = require("common.body_scale")
-local GrillCurve = require("common.grill_curve")
+local game_cfg = require("common.game_cfg")
+local body_scale = require("common.body_scale")
+local grill_curve = require("common.grill_curve")
 local spoke = require("common.packages.spoke.api")
-local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
+local spoke_runtime = require("common.packages.spoke.runtime.spoke_runtime")
 
 local State = spoke.State
-local PlayerGrill = {}
+local player_grill = {}
 
-local ITEM_BAR = GameCfg.Items.ContainerId.ItemBar
-local BACKPACK = GameCfg.Items.ContainerId.Backpack
+local ITEM_BAR = game_cfg.Items.ContainerId.ItemBar
+local BACKPACK = game_cfg.Items.ContainerId.Backpack
 
 local function cfg()
-  return GameCfg.Grill
+  return game_cfg.Grill
 end
 
 local function flat_distance(a, b)
@@ -22,7 +22,7 @@ local function flat_distance(a, b)
 end
 
 local function is_token(item_id)
-  local exchanges = GameCfg.Content and GameCfg.Content.Exchanges or {}
+  local exchanges = game_cfg.Content and game_cfg.Content.Exchanges or {}
   for _, chain in ipairs(exchanges) do
     if chain.EliteToken == item_id or chain.BossToken == item_id then return true end
   end
@@ -31,15 +31,15 @@ end
 
 local function grillable(entry)
   if type(entry) ~= "table" or (entry.count or 0) <= 0 then return false end
-  local definition = GameCfg.Items.Definitions[entry.itemId]
+  local definition = game_cfg.Items.Definitions[entry.itemId]
   if not definition then return false end
   if definition.Type ~= "食物" and definition.Type ~= "极品食物" then return false end
-  return GameCfg.Items.CookRate(entry) == nil
+  return game_cfg.Items.CookRate(entry) == nil
 end
 
 local function selected_entry(data)
-  local items = data and data.Data and data.Data.Containers and data.Data.Containers[ITEM_BAR]
-  local slot = data and data.Data and data.Data.SelectedSlot
+  local items = data and data.data and data.data.Containers and data.data.Containers[ITEM_BAR]
+  local slot = data and data.data and data.data.SelectedSlot
   local entry = slot and items and items[slot]
   if type(entry) == "table" and (entry.count or 0) > 0 then return slot, entry end
   return nil, nil
@@ -51,7 +51,7 @@ local function place(data, item_id, mult, rate, select_slot)
     { BACKPACK, data:BackpackCapacity() },
   }
   for _, pair in ipairs(pairs_) do
-    local items = data.Data.Containers[pair[1]]
+    local items = data.data.Containers[pair[1]]
     for index = 1, pair[2] do
       local entry = items[index]
       if not entry or (entry.count or 0) <= 0 then
@@ -63,7 +63,7 @@ local function place(data, item_id, mult, rate, select_slot)
           cooked = rate,
           saved = rate and { k = rate } or nil,
         }
-        if select_slot and pair[1] == ITEM_BAR then data.Data.SelectedSlot = index end
+        if select_slot and pair[1] == ITEM_BAR then data.data.SelectedSlot = index end
         return true
       end
     end
@@ -106,7 +106,7 @@ local function find_anchor(world, name, cache)
   if not world or type(world.FindFirstChild) ~= "function" then return nil end
   local ok, unit = pcall(world.FindFirstChild, world, name, true)
   if not ok then
-    print("[PlayerGrill] 查找场景锚点失败", name, tostring(unit))
+    print("[player_grill] 查找场景锚点失败", name, tostring(unit))
     return nil
   end
   if unit then cache[name] = unit end
@@ -120,7 +120,7 @@ local function anchor_in_range(player, world, cache)
   for _, point in ipairs(cfg().Points or {}) do
     local anchor = find_anchor(world, point.AnchorName, cache)
     local center = anchor and anchor.Position
-    local radius = BodyScale.InteractionRadius(character, cfg().Radius) + (cfg().Slack or 0)
+    local radius = body_scale.InteractionRadius(character, cfg().Radius) + (cfg().Slack or 0)
     if center and flat_distance(pos, center) <= radius then
       return point.AnchorName, anchor
     end
@@ -131,8 +131,8 @@ end
 local function rate_of(session, now)
   if session.rate ~= nil then return session.rate end
   local elapsed = now - (session.startedAt or now)
-  if GrillCurve.IsBurnt(elapsed, cfg()) then return 0 end
-  return GrillCurve.Rate(elapsed, cfg())
+  if grill_curve.IsBurnt(elapsed, cfg()) then return 0 end
+  return grill_curve.Rate(elapsed, cfg())
 end
 
 local function pending_rate(pending, now)
@@ -140,11 +140,11 @@ local function pending_rate(pending, now)
   if pending.cooked ~= nil then return pending.cooked end
   if type(pending.at) ~= "number" then return nil end
   local elapsed = now - pending.at
-  if GrillCurve.IsBurnt(elapsed, cfg()) then return 0 end
-  return GrillCurve.Rate(elapsed, cfg())
+  if grill_curve.IsBurnt(elapsed, cfg()) then return 0 end
+  return grill_curve.Rate(elapsed, cfg())
 end
 
-function PlayerGrill.mount(scope, tree, opts)
+function player_grill.mount(scope, tree, opts)
   opts = type(opts) == "table" and opts or {}
   local player = tree.player
   local data = tree.data
@@ -159,7 +159,7 @@ function PlayerGrill.mount(scope, tree, opts)
     create_unit = opts.create_unit,
   }
   local cleaned = false
-  local is_cooking = State.new("PlayerGrill.is_cooking", false)
+  local is_cooking = State.new("player_grill.is_cooking", false)
 
   local function set_cooking(active)
     if not cleaned and is_cooking:now() ~= active then
@@ -221,7 +221,7 @@ function PlayerGrill.mount(scope, tree, opts)
       session.visual = unit
       return
     end
-    print("[PlayerGrill] 烤制单位创建失败", tostring(unit))
+    print("[player_grill] 烤制单位创建失败", tostring(unit))
   end
 
   local function explode()
@@ -278,7 +278,7 @@ function PlayerGrill.mount(scope, tree, opts)
     end)
     clear_memory()
     push_state(remote, player, { state = "burnt" })
-    print("[PlayerGrill] 烤糊", player.UserId, item_id)
+    print("[player_grill] 烤糊", player.UserId, item_id)
     return true
   end
 
@@ -302,7 +302,7 @@ function PlayerGrill.mount(scope, tree, opts)
     destroy_visual()
     clear_memory()
     publish()
-    print("[PlayerGrill] 自动结算", player.UserId, item_id, reason, "rate=" .. tostring(rate))
+    print("[player_grill] 自动结算", player.UserId, item_id, reason, "rate=" .. tostring(rate))
     return true
   end
 
@@ -335,7 +335,7 @@ function PlayerGrill.mount(scope, tree, opts)
     end)
     if accepted then
       publish()
-      print("[PlayerGrill] 重进恢复", player.UserId, pending.itemId, "rate=" .. tostring(rate))
+      print("[player_grill] 重进恢复", player.UserId, pending.itemId, "rate=" .. tostring(rate))
     end
     return accepted
   end
@@ -363,8 +363,8 @@ function PlayerGrill.mount(scope, tree, opts)
       if draft_slot ~= slot or not grillable(draft_entry) or draft_entry.itemId ~= item_id then
         return nil, "no-fish"
       end
-      draft.Data.Containers[ITEM_BAR][slot] = nil
-      if draft.Data.SelectedSlot == slot then draft.Data.SelectedSlot = nil end
+      draft.data.Containers[ITEM_BAR][slot] = nil
+      if draft.data.SelectedSlot == slot then draft.data.SelectedSlot = nil end
       local pending = draft.Extra and draft.Extra.recovery and draft.Extra.recovery.grill
       if type(pending) == "table" then
         local recovered = pending_rate(pending, started_at)
@@ -388,7 +388,7 @@ function PlayerGrill.mount(scope, tree, opts)
         return
       end
       result = value
-      SpokeRuntime.batch(function()
+      spoke_runtime.batch(function()
         sync_tree()
         session.state = "cooking"
         session.itemId = item_id
@@ -403,7 +403,7 @@ function PlayerGrill.mount(scope, tree, opts)
       spawn_visual()
       reply(remote, player, value)
       publish()
-      print("[PlayerGrill] 开烤", player.UserId, item_id, mult)
+      print("[player_grill] 开烤", player.UserId, item_id, mult)
     end)
     if mode == "replay" then return true end
     if not accepted then return fail(remote, player, mode, seq) end
@@ -422,11 +422,11 @@ function PlayerGrill.mount(scope, tree, opts)
       return fail(remote, player, "out-of-range", seq)
     end
     local now = clock.now()
-    if session.state == "cooking" and GrillCurve.IsBurnt(now - (session.startedAt or now), cfg()) then
+    if session.state == "cooking" and grill_curve.IsBurnt(now - (session.startedAt or now), cfg()) then
       settle_burn()
       return fail(remote, player, "burnt", seq)
     end
-    local rate = session.rate or GrillCurve.Rate(now - session.startedAt, cfg())
+    local rate = session.rate or grill_curve.Rate(now - session.startedAt, cfg())
     local item_id, mult = session.itemId, session.mult
     local frozen = false
     local accepted, mode = execute("grill:takeout", seq, function(draft)
@@ -449,13 +449,13 @@ function PlayerGrill.mount(scope, tree, opts)
         fail(remote, player, tostring(value or "rejected"), seq)
         return
       end
-      SpokeRuntime.batch(function()
+      spoke_runtime.batch(function()
         sync_tree()
         clear_memory()
       end)
       reply(remote, player, value)
       publish()
-      print("[PlayerGrill] 取出", player.UserId, item_id, "rate=" .. tostring(rate))
+      print("[player_grill] 取出", player.UserId, item_id, "rate=" .. tostring(rate))
     end)
     if mode == "replay" then return true end
     if not accepted then return fail(remote, player, mode, seq) end
@@ -495,7 +495,7 @@ function PlayerGrill.mount(scope, tree, opts)
         settle_current(now, "downed")
         return
       end
-      if GrillCurve.IsBurnt(now - (session.startedAt or now), cfg()) then
+      if grill_curve.IsBurnt(now - (session.startedAt or now), cfg()) then
         settle_burn()
       end
     end)
@@ -512,4 +512,4 @@ function PlayerGrill.mount(scope, tree, opts)
   return { handle = on_action }
 end
 
-return PlayerGrill
+return player_grill

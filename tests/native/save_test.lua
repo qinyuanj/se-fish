@@ -1,5 +1,5 @@
 -- #88 迁移：存档序列化与读写（原 tests/gameplay/save_test.lua，16 例）。
--- #92 存档：序列化往返、读档校验、失败重试、UpdateAsync 记账、体积台账（真 PlayerData + 假 DataStore/Task）。
+-- #92 存档：序列化往返、读档校验、失败重试、UpdateAsync 记账、体积台账（真 player_data + 假 DataStore/Task）。
 -- 失败方式（先列后写）：
 --   1. 序列化丢信息：金币、道具栏/背包格子位置、个体倍率、鱼饵计数、升级等级、当前区域任一丢失或错位；
 --   2. 读档不校验：坏类型、未知物品 id、超容量格位直接灌进内存态，脏存档搞坏游戏；
@@ -11,8 +11,8 @@
 --   8. 只有离场才存档：中途掉线/关服丢进度（周期自动存档、BindToClose 兜底）；
 --   9. 读档竞态：读档返回前玩家已操作，旧档灌入吞掉新操作（Touched 会话锁）。
 -- it 按旧 LuaUnit 的方法名字典序注册，保持与旧套件一致的案例顺序。
--- 夹具必须恢复三样：共享配置（GameCfg.Debug / Save.QaSlot，槽位由 helper 建基线、
-local GameCfg = require('common.game_cfg')
+-- 夹具必须恢复三样：共享配置（game_cfg.Debug / Save.QaSlot，槽位由 helper 建基线、
+local game_cfg = require('common.game_cfg')
 
 -- 假 DataStore：内存表 + 可注入失败次数与 CAS 冲突次数
 local function fakeStore(env)
@@ -48,17 +48,17 @@ describe('TestSave', function()
     local env, savedDebug, savedSlot, savedGame, savedSaveModule
 
     -- 逐例夹具：旧 LuaUnit 每例跑 setUp/tearDown，这里同样用 before_each/after_each。
-    -- before_each 依次快照 Debug / QaSlot / _G.game / MgrSave 模块缓存，
+    -- before_each 依次快照 Debug / QaSlot / _G.game / mgr_save 模块缓存，
     -- 全部保存在改任何状态之前，因此夹具中途抛错时 after_each 仍能逐项还原。
     before_each(function()
-        savedDebug = GameCfg.Debug
-        savedSlot = GameCfg.Save.QaSlot
+        savedDebug = game_cfg.Debug
+        savedSlot = game_cfg.Save.QaSlot
         savedGame = rawget(_G, 'game')
         savedSaveModule = package.loaded['server.save_host']
         package.loaded['server.save_host'] = nil
-        GameCfg.Debug = { Enabled = true, InitialGrants = savedDebug.InitialGrants }
-        GameCfg.Save.QaSlot = ''
-        env = { cfg = GameCfg, ops = {}, waits = {}, players = {}, dataInsts = {}, spawnQueue = {} }
+        game_cfg.Debug = { Enabled = true, InitialGrants = savedDebug.InitialGrants }
+        game_cfg.Save.QaSlot = ''
+        env = { cfg = game_cfg, ops = {}, waits = {}, players = {}, dataInsts = {}, spawnQueue = {} }
         env.failGet, env.failSet, env.failUpdate, env.casConflicts = 0, 0, 0, 0
         env.store = fakeStore(env)
         env.spawned = 0
@@ -91,14 +91,14 @@ describe('TestSave', function()
         }
         env.save = assert(loadfile('server/save_host.lua'))()
         env.syncs = 0
-        env.save.PlayerData = {
+        env.save.player_data = {
             SendItemBar = function() env.syncs = env.syncs + 1 end,
             GetDataInst = function(_, p) return env.dataInsts[p] end,
         }
-        local PlayerData = assert(loadfile('server/data/player_data.lua'))()
+        local player_data = assert(loadfile('server/data/player_data.lua'))()
         env.newData = function(userId)
             local p = { UserId = userId, SetAttribute = function() end }
-            local data = PlayerData.New(p)
+            local data = player_data.New(p)
             data:Init()
             env.dataInsts[p] = data
             return p, data
@@ -106,11 +106,11 @@ describe('TestSave', function()
         env.me, env.data = env.newData(1)
         env.save:LoadInto(env.me, env.data)
         env.ops, env.waits, env.syncs = {}, {}, 0
-        env.save.Ledger = {}
+        env.save.ledger = {}
     end)
     after_each(function()
-        GameCfg.Save.QaSlot = savedSlot
-        GameCfg.Debug = savedDebug
+        game_cfg.Save.QaSlot = savedSlot
+        game_cfg.Debug = savedDebug
         package.loaded['server.save_host'] = savedSaveModule
         _G.game = savedGame
         savedDebug, savedSlot, savedGame, savedSaveModule = nil, nil, nil, nil
@@ -141,7 +141,7 @@ describe('TestSave', function()
 
     it('test_autosave_periodically_saves_online_players', function()
         env.players = { env.me }
-        env.data.Data.FishCoin = 33
+        env.data.data.FishCoin = 33
         env.save:Update() -- 第一次只定下一次存档时刻
         assert.same(0, env.store.data[env.save:Key(1)].coin)
         env.now = env.now + env.cfg.Save.AutosaveSec - 1
@@ -150,7 +150,7 @@ describe('TestSave', function()
         env.now = env.now + 1
         env.save:Update() -- 到点：在线玩家落档
         assert.same(33, env.store.data[env.save:Key(1)].coin)
-        assert.same('autosave', env.save.Ledger[1].LastReason)
+        assert.same('autosave', env.save.ledger[1].LastReason)
         -- 离场（不在线）玩家不自动存
         local stranger = { UserId = 2 }
         env.players = { stranger }
@@ -163,14 +163,14 @@ describe('TestSave', function()
         env.save:Start()
         assert.is_not_nil(env.boundClose)
         env.players = { env.me }
-        env.data.Data.FishCoin = 44
+        env.data.data.FishCoin = 44
         env.boundClose()
         assert.same(44, env.store.data[env.save:Key(1)].coin)
-        assert.same('shutdown', env.save.Ledger[1].LastReason)
+        assert.same('shutdown', env.save.ledger[1].LastReason)
     end)
 
     it('test_commit_uses_update_async_and_survives_cas_conflict', function()
-        env.data.Data.FishCoin = 10
+        env.data.data.FishCoin = 10
         env.casConflicts = 1 -- transform 会被调两次（模拟冲突重算）
         local ok = env.save:Commit(1, env.data:Serialize(), 'exchange:eelHead')
         assert.is_true(ok)
@@ -185,7 +185,7 @@ describe('TestSave', function()
         assert.same(10, env.store.data[env.save:Key(1)].coin)
         -- 记账失败重试：第一次 update 失败也能补上
         env.failUpdate = 1
-        env.data.Data.FishCoin = 11
+        env.data.data.FishCoin = 11
         assert.is_true(env.save:Commit(1, env.data:Serialize(), 'ferry:ticket'))
         assert.same(11, env.store.data[env.save:Key(1)].coin)
     end)
@@ -193,9 +193,9 @@ describe('TestSave', function()
     it('test_enqueue_merges_to_latest_snapshot_per_player', function()
         -- 排空任务还没跑就连来两笔：只落最新快照（旧 Set 不会盖新 Commit，反之同理）
         env.deferSpawn = true
-        env.data.Data.FishCoin = 10
+        env.data.data.FishCoin = 10
         assert.is_true(env.save:Save(1, env.data:Serialize(), 'a'))
-        env.data.Data.FishCoin = 20
+        env.data.data.FishCoin = 20
         assert.is_true(env.save:Commit(1, env.data:Serialize(), 'b'))
         assert.same(0, #env.ops) -- 还没排空
         env.flushSpawns()
@@ -221,7 +221,7 @@ describe('TestSave', function()
         assert.same(1, d:ItemCount('duck'))
         env.casConflicts = 0
         assert.is_true(env.save:Commit(1, d:Serialize(), 'exchange:eelHead'))
-        -- 断线重连：新 Data 读档
+        -- 断线重连：新 data 读档
         local _, d2 = env.newData(1)
         local loaded = env.save:Load(1)
         assert.is_not_nil(loaded)
@@ -241,7 +241,7 @@ describe('TestSave', function()
     it('test_ledger_tracks_size_and_write_count', function()
         assert.is_true(env.save:Save(1, env.data:Serialize(), 'a'))
         assert.is_true(env.save:Save(1, env.data:Serialize(), 'b'))
-        local ledger = env.save.Ledger[1]
+        local ledger = env.save.ledger[1]
         assert.is_not_nil(ledger)
         assert.same(2, ledger.Writes)
         assert.is_true(ledger.Bytes > 0)
@@ -256,12 +256,12 @@ describe('TestSave', function()
     end)
 
     it('test_load_into_applies_save_and_syncs_client', function()
-        env.data.Data.FishCoin = 66
+        env.data.data.FishCoin = 66
         assert.is_true(env.data:AddItem('duck'))
         env.store.data[env.save:Key(9)] = env.data:Serialize()
         local player9, d9 = env.newData(9)
         env.save:LoadInto(player9, d9)
-        assert.same(66, d9.Data.FishCoin)
+        assert.same(66, d9.data.FishCoin)
         assert.same(1, d9:ItemCount('duck'))
         assert.same(1, env.syncs) -- 恢复后推了一次 ItemBarState
         -- 新档同样发送 ready 快照。
@@ -270,12 +270,12 @@ describe('TestSave', function()
     end)
 
     it('test_load_into_never_discards_old_property_because_of_touched_flag', function()
-        env.data.Data.FishCoin = 66
+        env.data.data.FishCoin = 66
         env.store.data[env.save:Key(9)] = env.data:Serialize()
         local player9, d9 = env.newData(9)
         d9.Touched = true
         env.save:LoadInto(player9, d9)
-        assert.same(66, d9.Data.FishCoin)
+        assert.same(66, d9.data.FishCoin)
         assert.same(1, env.syncs)
     end)
 
@@ -288,18 +288,18 @@ describe('TestSave', function()
         assert.same(2, #env.waits) -- 每次失败等 RetryDelaySec
         -- 永远失败：返回 nil，内存态不变；GetAsync 总调用次数 = 3(成功路) + MaxRetries(失败路)
         env.failGet = 99
-        env.data.Data.FishCoin = 77
+        env.data.data.FishCoin = 77
         assert.is_nil(env.save:Load(1))
-        assert.same(77, env.data.Data.FishCoin)
+        assert.same(77, env.data.data.FishCoin)
         assert.same(3 + env.cfg.Save.MaxRetries, #env.ops)
     end)
 
     it('test_save_failure_keeps_memory_and_reports', function()
         env.failUpdate = 99
-        env.data.Data.FishCoin = 88
+        env.data.data.FishCoin = 88
         -- 失败保留原 job 与写身份，恢复后 Update 再排空。
         assert.is_true(env.save:Save(1, env.data:Serialize(), 'test'))
-        assert.same(88, env.data.Data.FishCoin)
+        assert.same(88, env.data.data.FishCoin)
         assert.same(0, env.store.data[env.save:Key(1)].coin)
         assert.same(env.cfg.Save.MaxRetries - 1, #env.waits)
         env.failUpdate = 0
@@ -309,9 +309,9 @@ describe('TestSave', function()
 
     it('test_serialize_roundtrip_restores_coin_slots_bait_upgrade_zone', function()
         local d = env.data
-        d.Data.FishCoin = 45
-        d.Data.UpgradeLevel = 1
-        d.Data.Zone = 'shrimpPond'
+        d.data.FishCoin = 45
+        d.data.UpgradeLevel = 1
+        d.data.Zone = 'shrimpPond'
         assert.is_true(d:AddItem('duck'))
         assert.is_true(d:AddItem('shrimpTicket'))
         assert.is_true(d:AddBait('sausage', 3))
@@ -322,14 +322,14 @@ describe('TestSave', function()
         -- 全新玩家读档
         local player2, d2 = env.newData(2)
         assert.is_true(d2:ApplySave(snapshot))
-        assert.same(45, d2.Data.FishCoin)
-        assert.same(1, d2.Data.UpgradeLevel)
-        assert.same('shrimpPond', d2.Data.Zone)
-        assert.same(3, d2.Data.Bait.sausage)
-        assert.same(d.Data.Bait.worm, d2.Data.Bait.worm) -- 白送蚯蚓也在
+        assert.same(45, d2.data.FishCoin)
+        assert.same(1, d2.data.UpgradeLevel)
+        assert.same('shrimpPond', d2.data.Zone)
+        assert.same(3, d2.data.Bait.sausage)
+        assert.same(d.data.Bait.worm, d2.data.Bait.worm) -- 白送蚯蚓也在
         -- 格子位置逐项一致（含 mult）
-        local bar1 = d.Data.Containers.itemBar
-        local bar2 = d2.Data.Containers.itemBar
+        local bar1 = d.data.Containers.itemBar
+        local bar2 = d2.data.Containers.itemBar
         for i = 1, 8 do
             local a, b = bar1[i], bar2[i]
             if a then
@@ -339,8 +339,8 @@ describe('TestSave', function()
                 assert.message('itemBar ' .. i).is_nil(b)
             end
         end
-        local bp1 = d.Data.Containers.backpack
-        local bp2 = d2.Data.Containers.backpack
+        local bp1 = d.data.Containers.backpack
+        local bp2 = d2.data.Containers.backpack
         for i = 1, 10 do
             local a, b = bp1[i], bp2[i]
             if a then

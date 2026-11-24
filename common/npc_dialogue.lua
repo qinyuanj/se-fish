@@ -1,23 +1,23 @@
-local GameCfg = require('common.game_cfg')
-local Dialogue = {}
+local game_cfg = require('common.game_cfg')
+local dialogue = {}
 
 local function zoneName(id)
-    for _, zone in ipairs(GameCfg.Zones) do if zone.Id == id then return zone.Name end end
+    for _, zone in ipairs(game_cfg.Zones) do if zone.Id == id then return zone.Name end end
     return tostring(id)
 end
 
 local function itemName(id)
     local achievement = type(id) == 'string' and id:match('^achievement%.(.+)$')
-    if achievement then return GameCfg.Achievements[achievement].Name end
-    local item = GameCfg.Items.Definitions[id]
+    if achievement then return game_cfg.Achievements[achievement].Name end
+    local item = game_cfg.Items.Definitions[id]
     return item and item.Name or tostring(id)
 end
 
-function Dialogue.Lines(zoneId)
+function dialogue.Lines(zoneId)
     local zone, npc, chain
-    for _, value in ipairs(GameCfg.Zones) do if value.Id == zoneId then zone = value end end
-    for _, value in ipairs(GameCfg.Interact.Fishermen) do if value.ZoneId == zoneId then npc = value end end
-    for _, value in ipairs(GameCfg.Content.Exchanges) do if value.ZoneId == zoneId then chain = value end end
+    for _, value in ipairs(game_cfg.Zones) do if value.Id == zoneId then zone = value end end
+    for _, value in ipairs(game_cfg.Interact.Fishermen) do if value.ZoneId == zoneId then npc = value end end
+    for _, value in ipairs(game_cfg.Content.Exchanges) do if value.ZoneId == zoneId then chain = value end end
     if not zone or not npc or not chain then return nil end
     local lines = {
         zone.Name .. '的钓鱼佬：我什么都吃！选中鱼获或鱼饵再喂食，就能换金币。',
@@ -31,7 +31,7 @@ function Dialogue.Lines(zoneId)
     else
         lines[#lines + 1] = '交船票后倒计时出发，船边其他玩家可搭便船；返程按人支付金币。'
     end
-    for _, route in ipairs(GameCfg.Ferry.Routes) do
+    for _, route in ipairs(game_cfg.Ferry.Routes) do
         if route.FromZoneId == zoneId then
             lines[#lines + 1] = '交' .. itemName(route.Outbound.Ticket) .. '后'
                 .. route.Outbound.CountdownSec .. '秒前往' .. zoneName(route.ToZoneId)
@@ -53,9 +53,9 @@ function Dialogue.Lines(zoneId)
     return lines
 end
 
-function Dialogue.Describe(zoneId)
-    local lines = Dialogue.Lines(zoneId)
+function dialogue.Describe(zoneId)
+    local lines = dialogue.Lines(zoneId)
     return lines and table.concat(lines, '\n') or nil
 end
 
-return Dialogue
+return dialogue

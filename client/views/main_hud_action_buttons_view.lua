@@ -1,18 +1,18 @@
 -- Spoke 主 HUD 右侧动作键视图（ADR-0032 / #297-B3b1，归属 L2 client.views）：
--- 挂载于 RootView 常驻 HUD 槽位，订阅只读 ClientStore.item_bar / cast / special_item / hud_visible；
+-- 挂载于 root_view 常驻 HUD 槽位，订阅只读 client_store.item_bar / cast / special_item / hud_visible；
 -- 负责右侧 ItemDiscard（丢弃/确认丢弃）与 ItemAction2（抛竿/收竿/点击收线/已上岸/放下/手持与吃/长按飞行/原子吐息冷却）
 -- 的排版、文案、呼吸高亮色、交互上行 RE 与 backpack_open 展开遮挡隐藏；
 -- 所有动态 UI 节点与事件连接统一经 ctx.create_node / ctx.connect 托管，随重连或根 UI 销毁零残留释放。
 
 local spoke = require("common.packages.spoke.api")
-local GameCfg = require("common.game_cfg")
-local Number = require("common.number")
-local MainHudLayout = require("client.main_hud_layout")
-local ViewUtil = require("client.views.view_util")
+local game_cfg = require("common.game_cfg")
+local number = require("common.number")
+local main_hud_layout = require("client.main_hud_layout")
+local view_util = require("client.views.view_util")
 
 local State = spoke.State
 
-local MainHudActionButtonsView = {}
+local main_hud_action_buttons_view = {}
 
 local BUTTON_IMAGE = "official://image/11017"
 local LABEL_FONT_SIZE = 30
@@ -38,14 +38,14 @@ end
 
 local function fire_re(channel, payload)
   local ok, err = pcall(function() -- 宿主 RE 通道未就绪或调用异常时记录并安全忽略
-    local re_util = rawget(_G, "REUtil") or require("common.re_util")
+    local re_util = rawget(_G, "re_util") or require("common.re_util")
     local re = re_util and re_util:GetRE(channel) or nil
     if re ~= nil then
       re:FireServer(payload)
     end
   end)
   if not ok then
-    print("[MainHudActionButtonsView] 发送 " .. tostring(channel) .. " 失败", tostring(err))
+    print("[main_hud_action_buttons_view] 发送 " .. tostring(channel) .. " 失败", tostring(err))
   end
 end
 
@@ -87,9 +87,9 @@ local function make_label(ctx, scope, name, rect, text)
 end
 
 local function compute_layout(resolution, item_bar)
-  local slot_count = (type(item_bar) == "table" and Number.IsFiniteNumber(item_bar.slotCount))
-    and item_bar.slotCount or GameCfg.Items.ItemBarSlots
-  return MainHudLayout.Compute({
+  local slot_count = (type(item_bar) == "table" and number.IsFiniteNumber(item_bar.slotCount))
+    and item_bar.slotCount or game_cfg.Items.ItemBarSlots
+  return main_hud_layout.Compute({
     width = resolution.x,
     height = resolution.y,
     itemBarSlots = slot_count,
@@ -111,7 +111,7 @@ end
 
 local function selected_food(item_bar)
   local entry, slot = selected_entry(item_bar)
-  local def = entry and GameCfg.Items.Definitions[entry.itemId] or nil
+  local def = entry and game_cfg.Items.Definitions[entry.itemId] or nil
   if def ~= nil and type(def.EatPercent) == "number" then
     return entry, slot, def
   end
@@ -120,7 +120,7 @@ end
 
 local function selected_rod(item_bar)
   local entry, slot = selected_entry(item_bar)
-  local def = entry and GameCfg.Items.Definitions[entry.itemId] or nil
+  local def = entry and game_cfg.Items.Definitions[entry.itemId] or nil
   if def ~= nil and type(def.Level) == "number" then
     return entry, slot, def
   end
@@ -163,7 +163,7 @@ local function cast_action_color(phase, alert_now)
   if alert_now == nil then
     return phase == "landed" and make_color(COLORS.DISABLED) or make_color(COLORS.NORMAL)
   end
-  local alert = GameCfg.HookAlert
+  local alert = game_cfg.HookAlert
   local k = (math.sin(alert_now * 2 * math.pi / alert.BreathPeriodSec) + 1) / 2
   local h = alert.HighlightColor
   return Color.New(
@@ -183,11 +183,11 @@ end
 
 --- 挂载右侧动作键（ItemDiscard 与 ItemAction2）。
 ---@param s table EffectBuilder
----@param ctx table RootView 上下文 { root_node, store, clock, create_node, own_node, connect }
+---@param ctx table root_view 上下文 { root_node, store, clock, create_node, own_node, connect }
 ---@param options table|nil { get_resolution?, backpack_open?, layout?, reel_active?, is_reel_active?, on_reel_click?, send_operate?, send_cast?, send_special? }
-function MainHudActionButtonsView.mount(s, ctx, options)
+function main_hud_action_buttons_view.mount(s, ctx, options)
   options = options or {}
-  local resolution = ViewUtil.get_resolution(ctx, options)
+  local resolution = view_util.get_resolution(ctx, options)
   local backpack_open = options.backpack_open
   local reel_active_sig = options.reel_active
   local is_reel_active_fn = options.is_reel_active or default_is_reel_active
@@ -228,11 +228,11 @@ function MainHudActionButtonsView.mount(s, ctx, options)
 
   -- 2. 原子吐息冷却（1Hz on_second）与上钩呼吸高亮（活跃期 on_frame 原地改色，绝不重建 Effect）
   local breath_until = nil
-  local breath_active = State.new("MainHudActionButtonsView.breath_active", false)
+  local breath_active = State.new("main_hud_action_buttons_view.breath_active", false)
 
   local alerted_session = nil
   local hook_alert_until = nil
-  local hook_alert_active = State.new("MainHudActionButtonsView.hook_alert_active", false)
+  local hook_alert_active = State.new("main_hud_action_buttons_view.hook_alert_active", false)
 
   local flying_held = false
 
@@ -302,7 +302,7 @@ function MainHudActionButtonsView.mount(s, ctx, options)
     local special_item = es:d(ctx.store.special_item)
     if type(special_item) == "table"
       and special_item.effect == "godzilla"
-      and Number.IsFiniteNumber(special_item.breathRemaining)
+      and number.IsFiniteNumber(special_item.breathRemaining)
       and special_item.breathRemaining > 0 then
       breath_until = ctx.clock.now() + special_item.breathRemaining
       breath_active:set(true)
@@ -329,7 +329,7 @@ function MainHudActionButtonsView.mount(s, ctx, options)
     if phase == "hooked" and session ~= nil then
       if session ~= alerted_session then
         alerted_session = session
-        hook_alert_until = ctx.clock.now() + GameCfg.HookAlert.DurationSec
+        hook_alert_until = ctx.clock.now() + game_cfg.HookAlert.DurationSec
       end
       hook_alert_active:set(hook_alert_until ~= nil and ctx.clock.now() < hook_alert_until)
     else
@@ -540,14 +540,14 @@ function MainHudActionButtonsView.mount(s, ctx, options)
   end)
 end
 
---- 返回可供 RootView.mount({ hud = { ... } }) 直接注册的 HUD spec。
-function MainHudActionButtonsView.spec(options)
+--- 返回可供 root_view.mount({ hud = { ... } }) 直接注册的 HUD spec。
+function main_hud_action_buttons_view.spec(options)
   return {
     name = "MainHudActionButtons",
     mount = function(s, ctx)
-      MainHudActionButtonsView.mount(s, ctx, options)
+      main_hud_action_buttons_view.mount(s, ctx, options)
     end,
   }
 end
 
-return MainHudActionButtonsView
+return main_hud_action_buttons_view

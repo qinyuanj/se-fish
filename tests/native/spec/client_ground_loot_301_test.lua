@@ -1,9 +1,9 @@
 
-local Eui = require("tests.support.eui_double")
-local ClientStore = require("client.store.client_store")
-local RootView = require("client.views.root_view")
-local GroundLootView = require("client.views.ground_loot_view")
-local SpokeClock = require("common.spoke_clock")
+local eui = require("tests.support.eui_double")
+local client_store = require("client.store.client_store")
+local root_view = require("client.views.root_view")
+local ground_loot_view = require("client.views.ground_loot_view")
+local spoke_clock = require("common.spoke_clock")
 
 local function row(id, x, z, warn)
   return { id = id, kind = "item", itemId = "tilapia", x = x, y = 0, z = z, warn = warn == true }
@@ -11,34 +11,34 @@ end
 
 local function mount(opts)
   opts = opts or {}
-  local clock = SpokeClock.new(10)
-  local store, writer = ClientStore.new({ clock = clock })
-  local root = Eui.Node({ Name = "UIRoot" })
+  local clock = spoke_clock.new(10)
+  local store, writer = client_store.new({ clock = clock })
+  local root = eui.Node({ Name = "UIRoot" })
   local created = {}
   local sent = {}
   local notices = {}
-  local view = RootView.mount(root, store, {
+  local view = root_view.mount(root, store, {
     services = {
       set_overlay = function(id, active) writer:set_overlay(id, active) end,
       notify = function(text) notices[#notices + 1] = text end,
     },
     create_node = function(kind, props)
-      local node = Eui.Node(props or {})
+      local node = eui.Node(props or {})
       node.UnitType = kind
       created[#created + 1] = node
       return node
     end,
     hud = opts.with_toggle and {
-      GroundLootView.aim_toggle_spec({ radius = opts.radius or 2 }),
+      ground_loot_view.aim_toggle_spec({ radius = opts.radius or 2 }),
     } or nil,
     docks = {
-      ground_loot = GroundLootView.bubble_spec({
+      ground_loot = ground_loot_view.bubble_spec({
         send = function(payload) sent[#sent + 1] = payload end,
         radius = opts.radius or 2,
       }),
     },
     overlays = {
-      aim_pickup = GroundLootView.aim_spec({
+      aim_pickup = ground_loot_view.aim_spec({
         send = function(payload) sent[#sent + 1] = payload end,
         on_pick = opts.on_pick,
         radius = opts.radius or 2,
@@ -81,7 +81,7 @@ describe("地面气泡与瞄准拾取（#301 客户端宿主）", function()
     assert.equals(1, alive_named(env, "BtnPickup_"))
     local btn = node_named(env, "BtnPickup_loot-1")
     assert.is_not_nil(btn)
-    assert.is_true(Eui.Click(btn))
+    assert.is_true(eui.Click(btn))
     assert.same({ { action = "Pickup", value = "loot-1" } }, env.sent)
 
     env.writer:update_spatial({ x = 30, y = 0, z = 30 }, {})
@@ -117,15 +117,15 @@ describe("地面气泡与瞄准拾取（#301 客户端宿主）", function()
 
     local toggle = node_named(env, "BtnAimPickup")
     assert.is_not_nil(toggle)
-    assert.is_true(Eui.Click(toggle))
+    assert.is_true(eui.Click(toggle))
     local mask = node_named(env, "AimPickupMask")
     assert.is_not_nil(mask)
 
-    assert.is_true(Eui.Click(mask))
+    assert.is_true(eui.Click(mask))
     assert.same({ { action = "Pickup", value = "near" } }, env.sent)
     assert.is_nil(node_named(env, "AimPickupMask"))
 
-    assert.is_true(Eui.Click(toggle))
+    assert.is_true(eui.Click(toggle))
     assert.is_not_nil(node_named(env, "AimPickupMask"))
     env.writer:update_spatial({ x = 50, y = 0, z = 50 }, {})
     assert.is_nil(node_named(env, "AimPickupMask"))

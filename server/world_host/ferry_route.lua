@@ -1,13 +1,13 @@
 
-local GameCfg = require("common.game_cfg")
+local game_cfg = require("common.game_cfg")
 local spoke = require("common.packages.spoke.api")
-local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
+local spoke_runtime = require("common.packages.spoke.runtime.spoke_runtime")
 
 local LambdaEpoch = spoke.LambdaEpoch
 local Effect = spoke.Effect
 local State = spoke.State
 
-local FerryRoute = {}
+local ferry_route = {}
 
 local function is_object(value)
   local kind = type(value)
@@ -28,7 +28,7 @@ local function mark_arrival(draft, zone)
   arrived[zone] = (arrived[zone] or 0) + 1
 end
 
-function FerryRoute.mount(world, opts)
+function ferry_route.mount(world, opts)
   opts = type(opts) == "table" and opts or {}
   local remote = opts.remote
   local player_data = opts.player_data
@@ -48,10 +48,10 @@ function FerryRoute.mount(world, opts)
   local route_sailing = {}
   local left_players = setmetatable({}, { __mode = "v" })
   local recovery_watch_users = {}
-  local recovery_watch_active = State.new("FerryRoute.recovery_watch", false)
+  local recovery_watch_active = State.new("ferry_route.recovery_watch", false)
 
   local function log(...)
-    print("[FerryRoute]", ...)
+    print("[ferry_route]", ...)
   end
 
   local function event(name)
@@ -196,7 +196,7 @@ function FerryRoute.mount(world, opts)
           or not save:IsCurrent(player.UserId, session, data) then return end
       self.BoardPending[route.Id] = nil
       if not ok then self:Fail(player, "Board", result) return end
-      SpokeRuntime.batch(function()
+      spoke_runtime.batch(function()
         sync_tree(player, data)
         self.Flights[route.Id] = { player = player, operation = operation.id, routeId = route.Id,
           DepartAt = world.clock.now() + point.CountdownSec }
@@ -357,7 +357,7 @@ function FerryRoute.mount(world, opts)
     local now = world.clock.now()
     if now >= flight.DepartAt then
       self.Flights[route.Id] = nil
-      SpokeRuntime.batch(function()
+      spoke_runtime.batch(function()
         if state then state:set({ phase = "idle", routeId = route.Id }) end
         if sailing then sailing:set(false) end
       end)
@@ -374,7 +374,7 @@ function FerryRoute.mount(world, opts)
   function handle:Update()
     if self.disposed then return end
     self:UpdateRecoveries()
-    for _, route in ipairs(GameCfg.Ferry.Routes) do
+    for _, route in ipairs(game_cfg.Ferry.Routes) do
       self:StepRoute(route)
     end
   end
@@ -384,7 +384,7 @@ function FerryRoute.mount(world, opts)
     left_players[player.UserId] = nil
     local now = world.clock.now()
     local channel = event("FerryState")
-    for _, route in ipairs(GameCfg.Ferry.Routes) do
+    for _, route in ipairs(game_cfg.Ferry.Routes) do
       local flight = self.Flights[route.Id]
       if flight and flight.DepartAt and now < flight.DepartAt and channel and channel.FireClient then
         channel:FireClient(player, { phase = "countdown", routeId = route.Id, operation = flight.operation,
@@ -423,7 +423,7 @@ function FerryRoute.mount(world, opts)
       if flight.player == player then
         interrupted = true
         self.Flights[route_id] = nil
-        SpokeRuntime.batch(function()
+        spoke_runtime.batch(function()
           if route_states[route_id] then route_states[route_id]:set({ phase = "idle", routeId = route_id }) end
           if route_sailing[route_id] then route_sailing[route_id]:set(false) end
         end)
@@ -443,7 +443,7 @@ function FerryRoute.mount(world, opts)
     local method = Actions[payload.action]
     local seq = payload.seq
     if not method or type(seq) ~= "number" or seq ~= math.floor(seq) then return false end
-    local route = GameCfg.Ferry.Route(payload.routeId)
+    local route = game_cfg.Ferry.Route(payload.routeId)
     if not route then return self:Fail(player, payload.action, "route") end
     local data = data_of(player)
     if not data then return false end
@@ -482,12 +482,12 @@ function FerryRoute.mount(world, opts)
     return self[method](self, player, data, route, operation)
   end
 
-  for index, route in ipairs(GameCfg.Ferry.Routes) do
+  for index, route in ipairs(game_cfg.Ferry.Routes) do
     local zone = world.zones[route.FromZoneId]
     if zone and zone.ferry_routes then
-      zone.ferry_routes:call(route.Id, LambdaEpoch.new("FerryRoute:" .. route.Id, function(scope)
-        local state = State.new("FerryRoute." .. route.Id, { phase = "idle", routeId = route.Id })
-        local sailing = State.new("FerryRoute.sailing." .. route.Id, false)
+      zone.ferry_routes:call(route.Id, LambdaEpoch.new("ferry_route:" .. route.Id, function(scope)
+        local state = State.new("ferry_route." .. route.Id, { phase = "idle", routeId = route.Id })
+        local sailing = State.new("ferry_route.sailing." .. route.Id, false)
         route_states[route.Id] = state
         route_sailing[route.Id] = sailing
         scope:call(Effect.new("FerryClock:" .. route.Id, function(es)
@@ -521,4 +521,4 @@ function FerryRoute.mount(world, opts)
   return handle
 end
 
-return FerryRoute
+return ferry_route

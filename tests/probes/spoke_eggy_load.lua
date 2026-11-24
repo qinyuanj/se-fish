@@ -84,7 +84,7 @@ end
 local ok_spy, spy_err = pcall(function()
   package.loaded["common.packages.spoke_eggy.api"] = nil
   local fresh = require("common.packages.spoke_eggy.api")
-  local probe_unit, probe_signal = fake_unit("Probe")
+  local probe_unit, probe_signal = fake_unit("probe")
   local spy_handle = fresh.behaviour(probe_unit, function(s, self)
     s:effect(function(tick) tick:d(self.is_alive) end)
   end)

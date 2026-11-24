@@ -3,17 +3,17 @@
 -- 视图层与旧界面仅持有只读 store，只能通过 s:d / s:subscribe 订阅，无法反向修改仓库内部写入入口。
 
 local spoke = require("common.packages.spoke.api")
-local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
-local SpokeClock = require("common.spoke_clock")
-local BodyScale = require("common.body_scale")
-local GameCfg = require("common.game_cfg")
-local Number = require("common.number")
-local ZoneMarkers = require("common.zone_markers")
+local spoke_runtime = require("common.packages.spoke.runtime.spoke_runtime")
+local spoke_clock = require("common.spoke_clock")
+local body_scale = require("common.body_scale")
+local game_cfg = require("common.game_cfg")
+local number = require("common.number")
+local zone_markers = require("common.zone_markers")
 
 local State = spoke.State
 local Trigger = spoke.Trigger
 
-local ClientStore = {}
+local client_store = {}
 
 local VALID_SURVIVAL_PHASES = {
   alive = true,
@@ -52,7 +52,7 @@ local DEFAULT_CHANNELS = {
   "BlindboxResult",
   "PlatformResult",
   "GMResult",
-  "DamageNotice",
+  "damage_notice",
   "StoryNotice",
   "ReelInRE",
   "CloseReelIn",
@@ -74,7 +74,7 @@ local function freeze_snapshot(value, depth, label)
   return setmetatable({}, {
     __index = copy,
     __newindex = function(_, key)
-      error((label or "ClientStore.Snapshot") .. " 为只读快照，禁止修改字段: " .. tostring(key), 2)
+      error((label or "client_store.Snapshot") .. " 为只读快照，禁止修改字段: " .. tostring(key), 2)
     end,
     __pairs = function()
       return pairs(copy)
@@ -87,7 +87,7 @@ local function freeze_snapshot(value, depth, label)
 end
 
 local function clone_value(value, depth)
-  return freeze_snapshot(value, depth or 0, "ClientStore.Snapshot")
+  return freeze_snapshot(value, depth or 0, "client_store.Snapshot")
 end
 
 local function freeze_table(fields, label)
@@ -130,11 +130,11 @@ end
 
 local function readonly_clock(clock)
   return freeze_table({
-    second = readonly_signal(clock.second, "ClientStore.clock.second"),
-    on_second = readonly_trigger(clock.on_second, "ClientStore.clock.on_second"),
-    on_frame = readonly_trigger(clock.on_frame, "ClientStore.clock.on_frame"),
+    second = readonly_signal(clock.second, "client_store.clock.second"),
+    on_second = readonly_trigger(clock.on_second, "client_store.clock.on_second"),
+    on_frame = readonly_trigger(clock.on_frame, "client_store.clock.on_frame"),
     now = clock.now,
-  }, "ClientStore.clock")
+  }, "client_store.clock")
 end
 
 local function position_equals(a, b)
@@ -162,31 +162,31 @@ local function vitals_equals(a, b)
 end
 
 local function default_vitals()
-  local c = GameCfg.Vitals
+  local c = game_cfg.vitals
   return freeze_snapshot({
     health = c.MaxHealth,
     maxHealth = c.MaxHealth,
     hunger = c.MaxHunger,
     maxHunger = c.MaxHunger,
-  }, 0, "ClientStore.vitals")
+  }, 0, "client_store.vitals")
 end
 
 local function sanitize_vital_field(raw, fallback)
-  if Number.IsFiniteNumber(raw) then
+  if number.IsFiniteNumber(raw) then
     return math.floor(raw)
   end
   return fallback
 end
 
 local function normalize_camera_distance(raw)
-  if not Number.IsFiniteNumber(raw) or raw <= 0 then
+  if not number.IsFiniteNumber(raw) or raw <= 0 then
     return nil
   end
-  local base = GameCfg.Ability.BodyScale.CameraDistance
-  if not Number.IsFiniteNumber(base) or base <= 0 then
+  local base = game_cfg.Ability.body_scale.CameraDistance
+  if not number.IsFiniteNumber(base) or base <= 0 then
     return nil
   end
-  return BodyScale.Derive(BodyScale.Sanitize(raw / base)).CameraDistance
+  return body_scale.Derive(body_scale.Sanitize(raw / base)).CameraDistance
 end
 
 local function sanitize_position(pos)
@@ -202,22 +202,22 @@ local function sanitize_position(pos)
   if not ok then
     return nil, false
   end
-  if not Number.IsFiniteNumber(x) or not Number.IsFiniteNumber(y) or not Number.IsFiniteNumber(z) then
+  if not number.IsFiniteNumber(x) or not number.IsFiniteNumber(y) or not number.IsFiniteNumber(z) then
     return nil, false
   end
-  return freeze_snapshot({ x = x, y = y, z = z }, 0, "ClientStore.position"), true
+  return freeze_snapshot({ x = x, y = y, z = z }, 0, "client_store.position"), true
 end
 
 local function resolve_zone(pos, zones)
   if pos == nil or type(zones) ~= "table" then
     return nil, nil
   end
-  for _, zone in ipairs(GameCfg.Zones) do
+  for _, zone in ipairs(game_cfg.Zones) do
     local scene = zones[zone.Id]
     local bounds = scene and scene.Boundary
     if type(bounds) == "table"
-        and Number.IsFiniteNumber(bounds.MinX) and Number.IsFiniteNumber(bounds.MaxX)
-        and Number.IsFiniteNumber(bounds.MinZ) and Number.IsFiniteNumber(bounds.MaxZ) then
+        and number.IsFiniteNumber(bounds.MinX) and number.IsFiniteNumber(bounds.MaxX)
+        and number.IsFiniteNumber(bounds.MinZ) and number.IsFiniteNumber(bounds.MaxZ) then
       if pos.x >= bounds.MinX and pos.x <= bounds.MaxX
           and pos.z >= bounds.MinZ and pos.z <= bounds.MaxZ then
         return zone.Id, zone.Name
@@ -237,10 +237,10 @@ local function normalize_survival(payload)
   end
   return freeze_snapshot({
     phase = phase,
-    endsAt = Number.IsFiniteNumber(payload.endsAt) and payload.endsAt or nil,
-    weakUntil = Number.IsFiniteNumber(payload.weakUntil) and payload.weakUntil or nil,
+    endsAt = number.IsFiniteNumber(payload.endsAt) and payload.endsAt or nil,
+    weakUntil = number.IsFiniteNumber(payload.weakUntil) and payload.weakUntil or nil,
     platformPending = payload.platformPending and true or nil,
-  }, 0, "ClientStore.survival")
+  }, 0, "client_store.survival")
 end
 
 local function normalize_party(payload)
@@ -256,14 +256,14 @@ local function normalize_party(payload)
   local members = {}
   for i, member in ipairs(payload.members) do
     if type(member) ~= "table"
-        or not Number.IsFiniteNumber(member.userId)
+        or not number.IsFiniteNumber(member.userId)
         or type(member.name) ~= "string" then
       return nil
     end
-    if member.health ~= nil and not Number.IsFiniteNumber(member.health) then
+    if member.health ~= nil and not number.IsFiniteNumber(member.health) then
       return nil
     end
-    if member.maxHealth ~= nil and not Number.IsFiniteNumber(member.maxHealth) then
+    if member.maxHealth ~= nil and not number.IsFiniteNumber(member.maxHealth) then
       return nil
     end
     if member.phase ~= nil and not VALID_SURVIVAL_PHASES[member.phase] then
@@ -278,18 +278,18 @@ local function normalize_party(payload)
       self = member.self == true or nil,
     }
   end
-  if payload.state == "party" and (not Number.IsFiniteNumber(payload.partyId) or #members < 1) then
+  if payload.state == "party" and (not number.IsFiniteNumber(payload.partyId) or #members < 1) then
     return nil
   end
   local invite = nil
   if payload.invite ~= nil then
     if type(payload.invite) ~= "table"
-        or not Number.IsFiniteNumber(payload.invite.fromUserId)
-        or not Number.IsFiniteNumber(payload.invite.expiresInSec)
+        or not number.IsFiniteNumber(payload.invite.fromUserId)
+        or not number.IsFiniteNumber(payload.invite.expiresInSec)
         or payload.invite.expiresInSec < 0 then
       return nil
     end
-    if payload.invite.expiresAt ~= nil and not Number.IsFiniteNumber(payload.invite.expiresAt) then
+    if payload.invite.expiresAt ~= nil and not number.IsFiniteNumber(payload.invite.expiresAt) then
       return nil
     end
     invite = {
@@ -305,7 +305,7 @@ local function normalize_party(payload)
     members = members,
     invite = invite,
     notice = type(payload.notice) == "string" and payload.notice or nil,
-  }, 0, "ClientStore.party")
+  }, 0, "client_store.party")
 end
 
 local function default_shop()
@@ -313,7 +313,7 @@ local function default_shop()
     purchases = {},
     upgradeLevels = {},
     upgradeLevel = 0,
-  }, 0, "ClientStore.shop")
+  }, 0, "client_store.shop")
 end
 
 local function normalize_table_snapshot(payload)
@@ -324,13 +324,13 @@ local function normalize_table_snapshot(payload)
 end
 
 local function default_host()
-  local REUtil = require("common.re_util")
+  local re_util = require("common.re_util")
   local Players = game:GetService("Players")
   local RunService = game:GetService("RunService")
   local World = game:GetService("World")
   return {
     get_re = function(name)
-      return REUtil:GetRE(name)
+      return re_util:GetRE(name)
     end,
     heartbeat = RunService.Heartbeat,
     get_server_time = function()
@@ -371,12 +371,12 @@ local function default_host()
       return ok and sig or nil
     end,
     get_zones = function()
-      return ZoneMarkers.Zones
+      return zone_markers.Zones
     end,
   }
 end
 
-function ClientStore.default_channels()
+function client_store.default_channels()
   local copy = {}
   for i = 1, #DEFAULT_CHANNELS do
     copy[i] = DEFAULT_CHANNELS[i]
@@ -387,53 +387,53 @@ end
 ---@param options table|nil { clock?: table, initial_now?: number }
 ---@return table store 只读响应式状态面
 ---@return table writer 写侧句柄（仅 L1 宿主入口持有）
-function ClientStore.new(options)
+function client_store.new(options)
   options = options or {}
-  local clock = options.clock or SpokeClock.new(options.initial_now)
+  local clock = options.clock or spoke_clock.new(options.initial_now)
 
   local states = {
-    connected = State.new("ClientStore.connected", false),
-    item_bar = State.new("ClientStore.item_bar", nil),
-    survival = State.new("ClientStore.survival", freeze_snapshot({ phase = "alive" }, 0, "ClientStore.survival")),
-    party = State.new("ClientStore.party", freeze_snapshot({ state = "none", members = {} }, 0, "ClientStore.party")),
-    cast = State.new("ClientStore.cast", nil),
-    special_item = State.new("ClientStore.special_item", nil),
-    fish_combat = State.new("ClientStore.fish_combat", nil),
-    loot = State.new("ClientStore.loot", freeze_snapshot({}, 0, "ClientStore.loot")),
-    quest = State.new("ClientStore.quest", nil),
-    story = State.new("ClientStore.story", nil),
-    ferry = State.new("ClientStore.ferry", nil),
-    grill = State.new("ClientStore.grill", nil),
-    lottery_result = State.new("ClientStore.lottery_result", nil),
-    blindbox_result = State.new("ClientStore.blindbox_result", nil),
-    platform_result = State.new("ClientStore.platform_result", nil),
-    compendium = State.new("ClientStore.compendium", nil),
-    records = State.new("ClientStore.records", nil),
-    message = State.new("ClientStore.message", nil),
-    gm_result = State.new("ClientStore.gm_result", nil),
-    position = State.new("ClientStore.position", nil, position_equals),
-    zone_id = State.new("ClientStore.zone_id", nil),
-    zone_name = State.new("ClientStore.zone_name", nil),
-    vitals = State.new("ClientStore.vitals", default_vitals(), vitals_equals),
-    coin = State.new("ClientStore.coin", 0),
-    shop = State.new("ClientStore.shop", default_shop()),
-    local_character = State.new("ClientStore.local_character", nil),
-    camera_distance = State.new("ClientStore.camera_distance", nil),
-    hud_visible = State.new("ClientStore.hud_visible", true),
-    active_modal = State.new("ClientStore.active_modal", nil),
-    modal_payload = State.new("ClientStore.modal_payload", nil),
-    overlays = State.new("ClientStore.overlays", freeze_snapshot({}, 0, "ClientStore.overlays")),
+    connected = State.new("client_store.connected", false),
+    item_bar = State.new("client_store.item_bar", nil),
+    survival = State.new("client_store.survival", freeze_snapshot({ phase = "alive" }, 0, "client_store.survival")),
+    party = State.new("client_store.party", freeze_snapshot({ state = "none", members = {} }, 0, "client_store.party")),
+    cast = State.new("client_store.cast", nil),
+    special_item = State.new("client_store.special_item", nil),
+    fish_combat = State.new("client_store.fish_combat", nil),
+    loot = State.new("client_store.loot", freeze_snapshot({}, 0, "client_store.loot")),
+    quest = State.new("client_store.quest", nil),
+    story = State.new("client_store.story", nil),
+    ferry = State.new("client_store.ferry", nil),
+    grill = State.new("client_store.grill", nil),
+    lottery_result = State.new("client_store.lottery_result", nil),
+    blindbox_result = State.new("client_store.blindbox_result", nil),
+    platform_result = State.new("client_store.platform_result", nil),
+    compendium = State.new("client_store.compendium", nil),
+    records = State.new("client_store.records", nil),
+    message = State.new("client_store.message", nil),
+    gm_result = State.new("client_store.gm_result", nil),
+    position = State.new("client_store.position", nil, position_equals),
+    zone_id = State.new("client_store.zone_id", nil),
+    zone_name = State.new("client_store.zone_name", nil),
+    vitals = State.new("client_store.vitals", default_vitals(), vitals_equals),
+    coin = State.new("client_store.coin", 0),
+    shop = State.new("client_store.shop", default_shop()),
+    local_character = State.new("client_store.local_character", nil),
+    camera_distance = State.new("client_store.camera_distance", nil),
+    hud_visible = State.new("client_store.hud_visible", true),
+    active_modal = State.new("client_store.active_modal", nil),
+    modal_payload = State.new("client_store.modal_payload", nil),
+    overlays = State.new("client_store.overlays", freeze_snapshot({}, 0, "client_store.overlays")),
   }
 
-  local on_server_event = Trigger.new("ClientStore.on_server_event")
-  local on_reconnect = Trigger.new("ClientStore.on_reconnect")
+  local on_server_event = Trigger.new("client_store.on_server_event")
+  local on_reconnect = Trigger.new("client_store.on_reconnect")
 
   local function normalize_compendium(payload)
     if type(payload) ~= "table" then return nil end
     for _, key in ipairs({ "unlocked", "weights", "catches" }) do
       if payload[key] ~= nil and type(payload[key]) ~= "table" then return nil end
     end
-    if payload.total ~= nil and not Number.IsFiniteNumber(payload.total) then return nil end
+    if payload.total ~= nil and not number.IsFiniteNumber(payload.total) then return nil end
     return normalize_table_snapshot(payload)
   end
 
@@ -444,7 +444,7 @@ function ClientStore.new(options)
 
   local function apply_quest_snapshot(normalized)
     if type(normalized.notice) == "string" and normalized.notice ~= "" then
-      states.message:set(freeze_snapshot({ text = normalized.notice }, 0, "ClientStore.message"))
+      states.message:set(freeze_snapshot({ text = normalized.notice }, 0, "client_store.message"))
     end
   end
 
@@ -459,7 +459,7 @@ function ClientStore.new(options)
   end
 
   local function apply_item_bar_snapshot(_, payload)
-    if type(payload) == "table" and Number.IsFiniteNumber(payload.coin) then
+    if type(payload) == "table" and number.IsFiniteNumber(payload.coin) then
       states.coin:set(math.floor(payload.coin))
     end
   end
@@ -468,7 +468,7 @@ function ClientStore.new(options)
     if type(cloned) ~= "table" then
       return
     end
-    local story = freeze_snapshot(cloned, 0, "ClientStore.story")
+    local story = freeze_snapshot(cloned, 0, "client_store.story")
     states.story:set(story)
     states.active_modal:set("story")
     states.modal_payload:set(story)
@@ -492,8 +492,8 @@ function ClientStore.new(options)
     end
     states.shop:set(freeze_snapshot({
       purchases = purchases, upgradeLevels = upgrade_levels, upgradeLevel = upgrade_level,
-    }, 0, "ClientStore.shop"))
-    if Number.IsFiniteNumber(payload.coinAfter) then
+    }, 0, "client_store.shop"))
+    if number.IsFiniteNumber(payload.coinAfter) then
       states.coin:set(math.floor(payload.coinAfter))
     end
   end
@@ -525,40 +525,40 @@ function ClientStore.new(options)
 
   local store = freeze_table({
     clock = readonly_clock(clock),
-    connected = readonly_signal(states.connected, "ClientStore.connected"),
-    item_bar = readonly_signal(states.item_bar, "ClientStore.item_bar"),
-    survival = readonly_signal(states.survival, "ClientStore.survival"),
-    party = readonly_signal(states.party, "ClientStore.party"),
-    cast = readonly_signal(states.cast, "ClientStore.cast"),
-    special_item = readonly_signal(states.special_item, "ClientStore.special_item"),
-    fish_combat = readonly_signal(states.fish_combat, "ClientStore.fish_combat"),
-    loot = readonly_signal(states.loot, "ClientStore.loot"),
-    quest = readonly_signal(states.quest, "ClientStore.quest"),
-    story = readonly_signal(states.story, "ClientStore.story"),
-    ferry = readonly_signal(states.ferry, "ClientStore.ferry"),
-    grill = readonly_signal(states.grill, "ClientStore.grill"),
-    lottery_result = readonly_signal(states.lottery_result, "ClientStore.lottery_result"),
-    blindbox_result = readonly_signal(states.blindbox_result, "ClientStore.blindbox_result"),
-    platform_result = readonly_signal(states.platform_result, "ClientStore.platform_result"),
-    compendium = readonly_signal(states.compendium, "ClientStore.compendium"),
-    records = readonly_signal(states.records, "ClientStore.records"),
-    message = readonly_signal(states.message, "ClientStore.message"),
-    gm_result = readonly_signal(states.gm_result, "ClientStore.gm_result"),
-    position = readonly_signal(states.position, "ClientStore.position"),
-    zone_id = readonly_signal(states.zone_id, "ClientStore.zone_id"),
-    zone_name = readonly_signal(states.zone_name, "ClientStore.zone_name"),
-    vitals = readonly_signal(states.vitals, "ClientStore.vitals"),
-    coin = readonly_signal(states.coin, "ClientStore.coin"),
-    shop = readonly_signal(states.shop, "ClientStore.shop"),
-    local_character = readonly_signal(states.local_character, "ClientStore.local_character"),
-    camera_distance = readonly_signal(states.camera_distance, "ClientStore.camera_distance"),
-    hud_visible = readonly_signal(states.hud_visible, "ClientStore.hud_visible"),
-    active_modal = readonly_signal(states.active_modal, "ClientStore.active_modal"),
-    modal_payload = readonly_signal(states.modal_payload, "ClientStore.modal_payload"),
-    overlays = readonly_signal(states.overlays, "ClientStore.overlays"),
-    on_server_event = readonly_trigger(on_server_event, "ClientStore.on_server_event"),
-    on_reconnect = readonly_trigger(on_reconnect, "ClientStore.on_reconnect"),
-  }, "ClientStore")
+    connected = readonly_signal(states.connected, "client_store.connected"),
+    item_bar = readonly_signal(states.item_bar, "client_store.item_bar"),
+    survival = readonly_signal(states.survival, "client_store.survival"),
+    party = readonly_signal(states.party, "client_store.party"),
+    cast = readonly_signal(states.cast, "client_store.cast"),
+    special_item = readonly_signal(states.special_item, "client_store.special_item"),
+    fish_combat = readonly_signal(states.fish_combat, "client_store.fish_combat"),
+    loot = readonly_signal(states.loot, "client_store.loot"),
+    quest = readonly_signal(states.quest, "client_store.quest"),
+    story = readonly_signal(states.story, "client_store.story"),
+    ferry = readonly_signal(states.ferry, "client_store.ferry"),
+    grill = readonly_signal(states.grill, "client_store.grill"),
+    lottery_result = readonly_signal(states.lottery_result, "client_store.lottery_result"),
+    blindbox_result = readonly_signal(states.blindbox_result, "client_store.blindbox_result"),
+    platform_result = readonly_signal(states.platform_result, "client_store.platform_result"),
+    compendium = readonly_signal(states.compendium, "client_store.compendium"),
+    records = readonly_signal(states.records, "client_store.records"),
+    message = readonly_signal(states.message, "client_store.message"),
+    gm_result = readonly_signal(states.gm_result, "client_store.gm_result"),
+    position = readonly_signal(states.position, "client_store.position"),
+    zone_id = readonly_signal(states.zone_id, "client_store.zone_id"),
+    zone_name = readonly_signal(states.zone_name, "client_store.zone_name"),
+    vitals = readonly_signal(states.vitals, "client_store.vitals"),
+    coin = readonly_signal(states.coin, "client_store.coin"),
+    shop = readonly_signal(states.shop, "client_store.shop"),
+    local_character = readonly_signal(states.local_character, "client_store.local_character"),
+    camera_distance = readonly_signal(states.camera_distance, "client_store.camera_distance"),
+    hud_visible = readonly_signal(states.hud_visible, "client_store.hud_visible"),
+    active_modal = readonly_signal(states.active_modal, "client_store.active_modal"),
+    modal_payload = readonly_signal(states.modal_payload, "client_store.modal_payload"),
+    overlays = readonly_signal(states.overlays, "client_store.overlays"),
+    on_server_event = readonly_trigger(on_server_event, "client_store.on_server_event"),
+    on_reconnect = readonly_trigger(on_reconnect, "client_store.on_reconnect"),
+  }, "client_store")
 
   local writer = {}
   local active_binding = nil
@@ -569,8 +569,8 @@ function ClientStore.new(options)
   end
 
   function writer:step_clock(dt, now)
-    local safe_dt = (Number.IsFiniteNumber(dt) and dt >= 0) and dt or 0
-    local safe_now = Number.IsFiniteNumber(now) and now or nil
+    local safe_dt = (number.IsFiniteNumber(dt) and dt >= 0) and dt or 0
+    local safe_now = number.IsFiniteNumber(now) and now or nil
     clock:step(safe_dt, safe_now)
   end
 
@@ -585,7 +585,7 @@ function ClientStore.new(options)
     local entry = snapshot_handlers[channel]
     if entry ~= nil then
       if entry.ordered_seq and type(payload) == "table"
-        and Number.IsFiniteNumber(payload.seq) and Number.IsFiniteNumber(snapshot_seq[channel])
+        and number.IsFiniteNumber(payload.seq) and number.IsFiniteNumber(snapshot_seq[channel])
         and payload.seq <= snapshot_seq[channel] then
         return false
       end
@@ -593,10 +593,10 @@ function ClientStore.new(options)
       if normalized == nil then
         return false
       end
-      if type(payload) == "table" and Number.IsFiniteNumber(payload.seq) then
+      if type(payload) == "table" and number.IsFiniteNumber(payload.seq) then
         snapshot_seq[channel] = payload.seq
       end
-      SpokeRuntime.batch(function()
+      spoke_runtime.batch(function()
         states.connected:set(true)
         entry.state:set(normalized)
         if entry.after ~= nil then
@@ -609,7 +609,7 @@ function ClientStore.new(options)
 
     local cloned = clone_value(payload, 0)
     local discrete = discrete_handlers[channel]
-    SpokeRuntime.batch(function()
+    spoke_runtime.batch(function()
       states.connected:set(true)
       if discrete ~= nil then
         discrete(cloned, payload)
@@ -625,7 +625,7 @@ function ClientStore.new(options)
       return false
     end
     local zone_id, zone_name = resolve_zone(clean_pos, zones)
-    SpokeRuntime.batch(function()
+    spoke_runtime.batch(function()
       states.position:set(clean_pos)
       states.zone_id:set(zone_id)
       states.zone_name:set(zone_name)
@@ -634,7 +634,7 @@ function ClientStore.new(options)
   end
 
   function writer:set_coin(value)
-    if not Number.IsFiniteNumber(value) then
+    if not number.IsFiniteNumber(value) then
       return false
     end
     states.coin:set(math.floor(value))
@@ -651,10 +651,10 @@ function ClientStore.new(options)
       maxHealth = sanitize_vital_field(input.maxHealth, cur.maxHealth),
       hunger = sanitize_vital_field(input.hunger, cur.hunger),
       maxHunger = sanitize_vital_field(input.maxHunger, cur.maxHunger),
-    }, 0, "ClientStore.vitals")
-    SpokeRuntime.batch(function()
+    }, 0, "client_store.vitals")
+    spoke_runtime.batch(function()
       states.vitals:set(next_vitals)
-      if Number.IsFiniteNumber(input.coin) then
+      if number.IsFiniteNumber(input.coin) then
         states.coin:set(math.floor(input.coin))
       end
     end)
@@ -663,7 +663,7 @@ function ClientStore.new(options)
 
   function writer:update_camera_target(character, raw_distance)
     local normalized = character ~= nil and normalize_camera_distance(raw_distance) or nil
-    SpokeRuntime.batch(function()
+    spoke_runtime.batch(function()
       states.local_character:set(character)
       states.camera_distance:set(normalized)
     end)
@@ -676,10 +676,10 @@ function ClientStore.new(options)
 
   function writer:open_modal(modal_id, payload)
     if type(modal_id) ~= "string" or modal_id == "" then
-      error("ClientStore writer:open_modal 需要非空字符串 modal_id", 2)
+      error("client_store writer:open_modal 需要非空字符串 modal_id", 2)
     end
     local cloned = clone_value(payload, 0)
-    SpokeRuntime.batch(function()
+    spoke_runtime.batch(function()
       states.active_modal:set(modal_id)
       states.modal_payload:set(cloned)
     end)
@@ -687,14 +687,14 @@ function ClientStore.new(options)
 
   function writer:show_notice(text)
     local value = text == nil and "" or tostring(text)
-    states.message:set(freeze_snapshot({ text = value }, 0, "ClientStore.message"))
+    states.message:set(freeze_snapshot({ text = value }, 0, "client_store.message"))
   end
 
   function writer:close_modal(expected_id)
     if expected_id ~= nil and states.active_modal:now() ~= expected_id then
       return
     end
-    SpokeRuntime.batch(function()
+    spoke_runtime.batch(function()
       states.active_modal:set(nil)
       states.modal_payload:set(nil)
     end)
@@ -702,7 +702,7 @@ function ClientStore.new(options)
 
   function writer:set_overlay(overlay_id, active)
     if type(overlay_id) ~= "string" or overlay_id == "" then
-      error("ClientStore writer:set_overlay 需要非空字符串 overlay_id", 2)
+      error("client_store writer:set_overlay 需要非空字符串 overlay_id", 2)
     end
     local flag = active == true
     local current = states.overlays:now()
@@ -716,20 +716,20 @@ function ClientStore.new(options)
       end
     end
     next_overlays[overlay_id] = flag and true or nil
-    states.overlays:set(freeze_snapshot(next_overlays, 0, "ClientStore.overlays"))
+    states.overlays:set(freeze_snapshot(next_overlays, 0, "client_store.overlays"))
   end
 
   function writer:reset_session(reason)
-    SpokeRuntime.batch(function()
+    spoke_runtime.batch(function()
       states.connected:set(false)
       snapshot_seq = {}
       states.item_bar:set(nil)
-      states.survival:set(freeze_snapshot({ phase = "alive" }, 0, "ClientStore.survival"))
-      states.party:set(freeze_snapshot({ state = "none", members = {} }, 0, "ClientStore.party"))
+      states.survival:set(freeze_snapshot({ phase = "alive" }, 0, "client_store.survival"))
+      states.party:set(freeze_snapshot({ state = "none", members = {} }, 0, "client_store.party"))
       states.cast:set(nil)
       states.special_item:set(nil)
       states.fish_combat:set(nil)
-      states.loot:set(freeze_snapshot({}, 0, "ClientStore.loot"))
+      states.loot:set(freeze_snapshot({}, 0, "client_store.loot"))
       states.quest:set(nil)
       states.story:set(nil)
       states.ferry:set(nil)
@@ -752,7 +752,7 @@ function ClientStore.new(options)
       states.modal_payload:set(nil)
       states.message:set(nil)
       states.gm_result:set(nil)
-      states.overlays:set(freeze_snapshot({}, 0, "ClientStore.overlays"))
+      states.overlays:set(freeze_snapshot({}, 0, "client_store.overlays"))
       on_reconnect:invoke({ reason = reason or "reset" })
     end)
   end
@@ -811,18 +811,18 @@ function ClientStore.new(options)
       if player == nil or type(read_player_attr) ~= "function" then
         return
       end
-      local c = GameCfg.Vitals
+      local c = game_cfg.vitals
       local raw_health = tonumber(read_player_attr(player, "Health"))
       local raw_max_health = tonumber(read_player_attr(player, "MaxHealth"))
       local raw_hunger = tonumber(read_player_attr(player, "Hunger"))
       local raw_max_hunger = tonumber(read_player_attr(player, "MaxHunger"))
       local raw_coin = include_coin and tonumber(read_player_attr(player, "FishCoin")) or nil
       self:update_vitals({
-        health = Number.IsFiniteNumber(raw_health) and raw_health or c.MaxHealth,
-        maxHealth = Number.IsFiniteNumber(raw_max_health) and raw_max_health or c.MaxHealth,
-        hunger = Number.IsFiniteNumber(raw_hunger) and raw_hunger or c.MaxHunger,
-        maxHunger = Number.IsFiniteNumber(raw_max_hunger) and raw_max_hunger or c.MaxHunger,
-        coin = Number.IsFiniteNumber(raw_coin) and raw_coin or nil,
+        health = number.IsFiniteNumber(raw_health) and raw_health or c.MaxHealth,
+        maxHealth = number.IsFiniteNumber(raw_max_health) and raw_max_health or c.MaxHealth,
+        hunger = number.IsFiniteNumber(raw_hunger) and raw_hunger or c.MaxHunger,
+        maxHunger = number.IsFiniteNumber(raw_max_hunger) and raw_max_hunger or c.MaxHunger,
+        coin = number.IsFiniteNumber(raw_coin) and raw_coin or nil,
       })
     end
 
@@ -843,7 +843,7 @@ function ClientStore.new(options)
               return
             end
             local raw = type(read_player_attr) == "function" and tonumber(read_player_attr(player, "FishCoin")) or nil
-            if Number.IsFiniteNumber(raw) then
+            if number.IsFiniteNumber(raw) then
               self:set_coin(raw)
             end
           end)
@@ -885,9 +885,9 @@ function ClientStore.new(options)
           ensure_player_bound(get_local_player())
         end
         local now = type(get_server_time) == "function" and get_server_time() or nil
-        -- 先独立步进时钟（保留跨多秒时 SpokeClock 逐秒 batch 排空语义），再原子更新空间与相机传感状态
+        -- 先独立步进时钟（保留跨多秒时 spoke_clock 逐秒 batch 排空语义），再原子更新空间与相机传感状态
         self:step_clock(dt, now)
-        SpokeRuntime.batch(function()
+        spoke_runtime.batch(function()
           if type(get_local_position) == "function" then
             local pos = get_local_position()
             local zones = type(get_zones) == "function" and get_zones() or nil
@@ -930,4 +930,4 @@ function ClientStore.new(options)
   return store, writer
 end
 
-return ClientStore
+return client_store

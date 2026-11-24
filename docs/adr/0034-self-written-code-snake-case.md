@@ -42,6 +42,18 @@ L1 的实际落地方式（原计划「按端三个 PR」，执行时改为并�
 
 并行之所以能这么切：`client` 与 `server` 互不 `require`（实测各 0 条），两端重叠的写面只有 6 个双端测试与上述共享文件；`coverage.md` 单行常混两端（如 6-33 行），`arch_policy.lua` 有 9 行同一行同时出现 client 与 server 命名，`policy.edn` 的 `:levels` 是单行——这三处正是并行改必然冲突、且错了不报错的地方。
 
+## L2 的落地方式（模块表变量名）
+
+一版**逐文件**改名（只改本文件里 `local X = require(...)` 绑定的名字）当场破了 **128 failures + 273 errors**：模块表变量是跨文件的名字，守卫还直接用源码文本断言（`static_require_test` 要求 `server/main.lua` 里出现 `ServerRuntime.new(`），逐文件口径够不到，还会因"目标名已被本文件占用"跳过 148 处，留下半新半旧的状态。
+
+改成**按名字全局改**后一次通过：173 个名字、383 个文件、1754 处命名命中，落点只剩 13 条，逐条修完 `test full` 全绿。
+
+三类残留是这层真正的成本，都只能靠测试兜住：
+
+1. **字符串数据键**：`{ "Weapon", "Bait" }` 这种运行期 kind 串被一起改成了 `"weapon"`，而 `Rects.WeaponBar` 之类的查表键没变，`Rects["weapon" .. "Bar"]` 取到 nil。数据串与 Spoke 作用域名同级，属于第二类豁免，改名时必须只动标识符、不动引号里的运行期名字。
+2. **形参/局部撞名**：`find_goods_by_number(number, level)` 的形参 `number` 与模块 `Number` 在改名后同名；`local Host = require(...)` 与 `before_each` 里的 `local host` 也撞在一起，`host.start()` 变成自己调自己。撞名在旧代码里靠大小写区分，snake_case 之后只能靠改名时错开（形参改 `goods_number`、模块改回 basename `shop_feed_host`）。
+3. **官方名别名**：`World = game:GetService("World")` 与 `State = spoke.State` 这类"变量名就是官方名"的绑定保留原样，属于第一、二类豁免的延伸。
+
 门禁在 L1 完成后开启（先开会让全仓常红）：三端文件名与目录名必须 snake_case，豁免名单外一律失败；`require` 大小写精确匹配已有守卫。
 
 ## 与 ADR-0033 的关系

@@ -4,19 +4,19 @@
 -- 专门验证关闭调试/切换槽的用例仍在自己的 setUp 或测试体里覆盖并恢复这些字段。
 local M = {}
 
-local GameCfg = require("common.game_cfg")
-local ZoneFixtures = require("tests.support.zone_fixtures")
+local game_cfg = require("common.game_cfg")
+local zone_fixtures = require("tests.support.zone_fixtures")
 
-ZoneFixtures.Apply(GameCfg)
+zone_fixtures.Apply(game_cfg)
 
 function M.apply()
-  GameCfg.Debug = { Enabled = true, InitialGrants = GameCfg.Debug.InitialGrants }
-  GameCfg.Save.QaSlot = ""
-  return GameCfg
+  game_cfg.Debug = { Enabled = true, InitialGrants = game_cfg.Debug.InitialGrants }
+  game_cfg.Save.QaSlot = ""
+  return game_cfg
 end
 
 function M.snapshot()
-  return { Debug = GameCfg.Debug, QaSlot = GameCfg.Save.QaSlot }
+  return { Debug = game_cfg.Debug, QaSlot = game_cfg.Save.QaSlot }
 end
 
 -- 部分 setup 失败时也要能恢复：调用方（tests/native/helper.lua 的 after_each）
@@ -25,9 +25,9 @@ function M.restore(snapshot)
   if not snapshot then
     return M.apply()
   end
-  GameCfg.Debug = snapshot.Debug
-  GameCfg.Save.QaSlot = snapshot.QaSlot
-  return GameCfg
+  game_cfg.Debug = snapshot.Debug
+  game_cfg.Save.QaSlot = snapshot.QaSlot
+  return game_cfg
 end
 
 return M

@@ -1,6 +1,6 @@
 
-local GameCfg = require("common.game_cfg")
-local ServerRuntime = require("server.world_host.server_runtime")
+local game_cfg = require("common.game_cfg")
+local server_runtime = require("server.world_host.server_runtime")
 
 local function signal()
   local handlers = {}
@@ -21,7 +21,7 @@ end
 
 local function make_player(id, x, z)
   local controller = {
-    Health = GameCfg.Vitals.MaxHealth, MaxHealth = GameCfg.Vitals.MaxHealth, WalkSpeed = 16,
+    Health = game_cfg.vitals.MaxHealth, MaxHealth = game_cfg.vitals.MaxHealth, WalkSpeed = 16,
     HealthChanged = signal(), Died = signal(), OnReborn = signal(),
   }
   function controller:TakeDamage(amount)
@@ -42,10 +42,10 @@ end
 local function make_data(player, saved_party)
   return {
     Player = player, Inited = true, LoadState = "ready",
-    Data = { FishCoin = 0, Zone = "shrimpPond", Containers = {} },
+    data = { FishCoin = 0, Zone = "shrimpPond", Containers = {} },
     Extra = {
       growth = { potions = {}, upgrades = {} },
-      survival = { health = GameCfg.Vitals.MaxHealth, hunger = GameCfg.Vitals.MaxHunger },
+      survival = { health = game_cfg.vitals.MaxHealth, hunger = game_cfg.vitals.MaxHunger },
       party = saved_party,
     },
   }
@@ -91,7 +91,7 @@ local function boot(ids, options)
     ctx.players[id] = player
     ctx.data[id] = make_data(player, options.saved and options.saved[id] or nil)
   end
-  ctx.runtime = ServerRuntime.new({
+  ctx.runtime = server_runtime.new({
     initial_now = 100, remote = re,
     player_data = { GetDataInst = function(_, player)
       if ctx.fail_read == player.UserId then error(ctx.fail_reason or "party-save-unavailable") end
@@ -225,10 +225,10 @@ describe("全局小队服务端宿主接缝（#314）", function()
     ctx:make_party(1, 2)
     ctx:make_party(1, 3)
     assert.is_false(ctx:hit(ctx.players[1], ctx.players[2], 20))
-    assert.equals(GameCfg.Vitals.MaxHealth, ctx.players[2].Character.Controller.Health)
+    assert.equals(game_cfg.vitals.MaxHealth, ctx.players[2].Character.Controller.Health)
     ctx:action(2, "Leave")
     assert.is_true(ctx:hit(ctx.players[1], ctx.players[2], 20))
-    assert.equals(GameCfg.Vitals.MaxHealth - 20, ctx.players[2].Character.Controller.Health)
+    assert.equals(game_cfg.vitals.MaxHealth - 20, ctx.players[2].Character.Controller.Health)
     assert.equals("party", ctx:state(1).state)
     ctx.runtime:on_player_removing(ctx.players[3])
     assert.equals("none", ctx:state(1).state)
@@ -239,18 +239,18 @@ describe("全局小队服务端宿主接缝（#314）", function()
     ctx = boot({ 1, 2 })
     ctx:make_party(1, 2)
     assert.is_true(ctx:hit(nil, ctx.players[2], 20))
-    assert.equals(GameCfg.Vitals.MaxHealth - 20, ctx:member(1, 2).health)
+    assert.equals(game_cfg.vitals.MaxHealth - 20, ctx:member(1, 2).health)
     assert.equals("alive", ctx:member(1, 2).phase)
     assert.is_true(ctx:hit(nil, ctx.players[2], 999))
     assert.equals(1, ctx:member(1, 2).health)
     assert.equals("downed", ctx:member(1, 2).phase)
     ctx.events.InteractAction.OnServerEvent:Fire(ctx.players[1], {
-      target = GameCfg.Rescue.Target, action = GameCfg.Rescue.Action, targetUserId = 2, seq = 1,
+      target = game_cfg.Rescue.Target, action = game_cfg.Rescue.Action, targetUserId = 2, seq = 1,
     })
     assert.equals("rescuing", ctx:member(1, 2).phase)
     ctx.runtime:step(2.01, 102.01)
     assert.equals("alive", ctx:member(1, 2).phase)
-    assert.equals(math.floor(GameCfg.Vitals.MaxHealth * GameCfg.Survival.ReviveHealthPercent / 100),
+    assert.equals(math.floor(game_cfg.vitals.MaxHealth * game_cfg.Survival.ReviveHealthPercent / 100),
       ctx:member(1, 2).health)
   end)
 
@@ -259,7 +259,7 @@ describe("全局小队服务端宿主接缝（#314）", function()
     ctx:make_party(1, 2)
     ctx.runtime:get_player_tree(2):dispose()
     assert.is_true(ctx:hit(nil, ctx.players[1], 15))
-    assert.equals(GameCfg.Vitals.MaxHealth - 15, ctx:member(1, 1).health)
+    assert.equals(game_cfg.vitals.MaxHealth - 15, ctx:member(1, 1).health)
     assert.is_false(ctx.runtime.world:is_faulted())
     assert.equals("party", ctx:state(1).state)
   end)
@@ -334,7 +334,7 @@ describe("全局小队服务端宿主接缝（#314）", function()
     assert.is_nil(party_id(ctx, 2))
     assert.equals(0, ctx.data[1].Extra.party.id)
     local logged = table.concat(ctx.printed, "\n")
-    assert.is_truthy(logged:find("SquadDock", 1, true))
+    assert.is_truthy(logged:find("squad_dock", 1, true))
     assert.is_truthy(logged:find("party%-save%-unavailable"))
     ctx:action(1, "Invite", { targetUserId = 2 })
     ctx:make_party(1, 2)
@@ -366,9 +366,9 @@ describe("全局小队服务端宿主接缝（#314）", function()
   end)
 
   it("兼容 SE 引擎 userdata 玩家与 userdata Position 完成入队、邀请、建队与离场", function()
-    local SharedWorldTree = require("server.world_host.shared_world_tree")
-    local SpokeClock = require("common.spoke_clock")
-    local clock = SpokeClock.new(100)
+    local shared_world_tree = require("server.world_host.shared_world_tree")
+    local spoke_clock = require("common.spoke_clock")
+    local clock = spoke_clock.new(100)
     local events = {}
     local function channel(name)
       events[name] = events[name] or {
@@ -385,7 +385,7 @@ describe("全局小队服务端宿主接缝（#314）", function()
       [701] = make_data(p1),
       [702] = make_data(p2),
     }
-    local world = SharedWorldTree.spawn({
+    local world = shared_world_tree.spawn({
       clock = clock,
       remote = { GetRE = function(_, name) return channel(name) end },
       player_data = { GetDataInst = function(_, player) return datas[player.UserId] end },

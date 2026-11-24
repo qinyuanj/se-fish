@@ -9,9 +9,9 @@
 -- seam：common.lottery_draw 的 RollAxis / RollAxes / Evaluate / ChooseWeapon，注入确定性 RNG（系统边界：随机数）。
 -- 迁移说明：案例按旧 LuaUnit 实际执行序（方法名字典序）逐个 it 注册；
 --   唯一的 assertAlmostEquals(实际, 期望, 容差) 映射为 assert.near(期望, 实际, 容差)。
-local GameCfg = require("common.game_cfg")
-local Draw = require("common.lottery_draw")
-local RandomGuard = require("tests.support.random_guard")
+local game_cfg = require("common.game_cfg")
+local draw = require("common.lottery_draw")
+local random_guard = require("tests.support.random_guard")
 
 -- 逐项钉表（原表「渔力全开--抽奖表.xlsx」R3..R9）：权重与两同倍数是独立真源字面量
 local EXPECTED = {
@@ -26,34 +26,34 @@ local EXPECTED = {
 
 describe("抽奖机纯逻辑（common/lottery_draw）", function()
   -- 随机数全部经参数注入；逐案例还原全局 math.random，杜绝替换泄漏。
-  after_each(RandomGuard.restore)
+  after_each(random_guard.restore)
 
   it("test_choose_weapon_picks_uniformly_within_the_group", function()
-    local pattern1 = GameCfg.Lottery.Patterns[1]
+    local pattern1 = game_cfg.Lottery.Patterns[1]
     for index, itemKey in ipairs(pattern1.tripleReward.itemKeys) do
-      assert.same(itemKey, Draw.ChooseWeapon(pattern1, function()
+      assert.same(itemKey, draw.ChooseWeapon(pattern1, function()
         return index
       end))
     end
     -- 非武器组（加速药水）没有组内选择
-    assert.is_nil(Draw.ChooseWeapon(GameCfg.Lottery.Patterns[4], function()
+    assert.is_nil(draw.ChooseWeapon(game_cfg.Lottery.Patterns[4], function()
       return 1
     end))
   end)
 
   it("test_evaluate_triple_first_then_exactly_two", function()
-    assert.same({ outcome = "triple", pattern = 4 }, Draw.Evaluate({ 4, 4, 4 }))
+    assert.same({ outcome = "triple", pattern = 4 }, draw.Evaluate({ 4, 4, 4 }))
     -- 恰两同：三种位置组合都是两同，图案取相同那一对
-    assert.same({ outcome = "pair", pattern = 2 }, Draw.Evaluate({ 2, 2, 5 }))
-    assert.same({ outcome = "pair", pattern = 2 }, Draw.Evaluate({ 5, 2, 2 }))
-    assert.same({ outcome = "pair", pattern = 2 }, Draw.Evaluate({ 2, 5, 2 }))
-    assert.same({ outcome = "none" }, Draw.Evaluate({ 1, 2, 3 }))
+    assert.same({ outcome = "pair", pattern = 2 }, draw.Evaluate({ 2, 2, 5 }))
+    assert.same({ outcome = "pair", pattern = 2 }, draw.Evaluate({ 5, 2, 2 }))
+    assert.same({ outcome = "pair", pattern = 2 }, draw.Evaluate({ 2, 5, 2 }))
+    assert.same({ outcome = "none" }, draw.Evaluate({ 1, 2, 3 }))
   end)
 
   it("test_roll_axes_samples_three_times_independently", function()
     local rolls = { 1, 43, 96 } -- 鳄雀鳝 / 蟹老板 / 哥斯拉
     local index = 0
-    local axes = Draw.RollAxes(function()
+    local axes = draw.RollAxes(function()
       index = index + 1
       return rolls[index]
     end)
@@ -69,10 +69,10 @@ describe("抽奖机纯逻辑（common/lottery_draw）", function()
     }
     for _, bound in ipairs(bounds) do
       local lo, hi, number = bound[1], bound[2], bound[3]
-      assert.same(number, Draw.RollAxis(function()
+      assert.same(number, draw.RollAxis(function()
         return lo
       end), "下界 " .. lo)
-      assert.same(number, Draw.RollAxis(function()
+      assert.same(number, draw.RollAxis(function()
         return hi
       end), "上界 " .. hi)
     end
@@ -82,7 +82,7 @@ describe("抽奖机纯逻辑（common/lottery_draw）", function()
     -- 静态期望（原表合计行 R10「返奖倍率」2.119671）：恰两同概率 3·p²·(1−p) 乘对应倍数之和。
     -- 期望字面量来自原表，公式来自 GameSpec §14「恰好两同」，两者都不是实现代码。
     local expectation = 0
-    for _, pattern in ipairs(GameCfg.Lottery.Patterns) do
+    for _, pattern in ipairs(game_cfg.Lottery.Patterns) do
       local p = pattern.weight / 100
       expectation = expectation + 3 * p * p * (1 - p) * pattern.pairMultiplier
     end
@@ -90,7 +90,7 @@ describe("抽奖机纯逻辑（common/lottery_draw）", function()
   end)
 
   it("test_weights_and_pair_multipliers_match_source_table", function()
-    local patterns = GameCfg.Lottery.Patterns
+    local patterns = game_cfg.Lottery.Patterns
     assert.same(7, #patterns)
     for index, expected in ipairs(EXPECTED) do
       local pattern = patterns[index]

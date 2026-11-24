@@ -8,14 +8,14 @@
 -- 假引擎世界搬到 tests/support/isle_combat.lua：旧套件里 volcano_combat 用
 -- `TestVolcanoCombat.setUp = TestReefCombat.setUp` 直接继承这份夹具（靠 LuaUnit 的全局类名互访），
 -- Busted 下两个 spec 各自 open/close 同一个 support 模块，逐案例新建世界，口径不变。
-local Cfg = require('common.game_cfg')
-local Islet = require('tests.support.isle_combat')
-local Host = require('tests.support.fishing_host')
+local cfg = require('common.game_cfg')
+local islet = require('tests.support.isle_combat')
+local host = require('tests.support.fishing_host')
 
 describe('TestReefCombat', function()
     local env
     before_each(function()
-        env = Islet.new(6)
+        env = islet.new(6)
     end)
     after_each(function()
         env:tearDown()
@@ -35,17 +35,17 @@ describe('TestReefCombat', function()
 
     -- 首领在别处水域被召唤时，飞行边界仍取当前区，不跟着水区换。
     it('test_boss_summoned_at_other_water_keeps_the_current_zone_flight_bounds', function()
-        local safe = Cfg.Zones[1].Scene.SafePoint
+        local safe = cfg.Zones[1].Scene.SafePoint
         env.player.Character.Position = env.vec(safe.x, safe.y, safe.z)
         local fish = env:drop('fish48Boss')
         env:advance(0.05)
-        local b = Cfg.Zones[1].Scene.Boundary
+        local b = cfg.Zones[1].Scene.Boundary
         assert.is_true(fish.Carrier.Body.Position.x >= b.MinX and fish.Carrier.Body.Position.x <= b.MaxX)
     end)
 
     -- 抓举状态回灌：air 来源要把钩位抬到空中，water 来源保持落点原样。
     it('test_cast_state_exposes_air_origin_and_preserves_water_landing', function()
-        local host = Host.new()
+        local host = host.new()
         assert.is_true(host.runtime:set_next_fish(host.player, 'item81'))
         host:cast()
         host:hook()
@@ -64,7 +64,7 @@ describe('TestReefCombat', function()
         host:dispose()
     end)
 
-    -- 官方 AI 的停止/恢复是外部边界，业务驱动与预警/Vitals 仍走真实 Update。
+    -- 官方 AI 的停止/恢复是外部边界，业务驱动与预警/vitals 仍走真实 Update。
     it('test_control_cancels_air_warning_and_never_hits_old_locked_point', function()
         local fish = env:drop('fish48Boss')
         env:advance(4)
@@ -103,8 +103,8 @@ describe('TestReefCombat', function()
     -- 失败方式：俯冲不能跟着目标游出本区围栏（越区追击）。
     it('test_dive_cannot_follow_a_target_outside_reef_boundary', function()
         local fish = env:drop('fish47Elite')
-        local b = Cfg.Zones[6].Scene.Boundary
-        env.player.Character.Position = env.vec(b.MaxX + 10, 6, Cfg.Zones[6].Scene.SafePoint.z)
+        local b = cfg.Zones[6].Scene.Boundary
+        env.player.Character.Position = env.vec(b.MaxX + 10, 6, cfg.Zones[6].Scene.SafePoint.z)
         env:advance(20)
         while env.now < 21.75 do
             env:advance(env.now + 0.05)
@@ -115,7 +115,7 @@ describe('TestReefCombat', function()
     -- 失败方式：飞过水面即消失。真机契约是鱼群在水面上方存活，受击体与本体同帧跟随。
     it('test_flying_above_water_survives_and_receiver_follows_same_frame', function()
         local fish = env:drop('fish47Elite')
-        local water = Cfg.Zones[6].Scene.Waters[1]
+        local water = cfg.Zones[6].Scene.Waters[1]
         fish.Carrier.Body.Position = env.vec(water.Center.x, water.SurfaceY + 12, water.Center.z)
         -- 重新起飞以这条真实世界坐标作为轨迹起点。
         env.mgr:StartFlight(fish, env.now)
@@ -142,12 +142,12 @@ describe('TestReefCombat', function()
 
     -- 失败方式：空中鱼仍不可抽取（进不了普通抽取池）；抓取来源口径 air/water 被合并。
     it('test_reef_fish_enter_normal_draw_pool_and_distinguish_air_source', function()
-        local FishCatch = require('common.fish_catch')
-        local rows = Cfg.Casting.Zones['reefIsland.water']
-        assert.same('item81', FishCatch.Select(rows, 1, nil, function() return 0 end))
-        assert.same('air', Cfg.Fish.item81.CatchSource)
-        assert.same('water', Cfg.Fish.item82.CatchSource)
-        assert.same('water', Cfg.Fish.item88.CatchSource)
+        local fish_catch = require('common.fish_catch')
+        local rows = cfg.Casting.Zones['reefIsland.water']
+        assert.same('item81', fish_catch.Select(rows, 1, nil, function() return 0 end))
+        assert.same('air', cfg.Fish.item81.CatchSource)
+        assert.same('water', cfg.Fish.item82.CatchSource)
+        assert.same('water', cfg.Fish.item88.CatchSource)
     end)
 
     -- Stop 清掉旧招后 Start 必须恢复现存礁石鱼的冷却，不能永久停攻或补结算旧预警。
@@ -174,28 +174,28 @@ describe('TestReefCombat', function()
     end)
 
     it('test_throw_client_displays_falling_body_and_clear_destroys_it', function()
-        local Eui = require('tests.support.eui_double')
-        local ClientStore = require('client.store.client_store')
-        local RootView = require('client.views.root_view')
-        local FishCombatView = require('client.views.fish_combat_view')
-        local SpokeClock = require('common.spoke_clock')
+        local eui = require('tests.support.eui_double')
+        local client_store = require('client.store.client_store')
+        local root_view = require('client.views.root_view')
+        local fish_combat_view = require('client.views.fish_combat_view')
+        local spoke_clock = require('common.spoke_clock')
         local n = require('common.gar_bite_notice')
         local p = n.Lock(-37, { x = 0, y = 6, z = 0 }, 0, 1, 5, 180, 1.2)
         p.move, p.shape, p.flightOrigin = 'airThrow', 'circle', { x = 0, y = 21, z = 0 }
         assert.is_true(n.Valid(p))
 
-        local clock = SpokeClock.new(0)
-        local store, writer = ClientStore.new({ clock = clock })
-        local root = Eui.Node({ Name = 'UIRoot' })
+        local clock = spoke_clock.new(0)
+        local store, writer = client_store.new({ clock = clock })
+        local root = eui.Node({ Name = 'UIRoot' })
         local created = {}
-        local view = RootView.mount(root, store, {
+        local view = root_view.mount(root, store, {
             create_node = function(kind, props)
-                local node = Eui.Node(props or {})
+                local node = eui.Node(props or {})
                 node.UnitType = kind
                 created[#created + 1] = node
                 return node
             end,
-            docks = { fish_warning = FishCombatView.warning_spec() },
+            docks = { fish_warning = fish_combat_view.warning_spec() },
         })
         assert.is_true(writer:ingest_event('FishCombatState', {
             warnings = { { id = -37, fishId = 'fish48Boss', move = p.move, shape = p.shape, range = p.range } },

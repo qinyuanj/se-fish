@@ -24,7 +24,7 @@
 - server 持权威玩法状态（校验、结算、存储），client 管输入、UI、相机与本地表现，common 放双端配置、协议与共用逻辑；客户端只提交操作意图，结果由服务端判定。
 - `main.lua` 组装模块、分发生命周期，业务逻辑归对应模块；依赖用 `local X = require(...)` 显式取得并保持单向，多模块协调由入口注入。
 - 加载阶段只定义表、函数和必要的通信协议；事件绑定、UI 创建、玩家读取和玩法启动放进显式生命周期入口，纯配置模块加载时不获取 Service。
-- 入口先接入已在线玩家、再启动 `ServerRuntime`（见 [server/main.lua](server/main.lua)），玩家入场钩子不能依赖启动回调已执行；宿主与 Spoke 树按显式顺序装配。
+- 入口先接入已在线玩家、再启动 `server_runtime`（见 [server/main.lua](server/main.lua)），玩家入场钩子不能依赖启动回调已执行；宿主与 Spoke 树按显式顺序装配。
 - 三端脚本目录与文件名不得与 SE 内置服务名同名（`World`、`MapData`、`Game`、`Camps`、`*Service`）：编辑器按服务名索引脚本树，重名子树同步时被跳过，见 [architecture 关键边界](docs/architecture.md)与 [ADR-0033](docs/adr/0033-script-names-must-not-shadow-se-services.md)。
 - `pcall` 的业务失败要记录模块、操作、对象标识与错误内容，再按业务返回或清理，不继续报成功；包裹可能不存在的 UI/引擎 API 时允许忽略，同行注明理由。
 
@@ -40,8 +40,8 @@
 
 **项目规则**（依据 [S8]）：
 
-- 通过 [REUtil](common/re_util.lua) 获取已有事件，双端共用事件名与协议定义；改旧的多实参消息时同时迁移收发两端。
-- 服务端按五层校验：身份 → 类型 → 频率 → 业务条件 → 结果下发，全部通过后才改权威状态；[RateLimit](common/rate_limit.lua) 管滑动窗，`CheckRECD` 是每通道固定窗口的粗拦截，限频不替代其他校验。数值字段须经 [Number.IsFiniteNumber](common/number.lua) 排除 `NaN` 与 `±math.huge`，再判整数、范围。
+- 通过 [re_util](common/re_util.lua) 获取已有事件，双端共用事件名与协议定义；改旧的多实参消息时同时迁移收发两端。
+- 服务端按五层校验：身份 → 类型 → 频率 → 业务条件 → 结果下发，全部通过后才改权威状态；[rate_limit](common/rate_limit.lua) 管滑动窗，`CheckRECD` 是每通道固定窗口的粗拦截，限频不替代其他校验。数值字段须经 [number.IsFiniteNumber](common/number.lua) 排除 `NaN` 与 `±math.huge`，再判整数、范围。
 - 客户端先监听响应再发请求，收到快照先校验结构再更新显示；要覆盖迟加入或重连时，提供只读、幂等的 ready / snapshot 握手。
 - 玩家离开时清理按玩家保存的限频表与临时请求状态。
 

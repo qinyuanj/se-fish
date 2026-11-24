@@ -7,21 +7,21 @@
 --
 -- 旧文件靠 `TestVolcanoCombat.setUp = TestReefCombat.setUp` 继承礁石岛夹具（LuaUnit 的全局类名互访）。
 -- Busted 下两个 spec 各自 require 同一份 tests/support/isle_combat.lua，逐案例 open/close；
--- 本岛的差异只有：出生点换 7 号区岸边干地（Islet.shoreDryPoint）、摘掉 server.ability_api 的模块缓存；
--- RemoteEvent 与礁石共用完整替身，close 后再恢复 AbilityAPI。
-local Cfg = require('common.game_cfg')
-local Islet = require('tests.support.isle_combat')
+-- 本岛的差异只有：出生点换 7 号区岸边干地（islet.shoreDryPoint）、摘掉 server.ability_api 的模块缓存；
+-- RemoteEvent 与礁石共用完整替身，close 后再恢复 ability_api。
+local cfg = require('common.game_cfg')
+local islet = require('tests.support.isle_combat')
 
 describe('TestVolcanoCombat', function()
     local env
     local savedExtra
     before_each(function()
         savedExtra = { ability = package.loaded['server.ability_api'] }
-        env = Islet.new(7)
+        env = islet.new(7)
         package.loaded['server.ability_api'] = nil
         -- #102 现场同步：出生点用「岸边干地」（水岸线向内 32 米），不跟随移到区内侧的合同安全点 ——
         -- 本文件的入水/携带用例时序是按这个距离调的（见 tests/support/isle_combat.lua 的 shoreDryPoint）。
-        local p = Islet.shoreDryPoint(7)
+        local p = islet.shoreDryPoint(7)
         env.player.Character.Position = env.vec(p.x, p.y, p.z)
     end)
     after_each(function()
@@ -149,7 +149,7 @@ describe('TestVolcanoCombat', function()
         env:advance(15.1)
         env.now = 17.7
         env.mgr:Update()
-        assert.is_not_nil(fish.Carry)
+        assert.is_not_nil(fish.carry)
         assert.same('mosasaurHead', env.notices[#env.notices].move)
         env.now = 18.6
         env.mgr:Update()
@@ -165,8 +165,8 @@ describe('TestVolcanoCombat', function()
         env.mgr:Update()
         assert.same(1, env.player.Character.Controller.Health)
         assert.same('downed', env.vitals:LifeStatus(env.player))
-        assert.is_nil(fish.Carry)
-        assert.is_nil(fish.CarryMount)
+        assert.is_nil(fish.carry)
+        assert.is_nil(fish.carry_mount)
     end)
 
     -- 砸击或咬击同步触发 Died 后，旧跳跃不能再给死者建甩头预警。
@@ -201,11 +201,11 @@ describe('TestVolcanoCombat', function()
         env:advance(15.1)
         assert.same('mosasaurLeap', env.notices[#env.notices].move)
         env:advance(18)
-        assert.is_not_nil(fish.Carry)
+        assert.is_not_nil(fish.carry)
         assert.is_true(env.player.Character.Controller.Health <= 665)
-        local MathWater = require('common.math_water_judge')
+        local math_water = require('common.math_water_judge')
         env:advance(25)
-        assert.is_not_nil(MathWater.HitZone(Cfg.Water.Zones, env.player.Character.Position))
+        assert.is_not_nil(math_water.HitZone(cfg.Water.Zones, env.player.Character.Position))
     end)
 
     -- 表/正文并集失败方式：有爪击却漏掉正文独立跺脚（2秒、脚边10米150）。
@@ -237,14 +237,14 @@ describe('TestVolcanoCombat', function()
         fish.Carrier.Receiver.Controller:TakeDamage(11000)
         env.mgr:Update()
         env:advance(5)
-        local MathWater = require('common.math_water_judge')
-        assert.is_not_nil(MathWater.HitZone(Cfg.Water.Zones, fish.Carrier.Body.Position))
+        local math_water = require('common.math_water_judge')
+        assert.is_not_nil(math_water.HitZone(cfg.Water.Zones, fish.Carrier.Body.Position))
         env:advance(18)
-        assert.is_not_nil(fish.Carry)
+        assert.is_not_nil(fish.carry)
         fish.Carrier.Receiver.Controller:TakeDamage(10000)
         env.mgr:Update()
-        assert.is_nil(fish.Carry)
-        assert.is_nil(MathWater.HitZone(Cfg.Water.Zones, fish.Carrier.Body.Position))
+        assert.is_nil(fish.carry)
+        assert.is_nil(math_water.HitZone(cfg.Water.Zones, fish.Carrier.Body.Position))
         env.mgr:Update()
         env.mgr:Update()
         assert.same(2, fish.Phase.Stats.Transitions)

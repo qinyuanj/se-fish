@@ -4,8 +4,8 @@
 -- 若已拥有信物，在本区钓鱼佬旁选中信物后重跑会执行Feed；摆渡使用正常Board请求。
 local cfg = require('common.game_cfg')
 local pd = require('server.player_data_host')
-local ServerRuntime = require('server.world_host.server_runtime')
-local runtime = ServerRuntime.current()
+local server_runtime = require('server.world_host.server_runtime')
+local runtime = server_runtime.current()
 local units = (runtime and runtime.fish_host) or require('server.world_host.fish_tree')
 local life = runtime and runtime.life
 local ferry = runtime and runtime:get_world() and runtime:get_world().ferry
@@ -16,7 +16,7 @@ local function equippedWeapon(d)
     if type(held) == 'table' and held.kind == 'weapon' and d:WeaponCount(held.id) > 0 then
         return held.id
     end
-    local selected = d.Data and d.Data.SelectedWeapon
+    local selected = d.data and d.data.SelectedWeapon
     if selected and d:WeaponCount(selected) > 0 then return selected end
     return nil
 end
@@ -32,7 +32,7 @@ local token = rt.token
 local tag = 'S135-' .. tostring(math.floor(world:GetServerTime()))
 local function log(...) print('SHRIMP135', tag, ...) end
 local function ledger()
-    log('库存', 'coin=' .. tostring(data.Data.FishCoin), 'zone=' .. tostring(data.Data.Zone),
+    log('库存', 'coin=' .. tostring(data.data.FishCoin), 'zone=' .. tostring(data.data.Zone),
         'tail=' .. data:ItemCount('item31'), 'pearl=' .. data:ItemCount('item121'),
         'tendon=' .. data:ItemCount('item32'), 'ticket=' .. data:ItemCount('item147'),
         'weapon=' .. tostring(equippedWeapon(data)))
@@ -42,7 +42,7 @@ local snap = data:GetItemBarSnapshot()
 local slot = snap.selectedSlot and snap.slots[snap.selectedSlot]
 if slot and (slot.itemId == 'item31' or slot.itemId == 'item32') then
     log('兑换请求', slot.itemId)
-    local runtime = ServerRuntime.current and ServerRuntime.current()
+    local runtime = server_runtime.current and server_runtime.current()
     if runtime then runtime:dispatch_interact(player, { target = 'fisherman', action = 'Feed', seq = rt.seq }) end
 end
 -- 外部选择rt.routeId后可重跑：日志记录实际航线与扣款，不默认移动玩家。

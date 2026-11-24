@@ -33,13 +33,13 @@ local function newPlayer(userId, x, y, z)
   return player
 end
 
-describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
+describe('摆渡（server_runtime × mgr_save × player_data）', function()
   local env
   local restore
 
   before_each(function()
     restore = {
-      game = rawget(_G, 'game'), Vector3 = rawget(_G, 'Vector3'), REUtilG = rawget(_G, 'REUtil'),
+      game = rawget(_G, 'game'), Vector3 = rawget(_G, 'Vector3'), REUtilG = rawget(_G, 're_util'),
       modules = {},
     }
     for name, value in pairs(package.loaded) do
@@ -100,7 +100,7 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
       CheckRECD = function() return false end,
     }
     package.loaded['common.re_util'] = reStub
-    _G.REUtil = reStub
+    _G.re_util = reStub
     package.loaded['server.player_data_host'] = {
       GetDataInst = function(_, player) return env.data[player.UserId] end,
       SendItemBar = function() end,
@@ -119,7 +119,7 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
         return anchor
       end,
     }
-    env.mgr.PlayerData = package.loaded['server.player_data_host']
+    env.mgr.player_data = package.loaded['server.player_data_host']
     env.mgr.OnlinePlayers = function() return env.players end
     env.store = {
       GetAsync = function(_, key) return env.values[key] end,
@@ -146,12 +146,12 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
     env.mgr.Save = env.save
     for _, player in ipairs(env.players) do env.save:LoadInto(player, env.data[player.UserId]) end
 
-    local ServerRuntime = require('server.world_host.server_runtime')
-    env.runtime = ServerRuntime.new({
+    local server_runtime = require('server.world_host.server_runtime')
+    env.runtime = server_runtime.new({
       initial_now = env.now,
       zones = env.cfg.Zones,
       remote = reStub,
-      player_data = env.mgr.PlayerData,
+      player_data = env.mgr.player_data,
       save = env.save,
       interact = env.mgr.Interact,
       players_service = _G.game:GetService('Players'),
@@ -198,7 +198,7 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
       for name, value in pairs(restore.modules) do package.loaded[name] = value end
       _G.game = restore.game
       _G.Vector3 = restore.Vector3
-      _G.REUtil = restore.REUtilG
+      _G.re_util = restore.REUtilG
     end
     env = nil
     restore = nil
@@ -245,7 +245,7 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
     assert.same(1, env.data[3]:ItemCount(env.route.Outbound.Ticket))
     assert.is_true(env.data[3]:AddCoin(env.route.Return.Price, nil, 'test'))
     assert.is_false(back(3, 2))
-    assert.same(env.route.Return.Price, env.data[3].Data.FishCoin)
+    assert.same(env.route.Return.Price, env.data[3].data.FishCoin)
   end)
 
   it('test_board_replay_and_stale_seq_rejected', function()
@@ -285,7 +285,7 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
 
   it('test_board_waits_for_durable_ticket_before_publishing_countdown', function()
     env.data[1]:AddItem(env.route.Outbound.Ticket)
-    local before = env.data[1].Data.Containers
+    local before = env.data[1].data.Containers
     env.defer = true
     assert.is_true(board(1, 1))
     assert.message('落账前不能删除真实船票').is_not_nil(before.itemBar[1])
@@ -323,7 +323,7 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
     sail()
     assert.same(0, env.data[1]:ItemCount(env.route.Outbound.Ticket))
     assert.message('写入失败不能凭空塞回船票；开发赠礼也替代不了恢复记账')
-      .is_nil(env.data[1].Data.Containers.itemBar[1])
+      .is_nil(env.data[1].data.Containers.itemBar[1])
     assert.same(0, env.players[1].teleports)
     env.writeFailure = false
     env.loseReply = true
@@ -395,7 +395,7 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
     env.save:LoadInto(player, data)
     env.mgr:Update()
     assert.same(0, data:ItemCount(env.route.Outbound.Ticket))
-    assert.same(env.route.ToZoneId, data.Data.Zone)
+    assert.same(env.route.ToZoneId, data.data.Zone)
     -- 到达记录跟区域一起落进存档，重进后再跑一次 Update 也不会重复累加
     assert.same(1, data.Extra.travel.arrived[env.route.ToZoneId])
     env.mgr:Update()
@@ -410,7 +410,7 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
     standAt(2, env.route.Outbound.AnchorName, 100)
     sail()
     assert.same(0, env.players[1].teleports)
-    assert.same('fishPond', env.data[1].Data.Zone)
+    assert.same('fishPond', env.data[1].data.Zone)
     assert.is_nil(env.data[1].Extra.travel.arrived[env.route.ToZoneId])
     assert.same(1, env.data[1]:ItemCount(env.route.Outbound.Ticket))
     assert.same('not_aboard', lastReply(1).reason)
@@ -429,7 +429,7 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
     standAt(1, env.route.Outbound.AnchorName, 100)
     sail()
     assert.same(0, env.players[1].teleports)
-    assert.same('fishPond', env.data[1].Data.Zone)
+    assert.same('fishPond', env.data[1].data.Zone)
     assert.is_nil(env.data[1].Extra.travel.arrived[env.route.ToZoneId])
     assert.same(1, env.data[1]:ItemCount(env.route.Outbound.Ticket))
     assert.same('not_aboard', lastReply(1).reason)
@@ -446,7 +446,7 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
     env.players[1].Character.SetPosition = function() error('boom') end
     sail()
     assert.same(0, env.players[1].teleports)
-    assert.same('fishPond', env.data[1].Data.Zone)
+    assert.same('fishPond', env.data[1].data.Zone)
     assert.is_nil(env.data[1].Extra.travel.arrived[env.route.ToZoneId])
     assert.same(1, env.data[1]:ItemCount(env.route.Outbound.Ticket))
     assert.same('teleport', lastReply(1).reason)
@@ -471,11 +471,11 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
     for _, userId in ipairs({ 1, 2 }) do
       assert.same(1, env.players[userId].teleports)
       assert.same(vec(dest.x, dest.y, dest.z), env.players[userId].Character.Position)
-      assert.same(env.route.ToZoneId, env.data[userId].Data.Zone)
+      assert.same(env.route.ToZoneId, env.data[userId].data.Zone)
     end
     -- 范围外的不动
     assert.same(0, env.players[3].teleports)
-    assert.same('fishPond', env.data[3].Data.Zone)
+    assert.same('fishPond', env.data[3].data.Zone)
     local operation = lastReply(1).operation.id
     assert.same({
       { phase = 'countdown', routeId = env.route.Id, operation = operation, seconds = 5 },
@@ -498,23 +498,23 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
       seq = seq + 1
       assert.message('第' .. index .. '条航线应能交票').is_true(board(1, seq, route))
       assert.message('去程票只扣一次').same(0, data:ItemCount(route.Outbound.Ticket))
-      assert.message('去程不收金币').same(0, data.Data.FishCoin)
+      assert.message('去程不收金币').same(0, data.data.FishCoin)
       sail(route)
       assert.same(index * 2 - 1, player.teleports)
       local destination = route.Outbound.Destination
       assert.same(vec(destination.x, destination.y, destination.z), player.Character.Position)
-      assert.same(route.ToZoneId, data.Data.Zone)
+      assert.same(route.ToZoneId, data.data.Zone)
       assert.message('到达记录要落进存档').same(1, data.Extra.travel.arrived[route.ToZoneId])
 
       assert.is_true(data:AddCoin(route.Return.Price, nil, 'test'))
       standAt(1, route.Return.AnchorName)
       seq = seq + 1
       assert.message('第' .. index .. '条航线应能返程').is_true(back(1, seq, route))
-      assert.message('返程价只扣一次').same(0, data.Data.FishCoin)
+      assert.message('返程价只扣一次').same(0, data.data.FishCoin)
       assert.same(index * 2, player.teleports)
       local backPoint = route.Return.Destination
       assert.same(vec(backPoint.x, backPoint.y, backPoint.z), player.Character.Position)
-      assert.same(route.FromZoneId, data.Data.Zone)
+      assert.same(route.FromZoneId, data.data.Zone)
     end
   end)
 
@@ -546,7 +546,7 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
     standAt(1, route.Return.AnchorName)
     assert.is_false(back(1, 2, route))
     assert.same('coin', lastReply(1).reason)
-    assert.same(0, env.data[1].Data.FishCoin)
+    assert.same(0, env.data[1].data.FishCoin)
     assert.same(0, env.players[1].teleports)
   end)
 
@@ -626,10 +626,10 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
     assert.same({ phase = 'cancelled', routeId = routeA.Id, operation = operationA,
       reason = 'payer_left' }, env.broadcasts[3])
     assert.same(3, #env.broadcasts)
-    -- B 到点照常开船，把 B 船上的人带走，且没有另一班次的 cancelled。
+    -- b 到点照常开船，把 b 船上的人带走，且没有另一班次的 cancelled。
     env.now = env.now + routeB.Outbound.CountdownSec
     env.mgr:Update()
-    assert.same(routeB.ToZoneId, env.data[2].Data.Zone)
+    assert.same(routeB.ToZoneId, env.data[2].data.Zone)
     assert.same({ phase = 'departed', routeId = routeB.Id, operation = operationB }, env.broadcasts[4])
     assert.same(4, #env.broadcasts)
   end)
@@ -729,24 +729,24 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
     standAt(1, env.route.Return.AnchorName)
     standAt(2, env.route.Return.AnchorName, 1)
     assert.is_true(env.data[1]:AddCoin(point.Price, nil, 'test'))
-    env.data[1].Data.Zone = env.route.ToZoneId
-    env.data[2].Data.Zone = env.route.ToZoneId
+    env.data[1].data.Zone = env.route.ToZoneId
+    env.data[2].data.Zone = env.route.ToZoneId
     assert.is_true(back(1, 1))
-    assert.same(0, env.data[1].Data.FishCoin)
+    assert.same(0, env.data[1].data.FishCoin)
     assert.same(vec(point.Destination.x, point.Destination.y, point.Destination.z),
       env.players[1].Character.Position)
-    assert.same(env.route.FromZoneId, env.data[1].Data.Zone)
+    assert.same(env.route.FromZoneId, env.data[1].data.Zone)
     -- 没付费的搭不了返程
     assert.is_false(back(2, 1))
     assert.same('coin', lastReply(2).reason)
     assert.same(0, env.players[2].teleports)
-    assert.same(env.route.ToZoneId, env.data[2].Data.Zone)
+    assert.same(env.route.ToZoneId, env.data[2].data.Zone)
     -- 自己掏钱就自己回，与别人无关（按人返程）
     assert.is_true(env.data[2]:AddCoin(point.Price, nil, 'test'))
     assert.is_true(back(2, 2))
-    assert.same(0, env.data[2].Data.FishCoin)
+    assert.same(0, env.data[2].data.FishCoin)
     assert.same(1, env.players[2].teleports)
-    assert.same(env.route.FromZoneId, env.data[2].Data.Zone)
+    assert.same(env.route.FromZoneId, env.data[2].data.Zone)
   end)
 
   it('test_return_failure_keeps_durable_refund_until_storage_recovers', function()
@@ -758,21 +758,21 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
       error('引擎拒绝传送')
     end
     back(1, 1)
-    assert.message('退款未落账不能裸加金币').same(40 - env.route.Return.Price, data.Data.FishCoin)
+    assert.message('退款未落账不能裸加金币').same(40 - env.route.Return.Price, data.data.FishCoin)
     assert.message('退款未落账不能声称已处理').is_nil(lastReply(1))
     env.writeFailure = false
     env.loseReply = true
     env.save:Update()
-    assert.same(40, data.Data.FishCoin)
+    assert.same(40, data.data.FishCoin)
     assert.is_false(lastReply(1).ok)
     local operation = lastReply(1).operation
     assert.is_true(env.mgr:Handle(player,
       { action = 'Return', routeId = env.route.Id, seq = 2, requestId = operation }))
     assert.same('teleport', lastReply(1).reason)
-    assert.same(40, data.Data.FishCoin)
+    assert.same(40, data.data.FishCoin)
     env.save:LoadInto(player, data)
     env.mgr:Update()
-    assert.same(40, data.Data.FishCoin)
+    assert.same(40, data.data.FishCoin)
   end)
 
   it('test_return_operation_replay_after_rejoin_never_charges_or_teleports', function()
@@ -789,7 +789,7 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
     env.save:LoadInto(player, data)
     assert.is_true(env.mgr:Handle(player,
       { action = 'Return', routeId = env.route.Id, seq = 1, requestId = operation }))
-    assert.same(40 - env.route.Return.Price, data.Data.FishCoin)
+    assert.same(40 - env.route.Return.Price, data.data.FishCoin)
     assert.same(0, player.teleports)
     assert.is_true(lastReply(1).ok)
   end)
@@ -800,7 +800,7 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
     assert.is_true(env.data[1]:AddCoin(point.Price, nil, 'test'))
     env.players[1].Character = nil
     assert.is_false(back(1, 1))
-    assert.same(point.Price, env.data[1].Data.FishCoin)
+    assert.same(point.Price, env.data[1].data.FishCoin)
   end)
 
   it('test_return_teleport_failure_reports_teleport_reason', function()
@@ -811,7 +811,7 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
     env.players[1].Character.SetPosition = function() error('boom') end
     assert.is_false(back(1, 1))
     assert.same('teleport', lastReply(1).reason)
-    assert.same(point.Price, env.data[1].Data.FishCoin)
+    assert.same(point.Price, env.data[1].data.FishCoin)
   end)
 
   it('test_return_waits_for_payment_and_recovery_before_teleport', function()
@@ -820,11 +820,11 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
     data:AddCoin(40)
     env.defer = true
     assert.is_true(back(1, 1))
-    assert.same(40, data.Data.FishCoin)
+    assert.same(40, data.data.FishCoin)
     assert.same(0, player.teleports)
     assert.is_nil(lastReply(1))
     drain()
-    assert.same(40 - env.route.Return.Price, data.Data.FishCoin)
+    assert.same(40 - env.route.Return.Price, data.data.FishCoin)
     assert.same(1, player.teleports)
     assert.is_true(lastReply(1).ok)
   end)
@@ -842,23 +842,23 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
     assert.is_true(board(2, 1, routeB))
     assert.same(2, #env.broadcasts)
 
-    -- A 到点：只带走 A 船上的人，B 的倒计时不受影响
+    -- a 到点：只带走 a 船上的人，b 的倒计时不受影响
     env.now = env.now + routeA.Outbound.CountdownSec - 2
     env.mgr:Update()
     assert.same(3, #env.broadcasts)
-    assert.same(routeA.ToZoneId, env.data[1].Data.Zone)
+    assert.same(routeA.ToZoneId, env.data[1].data.Zone)
     assert.same(0, env.players[2].teleports)
     assert.same(0, env.players[3].teleports)
-    assert.message('B 的票在交票时就扣掉，只扣一次').same(0, env.data[2]:ItemCount(routeB.Outbound.Ticket))
+    assert.message('b 的票在交票时就扣掉，只扣一次').same(0, env.data[2]:ItemCount(routeB.Outbound.Ticket))
 
-    -- B 到点：交票人与搭便船者一起走，搭便船者不付任何代价，也要有到达记录
+    -- b 到点：交票人与搭便船者一起走，搭便船者不付任何代价，也要有到达记录
     env.now = env.now + 2
     env.mgr:Update()
     assert.same(1, env.players[2].teleports)
     assert.same(1, env.players[3].teleports)
-    assert.same(routeB.ToZoneId, env.data[2].Data.Zone)
-    assert.same(routeB.ToZoneId, env.data[3].Data.Zone)
-    assert.same(0, env.data[3].Data.FishCoin)
+    assert.same(routeB.ToZoneId, env.data[2].data.Zone)
+    assert.same(routeB.ToZoneId, env.data[3].data.Zone)
+    assert.same(0, env.data[3].data.FishCoin)
     assert.same(0, env.data[3]:ItemCount(routeB.Outbound.Ticket))
     assert.same(1, env.data[3].Extra.travel.arrived[routeB.ToZoneId])
     assert.same('departed', (env.broadcasts[#env.broadcasts]).phase)
@@ -891,6 +891,6 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
   end)
 
   it('test_zone_defaults_to_home', function()
-    assert.same('fishPond', env.data[1].Data.Zone)
+    assert.same('fishPond', env.data[1].data.Zone)
   end)
 end)

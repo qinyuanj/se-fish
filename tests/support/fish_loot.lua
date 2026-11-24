@@ -1,7 +1,7 @@
--- 鱼获共享夹具：真 PlayerData 配合举鱼假引擎，不注册测试案例。
+-- 鱼获共享夹具：真 player_data 配合举鱼假引擎，不注册测试案例。
 -- 复用 fish_lift 的方式：以它为 __index 原型（同族统一手法），不再逐方法拷贝。
-local FishLift = require('tests.support.fish_lift')
-local M = setmetatable({}, { __index = FishLift })
+local fish_lift = require('tests.support.fish_lift')
+local M = setmetatable({}, { __index = fish_lift })
 
 --- 建一个空世界壳；调用方随后 :setUp() 搭世界、:tearDown() 拆除
 --- （与 blindbox_world / revive_world 同一构造/拆除入口名）。
@@ -23,7 +23,7 @@ function M:setUp()
     -- 拾饵消费者可能已经开启调试，保留它传入的原始基线。
     self.savedGrantDebug = self.savedGrantDebug or require('common.game_cfg').Debug
     require('common.game_cfg').Debug = { Enabled = true, InitialGrants = self.savedGrantDebug.InitialGrants }
-    FishLift.setUp(self)
+    fish_lift.setUp(self)
     local env = self
     self.diedSubs = {}
     package.loaded['server.world_host.fish_carrier'].SubscribeDied = function(_, fn)
@@ -41,10 +41,10 @@ function M:setUp()
         return get(s, name)
     end }
     self.data = {}
-    local PlayerData = assert(loadfile('server/data/player_data.lua'))()
+    local player_data = assert(loadfile('server/data/player_data.lua'))()
     for _, player in ipairs({ self.player, self.other }) do
         player.SetAttribute = function() end
-        local data = PlayerData.New(player)
+        local data = player_data.New(player)
         data:Init()
         self.data[player.UserId] = data
     end
@@ -57,7 +57,7 @@ end
 function M:tearDown()
     if self.lootSaved then
         -- setUp 未完成时也按已保存状态回滚，避免半成品环境遗留到下一轮。
-        local ok, err = pcall(function() FishLift.tearDown(self) end)
+        local ok, err = pcall(function() fish_lift.tearDown(self) end)
         _G.Color = self.savedColor
         if self.savedGrantDebug then require('common.game_cfg').Debug = self.savedGrantDebug end
         package.loaded['server.world_host.ground_loot'] = self.lootModule
@@ -65,7 +65,7 @@ function M:tearDown()
         if not ok then error(err, 0) end
         return
     end
-    FishLift.tearDown(self)
+    fish_lift.tearDown(self)
 end
 
 function M:kill(fish)

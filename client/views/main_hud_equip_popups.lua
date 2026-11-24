@@ -1,18 +1,18 @@
 -- Spoke 主 HUD 武器栏/鱼饵栏及其展开浮层视图（ADR-0032 / #297-B3a，归属 L2 client.views）：
--- 挂载于 RootView 常驻 HUD 槽位，订阅只读 ClientStore.item_bar；
+-- 挂载于 root_view 常驻 HUD 槽位，订阅只读 client_store.item_bar；
 -- 武器栏与鱼饵栏常驻底部栏位，展开浮层由 Phase + Dock 管理候选格生命周期；
 -- 点击遮罩、切换另一栏、选择候选、打开背包、重连或根 UI 销毁均自动零残留销毁节点与连接。
 
 local spoke = require("common.packages.spoke.api")
-local GameCfg = require("common.game_cfg")
-local Number = require("common.number")
-local MainHudLayout = require("client.main_hud_layout")
-local ViewUtil = require("client.views.view_util")
+local game_cfg = require("common.game_cfg")
+local number = require("common.number")
+local main_hud_layout = require("client.main_hud_layout")
+local view_util = require("client.views.view_util")
 
 local Effect = spoke.Effect
 local State = spoke.State
 
-local MainHudEquipPopups = {}
+local main_hud_equip_popups = {}
 
 local BUTTON_IMAGE = "official://image/11017"
 local CELL_FONT = 18
@@ -46,12 +46,12 @@ end
 
 local function cell_text(name, count, width)
   local cols = math.max(1, math.floor(width / CELL_FONT))
-  local text = ViewUtil.wrap_text(name, cols)
+  local text = view_util.wrap_text(name, cols)
   return count ~= nil and (text .. "\n×" .. tostring(count)) or text
 end
 
 local function item_name(id)
-  local def = GameCfg.Items.Definitions[id]
+  local def = game_cfg.Items.Definitions[id]
   return def and def.Name or tostring(id)
 end
 
@@ -62,7 +62,7 @@ local function bait_stock(state, id)
 end
 
 local function worm_count(state)
-  return bait_stock(state, GameCfg.Items.Id.Worm)
+  return bait_stock(state, game_cfg.Items.Id.Worm)
 end
 
 local function equipped_weapon(state)
@@ -83,14 +83,14 @@ end
 
 local function default_fire_item_bar(payload)
   local ok, err = pcall(function() -- 宿主 RE 通道未就绪或调用异常时记录并安全忽略
-    local re_util = rawget(_G, "REUtil") or require("common.re_util")
+    local re_util = rawget(_G, "re_util") or require("common.re_util")
     local re = re_util and re_util:GetRE("ItemBarAction") or nil
     if re ~= nil then
       re:FireServer(payload)
     end
   end)
   if not ok then
-    print("[MainHudEquipPopups] 发送 ItemBarAction 失败", tostring(err))
+    print("[main_hud_equip_popups] 发送 ItemBarAction 失败", tostring(err))
   end
 end
 
@@ -156,7 +156,7 @@ local function build_weapon_candidates(state, send_operate)
 end
 
 local function build_bait_candidates(state, send_action)
-  local ids = GameCfg.Items.Id
+  local ids = game_cfg.Items.Id
   local fixed = { ids.Worm, ids.Sausage, ids.Duck }
   local dynamic, is_fixed = {}, {}
   for _, id in ipairs(fixed) do
@@ -212,8 +212,8 @@ end
 
 local function compute_layout(resolution, state)
   local slot_count = (type(state) == "table" and type(state.slotCount) == "number")
-    and state.slotCount or GameCfg.Items.ItemBarSlots
-  return MainHudLayout.Compute({
+    and state.slotCount or game_cfg.Items.ItemBarSlots
+  return main_hud_layout.Compute({
     width = resolution.x,
     height = resolution.y,
     itemBarSlots = slot_count,
@@ -222,11 +222,11 @@ end
 
 --- 挂载武器栏、鱼饵栏常驻入口与互斥展开浮层（Phase + Dock）。
 ---@param s table EffectBuilder
----@param ctx table RootView 上下文 { root_node, store, clock, create_node, own_node, connect }
+---@param ctx table root_view 上下文 { root_node, store, clock, create_node, own_node, connect }
 ---@param options table|nil { get_resolution?, send_action?, send_operate?, open_popup?, backpack_open?, layout? }
-function MainHudEquipPopups.mount(s, ctx, options)
+function main_hud_equip_popups.mount(s, ctx, options)
   options = options or {}
-  local resolution = ViewUtil.get_resolution(ctx, options)
+  local resolution = view_util.get_resolution(ctx, options)
 
   local op_seq = 0
   local send_action = options.send_action or function(action, value)
@@ -243,9 +243,9 @@ function MainHudEquipPopups.mount(s, ctx, options)
     default_fire_item_bar(body)
   end
 
-  local open_popup = options.open_popup or State.new("MainHudEquipPopups.open_popup", nil)
+  local open_popup = options.open_popup or State.new("main_hud_equip_popups.open_popup", nil)
   local external_popup = options.open_popup ~= nil
-  local backpack_open = options.backpack_open or State.new("MainHudEquipPopups.backpack_open", false)
+  local backpack_open = options.backpack_open or State.new("main_hud_equip_popups.backpack_open", false)
 
   local layout_sig = options.layout or s:memo("EquipPopupsLayout", function(ms)
     return compute_layout(resolution, ms:d(ctx.store.item_bar))
@@ -378,7 +378,7 @@ function MainHudEquipPopups.mount(s, ctx, options)
         end
       end
 
-      local rects = MainHudLayout.PopupCells(layout, kind, #list)
+      local rects = main_hud_layout.PopupCells(layout, kind, #list)
       local seen = {}
 
       for i, candidate in ipairs(list) do
@@ -452,7 +452,7 @@ function MainHudEquipPopups.mount(s, ctx, options)
         cell_dock:drop(dock_key)
       end
 
-      local plate_rect = MainHudLayout.Bounds(rects, 4)
+      local plate_rect = main_hud_layout.Bounds(rects, 4)
       if plate_rect ~= nil and plates[kind] ~= nil then
         place(plates[kind], plate_rect)
         plates[kind].Visible = true
@@ -461,14 +461,14 @@ function MainHudEquipPopups.mount(s, ctx, options)
   end)
 end
 
---- 返回可供 RootView.mount({ hud = { ... } }) 直接注册的 HUD spec。
-function MainHudEquipPopups.spec(options)
+--- 返回可供 root_view.mount({ hud = { ... } }) 直接注册的 HUD spec。
+function main_hud_equip_popups.spec(options)
   return {
-    name = "MainHudEquipPopups",
+    name = "main_hud_equip_popups",
     mount = function(s, ctx)
-      MainHudEquipPopups.mount(s, ctx, options)
+      main_hud_equip_popups.mount(s, ctx, options)
     end,
   }
 end
 
-return MainHudEquipPopups
+return main_hud_equip_popups

@@ -8,14 +8,14 @@
 -- 5. 吐息等30秒起手后侧移4米，另轮站在线内；死亡/离线由真实玩法触发。
 -- 6. Snapshot 只回读本地成就与送达标记；平台ID缺失时只能记为缺证。
 -- Cleanup(id) 仅清本探针创建的鱼；测试过程中原有主循环持续运行。
-local Probe={Owned={}}
-local ServerRuntime=require('server.world_host.server_runtime')
-local FishTree=require('server.world_host.fish_tree')
-local Data=require('server.player_data_host')
-local Cfg=require('common.game_cfg')
+local probe={Owned={}}
+local server_runtime=require('server.world_host.server_runtime')
+local fish_tree=require('server.world_host.fish_tree')
+local data=require('server.player_data_host')
+local cfg=require('common.game_cfg')
 local function fishHost()
-    local runtime=ServerRuntime.current and ServerRuntime.current()
-    return (runtime and runtime.fish_host) or FishTree
+    local runtime=server_runtime.current and server_runtime.current()
+    return (runtime and runtime.fish_host) or fish_tree
 end
 local function point(unit)
     if not unit then return nil end
@@ -26,62 +26,62 @@ local function log(action,id)
     print('[volcano_probe]',action,'fish='..tostring(id),'at='..tostring(fishHost():Now()))
 end
 
-function Probe.Spawn(player,species,isolated)
+function probe.Spawn(player,species,isolated)
     local Fish=fishHost()
     assert(isolated==true,'必须明确使用独立验收会话')
     assert(species=='fish55Elite' or species=='fish56Boss','只允许火山岛战斗目标')
     assert(player and player.Character and not Fish:GetHeld(player),'需要在线空手玩家')
-    local safe=Cfg.Zones[7].Scene.SafePoint
+    local safe=cfg.Zones[7].Scene.SafePoint
     player.Character.Position=Vector3.New(safe.x,safe.y,safe.z)
     local fish,err=Fish:SpawnLanded(player,{fishId=species,mult=1},player.Character.Position)
     assert(fish,err)
-    Probe.Owned[fish.Id]=fish
+    probe.Owned[fish.Id]=fish
     log('spawn 等待原生抓举确认',fish.Id)
     return fish.Id
 end
 
-function Probe.Drop(player,id)
+function probe.Drop(player,id)
     local Fish=fishHost()
-    local fish=assert(Probe.Owned[id],'不是探针创建的鱼')
+    local fish=assert(probe.Owned[id],'不是探针创建的鱼')
     assert(Fish:GetHeld(player)==fish,'原生抓举尚未确认')
     assert(Fish:Drop(player),'放下失败')
     log('drop',id)
 end
 
-function Probe.Damage(id,amount)
+function probe.Damage(id,amount)
     local Fish=fishHost()
-    local fish=assert(Probe.Owned[id],'不是探针创建的鱼')
+    local fish=assert(probe.Owned[id],'不是探针创建的鱼')
     assert(Fish.Fish[id]==fish and amount>0 and amount==math.floor(amount),'目标或伤害无效')
     fish.Carrier.Receiver.Controller:TakeDamage(amount)
     log('阶段触发伤害 '..tostring(amount),id)
 end
 
-function Probe.Snapshot(player,id)
+function probe.Snapshot(player,id)
     local Fish=fishHost()
-    local fish=Probe.Owned[id]
-    local data=Data:GetDataInst(player)
+    local fish=probe.Owned[id]
+    local data=data:GetDataInst(player)
     local result={at=Fish:Now(),exists=fish~=nil and Fish.Fish[id]==fish,
         player=point(player.Character),playerHealth=player.Character and player.Character.Controller.Health,
         localCompleted=data and data.Extra.achievements and data.Extra.achievements.final,
         platformDelivered=data and data.Extra.achievementDelivered and data.Extra.achievementDelivered.final,
-        platformConfigured=type(Cfg.Achievements.final.PlatformId)=='number'}
+        platformConfigured=type(cfg.Achievements.final.PlatformId)=='number'}
     if result.exists then
         result.body,result.receiver=point(fish.Carrier.Body),point(fish.Carrier.Receiver)
         result.health,result.maxHealth=fish.Carrier.Health,fish.Carrier.MaxHealth
         result.state,result.phase=fish.State,fish.Phase and fish.Phase.Phase
         result.transitions=fish.Phase and fish.Phase.Stats.Transitions
-        result.carry=fish.Carry and fish.Carry.TargetPlayer.UserId
+        result.carry=fish.carry and fish.carry.TargetPlayer.UserId
         result.warning=fish.BossWarn~=nil
     end
     log('snapshot',id)
     return result
 end
 
-function Probe.Cleanup(id)
+function probe.Cleanup(id)
     local Fish=fishHost()
-    local fish=Probe.Owned[id]
+    local fish=probe.Owned[id]
     if fish and Fish.Fish[id]==fish then Fish:Remove(fish) end
-    Probe.Owned[id]=nil
+    probe.Owned[id]=nil
     log('cleanup',id)
 end
-return Probe
+return probe

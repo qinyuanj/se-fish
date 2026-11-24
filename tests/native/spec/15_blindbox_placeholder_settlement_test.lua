@@ -11,14 +11,14 @@
 --   3. 取消或超时仍发奖、仍推进保底（单边落地，扣费与发奖不对称）；
 --   4. 重复确认重复发奖；
 --   5. 保底边界错：49 抽未中不保底、或未满 49 抽就保底、或保底只出固定一件、或出大奖后计数没清零。
-local GameCfg = require('common.game_cfg')
-local BlindboxWorld = require('tests.support.blindbox_world')
-local RandomGuard = require('tests.support.random_guard')
+local game_cfg = require('common.game_cfg')
+local blindbox_world = require('tests.support.blindbox_world')
+local random_guard = require('tests.support.random_guard')
 
 local WIRING = {
-    'save = SaveHost,',
-    'platform = PlatformHost,',
-    'player_data = PlayerDataHost,',
+    'save = save_host,',
+    'platform = platform_host,',
+    'player_data = player_data_host,',
     'bind_blindbox_action = function(dispatch)',
 }
 
@@ -62,7 +62,7 @@ describe('条款 15-21 / 15-01 / 15-09 / 15-10 / 15-11 盲盒占位支付通道�
     end
 
     local function draw(count, seq)
-        assert.is_true(world:blindboxAction({ action = 'Draw', count = count, seq = seq }))
+        assert.is_true(world:blindboxAction({ action = 'draw', count = count, seq = seq }))
     end
 
     -- 占位通道的确认 / 取消：客户端在确认面板上按下的那一格
@@ -74,18 +74,18 @@ describe('条款 15-21 / 15-01 / 15-09 / 15-10 / 15-11 盲盒占位支付通道�
 
     before_each(function()
         assert_wiring()
-        world = BlindboxWorld.new()
+        world = blindbox_world.new()
         world:setUp()
         -- #249 占位闸门：占位通道随调试构建放行（发布构建要显式 AllowInPublish）；
         -- 本文件证的是占位通道整条路径，不走调试构建的测试驱动器。
-        GameCfg.Debug = { Enabled = true }
-        savedPlaceholder = GameCfg.Platform.Placeholder.Enabled
-        GameCfg.Platform.Placeholder.Enabled = true
+        game_cfg.Debug = { Enabled = true }
+        savedPlaceholder = game_cfg.Platform.Placeholder.Enabled
+        game_cfg.Platform.Placeholder.Enabled = true
     end)
 
     after_each(function()
-        GameCfg.Platform.Placeholder.Enabled = savedPlaceholder
-        RandomGuard.restore()
+        game_cfg.Platform.Placeholder.Enabled = savedPlaceholder
+        random_guard.restore()
         if world then world:tearDown(); world = nil end
     end)
 
@@ -144,7 +144,7 @@ describe('条款 15-21 / 15-01 / 15-09 / 15-10 / 15-11 盲盒占位支付通道�
     it('超时按取消结算：不发奖、不推进保底', function()
         world.rolls = { MISS_ROLL }
         draw(1, 1)
-        world.now = world.now + GameCfg.Platform.FlowTimeoutSec
+        world.now = world.now + game_cfg.Platform.FlowTimeoutSec
         world.platform:Update()
         world:drain()
         local result = world:lastResult()
@@ -166,7 +166,7 @@ describe('条款 15-21 / 15-01 / 15-09 / 15-10 / 15-11 盲盒占位支付通道�
     end)
 
     it('连续 49 抽未中大奖后第 50 抽强制保底，两个保底奖品都出得来', function()
-        -- 抽前已连续未中 49 次（GameCfg.Blindbox.Pity.afterMisses）：本抽强制保底
+        -- 抽前已连续未中 49 次（game_cfg.Blindbox.Pity.afterMisses）：本抽强制保底
         world.data.Extra.lottery.pity = 49
         world.rolls = { 1 }
         draw(1, 1)

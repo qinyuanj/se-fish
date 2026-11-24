@@ -1,6 +1,6 @@
 local World = require("tests.support.economy_world")
 
-describe("抽奖机服务端原子结算（#312 ServerRuntime 宿主）", function()
+describe("抽奖机服务端原子结算（#312 server_runtime 宿主）", function()
   local world
   local ITEM_BAR = "itemBar"
 
@@ -23,7 +23,7 @@ describe("抽奖机服务端原子结算（#312 ServerRuntime 宿主）", functi
     local result = world:messages("LotteryResult")[1]
     assert.same(100, result.betValue)
     assert.same(2000, result.coins)
-    assert.same(2000, world.data.Data.FishCoin)
+    assert.same(2000, world.data.data.FishCoin)
   end)
 
   it("test_consecutive_draws_settle_independently", function()
@@ -37,7 +37,7 @@ describe("抽奖机服务端原子结算（#312 ServerRuntime 宿主）", functi
     local results = world:messages("LotteryResult")
     assert.same(2, #results)
     assert.same(1000, results[2].coins)
-    assert.same(1008, world.data.Data.FishCoin)
+    assert.same(1008, world.data.data.FishCoin)
     assert.same(0, world.data:ItemCount("item7"))
     assert.same(0, world.data:ItemCount("item31"))
   end)
@@ -48,17 +48,17 @@ describe("抽奖机服务端原子结算（#312 ServerRuntime 宿主）", functi
     assert.is_true(world:lotteryDraw(1, 1))
     local first = world:messages("LotteryResult")[1]
     world:clearEvents()
-    assert.is_true(world:lotteryAction({ action = "Draw", slot = 1, seq = 1 }))
+    assert.is_true(world:lotteryAction({ action = "draw", slot = 1, seq = 1 }))
     local seqReplay = world:messages("LotteryResult")
     assert.same(1, #seqReplay)
     assert.same(first.coins, seqReplay[1].coins)
     world:clearEvents()
-    assert.is_true(world:lotteryAction({ action = "Draw", slot = 1, seq = 2, operation = first.operation }))
+    assert.is_true(world:lotteryAction({ action = "draw", slot = 1, seq = 2, operation = first.operation }))
     local replayed = world:messages("LotteryResult")
     assert.same(1, #replayed)
     assert.same(first.coins, replayed[1].coins)
     assert.same(first.operation.id, replayed[1].operation.id)
-    assert.same(6, world.data.Data.FishCoin)
+    assert.same(6, world.data.data.FishCoin)
     assert.same(0, world.data:ItemCount("item7"))
   end)
 
@@ -71,8 +71,8 @@ describe("抽奖机服务端原子结算（#312 ServerRuntime 宿主）", functi
       world.save:Update()
       world:drain()
     end
-    assert.same(0, world.data.Data.FishCoin)
-    assert.same("item7", world.data.Data.Containers[ITEM_BAR][1].itemId)
+    assert.same(0, world.data.data.FishCoin)
+    assert.same("item7", world.data.data.Containers[ITEM_BAR][1].itemId)
     assert.same({}, world:messages("ItemBarState"))
     assert.is_false(world:messages("LotteryResult")[1].ok)
   end)
@@ -86,16 +86,16 @@ describe("抽奖机服务端原子结算（#312 ServerRuntime 宿主）", functi
     assert.same("none", result.outcome)
     assert.is_nil(result.coins)
     assert.is_nil(result.prize)
-    assert.same(0, world.data.Data.FishCoin)
-    assert.is_nil(world.data.Data.Containers[ITEM_BAR][1])
+    assert.same(0, world.data.data.FishCoin)
+    assert.is_nil(world.data.data.Containers[ITEM_BAR][1])
   end)
 
   it("test_non_premium_cooked_and_grilled_token_are_rejected", function()
-    world.data.Data.UpgradeLevel = 1
+    world.data.data.UpgradeLevel = 1
     assert.is_true(world.data:AddItem("carp"))
     assert.is_true(world.data:AddItem("item7", nil, 1.5))
     assert.is_true(world.data:AddItem("item31"))
-    world.data.Data.Containers[ITEM_BAR][3].saved = { cooked = true }
+    world.data.data.Containers[ITEM_BAR][3].saved = { cooked = true }
     world:persistReady()
     for slot, reason in ipairs({ "not-premium", "cooked", "cooked" }) do
       world:lotteryDraw(slot, slot)
@@ -106,7 +106,7 @@ describe("抽奖机服务端原子结算（#312 ServerRuntime 宿主）", functi
     assert.same(1, world.data:ItemCount("carp"))
     assert.same(1, world.data:ItemCount("item7"))
     assert.same(1, world.data:ItemCount("item31"))
-    assert.same(0, world.data.Data.FishCoin)
+    assert.same(0, world.data.data.FishCoin)
     assert.same(0, world.data:Serialize().meta.sequence)
   end)
 
@@ -121,8 +121,8 @@ describe("抽奖机服务端原子结算（#312 ServerRuntime 宿主）", functi
     assert.same(2, result.multiplier)
     assert.same(8, result.coins)
     assert.same({ 1, 1, 2 }, result.axes)
-    assert.same(8, world.data.Data.FishCoin)
-    assert.is_nil(world.data.Data.Containers[ITEM_BAR][1])
+    assert.same(8, world.data.data.FishCoin)
+    assert.is_nil(world.data.data.Containers[ITEM_BAR][1])
     assert.same(0, result.coinBefore)
     assert.same(8, result.coinAfter)
   end)
@@ -130,9 +130,9 @@ describe("抽奖机服务端原子结算（#312 ServerRuntime 宿主）", functi
   it("test_pending_window_second_handle_is_dropped_silently", function()
     give("item7")
     world.rolls = { 1, 22, 23 }
-    assert.is_true(world:lotteryAction({ action = "Draw", slot = 1, seq = 1 }, false))
+    assert.is_true(world:lotteryAction({ action = "draw", slot = 1, seq = 1 }, false))
     local before = #world.events
-    assert.is_false(world:lotteryAction({ action = "Draw", slot = 1, seq = 2 }, false))
+    assert.is_false(world:lotteryAction({ action = "draw", slot = 1, seq = 2 }, false))
     assert.same(before, #world.events)
     world:drain()
     assert.same(1, #world:messages("LotteryResult"))
@@ -149,10 +149,10 @@ describe("抽奖机服务端原子结算（#312 ServerRuntime 宿主）", functi
     assert.same(1, world.data:ItemCount("item7"))
     world.inRange = true
     for _, slot in ipairs({ 0, 100, 2, "x", 1.5 }) do
-      assert.is_false(world:lotteryAction({ action = "Draw", slot = slot, seq = 10 }))
+      assert.is_false(world:lotteryAction({ action = "draw", slot = slot, seq = 10 }))
     end
     assert.same(1, world.data:ItemCount("item7"))
-    assert.same(0, world.data.Data.FishCoin)
+    assert.same(0, world.data.data.FishCoin)
     assert.same(0, world.data:Serialize().meta.sequence)
   end)
 
@@ -176,7 +176,7 @@ describe("抽奖机服务端原子结算（#312 ServerRuntime 宿主）", functi
       assert.same(settled.prize, recovered[1].prize)
       assert.same(1, world.data:ItemCount("item167"))
       assert.same(0, world.data:ItemCount("item31"))
-      assert.same(0, world.data.Data.FishCoin)
+      assert.same(0, world.data.data.FishCoin)
     end)
   end
 
@@ -187,7 +187,7 @@ describe("抽奖机服务端原子结算（#312 ServerRuntime 宿主）", functi
     local result = world:messages("LotteryResult")[1]
     assert.same("triple", result.outcome)
     assert.same({ kind = "item", itemId = "item167", name = "加速药水" }, result.prize)
-    local item = world.data.Data.Containers[ITEM_BAR][1]
+    local item = world.data.data.Containers[ITEM_BAR][1]
     assert.same("item167", item.itemId)
     assert.same(1, item.count)
     assert.is_nil(item.mult)

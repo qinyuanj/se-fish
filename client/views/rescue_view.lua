@@ -1,11 +1,11 @@
 
-local GameCfg = require("common.game_cfg")
+local game_cfg = require("common.game_cfg")
 local spoke = require("common.packages.spoke.api")
-local ViewUtil = require("client.views.view_util")
+local view_util = require("client.views.view_util")
 
 local State = spoke.State
 
-local RescueView = {}
+local rescue_view = {}
 
 local function rows_equals(a, b)
   if a == b then
@@ -27,7 +27,7 @@ local function is_downed_or_rescuing(phase)
 end
 
 local function read_player_user_id(player)
-  if not ViewUtil.is_record(player) then
+  if not view_util.is_record(player) then
     return nil
   end
   local ok, user_id = pcall(function() return player.UserId end) -- 兼容 SE Player userdata 字段读取
@@ -35,7 +35,7 @@ local function read_player_user_id(player)
 end
 
 local function read_player_phase(player)
-  if not ViewUtil.is_record(player) then
+  if not view_util.is_record(player) then
     return nil
   end
   local ok, phase = pcall(function() return player.GetAttribute and player:GetAttribute("SurvivalPhase") or nil end) -- 兼容 SE Player userdata 属性读取
@@ -43,7 +43,7 @@ local function read_player_phase(player)
 end
 
 local function read_player_position(player)
-  if not ViewUtil.is_record(player) then
+  if not view_util.is_record(player) then
     return nil
   end
   local ok, pos = pcall(function() -- 兼容 SE Player/Character userdata 销毁瞬态坐标读取
@@ -53,7 +53,7 @@ local function read_player_position(player)
   return ok and pos or nil
 end
 
-function RescueView.create_state(label, options)
+function rescue_view.create_state(label, options)
   options = options or {}
   return {
     rows = State.new(label, {}, rows_equals),
@@ -68,7 +68,7 @@ local function collect_world_targets(shared, position)
   local has_downed = false
   local me = type(shared.get_local_player) == "function" and shared.get_local_player() or nil
   local players = type(shared.get_players) == "function" and shared.get_players() or {}
-  local range_sq = GameCfg.Rescue.Range * GameCfg.Rescue.Range
+  local range_sq = game_cfg.Rescue.Range * game_cfg.Rescue.Range
   for _, player in ipairs(players) do
     local user_id = read_player_user_id(player)
     local squad_owned = user_id ~= nil and type(shared.is_squad_member) == "function" and shared.is_squad_member(user_id)
@@ -77,7 +77,7 @@ local function collect_world_targets(shared, position)
       has_downed = true
       if position ~= nil then
         local target_pos = read_player_position(player)
-        local dist_sq = target_pos ~= nil and ViewUtil.distance_sq_xz(position, target_pos) or nil
+        local dist_sq = target_pos ~= nil and view_util.distance_sq_xz(position, target_pos) or nil
         if dist_sq ~= nil and dist_sq <= range_sq then
           list[#list + 1] = { userId = user_id, position = target_pos }
         end
@@ -102,14 +102,14 @@ local function collect_squad_targets(shared, party, position)
       by_id[user_id] = player
     end
   end
-  local range_sq = GameCfg.Rescue.Range * GameCfg.Rescue.Range
+  local range_sq = game_cfg.Rescue.Range * game_cfg.Rescue.Range
   for _, row in ipairs(party.members or {}) do
     if not row.self and is_downed_or_rescuing(row.phase) then
       has_downed = true
       local target = by_id[row.userId]
       if target ~= nil and target ~= me and position ~= nil then
         local target_pos = read_player_position(target)
-        local dist_sq = target_pos ~= nil and ViewUtil.distance_sq_xz(position, target_pos) or nil
+        local dist_sq = target_pos ~= nil and view_util.distance_sq_xz(position, target_pos) or nil
         if dist_sq ~= nil and dist_sq <= range_sq then
           list[#list + 1] = { userId = row.userId, position = target_pos }
         end
@@ -119,7 +119,7 @@ local function collect_squad_targets(shared, party, position)
   return list, has_downed
 end
 
-function RescueView.driver_spec(shared, config)
+function rescue_view.driver_spec(shared, config)
   local mode = config.mode
   local driver_name = config.name
   return {
@@ -157,7 +157,7 @@ function RescueView.driver_spec(shared, config)
   }
 end
 
-function RescueView.bubble_spec(shared, config)
+function rescue_view.bubble_spec(shared, config)
   local key_prefix = config.key_prefix or ""
   local scene_kind = config.scene_kind
   local scene_prefix = config.scene_prefix
@@ -174,13 +174,13 @@ function RescueView.bubble_spec(shared, config)
     end,
     mount = function(scope, ctx, item_signal)
       local row = item_signal:now()
-      local node = ViewUtil.create_anchor_scene_node(
-        scope, ctx, row, GameCfg.Rescue.BubbleHeight, scene_kind, scene_prefix .. tostring(row.userId)
+      local node = view_util.create_anchor_scene_node(
+        scope, ctx, row, game_cfg.Rescue.BubbleHeight, scene_kind, scene_prefix .. tostring(row.userId)
       )
       local ok, button = pcall(ctx.create_node, scope, "EUIButton", {
         Name = button_prefix .. tostring(row.userId),
         Parent = node,
-        ButtonText = GameCfg.Rescue.PromptText,
+        ButtonText = game_cfg.Rescue.PromptText,
         TouchEnabled = true,
       })
       if not ok then
@@ -196,8 +196,8 @@ function RescueView.bubble_spec(shared, config)
         local send = ctx.services and ctx.services.send_interact
         if type(send) == "function" then
           send({
-            target = GameCfg.Rescue.Target,
-            action = GameCfg.Rescue.Action,
+            target = game_cfg.Rescue.Target,
+            action = game_cfg.Rescue.Action,
             targetUserId = latest.userId,
             seq = type(next_seq) == "function" and next_seq() or 1,
           })
@@ -207,4 +207,4 @@ function RescueView.bubble_spec(shared, config)
   }
 end
 
-return RescueView
+return rescue_view

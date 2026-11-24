@@ -3,8 +3,8 @@
 -- 预警锁定朝向、目标失效即取消、逃跑时限转直线逃脱、预警协议校验。
 -- 沿用 tests/support/fish_combat 共享夹具（含 Quaternion / math.random 的保存与还原）。
 -- describe/it 名称保留旧类名与方法名，并按方法名字典序注册以保持旧套件执行顺序。
-local FishCombat = require('tests.support.fish_combat')
-local GameCfg = require('common.game_cfg')
+local fish_combat = require('tests.support.fish_combat')
+local game_cfg = require('common.game_cfg')
 
 local function vec(x, y, z) return { x = x, y = y, z = z } end
 
@@ -15,7 +15,7 @@ local function armPlayer(player, health)
     return damages
 end
 
-local function gar() return GameCfg.FishCombat.gar end
+local function gar() return game_cfg.fish_combat.gar end
 
 local function lastNotice(env, kind)
     for i = #env.notices, 1, -1 do
@@ -38,7 +38,7 @@ describe('TestGarCombat', function()
     local env
 
     before_each(function()
-        env = FishCombat.new()
+        env = fish_combat.new()
         env:setUp()
     end)
     after_each(function()
@@ -46,15 +46,15 @@ describe('TestGarCombat', function()
     end)
 
     it('test_bite_is_skipped_when_vitals_entry_is_not_wired', function()
-        -- #128 健壮性：Vitals 未接线（如独立测试或接线遗漏）时追咬不得报错，只停住不咬
+        -- #128 健壮性：vitals 未接线（如独立测试或接线遗漏）时追咬不得报错，只停住不咬
         env:prepare()
         armPlayer(env.player, 300)
         local fish = env:heldFish(env.player, 'alligatorGar')
         env.mgr:Drop(env.player)
-        env.mgr.Vitals = nil
+        env.mgr.vitals = nil
         local body = fish.Carrier.Body
         env.player.Character.Position = vec(body.Position.x, 2, body.Position.z)
-        local cd = GameCfg.FishCombat.gar.BiteCooldownSec
+        local cd = game_cfg.fish_combat.gar.BiteCooldownSec
         env.now = cd
         env.mgr:Update()
         assert.are.equal(300, env.player.Character.Controller.Health)
@@ -72,7 +72,7 @@ describe('TestGarCombat', function()
         assert.same({}, damages)
         assert.near(0, body.LinearVelocity.x, 1e-6)
         assert.near(0, body.LinearVelocity.z, 1e-6)
-        local cd = GameCfg.FishCombat.gar.BiteCooldownSec
+        local cd = game_cfg.fish_combat.gar.BiteCooldownSec
         env.now = cd
         env.mgr:Update()
         assert.same({ 30 }, damages)
@@ -201,16 +201,16 @@ describe('TestGarCombat', function()
     end)
 
     it('test_notice_protocol_validation', function()
-        local N = require('common.gar_bite_notice')
-        local lock = N.Lock(3, vec(1, 2, 3), 1, 0, 2.5, 90, 1.5)
-        assert.is_true(N.Valid(lock))
+        local n = require('common.gar_bite_notice')
+        local lock = n.Lock(3, vec(1, 2, 3), 1, 0, 2.5, 90, 1.5)
+        assert.is_true(n.Valid(lock))
         assert.near(math.pi / 2, lock.yaw, 1e-9)
-        assert.is_true(N.Valid(N.Clear(3, 'miss')))
-        assert.is_false(N.Valid(nil))
-        assert.is_false(N.Valid({ kind = 'lock', fishId = 3 }))
-        assert.is_false(N.Valid(N.Lock(3, vec(0 / 0, 0, 0), 1, 0, 2.5, 90, 1.5)))
-        assert.is_false(N.Valid(N.Lock(3, vec(0, 0, 0), 1, 0, 0, 90, 1.5)))
-        assert.is_false(N.Valid({ kind = 'boom', fishId = 3 }))
+        assert.is_true(n.Valid(n.Clear(3, 'miss')))
+        assert.is_false(n.Valid(nil))
+        assert.is_false(n.Valid({ kind = 'lock', fishId = 3 }))
+        assert.is_false(n.Valid(n.Lock(3, vec(0 / 0, 0, 0), 1, 0, 2.5, 90, 1.5)))
+        assert.is_false(n.Valid(n.Lock(3, vec(0, 0, 0), 1, 0, 0, 90, 1.5)))
+        assert.is_false(n.Valid({ kind = 'boom', fishId = 3 }))
     end)
 
     it('test_side_step_during_windup_counts_as_rear', function()

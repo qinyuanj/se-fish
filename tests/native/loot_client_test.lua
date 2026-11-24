@@ -1,24 +1,24 @@
-local Eui = require("tests.support.eui_double")
-local ClientStore = require("client.store.client_store")
-local RootView = require("client.views.root_view")
-local GroundLootView = require("client.views.ground_loot_view")
-local SpokeClock = require("common.spoke_clock")
-local GameCfg = require("common.game_cfg")
+local eui = require("tests.support.eui_double")
+local client_store = require("client.store.client_store")
+local root_view = require("client.views.root_view")
+local ground_loot_view = require("client.views.ground_loot_view")
+local spoke_clock = require("common.spoke_clock")
+local game_cfg = require("common.game_cfg")
 
 local function mount()
-  local store, writer = ClientStore.new({ clock = SpokeClock.new(1) })
-  local root = Eui.Node({ Name = "UIRoot" })
+  local store, writer = client_store.new({ clock = spoke_clock.new(1) })
+  local root = eui.Node({ Name = "UIRoot" })
   local created, sent = {}, {}
-  RootView.mount(root, store, {
+  root_view.mount(root, store, {
     create_node = function(kind, props)
-      local node = Eui.Node(props or {})
+      local node = eui.Node(props or {})
       node.UnitType = kind
       created[#created + 1] = node
       return node
     end,
-    docks = { ground_loot = GroundLootView.bubble_spec({
+    docks = { ground_loot = ground_loot_view.bubble_spec({
       send = function(payload) sent[#sent + 1] = payload end,
-      radius = GameCfg.Loot.PickupRadius,
+      radius = game_cfg.Loot.PickupRadius,
     }) },
   })
   return { writer = writer, created = created, sent = sent }
@@ -39,7 +39,7 @@ describe("地面拾取气泡", function()
     env.writer:update_spatial({ x = 0, y = 0, z = 0 }, {})
     local btn
     for _, node in ipairs(env.created) do if node.Name == "BtnPickup_7" then btn = node end end
-    assert.is_true(Eui.Click(btn))
+    assert.is_true(eui.Click(btn))
     assert.same({ { action = "Pickup", value = 7 } }, env.sent)
   end)
 
@@ -57,7 +57,7 @@ describe("地面拾取气泡", function()
     env.writer:ingest_event("LootState", { list = { { id = 1, x = 0, y = 0, z = 0 } } })
     env.writer:update_spatial({ x = 0, y = 0, z = 0 }, {})
     assert.equals(1, alive(env))
-    env.writer:update_spatial({ x = GameCfg.Loot.PickupRadius + 1, y = 0, z = 0 }, {})
+    env.writer:update_spatial({ x = game_cfg.Loot.PickupRadius + 1, y = 0, z = 0 }, {})
     assert.equals(0, alive(env))
     env.writer:update_spatial({ x = 1, y = 0, z = 0 }, {})
     assert.equals(1, alive(env))

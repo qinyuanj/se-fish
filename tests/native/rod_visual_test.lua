@@ -1,9 +1,9 @@
 -- 迁移自 tests/gameplay/rod_visual_test.lua（#85）。
 -- it 名字沿用旧方法名，注册顺序 = LuaUnit sortedPairs 的实际执行顺序。
 
-local GameCfg = require('common.game_cfg')
-local Mgr = require('server.player_data_host')
-local ServerRuntime = require('server.world_host.server_runtime')
+local game_cfg = require('common.game_cfg')
+local mgr = require('server.player_data_host')
+local server_runtime = require('server.world_host.server_runtime')
 
 local function signal()
   local callbacks = {}
@@ -18,7 +18,7 @@ local function signal()
   }
 end
 
-describe('鱼竿外观挂载（PlayerDataHost）', function()
+describe('鱼竿外观挂载（player_data_host）', function()
   local env
   local restore
 
@@ -30,7 +30,7 @@ describe('鱼竿外观挂载（PlayerDataHost）', function()
       game = _G.game,
       Vector3 = _G.Vector3,
       Color = _G.Color,
-      REUtil = _G.REUtil,
+      re_util = _G.re_util,
     }
     env = { failKind = nil, created = {}, events = {} }
     require('common.game_cfg').Debug = { Enabled = true, InitialGrants = restore.GrantDebug.InitialGrants }
@@ -46,7 +46,7 @@ describe('鱼竿外观挂载（PlayerDataHost）', function()
     _G.Vector3 = { New = function(x, y, z) return { x = x, y = y, z = z } end }
     -- 鱼竿模型带 ModelColor1，服务端要 Color.New；原生逐例隔离后不能再蹭别的套件的残留全局。
     _G.Color = { New = function(...) return { ... } end }
-    _G.REUtil = { CheckRECD = function() return false end, GetRE = function(_, name)
+    _G.re_util = { CheckRECD = function() return false end, GetRE = function(_, name)
       if not env.events[name] then
         env.events[name] = {
           OnServerEvent = signal(),
@@ -58,21 +58,21 @@ describe('鱼竿外观挂载（PlayerDataHost）', function()
     env.player = { UserId = 34001, Character = { Name = 'Eggy' },
       CharacterAdded = signal(), CharacterRemoving = signal() }
     function env.player:SetAttribute() end
-    env.runtime = ServerRuntime.new({
-      player_data = Mgr,
+    env.runtime = server_runtime.new({
+      player_data = mgr,
       bait_spots = { Enabled = false },
       create_unit = function(kind, props)
         return world:CreateUnit(kind, props)
       end,
       on_item_bar_state = function(p, snapshot)
-        _G.REUtil:GetRE('ItemBarState'):FireClient(p, snapshot)
+        _G.re_util:GetRE('ItemBarState'):FireClient(p, snapshot)
       end,
     })
     env.runtime:start()
     env.runtime:mark_started()
     env.join = function(p)
       env.runtime:on_player_added(p)
-      local data = Mgr:GetDataInst(p)
+      local data = mgr:GetDataInst(p)
       if data then env.runtime:on_save_ready(p, data) end
     end
     env.leave = function(p)
@@ -90,13 +90,13 @@ describe('鱼竿外观挂载（PlayerDataHost）', function()
       env.runtime:shutdown()
     end
     if env and env.player then
-      Mgr:OnPlayerRemoving(env.player)
+      mgr:OnPlayerRemoving(env.player)
     end
       if restore then
       _G.game = restore.game
       _G.Vector3 = restore.Vector3
       _G.Color = restore.Color
-      _G.REUtil = restore.REUtil
+      _G.re_util = restore.re_util
     end
     env = nil
     restore = nil
@@ -120,8 +120,8 @@ describe('鱼竿外观挂载（PlayerDataHost）', function()
     assert.is_true(env.created[3].Destroyed)
     assert.same(3, #env.created)
     env.failKind = nil
-    Mgr:SendItemBar(env.player)
-    Mgr:SyncPlayerTree(env.player)
+    mgr:SendItemBar(env.player)
+    mgr:SyncPlayerTree(env.player)
     assert.same(5, #env.created)
     assert.is_false(env.created[4].Destroyed)
     assert.is_false(env.created[5].Destroyed)
@@ -150,10 +150,10 @@ describe('鱼竿外观挂载（PlayerDataHost）', function()
     env.player.CharacterAdded:Fire(env.player.Character)
     assert.same(4, #env.created)
     assert.are.equal(env.player.Character, env.created[3].Parent)
-    Mgr:GetDataInst(env.player):UpdateData(function(data)
-      data.Containers[GameCfg.Items.ContainerId.ItemBar][1].count = 0
+    mgr:GetDataInst(env.player):UpdateData(function(data)
+      data.Containers[game_cfg.Items.ContainerId.ItemBar][1].count = 0
     end, true)
-    Mgr:SyncPlayerTree(env.player)
+    mgr:SyncPlayerTree(env.player)
     assert.is_true(env.created[3].Destroyed)
     assert.is_true(env.created[4].Destroyed)
     assert.is_nil(env.player.lastState.selectedSlot)
@@ -200,8 +200,8 @@ describe('鱼竿外观挂载（PlayerDataHost）', function()
     assert.same({ x = 0.2, y = 0.25, z = 0.2 }, model.Scale)
     assert.is_false(model.PhysicsActive)
     assert.is_false(model.CanCollide)
-    Mgr:SendItemBar(env.player)
-    Mgr:SyncPlayerTree(env.player)
+    mgr:SendItemBar(env.player)
+    mgr:SyncPlayerTree(env.player)
     assert.same(2, #env.created)
     select(1)
     assert.is_true(mount.Destroyed)

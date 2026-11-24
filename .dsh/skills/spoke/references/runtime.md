@@ -6,9 +6,9 @@
 
 `require("common.packages.spoke.api")` 返回 13 个类：Epoch、Ticker、SpokeTree、Dock、LambdaEpoch、SpokeHandle、Trigger、State、Effect、Reaction、Memo、Phase、EffectBuilder。
 
-SpokeRuntime 与工具类型不在门面上，需要时深 require：
+spoke_runtime 与工具类型不在门面上，需要时深 require：
 
-- `common.packages.spoke.runtime.spoke_runtime`：`SpokeRuntime.batch(fn)`，合并 Auto 树 flush 的稳定入口。
+- `common.packages.spoke.runtime.spoke_runtime`：`spoke_runtime.batch(fn)`，合并 Auto 树 flush 的稳定入口。
 - `common.packages.spoke.runtime.spoke_exception`：故障时保存的 frame/tree trace。
 - `common.packages.spoke.runtime.spoke_error`：`SpokeError.log`，接管日志。
 
@@ -29,7 +29,7 @@ SpokeRuntime 与工具类型不在门面上，需要时深 require：
 - `try_import` 未命中返回 `false, nil`，`import` 未命中抛错。树 services 在 root Init 前导出，按 key 排序，不能依赖 table 枚举顺序。
 - `s:log(message)` 挂载持久的 `Log: <message>` LambdaEpoch，并输出 frame/tree trace；它占 attachment 与坐标位置。logger 可经 `logger` service 替换，logger 错误不得中断用户逻辑。
 
-## Ticker、SpokeTree 与 SpokeRuntime
+## Ticker、SpokeTree 与 spoke_runtime
 
 - 每个 Epoch 向最近祖先 Ticker 请求 Tick。Ticker 只控制推进节奏，不按请求先后执行；每次 `tick_next()` 都必须取当前 pending 集中 tick cursor 最小的 Epoch，包括 flush 中被重新 arm 的项。
 - 自定义 Ticker 的 `bootstrap` 返回 root；`on_tick` 至少调用一次 `tick_next()` 或 pause，否则形成故障。`tick_next()` 只允许在 OnTick 中调用。
@@ -37,10 +37,10 @@ SpokeRuntime 与工具类型不在门面上，需要时深 require：
 - `SpokeTree.spawn` / `spawn_eager` 是 Auto，layer 分别为 0 / -1；`spawn_manual` 由调用方驱动。Auto 拒绝显式 `tick()` / `flush()`。
 - Auto 在用户调用返回前同步排空。Manual `tick()` 只交付一个 pending Epoch，`flush()` 排空；两者拒绝重入。Manual spawn 后通常需要首次 `flush()` 才完成 Effect 等挂载。
 - 同一工作单元内的 request 只登记意图，通常在 frame pop 后才调度，不会中途插入另一个 Epoch。需要严格先后时，用树的声明顺序表达，而不是依赖 request 调用顺序。
-- `SpokeRuntime.batch(fn)` 只暂停 Auto flush；nested batch 仅最外层 release 排空。fn 抛错时也必须 release，再向调用方重抛；普通订阅通知等同步副作用不属于 batch 的合并范围。
+- `spoke_runtime.batch(fn)` 只暂停 Auto flush；nested batch 仅最外层 release 排空。fn 抛错时也必须 release，再向调用方重抛；普通订阅通知等同步副作用不属于 batch 的合并范围。
 - 跨树先按较小 flush layer，再按 spawn timestamp。高优先级树可嵌套 flush；新建且优先级不低于当前树的树，仅在创建 frame 存活期间获得 scoped boost，同级既有树不能相互递归嵌套。
-- Manual 与 Auto 可共存；Manual 驱动结束后，Runtime 仍按相同规则交付已 pending 的 Auto 工作。
-- Runtime 有 100 次跨树调度振荡 guard，超限后记录并清空 pending Auto 树。每个 Ticker（含 SpokeTree）默认有 1000 次 loop guard：同一 host entry 内 coordinate regression 或同一非 Ticker 重入会累计，队列排空或返回宿主后清零，重复推进嵌套 Ticker 不累计；超限后 fault/stop，因此也能拦住单个计算持续自我激发。bootstrap 中用 `s:loop_guard(n)` 配置，`n <= 0` 关闭。
+- Manual 与 Auto 可共存；Manual 驱动结束后，runtime 仍按相同规则交付已 pending 的 Auto 工作。
+- runtime 有 100 次跨树调度振荡 guard，超限后记录并清空 pending Auto 树。每个 Ticker（含 SpokeTree）默认有 1000 次 loop guard：同一 host entry 内 coordinate regression 或同一非 Ticker 重入会累计，队列排空或返回宿主后清零，重复推进嵌套 Ticker 不累计；超限后 fault/stop，因此也能拦住单个计算持续自我激发。bootstrap 中用 `s:loop_guard(n)` 配置，`n <= 0` 关闭。
 
 ## 坐标与 Dock
 
@@ -55,8 +55,8 @@ SpokeRuntime 与工具类型不在门面上，需要时深 require：
 
 ## 故障、Teardown 与性能
 
-- 用户 Init/Tick 错误只包装一次为保存故障时 frame stack 的 `SpokeException`，沿 Ticker 传播。未捕获 fault 到树边界后记录、置 faulted 并停止 flush，最终 Runtime 边界不向宿主 rethrow，树不自动复活。
+- 用户 Init/Tick 错误只包装一次为保存故障时 frame stack 的 `SpokeException`，沿 Ticker 传播。未捕获 fault 到树边界后记录、置 faulted 并停止 flush，最终 runtime 边界不向宿主 rethrow，树不自动复活。
 - 排障先读 fault 的 frame/tree trace，再用事件日志区分 Init、Tick、frame-pop 调度与 Detach。修故障时同时核对后续 cleanup、pending 工作和树状态。
 - 资源获取与清理由同一 Epoch 所有；宿主应在对象失效前驱动 teardown。核心不读取宿主全局、不注册计时器，宿主集成见 `eggy-integration.md`。
 - 优先保持生命周期与顺序清晰。稳定子树避免无谓重建；per-tick builder、闭包、attachment 和动态子树是分配审查点。没有测量与具体需求时不引入池化，核心 Epoch 等对象不池化。
-- Runtime 适合 orchestrate 长寿命行为，不应默认承载高频逐帧计算。需要分帧或单步调试时使用 Manual，由消费方控制节拍。
+- runtime 适合 orchestrate 长寿命行为，不应默认承载高频逐帧计算。需要分帧或单步调试时使用 Manual，由消费方控制节拍。

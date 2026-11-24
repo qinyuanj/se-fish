@@ -28,7 +28,7 @@
 - 包内没有版本号、变更记录或来源 URL，升级以整包导入为准，替换后 diff 三端子树确认改动面。
 - 升级来源用官方资源包空图（新建空图导入四个包后的宿主目录）：三端 `packages/<包>/` 按原始字节整包覆盖并删除旧包多余文件。2026-11-05 的全量升级与逐包差异摘要见 [GitHub #177](https://github.com/qinyuanj/se-fish/issues/177)。
 - 业务层直接 require 对应端的包内 `api.lua`；不在上一层复制导出名单、拍平 `Funcs` 或逐函数转发。属性和 AI 包使用原生 `Funcs` 函数表，`Enums` / `Configs` / `Prefabs` 保持包内结构。升级后通过真实包回归核对调用契约（属性：`attr_migration_test.lua`、`attr_rule_probe_test.lua`；效果：`modifier_system_probe_test.lua`；AI 与技能桥：`ai_migration_test.lua`、`official_ai_probe_test.lua`）。
-- `server/ability_api.lua` 仅保留本图业务：施法守卫、体型、挂点与锚点补挂。需要守卫的业务施法继续调用它；装配、停止和查询技能直接调用包。锚点行为所需的管理器由 `server/main.lua` 通过 `BehaviorServices` 注入，行为不反向加载 `server.Mgr`。AI 位移生命周期查询由 `MgrAi` 持有，不另建 AI 转发入口。挥砍登记由 `server/swing_registry.lua` 独立持有，武器入口与近战行为共同依赖它。
+- `server/ability_api.lua` 仅保留本图业务：施法守卫、体型、挂点与锚点补挂。需要守卫的业务施法继续调用它；装配、停止和查询技能直接调用包。锚点行为所需的管理器由 `server/main.lua` 通过 `BehaviorServices` 注入，行为不反向加载 `server.mgr`。AI 位移生命周期查询由 `MgrAi` 持有，不另建 AI 转发入口。挥砍登记由 `server/swing_registry.lua` 独立持有，武器入口与近战行为共同依赖它。
 
 ## 新版包的默认行为（2026-11-05 版）
 

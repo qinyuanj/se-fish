@@ -1,17 +1,17 @@
 
-local GameCfg = require("common.game_cfg")
-local FlightPath = require("common.flight_path")
-local Number = require("common.number")
-local SpecialItem = require("common.special_item")
+local game_cfg = require("common.game_cfg")
+local flight_path = require("common.flight_path")
+local number = require("common.number")
+local special_item = require("common.special_item")
 local State = require("common.packages.spoke.api").State
 
-local SpecialItemPhase = {}
+local special_item_phase = {}
 
 local CLEANUP_RETRY_SEC = 1
 local CLEANUP_RETRIES = 5
 
 local function cfg()
-  return GameCfg.Ability.SpecialItem
+  return game_cfg.Ability.special_item
 end
 
 local function breath_cfg()
@@ -19,11 +19,11 @@ local function breath_cfg()
 end
 
 local function finite(value)
-  return Number.IsFiniteNumber(value)
+  return number.IsFiniteNumber(value)
 end
 
 local function zone_scene(zone_id)
-  for _, zone in ipairs(GameCfg.Zones or {}) do
+  for _, zone in ipairs(game_cfg.Zones or {}) do
     if zone.Id == zone_id then return zone.Scene end
   end
 end
@@ -77,7 +77,7 @@ local function selected_item_id(item_bar, selected_slot)
   return entry.itemId
 end
 
-function SpecialItemPhase.mount(ps, player_tree, opts)
+function special_item_phase.mount(ps, player_tree, opts)
   opts = type(opts) == "table" and opts or {}
   local states = player_tree.states
   local memos = player_tree.memos
@@ -108,8 +108,8 @@ function SpecialItemPhase.mount(ps, player_tree, opts)
   local published_breath = nil
   local failures = {}
   local restoring = false
-  local selected_phase = State.new("SpecialItemPhase.selected", nil)
-  local cleanup_active = State.new("SpecialItemPhase.cleanup_active", false)
+  local selected_phase = State.new("special_item_phase.selected", nil)
+  local cleanup_active = State.new("special_item_phase.cleanup_active", false)
   local cleanup_character = nil
 
   local function now()
@@ -122,7 +122,7 @@ function SpecialItemPhase.mount(ps, player_tree, opts)
 
   local function log_failure(key, object, err)
     if not failures[key] then
-      print("[SpecialItemPhase] 引擎操作失败", key, tostring(object), tostring(err))
+      print("[special_item_phase] 引擎操作失败", key, tostring(object), tostring(err))
     end
   end
 
@@ -152,7 +152,7 @@ function SpecialItemPhase.mount(ps, player_tree, opts)
   end
 
   local function fail(action, reason)
-    print("[SpecialItemPhase] 请求拒绝", player.UserId, action, tostring(reason))
+    print("[special_item_phase] 请求拒绝", player.UserId, action, tostring(reason))
     reply({ ok = false, action = action, reason = reason })
     return false
   end
@@ -176,7 +176,7 @@ function SpecialItemPhase.mount(ps, player_tree, opts)
       ready = breath_ready_at
     end
     if type(ready) ~= "number" then return 0 end
-    return SpecialItem.CooldownRemaining(ready - breath_cfg().CooldownSec, now(), breath_cfg().CooldownSec)
+    return special_item.CooldownRemaining(ready - breath_cfg().CooldownSec, now(), breath_cfg().CooldownSec)
   end
 
   local function publish()
@@ -292,8 +292,8 @@ function SpecialItemPhase.mount(ps, player_tree, opts)
       skin_applied = true
       appearance = current_appearance
     else
-      local visual = GameCfg.PlaceholderAssets and GameCfg.PlaceholderAssets.Special
-        and GameCfg.PlaceholderAssets.Special[desired]
+      local visual = game_cfg.placeholder_assets and game_cfg.placeholder_assets.Special
+        and game_cfg.placeholder_assets.Special[desired]
       if visual and type(create_unit) == "function" then
         local ok, mount = engine_call("placeholderMount", character, function()
           return create_unit("SkeletalSocketMount", {
@@ -337,10 +337,10 @@ function SpecialItemPhase.mount(ps, player_tree, opts)
 
   local function current_selection()
     local record = player_tree.data
-    local data_part = type(record) == "table" and record.Data or nil
+    local data_part = type(record) == "table" and record.data or nil
     if type(data_part) == "table" then
       local containers = type(data_part.Containers) == "table" and data_part.Containers or {}
-      return selected_item_id(containers[GameCfg.Items.ContainerId.ItemBar], data_part.SelectedSlot)
+      return selected_item_id(containers[game_cfg.Items.ContainerId.ItemBar], data_part.SelectedSlot)
     end
     return selected_item_id(states.item_bar:now(), states.selected_slot:now())
   end
@@ -354,7 +354,7 @@ function SpecialItemPhase.mount(ps, player_tree, opts)
       suspended_item = nil
     end
     if suspended then return nil end
-    return SpecialItem.Desired(selected)
+    return special_item.Desired(selected)
   end
 
   local function reconcile()
@@ -385,17 +385,17 @@ function SpecialItemPhase.mount(ps, player_tree, opts)
       return
     end
     local scene = zone_scene(states.zone_id:now())
-    local bounds = scene and FlightPath.BoundsOf(scene, GameCfg.Ability.Flight)
+    local bounds = scene and flight_path.BoundsOf(scene, game_cfg.Ability.Flight)
     if not bounds then return end
     if not flight_ground_y then flight_ground_y = pos.y end
     bounds.GroundY = flight_ground_y
     bounds.CeilingY = math.min(bounds.CeilingY, flight_ground_y + bounds.MaxHeight)
     if not set_gravity(false) then return end
-    local y, next_airborne = SpecialItem.StepFlightY(wings, {
+    local y, next_airborne = special_item.StepFlightY(wings, {
       Y = flight_y or pos.y,
       Airborne = airborne,
     }, holding, dt, bounds)
-    local x, z = SpecialItem.ClampXZ(bounds, pos.x, pos.z)
+    local x, z = special_item.ClampXZ(bounds, pos.x, pos.z)
     write_position(character, x, y, z)
     flight_y = y
     airborne = next_airborne
@@ -470,7 +470,7 @@ function SpecialItemPhase.mount(ps, player_tree, opts)
       local tick = breath.tick
       for _, target in ipairs(breath_targets()) do
         if in_corridor(breath.origin, breath.forward, target.pos, bc) then
-          local amount = SpecialItem.BreathHit(breath.ledger, target.key, tick)
+          local amount = special_item.BreathHit(breath.ledger, target.key, tick)
           if amount then target.apply(amount) end
         end
       end
@@ -511,7 +511,7 @@ function SpecialItemPhase.mount(ps, player_tree, opts)
     breath = {
       cast_at = current,
       tick = 1,
-      ledger = SpecialItem.NewBreathLedger(bc),
+      ledger = special_item.NewBreathLedger(bc),
       origin = { x = pos.x, y = pos.y, z = pos.z },
       forward = flat_forward(character_of().Rotation),
     }
@@ -705,4 +705,4 @@ function SpecialItemPhase.mount(ps, player_tree, opts)
   publish()
 end
 
-return SpecialItemPhase
+return special_item_phase

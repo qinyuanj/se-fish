@@ -1,6 +1,6 @@
 
-local GameCfg = require("common.game_cfg")
-local ServerRuntime = require("server.world_host.server_runtime")
+local game_cfg = require("common.game_cfg")
+local server_runtime = require("server.world_host.server_runtime")
 
 local function signal()
   local handlers = {}
@@ -17,8 +17,8 @@ end
 
 local function make_player(id, x, z)
   local controller = {
-    Health = GameCfg.Vitals.MaxHealth,
-    MaxHealth = GameCfg.Vitals.MaxHealth,
+    Health = game_cfg.vitals.MaxHealth,
+    MaxHealth = game_cfg.vitals.MaxHealth,
     WalkSpeed = 16,
     HealthChanged = signal(),
     Died = signal(),
@@ -54,19 +54,19 @@ local function make_data(player)
     Player = player,
     Inited = true,
     LoadState = "ready",
-    Data = {
+    data = {
       FishCoin = 0,
       Zone = "fishPond",
       Weapons = {},
       Containers = {
-        [GameCfg.Items.ContainerId.ItemBar] = {},
-        [GameCfg.Items.ContainerId.Backpack] = {},
+        [game_cfg.Items.ContainerId.ItemBar] = {},
+        [game_cfg.Items.ContainerId.Backpack] = {},
       },
     },
     Extra = {
       growth = { potions = {}, upgrades = {} },
       inventory = { selection = { held = {} } },
-      survival = { health = GameCfg.Vitals.MaxHealth, hunger = GameCfg.Vitals.MaxHunger },
+      survival = { health = game_cfg.vitals.MaxHealth, hunger = game_cfg.vitals.MaxHunger },
     },
   }
 end
@@ -140,7 +140,7 @@ local function boot(overrides)
     },
   }
   for key, value in pairs(overrides or {}) do options[key] = value end
-  local runtime = ServerRuntime.new(options)
+  local runtime = server_runtime.new(options)
   runtime:start()
   runtime:mark_started()
   return runtime, units, ai
@@ -181,7 +181,7 @@ describe("活鱼树宿主接缝（#309）", function()
     local again = make_player(2, 12, -20)
     join(runtime, again)
     assert.is_true(runtime:receive_landed(again, { fishId = "bass", mult = 1, x = 12, y = 2, z = -18 }))
-    runtime.life:ApplyDamage(again, GameCfg.Vitals.MaxHealth)
+    runtime.life:ApplyDamage(again, game_cfg.vitals.MaxHealth)
     local downed = runtime:fish_snapshot(again.UserId)[1]
     assert.not_equals("lifted", downed.phase)
 
@@ -275,7 +275,7 @@ describe("活鱼树宿主接缝（#309）", function()
     local names = {}
     for _, unit in ipairs(units) do
       local name = tostring(unit.Name)
-      if unit.Destroyed ~= true and (name:find("Fish", 1, true) or name:find("Carry", 1, true)) then
+      if unit.Destroyed ~= true and (name:find("Fish", 1, true) or name:find("carry", 1, true)) then
         names[#names + 1] = name
       end
     end
@@ -306,7 +306,7 @@ describe("活鱼树宿主接缝（#309）", function()
     assert.equals(rows[2].id, left[1].id)
   end)
 
-  it("经 FishTree 直接上岸的活鱼同步发布且空闲帧不重复发空表，同时驱动 FishCarrier:Update", function()
+  it("经 fish_tree 直接上岸的活鱼同步发布且空闲帧不重复发空表，同时驱动 fish_carrier:Update", function()
     local broadcasts, carrier_updates = {}, 0
     local runtime = boot({
       remote = {
@@ -330,7 +330,7 @@ describe("活鱼树宿主接缝（#309）", function()
     runtime:step(0.1, 1000.1)
     runtime:step(0.1, 1000.2)
     assert.equals(0, #broadcasts, "无活鱼时不得每帧发空 FishCombatState")
-    assert.equals(2, carrier_updates, "ServerRuntime:step 须驱动 FishCarrier:Update")
+    assert.equals(2, carrier_updates, "server_runtime:step 须驱动 fish_carrier:Update")
 
     local spawned = runtime.fish_host:SpawnLanded(player, { fishId = "bass", mult = 1.2 }, { x = 10, y = 2, z = -18 })
     assert.is_not_nil(spawned)

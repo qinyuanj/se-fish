@@ -1,26 +1,26 @@
-local BodyScale = require("common.body_scale")
+local body_scale = require("common.body_scale")
 
-local InteractionPoints = { Anchors = {} }
+local interaction_points = { Anchors = {} }
 
 local function flat_distance(a, b)
   local dx, dz = a.x - b.x, a.z - b.z
   return math.sqrt(dx * dx + dz * dz)
 end
 
-function InteractionPoints:FindAnchor(name)
+function interaction_points:FindAnchor(name)
   local cached = self.Anchors[name]
   if cached then return cached end
   local world = game:GetService("World")
   local ok, unit = pcall(world.FindFirstChild, world, name, true)
   if not ok then
-    print("[InteractionPoints] 查找场景锚点失败", name, tostring(unit))
+    print("[interaction_points] 查找场景锚点失败", name, tostring(unit))
     return nil
   end
   if unit then self.Anchors[name] = unit end
   return unit
 end
 
-function InteractionPoints:InRange(player, point)
+function interaction_points:InRange(player, point)
   local character = player and player.Character
   local position = character and character.Position
   if not position then return nil end
@@ -29,11 +29,11 @@ function InteractionPoints:InRange(player, point)
     local anchor = self:FindAnchor(name)
     local center = anchor and anchor.Position
     if center and flat_distance(position, center)
-        <= BodyScale.InteractionRadius(character, point.Radius) + (point.Slack or 0) then
+        <= body_scale.InteractionRadius(character, point.Radius) + (point.Slack or 0) then
       return anchor
     end
   end
   return nil
 end
 
-return InteractionPoints
+return interaction_points

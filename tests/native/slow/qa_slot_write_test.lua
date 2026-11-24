@@ -1,11 +1,11 @@
 -- 验收槽 CLI 的落盘替换：在进程内把当前目录切到临时假仓库，直接调 qa_slot.main，
--- 断言 GameCfg 文本、退出码与临时文件无残留。Windows 原生（#192）：不再拼 POSIX 命令串，
--- 也不再起 lua 子进程；配置路径相对当前目录，所以先 lfs.chdir 进假仓库，真仓库的 GameCfg 不被碰。
+-- 断言 game_cfg 文本、退出码与临时文件无残留。Windows 原生（#192）：不再拼 POSIX 命令串，
+-- 也不再起 lua 子进程；配置路径相对当前目录，所以先 lfs.chdir 进假仓库，真仓库的 game_cfg 不被碰。
 local lfs = require("lfs")
 local slot = require("tools.qa_slot")
 
 local SAMPLE = table.concat({
-  "GameCfg.Save = {",
+  "game_cfg.Save = {",
   "    Store = 'sefish_save_v1',",
   "    QaSlot = '',",
   "    MaxRetries = 3,",
@@ -100,7 +100,7 @@ describe("TestQaSlotWrite", function()
   end)
 
   it("test_set_succeeds_when_target_config_already_exists", function()
-    -- 目标 GameCfg.lua 已存在（before_each 已建）：Windows 上 os.rename 不覆盖目标，
+    -- 目标 game_cfg.lua 已存在（before_each 已建）：Windows 上 os.rename 不覆盖目标，
     -- 修复后必须先删目标再重命名，set 才能成功。
     assert.is_not_nil(slurp(CONFIG))
     local code, output = invoke({ "set", "qa122" })

@@ -1,9 +1,9 @@
-local GameCfg = require("common.game_cfg")
-local ClientWorld = require("tests.support.economy_client")
+local game_cfg = require("common.game_cfg")
+local client_world = require("tests.support.economy_client")
 
-describe("盲盒与地图商店界面（#312 RootView 宿主）", function()
+describe("盲盒与地图商店界面（#312 root_view 宿主）", function()
   local env
-  before_each(function() env = ClientWorld.new() end)
+  before_each(function() env = client_world.new() end)
   after_each(function() if env then env:cleanup(); env = nil end end)
 
   local function open_blindbox()
@@ -20,7 +20,7 @@ describe("盲盒与地图商店界面（#312 RootView 宿主）", function()
     env:click("BtnBlindboxSingle")
     env:click("BtnBlindboxTen")
     assert.same(1, #env.sent.blindbox)
-    env:step(GameCfg.Blindbox.ResultTimeoutSec - 1)
+    env:step(game_cfg.Blindbox.ResultTimeoutSec - 1)
     assert.same(1, #env.sent.blindbox)
     env:step(1)
     assert.same(2, #env.sent.blindbox)
@@ -30,10 +30,10 @@ describe("盲盒与地图商店界面（#312 RootView 宿主）", function()
 
   it("test_buttons_show_platform_prices_and_send_counts", function()
     open_blindbox()
-    assert.matches(tostring(GameCfg.Platform.Goods.blindboxSingle.beans), env:child("BtnBlindboxSingle").Text)
-    assert.matches(tostring(GameCfg.Platform.Goods.blindboxTen.beans), env:child("BtnBlindboxTen").Text)
+    assert.matches(tostring(game_cfg.Platform.Goods.blindboxSingle.beans), env:child("BtnBlindboxSingle").Text)
+    assert.matches(tostring(game_cfg.Platform.Goods.blindboxTen.beans), env:child("BtnBlindboxTen").Text)
     env:click("BtnBlindboxTen")
-    assert.same({ action = "Draw", count = 10, seq = 1 }, env.sent.blindbox[1])
+    assert.same({ action = "draw", count = 10, seq = 1 }, env.sent.blindbox[1])
   end)
 
   it("test_failures_have_readable_notices_and_unlock", function()
@@ -77,7 +77,7 @@ describe("盲盒与地图商店界面（#312 RootView 宿主）", function()
       ok = false, seq = 1, originalSeq = 1, requestId = "req-1",
       reason = "busy", deliveryPending = true,
     })
-    env:step(GameCfg.Blindbox.ResultTimeoutSec)
+    env:step(game_cfg.Blindbox.ResultTimeoutSec)
     assert.same({ action = "Query", count = 1, seq = 1, requestId = "req-1" }, env.sent.blindbox[2])
   end)
 

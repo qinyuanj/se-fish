@@ -343,7 +343,7 @@ function M.requires(source)
         if stop then value = text:sub(start, stop - 1):gsub('^\r?\n', '') end
       end
     end
-    local name = value and value:match('^[A-Za-z_][%w_.]*$')
+    local name = value and value:match('^[a-Za-z_][%w_.]*$')
     if name and not seen[name] and not in_hole(holes, first)
       and previous_token ~= '.' and previous_token ~= ':'
       and not before:match('[%w_]') and not after:match('[%w_]') then

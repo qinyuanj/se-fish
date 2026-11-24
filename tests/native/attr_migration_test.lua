@@ -118,7 +118,7 @@ describe('TestAttrMigration', function()
         local before = #logs
         mgr:Update()
         assert.same(before + 1, #logs)
-        assert.matches('[AttrLeaf] 属性重试失败 51', logs[#logs], nil, true)
+        assert.matches('[attr_leaf] 属性重试失败 51', logs[#logs], nil, true)
         assert.matches('vendor-owner-unavailable', logs[#logs], nil, true)
         mgr:Update()
         assert.same(before + 1, #logs)

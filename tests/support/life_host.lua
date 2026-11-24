@@ -1,6 +1,6 @@
-local PlayerData = require("server.data.player_data")
-local ServerRuntime = require("server.world_host.server_runtime")
-local SpokeClock = require("common.spoke_clock")
+local player_data = require("server.data.player_data")
+local server_runtime = require("server.world_host.server_runtime")
+local spoke_clock = require("common.spoke_clock")
 
 local M = {}
 
@@ -58,7 +58,7 @@ end
 function M.start(opts)
   opts = type(opts) == "table" and opts or {}
   local now = opts.now or 100
-  local clock = opts.clock or SpokeClock.new(now)
+  local clock = opts.clock or spoke_clock.new(now)
   local players = {}
   local data_of = {}
   local events = {}
@@ -79,7 +79,7 @@ function M.start(opts)
     GetRE = function(_, name) return event(name) end,
     CheckRECD = function() return false end,
   }
-  local runtime = ServerRuntime.new({
+  local runtime = server_runtime.new({
     clock = clock,
     initial_now = now,
     remote = remote,
@@ -114,7 +114,7 @@ function M.start(opts)
       function player:SetAttribute(key, value) self.attrs[key] = value end
       function player:GetAttribute(key) return self.attrs[key] end
     end
-    data = data or PlayerData.New(player)
+    data = data or player_data.New(player)
     if not data.Inited then data:Init() end
     data.LoadState = "ready"
     data.Player = player

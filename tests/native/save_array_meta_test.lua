@@ -4,14 +4,14 @@
 -- 把所有老档判成「库存结构损坏」→ 读写屏障永久关闭。
 -- 本单失败方式先列：合法存档因平台元数据被拒（本文件主测）；剥离时顺手放松校验放行真损坏档；
 -- 长度以 __count 为准而非实际条数；平台元数据被带回内存并写回库；无标记的旧档受影响。
--- seam：真实 PlayerData.Migrate/CompleteLoad 与 MgrSave 公共接口；只替换 Task/DataStore 引擎边界。
+-- seam：真实 player_data.Migrate/CompleteLoad 与 mgr_save 公共接口；只替换 Task/DataStore 引擎边界。
 -- it 按旧 LuaUnit 的方法名字典序注册，保持与旧套件一致的案例顺序。
 -- 断言映射：assertEquals 的 table 深比较由 assert.same 承接；assertFalse 是严格 false（rawequal / hasCountKey
 -- 都只返回布尔，语义不变）。
 -- 注意：capturePrint 必须改写真实全局 `_G.print`。Busted 对案例文件套逐文件沙箱，
 -- 裸赋值 `print = fn` 只改沙箱副本，被测模块（其 _ENV 是真实 _G）看不到，日志会全部漏捕获。
-local GameCfg = require('common.game_cfg')
-local PlayerData = require('server.data.player_data')
+local game_cfg = require('common.game_cfg')
+local player_data = require('server.data.player_data')
 
 local function copy(value)
     if type(value) ~= 'table' then return value end
@@ -75,17 +75,17 @@ end
 
 local function player(id) return { UserId = id, SetAttribute = function() end } end
 local function pending(id)
-    local data = PlayerData.New(player(id))
+    local data = player_data.New(player(id))
     data:Init(true)
     return data
 end
 local function fresh(id)
-    local data = PlayerData.New(player(id))
+    local data = player_data.New(player(id))
     data:Init()
     return data
 end
 -- 只调 Migrate 的用例不需要 Init；IsValidSave 也走同一条路径。
-local function migrator(id) return PlayerData.New(player(id)) end
+local function migrator(id) return player_data.New(player(id)) end
 
 describe('TestSaveArrayMeta', function()
     local env, savedGame
@@ -133,7 +133,7 @@ describe('TestSaveArrayMeta', function()
             snapshot.bp = { { i = 2, id = 'eelMeat', n = 1 }, __count = 7 }
             assert.is_true(data:CompleteLoad(snapshot))
             assert.same(1, data:ItemCount('eelMeat'))
-            assert.is_nil(data.Data.Containers[GameCfg.Items.ContainerId.ItemBar][1])
+            assert.is_nil(data.data.Containers[game_cfg.Items.ContainerId.ItemBar][1])
         end)
         local joined = table.concat(logs, '\n')
         -- 声称 7 条、实际 1 条：以实际条数为准，并留一行痕迹。
@@ -162,14 +162,14 @@ describe('TestSaveArrayMeta', function()
         -- 云端已有真机同形旧档：修复前这里必然走 Fail('库存结构损坏')，屏障永久关闭。
         env.values.u80 = copy(realSnapshot())
         local p = { UserId = 80, SetAttribute = function(_, key, value) env.attributes[key] = value end }
-        local data = PlayerData.New(p)
+        local data = player_data.New(p)
         data:Init(true)
         env.save:LoadInto(p, data)
         drain()
         assert.same('ready', env.attributes.SaveState)
         assert.same('ready', data.LoadState)
         assert.is_true(data.Inited)
-        assert.same(4966, data.Data.FishCoin)
+        assert.same(4966, data.data.FishCoin)
         assert.same(1, data:ItemCount('garMeat'))
         assert.same(1, data:ItemCount('eelMeat'))
         assert.is_false(hasCountKey(data:Serialize()))
@@ -185,7 +185,7 @@ describe('TestSaveArrayMeta', function()
     it('test_mgr_save_operation_reply_keeps_memory_clean', function()
         env.values.u81 = copy(realSnapshot())
         local p = { UserId = 81, SetAttribute = function() end }
-        local data = PlayerData.New(p)
+        local data = player_data.New(p)
         data:Init(true)
         env.save:LoadInto(p, data)
         drain()
@@ -198,7 +198,7 @@ describe('TestSaveArrayMeta', function()
         end, function(ok, value) result = { ok, value } end))
         drain()
         assert.is_true(result[1])
-        assert.same(4969, data.Data.FishCoin)
+        assert.same(4969, data.data.FishCoin)
         assert.is_nil(data.SaveMeta.operations.__count)
         assert.is_false(hasCountKey(data:Serialize()))
         assert.is_false(hasCountKey(env.values.u81))
@@ -246,17 +246,17 @@ describe('TestSaveArrayMeta', function()
         local data = pending(90)
         assert.is_true(data:CompleteLoad(realSnapshot()))
         assert.same('ready', data.LoadState)
-        assert.same(4966, data.Data.FishCoin)
-        assert.same(6, data.Data.UpgradeLevel)
-        assert.same('fishPond1', data.Data.Zone)
-        assert.same(3, data.Data.Bait.worm)
-        assert.same(0, data.Data.Bait.sausage)
-        local bar = data.Data.Containers[GameCfg.Items.ContainerId.ItemBar]
+        assert.same(4966, data.data.FishCoin)
+        assert.same(6, data.data.UpgradeLevel)
+        assert.same('fishPond1', data.data.Zone)
+        assert.same(3, data.data.Bait.worm)
+        assert.same(0, data.data.Bait.sausage)
+        local bar = data.data.Containers[game_cfg.Items.ContainerId.ItemBar]
         assert.same('garMeat', bar[2].itemId)
         assert.same(1.23, bar[2].mult)
         assert.same('shrimpRod', bar[3].itemId)
         assert.is_nil(bar[1])
-        local bp = data.Data.Containers[GameCfg.Items.ContainerId.Backpack]
+        local bp = data.data.Containers[game_cfg.Items.ContainerId.Backpack]
         assert.same('eelMeat', bp[2].itemId)
         assert.same(1.87, bp[2].mult)
         assert.same('tilapia', bp[3].itemId)
@@ -269,7 +269,7 @@ describe('TestSaveArrayMeta', function()
         -- Migrate 会对副本原地改写（LegacyIdMap 改名、bait 合并），剥离必须走深拷贝、不与入参共享子表。
         local shared = { a = 1 }
         local input = { bar = { { i = 1, id = 'shrimpRod' }, __count = 1 }, p = shared, q = shared, keep = 7 }
-        local out = PlayerData.StripArrayMeta(input, 'save')
+        local out = player_data.StripArrayMeta(input, 'save')
         assert.is_nil(out.bar.__count)
         assert.same('shrimpRod', out.bar[1].id)
         assert.same(7, out.keep)

@@ -1,10 +1,10 @@
-local GameCfg = require("common.game_cfg")
-local RateLimit = require("common.rate_limit")
-local ReelDisplay = require("common.reel_display")
+local game_cfg = require("common.game_cfg")
+local rate_limit = require("common.rate_limit")
+local reel_display = require("common.reel_display")
 local spoke = require("common.packages.spoke.api")
 
 local State = spoke.State
-local ReelOverlayView = {}
+local reel_overlay_view = {}
 local BLOCK_IMAGE = "official://image/11017"
 
 local function now_of(ctx)
@@ -28,7 +28,7 @@ local function send_reel(ctx, payload)
     if re and type(re.FireServer) == "function" then re:FireServer(payload) end
   end)
   if not ok then
-    print("[ReelOverlayView] 发送 ReelInRE 失败", tostring(err))
+    print("[reel_overlay_view] 发送 ReelInRE 失败", tostring(err))
   end
 end
 
@@ -43,7 +43,7 @@ local function send_close(ctx, payload)
     if re and type(re.FireServer) == "function" then re:FireServer(payload) end
   end)
   if not ok then
-    print("[ReelOverlayView] 发送 CloseReelIn 失败", tostring(err))
+    print("[reel_overlay_view] 发送 CloseReelIn 失败", tostring(err))
   end
 end
 
@@ -63,7 +63,7 @@ local function valid_session(id)
   return type(id) == "string" and id ~= ""
 end
 
-function ReelOverlayView.spec(options)
+function reel_overlay_view.spec(options)
   options = type(options) == "table" and options or {}
   local closed = State.new("ReelOverlay.closedSession", nil)
   return {
@@ -79,11 +79,11 @@ function ReelOverlayView.spec(options)
     mount = function(scope, ctx)
       local cast = ctx.store.cast:now() or {}
       local session = valid_session(cast.reelSession) and cast.reelSession or nil
-      local aggregator = session and RateLimit.NewAggregator({
-        SessionId = session, AggregateSec = GameCfg.HighFreqInput.AggregateSec,
+      local aggregator = session and rate_limit.NewAggregator({
+        SessionId = session, AggregateSec = game_cfg.HighFreqInput.AggregateSec,
       }) or nil
-      local display = session and ReelDisplay.New(now_of(ctx), GameCfg.ReelIn) or nil
-      local current_progress = GameCfg.ReelIn.Initial
+      local display = session and reel_display.New(now_of(ctx), game_cfg.ReelIn) or nil
+      local current_progress = game_cfg.ReelIn.Initial
       local last_payload = nil
       local controller = options.controller or (ctx.services and ctx.services.reel) or {}
 
@@ -94,11 +94,11 @@ function ReelOverlayView.spec(options)
         Image = BLOCK_IMAGE, Color = Color.New(20, 30, 40, 220), Visible = true,
       })
       local bar = make(scope, ctx, "EUIImage", bar_bg, "ReelBar", 0, 0, 600, 34, {
-        Image = "official://image/30007", Direction = 0, Percent = GameCfg.ReelIn.Initial,
+        Image = "official://image/30007", Direction = 0, Percent = game_cfg.ReelIn.Initial,
         Color = Color.New(36, 200, 94, 255), Visible = true,
       })
       local hint = make(scope, ctx, "EUITextLabel", mask, "HookHint", 660, 740, 600, 60, {
-        Text = GameCfg.HookAlert.Text, FontSize = 32, TextColor = Color.New(255, 220, 40, 255), Visible = true,
+        Text = game_cfg.HookAlert.Text, FontSize = 32, TextColor = Color.New(255, 220, 40, 255), Visible = true,
       })
       local close = make(scope, ctx, "EUIButton", mask, "BtnReelClose", 840, 900, 240, 70, {
         ButtonText = "", NormalImage = BLOCK_IMAGE, PressImage = BLOCK_IMAGE,
@@ -117,7 +117,7 @@ function ReelOverlayView.spec(options)
           bar.Percent = value
         end
         local text = current.phase == "landed" and "鱼已上岸"
-          or (last_payload and last_payload.action == "started" and GameCfg.HookAlert.Text)
+          or (last_payload and last_payload.action == "started" and game_cfg.HookAlert.Text)
           or ("收线 " .. tostring(math.floor(value + 0.5)) .. "%")
         if text ~= last_hint_text then
           last_hint_text = text
@@ -136,9 +136,9 @@ function ReelOverlayView.spec(options)
         if not valid_session(id) or closed:now() == id then return false end
         if session == id then return true end
         session = id
-        aggregator = RateLimit.NewAggregator({ SessionId = id, AggregateSec = GameCfg.HighFreqInput.AggregateSec })
-        display = ReelDisplay.New(now_of(ctx), GameCfg.ReelIn)
-        set_progress(GameCfg.ReelIn.Initial)
+        aggregator = rate_limit.NewAggregator({ SessionId = id, AggregateSec = game_cfg.HighFreqInput.AggregateSec })
+        display = reel_display.New(now_of(ctx), game_cfg.ReelIn)
+        set_progress(game_cfg.ReelIn.Initial)
         return true
       end
 
@@ -179,7 +179,7 @@ function ReelOverlayView.spec(options)
         return session ~= nil and (id == nil or id == session)
       end
       local progress_fn = function()
-        return display and display:Value(now_of(ctx)) or GameCfg.ReelIn.Initial
+        return display and display:Value(now_of(ctx)) or game_cfg.ReelIn.Initial
       end
       controller.click = click_fn
       controller.close = close_fn
@@ -238,4 +238,4 @@ function ReelOverlayView.spec(options)
   }
 end
 
-return ReelOverlayView
+return reel_overlay_view

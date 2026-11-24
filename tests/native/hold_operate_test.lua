@@ -2,9 +2,9 @@
 -- 失败方式先列：满格互换吞物/复制、取消拖拽仍移动、跨容器倍率丢失；
 -- 首领饵从背包使用、普通饵/武器占格；选中即消费、重复操作重复扣物；
 -- 非法身份/状态绕过持久屏障、落地失败扣物、重进手持悬空。
--- 接缝：PlayerData 公共库存/选择接口。
-local GameCfg = require('common.game_cfg')
-local PlayerData = require('server.data.player_data')
+-- 接缝：player_data 公共库存/选择接口。
+local game_cfg = require('common.game_cfg')
+local player_data = require('server.data.player_data')
 
 describe("持有与操作的数据层规则", function()
     local ctx
@@ -12,15 +12,15 @@ describe("持有与操作的数据层规则", function()
     -- 与旧 LuaUnit 的每例 setUp/tearDown 同级成对：库存实例逐例新建，配置逐例恢复。
     before_each(function()
         ctx = {}
-        ctx.debug = GameCfg.Debug
-        GameCfg.Debug = { Enabled = false }
-        ctx.data = PlayerData.New({ UserId = 124, SetAttribute = function() end })
+        ctx.debug = game_cfg.Debug
+        game_cfg.Debug = { Enabled = false }
+        ctx.data = player_data.New({ UserId = 124, SetAttribute = function() end })
         ctx.data:Init()
     end)
 
     -- 配置逐例恢复；setUp 中途失败也照样清理。
     after_each(function()
-        GameCfg.Debug = ctx.debug
+        game_cfg.Debug = ctx.debug
     end)
 
     -- 各容量档位：满格互换不吞物不复制，越界/缺目标拒绝，跨容器倍率随实例走。
@@ -70,24 +70,24 @@ describe("持有与操作的数据层规则", function()
         assert.is_true(ok)
         assert.same('duck', bait)
         assert.same(0, ctx.data:ItemCount('duck'))
-        assert.is_nil(ctx.data.Data.SelectedBait)
+        assert.is_nil(ctx.data.data.SelectedBait)
     end)
 
     -- 重进恢复合法：手持持久化往返，槽位/武器失效时清空而不是悬空。
     it("test_held_persists_across_serialize_and_invalidates", function()
-        local rod = GameCfg.Items.Id.StarterRod
+        local rod = game_cfg.Items.Id.StarterRod
         assert.is_true(ctx.data:AddItem(rod, 1.37))
         assert.is_true(ctx.data:AddItem('carp', 1.99))
         assert.is_true(ctx.data:HoldSlot(1))
         local snapshot = ctx.data:Serialize()
-        local other = PlayerData.New({ UserId = 124, SetAttribute = function() end })
+        local other = player_data.New({ UserId = 124, SetAttribute = function() end })
         other:Init()
         assert.is_true(other:ApplySave(snapshot))
         assert.same({ kind = 'slot', id = rod, slot = 1 }, other:GetItemBarSnapshot().held)
         -- 槽位物品与手持不符：重进后清空
         local broken = ctx.data:Serialize()
         broken.bar = { { i = 1, id = 'carp', n = 1, m = 1.99 }, { i = 2, id = rod, n = 1, m = 1.37 } }
-        local third = PlayerData.New({ UserId = 124, SetAttribute = function() end })
+        local third = player_data.New({ UserId = 124, SetAttribute = function() end })
         third:Init()
         assert.is_true(third:ApplySave(broken))
         assert.is_nil(third:GetItemBarSnapshot().held.kind)
@@ -95,7 +95,7 @@ describe("持有与操作的数据层规则", function()
 
     -- 切手持与实际使用分两次：首次仅切手持，手持匹配才算再次；重复点击合法。
     it("test_held_toggle_first_hold_then_use", function()
-        local rod = GameCfg.Items.Id.StarterRod
+        local rod = game_cfg.Items.Id.StarterRod
         assert.is_true(ctx.data:AddItem(rod, 1.37))
         assert.is_true(ctx.data:AddItem('carp', 1.99))
         -- 首次：切手持，选中与使用不提前发生
@@ -139,7 +139,7 @@ describe("持有与操作的数据层规则", function()
 
     -- #130：武器不占格，满格也可授予；移动目标不能是武器容器。
     it("test_weapon_inventory_and_boss_bait_location_rules", function()
-        local ids = GameCfg.Items.ContainerId
+        local ids = game_cfg.Items.ContainerId
         while ctx.data:AddItem('carp', 1.37) do end
         local before = ctx.data:GetItemBarSnapshot()
         -- #130：武器不占格，满格也可购买/授予（与 GrantWeapon 行为一致）

@@ -1,8 +1,8 @@
-local EconomyWorld = require('tests.support.economy_world')
+local economy_world = require('tests.support.economy_world')
 -- 条款 18（docs/acceptance/18-save-and-recovery.md）：会话 fencing、版本校验、重连落点与虚弱恢复、
 -- 个人/共享状态隔离、旧档升级，以及摆渡结算的可重试操作身份。
 -- 四类证据：正常（交票落账）、失败（写档失败不扣票）、退出重进（旧会话回调失效 + 落点/虚弱恢复）、
--- 重放（同一 operation 只结算一次）。B 级时序证据另见 tests/native/ferry_test.lua 与 save_test.lua。
+-- 重放（同一 operation 只结算一次）。b 级时序证据另见 tests/native/ferry_test.lua 与 save_test.lua。
 -- 失败方式（先列后写）：
 --   1. 旧会话的迟到快照还能写进存档，或外部改过 revision 后当前会话照样盖过去；
 --   2. 写档失败仍先扣船票 / 开航班 / 回成功包，或同一 operation 重放再扣一次；
@@ -50,7 +50,7 @@ describe('条款 18 存档会话与结算身份', function()
   end
 
   local function seedSnapshot(uid)
-    local seed = env.PlayerData.New(newPlayer(uid, vec(0, 0, 0)))
+    local seed = env.player_data.New(newPlayer(uid, vec(0, 0, 0)))
     seed:Init()
     return seed:Serialize()
   end
@@ -85,7 +85,7 @@ describe('条款 18 存档会话与结算身份', function()
     env.cfg.Save.QaSlot = ''
     env.values, env.queue, env.sent, env.events = {}, {}, {}, {}
     env.now, env.writeFailure = 100, false
-    env.savedGame, env.savedVector, env.savedRE = rawget(_G, 'game'), rawget(_G, 'Vector3'), rawget(_G, 'REUtil')
+    env.savedGame, env.savedVector, env.savedRE = rawget(_G, 'game'), rawget(_G, 'Vector3'), rawget(_G, 're_util')
     _G.Vector3 = { New = vec }
     _G.game = { GetService = function(_, name)
       if name == 'Task' then
@@ -125,12 +125,12 @@ describe('条款 18 存档会话与结算身份', function()
       CheckRECD = function() return false end,
     }
     package.loaded['common.re_util'] = reStub
-    _G.REUtil = reStub
+    _G.re_util = reStub
     package.loaded['server.data.player_data'] = nil
-    env.PlayerData = require('server.data.player_data')
+    env.player_data = require('server.data.player_data')
     env.save = assert(loadfile('server/save_host.lua'))()
     env.players = assert(loadfile('server/player_data_host.lua'))()
-    env.players.Save, env.save.PlayerData = env.save, env.players
+    env.players.Save, env.save.player_data = env.save, env.players
     env.ferry = { OnlinePlayers = function() return {} end }
     env.anchors = {}
     for _, zone in ipairs(env.cfg.Zones) do
@@ -151,8 +151,8 @@ describe('条款 18 存档会话与结算身份', function()
       FindAnchor = function(_, name) return env.anchors[name] end,
     }
     env.route = env.cfg.Ferry.Routes[1]
-    local ServerRuntime = require('server.world_host.server_runtime')
-    env.runtime = ServerRuntime.new({
+    local server_runtime = require('server.world_host.server_runtime')
+    env.runtime = server_runtime.new({
       initial_now = env.now, zones = env.cfg.Zones, remote = reStub,
       player_data = env.players, save = env.save, interact = env.interact,
       players_service = { GetPlayers = function() return env.ferry.OnlinePlayers() end },
@@ -184,7 +184,7 @@ describe('条款 18 存档会话与结算身份', function()
       for name, value in pairs(env.savedWorldModules or {}) do package.loaded[name] = value end
       _G.game = env.savedGame
       _G.Vector3 = env.savedVector
-      _G.REUtil = env.savedRE
+      _G.re_util = env.savedRE
       env = nil
     end
   end)
@@ -298,7 +298,7 @@ describe('条款 18 存档会话与结算身份', function()
 
   -- 18-24（review #249-4）：发奖走同一条持久操作协议，同一身份重试只补回执、不再发一次。
   it('发奖重放只回执、只发一次', function()
-    local shop = EconomyWorld.new()
+    local shop = economy_world.new()
     local uid = shop.player.UserId
     local itemId = env.cfg.Platform.Goods.adrenaline1.itemId
     local function snapshot() return shop.values[env.cfg.Save.KeyPrefix .. tostring(uid)] end
@@ -397,16 +397,16 @@ describe('条款 18 存档会话与结算身份', function()
     snapshot.bp = { { i = 1, id = 'shrimpTicket', n = 1 }, { i = 2, id = 'shrimpTicket', n = 1 } }
     snapshot.bait = { worm = 2, sausage = 1 }
     local _, data = ready(uid, vec(99999, 5, 99999), snapshot)
-    assert.same(321, data.Data.FishCoin, 'v1 旧档财产必须保留')
+    assert.same(321, data.data.FishCoin, 'v1 旧档财产必须保留')
     assert.same(1, data:ItemCount('starterRod'))
     assert.same(2, data:ItemCount('shrimpTicket'))
-    assert.same(2, data.Data.Bait.worm, 'v1 鱼饵计数必须保留')
-    assert.same(1, data.Data.Bait.sausage)
+    assert.same(2, data.data.Bait.worm, 'v1 鱼饵计数必须保留')
+    assert.same(1, data.data.Bait.sausage)
     local roundtrip = data:Serialize()
     assert.same(1.5, roundtrip.bar[1].m, 'v1 实例倍率必须保留')
     assert.same(1.2, roundtrip.bar[1].k, 'v1 烤制状态必须保留')
-    assert.same(env.cfg.Vitals.MaxHealth, data.Extra.survival.health, '新增血量字段按默认值填充')
-    assert.same(env.cfg.Vitals.MaxHunger, data.Extra.survival.hunger, '新增饥饿字段按默认值填充')
+    assert.same(env.cfg.vitals.MaxHealth, data.Extra.survival.health, '新增血量字段按默认值填充')
+    assert.same(env.cfg.vitals.MaxHunger, data.Extra.survival.hunger, '新增饥饿字段按默认值填充')
     assert.same(0, data.Extra.survival.weakRemaining, '新增虚弱字段按默认值填充')
     assert.is_table(data.Extra.travel.safePoint)
     assert.is_table(data.Extra.recovery)

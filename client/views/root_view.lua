@@ -9,7 +9,7 @@ local spoke_eggy = require("common.packages.spoke_eggy.api")
 local Effect = spoke.Effect
 local State = spoke.State
 
-local RootView = {}
+local root_view = {}
 
 local function sorted_keys(map)
   local keys = {}
@@ -67,15 +67,15 @@ local function disconnect_safely(conn)
 end
 
 ---@param root_node table 宿主根 UI 节点（须带 Destroying 信号）
----@param store table 只读 ClientStore
+---@param store table 只读 client_store
 ---@param options table|nil { name?, logger?, services?, create_node?, hud?, modals?, overlays?, docks? }
 ---@return table view_handle
-function RootView.mount(root_node, store, options)
+function root_view.mount(root_node, store, options)
   if root_node == nil then
-    error("RootView.mount 需要非空 root_node", 2)
+    error("root_view.mount 需要非空 root_node", 2)
   end
   if type(store) ~= "table" then
-    error("RootView.mount 需要只读 ClientStore", 2)
+    error("root_view.mount 需要只读 client_store", 2)
   end
 
   options = options or {}
@@ -139,7 +139,7 @@ function RootView.mount(root_node, store, options)
       end
       local node = node_factory(kind, final_props)
       if node == nil then
-        error("RootView 动态创建 UI 节点失败: " .. tostring(kind), 2)
+        error("root_view 动态创建 UI 节点失败: " .. tostring(kind), 2)
       end
       return ctx.own_node(scope, node)
     end
@@ -174,7 +174,7 @@ function RootView.mount(root_node, store, options)
           local is_open = bs:memo("ModalOpen:" .. modal_id, function(ms)
             return ms:d(store.active_modal) == modal_id
           end)
-          bs:phase("Modal:" .. modal_id, is_open, function(ps)
+          bs:phase("modal:" .. modal_id, is_open, function(ps)
             mount_fn(ps, ctx)
           end)
         end
@@ -282,4 +282,4 @@ function RootView.mount(root_node, store, options)
   return handle
 end
 
-return RootView
+return root_view

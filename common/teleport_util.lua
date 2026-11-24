@@ -1,8 +1,8 @@
-local Util = {}
-function Util:Teleport()
+local util = {}
+function util:Teleport()
 end
 
-function Util:SimpleTeleport(player, pos)
+function util:SimpleTeleport(player, pos)
     if not player or not player.Character then
         print("[TeleportUtil] SimpleTeleport() no player character")
         return
@@ -12,6 +12,6 @@ function Util:SimpleTeleport(player, pos)
     player.Character.Position =  pos
 end
 
-_G.TeleportUtil = Util
+_G.TeleportUtil = util
 
-return Util
+return util

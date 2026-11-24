@@ -2,7 +2,7 @@
 -- （物品表!R8 / 钓鱼表!R14），不能静默放行，也不能只报「有错」而不给定位。
 -- 全量配置零错误与各表计数由 lua tools/validate_content.lua 接手（它就是同一 Check 的入口）。
 -- 迁移自 tests/gameplay/content_validation_test.lua（#83）；案例顺序沿用旧入口的方法名字典序。
-local Validate = require('common.content_validation')
+local validate = require('common.content_validation')
 local cfg = require('common.game_cfg')
 
 describe("TestContentValidation", function()
@@ -10,7 +10,7 @@ describe("TestContentValidation", function()
     local original = cfg.Content.Exchanges and cfg.Content.Exchanges[1] and cfg.Content.Exchanges[1].BossBait
     if not original then return end
     cfg.Content.Exchanges[1].BossBait = 'missing-bait'
-    local result = Validate.Check(cfg)
+    local result = validate.Check(cfg)
     cfg.Content.Exchanges[1].BossBait = original
     assert.matches('missing-bait', table.concat(result.errors, '\n'), nil, true)
   end)
@@ -19,7 +19,7 @@ describe("TestContentValidation", function()
     local fish = cfg.Fish.eel
     local original = fish.Drops[1].ItemId
     fish.Drops[1].ItemId = 'missing-item'
-    local result = Validate.Check(cfg)
+    local result = validate.Check(cfg)
     fish.Drops[1].ItemId = original
     assert.matches('钓鱼表!R14', table.concat(result.errors, '\n'), nil, true)
     assert.matches('missing-item', table.concat(result.errors, '\n'), nil, true)
@@ -27,7 +27,7 @@ describe("TestContentValidation", function()
 end)
 
 -- #251 实现标记纯台账的静态门禁自检（与内容校验同源，不新增遗留测试文件）
-local Ledger = require('common.cfg.content_ledger')
+local ledger = require('common.cfg.content_ledger')
 
 local GROUPS = { Fish = cfg.Fish, Items = cfg.Items.Definitions, Shop = cfg.Content.Shop.Goods,
     Lottery = cfg.Content.Lottery.Patterns, Blindbox = cfg.Content.Blindbox.Entries }
@@ -42,7 +42,7 @@ end
 describe('内容标记纯台账', function()
   it('内容表不再自带实现标记，台账逐行覆盖五张表', function()
     for name, rows in pairs(GROUPS) do
-      local ledger = assert(Ledger[name], '台账缺少 ' .. name)
+      local ledger = assert(ledger[name], '台账缺少 ' .. name)
       local seen = {}
       for key, row in pairs(rows) do
         assert.is_nil(row.implemented, name .. ' 的内容表仍有 implemented 字段：' .. tostring(key))
@@ -59,11 +59,11 @@ describe('内容标记纯台账', function()
   end)
 
   it('标记未实现但已有实现路径判红', function()
-    local entry = Ledger.Blindbox[1]
+    local entry = ledger.Blindbox[1]
     local oldImplemented, oldPath = entry.implemented, entry.path
     entry.implemented, entry.path = false, 'server/world_host/player_blindbox.lua'
     local ok, err = frozen(function()
-      local result = Validate.Check(cfg)
+      local result = validate.Check(cfg)
       assert.matches('标记为未实现但已有实现路径', table.concat(result.errors, '\n'), nil, true)
       assert.matches(entry.source, table.concat(result.errors, '\n'), nil, true)
     end)()
@@ -72,11 +72,11 @@ describe('内容标记纯台账', function()
   end)
 
   it('标记已实现但没有代码落点判红', function()
-    local entry = Ledger.Fish.tilapia
+    local entry = ledger.Fish.tilapia
     local oldImplemented, oldPath = entry.implemented, entry.path
     entry.implemented, entry.path = true, nil
     local ok, err = frozen(function()
-      local result = Validate.Check(cfg)
+      local result = validate.Check(cfg)
       assert.matches('标记为已实现但没有代码落点', table.concat(result.errors, '\n'), nil, true)
       assert.matches(entry.source, table.concat(result.errors, '\n'), nil, true)
     end)()
@@ -85,7 +85,7 @@ describe('内容标记纯台账', function()
   end)
 
   it('全部已实现标记的代码落点都是真实业务文件', function()
-    for name, ledger in pairs(Ledger) do
+    for name, ledger in pairs(ledger) do
       for id, entry in pairs(ledger) do
         if entry.implemented then
           local prefix = tostring(entry.path):sub(1, 7)
@@ -108,11 +108,11 @@ describe('内容标记纯台账', function()
       if fish.ZoneId == 'volcanoIsland' then found = fish break end
     end
     assert.is_truthy(found, '火山岛鱼不存在')
-    assert.are.equal('7000546', found.Model)
-    assert.is_true(Ledger.Fish[found.Id].implemented, found.Id)
+    assert.are.equal('7000546', found.model)
+    assert.is_true(ledger.Fish[found.Id].implemented, found.Id)
     for _, row in ipairs(cfg.Content.Blindbox.Entries) do
-      assert.is_true(Ledger.Blindbox[row.number].implemented, row.source)
-      assert.are.equal('server/world_host/player_blindbox.lua', Ledger.Blindbox[row.number].path)
+      assert.is_true(ledger.Blindbox[row.number].implemented, row.source)
+      assert.are.equal('server/world_host/player_blindbox.lua', ledger.Blindbox[row.number].path)
     end
   end)
 end)

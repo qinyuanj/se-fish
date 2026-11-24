@@ -1,8 +1,8 @@
-local GameCfg = require("common.game_cfg")
-local Eligibility = require("common.lottery_eligibility")
-local Modal = require("client.views.economy_modal")
+local game_cfg = require("common.game_cfg")
+local eligibility = require("common.lottery_eligibility")
+local modal = require("client.views.economy_modal")
 
-local LotteryView = {}
+local lottery_view = {}
 local FAIL_TEXT = {
   ["not-premium"] = "只能投入极品鱼获或信物",
   ["cooked"] = "烤过的物品不能抽奖",
@@ -13,20 +13,20 @@ local FAIL_TEXT = {
 }
 
 local function pattern_name(number)
-  local pattern = GameCfg.Lottery.Patterns[number]
+  local pattern = game_cfg.Lottery.Patterns[number]
   return pattern and pattern.name or "?"
 end
 
-function LotteryView.modal_spec()
+function lottery_view.modal_spec()
   return function(scope, ctx)
     local services = ctx.services or {}
-    local panel = Modal.panel(scope, ctx, "ScreenLottery", "抽奖机")
-    local bet = Modal.label(scope, ctx, panel, "LabelLotteryBet", "")
-    local result_label = Modal.label(scope, ctx, panel, "LabelLotteryResult", "")
+    local panel = modal.panel(scope, ctx, "ScreenLottery", "抽奖机")
+    local bet = modal.label(scope, ctx, panel, "LabelLotteryBet", "")
+    local result_label = modal.label(scope, ctx, panel, "LabelLotteryResult", "")
     local reels = {
-      left = Modal.label(scope, ctx, panel, "LabelReelLeft", "?"),
-      right = Modal.label(scope, ctx, panel, "LabelReelRight", "?"),
-      middle = Modal.label(scope, ctx, panel, "LabelReelMiddle", "?"),
+      left = modal.label(scope, ctx, panel, "LabelReelLeft", "?"),
+      right = modal.label(scope, ctx, panel, "LabelReelRight", "?"),
+      middle = modal.label(scope, ctx, panel, "LabelReelMiddle", "?"),
     }
     local seq, request_seq = 0, nil
     local draw
@@ -57,32 +57,32 @@ function LotteryView.modal_spec()
       local slot = snapshot and snapshot.selectedSlot
       local entry = slot and snapshot.slots and snapshot.slots[slot] or nil
       selected_slot = entry and slot or nil
-      local enabled = entry ~= nil and Eligibility.Check(entry) == true and not awaiting and not spinning
+      local enabled = entry ~= nil and eligibility.Check(entry) == true and not awaiting and not spinning
       draw.Disabled = not enabled
       draw.TouchEnabled = enabled
       if not entry then
         bet.Text = "请先在道具栏选中一件极品食物"
-      elseif Eligibility.Check(entry) then
-        local definition = GameCfg.Items.Definitions[entry.itemId]
-        local value = GameCfg.Items.SalePrice(entry.itemId, entry.mult) or 0
+      elseif eligibility.Check(entry) then
+        local definition = game_cfg.Items.Definitions[entry.itemId]
+        local value = game_cfg.Items.SalePrice(entry.itemId, entry.mult) or 0
         bet.Text = string.format("投注：%s（价值 %d 金币）", definition and definition.Name or entry.itemId, value)
       else
-        local _, reason = Eligibility.Check(entry)
+        local _, reason = eligibility.Check(entry)
         bet.Text = FAIL_TEXT[reason] or "这件物品不能抽奖"
       end
     end
 
-    draw = Modal.button(scope, ctx, panel, "BtnLotteryDraw", "抽奖", function()
+    draw = modal.button(scope, ctx, panel, "BtnLotteryDraw", "抽奖", function()
       if awaiting or spinning or not selected_slot then return end
       seq = seq + 1
       request_seq = seq
       awaiting, awaiting_elapsed = true, 0
       refresh_bet()
       if type(services.send_lottery) == "function" then
-        services.send_lottery({ action = "Draw", slot = selected_slot, seq = seq })
+        services.send_lottery({ action = "draw", slot = selected_slot, seq = seq })
       end
     end)
-    Modal.close(scope, ctx, panel, "BtnLotteryClose", "lottery")
+    modal.close(scope, ctx, panel, "BtnLotteryClose", "lottery")
 
     scope:effect("LotteryBetProjection", function(es)
       bet_snapshot = es:d(ctx.store.item_bar)
@@ -119,7 +119,7 @@ function LotteryView.modal_spec()
       if type(dt) ~= "number" or dt < 0 then return end
       if awaiting then
         awaiting_elapsed = awaiting_elapsed + dt
-        if awaiting_elapsed >= GameCfg.Lottery.ResultTimeoutSec then
+        if awaiting_elapsed >= game_cfg.Lottery.ResultTimeoutSec then
           awaiting, awaiting_elapsed = false, 0
           notify("抽奖回包超时，请再试一次")
           refresh_bet()
@@ -128,7 +128,7 @@ function LotteryView.modal_spec()
       local current = spinning
       if not current then return end
       current.t = current.t + dt
-      local cfg = GameCfg.Lottery
+      local cfg = game_cfg.Lottery
       local order = cfg.AxisOrder or { "left", "right", "middle" }
       local all_stopped = true
       for stop_index = 1, 3 do
@@ -152,4 +152,4 @@ function LotteryView.modal_spec()
   end
 end
 
-return LotteryView
+return lottery_view
