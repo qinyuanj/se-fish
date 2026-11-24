@@ -29,13 +29,32 @@ local PACKAGE_SNAPSHOTS = {
   },
 }
 
--- 三类存量债务水位线（只减不增；每个垂直切片完成后单调下调对应数值直至归零）。
+-- 三类存量债务水位线（只减不增；#316 完成后已全部归零，后续禁止回潮）。
 local DEBT_WATERMARKS = {
-  -- 合并 #314/#315 后实测：OwnedUnits 5、旧债务裸 Connect 19、MgrMap 5。
-  -- 水位只减不增；后续切片应继续下降，不能为通过门禁调高。
+  -- #316 清零后实测：OwnedUnits 0、旧债务裸 Connect 0、MgrMap 0。
+  -- 水位只减不增；后续不得为通过门禁调高。
   owned_units_calls = 0,
   legacy_raw_connects = 0,
   mgr_map_members = 0,
+}
+
+-- #309 已清退的活鱼、载体、AI 管理器与客户端战斗标签（不可恢复或被业务源码引用）。
+local REMOVED_FISH_LEGACY_FILES = {
+  "server/Mgr/MgrFishUnit.lua",
+  "server/Mgr/MgrFishCarrier.lua",
+  "server/Mgr/MgrAi.lua",
+  "server/Mgr/MgrAiTarget.lua",
+  "client/FishCombatLabel.lua",
+  "client/LocalGarBite.lua",
+}
+
+local FORBIDDEN_FISH_LEGACY_MODULES = {
+  "server.Mgr.MgrFishUnit",
+  "server.Mgr.MgrFishCarrier",
+  "server.Mgr.MgrAi",
+  "server.Mgr.MgrAiTarget",
+  "client.FishCombatLabel",
+  "client.LocalGarBite",
 }
 
 local BUSINESS_ROOTS = { "client", "common", "server" }
@@ -471,6 +490,24 @@ describe("Spoke 原生重构机械棘轮守卫", function()
         fail("MgrMap 成员数 %d 超过水位线 %d（只减不增）：\n%s",
           #entries, DEBT_WATERMARKS.mgr_map_members, table.concat(entries, "\n"))
       end
+    end)
+  end)
+
+  describe("活鱼旧模块棘轮（#309）", function()
+    it("旧活鱼、载体、AI 管理器与客户端战斗标签已不可加载且业务源码零引用", function()
+      for _, path in ipairs(REMOVED_FISH_LEGACY_FILES) do
+        assert.is_false(fs.exists(path), path .. " 仍在")
+      end
+      local hits = {}
+      for _, path in ipairs(business_lua_files()) do
+        local text = fs.slurp(path) or ""
+        for _, name in ipairs(FORBIDDEN_FISH_LEGACY_MODULES) do
+          if text:find(name, 1, true) then
+            hits[#hits + 1] = path .. " -> " .. name
+          end
+        end
+      end
+      assert.equals(0, #hits, table.concat(hits, "\n"))
     end)
   end)
 end)

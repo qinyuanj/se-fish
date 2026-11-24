@@ -12,6 +12,7 @@
 
 
 local fs = require("tests.support.fs_fixture")
+local Arch = require("tools.arch_policy")
 
 local LOCAL_BEHAVIOR_DIR = "server/AbilityBehaviors"
 local PACKAGE_ANCHOR_DIR = "server/packages/ability_system/anchors"
@@ -147,16 +148,59 @@ describe("字面量 require 的包内模块", function()
   end)
 end)
 -- L1 宿主在唯一组合根显式注入；ServerRuntime 不再依赖旧管理器表。
+local function discover_server_hosts()
+  local hosts = {}
+  for _, file in ipairs(fs.list_dir("server")) do
+    local name = file:match("^(.+Host)%.lua$")
+    if not name and file == "FishAbility.lua" then
+      name = "FishAbility"
+    end
+    if name then
+      hosts[#hosts + 1] = name
+    end
+  end
+  table.sort(hosts)
+  assert.is_true(#hosts > 0, "server/ 下未扫描到任何 Spoke 宿主模块")
+  return hosts
+end
+
+local function find_required_local(src, code, mod_pattern)
+  local from = 1
+  while true do
+    local first, last, var_name = code:find("local%s+([%w_]+)%s*=%s*require%s*%(", from)
+    if not first then return nil end
+    if src:sub(first):match("^local%s+[%w_]+%s*=%s*require%s*%(%s*['\"]" .. mod_pattern .. "['\"]%s*%)") then
+      return var_name
+    end
+    from = last + 1
+  end
+end
+
 describe("宿主组合", function()
   it("test_spoke_hosts_are_explicitly_composed_without_mgr_map", function()
     local src = assert(fs.slurp("server/main.lua"), "读不到 server/main.lua")
-    for _, name in ipairs({ "PlayerDataHost", "SaveHost", "PlatformHost", "FishAbility" }) do
-      assert.is_truthy(src:find('require("server.' .. name .. '")', 1, true), name .. " 未在组合根加载")
+    local main_code = Arch.code_only(src)
+    assert.is_nil(main_code:find("MgrMap", 1, true), "server/main.lua 不得恢复 MgrMap")
+
+    local runtime_args = assert(main_code:match("ServerRuntime%.new%s*(%b())"),
+      "server/main.lua 找不到 ServerRuntime.new(...) 组合根调用")
+
+    local problems = {}
+    for _, name in ipairs(discover_server_hosts()) do
+      local host_path = "server/" .. name .. ".lua"
+      local host_code = Arch.code_only(assert(fs.slurp(host_path), "读不到宿主模块 " .. host_path))
+      if not host_code:find("SpokeHost%s*=%s*true%f[^%w_]") then
+        problems[#problems + 1] = host_path .. " 缺少 SpokeHost = true 标记"
+      end
+
+      local var_name = find_required_local(src, main_code, "server%." .. name)
+      if not var_name then
+        problems[#problems + 1] = name .. " 未在 server/main.lua 组合根加载"
+      elseif not runtime_args:find("[%w_]+%s*=%s*" .. var_name .. "%f[^%w_]") then
+        problems[#problems + 1] = name .. "（变量 " .. var_name .. "）未注入 ServerRuntime.new(...)"
+      end
     end
-    assert.is_nil(src:find("MgrMap", 1, true), "server/main.lua 不得恢复 MgrMap")
-    assert.is_truthy(src:find("player_data = PlayerDataHost", 1, true))
-    assert.is_truthy(src:find("save = SaveHost", 1, true))
-    assert.is_truthy(src:find("platform = PlatformHost", 1, true))
-    assert.is_truthy(src:find("fish_ability = FishAbility", 1, true))
+    table.sort(problems)
+    assert.same({}, problems)
   end)
 end)

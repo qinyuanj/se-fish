@@ -1,4 +1,5 @@
 -- 集成分支 R1 结构硬项守卫；行为仍由公开宿主规格测试证明。
+local Arch = require("tools.arch_policy")
 local fs = require("tests.support.fs_fixture")
 
 local function slurp(path)
@@ -47,9 +48,31 @@ describe("集成分支 R1 结构硬项", function()
     assert.is_false(contains(source, "失败时退回普通表"))
   end)
 
-  it("生命生产代码不含 DBG，重登协议注释仍是一次性虚弱复活", function()
+  it("生命模块保留重登一次性虚弱复活与离场终镜像结构，且无临时 DBG 调试输出", function()
     local source = slurp("server/World/PlayerLife.lua")
-    assert.is_false(contains(source, "DBG reopen"))
-    assert.is_true(contains(source, "survival:recover"))
+    local code = Arch.code_only(source)
+    local from = 1
+    while true do
+      local pos = code:find("print%s*%(", from)
+      if not pos then break end
+      assert.is_nil(source:sub(pos):match("^print%s*%(%s*['\"]DBG"),
+        "PlayerLife 生产代码不得残留 DBG 调试 print")
+      from = pos + 5
+    end
+    local has_recover_request = false
+    from = 1
+    while true do
+      local pos = code:find("ResolveRequest%s*%(", from)
+      if not pos then break end
+      local call = source:sub(pos):match("^ResolveRequest%s*(%b())")
+      if call and call:find("['\"]survival:recover['\"]") then
+        has_recover_request = true
+        break
+      end
+      from = pos + 14
+    end
+    assert.is_true(has_recover_request, "PlayerLife 缺少重登恢复事务键 survival:recover 调用")
+    assert.is_true(contains(code, "weak_revive()"), "PlayerLife 缺少一次性虚弱复活调用")
+    assert.is_true(contains(code, "register_leave_finalizer"), "PlayerLife 缺少离场终镜像登记")
   end)
 end)
