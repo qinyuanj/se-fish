@@ -29,6 +29,33 @@ local function kinds(result)
   return out
 end
 
+local function is_business(id)
+  return (id:match('^client%.') or id:match('^common%.') or id:match('^server%.'))
+    and not id:match('^[^.]+%.packages$') and not id:match('%.packages%.')
+    and not id:match('^server%._trigger%.')
+end
+
+local function declared_levels()
+  local handle = assert(io.open('policy.edn', 'rb'))
+  local text = handle:read('*a')
+  handle:close()
+  local groups = {}
+  for group in assert(text:match(':levels%s+%[(.*)%]}')):gmatch('%[([^%]]*)%]') do
+    local ids = {}
+    for id in group:gmatch(':([%w_%.%-]+)') do ids[#ids + 1] = id end
+    groups[#groups + 1] = ids
+  end
+  return groups
+end
+
+local function level_of(groups, id)
+  for rank, ids in ipairs(groups) do
+    for _, prefix in ipairs(ids) do
+      if id == prefix or id:sub(1, #prefix + 1) == prefix .. '.' then return rank - 1 end
+    end
+  end
+end
+
 describe('架构分层门禁', function()
   it('解码静态字符串转义并排除带空白的成员调用', function()
     assert.same({ 'app.rules.a', 'app.rules.b', 'app.rules.c', 'app.rules.d' }, Arch.requires([=[
@@ -193,7 +220,7 @@ describe('架构分层门禁', function()
     assert.equals(':levels [[:client.packages :server.packages :common.packages]', expected:sub(1, 61))
   end)
 
-  it('docs/uml/se-fish.edn 与当前业务模块保持同步', function()
+  it('docs/uml/se-fish.edn 的模块、层级与依赖边与声明保持同步', function()
     local handle = assert(io.open('docs/uml/se-fish.edn', 'rb'))
     local text = handle:read('*a')
     handle:close()
@@ -206,7 +233,7 @@ describe('架构分层门禁', function()
     local source_modules = {}
     local missing = {}
     for _, id in ipairs(scan_real().modules) do
-      if not id:match('^[^.]+%.packages$') and not id:match('%.packages%.') then
+      if is_business(id) then
         source_modules[id] = true
         if not uml_ids[id] then
           missing[#missing + 1] = id
@@ -218,12 +245,37 @@ describe('架构分层门禁', function()
 
     local extra = {}
     for id in pairs(uml_ids) do
-      local is_biz = id:match('^client%.') or id:match('^common%.') or id:match('^server%.')
-      if is_biz and not id:match('^server%._trigger%.') and not source_modules[id] then
+      if is_business(id) and not source_modules[id] then
         extra[#extra + 1] = id
       end
     end
     table.sort(extra)
     assert.same({}, extra)
+
+    local levels = declared_levels()
+    local drifted = {}
+    for id, level in text:gmatch(':id%s+:([%w_%.%-]+)[^}]-:level%s+(%d+)') do
+      local expected = level_of(levels, id)
+      if expected ~= tonumber(level) then
+        drifted[#drifted + 1] = id .. ': EDN ' .. level .. ' / policy.edn ' .. tostring(expected)
+      end
+    end
+    table.sort(drifted)
+    assert.same({}, drifted)
+
+    local source_edges, uml_edges = {}, {}
+    for _, edge in ipairs(scan_real().edges) do
+      if is_business(edge.from) and is_business(edge.to) then
+        source_edges[#source_edges + 1] = edge.from .. ' -> ' .. edge.to
+      end
+    end
+    for from, to in text:gmatch('{:from%s+:([%w_%.%-]+)%s+:kind%s+:dependency%s+:to%s+:([%w_%.%-]+)}') do
+      if is_business(from) and is_business(to) then
+        uml_edges[#uml_edges + 1] = from .. ' -> ' .. to
+      end
+    end
+    table.sort(source_edges)
+    table.sort(uml_edges)
+    assert.same(source_edges, uml_edges)
   end)
 end)
