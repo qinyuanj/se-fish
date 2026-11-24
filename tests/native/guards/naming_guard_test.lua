@@ -60,7 +60,9 @@ describe("命名门禁", function()
       assert.is_truthy(lfs.attributes(root, "mode"), root .. " 不存在")
       scan(root, root, bad)
     end
-    assert.equals(0, #bad, "以下路径不是 snake_case：\n" .. table.concat(bad, "\n"))
+    if #bad > 0 then
+      assert.equals(0, #bad, "以下路径不是 snake_case：\n" .. table.concat(bad, "\n"))
+    end
   end)
 end)
 
@@ -100,7 +102,9 @@ describe("模块表命名", function()
         end
       end
     end
-    assert.equals(0, #bad, "模块表绑定不是 PascalCase：\n" .. table.concat(bad, "\n"))
+    if #bad > 0 then
+      assert.equals(0, #bad, "模块表绑定不是 PascalCase：\n" .. table.concat(bad, "\n"))
+    end
   end)
 
   it("test_pascal_judgement_accepts_types_rejects_values", function()
@@ -111,138 +115,99 @@ describe("模块表命名", function()
   end)
 end)
 
--- 第三层兜底（#337）：旧名字符串键与动态字段守卫。
+-- 第三层（ADR-0034 的 L3、ADR-0037 的口径）：方法名与自研配置段名必须是 snake_case。
 -- 失败方式先列：
---   1. 动态下标 t["OldField"]、表键 ["OldField"] = ... 或 rawget/rawset(t, "OldField")
---      在 EmmyLua 重命名与静态检查中是盲区，漏改会导致运行时静默取 nil；
---   2. 若用“所有字符串键一律 snake_case”的粗暴规则，会把 EUI 节点键、Spoke 作用域名、
---      全局模块名 REUtil、策划表 ID 与 ADR-0037 冻结键全打成误报，导致守卫被静音。
--- 口径：拦截动态键位置中出现已迁移的旧自研字段/方法名（以及未豁免的 camelCase 键），
--- 同时显式豁免 ADR-0037 冻结动态键、全局模块名与策划表 ID 枚举文件。
-local BANNED_OLD_KEYS = {
-  -- L3/L4 已迁移的高危旧字段与旧方法名
-  Active = true,
-  AddFish = true,
-  AddItem = true,
-  AfterIdle = true,
-  BackpackCapacity = true,
-  BindCombatChannel = true,
-  CallBack = true,
-  CameraDistance = true,
-  CanAct = true,
-  CheckZone = true,
-  CombatRE = true,
-  DropItem = true,
-  EatBait = true,
-  FishCoin = true,
-  GetAttack = true,
-  GetFish = true,
-  GetItem = true,
-  GetReelState = true,
-  GetState = true,
-  GetUiRoot = true,
-  HeadHeight = true,
-  InteractRange = true,
-  IsDead = true,
-  IsDowned = true,
-  ItemBarCapacity = true,
-  LastReason = true,
-  LongPressSec = true,
-  MaxHealth = true,
-  MaxHunger = true,
-  MoveSlot = true,
-  Msg = true,
-  NextFish = true,
-  PlayerWalkSpeed = true,
-  Ref = true,
-  Root = true,
-  SafePoint = true,
-  SetFocus = true,
-  SetHealth = true,
-  SetHunger = true,
-  Settle = true,
-  -- 通信与自研 camelCase 旧键
-  fishId = true,
-  itemId = true,
-  maxHealth = true,
-  maxHunger = true,
-  readKey = true,
-  requestKey = true,
-  routeId = true,
-  targetId = true,
-  targetType = true,
-  upgradeLevel = true,
-  upgradeLevels = true,
-}
+--   1. 新写 function PlayerData:Serialize() → 与已改完的 player_data:serialize 并存两套方法名，L3 剩下的方法要付第二遍改名成本；
+--   2. 新写 GameCfg.SomeSection = { ... } → 与已改完的 GameCfg.some_section 并存，读代码分不清哪个还有效；
+--   3. 把守卫写成「存量必须为零」→ L3 还在迁移中，全仓常红后必然被静音（ADR-0034「门禁先开会让全仓常红」的教训）。
+-- 所以存量冻结在 data/legacy_pascal_names_baseline.txt：基线之外的新名字一律失败，基线内的等 L3 搬完再删行。
+-- 扫描面只有两处：函数定义的名字尾段、GameCfg 的段名。官方契约五类豁免见 ADR-0034「官方契约原样」，
+-- 包内接口实现的方法名跟随接口（ADR-0037），所以 Attach 这类由 INTERFACE_METHODS 点名放行。
+local BASELINE = "tests/native/guards/data/legacy_pascal_names_baseline.txt"
+local INTERFACE_METHODS = { Attach = true }
 
--- 策划表 ID 枚举文件与全局模块名豁免（ADR-0034 / ADR-0037）
-local STRING_KEY_SKIP_FILES = {
-  ["common/cfg/content_ledger.lua"] = true,
-}
-local STRING_KEY_EXEMPT = {
-  REUtil = true,
-  -- ADR-0037 冻结的 25 个动态键（含 Regions / Rects / 计时动态键）
-  ActiveUntil = true,
-  SpecialAt = true,
-  JabAt = true,
-  PinchAt = true,
-  ChargeAt = true,
-  JumpAt = true,
-  RoarAt = true,
-  TailAt = true,
-  ClawAt = true,
-  NextReefDiveAt = true,
-  NextThrowAt = true,
-  CreateResult = true,
-}
-
-local function strip_line_comment(line)
-  return line:gsub("%-%-.*$", "")
+-- 方法名取最后一个 . 或 : 之后的尾段；表路径（GameCfg.Shop.list_for_page 里的 Shop）不参与判定。
+local function pascal_method_tail(name)
+  local _, tail = name:match("^(.-)([%.:]%u[%w_]*)$")
+  return tail and tail:sub(2) or nil
 end
 
-local function find_bad_string_keys_in_line(line, rel, line_no, bad)
-  if STRING_KEY_SKIP_FILES[rel] then return end
-  local code = strip_line_comment(line)
-  local function check_key(k)
-    if STRING_KEY_EXEMPT[k] then return end
-    if BANNED_OLD_KEYS[k] then
-      bad[#bad + 1] = string.format("%s:%d : 禁止使用已迁移旧名字符串键 %q", rel, line_no, k)
+local function collect_pascal_names(item, src, found)
+  local line_no = 0
+  for line in (src .. "\n"):gmatch("([^\n]*)\n") do
+    line_no = line_no + 1
+    local where = item.rel .. ":" .. line_no
+    for name in line:gmatch("function%s+([%w_%.:]+)") do
+      local tail = pascal_method_tail(name)
+      if tail and not INTERFACE_METHODS[tail] then
+        found[#found + 1] = { key = "method " .. tail, where = where }
+      end
+    end
+    for name in line:gmatch("([%w_%.:]+)%s*=%s*function%s*%(") do
+      local tail = pascal_method_tail(name)
+      if tail and not INTERFACE_METHODS[tail] then
+        found[#found + 1] = { key = "method " .. tail, where = where }
+      end
+    end
+    for section in line:gmatch("GameCfg%.(%u[%w_]*)") do
+      found[#found + 1] = { key = "cfg " .. section, where = where }
     end
   end
-  for _, key in code:gmatch("%[%s*([\"'])([%a_][%w_]*)%1%s*%]") do
-    check_key(key)
-  end
-  for _, key in code:gmatch("raw[gs]et%s*%([^,]+,%s*([\"'])([%a_][%w_]*)%1") do
-    check_key(key)
-  end
 end
 
-describe("旧名字符串键守卫", function()
-  it("test_string_key_guard_rejects_old_keys_and_respects_exemptions", function()
-    local bad = {}
-    find_bad_string_keys_in_line('local x = tbl["GetState"]', "client/foo.lua", 10, bad)
-    find_bad_string_keys_in_line('local y = rawget(tbl, "fishId")', "server/bar.lua", 20, bad)
-    find_bad_string_keys_in_line('local z = rawget(_G, "REUtil")', "client/foo.lua", 30, bad)
-    find_bad_string_keys_in_line('local t = fish["ActiveUntil"]', "server/world_host/fish_tree.lua", 40, bad)
-    assert.equals(2, #bad)
-    assert.is_truthy(bad[1]:find("GetState", 1, true))
-    assert.is_truthy(bad[2]:find("fishId", 1, true))
+local function load_baseline()
+  local handle = assert(io.open(BASELINE, "r"), "读不到基线 " .. BASELINE)
+  local text = handle:read("*a")
+  handle:close()
+  local known, order, line_no = {}, {}, 0
+  for line in (text .. "\n"):gmatch("([^\n]*)\n") do
+    line_no = line_no + 1
+    line = line:gsub("%s+$", "")
+    if line ~= "" and not line:match("^#") then
+      assert(not known[line], BASELINE .. ":" .. line_no .. " 行重复：" .. line)
+      known[line] = true
+      order[#order + 1] = line
+    end
+  end
+  for i = 2, #order do
+    assert(order[i - 1] < order[i], BASELINE .. " 未按字节序排序：" .. order[i - 1] .. " 之后是 " .. order[i])
+  end
+  return known
+end
+
+describe("方法与配置段命名", function()
+  it("test_judge_reads_method_tail_only", function()
+    assert.equals("Serialize", pascal_method_tail("PlayerData:Serialize"))
+    assert.equals("Attach", pascal_method_tail("M.Attach"))
+    assert.is_nil(pascal_method_tail("player_data:serialize"))
+    assert.is_nil(pascal_method_tail("GameCfg.Shop.list_for_page"))
+    assert.is_nil(pascal_method_tail("foo"))
   end)
 
-  it("test_three_ends_no_banned_old_string_keys", function()
-    local files, bad = {}, {}
+  it("test_no_new_pascal_method_or_cfg_section", function()
+    local known = load_baseline()
+    local files, found = {}, {}
     for _, root in ipairs(ROOTS) do
       walk_lua(root, root, files)
     end
     for _, item in ipairs(files) do
-      local handle = io.open(item.path, "r")
-      local idx = 0
-      for line in handle:lines() do
-        idx = idx + 1
-        find_bad_string_keys_in_line(line, item.rel, idx, bad)
-      end
+      local handle = assert(io.open(item.path, "r"), "读不到 " .. item.path)
+      local src = handle:read("*a")
       handle:close()
+      collect_pascal_names(item, src, found)
     end
-    assert.equals(0, #bad, "发现残留的旧名字符串键：\n" .. table.concat(bad, "\n"))
+    local seen, bad = {}, {}
+    for _, item in ipairs(found) do
+      if not known[item.key] and not seen[item.key] then
+        seen[item.key] = true
+        bad[#bad + 1] = item.key .. "  首次出现 " .. item.where
+      end
+    end
+    if #bad > 0 then
+      table.sort(bad)
+      assert.same({}, bad, "新写的 PascalCase 方法名或 GameCfg 段名（ADR-0034 L3 / ADR-0037）：\n" .. table.concat(bad, "\n"))
+    end
   end)
 end)
+
+-- 旧名字符串键守卫已统一归口 tools/naming_guard.lua 与 tests/native/guards/naming_string_keys_test.lua（#337）。

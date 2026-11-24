@@ -88,4 +88,39 @@ describe('文档相对链接守卫', function()
     table.sort(bad)
     assert.same({}, bad)
   end)
+
+  -- 反向守卫：docs/research/ 里放的是跨轮复用的调研，没人指向它等于不存在。
+  -- 失败方式先列：结论写进一个零引用的文件，下一轮 agent 重新调研一遍（2026-11-24 的调查曾处于零引用状态，
+  -- 没有任何入口能让人找到它）。
+  -- 口径是「有没有被别的 markdown 提到」而不是「链接是否可达」：本仓 AGENTS.md 的指针多写成代码路径，
+  -- 所以按文件名匹配；提到它的是不是一条好指针由人负责，这里只兜住零引用。
+  it('test_research_documents_are_referenced', function()
+    local tracked, docs, corpus = tracked_paths(), {}, {}
+    for path in pairs(tracked.files) do
+      if path:match('%.md$') then docs[#docs + 1] = path end
+    end
+    table.sort(docs)
+    for _, path in ipairs(docs) do
+      local handle = io.open(path, 'r')
+      if handle then
+        corpus[path] = handle:read('*a')
+        handle:close()
+      end
+    end
+    local bad = {}
+    for _, doc in ipairs(docs) do
+      local name = doc:match('^docs/research/([^/]+)$')
+      if name then
+        local cited = false
+        for _, other in ipairs(docs) do
+          if other ~= doc and corpus[other] and corpus[other]:find(name, 1, true) then
+            cited = true
+            break
+          end
+        end
+        if not cited then bad[#bad + 1] = doc end
+      end
+    end
+    assert.same({}, bad, 'docs/research/ 下的文档零引用（从 AGENTS.md、docs/agents/ 或 ADR 留一条指针）')
+  end)
 end)

@@ -1,0 +1,4 @@
+# 旧名字符串键豁免（#337）
+# 格式：path<TAB>旧名<TAB>理由
+# 只放「确实是线上协议/官方契约、但看起来像表值」的个别点；能靠 PROTOCOL_KEYS 放行的不要写进来。
+server/world_host/player_gm.lua	GetState	GM 调试动作名，按字符串比较而非方法分发，协议侧仍用 Pascal 名

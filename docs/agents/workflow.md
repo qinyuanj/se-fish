@@ -22,6 +22,7 @@ Lua 命令使用 **Lua 5.4**，命令名统一 `lua`，执行前用 `lua -v` 核
 
 - `lua tools/cli.lua deploy`：将三端一级子树字节镜像到宿主目录（经 `tools/seam.lua` 调用 `robocopy /MIR`，镜像前打印将被删掉的宿主多余文件；宿主三端根下仓库已删的散文件或子树同样先删）；robocopy 缺失时在镜像前以退出码 3 失败。编辑器开着本图时执行 validate → 有差异时 `code push` → `code diff` 复核，push 后仍不一致才返回失败。三端内本地已删的地图文件用 `code push --delete --yes` 删掉；三端外的地图独有文件（`temp/` 等编辑器生成物）只提示保留，两类同时出现时不推送（#167）。跨接缝约定见 [ADR-0017](../adr/0017-windows-native-only.md)。
 - `lua tools/cli.lua sync`：将宿主目录的 API 存根、`data/` 回灌仓库；`eggy.json` 不回灌，见下方「编辑器工程 ≠ 仓库检出」；三端 `packages/` 由仓库管理，也不回灌。
+- `lua tools/cli.lua naming [--recon|--apply|--check] [--layer l3a|l3b|all] [--root <目录>]`：命名改名 codemod 与旧名字符串键守卫（#337）。`--recon` 只列将要改的 `文件:行 旧名 -> 新名`，`--apply` 才落盘且要求目标 git 工作区干净（只用于父提交 worktree）；映射与 keydefs 在 `tools/naming/data/`，口径见 [ADR-0034](../adr/0034-self-written-code-snake-case.md)。`--root` 用于在父提交的干净 worktree 上重放历史层：L3a 对应 `b3a1855`（父提交 `e2a59d1`），L3b 对应 `9685b9e`（父提交 `c75e740`）。`--check` 与 `tests/native/guards/naming_string_keys_test.lua` 共用规则，发现字符串字面量里的旧方法名时报文件与行号。
 - `lua tools/cli.lua docs sync`：显式同步 SE 官方手册到已忽略的 `.toolcache/se-manual/`，覆盖 `lua/00–22`、教程与 API 总索引及 API 索引所列最新 changelog；`docs sync api <类型名或官方 URL>` 按需加入一个 `game_api` 成员页。每个纯文本文件头记录官方 URL、UTC 拉取时间与正文的 SHA-256，日志另记官网文件名提供的版本；所有核心页面下载并解析成功后才写入，失败保留旧缓存。`lua tools/cli.lua docs search <查询>` 只检索本地缓存、无需网络或编辑器，命中给出本地文件行号与官方来源 URL；缓存为空时先跑 `docs sync`，精确成员详情仍可走 `editor-cli api get` / 官方单页兜底。同步依赖 PATH 上的 `curl`，检索不依赖它。
 - `lua tools/cli.lua blender <脚本.py> [--blend <输入.blend>] [-- <脚本参数>...]`：在本机无头 Blender 里执行脚本，是唯一的 Blender 入口；`--which` 核对将用的 Blender，`--expr` 执行内联代码。路径写正斜杠 Windows 形式（`C:/...`）或仓库内相对路径；用法见 [Blender 与 Meshy 使用](art-pipeline.md)，决策见 [ADR-0009](../adr/0009-blender-headless-only.md)。
 - `lua tools/cli.lua screenshot [--window <标题子串>] [--screen] [--out <文件.png>]`：取证画面的统一入口，缺省后台抓屏（`PrintWindow`），输出落 `tmp/`。选窗、虚拟屏与判帧新旧的实测坑见 [editor-cli.md「截图」](editor-cli.md)，取证前先跑 `--info`。
@@ -94,6 +95,6 @@ lua tools/cli.lua worktree-init
 
 ## 产物归属
 
-执行过程产物（调研全文、验证台账、验收记录、开发计划）贴进对应 issue 的评论；`docs/` 只留长期参考（术语、技术难点、ADR）。`eggy-dev-plan` 默认的 `docs/plan/` 输出在本仓库改为 issue 评论。
+执行过程产物（调研全文、验证台账、验收记录、开发计划）贴进对应 issue 的评论；`docs/` 只留长期参考（术语、技术难点、ADR、跨轮复用的技术选型调查）。放进 `docs/research/` 的文档必须从 `AGENTS.md`、`docs/agents/` 或 ADR 留一条指针——没人指向的调研等于不存在，`doc_link_guard_test` 会拦下零引用的 research 文档。`eggy-dev-plan` 默认的 `docs/plan/` 输出在本仓库改为 issue 评论。
 
 **交接摘要**：写交接或续接摘要时附授权台账，逐条列「用户授权原文 → 覆盖的动作 → 已用完 / 未用」；台账里写不出原文的动作视为未授权，续接方须重新取得确认。部署、试玩、地图保存与重开不需要授权（见 [editor-cli.md](editor-cli.md)），不必入台账。
