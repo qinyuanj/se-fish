@@ -6,7 +6,33 @@ local seam = require('tools.seam')
 local M = {}
 local cache = {}
 
--- 读文档正文。Windows 上 fopen 走系统 ANSI 代码页，中文路径可能打不开，回退到 git 索引。
+local function index()
+  local entries = {}
+  local git = seam.which('git')
+  if not git then return entries end
+  local code, listing = seam.capture({
+    argv = { git, '-c', 'core.quotepath=false', 'ls-files', '-s' },
+    cwd = fs.repo_root(),
+  })
+  if code ~= 0 then return entries end
+  for line in (listing .. '\n'):gmatch('([^\n]+)\n') do
+    local sha, path = line:match('^%d+ (%x+) %d\t(.*)$')
+    if sha then entries[path] = sha end
+  end
+  return entries
+end
+
+-- 读文档正文。Windows 上 fopen 走系统 ANSI 代码页，中文路径可能打不开。
+-- 兜底改从 git 索引取 blob SHA 再按 SHA 读：路径只用于与 ls-files 的输出逐字节比较，不作为 argv 传给 git。
+local function read_from_index(path)
+  local object = index()[path]
+  if not object then return nil end
+  local git = seam.which('git')
+  local code, body = seam.capture({ argv = { git, 'cat-file', 'blob', object }, cwd = fs.repo_root() })
+  if code ~= 0 then return nil end
+  return body
+end
+
 function M.read(path)
   if cache[path] ~= nil then return cache[path] or nil end
   local handle = io.open(path, 'rb')
@@ -16,18 +42,9 @@ function M.read(path)
     cache[path] = body
     return body
   end
-  local git = seam.which('git')
-  if not git then
-    cache[path] = false
-    return nil
-  end
-  local code, output = seam.capture({ argv = { git, 'show', ':' .. path }, cwd = fs.repo_root() })
-  if code ~= 0 then
-    cache[path] = false
-    return nil
-  end
-  cache[path] = output
-  return output
+  local body = read_from_index(path)
+  cache[path] = body or false
+  return body
 end
 
 local function headings(text)
