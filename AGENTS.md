@@ -8,7 +8,7 @@
 
 - **探索代码**：先读 `docs/agents/domain.md`，按其中指引读取领域资料；ADR 放在 `docs/adr/`。
 - **玩法与术语**：玩法与系统设计以 `docs/design/` 为准（策划案原文与数值表）；起名或写玩家可见文案前查 `GLOSSARY.md`。
-- **技术方案**：先读 `docs/技术难点识别.md`；策划案内部矛盾与数值缺口一律记在 [`docs/to-questionnaire-策划案内部矛盾.md`](docs/to-questionnaire-策划案内部矛盾.md)（未定的题），定案后移进 [策划案已确认结论](docs/策划案已确认结论.md)。
+- **技术方案**：涉及平台能力、工具链或生命周期前，先读 `docs/adr/` 里相关条目，剩余能力缺口与待实测项见 [#323](https://github.com/qinyuanj/se-fish/issues/323)；策划案内部矛盾与数值缺口一律记在 [`docs/to-questionnaire-策划案内部矛盾.md`](docs/to-questionnaire-策划案内部矛盾.md)（未定的题），定案后移进 [策划案已确认结论](docs/策划案已确认结论.md)。
 - **编码与审查**：编写或审查 SE 业务 Lua 前，读 `CODING_STANDARDS.md`。
 - **开发工作流**：修改代码、运行测试、同步宿主或操作编辑器前，以及整理过程产物时，读 `docs/agents/workflow.md`。
 - **截图**：取证统一走 `lua tools/cli.lua screenshot`，细节见 `docs/agents/editor-cli.md`「截图」条。
