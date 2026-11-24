@@ -899,7 +899,7 @@ function PlayerTree.spawn(opts)
     local upgrades = type(growth.upgrades) == "table" and growth.upgrades or {}
     local cds = type(extra.cooldowns) == "table" and extra.cooldowns or {}
 
-    -- 先完成所有数据预处理与引擎属性读取，再进入无 pcall 的纯状态 batch 写入。
+    -- 先完成所有数据预处理与引擎属性读取，再进入批量状态写入。
     local next_coin = d.FishCoin or 0
     local next_zone = d.Zone or states.zone_id:now()
     local next_upgrade = d.UpgradeLevel or 0
@@ -933,7 +933,7 @@ function PlayerTree.spawn(opts)
     if src == data then
       syncing_from_data = true
     end
-    SpokeRuntime.batch(function()
+    local ok, err = pcall(SpokeRuntime.batch, function() -- 仅保证异常时恢复 syncing_from_data，不吞错
       if states.coin:now() ~= next_coin then states.coin:set(next_coin) end
       if states.zone_id:now() ~= next_zone then states.zone_id:set(next_zone) end
       if states.upgrade_level:now() ~= next_upgrade then states.upgrade_level:set(next_upgrade) end
@@ -955,6 +955,9 @@ function PlayerTree.spawn(opts)
       end
     end)
     syncing_from_data = prev_syncing
+    if not ok then
+      error(err, 0)
+    end
     if type(sync_opts) == "table" and sync_opts.force_push == true and last_pushed_snapshot == prev_pushed_snapshot then
       handle:push_item_bar_state()
     end

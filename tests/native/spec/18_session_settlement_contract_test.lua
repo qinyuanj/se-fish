@@ -284,6 +284,8 @@ describe('条款 18 存档会话与结算身份', function()
     env.players:OnPlayerRemoving(player)
     local rejoined, fresh = ready(uid, vec(0, 5, 0))
     env.ferry.OnlinePlayers = function() return { rejoined } end
+    -- FerryRoute 后台恢复扫描按 1Hz on_second 驱动
+    env.now = env.now + 1
     env.ferry:Update()
     drain()
     assert.same(1, fresh:ItemCount(env.route.Outbound.Ticket), '未完成的船票应回退一次')
