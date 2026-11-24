@@ -47,5 +47,7 @@ jobs:
           "$(Resolve-Path .hererocks/bin)" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
       - name: 安装 emmylua_check 0.25.1
         run: cargo install emmylua_check --version 0.25.1 --locked
+      - name: 安装 luafilesystem
+        run: luarocks install luafilesystem
       - name: 运行 EmmyLua 诊断门禁
         run: lua tools/cli.lua emmylua
