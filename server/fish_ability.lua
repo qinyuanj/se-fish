@@ -3,7 +3,7 @@ local World = game:GetService("World")
 local Task = game:GetService("Task")
 
 local GameCfg = require("common.game_cfg")
-local AbilityAPI = require("server.AbilityAPI")
+local AbilityAPI = require("server.ability_api")
 local AbilityPackageAPI = require("server.packages.ability_system.api")
 
 local FishAbility = { SpokeHost = true, PendingFishCleanup = {} }

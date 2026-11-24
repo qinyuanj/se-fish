@@ -1,6 +1,6 @@
 
 local GameCfg = require("common.game_cfg")
-local ServerRuntime = require("server.WorldHost.ServerRuntime")
+local ServerRuntime = require("server.world_host.server_runtime")
 
 local function signal()
   local handlers = {}
@@ -121,8 +121,8 @@ describe("服务端商店与钓鱼佬原子事务（#311）", function()
         return ctx.events[name]
       end,
     }
-    ctx.PlayerData = assert(loadfile("server/Data/PlayerData.lua"))()
-    ctx.save = assert(loadfile("server/SaveHost.lua"))()
+    ctx.PlayerData = assert(loadfile("server/data/player_data.lua"))()
+    ctx.save = assert(loadfile("server/save_host.lua"))()
     ctx.runtime = ServerRuntime.new({
       initial_now = 1000,
       remote = _G.REUtil,

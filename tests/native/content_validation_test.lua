@@ -61,7 +61,7 @@ describe('内容标记纯台账', function()
   it('标记未实现但已有实现路径判红', function()
     local entry = Ledger.Blindbox[1]
     local oldImplemented, oldPath = entry.implemented, entry.path
-    entry.implemented, entry.path = false, 'server/WorldHost/PlayerBlindbox.lua'
+    entry.implemented, entry.path = false, 'server/world_host/player_blindbox.lua'
     local ok, err = frozen(function()
       local result = Validate.Check(cfg)
       assert.matches('标记为未实现但已有实现路径', table.concat(result.errors, '\n'), nil, true)

@@ -12,7 +12,7 @@ local GameCfg = require('common.game_cfg')
 local EconomyWorld = require('tests.support.economy_world')
 
 local WIRING = {
-    'local PlatformHost = require("server.PlatformHost")',
+    'local PlatformHost = require("server.platform_host")',
     'save = SaveHost',
     'platform = PlatformHost',
     'player_data = PlayerDataHost',
@@ -61,9 +61,9 @@ describe('条款 17-18：分享任务的占位入口', function()
         env.re = channels()
         _G.REUtil = { GetRE = env.re.GetRE, CheckRECD = function() return false end }
         env.player = { UserId = 26303, SetAttribute = function() end }
-        env.data = assert(loadfile('server/Data/PlayerData.lua'))().New(env.player, function() end)
+        env.data = assert(loadfile('server/data/player_data.lua'))().New(env.player, function() end)
         env.data:Init()
-        env.platform = assert(loadfile('server/PlatformHost.lua'))()
+        env.platform = assert(loadfile('server/platform_host.lua'))()
         env.platform.PlayerData = { GetDataInst = function(_, player) return player == env.player and env.data end,
             SendItemBar = function() end }
         env.platform.Save = { NextOperation = function() return { id = '26303:1' } end,

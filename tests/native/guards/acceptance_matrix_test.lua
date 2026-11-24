@@ -205,7 +205,7 @@ describe('验收矩阵门禁', function()
 
     it('覆盖表的代码落点写成破折号就红', function()
       fixture.patch(root, Acceptance.COVERAGE,
-        '| 1-01 | server/PlatformHost.lua |', '| 1-01 | — |')
+        '| 1-01 | server/platform_host.lua |', '| 1-01 | — |')
       local ok, found, text = verify()
       assert.is_false(ok)
       assert.same({ 'coverage_landing_missing' }, found, text)
@@ -213,7 +213,7 @@ describe('验收矩阵门禁', function()
 
     it('覆盖表的代码落点是不存在的文件就红', function()
       fixture.patch(root, Acceptance.COVERAGE,
-        '| 1-02 | server/PlatformHost.lua |', '| 1-02 | server/Mgr/GonePlatform.lua |')
+        '| 1-02 | server/platform_host.lua |', '| 1-02 | server/Mgr/GonePlatform.lua |')
       local ok, found, text = verify()
       assert.is_false(ok)
       assert.same({ 'coverage_landing_path' }, found, text)
@@ -221,7 +221,7 @@ describe('验收矩阵门禁', function()
 
     it('已贯通小节里的非试玩条款漏登记就红', function()
       fixture.patch(root, Acceptance.COVERAGE,
-        '\n| 1-02 | server/PlatformHost.lua | — | 缺 | 缺 | 缺 | 缺 | B |', '')
+        '\n| 1-02 | server/platform_host.lua | — | 缺 | 缺 | 缺 | 缺 | B |', '')
       local ok, found, text = verify()
       assert.is_false(ok)
       assert.same({ 'coverage_clause_missing' }, found, text)

@@ -1,7 +1,7 @@
 
 local GameCfg = require("common.game_cfg")
-local ServerRuntime = require("server.WorldHost.ServerRuntime")
-local SwingRegistry = require("server.SwingRegistry")
+local ServerRuntime = require("server.world_host.server_runtime")
+local SwingRegistry = require("server.swing_registry")
 
 local function signal()
   local handlers = {}

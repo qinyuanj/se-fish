@@ -7,7 +7,7 @@
 
 local GameCfg = require("common.game_cfg")
 local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
-local ServerRuntime = require("server.WorldHost.ServerRuntime")
+local ServerRuntime = require("server.world_host.server_runtime")
 
 local function make_signal()
   local handlers = {}
@@ -499,18 +499,18 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
           if path == "server.packages.attr_rule.api" then return attr_api_stub end
           if path == "server.packages.modifier_system.api" then return modifier_api_stub end
           if path == "server.packages.ability_system.api" then return ability_api_stub end
-          if path == "server.AbilityAPI" then
+          if path == "server.ability_api" then
             if not mgrs._AbilityAPI then
-              mgrs._AbilityAPI = assert(loadfile("server/AbilityAPI.lua", "t", sandbox))()
+              mgrs._AbilityAPI = assert(loadfile("server/ability_api.lua", "t", sandbox))()
             end
             return mgrs._AbilityAPI
           end
-          if path == "server.SaveHost" or path == "server.PlayerDataHost" or path == "server.FishAbility" then
+          if path == "server.save_host" or path == "server.player_data_host" or path == "server.fish_ability" then
             local name = path:match("([%w_]+)$")
             if not mgrs[name] then mgrs[name] = assert(loadfile(path:gsub("%.", "/") .. ".lua", "t", sandbox))() end
             return mgrs[name]
           end
-          if path == "server.PlatformHost" then return {} end
+          if path == "server.platform_host" then return {} end
           return require(path)
         end,
       }, { __index = _G })

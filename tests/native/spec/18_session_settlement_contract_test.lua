@@ -126,10 +126,10 @@ describe('条款 18 存档会话与结算身份', function()
     }
     package.loaded['common.re_util'] = reStub
     _G.REUtil = reStub
-    package.loaded['server.Data.PlayerData'] = nil
-    env.PlayerData = require('server.Data.PlayerData')
-    env.save = assert(loadfile('server/SaveHost.lua'))()
-    env.players = assert(loadfile('server/PlayerDataHost.lua'))()
+    package.loaded['server.data.player_data'] = nil
+    env.PlayerData = require('server.data.player_data')
+    env.save = assert(loadfile('server/save_host.lua'))()
+    env.players = assert(loadfile('server/player_data_host.lua'))()
     env.players.Save, env.save.PlayerData = env.save, env.players
     env.ferry = { OnlinePlayers = function() return {} end }
     env.anchors = {}
@@ -151,7 +151,7 @@ describe('条款 18 存档会话与结算身份', function()
       FindAnchor = function(_, name) return env.anchors[name] end,
     }
     env.route = env.cfg.Ferry.Routes[1]
-    local ServerRuntime = require('server.WorldHost.ServerRuntime')
+    local ServerRuntime = require('server.world_host.server_runtime')
     env.runtime = ServerRuntime.new({
       initial_now = env.now, zones = env.cfg.Zones, remote = reStub,
       player_data = env.players, save = env.save, interact = env.interact,

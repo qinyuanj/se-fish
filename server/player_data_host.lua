@@ -1,4 +1,4 @@
-local PlayerData = require('server.Data.PlayerData')
+local PlayerData = require('server.data.player_data')
 local GameCfg = require('common.game_cfg')
 local Number = require('common.number')
 local PlayerDataHost = { SpokeHost = true }

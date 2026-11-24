@@ -114,9 +114,9 @@ describe('平台适配层（MgrPlatform）', function()
       end, OnServerEvent = signal() }
     end })
     -- loadfile 每次得到全新的管理器实例表，避免 Mgr.Flows / DataMap 跨案例残留。
-    env.save = assert(loadfile('server/SaveHost.lua'))()
-    env.players = assert(loadfile('server/PlayerDataHost.lua'))()
-    env.platform = assert(loadfile('server/PlatformHost.lua'))()
+    env.save = assert(loadfile('server/save_host.lua'))()
+    env.players = assert(loadfile('server/player_data_host.lua'))()
+    env.platform = assert(loadfile('server/platform_host.lua'))()
     env.players.Save, env.save.PlayerData = env.save, env.players
     env.platform.Save, env.platform.PlayerData = env.save, env.players
     env.platform.Now = function() return env.now end

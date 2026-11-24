@@ -13,7 +13,7 @@ describe('TestGrowthCleanup', function()
 
     before_each(function()
         ctx = { savedDebug = GameCfg.Debug }
-        ctx.PlayerData = assert(loadfile('server/Data/PlayerData.lua'))()
+        ctx.PlayerData = assert(loadfile('server/data/player_data.lua'))()
     end)
 
     -- before_each 中途失败（loadfile 报错）时 ctx 可能只建了一半：恢复要逐项判空。

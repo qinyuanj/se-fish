@@ -6,7 +6,7 @@
 -- 观察 35 秒可覆盖每 4 秒投掷与 20 秒俯冲；手动 input 射击/换弹/走出落点取证。
 -- 轨迹目标/受击体同步误差与预警起落打印 REEF37_FRAME；本体读值可能有引擎延迟，单独记录。
 -- 夹具不能证明自然抽鱼、从零经济、正常金币枪单杀；这些另走真实购买/钓鱼/input 路线。
-local units=require('server.WorldHost.FishTree')
+local units=require('server.world_host.fish_tree')
 local task=game:GetService('Task')
 local world=game:GetService('World')
 local player=game:GetService('Players'):GetPlayers()[1]

@@ -4,7 +4,7 @@
 -- 非法身份/状态绕过持久屏障、落地失败扣物、重进手持悬空。
 -- 接缝：PlayerData 公共库存/选择接口。
 local GameCfg = require('common.game_cfg')
-local PlayerData = require('server.Data.PlayerData')
+local PlayerData = require('server.data.player_data')
 
 describe("持有与操作的数据层规则", function()
     local ctx

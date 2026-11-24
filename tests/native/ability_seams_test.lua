@@ -10,7 +10,7 @@
 --   4. 空中受击不改变索敌：被打的鱼不找打它的玩家，只按最近挑人；
 --   5. 阶段首领的招式不结算伤害、咬中不叼人；携带跟随不写回玩家位置、超时不放下。
 --
--- 官方包边界（不改动 vendor）：本文件走的是「真实 server.AbilityAPI」，它转发到
+-- 官方包边界（不改动 vendor）：本文件走的是「真实 server.ability_api」，它转发到
 -- server.packages.ability_system.api。迁移只把这份真模块在 after_each 里放回快照（含 nil），
 -- 不给 vendor 打桩、不写 package.preload，因此不会把桩泄漏给同进程的其他 spec。
 -- 加载真包 api 需要全局 game 已就位（包内 sub_ability 在加载期读 game），故 before_each 先摆引擎替身再 require。
@@ -26,7 +26,7 @@ describe('TestAbilitySeams', function()
     local saved
     before_each(function()
         saved = { Vector3 = rawget(_G, 'Vector3'), Quaternion = rawget(_G, 'Quaternion'),
-            game = rawget(_G, 'game'), api = package.loaded['server.AbilityAPI'],
+            game = rawget(_G, 'game'), api = package.loaded['server.ability_api'],
             vendor = package.loaded['server.packages.ability_system.api'] }
         ctx = { created = {} }
         _G.Vector3 = { New = vec }
@@ -45,14 +45,14 @@ describe('TestAbilitySeams', function()
             if name == 'World' then return ctx.world end
             return {}
         end }
-        package.loaded['server.AbilityAPI'] = nil
-        ctx.api = require('server.AbilityAPI')
+        package.loaded['server.ability_api'] = nil
+        ctx.api = require('server.ability_api')
     end)
     after_each(function()
         _G.Vector3 = saved.Vector3
         _G.Quaternion = saved.Quaternion
         _G.game = saved.game
-        package.loaded['server.AbilityAPI'] = saved.api
+        package.loaded['server.ability_api'] = saved.api
         package.loaded['server.packages.ability_system.api'] = saved.vendor
     end)
 
@@ -127,9 +127,9 @@ describe('TestFishAbilitySeams', function()
     before_each(function()
         saved = { Vector3 = rawget(_G, 'Vector3'), Quaternion = rawget(_G, 'Quaternion'),
             RaycastParams = rawget(_G, 'RaycastParams'), game = rawget(_G, 'game'),
-            carrier = package.loaded['server.WorldHost.FishCarrier'],
-            ability = package.loaded['server.WorldHost.FishTree'],
-            api = package.loaded['server.AbilityAPI'] }
+            carrier = package.loaded['server.world_host.fish_carrier'],
+            ability = package.loaded['server.world_host.fish_tree'],
+            api = package.loaded['server.ability_api'] }
         ctx = { now = 100, players = {}, hits = {}, mounts = {}, detached = {} }
         _G.Vector3 = { New = vec }
         _G.Quaternion = { New = function() return {} end, FromEulerAngles = function() return {} end }
@@ -139,9 +139,9 @@ describe('TestFishAbilitySeams', function()
             if name == 'Players' then return { GetPlayers = function() return ctx.players end } end
             return {}
         end }
-        package.loaded['server.WorldHost.FishCarrier'] = { Spawn = function() return nil end, Despawn = function() end,
+        package.loaded['server.world_host.fish_carrier'] = { Spawn = function() return nil end, Despawn = function() end,
             SyncPosition = function() end }
-        package.loaded['server.AbilityAPI'] = {
+        package.loaded['server.ability_api'] = {
             AttachToSocket = function(_, unit, host, socketName, offset)
                 local mount = { UnitType = 'SkeletalSocketMount', Parent = host, SocketName = socketName,
                     SocketOffset = offset, Destroyed = false }
@@ -154,11 +154,11 @@ describe('TestFishAbilitySeams', function()
                 return true
             end,
         }
-        package.loaded['server.WorldHost.FishTree'] = nil
-        ctx.mgr = assert(loadfile('server/WorldHost/FishTree.lua'))()
-        ctx.mgr.AbilityApi = package.loaded['server.AbilityAPI']
+        package.loaded['server.world_host.fish_tree'] = nil
+        ctx.mgr = assert(loadfile('server/world_host/fish_tree.lua'))()
+        ctx.mgr.AbilityApi = package.loaded['server.ability_api']
         -- 目标裁决适配层按生产接线（server/main.lua）注入
-        ctx.mgr.AiTarget = require('server.WorldHost.FishAiTarget')
+        ctx.mgr.AiTarget = require('server.world_host.fish_ai_target')
         ctx.mgr.World = _G.game:GetService('World')
         ctx.mgr.Vitals = {
             CanTakeDamage = function() return true end,
@@ -174,9 +174,9 @@ describe('TestFishAbilitySeams', function()
         _G.Quaternion = saved.Quaternion
         _G.RaycastParams = saved.RaycastParams
         _G.game = saved.game
-        package.loaded['server.WorldHost.FishCarrier'] = saved.carrier
-        package.loaded['server.WorldHost.FishTree'] = saved.ability
-        package.loaded['server.AbilityAPI'] = saved.api
+        package.loaded['server.world_host.fish_carrier'] = saved.carrier
+        package.loaded['server.world_host.fish_tree'] = saved.ability
+        package.loaded['server.ability_api'] = saved.api
     end)
 
     -- 失败方式 4：空中受击改变索敌（威胁优先），攻击者死亡后仇恨失效回落最近

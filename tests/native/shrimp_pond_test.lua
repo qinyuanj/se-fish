@@ -73,8 +73,8 @@ describe('虾池最小内容（水区 / 鱼表 / 商店 / 钓鱼佬 / 抛竿）'
       game = rawget(_G, 'game'),
       GameCfg = package.loaded['common.game_cfg'],
       REUtil = package.loaded['common.re_util'],
-      MgrPlayerData = package.loaded['server.PlayerDataHost'],
-      MgrFishUnit = package.loaded['server.WorldHost.FishTree'],
+      MgrPlayerData = package.loaded['server.player_data_host'],
+      MgrFishUnit = package.loaded['server.world_host.fish_tree'],
     }
     env = { replies = {}, sent = {}, seq = 0, now = 0 }
     env.cfg = require('tests.support.zone_fixtures').Load()
@@ -91,8 +91,8 @@ describe('虾池最小内容（水区 / 鱼表 / 商店 / 钓鱼佬 / 抛竿）'
     if env and env.host then env.host:shutdown() end
     package.loaded['common.game_cfg'] = restore and restore.GameCfg
     package.loaded['common.re_util'] = restore and restore.REUtil
-    package.loaded['server.PlayerDataHost'] = restore and restore.MgrPlayerData
-    package.loaded['server.WorldHost.FishTree'] = restore and restore.MgrFishUnit
+    package.loaded['server.player_data_host'] = restore and restore.MgrPlayerData
+    package.loaded['server.world_host.fish_tree'] = restore and restore.MgrFishUnit
     _G.game = restore and restore.game
     env = nil
     restore = nil

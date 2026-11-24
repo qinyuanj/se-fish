@@ -55,14 +55,14 @@ describe('第 12 节 远程与俯冲组逐招表', function()
 
     before_each(function()
         restore, hits = {}, {}
-        savedAbility = package.loaded['server.AbilityAPI']
-        package.loaded['server.AbilityAPI'] = nil
+        savedAbility = package.loaded['server.ability_api']
+        package.loaded['server.ability_api'] = nil
     end)
 
     after_each(function()
         for index = #restore, 1, -1 do restore[index]() end
         if env then env:tearDown() end
-        package.loaded['server.AbilityAPI'] = savedAbility
+        package.loaded['server.ability_api'] = savedAbility
         env = nil
     end)
 

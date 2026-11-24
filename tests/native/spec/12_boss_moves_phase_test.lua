@@ -34,9 +34,9 @@ describe('第 12 节 阶段与复合组（沧龙 / 哥斯拉）', function()
     local savedExtra
 
     before_each(function()
-        savedExtra = { ability = package.loaded['server.AbilityAPI'] }
+        savedExtra = { ability = package.loaded['server.ability_api'] }
         env = Islet.new(7)
-        package.loaded['server.AbilityAPI'] = nil
+        package.loaded['server.ability_api'] = nil
         local p = Islet.shoreDryPoint(7)
         env.player.Character.Position = env.vec(p.x, p.y, p.z)
         env.player.Character.Controller.Health = 100000
@@ -44,7 +44,7 @@ describe('第 12 节 阶段与复合组（沧龙 / 哥斯拉）', function()
 
     after_each(function()
         env:tearDown()
-        package.loaded['server.AbilityAPI'] = savedExtra.ability
+        package.loaded['server.ability_api'] = savedExtra.ability
     end)
 
     local function health()

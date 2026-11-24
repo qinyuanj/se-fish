@@ -2,8 +2,8 @@
 -- it 名字沿用旧方法名，注册顺序 = LuaUnit sortedPairs 的实际执行顺序。
 
 local GameCfg = require('common.game_cfg')
-local Mgr = require('server.PlayerDataHost')
-local ServerRuntime = require('server.WorldHost.ServerRuntime')
+local Mgr = require('server.player_data_host')
+local ServerRuntime = require('server.world_host.server_runtime')
 
 local function signal()
   local callbacks = {}

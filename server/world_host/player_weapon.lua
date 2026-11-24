@@ -2,7 +2,7 @@
 local GameCfg = require("common.game_cfg")
 local Number = require("common.number")
 local MathWaterJudge = require("common.math_water_judge")
-local SwingRegistry = require("server.SwingRegistry")
+local SwingRegistry = require("server.swing_registry")
 local State = require("common.packages.spoke.api").State
 
 local PlayerWeapon = {}

@@ -129,14 +129,14 @@ function M.new()
     CheckRECD = function() return false end,
   }
 
-  env.save = assert(loadfile("server/SaveHost.lua"))()
-  env.players = assert(loadfile("server/PlayerDataHost.lua"))()
-  env.platform = assert(loadfile("server/PlatformHost.lua"))()
+  env.save = assert(loadfile("server/save_host.lua"))()
+  env.players = assert(loadfile("server/player_data_host.lua"))()
+  env.platform = assert(loadfile("server/platform_host.lua"))()
   env.players.Save, env.save.PlayerData = env.save, env.players
   env.platform.Save, env.platform.PlayerData = env.save, env.players
   env.platform.Now = function() return env.now end
 
-  local ServerRuntime = require("server.WorldHost.ServerRuntime")
+  local ServerRuntime = require("server.world_host.server_runtime")
   local SpokeClock = require("common.spoke_clock")
   env.ServerRuntime = ServerRuntime
   env.runtime = ServerRuntime.new({

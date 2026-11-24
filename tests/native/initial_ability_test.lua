@@ -10,7 +10,7 @@ describe("初始技能", function()
   end)
 
   it("GM 伤害基准读取挥砍行为，不依赖技能数组下标", function()
-    local source = assert(io.open("server/WorldHost/PlayerGM.lua", "rb")):read("a")
+    local source = assert(io.open("server/world_host/player_gm.lua", "rb")):read("a")
     assert.is_nil(source:find("InitialAbilities[2]", 1, true))
     assert.matches("AnchorBehavior%s*==%s*'melee_hit'", source)
   end)

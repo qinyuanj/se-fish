@@ -67,18 +67,18 @@ describe('第 6 节 官方 AI 目标选择接线（哥斯拉贯通）', function
     end
 
     local function officialFocus(fish)
-        return require('server.WorldHost.FishAiTarget'):Focus(fish)
+        return require('server.world_host.fish_ai_target'):Focus(fish)
     end
 
     before_each(function()
         env = Islet.new(7)
-        for _, name in ipairs({ 'server.WorldHost.FishAiTarget', 'server.packages.official_ai_feature.api',
+        for _, name in ipairs({ 'server.world_host.fish_ai_target', 'server.packages.official_ai_feature.api',
             'server.packages.official_ai_feature.official_ai_feature',
             'server.packages.official_ai_feature.behavior_runtime',
             'server.packages.official_ai_feature.ability_bridge' }) do
             package.loaded[name] = nil
         end
-        env.mgr.AiTarget = require('server.WorldHost.FishAiTarget')
+        env.mgr.AiTarget = require('server.world_host.fish_ai_target')
         local p = Islet.shoreDryPoint(7)
         env.player.Character.Position = vec(p.x, p.y, p.z)
         env.player.Character.Controller.Health = 100000
@@ -98,7 +98,7 @@ describe('第 6 节 官方 AI 目标选择接线（哥斯拉贯通）', function
 
         env:advance(0.2)
         assert.same(env.player.Character, officialFocus(fish), '官方 AI 管理器没有持有伤害优先目标')
-        local adapter = require('server.WorldHost.FishAiTarget')
+        local adapter = require('server.world_host.fish_ai_target')
         local state = adapter:State(fish)
         assert.same(GameCfg.Ability.AiTarget.PriorityMode, state.priorityMode,
             '伤害优先模式没有登记到官方 AI 管理器')
@@ -177,8 +177,8 @@ describe('第 6 节 官方 AI 目标选择接线（哥斯拉贯通）', function
         local oldApi, oldPreload = package.loaded[apiName], package.preload[apiName]
         package.loaded[apiName] = nil
         package.preload[apiName] = function() error('official-api-load-failed') end
-        package.loaded['server.WorldHost.FishAiTarget'] = nil
-        env.mgr.AiTarget = require('server.WorldHost.FishAiTarget')
+        package.loaded['server.world_host.fish_ai_target'] = nil
+        env.mgr.AiTarget = require('server.world_host.fish_ai_target')
         local rawPrint = _G.print
         local logs = {}
         _G.print = function(...) logs[#logs + 1] = tostring((...)) end
@@ -222,7 +222,7 @@ describe('第 6 节 官方 AI 目标选择接线（哥斯拉贯通）', function
 
     it('官方状态读取失败时记录模块、操作、对象与原始错误', function()
         local fish = dropBoss()
-        local adapter = require('server.WorldHost.FishAiTarget')
+        local adapter = require('server.world_host.fish_ai_target')
         local runtime = require('server.packages.official_ai_feature.behavior_runtime')
         local original = runtime.getState
         runtime.getState = function() error('official-state-read-failed') end
@@ -296,7 +296,7 @@ describe('第 6 节 官方 AI 目标选择接线（哥斯拉贯通）', function
         local fish = dropBoss()
         place(fish, env.player, 2)
         env:advance(1)
-        local adapter = require('server.WorldHost.FishAiTarget')
+        local adapter = require('server.world_host.fish_ai_target')
         local state = adapter:State(fish)
         assert.is_nil(state and state.modeName, '官方 AI 启动了移动模式，与自研轨迹双写权威')
         assert.is_not_true(fish.Carrier.AiOwnsMovement, '受击体的移动所有权被官方 AI 接管')
@@ -353,17 +353,17 @@ describe('第 6 节 6-30：离开战斗范围的玩家退出飞行鱼目标', fu
     local env
 
     local function vec(x, y, z) return env.vec(x, y, z) end
-    local function focus(fish) return require('server.WorldHost.FishAiTarget'):Focus(fish) end
+    local function focus(fish) return require('server.world_host.fish_ai_target'):Focus(fish) end
 
     before_each(function()
         env = Islet.new(6)
-        for _, name in ipairs({ 'server.WorldHost.FishAiTarget', 'server.packages.official_ai_feature.api',
+        for _, name in ipairs({ 'server.world_host.fish_ai_target', 'server.packages.official_ai_feature.api',
             'server.packages.official_ai_feature.official_ai_feature',
             'server.packages.official_ai_feature.behavior_runtime',
             'server.packages.official_ai_feature.ability_bridge' }) do
             package.loaded[name] = nil
         end
-        env.mgr.AiTarget = require('server.WorldHost.FishAiTarget')
+        env.mgr.AiTarget = require('server.world_host.fish_ai_target')
         local p = Islet.shoreDryPoint(6)
         env.player.Character.Position = vec(p.x, p.y, p.z)
     end)
@@ -487,7 +487,7 @@ describe('接线验收：霜之新星命中经武器入口挂霜冻（6-26）', 
             end, MagazineSize = function(_, base) return base end }
         local SpokeClock = require('common.spoke_clock')
         local spoke = require('common.packages.spoke.api')
-        local PlayerWeapon = require('server.WorldHost.PlayerWeapon')
+        local PlayerWeapon = require('server.world_host.player_weapon')
         env.clock = SpokeClock.new(env.now)
         local heldState = spoke.State.new('AiTarget626.held', { kind = 'weapon', id = 'item163' })
         local selectedState = spoke.State.new('AiTarget626.selected', nil)

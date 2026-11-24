@@ -5,7 +5,7 @@
 -- it 按旧 LuaUnit 的方法名字典序注册，保持与旧套件一致的案例顺序。
 -- 引擎边界替身必须写真实全局（_G.game）：MgrSave 由 loadfile 得到独立 chunk，
 -- 其 _ENV 是真实 _G，Busted 的逐文件沙箱里裸赋值只改沙箱、模块读不到。
-local PlayerData = require('server.Data.PlayerData')
+local PlayerData = require('server.data.player_data')
 
 describe('TestSaveFoundation', function()
     local env, savedGame
@@ -36,7 +36,7 @@ describe('TestSaveFoundation', function()
             if name == 'World' then return { GetServerTime = function() return 100 end } end
             if name == 'Players' then return { GetPlayers = function() return {} end } end
         end }
-        env.save = assert(loadfile('server/SaveHost.lua'))()
+        env.save = assert(loadfile('server/save_host.lua'))()
     end)
     after_each(function()
         _G.game = savedGame

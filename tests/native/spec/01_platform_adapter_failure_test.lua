@@ -13,7 +13,7 @@ local EconomyWorld = require('tests.support.economy_world')
 
 -- 前提守卫：本文件复现的是 main.lua 的接线，而不是自造一套协作关系。
 local WIRING = {
-    'local PlatformHost = require("server.PlatformHost")',
+    'local PlatformHost = require("server.platform_host")',
     'player_data = PlayerDataHost',
     'save = SaveHost',
     'platform = PlatformHost',
@@ -106,9 +106,9 @@ describe('条款 1-12：适配层失败路径', function()
             }
         end })
         -- loadfile 每次得到全新的管理器实例表，避免 Flows / DataMap 跨案例残留。
-        env.save = assert(loadfile('server/SaveHost.lua'))()
-        env.players = assert(loadfile('server/PlayerDataHost.lua'))()
-        env.platform = assert(loadfile('server/PlatformHost.lua'))()
+        env.save = assert(loadfile('server/save_host.lua'))()
+        env.players = assert(loadfile('server/player_data_host.lua'))()
+        env.platform = assert(loadfile('server/platform_host.lua'))()
         env.players.Save, env.save.PlayerData = env.save, env.players
         env.platform.Save, env.platform.PlayerData = env.save, env.players
         env.platform.Now = function() return env.now end
