@@ -6,7 +6,7 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | 13-01 | 图鉴共 98 条独立记录，其中普通 42、极品 42、精英 7、首领 7 | 规则 | agent | A | unverified | — |
 | 13-02 | 图鉴按七个钓鱼区分页 | 规则 | agent | A | unverified | — |
-| 13-03 | 普通与极品分类展示，精英与首领另有明确的品级入口 | 规则 | agent | A | unverified | — |
+| 13-03 | 普通与极品分类展示，精英与首领另有明确的品级入口 | 规则 | agent | A | evidenced | tests/native/spec/13_compendium_grade_filter_test.lua |
 | 13-04 | 成功收线上岸即解锁该鱼种图鉴记录，不等待击杀 | 规则 | agent | A | unverified | — |
 | 13-05 | 同一条鱼的多份掉落不在图鉴重复记为钓取，一次上岸只入账一次 | 契约 | agent | B | unverified | — |
 | 13-06 | 每次上岸更新该鱼种的个人最大钓取重量，仅在超过旧值时刷新 | 规则 | agent | A | unverified | — |

@@ -64,6 +64,7 @@ client/press_gesture.lua:44:unnecessary-if
 client/press_gesture.lua:46:unnecessary-if
 client/press_gesture.lua:48:undefined-field
 client/press_gesture.lua:53:unnecessary-if
+client/store/client_store.lua:100:return-type-mismatch
 client/store/client_store.lua:200:redundant-return-value
 client/store/client_store.lua:269:unnecessary-if
 client/store/client_store.lua:335:need-check-nil
@@ -89,6 +90,7 @@ client/store/client_store.lua:703:unused
 client/store/client_store.lua:722:unused
 client/store/client_store.lua:760:unused
 client/store/client_store.lua:764:undefined-field
+client/store/client_store.lua:80:return-type-mismatch
 client/store/client_store.lua:800:unnecessary-if
 client/store/client_store.lua:920:unnecessary-if
 client/views/attack_view.lua:133:assign-type-mismatch
@@ -1100,14 +1102,14 @@ server/world_host/player_weapon.lua:190:need-check-nil
 server/world_host/player_weapon.lua:223:unnecessary-if
 server/world_host/player_weapon.lua:23:unnecessary-if
 server/world_host/player_weapon.lua:267:assign-type-mismatch
-server/world_host/player_weapon.lua:608:unnecessary-if
-server/world_host/player_weapon.lua:610:unnecessary-if
+server/world_host/player_weapon.lua:652:unnecessary-if
+server/world_host/player_weapon.lua:654:unnecessary-if
 server/world_host/player_weapon.lua:6:unresolved-require
-server/world_host/player_weapon.lua:707:need-check-nil
-server/world_host/player_weapon.lua:707:unnecessary-if
-server/world_host/player_weapon.lua:708:need-check-nil
-server/world_host/player_weapon.lua:708:undefined-field
-server/world_host/player_weapon.lua:710:need-check-nil
+server/world_host/player_weapon.lua:751:need-check-nil
+server/world_host/player_weapon.lua:751:unnecessary-if
+server/world_host/player_weapon.lua:752:need-check-nil
+server/world_host/player_weapon.lua:752:undefined-field
+server/world_host/player_weapon.lua:754:need-check-nil
 server/world_host/server_runtime.lua:1084:unused
 server/world_host/server_runtime.lua:1107:unused
 server/world_host/server_runtime.lua:1114:unused

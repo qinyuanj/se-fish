@@ -38,7 +38,7 @@ function M:set_up()
     ctx.now = 1000
     ctx.clock = SpokeClock.new(ctx.now)
     ctx.replies, ctx.applied, ctx.spawnedFish, ctx.visuals = {}, {}, {}, {}
-    ctx.casts, ctx.effects = {}, {}
+    ctx.casts, ctx.effects, ctx.rays = {}, {}, {}
     ctx.order = 0
     ctx.rayHit, ctx.lastRay, ctx.create_unit, ctx.random = nil, nil, nil, nil
     ctx.applyOk = true
@@ -66,6 +66,10 @@ function M:set_up()
             origin, direction = select(1, ...), select(2, ...)
         end
         ctx.lastRay = { o = origin, d = direction }
+        ctx.rays[#ctx.rays + 1] = ctx.lastRay
+        if type(ctx.rayHit) == 'function' then
+            return ctx.rayHit(origin, direction, #ctx.rays)
+        end
         return ctx.rayHit
     end }
     ctx.players_service = {

@@ -569,7 +569,7 @@ function Mgr:release(fish, reason)
             elseif species.Combat == 'walrus' then
                 fish.ChargeAt = now + GameCfg.FishCombat[species.Combat].ChargeSec
             elseif species.Combat == 'orca' then
-                local params = GameCfg.FishCombat[species.Combat]
+                local params = BossMoves.combat_params(GameCfg.FishCombat[species.Combat], BossMoves.key_of(species, fish.fish_id))
                 fish.JumpAt = now + params.JumpIntervalSec
                 fish.RoarAt = now + params.RoarSec
                 fish.TailAt = now + params.TailSec

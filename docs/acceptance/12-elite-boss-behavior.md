@@ -10,7 +10,7 @@
 | 12-03 | 表中未给出参数的独立招式沿用正文数值，不因表缺列而删除该招式 | 规则 | agent | A | unverified | — |
 | 12-04 | 表中未明确的命中次数、轨迹、预警与效果持续时间属实现期配置细化，须先形成可复验样例 | 规则 | agent | A | evidenced | tests/native/spec/12_boss_moves_test.lua |
 | 12-05 | 实现期细化不得暗中增加新招式，本节列出的招式集合之外不新增攻击 | 规则 | agent | A | evidenced | tests/native/spec/12_boss_moves_test.lua |
-| 12-06 | 精英与首领只在被召出并放下后进入战斗态，本节不新设召唤入口（出场沿用首领饵与信物兑换，见 §4、§8） | 规则 | agent | A | unverified | — |
+| 12-06 | 精英可普通抽取、首领沿用首领饵强制召唤，二者均在上岸举鱼后首次放下时进入战斗态，本节不新设召唤入口 | 规则 | agent | A | evidenced | tests/native/spec/12_boss_moves_ranged_dive_test.lua |
 | 12-07 | 电鳗移速 6，5 米内每秒放电一次、每次 10，持续 5 秒，之后睡眠 10 秒且睡眠中可受击 | 规则 | agent | A | evidenced | tests/native/spec/12_boss_moves_melee_aoe_test.lua |
 | 12-08 | 鳄雀鳝追咬伤害 30、间隔 1.5 秒 | 规则 | agent | A | evidenced | tests/native/spec/12_boss_moves_melee_aoe_test.lua |
 | 12-09 | 鳄雀鳝只在头部区判定命中，玩家绕到后身即咬空 | 规则 | agent | A | evidenced | tests/native/spec/12_boss_moves_melee_aoe_test.lua |
@@ -33,7 +33,7 @@
 | 12-26 | 海象突击周期 40 秒，直线冲锋 20 米、命中 120 | 规则 | agent | A | evidenced | tests/native/spec/12_boss_moves_ranged_dive_test.lua |
 | 12-27 | 虎鲸爪击 30、间隔 2 秒 | 规则 | agent | A | unverified | — |
 | 12-28 | 虎鲸每 10 秒虎啸远程攻击一次 | 规则 | agent | A | evidenced | tests/native/spec/12_boss_moves_ranged_dive_test.lua |
-| 12-29 | 虎鲸每 10 秒甩尾一次，对后方 160 伤害 | 规则 | agent | A | unverified | — |
+| 12-29 | 虎鲸存在有效目标且招式互斥时按 10 秒周期起手甩尾（到期无目标不空放、保留至下次可攻击），对后方 4 米内目标造成 160 伤害 | 规则 | agent | A | evidenced | tests/native/spec/12_boss_moves_ranged_dive_test.lua |
 | 12-30 | 虎鲸跳跃周期 25 秒，随机 15 米外落点、10 米范围 240 伤害 | 规则 | agent | A | evidenced | tests/native/spec/12_boss_moves_ranged_dive_test.lua |
 | 12-31 | 白头鹰飞行移速 20、每 20 秒俯冲一次、基础攻击 30 | 规则 | agent | A | evidenced | tests/native/spec/12_boss_moves_ranged_dive_test.lua |
 | 12-32 | 风神翼龙飞行移速 20、每 4 秒投掷一次、落地范围 5 米 | 规则 | agent | A | evidenced | tests/native/spec/12_boss_moves_ranged_dive_test.lua |

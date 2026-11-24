@@ -764,7 +764,7 @@ GameCfg.Ability = {
     GunShared = { ReloadSec = 2, Range = 30, ActionCooldownSec = 0.1 },
     Guns = {
         item137 = { Damage = 10, IntervalSec = 1.0, Magazine = 10, Anim = AttackAnim.Pistol },
-        item138 = { Damage = 20, Pellets = 5, IntervalSec = 1.5, Magazine = 2, Anim = AttackAnim.Rifle },
+        item138 = { Damage = 20, Pellets = 5, SpreadDeg = 12, IntervalSec = 1.5, Magazine = 2, Anim = AttackAnim.Rifle },
         item139 = { Damage = 13, IntervalSec = 0.15, Magazine = 30, Auto = true, Anim = AttackAnim.Auto },
         item140 = { Damage = 20, IntervalSec = 0.2, Magazine = 30, Auto = true, Anim = AttackAnim.Auto },
         item141 = { Damage = 200, IntervalSec = 1.5, Magazine = 5, Anim = AttackAnim.Rifle },

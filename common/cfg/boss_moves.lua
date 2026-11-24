@@ -293,6 +293,7 @@ local COMBAT_FIELDS = {
     ['shark.jump'] = { JumpRadius = 'Range', JumpDamage = 'Damage', JumpIntervalSec = 'Sec', JumpDistance = 'Distance' },
     ['walrus.charge'] = { ChargeDamage = 'Damage', ChargeSec = 'Sec', ChargeDistance = 'Distance' },
     ['orca.roar'] = { RoarDamage = 'Damage', RoarSec = 'Sec', RoarRange = 'Range' },
+    ['orca.tail'] = { TailRadius = 'Range', TailDamage = 'Damage', TailSec = 'Sec' },
     ['orca.jump'] = { JumpRadius = 'Range', JumpDamage = 'Damage', JumpIntervalSec = 'Sec', JumpDistance = 'Distance' },
     ['fish47Elite.dive'] = { DiveRadius = 'Range', DiveDamage = 'Damage', DiveIntervalSec = 'Sec' },
     ['fish48Boss.throw'] = { ThrowRadius = 'Range', ThrowDamage = 'Damage', ThrowIntervalSec = 'Sec' },

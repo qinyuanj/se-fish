@@ -179,12 +179,12 @@
 | 6-05 | server/world_host/player_weapon.lua、client/packages/ability_system/strategy/HoldStrategy.lua、client/weapon_aim.lua | tests/native/weapon_system_test.lua、tests/native/combat_behavior_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 6-06 | common/cfg/shop.lua、server/world_host/player_weapon.lua、common/game_cfg.lua | tests/native/weapon_system_test.lua、tests/native/combat_behavior_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 6-07 | common/cfg/items.lua、common/game_cfg.lua | tests/native/cfg_fish_items_test.lua、tests/native/prize_weapon_effect_test.lua、tests/native/prize_weapon_cfg_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 6-08 | common/cfg/shop.lua、server/world_host/player_weapon.lua | tests/native/weapon_system_test.lua、tests/native/combat_behavior_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 6-08 | common/cfg/shop.lua、server/world_host/player_weapon.lua | tests/native/weapon_system_test.lua、tests/native/combat_behavior_test.lua、tests/native/spec/06_shotgun_pellets_test.lua | 有 | 有 | 缺 | 缺 | A |
 | 6-09 | server/world_host/player_weapon.lua、server/world_host/player_life.lua | tests/native/weapon_system_test.lua、tests/native/combat_behavior_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 6-10 | server/world_host/player_weapon.lua | tests/native/weapon_system_test.lua、tests/native/combat_behavior_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 6-11 | server/world_host/player_weapon.lua、client/weapon_aim.lua | tests/native/weapon_system_test.lua、tests/native/combat_behavior_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 6-12 | server/world_host/player_weapon.lua | tests/native/weapon_system_test.lua、tests/native/combat_behavior_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 6-13 | server/world_host/player_weapon.lua、common/fish_catch.lua、server/world_host/fish_tree.lua | tests/native/weapon_system_test.lua、tests/native/combat_behavior_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 6-13 | server/world_host/player_weapon.lua、common/fish_catch.lua、server/world_host/fish_tree.lua | tests/native/weapon_system_test.lua、tests/native/combat_behavior_test.lua、tests/native/spec/06_blast_fish_test.lua | 有 | 有 | 缺 | 缺 | A |
 | 6-14 | common/cfg/shop.lua、server/world_host/player_shop.lua、server/world_host/player_weapon.lua、common/attr_model.lua、server/world_host/attr_leaf.lua | tests/native/prize_growth_wiring_test.lua、tests/native/shop_test.lua、tests/native/attr_migration_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 6-15 | common/cfg/shop.lua、server/world_host/player_shop.lua、server/world_host/player_weapon.lua、common/attr_model.lua、server/world_host/attr_leaf.lua | tests/native/prize_growth_wiring_test.lua、tests/native/shop_test.lua、tests/native/attr_migration_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 6-16 | common/cfg/shop.lua、server/world_host/player_shop.lua、server/world_host/player_weapon.lua、common/attr_model.lua、server/world_host/attr_leaf.lua | tests/native/prize_growth_wiring_test.lua、tests/native/shop_test.lua、tests/native/attr_migration_test.lua | 缺 | 缺 | 缺 | 缺 | A |
@@ -358,7 +358,7 @@
 | 12-03 | common/cfg/boss_moves.lua | tests/native/spec/12_boss_moves_test.lua | 有 | 缺 | 缺 | 缺 | A |
 | 12-04 | common/cfg/boss_moves.lua、server/world_host/fish_tree.lua | tests/native/spec/12_boss_moves_test.lua | 有 | 缺 | 缺 | 缺 | A |
 | 12-05 | common/cfg/boss_moves.lua | tests/native/spec/12_boss_moves_test.lua | 有 | 缺 | 缺 | 缺 | A |
-| 12-06 | server/world_host/fish_tree.lua、common/game_cfg.lua | tests/native/boss_bait_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 12-06 | server/world_host/fish_tree.lua、common/game_cfg.lua | tests/native/spec/12_boss_moves_ranged_dive_test.lua、tests/native/boss_bait_test.lua | 有 | 缺 | 缺 | 缺 | A |
 | 12-07 | common/cfg/boss_moves.lua、common/game_cfg.lua、server/world_host/fish_tree.lua| tests/native/spec/12_boss_moves_melee_aoe_test.lua、tests/native/eel_combat_test.lua| 有| 缺 | 缺 | 缺 | A |
 | 12-08 | common/cfg/boss_moves.lua、common/game_cfg.lua、server/world_host/fish_tree.lua、common/gar_bite_notice.lua| tests/native/spec/12_boss_moves_melee_aoe_test.lua、tests/native/gar_combat_test.lua| 有| 缺 | 缺 | 缺 | A |
 | 12-09 | common/cfg/boss_moves.lua、server/world_host/fish_tree.lua| tests/native/spec/12_boss_moves_melee_aoe_test.lua、tests/native/gar_combat_test.lua| 有| 有| 缺 | 缺 | A |
@@ -381,7 +381,7 @@
 | 12-26 | common/cfg/boss_moves.lua、common/game_cfg.lua、server/world_host/fish_tree.lua | tests/native/spec/12_boss_moves_ranged_dive_test.lua | 有 | 缺 | 缺 | 缺 | A |
 | 12-27 | common/game_cfg.lua、server/world_host/fish_tree.lua | tests/native/beach_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 12-28 | common/cfg/boss_moves.lua、common/game_cfg.lua、server/world_host/fish_tree.lua | tests/native/spec/12_boss_moves_ranged_dive_test.lua | 有 | 缺 | 缺 | 缺 | A |
-| 12-29 | common/game_cfg.lua、server/world_host/fish_tree.lua | tests/native/beach_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 12-29 | common/cfg/boss_moves.lua、common/game_cfg.lua、server/world_host/fish_tree.lua | tests/native/spec/12_boss_moves_ranged_dive_test.lua、tests/native/beach_combat_test.lua | 有 | 缺 | 缺 | 缺 | A |
 | 12-30 | common/cfg/boss_moves.lua、common/game_cfg.lua、server/world_host/fish_tree.lua | tests/native/spec/12_boss_moves_ranged_dive_test.lua | 有 | 缺 | 缺 | 缺 | A |
 | 12-31 | common/cfg/boss_moves.lua、common/game_cfg.lua、server/world_host/fish_tree.lua | tests/native/spec/12_boss_moves_ranged_dive_test.lua | 有 | 缺 | 缺 | 缺 | A |
 | 12-32 | common/cfg/boss_moves.lua、common/game_cfg.lua、server/world_host/fish_tree.lua | tests/native/spec/12_boss_moves_ranged_dive_test.lua | 有 | 缺 | 缺 | 缺 | A |
@@ -420,7 +420,7 @@
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 13-01 | common/cfg/fish.lua、client/views/compendium_view.lua | tests/native/spec/server_progress_315_test.lua、tests/native/spec/client_progress_315_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 13-02 | client/views/compendium_view.lua、common/game_cfg.lua | tests/native/spec/client_progress_315_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 13-03 | client/views/compendium_view.lua | tests/native/spec/client_progress_315_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 13-03 | client/views/compendium_view.lua | tests/native/spec/client_progress_315_test.lua、tests/native/spec/13_compendium_grade_filter_test.lua | 有 | 缺 | 缺 | 缺 | A |
 | 13-04 | server/world_host/player_compendium.lua、server/world_host/fishing_phase.lua、server/world_host/fish_tree.lua | tests/native/spec/server_progress_315_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 13-05 | server/world_host/player_compendium.lua | tests/native/spec/server_progress_315_test.lua | 缺 | 缺 | 缺 | 缺 | B |
 | 13-06 | server/world_host/player_compendium.lua、server/data/player_data.lua | tests/native/spec/server_progress_315_test.lua | 缺 | 缺 | 缺 | 缺 | A |

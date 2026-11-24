@@ -192,4 +192,38 @@ describe('架构分层门禁', function()
     assert.is_true(text:find(expected, 1, true) ~= nil, expected)
     assert.equals(':levels [[:client.packages :server.packages :common.packages]', expected:sub(1, 61))
   end)
+
+  it('docs/uml/se-fish.edn 与当前业务模块保持同步', function()
+    local handle = assert(io.open('docs/uml/se-fish.edn', 'rb'))
+    local text = handle:read('*a')
+    handle:close()
+
+    local uml_ids = {}
+    for id in text:gmatch(':id%s+:([%w_%.%-]+)') do
+      uml_ids[id] = true
+    end
+
+    local source_modules = {}
+    local missing = {}
+    for _, id in ipairs(scan_real().modules) do
+      if not id:match('^[^.]+%.packages$') and not id:match('%.packages%.') then
+        source_modules[id] = true
+        if not uml_ids[id] then
+          missing[#missing + 1] = id
+        end
+      end
+    end
+    table.sort(missing)
+    assert.same({}, missing)
+
+    local extra = {}
+    for id in pairs(uml_ids) do
+      local is_biz = id:match('^client%.') or id:match('^common%.') or id:match('^server%.')
+      if is_biz and not id:match('^server%._trigger%.') and not source_modules[id] then
+        extra[#extra + 1] = id
+      end
+    end
+    table.sort(extra)
+    assert.same({}, extra)
+  end)
 end)

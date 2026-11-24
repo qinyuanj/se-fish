@@ -28,14 +28,14 @@
 - 包内没有版本号、变更记录或来源 URL，升级以整包导入为准，替换后 diff 三端子树确认改动面。
 - 升级来源用官方资源包空图（新建空图导入四个包后的宿主目录）：三端 `packages/<包>/` 按原始字节整包覆盖并删除旧包多余文件。2026-11-05 的全量升级与逐包差异摘要见 [GitHub #177](https://github.com/qinyuanj/se-fish/issues/177)。
 - 业务层直接 require 对应端的包内 `api.lua`；不在上一层复制导出名单、拍平 `Funcs` 或逐函数转发。属性和 AI 包使用原生 `Funcs` 函数表，`Enums` / `Configs` / `Prefabs` 保持包内结构。升级后通过真实包回归核对调用契约（属性：`attr_migration_test.lua`、`attr_rule_probe_test.lua`；效果：`modifier_system_probe_test.lua`；AI 与技能桥：`ai_migration_test.lua`、`official_ai_probe_test.lua`）。
-- `server/ability_api.lua` 仅保留本图业务：施法守卫、体型、挂点与锚点补挂。需要守卫的业务施法继续调用它；装配、停止和查询技能直接调用包。锚点行为所需的管理器由 `server/main.lua` 通过 `BehaviorServices` 注入，行为不反向加载 `server.Mgr`。AI 位移生命周期查询由 `MgrAi` 持有，不另建 AI 转发入口。挥砍登记由 `server/swing_registry.lua` 独立持有，武器入口与近战行为共同依赖它。
+- `server/ability_api.lua` 仅保留本图业务：施法守卫、体型、挂点与锚点补挂。需要守卫的业务施法继续调用它；装配、停止和查询技能直接调用包。锚点行为所需的管理器由 `server/main.lua` 通过 `BehaviorServices` 注入，行为不反向加载宿主组合根。AI 位移生命周期查询由 `server/world_host/fish_ai.lua`（`FishAi`）持有，不另建 AI 转发入口。挥砍登记由 `server/swing_registry.lua` 独立持有，武器入口与近战行为共同依赖它。
 
 ## 新版包的默认行为（2026-11-05 版）
 
 以下行为随 #177 升级进来，业务依赖它们时以此为准：
 
-- **效果清除规则**：效果预设壳新增「清除规则」`RemoveMode`，默认 `1`（击败后清除），拥有者触发引擎死亡信号时移除效果。本图生死由 `MgrSurvival` 管理，`MgrModifier` 获得效果时显式传 `removeMode = 0`，保持旧包「死亡不清效果」的行为。
-- **效果阻断与打断**：预设的 `ForbidTags` 命中已有效果时获得结果为 `Blocked`，`RemoveTags` 会移除带对应标签的已有效果；本图预设未配置这两项。`MgrModifier` 把 `Added` / `Reobtained` 以外的结果都当失败处理。
+- **效果清除规则**：效果预设壳新增「清除规则」`RemoveMode`，默认 `1`（击败后清除），拥有者触发引擎死亡信号时移除效果。本图生死由 `server/world_host/player_life.lua`（`PlayerLife`）管理，`server/world_host/modifier_leaf.lua`（`ModifierLeaf`）获得效果时显式传 `removeMode = 0`，保持旧包「死亡不清效果」的行为。
+- **效果阻断与打断**：预设的 `ForbidTags` 命中已有效果时获得结果为 `Blocked`，`RemoveTags` 会移除带对应标签的已有效果；本图预设未配置这两项。`ModifierLeaf` 把 `Added` / `Reobtained` 以外的结果都当失败处理。
 - **效果状态栏 UI**：客户端效果管理器启动后自动拉起 `ui/EffectStatusBarUI`，按 `UIType=EffectStatusBar` 或节点名「效果状态栏」找界面节点。本图没有这个节点，界面不显示；循环每 0.5 秒重查一次，约 30 秒后打一条「未找到可用的效果状态栏」提示，属预期。
 - **技能覆盖装配**：`add_ability` 指定的槽位被另一预设占用时，旧包返回失败，新包先移除旧技能再装配。本图初始技能与鱼技能各占一个槽位，不触发覆盖。
 - **客户端施法竞态守卫**：包内 `cast_ability` 新增末参数 `fromClient`，只有包自带的客户端施法请求传 `true`；`server/ability_api.lua` 的守卫转发不传，行为与旧包一致。
