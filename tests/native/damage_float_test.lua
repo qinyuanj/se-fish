@@ -10,7 +10,7 @@
 -- 替身全局在「迁移前本来就不存在」时不会被清掉。本 spec 改为逐键 rawget 快照 + 显式赋回（含 nil）。
 local DamageNotice = require('common.damage_notice')
 local GameCfg = require('common.game_cfg')
-local DamageFloat = require('client.DamageFloat')
+local DamageFloat = require('client.damage_float')
 
 describe('TestDamageFloat', function()
     -- 旧 setUp/tearDown 的替身环境逐例建立与恢复：模块单例状态与全局都按案例回滚。

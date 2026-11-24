@@ -24,7 +24,7 @@ local REENTRANT_ENTRIES = {
 
 local function is_reentrant_entry(path, name)
   if REENTRANT_ENTRIES[name] then return true end
-  if path:match("^client/Views/") and (name == "spec" or name:match("_spec$")) then
+  if path:match("^client/views/") and (name == "spec" or name:match("_spec$")) then
     return true
   end
   return false

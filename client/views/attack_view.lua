@@ -1,9 +1,9 @@
 
 local GameCfg = require("common.game_cfg")
-local PressGesture = require("client.PressGesture")
+local PressGesture = require("client.press_gesture")
 local spoke = require("common.packages.spoke.api")
-local MainHudLayout = require("client.MainHudLayout")
-local ViewUtil = require("client.Views.ViewUtil")
+local MainHudLayout = require("client.main_hud_layout")
+local ViewUtil = require("client.views.view_util")
 
 local State = spoke.State
 local AttackView = {}

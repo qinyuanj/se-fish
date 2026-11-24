@@ -1,4 +1,4 @@
-local Modal = require("client.Views.EconomyModal")
+local Modal = require("client.views.economy_modal")
 local MessageView = {}
 
 function MessageView.spec()

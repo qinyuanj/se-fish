@@ -1,7 +1,7 @@
 local GameCfg = require("common.game_cfg")
 local BodyScale = require("common.body_scale")
-local Modal = require("client.Views.EconomyModal")
-local ViewUtil = require("client.Views.ViewUtil")
+local Modal = require("client.views.economy_modal")
+local ViewUtil = require("client.views.view_util")
 
 local LotteryInteraction = {}
 

@@ -1,9 +1,9 @@
-local ClientStore = require("client.Store.ClientStore")
-local RootView = require("client.Views.RootView")
-local LotteryView = require("client.Views.LotteryView")
-local BlindboxView = require("client.Views.BlindboxView")
-local PlatformShopView = require("client.Views.PlatformShopView")
-local LotteryInteraction = require("client.Views.LotteryInteraction")
+local ClientStore = require("client.store.client_store")
+local RootView = require("client.views.root_view")
+local LotteryView = require("client.views.lottery_view")
+local BlindboxView = require("client.views.blindbox_view")
+local PlatformShopView = require("client.views.platform_shop_view")
+local LotteryInteraction = require("client.views.lottery_interaction")
 local Eui = require("tests.support.eui_double")
 
 local M = {}

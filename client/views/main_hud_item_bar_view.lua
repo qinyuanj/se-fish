@@ -1,4 +1,4 @@
--- Spoke 主 HUD 底部道具栏视图（ADR-0032 / #297-B3b2，归属 L2 client.Views）：
+-- Spoke 主 HUD 底部道具栏视图（ADR-0032 / #297-B3b2，归属 L2 client.views）：
 -- 挂载于 RootView 常驻 HUD 槽位，订阅只读 ClientStore.item_bar；
 -- 通过 Dock 增量管理 ItemBarSlot1..N（随 slotCount 2..8 扩容重排与缩容卸载）；
 -- 支持点击选槽（SelectSlot）、拖拽换格（MoveSlot）、爆炸物点按直投/长按瞄准手势（PressGesture + ThrowAimPhase）；
@@ -7,9 +7,9 @@
 local spoke = require("common.packages.spoke.api")
 local GameCfg = require("common.game_cfg")
 local Number = require("common.number")
-local MainHudLayout = require("client.MainHudLayout")
-local PressGesture = require("client.PressGesture")
-local ViewUtil = require("client.Views.ViewUtil")
+local MainHudLayout = require("client.main_hud_layout")
+local PressGesture = require("client.press_gesture")
+local ViewUtil = require("client.views.view_util")
 
 local Effect = spoke.Effect
 local State = spoke.State

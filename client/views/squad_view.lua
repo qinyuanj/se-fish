@@ -1,7 +1,7 @@
 
 local GameCfg = require("common.game_cfg")
-local ViewUtil = require("client.Views.ViewUtil")
-local RescueView = require("client.Views.RescueView")
+local ViewUtil = require("client.views.view_util")
+local RescueView = require("client.views.rescue_view")
 
 local SquadView = {}
 

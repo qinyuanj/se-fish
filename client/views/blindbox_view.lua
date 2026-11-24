@@ -1,5 +1,5 @@
 local GameCfg = require("common.game_cfg")
-local Modal = require("client.Views.EconomyModal")
+local Modal = require("client.views.economy_modal")
 
 local BlindboxView = {}
 

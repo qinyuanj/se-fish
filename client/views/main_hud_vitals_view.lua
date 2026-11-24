@@ -1,12 +1,12 @@
--- Spoke 主 HUD 左上状态区与金币视图（ADR-0032 / #297-B2，归属 L2 client.Views）：
+-- Spoke 主 HUD 左上状态区与金币视图（ADR-0032 / #297-B2，归属 L2 client.views）：
 -- 挂载于 RootView 常驻 HUD 槽位，订阅只读 ClientStore.vitals / coin / clock；
 -- 负责血量环（'血 '）、饥饿环（'饥饿度 '）、4 条饥饿闪烁红边与编辑器预置金币节点（ImageCoin/LabelCoin）排版。
 
 local spoke = require("common.packages.spoke.api")
 local GameCfg = require("common.game_cfg")
 local Number = require("common.number")
-local MainHudLayout = require("client.MainHudLayout")
-local ViewUtil = require("client.Views.ViewUtil")
+local MainHudLayout = require("client.main_hud_layout")
+local ViewUtil = require("client.views.view_util")
 
 local State = spoke.State
 
