@@ -47,7 +47,7 @@ function Mgr:State(fish)
     end
     local runtime = loadRuntime(fish, unit)
     if not runtime then return nil end
-    local ok, state = pcall(runtime.get_state, unit)
+    local ok, state = pcall(runtime.getState, unit)
     if not ok then
         logFailure('ReadOfficialState', fish, unit, nil, state)
         return nil
@@ -90,7 +90,7 @@ function Mgr:set_focus(fish, player, ranked)
             end
         end
         funcs.SetSearchEnemyFocusTarget(unit, target)
-        local state = runtime.get_state(unit)
+        local state = runtime.getState(unit)
         if not state or state.focusTarget ~= target then
             error('official AI focus registration did not apply')
         end

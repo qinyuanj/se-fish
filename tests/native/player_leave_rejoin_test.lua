@@ -150,9 +150,9 @@ describe('TestPlayerLeaveRejoin', function()
             RemoveModifier = function() end,
         }
         local ability_api_stub = {
-            add_ability = function() return { SetAttribute = function() end } end,
+            AddAbility = function() return { SetAttribute = function() end } end,
             StopAbility = function() end,
-            cast_ability = function() return true end,
+            CastAbility = function() return true end,
         }
         env.save = assert(loadfile('server/save_host.lua'))()
         env.data = assert(loadfile('server/player_data_host.lua'))()

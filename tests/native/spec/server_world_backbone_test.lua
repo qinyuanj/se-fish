@@ -938,9 +938,9 @@ describe("服务端入口接线：server/main.lua 宿主测试双端到端集成
       RemoveModifier = function() end,
     }
     local ability_api_stub = {
-      add_ability = function() return { SetAttribute = function() end } end,
+      AddAbility = function() return { SetAttribute = function() end } end,
       StopAbility = function() end,
-      cast_ability = function() return true end,
+      CastAbility = function() return true end,
     }
 
     mgrs.SaveHost = assert(loadfile("server/save_host.lua"))()

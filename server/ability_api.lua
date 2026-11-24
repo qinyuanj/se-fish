@@ -1,7 +1,7 @@
 local AbilityPackageAPI = require("server.packages.ability_system.api")
 local AbilityAPI = { BehaviorServices = {} }
 
-local packageCastAbility = AbilityPackageAPI.cast_ability
+local packageCastAbility = AbilityPackageAPI.CastAbility
 local castGuard
 local extraGuards = {}
 function AbilityAPI.add_cast_guard(guard)

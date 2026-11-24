@@ -47,11 +47,11 @@ describe('TestAbilityCastGuard', function()
         package.loaded['server.ability_api'] = saved.api
     end)
 
-    -- 根 AbilityAPI 必须先跑服务端守卫，再进 vendor 的包内 cast_ability；守卫拒绝时包完全不被调用。
+    -- 根 AbilityAPI 必须先跑服务端守卫，再进 vendor 的包内 CastAbility；守卫拒绝时包完全不被调用。
     it('test_root_api_applies_server_guard_before_package_cast', function()
         local impl = {}
         local calls = {}
-        impl.cast_ability = function(unit, index) calls[#calls + 1] = { unit, index } return true end
+        impl.CastAbility = function(unit, index) calls[#calls + 1] = { unit, index } return true end
         package.preload[VENDOR] = function() return impl end
         package.loaded[VENDOR] = nil
         package.loaded['server.ability_api'] = nil

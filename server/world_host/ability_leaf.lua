@@ -104,7 +104,7 @@ local function try_equip_entry(ability_api, character, entry, create_asset, opts
   if not character_readable(character) then
     return false, "character-unreadable"
   end
-  local ok_add, ability_script = pcall(ability_api.add_ability, character, entry.AssetId, entry.Index)
+  local ok_add, ability_script = pcall(ability_api.AddAbility, character, entry.AssetId, entry.Index)
   if not ok_add or not ability_script then
     return false, "not-ready"
   end
@@ -195,7 +195,7 @@ function AbilityLeaf.cast_ability(player_tree, ability_index, release_point, rel
   end
   local ability_api = opts.ability_api or default_ability_api()
   local ok, result, err = pcall(
-    ability_api.cast_ability,
+    ability_api.CastAbility,
     character,
     ability_index,
     release_point,

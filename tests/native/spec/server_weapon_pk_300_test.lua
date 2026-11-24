@@ -169,7 +169,7 @@ describe("武器攻击换弹与 PK 过滤宿主接缝（#300）", function()
         events.PartyAction.OnServerEvent:Connect(function(actor, payload) dispatch(actor, payload) end)
       end,
       bind_weapon_action = function(dispatch)
-        events.weapon_action.OnServerEvent:Connect(function(actor, payload)
+        events.WeaponAction.OnServerEvent:Connect(function(actor, payload)
           dispatch(actor, payload)
         end)
       end,
@@ -183,7 +183,7 @@ describe("武器攻击换弹与 PK 过滤宿主接缝（#300）", function()
   end
 
   local function attack(aim)
-    events.weapon_action.OnServerEvent:Fire(player, { action = "attack", aim = aim })
+    events.WeaponAction.OnServerEvent:Fire(player, { action = "attack", aim = aim })
     return last_result(events, player)
   end
 

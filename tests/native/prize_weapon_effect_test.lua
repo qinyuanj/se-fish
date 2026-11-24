@@ -12,10 +12,10 @@ local Weapon = require('tests.support.weapon_world')
 local SwingRegistry = require('server.swing_registry')
 local VENDOR = 'server.packages.ability_system.api'
 
--- 只替换包内 cast_ability，保持业务守卫的真实实现。
+-- 只替换包内 CastAbility，保持业务守卫的真实实现。
 local function stubPackageApi(castAbility)
     local impl = {}
-    impl.cast_ability = castAbility or function() return true end
+    impl.CastAbility = castAbility or function() return true end
     return impl
 end
 

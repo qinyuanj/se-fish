@@ -9,7 +9,7 @@
 -- 投掷一发一件走 #123 协议（重放不重复扣）、20 米钳制、落水 3–5 条当地 1 级普通鱼后算伤害、
 -- 5 米爆炸、普通投掷召唤不出首领；装备/选中重进恢复、弹匣按满匣恢复。
 --
--- 每例只替换包内 cast_ability，并在 after_each 还原 preload 与模块缓存。
+-- 每例只替换包内 CastAbility，并在 after_each 还原 preload 与模块缓存。
 local Weapon = require('tests.support.weapon_world')
 local GameCfg = require('common.game_cfg')
 local PlayerData = require('server.data.player_data')
@@ -27,7 +27,7 @@ describe('TestAbilitySwingRegistry', function()
     before_each(function()
         saved = { game = rawget(_G, 'game'), preload = package.preload[VENDOR],
             vendor = package.loaded[VENDOR], api = package.loaded['server.ability_api'] }
-        package.preload[VENDOR] = function() return { cast_ability = function() return true end } end
+        package.preload[VENDOR] = function() return { CastAbility = function() return true end } end
         package.loaded[VENDOR] = nil
         ctx = { now = 1000 }
         _G.game = { GetService = function(_, name)

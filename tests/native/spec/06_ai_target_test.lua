@@ -5,7 +5,7 @@
 -- 玩家经公开损伤登记口 note_damage 记累计有效伤害，经 set_target_override 指定特殊招式目标。
 -- 观察三条外部可见结果：
 --   1. 玩家血量：爪击只落在被选中的目标身上；
---   2. 官方 AI 管理器登记的结果（BehaviorRuntime.get_state(receiver) 的 focusTarget / priorityMode）：
+--   2. 官方 AI 管理器登记的结果（BehaviorRuntime.getState(receiver) 的 focusTarget / priorityMode）：
 --      业务 Policy.order 负责伤害优先裁决，官方包只保存登记值，不参与裁决；
 --      适配层不调用 SearchEnemy / ChaseTarget，移动仍归自研 FishBehaviors / FlightPath；
 --   3. 属性/效果投影值：MgrAttr 对 attr_rule 的分量写入，MgrModifier 对 modifier_system 的效果实例。
@@ -143,8 +143,8 @@ describe('第 6 节 官方 AI 目标选择接线（哥斯拉贯通）', function
         env.mgr:note_damage(fish, env.player, 300)
 
         local manager = require('server.packages.official_ai_feature.official_ai_feature')
-        local original = manager.set_search_enemy_priority_mode
-        manager.set_search_enemy_priority_mode = function() error('official-register-failed') end
+        local original = manager.setSearchEnemyPriorityMode
+        manager.setSearchEnemyPriorityMode = function() error('official-register-failed') end
         local rawPrint = _G.print
         local logs = {}
         _G.print = function(...)
@@ -154,7 +154,7 @@ describe('第 6 节 官方 AI 目标选择接线（哥斯拉贯通）', function
         end
         local ok, selected, cp = pcall(env.mgr.choose_target, env.mgr, fish, fish.Carrier.Body.Position)
         _G.print = rawPrint
-        manager.set_search_enemy_priority_mode = original
+        manager.setSearchEnemyPriorityMode = original
         assert.is_true(ok, tostring(selected))
         assert.same(env.player, selected, '官方登记失败阻断了业务伤害优先目标')
         assert.same(env.player.Character.Position, cp)
@@ -202,14 +202,14 @@ describe('第 6 节 官方 AI 目标选择接线（哥斯拉贯通）', function
         place(fish, env.rival, 2)
         assert.is_true(env.mgr:set_target_override(fish, env.rival))
         local manager = require('server.packages.official_ai_feature.official_ai_feature')
-        local original = manager.set_search_enemy_priority_mode
-        manager.set_search_enemy_priority_mode = function() error('official-focus-failed') end
+        local original = manager.setSearchEnemyPriorityMode
+        manager.setSearchEnemyPriorityMode = function() error('official-focus-failed') end
         local rawPrint = _G.print
         local logs = {}
         _G.print = function(...) logs[#logs + 1] = tostring((...)) end
         local ok, selected = pcall(env.mgr.choose_target, env.mgr, fish, fish.Carrier.Body.Position)
         _G.print = rawPrint
-        manager.set_search_enemy_priority_mode = original
+        manager.setSearchEnemyPriorityMode = original
         assert.is_true(ok, tostring(selected))
         assert.same(env.rival, selected, '官方焦点登记失败阻断了业务 override')
         local text = table.concat(logs, '\n')
@@ -224,14 +224,14 @@ describe('第 6 节 官方 AI 目标选择接线（哥斯拉贯通）', function
         local fish = dropBoss()
         local adapter = require('server.world_host.fish_ai_target')
         local runtime = require('server.packages.official_ai_feature.behavior_runtime')
-        local original = runtime.get_state
-        runtime.get_state = function() error('official-state-read-failed') end
+        local original = runtime.getState
+        runtime.getState = function() error('official-state-read-failed') end
         local rawPrint = _G.print
         local logs = {}
         _G.print = function(...) logs[#logs + 1] = tostring((...)) end
         local ok, state = pcall(adapter.State, adapter, fish)
         _G.print = rawPrint
-        runtime.get_state = original
+        runtime.getState = original
         assert.is_true(ok, tostring(state))
         assert.is_nil(state)
         local text = table.concat(logs, '\n')

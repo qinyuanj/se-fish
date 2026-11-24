@@ -509,7 +509,7 @@ describe("AbilityLeaf：ability_system 单向叶子投影、can_act 门控与 us
 
     local function make_ability_api()
       return {
-        add_ability = function(character, asset_id, index)
+        AddAbility = function(character, asset_id, index)
           add_attempts = add_attempts + 1
           if add_attempts < ready_after then
             return nil
@@ -528,7 +528,7 @@ describe("AbilityLeaf：ability_system 单向叶子投影、can_act 门控与 us
           stopped_calls[#stopped_calls + 1] = { character = character, index = index }
           return true
         end,
-        cast_ability = function(character, index)
+        CastAbility = function(character, index)
           cast_calls[#cast_calls + 1] = { character = character, index = index }
           return true
         end,
@@ -585,7 +585,7 @@ describe("AbilityLeaf：ability_system 单向叶子投影、can_act 门控与 us
       },
     })
 
-    -- 首帧已创建管理器并挂在 char1 下；第 1 次 add_ability 未就绪，挂起重试
+    -- 首帧已创建管理器并挂在 char1 下；第 1 次 AddAbility 未就绪，挂起重试
     assert.equals(1, #created_managers)
     assert.equals(char1, created_managers[1].Parent)
     assert.equals(0, #created_anchors)

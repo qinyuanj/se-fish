@@ -70,8 +70,8 @@ describe('TestFishStatusGate', function()
     -- 麻痹的鱼不追咬、不施法、就地停住
     it('test_paralyzed_fish_skips_combat_actions', function()
         local dispatched = {}
-        for _, name in ipairs({ 'UpdateChase', 'UpdateEel', 'UpdateBossPhase', 'UpdateShrimpCombat',
-            'UpdateKingCrabCombat', 'UpdateCrabBossCombat', 'StunFish' }) do
+        for _, name in ipairs({ 'update_chase', 'update_eel', 'update_boss_phase', 'update_shrimp_combat',
+            'update_king_crab_combat', 'update_crab_boss_combat', 'stun_fish' }) do
             ctx.mgr[name] = function() dispatched[#dispatched + 1] = name end
         end
         ctx.mgr.refresh_moving_combat = function() end
@@ -85,7 +85,7 @@ describe('TestFishStatusGate', function()
         assert.same(vec(0, 0, 0), body.LinearVelocity)
         ctx.paralyzed = false
         ctx.mgr:update_combat(fish, ctx.now)
-        assert.same({ 'UpdateChase' }, dispatched)
+        assert.same({ 'update_chase' }, dispatched)
     end)
 
     -- 鱼的移速 = 基础 × 状态因子；效果口故障不拖垮移动

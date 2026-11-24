@@ -1,6 +1,6 @@
 -- #90 迁移：电鳗技能装配失败路径（原 tests/gameplay/eel_ability_failure_test.lua，6 例）。
 -- describe / it 名沿用旧类名与方法名；注册顺序 = 旧套件实际执行顺序（单类，方法按字典序）。
--- #86 装配失败方式：add_ability/属性/锚点抛错遗留半初始化对象；销毁失败丢失重试入口。
+-- #86 装配失败方式：AddAbility/属性/锚点抛错遗留半初始化对象；销毁失败丢失重试入口。
 --
 -- 迁移纪律：
 --   * 全部走 pcall 失败路径，断言的就是「失败之后清理做到哪一步」，因此不改成功路径、不放宽断言；
@@ -10,7 +10,7 @@
 --     after_each 只读快照里已有的字段，不会把没替换过的环境写成别的值。
 --   * 夹具对象全部是 describe 的局部变量，不新增任何全局（旧文件靠 `env = self` 复用一个 upvalue，
 --     迁移后由 ctx 直接承载，销毁计数与 failDestroy 开关都在 ctx 上，跨案例互不残留）。
---   * 每例用 loadfile 重新取一份 MgrAbility；包内 add_ability 与本图 attach_anchor 分别注入，
+--   * 每例用 loadfile 重新取一份 MgrAbility；包内 AddAbility 与本图 attach_anchor 分别注入，
 --     避免旧聚合入口的桩掩盖真实调用路径。
 local saved
 
@@ -32,7 +32,7 @@ describe('TestEelAbilityFailure', function()
             } end
         end }
         ctx.api = {}
-        ctx.vendor = { add_ability = function() error('add-failed') end }
+        ctx.vendor = { AddAbility = function() error('add-failed') end }
         package.loaded['server.packages.ability_system.api'] = ctx.vendor
         package.loaded['server.ability_api'] = ctx.api
         ctx.mgr = assert(loadfile('server/fish_ability.lua'))()
@@ -44,7 +44,7 @@ describe('TestEelAbilityFailure', function()
         package.loaded['server.packages.ability_system.api'] = saved.vendor
     end)
 
-    -- add_ability 直接抛错：半初始化的 manager 必须被销毁，鱼身上不留技能记录。
+    -- AddAbility 直接抛错：半初始化的 manager 必须被销毁，鱼身上不留技能记录。
     it('test_add_failure_cleans_partial_manager', function()
         ctx.mgr:equip_fish(ctx.fish)
         assert.is_true(pcall(ctx.jobs[1]))
@@ -59,7 +59,7 @@ describe('TestEelAbilityFailure', function()
             SetAttribute = function() end,
             Destroy = function() cleaned[#cleaned + 1] = 'anchor' end,
         }
-        ctx.vendor.add_ability = function() return { SetAttribute = function() end } end
+        ctx.vendor.AddAbility = function() return { SetAttribute = function() end } end
         ctx.api.attach_anchor = function() error('anchor-attach-failed') end
         ctx.manager.Destroy = function() cleaned[#cleaned + 1] = 'manager' end
         ctx.mgr:equip_fish(ctx.fish)
@@ -72,7 +72,7 @@ describe('TestEelAbilityFailure', function()
 
     -- 锚点资源建不出来：manager 销毁干净，不留待重试队列。
     it('test_anchor_creation_failure_cleans_partial_manager', function()
-        ctx.vendor.add_ability = function() return { SetAttribute = function() end } end
+        ctx.vendor.AddAbility = function() return { SetAttribute = function() end } end
         ctx.mgr:equip_fish(ctx.fish)
         ctx.world.CreateAsset = function() error('anchor-create-failed') end
         assert.is_true(pcall(ctx.jobs[1]))
@@ -83,7 +83,7 @@ describe('TestEelAbilityFailure', function()
 
     -- SetAttribute 抛错（技能对象已建出来）：同样要回收 manager。
     it('test_attribute_failure_cleans_partial_manager', function()
-        ctx.vendor.add_ability = function() return { SetAttribute = function() error('attribute-failed') end } end
+        ctx.vendor.AddAbility = function() return { SetAttribute = function() error('attribute-failed') end } end
         ctx.mgr:equip_fish(ctx.fish)
         assert.is_true(pcall(ctx.jobs[1]))
         assert.is_nil(ctx.fish.AbilityRecord)
@@ -93,7 +93,7 @@ describe('TestEelAbilityFailure', function()
     -- 等待间隙被取消：恢复协程后不得继续装配，也不能多销毁一次。
     it('test_cancel_during_wait_does_not_resume_equipping', function()
         local attempts = 0
-        ctx.vendor.add_ability = function()
+        ctx.vendor.AddAbility = function()
             attempts = attempts + 1
             return nil, 'manager-not-ready'
         end

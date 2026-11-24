@@ -99,7 +99,7 @@ function FishAbility:equip_fish(fish)
         for _ = 1, EQUIP_RETRY_COUNT do
             if record.Cancelled then return end
             if fish.Carrier.Dead then self:remove_fish(fish) return end
-            local ability = AbilityPackageAPI.add_ability(receiver, entry.AssetId, entry.Index)
+            local ability = AbilityPackageAPI.AddAbility(receiver, entry.AssetId, entry.Index)
             if ability then
                 ability:SetAttribute('CastTime', entry.CastSec)
                 ability:SetAttribute('CdTime', 0)

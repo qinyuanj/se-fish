@@ -169,7 +169,7 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
 
     local created_managers, stopped_abilities, registered_guards = {}, {}, {}
     local ability_api = {
-      add_ability = function()
+      AddAbility = function()
         return { SetAttribute = function() end }
       end,
       StopAbility = function(ch, idx)
@@ -475,9 +475,9 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
         end,
       }
       local ability_api_stub = {
-        add_ability = function() return { SetAttribute = function() end } end,
+        AddAbility = function() return { SetAttribute = function() end } end,
         StopAbility = function() end,
-        cast_ability = function() return true end,
+        CastAbility = function() return true end,
       }
 
       local sandbox
