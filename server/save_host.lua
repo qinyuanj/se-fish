@@ -120,7 +120,7 @@ end
 function SaveHost:note_write(userId, snapshot, reason)
     local ledger = self.ledger[userId] or { writes = 0 }
     ledger.writes, ledger.bytes = ledger.writes + 1, self:estimate_size(snapshot)
-    ledger.LastReason, ledger.revision = reason, snapshot.meta.revision
+    ledger.last_reason, ledger.revision = reason, snapshot.meta.revision
     ledger.operation_count = #snapshot.meta.operations
     self.ledger[userId] = ledger
     print('[SaveHost] 落账', userId, reason, 'revision=' .. ledger.revision,

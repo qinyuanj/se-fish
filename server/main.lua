@@ -262,7 +262,7 @@ WorldRuntime = ServerRuntime.new({
     entity_modifiers = {
         modifier_api = ModifierPackageApi,
         on_dot_tick = function(target, _kind, damage, source)
-            local ref = type(target) == "table" and target.Ref or target
+            local ref = type(target) == "table" and target.ref or target
             applyDotHit(ref, damage, source)
         end,
     },

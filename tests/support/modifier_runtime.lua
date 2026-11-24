@@ -169,7 +169,7 @@ function Runtime.new(clock)
             presets = preset_proxy,
             now = function() return e.now end,
             on_dot_tick = function(target, _kind, damage, source)
-                local ref = type(target) == 'table' and target.Ref or target
+                local ref = type(target) == 'table' and target.ref or target
                 apply_dot(ref, damage, source)
             end,
         })
@@ -195,7 +195,7 @@ function Runtime.new(clock)
             if target.carrier then return target end
             if mgr.Vitals and mgr.Vitals.FishCarrier and mgr.Vitals.FishCarrier.resolve_carrier then
                 local carrier = mgr.Vitals.FishCarrier:resolve_carrier(target)
-                if carrier then return { carrier = carrier, Ref = target } end
+                if carrier then return { carrier = carrier, ref = target } end
             end
             return target
         end
