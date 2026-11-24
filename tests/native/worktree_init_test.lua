@@ -94,6 +94,23 @@ describe("TestWorktreeInit", function()
     assert.matches("拒绝覆盖", err.text, 1, true)
   end)
 
+  it("test_existing_managed_hook_is_upgraded", function()
+    local legacy = table.concat({
+      "#!/bin/sh",
+      git_hooks.MANAGED_HEADER .. "；不同内容的既有 hook 不会被覆盖。",
+      'repo_root=$(git rev-parse --show-toplevel) || exit 1',
+      'cd "$repo_root" || exit 1',
+      "exec lua tools/cli.lua test guards",
+      "",
+    }, "\n")
+    write_file(HOOK, legacy)
+    assert.are.equal(0, run(), err.text)
+    assert.matches("升级 pre-commit", out.text, 1, true)
+    assert.are.equal(git_hooks.HOOK_BODY, slurp(HOOK))
+    assert.is_false(exists(HOOK .. ".partial"))
+    assert.is_false(exists(HOOK .. ".bak"))
+  end)
+
   it("test_standalone_hook_init_is_idempotent", function()
     assert.are.equal(0, run(), err.text)
     out, err = stream(), stream()
