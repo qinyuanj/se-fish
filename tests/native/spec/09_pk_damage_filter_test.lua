@@ -141,7 +141,7 @@ describe('条款 9 PK 伤害过滤', function()
     env.vitals = env.lifeHost.runtime.life
     env.players = assert(loadfile('server/player_data_host.lua'))()
     env.save = assert(loadfile('server/save_host.lua'))()
-    env.players.Save, env.save.PlayerData = env.save, env.players
+    env.players.Save, env.save.player_data = env.save, env.players
     env.filter = require('server.world_host.pk_damage_filter').make({
       party = env.party, zone_markers = require('common.zone_markers'), zones = env.cfg.Zones,
     })
@@ -161,8 +161,8 @@ describe('条款 9 PK 伤害过滤', function()
       AttackGun = function(_, player, weapon_id, _, _, aim)
         local tree = env.lifeHost.runtime:get_player_tree(player.UserId)
         tree:sync_from_data({
-          Player = player, Inited = true, LoadState = 'ready',
-          Data = { FishCoin = 0, Zone = 'fishPond', Weapons = { [weapon_id] = 1 }, Containers = {} },
+          Player = player, inited = true, load_state = 'ready',
+          Data = { FishCoin = 0, Zone = 'fishPond', weapons = { [weapon_id] = 1 }, containers = {} },
           Extra = { growth = { potions = {}, upgrades = {} }, inventory = { selection = { held = { kind = 'weapon', id = weapon_id } } }, survival = {} },
         })
         return env.lifeHost.runtime.life:weapon_action(player, { action = 'attack', aim = aim })
@@ -248,7 +248,7 @@ describe('条款 9 PK 伤害过滤', function()
     local ok, actual = hit(a, b, 'gun', 45)
     local blockedHealth = b.Character.Controller.Health
     -- 同一口径下鱼攻击不受这条兜底影响（9-16）。
-    local fishHit = hit({ Id = 91, Body = { UnitId = 91 }, Receiver = {} }, b, 'fishAttack', 10)
+    local fishHit = hit({ Id = 91, body = { UnitId = 91 }, receiver = {} }, b, 'fishAttack', 10)
     _G.print = rawPrint
     env.vitals.ZoneMarkers, env.cfg.Zones[1].Scene = snapshot, scene
     assert.is_true(ok, '区域未解析不能全局误拒非同队玩家互伤')
@@ -289,7 +289,7 @@ describe('条款 9 PK 伤害过滤', function()
   it('9-16：安全区挡玩家伤害但不挡鱼攻击', function()
     local a = join(1, vec(6.26, 5.01, -0.71))
     local b = join(2, vec(5, 6, -9))
-    local fish = { Id = 91, Body = { UnitId = 91 }, Receiver = {}, Position = vec(0, 2, 0) }
+    local fish = { Id = 91, body = { UnitId = 91 }, receiver = {}, Position = vec(0, 2, 0) }
     assert.is_false(hit(a, b, 'gun', 25))
     assert.same(300, b.Character.Controller.Health)
     assert.is_true(hit(fish, b, 'fishAttack', 25))

@@ -91,7 +91,7 @@ describe('TestSave', function()
         }
         env.save = assert(loadfile('server/save_host.lua'))()
         env.syncs = 0
-        env.save.PlayerData = {
+        env.save.player_data = {
             send_item_bar = function() env.syncs = env.syncs + 1 end,
             get_data_inst = function(_, p) return env.dataInsts[p] end,
         }
@@ -207,8 +207,8 @@ describe('TestSave', function()
         assert.same(1, updates)
         assert.same(20, env.store.data[env.save:key(1)].coin)
         -- 排空后队列清空，后续写入重新起一轮
-        assert.is_nil(env.save.Pending[1])
-        assert.is_nil(env.save.Flying[1])
+        assert.is_nil(env.save.pending[1])
+        assert.is_nil(env.save.flying[1])
     end)
 
     it('test_exchange_snapshot_rejoin_has_no_double_grant', function()
@@ -310,7 +310,7 @@ describe('TestSave', function()
     it('test_serialize_roundtrip_restores_coin_slots_bait_upgrade_zone', function()
         local d = env.data
         d.Data.FishCoin = 45
-        d.Data.UpgradeLevel = 1
+        d.Data.upgrade_level = 1
         d.Data.Zone = 'shrimpPond'
         assert.is_true(d:AddItem('duck'))
         assert.is_true(d:AddItem('shrimpTicket'))
@@ -323,13 +323,13 @@ describe('TestSave', function()
         local player2, d2 = env.new_data(2)
         assert.is_true(d2:ApplySave(snapshot))
         assert.same(45, d2.Data.FishCoin)
-        assert.same(1, d2.Data.UpgradeLevel)
+        assert.same(1, d2.Data.upgrade_level)
         assert.same('shrimpPond', d2.Data.Zone)
         assert.same(3, d2.Data.Bait.sausage)
         assert.same(d.Data.Bait.worm, d2.Data.Bait.worm) -- 白送蚯蚓也在
         -- 格子位置逐项一致（含 mult）
-        local bar1 = d.Data.Containers.itemBar
-        local bar2 = d2.Data.Containers.itemBar
+        local bar1 = d.Data.containers.itemBar
+        local bar2 = d2.Data.containers.itemBar
         for i = 1, 8 do
             local a, b = bar1[i], bar2[i]
             if a then
@@ -339,8 +339,8 @@ describe('TestSave', function()
                 assert.message('itemBar ' .. i).is_nil(b)
             end
         end
-        local bp1 = d.Data.Containers.backpack
-        local bp2 = d2.Data.Containers.backpack
+        local bp1 = d.Data.containers.backpack
+        local bp2 = d2.Data.containers.backpack
         for i = 1, 10 do
             local a, b = bp1[i], bp2[i]
             if a then

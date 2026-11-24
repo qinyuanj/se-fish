@@ -127,8 +127,8 @@ describe('主界面布局模块', function()
                     if not inside(rect, entry.bounds) then
                         fail('%s %s.%s 越出自己的区域', case, region, name)
                     end
-                    if rect ~= layout.Rects[name] then
-                        assert.equal(rect, layout.Rects[name], case .. ' 扁平索引 ' .. name)
+                    if rect ~= layout.rects[name] then
+                        assert.equal(rect, layout.rects[name], case .. ' 扁平索引 ' .. name)
                     end
                 end
             end
@@ -220,14 +220,14 @@ describe('主界面布局模块', function()
                 fail('%s 道具栏格数 %d，期望 %d', case, #layout.ItemBarSlots, input.slots)
             end
             for i, rect in ipairs(layout.ItemBarSlots) do
-                if rect ~= layout.Rects['ItemBarSlot' .. i] then
-                    assert.equal(rect, layout.Rects['ItemBarSlot' .. i], case)
+                if rect ~= layout.rects['ItemBarSlot' .. i] then
+                    assert.equal(rect, layout.rects['ItemBarSlot' .. i], case)
                 end
             end
             -- 装备栏一行（武器栏｜道具栏｜背包｜鱼饵栏）从左到右，整体居中（偏离屏幕中线不超过 60）
-            local weapon, bait = layout.Rects.WeaponBar, layout.Rects.BaitBar
+            local weapon, bait = layout.rects.WeaponBar, layout.rects.BaitBar
             local first, last = layout.ItemBarSlots[1], layout.ItemBarSlots[#layout.ItemBarSlots]
-            local backpack = layout.Rects.backpack_button
+            local backpack = layout.rects.backpack_button
             if not (weapon.x < first.x and last.x < backpack.x and backpack.x < bait.x) then
                 fail('%s 装备栏一行左右顺序不对', case)
             end
@@ -243,20 +243,20 @@ describe('主界面布局模块', function()
         each_case(function(layout, case)
             local bounds = layout.regions.QuestLeft.bounds
             if bounds.w > 1920 / 4 then fail('%s 任务区宽 %.0f 超过屏幕 1/4', case, bounds.w) end
-            assert.is_not_nil(layout.Rects.quest_panel, case)
-            assert.is_not_nil(layout.Rects.quest_toggle, case)
+            assert.is_not_nil(layout.rects.quest_panel, case)
+            assert.is_not_nil(layout.rects.quest_toggle, case)
             -- 面板至少能放三行 24 号字
-            if layout.Rects.quest_panel.h < 3 * 24 then
-                fail('%s 任务面板高 %.0f 放不下三行', case, layout.Rects.quest_panel.h)
+            if layout.rects.quest_panel.h < 3 * 24 then
+                fail('%s 任务面板高 %.0f 放不下三行', case, layout.rects.quest_panel.h)
             end
         end)
     end)
 
     it('test_reel_close_only_while_reeling_and_clear_of_attack', function()
         each_case(function(layout, case, input)
-            local close, attack = layout.Rects.reel_close, layout.Rects.attack_control
+            local close, attack = layout.rects.reel_close, layout.rects.attack_control
             assert.is_not_nil(attack, case)
-            assert.is_not_nil(layout.Rects.ItemAction, case)
+            assert.is_not_nil(layout.rects.item_action, case)
             if input.reeling then
                 assert.is_not_nil(close, case)
                 if overlaps(close, attack) then fail('%s 结束收线压住攻击键', case) end
@@ -302,7 +302,7 @@ describe('主界面布局模块', function()
         each_case(function(layout, case, input)
             local screen = { x = 960, y = input.height / 2, w = 1920 - 2 * EDGE, h = input.height - 2 * EDGE }
             for kind, count in pairs(max) do
-                local bar = layout.Rects[kind .. 'Bar']
+                local bar = layout.rects[kind .. 'Bar']
                 for n = 1, count do
                     local cells = MainHudLayout.popup_cells(layout, kind, n)
                     if #cells ~= n then

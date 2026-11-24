@@ -1,5 +1,5 @@
 local GameCfg=require('common.game_cfg')
-local Mgr={retry_at={},Busy={}}
+local Mgr={retry_at={},busy={}}
 
 local function positiveId(value)
     return type(value)=='number' and value>0 and value==math.floor(value) and value or nil
@@ -19,23 +19,23 @@ local function debugEnabled()
 end
 
 function Mgr:confirm(player,data,key)
-    if self.PlayerData:get_data_inst(player)~=data or self.Busy[player.UserId] then return end
+    if self.player_data:get_data_inst(player)~=data or self.busy[player.UserId] then return end
     if self.Save then
         local operation=self.Save:next_operation(player,'achievement-confirm')
         if not operation then return end
-        self.Busy[player.UserId]=true
+        self.busy[player.UserId]=true
         local accepted,reason=self.Save:execute(player,data,operation,function(draft)
             if not draft.Extra.achievements[key] then return nil,'not-completed' end
             draft.Extra.achievementDelivered=draft.Extra.achievementDelivered or {}
             draft.Extra.achievementDelivered[key]=true
             return {ok=true,achievement=key}
         end,function(ok,result)
-            if self.PlayerData:get_data_inst(player)~=data then return end
-            self.Busy[player.UserId]=nil
+            if self.player_data:get_data_inst(player)~=data then return end
+            self.busy[player.UserId]=nil
             if not ok then print('[PlayerAchievements] 平台确认落账失败',player.UserId,key,tostring(result)) end
         end)
-        if not accepted and self.PlayerData:get_data_inst(player)==data then
-            self.Busy[player.UserId]=nil
+        if not accepted and self.player_data:get_data_inst(player)==data then
+            self.busy[player.UserId]=nil
             print('[PlayerAchievements] 平台确认暂不能落账，保留补交',player.UserId,key,tostring(reason))
         end
     else
@@ -46,11 +46,11 @@ function Mgr:confirm(player,data,key)
 end
 
 function Mgr:update()
-    if not self.PlayerData or not self.Players or not self.World then return end
+    if not self.player_data or not self.Players or not self.World then return end
     local now=self.World:GetServerTime()
     for _, player in ipairs(self.Players:GetPlayers()) do
-        local data=self.PlayerData:get_data_inst(player)
-        if data and data.Inited and not self.Busy[player.UserId]
+        local data=self.player_data:get_data_inst(player)
+        if data and data.inited and not self.busy[player.UserId]
             and now>=(self.retry_at[player.UserId] or 0) then
             for key,definition in pairs(GameCfg.Achievements) do
                 local id,placeholder=target(definition)
@@ -78,14 +78,14 @@ end
 
 function Mgr:on_player_removing(player)
     if not player or player.UserId == nil then return end
-    self.retry_at[player.UserId],self.Busy[player.UserId]=nil,nil
+    self.retry_at[player.UserId],self.busy[player.UserId]=nil,nil
 end
 
 function Mgr.mount(scope, player_tree, opts)
     local player = opts.player
     local ok, archive = pcall(function() return game:GetService('ArchiveService') end)
     local session = setmetatable({
-        Busy = {}, retry_at = {}, PlayerData = opts.player_data, Save = opts.save,
+        busy = {}, retry_at = {}, player_data = opts.player_data, Save = opts.save,
         Players = { GetPlayers = function() return { player } end },
         World = { GetServerTime = function() return opts.clock.now() end },
         archive = ok and archive or nil,

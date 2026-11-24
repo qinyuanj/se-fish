@@ -216,24 +216,24 @@ describe('TestPlayerLeaveRejoin', function()
     it('test_quest_queue_keeps_old_session_until_committed_then_rebinds', function()
         fact('worm:1')
         fact('worm:2')
-        local old = env.save.Sessions[env.a.UserId]
+        local old = env.save.sessions[env.a.UserId]
         env.players.PlayerRemoving:Fire(env.a)
         local b = join(env.a.UserId)
-        assert.are.equal(old, env.save.Sessions[env.a.UserId])
+        assert.are.equal(old, env.save.sessions[env.a.UserId])
         assert.same('pending', b.attrs.SaveState)
         drain()
         assertRejoined(b)
         assert.same(2, env.quest:get_state(b).count)
         assert.same(2, env.values.u560.extra.quest.count)
-        local current = env.save.Sessions[b.UserId]
+        local current = env.save.sessions[b.UserId]
         env.players.PlayerRemoving:Fire(env.a)
-        assert.are.equal(current, env.save.Sessions[b.UserId])
+        assert.are.equal(current, env.save.sessions[b.UserId])
         assertRejoined(b)
     end)
 
     it('test_retry_failure_finishes_without_blocking_other_user', function()
         fact('worm:failure')
-        env.failedToken = env.save.Sessions[env.a.UserId].Token
+        env.failedToken = env.save.sessions[env.a.UserId].token
         env.players.PlayerRemoving:Fire(env.a)
         local b = join(env.a.UserId)
         env.failWrite = true
@@ -275,7 +275,7 @@ describe('TestPlayerLeaveRejoin', function()
         env.players.PlayerRemoving:Fire(b)
         drain()
         assert.is_nil(env.data:get_data_inst(b))
-        assert.is_nil(env.save.Sessions[b.UserId])
+        assert.is_nil(env.save.sessions[b.UserId])
         assert.is_nil(env.runtime.life:get_state(b))
         local c = join(env.a.UserId)
         drain()

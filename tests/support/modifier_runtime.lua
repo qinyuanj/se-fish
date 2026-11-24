@@ -10,9 +10,9 @@ local Runtime = {}
 local function make_dummy_data(player)
     return {
         Player = player,
-        Inited = true,
-        LoadState = 'ready',
-        Data = { FishCoin = 0, Zone = 'fishPond', Containers = { itemBar = {}, backpack = {} }, Bait = {}, Weapons = {} },
+        inited = true,
+        load_state = 'ready',
+        Data = { FishCoin = 0, Zone = 'fishPond', containers = { itemBar = {}, backpack = {} }, Bait = {}, weapons = {} },
         Extra = {
             inventory = { weapons = {}, selection = { held = {} } },
             growth = { potions = {}, upgrades = {} },
@@ -192,10 +192,10 @@ function Runtime.new(clock)
 
         local function resolve_entity(target)
             if type(target) ~= 'table' then return target end
-            if target.Carrier then return target end
+            if target.carrier then return target end
             if mgr.Vitals and mgr.Vitals.FishCarrier and mgr.Vitals.FishCarrier.resolve_carrier then
                 local carrier = mgr.Vitals.FishCarrier:resolve_carrier(target)
-                if carrier then return { Carrier = carrier, Ref = target } end
+                if carrier then return { carrier = carrier, Ref = target } end
             end
             return target
         end
@@ -263,7 +263,7 @@ function Runtime.new(clock)
                 return ok, err
             end
             local ent = resolve_entity(target)
-            if type(ent) ~= 'table' or not ent.Carrier then
+            if type(ent) ~= 'table' or not ent.carrier then
                 return false, 'no-effect-owner'
             end
             return entity_store:apply(source, ent, kind, seconds)

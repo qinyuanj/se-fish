@@ -132,8 +132,8 @@ function M.new()
   env.save = assert(loadfile("server/save_host.lua"))()
   env.players = assert(loadfile("server/player_data_host.lua"))()
   env.platform = assert(loadfile("server/platform_host.lua"))()
-  env.players.Save, env.save.PlayerData = env.save, env.players
-  env.platform.Save, env.platform.PlayerData = env.save, env.players
+  env.players.Save, env.save.player_data = env.save, env.players
+  env.platform.Save, env.platform.player_data = env.save, env.players
   env.platform.now = function() return env.now end
 
   local ServerRuntime = require("server.world_host.server_runtime")

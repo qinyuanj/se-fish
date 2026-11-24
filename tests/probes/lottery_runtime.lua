@@ -71,7 +71,7 @@ local pairCount, tripleCount, noneCount = {}, {}, 0
 local coinsPaid, consumed = 0, 0
 for _ = 1, N do
     -- 每次投一件未烤极品罗非鱼（基础价 3）：直接摆进第 1 格，走真实 settle
-    local bar = data.Data.Containers[ITEM_BAR]
+    local bar = data.Data.containers[ITEM_BAR]
     for slot = 1, data:ItemBarCapacity() do bar[slot] = nil end
     bar[1] = { itemId = 'item7', count = 1, containerId = ITEM_BAR }
     local result = assert(lottery:settle(data, 1))
@@ -162,7 +162,7 @@ for i, p in ipairs(patterns) do
     bounds[i] = low -- 每轴取该图案区间下界，必中该图案
 end
 for i, p in ipairs(patterns) do
-    local bar = data.Data.Containers[ITEM_BAR]
+    local bar = data.Data.containers[ITEM_BAR]
     for slot = 1, data:ItemBarCapacity() do bar[slot] = nil end
     bar[1] = { itemId = 'item7', count = 1, containerId = ITEM_BAR }
     local roll = bounds[i]
@@ -181,9 +181,9 @@ for i, p in ipairs(patterns) do
     if reward.kind == 'weaponChoice' then
         local itemId = reward.itemKeys[1]
         placement = result.prize.itemId == itemId and data:WeaponCount(itemId) >= 1
-            and data.Data.Containers[ITEM_BAR][1] == nil
+            and data.Data.containers[ITEM_BAR][1] == nil
     else
-        local entry = data.Data.Containers[ITEM_BAR][1]
+        local entry = data.Data.containers[ITEM_BAR][1]
         placement = result.prize.itemId == reward.itemKey and entry ~= nil
             and entry.itemId == reward.itemKey and entry.count == 1
     end

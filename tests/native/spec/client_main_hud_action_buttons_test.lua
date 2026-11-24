@@ -112,10 +112,10 @@ describe("Spoke 主 HUD 右侧动作键视图（#297-B3b1）", function()
     local btn_action = env.nodes.ItemAction2
     local lbl_action = env.nodes.BtnItemActionLabel
 
-    assert_at(btn_discard, layout.Rects.discard, "ItemDiscard")
-    assert_at(lbl_discard, layout.Rects.discard, "BtnDiscardLabel")
-    assert_at(btn_action, layout.Rects.ItemAction, "ItemAction2")
-    assert_at(lbl_action, layout.Rects.ItemAction, "BtnItemActionLabel")
+    assert_at(btn_discard, layout.rects.discard, "ItemDiscard")
+    assert_at(lbl_discard, layout.rects.discard, "BtnDiscardLabel")
+    assert_at(btn_action, layout.rects.item_action, "ItemAction2")
+    assert_at(lbl_action, layout.rects.item_action, "BtnItemActionLabel")
 
     -- EUIButton 严禁写 Color；文案标签 LocalZOrder 必须高于按钮
     assert.is_nil(btn_discard.Color)

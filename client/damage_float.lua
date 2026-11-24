@@ -1,5 +1,5 @@
 local GameCfg = require('common.game_cfg')
-local DamageFloat = { Active = {}, Pool = {}, sequence = {}, pending_cleanup = {} }
+local DamageFloat = { Active = {}, pool = {}, sequence = {}, pending_cleanup = {} }
 local cfg = GameCfg.DamageFloat
 
 function DamageFloat.display_amount(amount)
@@ -18,8 +18,8 @@ function DamageFloat:clear()
     for _, node in ipairs(self.pending_cleanup) do destroy(node) end
     self.pending_cleanup = pending
     for _, entry in ipairs(self.Active) do destroy(entry.node) end
-    for _, node in ipairs(self.Pool) do destroy(node) end
-    self.Active, self.Pool, self.sequence = {}, {}, {}
+    for _, node in ipairs(self.pool) do destroy(node) end
+    self.Active, self.pool, self.sequence = {}, {}, {}
     self.Root, self.resolution = nil, nil
 end
 
@@ -52,7 +52,7 @@ function DamageFloat:show(payload)
     if not self.Root or not valid(payload) then return end
     local x, y = self:project(payload.position, payload.height)
     if not x then return end
-    local node = table.remove(self.Pool)
+    local node = table.remove(self.pool)
     if not node then
         node = game:GetService('World'):CreateUnit('EUITextLabel', {
             Parent = self.Root, Name = 'DamageFloat',
@@ -101,8 +101,8 @@ function DamageFloat:update()
             entry.node.Visible = false
             entry.node.Opacity = 1
             table.remove(self.Active, i)
-            if #self.Pool < cfg.PoolSize then
-                self.Pool[#self.Pool + 1] = entry.node
+            if #self.pool < cfg.PoolSize then
+                self.pool[#self.pool + 1] = entry.node
             else
                 entry.node:Destroy()
             end

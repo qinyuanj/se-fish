@@ -43,7 +43,7 @@ describe('第 12 节 首领逐招表（哥斯拉）', function()
 
     -- 把玩家摆到鱼的水平距离 distance 处（同高），返回该距离。
     local function stand(fish, distance)
-        local p = fish.Carrier.Body.Position
+        local p = fish.carrier.body.Position
         env.player.Character.Position = env.vec(p.x, p.y, p.z + distance)
     end
 
@@ -67,8 +67,8 @@ describe('第 12 节 首领逐招表（哥斯拉）', function()
     it('条款 12-39：放下哥斯拉即以 25000 血进入战斗态', function()
         local fish = env:drop('fish56Boss')
         assert.same(25000, Cfg.Fish.fish56Boss.Health)
-        assert.same(25000, fish.Carrier.MaxHealth)
-        assert.same(25000, fish.Carrier.Health)
+        assert.same(25000, fish.carrier.MaxHealth)
+        assert.same(25000, fish.carrier.Health)
         assert.is_not_nil(fish.Phase)
     end)
 
@@ -154,7 +154,7 @@ describe('第 12 节 首领逐招表（哥斯拉）', function()
         assert.truthy(#claw >= 11, '爪击没有按 2 秒节拍落地')
         for _, attack in ipairs(claw) do assert.same(50, attack.Damage) end
         for index = 2, #claw do
-            local gap = claw[index].At - claw[index - 1].At
+            local gap = claw[index].at - claw[index - 1].at
             -- 爪击到期时若正好撞上另一招的起手，会顺延到起手结束（最多 0.8 秒的跺脚起手）
             need(gap >= 1.9 and gap <= 2.9, '爪击间隔不是 2 秒（实测 %s）', gap)
         end
@@ -163,7 +163,7 @@ describe('第 12 节 首领逐招表（哥斯拉）', function()
         assert.truthy(#tail >= 2, '甩尾被爪击吃掉了')
         for _, attack in ipairs(tail) do assert.same(50, attack.Damage) end
         for index = 2, #tail do
-            local gap = tail[index].At - tail[index - 1].At
+            local gap = tail[index].at - tail[index - 1].at
             need(gap >= 5.9 and gap <= 6.8, '甩尾间隔不是 6 秒（实测 %s）', gap)
         end
 
@@ -211,7 +211,7 @@ describe('第 12 节 首领逐招表（哥斯拉）', function()
         local fish = env:drop('fish56Boss')
         stand(fish, 2)
         env:advance(0.2)
-        fish.Carrier.Health = 14000 -- 56%
+        fish.carrier.Health = 14000 -- 56%
         env:advance(0.4)
         assert.same('water', fish.Phase.Phase, '血量低于 60% 没有入水')
 
@@ -230,7 +230,7 @@ describe('第 12 节 首领逐招表（哥斯拉）', function()
         local fish = env:drop('fish56Boss')
         stand(fish, 2)
         env:advance(0.2)
-        fish.Carrier.Health = 4000 -- 16%
+        fish.carrier.Health = 4000 -- 16%
         env:advance(0.4)
         assert.same('enraged', fish.Phase.Phase, '血量低于 20% 没有进入狂暴阶段')
 
@@ -254,10 +254,10 @@ describe('第 12 节 首领逐招表（哥斯拉）', function()
         env:advance(30.1)
         assert.truthy(#noticesBy('bossBreath') >= 1, '吐息没有进入起手')
 
-        fish.Carrier.Health = 14000 -- 起手中跌破 60%
+        fish.carrier.Health = 14000 -- 起手中跌破 60%
         env:advance(30.2)
         assert.same('water', fish.Phase.Phase, '阶段阈值没有立即生效')
-        assert.is_nil(fish.BossWarn, '阶段切换后旧的起手没有撤销')
+        assert.is_nil(fish.boss_warn, '阶段切换后旧的起手没有撤销')
         env:advance(33)
         assert.is_true(env.player.Character.Controller.Health > 0, '撤销的吐息仍然落地了')
     end)

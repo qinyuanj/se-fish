@@ -155,12 +155,12 @@ function MainHudLayout.compute(input)
 
     local actionBase = top(zone.Jump) + GAP
     local action = { attack_control = rect(W - 230, actionBase + ATTACK / 2, ATTACK, ATTACK) }
-    action.ItemAction = rect(left(action.attack_control) - GAP - ACTION_W / 2, action.attack_control.y,
+    action.item_action = rect(left(action.attack_control) - GAP - ACTION_W / 2, action.attack_control.y,
         ACTION_W, ACTION_H)
     action.discard = rect(action.attack_control.x, top(action.attack_control) + GAP + ACTION_H / 2,
         ACTION_W, ACTION_H)
     if input.reeling then
-        action.reel_close = rect(action.ItemAction.x, top(action.ItemAction) + GAP + ACTION_H / 2,
+        action.reel_close = rect(action.item_action.x, top(action.item_action) + GAP + ACTION_H / 2,
             ACTION_W, ACTION_H)
     end
 
@@ -184,7 +184,7 @@ function MainHudLayout.compute(input)
         for name, r in pairs(region.controls) do rects[name] = r end
     end
     return {
-        regions = regions, Rects = rects, ItemBarSlots = itemBar,
+        regions = regions, rects = rects, ItemBarSlots = itemBar,
         panels = { BackpackPanel = backpackPanel },
         reserved = reserved,
         popup = { left = bandLeft, right = left(zone.Roll) - GAP, firstY = top(equipBounds) + GAP + CELL / 2,
@@ -193,7 +193,7 @@ function MainHudLayout.compute(input)
 end
 
 function MainHudLayout.popup_cells(layout, kind, count)
-    local bar = layout and layout.Rects and layout.Rects[kind .. 'Bar']
+    local bar = layout and layout.rects and layout.rects[kind .. 'Bar']
     if not bar or type(count) ~= 'number' or count < 1 then return {} end
     local p = layout.popup
     local perRow = math.max(1, math.floor((p.right - p.left - p.cell) / p.step) + 1)

@@ -6,14 +6,14 @@ local DataMap = {}
 
 function PlayerDataHost:get_data_inst(player)
     local data = player and DataMap[player.UserId]
-    if data and data.Player == player and data.Inited and data.LoadState == 'ready' then return data end
+    if data and data.Player == player and data.inited and data.load_state == 'ready' then return data end
 end
 
 function PlayerDataHost:send_item_bar(player, forcePush)
     local data = self:get_data_inst(player)
     if not data then return end
     if self.Vitals and self.Vitals.RefreshHeldDamage then self.Vitals:RefreshHeldDamage(player, data) end
-    local tree = self.Runtime and self.Runtime:get_player_tree(player.UserId)
+    local tree = self.runtime and self.runtime:get_player_tree(player.UserId)
     if tree then
         if forcePush then return self:sync_player_tree(player, true) end
         return false
@@ -22,7 +22,7 @@ function PlayerDataHost:send_item_bar(player, forcePush)
 end
 
 function PlayerDataHost:sync_player_tree(player, forcePush)
-    local tree = self.Runtime and self.Runtime:get_player_tree(player.UserId)
+    local tree = self.runtime and self.runtime:get_player_tree(player.UserId)
     local data = self:get_data_inst(player)
     if not tree or not data then return false end
     return tree:sync_from_data(data, forcePush and { force_push = true } or nil)
@@ -73,8 +73,8 @@ end
 
 local function eatSlot(mgr, player, data, value)
     if not mgr.Vitals then return end
-    local slot = data.Data.SelectedSlot
-    local entry = value == slot and data.Data.Containers[GameCfg.Items.ContainerId.ItemBar][slot]
+    local slot = data.Data.selected_slot
+    local entry = value == slot and data.Data.containers[GameCfg.Items.ContainerId.ItemBar][slot]
     if not entry or entry.count <= 0 or not mgr.Vitals:can_eat(player, entry.itemId) then return end
     local cooked = GameCfg.Items.cook_rate(entry)
     local itemId = data:EatSlot(slot)
@@ -87,7 +87,7 @@ function PlayerDataHost:operate(player, data, payload)
         _G.REUtil:get_re('ItemBarResult'):FireClient(player, result)
     end
     local function worldOf()
-        local runtime = self.Runtime
+        local runtime = self.runtime
         return runtime and runtime:get_world()
     end
     local op = payload.op
@@ -97,7 +97,7 @@ function PlayerDataHost:operate(player, data, payload)
         return
     end
     local slot = payload.slot
-    local items = data.Data.Containers[GameCfg.Items.ContainerId.ItemBar]
+    local items = data.Data.containers[GameCfg.Items.ContainerId.ItemBar]
     local entry
     if op == 'attack' then
         if type(weapon) ~= 'string' or data:WeaponCount(weapon) < 1 then
@@ -166,7 +166,7 @@ function PlayerDataHost:operate(player, data, payload)
             if not target:HoldSlot(slot) then return nil, 'empty' end
             return { ok = true, op = op, held = true }
         end
-        local heldEntry = target.Data.Containers[GameCfg.Items.ContainerId.ItemBar][slot]
+        local heldEntry = target.Data.containers[GameCfg.Items.ContainerId.ItemBar][slot]
         if not heldEntry or heldEntry.count <= 0 then return nil, 'empty' end
         if op == 'discard' then
             if not dropApi then return nil, 'drop-unavailable' end
@@ -180,7 +180,7 @@ function PlayerDataHost:operate(player, data, payload)
             target.Extra.growth.potions[heldEntry.itemId] = count + 1
             target:SelectSlot(slot)
             target:UpdateData(function(d)
-                d.Containers[GameCfg.Items.ContainerId.ItemBar][slot] = nil
+                d.containers[GameCfg.Items.ContainerId.ItemBar][slot] = nil
             end, true)
             return { ok = true, op = 'eat', held = false, itemId = heldEntry.itemId, action = 'potion' }
         end
@@ -255,7 +255,7 @@ end
 function PlayerDataHost:start()
     _G.REUtil:get_re('RequestItemBar').OnServerEvent:Connect(function(player)
         if _G.REUtil:check_recd(player, 'RequestItemBar', GameCfg.Items.ActionCooldownSec) then return end
-        local tree = self.Runtime and self.Runtime:get_player_tree(player.UserId)
+        local tree = self.runtime and self.runtime:get_player_tree(player.UserId)
         if tree then self:sync_player_tree(player, true) else self:send_item_bar(player, true) end
     end)
     local actions = {
@@ -272,7 +272,7 @@ function PlayerDataHost:start()
         local action = payload.action
         if action == 'Pickup' or action == 'Drop' then
             if _G.REUtil:check_recd(player, 'ItemBarAction', GameCfg.Items.ActionCooldownSec) then return end
-            local runtime = self.Runtime
+            local runtime = self.runtime
             local world = runtime and runtime:get_world()
             if not world then return end
             if type(world.handle_item_bar_action) == 'function' then

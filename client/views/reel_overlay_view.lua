@@ -80,7 +80,7 @@ function ReelOverlayView.spec(options)
       local cast = ctx.store.cast:now() or {}
       local session = valid_session(cast.reelSession) and cast.reelSession or nil
       local aggregator = session and RateLimit.new_aggregator({
-        SessionId = session, AggregateSec = GameCfg.HighFreqInput.AggregateSec,
+        session_id = session, AggregateSec = GameCfg.HighFreqInput.AggregateSec,
       }) or nil
       local display = session and ReelDisplay.new(now_of(ctx), GameCfg.ReelIn) or nil
       local current_progress = GameCfg.ReelIn.Initial
@@ -136,7 +136,7 @@ function ReelOverlayView.spec(options)
         if not valid_session(id) or closed:now() == id then return false end
         if session == id then return true end
         session = id
-        aggregator = RateLimit.new_aggregator({ SessionId = id, AggregateSec = GameCfg.HighFreqInput.AggregateSec })
+        aggregator = RateLimit.new_aggregator({ session_id = id, AggregateSec = GameCfg.HighFreqInput.AggregateSec })
         display = ReelDisplay.new(now_of(ctx), GameCfg.ReelIn)
         set_progress(GameCfg.ReelIn.Initial)
         return true

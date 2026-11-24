@@ -54,13 +54,13 @@ local function make_data(player, overrides)
   overrides = overrides or {}
   return {
     Player = player,
-    Inited = true,
-    LoadState = "ready",
+    inited = true,
+    load_state = "ready",
     Data = {
       FishCoin = 0,
       Zone = "fishPond",
-      Weapons = overrides.weapons or {},
-      Containers = {
+      weapons = overrides.weapons or {},
+      containers = {
         [GameCfg.Items.ContainerId.ItemBar] = {},
         [GameCfg.Items.ContainerId.Backpack] = {},
       },
@@ -277,7 +277,7 @@ describe("武器攻击换弹与 PK 过滤宿主接缝（#300）", function()
     assert.same(1, last_result(events, player).ammo)
 
     hold(runtime, player, data, nil)
-    data.Data.Weapons.item142 = 1
+    data.Data.weapons.item142 = 1
     hold(runtime, player, data, "item142")
     other.Character.Controller.Health = GameCfg.Vitals.MaxHealth
     other.Character.Position = { x = 0, y = 2, z = 4 }

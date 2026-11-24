@@ -160,11 +160,11 @@ describe("服务端旧进度玩法的公开宿主等价迁移（#315）", functi
     assert.same(98, count)
     assert.same(3, world.data.Extra.lottery.pity)
     assert.is_nil(snapshot.catches.lottery)
-    local operations = #world.data.SaveMeta.operations
+    local operations = #world.data.save_meta.operations
     assert.is_false(world:landing("bass", 1, 98))
     world:request("CompendiumRequest", {})
     assert.same(98, world:last_result("CompendiumState").total)
-    assert.same(operations, #world.data.SaveMeta.operations)
+    assert.same(operations, #world.data.save_meta.operations)
   end)
 
   it("击杀、岸边掉落和物品入包不生成钓取重量，个人最佳重进后不回退", function()
@@ -526,14 +526,14 @@ describe("服务端旧进度玩法的公开宿主等价迁移（#315）", functi
 
     local records = world.runtime:get_world().records
     local uid = world.player.UserId
-    assert.same(10, records.LastSeq[uid])
+    assert.same(10, records.last_seq[uid])
 
     local oldPlayer = world.player
     world.runtime:on_player_removing(oldPlayer)
     world.platform:on_player_removing(oldPlayer)
     world.players:on_player_removing(oldPlayer)
     world:drain()
-    assert.is_nil(records.LastSeq[uid], "玩家离场后 WorldRecords.LastSeq 须清理")
+    assert.is_nil(records.last_seq[uid], "玩家离场后 WorldRecords.LastSeq 须清理")
 
     local back = world:add_player(uid, "重连玩家")
     world:use_player(back)

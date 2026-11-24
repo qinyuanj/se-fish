@@ -157,13 +157,13 @@ describe("TestBossPhase", function()
     assert.are.equal(1, #fired)
     assert.are.equal('claw', fired[1].Name) -- 2 秒爪击
     assert.are.equal(50, fired[1].Damage)
-    assert.are.equal(1, state.Stats.Attacks)
+    assert.are.equal(1, state.stats.Attacks)
     -- 失目标：不再出招，也不残留待发
     inp.Target = nil
-    local after = state.Stats.Attacks
+    local after = state.stats.Attacks
     run(state, 2.1, 32.1, inp)
-    assert.are.equal(after, state.Stats.Attacks)
-    assert.is_nil(state.Pending)
+    assert.are.equal(after, state.stats.Attacks)
+    assert.is_nil(state.pending)
     assert.is_nil(state.Target)
     -- 目标回来后接着打（冷却保留：不是从头再等，也不是立刻白赚）
     inp.Target = Target
@@ -196,19 +196,19 @@ describe("TestBossPhase", function()
     local state = Boss.new(BossCfg, 0)
     local inp = input(10000, Target)
     run(state, 0, 30.2, inp)
-    assert.is_not_nil(state.Pending)
-    local attacks = state.Stats.Attacks
+    assert.is_not_nil(state.pending)
+    local attacks = state.stats.Attacks
     inp.alive = false
     local events = Boss.update(state, 30.25, 0.05, inp)
     assert.is_true(events.interrupted)
     assert.are.equal('death', events.Reason)
     assert.is_nil(events.Attack)
-    assert.is_nil(state.Pending)
-    assert.are.equal(1, state.Stats.interrupts)
+    assert.is_nil(state.pending)
+    assert.are.equal(1, state.stats.interrupts)
     -- 死亡后不再有任何攻击落地
     local after = run(state, 30.25, 45.25, inp)
     assert.are.equal(0, #after)
-    assert.are.equal(attacks, state.Stats.Attacks)
+    assert.are.equal(attacks, state.stats.Attacks)
     assert.is_false(Boss.update(state, 45.3, 0.05, inp).interrupted, '打断只算一次')
   end)
 
@@ -239,11 +239,11 @@ describe("TestBossPhase", function()
     local events = Boss.update(state, 0.2, 0.1, input(500, Target))
     assert.are.equal('enraged', events.Phase)
     assert.is_true(events.phase_changed)
-    assert.are.equal(1, state.Stats.transitions, '一帧只算一次切换')
+    assert.are.equal(1, state.stats.transitions, '一帧只算一次切换')
     assert.are.equal('normal', state.Log[1].From)
     assert.are.equal('enraged', state.Log[1].to)
     assert.same({ 'water' }, state.Log[1].skipped, '被跳过的阶段必须记下来')
-    assert.are.equal(1, state.Stats.skipped)
+    assert.are.equal(1, state.stats.skipped)
     assert.are.equal(5, state.Percent)
   end)
 
@@ -256,7 +256,7 @@ describe("TestBossPhase", function()
     assert.are.equal('water', Boss.update(state, 0.3, 0.1, input(5990, Target)).Phase)
     assert.are.equal('water', Boss.update(state, 0.4, 0.1, input(2000, Target)).Phase)
     assert.are.equal('enraged', Boss.update(state, 0.5, 0.1, input(1990, Target)).Phase)
-    assert.are.equal(2, state.Stats.transitions)
+    assert.are.equal(2, state.stats.transitions)
     assert.are.equal(2, #state.Log)
     assert.are.equal('normal', state.Log[1].From)
     assert.are.equal('water', state.Log[1].to)
@@ -266,7 +266,7 @@ describe("TestBossPhase", function()
     for i = 1, 20 do
       Boss.update(state, 0.6 + i * 0.05, 0.05, input(1900 + i * 10, Target))
     end
-    assert.are.equal(2, state.Stats.transitions)
+    assert.are.equal(2, state.stats.transitions)
     assert.are.equal(2, #state.Log)
     assert.are.equal(21, state.Percent)
     assert.are.equal('enraged', state.Phase, '回血不倒退阶段')
@@ -287,19 +287,19 @@ describe("TestBossPhase", function()
     local state = Boss.new(BossCfg, 0)
     local inp = input(10000, Target)
     run(state, 0, 30.2, inp) -- 吐息 30 秒起手，起手 1.5 秒
-    assert.is_not_nil(state.Pending)
-    assert.are.equal('breath', state.Pending.Name)
+    assert.is_not_nil(state.pending)
+    assert.are.equal('breath', state.pending.Name)
     -- 吐息 30 秒到期、起手 1.5 秒；容差按帧粒度（同一帧先落地的爪击会占掉 30 秒那一帧）
-    assert.near(30 + BossCfg.Attacks.breath.WindupSec, state.Pending.ready_at, 0.15)
-    local attacks = state.Stats.Attacks
+    assert.near(30 + BossCfg.Attacks.breath.WindupSec, state.pending.ready_at, 0.15)
+    local attacks = state.stats.Attacks
     inp.Target = nil
     local events = Boss.update(state, 30.25, 0.05, inp)
     assert.is_true(events.interrupted)
     assert.are.equal('lostTarget', events.Reason)
     assert.is_nil(events.Attack)
-    assert.is_nil(state.Pending)
-    assert.are.equal(attacks, state.Stats.Attacks)
-    assert.are.equal(1, state.Stats.interrupts)
+    assert.is_nil(state.pending)
+    assert.are.equal(attacks, state.stats.Attacks)
+    assert.are.equal(1, state.stats.interrupts)
     -- 目标回来后吐息要重新计时，不能立刻落地
     inp.Target = Target
     local fired = run(state, 30.25, 32.25, inp)
@@ -356,19 +356,19 @@ describe("TestCarryMount", function()
     local state
     Carry, state = newCarry(CarryCfg)
     Carry.attach(state, { x = 1, y = 0, z = 1 }, 100)
-    local mount = Carry.mount_point(state.Host, state.Offset, state.Yaw)
+    local mount = Carry.mount_point(state.host, state.Offset, state.Yaw)
     -- 容差内不动它，避免每帧都被「纠正」而抖动
     local near = { x = mount.x + 0.1, y = mount.y, z = mount.z }
     local kept = Carry.follow(state, near, 100, 0.05)
     assert.is_false(kept.snapped)
     assert.same(near, kept.Position)
-    assert.are.equal(0, state.Stats.snaps)
+    assert.are.equal(0, state.stats.snaps)
     -- 被甩开后整段钳回挂点
     local away = { x = mount.x + 20, y = mount.y, z = mount.z }
     local snapped = Carry.follow(state, away, 100, 0.05)
     assert.is_true(snapped.snapped)
     assert.same(mount, snapped.Position)
-    assert.are.equal(1, state.Stats.snaps)
+    assert.are.equal(1, state.stats.snaps)
     -- NaN 目标直接释放，绝不把 NaN 写回玩家身上
     local nan = Carry.follow(state, { x = 0 / 0, y = 1, z = 2 }, 101, 0.05)
     assert.is_true(nan.released)
@@ -381,8 +381,8 @@ describe("TestCarryMount", function()
     local state
     Carry, state = newCarry(CarryCfg)
     Carry.attach(state, { x = 1, y = 0, z = 1 }, 100)
-    state.Host = { x = 0, y = 3, z = 0 }
-    state.GroundY = 2
+    state.host = { x = 0, y = 3, z = 0 }
+    state.ground_y = 2
     local last = nil
     for step = 1, 600 do
       last = Carry.step(state, 100 + step * 0.05, 0.05)
@@ -393,7 +393,7 @@ describe("TestCarryMount", function()
     assert.is_false(Carry.carried(state))
     -- 落点在宿主前方 DropForward 米、离地 DropHeight 米
     local drop = last.drop_point
-    assert.near(state.GroundY + CarryCfg.DropHeight, drop.y, 1e-9)
+    assert.near(state.ground_y + CarryCfg.DropHeight, drop.y, 1e-9)
     assert.is_true(math.abs(drop.z - CarryCfg.DropForward) < 1e-9)
     -- 释放后不再重复触发，也不残留挂点
     local again = Carry.step(state, 200, 0.05)
@@ -457,7 +457,7 @@ describe("TestCarryMount", function()
     local events = Carry.step(state, 100.05, 0.05)
     assert.is_false(events.released)
     assert.is_nil(events.Position)
-    assert.are.equal(1, state.Stats.frames)
+    assert.are.equal(1, state.stats.frames)
   end)
 end)
 
@@ -470,7 +470,7 @@ end)
 --   5. 俯冲节奏：不俯冲 / 每帧都俯冲 / 俯冲后不回巡航高度 / 无目标时仍朝空目标俯冲。
 local function flightBounds()
   return { MinX = -10, MaxX = 10, MinZ = -10, MaxZ = 10, bottom_y = -5, top_y = 40,
-    GroundY = 2, ceiling_y = 22 }
+    ground_y = 2, ceiling_y = 22 }
 end
 
 local function newFlight(cfg, profile, start)
@@ -493,7 +493,7 @@ describe("TestFlightPath", function()
     local bounds = Fly.bounds_of(zone, FlightCfg)
     assert.are.equal(zone.Boundary.MinX, bounds.MinX)
     assert.are.equal(zone.Boundary.MaxZ, bounds.MaxZ)
-    assert.are.equal(zone.SafePoint.y, bounds.GroundY)
+    assert.are.equal(zone.SafePoint.y, bounds.ground_y)
     assert.are.equal(zone.SafePoint.y + FlightCfg.MaxHeight, bounds.ceiling_y)
     -- 场景合同缺 MaxFlightHeight 时用配置兜底，不能没有天花板
     local patched = {}
@@ -514,8 +514,8 @@ describe("TestFlightPath", function()
     local ceiling, yLogged = 0, false
     for step = 1, 60 do
       Fly.step(state, 100 + step * 0.05, 0.05)
-      ceiling = math.max(ceiling, state.Pos.y)
-      assert.is_true(state.Pos.y <= 22, 'y ' .. tostring(state.Pos.y))
+      ceiling = math.max(ceiling, state.pos.y)
+      assert.is_true(state.pos.y <= 22, 'y ' .. tostring(state.pos.y))
     end
     assert.is_true(ceiling > 21.9 and ceiling <= 22, '必须顶到天花板，实际 ' .. tostring(ceiling))
     for _, entry in ipairs(state.clamp_log) do
@@ -528,26 +528,26 @@ describe("TestFlightPath", function()
     local state
     Fly, state = newFlight(FlightCfg, { CruiseHeight = 12, DiveIntervalSec = 20, DiveDamage = 30 })
     Fly.set_target(state, { x = 0, y = 2, z = 0 })
-    local now, dives, minY = 100, 0, state.Pos.y
+    local now, dives, minY = 100, 0, state.pos.y
     for step = 1, 1210 do -- 60.5 秒（第 3 次俯冲在 60 秒整触发，多跑半秒避免边界抖动）
       now = now + 0.05
       local events = Fly.step(state, now, 0.05)
       if events.dive then dives = dives + 1 end
-      minY = math.min(minY, state.Pos.y)
+      minY = math.min(minY, state.pos.y)
     end
     assert.are.equal(3, dives) -- 20 秒一次，60 秒三次
-    assert.are.equal(3, state.Stats.dives)
+    assert.are.equal(3, state.stats.dives)
     assert.is_true(minY < 12, '俯冲必须真的降低高度')
     assert.is_true(minY >= 2, '俯冲不得钻到地面以下')
     -- 第三次俯冲在 60 秒整刚好触发，再跑 4 秒让它落底并爬回
     for step = 1, 80 do
       now = now + 0.05
       Fly.step(state, now, 0.05)
-      minY = math.min(minY, state.Pos.y)
+      minY = math.min(minY, state.pos.y)
     end
-    assert.is_true(state.Pos.y > 12, '俯冲结束必须爬回巡航高度')
+    assert.is_true(state.pos.y > 12, '俯冲结束必须爬回巡航高度')
     assert.are.equal('cruise', state.Phase)
-    assert.are.equal(3, state.Stats.dives, '爬回过程不得再触发俯冲')
+    assert.are.equal(3, state.stats.dives, '爬回过程不得再触发俯冲')
     -- 无目标时只巡航，不俯冲
     Fly.set_target(state, nil)
     local solo = 0
@@ -556,52 +556,52 @@ describe("TestFlightPath", function()
       if Fly.step(state, now, 0.05).dive then solo = solo + 1 end
     end
     assert.are.equal(0, solo)
-    assert.are.equal(3, state.Stats.dives)
+    assert.are.equal(3, state.stats.dives)
   end)
 
   it("test_external_shove_is_pulled_back_to_the_route", function()
     local state
     Fly, state = newFlight(FlightCfg, { CruiseHeight = 12, DiveIntervalSec = 20 })
     Fly.step(state, 100.1, 0.1)
-    local route = { x = state.Pos.x, y = state.Pos.y, z = state.Pos.z }
-    state.Pos.x = state.Pos.x + 30 -- 被顶飞
+    local route = { x = state.pos.x, y = state.pos.y, z = state.pos.z }
+    state.pos.x = state.pos.x + 30 -- 被顶飞
     local events = Fly.step(state, 100.2, 0.1)
     assert.is_true(events.drift)
-    assert.are.equal(1, state.Stats.drifts)
-    assert.is_true(math.abs(state.Pos.x - route.x) < 1e-9)
-    assert.is_true(state.Last.x < 10, '回退点必须是合法点')
+    assert.are.equal(1, state.stats.drifts)
+    assert.is_true(math.abs(state.pos.x - route.x) < 1e-9)
+    assert.is_true(state.last.x < 10, '回退点必须是合法点')
   end)
 
   it("test_huge_dt_cannot_step_over_the_fence", function()
     local state
     Fly, state = newFlight(FlightCfg, { CruiseHeight = 12, DiveIntervalSec = 20 })
     Fly.set_target(state, { x = 500, y = 12, z = 0 })
-    local before = state.Pos.x
+    local before = state.pos.x
     Fly.step(state, 101, 5) -- 一帧补算 5 秒
-    assert.is_true(state.Pos.x - before <= FlightCfg.MaxStepSec * FlightCfg.DiveSpeed + 1e-9)
-    assert.is_true(state.Pos.x <= 10)
-    assert.are.equal(1, state.Stats.step_truncations)
+    assert.is_true(state.pos.x - before <= FlightCfg.MaxStepSec * FlightCfg.DiveSpeed + 1e-9)
+    assert.is_true(state.pos.x <= 10)
+    assert.are.equal(1, state.stats.step_truncations)
   end)
 
   it("test_nan_position_recovers_to_last_legal_point", function()
     local state
     Fly, state = newFlight(FlightCfg, { CruiseHeight = 12, DiveIntervalSec = 20 })
     Fly.step(state, 100.1, 0.1)
-    local safe = { x = state.Pos.x, y = state.Pos.y, z = state.Pos.z }
-    state.Pos.x = 0 / 0
+    local safe = { x = state.pos.x, y = state.pos.y, z = state.pos.z }
+    state.pos.x = 0 / 0
     local events = Fly.step(state, 100.2, 0.1)
     assert.is_true(events.nan)
-    assert.are.equal(1, state.Stats.nan_recoveries)
-    assert.are.equal(safe.x, state.Pos.x)
-    assert.are.equal(safe.z, state.Pos.z)
-    assert.same({ x = 0, y = 0, z = 0 }, state.Vel)
+    assert.are.equal(1, state.stats.nan_recoveries)
+    assert.are.equal(safe.x, state.pos.x)
+    assert.are.equal(safe.z, state.pos.z)
+    assert.same({ x = 0, y = 0, z = 0 }, state.vel)
     -- inf 与速度里的坏值同理
-    state.Vel.y = math.huge
+    state.vel.y = math.huge
     assert.is_true(Fly.step(state, 100.3, 0.1).nan)
-    assert.are.equal(2, state.Stats.nan_recoveries)
+    assert.are.equal(2, state.stats.nan_recoveries)
     local ok, finite = pcall(function()
-      return state.Pos.x == state.Pos.x and math.abs(state.Pos.x) < math.huge
-        and math.abs(state.Pos.y) < math.huge and math.abs(state.Pos.z) < math.huge
+      return state.pos.x == state.pos.x and math.abs(state.pos.x) < math.huge
+        and math.abs(state.pos.y) < math.huge and math.abs(state.pos.z) < math.huge
     end)
     assert.is_true(ok and finite)
   end)
@@ -614,13 +614,13 @@ describe("TestFlightPath", function()
     for step = 1, 600 do
       local events = Fly.step(state, 100 + step * 0.05, 0.05)
       clamps = clamps + (events.clamped or 0)
-      assert.is_true(state.Pos.x >= -10 and state.Pos.x <= 10, 'x ' .. tostring(state.Pos.x))
-      assert.is_true(state.Pos.z >= -10 and state.Pos.z <= 10, 'z ' .. tostring(state.Pos.z))
-      assert.is_true(state.Pos.y <= 22, 'y ' .. tostring(state.Pos.y))
-      assert.is_true(state.Pos.y >= -5, 'y ' .. tostring(state.Pos.y))
+      assert.is_true(state.pos.x >= -10 and state.pos.x <= 10, 'x ' .. tostring(state.pos.x))
+      assert.is_true(state.pos.z >= -10 and state.pos.z <= 10, 'z ' .. tostring(state.pos.z))
+      assert.is_true(state.pos.y <= 22, 'y ' .. tostring(state.pos.y))
+      assert.is_true(state.pos.y >= -5, 'y ' .. tostring(state.pos.y))
     end
     assert.is_true(clamps > 0, '越界必须被记录')
-    assert.are.equal(clamps, state.Stats.clamps)
+    assert.are.equal(clamps, state.stats.clamps)
     assert.is_true(#state.clamp_log > 0)
     assert.are.equal('x', state.clamp_log[1].axis)
   end)

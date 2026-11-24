@@ -12,8 +12,8 @@ local function drop(env)
     local fish = env:held_fish(env.player, 'fish23Elite')
     env.mgr:drop(env.player)
     assert.are.equal('combat', fish.State)
-    assert.are.equal(180, fish.FleeAt) -- EscapeSec=180
-    local p = fish.Carrier.Body.Position
+    assert.are.equal(180, fish.flee_at) -- EscapeSec=180
+    local p = fish.carrier.body.Position
     -- 目标站进咬距：第一次 update 即起手乱刺预警
     env.player.Character.Position = { x = p.x, y = p.y, z = p.z + 1 }
     env.other.Character.Controller.Health = 0
@@ -46,21 +46,21 @@ describe('TestKingCrabCombat', function()
             local fish = env:held_fish(env.player, case.fishId)
             env.mgr:drop(env.player)
             assert.are.equal('combat', fish.State)
-            assert.are.equal(case.fleeAt, fish.FleeAt)
-            local p = fish.Carrier.Body.Position
+            assert.are.equal(case.fleeAt, fish.flee_at)
+            local p = fish.carrier.body.Position
             env.player.Character.Position = { x = p.x, y = p.y, z = p.z + 20 } -- 咬距外 20 米
             env.other.Character.Controller.Health = 0
             env.now = 0
             env.mgr:update() -- 首帧 dt=0，不位移
-            local z0 = fish.Carrier.Body.Position.z
+            local z0 = fish.carrier.body.Position.z
             env.now = 0.5
             env.mgr:update()
-            assert.near(10 * 0.5, fish.Carrier.Body.Position.z - z0, 1e-6, '追击步长 = Speed × dt')
+            assert.near(10 * 0.5, fish.carrier.body.Position.z - z0, 1e-6, '追击步长 = Speed × dt')
             assert.is_nil(fish.Move, '追击帧不起手')
             -- 大 dt 帧：步长按实际间隔放大，但被咬距钳制（distance - BiteRange）
             env.now = 5.5
             env.mgr:update()
-            assert.near(20 - 2.5, fish.Carrier.Body.Position.z - z0, 1e-6, '大 dt 一帧追到咬距边')
+            assert.near(20 - 2.5, fish.carrier.body.Position.z - z0, 1e-6, '大 dt 一帧追到咬距边')
             env.now = 5.6
             env.mgr:update()
             assert.are.equal(case.move, fish.Move.Name, '追进咬距即起手')
@@ -152,7 +152,7 @@ describe('TestKingCrabCombat', function()
         env.mgr:update()
         assert.are.equal('stunned', fish.State)
         assert.is_nil(fish.Move)
-        assert.are.equal(35, fish.WakeAt)
+        assert.are.equal(35, fish.wake_at)
         assert.are.equal(0, #env.vitalsCalls)
         env.now = 34.9
         env.mgr:update()

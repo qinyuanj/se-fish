@@ -50,7 +50,7 @@ describe('条款 18 存档会话与结算身份', function()
   end
 
   local function seedSnapshot(uid)
-    local seed = env.PlayerData.new(new_player(uid, vec(0, 0, 0)))
+    local seed = env.player_data.new(new_player(uid, vec(0, 0, 0)))
     seed:Init()
     return seed:Serialize()
   end
@@ -127,10 +127,10 @@ describe('条款 18 存档会话与结算身份', function()
     package.loaded['common.re_util'] = reStub
     _G.REUtil = reStub
     package.loaded['server.data.player_data'] = nil
-    env.PlayerData = require('server.data.player_data')
+    env.player_data = require('server.data.player_data')
     env.save = assert(loadfile('server/save_host.lua'))()
     env.players = assert(loadfile('server/player_data_host.lua'))()
-    env.players.Save, env.save.PlayerData = env.save, env.players
+    env.players.Save, env.save.player_data = env.save, env.players
     env.ferry = { online_players = function() return {} end }
     env.anchors = {}
     for _, zone in ipairs(env.cfg.Zones) do

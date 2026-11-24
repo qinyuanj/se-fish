@@ -264,7 +264,7 @@ function MainHudEquipPopups.mount(s, ctx, options)
   local equip_bars = {}
   for _, kind in ipairs({ "Weapon", "Bait" }) do
     local bar_kind = kind
-    local r = initial_layout.Rects[bar_kind .. "Bar"]
+    local r = initial_layout.rects[bar_kind .. "Bar"]
     local btn = make_button(ctx, s, bar_kind .. "Bar", r.x, r.y, r.w, r.h)
     btn.LocalZOrder = 6
     local label = make_label(
@@ -292,17 +292,17 @@ function MainHudEquipPopups.mount(s, ctx, options)
 
     local weapon_bar = equip_bars.Weapon
     local bait_bar = equip_bars.Bait
-    place(weapon_bar.button, layout.Rects.WeaponBar)
-    place(weapon_bar.label, layout.Rects.WeaponBar)
-    place(bait_bar.button, layout.Rects.BaitBar)
-    place(bait_bar.label, layout.Rects.BaitBar)
+    place(weapon_bar.button, layout.rects.WeaponBar)
+    place(weapon_bar.label, layout.rects.WeaponBar)
+    place(bait_bar.button, layout.rects.BaitBar)
+    place(bait_bar.label, layout.rects.BaitBar)
 
     local weapon = equipped_weapon(state)
-    weapon_bar.label.Text = weapon and cell_text(item_name(weapon), nil, layout.Rects.WeaponBar.w) or ""
+    weapon_bar.label.Text = weapon and cell_text(item_name(weapon), nil, layout.rects.WeaponBar.w) or ""
     local bait_id = type(state) == "table" and state.selectedBait or nil
     bait_bar.label.Text = bait_id
-      and cell_text(item_name(bait_id), bait_stock(state, bait_id), layout.Rects.BaitBar.w)
-      or cell_text("不挂鱼饵", nil, layout.Rects.BaitBar.w)
+      and cell_text(item_name(bait_id), bait_stock(state, bait_id), layout.rects.BaitBar.w)
+      or cell_text("不挂鱼饵", nil, layout.rects.BaitBar.w)
 
     for kind, bar in pairs(equip_bars) do
       bar.button.Visible = show_bars
@@ -338,7 +338,7 @@ function MainHudEquipPopups.mount(s, ctx, options)
     local plates = {}
     local cur_layout = layout_sig:now() or compute_layout(resolution, ctx.store.item_bar:now())
     for _, kind in ipairs({ "Weapon", "Bait" }) do
-      local r = cur_layout.Rects[kind .. "Bar"]
+      local r = cur_layout.rects[kind .. "Bar"]
       local plate = make_passive(ctx.create_node(ps, "EUIImage", {
         Name = kind .. "Popup",
         Position = Vector2.New(r.x, r.y),

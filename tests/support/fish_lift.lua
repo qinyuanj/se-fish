@@ -68,17 +68,17 @@ function M:set_up()
     end
     package.loaded['server.world_host.fish_carrier'] = {
         spawn = function(_, opts)
-            local carrier = { Opts = opts, Body = body(opts.Position),
-                Receiver = { UnitId = 'r' .. tostring(#env.spawned + 1), Controller = { LiftedEnabled = true } } }
+            local carrier = { Opts = opts, body = body(opts.Position),
+                receiver = { UnitId = 'r' .. tostring(#env.spawned + 1), Controller = { LiftedEnabled = true } } }
             env.spawned[#env.spawned + 1] = carrier
             return carrier
         end,
         despawn = function(_, carrier) env.despawned[#env.despawned + 1] = carrier end,
         sync_ai_position = function(_, carrier)
             if not carrier.ai_owns_movement then return true end
-            local p, offset = carrier.Receiver.Position, carrier.ReceiverOffset or vec(0, 0, 0)
+            local p, offset = carrier.receiver.Position, carrier.receiver_offset or vec(0, 0, 0)
             if not p or p.x ~= p.x or p.y ~= p.y or p.z ~= p.z then return false end
-            carrier.Body.Position = vec(p.x - offset.x, p.y - offset.y, p.z - offset.z)
+            carrier.body.Position = vec(p.x - offset.x, p.y - offset.y, p.z - offset.z)
             return true
         end,
     }

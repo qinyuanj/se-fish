@@ -195,11 +195,11 @@ function AttrLeaf.mount(s, player_tree, opts)
       local memos = player_tree.memos or {}
       local attr_plan = memos.attr_plan and ps:d(memos.attr_plan)
       local weapon_comps = memos.weapon_damage_components and ps:d(memos.weapon_damage_components)
-      if type(attr_plan) ~= "table" or type(attr_plan.Attributes) ~= "table" then
+      if type(attr_plan) ~= "table" or type(attr_plan.attributes) ~= "table" then
         return
       end
 
-      local attrs = attr_plan.Attributes
+      local attrs = attr_plan.attributes
       local summary = {
         ok = true,
         errors = {},
@@ -221,7 +221,7 @@ function AttrLeaf.mount(s, player_tree, opts)
         else
           local sanitized = BodyScale.sanitize(scale)
           summary.values.PlayerBodyScale = sanitized
-          local capped = type(attr_plan.Body) == "table" and attr_plan.Body.capped == true
+          local capped = type(attr_plan.body) == "table" and attr_plan.body.capped == true
           local ok_pres, derived_or_err = AttrLeaf.apply_body_presentation(character, sanitized, capped)
           if not ok_pres then
             record_err("BodyPresentation", derived_or_err)

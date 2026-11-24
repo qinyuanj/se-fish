@@ -109,7 +109,7 @@ describe("烤制值的存档字段", function()
         local restored = PlayerData.new(ctx.player)
         restored:Init()
         assert.is_true(restored:ApplySave(snapshot))
-        local entry = restored.Data.Containers[GameCfg.Items.ContainerId.ItemBar][1]
+        local entry = restored.Data.containers[GameCfg.Items.ContainerId.ItemBar][1]
         assert.same(0.75, entry.cooked)
         assert.same(0.75, entry.saved.k)
     end)
@@ -212,7 +212,7 @@ describe("吃通道传递烤制倍率", function()
     -- #137 审查修复：吃通道走 cook_rate 统一口径，#127 之前的旧布尔档 saved.cooked==true 按烤熟价倍率恢复
     it("test_operate_eat_legacy_boolean_archive_passes_scale", function()
         assert.is_true(ctx.data:AddItem('carp', 1.5))
-        local entry = ctx.data.Data.Containers[GameCfg.Items.ContainerId.ItemBar][1]
+        local entry = ctx.data.Data.containers[GameCfg.Items.ContainerId.ItemBar][1]
         entry.saved = { [GameCfg.Items.CookedFlag] = true }
         operate({ action = 'Operate', op = 'eat', slot = 1 })
         operate({ action = 'Operate', op = 'eat', slot = 1 })

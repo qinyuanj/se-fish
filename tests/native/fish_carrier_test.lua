@@ -133,12 +133,12 @@ end
 
 local function freshManager()
   MgrFishCarrier.carriers = {}
-  MgrFishCarrier.Subscribers = {}
+  MgrFishCarrier.subscribers = {}
   return MgrFishCarrier
 end
 
 local SPAWN_OPTS = {
-  FishId = 'T1',
+  fish_id = 'T1',
   RenderMeshId = 'official://mesh/7000544',
   Position = newVector3(1, 2, 3),
   MaxHealth = 50,
@@ -171,8 +171,8 @@ describe('TestFishCarrierEngine', function()
     local carrier = withFakeEngine(world, function()
       return mgr:spawn(SPAWN_OPTS)
     end)
-    assert.are.equal(1, #carrier.Body.NoCollidePairs)
-    assert.is_true(carrier.Body.NoCollidePairs[1] == carrier.Receiver)
+    assert.are.equal(1, #carrier.body.NoCollidePairs)
+    assert.is_true(carrier.body.NoCollidePairs[1] == carrier.receiver)
   end)
 
   it('test_business_damage_requires_hit_and_reports_actual_amount', function()
@@ -181,7 +181,7 @@ describe('TestFishCarrierEngine', function()
     withFakeEngine(world, function()
       local carrier = mgr:spawn(SPAWN_OPTS)
       carrier.Controller.Health = 10
-      assert.same(carrier, mgr:resolve_carrier(carrier.Receiver))
+      assert.same(carrier, mgr:resolve_carrier(carrier.receiver))
       assert.is_false(mgr:Damage(carrier, 5))
       assert.are.equal(10, carrier.Controller.Health)
       local seen = {}
@@ -206,7 +206,7 @@ describe('TestFishCarrierEngine', function()
       local carrier = mgr:spawn(SPAWN_OPTS)
       carrier.Controller:TakeDamage(2.7)
       assert.near(2.7, notices[1].amount, 0.00001)
-      assert.are.equal(carrier.Body.UnitId, notices[1].targetId)
+      assert.are.equal(carrier.body.UnitId, notices[1].targetId)
       assert.are.equal(2, notices[1].position.y)
       mgr:Damage(carrier, 2.4, { id = 1001 })
       assert.near(2.4, notices[2].amount, 0.00001)
@@ -236,8 +236,8 @@ describe('TestFishCarrierEngine', function()
       opts.AngularDamping = 10
       return mgr:spawn(opts)
     end)
-    assert.are.equal(10, carrier.Body.LinearDamping)
-    assert.are.equal(10, carrier.Body.AngularDamping)
+    assert.are.equal(10, carrier.body.LinearDamping)
+    assert.are.equal(10, carrier.body.AngularDamping)
   end)
 
   it('test_death_fired_without_health_changed_still_syncs_health', function()
@@ -258,7 +258,7 @@ describe('TestFishCarrierEngine', function()
     end)
     assert.are.equal(0, seen)
     assert.are.equal(0, carrier.Health)
-    assert.is_true(carrier.Dead)
+    assert.is_true(carrier.dead)
   end)
 
   it('test_despawn_unregisters_and_stops_notifying', function()
@@ -272,13 +272,13 @@ describe('TestFishCarrierEngine', function()
       deaths = deaths + 1
     end)
 
-    local bodyId = carrier.Body.UnitId
+    local bodyId = carrier.body.UnitId
     withFakeEngine(world, function()
       mgr:despawn(carrier)
     end)
 
     assert.is_nil(mgr.carriers[bodyId])
-    assert.is_true(carrier.Body == nil)
+    assert.is_true(carrier.body == nil)
     assert.are.equal(50, carrier.MaxHealth) -- 血量口径留着，M2 生成鱼获时还要读
   end)
 
@@ -289,10 +289,10 @@ describe('TestFishCarrierEngine', function()
       local carrier = mgr:spawn(SPAWN_OPTS)
       local target = Vector3.New(20, 15, 30)
       mgr:sync_position(carrier, target)
-      assert.same(target + carrier.ReceiverOffset, carrier.Receiver.Position)
+      assert.same(target + carrier.receiver_offset, carrier.receiver.Position)
       assert.same({ x = 20, y = 15, z = 30 }, carrier.last_position)
       mgr:update(0.03) -- pairs 顺序可在脚本写回之后跑默认同步，不能再用旧本体位置覆盖。
-      assert.same(target + carrier.ReceiverOffset, carrier.Receiver.Position)
+      assert.same(target + carrier.receiver_offset, carrier.receiver.Position)
     end)
   end)
 
@@ -303,7 +303,7 @@ describe('TestFishCarrierEngine', function()
     mgr.damage_publisher = function(payload) notices[#notices + 1] = payload end
     withFakeEngine(world, function()
       local carrier = mgr:spawn(SPAWN_OPTS)
-      carrier.Body.GetPosition = function() error('unit destroyed') end
+      carrier.body.GetPosition = function() error('unit destroyed') end
       carrier.Controller:TakeDamage(0.5)
       assert.are.equal(1, notices[1].position.x)
       assert.are.equal(0.5, notices[1].amount)
@@ -337,7 +337,7 @@ describe('TestFishCarrierEngine', function()
     end)
     assert.are.equal(0, carrier.Health)
     assert.are.equal(1, deaths)
-    assert.are.equal(true, carrier.Dead)
+    assert.are.equal(true, carrier.dead)
   end)
 
   it('test_overkill_reports_only_remaining_health', function()
@@ -366,9 +366,9 @@ describe('TestFishCarrierEngine', function()
     end)
 
     -- #32 的接缝：受击体带 EnableController，包内 _applyDamage 才找得到 target.Controller
-    assert.are.equal(true, carrier.Receiver.EnableController)
-    assert.are.equal('EggyUnit', carrier.Receiver.UnitType)
-    assert.is_true(carrier.Receiver.Parent == carrier.Body)
+    assert.are.equal(true, carrier.receiver.EnableController)
+    assert.are.equal('EggyUnit', carrier.receiver.UnitType)
+    assert.is_true(carrier.receiver.Parent == carrier.body)
     assert.is_not.is_nil(carrier.Controller)
     assert.are.equal(50, carrier.Controller.MaxHealth)
     assert.are.equal(50, carrier.Controller.Health)
@@ -382,11 +382,11 @@ describe('TestFishCarrierEngine', function()
     end)
 
     assert.is_not.is_nil(carrier)
-    assert.are.equal('WorldUnit', carrier.Body.UnitType)
-    assert.are.equal(4, carrier.Body.BodyType) -- Dynamic：抓举只对动态物体生效
-    assert.are.equal(true, carrier.Body.Liftable)
-    assert.are.equal('official://mesh/7000544', carrier.Body.RenderMeshId)
-    assert.is_true(mgr.carriers[carrier.Body.UnitId] == carrier)
+    assert.are.equal('WorldUnit', carrier.body.UnitType)
+    assert.are.equal(4, carrier.body.BodyType) -- Dynamic：抓举只对动态物体生效
+    assert.are.equal(true, carrier.body.Liftable)
+    assert.are.equal('official://mesh/7000544', carrier.body.RenderMeshId)
+    assert.is_true(mgr.carriers[carrier.body.UnitId] == carrier)
   end)
 
   it('test_each_spawned_body_gets_its_own_name', function()
@@ -400,9 +400,9 @@ describe('TestFishCarrierEngine', function()
       opts.Name = 'CallerChosen'
       return mgr:spawn(opts), mgr:spawn(opts)
     end)
-    assert.is_not.same(first.Body.Name, second.Body.Name)
+    assert.is_not.same(first.body.Name, second.body.Name)
     for _, carrier in ipairs({ first, second }) do
-      local name = carrier.Body.Name
+      local name = carrier.body.Name
       assert.is_truthy(name, '鱼本体建单位必须带名字')
       assert.is_truthy(string.find(name, 'FishCarrier', 1, true),
         '名字要带模块前缀：' .. tostring(name))
@@ -414,7 +414,7 @@ describe('TestFishCarrierEngine', function()
     local mgr = freshManager()
     local world = newFakeWorld()
     local carrier, why = withFakeEngine(world, function()
-      return mgr:spawn({ FishId = 'T-no-mesh' })
+      return mgr:spawn({ fish_id = 'T-no-mesh' })
     end)
     assert.is_nil(carrier)
     assert.are.equal('no-mesh', why)
@@ -431,12 +431,12 @@ describe('TestFishCarrierEngine', function()
 
     -- 举着 / 逃脱 / 落地：鱼本体动到哪，受击体跟到哪（引擎没有给 EggyUnit 的子节点跟随开关）
     withFakeEngine(world, function()
-      carrier.Body.Position = newVector3(10, 20, 30)
+      carrier.body.Position = newVector3(10, 20, 30)
       mgr:update(0.03)
     end)
-    assert.are.equal(10, carrier.Receiver.Position.x)
-    assert.are.equal(20, carrier.Receiver.Position.y)
-    assert.are.equal(30, carrier.Receiver.Position.z)
+    assert.are.equal(10, carrier.receiver.Position.x)
+    assert.are.equal(20, carrier.receiver.Position.y)
+    assert.are.equal(30, carrier.receiver.Position.z)
   end)
 
   it('test_zero_damage_recovery_and_binding_never_report', function()
@@ -513,14 +513,14 @@ describe('TestFishCarrierSeam', function()
     -- 死亡单点：Died 与 HealthChanged(<=0) 两条路都来也只能通知一次（M2 靠它生成鱼获）
     local mgr = freshManager()
     local calls = {}
-    local carrier = { Dead = false }
+    local carrier = { dead = false }
     mgr:subscribe_died(function(c)
       calls[#calls + 1] = c
     end)
     mgr:notify_died(carrier)
     mgr:notify_died(carrier)
     assert.are.equal(1, #calls)
-    assert.is_true(carrier.Dead)
+    assert.is_true(carrier.dead)
   end)
 
   it('test_manager_is_registered_in_the_mgr_map', function()

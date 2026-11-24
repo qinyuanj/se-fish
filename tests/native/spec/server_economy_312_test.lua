@@ -16,12 +16,12 @@ describe("服务端抽奖机、盲盒与地图商店宿主接缝（#312）", fun
     assert.is_false(world:lottery_draw(1, 1))
     assert.same(1, world.data:ItemCount("carp"))
 
-    world.data.Data.Containers[ITEM_BAR][1] = nil
+    world.data.Data.containers[ITEM_BAR][1] = nil
     world:give_premium("item31", 2, { grilled = true })
     assert.is_false(world:lottery_draw(1, 2))
     assert.same(1, world.data:ItemCount("item31"))
 
-    world.data.Data.Containers[ITEM_BAR][1] = nil
+    world.data.Data.containers[ITEM_BAR][1] = nil
     world:give_premium("item31", 2)
     world:persist_ready()
     world:script_axes(96, 100, 5)
@@ -30,7 +30,7 @@ describe("服务端抽奖机、盲盒与地图商店宿主接缝（#312）", fun
     assert.same(100, result.betValue)
     assert.same(2000, result.coins)
     assert.same(2000, world.data.Data.FishCoin)
-    assert.is_nil(world.data.Data.Containers[ITEM_BAR][1])
+    assert.is_nil(world.data.Data.containers[ITEM_BAR][1])
   end)
 
   it("三同武器大奖进入独立武器库存且不叠加金币", function()
@@ -44,7 +44,7 @@ describe("服务端抽奖机、盲盒与地图商店宿主接缝（#312）", fun
     assert.is_nil(result.coins)
     assert.same(0, world.data.Data.FishCoin)
     assert.same(1, world.data:WeaponCount("item154"))
-    assert.is_nil(world.data.Data.Containers[ITEM_BAR][1])
+    assert.is_nil(world.data.Data.containers[ITEM_BAR][1])
   end)
 
   it("test_old_epoch_does_not_block_current_delivery", function()

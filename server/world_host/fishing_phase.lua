@@ -398,7 +398,7 @@ function FishingPhase.mount(scope, tree, opts)
     local now = now_of(tree)
     local result = reel.receiver:accept(now, payload)
     if result.Status ~= RateLimit.Result.Ok then return false end
-    local grace_deadline = reel.progress.ZeroAt and reel.progress.ZeroAt + GameCfg.ReelIn.GraceSec
+    local grace_deadline = reel.progress.zero_at and reel.progress.zero_at + GameCfg.ReelIn.GraceSec
     if grace_deadline and now > grace_deadline then
       local expired = reel.progress:advance(now)
       if expired then
@@ -488,8 +488,8 @@ function FishingPhase.mount(scope, tree, opts)
         accepted = 0,
       })
     end
-    if reel and session and session.phase == "hooked" and reel.progress.ZeroAt
-      and now > reel.progress.ZeroAt + GameCfg.ReelIn.GraceSec then
+    if reel and session and session.phase == "hooked" and reel.progress.zero_at
+      and now > reel.progress.zero_at + GameCfg.ReelIn.GraceSec then
       local outcome = reel.progress:advance(now)
       if outcome then finish_reel(outcome, true) end
     end

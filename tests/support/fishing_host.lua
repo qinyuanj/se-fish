@@ -110,7 +110,7 @@ function Host.new(opts)
       spawn_landed = function(_, owner, catch, position)
         if opts.spawn_fails then return nil, "spawn-failed" end
         seq = seq + 1
-        local fish = { Id = seq, Owner = owner, FishId = catch.fishId, Mult = catch.mult,
+        local fish = { Id = seq, Owner = owner, fish_id = catch.fishId, mult = catch.mult,
           Position = position, State = "awaitLift" }
         env.units[#env.units + 1] = { Name = "LandedFish_" .. tostring(seq), fish = fish,
           destroyed = false, Destroy = function(self) self.destroyed = true end }

@@ -32,8 +32,8 @@ end
 function M:held_fish(player, fishId, mult)
     player = player or self.player
     local fish = self:land(player, fishId, mult)
-    fish.Carrier.Body.OnLiftedBegin:Fire(player.Character)
-    fish.Carrier.Body.BodyType = 2
+    fish.carrier.body.OnLiftedBegin:Fire(player.Character)
+    fish.carrier.body.BodyType = 2
     return fish
 end
 

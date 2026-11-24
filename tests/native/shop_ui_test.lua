@@ -103,7 +103,7 @@ describe("钓场商店统一视图行为", function()
       expected[index] = row.Number
       assert.same(row.Name, child(ctx.root, "ShopRowName" .. index).Text)
       assert.same(tostring(row.Price), child(ctx.root, "ShopRowPrice" .. index).Text)
-      assert.same(row.MinShopLevel == ctx.stand.Level and ShopView.ShopText.New or "",
+      assert.same(row.MinShopLevel == ctx.stand.Level and ShopView.shop_text.New or "",
         child(ctx.root, "ShopRowNew" .. index).Text)
       if row.MinShopLevel > ctx.stand.Level then
         assert.matches("需 " .. row.MinShopLevel .. " 级摊位", child(ctx.root, "ShopRowState" .. index).Text, 1, true)
@@ -145,7 +145,7 @@ describe("钓场商店统一视图行为", function()
   it("金币不足只引导金币页，不发出必被服务端拒绝的购买", function()
     ctx.writer:set_coin(0)
     select_number(12)
-    assert.same(ShopView.ShopText.go_platform_shop, child(ctx.root, "LabelShopBuyDetail").Text)
+    assert.same(ShopView.shop_text.go_platform_shop, child(ctx.root, "LabelShopBuyDetail").Text)
     assert.is_true(Eui.click(child(ctx.root, "BtnShopBuyDetail")))
     assert.same(0, #ctx.sent)
     assert.is_true(child(ctx.root, "ShopCoinPanel").Visible)
@@ -156,14 +156,14 @@ describe("钓场商店统一视图行为", function()
     Eui.click(child(ctx.root, "BtnShopPage4"))
     ctx.platform_available = false
     Eui.click(child(ctx.root, "BtnOpenPlatformShop"))
-    assert.same(ShopView.ShopText.platform_unavailable, child(ctx.root, "LabelCoinPageHint").Text)
+    assert.same(ShopView.shop_text.platform_unavailable, child(ctx.root, "LabelCoinPageHint").Text)
     assert.same(0, ctx.platform_opened or 0)
     ctx.platform_available = true
     Eui.click(child(ctx.root, "BtnOpenPlatformShop"))
     assert.same(1, ctx.platform_opened)
     ctx.platform_error = true
     Eui.click(child(ctx.root, "BtnOpenPlatformShop"))
-    assert.same(ShopView.ShopText.platform_open_failed, child(ctx.root, "LabelCoinPageHint").Text)
+    assert.same(ShopView.shop_text.platform_open_failed, child(ctx.root, "LabelCoinPageHint").Text)
     Eui.click(child(ctx.root, "BtnShopPage1"))
     assert.is_true(child(ctx.root, "ShopListPanel").Visible)
     assert.same(0, #ctx.sent)

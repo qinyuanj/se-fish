@@ -120,7 +120,7 @@ describe('TestEconomyPersistence', function()
                 return data and data.Extra.quest or { step = 1, count = 0 }
             end,
         }
-        env.players.Save, env.save.PlayerData = env.save, env.players
+        env.players.Save, env.save.player_data = env.save, env.players
         env.runtime = ServerRuntime.new({
             clock = SpokeClock.new(100), remote = _G.REUtil,
             on_item_bar_state = function(player, snapshot)
@@ -165,14 +165,14 @@ describe('TestEconomyPersistence', function()
         assert.is_true(env.shop:handle(env.player, { action = 'Buy', number = 33, seq = 1 })) -- 背包升级1，100 金
         drain()
         assert.same(900, env.data.Data.FishCoin)
-        assert.same(1, env.data.Data.UpgradeLevel)
+        assert.same(1, env.data.Data.upgrade_level)
         assert.same(3, env.data:ItemBarCapacity())
         assert.same(10, env.data:BackpackCapacity())
         assert.same(1, env.data:PurchaseCount(33))
         join()
         drain()
         local restored = env.players:get_data_inst(env.player)
-        assert.same(1, restored.Data.UpgradeLevel)
+        assert.same(1, restored.Data.upgrade_level)
         assert.same(1, restored:shop_upgrade_level('backpack'))
         assert.same(3, restored:ItemBarCapacity())
         assert.same(1, restored:PurchaseCount(33))
@@ -213,7 +213,7 @@ describe('TestEconomyPersistence', function()
         persistSetup()
         env.writeFailure = true
         assert.is_true(env.interact:handle(env.player, { target = 'fisherman', action = 'Feed', seq = 1 }))
-        assert.same('garHead', env.data.Data.Containers.itemBar[1].itemId)
+        assert.same('garHead', env.data.Data.containers.itemBar[1].itemId)
         drain()
         assert.same({}, env.events)
         assert.same(0, env.plays)
@@ -266,7 +266,7 @@ describe('TestEconomyPersistence', function()
         drain()
         assert.same(0, env.data:ItemCount('garHead'))
         assert.same(1, env.data:ItemCount('shrimpTicket'))
-        assert.same('shrimpTicket', env.data.Data.Containers.itemBar[1].itemId)
+        assert.same('shrimpTicket', env.data.Data.containers.itemBar[1].itemId)
         assert.same(0, env.data.Data.FishCoin)
         assert.same({ from = 'garHead', to = 'shrimpTicket' }, messages('InteractResult')[1].exchange)
     end)
@@ -352,13 +352,13 @@ describe('TestEconomyPersistence', function()
         assert.is_true(env.data:SelectSlot(1))
         persistSetup()
         -- 当前基线从 Serialize 恢复选中态；cherry-pick impl-123 的选择态持久化提交后仍由真实入口重选，seam 不变。
-        if env.data.Data.SelectedSlot ~= 1 then env.data:SelectSlot(1) end
+        if env.data.Data.selected_slot ~= 1 then env.data:SelectSlot(1) end
         clear_events()
         local request = { target = 'fisherman', action = 'Feed', seq = 1 }
         env.writeFailure = true
         assert.is_true(env.interact:handle(env.player, request))
         assert.same(0, env.data.Data.FishCoin)
-        assert.same('bass', env.data.Data.Containers.itemBar[1].itemId)
+        assert.same('bass', env.data.Data.containers.itemBar[1].itemId)
         assert.is_nil(env.players:get_data_inst(env.player))
         drain()
         assert.same({}, env.events)
@@ -430,7 +430,7 @@ describe('TestEconomyPersistence', function()
         assert.same({ exchange }, messages('InteractResult'))
         assert.same({}, messages('ItemBarState'))
         assert.same(0, env.plays)
-        assert.same(1, env.data.Data.UpgradeLevel)
+        assert.same(1, env.data.Data.upgrade_level)
         assert.same(1, env.data:ItemCount('shrimpTicket'))
     end)
 
@@ -448,7 +448,7 @@ describe('TestEconomyPersistence', function()
         -- #127 起满格不再是喂食的业务拒绝：信物兑换先交付选中格、再按交付后的容量校验，
         -- 满格也能用本次交付释放出的格位成交；钓鱼佬侧仍然真实的业务拒绝是「选中格为空」。
         -- 取消选中是本次用例的输入，不算「被拒绝的请求改动了数据」。
-        env.data.Data.SelectedSlot = nil
+        env.data.Data.selected_slot = nil
         before.selectedSlot = nil
         env.interact:handle(env.player, { target = 'fisherman', action = 'Feed', seq = 1 })
         assert.same('nothing', messages('InteractResult')[1].reason)

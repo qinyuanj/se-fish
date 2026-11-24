@@ -74,7 +74,7 @@ function AbilityAPI.attach_to_socket(world, unit, host, socketName, offset, rota
 			return { Ok = false, Error = tostring(parentErr) }
 		end
 	end
-	return { Ok = true, Mount = mount, Offset = pos }
+	return { Ok = true, mount = mount, Offset = pos }
 end
 
 ---@return boolean

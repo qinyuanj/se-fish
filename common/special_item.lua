@@ -36,8 +36,8 @@ function M.step_flight_y(wingsCfg, state, holding, dt, bounds)
         y = y - wingsCfg.DescendSpeed * dt
     end
     if y > bounds.ceiling_y then y = bounds.ceiling_y end
-    if y <= bounds.GroundY then
-        y = bounds.GroundY
+    if y <= bounds.ground_y then
+        y = bounds.ground_y
         airborne = false
     end
     return y, airborne

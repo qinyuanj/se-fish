@@ -55,14 +55,14 @@ describe('第 6 节 官方 AI 目标选择接线（哥斯拉贯通）', function
     end
 
     local function place(fish, player, distance)
-        local p = fish.Carrier.Body.Position
+        local p = fish.carrier.body.Position
         player.Character.Position = vec(p.x + distance, p.y, p.z)
     end
 
     local function dropBoss()
         local fish = env:drop('fish56Boss')
         -- 官方包 utils.isValidUnit 要求单位有 Parent；宿主世界里受击体挂在 World 下。
-        fish.Carrier.Receiver.Parent = env.world
+        fish.carrier.receiver.Parent = env.world
         return fish
     end
 
@@ -127,7 +127,7 @@ describe('第 6 节 官方 AI 目标选择接线（哥斯拉贯通）', function
         place(fish, env.player, 20)
         place(fish, env.rival, 22)
         local low, high = spawn(91), spawn(100)
-        local p = fish.Carrier.Body.Position
+        local p = fish.carrier.body.Position
         low.Character.Position = vec(p.x + 2, p.y, p.z)
         high.Character.Position = vec(p.x - 2, p.y, p.z)
         env:advance(0.2)
@@ -152,7 +152,7 @@ describe('第 6 节 官方 AI 目标选择接线（哥斯拉贯通）', function
             for i = 1, select('#', ...) do parts[#parts + 1] = tostring(select(i, ...)) end
             logs[#logs + 1] = table.concat(parts, ' ')
         end
-        local ok, selected, cp = pcall(env.mgr.choose_target, env.mgr, fish, fish.Carrier.Body.Position)
+        local ok, selected, cp = pcall(env.mgr.choose_target, env.mgr, fish, fish.carrier.body.Position)
         _G.print = rawPrint
         manager.setSearchEnemyPriorityMode = original
         assert.is_true(ok, tostring(selected))
@@ -163,7 +163,7 @@ describe('第 6 节 官方 AI 目标选择接线（哥斯拉贯通）', function
         assert.is_truthy(text:find('[FishAiTarget]', 1, true), '日志缺模块名')
         assert.is_truthy(text:find('SetFocus', 1, true), '日志缺官方登记操作名')
         assert.is_truthy(text:find(tostring(fish.Id), 1, true), '日志缺鱼标识')
-        assert.is_truthy(text:find(tostring(fish.Carrier.Receiver.UnitId), 1, true), '日志缺单位标识')
+        assert.is_truthy(text:find(tostring(fish.carrier.receiver.UnitId), 1, true), '日志缺单位标识')
         assert.is_truthy(text:find('official-register-failed', 1, true), '日志缺原始错误')
     end)
 
@@ -182,7 +182,7 @@ describe('第 6 节 官方 AI 目标选择接线（哥斯拉贯通）', function
         local rawPrint = _G.print
         local logs = {}
         _G.print = function(...) logs[#logs + 1] = tostring((...)) end
-        local ok, selected = pcall(env.mgr.choose_target, env.mgr, fish, fish.Carrier.Body.Position)
+        local ok, selected = pcall(env.mgr.choose_target, env.mgr, fish, fish.carrier.body.Position)
         _G.print = rawPrint
         package.preload[apiName] = oldPreload
         package.loaded[apiName] = oldApi
@@ -193,7 +193,7 @@ describe('第 6 节 官方 AI 目标选择接线（哥斯拉贯通）', function
         assert.is_truthy(text:find('[FishAiTarget]', 1, true), '日志缺模块名')
         assert.is_truthy(text:find('RequireOfficialAPI', 1, true), '日志缺官方 API 加载操作名')
         assert.is_truthy(text:find(tostring(fish.Id), 1, true), '日志缺鱼标识')
-        assert.is_truthy(text:find(tostring(fish.Carrier.Receiver.UnitId), 1, true), '日志缺单位标识')
+        assert.is_truthy(text:find(tostring(fish.carrier.receiver.UnitId), 1, true), '日志缺单位标识')
         assert.is_truthy(text:find('official-api-load-failed', 1, true), '日志缺原始错误')
     end)
 
@@ -207,7 +207,7 @@ describe('第 6 节 官方 AI 目标选择接线（哥斯拉贯通）', function
         local rawPrint = _G.print
         local logs = {}
         _G.print = function(...) logs[#logs + 1] = tostring((...)) end
-        local ok, selected = pcall(env.mgr.choose_target, env.mgr, fish, fish.Carrier.Body.Position)
+        local ok, selected = pcall(env.mgr.choose_target, env.mgr, fish, fish.carrier.body.Position)
         _G.print = rawPrint
         manager.setSearchEnemyPriorityMode = original
         assert.is_true(ok, tostring(selected))
@@ -238,7 +238,7 @@ describe('第 6 节 官方 AI 目标选择接线（哥斯拉贯通）', function
         assert.is_truthy(text:find('[FishAiTarget]', 1, true), '日志缺模块名')
         assert.is_truthy(text:find('ReadOfficialState', 1, true), '日志缺状态读取操作名')
         assert.is_truthy(text:find(tostring(fish.Id), 1, true), '日志缺鱼标识')
-        assert.is_truthy(text:find(tostring(fish.Carrier.Receiver.UnitId), 1, true), '日志缺单位标识')
+        assert.is_truthy(text:find(tostring(fish.carrier.receiver.UnitId), 1, true), '日志缺单位标识')
         assert.is_truthy(text:find('official-state-read-failed', 1, true), '日志缺原始错误')
     end)
 
@@ -252,7 +252,7 @@ describe('第 6 节 官方 AI 目标选择接线（哥斯拉贯通）', function
         env.player.Character.Controller.Died:Fire()
         env:advance(0.4)
         assert.same(env.rival.Character, officialFocus(fish), '死亡玩家仍被选中')
-        assert.is_nil(fish.Threat[env.player], '死亡玩家的伤害记录没有清除')
+        assert.is_nil(fish.threat[env.player], '死亡玩家的伤害记录没有清除')
 
         -- 换到有伤害的玩家，再让他离线（离开玩家列表）：同样不能成为目标。
         env.mgr:note_damage(fish, env.rival, 900)
@@ -265,13 +265,13 @@ describe('第 6 节 官方 AI 目标选择接线（哥斯拉贯通）', function
         -- 单位仍然有效，不能拿镜面焦点当「没被选中」的证据。
         local wounded = spawn(3703)
         place(fish, wounded, 2)
-        local pos = fish.Carrier.Body.Position
+        local pos = fish.carrier.body.Position
         assert.same(wounded, (env.mgr:choose_target(fish, pos)), '新玩家应接替成为目标')
         env.mgr:note_damage(fish, wounded, 900)
         env.vitals:apply_hit(env.vitals:new_hit(nil, 'fishAttack'), wounded, 1000000)
         assert.equals('downed', env.vitals:life_status(wounded))
         assert.is_nil((env.mgr:choose_target(fish, pos)), '濒死玩家仍被选中')
-        assert.is_nil(fish.Threat[wounded], '濒死玩家的伤害记录没有清除')
+        assert.is_nil(fish.threat[wounded], '濒死玩家的伤害记录没有清除')
     end)
 
     it('条款 6-31：特殊招式指定目标优先于自动伤害排序，失效后回到自动目标', function()
@@ -299,11 +299,11 @@ describe('第 6 节 官方 AI 目标选择接线（哥斯拉贯通）', function
         local adapter = require('server.world_host.fish_ai_target')
         local state = adapter:state(fish)
         assert.is_nil(state and state.modeName, '官方 AI 启动了移动模式，与自研轨迹双写权威')
-        assert.is_not_true(fish.Carrier.ai_owns_movement, '受击体的移动所有权被官方 AI 接管')
-        local pos = fish.Carrier.Body.Position
+        assert.is_not_true(fish.carrier.ai_owns_movement, '受击体的移动所有权被官方 AI 接管')
+        local pos = fish.carrier.body.Position
         place(fish, env.player, 2)
         env:advance(0.2)
-        assert.same(pos.x, fish.Carrier.Body.Position.x, '目标选择不应改动鱼本体位置')
+        assert.same(pos.x, fish.carrier.body.Position.x, '目标选择不应改动鱼本体位置')
     end)
 end)
 -- #260 接线验收：属性与效果投影。目标选择用到的有效伤害来自同一条投影链——
@@ -323,13 +323,13 @@ describe('接线验收：属性与效果投影一致', function()
             GetChildren = function() return {} end, SetScale = function() end } }
         local plan = mgr:plan(player)
         local expected = Model.plan({ bodyPotions = 2, speedPotions = 3, baseSpeed = 7, moveMultiplier = 0.5 })
-        assert.same(expected.Attributes.PlayerWalkSpeed, plan.Attributes.PlayerWalkSpeed,
+        assert.same(expected.attributes.PlayerWalkSpeed, plan.attributes.PlayerWalkSpeed,
             'MgrAttr:Plan 与 AttrModel:Plan 分量不一致')
         assert.near(1.3, Growth.speed_factor(3), 1e-9, 'AttrGrowth 与药水成长公式不一致')
 
         assert.is_true(mgr:apply_growth(player).Ok)
         local speed = mgr.AttrAPI.Funcs.GetAttr(player.Character, 'PlayerWalkSpeed')
-        local c = expected.Attributes.PlayerWalkSpeed
+        local c = expected.attributes.PlayerWalkSpeed
         assert.near((c.Base + c.BaseExtra) * (1 + c.Ratio) + c.Bonus, speed, 1e-9,
             '官方 attr_rule 的属性值与 AttrModel 分量不一致')
     end)
@@ -376,9 +376,9 @@ describe('第 6 节 6-30：离开战斗范围的玩家退出飞行鱼目标', fu
     -- 玩家会留在镜面焦点里，不能拿它当「没被选为目标」的证据。
     it('条款 6-30：离开索敌半径的玩家不再被飞行鱼锁定', function()
         local fish = env:drop('fish47Elite')
-        fish.Carrier.Receiver.Parent = env.world
+        fish.carrier.receiver.Parent = env.world
         assert.is_not_nil(fish.Flight, '精英鱼应在空中飞行')
-        local p = fish.Carrier.Body.Position
+        local p = fish.carrier.body.Position
         env.player.Character.Position = vec(p.x + 5, p.y, p.z)
         env:advance(0.3)
         assert.same(env.player.Character, focus(fish), '索敌半径内的玩家应被锁定')
@@ -386,10 +386,10 @@ describe('第 6 节 6-30：离开战斗范围的玩家退出飞行鱼目标', fu
 
         -- 走出 Flight.AggroRange：候选过滤在外，业务裁决无目标，轨迹不再追这个玩家。
         local range = GameCfg.Ability.Flight.AggroRange
-        local at = fish.Carrier.Body.Position
+        local at = fish.carrier.body.Position
         env.player.Character.Position = vec(at.x + range + 20, at.y, at.z)
         env:advance(env.now + 0.2) -- advance 收的是绝对时刻
-        assert.is_nil((env.mgr:choose_target(fish, fish.Carrier.Body.Position, { AggroRange = range })),
+        assert.is_nil((env.mgr:choose_target(fish, fish.carrier.body.Position, { AggroRange = range })),
             '离开战斗范围仍被选为目标')
         assert.is_nil(fish.Flight.Target, '离开战斗范围后轨迹仍在追玩家')
     end)

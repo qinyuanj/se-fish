@@ -16,7 +16,7 @@ local function equippedWeapon(d)
     if type(held) == 'table' and held.kind == 'weapon' and d:WeaponCount(held.id) > 0 then
         return held.id
     end
-    local selected = d.Data and d.Data.SelectedWeapon
+    local selected = d.Data and d.Data.selected_weapon
     if selected and d:WeaponCount(selected) > 0 then return selected end
     return nil
 end
@@ -56,22 +56,22 @@ task:Spawn(function()
     local untilAt = world:GetServerTime() + 75
     while rt.token == token and world:GetServerTime() < untilAt do
         for id, fish in pairs(units.Fish) do
-            if fish.FishId == 'fish15Elite' or fish.FishId == 'fish16Boss' then
+            if fish.fish_id == 'fish15Elite' or fish.fish_id == 'fish16Boss' then
                 local move = fish.Move and fish.Move.Name or '-'
                 local state = fish.State .. ':' .. move
                 if last[id] ~= state then
-                    log('招式', id, fish.FishId, state, 'health=' .. tostring(fish.Carrier.Health),
-                        'wake=' .. tostring(fish.WakeAt), 'flee=' .. tostring(fish.FleeAt))
+                    log('招式', id, fish.fish_id, state, 'health=' .. tostring(fish.carrier.Health),
+                        'wake=' .. tostring(fish.wake_at), 'flee=' .. tostring(fish.flee_at))
                     last[id] = state
                 end
-                local p, cp = fish.Carrier.Body.Position, player.Character and player.Character.Position
+                local p, cp = fish.carrier.body.Position, player.Character and player.Character.Position
                 local weaponId = equippedWeapon(data)
                 local weapon = cfg.Ability.MeleeWeapons[weaponId]
                 -- 自然购买的金币近战武器才计正常击杀；探针不装备或赠送武器。
                 if weapon and p and cp and (p.x-cp.x)^2 + (p.z-cp.z)^2 <= weapon.Range^2 then
-                    local before = fish.Carrier.Health
+                    local before = fish.carrier.Health
                     local ok = life and life:weapon_action(player, { action = 'attack' }) or false
-                    if ok then log('正常攻击', fish.FishId, weaponId, 'before=' .. tostring(before)) end
+                    if ok then log('正常攻击', fish.fish_id, weaponId, 'before=' .. tostring(before)) end
                 end
             end
         end

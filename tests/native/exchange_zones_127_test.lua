@@ -31,10 +31,10 @@ describe("TestExchangeZones", function()
   local function resetInventory()
     local fresh = PlayerData.new(t.player)
     fresh:Init()
-    local save_meta = t.data.SaveMeta
+    local save_meta = t.data.save_meta
     t.data.Data, t.data.Extra = fresh.Data, fresh.Extra
-    t.data.SaveMeta = save_meta
-    t.data.Data.SaveMeta = save_meta
+    t.data.save_meta = save_meta
+    t.data.Data.save_meta = save_meta
     t.replies, t.plays = {}, {}
     t.host.results[1].InteractResult = t.replies
     t.host.sync_counts[1] = 0
@@ -55,7 +55,7 @@ describe("TestExchangeZones", function()
 
   local function give(itemId, mult)
     assert.is_true(t.data:AddItem(itemId, mult))
-    local bar = t.data.Data.Containers[t.cfg.Items.ContainerId.ItemBar]
+    local bar = t.data.Data.containers[t.cfg.Items.ContainerId.ItemBar]
     for index = 1, t.data:ItemBarCapacity() do
       if bar[index] and bar[index].itemId == itemId and bar[index].mult == mult then return index end
     end
@@ -63,7 +63,7 @@ describe("TestExchangeZones", function()
 
   local function countItem(itemId)
     local total = 0
-    for _, container in pairs(t.data.Data.Containers) do
+    for _, container in pairs(t.data.Data.containers) do
       for _, entry in pairs(container) do
         if entry.itemId == itemId then total = total + entry.count end
       end
@@ -99,7 +99,7 @@ describe("TestExchangeZones", function()
   -- 烤过的信物只售卖：按烤熟价（基础价 × 倍率 × 1.5）结金币，不再走兑换
   it("test_cooked_token_is_sold_only", function()
     local slot = give('garHead')
-    t.data.Data.Containers.itemBar[slot].saved = { [t.cfg.Items.CookedFlag] = true }
+    t.data.Data.containers.itemBar[slot].saved = { [t.cfg.Items.CookedFlag] = true }
     assert.is_true(t.data:SelectSlot(slot))
     assert.is_true(feed())
     assert.are.equal(0, countItem('garHead'))
@@ -119,7 +119,7 @@ describe("TestExchangeZones", function()
       assert.are.equal(0, countItem(chain.EliteToken))
       assert.are.equal(1, countItem(chain.BossBait))
       assert.are.equal(0, t.data.Data.FishCoin, '兑换不给金币')
-      assert.is_nil(t.data.Data.SelectedSlot, '兑换后选中态要归位')
+      assert.is_nil(t.data.Data.selected_slot, '兑换后选中态要归位')
       assert.same({ from = chain.EliteToken, to = chain.BossBait }, last_reply().exchange)
       assert.same(1, t.host.sync_counts[1], '兑换成功后要推一次库存')
 
@@ -185,7 +185,7 @@ describe("TestExchangeZones", function()
     while t.data:AddItem('tilapia') do end
     assert.is_false(t.data:AddItem('tilapia'), '前置：道具栏与背包都满了')
     assert.is_true(feed())
-    local bar = t.data.Data.Containers.itemBar
+    local bar = t.data.Data.containers.itemBar
     assert.are.equal('shrimpTicket', bar[slot] and bar[slot].itemId)
     assert.are.equal(0, countItem('garHead'))
     assert.are.equal(0, t.data.Data.FishCoin)
@@ -229,7 +229,7 @@ describe("TestExchangeZones", function()
     assert.are.equal(36, t.data.Data.FishCoin)
 
     local cookedSlot = give('bass', 1.99)
-    t.data.Data.Containers.itemBar[cookedSlot].saved = { [t.cfg.Items.CookedFlag] = true }
+    t.data.Data.containers.itemBar[cookedSlot].saved = { [t.cfg.Items.CookedFlag] = true }
     assert.is_true(t.data:SelectSlot(cookedSlot))
     assert.is_true(feed())                      -- floor(6 × 1.99 × 1.5) = 17
     assert.are.equal(53, t.data.Data.FishCoin)

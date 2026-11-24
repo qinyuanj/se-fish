@@ -2,7 +2,7 @@ local GameCfg = require('common.game_cfg')
 local QuestSteps = require('common.quest_steps')
 local SignalRouter = require('server.world_host.world_signal_router')
 
-local Mgr = { States = {}, Players = {}, Queues = {} }
+local Mgr = { States = {}, Players = {}, queues = {} }
 
 local function cfg()
     return GameCfg.Quest
@@ -13,7 +13,7 @@ function Mgr:record_fact(draft, kind, payload)
     local state = QuestSteps.restore(cfg().Steps, draft.Extra.quest)
     local counted, advanced = QuestSteps.apply(cfg().Steps, state, {
         kind = kind, itemId = payload.itemId, category = payload.category, count = payload.count,
-        eventId = tostring(draft.SaveMeta.epoch) .. ':' .. payload.eventId,
+        eventId = tostring(draft.save_meta.epoch) .. ':' .. payload.eventId,
     })
     if counted then draft.Extra.quest = state end
     return counted, advanced
@@ -21,11 +21,11 @@ end
 
 function Mgr:refresh_committed(player, data)
     local previous = self:get_state(player)
-    if not previous or not data or not data.Inited then return end
+    if not previous or not data or not data.inited then return end
     local restored = QuestSteps.restore(cfg().Steps, data.Extra.quest)
     if restored.step == previous.step and restored.count == previous.count then return end
     self.States[player.UserId] = restored
-    local queue = self.Queues[player.UserId]
+    local queue = self.queues[player.UserId]
     if queue and not queue.writing then
         for i = #queue.events, 1, -1 do
             if restored.seen[queue.events[i].eventId] then table.remove(queue.events, i) end
@@ -70,16 +70,16 @@ function Mgr:publish(player, notice)
 end
 
 function Mgr:notify(kind, player, payload)
-    if self.Save and self.PlayerData then
-        self:refresh_committed(player, self.PlayerData:get_data_inst(player))
+    if self.Save and self.player_data then
+        self:refresh_committed(player, self.player_data:get_data_inst(player))
     end
     local state = self:get_state(player)
     if not state or type(payload) ~= 'table' then return false end
     local c = cfg()
     if self.Save then
-        local queue = self.Queues[player.UserId]
+        local queue = self.queues[player.UserId]
         if queue.leaving then return false end
-        local data = self.PlayerData and self.PlayerData:get_data_inst(player)
+        local data = self.player_data and self.player_data:get_data_inst(player)
         if not data and queue and self.Save:status(player.UserId).loadState == 'ready'
             and queue.data.Player == player then data = queue.data end
         if not data then return false end
@@ -87,7 +87,7 @@ function Mgr:notify(kind, player, payload)
         if type(eventId) ~= 'string' or #eventId < 1 or #eventId > 160 then return false end
         local candidate = QuestSteps.restore(c.Steps, queue.tail or state)
         local fact = { kind = kind, itemId = payload.itemId, category = payload.category,
-            eventId = tostring(data.SaveMeta.epoch) .. ':' .. eventId, count = payload.count }
+            eventId = tostring(data.save_meta.epoch) .. ':' .. eventId, count = payload.count }
         if not QuestSteps.apply(c.Steps, candidate, fact) then return false end
         queue.events[#queue.events + 1] = fact
         queue.tail = candidate
@@ -113,22 +113,22 @@ end
 
 function Mgr:on_player_added(player)
     if not player or self.Players[player.UserId] == player then return end
-    local data = self.PlayerData and self.PlayerData:get_data_inst(player)
+    local data = self.player_data and self.player_data:get_data_inst(player)
     if self.Save and not data then return end
     self.Players[player.UserId] = player
     self.States[player.UserId] = data and QuestSteps.restore(cfg().Steps, data.Extra.quest) or QuestSteps.new()
-    self.Queues[player.UserId] = { player = player, data = data, events = {} }
+    self.queues[player.UserId] = { player = player, data = data, events = {} }
     self:publish(player)
 end
 
 function Mgr:on_player_removing(player)
     if player and self.Players[player.UserId] == player then
-        self.States[player.UserId], self.Players[player.UserId], self.Queues[player.UserId] = nil, nil, nil
+        self.States[player.UserId], self.Players[player.UserId], self.queues[player.UserId] = nil, nil, nil
     end
 end
 
 function Mgr:drain(player)
-    local queue = player and self.Queues[player.UserId]
+    local queue = player and self.queues[player.UserId]
     if not queue or queue.player ~= player or queue.writing or #queue.events == 0 then return end
     local status = self.Save:status(player.UserId)
     if status.autosavePaused or status.loadState == 'failed' then
@@ -138,7 +138,7 @@ function Mgr:drain(player)
         if leave then leave() end
         return
     end
-    local data = self.PlayerData and self.PlayerData:get_data_inst(player)
+    local data = self.player_data and self.player_data:get_data_inst(player)
     if not data then return end
     local operation = self.Save:next_operation(player, 'quest-fact')
     if not operation then return end
@@ -150,7 +150,7 @@ function Mgr:drain(player)
         draft.Extra.quest = state
         return { counted = counted, advanced = advanced }
     end, function(written, result)
-        if self.Queues[player.UserId] ~= queue then return end
+        if self.queues[player.UserId] ~= queue then return end
         queue.writing = false
         if not written then
             print('[PlayerQuest] 任务未落账', player.UserId, tostring(result))
@@ -183,7 +183,7 @@ function Mgr:drain(player)
 end
 
 function Mgr:flush_before_leave(player, done)
-    local queue = player and self.Queues[player.UserId]
+    local queue = player and self.queues[player.UserId]
     if not self.Save or not queue or queue.player ~= player or queue.failed
         or self.Save:status(player.UserId).loadState ~= 'ready'
         or #queue.events == 0 and not queue.writing then return false end
@@ -199,13 +199,13 @@ function Mgr:flush_before_leave(player, done)
 end
 
 function Mgr:update()
-    for _, queue in pairs(self.Queues) do self:drain(queue.player) end
+    for _, queue in pairs(self.queues) do self:drain(queue.player) end
 end
 
 function Mgr.mount(scope, player_tree, opts)
     local player = opts.player
     local session = setmetatable({
-        States = {}, Players = {}, Queues = {}, PlayerData = opts.player_data, Save = opts.save,
+        States = {}, Players = {}, queues = {}, player_data = opts.player_data, Save = opts.save,
     }, { __index = Mgr })
     player_tree.quest = session
     session:on_player_added(player)

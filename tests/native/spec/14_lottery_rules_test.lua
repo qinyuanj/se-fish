@@ -105,7 +105,7 @@ describe('条款 14：抽奖机数值规则', function()
     env.rolls = { 22, 22, 22, 1 }
     local _, reply = env:draw(1)
     assert.are.equal('weapon', reply.prize.kind)
-    local bar = env.data.Data.Containers[ITEM_BAR]
+    local bar = env.data.Data.containers[ITEM_BAR]
     assert.is_nil(bar[1], '投入格位应是空的，大奖不占道具格')
     for _, entry in pairs(bar) do
       assert.are_not.equal(reply.prize.itemId, entry.itemId, '武器大奖不该出现在道具栏')

@@ -12,8 +12,8 @@ local function drop(env)
     local fish = env:held_fish(env.player, 'fish24Boss')
     env.mgr:drop(env.player)
     assert.are.equal('combat', fish.State)
-    assert.are.equal(300, fish.FleeAt) -- EscapeSec=300
-    local p = fish.Carrier.Body.Position
+    assert.are.equal(300, fish.flee_at) -- EscapeSec=300
+    local p = fish.carrier.body.Position
     env.player.Character.Position = { x = p.x, y = p.y, z = p.z + 1 }
     env.other.Character.Controller.Health = 0
     return fish
@@ -153,7 +153,7 @@ describe('TestCrabBossCombat', function()
         -- pinch 已收、spin 未起（pinch 收招帧不连起 spin）；再一帧起 spin
         if not fish.Move then env.mgr:update() end
         assert.are.equal('spin', fish.Move.Name)
-        local spinStart = fish.Move.At
+        local spinStart = fish.Move.at
         local before = #env.vitalsCalls
         -- 旋转 5 秒：每秒槽一次碰触，同一秒槽重复帧不重复结算
         for tick = 1, 5 do

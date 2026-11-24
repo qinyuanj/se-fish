@@ -89,9 +89,9 @@ do
     local fish = drop(env, 'fish31Elite', 20)
     at(env, 0)
     at(env, 50)
-    local dest = fish.Move and fish.Move.Destination
+    local dest = fish.Move and fish.Move.destination
     local jumped = fish.Move and fish.Move.Name == 'jump'
-    local startX = fish.Carrier.Body.Position.x
+    local startX = fish.carrier.body.Position.x
     if jumped then env.player.Character.Position = Vector3.New(dest.x, 2, dest.z) end
     at(env, 51.5)
     local d = dest and math.abs(dest.x - startX - 10) or -1
@@ -117,13 +117,13 @@ do
     local env = combat()
     local fish = drop(env, 'fish32Boss', 20)
     env.mgr:note_damage(fish, env.player, 30)
-    local bp = fish.Carrier.Body.Position
+    local bp = fish.carrier.body.Position
     env.other.Character.Position = Vector3.New(bp.x, 2, bp.z + 2)
     at(env, 0)
     at(env, 0.1) -- 首个真实滚动帧
     at(env, 0.2) -- 同秒槽重复接触
     local once = #env.hits == 1 and env.hits[1].amount == 25
-    local bp2 = fish.Carrier.Body.Position
+    local bp2 = fish.carrier.body.Position
     env.other.Character.Position = Vector3.New(bp2.x, 2, bp2.z + 2)
     at(env, 1)
     check('翻滚接触同一秒槽只结算一次 25', once and #env.hits == 2,
@@ -137,9 +137,9 @@ do
     local fish = drop(env, 'fish32Boss', 20)
     at(env, 0)
     at(env, 20)
-    local dest = fish.Move and fish.Move.Destination
+    local dest = fish.Move and fish.Move.destination
     local jumped = fish.Move and fish.Move.Name == 'jump'
-    local startX = fish.Carrier.Body.Position.x
+    local startX = fish.carrier.body.Position.x
     if jumped then env.player.Character.Position = Vector3.New(dest.x, 2, dest.z) end
     at(env, 21.5)
     local d = dest and math.abs(dest.x - startX - 15) or -1

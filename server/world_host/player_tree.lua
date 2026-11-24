@@ -97,8 +97,8 @@ local function assert_ready_player_data(player, data)
   if data.Player ~= player then
     error("PlayerTree.spawn 拒绝归属不匹配的存档对象", 3)
   end
-  if data.Inited ~= true or data.LoadState ~= "ready" then
-    error("PlayerTree.spawn 仅允许在存档就绪后生成（LoadState=" .. tostring(data.LoadState) .. "）", 3)
+  if data.inited ~= true or data.load_state ~= "ready" then
+    error("PlayerTree.spawn 仅允许在存档就绪后生成（LoadState=" .. tostring(data.load_state) .. "）", 3)
   end
 end
 
@@ -247,7 +247,7 @@ function PlayerTree.spawn(opts)
   local container_ids = GameCfg.Items.ContainerId
 
   local raw_data = type(data.Data) == "table" and data.Data or {}
-  local raw_containers = type(raw_data.Containers) == "table" and raw_data.Containers or {}
+  local raw_containers = type(raw_data.containers) == "table" and raw_data.containers or {}
   local raw_extra = type(data.Extra) == "table" and data.Extra or {}
   local raw_inventory = type(raw_extra.inventory) == "table" and raw_extra.inventory or {}
   local raw_selection = type(raw_inventory.selection) == "table" and raw_inventory.selection or {}
@@ -266,18 +266,18 @@ function PlayerTree.spawn(opts)
     zone_id = State.new("PlayerTree.zone_id", raw_data.Zone or (GameCfg.Zones[1] and GameCfg.Zones[1].Id) or "fishPond"),
     item_bar = State.new("PlayerTree.item_bar", deep_copy(raw_containers[container_ids.ItemBar] or {})),
     backpack = State.new("PlayerTree.backpack", deep_copy(raw_containers[container_ids.Backpack] or {})),
-    weapons = State.new("PlayerTree.weapons", deep_copy(raw_data.Weapons or raw_inventory.weapons or {})),
+    weapons = State.new("PlayerTree.weapons", deep_copy(raw_data.weapons or raw_inventory.weapons or {})),
     bait = State.new("PlayerTree.bait", deep_copy(raw_data.Bait or {})),
     selected_slot = State.new("PlayerTree.selected_slot",
-      raw_data.SelectedSlot ~= nil and raw_data.SelectedSlot or raw_selection.slot),
+      raw_data.selected_slot ~= nil and raw_data.selected_slot or raw_selection.slot),
     selected_bait = State.new("PlayerTree.selected_bait",
-      raw_data.SelectedBait ~= nil and raw_data.SelectedBait or raw_selection.bait),
+      raw_data.selected_bait ~= nil and raw_data.selected_bait or raw_selection.bait),
     selected_weapon = State.new("PlayerTree.selected_weapon",
-      raw_data.SelectedWeapon ~= nil and raw_data.SelectedWeapon or raw_selection.weapon),
+      raw_data.selected_weapon ~= nil and raw_data.selected_weapon or raw_selection.weapon),
     held = State.new("PlayerTree.held", normalize_held(raw_selection.held)),
     potion_big_count = State.new("PlayerTree.potion_big_count", raw_potions.item168 or 0),
     potion_speed_count = State.new("PlayerTree.potion_speed_count", raw_potions.item167 or 0),
-    upgrade_level = State.new("PlayerTree.upgrade_level", raw_data.UpgradeLevel or 0),
+    upgrade_level = State.new("PlayerTree.upgrade_level", raw_data.upgrade_level or 0),
     shop_upgrades = State.new("PlayerTree.shop_upgrades", deep_copy(raw_upgrades)),
     cooldowns = State.new("PlayerTree.cooldowns", deep_copy(raw_cooldowns)),
     save_version = State.new("PlayerTree.save_version", 0),
@@ -354,17 +354,17 @@ function PlayerTree.spawn(opts)
     local d = data.Data
     d.FishCoin = states.coin:now()
     d.Zone = states.zone_id:now()
-    d.UpgradeLevel = states.upgrade_level:now()
-    if type(d.Containers) ~= "table" then
-      d.Containers = {}
+    d.upgrade_level = states.upgrade_level:now()
+    if type(d.containers) ~= "table" then
+      d.containers = {}
     end
-    d.Containers[container_ids.ItemBar] = deep_copy(states.item_bar:now() or {})
-    d.Containers[container_ids.Backpack] = deep_copy(states.backpack:now() or {})
+    d.containers[container_ids.ItemBar] = deep_copy(states.item_bar:now() or {})
+    d.containers[container_ids.Backpack] = deep_copy(states.backpack:now() or {})
     d.Bait = deep_copy(states.bait:now() or {})
-    d.Weapons = deep_copy(states.weapons:now() or {})
-    d.SelectedSlot = states.selected_slot:now()
-    d.SelectedBait = states.selected_bait:now()
-    d.SelectedWeapon = states.selected_weapon:now()
+    d.weapons = deep_copy(states.weapons:now() or {})
+    d.selected_slot = states.selected_slot:now()
+    d.selected_bait = states.selected_bait:now()
+    d.selected_weapon = states.selected_weapon:now()
 
     if type(data.Extra) ~= "table" then
       data.Extra = {}
@@ -886,7 +886,7 @@ function PlayerTree.spawn(opts)
       return false
     end
     local d = type(src.Data) == "table" and src.Data or {}
-    local c = type(d.Containers) == "table" and d.Containers or {}
+    local c = type(d.containers) == "table" and d.containers or {}
     local extra = type(src.Extra) == "table" and src.Extra or {}
     local inv = type(extra.inventory) == "table" and extra.inventory or {}
     local sel = type(inv.selection) == "table" and inv.selection or {}
@@ -897,22 +897,22 @@ function PlayerTree.spawn(opts)
 
     local next_coin = d.FishCoin or 0
     local next_zone = d.Zone or states.zone_id:now()
-    local next_upgrade = d.UpgradeLevel or 0
+    local next_upgrade = d.upgrade_level or 0
     local next_item_bar = c[container_ids.ItemBar] or {}
     local item_bar_changed = not deep_equal(states.item_bar:now(), next_item_bar)
     local item_bar_copy = item_bar_changed and deep_copy(next_item_bar) or nil
     local next_backpack = c[container_ids.Backpack] or {}
     local backpack_changed = not deep_equal(states.backpack:now(), next_backpack)
     local backpack_copy = backpack_changed and deep_copy(next_backpack) or nil
-    local next_weapons = d.Weapons or inv.weapons or {}
+    local next_weapons = d.weapons or inv.weapons or {}
     local weapons_changed = not deep_equal(states.weapons:now(), next_weapons)
     local weapons_copy = weapons_changed and deep_copy(next_weapons) or nil
     local next_bait = d.Bait or {}
     local bait_changed = not deep_equal(states.bait:now(), next_bait)
     local bait_copy = bait_changed and deep_copy(next_bait) or nil
-    local next_slot = d.SelectedSlot
-    local next_bait_sel = d.SelectedBait
-    local next_weapon_sel = d.SelectedWeapon
+    local next_slot = d.selected_slot
+    local next_bait_sel = d.selected_bait
+    local next_weapon_sel = d.selected_weapon
     local next_held = normalize_held(sel.held)
     local held_changed = not deep_equal(states.held:now(), next_held)
     local next_big = potions.item168 or 0

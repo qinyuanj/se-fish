@@ -12,7 +12,7 @@ Mgr.body_seq = 0
 Mgr.DEFAULT_MAX_HEALTH = 100
 
 Mgr.carriers = {}
-Mgr.Subscribers = {}
+Mgr.subscribers = {}
 
 
 local function isPositiveNumber(v)
@@ -68,8 +68,8 @@ end
 
 local function syncReceiver(carrier, targetPosition)
 	if carrier.ai_owns_movement then return end
-	local body = carrier.Body
-	local receiver = carrier.Receiver
+	local body = carrier.body
+	local receiver = carrier.receiver
 	if not body or not receiver then
 		return
 	end
@@ -81,9 +81,9 @@ local function syncReceiver(carrier, targetPosition)
 	carrier.last_position = { x = pos.x, y = pos.y, z = pos.z }
 	pcall(function()
 		if receiver.SetPosition then
-			receiver:SetPosition(pos + carrier.ReceiverOffset)
+			receiver:SetPosition(pos + carrier.receiver_offset)
 		else
-			receiver.Position = pos + carrier.ReceiverOffset
+			receiver.Position = pos + carrier.receiver_offset
 		end
 	end)
 end
@@ -92,7 +92,7 @@ function Mgr:subscribe_died(fn)
 	if type(fn) ~= "function" then
 		return false
 	end
-	self.Subscribers[#self.Subscribers + 1] = fn
+	self.subscribers[#self.subscribers + 1] = fn
 	return true
 end
 
@@ -100,9 +100,9 @@ function Mgr:unsubscribe_died(fn)
 	if type(fn) ~= "function" then
 		return false
 	end
-	for i = #self.Subscribers, 1, -1 do
-		if self.Subscribers[i] == fn then
-			table.remove(self.Subscribers, i)
+	for i = #self.subscribers, 1, -1 do
+		if self.subscribers[i] == fn then
+			table.remove(self.subscribers, i)
 			return true
 		end
 	end
@@ -117,18 +117,18 @@ end
 function Mgr:sync_ai_position(carrier)
 	if not carrier or not carrier.ai_owns_movement then return true end
 	local ok, err = pcall(function()
-		local p = carrier.Receiver.Position
+		local p = carrier.receiver.Position
 		for _, key in ipairs({ 'x', 'y', 'z' }) do
 			local value = p and p[key]
 			assert(Number.is_finite_number(value), '受击体坐标异常：' .. key)
 		end
-		local offset = carrier.ReceiverOffset or Vector3.New(0, 0, 0)
-		carrier.Body.Position = Vector3.New(p.x - offset.x, p.y - offset.y, p.z - offset.z)
-		carrier.Body.LinearVelocity = Vector3.New(0, 0, 0)
+		local offset = carrier.receiver_offset or Vector3.New(0, 0, 0)
+		carrier.body.Position = Vector3.New(p.x - offset.x, p.y - offset.y, p.z - offset.z)
+		carrier.body.LinearVelocity = Vector3.New(0, 0, 0)
 	end)
 	if not ok then
 		carrier.ai_owns_movement = false
-		print('[FishCarrier] operation=SyncAiPosition', carrier.Body and carrier.Body.UnitId, tostring(err))
+		print('[FishCarrier] operation=SyncAiPosition', carrier.body and carrier.body.UnitId, tostring(err))
 	end
 	return ok
 end
@@ -137,41 +137,41 @@ end
 -- 通知前把 Controller 的真血量同步回记录：致命一击时 Died 早于 HealthChanged，
 -- 订阅者若读 carrier.Health 会看到上一档的值（实测读到 25 而不是 0）。
 function Mgr:record_health(carrier)
-	if not carrier or carrier.Dead or not carrier.Controller then return end
+	if not carrier or carrier.dead or not carrier.Controller then return end
 	local ok, health = pcall(function() return carrier.Controller.Health end)
 	if not ok or type(health) ~= 'number' or health ~= health then return end
 	local previous = carrier.Health
 	local position
-	if carrier.Body then
-		local positionOk, currentPosition = pcall(readPosition, carrier.Body)
+	if carrier.body then
+		local positionOk, currentPosition = pcall(readPosition, carrier.body)
 		if positionOk then position = currentPosition end
 	end
 	if not position then position = carrier.last_position end
 	carrier.Health = health
 	if position then carrier.last_position = { x = position.x, y = position.y, z = position.z } end
-	if carrier.Body and carrier.Body.UnitId and previous and health < previous then
+	if carrier.body and carrier.body.UnitId and previous and health < previous then
 		if position then
-			local heightOk, size = pcall(function() return carrier.Body.Size end)
+			local heightOk, size = pcall(function() return carrier.body.Size end)
 			local height = heightOk and size and size.y
-			local payload = DamageNotice.from_health(carrier.Body.UnitId, previous, health, position,
+			local payload = DamageNotice.from_health(carrier.body.UnitId, previous, health, position,
 				nil, 'fish', height)
 			if payload then
 				print('[FishCarrier] 实际扣血', payload.targetId, previous, health, payload.amount)
 				local sent, err = pcall(self.damage_publisher or DamageNotice.publish, payload)
-				if not sent then print('[FishCarrier] 伤害通知失败', carrier.Body.UnitId, tostring(err)) end
+				if not sent then print('[FishCarrier] 伤害通知失败', carrier.body.UnitId, tostring(err)) end
 			end
 		else
-			print('[FishCarrier] 实际扣血缺少受伤位置', carrier.Body.UnitId, previous, health)
+			print('[FishCarrier] 实际扣血缺少受伤位置', carrier.body.UnitId, previous, health)
 		end
 	end
 end
 
 function Mgr:notify_died(carrier)
-	if not carrier or carrier.Dead then
+	if not carrier or carrier.dead then
 		return
 	end
 	self:record_health(carrier)
-	carrier.Dead = true
+	carrier.dead = true
 	if carrier.Controller then
 		local ok, health = pcall(function()
 			return carrier.Controller.Health
@@ -180,7 +180,7 @@ function Mgr:notify_died(carrier)
 			carrier.Health = health
 		end
 	end
-	for _, fn in ipairs(self.Subscribers) do
+	for _, fn in ipairs(self.subscribers) do
 		pcall(fn, carrier)
 	end
 end
@@ -188,8 +188,8 @@ end
 function Mgr:resolve_carrier(target)
     if not target then return nil end
     for _, carrier in pairs(self.carriers) do
-        if target == carrier or target == carrier.Body or target == carrier.Receiver
-            or target.Carrier == carrier then
+        if target == carrier or target == carrier.body or target == carrier.receiver
+            or target.carrier == carrier then
             return carrier
         end
     end
@@ -213,7 +213,7 @@ function Mgr:attach(body, opts)
 	local receiver = createUnit("EggyUnit", {
 		Name = Mgr.RECEIVER_NAME .. "_" .. tostring(body.UnitId),
 		Parent = body,
-		Position = pos + (opts.ReceiverOffset or Vector3.New(0, 0, 0)),
+		Position = pos + (opts.receiver_offset or Vector3.New(0, 0, 0)),
 		EnableController = true,
 		Visible = false,
 	})
@@ -235,16 +235,16 @@ function Mgr:attach(body, opts)
 	controller.Health = maxHealth
 
 	local carrier = {
-		Body = body,
-		Receiver = receiver,
+		body = body,
+		receiver = receiver,
 		Controller = controller,
 		MaxHealth = maxHealth,
 		Health = maxHealth,
-		FishId = opts.FishId,
+		fish_id = opts.fish_id,
 		Player = opts.Player,
-		ReceiverOffset = opts.ReceiverOffset or Vector3.New(0, 0, 0),
+		receiver_offset = opts.receiver_offset or Vector3.New(0, 0, 0),
 		last_position = { x = pos.x, y = pos.y, z = pos.z },
-		Dead = false,
+		dead = false,
 	}
 
 	carrier.health_conn = controller.HealthChanged:Connect(function()
@@ -283,11 +283,11 @@ function Mgr:spawn(opts)
 	end
 
 	local cfg = GameCfg.FishCarrier or {}
-	local species = GameCfg.Fish[opts.FishId]
+	local species = GameCfg.Fish[opts.fish_id]
 	local tint = species and species.VisualColor
 	Mgr.body_seq = Mgr.body_seq + 1
 	local values = {
-		Name = Mgr.BODY_NAME_PREFIX .. "_" .. tostring(Mgr.body_seq) .. "_" .. tostring(opts.FishId or "unknown"),
+		Name = Mgr.BODY_NAME_PREFIX .. "_" .. tostring(Mgr.body_seq) .. "_" .. tostring(opts.fish_id or "unknown"),
 		Position = opts.Position or Vector3.New(0, 0, 0),
 		Rotation = opts.Rotation or Quaternion.FromEulerAngles(0, 0, 0),
 		RenderMeshId = mesh,
@@ -330,7 +330,7 @@ end
 
 ---单点造成的伤害；业务调用必须带 MgrVitals 颁发的命中身份
 function Mgr:Damage(carrier, damage, hit)
-	if not carrier or carrier.Dead or not carrier.Controller
+	if not carrier or carrier.dead or not carrier.Controller
 		or type(hit) ~= 'table' or type(hit.id) ~= 'number' then
 		return false
 	end
@@ -341,7 +341,7 @@ function Mgr:Damage(carrier, damage, hit)
 	if not beforeOk or type(before) ~= 'number' then return false end
 	local ok, err = pcall(function() carrier.Controller:TakeDamage(damage) end)
 	if not ok then
-		print('[FishCarrier] 受击扣血失败', carrier.Body and carrier.Body.UnitId, tostring(err))
+		print('[FishCarrier] 受击扣血失败', carrier.body and carrier.body.UnitId, tostring(err))
 		return false
 	end
 	self:record_health(carrier)
@@ -351,7 +351,7 @@ function Mgr:Damage(carrier, damage, hit)
 	local actual = before - after
 	if self.damage_listener then
 		local notified, notifyErr = pcall(self.damage_listener, carrier, actual, hit)
-		if not notified then print('[FishCarrier] 有效伤害通知失败', carrier.Body and carrier.Body.UnitId, tostring(notifyErr)) end
+		if not notified then print('[FishCarrier] 有效伤害通知失败', carrier.body and carrier.body.UnitId, tostring(notifyErr)) end
 	end
 	return true, actual
 end
@@ -366,21 +366,21 @@ function Mgr:despawn(carrier)
 	if carrier.died_conn then
 		carrier.died_conn:Disconnect()
 	end
-	if carrier.Body and carrier.Body.UnitId then
-		self.carriers[carrier.Body.UnitId] = nil
+	if carrier.body and carrier.body.UnitId then
+		self.carriers[carrier.body.UnitId] = nil
 	end
 	pcall(function()
-		if carrier.Receiver then
-			carrier.Receiver:Destroy()
+		if carrier.receiver then
+			carrier.receiver:Destroy()
 		end
 	end)
 	pcall(function()
-		if carrier.Body then
-			carrier.Body:Destroy()
+		if carrier.body then
+			carrier.body:Destroy()
 		end
 	end)
-	carrier.Body = nil
-	carrier.Receiver = nil
+	carrier.body = nil
+	carrier.receiver = nil
 	carrier.Controller = nil
 end
 

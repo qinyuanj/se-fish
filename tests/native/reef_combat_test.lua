@@ -27,7 +27,7 @@ describe('TestReefCombat', function()
         assert.same('escaping', air.State)
         env:advance(1.05)
         assert.same(air, env.mgr.Fish[air.Id])
-        assert.is_true(air.Carrier.Body.LinearVelocity.z > 0)
+        assert.is_true(air.carrier.body.LinearVelocity.z > 0)
         local penguin = env:drop('item82')
         assert.same('escaping', penguin.State)
     end)
@@ -40,7 +40,7 @@ describe('TestReefCombat', function()
         local fish = env:drop('fish48Boss')
         env:advance(0.05)
         local b = Cfg.Zones[1].Scene.Boundary
-        assert.is_true(fish.Carrier.Body.Position.x >= b.MinX and fish.Carrier.Body.Position.x <= b.MaxX)
+        assert.is_true(fish.carrier.body.Position.x >= b.MinX and fish.carrier.body.Position.x <= b.MaxX)
     end)
 
     -- 抓举状态回灌：air 来源要把钩位抬到空中，water 来源保持落点原样。
@@ -68,36 +68,36 @@ describe('TestReefCombat', function()
     it('test_control_cancels_air_warning_and_never_hits_old_locked_point', function()
         local fish = env:drop('fish48Boss')
         env:advance(4)
-        local attack = fish.AirAttacks.airThrow
+        local attack = fish.air_attacks.airThrow
         assert.is_not_nil(attack)
-        env.mgr.Ai = { Stopped = true, Sync = function() return true end, pause = function() end, custom = function() end }
+        env.mgr.ai = { Stopped = true, Sync = function() return true end, pause = function() end, custom = function() end }
         env.mgr:update()
         assert.same({ kind = 'clear', fishId = attack.Id, reason = 'controlled' }, env.notices[#env.notices])
         env:advance(6)
-        env.mgr.Ai.Stopped = false
+        env.mgr.ai.Stopped = false
         env.mgr:update()
         assert.same(300, env.player.Character.Controller.Health)
-        assert.is_nil(fish.AirAttacks.airThrow)
-        env.mgr.Ai = nil
+        assert.is_nil(fish.air_attacks.airThrow)
+        env.mgr.ai = nil
     end)
 
     -- 控制期间冻结投掷/俯冲冷却，解除后平移而不是补放积压招式。
     it('test_control_freezes_throw_and_dive_cooldowns_without_catchup', function()
         local fish = env:drop('fish48Boss')
         env:advance(3)
-        env.mgr.Ai = { Stopped = true, Sync = function() return true end, pause = function() end, custom = function() end }
+        env.mgr.ai = { Stopped = true, Sync = function() return true end, pause = function() end, custom = function() end }
         env.mgr:update()
         local throwAt, diveAt = fish.NextThrowAt, fish.NextReefDiveAt
         env:advance(13)
-        env.mgr.Ai.Stopped = false
+        env.mgr.ai.Stopped = false
         env.mgr:update()
         assert.near(throwAt + 10, fish.NextThrowAt, 1e-6)
         assert.near(diveAt + 10, fish.NextReefDiveAt, 1e-6)
-        assert.is_nil(fish.AirAttacks.airThrow)
+        assert.is_nil(fish.air_attacks.airThrow)
         env:advance(14)
-        assert.is_not_nil(fish.AirAttacks.airThrow)
+        assert.is_not_nil(fish.air_attacks.airThrow)
         assert.same(300, env.player.Character.Controller.Health)
-        env.mgr.Ai = nil
+        env.mgr.ai = nil
     end)
 
     -- 失败方式：俯冲不能跟着目标游出本区围栏（越区追击）。
@@ -108,7 +108,7 @@ describe('TestReefCombat', function()
         env:advance(20)
         while env.now < 21.75 do
             env:advance(env.now + 0.05)
-            assert.is_true(fish.Carrier.Body.Position.x <= b.MaxX)
+            assert.is_true(fish.carrier.body.Position.x <= b.MaxX)
         end
     end)
 
@@ -116,12 +116,12 @@ describe('TestReefCombat', function()
     it('test_flying_above_water_survives_and_receiver_follows_same_frame', function()
         local fish = env:drop('fish47Elite')
         local water = Cfg.Zones[6].Scene.Waters[1]
-        fish.Carrier.Body.Position = env.vec(water.Center.x, water.SurfaceY + 12, water.Center.z)
+        fish.carrier.body.Position = env.vec(water.Center.x, water.SurfaceY + 12, water.Center.z)
         -- 重新起飞以这条真实世界坐标作为轨迹起点。
         env.mgr:start_flight(fish, env.now)
         env:advance(0.05)
         assert.same('flying', fish.State)
-        assert.same(fish.Carrier.Body.Position, fish.Carrier.Receiver.Position)
+        assert.same(fish.carrier.body.Position, fish.carrier.receiver.Position)
     end)
 
     -- 失败方式：投掷预警必须锁地面落点，命中只结算一次。

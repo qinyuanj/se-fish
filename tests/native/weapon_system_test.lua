@@ -163,7 +163,7 @@ describe('TestMgrFishUnitBlastFish', function()
         package.loaded['server.world_host.fish_carrier'] = {
             spawn = function(_, opts)
                 ctx.spawnOpts[#ctx.spawnOpts + 1] = opts
-                return { Body = { Position = opts.Position }, Receiver = { Controller = {} } }, nil
+                return { body = { Position = opts.Position }, receiver = { Controller = {} } }, nil
             end,
             despawn = function(_, carrier) ctx.despawned[#ctx.despawned + 1] = carrier end,
             attach = function() end,
@@ -188,7 +188,7 @@ describe('TestMgrFishUnitBlastFish', function()
         assert.same(ctx.owner, fish.Owner)
         assert.same(3000 + GameCfg.Ability.Throw.FishTtlSec, fish.wild_until)
         assert.same(fish, ctx.mgr.Fish[fish.Id])
-        assert.same('tilapia', ctx.spawnOpts[1].FishId)
+        assert.same('tilapia', ctx.spawnOpts[1].fish_id)
         assert.same({ x = 1, y = 2, z = 3 }, ctx.spawnOpts[1].Position)
         assert.same(GameCfg.Fish.tilapia.Health, ctx.spawnOpts[1].MaxHealth)
         -- Wild 鱼不接抓举：不会发起 Lift（没有 Conns/request_lift 副作用）
@@ -777,7 +777,7 @@ describe('TestMgrWeaponUpgrade', function()
         assert.near(68, swing.damage, 1e-9)
         assert.same(4, swing.range)
         ctx.data.Extra.inventory.selection.held = { kind = nil, id = nil, slot = nil } -- 回到空手
-        ctx.data.Data.SelectedWeapon = nil
+        ctx.data.Data.selected_weapon = nil
         ctx:advance(2)
         ctx:attack(ctx.player)
         assert.same(5, SwingRegistry.peek_swing(ctx.player.UserId).damage)

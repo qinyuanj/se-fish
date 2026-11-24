@@ -17,7 +17,7 @@ local function settle(target, slot, random)
     or slot < 1 or slot > target:ItemBarCapacity() then
     return nil, "slot"
   end
-  local items = target.Data.Containers[ITEM_BAR]
+  local items = target.Data.containers[ITEM_BAR]
   local entry = items[slot]
   if not entry or entry.count <= 0 then return nil, "slot" end
   local eligible, reason = Eligibility.check(entry)
@@ -105,7 +105,7 @@ function PlayerLottery.mount(scope, tree, opts)
   end
 
   local function push_recovered()
-    local meta = data and data.SaveMeta
+    local meta = data and data.save_meta
     local operations = meta and meta.operations
     local last = operations and operations[#operations]
     if not last or last.kind ~= "lottery" or last.sequence ~= meta.sequence
@@ -137,7 +137,7 @@ function PlayerLottery.mount(scope, tree, opts)
       reply({ ok = false, reason = "range" })
       return false
     end
-    local items = data.Data.Containers[ITEM_BAR]
+    local items = data.Data.containers[ITEM_BAR]
     local entry = slot >= 1 and slot <= data:ItemBarCapacity() and items[slot]
     if not entry or entry.count <= 0 then
       reply({ ok = false, reason = "slot" })

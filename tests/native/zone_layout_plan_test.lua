@@ -14,7 +14,7 @@ end
 describe('#164 场景标记读取合同', function()
   it('七区几何、17 个鱼饵点和六条航线来自同一快照', function()
     local cfg = freshConfig()
-    assert.is_true(ZoneMarkers.Ready)
+    assert.is_true(ZoneMarkers.ready)
     assert.are.equal(17, #cfg.BaitSpots.Spots)
     assert.are.equal(7, #cfg.Zones)
     assert.are.equal(6, #cfg.Ferry.Routes)
@@ -29,8 +29,8 @@ describe('#164 场景标记读取合同', function()
       end
     end
     for index, route in ipairs(cfg.Ferry.Routes) do
-      assert.are.equal(cfg.Zones[index + 1].Scene.SafePoint, route.Outbound.Destination)
-      assert.are.equal(cfg.Zones[index].Scene.SafePoint, route.Return.Destination)
+      assert.are.equal(cfg.Zones[index + 1].Scene.SafePoint, route.Outbound.destination)
+      assert.are.equal(cfg.Zones[index].Scene.SafePoint, route.Return.destination)
     end
   end)
 
@@ -44,21 +44,21 @@ describe('#164 场景标记读取合同', function()
       if unit.Name == 'Z1_Safe' then table.remove(ferry, index) break end
     end
     assert.error_matches(function() ZoneMarkers.resolve(world, cfg) end, 'Z1_Safe', nil, true)
-    assert.is_false(ZoneMarkers.Ready)
+    assert.is_false(ZoneMarkers.ready)
     assert.are.equal(previous, cfg.Zones[1].Scene)
   end)
 
   it('末条航线缺标记时航线与快照都不发布', function()
     local cfg = freshConfig()
-    local destination = cfg.Ferry.Routes[1].Outbound.Destination
+    local destination = cfg.Ferry.Routes[1].Outbound.destination
     local world = Fixtures.World()
     local ferry = Engine.children(findChild(findChild(world, '07 火山岛'), '摆渡'))
     for index, unit in ipairs(ferry) do
       if unit.Name == 'Z7_FerryReturn' then table.remove(ferry, index) break end
     end
     assert.error_matches(function() ZoneMarkers.resolve(world, cfg) end, 'Z7_FerryReturn', nil, true)
-    assert.are.equal(destination, cfg.Ferry.Routes[1].Outbound.Destination)
-    assert.is_false(ZoneMarkers.Ready)
+    assert.are.equal(destination, cfg.Ferry.Routes[1].Outbound.destination)
+    assert.is_false(ZoneMarkers.ready)
     assert.are.same({}, ZoneMarkers.Zones)
   end)
 
@@ -97,7 +97,7 @@ describe('#164 场景标记读取合同', function()
     local children = Engine.children(ferry)
     children[#children + 1] = safe
     assert.error_matches(function() ZoneMarkers.resolve(world, cfg) end, '重名', nil, true)
-    assert.is_false(ZoneMarkers.Ready)
+    assert.is_false(ZoneMarkers.ready)
   end)
 
   for _, bad in ipairs({ 0, -1, math.huge, 0 / 0 }) do
@@ -110,7 +110,7 @@ describe('#164 场景标记读取合同', function()
       local size = water.Size
       Engine.set_size(water, { x = bad, y = size.y, z = size.z })
       assert.error_matches(function() ZoneMarkers.resolve(world, cfg) end, '尺寸非法', nil, true)
-      assert.is_false(ZoneMarkers.Ready)
+      assert.is_false(ZoneMarkers.ready)
     end)
   end
 
@@ -123,7 +123,7 @@ describe('#164 场景标记读取合同', function()
     local extra = findChild(waters, 'Z1_Water2')
     extra.Position = { x = primary.Position.x, y = primary.Position.y, z = primary.Position.z }
     assert.error_matches(function() ZoneMarkers.resolve(world, cfg) end, '水域重叠', nil, true)
-    assert.is_false(ZoneMarkers.Ready)
+    assert.is_false(ZoneMarkers.ready)
   end)
 
   it('静态配置没有区域坐标，解析后飞行兜底边界取首区', function()

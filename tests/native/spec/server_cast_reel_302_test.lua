@@ -181,7 +181,7 @@ describe("抛竿上钩收线举鱼宿主接缝（#302）", function()
           if overrides.spawn_fails then return nil, "spawn-failed" end
           seq = seq + 1
           local fish = {
-            Id = seq, Owner = owner, FishId = catch.fishId, Mult = catch.mult,
+            Id = seq, Owner = owner, fish_id = catch.fishId, mult = catch.mult,
             Position = position, State = "awaitLift",
           }
           units[#units + 1] = {
@@ -287,7 +287,7 @@ describe("抛竿上钩收线举鱼宿主接缝（#302）", function()
     boot({ bait = "duck", bait_count = 1, roll = 1 })
     cast()
     assert.are.equal(0, data:ItemCount("duck"))
-    assert.is_nil(data.Data.SelectedBait)
+    assert.is_nil(data.Data.selected_bait)
     hook()
     assert.are.equal("alligatorGar", last_cast().fishId)
     channel("CastAction").OnServerEvent:Fire(player, { action = "Reel" })
@@ -316,8 +316,8 @@ describe("抛竿上钩收线举鱼宿主接缝（#302）", function()
     for _, unit in ipairs(units) do
       if unit.fish then fish = unit.fish end
     end
-    assert.are.equal("tilapia", fish.FishId)
-    assert.are.equal(1, fish.Mult)
+    assert.are.equal("tilapia", fish.fish_id)
+    assert.are.equal(1, fish.mult)
     assert.are.equal(-11.75, fish.Position.x)
     assert.are.equal(2.5, fish.Position.y)
     assert.are.equal(-18, fish.Position.z)

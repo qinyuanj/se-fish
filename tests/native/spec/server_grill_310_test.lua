@@ -63,7 +63,7 @@ describe("服务端烧烤点宿主接缝（#310）", function()
   end
 
   local function make_data(player)
-    local data = ctx.PlayerData.new(player)
+    local data = ctx.player_data.new(player)
     data:Init(true)
     ctx.save:load_into(player, data)
     drain()
@@ -152,7 +152,7 @@ describe("服务端烧烤点宿主接缝（#310）", function()
         return ctx.events[name]
       end,
     }
-    ctx.PlayerData = assert(loadfile("server/data/player_data.lua"))()
+    ctx.player_data = assert(loadfile("server/data/player_data.lua"))()
     ctx.save = assert(loadfile("server/save_host.lua"))()
     ctx.runtime = ServerRuntime.new({
       initial_now = 1000,
@@ -226,7 +226,7 @@ describe("服务端烧烤点宿主接缝（#310）", function()
 
   local function count_item(data, item_id)
     local total = 0
-    for _, container in pairs(data.Data.Containers) do
+    for _, container in pairs(data.Data.containers) do
       for _, entry in pairs(container) do
         if entry.itemId == item_id and entry.count > 0 then total = total + entry.count end
       end
@@ -235,7 +235,7 @@ describe("服务端烧烤点宿主接缝（#310）", function()
   end
 
   local function find_entry(data, item_id)
-    for _, container in pairs(data.Data.Containers) do
+    for _, container in pairs(data.Data.containers) do
       for _, entry in pairs(container) do
         if entry.itemId == item_id and entry.count > 0 then return entry end
       end
@@ -296,23 +296,23 @@ describe("服务端烧烤点宿主接缝（#310）", function()
       local reply = act(player, { action = "Takeout" })
       assert.is_true(reply.ok)
       assert.near(case[2], reply.rate, 0.001)
-      local entry = data.Data.Containers[ITEM_BAR][1]
+      local entry = data.Data.containers[ITEM_BAR][1]
       assert.same(FISH, entry.itemId)
       assert.near(case[2], entry.cooked, 0.001)
-      assert.same(1, data.Data.SelectedSlot)
+      assert.same(1, data.Data.selected_slot)
       advance(20)
-      assert.near(case[2], data.Data.Containers[ITEM_BAR][1].cooked, 0.001)
+      assert.near(case[2], data.Data.containers[ITEM_BAR][1].cooked, 0.001)
       assert.same("idle", player.grill_state.state)
       assert.same(0, live_units())
     end
 
     local premium, premium_data = join(9520)
     give_selected(premium_data, "item7", 1)
-    assert.is_true(LotteryEligibility.check(premium_data.Data.Containers[ITEM_BAR][1]))
+    assert.is_true(LotteryEligibility.check(premium_data.Data.containers[ITEM_BAR][1]))
     assert.is_true(act(premium, { action = "Start" }).ok)
     advance(2)
     assert.is_true(act(premium, { action = "Takeout" }).ok)
-    local cooked_premium = premium_data.Data.Containers[ITEM_BAR][1]
+    local cooked_premium = premium_data.Data.containers[ITEM_BAR][1]
     local ok_lottery, reason = LotteryEligibility.check(cooked_premium)
     assert.is_false(ok_lottery)
     assert.same("cooked", reason)
@@ -370,7 +370,7 @@ describe("服务端烧烤点宿主接缝（#310）", function()
     assert.same("full", full.reason)
     assert.same(0, count_item(full_data, FISH))
     advance(1.5)
-    full_data.Data.Containers[BACKPACK][1] = nil
+    full_data.Data.containers[BACKPACK][1] = nil
     tree:sync_from_data(full_data)
     local retry = act(full_player, { action = "Takeout" })
     assert.is_true(retry.ok)
@@ -522,12 +522,12 @@ describe("服务端烧烤点宿主接缝（#310）", function()
     assert.is_false(act(player, { action = "Takeout" }).ok)
     assert.same(baseline, active_frame_subs, "满格冻结为 ready 后须退出烤制活跃相位并退订 on_frame")
 
-    data.Data.Containers[BACKPACK][1] = nil
+    data.Data.containers[BACKPACK][1] = nil
     ctx.runtime:get_player_tree(player.UserId):sync_from_data(data)
     assert.is_true(act(player, { action = "Takeout" }).ok)
     assert.same(baseline, active_frame_subs)
 
-    data.Data.Containers[ITEM_BAR][1] = nil
+    data.Data.containers[ITEM_BAR][1] = nil
     give_selected(data, FISH, 1)
     assert.is_true(act(player, { action = "Start" }).ok)
     assert.same(baseline + 1, active_frame_subs)

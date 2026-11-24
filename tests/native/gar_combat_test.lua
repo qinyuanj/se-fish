@@ -29,7 +29,7 @@ local function dropNear(env, dx, dz)
     local damages = armPlayer(env.player, 300)
     local fish = env:held_fish(env.player, 'alligatorGar')
     env.mgr:drop(env.player)
-    local p = fish.Carrier.Body.Position
+    local p = fish.carrier.body.Position
     env.player.Character.Position = vec(p.x + dx, 2, p.z + dz)
     return fish, p, damages
 end
@@ -52,7 +52,7 @@ describe('TestGarCombat', function()
         local fish = env:held_fish(env.player, 'alligatorGar')
         env.mgr:drop(env.player)
         env.mgr.Vitals = nil
-        local body = fish.Carrier.Body
+        local body = fish.carrier.body
         env.player.Character.Position = vec(body.Position.x, 2, body.Position.z)
         local cd = GameCfg.FishCombat.gar.BiteCooldownSec
         env.now = cd
@@ -65,7 +65,7 @@ describe('TestGarCombat', function()
         local damages = armPlayer(env.player, 300)
         local fish = env:held_fish(env.player, 'alligatorGar')
         env.mgr:drop(env.player)
-        local body = fish.Carrier.Body
+        local body = fish.carrier.body
         -- 站进咬距：首个冷却期是起手预警，不立刻咬
         env.player.Character.Position = vec(body.Position.x, 2, body.Position.z)
         env.mgr:update()
@@ -102,7 +102,7 @@ describe('TestGarCombat', function()
         end }
         local fish, p = dropNear(env, 10, 0)
         env.mgr:update()
-        local body = fish.Carrier.Body
+        local body = fish.carrier.body
         assert.near(math.pi / 2 + gar().ModelYawOffset, body.Rotation.y, 1e-9) -- 朝 +x 追
         env.player.Character.Position = vec(p.x, 2, p.z + 2)
         env.mgr:update()
@@ -119,18 +119,18 @@ describe('TestGarCombat', function()
         local fish = env:held_fish(env.player, 'alligatorGar')
         env.mgr:drop(env.player)
         assert.are.equal('combat', fish.State)
-        assert.is_not.is_nil(fish.FleeAt)
+        assert.is_not.is_nil(fish.flee_at)
         -- 放下后玩家走开：鱼追最近的 env.player（+z 方向），速度取鱼种 Speed=6；不走技能装配
         env.player.Character.Position = vec(10, 2, 0)
         env.mgr:update()
-        local v = fish.Carrier.Body.LinearVelocity
+        local v = fish.carrier.body.LinearVelocity
         assert.near(0, v.x, 1e-6)
         assert.near(6, v.z, 1e-6)
         assert.are.equal(0, equipped)
         -- env.player 倒下后改追 env.other（-x 方向）
         env.player.Character.Controller.Health = 0
         env.mgr:update()
-        v = fish.Carrier.Body.LinearVelocity
+        v = fish.carrier.body.LinearVelocity
         assert.is_true(v.x > 0)
         assert.near(6, math.sqrt(v.x * v.x + v.z * v.z), 1e-6)
     end)
@@ -147,15 +147,15 @@ describe('TestGarCombat', function()
         env.notices = {}
         local fish2 = env:held_fish(env.player, 'alligatorGar')
         env.mgr:drop(env.player)
-        local p2 = fish2.Carrier.Body.Position
+        local p2 = fish2.carrier.body.Position
         env.player.Character.Position = vec(p2.x, 2, p2.z + 2)
-        env.now = fish2.FleeAt - 0.5
+        env.now = fish2.flee_at - 0.5
         env.mgr:update()
-        assert.is_not.is_nil(fish2.BiteAim)
-        env.now = fish2.FleeAt
+        assert.is_not.is_nil(fish2.bite_aim)
+        env.now = fish2.flee_at
         env.mgr:update()
         assert.are.equal('escaping', fish2.State)
-        assert.is_nil(fish2.BiteAim)
+        assert.is_nil(fish2.bite_aim)
         assert.are.equal('gone', lastNotice(env, 'clear').reason)
         assert.same({}, damages)
     end)
@@ -174,7 +174,7 @@ describe('TestGarCombat', function()
         assert.are.equal('escaping', fish.State)
         assert.is_true(fish.straight_escape)
         -- 直线逃脱朝最近的拼接水区 PondSouth_7_1（中心 11.5,-26.5），从 (10,-18) 朝南。
-        assert.is_true(fish.Carrier.Body.LinearVelocity.z < 0)
+        assert.is_true(fish.carrier.body.LinearVelocity.z < 0)
     end)
 
     it('test_head_zone_geometry_and_range_boundary', function()
@@ -220,7 +220,7 @@ describe('TestGarCombat', function()
         env.now = gar().BiteCooldownSec
         env.mgr:update()
         assert.same({}, damages)
-        assert.is_not.is_nil(fish.BiteAim) -- 仍在咬距内：重新起咬
+        assert.is_not.is_nil(fish.bite_aim) -- 仍在咬距内：重新起咬
     end)
 
     it('test_target_downed_or_leaving_during_windup_cancels_bite', function()
@@ -233,8 +233,8 @@ describe('TestGarCombat', function()
         env.mgr:update()
         assert.are.equal('cancel', lastNotice(env, 'clear').reason)
         -- 取消后改追另一名合法玩家，不原地发呆
-        assert.is_true(fish.Carrier.Body.LinearVelocity.x > 0)
-        assert.is_nil(fish.BiteAim)
+        assert.is_true(fish.carrier.body.LinearVelocity.x > 0)
+        assert.is_nil(fish.bite_aim)
         env.now = gar().BiteCooldownSec
         env.mgr:update()
         assert.same({}, damages)
@@ -247,7 +247,7 @@ describe('TestGarCombat', function()
         armPlayer(env.other, 300)
         local fish = env:held_fish(env.player, 'alligatorGar')
         env.mgr:drop(env.player)
-        local body = fish.Carrier.Body
+        local body = fish.carrier.body
         env.mgr:note_damage(fish, env.player, 30)
         env.mgr:note_damage(fish, env.other, 10)
         -- other 更近，但累计有效伤害更高的 player 优先
@@ -268,15 +268,15 @@ describe('TestGarCombat', function()
         env.downed[env.other] = false
         env.mgr:update()
         assert.is_true(body.LinearVelocity.z > 0)
-        assert.is_nil(fish.Threat[env.player])
+        assert.is_nil(fish.threat[env.player])
     end)
 
     it('test_windup_locks_facing_so_circling_behind_misses_then_reaims', function()
         local fish, p, damages = dropNear(env, 0, 2)
         local cd = gar().BiteCooldownSec
         env.mgr:update()
-        assert.is_not.is_nil(fish.BiteAim)
-        assert.near(1, fish.Facing.z, 1e-9)
+        assert.is_not.is_nil(fish.bite_aim)
+        assert.near(1, fish.facing.z, 1e-9)
         local lock = lastNotice(env, 'lock')
         assert.are.equal(fish.Id, lock.fishId)
         assert.near(0, lock.yaw, 1e-9)
@@ -286,13 +286,13 @@ describe('TestGarCombat', function()
         env.player.Character.Position = vec(p.x, 2, p.z - 2)
         env.now = cd / 2
         env.mgr:update()
-        assert.near(1, fish.Facing.z, 1e-9)
+        assert.near(1, fish.facing.z, 1e-9)
         env.now = cd
         env.mgr:update()
         assert.same({}, damages)
         assert.are.equal('miss', lastNotice(env, 'clear').reason)
         -- 咬空后按冷却重新对准身后的目标，不立刻补咬
-        assert.near(-1, fish.Facing.z, 1e-9)
+        assert.near(-1, fish.facing.z, 1e-9)
         env.now = cd + 0.1
         env.mgr:update()
         assert.same({}, damages)

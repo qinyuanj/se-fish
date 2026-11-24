@@ -1,7 +1,7 @@
 local GameCfg = require('common.game_cfg')
 local SignalRouter = require('server.world_host.world_signal_router')
 
-local Mgr = { States = {}, Requested = {} }
+local Mgr = { States = {}, requested = {} }
 local isValidPlayer = SignalRouter.is_valid_player
 
 local function cfg()
@@ -31,12 +31,12 @@ end
 
 function Mgr:begin(player)
     if not player then return end
-    self.Requested[player.UserId] = player
-    local data = self.PlayerData and self.PlayerData:get_data_inst(player)
+    self.requested[player.UserId] = player
+    local data = self.player_data and self.player_data:get_data_inst(player)
     if self.Save and not data then return end
     local readKey = cfg().ReadKey or 'opening'
     if data and data.Extra.story.read and data.Extra.story.read[readKey] then
-        self.Requested[player.UserId] = nil
+        self.requested[player.UserId] = nil
         return
     end
     local previous = self.States[player.UserId]
@@ -89,7 +89,7 @@ function Mgr:persist_read(player, state)
             return false
         end
     end
-    local data = self.PlayerData and self.PlayerData:get_data_inst(player)
+    local data = self.player_data and self.player_data:get_data_inst(player)
     if self.Save and not data then return false end
     if not self.Save then
         state.phase = 'read'
@@ -153,12 +153,12 @@ function Mgr:flush_before_leave(player, done)
 end
 
 function Mgr:on_player_added(player)
-    if self.Requested[player.UserId] == player then self:begin(player) end
+    if self.requested[player.UserId] == player then self:begin(player) end
 end
 
 function Mgr:update()
     local now
-    for _, player in pairs(self.Requested) do
+    for _, player in pairs(self.requested) do
         if not self.States[player.UserId] then self:begin(player) end
     end
     for userId, state in pairs(self.States) do
@@ -182,7 +182,7 @@ end
 
 function Mgr:on_player_removing(player)
     if isValidPlayer(player) then
-        if self.Requested[player.UserId] == player then self.Requested[player.UserId] = nil end
+        if self.requested[player.UserId] == player then self.requested[player.UserId] = nil end
         local state = self.States[player.UserId]
         if state and state.player == player then self.States[player.UserId] = nil end
     end
@@ -191,7 +191,7 @@ end
 function Mgr.mount(scope, player_tree, opts)
     local player = opts.player
     local session = setmetatable({
-        States = {}, Requested = {}, PlayerData = opts.player_data, Save = opts.save,
+        States = {}, requested = {}, player_data = opts.player_data, Save = opts.save,
         World = { GetServerTime = function() return opts.clock.now() end },
     }, { __index = Mgr })
     local ok, service = pcall(function() return game:GetService('StoryService') end)

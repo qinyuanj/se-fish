@@ -106,7 +106,7 @@ function Host.start(options)
   package.loaded["server.data.player_data"] = nil
   host.save = assert(loadfile("server/save_host.lua"))()
   host.player_data = assert(loadfile("server/player_data_host.lua"))()
-  host.save.PlayerData = host.player_data
+  host.save.player_data = host.player_data
   host.player_data.Save = host.save
   host.runtime = ServerRuntime.new({
     clock = host.clock,

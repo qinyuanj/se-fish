@@ -74,7 +74,7 @@ describe("抽奖投入资格（common.lottery_eligibility × PlayerData）", fun
     local ids = GameCfg.Items.ContainerId
     local function find(player, itemId)
       for _, id in ipairs({ ids.ItemBar, ids.Backpack }) do
-        for _, entry in pairs(player.Data.Containers[id]) do
+        for _, entry in pairs(player.Data.containers[id]) do
           if entry.itemId == itemId then
             return entry
           end

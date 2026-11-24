@@ -242,7 +242,7 @@ describe('TestPrizeWeaponEffect', function()
         assert.message('无特效武器不挂 effect').is_nil(SwingRegistry.peek_swing(ctx.player.UserId).effect)
         ctx:advance(0.5)
         ctx.data.Extra.inventory.selection.held = { kind = nil, id = nil, slot = nil }
-        ctx.data.Data.SelectedWeapon = nil
+        ctx.data.Data.selected_weapon = nil
         ctx:attack(ctx.player)
         assert.is_nil(SwingRegistry.peek_swing(ctx.player.UserId).effect)
     end)

@@ -161,7 +161,7 @@ function PlayerLife.mount(s3, player_tree, opts)
   local function carrying_barrel(source)
     local held = vitals_cfg.HeldDamage
     if not held then return false end
-    local containers = source and source.Data and source.Data.Containers
+    local containers = source and source.Data and source.Data.containers
     if type(containers) ~= "table" then return false end
     local ids = GameCfg.Items.ContainerId
     for _, id in ipairs({ ids.ItemBar, ids.Backpack }) do
@@ -711,8 +711,8 @@ function PlayerLife.mount(s3, player_tree, opts)
       local item_id = survival_cfg.AdrenalineItemId
       local count = type(inst.ItemCount) == "function" and inst:ItemCount(item_id) or 0
       if count < 1 then
-        if platform_api and type(platform_api.ShopAction) == "function" then
-          pcall(platform_api.ShopAction, player, { action = "OpenAdrenaline" })
+        if platform_api and type(platform_api.shop_action) == "function" then
+          pcall(platform_api.shop_action, player, { action = "OpenAdrenaline" })
         end
         return fail("no-adrenaline")
       end

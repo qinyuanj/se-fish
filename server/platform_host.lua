@@ -1,6 +1,6 @@
 local GameCfg = require('common.game_cfg')
 
-local PlatformHost = { SpokeHost = true, Flows = {}, next_flow_id = 0 }
+local PlatformHost = { SpokeHost = true, flows = {}, next_flow_id = 0 }
 
 local function isValidPlayer(player)
     local kind = type(player)
@@ -91,7 +91,7 @@ local function placeholderGoodsId(kind, key)
 end
 
 function PlatformHost:has_flow(player)
-    local flow = player and self.Flows[player.UserId]
+    local flow = player and self.flows[player.UserId]
     return flow ~= nil and flow.player == player
 end
 
@@ -128,7 +128,7 @@ local function notifyFlow(mgr, player, flow, open)
 end
 
 local function resolve(mgr, player, flow, outcome, payload)
-    if mgr.Flows[player.UserId] == flow then mgr.Flows[player.UserId] = nil end
+    if mgr.flows[player.UserId] == flow then mgr.flows[player.UserId] = nil end
     notifyFlow(mgr, player, flow, false)
     print('[PlatformHost] flow 结算', player.UserId, flow.kind, tostring(flow.goods or flow.ad), outcome)
     if type(flow.onResult) == 'function' then
@@ -169,7 +169,7 @@ local function openFlow(self, player, intent, onResult)
         ad = intent.ad, coin = intent.coin, purpose = intent.purpose, goodsId = goodsId, real = nil,
         placeholder = label == '占位', onResult = onResult, startedAt = now,
         deadline = now + cfg().FlowTimeoutSec }
-    self.Flows[player.UserId] = flow
+    self.flows[player.UserId] = flow
     print('[PlatformHost] flow 建立', player.UserId, intent.kind, tostring(key), label,
         'flow=' .. tostring(flow.id))
     notifyFlow(self, player, flow, true)
@@ -187,8 +187,8 @@ end
 function PlatformHost:cancel_flow(player)
     if not self:has_flow(player) then return false end
     print('[PlatformHost] flow 被业务取消', player.UserId)
-    local flow = self.Flows[player.UserId]
-    self.Flows[player.UserId] = nil
+    local flow = self.flows[player.UserId]
+    self.flows[player.UserId] = nil
     notifyFlow(self, player, flow, false)
     return true
 end
@@ -200,7 +200,7 @@ end
 
 function PlatformHost:resolve_placeholder(player, outcome)
     if outcome ~= 'success' and outcome ~= 'cancel' and outcome ~= 'fail' then return false end
-    local flow = player and self.Flows[player.UserId]
+    local flow = player and self.flows[player.UserId]
     if not flow or flow.player ~= player or not flow.placeholder then return false end
     resolve(self, player, flow, outcome, { placeholder = true })
     return true
@@ -220,7 +220,7 @@ function PlatformHost:handle_test_action(player, payload)
         or (payload.outcome ~= 'success' and payload.outcome ~= 'cancel' and payload.outcome ~= 'fail') then
         return false
     end
-    local flow = player and self.Flows[player.UserId]
+    local flow = player and self.flows[player.UserId]
     if not flow or flow.player ~= player or flow.placeholder then return false end
     resolve(self, player, flow, payload.outcome, { driver = true })
     return true
@@ -243,9 +243,9 @@ end
 
 function PlatformHost:handle_action(player, payload)
     if type(payload) ~= 'table' then return false end
-    if self.ShopAction and (payload.action == 'OpenAdrenaline' or payload.action == 'OpenCoinShop'
+    if self.shop_action and (payload.action == 'OpenAdrenaline' or payload.action == 'OpenCoinShop'
         or payload.action == 'Purchase' or payload.action == 'BuyCoin' or payload.action == 'Query') then
-        return self.ShopAction(player, payload)
+        return self.shop_action(player, payload)
     end
     if payload.action == 'Share' then
         self:Share(player, payload.purpose)
@@ -259,7 +259,7 @@ end
 
 function PlatformHost:update()
     local now = self:now()
-    for userId, flow in pairs(self.Flows) do
+    for userId, flow in pairs(self.flows) do
         if now >= flow.deadline then
             resolve(self, flow.player, flow, 'timeout')
         end
@@ -267,7 +267,7 @@ function PlatformHost:update()
 end
 
 function PlatformHost:on_player_removing(player)
-    self.Flows[player.UserId] = nil
+    self.flows[player.UserId] = nil
 end
 
 function PlatformHost:start()

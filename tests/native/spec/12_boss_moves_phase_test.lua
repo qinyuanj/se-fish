@@ -82,11 +82,11 @@ describe('第 12 节 阶段与复合组（沧龙 / 哥斯拉）', function()
     it('条款 12-35：沧龙移速按表 13，绕岛巡航逐帧不瞬移', function()
         local fish = env:drop('fish55Elite')
         assert.same(13, Cfg.Fish.fish55Elite.Speed)
-        local dt, last, moved = 0.05, fish.Carrier.Body.Position, 0
+        local dt, last, moved = 0.05, fish.carrier.body.Position, 0
         for _ = 1, 20 do
             env.now = env.now + dt
             env.mgr:update()
-            local p = fish.Carrier.Body.Position
+            local p = fish.carrier.body.Position
             local step = math.sqrt((p.x - last.x) ^ 2 + (p.z - last.z) ^ 2)
             need(step <= 13 * dt + 1e-6, '巡航单帧位移 %s 超过表内移速 13', step)
             moved, last = moved + step, p
@@ -129,12 +129,12 @@ describe('第 12 节 阶段与复合组（沧龙 / 哥斯拉）', function()
         local fish = env:drop('fish55Elite')
         env:advance(5)
         local function radius()
-            local p = fish.Carrier.Body.Position
+            local p = fish.carrier.body.Position
             return math.sqrt((p.x - water.Center.x) ^ 2 + (p.z - water.Center.z) ^ 2)
         end
-        local r1, p1 = radius(), fish.Carrier.Body.Position
+        local r1, p1 = radius(), fish.carrier.body.Position
         env:advance(10)
-        local r2, p2 = radius(), fish.Carrier.Body.Position
+        local r2, p2 = radius(), fish.carrier.body.Position
         need(math.abs(r1 - r2) < 3, '绕岛半径在漂移（%s → %s）', r1, r2)
         need(math.sqrt((p2.x - p1.x) ^ 2 + (p2.z - p1.z) ^ 2) > 5, '绕岛巡航没有绕行')
 
@@ -198,14 +198,14 @@ describe('第 12 节 阶段与复合组（沧龙 / 哥斯拉）', function()
         assert.is_true(#phase.Thresholds[1].PhaseName > 0, '阶段切换没有可读的阶段名')
 
         local fish = env:drop('fish56Boss')
-        local p = fish.Carrier.Body.Position
+        local p = fish.carrier.body.Position
         env.player.Character.Position = env.vec(p.x, p.y, p.z + 2)
         env:advance(1.98)
         local before = 0
         for _, attack in ipairs(fish.Phase.attack_log) do
             if attack.Name == 'claw' then before = before + 1 end
         end
-        fish.Carrier.Health = 14000 -- 56%：与 2 秒到期的爪击同一帧跌破 60%
+        fish.carrier.Health = 14000 -- 56%：与 2 秒到期的爪击同一帧跌破 60%
         env:advance(2.02)
         assert.same('water', fish.Phase.Phase, '阈值没有在同一帧生效')
         local after = 0

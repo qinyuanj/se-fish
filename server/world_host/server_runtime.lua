@@ -82,8 +82,8 @@ end
 local function is_ready_data(player, data)
   return type(data) == "table"
       and data.Player == player
-      and data.Inited == true
-      and data.LoadState == "ready"
+      and data.inited == true
+      and data.load_state == "ready"
 end
 
 ---@param opts? table
@@ -109,7 +109,7 @@ function ServerRuntime.new(opts)
   local fish_host = FishTree.new()
   fish_host.clock = clock
   fish_host.ai_projection = opts.ai
-  fish_host.Logger = opts.logger
+  fish_host.logger = opts.logger
   fish_host.get_player_tree = function(_, player)
     return is_valid_player(player) and player_trees[player.UserId] or nil
   end
@@ -119,7 +119,7 @@ function ServerRuntime.new(opts)
   fish_host.CreateUnit = opts.create_unit
   fish_host.World = opts.world_service
   fish_host.cast = opts.cast
-  fish_host.Ai = opts.fish_ai
+  fish_host.ai = opts.fish_ai
   fish_host.AiTarget = opts.fish_ai_target or FishAiTarget
   fish_host.ability_api = opts.ability_api
   fish_host.Ability = opts.fish_ability
@@ -165,7 +165,7 @@ function ServerRuntime.new(opts)
     fish_host.cast = {
       PushState = function(_, player) return runtime:push_cast_state(player) end,
       abort = function(_, player) return runtime:abort_cast(player) end,
-      SetNextFish = function(_, player, fish_id) return runtime:set_next_fish(player, fish_id) end,
+      set_next_fish = function(_, player, fish_id) return runtime:set_next_fish(player, fish_id) end,
     }
   end
 
@@ -189,7 +189,7 @@ function ServerRuntime.new(opts)
 
   local function entity_target(target)
     if not target then return nil end
-    local ok_carrier, carrier = pcall(function() return target.Carrier end)
+    local ok_carrier, carrier = pcall(function() return target.carrier end)
     if ok_carrier and carrier then return target end
     local carrier_host = opts.fish_carrier
     local resolved = carrier_host and carrier_host.resolve_carrier and carrier_host:resolve_carrier(target)
@@ -245,7 +245,7 @@ function ServerRuntime.new(opts)
   PlayerGM.configure({
     player_data = opts.player_data,
     save = opts.save,
-    cast = { SetNextFish = function(_, target, fishId) return runtime:set_next_fish(target, fishId) end },
+    cast = { set_next_fish = function(_, target, fishId) return runtime:set_next_fish(target, fishId) end },
     vitals = {
       set_health = function(_, target, value) return runtime.life:set_health(target, value) end,
       set_hunger = function(_, target, value) return runtime.life:set_hunger(target, value) end,
@@ -1016,7 +1016,7 @@ function ServerRuntime.new(opts)
   local function prune_faulted_fish()
     local faulted = {}
     for _, fish in pairs(fish_host.Fish) do
-      if type(fish) == "table" and fish.Tree and fish.Tree.fault ~= nil then
+      if type(fish) == "table" and fish.tree and fish.tree.fault ~= nil then
         faulted[#faulted + 1] = fish
       end
     end
@@ -1026,29 +1026,29 @@ function ServerRuntime.new(opts)
   end
 
   local function fish_row(fish)
-    local species = GameCfg.Fish[fish.FishId] or {}
+    local species = GameCfg.Fish[fish.fish_id] or {}
     local state = fish.State
     local phase = "lifted"
     if state == FishTree.State.escaping then
       phase = "escape"
     elseif state == FishTree.State.wild then
       phase = "wild"
-    elseif state ~= FishTree.State.AwaitLift and state ~= FishTree.State.Held then
+    elseif state ~= FishTree.State.await_lift and state ~= FishTree.State.held then
       phase = "combat"
     end
-    local health = fish.Carrier and fish.Carrier.Health or species.Health
+    local health = fish.carrier and fish.carrier.Health or species.Health
     local maxHealth = species.Health or 0
     local ratio = maxHealth > 0 and (health or 0) / maxHealth or 0
     local bossPhase = nil
-    if fish.FishId == "fish56Boss" then
+    if fish.fish_id == "fish56Boss" then
       bossPhase = ratio > 0.6 and "land" or (ratio > 0.2 and "water" or "enraged")
     end
-    local lifted = state == FishTree.State.AwaitLift or state == FishTree.State.Held
+    local lifted = state == FishTree.State.await_lift or state == FishTree.State.held
     return {
       id = fish.Id,
-      fishId = fish.FishId,
+      fishId = fish.fish_id,
       name = species.Name,
-      mult = fish.Mult,
+      mult = fish.mult,
       zoneId = species.ZoneId,
       phase = phase,
       bossPhase = bossPhase,
@@ -1225,8 +1225,8 @@ function ServerRuntime.new(opts)
       opts.fish_carrier:unsubscribe_died(carrier_died_handler)
       carrier_died_handler = nil
     end
-    if bound_shop_action and type(platform) == "table" and platform.ShopAction == bound_shop_action then
-      platform.ShopAction = nil
+    if bound_shop_action and type(platform) == "table" and platform.shop_action == bound_shop_action then
+      platform.shop_action = nil
       bound_shop_action = nil
     end
     if self.world then
@@ -1276,7 +1276,7 @@ function ServerRuntime.new(opts)
   fish_host.Vitals = runtime.life
 
   if has_method(player_data, "on_player_added") then
-    player_data.Runtime = runtime
+    player_data.runtime = runtime
     player_data.Save = save
     player_data.Vitals = runtime.life
     player_data.Quest = { notify = function(_, kind, owner, fact) return runtime:notify_quest(kind, owner, fact) end }
@@ -1291,25 +1291,25 @@ function ServerRuntime.new(opts)
     }
   end
   if has_method(save, "load_into") or has_method(save, "start") then
-    if has_method(player_data, "send_item_bar") then save.PlayerData = player_data end
+    if has_method(player_data, "send_item_bar") then save.player_data = player_data end
     save.on_ready = function(player, data) runtime:on_save_ready(player, data) end
   end
   if type(platform) == "table" then
     if has_method(platform, "start") then
       if type(save) == "table" then platform.Save = save end
-      if type(player_data) == "table" then platform.PlayerData = player_data end
+      if type(player_data) == "table" then platform.player_data = player_data end
     end
-    if platform.ShopAction == nil then
+    if platform.shop_action == nil then
       bound_shop_action = function(actor, payload)
         return runtime:platform_shop_action(actor, payload)
       end
-      platform.ShopAction = bound_shop_action
+      platform.shop_action = bound_shop_action
     end
   end
   if opts.fish_ability then
     opts.fish_ability.Modifier = modifier_service
     opts.fish_ability.Vitals = runtime.life
-    opts.fish_ability.Ai = opts.fish_ai
+    opts.fish_ability.ai = opts.fish_ai
     opts.fish_ability.behavior_services = { Vitals = runtime.life, Modifier = modifier_service, GM = PlayerGM }
   end
 

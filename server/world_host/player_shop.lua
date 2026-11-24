@@ -131,12 +131,12 @@ function PlayerShop.mount(scope, tree, opts)
     local accepted = save:execute(player, data, operation, function(draft)
       local draft_row, failure = backpack_row(draft, stand.Level)
       if not draft_row then return nil, failure end
-      local before_coin, before_level = draft.Data.FishCoin, draft.Data.UpgradeLevel
+      local before_coin, before_level = draft.Data.FishCoin, draft.Data.upgrade_level
       local upgraded, cost = draft:UpgradeStorage()
       if not upgraded then return nil, cost end
       draft:NotePurchase(draft_row.Number)
       return {
-        ok = true, action = "UpgradeStorage", price = cost, level = draft.Data.UpgradeLevel,
+        ok = true, action = "UpgradeStorage", price = cost, level = draft.Data.upgrade_level,
         coinBefore = before_coin, coinAfter = draft.Data.FishCoin, levelBefore = before_level,
       }
     end, function(written, result)

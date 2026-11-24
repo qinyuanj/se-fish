@@ -8,9 +8,9 @@ local isValidPlayer = SignalRouter.is_valid_player
 local function syncTarget(self, target, data)
     local tree = isValidPlayer(target) and active_trees[target.UserId] or nil
     local hasLiveTree = tree ~= nil and tree.player == target and not tree:is_disposed()
-    if self.PlayerData and type(self.PlayerData.send_item_bar) == 'function' then
-        local synced = self.PlayerData:send_item_bar(target, true)
-        if hasLiveTree and not self.PlayerData.Runtime and type(tree.sync_from_data) == 'function' then
+    if self.player_data and type(self.player_data.send_item_bar) == 'function' then
+        local synced = self.player_data:send_item_bar(target, true)
+        if hasLiveTree and not self.player_data.runtime and type(tree.sync_from_data) == 'function' then
             tree:sync_from_data(data, { force_push = true })
         end
         return synced
@@ -96,7 +96,7 @@ function Mgr:next_fish(_, payload, target)
         return false, '鱼种 ID 不在白名单中'
     end
     if not self.cast then return false, '钓鱼管理器未就绪' end
-    self.cast:SetNextFish(target, fishId)
+    self.cast:set_next_fish(target, fishId)
     return true
 end
 
@@ -119,7 +119,7 @@ function Mgr:handle(player, payload)
     if type(payload) ~= 'table' then return false end
     local method = Actions[payload.action]
     local target = method and self:resolve_target(player, payload.target)
-    local data = target and self.PlayerData and self.PlayerData:get_data_inst(target)
+    local data = target and self.player_data and self.player_data:get_data_inst(target)
     if data and self.Save and (method == 'ApplyState' or method == 'SaveState'
         or method == 'ReadState' or method == 'SelectSaveSlot' or method == 'GetState') then
         local function finish(ok, reason)
@@ -162,7 +162,7 @@ function Mgr:handle(player, payload)
 end
 
 function Mgr.configure(opts)
-    Mgr.PlayerData, Mgr.Save, Mgr.cast, Mgr.Vitals = opts.player_data, opts.save, opts.cast, opts.vitals
+    Mgr.player_data, Mgr.Save, Mgr.cast, Mgr.Vitals = opts.player_data, opts.save, opts.cast, opts.vitals
 end
 
 function Mgr.mount(scope, player_tree, opts)

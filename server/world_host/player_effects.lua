@@ -463,15 +463,15 @@ function PlayerEffects.mount(s2, player_tree, opts)
   end)
 
   memos.max_health = s2:memo("MaxHealth", function(ms)
-    return ms:d(memos.attr_plan).Body.Health
+    return ms:d(memos.attr_plan).body.Health
   end)
 
   memos.body_scale = s2:memo("BodyScale", function(ms)
-    return ms:d(memos.attr_plan).Body.Scale
+    return ms:d(memos.attr_plan).body.Scale
   end)
 
   memos.body_scale_capped = s2:memo("BodyScaleCapped", function(ms)
-    return ms:d(memos.attr_plan).Body.capped == true
+    return ms:d(memos.attr_plan).body.capped == true
   end)
 
   memos.body_derived = s2:memo("BodyDerived", function(ms)
@@ -479,11 +479,11 @@ function PlayerEffects.mount(s2, player_tree, opts)
   end)
 
   memos.move_speed_scale = s2:memo("MoveSpeedScale", function(ms)
-    return 1 + ms:d(memos.attr_plan).Attributes.PlayerWalkSpeed.Ratio
+    return 1 + ms:d(memos.attr_plan).attributes.PlayerWalkSpeed.Ratio
   end)
 
   memos.walk_speed = s2:memo("WalkSpeed", function(ms)
-    local comp = ms:d(memos.attr_plan).Attributes.PlayerWalkSpeed
+    local comp = ms:d(memos.attr_plan).attributes.PlayerWalkSpeed
     return math.max(0, (comp.Base + comp.BaseExtra) * (1 + comp.Ratio) + comp.Bonus)
   end)
 

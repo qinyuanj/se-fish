@@ -198,10 +198,10 @@ local function radial_damage(opts, center, radius, amount, hit, skip)
   local fish = opts.fish_unit
   if fish and type(fish.Fish) == "table" then
     for _, entry in pairs(fish.Fish) do
-      local body = entry.Carrier and entry.Carrier.Body
+      local body = entry.carrier and entry.carrier.body
       local pos = body and body.Position
       if pos and distance2d(center, pos) <= radius then
-        if opts.apply_hit(hit, entry.Carrier, amount) == true then damaged = damaged + 1 end
+        if opts.apply_hit(hit, entry.carrier, amount) == true then damaged = damaged + 1 end
       end
     end
   end
@@ -533,7 +533,7 @@ local function consume_throwable(session, player, slot, item_id, payload)
   local save = session.opts.save
   local data = session.tree.data
   if not save then
-    local container = data.Data and data.Data.Containers and data.Data.Containers[GameCfg.Items.ContainerId.ItemBar]
+    local container = data.Data and data.Data.containers and data.Data.containers[GameCfg.Items.ContainerId.ItemBar]
     local entry = container and container[slot]
     if not entry or (entry.count or 0) <= 0 or entry.itemId ~= item_id then
       return fail(session.remote, player, "throw", "empty", { slot = slot })
@@ -564,14 +564,14 @@ local function consume_throwable(session, player, slot, item_id, payload)
     end) == true
   end
   return save:execute(player, data, operation, function(draft)
-    local container = draft.Data.Containers[GameCfg.Items.ContainerId.ItemBar]
+    local container = draft.Data.containers[GameCfg.Items.ContainerId.ItemBar]
     local entry = container and container[slot]
     if not entry or (entry.count or 0) <= 0 or entry.itemId ~= item_id then return nil, "empty" end
     if type(draft.UpdateData) == "function" then
       draft:UpdateData(function(stored)
-        local current = stored.Containers[GameCfg.Items.ContainerId.ItemBar][slot]
+        local current = stored.containers[GameCfg.Items.ContainerId.ItemBar][slot]
         if current and current.count > 1 then current.count = current.count - 1
-        else stored.Containers[GameCfg.Items.ContainerId.ItemBar][slot] = nil end
+        else stored.containers[GameCfg.Items.ContainerId.ItemBar][slot] = nil end
       end, true)
     end
     return { ok = true, action = "throw", itemId = item_id, slot = slot }

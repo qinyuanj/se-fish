@@ -38,8 +38,8 @@ local function grillable(entry)
 end
 
 local function selected_entry(data)
-  local items = data and data.Data and data.Data.Containers and data.Data.Containers[ITEM_BAR]
-  local slot = data and data.Data and data.Data.SelectedSlot
+  local items = data and data.Data and data.Data.containers and data.Data.containers[ITEM_BAR]
+  local slot = data and data.Data and data.Data.selected_slot
   local entry = slot and items and items[slot]
   if type(entry) == "table" and (entry.count or 0) > 0 then return slot, entry end
   return nil, nil
@@ -51,7 +51,7 @@ local function place(data, item_id, mult, rate, select_slot)
     { BACKPACK, data:BackpackCapacity() },
   }
   for _, pair in ipairs(pairs_) do
-    local items = data.Data.Containers[pair[1]]
+    local items = data.Data.containers[pair[1]]
     for index = 1, pair[2] do
       local entry = items[index]
       if not entry or (entry.count or 0) <= 0 then
@@ -63,7 +63,7 @@ local function place(data, item_id, mult, rate, select_slot)
           cooked = rate,
           saved = rate and { k = rate } or nil,
         }
-        if select_slot and pair[1] == ITEM_BAR then data.Data.SelectedSlot = index end
+        if select_slot and pair[1] == ITEM_BAR then data.Data.selected_slot = index end
         return true
       end
     end
@@ -363,8 +363,8 @@ function PlayerGrill.mount(scope, tree, opts)
       if draft_slot ~= slot or not grillable(draft_entry) or draft_entry.itemId ~= item_id then
         return nil, "no-fish"
       end
-      draft.Data.Containers[ITEM_BAR][slot] = nil
-      if draft.Data.SelectedSlot == slot then draft.Data.SelectedSlot = nil end
+      draft.Data.containers[ITEM_BAR][slot] = nil
+      if draft.Data.selected_slot == slot then draft.Data.selected_slot = nil end
       local pending = draft.Extra and draft.Extra.recovery and draft.Extra.recovery.grill
       if type(pending) == "table" then
         local recovered = pending_rate(pending, started_at)

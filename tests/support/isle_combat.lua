@@ -123,7 +123,7 @@ end
 -- 放下鱼并确认返回严格 true（旧用例这里是 lu.assertTrue；support 模块不依赖 luassert 的表形 assert）。
 function M.drop(env, id)
     local fish = assert(env.mgr:spawn_landed(env.player, { fishId = id, mult = 1 }, env.player.Character.Position))
-    fish.Carrier.Body.OnLiftedBegin:Fire(env.player.Character)
+    fish.carrier.body.OnLiftedBegin:Fire(env.player.Character)
     local dropped = env.mgr:drop(env.player)
     if dropped ~= true then
         error('MgrFishUnit:Drop 未返回 true：' .. tostring(dropped))

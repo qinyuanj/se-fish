@@ -109,8 +109,8 @@ describe('条款 1-12：适配层失败路径', function()
         env.save = assert(loadfile('server/save_host.lua'))()
         env.players = assert(loadfile('server/player_data_host.lua'))()
         env.platform = assert(loadfile('server/platform_host.lua'))()
-        env.players.Save, env.save.PlayerData = env.save, env.players
-        env.platform.Save, env.platform.PlayerData = env.save, env.players
+        env.players.Save, env.save.player_data = env.save, env.players
+        env.platform.Save, env.platform.player_data = env.save, env.players
         env.platform.now = function() return env.now end
         env.platform:start()
         env.player = { UserId = 1201, Character = { Position = { x = 0, y = 0, z = 0 } },

@@ -86,7 +86,7 @@ function M.new(opts)
     local GameCfg = require('common.game_cfg')
     local ZoneFixtures = require('tests.support.zone_fixtures')
     local ZoneMarkers = require('common.zone_markers')
-    if not ZoneMarkers.Ready then ZoneFixtures.apply(GameCfg) end
+    if not ZoneMarkers.ready then ZoneFixtures.apply(GameCfg) end
 
     local env = {
         cfg = GameCfg, queue = {}, sent = {}, re = {}, values = {}, online_players = {}, created = {},

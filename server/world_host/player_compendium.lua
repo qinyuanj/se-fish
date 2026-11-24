@@ -3,7 +3,7 @@ local FishCatch = require('common.fish_catch')
 local Records = require('common.records')
 local SignalRouter = require('server.world_host.world_signal_router')
 
-local Mgr = { Queues = {}, LastSeq = {}, KIND = 'compendium-land', max_queue = 16 }
+local Mgr = { queues = {}, last_seq = {}, KIND = 'compendium-land', max_queue = 16 }
 local isValidPlayer = SignalRouter.is_valid_player
 
 local function copy(value)
@@ -22,10 +22,10 @@ local function collection(extra)
 end
 
 function Mgr:snapshot(player)
-    local data = self.PlayerData and self.PlayerData:get_data_inst(player)
+    local data = self.player_data and self.player_data:get_data_inst(player)
     local bag = data and data.Extra and data.Extra.collection or nil
-    if not bag or data.LoadState ~= 'ready' then
-        return { state = data and data.LoadState == 'loading' and 'loading' or 'unavailable',
+    if not bag or data.load_state ~= 'ready' then
+        return { state = data and data.load_state == 'loading' and 'loading' or 'unavailable',
             unlocked = {}, catches = {}, weights = {}, total = 0 }
     end
     return { unlocked = copy(bag.unlocked), catches = copy(bag.catches),
@@ -37,9 +37,9 @@ function Mgr:handle(player, payload)
     if not isValidPlayer(player) or not Records.valid_user_id(player.UserId) or type(payload) ~= 'table' then return end
     local seq = payload.seq
     if type(seq) ~= 'number' or seq ~= math.floor(seq) or seq < 1 or seq > 2147483647 then return end
-    local last = self.LastSeq[player.UserId]
+    local last = self.last_seq[player.UserId]
     if last and last.player == player and seq <= last.seq then return end
-    self.LastSeq[player.UserId] = { player = player, seq = seq }
+    self.last_seq[player.UserId] = { player = player, seq = seq }
     local state = self:snapshot(player)
     state.seq = seq
     _G.REUtil:get_re('CompendiumState'):FireClient(player, state)
@@ -69,10 +69,10 @@ function Mgr:record_landing(player, event)
         or event.reelSerial ~= math.floor(event.reelSerial) or event.reelSerial < 1 then
         return false, 'invalid'
     end
-    local queue = self.Queues[player.UserId]
+    local queue = self.queues[player.UserId]
     if not queue or queue.player ~= player then
         queue = { player = player, events = {} }
-        self.Queues[player.UserId] = queue
+        self.queues[player.UserId] = queue
     end
     for _, queued in ipairs(queue.events) do
         if queued.reelSerial == event.reelSerial then return false, 'duplicate' end
@@ -94,7 +94,7 @@ local function finish_leave(queue)
 end
 
 function Mgr:flush_before_leave(player, done)
-    local queue = player and self.Queues[player.UserId]
+    local queue = player and self.queues[player.UserId]
     if not queue or queue.player ~= player or (#queue.events == 0 and not queue.writing) then return false end
     queue.leaving, queue.leave = true, done
     self:drain(player)
@@ -103,10 +103,10 @@ function Mgr:flush_before_leave(player, done)
 end
 
 function Mgr:drain(player)
-    local queue = self.Queues[player.UserId]
+    local queue = self.queues[player.UserId]
     if not queue or queue.player ~= player or queue.writing then return end
     if #queue.events == 0 then finish_leave(queue) return end
-    local data = self.PlayerData and self.PlayerData:get_data_inst(player)
+    local data = self.player_data and self.player_data:get_data_inst(player)
     if not data then return end
     local onlyEvent = #queue.events == 1
     local event = queue.events[1]
@@ -151,21 +151,21 @@ function Mgr:drain(player)
 end
 
 function Mgr:update()
-    for _, queue in pairs(self.Queues) do self:drain(queue.player) end
+    for _, queue in pairs(self.queues) do self:drain(queue.player) end
 end
 
 function Mgr:on_player_removing(player)
     if not isValidPlayer(player) then return end
-    local queue = self.Queues[player.UserId]
-    if queue and queue.player == player then self.Queues[player.UserId] = nil end
-    local request = self.LastSeq[player.UserId]
-    if request and request.player == player then self.LastSeq[player.UserId] = nil end
+    local queue = self.queues[player.UserId]
+    if queue and queue.player == player then self.queues[player.UserId] = nil end
+    local request = self.last_seq[player.UserId]
+    if request and request.player == player then self.last_seq[player.UserId] = nil end
 end
 
 function Mgr.mount(scope, player_tree, opts)
     local player = opts.player
     local session = setmetatable({
-        Queues = {}, LastSeq = {}, PlayerData = opts.player_data, Save = opts.save,
+        queues = {}, last_seq = {}, player_data = opts.player_data, Save = opts.save,
         Quest = player_tree.quest, Records = opts.records,
     }, { __index = Mgr })
     player_tree.compendium = session

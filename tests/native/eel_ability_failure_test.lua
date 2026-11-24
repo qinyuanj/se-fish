@@ -36,7 +36,7 @@ describe('TestEelAbilityFailure', function()
         package.loaded['server.packages.ability_system.api'] = ctx.vendor
         package.loaded['server.ability_api'] = ctx.api
         ctx.mgr = assert(loadfile('server/fish_ability.lua'))()
-        ctx.fish = { Id = 1, FishId = 'eel', Carrier = { Receiver = {} } }
+        ctx.fish = { Id = 1, fish_id = 'eel', carrier = { receiver = {} } }
     end)
     after_each(function()
         _G.game = saved.game

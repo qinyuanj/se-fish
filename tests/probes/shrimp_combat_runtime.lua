@@ -16,7 +16,7 @@ if fish then
     game:GetService('Task'):Delay(2, function()
         if _G.Shrimp135CombatToken == runId and units.Fish[fish.Id] == fish then
             units:drop(player)
-            print('SHRIMP135_RELEASE', fish.Id, fish.State, fish.Carrier.Health, fish.Carrier.Body.Position)
+            print('SHRIMP135_RELEASE', fish.Id, fish.State, fish.carrier.Health, fish.carrier.body.Position)
             if _G.Shrimp135Observe then
                 local task = game:GetService('Task')
                 task:Spawn(function()
@@ -27,18 +27,18 @@ if fish then
                         local name = move and move.Name or fish.State
                         if name ~= last then
                             print('SHRIMP135_BEHAVIOR', fish.Id, name, player.Character.Controller.Health,
-                                fish.WakeAt, world:GetServerTime() - started)
+                                fish.wake_at, world:GetServerTime() - started)
                             last = name
                         end
                         if life and life:can_act(player) then
-                            local fp = fish.Carrier.Body.Position
+                            local fp = fish.carrier.body.Position
                             if name == 'rain' then
                                 player.Character.Position = Vector3.New(fp.x + 12, fp.y, fp.z)
                             elseif name == 'dive' then
-                                local dest = move.Destination
+                                local dest = move.destination
                                 player.Character.Position = Vector3.New(dest.x, move.Center.y, dest.z)
                             elseif fish.State ~= 'stunned' then
-                                local forward = fish.Carrier.Body.Rotation:GetForward()
+                                local forward = fish.carrier.body.Rotation:GetForward()
                                 player.Character.Position = Vector3.New(fp.x - forward.x * 1.5, fp.y, fp.z - forward.z * 1.5)
                             end
                         end
@@ -54,20 +54,20 @@ if fish then
                 print('SHRIMP135_INPUT', '主动定位并面向目标；真实攻击，不改血量/时间', data:weapon_damage_scale('melee'))
                 task:Spawn(function()
                     while _G.Shrimp135CombatToken == runId and units.Fish[fish.Id] == fish and world:GetServerTime() - started < 100 do
-                        local fp = fish.Carrier.Body.Position
-                        local forward = fish.Carrier.Body.Rotation:GetForward()
+                        local fp = fish.carrier.body.Position
+                        local forward = fish.carrier.body.Rotation:GetForward()
                         local character = player.Character
                         if character and character.Controller and life and life:can_act(player) then
                             character.Position = Vector3.New(fp.x - forward.x * 1.5, fp.y, fp.z - forward.z * 1.5)
-                            character.Rotation = fish.Carrier.Body.Rotation
+                            character.Rotation = fish.carrier.body.Rotation
                         end
-                        local before = fish.Carrier.Health
+                        local before = fish.carrier.Health
                         local ok = life and life:weapon_action(player, { action = 'attack' }) or false
                         print('SHRIMP135_ATTACK', fish.Id, before, ok, character and character.Controller and character.Controller.Health,
                             world:GetServerTime() - started)
                         task:Wait(0.5)
                     end
-                    print('SHRIMP135_END', fish.Id, fish.State, fish.Carrier.Health, world:GetServerTime() - started)
+                    print('SHRIMP135_END', fish.Id, fish.State, fish.carrier.Health, world:GetServerTime() - started)
                 end)
             end
         end

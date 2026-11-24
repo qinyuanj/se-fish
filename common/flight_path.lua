@@ -39,7 +39,7 @@ function M.bounds_of(scene, flightCfg)
     return {
         MinX = b.MinX, MaxX = b.MaxX, MinZ = b.MinZ, MaxZ = b.MaxZ,
         bottom_y = bottom, top_y = top,
-        GroundY = ground, ceiling_y = math.min(ground + height, top), MaxHeight = height,
+        ground_y = ground, ceiling_y = math.min(ground + height, top), MaxHeight = height,
     }
 end
 
@@ -51,18 +51,18 @@ end
 function M.new(bounds, flightCfg, profile, start, now)
     flightCfg = flightCfg or cfg()
     profile = profile or {}
-    start = start or { x = bounds.MinX, y = bounds.GroundY + (profile.CruiseHeight or flightCfg.CruiseHeight), z = bounds.MinZ }
+    start = start or { x = bounds.MinX, y = bounds.ground_y + (profile.CruiseHeight or flightCfg.CruiseHeight), z = bounds.MinZ }
     now = isBadNumber(now) and 0 or now
     return {
-        bounds = bounds, Cfg = flightCfg, Profile = profile,
-        Pos = copy(start), Last = copy(start), Vel = { x = 0, y = 0, z = 0 },
+        bounds = bounds, cfg = flightCfg, profile = profile,
+        pos = copy(start), last = copy(start), vel = { x = 0, y = 0, z = 0 },
         Phase = 'cruise', Target = nil,
         Center = profile.Center or { x = (bounds.MinX + bounds.MaxX) / 2, z = (bounds.MinZ + bounds.MaxZ) / 2 },
         Radius = profile.Radius or 15,
         Angle = 0,
         next_dive_at = now + (profile.DiveIntervalSec or flightCfg.DiveIntervalSec),
         phase_ends_at = 0,
-        Stats = { frames = 0, clamps = 0, nan_recoveries = 0, drifts = 0, dives = 0, step_truncations = 0 },
+        stats = { frames = 0, clamps = 0, nan_recoveries = 0, drifts = 0, dives = 0, step_truncations = 0 },
         clamp_log = {},
     }
 end
@@ -72,15 +72,15 @@ function M.set_target(state, target)
 end
 
 function M.speed(state)
-    return state.Profile.Speed or state.Cfg.Speed
+    return state.profile.Speed or state.cfg.Speed
 end
 
 function M.CruiseHeight(state)
-    return state.Profile.CruiseHeight or state.Cfg.CruiseHeight
+    return state.profile.CruiseHeight or state.cfg.CruiseHeight
 end
 
 local function clampToBounds(state)
-    local b, p = state.bounds, state.Pos
+    local b, p = state.bounds, state.pos
     local clamped = 0
     local function clampAxis(axis, min, max)
         local v = p[axis]
@@ -95,65 +95,65 @@ local function clampToBounds(state)
         end
     end
     clampAxis('x', b.MinX, b.MaxX)
-    clampAxis('y', math.max(b.bottom_y, b.GroundY), math.min(b.ceiling_y, b.top_y))
+    clampAxis('y', math.max(b.bottom_y, b.ground_y), math.min(b.ceiling_y, b.top_y))
     clampAxis('z', b.MinZ, b.MaxZ)
-    state.Stats.clamps = state.Stats.clamps + clamped
+    state.stats.clamps = state.stats.clamps + clamped
     return clamped
 end
 
 local function driftLimit(state, dt)
-    return M.speed(state) * state.Cfg.MaxStepSec * 2 + state.Cfg.DriftTolerance
+    return M.speed(state) * state.cfg.MaxStepSec * 2 + state.cfg.DriftTolerance
 end
 
 local function updateCruise(state, dt, now, events)
-    local profile, c = state.Profile, state.Cfg
-    local cruiseY = state.bounds.GroundY + M.CruiseHeight(state)
+    local profile, c = state.profile, state.cfg
+    local cruiseY = state.bounds.ground_y + M.CruiseHeight(state)
     local speed = M.speed(state)
     local dx, dz
     if state.Target then
-        dx, dz = state.Target.x - state.Pos.x, state.Target.z - state.Pos.z
+        dx, dz = state.Target.x - state.pos.x, state.Target.z - state.pos.z
     else
         state.Angle = state.Angle + (profile.TurnRate or 0.2) * dt
         local spot = { x = state.Center.x + math.cos(state.Angle) * state.Radius,
             z = state.Center.z + math.sin(state.Angle) * state.Radius }
-        dx, dz = spot.x - state.Pos.x, spot.z - state.Pos.z
+        dx, dz = spot.x - state.pos.x, spot.z - state.pos.z
     end
     local length = math.sqrt(dx * dx + dz * dz)
     if length > 1e-6 then
-        state.Vel.x, state.Vel.z = dx / length * speed, dz / length * speed
+        state.vel.x, state.vel.z = dx / length * speed, dz / length * speed
     else
-        state.Vel.x, state.Vel.z = 0, 0
+        state.vel.x, state.vel.z = 0, 0
     end
-    state.Vel.y = (cruiseY - state.Pos.y) * 2
-    if state.Vel.y > c.ClimbSpeed then state.Vel.y = c.ClimbSpeed end
-    if state.Vel.y < -c.ClimbSpeed then state.Vel.y = -c.ClimbSpeed end
+    state.vel.y = (cruiseY - state.pos.y) * 2
+    if state.vel.y > c.ClimbSpeed then state.vel.y = c.ClimbSpeed end
+    if state.vel.y < -c.ClimbSpeed then state.vel.y = -c.ClimbSpeed end
     if state.Target and now >= state.next_dive_at then
         state.Phase = 'dive'
         state.phase_ends_at = now + (profile.DiveSec or c.DiveSec)
         state.next_dive_at = now + (profile.DiveIntervalSec or c.DiveIntervalSec)
         events.dive = true
         events.diveDamage = profile.DiveDamage or c.DiveDamage
-        state.Stats.dives = state.Stats.dives + 1
+        state.stats.dives = state.stats.dives + 1
     end
     return speed
 end
 
 local function updateDive(state, dt, now, events)
-    local c = state.Cfg
-    local speed = state.Profile.DiveSpeed or c.DiveSpeed
+    local c = state.cfg
+    local speed = state.profile.DiveSpeed or c.DiveSpeed
     local target = state.Target
     if target then
-        local dx, dy, dz = target.x - state.Pos.x, target.y - state.Pos.y, target.z - state.Pos.z
+        local dx, dy, dz = target.x - state.pos.x, target.y - state.pos.y, target.z - state.pos.z
         local length = math.sqrt(dx * dx + dy * dy + dz * dz)
         if length > 1e-6 then
-            state.Vel.x, state.Vel.y, state.Vel.z = dx / length * speed, dy / length * speed, dz / length * speed
+            state.vel.x, state.vel.y, state.vel.z = dx / length * speed, dy / length * speed, dz / length * speed
         end
     else
-        state.Vel.x, state.Vel.z = 0, 0
-        state.Vel.y = -speed
+        state.vel.x, state.vel.z = 0, 0
+        state.vel.y = -speed
     end
-    local floor = state.bounds.GroundY
-    if now >= state.phase_ends_at or state.Pos.y <= floor + 0.01 then
+    local floor = state.bounds.ground_y
+    if now >= state.phase_ends_at or state.pos.y <= floor + 0.01 then
         state.Phase = 'climb'
     end
     return speed
@@ -161,30 +161,30 @@ end
 
 local function updateClimb(state, dt, now, events)
     local speed = M.speed(state)
-    local cruiseY = state.bounds.GroundY + M.CruiseHeight(state)
-    state.Vel.x, state.Vel.z = 0, 0
-    state.Vel.y = state.Profile.ClimbSpeed or state.Cfg.ClimbSpeed
-    if state.Pos.y >= cruiseY - 0.01 then
-        state.Pos.y = cruiseY
+    local cruiseY = state.bounds.ground_y + M.CruiseHeight(state)
+    state.vel.x, state.vel.z = 0, 0
+    state.vel.y = state.profile.ClimbSpeed or state.cfg.ClimbSpeed
+    if state.pos.y >= cruiseY - 0.01 then
+        state.pos.y = cruiseY
         state.Phase = 'cruise'
     end
     return speed
 end
 
 local function updateLeap(state, dt, now, events)
-    local c = state.Cfg
-    local apex = state.Profile.LeapHeight or c.LeapHeight
+    local c = state.cfg
+    local apex = state.profile.LeapHeight or c.LeapHeight
     local progress = 0
     if state.phase_ends_at > state.phase_started_at then
         progress = (now - state.phase_started_at) / (state.phase_ends_at - state.phase_started_at)
     end
     if progress >= 1 then
         state.Phase = 'cruise'
-        state.next_dive_at = now + (state.Profile.DiveIntervalSec or c.DiveIntervalSec)
+        state.next_dive_at = now + (state.profile.DiveIntervalSec or c.DiveIntervalSec)
         return M.speed(state)
     end
-    state.Pos.y = state.bounds.GroundY + apex * math.sin(math.pi * progress)
-    state.Vel.y = 0
+    state.pos.y = state.bounds.ground_y + apex * math.sin(math.pi * progress)
+    state.vel.y = 0
     return M.speed(state)
 end
 
@@ -197,43 +197,43 @@ function M.step(state, now, dt)
     if isBadNumber(now) then now = state.last_at or 0 end
     state.last_at = now
     if isBadNumber(dt) or dt < 0 then dt = 0 end
-    if dt > state.Cfg.MaxStepSec then
-        dt = state.Cfg.MaxStepSec
-        state.Stats.step_truncations = state.Stats.step_truncations + 1
+    if dt > state.cfg.MaxStepSec then
+        dt = state.cfg.MaxStepSec
+        state.stats.step_truncations = state.stats.step_truncations + 1
         events.truncated = true
     end
-    if isBadPoint(state.Pos) or isBadPoint(state.Vel) then
-        state.Pos = copy(state.Last)
-        state.Vel = { x = 0, y = 0, z = 0 }
-        state.Stats.nan_recoveries = state.Stats.nan_recoveries + 1
+    if isBadPoint(state.pos) or isBadPoint(state.vel) then
+        state.pos = copy(state.last)
+        state.vel = { x = 0, y = 0, z = 0 }
+        state.stats.nan_recoveries = state.stats.nan_recoveries + 1
         events.nan = true
-        events.position = copy(state.Pos)
+        events.position = copy(state.pos)
         events.phase = state.Phase
         return events
     end
-    local dx, dy, dz = state.Pos.x - state.Last.x, state.Pos.y - state.Last.y, state.Pos.z - state.Last.z
+    local dx, dy, dz = state.pos.x - state.last.x, state.pos.y - state.last.y, state.pos.z - state.last.z
     if math.sqrt(dx * dx + dy * dy + dz * dz) > driftLimit(state, dt) then
-        state.Pos = copy(state.Last)
-        state.Vel = { x = 0, y = 0, z = 0 }
-        state.Stats.drifts = state.Stats.drifts + 1
+        state.pos = copy(state.last)
+        state.vel = { x = 0, y = 0, z = 0 }
+        state.stats.drifts = state.stats.drifts + 1
         events.drift = true
-        events.position = copy(state.Pos)
+        events.position = copy(state.pos)
         events.phase = state.Phase
         return events
     end
 
-    state.Stats.frames = state.Stats.frames + 1
-    local mode = state.Profile.Mode or 'fly'
+    state.stats.frames = state.stats.frames + 1
+    local mode = state.profile.Mode or 'fly'
     local speed
     if mode == 'leap' then
         if state.Phase == 'cruise' and now >= state.next_dive_at then
             state.Phase = 'leap'
             state.phase_started_at = now
-            state.phase_ends_at = now + (state.Profile.LeapSec or state.Cfg.LeapSec)
-            state.next_dive_at = now + (state.Profile.DiveIntervalSec or state.Cfg.DiveIntervalSec)
+            state.phase_ends_at = now + (state.profile.LeapSec or state.cfg.LeapSec)
+            state.next_dive_at = now + (state.profile.DiveIntervalSec or state.cfg.DiveIntervalSec)
             events.dive = true
-            events.diveDamage = state.Profile.DiveDamage or state.Cfg.DiveDamage
-            state.Stats.dives = state.Stats.dives + 1
+            events.diveDamage = state.profile.DiveDamage or state.cfg.DiveDamage
+            state.stats.dives = state.stats.dives + 1
             speed = M.speed(state)
         elseif state.Phase == 'leap' then
             speed = updateLeap(state, dt, now, events)
@@ -250,14 +250,14 @@ function M.step(state, now, dt)
     end
 
     if speed then
-        state.Pos.x = state.Pos.x + state.Vel.x * dt
-        state.Pos.y = state.Pos.y + state.Vel.y * dt
-        state.Pos.z = state.Pos.z + state.Vel.z * dt
+        state.pos.x = state.pos.x + state.vel.x * dt
+        state.pos.y = state.pos.y + state.vel.y * dt
+        state.pos.z = state.pos.z + state.vel.z * dt
     end
 
     events.clamped = clampToBounds(state)
-    state.Last = copy(state.Pos)
-    events.position = copy(state.Pos)
+    state.last = copy(state.pos)
+    events.position = copy(state.pos)
     events.phase = state.Phase
     return events
 end
