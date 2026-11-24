@@ -8,11 +8,12 @@ local exit_code = require('tools.exit_code')
 
 local M = {}
 
-local MODES = { ['--check'] = 'check', ['--write'] = 'write', ['--update-baseline'] = 'baseline' }
+local MODES = { ['--check'] = 'check', ['--write'] = 'write', ['--update-baseline'] = 'baseline',
+  ['--infer'] = 'infer' }
 
 function M.usage()
   return table.concat({
-    '用法: lua tools/cli.lua acceptance [--check|--write|--update-baseline]',
+    '用法: lua tools/cli.lua acceptance [--check|--write|--update-baseline|--infer]',
     '',
     '把 docs/acceptance/ 的条款矩阵当账来核：分片覆盖、封闭词表、条款 ID 连续、证据路径存在、',
     '规格无工单编号、索引生成块与分片一致，以及双棘轮（已取证只增、遗留测试只减）。',
@@ -20,6 +21,8 @@ function M.usage()
     '  --check（缺省）  跑全部校验，逐条打印违反项；全绿打印计数摘要。有违反项退 1。',
     '  --write         按分片重写 README 的生成块（幂等）。',
     '  --update-baseline  把基线抬到当前值；只许 evidenced 抬、legacyTests 降，反方向退 2。',
+    '  --infer         从 spec、probes 与 evidence/*/session.md 反推「条款 → 证据路径 → 状态」，',
+    '                  与分片里手写的状态逐条比对；不一致或出现孤儿条款号退 1。',
     '',
     '退出码：0 通过 / 1 有违反项 / 2 用法错误或棘轮拒绝 / 3 关键文件不可用。',
   }, '\n') .. '\n'
@@ -142,6 +145,40 @@ local function run_baseline(root)
   return exit_code.OK
 end
 
+-- 反推报告（#326）：状态是人不再手写的第一列，迁移期拿它跟手写列逐条比对。
+local function run_infer(root)
+  local matrix = acceptance.scan(root)
+  local inferred = matrix.inference
+  local status, total = {}, 0
+  for _, shard in ipairs(matrix.shards) do
+    for _, clause in ipairs(shard.clauses) do
+      total = total + 1
+      local value = inferred.status[clause.id] or 'unverified'
+      status[value] = (status[value] or 0) + 1
+    end
+  end
+  io.stdout:write(string.format('反推：%d 条条款；evidenced %d  blocked %d  unverified %d\n',
+    total, status.evidenced or 0, status.blocked or 0, status.unverified or 0))
+  for _, item in ipairs(inferred.exceptions) do
+    io.stdout:write(string.format('  例外 %s（命中 %d 个文件）：%s\n', item.id, item.hits, item.reason))
+  end
+  local drift = acceptance.inference_drift(matrix)
+  for _, item in ipairs(drift) do
+    io.stdout:write(string.format('[inference_drift] %s:%d  %s 手写 %s，反推 %s\n',
+      item.path, item.line, item.id, item.written, item.inferred))
+  end
+  for _, item in ipairs(inferred.orphans) do
+    io.stdout:write(string.format('[orphan_clause] %s  证据文件里出现矩阵没有的条款号 %s\n',
+      item.path, item.id))
+  end
+  if #drift > 0 or #inferred.orphans > 0 then
+    io.stdout:write(string.format('\n%d 处不一致：反推覆盖不了这些条款\n', #drift + #inferred.orphans))
+    return exit_code.FAILURE
+  end
+  io.stdout:write('反推与手写状态逐条一致\n')
+  return exit_code.OK
+end
+
 function M.main(args, env)
   local opts, err = parse(args)
   if not opts then
@@ -153,7 +190,7 @@ function M.main(args, env)
     return exit_code.OK
   end
   local root = (env and env.repo_root) or '.'
-  local runner = ({ check = run_check, write = run_write, baseline = run_baseline })[opts.mode]
+  local runner = ({ check = run_check, write = run_write, baseline = run_baseline, infer = run_infer })[opts.mode]
   local ok, code = pcall(runner, root)
   if not ok then
     io.stderr:write('acceptance: ' .. tostring(code) .. '\n')
