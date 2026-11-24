@@ -24,7 +24,7 @@
 - `common.Util` 含引擎等待、通知和 `REUtil` 依赖，不是纯 foundation；它与 `REUtil` 同处 L3。
 - `common.GameCfg` 含配置解析与玩法计算，归 L4；纯配置内容归 L5 的 `common.cfg`。
 - `server.AbilityAPI` 与本图技能行为同属 L2。行为需要的 `Vitals`、`FishCarrier`、`GM`、`Modifier` 由 `server/main.lua` 通过 `AbilityAPI.BehaviorServices` 注入，行为不得反向加载宿主组合根。
-- `server.SwingRegistry` 独立持有带 TTL、一次性消费的挥砍登记，`MgrWeapon` 与 `melee_hit` 共同依赖它。时钟异常时拒绝登记与消费；失效读取、施法失败及玩家退出时清除登记，施法失败回复失败。
+- `server.SwingRegistry` 独立持有带 TTL、一次性消费的挥砍登记，`server.World.PlayerWeapon` 与 `melee_hit` 共同依赖它。时钟异常时拒绝登记与消费；失效读取、施法失败及玩家退出时清除登记，施法失败回复失败。
 - 武器持续效果由 `server/World/ModifierLeaf.lua`（经 `PlayerTree`/`PlayerEffects` 与 `entity_modifiers`）实现，近战行为与枪击不经过 `FishAbility` 转发。
 - Spoke 原生重构单向棘轮（[ADR-0032](adr/0032-spoke-native-lifecycle-architecture.md)）：`common.SpokeClock` 归 L4、`client.Store` 归 L3、`server.World` 与 `client.Views` 归 L2；新 Spoke 命名空间严禁反向 `require` `server.AbilityAPI` / `server.AbilityBehaviors` 等上层模块。`OwnedUnits`、`MgrMap`、旧客户端双轨 UI 已在 #316 删除；`OwnedUnits` 调用、旧式裸 `:Connect(`、`MgrMap` 成员三类水位均为 0，禁止恢复。
 

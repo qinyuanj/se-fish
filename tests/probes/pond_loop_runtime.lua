@@ -11,10 +11,10 @@
 --   买竿   ServerRuntime:dispatch_shop {action='Buy', itemId='starterRod', seq}
 --   抛竿   CastProbe:Cast / :Reel / :Drop           （CastAction 的处理函数）
 --   收线   ReelProbe:Accept {s, n, q}             （ReelInRE）
---   攻击   MgrWeapon:Attack                       （WeaponAction.attack）
+--   攻击   ServerRuntime.life:WeaponAction        （WeaponAction.attack）
 --   摆渡   FerryRoute:Handle {action='Board', routeId, seq}
 --   买匕首 ServerRuntime:dispatch_shop {action='Buy', number=25, seq}（钓场商店 Level1 摊位，itemKey item135）
---   装备   data:SelectWeapon('item135')（必要时 data:HoldWeapon），用 MgrWeapon:EquippedWeapon 复核
+--   装备   data:SelectWeapon('item135')（必要时 data:HoldWeapon），用 Weapon:EquippedWeapon 复核
 --   整理   data:MoveToItemBar / data:MoveSlot(from, index, target, slot)（背包/道具栏满时的合法换格）
 -- 成长：正常击杀卖鱼；空手追鱼失败时可拾免费蚯蚓喂食攒匕首（50），买到并装备后再打电鳗/鳄雀鳝。
 -- 战斗：对电鳗/鳄雀鳝先提示「绕后」站位（鱼身后 ≈range-0.8 米）并暂停；倒地/死亡只等待原地弱复活（免费），
@@ -67,8 +67,40 @@ local function findGoodsByNumber(number, level)
         if goods.Number == number and goods.MinShopLevel <= level then return goods end
     end
 end
-local MgrFishUnit = require('server.World.FishTree')
-local MgrWeapon = require('server.Mgr.MgrWeapon')
+local FishTree = require('server.World.FishTree')
+local function runtimeOf()
+    return ServerRuntime.current and ServerRuntime.current()
+end
+local function fishHost()
+    local runtime = runtimeOf()
+    return (runtime and runtime.fish_host) or FishTree
+end
+local MgrFishUnit = setmetatable({}, {
+    __index = function(_, key) return fishHost()[key] end,
+})
+local function equippedWeapon(data)
+    if not data then return nil end
+    local held = data.Extra and data.Extra.inventory and data.Extra.inventory.selection
+        and data.Extra.inventory.selection.held
+    if type(held) == 'table' and held.kind == 'weapon' and data:WeaponCount(held.id) > 0 then
+        return held.id
+    end
+    local selected = data.Data and data.Data.SelectedWeapon
+    if selected and data:WeaponCount(selected) > 0 then return selected end
+    return nil
+end
+local Weapon = {
+    EquippedWeapon = function(_, data) return equippedWeapon(data) end,
+    Attack = function(_, target)
+        local runtime = runtimeOf()
+        local life = runtime and runtime.life
+        return life and life:WeaponAction(target, { action = 'attack' }) or false
+    end,
+    Life = function()
+        local runtime = runtimeOf()
+        return runtime and runtime.life or nil
+    end,
+}
 local Ferry = ground() and ground().ferry
 
 local Task = game:GetService('Task')
@@ -183,7 +215,7 @@ local function snapshot(reason)
         'rejected=' .. c.rejected, 'unsettled=' .. c.unsettled, 'cast=' .. c.cast,
         'hooked=' .. c.hooked, 'landed=' .. c.landed, 'dropped=' .. c.dropped, 'attacks=' .. c.attacks,
         'ended=' .. c.kills, 'moves=' .. c.moves, 'deaths=' .. c.deaths, 'flanks=' .. c.flanks,
-        'dagger=' .. data:WeaponCount(DAGGER.Id), 'equipped=' .. tostring(MgrWeapon:EquippedWeapon(data)),
+        'dagger=' .. data:WeaponCount(DAGGER.Id), 'equipped=' .. tostring(Weapon:EquippedWeapon(data)),
         RT.legacy and ('legacy{feedTry=' .. RT.legacy.feedTry .. ' buyTry=' .. RT.legacy.buyTry
             .. ' daggerTries=' .. RT.legacy.daggerTries .. ' 未确认}') or 'legacy=none')
 end
@@ -495,16 +527,16 @@ end
 
 -- 装备匕首：SelectWeapon 是开关，只在未选中时调；EquippedWeapon 复核，被别的手持武器压住时才用 HoldWeapon 切换
 local function equipDagger(data)
-    if MgrWeapon:EquippedWeapon(data) == DAGGER.Id then return true end
+    if Weapon:EquippedWeapon(data) == DAGGER.Id then return true end
     if data.Data.SelectedWeapon ~= DAGGER.Id then data:SelectWeapon(DAGGER.Id) end
-    if MgrWeapon:EquippedWeapon(data) ~= DAGGER.Id then
+    if Weapon:EquippedWeapon(data) ~= DAGGER.Id then
         local held = data.Extra.inventory.selection.held
         if held.kind == 'weapon' and held.id ~= DAGGER.Id then data:HoldWeapon(DAGGER.Id) end
     end
-    MgrPlayerData:SendItemBar(player)
-    local ok = MgrWeapon:EquippedWeapon(data) == DAGGER.Id
+    MgrPlayerData:SendItemBar(player, true)
+    local ok = Weapon:EquippedWeapon(data) == DAGGER.Id
     RT.counts.dagger = RT.counts.dagger + 1
-    say('EQUIP', DAGGER.Id, 'equipped=' .. tostring(MgrWeapon:EquippedWeapon(data)), 'ok=' .. tostring(ok))
+    say('EQUIP', DAGGER.Id, 'equipped=' .. tostring(Weapon:EquippedWeapon(data)), 'ok=' .. tostring(ok))
     return ok
 end
 
@@ -521,7 +553,7 @@ local function validate(data)
     need('CastProbe.Sessions', type(CastProbe.Sessions) == 'table')
     fn('ReelProbe:', ReelProbe, 'Accept')
     need('MgrFishUnit.Fish', type(MgrFishUnit.Fish) == 'table')
-    fn('MgrWeapon:', MgrWeapon, 'Attack') fn('MgrWeapon:', MgrWeapon, 'EquippedWeapon')
+    fn('Weapon:', Weapon, 'Attack') fn('Weapon:', Weapon, 'EquippedWeapon')
     fn('FerryRoute:', Ferry, 'Handle')
     need('FerryRoute.LastSeq', type(Ferry.LastSeq) == 'table')
     for _, name in ipairs({ 'SelectSlot', 'SelectBait', 'SelectWeapon', 'HoldWeapon', 'MoveSlot', 'MoveToItemBar',
@@ -538,8 +570,8 @@ local function validate(data)
     need('商店编号 25 = item135', goods and goods.ItemId == DAGGER.Id and type(goods.Price) == 'number')
     need('GameCfg.Ability.MeleeWeapons.item135', GameCfg.Ability.MeleeWeapons and GameCfg.Ability.MeleeWeapons[DAGGER.Id] ~= nil)
     need('GameCfg.Ability.Unarmed', GameCfg.Ability.Unarmed ~= nil)
-    local vitals = MgrWeapon.Vitals
-    need('MgrWeapon.Vitals:LifeStatus/CanAct', vitals and type(vitals.LifeStatus) == 'function' and type(vitals.CanAct) == 'function')
+    local vitals = Weapon.Life()
+    need('ServerRuntime.life:LifeStatus/CanAct', vitals and type(vitals.LifeStatus) == 'function' and type(vitals.CanAct) == 'function')
     if #missing > 0 then
         say('CHECK-FAIL', table.concat(missing, ' | '))
         return false
@@ -616,9 +648,9 @@ local function myFish()
     return held, live or prey
 end
 
--- 当前武器射程/间隔（与 MgrWeapon.AttackMelee 同表）
+-- 当前武器射程/间隔（与 PlayerWeapon 近战攻击同表）
 local function weaponStats(data)
-    local id = MgrWeapon:EquippedWeapon(data)
+    local id = Weapon:EquippedWeapon(data)
     local mcfg = id and GameCfg.Ability.MeleeWeapons[id] or GameCfg.Ability.Unarmed
     return mcfg.Range, mcfg.IntervalSec
 end
@@ -698,7 +730,7 @@ local function step()
 
     -- 死亡免费恢复：倒地 15s → 死亡 30s → 原地弱复活（10% 血、半速）。只等待，不治疗不传送；
     -- 复活后继续正常拾饵、喂食；饥饿仍为零时静等会再次饿死，不用等待代替恢复。
-    local vitals = MgrWeapon.Vitals
+    local vitals = Weapon.Life()
     local life = vitals and vitals:LifeStatus(player) or 'alive'
     if life == 'downed' or life == 'dead' then
         if not RT.lifeSince then
@@ -733,7 +765,7 @@ local function step()
             if combatFish then return 'wait', 0.5 end
             return pickBait()
         end
-        local v = MgrPlayerData.Vitals
+        local v = MgrPlayerData.Vitals or Weapon.Life()
         if v:CanEat(player, 'worm') and data:EatBait('worm') then
             v:Eat(player, 'worm')
             MgrPlayerData:SendItemBar(player)
@@ -777,7 +809,7 @@ local function step()
         local target = isTarget(held.FishId)
         if target and type(hunger) == 'number' and hunger < 180 then
             if worms(data) < 1 then return pickBait() end
-            local v = MgrPlayerData.Vitals
+            local v = MgrPlayerData.Vitals or Weapon.Life()
             if v:CanEat(player, 'worm') and data:EatBait('worm') then
                 v:Eat(player, 'worm')
                 MgrPlayerData:SendItemBar(player)
@@ -796,9 +828,9 @@ local function step()
         end
         -- 普通鱼放下即逃（EscapeSec 很短）：不等，立刻挥击，击杀掉落整鱼卖钱攒匕首
         RT.counts.dropped = RT.counts.dropped + 1
-        say('DROP', 'prey', held.FishId, 'weapon=' .. tostring(MgrWeapon:EquippedWeapon(data)))
+        say('DROP', 'prey', held.FishId, 'weapon=' .. tostring(Weapon:EquippedWeapon(data)))
         RT.counts.attacks = RT.counts.attacks + 1
-        MgrWeapon:Attack(player)
+        Weapon:Attack(player)
         return 'wait', 0.3
     end
     if live then
@@ -841,7 +873,7 @@ local function step()
         end
         if not dist or dist <= range + 1.5 then
             RT.counts.attacks = RT.counts.attacks + 1
-            MgrWeapon:Attack(player)
+            Weapon:Attack(player)
         elseif isBoss and now() - RT.combatSince > 5 then
             say('COMBAT', live.FishId, 'state=' .. tostring(live.State), 'dist=' .. fmt(dist),
                 'fish@' .. fmt(p.x) .. ',' .. fmt(p.z))
