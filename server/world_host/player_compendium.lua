@@ -3,7 +3,7 @@ local FishCatch = require('common.fish_catch')
 local Records = require('common.records')
 local SignalRouter = require('server.world_host.world_signal_router')
 
-local Mgr = { Queues = {}, LastSeq = {}, KIND = 'compendium-land', MaxQueue = 16 }
+local Mgr = { Queues = {}, LastSeq = {}, KIND = 'compendium-land', max_queue = 16 }
 local isValidPlayer = SignalRouter.is_valid_player
 
 local function copy(value)
@@ -77,7 +77,7 @@ function Mgr:record_landing(player, event)
     for _, queued in ipairs(queue.events) do
         if queued.reelSerial == event.reelSerial then return false, 'duplicate' end
     end
-    if #queue.events >= self.MaxQueue then return false, 'busy' end
+    if #queue.events >= self.max_queue then return false, 'busy' end
     queue.events[#queue.events + 1] = { reelSerial = event.reelSerial,
         fishId = event.fishId, mult = event.mult }
     local mode = self:drain(player)

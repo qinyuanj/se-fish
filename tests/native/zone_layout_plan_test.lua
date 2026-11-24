@@ -20,7 +20,7 @@ describe('#164 场景标记读取合同', function()
     assert.are.equal(6, #cfg.Ferry.Routes)
     for index, zone in ipairs(cfg.Zones) do
       assert.are.equal('resolved', zone.Scene.State)
-      assert.are.equal(index == 1 and 5 or 2, #zone.Scene.BaitSpots.Positions)
+      assert.are.equal(index == 1 and 5 or 2, #zone.Scene.BaitSpots.positions)
       assert.is_true(#zone.Scene.Waters > 0)
       assert.is_nil(zone.Scene.land)
       for _, water in ipairs(zone.Scene.Waters) do

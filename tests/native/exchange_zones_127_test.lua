@@ -160,7 +160,7 @@ describe("TestExchangeZones", function()
     for index, chain in ipairs(t.cfg.Content.Exchanges) do
       local npc = t.cfg.Interact.Fishermen[index]
       assert.are.equal(chain.ZoneId, npc.ZoneId)
-      assert.same({ t.cfg.Zones[index].Scene.FishermanName }, npc.AnchorNames)
+      assert.same({ t.cfg.Zones[index].Scene.fisherman_name }, npc.AnchorNames)
       assert.are.equal(chain.BossBait, npc.Exchange[chain.EliteToken])
       assert.are.equal(chain.Result, npc.Exchange[chain.BossToken])
       -- 串区自检：本区链恰好两条，且不含别区信物

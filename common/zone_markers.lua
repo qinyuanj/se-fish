@@ -58,17 +58,17 @@ local function catalog(world)
         table.sort(waters, function(first, second)
             return waterOrder(first.Name, prefix) < waterOrder(second.Name, prefix)
         end)
-        zones[index] = { Name = zoneName, ByName = byName, Waters = waters }
+        zones[index] = { Name = zoneName, by_name = byName, Waters = waters }
     end
     return {
         Zones = zones,
         Unit = function(zoneIndex, name)
             unique(name)
-            local unit = zones[zoneIndex].ByName[name]
+            local unit = zones[zoneIndex].by_name[name]
             if not unit then error('区域标记不在所属区: ' .. zoneNames[zoneIndex] .. '/' .. name) end
             return unit
         end,
-        Unique = unique,
+        unique = unique,
     }
 end
 
@@ -96,10 +96,10 @@ local function boundary(markers, zoneIndex, maxFlightHeight)
     return {
         MinX = west.Position.x, MaxX = east.Position.x,
         MinZ = south.Position.z, MaxZ = north.Position.z,
-        BottomY = bottom, TopY = top,
-        MaxFlightHeight = maxFlightHeight,
-        CanClimb = false,
-        EntityNames = { prefix .. 'West', prefix .. 'East', prefix .. 'South', prefix .. 'North' },
+        bottom_y = bottom, top_y = top,
+        max_flight_height = maxFlightHeight,
+        can_climb = false,
+        entity_names = { prefix .. 'West', prefix .. 'East', prefix .. 'South', prefix .. 'North' },
     }
 end
 
@@ -121,7 +121,7 @@ function ZoneMarkers.contract(cfg)
     cfg = cfg or GameCfg
     local entries = {}
     local function add(zoneIndex, role, name)
-        entries[#entries + 1] = { ZoneIndex = zoneIndex, Role = role, Name = name }
+        entries[#entries + 1] = { zone_index = zoneIndex, role = role, Name = name }
     end
     for index = 1, #cfg.Zones do
         local prefix = 'Z' .. index .. '_'
@@ -149,33 +149,33 @@ local function resolveZone(markers, cfg, index, snapshot)
     local scene = {
         State = 'resolved', Entities = {}, Waters = {},
         Boundary = boundary(markers, index, cfg.Ability.Flight.MaxHeight),
-        BaitSpots = { ItemId = zone.BaitItemId, RespawnSec = 15, Count = 1, Positions = {} },
+        BaitSpots = { ItemId = zone.BaitItemId, RespawnSec = 15, Count = 1, positions = {} },
     }
     local function point(role, name)
         local position = vector(markers.Unit(index, name).Position, '坐标', name)
         if not inside(scene.Boundary, position) then
             error('区域标记越出本区边界: ' .. zoneName .. '/' .. name)
         end
-        scene.Entities[#scene.Entities + 1] = { Name = name, Role = role, Position = position, State = 'observed' }
+        scene.Entities[#scene.Entities + 1] = { Name = name, role = role, Position = position, State = 'observed' }
         return position
     end
-    scene.SafePointName = prefix .. 'Safe'
-    scene.SafePoint = point('Safe', scene.SafePointName)
-    scene.FishermanName = cfg.Interact.Fishermen[index].AnchorNames[1]
-    point('Fisherman', scene.FishermanName)
-    scene.ShopName = cfg.Shop.Stands[index].AnchorName
-    point('Shop', scene.ShopName)
-    scene.LotteryName = prefix .. 'Lottery'
-    point('Lottery', scene.LotteryName)
+    scene.safe_point_name = prefix .. 'Safe'
+    scene.SafePoint = point('Safe', scene.safe_point_name)
+    scene.fisherman_name = cfg.Interact.Fishermen[index].AnchorNames[1]
+    point('Fisherman', scene.fisherman_name)
+    scene.shop_name = cfg.Shop.Stands[index].AnchorName
+    point('Shop', scene.shop_name)
+    scene.lottery_name = prefix .. 'Lottery'
+    point('Lottery', scene.lottery_name)
     if index >= 3 then
-        scene.GrillName = prefix .. 'Grill'
-        point('Grill', scene.GrillName)
+        scene.grill_name = prefix .. 'Grill'
+        point('Grill', scene.grill_name)
     end
     for baitIndex = 1, index == 1 and 5 or 2 do
         local name = prefix .. 'Bait' .. baitIndex
         local position = point('Bait' .. baitIndex, name)
         scene['Bait' .. baitIndex .. 'Name'] = name
-        scene.BaitSpots.Positions[#scene.BaitSpots.Positions + 1] = position
+        scene.BaitSpots.positions[#scene.BaitSpots.positions + 1] = position
         snapshot.BaitSpots[#snapshot.BaitSpots + 1] = {
             Id = zone.Id .. ':bait-' .. baitIndex, ItemId = zone.BaitItemId,
             Count = 1, Position = position, ZoneId = zone.Id,
@@ -187,32 +187,32 @@ local function resolveZone(markers, cfg, index, snapshot)
     if not casting then error('区域抽鱼池缺失: ' .. zone.Id) end
     for waterIndex, unit in ipairs(waterUnits) do
         local name = unit.Name
-        markers.Unique(name)
+        markers.unique(name)
         local center = vector(unit.Position, '坐标', name)
         local size = sizeOf(unit, name)
         local water = {
             Id = waterIndex == 1 and zone.WaterId or (zone.WaterId .. '.' .. waterIndex),
-            ZoneId = zone.Id, EntityName = name,
+            ZoneId = zone.Id, entity_name = name,
             Center = center, HalfX = size.x / 2, HalfZ = size.z / 2,
             SurfaceY = center.y + size.y,
         }
         for _, other in ipairs(snapshot.Waters) do
-            if overlaps(water, other) then error('区域水域重叠: ' .. name .. ' / ' .. other.EntityName) end
+            if overlaps(water, other) then error('区域水域重叠: ' .. name .. ' / ' .. other.entity_name) end
         end
         if not inside(scene.Boundary, center) then error('区域水域越出本区边界: ' .. name) end
         scene.Waters[#scene.Waters + 1] = water
-        scene.Entities[#scene.Entities + 1] = { Name = name, Role = 'Water', Position = center, State = 'observed' }
+        scene.Entities[#scene.Entities + 1] = { Name = name, role = 'Water', Position = center, State = 'observed' }
         snapshot.Waters[#snapshot.Waters + 1] = water
         snapshot.ZoneIdByWater[water.Id] = zone.Id
         snapshot.Casting[water.Id] = casting
     end
     if index == 6 then
-        scene.AirCombat = {
-            MinY = 5, MaxY = 30, Radius = 35, Center = copyPoint(scene.SafePoint),
+        scene.air_combat = {
+            min_y = 5, max_y = 30, Radius = 35, Center = copyPoint(scene.SafePoint),
         }
     elseif index == 7 then
-        scene.CruiseWater = scene.Waters[1]
-        scene.BossArena = { Center = copyPoint(scene.SafePoint), HalfX = 30, HalfZ = 25 }
+        scene.cruise_water = scene.Waters[1]
+        scene.boss_arena = { Center = copyPoint(scene.SafePoint), HalfX = 30, HalfZ = 25 }
     end
     snapshot.Zones[zone.Id] = scene
     snapshot.ContentWaterIds[zone.WaterId] = zone.Id
@@ -234,13 +234,13 @@ function ZoneMarkers.resolve(world, config)
         local returning = vector(markers.Unit(index + 1, backName).Position, '坐标', backName)
         if not inside(snapshot.Zones[from.Id].Boundary, outbound) then error('区域标记越出本区边界: ' .. outName) end
         if not inside(snapshot.Zones[to.Id].Boundary, returning) then error('区域标记越出本区边界: ' .. backName) end
-        routes[index] = { OutName = outName, BackName = backName, Outbound = outbound, Returning = returning }
+        routes[index] = { out_name = outName, back_name = backName, Outbound = outbound, returning = returning }
     end
     for index, route in ipairs(routes) do
         local fromScene = snapshot.Zones[cfg.Zones[index].Id]
         local toScene = snapshot.Zones[cfg.Zones[index + 1].Id]
-        fromScene.Entities[#fromScene.Entities + 1] = { Name = route.OutName, Role = 'Ferry', Position = route.Outbound, State = 'observed' }
-        toScene.Entities[#toScene.Entities + 1] = { Name = route.BackName, Role = 'Ferry', Position = route.Returning, State = 'observed' }
+        fromScene.Entities[#fromScene.Entities + 1] = { Name = route.out_name, role = 'Ferry', Position = route.Outbound, State = 'observed' }
+        toScene.Entities[#toScene.Entities + 1] = { Name = route.back_name, role = 'Ferry', Position = route.returning, State = 'observed' }
     end
 
     for _, route in ipairs(cfg.Ferry.Routes) do
@@ -256,16 +256,16 @@ function ZoneMarkers.resolve(world, config)
     local fallback = snapshot.Zones[cfg.Zones[1].Id].Boundary
     cfg.Ability.Flight.FallbackBounds = {
         MinX = fallback.MinX, MaxX = fallback.MaxX, MinZ = fallback.MinZ, MaxZ = fallback.MaxZ,
-        BottomY = fallback.BottomY, TopY = fallback.TopY, MaxFlightHeight = fallback.MaxFlightHeight,
+        bottom_y = fallback.bottom_y, top_y = fallback.top_y, max_flight_height = fallback.max_flight_height,
     }
-    snapshot.FerryRoutes = {}
+    snapshot.ferry_routes = {}
     for index, route in ipairs(cfg.Ferry.Routes) do
-        snapshot.FerryRoutes[index] = {
+        snapshot.ferry_routes[index] = {
             State = 'resolved', FromZoneId = route.FromZoneId, ToZoneId = route.ToZoneId,
             Outbound = route.Outbound, Return = route.Return,
         }
     end
-    cfg.Ferry.PlannedRoutes = snapshot.FerryRoutes
+    cfg.Ferry.planned_routes = snapshot.ferry_routes
     snapshot.Ready = true
     ZoneMarkers.Ready, ZoneMarkers.Zones = true, snapshot.Zones
     return snapshot
@@ -282,7 +282,7 @@ function ZoneMarkers.start()
     end
     if not ok then error(snapshot, 0) end
     print('[ZoneMarkers] ready', 'waters=' .. #snapshot.Waters, 'baits=' .. #snapshot.BaitSpots,
-        'routes=' .. #snapshot.FerryRoutes, 'waitedSec=' .. waited)
+        'routes=' .. #snapshot.ferry_routes, 'waitedSec=' .. waited)
     return snapshot
 end
 

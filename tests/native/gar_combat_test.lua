@@ -172,7 +172,7 @@ describe('TestGarCombat', function()
         env.now = 300
         env.mgr:update()
         assert.are.equal('escaping', fish.State)
-        assert.is_true(fish.StraightEscape)
+        assert.is_true(fish.straight_escape)
         -- 直线逃脱朝最近的拼接水区 PondSouth_7_1（中心 11.5,-26.5），从 (10,-18) 朝南。
         assert.is_true(fish.Carrier.Body.LinearVelocity.z < 0)
     end)
@@ -263,7 +263,7 @@ describe('TestGarCombat', function()
         env.downed[env.other] = true
         env.mgr:update()
         assert.is_true(body.LinearVelocity.x > 0)
-        assert.is_nil(fish.TargetOverride)
+        assert.is_nil(fish.target_override)
         env.downed[env.player] = true
         env.downed[env.other] = false
         env.mgr:update()

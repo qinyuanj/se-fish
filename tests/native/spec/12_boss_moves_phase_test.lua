@@ -144,7 +144,7 @@ describe('第 12 节 阶段与复合组（沧龙 / 哥斯拉）', function()
         env:advance(15.1)
         env:advance(17.6)
         assert.is_not_nil(fish.Carry, '咬中后没有叼走玩家')
-        assert.same(peer, fish.Carry.TargetPlayer, '叼走的不是离岛中心最近的玩家')
+        assert.same(peer, fish.Carry.target_player, '叼走的不是离岛中心最近的玩家')
         assert.same(100000, health(), '没有目标资格的岸边玩家被错伤')
         assert.same(100000 - 35 - 300, peer.Character.Controller.Health)
         local MathWater = require('common.math_water_judge')
@@ -202,14 +202,14 @@ describe('第 12 节 阶段与复合组（沧龙 / 哥斯拉）', function()
         env.player.Character.Position = env.vec(p.x, p.y, p.z + 2)
         env:advance(1.98)
         local before = 0
-        for _, attack in ipairs(fish.Phase.AttackLog) do
+        for _, attack in ipairs(fish.Phase.attack_log) do
             if attack.Name == 'claw' then before = before + 1 end
         end
         fish.Carrier.Health = 14000 -- 56%：与 2 秒到期的爪击同一帧跌破 60%
         env:advance(2.02)
         assert.same('water', fish.Phase.Phase, '阈值没有在同一帧生效')
         local after = 0
-        for _, attack in ipairs(fish.Phase.AttackLog) do
+        for _, attack in ipairs(fish.Phase.attack_log) do
             if attack.Name == 'claw' then after = after + 1 end
         end
         assert.same(before, after, '切阶段的同一帧仍落了普通招式')

@@ -221,8 +221,8 @@ function MainHudActionButtonsView.mount(s, ctx, options)
     or compute_layout(resolution, ctx.store.item_bar:now())
 
   -- 1. 创建 ItemDiscard / ItemAction2 按钮与同级高 ZOrder 文案标签（全部由 ctx.create_node 托管）
-  local btn_discard = make_button(ctx, s, "ItemDiscard", initial_layout.Rects.Discard)
-  local label_discard = make_label(ctx, s, "BtnDiscardLabel", initial_layout.Rects.Discard, "丢弃选中物")
+  local btn_discard = make_button(ctx, s, "ItemDiscard", initial_layout.Rects.discard)
+  local label_discard = make_label(ctx, s, "BtnDiscardLabel", initial_layout.Rects.discard, "丢弃选中物")
   local btn_action = make_button(ctx, s, "ItemAction2", initial_layout.Rects.ItemAction)
   local label_action = make_label(ctx, s, "BtnItemActionLabel", initial_layout.Rects.ItemAction, "抛竿")
 
@@ -362,8 +362,8 @@ function MainHudActionButtonsView.mount(s, ctx, options)
     local layout = es:d(layout_sig) or compute_layout(resolution, item_bar)
     local reel_flag = reel_active_sig ~= nil and (es:d(reel_active_sig) == true) or is_reel_active_fn(cast) == true
 
-    place(btn_discard, layout.Rects.Discard)
-    place(label_discard, layout.Rects.Discard)
+    place(btn_discard, layout.Rects.discard)
+    place(label_discard, layout.Rects.discard)
     place(btn_action, layout.Rects.ItemAction)
     place(label_action, layout.Rects.ItemAction)
 

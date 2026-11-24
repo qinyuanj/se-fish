@@ -112,8 +112,8 @@ function AttrBridge:apply_body_scale(player)
         Error = not ok and tostring(derivedOrErr) or nil,
         Scale = scale,
         Health = tree.memos.max_health:now(),
-        Capped = capped,
-        Derived = ok and derivedOrErr or tree.memos.body_derived:now(),
+        capped = capped,
+        derived = ok and derivedOrErr or tree.memos.body_derived:now(),
     }
 end
 function AttrBridge:apply_growth(player)

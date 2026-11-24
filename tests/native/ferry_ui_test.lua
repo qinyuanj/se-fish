@@ -42,7 +42,7 @@ describe('客户端摆渡统一视图树（RootView × ClientStore）', function
     env.anchor_positions = {}
     for _, zone in ipairs(env.cfg.Zones) do
       for _, entity in ipairs(zone.Scene.Entities) do
-        if entity.Role == 'Ferry' then env.anchor_positions[entity.Name] = entity.Position end
+        if entity.role == 'Ferry' then env.anchor_positions[entity.Name] = entity.Position end
       end
     end
     local ClientStore = require('client.store.client_store')

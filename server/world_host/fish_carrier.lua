@@ -7,11 +7,11 @@ local Mgr = {}
 
 Mgr.RECEIVER_NAME = "FishHitReceiver"
 Mgr.BODY_NAME_PREFIX = "FishCarrier"
-Mgr.BodySeq = 0
+Mgr.body_seq = 0
 
 Mgr.DEFAULT_MAX_HEALTH = 100
 
-Mgr.Carriers = {}
+Mgr.carriers = {}
 Mgr.Subscribers = {}
 
 
@@ -39,15 +39,15 @@ local function resolveMesh(opts, cfg)
 	if cfg.RenderMeshId and cfg.RenderMeshId ~= "" then
 		return cfg.RenderMeshId
 	end
-	local id = (opts and opts.ModelId) or cfg.ModelId
+	local id = (opts and opts.model_id) or cfg.model_id
 	if id ~= nil and id ~= "" then
 		return "official://mesh/" .. tostring(id)
 	end
 	return nil
 end
 
-Mgr.ResolveMaxHealth = resolveMaxHealth
-Mgr.ResolveMesh = resolveMesh
+Mgr.resolve_max_health = resolveMaxHealth
+Mgr.resolve_mesh = resolveMesh
 
 
 local function readPosition(unit)
@@ -67,7 +67,7 @@ local function readPosition(unit)
 end
 
 local function syncReceiver(carrier, targetPosition)
-	if carrier.AiOwnsMovement then return end
+	if carrier.ai_owns_movement then return end
 	local body = carrier.Body
 	local receiver = carrier.Receiver
 	if not body or not receiver then
@@ -78,7 +78,7 @@ local function syncReceiver(carrier, targetPosition)
 	if not ok or not pos then
 		return
 	end
-	carrier.LastPosition = { x = pos.x, y = pos.y, z = pos.z }
+	carrier.last_position = { x = pos.x, y = pos.y, z = pos.z }
 	pcall(function()
 		if receiver.SetPosition then
 			receiver:SetPosition(pos + carrier.ReceiverOffset)
@@ -110,12 +110,12 @@ function Mgr:unsubscribe_died(fn)
 end
 
 function Mgr:sync_position(carrier, targetPosition)
-	carrier.SkipNextAutoSync = targetPosition ~= nil
+	carrier.skip_next_auto_sync = targetPosition ~= nil
 	syncReceiver(carrier, targetPosition)
 end
 
 function Mgr:sync_ai_position(carrier)
-	if not carrier or not carrier.AiOwnsMovement then return true end
+	if not carrier or not carrier.ai_owns_movement then return true end
 	local ok, err = pcall(function()
 		local p = carrier.Receiver.Position
 		for _, key in ipairs({ 'x', 'y', 'z' }) do
@@ -127,7 +127,7 @@ function Mgr:sync_ai_position(carrier)
 		carrier.Body.LinearVelocity = Vector3.New(0, 0, 0)
 	end)
 	if not ok then
-		carrier.AiOwnsMovement = false
+		carrier.ai_owns_movement = false
 		print('[FishCarrier] operation=SyncAiPosition', carrier.Body and carrier.Body.UnitId, tostring(err))
 	end
 	return ok
@@ -146,9 +146,9 @@ function Mgr:record_health(carrier)
 		local positionOk, currentPosition = pcall(readPosition, carrier.Body)
 		if positionOk then position = currentPosition end
 	end
-	if not position then position = carrier.LastPosition end
+	if not position then position = carrier.last_position end
 	carrier.Health = health
-	if position then carrier.LastPosition = { x = position.x, y = position.y, z = position.z } end
+	if position then carrier.last_position = { x = position.x, y = position.y, z = position.z } end
 	if carrier.Body and carrier.Body.UnitId and previous and health < previous then
 		if position then
 			local heightOk, size = pcall(function() return carrier.Body.Size end)
@@ -187,7 +187,7 @@ end
 
 function Mgr:resolve_carrier(target)
     if not target then return nil end
-    for _, carrier in pairs(self.Carriers) do
+    for _, carrier in pairs(self.carriers) do
         if target == carrier or target == carrier.Body or target == carrier.Receiver
             or target.Carrier == carrier then
             return carrier
@@ -243,17 +243,17 @@ function Mgr:attach(body, opts)
 		FishId = opts.FishId,
 		Player = opts.Player,
 		ReceiverOffset = opts.ReceiverOffset or Vector3.New(0, 0, 0),
-		LastPosition = { x = pos.x, y = pos.y, z = pos.z },
+		last_position = { x = pos.x, y = pos.y, z = pos.z },
 		Dead = false,
 	}
 
-	carrier.HealthConn = controller.HealthChanged:Connect(function()
+	carrier.health_conn = controller.HealthChanged:Connect(function()
 		Mgr:record_health(carrier)
 		if carrier.Health <= 0 then
 			Mgr:notify_died(carrier)
 		end
 	end)
-	carrier.DiedConn = controller.Died:Connect(function()
+	carrier.died_conn = controller.Died:Connect(function()
 		Mgr:notify_died(carrier)
 	end)
 
@@ -261,7 +261,7 @@ function Mgr:attach(body, opts)
 		pcall(body.AddNoCollisionPairWithUnit, body, receiver)
 	end
 
-	self.Carriers[body.UnitId] = carrier
+	self.carriers[body.UnitId] = carrier
 	return carrier
 end
 
@@ -285,9 +285,9 @@ function Mgr:spawn(opts)
 	local cfg = GameCfg.FishCarrier or {}
 	local species = GameCfg.Fish[opts.FishId]
 	local tint = species and species.VisualColor
-	Mgr.BodySeq = Mgr.BodySeq + 1
+	Mgr.body_seq = Mgr.body_seq + 1
 	local values = {
-		Name = Mgr.BODY_NAME_PREFIX .. "_" .. tostring(Mgr.BodySeq) .. "_" .. tostring(opts.FishId or "unknown"),
+		Name = Mgr.BODY_NAME_PREFIX .. "_" .. tostring(Mgr.body_seq) .. "_" .. tostring(opts.FishId or "unknown"),
 		Position = opts.Position or Vector3.New(0, 0, 0),
 		Rotation = opts.Rotation or Quaternion.FromEulerAngles(0, 0, 0),
 		RenderMeshId = mesh,
@@ -360,14 +360,14 @@ function Mgr:despawn(carrier)
 	if not carrier then
 		return
 	end
-	if carrier.HealthConn then
-		carrier.HealthConn:Disconnect()
+	if carrier.health_conn then
+		carrier.health_conn:Disconnect()
 	end
-	if carrier.DiedConn then
-		carrier.DiedConn:Disconnect()
+	if carrier.died_conn then
+		carrier.died_conn:Disconnect()
 	end
 	if carrier.Body and carrier.Body.UnitId then
-		self.Carriers[carrier.Body.UnitId] = nil
+		self.carriers[carrier.Body.UnitId] = nil
 	end
 	pcall(function()
 		if carrier.Receiver then
@@ -394,8 +394,8 @@ function Mgr:on_player_removing(player)
 end
 
 function Mgr:update(deltaTime)
-	for _, carrier in pairs(self.Carriers) do
-		if carrier.SkipNextAutoSync then carrier.SkipNextAutoSync = nil
+	for _, carrier in pairs(self.carriers) do
+		if carrier.skip_next_auto_sync then carrier.skip_next_auto_sync = nil
 		else syncReceiver(carrier) end
 	end
 end

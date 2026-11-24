@@ -124,8 +124,8 @@ describe('虾池最小内容（水区 / 鱼表 / 商店 / 钓鱼佬 / 抛竿）'
     local scene = env.cfg.Zones[2].Scene
     assert.same('resolved', scene.State)
     assert.same({ MinX = 180, MaxX = 300, MinZ = -70, MaxZ = 50,
-      BottomY = -30, TopY = 40, MaxFlightHeight = 20, CanClimb = false,
-      EntityNames = scene.Boundary.EntityNames }, scene.Boundary)
+      bottom_y = -30, top_y = 40, max_flight_height = 20, can_climb = false,
+      entity_names = scene.Boundary.entity_names }, scene.Boundary)
     assert.same({ x = 240, y = 6, z = 30.5 }, scene.SafePoint)
     local positions = {}
     for _, entity in ipairs(scene.Entities) do positions[entity.Name] = entity.Position end
@@ -137,7 +137,7 @@ describe('虾池最小内容（水区 / 鱼表 / 商店 / 钓鱼佬 / 抛竿）'
     assert.same({ x = 215, y = 6, z = 40.5 }, positions.Z2_FerryOut)
     assert.same({ x = 265, y = 6, z = 40.5 }, positions.FerryReturn)
     assert.is_nil(scene.LandName)
-    assert.same('Z2_Water1', scene.Waters[1].EntityName)
+    assert.same('Z2_Water1', scene.Waters[1].entity_name)
     assert.same({ x = 240, y = 2, z = -44 }, scene.Waters[1].Center)
     assert.same(40, scene.Waters[1].HalfX)
     assert.same(12, scene.Waters[1].HalfZ)

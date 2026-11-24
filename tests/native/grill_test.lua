@@ -44,9 +44,9 @@ describe("烧烤配置对齐策划案", function()
     it("test_anchors_cover_zones_three_to_seven", function()
         for index, zone in ipairs(GameCfg.Zones) do
             if index >= 3 then
-                assert.is_not_nil(zone.Scene.GrillName)
+                assert.is_not_nil(zone.Scene.grill_name)
             else
-                assert.is_nil(zone.Scene.GrillName)
+                assert.is_nil(zone.Scene.grill_name)
             end
         end
     end)

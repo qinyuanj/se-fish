@@ -1,4 +1,4 @@
-local GarBiteNotice = { EventName = 'GarBiteNotice' }
+local GarBiteNotice = { event_name = 'GarBiteNotice' }
 
 local function finite(v)
     return type(v) == 'number' and v == v and math.abs(v) < math.huge
@@ -29,7 +29,7 @@ function GarBiteNotice.valid(payload)
 end
 
 function GarBiteNotice.publish(payload)
-    require('common.re_util'):get_re(GarBiteNotice.EventName):FireAllClients(payload)
+    require('common.re_util'):get_re(GarBiteNotice.event_name):FireAllClients(payload)
 end
 
 return GarBiteNotice

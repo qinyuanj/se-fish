@@ -288,7 +288,7 @@ describe('第 6 节 官方 AI 目标选择接线（哥斯拉贯通）', function
 
         env.rival.Character.Controller.Died:Fire()
         env:advance(0.6)
-        assert.is_nil(fish.TargetOverride)
+        assert.is_nil(fish.target_override)
         assert.same(env.player.Character, officialFocus(fish), '指定目标失效后没有回到自动目标')
     end)
 
@@ -299,7 +299,7 @@ describe('第 6 节 官方 AI 目标选择接线（哥斯拉贯通）', function
         local adapter = require('server.world_host.fish_ai_target')
         local state = adapter:state(fish)
         assert.is_nil(state and state.modeName, '官方 AI 启动了移动模式，与自研轨迹双写权威')
-        assert.is_not_true(fish.Carrier.AiOwnsMovement, '受击体的移动所有权被官方 AI 接管')
+        assert.is_not_true(fish.Carrier.ai_owns_movement, '受击体的移动所有权被官方 AI 接管')
         local pos = fish.Carrier.Body.Position
         place(fish, env.player, 2)
         env:advance(0.2)

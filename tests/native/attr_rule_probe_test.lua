@@ -69,7 +69,7 @@ describe("TestAttrRuleProbe", function()
     local context = fixture({ destroyError = true })
     local report = Probe.run(context)
     assert.is_false(report.Ok)
-    assert.is_false(report.Cleaned)
+    assert.is_false(report.cleaned)
     assert.matches('清理失败', report.Error, 1, true)
   end)
 
@@ -79,7 +79,7 @@ describe("TestAttrRuleProbe", function()
     local report = Probe.run(context)
     assert.is_false(report.Ok)
     assert.matches('拒绝污染', report.Error, 1, true)
-    assert.is_true(report.Cleaned)
+    assert.is_true(report.cleaned)
   end)
 
   -- 失败清理：日志回调中途抛错，探针仍要报失败并把已创建的单位清干净。
@@ -94,7 +94,7 @@ describe("TestAttrRuleProbe", function()
       local report = Probe.run(context)
       assert.is_false(report.Ok)
       assert.matches('日志回调失败', report.Error, 1, true)
-      assert.is_true(report.Cleaned)
+      assert.is_true(report.cleaned)
       for _, unit in ipairs(all) do assert.is_true(unit.destroyed) end
     end
   end)
@@ -115,7 +115,7 @@ describe("TestAttrRuleProbe", function()
     local report = Probe.run(context)
     assert.is_false(report.Ok)
     assert.matches('懒创建失败', report.Error, 1, true)
-    assert.is_true(report.Cleaned)
+    assert.is_true(report.cleaned)
     assert.matches('cleanup', logs[#logs], 1, true)
   end)
 
@@ -126,7 +126,7 @@ describe("TestAttrRuleProbe", function()
       if not report.Ok then print(table.concat(logs, '\n')) end
       assert.is_true(report.Ok)
       assert.are.equal('offline-engine-double', report.Evidence)
-      assert.is_true(report.Cleaned)
+      assert.is_true(report.cleaned)
       assert.is_true(#logs > 8)
       for _, u in ipairs(all) do assert.is_true(u.destroyed) end
     end

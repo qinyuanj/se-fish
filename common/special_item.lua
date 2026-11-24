@@ -26,7 +26,7 @@ end
 ---@return number y, bool airborne
 function M.step_flight_y(wingsCfg, state, holding, dt, bounds)
     local y = state.Y
-    local airborne = state.Airborne == true
+    local airborne = state.airborne == true
     if isBadNumber(dt) or dt < 0 then return y, airborne end
     if dt > wingsCfg.MaxStepSec then dt = wingsCfg.MaxStepSec end
     if holding then
@@ -35,7 +35,7 @@ function M.step_flight_y(wingsCfg, state, holding, dt, bounds)
     else
         y = y - wingsCfg.DescendSpeed * dt
     end
-    if y > bounds.CeilingY then y = bounds.CeilingY end
+    if y > bounds.ceiling_y then y = bounds.ceiling_y end
     if y <= bounds.GroundY then
         y = bounds.GroundY
         airborne = false
@@ -81,7 +81,7 @@ end
 function M.new_breath_ledger(breathCfg)
     return {
         plan = M.tick_damages(breathCfg.TotalDamage, breathCfg.DurationSec, breathCfg.TickSec),
-        Targets = {},
+        targets = {},
     }
 end
 
@@ -93,14 +93,14 @@ function M.breath_hit(ledger, targetKey, tick)
     if type(targetKey) ~= 'string' or type(tick) ~= 'number' then return nil end
     local amount = ledger.plan[tick]
     if not amount then return nil end
-    local entry = ledger.Targets[targetKey]
+    local entry = ledger.targets[targetKey]
     if not entry then
-        entry = { Hits = {}, Total = 0 }
-        ledger.Targets[targetKey] = entry
+        entry = { hits = {}, total = 0 }
+        ledger.targets[targetKey] = entry
     end
-    if entry.Hits[tick] then return nil end
-    entry.Hits[tick] = true
-    entry.Total = entry.Total + amount
+    if entry.hits[tick] then return nil end
+    entry.hits[tick] = true
+    entry.total = entry.total + amount
     return amount
 end
 

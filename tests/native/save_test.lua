@@ -106,7 +106,7 @@ describe('TestSave', function()
         env.me, env.data = env.new_data(1)
         env.save:load_into(env.me, env.data)
         env.ops, env.waits, env.syncs = {}, {}, 0
-        env.save.Ledger = {}
+        env.save.ledger = {}
     end)
     after_each(function()
         GameCfg.Save.QaSlot = savedSlot
@@ -150,7 +150,7 @@ describe('TestSave', function()
         env.now = env.now + 1
         env.save:update() -- 到点：在线玩家落档
         assert.same(33, env.store.data[env.save:key(1)].coin)
-        assert.same('autosave', env.save.Ledger[1].LastReason)
+        assert.same('autosave', env.save.ledger[1].LastReason)
         -- 离场（不在线）玩家不自动存
         local stranger = { UserId = 2 }
         env.players = { stranger }
@@ -166,7 +166,7 @@ describe('TestSave', function()
         env.data.Data.FishCoin = 44
         env.boundClose()
         assert.same(44, env.store.data[env.save:key(1)].coin)
-        assert.same('shutdown', env.save.Ledger[1].LastReason)
+        assert.same('shutdown', env.save.ledger[1].LastReason)
     end)
 
     it('test_commit_uses_update_async_and_survives_cas_conflict', function()
@@ -241,10 +241,10 @@ describe('TestSave', function()
     it('test_ledger_tracks_size_and_write_count', function()
         assert.is_true(env.save:Save(1, env.data:Serialize(), 'a'))
         assert.is_true(env.save:Save(1, env.data:Serialize(), 'b'))
-        local ledger = env.save.Ledger[1]
+        local ledger = env.save.ledger[1]
         assert.is_not_nil(ledger)
-        assert.same(2, ledger.Writes)
-        assert.is_true(ledger.Bytes > 0)
+        assert.same(2, ledger.writes)
+        assert.is_true(ledger.bytes > 0)
         assert.is_not_nil(ledger.LastReason)
         -- 东西越多体积越大
         local small = env.save:estimate_size(env.data:Serialize())
@@ -273,7 +273,7 @@ describe('TestSave', function()
         env.data.Data.FishCoin = 66
         env.store.data[env.save:key(9)] = env.data:Serialize()
         local player9, d9 = env.new_data(9)
-        d9.Touched = true
+        d9.touched = true
         env.save:load_into(player9, d9)
         assert.same(66, d9.Data.FishCoin)
         assert.same(1, env.syncs)
@@ -355,7 +355,7 @@ describe('TestSave', function()
     end)
 
     it('test_unavailable_service_closes_persistence', function()
-        env.save.StoreChecked, env.save.Store = false, nil
+        env.save.store_checked, env.save.Store = false, nil
         _G.game = { GetService = function(_, name)
             if name == 'Task' then return env.task end
             if name == 'DataStoreService' then error('service missing') end

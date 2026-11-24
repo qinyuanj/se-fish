@@ -188,11 +188,11 @@ describe('TestFishAirEscape', function()
     it('test_air_fish_rehead_after_three_seconds_and_release_is_idempotent', function()
         local fish = env:drop('item87')
         local body = fish.Carrier.Body
-        local escapeAt = fish.EscapeAt
+        local escapeAt = fish.escape_at
         env:advance(1.05)
         body.OnLiftedEnd:Fire()
         assert.is_false(env.mgr:release(fish, 'drop'))
-        assert.are.equal(escapeAt, fish.EscapeAt)
+        assert.are.equal(escapeAt, fish.escape_at)
         -- 挪到礁石岛水区北侧：到三秒整点后应由朝北改为朝南。
         body.Position = vec(480, body.Position.y, 390)
         env.now = 2.95
@@ -227,7 +227,7 @@ describe('TestFishAirEscape', function()
             assert.is_true(body.Destroyed, id)
             assert.is_true(receiver.Destroyed, id)
             assert.is_nil(fish.Carrier.Receiver, id)
-            assert.is_nil(env.carrier.Carriers[body.UnitId], id)
+            assert.is_nil(env.carrier.carriers[body.UnitId], id)
             assert.is_nil(next(env.loot.Loots), id)
             assert.is_nil(env.mgr:take_killed(fish), id)
         end
@@ -277,7 +277,7 @@ describe('TestFishAirEscape', function()
         assert.is_nil(ground.FleeAt)
         env.mgr:remove(ground)
         local wild = assert(env.mgr:spawn_blast_fish('item81', 1.57, env.player.Character.Position, env.player))
-        env.now = wild.WildUntil
+        env.now = wild.wild_until
         env.mgr:update()
         assert.is_nil(env.mgr.Fish[wild.Id])
         assert.is_nil(next(env.loot.Loots))

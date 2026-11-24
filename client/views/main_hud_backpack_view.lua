@@ -252,7 +252,7 @@ function MainHudBackpackView.mount(s, ctx, options)
 
   local initial_layout = (options.layout ~= nil and options.layout:now())
     or compute_layout(resolution, ctx.store.item_bar:now())
-  local entry_rect = initial_layout.Rects.BackpackButton
+  local entry_rect = initial_layout.Rects.backpack_button
 
   -- 1. 常驻背包入口按钮（EUIButton 不写 Color，文字置于同级高 ZOrder EUITextLabel）
   local btn_backpack = make_button(
@@ -278,8 +278,8 @@ function MainHudBackpackView.mount(s, ctx, options)
     local layout = es:d(layout_sig) or compute_layout(resolution, state)
     local is_open = es:d(backpack_open) == true
 
-    place(btn_backpack, layout.Rects.BackpackButton)
-    place(label_backpack, layout.Rects.BackpackButton)
+    place(btn_backpack, layout.Rects.backpack_button)
+    place(label_backpack, layout.Rects.backpack_button)
     btn_backpack.Visible = hud_visible
     btn_backpack.TouchEnabled = hud_visible
     label_backpack.Visible = hud_visible
@@ -310,7 +310,7 @@ function MainHudBackpackView.mount(s, ctx, options)
 
   s:phase("BackpackPanelPhase", panel_active, function(ps)
     local cur_layout = layout_sig:now() or compute_layout(resolution, ctx.store.item_bar:now())
-    local panel_rect = cur_layout.Panels.BackpackPanel
+    local panel_rect = cur_layout.panels.BackpackPanel
     local cx, cy = panel_rect.x, panel_rect.y
 
     local panel = make_passive(ctx.create_node(ps, "EUIImage", {
@@ -380,7 +380,7 @@ function MainHudBackpackView.mount(s, ctx, options)
     ps:effect("BackpackPanelSync", function(es)
       local state = es:d(ctx.store.item_bar)
       local layout = es:d(layout_sig) or compute_layout(resolution, state)
-      local p_rect = layout.Panels.BackpackPanel
+      local p_rect = layout.panels.BackpackPanel
       local count = clamp_backpack_count(state)
       local backpack = type(state) == "table" and type(state.backpack) == "table" and state.backpack or {}
       local cur_selected = es:d(selected_slot)

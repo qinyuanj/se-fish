@@ -107,8 +107,8 @@ function ServerRuntime.new(opts)
   local carrier_died_handler = nil
   local bound_shop_action = nil
   local fish_host = FishTree.new()
-  fish_host.Clock = clock
-  fish_host.AiProjection = opts.ai
+  fish_host.clock = clock
+  fish_host.ai_projection = opts.ai
   fish_host.Logger = opts.logger
   fish_host.get_player_tree = function(_, player)
     return is_valid_player(player) and player_trees[player.UserId] or nil
@@ -121,7 +121,7 @@ function ServerRuntime.new(opts)
   fish_host.cast = opts.cast
   fish_host.Ai = opts.fish_ai
   fish_host.AiTarget = opts.fish_ai_target or FishAiTarget
-  fish_host.AbilityApi = opts.ability_api
+  fish_host.ability_api = opts.ability_api
   fish_host.Ability = opts.fish_ability
   fish_host.now = function() return clock.now() end
   fish_host.players = function()
@@ -1031,7 +1031,7 @@ function ServerRuntime.new(opts)
     local phase = "lifted"
     if state == FishTree.State.escaping then
       phase = "escape"
-    elseif state == FishTree.State.Wild then
+    elseif state == FishTree.State.wild then
       phase = "wild"
     elseif state ~= FishTree.State.AwaitLift and state ~= FishTree.State.Held then
       phase = "combat"
@@ -1310,7 +1310,7 @@ function ServerRuntime.new(opts)
     opts.fish_ability.Modifier = modifier_service
     opts.fish_ability.Vitals = runtime.life
     opts.fish_ability.Ai = opts.fish_ai
-    opts.fish_ability.BehaviorServices = { Vitals = runtime.life, Modifier = modifier_service, GM = PlayerGM }
+    opts.fish_ability.behavior_services = { Vitals = runtime.life, Modifier = modifier_service, GM = PlayerGM }
   end
 
   return runtime

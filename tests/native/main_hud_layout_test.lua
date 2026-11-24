@@ -78,7 +78,7 @@ local function residents(layout)
     if cached then return cached end
     local out = {}
     for _, region in ipairs(REGION_NAMES) do
-        for name, rect in pairs(layout.Regions[region].Controls) do
+        for name, rect in pairs(layout.regions[region].controls) do
             out[#out + 1] = { name = name, rect = rect, region = region }
         end
     end
@@ -119,11 +119,11 @@ describe('主界面布局模块', function()
     it('test_regions_named_and_controls_inside_their_region', function()
         each_case(function(layout, case)
             for _, region in ipairs(REGION_NAMES) do
-                local entry = layout.Regions[region]
+                local entry = layout.regions[region]
                 if type(entry) ~= 'table' or type(entry.bounds) ~= 'table' then
                     fail('%s %s 区域或边界缺失', case, region)
                 end
-                for name, rect in pairs(entry.Controls) do
+                for name, rect in pairs(entry.controls) do
                     if not inside(rect, entry.bounds) then
                         fail('%s %s.%s 越出自己的区域', case, region, name)
                     end
@@ -132,7 +132,7 @@ describe('主界面布局模块', function()
                     end
                 end
             end
-            assert.same({}, layout.Regions.CenterClear.Controls, case)
+            assert.same({}, layout.regions.CenterClear.controls, case)
         end)
     end)
 
@@ -169,16 +169,16 @@ describe('主界面布局模块', function()
 
     it('test_residents_avoid_engine_reserved', function()
         each_case(function(layout, case, input)
-            if #layout.Reserved < 8 then fail('%s 保留区只有 %d 个', case, #layout.Reserved) end
+            if #layout.reserved < 8 then fail('%s 保留区只有 %d 个', case, #layout.reserved) end
             -- 保留区自身随屏幕比例换算：顶部组离顶距离不变，都在屏幕内
-            for _, zone in ipairs(layout.Reserved) do
+            for _, zone in ipairs(layout.reserved) do
                 local _, _, bottom, top = edges(zone.rect)
                 if not (bottom >= -20 and top <= input.height + 20) then
                     fail('%s 保留区 %s 跑出屏幕', case, zone.name)
                 end
             end
             for _, item in ipairs(residents(layout)) do
-                for _, zone in ipairs(layout.Reserved) do
+                for _, zone in ipairs(layout.reserved) do
                     if overlaps(item.rect, zone.rect) then
                         fail('%s %s%s 进入保留区 %s%s', case,
                             item.name, describe_rect(item.rect), zone.name, describe_rect(zone.rect))
@@ -192,7 +192,7 @@ describe('主界面布局模块', function()
         -- 左上系统按钮组实测在 1238 高时离顶 77–181；换算到 886 高时仍贴着顶部，而不是留在原 y
         local low = MainHudLayout.compute({ width = 1920, height = 886, itemBarSlots = 2 })
         local found
-        for _, zone in ipairs(low.Reserved) do
+        for _, zone in ipairs(low.reserved) do
             local left, _, _, top = edges(zone.rect)
             if left < 100 and top > 800 then found = zone end
         end
@@ -203,11 +203,11 @@ describe('主界面布局模块', function()
         each_case(function(layout, case, input)
             -- 角色周围至少留出 ±240 × ±150 的空白
             local core = { x = 960, y = input.height / 2, w = 480, h = 300 }
-            if not inside(core, layout.Regions.CenterClear.bounds) then
+            if not inside(core, layout.regions.CenterClear.bounds) then
                 fail('%s 中央留空区不足 ±240 × ±150', case)
             end
             for _, item in ipairs(residents(layout)) do
-                if overlaps(item.rect, layout.Regions.CenterClear.bounds) then
+                if overlaps(item.rect, layout.regions.CenterClear.bounds) then
                     fail('%s 中央留空区内有 %s', case, item.name)
                 end
             end
@@ -227,7 +227,7 @@ describe('主界面布局模块', function()
             -- 装备栏一行（武器栏｜道具栏｜背包｜鱼饵栏）从左到右，整体居中（偏离屏幕中线不超过 60）
             local weapon, bait = layout.Rects.WeaponBar, layout.Rects.BaitBar
             local first, last = layout.ItemBarSlots[1], layout.ItemBarSlots[#layout.ItemBarSlots]
-            local backpack = layout.Rects.BackpackButton
+            local backpack = layout.Rects.backpack_button
             if not (weapon.x < first.x and last.x < backpack.x and backpack.x < bait.x) then
                 fail('%s 装备栏一行左右顺序不对', case)
             end
@@ -241,20 +241,20 @@ describe('主界面布局模块', function()
 
     it('test_quest_width_at_most_quarter_screen', function()
         each_case(function(layout, case)
-            local bounds = layout.Regions.QuestLeft.bounds
+            local bounds = layout.regions.QuestLeft.bounds
             if bounds.w > 1920 / 4 then fail('%s 任务区宽 %.0f 超过屏幕 1/4', case, bounds.w) end
-            assert.is_not_nil(layout.Rects.QuestPanel, case)
-            assert.is_not_nil(layout.Rects.QuestToggle, case)
+            assert.is_not_nil(layout.Rects.quest_panel, case)
+            assert.is_not_nil(layout.Rects.quest_toggle, case)
             -- 面板至少能放三行 24 号字
-            if layout.Rects.QuestPanel.h < 3 * 24 then
-                fail('%s 任务面板高 %.0f 放不下三行', case, layout.Rects.QuestPanel.h)
+            if layout.Rects.quest_panel.h < 3 * 24 then
+                fail('%s 任务面板高 %.0f 放不下三行', case, layout.Rects.quest_panel.h)
             end
         end)
     end)
 
     it('test_reel_close_only_while_reeling_and_clear_of_attack', function()
         each_case(function(layout, case, input)
-            local close, attack = layout.Rects.ReelClose, layout.Rects.AttackControl
+            local close, attack = layout.Rects.reel_close, layout.Rects.attack_control
             assert.is_not_nil(attack, case)
             assert.is_not_nil(layout.Rects.ItemAction, case)
             if input.reeling then
@@ -269,7 +269,7 @@ describe('主界面布局模块', function()
     it('test_entries_reserve_shop_slot', function()
         each_case(function(layout, case)
             for _, name in ipairs({ 'CompendiumEntry', 'ShopEntry', 'BlindboxEntry' }) do
-                if layout.Regions.EntriesTopRight.Controls[name] == nil then
+                if layout.regions.EntriesTopRight.controls[name] == nil then
                     fail('%s 入口区缺 %s', case, name)
                 end
             end
@@ -278,7 +278,7 @@ describe('主界面布局模块', function()
 
     it('test_backpack_panel_clear_of_equip_bar_and_quest', function()
         each_case(function(layout, case, input)
-            local panel = layout.Panels.BackpackPanel
+            local panel = layout.panels.BackpackPanel
             local screen = { x = 960, y = input.height / 2, w = 1920, h = input.height }
             if not inside(panel, screen) then
                 fail('%s 背包面板出屏 %s', case, describe_rect(panel))
@@ -287,7 +287,7 @@ describe('主界面布局模块', function()
                 fail('%s 背包面板缩到 %s', case, describe_rect(panel))
             end
             for _, region in ipairs({ 'EquipBottom', 'QuestLeft' }) do
-                for name, rect in pairs(layout.Regions[region].Controls) do
+                for name, rect in pairs(layout.regions[region].controls) do
                     if overlaps(panel, rect) then
                         fail('%s 背包面板压住 %s', case, name)
                     end
@@ -318,7 +318,7 @@ describe('主界面布局模块', function()
                         if overlaps(cell, bar) then
                             fail('%s %s 候选 %d/%d 压住栏位', case, kind, i, n)
                         end
-                        for _, zone in ipairs(layout.Reserved) do
+                        for _, zone in ipairs(layout.reserved) do
                             if overlaps(cell, zone.rect) then
                                 fail('%s %s 候选 %d/%d 进入保留区 %s%s', case, kind, i, n,
                                     zone.name, describe_rect(zone.rect))

@@ -3,13 +3,13 @@ ReelProgress.__index = ReelProgress
 
 function ReelProgress.new(now, cfg)
     return setmetatable({ Progress = cfg.Initial, Time = now, ZeroAt = nil,
-        Result = nil, Config = cfg }, ReelProgress)
+        Result = nil, config = cfg }, ReelProgress)
 end
 
 function ReelProgress:advance(now, count, span)
     if self.Result then return self.Result end
     now = math.max(now, self.Time)
-    local cfg = self.Config
+    local cfg = self.config
     local function step(at)
         if self.Result then return end
         local elapsed = at - self.Time

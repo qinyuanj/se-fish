@@ -6,7 +6,7 @@ local GameCfg = require("common.game_cfg")
 local AbilityAPI = require("server.ability_api")
 local AbilityPackageAPI = require("server.packages.ability_system.api")
 
-local FishAbility = { SpokeHost = true, PendingFishCleanup = {} }
+local FishAbility = { SpokeHost = true, pending_fish_cleanup = {} }
 
 local EQUIP_RETRY_INTERVAL = 0.1
 local EQUIP_RETRY_COUNT = 50
@@ -65,39 +65,39 @@ end
 
 function FishAbility:remove_fish(fish)
     if self.Modifier then self.Modifier:clear_target(fish) end
-    local record = fish.AbilityRecord
+    local record = fish.ability_record
     if not record then return end
-    record.Cancelled = true
+    record.cancelled = true
     if record.Ready then
         local ok, err = pcall(AbilityPackageAPI.StopAbility, record.Receiver, record.entry.Index)
         if not ok then print('[FishAbility] 停止鱼技能失败', fish.Id, tostring(err)) end
     end
-    local ok, err = pcall(function() record.Manager:Destroy() end)
+    local ok, err = pcall(function() record.manager:Destroy() end)
     if not ok then
-        if not self.PendingFishCleanup[fish] then
+        if not self.pending_fish_cleanup[fish] then
             print('[FishAbility] 回收鱼技能管理器失败，将重试', fish.Id, tostring(err))
         end
-        self.PendingFishCleanup[fish] = true
+        self.pending_fish_cleanup[fish] = true
         return
     end
-    self.PendingFishCleanup[fish] = nil
-    fish.AbilityRecord = nil
+    self.pending_fish_cleanup[fish] = nil
+    fish.ability_record = nil
 end
 
 function FishAbility:equip_fish(fish)
-    if fish.AbilityRecord then return true end
+    if fish.ability_record then return true end
     local species = GameCfg.Fish[fish.FishId]
     local entry = GameCfg.Ability.FishAbilities[species.Combat]
     local receiver = fish.Carrier.Receiver
     if not entry or not receiver then return false end
     local manager = createManager(receiver, GameCfg.Ability.ManagerPreset)
     if not manager then return false end
-    local record = { Manager = manager, Receiver = receiver, entry = entry }
-    fish.AbilityRecord = record
+    local record = { manager = manager, Receiver = receiver, entry = entry }
+    fish.ability_record = record
     Task:Spawn(function()
         local ok, err = pcall(function()
         for _ = 1, EQUIP_RETRY_COUNT do
-            if record.Cancelled then return end
+            if record.cancelled then return end
             if fish.Carrier.Dead then self:remove_fish(fish) return end
             local ability = AbilityPackageAPI.AddAbility(receiver, entry.AssetId, entry.Index)
             if ability then
@@ -106,7 +106,7 @@ function FishAbility:equip_fish(fish)
                 local anchor = createAnchor(ability, {
                     Anchor = entry.Anchor,
                     AnchorBehavior = entry.AnchorBehavior,
-                    AnchorAttributes = { Duration = 0, StartTime = 0, DischargeRadius = entry.Radius,
+                    AnchorAttributes = { Duration = 0, start_time = 0, DischargeRadius = entry.Radius,
                         DischargeDamage = entry.Damage or species.Attack },
                 })
                 if not anchor then self:remove_fish(fish) return end
@@ -116,7 +116,7 @@ function FishAbility:equip_fish(fish)
             end
             Task:Wait(EQUIP_RETRY_INTERVAL)
         end
-        if not record.Cancelled then
+        if not record.cancelled then
             print('[FishAbility] 电鳗技能装配超时', fish.Id)
             self:remove_fish(fish)
         end
@@ -130,8 +130,8 @@ function FishAbility:equip_fish(fish)
 end
 
 function FishAbility:cast_fish(fish)
-    local record = fish.AbilityRecord
-    if not record or not record.Ready or record.Cancelled or fish.Carrier.Dead then return false end
+    local record = fish.ability_record
+    if not record or not record.Ready or record.cancelled or fish.Carrier.Dead then return false end
     if self.Ai then return self.Ai:cast_fish(fish) end
     return AbilityAPI.cast_ability(record.Receiver, record.entry.Index)
 end
@@ -229,7 +229,7 @@ function FishAbility:fish_paralyzed(fish)
 end
 
 function FishAbility:start()
-	AbilityAPI.BehaviorServices = self.BehaviorServices
+	AbilityAPI.behavior_services = self.behavior_services
 	AbilityAPI.set_cast_guard(function(unit, index) return self:can_cast(unit) end)
 end
 
@@ -248,7 +248,7 @@ function FishAbility:on_player_removing(player)
 end
 
 function FishAbility:update(deltaTime)
-    for fish in pairs(self.PendingFishCleanup) do self:remove_fish(fish) end
+    for fish in pairs(self.pending_fish_cleanup) do self:remove_fish(fish) end
     local retrySpeed = {}
     for uid, player in pairs(self.PendingSpeed or {}) do retrySpeed[uid] = player end
     for uid, player in pairs(retrySpeed) do

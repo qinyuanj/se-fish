@@ -23,7 +23,7 @@ end
 
 local function grill_anchor()
   for _, entity in ipairs(GameCfg.Zones[3].Scene.Entities) do
-    if entity.Role == "Grill" then return entity end
+    if entity.role == "Grill" then return entity end
   end
 end
 
@@ -100,7 +100,7 @@ describe("服务端烧烤点宿主接缝（#310）", function()
         return {
           GetServerTime = function() return ctx.runtime and ctx.runtime.clock.now() or 1000 end,
           FindFirstChild = function(_, name)
-            if name == ctx.anchor_entity.Name or name == GameCfg.Zones[3].Scene.GrillName then
+            if name == ctx.anchor_entity.Name or name == GameCfg.Zones[3].Scene.grill_name then
               return { Name = name, Position = ctx.anchor, Destroy = function(self) self.Destroyed = true end }
             end
           end,

@@ -7,7 +7,7 @@ local State = Spoke.State
 
 local ShopView = {}
 
-ShopView.FailText = {
+ShopView.fail_text = {
   coin = "金币不足，可在金币页打开地图商店购买金币",
   full = "背包已满",
   max = "已升至上限",
@@ -21,19 +21,19 @@ ShopView.FailText = {
 ShopView.ShopText = {
   close = "关闭",
   Buy = "购买",
-  GoPlatformShop = "去地图商店",
-  OpenPlatformShop = "打开地图商店",
-  CoinPageHint = "金币可在地图商店购买",
-  PlatformUnavailable = "地图商店暂不可用，可返回其他分页",
-  PlatformOpenFailed = "打开地图商店失败，可稍后重试或返回其他分页",
-  PlatformOpened = "已请求打开地图商店，请在地图商店内完成操作",
+  go_platform_shop = "去地图商店",
+  open_platform_shop = "打开地图商店",
+  coin_page_hint = "金币可在地图商店购买",
+  platform_unavailable = "地图商店暂不可用，可返回其他分页",
+  platform_open_failed = "打开地图商店失败，可稍后重试或返回其他分页",
+  platform_opened = "已请求打开地图商店，请在地图商店内完成操作",
   New = "新品",
-  Owned = "已购",
-  NoLimit = "不限购",
-  StandLocked = "需 %d 级摊位",
-  LimitText = "已购 %d / %d 次",
-  UpgradeTarget = "当前 %d 级，买完升到 %d 级",
-  UpgradeOwned = "当前 %d 级，本行已购买",
+  owned = "已购",
+  no_limit = "不限购",
+  stand_locked = "需 %d 级摊位",
+  limit_text = "已购 %d / %d 次",
+  upgrade_target = "当前 %d 级，买完升到 %d 级",
+  upgrade_owned = "当前 %d 级，本行已购买",
 }
 
 local function near(position, center, character)
@@ -119,16 +119,16 @@ end
 
 local function row_state(goods, level, current, purchases)
   if goods.MinShopLevel > level then
-    return "locked", "stand", string.format(ShopView.ShopText.StandLocked, goods.MinShopLevel)
+    return "locked", "stand", string.format(ShopView.ShopText.stand_locked, goods.MinShopLevel)
   end
   if goods.Upgrade then
     current = current or 0
-    if goods.Upgrade.level <= current then return "owned", "level", ShopView.ShopText.Owned end
-    if goods.Upgrade.level > current + 1 then return "locked", "level", ShopView.FailText.level end
+    if goods.Upgrade.level <= current then return "owned", "level", ShopView.ShopText.owned end
+    if goods.Upgrade.level > current + 1 then return "locked", "level", ShopView.fail_text.level end
   end
   local bought = purchases and purchases[goods.Number] or 0
   if (goods.PurchaseLimit or 0) > 0 and bought >= goods.PurchaseLimit then
-    return "owned", "limit", ShopView.ShopText.Owned
+    return "owned", "limit", ShopView.ShopText.owned
   end
   return "buy", nil, ""
 end
@@ -173,7 +173,7 @@ local function detail_of(ctx, row)
   if row.purchasable then action = ctx.store.coin:now() >= (goods.Price or 0) and "buy" or "coin" end
   local buy_text = ShopView.ShopText.Buy
   if action == "coin" then
-    buy_text = ShopView.ShopText.GoPlatformShop
+    buy_text = ShopView.ShopText.go_platform_shop
   elseif not action then
     buy_text = row.stateText
   end
@@ -181,8 +181,8 @@ local function detail_of(ctx, row)
   if goods.Upgrade then
     local current = row.upgradeLevel or 0
     upgrade_text = current >= goods.Upgrade.level
-        and string.format(ShopView.ShopText.UpgradeOwned, current)
-        or string.format(ShopView.ShopText.UpgradeTarget, current, goods.Upgrade.level)
+        and string.format(ShopView.ShopText.upgrade_owned, current)
+        or string.format(ShopView.ShopText.upgrade_target, current, goods.Upgrade.level)
   end
   return {
     number = row.number,
@@ -190,8 +190,8 @@ local function detail_of(ctx, row)
     desc = goods.Desc or "",
     icon = row.icon,
     priceText = row.priceText,
-    limitText = limit > 0 and string.format(ShopView.ShopText.LimitText, bought, limit)
-        or ShopView.ShopText.NoLimit,
+    limitText = limit > 0 and string.format(ShopView.ShopText.limit_text, bought, limit)
+        or ShopView.ShopText.no_limit,
     upgradeText = upgrade_text,
     buyText = buy_text,
     buyAction = action,
@@ -211,7 +211,7 @@ function ShopView.modal_spec()
     local coin_page = pages[#pages]
     local page = State.new("ShopView.page", pages[1])
     local selected = State.new("ShopView.selected", nil)
-    local hint = State.new("ShopView.hint", ShopView.ShopText.CoinPageHint)
+    local hint = State.new("ShopView.hint", ShopView.ShopText.coin_page_hint)
     local panel = ctx.create_node(scope, "EUIImage", { Name = "ScreenShop", Visible = true })
     ctx.create_node(scope, "EUITextLabel", {
       Name = "LabelShopTitle", Parent = panel, Text = GameCfg.Shop.HintText,
@@ -225,7 +225,7 @@ function ShopView.modal_spec()
     local platform = ctx.create_node(scope, "EUIButton", {
       Name = "BtnOpenPlatformShop", Parent = coin_panel, TouchEnabled = true,
     })
-    text_node(ctx, scope, platform, "LabelOpenPlatformShop").Text = ShopView.ShopText.OpenPlatformShop
+    text_node(ctx, scope, platform, "LabelOpenPlatformShop").Text = ShopView.ShopText.open_platform_shop
     local detail = {}
     for _, name in ipairs({ "LabelShopDetailName", "LabelShopDetailDesc", "LabelShopDetailPrice",
         "LabelShopDetailLimit", "LabelShopDetailUpgrade" }) do
@@ -251,7 +251,7 @@ function ShopView.modal_spec()
         SpokeRuntime.batch(function()
           page:set(name)
           selected:set(nil)
-          if name == coin_page then hint:set(ShopView.ShopText.CoinPageHint) end
+          if name == coin_page then hint:set(ShopView.ShopText.coin_page_hint) end
         end)
       end)
     end
@@ -317,7 +317,7 @@ function ShopView.modal_spec()
     ctx.connect(scope, buy.OnClicked, function()
       local row = current_rows()[selected:now() or 0]
       if not row then return end
-      if not row.purchasable then notify(ctx, ShopView.FailText[row.reason]) return end
+      if not row.purchasable then notify(ctx, ShopView.fail_text[row.reason]) return end
       if ctx.store.coin:now() < (row.goods.Price or 0) then
         page:set(coin_page)
         return
@@ -331,17 +331,17 @@ function ShopView.modal_spec()
     ctx.connect(scope, platform.OnClicked, function()
       local open = ctx.services and ctx.services.open_platform_shop
       if type(open) ~= "function" then
-        hint:set(ShopView.ShopText.PlatformUnavailable)
+        hint:set(ShopView.ShopText.platform_unavailable)
         return
       end
       local ok, opened = pcall(open)
       if not ok then
-        hint:set(ShopView.ShopText.PlatformOpenFailed)
+        hint:set(ShopView.ShopText.platform_open_failed)
         print("[ShopView] 打开地图商店失败", tostring(opened))
       elseif opened == false then
-        hint:set(ShopView.ShopText.PlatformUnavailable)
+        hint:set(ShopView.ShopText.platform_unavailable)
       else
-        hint:set(ShopView.ShopText.PlatformOpened)
+        hint:set(ShopView.ShopText.platform_opened)
       end
     end)
   end
@@ -366,7 +366,7 @@ function ShopView.presentation_spec()
               .. "，花费 " .. tostring(result.price) .. " 金币")
           end
         else
-          notify(ctx, ShopView.FailText[result.reason] or "购买失败")
+          notify(ctx, ShopView.fail_text[result.reason] or "购买失败")
         end
       end)
     end,

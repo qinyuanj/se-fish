@@ -8,7 +8,7 @@
 -- 5. 吐息等30秒起手后侧移4米，另轮站在线内；死亡/离线由真实玩法触发。
 -- 6. snapshot 只回读本地成就与送达标记；平台ID缺失时只能记为缺证。
 -- Cleanup(id) 仅清本探针创建的鱼；测试过程中原有主循环持续运行。
-local Probe={Owned={}}
+local Probe={owned={}}
 local ServerRuntime=require('server.world_host.server_runtime')
 local FishTree=require('server.world_host.fish_tree')
 local Data=require('server.player_data_host')
@@ -35,14 +35,14 @@ function Probe.spawn(player,species,isolated)
     player.Character.Position=Vector3.New(safe.x,safe.y,safe.z)
     local fish,err=Fish:spawn_landed(player,{fishId=species,mult=1},player.Character.Position)
     assert(fish,err)
-    Probe.Owned[fish.Id]=fish
+    Probe.owned[fish.Id]=fish
     log('spawn 等待原生抓举确认',fish.Id)
     return fish.Id
 end
 
 function Probe.drop(player,id)
     local Fish=fishHost()
-    local fish=assert(Probe.Owned[id],'不是探针创建的鱼')
+    local fish=assert(Probe.owned[id],'不是探针创建的鱼')
     assert(Fish:get_held(player)==fish,'原生抓举尚未确认')
     assert(Fish:drop(player),'放下失败')
     log('drop',id)
@@ -50,7 +50,7 @@ end
 
 function Probe.Damage(id,amount)
     local Fish=fishHost()
-    local fish=assert(Probe.Owned[id],'不是探针创建的鱼')
+    local fish=assert(Probe.owned[id],'不是探针创建的鱼')
     assert(Fish.Fish[id]==fish and amount>0 and amount==math.floor(amount),'目标或伤害无效')
     fish.Carrier.Receiver.Controller:TakeDamage(amount)
     log('阶段触发伤害 '..tostring(amount),id)
@@ -58,7 +58,7 @@ end
 
 function Probe.snapshot(player,id)
     local Fish=fishHost()
-    local fish=Probe.Owned[id]
+    local fish=Probe.owned[id]
     local data=Data:get_data_inst(player)
     local result={at=Fish:now(),exists=fish~=nil and Fish.Fish[id]==fish,
         player=point(player.Character),playerHealth=player.Character and player.Character.Controller.Health,
@@ -69,8 +69,8 @@ function Probe.snapshot(player,id)
         result.body,result.receiver=point(fish.Carrier.Body),point(fish.Carrier.Receiver)
         result.health,result.maxHealth=fish.Carrier.Health,fish.Carrier.MaxHealth
         result.state,result.phase=fish.State,fish.Phase and fish.Phase.Phase
-        result.transitions=fish.Phase and fish.Phase.Stats.Transitions
-        result.carry=fish.Carry and fish.Carry.TargetPlayer.UserId
+        result.transitions=fish.Phase and fish.Phase.Stats.transitions
+        result.carry=fish.Carry and fish.Carry.target_player.UserId
         result.warning=fish.BossWarn~=nil
     end
     log('snapshot',id)
@@ -79,9 +79,9 @@ end
 
 function Probe.cleanup(id)
     local Fish=fishHost()
-    local fish=Probe.Owned[id]
+    local fish=Probe.owned[id]
     if fish and Fish.Fish[id]==fish then Fish:remove(fish) end
-    Probe.Owned[id]=nil
+    Probe.owned[id]=nil
     log('cleanup',id)
 end
 return Probe

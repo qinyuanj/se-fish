@@ -71,7 +71,7 @@ describe('TestAiMigration', function()
         env.runtime.task:pump(0.1)
         env.mgr:remove(env.fish)
         env.runtime.task:pump(1)
-        assert.is_false(env.fish.Carrier.AiOwnsMovement)
+        assert.is_false(env.fish.Carrier.ai_owns_movement)
         assert.are.equal(0, env.runtime.vecLen(env.unit.Controller.moves[#env.unit.Controller.moves]))
     end)
 
@@ -84,7 +84,7 @@ describe('TestAiMigration', function()
                     Disconnect = function() connected = false end } end,
             } } end } end,
         }
-        env.fish.AbilityRecord = { Ready = true, Receiver = env.unit, entry = { Index = 2 } }
+        env.fish.ability_record = { Ready = true, Receiver = env.unit, entry = { Index = 2 } }
         env.mgr.AiAPI = { Configs = { CMD_ABILITY = 5 }, Funcs = { StopAI = function() end, StopMove = function() end,
             BasicCommand = function(_, command, slot)
                 assert.are.equal(5, command)
@@ -112,7 +112,7 @@ describe('TestAiMigration', function()
         env.unit.Position = v(0 / 0, 0, 0)
         local carrier_host = require('server.world_host.fish_carrier')
         assert.is_false(carrier_host:sync_ai_position(env.fish.Carrier))
-        assert.is_false(env.fish.Carrier.AiOwnsMovement)
+        assert.is_false(env.fish.Carrier.ai_owns_movement)
         assert.are.equal(0, env.fish.Carrier.Body.Position.x)
     end)
 
@@ -131,7 +131,7 @@ describe('TestAiMigration', function()
         assert.are.equal(1, env.unit.Controller.moves[#env.unit.Controller.moves].z)
         env.mgr:custom(env.fish)
         env.runtime.task:pump(0.1)
-        assert.is_false(env.fish.Carrier.AiOwnsMovement)
+        assert.is_false(env.fish.Carrier.ai_owns_movement)
         assert.are.equal(0, env.runtime.vecLen(env.unit.Controller.moves[#env.unit.Controller.moves]))
     end)
 

@@ -1,6 +1,6 @@
 local GameCfg = require('common.game_cfg')
 local PlayerData = require('server.data.player_data')
-local SaveHost = { SpokeHost = true, Ledger = {}, Pending = {}, Flying = {}, Sessions = {}, Waiters = {}, NextAutosaveAt = nil }
+local SaveHost = { SpokeHost = true, ledger = {}, Pending = {}, Flying = {}, Sessions = {}, waiters = {}, next_autosave_at = nil }
 local function cfg() return GameCfg.Save end
 local function task() return game:GetService('Task') end
 local function copy(value)
@@ -25,25 +25,25 @@ local function validSlot(slot)
     return type(slot) == 'string' and #slot >= 1 and #slot <= 40 and slot:match('^[%w_-]+$') ~= nil
 end
 function SaveHost:key(userId)
-    if not self.SlotPinned then
+    if not self.slot_pinned then
         local slot = cfg().QaSlot
         assert(slot == nil or slot == '' or validSlot(slot), 'QA 存档槽须为 1—40 位字母、数字、下划线或连字符')
-        self.QaSlot, self.SlotPinned = slot or '', true
+        self.QaSlot, self.slot_pinned = slot or '', true
     end
     local session = self.Sessions[userId]
-    local slot = session and session.Current or self.QaSlot
+    local slot = session and session.current or self.QaSlot
     return cfg().KeyPrefix .. tostring(userId) .. (slot ~= '' and ':qa:' .. slot or '')
 end
 function SaveHost:session(userId)
     self:key(userId)
     if not self.Sessions[userId] then
-        self.Sessions[userId] = { Current = self.QaSlot, Next = self.QaSlot, Paused = false }
+        self.Sessions[userId] = { current = self.QaSlot, next = self.QaSlot, Paused = false }
     end
     return self.Sessions[userId]
 end
 function SaveHost:status(userId)
     local s = self:session(userId)
-    return { currentSlot = s.Current, nextSlot = s.Next, autosavePaused = s.Paused,
+    return { currentSlot = s.current, nextSlot = s.next, autosavePaused = s.Paused,
         loadState = s.State or 'pending', error = s.Error, revision = s.Revision, epoch = s.Epoch }
 end
 function SaveHost:is_paused(userId)
@@ -64,23 +64,23 @@ function SaveHost:fail(userId, session, reason)
 end
 function SaveHost:after_idle(userId, fn)
     if not self.Flying[userId] and not self.Pending[userId] then callback('AfterIdle', userId, fn) return end
-    self.Waiters[userId] = self.Waiters[userId] or {}
-    table.insert(self.Waiters[userId], fn)
+    self.waiters[userId] = self.waiters[userId] or {}
+    table.insert(self.waiters[userId], fn)
 end
 function SaveHost:finish_save(userId)
     self.Flying[userId] = nil
     if self.Pending[userId] then
-        if self.Pending[userId].RetryRounds then return end
+        if self.Pending[userId].retry_rounds then return end
         self:drain(userId)
         return
     end
-    local callbacks = self.Waiters[userId] or {}
-    self.Waiters[userId] = nil
+    local callbacks = self.waiters[userId] or {}
+    self.waiters[userId] = nil
     for _, fn in ipairs(callbacks) do callback('AfterIdle', userId, fn) end
 end
 function SaveHost:get_store()
-    if self.StoreChecked then return self.Store end
-    self.StoreChecked = true
+    if self.store_checked then return self.Store end
+    self.store_checked = true
     local ok, store = pcall(function() return game:GetService('DataStoreService'):GetDataStore(cfg().Store) end)
     if not ok or not store then
         print('[SaveHost] DataStore 不可用，保持读档失败屏障', tostring(store))
@@ -118,13 +118,13 @@ function SaveHost:within_budget(snapshot)
     return self:estimate_size(snapshot) <= 256 * 1024
 end
 function SaveHost:note_write(userId, snapshot, reason)
-    local ledger = self.Ledger[userId] or { Writes = 0 }
-    ledger.Writes, ledger.Bytes = ledger.Writes + 1, self:estimate_size(snapshot)
+    local ledger = self.ledger[userId] or { writes = 0 }
+    ledger.writes, ledger.bytes = ledger.writes + 1, self:estimate_size(snapshot)
     ledger.LastReason, ledger.Revision = reason, snapshot.meta.revision
-    ledger.OperationCount = #snapshot.meta.operations
-    self.Ledger[userId] = ledger
+    ledger.operation_count = #snapshot.meta.operations
+    self.ledger[userId] = ledger
     print('[SaveHost] 落账', userId, reason, 'revision=' .. ledger.Revision,
-        'bytes=' .. ledger.Bytes, 'writes=' .. ledger.Writes, 'ops=' .. ledger.OperationCount)
+        'bytes=' .. ledger.bytes, 'writes=' .. ledger.writes, 'ops=' .. ledger.operation_count)
 end
 
 function SaveHost:restore_landing(userId, player, data, session)
@@ -154,10 +154,10 @@ function SaveHost:load_into(player, data)
     if previous.Data and previous.Data ~= data then
         previous.Data.Inited, previous.Data.LoadState = false, 'stale'
     end
-    self.Counter = (self.Counter or 0) + 1
-    local s = { Current = self.QaSlot, Next = self.QaSlot, Paused = false,
+    self.counter = (self.counter or 0) + 1
+    local s = { current = self.QaSlot, next = self.QaSlot, Paused = false,
         State = 'pending', Player = player, Data = data,
-        Token = tostring(userId) .. ':' .. tostring(self.Counter) .. ':' .. tostring({}) .. ':' .. tostring(math.random()) }
+        Token = tostring(userId) .. ':' .. tostring(self.counter) .. ':' .. tostring({}) .. ':' .. tostring(math.random()) }
     self.Sessions[userId] = s
     data.Inited, data.LoadState = false, 'pending'
     player:SetAttribute('SaveState', 'pending')
@@ -173,7 +173,7 @@ function SaveHost:load_into(player, data)
             if not okSlot or slot ~= nil and slot ~= '' and not validSlot(slot) then
                 self:fail(userId, s, '槽选择读取失败或损坏') return
             end
-            if slot ~= nil then s.Current, s.Next = slot, slot end
+            if slot ~= nil then s.current, s.next = slot, slot end
             s.Key = self:key(userId)
             local loaded, status = self:load(userId)
             if not self:is_current(userId, s, data) then return end
@@ -214,21 +214,21 @@ function SaveHost:load_into(player, data)
             if self.PlayerData then self.PlayerData:send_item_bar(player, true) end
         end)
     end
-    if previous.SlotChoosing then
-        previous.SlotWaiters = previous.SlotWaiters or {}
-        table.insert(previous.SlotWaiters, load)
+    if previous.slot_choosing then
+        previous.slot_waiters = previous.slot_waiters or {}
+        table.insert(previous.slot_waiters, load)
     else load() end
 end
 
 function SaveHost:write_job(userId, job)
     local s = job.session
     if self.Sessions[userId] ~= s then return false, 'stale' end
-    if not job.BaseRevision then
-        job.BaseRevision = s.Revision
+    if not job.base_revision then
+        job.base_revision = s.Revision
         job.snapshot.meta.revision = s.Revision + 1
         job.snapshot.meta.epoch, job.snapshot.meta.session = s.Epoch, s.Token
-        s.WriteSequence = (s.WriteSequence or 0) + 1
-        job.Id = s.Token .. ':write:' .. s.WriteSequence
+        s.write_sequence = (s.write_sequence or 0) + 1
+        job.Id = s.Token .. ':write:' .. s.write_sequence
         job.snapshot.meta.write = job.Id
     end
     local ok, value = self:with_retry('写档 ' .. userId .. ' ' .. job.Reason, function()
@@ -237,7 +237,7 @@ function SaveHost:write_job(userId, job)
             if type(current) ~= 'table' or type(current.meta) ~= 'table'
                 or current.meta.session ~= s.Token or current.meta.epoch ~= s.Epoch then return nil end
             if current.meta.write == job.Id then return current end
-            if current.meta.revision ~= job.BaseRevision then return nil end
+            if current.meta.revision ~= job.base_revision then return nil end
             return copy(job.snapshot)
         end)
     end)
@@ -249,14 +249,14 @@ function SaveHost:write_job(userId, job)
     end
     s.Revision = value.meta.revision
     if s.Data and s.Data.Player == s.Player then
-        s.Data.SaveMeta = PlayerData.StripArrayMeta(value.meta, 'stored.meta')
+        s.Data.SaveMeta = PlayerData.strip_array_meta(value.meta, 'stored.meta')
     end
     self:note_write(userId, value, job.Reason)
     return true, value
 end
 local function appendJob(current, job)
     if not current then return job end
-    if not current.BaseRevision and not current.done and not current.After then return job end
+    if not current.base_revision and not current.done and not current.After then return job end
     local last = current
     while last.After do last = last.After end
     last.After = job
@@ -270,9 +270,9 @@ function SaveHost:drain(userId)
             local job = self.Pending[userId]
             self.Pending[userId] = nil
             local ok, result = self:write_job(userId, job)
-            if not ok and result == 'retry' and not job.NoRetry then
-                job.RetryRounds = (job.RetryRounds or 0) + 1
-                if job.RetryRounds <= 3 then
+            if not ok and result == 'retry' and not job.no_retry then
+                job.retry_rounds = (job.retry_rounds or 0) + 1
+                if job.retry_rounds <= 3 then
                     if self.Pending[userId] then job.After = appendJob(job.After, self.Pending[userId]) end
                     self.Pending[userId] = job
                     break
@@ -301,7 +301,7 @@ function SaveHost:enqueue(userId, snapshot, reason, done)
         or not s.Data or not s.Data.Inited or not snapshot or not s.Data:IsValidSave(snapshot)
         or not self:within_budget(snapshot) or snapshot.meta.session ~= s.Token then return false end
     local job = { session = s, Key = s.Key, snapshot = copy(snapshot), Reason = reason or 'save', done = done,
-        NoRetry = reason == 'gm' }
+        no_retry = reason == 'gm' }
     self.Pending[userId] = appendJob(self.Pending[userId], job)
     self:drain(userId)
     return true
@@ -483,16 +483,16 @@ end
 function SaveHost:select_next_slot(userId, slot, done)
     if slot ~= '' and not validSlot(slot) then return false, '存档槽须为 1—40 位字母、数字、下划线或连字符' end
     local s, store = self:session(userId), self:get_store()
-    if s.SlotChoosing or not store then return false, '槽选择进行中或服务不可用' end
-    s.SlotChoosing = true
+    if s.slot_choosing or not store then return false, '槽选择进行中或服务不可用' end
+    s.slot_choosing = true
     task():Spawn(function()
         local ok = self:with_retry('选择槽 ' .. userId, function()
             store:SetAsync(cfg().KeyPrefix .. userId .. ':gm-slot', slot)
         end)
-        if ok and self.Sessions[userId] == s then s.Next = slot end
-        s.SlotChoosing = false
-        local waiters = s.SlotWaiters or {}
-        s.SlotWaiters = nil
+        if ok and self.Sessions[userId] == s then s.next = slot end
+        s.slot_choosing = false
+        local waiters = s.slot_waiters or {}
+        s.slot_waiters = nil
         for _, fn in ipairs(waiters) do callback('槽选择', userId, fn) end
         if self.Sessions[userId] == s then callback('槽选择结果', userId, done, ok,
             not ok and '存档槽选择未保存' or nil) end
@@ -502,7 +502,7 @@ end
 function SaveHost:release_session(userId, player)
     local s = self.Sessions[userId]
     if not s or player and s.Player ~= player then return end
-    s.Leaving = true
+    s.leaving = true
     self:after_idle(userId, function() if self.Sessions[userId] == s then self.Sessions[userId] = nil end end)
 end
 function SaveHost:save_leaving(player, data)
@@ -515,9 +515,9 @@ function SaveHost:update()
     local now = game:GetService('World'):GetServerTime()
     local interval = cfg().AutosaveSec
     if not interval or interval <= 0 then return end
-    if not self.NextAutosaveAt then self.NextAutosaveAt = now + interval return end
-    if now < self.NextAutosaveAt then return end
-    self.NextAutosaveAt = now + interval
+    if not self.next_autosave_at then self.next_autosave_at = now + interval return end
+    if now < self.next_autosave_at then return end
+    self.next_autosave_at = now + interval
     if self.PlayerData then
         for _, player in ipairs(game:GetService('Players'):GetPlayers()) do
             local data = self.PlayerData:get_data_inst(player)

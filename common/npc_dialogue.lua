@@ -41,7 +41,7 @@ function Dialogue.Lines(zoneId)
                 .. '，每人支付' .. route.Return.Price .. '金币后立即出发。'
         end
     end
-    if zone.Scene.GrillName then
+    if zone.Scene.grill_name then
         lines[#lines + 1] = '本区有烧烤点。烤制后按取出时的程度变现或恢复；烤糊会损毁并伤人。'
     else
         lines[#lines + 1] = '本区没有烧烤点，蟹湖起可以烤鱼。'

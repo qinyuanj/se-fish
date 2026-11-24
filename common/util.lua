@@ -90,15 +90,15 @@ end
 
 local NumWithStrMap = {
 	{
-		Str = "K",
+		str = "K",
 		Value = 1000,
 	},
 	{
-		Str = "M",
+		str = "M",
 		Value = 1000000,
 	},
 	{
-		Str = "B",
+		str = "B",
 		Value = 1000000000,
 	},
 }
@@ -119,7 +119,7 @@ function Util:design_number(value, keepNum)
 
 	if not keepNum then keepNum = 2 end
 
-	local formatKey = "%." .. keepNum ..  "f" ..curNumInfo.Str
+	local formatKey = "%." .. keepNum ..  "f" ..curNumInfo.str
 	return string.format(formatKey, value/curNumInfo.Value)
 end
 

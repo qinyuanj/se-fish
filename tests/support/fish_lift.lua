@@ -75,7 +75,7 @@ function M:set_up()
         end,
         despawn = function(_, carrier) env.despawned[#env.despawned + 1] = carrier end,
         sync_ai_position = function(_, carrier)
-            if not carrier.AiOwnsMovement then return true end
+            if not carrier.ai_owns_movement then return true end
             local p, offset = carrier.Receiver.Position, carrier.ReceiverOffset or vec(0, 0, 0)
             if not p or p.x ~= p.x or p.y ~= p.y or p.z ~= p.z then return false end
             carrier.Body.Position = vec(p.x - offset.x, p.y - offset.y, p.z - offset.z)

@@ -30,9 +30,9 @@ function M.plan(potions)
     local health = c.HealthBase + c.HealthBase * c.HealthStepPercent / 100 * count
     if health > c.HealthMax then health = c.HealthMax end
     return {
-        Scale = scale, Health = health, Potions = count,
-        Capped = count >= maxPotions,
-        MaxScale = c.Max, MaxHealth = c.HealthMax,
+        Scale = scale, Health = health, potions = count,
+        capped = count >= maxPotions,
+        max_scale = c.Max, MaxHealth = c.HealthMax,
     }
 end
 

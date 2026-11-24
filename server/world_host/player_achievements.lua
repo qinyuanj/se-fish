@@ -1,5 +1,5 @@
 local GameCfg=require('common.game_cfg')
-local Mgr={RetryAt={},Busy={}}
+local Mgr={retry_at={},Busy={}}
 
 local function positiveId(value)
     return type(value)=='number' and value>0 and value==math.floor(value) and value or nil
@@ -51,22 +51,22 @@ function Mgr:update()
     for _, player in ipairs(self.Players:GetPlayers()) do
         local data=self.PlayerData:get_data_inst(player)
         if data and data.Inited and not self.Busy[player.UserId]
-            and now>=(self.RetryAt[player.UserId] or 0) then
+            and now>=(self.retry_at[player.UserId] or 0) then
             for key,definition in pairs(GameCfg.Achievements) do
                 local id,placeholder=target(definition)
                 if placeholder and not debugEnabled() then id=nil end
                 if data.Extra.achievements and data.Extra.achievements[key]
                     and not (data.Extra.achievementDelivered and data.Extra.achievementDelivered[key])
                     and id then
-                    self.RetryAt[player.UserId]=now+GameCfg.AchievementDelivery.RetrySec
-                    if self.Archive then
-                        local ok,done=pcall(self.Archive.IsAchievementCompleted,self.Archive,player,id)
+                    self.retry_at[player.UserId]=now+GameCfg.AchievementDelivery.RetrySec
+                    if self.archive then
+                        local ok,done=pcall(self.archive.IsAchievementCompleted,self.archive,player,id)
                         if not ok then
                             print('[PlayerAchievements] 平台查询失败，保留补交',player.UserId,key,tostring(done))
                         elseif done==true then
                             if not placeholder then self:confirm(player,data,key) end
                         elseif done==false then
-                            local sent,err=pcall(self.Archive.SetAchievementProgress,self.Archive,player,id,1)
+                            local sent,err=pcall(self.archive.SetAchievementProgress,self.archive,player,id,1)
                             if not sent then print('[PlayerAchievements] 平台提交失败，保留补交',player.UserId,key,tostring(err)) end
                         end
                     end
@@ -78,17 +78,17 @@ end
 
 function Mgr:on_player_removing(player)
     if not player or player.UserId == nil then return end
-    self.RetryAt[player.UserId],self.Busy[player.UserId]=nil,nil
+    self.retry_at[player.UserId],self.Busy[player.UserId]=nil,nil
 end
 
 function Mgr.mount(scope, player_tree, opts)
     local player = opts.player
     local ok, archive = pcall(function() return game:GetService('ArchiveService') end)
     local session = setmetatable({
-        Busy = {}, RetryAt = {}, PlayerData = opts.player_data, Save = opts.save,
+        Busy = {}, retry_at = {}, PlayerData = opts.player_data, Save = opts.save,
         Players = { GetPlayers = function() return { player } end },
         World = { GetServerTime = function() return opts.clock.now() end },
-        Archive = ok and archive or nil,
+        archive = ok and archive or nil,
     }, { __index = Mgr })
     player_tree.achievements = session
     scope:subscribe(opts.clock.on_second, function() session:update() end)

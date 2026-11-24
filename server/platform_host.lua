@@ -1,6 +1,6 @@
 local GameCfg = require('common.game_cfg')
 
-local PlatformHost = { SpokeHost = true, Flows = {}, NextFlowId = 0 }
+local PlatformHost = { SpokeHost = true, Flows = {}, next_flow_id = 0 }
 
 local function isValidPlayer(player)
     local kind = type(player)
@@ -163,9 +163,9 @@ local function openFlow(self, player, intent, onResult)
     end
     if not label and debugEnabled() then label = '测试' end
     if not label then return false, closedReason() end
-    self.NextFlowId = self.NextFlowId + 1
+    self.next_flow_id = self.next_flow_id + 1
     local now = self:now()
-    local flow = { id = self.NextFlowId, player = player, kind = intent.kind, goods = intent.goods,
+    local flow = { id = self.next_flow_id, player = player, kind = intent.kind, goods = intent.goods,
         ad = intent.ad, coin = intent.coin, purpose = intent.purpose, goodsId = goodsId, real = nil,
         placeholder = label == '占位', onResult = onResult, startedAt = now,
         deadline = now + cfg().FlowTimeoutSec }

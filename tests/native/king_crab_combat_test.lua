@@ -88,7 +88,7 @@ describe('TestKingCrabCombat', function()
         env.now = 180
         env.mgr:update()
         assert.are.equal('escaping', fish.State)
-        assert.is_true(fish.StraightEscape)
+        assert.is_true(fish.straight_escape)
         assert.is_nil(fish.Move)
         assert.are.equal('clear', env.notices[#env.notices].kind)
         assert.are.equal('gone', env.notices[#env.notices].reason)

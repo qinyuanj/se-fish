@@ -35,7 +35,7 @@ describe('条款 10：烧烤倍率与会话规则', function()
 
   local function grillAnchor()
     for _, entity in ipairs(GameCfg.Zones[3].Scene.Entities) do
-      if entity.Role == 'Grill' then return entity end
+      if entity.role == 'Grill' then return entity end
     end
   end
 
@@ -89,7 +89,7 @@ describe('条款 10：烧烤倍率与会话规则', function()
       players_service = { GetPlayers = function() return ctx.list end },
       world_service = {
         FindFirstChild = function(_, name)
-          if name == GameCfg.Zones[3].Scene.GrillName then
+          if name == GameCfg.Zones[3].Scene.grill_name then
             return { Name = name, Position = ctx.anchorPos }
           end
         end,

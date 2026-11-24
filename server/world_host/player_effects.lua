@@ -471,7 +471,7 @@ function PlayerEffects.mount(s2, player_tree, opts)
   end)
 
   memos.body_scale_capped = s2:memo("BodyScaleCapped", function(ms)
-    return ms:d(memos.attr_plan).Body.Capped == true
+    return ms:d(memos.attr_plan).Body.capped == true
   end)
 
   memos.body_derived = s2:memo("BodyDerived", function(ms)

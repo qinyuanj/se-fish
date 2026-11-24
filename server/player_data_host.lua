@@ -247,9 +247,9 @@ end
 
 local function notifyEquippedBait(mgr, player, method, value)
     if method ~= 'SelectBait' or value == nil or not mgr.Quest then return end
-    mgr.NextFactId = (mgr.NextFactId or 0) + 1
+    mgr.next_fact_id = (mgr.next_fact_id or 0) + 1
     mgr.Quest:notify('EquipBait', player, { itemId = value,
-        eventId = 'bait:' .. tostring(player.UserId) .. ':' .. tostring(mgr.NextFactId) })
+        eventId = 'bait:' .. tostring(player.UserId) .. ':' .. tostring(mgr.next_fact_id) })
 end
 
 function PlayerDataHost:start()

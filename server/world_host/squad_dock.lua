@@ -41,7 +41,7 @@ function SquadDock.mount(world, opts)
     online = {},
     NextId = 0,
     Epoch = nil,
-    WaitingRestore = {},
+    waiting_restore = {},
   }
 
   local function log_failure(operation, player, err)
@@ -247,13 +247,13 @@ function SquadDock.mount(world, opts)
     local party = party_id and self.Parties[party_id]
     local invite = self.Invites[player.UserId]
     if invite then
-      local left = math.max(0, math.ceil(invite.ExpiresAt - now()))
+      local left = math.max(0, math.ceil(invite.expires_at - now()))
       local from = self.online[invite.FromUserId]
       snapshot.invite = {
         fromUserId = invite.FromUserId,
         fromName = from and from.Name or nil,
         expiresInSec = left,
-        expiresAt = invite.ExpiresAt,
+        expiresAt = invite.expires_at,
       }
     end
     if party then
@@ -299,7 +299,7 @@ function SquadDock.mount(world, opts)
       self:reply(player, "Invite", false, "too-far")
       return
     end
-    self.Invites[target_user_id] = { FromUserId = player.UserId, ExpiresAt = now() + cfg().InviteTimeoutSec }
+    self.Invites[target_user_id] = { FromUserId = player.UserId, expires_at = now() + cfg().InviteTimeoutSec }
     self:reply(player, "Invite", true)
     self:push(target)
   end
@@ -307,7 +307,7 @@ function SquadDock.mount(world, opts)
   function self:accept(player, from_user_id)
     local invite = self.Invites[player.UserId]
     if not invite then self:reply(player, "Accept", false, "no-invite") return end
-    if invite.ExpiresAt <= now() then
+    if invite.expires_at <= now() then
       self.Invites[player.UserId] = nil
       self:reply(player, "Accept", false, "expired")
       self:push(player)
@@ -397,8 +397,8 @@ function SquadDock.mount(world, opts)
   end
 
   function self:retry_restore(skip_user_id)
-    local waiting = self.WaitingRestore
-    self.WaitingRestore = {}
+    local waiting = self.waiting_restore
+    self.waiting_restore = {}
     for _, user_id in ipairs(waiting) do
       if user_id ~= skip_user_id then
         local member = self.online[user_id]
@@ -462,7 +462,7 @@ function SquadDock.mount(world, opts)
   function self:update()
     local expired = {}
     for user_id, invite in pairs(self.Invites) do
-      if invite.ExpiresAt <= now() then
+      if invite.expires_at <= now() then
         expired[#expired + 1] = user_id
         self.Invites[user_id] = nil
         self:reply(self.online[user_id], "Invite", false, "expired")
@@ -480,7 +480,7 @@ function SquadDock.mount(world, opts)
       return
     end
     if #party.Members >= cfg().MaxMembers then
-      self.WaitingRestore[#self.WaitingRestore + 1] = player.UserId
+      self.waiting_restore[#self.waiting_restore + 1] = player.UserId
       self:push(player, "full")
       return
     end

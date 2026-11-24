@@ -15,8 +15,8 @@ local function classify(err)
 end
 
 function Adapter:Store()
-    if self.Checked then return self.holder end
-    self.Checked = true
+    if self.checked then return self.holder end
+    self.checked = true
     local ok, store = pcall(function() return game:GetService('DataStoreService'):GetDataStore(cfg().Store) end)
     if not ok or not store then
         print('[RecordsAdapter] DataStore 不可用，全服纪录按暂不可用处理', tostring(store))

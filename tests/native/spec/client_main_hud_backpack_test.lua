@@ -129,8 +129,8 @@ describe("Spoke 主 HUD 背包入口与背包面板视图（#297-B3c）", functi
       backpack = {},
     })
     local layout2 = MainHudLayout.compute({ width = 1920, height = 1080, itemBarSlots = 2 })
-    assert_at(env.nodes.BtnBackpack, layout2.Rects.BackpackButton, "BtnBackpack(2)")
-    assert_at(env.nodes.LabelBackpack, layout2.Rects.BackpackButton, "LabelBackpack(2)")
+    assert_at(env.nodes.BtnBackpack, layout2.Rects.backpack_button, "BtnBackpack(2)")
+    assert_at(env.nodes.LabelBackpack, layout2.Rects.backpack_button, "LabelBackpack(2)")
     assert.equals("背包 5 格", env.nodes.LabelBackpack.Text)
 
     -- 展开背包：挂载 BackpackSlot1..5
@@ -151,7 +151,7 @@ describe("Spoke 主 HUD 背包入口与背包面板视图（#297-B3c）", functi
       backpack = {},
     })
     local layout5 = MainHudLayout.compute({ width = 1920, height = 1080, itemBarSlots = 5 })
-    assert_at(env.nodes.BtnBackpack, layout5.Rects.BackpackButton, "BtnBackpack(5)")
+    assert_at(env.nodes.BtnBackpack, layout5.Rects.backpack_button, "BtnBackpack(5)")
     assert.equals("背包 10 格", env.nodes.LabelBackpack.Text)
     assert.equals(slot1, env.nodes.BackpackSlot1)
     assert.is_not_nil(env.nodes.BackpackSlot10)

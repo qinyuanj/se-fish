@@ -96,7 +96,7 @@ describe('TestAbilitySeams', function()
         assert.is_true(applied.Ok)
         assert.same(3, applied.Scale)
         assert.same(vec(3, 3, 3), written)
-        assert.same(6, applied.Derived.CapsuleHeight) -- 胶囊高随倍率放大
+        assert.same(6, applied.derived.CapsuleHeight) -- 胶囊高随倍率放大
         -- 非法倍率净化成 1 倍，绝不把 NaN 写进单位
         for _, bad in ipairs({ 0 / 0, math.huge, -1, 0, 'x', nil }) do
             written = nil
@@ -156,7 +156,7 @@ describe('TestFishAbilitySeams', function()
         }
         package.loaded['server.world_host.fish_tree'] = nil
         ctx.mgr = assert(loadfile('server/world_host/fish_tree.lua'))()
-        ctx.mgr.AbilityApi = package.loaded['server.ability_api']
+        ctx.mgr.ability_api = package.loaded['server.ability_api']
         -- 目标裁决适配层按生产接线（server/main.lua）注入
         ctx.mgr.AiTarget = require('server.world_host.fish_ai_target')
         ctx.mgr.World = _G.game:GetService('World')
@@ -211,7 +211,7 @@ describe('TestFishAbilitySeams', function()
         -- 50%：入水阶段（咬中 1000）
         fish.Carrier.Health, fish.Carrier.MaxHealth = 5000, 10000
         fish.Phase = require('common.boss_phase').new(GameCfg.Ability.BossPhase, ctx.now, fish.Carrier.Body.Position)
-        fish.PhaseAt = ctx.now
+        fish.phase_at = ctx.now
         fish.Yaw = 0
         for _ = 1, 355 do -- #38 正文沧龙式：15秒跃起，1秒预警+1.5秒腾空后咬中
             ctx.now = ctx.now + 0.05
@@ -225,9 +225,9 @@ describe('TestFishAbilitySeams', function()
         assert.same(player, ctx.hits[2].target)
         -- 咬中即叼走：挂点建出来了，玩家归到携带态
         assert.is_not_nil(fish.Carry)
-        assert.is_not_nil(fish.CarryMount)
-        assert.same(GameCfg.Ability.Carry.Socket, fish.CarryMount.SocketName)
-        assert.same(player, fish.Carry.TargetPlayer)
+        assert.is_not_nil(fish.carry_mount)
+        assert.same(GameCfg.Ability.Carry.Socket, fish.carry_mount.SocketName)
+        assert.same(player, fish.Carry.target_player)
     end)
 
     -- 失败方式 5：携带跟随容差内不写回、被甩开则钳回挂点、超时放下并销毁挂点
@@ -240,10 +240,10 @@ describe('TestFishAbilitySeams', function()
         local cfg = GameCfg.Ability.Carry
         fish.Carry = CarryMount.new(cfg, { x = 0, y = 0, z = 0 }, 0, ctx.now)
         fish.Carry.GroundY = 2
-        fish.Carry.TargetPlayer = player
-        fish.Carry.LastStepAt = ctx.now
+        fish.Carry.target_player = player
+        fish.Carry.last_step_at = ctx.now
         assert.is_true(CarryMount.attach(fish.Carry, { x = 1, y = 0, z = 0 }, ctx.now).Ok)
-        fish.CarryMount = ctx.mounts[#ctx.mounts + 1] or { Destroyed = false, Destroy = function() end }
+        fish.carry_mount = ctx.mounts[#ctx.mounts + 1] or { Destroyed = false, Destroy = function() end }
         -- 容差内不写回（避免每帧纠正抖动）
         local before = vec(player.Character.Position.x, player.Character.Position.y, player.Character.Position.z)
         ctx.mgr:update_carry(fish, ctx.now + 0.05)
@@ -254,11 +254,11 @@ describe('TestFishAbilitySeams', function()
         local mount = CarryMount.mount_point(fish.Carry.Host, fish.Carry.Offset, 0)
         assert.near(mount.x, player.Character.Position.x, 1e-9)
         assert.near(mount.z, player.Character.Position.z, 1e-9)
-        assert.same(1, fish.Carry.Stats.Snaps)
+        assert.same(1, fish.Carry.Stats.snaps)
         -- 超时：放下玩家、销毁挂点、清携带态
         ctx.mgr:update_carry(fish, ctx.now + cfg.MaxCarrySec + 1)
         assert.is_nil(fish.Carry)
-        assert.is_nil(fish.CarryMount)
+        assert.is_nil(fish.carry_mount)
         assert.same(1, #ctx.detached)
         assert.near(2 + cfg.DropHeight, player.Character.Position.y, 1e-9)
         assert.near(cfg.DropForward, player.Character.Position.z, 1e-9)
@@ -272,11 +272,11 @@ describe('TestFishAbilitySeams', function()
         end
         local bounds = ctx.mgr:flight_bounds('fish47Elite')
         assert.same(zone.Boundary.MinX, bounds.MinX)
-        assert.same(zone.SafePoint.y + GameCfg.Ability.Flight.MaxHeight, bounds.CeilingY)
+        assert.same(zone.SafePoint.y + GameCfg.Ability.Flight.MaxHeight, bounds.ceiling_y)
         -- 未知鱼种用兜底围栏，仍然是有限边界
         local fallback = ctx.mgr:flight_bounds('noSuchFish')
         assert.same(GameCfg.Ability.Flight.FallbackBounds.MaxX, fallback.MaxX)
-        assert.is_not.same(math.huge, fallback.CeilingY)
+        assert.is_not.same(math.huge, fallback.ceiling_y)
     end)
 
     -- 失败方式 3：驱动帧写回的位置必须在围栏内，越界要被钳制并计数
@@ -285,7 +285,7 @@ describe('TestFishAbilitySeams', function()
         ctx.mgr.Fish[fish.Id] = fish
         local bounds = ctx.mgr:flight_bounds(fish.FishId)
         -- 起点故意放到围栏外：驱动一帧必须把它夹回本区
-        fish.Carrier.Body.Position = vec(bounds.MaxX + 200, bounds.CeilingY + 50, bounds.MaxZ + 200)
+        fish.Carrier.Body.Position = vec(bounds.MaxX + 200, bounds.ceiling_y + 50, bounds.MaxZ + 200)
         assert.is_true(ctx.mgr:start_flight(fish, ctx.now))
         assert.same('flying', fish.State)
         for _ = 1, 60 do
@@ -295,9 +295,9 @@ describe('TestFishAbilitySeams', function()
         local pos = fish.Carrier.Body.Position
         assert.message('x ' .. tostring(pos.x)).is_true(pos.x <= bounds.MaxX and pos.x >= bounds.MinX)
         assert.message('z ' .. tostring(pos.z)).is_true(pos.z <= bounds.MaxZ and pos.z >= bounds.MinZ)
-        assert.message('y ' .. tostring(pos.y)).is_true(pos.y <= bounds.CeilingY)
-        assert.message('越界必须被钳制并计数').is_true(fish.Flight.Stats.Clamps > 0)
-        assert.is_true(#fish.Flight.ClampLog > 0)
+        assert.message('y ' .. tostring(pos.y)).is_true(pos.y <= bounds.ceiling_y)
+        assert.message('越界必须被钳制并计数').is_true(fish.Flight.Stats.clamps > 0)
+        assert.is_true(#fish.Flight.clamp_log > 0)
     end)
 
     -- 失败方式 5：remove 必须先放下携带中的玩家，再清鱼
@@ -308,7 +308,7 @@ describe('TestFishAbilitySeams', function()
         local CarryMount = require('common.carry_mount')
         fish.Carry = CarryMount.new(GameCfg.Ability.Carry, { x = 0, y = 0, z = 0 }, 0, ctx.now)
         fish.Carry.GroundY = 2
-        fish.Carry.TargetPlayer = player
+        fish.Carry.target_player = player
         CarryMount.attach(fish.Carry, { x = 1, y = 0, z = 0 }, ctx.now)
         ctx.mgr:remove(fish)
         assert.is_nil(fish.Carry)

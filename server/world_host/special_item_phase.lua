@@ -389,11 +389,11 @@ function SpecialItemPhase.mount(ps, player_tree, opts)
     if not bounds then return end
     if not flight_ground_y then flight_ground_y = pos.y end
     bounds.GroundY = flight_ground_y
-    bounds.CeilingY = math.min(bounds.CeilingY, flight_ground_y + bounds.MaxHeight)
+    bounds.ceiling_y = math.min(bounds.ceiling_y, flight_ground_y + bounds.MaxHeight)
     if not set_gravity(false) then return end
     local y, next_airborne = SpecialItem.step_flight_y(wings, {
       Y = flight_y or pos.y,
-      Airborne = airborne,
+      airborne = airborne,
     }, holding, dt, bounds)
     local x, z = SpecialItem.clamp_xz(bounds, pos.x, pos.z)
     write_position(character, x, y, z)

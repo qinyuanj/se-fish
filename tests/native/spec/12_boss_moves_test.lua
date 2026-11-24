@@ -50,7 +50,7 @@ describe('第 12 节 首领逐招表（哥斯拉）', function()
     -- 服务端招式台账里某一招的全部落地记录（按时间序）。
     local function landed(fish, name)
         local out = {}
-        for _, attack in ipairs(fish.Phase and fish.Phase.AttackLog or {}) do
+        for _, attack in ipairs(fish.Phase and fish.Phase.attack_log or {}) do
             if attack.Name == name then out[#out + 1] = attack end
         end
         return out

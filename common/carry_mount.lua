@@ -42,10 +42,10 @@ function M.safe_offset(offset, hostHalf, carriedHalf)
     local safe = { x = num(offset and offset.x), y = num(offset and offset.y), z = num(offset and offset.z) }
     local need = math.max(0, num(hostHalf)) + math.max(0, num(carriedHalf))
     local length = M.length(safe)
-    if length >= need and length > 0 then return { Offset = safe, Corrected = false } end
-    if length <= 1e-9 then return { Offset = { x = 0, y = 0, z = need }, Corrected = true } end
+    if length >= need and length > 0 then return { Offset = safe, corrected = false } end
+    if length <= 1e-9 then return { Offset = { x = 0, y = 0, z = need }, corrected = true } end
     local k = need / length
-    return { Offset = { x = safe.x * k, y = safe.y * k, z = safe.z * k }, Corrected = true }
+    return { Offset = { x = safe.x * k, y = safe.y * k, z = safe.z * k }, corrected = true }
 end
 
 ---@param host table 宿主位置
@@ -86,10 +86,10 @@ function M.new(carryCfg, host, yaw, now)
     local safe = M.safe_offset(carryCfg.Offset, carryCfg.HostHalfHeight, carryCfg.CarriedHalfHeight)
     return {
         Cfg = carryCfg, Host = host, Yaw = num(yaw), GroundY = host.y,
-        Offset = safe.Offset, Corrected = safe.Corrected,
+        Offset = safe.Offset, corrected = safe.corrected,
         carried = false, Target = nil, Mount = nil,
-        StartedAt = num(now), ReleasedAt = nil,
-        Stats = { Frames = 0, Attaches = 0, Snaps = 0, Releases = 0 },
+        started_at = num(now), released_at = nil,
+        Stats = { frames = 0, attaches = 0, snaps = 0, releases = 0 },
     }
 end
 
@@ -112,18 +112,18 @@ function M.attach(state, target, now)
     if not M.in_range(state, target) then return { Ok = false, Reason = 'outOfRange' } end
     state.carried = true
     state.Target = copy(target)
-    state.StartedAt = num(now)
-    state.ReleasedAt = nil
+    state.started_at = num(now)
+    state.released_at = nil
     state.Mount = M.mount_point(state.Host, state.Offset, state.Yaw)
-    state.Stats.Attaches = state.Stats.Attaches + 1
+    state.Stats.attaches = state.Stats.attaches + 1
     return { Ok = true, Damage = state.Cfg.GrabDamage, Position = state.Mount }
 end
 
 function M.release(state, now, reason)
     if not state.carried then return { Ok = false, Reason = 'notCarrying' } end
     state.carried = false
-    state.ReleasedAt = num(now)
-    state.Stats.Releases = state.Stats.Releases + 1
+    state.released_at = num(now)
+    state.Stats.releases = state.Stats.releases + 1
     local drop = M.drop_point(state.Host, state.Yaw, state.GroundY, state.Cfg)
     state.Target = nil
     return { Ok = true, Reason = reason or 'manual', drop_point = drop, Position = drop }
@@ -136,24 +136,24 @@ function M.follow(state, targetPos, now, dt)
     state.Mount = desired
     if isBadPoint(targetPos) then
         local released = M.release(state, now, 'nan')
-        return { Position = released.drop_point, Released = true, Reason = 'nan' }
+        return { Position = released.drop_point, released = true, Reason = 'nan' }
     end
     if pointDistance(targetPos, desired) > state.Cfg.FollowTolerance then
-        state.Stats.Snaps = state.Stats.Snaps + 1
-        return { Position = desired, Snapped = true }
+        state.Stats.snaps = state.Stats.snaps + 1
+        return { Position = desired, snapped = true }
     end
-    return { Position = targetPos, Snapped = false }
+    return { Position = targetPos, snapped = false }
 end
 
 ---@return table { Released, Reason?, drop_point?, Position? }
 function M.step(state, now, dt)
-    state.Stats.Frames = state.Stats.Frames + 1
-    if not state.carried then return { Released = false, Position = nil } end
-    if num(now) - state.StartedAt >= state.Cfg.MaxCarrySec then
+    state.Stats.frames = state.Stats.frames + 1
+    if not state.carried then return { released = false, Position = nil } end
+    if num(now) - state.started_at >= state.Cfg.MaxCarrySec then
         local released = M.release(state, now, 'timeout')
-        return { Released = true, Reason = 'timeout', drop_point = released.drop_point, Position = released.drop_point }
+        return { released = true, Reason = 'timeout', drop_point = released.drop_point, Position = released.drop_point }
     end
-    return { Released = false, Position = state.Mount or M.mount_point(state.Host, state.Offset, state.Yaw) }
+    return { released = false, Position = state.Mount or M.mount_point(state.Host, state.Offset, state.Yaw) }
 end
 
 return M

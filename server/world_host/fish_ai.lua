@@ -3,14 +3,14 @@ local AiAPI = require('server.packages.official_ai_feature.api')
 local Mgr = { AiAPI = AiAPI }
 
 local function leaf(fish)
-    if not fish.AiLeaf then fish.AiLeaf = {} end
-    return fish.AiLeaf
+    if not fish.ai_leaf then fish.ai_leaf = {} end
+    return fish.ai_leaf
 end
 
 function Mgr:custom(fish)
     local state = leaf(fish)
     local carrier = fish.Carrier
-    if state.Mode or not state.Initialized then
+    if state.Mode or not state.initialized then
         local ok, err = pcall(function()
             self.AiAPI.Funcs.StopAI(carrier.Receiver)
             self.AiAPI.Funcs.StopMove(carrier.Receiver, 0)
@@ -19,15 +19,15 @@ function Mgr:custom(fish)
                 p.y + (offset and offset.y or 0), p.z + (offset and offset.z or 0))
         end)
         state.Mode, state.Target, state.Direction = nil, nil, nil
-        carrier.AiOwnsMovement = false
+        carrier.ai_owns_movement = false
         if not ok then
-            state.Initialized = false
+            state.initialized = false
             print('[FishAi] operation=Custom', 'fish=' .. tostring(fish.Id), tostring(err))
             return false
         end
-        state.Initialized = true
+        state.initialized = true
     end
-    carrier.AiOwnsMovement = false
+    carrier.ai_owns_movement = false
     return true
 end
 
@@ -35,7 +35,7 @@ function Mgr:pause(fish, paused)
     local state = leaf(fish)
     if paused then
         self:custom(fish)
-        local record = fish.AbilityRecord
+        local record = fish.ability_record
         if record and record.Ready and not state.Paused then
             local api = self.AbilityAPI or require('server.packages.ability_system.api')
             local ok, err = pcall(api.StopAbility, record.Receiver, record.entry.Index)
@@ -62,11 +62,11 @@ function Mgr:command(fish, mode, target, direction, speed, distance, range)
     local current_distance = horizontal_distance()
     if state.Mode == mode and state.Target == target and state.Direction == direction
         and state.Speed == speed and state.Distance == distance and state.Range == range
-        and carrier.AiOwnsMovement then
-        local resume = mode == 'chase' and state.LastDistance ~= nil and distance ~= nil
-            and state.LastDistance <= distance and current_distance ~= nil and current_distance > distance
+        and carrier.ai_owns_movement then
+        local resume = mode == 'chase' and state.last_distance ~= nil and distance ~= nil
+            and state.last_distance <= distance and current_distance ~= nil and current_distance > distance
         if not resume then
-            state.LastDistance = current_distance
+            state.last_distance = current_distance
             return true
         end
     end
@@ -92,8 +92,8 @@ function Mgr:command(fish, mode, target, direction, speed, distance, range)
     end
     state.Mode, state.Target, state.Direction, state.Speed = mode, target, direction, speed
     state.Distance, state.Range = distance, range
-    state.LastDistance = current_distance
-    carrier.AiOwnsMovement = true
+    state.last_distance = current_distance
+    carrier.ai_owns_movement = true
     return true
 end
 
@@ -109,9 +109,9 @@ end
 -- 零蓄力避免 vendor 创建不受 StopAI 管理的延迟施法任务。
 function Mgr:cast_fish(fish)
     local state = leaf(fish)
-    local record = fish.AbilityRecord
+    local record = fish.ability_record
     if self.Stopped or state.Paused or not record or not record.Ready
-        or record.Cancelled or fish.Carrier.Dead then return false end
+        or record.cancelled or fish.Carrier.Dead then return false end
     local api = self.AbilityAPI or require('server.packages.ability_system.api')
     local connection, started = nil, false
     local ok, err = pcall(function()
@@ -136,15 +136,15 @@ function Mgr:attach(fish)
         print('[FishAi] operation=Attach', 'fish=' .. tostring(fish and fish.Id), 'missing-receiver')
         return false
     end
-    leaf(fish).Attached = true
+    leaf(fish).attached = true
     return true
 end
 
 function Mgr:remove(fish)
     if not fish then return true end
     local ok = self:custom(fish)
-    fish.AiLeaf = nil
-    if fish.Carrier then fish.Carrier.AiOwnsMovement = false end
+    fish.ai_leaf = nil
+    if fish.Carrier then fish.Carrier.ai_owns_movement = false end
     return ok
 end
 

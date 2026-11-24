@@ -1,7 +1,7 @@
 local GameCfg = require('common.game_cfg')
 local SignalRouter = require('server.world_host.world_signal_router')
 
-local Mgr = { AttackBonuses = {} }
+local Mgr = { attack_bonuses = {} }
 local active_trees = {}
 local isValidPlayer = SignalRouter.is_valid_player
 
@@ -29,19 +29,19 @@ for _, entry in ipairs(GameCfg.Ability.InitialAbilities) do
 end
 
 function Mgr:get_melee_damage(player, base)
-    return base + (player and self.AttackBonuses[player.UserId] or 0)
+    return base + (player and self.attack_bonuses[player.UserId] or 0)
 end
 
 function Mgr:add_attack(_, _, target)
-    local previous = self.AttackBonuses[target.UserId] or 0
+    local previous = self.attack_bonuses[target.UserId] or 0
     if previous > math.maxinteger - AttackStep - BaseAttack then return false, '伤害数值已达到可表示范围' end
-    self.AttackBonuses[target.UserId] = previous + AttackStep
+    self.attack_bonuses[target.UserId] = previous + AttackStep
     return true
 end
 
 function Mgr:on_player_removing(player)
     if not isValidPlayer(player) then return end
-    self.AttackBonuses[player.UserId] = nil
+    self.attack_bonuses[player.UserId] = nil
 end
 
 local MaxItemCount = 99

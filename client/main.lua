@@ -57,7 +57,7 @@ _G.GM = {
     set_hunger = function(value, target) send_gm({ action = "SetHunger", value = value, target = target }) end,
     next_fish = function(fishId, target) send_gm({ action = "NextFish", fishId = fishId, target = target }) end,
 }
-_G.ClientSpoke = { Store = client_store, Clock = client_store.clock }
+_G.ClientSpoke = { Store = client_store, clock = client_store.clock }
 
 local hud_backpack_open = Spoke.State.new("ClientMain.hud_backpack_open", false)
 local hud_open_popup = Spoke.State.new("ClientMain.hud_open_popup", nil)
@@ -158,7 +158,7 @@ Task:Spawn(function()
         ui_root = GameUI:get_ui_root()
     end
     if ui_root then
-        _G.PlatformShop = { Open = open_platform_shop }
+        _G.PlatformShop = { open = open_platform_shop }
         RootView.mount(ui_root, client_store, {
             services = {
                 open_modal = function(id, payload) client_store_writer:open_modal(id, payload) end,

@@ -107,7 +107,7 @@ describe('TestFishStatusGate', function()
     -- 直线逃跑每帧刷新状态速度：不等 TurnSec 转向
     it('test_straight_escape_refreshes_status_velocity_each_frame', function()
         local body = { Position = vec(9999, 500, 9999) }
-        local fish = { Id = 3, FishId = 'alligatorGar', StraightEscape = true,
+        local fish = { Id = 3, FishId = 'alligatorGar', straight_escape = true,
             Heading = { x = 1, z = 0 }, Carrier = { Body = body } }
         ctx.factor = 0
         ctx.mgr:update_escaping(fish, ctx.now)

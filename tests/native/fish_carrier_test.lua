@@ -132,7 +132,7 @@ local function withFakeEngine(world, fn)
 end
 
 local function freshManager()
-  MgrFishCarrier.Carriers = {}
+  MgrFishCarrier.carriers = {}
   MgrFishCarrier.Subscribers = {}
   return MgrFishCarrier
 end
@@ -159,7 +159,7 @@ describe('TestFishCarrierEngine', function()
       return mgr:attach(body, { MaxHealth = 50 })
     end)
     assert.is_nil(carrier)
-    assert.are.equal(0, #mgr.Carriers)
+    assert.are.equal(0, #mgr.carriers)
     local receiver = world.Created[#world.Created]
     assert.are.equal('EggyUnit', receiver.UnitType)
     assert.is_true(receiver.Destroyed == true, '孤儿受击体必须被销毁')
@@ -277,7 +277,7 @@ describe('TestFishCarrierEngine', function()
       mgr:despawn(carrier)
     end)
 
-    assert.is_nil(mgr.Carriers[bodyId])
+    assert.is_nil(mgr.carriers[bodyId])
     assert.is_true(carrier.Body == nil)
     assert.are.equal(50, carrier.MaxHealth) -- 血量口径留着，M2 生成鱼获时还要读
   end)
@@ -290,7 +290,7 @@ describe('TestFishCarrierEngine', function()
       local target = Vector3.New(20, 15, 30)
       mgr:sync_position(carrier, target)
       assert.same(target + carrier.ReceiverOffset, carrier.Receiver.Position)
-      assert.same({ x = 20, y = 15, z = 30 }, carrier.LastPosition)
+      assert.same({ x = 20, y = 15, z = 30 }, carrier.last_position)
       mgr:update(0.03) -- pairs 顺序可在脚本写回之后跑默认同步，不能再用旧本体位置覆盖。
       assert.same(target + carrier.ReceiverOffset, carrier.Receiver.Position)
     end)
@@ -386,7 +386,7 @@ describe('TestFishCarrierEngine', function()
     assert.are.equal(4, carrier.Body.BodyType) -- Dynamic：抓举只对动态物体生效
     assert.are.equal(true, carrier.Body.Liftable)
     assert.are.equal('official://mesh/7000544', carrier.Body.RenderMeshId)
-    assert.is_true(mgr.Carriers[carrier.Body.UnitId] == carrier)
+    assert.is_true(mgr.carriers[carrier.Body.UnitId] == carrier)
   end)
 
   it('test_each_spawned_body_gets_its_own_name', function()
@@ -464,7 +464,7 @@ describe('TestFishCarrierHealthConfig', function()
   it('test_bad_max_health_falls_back', function()
     -- 0 / 负数 / nan / inf / 非数：一律回落默认，不把「血量为 0」这种值放行进引擎
     for _, bad in ipairs({ 0, -1, 0 / 0, math.huge, -math.huge, '50', true }) do
-      assert.are.equal(100, MgrFishCarrier.ResolveMaxHealth({ MaxHealth = bad }, {}))
+      assert.are.equal(100, MgrFishCarrier.resolve_max_health({ MaxHealth = bad }, {}))
     end
   end)
 
@@ -472,37 +472,37 @@ describe('TestFishCarrierHealthConfig', function()
     -- 本图配置落盘后（M17 的 GameCfg.FishCarrier）应当被优先采用；没落盘时这条自动跳过
     local cfg = GameCfg.FishCarrier
     if not cfg or cfg.MaxHealth == nil then
-      assert.are.equal(100, MgrFishCarrier.ResolveMaxHealth(nil))
+      assert.are.equal(100, MgrFishCarrier.resolve_max_health(nil))
       return
     end
-    assert.are.equal(cfg.MaxHealth, MgrFishCarrier.ResolveMaxHealth(nil))
+    assert.are.equal(cfg.MaxHealth, MgrFishCarrier.resolve_max_health(nil))
   end)
 
   it('test_max_health_falls_back_to_engine_default', function()
-    assert.are.equal(100, MgrFishCarrier.ResolveMaxHealth(nil, {}))
-    assert.are.equal(100, MgrFishCarrier.ResolveMaxHealth({}, {}))
+    assert.are.equal(100, MgrFishCarrier.resolve_max_health(nil, {}))
+    assert.are.equal(100, MgrFishCarrier.resolve_max_health({}, {}))
   end)
 
   it('test_max_health_priority_is_opts_then_config', function()
-    assert.are.equal(50, MgrFishCarrier.ResolveMaxHealth({ MaxHealth = 50 }, { MaxHealth = 30 }))
-    assert.are.equal(30, MgrFishCarrier.ResolveMaxHealth({}, { MaxHealth = 30 }))
+    assert.are.equal(50, MgrFishCarrier.resolve_max_health({ MaxHealth = 50 }, { MaxHealth = 30 }))
+    assert.are.equal(30, MgrFishCarrier.resolve_max_health({}, { MaxHealth = 30 }))
   end)
 
   it('test_mesh_priority_is_opts_then_config', function()
     assert.are.equal('official://mesh/1',
-      MgrFishCarrier.ResolveMesh({ RenderMeshId = 'official://mesh/1' }, { RenderMeshId = 'official://mesh/2' }))
-    assert.are.equal('official://mesh/2', MgrFishCarrier.ResolveMesh({}, { RenderMeshId = 'official://mesh/2' }))
+      MgrFishCarrier.resolve_mesh({ RenderMeshId = 'official://mesh/1' }, { RenderMeshId = 'official://mesh/2' }))
+    assert.are.equal('official://mesh/2', MgrFishCarrier.resolve_mesh({}, { RenderMeshId = 'official://mesh/2' }))
   end)
 
   it('test_model_id_is_written_as_official_mesh_uri', function()
     -- M0-V3 实测：official://preset/... 会建出 1×1×1 空壳，只有 official://mesh/<号> 是对的写法
-    assert.are.equal('official://mesh/7000544', MgrFishCarrier.ResolveMesh({ ModelId = 7000544 }, {}))
-    assert.are.equal('official://mesh/7000544', MgrFishCarrier.ResolveMesh({}, { ModelId = '7000544' }))
+    assert.are.equal('official://mesh/7000544', MgrFishCarrier.resolve_mesh({ model_id = 7000544 }, {}))
+    assert.are.equal('official://mesh/7000544', MgrFishCarrier.resolve_mesh({}, { model_id = '7000544' }))
   end)
 
   it('test_no_mesh_anywhere_is_nil_so_spawn_refuses', function()
-    assert.is_nil(MgrFishCarrier.ResolveMesh({}, {}))
-    assert.is_nil(MgrFishCarrier.ResolveMesh({ ModelId = '' }, {}))
+    assert.is_nil(MgrFishCarrier.resolve_mesh({}, {}))
+    assert.is_nil(MgrFishCarrier.resolve_mesh({ model_id = '' }, {}))
   end)
 end)
 

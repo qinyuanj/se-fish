@@ -2,7 +2,7 @@ local GameCfg = require('common.game_cfg')
 
 local LotteryEligibility = {}
 
-LotteryEligibility.PremiumType = '极品食物'
+LotteryEligibility.premium_type = '极品食物'
 
 local function cookedState(entry)
     local cooked = entry.cooked
@@ -27,7 +27,7 @@ function LotteryEligibility.check(entry)
     if cooked == nil then return false, 'malformed' end
     local definition = GameCfg.Items.Definitions[entry.itemId]
     if not definition then return false, 'bad-item' end
-    if definition.Type ~= LotteryEligibility.PremiumType then return false, 'not-premium' end
+    if definition.Type ~= LotteryEligibility.premium_type then return false, 'not-premium' end
     if cooked then return false, 'cooked' end
     return true
 end

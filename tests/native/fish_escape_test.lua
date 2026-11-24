@@ -183,13 +183,13 @@ describe('TestFishEscape', function()
         local fish = env:held_fish()
         assert.is_true(env.mgr:drop(env.player))
         local velocity = fish.Carrier.Body.LinearVelocity
-        local escapedAt = fish.EscapeAt
+        local escapedAt = fish.escape_at
         env.now = 0.5
         assert.is_false(env.mgr:drop(env.player))
         fish.Carrier.Body.OnLiftedEnd:Fire()
         env.player.Character.Controller.Died:Fire()
         assert.same(velocity, fish.Carrier.Body.LinearVelocity)
-        assert.are.equal(escapedAt, fish.EscapeAt)
+        assert.are.equal(escapedAt, fish.escape_at)
     end)
 
     it('test_turns_every_three_seconds_and_ninety_degrees_on_wall', function()

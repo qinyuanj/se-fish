@@ -152,7 +152,7 @@ describe('TestBeachCombat', function()
         env.now = 300
         env.mgr:update()
         assert.are.equal('escaping', fish.State)
-        assert.is_true(fish.StraightEscape)
+        assert.is_true(fish.straight_escape)
     end)
 
     it('test_orca_four_skills_all_fire_in_order', function()
@@ -442,7 +442,7 @@ describe('TestBeachCombat', function()
         env.now = 180
         env.mgr:update()
         assert.are.equal('escaping', fish.State)
-        assert.is_true(fish.StraightEscape)
+        assert.is_true(fish.straight_escape)
     end)
 
     it('test_walrus_head_swing_25_on_cadence', function()
