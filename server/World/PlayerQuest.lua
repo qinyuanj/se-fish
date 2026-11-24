@@ -2,6 +2,37 @@ local GameCfg = require('common.GameCfg')
 local QuestSteps = require('common.QuestSteps')
 
 local Mgr = { States = {}, Players = {}, Queues = {} }
+local bound_signals = setmetatable({}, { __mode = 'k' })
+
+local function isValidPlayer(player)
+    local kind = type(player)
+    return (kind == 'table' or kind == 'userdata') and player.UserId ~= nil
+end
+
+local function registerPlayerSignal(scope, signal, player, fn)
+    if not signal then return end
+    local slot = bound_signals[signal]
+    if not slot then
+        local handlers = {}
+        local connection = signal:Connect(function(actor, ...)
+            if not isValidPlayer(actor) then return end
+            local entry = handlers[actor.UserId]
+            if entry and entry.player == actor then
+                entry.fn(actor, ...)
+            end
+        end)
+        slot = { connection = connection, handlers = handlers }
+        bound_signals[signal] = slot
+    end
+    local uid = player.UserId
+    local entry = { player = player, fn = fn }
+    slot.handlers[uid] = entry
+    scope:on_cleanup(function()
+        if slot.handlers[uid] == entry then
+            slot.handlers[uid] = nil
+        end
+    end)
+end
 
 local function cfg()
     return GameCfg.Quest
@@ -201,22 +232,8 @@ function Mgr:Update()
     for _, queue in pairs(self.Queues) do self:Drain(queue.player) end
 end
 
-function Mgr:Start()
-    if self.Connection then self.Connection:Disconnect() end
-    self.Connection = _G.REUtil:GetRE('RequestQuest').OnServerEvent:Connect(function(player)
-        if _G.REUtil:CheckRECD(player, 'RequestQuest', 0.5) then return end
-        self:OnPlayerAdded(player)
-        self:Publish(player)
-    end)
-end
-
-
-local function managed_connect(scope, signal, callback)
-    local connection = signal:Connect(callback)
-    scope:on_cleanup(function() connection:Disconnect() end)
-end
-
--- 任务状态在存档就绪后与玩家树同生共死；事实写入仍使用 MgrSave 的同一原子 draft。
+-- 任务状态在存档就绪后与玩家树同生共死；全局 RE 按信号对象单次绑定并按 UserId O(1) 路由，
+-- 事实队列事件驱动即时落账，仅以秒级心跳兜底重试。
 function Mgr.mount(scope, player_tree, opts)
     local player = opts.player
     local session = setmetatable({
@@ -224,12 +241,12 @@ function Mgr.mount(scope, player_tree, opts)
     }, { __index = Mgr })
     player_tree.quest = session
     session:OnPlayerAdded(player)
-    managed_connect(scope, _G.REUtil:GetRE('RequestQuest').OnServerEvent, function(actor)
-        if actor ~= player or _G.REUtil:CheckRECD(actor, 'RequestQuest', 0.5) then return end
+    registerPlayerSignal(scope, _G.REUtil:GetRE('RequestQuest').OnServerEvent, player, function(actor)
+        if _G.REUtil:CheckRECD(actor, 'RequestQuest', 0.5) then return end
         session:OnPlayerAdded(actor)
         session:Publish(actor)
     end)
-    scope:subscribe(opts.clock.on_frame, function() session:Drain(player) end)
+    scope:subscribe(opts.clock.on_second, function() session:Drain(player) end)
     scope:on_cleanup(function()
         session:OnPlayerRemoving(player)
         if player_tree.quest == session then player_tree.quest = nil end

@@ -8,15 +8,25 @@ World.__index = World
 
 local function signal()
   local handlers = {}
-  return {
-    Connect = function(_, fn)
-      handlers[#handlers + 1] = fn
-      return { Disconnect = function() end }
-    end,
-    Fire = function(_, ...)
-      for _, fn in ipairs(handlers) do fn(...) end
-    end,
-  }
+  local sig = { connects = 0 }
+  function sig:Connect(fn)
+    self.connects = self.connects + 1
+    handlers[#handlers + 1] = fn
+    return {
+      Disconnect = function()
+        for i = #handlers, 1, -1 do
+          if handlers[i] == fn then
+            table.remove(handlers, i)
+            return
+          end
+        end
+      end,
+    }
+  end
+  function sig:Fire(...)
+    for _, fn in ipairs({ table.unpack(handlers) }) do fn(...) end
+  end
+  return sig
 end
 
 local function make_player(id, character)
@@ -156,6 +166,9 @@ function M.new()
       }
     end,
     bait_spots = { Enabled = false },
+    on_item_bar_state = function(player, snapshot)
+      _G.REUtil:GetRE("ItemBarState"):FireClient(player, snapshot)
+    end,
     bind_lottery_action = function(dispatch) env.lotteryDispatch = dispatch end,
     bind_blindbox_action = function(dispatch) env.blindboxDispatch = dispatch end,
   })

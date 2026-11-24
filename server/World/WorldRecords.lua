@@ -8,8 +8,10 @@ local Mgr = {
     Pending = {},
     Reading = {},
     LastSeq = {},
+    LastSeqPlayers = {},
     Stats = { Writes = 0, Merged = 0, Failures = 0, Retries = 0, Dropped = 0, Rejected = 0 },
 }
+local bound_signals = setmetatable({}, { __mode = 'k' })
 
 local function cfg() return GameCfg.Records end
 local function task() return game:GetService('Task') end
@@ -19,8 +21,13 @@ local function now()
     return ok and tonumber(value) or 0
 end
 
+local function isValidPlayer(player)
+    local kind = type(player)
+    return (kind == 'table' or kind == 'userdata') and player.UserId ~= nil
+end
+
 local function validPlayerId(player)
-    local userId = player and player.UserId
+    local userId = isValidPlayer(player) and player.UserId or nil
     return Records.ValidUserId(userId)
 end
 
@@ -163,7 +170,10 @@ function Mgr:Read(fishId, done)
 end
 
 function Mgr:OnPlayerRemoving(player)
-    if player then self.LastSeq[player.UserId] = nil end
+    if isValidPlayer(player) then
+        self.LastSeq[player.UserId] = nil
+        if self.LastSeqPlayers then self.LastSeqPlayers[player.UserId] = nil end
+    end
 end
 
 -- 读到什么回什么（含 'unavailable'），绝不回客户端臆造或本地缓存里已经过期的「确定值」。
@@ -173,8 +183,10 @@ function Mgr:Handle(player, payload)
     local fishId, seq = payload.fishId, payload.seq
     if type(seq) ~= 'number' or seq ~= math.floor(seq) or seq < 1 or seq > 2147483647 then return end
     local last = self.LastSeq[player.UserId]
-    if last and seq <= last then return end
+    local owner = self.LastSeqPlayers and self.LastSeqPlayers[player.UserId]
+    if last and (owner == nil or owner == player) and seq <= last then return end
     self.LastSeq[player.UserId] = seq
+    if self.LastSeqPlayers then self.LastSeqPlayers[player.UserId] = player end
     self:Read(fishId, function(state)
         state.seq = seq
         self:Reconcile(player, state)
@@ -192,26 +204,40 @@ function Mgr:Reconcile(player, state)
     self:NoteLanding(player, state.fishId, Records.Unscale(best))
 end
 
-local function managed_connect(scope, signal, callback)
-    local connection = signal:Connect(callback)
-    scope:on_cleanup(function() connection:Disconnect() end)
+local function registerWorldSignal(scope, signal, session)
+    if not signal then return end
+    local slot = bound_signals[signal]
+    if not slot then
+        local entry = { session = nil }
+        local connection = signal:Connect(function(player, payload)
+            local active = entry.session
+            if not active or _G.REUtil:CheckRECD(player, 'RecordsRequest', cfg().RequestCooldownSec) then return end
+            active:Handle(player, payload)
+        end)
+        entry.connection = connection
+        bound_signals[signal] = entry
+        slot = entry
+    end
+    slot.session = session
+    scope:on_cleanup(function()
+        if slot.session == session then slot.session = nil end
+    end)
 end
 
--- 全服纪录挂在 SharedWorldTree；DataStore UpdateAsync 仍是唯一写入边界。
+-- 全服纪录挂在 SharedWorldTree；全局 RE 按信号对象单次绑定，DataStore UpdateAsync 仍是唯一写入边界。
 function Mgr.mount(scope, world, opts)
     local adapter = setmetatable({ Checked = false, Holder = nil }, { __index = Adapter })
     local session = setmetatable({
-        Adapter = adapter, Cache = {}, Pending = {}, Reading = {}, LastSeq = {},
+        Adapter = adapter, Cache = {}, Pending = {}, Reading = {}, LastSeq = {}, LastSeqPlayers = {},
         Stats = { Writes = 0, Merged = 0, Failures = 0, Retries = 0, Dropped = 0, Rejected = 0 },
         PlayerData = opts.player_data,
     }, { __index = Mgr })
     world.records = session
-    managed_connect(scope, _G.REUtil:GetRE('RecordsRequest').OnServerEvent, function(player, payload)
-        if _G.REUtil:CheckRECD(player, 'RecordsRequest', cfg().RequestCooldownSec) then return end
-        session:Handle(player, payload)
-    end)
-    scope:subscribe(world.clock.on_frame, function() session:Update() end)
+    registerWorldSignal(scope, _G.REUtil:GetRE('RecordsRequest').OnServerEvent, session)
+    scope:subscribe(world.clock.on_second, function() session:Update() end)
     scope:on_cleanup(function()
+        session.LastSeq = {}
+        session.LastSeqPlayers = {}
         if world.records == session then world.records = nil end
     end)
     return session

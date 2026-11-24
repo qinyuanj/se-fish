@@ -1,6 +1,53 @@
 local GameCfg = require('common.GameCfg')
 
 local Mgr = { AttackBonuses = {} }
+local bound_signals = setmetatable({}, { __mode = 'k' })
+local active_trees = {}
+
+local function isValidPlayer(player)
+    local kind = type(player)
+    return (kind == 'table' or kind == 'userdata') and player.UserId ~= nil
+end
+
+local function registerPlayerSignal(scope, signal, player, fn)
+    if not signal then return end
+    local slot = bound_signals[signal]
+    if not slot then
+        local handlers = {}
+        local connection = signal:Connect(function(actor, ...)
+            if not isValidPlayer(actor) then return end
+            local entry = handlers[actor.UserId]
+            if entry and entry.player == actor then
+                entry.fn(actor, ...)
+            end
+        end)
+        slot = { connection = connection, handlers = handlers }
+        bound_signals[signal] = slot
+    end
+    local uid = player.UserId
+    local entry = { player = player, fn = fn }
+    slot.handlers[uid] = entry
+    scope:on_cleanup(function()
+        if slot.handlers[uid] == entry then
+            slot.handlers[uid] = nil
+        end
+    end)
+end
+
+local function syncTarget(self, target, data)
+    local tree = isValidPlayer(target) and active_trees[target.UserId] or nil
+    local hasLiveTree = tree ~= nil and tree.player == target and not tree:is_disposed()
+    if self.PlayerData and type(self.PlayerData.SendItemBar) == 'function' then
+        local synced = self.PlayerData:SendItemBar(target, true)
+        -- 宿主 PlayerData 未挂载 Runtime（例如独立测试替身）时，直接同步活跃 PlayerTree。
+        if hasLiveTree and not self.PlayerData.Runtime and type(tree.sync_from_data) == 'function' then
+            tree:sync_from_data(data, { force_push = true })
+        end
+        return synced
+    elseif hasLiveTree and type(tree.sync_from_data) == 'function' then
+        return tree:sync_from_data(data, { force_push = true })
+    end
+end
 
 local AttackStep = 25
 local BaseAttack = 0
@@ -23,6 +70,7 @@ function Mgr:AddAttack(_, _, target)
 end
 
 function Mgr:OnPlayerRemoving(player)
+    if not isValidPlayer(player) then return end
     self.AttackBonuses[player.UserId] = nil
 end
 
@@ -106,7 +154,7 @@ function Mgr:Handle(player, payload)
         or method == 'ReadState' or method == 'SelectSaveSlot' or method == 'GetState') then
         local function finish(ok, reason)
             if ok and (method == 'ApplyState' or method == 'ReadState') then
-                self.PlayerData:SendItemBar(target)
+                syncTarget(self, target, data)
             end
             self:Reply(player, { ok = ok, action = payload.action, target = target.UserId,
                 reason = reason, status = self.Save:Status(target.UserId),
@@ -135,7 +183,7 @@ function Mgr:Handle(player, payload)
     print('[PlayerGM]', ok and '发放' or '拒绝', player and player.UserId, '->', target and target.UserId,
         tostring(payload.action), tostring(payload.amount or payload.itemId or payload.value or payload.scene or payload.fishId), tostring(payload.count or ''))
     if ok and method ~= 'NextFish' and method ~= 'AddAttack' and method ~= 'GetAttack' then
-        self.PlayerData:SendItemBar(target)
+        syncTarget(self, target, data)
     end
     self:Reply(player, { ok = ok, action = payload.action, target = target and target.UserId,
         damage = ok and (method == 'AddAttack' or method == 'GetAttack') and self:GetMeleeDamage(target, BaseAttack) or nil,
@@ -143,15 +191,8 @@ function Mgr:Handle(player, payload)
     return ok
 end
 
-
-
-
-local function managed_connect(scope, signal, callback)
-    local connection = signal:Connect(callback)
-    scope:on_cleanup(function() connection:Disconnect() end)
-end
-
--- 入口只配置一次公开 GM 服务；攻击加成仍按 UserId 隔离并随对应玩家树清理。
+-- 入口只配置一次公开 GM 服务；全局 RE 按信号对象单次绑定并按 UserId O(1) 路由，
+-- 攻击加成与活跃树引用随对应玩家树清理。
 function Mgr.configure(opts)
     Mgr.PlayerData, Mgr.Save, Mgr.Cast, Mgr.Vitals = opts.player_data, opts.save, opts.cast, opts.vitals
 end
@@ -159,12 +200,14 @@ end
 function Mgr.mount(scope, player_tree, opts)
     local player = opts.player
     player_tree.gm = Mgr
-    managed_connect(scope, _G.REUtil:GetRE('GMAction').OnServerEvent, function(actor, payload)
-        if actor ~= player or _G.REUtil:CheckRECD(actor, 'GMAction', GameCfg.Items.ActionCooldownSec) then return end
+    active_trees[player.UserId] = player_tree
+    registerPlayerSignal(scope, _G.REUtil:GetRE('GMAction').OnServerEvent, player, function(actor, payload)
+        if _G.REUtil:CheckRECD(actor, 'GMAction', GameCfg.Items.ActionCooldownSec) then return end
         Mgr:Handle(actor, payload)
     end)
     scope:on_cleanup(function()
         Mgr:OnPlayerRemoving(player)
+        if active_trees[player.UserId] == player_tree then active_trees[player.UserId] = nil end
         if player_tree.gm == Mgr then player_tree.gm = nil end
     end)
 end

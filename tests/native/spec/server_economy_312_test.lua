@@ -109,4 +109,24 @@ describe("服务端抽奖机、盲盒与地图商店宿主接缝（#312）", fun
     assert.same(600, world.data.Data.FishCoin)
     assert.same(sequence, world.data:Serialize().meta.sequence)
   end)
+
+  it("PlatformHost:Share 兼容 SE 引擎 userdata 玩家对象", function()
+    local real_type = _G.type
+    local userdata_player = world.player
+    local ok_call, err = pcall(function()
+      _G.type = function(value)
+        if value == userdata_player then return "userdata" end
+        return real_type(value)
+      end
+      local ok, reason = world.platform:Share(userdata_player, "invite")
+      assert.is_false(ok)
+      assert.not_same("invalid", reason)
+      local reply = world:lastResult("PlatformResult")
+      assert.is_not_nil(reply)
+      assert.same("Share", reply.action)
+      assert.same("invite", reply.purpose)
+    end)
+    _G.type = real_type
+    if not ok_call then error(err, 0) end
+  end)
 end)

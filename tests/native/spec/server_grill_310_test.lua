@@ -500,4 +500,53 @@ describe("服务端烧烤点宿主接缝（#310）", function()
     act(a, { action = "Takeout", seq = first.seq })
     assert.same(1, count_item(data_a, FISH))
   end)
+
+  it("仅在活跃烤制相位按需订阅 on_frame，空闲、满格冻结与取出后零帧订阅", function()
+    local on_frame = ctx.runtime.clock.on_frame
+    local active_frame_subs = 0
+    local orig_subscribe = on_frame.subscribe
+    on_frame.subscribe = function(self, fn)
+      active_frame_subs = active_frame_subs + 1
+      local handle = orig_subscribe(self, fn)
+      local orig_dispose = handle.dispose
+      handle.dispose = function(h)
+        if not h._counted_disposed then
+          h._counted_disposed = true
+          active_frame_subs = active_frame_subs - 1
+        end
+        return orig_dispose(h)
+      end
+      return handle
+    end
+
+    local player, data = join(9580)
+    local baseline = active_frame_subs
+    give_selected(data, FISH, 1)
+    assert.same(baseline, active_frame_subs, "空闲烧烤会话不得增加 on_frame 订阅")
+
+    assert.is_true(act(player, { action = "Start" }).ok)
+    assert.same(baseline + 1, active_frame_subs, "进入烤制活跃相位后按需订阅 1 条 on_frame")
+
+    -- 满格冻结为 ready 时应退订 on_frame
+    advance(2)
+    while data:AddItem("tilapia") do end
+    ctx.runtime:get_player_tree(player.UserId):sync_from_data(data)
+    assert.is_false(act(player, { action = "Takeout" }).ok)
+    assert.same(baseline, active_frame_subs, "满格冻结为 ready 后须退出烤制活跃相位并退订 on_frame")
+
+    -- 腾出格位取出，保持零多余订阅
+    data.Data.Containers[BACKPACK][1] = nil
+    ctx.runtime:get_player_tree(player.UserId):sync_from_data(data)
+    assert.is_true(act(player, { action = "Takeout" }).ok)
+    assert.same(baseline, active_frame_subs)
+
+    -- 开烤并到 4.5 秒烤糊后也须退订 on_frame
+    data.Data.Containers[ITEM_BAR][1] = nil
+    give_selected(data, FISH, 1)
+    assert.is_true(act(player, { action = "Start" }).ok)
+    assert.same(baseline + 1, active_frame_subs)
+    advance(GameCfg.Grill.BurnSec)
+    assert.same("burnt", player.grill_state.state)
+    assert.same(baseline, active_frame_subs, "烤糊结算后须退订 on_frame")
+  end)
 end)
