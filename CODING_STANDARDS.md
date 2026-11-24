@@ -1,12 +1,10 @@
 # 编码规范
 
-编写或审查本仓库 SE 业务 Lua 时，按本次改动涉及的章节检查。运行时限制不适用于宿主机工具与独立 Lua 测试进程；存量代码仅在本次触及时按相关规则修订。
+**约束**指官方公开契约；**项目规则**指本仓库采用的工程做法。教程里的示例数值和完整生命周期方法集不作为额外要求。
 
-**约束**指官方公开契约；**项目规则**指本仓库采用的工程做法。教程里的命名、示例数值和完整生命周期方法集不作为额外要求。
+## 命名
 
-接入服务端宿主、界面、技能包，或修改配置、导出物时，先查 [AGENTS.md 的修改边界](AGENTS.md#修改边界)；命名和玩家文案查 [GLOSSARY.md](GLOSSARY.md)。
-
-**已机检，审查时不必逐条比对**：`require` 的工程前缀与大小写、禁止加载 `EggyAPI.lua` 等引擎存根、禁用 `io`/`os`/`package`/`debug`（三端业务代码，`packages/` 是上游整包拷贝、不在其列）、远程事件只经 `REUtil` 用公开 `RemoteEvent.New` 创建、单端专属 Service / `Players.LocalPlayer` 不跨端、可重入口不泄漏监听（[guards/source_guard_test](tests/native/guards/source_guard_test.lua)）；服务端 Spoke 宿主由 `server/main.lua` 显式组合（无 `MgrMap`）与锚点行为登记一致（[guards/static_require_test](tests/native/guards/static_require_test.lua)）；三端依赖方向、循环依赖与禁止引用测试夹具（[guards/arch_policy_test](tests/native/guards/arch_policy_test.lua)）。
+**项目规则**：文件、目录与 `require` 命名空间用 PascalCase，与模块表同名（`common/FishCatch.lua` → `FishCatch`）；其余标识符一律 snake_case——局部变量、参数、函数与方法名、table 字段、协议字段（`fish_count`、`get_reel_state`），常量用 UPPER_SNAKE_CASE。外部契约名照原样：官方 API 成员（`OnServerEvent`）、`data/` 导出字段、对应策划表列的配置字段、`packages/` 上游包。存量 PascalCase 名称不单独改名，本次新增或改名的按本节执行。
 
 ## API 与运行端
 
@@ -58,7 +56,7 @@
 
 ## 验证审查
 
-对本次修改涉及的每条规则，检查实现、关键分支及失败路径；引擎交互、通信和生命周期改动须覆盖涉及的双端行为、非法请求与重复进入等路径。
+对本次修改涉及的每条规则，检查实现、关键分支及失败路径；引擎交互、通信和生命周期改动须覆盖涉及的双端行为、非法请求与重复进入等路径；标识符命名按[命名](#命名)核对。
 
 **项目规则**：夹具迁就生产，生产不迁就夹具——生产代码里只为测试存在的分支、历史名兼容或数据一律退回，改夹具；迁移真源时删除绑在旧真源上的断言，夹具只喂新真源的数据。
 
