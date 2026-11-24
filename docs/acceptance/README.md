@@ -59,7 +59,7 @@
 | [17](17-tutorial-story-platform.md) | 新手任务、剧情与平台边界 | 22 | 20 | 2 | 0 | 0 | 0 | 91% |
 | [18](18-save-and-recovery.md) | 存档与恢复契约 | 32 | 9 | 23 | 0 | 0 | 0 | 28% |
 | [19](19-acceptance-criteria.md) | 验收口径 | 20 | 12 | 2 | 0 | 6 | 0 | 90% |
-| 合计 | — | 525 | 318 | 155 | 0 | 52 | 0 | 70% |
+| 合计 | — | 525 | 317 | 156 | 0 | 52 | 0 | 70% |
 
-已取证（evidenced + accepted）155 / 525；缺口密度 70% =（unverified + blocked + out-of-scope）÷ 条款数，其中 out-of-scope 占 0%。
+已取证（evidenced + accepted）156 / 525；缺口密度 70% =（unverified + blocked + out-of-scope）÷ 条款数，其中 out-of-scope 占 0%。
 <!-- END GENERATED: acceptance-counts -->
