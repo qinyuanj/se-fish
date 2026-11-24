@@ -219,11 +219,11 @@ describe('条款 11 广告满血复活（占位广告位）', function()
     package.loaded['common.re_util'] = re
     _G.REUtil = re
 
-    package.loaded['server.Data.PlayerData'] = nil
-    env.PlayerData = require('server.Data.PlayerData')
-    env.save = assert(loadfile('server/SaveHost.lua'))()
-    env.players = assert(loadfile('server/PlayerDataHost.lua'))()
-    env.platform = assert(loadfile('server/PlatformHost.lua'))()
+    package.loaded['server.data.player_data'] = nil
+    env.PlayerData = require('server.data.player_data')
+    env.save = assert(loadfile('server/save_host.lua'))()
+    env.players = assert(loadfile('server/player_data_host.lua'))()
+    env.platform = assert(loadfile('server/platform_host.lua'))()
     env.players.Save, env.save.PlayerData = env.save, env.players
     env.platform.Save, env.platform.PlayerData = env.save, env.players
     env.platform.Now = function() return env.now end
@@ -620,9 +620,9 @@ describe('条款 11 广告复活入口（客户端）', function()
       } } } } end
       if name == 'RunService' then return { Heartbeat = env.heartbeats } end
     end }
-    local ClientStore = require('client.Store.ClientStore')
-    local RootView = require('client.Views.RootView')
-    local SurvivalOverlayView = require('client.Views.SurvivalOverlayView')
+    local ClientStore = require('client.store.client_store')
+    local RootView = require('client.views.root_view')
+    local SurvivalOverlayView = require('client.views.survival_overlay_view')
     ctx.store, ctx.writer = ClientStore.new({ initial_now = ctx.now })
     ctx.events.SurvivalState = { OnClientEvent = { Fire = function(_, state)
       ctx.writer:ingest_event('SurvivalState', state)

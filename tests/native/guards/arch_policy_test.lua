@@ -120,12 +120,12 @@ describe('架构分层门禁', function()
   it('扫描真实 require，忽略注释字符串和 _trigger', function()
     local names = Arch.requires([[
       local A = require('common.util')
-      local B = require("server.AbilityAPI")
+      local B = require("server.ability_api")
       -- require('client.NotReal')
       local text = "require('server.NotReal')"
       obj.require('client.NotReal')
     ]])
-    assert.same({ 'common.util', 'server.AbilityAPI' }, names)
+    assert.same({ 'common.util', 'server.ability_api' }, names)
 
     local graph = scan_real()
     assert.is_true(#graph.modules > 100)

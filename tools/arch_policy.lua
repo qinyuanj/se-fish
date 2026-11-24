@@ -13,9 +13,9 @@ M.policy = {
     { ids = { 'client.packages', 'server.packages', 'common.packages' } },
     { ids = { 'common.cfg' } },
     {
-      ids = { 'server.Data' },
+      ids = { 'server.data' },
       modules = {
-        'server.SwingRegistry',
+        'server.swing_registry',
         'common.ai_target_policy', 'common.attr_growth', 'common.attr_model', 'common.blindbox_draw', 'common.body_scale',
         'common.boss_phase', 'common.carry_mount', 'common.content_validation', 'common.fish_catch',
         'common.flight_path', 'common.game_cfg', 'common.grill_curve', 'common.host_signal', 'common.lottery_draw',
@@ -27,21 +27,21 @@ M.policy = {
     },
     {
       -- ADR-0032 客户端只读响应式状态仓库（#296），归属 L3 支撑层，
-      ids = { 'client.Store' },
+      ids = { 'client.store' },
       modules = {
-        'client.DamageFloat', 'client.GameUI', 'client.InteractionBubble',
-        'client.MainHudLayout', 'client.PressGesture', 'client.WeaponAim',
-        'server.FishBehaviors',
+        'client.damage_float', 'client.game_ui', 'client.interaction_bubble',
+        'client.main_hud_layout', 'client.press_gesture', 'client.weapon_aim',
+        'server.fish_behaviors',
         'common.damage_notice', 'common.gar_bite_notice', 'common.re_util',
         'common.teleport_util', 'common.util',
       },
     },
     {
       -- ADR-0032 服务端 Spoke 树（#295）与客户端 Spoke 视图树（#296）归属 L2。
-      ids = { 'server.AbilityBehaviors', 'client.Views', 'server.WorldHost' },
+      ids = { 'server.ability_behaviors', 'client.views', 'server.world_host' },
       modules = {
-        'server.AbilityAPI',
-        'server.PlayerDataHost', 'server.SaveHost', 'server.PlatformHost', 'server.FishAbility',
+        'server.ability_api',
+        'server.player_data_host', 'server.save_host', 'server.platform_host', 'server.fish_ability',
       },
     },
     { modules = { 'client.main', 'server.main' } },

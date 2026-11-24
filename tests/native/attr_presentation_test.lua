@@ -3,7 +3,7 @@
 describe('TestAttrPresentation', function()
     -- 相机刷新尊重其他拥有者，清理时恢复
     it('test_camera_rebuild_restores_old_camera_and_uses_new_character_projection', function()
-        local CameraZoomView = require('client.Views.CameraZoomView')
+        local CameraZoomView = require('client.views.camera_zoom_view')
         local ctrl = CameraZoomView.new_controller()
         local first = { GetAttribute = function() return 39 end }
         local second = { GetAttribute = function() return 13 end }
@@ -18,7 +18,7 @@ describe('TestAttrPresentation', function()
 
     -- 相机刷新尊重外部改动（他人拥有）并在清理后恢复；新实例不残留上一份
     it('test_camera_refresh_respects_other_owner_and_restores_on_stop', function()
-        local CameraZoomView = require('client.Views.CameraZoomView')
+        local CameraZoomView = require('client.views.camera_zoom_view')
         local ctrl = CameraZoomView.new_controller()
         local character = { GetAttribute = function() return 52 end }
         local camera = { Distance = 8, TrackingUnit = character }
@@ -50,7 +50,7 @@ describe('TestAttrPresentation', function()
 
     -- 服务端判定按体型缩放半径，同时保留 slack；没有角色时拒绝
     it('test_server_range_scales_radius_but_keeps_slack_and_rejects_missing_character', function()
-        local mgr = require('server.WorldHost.InteractionPoints')
+        local mgr = require('server.world_host.interaction_points')
         local anchor = { Position = { x = 0, z = 0 } }
         mgr.FindAnchor = function() return anchor end
         local value = require('common.body_scale').Derive(3).InteractRange

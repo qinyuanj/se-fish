@@ -15,9 +15,9 @@
 -- 模块缓存（package.loaded 的 MgrFishUnit 与 common.re_util）与配置（GameCfg.Debug）逐例恢复，
 -- after_each 对未完成的 before_each 幂等。describe 顺序沿用旧执行序（类名字典序）。
 local GameCfg = require('common.game_cfg')
-local ClientStore = require('client.Store.ClientStore')
-local RootView = require('client.Views.RootView')
-local AttackView = require('client.Views.AttackView')
+local ClientStore = require('client.store.client_store')
+local RootView = require('client.views.root_view')
+local AttackView = require('client.views.attack_view')
 
 local function signal()
     local callbacks = {}
@@ -40,7 +40,7 @@ describe('TestFishStatusGate', function()
 
     before_each(function()
         ctx = { saved = { game = rawget(_G, 'game'), Vector3 = rawget(_G, 'Vector3'),
-            unit = package.loaded['server.WorldHost.FishTree'] } }
+            unit = package.loaded['server.world_host.fish_tree'] } }
         ctx.now = 10
         local state = ctx
         _G.Vector3 = { New = vec }
@@ -49,8 +49,8 @@ describe('TestFishStatusGate', function()
             if name == 'Players' then return { GetPlayers = function() return {} end } end
             return {}
         end }
-        package.loaded['server.WorldHost.FishTree'] = nil
-        ctx.mgr = assert(loadfile('server/WorldHost/FishTree.lua'))()
+        package.loaded['server.world_host.fish_tree'] = nil
+        ctx.mgr = assert(loadfile('server/world_host/fish_tree.lua'))()
         ctx.factor, ctx.paralyzed = 1, false
         ctx.mgr.Ability = {
             FishSpeedFactor = function() return state.factor end,
@@ -63,7 +63,7 @@ describe('TestFishStatusGate', function()
         if ctx and ctx.saved then
             _G.game = ctx.saved.game
             _G.Vector3 = ctx.saved.Vector3
-            package.loaded['server.WorldHost.FishTree'] = ctx.saved.unit
+            package.loaded['server.world_host.fish_tree'] = ctx.saved.unit
         end
     end)
 
@@ -128,7 +128,7 @@ describe('TestPrizeGrowthPotion', function()
     before_each(function()
         ctx = { debug = GameCfg.Debug, oldREUtil = _G.REUtil, events = {}, growth = {}, bodyOnly = {} }
         local state = ctx
-        ctx.mgr = require('server.PlayerDataHost')
+        ctx.mgr = require('server.player_data_host')
         GameCfg.Debug = { Enabled = false }
         _G.REUtil = { CheckRECD = function() return false end, GetRE = function(_, name)
             if not state.events[name] then
@@ -193,7 +193,7 @@ describe('TestPrizeGrowthPotion', function()
         assert.is_true(ctx.data:GrantWeapon('item165', 1)) -- 黄金AK47
         assert.is_true(ctx.data:GrantWeapon('item152', 1)) -- 淬毒匕首
         local snapshot = ctx.data:Serialize()
-        local PlayerData = require('server.Data.PlayerData')
+        local PlayerData = require('server.data.player_data')
         local again = PlayerData.New({ UserId = 13961, SetAttribute = function() end })
         again:Init()
         assert.is_true(again:ApplySave(snapshot))

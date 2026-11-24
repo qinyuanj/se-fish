@@ -12,8 +12,8 @@
 -- 每例只替换包内 CastAbility，并在 after_each 还原 preload 与模块缓存。
 local Weapon = require('tests.support.weapon_world')
 local GameCfg = require('common.game_cfg')
-local PlayerData = require('server.Data.PlayerData')
-local SwingRegistry = require('server.SwingRegistry')
+local PlayerData = require('server.data.player_data')
+local SwingRegistry = require('server.swing_registry')
 local VENDOR = 'server.packages.ability_system.api'
 
 local function fail(fmt, ...)
@@ -26,7 +26,7 @@ describe('TestAbilitySwingRegistry', function()
     local saved
     before_each(function()
         saved = { game = rawget(_G, 'game'), preload = package.preload[VENDOR],
-            vendor = package.loaded[VENDOR], api = package.loaded['server.AbilityAPI'] }
+            vendor = package.loaded[VENDOR], api = package.loaded['server.ability_api'] }
         package.preload[VENDOR] = function() return { CastAbility = function() return true end } end
         package.loaded[VENDOR] = nil
         ctx = { now = 1000 }
@@ -34,13 +34,13 @@ describe('TestAbilitySwingRegistry', function()
             if name == 'World' then return { GetServerTime = function() return ctx.now end } end
             return nil
         end }
-        ctx.api = assert(loadfile('server/AbilityAPI.lua'))()
+        ctx.api = assert(loadfile('server/ability_api.lua'))()
     end)
     after_each(function()
         _G.game = saved.game
         package.preload[VENDOR] = saved.preload
         package.loaded[VENDOR] = saved.vendor
-        package.loaded['server.AbilityAPI'] = saved.api
+        package.loaded['server.ability_api'] = saved.api
     end)
 
     it('test_add_cast_guard_chains_after_base_guard', function()
@@ -56,7 +56,7 @@ describe('TestAbilitySwingRegistry', function()
     end)
 
     it('test_expired_or_future_swing_rejected', function()
-        ctx.swing = assert(loadfile('server/SwingRegistry.lua'))()
+        ctx.swing = assert(loadfile('server/swing_registry.lua'))()
         ctx.swing.StageSwing(7, { damage = 5, range = 2 })  -- at=1000
         ctx.now = 1000 + 1.6                              -- TTL 1.5 秒
         assert.is_nil(ctx.swing.PeekSwing(7))
@@ -68,7 +68,7 @@ describe('TestAbilitySwingRegistry', function()
     end)
 
     it('test_stage_take_once_and_overwrite', function()
-        ctx.swing = assert(loadfile('server/SwingRegistry.lua'))()
+        ctx.swing = assert(loadfile('server/swing_registry.lua'))()
         assert.is_true(ctx.swing.StageSwing(7, { damage = 5, range = 2 }))
         assert.same(5, ctx.swing.PeekSwing(7).damage)
         assert.same({ damage = 5, range = 2, at = 1000 }, ctx.swing.TakeSwing(7))
@@ -80,7 +80,7 @@ describe('TestAbilitySwingRegistry', function()
     end)
 
     it('时钟异常时拒绝登记和消费，恢复后不复活旧登记', function()
-        local swing = assert(loadfile('server/SwingRegistry.lua'))()
+        local swing = assert(loadfile('server/swing_registry.lua'))()
         assert.is_true(swing.StageSwing(7, { damage = 5 }))
         ctx.now = math.huge
         assert.is_false(swing.StageSwing(7, { damage = 40 }))
@@ -96,7 +96,7 @@ describe('TestAbilitySwingRegistry', function()
     end)
 
     it('过期登记读取后清除，不随时钟回拨复活', function()
-        local swing = assert(loadfile('server/SwingRegistry.lua'))()
+        local swing = assert(loadfile('server/swing_registry.lua'))()
         swing.StageSwing(7, { damage = 5 })
         ctx.now = 1002
         assert.is_nil(swing.PeekSwing(7))
@@ -147,9 +147,9 @@ describe('TestMainWeaponWiring', function()
     it('test_main_registers_and_wires_mgr_weapon', function()
         local src = readSource('server/main.lua')
         assert.matches('bind_weapon_action = function(dispatch)', src, nil, true)
-        assert.matches('function runtime:damage_fish', readSource('server/WorldHost/ServerRuntime.lua'), nil, true)
+        assert.matches('function runtime:damage_fish', readSource('server/world_host/server_runtime.lua'), nil, true)
         assert.matches('bind_party_action = function(dispatch)', src, nil, true)
-        assert.matches('PkDamageFilter.make', readSource('server/WorldHost/ServerRuntime.lua'), nil, true)
+        assert.matches('PkDamageFilter.make', readSource('server/world_host/server_runtime.lua'), nil, true)
         assert.matches('register_cast_guard = registerCastGuard', src, nil, true)
     end)
 end)
@@ -158,9 +158,9 @@ describe('TestMgrFishUnitBlastFish', function()
     local ctx
     local saved
     before_each(function()
-        saved = { game = rawget(_G, 'game'), carrier = package.loaded['server.WorldHost.FishCarrier'] }
+        saved = { game = rawget(_G, 'game'), carrier = package.loaded['server.world_host.fish_carrier'] }
         ctx = { now = 3000, despawned = {}, spawnOpts = {} }
-        package.loaded['server.WorldHost.FishCarrier'] = {
+        package.loaded['server.world_host.fish_carrier'] = {
             Spawn = function(_, opts)
                 ctx.spawnOpts[#ctx.spawnOpts + 1] = opts
                 return { Body = { Position = opts.Position }, Receiver = { Controller = {} } }, nil
@@ -173,12 +173,12 @@ describe('TestMgrFishUnitBlastFish', function()
             if name == 'Players' then return { GetPlayers = function() return {} end } end
             return nil
         end }
-        ctx.mgr = assert(loadfile('server/WorldHost/FishTree.lua'))()
+        ctx.mgr = assert(loadfile('server/world_host/fish_tree.lua'))()
         ctx.owner = { UserId = 55 }
     end)
     after_each(function()
         _G.game = saved.game
-        package.loaded['server.WorldHost.FishCarrier'] = saved.carrier
+        package.loaded['server.world_host.fish_carrier'] = saved.carrier
     end)
 
     it('test_spawn_wild_fish_with_ttl_and_owner', function()
@@ -260,7 +260,7 @@ describe('TestMgrWeapon', function()
                 return { Direction = { x = 0, y = 0.6, z = 0.8 } }
             end } end
         end }
-        local ok, payload = pcall(function() return require('client.WeaponAim'):AttackPayload() end)
+        local ok, payload = pcall(function() return require('client.weapon_aim'):AttackPayload() end)
         _G.game = prior
         assert.is_true(ok, tostring(payload))
         assert.same({ action = 'attack', aim = { x = 0, y = 0.6, z = 0.8 } }, payload)
@@ -830,7 +830,7 @@ end)
 -- ===== 客户端手势状态机 =====
 describe('TestPressGesture', function()
     it('test_tap_and_long_press_and_move_cancel', function()
-        local Gesture = require('client.PressGesture')
+        local Gesture = require('client.press_gesture')
         local g = Gesture.New({ LongPressSec = 0.35 })
         g:Begin(10, { x = 100, y = 100 })
         assert.same('tap', g:End(10.1, { x = 103, y = 101 }))

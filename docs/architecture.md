@@ -9,9 +9,9 @@
 | 层 | 真实命名空间 | 职责 |
 |---|---|---|
 | L1 入口 | `client.main`、`server.main` | 唯一组合根：启动、宿主适配器与玩法服务装配、引擎事件翻译和依赖注入 |
-| L2 应用流程与宿主 | `server.WorldHost`、`server.AbilityAPI`、`server.AbilityBehaviors`、`server.PlayerDataHost`、`server.SaveHost`、`server.PlatformHost`、`server.FishAbility`；`client.Views` | 服务端 Spoke 世界/玩家/活鱼树与持久化、平台、能力宿主；客户端 Spoke 视图树与输入、交互流程 |
-| L3 展示与运行端支撑 | `client.Store`、`client.GameUI` 等展示基元；`server.FishBehaviors`；`common.re_util`、`Util`、`TeleportUtil`、`DamageNotice`、`GarBiteNotice` | 客户端只读响应式状态仓库、展示、主界面布局、手势与瞄准；行为分发；引擎和协议适配 |
-| L4 共享规则与业务状态 | `server.Data`、`server.SwingRegistry`；`common.spoke_clock`、`common.game_cfg`、`AttrModel`、`FishCatch`、`Vitals` 等规则模块 | 存档与记录、一次性挥砍登记、消费方确定性时钟、配置解析与共享玩法计算 |
+| L2 应用流程与宿主 | `server.world_host`、`server.ability_api`、`server.ability_behaviors`、`server.player_data_host`、`server.save_host`、`server.platform_host`、`server.fish_ability`；`client.views` | 服务端 Spoke 世界/玩家/活鱼树与持久化、平台、能力宿主；客户端 Spoke 视图树与输入、交互流程 |
+| L3 展示与运行端支撑 | `client.store`、`client.game_ui` 等展示基元；`server.fish_behaviors`；`common.re_util`、`Util`、`TeleportUtil`、`DamageNotice`、`GarBiteNotice` | 客户端只读响应式状态仓库、展示、主界面布局、手势与瞄准；行为分发；引擎和协议适配 |
+| L4 共享规则与业务状态 | `server.data`、`server.swing_registry`；`common.spoke_clock`、`common.game_cfg`、`AttrModel`、`FishCatch`、`Vitals` 等规则模块 | 存档与记录、一次性挥砍登记、消费方确定性时钟、配置解析与共享玩法计算 |
 | L5 配置内容 | `common.cfg` | 鱼、物品、商店、抽奖、盲盒与占位资产数据 |
 | L6 包 | `client.packages`、`server.packages`、`common.packages` | 整包交付的库：**官方包**与**自研包**。门禁仍要求可分类，但架构图不画、质量工具不度量（[ADR-0021](adr/0021-packages-outside-business-scope.md)） |
 
@@ -23,11 +23,11 @@
 - `client` 与 `server` 互不加载，`common` 不依赖任一端专属模块。
 - `common.util` 含引擎等待、通知和 `REUtil` 依赖，不是纯 foundation；它与 `REUtil` 同处 L3。
 - `common.game_cfg` 含配置解析与玩法计算，归 L4；纯配置内容归 L5 的 `common.cfg`。
-- `server.AbilityAPI` 与本图技能行为同属 L2。行为需要的 `Vitals`、`FishCarrier`、`GM`、`Modifier` 由 `server/main.lua` 通过 `AbilityAPI.BehaviorServices` 注入，行为不得反向加载宿主组合根。
-- `server.SwingRegistry` 独立持有带 TTL、一次性消费的挥砍登记，`server.WorldHost.PlayerWeapon` 与 `melee_hit` 共同依赖它。时钟异常时拒绝登记与消费；失效读取、施法失败及玩家退出时清除登记，施法失败回复失败。
-- 武器持续效果由 `server/WorldHost/ModifierLeaf.lua`（经 `PlayerTree`/`PlayerEffects` 与 `entity_modifiers`）实现，近战行为与枪击不经过 `FishAbility` 转发。
-- 三端脚本目录与文件名不得与 SE 内置服务名同名（`World`、`MapData`、`Game`、`Camps`、`*Service` 一类）：编辑器按服务名索引脚本树，同名目录在同步时被整棵跳过并报 warn「不会生效」（2026-11-24 实测 `server/World/`）。服务端世界宿主包因此叫 `server/WorldHost`（[ADR-0033](adr/0033-script-names-must-not-shadow-se-services.md)）；新增顶层目录或脚本文件前先按此核对。
-- Spoke 原生重构单向棘轮（[ADR-0032](adr/0032-spoke-native-lifecycle-architecture.md)）：`common.spoke_clock` 归 L4、`client.Store` 归 L3、`server.WorldHost` 与 `client.Views` 归 L2；新 Spoke 命名空间严禁反向 `require` `server.AbilityAPI` / `server.AbilityBehaviors` 等上层模块。`OwnedUnits`、`MgrMap`、旧客户端双轨 UI 已在 #316 删除；`OwnedUnits` 调用、旧式裸 `:Connect(`、`MgrMap` 成员三类水位均为 0，禁止恢复。
+- `server.ability_api` 与本图技能行为同属 L2。行为需要的 `Vitals`、`FishCarrier`、`GM`、`Modifier` 由 `server/main.lua` 通过 `AbilityAPI.BehaviorServices` 注入，行为不得反向加载宿主组合根。
+- `server.swing_registry` 独立持有带 TTL、一次性消费的挥砍登记，`server.world_host.player_weapon` 与 `melee_hit` 共同依赖它。时钟异常时拒绝登记与消费；失效读取、施法失败及玩家退出时清除登记，施法失败回复失败。
+- 武器持续效果由 `server/world_host/modifier_leaf.lua`（经 `PlayerTree`/`PlayerEffects` 与 `entity_modifiers`）实现，近战行为与枪击不经过 `FishAbility` 转发。
+- 三端脚本目录与文件名不得与 SE 内置服务名同名（`World`、`MapData`、`Game`、`Camps`、`*Service` 一类）：编辑器按服务名索引脚本树，同名目录在同步时被整棵跳过并报 warn「不会生效」（2026-11-24 实测 `server/World/`）。服务端世界宿主包因此叫 `server/world_host`（[ADR-0033](adr/0033-script-names-must-not-shadow-se-services.md)）；新增顶层目录或脚本文件前先按此核对。
+- Spoke 原生重构单向棘轮（[ADR-0032](adr/0032-spoke-native-lifecycle-architecture.md)）：`common.spoke_clock` 归 L4、`client.store` 归 L3、`server.world_host` 与 `client.views` 归 L2；新 Spoke 命名空间严禁反向 `require` `server.ability_api` / `server.ability_behaviors` 等上层模块。`OwnedUnits`、`MgrMap`、旧客户端双轨 UI 已在 #316 删除；`OwnedUnits` 调用、旧式裸 `:Connect(`、`MgrMap` 成员三类水位均为 0，禁止恢复。
 
 ## 可执行门禁
 
