@@ -51,14 +51,14 @@ function SaveHost:is_paused(userId)
     return not s or s.State ~= 'ready' or s.paused or s.transition or false
 end
 function SaveHost:is_current(userId, session, data)
-    return self.sessions[userId] == session and session.Data == data and data.Player == session.Player
+    return self.sessions[userId] == session and session.data == data and data.Player == session.Player
 end
 function SaveHost:fail(userId, session, reason)
     if self.sessions[userId] ~= session then return end
     session.State, session.Error = 'failed', reason
-    if session.Data then
-        session.Data.load_state, session.Data.inited = 'failed', false
-        if session.Data.Player then session.Data.Player:SetAttribute('SaveState', 'failed') end
+    if session.data then
+        session.data.load_state, session.data.inited = 'failed', false
+        if session.data.Player then session.data.Player:SetAttribute('SaveState', 'failed') end
     end
     print('[SaveHost] 读写屏障关闭', userId, tostring(session.token), reason)
 end
@@ -151,12 +151,12 @@ end
 function SaveHost:load_into(player, data)
     local userId = player.UserId
     local previous = self:session(userId)
-    if previous.Data and previous.Data ~= data then
-        previous.Data.inited, previous.Data.load_state = false, 'stale'
+    if previous.data and previous.data ~= data then
+        previous.data.inited, previous.data.load_state = false, 'stale'
     end
     self.counter = (self.counter or 0) + 1
     local s = { current = self.QaSlot, next = self.QaSlot, paused = false,
-        State = 'pending', Player = player, Data = data,
+        State = 'pending', Player = player, data = data,
         token = tostring(userId) .. ':' .. tostring(self.counter) .. ':' .. tostring({}) .. ':' .. tostring(math.random()) }
     self.sessions[userId] = s
     data.inited, data.load_state = false, 'pending'
@@ -248,8 +248,8 @@ function SaveHost:write_job(userId, job)
         return false, 'conflict'
     end
     s.revision = value.meta.revision
-    if s.Data and s.Data.Player == s.Player then
-        s.Data.save_meta = PlayerData.strip_array_meta(value.meta, 'stored.meta')
+    if s.data and s.data.Player == s.Player then
+        s.data.save_meta = PlayerData.strip_array_meta(value.meta, 'stored.meta')
     end
     self:note_write(userId, value, job.Reason)
     return true, value
@@ -298,7 +298,7 @@ end
 function SaveHost:enqueue(userId, snapshot, reason, done)
     local s = self.sessions[userId]
     if not s or s.State ~= 'ready' or s.paused or s.transition or not self:get_store()
-        or not s.Data or not s.Data.inited or not snapshot or not s.Data:IsValidSave(snapshot)
+        or not s.data or not s.data.inited or not snapshot or not s.data:IsValidSave(snapshot)
         or not self:within_budget(snapshot) or snapshot.meta.session ~= s.token then return false end
     local job = { session = s, Key = s.Key, snapshot = copy(snapshot), Reason = reason or 'save', done = done,
         no_retry = reason == 'gm' }
@@ -344,9 +344,9 @@ end
 -- 身份由服务端颁发，调用者必须保留原身份重试；不能把客户端自报 id 当凭证。
 function SaveHost:next_operation(player, kind)
     local s = self.sessions[player.UserId]
-    if not s or s.Player ~= player or self:is_paused(player.UserId) or not s.Data.inited
+    if not s or s.Player ~= player or self:is_paused(player.UserId) or not s.data.inited
         or type(kind) ~= 'string' or #kind < 1 or #kind > 80 then return nil end
-    local sequence = s.Data.save_meta.sequence + 1
+    local sequence = s.data.save_meta.sequence + 1
     return { id = tostring(player.UserId) .. ':' .. sequence, sequence = sequence, kind = kind }
 end
 
@@ -507,7 +507,7 @@ function SaveHost:release_session(userId, player)
 end
 function SaveHost:save_leaving(player, data)
     local s = self.sessions[player.UserId]
-    if not s or s.Player ~= player or s.Data ~= data then return end
+    if not s or s.Player ~= player or s.data ~= data then return end
     if data and data.inited then self:Save(player.UserId, data:Serialize(), 'leave') end
 end
 function SaveHost:update()

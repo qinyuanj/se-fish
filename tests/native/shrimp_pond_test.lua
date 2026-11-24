@@ -163,7 +163,7 @@ describe('虾池最小内容（水区 / 鱼表 / 商店 / 钓鱼佬 / 抛竿）'
     env.data:AddCoin(10, nil, 'test')
     assert.is_false(buy('worm'))
     assert.same('range', lastReason())
-    assert.same(10, env.data.Data.FishCoin)
+    assert.same(10, env.data.data.FishCoin)
   end)
 
   it('test_buy_sausage_at_shrimp_stand_goes_to_bait_counter', function()
@@ -171,8 +171,8 @@ describe('虾池最小内容（水区 / 鱼表 / 商店 / 钓鱼佬 / 抛竿）'
     moveTo('TGUnitShopShrimp')
     env.data:AddCoin(10, nil, 'test')
     assert.is_true(buy('sausage'))
-    assert.same(8, env.data.Data.FishCoin)
-    assert.same(1, env.data.Data.Bait.sausage)
+    assert.same(8, env.data.data.FishCoin)
+    assert.same(1, env.data.data.Bait.sausage)
     assert.is_nil(env.data:GetItemBarSnapshot().slots[2])
     assert.is_true(env.replies[#env.replies].ok)
     assert.same(2, env.replies[#env.replies].price)
@@ -216,23 +216,23 @@ describe('虾池最小内容（水区 / 鱼表 / 商店 / 钓鱼佬 / 抛竿）'
     assert.is_true(env.data:AddItem('riverShrimp'))
     local slot
     for index = 1, 8 do
-      local entry = env.data.Data.containers.itemBar[index]
+      local entry = env.data.data.containers.itemBar[index]
       if entry and entry.itemId == 'riverShrimp' then slot = index end
     end
     assert.is_true(env.data:SelectSlot(slot))
     assert.is_true(feed(1))
-    assert.same(10, env.data.Data.FishCoin)
+    assert.same(10, env.data.data.FishCoin)
     assert.is_true(replies[#replies].ok)
     -- 一区钓鱼佬旁同样可用（按区分派：各自只认本区锚点，互不借用）
     moveTo('TGUnitFish')
     assert.is_true(env.data:AddItem('carp'))
     for index = 1, 8 do
-      local entry = env.data.Data.containers.itemBar[index]
+      local entry = env.data.data.containers.itemBar[index]
       if entry and entry.itemId == 'carp' then slot = index end
     end
     assert.is_true(env.data:SelectSlot(slot))
     assert.is_true(feed(2))
-    assert.same(14, env.data.Data.FishCoin)
+    assert.same(14, env.data.data.FishCoin)
   end)
 
   it('test_home_stand_cannot_sell_shrimp_goods', function()
@@ -243,9 +243,9 @@ describe('虾池最小内容（水区 / 鱼表 / 商店 / 钓鱼佬 / 抛竿）'
     assert.same('item', lastReason())
     assert.is_false(buy('shrimpRod'))
     assert.same('item', lastReason())
-    assert.same(20, env.data.Data.FishCoin)
+    assert.same(20, env.data.data.FishCoin)
     assert.is_true(buy('worm'))
-    assert.same(19, env.data.Data.FishCoin)
+    assert.same(19, env.data.data.FishCoin)
   end)
 
   it('test_sausage_definition_and_shop_rows', function()
@@ -327,7 +327,7 @@ describe('虾池最小内容（水区 / 鱼表 / 商店 / 钓鱼佬 / 抛竿）'
     moveTo('TGUnitShopShrimp')
     env.data:AddCoin(12, nil, 'test')
     assert.is_true(buy('shrimpRod'))
-    assert.same(0, env.data.Data.FishCoin)
+    assert.same(0, env.data.data.FishCoin)
     assert.same('shrimpRod', env.data:GetItemBarSnapshot().slots[2].itemId)
     assert.is_not_nil(findGoods('shrimpRod', 2))
     assert.is_nil(findGoods('shrimpRod', 1))

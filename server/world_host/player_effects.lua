@@ -94,10 +94,10 @@ function PlayerEffects.mount(s2, player_tree, opts)
   end
   if states.shop_upgrades == nil then
     local raw_upgrades = type(player_tree.data) == "table"
-        and type(player_tree.data.Extra) == "table"
-        and type(player_tree.data.Extra.growth) == "table"
-        and type(player_tree.data.Extra.growth.upgrades) == "table"
-        and player_tree.data.Extra.growth.upgrades or {}
+        and type(player_tree.data.extra) == "table"
+        and type(player_tree.data.extra.growth) == "table"
+        and type(player_tree.data.extra.growth.upgrades) == "table"
+        and player_tree.data.extra.growth.upgrades or {}
     states.shop_upgrades = State.new("PlayerTree.shop_upgrades", raw_upgrades)
   end
 
@@ -424,9 +424,9 @@ function PlayerEffects.mount(s2, player_tree, opts)
   end, { states.character })
 
   -- 若存档载入时带有历史 weakRemaining，初始化即纳入 PlayerTree 计时主权。
-  local raw_survival = type(player_tree.data.Extra) == "table"
-      and type(player_tree.data.Extra.survival) == "table"
-      and player_tree.data.Extra.survival or nil
+  local raw_survival = type(player_tree.data.extra) == "table"
+      and type(player_tree.data.extra.survival) == "table"
+      and player_tree.data.extra.survival or nil
   local initial_weak = raw_survival and raw_survival.weakRemaining or 0
   if finite_positive(initial_weak) then
     local clamped = math.min(GameCfg.Survival.WeakSec, initial_weak)

@@ -337,7 +337,7 @@ function SpecialItemPhase.mount(ps, player_tree, opts)
 
   local function current_selection()
     local record = player_tree.data
-    local data_part = type(record) == "table" and record.Data or nil
+    local data_part = type(record) == "table" and record.data or nil
     if type(data_part) == "table" then
       local containers = type(data_part.containers) == "table" and data_part.containers or {}
       return selected_item_id(containers[GameCfg.Items.ContainerId.ItemBar], data_part.selected_slot)
@@ -672,11 +672,11 @@ function SpecialItemPhase.mount(ps, player_tree, opts)
   local leave_finalizer = function()
     local remaining = breath_remaining()
     if type(player_tree.data) == "table" then
-      if type(player_tree.data.Extra) ~= "table" then player_tree.data.Extra = {} end
-      if type(player_tree.data.Extra.cooldowns) ~= "table" then
-        player_tree.data.Extra.cooldowns = {}
+      if type(player_tree.data.extra) ~= "table" then player_tree.data.extra = {} end
+      if type(player_tree.data.extra.cooldowns) ~= "table" then
+        player_tree.data.extra.cooldowns = {}
       end
-      player_tree.data.Extra.cooldowns.godzillaBreath = remaining
+      player_tree.data.extra.cooldowns.godzillaBreath = remaining
     end
   end
   if type(player_tree.register_leave_finalizer) == "function" then

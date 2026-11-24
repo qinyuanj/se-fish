@@ -47,7 +47,7 @@ local function make_ready_data(player, overrides)
     Player = player,
     inited = true,
     load_state = "ready",
-    Data = {
+    data = {
       FishCoin = overrides.coin or 100,
       Zone = overrides.zone or "fishPond",
       upgrade_level = overrides.upgrade_level or 0,
@@ -63,7 +63,7 @@ local function make_ready_data(player, overrides)
       selected_bait = overrides.selected_bait,
       selected_weapon = overrides.selected_weapon,
     },
-    Extra = {
+    extra = {
       inventory = {
         weapons = overrides.weapons or {},
         selection = {
@@ -194,13 +194,13 @@ describe("PlayerTree #297-A1b：单批合并推送、属性即时重算与存档
     assert.near(GameCfg.Shop.damage_scale("melee", 2), pt.memos.weapon_damage_scales:now().melee, 1e-9)
 
     -- 存档镜像已同步写回 data.Data / data.Extra
-    assert.equals(550, data.Data.FishCoin)
-    assert.equals(2, data.Data.upgrade_level)
-    assert.equals(3, data.Extra.growth.potions.item168)
-    assert.equals(4, data.Extra.growth.potions.item167)
-    assert.equals(2, data.Extra.growth.upgrades.melee)
-    assert.equals(125, data.Extra.cooldowns.breath)
-    assert.equals(boss_bait_id, data.Data.containers[CONTAINER.ItemBar][2].itemId)
+    assert.equals(550, data.data.FishCoin)
+    assert.equals(2, data.data.upgrade_level)
+    assert.equals(3, data.extra.growth.potions.item168)
+    assert.equals(4, data.extra.growth.potions.item167)
+    assert.equals(2, data.extra.growth.upgrades.melee)
+    assert.equals(125, data.extra.cooldowns.breath)
+    assert.equals(boss_bait_id, data.data.containers[CONTAINER.ItemBar][2].itemId)
 
     pt:dispose()
   end)
@@ -326,9 +326,9 @@ describe("PlayerTree #297-A1b：单批合并推送、属性即时重算与存档
       end,
       on_leave_finalize = function(_, _, finalized_data)
         observed_in_finalize = {
-          coin = finalized_data.Data.FishCoin,
-          weak = finalized_data.Extra.survival.weakRemaining,
-          big = finalized_data.Extra.growth.potions.item168,
+          coin = finalized_data.data.FishCoin,
+          weak = finalized_data.extra.survival.weakRemaining,
+          big = finalized_data.extra.growth.potions.item168,
         }
       end,
     })
@@ -353,8 +353,8 @@ describe("PlayerTree #297-A1b：单批合并推送、属性即时重算与存档
     assert.equals(777, observed_in_finalize.coin)
     assert.near(38, observed_in_finalize.weak, 1e-9)
     assert.equals(5, observed_in_finalize.big)
-    assert.near(38, data.Extra.survival.weakRemaining, 1e-9)
-    assert.equals(777, data.Data.FishCoin)
+    assert.near(38, data.extra.survival.weakRemaining, 1e-9)
+    assert.equals(777, data.data.FishCoin)
 
     -- Step 2 同步 dispose 后零残留
     pt:dispose()

@@ -111,7 +111,7 @@ describe("TestModifierProbe", function()
     host:advance(20)
     assert.is_true(tree:get_modifier_remaining('weak') <= 30 and tree:get_modifier_remaining('weak') > 29)
     host:remove(player)
-    local mark = data.Extra.survival
+    local mark = data.extra.survival
     assert.is_true(mark.weakRemaining >= 30 and mark.weakRemaining <= 31)
     host:advance(100)
     player.Character = { Controller = { Health = 300, MaxHealth = 300, WalkSpeed = 16,
@@ -284,9 +284,9 @@ describe("TestModifierProbe", function()
     assert.are.equal(0, mappings.frost.stackCountMode)
     assert.is_true(mappings.frost.stackable)
     assert.are.equal(0.5, mappings.paralyze.duration)
-    assert.are.equal(17, probe.weak_remaining({ Extra = { survival = { weakRemaining = 17 } } }, 60))
-    assert.are.equal(60, probe.weak_remaining({ Extra = { survival = { weakRemaining = 999 } } }, 60))
-    assert.are.equal(0, probe.weak_remaining({ Extra = { survival = { weakUntil = 999 } } }, 60))
+    assert.are.equal(17, probe.weak_remaining({ extra = { survival = { weakRemaining = 17 } } }, 60))
+    assert.are.equal(60, probe.weak_remaining({ extra = { survival = { weakRemaining = 999 } } }, 60))
+    assert.are.equal(0, probe.weak_remaining({ extra = { survival = { weakUntil = 999 } } }, 60))
   end)
 
   it("test_real_vendor_public_api_reruns_and_cleans_isolated_objects", function()

@@ -54,7 +54,7 @@ local function make_data(player)
     Player = player,
     inited = true,
     load_state = "ready",
-    Data = {
+    data = {
       FishCoin = 0,
       Zone = "fishPond",
       weapons = {},
@@ -63,7 +63,7 @@ local function make_data(player)
         [GameCfg.Items.ContainerId.Backpack] = {},
       },
     },
-    Extra = {
+    extra = {
       growth = { potions = {}, upgrades = {} },
       inventory = { selection = { held = {} } },
       survival = { health = GameCfg.Vitals.MaxHealth, hunger = GameCfg.Vitals.MaxHunger },

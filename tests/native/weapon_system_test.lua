@@ -742,7 +742,7 @@ describe('TestMgrWeaponUpgrade', function()
 
 
     it('test_explosive_max_level_scales_detonation', function()
-        ctx.data.Extra.growth.upgrades.explosive = 3
+        ctx.data.extra.growth.upgrades.explosive = 3
         local slot = ctx:give_explosive(ctx.player, 'item144')
         ctx.other.Character.Position = { x = 0, y = 2, z = 14.9 }
         assert.is_true(ctx:throw(ctx.player, slot, { x = 0, y = 2, z = 10 }).ok)
@@ -755,7 +755,7 @@ describe('TestMgrWeaponUpgrade', function()
 
     -- 弹容满级 +150% 向上取整：狙击 5→13（7.5→8 逐级验证在配置层），第 14 发才空匣
     it('test_magazine_max_level_rounds_up_and_extends_ammo', function()
-        ctx.data.Extra.growth.upgrades.magazine = 3
+        ctx.data.extra.growth.upgrades.magazine = 3
         ctx:equip(ctx.player, 'item141')
         for i = 1, 13 do
             ctx:advance(2)
@@ -770,14 +770,14 @@ describe('TestMgrWeaponUpgrade', function()
 
     -- 近战满级 +70%：斧头 40→68 登记进挥砍；空手不吃武器加成
     it('test_melee_max_level_scales_staged_swing', function()
-        ctx.data.Extra.growth.upgrades.melee = 7
+        ctx.data.extra.growth.upgrades.melee = 7
         ctx:equip(ctx.player, 'item136')
         ctx:attack(ctx.player)
         local swing = SwingRegistry.peek_swing(ctx.player.UserId)
         assert.near(68, swing.damage, 1e-9)
         assert.same(4, swing.range)
-        ctx.data.Extra.inventory.selection.held = { kind = nil, id = nil, slot = nil } -- 回到空手
-        ctx.data.Data.selected_weapon = nil
+        ctx.data.extra.inventory.selection.held = { kind = nil, id = nil, slot = nil } -- 回到空手
+        ctx.data.data.selected_weapon = nil
         ctx:advance(2)
         ctx:attack(ctx.player)
         assert.same(5, SwingRegistry.peek_swing(ctx.player.UserId).damage)
@@ -785,7 +785,7 @@ describe('TestMgrWeaponUpgrade', function()
 
     -- 远程满级 +50%：每发弹丸乘算（霰弹 20→30）
     it('test_ranged_max_level_scales_each_pellet', function()
-        ctx.data.Extra.growth.upgrades.ranged = 5
+        ctx.data.extra.growth.upgrades.ranged = 5
         ctx:equip(ctx.player, 'item138')
         ctx.rayHit = { Instance = ctx.other.Character, Position = { x = 0, y = 2, z = 5 } }
         ctx:attack(ctx.player)
@@ -795,8 +795,8 @@ describe('TestMgrWeaponUpgrade', function()
 
     -- 火箭筒两段只归远程：直击 500→750；溅射 100→150，且不吃爆炸物加成（不双加成）
     it('test_rocket_two_stages_only_ranged_no_double_bonus', function()
-        ctx.data.Extra.growth.upgrades.ranged = 5
-        ctx.data.Extra.growth.upgrades.explosive = 3
+        ctx.data.extra.growth.upgrades.ranged = 5
+        ctx.data.extra.growth.upgrades.explosive = 3
         ctx:equip(ctx.player, 'item142')
         ctx.other.Character.Position = { x = 0, y = 2, z = 4 }
         ctx.rayHit = { Instance = ctx.other.Character, Position = { x = 0, y = 2, z = 4 } }

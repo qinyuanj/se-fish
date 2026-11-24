@@ -71,13 +71,13 @@ local function make_data(player, overrides)
     Player = player,
     inited = true,
     load_state = "ready",
-    Data = {
+    data = {
       FishCoin = overrides.coin or 0,
       Zone = overrides.zone or "fishPond",
       containers = containers,
       selected_slot = overrides.selected_slot,
     },
-    Extra = {
+    extra = {
       growth = { potions = {}, upgrades = {} },
       survival = {
         health = overrides.health or GameCfg.Vitals.MaxHealth,
@@ -91,7 +91,7 @@ local function make_data(player, overrides)
     },
     ItemCount = function(self, item_id)
       local total = 0
-      for _, container in pairs(self.Data.containers) do
+      for _, container in pairs(self.data.containers) do
         for _, entry in pairs(container) do
           if entry.itemId == item_id and (entry.count or 0) > 0 then
             total = total + entry.count
@@ -101,7 +101,7 @@ local function make_data(player, overrides)
       return total
     end,
     ConsumeItem = function(self, item_id)
-      for _, container in pairs(self.Data.containers) do
+      for _, container in pairs(self.data.containers) do
         for _, entry in pairs(container) do
           if entry.itemId == item_id and (entry.count or 0) > 0 then
             entry.count = entry.count - 1
@@ -280,7 +280,7 @@ describe("玩家生命双层相位宿主接缝（#298）", function()
     local tree = runtime:get_player_tree(player.UserId)
     runtime.clock:advance(1)
     assert.equals(GameCfg.Vitals.MaxHealth - 1, tree.states.health:now())
-    data.Data.containers[GameCfg.Items.ContainerId.Backpack] = {}
+    data.data.containers[GameCfg.Items.ContainerId.Backpack] = {}
     tree:sync_from_data(data)
     local health = tree.states.health:now()
     runtime.clock:advance(1)
@@ -451,7 +451,7 @@ describe("玩家生命双层相位宿主接缝（#298）", function()
     assert.is_true(tree:apply_hit(tree:new_hit(other, "fishAttack"), player, 999))
     runtime.clock:advance(4.2)
     tree:begin_leave()
-    local mark = data.Extra.survival
+    local mark = data.extra.survival
     assert.is_true(mark.dying)
     assert.is_false(mark.dead)
     assert.equals(11, mark.dyingRemaining)
@@ -497,9 +497,9 @@ describe("玩家生命双层相位宿主接缝（#298）", function()
     join(runtime, rejoined, restored)
     local again = runtime:get_player_tree(rejoined.UserId)
     assert.equals(1, calls)
-    assert.is_false(restored.Extra.survival.dying)
-    assert.is_false(restored.Extra.survival.dead)
-    assert.equals(GameCfg.Survival.WeakSec, restored.Extra.survival.weakRemaining)
+    assert.is_false(restored.extra.survival.dying)
+    assert.is_false(restored.extra.survival.dead)
+    assert.equals(GameCfg.Survival.WeakSec, restored.extra.survival.weakRemaining)
     assert.equals("alive", again.states.life_phase:now())
     local health = math.floor(GameCfg.Vitals.MaxHealth * GameCfg.Survival.ReviveHealthPercent / 100)
     assert.equals(health, again.states.health:now())
@@ -515,8 +515,8 @@ describe("玩家生命双层相位宿主接缝（#298）", function()
     local tree = runtime:get_player_tree(player.UserId)
     tree:apply_modifier("weak", { duration = 20 })
     tree:begin_leave()
-    assert.equals(20, data.Extra.survival.weakRemaining)
-    assert.is_false(data.Extra.survival.dying)
+    assert.equals(20, data.extra.survival.weakRemaining)
+    assert.is_false(data.extra.survival.dying)
     runtime:on_player_removing(player)
     local rejoined = make_player(3, 0, 0)
     local restored = make_data(rejoined, { weak_remaining = 20, health = 30, hunger = 30 })

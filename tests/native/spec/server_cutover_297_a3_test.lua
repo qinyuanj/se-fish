@@ -53,7 +53,7 @@ local function make_ready_data(player, overrides)
     Player = player,
     inited = true,
     load_state = "ready",
-    Data = {
+    data = {
       FishCoin = overrides.coin or 0,
       Zone = "fishPond",
       upgrade_level = 0,
@@ -65,7 +65,7 @@ local function make_ready_data(player, overrides)
       weapons = {},
       selected_slot = overrides.selected_slot,
     },
-    Extra = {
+    extra = {
       inventory = {
         weapons = {},
         selection = { held = {} },
@@ -266,25 +266,25 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
     assert.are.equal(fish, dot_hits[1].target)
 
     -- sync_from_data(d1) 不得触发反向 mirror_stage1_to_data 覆写替换 d1 内部子表引用
-    local ref_item_bar = d1.Data.containers.itemBar
-    local ref_bait = d1.Data.Bait
-    local ref_weapons = d1.Data.weapons
-    local ref_held = d1.Extra.inventory.selection.held
-    local ref_potions = d1.Extra.growth.potions
-    local ref_upgrades = d1.Extra.growth.upgrades
-    local ref_cooldowns = d1.Extra.cooldowns
-    d1.Data.FishCoin = 321
-    d1.Extra.growth.potions.item168 = 3
+    local ref_item_bar = d1.data.containers.itemBar
+    local ref_bait = d1.data.Bait
+    local ref_weapons = d1.data.weapons
+    local ref_held = d1.extra.inventory.selection.held
+    local ref_potions = d1.extra.growth.potions
+    local ref_upgrades = d1.extra.growth.upgrades
+    local ref_cooldowns = d1.extra.cooldowns
+    d1.data.FishCoin = 321
+    d1.extra.growth.potions.item168 = 3
     assert.is_true(pt1:sync_from_data(d1))
     assert.equals(321, pt1.states.coin:now())
     assert.equals(480, pt1.memos.max_health:now())
-    assert.are.equal(ref_item_bar, d1.Data.containers.itemBar)
-    assert.are.equal(ref_bait, d1.Data.Bait)
-    assert.are.equal(ref_weapons, d1.Data.weapons)
-    assert.are.equal(ref_held, d1.Extra.inventory.selection.held)
-    assert.are.equal(ref_potions, d1.Extra.growth.potions)
-    assert.are.equal(ref_upgrades, d1.Extra.growth.upgrades)
-    assert.are.equal(ref_cooldowns, d1.Extra.cooldowns)
+    assert.are.equal(ref_item_bar, d1.data.containers.itemBar)
+    assert.are.equal(ref_bait, d1.data.Bait)
+    assert.are.equal(ref_weapons, d1.data.weapons)
+    assert.are.equal(ref_held, d1.extra.inventory.selection.held)
+    assert.are.equal(ref_potions, d1.extra.growth.potions)
+    assert.are.equal(ref_upgrades, d1.extra.growth.upgrades)
+    assert.are.equal(ref_cooldowns, d1.extra.cooldowns)
 
     -- 玩家离场：三步协议拆除全部资源、连接、能力守卫，并清理其对活鱼施加的毒
     rt:on_player_removing(p1)
@@ -575,11 +575,11 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
       SpokeRuntime.batch(function()
         pt:set_coin(888)
         pt:set_upgrade_level(1)
-        data.Data.FishCoin = 888
-        data.Data.upgrade_level = 1
-        data.Data.selected_slot = nil
+        data.data.FishCoin = 888
+        data.data.upgrade_level = 1
+        data.data.selected_slot = nil
         mgrs.player_data_host:sync_player_tree(p)
-        data.Data.FishCoin = 999
+        data.data.FishCoin = 999
         mgrs.player_data_host:sync_player_tree(p)
       end)
       assert.equals(before_batch_pushes + 1, #item_bar_pushes)
@@ -589,8 +589,8 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
       -- 重新选回鱼竿格以维持后续测试预期
       re_map.ItemBarAction.OnServerEvent:Fire(p, { action = "SelectSlot", value = 1 })
 
-      data.Extra.growth.potions.item168 = 2
-      data.Extra.growth.potions.item167 = 5
+      data.extra.growth.potions.item168 = 2
+      data.extra.growth.potions.item167 = 5
       assert.is_true(mgrs.fish_ability:apply_growth(p).Ok)
       assert.equals(420, runtime.life:max_health_of(p))
       assert.near(1.4, ch.scale, 1e-9)

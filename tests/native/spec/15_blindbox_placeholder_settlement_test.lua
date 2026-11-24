@@ -113,7 +113,7 @@ describe('条款 15-21 / 15-01 / 15-09 / 15-10 / 15-11 盲盒占位支付通道�
         world.rolls = { MISS_ROLL }
         draw(1, 1)
         assert.same(0, world.data:ItemCount(LAST_ITEM), '确认前不得发奖')
-        assert.same(0, world.data.Extra.lottery.pity, '确认前不得推进保底计数')
+        assert.same(0, world.data.extra.lottery.pity, '确认前不得推进保底计数')
         assert.is_true(settle('success'))
         local result = world:last_result()
         assert.is_true(result.ok, result.reason)
@@ -121,7 +121,7 @@ describe('条款 15-21 / 15-01 / 15-09 / 15-10 / 15-11 盲盒占位支付通道�
         assert.same(LAST_ITEM, result.draws[1].itemKey)
         assert.same(1, result.pityAfter)
         assert.same(1, world.data:ItemCount(LAST_ITEM), '确认后必须真的发奖')
-        assert.same(1, world.data.Extra.lottery.pity)
+        assert.same(1, world.data.extra.lottery.pity)
     end)
 
     it('取消不发奖、不推进保底，也不残留待结算通道', function()
@@ -133,7 +133,7 @@ describe('条款 15-21 / 15-01 / 15-09 / 15-10 / 15-11 盲盒占位支付通道�
         assert.is_false(result.ok)
         assert.same('cancel', result.reason)
         assert.same(0, world.data:ItemCount(LAST_ITEM), '取消不得发奖')
-        assert.same(0, world.data.Extra.lottery.pity, '取消不得推进保底')
+        assert.same(0, world.data.extra.lottery.pity, '取消不得推进保底')
         assert.is_false(world.platform:has_flow(world.player))
         -- 不残留半截状态：下一次抽取仍能开通道
         world.rolls = { MISS_ROLL }
@@ -151,7 +151,7 @@ describe('条款 15-21 / 15-01 / 15-09 / 15-10 / 15-11 盲盒占位支付通道�
         assert.is_false(result.ok)
         assert.same('timeout', result.reason)
         assert.same(0, world.data:ItemCount(LAST_ITEM), '超时不得发奖')
-        assert.same(0, world.data.Extra.lottery.pity, '超时不得推进保底')
+        assert.same(0, world.data.extra.lottery.pity, '超时不得推进保底')
         assert.is_false(world.platform:has_flow(world.player))
     end)
 
@@ -167,7 +167,7 @@ describe('条款 15-21 / 15-01 / 15-09 / 15-10 / 15-11 盲盒占位支付通道�
 
     it('连续 49 抽未中大奖后第 50 抽强制保底，两个保底奖品都出得来', function()
         -- 抽前已连续未中 49 次（GameCfg.Blindbox.Pity.afterMisses）：本抽强制保底
-        world.data.Extra.lottery.pity = 49
+        world.data.extra.lottery.pity = 49
         world.rolls = { 1 }
         draw(1, 1)
         assert.is_true(settle('success'))
@@ -177,7 +177,7 @@ describe('条款 15-21 / 15-01 / 15-09 / 15-10 / 15-11 盲盒占位支付通道�
         assert.is_true(first.draws[1].jackpot)
         assert.same(0, first.pityAfter, '出大奖立即清零连续未中计数')
         -- 保底是等概率二选一：同一保底条件下 roll 2 取另一件
-        world.data.Extra.lottery.pity = 49
+        world.data.extra.lottery.pity = 49
         world.rolls = { 2 }
         draw(1, 2)
         assert.is_true(settle('success'))
@@ -187,16 +187,16 @@ describe('条款 15-21 / 15-01 / 15-09 / 15-10 / 15-11 盲盒占位支付通道�
     end)
 
     it('未满 49 抽不保底，自然出大奖也立即清零计数', function()
-        world.data.Extra.lottery.pity = 48
+        world.data.extra.lottery.pity = 48
         world.rolls = { MISS_ROLL }
         draw(1, 1)
         assert.is_true(settle('success'))
         local miss = world:last_result()
         assert.is_false(miss.draws[1].guaranteed, '未满 49 抽不得保底')
         assert.same(49, miss.pityAfter)
-        assert.same(49, world.data.Extra.lottery.pity)
+        assert.same(49, world.data.extra.lottery.pity)
         -- 自然出大奖（权重区间第一档，极品美人鱼）：计数立即清零
-        world.data.Extra.lottery.pity = 10
+        world.data.extra.lottery.pity = 10
         world.rolls = { 5 }
         draw(1, 2)
         assert.is_true(settle('success'))
@@ -204,6 +204,6 @@ describe('条款 15-21 / 15-01 / 15-09 / 15-10 / 15-11 盲盒占位支付通道�
         assert.is_true(jackpot.draws[1].jackpot)
         assert.is_false(jackpot.draws[1].guaranteed)
         assert.same(0, jackpot.pityAfter)
-        assert.same(0, world.data.Extra.lottery.pity)
+        assert.same(0, world.data.extra.lottery.pity)
     end)
 end)

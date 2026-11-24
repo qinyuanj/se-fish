@@ -7,10 +7,10 @@ describe("抛竿与等待上钩（ServerRuntime）", function()
 
   it("test_valid_cast_consumes_one_bait_and_waits_for_hook_delay", function()
     env = Host.new({ roll = 1, multiplier_roll = 150 })
-    local before = env.data.Data.Bait[GameCfg.Items.Id.Worm]
+    local before = env.data.data.Bait[GameCfg.Items.Id.Worm]
     env:cast()
     assert.are.equal("cast", env:last_state().phase)
-    assert.are.equal(before - 1, env.data.Data.Bait[GameCfg.Items.Id.Worm])
+    assert.are.equal(before - 1, env.data.data.Bait[GameCfg.Items.Id.Worm])
     env:advance(GameCfg.Casting.HookDelaySec - 0.01)
     assert.are.equal("cast", env:last_state().phase)
     env:advance(0.01)

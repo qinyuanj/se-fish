@@ -121,20 +121,20 @@ function SquadDock.mount(world, opts)
 
   function self:save_party_id(player, id)
     local data = self:data_of(player)
-    if not data or type(data.Extra) ~= "table" then
+    if not data or type(data.extra) ~= "table" then
       log_failure("写入小队归属 SavePartyId", player, "玩家存档或 Extra 不可用")
       return false, "save-failed"
     end
-    if type(data.Extra.party) ~= "table" then data.Extra.party = { id = 0 } end
+    if type(data.extra.party) ~= "table" then data.extra.party = { id = 0 } end
     local party_id = id or 0
-    data.Extra.party.id = party_id
-    data.Extra.party.epoch = party_id > 0 and self:session_epoch() or nil
+    data.extra.party.id = party_id
+    data.extra.party.epoch = party_id > 0 and self:session_epoch() or nil
     return true
   end
 
   function self:saved_party(player)
     local data = self:data_of(player)
-    local party = data and data.Extra and data.Extra.party
+    local party = data and data.extra and data.extra.party
     local id = party and party.id
     if type(id) ~= "number" or id ~= math.floor(id) or id <= 0 then return nil end
     return id, type(party.epoch) == "string" and party.epoch or nil

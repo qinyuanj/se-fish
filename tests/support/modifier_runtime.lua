@@ -12,8 +12,8 @@ local function make_dummy_data(player)
         Player = player,
         inited = true,
         load_state = 'ready',
-        Data = { FishCoin = 0, Zone = 'fishPond', containers = { itemBar = {}, backpack = {} }, Bait = {}, weapons = {} },
-        Extra = {
+        data = { FishCoin = 0, Zone = 'fishPond', containers = { itemBar = {}, backpack = {} }, Bait = {}, weapons = {} },
+        extra = {
             inventory = { weapons = {}, selection = { held = {} } },
             growth = { potions = {}, upgrades = {} },
             survival = {},

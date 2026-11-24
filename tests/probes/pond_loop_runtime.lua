@@ -72,12 +72,12 @@ local MgrFishUnit = setmetatable({}, {
 })
 local function equippedWeapon(data)
     if not data then return nil end
-    local held = data.Extra and data.Extra.inventory and data.Extra.inventory.selection
-        and data.Extra.inventory.selection.held
+    local held = data.extra and data.extra.inventory and data.extra.inventory.selection
+        and data.extra.inventory.selection.held
     if type(held) == 'table' and held.kind == 'weapon' and data:WeaponCount(held.id) > 0 then
         return held.id
     end
-    local selected = data.Data and data.Data.selected_weapon
+    local selected = data.data and data.data.selected_weapon
     if selected and data:WeaponCount(selected) > 0 then return selected end
     return nil
 end
@@ -191,8 +191,8 @@ local function fmt(x) return string.format('%.2f', x) end
 
 local function dataOf() return MgrPlayerData:get_data_inst(player) end
 
-local function coins(data) return data.Data.FishCoin or 0 end
-local function worms(data) return data.Data.Bait.worm or 0 end
+local function coins(data) return data.data.FishCoin or 0 end
+local function worms(data) return data.data.Bait.worm or 0 end
 
 local function snapshot(reason)
     local data = dataOf()
@@ -201,7 +201,7 @@ local function snapshot(reason)
     say('K', reason, 'coin=' .. tostring(coins(data)), 'worm=' .. tostring(worms(data)),
         'eelHead=' .. data:ItemCount('eelHead'), 'duck=' .. data:ItemCount('duck'),
         'garHead=' .. data:ItemCount('garHead'), 'ticket=' .. data:ItemCount('shrimpTicket'),
-        'zone=' .. tostring(data.Data.Zone),
+        'zone=' .. tostring(data.data.Zone),
         'pick=' .. c.pick, 'feed=' .. c.feed .. '/' .. c.feedTry, 'buy=' .. c.buy .. '/' .. c.buyTry,
         'rejected=' .. c.rejected, 'unsettled=' .. c.unsettled, 'cast=' .. c.cast,
         'hooked=' .. c.hooked, 'landed=' .. c.landed, 'dropped=' .. c.dropped, 'attacks=' .. c.attacks,
@@ -269,7 +269,7 @@ local function needNear(names, radius, slack, label)
 end
 
 -- ========== 库存辅助 ==========
-local function itemBar(data) return data.Data.containers[GameCfg.Items.ContainerId.ItemBar] end
+local function itemBar(data) return data.data.containers[GameCfg.Items.ContainerId.ItemBar] end
 
 local function slotOf(data, predicate)
     for slot, entry in pairs(itemBar(data)) do
@@ -294,7 +294,7 @@ local ids = GameCfg.Items.ContainerId
 local function freeSlots(data)
     local free = 0
     for _, c in ipairs({ { ids.ItemBar, data:ItemBarCapacity() }, { ids.Backpack, data:BackpackCapacity() } }) do
-        local items = data.Data.containers[c[1]]
+        local items = data.data.containers[c[1]]
         for i = 1, c[2] do
             local e = items[i]
             if not e or e.count <= 0 then free = free + 1 end
@@ -307,7 +307,7 @@ end
 local function findEntry(data, predicate)
     local slot, entry = slotOf(data, predicate)
     if slot then return ids.ItemBar, slot, entry end
-    local bp = data.Data.containers[ids.Backpack]
+    local bp = data.data.containers[ids.Backpack]
     for i = 1, data:BackpackCapacity() do
         local e = bp[i]
         if e and e.count > 0 and predicate(e) then return ids.Backpack, i, e end
@@ -352,8 +352,8 @@ end
 -- SelectSlot 是开关：已选中再选会取消，所以只在需要切换时调
 local function focus(data, slot)
     if slot == nil then
-        if data.Data.selected_slot ~= nil then data:SelectSlot(data.Data.selected_slot) end
-    elseif data.Data.selected_slot ~= slot then
+        if data.data.selected_slot ~= nil then data:SelectSlot(data.data.selected_slot) end
+    elseif data.data.selected_slot ~= slot then
         data:SelectSlot(slot)
     end
     MgrPlayerData:send_item_bar(player)
@@ -374,7 +374,7 @@ local SETTLE_TIMEOUT_SEC = 8
 local PENDING_KIND = { feed = 'feed', rod = 'buy', dagger = 'buy' }
 
 local function selectedItem(data)
-    local slot = data.Data.selected_slot
+    local slot = data.data.selected_slot
     local entry = slot and itemBar(data)[slot]
     return entry and entry.count and entry.count > 0 and entry.itemId or nil
 end
@@ -519,9 +519,9 @@ end
 -- 装备匕首：SelectWeapon 是开关，只在未选中时调；EquippedWeapon 复核，被别的手持武器压住时才用 HoldWeapon 切换
 local function equipDagger(data)
     if Weapon:EquippedWeapon(data) == DAGGER.Id then return true end
-    if data.Data.selected_weapon ~= DAGGER.Id then data:SelectWeapon(DAGGER.Id) end
+    if data.data.selected_weapon ~= DAGGER.Id then data:SelectWeapon(DAGGER.Id) end
     if Weapon:EquippedWeapon(data) ~= DAGGER.Id then
-        local held = data.Extra.inventory.selection.held
+        local held = data.extra.inventory.selection.held
         if held.kind == 'weapon' and held.id ~= DAGGER.Id then data:HoldWeapon(DAGGER.Id) end
     end
     MgrPlayerData:send_item_bar(player, true)
@@ -551,12 +551,12 @@ local function validate(data)
         'ItemCount', 'WeaponCount', 'GetItemBarSnapshot', 'ItemBarCapacity', 'BackpackCapacity' }) do
         need('data:' .. name, type(data[name]) == 'function')
     end
-    need('data.Data.Containers', type(data.Data.containers) == 'table' and type(data.Data.containers[ids.ItemBar]) == 'table'
-        and type(data.Data.containers[ids.Backpack]) == 'table')
-    need('data.Data.Weapons', type(data.Data.weapons) == 'table')
-    need('data.Data.Bait', type(data.Data.Bait) == 'table')
-    need('data.Extra.inventory.selection.held', type(data.Extra) == 'table' and type(data.Extra.inventory) == 'table'
-        and type(data.Extra.inventory.selection) == 'table' and type(data.Extra.inventory.selection.held) == 'table')
+    need('data.Data.Containers', type(data.data.containers) == 'table' and type(data.data.containers[ids.ItemBar]) == 'table'
+        and type(data.data.containers[ids.Backpack]) == 'table')
+    need('data.Data.Weapons', type(data.data.weapons) == 'table')
+    need('data.Data.Bait', type(data.data.Bait) == 'table')
+    need('data.Extra.inventory.selection.held', type(data.extra) == 'table' and type(data.extra.inventory) == 'table'
+        and type(data.extra.inventory.selection) == 'table' and type(data.extra.inventory.selection.held) == 'table')
     local goods = findGoodsByNumber(DAGGER.Number, DAGGER.MinLevel)
     need('商店编号 25 = item135', goods and goods.ItemId == DAGGER.Id and type(goods.Price) == 'number')
     need('GameCfg.Ability.MeleeWeapons.item135', GameCfg.Ability.MeleeWeapons and GameCfg.Ability.MeleeWeapons[DAGGER.Id] ~= nil)
@@ -602,7 +602,7 @@ local function castRod(data, useDuck)
         if duckSlot == 'moved' then return 'wait', 0.4 end
         if not duckSlot then return pause('鸭子饵不在道具栏: ' .. tostring(duckWhy)) end
     end
-    if data.Data.selected_bait ~= bait then
+    if data.data.selected_bait ~= bait then
         if not data:SelectBait(bait) then return pause('无法挂饵 ' .. bait) end
         MgrPlayerData:send_item_bar(player)
     end
@@ -769,8 +769,8 @@ local function step()
     if RT.pendingUntil and now() < RT.pendingUntil then return 'wait', 0.3 end
 
     -- 0 摆渡：有船票就去 FerryBoat（航线 1），到达虾池即闭环完成
-    if data.Data.Zone ~= zone1.Id then
-        say('DONE', '已到达', tostring(data.Data.Zone))
+    if data.data.Zone ~= zone1.Id then
+        say('DONE', '已到达', tostring(data.data.Zone))
         snapshot('done')
         return 'done'
     end
@@ -969,7 +969,7 @@ end
 
 -- ========== 异步驱动 ==========
 Task:Spawn(function()
-    say('START', 'Debug.Enabled=' .. tostring(GameCfg.Debug.Enabled), 'zone=' .. tostring(dataOf() and dataOf().Data.Zone))
+    say('START', 'Debug.Enabled=' .. tostring(GameCfg.Debug.Enabled), 'zone=' .. tostring(dataOf() and dataOf().data.Zone))
     snapshot('start')
     local lastKind = nil
     while RT.token == myToken do

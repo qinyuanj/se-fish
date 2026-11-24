@@ -35,7 +35,7 @@ function Mgr:begin(player)
     local data = self.player_data and self.player_data:get_data_inst(player)
     if self.Save and not data then return end
     local readKey = cfg().ReadKey or 'opening'
-    if data and data.Extra.story.read and data.Extra.story.read[readKey] then
+    if data and data.extra.story.read and data.extra.story.read[readKey] then
         self.requested[player.UserId] = nil
         return
     end
@@ -101,8 +101,8 @@ function Mgr:persist_read(player, state)
     local previousPhase = state.phase
     state.phase = 'saving'
     local accepted = self.Save:execute(player, data, operation, function(draft)
-        draft.Extra.story.read = draft.Extra.story.read or {}
-        draft.Extra.story.read[state.readKey] = true
+        draft.extra.story.read = draft.extra.story.read or {}
+        draft.extra.story.read[state.readKey] = true
         return { read = true, readKey = state.readKey }
     end, function(written, result)
         if self.States[player.UserId] ~= state then return end

@@ -42,8 +42,8 @@ end
 local function make_data(player, saved_party)
   return {
     Player = player, inited = true, load_state = "ready",
-    Data = { FishCoin = 0, Zone = "shrimpPond", containers = {} },
-    Extra = {
+    data = { FishCoin = 0, Zone = "shrimpPond", containers = {} },
+    extra = {
       growth = { potions = {}, upgrades = {} },
       survival = { health = GameCfg.Vitals.MaxHealth, hunger = GameCfg.Vitals.MaxHunger },
       party = saved_party,
@@ -232,7 +232,7 @@ describe("全局小队服务端宿主接缝（#314）", function()
     assert.equals("party", ctx:state(1).state)
     ctx.runtime:on_player_removing(ctx.players[3])
     assert.equals("none", ctx:state(1).state)
-    assert.equals(0, ctx.data[1].Extra.party.id)
+    assert.equals(0, ctx.data[1].extra.party.id)
   end)
 
   it("9-20 小队子域自动汇总血量与濒死相位，并沿用两秒抢救", function()
@@ -269,8 +269,8 @@ describe("全局小队服务端宿主接缝（#314）", function()
     ctx:make_party(1, 2)
     ctx:make_party(1, 3)
     local id = party_id(ctx, 1)
-    assert.equals(id, ctx.data[3].Extra.party.id)
-    assert.equals("session-314", ctx.data[3].Extra.party.epoch)
+    assert.equals(id, ctx.data[3].extra.party.id)
+    assert.equals("session-314", ctx.data[3].extra.party.epoch)
     ctx.runtime:on_player_removing(ctx.players[3])
     local back = make_player(3, 103, 0)
     ctx.players[3] = back
@@ -286,7 +286,7 @@ describe("全局小队服务端宿主接缝（#314）", function()
     ctx.data[2].Player = again
     ctx:join(2)
     assert.equals("disbanded", ctx:state(2).notice)
-    assert.equals(0, ctx.data[2].Extra.party.id)
+    assert.equals(0, ctx.data[2].extra.party.id)
   end)
 
   it("9-22 原队满员返回 full，空位出现后自动恢复", function()
@@ -302,7 +302,7 @@ describe("全局小队服务端宿主接缝（#314）", function()
     ctx.data[3].Player = back
     ctx:join(3)
     assert.equals("full", ctx:state(3).notice)
-    assert.equals(id, ctx.data[3].Extra.party.id)
+    assert.equals(id, ctx.data[3].extra.party.id)
     ctx:action(2, "Leave")
     assert.equals(id, party_id(ctx, 3))
     assert.equals("restored", ctx:state(3).notice)
@@ -318,7 +318,7 @@ describe("全局小队服务端宿主接缝（#314）", function()
     ctx:make_party(3, 4)
     assert.equals(saved_id, party_id(ctx, 3))
     assert.equals("disbanded", ctx:state(1).notice)
-    assert.equals(0, ctx.data[1].Extra.party.id)
+    assert.equals(0, ctx.data[1].extra.party.id)
     assert.equals(saved_id, party_id(ctx, 3))
   end)
 
@@ -332,7 +332,7 @@ describe("全局小队服务端宿主接缝（#314）", function()
     assert.equals("save-failed", ctx:result(2).reason)
     assert.is_nil(party_id(ctx, 1))
     assert.is_nil(party_id(ctx, 2))
-    assert.equals(0, ctx.data[1].Extra.party.id)
+    assert.equals(0, ctx.data[1].extra.party.id)
     local logged = table.concat(ctx.printed, "\n")
     assert.is_truthy(logged:find("SquadDock", 1, true))
     assert.is_truthy(logged:find("party%-save%-unavailable"))
@@ -345,7 +345,7 @@ describe("全局小队服务端宿主接缝（#314）", function()
     assert.is_false(ctx:result(2).ok)
     assert.equals(id, party_id(ctx, 1))
     assert.equals(id, party_id(ctx, 2))
-    assert.equals(id, ctx.data[2].Extra.party.id)
+    assert.equals(id, ctx.data[2].extra.party.id)
     ctx:action(2, "Leave")
     assert.is_true(ctx:result(2).ok)
     assert.is_nil(party_id(ctx, 1))

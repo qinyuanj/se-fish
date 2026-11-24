@@ -14,7 +14,7 @@ if not data or not pt or not player.Character or not player.Character.Controller
     print('PRIZE139 ABORT 玩家、存档或 PlayerTree 未就绪') return
 end
 local function log(...) print('PRIZE139', '[专项探针]', ...) end
-local growth = data.Extra.growth.potions
+local growth = data.extra.growth.potions
 local oldSpeed, oldBody = growth.item167, growth.item168
 local life = rt.life
 local oldWeak = pt:get_modifier_remaining('weak')

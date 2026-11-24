@@ -25,9 +25,9 @@ function Mgr:confirm(player,data,key)
         if not operation then return end
         self.busy[player.UserId]=true
         local accepted,reason=self.Save:execute(player,data,operation,function(draft)
-            if not draft.Extra.achievements[key] then return nil,'not-completed' end
-            draft.Extra.achievementDelivered=draft.Extra.achievementDelivered or {}
-            draft.Extra.achievementDelivered[key]=true
+            if not draft.extra.achievements[key] then return nil,'not-completed' end
+            draft.extra.achievementDelivered=draft.extra.achievementDelivered or {}
+            draft.extra.achievementDelivered[key]=true
             return {ok=true,achievement=key}
         end,function(ok,result)
             if self.player_data:get_data_inst(player)~=data then return end
@@ -39,8 +39,8 @@ function Mgr:confirm(player,data,key)
             print('[PlayerAchievements] 平台确认暂不能落账，保留补交',player.UserId,key,tostring(reason))
         end
     else
-        data.Extra.achievementDelivered=data.Extra.achievementDelivered or {}
-        data.Extra.achievementDelivered[key]=true
+        data.extra.achievementDelivered=data.extra.achievementDelivered or {}
+        data.extra.achievementDelivered[key]=true
         data:UpdateData(function() end,true)
     end
 end
@@ -55,8 +55,8 @@ function Mgr:update()
             for key,definition in pairs(GameCfg.Achievements) do
                 local id,placeholder=target(definition)
                 if placeholder and not debugEnabled() then id=nil end
-                if data.Extra.achievements and data.Extra.achievements[key]
-                    and not (data.Extra.achievementDelivered and data.Extra.achievementDelivered[key])
+                if data.extra.achievements and data.extra.achievements[key]
+                    and not (data.extra.achievementDelivered and data.extra.achievementDelivered[key])
                     and id then
                     self.retry_at[player.UserId]=now+GameCfg.AchievementDelivery.RetrySec
                     if self.archive then

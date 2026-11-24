@@ -206,7 +206,7 @@ describe("商店成长与限购", function()
         local data = new_data(104)
         assert.is_true(data:ApplyShopUpgrade(upgradeRow(33).Upgrade)) -- 背包升级 1
         assert.same(1, data:shop_upgrade_level('backpack'))
-        assert.same(1, data.Data.upgrade_level)
+        assert.same(1, data.data.upgrade_level)
         assert.same(3, data:ItemBarCapacity())
         assert.same(10, data:BackpackCapacity())
         -- 跳级买背包 3 拒绝

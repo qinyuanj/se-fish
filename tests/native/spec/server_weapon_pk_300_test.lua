@@ -56,7 +56,7 @@ local function make_data(player, overrides)
     Player = player,
     inited = true,
     load_state = "ready",
-    Data = {
+    data = {
       FishCoin = 0,
       Zone = "fishPond",
       weapons = overrides.weapons or {},
@@ -65,13 +65,13 @@ local function make_data(player, overrides)
         [GameCfg.Items.ContainerId.Backpack] = {},
       },
     },
-    Extra = {
+    extra = {
       growth = { potions = {}, upgrades = overrides.upgrades or {} },
       inventory = { selection = { held = overrides.held or {} } },
       survival = { health = GameCfg.Vitals.MaxHealth, hunger = GameCfg.Vitals.MaxHunger },
     },
     magazine_size = function(self, base)
-      return GameCfg.Shop.magazine_size(base, self.Extra.growth.upgrades.magazine or 0)
+      return GameCfg.Shop.magazine_size(base, self.extra.growth.upgrades.magazine or 0)
     end,
   }
 end
@@ -86,7 +86,7 @@ local function last_result(events, player)
 end
 
 local function hold(runtime, player, data, weapon_id)
-  data.Extra.inventory.selection.held = { kind = "weapon", id = weapon_id }
+  data.extra.inventory.selection.held = { kind = "weapon", id = weapon_id }
   runtime:get_player_tree(player.UserId):sync_from_data(data)
 end
 
@@ -277,7 +277,7 @@ describe("武器攻击换弹与 PK 过滤宿主接缝（#300）", function()
     assert.same(1, last_result(events, player).ammo)
 
     hold(runtime, player, data, nil)
-    data.Data.weapons.item142 = 1
+    data.data.weapons.item142 = 1
     hold(runtime, player, data, "item142")
     other.Character.Controller.Health = GameCfg.Vitals.MaxHealth
     other.Character.Position = { x = 0, y = 2, z = 4 }

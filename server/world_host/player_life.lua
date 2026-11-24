@@ -87,8 +87,8 @@ function PlayerLife.mount(s3, player_tree, opts)
   local remote = opts.remote
   local raw = {}
   local seeded = player_data and type(player_data.get_data_inst) == "function" and select(2, pcall(player_data.get_data_inst, player_data, player)) or data
-  if type(seeded) == "table" and type(seeded.Extra) == "table" and type(seeded.Extra.survival) == "table" then
-    raw = seeded.Extra.survival
+  if type(seeded) == "table" and type(seeded.extra) == "table" and type(seeded.extra.survival) == "table" then
+    raw = seeded.extra.survival
   end
 
   local now0 = clock.now()
@@ -123,9 +123,9 @@ function PlayerLife.mount(s3, player_tree, opts)
   local function mark_table()
     local inst = live_data()
     if type(inst) ~= "table" then return nil end
-    if type(inst.Extra) ~= "table" then inst.Extra = {} end
-    if type(inst.Extra.survival) ~= "table" then inst.Extra.survival = {} end
-    return inst.Extra.survival
+    if type(inst.extra) ~= "table" then inst.extra = {} end
+    if type(inst.extra.survival) ~= "table" then inst.extra.survival = {} end
+    return inst.extra.survival
   end
 
   local function max_health()
@@ -161,7 +161,7 @@ function PlayerLife.mount(s3, player_tree, opts)
   local function carrying_barrel(source)
     local held = vitals_cfg.HeldDamage
     if not held then return false end
-    local containers = source and source.Data and source.Data.containers
+    local containers = source and source.data and source.data.containers
     if type(containers) ~= "table" then return false end
     local ids = GameCfg.Items.ContainerId
     for _, id in ipairs({ ids.ItemBar, ids.Backpack }) do
@@ -654,7 +654,7 @@ function PlayerLife.mount(s3, player_tree, opts)
     if not operation or type(save_api.execute) ~= "function" then return end
     recover_flying = true
     local accepted = save_api:execute(player, inst, operation, function(draft)
-      local mark = draft.Extra and draft.Extra.survival
+      local mark = draft.extra and draft.extra.survival
       if type(mark) ~= "table" then return nil, "no-mark" end
       mark.dying, mark.dead = false, false
       mark.dyingRemaining, mark.deadRemaining = 0, 0
@@ -666,7 +666,7 @@ function PlayerLife.mount(s3, player_tree, opts)
       if not written then return end
       recovering:set(false)
       local live = mark_table()
-      if live and live ~= inst.Extra.survival and inst.Extra and inst.Extra.survival then
+      if live and live ~= inst.extra.survival and inst.extra and inst.extra.survival then
         live.dying, live.dead = false, false
         live.dyingRemaining, live.deadRemaining = 0, 0
         live.weakRemaining = survival_cfg.WeakSec
@@ -994,8 +994,8 @@ function PlayerLife.mount(s3, player_tree, opts)
       local inst = current_data()
       local mark = mark_table()
       if type(inst) == "table" and inst ~= data and type(mark) == "table" then
-        if type(inst.Extra) ~= "table" then inst.Extra = {} end
-        inst.Extra.survival = mark
+        if type(inst.extra) ~= "table" then inst.extra = {} end
+        inst.extra.survival = mark
       end
     end)
   end

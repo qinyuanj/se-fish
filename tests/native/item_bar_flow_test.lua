@@ -136,7 +136,7 @@ describe("道具栏的请求流", function()
         action:Fire(ctx.player, { action = 'DiscardSlot', value = 1 })
         assert.is_nil(ctx.player.lastState.selectedSlot)
         assert.is_nil(ctx.player.lastState.slots[1])
-        Mgr:get_data_inst(ctx.player).Data.Bait.worm = 1
+        Mgr:get_data_inst(ctx.player).data.Bait.worm = 1
         action:Fire(ctx.player, { action = 'EatBait', value = 'worm' })
         assert.same(0, ctx.player.lastState.bait.worm)
     end)
@@ -166,25 +166,25 @@ describe("道具栏的请求流", function()
             local action = ctx.events.ItemBarAction.OnServerEvent
             putFish()
             action:Fire(ctx.player, { action = 'EatSlot', value = 2 }) -- 未选中任何格：不吃
-            assert.is_not_nil(data.Data.containers[bar][2])
+            assert.is_not_nil(data.data.containers[bar][2])
             action:Fire(ctx.player, { action = 'SelectSlot', value = 2 })
             action:Fire(ctx.player, { action = 'EatSlot', value = 1 }) -- 与选中格不符：不吃
-            assert.is_not_nil(data.Data.containers[bar][2])
+            assert.is_not_nil(data.data.containers[bar][2])
             canEat = false -- Vitals 拒绝（如死亡期间）：不扣格、不恢复
             action:Fire(ctx.player, { action = 'EatSlot', value = 2 })
-            assert.is_not_nil(data.Data.containers[bar][2])
+            assert.is_not_nil(data.data.containers[bar][2])
             assert.same({}, healed)
             canEat = true
             local sent = ctx.player.stateCount
             action:Fire(ctx.player, { action = 'EatSlot', value = 2 })
-            assert.is_nil(data.Data.containers[bar][2])
+            assert.is_nil(data.data.containers[bar][2])
             assert.same({ 'carp' }, healed)
             assert.is_true(ctx.player.stateCount > sent) -- 吃完推送了新状态
             assert.is_nil(ctx.player.lastState.slots[2])
             assert.is_nil(ctx.player.lastState.selectedSlot)
             action:Fire(ctx.player, { action = 'SelectSlot', value = 1 }) -- 鱼竿没配 EatPercent：不能吃
             action:Fire(ctx.player, { action = 'EatSlot', value = 1 })
-            assert.is_not_nil(data.Data.containers[bar][1])
+            assert.is_not_nil(data.data.containers[bar][1])
             assert.same({ 'carp' }, healed)
         end)
         Mgr.Vitals = nil

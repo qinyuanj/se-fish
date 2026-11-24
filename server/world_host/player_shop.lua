@@ -6,7 +6,7 @@ local InteractionPoints = require("server.world_host.interaction_points")
 local PlayerShop = {}
 
 local function item_count(data, item_id)
-  return data.Data.Bait[item_id] or data:ItemCount(item_id)
+  return data.data.Bait[item_id] or data:ItemCount(item_id)
 end
 
 local function find_goods(item_id, level)
@@ -63,7 +63,7 @@ local function settle_purchase(draft, goods)
   if goods.Upgrade then
     local allowed, failure = draft:CanShopUpgrade(goods.Upgrade)
     if not allowed then return nil, failure end
-    local before_coin = draft.Data.FishCoin
+    local before_coin = draft.data.FishCoin
     if not draft:SpendCoin(goods.Price, function() draft:ApplyShopUpgrade(goods.Upgrade) end,
         "shop:" .. goods.Number) then
       return nil, "coin"
@@ -72,20 +72,20 @@ local function settle_purchase(draft, goods)
     return {
       ok = true, action = "Upgrade", number = goods.Number, name = goods.Name, price = goods.Price,
       kind = goods.Upgrade.kind, level = goods.Upgrade.level,
-      coinBefore = before_coin, coinAfter = draft.Data.FishCoin,
+      coinBefore = before_coin, coinAfter = draft.data.FishCoin,
     }
   end
   local item_id = goods.ItemId
   local allowed, failure = draft:CanGrant(item_id, 1)
   if not allowed then return nil, failure == "full" and "full" or "item" end
-  local before_coin, before_item = draft.Data.FishCoin, item_count(draft, item_id)
+  local before_coin, before_item = draft.data.FishCoin, item_count(draft, item_id)
   if not draft:SpendCoin(goods.Price, function() draft:GrantItem(item_id, 1) end, "shop:" .. item_id) then
     return nil, "coin"
   end
   draft:NotePurchase(goods.Number)
   return {
     ok = true, itemId = item_id, number = goods.Number, name = goods.Name, price = goods.Price,
-    coinBefore = before_coin, coinAfter = draft.Data.FishCoin,
+    coinBefore = before_coin, coinAfter = draft.data.FishCoin,
     itemBefore = before_item, itemAfter = item_count(draft, item_id),
   }
 end
@@ -131,13 +131,13 @@ function PlayerShop.mount(scope, tree, opts)
     local accepted = save:execute(player, data, operation, function(draft)
       local draft_row, failure = backpack_row(draft, stand.Level)
       if not draft_row then return nil, failure end
-      local before_coin, before_level = draft.Data.FishCoin, draft.Data.upgrade_level
+      local before_coin, before_level = draft.data.FishCoin, draft.data.upgrade_level
       local upgraded, cost = draft:UpgradeStorage()
       if not upgraded then return nil, cost end
       draft:NotePurchase(draft_row.Number)
       return {
-        ok = true, action = "UpgradeStorage", price = cost, level = draft.Data.upgrade_level,
-        coinBefore = before_coin, coinAfter = draft.Data.FishCoin, levelBefore = before_level,
+        ok = true, action = "UpgradeStorage", price = cost, level = draft.data.upgrade_level,
+        coinBefore = before_coin, coinAfter = draft.data.FishCoin, levelBefore = before_level,
       }
     end, function(written, result)
       if cleaned then return end

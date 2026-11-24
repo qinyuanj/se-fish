@@ -92,7 +92,7 @@ describe("道具栏与鱼饵栏", function()
         assert.is_nil(ctx.data:GetItemBarSnapshot().selectedSlot)
         assert.is_nil(ctx.data:GetItemBarSnapshot().slots[1])
         assert.is_false(ctx.data:DiscardSlot(1))
-        ctx.data.Data.Bait.worm = 1
+        ctx.data.data.Bait.worm = 1
         assert.is_true(ctx.data:SelectBait('worm'))
         assert.same(1, ctx.data:GetItemBarSnapshot().bait.worm)
         assert.is_true(ctx.data:ConsumeSelectedBait())
@@ -103,7 +103,7 @@ describe("道具栏与鱼饵栏", function()
     end)
 
     it("test_eat_and_cast_share_inventory_and_last_eat_clears_selection", function()
-        ctx.data.Data.Bait.worm = 2
+        ctx.data.data.Bait.worm = 2
         assert.is_true(ctx.data:SelectBait('worm'))
         assert.is_true(ctx.data:EatBait('worm'))
         assert.same(1, ctx.data:GetItemBarSnapshot().bait.worm)
@@ -130,7 +130,7 @@ describe("道具栏与鱼饵栏", function()
         assert.is_false(ok)
         assert.same('coin', reason)
         assert.same(2, ctx.data:GetItemBarSnapshot().slotCount)
-        assert.same(0, ctx.data.Data.FishCoin)
+        assert.same(0, ctx.data.data.FishCoin)
     end)
 
     it("test_initial_snapshot_has_two_slots_and_separate_bait", function()
@@ -192,7 +192,7 @@ describe("道具栏与鱼饵栏", function()
     end)
 
     it("test_switch_bait_does_not_spend_old_or_new_until_consume", function()
-        ctx.data.Data.Bait.shrimp = 2
+        ctx.data.data.Bait.shrimp = 2
         assert.is_true(ctx.data:SelectBait('worm'))
         assert.is_true(ctx.data:SelectBait('shrimp'))
         assert.same(10, ctx.data:GetItemBarSnapshot().bait.worm)
@@ -209,7 +209,7 @@ describe("道具栏与鱼饵栏", function()
         ctx.data:UpdateData(function(data) data.Bait.worm = 0 end)
         assert.is_nil(ctx.data:GetItemBarSnapshot().selectedBait)
         assert.is_false(ctx.data:SelectBait('worm'))
-        ctx.data.Data.selected_bait = 'worm'
+        ctx.data.data.selected_bait = 'worm'
         local ok, itemId = ctx.data:ConsumeSelectedBait()
         assert.is_false(ok)
         assert.is_nil(itemId)
@@ -227,7 +227,7 @@ describe("道具栏与鱼饵栏", function()
             assert.same(2 + level, snapshot.slotCount)
             assert.same(level == 6 and 40 or 5 + 5 * level, snapshot.backpackCount)
         end
-        assert.same(0, ctx.data.Data.FishCoin)
+        assert.same(0, ctx.data.data.FishCoin)
         assert.is_false(ctx.data:UpgradeStorage())
         for _ = 1, 47 do assert.is_true(ctx.data:AddItem('carp', 1)) end
         assert.is_false(ctx.data:AddItem('carp', 1))

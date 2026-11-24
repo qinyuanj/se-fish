@@ -71,7 +71,7 @@ local pairCount, tripleCount, noneCount = {}, {}, 0
 local coinsPaid, consumed = 0, 0
 for _ = 1, N do
     -- 每次投一件未烤极品罗非鱼（基础价 3）：直接摆进第 1 格，走真实 settle
-    local bar = data.Data.containers[ITEM_BAR]
+    local bar = data.data.containers[ITEM_BAR]
     for slot = 1, data:ItemBarCapacity() do bar[slot] = nil end
     bar[1] = { itemId = 'item7', count = 1, containerId = ITEM_BAR }
     local result = assert(lottery:settle(data, 1))
@@ -135,8 +135,8 @@ quantity('两同总数', pairTotal)
 quantity('三同总数', tripleTotal)
 quantity('未中奖数', noneCount)
 check('三种结局覆盖全部抽奖', pairTotal + tripleTotal + noneCount == N)
-check('金币账平：FishCoin == 累计赔付', data.Data.FishCoin == coinsPaid,
-    data.Data.FishCoin .. ' vs ' .. coinsPaid)
+check('金币账平：FishCoin == 累计赔付', data.data.FishCoin == coinsPaid,
+    data.data.FishCoin .. ' vs ' .. coinsPaid)
 
 -- 三同武器应全进独立库存；占格奖品在模拟里被下一次清格覆盖，按结果流计数
 local weaponGrants = 0
@@ -162,7 +162,7 @@ for i, p in ipairs(patterns) do
     bounds[i] = low -- 每轴取该图案区间下界，必中该图案
 end
 for i, p in ipairs(patterns) do
-    local bar = data.Data.containers[ITEM_BAR]
+    local bar = data.data.containers[ITEM_BAR]
     for slot = 1, data:ItemBarCapacity() do bar[slot] = nil end
     bar[1] = { itemId = 'item7', count = 1, containerId = ITEM_BAR }
     local roll = bounds[i]
@@ -174,21 +174,21 @@ for i, p in ipairs(patterns) do
         index = index + 1
         return assert(script[index], '专项脚本耗尽')
     end
-    local before = data.Data.FishCoin
+    local before = data.data.FishCoin
     local result = assert(lottery:settle(data, 1))
     local ok = result.outcome == 'triple' and result.patternName == p.name and result.prize ~= nil
     local placement
     if reward.kind == 'weaponChoice' then
         local itemId = reward.itemKeys[1]
         placement = result.prize.itemId == itemId and data:WeaponCount(itemId) >= 1
-            and data.Data.containers[ITEM_BAR][1] == nil
+            and data.data.containers[ITEM_BAR][1] == nil
     else
-        local entry = data.Data.containers[ITEM_BAR][1]
+        local entry = data.data.containers[ITEM_BAR][1]
         placement = result.prize.itemId == reward.itemKey and entry ~= nil
             and entry.itemId == reward.itemKey and entry.count == 1
     end
     check(string.format('[专项探针] 图案%d %s 三同发大奖且落位正确（不叠加金币）', i, p.name),
-        ok and placement and result.coins == nil and data.Data.FishCoin == before,
+        ok and placement and result.coins == nil and data.data.FishCoin == before,
         string.format('outcome=%s prize=%s coins=%s', tostring(result.outcome),
             result.prize and tostring(result.prize.itemId) or 'nil', tostring(result.coins)))
 end

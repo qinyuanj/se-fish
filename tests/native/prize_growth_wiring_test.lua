@@ -175,7 +175,7 @@ describe('TestPrizeGrowthPotion', function()
 
     -- 变大最多 10 个：第 10 个生效，第 11 个拒绝
     it('test_body_potion_10th_applies_growth_11th_rejected', function()
-        ctx.data.Extra.growth.potions.item168 = 9
+        ctx.data.extra.growth.potions.item168 = 9
         assert.is_true(drink('item168').ok)
         assert.same(10, ctx.data:potion_count('item168'))
         assert.same(1, #ctx.growth)
@@ -186,9 +186,9 @@ describe('TestPrizeGrowthPotion', function()
 
     -- 重进：药水次数与抽奖武器随存档往返
     it('test_rejoin_keeps_potion_counts_and_prize_weapons', function()
-        ctx.data.Extra.growth.potions.item167 = 19
+        ctx.data.extra.growth.potions.item167 = 19
         assert.is_true(drink('item167').ok)
-        ctx.data.Extra.growth.potions.item168 = 9
+        ctx.data.extra.growth.potions.item168 = 9
         assert.is_true(drink('item168').ok)
         assert.is_true(ctx.data:GrantWeapon('item165', 1)) -- 黄金AK47
         assert.is_true(ctx.data:GrantWeapon('item152', 1)) -- 淬毒匕首
@@ -205,7 +205,7 @@ describe('TestPrizeGrowthPotion', function()
 
     -- 统一规格 §2：加速最多 20 个；第 20 个生效，第 21 个拒绝且不扣格、不触发成长应用
     it('test_speed_potion_20th_applies_growth_21st_rejected', function()
-        ctx.data.Extra.growth.potions.item167 = 19
+        ctx.data.extra.growth.potions.item167 = 19
         local twentieth = drink('item167')
         assert.is_true(twentieth.ok)
         assert.same(20, ctx.data:potion_count('item167'))

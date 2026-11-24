@@ -136,7 +136,7 @@ describe('条款 1-12：适配层失败路径', function()
     it('timeout_replies_clear_reason_without_charge_or_grant', function()
         GameCfg.Platform.Goods.adrenaline1.goodsId = 'goodsAdr1'
         local shop = EconomyWorld.new()
-        local coin = shop.data.Data.FishCoin
+        local coin = shop.data.data.FishCoin
         assert.is_true(shop:platform_action({ action = 'Purchase', goods = 'adrenaline1', seq = 1 }))
         shop.now = shop.now + (GameCfg.Platform.FlowTimeoutSec or 0) + 1
         shop.platform:update()
@@ -147,7 +147,7 @@ describe('条款 1-12：适配层失败路径', function()
         assert.same('Purchase', last.action)
         assert.same('adrenaline1', last.goods)
         assert.same('timeout', last.reason)
-        assert.same(coin, shop.data.Data.FishCoin)
+        assert.same(coin, shop.data.data.FishCoin)
         assert.same(0, shop.data:ItemCount(itemId))
         assert.is_false(shop.platform:has_flow(shop.player))
         shop:tear_down()
@@ -156,7 +156,7 @@ describe('条款 1-12：适配层失败路径', function()
     it('fail_replies_clear_reason_without_charge_or_grant', function()
         GameCfg.Platform.Goods.adrenaline1.goodsId = 'goodsAdr1'
         local shop = EconomyWorld.new()
-        local coin = shop.data.Data.FishCoin
+        local coin = shop.data.data.FishCoin
         assert.is_true(shop:platform_action({ action = 'Purchase', goods = 'adrenaline1', seq = 1 }))
         shop:resolve_platform('fail')
         local last = shop:last_result('PlatformResult')
@@ -165,7 +165,7 @@ describe('条款 1-12：适配层失败路径', function()
         assert.same('Purchase', last.action)
         assert.same('adrenaline1', last.goods)
         assert.same('fail', last.reason)
-        assert.same(coin, shop.data.Data.FishCoin)
+        assert.same(coin, shop.data.data.FishCoin)
         assert.same(0, shop.data:ItemCount(itemId))
         assert.is_false(shop.platform:has_flow(shop.player))
         shop:tear_down()
@@ -175,7 +175,7 @@ describe('条款 1-12：适配层失败路径', function()
     it('unavailable_entry_replies_reason_and_keeps_account_untouched', function()
         GameCfg.Platform.Placeholder.Enabled = false
         local shop = EconomyWorld.new()
-        local coin = shop.data.Data.FishCoin
+        local coin = shop.data.data.FishCoin
         assert.is_false(shop:platform_action({ action = 'OpenCoinShop' }))
         local last = shop:last_result('PlatformResult')
         assert.is_table(last)
@@ -183,7 +183,7 @@ describe('条款 1-12：适配层失败路径', function()
         assert.same('CoinShop', last.action)
         assert.same('unavailable', last.reason)
         assert.is_false(shop.platform:has_flow(shop.player))
-        assert.same(coin, shop.data.Data.FishCoin)
+        assert.same(coin, shop.data.data.FishCoin)
         assert.same(0, shop.data:ItemCount(itemId))
         shop:tear_down()
     end)

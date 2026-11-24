@@ -6,8 +6,8 @@ local PlayerFisherman = {}
 local ITEM_BAR = GameCfg.Items.ContainerId.ItemBar
 
 local function selected_entry(data)
-  local items = data.Data.containers[ITEM_BAR]
-  local slot = data.Data.selected_slot
+  local items = data.data.containers[ITEM_BAR]
+  local slot = data.data.selected_slot
   local entry = slot and items[slot]
   if entry and entry.count > 0 then return slot, entry end
   return nil
@@ -44,9 +44,9 @@ local function saleable(data, point)
           entry.itemId, GameCfg.Fish[entry.itemId] and "fish" or "item"
     end
   end
-  local bait_id = data.Data.selected_bait
+  local bait_id = data.data.selected_bait
   local price = bait_id and point.BaitPrice[bait_id]
-  local count = bait_id and data.Data.Bait[bait_id]
+  local count = bait_id and data.data.Bait[bait_id]
   if price and type(count) == "number" and count >= 1 then
     return price, function(d) d.Bait[bait_id] = d.Bait[bait_id] - 1 end, bait_id, "bait"
   end
@@ -54,7 +54,7 @@ local function saleable(data, point)
 end
 
 local function item_count(data, item_id)
-  return data.Data.Bait[item_id] or data:ItemCount(item_id)
+  return data.data.Bait[item_id] or data:ItemCount(item_id)
 end
 
 local function exchangeable(data, point)
@@ -73,21 +73,21 @@ local function product_of(product)
 end
 
 local function deliver(target, exchange, product)
-  local items = target.Data.containers[ITEM_BAR]
+  local items = target.data.containers[ITEM_BAR]
   local kept = items[exchange.slot]
   if not kept or kept.count <= 0 or kept.itemId ~= exchange.tokenId then return false, "nothing" end
-  if product.achievement and target.Extra.achievements and target.Extra.achievements[product.achievement] then
+  if product.achievement and target.extra.achievements and target.extra.achievements[product.achievement] then
     return false, "already-completed"
   end
   items[exchange.slot] = nil
   if product.achievement then
-    target.Extra.achievements = target.Extra.achievements or {}
-    target.Extra.achievements[product.achievement] = true
+    target.extra.achievements = target.extra.achievements or {}
+    target.extra.achievements[product.achievement] = true
   elseif not target:CanGrant(product.itemId, 1) or not target:GrantItem(product.itemId, 1) then
     items[exchange.slot] = kept
     return false, "full"
   end
-  if target.Data.selected_slot == exchange.slot then target.Data.selected_slot = nil end
+  if target.data.selected_slot == exchange.slot then target.data.selected_slot = nil end
   return true
 end
 
@@ -135,7 +135,7 @@ function PlayerFisherman.mount(scope, tree, opts)
     end
     local result_value = nil
     local accepted = save:execute(player, data, operation, function(draft)
-      local entry = draft.Data.containers[ITEM_BAR][request.slot]
+      local entry = draft.data.containers[ITEM_BAR][request.slot]
       if not entry or entry.itemId ~= request.tokenId then return nil, "nothing" end
       local before_token = item_count(draft, request.tokenId)
       local before_product = item_count(draft, request.product)
@@ -143,7 +143,7 @@ function PlayerFisherman.mount(scope, tree, opts)
       if not changed then return nil, failure end
       local result = {
         ok = true, action = "Feed", exchange = { from = request.tokenId, to = request.product },
-        coinBefore = draft.Data.FishCoin, coinAfter = draft.Data.FishCoin,
+        coinBefore = draft.data.FishCoin, coinAfter = draft.data.FishCoin,
         tokenBefore = before_token, tokenAfter = item_count(draft, request.tokenId),
         itemBefore = before_product, itemAfter = item_count(draft, request.product),
       }
@@ -163,13 +163,13 @@ function PlayerFisherman.mount(scope, tree, opts)
   end
 
   local function feed(operation, point, anchor)
-    local selected_slot, selected_bait = data.Data.selected_slot, data.Data.selected_bait
+    local selected_slot, selected_bait = data.data.selected_slot, data.data.selected_bait
     local result_value = nil
     local accepted = save:execute(player, data, operation, function(draft)
-      draft.Data.selected_slot, draft.Data.selected_bait = selected_slot, selected_bait
+      draft.data.selected_slot, draft.data.selected_bait = selected_slot, selected_bait
       local earned, consume, item_id, category = saleable(draft, point)
       if not earned then return nil, "nothing" end
-      local before_coin, before_item = draft.Data.FishCoin, item_count(draft, item_id)
+      local before_coin, before_item = draft.data.FishCoin, item_count(draft, item_id)
       if not draft:AddCoin(earned, consume, "feed") then return nil, "nothing" end
       if opts.quest and opts.quest.record_fact then
         opts.quest:record_fact(draft, "Feed", {
@@ -178,7 +178,7 @@ function PlayerFisherman.mount(scope, tree, opts)
       end
       return {
         ok = true, action = "Feed", coins = earned, itemId = item_id, category = category,
-        coinBefore = before_coin, coinAfter = draft.Data.FishCoin,
+        coinBefore = before_coin, coinAfter = draft.data.FishCoin,
         itemBefore = before_item, itemAfter = item_count(draft, item_id),
       }
     end, function(written, result)

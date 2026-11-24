@@ -51,7 +51,7 @@ end
 
 -- 找一条未烤鱼获；wantToken=true 时只要信物，=false 时只要非信物，nil 不限
 local function grillableSlot(wantToken)
-    for containerId, container in pairs(data.Data.containers) do
+    for containerId, container in pairs(data.data.containers) do
         for index, entry in pairs(container) do
             local def = entry.itemId and cfg.Items.Definitions[entry.itemId]
             if entry.count > 0 and def and (def.Type == '食物' or def.Type == '极品食物')
@@ -78,7 +78,7 @@ local function health()
 end
 
 local function findCooked(itemId)
-    for _, container in pairs(data.Data.containers) do
+    for _, container in pairs(data.data.containers) do
         for _, e in pairs(container) do
             if e.itemId == itemId and e.count > 0 and e.cooked ~= nil then return e end
         end
@@ -125,7 +125,7 @@ task:Spawn(function()
         '曲线倍率=' .. curve.Format(curve.rate(elapsed, cfg.Grill) or -1),
         '格位cooked=' .. tostring(back and back.cooked),
         'saved.k=' .. tostring(back and back.saved and back.saved.k),
-        '选中格=' .. tostring(data.Data.selected_slot))
+        '选中格=' .. tostring(data.data.selected_slot))
 
     -- 场景 B：烤糊（非信物）
     local cidB, idxB, entryB = grillableSlot(false)
@@ -145,6 +145,6 @@ task:Spawn(function()
         '差值=' .. tostring(before and after and (before - after)),
         '会话=' .. tostring(player.grill_state and player.grill_state.state or '已清'),
         '库存残留=' .. tostring(data:ItemCount(entryB.itemId)),
-        '待恢复=' .. tostring(data.Extra.recovery.grill ~= nil))
+        '待恢复=' .. tostring(data.extra.recovery.grill ~= nil))
     log('观察结束')
 end)

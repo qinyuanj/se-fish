@@ -83,7 +83,7 @@ local function make_data(player, item_id, zone)
     Player = player,
     inited = true,
     load_state = "ready",
-    Data = {
+    data = {
       FishCoin = 0,
       Zone = zone or "fishPond",
       selected_slot = item_id and 1 or nil,
@@ -95,7 +95,7 @@ local function make_data(player, item_id, zone)
       Bait = {},
       weapons = {},
     },
-    Extra = {
+    extra = {
       cooldowns = {},
       survival = { health = GameCfg.Vitals.MaxHealth, hunger = GameCfg.Vitals.MaxHunger },
     },
@@ -139,9 +139,9 @@ describe("风神之翼与哥斯拉存活相位宿主接缝（#299）", function(
 
   local function select_item(target, item_id)
     local record = target == player and data or other_data
-    local bar = record.Data.containers[GameCfg.Items.ContainerId.ItemBar]
+    local bar = record.data.containers[GameCfg.Items.ContainerId.ItemBar]
     bar[1] = item_id and { itemId = item_id, count = 1 } or nil
-    record.Data.selected_slot = item_id and 1 or nil
+    record.data.selected_slot = item_id and 1 or nil
     runtime:get_player_tree(target.UserId):sync_from_data(record)
   end
 
@@ -397,14 +397,14 @@ describe("风神之翼与哥斯拉存活相位宿主接缝（#299）", function(
     assert.is_true(player.last_result.ok)
     runtime.clock:advance(2)
     runtime:on_player_removing(player)
-    local remaining = data.Extra.cooldowns.godzillaBreath
+    local remaining = data.extra.cooldowns.godzillaBreath
     assert.near(18, remaining, 0.05)
     assert.is_true(has_call(player.Character, "resetSkin"))
     assert.is_true(player.Character.Controller.GravityEnabled)
 
     local rejoined = make_player(1, 6, 5.01, 40)
     local next_data = make_data(rejoined, "item170")
-    next_data.Extra.cooldowns.godzillaBreath = remaining
+    next_data.extra.cooldowns.godzillaBreath = remaining
     data = next_data
     runtime:on_player_added(rejoined)
     runtime:on_save_ready(rejoined, next_data)
@@ -420,11 +420,11 @@ describe("风神之翼与哥斯拉存活相位宿主接缝（#299）", function(
   it("切槽和濒死不清空吐息冷却，松开飞行不受限频影响", function()
     boot("item170")
     act(player, { action = "breath" })
-    local cast_remaining = data.Extra.cooldowns.godzillaBreath
+    local cast_remaining = data.extra.cooldowns.godzillaBreath
     select_item(player, "item169")
     local tree = runtime:get_player_tree(player.UserId)
     assert.is_true(tree:apply_hit(tree:new_hit(other, "fishAttack"), player, 9999))
-    assert.near(cast_remaining, data.Extra.cooldowns.godzillaBreath, 0.05)
+    assert.near(cast_remaining, data.extra.cooldowns.godzillaBreath, 0.05)
 
     runtime.clock:advance(46)
     assert.equals("alive", tree.states.life_phase:now())
@@ -447,7 +447,7 @@ describe("风神之翼与哥斯拉存活相位宿主接缝（#299）", function(
     act(player, { action = "fly", holding = true })
     runtime.clock:step(1)
     assert.is_false(player.Character.Controller.GravityEnabled)
-    data.Data.Zone = "coralCoast"
+    data.data.Zone = "coralCoast"
     runtime:get_player_tree(player.UserId):sync_from_data(data)
     assert.is_true(player.Character.Controller.GravityEnabled)
     assert.is_true(has_call(player.Character, "unbind"))

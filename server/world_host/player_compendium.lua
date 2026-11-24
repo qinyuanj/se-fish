@@ -23,14 +23,14 @@ end
 
 function Mgr:snapshot(player)
     local data = self.player_data and self.player_data:get_data_inst(player)
-    local bag = data and data.Extra and data.Extra.collection or nil
+    local bag = data and data.extra and data.extra.collection or nil
     if not bag or data.load_state ~= 'ready' then
         return { state = data and data.load_state == 'loading' and 'loading' or 'unavailable',
             unlocked = {}, catches = {}, weights = {}, total = 0 }
     end
     return { unlocked = copy(bag.unlocked), catches = copy(bag.catches),
         weights = copy(bag.weights), total = bag.total or 0, state = 'ready',
-        completed = data.Extra.achievements and data.Extra.achievements.final == true }
+        completed = data.extra.achievements and data.extra.achievements.final == true }
 end
 
 function Mgr:handle(player, payload)
@@ -51,7 +51,7 @@ function Mgr:weight(fishId, mult)
 end
 
 local function apply(draft, event, weight)
-    local bag = collection(draft.Extra)
+    local bag = collection(draft.extra)
     local previous = bag.weights[event.fishId]
     local record = previous == nil or weight > previous
     bag.unlocked[event.fishId] = true

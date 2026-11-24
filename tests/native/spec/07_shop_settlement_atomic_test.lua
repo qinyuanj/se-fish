@@ -40,7 +40,7 @@ describe("条款 7-17 商店购买的扣费与发奖在一次结算里落地", f
     assert.same(1000 - price, reply.coinAfter)
     assert.same(baseline, reply.itemBefore)
     assert.same(baseline + 1, reply.itemAfter)
-    assert.same(1000 - price, data.Data.FishCoin)
+    assert.same(1000 - price, data.data.FishCoin)
     assert.same(baseline + 1, data:ItemCount(ROW_ITEM))
   end)
 
@@ -50,7 +50,7 @@ describe("条款 7-17 商店购买的扣费与发奖在一次结算里落地", f
     assert.is_false(reply.ok)
     assert.same("coin", reply.reason)
     assert.is_nil(reply.coinAfter)
-    assert.same(0, data.Data.FishCoin)
+    assert.same(0, data.data.FishCoin)
     assert.same(baseline, data:ItemCount(ROW_ITEM))
   end)
 
@@ -60,7 +60,7 @@ describe("条款 7-17 商店购买的扣费与发奖在一次结算里落地", f
     assert.is_false(reply.ok)
     assert.same("full", reply.reason)
     assert.is_nil(reply.coinAfter)
-    assert.same(1000, data.Data.FishCoin)
+    assert.same(1000, data.data.FishCoin)
     assert.same(baseline, data:ItemCount(ROW_ITEM))
   end)
 end)

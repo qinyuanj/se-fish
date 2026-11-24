@@ -36,8 +36,8 @@ local function coin_amount(offer)
   return math.floor(offer.price * unit + 0.5)
 end
 local function bag(data)
-  local extra = data.Extra
-  if type(extra) ~= "table" then extra = {}; data.Extra = extra end
+  local extra = data.extra
+  if type(extra) ~= "table" then extra = {}; data.extra = extra end
   local value = extra.platformShop
   if type(value) ~= "table" then
     value = {}
@@ -115,11 +115,11 @@ function PlayerPlatformShop.mount(scope, tree, opts)
       local offer = coin_offer(intent.goods)
       local amount = coin_amount(offer)
       if not amount then return nil, "unavailable" end
-      local before = draft.Data.FishCoin
+      local before = draft.data.FishCoin
       if not draft:AddCoin(amount, nil, "coinpage:" .. intent.goods) then return nil, "coin" end
       return {
         ok = true, action = "CoinGrant", goods = intent.goods, name = offer.name,
-        coin = amount, coinBefore = before, coinAfter = draft.Data.FishCoin,
+        coin = amount, coinBefore = before, coinAfter = draft.data.FishCoin,
       }
     end
     local row = cfg().Goods[intent.goods]

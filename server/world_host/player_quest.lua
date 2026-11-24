@@ -10,19 +10,19 @@ end
 
 -- 持久业务在自己的隔离 draft 内记事实，让扣件/扣费/发货与任务进度同键落账。
 function Mgr:record_fact(draft, kind, payload)
-    local state = QuestSteps.restore(cfg().Steps, draft.Extra.quest)
+    local state = QuestSteps.restore(cfg().Steps, draft.extra.quest)
     local counted, advanced = QuestSteps.apply(cfg().Steps, state, {
         kind = kind, itemId = payload.itemId, category = payload.category, count = payload.count,
         eventId = tostring(draft.save_meta.epoch) .. ':' .. payload.eventId,
     })
-    if counted then draft.Extra.quest = state end
+    if counted then draft.extra.quest = state end
     return counted, advanced
 end
 
 function Mgr:refresh_committed(player, data)
     local previous = self:get_state(player)
     if not previous or not data or not data.inited then return end
-    local restored = QuestSteps.restore(cfg().Steps, data.Extra.quest)
+    local restored = QuestSteps.restore(cfg().Steps, data.extra.quest)
     if restored.step == previous.step and restored.count == previous.count then return end
     self.States[player.UserId] = restored
     local queue = self.queues[player.UserId]
@@ -116,7 +116,7 @@ function Mgr:on_player_added(player)
     local data = self.player_data and self.player_data:get_data_inst(player)
     if self.Save and not data then return end
     self.Players[player.UserId] = player
-    self.States[player.UserId] = data and QuestSteps.restore(cfg().Steps, data.Extra.quest) or QuestSteps.new()
+    self.States[player.UserId] = data and QuestSteps.restore(cfg().Steps, data.extra.quest) or QuestSteps.new()
     self.queues[player.UserId] = { player = player, data = data, events = {} }
     self:publish(player)
 end
@@ -145,9 +145,9 @@ function Mgr:drain(player)
     local fact, c = queue.events[1], cfg()
     queue.writing = true
     local accepted = self.Save:execute(player, data, operation, function(draft)
-        local state = QuestSteps.restore(c.Steps, draft.Extra.quest)
+        local state = QuestSteps.restore(c.Steps, draft.extra.quest)
         local counted, advanced = QuestSteps.apply(c.Steps, state, fact)
-        draft.Extra.quest = state
+        draft.extra.quest = state
         return { counted = counted, advanced = advanced }
     end, function(written, result)
         if self.queues[player.UserId] ~= queue then return end
@@ -161,7 +161,7 @@ function Mgr:drain(player)
             return
         end
         table.remove(queue.events, 1)
-        local restored = QuestSteps.restore(c.Steps, data.Extra.quest)
+        local restored = QuestSteps.restore(c.Steps, data.extra.quest)
         self.States[player.UserId] = restored
         local notice
         if result.advanced then

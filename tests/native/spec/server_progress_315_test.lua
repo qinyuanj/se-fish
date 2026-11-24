@@ -22,7 +22,7 @@ describe("服务端图鉴、纪录与玩家进度宿主接缝（#315）", functi
     assert.is_true(world:landing("bass", 1.5, 2))
     world:landing("bass", 1.5, 2)
     assert.is_true(world:landing("bass", 0.8, 3))
-    local bag = world.data.Extra.collection
+    local bag = world.data.extra.collection
     assert.same(3, bag.total)
     assert.same(3, bag.catches.bass)
     assert.same(heavier, bag.weights.bass)
@@ -30,9 +30,9 @@ describe("服务端图鉴、纪录与玩家进度宿主接缝（#315）", functi
     assert.is_true(first < heavier)
     world:persist_ready()
     world:reconnect()
-    assert.same(heavier, world.data.Extra.collection.weights.bass)
-    assert.same(3, world.data.Extra.collection.total)
-    assert.is_nil(world.data.Extra.blindbox)
+    assert.same(heavier, world.data.extra.collection.weights.bass)
+    assert.same(3, world.data.extra.collection.total)
+    assert.is_nil(world.data.extra.blindbox)
   end)
 
   it("图鉴查询返回真实存档，全服纪录经原子更新保留重量与保持者", function()
@@ -45,7 +45,7 @@ describe("服务端图鉴、纪录与玩家进度宿主接缝（#315）", functi
     assert.same("ok", record.state)
     assert.same(world.player.UserId, record.userId)
     assert.same(world.player.Name, record.holder)
-    assert.same(world.data.Extra.collection.weights.bass, record.weight)
+    assert.same(world.data.extra.collection.weights.bass, record.weight)
   end)
 
   it("平台纪录不可读时保留个人图鉴并明确返回未取得数据", function()
@@ -53,11 +53,11 @@ describe("服务端图鉴、纪录与玩家进度宿主接缝（#315）", functi
     assert.is_true(world:landing("bass", 1, 21))
     world:request("RecordsRequest", { fishId = "bass", seq = 1 })
     assert.same("unavailable", world:last_result("RecordsState").state)
-    assert.is_true(world.data.Extra.collection.unlocked.bass)
+    assert.is_true(world.data.extra.collection.unlocked.bass)
   end)
 
   it("九步任务只按当前步骤推进，重复事件不跳步也不发奖励", function()
-    local before = world.data.Data.FishCoin
+    local before = world.data.data.FishCoin
     world:notify("PickBait", { itemId = "worm", count = 5, eventId = "pick-1" })
     world:notify("Feed", { itemId = "worm", count = 5, eventId = "feed-1" })
     world:notify("Buy", { itemId = "starterRod", eventId = "buy-1" })
@@ -68,8 +68,8 @@ describe("服务端图鉴、纪录与玩家进度宿主接缝（#315）", functi
     world:notify("Kill", { itemId = "bass", eventId = "kill-1" })
     world:notify("Feed", { category = "fish", eventId = "feed-fish-1" })
     world:notify("Feed", { category = "fish", eventId = "feed-fish-1" })
-    assert.same(#GameCfg.Quest.Steps + 1, world.data.Extra.quest.step)
-    assert.same(before, world.data.Data.FishCoin)
+    assert.same(#GameCfg.Quest.Steps + 1, world.data.extra.quest.step)
+    assert.same(before, world.data.data.FishCoin)
     assert.same("新手任务完成！", world:last_result("QuestState").text)
   end)
 
@@ -101,28 +101,28 @@ describe("服务端图鉴、纪录与玩家进度宿主接缝（#315）", functi
   -- 13-12 / 13-13 / 13-14：本地标记、失败补交与确认去重。
   it("通关成就先保留本地标记，平台失败保留补交且确认后不重复", function()
     GameCfg.Achievements.final.PlatformId = 123456
-    world.data.Extra.achievements.final = true
+    world.data.extra.achievements.final = true
     world.archive.completed = false
     world:advance(1)
     assert.same(1, #world.archive.submissions)
-    assert.is_nil((world.data.Extra.achievementDelivered or {}).final)
+    assert.is_nil((world.data.extra.achievementDelivered or {}).final)
     world.archive.completed = true
     world:advance(GameCfg.AchievementDelivery.RetrySec + 1)
     world:advance(GameCfg.AchievementDelivery.RetrySec + 1)
-    assert.is_true((world.data.Extra.achievementDelivered or {}).final)
+    assert.is_true((world.data.extra.achievementDelivered or {}).final)
     local submissions = #world.archive.submissions
     world:advance(GameCfg.AchievementDelivery.RetrySec + 1)
     assert.same(submissions, #world.archive.submissions)
   end)
 
   it("GM 只经上行意图修改调试状态，关闭调试后拒绝", function()
-    local before = world.data.Data.FishCoin
+    local before = world.data.data.FishCoin
     world:request("GMAction", { action = "Coin", amount = 25 })
-    assert.same(before + 25, world.data.Data.FishCoin)
+    assert.same(before + 25, world.data.data.FishCoin)
     assert.is_true(world:last_result("GMResult").ok)
     GameCfg.Debug.Enabled = false
     world:request("GMAction", { action = "Coin", amount = 25 })
-    assert.same(before + 25, world.data.Data.FishCoin)
+    assert.same(before + 25, world.data.data.FishCoin)
     assert.is_false(world:last_result("GMResult").ok)
   end)
 end)
@@ -143,7 +143,7 @@ describe("服务端旧进度玩法的公开宿主等价迁移（#315）", functi
   end)
 
   it("九十八种鱼各自解锁，盲盒计数不混入且重复上岸序列只落一次", function()
-    world.data.Extra.lottery.pity = 3
+    world.data.extra.lottery.pity = 3
     local serial = 0
     for fishId in pairs(GameCfg.Fish) do
       serial = serial + 1
@@ -158,7 +158,7 @@ describe("服务端旧进度玩法的公开宿主等价迁移（#315）", functi
       count = count + 1
     end
     assert.same(98, count)
-    assert.same(3, world.data.Extra.lottery.pity)
+    assert.same(3, world.data.extra.lottery.pity)
     assert.is_nil(snapshot.catches.lottery)
     local operations = #world.data.save_meta.operations
     assert.is_false(world:landing("bass", 1, 98))
@@ -272,19 +272,19 @@ describe("服务端旧进度玩法的公开宿主等价迁移（#315）", functi
 
   it("任务乱序与重复事实不推进、不发奖，部分计数跨重进且按新 epoch 去重", function()
     assert.is_false(world:notify("Feed", { itemId = "tilapia", eventId = "early" }))
-    local coin = world.data.Data.FishCoin
+    local coin = world.data.data.FishCoin
     assert.is_true(world:notify("PickBait", { itemId = "worm", eventId = "same" }))
-    assert.same(coin, world.data.Data.FishCoin)
+    assert.same(coin, world.data.data.FishCoin)
     assert.is_false(world:notify("PickBait", { itemId = "worm", eventId = "same" }))
     world:persist_ready()
     world:reconnect()
     assert.is_true(world:notify("PickBait", { itemId = "worm", count = 2, eventId = "same" }))
-    assert.same(3, world.data.Extra.quest.count)
+    assert.same(3, world.data.extra.quest.count)
     world:persist_ready()
     world:reconnect()
-    assert.same(3, world.data.Extra.quest.count)
+    assert.same(3, world.data.extra.quest.count)
     assert.is_true(world:notify("PickBait", { itemId = "worm", count = 1, eventId = "same" }))
-    assert.same(4, world.data.Extra.quest.count)
+    assert.same(4, world.data.extra.quest.count)
   end)
 
   it("剧情已读写失败保持未读并可重试，离场等待已接受已读写", function()
@@ -293,7 +293,7 @@ describe("服务端旧进度玩法的公开宿主等价迁移（#315）", functi
     assert.same("opening", world:last_result("StoryNotice").readKey)
     world.failWrites = true
     world:request("StoryRead", { action = "read", readKey = "opening" })
-    assert.is_nil(world.data.Extra.story.read.opening)
+    assert.is_nil(world.data.extra.story.read.opening)
     world.failWrites = false
     world:use_player(world:add_player(2400, "重试"))
     world:clear_events()
@@ -320,23 +320,23 @@ describe("服务端旧进度玩法的公开宿主等价迁移（#315）", functi
     GameCfg.Achievements.final.PlatformId = nil
     GameCfg.Achievements.final.PlaceholderId = 990001
     GameCfg.Debug.Enabled = false
-    world.data.Extra.achievements.final = true
+    world.data.extra.achievements.final = true
     world:advance(GameCfg.AchievementDelivery.RetrySec + 1)
     assert.same(0, #world.archive.queries)
-    assert.is_nil((world.data.Extra.achievementDelivered or {}).final)
+    assert.is_nil((world.data.extra.achievementDelivered or {}).final)
     GameCfg.Debug.Enabled = true
     world.archive.completed = false
     world:advance(GameCfg.AchievementDelivery.RetrySec + 1)
     assert.same(990001, world.archive.submissions[1].id)
     world.archive.completed = true
     world:advance(GameCfg.AchievementDelivery.RetrySec + 1)
-    assert.is_nil((world.data.Extra.achievementDelivered or {}).final)
+    assert.is_nil((world.data.extra.achievementDelivered or {}).final)
   end)
 
   -- 13-18 / 17-17：真实 ID 确认与平台异常仍遵循同一持久化契约。
   it("成就平台查询和提交异常均可补交，真实 ID 确认只落一次", function()
     GameCfg.Achievements.final.PlatformId = 3801
-    world.data.Extra.achievements.final = true
+    world.data.extra.achievements.final = true
     world.archive.queryError = true
     world:advance(1)
     assert.same(0, #world.archive.submissions)
@@ -349,7 +349,7 @@ describe("服务端旧进度玩法的公开宿主等价迁移（#315）", functi
     assert.same(1, #world.archive.submissions)
     world.archive.completed = true
     world:advance(GameCfg.AchievementDelivery.RetrySec + 1)
-    assert.is_true((world.data.Extra.achievementDelivered or {}).final)
+    assert.is_true((world.data.extra.achievementDelivered or {}).final)
     local submissions = #world.archive.submissions
     world:advance(GameCfg.AchievementDelivery.RetrySec + 1)
     assert.same(submissions, #world.archive.submissions)
@@ -359,38 +359,38 @@ describe("服务端旧进度玩法的公开宿主等价迁移（#315）", functi
     local other, otherData = world:add_player(2001, "目标")
     world:request("GMAction", { action = "Coin", amount = 10 })
     world:request("GMAction", { action = "Coin", amount = 7, target = other.UserId })
-    assert.same(10, world.data.Data.FishCoin)
-    assert.same(7, otherData.Data.FishCoin)
+    assert.same(10, world.data.data.FishCoin)
+    assert.same(7, otherData.data.FishCoin)
     world:request("GMAction", { action = "Coin", amount = 7, target = 9999 })
     assert.is_false(world:last_result("GMResult").ok)
     world:request("GMAction", { action = "Coin", amount = -4 })
-    assert.same(6, world.data.Data.FishCoin)
+    assert.same(6, world.data.data.FishCoin)
     for _, amount in ipairs({ 0, 2.5, -11 }) do
       world:request("GMAction", { action = "Coin", amount = amount })
-      assert.same(6, world.data.Data.FishCoin)
+      assert.same(6, world.data.data.FishCoin)
     end
-    local bait = otherData.Data.Bait.worm or 0
+    local bait = otherData.data.Bait.worm or 0
     world:request("GMAction", { action = "Item", itemId = "worm", count = 5, target = other.UserId })
-    assert.same(bait + 5, otherData.Data.Bait.worm)
+    assert.same(bait + 5, otherData.data.Bait.worm)
     world:request("GMAction", { action = "Item", itemId = "starterRod", count = 2 })
     assert.same(2, world.data:ItemCount("starterRod"))
-    assert.is_nil(world.data.Data.Bait.starterRod)
+    assert.is_nil(world.data.data.Bait.starterRod)
     local snapshot = world.data:GetItemBarSnapshot()
     assert.is_not_nil(snapshot.slots)
     assert.is_not_nil(snapshot.backpack)
     GameCfg.Debug.Enabled = false
     world:request("GMAction", { action = "Coin", amount = 100 })
-    assert.same(6, world.data.Data.FishCoin)
+    assert.same(6, world.data.data.FishCoin)
   end)
 
   it("GM 临时补丁原子保留其他字段，显式保存失败不解除暂停，读档恢复权威快照", function()
     world:request("GMAction", { action = "Coin", amount = 20 })
     world:request("GMAction", { action = "ApplyState", coin = 101 })
-    assert.same(101, world.data.Data.FishCoin)
+    assert.same(101, world.data.data.FishCoin)
     assert.is_true(world:last_result("GMResult").status.autosavePaused)
     local before = world.data:GetItemBarSnapshot()
     world:request("GMAction", { action = "ApplyState", coin = 500, upgradeLevel = 99 })
-    assert.same(101, world.data.Data.FishCoin)
+    assert.same(101, world.data.data.FishCoin)
     assert.same(before.upgradeLevel, world.data:GetItemBarSnapshot().upgradeLevel)
     world.failWrites = true
     world:request("GMAction", { action = "SaveState" })
@@ -401,9 +401,9 @@ describe("服务端旧进度玩法的公开宿主等价迁移（#315）", functi
     assert.is_true(world:last_result("GMResult").ok)
     assert.same(101, world:saved(world.player.UserId).coin)
     world:request("GMAction", { action = "ApplyState", coin = 777 })
-    assert.same(777, world.data.Data.FishCoin)
+    assert.same(777, world.data.data.FishCoin)
     world:request("GMAction", { action = "ReadState" })
-    assert.same(101, world.data.Data.FishCoin)
+    assert.same(101, world.data.data.FishCoin)
   end)
 
   it("GM 命名存档槽只在重进切换，攻击加成与下一鱼保持服务端权威", function()
@@ -479,9 +479,9 @@ describe("服务端旧进度玩法的公开宿主等价迁移（#315）", functi
     world:clear_events()
     world:fire("GMAction", { action = "Coin", amount = 13 }, p2)
     world:drain()
-    assert.same(13, world.players:get_data_inst(p2).Data.FishCoin)
-    assert.same(0, world.players:get_data_inst(p3).Data.FishCoin)
-    assert.same(0, world.players:get_data_inst(p4).Data.FishCoin)
+    assert.same(13, world.players:get_data_inst(p2).data.FishCoin)
+    assert.same(0, world.players:get_data_inst(p3).data.FishCoin)
+    assert.same(0, world.players:get_data_inst(p4).data.FishCoin)
 
     world:clear_events()
     world:fire("CompendiumRequest", { seq = 1 }, p3)

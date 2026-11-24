@@ -16,12 +16,12 @@ describe("服务端抽奖机、盲盒与地图商店宿主接缝（#312）", fun
     assert.is_false(world:lottery_draw(1, 1))
     assert.same(1, world.data:ItemCount("carp"))
 
-    world.data.Data.containers[ITEM_BAR][1] = nil
+    world.data.data.containers[ITEM_BAR][1] = nil
     world:give_premium("item31", 2, { grilled = true })
     assert.is_false(world:lottery_draw(1, 2))
     assert.same(1, world.data:ItemCount("item31"))
 
-    world.data.Data.containers[ITEM_BAR][1] = nil
+    world.data.data.containers[ITEM_BAR][1] = nil
     world:give_premium("item31", 2)
     world:persist_ready()
     world:script_axes(96, 100, 5)
@@ -29,8 +29,8 @@ describe("服务端抽奖机、盲盒与地图商店宿主接缝（#312）", fun
     local result = world:last_result("LotteryResult")
     assert.same(100, result.betValue)
     assert.same(2000, result.coins)
-    assert.same(2000, world.data.Data.FishCoin)
-    assert.is_nil(world.data.Data.containers[ITEM_BAR][1])
+    assert.same(2000, world.data.data.FishCoin)
+    assert.is_nil(world.data.data.containers[ITEM_BAR][1])
   end)
 
   it("三同武器大奖进入独立武器库存且不叠加金币", function()
@@ -42,13 +42,13 @@ describe("服务端抽奖机、盲盒与地图商店宿主接缝（#312）", fun
     assert.same("triple", result.outcome)
     assert.same({ kind = "weapon", itemId = "item154", name = "黄金匕首" }, result.prize)
     assert.is_nil(result.coins)
-    assert.same(0, world.data.Data.FishCoin)
+    assert.same(0, world.data.data.FishCoin)
     assert.same(1, world.data:WeaponCount("item154"))
-    assert.is_nil(world.data.Data.containers[ITEM_BAR][1])
+    assert.is_nil(world.data.data.containers[ITEM_BAR][1])
   end)
 
   it("test_old_epoch_does_not_block_current_delivery", function()
-    local bag = world.data.Extra.lottery
+    local bag = world.data.extra.lottery
     bag.deliveries = {
       old = { epoch = "old-world", itemId = "item7" },
       current = { epoch = "test-world", itemId = "item7" },
@@ -56,14 +56,14 @@ describe("服务端抽奖机、盲盒与地图商店宿主接缝（#312）", fun
     world:persist_ready()
     world:pump()
     assert.same(1, #world:ground_items())
-    assert.is_not_nil(world.data.Extra.lottery.deliveries.old)
-    assert.is_nil(world.data.Extra.lottery.deliveries.current)
+    assert.is_not_nil(world.data.extra.lottery.deliveries.old)
+    assert.is_nil(world.data.extra.lottery.deliveries.current)
   end)
 
   it("盲盒支付重试与重连不重复扣费或发奖", function()
     world.rolls = { 1000 }
     assert.is_true(world:blindbox_draw(1, 1))
-    local requestId = next(world.data.Extra.lottery.intents)
+    local requestId = next(world.data.extra.lottery.intents)
     assert.is_true(world:blindbox_draw(1, 1))
     world:resolve_platform("success")
     assert.same(1, world.data:ItemCount("item7"))
@@ -81,14 +81,14 @@ describe("服务端抽奖机、盲盒与地图商店宿主接缝（#312）", fun
     while world.data:AddItem("carp") do end
     world:persist_ready()
     assert.is_true(world:platform_action({ action = "Purchase", goods = "adrenaline1", seq = 1 }))
-    local requestId = next(world.data.Extra.platformShop.intents)
+    local requestId = next(world.data.extra.platformShop.intents)
     assert.is_not_nil(requestId)
     world:resolve_platform("success")
     local result = world:last_result("PlatformResult")
     assert.same("Grant", result.action)
     assert.same(1, result.overflow)
     assert.same(1, #world:ground_items())
-    assert.is_nil(next(world.data.Extra.platformShop.deliveries))
+    assert.is_nil(next(world.data.extra.platformShop.deliveries))
 
     assert.is_true(world:platform_action({ action = "Purchase", goods = "adrenaline1", seq = 1 }))
     assert.same(1, #world:ground_items())
@@ -99,10 +99,10 @@ describe("服务端抽奖机、盲盒与地图商店宿主接缝（#312）", fun
     GameCfg.Platform.Placeholder.Enabled = true
     assert.is_true(world:platform_action({ action = "BuyCoin", goods = "coinPouch", seq = 1 }))
     world:resolve_platform("success")
-    assert.same(600, world.data.Data.FishCoin)
+    assert.same(600, world.data.data.FishCoin)
     local sequence = world.data:Serialize().meta.sequence
     assert.is_true(world:platform_action({ action = "BuyCoin", goods = "coinPouch", seq = 1 }))
-    assert.same(600, world.data.Data.FishCoin)
+    assert.same(600, world.data.data.FishCoin)
     assert.same(sequence, world.data:Serialize().meta.sequence)
   end)
 

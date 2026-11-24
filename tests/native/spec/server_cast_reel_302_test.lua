@@ -259,12 +259,12 @@ describe("抛竿上钩收线举鱼宿主接缝（#302）", function()
 
   it("合法抛竿消耗一次鱼饵，3 秒后上钩并按区表与倍率决定鱼", function()
     boot({ roll = 1, multiplier_roll = 150 })
-    local before = data.Data.Bait[WORM]
+    local before = data.data.Bait[WORM]
     cast()
     local waiting = last_cast()
     assert.are.equal("cast", waiting.phase)
     assert.are.equal("fishPond.water", waiting.zoneId)
-    assert.are.equal(before - 1, data.Data.Bait[WORM])
+    assert.are.equal(before - 1, data.data.Bait[WORM])
     assert.are.equal(1, alive_units("CastLine_"))
     runtime.clock:advance(GameCfg.Casting.HookDelaySec - 0.01)
     assert.are.equal("cast", last_cast().phase)
@@ -287,7 +287,7 @@ describe("抛竿上钩收线举鱼宿主接缝（#302）", function()
     boot({ bait = "duck", bait_count = 1, roll = 1 })
     cast()
     assert.are.equal(0, data:ItemCount("duck"))
-    assert.is_nil(data.Data.selected_bait)
+    assert.is_nil(data.data.selected_bait)
     hook()
     assert.are.equal("alligatorGar", last_cast().fishId)
     channel("CastAction").OnServerEvent:Fire(player, { action = "Reel" })
@@ -384,11 +384,11 @@ describe("抛竿上钩收线举鱼宿主接缝（#302）", function()
 
     player.Character.Controller.Health = GameCfg.Vitals.MaxHealth
     runtime:on_player_removing(player)
-    data.Extra.survival.health = GameCfg.Vitals.MaxHealth
-    data.Extra.survival.dying = false
-    data.Extra.survival.dead = false
-    data.Extra.survival.dyingRemaining = 0
-    data.Extra.survival.deadRemaining = 0
+    data.extra.survival.health = GameCfg.Vitals.MaxHealth
+    data.extra.survival.dying = false
+    data.extra.survival.dead = false
+    data.extra.survival.dyingRemaining = 0
+    data.extra.survival.deadRemaining = 0
     runtime:on_player_added(player)
     runtime:on_save_ready(player, data)
     cast()

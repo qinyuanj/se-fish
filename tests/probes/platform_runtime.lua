@@ -28,21 +28,21 @@ local function ready()
 end
 task:Spawn(function()
     if platform:has_flow(p) then log('ABORT 已有平台flow') return end
-    local before = ((data.Extra.lottery and data.Extra.lottery.pity) or 0)
+    local before = ((data.extra.lottery and data.extra.lottery.pity) or 0)
     assert(runtime:blindbox_action(p, { action = 'Draw', count = 1, seq = seq }))
     if not ready() then log('ABORT 支付意图未落账') return end
     assert(platform:handle_test_action(p, { action = 'ResolveFlow', outcome = 'cancel' }))
-    log('取消不发奖', 'pity=' .. ((data.Extra.lottery and data.Extra.lottery.pity) or 0), 'before=' .. before)
-    assert(((data.Extra.lottery and data.Extra.lottery.pity) or 0) == before)
+    log('取消不发奖', 'pity=' .. ((data.extra.lottery and data.extra.lottery.pity) or 0), 'before=' .. before)
+    assert(((data.extra.lottery and data.extra.lottery.pity) or 0) == before)
     assert(runtime:blindbox_action(p, { action = 'Draw', count = 1, seq = seq + 1 }))
     if not ready() then log('ABORT 支付意图未落账') return end
     assert(platform:handle_test_action(p, { action = 'ResolveFlow', outcome = 'success' }))
     if not ready() then log('ABORT 单抽落账未就绪') return end
-    local after = ((data.Extra.lottery and data.Extra.lottery.pity) or 0)
+    local after = ((data.extra.lottery and data.extra.lottery.pity) or 0)
     log('模拟单抽落账', 'pity=' .. before .. '->' .. after)
     assert(runtime:blindbox_action(p, { action = 'Draw', count = 1, seq = seq + 1 }))
-    log('原序号重试', '无新flow=' .. tostring(not platform:has_flow(p)), 'pity=' .. ((data.Extra.lottery and data.Extra.lottery.pity) or 0))
-    assert(not platform:has_flow(p) and ((data.Extra.lottery and data.Extra.lottery.pity) or 0) == after)
+    log('原序号重试', '无新flow=' .. tostring(not platform:has_flow(p)), 'pity=' .. ((data.extra.lottery and data.extra.lottery.pity) or 0))
+    assert(not platform:has_flow(p) and ((data.extra.lottery and data.extra.lottery.pity) or 0) == after)
     local old = cfg.Debug.Enabled
     cfg.Debug.Enabled = false
     local ok, why = platform:purchase(p, 'blindboxSingle', 'blindbox', function() end)

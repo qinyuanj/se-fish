@@ -27,7 +27,7 @@ end
 -- 旧档明确是剩余秒数，不使用 weakUntil，也不减去墙钟离线时长。
 -- 濒死/死亡旧档优先交给现存复活结算，不能凭该函数抢先恢复虚弱。
 function Probe.weak_remaining(data, maximum)
-    local mark = data and data.Extra and data.Extra.survival
+    local mark = data and data.extra and data.extra.survival
     if type(mark) ~= 'table' or mark.dying or mark.dead then return 0 end
     local value = mark.weakRemaining
     if type(value) ~= 'number' or value ~= value or value == math.huge or value <= 0 then return 0 end
@@ -202,7 +202,7 @@ function Probe.run(context)
         local entity = one(key)
         api.SetModifierRemainTime(entity, remaining)
         api.Pause(c.owner, key, entity.UnitId)
-        local mark = { Extra = { survival = { weakRemaining = math.ceil(api.GetRemainingTimeByKey(c.owner, key)) } } }
+        local mark = { extra = { survival = { weakRemaining = math.ceil(api.GetRemainingTimeByKey(c.owner, key)) } } }
         check('weak.退出清理', api.ClearUnitModifiers(c.owner, key) == 1)
         c.wait(2) -- 离线墙钟仅流逝，不更改持久剩余秒数。
         check('weak.重进重建', api.AddModifier(c.owner, key, conf) == api.Enums.CreateResult.Added)

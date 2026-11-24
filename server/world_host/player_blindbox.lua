@@ -6,8 +6,8 @@ local PlayerBlindbox = {}
 local function cfg() return GameCfg.Blindbox end
 local function goods(count) return count == 10 and "blindboxTen" or "blindboxSingle" end
 local function bag(data)
-  local extra = data.Extra
-  if type(extra) ~= "table" then extra = {}; data.Extra = extra end
+  local extra = data.extra
+  if type(extra) ~= "table" then extra = {}; data.extra = extra end
   local value = extra.lottery
   if type(value) ~= "table" then value = {}; extra.lottery = value end
   value.intents, value.deliveries = value.intents or {}, value.deliveries or {}
@@ -107,7 +107,7 @@ function PlayerBlindbox.mount(scope, tree, opts)
     for index, draw in ipairs(draws) do
       for fishId, fish in pairs(GameCfg.Fish) do
         for _, drop in ipairs(fish.Drops or {}) do
-          if drop.ItemId == draw.itemKey then draft.Extra.collection.unlocked[fishId] = true end
+          if drop.ItemId == draw.itemKey then draft.extra.collection.unlocked[fishId] = true end
         end
       end
       draw.landed = not draft:AddItem(draw.itemKey, 1)
