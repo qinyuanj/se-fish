@@ -36,6 +36,7 @@ local M = {}
 
 M.commands = {
   { name = "test", mod = "tools.test", summary = "按测试车道跑 busted：test [fast|full|spec|art] [-- <busted 参数>...]，缺省 fast" },
+  { name = "naming", mod = "tools.naming", summary = "命名改名 codemod 与旧名字符串守卫：naming [--recon|--apply|--check] [--layer l3a|l3b|all] [--root <目录>]" },
   { name = "acceptance", mod = "tools.acceptance_cli", summary = "验收矩阵校验：acceptance [--check|--write|--update-baseline]，缺省 --check" },
   { name = "emmylua", mod = "tools.emmylua", summary = "EmmyLua 诊断门禁：emmylua [--update-baseline]（基线外诊断失败）" },
   { name = "deploy", mod = "tools.deploy", summary = "仓库三端一级子树镜像进编辑器宿主目录（robocopy /MIR + 编辑器收尾）" },

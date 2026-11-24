@@ -106,6 +106,12 @@ describe("TestCliEntryHelp", function()
     assert.is_truthy(out:find("tools/cli.lua test [fast|full|spec|art]", 1, true))
   end)
 
+  it("test_naming_help_is_routed", function()
+    local code, out, err = cli({ "naming", "--help" })
+    assert.are.equal(0, code, out .. err)
+    assert.matches("lua tools/cli.lua naming --recon", out, 1, true)
+  end)
+
   it("test_unknown_lane_exits_2_through_the_entry", function()
     local code, out, err = cli({ "test", "slow" })
     assert.are.equal(2, code, out .. err)

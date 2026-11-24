@@ -1,0 +1,336 @@
+tests/native/ability_seams_test.lua:33 New        | _G.Quaternion = { New = function(x, y, z, w) return { x = x, y = y, z = z, w = w
+      ctx: vendor = package.loaded['server.packages.ability_system.api' / ctx = { created = {} } / _G.Vector3 = { New = vec } / _G.Quaternion = { New = function(x, y, z, w) return { x = x,
+tests/native/ability_seams_test.lua:135 New        | _G.Quaternion = { New = function() return {} end, FromEulerAngles = function() r
+      ctx: api = package.loaded['server.ability_api'] } / ctx = { now = 100, players = {}, hits = {}, mounts = {}, det / _G.Vector3 = { New = vec } / _G.Quaternion = { New = function() return {} end, F
+tests/native/ability_seams_test.lua:142 Spawn      | package.loaded['server.world_host.fish_carrier'] = { Spawn = function() return n
+      ctx: if name == 'Players' then return { GetPlayers = function() r / return {} / end } / package.loaded['server.world_host.fish_carrier'] = { Spawn =
+tests/native/ability_seams_test.lua:246 Destroy    | fish.CarryMount = ctx.mounts[#ctx.mounts + 1] or { Destroyed = false, Destroy =
+      ctx: fish.Carry.TargetPlayer = player / fish.Carry.LastStepAt = ctx.now / assert.is_true(CarryMount.attach(fish.Carry, { x = 1, y = 0, / fish.CarryMount = ctx.mounts[#ctx.mounts + 1] or { Destroy
+tests/native/ai_migration_test.lua:179 Custom     | Custom = function(_, fish) calls[fish] = (calls[fish] or 0) + 1; return true end
+      ctx: it('test_every_configured_fish_hands_off_on_release_and_remo / local calls = {} / env.mgr.Ai = { / Custom = function(_, fish) calls[fish] = (calls[fish] or 0)
+tests/native/ai_migration_test.lua:181 Stop       | move_direction = function() return true end, Stop = function() end,
+      ctx: env.mgr.Ai = { / Custom = function(_, fish) calls[fish] = (calls[fish] or 0)  / remove = function(_, fish) calls[fish] = (calls[fish] or 0)  / move_direction = function() return true end, St
+tests/native/ai_migration_test.lua:195 Custom     | env.mgr.Ai = { Custom = function() return false end, Stop = function() end }
+      ctx: end) /  / it('test_failed_handoff_does_not_start_business_move', funct / env.mgr.Ai = { Custom = function() return false end, Stop =
+tests/native/ai_migration_test.lua:202 Custom     | env.mgr.Ai = { Custom = function() return true end, Pause = function() end,
+      ctx: end) /  / it('test_stop_cancels_pending_bite_and_start_preserves_escap / env.mgr.Ai = { Custom = function() return true end, Pause =
+tests/native/ai_migration_test.lua:203 Stop       | Stop = function(self) self.Stopped = true end, Start = function(self) self.Stopp
+      ctx:  / it('test_stop_cancels_pending_bite_and_start_preserves_escap / env.mgr.Ai = { Custom = function() return true end, Pause =  / Stop = function(self) self.Stopped = true end, Start = funct
+tests/native/damage_float_test.lua:35 New        | _G.Vector2 = { New = function(x, y) return { x = x, y = y } end }
+      ctx: it('test_offscreen_and_reuse_reset', function() / local time, visible = 0, false / local created = {} / _G.Vector2 = { New = function(x, y) return { x = x, y = y }
+tests/native/damage_float_test.lua:36 New        | _G.Vector3 = { New = function(x, y, z) return { x = x, y = y, z = z } end }
+      ctx: local time, visible = 0, false / local created = {} / _G.Vector2 = { New = function(x, y) return { x = x, y = y }  / _G.Vector3 = { New = function(x, y, z) return { x = x, y = y
+tests/native/damage_float_test.lua:37 New        | _G.Color = { New = function(r, g, b, a) return { r = r, g = g, b = b, a = a } en
+      ctx: local created = {} / _G.Vector2 = { New = function(x, y) return { x = x, y = y }  / _G.Vector3 = { New = function(x, y, z) return { x = x, y = y / _G.Color = { New = function(r, g, b, a) ret
+tests/native/damage_float_test.lua:46 Destroy    | local node = { Parent = spec.Parent, Destroy = function(self) self.Destroyed = t
+      ctx: if name == 'World' then return { / GetServerTime = function() return time end, / CreateUnit = function(_, _, spec) / local node = { Parent = spec.Parent, Destroy = function(self
+tests/native/economy_persistence_test.lua:91 Spawn      | if name == 'Task' then return { Spawn = function(_, fn) env.queue[#env.queue + 1
+      ctx: env.anchor = { Position = { x = 0, y = 0, z = 0 }, / PlayAnimation = function() env.plays = env.plays + 1 end } / _G.game = { GetService = function(_, name) / if name == 'Task' then return {
+tests/native/economy_persistence_test.lua:118 GetState   | GetState = function()
+      ctx: env.quest = { / on_player_added = function() end, / on_player_removing = function() end, / GetState = function()
+tests/native/economy_persistence_test.lua:137 Handle     | env.shop = { Handle = function(_, player, payload) return env.shop_action(player
+      ctx: }) / env.runtime:start() / env.runtime:mark_started() / env.shop = { Handle = function(_, player, payload) return en
+tests/native/economy_persistence_test.lua:139 Handle     | Handle = function(_, player, payload) return env.interact_action(player, payload
+      ctx: env.runtime:mark_started() / env.shop = { Handle = function(_, player, payload) return en / env.interact = { / Handle = function(_, player, payload) return env.interact_ac
+tests/native/eel_ability_failure_test.lua:22 Destroy    | ctx.manager = { Destroy = function()
+      ctx: before_each(function() / saved = { game = rawget(_G, 'game'), api = package.loaded['s / ctx = { jobs = {}, destroyed = 0 } / ctx.manager = { Destroy = function()
+tests/native/eel_ability_failure_test.lua:30 Spawn      | Spawn = function(_, fn) ctx.jobs[#ctx.jobs + 1] = fn end,
+      ctx: _G.game = { GetService = function(_, name) / if name == 'World' then return ctx.world end / if name == 'Task' then return { / Spawn = function(_, fn) ctx.jobs[#ctx.jobs + 1] = fn end,
+tests/native/eel_ability_failure_test.lua:60 Destroy    | Destroy = function() cleaned[#cleaned + 1] = 'anchor' end,
+      ctx: local cleaned = {} / local anchor = { / SetAttribute = function() end, / Destroy = function() cleaned[#cleaned + 1] = 'anchor' end,
+tests/native/ferry_test.lua:136 Spawn      | Spawn = function(_, fn)
+      ctx: } / _G.game = { GetService = function(_, name) / if name == 'Task' then return { / Spawn = function(_, fn)
+tests/native/ferry_ui_test.lua:35 New        | _G.Vector2 = { New = function(x, y) return { x = x, y = y } end }
+      ctx: restore.modules[name] = package.loaded[name] / package.loaded[name] = nil / end / _G.Vector2 = { New = function(x, y) return { x = x, y = y }
+tests/native/ferry_ui_test.lua:37 New        | _G.Color = { New = function(...) return { ... } end }
+      ctx: end / _G.Vector2 = { New = function(x, y) return { x = x, y = y }  / _G.Vector3 = { New = vec } / _G.Color = { New = function(...) return { ... } end }
+tests/native/fish_air_escape_test.lua:75 New        | _G.Color = { New = function(r, g, b, a) return { r = r, g = g, b = b, a = a } en
+      ctx: end, / } / _G.Vector3 = { New = vec } / _G.Color = { New = function(r, g, b, a) return { r = r, g =
+tests/native/fish_carrier_test.lua:122 New        | rawset(_G, 'Vector3', { New = function(x, y, z) return newVector3(x, y, z) end }
+      ctx: return nil / end, / }) / rawset(_G, 'Vector3', { New = function(x, y, z) return newVe
+tests/native/fisherman_model_pulse_test.lua:14 New        | _G.Vector3 = { New = function(x, y, z) return { x = x, y = y, z = z } end }
+      ctx: local old_vector / before_each(function() / old_vector = rawget(_G, "Vector3") / _G.Vector3 = { New = function(x, y, z) return { x = x, y = y
+tests/native/guards/static_require_test.lua:133 Attach     | package.loaded[anchorLogic] = { Attach = function(script) attached[#attached + 1
+      ctx: package.loaded[vendor] = nil / package.preload[vendor] = function() return {} end / local attached = {} / package.loaded[anchorLogic] = { Attach = function(script) at
+tests/native/helper.lua:27 Length     | vector_mt.__index = { Length = function(self) return math.sqrt(self.x ^ 2 + self
+      ctx: return _G.Vector3.New(a.x * b, a.y * b, a.z * b) / end, / } / vector_mt.__index = { Length = function(self) return math.sq
+tests/native/helper.lua:28 New        | _G.Vector3 = { New = function(x, y, z) return setmetatable({ x = x, y = y, z = z
+      ctx: end, / } / vector_mt.__index = { Length = function(self) return math.sq / _G.Vector3 = { New = function(x, y, z) return setmetatable({
+tests/native/modifier_system_probe_test.lua:62 New        | e.remote = { New = function() return { OnServerEvent = signal(), FireAllClients
+      ctx: end, CreateUnit = function(_, _, props) / local u = e.unit('BindableEvent'); u.Name = props.Name; retu / end } / e.remote = { New = function() return { OnServerEvent = signa
+tests/native/platform_seam_test.lua:103 Spawn      | if name == 'Task' then return { Spawn = function(_, fn) env.queue[#env.queue + 1
+      ctx: SetAsync = function(_, key, value) env.values[key] = value e / } / rawset(_G, 'game', { GetService = function(_, name) / if name == 'Task' then return { Spawn = function(_, fn) env.
+tests/native/player_leave_rejoin_test.lua:82 New        | _G.Vector3 = { New = function(x, y, z) return { x = x, y = y, z = z } end }
+      ctx: saved.Vector3, saved.Color = rawget(_G, 'Vector3'), rawget(_ / saved.Debug, saved.slot = GameCfg.Debug, GameCfg.Save.QaSlot / GameCfg.Debug, GameCfg.Save.QaSlot = { Enabled = false }, '' / _
+tests/native/player_leave_rejoin_test.lua:83 New        | _G.Color = { New = function(...) return { ... } end }
+      ctx: saved.Debug, saved.slot = GameCfg.Debug, GameCfg.Save.QaSlot / GameCfg.Debug, GameCfg.Save.QaSlot = { Enabled = false }, '' / _G.Vector3 = { New = function(x, y, z) return { x = x, y = y / _
+tests/native/player_leave_rejoin_test.lua:113 Spawn      | Spawn = function(_, fn) env.tasks[#env.tasks + 1] = fn end, Wait = function() en
+      ctx: BindToClose = function() end, / GetService = function(_, name) / if name == 'Task' then return { / Spawn = function(_, fn) env.tasks[#env.tasks + 1] = fn end,
+tests/native/player_leave_rejoin_test.lua:132 New        | _G.RemoteEvent = { New = function() return {
+      ctx: end / return env.remotes[name] / end, check_recd = function() return false end } / _G.RemoteEvent = { New = function() return {
+tests/native/player_leave_rejoin_test.lua:161 GetState   | GetState = function(_, player) return env.data:get_data_inst(player).Extra.quest
+      ctx: env.data = assert(loadfile('server/player_data_host.lua'))() / env.quest = { / notify = function(_, kind, player, payload) return env.runti / GetState = function(_, player) return env.data:g
+tests/native/player_leave_rejoin_test.lua:169 Start      | if path == 'server.MgrUtil' then return { Start = function() end } end
+      ctx: if parts[1] == '[server.main]' then env.errors[#env.errors + / end, / require = function(path) / if path == 'server.MgrUtil' then return { Start = function()
+tests/native/player_leave_rejoin_test.lua:170 Start      | if path == 'common.zone_markers' then return { Start = function() end } end
+      ctx: end, / require = function(path) / if path == 'server.MgrUtil' then return { Start = function() / if path == 'common.zone_markers' then return { Start = funct
+tests/native/player_leave_rejoin_test.lua:177 Start      | if path == 'server.fish_ability' then return { Start = function() end, update =
+      ctx: if path == 'server.save_host' then return env.save end / if path == 'server.player_data_host' then return env.data en / if path == 'server.platform_host' then return {} end / if path == 'ser
+tests/native/player_leave_rejoin_test.lua:318 New        | _G.RemoteEvent = { New = function(name)
+      ctx:  / it('test_creates_by_public_api_and_reuses_same_name', functi / local calls, events = {}, {} / _G.RemoteEvent = { New = function(name)
+tests/native/reef_combat_test.lua:73 Pause      | env.mgr.Ai = { Stopped = true, Sync = function() return true end, Pause = functi
+      ctx: env:advance(4) / local attack = fish.AirAttacks.airThrow / assert.is_not_nil(attack) / env.mgr.Ai = { Stopped = true, Sync = function() return true
+tests/native/reef_combat_test.lua:88 Pause      | env.mgr.Ai = { Stopped = true, Sync = function() return true end, Pause = functi
+      ctx: it('test_control_freezes_throw_and_dive_cooldowns_without_ca / local fish = env:drop('fish48Boss') / env:advance(3) / env.mgr.Ai = { Stopped = true, Sync = function() return true
+tests/native/rod_visual_test.lua:46 New        | _G.Vector3 = { New = function(x, y, z) return { x = x, y = y, z = z } end }
+      ctx: return unit / end } / _G.game = { GetService = function(_, name) if name == 'World / _G.Vector3 = { New = function(x, y, z) return { x = x, y = y
+tests/native/rod_visual_test.lua:48 New        | _G.Color = { New = function(...) return { ... } end }
+      ctx: _G.game = { GetService = function(_, name) if name == 'World / _G.Vector3 = { New = function(x, y, z) return { x = x, y = y / -- 鱼竿模型带 ModelColor1，服务端要 Color.New；原生逐例隔离后不能再蹭别的套件的残留全局。 / _G.C
+tests/native/save_array_meta_test.lua:110 Spawn      | if name == 'Task' then return { Spawn = function(_, fn) env.queue[#env.queue + 1
+      ctx: SetAsync = function(_, key, value) env.values[key] = copy(va / } / _G.game = { GetService = function(_, name) / if name == 'Task' then return { Spawn = function(_, fn) env.
+tests/native/save_foundation_test.lua:33 Spawn      | if name == 'Task' then return { Spawn = function(_, fn) env.queue[#env.queue + 1
+      ctx: SetAsync = function(_, key, value) env.values[key] = value e / } / _G.game = { GetService = function(_, name) / if name == 'Task' then return { Spawn = function(_, fn) env.
+tests/native/save_test.lua:75 Spawn      | Spawn = function(_, fn)
+      ctx: end / env.flushSpawns = flushSpawns / env.task = { / Spawn = function(_, fn)
+tests/native/shop_ui_test.lua:33 New        | _G.Vector3 = { New = function(x, y, z) return { x = x, y = y, z = z } end }
+      ctx:  / before_each(function() / old_vector = rawget(_G, "Vector3") / _G.Vector3 = { New = function(x, y, z) return { x = x, y = y
+tests/native/spec/01_placeholder_asset_visual_test.lua:91 New        | _G.Color = { New = function(r, g, b, a) return { r = r, g = g, b = b, a = a } en
+      ctx: local saved = { game = rawget(_G, 'game'), Vector3 = rawget( / Color = rawget(_G, 'Color'), Quaternion = rawget(_G, 'Quater / _G.Vector3 = { New = vec } / _G.Color = { New = function(r, g, b
+tests/native/spec/01_platform_adapter_failure_test.lua:92 Spawn      | return { Spawn = function(_, fn) env.queue[#env.queue + 1] = fn end, Wait = func
+      ctx: } / rawset(_G, 'game', { GetService = function(_, name) / if name == 'Task' then / return { Spawn = function(_, fn) env.queue[#env.queue + 1] =
+tests/native/spec/05_zone_fish_data_test.lua:27 New        | _G.Vector2 = { New = function(x, y) return { x = x, y = y } end }
+      ctx: get_eui_manager = function() return { GetDeviceResolution =  / } / _G.game = { GetService = function() return {} end } / _G.Vector2 = { New = function(x, y) return { x = x, y = y }
+tests/native/spec/05_zone_fish_data_test.lua:28 New        | _G.Color = { New = function(...) return { ... } end }
+      ctx: } / _G.game = { GetService = function() return {} end } / _G.Vector2 = { New = function(x, y) return { x = x, y = y }  / _G.Color = { New = function(...) return { ... } end }
+tests/native/spec/06_ai_target_test.lua:448 New        | _G.Vector3 = { New = function(x, y, z) return v3(x, y, z) end }
+      ctx: ctx = { now = 100, sent = {}, saved = { game = rawget(_G, 'g / reutil = rawget(_G, 'REUtil'), re = package.loaded['common.r / local env = ctx / _G.Vector3 = { New = function(x, y, z) return
+tests/native/spec/09_pk_damage_filter_test.lua:101 Spawn      | return { Spawn = function(_, fn) env.queue[#env.queue + 1] = fn end, Wait = func
+      ctx: _G.Vector3 = { New = vec } / _G.game = { GetService = function(_, name) / if name == 'Task' then / return { Spawn = function(_, fn) env.queue[#env.queue + 1] =
+tests/native/spec/09_pk_damage_filter_test.lua:156 New        | _G.RemoteEvent = { New = function()
+      ctx: -- AbilityAPI 在装载时要引擎的 RemoteEvent 全局：补替身并清模块缓存，避免复用别的用例的上下文 / env.remoteEvent, env.abilityModule, env.swingModule = / rawget(_G, 'RemoteEvent'), package.loaded['server.ability_ap / _G.Remot
+tests/native/spec/09_rescue_test.lua:94 New        | _G.Vector2 = { New = function(x, y) return { x = x, y = y } end }
+      ctx: Vector2 = rawget(_G, 'Vector2'), Color = rawget(_G, 'Color') / REUtil = rawget(_G, 'REUtil'), reutil = package.loaded['comm / _G.Vector3 = { New = vec } / _G.Vector2 = { New = function(x, y)
+tests/native/spec/09_rescue_test.lua:95 New        | _G.Color = { New = function(...) return { ... } end }
+      ctx: REUtil = rawget(_G, 'REUtil'), reutil = package.loaded['comm / _G.Vector3 = { New = vec } / _G.Vector2 = { New = function(x, y) return { x = x, y = y }  / _G.Color = { New = function(...) re
+tests/native/spec/09_rescue_test.lua:100 Spawn      | return { Spawn = function(_, fn) env.queue[#env.queue + 1] = fn end, Wait = func
+      ctx: env.clientPlayers = {} / _G.game = { GetService = function(_, name) / if name == 'Task' then / return { Spawn = function(_, fn) env.queue[#env.queue + 1] =
+tests/native/spec/10_grill_curve_test.lua:59 Spawn      | return { Spawn = function(_, fn) ctx.queue[#ctx.queue + 1] = fn end, Wait = func
+      ctx: ctx.anchorPos = grillAnchor().Position / _G.game = { GetService = function(_, name) / if name == 'Task' then / return { Spawn = function(_, fn) ctx.queue[#ctx.queue + 1] =
+tests/native/spec/10_grill_curve_test.lua:99 Destroy    | Destroy = function(self) self.Destroyed = true end }
+      ctx: }, / create_unit = function(kind, props) / return { kind = kind, Name = props and props.Name, / Destroy = function(self) self.Destroyed = true end }
+tests/native/spec/11_ad_revive_placeholder_test.lua:178 New        | _G.Vector2 = { New = function(x, y) return { x = x, y = y } end }
+      ctx: env.cfg.Save.QaSlot = '' / env.cfg.Platform.Placeholder.Enabled = true / _G.Vector3 = { New = vec } / _G.Vector2 = { New = function(x, y) return { x = x, y = y }
+tests/native/spec/11_ad_revive_placeholder_test.lua:179 New        | _G.Color = { New = function(...) return { ... } end }
+      ctx: env.cfg.Platform.Placeholder.Enabled = true / _G.Vector3 = { New = vec } / _G.Vector2 = { New = function(x, y) return { x = x, y = y }  / _G.Color = { New = function(...) return { ... } end
+tests/native/spec/11_ad_revive_placeholder_test.lua:182 Spawn      | return { Spawn = function(_, fn) env.queue[#env.queue + 1] = fn end, Wait = func
+      ctx: _G.Color = { New = function(...) return { ... } end } / _G.game = { GetService = function(_, name) / if name == 'Task' then / return { Spawn = function(_, fn) env.queue[#env.queue + 1] =
+tests/native/spec/11_ad_revive_placeholder_test.lua:603 New        | _G.Vector2 = { New = function(x, y) return { x = x, y = y } end }
+      ctx: local_msg_notice = rawget(_G, 'LocalMsgNotice'), reutil = pa / local env = ctx / _G.local_msg_notice = function(msg) env.notices[#env.notices / _G.Vector2 = { New = function(x, y) return { x
+tests/native/spec/11_ad_revive_placeholder_test.lua:604 New        | _G.Color = { New = function(...) return { ... } end }
+      ctx: local env = ctx / _G.local_msg_notice = function(msg) env.notices[#env.notices / _G.Vector2 = { New = function(x, y) return { x = x, y = y }  / _G.Color = { New = function(...) return { ...
+tests/native/spec/18_session_settlement_contract_test.lua:92 Spawn      | return { Spawn = function(_, fn) env.queue[#env.queue + 1] = fn end, Wait = func
+      ctx: _G.Vector3 = { New = vec } / _G.game = { GetService = function(_, name) / if name == 'Task' then / return { Spawn = function(_, fn) env.queue[#env.queue + 1] =
+tests/native/spec/client_attack_view_300_test.lua:50 New        | _G.Vector2 = { New = function(x, y) return { x = x, y = y } end }
+      ctx: before_each(function() / saved_vector = rawget(_G, "Vector2") / saved_color = rawget(_G, "Color") / _G.Vector2 = { New = function(x, y) return { x = x, y = y }
+tests/native/spec/client_attack_view_300_test.lua:51 New        | _G.Color = { New = function(...) return { ... } end }
+      ctx: saved_vector = rawget(_G, "Vector2") / saved_color = rawget(_G, "Color") / _G.Vector2 = { New = function(x, y) return { x = x, y = y }  / _G.Color = { New = function(...) return { ... } end
+tests/native/spec/client_cast_source_302_test.lua:11 New        | _G.Vector3 = { New = function(x, y, z) return { x = x, y = y, z = z } end }
+      ctx: local saved_v3, saved_color / before_each(function() / saved_v3, saved_color = rawget(_G, "Vector3"), rawget(_G, "C / _G.Vector3 = { New = function(x, y, z) return { x = x, y = y
+tests/native/spec/client_cast_source_302_test.lua:12 New        | _G.Color = { New = function(r, g, b, a) return { r = r, g = g, b = b, a = a } en
+      ctx: before_each(function() / saved_v3, saved_color = rawget(_G, "Vector3"), rawget(_G, "C / _G.Vector3 = { New = function(x, y, z) return { x = x, y = y / _G.Color = { New = function(r, g, b, a)
+tests/native/spec/client_economy_312_test.lua:17 New        | _G.Vector2 = { New = function(x, y) return { x = x, y = y } end }
+      ctx:  / before_each(function() / oldVector, oldColor = rawget(_G, "Vector2"), rawget(_G, "Col / _G.Vector2 = { New = function(x, y) return { x = x, y = y }
+tests/native/spec/client_economy_312_test.lua:18 New        | _G.Color = { New = function(...) return { ... } end }
+      ctx: before_each(function() / oldVector, oldColor = rawget(_G, "Vector2"), rawget(_G, "Col / _G.Vector2 = { New = function(x, y) return { x = x, y = y }  / _G.Color = { New = function(...) return
+tests/native/spec/client_grill_310_test.lua:50 New        | _G.Vector2 = { New = function(x, y) return { x = x, y = y } end }
+      ctx: before_each(function() / saved_vector = rawget(_G, "Vector2") / saved_color = rawget(_G, "Color") / _G.Vector2 = { New = function(x, y) return { x = x, y = y }
+tests/native/spec/client_grill_310_test.lua:51 New        | _G.Color = { New = function(...) return { ... } end }
+      ctx: saved_vector = rawget(_G, "Vector2") / saved_color = rawget(_G, "Color") / _G.Vector2 = { New = function(x, y) return { x = x, y = y }  / _G.Color = { New = function(...) return { ... } end
+tests/native/spec/client_main_hud_action_buttons_test.lua:37 New        | _G.Vector2 = { New = function(x, y) return { x = x, y = y } end }
+      ctx: Color = rawget(_G, "Color"), / REUtil = rawget(_G, "REUtil"), / } / _G.Vector2 = { New = function(x, y) return { x = x, y = y }
+tests/native/spec/client_main_hud_action_buttons_test.lua:38 New        | _G.Color = { New = function(...) return { ... } end }
+      ctx: REUtil = rawget(_G, "REUtil"), / } / _G.Vector2 = { New = function(x, y) return { x = x, y = y }  / _G.Color = { New = function(...) return { ... } end }
+tests/native/spec/client_main_hud_backpack_test.lua:41 New        | _G.Vector2 = { New = function(x, y) return { x = x, y = y } end }
+      ctx: Vector2 = rawget(_G, "Vector2"), / Color = rawget(_G, "Color"), / } / _G.Vector2 = { New = function(x, y) return { x = x, y = y }
+tests/native/spec/client_main_hud_backpack_test.lua:42 New        | _G.Color = { New = function(...) return { ... } end }
+      ctx: Color = rawget(_G, "Color"), / } / _G.Vector2 = { New = function(x, y) return { x = x, y = y }  / _G.Color = { New = function(...) return { ... } end }
+tests/native/spec/client_main_hud_item_bar_test.lua:38 New        | _G.Vector2 = { New = function(x, y) return { x = x, y = y } end }
+      ctx: Vector2 = rawget(_G, "Vector2"), / Color = rawget(_G, "Color"), / } / _G.Vector2 = { New = function(x, y) return { x = x, y = y }
+tests/native/spec/client_main_hud_item_bar_test.lua:39 New        | _G.Color = { New = function(...) return { ... } end }
+      ctx: Color = rawget(_G, "Color"), / } / _G.Vector2 = { New = function(x, y) return { x = x, y = y }  / _G.Color = { New = function(...) return { ... } end }
+tests/native/spec/client_main_hud_popups_test.lua:32 New        | _G.Vector2 = { New = function(x, y) return { x = x, y = y } end }
+      ctx: Vector2 = rawget(_G, "Vector2"), / Color = rawget(_G, "Color"), / } / _G.Vector2 = { New = function(x, y) return { x = x, y = y }
+tests/native/spec/client_main_hud_popups_test.lua:33 New        | _G.Color = { New = function(...) return { ... } end }
+      ctx: Color = rawget(_G, "Color"), / } / _G.Vector2 = { New = function(x, y) return { x = x, y = y }  / _G.Color = { New = function(...) return { ... } end }
+tests/native/spec/client_main_hud_vitals_test.lua:34 New        | _G.Vector2 = { New = function(x, y) return { x = x, y = y } end }
+      ctx: Vector2 = rawget(_G, "Vector2"), / Color = rawget(_G, "Color"), / } / _G.Vector2 = { New = function(x, y) return { x = x, y = y }
+tests/native/spec/client_main_hud_vitals_test.lua:35 New        | _G.Color = { New = function(...) return { ... } end }
+      ctx: Color = rawget(_G, "Color"), / } / _G.Vector2 = { New = function(x, y) return { x = x, y = y }  / _G.Color = { New = function(...) return { ... } end }
+tests/native/spec/client_progress_315_test.lua:17 New        | _G.Vector2 = { New = function(x, y) return { x = x, y = y } end }
+      ctx: local root, store, writer, view, sent, oldVector, oldColor / before_each(function() / oldVector, oldColor = rawget(_G, "Vector2"), rawget(_G, "Col / _G.Vector2 = { New = function(x, y) retur
+tests/native/spec/client_progress_315_test.lua:18 New        | _G.Color = { New = function(...) return { ... } end }
+      ctx: before_each(function() / oldVector, oldColor = rawget(_G, "Vector2"), rawget(_G, "Col / _G.Vector2 = { New = function(x, y) return { x = x, y = y }  / _G.Color = { New = function(...) return
+tests/native/spec/client_reel_overlay_302_test.lua:50 New        | _G.Vector2 = { New = function(x, y) return { x = x, y = y } end }
+      ctx: local saved_vector, saved_color / before_each(function() / saved_vector, saved_color = rawget(_G, "Vector2"), rawget(_G / _G.Vector2 = { New = function(x, y) return { x = x, y = y }
+tests/native/spec/client_reel_overlay_302_test.lua:51 New        | _G.Color = { New = function(r, g, b, a) return { r = r, g = g, b = b, a = a } en
+      ctx: before_each(function() / saved_vector, saved_color = rawget(_G, "Vector2"), rawget(_G / _G.Vector2 = { New = function(x, y) return { x = x, y = y }  / _G.Color = { New = function(r, g, b, a)
+tests/native/spec/client_shop_interaction_311_test.lua:41 New        | _G.Vector3 = { New = function(x, y, z) return { x = x, y = y, z = z } end }
+      ctx: local old_vector / before_each(function() / old_vector = rawget(_G, "Vector3") / _G.Vector3 = { New = function(x, y, z) return { x = x, y = y
+tests/native/spec/client_special_item_299_test.lua:13 New        | _G.Vector2 = { New = function(x, y) return { x = x, y = y } end }
+      ctx: before_each(function() / saved_vector = rawget(_G, "Vector2") / saved_color = rawget(_G, "Color") / _G.Vector2 = { New = function(x, y) return { x = x, y = y }
+tests/native/spec/client_special_item_299_test.lua:14 New        | _G.Color = { New = function(...) return { ... } end }
+      ctx: saved_vector = rawget(_G, "Vector2") / saved_color = rawget(_G, "Color") / _G.Vector2 = { New = function(x, y) return { x = x, y = y }  / _G.Color = { New = function(...) return { ... } end
+tests/native/spec/client_spoke_backbone_test.lua:629 New        | _G.Vector2 = { New = function(x, y) return { x = x, y = y } end }
+      ctx: local noop_module = { Start = noop } /  / local ok, err = pcall(function() / _G.Vector2 = { New = function(x, y) return { x = x, y = y }
+tests/native/spec/client_spoke_backbone_test.lua:630 New        | _G.Color = { New = function(...) return { ... } end }
+      ctx:  / local ok, err = pcall(function() / _G.Vector2 = { New = function(x, y) return { x = x, y = y }  / _G.Color = { New = function(...) return { ... } end }
+tests/native/spec/client_spoke_backbone_test.lua:696 Spawn      | Spawn = function(_, fn) fn() end,
+      ctx: GetService = function(_, name) / if name == "Task" then / return { / Spawn = function(_, fn) fn() end,
+tests/native/spec/client_squad_314_test.lua:64 New        | _G.Vector2 = { New = function(x, y) return { x = x, y = y } end }
+      ctx: local old_vector / before_each(function() / old_vector = rawget(_G, "Vector2") / _G.Vector2 = { New = function(x, y) return { x = x, y = y }
+tests/native/spec/client_survival_overlay_298_test.lua:52 New        | _G.Vector2 = { New = function(x, y) return { x = x, y = y } end }
+      ctx: before_each(function() / saved_vector = rawget(_G, "Vector2") / saved_color = rawget(_G, "Color") / _G.Vector2 = { New = function(x, y) return { x = x, y = y }
+tests/native/spec/client_survival_overlay_298_test.lua:53 New        | _G.Color = { New = function(...) return { ... } end }
+      ctx: saved_vector = rawget(_G, "Vector2") / saved_color = rawget(_G, "Color") / _G.Vector2 = { New = function(x, y) return { x = x, y = y }  / _G.Color = { New = function(...) return { ... } end
+tests/native/spec/official_package_leaves_test.lua:83 New        | Vector3 = { New = function(x, y, z) return { x = x, y = y, z = z } end },
+      ctx: function world:CreateAsset() return { unit("Script", world)  / local env = setmetatable({ / game = { GetService = function() return world end }, / Vector3 = { New = function(x, y, z) return
+tests/native/spec/official_package_leaves_test.lua:173 New        | New = function()
+      ctx: end, / } / local mock_remote = { / New = function()
+tests/native/spec/official_package_leaves_test.lua:230 New        | _G.Vector3 = { New = function(x, y, z) return { x = x, y = y, z = z } end }
+      ctx:  / before_each(function() / saved_vec3 = rawget(_G, "Vector3") / _G.Vector3 = { New = function(x, y, z) return { x = x, y = y
+tests/native/spec/official_package_leaves_test.lua:492 New        | _G.Vector3 = { New = function(x, y, z) return { x = x, y = y, z = z } end }
+      ctx:  / before_each(function() / saved_vec3 = rawget(_G, "Vector3") / _G.Vector3 = { New = function(x, y, z) return { x = x, y = y
+tests/native/spec/player_effects_and_held_rod_test.lua:288 New        | _G.Vector3 = { New = function(x, y, z) return { x = x, y = y, z = z } end }
+      ctx: before_each(function() / saved_vec3 = rawget(_G, "Vector3") / saved_color = rawget(_G, "Color") / _G.Vector3 = { New = function(x, y, z) return { x = x, y = y
+tests/native/spec/player_effects_and_held_rod_test.lua:289 New        | _G.Color = { New = function(...) return { ... } end }
+      ctx: saved_vec3 = rawget(_G, "Vector3") / saved_color = rawget(_G, "Color") / _G.Vector3 = { New = function(x, y, z) return { x = x, y = y / _G.Color = { New = function(...) return { ... } end }
+tests/native/spec/player_effects_and_held_rod_test.lua:310 Destroy    | Destroy = function(self)
+      ctx: local unit = { / Type = unit_type, / Props = props, / Destroy = function(self)
+tests/native/spec/player_tree_state_sync_test.lua:101 New        | _G.Vector3 = { New = function(x, y, z) return { x = x, y = y, z = z } end }
+      ctx: before_each(function() / saved_vec3 = rawget(_G, "Vector3") / saved_color = rawget(_G, "Color") / _G.Vector3 = { New = function(x, y, z) return { x = x, y = y
+tests/native/spec/player_tree_state_sync_test.lua:102 New        | _G.Color = { New = function(...) return { ... } end }
+      ctx: saved_vec3 = rawget(_G, "Vector3") / saved_color = rawget(_G, "Color") / _G.Vector3 = { New = function(x, y, z) return { x = x, y = y / _G.Color = { New = function(...) return { ... } end }
+tests/native/spec/player_tree_state_sync_test.lua:267 Destroy    | Destroy = function(self)
+      ctx: local unit = { / Type = unit_type, / Props = props, / Destroy = function(self)
+tests/native/spec/server_cast_reel_302_test.lua:66 New        | _G.Vector3 = { New = function(x, y, z) return { x = x, y = y, z = z } end }
+      ctx:  / before_each(function() / saved_vector, saved_color = rawget(_G, "Vector3"), rawget(_G / _G.Vector3 = { New = function(x, y, z) return { x = x, y = y
+tests/native/spec/server_cast_reel_302_test.lua:67 New        | _G.Color = { New = function(r, g, b, a) return { r = r, g = g, b = b, a = a } en
+      ctx: before_each(function() / saved_vector, saved_color = rawget(_G, "Vector3"), rawget(_G / _G.Vector3 = { New = function(x, y, z) return { x = x, y = y / _G.Color = { New = function(r, g, b, a)
+tests/native/spec/server_cast_reel_302_test.lua:158 Destroy    | Destroy = function(self) self.destroyed = true end,
+      ctx: Kind = kind, / props = props, / destroyed = false, / Destroy = function(self) self.destroyed = true end,
+tests/native/spec/server_cast_reel_302_test.lua:170 Destroy    | Destroy = function(self) self.destroyed = true end,
+      ctx: Kind = kind, / props = props, / destroyed = false, / Destroy = function(self) self.destroyed = true end,
+tests/native/spec/server_cast_reel_302_test.lua:191 Destroy    | Destroy = function(self) self.destroyed = true end,
+      ctx: Name = "LandedFish_" .. tostring(seq), / fish = fish, / destroyed = false, / Destroy = function(self) self.destroyed = true end,
+tests/native/spec/server_cutover_297_a3_test.lua:106 New        | _G.Vector3 = { New = function(x, y, z) return { x = x, y = y, z = z } end }
+      ctx: before_each(function() / saved_vec3 = rawget(_G, "Vector3") / saved_color = rawget(_G, "Color") / _G.Vector3 = { New = function(x, y, z) return { x = x, y = y
+tests/native/spec/server_cutover_297_a3_test.lua:107 New        | _G.Color = { New = function(...) return { ... } end }
+      ctx: saved_vec3 = rawget(_G, "Vector3") / saved_color = rawget(_G, "Color") / _G.Vector3 = { New = function(x, y, z) return { x = x, y = y / _G.Color = { New = function(...) return { ... } end }
+tests/native/spec/server_cutover_297_a3_test.lua:372 New        | _G.RemoteEvent = { New = function()
+      ctx: end, / } /  / _G.RemoteEvent = { New = function()
+tests/native/spec/server_cutover_297_a3_test.lua:376 New        | _G.Vector3 = { New = function(x, y, z) return { x = x, y = y, z = z } end }
+      ctx: return { OnServerEvent = make_signal(), OnClientEvent = make / FireServer = function() end, FireClient = function() end, Fi / end } / _G.Vector3 = { New = function(x, y, z) return { x = x, y
+tests/native/spec/server_cutover_297_a3_test.lua:377 New        | _G.Color = { New = function(...) return { ... } end }
+      ctx: FireServer = function() end, FireClient = function() end, Fi / end } / _G.Vector3 = { New = function(x, y, z) return { x = x, y = y / _G.Color = { New = function(...) return { ... } end }
+tests/native/spec/server_cutover_297_a3_test.lua:383 Spawn      | Spawn = function(_, fn) tasks[#tasks + 1] = fn end,
+      ctx: GetService = function(_, name) / if name == "Task" then / return { / Spawn = function(_, fn) tasks[#tasks + 1] = fn end,
+tests/native/spec/server_cutover_297_a3_test.lua:485 New        | RemoteEvent = { New = function()
+      ctx:  / local sandbox / sandbox = setmetatable({ / RemoteEvent = { New = function()
+tests/native/spec/server_cutover_297_a3_test.lua:497 Start      | if path == "server.MgrUtil" then return { Start = function() end } end
+      ctx: end, / require = function(path) / if path == "common.re_util" then return remote_util end / if path == "server.MgrUtil" then return { Start = function()
+tests/native/spec/server_cutover_297_a3_test.lua:498 Start      | if path == "common.zone_markers" then return { Start = function() end } end
+      ctx: require = function(path) / if path == "common.re_util" then return remote_util end / if path == "server.MgrUtil" then return { Start = function() / if path == "common.zone_markers" then retu
+tests/native/spec/server_fish_tree_309_test.lua:81 New        | _G.Color = { New = function(r, g, b, a) return { r = r, g = g, b = b, a = a } en
+      ctx: end } / end / if rawget(_G, "Color") == nil then / _G.Color = { New = function(r, g, b, a) return { r = r, g =
+tests/native/spec/server_fish_tree_309_test.lua:111 Destroy    | Destroy = function(self) self.Destroyed = true end,
+      ctx: Position = props and props.Position or { x = 10, y = 2, z =  / Rotation = { GetForward = function() return { x = 0, y = 0,  / Destroyed = false, / Destroy = function(self) self.Destroyed = t
+tests/native/spec/server_grill_310_test.lua:96 Spawn      | return { Spawn = function(_, fn) ctx.queue[#ctx.queue + 1] = fn end, Wait = func
+      ctx: ctx.players = {} / _G.game = { GetService = function(_, name) / if name == "Task" then / return { Spawn = function(_, fn) ctx.queue[#ctx.queue + 1] =
+tests/native/spec/server_grill_310_test.lua:104 Destroy    | return { Name = name, Position = ctx.anchor, Destroy = function(self) self.Destr
+      ctx: GetServerTime = function() return ctx.runtime and ctx.runtim / FindFirstChild = function(_, name) / if name == ctx.anchor_entity.Name or name == GameCfg.Zones[3 / return { Name = name, Posit
+tests/native/spec/server_grill_310_test.lua:111 Destroy    | Destroy = function(self)
+      ctx: ctx.unit_seq = ctx.unit_seq + 1 / local unit = { / id = ctx.unit_seq, kind = kind, props = props, Name = props  / Destroy = function(self)
+tests/native/spec/server_shop_feed_311_test.lua:92 Spawn      | return { Spawn = function(_, fn) ctx.queue[#ctx.queue + 1] = fn end, Wait = func
+      ctx: end / _G.game = { GetService = function(_, name) / if name == "Task" then / return { Spawn = function(_, fn) ctx.queue[#ctx.queue + 1] =
+tests/native/spec/server_special_item_299_test.lua:177 Destroy    | Destroy = function(self) self.Destroyed = true end,
+      ctx: Name = props and props.Name, / Parent = props and props.Parent, / Destroyed = false, / Destroy = function(self) self.Destroyed = true end,
+tests/native/spec/server_world_backbone_test.lua:422 Destroy    | Destroy = function(self)
+      ctx: actions = function(s) / local unit = { / name = "TempSpecialProp", / Destroy = function(self)
+tests/native/spec/server_world_backbone_test.lua:838 New        | _G.Vector3 = { New = function(x, y, z) return { x = x, y = y, z = z } end }
+      ctx: } / GameCfg.Debug = { Enabled = false } / GameCfg.Save.QaSlot = "" / _G.Vector3 = { New = function(x, y, z) return { x = x, y = y
+tests/native/spec/server_world_backbone_test.lua:839 New        | _G.Color = { New = function(...) return { ... } end }
+      ctx: GameCfg.Debug = { Enabled = false } / GameCfg.Save.QaSlot = "" / _G.Vector3 = { New = function(x, y, z) return { x = x, y = y / _G.Color = { New = function(...) return { ... } end }
+tests/native/spec/server_world_backbone_test.lua:840 New        | _G.RemoteEvent = { New = function()
+      ctx: GameCfg.Save.QaSlot = "" / _G.Vector3 = { New = function(x, y, z) return { x = x, y = y / _G.Color = { New = function(...) return { ... } end } / _G.RemoteEvent = { New = function()
+tests/native/spec/server_world_backbone_test.lua:899 Spawn      | Spawn = function(_, fn) tasks[#tasks + 1] = fn end,
+      ctx: GetService = function(_, name) / if name == "Task" then / return { / Spawn = function(_, fn) tasks[#tasks + 1] = fn end,
+tests/native/spec/server_world_backbone_test.lua:949 Start      | mgrs.FishAbility = { Start = function() end, update = function() end }
+      ctx: mgrs.SaveHost = assert(loadfile("server/save_host.lua"))() / mgrs.PlayerDataHost = assert(loadfile("server/player_data_ho / mgrs.PlatformHost = {} / mgrs.FishAbility = { Start = function() e
+tests/native/spec/server_world_backbone_test.lua:962 Start      | if path == "server.MgrUtil" then return { Start = function() end } end
+      ctx: end, / require = function(path) / if path == "common.re_util" then return remote_util end / if path == "server.MgrUtil" then return { Start = function()
+tests/native/spec/server_world_backbone_test.lua:963 Start      | if path == "common.zone_markers" then return { Start = function() end } end
+      ctx: require = function(path) / if path == "common.re_util" then return remote_util end / if path == "server.MgrUtil" then return { Start = function() / if path == "common.zone_markers" then retu
+tests/native/status_effect_test.lua:64 Spawn      | if name == 'Task' then return { Spawn = function() end, Wait = function() end }
+      ctx: if name == 'Players' then return { GetPlayerFromCharacter =  / return unit and unit.PlayerRef or nil / end } end / if name == 'Task' then return { Spawn = function() end, Wait
+tests/native/status_effect_test.lua:90 GetState   | state.mgr.Survival = { GetState = function()
+      ctx: -- 假 PlayerData / Survival / state.mgr.PlayerData = { get_data_inst = function() return { / potion_count = function(_, itemId) return state.potions[item / state.mgr.Survival = { GetState = f
+tests/native/status_effect_test.lua:372 New        | _G.Vector3 = { New = function(x, y, z) return { x = x, y = y, z = z } end }
+      ctx: -- 真实效果计时 + 真实逃跑更新：麻痹0.5秒到期恢复霜冻速度，霜冻3秒到期恢复原速。 / it('test_straight_escape_uses_real_status_expiration', funct / local oldVector = _G.Vector3 / _G.Vector3 = { New = function(x, y, z) return {
+tests/native/volcano_combat_test.lua:98 Pause      | env.mgr.Ai = { Pause = function() end, Custom = function() return true end, Sync
+      ctx: env:drop('fish55Elite') / env:advance(15.1) / local controlled = true / env.mgr.Ai = { Pause = function() end, Custom = function() r
+tests/native/volcano_combat_test.lua:99 Stop       | remove = function() end, Stop = function() end }
+      ctx: env:advance(15.1) / local controlled = true / env.mgr.Ai = { Pause = function() end, Custom = function() r / remove = function() end, Stop = function() end }
+tests/native/weapon_system_test.lua:164 Spawn      | Spawn = function(_, opts)
+      ctx: saved = { game = rawget(_G, 'game'), carrier = package.loade / ctx = { now = 3000, despawned = {}, spawnOpts = {} } / package.loaded['server.world_host.fish_carrier'] = { / Spawn = function(
+tests/native/weapon_system_test.lua:169 Attach     | Attach = function() end,
+      ctx: return { Body = { Position = opts.Position }, Receiver = { C / end, / despawn = function(_, carrier) ctx.despawned[#ctx.despawned  / Attach = function() end,
+tests/probes/pond_loop_runtime.lua:51 Handle     | local interact = { Handle = function(_, player, payload)
+      ctx: local runtime = ServerRuntime.current and ServerRuntime.curr / return runtime and runtime[name](runtime, player, payload) o / end / local interact = { Handle = function(_, player, payload)
+tests/probes/pond_loop_runtime.lua:54 Handle     | local shop = { Handle = function(_, player, payload)
+      ctx: local interact = { Handle = function(_, player, payload) / return runtimeCommand('dispatch_interact', player, payload) / end } / local shop = { Handle = function(_, player, payload)
+tests/support/attr_runtime.lua:43 New        | Vector3 = { New = function(x, y, z) return { x = x, y = y, z = z } end },
+      ctx: end } / local env = setmetatable({ / game = { GetService = function() return world end }, / Vector3 = { New = function(x, y, z) return { x = x, y = y, z
+tests/support/economy_client.lua:14 New        | _G.Vector2 = { New = function(x, y) return { x = x, y = y } end }
+      ctx: options = options or {} / local env = { sent = { lottery = {}, blindbox = {}, platform / env.oldVector, env.oldColor, env.oldVector3 = rawget(_G, "Ve / _G.Vector2 = { New = function(x, y) re
+tests/support/economy_client.lua:15 New        | _G.Vector3 = { New = function(x, y, z) return { x = x, y = y, z = z } end }
+      ctx: local env = { sent = { lottery = {}, blindbox = {}, platform / env.oldVector, env.oldColor, env.oldVector3 = rawget(_G, "Ve / _G.Vector2 = { New = function(x, y) return { x = x, y = y }  / _
+tests/support/economy_client.lua:16 New        | _G.Color = { New = function(...) return { ... } end }
+      ctx: env.oldVector, env.oldColor, env.oldVector3 = rawget(_G, "Ve / _G.Vector2 = { New = function(x, y) return { x = x, y = y }  / _G.Vector3 = { New = function(x, y, z) return { x = x, y = y / _
+tests/support/economy_world.lua:91 Spawn      | Spawn = function(_, fn) env.queue[#env.queue + 1] = fn end,
+      ctx: GetService = function(_, name) / if name == "Task" then / return { / Spawn = function(_, fn) env.queue[#env.queue + 1] = fn end,
+tests/support/economy_world.lua:163 Destroy    | Destroy = function(unit) unit.Destroyed = true end,
+      ctx: Name = props and props.Name, / Position = props and props.Position, / Destroyed = false, / Destroy = function(unit) unit.Destroyed = true end,
+tests/support/fish_escape.lua:16 New        | _G.RaycastParams = { New = function() return { FilterDescendantsInstances = {} }
+      ctx: local env = self / self.rays = {} / self.hits = {} / _G.RaycastParams = { New = function() return { FilterDescend
+tests/support/fish_loot.lua:22 New        | _G.Color = { New = function(r, g, b, a) return { r = r, g = g, b = b, a = a } en
+      ctx: self.savedColor = _G.Color / self.lootModule = package.loaded['server.world_host.ground_l / self.lootSaved = true / _G.Color = { New = function(r, g, b, a) return { r = r, g =
+tests/support/fish_loot.lua:37 New        | _G.RaycastParams = { New = function() return { FilterDescendantsInstances = {} }
+      ctx: self.physics = { Raycast = function(_, origin, direction) / if direction.y < 0 then return { Position = vec(origin.x, en / end } / _G.RaycastParams = { New = function() return { FilterDescen
+tests/support/fish_loot.lua:54 Start      | self.loot = { Loots = {}, Start = function() end }
+      ctx: self.synced = {} / self.broadcasts = 0 / self.replies = {} / self.loot = { Loots = {}, Start = function() end }
+tests/support/fishing_host.lua:55 New        | _G.Vector3 = { New = function(x, y, z) return { x = x, y = y, z = z } end }
+      ctx: events = {}, units = {}, compendium = {}, quests = {}, rolls / saved_vector = rawget(_G, "Vector3"), saved_color = rawget(_ / } / _G.Vector3 = { New = function(x, y, z) return { x = x, y = y
+tests/support/fishing_host.lua:56 New        | _G.Color = { New = function(r, g, b, a) return { r = r, g = g, b = b, a = a } en
+      ctx: saved_vector = rawget(_G, "Vector3"), saved_color = rawget(_ / } / _G.Vector3 = { New = function(x, y, z) return { x = x, y = y / _G.Color = { New = function(r, g, b, a) return { r = r, g =
+tests/support/fishing_host.lua:91 Destroy    | Destroy = function(self) self.destroyed = true end,
+      ctx: local function create_unit(kind, props) / local unit = { / Name = props and props.Name, Kind = kind, props = props, des / Destroy = function(self) self.destroyed = true end,
+tests/support/fishing_host.lua:116 Destroy    | destroyed = false, Destroy = function(self) self.destroyed = true end }
+      ctx: local fish = { Id = seq, Owner = owner, FishId = catch.fishI / Position = position, State = "awaitLift" } / env.units[#env.units + 1] = { Name = "LandedFish_" .. tostri / destroyed = false,
+tests/support/isle_combat.lua:81 New        | _G.Color = { New = function(r, g, b, a) return { r = r, g = g, b = b, a = a } en
+      ctx: -- MgrFishCarrier 在有染色（species.VisualColor）时读 Color.New；旧 re / -- #90 迁移前一直是靠 damage_float 测试的全局泄漏跑通的。这里显式补替身并纳入恢复名单， / -- 使这份夹具自洽（不改业务行为，只把缺的引擎替身补上）。 / _G.Color = { New = function(r, g, b,
+tests/support/isle_combat.lua:88 New        | _G.RemoteEvent = { New = function(name) return {
+      ctx: if name == 'RunService' then return { IsServer = function()  / if name == 'Players' then return { GetPlayers = function() r / end } / _G.RemoteEvent = { New = function(name) return {
+tests/support/local_link.lua:128 New        | _G.Vector2 = { New = function(x, y) return { x = x, y = y } end }
+      ctx: end, LocalPlayer = nil } /  / _G.Vector3 = { New = vec } / _G.Vector2 = { New = function(x, y) return { x = x, y = y }
+tests/support/local_link.lua:129 New        | _G.Color = { New = function(r, g, b, a) return { r = r, g = g, b = b, a = a } en
+      ctx:  / _G.Vector3 = { New = vec } / _G.Vector2 = { New = function(x, y) return { x = x, y = y }  / _G.Color = { New = function(r, g, b, a) return { r = r, g =
+tests/support/local_link.lua:134 Spawn      | Spawn = function(_, fn) env.queue[#env.queue + 1] = fn end,
+      ctx: GetService = function(_, name) / if name == 'Task' then / return { / Spawn = function(_, fn) env.queue[#env.queue + 1] = fn end,
+tests/support/modifier_runtime.lua:95 New        | e.remote = { New = function() return { OnServerEvent = signal(), FireAllClients
+      ctx: return u / end, / } / e.remote = { New = function() return { OnServerEvent = signa
+tests/support/reel_view_host.lua:10 New        | _G.Vector2 = { New = function(x, y) return { x = x, y = y } end }
+      ctx: local Host = {} / function Host.new() / local saved_vector, saved_color = rawget(_G, "Vector2"), raw / _G.Vector2 = { New = function(x, y) return { x = x, y = y }
+tests/support/reel_view_host.lua:11 New        | _G.Color = { New = function(r, g, b, a) return { r = r, g = g, b = b, a = a } en
+      ctx: function Host.new() / local saved_vector, saved_color = rawget(_G, "Vector2"), raw / _G.Vector2 = { New = function(x, y) return { x = x, y = y }  / _G.Color = { New = function(r, g, b, a) re
+tests/support/shop_feed_host.lua:82 Spawn      | Spawn = function(_, fn) host.queue[#host.queue + 1] = fn end,
+      ctx: GetService = function(_, name) / if name == "Task" then / return { / Spawn = function(_, fn) host.queue[#host.queue + 1] = fn end
