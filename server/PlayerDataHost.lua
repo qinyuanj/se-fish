@@ -1,5 +1,6 @@
 local PlayerData = require('server.Data.PlayerData')
 local GameCfg = require('common.GameCfg')
+local Number = require('common.Number')
 local PlayerDataHost = { SpokeHost = true }
 local DataMap = {}
 
@@ -50,14 +51,16 @@ function PlayerDataHost:OnPlayerRemoving(player)
     end
 end
 
+local function isPositiveInt(value)
+    return Number.IsFiniteNumber(value) and value == math.floor(value) and value >= 1
+end
+
 local function validActionValue(action, value, data)
     if action == 'SelectSlot' or action == 'DiscardSlot' or action == 'EatSlot' then
-        return type(value) == 'number' and value == math.floor(value)
-            and value >= 1 and value <= data:ItemBarCapacity()
+        return isPositiveInt(value) and value <= data:ItemBarCapacity()
     end
     if action == 'MoveToItemBar' then
-        return type(value) == 'number' and value == math.floor(value)
-            and value >= 1 and value <= data:BackpackCapacity()
+        return isPositiveInt(value) and value <= data:BackpackCapacity()
     end
     if action == 'SelectBait' and value == nil then return true end
     return type(value) == 'string' and data:HasBait(value)
@@ -102,8 +105,7 @@ function PlayerDataHost:Operate(player, data, payload)
             return
         end
     else
-        if type(slot) ~= 'number' or slot ~= math.floor(slot)
-            or slot < 1 or slot > data:ItemBarCapacity() then
+        if not isPositiveInt(slot) or slot > data:ItemBarCapacity() then
             finish({ ok = false, reason = 'bad-slot' })
             return
         end
@@ -252,6 +254,7 @@ end
 
 function PlayerDataHost:Start()
     _G.REUtil:GetRE('RequestItemBar').OnServerEvent:Connect(function(player)
+        if _G.REUtil:CheckRECD(player, 'RequestItemBar', GameCfg.Items.ActionCooldownSec) then return end
         local tree = self.Runtime and self.Runtime:get_player_tree(player.UserId)
         if tree then self:SyncPlayerTree(player, true) else self:SendItemBar(player, true) end
     end)
@@ -272,7 +275,9 @@ function PlayerDataHost:Start()
             local runtime = self.Runtime
             local world = runtime and runtime:get_world()
             if not world then return end
-            if action == 'Pickup' and type(world.try_pickup) == 'function' then
+            if type(world.handle_item_bar_action) == 'function' then
+                world:handle_item_bar_action(player, payload, true)
+            elseif action == 'Pickup' and type(world.try_pickup) == 'function' then
                 world:try_pickup(player, payload.value)
             elseif action == 'Drop' and type(world.try_drop) == 'function' then
                 world:try_drop(player, payload.container, payload.index)
@@ -284,8 +289,8 @@ function PlayerDataHost:Start()
             local from, index, target, slot = payload.from, payload.index, payload.target, payload.slot
             local valid = (from == ids.ItemBar or from == ids.Backpack)
                 and (target == ids.ItemBar or target == ids.Backpack)
-                and type(index) == 'number' and index == math.floor(index) and index >= 1
-                and type(slot) == 'number' and slot == math.floor(slot) and slot >= 1
+                and isPositiveInt(index)
+                and isPositiveInt(slot)
             if not valid then return end
             if _G.REUtil:CheckRECD(player, 'ItemBarAction', GameCfg.Items.ActionCooldownSec) then return end
             if data:MoveSlot(from, index, target, slot) then self:SendItemBar(player) self:SyncPlayerTree(player) end

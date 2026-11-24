@@ -305,13 +305,52 @@ describe("活鱼树宿主接缝（#309）", function()
     assert.is_true(runtime:receive_landed(player, { fishId = "carp", mult = 1, x = 12, y = 2, z = -18 }))
     local rows = runtime:fish_snapshot()
     assert.equals(2, #rows)
-    runtime:fault_fish(rows[1].id, "boom")
+    local doomed = runtime.fish_host.Fish[rows[1].id]
+    assert.is_true(runtime:fault_fish(rows[1].id, "boom"))
+    assert.is_not_nil(doomed.Tree.fault, "fault_fish 须实证真实 SpokeTree 故障隔离")
     runtime:step(0, 1001)
     assert.is_false(tree:is_faulted())
     assert.is_false(runtime:get_world():is_disposed())
     local left = runtime:fish_snapshot()
     assert.equals(1, #left)
     assert.equals(rows[2].id, left[1].id)
+  end)
+
+  it("经 FishTree 直接上岸的活鱼同步发布且空闲帧不重复发空表，同时驱动 FishCarrier:Update", function()
+    local broadcasts, carrier_updates = {}, 0
+    local runtime = boot({
+      remote = {
+        GetRE = function(_, name)
+          return {
+            OnServerEvent = signal(),
+            FireClient = function() end,
+            FireAllClients = function(_, payload)
+              if name == "FishCombatState" then broadcasts[#broadcasts + 1] = payload end
+            end,
+          }
+        end,
+        CheckRECD = function() return false end,
+      },
+      fish_carrier = {
+        Update = function() carrier_updates = carrier_updates + 1 end,
+      },
+    })
+    local player = make_player(10)
+    join(runtime, player)
+    runtime:step(0.1, 1000.1)
+    runtime:step(0.1, 1000.2)
+    assert.equals(0, #broadcasts, "无活鱼时不得每帧发空 FishCombatState")
+    assert.equals(2, carrier_updates, "ServerRuntime:step 须驱动 FishCarrier:Update")
+
+    local spawned = runtime.fish_host:SpawnLanded(player, { fishId = "bass", mult = 1.2 }, { x = 10, y = 2, z = -18 })
+    assert.is_not_nil(spawned)
+    runtime:step(0.1, 1000.3)
+    assert.equals(1, #broadcasts)
+    assert.equals(1, #broadcasts[1].list)
+    assert.equals(spawned.Id, broadcasts[1].list[1].id)
+    assert.equals(1, #runtime:fish_snapshot())
+    runtime:step(0.1, 1000.4)
+    assert.equals(1, #broadcasts, "状态未变化时不重复推送")
   end)
 
   it("官方 AI 启动失败会记录且后续帧重试，清理仍对称注销", function()

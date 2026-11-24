@@ -10,6 +10,7 @@ local MathWaterJudge = require("common.MathWaterJudge")
 local Number = require("common.Number")
 local RateLimit = require("common.RateLimit")
 local ReelProgress = require("common.ReelProgress")
+local State = require("common.packages.spoke.api").State
 
 local FishingPhase = {}
 
@@ -97,6 +98,7 @@ function FishingPhase.mount(scope, tree, opts)
   local next_fish = nil
   local next_fish_serial = 0
   local cleaned = false
+  local active_frame = State.new("FishingPhase.active_frame", false)
 
   local function create_line(cast_id, landing)
     local maker = create_unit
@@ -174,6 +176,7 @@ function FishingPhase.mount(scope, tree, opts)
   local function clear_session(reason, notify)
     session = nil
     reel = nil
+    active_frame:set(false)
     destroy_line()
     if notify ~= false then publish(reason) end
   end
@@ -260,6 +263,7 @@ function FishingPhase.mount(scope, tree, opts)
       rodLevel = definition.Level or 1,
       hookAt = now_of(tree) + GameCfg.Casting.HookDelaySec,
     }
+    active_frame:set(true)
     create_line(session.castId, landing)
     publish()
     if quest and type(quest.Notify) == "function" then
@@ -501,7 +505,10 @@ function FishingPhase.mount(scope, tree, opts)
   end
 
   scope:subscribe(tree.clock.on_second, tick)
-  scope:subscribe(tree.clock.on_frame, tick)
+  -- 仅在抛竿/收线宽限/短暂举鱼保持的活跃期内按需订阅 on_frame，空闲时零 on_frame 订阅。
+  scope:phase("FishingActiveFrame", active_frame, function(fs)
+    fs:subscribe(tree.clock.on_frame, tick)
+  end)
   if tree.states and tree.states.life_phase and type(tree.states.life_phase.subscribe) == "function" then
     scope:subscribe(tree.states.life_phase, function()
       local phase_name = tree.states.life_phase:now()
@@ -517,7 +524,6 @@ function FishingPhase.mount(scope, tree, opts)
   end
 
   scope:on_cleanup(function()
-    cleaned = true
     if reel then
       reel.receiver:EndSession()
       reel = nil
@@ -525,8 +531,10 @@ function FishingPhase.mount(scope, tree, opts)
     local had = session
     session = nil
     next_fish = nil
+    active_frame:set(false)
     destroy_line()
     if had then publish() end
+    cleaned = true
   end)
 
   local function push_state()

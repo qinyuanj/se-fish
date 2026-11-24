@@ -132,6 +132,14 @@ function AttrBridge:ApplyGrowth(player)
 end
 FishAbility.Attr = AttrBridge
 
+local function bindRE(name, cooldown, handler, requireTable)
+    _G.REUtil:GetRE(name).OnServerEvent:Connect(function(player, payload)
+        if requireTable and type(payload) ~= "table" then return end
+        if cooldown and _G.REUtil:CheckRECD(player, name, cooldown) then return end
+        handler(player, payload)
+    end)
+end
+
 -- 服务端 Spoke 运行时主干：装配官方包叶子投影与宿主事件入口。
 WorldRuntime = ServerRuntime.new({
     initial_now = serverNow() or 0,
@@ -160,93 +168,62 @@ WorldRuntime = ServerRuntime.new({
     world_service = WorldService,
     zone_markers = ZoneMarkers,
     bind_weapon_action = function(dispatch)
-        local event = _G.REUtil:GetRE("WeaponAction")
-        event.OnServerEvent:Connect(function(player, payload)
-            if _G.REUtil:CheckRECD(player, "WeaponAction", GameCfg.Ability.GunShared.ActionCooldownSec) then return end
-            dispatch(player, payload)
-        end)
+        bindRE("WeaponAction", GameCfg.Ability.GunShared.ActionCooldownSec, dispatch)
     end,
     bind_party_action = function(dispatch)
-        _G.REUtil:GetRE("PartyAction").OnServerEvent:Connect(function(player, payload)
-            if _G.REUtil:CheckRECD(player, "PartyAction", GameCfg.Party.ActionCooldownSec) then return end
-            dispatch(player, payload)
-        end)
+        bindRE("PartyAction", GameCfg.Party.ActionCooldownSec, dispatch)
     end,
     bind_party_state_request = function(dispatch)
-        _G.REUtil:GetRE("PartyStateRequest").OnServerEvent:Connect(function(player)
-            if _G.REUtil:CheckRECD(player, "PartyStateRequest", GameCfg.Party.StateCooldownSec) then return end
-            dispatch(player)
-        end)
+        bindRE("PartyStateRequest", GameCfg.Party.StateCooldownSec, dispatch)
     end,
     bind_ferry_action = function(dispatch)
-        _G.REUtil:GetRE("FerryAction").OnServerEvent:Connect(function(player, payload)
-            if type(payload) ~= "table" then return end
-            if _G.REUtil:CheckRECD(player, "FerryAction", GameCfg.Items.ActionCooldownSec) then return end
-            dispatch(player, payload)
-        end)
+        bindRE("FerryAction", GameCfg.Items.ActionCooldownSec, dispatch, true)
     end,
     bind_grill_action = function(dispatch)
-        local event = _G.REUtil:GetRE("GrillAction")
-        event.OnServerEvent:Connect(function(player, payload)
-            if type(payload) ~= "table" then return end
-            if _G.REUtil:CheckRECD(player, "GrillAction", GameCfg.Items.ActionCooldownSec) then return end
-            dispatch(player, payload)
-        end)
+        bindRE("GrillAction", GameCfg.Items.ActionCooldownSec, dispatch, true)
     end,
     bind_shop_action = function(dispatch)
-        _G.REUtil:GetRE("ShopAction").OnServerEvent:Connect(function(player, payload)
-            if _G.REUtil:CheckRECD(player, "ShopAction", GameCfg.Items.ActionCooldownSec) then return end
-            dispatch(player, payload)
-        end)
+        bindRE("ShopAction", GameCfg.Items.ActionCooldownSec, dispatch)
     end,
     bind_interact_action = function(dispatch)
-        _G.REUtil:GetRE("InteractAction").OnServerEvent:Connect(function(player, payload)
-            if _G.REUtil:CheckRECD(player, "InteractAction", GameCfg.Items.ActionCooldownSec) then return end
-            dispatch(player, payload)
-        end)
+        bindRE("InteractAction", GameCfg.Items.ActionCooldownSec, dispatch)
     end,
+    bind_survival_action = function(dispatch)
+        bindRE("SurvivalAction", GameCfg.Items.ActionCooldownSec, dispatch, true)
+    end,
+    bind_special_item_action = function(onAction, onQuery)
+        bindRE("SpecialItemAction", nil, onAction, true)
+        bindRE("SpecialItemStateRequest", nil, onQuery)
+    end,
+    bind_loot_request = function(dispatch)
+        bindRE("RequestLoot", GameCfg.Items.ActionCooldownSec, dispatch)
+    end,
+    bind_item_bar_action = false,
     bind_lottery_action = function(dispatch)
-        _G.REUtil:GetRE("LotteryAction").OnServerEvent:Connect(function(player, payload)
-            if _G.REUtil:CheckRECD(player, "LotteryAction", GameCfg.Lottery.ActionCooldownSec) then return end
-            dispatch(player, payload)
-        end)
-        _G.REUtil:GetRE("LotteryStateRequest").OnServerEvent:Connect(function(player)
-            if _G.REUtil:CheckRECD(player, "LotteryStateRequest", GameCfg.Lottery.ActionCooldownSec) then return end
+        bindRE("LotteryAction", GameCfg.Lottery.ActionCooldownSec, dispatch)
+        bindRE("LotteryStateRequest", GameCfg.Lottery.ActionCooldownSec, function(player)
             if WorldRuntime then WorldRuntime:lottery_state(player) end
         end)
     end,
     bind_blindbox_action = function(dispatch)
-        _G.REUtil:GetRE("BlindboxAction").OnServerEvent:Connect(function(player, payload)
-            if _G.REUtil:CheckRECD(player, "BlindboxAction", GameCfg.Blindbox.ActionCooldownSec) then return end
-            dispatch(player, payload)
-        end)
-        _G.REUtil:GetRE("BlindboxStateRequest").OnServerEvent:Connect(function(player)
-            if _G.REUtil:CheckRECD(player, "BlindboxStateRequest", GameCfg.Blindbox.ActionCooldownSec) then return end
+        bindRE("BlindboxAction", GameCfg.Blindbox.ActionCooldownSec, dispatch)
+        bindRE("BlindboxStateRequest", GameCfg.Blindbox.ActionCooldownSec, function(player)
             if WorldRuntime then WorldRuntime:blindbox_state(player) end
         end)
     end,
     bind_cast_action = function(dispatch)
-        _G.REUtil:GetRE("CastAction").OnServerEvent:Connect(function(player, payload)
-            if type(payload) ~= "table" then return end
-            if _G.REUtil:CheckRECD(player, "CastAction", GameCfg.Items.ActionCooldownSec) then return end
-            dispatch(player, payload)
-        end)
-        _G.REUtil:GetRE("RequestCastState").OnServerEvent:Connect(function(player)
-            if _G.REUtil:CheckRECD(player, "RequestCastState", GameCfg.Items.ActionCooldownSec) then return end
+        bindRE("CastAction", GameCfg.Items.ActionCooldownSec, dispatch, true)
+        bindRE("RequestCastState", GameCfg.Items.ActionCooldownSec, function(player)
             dispatch(player, { action = "Request" })
         end)
     end,
     bind_reel_action = function(dispatch)
-        _G.REUtil:GetRE("ReelInRE").OnServerEvent:Connect(function(player, payload)
-            if type(payload) ~= "table" then return end
-            if _G.REUtil:CheckRECD(player, "ReelInRE", GameCfg.Items.ActionCooldownSec) then return end
+        bindRE("ReelInRE", GameCfg.Items.ActionCooldownSec, function(player, payload)
             dispatch(player, "click", payload)
-        end)
-        _G.REUtil:GetRE("CloseReelIn").OnServerEvent:Connect(function(player, payload)
-            if type(payload) ~= "table" then return end
-            if _G.REUtil:CheckRECD(player, "CloseReelIn", GameCfg.Items.ActionCooldownSec) then return end
+        end, true)
+        bindRE("CloseReelIn", GameCfg.Items.ActionCooldownSec, function(player, payload)
             dispatch(player, "close", payload)
-        end)
+        end, true)
     end,
     ability = { CastAbility = AbilityAPI.CastAbility },
     register_cast_guard = registerCastGuard,
@@ -271,7 +248,6 @@ WorldRuntime = ServerRuntime.new({
             return FishAi:Command(fish, ...)
         end,
     },
-    bait_spots = { Enabled = false },
     on_item_bar_state = function(player, snapshot)
         _G.REUtil:GetRE('ItemBarState'):FireClient(player, snapshot)
     end,
@@ -305,7 +281,7 @@ FishCarrier.DamageListener = function(carrier, actual, hit)
     local attacker = hit and hit.sourcePlayer
     if fish and attacker then fishHost:NoteDamage(fish, attacker, actual) end
 end
-FishAi:Start()
+fishHost:Start()
 
 local function HandlePlayerAdded(player)
     WorldRuntime:on_player_added(player)

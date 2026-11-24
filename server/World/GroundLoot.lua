@@ -459,54 +459,57 @@ function GroundLoot.mount(world, opts)
     return nil
   end
 
-  local function ensure_events()
-    local remote = opts.remote
-    if type(remote) ~= "table" or type(remote.GetRE) ~= "function" then return end
-    scope:effect("GroundLootRemote", function(es)
-      local function allow(player, channel)
-        local tree = lookup_tree(player)
-        if world:is_disposed() or not tree or tree:is_disposed() then return false end
-        if type(remote.CheckRECD) == "function"
-            and remote:CheckRECD(player, channel, GameCfg.Items.ActionCooldownSec) then
-          return false
-        end
-        return true
-      end
-      local action = remote:GetRE("ItemBarAction")
-      if action and action.OnServerEvent and type(action.OnServerEvent.Connect) == "function" then
-        local conn = action.OnServerEvent:Connect(function(player, payload)
-          if type(payload) ~= "table" then return end
-          if payload.action ~= "Pickup" and payload.action ~= "Drop" then return end
-          if not allow(player, "ItemBarAction") then return end
-          if payload.action == "Pickup" then
-            world:try_pickup(player, payload.value)
-          else
-            world:try_drop(player, payload.container, payload.index)
-          end
-        end)
-        es:on_cleanup(function() conn:Disconnect() end)
-      end
-      local request = remote:GetRE("RequestLoot")
-      if request and request.OnServerEvent and type(request.OnServerEvent.Connect) == "function" then
-        local conn = request.OnServerEvent:Connect(function(player)
-          if not allow(player, "RequestLoot") then return end
-          local list = {}
-          for _, id in ipairs(order) do
-            local row = records[id]
-            if row then
-              list[#list + 1] = { id = row.id, kind = row.kind, itemId = row.itemId, x = row.x, y = row.y, z = row.z, warn = row.warn == true, spotId = row.spotId, zoneId = row.zoneId }
-            end
-          end
-          local state = remote:GetRE("LootState")
-          if state and type(state.FireClient) == "function" then
-            state:FireClient(player, { list = list })
-          end
-        end)
-        es:on_cleanup(function() conn:Disconnect() end)
-      end
+  local remote_active = false
+  scope:effect("GroundLootRemote", function(es)
+    remote_active = true
+    es:on_cleanup(function()
+      remote_active = false
     end)
+  end)
+
+  local function allow_remote(player, channel, skip_cd)
+    local tree = lookup_tree(player)
+    if not remote_active or world:is_disposed() or not tree or tree:is_disposed() then return false end
+    local remote = opts.remote
+    if not skip_cd and type(remote) == "table" and type(remote.CheckRECD) == "function"
+        and remote:CheckRECD(player, channel, GameCfg.Items.ActionCooldownSec) then
+      return false
+    end
+    return true
   end
-  ensure_events()
+
+  function world:handle_item_bar_action(player, payload, skip_cd)
+    if type(payload) ~= "table" then return false end
+    if payload.action ~= "Pickup" and payload.action ~= "Drop" then return false end
+    if not allow_remote(player, "ItemBarAction", skip_cd) then return false end
+    if payload.action == "Pickup" then
+      return world:try_pickup(player, payload.value)
+    end
+    return world:try_drop(player, payload.container, payload.index)
+  end
+
+  function world:handle_loot_request(player, skip_cd)
+    if not allow_remote(player, "RequestLoot", skip_cd) then return false end
+    local remote = opts.remote
+    if type(remote) ~= "table" or type(remote.GetRE) ~= "function" then return false end
+    local list = {}
+    for _, id in ipairs(order) do
+      local row = records[id]
+      if row then
+        list[#list + 1] = {
+          id = row.id, kind = row.kind, itemId = row.itemId,
+          x = row.x, y = row.y, z = row.z,
+          warn = row.warn == true, spotId = row.spotId, zoneId = row.zoneId,
+        }
+      end
+    end
+    local state = remote:GetRE("LootState")
+    if state and type(state.FireClient) == "function" then
+      state:FireClient(player, { list = list })
+      return true
+    end
+    return false
+  end
 
   function world:try_pickup(player, loot_id)
     if world:is_disposed() then return false, "disposed" end
@@ -530,11 +533,7 @@ function GroundLoot.mount(world, opts)
       if zone and zone.ground_loot then zone.ground_loot:drop(current.key) end
       committed = records[id] == nil
     end
-    if SpokeRuntime._hold_count > 0 then
-      commit()
-    else
-      SpokeRuntime.batch(commit)
-    end
+    SpokeRuntime.batch(commit)
     if committed then
       publish()
       reply(player, { ok = true, action = "Pickup", id = id })
@@ -545,7 +544,7 @@ function GroundLoot.mount(world, opts)
   end
 
   function world:on_carrier_killed(killed)
-    if world:is_disposed() or type(killed) ~= "table" or type(killed.position) ~= "table" then return false end
+    if world:is_disposed() or type(killed) ~= "table" or (type(killed.position) ~= "table" and type(killed.position) ~= "userdata") then return false end
     local species = GameCfg.Fish[killed.fishId]
     if species == nil then return false end
     local zone_id = killed.zoneId
@@ -589,7 +588,7 @@ function GroundLoot.mount(world, opts)
         if id ~= nil then placed[#placed + 1] = id end
       end
     end
-    if SpokeRuntime._hold_count > 0 then commit() else SpokeRuntime.batch(commit) end
+    SpokeRuntime.batch(commit)
     return #placed > 0, placed
   end
 
@@ -597,7 +596,7 @@ function GroundLoot.mount(world, opts)
     if world:is_disposed() then return false, "disposed" end
     local tree = lookup_tree(player)
     if not player_can_act(tree) then return false, "cannot-act" end
-    if type(index) ~= "number" or index ~= math.floor(index) or index < 1 then return false, "bad" end
+    if not Number.IsFiniteNumber(index) or index ~= math.floor(index) or index < 1 then return false, "bad" end
     local source = container == GameCfg.Items.ContainerId.Backpack
       and (tree.states.backpack:now() or {})
       or (tree.states.item_bar:now() or {})
@@ -628,11 +627,7 @@ function GroundLoot.mount(world, opts)
       })
       dropped = id ~= nil
     end
-    if SpokeRuntime._hold_count > 0 then
-      commit_drop()
-    else
-      SpokeRuntime.batch(commit_drop)
-    end
+    SpokeRuntime.batch(commit_drop)
     reply(player, { ok = dropped == true, action = "Drop", index = index })
     return dropped
   end

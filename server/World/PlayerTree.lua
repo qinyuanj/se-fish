@@ -582,7 +582,8 @@ function PlayerTree.spawn(opts)
         return ms:d(states.life_phase) == "alive"
       end)
       memos.is_downed = s3:memo("IsDowned", function(ms)
-        return ms:d(states.life_phase) == "downed"
+        local phase = ms:d(states.life_phase)
+        return phase == "downed" or phase == "rescuing"
       end)
       memos.is_dead = s3:memo("IsDead", function(ms)
         return ms:d(states.life_phase) == "dead"
@@ -898,82 +899,62 @@ function PlayerTree.spawn(opts)
     local upgrades = type(growth.upgrades) == "table" and growth.upgrades or {}
     local cds = type(extra.cooldowns) == "table" and extra.cooldowns or {}
 
+    -- 先完成所有数据预处理与引擎属性读取，再进入无 pcall 的纯状态 batch 写入。
+    local next_coin = d.FishCoin or 0
+    local next_zone = d.Zone or states.zone_id:now()
+    local next_upgrade = d.UpgradeLevel or 0
+    local next_item_bar = c[container_ids.ItemBar] or {}
+    local item_bar_changed = not deep_equal(states.item_bar:now(), next_item_bar)
+    local item_bar_copy = item_bar_changed and deep_copy(next_item_bar) or nil
+    local next_backpack = c[container_ids.Backpack] or {}
+    local backpack_changed = not deep_equal(states.backpack:now(), next_backpack)
+    local backpack_copy = backpack_changed and deep_copy(next_backpack) or nil
+    local next_weapons = d.Weapons or inv.weapons or {}
+    local weapons_changed = not deep_equal(states.weapons:now(), next_weapons)
+    local weapons_copy = weapons_changed and deep_copy(next_weapons) or nil
+    local next_bait = d.Bait or {}
+    local bait_changed = not deep_equal(states.bait:now(), next_bait)
+    local bait_copy = bait_changed and deep_copy(next_bait) or nil
+    local next_slot = d.SelectedSlot
+    local next_bait_sel = d.SelectedBait
+    local next_weapon_sel = d.SelectedWeapon
+    local next_held = normalize_held(sel.held)
+    local held_changed = not deep_equal(states.held:now(), next_held)
+    local next_big = potions.item168 or 0
+    local next_speed = potions.item167 or 0
+    local upgrades_changed = not deep_equal(states.shop_upgrades:now(), upgrades)
+    local upgrades_copy = upgrades_changed and deep_copy(upgrades) or nil
+    local cds_changed = not deep_equal(states.cooldowns:now(), cds)
+    local cds_copy = cds_changed and deep_copy(cds) or nil
+    local ok_ch, ch = pcall(function() return player.Character end) -- 兼容引擎 userdata 玩家
+
     local prev_pushed_snapshot = last_pushed_snapshot
     local prev_syncing = syncing_from_data
     if src == data then
       syncing_from_data = true
     end
-    local ok_batch, batch_err = pcall(SpokeRuntime.batch, function()
-      local next_coin = d.FishCoin or 0
+    SpokeRuntime.batch(function()
       if states.coin:now() ~= next_coin then states.coin:set(next_coin) end
-
-      local next_zone = d.Zone or states.zone_id:now()
       if states.zone_id:now() ~= next_zone then states.zone_id:set(next_zone) end
-
-      local next_upgrade = d.UpgradeLevel or 0
       if states.upgrade_level:now() ~= next_upgrade then states.upgrade_level:set(next_upgrade) end
-
-      local next_item_bar = c[container_ids.ItemBar] or {}
-      if not deep_equal(states.item_bar:now(), next_item_bar) then
-        states.item_bar:set(deep_copy(next_item_bar))
-      end
-
-      local next_backpack = c[container_ids.Backpack] or {}
-      if not deep_equal(states.backpack:now(), next_backpack) then
-        states.backpack:set(deep_copy(next_backpack))
-      end
-
-      local next_weapons = d.Weapons or inv.weapons or {}
-      if not deep_equal(states.weapons:now(), next_weapons) then
-        states.weapons:set(deep_copy(next_weapons))
-      end
-
-      local next_bait = d.Bait or {}
-      if not deep_equal(states.bait:now(), next_bait) then
-        states.bait:set(deep_copy(next_bait))
-      end
-
-      local next_slot = d.SelectedSlot
+      if item_bar_changed then states.item_bar:set(item_bar_copy) end
+      if backpack_changed then states.backpack:set(backpack_copy) end
+      if weapons_changed then states.weapons:set(weapons_copy) end
+      if bait_changed then states.bait:set(bait_copy) end
       if states.selected_slot:now() ~= next_slot then states.selected_slot:set(next_slot) end
-
-      local next_bait_sel = d.SelectedBait
       if states.selected_bait:now() ~= next_bait_sel then states.selected_bait:set(next_bait_sel) end
-
-      local next_weapon_sel = d.SelectedWeapon
       if states.selected_weapon:now() ~= next_weapon_sel then states.selected_weapon:set(next_weapon_sel) end
-
-      local next_held = normalize_held(sel.held)
-      if not deep_equal(states.held:now(), next_held) then
-        states.held:set(next_held)
-      end
-
-      local next_big = potions.item168 or 0
+      if held_changed then states.held:set(next_held) end
       if states.potion_big_count:now() ~= next_big then states.potion_big_count:set(next_big) end
-
-      local next_speed = potions.item167 or 0
       if states.potion_speed_count:now() ~= next_speed then states.potion_speed_count:set(next_speed) end
-
-      if not deep_equal(states.shop_upgrades:now(), upgrades) then
-        states.shop_upgrades:set(deep_copy(upgrades))
-      end
-
-      if not deep_equal(states.cooldowns:now(), cds) then
-        states.cooldowns:set(deep_copy(cds))
-      end
-
-      local ok_ch, ch = pcall(function() return player.Character end) -- 兼容引擎 userdata 玩家
-      if ok_ch and states.character:now() ~= ch then
-        states.character:set(ch)
-      end
-
+      if upgrades_changed then states.shop_upgrades:set(upgrades_copy) end
+      if cds_changed then states.cooldowns:set(cds_copy) end
+      if ok_ch and states.character:now() ~= ch then states.character:set(ch) end
       if handle._held_rod_failed then
         states.held_rod_retry:set(states.held_rod_retry:now() + 1)
       end
-    end) -- 保证异常时也能还原 syncing_from_data 保护标志
+    end)
     syncing_from_data = prev_syncing
-    if not ok_batch then
-      error(batch_err, 0)
-    end
     if type(sync_opts) == "table" and sync_opts.force_push == true and last_pushed_snapshot == prev_pushed_snapshot then
       handle:push_item_bar_state()
     end

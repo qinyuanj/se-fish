@@ -6,6 +6,7 @@ local GameCfg = require("common.GameCfg")
 local Number = require("common.Number")
 local MathWaterJudge = require("common.MathWaterJudge")
 local SwingRegistry = require("server.SwingRegistry")
+local State = require("common.packages.spoke.api").State
 
 local PlayerWeapon = {}
 
@@ -236,7 +237,7 @@ local function gun_hit(opts, player, aim)
   if (not ok or hit == nil) and physics.Raycast then
     ok, hit = pcall(physics.Raycast, ray_origin, ray_dir, params)
   end
-  if not ok or type(hit) ~= "table" or not hit.Instance then return nil, end_pos end
+  if not ok or (type(hit) ~= "table" and type(hit) ~= "userdata") or not hit.Instance then return nil, end_pos end
   local hit_pos = hit.Position or end_pos
   local players = service("Players", opts.players_service)
   local target = players and type(players.GetPlayerFromCharacter) == "function"
@@ -381,8 +382,11 @@ local function step_flights(session, now)
       end
       detonate(session, flight)
     elseif flight.visual then
-      pcall(function() flight.visual.Position = flight_position(flight, math.max(0, t)) end)
+      pcall(function() flight.visual.Position = flight_position(flight, math.max(0, t)) end) -- 视觉位姿失败不影响结算
     end
+  end
+  if #session.flying == 0 and session.has_flights then
+    session.has_flights:set(false)
   end
 end
 
@@ -415,6 +419,7 @@ local function launch(session, player, item_id, target)
   }
   flight.visual = create_visual(session, player, flight)
   session.flying[#session.flying + 1] = flight
+  if session.has_flights then session.has_flights:set(true) end
   play_anim(session.tracks, player, ability().Throw.Anim)
   print("[PlayerWeapon] 投掷", player.UserId, item_id, zone and ("落水 " .. zone.Id) or "落地")
   return flight
@@ -640,7 +645,7 @@ local function on_action(session, player, payload)
       return true
     end
     local slot = payload.slot
-    if type(slot) ~= "number" then
+    if not finite(slot) or slot ~= math.floor(slot) or slot < 1 then
       fail(session.remote, player, "throw", "bad-slot")
       return true
     end
@@ -663,6 +668,7 @@ end
 function PlayerWeapon.mount(scope, tree, opts)
   opts = type(opts) == "table" and opts or {}
   local player = tree.player
+  local has_flights = State.new("PlayerWeapon.has_flights", false)
   local session = {
     tree = tree,
     opts = opts,
@@ -672,20 +678,24 @@ function PlayerWeapon.mount(scope, tree, opts)
     fire_at = {},
     mags = {},
     flying = {},
+    has_flights = has_flights,
     tracks = setmetatable({}, { __mode = "k" }),
     throw_seq = 0,
     equipped = equipped_weapon(tree),
   }
 
-  scope:subscribe(tree.clock.on_frame, function()
-    step_flights(session, session.now())
+  -- 仅在投掷物飞行期间按需订阅 on_frame，空闲时零每帧订阅。
+  scope:phase("ThrowFlightPhase", has_flights, function(fs)
+    fs:subscribe(tree.clock.on_frame, function()
+      step_flights(session, session.now())
+    end)
   end)
 
   scope:effect("WeaponEquipWatch", function(es)
-    local weapon_id = equipped_weapon(tree)
     es:d(tree.states.held)
     es:d(tree.states.selected_weapon)
     es:d(tree.states.weapons)
+    local weapon_id = equipped_weapon(tree)
     if session.equipped ~= weapon_id then
       SwingRegistry.ClearSwing(player.UserId)
     end
@@ -698,9 +708,15 @@ function PlayerWeapon.mount(scope, tree, opts)
     session.cleaned = true
     for index = #session.flying, 1, -1 do
       local flight = session.flying[index]
-      if flight.visual then pcall(function() flight.visual:Destroy() end) end
+      if flight.visual then
+        local destroyed, err = pcall(function() flight.visual:Destroy() end)
+        if not destroyed then
+          print("[PlayerWeapon] 清理阶段投掷物视觉销毁失败", player.UserId, flight.item_id, tostring(err))
+        end
+      end
       session.flying[index] = nil
     end
+    has_flights:set(false)
   end)
 
   return {
