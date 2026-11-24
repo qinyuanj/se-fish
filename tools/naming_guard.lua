@@ -17,7 +17,7 @@ local SKIP_DIR_NAMES = { packages = true, _trigger = true }
 local DATA_DIR = "tools/naming/data"
 
 -- 官方契约上下文：出现在这些调用/字段里的字符串是引擎/协议名字，不是自研方法名。
--- 出处：docs/engine-keys.md 五类豁免；新增前先确认真是官方或线上协议。
+-- 出处：ADR-0034「官方契约原样」五类豁免与迁移索引附录（docs/adr/0034-self-written-code-snake-case.md）；新增前先确认真是官方或线上协议。
 local OFFICIAL_CONTEXT = {
   "action", "GetService", "GetAttribute", "SetAttribute", "read_player_attr",
   "attr", "get_re", "send", "Name", "Parent", "FindFirstChild", "CreateUnit",
