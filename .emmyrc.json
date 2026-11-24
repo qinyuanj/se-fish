@@ -1,0 +1,12 @@
+{
+  "$schema": "https://raw.githubusercontent.com/EmmyLuaLs/emmylua-analyzer-rust/main/crates/emmylua_code_analysis/resources/schema.json",
+  "runtime": {
+    "version": "Lua5.4"
+  },
+  "workspace": {
+    "ignoreDir": [
+      ".git", ".dsh", ".claude", ".agents", ".teamai",
+      "tmp", "target", ".toolcache", "evidence", "learn", "data", "docs", "tools", "packages", "_trigger"
+    ]
+  }
+}

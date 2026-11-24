@@ -12,7 +12,7 @@
 -- 进程当前目录不改：deploy / sync 等按当前目录读写，与之前一致。
 --
 -- 退出码：0 成功 / 1 业务失败 / 2 用法错误（未知子命令、模块加载失败、未知参数）/
---         3 外部工具不可用（busted / editor-cli / Blender / robocopy / curl 缺失）。
+--         3 外部工具不可用（busted / editor-cli / Blender / robocopy / curl / emmylua_check 缺失）。
 -- test 不原样透传 busted 的退出码（那是失败数加错误数，恰好 3 个失败会撞上退出码 3）：
 -- busted 非 0 一律收成 1。
 -- 「编辑器没装或没打开本图 → 打印跳过并返回 0」不受退出码 3 影响。
@@ -37,6 +37,7 @@ local M = {}
 M.commands = {
   { name = "test", mod = "tools.test", summary = "按测试车道跑 busted：test [fast|full|spec|art] [-- <busted 参数>...]，缺省 fast" },
   { name = "acceptance", mod = "tools.acceptance_cli", summary = "验收矩阵校验：acceptance [--check|--write|--update-baseline]，缺省 --check" },
+  { name = "emmylua", mod = "tools.emmylua", summary = "EmmyLua 诊断门禁：emmylua [--update-baseline]（基线外诊断失败）" },
   { name = "deploy", mod = "tools.deploy", summary = "仓库三端一级子树镜像进编辑器宿主目录（robocopy /MIR + 编辑器收尾）" },
   { name = "sync",   mod = "tools.sync",   summary = "从宿主回同步配置 / API 存根 / data/" },
   { name = "docs", mod = "tools.docs", summary = "同步并离线检索 SE 官方手册：docs sync [api <页面>] / docs search <查询>" },
@@ -44,7 +45,7 @@ M.commands = {
   { name = "ability-presets", mod = "tools.ability_presets", summary = "重建技能包的编辑器侧预设（复制官方模板、刷壳与属性、回写 GameCfg key）" },
   { name = "blender", mod = "tools.blender", summary = "在 Windows 侧无头 Blender 执行脚本（唯一 Blender 入口，透传 JSON 与退出码）" },
   { name = "worktree-init", mod = "tools.worktree_init", summary = "把新 worktree 补齐到能跑 test full（复制上游 blender-* skill、安装 pre-commit；幂等）" },
-  { name = "git-hook-init", mod = "tools.git_hooks", summary = "安装本地 pre-commit（提交前运行 test guards；幂等且不覆盖其他 hook）" },
+  { name = "git-hook-init", mod = "tools.git_hooks", summary = "安装本地 pre-commit（提交前依次运行 test guards 与 emmylua 门禁；幂等且不覆盖其他 hook）" },
   { name = "screenshot", mod = "tools.screenshot", summary = "抓画面存 PNG（缺省后台 PrintWindow，窗口被遮挡也能取当前帧）；--info 只报显示路径与选中的窗口" },
   { name = "editor", mod = "tools.editor", summary = "打开、查看、停止编辑器与地图：editor [open|status|stop] [--map <id|目录>]" },
 }

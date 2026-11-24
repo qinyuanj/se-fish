@@ -26,6 +26,7 @@ Lua 命令使用 **Lua 5.4**，命令名统一 `lua`，执行前用 `lua -v` 核
 - `lua tools/cli.lua blender <脚本.py> [--blend <输入.blend>] [-- <脚本参数>...]`：在本机无头 Blender 里执行脚本，是唯一的 Blender 入口；`--which` 核对将用的 Blender，`--expr` 执行内联代码。路径写正斜杠 Windows 形式（`C:/...`）或仓库内相对路径；用法见 [Blender 与 Meshy 使用](art-pipeline.md)，决策见 [ADR-0009](../adr/0009-blender-headless-only.md)。
 - `lua tools/cli.lua screenshot [--window <标题子串>] [--screen] [--out <文件.png>]`：取证画面的统一入口，缺省后台抓屏（`PrintWindow`），输出落 `tmp/`。选窗、虚拟屏与判帧新旧的实测坑见 [editor-cli.md「截图」](editor-cli.md)，取证前先跑 `--info`。
 - `lua tools/cli.lua acceptance [--check|--write|--update-baseline]`：验收矩阵的统一校验入口（#243），矩阵入口见 [条款矩阵](../acceptance/README.md)（接手先读 [交接说明](../acceptance/handover.md)），判定逻辑在 `tools/acceptance.lua`，用法与退出码看 `--help`。同一判定随 fast 车道跑（`tests/native/guards/acceptance_matrix_test.lua`）。
+- `lua tools/cli.lua emmylua [--update-baseline]`：EmmyLua 诊断门禁（[ADR-0038](../adr/0038-emmylua-agentic-coding-quality-gate.md)），固定 `emmylua_check 0.25.1`，扫描三端自写代码、排除 `tests/` 与 `packages/`；只拦 `tools/emmylua_baseline.txt` 基线外的新诊断。pre-commit 在 `test guards` 之后运行它，CI 先做非 required 观察。
   **Ratchet / 棘轮**：验收基线的单向闸门，已取证数只升、遗留测试数只降。_Avoid_: 阈值、配额、budget、上限
 - 官方包升级、直接调用接口与编辑器预设依赖见 [官方包接入参考](../packages-reference.md)。技能包预设命令见 `lua tools/cli.lua ability-presets --help`。
 - **临时产物**：agent 手工产物（验证中间文件、单据正文草稿）放仓库 `tmp/`，任务结束时删掉本任务产生的文件。脚本自建自删的目录由脚本收尾。
@@ -76,11 +77,12 @@ lua tools/cli.lua worktree-init
 
 ## 完成判据
 
-代码改动按顺序执行，全部通过才算完成。新 checkout 执行 `lua tools/cli.lua worktree-init` 会安装本地 `pre-commit`，已有 checkout 可单独执行 `lua tools/cli.lua git-hook-init`；提交前自动运行 `lua tools/cli.lua test guards`，重复安装幂等，已有不同 hook 不覆盖。PR 与 `main` 推送由 [test.yml](../../.github/workflows/test.yml) 自动运行 full，check-run context `full`（PR 界面显示 `test / full`）是 `main` 的 required status check。下表其余每一项仍由 agent 显式执行，质量工具由人运行，见表后的「人工验收」。
+代码改动按顺序执行，全部通过才算完成。新 checkout 执行 `lua tools/cli.lua worktree-init` 会安装本地 `pre-commit`，已有 checkout 可单独执行 `lua tools/cli.lua git-hook-init`；提交前自动依次运行 `lua tools/cli.lua test guards` 与 `lua tools/cli.lua emmylua`，重复安装幂等，已有不同 hook 不覆盖。PR 与 `main` 推送由 [test.yml](../../.github/workflows/test.yml) 自动运行 full，check-run context `full`（PR 界面显示 `test / full`）是 `main` 的 required status check。下表其余每一项仍由 agent 显式执行，质量工具由人运行，见表后的「人工验收」。
 
 | 检查 | 通过条件 |
 |---|---|
 | `lua tools/cli.lua test full`（收尾） | 含 slow 车道，全部用例通过，末行匹配 `N successes / 0 failures / 0 errors / 0 pending : T seconds`，退出码 0 |
+| `lua tools/cli.lua emmylua`（本地门禁） | `emmylua_check 0.25.1` 跑完且没有基线外诊断，退出码 0；CI 的独立观察任务暂不列 required |
 | 美术资产交付（美术校验） | 仓库外的资产校验脚本跑完并产出 `validation/validation.json`，报告里 `failures` 为空（含网格封闭性硬门槛）；只看这份报告，不另开 CI，资产校验不进测试车道。预算文件、`mesh` 段或 `validation.json` 缺失同样算失败，口径见 [美术资产概要「验收」](../art-asset-overview.md#验收) |
 | `lua tools/cli.lua deploy` 后复核 `code validate` | `ok=true`、`data.valid=true`、`data.is_se_map=true`，`data.issues` 与 `meta.warnings` 均为空 |
 | validate 通过后全套试玩 | 每条验收现象都有取证产物；`log trace` 本轮窗口有效且无错误 |
