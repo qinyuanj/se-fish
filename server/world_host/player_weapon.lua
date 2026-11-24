@@ -231,7 +231,7 @@ local function gun_hit(opts, player, aim)
   local ok, hit = pcall(function()
     return physics:Raycast(ray_origin, ray_dir, params)
   end)
-  if (not ok or hit == nil) and physics.Raycast then
+  if not ok and physics.Raycast then
     ok, hit = pcall(physics.Raycast, ray_origin, ray_dir, params)
   end
   if not ok or (type(hit) ~= "table" and type(hit) ~= "userdata") or not hit.Instance then return nil, end_pos end
@@ -490,6 +490,20 @@ local function attack_melee(session, player, weapon_id)
   })
 end
 
+local function pellet_directions(fx, fy, fz, pellets, spread_deg)
+  if pellets <= 1 or not finite(spread_deg) or spread_deg <= 0 then
+    return { { x = fx, y = fy, z = fz } }
+  end
+  local dirs = {}
+  for i = 1, pellets do
+    local offset_deg = -spread_deg / 2 + spread_deg * (i - 1) / (pellets - 1)
+    local rad = math.rad(offset_deg)
+    local c, s = math.cos(rad), math.sin(rad)
+    dirs[i] = { x = fx * c + fz * s, y = fy, z = -fx * s + fz * c }
+  end
+  return dirs
+end
+
 local function attack_gun(session, player, weapon_id, cfg, aim)
   local now = session.now()
   local size = magazine_size(session.tree.data, cfg.Magazine)
@@ -510,27 +524,40 @@ local function attack_gun(session, player, weapon_id, cfg, aim)
   session.fire_at[weapon_id] = now
   play_anim(session.tracks, player, cfg.Anim)
   local scale = damage_scale(session.tree, "ranged")
-  local target, hit_pos = gun_hit(session.opts, player, aim)
-  local pellets = cfg.Pellets or 1
+  local fx, fy, fz
+  if aim then
+    fx, fy, fz = aim.x, aim.y, aim.z
+  else
+    fx, fy, fz = forward_of(character_of(player))
+  end
+  local dirs = pellet_directions(fx, fy, fz, cfg.Pellets or 1, cfg.SpreadDeg)
   local damage = cfg.Damage * scale
-  if target then
-    local applied = false
-    for _ = 1, pellets do
+  local hit_count = 0
+  local effect_targets = {}
+  for _, dir in ipairs(dirs) do
+    local target, hit_pos = gun_hit(session.opts, player, dir)
+    if target then
       local hit = session.opts.new_hit(player, "weapon")
-      local result = session.opts.apply_hit(hit, target, damage)
-      applied = result == true or applied
+      if session.opts.apply_hit(hit, target, damage) == true then
+        hit_count = hit_count + 1
+        if cfg.Effect and not effect_targets[target] then
+          effect_targets[target] = true
+          apply_effect(session.opts, player, target, cfg.Effect)
+        end
+      end
     end
-    if applied then apply_effect(session.opts, player, target, cfg.Effect) end
+    if cfg.Splash and hit_pos then
+      local splash_hit = session.opts.new_hit(player, "weapon")
+      local skipped = { player }
+      if target then skipped[#skipped + 1] = target end
+      radial_damage(session.opts, hit_pos, cfg.Splash.Radius, cfg.Splash.Damage * scale,
+        splash_hit, skipped)
+    end
+  end
+  if hit_count > 0 then
     print("[PlayerWeapon] 枪击命中", player.UserId, weapon_id, "ammo=" .. tostring(mag.ammo))
   else
     print("[PlayerWeapon] 枪击未命中", player.UserId, weapon_id, "ammo=" .. tostring(mag.ammo))
-  end
-  if cfg.Splash and hit_pos then
-    local splash_hit = session.opts.new_hit(player, "weapon")
-    local skipped = { player }
-    if target then skipped[#skipped + 1] = target end
-    radial_damage(session.opts, hit_pos, cfg.Splash.Radius, cfg.Splash.Damage * scale,
-      splash_hit, skipped)
   end
   return reply(session.remote, player, { ok = true, action = "attack", weapon = weapon_id, ammo = mag.ammo })
 end

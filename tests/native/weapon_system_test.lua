@@ -830,7 +830,7 @@ describe('TestWeaponConfig', function()
         local g = {}
         for id, row in pairs(GameCfg.Ability.Guns) do g[id] = numbers(row) end
         assert.same({ Damage = 10, IntervalSec = 1.0, Magazine = 10 }, g.item137)
-        assert.same({ Damage = 20, Pellets = 5, IntervalSec = 1.5, Magazine = 2 }, g.item138)
+        assert.same({ Damage = 20, Pellets = 5, SpreadDeg = 12, IntervalSec = 1.5, Magazine = 2 }, g.item138)
         assert.same({ Damage = 13, IntervalSec = 0.15, Magazine = 30, Auto = true }, g.item139)
         assert.same({ Damage = 20, IntervalSec = 0.2, Magazine = 30, Auto = true }, g.item140)
         assert.same({ Damage = 200, IntervalSec = 1.5, Magazine = 5 }, g.item141)

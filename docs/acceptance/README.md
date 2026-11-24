@@ -45,7 +45,7 @@
 | [3](03-inventory-and-controls.md) | 持有与操作 | 25 | 22 | 1 | 0 | 2 | 0 | 96% |
 | [4](04-fishing-system.md) | 钓鱼系统 | 31 | 25 | 3 | 0 | 3 | 0 | 90% |
 | [5](05-zone-fish-data.md) | 七区鱼种完整数据 | 18 | 16 | 2 | 0 | 0 | 0 | 89% |
-| [6](06-combat-and-growth.md) | 战斗与成长 | 38 | 30 | 5 | 0 | 3 | 0 | 87% |
+| [6](06-combat-and-growth.md) | 战斗与成长 | 38 | 29 | 6 | 0 | 3 | 0 | 84% |
 | [7](07-economy-and-shop.md) | 经济与钓场商店 | 27 | 21 | 5 | 0 | 1 | 0 | 81% |
 | [8](08-npc-exchange-ferry.md) | NPC、兑换与摆渡 | 41 | 34 | 0 | 0 | 7 | 0 | 100% |
 | [9](09-multiplayer-rules.md) | 多人规则 | 25 | 2 | 20 | 0 | 3 | 0 | 20% |

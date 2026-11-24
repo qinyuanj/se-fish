@@ -11,7 +11,7 @@
 | 6-05 | 冲锋枪、自动步枪与连发火箭筒支持长按连续攻击，其余武器按次攻击 | 规则 | agent | A | unverified | — |
 | 6-06 | 枪械与近战武器的伤害、射击间隔与基础弹容量以商店商品表的数值为准 | 规则 | agent | A | unverified | — |
 | 6-07 | 武器大奖的数值以物品表为准，与正文旧数值冲突时取物品表 | 规则 | agent | A | unverified | — |
-| 6-08 | 霰弹枪每次击发打出 5 发弹丸，每发独立判定命中并各自结算伤害 | 规则 | agent | A | unverified | — |
+| 6-08 | 霰弹枪每次击发打出 5 发弹丸，每发独立判定命中并各自结算伤害 | 规则 | agent | A | evidenced | tests/native/spec/06_shotgun_pellets_test.lua |
 | 6-09 | 火箭筒的直击伤害与 5 米范围爆炸伤害分开结算，同一目标不因同一段伤害被重复命中 | 规则 | agent | A | unverified | — |
 | 6-10 | 爆炸物每次投掷消耗一件 | 规则 | agent | A | unverified | — |
 | 6-11 | 单击投掷爆炸物时向前方 20 米抛出；长按可选择落点，松开后投掷 | 规则 | agent | A | unverified | — |

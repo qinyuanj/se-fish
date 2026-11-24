@@ -179,7 +179,7 @@
 | 6-05 | server/world_host/player_weapon.lua、client/packages/ability_system/strategy/HoldStrategy.lua、client/weapon_aim.lua | tests/native/weapon_system_test.lua、tests/native/combat_behavior_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 6-06 | common/cfg/shop.lua、server/world_host/player_weapon.lua、common/game_cfg.lua | tests/native/weapon_system_test.lua、tests/native/combat_behavior_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 6-07 | common/cfg/items.lua、common/game_cfg.lua | tests/native/cfg_fish_items_test.lua、tests/native/prize_weapon_effect_test.lua、tests/native/prize_weapon_cfg_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 6-08 | common/cfg/shop.lua、server/world_host/player_weapon.lua | tests/native/weapon_system_test.lua、tests/native/combat_behavior_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 6-08 | common/cfg/shop.lua、server/world_host/player_weapon.lua | tests/native/weapon_system_test.lua、tests/native/combat_behavior_test.lua、tests/native/spec/06_shotgun_pellets_test.lua | 有 | 有 | 缺 | 缺 | A |
 | 6-09 | server/world_host/player_weapon.lua、server/world_host/player_life.lua | tests/native/weapon_system_test.lua、tests/native/combat_behavior_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 6-10 | server/world_host/player_weapon.lua | tests/native/weapon_system_test.lua、tests/native/combat_behavior_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 6-11 | server/world_host/player_weapon.lua、client/weapon_aim.lua | tests/native/weapon_system_test.lua、tests/native/combat_behavior_test.lua | 缺 | 缺 | 缺 | 缺 | A |
