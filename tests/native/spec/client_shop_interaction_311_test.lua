@@ -142,8 +142,8 @@ describe("客户端商店弹窗与场景气泡（#311）", function()
     local dialog_close = child(root, "BtnFishermanClose")
     assert.is_not_nil(dialog)
     writer:open_modal("confirm", {
-      Msg = "确认交付信物？",
-      CallBack = function(yes) confirmed = yes end,
+      msg = "确认交付信物？",
+      call_back = function(yes) confirmed = yes end,
     })
     assert.is_true(dialog.Destroyed)
     assert.equals(0, dialog_close.OnClicked:Count())

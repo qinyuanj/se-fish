@@ -114,7 +114,7 @@ function FishermanView.confirm_modal_spec()
     local payload = ctx.store.modal_payload:now() or {}
     local panel = ctx.create_node(scope, "EUIImage", { Name = "DialogNoticeConfirm" })
     ctx.create_node(scope, "EUITextLabel", {
-      Name = "LabelText", Parent = panel, Text = tostring(payload.Msg or ""),
+      Name = "LabelText", Parent = panel, Text = tostring(payload.msg or ""),
     })
     local yes = ctx.create_node(scope, "EUIButton", {
       Name = "BtnYes", Parent = panel, ButtonText = "是", TouchEnabled = true,
@@ -123,8 +123,8 @@ function FishermanView.confirm_modal_spec()
       Name = "BtnNo", Parent = panel, ButtonText = "否", TouchEnabled = true,
     })
     local function finish(value)
-      if type(payload.CallBack) == "function" then
-        local ok, err = pcall(payload.CallBack, value)
+      if type(payload.call_back) == "function" then
+        local ok, err = pcall(payload.call_back, value)
         if not ok then
           print("[FishermanView] 确认弹窗回调执行失败", tostring(err))
         end
