@@ -1,6 +1,6 @@
 local GameCfg = require('common.game_cfg')
 local QuestSteps = require('common.quest_steps')
-local SignalRouter = require('server.WorldHost.WorldSignalRouter')
+local SignalRouter = require('server.world_host.world_signal_router')
 
 local Mgr = { States = {}, Players = {}, Queues = {} }
 

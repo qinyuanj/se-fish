@@ -65,7 +65,7 @@ describe("抽奖投入资格（common.lottery_eligibility × PlayerData）", fun
   end)
 
   it("test_real_inventory_entries_keep_cooked_state_through_snapshot_and_reload", function()
-    local PlayerData = require("server.Data.PlayerData")
+    local PlayerData = require("server.data.player_data")
     local data = PlayerData.New({ UserId = 134, SetAttribute = function() end })
     data:Init()
     assert.is_true(data:AddItem("item9", 1.42))

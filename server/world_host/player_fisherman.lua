@@ -1,6 +1,6 @@
 local GameCfg = require("common.game_cfg")
 local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
-local InteractionPoints = require("server.WorldHost.InteractionPoints")
+local InteractionPoints = require("server.world_host.interaction_points")
 
 local PlayerFisherman = {}
 local ITEM_BAR = GameCfg.Items.ContainerId.ItemBar

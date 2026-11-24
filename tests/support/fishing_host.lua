@@ -1,6 +1,6 @@
 local GameCfg = require("common.game_cfg")
-local ServerRuntime = require("server.WorldHost.ServerRuntime")
-local PlayerData = require("server.Data.PlayerData")
+local ServerRuntime = require("server.world_host.server_runtime")
+local PlayerData = require("server.data.player_data")
 
 local Host = {}
 local ROD = GameCfg.Items.Id.StarterRod

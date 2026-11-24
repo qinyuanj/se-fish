@@ -2,9 +2,9 @@
 local GameCfg = require('common.game_cfg')
 local SpokeClock = require('common.spoke_clock')
 local spoke = require('common.packages.spoke.api')
-local PlayerData = require('server.Data.PlayerData')
-local SwingRegistry = require('server.SwingRegistry')
-local PlayerWeapon = require('server.WorldHost.PlayerWeapon')
+local PlayerData = require('server.data.player_data')
+local SwingRegistry = require('server.swing_registry')
+local PlayerWeapon = require('server.world_host.player_weapon')
 
 local M = {}
 M.__index = M

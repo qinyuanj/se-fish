@@ -1,5 +1,5 @@
 
-local SwingRegistry = require("server.SwingRegistry")
+local SwingRegistry = require("server.swing_registry")
 local HostSignal = require("common.host_signal")
 local spoke_eggy = require("common.packages.spoke_eggy.api")
 

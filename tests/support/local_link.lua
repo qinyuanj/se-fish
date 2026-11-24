@@ -40,7 +40,7 @@ function M.assert_wiring()
     local handle = assert(io.open('server/main.lua', 'rb'), '读不到 server/main.lua')
     local source = handle:read('a')
     handle:close()
-    local runtime_handle = assert(io.open('server/WorldHost/ServerRuntime.lua', 'rb'), '读不到 server/WorldHost/ServerRuntime.lua')
+    local runtime_handle = assert(io.open('server/world_host/server_runtime.lua', 'rb'), '读不到 server/world_host/server_runtime.lua')
     source = source .. '\n' .. runtime_handle:read('a')
     runtime_handle:close()
     for _, line in ipairs(M.WIRING) do
@@ -94,8 +94,8 @@ function M.new(opts)
         saved = {
             game = rawget(_G, 'game'), Vector3 = rawget(_G, 'Vector3'), Vector2 = rawget(_G, 'Vector2'),
             Color = rawget(_G, 'Color'), REUtil = rawget(_G, 'REUtil'), task = rawget(_G, 'task'),
-            reutil = package.loaded['common.re_util'], playerdata = package.loaded['server.Data.PlayerData'],
-            carrier = package.loaded['server.WorldHost.FishCarrier'],
+            reutil = package.loaded['common.re_util'], playerdata = package.loaded['server.data.player_data'],
+            carrier = package.loaded['server.world_host.fish_carrier'],
         },
     }
 
@@ -173,16 +173,16 @@ function M.new(opts)
     package.loaded['common.re_util'] = re
     _G.REUtil = re
 
-    package.loaded['server.Data.PlayerData'] = nil
-    env.PlayerData = require('server.Data.PlayerData')
+    package.loaded['server.data.player_data'] = nil
+    env.PlayerData = require('server.data.player_data')
     env.managers = {
-        Save = assert(loadfile('server/SaveHost.lua'))(),
-        PlayerData = assert(loadfile('server/PlayerDataHost.lua'))(),
+        Save = assert(loadfile('server/save_host.lua'))(),
+        PlayerData = assert(loadfile('server/player_data_host.lua'))(),
         Party = {},
     }
     local mgr = env.managers
     env.filter = function()
-        return require('server.WorldHost.PkDamageFilter').make({
+        return require('server.world_host.pk_damage_filter').make({
             party = mgr.Party,
             zone_markers = require('common.zone_markers'),
         })
@@ -452,8 +452,8 @@ function M:Close()
     _G.game, _G.Vector3, _G.Vector2 = saved.game, saved.Vector3, saved.Vector2
     _G.Color, _G.REUtil, _G.task = saved.Color, saved.REUtil, saved.task
     package.loaded['common.re_util'] = saved.reutil
-    package.loaded['server.Data.PlayerData'] = saved.playerdata
-    package.loaded['server.WorldHost.FishCarrier'] = saved.carrier
+    package.loaded['server.data.player_data'] = saved.playerdata
+    package.loaded['server.world_host.fish_carrier'] = saved.carrier
     self.saved, self.queue, self.re, self.sent = nil, {}, {}, {}
     return self
 end

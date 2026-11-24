@@ -9,7 +9,7 @@
 -- 不使用 LuaUnit 断言桥。业务模块经 loadfile 加载，其 _ENV 是真实 _G，
 -- 故 Busted 逐文件沙箱下必须写 _G.game / _G.REUtil 而不是裸赋值。
 local GameCfg = require('common.game_cfg')
-local ServerRuntime = require('server.WorldHost.ServerRuntime')
+local ServerRuntime = require('server.world_host.server_runtime')
 local SpokeClock = require('common.spoke_clock')
 
 describe('TestEconomyPersistence', function()
@@ -110,8 +110,8 @@ describe('TestEconomyPersistence', function()
             end,
             CheckRECD = function() return false end,
         }
-        env.save = assert(loadfile('server/SaveHost.lua'))()
-        env.players = assert(loadfile('server/PlayerDataHost.lua'))()
+        env.save = assert(loadfile('server/save_host.lua'))()
+        env.players = assert(loadfile('server/player_data_host.lua'))()
         env.quest = {
             OnPlayerAdded = function() end,
             OnPlayerRemoving = function() end,

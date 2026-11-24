@@ -6,7 +6,7 @@
 -- 场景 B：非信物鱼开烤后不取出，等烤糊：burnt 推送、烤糊前后血量差（3 米内 30）、只损毁一次。
 -- 注意：开烤/取出经 #123 持久协议，会话在异步落账回调里建立，所以全程在协程里轮询等待。
 local cfg = require('common.game_cfg')
-local pd = require('server.PlayerDataHost')
+local pd = require('server.player_data_host')
 local curve = require('common.grill_curve')
 local world, task = game:GetService('World'), game:GetService('Task')
 local player = game:GetService('Players'):GetPlayers()[1]

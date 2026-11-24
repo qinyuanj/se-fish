@@ -7,7 +7,7 @@
 --   6. 升级行没有稳定的购买键（itemKey 缺失时 number 必须可用）；
 --   7. 旧白名单商品（钓具 9 行）换表后价格/等级漂移，不再兼容。
 local GameCfg = require('common.game_cfg')
-local PlayerData = require('server.Data.PlayerData')
+local PlayerData = require('server.data.player_data')
 
 -- 钓具 1-14、武器 15-26、升级 28-51（27 作废），共 50 行
 describe("钓场商店货架表", function()

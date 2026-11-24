@@ -7,7 +7,7 @@
 --   3. 确定性派生 AttrModel / BodyScale / WeaponComponents（max_health、body_scale、
 --      body_derived、move_multiplier、move_speed_scale、walk_speed、weapon_damage_*）；
 --   4. 为 A2 的 modifier_system 叶子投影预留 on_mount_modifier_leaf 纯输出挂点。
--- 本模块归属 L2（server.WorldHost），零反向依赖存量旧债务模块。
+-- 本模块归属 L2（server.world_host），零反向依赖存量旧债务模块。
 
 local GameCfg = require("common.game_cfg")
 local AttrModel = require("common.attr_model")

@@ -1,10 +1,10 @@
 -- 服务端 ability_system 官方包单向输出叶子投影层（ADR-0032 §3 / #297-A2）：
 --   1. 角色就绪时单向创建并挂载能力管理器（ManagerPreset），装配 InitialAbilities
 --      （CdTime / CastTime / 锚点预设与属性覆盖，经可选回调 attach_anchor 挂接）；
---   2. 将 PlayerTree 的 can_act 守卫以回调形式注入施法门控（零反向依赖 server.AbilityAPI）；
+--   2. 将 PlayerTree 的 can_act 守卫以回调形式注入施法门控（零反向依赖 server.ability_api）；
 --   3. 角色更换或树销毁时在 s:on_cleanup 中对称停止全部已装配技能并销毁能力管理器；
 --   4. 若管理器脚本首帧尚未就绪，依托 SpokeClock.on_frame 托管重试（随 on_cleanup 自动退订，零协程泄漏）。
--- 本模块归属 L2（server.WorldHost），零反向依赖存量旧债务模块，零新增 CreateUnit 建点。
+-- 本模块归属 L2（server.world_host），零反向依赖存量旧债务模块，零新增 CreateUnit 建点。
 
 local GameCfg = require("common.game_cfg")
 

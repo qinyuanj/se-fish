@@ -7,7 +7,7 @@ local WaterJudge = require('common.math_water_judge')
 
 local AIR_IDS = { 'item81', 'item83', 'item84', 'item85', 'item86',
     'item87', 'item89', 'item90', 'item91', 'item92' }
-local MODULES = { 'server.WorldHost.FishCarrier', 'server.WorldHost.FishTree' }
+local MODULES = { 'server.world_host.fish_carrier', 'server.world_host.fish_tree' }
 
 local function signal()
     local slots = {}
@@ -88,13 +88,13 @@ function FishAirEscape:setUp()
         if name == 'World' then return env.world end
         if name == 'Players' then return { GetPlayers = function() return { env.player } end } end
     end }
-    self.carrier = require('server.WorldHost.FishCarrier')
+    self.carrier = require('server.world_host.fish_carrier')
     self.carrier.DamagePublisher = function() end
-    self.mgr = require('server.WorldHost.FishTree')
+    self.mgr = require('server.world_host.fish_tree')
     -- 目标裁决适配层按生产接线（server/main.lua）由入口注入
-    self.mgr.AiTarget = require('server.WorldHost.FishAiTarget')
+    self.mgr.AiTarget = require('server.world_host.fish_ai_target')
     self.mgr:Start()
-    local ServerRuntime = require('server.WorldHost.ServerRuntime')
+    local ServerRuntime = require('server.world_host.server_runtime')
     local SpokeClock = require('common.spoke_clock')
     self.runtime = ServerRuntime.new({
         clock = SpokeClock.new(self.now), initial_now = self.now,
@@ -138,7 +138,7 @@ function FishAirEscape:tearDown()
     end
     if self.runtime then
         self.runtime:shutdown()
-        local runtimeApi = require('server.WorldHost.ServerRuntime')
+        local runtimeApi = require('server.world_host.server_runtime')
         if runtimeApi.current and runtimeApi.current() == self.runtime then runtimeApi.set_current(nil) end
     end
     for _, name in ipairs(MODULES) do package.loaded[name] = self.modules[name] end

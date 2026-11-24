@@ -3,10 +3,10 @@
 -- 假引擎只在被测函数执行期间挂上（withFakeEngine），测完恢复 _G，不影响别的文件；
 -- Busted 案例体在沙箱 _ENV 里，业务模块读的是真 _G，因此引擎全局必须 rawset 到 _G。
 -- describe/it 名称保留旧类名与方法名，按类名字典序 + 方法名字典序注册以保持旧套件执行顺序。
-local MgrFishCarrier = require('server.WorldHost.FishCarrier')
+local MgrFishCarrier = require('server.world_host.fish_carrier')
 local GameCfg = require('common.game_cfg')
 
-local CARRIER_PATH = 'server/WorldHost/FishCarrier.lua'
+local CARRIER_PATH = 'server/world_host/fish_carrier.lua'
 local MAIN_PATH = 'server/main.lua'
 local MELEE_HIT_PATH = 'server/packages/ability_system/anchors/melee_hit.lua'
 
@@ -525,11 +525,11 @@ describe('TestFishCarrierSeam', function()
 
   it('test_manager_is_registered_in_the_mgr_map', function()
     -- 不进 MgrMap 就没有 Start/Update，受击体也不会跟着鱼走
-    local runtime = readSource('server/WorldHost/ServerRuntime.lua')
-    local host = readSource('server/WorldHost/FishTree.lua')
-    assert.is_true(contains(runtime, 'require("server.WorldHost.FishTree")'),
+    local runtime = readSource('server/world_host/server_runtime.lua')
+    local host = readSource('server/world_host/fish_tree.lua')
+    assert.is_true(contains(runtime, 'require("server.world_host.fish_tree")'),
       'ServerRuntime 必须持有 FishTree 公开宿主')
-    assert.is_true(contains(host, "require('server.WorldHost.FishCarrier')"),
+    assert.is_true(contains(host, "require('server.world_host.fish_carrier')"),
       'FishTree 必须挂接 FishCarrier 受击体')
   end)
 

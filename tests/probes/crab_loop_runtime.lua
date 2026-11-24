@@ -3,10 +3,10 @@
 -- 持续输出每招、伤害前后血量和收招；需玩家正常钓出鱼并放到岸上，再站到目标鱼攻击距离内。
 -- 若已拥有信物，在本区钓鱼佬旁选中信物后重跑会执行Feed；摆渡使用正常Board请求。
 local cfg = require('common.game_cfg')
-local pd = require('server.PlayerDataHost')
-local ServerRuntime = require('server.WorldHost.ServerRuntime')
+local pd = require('server.player_data_host')
+local ServerRuntime = require('server.world_host.server_runtime')
 local runtime = ServerRuntime.current()
-local units = (runtime and runtime.fish_host) or require('server.WorldHost.FishTree')
+local units = (runtime and runtime.fish_host) or require('server.world_host.fish_tree')
 local life = runtime and runtime.life
 local ferry = runtime and runtime:get_world() and runtime:get_world().ferry
 local function equippedWeapon(d)

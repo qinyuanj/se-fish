@@ -13,7 +13,7 @@
 --   类内方法字典序）注册为三个 describe / 逐个 it；lu.assertNotEquals 是深不等，映射为 assert.are_not.same。
 local GameCfg = require("common.game_cfg")
 local Records = require("common.records")
-local PlayerData = require("server.Data.PlayerData")
+local PlayerData = require("server.data.player_data")
 local RandomGuard = require("tests.support.random_guard")
 
 local function readSource(path)

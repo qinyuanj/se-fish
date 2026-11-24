@@ -129,7 +129,7 @@ describe("盲盒服务端结算（ServerRuntime × MgrSave × MgrPlatform）", f
   end)
 
   it("test_loot_delivery_key_remains_consumed_after_entity_disappears", function()
-    local ServerRuntime = require("server.WorldHost.ServerRuntime")
+    local ServerRuntime = require("server.world_host.server_runtime")
     local SpokeClock = require("common.spoke_clock")
     local clock = SpokeClock.new(1)
     local runtime = ServerRuntime.new({

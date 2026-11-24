@@ -54,8 +54,8 @@ describe('TestSave', function()
         savedDebug = GameCfg.Debug
         savedSlot = GameCfg.Save.QaSlot
         savedGame = rawget(_G, 'game')
-        savedSaveModule = package.loaded['server.SaveHost']
-        package.loaded['server.SaveHost'] = nil
+        savedSaveModule = package.loaded['server.save_host']
+        package.loaded['server.save_host'] = nil
         GameCfg.Debug = { Enabled = true, InitialGrants = savedDebug.InitialGrants }
         GameCfg.Save.QaSlot = ''
         env = { cfg = GameCfg, ops = {}, waits = {}, players = {}, dataInsts = {}, spawnQueue = {} }
@@ -89,13 +89,13 @@ describe('TestSave', function()
             end,
             BindToClose = function(_, cb) env.boundClose = cb end,
         }
-        env.save = assert(loadfile('server/SaveHost.lua'))()
+        env.save = assert(loadfile('server/save_host.lua'))()
         env.syncs = 0
         env.save.PlayerData = {
             SendItemBar = function() env.syncs = env.syncs + 1 end,
             GetDataInst = function(_, p) return env.dataInsts[p] end,
         }
-        local PlayerData = assert(loadfile('server/Data/PlayerData.lua'))()
+        local PlayerData = assert(loadfile('server/data/player_data.lua'))()
         env.newData = function(userId)
             local p = { UserId = userId, SetAttribute = function() end }
             local data = PlayerData.New(p)
@@ -111,7 +111,7 @@ describe('TestSave', function()
     after_each(function()
         GameCfg.Save.QaSlot = savedSlot
         GameCfg.Debug = savedDebug
-        package.loaded['server.SaveHost'] = savedSaveModule
+        package.loaded['server.save_host'] = savedSaveModule
         _G.game = savedGame
         savedDebug, savedSlot, savedGame, savedSaveModule = nil, nil, nil, nil
         env = nil
@@ -121,7 +121,7 @@ describe('TestSave', function()
         assert.same('u1', env.save:Key(1))
         env.cfg.Save.QaSlot = 'qa-first'
         assert.same('u1', env.save:Key(1)) -- 本局内修改配置不改变写入目标
-        local another = assert(loadfile('server/SaveHost.lua'))()
+        local another = assert(loadfile('server/save_host.lua'))()
         assert.same('u1:qa:qa-first', another:Key(1))
         env.cfg.Save.QaSlot = 'qa-second'
         assert.same('u1:qa:qa-first', another:Key(1))
@@ -232,7 +232,7 @@ describe('TestSave', function()
 
     it('test_invalid_qa_slot_fails_before_any_key_is_used', function()
         env.cfg.Save.QaSlot = false
-        local another = assert(loadfile('server/SaveHost.lua'))()
+        local another = assert(loadfile('server/save_host.lua'))()
         assert.has_error(function() another:Key(1) end)
         env.cfg.Save.QaSlot = '../unsafe'
         assert.has_error(function() another:Key(1) end)

@@ -3,10 +3,10 @@
 -- 不预置保底计数、不清库存；模拟成功单抽会正常发奖并推进持久计数，按真实权重 RNG 抽样。
 -- flow 失败/成功走公开 HandleTestAction；超时由单测/feature 脚本化时钟覆盖。
 local cfg = require('common.game_cfg')
-local platform = require('server.PlatformHost')
-local players = require('server.PlayerDataHost')
-local save = require('server.SaveHost')
-local ServerRuntime = require('server.WorldHost.ServerRuntime')
+local platform = require('server.platform_host')
+local players = require('server.player_data_host')
+local save = require('server.save_host')
+local ServerRuntime = require('server.world_host.server_runtime')
 local world, task = game:GetService('World'), game:GetService('Task')
 local p = game:GetService('Players'):GetPlayers()[1]
 if not p then print('PLATFORM147 ABORT 无玩家') return end

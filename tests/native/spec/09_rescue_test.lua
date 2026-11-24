@@ -148,10 +148,10 @@ describe('条款 9/11 他人抢救', function()
     package.loaded['common.re_util'] = re
     _G.REUtil = re
 
-    package.loaded['server.Data.PlayerData'] = nil
-    env.PlayerData = require('server.Data.PlayerData')
-    env.save = assert(loadfile('server/SaveHost.lua'))()
-    env.players = assert(loadfile('server/PlayerDataHost.lua'))()
+    package.loaded['server.data.player_data'] = nil
+    env.PlayerData = require('server.data.player_data')
+    env.save = assert(loadfile('server/save_host.lua'))()
+    env.players = assert(loadfile('server/player_data_host.lua'))()
     env.players.Save, env.save.PlayerData = env.save, env.players
     env.lifeHost = require('tests.support.life_host').start({
       now = env.now or 100, remote = re, player_data = env.players, save = env.save,

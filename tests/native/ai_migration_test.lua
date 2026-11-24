@@ -18,7 +18,7 @@ describe('TestAiMigration', function()
             if name == 'server.packages.official_ai_feature.behavior_runtime' then return env.runtime.behavior end
             return require(name)
         end }, { __index = _G })
-        env.mgr = assert(loadfile('server/WorldHost/FishAi.lua', 't', e))()
+        env.mgr = assert(loadfile('server/world_host/fish_ai.lua', 't', e))()
         env.unit = env.runtime.newUnit(5301)
         env.fish = { Id = 1, Carrier = { Receiver = env.unit, Body = env.runtime.newUnit(5302) } }
     end)
@@ -110,7 +110,7 @@ describe('TestAiMigration', function()
         local v = env.runtime.Vector
         env.mgr:MoveDirection(env.fish, v(1, 0, 0), 3)
         env.unit.Position = v(0 / 0, 0, 0)
-        local carrier_host = require('server.WorldHost.FishCarrier')
+        local carrier_host = require('server.world_host.fish_carrier')
         assert.is_false(carrier_host:SyncAiPosition(env.fish.Carrier))
         assert.is_false(env.fish.Carrier.AiOwnsMovement)
         assert.are.equal(0, env.fish.Carrier.Body.Position.x)

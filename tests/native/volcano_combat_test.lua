@@ -7,7 +7,7 @@
 --
 -- 旧文件靠 `TestVolcanoCombat.setUp = TestReefCombat.setUp` 继承礁石岛夹具（LuaUnit 的全局类名互访）。
 -- Busted 下两个 spec 各自 require 同一份 tests/support/isle_combat.lua，逐案例 open/close；
--- 本岛的差异只有：出生点换 7 号区岸边干地（Islet.shoreDryPoint）、摘掉 server.AbilityAPI 的模块缓存；
+-- 本岛的差异只有：出生点换 7 号区岸边干地（Islet.shoreDryPoint）、摘掉 server.ability_api 的模块缓存；
 -- RemoteEvent 与礁石共用完整替身，close 后再恢复 AbilityAPI。
 local Cfg = require('common.game_cfg')
 local Islet = require('tests.support.isle_combat')
@@ -16,9 +16,9 @@ describe('TestVolcanoCombat', function()
     local env
     local savedExtra
     before_each(function()
-        savedExtra = { ability = package.loaded['server.AbilityAPI'] }
+        savedExtra = { ability = package.loaded['server.ability_api'] }
         env = Islet.new(7)
-        package.loaded['server.AbilityAPI'] = nil
+        package.loaded['server.ability_api'] = nil
         -- #102 现场同步：出生点用「岸边干地」（水岸线向内 32 米），不跟随移到区内侧的合同安全点 ——
         -- 本文件的入水/携带用例时序是按这个距离调的（见 tests/support/isle_combat.lua 的 shoreDryPoint）。
         local p = Islet.shoreDryPoint(7)
@@ -26,7 +26,7 @@ describe('TestVolcanoCombat', function()
     end)
     after_each(function()
         env:tearDown()
-        package.loaded['server.AbilityAPI'] = savedExtra.ability
+        package.loaded['server.ability_api'] = savedExtra.ability
     end)
 
     it('test_breath_has_reachable_range_and_player_can_dodge_sideways', function()

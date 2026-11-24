@@ -31,16 +31,16 @@ describe('第 12 节 逐招表（近战与范围组）', function()
     local env, savedAbility, hp
 
     before_each(function()
-        savedAbility = package.loaded['server.AbilityAPI']
+        savedAbility = package.loaded['server.ability_api']
         env = Islet.new(1)
         env.player.Character.Controller.Health = 100000 -- 长时间节拍断言不被 300 血上限截断
-        package.loaded['server.AbilityAPI'] = nil
+        package.loaded['server.ability_api'] = nil
         hp = function() return env.player.Character.Controller.Health end
     end)
 
     after_each(function()
         env:tearDown()
-        package.loaded['server.AbilityAPI'] = savedAbility
+        package.loaded['server.ability_api'] = savedAbility
     end)
 
     local function dropNear(id, distance)

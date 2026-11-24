@@ -175,7 +175,7 @@ describe("三端源码守卫", function()
       local code = Arch.code_only(src)
       local bad = {}
       for _, name in ipairs(BANNED_GLOBALS) do
-        -- 同名 local 会遮蔽全局（如 server/Data/PlayerData.lua 的 local debug = GameCfg.Debug），
+        -- 同名 local 会遮蔽全局（如 server/data/player_data.lua 的 local debug = GameCfg.Debug），
         -- 这类文件整份放行：宁可漏报，不误伤。
         local position = not shadows_local(code, name) and code:find("%f[%w_]" .. name .. "%s*[%.:]")
         if position then

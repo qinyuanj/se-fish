@@ -9,7 +9,7 @@
 --
 -- 技能包替身只提供本案例需要的施法接口，每例还原模块缓存。
 local Weapon = require('tests.support.weapon_world')
-local SwingRegistry = require('server.SwingRegistry')
+local SwingRegistry = require('server.swing_registry')
 local VENDOR = 'server.packages.ability_system.api'
 
 -- 只替换包内 CastAbility，保持业务守卫的真实实现。
@@ -39,10 +39,10 @@ describe('TestMeleeHitEffect', function()
     before_each(function()
         saved = { game = rawget(_G, 'game'), Vector3 = rawget(_G, 'Vector3'),
             Quaternion = rawget(_G, 'Quaternion'),
-            carrier = package.loaded['server.WorldHost.FishCarrier'],
-            gm = package.loaded['server.WorldHost.PlayerGM'],
-            ability = package.loaded['server.FishAbility'],
-            api = package.loaded['server.AbilityAPI'], swing = package.loaded['server.SwingRegistry'] }
+            carrier = package.loaded['server.world_host.fish_carrier'],
+            gm = package.loaded['server.world_host.player_gm'],
+            ability = package.loaded['server.fish_ability'],
+            api = package.loaded['server.ability_api'], swing = package.loaded['server.swing_registry'] }
         ctx = { effects = {}, hitsApplied = {} }
         ctx.owner = { UnitId = 1, Position = vec(0, 0, 0) }
         ctx.player = { UserId = 13931, Character = ctx.owner }
@@ -59,23 +59,23 @@ describe('TestMeleeHitEffect', function()
                 return ctx.applyOk
             end,
         }
-        package.loaded['server.WorldHost.FishCarrier'] = { ResolveCarrier = function() return nil end }
-        package.loaded['server.WorldHost.PlayerGM'] = { GetMeleeDamage = function(_, _, d) return d end }
-        package.loaded['server.FishAbility'] = { ApplyWeaponEffect = function()
+        package.loaded['server.world_host.fish_carrier'] = { ResolveCarrier = function() return nil end }
+        package.loaded['server.world_host.player_gm'] = { GetMeleeDamage = function(_, _, d) return d end }
+        package.loaded['server.fish_ability'] = { ApplyWeaponEffect = function()
             error('近战特效不应再经 MgrAbility 转发')
         end }
         local modifierStub = { ApplyWeaponEffect = function(_, source, target, effect)
             ctx.effects[#ctx.effects + 1] = { source = source, target = target, effect = effect }
             return true
         end }
-        package.loaded['server.AbilityAPI'] = {}
-        package.loaded['server.SwingRegistry'] = { TakeSwing = function()
+        package.loaded['server.ability_api'] = {}
+        package.loaded['server.swing_registry'] = { TakeSwing = function()
             local s = ctx.swing; ctx.swing = nil; return s
         end }
         ctx.services = { Vitals = ctx.vitals,
-            FishCarrier = package.loaded['server.WorldHost.FishCarrier'], GM = package.loaded['server.WorldHost.PlayerGM'],
+            FishCarrier = package.loaded['server.world_host.fish_carrier'], GM = package.loaded['server.world_host.player_gm'],
             Modifier = modifierStub }
-        for _, name in ipairs({ 'server.WorldHost.FishCarrier', 'server.WorldHost.PlayerGM' }) do
+        for _, name in ipairs({ 'server.world_host.fish_carrier', 'server.world_host.player_gm' }) do
             package.loaded[name] = setmetatable({}, { __index = function()
                 error('近战行为不应再加载上层管理器: ' .. name) end })
         end
@@ -111,7 +111,7 @@ describe('TestMeleeHitEffect', function()
             if name == 'PhysicsService' then return { GetPartsInPart = function() return {} end } end
             return nil
         end }
-        ctx.behavior = assert(loadfile('server/AbilityBehaviors/melee_hit.lua'))()
+        ctx.behavior = assert(loadfile('server/ability_behaviors/melee_hit.lua'))()
         ctx.behaviour = ctx.behavior.Attach(anchor, ctx.services)
         assert.is_nil(ctx.behaviour.root.fault)
     end)
@@ -119,11 +119,11 @@ describe('TestMeleeHitEffect', function()
         _G.game = saved.game
         _G.Vector3 = saved.Vector3
         _G.Quaternion = saved.Quaternion
-        package.loaded['server.WorldHost.FishCarrier'] = saved.carrier
-        package.loaded['server.WorldHost.PlayerGM'] = saved.gm
-        package.loaded['server.FishAbility'] = saved.ability
-        package.loaded['server.AbilityAPI'] = saved.api
-        package.loaded['server.SwingRegistry'] = saved.swing
+        package.loaded['server.world_host.fish_carrier'] = saved.carrier
+        package.loaded['server.world_host.player_gm'] = saved.gm
+        package.loaded['server.fish_ability'] = saved.ability
+        package.loaded['server.ability_api'] = saved.api
+        package.loaded['server.swing_registry'] = saved.swing
     end)
 
     -- 把 Players 服务换成能认出 victim 的版本（保留其余服务）
@@ -254,7 +254,7 @@ describe('TestSwingEffectPassthrough', function()
     local saved
     before_each(function()
         saved = { game = rawget(_G, 'game'), preload = package.preload[VENDOR],
-            vendor = package.loaded[VENDOR], api = package.loaded['server.AbilityAPI'], swing = package.loaded['server.SwingRegistry'] }
+            vendor = package.loaded[VENDOR], api = package.loaded['server.ability_api'], swing = package.loaded['server.swing_registry'] }
         package.preload[VENDOR] = function() return stubPackageApi() end
         package.loaded[VENDOR] = nil
         ctx = { now = 1000 }
@@ -262,14 +262,14 @@ describe('TestSwingEffectPassthrough', function()
             if name == 'World' then return { GetServerTime = function() return ctx.now end } end
             return nil
         end }
-        ctx.api = assert(loadfile('server/SwingRegistry.lua'))()
+        ctx.api = assert(loadfile('server/swing_registry.lua'))()
     end)
     after_each(function()
         _G.game = saved.game
         package.preload[VENDOR] = saved.preload
         package.loaded[VENDOR] = saved.vendor
-        package.loaded['server.AbilityAPI'] = saved.api
-        package.loaded['server.SwingRegistry'] = saved.swing
+        package.loaded['server.ability_api'] = saved.api
+        package.loaded['server.swing_registry'] = saved.swing
     end)
 
     it('test_swing_carries_effect_through_stage_and_take', function()

@@ -1,7 +1,7 @@
 -- Spoke 原生重构机械棘轮守卫（#294 / ADR-0032 §4、§5）：
 -- 失败方式先列：
---   1. 新 Spoke 命名空间（common.spoke_clock、server.WorldHost.*、client.Store.*、client.Views.*）
---      反向 require 存量旧债务模块（server.Mgr.*、server.AbilityAPI、server.AbilityBehaviors.*、
+--   1. 新 Spoke 命名空间（common.spoke_clock、server.world_host.*、client.Store.*、client.Views.*）
+--      反向 require 存量旧债务模块（server.Mgr.*、server.ability_api、server.ability_behaviors.*、
 --      client.MgrGameUI、client.ScreenHandlers.*、client.Local*、common.OwnedUnits）→ 破坏单向棘轮；
 --   2. 就地修改 common/packages/spoke/ 或 common/packages/spoke_eggy/ 或与 docs/packages-reference.md
 --      记录的上游 SHA 漂移 → 破坏上游双包零扩展边界；
@@ -103,8 +103,8 @@ end
 
 local function is_legacy_debt_file(path)
   return path:match("^server/Mgr/") ~= nil
-    or path == "server/AbilityAPI.lua"
-    or path:match("^server/AbilityBehaviors/") ~= nil
+    or path == "server/ability_api.lua"
+    or path:match("^server/ability_behaviors/") ~= nil
     or path == "client/MgrGameUI.lua"
     or path:match("^client/Local[^/]+%.lua$") ~= nil
     or path:match("^client/ScreenHandlers/") ~= nil
@@ -112,7 +112,7 @@ end
 
 local function is_spoke_namespace_file(path)
   return path == "common/spoke_clock.lua"
-    or path:match("^server/WorldHost/") ~= nil
+    or path:match("^server/world_host/") ~= nil
     or path:match("^client/Store/") ~= nil
     or path:match("^client/Views/") ~= nil
 end
@@ -311,30 +311,30 @@ describe("Spoke 原生重构机械棘轮守卫", function()
           "common.spoke_clock",
           "common.game_cfg",
           "common.packages.spoke.api",
-          "server.Data.PlayerData",
-          "server.WorldHost.PlayerTree",
-          "server.AbilityBehaviors.melee_hit",
+          "server.data.player_data",
+          "server.world_host.player_tree",
+          "server.ability_behaviors.melee_hit",
           "client.GameUI",
           "client.Store.ClientStore",
           "client.Views.RootView",
-          "server.AbilityAPI",
+          "server.ability_api",
         },
         edges = {
           { from = "common.spoke_clock", to = "common.packages.spoke.api" },
-          { from = "server.WorldHost.PlayerTree", to = "common.spoke_clock" },
-          { from = "server.WorldHost.PlayerTree", to = "server.Data.PlayerData" },
-          { from = "server.AbilityBehaviors.melee_hit", to = "server.WorldHost.PlayerTree" },
+          { from = "server.world_host.player_tree", to = "common.spoke_clock" },
+          { from = "server.world_host.player_tree", to = "server.data.player_data" },
+          { from = "server.ability_behaviors.melee_hit", to = "server.world_host.player_tree" },
           { from = "client.Store.ClientStore", to = "common.spoke_clock" },
           { from = "client.Views.RootView", to = "client.Store.ClientStore" },
           { from = "client.Views.RootView", to = "client.GameUI" },
-          { from = "server.AbilityAPI", to = "server.WorldHost.PlayerTree" },
+          { from = "server.ability_api", to = "server.world_host.player_tree" },
         },
       })
       assert.is_true(valid.ok, valid.message)
 
       local invalid_edges = {
-        { from = "server.WorldHost.PlayerTree", to = "server.AbilityBehaviors.melee_hit" },
-        { from = "server.WorldHost.PlayerTree", to = "server.AbilityAPI" },
+        { from = "server.world_host.player_tree", to = "server.ability_behaviors.melee_hit" },
+        { from = "server.world_host.player_tree", to = "server.ability_api" },
         { from = "client.Store.ClientStore", to = "client.Views.RootView" },
         { from = "client.Views.RootView", to = "client.MgrGameUI" },
         { from = "client.Views.RootView", to = "client.ScreenHandlers.ScreenMain" },

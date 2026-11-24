@@ -89,8 +89,8 @@ function AbilityAPI.DetachFromSocket(mount)
 end
 
 local AnchorBehaviorLoaders = {
-	eel_discharge = function() return require("server.AbilityBehaviors.eel_discharge") end,
-	melee_hit = function() return require("server.AbilityBehaviors.melee_hit") end,
+	eel_discharge = function() return require("server.ability_behaviors.eel_discharge") end,
+	melee_hit = function() return require("server.ability_behaviors.melee_hit") end,
 	active_cd = function() return require("server.packages.ability_system.anchors.active_cd") end,
 	add_bind_diy_model = function() return require("server.packages.ability_system.anchors.add_bind_diy_model") end,
 	bungee_cord = function() return require("server.packages.ability_system.anchors.bungee_cord") end,

@@ -1,8 +1,8 @@
 -- #135 独立战斗夹具：从真实SpawnLanded/Drop入口生成指定600/1200血鱼，用于招式表现取证。
 -- 明确不作为自然抽鱼/从零经济证明；不修改血量、时间、玩家库存或奖励裁决。
-local ServerRuntime = require('server.WorldHost.ServerRuntime')
+local ServerRuntime = require('server.world_host.server_runtime')
 local runtime = ServerRuntime.current()
-local units = (runtime and runtime.fish_host) or require('server.WorldHost.FishTree')
+local units = (runtime and runtime.fish_host) or require('server.world_host.fish_tree')
 local life = runtime and runtime.life
 local player = game:GetService('Players'):GetPlayers()[1]
 if not player or not player.Character then return end
@@ -48,7 +48,7 @@ if fish then
                 end)
             end
             if _G.Shrimp135Attack then
-                local data = require('server.PlayerDataHost'):GetDataInst(player)
+                local data = require('server.player_data_host'):GetDataInst(player)
                 local world, task = game:GetService('World'), game:GetService('Task')
                 local started = world:GetServerTime()
                 print('SHRIMP135_INPUT', '主动定位并面向目标；真实攻击，不改血量/时间', data:WeaponDamageScale('melee'))

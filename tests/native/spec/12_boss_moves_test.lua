@@ -29,16 +29,16 @@ describe('第 12 节 首领逐招表（哥斯拉）', function()
     local savedExtra
 
     before_each(function()
-        savedExtra = { ability = package.loaded['server.AbilityAPI'] }
+        savedExtra = { ability = package.loaded['server.ability_api'] }
         env = Islet.new(7)
-        package.loaded['server.AbilityAPI'] = nil
+        package.loaded['server.ability_api'] = nil
         local p = Islet.shoreDryPoint(7)
         env.player.Character.Position = env.vec(p.x, p.y, p.z)
     end)
 
     after_each(function()
         env:tearDown()
-        package.loaded['server.AbilityAPI'] = savedExtra.ability
+        package.loaded['server.ability_api'] = savedExtra.ability
     end)
 
     -- 把玩家摆到鱼的水平距离 distance 处（同高），返回该距离。

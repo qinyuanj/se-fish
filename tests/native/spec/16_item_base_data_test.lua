@@ -7,7 +7,7 @@ local GameCfg = require('common.game_cfg')
 -- 前提守卫：本文件复现的是 main.lua 的接线，而不是自造一套协作关系。
 local WIRING = {
     'local fishHost = WorldRuntime.fish_host',
-    'local PlayerDataHost = require("server.PlayerDataHost")',
+    'local PlayerDataHost = require("server.player_data_host")',
 }
 
 local function assert_wiring()

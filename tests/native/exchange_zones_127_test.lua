@@ -17,7 +17,7 @@
 
 local GameCfg = require('common.game_cfg')
 local Host = require('tests.support.shop_feed_host')
-local PlayerData = require('server.Data.PlayerData')
+local PlayerData = require('server.data.player_data')
 local function vec(x, y, z) return { x = x, y = y, z = z } end
 
 describe("TestExchangeZones", function()

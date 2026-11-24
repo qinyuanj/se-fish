@@ -39,12 +39,12 @@ describe('TestAbilityCastGuard', function()
     local VENDOR = 'server.packages.ability_system.api'
     before_each(function()
         saved = { preload = package.preload[VENDOR], vendor = package.loaded[VENDOR],
-            api = package.loaded['server.AbilityAPI'] }
+            api = package.loaded['server.ability_api'] }
     end)
     after_each(function()
         package.preload[VENDOR] = saved.preload
         package.loaded[VENDOR] = saved.vendor
-        package.loaded['server.AbilityAPI'] = saved.api
+        package.loaded['server.ability_api'] = saved.api
     end)
 
     -- 根 AbilityAPI 必须先跑服务端守卫，再进 vendor 的包内 CastAbility；守卫拒绝时包完全不被调用。
@@ -54,8 +54,8 @@ describe('TestAbilityCastGuard', function()
         impl.CastAbility = function(unit, index) calls[#calls + 1] = { unit, index } return true end
         package.preload[VENDOR] = function() return impl end
         package.loaded[VENDOR] = nil
-        package.loaded['server.AbilityAPI'] = nil
-        local api = assert(loadfile('server/AbilityAPI.lua'))()
+        package.loaded['server.ability_api'] = nil
+        local api = assert(loadfile('server/ability_api.lua'))()
         local allowed, unit = false, {}
         api.SetCastGuard(function(candidate, index)
             assert.same({ unit, 2 }, { candidate, index })
@@ -197,16 +197,16 @@ describe('TestCombatBase', function()
 end)
 
 describe('TestMgrAbilityActionGuard', function()
-    -- 旧文件在测试体内自行存取 game 与 server.AbilityAPI；这里保持同样的存取，
+    -- 旧文件在测试体内自行存取 game 与 server.ability_api；这里保持同样的存取，
     -- 但把恢复挪进 after_each，使断言失败时也不把桩留给下一条案例。
     local saved
     before_each(function()
         saved = { game = rawget(_G, 'game'), vendorApi = package.loaded['server.packages.ability_system.api'],
-            api = package.loaded['server.AbilityAPI'] }
+            api = package.loaded['server.ability_api'] }
     end)
     after_each(function()
         _G.game = saved.game
-        package.loaded['server.AbilityAPI'] = saved.api
+        package.loaded['server.ability_api'] = saved.api
         package.loaded['server.packages.ability_system.api'] = saved.vendorApi
     end)
 
@@ -214,9 +214,9 @@ describe('TestMgrAbilityActionGuard', function()
         local guard
         package.loaded['server.packages.ability_system.api'] = {}
         local api = { SetCastGuard = function(fn) guard = fn end }
-        package.loaded['server.AbilityAPI'] = api
+        package.loaded['server.ability_api'] = api
         _G.game = { GetService = function() return {} end }
-        local mgr = assert(loadfile('server/FishAbility.lua'))()
+        local mgr = assert(loadfile('server/fish_ability.lua'))()
         local blocked, free = player(1), player(2)
         local host = require('tests.support.life_host').start({ now = 100 })
         host:add(blocked)
@@ -229,7 +229,7 @@ describe('TestMgrAbilityActionGuard', function()
         assert.same(mgr.BehaviorServices, api.BehaviorServices)
         -- 装配完成后立刻放回真实环境：守卫闭包已捕获 vitals，后续断言不需要假 game
         _G.game = saved.game
-        package.loaded['server.AbilityAPI'] = saved.api
+        package.loaded['server.ability_api'] = saved.api
         package.loaded['server.packages.ability_system.api'] = saved.vendorApi
         assert.is_not_nil(guard)
         assert.is_false(mgr:CanCast(blocked))

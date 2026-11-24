@@ -1,6 +1,6 @@
 
 local GameCfg = require("common.game_cfg")
-local ServerRuntime = require("server.WorldHost.ServerRuntime")
+local ServerRuntime = require("server.world_host.server_runtime")
 local LotteryEligibility = require("common.lottery_eligibility")
 
 local FISH = "carp"
@@ -152,8 +152,8 @@ describe("服务端烧烤点宿主接缝（#310）", function()
         return ctx.events[name]
       end,
     }
-    ctx.PlayerData = assert(loadfile("server/Data/PlayerData.lua"))()
-    ctx.save = assert(loadfile("server/SaveHost.lua"))()
+    ctx.PlayerData = assert(loadfile("server/data/player_data.lua"))()
+    ctx.save = assert(loadfile("server/save_host.lua"))()
     ctx.runtime = ServerRuntime.new({
       initial_now = 1000,
       remote = _G.REUtil,

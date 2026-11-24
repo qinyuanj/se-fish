@@ -154,8 +154,8 @@ describe('TestPlayerLeaveRejoin', function()
             StopAbility = function() end,
             CastAbility = function() return true end,
         }
-        env.save = assert(loadfile('server/SaveHost.lua'))()
-        env.data = assert(loadfile('server/PlayerDataHost.lua'))()
+        env.save = assert(loadfile('server/save_host.lua'))()
+        env.data = assert(loadfile('server/player_data_host.lua'))()
         env.quest = {
             Notify = function(_, kind, player, payload) return env.runtime:notify_quest(kind, player, payload) end,
             GetState = function(_, player) return env.data:GetDataInst(player).Extra.quest end,
@@ -171,15 +171,15 @@ describe('TestPlayerLeaveRejoin', function()
                 if path == 'server.packages.attr_rule.api' then return attr_api_stub end
                 if path == 'server.packages.modifier_system.api' then return modifier_api_stub end
                 if path == 'server.packages.ability_system.api' then return ability_api_stub end
-                if path == 'server.SaveHost' then return env.save end
-                if path == 'server.PlayerDataHost' then return env.data end
-                if path == 'server.PlatformHost' then return {} end
-                if path == 'server.FishAbility' then return { Start = function() end, Update = function() end } end
+                if path == 'server.save_host' then return env.save end
+                if path == 'server.player_data_host' then return env.data end
+                if path == 'server.platform_host' then return {} end
+                if path == 'server.fish_ability' then return { Start = function() end, Update = function() end } end
                 return require(path)
             end,
         }, { __index = _G })
         assert(loadfile('server/main.lua', 't', sandbox))()
-        env.runtime = require('server.WorldHost.ServerRuntime').current()
+        env.runtime = require('server.world_host.server_runtime').current()
         env.a = join(560)
         drain()
     end)
