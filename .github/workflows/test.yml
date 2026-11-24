@@ -28,3 +28,24 @@ jobs:
         run: luarocks install busted 2.3.0-1
       - name: 运行 full 测试车道
         run: lua tools/cli.lua test full
+
+  # 观察期：独立 job、continue-on-error，不进 main 的 required status check（ADR-0038）。
+  # 稳定后再去掉 continue-on-error，并把 context 加入分支保护。
+  emmylua:
+    name: emmylua (观察)
+    runs-on: windows-latest
+    continue-on-error: true
+    steps:
+      - name: 检出仓库
+        uses: actions/checkout@v4
+      - name: 配置 MSVC
+        uses: step-security/msvc-dev-cmd@v1
+      - name: 安装 Lua 5.4.6 与 LuaRocks 3.12.2
+        run: |
+          python -m pip install "hererocks @ https://github.com/luarocks/hererocks/archive/ec31d070ae0076415c0175a2006b29496494d37a.zip"
+          python -m hererocks .hererocks --lua 5.4.6 --luarocks 3.12.2 --target vs
+          "$(Resolve-Path .hererocks/bin)" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+      - name: 安装 emmylua_check 0.25.1
+        run: cargo install emmylua_check --version 0.25.1 --locked
+      - name: 运行 EmmyLua 诊断门禁
+        run: lua tools/cli.lua emmylua
