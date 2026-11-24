@@ -20,13 +20,13 @@ function DamageFloat:clear()
     for _, entry in ipairs(self.Active) do destroy(entry.node) end
     for _, node in ipairs(self.pool) do destroy(node) end
     self.Active, self.pool, self.sequence = {}, {}, {}
-    self.Root, self.resolution = nil, nil
+    self.root, self.resolution = nil, nil
 end
 
 function DamageFloat:bind(root, resolution)
-    if self.Root == root then return end
+    if self.root == root then return end
     self:clear()
-    self.Root, self.resolution = root, resolution
+    self.root, self.resolution = root, resolution
 end
 
 local function valid(payload)
@@ -49,13 +49,13 @@ function DamageFloat:project(position, height)
 end
 
 function DamageFloat:show(payload)
-    if not self.Root or not valid(payload) then return end
+    if not self.root or not valid(payload) then return end
     local x, y = self:project(payload.position, payload.height)
     if not x then return end
     local node = table.remove(self.pool)
     if not node then
         node = game:GetService('World'):CreateUnit('EUITextLabel', {
-            Parent = self.Root, Name = 'DamageFloat',
+            Parent = self.root, Name = 'DamageFloat',
             Position = Vector2.New(0, 0), Size = Vector2.New(cfg.Width, cfg.Height),
         })
     end
@@ -81,7 +81,7 @@ function DamageFloat:show(payload)
 end
 
 function DamageFloat:update()
-    if not self.Root then return end
+    if not self.root then return end
     if #self.pending_cleanup > 0 then
         local pending = self.pending_cleanup
         self.pending_cleanup = {}

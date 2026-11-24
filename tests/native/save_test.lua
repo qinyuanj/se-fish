@@ -150,7 +150,7 @@ describe('TestSave', function()
         env.now = env.now + 1
         env.save:update() -- 到点：在线玩家落档
         assert.same(33, env.store.data[env.save:key(1)].coin)
-        assert.same('autosave', env.save.ledger[1].LastReason)
+        assert.same('autosave', env.save.ledger[1].last_reason)
         -- 离场（不在线）玩家不自动存
         local stranger = { UserId = 2 }
         env.players = { stranger }
@@ -166,7 +166,7 @@ describe('TestSave', function()
         env.data.data.FishCoin = 44
         env.boundClose()
         assert.same(44, env.store.data[env.save:key(1)].coin)
-        assert.same('shutdown', env.save.ledger[1].LastReason)
+        assert.same('shutdown', env.save.ledger[1].last_reason)
     end)
 
     it('test_commit_uses_update_async_and_survives_cas_conflict', function()
@@ -245,7 +245,7 @@ describe('TestSave', function()
         assert.is_not_nil(ledger)
         assert.same(2, ledger.writes)
         assert.is_true(ledger.bytes > 0)
-        assert.is_not_nil(ledger.LastReason)
+        assert.is_not_nil(ledger.last_reason)
         -- 东西越多体积越大
         local small = env.save:estimate_size(env.data:Serialize())
         assert.is_true(env.data:AddItem('duck'))

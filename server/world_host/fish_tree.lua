@@ -1551,8 +1551,8 @@ function Mgr:publish_combat(fish, gone)
     if gone and not fish.combat_published then return end
     fish.combat_published = not gone and fish.State ~= Mgr.State.escaping
     local publish = self.combat_publisher
-    if not publish and self.CombatRE then
-        publish = function(payload) self.CombatRE:FireAllClients(payload) end
+    if not publish and self.combat_re then
+        publish = function(payload) self.combat_re:FireAllClients(payload) end
     end
     if not publish then return end
     local ok, err = pcall(publish, self:combat_payload(fish, gone))
@@ -1560,10 +1560,10 @@ function Mgr:publish_combat(fish, gone)
 end
 
 function Mgr:handle_combat_request(player)
-    if not player or not self.CombatRE then return false end
+    if not player or not self.combat_re then return false end
     for _, fish in pairs(self.Fish) do
         if fish.combat_published then
-            local ok, err = pcall(function() self.CombatRE:FireClient(player, self:combat_payload(fish)) end)
+            local ok, err = pcall(function() self.combat_re:FireClient(player, self:combat_payload(fish)) end)
             if not ok then print('[FishTree] 战斗快照发送失败', player.UserId, tostring(err)) end
         end
     end
@@ -1573,8 +1573,8 @@ end
 function Mgr:start_combat_channel()
     if self.combat_channel_started then return end
     self.combat_channel_started = true
-    if type(self.BindCombatChannel) == 'function' then
-        self.combat_request_conn = self.BindCombatChannel(function(player)
+    if type(self.bind_combat_channel) == 'function' then
+        self.combat_request_conn = self.bind_combat_channel(function(player)
             self:handle_combat_request(player)
         end)
     end
