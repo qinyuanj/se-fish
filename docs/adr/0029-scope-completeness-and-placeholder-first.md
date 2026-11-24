@@ -78,18 +78,17 @@
 | 12 | 盲盒是否平台功能（抽奖 / 随机能否走平台商品） | 自研随机 + 占位商品走通抽奖与结算，概率与货币取自 `GameCfg` | 若平台开放盲盒 / 抽奖能力，改走平台接口并把随机交给平台 | 自研随机不宣称与平台盲盒的概率或合规口径一致 |
 | 13 | `RemoteEvent.New` 多人收发、迟加入/重连与 `PlayerRemoving` 清理实测 | `common/re_util.lua` 已迁至公开 `RemoteEvent.New` 并含 `PlayerRemoving` 清理，源码守卫（`tests/native/guards/source_guard_test.lua`）、单测与单人试玩（会话 `93c3c63`，50 条通道零报错）均通过；本地编辑器无模拟多人能力 | 具备真实双客户端联机环境后补测多玩家收发、迟加入/重连与 `PlayerRemoving` 清理 | 单人试玩与离线单测不替代真实双客户端联机结论 |
 
-### 五、实现覆盖表与静态门禁
+### 五、静态门禁
 
-- [实现覆盖表](../acceptance/coverage.md)登记每条**非试玩**条款的代码落点、关联测试、四类证据（正常流程、失败流程、退出重进、存档恢复）与 A/B/C 等级。
-- 它是**文档与代码的门禁**，不是业务运行时入口：没有新增运行时缝隙，只新增一个静态缝隙。
-- 静态校验并入 `tools/acceptance.lua`，随 `lua tools/cli.lua acceptance --check` 与 fast 车道运行；空落点、落点路径不存在、条款 ID 不在矩阵里、等级与矩阵不一致都判红。
-- 已贯通小节逐节扩大：第 1 节（19 条）是第一个贯通样本，其中 1-12 由一条走业务入口的 A 级断言（`tests/native/spec/01_platform_adapter_failure_test.lua`）转成 `evidenced`。
+- 实现覆盖表已按 [ADR-0039](0039-acceptance-surface-as-feature-files.md) 删除：条款只剩 ID 与文案两格，证据等级写成文案的行尾后缀，代码落点改由 `tests/native/spec/` 的条款断言表达。
+- 静态校验并入 `tools/acceptance.lua`，随 `lua tools/cli.lua acceptance --check` 与 fast 车道运行：ID 连续、禁用措辞、索引一致、证据文件不引用孤儿条款号、已取证只增。
+- 状态从证据文件反推，不再手写；逐条结果可用 `lua tools/cli.lua acceptance --infer` 查看。
 
 ### 六、与旧 ADR 的接管关系
 
 - 本 ADR **接管** [ADR-0028](0028-solo-clear-on-shared-world.md) 中关于「真实双账号、真实设备与容量验收继续延期」与「占位资源期间」的表述：延期不再是条款级阻塞，真实渠道事项一律改记为本 ADR 的生产开关；「不以占位资源通过作为结项」改口径为「占位走通代码路径 + 生产开关单列」，占位仍不发放真实付费权益、仍不算真实渠道结项。
 - **继续有效、本 ADR 不改动**：Solo clear 是唯一玩法目标；只有一套服务端权威实现，不为单人另写管理器；四类证据（正常流程、失败流程、退出重进、存档恢复）缺一不可；外部依赖各归各的出口；个人状态与共享世界状态的边界。
-- [ADR-0027](0027-clause-matrix-as-sole-acceptance-surface.md) 的「验收矩阵是唯一验收面」继续有效；本 ADR 只改范围口径，不动矩阵的七列格式与门禁种类。
+- [ADR-0027](0027-clause-matrix-as-sole-acceptance-surface.md) 的「验收矩阵是唯一验收面」继续有效；本 ADR 只改范围口径，不动矩阵的条款格式与门禁种类（格式已于 [ADR-0039](0039-acceptance-surface-as-feature-files.md) 调整为两列）。
 
 ## 理由
 

@@ -15,14 +15,14 @@ function M.usage()
   return table.concat({
     '用法: lua tools/cli.lua acceptance [--check|--write|--update-baseline|--infer]',
     '',
-    '把 docs/acceptance/ 的条款矩阵当账来核：分片覆盖、封闭词表、条款 ID 连续、证据路径存在、',
-    '规格无工单编号、索引生成块与分片一致，以及双棘轮（已取证只增、遗留测试只减）。',
+    '把 docs/acceptance/ 的条款矩阵当账来核：19 节分片覆盖、条款 ID 连续、禁用措辞、索引生成块',
+    '与分片一致、证据文件不引用已删条款，以及已取证只增的棘轮。状态不再手写，从 spec、probes',
+    '与 evidence/*/session.md 的正文反推。',
     '',
     '  --check（缺省）  跑全部校验，逐条打印违反项；全绿打印计数摘要。有违反项退 1。',
     '  --write         按分片重写 README 的生成块（幂等）。',
-    '  --update-baseline  把基线抬到当前值；只许 evidenced 抬、legacyTests 降，反方向退 2。',
-    '  --infer         从 spec、probes 与 evidence/*/session.md 反推「条款 → 证据路径 → 状态」，',
-    '                  与分片里手写的状态逐条比对；不一致或出现孤儿条款号退 1。',
+    '  --update-baseline  把基线抬到当前值；只许 evidenced 抬，反方向退 2。',
+    '  --infer         列出反推出的「条款 → 证据路径 → 状态」与孤儿条款号；有孤儿号退 1。',
     '',
     '退出码：0 通过 / 1 有违反项 / 2 用法错误或棘轮拒绝 / 3 关键文件不可用。',
   }, '\n') .. '\n'
@@ -45,35 +45,17 @@ local function parse(args)
   return opts
 end
 
-local function lane_report(matrix)
-  local names = {}
-  for name in pairs(matrix.lanes.files or {}) do names[#names + 1] = name end
-  table.sort(names)
-  local parts = {}
-  for _, name in ipairs(names) do
-    parts[#parts + 1] = string.format('%s %d', name, matrix.lanes.files[name])
-  end
-  return table.concat(parts, ' / ')
-end
-
 local function summary(result)
   local counts, matrix = result.counts, result.matrix
   local lines = {
     string.format('验收矩阵：%d 份分片 / %d 条条款', #matrix.shards, counts.total),
-    string.format('  unverified %d  evidenced %d  accepted %d  blocked %d  out-of-scope %d',
-      counts.status.unverified, counts.status.evidenced, counts.status.accepted,
-      counts.status.blocked, counts.status['out-of-scope']),
-    string.format('  已取证（evidenced + accepted）%d / %d；缺口密度 %.0f%%（out-of-scope 占 %.0f%%）',
-      counts.evidenced, counts.total, counts.gap * 100, counts.outOfScope * 100),
+    string.format('  evidenced %d  blocked %d  unverified %d（状态由证据文件反推）',
+      counts.status.evidenced, counts.status.blocked, counts.status.unverified),
+    string.format('  已取证 %d / %d；缺口密度 %.0f%%', counts.evidenced, counts.total, counts.gap * 100),
   }
-  if matrix.lanes.legacy then
-    lines[#lines + 1] = string.format('  遗留测试 %d 个（fast 与 full，剔除 spec）；各车道文件数：%s',
-      #matrix.lanes.legacy, lane_report(matrix))
-  end
   if matrix.baseline then
-    lines[#lines + 1] = string.format('  基线：evidenced %s / legacyTests %s（updated %s）',
-      tostring(matrix.baseline.evidenced), tostring(matrix.baseline.legacyTests),
-      tostring(matrix.baseline.updated))
+    lines[#lines + 1] = string.format('  基线：evidenced %s（updated %s）',
+      tostring(matrix.baseline.evidenced), tostring(matrix.baseline.updated))
   end
   return table.concat(lines, '\n')
 end
@@ -140,12 +122,12 @@ local function run_baseline(root)
   end
   local written, err = write_file(root, acceptance.BASELINE, text)
   if not written then return failed(err, exit_code.UNAVAILABLE) end
-  io.stdout:write(string.format('已重写 %s：evidenced %d / legacyTests %d\n',
-    acceptance.BASELINE, matrix.counts.evidenced, #matrix.lanes.legacy))
+  io.stdout:write(string.format('已重写 %s：evidenced %d\n',
+    acceptance.BASELINE, matrix.counts.evidenced))
   return exit_code.OK
 end
 
--- 反推报告（#326）：状态是人不再手写的第一列，迁移期拿它跟手写列逐条比对。
+-- 反推报告（#326）：状态是人不再手写的第一列，这里把它连同证据路径一起列出来。
 local function run_infer(root)
   local matrix = acceptance.scan(root)
   local inferred = matrix.inference
@@ -162,20 +144,15 @@ local function run_infer(root)
   for _, item in ipairs(inferred.exceptions) do
     io.stdout:write(string.format('  例外 %s（命中 %d 个文件）：%s\n', item.id, item.hits, item.reason))
   end
-  local drift = acceptance.inference_drift(matrix)
-  for _, item in ipairs(drift) do
-    io.stdout:write(string.format('[inference_drift] %s:%d  %s 手写 %s，反推 %s\n',
-      item.path, item.line, item.id, item.written, item.inferred))
-  end
   for _, item in ipairs(inferred.orphans) do
     io.stdout:write(string.format('[orphan_clause] %s  证据文件里出现矩阵没有的条款号 %s\n',
       item.path, item.id))
   end
-  if #drift > 0 or #inferred.orphans > 0 then
-    io.stdout:write(string.format('\n%d 处不一致：反推覆盖不了这些条款\n', #drift + #inferred.orphans))
+  if #inferred.orphans > 0 then
+    io.stdout:write(string.format('\n%d 处孤儿条款号：证据文件引用了矩阵里没有的条款\n', #inferred.orphans))
     return exit_code.FAILURE
   end
-  io.stdout:write('反推与手写状态逐条一致\n')
+  io.stdout:write('反推完成，没有孤儿条款号\n')
   return exit_code.OK
 end
 
