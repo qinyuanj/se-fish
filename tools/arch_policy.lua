@@ -58,13 +58,13 @@ M.policy = {
     {
       name = 'spoke_no_legacy_reverse_dep',
       from = {
-        '^common%.SpokeClock$',
-        '^server%.WorldHost$', '^server%.WorldHost%.',
-        '^client%.Store$', '^client%.Store%.',
-        '^client%.Views$', '^client%.Views%.',
+        '^common%.spoke_clock$',
+        '^server%.world_host$', '^server%.world_host%.',
+        '^client%.store$', '^client%.store%.',
+        '^client%.views$', '^client%.views%.',
       },
       to = {
-        '^server%.AbilityAPI$', '^server%.AbilityBehaviors$', '^server%.AbilityBehaviors%.',
+        '^server%.ability_api$', '^server%.ability_behaviors$', '^server%.ability_behaviors%.',
       },
     },
   },

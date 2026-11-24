@@ -148,9 +148,9 @@ end)
 local function discover_server_hosts()
   local hosts = {}
   for _, file in ipairs(fs.list_dir("server")) do
-    local name = file:match("^(.+Host)%.lua$")
-    if not name and file == "FishAbility.lua" then
-      name = "FishAbility"
+    local name = file:match("^(.+_host)%.lua$")
+    if not name and file == "fish_ability.lua" then
+      name = "fish_ability"
     end
     if name then
       hosts[#hosts + 1] = name

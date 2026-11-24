@@ -314,7 +314,7 @@ describe("Spoke 原生重构机械棘轮守卫", function()
           "server.data.player_data",
           "server.world_host.player_tree",
           "server.ability_behaviors.melee_hit",
-          "client.GameUI",
+          "client.game_ui",
           "client.store.ClientStore",
           "client.views.RootView",
           "server.ability_api",
@@ -326,7 +326,7 @@ describe("Spoke 原生重构机械棘轮守卫", function()
           { from = "server.ability_behaviors.melee_hit", to = "server.world_host.player_tree" },
           { from = "client.store.ClientStore", to = "common.spoke_clock" },
           { from = "client.views.RootView", to = "client.store.ClientStore" },
-          { from = "client.views.RootView", to = "client.GameUI" },
+          { from = "client.views.RootView", to = "client.game_ui" },
           { from = "server.ability_api", to = "server.world_host.player_tree" },
         },
       })

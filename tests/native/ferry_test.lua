@@ -45,7 +45,7 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
     for name, value in pairs(package.loaded) do
       if name == 'common.game_cfg' or name == 'common.re_util'
           or name == 'server.data.player_data' or name == 'server.player_data_host'
-          or name:match('^server%.WorldHost%.') then
+          or name:match('^server%.world_host%.') then
         restore.modules[name] = value
         package.loaded[name] = nil
       end
@@ -190,7 +190,7 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
     for name in pairs(package.loaded) do
       if name == 'common.game_cfg' or name == 'common.re_util'
           or name == 'server.data.player_data' or name == 'server.player_data_host'
-          or name:match('^server%.WorldHost%.') then
+          or name:match('^server%.world_host%.') then
         package.loaded[name] = nil
       end
     end
