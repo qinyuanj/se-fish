@@ -1,5 +1,5 @@
 local GameCfg = require("common.GameCfg")
-local ServerRuntime = require("server.World.ServerRuntime")
+local ServerRuntime = require("server.WorldHost.ServerRuntime")
 local PlayerData = require("server.Data.PlayerData")
 
 local Host = {}

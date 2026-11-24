@@ -6,22 +6,22 @@
 --   4. 动作、特殊道具与设施会话相位（Actions）
 -- 树底挂载纯输出叶子（HeldRodLeaf）、单批合并同步 Reaction（ItemBarState 下发 / FishCoin 属性 / 存档镜像）
 -- 与离场终镜像 Reaction（session_alive=false 时同步写回完整镜像，包括 weakRemaining）。
--- 本模块归属 L2（server.World），零反向依赖存量旧债务模块。
+-- 本模块归属 L2（server.WorldHost），零反向依赖存量旧债务模块。
 
 local GameCfg = require("common.GameCfg")
 local Number = require("common.Number")
 local spoke = require("common.packages.spoke.api")
 local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
-local PlayerEffects = require("server.World.PlayerEffects")
-local PlayerLife = require("server.World.PlayerLife")
-local SpecialItemPhase = require("server.World.SpecialItemPhase")
-local FishingPhase = require("server.World.FishingPhase")
-local HeldRodLeaf = require("server.World.HeldRodLeaf")
-local PlayerCompendium = require("server.World.PlayerCompendium")
-local PlayerQuest = require("server.World.PlayerQuest")
-local PlayerStory = require("server.World.PlayerStory")
-local PlayerAchievements = require("server.World.PlayerAchievements")
-local PlayerGM = require("server.World.PlayerGM")
+local PlayerEffects = require("server.WorldHost.PlayerEffects")
+local PlayerLife = require("server.WorldHost.PlayerLife")
+local SpecialItemPhase = require("server.WorldHost.SpecialItemPhase")
+local FishingPhase = require("server.WorldHost.FishingPhase")
+local HeldRodLeaf = require("server.WorldHost.HeldRodLeaf")
+local PlayerCompendium = require("server.WorldHost.PlayerCompendium")
+local PlayerQuest = require("server.WorldHost.PlayerQuest")
+local PlayerStory = require("server.WorldHost.PlayerStory")
+local PlayerAchievements = require("server.WorldHost.PlayerAchievements")
+local PlayerGM = require("server.WorldHost.PlayerGM")
 
 local SpokeTree = spoke.SpokeTree
 local Effect = spoke.Effect

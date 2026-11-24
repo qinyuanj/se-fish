@@ -94,8 +94,8 @@ describe('向钓鱼佬喂食换金币（PlayerFisherman）', function()
 
   it('test_fish_coin_has_single_write_entry', function()
     local writers = 0
-    for _, path in ipairs({ 'server/Data/PlayerData.lua', 'server/World/PlayerFisherman.lua',
-      'server/PlayerDataHost.lua', 'server/World/GroundLoot.lua' }) do
+    for _, path in ipairs({ 'server/Data/PlayerData.lua', 'server/WorldHost/PlayerFisherman.lua',
+      'server/PlayerDataHost.lua', 'server/WorldHost/GroundLoot.lua' }) do
       local file = assert(io.open(path, 'r'))
       local text = file:read('a')
       file:close()

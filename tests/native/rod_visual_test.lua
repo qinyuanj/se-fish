@@ -3,7 +3,7 @@
 
 local GameCfg = require('common.GameCfg')
 local Mgr = require('server.PlayerDataHost')
-local ServerRuntime = require('server.World.ServerRuntime')
+local ServerRuntime = require('server.WorldHost.ServerRuntime')
 
 local function signal()
   local callbacks = {}

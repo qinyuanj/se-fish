@@ -45,7 +45,7 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
     for name, value in pairs(package.loaded) do
       if name == 'common.GameCfg' or name == 'common.REUtil'
           or name == 'server.Data.PlayerData' or name == 'server.PlayerDataHost'
-          or name:match('^server%.World%.') then
+          or name:match('^server%.WorldHost%.') then
         restore.modules[name] = value
         package.loaded[name] = nil
       end
@@ -146,7 +146,7 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
     env.mgr.Save = env.save
     for _, player in ipairs(env.players) do env.save:LoadInto(player, env.data[player.UserId]) end
 
-    local ServerRuntime = require('server.World.ServerRuntime')
+    local ServerRuntime = require('server.WorldHost.ServerRuntime')
     env.runtime = ServerRuntime.new({
       initial_now = env.now,
       zones = env.cfg.Zones,
@@ -190,7 +190,7 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
     for name in pairs(package.loaded) do
       if name == 'common.GameCfg' or name == 'common.REUtil'
           or name == 'server.Data.PlayerData' or name == 'server.PlayerDataHost'
-          or name:match('^server%.World%.') then
+          or name:match('^server%.WorldHost%.') then
         package.loaded[name] = nil
       end
     end

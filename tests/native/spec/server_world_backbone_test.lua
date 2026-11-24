@@ -89,7 +89,7 @@ end
 
 describe("服务端 Spoke 主干：SharedWorldTree", function()
   it("以 Auto SpokeTree 挂载 7 个钓鱼区子域骨架与全局小队 Dock，并在 dispose 时逆序清理且不再响应时钟", function()
-    local SharedWorldTree = require("server.World.SharedWorldTree")
+    local SharedWorldTree = require("server.WorldHost.SharedWorldTree")
     local clock = SpokeClock.new(10)
     local logger = silent_logger()
     local log = {}
@@ -177,7 +177,7 @@ end)
 
 describe("服务端 Spoke 主干：PlayerTree 因果顺序、双层相位与逆序清理", function()
   it("存档未就绪或归属不匹配时拒绝生成 PlayerTree", function()
-    local PlayerTree = require("server.World.PlayerTree")
+    local PlayerTree = require("server.WorldHost.PlayerTree")
     local clock = SpokeClock.new(0)
     local player = { UserId = 1001 }
     local other = { UserId = 1002 }
@@ -209,7 +209,7 @@ describe("服务端 Spoke 主干：PlayerTree 因果顺序、双层相位与逆�
   end)
 
   it("严格按四段因果顺序排布：同一 batch 内上游先算、下游后跑并看到最新派生值", function()
-    local PlayerTree = require("server.World.PlayerTree")
+    local PlayerTree = require("server.WorldHost.PlayerTree")
     local clock = SpokeClock.new(0)
     local logger = silent_logger()
     local player = { UserId = 2001 }
@@ -296,7 +296,7 @@ describe("服务端 Spoke 主干：PlayerTree 因果顺序、双层相位与逆�
   end)
 
   it("双层相位隔离：麻痹仅关闭 can_act 不退出外层存活相位，platform_pending 暂停濒死与死亡倒计时", function()
-    local PlayerTree = require("server.World.PlayerTree")
+    local PlayerTree = require("server.WorldHost.PlayerTree")
     local clock = SpokeClock.new(0)
     local player = { UserId = 2002 }
     local data = make_ready_data(player)
@@ -377,7 +377,7 @@ describe("服务端 Spoke 主干：PlayerTree 因果顺序、双层相位与逆�
   end)
 
   it("离场 Step 1 触发终镜像时在场资源仍可读，Step 2 同步 dispose 按逆序拆除资源与局部信号连接零残留", function()
-    local PlayerTree = require("server.World.PlayerTree")
+    local PlayerTree = require("server.WorldHost.PlayerTree")
     local clock = SpokeClock.new(0)
     local player = { UserId = 2003 }
     local data = make_ready_data(player)
@@ -475,7 +475,7 @@ describe("服务端 Spoke 主干：ServerRuntime 离场三步协议、排空栅�
   end
 
   it("SharedWorldTree 全局唯一启动，且玩家仅在存档就绪与服务启动后才生成专属 PlayerTree", function()
-    local ServerRuntime = require("server.World.ServerRuntime")
+    local ServerRuntime = require("server.WorldHost.ServerRuntime")
     local logger = silent_logger()
     local ready_callbacks = {}
     local join_starts = {}
@@ -535,7 +535,7 @@ describe("服务端 Spoke 主干：ServerRuntime 离场三步协议、排空栅�
   end)
 
   it("启动时非有限 initial_now 降级为 0 且接受非裸表形态（元表代理 / userdata 协议）的玩家对象", function()
-    local ServerRuntime = require("server.World.ServerRuntime")
+    local ServerRuntime = require("server.WorldHost.ServerRuntime")
     local logger = silent_logger()
 
     local rt_nan = ServerRuntime.new({ initial_now = 0 / 0, logger = logger })
@@ -563,7 +563,7 @@ describe("服务端 Spoke 主干：ServerRuntime 离场三步协议、排空栅�
   end)
 
   it("离场三步协议严格按顺序执行，并在同账号重进期间通过排空栅栏防脏读与覆盖写入", function()
-    local ServerRuntime = require("server.World.ServerRuntime")
+    local ServerRuntime = require("server.WorldHost.ServerRuntime")
     local logger = silent_logger()
     local timeline = {}
     local store = {}
@@ -730,7 +730,7 @@ describe("服务端 Spoke 主干：ServerRuntime 离场三步协议、排空栅�
   end)
 
   it("树级故障隔离：单棵 PlayerTree 抛未捕获异常时其余 PlayerTree 与 SharedWorldTree 正常推进，且已 dispose 树不再响应", function()
-    local ServerRuntime = require("server.World.ServerRuntime")
+    local ServerRuntime = require("server.WorldHost.ServerRuntime")
     local logger = silent_logger()
     local world_ticks, b_ticks, a_ticks = 0, 0, 0
     local a_finalized = false

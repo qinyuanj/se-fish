@@ -6,7 +6,7 @@ local cfg = require('common.GameCfg')
 local platform = require('server.PlatformHost')
 local players = require('server.PlayerDataHost')
 local save = require('server.SaveHost')
-local ServerRuntime = require('server.World.ServerRuntime')
+local ServerRuntime = require('server.WorldHost.ServerRuntime')
 local world, task = game:GetService('World'), game:GetService('Task')
 local p = game:GetService('Players'):GetPlayers()[1]
 if not p then print('PLATFORM147 ABORT 无玩家') return end

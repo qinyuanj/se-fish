@@ -231,9 +231,9 @@ describe('条款 1-15 七区鱼与首领的代码路径（可见 / 可打 / 可�
   before_each(function()
     env = newWorld()
     saved = installWorld(env)
-    Carrier = assert(loadfile('server/World/FishCarrier.lua'))()
-    package.loaded['server.World.FishCarrier'] = Carrier
-    Unit = assert(loadfile('server/World/FishTree.lua'))()
+    Carrier = assert(loadfile('server/WorldHost/FishCarrier.lua'))()
+    package.loaded['server.WorldHost.FishCarrier'] = Carrier
+    Unit = assert(loadfile('server/WorldHost/FishTree.lua'))()
     -- Start 里做的是注入 World 与开战斗通道；战斗通道不在本断言范围，只做同一份注入。
     Unit.World = env.world
     Unit.Cast = { PushState = function() end }
@@ -243,8 +243,8 @@ describe('条款 1-15 七区鱼与首领的代码路径（可见 / 可打 / 可�
 
   after_each(function()
     restoreWorld(saved)
-    package.loaded['server.World.FishCarrier'] = nil
-    package.loaded['server.World.FishTree'] = nil
+    package.loaded['server.WorldHost.FishCarrier'] = nil
+    package.loaded['server.WorldHost.FishTree'] = nil
     Carrier.Carriers = {}
   end)
 

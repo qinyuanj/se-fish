@@ -127,8 +127,8 @@ describe('TestFishAbilitySeams', function()
     before_each(function()
         saved = { Vector3 = rawget(_G, 'Vector3'), Quaternion = rawget(_G, 'Quaternion'),
             RaycastParams = rawget(_G, 'RaycastParams'), game = rawget(_G, 'game'),
-            carrier = package.loaded['server.World.FishCarrier'],
-            ability = package.loaded['server.World.FishTree'],
+            carrier = package.loaded['server.WorldHost.FishCarrier'],
+            ability = package.loaded['server.WorldHost.FishTree'],
             api = package.loaded['server.AbilityAPI'] }
         ctx = { now = 100, players = {}, hits = {}, mounts = {}, detached = {} }
         _G.Vector3 = { New = vec }
@@ -139,7 +139,7 @@ describe('TestFishAbilitySeams', function()
             if name == 'Players' then return { GetPlayers = function() return ctx.players end } end
             return {}
         end }
-        package.loaded['server.World.FishCarrier'] = { Spawn = function() return nil end, Despawn = function() end,
+        package.loaded['server.WorldHost.FishCarrier'] = { Spawn = function() return nil end, Despawn = function() end,
             SyncPosition = function() end }
         package.loaded['server.AbilityAPI'] = {
             AttachToSocket = function(_, unit, host, socketName, offset)
@@ -154,11 +154,11 @@ describe('TestFishAbilitySeams', function()
                 return true
             end,
         }
-        package.loaded['server.World.FishTree'] = nil
-        ctx.mgr = assert(loadfile('server/World/FishTree.lua'))()
+        package.loaded['server.WorldHost.FishTree'] = nil
+        ctx.mgr = assert(loadfile('server/WorldHost/FishTree.lua'))()
         ctx.mgr.AbilityApi = package.loaded['server.AbilityAPI']
         -- 目标裁决适配层按生产接线（server/main.lua）注入
-        ctx.mgr.AiTarget = require('server.World.FishAiTarget')
+        ctx.mgr.AiTarget = require('server.WorldHost.FishAiTarget')
         ctx.mgr.World = _G.game:GetService('World')
         ctx.mgr.Vitals = {
             CanTakeDamage = function() return true end,
@@ -174,8 +174,8 @@ describe('TestFishAbilitySeams', function()
         _G.Quaternion = saved.Quaternion
         _G.RaycastParams = saved.RaycastParams
         _G.game = saved.game
-        package.loaded['server.World.FishCarrier'] = saved.carrier
-        package.loaded['server.World.FishTree'] = saved.ability
+        package.loaded['server.WorldHost.FishCarrier'] = saved.carrier
+        package.loaded['server.WorldHost.FishTree'] = saved.ability
         package.loaded['server.AbilityAPI'] = saved.api
     end)
 

@@ -4,7 +4,7 @@
 --   2. 在同作用域 s:on_cleanup 中对称调用 RemoveModifier，角色重建与树销毁零残留；
 --   3. 提供独立轻量的活鱼 / 非玩家实体效果施加与清理辅助接口（create_entity_store），
 --      同样遵循 removeMode = 0 与业务时钟主权，供淘汰 MgrModifier 时无缝承接活鱼受击。
--- 本模块归属 L2（server.World），零反向依赖存量旧债务模块。
+-- 本模块归属 L2（server.WorldHost），零反向依赖存量旧债务模块。
 
 local GameCfg = require("common.GameCfg")
 local Number = require("common.Number")

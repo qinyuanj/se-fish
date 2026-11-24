@@ -1,6 +1,6 @@
 -- Spoke 原生重构机械棘轮守卫（#294 / ADR-0032 §4、§5）：
 -- 失败方式先列：
---   1. 新 Spoke 命名空间（common.SpokeClock、server.World.*、client.Store.*、client.Views.*）
+--   1. 新 Spoke 命名空间（common.SpokeClock、server.WorldHost.*、client.Store.*、client.Views.*）
 --      反向 require 存量旧债务模块（server.Mgr.*、server.AbilityAPI、server.AbilityBehaviors.*、
 --      client.MgrGameUI、client.ScreenHandlers.*、client.Local*、common.OwnedUnits）→ 破坏单向棘轮；
 --   2. 就地修改 common/packages/spoke/ 或 common/packages/spoke_eggy/ 或与 docs/packages-reference.md
@@ -112,7 +112,7 @@ end
 
 local function is_spoke_namespace_file(path)
   return path == "common/SpokeClock.lua"
-    or path:match("^server/World/") ~= nil
+    or path:match("^server/WorldHost/") ~= nil
     or path:match("^client/Store/") ~= nil
     or path:match("^client/Views/") ~= nil
 end
@@ -312,7 +312,7 @@ describe("Spoke 原生重构机械棘轮守卫", function()
           "common.GameCfg",
           "common.packages.spoke.api",
           "server.Data.PlayerData",
-          "server.World.PlayerTree",
+          "server.WorldHost.PlayerTree",
           "server.AbilityBehaviors.melee_hit",
           "client.GameUI",
           "client.Store.ClientStore",
@@ -321,20 +321,20 @@ describe("Spoke 原生重构机械棘轮守卫", function()
         },
         edges = {
           { from = "common.SpokeClock", to = "common.packages.spoke.api" },
-          { from = "server.World.PlayerTree", to = "common.SpokeClock" },
-          { from = "server.World.PlayerTree", to = "server.Data.PlayerData" },
-          { from = "server.AbilityBehaviors.melee_hit", to = "server.World.PlayerTree" },
+          { from = "server.WorldHost.PlayerTree", to = "common.SpokeClock" },
+          { from = "server.WorldHost.PlayerTree", to = "server.Data.PlayerData" },
+          { from = "server.AbilityBehaviors.melee_hit", to = "server.WorldHost.PlayerTree" },
           { from = "client.Store.ClientStore", to = "common.SpokeClock" },
           { from = "client.Views.RootView", to = "client.Store.ClientStore" },
           { from = "client.Views.RootView", to = "client.GameUI" },
-          { from = "server.AbilityAPI", to = "server.World.PlayerTree" },
+          { from = "server.AbilityAPI", to = "server.WorldHost.PlayerTree" },
         },
       })
       assert.is_true(valid.ok, valid.message)
 
       local invalid_edges = {
-        { from = "server.World.PlayerTree", to = "server.AbilityBehaviors.melee_hit" },
-        { from = "server.World.PlayerTree", to = "server.AbilityAPI" },
+        { from = "server.WorldHost.PlayerTree", to = "server.AbilityBehaviors.melee_hit" },
+        { from = "server.WorldHost.PlayerTree", to = "server.AbilityAPI" },
         { from = "client.Store.ClientStore", to = "client.Views.RootView" },
         { from = "client.Views.RootView", to = "client.MgrGameUI" },
         { from = "client.Views.RootView", to = "client.ScreenHandlers.ScreenMain" },

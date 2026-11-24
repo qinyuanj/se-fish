@@ -2,8 +2,8 @@
 -- （含活鱼 entity_store）与真实官方包 modifier_system.api；仅引擎单位、事件与 Timer 为替身。
 local GameCfg = require('common.GameCfg')
 local SpokeClock = require('common.SpokeClock')
-local PlayerTree = require('server.World.PlayerTree')
-local ModifierLeaf = require('server.World.ModifierLeaf')
+local PlayerTree = require('server.WorldHost.PlayerTree')
+local ModifierLeaf = require('server.WorldHost.ModifierLeaf')
 
 local Runtime = {}
 

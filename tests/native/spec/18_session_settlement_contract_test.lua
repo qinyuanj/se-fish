@@ -77,7 +77,7 @@ describe('条款 18 存档会话与结算身份', function()
     env.cfg.Debug = { Enabled = false }
     env.savedWorldModules = {}
     for name, value in pairs(package.loaded) do
-      if name:match('^server%.World%.') then
+      if name:match('^server%.WorldHost%.') then
         env.savedWorldModules[name] = value
         package.loaded[name] = nil
       end
@@ -151,7 +151,7 @@ describe('条款 18 存档会话与结算身份', function()
       FindAnchor = function(_, name) return env.anchors[name] end,
     }
     env.route = env.cfg.Ferry.Routes[1]
-    local ServerRuntime = require('server.World.ServerRuntime')
+    local ServerRuntime = require('server.WorldHost.ServerRuntime')
     env.runtime = ServerRuntime.new({
       initial_now = env.now, zones = env.cfg.Zones, remote = reStub,
       player_data = env.players, save = env.save, interact = env.interact,
@@ -179,7 +179,7 @@ describe('条款 18 存档会话与结算身份', function()
     if env then
       if env.runtime then env.runtime:shutdown() end
       for name in pairs(package.loaded) do
-        if name:match('^server%.World%.') then package.loaded[name] = nil end
+        if name:match('^server%.WorldHost%.') then package.loaded[name] = nil end
       end
       for name, value in pairs(env.savedWorldModules or {}) do package.loaded[name] = value end
       _G.game = env.savedGame

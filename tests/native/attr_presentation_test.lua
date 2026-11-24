@@ -50,7 +50,7 @@ describe('TestAttrPresentation', function()
 
     -- 服务端判定按体型缩放半径，同时保留 slack；没有角色时拒绝
     it('test_server_range_scales_radius_but_keeps_slack_and_rejects_missing_character', function()
-        local mgr = require('server.World.InteractionPoints')
+        local mgr = require('server.WorldHost.InteractionPoints')
         local anchor = { Position = { x = 0, z = 0 } }
         mgr.FindAnchor = function() return anchor end
         local value = require('common.BodyScale').Derive(3).InteractRange

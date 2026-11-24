@@ -40,7 +40,7 @@ function M.assert_wiring()
     local handle = assert(io.open('server/main.lua', 'rb'), '读不到 server/main.lua')
     local source = handle:read('a')
     handle:close()
-    local runtime_handle = assert(io.open('server/World/ServerRuntime.lua', 'rb'), '读不到 server/World/ServerRuntime.lua')
+    local runtime_handle = assert(io.open('server/WorldHost/ServerRuntime.lua', 'rb'), '读不到 server/WorldHost/ServerRuntime.lua')
     source = source .. '\n' .. runtime_handle:read('a')
     runtime_handle:close()
     for _, line in ipairs(M.WIRING) do
@@ -95,7 +95,7 @@ function M.new(opts)
             game = rawget(_G, 'game'), Vector3 = rawget(_G, 'Vector3'), Vector2 = rawget(_G, 'Vector2'),
             Color = rawget(_G, 'Color'), REUtil = rawget(_G, 'REUtil'), task = rawget(_G, 'task'),
             reutil = package.loaded['common.REUtil'], playerdata = package.loaded['server.Data.PlayerData'],
-            carrier = package.loaded['server.World.FishCarrier'],
+            carrier = package.loaded['server.WorldHost.FishCarrier'],
         },
     }
 
@@ -182,7 +182,7 @@ function M.new(opts)
     }
     local mgr = env.managers
     env.filter = function()
-        return require('server.World.PkDamageFilter').make({
+        return require('server.WorldHost.PkDamageFilter').make({
             party = mgr.Party,
             zone_markers = require('common.ZoneMarkers'),
         })
@@ -453,7 +453,7 @@ function M:Close()
     _G.Color, _G.REUtil, _G.task = saved.Color, saved.REUtil, saved.task
     package.loaded['common.REUtil'] = saved.reutil
     package.loaded['server.Data.PlayerData'] = saved.playerdata
-    package.loaded['server.World.FishCarrier'] = saved.carrier
+    package.loaded['server.WorldHost.FishCarrier'] = saved.carrier
     self.saved, self.queue, self.re, self.sent = nil, {}, {}, {}
     return self
 end

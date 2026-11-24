@@ -12,9 +12,9 @@ local BodyScale = require("common.BodyScale")
 local SpokeClock = require("common.SpokeClock")
 local spoke = require("common.packages.spoke.api")
 local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
-local PlayerTree = require("server.World.PlayerTree")
-local PlayerEffects = require("server.World.PlayerEffects")
-local HeldRodLeaf = require("server.World.HeldRodLeaf")
+local PlayerTree = require("server.WorldHost.PlayerTree")
+local PlayerEffects = require("server.WorldHost.PlayerEffects")
+local HeldRodLeaf = require("server.WorldHost.HeldRodLeaf")
 
 local State = spoke.State
 local Effect = spoke.Effect

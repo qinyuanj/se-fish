@@ -370,7 +370,7 @@ describe('TestStatusEffect', function()
     it('test_straight_escape_uses_real_status_expiration', function()
         local oldVector = _G.Vector3
         _G.Vector3 = { New = function(x, y, z) return { x = x, y = y, z = z } end }
-        local unit = assert(loadfile('server/World/FishTree.lua'))()
+        local unit = assert(loadfile('server/WorldHost/FishTree.lua'))()
         unit.Ability = ctx.mgr
         local fish, carrier = installFish()
         fish.FishId, fish.StraightEscape, fish.Heading = 'alligatorGar', true, { x = 1, z = 0 }

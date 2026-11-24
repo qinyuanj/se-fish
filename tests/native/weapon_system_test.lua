@@ -147,9 +147,9 @@ describe('TestMainWeaponWiring', function()
     it('test_main_registers_and_wires_mgr_weapon', function()
         local src = readSource('server/main.lua')
         assert.matches('bind_weapon_action = function(dispatch)', src, nil, true)
-        assert.matches('function runtime:damage_fish', readSource('server/World/ServerRuntime.lua'), nil, true)
+        assert.matches('function runtime:damage_fish', readSource('server/WorldHost/ServerRuntime.lua'), nil, true)
         assert.matches('bind_party_action = function(dispatch)', src, nil, true)
-        assert.matches('PkDamageFilter.make', readSource('server/World/ServerRuntime.lua'), nil, true)
+        assert.matches('PkDamageFilter.make', readSource('server/WorldHost/ServerRuntime.lua'), nil, true)
         assert.matches('register_cast_guard = registerCastGuard', src, nil, true)
     end)
 end)
@@ -158,9 +158,9 @@ describe('TestMgrFishUnitBlastFish', function()
     local ctx
     local saved
     before_each(function()
-        saved = { game = rawget(_G, 'game'), carrier = package.loaded['server.World.FishCarrier'] }
+        saved = { game = rawget(_G, 'game'), carrier = package.loaded['server.WorldHost.FishCarrier'] }
         ctx = { now = 3000, despawned = {}, spawnOpts = {} }
-        package.loaded['server.World.FishCarrier'] = {
+        package.loaded['server.WorldHost.FishCarrier'] = {
             Spawn = function(_, opts)
                 ctx.spawnOpts[#ctx.spawnOpts + 1] = opts
                 return { Body = { Position = opts.Position }, Receiver = { Controller = {} } }, nil
@@ -173,12 +173,12 @@ describe('TestMgrFishUnitBlastFish', function()
             if name == 'Players' then return { GetPlayers = function() return {} end } end
             return nil
         end }
-        ctx.mgr = assert(loadfile('server/World/FishTree.lua'))()
+        ctx.mgr = assert(loadfile('server/WorldHost/FishTree.lua'))()
         ctx.owner = { UserId = 55 }
     end)
     after_each(function()
         _G.game = saved.game
-        package.loaded['server.World.FishCarrier'] = saved.carrier
+        package.loaded['server.WorldHost.FishCarrier'] = saved.carrier
     end)
 
     it('test_spawn_wild_fish_with_ttl_and_owner', function()

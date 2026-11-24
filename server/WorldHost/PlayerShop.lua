@@ -1,7 +1,7 @@
 local GameCfg = require("common.GameCfg")
 local Number = require("common.Number")
 local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
-local InteractionPoints = require("server.World.InteractionPoints")
+local InteractionPoints = require("server.WorldHost.InteractionPoints")
 
 local PlayerShop = {}
 

@@ -19,7 +19,7 @@
 local GameCfg = require('common.GameCfg')
 local MathWaterJudge = require('common.MathWaterJudge')
 local MgrPlayerData = require('server.PlayerDataHost')
-local ServerRuntime = require('server.World.ServerRuntime')
+local ServerRuntime = require('server.WorldHost.ServerRuntime')
 local function ground()
     local runtime = ServerRuntime.current and ServerRuntime.current()
     return runtime and runtime:get_world()
@@ -42,7 +42,7 @@ local MgrLoot = {
         return world and world:try_pickup(player, id) or false
     end,
 }
-local InteractionPoints = require('server.World.InteractionPoints')
+local InteractionPoints = require('server.WorldHost.InteractionPoints')
 local MgrSave = require('server.SaveHost')
 local function runtimeCommand(name, player, payload)
     local runtime = ServerRuntime.current and ServerRuntime.current()
@@ -59,7 +59,7 @@ local function findGoodsByNumber(number, level)
         if goods.Number == number and goods.MinShopLevel <= level then return goods end
     end
 end
-local FishTree = require('server.World.FishTree')
+local FishTree = require('server.WorldHost.FishTree')
 local function runtimeOf()
     return ServerRuntime.current and ServerRuntime.current()
 end

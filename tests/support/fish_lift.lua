@@ -33,7 +33,7 @@ function M:setUp()
     self.saved = { game = rawget(_G, 'game'), Vector3 = rawget(_G, 'Vector3'),
         RaycastParams = rawget(_G, 'RaycastParams') }
     self.modules = {}
-    for _, name in ipairs({ 'server.World.FishCarrier', 'server.World.FishTree' }) do
+    for _, name in ipairs({ 'server.WorldHost.FishCarrier', 'server.WorldHost.FishTree' }) do
         self.modules[name] = package.loaded[name]
     end
     self.now = 0
@@ -66,7 +66,7 @@ function M:setUp()
         function unit:AddNoCollisionPairWithUnit(other) self.Pairs[other] = true end
         return unit
     end
-    package.loaded['server.World.FishCarrier'] = {
+    package.loaded['server.WorldHost.FishCarrier'] = {
         Spawn = function(_, opts)
             local carrier = { Opts = opts, Body = body(opts.Position),
                 Receiver = { UnitId = 'r' .. tostring(#env.spawned + 1), Controller = { LiftedEnabled = true } } }
@@ -82,8 +82,8 @@ function M:setUp()
             return true
         end,
     }
-    package.loaded['server.World.FishTree'] = nil
-    self.mgr = assert(loadfile('server/World/FishTree.lua'))()
+    package.loaded['server.WorldHost.FishTree'] = nil
+    self.mgr = assert(loadfile('server/WorldHost/FishTree.lua'))()
     self.holder_trees = {}
     self.mgr.GetPlayerTree = function(_, player)
         return player and self.holder_trees[player.UserId] or nil
@@ -101,7 +101,7 @@ function M:setUp()
         return removing(host, player)
     end
     -- 目标裁决适配层由入口注入（生产见 server/main.lua）；夹具照生产接线补上，不走模块内 require。
-    self.mgr.AiTarget = require('server.World.FishAiTarget')
+    self.mgr.AiTarget = require('server.WorldHost.FishAiTarget')
     self.pushed = {}
     self.mgr.Cast = { PushState = function(_, player) env.pushed[#env.pushed + 1] = player end }
     self.mgr:Start()
@@ -131,7 +131,7 @@ function M:tearDown()
     -- 即使 setUp 只走到一半也恢复已保存的进程状态；Stop 失败最后传播。
     local ok, err = pcall(function() if self.mgr then self.mgr:Stop() end end)
     if self.modules then
-        for _, name in ipairs({ 'server.World.FishCarrier', 'server.World.FishTree' }) do
+        for _, name in ipairs({ 'server.WorldHost.FishCarrier', 'server.WorldHost.FishTree' }) do
             package.loaded[name] = self.modules[name]
         end
     end

@@ -1,7 +1,7 @@
 local GameCfg = require('common.GameCfg')
 local Records = require('common.Records')
 local Adapter = require('server.Data.RecordsAdapter')
-local SignalRouter = require('server.World.WorldSignalRouter')
+local SignalRouter = require('server.WorldHost.WorldSignalRouter')
 
 local Mgr = {
     Adapter = Adapter,

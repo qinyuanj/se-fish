@@ -7,7 +7,7 @@
 
 local GameCfg = require("common.GameCfg")
 local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
-local ServerRuntime = require("server.World.ServerRuntime")
+local ServerRuntime = require("server.WorldHost.ServerRuntime")
 
 local function make_signal()
   local handlers = {}

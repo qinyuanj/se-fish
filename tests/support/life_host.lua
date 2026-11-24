@@ -1,5 +1,5 @@
 local PlayerData = require("server.Data.PlayerData")
-local ServerRuntime = require("server.World.ServerRuntime")
+local ServerRuntime = require("server.WorldHost.ServerRuntime")
 local SpokeClock = require("common.SpokeClock")
 
 local M = {}

@@ -60,7 +60,7 @@
 
 1. **命名空间与分层（配合 [ADR-0012](0012-six-layer-architecture.md) 与 `tools/arch_policy.lua`）**：
    - `common/SpokeClock.lua` 归 **L4（共享规则）**；
-   - 服务端新建 `server/World/`（承载 `SharedWorldTree`、`PlayerTree`、`FishTree` 及领域子 Epoch），客户端新建 `client/Store/`（Reactive Store）与 `client/Views/`（Spoke 视图树），登记入 `tools/arch_policy.lua` 并同步投影到 `policy.edn`。
+   - 服务端新建 `server/WorldHost/`（原名 `server/World`，与 SE 内置服务名重名，2026-11-24 按 [ADR-0033](0033-script-names-must-not-shadow-se-services.md) 改名；承载 `SharedWorldTree`、`PlayerTree`、`FishTree` 及领域子 Epoch），客户端新建 `client/Store/`（Reactive Store）与 `client/Views/`（Spoke 视图树），登记入 `tools/arch_policy.lua` 并同步投影到 `policy.edn`。
    - **过渡期单向依赖铁律**：只允许存量债务模块（`server.Mgr`、`client.ScreenHandlers`、`client.Local*`）单向读取新 Spoke 命名空间，**严禁新 Spoke 代码反向 `require` 旧模块**（必须调用的过渡接缝仅在 L1 入口以回调注入，切片完成后即删），防止触发 `arch_policy` 的命名空间投影环检查。
 2. **分步棘轮迁移**：
    - **第 0 步（立主干）**：落地 `common/SpokeClock.lua`、`SharedWorldTree` / `PlayerTree` 主干与客户端 `ClientStore` 根视图树；
@@ -79,6 +79,6 @@
 ## 后果
 
 - 每次迁移须按垂直切片同时替换服务端与客户端并下调源码守卫水位线，不允许长期滞留在半迁移态。
-- 新增 `common/SpokeClock.lua`、`server/World/`、`client/Store/`、`client/Views/` 时须同步更新 `tools/arch_policy.lua`、`policy.edn` 并重生成 `docs/uml/se-fish.edn`，确保 `arch_policy_test.lua` 持续全绿。
+- 新增 `common/SpokeClock.lua`、`server/WorldHost/`、`client/Store/`、`client/Views/` 时须同步更新 `tools/arch_policy.lua`、`policy.edn` 并重生成 `docs/uml/se-fish.edn`，确保 `arch_policy_test.lua` 持续全绿。
 - 既有 `docs/acceptance/README.md` 验收矩阵与 `fast`/`full` 测试车道在每一批切片迁移期间均须保持不退化。
 - 当 `OwnedUnits.` 水位线归零后，[ADR-0026](0026-no-global-unit-factory.md) 的归属登记条款完全退出历史舞台，仅保留命名规范与事件桥约束。

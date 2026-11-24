@@ -17,7 +17,7 @@ end
 
 function M:setUp()
     self.savedColor = _G.Color
-    self.lootModule = package.loaded['server.World.GroundLoot']
+    self.lootModule = package.loaded['server.WorldHost.GroundLoot']
     self.lootSaved = true
     _G.Color = { New = function(r, g, b, a) return { r = r, g = g, b = b, a = a } end }
     -- 拾饵消费者可能已经开启调试，保留它传入的原始基线。
@@ -26,7 +26,7 @@ function M:setUp()
     FishLift.setUp(self)
     local env = self
     self.diedSubs = {}
-    package.loaded['server.World.FishCarrier'].SubscribeDied = function(_, fn)
+    package.loaded['server.WorldHost.FishCarrier'].SubscribeDied = function(_, fn)
         env.diedSubs[#env.diedSubs + 1] = fn
         return true
     end
@@ -60,7 +60,7 @@ function M:tearDown()
         local ok, err = pcall(function() FishLift.tearDown(self) end)
         _G.Color = self.savedColor
         if self.savedGrantDebug then require('common.GameCfg').Debug = self.savedGrantDebug end
-        package.loaded['server.World.GroundLoot'] = self.lootModule
+        package.loaded['server.WorldHost.GroundLoot'] = self.lootModule
         self.lootSaved = nil
         if not ok then error(err, 0) end
         return

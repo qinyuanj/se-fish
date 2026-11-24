@@ -136,7 +136,7 @@ function M.new()
   env.platform.Save, env.platform.PlayerData = env.save, env.players
   env.platform.Now = function() return env.now end
 
-  local ServerRuntime = require("server.World.ServerRuntime")
+  local ServerRuntime = require("server.WorldHost.ServerRuntime")
   local SpokeClock = require("common.SpokeClock")
   env.ServerRuntime = ServerRuntime
   env.runtime = ServerRuntime.new({
