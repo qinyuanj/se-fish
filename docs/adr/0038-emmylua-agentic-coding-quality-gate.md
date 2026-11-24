@@ -1,6 +1,6 @@
 # 0038 EmmyLua 作为 agentic coding 的诊断质量门禁
 
-**Status**: accepted（2026-11-24；取代 #335/#336 的 LuaLS 路线，路线暂缓而非单据关闭）
+**Status**: accepted（2026-11-24；正式放弃 #335/#336 的 LuaLS 路线，两单已按 not planned 关闭）
 
 ## 背景
 
@@ -10,7 +10,7 @@ EmmyLua Analyzer Rust 是另一个产品：VSCode 插件 `tangzx.emmylua` 本机
 
 ## 决定
 
-- **角色**：EmmyLua 作为 agentic coding 的**诊断型质量门禁**；LuaLS 路线（#335/#336）暂缓，不关闭、不重写历史 ADR。两单加评论指向本 ADR。
+- **角色**：EmmyLua 作为 agentic coding 的**诊断型质量门禁**；正式放弃 LuaLS 路线，#335/#336 按 `not planned` 关闭并评论指向本 ADR，本地 LuaLS 产物与实验分支一并清理。
 - **检查面**：只做诊断（未定义字段/全局、类型不匹配、改名后的残留调用点等），不含 formatter、注解完整度、文档生成。注解只在诊断确实需要时补。
 - **范围**：`client/`、`common/`、`server/` 的自写代码；排除 `tests/`、三端 `packages/`、`_trigger/`、`data/`、`tmp/` 等工具与生成目录。`tests/` 不进 IDE 的 ignoreDir（rename/引用仍覆盖测试文件），由 CLI 门禁的 `-i` 单独排除。
 - **配置与工具**：诊断规则真源是仓库根 `.emmyrc.json`，IDE 与 CLI 共用；门禁扫描范围由 `emmylua` 子命令的 `-i` 额外收窄。CLI 为 `emmylua_check`，固定版本 `0.25.1`，不 vendor 二进制，PATH 上找不到或 `--version` 不匹配时退出码 3；安装命令 `cargo install emmylua_check --version 0.25.1 --locked`。
@@ -29,6 +29,6 @@ EmmyLua Analyzer Rust 是另一个产品：VSCode 插件 `tangzx.emmylua` 本机
 
 ## 备选方案
 
-- **继续推进 LuaLS（#335/#336）**：路线已拆好但依赖文档缺失，吞吐不满足本轮 agentic coding；暂缓而不废弃。
+- **继续推进 LuaLS（#335/#336）**：路线依赖的调研文档未入主干且吞吐不满足本轮 agentic coding，已正式放弃并关闭两单。
 - **两套语言服务并行**：配置口径与基线真源容易漂移，且没有权威语义对照支撑「谁补谁」，暂不采用。
 - **零存量直接卡全仓**：存量诊断未知，首日必红，最后只会关掉门禁；改用棘轮基线。
