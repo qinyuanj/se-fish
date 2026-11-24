@@ -28,7 +28,7 @@ describe('客户端摆渡统一视图树（RootView × ClientStore）', function
   before_each(function()
     restore = { Vector2 = rawget(_G, 'Vector2'), Vector3 = rawget(_G, 'Vector3'),
       Color = rawget(_G, 'Color'), modules = {} }
-    for _, name in ipairs({ 'common.GameCfg', 'client.Store.ClientStore', 'client.Views.FerryView' }) do
+    for _, name in ipairs({ 'common.game_cfg', 'client.Store.ClientStore', 'client.Views.FerryView' }) do
       restore.modules[name] = package.loaded[name]
       package.loaded[name] = nil
     end

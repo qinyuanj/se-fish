@@ -5,9 +5,9 @@ local Eui = require('tests.support.eui_double')
 local ClientStore = require('client.Store.ClientStore')
 local RootView = require('client.Views.RootView')
 local FishCombatView = require('client.Views.FishCombatView')
-local SpokeClock = require('common.SpokeClock')
-local GarBiteNotice = require('common.GarBiteNotice')
-local GameCfg = require('common.GameCfg')
+local SpokeClock = require('common.spoke_clock')
+local GarBiteNotice = require('common.gar_bite_notice')
+local GameCfg = require('common.game_cfg')
 
 describe('鳄雀鳝上钩预警表现（GarBiteWarning -> FishCombatView）', function()
   local env

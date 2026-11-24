@@ -1,6 +1,6 @@
-local GameCfg = require("common.GameCfg")
-local RateLimit = require("common.RateLimit")
-local ReelDisplay = require("common.ReelDisplay")
+local GameCfg = require("common.game_cfg")
+local RateLimit = require("common.rate_limit")
+local ReelDisplay = require("common.reel_display")
 local spoke = require("common.packages.spoke.api")
 
 local State = spoke.State
@@ -24,7 +24,7 @@ local function send_reel(ctx, payload)
     return
   end
   local ok, err = pcall(function()
-    local re = require("common.REUtil"):GetRE("ReelInRE")
+    local re = require("common.re_util"):GetRE("ReelInRE")
     if re and type(re.FireServer) == "function" then re:FireServer(payload) end
   end)
   if not ok then
@@ -39,7 +39,7 @@ local function send_close(ctx, payload)
     return
   end
   local ok, err = pcall(function()
-    local re = require("common.REUtil"):GetRE("CloseReelIn")
+    local re = require("common.re_util"):GetRE("CloseReelIn")
     if re and type(re.FireServer) == "function" then re:FireServer(payload) end
   end)
   if not ok then

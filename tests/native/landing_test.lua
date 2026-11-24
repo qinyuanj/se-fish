@@ -1,4 +1,4 @@
-local GameCfg = require("common.GameCfg")
+local GameCfg = require("common.game_cfg")
 local Host = require("tests.support.fishing_host")
 
 describe("上岸结算（ServerRuntime × FishTree × Compendium）", function()

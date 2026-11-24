@@ -5,7 +5,7 @@
 --   3. 离场玩家对活鱼或其他玩家施加的 DoT 未在离场时清理，导致离线来源继续扣血；
 --   4. server/main.lua 未移除旧 MgrAttr / MgrModifier 或未将 MgrPlayerData 同步接线至 PlayerTree。
 
-local GameCfg = require("common.GameCfg")
+local GameCfg = require("common.game_cfg")
 local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
 local ServerRuntime = require("server.WorldHost.ServerRuntime")
 
@@ -314,7 +314,7 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
       saved = {
         game = rawget(_G, "game"),
         REUtil = rawget(_G, "REUtil"),
-        reutil = package.loaded["common.REUtil"],
+        reutil = package.loaded["common.re_util"],
         MgrUtil = rawget(_G, "MgrUtil"),
         Vector3 = rawget(_G, "Vector3"),
         Color = rawget(_G, "Color"),
@@ -333,7 +333,7 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
       end
       _G.game = saved.game
       _G.REUtil = saved.REUtil
-      package.loaded["common.REUtil"] = saved.reutil
+      package.loaded["common.re_util"] = saved.reutil
       _G.MgrUtil = saved.MgrUtil
       _G.Vector3 = saved.Vector3
       _G.Color = saved.Color
@@ -493,9 +493,9 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
           end
         end,
         require = function(path)
-          if path == "common.REUtil" then return remote_util end
+          if path == "common.re_util" then return remote_util end
           if path == "server.MgrUtil" then return { Start = function() end } end
-          if path == "common.ZoneMarkers" then return { Start = function() end } end
+          if path == "common.zone_markers" then return { Start = function() end } end
           if path == "server.packages.attr_rule.api" then return attr_api_stub end
           if path == "server.packages.modifier_system.api" then return modifier_api_stub end
           if path == "server.packages.ability_system.api" then return ability_api_stub end
@@ -517,7 +517,7 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
 
 
       _G.REUtil = remote_util
-      package.loaded["common.REUtil"] = remote_util
+      package.loaded["common.re_util"] = remote_util
       runtime = assert(loadfile("server/main.lua", "t", sandbox))()
       assert.are.equal(runtime, ServerRuntime.current())
       assert.is_not_nil(runtime:get_entity_modifiers())

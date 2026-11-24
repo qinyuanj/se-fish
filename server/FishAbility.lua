@@ -2,7 +2,7 @@
 local World = game:GetService("World")
 local Task = game:GetService("Task")
 
-local GameCfg = require("common.GameCfg")
+local GameCfg = require("common.game_cfg")
 local AbilityAPI = require("server.AbilityAPI")
 local AbilityPackageAPI = require("server.packages.ability_system.api")
 

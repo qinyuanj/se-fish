@@ -54,9 +54,9 @@
 --   「精英 / 首领鱼带 Combat 标签」—— 标签到 GameCfg.FishCombat 的映射目前没人拦
 --     （MgrFishUnit 用 `GameCfg.FishCombat and GameCfg.FishCombat[species.Combat]` 防御式取值，
 --     缺表静默不攻击）；明确不再拦。
-local cfg = require('common.GameCfg')
-local FishCatch = require('common.FishCatch')
-local Ledger = require('common.cfg.ContentLedger')
+local cfg = require('common.game_cfg')
+local FishCatch = require('common.fish_catch')
+local Ledger = require('common.cfg.content_ledger')
 
 -- 三座岛的参数：Index 是钓鱼区 / 信物链 / 渔夫 / 摊位的序号（蟹湖 3、树林岛 4、沙滩岛 5）。
 -- 水区 ID、鱼种、船票、鱼竿一律按序号从真源派生，不另抄一份 id 清单。

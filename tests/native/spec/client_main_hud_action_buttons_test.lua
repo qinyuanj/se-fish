@@ -8,7 +8,7 @@
 
 local spoke = require("common.packages.spoke.api")
 local Eui = require("tests.support.eui_double")
-local GameCfg = require("common.GameCfg")
+local GameCfg = require("common.game_cfg")
 local MainHudLayout = require("client.MainHudLayout")
 local ClientStore = require("client.Store.ClientStore")
 local RootView = require("client.Views.RootView")

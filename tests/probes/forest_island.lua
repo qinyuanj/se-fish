@@ -14,8 +14,8 @@
 --   7. 四级摊位买不到普通鱼竿，或信物链 / 返程价与原表不符。
 --
 -- 模拟边界（逐条标注在输出里）：
---   * 业务模块用真实代码：common/GameCfg（抽鱼池 / 战斗数值 / 商店 / 兑换 / 摆渡）、
---     server/Mgr/MgrFishUnit（剑鱼 / 三头鲨状态机）、common/FishCatch（抽鱼）。
+--   * 业务模块用真实代码：common/game_cfg（抽鱼池 / 战斗数值 / 商店 / 兑换 / 摆渡）、
+--     server/Mgr/MgrFishUnit（剑鱼 / 三头鲨状态机）、common/fish_catch（抽鱼）。
 --   * 引擎边界是假的：载体、Vitals、RE、服务器时刻（探针按帧自增 now）。
 --   * 高跃落点方向由替换的 math.random（固定 0）钉死为 +x，只验距离与范围。
 --   * 攻击 / 躲避窗口与真机手感未验证 [未查证]：本探针只证明招式按契约结算，不证明“正常单杀可行”。
@@ -28,8 +28,8 @@ local function check(name, ok, detail)
 end
 local function quantity(label, value) print(string.format('K %s = %s', label, tostring(value))) end
 
-local GameCfg = require('common.GameCfg')
-local FishCatch = require('common.FishCatch')
+local GameCfg = require('common.game_cfg')
+local FishCatch = require('common.fish_catch')
 
 -- ===== 假引擎战斗世界（tests/support/combat_world，复用 fish_escape 测试夹具）=====
 local CombatWorld = require('tests.support.combat_world')

@@ -4,7 +4,7 @@
 -- Busted 案例体在沙箱 _ENV 里，业务模块读的是真 _G，因此引擎全局必须 rawset 到 _G。
 -- describe/it 名称保留旧类名与方法名，按类名字典序 + 方法名字典序注册以保持旧套件执行顺序。
 local MgrFishCarrier = require('server.WorldHost.FishCarrier')
-local GameCfg = require('common.GameCfg')
+local GameCfg = require('common.game_cfg')
 
 local CARRIER_PATH = 'server/WorldHost/FishCarrier.lua'
 local MAIN_PATH = 'server/main.lua'

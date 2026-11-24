@@ -235,7 +235,7 @@ describe("三端源码守卫", function()
       if old then
         bad[#bad + 1] = path .. ":" .. line_of(code, old) .. " 使用未公开 game:CreateRemoteEvent"
       end
-      if path ~= "common/REUtil.lua" then
+      if path ~= "common/re_util.lua" then
         local direct = code:find("RemoteEvent%s*%.%s*New%s*%(")
         if direct then
           bad[#bad + 1] = path .. ":" .. line_of(code, direct) .. " 绕过 REUtil 直接调用 RemoteEvent.New"

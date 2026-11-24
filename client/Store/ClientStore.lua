@@ -4,11 +4,11 @@
 
 local spoke = require("common.packages.spoke.api")
 local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
-local SpokeClock = require("common.SpokeClock")
-local BodyScale = require("common.BodyScale")
-local GameCfg = require("common.GameCfg")
-local Number = require("common.Number")
-local ZoneMarkers = require("common.ZoneMarkers")
+local SpokeClock = require("common.spoke_clock")
+local BodyScale = require("common.body_scale")
+local GameCfg = require("common.game_cfg")
+local Number = require("common.number")
+local ZoneMarkers = require("common.zone_markers")
 
 local State = spoke.State
 local Trigger = spoke.Trigger
@@ -324,7 +324,7 @@ local function normalize_table_snapshot(payload)
 end
 
 local function default_host()
-  local REUtil = require("common.REUtil")
+  local REUtil = require("common.re_util")
   local Players = game:GetService("Players")
   local RunService = game:GetService("RunService")
   local World = game:GetService("World")

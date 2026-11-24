@@ -1,10 +1,10 @@
 
-local GameCfg = require("common.GameCfg")
-local FishCatch = require("common.FishCatch")
-local MathWaterJudge = require("common.MathWaterJudge")
-local Number = require("common.Number")
-local RateLimit = require("common.RateLimit")
-local ReelProgress = require("common.ReelProgress")
+local GameCfg = require("common.game_cfg")
+local FishCatch = require("common.fish_catch")
+local MathWaterJudge = require("common.math_water_judge")
+local Number = require("common.number")
+local RateLimit = require("common.rate_limit")
+local ReelProgress = require("common.reel_progress")
 local State = require("common.packages.spoke.api").State
 
 local FishingPhase = {}

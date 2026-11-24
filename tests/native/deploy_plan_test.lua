@@ -5,13 +5,13 @@ local plan = require("tools.deploy_plan")
 local WORKSPACE = "fixture-host"
 local ENTRIES = {
   client = { { name = "UI", dir = true }, { name = "packages", dir = true } },
-  common = { { name = "GameCfg.lua", dir = false }, { name = "packages", dir = true } },
+  common = { { name = "game_cfg.lua", dir = false }, { name = "packages", dir = true } },
   server = { { name = "Mgr", dir = true }, { name = "packages", dir = true } },
 }
 local EXPECTED = {
   { rel = "client/UI", dir = true, src = "client/UI", dst = WORKSPACE .. "/client/UI" },
   { rel = "client/packages", dir = true, src = "client/packages", dst = WORKSPACE .. "/client/packages" },
-  { rel = "common/GameCfg.lua", dir = false, src = "common/GameCfg.lua", dst = WORKSPACE .. "/common/GameCfg.lua" },
+  { rel = "common/game_cfg.lua", dir = false, src = "common/game_cfg.lua", dst = WORKSPACE .. "/common/game_cfg.lua" },
   { rel = "common/packages", dir = true, src = "common/packages", dst = WORKSPACE .. "/common/packages" },
   { rel = "server/Mgr", dir = true, src = "server/Mgr", dst = WORKSPACE .. "/server/Mgr" },
   { rel = "server/packages", dir = true, src = "server/packages", dst = WORKSPACE .. "/server/packages" },

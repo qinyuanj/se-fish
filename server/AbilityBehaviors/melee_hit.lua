@@ -1,6 +1,6 @@
 
 local SwingRegistry = require("server.SwingRegistry")
-local HostSignal = require("common.HostSignal")
+local HostSignal = require("common.host_signal")
 local spoke_eggy = require("common.packages.spoke_eggy.api")
 
 local M = { Services = {} }

@@ -1,5 +1,5 @@
 -- #89 迁移（原 tests/gameplay/attr_growth_test.lua，#139 T18 大奖成长切片 2）：
--- 属性成长纯逻辑（common/AttrGrowth.lua）。
+-- 属性成长纯逻辑（common/attr_growth.lua）。
 -- 失败方式（先列后写）：
 --   1. 加速因子算错或超限不钳制：第 21 个加速药水算出超过 3 倍（统一规格 §2 封顶基础 3 倍/20 个）；
 --   2. 移速没有单一计算处：虚弱（×0.5）、霜冻（×0.7）、麻痹（×0）在不同管理器各乘一遍，
@@ -8,8 +8,8 @@
 --   4. 血量上限与 BodyScale 钉表漂移（两处各算一遍）。
 -- 接缝：纯逻辑模块，不碰引擎；数值全部来自 GameCfg 钉表（SpeedPotion/Survival/StatusEffects/BodyScale）。
 -- describe/it 名沿用旧类名与方法名，案例顺序沿用旧 LuaUnit 的字典序执行序。
-local GameCfg = require('common.GameCfg')
-local AttrGrowth = require('common.AttrGrowth')
+local GameCfg = require('common.game_cfg')
+local AttrGrowth = require('common.attr_growth')
 
 describe('TestAttrGrowth', function()
     -- 有效移速单一计算：基础 × 加速成长 × 虚弱 × 霜冻；麻痹为 0
@@ -40,7 +40,7 @@ describe('TestAttrGrowth', function()
         assert.same(900, AttrGrowth.MaxHealth(10))
         assert.same(900, AttrGrowth.MaxHealth(11))
         assert.same(300, AttrGrowth.MaxHealth('x'))
-        local BodyScale = require('common.BodyScale')
+        local BodyScale = require('common.body_scale')
         for n = 0, 12 do
             assert.same(BodyScale.Plan(n).Health, AttrGrowth.MaxHealth(n))
         end
@@ -61,12 +61,12 @@ describe('TestAttrGrowth', function()
         assert.near(1.1, AttrGrowth.SpeedFactor(1.5), 1e-9)
     end)
 
-    -- 属性投影（common/AttrModel.lua 的 35 行实现）只组合既有成长与商店真源，不另算一份：
+    -- 属性投影（common/attr_model.lua 的 35 行实现）只组合既有成长与商店真源，不另算一份：
     -- 体型与血量上限走 BodyScale.Plan，移速走 AttrGrowth 口径，武器升级走 Shop.DamageScale，
     -- 饥饿上限钳到 Vitals.MaxHunger。并入自 tests/native/attr_model_test.lua（原 2 例）。
     it('test_attr_model_projection_reuses_growth_and_shop_sources', function()
-        local AttrModel = require('common.AttrModel')
-        local BodyScale = require('common.BodyScale')
+        local AttrModel = require('common.attr_model')
+        local BodyScale = require('common.body_scale')
         local plan = AttrModel.Plan({ bodyPotions = 2, speedPotions = 3, baseSpeed = 7, moveMultiplier = 0.35, hunger = 500 })
         assert.same(BodyScale.Plan(2).Scale, plan.Body.Scale)
         assert.same(plan.Body.Health - GameCfg.Ability.BodyScale.HealthBase, plan.Attributes.PlayerMaxHealth.BaseExtra)

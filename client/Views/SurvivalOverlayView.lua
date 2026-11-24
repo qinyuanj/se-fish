@@ -1,5 +1,5 @@
 
-local GameCfg = require("common.GameCfg")
+local GameCfg = require("common.game_cfg")
 local spoke = require("common.packages.spoke.api")
 local ViewUtil = require("client.Views.ViewUtil")
 
@@ -30,7 +30,7 @@ local function send(ctx, seq, action, mode)
     return
   end
   local ok, err = pcall(function()
-    local re = require("common.REUtil"):GetRE("SurvivalAction")
+    local re = require("common.re_util"):GetRE("SurvivalAction")
     if re and type(re.FireServer) == "function" then
       re:FireServer(payload)
     end

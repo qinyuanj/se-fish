@@ -10,7 +10,7 @@
 --     server/AbilityBehaviors/melee_hit.lua 与 eel_discharge.lua 这两个公开接缝上观察，不伸手进实现；
 --   * server/main.lua 的接线守卫读源码断言：assertStrContains 的 plain 子串语义用
 --     assert.matches(needle, haystack, nil, true) 保留（`.` 在 Lua pattern 里是任意字符，不能当 pattern 跑）。
-local GameCfg = require('common.GameCfg')
+local GameCfg = require('common.game_cfg')
 
 local function signal()
     local s = { handlers = {} }

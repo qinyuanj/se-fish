@@ -1,7 +1,7 @@
 local Fixtures = require('tests.support.zone_fixtures')
 local Engine = require('tests.support.engine_double')
-local GameCfg = require('common.GameCfg')
-local ZoneMarkers = require('common.ZoneMarkers')
+local GameCfg = require('common.game_cfg')
+local ZoneMarkers = require('common.zone_markers')
 
 local function findChild(parent, name)
   return parent:FindFirstChild(name)
@@ -127,8 +127,8 @@ describe('#164 场景标记读取合同', function()
   end)
 
   it('静态配置没有区域坐标，解析后飞行兜底边界取首区', function()
-    package.loaded['common.GameCfg'] = nil
-    local bare = require('common.GameCfg')
+    package.loaded['common.game_cfg'] = nil
+    local bare = require('common.game_cfg')
     assert.is_nil(bare.Zones[1].Scene)
     assert.are.equal(0, #bare.Water.Zones)
     assert.are.equal(0, #bare.BaitSpots.Spots)

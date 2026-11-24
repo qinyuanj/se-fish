@@ -1,5 +1,5 @@
-local Model = require('common.AttrModel')
-local GameCfg = require('common.GameCfg')
+local Model = require('common.attr_model')
+local GameCfg = require('common.game_cfg')
 local M = {}
 function M.SpeedFactor(potions)
     return 1 + Model.Plan({ speedPotions = potions }).Attributes.PlayerWalkSpeed.Ratio

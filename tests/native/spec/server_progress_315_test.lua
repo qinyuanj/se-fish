@@ -1,5 +1,5 @@
-local GameCfg = require("common.GameCfg")
-local FishCatch = require("common.FishCatch")
+local GameCfg = require("common.game_cfg")
+local FishCatch = require("common.fish_catch")
 local EconomyWorld = require("tests.support.economy_world")
 
 describe("服务端图鉴、纪录与玩家进度宿主接缝（#315）", function()

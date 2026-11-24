@@ -10,7 +10,7 @@
 --   4. 扣除与发放不同步：信物扣了产物没发，或发了产物信物还在；金币被兑换改动；
 --   5. 拒绝时缺提示（reason 不是 'full'），或成功回包缺兑换双方，客户端无法给兑换提示；
 --   6. 兑换成功不播吃动作、不推送库存；未选中的信物被误当兑换物。
-local GameCfg = require('common.GameCfg')
+local GameCfg = require('common.game_cfg')
 local Host = require('tests.support.shop_feed_host')
 
 describe("喂钓鱼佬的信物兑换", function()

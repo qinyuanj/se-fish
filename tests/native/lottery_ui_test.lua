@@ -1,4 +1,4 @@
-local GameCfg = require("common.GameCfg")
+local GameCfg = require("common.game_cfg")
 local ClientWorld = require("tests.support.economy_client")
 
 describe("抽奖机界面（#312 RootView 宿主）", function()

@@ -43,7 +43,7 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
       modules = {},
     }
     for name, value in pairs(package.loaded) do
-      if name == 'common.GameCfg' or name == 'common.REUtil'
+      if name == 'common.game_cfg' or name == 'common.re_util'
           or name == 'server.Data.PlayerData' or name == 'server.PlayerDataHost'
           or name:match('^server%.WorldHost%.') then
         restore.modules[name] = value
@@ -99,7 +99,7 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
       end,
       CheckRECD = function() return false end,
     }
-    package.loaded['common.REUtil'] = reStub
+    package.loaded['common.re_util'] = reStub
     _G.REUtil = reStub
     package.loaded['server.PlayerDataHost'] = {
       GetDataInst = function(_, player) return env.data[player.UserId] end,
@@ -188,7 +188,7 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
   after_each(function()
     if env and env.runtime then env.runtime:shutdown() end
     for name in pairs(package.loaded) do
-      if name == 'common.GameCfg' or name == 'common.REUtil'
+      if name == 'common.game_cfg' or name == 'common.re_util'
           or name == 'server.Data.PlayerData' or name == 'server.PlayerDataHost'
           or name:match('^server%.WorldHost%.') then
         package.loaded[name] = nil

@@ -12,7 +12,7 @@ local Probe={Owned={}}
 local ServerRuntime=require('server.WorldHost.ServerRuntime')
 local FishTree=require('server.WorldHost.FishTree')
 local Data=require('server.PlayerDataHost')
-local Cfg=require('common.GameCfg')
+local Cfg=require('common.game_cfg')
 local function fishHost()
     local runtime=ServerRuntime.current and ServerRuntime.current()
     return (runtime and runtime.fish_host) or FishTree

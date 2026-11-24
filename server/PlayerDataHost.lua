@@ -1,6 +1,6 @@
 local PlayerData = require('server.Data.PlayerData')
-local GameCfg = require('common.GameCfg')
-local Number = require('common.Number')
+local GameCfg = require('common.game_cfg')
+local Number = require('common.number')
 local PlayerDataHost = { SpokeHost = true }
 local DataMap = {}
 

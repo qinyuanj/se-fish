@@ -1,7 +1,7 @@
 
-local GameCfg = require("common.GameCfg")
-local Number = require("common.Number")
-local DamageNotice = require("common.DamageNotice")
+local GameCfg = require("common.game_cfg")
+local Number = require("common.number")
+local DamageNotice = require("common.damage_notice")
 
 local Mgr = {}
 

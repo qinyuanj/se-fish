@@ -22,7 +22,7 @@
 -- 断言消息（同一轮提速）：以前每个「通过」的断言也拼一次 string.format 与 describe_rect，
 -- 单是 popup 用例就有数万次格式化，是文件级 2.2 s 的主要来源。现在只在失败分支里拼。
 local MainHudLayout = require('client.MainHudLayout')
-local GameCfg = require('common.GameCfg')
+local GameCfg = require('common.game_cfg')
 
 -- 三因子两两覆盖：{ 屏幕高, 道具栏格数, 是否收线 }
 --   屏高 × 格数：886/1080/1238/1440 各自都配过 2 与 8；

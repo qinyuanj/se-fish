@@ -11,7 +11,7 @@
 --
 -- 每例只替换包内 CastAbility，并在 after_each 还原 preload 与模块缓存。
 local Weapon = require('tests.support.weapon_world')
-local GameCfg = require('common.GameCfg')
+local GameCfg = require('common.game_cfg')
 local PlayerData = require('server.Data.PlayerData')
 local SwingRegistry = require('server.SwingRegistry')
 local VENDOR = 'server.packages.ability_system.api'

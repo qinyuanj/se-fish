@@ -1,6 +1,6 @@
 
-local BodyScale = require("common.BodyScale")
-local GameCfg = require("common.GameCfg")
+local BodyScale = require("common.body_scale")
+local GameCfg = require("common.game_cfg")
 local ViewUtil = require("client.Views.ViewUtil")
 
 local GroundLootView = {}

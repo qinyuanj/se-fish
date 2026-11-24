@@ -3,7 +3,7 @@ local Eui = require("tests.support.eui_double")
 local ClientStore = require("client.Store.ClientStore")
 local RootView = require("client.Views.RootView")
 local GroundLootView = require("client.Views.GroundLootView")
-local SpokeClock = require("common.SpokeClock")
+local SpokeClock = require("common.spoke_clock")
 
 local function row(id, x, z, warn)
   return { id = id, kind = "item", itemId = "tilapia", x = x, y = 0, z = z, warn = warn == true }

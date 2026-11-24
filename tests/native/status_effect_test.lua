@@ -11,7 +11,7 @@
 --   Vitals/PlayerData/Survival 以假实现注入（与 main.lua 的接线同形状）。
 -- 旧 setUp/tearDown 逐例映射为 before_each/after_each：替换的全局（game / Vector3）、模块缓存
 -- before_each 幂等。describe/it 名沿用旧类名与方法名，案例顺序沿用旧 LuaUnit 的字典序执行序。
-local GameCfg = require('common.GameCfg')
+local GameCfg = require('common.game_cfg')
 
 local function signal()
     local callbacks = {}

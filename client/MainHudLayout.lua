@@ -1,5 +1,5 @@
 -- 坐标约定与 EUI 一致：原点在左下、Y 向上；每个矩形是 { x, y, w, h }，x / y 指中心点。
-local GameCfg = require('common.GameCfg')
+local GameCfg = require('common.game_cfg')
 
 local MainHudLayout = {}
 

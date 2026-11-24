@@ -1,7 +1,7 @@
 local DamageNotice = {}
 
 function DamageNotice.Publish(payload)
-    require('common.REUtil'):GetRE('DamageNotice'):FireAllClients(payload)
+    require('common.re_util'):GetRE('DamageNotice'):FireAllClients(payload)
 end
 
 function DamageNotice.FromHealth(targetId, previous, current, position, critical, targetType, height)

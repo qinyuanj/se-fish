@@ -21,8 +21,8 @@ function M:setUp()
     self.lootSaved = true
     _G.Color = { New = function(r, g, b, a) return { r = r, g = g, b = b, a = a } end }
     -- 拾饵消费者可能已经开启调试，保留它传入的原始基线。
-    self.savedGrantDebug = self.savedGrantDebug or require('common.GameCfg').Debug
-    require('common.GameCfg').Debug = { Enabled = true, InitialGrants = self.savedGrantDebug.InitialGrants }
+    self.savedGrantDebug = self.savedGrantDebug or require('common.game_cfg').Debug
+    require('common.game_cfg').Debug = { Enabled = true, InitialGrants = self.savedGrantDebug.InitialGrants }
     FishLift.setUp(self)
     local env = self
     self.diedSubs = {}
@@ -59,7 +59,7 @@ function M:tearDown()
         -- setUp 未完成时也按已保存状态回滚，避免半成品环境遗留到下一轮。
         local ok, err = pcall(function() FishLift.tearDown(self) end)
         _G.Color = self.savedColor
-        if self.savedGrantDebug then require('common.GameCfg').Debug = self.savedGrantDebug end
+        if self.savedGrantDebug then require('common.game_cfg').Debug = self.savedGrantDebug end
         package.loaded['server.WorldHost.GroundLoot'] = self.lootModule
         self.lootSaved = nil
         if not ok then error(err, 0) end

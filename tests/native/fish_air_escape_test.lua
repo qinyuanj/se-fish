@@ -2,8 +2,8 @@
 -- 接缝：真实 MgrFishCarrier / MgrFishUnit / MgrLoot 只换引擎对象与时间——空中鱼 1 秒内不销毁、
 -- 朝最近水区直线逃脱、3 秒重定向、重复放下幂等、入水回收本体与受击体且不产鱼获、1 秒后可击杀且只掉一份。
 -- describe/it 名称保留旧类名与方法名，并按方法名字典序注册以保持旧套件执行顺序。
-local Cfg = require('common.GameCfg')
-local WaterJudge = require('common.MathWaterJudge')
+local Cfg = require('common.game_cfg')
+local WaterJudge = require('common.math_water_judge')
 
 local AIR_IDS = { 'item81', 'item83', 'item84', 'item85', 'item86',
     'item87', 'item89', 'item90', 'item91', 'item92' }
@@ -95,7 +95,7 @@ function FishAirEscape:setUp()
     self.mgr.AiTarget = require('server.WorldHost.FishAiTarget')
     self.mgr:Start()
     local ServerRuntime = require('server.WorldHost.ServerRuntime')
-    local SpokeClock = require('common.SpokeClock')
+    local SpokeClock = require('common.spoke_clock')
     self.runtime = ServerRuntime.new({
         clock = SpokeClock.new(self.now), initial_now = self.now,
         remote = { GetRE = function() return { FireAllClients = function() end, FireClient = function() end, OnServerEvent = { Connect = function() return { Disconnect = function() end } end } } end, CheckRECD = function() return false end },

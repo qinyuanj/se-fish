@@ -31,7 +31,7 @@ local function check(name, ok, detail)
 end
 local function quantity(label, value) print(string.format('K %s = %s', label, tostring(value))) end
 
-local GameCfg = require('common.GameCfg')
+local GameCfg = require('common.game_cfg')
 local EconomyWorld = require('tests.support.economy_world')
 local ITEM_BAR = GameCfg.Items.ContainerId.ItemBar
 

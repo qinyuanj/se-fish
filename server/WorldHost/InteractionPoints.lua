@@ -1,4 +1,4 @@
-local BodyScale = require("common.BodyScale")
+local BodyScale = require("common.body_scale")
 
 local InteractionPoints = { Anchors = {} }
 

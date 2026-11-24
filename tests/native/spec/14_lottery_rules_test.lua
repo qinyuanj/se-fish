@@ -8,14 +8,14 @@
 --   14-10 两同金币按投入物已确定的整数售价计算；
 --   14-13 两同金币直接入账户，不落到世界物品；
 --   14-15 三同的武器大奖进入独立武器库存，不占道具栏或背包格。
--- 权重表（common/cfg/Lottery.lua）：22/20/18/16/14/5/5，合计 100，累计边界 22、42、60、76、90、95、100。
+-- 权重表（common/cfg/lottery.lua）：22/20/18/16/14/5/5，合计 100，累计边界 22、42、60、76、90、95、100。
 -- 失败方式（先列后写）：
 --   1. 三个轴不是各抽各的，或某一轴换了权重表；
 --   2. 三同时还发两同金币，或三同大奖不对应该图案；
 --   3. 两同金币按随机倍率后的价格算，而不是已确定的整数售价；
 --   4. 无两同也发奖，或金币不直接入账户而是生成世界物品；
 --   5. 武器大奖占道具格而不是进独立武器库存。
-local GameCfg = require('common.GameCfg')
+local GameCfg = require('common.game_cfg')
 local EconomyWorld = require('tests.support.economy_world')
 
 local ITEM_BAR = GameCfg.Items.ContainerId.ItemBar

@@ -1,4 +1,4 @@
-local GameCfg = require("common.GameCfg")
+local GameCfg = require("common.game_cfg")
 local Modal = require("client.Views.EconomyModal")
 local GMView = {}
 

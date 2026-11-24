@@ -7,9 +7,9 @@
 --   4. 单向投影角色 SetScale、CameraDistance / InteractRange / BodyScaleCapped 与 character.Controller.WalkSpeed。
 -- 本模块归属 L2（server.WorldHost），零反向依赖存量旧债务模块。
 
-local BodyScale = require("common.BodyScale")
-local GameCfg = require("common.GameCfg")
-local Number = require("common.Number")
+local BodyScale = require("common.body_scale")
+local GameCfg = require("common.game_cfg")
+local Number = require("common.number")
 
 local AttrLeaf = {}
 

@@ -9,10 +9,10 @@
 --   4. 为 A2 的 modifier_system 叶子投影预留 on_mount_modifier_leaf 纯输出挂点。
 -- 本模块归属 L2（server.WorldHost），零反向依赖存量旧债务模块。
 
-local GameCfg = require("common.GameCfg")
-local AttrModel = require("common.AttrModel")
-local BodyScale = require("common.BodyScale")
-local Number = require("common.Number")
+local GameCfg = require("common.game_cfg")
+local AttrModel = require("common.attr_model")
+local BodyScale = require("common.body_scale")
+local Number = require("common.number")
 local spoke = require("common.packages.spoke.api")
 local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
 

@@ -1,5 +1,5 @@
 
-local Number = require("common.Number")
+local Number = require("common.number")
 
 local ViewUtil = {}
 

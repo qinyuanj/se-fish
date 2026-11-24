@@ -3,7 +3,7 @@ local Eui = require("tests.support.eui_double")
 local ClientStore = require("client.Store.ClientStore")
 local RootView = require("client.Views.RootView")
 local FishCombatView = require("client.Views.FishCombatView")
-local SpokeClock = require("common.SpokeClock")
+local SpokeClock = require("common.spoke_clock")
 
 local function mount()
   local clock = SpokeClock.new(10)

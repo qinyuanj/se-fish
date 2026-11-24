@@ -11,7 +11,7 @@
 -- pending flow 关联与超时兜底；跨会话防重、补发与对账归 #148，本文件不断言这些能力存在。
 -- it 名字沿用旧方法名，注册顺序 = LuaUnit sortedPairs 的实际执行顺序。
 
-local GameCfg = require('common.GameCfg')
+local GameCfg = require('common.game_cfg')
 local EconomyWorld = require('tests.support.economy_world')
 
 local globalNames = { 'game', 'REUtil', 'MgrPlayerData' }

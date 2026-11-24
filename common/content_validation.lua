@@ -1,5 +1,5 @@
 local Validate = {}
-local Ledger = require('common.cfg.ContentLedger')
+local Ledger = require('common.cfg.content_ledger')
 
 local function positive(value) return type(value) == 'number' and value > 0 end
 local function nonnegative(value) return type(value) == 'number' and value >= 0 end

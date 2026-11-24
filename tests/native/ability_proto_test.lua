@@ -1,4 +1,4 @@
--- #132 T11 原型（能力 A：三倍体型）单测。纯逻辑在 common/BodyScale.lua，数值在 GameCfg.Ability.BodyScale。
+-- #132 T11 原型（能力 A：三倍体型）单测。纯逻辑在 common/body_scale.lua，数值在 GameCfg.Ability.BodyScale。
 -- 失败方式（先列后写）：
 --   1. 药水数越界：负数 / 小数 / 非数 / 超过上限仍继续变大；上限那一档没有封顶标记；
 --   2. 倍率污染：NaN / inf / ≤0 / 非数的倍率被写进单位，派生量随之变 NaN；
@@ -17,8 +17,8 @@ describe("TestBodyScale", function()
   local Cfg, BodyScale
 
   before_each(function()
-    Cfg = require('common.GameCfg')
-    BodyScale = require('common.BodyScale')
+    Cfg = require('common.game_cfg')
+    BodyScale = require('common.body_scale')
   end)
 
   it("test_config_matches_spec_linear_growth_and_caps", function()
@@ -125,8 +125,8 @@ describe("TestBossPhase", function()
   local Cfg, Boss, BossCfg, Target
 
   before_each(function()
-    Cfg = require('common.GameCfg')
-    Boss = require('common.BossPhase')
+    Cfg = require('common.game_cfg')
+    Boss = require('common.boss_phase')
     BossCfg = Cfg.Ability.BossPhase
     Target = { x = 1, y = 0, z = 0 }
   end)
@@ -317,7 +317,7 @@ end)
 --   4. 越界携带：超出抓取距离仍能叼走；无挂点/无目标也能叼；
 --   5. 释放不干净：超时或目标出 NaN 后仍处于携带态、能重复释放、落点算不出。
 local function newCarry(cfg, host)
-  local Carry = require('common.CarryMount')
+  local Carry = require('common.carry_mount')
   return Carry, Carry.New(cfg, host or { x = 0, y = 0, z = 0 }, 0, 100)
 end
 
@@ -325,8 +325,8 @@ describe("TestCarryMount", function()
   local Cfg, Carry, CarryCfg
 
   before_each(function()
-    Cfg = require('common.GameCfg')
-    Carry = require('common.CarryMount')
+    Cfg = require('common.game_cfg')
+    Carry = require('common.carry_mount')
     CarryCfg = Cfg.Ability.Carry
   end)
 
@@ -440,7 +440,7 @@ describe("TestCarryMount", function()
     assert.near(7, turned.y, 1e-9)
     assert.near(-3, turned.z, 1e-9)
     -- 三倍体型：挂点位移随体型放大，挂件才不会陷进放大的身体
-    local BodyScale = require('common.BodyScale')
+    local BodyScale = require('common.body_scale')
     local base = { CapsuleHeight = Cfg.Ability.BodyScale.CapsuleHeight,
       SocketOffset = { x = 0, y = 2, z = 2 } }
     local one = BodyScale.Derive(1, base)
@@ -461,7 +461,7 @@ describe("TestCarryMount", function()
   end)
 end)
 
--- 能力 B：飞行与俯冲（common/FlightPath.lua）。
+-- 能力 B：飞行与俯冲（common/flight_path.lua）。
 -- 失败方式（先列后写）：
 --   1. 越界：飞过钓鱼区围栏（借飞行跨区）、超过 20 米高度上限、掉到地面以下；
 --   2. 一帧过大：dt 补算让单帧位移越过围栏（钳制被跳过）；
@@ -474,7 +474,7 @@ local function flightBounds()
 end
 
 local function newFlight(cfg, profile, start)
-  local FlightPath = require('common.FlightPath')
+  local FlightPath = require('common.flight_path')
   local state = FlightPath.New(flightBounds(), cfg, profile or {}, start or { x = 0, y = 14, z = 0 }, 100)
   return FlightPath, state
 end
@@ -483,8 +483,8 @@ describe("TestFlightPath", function()
   local Cfg, Fly, FlightCfg
 
   before_each(function()
-    Cfg = require('common.GameCfg')
-    Fly = require('common.FlightPath')
+    Cfg = require('common.game_cfg')
+    Fly = require('common.flight_path')
     FlightCfg = Cfg.Ability.Flight
   end)
 

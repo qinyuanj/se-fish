@@ -26,8 +26,8 @@ function AbilityAPI.CastAbility(unit, abilityIndex, releasePoint, releaseDir, re
     return packageCastAbility(unit, abilityIndex, releasePoint, releaseDir, releaseTarget)
 end
 
-local BodyScale = require("common.BodyScale")
-local CarryMount = require("common.CarryMount")
+local BodyScale = require("common.body_scale")
+local CarryMount = require("common.carry_mount")
 
 function AbilityAPI.SetBodyScale(unit, factor)
 	if not unit then return { Ok = false, Error = 'no-unit' } end

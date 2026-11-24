@@ -41,7 +41,7 @@ local function seed_repo()
   fs.mkdirp(FAKE_REPO)
   write_file(FAKE_REPO .. "/client/UI/a.lua", "-- 客户端 A\n")
   write_file(FAKE_REPO .. "/client/UI/sub/b.lua", "-- 客户端 B\n")
-  write_file(FAKE_REPO .. "/common/GameCfg.lua", "-- 共享配置\n")
+  write_file(FAKE_REPO .. "/common/game_cfg.lua", "-- 共享配置\n")
   write_file(FAKE_REPO .. "/server/Mgr/c.lua", "-- 服务端 C\n")
 end
 
@@ -81,7 +81,7 @@ describe("TestDeployCli", function()
     assert.matches("编辑器收尾跳过", out, 1, true) -- 临时宿主没有 eggy.json
     assert.are.equal("-- 客户端 A\n", slurp(HOST .. "/client/UI/a.lua"))
     assert.are.equal("-- 客户端 B\n", slurp(HOST .. "/client/UI/sub/b.lua"))
-    assert.are.equal("-- 共享配置\n", slurp(HOST .. "/common/GameCfg.lua"))
+    assert.are.equal("-- 共享配置\n", slurp(HOST .. "/common/game_cfg.lua"))
     assert.are.equal("-- 服务端 C\n", slurp(HOST .. "/server/Mgr/c.lua"))
     assert.is_false(exists(HOST .. "/client/UI/stale.lua"), "宿主多余文件应被 /MIR 删除")
     assert.is_false(exists(HOST .. "/client/AttrAPI.lua"), "仓库已删的端根散文件应被删除")

@@ -14,7 +14,7 @@
 -- server.packages.ability_system.api。迁移只把这份真模块在 after_each 里放回快照（含 nil），
 -- 不给 vendor 打桩、不写 package.preload，因此不会把桩泄漏给同进程的其他 spec。
 -- 加载真包 api 需要全局 game 已就位（包内 sub_ability 在加载期读 game），故 before_each 先摆引擎替身再 require。
-local GameCfg = require('common.GameCfg')
+local GameCfg = require('common.game_cfg')
 
 local function vec(x, y, z)
     return { x = x, y = y, z = z }
@@ -210,7 +210,7 @@ describe('TestFishAbilitySeams', function()
         ctx.players = { player }
         -- 50%：入水阶段（咬中 1000）
         fish.Carrier.Health, fish.Carrier.MaxHealth = 5000, 10000
-        fish.Phase = require('common.BossPhase').New(GameCfg.Ability.BossPhase, ctx.now, fish.Carrier.Body.Position)
+        fish.Phase = require('common.boss_phase').New(GameCfg.Ability.BossPhase, ctx.now, fish.Carrier.Body.Position)
         fish.PhaseAt = ctx.now
         fish.Yaw = 0
         for _ = 1, 355 do -- #38 正文沧龙式：15秒跃起，1秒预警+1.5秒腾空后咬中
@@ -236,7 +236,7 @@ describe('TestFishAbilitySeams', function()
         ctx.mgr.Fish[fish.Id] = fish
         local player = newPlayer(9, { x = 1, y = 0, z = 0 })
         ctx.players = { player }
-        local CarryMount = require('common.CarryMount')
+        local CarryMount = require('common.carry_mount')
         local cfg = GameCfg.Ability.Carry
         fish.Carry = CarryMount.New(cfg, { x = 0, y = 0, z = 0 }, 0, ctx.now)
         fish.Carry.GroundY = 2
@@ -305,7 +305,7 @@ describe('TestFishAbilitySeams', function()
         local fish = newFish(5, 'fish56Boss', { x = 0, y = 0, z = 0 })
         ctx.mgr.Fish[fish.Id] = fish
         local player = newPlayer(9, { x = 1, y = 0, z = 0 })
-        local CarryMount = require('common.CarryMount')
+        local CarryMount = require('common.carry_mount')
         fish.Carry = CarryMount.New(GameCfg.Ability.Carry, { x = 0, y = 0, z = 0 }, 0, ctx.now)
         fish.Carry.GroundY = 2
         fish.Carry.TargetPlayer = player

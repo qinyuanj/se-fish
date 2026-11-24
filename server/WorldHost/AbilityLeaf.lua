@@ -6,7 +6,7 @@
 --   4. 若管理器脚本首帧尚未就绪，依托 SpokeClock.on_frame 托管重试（随 on_cleanup 自动退订，零协程泄漏）。
 -- 本模块归属 L2（server.WorldHost），零反向依赖存量旧债务模块，零新增 CreateUnit 建点。
 
-local GameCfg = require("common.GameCfg")
+local GameCfg = require("common.game_cfg")
 
 local AbilityLeaf = {}
 

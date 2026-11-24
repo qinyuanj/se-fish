@@ -1,7 +1,7 @@
-local GameCfg = require("common.GameCfg")
+local GameCfg = require("common.game_cfg")
 local ServerRuntime = require("server.WorldHost.ServerRuntime")
-local SpokeClock = require("common.SpokeClock")
-local Ledger = require("common.cfg.ContentLedger")
+local SpokeClock = require("common.spoke_clock")
+local Ledger = require("common.cfg.content_ledger")
 local PlayerData = require("server.Data.PlayerData")
 
 local POND_RARES = {
@@ -10,7 +10,7 @@ local POND_RARES = {
 }
 
 local function selectable(rows, rodLevel, baitId)
-  local FishCatch = require("common.FishCatch")
+  local FishCatch = require("common.fish_catch")
   local total = 0
   for _, row in ipairs(rows) do
     if row.RodLevel <= rodLevel and (row.Bait == 0 or row.Bait == baitId) then total = total + row.DrawWeight end

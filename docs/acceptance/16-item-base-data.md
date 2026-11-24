@@ -16,7 +16,7 @@
 | 16-10 | 物品表中沧龙肉与沧龙头两行改名为沧龙翅与沧龙尾，售价与恢复比例保持不变 | 规则 | agent | A | unverified | — |
 | 16-11 | 鹰翅膀与三联鲨鱼头的名字统一为单一写法 | 规则 | agent | A | unverified | — |
 | 16-12 | 除上述改名与统一外，其他物品名不自行改动 | 规则 | agent | A | unverified | — |
-| 16-13 | 内容表 common/cfg/Items.lua 与物品表逐条对应：171 条的 SourceId 与源表编号一一对齐，并经 common/GameCfg.lua 投影为 GameCfg.Items 供运行期读取 | 契约 | agent | B | unverified | — |
+| 16-13 | 内容表 common/cfg/items.lua 与物品表逐条对应：171 条的 SourceId 与源表编号一一对齐，并经 common/game_cfg.lua 投影为 GameCfg.Items 供运行期读取 | 契约 | agent | B | unverified | — |
 | 16-14 | 每条的 source 字段记录源表物理行号（含表头），可回查原表 | 契约 | agent | B | unverified | — |
 | 16-15 | BasePrice 仅为回收价，不等于个体倍率后的鱼获售价 | 契约 | agent | B | unverified | — |
 | 16-16 | 无图标的物品不编造资产引用，图标字段留空而不是指向不存在的资源 | 契约 | agent | B | unverified | — |

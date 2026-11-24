@@ -14,7 +14,7 @@
 --   4. 两个人抢同一份只结算一次这条在多人连接下变成两份；
 --   5. 施救者断线后抢救照样结算，或重连后又补一次；
 --   6. 被救者恢复量不是自己的上限 10%。
-local GameCfg = require('common.GameCfg')
+local GameCfg = require('common.game_cfg')
 local Link = assert(loadfile('tests/support/local_link.lua'))()
 
 local POND = { x = 6.26, y = 5.01, z = -0.71 }

@@ -1,4 +1,4 @@
-local GameCfg = require("common.GameCfg")
+local GameCfg = require("common.game_cfg")
 local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
 local InteractionPoints = require("server.WorldHost.InteractionPoints")
 

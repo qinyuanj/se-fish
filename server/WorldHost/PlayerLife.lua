@@ -1,7 +1,7 @@
 
-local GameCfg = require("common.GameCfg")
-local Vitals = require("common.Vitals")
-local Number = require("common.Number")
+local GameCfg = require("common.game_cfg")
+local Vitals = require("common.vitals")
+local Number = require("common.number")
 local spoke = require("common.packages.spoke.api")
 local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
 

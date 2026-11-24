@@ -69,7 +69,7 @@ local function assert_no_dynamic_require(src, path)
 end
 
 local function configured_anchor_behaviors()
-  local GameCfg = require("common.GameCfg")
+  local GameCfg = require("common.game_cfg")
   local names = {}
   for _, entry in ipairs(GameCfg.Ability.InitialAbilities or {}) do
     if entry.AnchorBehavior then names[entry.AnchorBehavior] = true end

@@ -13,10 +13,10 @@
 -- 说明：describe 按旧 LuaUnit 的执行顺序登记（类名字节序、其内方法字节序），保持案例顺序一致。
 -- 随机数：烤糊倍率与伤害由服务器时刻（假 World.GetServerTime）一次算出，烤位取场景锚点而非随机点位；
 -- fencing 命名空间），不参与任何断言，因此无需固定或恢复随机数函数。
-local GameCfg = require('common.GameCfg')
-local Curve = require('common.GrillCurve')
+local GameCfg = require('common.game_cfg')
+local Curve = require('common.grill_curve')
 local PlayerData = require('server.Data.PlayerData')
-local LotteryEligibility = require('common.LotteryEligibility')
+local LotteryEligibility = require('common.lottery_eligibility')
 local ShopFeedHost = require('tests.support.shop_feed_host')
 
 local function signal()

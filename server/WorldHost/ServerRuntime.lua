@@ -8,9 +8,9 @@
 --   5. 维护同账号重进排空栅栏（leaving.waiting），防止提前读旧档或覆盖正在落盘的数据。
 -- 本模块归属 L2（server.WorldHost），零反向依赖存量旧债务模块；过渡接缝全部由 L1 入口以回调注入。
 
-local GameCfg = require("common.GameCfg")
-local Number = require("common.Number")
-local SpokeClock = require("common.SpokeClock")
+local GameCfg = require("common.game_cfg")
+local Number = require("common.number")
+local SpokeClock = require("common.spoke_clock")
 local SharedWorldTree = require("server.WorldHost.SharedWorldTree")
 local PlayerTree = require("server.WorldHost.PlayerTree")
 local AttrLeaf = require("server.WorldHost.AttrLeaf")

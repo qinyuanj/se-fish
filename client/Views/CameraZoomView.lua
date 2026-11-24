@@ -3,9 +3,9 @@
 -- 若检测到玩家或其它系统手动修改过相机距离则自动让权，角色更换或作用域清理时恢复初始距离。
 
 local spoke = require("common.packages.spoke.api")
-local BodyScale = require("common.BodyScale")
-local GameCfg = require("common.GameCfg")
-local Number = require("common.Number")
+local BodyScale = require("common.body_scale")
+local GameCfg = require("common.game_cfg")
+local Number = require("common.number")
 
 local State = spoke.State
 

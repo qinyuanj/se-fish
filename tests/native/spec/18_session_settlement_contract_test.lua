@@ -124,7 +124,7 @@ describe('条款 18 存档会话与结算身份', function()
       end,
       CheckRECD = function() return false end,
     }
-    package.loaded['common.REUtil'] = reStub
+    package.loaded['common.re_util'] = reStub
     _G.REUtil = reStub
     package.loaded['server.Data.PlayerData'] = nil
     env.PlayerData = require('server.Data.PlayerData')

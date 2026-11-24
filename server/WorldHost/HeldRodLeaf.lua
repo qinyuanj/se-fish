@@ -1,7 +1,7 @@
 -- 服务端左手持竿 / 手持外观纯输出叶子投影（ADR-0032 §3、§4 / #297-A1a）：
 -- 仅在树底消费 character 与 held_visual_item_id，经注入的 create_unit 单向创建挂点与视觉模型，
 
-local GameCfg = require("common.GameCfg")
+local GameCfg = require("common.game_cfg")
 
 local HeldRodLeaf = {}
 

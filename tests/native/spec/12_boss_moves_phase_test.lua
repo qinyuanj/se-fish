@@ -5,7 +5,7 @@
 --   1. 玩家血量（Controller.Health，所有伤害都走 MgrVitals）；
 --   2. 广播给客户端的 GarBiteNotice 预警载荷（client/LocalGarBite 消费的同一份契约）；
 --   3. 服务端权威的巡航 / 携带 / 阶段态（fish.Aquatic、fish.Carry、fish.Phase、CombatPayload）。
--- 逐招表与阶段表（common/cfg/BossMoves.lua）只做结构断言：阶段表引用的招式必须已经出现在普通招式表里
+-- 逐招表与阶段表（common/cfg/boss_moves.lua）只做结构断言：阶段表引用的招式必须已经出现在普通招式表里
 -- （12-05 不新增表外招式），阶段阈值不是招式行。
 --
 -- 失败方式（编码前列出）：
@@ -15,9 +15,9 @@
 --   4. 叼人不选离岛中心最近的玩家，或把玩家带不进真正的水域；
 --   5. 阶段阈值被普通招式循环压住：同一帧该切阶段却先放了爪击。
 
-local Cfg = require('common.GameCfg')
+local Cfg = require('common.game_cfg')
 local Islet = require('tests.support.isle_combat')
-local BossMoves = require('common.cfg.BossMoves')
+local BossMoves = require('common.cfg.boss_moves')
 
 local function need(cond, ...)
     if not cond then error(string.format(...), 2) end
@@ -108,7 +108,7 @@ describe('第 12 节 阶段与复合组（沧龙 / 哥斯拉）', function()
         assert.same(leap.Range, warning.range)
         assert.same(Cfg.Ability.Aquatic.LeapWindupSec + Cfg.Ability.Aquatic.LeapSec, warning.duration)
         assert.is_nil(warning.damage, '预警载荷带了伤害：客户端不得承担结算')
-        assert.is_true(require('common.GarBiteNotice').Valid(warning))
+        assert.is_true(require('common.gar_bite_notice').Valid(warning))
         env:advance(17.6) -- 15.0 起手 + 1.0 预警 + 1.5 滞空
         assert.same(100000 - leap.Damage.Value - 300, health(), '砸击与咬中没有各结算一次')
         assert.same(100000 - leap.Damage.Value, peer.Character.Controller.Health)
@@ -147,7 +147,7 @@ describe('第 12 节 阶段与复合组（沧龙 / 哥斯拉）', function()
         assert.same(peer, fish.Carry.TargetPlayer, '叼走的不是离岛中心最近的玩家')
         assert.same(100000, health(), '没有目标资格的岸边玩家被错伤')
         assert.same(100000 - 35 - 300, peer.Character.Controller.Health)
-        local MathWater = require('common.MathWaterJudge')
+        local MathWater = require('common.math_water_judge')
         env:advance(30)
         assert.is_not_nil(MathWater.HitZone(Cfg.Water.Zones, peer.Character.Position),
             '被叼走的玩家没有进入水域')

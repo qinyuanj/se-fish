@@ -9,7 +9,7 @@
 --   MgrPlatform（#123 持久操作协议），替换引擎边界（game / REUtil / DataStore / 时钟）；
 -- 迁移说明：引擎边界夹具下沉到 tests/support/blindbox_world.lua（调用方各自实例化，
 --   互不共享状态）；案例按旧 LuaUnit 实际执行序（方法名字典序）逐个 it 注册。
-local GameCfg = require("common.GameCfg")
+local GameCfg = require("common.game_cfg")
 local BlindboxWorld = require("tests.support.blindbox_world")
 local RandomGuard = require("tests.support.random_guard")
 
@@ -130,7 +130,7 @@ describe("盲盒服务端结算（ServerRuntime × MgrSave × MgrPlatform）", f
 
   it("test_loot_delivery_key_remains_consumed_after_entity_disappears", function()
     local ServerRuntime = require("server.WorldHost.ServerRuntime")
-    local SpokeClock = require("common.SpokeClock")
+    local SpokeClock = require("common.spoke_clock")
     local clock = SpokeClock.new(1)
     local runtime = ServerRuntime.new({
       clock = clock, initial_now = 1,

@@ -2,7 +2,7 @@ local Eui = require("tests.support.eui_double")
 local ClientStore = require("client.Store.ClientStore")
 local RootView = require("client.Views.RootView")
 local ReelOverlayView = require("client.Views.ReelOverlayView")
-local SpokeClock = require("common.SpokeClock")
+local SpokeClock = require("common.spoke_clock")
 
 local Host = {}
 function Host.new()

@@ -1,4 +1,4 @@
-local GameCfg=require('common.GameCfg')
+local GameCfg=require('common.game_cfg')
 local Mgr={RetryAt={},Busy={}}
 
 local function positiveId(value)

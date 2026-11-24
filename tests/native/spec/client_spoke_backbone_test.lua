@@ -577,9 +577,9 @@ describe("客户端 Spoke 主干契约（#296）", function()
 
     it("client/main.lua 在宿主测试双下真实装配只读 ClientSpoke、绑定事件传感并挂载 RootView", function()
       local stub_modules = {
-        "common.ZoneMarkers",
-        "common.REUtil",
-        "common.Util",
+        "common.zone_markers",
+        "common.re_util",
+        "common.util",
         "client.GameUI",
         "client.LocalMgrUtil",
         "client.LocalMotorUnitCtrl",
@@ -628,8 +628,8 @@ describe("客户端 Spoke 主干契约（#296）", function()
       local ok, err = pcall(function()
         _G.Vector2 = { New = function(x, y) return { x = x, y = y } end }
         _G.Color = { New = function(...) return { ... } end }
-        package.loaded["common.ZoneMarkers"] = { Start = noop, Zones = zones }
-        package.loaded["common.REUtil"] = {
+        package.loaded["common.zone_markers"] = { Start = noop, Zones = zones }
+        package.loaded["common.re_util"] = {
           GetRE = function(_, name)
             if not remote_events[name] then
               remote_events[name] = {
@@ -652,7 +652,7 @@ describe("客户端 Spoke 主干契约（#296）", function()
         package.loaded["client.GameUI"] = game_ui_stub
         _G.GameUI = game_ui_stub
         package.loaded["client.packages.ability_system.api"] = { StartClientLifecycle = noop }
-        package.loaded["common.Util"] = nil
+        package.loaded["common.util"] = nil
         for _, name in ipairs({
           "client.LocalMgrUtil", "client.LocalMotorUnitCtrl",
           "client.LocalLoot",

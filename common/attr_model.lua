@@ -1,5 +1,5 @@
-local GameCfg = require('common.GameCfg')
-local BodyScale = require('common.BodyScale')
+local GameCfg = require('common.game_cfg')
+local BodyScale = require('common.body_scale')
 local M = {}
 local function finite(value)
     return type(value) == 'number' and value == value and math.abs(value) < math.huge

@@ -8,8 +8,8 @@
 -- 与离场终镜像 Reaction（session_alive=false 时同步写回完整镜像，包括 weakRemaining）。
 -- 本模块归属 L2（server.WorldHost），零反向依赖存量旧债务模块。
 
-local GameCfg = require("common.GameCfg")
-local Number = require("common.Number")
+local GameCfg = require("common.game_cfg")
+local Number = require("common.number")
 local spoke = require("common.packages.spoke.api")
 local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
 local PlayerEffects = require("server.WorldHost.PlayerEffects")

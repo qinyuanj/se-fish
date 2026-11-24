@@ -6,8 +6,8 @@
 --      同样遵循 removeMode = 0 与业务时钟主权，供淘汰 MgrModifier 时无缝承接活鱼受击。
 -- 本模块归属 L2（server.WorldHost），零反向依赖存量旧债务模块。
 
-local GameCfg = require("common.GameCfg")
-local Number = require("common.Number")
+local GameCfg = require("common.game_cfg")
+local Number = require("common.number")
 
 local ModifierLeaf = {}
 

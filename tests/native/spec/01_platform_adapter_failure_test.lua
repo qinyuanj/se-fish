@@ -8,7 +8,7 @@
 --   2. 拒绝或超时后照常发放商品（「不发放」被破坏）；
 --   3. 拒绝或超时后玩家金币被扣（「不扣费」被破坏）；
 --   4. 适配层不可用时仍建立 flow 或发放权益（把不可用伪装成成功）。
-local GameCfg = require('common.GameCfg')
+local GameCfg = require('common.game_cfg')
 local EconomyWorld = require('tests.support.economy_world')
 
 -- 前提守卫：本文件复现的是 main.lua 的接线，而不是自造一套协作关系。

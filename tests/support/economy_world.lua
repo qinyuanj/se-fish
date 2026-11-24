@@ -1,4 +1,4 @@
-local GameCfg = require("common.GameCfg")
+local GameCfg = require("common.game_cfg")
 
 local M = {}
 local World = {}
@@ -137,7 +137,7 @@ function M.new()
   env.platform.Now = function() return env.now end
 
   local ServerRuntime = require("server.WorldHost.ServerRuntime")
-  local SpokeClock = require("common.SpokeClock")
+  local SpokeClock = require("common.spoke_clock")
   env.ServerRuntime = ServerRuntime
   env.runtime = ServerRuntime.new({
     clock = SpokeClock.new(env.now),

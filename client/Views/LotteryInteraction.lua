@@ -1,5 +1,5 @@
-local GameCfg = require("common.GameCfg")
-local BodyScale = require("common.BodyScale")
+local GameCfg = require("common.game_cfg")
+local BodyScale = require("common.body_scale")
 local Modal = require("client.Views.EconomyModal")
 local ViewUtil = require("client.Views.ViewUtil")
 

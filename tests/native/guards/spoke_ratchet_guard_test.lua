@@ -1,6 +1,6 @@
 -- Spoke 原生重构机械棘轮守卫（#294 / ADR-0032 §4、§5）：
 -- 失败方式先列：
---   1. 新 Spoke 命名空间（common.SpokeClock、server.WorldHost.*、client.Store.*、client.Views.*）
+--   1. 新 Spoke 命名空间（common.spoke_clock、server.WorldHost.*、client.Store.*、client.Views.*）
 --      反向 require 存量旧债务模块（server.Mgr.*、server.AbilityAPI、server.AbilityBehaviors.*、
 --      client.MgrGameUI、client.ScreenHandlers.*、client.Local*、common.OwnedUnits）→ 破坏单向棘轮；
 --   2. 就地修改 common/packages/spoke/ 或 common/packages/spoke_eggy/ 或与 docs/packages-reference.md
@@ -111,7 +111,7 @@ local function is_legacy_debt_file(path)
 end
 
 local function is_spoke_namespace_file(path)
-  return path == "common/SpokeClock.lua"
+  return path == "common/spoke_clock.lua"
     or path:match("^server/WorldHost/") ~= nil
     or path:match("^client/Store/") ~= nil
     or path:match("^client/Views/") ~= nil
@@ -308,8 +308,8 @@ describe("Spoke 原生重构机械棘轮守卫", function()
     it("分层门禁正确分类新 Spoke 命名空间并拦截一切对旧债务的反向依赖", function()
       local valid = Arch.check(Arch.policy, {
         modules = {
-          "common.SpokeClock",
-          "common.GameCfg",
+          "common.spoke_clock",
+          "common.game_cfg",
           "common.packages.spoke.api",
           "server.Data.PlayerData",
           "server.WorldHost.PlayerTree",
@@ -320,11 +320,11 @@ describe("Spoke 原生重构机械棘轮守卫", function()
           "server.AbilityAPI",
         },
         edges = {
-          { from = "common.SpokeClock", to = "common.packages.spoke.api" },
-          { from = "server.WorldHost.PlayerTree", to = "common.SpokeClock" },
+          { from = "common.spoke_clock", to = "common.packages.spoke.api" },
+          { from = "server.WorldHost.PlayerTree", to = "common.spoke_clock" },
           { from = "server.WorldHost.PlayerTree", to = "server.Data.PlayerData" },
           { from = "server.AbilityBehaviors.melee_hit", to = "server.WorldHost.PlayerTree" },
-          { from = "client.Store.ClientStore", to = "common.SpokeClock" },
+          { from = "client.Store.ClientStore", to = "common.spoke_clock" },
           { from = "client.Views.RootView", to = "client.Store.ClientStore" },
           { from = "client.Views.RootView", to = "client.GameUI" },
           { from = "server.AbilityAPI", to = "server.WorldHost.PlayerTree" },
@@ -340,7 +340,7 @@ describe("Spoke 原生重构机械棘轮守卫", function()
         { from = "client.Views.RootView", to = "client.ScreenHandlers.ScreenMain" },
         { from = "client.Views.ReelOverlayView", to = "client.LocalMotorUnitCtrl" },
         { from = "client.Views.RootView", to = "common.OwnedUnits" },
-        { from = "common.SpokeClock", to = "common.OwnedUnits" },
+        { from = "common.spoke_clock", to = "common.OwnedUnits" },
       }
       for _, edge in ipairs(invalid_edges) do
         local result = Arch.check(Arch.policy, {

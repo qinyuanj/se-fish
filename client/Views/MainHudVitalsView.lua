@@ -3,8 +3,8 @@
 -- 负责血量环（'血 '）、饥饿环（'饥饿度 '）、4 条饥饿闪烁红边与编辑器预置金币节点（ImageCoin/LabelCoin）排版。
 
 local spoke = require("common.packages.spoke.api")
-local GameCfg = require("common.GameCfg")
-local Number = require("common.Number")
+local GameCfg = require("common.game_cfg")
+local Number = require("common.number")
 local MainHudLayout = require("client.MainHudLayout")
 local ViewUtil = require("client.Views.ViewUtil")
 

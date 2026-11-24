@@ -1,6 +1,6 @@
 local spoke = require("common.packages.spoke.api")
 local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
-local Number = require("common.Number")
+local Number = require("common.number")
 
 local State = spoke.State
 local Trigger = spoke.Trigger

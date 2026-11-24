@@ -1,4 +1,4 @@
-local GameCfg = require('common.GameCfg')
+local GameCfg = require('common.game_cfg')
 local PlayerData = require('server.Data.PlayerData')
 local SaveHost = { SpokeHost = true, Ledger = {}, Pending = {}, Flying = {}, Sessions = {}, Waiters = {}, NextAutosaveAt = nil }
 local function cfg() return GameCfg.Save end

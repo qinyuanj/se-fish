@@ -1,5 +1,5 @@
-local GameCfg = require('common.GameCfg')
-local Policy = require('common.AiTargetPolicy')
+local GameCfg = require('common.game_cfg')
+local Policy = require('common.ai_target_policy')
 
 local Mgr = { Policy = Policy }
 local AiAPI, Runtime

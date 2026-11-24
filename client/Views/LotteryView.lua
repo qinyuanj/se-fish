@@ -1,5 +1,5 @@
-local GameCfg = require("common.GameCfg")
-local Eligibility = require("common.LotteryEligibility")
+local GameCfg = require("common.game_cfg")
+local Eligibility = require("common.lottery_eligibility")
 local Modal = require("client.Views.EconomyModal")
 
 local LotteryView = {}

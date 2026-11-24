@@ -38,7 +38,7 @@ describe('TestAttrPresentation', function()
 
     -- 交互半径按体型派生缩放，非法属性回落基础半径
     it('test_interaction_radius_scales_and_falls_back_for_invalid_attributes', function()
-        local body = require('common.BodyScale')
+        local body = require('common.body_scale')
         local value = body.Derive(3).InteractRange
         local character = { GetAttribute = function() return value end }
         assert.same(12, body.InteractionRadius(character, 4))
@@ -53,7 +53,7 @@ describe('TestAttrPresentation', function()
         local mgr = require('server.WorldHost.InteractionPoints')
         local anchor = { Position = { x = 0, z = 0 } }
         mgr.FindAnchor = function() return anchor end
-        local value = require('common.BodyScale').Derive(3).InteractRange
+        local value = require('common.body_scale').Derive(3).InteractRange
         local character = { Position = { x = 12.5, z = 0 }, GetAttribute = function() return value end }
         local p = { Character = character }
         local point = { AnchorName = 'test', Radius = 4, Slack = 0.5 }

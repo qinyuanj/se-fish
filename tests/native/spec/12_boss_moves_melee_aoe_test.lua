@@ -11,10 +11,10 @@
 --   3. 头部区判定失效（绕后仍咬中）/ 表外招式被排进循环；
 --   4. 活动 15 / 30 秒后的眩晕窗口被抬后或不生效。
 
-local Cfg = require('common.GameCfg')
+local Cfg = require('common.game_cfg')
 local Islet = require('tests.support.isle_combat')
-local BossMoves = require('common.cfg.BossMoves')
-local GarBiteNotice = require('common.GarBiteNotice')
+local BossMoves = require('common.cfg.boss_moves')
+local GarBiteNotice = require('common.gar_bite_notice')
 
 local function need(cond, fmt, ...)
     if not cond then error(string.format(fmt, ...), 2) end

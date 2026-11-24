@@ -1,6 +1,6 @@
 --
-local GameCfg = require('common.GameCfg')
-local SpokeClock = require('common.SpokeClock')
+local GameCfg = require('common.game_cfg')
+local SpokeClock = require('common.spoke_clock')
 local spoke = require('common.packages.spoke.api')
 local PlayerData = require('server.Data.PlayerData')
 local SwingRegistry = require('server.SwingRegistry')

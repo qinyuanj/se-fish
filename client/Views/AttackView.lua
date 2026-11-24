@@ -1,5 +1,5 @@
 
-local GameCfg = require("common.GameCfg")
+local GameCfg = require("common.game_cfg")
 local PressGesture = require("client.PressGesture")
 local spoke = require("common.packages.spoke.api")
 local MainHudLayout = require("client.MainHudLayout")

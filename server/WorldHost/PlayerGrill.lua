@@ -1,7 +1,7 @@
 
-local GameCfg = require("common.GameCfg")
-local BodyScale = require("common.BodyScale")
-local GrillCurve = require("common.GrillCurve")
+local GameCfg = require("common.game_cfg")
+local BodyScale = require("common.body_scale")
+local GrillCurve = require("common.grill_curve")
 local spoke = require("common.packages.spoke.api")
 local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
 

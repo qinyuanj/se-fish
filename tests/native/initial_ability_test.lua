@@ -1,6 +1,6 @@
 -- 失败方式：非策划的加速示例重新进入初始技能，或攻击被绑定到数组下标而随技能删除错位。
 
-local GameCfg = require("common.GameCfg")
+local GameCfg = require("common.game_cfg")
 
 describe("初始技能", function()
   it("只装备挥砍攻击，不装配加速示例", function()

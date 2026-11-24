@@ -6,7 +6,7 @@
 --   1. 鱼本体血量（Carrier.Health / MaxHealth，玩家打得到的那条血）；
 --   2. 玩家血量（Controller.Health，所有伤害都走 MgrVitals）；
 --   3. 广播给客户端的 GarBiteNotice 预警载荷（client/LocalGarBite 消费的同一份契约）。
--- 服务端招式台账 fish.Phase.AttackLog 由 common/BossPhase.lua 公开维护（探针与台账取「攻击序列」的
+-- 服务端招式台账 fish.Phase.AttackLog 由 common/boss_phase.lua 公开维护（探针与台账取「攻击序列」的
 -- 同一入口），这里用它断言冷却调度，不碰任何内部字段。
 --
 -- 失败方式（编码前列出）：
@@ -15,9 +15,9 @@
 --   3. 吐息不再秒杀，或跺脚伤害 / 范围与表不符；
 --   4. 阶段阈值被普通招式循环压住（该入水时还在出爪击）。
 
-local Cfg = require('common.GameCfg')
+local Cfg = require('common.game_cfg')
 local Islet = require('tests.support.isle_combat')
-local BossMoves = require('common.cfg.BossMoves')
+local BossMoves = require('common.cfg.boss_moves')
 
 -- 循环里的断言只在失败时拼消息（断言参数里的字符串每个通过的断言都要付一次）。
 local function need(cond, ...)
@@ -148,7 +148,7 @@ describe('第 12 节 首领逐招表（哥斯拉）', function()
         stand(fish, 2) -- 爪击 4 米内、甩尾 5 米内
         env:advance(29.9)
 
-        -- 同一帧只落地一个招式（common/BossPhase.lua 的确定性契约）：跺脚 0.8 秒起手期间
+        -- 同一帧只落地一个招式（common/boss_phase.lua 的确定性契约）：跺脚 0.8 秒起手期间
         -- 爪击会被挤到起手结束后的第一帧，所以节拍允许被另一招起手推迟一拍，但不能更久。
         local claw = landed(fish, 'claw')
         assert.truthy(#claw >= 11, '爪击没有按 2 秒节拍落地')
@@ -203,7 +203,7 @@ describe('第 12 节 首领逐招表（哥斯拉）', function()
         assert.same(2, warning.width)
         assert.same(1.5, warning.duration)
         -- 客户端的合法性门禁必须接受这份载荷（LocalGarBite 只画合法的预警）
-        assert.is_true(require('common.GarBiteNotice').Valid(warning))
+        assert.is_true(require('common.gar_bite_notice').Valid(warning))
     end)
 
     it('条款 12-43：血量低于 60% 入水，切换沧龙式攻击，咬中 1000', function()
@@ -273,6 +273,6 @@ describe('第 12 节 首领逐招表（哥斯拉）', function()
         assert.same(row.Warning.Kind, warning.shape)
         assert.same(row.Warning.WindupSec, warning.duration)
         assert.same(row.Range, warning.range)
-        assert.is_true(require('common.GarBiteNotice').Valid(warning))
+        assert.is_true(require('common.gar_bite_notice').Valid(warning))
     end)
 end)

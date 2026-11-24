@@ -1,16 +1,16 @@
 -- 原生 Busted（#87 迁移自 tests/gameplay/lottery_draw_test.lua 的 TestLotteryDraw）。
--- #138 T17 抽奖机纯逻辑（common/LotteryDraw）失败方式先列：
+-- #138 T17 抽奖机纯逻辑（common/lottery_draw）失败方式先列：
 --   1. 权重表错位：单轴抽样区间与原表 22/20/18/16/14/5/5 不符（含边界值落错图案）；
 --   2. 三轴不独立：一次抽样复用给三轴，或三轴共用同一 RNG 序列段；
 --   3. 两同倍数错位：用了别图案的倍数，或「恰两同」判成「至少两同」（三同也发金币）；
 --   4. 三同不优先：三同被两同分支抢走大奖；
 --   5. 武器组五选一的组内随机越界或拿错组；
 --   6. 静态期望漂移：权重/倍数改动后两同金币期望偏离原表 2.119671。
--- seam：common.LotteryDraw 的 RollAxis / RollAxes / Evaluate / ChooseWeapon，注入确定性 RNG（系统边界：随机数）。
+-- seam：common.lottery_draw 的 RollAxis / RollAxes / Evaluate / ChooseWeapon，注入确定性 RNG（系统边界：随机数）。
 -- 迁移说明：案例按旧 LuaUnit 实际执行序（方法名字典序）逐个 it 注册；
 --   唯一的 assertAlmostEquals(实际, 期望, 容差) 映射为 assert.near(期望, 实际, 容差)。
-local GameCfg = require("common.GameCfg")
-local Draw = require("common.LotteryDraw")
+local GameCfg = require("common.game_cfg")
+local Draw = require("common.lottery_draw")
 local RandomGuard = require("tests.support.random_guard")
 
 -- 逐项钉表（原表「渔力全开--抽奖表.xlsx」R3..R9）：权重与两同倍数是独立真源字面量
@@ -24,7 +24,7 @@ local EXPECTED = {
   { name = "哥斯拉", weight = 5, pairMultiplier = 20 },
 }
 
-describe("抽奖机纯逻辑（common/LotteryDraw）", function()
+describe("抽奖机纯逻辑（common/lottery_draw）", function()
   -- 随机数全部经参数注入；逐案例还原全局 math.random，杜绝替换泄漏。
   after_each(RandomGuard.restore)
 

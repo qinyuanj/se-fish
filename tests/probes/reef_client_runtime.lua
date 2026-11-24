@@ -5,7 +5,7 @@
 if _G.Reef37ClientConns then
     for _,conn in ipairs(_G.Reef37ClientConns) do conn:Disconnect() end
 end
-local re=require('common.REUtil')
+local re=require('common.re_util')
 _G.Reef37ClientConns={
     re:GetRE('GarBiteNotice').OnClientEvent:Connect(function(p)
         if p.move=='airThrow' or p.move=='airDive' or (type(p.fishId)=='number' and p.fishId<0) then

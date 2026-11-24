@@ -14,11 +14,11 @@
 -- 动画表现都必须在编辑器窗口里验证（见 issue #132 的待办清单）。探针不连接编辑器。
 package.path = table.concat({ "./?.lua", "./?/init.lua", package.path }, ";")
 
-local GameCfg = require('common.GameCfg')
-local BodyScale = require('common.BodyScale')
-local FlightPath = require('common.FlightPath')
-local CarryMount = require('common.CarryMount')
-local BossPhase = require('common.BossPhase')
+local GameCfg = require('common.game_cfg')
+local BodyScale = require('common.body_scale')
+local FlightPath = require('common.flight_path')
+local CarryMount = require('common.carry_mount')
+local BossPhase = require('common.boss_phase')
 
 local Pass, Fail = 0, 0
 local function check(name, ok, detail)

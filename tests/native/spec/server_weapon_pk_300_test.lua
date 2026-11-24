@@ -1,5 +1,5 @@
 
-local GameCfg = require("common.GameCfg")
+local GameCfg = require("common.game_cfg")
 local ServerRuntime = require("server.WorldHost.ServerRuntime")
 local SwingRegistry = require("server.SwingRegistry")
 
@@ -164,7 +164,7 @@ describe("武器攻击换弹与 PK 过滤宿主接缝（#300）", function()
           return 0
         end,
       },
-      zone_markers = require("common.ZoneMarkers"),
+      zone_markers = require("common.zone_markers"),
       bind_party_action = function(dispatch)
         events.PartyAction.OnServerEvent:Connect(function(actor, payload) dispatch(actor, payload) end)
       end,

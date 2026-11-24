@@ -12,7 +12,7 @@
 --   8. 满血复活后带虚弱、血量不是上限、饥饿低于 10%（11-21、11-22）；
 --   9. 占位成功当成平台结论（发真实权益 / 真实信号被当成已支付）（11-37、11-38）。
 local function vec(x, y, z) return { x = x, y = y, z = z } end
-local GameCfg = require('common.GameCfg')
+local GameCfg = require('common.game_cfg')
 
 local WIRING = {
   'platform = PlatformHost',
@@ -170,7 +170,7 @@ describe('条款 11 广告满血复活（占位广告位）', function()
       placeholderAd = GameCfg.Platform.Placeholder.Ads.revive,
       game = rawget(_G, 'game'), Vector3 = rawget(_G, 'Vector3'),
       Vector2 = rawget(_G, 'Vector2'), Color = rawget(_G, 'Color'),
-      REUtil = rawget(_G, 'REUtil'), reutil = package.loaded['common.REUtil'] }
+      REUtil = rawget(_G, 'REUtil'), reutil = package.loaded['common.re_util'] }
     env.cfg.Debug = { Enabled = true }
     env.cfg.Save.QaSlot = ''
     env.cfg.Platform.Placeholder.Enabled = true
@@ -216,7 +216,7 @@ describe('条款 11 广告满血复活（占位广告位）', function()
       return env.re[name]
     end
     local re = { GetRE = function(_, name) return reStub(name) end, CheckRECD = function() return false end }
-    package.loaded['common.REUtil'] = re
+    package.loaded['common.re_util'] = re
     _G.REUtil = re
 
     package.loaded['server.Data.PlayerData'] = nil
@@ -250,7 +250,7 @@ describe('条款 11 广告满血复活（占位广告位）', function()
     _G.Vector2 = saved.Vector2
     _G.Color = saved.Color
     _G.REUtil = saved.REUtil
-    package.loaded['common.REUtil'] = saved.reutil
+    package.loaded['common.re_util'] = saved.reutil
     env = nil
   end)
 
@@ -597,7 +597,7 @@ describe('条款 11 广告复活入口（客户端）', function()
     ctx = { now = 1000, nodes = {}, requests = {}, events = {}, notices = {},
       heartbeats = signal(), saved = {
         game = rawget(_G, 'game'), Vector2 = rawget(_G, 'Vector2'), Color = rawget(_G, 'Color'),
-        LocalMsgNotice = rawget(_G, 'LocalMsgNotice'), reutil = package.loaded['common.REUtil'] } }
+        LocalMsgNotice = rawget(_G, 'LocalMsgNotice'), reutil = package.loaded['common.re_util'] } }
     local env = ctx
     _G.LocalMsgNotice = function(msg) env.notices[#env.notices + 1] = msg end
     _G.Vector2 = { New = function(x, y) return { x = x, y = y } end }
@@ -648,7 +648,7 @@ describe('条款 11 广告复活入口（客户端）', function()
   after_each(function()
     if not ctx then return end
     local saved = ctx.saved
-    package.loaded['common.REUtil'] = saved.reutil
+    package.loaded['common.re_util'] = saved.reutil
     _G.game = saved.game
     _G.Vector2 = saved.Vector2
     _G.Color = saved.Color

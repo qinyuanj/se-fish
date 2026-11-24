@@ -2,7 +2,7 @@
 -- editor-cli exec -p server --file <本文件绝对路径> --json；随后运行 platform_client.lua。
 -- 不预置保底计数、不清库存；模拟成功单抽会正常发奖并推进持久计数，按真实权重 RNG 抽样。
 -- flow 失败/成功走公开 HandleTestAction；超时由单测/feature 脚本化时钟覆盖。
-local cfg = require('common.GameCfg')
+local cfg = require('common.game_cfg')
 local platform = require('server.PlatformHost')
 local players = require('server.PlayerDataHost')
 local save = require('server.SaveHost')

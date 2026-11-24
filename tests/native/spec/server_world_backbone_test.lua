@@ -8,8 +8,8 @@
 --   6. 同账号重进期间排空栅栏未阻塞，导致提前读旧档或覆盖正在落盘的数据；
 --   7. 单棵 PlayerTree 抛未捕获异常波及其他 PlayerTree 或 SharedWorldTree，或已 dispose 树仍响应事件。
 
-local GameCfg = require("common.GameCfg")
-local SpokeClock = require("common.SpokeClock")
+local GameCfg = require("common.game_cfg")
+local SpokeClock = require("common.spoke_clock")
 local spoke = require("common.packages.spoke.api")
 local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
 local LambdaEpoch = spoke.LambdaEpoch
@@ -824,7 +824,7 @@ describe("服务端入口接线：server/main.lua 宿主测试双端到端集成
     saved = {
       game = rawget(_G, "game"),
       REUtil = rawget(_G, "REUtil"),
-      reutil = package.loaded["common.REUtil"],
+      reutil = package.loaded["common.re_util"],
       MgrUtil = rawget(_G, "MgrUtil"),
       MgrPlayerData = rawget(_G, "MgrPlayerData"),
       Vector3 = rawget(_G, "Vector3"),
@@ -850,7 +850,7 @@ describe("服务端入口接线：server/main.lua 宿主测试双端到端集成
     end
     _G.game = saved.game
     _G.REUtil = saved.REUtil
-    package.loaded["common.REUtil"] = saved.reutil
+    package.loaded["common.re_util"] = saved.reutil
     _G.MgrUtil = saved.MgrUtil
     _G.MgrPlayerData = saved.MgrPlayerData
     _G.Vector3 = saved.Vector3
@@ -948,7 +948,7 @@ describe("服务端入口接线：server/main.lua 宿主测试双端到端集成
     mgrs.PlatformHost = {}
     mgrs.FishAbility = { Start = function() end, Update = function() end }
     _G.REUtil = remote_util
-    package.loaded["common.REUtil"] = remote_util
+    package.loaded["common.re_util"] = remote_util
 
     local sandbox = setmetatable({
       print = function(...)
@@ -958,9 +958,9 @@ describe("服务端入口接线：server/main.lua 宿主测试双端到端集成
         end
       end,
       require = function(path)
-        if path == "common.REUtil" then return remote_util end
+        if path == "common.re_util" then return remote_util end
         if path == "server.MgrUtil" then return { Start = function() end } end
-        if path == "common.ZoneMarkers" then return { Start = function() end } end
+        if path == "common.zone_markers" then return { Start = function() end } end
         if path == "server.packages.attr_rule.api" then return attr_api_stub end
         if path == "server.packages.modifier_system.api" then return modifier_api_stub end
         if path == "server.packages.ability_system.api" then return ability_api_stub end

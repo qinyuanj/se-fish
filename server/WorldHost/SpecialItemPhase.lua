@@ -1,8 +1,8 @@
 
-local GameCfg = require("common.GameCfg")
-local FlightPath = require("common.FlightPath")
-local Number = require("common.Number")
-local SpecialItem = require("common.SpecialItem")
+local GameCfg = require("common.game_cfg")
+local FlightPath = require("common.flight_path")
+local Number = require("common.number")
+local SpecialItem = require("common.special_item")
 local State = require("common.packages.spoke.api").State
 
 local SpecialItemPhase = {}

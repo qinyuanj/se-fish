@@ -3,7 +3,7 @@
 -- （地面物品、鱼饵刷新点、摆渡航线 Dock）与全局小队 SquadDock。
 -- 本模块归属 L2（server.WorldHost），零反向依赖存量旧债务模块。
 
-local GameCfg = require("common.GameCfg")
+local GameCfg = require("common.game_cfg")
 local spoke = require("common.packages.spoke.api")
 local GroundLoot = require("server.WorldHost.GroundLoot")
 local FerryRoute = require("server.WorldHost.FerryRoute")

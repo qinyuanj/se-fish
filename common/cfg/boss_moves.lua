@@ -219,7 +219,7 @@ for _, row in ipairs(M.Rows) do
         fish = {}
         M.Index[row.Fish] = fish
     end
-    assert(fish[row.Move] == nil, 'common/cfg/BossMoves.lua: 重复的一招一行 ' .. row.Fish .. '.' .. row.Move)
+    assert(fish[row.Move] == nil, 'common/cfg/boss_moves.lua: 重复的一招一行 ' .. row.Fish .. '.' .. row.Move)
     fish[row.Move] = row
 end
 
@@ -227,13 +227,13 @@ for fishKey, boss in pairs(M.Phases) do
     for _, set in pairs(boss.AttackSets) do
         for _, move in ipairs(set) do
             assert(M.Index[fishKey] and M.Index[fishKey][move] ~= nil,
-                'common/cfg/BossMoves.lua: 阶段表引用了表外招式 ' .. fishKey .. '.' .. move)
+                'common/cfg/boss_moves.lua: 阶段表引用了表外招式 ' .. fishKey .. '.' .. move)
         end
     end
     for _, threshold in ipairs(boss.Thresholds) do
         if threshold.Move then
             assert(M.Index[fishKey] and M.Index[fishKey][threshold.Move] ~= nil,
-                'common/cfg/BossMoves.lua: 阶段阈值引用了表外招式 ' .. fishKey .. '.' .. threshold.Move)
+                'common/cfg/boss_moves.lua: 阶段阈值引用了表外招式 ' .. fishKey .. '.' .. threshold.Move)
         end
     end
 end

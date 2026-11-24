@@ -7,9 +7,9 @@
 --   5. AbilityLeaf 在角色更换/树销毁时未停止技能并销毁管理器，或延迟就绪重试在角色销毁后仍泄漏执行；
 --   6. AbilityLeaf 未按 PlayerTree.memos.can_act 拦截施法，或无法兼容真机 userdata（newproxy）对象。
 
-local GameCfg = require("common.GameCfg")
-local BodyScale = require("common.BodyScale")
-local SpokeClock = require("common.SpokeClock")
+local GameCfg = require("common.game_cfg")
+local BodyScale = require("common.body_scale")
+local SpokeClock = require("common.spoke_clock")
 local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
 local PlayerTree = require("server.WorldHost.PlayerTree")
 local PlayerEffects = require("server.WorldHost.PlayerEffects")

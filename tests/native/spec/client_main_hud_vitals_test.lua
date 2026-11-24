@@ -6,7 +6,7 @@
 --   4. 重连重置或根 UI 销毁后遗留动态状态区节点，或误销毁编辑器预置节点 ImageCoin / LabelCoin。
 
 local Eui = require("tests.support.eui_double")
-local GameCfg = require("common.GameCfg")
+local GameCfg = require("common.game_cfg")
 local MainHudLayout = require("client.MainHudLayout")
 local ClientStore = require("client.Store.ClientStore")
 local RootView = require("client.Views.RootView")

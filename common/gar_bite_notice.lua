@@ -29,7 +29,7 @@ function GarBiteNotice.Valid(payload)
 end
 
 function GarBiteNotice.Publish(payload)
-    require('common.REUtil'):GetRE(GarBiteNotice.EventName):FireAllClients(payload)
+    require('common.re_util'):GetRE(GarBiteNotice.EventName):FireAllClients(payload)
 end
 
 return GarBiteNotice

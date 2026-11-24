@@ -2,7 +2,7 @@ local Util = {}
 local Task = game:GetService("Task")
 local RunService = game:GetService("RunService")
 local World = game:GetService("World")
-local REUtil = require("common.REUtil")
+local REUtil = require("common.re_util")
 
 function Util:WaitForChild(rootObj, childName, waitTime)
 	if not rootObj then

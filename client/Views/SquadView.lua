@@ -1,5 +1,5 @@
 
-local GameCfg = require("common.GameCfg")
+local GameCfg = require("common.game_cfg")
 local ViewUtil = require("client.Views.ViewUtil")
 local RescueView = require("client.Views.RescueView")
 

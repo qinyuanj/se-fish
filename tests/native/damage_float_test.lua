@@ -8,8 +8,8 @@
 -- 已单独验证通过（见 issue-90-mapping.md），故按「不遗漏」原则保留，映射清单里记为「旧沉睡用例」。
 -- 旧文件里恢复全局用的是 `for key, value in pairs(saved)`：saved 中值为 nil 的键会被 pairs 跳过，
 -- 替身全局在「迁移前本来就不存在」时不会被清掉。本 spec 改为逐键 rawget 快照 + 显式赋回（含 nil）。
-local DamageNotice = require('common.DamageNotice')
-local GameCfg = require('common.GameCfg')
+local DamageNotice = require('common.damage_notice')
+local GameCfg = require('common.game_cfg')
 local DamageFloat = require('client.DamageFloat')
 
 describe('TestDamageFloat', function()

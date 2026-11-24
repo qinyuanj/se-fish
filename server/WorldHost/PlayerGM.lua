@@ -1,4 +1,4 @@
-local GameCfg = require('common.GameCfg')
+local GameCfg = require('common.game_cfg')
 local SignalRouter = require('server.WorldHost.WorldSignalRouter')
 
 local Mgr = { AttackBonuses = {} }

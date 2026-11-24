@@ -8,7 +8,7 @@
 --   1. 分享能力未开放时入口静默吞掉请求（点了没反应）；
 --   2. 回包不带可读文案，玩家不知道发生了什么；
 --   3. 占位路径顺手发放了真实权益（商品件数或金币变化）。
-local GameCfg = require('common.GameCfg')
+local GameCfg = require('common.game_cfg')
 local EconomyWorld = require('tests.support.economy_world')
 
 local WIRING = {

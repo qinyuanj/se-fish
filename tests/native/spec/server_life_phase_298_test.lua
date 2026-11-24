@@ -1,5 +1,5 @@
 
-local GameCfg = require("common.GameCfg")
+local GameCfg = require("common.game_cfg")
 local ServerRuntime = require("server.WorldHost.ServerRuntime")
 
 local function signal()

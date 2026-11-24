@@ -1,6 +1,6 @@
-local GameCfg = require("common.GameCfg")
-local Eligibility = require("common.LotteryEligibility")
-local Draw = require("common.LotteryDraw")
+local GameCfg = require("common.game_cfg")
+local Eligibility = require("common.lottery_eligibility")
+local Draw = require("common.lottery_draw")
 
 local PlayerLottery = {}
 local ITEM_BAR = GameCfg.Items.ContainerId.ItemBar

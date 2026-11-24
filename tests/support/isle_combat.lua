@@ -7,12 +7,12 @@
 -- 只替换引擎对象、时间与 RemoteEvent，不替换业务管理器：真实 MgrFishCarrier / MgrFishUnit / MgrVitals
 -- 全部走 require，SpawnLanded / Drop / Update 与对外预警都在真实实现上观察。
 -- 因此这不是编辑器 E2E 证据。
-local Cfg = require('common.GameCfg')
+local Cfg = require('common.game_cfg')
 
 local M = {}
 
 local MODULES = { 'server.WorldHost.FishCarrier', 'server.WorldHost.FishTree',
-    'common.REUtil', 'client.Views.GarBiteWarning' }
+    'common.re_util', 'client.Views.GarBiteWarning' }
 local GLOBALS = { 'game', 'Vector3', 'Quaternion', 'REUtil', 'Color', 'RemoteEvent' }
 
 local function signal()

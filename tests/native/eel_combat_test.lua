@@ -2,7 +2,7 @@
 -- 接缝：MgrFishUnit 的 eel 状态机——5 次放电每秒一次、施法被拒不计数不入睡、5 次满才睡 10 秒、
 -- Busted 案例体在沙箱 _ENV 中，写业务可见的全局（Quaternion）必须用 _G.Quaternion。
 -- describe/it 名称保留旧类名与方法名，并按方法名字典序注册以保持旧套件执行顺序。
-local GameCfg = require('common.GameCfg')
+local GameCfg = require('common.game_cfg')
 local FishEscape = require('tests.support.fish_escape')
 
 -- 放下一条电鳗；castOk 决定每次施法结果，返回鱼与计数表
@@ -242,7 +242,7 @@ local Eui = require('tests.support.eui_double')
 local ClientStore = require('client.Store.ClientStore')
 local RootView = require('client.Views.RootView')
 local FishCombatView = require('client.Views.FishCombatView')
-local SpokeClock = require('common.SpokeClock')
+local SpokeClock = require('common.spoke_clock')
 
 describe('TestFishCombatLabel', function()
     local env

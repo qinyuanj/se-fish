@@ -5,7 +5,7 @@
 -- （旧套件里 TestAiMigration 整体先于 TestFishAiLifecycle，按类名字典序）。
 local Loader = require('tests.support.official_ai_vendor_runtime')
 local FishLift = require('tests.support.fish_lift')
-local GameCfg = require('common.GameCfg')
+local GameCfg = require('common.game_cfg')
 
 describe('TestAiMigration', function()
     local env

@@ -21,7 +21,7 @@
 --   7. require / pcall / State 失败日志缺模块、操作、鱼/单位标识或原始错误。
 
 local Islet = require('tests.support.isle_combat')
-local GameCfg = require('common.GameCfg')
+local GameCfg = require('common.game_cfg')
 
 local function need(cond, ...)
     if not cond then error(string.format(...), 2) end
@@ -311,9 +311,9 @@ end)
 describe('接线验收：属性与效果投影一致', function()
     it('AttrModel / AttrGrowth 的分量与官方 attr_rule 投影值一致', function()
         local AttrRuntime = require('tests.support.attr_runtime')
-        local Model = require('common.AttrModel')
-        local Growth = require('common.AttrGrowth')
-        local GameCfg = require('common.GameCfg')
+        local Model = require('common.attr_model')
+        local Growth = require('common.attr_growth')
+        local GameCfg = require('common.game_cfg')
         local data = { body = 2, speed = 3 }
         function data:PotionCount(id)
             return id == GameCfg.Ability.SpeedPotion.Item and self.speed or self.body
@@ -398,7 +398,7 @@ end)
 -- review #249-6：起手时长统一按 BossMoves.KeyOf 反查逐招行（与预警广播同一条行），
 -- 不再按字面鱼键硬取；取不到时调用方按 0 退化，不 nil 崩。
 describe('第 6 节：逐招表按 KeyOf 反查', function()
-    local BossMoves = require('common.cfg.BossMoves')
+    local BossMoves = require('common.cfg.boss_moves')
 
     it('逐招行按 KeyOf 反查，预警与起手时长同源', function()
         assert.is_true(#BossMoves.Rows > 0)
@@ -443,7 +443,7 @@ describe('接线验收：霜之新星命中经武器入口挂霜冻（6-26）', 
     before_each(function()
         -- 起始时钟不为 0：枪械射速按「上次开火时刻」算，0 会被当成刚开过枪（冷却中）。
         ctx = { now = 100, sent = {}, saved = { game = rawget(_G, 'game'), vector = rawget(_G, 'Vector3'),
-            reutil = rawget(_G, 'REUtil'), re = package.loaded['common.REUtil'] } }
+            reutil = rawget(_G, 'REUtil'), re = package.loaded['common.re_util'] } }
         local env = ctx
         _G.Vector3 = { New = function(x, y, z) return v3(x, y, z) end }
         _G.game = { GetService = function(_, name)
@@ -458,7 +458,7 @@ describe('接线验收：霜之新星命中经武器入口挂霜冻（6-26）', 
             end
             return {}
         end }
-        package.loaded['common.REUtil'] = nil
+        package.loaded['common.re_util'] = nil
         _G.REUtil = { GetRE = function(_, name)
             env.sent[name] = env.sent[name] or {}
             local record = env.sent[name]
@@ -485,7 +485,7 @@ describe('接线验收：霜之新星命中经武器入口挂霜冻（6-26）', 
         env.data = { GetItemBarSnapshot = function()
                 return { held = { kind = 'weapon', id = 'item163' }, weapons = { item163 = 1 } }
             end, MagazineSize = function(_, base) return base end }
-        local SpokeClock = require('common.SpokeClock')
+        local SpokeClock = require('common.spoke_clock')
         local spoke = require('common.packages.spoke.api')
         local PlayerWeapon = require('server.WorldHost.PlayerWeapon')
         env.clock = SpokeClock.new(env.now)
@@ -531,7 +531,7 @@ describe('接线验收：霜之新星命中经武器入口挂霜冻（6-26）', 
         if not ctx then return end
         if ctx.spokeTree then ctx.spokeTree:dispose() end
         _G.game, _G.Vector3, _G.REUtil = ctx.saved.game, ctx.saved.vector, ctx.saved.reutil
-        package.loaded['common.REUtil'] = ctx.saved.re
+        package.loaded['common.re_util'] = ctx.saved.re
         ctx = nil
     end)
 

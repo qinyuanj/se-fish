@@ -1,6 +1,6 @@
-local GameCfg = require("common.GameCfg")
+local GameCfg = require("common.game_cfg")
 local ServerRuntime = require("server.WorldHost.ServerRuntime")
-local SpokeClock = require("common.SpokeClock")
+local SpokeClock = require("common.spoke_clock")
 
 local Host = {}
 
@@ -35,7 +35,7 @@ function Host.start(options)
     saved = {
       game = rawget(_G, "game"),
       REUtil = rawget(_G, "REUtil"),
-      reutil = package.loaded["common.REUtil"],
+      reutil = package.loaded["common.re_util"],
       debug = GameCfg.Debug,
     },
   }
@@ -73,7 +73,7 @@ function Host.start(options)
     GetRE = function(_, name) return event(name) end,
     CheckRECD = function() return false end,
   }
-  package.loaded["common.REUtil"] = host.remote
+  package.loaded["common.re_util"] = host.remote
   _G.REUtil = host.remote
   _G.game = {
     GetService = function(_, name)
@@ -236,7 +236,7 @@ function Host.start(options)
     self.runtime:shutdown()
     _G.game = self.saved.game
     _G.REUtil = self.saved.REUtil
-    package.loaded["common.REUtil"] = self.saved.reutil
+    package.loaded["common.re_util"] = self.saved.reutil
     GameCfg.Debug = self.saved.debug
   end
 

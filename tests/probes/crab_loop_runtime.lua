@@ -2,7 +2,7 @@
 -- 试玩就绪后：editor-cli exec -p server --file <本文件绝对路径> --json。
 -- 持续输出每招、伤害前后血量和收招；需玩家正常钓出鱼并放到岸上，再站到目标鱼攻击距离内。
 -- 若已拥有信物，在本区钓鱼佬旁选中信物后重跑会执行Feed；摆渡使用正常Board请求。
-local cfg = require('common.GameCfg')
+local cfg = require('common.game_cfg')
 local pd = require('server.PlayerDataHost')
 local ServerRuntime = require('server.WorldHost.ServerRuntime')
 local runtime = ServerRuntime.current()

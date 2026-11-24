@@ -5,8 +5,8 @@
 -- 所有动态 UI 节点与事件连接统一经 ctx.create_node / ctx.connect 托管，随重连或根 UI 销毁零残留释放。
 
 local spoke = require("common.packages.spoke.api")
-local GameCfg = require("common.GameCfg")
-local Number = require("common.Number")
+local GameCfg = require("common.game_cfg")
+local Number = require("common.number")
 local MainHudLayout = require("client.MainHudLayout")
 local ViewUtil = require("client.Views.ViewUtil")
 
@@ -38,7 +38,7 @@ end
 
 local function fire_re(channel, payload)
   local ok, err = pcall(function() -- 宿主 RE 通道未就绪或调用异常时记录并安全忽略
-    local re_util = rawget(_G, "REUtil") or require("common.REUtil")
+    local re_util = rawget(_G, "REUtil") or require("common.re_util")
     local re = re_util and re_util:GetRE(channel) or nil
     if re ~= nil then
       re:FireServer(payload)

@@ -1,11 +1,11 @@
 local GameCfg = {}
-local ContentItems = require('common.cfg.Items')
-local ContentFish = require('common.cfg.Fish')
-local ContentShop = require('common.cfg.Shop')
-local ContentLottery = require('common.cfg.Lottery')
-local ContentBlindbox = require('common.cfg.Blindbox')
-local BossMoves = require('common.cfg.BossMoves')
-local FishCatch = require('common.FishCatch')
+local ContentItems = require('common.cfg.items')
+local ContentFish = require('common.cfg.fish')
+local ContentShop = require('common.cfg.shop')
+local ContentLottery = require('common.cfg.lottery')
+local ContentBlindbox = require('common.cfg.blindbox')
+local BossMoves = require('common.cfg.boss_moves')
+local FishCatch = require('common.fish_catch')
 
 GameCfg.Zones = {
     { Id = 'fishPond', Name = '鱼塘', WaterId = 'fishPond.water', BaitItemId = 'worm', source = '钓鱼表!R2' },
@@ -898,7 +898,7 @@ GameCfg.Ability = {
     },
 }
 
--- 判定语义见 common/MathWaterJudge.lua。标记 Position.y 是底面，水面 SurfaceY = Position.y + Size.y；
+-- 判定语义见 common/math_water_judge.lua。标记 Position.y 是底面，水面 SurfaceY = Position.y + Size.y；
 -- 运行时 Size 已含 Scale，半宽直接取 Size/2（#12 W-4、#31 实测）。
 GameCfg.Water = { Zones = {}, ZoneIdByWater = {}, ContentWaterIds = {} }
 
@@ -1020,7 +1020,7 @@ GameCfg.FishCombatLabel = {
     IdleColor = { 255, 255, 255, 255 },
 }
 
-GameCfg.PlaceholderAssets = require('common.cfg.PlaceholderAssets')
+GameCfg.PlaceholderAssets = require('common.cfg.placeholder_assets')
 GameCfg.PlaceholderAssets.Apply(GameCfg)
 
 return GameCfg

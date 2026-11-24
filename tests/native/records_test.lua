@@ -11,8 +11,8 @@
 --   8. 不同字符串玩家的查询序号/存档串扰，客户端伪造身份或重量污染权威纪录。
 -- 迁移说明：三个旧类按 LuaUnit 实际执行序（类名字典序 Core → Integration → Service，
 --   类内方法字典序）注册为三个 describe / 逐个 it；lu.assertNotEquals 是深不等，映射为 assert.are_not.same。
-local GameCfg = require("common.GameCfg")
-local Records = require("common.Records")
+local GameCfg = require("common.game_cfg")
+local Records = require("common.records")
 local PlayerData = require("server.Data.PlayerData")
 local RandomGuard = require("tests.support.random_guard")
 
@@ -26,7 +26,7 @@ local function readSource(path)
   return text
 end
 
-describe("全服纪录纯逻辑（common/Records）", function()
+describe("全服纪录纯逻辑（common/records）", function()
   after_each(RandomGuard.restore)
 
   it("test_entry_keeps_weight_and_holder_together", function()

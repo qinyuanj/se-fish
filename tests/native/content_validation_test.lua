@@ -2,8 +2,8 @@
 -- （物品表!R8 / 钓鱼表!R14），不能静默放行，也不能只报「有错」而不给定位。
 -- 全量配置零错误与各表计数由 lua tools/validate_content.lua 接手（它就是同一 Check 的入口）。
 -- 迁移自 tests/gameplay/content_validation_test.lua（#83）；案例顺序沿用旧入口的方法名字典序。
-local Validate = require('common.ContentValidation')
-local cfg = require('common.GameCfg')
+local Validate = require('common.content_validation')
+local cfg = require('common.game_cfg')
 
 describe("TestContentValidation", function()
   it("test_broken_exchange_reports_row", function()
@@ -27,7 +27,7 @@ describe("TestContentValidation", function()
 end)
 
 -- #251 实现标记纯台账的静态门禁自检（与内容校验同源，不新增遗留测试文件）
-local Ledger = require('common.cfg.ContentLedger')
+local Ledger = require('common.cfg.content_ledger')
 
 local GROUPS = { Fish = cfg.Fish, Items = cfg.Items.Definitions, Shop = cfg.Content.Shop.Goods,
     Lottery = cfg.Content.Lottery.Patterns, Blindbox = cfg.Content.Blindbox.Entries }

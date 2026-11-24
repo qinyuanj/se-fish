@@ -6,8 +6,8 @@
 -- 关闭面板、重连或根 UI 销毁均自动零残留销毁节点与信号连接。
 
 local spoke = require("common.packages.spoke.api")
-local GameCfg = require("common.GameCfg")
-local Number = require("common.Number")
+local GameCfg = require("common.game_cfg")
+local Number = require("common.number")
 local MainHudLayout = require("client.MainHudLayout")
 local ViewUtil = require("client.Views.ViewUtil")
 
@@ -80,7 +80,7 @@ end
 
 local function default_fire_item_bar(payload)
   local ok, err = pcall(function() -- 宿主 RE 通道未就绪或调用异常时记录并安全忽略
-    local re_util = rawget(_G, "REUtil") or require("common.REUtil")
+    local re_util = rawget(_G, "REUtil") or require("common.re_util")
     local re = re_util and re_util:GetRE("ItemBarAction") or nil
     if re ~= nil then
       re:FireServer(payload)

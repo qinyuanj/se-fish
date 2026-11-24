@@ -94,7 +94,7 @@ describe('条款 9 PK 伤害过滤', function()
     assert_wiring()
     env = { queue = {}, sent = {}, values = {}, re = {}, now = 100, byCharacter = {},
       game = rawget(_G, 'game'),
-      vector = rawget(_G, 'Vector3'), reutil = rawget(_G, 'REUtil'), cfg = rawget(package.loaded, 'common.GameCfg') }
+      vector = rawget(_G, 'Vector3'), reutil = rawget(_G, 'REUtil'), cfg = rawget(package.loaded, 'common.game_cfg') }
     _G.Vector3 = { New = vec }
     _G.game = { GetService = function(_, name)
       if name == 'Task' then
@@ -128,7 +128,7 @@ describe('条款 9 PK 伤害过滤', function()
         FireClient = function() end, FireAllClients = function() end, FireServer = function() end }
       return env.re[name]
     end, CheckRECD = function() return false end }
-    _G.REUtil, package.loaded['common.REUtil'] = re, re
+    _G.REUtil, package.loaded['common.re_util'] = re, re
     -- 真区域解析：鱼塘边界来自与生产同一条 ZoneMarkers 路径，不写死坐标。
     env.zones = assert(loadfile('tests/support/zone_fixtures.lua'))()
     env.cfg = env.zones.Load()
@@ -143,11 +143,11 @@ describe('条款 9 PK 伤害过滤', function()
     env.save = assert(loadfile('server/SaveHost.lua'))()
     env.players.Save, env.save.PlayerData = env.save, env.players
     env.filter = require('server.WorldHost.PkDamageFilter').make({
-      party = env.party, zone_markers = require('common.ZoneMarkers'), zones = env.cfg.Zones,
+      party = env.party, zone_markers = require('common.zone_markers'), zones = env.cfg.Zones,
     })
     -- 生产装配：过滤接缝与区域真源都经 mgr 注入，不缓存队伍归属。
     env.vitals.Party = env.party
-    env.vitals.ZoneMarkers = require('common.ZoneMarkers')
+    env.vitals.ZoneMarkers = require('common.zone_markers')
     env.vitals:SetDamageFilter(function(hit, target, mgr) return env.filter(hit, target, mgr) end)
     -- 9-12（review #249）：武器管理器照 main.lua 的接线装进同一套环境（伤害仍只经统一入口）。
     -- AbilityAPI 在装载时要引擎的 RemoteEvent 全局：补替身并清模块缓存，避免复用别的用例的上下文。
@@ -176,7 +176,7 @@ describe('条款 9 PK 伤害过滤', function()
     _G.RemoteEvent = env.remoteEvent
     package.loaded['server.AbilityAPI'] = env.abilityModule
     package.loaded['server.SwingRegistry'] = env.swingModule
-    package.loaded['common.GameCfg'] = env.cfg
+    package.loaded['common.game_cfg'] = env.cfg
     env = nil
   end)
 

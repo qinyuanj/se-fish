@@ -1,9 +1,9 @@
 -- #139 T18 大奖成长切片 1：配置钉表（只留跨表对账）。
 -- 失败方式（先列后写）：
---   1. 大奖武器与抽奖组（common/cfg/Lottery.lua）、物品表（common/cfg/Items.lua）对不上号，
+--   1. 大奖武器与抽奖组（common/cfg/lottery.lua）、物品表（common/cfg/items.lua）对不上号，
 --      或某件大奖武器在 GameCfg 的 MeleeWeapons / Guns 里没有数值（ContentValidation 不查武器数值）；
 --   2. 药水累计上限在 Ability 与物品表各写一处，两处漂移时吃药逻辑与商店描述对不上。
--- 接缝：common/GameCfg.lua 的 Ability 段是纯数据，loadfile 取全新实例断言。
+-- 接缝：common/game_cfg.lua 的 Ability 段是纯数据，loadfile 取全新实例断言。
 -- 逐项数值（伤害/间隔/弹匣/溅射/叠层/特效开关）等于把配置再写一遍；真行为由 weapon_system_test、
 -- prize_weapon_effect_test、status_effect_test 在攻击与结算路径上验。
 -- 迁移自 tests/gameplay/prize_weapon_cfg_test.lua（#83）；旧 setUp 逐例执行，映射为 before_each。
@@ -11,9 +11,9 @@ describe("TestPrizeWeaponCfg", function()
   local cfg, Items, Lottery
 
   before_each(function()
-    cfg = assert(loadfile('common/GameCfg.lua'))()
-    Items = require('common.cfg.Items')
-    Lottery = require('common.cfg.Lottery')
+    cfg = assert(loadfile('common/game_cfg.lua'))()
+    Items = require('common.cfg.items')
+    Lottery = require('common.cfg.lottery')
   end)
 
   -- 对账：15 件大奖武器 = 抽奖三个武器组的并集，物品表全部存在且为武器分类

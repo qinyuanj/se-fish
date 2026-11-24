@@ -8,7 +8,7 @@
 --   5. 动作被走跑动画盖掉（未设上半身过滤与 Action 优先级）、循环播放。
 --   6. 每次出手都 LoadAnimation 新 track（自动枪 0.15 秒一发会不停堆积）；优先级赋值不被运行时接受时连带不播。
 local Weapon = require('tests.support.weapon_world')
-local GameCfg = require('common.GameCfg')
+local GameCfg = require('common.game_cfg')
 
 local function exportedMotionIds()
     local ids = {}

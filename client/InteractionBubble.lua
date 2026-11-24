@@ -1,4 +1,4 @@
-local Style = require('common.GameCfg').InteractionBubble
+local Style = require('common.game_cfg').InteractionBubble
 local World = game:GetService('World')
 local Bubble = {}
 

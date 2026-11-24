@@ -1,7 +1,7 @@
 -- 离线测试用假场景：与生产 ZoneMarkers 同一解析路径，坐标只服务行为夹具，不是场景事实。
 -- 节点与坐标由严格引擎替身 engine_double 提供，越出真引擎能力的访问直接报错。
 local M = {}
-local ZoneMarkers = require('common.ZoneMarkers')
+local ZoneMarkers = require('common.zone_markers')
 local Engine = require('tests.support.engine_double')
 
 local centers = {
@@ -103,8 +103,8 @@ function M.Apply(cfg)
 end
 
 function M.Load()
-  package.loaded['common.GameCfg'] = nil
-  return M.Apply(require('common.GameCfg'))
+  package.loaded['common.game_cfg'] = nil
+  return M.Apply(require('common.game_cfg'))
 end
 
 return M

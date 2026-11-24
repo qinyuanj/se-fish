@@ -1,5 +1,5 @@
-local GameCfg = require("common.GameCfg")
-local BlindboxDraw = require("common.BlindboxDraw")
+local GameCfg = require("common.game_cfg")
+local BlindboxDraw = require("common.blindbox_draw")
 
 local PlayerBlindbox = {}
 

@@ -1,4 +1,4 @@
-local GameCfg = require("common.GameCfg")
+local GameCfg = require("common.game_cfg")
 local Host = require("tests.support.fishing_host")
 
 describe("收线脱钩与生命周期（ServerRuntime）", function()

@@ -12,9 +12,9 @@
 -- 接缝：MgrPlayerData:Handle（ItemBarAction 通道）、PlayerData 存档往返、MgrSurvival:ApplyWeak/ClearWeak、
 --   MgrFishUnit:Speed / UpdateCombat、MgrAbility:CastFish、server/main.lua 源码接线断言。
 -- 旧套件的逐例 setUp/tearDown 映射为 before_each/after_each；被替换的全局（game / Vector3 / REUtil）、
--- 模块缓存（package.loaded 的 MgrFishUnit 与 common.REUtil）与配置（GameCfg.Debug）逐例恢复，
+-- 模块缓存（package.loaded 的 MgrFishUnit 与 common.re_util）与配置（GameCfg.Debug）逐例恢复，
 -- after_each 对未完成的 before_each 幂等。describe 顺序沿用旧执行序（类名字典序）。
-local GameCfg = require('common.GameCfg')
+local GameCfg = require('common.game_cfg')
 local ClientStore = require('client.Store.ClientStore')
 local RootView = require('client.Views.RootView')
 local AttackView = require('client.Views.AttackView')

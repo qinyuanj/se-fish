@@ -83,9 +83,9 @@ end
 --- 调用方随后 link:Start()（等价 GameStart），结束时必须 link:Close()。
 function M.new(opts)
     opts = opts or {}
-    local GameCfg = require('common.GameCfg')
+    local GameCfg = require('common.game_cfg')
     local ZoneFixtures = require('tests.support.zone_fixtures')
-    local ZoneMarkers = require('common.ZoneMarkers')
+    local ZoneMarkers = require('common.zone_markers')
     if not ZoneMarkers.Ready then ZoneFixtures.Apply(GameCfg) end
 
     local env = {
@@ -94,7 +94,7 @@ function M.new(opts)
         saved = {
             game = rawget(_G, 'game'), Vector3 = rawget(_G, 'Vector3'), Vector2 = rawget(_G, 'Vector2'),
             Color = rawget(_G, 'Color'), REUtil = rawget(_G, 'REUtil'), task = rawget(_G, 'task'),
-            reutil = package.loaded['common.REUtil'], playerdata = package.loaded['server.Data.PlayerData'],
+            reutil = package.loaded['common.re_util'], playerdata = package.loaded['server.Data.PlayerData'],
             carrier = package.loaded['server.WorldHost.FishCarrier'],
         },
     }
@@ -170,7 +170,7 @@ function M.new(opts)
         BindToClose = function() end,
     }
     local re = { GetRE = function(_, name) return reStub(name) end, CheckRECD = function() return false end }
-    package.loaded['common.REUtil'] = re
+    package.loaded['common.re_util'] = re
     _G.REUtil = re
 
     package.loaded['server.Data.PlayerData'] = nil
@@ -184,7 +184,7 @@ function M.new(opts)
     env.filter = function()
         return require('server.WorldHost.PkDamageFilter').make({
             party = mgr.Party,
-            zone_markers = require('common.ZoneMarkers'),
+            zone_markers = require('common.zone_markers'),
         })
     end
 
@@ -451,7 +451,7 @@ function M:Close()
     local saved = self.saved
     _G.game, _G.Vector3, _G.Vector2 = saved.game, saved.Vector3, saved.Vector2
     _G.Color, _G.REUtil, _G.task = saved.Color, saved.REUtil, saved.task
-    package.loaded['common.REUtil'] = saved.reutil
+    package.loaded['common.re_util'] = saved.reutil
     package.loaded['server.Data.PlayerData'] = saved.playerdata
     package.loaded['server.WorldHost.FishCarrier'] = saved.carrier
     self.saved, self.queue, self.re, self.sent = nil, {}, {}, {}

@@ -18,8 +18,8 @@
 --   4. 非特殊道具被映射成特殊效果，或特殊道具漏映射；
 --   5. 飞行 y 越过 20 米上限或跌破地面；松开不降、长按不升；非法 dt（NaN/负/超步长）污染状态；
 --   6. 水平位置跨区不钳或钳错轴。
-local GameCfg = require('common.GameCfg')
-local SpecialItem = require('common.SpecialItem')
+local GameCfg = require('common.game_cfg')
+local SpecialItem = require('common.special_item')
 
 describe('TestSpecialItem', function()
     local function bounds()
