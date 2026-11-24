@@ -195,7 +195,7 @@ function Mgr:resolve_carrier(target)
     end
 end
 
-function Mgr:Attach(body, opts)
+function Mgr:attach(body, opts)
 	opts = opts or {}
 	local World = rawget(_G, "game") and game:GetService("World") or nil
 	local createUnit = opts.CreateUnit or function(kind, props)
@@ -268,7 +268,7 @@ end
 ---建一条鱼载体：鱼本体（WorldUnit + 官方鱼模型）+ 伤害接口
 ---@param opts Table { Position, Rotation, FishId, MaxHealth, RenderMeshId, ModelId, Mass, BodyType, GravityEnabled, LinearDamping, AngularDamping, ReceiverOffset, Player }
 ---@return Table? carrier, string? 失败原因
-function Mgr:Spawn(opts)
+function Mgr:spawn(opts)
 	opts = opts or {}
 	local World = rawget(_G, "game") and game:GetService("World") or nil
 	local createUnit = opts.CreateUnit or function(kind, props)
@@ -318,7 +318,7 @@ function Mgr:Spawn(opts)
 		return nil, "body-create-failed"
 	end
 
-	local carrier = self:Attach(body, opts)
+	local carrier = self:attach(body, opts)
 	if not carrier then
 		pcall(function()
 			body:Destroy()
@@ -384,7 +384,7 @@ function Mgr:despawn(carrier)
 	carrier.Controller = nil
 end
 
-function Mgr:Start()
+function Mgr:start()
 end
 
 function Mgr:on_player_added(player)

@@ -61,7 +61,7 @@ describe('条款 17-18：分享任务的占位入口', function()
         env.re = channels()
         _G.REUtil = { get_re = env.re.get_re, check_recd = function() return false end }
         env.player = { UserId = 26303, SetAttribute = function() end }
-        env.data = assert(loadfile('server/data/player_data.lua'))().New(env.player, function() end)
+        env.data = assert(loadfile('server/data/player_data.lua'))().new(env.player, function() end)
         env.data:Init()
         env.platform = assert(loadfile('server/platform_host.lua'))()
         env.platform.PlayerData = { get_data_inst = function(_, player) return player == env.player and env.data end,

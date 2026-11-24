@@ -125,10 +125,10 @@ function Probe.run(context)
         ai.Funcs.MoveDirection(unit, v(1, 0, 0), 0, 0)
         c.wait(0.1)
         local custom = gate:switch('custom')
-        assert(not gate:Write(old, v(99, 99, 99)), '旧代次未撤权')
-        assert(gate:Write(custom, unit:GetPosition()), '自定义轨迹未获得写入权')
+        assert(not gate:write(old, v(99, 99, 99)), '旧代次未撤权')
+        assert(gate:write(custom, unit:GetPosition()), '自定义轨迹未获得写入权')
         local control = gate:switch('controlled')
-        assert(not gate:Write(control, v(99, 99, 99)) and not gate:Hit(control, 'control', 1), '控制态未禁用写入/伤害')
+        assert(not gate:write(control, v(99, 99, 99)) and not gate:hit(control, 'control', 1), '控制态未禁用写入/伤害')
         c.wait(0.2); observe('轨迹交接取消官方移动', 'stopped', true)
         gate:switch('official')
         ai.Funcs.MoveDirection(unit, v(0, 0, 1), 0.2, 0)
@@ -166,17 +166,17 @@ function Probe.new_handoff(ai, unit, applyPosition, applyHit, log)
         log(string.format('[official_ai_probe] 轨迹交接 mode=%s generation=%d', mode, self.generation))
         return token
     end
-    function gate:IsActive(token) return token ~= nil and token == self.owner and token.generation == self.generation end
-    function gate:Write(token, position)
-        if not self:IsActive(token) or self.owner.mode == 'controlled' then
+    function gate:is_active(token) return token ~= nil and token == self.owner and token.generation == self.generation end
+    function gate:write(token, position)
+        if not self:is_active(token) or self.owner.mode == 'controlled' then
             log('[official_ai_probe] 拒绝失效写入 token=' .. tostring(token and token.generation))
             return false
         end
         applyPosition(position)
         return true
     end
-    function gate:Hit(token, key, damage)
-        if not self:IsActive(token) or token.mode == 'controlled' or self.appliedHits[key] then return false end
+    function gate:hit(token, key, damage)
+        if not self:is_active(token) or token.mode == 'controlled' or self.appliedHits[key] then return false end
         self.appliedHits[key] = true
         applyHit(damage)
         return true

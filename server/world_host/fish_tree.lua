@@ -76,7 +76,7 @@ end
 
 function Mgr:isolate(fish)
     local body = fish.Carrier.Body
-    for _, player in ipairs(self:Players()) do noCollide(body, player.Character) end
+    for _, player in ipairs(self:players()) do noCollide(body, player.Character) end
     for _, other in pairs(self.Fish) do
         if other ~= fish and other.Carrier then
             noCollide(body, other.Carrier.Body)
@@ -92,7 +92,7 @@ function Mgr:isolate_character(character)
     end
 end
 
-function Mgr:Players()
+function Mgr:players()
     local players = service('Players')
     return players and players:GetPlayers() or {}
 end
@@ -220,7 +220,7 @@ function Mgr:spawn_tree(fish)
                 if not es:d(alive) or not es:d(session) then
                     local reason = session:now() == false and 'leave' or 'life'
                     if fish.State == Mgr.State.Held then
-                        host:Release(fish, reason)
+                        host:release(fish, reason)
                     elseif fish.State == Mgr.State.AwaitLift then
                         host:release_await_lift(fish, reason)
                     end
@@ -272,7 +272,7 @@ end
 function Mgr:spawn_landed(player, catch, position)
     local species = catch and GameCfg.Fish[catch.fishId]
     if not player or not species or type(catch.mult) ~= 'number' then return nil, 'bad-catch' end
-    local carrier, err = MgrFishCarrier:Spawn({
+    local carrier, err = MgrFishCarrier:spawn({
         CreateUnit = self.CreateUnit,
         Position = position,
         FishId = catch.fishId,
@@ -300,7 +300,7 @@ function Mgr:spawn_landed(player, catch, position)
         local beginConn = body.OnLiftedBegin:Connect(function(liftunit) self:on_lifted(fish, liftunit) end)
         fish.Conns = { beginConn }
         if body.OnLiftedEnd then
-            fish.Conns[#fish.Conns + 1] = body.OnLiftedEnd:Connect(function() self:Release(fish, 'liftEnd') end)
+            fish.Conns[#fish.Conns + 1] = body.OnLiftedEnd:Connect(function() self:release(fish, 'liftEnd') end)
         end
     end
     self:request_lift(fish)
@@ -311,7 +311,7 @@ end
 function Mgr:spawn_blast_fish(fishId, mult, position, owner)
     local species = GameCfg.Fish[fishId]
     if not species or type(mult) ~= 'number' or not position then return nil, 'bad-fish' end
-    local carrier, err = MgrFishCarrier:Spawn({
+    local carrier, err = MgrFishCarrier:spawn({
         CreateUnit = self.CreateUnit,
         Position = position,
         FishId = fishId,
@@ -355,7 +355,7 @@ end
 function Mgr:resolve_lifter(fish, liftunit)
     if liftunit == nil then return fish.LiftAt and fish.Owner or nil end
     if fish.Owner.Character == liftunit then return fish.Owner end
-    for _, player in ipairs(self:Players()) do
+    for _, player in ipairs(self:players()) do
         if player.Character == liftunit then return player end
     end
 end
@@ -406,7 +406,7 @@ end
 
 function Mgr:drop(player)
     local fish = self:get_held(player)
-    return fish ~= nil and self:Release(fish, 'drop')
+    return fish ~= nil and self:release(fish, 'drop')
 end
 
 local function flatDirection(x, z)
@@ -436,7 +436,7 @@ local function inWater(pos)
     end
 end
 
-function Mgr:Speed(fish)
+function Mgr:speed(fish)
     local species = GameCfg.Fish[fish.FishId]
     local speed = species and species.Speed or cfg().EscapeSpeed
     if self.Ability and self.Ability.fish_speed_factor then
@@ -448,7 +448,7 @@ end
 
 function Mgr:set_heading(fish, x, z)
     if not x then return end
-    local speed = self:Speed(fish)
+    local speed = self:speed(fish)
     fish.Heading = { x = x, z = z }
     if self.Ai then
         local started = self.Ai:move_direction(fish, Vector3.New(x, 0, z), speed)
@@ -495,9 +495,9 @@ function Mgr:release_await_lift(fish, reason)
     return true
 end
 
-function Mgr:Release(fish, reason)
+function Mgr:release(fish, reason)
     if self.Fish[fish.Id] ~= fish or fish.State ~= Mgr.State.Held then return false end
-    if self.Ai then self.Ai:Custom(fish) end
+    if self.Ai then self.Ai:custom(fish) end
     local holder = fish.holder
     if holder and self.Held[holder.UserId] == fish then self.Held[holder.UserId] = nil end
     local body = fish.Carrier.Body
@@ -543,7 +543,7 @@ function Mgr:Release(fish, reason)
         fish.FleeAt = now + (species.EscapeSec or 300)
         fish.CombatPosition = pos
         fish.CombatRotation = body.Rotation
-        fish.Phase = BossPhase.New(GameCfg.Ability.BossPhase, now, pos)
+        fish.Phase = BossPhase.new(GameCfg.Ability.BossPhase, now, pos)
         fish.PhaseAt = now
         fish.Yaw = 0
         body.LinearVelocity = Vector3.New(0, 0, 0)
@@ -631,12 +631,12 @@ function Mgr:enforce_escape_cap(trigger, keep)
         trimOldest(self, own, #own - c.PerPlayerEscapeCap, keep, '每人上限')
     end
     local list = self:escaping()
-    trimOldest(self, list, #list - #self:Players() * c.GlobalEscapePerPlayer, keep, '全局上限')
+    trimOldest(self, list, #list - #self:players() * c.GlobalEscapePerPlayer, keep, '全局上限')
 end
 
 function Mgr:ray_exclusions()
     local list = {}
-    for _, player in ipairs(self:Players()) do
+    for _, player in ipairs(self:players()) do
         if player.Character then list[#list + 1] = player.Character end
     end
     for _, fish in pairs(self.Fish) do
@@ -695,7 +695,7 @@ function Mgr:update_escaping(fish, now)
         self:remove(fish)
         return
     end
-    if fish.Heading and fish.AppliedSpeed ~= self:Speed(fish) then
+    if fish.Heading and fish.AppliedSpeed ~= self:speed(fish) then
         self:set_heading(fish, fish.Heading.x, fish.Heading.z)
     end
     if fish.StraightEscape then return end
@@ -751,7 +751,7 @@ function Mgr:choose_target(fish, pos, params)
         fish.TargetOverride = nil
     end
     local candidates, present = {}, {}
-    for _, player in ipairs(self:Players()) do
+    for _, player in ipairs(self:players()) do
         present[player] = true
         local valid, cp = self:is_target_valid(player, pos, params)
         if valid then
@@ -819,11 +819,11 @@ end
 function Mgr:end_bite(fish, reason)
     if not fish.BiteAim then return end
     fish.BiteAim = nil
-    publishBite(self, GarBiteNotice.Clear(fish.Id, reason))
+    publishBite(self, GarBiteNotice.clear(fish.Id, reason))
 end
 
 function Mgr:lock_bite(fish, target, pos, tpos, now, params)
-    if self.Ai then self.Ai:Custom(fish) end
+    if self.Ai then self.Ai:custom(fish) end
     local fx, fz = flatDirection(tpos.x - pos.x, tpos.z - pos.z)
     if fx then self:face(fish, fx, fz, params) end
     fish.BiteAim = { Target = target, StrikeAt = now + params.BiteCooldownSec }
@@ -867,13 +867,13 @@ function Mgr:update_chase(fish, now, pos, params)
     end
     local target, tpos = self:choose_target(fish, pos, params)
     if not target then
-        if self.Ai then self.Ai:Custom(fish) end
+        if self.Ai then self.Ai:custom(fish) end
         pcall(function() body.LinearVelocity = Vector3.New(0, 0, 0) end)
         return
     end
     if not withinBite(pos, tpos, params) then
         local ux, uz = flatDirection(tpos.x - pos.x, tpos.z - pos.z)
-        local speed = self:Speed(fish)
+        local speed = self:speed(fish)
         self:face(fish, ux, uz, params)
         if self.Ai then
             self.Ai:Chase(fish, target.Character, speed, params.BiteRange, params.AggroRange)
@@ -889,12 +889,12 @@ end
 function Mgr:end_move(fish, reason)
     if not fish.Move then return end
     fish.Move, fish.MoveName = nil, nil
-    publishBite(self, GarBiteNotice.Clear(fish.Id, reason))
+    publishBite(self, GarBiteNotice.clear(fish.Id, reason))
     self:publish_combat(fish)
 end
 
 function Mgr:start_move(fish, name, pos, target, tpos, now, duration, range, shape)
-    if self.Ai and not self.Ai:Custom(fish) then return false end
+    if self.Ai and not self.Ai:custom(fish) then return false end
     fish.OfficialRollFrom, fish.RollFrom = nil, nil
     self:end_move(fish, 'replace')
     local fx, fz
@@ -937,7 +937,7 @@ function Mgr:start_move(fish, name, pos, target, tpos, now, duration, range, sha
 end
 
 function Mgr:stun_fish(fish, now, params)
-    if self.Ai then self.Ai:Custom(fish) end
+    if self.Ai then self.Ai:custom(fish) end
     self:end_move(fish, 'stun')
     fish.State, fish.WakeAt, fish.MoveName = 'stunned', now + params.StunSec, nil
     fish.Carrier.Body.LinearVelocity = Vector3.New(0, 0, 0)
@@ -975,10 +975,10 @@ function Mgr:update_shrimp_combat(fish, now, pos, params, combat)
             local tick = math.min(params.RainSec, math.floor(now - move.At))
             if tick > move.LastTick then
                 move.LastTick = tick
-                for _, player in ipairs(self:Players()) do
+                for _, player in ipairs(self:players()) do
                     local valid, cp = self:is_target_valid(player, move.Center)
                     if valid and (cp.x - move.Center.x)^2 + (cp.z - move.Center.z)^2 <= params.RainRadius^2 then
-                        self:Hit(fish, player, params.RainDamage, 'rain')
+                        self:hit(fish, player, params.RainDamage, 'rain')
                     end
                 end
             end
@@ -995,10 +995,10 @@ function Mgr:update_shrimp_combat(fish, now, pos, params, combat)
                 move.Center.z + (dest.z - move.Center.z) * progress)
             if now < move.StrikeAt then return end
             self:end_move(fish, 'dive-end')
-            for _, player in ipairs(self:Players()) do
+            for _, player in ipairs(self:players()) do
                 local valid, cp = self:is_target_valid(player, dest)
                 if valid and (cp.x - dest.x)^2 + (cp.z - dest.z)^2 <= params.DiveRadius^2 then
-                    self:Hit(fish, player, params.DiveDamage, 'dive')
+                    self:hit(fish, player, params.DiveDamage, 'dive')
                 end
             end
             self:stun_fish(fish, now, params)
@@ -1013,7 +1013,7 @@ function Mgr:update_shrimp_combat(fish, now, pos, params, combat)
             if Mgr.in_head_zone(pos, fish.Facing, cp, params) then
                 local damage = move.Name == 'tail' and params.TailDamage
                     or (move.Name == 'peck' and params.PeckDamage or params.ClawDamage)
-                local applied = self:Hit(fish, move.Target, damage, move.Name)
+                local applied = self:hit(fish, move.Target, damage, move.Name)
                 if applied and move.Name == 'tail' then
                     local f = fish.Facing or { x = 0, z = 1 }
                     local ok, err = pcall(function()
@@ -1028,7 +1028,7 @@ function Mgr:update_shrimp_combat(fish, now, pos, params, combat)
     end
     local target, tp = self:choose_target(fish, pos, params)
     if not target then
-        if self.Ai then self.Ai:Custom(fish) end
+        if self.Ai then self.Ai:custom(fish) end
         body.LinearVelocity = Vector3.New(0, 0, 0)
         return
     end
@@ -1036,11 +1036,11 @@ function Mgr:update_shrimp_combat(fish, now, pos, params, combat)
         local fx, fz = flatDirection(tp.x - pos.x, tp.z - pos.z)
         self:face(fish, fx, fz, params)
         if self.Ai then
-            self.Ai:Chase(fish, target.Character, self:Speed(fish), params.BiteRange, params.AggroRange)
+            self.Ai:Chase(fish, target.Character, self:speed(fish), params.BiteRange, params.AggroRange)
             return
         end
         local distance = math.sqrt((tp.x - pos.x)^2 + (tp.z - pos.z)^2)
-        local step = math.min(self:Speed(fish) * dt, math.max(0, distance - params.BiteRange))
+        local step = math.min(self:speed(fish) * dt, math.max(0, distance - params.BiteRange))
         body.LinearVelocity = Vector3.New(0, 0, 0)
         local moved, err = pcall(function()
             body.Position = Vector3.New(pos.x + (fx or 0) * step, pos.y, pos.z + (fz or 0) * step)
@@ -1063,19 +1063,19 @@ end
 local function chaseStep(self, fish, pos, tpos, dt, params, label, skipIdle, plainId)
     if self.Ai then
         local target = self:choose_target(fish, pos, params)
-        if not target then self.Ai:Custom(fish); return false end
+        if not target then self.Ai:custom(fish); return false end
         self:face(fish, flatDirection(tpos.x - pos.x, tpos.z - pos.z))
         local previous = fish.OfficialRollFrom
         fish.OfficialRollFrom = { x = pos.x, y = pos.y, z = pos.z }
         fish.RollFrom = previous
-        self.Ai:Chase(fish, target.Character, self:Speed(fish), params.BiteRange, params.AggroRange)
+        self.Ai:Chase(fish, target.Character, self:speed(fish), params.BiteRange, params.AggroRange)
         return previous ~= nil and (previous.x ~= pos.x or previous.z ~= pos.z)
     end
     local body = fish.Carrier.Body
     local fx, fz = flatDirection(tpos.x - pos.x, tpos.z - pos.z)
     self:face(fish, fx, fz, params)
     local distance = math.sqrt((tpos.x - pos.x)^2 + (tpos.z - pos.z)^2)
-    local step = math.min(self:Speed(fish) * dt, math.max(0, distance - params.BiteRange))
+    local step = math.min(self:speed(fish) * dt, math.max(0, distance - params.BiteRange))
     if skipIdle and step <= 0 then return false end
     local moved, err = pcall(function()
         body.Position = Vector3.New(pos.x + (fx or 0) * step, pos.y, pos.z + (fz or 0) * step)
@@ -1096,7 +1096,7 @@ local function advanceHeadMove(self, fish, move, now, pos, params, damage)
     if now < move.StrikeAt - 1e-9 then return true end
     self:end_move(fish, move.Name)
     if Mgr.in_head_zone(pos, fish.Facing, tp, params) then
-        self:Hit(fish, move.Target, damage, move.Name)
+        self:hit(fish, move.Target, damage, move.Name)
     end
     return true
 end
@@ -1104,7 +1104,7 @@ end
 local function engageOrChase(self, fish, now, pos, params, dt, name, windup, label, skipIdle)
     local target, tpos = self:choose_target(fish, pos, params)
     if not target then
-        if self.Ai then self.Ai:Custom(fish) end
+        if self.Ai then self.Ai:custom(fish) end
         return false
     end
     if withinBite(pos, tpos, params) then
@@ -1135,7 +1135,7 @@ function Mgr:update_king_crab_combat(fish, now, pos, params)
             local target, tp = self:is_target_valid(move.Target, pos, params)
             if target and withinBite(pos, tp, params)
                 and Mgr.in_head_zone(pos, fish.Facing, tp, params) then
-                self:Hit(fish, move.Target, params.JabDamage, 'jab')
+                self:hit(fish, move.Target, params.JabDamage, 'jab')
             end
         end
         if now < move.StrikeAt - 1e-9 then return end
@@ -1144,7 +1144,7 @@ function Mgr:update_king_crab_combat(fish, now, pos, params)
     end
     local target, tp = self:choose_target(fish, pos, params)
     if not target then
-        if self.Ai then self.Ai:Custom(fish) end
+        if self.Ai then self.Ai:custom(fish) end
         return
     end
     if now < (fish.JabAt or 0) then return end
@@ -1171,7 +1171,7 @@ function Mgr:update_crab_boss_combat(fish, now, pos, params)
                 local target, tp = self:is_target_valid(move.Target, pos, params)
                 if target and withinBite(pos, tp, params)
                     and Mgr.in_head_zone(pos, fish.Facing, tp, params) then
-                    self:Hit(fish, move.Target, params.PinchDamage, 'pinch')
+                    self:hit(fish, move.Target, params.PinchDamage, 'pinch')
                 end
             end
             if now < move.StrikeAt - 1e-9 then return end
@@ -1182,7 +1182,7 @@ function Mgr:update_crab_boss_combat(fish, now, pos, params)
                 local target, tp = self:choose_target(fish, pos, params)
                 if target and tp and (tp.x - pos.x)^2 + (tp.z - pos.z)^2 <= params.ChargeRange^2 then
                     move.HitDone = true
-                    self:Hit(fish, target, params.ChargeDamage, 'charge')
+                    self:hit(fish, target, params.ChargeDamage, 'charge')
                 end
             end
             if now < move.StrikeAt - 1e-9 then return end
@@ -1193,10 +1193,10 @@ function Mgr:update_crab_boss_combat(fish, now, pos, params)
                 math.max(0, math.floor(now - move.At)))
             if tick > (move.LastTick or 0) then
                 move.LastTick = tick
-                for _, player in ipairs(self:Players()) do
+                for _, player in ipairs(self:players()) do
                     local valid, cp = self:is_target_valid(player, move.Center)
                     if valid and (cp.x - pos.x)^2 + (cp.z - pos.z)^2 <= params.SpinRadius^2 then
-                        self:Hit(fish, player, params.SpinDamage, 'spin')
+                        self:hit(fish, player, params.SpinDamage, 'spin')
                     end
                 end
             end
@@ -1208,7 +1208,7 @@ function Mgr:update_crab_boss_combat(fish, now, pos, params)
     end
     local target, tp = self:choose_target(fish, pos, params)
     if not target then
-        if self.Ai then self.Ai:Custom(fish) end
+        if self.Ai then self.Ai:custom(fish) end
         return
     end
     if now >= (fish.SpecialAt or math.huge) then
@@ -1258,10 +1258,10 @@ function Mgr:advance_jump(fish, now, pos, params)
     end
     if now < move.StrikeAt - 1e-9 then return end
     self:end_move(fish, 'jump-end')
-    for _, player in ipairs(self:Players()) do
+    for _, player in ipairs(self:players()) do
         local valid, cp = self:is_target_valid(player, dest, params)
         if valid and (cp.x - dest.x)^2 + (cp.z - dest.z)^2 <= params.JumpRadius * params.JumpRadius then
-            self:Hit(fish, player, params.JumpDamage, 'jump')
+            self:hit(fish, player, params.JumpDamage, 'jump')
         end
     end
 end
@@ -1305,12 +1305,12 @@ function Mgr:update_shark_combat(fish, now, pos, params)
     if not actual or not pos or (actual.x == pos.x and actual.z == pos.z) then return end
     local slot = math.floor(now)
     if fish.RollSlot ~= slot then fish.RollSlot, fish.RollHits = slot, {} end
-    for _, player in ipairs(self:Players()) do
+    for _, player in ipairs(self:players()) do
         local valid, cp = self:is_target_valid(player, actual, params)
         if valid and not fish.RollHits[player]
             and segmentDistanceSq(cp.x, cp.z, pos.x, pos.z, actual.x, actual.z) <= params.BiteRange^2 then
             fish.RollHits[player] = true
-            self:Hit(fish, player, params.RollDamage, 'roll')
+            self:hit(fish, player, params.RollDamage, 'roll')
         end
     end
 end
@@ -1340,14 +1340,14 @@ function Mgr:advance_walrus_charge(fish, now, pos, params)
     end
     local actual = readPosition(body)
     if actual then
-        for _, player in ipairs(self:Players()) do
+        for _, player in ipairs(self:players()) do
             if not move.Hits[player] then
                 local valid, cp = self:is_target_valid(player, actual, params)
                 if valid and segmentDistanceSq(cp.x, cp.z,
                         move.DashFrom.x, move.DashFrom.z, actual.x, actual.z)
                     <= params.ChargeContactRange * params.ChargeContactRange then
                     move.Hits[player] = true
-                    self:Hit(fish, player, params.ChargeDamage, 'charge')
+                    self:hit(fish, player, params.ChargeDamage, 'charge')
                 end
             end
         end
@@ -1373,7 +1373,7 @@ function Mgr:update_walrus_combat(fish, now, pos, params)
     if now >= (fish.ChargeAt or math.huge) then
         local target, tp = self:choose_target(fish, pos, params)
         if not target then
-        if self.Ai then self.Ai:Custom(fish) end
+        if self.Ai then self.Ai:custom(fish) end
         return
     end
         fish.ChargeAt = now + params.ChargeSec
@@ -1405,7 +1405,7 @@ function Mgr:update_orca_combat(fish, now, pos, params)
             local valid, tp = self:is_target_valid(move.Target, pos, params)
             if valid and withinBite(pos, tp, params)
                 and Mgr.in_head_zone(pos, fish.Facing, tp, params) then
-                self:Hit(fish, move.Target, params.ClawDamage, 'claw')
+                self:hit(fish, move.Target, params.ClawDamage, 'claw')
             end
             return
         end
@@ -1413,19 +1413,19 @@ function Mgr:update_orca_combat(fish, now, pos, params)
             self:end_move(fish, 'roar')
             local valid, tp = self:is_target_valid(move.Target, pos, params)
             if valid and (tp.x - pos.x)^2 + (tp.z - pos.z)^2 <= params.RoarRange * params.RoarRange then
-                self:Hit(fish, move.Target, params.RoarDamage, 'roar')
+                self:hit(fish, move.Target, params.RoarDamage, 'roar')
             end
             return
         end
         if move.Name == 'tail' then
             self:end_move(fish, 'tail')
             local facing = fish.Facing or { x = 0, z = 1 }
-            for _, player in ipairs(self:Players()) do
+            for _, player in ipairs(self:players()) do
                 local valid, cp = self:is_target_valid(player, pos, params)
                 if valid and (cp.x - pos.x)^2 + (cp.z - pos.z)^2 <= params.TailRadius * params.TailRadius then
                     local dx, dz = cp.x - pos.x, cp.z - pos.z
                     if dx * facing.x + dz * facing.z < 0 then
-                        self:Hit(fish, player, params.TailDamage, 'tail')
+                        self:hit(fish, player, params.TailDamage, 'tail')
                     end
                 end
             end
@@ -1439,7 +1439,7 @@ function Mgr:update_orca_combat(fish, now, pos, params)
     end
     local target, tp = self:choose_target(fish, pos, params)
     if not target then
-        if self.Ai then self.Ai:Custom(fish) end
+        if self.Ai then self.Ai:custom(fish) end
         return
     end
     if now >= (fish.RoarAt or math.huge) then
@@ -1521,7 +1521,7 @@ function Mgr:update_combat(fish, now)
     local chase = GameCfg.FishCombat and GameCfg.FishCombat[combat]
     if chase then
         local key = BossMoves.key_of(GameCfg.Fish[fish.FishId], fish.FishId)
-        FishBehaviors.Step(self, fish, now, pos, BossMoves.combat_params(chase, key), combat)
+        FishBehaviors.step(self, fish, now, pos, BossMoves.combat_params(chase, key), combat)
         return
     end
     self:update_eel(fish, now, GameCfg.Ability.FishAbilities[combat])
@@ -1607,7 +1607,7 @@ function Mgr:update_eel(fish, now, entry)
         self:set_state(fish, Mgr.State.Sleeping)
         fish.WakeAt = now + entry.SleepSec
         fish.WarnAt = nil
-        publishBite(self, GarBiteNotice.Clear(fish.Id, 'sleep'))
+        publishBite(self, GarBiteNotice.clear(fish.Id, 'sleep'))
         print('[FishTree] 电鳗睡眠', 'fish=' .. tostring(fish.Id), 'wakeAt=' .. tostring(fish.WakeAt))
         self:publish_combat(fish)
         return
@@ -1702,12 +1702,12 @@ function Mgr:flight_bounds(fishId, position)
 end
 
 function Mgr:start_flight(fish, now)
-    if self.Ai then self.Ai:Custom(fish) end
+    if self.Ai then self.Ai:custom(fish) end
     local profile = self:flight_profile(fish.FishId)
     local pos = readPosition(fish.Carrier.Body)
     local bounds = self:flight_bounds(fish.FishId, pos)
     if not profile or not bounds then return false end
-    fish.Flight = FlightPath.New(bounds, GameCfg.Ability.Flight, profile, pos, now)
+    fish.Flight = FlightPath.new(bounds, GameCfg.Ability.Flight, profile, pos, now)
     fish.FlightAt = now
     self:set_state(fish, Mgr.State.Flying)
     fish.DiveActive = false
@@ -1774,7 +1774,7 @@ end
 
 function Mgr:end_air_attacks(fish, reason)
     for _, attack in pairs(fish.AirAttacks or {}) do
-        publishBite(self, GarBiteNotice.Clear(attack.Id, reason or 'gone'))
+        publishBite(self, GarBiteNotice.clear(attack.Id, reason or 'gone'))
     end
     fish.AirAttacks = nil
 end
@@ -1786,14 +1786,14 @@ function Mgr:update_air_attacks(fish, targetPos, now)
         if now >= attack.StrikeAt - 1e-8 then
             fish.AirAttacks[kind] = nil
             local hit = false
-            for _, player in ipairs(self:Players()) do
+            for _, player in ipairs(self:players()) do
                 local valid, cp = self:is_target_valid(player, attack.Center)
                 if valid and (cp.x-attack.Center.x)^2 + (cp.z-attack.Center.z)^2 <= attack.Radius^2
                     and math.abs(cp.y-attack.Center.y) <= attack.Radius then
-                    hit = self:Hit(fish, player, attack.Damage, kind) or hit
+                    hit = self:hit(fish, player, attack.Damage, kind) or hit
                 end
             end
-            publishBite(self, GarBiteNotice.Clear(attack.Id, hit and 'hit' or 'miss'))
+            publishBite(self, GarBiteNotice.clear(attack.Id, hit and 'hit' or 'miss'))
             if kind == 'airDive' then
                 state.Pos = {x=attack.Center.x,y=attack.Center.y,z=attack.Center.z}
                 state.Last = {x=state.Pos.x,y=state.Pos.y,z=state.Pos.z}
@@ -1856,12 +1856,12 @@ function Mgr:update_flying(fish, now)
     local dt = math.max(0, now - (fish.FlightAt or now))
     fish.FlightAt = now
     if self.Ai then
-        self.Ai:Custom(fish)
+        self.Ai:custom(fish)
         local speed = GameCfg.Fish[fish.FishId].Speed
-        if speed and speed > 0 then dt = dt * self:Speed(fish) / speed end
+        if speed and speed > 0 then dt = dt * self:speed(fish) / speed end
     end
     local diving = self:update_air_attacks(fish, tpos, now)
-    local events = diving and {} or FlightPath.Step(state, now, dt)
+    local events = diving and {} or FlightPath.step(state, now, dt)
     local moved, moveErr = pcall(function()
         body.Position = Vector3.New(state.Pos.x, state.Pos.y, state.Pos.z)
     end)
@@ -1881,13 +1881,13 @@ function Mgr:update_flying(fish, now)
         if target and tpos then
             local dx, dz = tpos.x - state.Pos.x, tpos.z - state.Pos.z
             if math.sqrt(dx * dx + dz * dz) <= flight.DiveRadius then
-                self:Hit(fish, target, events.diveDamage or state.Profile.DiveDamage or flight.DiveDamage, 'dive')
+                self:hit(fish, target, events.diveDamage or state.Profile.DiveDamage or flight.DiveDamage, 'dive')
             end
         end
     end
 end
 
-function Mgr:Hit(fish, target, damage, kind)
+function Mgr:hit(fish, target, damage, kind)
     if not target or not self.Vitals or type(damage) ~= 'number' or damage <= 0 then return false end
     local hit = self.Vitals:new_hit(fish, 'fishAttack')
     local applied = self.Vitals:apply_hit(hit, target, damage)
@@ -1898,7 +1898,7 @@ function Mgr:Hit(fish, target, damage, kind)
 end
 
 function Mgr:update_boss_phase(fish, now, pos)
-    if self.Ai then self.Ai:Custom(fish) end
+    if self.Ai then self.Ai:custom(fish) end
     local state = fish.Phase
     if not state then
         self:remove(fish)
@@ -1958,11 +1958,11 @@ function Mgr:update_boss_phase(fish, now, pos)
         self:end_boss_attack(fish,'stomp')
         if not warn then return end
         local radius=GameCfg.Ability.BossPhase.Attacks.stomp.Range
-        for _, player in ipairs(self:Players()) do
+        for _, player in ipairs(self:players()) do
             local valid,cp=self:is_target_valid(player,warn.Origin)
             if valid and (cp.x-warn.Origin.x)^2+(cp.z-warn.Origin.z)^2<=radius^2
                 and math.abs(cp.y-warn.Origin.y)<=radius then
-                self:Hit(fish,player,attack.Damage,'stomp')
+                self:hit(fish,player,attack.Damage,'stomp')
             end
         end
         return
@@ -1972,7 +1972,7 @@ function Mgr:update_boss_phase(fish, now, pos)
         self:end_boss_attack(fish,'strike')
         if not warn then return end
         local breath = GameCfg.Ability.BossPhase.Attacks.breath
-        for _, player in ipairs(self:Players()) do
+        for _, player in ipairs(self:players()) do
             local valid, cp = self:is_target_valid(player,warn.Origin)
             if valid then
                 local dx,dz = cp.x-warn.Origin.x,cp.z-warn.Origin.z
@@ -1980,25 +1980,25 @@ function Mgr:update_boss_phase(fish, now, pos)
                 local across = math.abs(dx*warn.Facing.z-dz*warn.Facing.x)
                 if along >= 0 and along <= breath.Range and across <= breath.Width/2
                     and math.abs(cp.y-warn.Origin.y) <= GameCfg.Ability.BossPhase.Chase.BiteRange then
-                    self:Hit(fish,player,player.Character.Controller.Health,'breath')
+                    self:hit(fish,player,player.Character.Controller.Health,'breath')
                 end
             end
         end
         return
     end
     if attack.Name == 'bite' and target and tpos and CarryMount.in_range(
-        CarryMount.New(GameCfg.Ability.Carry, pos, fish.Yaw or 0, now), tpos) then
+        CarryMount.new(GameCfg.Ability.Carry, pos, fish.Yaw or 0, now), tpos) then
         self:grab_player(fish, target, now, attack.Damage)
         return
     end
-    if target then self:Hit(fish, target, attack.Damage, attack.Name) end
+    if target then self:hit(fish, target, attack.Damage, attack.Name) end
 end
 
 function Mgr:end_boss_attack(fish, reason)
     if not fish.BossWarn then return end
     fish.BossWarn = nil
     if fish.Phase then fish.Phase.Pending = nil end
-    publishBite(self,GarBiteNotice.Clear(fish.Id,reason or 'gone'))
+    publishBite(self,GarBiteNotice.clear(fish.Id,reason or 'gone'))
 end
 
 function Mgr:start_aquatic(fish, now)
@@ -2020,13 +2020,13 @@ end
 function Mgr:update_aquatic(fish, now)
     local state=fish.Aquatic
     if not state then return end
-    if self.Ai then self.Ai:Custom(fish) end
+    if self.Ai then self.Ai:custom(fish) end
     local cfg=GameCfg.Ability.Aquatic
     local body=fish.Carrier.Body
     local p=readPosition(body)
     local dt=math.min(0.25,math.max(0,now-state.LastAt))
     state.LastAt=now
-    local speed=self:Speed(fish)
+    local speed=self:speed(fish)
     local w=state.Water
     local function moveTo(destination)
         local dx,dy,dz=destination.x-p.x,destination.y-p.y,destination.z-p.z
@@ -2038,10 +2038,10 @@ function Mgr:update_aquatic(fish, now)
         local center=state.HeadCenter
         state.HeadAt,state.HeadCenter=nil,nil
         self:end_boss_attack(fish,'head')
-        for _, player in ipairs(self:Players()) do
+        for _, player in ipairs(self:players()) do
             local valid,cp=self:is_target_valid(player,center)
             if valid and (cp.x-center.x)^2+(cp.z-center.z)^2<=cfg.HeadRadius^2 then
-                self:Hit(fish,player,cfg.HeadDamage,'head')
+                self:hit(fish,player,cfg.HeadDamage,'head')
             end
         end
     end
@@ -2063,10 +2063,10 @@ function Mgr:update_aquatic(fish, now)
             local phase = fish.Phase and fish.Phase.Phase
             state.Leap=nil
             self:end_boss_attack(fish,'land')
-            for _, player in ipairs(self:Players()) do
+            for _, player in ipairs(self:players()) do
                 local valid,cp=self:is_target_valid(player,p)
                 if valid and (cp.x-p.x)^2+(cp.z-p.z)^2<=cfg.LeapRadius^2 then
-                    self:Hit(fish,player,cfg.LeapDamage,'leap')
+                    self:hit(fish,player,cfg.LeapDamage,'leap')
                 end
             end
             if self.Fish[fish.Id] ~= fish or fish.Aquatic ~= state
@@ -2090,7 +2090,7 @@ function Mgr:update_aquatic(fish, now)
         if now>=state.NextLeapAt then
             local target,tpos,best
             local center=state.Scene.SafePoint
-            for _, player in ipairs(self:Players()) do
+            for _, player in ipairs(self:players()) do
                 local valid,cp=self:is_target_valid(player,center,{AggroRange=GameCfg.Ability.Flight.AggroRange})
                 if valid then
                     local d=(cp.x-center.x)^2+(cp.z-center.z)^2
@@ -2122,17 +2122,17 @@ function Mgr:grab_player(fish, target, now, damage)
     local carryCfg = GameCfg.Ability.Carry
     local pos = readPosition(fish.Carrier.Body)
     if not pos then return false end
-    local state = CarryMount.New(carryCfg, pos, fish.Yaw or 0, now)
+    local state = CarryMount.new(carryCfg, pos, fish.Yaw or 0, now)
     state.GroundY = (fish.Anchor and fish.Anchor.y) or pos.y
     state.TargetPlayer = target
     state.LastStepAt = now
-    local grabbed = CarryMount.Attach(state, target.Character and readPosition(target.Character) or pos, now)
+    local grabbed = CarryMount.attach(state, target.Character and readPosition(target.Character) or pos, now)
     if not grabbed.Ok then
         print('[FishTree] 叼人失败', tostring(grabbed.Reason), 'fish=' .. tostring(fish.Id))
         return false
     end
     fish.Carry = state
-    self:Hit(fish, target, damage or carryCfg.GrabDamage, 'bite')
+    self:hit(fish, target, damage or carryCfg.GrabDamage, 'bite')
     if fish.Carry ~= state or not self:is_target_valid(target, pos) then
         if fish.Carry == state then self:release_carried(fish, nil, 'gone') end
         return false
@@ -2165,12 +2165,12 @@ function Mgr:update_carry(fish, now)
         self:release_carried(fish, nil, 'gone')
         return
     end
-    local step = CarryMount.Step(state, now, dt)
+    local step = CarryMount.step(state, now, dt)
     if step.Released then
         self:release_carried(fish, step.drop_point, step.Reason)
         return
     end
-    local followed = CarryMount.Follow(state, tpos, now, dt)
+    local followed = CarryMount.follow(state, tpos, now, dt)
     if followed.Released then
         self:release_carried(fish, followed.Position, followed.Reason)
         return
@@ -2182,15 +2182,15 @@ function Mgr:update_carry(fish, now)
     end
     if carryCfg.ContactDamage and now - (fish.ContactAt or 0) >= (carryCfg.ContactIntervalSec or 1) then
         fish.ContactAt = now
-        self:Hit(fish, target, carryCfg.ContactDamage, 'carry')
+        self:hit(fish, target, carryCfg.ContactDamage, 'carry')
         if fish.Aquatic then
             local contact=GameCfg.Ability.Aquatic
-            for _, player in ipairs(self:Players()) do
+            for _, player in ipairs(self:players()) do
                 local valid,cp=self:is_target_valid(player,pos)
                 if player~=target and valid
                     and (cp.x-pos.x)^2+(cp.z-pos.z)^2<=contact.ContactRange^2
                     and math.abs(cp.y-pos.y)<=contact.ContactRange then
-                    self:Hit(fish,player,contact.ContactDamage,'carryContact')
+                    self:hit(fish,player,contact.ContactDamage,'carryContact')
                 end
             end
         end
@@ -2203,7 +2203,7 @@ function Mgr:release_carried(fish, dropPoint, reason)
     local now = self:now()
     local target = state.TargetPlayer
     local drop = dropPoint or CarryMount.drop_point(state.Host, state.Yaw, state.GroundY, GameCfg.Ability.Carry)
-    CarryMount.Release(state, now, reason or 'release')
+    CarryMount.release(state, now, reason or 'release')
     fish.Carry = nil
     fish.ContactAt = nil
     if fish.CarryMount then
@@ -2213,7 +2213,7 @@ function Mgr:release_carried(fish, dropPoint, reason)
     end
     if target and target.Character and drop then
         pcall(function() target.Character.Position = Vector3.New(drop.x, drop.y, drop.z) end)
-        self:Hit(fish, target, GameCfg.Ability.Carry.FallDamage or 0, 'fall')
+        self:hit(fish, target, GameCfg.Ability.Carry.FallDamage or 0, 'fall')
     end
     print('[FishTree] 放开玩家', target and target.UserId, reason or '', 'fish=' .. tostring(fish.Id))
     return true
@@ -2265,7 +2265,7 @@ function Mgr:cleanup_fish(fish)
     if self.Ai then self.Ai:remove(fish) end
     if fish.Carry then self:release_carried(fish, nil, 'died') end
     self:end_bite(fish, 'gone')
-    if fish.DischargeAt then publishBite(self, GarBiteNotice.Clear(fish.Id, 'gone')) end
+    if fish.DischargeAt then publishBite(self, GarBiteNotice.clear(fish.Id, 'gone')) end
     self:end_move(fish, 'gone')
     fish.WakeAt, fish.MoveName = nil, nil
     self.Fish[fish.Id] = nil
@@ -2317,8 +2317,8 @@ function Mgr:stabilize(fish)
     end)
 end
 
-function Mgr:Start()
-    if self.Ai then self.Ai:Start() end
+function Mgr:start()
+    if self.Ai then self.Ai:start() end
     self.World = service('World')
     local now = self:now()
     for _, fish in pairs(self.Fish) do
@@ -2341,7 +2341,7 @@ function Mgr:clear_links(player)
     self.Links[player.UserId] = nil
 end
 
-function Mgr:Stop()
+function Mgr:stop()
     for _, fish in pairs(self.Fish) do
         self:end_air_attacks(fish, 'stop')
         self:end_boss_attack(fish, 'stop')
@@ -2349,7 +2349,7 @@ function Mgr:Stop()
         if fish.Carry then self:release_carried(fish, nil, 'stop') end
     end
     if self.Ai then
-        self.Ai:Stop()
+        self.Ai:stop()
         for _, fish in pairs(self.Fish) do
             self:end_bite(fish, 'stop')
             self:end_move(fish, 'stop')
@@ -2375,7 +2375,7 @@ function Mgr:on_died(player)
     end
     if self.Ai then
         for _, current in pairs(self.Fish) do
-            self.Ai:Custom(current)
+            self.Ai:custom(current)
             if current.Heading then self:set_heading(current, current.Heading.x, current.Heading.z) end
             if current.Carry and current.Carry.TargetPlayer == player then self:release_carried(current, nil, 'gone') end
             if current.BiteAim and current.BiteAim.Target == player then self:end_bite(current, 'gone') end
@@ -2411,7 +2411,7 @@ function Mgr:on_player_removing(player)
     self:clear_links(player)
     for _, fish in pairs(self.Fish) do
         if self.Ai then
-            self.Ai:Custom(fish)
+            self.Ai:custom(fish)
             if fish.Heading then self:set_heading(fish, fish.Heading.x, fish.Heading.z) end
         end
         if fish.Carry and fish.Carry.TargetPlayer == player then self:release_carried(fish, nil, 'gone') end
@@ -2461,7 +2461,7 @@ function Mgr:ai_controlled(fish, now)
             if fish.Flight then fish.AirAttacks = {} end
             if fish.Carry then self:release_carried(fish, nil, 'controlled') end
         end
-        self.Ai:Pause(fish, true)
+        self.Ai:pause(fish, true)
         fish.Carrier.Body.LinearVelocity = Vector3.New(0, 0, 0)
         fish.CombatStepAt, fish.FlightAt, fish.PhaseAt = now, now, now
         return true
@@ -2482,7 +2482,7 @@ function Mgr:ai_controlled(fish, now)
             fish.Aquatic.LastAt=now
         end
         fish.ControlAt = nil
-        self.Ai:Pause(fish, false)
+        self.Ai:pause(fish, false)
         if fish.Heading then self:set_heading(fish, fish.Heading.x, fish.Heading.z) end
     end
     return false

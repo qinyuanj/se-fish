@@ -26,7 +26,7 @@ local function log(action,id)
     print('[volcano_probe]',action,'fish='..tostring(id),'at='..tostring(fishHost():now()))
 end
 
-function Probe.Spawn(player,species,isolated)
+function Probe.spawn(player,species,isolated)
     local Fish=fishHost()
     assert(isolated==true,'必须明确使用独立验收会话')
     assert(species=='fish55Elite' or species=='fish56Boss','只允许火山岛战斗目标')
@@ -77,7 +77,7 @@ function Probe.snapshot(player,id)
     return result
 end
 
-function Probe.Cleanup(id)
+function Probe.cleanup(id)
     local Fish=fishHost()
     local fish=Probe.Owned[id]
     if fish and Fish.Fish[id]==fish then Fish:remove(fish) end

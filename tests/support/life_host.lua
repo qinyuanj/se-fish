@@ -114,7 +114,7 @@ function M.start(opts)
       function player:SetAttribute(key, value) self.attrs[key] = value end
       function player:GetAttribute(key) return self.attrs[key] end
     end
-    data = data or PlayerData.New(player)
+    data = data or PlayerData.new(player)
     if not data.Inited then data:Init() end
     data.LoadState = "ready"
     data.Player = player

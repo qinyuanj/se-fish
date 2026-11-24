@@ -33,7 +33,7 @@ function Mgr:snapshot(player)
         completed = data.Extra.achievements and data.Extra.achievements.final == true }
 end
 
-function Mgr:Handle(player, payload)
+function Mgr:handle(player, payload)
     if not isValidPlayer(player) or not Records.valid_user_id(player.UserId) or type(payload) ~= 'table' then return end
     local seq = payload.seq
     if type(seq) ~= 'number' or seq ~= math.floor(seq) or seq < 1 or seq > 2147483647 then return end
@@ -171,7 +171,7 @@ function Mgr.mount(scope, player_tree, opts)
     player_tree.compendium = session
     SignalRouter.bind_player(scope, _G.REUtil:get_re('CompendiumRequest').OnServerEvent, player, function(actor, payload)
         if _G.REUtil:check_recd(actor, 'CompendiumRequest', GameCfg.Compendium.RequestCooldownSec) then return end
-        session:Handle(actor, payload)
+        session:handle(actor, payload)
     end)
     scope:subscribe(opts.clock.on_second, function() session:drain(player) end)
     scope:on_cleanup(function()

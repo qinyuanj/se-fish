@@ -97,7 +97,7 @@ function M.new(zoneIndex)
     env.lifeHost = LifeHost.start({ now = 0, fish_carrier = env.carrier })
     env.vitals = env.lifeHost.runtime.life
     env.mgr.Vitals = env.vitals
-    env.mgr:Start()
+    env.mgr:start()
     local safe = M.shore_dry_point(zoneIndex or 6)
     local c = { Health = 300, HealthChanged = signal(), Died = signal(), Lift = function() end }
     function c:TakeDamage(d) self.Health = math.max(0, self.Health - d); self.HealthChanged:Fire(self.Health) end
@@ -114,7 +114,7 @@ end
 function M:tear_down()
     local env = self
     for _, fish in pairs(env.mgr.Fish) do env.mgr:remove(fish) end
-    env.mgr:Stop()
+    env.mgr:stop()
     env.lifeHost:shutdown()
     for _, name in ipairs(MODULES) do package.loaded[name] = env.modules[name] end
     for _, name in ipairs(GLOBALS) do _G[name] = env.saved[name] end

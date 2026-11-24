@@ -29,7 +29,7 @@ function Mgr:send_fallback(player)
     })
 end
 
-function Mgr:Begin(player)
+function Mgr:begin(player)
     if not player then return end
     self.Requested[player.UserId] = player
     local data = self.PlayerData and self.PlayerData:get_data_inst(player)
@@ -64,11 +64,11 @@ function Mgr:on_signal(name, player, storyId)
         state.deadline = nil
     elseif (name == 'OnStoryEnd' or name == 'OnStorySkip')
         and (state.phase == 'started' or state.phase == 'pending') then
-        self:Complete(player, state.readKey, name == 'OnStorySkip' and 'skip' or 'end')
+        self:complete(player, state.readKey, name == 'OnStorySkip' and 'skip' or 'end')
     end
 end
 
-function Mgr:Complete(player, readKey, source)
+function Mgr:complete(player, readKey, source)
     local state = player and self.States[player.UserId]
     if not state or state.player ~= player or readKey ~= state.readKey
         or source == 'read' and state.phase ~= 'fallback'
@@ -80,7 +80,7 @@ end
 
 function Mgr:persist_read(player, state)
     if self.Save and state.leave then
-        local status = self.Save:Status(player.UserId)
+        local status = self.Save:status(player.UserId)
         if status.autosavePaused or status.loadState == 'failed' then
             state.failed = true
             local leave = state.leave
@@ -132,8 +132,8 @@ end
 function Mgr:flush_before_leave(player, done)
     local state = player and self.States[player.UserId]
     if not self.Save or not state or state.player ~= player or state.failed
-        or not state.completeSource or self.Save:Status(player.UserId).loadState ~= 'ready' then return false end
-    if self.Save:Status(player.UserId).autosavePaused then
+        or not state.completeSource or self.Save:status(player.UserId).loadState ~= 'ready' then return false end
+    if self.Save:status(player.UserId).autosavePaused then
         state.failed, state.leave = true, nil
         print('[PlayerStory] 保存已暂停，离场保留未读', player.UserId)
         return false
@@ -153,13 +153,13 @@ function Mgr:flush_before_leave(player, done)
 end
 
 function Mgr:on_player_added(player)
-    if self.Requested[player.UserId] == player then self:Begin(player) end
+    if self.Requested[player.UserId] == player then self:begin(player) end
 end
 
 function Mgr:update()
     local now
     for _, player in pairs(self.Requested) do
-        if not self.States[player.UserId] then self:Begin(player) end
+        if not self.States[player.UserId] then self:begin(player) end
     end
     for userId, state in pairs(self.States) do
         if state.completeSource and state.phase ~= 'saving' then self:persist_read(state.player, state) end
@@ -209,15 +209,15 @@ function Mgr.mount(scope, player_tree, opts)
     end
     SignalRouter.bind_player(scope, _G.REUtil:get_re('RequestStory').OnServerEvent, player, function(actor)
         if _G.REUtil:check_recd(actor, 'RequestStory', 0.5) then return end
-        session:Begin(actor)
+        session:begin(actor)
     end)
     SignalRouter.bind_player(scope, _G.REUtil:get_re('StoryRead').OnServerEvent, player, function(actor, payload)
         if type(payload) ~= 'table' or payload.action ~= 'read'
             or type(payload.readKey) ~= 'string' or _G.REUtil:check_recd(actor, 'StoryRead', 0.5) then return end
-        session:Complete(actor, payload.readKey, 'read')
+        session:complete(actor, payload.readKey, 'read')
     end)
     scope:subscribe(opts.clock.on_second, function() session:update() end)
-    session:Begin(player)
+    session:begin(player)
     scope:on_cleanup(function()
         session:on_player_removing(player)
         if player_tree.story == session then player_tree.story = nil end

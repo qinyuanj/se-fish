@@ -51,6 +51,6 @@ task:Spawn(function()
     log('生产守卫', tostring(ok), tostring(why), '测试驱动=' .. tostring(driven))
     assert(not ok and why == 'unavailable' and not driven)
     local life = ServerRuntime.current() and ServerRuntime.current().life
-    log('复活入口状态', life and life:Phase(p) or 'no-life')
+    log('复活入口状态', life and life:phase(p) or 'no-life')
     log('DONE 本地模拟取证；真实平台归#148')
 end)

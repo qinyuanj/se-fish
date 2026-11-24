@@ -628,7 +628,7 @@ describe("客户端 Spoke 主干契约（#296）", function()
       local ok, err = pcall(function()
         _G.Vector2 = { New = function(x, y) return { x = x, y = y } end }
         _G.Color = { New = function(...) return { ... } end }
-        package.loaded["common.zone_markers"] = { Start = noop, Zones = zones }
+        package.loaded["common.zone_markers"] = { start = noop, Zones = zones }
         package.loaded["common.re_util"] = {
           get_re = function(_, name)
             if not remote_events[name] then

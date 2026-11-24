@@ -174,8 +174,8 @@ function FishAbility:capture_base_speed(player)
 	return self.Attr:capture_base_speed(player)
 end
 
-function FishAbility:MaxHealth(player)
-	return self.Attr:MaxHealth(player)
+function FishAbility:max_health(player)
+	return self.Attr:max_health(player)
 end
 
 local function queueSpeed(self, player, err)
@@ -228,7 +228,7 @@ function FishAbility:fish_paralyzed(fish)
 	return self.Modifier:is_controlled(fish)
 end
 
-function FishAbility:Start()
+function FishAbility:start()
 	AbilityAPI.BehaviorServices = self.BehaviorServices
 	AbilityAPI.set_cast_guard(function(unit, index) return self:can_cast(unit) end)
 end

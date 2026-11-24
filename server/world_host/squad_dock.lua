@@ -74,7 +74,7 @@ function SquadDock.mount(world, opts)
     return nil
   end
 
-  function self:Members(player)
+  function self:members(player)
     local party = self.Parties[self:party_id_of(player) or 0]
     local out = {}
     if not party then return out end
@@ -448,7 +448,7 @@ function SquadDock.mount(world, opts)
     return true
   end
 
-  function self:Handle(player, payload)
+  function self:handle(player, payload)
     if not is_valid_player(player) or type(payload) ~= "table" then return false end
     local action = payload.action
     if action == "Invite" then self:invite(player, payload.targetUserId)

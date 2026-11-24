@@ -34,6 +34,7 @@ common/packages/spoke/runtime/epoch.lua             function Epoch:compare_to() 
 - 新增守卫：`local X = require(...)` 的 `X` 必须是 Pascal 形，否则口径会漂回 snake（原 L2 的门禁只有文件名）。
 - `docs/engine-keys.md` 的正反例随之更新（`DamageFloat:Show` → `DamageFloat:show`）。
 - **`*/packages/` 整包一律不参与命名迁移**（三个端各一个）：上游整包与本仓维护的自研包同等处理，包内文件、模块表、方法名都保持原样，跟随各自上游口径。命名门禁本来就跳过这些目录，这条把口径写死，避免「自研包要不要跟进」反复讨论。
+- **实现官方/包内接口的方法名跟随接口**：自研模块若实现包内声明的接口方法（如 ability 锚点接口的 `M.Attach`），该方法名保持接口原样；语义不同的自研同名方法照常改 snake，两者同名不冲突。L3b 落地时 `Attach` 就按这条处理：包内接口一侧 7 处保持，自研 `CarryMount.attach`/`FishAi:attach` 改 snake。
 
 ## 拒绝的备选
 

@@ -77,7 +77,7 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
     }
     env.data = {}
     for _, player in ipairs(env.players) do
-      env.data[player.UserId] = env.PlayerDataClass.New(player, function() end)
+      env.data[player.UserId] = env.PlayerDataClass.new(player, function() end)
       env.data[player.UserId]:Init()
     end
 
@@ -163,7 +163,7 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
         end)
       end,
     })
-    function env.mgr:Handle(player, payload)
+    function env.mgr:handle(player, payload)
       if not self.Save then return false end
       self:update()
       return reStub:get_re('FerryAction').OnServerEvent:Fire(player, payload) == true
@@ -217,12 +217,12 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
 
   local function board(userId, seq, route)
     route = route or env.route
-    return env.mgr:Handle(env.players[userId], { action = 'Board', routeId = route.Id, seq = seq })
+    return env.mgr:handle(env.players[userId], { action = 'Board', routeId = route.Id, seq = seq })
   end
 
   local function back(userId, seq, route)
     route = route or env.route
-    return env.mgr:Handle(env.players[userId], { action = 'Return', routeId = route.Id, seq = seq })
+    return env.mgr:handle(env.players[userId], { action = 'Return', routeId = route.Id, seq = seq })
   end
 
   local function standAt(userId, name, offsetX, offsetZ)
@@ -262,7 +262,7 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
     board(1, 1)
     local operation = last_reply(1).operation
     local broadcasts = #env.broadcasts
-    assert.is_true(env.mgr:Handle(env.players[1],
+    assert.is_true(env.mgr:handle(env.players[1],
       { action = 'Board', routeId = env.route.Id, seq = 2, requestId = operation }))
     assert.is_true(last_reply(1).ok)
     assert.same(broadcasts, #env.broadcasts)
@@ -373,10 +373,10 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
     local operation = last_reply(1).operation
     sail()
     local player = new_player(1, 100, 6, 103)
-    local data = env.PlayerDataClass.New(player)
+    local data = env.PlayerDataClass.new(player)
     env.players[1], env.data[1] = player, data
     env.save:load_into(player, data)
-    assert.is_true(env.mgr:Handle(player, { action = 'Board', routeId = env.route.Id, seq = 1,
+    assert.is_true(env.mgr:handle(player, { action = 'Board', routeId = env.route.Id, seq = 1,
       requestId = operation }))
     assert.same({ ok = true, action = 'Board', routeId = env.route.Id, price = nil, operation = operation },
       last_reply(1))
@@ -390,7 +390,7 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
     board(1, 1)
     sail()
     local player = new_player(1, 100, 6, 103)
-    local data = env.PlayerDataClass.New(player)
+    local data = env.PlayerDataClass.new(player)
     env.players[1], env.data[1] = player, data
     env.save:load_into(player, data)
     env.mgr:update()
@@ -524,12 +524,12 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
     assert.is_true(env.data[1]:AddItem(route.Outbound.Ticket))
     standAt(1, route.Outbound.AnchorName)
     for _, forged in ipairs({ 'fishPond>volcanoIsland', 'Z9', 1, true, '' }) do
-      assert.is_false(env.mgr:Handle(env.players[1], { action = 'Board', routeId = forged, seq = 1 }))
+      assert.is_false(env.mgr:handle(env.players[1], { action = 'Board', routeId = forged, seq = 1 }))
       assert.same('route', last_reply(1).reason)
     end
-    assert.is_false(env.mgr:Handle(env.players[1], { action = 'Board', seq = 1 }))
+    assert.is_false(env.mgr:handle(env.players[1], { action = 'Board', seq = 1 }))
     assert.same('route', last_reply(1).reason)
-    assert.is_false(env.mgr:Handle(env.players[1],
+    assert.is_false(env.mgr:handle(env.players[1],
       { action = 'Return', routeId = route.Id .. 'x', seq = 1 }))
     assert.same('route', last_reply(1).reason)
     assert.message('拒收不动账').same(1, env.data[1]:ItemCount(route.Outbound.Ticket))
@@ -596,7 +596,7 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
     env.mgr.Save = nil
     assert.is_false(board(1, 1))
     env.mgr.Save = env.save
-    assert.is_false(env.mgr:Handle(env.players[1], { action = 'Board', routeId = env.route.Id, seq = 2,
+    assert.is_false(env.mgr:handle(env.players[1], { action = 'Board', routeId = env.route.Id, seq = 2,
       requestId = { id = '1:99', sequence = 99, kind = 'ferry:board', requestKey = 'forged' } }))
     assert.is_false(board(1, math.huge))
     assert.same(1, env.data[1]:ItemCount(env.route.Outbound.Ticket))
@@ -674,7 +674,7 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
     local operation = last_reply(1).operation.id
     env.mgr:on_player_removing(env.players[1])
     local player = new_player(1, -8, 2.2, 24)
-    local data = env.PlayerDataClass.New(player)
+    local data = env.PlayerDataClass.new(player)
     env.players[1], env.data[1] = player, data
     env.save:load_into(player, data)
     env.mgr:on_player_added(player)
@@ -697,7 +697,7 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
     board(1, 1)
     env.mgr:on_player_removing(env.players[1])
     local player = new_player(1, -8, 2.2, 24)
-    local data = env.PlayerDataClass.New(player)
+    local data = env.PlayerDataClass.new(player)
     env.players[1], env.data[1] = player, data
     env.save:load_into(player, data)
     env.mgr:update()
@@ -766,7 +766,7 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
     assert.same(40, data.Data.FishCoin)
     assert.is_false(last_reply(1).ok)
     local operation = last_reply(1).operation
-    assert.is_true(env.mgr:Handle(player,
+    assert.is_true(env.mgr:handle(player,
       { action = 'Return', routeId = env.route.Id, seq = 2, requestId = operation }))
     assert.same('teleport', last_reply(1).reason)
     assert.same(40, data.Data.FishCoin)
@@ -784,10 +784,10 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
     assert.message('返回服务端操作身份供跨会话补发').is_not_nil(operation)
     env.mgr:on_player_removing(player)
     player = new_player(1, 101, 6, 103)
-    data = assert(loadfile('server/data/player_data.lua'))().New(player)
+    data = assert(loadfile('server/data/player_data.lua'))().new(player)
     env.players[1], env.data[1] = player, data
     env.save:load_into(player, data)
-    assert.is_true(env.mgr:Handle(player,
+    assert.is_true(env.mgr:handle(player,
       { action = 'Return', routeId = env.route.Id, seq = 1, requestId = operation }))
     assert.same(40 - env.route.Return.Price, data.Data.FishCoin)
     assert.same(0, player.teleports)

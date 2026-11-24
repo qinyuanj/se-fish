@@ -6,7 +6,7 @@ function DamageFloat.display_amount(amount)
     return math.max(1, math.floor(amount + 0.5))
 end
 
-function DamageFloat:Clear()
+function DamageFloat:clear()
     local pending = {}
     local function destroy(node)
         local ok, err = pcall(function() node:Destroy() end)
@@ -25,7 +25,7 @@ end
 
 function DamageFloat:bind(root, resolution)
     if self.Root == root then return end
-    self:Clear()
+    self:clear()
     self.Root, self.Resolution = root, resolution
 end
 
@@ -48,7 +48,7 @@ function DamageFloat:project(position, height)
     return screen.x, self.Resolution.y - screen.y
 end
 
-function DamageFloat:Show(payload)
+function DamageFloat:show(payload)
     if not self.Root or not valid(payload) then return end
     local x, y = self:project(payload.position, payload.height)
     if not x then return end

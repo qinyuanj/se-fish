@@ -7,7 +7,7 @@ local function leaf(fish)
     return fish.AiLeaf
 end
 
-function Mgr:Custom(fish)
+function Mgr:custom(fish)
     local state = leaf(fish)
     local carrier = fish.Carrier
     if state.Mode or not state.Initialized then
@@ -31,10 +31,10 @@ function Mgr:Custom(fish)
     return true
 end
 
-function Mgr:Pause(fish, paused)
+function Mgr:pause(fish, paused)
     local state = leaf(fish)
     if paused then
-        self:Custom(fish)
+        self:custom(fish)
         local record = fish.AbilityRecord
         if record and record.Ready and not state.Paused then
             local api = self.AbilityAPI or require('server.packages.ability_system.api')
@@ -70,7 +70,7 @@ function Mgr:command(fish, mode, target, direction, speed, distance, range)
             return true
         end
     end
-    if not self:Custom(fish) then return false end
+    if not self:custom(fish) then return false end
     local ok, err = pcall(function()
         local p, offset = carrier.Body.Position, carrier.ReceiverOffset
         unit.Position = Vector3.New(p.x + (offset and offset.x or 0),
@@ -87,7 +87,7 @@ function Mgr:command(fish, mode, target, direction, speed, distance, range)
     if not ok then
         print('[FishAi] operation=Command', 'fish=' .. tostring(fish.Id), mode, tostring(err))
         state.Mode = nil
-        self:Custom(fish)
+        self:custom(fish)
         return false
     end
     state.Mode, state.Target, state.Direction, state.Speed = mode, target, direction, speed
@@ -130,7 +130,7 @@ function Mgr:cast_fish(fish)
     return started
 end
 
-function Mgr:Attach(fish)
+function Mgr:attach(fish)
     local carrier = fish and fish.Carrier
     if not carrier or not carrier.Receiver or not carrier.Receiver.Controller then
         print('[FishAi] operation=Attach', 'fish=' .. tostring(fish and fish.Id), 'missing-receiver')
@@ -142,17 +142,17 @@ end
 
 function Mgr:remove(fish)
     if not fish then return true end
-    local ok = self:Custom(fish)
+    local ok = self:custom(fish)
     fish.AiLeaf = nil
     if fish.Carrier then fish.Carrier.AiOwnsMovement = false end
     return ok
 end
 
-function Mgr:Start()
+function Mgr:start()
     self.Stopped = false
 end
 
-function Mgr:Stop()
+function Mgr:stop()
     self.Stopped = true
 end
 

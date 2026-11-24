@@ -65,8 +65,8 @@ describe('TestAiMigration', function()
         local v = env.runtime.vector
         env.mgr:move_direction(env.fish, v(1, 0, 0), 3)
         env.runtime.task:pump(0.1)
-        env.mgr:Stop()
-        env.mgr:Start()
+        env.mgr:stop()
+        env.mgr:start()
         assert.is_true(env.mgr:move_direction(env.fish, v(0, 0, 1), 3))
         env.runtime.task:pump(0.1)
         env.mgr:remove(env.fish)
@@ -101,8 +101,8 @@ describe('TestAiMigration', function()
 
     it('test_failed_stop_rejects_same_frame_custom_handoff', function()
         env.unit.Controller.Move = function() error('stop-denied') end
-        assert.is_false(env.mgr:Custom(env.fish))
-        assert.is_false(env.mgr:Custom(env.fish))
+        assert.is_false(env.mgr:custom(env.fish))
+        assert.is_false(env.mgr:custom(env.fish))
         assert.is_false(env.mgr:Chase(env.fish, env.runtime.newUnit(5303), 3, 1, 30))
     end)
 
@@ -121,15 +121,15 @@ describe('TestAiMigration', function()
         assert.is_true(env.mgr:move_direction(env.fish, v(1, 0, 0), 3))
         env.runtime.task:pump(0.1)
         assert.are.equal(1, env.unit.Controller.moves[#env.unit.Controller.moves].x)
-        env.mgr:Pause(env.fish, true)
+        env.mgr:pause(env.fish, true)
         env.runtime.task:pump(0.1)
         assert.are.equal(0, env.runtime.vecLen(env.unit.Controller.moves[#env.unit.Controller.moves]))
         assert.is_false(env.mgr:move_direction(env.fish, v(0, 0, 1), 3))
-        env.mgr:Pause(env.fish, false)
+        env.mgr:pause(env.fish, false)
         assert.is_true(env.mgr:move_direction(env.fish, v(0, 0, 1), 3))
         env.runtime.task:pump(0.1)
         assert.are.equal(1, env.unit.Controller.moves[#env.unit.Controller.moves].z)
-        env.mgr:Custom(env.fish)
+        env.mgr:custom(env.fish)
         env.runtime.task:pump(0.1)
         assert.is_false(env.fish.Carrier.AiOwnsMovement)
         assert.are.equal(0, env.runtime.vecLen(env.unit.Controller.moves[#env.unit.Controller.moves]))
@@ -155,7 +155,7 @@ describe('TestAiMigration', function()
         local v = env.runtime.vector
         env.unit.Position = v(90, 10, 90)
         env.fish.Carrier.Body.Position = v(1, 2, 3)
-        assert.is_true(env.mgr:Custom(env.fish))
+        assert.is_true(env.mgr:custom(env.fish))
         assert.are.equal(1, env.unit.Position.x)
         assert.is_not.is_nil(env.unit.Controller.moves[1])
         assert.are.equal(0, env.runtime.vecLen(env.unit.Controller.moves[1]))
@@ -176,9 +176,9 @@ describe('TestFishAiLifecycle', function()
     it('test_every_configured_fish_hands_off_on_release_and_remove', function()
         local calls = {}
         env.mgr.Ai = {
-            Custom = function(_, fish) calls[fish] = (calls[fish] or 0) + 1; return true end,
+            custom = function(_, fish) calls[fish] = (calls[fish] or 0) + 1; return true end,
             remove = function(_, fish) calls[fish] = (calls[fish] or 0) + 1 end,
-            move_direction = function() return true end, Stop = function() end,
+            move_direction = function() return true end, stop = function() end,
         }
         for id in pairs(GameCfg.Fish) do
             local fish = env:land(env.player, id)
@@ -192,21 +192,21 @@ describe('TestFishAiLifecycle', function()
     end)
 
     it('test_failed_handoff_does_not_start_business_move', function()
-        env.mgr.Ai = { Custom = function() return false end, Stop = function() end }
+        env.mgr.Ai = { custom = function() return false end, stop = function() end }
         local fish = env:land(env.player)
         env.mgr:start_move(fish, 'peck', { x = 0, y = 0, z = 0 }, nil, nil, 1, 2, 3)
         assert.is_nil(fish.Move)
     end)
 
     it('test_stop_cancels_pending_bite_and_start_preserves_escape_deadline', function()
-        env.mgr.Ai = { Custom = function() return true end, Pause = function() end,
-            Stop = function(self) self.Stopped = true end, Start = function(self) self.Stopped = false end }
+        env.mgr.Ai = { custom = function() return true end, pause = function() end,
+            stop = function(self) self.Stopped = true end, start = function(self) self.Stopped = false end }
         local fish = env:land(env.player)
         fish.BiteAim = { Target = env.player, StrikeAt = 1 }
         fish.FleeAt = 30
-        env.mgr:Stop()
+        env.mgr:stop()
         assert.is_nil(fish.BiteAim)
-        env.mgr:Start()
+        env.mgr:start()
         assert.are.equal(30, fish.FleeAt)
     end)
 end)

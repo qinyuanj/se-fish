@@ -197,11 +197,11 @@ function LifeFacade.new(ctx)
     return true
   end
 
-  function life:Phase(player)
+  function life:phase(player)
     return self:life_status(player)
   end
 
-  function life:GetState(player)
+  function life:get_state(player)
     local tree = tree_of(player)
     if not tree then return nil end
     return { player = player, phase = tree.states.life_phase:now(), tree = tree }
@@ -266,7 +266,7 @@ function LifeFacade.new(ctx)
       return { ok = started == true, action = "Rescue", targetUserId = target.UserId, reason = why }
     end, function(written, result)
       if not written then
-        if started then self:cancel_rescue(self:GetState(target)) end
+        if started then self:cancel_rescue(self:get_state(target)) end
         reply({ action = "Rescue", ok = false, reason = tostring(result), seq = seq, targetUserId = target.UserId })
         return
       end

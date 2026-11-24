@@ -108,7 +108,7 @@ local function host(opts)
   }
 
   function api:add(player, data)
-    data = data or PlayerData.New(player)
+    data = data or PlayerData.new(player)
     if not data.Inited then data:Init() end
     data.LoadState = "ready"
     data.Player = player

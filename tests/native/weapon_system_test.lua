@@ -161,12 +161,12 @@ describe('TestMgrFishUnitBlastFish', function()
         saved = { game = rawget(_G, 'game'), carrier = package.loaded['server.world_host.fish_carrier'] }
         ctx = { now = 3000, despawned = {}, spawnOpts = {} }
         package.loaded['server.world_host.fish_carrier'] = {
-            Spawn = function(_, opts)
+            spawn = function(_, opts)
                 ctx.spawnOpts[#ctx.spawnOpts + 1] = opts
                 return { Body = { Position = opts.Position }, Receiver = { Controller = {} } }, nil
             end,
             despawn = function(_, carrier) ctx.despawned[#ctx.despawned + 1] = carrier end,
-            Attach = function() end,
+            attach = function() end,
         }
         _G.game = { GetService = function(_, name)
             if name == 'World' then return { GetServerTime = function() return ctx.now end } end
@@ -677,7 +677,7 @@ describe('TestMgrWeaponThrow', function()
                     done(true, { ok = true, action = 'throw', itemId = 'item143', slot = 2 })
                     return true
                 end
-                local draft = PlayerData.New(Weapon.player(42))
+                local draft = PlayerData.new(Weapon.player(42))
                 draft:Init()
                 assert.is_true(draft:ApplySave(data:Serialize()))
                 local result = transform(draft)
@@ -831,15 +831,15 @@ end)
 describe('TestPressGesture', function()
     it('test_tap_and_long_press_and_move_cancel', function()
         local Gesture = require('client.press_gesture')
-        local g = Gesture.New({ LongPressSec = 0.35 })
-        g:Begin(10, { x = 100, y = 100 })
-        assert.same('tap', g:End(10.1, { x = 103, y = 101 }))
-        g:Begin(20, { x = 100, y = 100 })
+        local g = Gesture.new({ LongPressSec = 0.35 })
+        g:begin(10, { x = 100, y = 100 })
+        assert.same('tap', g:finish(10.1, { x = 103, y = 101 }))
+        g:begin(20, { x = 100, y = 100 })
         assert.is_false(g:update(20.2))
         assert.is_true(g:update(20.4)) -- 长按触发选点
-        assert.same('long', g:End(20.5, { x = 300, y = 300 }))
-        g:Begin(30, { x = 100, y = 100 })
-        assert.is_nil(g:End(30.1, { x = 200, y = 100 })) -- 滑出容差：既不是点按也不是长按
+        assert.same('long', g:finish(20.5, { x = 300, y = 300 }))
+        g:begin(30, { x = 100, y = 100 })
+        assert.is_nil(g:finish(30.1, { x = 200, y = 100 })) -- 滑出容差：既不是点按也不是长按
     end)
 end)
 
@@ -934,12 +934,12 @@ end)
 describe('TestWeaponPersistence', function()
     it('test_rejoin_restores_equipment_and_full_magazine', function()
         local player = Weapon.player(129)
-        local data = PlayerData.New(player)
+        local data = PlayerData.new(player)
         data:Init()
         assert.is_true(data:GrantWeapon('item137', 1))
         assert.is_true(data:SelectWeapon('item137'))
         local snapshot = data:Serialize()
-        local re = PlayerData.New(player)
+        local re = PlayerData.new(player)
         re:Init()
         assert.is_true(re:ApplySave(snapshot))
 

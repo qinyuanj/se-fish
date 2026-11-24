@@ -79,7 +79,7 @@ end
 
 -- #52：业务入口使用真实 Spoke PlayerEffects + ModifierLeaf + 真实官方包；替身只提供单位、时钟与伤害边界。
 local function business(run)
-    local runtime = require('tests.support.modifier_runtime').New(100)
+    local runtime = require('tests.support.modifier_runtime').new(100)
     local modifier = runtime.load_modifier()
     local player = { UserId = 52001, Character = runtime.unit('character') }
     local hits = {}
@@ -136,8 +136,8 @@ describe("TestModifierProbe", function()
 
   it("test_character_removal_snapshots_weak_before_old_owner_destruction", function()
     business(function(e, mgr, player)
-      assert.is_true(mgr:Apply(nil, player, 'weak', 17))
-      assert.is_true(mgr:Apply(nil, player, 'burn'))
+      assert.is_true(mgr:apply(nil, player, 'weak', 17))
+      assert.is_true(mgr:apply(nil, player, 'burn'))
       e.wait(2)
       mgr:on_character_removing(player)
       player.Character:Destroy()
@@ -162,8 +162,8 @@ describe("TestModifierProbe", function()
       local died = { callbacks = {} }
       function died:Connect(fn) self.callbacks[#self.callbacks + 1] = fn return { Disconnect = function() end } end
       player.Character.Died = died
-      assert.is_true(mgr:Apply(nil, player, 'weak', 20))
-      assert.is_true(mgr:Apply(nil, player, 'paralyze', 5))
+      assert.is_true(mgr:apply(nil, player, 'weak', 20))
+      assert.is_true(mgr:apply(nil, player, 'paralyze', 5))
       e.wait(2)
       for _, fn in ipairs(died.callbacks) do fn() end
       assert.are.equal(18, mgr:get_remaining(player, 'weak'))
@@ -188,7 +188,7 @@ describe("TestModifierProbe", function()
 
   it("test_business_dot_uses_real_manager_phase_final_tick_and_latest_source", function()
     local clock, hits = 100, {}
-    local runtime = require('tests.support.modifier_runtime').New(clock)
+    local runtime = require('tests.support.modifier_runtime').new(clock)
     local target = { UserId = 49001, Character = runtime.unit('target') }
     local mgr = runtime.load_modifier()
     mgr.Vitals = {
@@ -235,15 +235,15 @@ describe("TestModifierProbe", function()
 
   it("test_business_refresh_controls_and_weak_remaining_are_vendor_driven", function()
     business(function(e, mgr, player)
-      assert.is_true(mgr:Apply(nil, player, 'weak', 17))
-      assert.is_true(mgr:Apply(nil, player, 'frost'))
+      assert.is_true(mgr:apply(nil, player, 'weak', 17))
+      assert.is_true(mgr:apply(nil, player, 'frost'))
       assert.are.equal(0.35, mgr:get_move_multiplier(player))
       e.wait(1)
-      assert.is_true(mgr:Apply(nil, player, 'frost'))
+      assert.is_true(mgr:apply(nil, player, 'frost'))
       local entity = mgr.ModifierAPI.GetUnitModifiers(player.Character, 'test:frost')[1]
       assert.are.equal(1, entity:GetAttribute('CurrCount'))
       assert.are.equal(3, mgr:get_remaining(player, 'frost'))
-      assert.is_true(mgr:Apply(nil, player, 'paralyze'))
+      assert.is_true(mgr:apply(nil, player, 'paralyze'))
       assert.is_true(mgr:is_controlled(player))
       assert.are.equal(0, mgr:get_move_multiplier(player))
       e.wait(0.5)
@@ -254,7 +254,7 @@ describe("TestModifierProbe", function()
       local remaining = mgr:get_remaining(player, 'weak')
       mgr:on_player_removing(player)
       e.wait(300)
-      assert.is_true(mgr:Apply(nil, player, 'weak', remaining))
+      assert.is_true(mgr:apply(nil, player, 'weak', remaining))
       assert.are.equal(12.5, mgr:get_remaining(player, 'weak'))
     end)
   end)
@@ -263,7 +263,7 @@ describe("TestModifierProbe", function()
     business(function(e, mgr, player)
       mgr.Ability = { refresh_move_speed = function() error('退出后禁止刷新属性') end }
       mgr.Ability = nil
-      assert.is_true(mgr:Apply(nil, player, 'weak', 17))
+      assert.is_true(mgr:apply(nil, player, 'weak', 17))
       mgr.Ability = { refresh_move_speed = function() error('退出后禁止刷新属性') end }
       mgr:on_player_removing(player)
       mgr:on_player_removing(player)

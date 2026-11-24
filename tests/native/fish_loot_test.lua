@@ -71,7 +71,7 @@ local function host()
   runtime:start(); runtime:mark_started()
   local api = { runtime = runtime, events = events, created = created, clock = clock }
   function api:add(p)
-    local data = PlayerData.New(p); data:Init(); data.LoadState = "ready"; data.Player = p
+    local data = PlayerData.new(p); data:Init(); data.LoadState = "ready"; data.Player = p
     data_of[p.UserId] = data; players[#players + 1] = p
     runtime:on_player_added(p); runtime:on_save_ready(p, data)
     return data

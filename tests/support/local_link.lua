@@ -80,13 +80,13 @@ local function new_player(env, userId, position, name)
 end
 
 --- 建一套连接夹具：装引擎替身、加载并装配管理器，但不 Start。
---- 调用方随后 link:Start()（等价 GameStart），结束时必须 link:close()。
+--- 调用方随后 link:start()（等价 GameStart），结束时必须 link:close()。
 function M.new(opts)
     opts = opts or {}
     local GameCfg = require('common.game_cfg')
     local ZoneFixtures = require('tests.support.zone_fixtures')
     local ZoneMarkers = require('common.zone_markers')
-    if not ZoneMarkers.Ready then ZoneFixtures.Apply(GameCfg) end
+    if not ZoneMarkers.Ready then ZoneFixtures.apply(GameCfg) end
 
     local env = {
         cfg = GameCfg, queue = {}, sent = {}, re = {}, values = {}, online_players = {}, created = {},
@@ -220,7 +220,7 @@ end
 
 -- ===== 任务队列与世界时钟 =====
 
-function M:Tick()
+function M:tick()
     for _ = 1, 500 do
         if #self.queue == 0 then return self end
         table.remove(self.queue, 1)()
@@ -235,24 +235,24 @@ function M:advance(seconds)
         self.now = self.lifeHost.clock.now()
         self.managers.Save:update()
     end
-    return self:Tick()
+    return self:tick()
 end
 
-function M:Start()
+function M:start()
     M.assert_wiring()
     -- 读档就绪回调：main.lua 用 MgrSave.on_ready 分发第一批管理器的 on_player_added，
     -- 这里接同一个入口，而不是自己另写一套「加入后初始化」。
     self.managers.Save.on_ready = function(player, data) onReady(self, player, data) end
     for _, name in ipairs({ 'Save', 'PlayerData' }) do
         local manager = self.managers[name]
-        if manager.Start then manager.Start(manager) end
+        if manager.Start then manager.start(manager) end
     end
     self.started = true
     for userId, entry in pairs(self.ready) do
         self.ready[userId] = nil
         self.managers.Save.on_ready(entry[1], entry[2])
     end
-    return self:Tick()
+    return self:tick()
 end
 
 -- ===== 连接生命周期（server/main.lua 的同构子集）=====
@@ -335,7 +335,7 @@ end
 function M:join(userId, opts)
     local player = self:join_raw(userId, opts)
     for _ = 1, 20 do
-        self:Tick()
+        self:tick()
         if self.managers.PlayerData:get_data_inst(player) then return player end
         self:advance(0.05)
     end
@@ -347,7 +347,7 @@ function M:leave(player)
     if self.current[player.UserId] ~= player then handleRemoving(self, player) return false end
     handleRemoving(self, player)
     for _ = 1, 20 do
-        self:Tick()
+        self:tick()
         if not self.leaving[player.UserId] then break end
         self:advance(0.05)
     end
@@ -364,7 +364,7 @@ end
 --- 等到这条连接真正离场结算完（after_idle 回调跑完）。
 function M:wait_leave(userId)
     for _ = 1, 20 do
-        self:Tick()
+        self:tick()
         if not self.leaving[userId] then return true end
         self:advance(0.05)
     end
@@ -387,7 +387,7 @@ end
 
 function M:request(name, player, payload)
     self.re[name].OnServerEvent:Fire(player, payload)
-    return self:Tick()
+    return self:tick()
 end
 
 function M:Party(player, payload) return self:request('PartyAction', player, payload) end
@@ -400,7 +400,7 @@ function M:reply(name)
 end
 
 --- 统一伤害入口：与武器 / 鱼攻击走同一个 apply_hit。
-function M:Hit(source, target, category, amount)
+function M:hit(source, target, category, amount)
     local vitals = self.managers.Vitals
     return vitals:apply_hit(vitals:new_hit(source, category), target, amount)
 end
@@ -432,18 +432,18 @@ function M:pickup(player, lootId)
 end
 
 --- 存档快照：MgrSave 的键与值，读档就绪后可核对「服务端没丢状态」。
-function M:stored(userId) return self.values[self.managers.Save:Key(userId)] end
+function M:stored(userId) return self.values[self.managers.Save:key(userId)] end
 
-function M:Data(player) return self.managers.PlayerData:get_data_inst(player) end
+function M:data(player) return self.managers.PlayerData:get_data_inst(player) end
 
 function M:Save(player)
-    local data = self:Data(player)
+    local data = self:data(player)
     local ok = self.managers.Save:Save(player.UserId, data:Serialize(), 'test')
-    self:Tick()
+    self:tick()
     return ok
 end
 
-function M:Phase(player) return self.managers.Survival:Phase(player) end
+function M:phase(player) return self.managers.Survival:phase(player) end
 
 -- ===== 拆除 =====
 
@@ -461,7 +461,7 @@ end
 --- 一案例一套夹具：new + Start，返回 link；用完 close。
 function M.open(opts)
     local link = M.new(opts)
-    link:Start()
+    link:start()
     return link
 end
 

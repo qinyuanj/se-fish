@@ -5,7 +5,7 @@ local REUtil = require("common.re_util")
 require("common.util")
 require("common.teleport_util")
 local ZoneMarkers = require("common.zone_markers")
-ZoneMarkers.Start()
+ZoneMarkers.start()
 local Number = require("common.number")
 local GameCfg = require("common.game_cfg")
 local AbilityAPI = require("server.ability_api")
@@ -70,7 +70,7 @@ function AttrBridge:body_plan(player)
     if not tree then return nil, "no-player-tree" end
     return tree.memos.attr_plan:now().Body
 end
-function AttrBridge:MaxHealth(player)
+function AttrBridge:max_health(player)
     local tree = attrTree(player)
     return tree and tree.memos.max_health:now() or GameCfg.Vitals.MaxHealth
 end
@@ -232,7 +232,7 @@ WorldRuntime = ServerRuntime.new({
             local host = WorldRuntime and WorldRuntime.fish_host
             local fish = host and host.Fish[fish_id]
             if not fish then return false end
-            return FishAi:Attach(fish) == true
+            return FishAi:attach(fish) == true
         end,
         stop = function(_, fish_id)
             local host = WorldRuntime and WorldRuntime.fish_host
@@ -277,7 +277,7 @@ FishCarrier.damage_listener = function(carrier, actual, hit)
     local attacker = hit and hit.sourcePlayer
     if fish and attacker then fishHost:note_damage(fish, attacker, actual) end
 end
-fishHost:Start()
+fishHost:start()
 
 local function HandlePlayerAdded(player)
     WorldRuntime:on_player_added(player)

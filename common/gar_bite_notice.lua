@@ -14,7 +14,7 @@ function GarBiteNotice.lock(fishId, pos, fx, fz, range, halfAngleDeg, duration)
 end
 
 ---reason：bite（咬中）/ miss（绕后咬空）/ cancel（目标出咬距或失效）/ gone（鱼逃脱或被移除）
-function GarBiteNotice.Clear(fishId, reason)
+function GarBiteNotice.clear(fishId, reason)
     return { kind = 'clear', fishId = fishId, reason = reason }
 end
 

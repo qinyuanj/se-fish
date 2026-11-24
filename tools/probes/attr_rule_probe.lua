@@ -7,7 +7,7 @@ local Probe = {}
 -- 可执行迁移映射：只生成计划，不写玩家、Controller 或存档。
 -- 统一顺序为 (Base + BaseExtra) * (1 + Ratio) + Bonus，最后业务钳制。
 -- 永久成长从 potion_count / weapon_damage_scale 重建，临时效果从权威状态重建；不保存最终值或 Buff 句柄。
-function Probe.Map(snapshot)
+function Probe.map(snapshot)
     local s = snapshot or {}
     local body = BodyScale.plan(s.bodyPotions)
     local baseSpeed = s.baseSpeed or GameCfg.Ability.MoveSpeed.Base
@@ -126,12 +126,12 @@ function Probe.run(context)
             assertTrue(api.Funcs.SetAttrComponent(target, 'Hunger', row[1], row[2]), '业务顺序分量写入失败')
         end
         local raw = api.Funcs.GetAttr(target, 'Hunger')
-        assertTrue(nearly(raw, 260) and Probe.Map({ hunger = raw }).Hunger.Value == 260, '业务钳制先后顺序错误')
+        assertTrue(nearly(raw, 260) and Probe.map({ hunger = raw }).Hunger.Value == 260, '业务钳制先后顺序错误')
         api.Funcs.SetAttrComponent(target, 'Hunger', c.Bonus, 100)
-        assertTrue(Probe.Map({ hunger = api.Funcs.GetAttr(target, 'Hunger') }).Hunger.Value == GameCfg.Vitals.MaxHunger,
+        assertTrue(Probe.map({ hunger = api.Funcs.GetAttr(target, 'Hunger') }).Hunger.Value == GameCfg.Vitals.MaxHunger,
             '业务 Max 钳制错误')
         api.Funcs.SetAttrComponent(target, 'Hunger', c.Base, -1000)
-        assertTrue(Probe.Map({ hunger = api.Funcs.GetAttr(target, 'Hunger') }).Hunger.Value == 0, '业务 Min 钳制错误')
+        assertTrue(Probe.map({ hunger = api.Funcs.GetAttr(target, 'Hunger') }).Hunger.Value == 0, '业务 Min 钳制错误')
         businessClampVerified = true
         log('business-clamp', 'ok', '先公式260，再钳制0/300；不提前夹分量')
 

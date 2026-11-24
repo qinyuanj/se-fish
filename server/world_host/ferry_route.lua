@@ -70,7 +70,7 @@ function FerryRoute.mount(world, opts)
     if channel and type(channel.FireAllClients) == "function" then channel:FireAllClients(payload) end
   end
 
-  function handle:Fail(player, action, reason)
+  function handle:fail(player, action, reason)
     log("请求拒绝", player and player.UserId, action, tostring(reason))
     self:reply(player, { ok = false, action = action, reason = reason })
     return false
@@ -180,8 +180,8 @@ function FerryRoute.mount(world, opts)
 
   function handle:board(player, data, route, operation)
     local point = route.Outbound
-    if self:pending_flight(route.Id) then return self:Fail(player, "Board", "sailing") end
-    if not interact or not interact:in_range(player, point) then return self:Fail(player, "Board", "range") end
+    if self:pending_flight(route.Id) then return self:fail(player, "Board", "sailing") end
+    if not interact or not interact:in_range(player, point) then return self:fail(player, "Board", "range") end
     local session = save.Sessions[player.UserId]
     local flight = { player = player, operation = operation.id, routeId = route.Id }
     self.BoardPending[route.Id] = flight
@@ -195,7 +195,7 @@ function FerryRoute.mount(world, opts)
       if self.BoardPending[route.Id] ~= flight
           or not save:is_current(player.UserId, session, data) then return end
       self.BoardPending[route.Id] = nil
-      if not ok then self:Fail(player, "Board", result) return end
+      if not ok then self:fail(player, "Board", result) return end
       SpokeRuntime.batch(function()
         sync_tree(player, data)
         self.Flights[route.Id] = { player = player, operation = operation.id, routeId = route.Id,
@@ -210,14 +210,14 @@ function FerryRoute.mount(world, opts)
     end, operation)
     if not accepted and self.BoardPending[route.Id] == flight then
       self.BoardPending[route.Id] = nil
-      return self:Fail(player, "Board", reason or "save")
+      return self:fail(player, "Board", reason or "save")
     end
     return accepted
   end
 
   function handle:return_back(player, data, route, operation)
     local point = route.Return
-    if not interact or not interact:in_range(player, point) then return self:Fail(player, "Return", "range") end
+    if not interact or not interact:in_range(player, point) then return self:fail(player, "Return", "range") end
     local record = { operation = operation.id, identity = operation, action = "Return", routeId = route.Id,
       price = point.Price, state = "pending", zone = point.Zone }
     self.ReturnPending[player.UserId] = record
@@ -231,7 +231,7 @@ function FerryRoute.mount(world, opts)
       if not ok then
         self.ReturnPending[player.UserId] = nil
         outcome = false
-        self:Fail(player, "Return", result)
+        self:fail(player, "Return", result)
         return
       end
       sync_tree(player, data)
@@ -240,12 +240,12 @@ function FerryRoute.mount(world, opts)
       self:finish_travel(player, data, record, delivered, "teleport", function(written, final)
         if self.ReturnPending[player.UserId] ~= record then return end
         self.ReturnPending[player.UserId] = nil
-        if written then self:reply(player, final) else self:Fail(player, "Return", final) end
+        if written then self:reply(player, final) else self:fail(player, "Return", final) end
       end)
     end, operation)
     if not accepted and outcome == nil then
       self.ReturnPending[player.UserId] = nil
-      return self:Fail(player, "Return", reason or "save")
+      return self:fail(player, "Return", reason or "save")
     end
     return accepted and outcome ~= false
   end
@@ -438,21 +438,21 @@ function FerryRoute.mount(world, opts)
   end
 
   local Actions = { Board = "board", Return = "return_back" }
-  function handle:Handle(player, payload)
+  function handle:handle(player, payload)
     if self.disposed or not is_valid_player(player) or type(payload) ~= "table" then return false end
     local method = Actions[payload.action]
     local seq = payload.seq
     if not method or type(seq) ~= "number" or seq ~= math.floor(seq) then return false end
     local route = GameCfg.Ferry.route(payload.routeId)
-    if not route then return self:Fail(player, payload.action, "route") end
+    if not route then return self:fail(player, payload.action, "route") end
     local data = data_of(player)
     if not data then return false end
     if not save or type(save.resolve_request) ~= "function" or not data.Inited or is_paused(player.UserId) then
-      return self:Fail(player, payload.action, "save")
+      return self:fail(player, payload.action, "save")
     end
     local kind = payload.action == "Board" and "ferry:board" or "ferry:return"
     local operation, status = save:resolve_request(player, data, kind, payload.requestId or seq)
-    if not operation then return self:Fail(player, payload.action, status) end
+    if not operation then return self:fail(player, payload.action, status) end
     if status == "replay" then
       if payload.requestId == nil then return false end
       local flight = self:pending_flight(route.Id)
@@ -461,14 +461,14 @@ function FerryRoute.mount(world, opts)
         self:recover(player, data)
         local final = data.Extra.recovery.ferryFinal and data.Extra.recovery.ferryFinal[operation.id]
         if final then self:reply(player, final) return true end
-        return self:Fail(player, payload.action, "pending")
+        return self:fail(player, payload.action, "pending")
       end
       return self:settle(player, data, kind, function() return nil, "replay" end, function(ok, result)
         if ok then
           local final = data.Extra.recovery.ferryFinal and data.Extra.recovery.ferryFinal[operation.id]
           self:reply(player, final or result)
         else
-          self:Fail(player, payload.action, result)
+          self:fail(player, payload.action, result)
         end
       end, operation)
     end
@@ -477,7 +477,7 @@ function FerryRoute.mount(world, opts)
     self.LastSeq[player.UserId] = seq
     if data.Extra.recovery.ferry then
       self:recover(player, data)
-      return self:Fail(player, payload.action, "pending")
+      return self:fail(player, payload.action, "pending")
     end
     return self[method](self, player, data, route, operation)
   end

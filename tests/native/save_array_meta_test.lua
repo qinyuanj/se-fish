@@ -75,17 +75,17 @@ end
 
 local function player(id) return { UserId = id, SetAttribute = function() end } end
 local function pending(id)
-    local data = PlayerData.New(player(id))
+    local data = PlayerData.new(player(id))
     data:Init(true)
     return data
 end
 local function fresh(id)
-    local data = PlayerData.New(player(id))
+    local data = PlayerData.new(player(id))
     data:Init()
     return data
 end
 -- 只调 Migrate 的用例不需要 Init；IsValidSave 也走同一条路径。
-local function migrator(id) return PlayerData.New(player(id)) end
+local function migrator(id) return PlayerData.new(player(id)) end
 
 describe('TestSaveArrayMeta', function()
     local env, savedGame
@@ -162,7 +162,7 @@ describe('TestSaveArrayMeta', function()
         -- 云端已有真机同形旧档：修复前这里必然走 Fail('库存结构损坏')，屏障永久关闭。
         env.values.u80 = copy(realSnapshot())
         local p = { UserId = 80, SetAttribute = function(_, key, value) env.attributes[key] = value end }
-        local data = PlayerData.New(p)
+        local data = PlayerData.new(p)
         data:Init(true)
         env.save:load_into(p, data)
         drain()
@@ -185,7 +185,7 @@ describe('TestSaveArrayMeta', function()
     it('test_mgr_save_operation_reply_keeps_memory_clean', function()
         env.values.u81 = copy(realSnapshot())
         local p = { UserId = 81, SetAttribute = function() end }
-        local data = PlayerData.New(p)
+        local data = PlayerData.new(p)
         data:Init(true)
         env.save:load_into(p, data)
         drain()

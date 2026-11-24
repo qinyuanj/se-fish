@@ -14,7 +14,7 @@ describe("持有与操作的数据层规则", function()
         ctx = {}
         ctx.debug = GameCfg.Debug
         GameCfg.Debug = { Enabled = false }
-        ctx.data = PlayerData.New({ UserId = 124, SetAttribute = function() end })
+        ctx.data = PlayerData.new({ UserId = 124, SetAttribute = function() end })
         ctx.data:Init()
     end)
 
@@ -80,14 +80,14 @@ describe("持有与操作的数据层规则", function()
         assert.is_true(ctx.data:AddItem('carp', 1.99))
         assert.is_true(ctx.data:HoldSlot(1))
         local snapshot = ctx.data:Serialize()
-        local other = PlayerData.New({ UserId = 124, SetAttribute = function() end })
+        local other = PlayerData.new({ UserId = 124, SetAttribute = function() end })
         other:Init()
         assert.is_true(other:ApplySave(snapshot))
         assert.same({ kind = 'slot', id = rod, slot = 1 }, other:GetItemBarSnapshot().held)
         -- 槽位物品与手持不符：重进后清空
         local broken = ctx.data:Serialize()
         broken.bar = { { i = 1, id = 'carp', n = 1, m = 1.99 }, { i = 2, id = rod, n = 1, m = 1.37 } }
-        local third = PlayerData.New({ UserId = 124, SetAttribute = function() end })
+        local third = PlayerData.new({ UserId = 124, SetAttribute = function() end })
         third:Init()
         assert.is_true(third:ApplySave(broken))
         assert.is_nil(third:GetItemBarSnapshot().held.kind)

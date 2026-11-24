@@ -137,7 +137,7 @@ end
 --- 注册一名玩家会话并挂载真实 PlayerWeapon；data 缺省时按真实存档新建。
 function M:_add(player, data)
     local ctx = self
-    local dataInst = data or PlayerData.New(player)
+    local dataInst = data or PlayerData.new(player)
     if not dataInst.Inited then dataInst:Init() end
     local tree = {
         player = player,

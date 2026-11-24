@@ -48,10 +48,10 @@ local function runtimeCommand(name, player, payload)
     local runtime = ServerRuntime.current and ServerRuntime.current()
     return runtime and runtime[name](runtime, player, payload) or false
 end
-local interact = { Handle = function(_, player, payload)
+local interact = { handle = function(_, player, payload)
     return runtimeCommand('dispatch_interact', player, payload)
 end }
-local shop = { Handle = function(_, player, payload)
+local shop = { handle = function(_, player, payload)
     return runtimeCommand('dispatch_shop', player, payload)
 end }
 local function findGoodsByNumber(number, level)
@@ -480,7 +480,7 @@ local function feed(data, label)
     if wait then return wait end
     local itemId = selectedItem(data)
     local before = ledger(data, itemId)
-    local ok = interact:Handle(player, { target = 'fisherman', action = 'Feed', seq = nextShopFeedSeq('feed') })
+    local ok = interact:handle(player, { target = 'fisherman', action = 'Feed', seq = nextShopFeedSeq('feed') })
     say('FEED', label, 'accepted=' .. tostring(ok), 'item=' .. tostring(itemId), ledgerText(before))
     beginOp('feed', label, data, ok, itemId, before)
     return 'wait', SETTLE_SEC
@@ -491,7 +491,7 @@ local function buyRod(data)
     local wait = needNear({ stand.AnchorName }, GameCfg.Shop.Radius, GameCfg.Shop.Slack, '钓场商店买竿')
     if wait then return wait end
     local before = ledger(data)
-    local ok = shop:Handle(player, { action = 'Buy', itemId = 'starterRod', seq = nextShopFeedSeq('shop') })
+    local ok = shop:handle(player, { action = 'Buy', itemId = 'starterRod', seq = nextShopFeedSeq('shop') })
     say('BUY', 'starterRod', 'accepted=' .. tostring(ok), ledgerText(before))
     beginOp('rod', 'starterRod', data, ok, nil, before)
     return 'wait', SETTLE_SEC
@@ -509,7 +509,7 @@ local function buyDagger(data)
     local wait = needNear({ stand.AnchorName }, GameCfg.Shop.Radius, GameCfg.Shop.Slack, '钓场商店买匕首')
     if wait then return wait end
     local before = ledger(data)
-    local ok = shop:Handle(player, { action = 'Buy', number = DAGGER.Number, seq = nextShopFeedSeq('shop') })
+    local ok = shop:handle(player, { action = 'Buy', number = DAGGER.Number, seq = nextShopFeedSeq('shop') })
     say('BUY', 'dagger#' .. DAGGER.Number, 'accepted=' .. tostring(ok), ledgerText(before), 'price=' .. tostring(daggerPrice()))
     -- daggerTries 只在 accepted 且超时未到账时由 settleOp 累加，到账后清零
     beginOp('dagger', 'dagger#' .. DAGGER.Number, data, ok, nil, before)
@@ -778,7 +778,7 @@ local function step()
         focus(data, nil)
         local wait = needNear({ route.Outbound.AnchorName }, route.Outbound.Radius, route.Outbound.Slack, '摆渡上船')
         if wait then return wait end
-        local ok = Ferry:Handle(player, { action = 'Board', routeId = route.Id, seq = nextSeq(Ferry) })
+        local ok = Ferry:handle(player, { action = 'Board', routeId = route.Id, seq = nextSeq(Ferry) })
         say('FERRY', 'Board accepted=' .. tostring(ok))
         RT.pendingUntil = now() + route.Outbound.CountdownSec + 2
         return 'wait', 1

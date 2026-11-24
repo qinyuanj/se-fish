@@ -120,7 +120,7 @@ describe('平台适配层（MgrPlatform）', function()
     env.players.Save, env.save.PlayerData = env.save, env.players
     env.platform.Save, env.platform.PlayerData = env.save, env.players
     env.platform.now = function() return env.now end
-    env.platform:Start() -- 订阅 GoodsPurchaseCompleted 与 RE 通道
+    env.platform:start() -- 订阅 GoodsPurchaseCompleted 与 RE 通道
     env.player = { UserId = 1471, Character = { Position = { x = 0, y = 0, z = 0 } },
       CharacterAdded = signal(), CharacterRemoving = signal(), SetAttribute = function() end }
     env.players:on_player_added(env.player)

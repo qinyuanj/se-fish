@@ -946,7 +946,7 @@ describe("服务端入口接线：server/main.lua 宿主测试双端到端集成
     mgrs.SaveHost = assert(loadfile("server/save_host.lua"))()
     mgrs.PlayerDataHost = assert(loadfile("server/player_data_host.lua"))()
     mgrs.PlatformHost = {}
-    mgrs.FishAbility = { Start = function() end, update = function() end }
+    mgrs.FishAbility = { start = function() end, update = function() end }
     _G.REUtil = remote_util
     package.loaded["common.re_util"] = remote_util
 
@@ -960,7 +960,7 @@ describe("服务端入口接线：server/main.lua 宿主测试双端到端集成
       require = function(path)
         if path == "common.re_util" then return remote_util end
         if path == "server.MgrUtil" then return { Start = function() end } end
-        if path == "common.zone_markers" then return { Start = function() end } end
+        if path == "common.zone_markers" then return { start = function() end } end
         if path == "server.packages.attr_rule.api" then return attr_api_stub end
         if path == "server.packages.modifier_system.api" then return modifier_api_stub end
         if path == "server.packages.ability_system.api" then return ability_api_stub end

@@ -82,7 +82,7 @@ function ReelOverlayView.spec(options)
       local aggregator = session and RateLimit.new_aggregator({
         SessionId = session, AggregateSec = GameCfg.HighFreqInput.AggregateSec,
       }) or nil
-      local display = session and ReelDisplay.New(now_of(ctx), GameCfg.ReelIn) or nil
+      local display = session and ReelDisplay.new(now_of(ctx), GameCfg.ReelIn) or nil
       local current_progress = GameCfg.ReelIn.Initial
       local last_payload = nil
       local controller = options.controller or (ctx.services and ctx.services.reel) or {}
@@ -137,7 +137,7 @@ function ReelOverlayView.spec(options)
         if session == id then return true end
         session = id
         aggregator = RateLimit.new_aggregator({ SessionId = id, AggregateSec = GameCfg.HighFreqInput.AggregateSec })
-        display = ReelDisplay.New(now_of(ctx), GameCfg.ReelIn)
+        display = ReelDisplay.new(now_of(ctx), GameCfg.ReelIn)
         set_progress(GameCfg.ReelIn.Initial)
         return true
       end
@@ -170,7 +170,7 @@ function ReelOverlayView.spec(options)
         aggregator:click(now)
         if display then
           display:click(now)
-          set_progress(display:Value(now))
+          set_progress(display:value(now))
         end
         return true
       end
@@ -179,7 +179,7 @@ function ReelOverlayView.spec(options)
         return session ~= nil and (id == nil or id == session)
       end
       local progress_fn = function()
-        return display and display:Value(now_of(ctx)) or GameCfg.ReelIn.Initial
+        return display and display:value(now_of(ctx)) or GameCfg.ReelIn.Initial
       end
       controller.click = click_fn
       controller.close = close_fn
@@ -217,7 +217,7 @@ function ReelOverlayView.spec(options)
 
       scope:subscribe(ctx.clock.on_frame, function()
         flush(false)
-        if display then set_progress(display:Value(now_of(ctx))) end
+        if display then set_progress(display:value(now_of(ctx))) end
       end)
       scope:effect("ReelOverlayCastRefresh", function(es)
         local current = es:d(ctx.store.cast) or {}

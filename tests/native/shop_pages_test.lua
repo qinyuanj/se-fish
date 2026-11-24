@@ -166,7 +166,7 @@ end)
 -- 失败方式：升级等级/购买次数不走持久字段（重进丢失）；越级或重复升级生效；满级继续扣钱；
 -- 武器购买被背包满格误拒（武器独立库存不占格）；损坏的 growth 存档被静默接受。
 local function new_data(userId)
-    local data = PlayerData.New({ UserId = userId, SetAttribute = function() end })
+    local data = PlayerData.new({ UserId = userId, SetAttribute = function() end })
     data:Init()
     return data
 end

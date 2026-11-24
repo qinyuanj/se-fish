@@ -47,7 +47,7 @@ local function rollGuaranteed(source)
     return nil
 end
 
-function BlindboxDraw.Draw(pity, rng)
+function BlindboxDraw.draw(pity, rng)
     if type(pity) ~= 'number' or pity ~= math.floor(pity) or pity < 0 then return nil end
     local source = rngOf(rng)
     local guaranteed = pity >= pityCfg().afterMisses
@@ -78,7 +78,7 @@ function BlindboxDraw.draw_many(count, pity, rng)
     local draws = {}
     local current = pity
     for index = 1, count do
-        local draw = BlindboxDraw.Draw(current, source)
+        local draw = BlindboxDraw.draw(current, source)
         if not draw then return nil end
         draws[index] = draw
         current = draw.pityAfter

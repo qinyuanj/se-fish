@@ -90,11 +90,11 @@ describe('TestStatusEffect', function()
         state.mgr.Survival = { GetState = function()
             return state.weak and { weakUntil = state.now + 60 } or nil
         end }
-        state.runtime = require('tests.support.modifier_runtime').New(state.now)
+        state.runtime = require('tests.support.modifier_runtime').new(state.now)
         state.mgr.Modifier = state.runtime.load_modifier()
         state.mgr.Modifier.Vitals = state.mgr.Vitals
         state.mgr.Modifier.Ability = state.mgr
-        state.mgr.Attr = require('tests.support.attr_runtime').New(state.mgr.PlayerData,
+        state.mgr.Attr = require('tests.support.attr_runtime').new(state.mgr.PlayerData,
             function(p) return state.mgr.Modifier:get_move_multiplier(p) end)
         local character = state.runtime.unit('character')
         character.Controller = { WalkSpeed = 7 }
@@ -162,7 +162,7 @@ describe('TestStatusEffect', function()
         local bare = { UserId = 13905 }
         ctx.mgr:capture_base_speed(bare)
         ctx.mgr:refresh_move_speed(bare)
-        assert.same(GameCfg.Ability.MoveSpeed.Base, ctx.mgr.Attr:State(bare).baseSpeed, '无控制器回落配置基准')
+        assert.same(GameCfg.Ability.MoveSpeed.Base, ctx.mgr.Attr:state(bare).baseSpeed, '无控制器回落配置基准')
     end)
 
     -- 刷新已过期状态视为全新（层数不继承）
@@ -251,7 +251,7 @@ describe('TestStatusEffect', function()
     -- 血量上限按变大药水数（委托 AttrGrowth/BodyScale）；body_plan 改走注入的 PlayerData
     it('test_max_health_and_body_plan_read_injected_player_data', function()
         ctx.potions.item168 = 10
-        assert.same(900, ctx.mgr:MaxHealth(ctx.player))
+        assert.same(900, ctx.mgr:max_health(ctx.player))
         local plan = ctx.mgr:body_plan(ctx.player)
         assert.same(3, plan.Scale)
         assert.same(900, plan.Health)
@@ -259,7 +259,7 @@ describe('TestStatusEffect', function()
         ctx.mgr.PlayerData = nil
         ctx.mgr.Attr.PlayerData = nil
         assert.same(1, ctx.mgr:body_plan(ctx.player).Scale)
-        assert.same(300, ctx.mgr:MaxHealth(ctx.player))
+        assert.same(300, ctx.mgr:max_health(ctx.player))
     end)
 
     -- 麻痹：无法行动闸 + 移速 0；0.5 秒到期恢复；不叠加
@@ -326,13 +326,13 @@ describe('TestStatusEffect', function()
         ctx.mgr:capture_base_speed(ctx.player)
         ctx.mgr:refresh_move_speed(ctx.player)
         assert.near(21, ctx.player.Character.Controller.WalkSpeed, 1e-9)
-        ctx.mgr.Modifier:Apply(nil, ctx.player, 'weak')
+        ctx.mgr.Modifier:apply(nil, ctx.player, 'weak')
         ctx.mgr:refresh_move_speed(ctx.player)
         assert.near(10.5, ctx.player.Character.Controller.WalkSpeed, 1e-9)
         ctx.mgr.Modifier:apply_weapon_effect(ctx.player, ctx.player, { Kind = 'frost' })
         assert.near(21 * 0.5 * 0.7, ctx.player.Character.Controller.WalkSpeed, 1e-9)
         -- 虚弱消退（Survival 委托同一路径）：霜冻仍在，只去掉 0.5
-        ctx.mgr.Modifier:Clear(ctx.player, 'weak')
+        ctx.mgr.Modifier:clear(ctx.player, 'weak')
         ctx.mgr:refresh_move_speed(ctx.player)
         assert.near(21 * 0.7, ctx.player.Character.Controller.WalkSpeed, 1e-9)
         advance(3)

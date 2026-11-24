@@ -10,7 +10,7 @@ function Records.valid_user_id(userId)
         and userId >= 1 and userId == math.floor(userId)
 end
 
-function Records.Scale(weight)
+function Records.scale(weight)
     if type(weight) ~= 'number' or weight ~= weight or weight == math.huge or weight == -math.huge
         or weight <= 0 then return nil, 'invalid' end
     local scaled = math.floor(weight * cfg().Scale + 0.5 + 1e-9)
@@ -60,7 +60,7 @@ function Records.holder(entry)
     return valid.n or (cfg().HolderFallback:format(valid.u))
 end
 
-function Records.State(entry)
+function Records.state(entry)
     local valid = Records.valid(entry)
     if not valid then return { state = 'missing' } end
     return { state = 'ok', scaled = valid.w, weight = valid.w / cfg().Scale,

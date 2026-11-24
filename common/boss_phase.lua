@@ -93,7 +93,7 @@ end
 ---@param bossCfg? table
 ---@param now? number
 ---@param pos? table 首领位置（吐息射程判定用）
-function M.New(bossCfg, now, pos)
+function M.new(bossCfg, now, pos)
     bossCfg = bossCfg or cfg()
     local state = {
         Cfg = bossCfg, Phase = 'normal', Alive = true, Target = nil, Pending = nil,

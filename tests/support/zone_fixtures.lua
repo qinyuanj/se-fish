@@ -97,14 +97,14 @@ function M.World()
   return world
 end
 
-function M.Apply(cfg)
+function M.apply(cfg)
   ZoneMarkers.resolve(M.World(), cfg)
   return cfg
 end
 
 function M.load()
   package.loaded['common.game_cfg'] = nil
-  return M.Apply(require('common.game_cfg'))
+  return M.apply(require('common.game_cfg'))
 end
 
 return M

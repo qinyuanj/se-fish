@@ -139,7 +139,7 @@ describe('TestFishAbilitySeams', function()
             if name == 'Players' then return { GetPlayers = function() return ctx.players end } end
             return {}
         end }
-        package.loaded['server.world_host.fish_carrier'] = { Spawn = function() return nil end, despawn = function() end,
+        package.loaded['server.world_host.fish_carrier'] = { spawn = function() return nil end, despawn = function() end,
             sync_position = function() end }
         package.loaded['server.ability_api'] = {
             attach_to_socket = function(_, unit, host, socketName, offset)
@@ -210,7 +210,7 @@ describe('TestFishAbilitySeams', function()
         ctx.players = { player }
         -- 50%：入水阶段（咬中 1000）
         fish.Carrier.Health, fish.Carrier.MaxHealth = 5000, 10000
-        fish.Phase = require('common.boss_phase').New(GameCfg.Ability.BossPhase, ctx.now, fish.Carrier.Body.Position)
+        fish.Phase = require('common.boss_phase').new(GameCfg.Ability.BossPhase, ctx.now, fish.Carrier.Body.Position)
         fish.PhaseAt = ctx.now
         fish.Yaw = 0
         for _ = 1, 355 do -- #38 正文沧龙式：15秒跃起，1秒预警+1.5秒腾空后咬中
@@ -238,11 +238,11 @@ describe('TestFishAbilitySeams', function()
         ctx.players = { player }
         local CarryMount = require('common.carry_mount')
         local cfg = GameCfg.Ability.Carry
-        fish.Carry = CarryMount.New(cfg, { x = 0, y = 0, z = 0 }, 0, ctx.now)
+        fish.Carry = CarryMount.new(cfg, { x = 0, y = 0, z = 0 }, 0, ctx.now)
         fish.Carry.GroundY = 2
         fish.Carry.TargetPlayer = player
         fish.Carry.LastStepAt = ctx.now
-        assert.is_true(CarryMount.Attach(fish.Carry, { x = 1, y = 0, z = 0 }, ctx.now).Ok)
+        assert.is_true(CarryMount.attach(fish.Carry, { x = 1, y = 0, z = 0 }, ctx.now).Ok)
         fish.CarryMount = ctx.mounts[#ctx.mounts + 1] or { Destroyed = false, Destroy = function() end }
         -- 容差内不写回（避免每帧纠正抖动）
         local before = vec(player.Character.Position.x, player.Character.Position.y, player.Character.Position.z)
@@ -306,10 +306,10 @@ describe('TestFishAbilitySeams', function()
         ctx.mgr.Fish[fish.Id] = fish
         local player = new_player(9, { x = 1, y = 0, z = 0 })
         local CarryMount = require('common.carry_mount')
-        fish.Carry = CarryMount.New(GameCfg.Ability.Carry, { x = 0, y = 0, z = 0 }, 0, ctx.now)
+        fish.Carry = CarryMount.new(GameCfg.Ability.Carry, { x = 0, y = 0, z = 0 }, 0, ctx.now)
         fish.Carry.GroundY = 2
         fish.Carry.TargetPlayer = player
-        CarryMount.Attach(fish.Carry, { x = 1, y = 0, z = 0 }, ctx.now)
+        CarryMount.attach(fish.Carry, { x = 1, y = 0, z = 0 }, ctx.now)
         ctx.mgr:remove(fish)
         assert.is_nil(fish.Carry)
         assert.is_nil(ctx.mgr.Fish[fish.Id])

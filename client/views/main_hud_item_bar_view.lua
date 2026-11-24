@@ -382,10 +382,10 @@ function MainHudItemBarView.mount(s, ctx, options)
               index = slot_index,
               began = began,
             }
-            local gesture = PressGesture.New({
+            local gesture = PressGesture.new({
               LongPressSec = GameCfg.Ability.Throw.LongPressSec,
             })
-            gesture:Begin(now_sec(), began)
+            gesture:begin(now_sec(), began)
             slot_press = { index = slot_index, gesture = gesture }
           end)
 
@@ -424,7 +424,7 @@ function MainHudItemBarView.mount(s, ctx, options)
             if not is_explosive_slot(slot_index) then
               return
             end
-            local result = press.gesture:End(now_sec(), ended)
+            local result = press.gesture:finish(now_sec(), ended)
             if result == "tap" then
               throw_handled = { index = slot_index, valid = true }
               on_throw(slot_index, nil)

@@ -30,7 +30,7 @@ local function fixture(logs)
     local data = { body = 2, speed = 3, level = 2 }
     function data:potion_count(id) return id == 'item167' and self.speed or self.body end
     function data:shop_upgrade_level() return self.level end
-    local mgr = require('tests.support.attr_runtime').New(
+    local mgr = require('tests.support.attr_runtime').new(
         { get_data_inst = function() return data end },
         function() return 0.35 end,
         { log = logFn }
@@ -45,7 +45,7 @@ describe('TestAttrMigration', function()
         data.body, data.speed = 1000, 1000
         mgr.move_multiplier_provider = function() return 0 end
         assert.is_true(mgr:apply_growth(p).Ok)
-        assert.same(900, mgr:MaxHealth(p))
+        assert.same(900, mgr:max_health(p))
         assert.same(3, p.Character.scale)
         assert.same(0, p.Character.Controller.WalkSpeed)
         mgr.move_multiplier_provider = function() return 1 end
@@ -97,7 +97,7 @@ describe('TestAttrMigration', function()
         local mgr, p = fixture()
         local a = mgr:apply_growth(p)
         assert.message(a.Error).is_true(a.Ok)
-        assert.same(420, mgr:MaxHealth(p))
+        assert.same(420, mgr:max_health(p))
         assert.near(3.185, p.Character.Controller.WalkSpeed, 1e-8)
         assert.same(1.4, p.Character.scale)
         assert.same(require('common.body_scale').derive(1.4).InteractRange, p.Character.attrs.InteractRange)
@@ -152,7 +152,7 @@ describe('TestAttrMigration', function()
             return true
           end },
         })
-        host.runtime._max_health_of = function() return mgr:MaxHealth(p) end
+        host.runtime._max_health_of = function() return mgr:max_health(p) end
         host:add(p)
         local life = host.runtime.life
         assert.is_true(mgr:apply_growth(p).Ok)

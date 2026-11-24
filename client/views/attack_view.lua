@@ -106,7 +106,7 @@ function AttackView.mount(scope, ctx)
     local pressing = State.new("AttackView.pressing", false)
     local auto_fired = false
     local next_auto = 0
-    local gesture = PressGesture.New({ LongPressSec = GameCfg.Ability.Throw.LongPressSec })
+    local gesture = PressGesture.new({ LongPressSec = GameCfg.Ability.Throw.LongPressSec })
     local function current_gun()
       local weapon_id = equipped(ctx.store.item_bar:now())
       return weapon_id and GameCfg.Ability.Guns[weapon_id] or nil
@@ -139,12 +139,12 @@ function AttackView.mount(scope, ctx)
       ctx.connect(ps, button.OnTouchBegan, function()
         auto_fired = false
         next_auto = 0
-        gesture:Begin(current_now(ctx, services))
+        gesture:begin(current_now(ctx, services))
         pressing:set(true)
       end)
       ctx.connect(ps, button.OnTouchEnded, function()
         pressing:set(false)
-        local result = gesture:End(current_now(ctx, services))
+        local result = gesture:finish(current_now(ctx, services))
         if result == "tap" then
           if not auto_fired then send("attack") end
         elseif result == "long" then

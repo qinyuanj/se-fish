@@ -93,7 +93,7 @@ function FishAirEscape:set_up()
     self.mgr = require('server.world_host.fish_tree')
     -- 目标裁决适配层按生产接线（server/main.lua）由入口注入
     self.mgr.AiTarget = require('server.world_host.fish_ai_target')
-    self.mgr:Start()
+    self.mgr:start()
     local ServerRuntime = require('server.world_host.server_runtime')
     local SpokeClock = require('common.spoke_clock')
     self.runtime = ServerRuntime.new({
@@ -134,7 +134,7 @@ function FishAirEscape:tear_down()
     -- 即使 set_up 只走到一半也要恢复进程状态：先清鱼与停管理器，再回滚全局与模块缓存。
     if self.mgr then
         for _, fish in pairs(self.mgr.Fish) do self.mgr:remove(fish) end
-        self.mgr:Stop()
+        self.mgr:stop()
     end
     if self.runtime then
         self.runtime:shutdown()
@@ -191,7 +191,7 @@ describe('TestFishAirEscape', function()
         local escapeAt = fish.EscapeAt
         env:advance(1.05)
         body.OnLiftedEnd:Fire()
-        assert.is_false(env.mgr:Release(fish, 'drop'))
+        assert.is_false(env.mgr:release(fish, 'drop'))
         assert.are.equal(escapeAt, fish.EscapeAt)
         -- 挪到礁石岛水区北侧：到三秒整点后应由朝北改为朝南。
         body.Position = vec(480, body.Position.y, 390)

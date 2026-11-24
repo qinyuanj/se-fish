@@ -39,7 +39,7 @@ local function receiver(fish)
     return carrier and carrier.Receiver or nil
 end
 
-function Mgr:State(fish)
+function Mgr:state(fish)
     local unit = receiver(fish)
     if not unit then
         logFailure('ReadOfficialState', fish, nil, nil, 'official AI receiver unavailable')
@@ -55,8 +55,8 @@ function Mgr:State(fish)
     return state
 end
 
-function Mgr:Focus(fish)
-    local state = self:State(fish)
+function Mgr:focus(fish)
+    local state = self:state(fish)
     return state and state.focusTarget or nil
 end
 
@@ -109,6 +109,6 @@ function Mgr:select(fish, candidates)
     return ranked
 end
 
-function Mgr:Start() end
+function Mgr:start() end
 
 return Mgr

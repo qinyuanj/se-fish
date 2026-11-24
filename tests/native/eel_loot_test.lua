@@ -45,7 +45,7 @@ describe("TestEelLoot", function()
     local other = { UserId = 2, attrs = {}, Character = { Position = { x = 2, y = 0, z = 0 } } }
     function other:SetAttribute() end
     function other:GetAttribute() end
-    local data = PlayerData.New(other); data:Init(); data.LoadState = "ready"; data.Player = other
+    local data = PlayerData.new(other); data:Init(); data.LoadState = "ready"; data.Player = other
     data_of[2] = data; players[1] = other
     runtime:on_player_added(other); runtime:on_save_ready(other, data)
     local rows = events.LootState.clients[#events.LootState.clients].list

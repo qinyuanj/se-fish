@@ -101,7 +101,7 @@ describe('鳄雀鳝上钩预警表现（GarBiteWarning -> FishCombatView）', fu
       assert.is_not_nil(node)
       assert.is_true(node.Visible)
 
-      assert.is_true(GarBiteNotice.valid(GarBiteNotice.Clear(141, 'cancel')))
+      assert.is_true(GarBiteNotice.valid(GarBiteNotice.clear(141, 'cancel')))
       assert.is_true(env.writer:ingest_event('FishCombatState', { warnings = {} }))
       assert.is_true(node.Destroyed)
       assert.is_nil(findWarning(141))

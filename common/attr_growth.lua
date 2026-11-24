@@ -12,7 +12,7 @@ function M.effective_speed(base, potions, mods)
     local component = Model.plan({ baseSpeed = base, speedPotions = potions, moveMultiplier = multiplier }).Attributes.PlayerWalkSpeed
     return component.Base * (1 + component.Ratio)
 end
-function M.MaxHealth(potions)
+function M.max_health(potions)
     return Model.plan({ bodyPotions = potions }).Body.Health
 end
 return M

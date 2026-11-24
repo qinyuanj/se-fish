@@ -18,7 +18,7 @@ package.path = table.concat({ './?.lua', './?/init.lua', package.path }, ';')
 
 local ZoneFixtures = require('tests.support.zone_fixtures')
 local GameCfg = require('common.game_cfg')
-ZoneFixtures.Apply(GameCfg)
+ZoneFixtures.apply(GameCfg)
 local Link = assert(loadfile('tests/support/local_link.lua'))()
 
 local MARK = 'LOCALLINK264'
@@ -45,22 +45,22 @@ local function run()
         check('10 条连接同时在线', link:Count() == 10, link:Count())
         local keys, seen, unique = {}, {}, true
         for _, player in ipairs(players) do
-            local key = link.managers.Save:Key(player.UserId)
+            local key = link.managers.Save:key(player.UserId)
             if seen[key] then unique = false end
             seen[key] = true
             keys[player.UserId] = key
-            if not link:Data(player) then unique = false end
+            if not link:data(player) then unique = false end
         end
         check('每条连接独立读档且存档键唯一', unique)
 
         link:Party(players[1], { action = 'Invite', targetUserId = players[2].UserId })
         link:Party(players[2], { action = 'Accept' })
         check('小队建立', link.managers.Party:same_party(players[1], players[2]))
-        check('同队免伤', link:Hit(players[1], players[2], 'weapon', 30) == false)
-        check('野外 PK 结算', link:Hit(players[1], players[4], 'weapon', 30) == true)
+        check('同队免伤', link:hit(players[1], players[2], 'weapon', 30) == false)
+        check('野外 PK 结算', link:hit(players[1], players[4], 'weapon', 30) == true)
         players[1].Character.Position = POND
         players[3].Character.Position = POND
-        check('鱼塘安全区免伤', link:Hit(players[1], players[3], 'weapon', 30) == false)
+        check('鱼塘安全区免伤', link:hit(players[1], players[3], 'weapon', 30) == false)
 
         local loot = assert(link:Loot('bass', ARENA))
         local seen = link:join(7101, { position = ARENA })
@@ -78,25 +78,25 @@ local function run()
         check('同一份地面实例只结算一次', okCount == 1, okCount)
 
         local target = players[7]
-        link:Hit(nil, target, 'fishAttack', GameCfg.Vitals.MaxHealth + 10)
-        check('目标进入濒死', link:Phase(target) == 'downed', link:Phase(target))
+        link:hit(nil, target, 'fishAttack', GameCfg.Vitals.MaxHealth + 10)
+        check('目标进入濒死', link:phase(target) == 'downed', link:phase(target))
         players[8].Character.Position = at(target.Character.Position, 1)
         link:Interact(players[8], { target = 'downedPlayer', action = 'Rescue',
             targetUserId = target.UserId, seq = 1 })
-        check('抢救开始', link:Phase(target) == 'rescuing', link:Phase(target))
+        check('抢救开始', link:phase(target) == 'rescuing', link:phase(target))
         link:leave(players[8])
         link:advance(GameCfg.Rescue.DurationSec + 0.1)
-        check('施救者断线后抢救不结算', link:Phase(target) == 'downed', link:Phase(target))
+        check('施救者断线后抢救不结算', link:phase(target) == 'downed', link:phase(target))
         local health = target.Character.Controller.Health
         local back = link:join(7008, { position = at(target.Character.Position, 1) })
         link:advance(GameCfg.Rescue.DurationSec + 0.1)
-        check('重连不补结算', link:Phase(target) == 'downed' and target.Character.Controller.Health == health)
+        check('重连不补结算', link:phase(target) == 'downed' and target.Character.Controller.Health == health)
         players[6].Character.Position = at(target.Character.Position, 1)
         link:Interact(players[6], { target = 'downedPlayer', action = 'Rescue',
             targetUserId = target.UserId, seq = 2 })
         link:advance(GameCfg.Rescue.DurationSec + 0.1)
         local expected = math.floor(GameCfg.Vitals.MaxHealth * GameCfg.Survival.ReviveHealthPercent / 100)
-        check('换人重新发起后救起', link:Phase(target) == 'alive'
+        check('换人重新发起后救起', link:phase(target) == 'alive'
             and target.Character.Controller.Health == expected, target.Character.Controller.Health)
         local online = link:online(back)
         check('重连的连接在线', online)
@@ -110,8 +110,8 @@ local function run()
             local restored = 0
             for index = 1, 10 do
                 local player = link:join(7000 + index, { position = at(ARENA, index) })
-                if keys[player.UserId] == link.managers.Save:Key(player.UserId)
-                    and link:Data(player) then restored = restored + 1 end
+                if keys[player.UserId] == link.managers.Save:key(player.UserId)
+                    and link:data(player) then restored = restored + 1 end
             end
             check('第 ' .. round .. ' 轮全员进出后全部恢复', left == 0 and restored == 10,
                 'left=' .. left .. ' restored=' .. restored)

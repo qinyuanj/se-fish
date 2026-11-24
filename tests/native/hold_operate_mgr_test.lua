@@ -44,7 +44,7 @@ describe("持有操作的服务端分发", function()
                 ctx.eaten[#ctx.eaten + 1] = { player = player, itemId = itemId }
             end }
         Mgr.Save = nil
-        Mgr:Start()
+        Mgr:start()
         Mgr:on_player_added(ctx.player)
         ctx.data = Mgr:get_data_inst(ctx.player)
     end)

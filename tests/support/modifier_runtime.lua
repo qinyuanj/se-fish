@@ -22,7 +22,7 @@ local function make_dummy_data(player)
     }
 end
 
-function Runtime.New(clock)
+function Runtime.new(clock)
     local start_now = clock or 100
     local e = { now = start_now, units = {}, timers = {}, spoke_clock = SpokeClock.new(start_now), step_hooks = {} }
     local function signal()
@@ -244,7 +244,7 @@ function Runtime.New(clock)
             return pt
         end
 
-        function mgr:Apply(source, target, kind, seconds)
+        function mgr:apply(source, target, kind, seconds)
             local player = resolve_player(target)
             if player then
                 if not player.Character then return false, 'no-effect-owner' end
@@ -270,7 +270,7 @@ function Runtime.New(clock)
         end
 
         function mgr:apply_weapon_effect(source, target, effect)
-            return self:Apply(source, target, type(effect) == 'table' and effect.Kind or nil)
+            return self:apply(source, target, type(effect) == 'table' and effect.Kind or nil)
         end
 
         function mgr:get_remaining(target, kind)
@@ -302,7 +302,7 @@ function Runtime.New(clock)
             return entity_store:get_move_multiplier(resolve_entity(target))
         end
 
-        function mgr:Clear(target, kind)
+        function mgr:clear(target, kind)
             local player = resolve_player(target)
             if player then
                 local pt = self.PlayerTrees[player.UserId]
@@ -369,7 +369,7 @@ function Runtime.New(clock)
             entity_store:clear_by_source(player)
         end
 
-        function mgr:Start() end
+        function mgr:start() end
         return mgr
     end
 
@@ -378,7 +378,7 @@ end
 
 -- 旧生存测试接入真实 SpokeClock + PlayerEffects + ModifierLeaf；速度投影是可观测边界，不复制效果计时。
 function Runtime.attach_survival(survival, now)
-    local e = Runtime.New(now())
+    local e = Runtime.new(now())
     local modifier = e.load_modifier()
     local syncing = false
     local function sync(player)
@@ -394,7 +394,7 @@ function Runtime.attach_survival(survival, now)
         end
     end
     local apply, left = modifier.Apply, modifier.get_remaining
-    function modifier:Apply(source, target, kind, seconds) sync(target); return apply(self, source, target, kind, seconds) end
+    function modifier:apply(source, target, kind, seconds) sync(target); return apply(self, source, target, kind, seconds) end
     function modifier:get_remaining(target, kind) sync(target); return left(self, target, kind) end
     local bases = {}
     survival.Modifier = modifier

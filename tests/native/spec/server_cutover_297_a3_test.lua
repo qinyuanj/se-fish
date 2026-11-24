@@ -495,7 +495,7 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
         require = function(path)
           if path == "common.re_util" then return remote_util end
           if path == "server.MgrUtil" then return { Start = function() end } end
-          if path == "common.zone_markers" then return { Start = function() end } end
+          if path == "common.zone_markers" then return { start = function() end } end
           if path == "server.packages.attr_rule.api" then return attr_api_stub end
           if path == "server.packages.modifier_system.api" then return modifier_api_stub end
           if path == "server.packages.ability_system.api" then return ability_api_stub end

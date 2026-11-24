@@ -1,5 +1,5 @@
 local ZoneMarkers = require("common.zone_markers")
-ZoneMarkers.Start()
+ZoneMarkers.start()
 
 local Number = require("common.number")
 local GameCfg = require("common.game_cfg")

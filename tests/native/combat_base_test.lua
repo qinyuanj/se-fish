@@ -225,7 +225,7 @@ describe('TestMgrAbilityActionGuard', function()
         local vitals = host.runtime.life
         mgr.Vitals = vitals
         mgr.BehaviorServices = { Vitals = vitals }
-        mgr:Start()
+        mgr:start()
         assert.same(mgr.BehaviorServices, api.BehaviorServices)
         -- 装配完成后立刻放回真实环境：守卫闭包已捕获 vitals，后续断言不需要假 game
         _G.game = saved.game

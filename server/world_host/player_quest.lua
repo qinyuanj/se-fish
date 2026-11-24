@@ -11,7 +11,7 @@ end
 -- 持久业务在自己的隔离 draft 内记事实，让扣件/扣费/发货与任务进度同键落账。
 function Mgr:record_fact(draft, kind, payload)
     local state = QuestSteps.restore(cfg().Steps, draft.Extra.quest)
-    local counted, advanced = QuestSteps.Apply(cfg().Steps, state, {
+    local counted, advanced = QuestSteps.apply(cfg().Steps, state, {
         kind = kind, itemId = payload.itemId, category = payload.category, count = payload.count,
         eventId = tostring(draft.SaveMeta.epoch) .. ':' .. payload.eventId,
     })
@@ -20,7 +20,7 @@ function Mgr:record_fact(draft, kind, payload)
 end
 
 function Mgr:refresh_committed(player, data)
-    local previous = self:GetState(player)
+    local previous = self:get_state(player)
     if not previous or not data or not data.Inited then return end
     local restored = QuestSteps.restore(cfg().Steps, data.Extra.quest)
     if restored.step == previous.step and restored.count == previous.count then return end
@@ -31,7 +31,7 @@ function Mgr:refresh_committed(player, data)
             if restored.seen[queue.events[i].eventId] then table.remove(queue.events, i) end
         end
         local tail = QuestSteps.restore(cfg().Steps, restored)
-        for _, fact in ipairs(queue.events) do QuestSteps.Apply(cfg().Steps, tail, fact) end
+        for _, fact in ipairs(queue.events) do QuestSteps.apply(cfg().Steps, tail, fact) end
         queue.tail = #queue.events > 0 and tail or nil
     end
     local nextStep = cfg().Steps[restored.step]
@@ -48,16 +48,16 @@ function Mgr:send(player, state)
     _G.REUtil:get_re('QuestState'):FireClient(player, state)
 end
 
-function Mgr:GetState(player)
+function Mgr:get_state(player)
     if player and self.Players[player.UserId] == player then return self.States[player.UserId] end
 end
 
 function Mgr:publish(player, notice)
-    local state = self:GetState(player)
+    local state = self:get_state(player)
     if not state then return end
     local c = cfg()
     local current = c.Steps[state.step]
-    local text = QuestSteps.Text(c.Steps, state, c.Title, c.DoneText)
+    local text = QuestSteps.text(c.Steps, state, c.Title, c.DoneText)
     local ok, err = pcall(function()
         player:SetAttribute('QuestStep', state.step)
         player:SetAttribute('QuestText', text)
@@ -73,14 +73,14 @@ function Mgr:notify(kind, player, payload)
     if self.Save and self.PlayerData then
         self:refresh_committed(player, self.PlayerData:get_data_inst(player))
     end
-    local state = self:GetState(player)
+    local state = self:get_state(player)
     if not state or type(payload) ~= 'table' then return false end
     local c = cfg()
     if self.Save then
         local queue = self.Queues[player.UserId]
         if queue.leaving then return false end
         local data = self.PlayerData and self.PlayerData:get_data_inst(player)
-        if not data and queue and self.Save:Status(player.UserId).loadState == 'ready'
+        if not data and queue and self.Save:status(player.UserId).loadState == 'ready'
             and queue.data.Player == player then data = queue.data end
         if not data then return false end
         local eventId = payload.eventId
@@ -88,13 +88,13 @@ function Mgr:notify(kind, player, payload)
         local candidate = QuestSteps.restore(c.Steps, queue.tail or state)
         local fact = { kind = kind, itemId = payload.itemId, category = payload.category,
             eventId = tostring(data.SaveMeta.epoch) .. ':' .. eventId, count = payload.count }
-        if not QuestSteps.Apply(c.Steps, candidate, fact) then return false end
+        if not QuestSteps.apply(c.Steps, candidate, fact) then return false end
         queue.events[#queue.events + 1] = fact
         queue.tail = candidate
         self:drain(player)
         return true
     end
-    local counted, advanced = QuestSteps.Apply(c.Steps, state, { kind = kind, itemId = payload.itemId,
+    local counted, advanced = QuestSteps.apply(c.Steps, state, { kind = kind, itemId = payload.itemId,
         category = payload.category, eventId = payload.eventId, count = payload.count })
     if not counted then return false end
     local notice
@@ -116,7 +116,7 @@ function Mgr:on_player_added(player)
     local data = self.PlayerData and self.PlayerData:get_data_inst(player)
     if self.Save and not data then return end
     self.Players[player.UserId] = player
-    self.States[player.UserId] = data and QuestSteps.restore(cfg().Steps, data.Extra.quest) or QuestSteps.New()
+    self.States[player.UserId] = data and QuestSteps.restore(cfg().Steps, data.Extra.quest) or QuestSteps.new()
     self.Queues[player.UserId] = { player = player, data = data, events = {} }
     self:publish(player)
 end
@@ -130,7 +130,7 @@ end
 function Mgr:drain(player)
     local queue = player and self.Queues[player.UserId]
     if not queue or queue.player ~= player or queue.writing or #queue.events == 0 then return end
-    local status = self.Save:Status(player.UserId)
+    local status = self.Save:status(player.UserId)
     if status.autosavePaused or status.loadState == 'failed' then
         queue.failed = true
         local leave = queue.leave
@@ -146,7 +146,7 @@ function Mgr:drain(player)
     queue.writing = true
     local accepted = self.Save:execute(player, data, operation, function(draft)
         local state = QuestSteps.restore(c.Steps, draft.Extra.quest)
-        local counted, advanced = QuestSteps.Apply(c.Steps, state, fact)
+        local counted, advanced = QuestSteps.apply(c.Steps, state, fact)
         draft.Extra.quest = state
         return { counted = counted, advanced = advanced }
     end, function(written, result)
@@ -185,9 +185,9 @@ end
 function Mgr:flush_before_leave(player, done)
     local queue = player and self.Queues[player.UserId]
     if not self.Save or not queue or queue.player ~= player or queue.failed
-        or self.Save:Status(player.UserId).loadState ~= 'ready'
+        or self.Save:status(player.UserId).loadState ~= 'ready'
         or #queue.events == 0 and not queue.writing then return false end
-    if self.Save:Status(player.UserId).autosavePaused then
+    if self.Save:status(player.UserId).autosavePaused then
         queue.failed = true
         queue.leave = nil
         print('[PlayerQuest] 保存已暂停，离场放弃未落账事实', player.UserId)

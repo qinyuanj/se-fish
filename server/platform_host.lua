@@ -270,7 +270,7 @@ function PlatformHost:on_player_removing(player)
     self.Flows[player.UserId] = nil
 end
 
-function PlatformHost:Start()
+function PlatformHost:start()
     local commodity = service('CommodityService')
     if commodity and commodity.GoodsPurchaseCompleted then
         local ok, err = pcall(function()

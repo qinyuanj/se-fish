@@ -156,7 +156,7 @@ describe('TestFishCarrierEngine', function()
     world.SuppressController = true
     local body = world:CreateUnit('WorldUnit', { Name = 'T-body', Position = newVector3(0, 0, 0) })
     local carrier = withFakeEngine(world, function()
-      return mgr:Attach(body, { MaxHealth = 50 })
+      return mgr:attach(body, { MaxHealth = 50 })
     end)
     assert.is_nil(carrier)
     assert.are.equal(0, #mgr.Carriers)
@@ -169,7 +169,7 @@ describe('TestFishCarrierEngine', function()
     local mgr = freshManager()
     local world = newFakeWorld()
     local carrier = withFakeEngine(world, function()
-      return mgr:Spawn(SPAWN_OPTS)
+      return mgr:spawn(SPAWN_OPTS)
     end)
     assert.are.equal(1, #carrier.Body.NoCollidePairs)
     assert.is_true(carrier.Body.NoCollidePairs[1] == carrier.Receiver)
@@ -179,7 +179,7 @@ describe('TestFishCarrierEngine', function()
     local mgr = freshManager()
     local world = newFakeWorld()
     withFakeEngine(world, function()
-      local carrier = mgr:Spawn(SPAWN_OPTS)
+      local carrier = mgr:spawn(SPAWN_OPTS)
       carrier.Controller.Health = 10
       assert.same(carrier, mgr:resolve_carrier(carrier.Receiver))
       assert.is_false(mgr:Damage(carrier, 5))
@@ -203,7 +203,7 @@ describe('TestFishCarrierEngine', function()
     local notices = {}
     mgr.damage_publisher = function(payload) notices[#notices + 1] = payload end
     withFakeEngine(world, function()
-      local carrier = mgr:Spawn(SPAWN_OPTS)
+      local carrier = mgr:spawn(SPAWN_OPTS)
       carrier.Controller:TakeDamage(2.7)
       assert.near(2.7, notices[1].amount, 0.00001)
       assert.are.equal(carrier.Body.UnitId, notices[1].targetId)
@@ -234,7 +234,7 @@ describe('TestFishCarrierEngine', function()
       end
       opts.LinearDamping = 10
       opts.AngularDamping = 10
-      return mgr:Spawn(opts)
+      return mgr:spawn(opts)
     end)
     assert.are.equal(10, carrier.Body.LinearDamping)
     assert.are.equal(10, carrier.Body.AngularDamping)
@@ -246,7 +246,7 @@ describe('TestFishCarrierEngine', function()
     local mgr = freshManager()
     local world = newFakeWorld()
     local carrier = withFakeEngine(world, function()
-      return mgr:Spawn(SPAWN_OPTS)
+      return mgr:spawn(SPAWN_OPTS)
     end)
     local seen
     mgr:subscribe_died(function(c)
@@ -265,7 +265,7 @@ describe('TestFishCarrierEngine', function()
     local mgr = freshManager()
     local world = newFakeWorld()
     local carrier = withFakeEngine(world, function()
-      return mgr:Spawn(SPAWN_OPTS)
+      return mgr:spawn(SPAWN_OPTS)
     end)
     local deaths = 0
     mgr:subscribe_died(function()
@@ -286,7 +286,7 @@ describe('TestFishCarrierEngine', function()
     -- #37 失败方式：本体写后仍读到上帧坐标；显式轨迹目标被忽略，受击体持续落后。
     local mgr, world = freshManager(), newFakeWorld()
     withFakeEngine(world, function()
-      local carrier = mgr:Spawn(SPAWN_OPTS)
+      local carrier = mgr:spawn(SPAWN_OPTS)
       local target = Vector3.New(20, 15, 30)
       mgr:sync_position(carrier, target)
       assert.same(target + carrier.ReceiverOffset, carrier.Receiver.Position)
@@ -302,7 +302,7 @@ describe('TestFishCarrierEngine', function()
     local notices = {}
     mgr.damage_publisher = function(payload) notices[#notices + 1] = payload end
     withFakeEngine(world, function()
-      local carrier = mgr:Spawn(SPAWN_OPTS)
+      local carrier = mgr:spawn(SPAWN_OPTS)
       carrier.Body.GetPosition = function() error('unit destroyed') end
       carrier.Controller:TakeDamage(0.5)
       assert.are.equal(1, notices[1].position.x)
@@ -316,7 +316,7 @@ describe('TestFishCarrierEngine', function()
     local world = newFakeWorld()
     local carrier
     withFakeEngine(world, function()
-      carrier = mgr:Spawn(SPAWN_OPTS)
+      carrier = mgr:spawn(SPAWN_OPTS)
     end)
 
     local deaths = 0
@@ -346,7 +346,7 @@ describe('TestFishCarrierEngine', function()
     local notices = {}
     mgr.damage_publisher = function(payload) notices[#notices + 1] = payload end
     withFakeEngine(world, function()
-      local carrier = mgr:Spawn(SPAWN_OPTS)
+      local carrier = mgr:spawn(SPAWN_OPTS)
       carrier.Controller.Health = 4
       carrier.Controller.HealthChanged:Fire(4)
       notices = {}
@@ -362,7 +362,7 @@ describe('TestFishCarrierEngine', function()
     local mgr = freshManager()
     local world = newFakeWorld()
     local carrier = withFakeEngine(world, function()
-      return mgr:Spawn(SPAWN_OPTS)
+      return mgr:spawn(SPAWN_OPTS)
     end)
 
     -- #32 的接缝：受击体带 EnableController，包内 _applyDamage 才找得到 target.Controller
@@ -378,7 +378,7 @@ describe('TestFishCarrierEngine', function()
     local mgr = freshManager()
     local world = newFakeWorld()
     local carrier = withFakeEngine(world, function()
-      return mgr:Spawn(SPAWN_OPTS)
+      return mgr:spawn(SPAWN_OPTS)
     end)
 
     assert.is_not.is_nil(carrier)
@@ -398,7 +398,7 @@ describe('TestFishCarrierEngine', function()
       local opts = {}
       for k, v in pairs(SPAWN_OPTS) do opts[k] = v end
       opts.Name = 'CallerChosen'
-      return mgr:Spawn(opts), mgr:Spawn(opts)
+      return mgr:spawn(opts), mgr:spawn(opts)
     end)
     assert.is_not.same(first.Body.Name, second.Body.Name)
     for _, carrier in ipairs({ first, second }) do
@@ -414,7 +414,7 @@ describe('TestFishCarrierEngine', function()
     local mgr = freshManager()
     local world = newFakeWorld()
     local carrier, why = withFakeEngine(world, function()
-      return mgr:Spawn({ FishId = 'T-no-mesh' })
+      return mgr:spawn({ FishId = 'T-no-mesh' })
     end)
     assert.is_nil(carrier)
     assert.are.equal('no-mesh', why)
@@ -426,7 +426,7 @@ describe('TestFishCarrierEngine', function()
     local world = newFakeWorld()
     local carrier
     withFakeEngine(world, function()
-      carrier = mgr:Spawn(SPAWN_OPTS)
+      carrier = mgr:spawn(SPAWN_OPTS)
     end)
 
     -- 举着 / 逃脱 / 落地：鱼本体动到哪，受击体跟到哪（引擎没有给 EggyUnit 的子节点跟随开关）
@@ -445,7 +445,7 @@ describe('TestFishCarrierEngine', function()
     local notices = {}
     mgr.damage_publisher = function(payload) notices[#notices + 1] = payload end
     withFakeEngine(world, function()
-      local carrier = mgr:Spawn(SPAWN_OPTS)
+      local carrier = mgr:spawn(SPAWN_OPTS)
       carrier.Controller.HealthChanged:Fire(50)
       carrier.Controller:TakeDamage(0)
       carrier.Controller.Health = 55

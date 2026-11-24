@@ -72,7 +72,7 @@ function Host.new(opts)
   }
   for _, name in ipairs({ "CastAction", "ReelInRE", "CloseReelIn", "CastState", "RequestCastState" }) do channel(name) end
   env.player = make_player(opts.user_id or 1, opts)
-  env.data = PlayerData.New(env.player)
+  env.data = PlayerData.new(env.player)
   env.data:Init()
   assert(env.data:SelectSlot(1))
   if opts.bait and GameCfg.Casting.BossBait[opts.bait] then

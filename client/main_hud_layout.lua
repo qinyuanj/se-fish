@@ -216,7 +216,7 @@ function MainHudLayout.bounds(rects, pad)
     return bounds(rects or {}, pad or 0)
 end
 
-function MainHudLayout.BottomLeft(r)
+function MainHudLayout.bottom_left(r)
     return r.x - r.w / 2, r.y - r.h / 2
 end
 

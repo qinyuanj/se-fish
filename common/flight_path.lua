@@ -48,7 +48,7 @@ end
 ---@param profile? table 鱼种飞行档案 { CruiseHeight, DiveIntervalSec, Speed, Mode, Center, Radius, DiveDamage }
 ---@param start? table 起始位置
 ---@param now number 起始时刻（World:GetServerTime()）
-function M.New(bounds, flightCfg, profile, start, now)
+function M.new(bounds, flightCfg, profile, start, now)
     flightCfg = flightCfg or cfg()
     profile = profile or {}
     start = start or { x = bounds.MinX, y = bounds.GroundY + (profile.CruiseHeight or flightCfg.CruiseHeight), z = bounds.MinZ }
@@ -71,7 +71,7 @@ function M.set_target(state, target)
     state.Target = (type(target) == 'table' and not isBadPoint(target)) and copy(target) or nil
 end
 
-function M.Speed(state)
+function M.speed(state)
     return state.Profile.Speed or state.Cfg.Speed
 end
 
@@ -102,13 +102,13 @@ local function clampToBounds(state)
 end
 
 local function driftLimit(state, dt)
-    return M.Speed(state) * state.Cfg.MaxStepSec * 2 + state.Cfg.DriftTolerance
+    return M.speed(state) * state.Cfg.MaxStepSec * 2 + state.Cfg.DriftTolerance
 end
 
 local function updateCruise(state, dt, now, events)
     local profile, c = state.Profile, state.Cfg
     local cruiseY = state.bounds.GroundY + M.CruiseHeight(state)
-    local speed = M.Speed(state)
+    local speed = M.speed(state)
     local dx, dz
     if state.Target then
         dx, dz = state.Target.x - state.Pos.x, state.Target.z - state.Pos.z
@@ -160,7 +160,7 @@ local function updateDive(state, dt, now, events)
 end
 
 local function updateClimb(state, dt, now, events)
-    local speed = M.Speed(state)
+    local speed = M.speed(state)
     local cruiseY = state.bounds.GroundY + M.CruiseHeight(state)
     state.Vel.x, state.Vel.z = 0, 0
     state.Vel.y = state.Profile.ClimbSpeed or state.Cfg.ClimbSpeed
@@ -181,18 +181,18 @@ local function updateLeap(state, dt, now, events)
     if progress >= 1 then
         state.Phase = 'cruise'
         state.NextDiveAt = now + (state.Profile.DiveIntervalSec or c.DiveIntervalSec)
-        return M.Speed(state)
+        return M.speed(state)
     end
     state.Pos.y = state.bounds.GroundY + apex * math.sin(math.pi * progress)
     state.Vel.y = 0
-    return M.Speed(state)
+    return M.speed(state)
 end
 
 ---@param state table
 ---@param now number World:GetServerTime()
 ---@param dt number 帧间隔
 ---@return table events { nan?, drift?, clamped?, dive?, position, phase }
-function M.Step(state, now, dt)
+function M.step(state, now, dt)
     local events = { nan = false, drift = false, clamped = 0, dive = false }
     if isBadNumber(now) then now = state.LastAt or 0 end
     state.LastAt = now
@@ -234,12 +234,12 @@ function M.Step(state, now, dt)
             events.dive = true
             events.diveDamage = state.Profile.DiveDamage or state.Cfg.DiveDamage
             state.Stats.Dives = state.Stats.Dives + 1
-            speed = M.Speed(state)
+            speed = M.speed(state)
         elseif state.Phase == 'leap' then
             speed = updateLeap(state, dt, now, events)
             dt = 0
         else
-            speed = M.Speed(state)
+            speed = M.speed(state)
         end
     elseif state.Phase == 'dive' then
         speed = updateDive(state, dt, now, events)

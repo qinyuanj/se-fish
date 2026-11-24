@@ -22,7 +22,7 @@ describe('TestDamageFloat', function()
         }
     end)
     after_each(function()
-        DamageFloat:Clear()
+        DamageFloat:clear()
         _G.game = saved.game
         _G.Vector2 = saved.Vector2
         _G.Vector3 = saved.Vector3
@@ -52,13 +52,13 @@ describe('TestDamageFloat', function()
         DamageFloat:bind({}, { x = 800, y = 600 })
         local payload = { targetType = 'fish', targetId = 7, amount = 0.5,
             position = { x = 3, y = 5, z = 9 } }
-        DamageFloat:Show(payload)
+        DamageFloat:show(payload)
         assert.same(0, #created)
         visible = true
-        DamageFloat:Show(payload)
+        DamageFloat:show(payload)
         assert.same('1', created[1].Text)
         assert.same(400, created[1].Position.y)
-        DamageFloat:Show(payload)
+        DamageFloat:show(payload)
         assert.same(2, #created)
         assert.not_equals(created[2].Position.x, created[1].Position.x)
         visible = false
@@ -72,12 +72,12 @@ describe('TestDamageFloat', function()
         DamageFloat:update()
         assert.same(2, #DamageFloat.Pool)
         payload.amount, payload.critical = 10, true
-        DamageFloat:Show(payload)
+        DamageFloat:show(payload)
         assert.same(2, #created)
         assert.same('10', DamageFloat.Active[1].node.Text)
         assert.same(GameCfg.DamageFloat.CriticalFontSize, DamageFloat.Active[1].node.FontSize)
         assert.same(1, DamageFloat.Active[1].node.Opacity)
-        DamageFloat:Clear()
+        DamageFloat:clear()
         assert.same(0, #DamageFloat.Active)
         assert.is_true(created[1].Destroyed and created[2].Destroyed)
     end)

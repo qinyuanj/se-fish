@@ -38,7 +38,7 @@ local Assets = {
     },
 }
 
-function Assets.Apply(cfg)
+function Assets.apply(cfg)
     for _, fish in pairs(cfg.Fish) do
         fish.VisualColor = fish.VisualColor or Assets.Grades[fish.Grade]
     end

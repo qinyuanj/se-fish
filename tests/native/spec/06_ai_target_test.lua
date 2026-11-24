@@ -67,7 +67,7 @@ describe('第 6 节 官方 AI 目标选择接线（哥斯拉贯通）', function
     end
 
     local function officialFocus(fish)
-        return require('server.world_host.fish_ai_target'):Focus(fish)
+        return require('server.world_host.fish_ai_target'):focus(fish)
     end
 
     before_each(function()
@@ -99,7 +99,7 @@ describe('第 6 节 官方 AI 目标选择接线（哥斯拉贯通）', function
         env:advance(0.2)
         assert.same(env.player.Character, officialFocus(fish), '官方 AI 管理器没有持有伤害优先目标')
         local adapter = require('server.world_host.fish_ai_target')
-        local state = adapter:State(fish)
+        local state = adapter:state(fish)
         assert.same(GameCfg.Ability.AiTarget.PriorityMode, state.priorityMode,
             '伤害优先模式没有登记到官方 AI 管理器')
 
@@ -229,7 +229,7 @@ describe('第 6 节 官方 AI 目标选择接线（哥斯拉贯通）', function
         local rawPrint = _G.print
         local logs = {}
         _G.print = function(...) logs[#logs + 1] = tostring((...)) end
-        local ok, state = pcall(adapter.State, adapter, fish)
+        local ok, state = pcall(adapter.state, adapter, fish)
         _G.print = rawPrint
         runtime.getState = original
         assert.is_true(ok, tostring(state))
@@ -297,7 +297,7 @@ describe('第 6 节 官方 AI 目标选择接线（哥斯拉贯通）', function
         place(fish, env.player, 2)
         env:advance(1)
         local adapter = require('server.world_host.fish_ai_target')
-        local state = adapter:State(fish)
+        local state = adapter:state(fish)
         assert.is_nil(state and state.modeName, '官方 AI 启动了移动模式，与自研轨迹双写权威')
         assert.is_not_true(fish.Carrier.AiOwnsMovement, '受击体的移动所有权被官方 AI 接管')
         local pos = fish.Carrier.Body.Position
@@ -318,7 +318,7 @@ describe('接线验收：属性与效果投影一致', function()
         function data:potion_count(id)
             return id == GameCfg.Ability.SpeedPotion.Item and self.speed or self.body
         end
-        local mgr = AttrRuntime.New({ get_data_inst = function() return data end }, function() return 0.5 end)
+        local mgr = AttrRuntime.new({ get_data_inst = function() return data end }, function() return 0.5 end)
         local player = { UserId = 72, Character = { Controller = { WalkSpeed = 7 },
             GetChildren = function() return {} end, SetScale = function() end } }
         local plan = mgr:plan(player)
@@ -337,12 +337,12 @@ describe('接线验收：属性与效果投影一致', function()
     -- 条款 6-26：霜之新星命中减速 30%、霜冻不叠加（持续 3 秒由效果定义给，这里断言倍率与不叠加）。
     it('条款 6-26：效果投影由 modifier_system 持有，霜冻减速 30% 且不叠加', function()
         local Runtime = require('tests.support.modifier_runtime')
-        local rt = Runtime.New(100)
+        local rt = Runtime.new(100)
         local modifier = rt:load_modifier()
         local player = { UserId = 73, Character = rt.unit('character') }
-        assert.is_true(modifier:Apply(nil, player, 'frost'), '霜冻效果没有交给官方效果系统')
+        assert.is_true(modifier:apply(nil, player, 'frost'), '霜冻效果没有交给官方效果系统')
         assert.near(0.7, modifier:get_move_multiplier(player), 1e-9, '霜冻减速不是 30%')
-        assert.is_true(modifier:Apply(nil, player, 'frost'), '重复霜冻应刷新持续')
+        assert.is_true(modifier:apply(nil, player, 'frost'), '重复霜冻应刷新持续')
         assert.near(0.7, modifier:get_move_multiplier(player), 1e-9, '霜冻效果叠加了')
     end)
 end)
@@ -353,7 +353,7 @@ describe('第 6 节 6-30：离开战斗范围的玩家退出飞行鱼目标', fu
     local env
 
     local function vec(x, y, z) return env.vec(x, y, z) end
-    local function focus(fish) return require('server.world_host.fish_ai_target'):Focus(fish) end
+    local function focus(fish) return require('server.world_host.fish_ai_target'):focus(fish) end
 
     before_each(function()
         env = Islet.new(6)
@@ -471,7 +471,7 @@ describe('接线验收：霜之新星命中经武器入口挂霜冻（6-26）', 
 
         env.player = { UserId = 91, Character = { Position = v3(0, 0, 0),
             Rotation = { GetForward = function() return v3(0, 0, 1) end } } }
-        env.rt = require('tests.support.modifier_runtime').New(100)
+        env.rt = require('tests.support.modifier_runtime').new(100)
         env.modifier = env.rt:load_modifier()
         env.modifier.Presets = nil -- 走 GameCfg.Ability.ModifierPresets 的真实预设键
         env.refreshed = 0

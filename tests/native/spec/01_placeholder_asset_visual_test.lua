@@ -158,7 +158,7 @@ describe('条款 1-14 占位资源只替换显示', function()
     local cfg = synthetic()
     local before = snapshot_numbers(cfg)
     local drops = cfg.Fish.probeElite.Drops
-    PlaceholderAssets.Apply(cfg)
+    PlaceholderAssets.apply(cfg)
     for id, species in pairs(cfg.Fish) do
       for _, key in ipairs(JUDGMENT) do
         assert.same(before[id][key], species[key], id .. ' 的判定字段 ' .. key .. ' 被占位层改了')
@@ -190,8 +190,8 @@ describe('条款 1-14 占位资源只替换显示', function()
     meat.Visual = { Mesh = 'official://mesh/2', Scale = { x = 1, y = 1, z = 1 } }
     cfg.Fish.probeElite.VisualColor = { 9, 9, 9, 255 }
     local before = snapshot_numbers(cfg)
-    PlaceholderAssets.Apply(cfg)
-    PlaceholderAssets.Apply(cfg)
+    PlaceholderAssets.apply(cfg)
+    PlaceholderAssets.apply(cfg)
     assert.are.equal('official://image/1', meat.Icon, '正式图标被占位覆盖')
     assert.same({ 1, 2, 3, 255 }, meat.IconColor)
     assert.are.equal('official://mesh/2', meat.Visual.Mesh)
@@ -279,7 +279,7 @@ describe('条款 1-15 七区鱼与首领的代码路径（可见 / 可打 / 可�
       ids[#ids + 1] = row.boss
       for _, id in ipairs(ids) do
         local species = GameCfg.Fish[id]
-        local carrier = assert(Carrier:Spawn({ Position = vec(0, 2, 0), FishId = id,
+        local carrier = assert(Carrier:spawn({ Position = vec(0, 2, 0), FishId = id,
           MaxHealth = species.Health, ModelId = species.Model, GravityEnabled = false }))
         assert.are.equal(species.Health, carrier.Controller.MaxHealth,
           id .. ' 的受击体血量不是鱼种血量')
