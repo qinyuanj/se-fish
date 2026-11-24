@@ -4,6 +4,7 @@ local GameCfg = require("common.GameCfg")
 local BodyScale = require("common.BodyScale")
 local spoke = require("common.packages.spoke.api")
 local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
+local ViewUtil = require("client.Views.ViewUtil")
 local State = spoke.State
 
 local ShopView = {}
@@ -38,10 +39,10 @@ ShopView.ShopText = {
 }
 
 local function near(position, center, character)
-  if type(position) ~= "table" or type(center) ~= "table" then return false end
-  local dx, dz = position.x - center.x, position.z - center.z
+  local dist_sq = ViewUtil.distance_sq_xz(position, center)
+  if dist_sq == nil then return false end
   local radius = BodyScale.InteractionRadius(character, GameCfg.Shop.Radius)
-  return dx * dx + dz * dz <= radius * radius
+  return dist_sq <= radius * radius
 end
 
 local function open_modal(ctx, id, payload)
@@ -72,17 +73,8 @@ function ShopView.bubble_spec(options)
     mount = function(scope, ctx, item_signal)
       local entry = item_signal:now()
       local key = "shop:" .. tostring(entry.name or entry.stand.AnchorName)
-      local create_scene = ctx.services and ctx.services.create_scene_node
-      local node
-      if type(create_scene) == "function" then
-        node = ctx.own_node(scope, create_scene(entry, GameCfg.Shop.BubbleHeight, "shop"))
-      else
-        node = ctx.create_node(scope, "EUIImage", {
-          Name = "SceneNodeShop_" .. tostring(entry.name or entry.stand.AnchorName),
-          Visible = true,
-        })
-      end
-      if node.Name == nil then node.Name = "SceneNodeShop_" .. tostring(entry.name or entry.stand.AnchorName) end
+      local fallback_name = "SceneNodeShop_" .. tostring(entry.name or entry.stand.AnchorName)
+      local node = ViewUtil.create_anchor_scene_node(scope, ctx, entry, GameCfg.Shop.BubbleHeight, "shop", fallback_name)
       local title = ctx.create_node(scope, "EUITextLabel", {
         Name = "LabelShopTitle",
         Parent = node,

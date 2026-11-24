@@ -36,7 +36,6 @@ local MessageView = require("client.Views.MessageView")
 local StoryView = require("client.Views.StoryView")
 local GMView = require("client.Views.GMView")
 local SquadView = require("client.Views.SquadView")
-local Util = require("common.Util")
 local REUtil = require("common.REUtil")
 local GameUI = require("client.GameUI")
 
@@ -66,6 +65,7 @@ local hud_open_popup = spoke.State.new("ClientMain.hud_open_popup", nil)
 local hud_reel = {}
 local hud_drop_resolvers = {}
 local fisherman_shared = {}
+local grill_shared = GrillView.new_shared()
 local rescue_view_state = FishermanView.rescue_state({
     get_players = function() return Players:GetPlayers() end,
     get_local_player = function() return Players.LocalPlayer end,
@@ -89,6 +89,10 @@ local function next_action_seq()
     return action_seq
 end
 
+local function is_positive_int(value)
+    return Number.IsFiniteNumber(value) and value >= 1 and value == math.floor(value)
+end
+
 local function resolve_item_bar_drop(pos)
     return hud_drop_resolvers.backpack and hud_drop_resolvers.backpack(pos) or nil
 end
@@ -103,6 +107,49 @@ local function send_hud_operate(payload)
     REUtil:GetRE("ItemBarAction"):FireServer(payload)
 end
 
+local function send_item_bar(payload)
+    REUtil:GetRE("ItemBarAction"):FireServer(payload)
+end
+
+local function get_eui_manager()
+    local player = Players.LocalPlayer
+    local eui = player and player.PlayerGui and player.PlayerGui.EuiManager or nil
+    if not eui and type(GameUI.GetEuiManager) == "function" then
+        eui = GameUI:GetEuiManager()
+    end
+    return eui
+end
+
+local function create_scene_node_at(position, name)
+    local eui = get_eui_manager()
+    if not eui then error("场景节点创建时 EUI 未就绪", 2) end
+    local node = eui:CreateSceneNodeAtPosition(position)
+    node.Name = name
+    return node
+end
+
+local function create_anchor_scene_node(entry, height, kind)
+    local anchor = entry.name and World:FindFirstChild(entry.name, true) or nil
+    if kind == "shop" and anchor and type(GameUI.CreateSceneNode) == "function" then
+        local ok, node = pcall(GameUI.CreateSceneNode, GameUI,
+            GameCfg.Shop.BubblePreset, anchor, Vector3.New(0, height, 0))
+        if ok and node then
+            return node
+        end
+        print("[client.main] 商店预设气泡创建失败，回退坐标节点", tostring(entry.name), tostring(node))
+    end
+    local eui = get_eui_manager()
+    local center = entry.position or (anchor and anchor.Position)
+    if not eui or not center then return nil end
+    return eui:CreateSceneNodeAtPosition(Vector3.New(center.x, center.y + height, center.z))
+end
+
+local function open_platform_shop()
+    client_store_writer:open_modal("platform")
+    REUtil:GetRE("PlatformAction"):FireServer({ action = "OpenCoinShop" })
+    return true
+end
+
 Task:Spawn(function()
     local waited = 0
     local ui_root = GameUI:GetUIRoot()
@@ -112,20 +159,19 @@ Task:Spawn(function()
         ui_root = GameUI:GetUIRoot()
     end
     if ui_root then
-        _G.PlatformShop = {
-            Open = function()
-                client_store_writer:open_modal("platform")
-                REUtil:GetRE("PlatformAction"):FireServer({ action = "OpenCoinShop" })
-            end,
-        }
+        _G.PlatformShop = { Open = open_platform_shop }
         RootView.mount(ui_root, client_store, {
             services = {
                 open_modal = function(id, payload) client_store_writer:open_modal(id, payload) end,
                 close_modal = function(id) client_store_writer:close_modal(id) end,
+                set_overlay = function(id, active) client_store_writer:set_overlay(id, active) end,
                 send_lottery = function(payload) REUtil:GetRE("LotteryAction"):FireServer(payload) end,
                 send_blindbox = function(payload) REUtil:GetRE("BlindboxAction"):FireServer(payload) end,
                 send_platform = function(payload) REUtil:GetRE("PlatformAction"):FireServer(payload) end,
                 send_story = function(payload) REUtil:GetRE("StoryRead"):FireServer(payload) end,
+                send_survival = function(payload) REUtil:GetRE("SurvivalAction"):FireServer(payload) end,
+                send_reel = function(payload) REUtil:GetRE("ReelInRE"):FireServer(payload) end,
+                send_close = function(payload) REUtil:GetRE("CloseReelIn"):FireServer(payload) end,
                 send_gm = send_gm,
                 request_compendium = function()
                     compendium_seq = compendium_seq + 1
@@ -144,27 +190,27 @@ Task:Spawn(function()
                     return GameUI:CreateSceneNode(preset, anchor, offset)
                 end,
                 hud_entry_rect = function(name)
-                    local resolution = GameUI:GetEuiManager():GetDeviceResolution() or { x = 1920, y = 1080 }
+                    local eui = get_eui_manager()
+                    local resolution = eui and eui:GetDeviceResolution() or { x = 1920, y = 1080 }
                     return MainHudLayout.Compute({ width = resolution.x, height = resolution.y }).Rects[name]
                 end,
                 send_ferry = function(payload)
                     REUtil:GetRE("FerryAction"):FireServer(payload)
                 end,
-                create_scene_node = function(position, name)
-                    local player = Players.LocalPlayer
-                    local eui = player and player.PlayerGui and player.PlayerGui.EuiManager
-                    if not eui then error("摆渡场景节点创建时 EUI 未就绪", 2) end
-                    local node = eui:CreateSceneNodeAtPosition(position)
-                    node.Name = name
-                    return node
-                end,
+                create_scene_node_at = create_scene_node_at,
+                create_anchor_scene_node = create_anchor_scene_node,
                 get_device_resolution = function()
-                    local player = Players.LocalPlayer
-                    local eui = player and player.PlayerGui and player.PlayerGui.EuiManager
+                    local eui = get_eui_manager()
                     return eui and eui:GetDeviceResolution() or { x = 1920, y = 1080 }
                 end,
                 send_grill = function(payload)
-                    REUtil:GetRE("GrillAction"):FireServer(payload)
+                    if type(payload) ~= "table" then return end
+                    local body = {}
+                    for k, v in pairs(payload) do body[k] = v end
+                    if not is_positive_int(body.seq) then
+                        body.seq = next_action_seq()
+                    end
+                    REUtil:GetRE("GrillAction"):FireServer(body)
                 end,
                 next_seq = next_action_seq,
                 send_party = function(payload)
@@ -176,35 +222,9 @@ Task:Spawn(function()
                 send_interact = function(payload)
                     REUtil:GetRE("InteractAction"):FireServer(payload)
                 end,
-                open_modal = function(id, payload)
-                    client_store_writer:open_modal(id, payload)
-                end,
-                close_modal = function(id)
-                    client_store_writer:close_modal(id)
-                end,
-                open_platform_shop = function()
-                    local platform = rawget(_G, "PlatformShop")
-                    if type(platform) ~= "table" or type(platform.Open) ~= "function" then
-                        error("地图商店暂不可用", 0)
-                    end
-                    return platform:Open()
-                end,
-                create_scene_node = function(entry, height, kind)
-                    local anchor = entry.name and World:FindFirstChild(entry.name, true) or nil
-                    if kind == "shop" and anchor and _G.GameUI then
-                        local ok, node = pcall(_G.GameUI.CreateSceneNode, _G.GameUI,
-                            GameCfg.Shop.BubblePreset, anchor, Vector3.New(0, height, 0))
-                        if ok and node then return node end
-                    end
-                    local eui = Players.LocalPlayer and Players.LocalPlayer.PlayerGui
-                        and Players.LocalPlayer.PlayerGui.EuiManager
-                    if not eui and _G.GameUI then eui = _G.GameUI:GetEuiManager() end
-                    local center = entry.position or (anchor and anchor.Position)
-                    if not eui or not center then return nil end
-                    return eui:CreateSceneNodeAtPosition(Vector3.New(center.x, center.y + height, center.z))
-                end,
+                open_platform_shop = open_platform_shop,
                 send_weapon = function(payload)
-                    local event = _G.REUtil and _G.REUtil:GetRE("WeaponAction")
+                    local event = REUtil:GetRE("WeaponAction")
                     if event and type(event.FireServer) == "function" then
                         event:FireServer(payload)
                     end
@@ -214,6 +234,7 @@ Task:Spawn(function()
                     local payload = WeaponAim:AttackPayload()
                     return payload and payload.aim or nil
                 end,
+                grill_shared = grill_shared,
                 reel = hud_reel,
             },
             create_node = function(kind, props)
@@ -236,6 +257,7 @@ Task:Spawn(function()
                 FishermanView.rescue_driver_spec(rescue_view_state),
                 SquadView.hud_spec(),
                 SquadView.rescue_driver_spec(squad_rescue_view_state),
+                GroundLootView.aim_toggle_spec(),
                 MainHudVitalsView.spec(),
                 MainHudEquipPopups.spec({
                     open_popup = hud_open_popup,
@@ -281,20 +303,26 @@ Task:Spawn(function()
                 shop = ShopView.modal_spec(),
                 fisherman = FishermanView.modal_spec(),
                 confirm = FishermanView.confirm_modal_spec(),
-            },
-            overlays = {
-                lottery_interaction = LotteryInteraction.spec(),
-                survival = SurvivalOverlayView.spec(),
-                aim_pickup = GroundLootView.aim_spec(),
-                reel = ReelOverlayView.spec({ controller = hud_reel }),
-            },
-            modals = {
                 lottery = LotteryView.modal_spec(),
                 blindbox = BlindboxView.modal_spec(),
                 platform = PlatformShopView.modal_spec(),
                 compendium = CompendiumView.modal_spec(),
                 story = StoryView.modal_spec(),
                 gm = GMView.modal_spec(),
+            },
+            overlays = {
+                lottery_interaction = LotteryInteraction.spec(),
+                survival = SurvivalOverlayView.spec(),
+                aim_pickup = GroundLootView.aim_spec({
+                    on_pick = function()
+                        local id = GroundLootView.pick_nearest(client_store)
+                        if id ~= nil then
+                            send_item_bar({ action = "Pickup", value = id })
+                        end
+                        client_store_writer:set_overlay("aim_pickup", false)
+                    end,
+                }),
+                reel = ReelOverlayView.spec({ controller = hud_reel }),
             },
             docks = {
                 shop = ShopView.bubble_spec({ anchors = (function()
@@ -319,13 +347,21 @@ Task:Spawn(function()
                     end
                     return rows
                 end)() }),
+                grill = GrillView.bubble_spec({ shared = grill_shared, anchors = (function()
+                    local rows = {}
+                    for index, point in ipairs(GameCfg.Grill.Points or {}) do
+                        local anchor = Util:WaitForChild(World, point.AnchorName)
+                        if anchor then rows[#rows + 1] = {
+                            point = point, index = index, name = point.AnchorName, position = anchor.Position,
+                        } end
+                    end
+                    return rows
+                end)() }),
                 rescue = FishermanView.rescue_bubble_spec(rescue_view_state),
                 squad_members = SquadView.member_spec(),
                 squad_rescue = SquadView.rescue_bubble_spec(squad_rescue_view_state),
                 ground_loot = GroundLootView.bubble_spec({
-                    send = function(payload)
-                        REUtil:GetRE('ItemBarAction'):FireServer(payload)
-                    end,
+                    send = send_item_bar,
                 }),
                 ferry = FerryView.legs_spec(),
                 fish_combat = FishCombatView.bar_spec(),
@@ -338,15 +374,14 @@ Task:Spawn(function()
 end)
 
 local StarterGui = game:GetService("StarterGui")
-pcall(function() StarterGui:SetCoreGuiEnabled(Enums.CoreGuiType.LiftButton, false) end)
-pcall(function() StarterGui:SetCoreGuiEnabled(Enums.CoreGuiType.Health, false) end)
-
+pcall(function() StarterGui:SetCoreGuiEnabled(Enums.CoreGuiType.LiftButton, false) end) -- 兼容部分宿主环境未开放 CoreGui 隐藏接口
+pcall(function() StarterGui:SetCoreGuiEnabled(Enums.CoreGuiType.Health, false) end) -- 兼容部分宿主环境未开放 CoreGui 隐藏接口
 
 local AbilityAPI = require("client.packages.ability_system.api")
 if AbilityAPI then
     AbilityAPI.StartClientLifecycle()
 end
 
+REUtil:GetRE("RequestLoot"):FireServer()
 REUtil:GetRE("RequestQuest"):FireServer()
 REUtil:GetRE("RequestStory"):FireServer()
-

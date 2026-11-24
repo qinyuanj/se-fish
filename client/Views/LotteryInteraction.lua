@@ -1,7 +1,9 @@
--- 抽奖机场景入口（#312）：RootView 时钟驱动，场景节点与按钮由同一作用域回收。
+-- 抽奖机场景入口（#312）：订阅只读 ClientStore 空间位置与角色，场景节点与按钮由同一作用域回收。
+-- 不在常驻作用域订阅 on_frame，仅在玩家移动或角色变化时增量更新气泡显隐与关闭弹窗。
 local GameCfg = require("common.GameCfg")
 local BodyScale = require("common.BodyScale")
 local Modal = require("client.Views.EconomyModal")
+local ViewUtil = require("client.Views.ViewUtil")
 
 local LotteryInteraction = {}
 
@@ -14,9 +16,13 @@ function LotteryInteraction.spec()
       local bubbles = {}
       local machine = nil
 
-      local function character()
+      local function resolve_character(stored_character)
+        if stored_character ~= nil then
+          return stored_character
+        end
         return type(services.local_character) == "function" and services.local_character() or nil
       end
+
       local function create_scene(preset, anchor, offset)
         if type(services.create_lottery_scene_node) ~= "function" then return nil end
         local ok, node = pcall(services.create_lottery_scene_node, preset, anchor, offset)
@@ -26,17 +32,16 @@ function LotteryInteraction.spec()
         end
         return node
       end
-      local function update()
-        local current = character()
-        local pos = current and current.Position
+
+      local function update(stored_pos, stored_character)
+        local current = resolve_character(stored_character)
+        local pos = stored_pos or (current and current.Position) or nil
         local radius = BodyScale.InteractionRadius(current, GameCfg.Lottery.Radius)
+        local radius_sq = radius * radius
         local near_machine = nil
         for _, bubble in ipairs(bubbles) do
-          local near = false
-          if pos then
-            local dx, dz = pos.x - bubble.center.x, pos.z - bubble.center.z
-            near = dx * dx + dz * dz <= radius * radius
-          end
+          local dist_sq = pos ~= nil and ViewUtil.distance_sq_xz(pos, bubble.center) or nil
+          local near = dist_sq ~= nil and dist_sq <= radius_sq
           if near then near_machine = bubble end
           if bubble.near ~= near then
             bubble.near = near
@@ -82,8 +87,12 @@ function LotteryInteraction.spec()
           end
         end
       end
-      scope:subscribe(ctx.clock.on_frame, update)
-      update()
+
+      scope:effect("LotteryInteractionSync", function(es)
+        local pos = es:d(ctx.store.position)
+        local char = es:d(ctx.store.local_character)
+        update(pos, char)
+      end)
     end,
   }
 end

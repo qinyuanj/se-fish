@@ -1,9 +1,10 @@
 -- 地面物品气泡与瞄准拾取蒙版（ADR-0032 / #301，归属 L2 client.Views）。
 -- 订阅只读 ClientStore 的地面快照与本地位置：范围内才建气泡，离开、消失或根销毁时由视图树拆干净。
--- 瞄准拾取蒙版挂在 RootView 覆盖相位上，退出瞄准或销毁根后零残留。
+-- 瞄准拾取开关与蒙版挂在 RootView 常驻 HUD / 覆盖相位上，退出瞄准或销毁根后零残留。
 
+local BodyScale = require("common.BodyScale")
 local GameCfg = require("common.GameCfg")
-local Number = require("common.Number")
+local ViewUtil = require("client.Views.ViewUtil")
 
 local GroundLootView = {}
 
@@ -23,21 +24,39 @@ local function rows_of(loot)
 end
 
 local function near(position, row, radius)
-  if type(position) ~= "table" or type(row) ~= "table" then return false end
-  if not Number.IsFiniteNumber(position.x) or not Number.IsFiniteNumber(row.x) then return false end
-  local dx = position.x - row.x
-  local dy = (position.y or 0) - (row.y or 0)
-  local dz = (position.z or 0) - (row.z or 0)
-  return dx * dx + dy * dy + dz * dz <= radius * radius
+  local dist_sq = ViewUtil.distance_sq_xyz(position, row)
+  return dist_sq ~= nil and dist_sq <= radius * radius
+end
+
+function GroundLootView.pick_nearest(store, radius)
+  if type(store) ~= "table" then return nil end
+  local position = store.position and store.position:now() or nil
+  local character = store.local_character and store.local_character:now() or nil
+  local loot = store.loot and store.loot:now() or nil
+  if position == nil then return nil end
+  local base_radius = radius or GameCfg.Loot.PickupRadius
+  local effective = BodyScale.InteractionRadius(character, base_radius)
+  local limit_sq = effective * effective
+  local best_id, best_dist = nil, nil
+  for _, row in ipairs(rows_of(loot)) do
+    local dist_sq = ViewUtil.distance_sq_xyz(position, row)
+    if dist_sq ~= nil and dist_sq <= limit_sq and (best_dist == nil or dist_sq < best_dist) then
+      best_dist = dist_sq
+      best_id = row.id or row.Id
+    end
+  end
+  return best_id
 end
 
 function GroundLootView.bubble_spec(options)
   options = type(options) == "table" and options or {}
-  local radius = options.radius or GameCfg.Loot.PickupRadius
+  local base_radius = options.radius or GameCfg.Loot.PickupRadius
   return {
     items = function(es, store)
       local loot = es:d(store.loot)
       local position = es:d(store.position)
+      local character = es:d(store.local_character)
+      local radius = options.radius or BodyScale.InteractionRadius(character, base_radius)
       local list = {}
       for _, row in ipairs(rows_of(loot)) do
         if near(position, row, radius) then
@@ -67,6 +86,68 @@ function GroundLootView.bubble_spec(options)
   }
 end
 
+function GroundLootView.aim_toggle_spec(options)
+  options = type(options) == "table" and options or {}
+  local base_radius = options.radius or GameCfg.Loot.PickupRadius
+  return {
+    name = "GroundLootAimToggle",
+    mount = function(scope, ctx)
+      local function set_aim(active)
+        local fn = ctx.services and ctx.services.set_overlay
+        if type(fn) == "function" then
+          fn("aim_pickup", active == true)
+        end
+      end
+
+      local has_nearby = scope:memo("GroundLootNearby", function(ms)
+        if ms:d(ctx.store.hud_visible) == false then
+          return false
+        end
+        local position = ms:d(ctx.store.position)
+        if position == nil then
+          return false
+        end
+        local character = ms:d(ctx.store.local_character)
+        local radius = options.radius or BodyScale.InteractionRadius(character, base_radius)
+        local loot = ms:d(ctx.store.loot)
+        for _, row in ipairs(rows_of(loot)) do
+          if near(position, row, radius) then
+            return true
+          end
+        end
+        return false
+      end)
+
+      scope:phase("GroundLootAimTogglePhase", has_nearby, function(ps)
+        local button = ctx.create_node(ps, "EUIButton", {
+          Name = "BtnAimPickup",
+          ButtonText = "瞄准拾取",
+          TouchEnabled = true,
+          Visible = true,
+        })
+        ctx.connect(ps, button.OnClicked, function()
+          local flags = ctx.store.overlays:now()
+          local active = type(flags) == "table" and flags.aim_pickup == true
+          set_aim(not active)
+        end)
+        ps:on_cleanup(function()
+          set_aim(false)
+        end)
+      end)
+
+      scope:subscribe(ctx.store.on_server_event, function(event)
+        if type(event) ~= "table" or event.channel ~= "LootResult" then
+          return
+        end
+        local result = event.payload
+        if type(result) == "table" and result.reason == "full" then
+          ViewUtil.notify(ctx, "背包已满")
+        end
+      end)
+    end,
+  }
+end
+
 function GroundLootView.aim_spec(options)
   options = type(options) == "table" and options or {}
   return {
@@ -79,11 +160,22 @@ function GroundLootView.aim_spec(options)
         Name = "AimPickupMask",
         Visible = true,
       })
-      if type(options.on_pick) == "function" then
-        ctx.connect(scope, mask.OnClicked, function()
-          options.on_pick()
-        end)
+      mask.TouchEnabled = true
+      local function handle_pick()
+        if type(options.on_pick) == "function" then
+          options.on_pick(ctx)
+        elseif type(options.send) == "function" then
+          local id = GroundLootView.pick_nearest(ctx.store, options.radius)
+          if id ~= nil then
+            options.send({ action = "Pickup", value = id })
+          end
+        end
+        local set_overlay = ctx.services and ctx.services.set_overlay
+        if type(set_overlay) == "function" then
+          set_overlay("aim_pickup", false)
+        end
       end
+      ctx.connect(scope, mask.OnClicked, handle_pick)
     end,
   }
 end

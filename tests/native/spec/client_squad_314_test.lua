@@ -41,6 +41,7 @@ local function mount(options)
       send_interact = options.send_interact,
       next_seq = options.next_seq,
       notify = options.notify,
+      get_device_resolution = options.get_device_resolution,
     },
     create_node = function(kind, props)
       local node = Eui.Node({
@@ -209,5 +210,54 @@ describe("客户端小队 HUD 与队友抢救气泡（#314）", function()
     assert.is_true(rescue.Destroyed)
     assert.equals(0, accept.OnClicked:Count())
     assert.equals(0, rescue.OnClicked:Count())
+  end)
+
+  it("队友全员存活时零 on_frame 扫描，且分辨率通过 get_device_resolution 注入", function()
+    local reads = 0
+    local me = { UserId = 1 }
+    local teammate = { UserId = 2, Character = { Position = { x = 1, y = 0, z = 0 } } }
+    local store, writer = ClientStore.new({ initial_now = 100 })
+    local root = Eui.Node({ Name = "UIRoot" })
+    local rescue = SquadView.rescue_state({
+      get_players = function()
+        reads = reads + 1
+        return { me, teammate }
+      end,
+      get_local_player = function() return me end,
+    })
+    RootView.mount(root, store, {
+      hud = { SquadView.hud_spec(), SquadView.rescue_driver_spec(rescue) },
+      docks = {
+        squad_members = SquadView.member_spec(),
+        squad_rescue = SquadView.rescue_bubble_spec(rescue),
+      },
+      services = {
+        get_device_resolution = function() return { x = 1280, y = 720 } end,
+      },
+      create_node = function(kind, props)
+        local node = Eui.Node({
+          Kind = kind, Name = props and props.Name, Parent = props and props.Parent,
+          Visible = props and props.Visible ~= false,
+          Text = props and (props.Text or props.ButtonText) or "",
+          TouchEnabled = kind == "EUIButton", Size = props and props.Size,
+          Position = props and props.Position,
+        })
+        for key, value in pairs(props or {}) do node[key] = value end
+        return node
+      end,
+    })
+    local hud = GameCfg.Party.HUD
+    assert.equals(1280 - hud.RowWidth - hud.MarginRight, child(root, "PartyHud").Position.x)
+
+    writer:update_spatial({ x = 0, y = 0, z = 0 }, {})
+    writer:ingest_event("PartyState", snapshot({
+      member(1, "自己", 300, 300, "alive", true),
+      member(2, "甲", 100, 100, "alive"),
+    }))
+    local baseline = reads
+    writer:advance_clock(0.05)
+    writer:advance_clock(0.05)
+    assert.equals(baseline, reads)
+    root:Destroy()
   end)
 end)

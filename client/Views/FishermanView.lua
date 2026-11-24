@@ -1,20 +1,23 @@
 -- 钓鱼佬与确认弹窗统一视图（#311）。
--- 气泡按本地位置增量建拆；对话、确认与商店共用 RootView 的互斥模态相位。
+-- 气泡按本地位置增量建拆；对话、确认与商店共用 RootView 的互斥模态相位；
+-- 喂食脉冲动画挂在短寿命 Phase，非队友抢救逻辑委托 RescueView 共享模块。
 local GameCfg = require("common.GameCfg")
 local BodyScale = require("common.BodyScale")
 local Dialogue = require("common.NpcDialogue")
 local spoke = require("common.packages.spoke.api")
-local State = spoke.State
+local ViewUtil = require("client.Views.ViewUtil")
+local RescueView = require("client.Views.RescueView")
 
+local State = spoke.State
 local FishermanView = {}
 local PULSE_FRAMES = 20
 local PULSE_AMPLITUDE = 0.2
 
 local function near(position, center, character)
-  if type(position) ~= "table" or type(center) ~= "table" then return false end
-  local dx, dz = position.x - center.x, position.z - center.z
+  local dist_sq = ViewUtil.distance_sq_xz(position, center)
+  if dist_sq == nil then return false end
   local radius = BodyScale.InteractionRadius(character, GameCfg.Interact.Fisherman.Radius)
-  return dx * dx + dz * dz <= radius * radius
+  return dist_sq <= radius * radius
 end
 
 local function open_modal(ctx, id, payload)
@@ -46,14 +49,9 @@ function FishermanView.bubble_spec(options)
       local entry = item_signal:now()
       local suffix = tostring(entry.index) .. "_" .. tostring(entry.name)
       local key = "fisherman:" .. tostring(entry.index) .. ":" .. tostring(entry.name)
-      local create_scene = ctx.services and ctx.services.create_scene_node
-      local node
-      if type(create_scene) == "function" then
-        node = ctx.own_node(scope, create_scene(entry, GameCfg.Interact.Fisherman.BubbleHeight, "fisherman"))
-      else
-        node = ctx.create_node(scope, "EUIImage", { Name = "SceneNodeFisherman_" .. suffix })
-      end
-      if node.Name == nil then node.Name = "SceneNodeFisherman_" .. suffix end
+      local node = ViewUtil.create_anchor_scene_node(
+        scope, ctx, entry, GameCfg.Interact.Fisherman.BubbleHeight, "fisherman", "SceneNodeFisherman_" .. suffix
+      )
       local talk = ctx.create_node(scope, "EUIButton", {
         Name = "BtnFishermanTalk" .. suffix,
         Parent = node,
@@ -128,7 +126,12 @@ function FishermanView.confirm_modal_spec()
       Name = "BtnNo", Parent = panel, ButtonText = "否", TouchEnabled = true,
     })
     local function finish(value)
-      if type(payload.CallBack) == "function" then pcall(payload.CallBack, value) end
+      if type(payload.CallBack) == "function" then
+        local ok, err = pcall(payload.CallBack, value)
+        if not ok then
+          print("[FishermanView] 确认弹窗回调执行失败", tostring(err))
+        end
+      end
       close_modal(ctx, "confirm")
     end
     ctx.connect(scope, yes.OnClicked, function() finish(true) end)
@@ -143,50 +146,68 @@ function FishermanView.presentation_spec(options)
   return {
     name = "FishermanPresentation",
     mount = function(scope, ctx)
-      local function notify(text)
-        local fn = ctx.services and ctx.services.notify
-        if text and type(fn) == "function" then fn(text) end
-      end
+      local pulse_active = State.new("FishermanView.pulse_active", false)
+
       scope:subscribe(ctx.store.on_server_event, function(event)
         if event.channel ~= "InteractResult" or type(event.payload) ~= "table" then return end
         local result = event.payload
         if result.action == GameCfg.Rescue.Action and result.reason == "busy" then
-          notify("正在抢救中")
+          ViewUtil.notify(ctx, "正在抢救中")
         end
         if not result.ok then
-          if result.reason == "nothing" then notify("未选中可喂食物品")
-          elseif result.reason == "full" then notify("交付失败：产物需要背包空位") end
+          if result.reason == "nothing" then ViewUtil.notify(ctx, "未选中可喂食物品")
+          elseif result.reason == "full" then ViewUtil.notify(ctx, "交付失败：产物需要背包空位") end
           return
         end
         if result.achievement then
-          notify("交付完成：解锁新成果")
+          ViewUtil.notify(ctx, "交付完成：解锁新成果")
         elseif result.exchange then
-          notify("交付完成：" .. tostring(result.exchange.from) .. " → " .. tostring(result.exchange.to))
+          ViewUtil.notify(ctx, "交付完成：" .. tostring(result.exchange.from) .. " → " .. tostring(result.exchange.to))
         elseif result.coins and result.coins > 0 then
-          notify("喂食成功，获得 " .. tostring(result.coins) .. " 金币")
+          ViewUtil.notify(ctx, "喂食成功，获得 " .. tostring(result.coins) .. " 金币")
         end
         shared.pulse_left = PULSE_FRAMES
+        pulse_active:set(true)
       end)
-      scope:subscribe(ctx.clock.on_frame, function()
-        if (shared.pulse_left or 0) <= 0 then return end
-        shared.pulse_left = shared.pulse_left - 1
-        local index = shared.last_feed_index
-        local model = models[index]
-        if not model then return end
-        local base = model.baseScale or Vector3.New(1, 1, 1)
-        local progress = 1 - shared.pulse_left / PULSE_FRAMES
-        local scale = 1 + PULSE_AMPLITUDE * math.sin(math.pi * progress)
-        local ok, err = pcall(function()
-          model.unit.Scale = Vector3.New(base.x * scale, base.y * scale, base.z * scale)
+
+      -- 仅在喂食缩放脉冲动画期间（20 帧短寿命相位）订阅 on_frame，播完自动退订
+      scope:phase("FishermanPulsePhase", pulse_active, function(ps)
+        ps:subscribe(ctx.clock.on_frame, function()
+          local left = shared.pulse_left or 0
+          if left <= 0 then
+            pulse_active:set(false)
+            return
+          end
+          left = left - 1
+          shared.pulse_left = left
+          local index = shared.last_feed_index
+          local model = models[index]
+          if not model then
+            if left <= 0 then pulse_active:set(false) end
+            return
+          end
+          local base = model.baseScale or Vector3.New(1, 1, 1)
+          local progress = 1 - left / PULSE_FRAMES
+          local scale = 1 + PULSE_AMPLITUDE * math.sin(math.pi * progress)
+          local ok, err = pcall(function()
+            model.unit.Scale = Vector3.New(base.x * scale, base.y * scale, base.z * scale)
+          end)
+          if not ok then
+            print("[FishermanView] 模型缩放失败", index, tostring(err))
+            models[index] = nil
+          end
+          if left <= 0 then
+            pulse_active:set(false)
+          end
         end)
-        if not ok then
-          print("[FishermanView] 模型缩放失败", index, tostring(err))
-          models[index] = nil
-        end
       end)
+
       scope:on_cleanup(function()
         for _, model in pairs(models) do
-          if model.unit and model.baseScale then model.unit.Scale = model.baseScale end
+          if model.unit and model.baseScale then
+            local ok, err = pcall(function() model.unit.Scale = model.baseScale end)
+            if not ok then print("[FishermanView] 模型缩放恢复失败", tostring(err)) end
+          end
         end
       end)
     end,
@@ -194,82 +215,25 @@ function FishermanView.presentation_spec(options)
 end
 
 function FishermanView.rescue_state(options)
-  return {
-    rows = State.new("FishermanView.rescue_rows", {}),
-    get_players = options.get_players,
-    get_local_player = options.get_local_player,
-    is_squad_member = options.is_squad_member,
-  }
+  return RescueView.create_state("FishermanView.rescue_rows", options)
 end
 
 function FishermanView.rescue_driver_spec(shared)
-  return {
+  return RescueView.driver_spec(shared, {
     name = "FishermanRescueDriver",
-    mount = function(scope, ctx)
-      local function refresh()
-        local list = {}
-        local me = type(shared.get_local_player) == "function" and shared.get_local_player() or nil
-        local position = ctx.store.position:now()
-        local players = type(shared.get_players) == "function" and shared.get_players() or {}
-        if position then
-          for _, player in ipairs(players) do
-            local phase = player and player.GetAttribute and player:GetAttribute("SurvivalPhase") or nil
-            local target = player and player.Character and player.Character.Position
-            local squad_owned = type(shared.is_squad_member) == "function" and shared.is_squad_member(player and player.UserId)
-            if player ~= me and not squad_owned and (phase == "downed" or phase == "rescuing") and target then
-              local dx, dz = position.x - target.x, position.z - target.z
-              if dx * dx + dz * dz <= GameCfg.Rescue.Range * GameCfg.Rescue.Range then
-                list[#list + 1] = { userId = player.UserId, position = target }
-              end
-            end
-          end
-        end
-        shared.rows:set(list)
-      end
-      scope:subscribe(ctx.clock.on_frame, refresh)
-      refresh()
-    end,
-  }
+    mode = "world",
+  })
 end
 
 function FishermanView.rescue_bubble_spec(shared)
-  return {
-    items = function(es) return es:d(shared.rows) end,
-    key_of = function(row) return "rescue:" .. tostring(row.userId) end,
-    mount = function(scope, ctx, item_signal)
-      local row = item_signal:now()
-      local create_scene = ctx.services and ctx.services.create_scene_node
-      local node
-      if type(create_scene) == "function" then
-        node = ctx.own_node(scope, create_scene(row, GameCfg.Rescue.BubbleHeight, "rescue"))
-      else
-        node = ctx.create_node(scope, "EUIImage", { Name = "SceneNodeRescue_" .. tostring(row.userId) })
-      end
-      local ok, button = pcall(ctx.create_node, scope, "EUIButton", {
-        Name = "BtnRescue" .. tostring(row.userId),
-        Parent = node,
-        ButtonText = GameCfg.Rescue.PromptText,
-        TouchEnabled = true,
-      })
-      if not ok then
-        if node and type(node.Destroy) == "function" then node:Destroy() end
-        print("[FishermanView] 抢救按钮创建失败", tostring(button))
-        return
-      end
-      ctx.connect(scope, button.OnClicked, function()
-        local next_seq = ctx.services and ctx.services.next_seq
-        local send = ctx.services and ctx.services.send_interact
-        if type(send) == "function" then
-          send({
-            target = GameCfg.Rescue.Target,
-            action = GameCfg.Rescue.Action,
-            targetUserId = row.userId,
-            seq = type(next_seq) == "function" and next_seq() or 1,
-          })
-        end
-      end)
-    end,
-  }
+  return RescueView.bubble_spec(shared, {
+    key_prefix = "rescue:",
+    scene_kind = "rescue",
+    scene_prefix = "SceneNodeRescue_",
+    button_prefix = "BtnRescue",
+    log_tag = "[FishermanView]",
+    fail_label = "抢救按钮创建失败",
+  })
 end
 
 return FishermanView

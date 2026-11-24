@@ -3,6 +3,7 @@
 
 local GameCfg = require("common.GameCfg")
 local spoke = require("common.packages.spoke.api")
+local ViewUtil = require("client.Views.ViewUtil")
 
 local State = spoke.State
 
@@ -17,42 +18,27 @@ end
 local function now_of(ctx)
   local services = services_of(ctx)
   if type(services.now) == "function" then
-    local ok, value = pcall(services.now)
-    if ok and type(value) == "number" then return value end
+    local value = services.now()
+    if type(value) == "number" then return value end
   end
   return ctx.clock and ctx.clock.now() or 0
-end
-
-local function resolution_of(ctx)
-  local services = services_of(ctx)
-  local res = services.resolution
-  if type(res) == "table" and type(res.x) == "number" and type(res.y) == "number" then
-    return res
-  end
-  return { x = 1920, y = 1080 }
-end
-
-local function notify(ctx, text)
-  local services = services_of(ctx)
-  if type(services.notify) == "function" then
-    pcall(services.notify, text)
-  elseif type(_G.LocalMsgNotice) == "function" then
-    _G.LocalMsgNotice(text)
-  end
 end
 
 local function send(ctx, seq, action, mode)
   local services = services_of(ctx)
   local payload = { action = action, mode = mode, seq = seq:now() }
   if type(services.send_survival) == "function" then
-    pcall(services.send_survival, payload)
+    services.send_survival(payload)
     return
   end
-  local ok, re = pcall(function()
-    return require("common.REUtil"):GetRE("SurvivalAction")
+  local ok, err = pcall(function()
+    local re = require("common.REUtil"):GetRE("SurvivalAction")
+    if re and type(re.FireServer) == "function" then
+      re:FireServer(payload)
+    end
   end)
-  if ok and re and type(re.FireServer) == "function" then
-    pcall(re.FireServer, re, payload)
+  if not ok then
+    print("[SurvivalOverlayView] 发送 SurvivalAction 失败", tostring(action), tostring(err))
   end
 end
 
@@ -69,7 +55,7 @@ local function make(scope, ctx, kind, parent, name, x, y, width, height, props)
 end
 
 local function mount_banner(scope, ctx, survival, seq, noticed_dead)
-  local res = resolution_of(ctx)
+  local res = ViewUtil.get_resolution(ctx)
   local cx, cy = res.x / 2, res.y / 2
   local banner = make(scope, ctx, "EUIImage", ctx.root_node, "SurvivalBanner", cx - 320, cy - 90, 640, 180, {
     Color = Color.New(0, 0, 0, 160),
@@ -138,7 +124,7 @@ local function mount_banner(scope, ctx, survival, seq, noticed_dead)
     paid.Position = Vector2.New(330, 20)
     if phase == "dead" and not noticed_dead:now() then
       noticed_dead:set(true)
-      notify(ctx, GameCfg.Survival.CallHelpText)
+      ViewUtil.notify(ctx, GameCfg.Survival.CallHelpText)
     elseif phase ~= "dead" then
       noticed_dead:set(false)
     end
@@ -171,7 +157,7 @@ local function mount_banner(scope, ctx, survival, seq, noticed_dead)
 end
 
 local function mount_weak(scope, ctx, survival)
-  local res = resolution_of(ctx)
+  local res = ViewUtil.get_resolution(ctx)
   local label = make(scope, ctx, "EUITextLabel", ctx.root_node, "SurvivalWeak", res.x / 2 - 320, res.y - 200, 640, 60, {
     Text = "",
     FontSize = 30,
@@ -187,18 +173,6 @@ local function mount_weak(scope, ctx, survival)
   end)
 end
 
-function SurvivalOverlayView.when(scope, store)
-  return scope:memo("SurvivalOverlayWhen", function(ms)
-    local state = ms:d(store.survival)
-    if type(state) ~= "table" then return false end
-    if state.phase == "downed" or state.phase == "rescuing" or state.phase == "dead" then
-      return true
-    end
-    local weak_until = state.weakUntil
-    return type(weak_until) == "number" and weak_until > ms:d(store.clock.second)
-  end)
-end
-
 function SurvivalOverlayView.spec()
   return {
     name = "SurvivalOverlay",
@@ -209,17 +183,12 @@ function SurvivalOverlayView.spec()
         return true
       end
       local weak_until = state.weakUntil
-      return type(weak_until) == "number" and weak_until > store.clock.now()
+      return type(weak_until) == "number" and weak_until > ms:d(store.clock.second)
     end,
     mount = function(scope, ctx)
       local survival = ctx.store.survival
       local seq = State.new("SurvivalOverlay.seq", 0)
       local noticed_dead = State.new("SurvivalOverlay.noticed_dead", false)
-      local function covered()
-        local state = survival:now()
-        local phase = type(state) == "table" and state.phase
-        return phase == "downed" or phase == "rescuing" or phase == "dead"
-      end
       local banner_when = scope:memo("SurvivalBannerWhen", function(ms)
         local state = ms:d(survival)
         local phase = type(state) == "table" and state.phase

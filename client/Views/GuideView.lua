@@ -1,40 +1,15 @@
 -- #315 新手任务 HUD：任务文本、深色背板与折叠按钮均由 RootView 作用域拥有。
 local MainHudLayout = require("client.MainHudLayout")
 local Modal = require("client.Views.EconomyModal")
+local ViewUtil = require("client.Views.ViewUtil")
 local GuideView = {}
-
-local function default_get_resolution()
-  local ok, x, y = pcall(function()
-    local game_ui = rawget(_G, "GameUI")
-    local manager = game_ui and game_ui:GetEuiManager() or nil
-    if manager == nil and game ~= nil then
-      local players = game:GetService("Players")
-      local player = players and players.LocalPlayer
-      manager = player and player.PlayerGui and player.PlayerGui.EuiManager or nil
-    end
-    local resolution = manager and manager:GetDeviceResolution() or nil
-    return resolution and resolution.x or nil, resolution and resolution.y or nil
-  end)
-  if ok and type(x) == "number" and type(y) == "number" and x > 0 and y > 0 then return { x = x, y = y } end
-  return { x = 1920, y = 1080 }
-end
-
-local function wrap_text(text, columns)
-  local out, count = {}, 0
-  for character in tostring(text):gmatch("[%z\1-\127\194-\244][\128-\191]*") do
-    if count >= columns then out[#out + 1], count = "\n", 0 end
-    out[#out + 1] = character
-    count = count + 1
-  end
-  return table.concat(out)
-end
 
 function GuideView.spec(options)
   options = options or {}
   return {
     name = "Guide",
     mount = function(scope, ctx)
-      local resolution = (options.get_resolution or default_get_resolution)()
+      local resolution = ViewUtil.get_resolution(ctx, options)
       local rects = MainHudLayout.Compute({ width = resolution.x, height = resolution.y,
         itemBarSlots = 0, reeling = false }).Rects
       local panel, toggle_rect = rects.QuestPanel, rects.QuestToggle
@@ -69,7 +44,7 @@ function GuideView.spec(options)
       scope:effect("QuestProjection", function(es)
         local quest = es:d(ctx.store.quest)
         shown = type(quest) == "table" and type(quest.text) == "string" and quest.hidden ~= true
-        if shown then label.Text = wrap_text(quest.text, math.max(1, math.floor((panel.w - 20) / 24))) end
+        if shown then label.Text = ViewUtil.wrap_text(quest.text, math.max(1, math.floor((panel.w - 20) / 24))) end
         render()
       end)
       render()

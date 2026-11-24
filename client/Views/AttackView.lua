@@ -1,11 +1,14 @@
 -- 攻击与伤害反馈投影（#300）：订阅只读道具栏、HUD 显隐与服务端事件。
--- 攻击键只在持有武器且 HUD 可见时存在；关闭、死亡或根节点销毁由视图树逆序清掉节点与连接。
+-- 攻击键只在持有武器且 HUD 可见时存在；长按连发仅在按下期间的短寿命相位订阅注入时钟；
+-- 关闭、死亡或根节点销毁由视图树逆序清掉节点与连接。
 
 local GameCfg = require("common.GameCfg")
 local PressGesture = require("client.PressGesture")
 local spoke = require("common.packages.spoke.api")
-local State = spoke.State
 local MainHudLayout = require("client.MainHudLayout")
+local ViewUtil = require("client.Views.ViewUtil")
+
+local State = spoke.State
 local AttackView = {}
 
 local HINTS = {
@@ -39,17 +42,8 @@ local function is_gun(weapon_id)
   return weapon_id ~= nil and GameCfg.Ability.Guns[weapon_id] ~= nil
 end
 
-local function resolution_of(services)
-  local value = services and services.resolution
-  if type(value) == "function" then value = value() end
-  if type(value) == "table" and type(value.x) == "number" and type(value.y) == "number" then
-    return value
-  end
-  return { x = 1920, y = 1080 }
-end
-
-local function attack_rect(services)
-  local resolution = resolution_of(services)
+local function attack_rect(ctx)
+  local resolution = ViewUtil.get_resolution(ctx)
   local layout = MainHudLayout.Compute({
     width = resolution.x,
     height = resolution.y,
@@ -58,9 +52,14 @@ local function attack_rect(services)
   return layout and layout.Rects and layout.Rects.AttackControl or { x = 1690, y = 430, w = 160, h = 160 }
 end
 
-local function color(rgba)
-  if Color then return Color.New(rgba[1], rgba[2], rgba[3], rgba[4] or 255) end
-  return rgba
+local function current_now(ctx, services)
+  if type(services.now) == "function" then
+    local value = services.now()
+    if type(value) == "number" then
+      return value
+    end
+  end
+  return ctx.clock and ctx.clock.now() or 0
 end
 
 function AttackView.mount(scope, ctx)
@@ -70,21 +69,21 @@ function AttackView.mount(scope, ctx)
   end)
 
   scope:phase("AttackButton", active, function(ps)
-    local rect = attack_rect(services)
+    local rect = attack_rect(ctx)
     local screen = ctx.root_node and ctx.root_node.FindFirstChild and ctx.root_node:FindFirstChild("ScreenMain", true)
     local control = ctx.create_node(ps, "EUILayout", {
       Name = "AttackControl",
       Parent = screen or nil,
-      Position = Vector2 and Vector2.New(rect.x, rect.y) or { x = rect.x, y = rect.y },
-      Size = Vector2 and Vector2.New(rect.w, rect.h) or { x = rect.w, y = rect.h },
+      Position = ViewUtil.vec2(rect.x, rect.y),
+      Size = ViewUtil.vec2(rect.w, rect.h),
     })
     control.TouchEnabled = false
     control.Visible = true
     local button = ctx.create_node(ps, "EUIButton", {
       Name = "BtnAttack",
       Parent = control,
-      Position = Vector2 and Vector2.New(rect.x, rect.y) or { x = rect.x, y = rect.y },
-      Size = Vector2 and Vector2.New(rect.w, rect.h) or { x = rect.w, y = rect.h },
+      Position = ViewUtil.vec2(rect.x, rect.y),
+      Size = ViewUtil.vec2(rect.w, rect.h),
       ButtonText = "",
     })
     button.TouchEnabled = false
@@ -107,22 +106,10 @@ function AttackView.mount(scope, ctx)
       label.Text = is_gun(weapon_id) and "射击" or "攻击"
     end)
 
-    local pressing = false
+    local pressing = State.new("AttackView.pressing", false)
     local auto_fired = false
     local next_auto = 0
     local gesture = PressGesture.New({ LongPressSec = GameCfg.Ability.Throw.LongPressSec })
-    local function current_now()
-      if type(services.now) == "function" then
-        local ok, value = pcall(services.now)
-        if ok and type(value) == "number" then return value end
-      end
-      local ok, world = pcall(function() return game:GetService("World") end)
-      if ok and world and type(world.GetServerTime) == "function" then
-        local ok_now, value = pcall(world.GetServerTime, world)
-        if ok_now and type(value) == "number" then return value end
-      end
-      return 0
-    end
     local function current_gun()
       local weapon_id = equipped(ctx.store.item_bar:now())
       return weapon_id and GameCfg.Ability.Guns[weapon_id] or nil
@@ -132,13 +119,17 @@ function AttackView.mount(scope, ctx)
       local payload = { action = action }
       if action == "attack" and type(services.aim_direction) == "function" then
         local ok, direction = pcall(services.aim_direction)
-        if ok and type(direction) == "table" then payload.aim = direction end
+        if not ok then
+          print("[AttackView] 读取瞄准方向失败", tostring(direction))
+        elseif ViewUtil.is_record(direction) then
+          local x, y, z = ViewUtil.read_vec3(direction)
+          payload.aim = x ~= nil and { x = x, y = y, z = z } or direction
+        end
       end
       services.send_weapon(payload)
     end
     local function tick()
-      if not pressing then return end
-      local t = current_now()
+      local t = current_now(ctx, services)
       gesture:Update(t)
       local gun = current_gun()
       if gun and gun.Auto and t >= next_auto then
@@ -149,14 +140,14 @@ function AttackView.mount(scope, ctx)
     end
     if button.OnTouchBegan and button.OnTouchEnded then
       ctx.connect(ps, button.OnTouchBegan, function()
-        pressing = true
         auto_fired = false
         next_auto = 0
-        gesture:Begin(current_now())
+        gesture:Begin(current_now(ctx, services))
+        pressing:set(true)
       end)
       ctx.connect(ps, button.OnTouchEnded, function()
-        pressing = false
-        local result = gesture:End(current_now())
+        pressing:set(false)
+        local result = gesture:End(current_now(ctx, services))
         if result == "tap" then
           if not auto_fired then send("attack") end
         elseif result == "long" then
@@ -164,10 +155,12 @@ function AttackView.mount(scope, ctx)
           if gun and not gun.Auto then send("reload") end
         end
       end)
-      local ok_run, run_service = pcall(function() return game:GetService("RunService") end)
-      if ok_run and run_service and run_service.Heartbeat then
-        ctx.connect(ps, run_service.Heartbeat, tick)
-      end
+      -- 仅在按住攻击键的短寿命相位订阅注入时钟 on_frame，松开或卸载即退订
+      ps:phase("AttackPressPhase", pressing, function(press_scope)
+        if ctx.clock and ctx.clock.on_frame then
+          press_scope:subscribe(ctx.clock.on_frame, tick)
+        end
+      end)
     else
       ctx.connect(ps, button.OnClicked, function() send("attack") end)
     end
@@ -178,8 +171,8 @@ function AttackView.mount(scope, ctx)
     if type(event) ~= "table" then return end
     if event.channel == "WeaponResult" then
       local payload = event.payload
-      if type(payload) == "table" and payload.ok == false and type(services.notify) == "function" then
-        services.notify(HINTS[payload.reason] or ("武器操作失败 " .. tostring(payload.reason)))
+      if type(payload) == "table" and payload.ok == false then
+        ViewUtil.notify(ctx, HINTS[payload.reason] or ("武器操作失败 " .. tostring(payload.reason)))
       end
     elseif event.channel == "DamageNotice" and type(event.payload) == "table" then
       local amount = tonumber(event.payload.amount)
@@ -198,10 +191,10 @@ function AttackView.mount(scope, ctx)
     local node = ctx.create_node(es, "EUITextLabel", {
       Name = "DamageFloat",
       Text = tostring(notice.amount),
-      Position = Vector2 and Vector2.New(0, 0) or { x = 0, y = 0 },
-      Size = Vector2 and Vector2.New(120, 40) or { x = 120, y = 40 },
+      Position = ViewUtil.vec2(0, 0),
+      Size = ViewUtil.vec2(120, 40),
     })
-    node.TextColor = color(notice.critical and { 255, 214, 74, 255 } or { 255, 255, 255, 255 })
+    node.TextColor = ViewUtil.color(notice.critical and { 255, 214, 74, 255 } or { 255, 255, 255, 255 })
     node.TouchEnabled = false
     node.Visible = true
   end)

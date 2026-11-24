@@ -3,7 +3,7 @@
 --   1. SurvivalState 下行后蒙版节点名、显隐矩阵与文案不符合旧 ScreenSurvival 契约；
 --   2. 按钮点击不上行 SurvivalAction（UseAdrenaline / FullRevive ad|goods，seq 递增）；
 --   3. platformPending 期间标题改为平台等待文案且按钮隐藏；倒计时随时钟整秒向上取整；
---   4. 首次进入 dead 弹一次呼救文案；虚弱剩余秒数大于 0 才显示 SurvivalWeak；
+--   4. 首次进入 dead 弹一次呼救文案；虚弱剩余秒数归零后自动拆 Phase 销毁 SurvivalWeak；
 --   5. 退出蒙版、重连重置或根节点销毁后子节点与点击连接零残留。
 -- 接缝：EUI 测试双 + ClientStore 下行事件 + 按钮上行 + 根节点销毁，不窥探私有 Effect 拓扑。
 
@@ -27,7 +27,9 @@ local function mount(store, sent)
       notify = function(text)
         sent[#sent + 1] = { notice = text }
       end,
-      resolution = { x = 1920, y = 1080 },
+      get_device_resolution = function()
+        return { x = 1920, y = 1080 }
+      end,
     },
     create_node = function(kind, props)
       return Eui.Node({
@@ -127,6 +129,25 @@ describe("客户端生存蒙版宿主接缝（#298）", function()
     assert.is_nil(child(root, "SurvivalWeak"))
     local clicks = adrenaline.OnClicked and adrenaline.OnClicked.Count and adrenaline.OnClicked:Count() or 0
     assert.equals(0, clicks)
+  end)
+
+  it("虚弱倒计时随 clock.second 超时后自动卸载覆盖相位并销毁节点", function()
+    local store, writer = ClientStore.new({ initial_now = 100 })
+    local sent = {}
+    local root = mount(store, sent)
+    writer:ingest_event("SurvivalState", { phase = "alive", weakUntil = 103 })
+    local weak = child(root, "SurvivalWeak")
+    assert.is_not_nil(weak)
+    assert.equals(GameCfg.Survival.WeakText .. "（3 秒）", weak.Text)
+
+    writer:advance_clock(2)
+    assert.is_not_nil(child(root, "SurvivalWeak"))
+    assert.equals(GameCfg.Survival.WeakText .. "（1 秒）", weak.Text)
+
+    writer:advance_clock(1)
+    assert.is_true(weak.Destroyed)
+    assert.is_nil(child(root, "SurvivalWeak"))
+    root:Destroy()
   end)
 
   it("根节点销毁后蒙版子节点与点击连接零残留", function()

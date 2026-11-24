@@ -1,5 +1,6 @@
 -- 客户端收线覆盖层（ADR-0032 / #302）。
--- 只依赖 ClientStore 的 CastState / ReelInRE 与 SpokeClock；节点、订阅和点击聚合均随相位销毁。
+-- 只依赖 ClientStore 的 CastState / ReelInRE 与 SpokeClock；节点、订阅和点击聚合均随相位销毁；
+-- 活跃收线相位内按帧原地更新进度条与文案，不写高频 State、不重建 Effect。
 local GameCfg = require("common.GameCfg")
 local RateLimit = require("common.RateLimit")
 local ReelDisplay = require("common.ReelDisplay")
@@ -12,8 +13,8 @@ local BLOCK_IMAGE = "official://image/11017"
 local function now_of(ctx)
   local services = ctx.services or {}
   if type(services.now) == "function" then
-    local ok, value = pcall(services.now)
-    if ok and type(value) == "number" then return value end
+    local value = services.now()
+    if type(value) == "number" then return value end
   end
   return ctx.clock and ctx.clock.now() or 0
 end
@@ -25,8 +26,13 @@ local function send_reel(ctx, payload)
     services.send_reel(payload)
     return
   end
-  local ok, re = pcall(function() return require("common.REUtil"):GetRE("ReelInRE") end)
-  if ok and re and type(re.FireServer) == "function" then re:FireServer(payload) end
+  local ok, err = pcall(function()
+    local re = require("common.REUtil"):GetRE("ReelInRE")
+    if re and type(re.FireServer) == "function" then re:FireServer(payload) end
+  end)
+  if not ok then
+    print("[ReelOverlayView] 发送 ReelInRE 失败", tostring(err))
+  end
 end
 
 local function send_close(ctx, payload)
@@ -35,8 +41,13 @@ local function send_close(ctx, payload)
     services.send_close(payload)
     return
   end
-  local ok, re = pcall(function() return require("common.REUtil"):GetRE("CloseReelIn") end)
-  if ok and re and type(re.FireServer) == "function" then re:FireServer(payload) end
+  local ok, err = pcall(function()
+    local re = require("common.REUtil"):GetRE("CloseReelIn")
+    if re and type(re.FireServer) == "function" then re:FireServer(payload) end
+  end)
+  if not ok then
+    print("[ReelOverlayView] 发送 CloseReelIn 失败", tostring(err))
+  end
 end
 
 local function make(scope, ctx, kind, parent, name, x, y, width, height, props)
@@ -76,7 +87,7 @@ function ReelOverlayView.spec(options)
         SessionId = session, AggregateSec = GameCfg.HighFreqInput.AggregateSec,
       }) or nil
       local display = session and ReelDisplay.New(now_of(ctx), GameCfg.ReelIn) or nil
-      local progress = State.new("ReelOverlay.progress", GameCfg.ReelIn.Initial)
+      local current_progress = GameCfg.ReelIn.Initial
       local last_payload = nil
       local controller = options.controller or (ctx.services and ctx.services.reel) or {}
 
@@ -101,9 +112,27 @@ function ReelOverlayView.spec(options)
         Text = "结束收线", FontSize = 30, TextColor = Color.New(255, 255, 255, 255), Visible = true,
       })
 
+      local last_percent, last_hint_text = nil, nil
+
+      local function render_progress(value, current_cast)
+        local current = current_cast or ctx.store.cast:now() or {}
+        if value ~= last_percent then
+          last_percent = value
+          bar.Percent = value
+        end
+        local text = current.phase == "landed" and "鱼已上岸"
+          or (last_payload and last_payload.action == "started" and GameCfg.HookAlert.Text)
+          or ("收线 " .. tostring(math.floor(value + 0.5)) .. "%")
+        if text ~= last_hint_text then
+          last_hint_text = text
+          hint.Text = text
+        end
+      end
+
       local function set_progress(value)
         if type(value) == "number" and value == value then
-          progress:set(math.max(0, math.min(100, value)))
+          current_progress = math.max(0, math.min(100, value))
+          render_progress(current_progress)
         end
       end
 
@@ -191,17 +220,14 @@ function ReelOverlayView.spec(options)
         end
       end)
 
+      -- 短寿命收线覆盖相位内原地刷新进度条与聚合点击，不写 State、不重建 Effect
       scope:subscribe(ctx.clock.on_frame, function()
         flush(false)
         if display then set_progress(display:Value(now_of(ctx))) end
       end)
-      scope:effect("ReelOverlayRefresh", function(es)
-        local value = es:d(progress)
+      scope:effect("ReelOverlayCastRefresh", function(es)
         local current = es:d(ctx.store.cast) or {}
-        bar.Percent = value
-        hint.Text = current.phase == "landed" and "鱼已上岸"
-          or (last_payload and last_payload.action == "started" and GameCfg.HookAlert.Text)
-          or ("收线 " .. tostring(math.floor(value + 0.5)) .. "%")
+        render_progress(current_progress, current)
       end)
       ctx.connect(scope, close.OnClicked, function() clear(nil, true) end)
       scope:on_cleanup(function()

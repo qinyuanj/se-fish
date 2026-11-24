@@ -252,6 +252,7 @@ describe('TestPrizeRocketInput', function()
             if name == 'Players' then return { LocalPlayer = { Character = {} } } end
         end }
         local store, writer = ClientStore.new({ initial_now = 0 })
+        state.writer = writer
         writer:set_hud_visible(true)
         local root = { Name = 'UIRoot', Destroying = signal(), Children = {},
             FindFirstChild = function(_, name) return state.nodes[name] end }
@@ -295,7 +296,7 @@ describe('TestPrizeRocketInput', function()
         ctx.nodes.BtnAttack.OnTouchBegan:Fire()
         local function tick(now)
             ctx.now = now
-            ctx.heartbeat:Fire()
+            ctx.writer:step_clock(0, now)
         end
         tick(0)
         tick(0.9)

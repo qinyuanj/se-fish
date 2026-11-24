@@ -1,11 +1,12 @@
 -- 客户端摆渡视图（#313 / ADR-0032 §1）：统一挂在 RootView 的 HUD 与 Dock。
 -- 六条去程、六条返程按各自锚点与交互半径投影；点击只上行 FerryAction。
--- 倒计时按 routeId 独立递减，显示最近一班；终局按 operation 防止旧回包误清新航班。
+-- 倒计时按 routeId 独立以截止时刻计算，仅在活跃倒计时 Phase 内订阅 1Hz 时钟原地刷新文案，零 on_frame 轮询；
 -- 所有场景节点、倒计时标签和下行订阅都由所在 Spoke 作用域逆序回收。
 
 local GameCfg = require("common.GameCfg")
 local BodyScale = require("common.BodyScale")
 local spoke = require("common.packages.spoke.api")
+local ViewUtil = require("client.Views.ViewUtil")
 
 local State = spoke.State
 
@@ -21,26 +22,17 @@ local function zone_name(route_id, action)
   return zone_id
 end
 
-local function notify(ctx, text)
-  local services = ctx.services or {}
-  if type(services.notify) == "function" then
-    services.notify(text)
-  elseif type(rawget(_G, "LocalMsgNotice")) == "function" then
-    rawget(_G, "LocalMsgNotice")(text)
-  end
-end
-
 local function on_result(ctx, result)
   if type(result) ~= "table" then return end
   if result.ok then
     if result.action == "Board" then
       if result.seconds == nil then
-        notify(ctx, "已经到" .. zone_name(result.routeId) .. "了")
+        ViewUtil.notify(ctx, "已经到" .. zone_name(result.routeId) .. "了")
       else
-        notify(ctx, "船票已交，" .. tostring(result.seconds) .. " 秒后开船")
+        ViewUtil.notify(ctx, "船票已交，" .. tostring(result.seconds) .. " 秒后开船")
       end
     elseif result.action == "Return" then
-      notify(ctx, "已经回到" .. zone_name(result.routeId, "Return") .. "，金币 -" .. tostring(result.price))
+      ViewUtil.notify(ctx, "已经回到" .. zone_name(result.routeId, "Return") .. "，金币 -" .. tostring(result.price))
     end
     return
   end
@@ -56,29 +48,45 @@ local function on_result(ctx, result)
     anchor = "航班取消，船票已退",
     interrupted = "上次航班已取消，船票已退",
   }
-  notify(ctx, reasons[result.reason] or "摆渡暂时不可用")
+  ViewUtil.notify(ctx, reasons[result.reason] or "摆渡暂时不可用")
 end
 
 function FerryView.mount(scope, ctx)
   local countdowns = {}
-  local selected = State.new("FerryView.selected", nil)
+  local has_countdown = State.new("FerryView.has_countdown", false)
+  local version = State.new("FerryView.version", 0)
 
-  local function refresh()
+  local function prune_and_select(now)
     local soonest
     for route_id, row in pairs(countdowns) do
-      if not soonest or row.remaining < soonest.remaining
-          or (row.remaining == soonest.remaining and route_id < soonest.routeId) then
-        soonest = { routeId = route_id, operation = row.operation, remaining = row.remaining }
+      local remaining = row.ends_at - now
+      if remaining <= 0 then
+        countdowns[route_id] = nil
+      elseif not soonest or remaining < soonest.remaining
+          or (remaining == soonest.remaining and route_id < soonest.routeId) then
+        soonest = { routeId = route_id, operation = row.operation, remaining = remaining }
       end
     end
-    selected:set(soonest)
+    return soonest
+  end
+
+  local function sync_phase()
+    local soonest = prune_and_select(ctx.clock.now())
+    local active = soonest ~= nil
+    if has_countdown:now() ~= active then
+      has_countdown:set(active)
+    end
+    if active then
+      version:set(version:now() + 1)
+    end
   end
 
   local function on_state(snapshot)
     if type(snapshot) ~= "table" or type(snapshot.routeId) ~= "string" then return end
     local route_id = snapshot.routeId
     if snapshot.phase == "countdown" then
-      countdowns[route_id] = { remaining = tonumber(snapshot.seconds) or 5, operation = snapshot.operation }
+      local seconds = tonumber(snapshot.seconds) or 5
+      countdowns[route_id] = { ends_at = ctx.clock.now() + seconds, operation = snapshot.operation }
     elseif snapshot.phase == "departed" or snapshot.phase == "cancelled" then
       local current = countdowns[route_id]
       if not current or current.operation ~= snapshot.operation then return end
@@ -86,7 +94,7 @@ function FerryView.mount(scope, ctx)
     else
       return
     end
-    refresh()
+    sync_phase()
   end
 
   scope:subscribe(ctx.store.on_server_event, function(event)
@@ -98,22 +106,8 @@ function FerryView.mount(scope, ctx)
     end
   end)
 
-  scope:subscribe(ctx.clock.on_frame, function(frame)
-    local dt = type(frame) == "table" and tonumber(frame.dt) or 0
-    if dt <= 0 or not next(countdowns) then return end
-    for route_id, row in pairs(countdowns) do
-      row.remaining = row.remaining - dt
-      if row.remaining <= 0 then countdowns[route_id] = nil end
-    end
-    refresh()
-  end)
-
-  local visible = scope:memo("FerryCountdownVisible", function(ms)
-    return ms:d(selected) ~= nil
-  end)
-  scope:phase("FerryCountdownPhase", visible, function(ps)
-    local resolution = type(ctx.services.get_device_resolution) == "function"
-      and ctx.services.get_device_resolution() or { x = 1920, y = 1080 }
+  scope:phase("FerryCountdownPhase", has_countdown, function(ps)
+    local resolution = ViewUtil.get_resolution(ctx)
     local label = ctx.create_node(ps, "EUITextLabel", {
       Name = "FerryCountdown",
       Position = Vector2.New((resolution.x or 1920) / 2, (resolution.y or 1080) - 120),
@@ -125,12 +119,30 @@ function FerryView.mount(scope, ctx)
       TouchEnabled = false,
       SwallowTouchEnabled = false,
     })
-    ps:effect("FerryCountdownText", function(es)
-      local current = es:d(selected)
-      if current then
-        label.Text = string.format("前往%s %d 秒", zone_name(current.routeId), math.ceil(current.remaining))
+
+    local last_text = nil
+    local function render_label()
+      local soonest = prune_and_select(ctx.clock.now())
+      if soonest == nil then
+        if has_countdown:now() then
+          has_countdown:set(false)
+        end
+        return
       end
+      local text = string.format("前往%s %d 秒", zone_name(soonest.routeId), math.ceil(soonest.remaining))
+      if text ~= last_text then
+        last_text = text
+        label.Text = text
+      end
+    end
+
+    ps:effect("FerryCountdownText", function(es)
+      es:d(version)
+      render_label()
     end)
+
+    -- 仅在存在活跃航班倒计时期间按 1Hz 秒节拍原地刷新文案，零 on_frame、零 60FPS State:set
+    ps:subscribe(ctx.clock.on_second, render_label)
   end)
 
   scope:on_cleanup(function() countdowns = {} end)
@@ -150,9 +162,8 @@ local function anchor_of(anchor_name)
 end
 
 local function near(position, center, radius)
-  if not position or not center then return false end
-  local dx, dz = position.x - center.x, position.z - center.z
-  return dx * dx + dz * dz <= radius * radius
+  local dist_sq = ViewUtil.distance_sq_xz(position, center)
+  return dist_sq ~= nil and dist_sq <= radius * radius
 end
 
 function FerryView.legs_spec()
@@ -185,8 +196,10 @@ function FerryView.legs_spec()
       local center = item.center
       local position = Vector3.New(center.x, center.y + item.point.BubbleHeight, center.z)
       local parent = nil
-      if type(ctx.services.create_scene_node) == "function" then
-        parent = ctx.services.create_scene_node(position, "FerryLeg:" .. key)
+      local services = ctx.services or {}
+      local create_at = services.create_scene_node_at or services.create_scene_node
+      if type(create_at) == "function" then
+        parent = create_at(position, "FerryLeg:" .. key)
         ctx.own_node(scope, parent)
       end
       local button = ctx.create_node(scope, "EUIButton", {
@@ -199,7 +212,7 @@ function FerryView.legs_spec()
       ctx.connect(scope, button.OnClicked, function()
         seq = seq + 1
         local payload = { action = item.action, routeId = item.routeId, seq = seq }
-        if type(ctx.services.send_ferry) == "function" then ctx.services.send_ferry(payload) end
+        if type(services.send_ferry) == "function" then services.send_ferry(payload) end
       end)
     end,
   }

@@ -1,31 +1,11 @@
 -- #315 开场剧情模态：保留分页、居中布局与已读协议，节点由 RootView 作用域拥有。
+local ViewUtil = require("client.Views.ViewUtil")
 local StoryView = {}
-
-local function default_get_resolution()
-  local ok, x, y = pcall(function()
-    local game_ui = rawget(_G, "GameUI")
-    local manager = game_ui and game_ui:GetEuiManager() or nil
-    local resolution = manager and manager:GetDeviceResolution() or nil
-    return resolution and resolution.x or nil, resolution and resolution.y or nil
-  end)
-  if ok and type(x) == "number" and type(y) == "number" and x > 0 and y > 0 then return { x = x, y = y } end
-  return { x = 1920, y = 1080 }
-end
-
-local function wrap_text(text, columns)
-  local out, count = {}, 0
-  for character in tostring(text):gmatch("[%z\1-\127\194-\244][\128-\191]*") do
-    out[#out + 1] = character
-    count = character == "\n" and 0 or count + 1
-    if count >= columns then out[#out + 1], count = "\n", 0 end
-  end
-  return table.concat(out)
-end
 
 function StoryView.modal_spec(options)
   options = options or {}
   return function(scope, ctx)
-    local resolution = (options.get_resolution or default_get_resolution)()
+    local resolution = ViewUtil.get_resolution(ctx, options)
     local width = math.min(1000, resolution.x - 60)
     local panel = ctx.create_node(scope, "EUIImage", {
       Parent = ctx.root_node, Name = "ScreenStory", Position = Vector2.New(resolution.x / 2, resolution.y / 2),
@@ -73,7 +53,7 @@ function StoryView.modal_spec(options)
       if #lines == 0 then lines = { "" } end
       page = math.max(1, math.min(page, #lines))
       title.Text = tostring(payload.title or "钓鱼佬") .. "  " .. page .. "/" .. #lines
-      body.Text = wrap_text(lines[page], math.max(12, math.floor((width - 80) / 26)))
+      body.Text = ViewUtil.wrap_text(lines[page], math.max(12, math.floor((width - 80) / 26)))
       next_button.TouchEnabled = page < #lines
       read_button.TouchEnabled = true
       read_label.Text = payload.readKey and "已读，开始钓鱼" or "知道了"

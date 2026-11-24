@@ -202,20 +202,73 @@ describe("客户端商店弹窗与场景气泡（#311）", function()
     }, sent[#sent])
     target.GetAttribute = function(_, key) return key == "SurvivalPhase" and "rescuing" or nil end
     writer:advance_clock(0.1)
-    assert.is_not_nil(child(root, "BtnRescue2"))
+    assert.equals(rescue, child(root, "BtnRescue2"))
     target.GetAttribute = function(_, key) return key == "SurvivalPhase" and "alive" or nil end
     writer:advance_clock(0.1)
     assert.is_nil(child(root, "BtnRescue2"))
     assert.equals(0, rescue.OnClicked:Count())
     target.GetAttribute = function(_, key) return key == "SurvivalPhase" and "downed" or nil end
-    writer:advance_clock(0.1)
+    writer:advance_clock(1)
     rescue = child(root, "BtnRescue2")
+    assert.is_not_nil(rescue)
     players = { me }
     writer:advance_clock(0.1)
     assert.is_nil(child(root, "BtnRescue2"))
     assert.equals(0, rescue.OnClicked:Count())
     writer:update_spatial({ x = 100, y = 0, z = 0 }, {})
     writer:advance_clock(0.1)
+    root:Destroy()
+  end)
+
+  it("抢救驱动平时零 on_frame 空转，同目标稳定时不重复触发 DockSync 重建", function()
+    local store, writer = ClientStore.new({ initial_now = 1000 })
+    local me = { UserId = 1 }
+    local target = {
+      UserId = 2,
+      Character = { Position = { x = 0, y = 0, z = 0 } },
+      GetAttribute = function(_, key) return key == "SurvivalPhase" and "alive" or nil end,
+    }
+    local reads = 0
+    local shared = FishermanView.rescue_state({
+      get_players = function()
+        reads = reads + 1
+        return { me, target }
+      end,
+      get_local_player = function() return me end,
+    })
+    local root = Eui.Node({ Name = "UIRoot" })
+    RootView.mount(root, store, {
+      hud = { FishermanView.rescue_driver_spec(shared) },
+      docks = { rescue = FishermanView.rescue_bubble_spec(shared) },
+      create_node = function(kind, props)
+        return Eui.Node({
+          Kind = kind, Name = props and props.Name, Parent = props and props.Parent,
+          Visible = props and props.Visible ~= false,
+          Text = props and (props.Text or props.ButtonText) or "",
+          TouchEnabled = kind == "EUIButton",
+        })
+      end,
+    })
+    writer:update_spatial({ x = 0, y = 0, z = 0 }, {})
+    local baseline = reads
+    -- 无濒死目标时，高频 on_frame 不再扫描玩家列表
+    writer:advance_clock(0.05)
+    writer:advance_clock(0.05)
+    assert.equals(baseline, reads)
+
+    -- 变为濒死后经 1Hz 发现，连续帧推进同一目标不重复触发 rows State 变更
+    local changes = 0
+    local unsub = shared.rows:subscribe(function() changes = changes + 1 end)
+    target.GetAttribute = function(_, key) return key == "SurvivalPhase" and "downed" or nil end
+    writer:advance_clock(1)
+    local btn = child(root, "BtnRescue2")
+    assert.is_not_nil(btn)
+    local after_appear = changes
+    writer:advance_clock(0.05)
+    writer:advance_clock(0.05)
+    assert.equals(after_appear, changes)
+    assert.equals(btn, child(root, "BtnRescue2"))
+    if type(unsub) == "function" then unsub() end
     root:Destroy()
   end)
 

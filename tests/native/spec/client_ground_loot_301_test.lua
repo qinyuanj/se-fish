@@ -2,7 +2,7 @@
 -- 失败方式先列：
 --   1. LootState 或本地位置变化后，范围内地面物品不建气泡、范围外仍残留气泡；
 --   2. 拾取按钮不发 ItemBarAction.Pickup，或离开范围 / 物品消失 / 根 UI 销毁后节点与点击监听仍在；
---   3. 瞄准拾取蒙版在无瞄准态时仍挂着，或退出瞄准、根销毁后蒙版节点与连接残留；
+--   3. 瞄准拾取蒙版在无瞄准态时仍挂着，或点击蒙版不触发 on_pick 并退出瞄准，或离开范围后蒙版残留；
 --   4. 视图仍依赖已删除的 client.LocalLoot。
 -- 接缝：EUI 测试双、ClientStore 下行事件与本地位置、按钮点击、节点销毁。不窥探私有 Effect 拓扑。
 
@@ -23,13 +23,21 @@ local function mount(opts)
   local root = Eui.Node({ Name = "UIRoot" })
   local created = {}
   local sent = {}
+  local notices = {}
   local view = RootView.mount(root, store, {
+    services = {
+      set_overlay = function(id, active) writer:set_overlay(id, active) end,
+      notify = function(text) notices[#notices + 1] = text end,
+    },
     create_node = function(kind, props)
       local node = Eui.Node(props or {})
       node.UnitType = kind
       created[#created + 1] = node
       return node
     end,
+    hud = opts.with_toggle and {
+      GroundLootView.aim_toggle_spec({ radius = opts.radius or 2 }),
+    } or nil,
     docks = {
       ground_loot = GroundLootView.bubble_spec({
         send = function(payload) sent[#sent + 1] = payload end,
@@ -39,6 +47,8 @@ local function mount(opts)
     overlays = {
       aim_pickup = GroundLootView.aim_spec({
         send = function(payload) sent[#sent + 1] = payload end,
+        on_pick = opts.on_pick,
+        radius = opts.radius or 2,
       }),
     },
   })
@@ -49,6 +59,7 @@ local function mount(opts)
     view = view,
     created = created,
     sent = sent,
+    notices = notices,
     clock = clock,
   }
 end
@@ -103,5 +114,35 @@ describe("地面气泡与瞄准拾取（#301 客户端宿主）", function()
     env.root:Destroy()
     assert.equals(0, alive_named(env, "AimPickup"))
     assert.is_false(env.view.is_alive:now())
+  end)
+
+  it("瞄准拾取按钮打通蒙版开关、最近物品拾取回调、离场关闭与满包提示", function()
+    local env = mount({ with_toggle = true })
+    assert.is_nil(node_named(env, "BtnAimPickup"))
+    env.writer:ingest_event("LootState", { list = { row("far", 1.8, 0), row("near", 0.5, 0) } })
+    env.writer:update_spatial({ x = 0, y = 0, z = 0 }, {})
+
+    local toggle = node_named(env, "BtnAimPickup")
+    assert.is_not_nil(toggle)
+    assert.is_true(Eui.Click(toggle))
+    local mask = node_named(env, "AimPickupMask")
+    assert.is_not_nil(mask)
+
+    -- 点击蒙版触发拾取最近物品并自动关闭蒙版
+    assert.is_true(Eui.Click(mask))
+    assert.same({ { action = "Pickup", value = "near" } }, env.sent)
+    assert.is_nil(node_named(env, "AimPickupMask"))
+
+    -- 再次开启蒙版后离开拾取范围自动关闭蒙版并拆掉按钮
+    assert.is_true(Eui.Click(toggle))
+    assert.is_not_nil(node_named(env, "AimPickupMask"))
+    env.writer:update_spatial({ x = 50, y = 0, z = 50 }, {})
+    assert.is_nil(node_named(env, "AimPickupMask"))
+    assert.is_nil(node_named(env, "BtnAimPickup"))
+
+    -- 满包回执给玩家提示
+    env.writer:ingest_event("LootResult", { ok = false, reason = "full" })
+    assert.same({ "背包已满" }, env.notices)
+    env.view:dispose()
   end)
 end)

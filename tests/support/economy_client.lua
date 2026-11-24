@@ -66,9 +66,21 @@ function M.new(options)
     if not node then return false end
     return Eui.Click(node)
   end
+  local function sync_spatial()
+    if options.character ~= nil then
+      env.writer:update_camera_target(options.character, nil)
+      if options.character.Position ~= nil then
+        env.writer:update_spatial(options.character.Position, {})
+      end
+    end
+  end
+  sync_spatial()
   function env:open(id) self.writer:open_modal(id) end
   function env:ingest(name, payload) self.writer:ingest_event(name, payload) end
-  function env:step(dt) self.writer:step_clock(dt) end
+  function env:step(dt)
+    sync_spatial()
+    self.writer:step_clock(dt)
+  end
   function env:bar(snapshot) self:ingest("ItemBarState", snapshot) end
   function env:cleanup()
     if self.view then self.view:dispose(); self.view = nil end
