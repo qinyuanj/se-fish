@@ -1,5 +1,5 @@
 -- #172 出手动作客户端取证（试玩客户端，只读）：WINDOW 秒内每帧读本地角色 Animator:GetPlayingAnimationTracks，
--- 出手动画（ID 与 game_cfg.AttackAnim 一致，沙盒不能 require，故以字面量嵌入）首次出现时打一行，窗口结束打汇总
+-- 出手动画（ID 与 GameCfg.AttackAnim 一致，沙盒不能 require，故以字面量嵌入）首次出现时打一行，窗口结束打汇总
 -- （最大播放进度、长度）。服务端轨道 IsPlaying 恒 false、Length=0（2026-11-04 实测），所以播放与否以客户端为准。
 -- 复跑：试玩中先 exec 本文件（--platform client），窗口内再逐类跑 zone172_attack_anim_runtime.lua（server），
 --       最后 editor-cli log grep AAC172 --platform client --context 0

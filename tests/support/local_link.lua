@@ -6,7 +6,7 @@
 -- 夹具结论不替代它。用例与探针里不得把夹具通过写成「容量已验收」「多人已验收」。
 --
 -- 不加生产代码分支、不读管理器私有表。引擎边界（Task / World / DataStoreService / Players /
--- RunService / PhysicsService / Vector3 / Vector2 / Color / re_util）用替身，Close 时逐项还原。
+-- RunService / PhysicsService / Vector3 / Vector2 / Color / REUtil）用替身，Close 时逐项还原。
 --
 -- 与 server/main.lua 的接线一一对应：WIRING 逐行核对，接线一改这里先红（先红再改夹具，别让夹具漂走）。
 -- 在 main.lua 里也有 OnPlayerAdded / BeforeLeave 钩子，它们的路径不在本夹具声明的覆盖范围里。
@@ -27,9 +27,9 @@ end
 
 -- 复现的接线：每行都是 server/main.lua 的原文子串，缺一行就说明生产装配变了。
 M.WIRING = {
-    'player_data = player_data_host',
-    'save = save_host',
-    'vitals = runtime.life',
+    'player_data = PlayerDataHost',
+    'save = SaveHost',
+    'Vitals = runtime.life',
     'bind_party_action = function(dispatch)',
     'bind_party_state_request = function(dispatch)',
     'bind_interact_action = function(dispatch)',
@@ -49,17 +49,17 @@ function M.assert_wiring()
 end
 
 -- 就绪顺序照 server/main.lua 的 OnReady：先操作角色与生命状态的那批，再其余管理器。
-local READY_FIRST = { 'vitals', 'Survival' }
+local READY_FIRST = { 'Vitals', 'Survival' }
 local READY_REST = {}
 -- 离场顺序照 ContinuePlayerRemoving：终镜像先于序列化，序列化先于其余管理器的 OnPlayerRemoving。
-local LEAVING_REST = { 'vitals', 'Survival' }
+local LEAVING_REST = { 'Vitals', 'Survival' }
 
 -- 前向声明：M:Start 与 handleAdded 的读档回调都转发到它（实现见下方连接生命周期段）。
 local onReady
 
 local function newPlayer(env, userId, position, name)
     local controller = {
-        Health = env.cfg.vitals.MaxHealth, MaxHealth = env.cfg.vitals.MaxHealth, WalkSpeed = 10,
+        Health = env.cfg.Vitals.MaxHealth, MaxHealth = env.cfg.Vitals.MaxHealth, WalkSpeed = 10,
         HealthChanged = signal(), Died = signal(), OnReborn = signal(),
     }
     function controller:TakeDamage(amount)
@@ -83,17 +83,17 @@ end
 --- 调用方随后 link:Start()（等价 GameStart），结束时必须 link:Close()。
 function M.new(opts)
     opts = opts or {}
-    local game_cfg = require('common.game_cfg')
-    local zone_fixtures = require('tests.support.zone_fixtures')
-    local zone_markers = require('common.zone_markers')
-    if not zone_markers.Ready then zone_fixtures.Apply(game_cfg) end
+    local GameCfg = require('common.game_cfg')
+    local ZoneFixtures = require('tests.support.zone_fixtures')
+    local ZoneMarkers = require('common.zone_markers')
+    if not ZoneMarkers.Ready then ZoneFixtures.Apply(GameCfg) end
 
     local env = {
-        cfg = game_cfg, queue = {}, sent = {}, re = {}, values = {}, online = {}, created = {},
+        cfg = GameCfg, queue = {}, sent = {}, re = {}, values = {}, online = {}, created = {},
         now = opts.now or 1000, started = false, active = {}, current = {}, leaving = {}, ready = {},
         saved = {
             game = rawget(_G, 'game'), Vector3 = rawget(_G, 'Vector3'), Vector2 = rawget(_G, 'Vector2'),
-            Color = rawget(_G, 'Color'), re_util = rawget(_G, 're_util'), task = rawget(_G, 'task'),
+            Color = rawget(_G, 'Color'), REUtil = rawget(_G, 'REUtil'), task = rawget(_G, 'task'),
             reutil = package.loaded['common.re_util'], playerdata = package.loaded['server.data.player_data'],
             carrier = package.loaded['server.world_host.fish_carrier'],
         },
@@ -171,13 +171,13 @@ function M.new(opts)
     }
     local re = { GetRE = function(_, name) return reStub(name) end, CheckRECD = function() return false end }
     package.loaded['common.re_util'] = re
-    _G.re_util = re
+    _G.REUtil = re
 
     package.loaded['server.data.player_data'] = nil
-    env.player_data = require('server.data.player_data')
+    env.PlayerData = require('server.data.player_data')
     env.managers = {
         Save = assert(loadfile('server/save_host.lua'))(),
-        player_data = assert(loadfile('server/player_data_host.lua'))(),
+        PlayerData = assert(loadfile('server/player_data_host.lua'))(),
         Party = {},
     }
     local mgr = env.managers
@@ -188,8 +188,8 @@ function M.new(opts)
         })
     end
 
-    mgr.Save.player_data = mgr.player_data
-    mgr.player_data.Save = mgr.Save
+    mgr.Save.PlayerData = mgr.PlayerData
+    mgr.PlayerData.Save = mgr.Save
     function mgr.Party:SameParty(a, b)
         local squad = env.lifeHost and env.lifeHost.runtime.world.squad
         return squad and squad:SameParty(a, b) or false
@@ -200,19 +200,19 @@ function M.new(opts)
     end
     -- #255 生产接线：统一伤害入口的过滤函数由 MgrPkFilter 工厂实例化，只读注入的权威接缝。
     env.lifeHost = require('tests.support.life_host').start({
-      now = env.now, remote = re, player_data = mgr.player_data, save = mgr.Save,
+      now = env.now, remote = re, player_data = mgr.PlayerData, save = mgr.Save,
       bind_interact_action = function(dispatch)
         re:GetRE('InteractAction').OnServerEvent:Connect(function(player, payload)
           dispatch(player, payload)
         end)
       end,
     })
-    mgr.vitals = env.lifeHost.runtime.life
-    mgr.Survival = mgr.vitals
-    mgr.player_data.vitals = mgr.vitals
-    mgr.vitals.Party = mgr.Party
-    mgr.vitals.zone_markers = zone_markers
-    mgr.vitals:SetDamageFilter(env.filter())
+    mgr.Vitals = env.lifeHost.runtime.life
+    mgr.Survival = mgr.Vitals
+    mgr.PlayerData.Vitals = mgr.Vitals
+    mgr.Vitals.Party = mgr.Party
+    mgr.Vitals.ZoneMarkers = ZoneMarkers
+    mgr.Vitals:SetDamageFilter(env.filter())
 
     env.player = function(self, userId, position, name) return newPlayer(self, userId, position, name) end
     return setmetatable(env, { __index = M })
@@ -240,10 +240,10 @@ end
 
 function M:Start()
     M.assert_wiring()
-    -- 读档就绪回调：main.lua 用 mgr_save.OnReady 分发第一批管理器的 OnPlayerAdded，
+    -- 读档就绪回调：main.lua 用 MgrSave.OnReady 分发第一批管理器的 OnPlayerAdded，
     -- 这里接同一个入口，而不是自己另写一套「加入后初始化」。
     self.managers.Save.OnReady = function(player, data) onReady(self, player, data) end
-    for _, name in ipairs({ 'Save', 'player_data' }) do
+    for _, name in ipairs({ 'Save', 'PlayerData' }) do
         local manager = self.managers[name]
         if manager.Start then manager.Start(manager) end
     end
@@ -260,7 +260,7 @@ end
 onReady = function(env, player, data)
     local userId = player.UserId
     if env.current[userId] ~= player or env.leaving[userId]
-        or env.managers.player_data:GetDataInst(player) ~= data or env.active[userId] == player then
+        or env.managers.PlayerData:GetDataInst(player) ~= data or env.active[userId] == player then
         return
     end
     if not env.started then env.ready[userId] = { player, data } return end
@@ -285,7 +285,7 @@ local function handleAdded(env, player)
     end
     env.online[player.UserId] = player
     env.current[player.UserId] = player
-    env.managers.player_data:OnPlayerAdded(player)
+    env.managers.PlayerData:OnPlayerAdded(player)
 end
 
 local function continueRemoving(env, player, leaving)
@@ -294,7 +294,7 @@ local function continueRemoving(env, player, leaving)
     local active = env.active[player.UserId] == player
     if active then env.active[player.UserId] = nil end
     if active then env.lifeHost:remove(player) end
-    env.managers.player_data:OnPlayerRemoving(player)
+    env.managers.PlayerData:OnPlayerRemoving(player)
     if active then
         for _, name in ipairs(LEAVING_REST) do
             local manager = env.managers[name]
@@ -336,7 +336,7 @@ function M:Join(userId, opts)
     local player = self:JoinRaw(userId, opts)
     for _ = 1, 20 do
         self:Tick()
-        if self.managers.player_data:GetDataInst(player) then return player end
+        if self.managers.PlayerData:GetDataInst(player) then return player end
         self:Advance(0.05)
     end
     error('连接 ' .. tostring(userId) .. ' 未在 20 轮内就绪')
@@ -401,7 +401,7 @@ end
 
 --- 统一伤害入口：与武器 / 鱼攻击走同一个 ApplyHit。
 function M:Hit(source, target, category, amount)
-    local vitals = self.managers.vitals
+    local vitals = self.managers.Vitals
     return vitals:ApplyHit(vitals:NewHit(source, category), target, amount)
 end
 
@@ -431,13 +431,13 @@ function M:Pickup(player, lootId)
     return ok == true
 end
 
---- 存档快照：mgr_save 的键与值，读档就绪后可核对「服务端没丢状态」。
+--- 存档快照：MgrSave 的键与值，读档就绪后可核对「服务端没丢状态」。
 function M:Stored(userId) return self.values[self.managers.Save:Key(userId)] end
 
-function M:data(player) return self.managers.player_data:GetDataInst(player) end
+function M:Data(player) return self.managers.PlayerData:GetDataInst(player) end
 
 function M:Save(player)
-    local data = self:data(player)
+    local data = self:Data(player)
     local ok = self.managers.Save:Save(player.UserId, data:Serialize(), 'test')
     self:Tick()
     return ok
@@ -450,7 +450,7 @@ function M:Phase(player) return self.managers.Survival:Phase(player) end
 function M:Close()
     local saved = self.saved
     _G.game, _G.Vector3, _G.Vector2 = saved.game, saved.Vector3, saved.Vector2
-    _G.Color, _G.re_util, _G.task = saved.Color, saved.re_util, saved.task
+    _G.Color, _G.REUtil, _G.task = saved.Color, saved.REUtil, saved.task
     package.loaded['common.re_util'] = saved.reutil
     package.loaded['server.data.player_data'] = saved.playerdata
     package.loaded['server.world_host.fish_carrier'] = saved.carrier

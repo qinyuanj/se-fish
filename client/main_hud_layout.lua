@@ -1,7 +1,7 @@
 -- 坐标约定与 EUI 一致：原点在左下、Y 向上；每个矩形是 { x, y, w, h }，x / y 指中心点。
-local game_cfg = require('common.game_cfg')
+local GameCfg = require('common.game_cfg')
 
-local main_hud_layout = {}
+local MainHudLayout = {}
 
 local DESIGN_W, DESIGN_H = 1920, 1238
 local SAFE = 16
@@ -60,7 +60,7 @@ local function bounds(controls, pad)
 end
 
 local function clampSlots(n)
-    local items = game_cfg.Items
+    local items = GameCfg.Items
     n = type(n) == 'number' and math.floor(n) or items.InitialItemBarSlots
     return math.max(items.InitialItemBarSlots, math.min(items.ItemBarSlots, n))
 end
@@ -79,9 +79,9 @@ local CENTER_HALF_W, CENTER_HALF_H_RATIO = 280, 0.18
 
 -- input = { width, height, itemBarSlots, reeling }
 -- 返回 { Regions = { 区域名 = { Bounds, Controls } }, Rects = 扁平索引,
---        ItemBarSlots = { 第 1..n 格 }, Panels = { BackpackPanel }, Reserved = { { name, rect } },
+--        ItemBarSlots = { 第 1..N 格 }, Panels = { BackpackPanel }, Reserved = { { name, rect } },
 --        Popup = 候选行参数（供 PopupCells） }
-function main_hud_layout.Compute(input)
+function MainHudLayout.Compute(input)
     input = type(input) == 'table' and input or {}
     local W = type(input.width) == 'number' and input.width or DESIGN_W
     local H = type(input.height) == 'number' and input.height or 1080
@@ -192,7 +192,7 @@ function main_hud_layout.Compute(input)
     }
 end
 
-function main_hud_layout.PopupCells(layout, kind, count)
+function MainHudLayout.PopupCells(layout, kind, count)
     local bar = layout and layout.Rects and layout.Rects[kind .. 'Bar']
     if not bar or type(count) ~= 'number' or count < 1 then return {} end
     local p = layout.Popup
@@ -212,12 +212,12 @@ function main_hud_layout.PopupCells(layout, kind, count)
     return cells
 end
 
-function main_hud_layout.Bounds(rects, pad)
+function MainHudLayout.Bounds(rects, pad)
     return bounds(rects or {}, pad or 0)
 end
 
-function main_hud_layout.BottomLeft(r)
+function MainHudLayout.BottomLeft(r)
     return r.x - r.w / 2, r.y - r.h / 2
 end
 
-return main_hud_layout
+return MainHudLayout

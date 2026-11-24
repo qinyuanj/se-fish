@@ -1,5 +1,5 @@
 -- #179 主界面布局模块（client.main_hud_layout）：纯函数，只断言约束，不断言具体坐标。
--- 接缝：main_hud_layout.Compute(input) 的输出矩形 + main_hud_layout.PopupCells(layout, kind, count)。
+-- 接缝：MainHudLayout.Compute(input) 的输出矩形 + MainHudLayout.PopupCells(layout, kind, count)。
 --
 -- 动手前列出的失败方式（本文件逐条覆盖）：
 --   1. 常驻控件两两重叠（结束收线压攻击键、提示行互叠、入口组叠在一起……）；
@@ -21,8 +21,8 @@
 --
 -- 断言消息（同一轮提速）：以前每个「通过」的断言也拼一次 string.format 与 describe_rect，
 -- 单是 popup 用例就有数万次格式化，是文件级 2.2 s 的主要来源。现在只在失败分支里拼。
-local main_hud_layout = require('client.main_hud_layout')
-local game_cfg = require('common.game_cfg')
+local MainHudLayout = require('client.main_hud_layout')
+local GameCfg = require('common.game_cfg')
 
 -- 三因子两两覆盖：{ 屏幕高, 道具栏格数, 是否收线 }
 --   屏高 × 格数：886/1080/1238/1440 各自都配过 2 与 8；
@@ -96,7 +96,7 @@ local function each_case(fn)
         local key = string.format('%d:%d:%s', height, slots, tostring(reeling))
         local layout = LAYOUTS[key]
         if not layout then
-            layout = main_hud_layout.Compute({ width = 1920, height = height,
+            layout = MainHudLayout.Compute({ width = 1920, height = height,
                 itemBarSlots = slots, reeling = reeling })
             LAYOUTS[key] = layout
         end
@@ -108,7 +108,7 @@ end
 -- 候选数上限取真实配置：武器 = 近战 + 远程；鱼饵栏 = 全部鱼饵 + 「不挂鱼饵」+「吃蚯蚓」
 local function max_candidates()
     local weapons, baits = 0, 2
-    for _, def in pairs(game_cfg.Items.Definitions) do
+    for _, def in pairs(GameCfg.Items.Definitions) do
         if def.Type == '近战武器' or def.Type == '远程武器' then weapons = weapons + 1 end
         if def.Type == '鱼饵' then baits = baits + 1 end
     end
@@ -190,7 +190,7 @@ describe('主界面布局模块', function()
 
     it('test_top_reserved_follow_screen_top', function()
         -- 左上系统按钮组实测在 1238 高时离顶 77–181；换算到 886 高时仍贴着顶部，而不是留在原 y
-        local low = main_hud_layout.Compute({ width = 1920, height = 886, itemBarSlots = 2 })
+        local low = MainHudLayout.Compute({ width = 1920, height = 886, itemBarSlots = 2 })
         local found
         for _, zone in ipairs(low.Reserved) do
             local left, _, _, top = edges(zone.rect)
@@ -304,7 +304,7 @@ describe('主界面布局模块', function()
             for kind, count in pairs(max) do
                 local bar = layout.Rects[kind .. 'Bar']
                 for n = 1, count do
-                    local cells = main_hud_layout.PopupCells(layout, kind, n)
+                    local cells = MainHudLayout.PopupCells(layout, kind, n)
                     if #cells ~= n then
                         fail('%s %s 候选 %d 只生成 %d 格', case, kind, n, #cells)
                     end
@@ -336,13 +336,13 @@ describe('主界面布局模块', function()
     end)
 
     it('test_compute_is_pure_and_rejects_bad_input', function()
-        local a = main_hud_layout.Compute({ width = 1920, height = 1080, itemBarSlots = 8 })
-        local b = main_hud_layout.Compute({ width = 1920, height = 1080, itemBarSlots = 8 })
+        local a = MainHudLayout.Compute({ width = 1920, height = 1080, itemBarSlots = 8 })
+        local b = MainHudLayout.Compute({ width = 1920, height = 1080, itemBarSlots = 8 })
         assert.same(a, b)
         assert.is_not.equal(a, b) -- 每次返回新表，调用方改动不串到下一次
         -- 道具栏格数越界时夹到 2–8
-        assert.same(8, #main_hud_layout.Compute({ width = 1920, height = 1080, itemBarSlots = 20 }).ItemBarSlots)
-        assert.same(2, #main_hud_layout.Compute({ width = 1920, height = 1080, itemBarSlots = 0 }).ItemBarSlots)
-        assert.same(2, #main_hud_layout.Compute({ width = 1920, height = 1080 }).ItemBarSlots)
+        assert.same(8, #MainHudLayout.Compute({ width = 1920, height = 1080, itemBarSlots = 20 }).ItemBarSlots)
+        assert.same(2, #MainHudLayout.Compute({ width = 1920, height = 1080, itemBarSlots = 0 }).ItemBarSlots)
+        assert.same(2, #MainHudLayout.Compute({ width = 1920, height = 1080 }).ItemBarSlots)
     end)
 end)

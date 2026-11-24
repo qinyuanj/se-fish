@@ -1,16 +1,16 @@
 
-local game_cfg = require("common.game_cfg")
-local vitals = require("common.vitals")
-local number = require("common.number")
-local spoke = require("common.packages.spoke.api")
-local spoke_runtime = require("common.packages.spoke.runtime.spoke_runtime")
+local GameCfg = require("common.game_cfg")
+local Vitals = require("common.vitals")
+local Number = require("common.number")
+local Spoke = require("common.packages.spoke.api")
+local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
 
-local State = spoke.State
+local State = Spoke.State
 
-local player_life = {}
+local PlayerLife = {}
 
 local function finite_number(value)
-  return number.IsFiniteNumber(value)
+  return Number.IsFiniteNumber(value)
 end
 
 local function positive_amount(value)
@@ -70,7 +70,7 @@ local function ceil_remaining(until_at, now)
   return math.max(0, math.ceil((until_at or now) - now))
 end
 
-function player_life.mount(s3, player_tree, opts)
+function PlayerLife.mount(s3, player_tree, opts)
   opts = type(opts) == "table" and opts or {}
   local states = player_tree.states
   local memos = player_tree.memos
@@ -78,9 +78,9 @@ function player_life.mount(s3, player_tree, opts)
   local player = player_tree.player
   local data = player_tree.data
 
-  local survival_cfg = game_cfg.Survival
-  local vitals_cfg = game_cfg.vitals
-  local rescue_cfg = game_cfg.Rescue
+  local survival_cfg = GameCfg.Survival
+  local vitals_cfg = GameCfg.Vitals
+  local rescue_cfg = GameCfg.Rescue
   local platform_api = opts.platform
   local save_api = opts.save
   local player_data = opts.player_data
@@ -92,13 +92,13 @@ function player_life.mount(s3, player_tree, opts)
   end
 
   local now0 = clock.now()
-  local downed_until = State.new("player_life.downed_until", nil)
-  local dead_until = State.new("player_life.dead_until", nil)
-  local rescue = State.new("player_life.rescue", nil)
-  local platform = State.new("player_life.platform", nil)
-  local episode = State.new("player_life.episode", 0)
-  local recovering = State.new("player_life.recovering", false)
-  local engine_death = State.new("player_life.engine_death", false)
+  local downed_until = State.new("PlayerLife.downed_until", nil)
+  local dead_until = State.new("PlayerLife.dead_until", nil)
+  local rescue = State.new("PlayerLife.rescue", nil)
+  local platform = State.new("PlayerLife.platform", nil)
+  local episode = State.new("PlayerLife.episode", 0)
+  local recovering = State.new("PlayerLife.recovering", false)
+  local engine_death = State.new("PlayerLife.engine_death", false)
   local hit_seq = 0
   local action_seq = 0
   local damage_filter = nil
@@ -161,9 +161,9 @@ function player_life.mount(s3, player_tree, opts)
   local function carrying_barrel(source)
     local held = vitals_cfg.HeldDamage
     if not held then return false end
-    local containers = source and source.data and source.data.Containers
+    local containers = source and source.Data and source.Data.Containers
     if type(containers) ~= "table" then return false end
-    local ids = game_cfg.Items.ContainerId
+    local ids = GameCfg.Items.ContainerId
     for _, id in ipairs({ ids.ItemBar, ids.Backpack }) do
       local container = containers[id]
       if type(container) == "table" then
@@ -181,12 +181,12 @@ function player_life.mount(s3, player_tree, opts)
   local function set_controller_health(value)
     local controller = controller_of(player)
     if not controller then
-      print("[player_life] operation=SetControllerHealth", "player=" .. tostring(player.UserId), "error=no-controller")
+      print("[PlayerLife] operation=SetControllerHealth", "player=" .. tostring(player.UserId), "error=no-controller")
       return false
     end
     local ok, err = pcall(function() controller.Health = value end)
     if not ok then
-      print("[player_life] operation=SetControllerHealth", "player=" .. tostring(player.UserId), tostring(err))
+      print("[PlayerLife] operation=SetControllerHealth", "player=" .. tostring(player.UserId), tostring(err))
       return false
     end
     local read = read_health(player)
@@ -299,7 +299,7 @@ function player_life.mount(s3, player_tree, opts)
 
   local function enter_downed()
     local now = clock.now()
-    spoke_runtime.batch(function()
+    SpokeRuntime.batch(function()
       episode:set(episode:now() + 1)
       rescue:set(nil)
       platform:set(nil)
@@ -320,7 +320,7 @@ function player_life.mount(s3, player_tree, opts)
     rescue:set(nil)
     platform:set(nil)
     states.platform_pending:set(false)
-    spoke_runtime.batch(function()
+    SpokeRuntime.batch(function()
       states.life_phase:set("dead")
       downed_until:set(nil)
       dead_until:set(now + survival_cfg.DeadSec)
@@ -339,7 +339,7 @@ function player_life.mount(s3, player_tree, opts)
     end
     hunger = math.max(0, math.min(vitals_cfg.MaxHunger, math.floor(hunger)))
     if not set_controller_health(next_health) then return false end
-    spoke_runtime.batch(function()
+    SpokeRuntime.batch(function()
       states.hunger:set(hunger)
       states.life_phase:set("alive")
       downed_until:set(nil)
@@ -427,7 +427,7 @@ function player_life.mount(s3, player_tree, opts)
 
   function publish_notice(actual, hit)
     if not (remote and type(remote.GetRE) == "function") or not (actual > 0) then return end
-    local event = remote:GetRE("damage_notice")
+    local event = remote:GetRE("DamageNotice")
     if event and type(event.FireAllClients) == "function" then
       pcall(event.FireAllClients, event, {
         amount = actual,
@@ -539,12 +539,12 @@ function player_life.mount(s3, player_tree, opts)
 
   function player_tree:eat(item_id, cook_rate)
     if memos.can_act:now() ~= true then return false end
-    local definition = type(item_id) == "string" and game_cfg.Items.Definitions[item_id]
+    local definition = type(item_id) == "string" and GameCfg.Items.Definitions[item_id]
     if type(definition) ~= "table" or type(definition.EatPercent) ~= "number" then return false end
     local rate = 1
     if finite_number(cook_rate) and cook_rate > 0 then rate = cook_rate end
     local percent = definition.EatPercent * rate
-    local hunger = vitals.Restore(states.hunger:now(), vitals_cfg.MaxHunger, percent)
+    local hunger = Vitals.Restore(states.hunger:now(), vitals_cfg.MaxHunger, percent)
     states.hunger:set(hunger)
     if percent < 0 then
       local damage = math.floor(max_health() * -percent / 100)
@@ -553,7 +553,7 @@ function player_life.mount(s3, player_tree, opts)
       end
     else
       local health = read_health(player) or states.health:now()
-      local restored = vitals.Restore(math.floor(health), max_health(), percent)
+      local restored = Vitals.Restore(math.floor(health), max_health(), percent)
       set_controller_health(restored)
     end
     write_vitals()
@@ -788,7 +788,7 @@ function player_life.mount(s3, player_tree, opts)
           states.platform_pending:set(false)
         end
         local why = reason or "unavailable"
-        local platform_cfg = game_cfg.Platform or {}
+        local platform_cfg = GameCfg.Platform or {}
         local text = why == "not_open" and platform_cfg.NotOpenText
           or why == "unavailable" and platform_cfg.UnavailableText or nil
         return reply({ seq = seq, ok = false, action = payload.action, mode = payload.mode,
@@ -824,7 +824,7 @@ function player_life.mount(s3, player_tree, opts)
   function player_tree:handle_survival_action(payload, skip_cd)
     if player_tree:is_disposed() or type(payload) ~= "table" then return false end
     if not skip_cd and remote and type(remote.CheckRECD) == "function"
-        and remote:CheckRECD(player, "SurvivalAction", game_cfg.Items.ActionCooldownSec) then
+        and remote:CheckRECD(player, "SurvivalAction", GameCfg.Items.ActionCooldownSec) then
       return false
     end
     on_action(payload)
@@ -842,7 +842,7 @@ function player_life.mount(s3, player_tree, opts)
       if sec > last_hunger_sec then
         local elapsed = math.min(sec - last_hunger_sec, vitals_cfg.MaxCatchUpSec)
         last_hunger_sec = sec
-        local hunger, damage = vitals.Advance(states.hunger:now(), elapsed, vitals_cfg)
+        local hunger, damage = Vitals.Advance(states.hunger:now(), elapsed, vitals_cfg)
         if hunger ~= states.hunger:now() then states.hunger:set(hunger) end
         if carrying_barrel(current_data()) then
           apply_damage(vitals_cfg.HeldDamage.DamagePerSec * elapsed, player_tree:new_hit(nil, "heldItem"))
@@ -1004,4 +1004,4 @@ function player_life.mount(s3, player_tree, opts)
   action_seq = action_seq
 end
 
-return player_life
+return PlayerLife

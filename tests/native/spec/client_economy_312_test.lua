@@ -1,9 +1,9 @@
-local client_store = require("client.store.client_store")
-local root_view = require("client.views.root_view")
-local lottery_view = require("client.views.lottery_view")
-local blindbox_view = require("client.views.blindbox_view")
-local platform_shop_view = require("client.views.platform_shop_view")
-local eui = require("tests.support.eui_double")
+local ClientStore = require("client.store.client_store")
+local RootView = require("client.views.root_view")
+local LotteryView = require("client.views.lottery_view")
+local BlindboxView = require("client.views.blindbox_view")
+local PlatformShopView = require("client.views.platform_shop_view")
+local Eui = require("tests.support.eui_double")
 
 local function child(root, name)
   return root:FindFirstChild(name, true)
@@ -17,9 +17,9 @@ describe("客户端抽奖机、盲盒与地图商店模态弹窗（#312）", fun
     _G.Vector2 = { New = function(x, y) return { x = x, y = y } end }
     _G.Color = { New = function(...) return { ... } end }
     sent = { lottery = {}, blindbox = {}, platform = {} }
-    store, writer = client_store.new()
-    root = eui.Node({ Name = "UIRoot" })
-    view = root_view.mount(root, store, {
+    store, writer = ClientStore.new()
+    root = Eui.Node({ Name = "UIRoot" })
+    view = RootView.mount(root, store, {
       services = {
         open_modal = function(id, payload) writer:open_modal(id, payload) end,
         close_modal = function(id) writer:close_modal(id) end,
@@ -27,14 +27,14 @@ describe("客户端抽奖机、盲盒与地图商店模态弹窗（#312）", fun
         send_blindbox = function(payload) table.insert(sent.blindbox, payload) end,
         send_platform = function(payload) table.insert(sent.platform, payload) end,
       },
-      hud = { blindbox_view.entry_spec(), platform_shop_view.entry_spec() },
+      hud = { BlindboxView.entry_spec(), PlatformShopView.entry_spec() },
       modals = {
-        lottery = lottery_view.modal_spec(),
-        blindbox = blindbox_view.modal_spec(),
-        platform = platform_shop_view.modal_spec(),
+        lottery = LotteryView.modal_spec(),
+        blindbox = BlindboxView.modal_spec(),
+        platform = PlatformShopView.modal_spec(),
       },
       create_node = function(kind, props)
-        return eui.Node({
+        return Eui.Node({
           Kind = kind,
           Name = props and props.Name,
           Parent = props and props.Parent,
@@ -61,8 +61,8 @@ describe("客户端抽奖机、盲盒与地图商店模态弹窗（#312）", fun
     writer:open_modal("lottery")
     local lottery = child(root, "ScreenLottery")
     assert.is_not_nil(lottery)
-    eui.Click(child(root, "BtnLotteryDraw"))
-    assert.same({ action = "draw", slot = 1, seq = 1 }, sent.lottery[1])
+    Eui.Click(child(root, "BtnLotteryDraw"))
+    assert.same({ action = "Draw", slot = 1, seq = 1 }, sent.lottery[1])
     writer:ingest_event("LotteryResult", { ok = true, recovered = true, axes = { 1, 1, 2 }, outcome = "pair", coins = 8 })
     assert.matches("8", child(root, "LabelLotteryResult").Text)
 
@@ -70,8 +70,8 @@ describe("客户端抽奖机、盲盒与地图商店模态弹窗（#312）", fun
     assert.is_true(lottery.Destroyed)
     local blindbox = child(root, "ScreenBlindbox")
     assert.is_not_nil(blindbox)
-    eui.Click(child(root, "BtnBlindboxSingle"))
-    assert.same({ action = "draw", count = 1, seq = 1 }, sent.blindbox[1])
+    Eui.Click(child(root, "BtnBlindboxSingle"))
+    assert.same({ action = "Draw", count = 1, seq = 1 }, sent.blindbox[1])
     writer:ingest_event("BlindboxResult", { ok = true, pityAfter = 1, draws = { { itemKey = "item7" } } })
     assert.matches("item7", child(root, "LabelBlindboxResult").Text)
 
@@ -85,23 +85,23 @@ describe("客户端抽奖机、盲盒与地图商店模态弹窗（#312）", fun
     })
     local offerButton = child(root, "BtnPlatformOffer_coinPouch")
     assert.equals(1, offerButton.OnClicked:Count())
-    assert.is_true(eui.Click(offerButton), string.format("destroyed=%s visible=%s touch=%s",
+    assert.is_true(Eui.Click(offerButton), string.format("destroyed=%s visible=%s touch=%s",
       tostring(offerButton.Destroyed), tostring(offerButton.Visible), tostring(offerButton.TouchEnabled)))
     assert.same({ action = "BuyCoin", goods = "coinPouch", seq = 1 }, sent.platform[1])
 
     local platformPanel = child(root, "ScreenPlatform")
-    eui.Click(child(root, "BtnPlatformClose"))
+    Eui.Click(child(root, "BtnPlatformClose"))
     assert.is_nil(store.active_modal:now())
     assert.is_true(platformPanel.Destroyed)
   end)
 
   it("常驻入口打开对应弹窗，根 UI 销毁后节点与监听零残留", function()
     local blindboxEntry = child(root, "BtnBlindboxEntry")
-    eui.Click(blindboxEntry)
+    Eui.Click(blindboxEntry)
     assert.equals("blindbox", store.active_modal:now())
     writer:open_modal("platform")
     local platformEntry = child(root, "BtnMapShopEntry")
-    eui.Click(platformEntry)
+    Eui.Click(platformEntry)
     assert.same({ action = "OpenCoinShop" }, sent.platform[1])
     local panel = child(root, "ScreenPlatform")
     local close = child(root, "BtnPlatformClose")

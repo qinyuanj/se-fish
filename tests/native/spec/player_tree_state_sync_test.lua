@@ -1,18 +1,18 @@
--- #297-A1b 契约测试：player_tree 第一/二因果段、单批 ItemBarState 合并推送、持竿叶子与离场终镜像。
+-- #297-A1b 契约测试：PlayerTree 第一/二因果段、单批 ItemBarState 合并推送、持竿叶子与离场终镜像。
 -- 失败方式先列：
---   1. 单次 spoke_runtime.batch 内多次修改库存/金币/药水/升级，触发多次 ItemBarState 推送或未同步 FishCoin/存档镜像；
---   2. 首领饵存在道具栏时未按 player_data 口径合并进 ItemBarState.bait，或背包/道具栏扩容容量未随 upgrade_level 同步；
+--   1. 单次 SpokeRuntime.batch 内多次修改库存/金币/药水/升级，触发多次 ItemBarState 推送或未同步 FishCoin/存档镜像；
+--   2. 首领饵存在道具栏时未按 PlayerData 口径合并进 ItemBarState.bait，或背包/道具栏扩容容量未随 upgrade_level 同步；
 --   3. 药水/商店升级/持续效果变更时 Stage 2 属性派生未即时重算，或亚秒级 paralyze 错误退出外层 alive 相位；
 --   4. 持竿模型未随切槽/切换 held/角色重建/离场 dispose 自动逆序清理；
 --   5. 离线/离场 Step 1 终镜像未完整写回 weakRemaining（含角色空窗暂停态）及第一因果段最新库存状态。
 
-local game_cfg = require("common.game_cfg")
-local body_scale = require("common.body_scale")
-local spoke_clock = require("common.spoke_clock")
-local spoke_runtime = require("common.packages.spoke.runtime.spoke_runtime")
-local player_tree = require("server.world_host.player_tree")
+local GameCfg = require("common.game_cfg")
+local BodyScale = require("common.body_scale")
+local SpokeClock = require("common.spoke_clock")
+local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
+local PlayerTree = require("server.world_host.player_tree")
 
-local CONTAINER = game_cfg.Items.ContainerId
+local CONTAINER = GameCfg.Items.ContainerId
 
 local function make_character(walk_speed)
   return {
@@ -47,13 +47,13 @@ local function make_ready_data(player, overrides)
     Player = player,
     Inited = true,
     LoadState = "ready",
-    data = {
+    Data = {
       FishCoin = overrides.coin or 100,
       Zone = overrides.zone or "fishPond",
       UpgradeLevel = overrides.upgrade_level or 0,
       Containers = {
         [CONTAINER.ItemBar] = overrides.item_bar or {
-          [1] = { itemId = game_cfg.Items.Id.StarterRod, count = 1, containerId = CONTAINER.ItemBar },
+          [1] = { itemId = GameCfg.Items.Id.StarterRod, count = 1, containerId = CONTAINER.ItemBar },
         },
         [CONTAINER.Backpack] = overrides.backpack or {},
       },
@@ -81,8 +81,8 @@ local function make_ready_data(player, overrides)
         upgrades = overrides.shop_upgrades or {},
       },
       survival = {
-        health = overrides.health or game_cfg.vitals.MaxHealth,
-        hunger = overrides.hunger or game_cfg.vitals.MaxHunger,
+        health = overrides.health or GameCfg.Vitals.MaxHealth,
+        hunger = overrides.hunger or GameCfg.Vitals.MaxHunger,
         dying = false,
         dead = false,
         weakRemaining = overrides.weak_remaining or 0,
@@ -92,7 +92,7 @@ local function make_ready_data(player, overrides)
   }
 end
 
-describe("player_tree #297-A1b：单批合并推送、属性即时重算与存档镜像", function()
+describe("PlayerTree #297-A1b：单批合并推送、属性即时重算与存档镜像", function()
   local saved_vec3, saved_color
 
   before_each(function()
@@ -108,21 +108,21 @@ describe("player_tree #297-A1b：单批合并推送、属性即时重算与存�
     saved_vec3, saved_color = nil, nil
   end)
 
-  it("单次 spoke_runtime.batch 内多次库存/金币/药水/升级变更只合并推送 1 次 ItemBarState 并同步属性与镜像", function()
-    local clock = spoke_clock.new(100)
+  it("单次 SpokeRuntime.batch 内多次库存/金币/药水/升级变更只合并推送 1 次 ItemBarState 并同步属性与镜像", function()
+    local clock = SpokeClock.new(100)
     local char = make_character(8)
     local player = make_player(9101, char)
     local data = make_ready_data(player, {
       coin = 200,
       selected_slot = 1,
       item_bar = {
-        [1] = { itemId = game_cfg.Items.Id.StarterRod, count = 1, containerId = CONTAINER.ItemBar },
+        [1] = { itemId = GameCfg.Items.Id.StarterRod, count = 1, containerId = CONTAINER.ItemBar },
         [2] = { itemId = "item168", count = 1, containerId = CONTAINER.ItemBar },
       },
     })
 
     local pushes = {}
-    local pt = player_tree.spawn({
+    local pt = PlayerTree.spawn({
       player = player,
       data = data,
       clock = clock,
@@ -138,16 +138,16 @@ describe("player_tree #297-A1b：单批合并推送、属性即时重算与存�
     assert.equals(2, pt.memos.item_bar_capacity:now())
     assert.equals(5, pt.memos.backpack_capacity:now())
 
-    -- 选取一个首领饵 ID，验证 ItemBarState.bait 合并口径与 player_data 一致
-    local boss_bait_id = next(game_cfg.Casting.BossBait)
+    -- 选取一个首领饵 ID，验证 ItemBarState.bait 合并口径与 PlayerData 一致
+    local boss_bait_id = next(GameCfg.Casting.BossBait)
     assert.is_string(boss_bait_id)
 
     local before_version = pt.states.save_version:now()
-    spoke_runtime.batch(function()
+    SpokeRuntime.batch(function()
       assert.is_true(pt:set_coin(550))
       assert.is_true(pt:set_upgrade_level(2))
       assert.is_true(pt:set_item_bar({
-        [1] = { itemId = game_cfg.Items.Id.StarterRod, count = 1, containerId = CONTAINER.ItemBar },
+        [1] = { itemId = GameCfg.Items.Id.StarterRod, count = 1, containerId = CONTAINER.ItemBar },
         [2] = { itemId = boss_bait_id, count = 1, containerId = CONTAINER.ItemBar },
       }))
       assert.is_true(pt:set_backpack({
@@ -189,28 +189,28 @@ describe("player_tree #297-A1b：单批合并推送、属性即时重算与存�
     -- Stage 2 属性派生即时重算
     assert.equals(480, pt.memos.max_health:now())
     assert.near(1.6, pt.memos.body_scale:now(), 1e-9)
-    assert.near(body_scale.Derive(1.6).CameraDistance, pt.memos.body_derived:now().CameraDistance, 1e-9)
+    assert.near(BodyScale.Derive(1.6).CameraDistance, pt.memos.body_derived:now().CameraDistance, 1e-9)
     assert.near(8 * 1.4, pt.memos.walk_speed:now(), 1e-9)
-    assert.near(game_cfg.Shop.DamageScale("melee", 2), pt.memos.weapon_damage_scales:now().melee, 1e-9)
+    assert.near(GameCfg.Shop.DamageScale("melee", 2), pt.memos.weapon_damage_scales:now().melee, 1e-9)
 
-    -- 存档镜像已同步写回 data.data / data.Extra
-    assert.equals(550, data.data.FishCoin)
-    assert.equals(2, data.data.UpgradeLevel)
+    -- 存档镜像已同步写回 data.Data / data.Extra
+    assert.equals(550, data.Data.FishCoin)
+    assert.equals(2, data.Data.UpgradeLevel)
     assert.equals(3, data.Extra.growth.potions.item168)
     assert.equals(4, data.Extra.growth.potions.item167)
     assert.equals(2, data.Extra.growth.upgrades.melee)
     assert.equals(125, data.Extra.cooldowns.breath)
-    assert.equals(boss_bait_id, data.data.Containers[CONTAINER.ItemBar][2].itemId)
+    assert.equals(boss_bait_id, data.Data.Containers[CONTAINER.ItemBar][2].itemId)
 
     pt:dispose()
   end)
 
-  it("亚秒级麻痹由 player_effects 驱动，仅关 can_act 与移速归零、不退出外层 alive 相位", function()
-    local clock = spoke_clock.new(200)
+  it("亚秒级麻痹由 PlayerEffects 驱动，仅关 can_act 与移速归零、不退出外层 alive 相位", function()
+    local clock = SpokeClock.new(200)
     local player = make_player(9102, make_character(7))
     local data = make_ready_data(player)
 
-    local pt = player_tree.spawn({
+    local pt = PlayerTree.spawn({
       player = player,
       data = data,
       clock = clock,
@@ -247,14 +247,14 @@ describe("player_tree #297-A1b：单批合并推送、属性即时重算与存�
   end)
 
   it("持竿纯输出叶子随切槽、角色重建与离场 dispose 自动逆序清理，兼容代理 userdata 角色", function()
-    local clock = spoke_clock.new(300)
+    local clock = SpokeClock.new(300)
     local char1 = setmetatable({}, { __index = { Name = "ProxyChar1" } })
     local char2 = setmetatable({}, { __index = { Name = "ProxyChar2" } })
     local player = make_player(9103, char1)
     local data = make_ready_data(player, {
       selected_slot = 1,
       item_bar = {
-        [1] = { itemId = game_cfg.Items.Id.StarterRod, count = 1, containerId = CONTAINER.ItemBar },
+        [1] = { itemId = GameCfg.Items.Id.StarterRod, count = 1, containerId = CONTAINER.ItemBar },
         [2] = { itemId = "item168", count = 1, containerId = CONTAINER.ItemBar },
       },
     })
@@ -272,7 +272,7 @@ describe("player_tree #297-A1b：单批合并推送、属性即时重算与存�
       return unit
     end
 
-    local pt = player_tree.spawn({
+    local pt = PlayerTree.spawn({
       player = player,
       data = data,
       clock = clock,
@@ -308,7 +308,7 @@ describe("player_tree #297-A1b：单批合并推送、属性即时重算与存�
   end)
 
   it("离线/离场终镜像完整写回 weakRemaining（含角色空窗暂停剩余秒数）与最新库存状态", function()
-    local clock = spoke_clock.new(400)
+    local clock = SpokeClock.new(400)
     local player = make_player(9104, make_character(7))
     local data = make_ready_data(player, {
       coin = 30,
@@ -317,7 +317,7 @@ describe("player_tree #297-A1b：单批合并推送、属性即时重算与存�
 
     local push_count = 0
     local observed_in_finalize = nil
-    local pt = player_tree.spawn({
+    local pt = PlayerTree.spawn({
       player = player,
       data = data,
       clock = clock,
@@ -326,7 +326,7 @@ describe("player_tree #297-A1b：单批合并推送、属性即时重算与存�
       end,
       on_leave_finalize = function(_, _, finalized_data)
         observed_in_finalize = {
-          coin = finalized_data.data.FishCoin,
+          coin = finalized_data.Data.FishCoin,
           weak = finalized_data.Extra.survival.weakRemaining,
           big = finalized_data.Extra.growth.potions.item168,
         }
@@ -354,7 +354,7 @@ describe("player_tree #297-A1b：单批合并推送、属性即时重算与存�
     assert.near(38, observed_in_finalize.weak, 1e-9)
     assert.equals(5, observed_in_finalize.big)
     assert.near(38, data.Extra.survival.weakRemaining, 1e-9)
-    assert.equals(777, data.data.FishCoin)
+    assert.equals(777, data.Data.FishCoin)
 
     -- Step 2 同步 dispose 后零残留
     pt:dispose()
@@ -362,7 +362,7 @@ describe("player_tree #297-A1b：单批合并推送、属性即时重算与存�
   end)
 
   it("FishCoin 属性写入失败时记录含玩家标识的日志且不推进缓存，后续恢复后可重试成功", function()
-    local clock = spoke_clock.new(500)
+    local clock = SpokeClock.new(500)
     local fail_once = true
     local logs = {}
     local attrs = {}
@@ -377,7 +377,7 @@ describe("player_tree #297-A1b：单批合并推送、属性即时重算与存�
       end,
     }
     local data = make_ready_data(player, { coin = 50 })
-    local pt = player_tree.spawn({
+    local pt = PlayerTree.spawn({
       player = player,
       data = data,
       clock = clock,

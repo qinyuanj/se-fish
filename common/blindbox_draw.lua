@@ -1,17 +1,17 @@
-local game_cfg = require('common.game_cfg')
+local GameCfg = require('common.game_cfg')
 
-local blindbox_draw = {}
+local BlindboxDraw = {}
 
 local function rngOf(rng)
     return type(rng) == 'function' and rng or math.random
 end
 
 local function entries()
-    return game_cfg.Blindbox.Entries
+    return GameCfg.Blindbox.Entries
 end
 
 local function pityCfg()
-    return game_cfg.Blindbox.Pity
+    return GameCfg.Blindbox.Pity
 end
 
 local function totalWeight()
@@ -47,7 +47,7 @@ local function rollGuaranteed(source)
     return nil
 end
 
-function blindbox_draw.draw(pity, rng)
+function BlindboxDraw.Draw(pity, rng)
     if type(pity) ~= 'number' or pity ~= math.floor(pity) or pity < 0 then return nil end
     local source = rngOf(rng)
     local guaranteed = pity >= pityCfg().afterMisses
@@ -69,7 +69,7 @@ function blindbox_draw.draw(pity, rng)
     }
 end
 
-function blindbox_draw.DrawMany(count, pity, rng)
+function BlindboxDraw.DrawMany(count, pity, rng)
     if type(count) ~= 'number' or count ~= math.floor(count) or count < 1 or count > 10 then
         return nil
     end
@@ -78,7 +78,7 @@ function blindbox_draw.DrawMany(count, pity, rng)
     local draws = {}
     local current = pity
     for index = 1, count do
-        local draw = blindbox_draw.draw(current, source)
+        local draw = BlindboxDraw.Draw(current, source)
         if not draw then return nil end
         draws[index] = draw
         current = draw.pityAfter
@@ -86,4 +86,4 @@ function blindbox_draw.DrawMany(count, pity, rng)
     return draws, current
 end
 
-return blindbox_draw
+return BlindboxDraw

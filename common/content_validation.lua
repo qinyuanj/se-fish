@@ -1,5 +1,5 @@
-local validate = {}
-local ledger = require('common.cfg.content_ledger')
+local Validate = {}
+local Ledger = require('common.cfg.content_ledger')
 
 local function positive(value) return type(value) == 'number' and value > 0 end
 local function nonnegative(value) return type(value) == 'number' and value >= 0 end
@@ -15,7 +15,7 @@ local function check_ledger(cfg, fail, activeGoods)
         Blindbox = { rows = cfg.Content.Blindbox.Entries, key = function(row) return row.number end },
     }
     for name, group in pairs(groups) do
-        local ledger = ledger[name] or {}
+        local ledger = Ledger[name] or {}
         local seen = {}
         for _, row in pairs(group.rows) do
             local id = group.key(row)
@@ -53,7 +53,7 @@ local function check_ledger(cfg, fail, activeGoods)
     end
 end
 
-function validate.Check(cfg)
+function Validate.Check(cfg)
     local errors = {}
     local function fail(source, message) errors[#errors + 1] = tostring(source or '配置') .. ': ' .. message end
     local zones, waters, zoneSeen = {}, {}, {}
@@ -101,7 +101,7 @@ function validate.Check(cfg)
     end
     local goods, lottery, blindbox = cfg.Content.Shop.Goods, cfg.Content.Lottery.Patterns, cfg.Content.Blindbox.Entries
     local shopNumbers, activeGoods = {}, {}
-    for _, row in ipairs(cfg.Shop.Goods or {}) do activeGoods[row.number] = row end
+    for _, row in ipairs(cfg.Shop.Goods or {}) do activeGoods[row.Number] = row end
     for _, row in ipairs(goods) do
         if shopNumbers[row.number] then fail(row.source, '商品编号重复 ' .. tostring(row.number) .. '（' .. shopNumbers[row.number] .. '）') end
         shopNumbers[row.number] = row.source
@@ -170,4 +170,4 @@ function validate.Check(cfg)
     return { errors = errors, counts = counts }
 end
 
-return validate
+return Validate

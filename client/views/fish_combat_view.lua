@@ -1,5 +1,5 @@
 
-local fish_combat_view = {}
+local FishCombatView = {}
 
 local function rows_of(snapshot, key)
   local list = {}
@@ -27,7 +27,7 @@ local function bar_text(row)
   return tostring(name) .. " " .. tostring(health) .. "/" .. tostring(max_health)
 end
 
-function fish_combat_view.bar_spec()
+function FishCombatView.bar_spec()
   return {
     items = function(es, store)
       return rows_of(es:d(store.fish_combat), "list")
@@ -56,7 +56,7 @@ function fish_combat_view.bar_spec()
   }
 end
 
-function fish_combat_view.warning_spec()
+function FishCombatView.warning_spec()
   return {
     items = function(es, store)
       return rows_of(es:d(store.fish_combat), "warnings")
@@ -74,4 +74,4 @@ function fish_combat_view.warning_spec()
   }
 end
 
-return fish_combat_view
+return FishCombatView

@@ -1,8 +1,8 @@
 --技能系统 - server锚点预设壳：近战挥砍（melee_hit）
 -- 只声明编辑器可编辑的属性，不做挂接（壳会在 Parent=World 时抢跑，见 issue #7）；
--- 挂接由根 ability_api.AttachAnchor 在锚点 parent 到技能单位之后补做。
+-- 挂接由根 AbilityAPI.AttachAnchor 在锚点 parent 到技能单位之后补做。
 -- 已声明属性（StartTime/Duration/Phase/TrackIndex）改默认值不会下发到实例（issue #7 坑 2），
--- 关键值由 MgrAbility 按 game_cfg.Ability 配置在挂接前 SetAttribute 覆盖。
+-- 关键值由 MgrAbility 按 GameCfg.Ability 配置在挂接前 SetAttribute 覆盖。
 
 ---@type number 开始时间
 StartTime = 0.0

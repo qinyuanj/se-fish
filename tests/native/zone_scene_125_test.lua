@@ -6,24 +6,24 @@
 -- → 用 assert.are.equal（就是 `==`，深比较的 same 会把「共享同一表」弱化成「内容相等」而漏判）。
 -- 七区几何、SafePoint 与航线 Destination、返程票价已由 zone_layout_plan_test 与 ferry_test
 -- 对同一份快照断言，这里不再重算。
-local judge = require('common.math_water_judge')
-local cfg = require('common.game_cfg')
+local Judge = require('common.math_water_judge')
+local Cfg = require('common.game_cfg')
 
 describe("TestZoneScene125", function()
   it("test_invalid_geometry_fails_before_a_judge_is_returned", function()
     for _, bad in ipairs({ math.huge, -math.huge, 0 / 0 }) do
       assert.error_matches(function()
-        judge.Build({ { Id = '坏水域', Center = { x = bad, z = 0 }, HalfXZ = 1, SurfaceY = 2 } })
+        Judge.Build({ { Id = '坏水域', Center = { x = bad, z = 0 }, HalfXZ = 1, SurfaceY = 2 } })
       end, '有限', nil, true)
     end
     local zone = { Id = '重复', Center = { x = 0, z = 0 }, HalfXZ = 1, SurfaceY = 2 }
     assert.error_matches(function()
-      judge.Build({ zone, zone })
+      Judge.Build({ zone, zone })
     end, '重复', nil, true)
   end)
 
   it("test_rectangular_water_preserves_dry_bank_and_inclusive_edges", function()
-    local judge = judge.Build({ {
+    local judge = Judge.Build({ {
       Id = '巡航水面', Center = { x = 10, z = 20 },
       HalfX = 30, HalfZ = 5, SurfaceY = 2,
     } })
@@ -39,7 +39,7 @@ describe("TestZoneScene125", function()
       { Name = 'CrabSafe', Position = { x = 260, y = 6, z = 100 } },
       { Name = 'CrabShop', Position = { x = 250, y = 5, z = 100 } },
     } } } }
-    local report = judge.InspectScene(scenes, {
+    local report = Judge.InspectScene(scenes, {
       { Name = 'CrabSafe', Position = { x = 260, y = 6, z = 100 } },
       { Name = 'CrabSafe', Position = { x = 260, y = 6, z = 100 } },
       { Name = 'CrabShop', Position = { x = 250, y = 5, z = 110 } },
@@ -52,12 +52,12 @@ describe("TestZoneScene125", function()
     }, report.Issues)
     local complete = {}
     for _, e in ipairs(scenes[1].Scene.Entities) do complete[#complete + 1] = e end
-    report = judge.InspectScene(scenes, complete)
+    report = Judge.InspectScene(scenes, complete)
     assert.is_true(report.EntitiesMatch)
     assert.is_nil(report.Ready) -- 名称和位置匹配不等于碰撞、保存或试玩通过。
     assert.same({ 'crabLake' }, report.PendingZones)
     scenes[1].Scene.State = 'resolved'
-    report = judge.InspectScene(scenes, complete)
+    report = Judge.InspectScene(scenes, complete)
     assert.is_nil(report.Ready)
     assert.same({
       Saved = 'unverified', Synced = 'unverified', Collision = 'unverified', Playtested = 'unverified',
@@ -65,7 +65,7 @@ describe("TestZoneScene125", function()
 
     -- 配置真值：实体与快照点必须是同一张表（不是内容相等）——共享点被复制成两份后，
     -- 改一处另一处不动就漂移，诊断按位置比也会各说一套。
-    for _, zone in ipairs(cfg.Zones) do
+    for _, zone in ipairs(Cfg.Zones) do
       local scene = zone.Scene
       for _, entity in ipairs(scene.Entities) do
         if entity.Role == 'Safe' then assert.are.equal(scene.SafePoint, entity.Position) end
@@ -79,7 +79,7 @@ describe("TestZoneScene125", function()
         end
       end
     end
-    assert.are.equal(cfg.Zones[1].Scene.BaitSpots.Positions[1], cfg.BaitSpots.Spots[1].Position)
-    assert.are.equal(cfg.Zones[7].Scene.Waters[1], cfg.Zones[7].Scene.CruiseWater)
+    assert.are.equal(Cfg.Zones[1].Scene.BaitSpots.Positions[1], Cfg.BaitSpots.Spots[1].Position)
+    assert.are.equal(Cfg.Zones[7].Scene.Waters[1], Cfg.Zones[7].Scene.CruiseWater)
   end)
 end)

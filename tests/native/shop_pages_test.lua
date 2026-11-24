@@ -6,24 +6,24 @@
 --   5. 逐级价格与商店表行价不符；
 --   6. 升级行没有稳定的购买键（itemKey 缺失时 number 必须可用）；
 --   7. 旧白名单商品（钓具 9 行）换表后价格/等级漂移，不再兼容。
-local game_cfg = require('common.game_cfg')
-local player_data = require('server.data.player_data')
+local GameCfg = require('common.game_cfg')
+local PlayerData = require('server.data.player_data')
 
 -- 钓具 1-14、武器 15-26、升级 28-51（27 作废），共 50 行
 describe("钓场商店货架表", function()
 
     -- 背包升级行描述与商店表原表一致（#130 code-review：升级6 同为「背包格+5」，按 design 原表）
     it("test_backpack_rows_match_source_sheet_wording", function()
-        for _, row in ipairs(game_cfg.Shop.Goods) do
+        for _, row in ipairs(GameCfg.Shop.Goods) do
             if row.Upgrade and row.Upgrade.kind == 'backpack' then
-                assert.same('购买后，道具栏+1，背包格+5', row.Desc, '行 ' .. row.number)
+                assert.same('购买后，道具栏+1，背包格+5', row.Desc, '行 ' .. row.Number)
             end
         end
     end)
 
     -- 按基础线性叠加：scale = 1 + increment × level（满级 +70%/+50%/+60%）
     it("test_damage_scale_is_linear_on_base", function()
-        local shop = game_cfg.Shop
+        local shop = GameCfg.Shop
         assert.is_not_nil(shop.DamageScale, '缺伤害加成函数')
         assert.near(1.0, shop.DamageScale('melee', 0), 1e-9)
         assert.near(1.1, shop.DamageScale('melee', 1), 1e-9)
@@ -38,15 +38,15 @@ describe("钓场商店货架表", function()
         assert.near(1.0, shop.DamageScale('melee', -3), 1e-9)
     end)
     it("test_goods_is_full_50_rows_with_pages_and_numbers", function()
-        local goods = game_cfg.Shop.Goods
+        local goods = GameCfg.Shop.Goods
         assert.same(50, #goods)
-        assert.same({ '钓具', '武器', '升级', '金币' }, game_cfg.Shop.Pages)
+        assert.same({ '钓具', '武器', '升级', '金币' }, GameCfg.Shop.Pages)
         local seen, perPage = {}, { ['钓具'] = 0, ['武器'] = 0, ['升级'] = 0, ['金币'] = 0 }
         for _, row in ipairs(goods) do
-            assert.is_not_nil(row.number, '货架行缺购买键 number')
-            assert.is_nil(seen[row.number], '编号重复 ' .. tostring(row.number))
-            seen[row.number] = true
-            assert.is_not.equal(27, row.number)
+            assert.is_not_nil(row.Number, '货架行缺购买键 number')
+            assert.is_nil(seen[row.Number], '编号重复 ' .. tostring(row.Number))
+            seen[row.Number] = true
+            assert.is_not.equal(27, row.Number)
             assert.is_not_nil(perPage[row.Page], '未知分页 ' .. tostring(row.Page))
             perPage[row.Page] = perPage[row.Page] + 1
             assert.is_true(row.Price > 0 and row.Price % 1 == 0)
@@ -63,7 +63,7 @@ describe("钓场商店货架表", function()
     -- 旧白名单 9 行在新货架同价同等级（兼容旧商品）
     it("test_legacy_goods_keep_price_and_level", function()
         local byItem = {}
-        for _, row in ipairs(game_cfg.Shop.Goods) do if row.ItemId then byItem[row.ItemId] = row end end
+        for _, row in ipairs(GameCfg.Shop.Goods) do if row.ItemId then byItem[row.ItemId] = row end end
         local legacy = { starterRod = { 5, 1 }, worm = { 1, 1 }, sausage = { 2, 2 }, shrimpRod = { 12, 2 },
             crabRod = { 24, 3 }, normalRod = { 50, 4 }, proRod = { 100, 5 },
             airforceRod = { 200, 6 }, unscientificRod = { 500, 7 } }
@@ -78,11 +78,11 @@ describe("钓场商店货架表", function()
 
     -- 分页过滤 + 新品置顶 + 同组按编号稳定升序
     it("test_list_for_page_filters_sorts_and_pins_new", function()
-        local shop = game_cfg.Shop
+        local shop = GameCfg.Shop
         assert.is_not_nil(shop.ListForPage, '缺分页列表函数')
         local function numbers(rows)
             local out = {}
-            for i, row in ipairs(rows) do out[i] = row.number end
+            for i, row in ipairs(rows) do out[i] = row.Number end
             return out
         end
         -- 1 级摊位钓具页：蚯蚓/新手鱼竿都是当地新品
@@ -105,7 +105,7 @@ describe("钓场商店货架表", function()
 
     -- 弹容 = ceil(base × (1 + 0.5×level))：向上取整，满级 +150%
     it("test_magazine_size_rounds_up", function()
-        local shop = game_cfg.Shop
+        local shop = GameCfg.Shop
         assert.is_not_nil(shop.MagazineSize, '缺弹容函数')
         assert.same(10, shop.MagazineSize(10, 0))
         assert.same(8, shop.MagazineSize(5, 1))   -- 狙击 5→7.5→8
@@ -120,9 +120,9 @@ describe("钓场商店货架表", function()
         assert.same(25, shop.MagazineSize(10, 99))
     end)
 
-    -- 满级实战结果（基础值来自 game_cfg.Ability，与商店表一致）
+    -- 满级实战结果（基础值来自 GameCfg.Ability，与商店表一致）
     it("test_max_level_results_match_ticket", function()
-        local shop, ability = game_cfg.Shop, game_cfg.Ability
+        local shop, ability = GameCfg.Shop, GameCfg.Ability
         -- 近战 +70%：指虎 10→17、匕首 15→25.5、斧头 40→68
         assert.near(17, ability.MeleeWeapons.item134.Damage * shop.DamageScale('melee', 7), 1e-9)
         assert.near(25.5, ability.MeleeWeapons.item135.Damage * shop.DamageScale('melee', 7), 1e-9)
@@ -140,7 +140,7 @@ describe("钓场商店货架表", function()
 
     -- 升级参数由商店表行派生：种类、级数、增量、逐级价格
     it("test_upgrade_kinds_derived_from_shop_rows", function()
-        local kinds = game_cfg.Shop.UpgradeKinds
+        local kinds = GameCfg.Shop.UpgradeKinds
         assert.is_not_nil(kinds, '缺升级参数表')
         assert.same(7, kinds.melee.MaxLevel)
         assert.near(0.1, kinds.melee.Increment, 1e-9)
@@ -158,22 +158,22 @@ describe("钓场商店货架表", function()
         -- 背包升级沿用同一表的价格序列（与 Items.UpgradePrices 同源）
         assert.same(6, kinds.backpack.MaxLevel)
         assert.same({ 100, 200, 400, 800, 1600, 3200 }, kinds.backpack.Prices)
-        assert.same(game_cfg.Items.UpgradePrices, kinds.backpack.Prices)
+        assert.same(GameCfg.Items.UpgradePrices, kinds.backpack.Prices)
     end)
 end)
 
--- ===== player_data 成长与限购状态（#130 持久字段）=====
+-- ===== PlayerData 成长与限购状态（#130 持久字段）=====
 -- 失败方式：升级等级/购买次数不走持久字段（重进丢失）；越级或重复升级生效；满级继续扣钱；
 -- 武器购买被背包满格误拒（武器独立库存不占格）；损坏的 growth 存档被静默接受。
 local function newData(userId)
-    local data = player_data.New({ UserId = userId, SetAttribute = function() end })
+    local data = PlayerData.New({ UserId = userId, SetAttribute = function() end })
     data:Init()
     return data
 end
 
 local function upgradeRow(number)
-    for _, row in ipairs(game_cfg.Shop.Goods) do
-        if row.number == number then return row end
+    for _, row in ipairs(GameCfg.Shop.Goods) do
+        if row.Number == number then return row end
     end
     error('缺商店行 ' .. tostring(number))
 end
@@ -206,7 +206,7 @@ describe("商店成长与限购", function()
         local data = newData(104)
         assert.is_true(data:ApplyShopUpgrade(upgradeRow(33).Upgrade)) -- 背包升级 1
         assert.same(1, data:ShopUpgradeLevel('backpack'))
-        assert.same(1, data.data.UpgradeLevel)
+        assert.same(1, data.Data.UpgradeLevel)
         assert.same(3, data:ItemBarCapacity())
         assert.same(10, data:BackpackCapacity())
         -- 跳级买背包 3 拒绝

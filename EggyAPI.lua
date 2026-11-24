@@ -8,7 +8,7 @@
 ---@alias String string
 ---@alias Table table
 
---========================== 数据 data ==========================
+--========================== 数据 Data ==========================
 
 ---Animation 动画资源引用对象
 ---**适用范围**: 客户端和服务端
@@ -2719,7 +2719,7 @@ Enums.AnimationFilterType = {
 	FullBody = 126,  ---全身
 }
 
----动画优先级。Eggy 的默认角色动画，播放时优先级为 core。Idle 到 Action4 的优先级供开发者使用
+---动画优先级。Eggy 的默认角色动画，播放时优先级为 Core。Idle 到 Action4 的优先级供开发者使用
 ---@enum Enums.AnimationPriority 
 Enums.AnimationPriority = {
 	Idle = 0,  ---推荐用于角色休闲动画的优先级
@@ -2728,7 +2728,7 @@ Enums.AnimationPriority = {
 	Action2 = 3,  ---Action2 将覆盖 Action
 	Action3 = 4,  ---Action3 将覆盖 Action2
 	Action4 = 5,  ---Action4 是可用的最高优先级，覆盖所有其他优先级值
-	core = 1000,  ---最低优先级，供 Eggy 默认动画使用
+	Core = 1000,  ---最低优先级，供 Eggy 默认动画使用
 }
 
 ---资产权限等级
@@ -3366,8 +3366,8 @@ Enums.KeyCode = {
 	Seven = 55,
 	Eight = 56,
 	Nine = 57,
-	a = 65,  ---Letters (a-Z)
-	b = 66,
+	A = 65,  ---Letters (A-Z)
+	B = 66,
 	C = 67,
 	D = 68,
 	E = 69,
@@ -3379,7 +3379,7 @@ Enums.KeyCode = {
 	K = 75,
 	L = 76,
 	M = 77,
-	n = 78,
+	N = 78,
 	O = 79,
 	P = 80,
 	Q = 81,
@@ -4970,7 +4970,7 @@ function SoundService:SetGroupVolume(name, volume) end
 ---@class StarterGui : Unit
 local StarterGui = {}
 
----获取自定义core UI参数的值
+---获取自定义Core UI参数的值
 ---@param parameterName String 参数名称
 function StarterGui:GetCore(parameterName) end
 
@@ -4978,7 +4978,7 @@ function StarterGui:GetCore(parameterName) end
 ---@param coreGuiType Enums.CoreGuiType CoreGui类型
 function StarterGui:GetCoreGuiEnabled(coreGuiType) end
 
----设置自定义core UI参数
+---设置自定义Core UI参数
 ---@param parameterName String 参数名称
 ---@param value Any 参数值
 function StarterGui:SetCore(parameterName, value) end
@@ -6219,7 +6219,7 @@ function EUINodeBase:ConvertToLocalPosition(worldPos) end
 ---@return Vector2 世界坐标
 function EUINodeBase:ConvertToWorldPosition(localPos) end
 
----返回当前 UI 节点从 UI 根节点到自身（不含 UI 根节点）的 '.' 分隔路径字符串。例：节点层级 root.a.b 中，b:GetFullPath() 返回 'a.b'
+---返回当前 UI 节点从 UI 根节点到自身（不含 UI 根节点）的 '.' 分隔路径字符串。例：节点层级 root.A.B 中，B:GetFullPath() 返回 'A.B'
 ---@return String UI 路径字符串（'.' 分隔）
 function EUINodeBase:GetFullPath() end
 

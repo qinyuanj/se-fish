@@ -1,7 +1,7 @@
 -- #139 T18 大奖成长切片 1：配置钉表（只留跨表对账）。
 -- 失败方式（先列后写）：
 --   1. 大奖武器与抽奖组（common/cfg/lottery.lua）、物品表（common/cfg/items.lua）对不上号，
---      或某件大奖武器在 game_cfg 的 MeleeWeapons / Guns 里没有数值（ContentValidation 不查武器数值）；
+--      或某件大奖武器在 GameCfg 的 MeleeWeapons / Guns 里没有数值（ContentValidation 不查武器数值）；
 --   2. 药水累计上限在 Ability 与物品表各写一处，两处漂移时吃药逻辑与商店描述对不上。
 -- 接缝：common/game_cfg.lua 的 Ability 段是纯数据，loadfile 取全新实例断言。
 -- 逐项数值（伤害/间隔/弹匣/溅射/叠层/特效开关）等于把配置再写一遍；真行为由 weapon_system_test、
@@ -42,7 +42,7 @@ describe("TestPrizeWeaponCfg", function()
     local potion = cfg.Ability.SpeedPotion
     assert.is_not_nil(potion, '缺加速药水配置')
     assert.are.equal(potion.MaxPotions, cfg.Items.PotionLimits[potion.Item], '加速药水累计上限与物品表不一致')
-    local body = cfg.Ability.body_scale
+    local body = cfg.Ability.BodyScale
     assert.is_not_nil(body, '缺变大体型配置')
     assert.are.equal(body.MaxPotions, cfg.Items.PotionLimits[body.PotionItem], '变大药水累计上限与物品表不一致')
   end)

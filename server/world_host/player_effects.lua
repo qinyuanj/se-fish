@@ -1,24 +1,24 @@
 -- 服务端玩家属性派生与持续效果主权模块（ADR-0032 §1、§3 / #297-A1）：
--- 挂载在 player_tree Stage 2（Attributes）内，负责：
+-- 挂载在 PlayerTree Stage 2（Attributes）内，负责：
 --   1. 接管 weak / poison / burn / frost / paralyze 的剩余时间、层数、末次来源与 DoT 结算主权；
---   2. 按 spoke_clock 驱动计时：weak 走 1 Hz on_second（角色空窗暂停、重建保留），
+--   2. 按 SpokeClock 驱动计时：weak 走 1 Hz on_second（角色空窗暂停、重建保留），
 --      paralyze（0.5s 亚秒）走短寿命 on_frame 仅置 is_paralyzed=true（不退出 alive 相位），
 --      poison / burn / frost 仅在活跃槽位内推进 DoT 与精准到期；
---   3. 确定性派生 attr_model / body_scale / WeaponComponents（max_health、body_scale、
+--   3. 确定性派生 AttrModel / BodyScale / WeaponComponents（max_health、body_scale、
 --      body_derived、move_multiplier、move_speed_scale、walk_speed、weapon_damage_*）；
 --   4. 为 A2 的 modifier_system 叶子投影预留 on_mount_modifier_leaf 纯输出挂点。
 -- 本模块归属 L2（server.world_host），零反向依赖存量旧债务模块。
 
-local game_cfg = require("common.game_cfg")
-local attr_model = require("common.attr_model")
-local body_scale = require("common.body_scale")
-local number = require("common.number")
-local spoke = require("common.packages.spoke.api")
-local spoke_runtime = require("common.packages.spoke.runtime.spoke_runtime")
+local GameCfg = require("common.game_cfg")
+local AttrModel = require("common.attr_model")
+local BodyScale = require("common.body_scale")
+local Number = require("common.number")
+local Spoke = require("common.packages.spoke.api")
+local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
 
-local State = spoke.State
+local State = Spoke.State
 
-local player_effects = {}
+local PlayerEffects = {}
 
 local ALL_KINDS = { "poison", "burn", "frost", "paralyze", "weak" }
 local VALID_KINDS = {
@@ -30,7 +30,7 @@ local VALID_KINDS = {
 }
 
 local function finite_positive(value)
-  return number.IsFiniteNumber(value) and value > 0
+  return Number.IsFiniteNumber(value) and value > 0
 end
 
 local function read_walk_speed(character)
@@ -49,14 +49,14 @@ end
 
 local function default_duration(kind)
   if kind == "weak" then
-    return game_cfg.Survival.WeakSec
+    return GameCfg.Survival.WeakSec
   end
-  local cfg = game_cfg.Ability.StatusEffects and game_cfg.Ability.StatusEffects[kind]
+  local cfg = GameCfg.Ability.StatusEffects and GameCfg.Ability.StatusEffects[kind]
   return cfg and cfg.DurationSec or 0
 end
 
 local function max_stacks_of(kind)
-  local cfg = game_cfg.Ability.StatusEffects and game_cfg.Ability.StatusEffects[kind]
+  local cfg = GameCfg.Ability.StatusEffects and GameCfg.Ability.StatusEffects[kind]
   if cfg and finite_positive(cfg.MaxStacks) then
     return math.floor(cfg.MaxStacks)
   end
@@ -64,8 +64,8 @@ local function max_stacks_of(kind)
 end
 
 local function dot_cfg_of(kind)
-  local cfg = game_cfg.Ability.StatusEffects and game_cfg.Ability.StatusEffects[kind]
-  if cfg and finite_positive(cfg.TickSec) and number.IsFiniteNumber(cfg.DamagePerStack) then
+  local cfg = GameCfg.Ability.StatusEffects and GameCfg.Ability.StatusEffects[kind]
+  if cfg and finite_positive(cfg.TickSec) and Number.IsFiniteNumber(cfg.DamagePerStack) then
     return cfg
   end
   return nil
@@ -74,7 +74,7 @@ end
 ---@param s2 table Stage 2 EffectBuilder
 ---@param player_tree table
 ---@param opts? table
-function player_effects.mount(s2, player_tree, opts)
+function PlayerEffects.mount(s2, player_tree, opts)
   opts = type(opts) == "table" and opts or {}
 
   local clock = player_tree.clock
@@ -84,13 +84,13 @@ function player_effects.mount(s2, player_tree, opts)
 
   if states.character == nil then
     local ok_char, ch = pcall(function() return player_tree.player and player_tree.player.Character end) -- 兼容引擎 userdata 玩家
-    states.character = State.new("player_tree.character", ok_char and ch or nil)
+    states.character = State.new("PlayerTree.character", ok_char and ch or nil)
   end
   if states.base_speed == nil then
-    states.base_speed = State.new("player_tree.base_speed", nil)
+    states.base_speed = State.new("PlayerTree.base_speed", nil)
   end
   if states.is_frost == nil then
-    states.is_frost = State.new("player_tree.is_frost", false)
+    states.is_frost = State.new("PlayerTree.is_frost", false)
   end
   if states.shop_upgrades == nil then
     local raw_upgrades = type(player_tree.data) == "table"
@@ -98,7 +98,7 @@ function player_effects.mount(s2, player_tree, opts)
         and type(player_tree.data.Extra.growth) == "table"
         and type(player_tree.data.Extra.growth.upgrades) == "table"
         and player_tree.data.Extra.growth.upgrades or {}
-    states.shop_upgrades = State.new("player_tree.shop_upgrades", raw_upgrades)
+    states.shop_upgrades = State.new("PlayerTree.shop_upgrades", raw_upgrades)
   end
 
   local function is_tree_disposed()
@@ -108,7 +108,7 @@ function player_effects.mount(s2, player_tree, opts)
   local active_effects = {}
   local modifier_signals = {}
   for _, kind in ipairs(ALL_KINDS) do
-    modifier_signals[kind] = State.new("player_effects." .. kind, nil)
+    modifier_signals[kind] = State.new("PlayerEffects." .. kind, nil)
   end
   player_tree.modifier_signals = modifier_signals
 
@@ -170,7 +170,7 @@ function player_effects.mount(s2, player_tree, opts)
       return false
     end
     active_effects[kind] = nil
-    spoke_runtime.batch(function()
+    SpokeRuntime.batch(function()
       sync_flag(kind, false)
       modifier_signals[kind]:set(nil)
       if not is_tree_disposed() then
@@ -289,7 +289,7 @@ function player_effects.mount(s2, player_tree, opts)
       else
         existing.expires_at = now + duration
       end
-      spoke_runtime.batch(function()
+      SpokeRuntime.batch(function()
         sync_flag(kind, true)
         emit_signal(kind)
       end)
@@ -314,7 +314,7 @@ function player_effects.mount(s2, player_tree, opts)
     }
     active_effects[kind] = entry
 
-    spoke_runtime.batch(function()
+    SpokeRuntime.batch(function()
       sync_flag(kind, true)
       emit_signal(kind)
       mount_slot(kind, entry)
@@ -323,7 +323,7 @@ function player_effects.mount(s2, player_tree, opts)
   end
 
   local function clear_all(keep_weak)
-    spoke_runtime.batch(function()
+    SpokeRuntime.batch(function()
       for _, kind in ipairs(ALL_KINDS) do
         if not (keep_weak and kind == "weak") then
           clear_kind(kind)
@@ -336,7 +336,7 @@ function player_effects.mount(s2, player_tree, opts)
     if source == nil then
       return
     end
-    spoke_runtime.batch(function()
+    SpokeRuntime.batch(function()
       for _, kind in ipairs(ALL_KINDS) do
         local entry = active_effects[kind]
         if entry and entry.source == source then
@@ -372,7 +372,7 @@ function player_effects.mount(s2, player_tree, opts)
     local prev_character = last_character
     last_character = character
 
-    spoke_runtime.batch(function()
+    SpokeRuntime.batch(function()
       -- 角色移除或更换：重置基准速待新角色捕获
       states.base_speed:set(nil)
       if character ~= nil then
@@ -423,24 +423,24 @@ function player_effects.mount(s2, player_tree, opts)
     end)
   end, { states.character })
 
-  -- 若存档载入时带有历史 weakRemaining，初始化即纳入 player_tree 计时主权。
+  -- 若存档载入时带有历史 weakRemaining，初始化即纳入 PlayerTree 计时主权。
   local raw_survival = type(player_tree.data.Extra) == "table"
       and type(player_tree.data.Extra.survival) == "table"
       and player_tree.data.Extra.survival or nil
   local initial_weak = raw_survival and raw_survival.weakRemaining or 0
   if finite_positive(initial_weak) then
-    local clamped = math.min(game_cfg.Survival.WeakSec, initial_weak)
+    local clamped = math.min(GameCfg.Survival.WeakSec, initial_weak)
     apply_modifier("weak", { duration = clamped })
   end
 
-  -- 确定性属性派生链（严格遵守 attr_model / body_scale 单一公式）：
+  -- 确定性属性派生链（严格遵守 AttrModel / BodyScale 单一公式）：
   memos.move_multiplier = s2:memo("MoveMultiplier", function(ms)
     if ms:d(states.is_paralyzed) then
       return 0
     end
-    local mult = ms:d(states.is_weak) and game_cfg.Survival.WeakSpeedScale or 1
+    local mult = ms:d(states.is_weak) and GameCfg.Survival.WeakSpeedScale or 1
     if ms:d(states.is_frost) then
-      local frost_cfg = game_cfg.Ability.StatusEffects and game_cfg.Ability.StatusEffects.frost
+      local frost_cfg = GameCfg.Ability.StatusEffects and GameCfg.Ability.StatusEffects.frost
       local slow_pct = frost_cfg and frost_cfg.SlowPercent or 30
       mult = mult * (1 - slow_pct / 100)
     end
@@ -453,7 +453,7 @@ function player_effects.mount(s2, player_tree, opts)
     local base_speed = ms:d(states.base_speed)
     local move_mult = ms:d(memos.move_multiplier)
     local hunger = ms:d(states.hunger)
-    return attr_model.Plan({
+    return AttrModel.Plan({
       bodyPotions = body_potions,
       speedPotions = speed_potions,
       baseSpeed = base_speed,
@@ -466,7 +466,7 @@ function player_effects.mount(s2, player_tree, opts)
     return ms:d(memos.attr_plan).Body.Health
   end)
 
-  memos.body_scale = s2:memo("body_scale", function(ms)
+  memos.body_scale = s2:memo("BodyScale", function(ms)
     return ms:d(memos.attr_plan).Body.Scale
   end)
 
@@ -475,7 +475,7 @@ function player_effects.mount(s2, player_tree, opts)
   end)
 
   memos.body_derived = s2:memo("BodyDerived", function(ms)
-    return body_scale.Derive(ms:d(memos.body_scale))
+    return BodyScale.Derive(ms:d(memos.body_scale))
   end)
 
   memos.move_speed_scale = s2:memo("MoveSpeedScale", function(ms)
@@ -490,9 +490,9 @@ function player_effects.mount(s2, player_tree, opts)
   memos.weapon_damage_components = s2:memo("WeaponDamageComponents", function(ms)
     local upgrades = ms:d(states.shop_upgrades) or {}
     return {
-      melee = attr_model.WeaponComponents("melee", upgrades.melee or 0),
-      ranged = attr_model.WeaponComponents("ranged", upgrades.ranged or 0),
-      explosive = attr_model.WeaponComponents("explosive", upgrades.explosive or 0),
+      melee = AttrModel.WeaponComponents("melee", upgrades.melee or 0),
+      ranged = AttrModel.WeaponComponents("ranged", upgrades.ranged or 0),
+      explosive = AttrModel.WeaponComponents("explosive", upgrades.explosive or 0),
     }
   end)
 
@@ -547,4 +547,4 @@ function player_effects.mount(s2, player_tree, opts)
   end
 end
 
-return player_effects
+return PlayerEffects

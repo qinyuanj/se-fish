@@ -1,20 +1,20 @@
 
-local game_cfg = require("common.game_cfg")
-local client_store = require("client.store.client_store")
-local root_view = require("client.views.root_view")
-local grill_view = require("client.views.grill_view")
-local eui = require("tests.support.eui_double")
+local GameCfg = require("common.game_cfg")
+local ClientStore = require("client.store.client_store")
+local RootView = require("client.views.root_view")
+local GrillView = require("client.views.grill_view")
+local Eui = require("tests.support.eui_double")
 
 local function mount(store, opts)
   opts = opts or {}
   local sent = opts.sent or {}
   local notices = opts.notices or {}
-  local shared = grill_view.new_shared()
-  local root = eui.Node({ Name = "UIRoot" })
-  local view = root_view.mount(root, store, {
-    hud = { grill_view.spec({ shared = shared }) },
+  local shared = GrillView.new_shared()
+  local root = Eui.Node({ Name = "UIRoot" })
+  local view = RootView.mount(root, store, {
+    hud = { GrillView.spec({ shared = shared }) },
     docks = opts.anchors and {
-      grill = grill_view.bubble_spec({ shared = shared, anchors = opts.anchors }),
+      grill = GrillView.bubble_spec({ shared = shared, anchors = opts.anchors }),
     } or nil,
     services = {
       send_grill = function(payload) sent[#sent + 1] = payload end,
@@ -22,7 +22,7 @@ local function mount(store, opts)
       now = function() return store.clock.now() end,
     },
     create_node = function(kind, props)
-      return eui.Node({
+      return Eui.Node({
         Kind = kind,
         Name = props and props.Name,
         Parent = props and props.Parent,
@@ -57,7 +57,7 @@ describe("客户端烧烤视图宿主接缝（#310）", function()
   end)
 
   it("烤制中显示两位小数倍率且原地刷新，取出携带正整数 seq，结束后零残留", function()
-    local store, writer = client_store.new({ initial_now = 1000 })
+    local store, writer = ClientStore.new({ initial_now = 1000 })
     local root, _, sent = mount(store)
     assert.is_nil(child(root, "GrillPanel"))
 
@@ -81,10 +81,10 @@ describe("客户端烧烤视图宿主接缝（#310）", function()
     assert.equals("已烤 1.00 秒", time.Text)
 
     local takeout = child(root, "GrillTakeout")
-    assert.is_true(eui.Click(takeout))
+    assert.is_true(Eui.Click(takeout))
     assert.same({ action = "Takeout", seq = 1 }, sent[#sent])
 
-    assert.is_true(eui.Click(takeout))
+    assert.is_true(Eui.Click(takeout))
     assert.same({ action = "Takeout", seq = 2 }, sent[#sent])
 
     writer:ingest_event("GrillState", { state = "burnt" })
@@ -107,7 +107,7 @@ describe("客户端烧烤视图宿主接缝（#310）", function()
   end)
 
   it("场景气泡触发投入、信物二次确认、关闭重开与 GrillResult 提示", function()
-    local store, writer = client_store.new({ initial_now = 1000 })
+    local store, writer = ClientStore.new({ initial_now = 1000 })
     local root, _, sent, notices = mount(store, {
       anchors = {
         { index = 1, name = "Z1_Grill", position = { x = 10, y = 0, z = 10 } },
@@ -120,29 +120,29 @@ describe("客户端烧烤视图宿主接缝（#310）", function()
     local bubble = child(root, "BtnGrill1")
     assert.is_not_nil(bubble)
 
-    assert.is_true(eui.Click(bubble))
+    assert.is_true(Eui.Click(bubble))
     assert.same({ action = "Start", seq = 1 }, sent[#sent])
 
     writer:ingest_event("GrillResult", { ok = false, reason = "token-warn" })
-    assert.equals(game_cfg.Grill.TokenWarnText, notices[#notices])
+    assert.equals(GameCfg.Grill.TokenWarnText, notices[#notices])
     writer:advance_clock(2)
-    assert.is_true(eui.Click(bubble))
+    assert.is_true(Eui.Click(bubble))
     assert.same({ action = "Start", seq = 2, confirm = true }, sent[#sent])
 
     writer:ingest_event("GrillState", { state = "cooking", itemId = "carp", startedAt = 1002 })
     assert.is_not_nil(child(root, "GrillPanel"))
-    assert.is_true(eui.Click(child(root, "GrillClose")))
+    assert.is_true(Eui.Click(child(root, "GrillClose")))
     assert.is_nil(child(root, "GrillPanel"))
-    assert.is_true(eui.Click(bubble))
+    assert.is_true(Eui.Click(bubble))
     assert.same({ action = "Query", seq = 3 }, sent[#sent])
     assert.is_not_nil(child(root, "GrillPanel"))
 
     writer:ingest_event("GrillResult", { ok = true, action = "Takeout", itemId = "carp", rate = 1.5 })
     assert.matches("1.50", notices[#notices], 1, true)
     writer:ingest_event("GrillResult", { ok = false, reason = "no-fish" })
-    assert.equals(game_cfg.Grill.NoFishText, notices[#notices])
+    assert.equals(GameCfg.Grill.NoFishText, notices[#notices])
     writer:ingest_event("GrillResult", { ok = false, reason = "full" })
-    assert.equals(game_cfg.Grill.FullText, notices[#notices])
+    assert.equals(GameCfg.Grill.FullText, notices[#notices])
 
     writer:update_spatial({ x = 50, y = 0, z = 50 }, {})
     assert.is_nil(child(root, "BtnGrill1"))
@@ -151,11 +151,11 @@ describe("客户端烧烤视图宿主接缝（#310）", function()
   end)
 
   it("烤糊提示使用配置文案且不重复弹两次", function()
-    local store, writer = client_store.new({ initial_now = 1000 })
+    local store, writer = ClientStore.new({ initial_now = 1000 })
     local _, _, _, notices = mount(store)
     writer:ingest_event("GrillState", { state = "burnt" })
     writer:ingest_event("GrillResult", { ok = false, reason = "burnt" })
     assert.equals(1, #notices)
-    assert.equals(game_cfg.Grill.BurntText, notices[1])
+    assert.equals(GameCfg.Grill.BurntText, notices[1])
   end)
 end)

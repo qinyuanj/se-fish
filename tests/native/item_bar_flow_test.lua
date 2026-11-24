@@ -1,7 +1,7 @@
 -- #86 迁移（原 tests/gameplay/item_bar_flow_test.lua）：道具栏动作的服务端请求流。
 -- 接缝：ItemBarAction / RequestItemBar 的 OnServerEvent 与 ItemBarState 回包。
-local game_cfg = require('common.game_cfg')
-local mgr = require('server.player_data_host')
+local GameCfg = require('common.game_cfg')
+local Mgr = require('server.player_data_host')
 
 local function signal()
     local callbacks = {}
@@ -21,13 +21,13 @@ describe("道具栏的请求流", function()
     -- #49：进图白送只在调试开关下发放，这些用例沿用它的起始库存（鱼竿在第 1 格、蚯蚓若干）。
     before_each(function()
         ctx = { events = {}, cooldowns = {}, enableCooldown = false, now = 0 }
-        ctx.savedGrantDebug = game_cfg.Debug
-        game_cfg.Debug = { Enabled = true, InitialGrants = ctx.savedGrantDebug.InitialGrants }
-        ctx.previousREUtil = _G.re_util
-        _G.re_util = { CheckRECD = function(_, player, name, duration)
+        ctx.savedGrantDebug = GameCfg.Debug
+        GameCfg.Debug = { Enabled = true, InitialGrants = ctx.savedGrantDebug.InitialGrants }
+        ctx.previousREUtil = _G.REUtil
+        _G.REUtil = { CheckRECD = function(_, player, name, duration)
             if not ctx.enableCooldown then return false end
             assert.same('ItemBarAction', name)
-            assert.same(game_cfg.Items.ActionCooldownSec, duration)
+            assert.same(GameCfg.Items.ActionCooldownSec, duration)
             local expiry = ctx.cooldowns[player.UserId]
             if expiry and ctx.now <= expiry then return true end
             ctx.cooldowns[player.UserId] = ctx.now + duration
@@ -46,15 +46,15 @@ describe("道具栏的请求流", function()
         end }
         ctx.player = { UserId = 341, attrs = {}, CharacterAdded = signal(), CharacterRemoving = signal() }
         function ctx.player:SetAttribute(key, value) self.attrs[key] = value end
-        mgr:Start()
-        mgr:OnPlayerAdded(ctx.player)
+        Mgr:Start()
+        Mgr:OnPlayerAdded(ctx.player)
     end)
 
     -- 配置、全局与玩家实例逐例回收；setUp 中途失败也照样清理。
     after_each(function()
-        game_cfg.Debug = ctx.savedGrantDebug
-        if ctx.player then mgr:OnPlayerRemoving(ctx.player) end
-        _G.re_util = ctx.previousREUtil
+        GameCfg.Debug = ctx.savedGrantDebug
+        if ctx.player then Mgr:OnPlayerRemoving(ctx.player) end
+        _G.REUtil = ctx.previousREUtil
     end)
 
     it("test_action_rate_limit_and_recovery", function()
@@ -75,10 +75,10 @@ describe("道具栏的请求流", function()
         assert.same(9, ctx.player.lastState.bait.worm)
         assert.is_nil(ctx.player.lastState.selectedSlot)
         assert.same(sent, ctx.player.stateCount)
-        ctx.now = game_cfg.Items.ActionCooldownSec + 0.001
+        ctx.now = GameCfg.Items.ActionCooldownSec + 0.001
         action:Fire(ctx.player, { action = 'SelectSlot', value = 1 })
         assert.same(1, ctx.player.lastState.selectedSlot)
-        ctx.now = ctx.now + game_cfg.Items.ActionCooldownSec + 0.001
+        ctx.now = ctx.now + GameCfg.Items.ActionCooldownSec + 0.001
         action:Fire(ctx.player, { action = 'EatBait', value = 'worm' })
         assert.same(8, ctx.player.lastState.bait.worm)
     end)
@@ -87,13 +87,13 @@ describe("道具栏的请求流", function()
         ctx.enableCooldown = true
         local other = { UserId = 342, CharacterAdded = signal(), CharacterRemoving = signal() }
         function other:SetAttribute() end
-        mgr:OnPlayerAdded(other)
+        Mgr:OnPlayerAdded(other)
         local action = ctx.events.ItemBarAction.OnServerEvent
         action:Fire(ctx.player, { action = 'EatBait', value = 'worm' })
         action:Fire(other, { action = 'EatBait', value = 'worm' })
         assert.same(9, ctx.player.lastState.bait.worm)
         assert.same(9, other.lastState.bait.worm)
-        mgr:OnPlayerRemoving(other)
+        Mgr:OnPlayerRemoving(other)
     end)
 
     -- 请求通道的回包面：每个有效动作（含数据层直接消耗与客户端主动拉取）都推一次新的
@@ -101,7 +101,7 @@ describe("道具栏的请求流", function()
     -- 这里只守住回包与广播这个增量断言面。
     it("test_actions_reply_and_broadcast_state", function()
         local action = ctx.events.ItemBarAction.OnServerEvent
-        local data = mgr:GetDataInst(ctx.player)
+        local data = Mgr:GetDataInst(ctx.player)
         data:UpdateData(function(state) state.Bait.worm = 1 end, true)
         action:Fire(ctx.player, { action = 'SelectSlot', value = 1 })
         assert.same(1, ctx.player.lastState.selectedSlot)
@@ -136,7 +136,7 @@ describe("道具栏的请求流", function()
         action:Fire(ctx.player, { action = 'DiscardSlot', value = 1 })
         assert.is_nil(ctx.player.lastState.selectedSlot)
         assert.is_nil(ctx.player.lastState.slots[1])
-        mgr:GetDataInst(ctx.player).data.Bait.worm = 1
+        Mgr:GetDataInst(ctx.player).Data.Bait.worm = 1
         action:Fire(ctx.player, { action = 'EatBait', value = 'worm' })
         assert.same(0, ctx.player.lastState.bait.worm)
     end)
@@ -145,11 +145,11 @@ describe("道具栏的请求流", function()
     --   1. EatSlot 不在 actions 表里，动作在 method 查找处被静默丢弃，选中鱼获点「吃」没反应
     --      （#53 的特例分支排在 method 判空之后，从来没接通；ba6a78c 重构时按死代码删掉了）；
     --   2. 吃的不是选中格（value 与 SelectedSlot 不符也生效），或鱼竿等没配 EatPercent 的物品也能吃；
-    --   3. vitals 拒绝（死亡期间）仍扣格，或只扣格不走 vitals:Eat 恢复血量饥饿；
+    --   3. Vitals 拒绝（死亡期间）仍扣格，或只扣格不走 Vitals:Eat 恢复血量饥饿；
     --   4. 吃完不推送 ItemBarState，客户端残留旧格子与选中态。
     it("test_eat_slot_action_consumes_selected_food_and_heals", function()
-        local data = mgr:GetDataInst(ctx.player)
-        local bar = game_cfg.Items.ContainerId.ItemBar
+        local data = Mgr:GetDataInst(ctx.player)
+        local bar = GameCfg.Items.ContainerId.ItemBar
         local function putFish()
             data:UpdateData(function(state)
                 state.Containers[bar][2] = { itemId = 'carp', count = 1, containerId = bar }
@@ -157,44 +157,44 @@ describe("道具栏的请求流", function()
         end
         local healed = {}
         local canEat = true
-        mgr.vitals = {
+        Mgr.Vitals = {
             CanEat = function() return canEat end,
             Eat = function(_, _, itemId) healed[#healed + 1] = itemId end,
         }
-        -- pcall 包住主体：vitals 挂上后即使断言失败也要摘掉，再抛错让本例失败。
+        -- pcall 包住主体：Vitals 挂上后即使断言失败也要摘掉，再抛错让本例失败。
         local ok, err = pcall(function()
             local action = ctx.events.ItemBarAction.OnServerEvent
             putFish()
             action:Fire(ctx.player, { action = 'EatSlot', value = 2 }) -- 未选中任何格：不吃
-            assert.is_not_nil(data.data.Containers[bar][2])
+            assert.is_not_nil(data.Data.Containers[bar][2])
             action:Fire(ctx.player, { action = 'SelectSlot', value = 2 })
             action:Fire(ctx.player, { action = 'EatSlot', value = 1 }) -- 与选中格不符：不吃
-            assert.is_not_nil(data.data.Containers[bar][2])
-            canEat = false -- vitals 拒绝（如死亡期间）：不扣格、不恢复
+            assert.is_not_nil(data.Data.Containers[bar][2])
+            canEat = false -- Vitals 拒绝（如死亡期间）：不扣格、不恢复
             action:Fire(ctx.player, { action = 'EatSlot', value = 2 })
-            assert.is_not_nil(data.data.Containers[bar][2])
+            assert.is_not_nil(data.Data.Containers[bar][2])
             assert.same({}, healed)
             canEat = true
             local sent = ctx.player.stateCount
             action:Fire(ctx.player, { action = 'EatSlot', value = 2 })
-            assert.is_nil(data.data.Containers[bar][2])
+            assert.is_nil(data.Data.Containers[bar][2])
             assert.same({ 'carp' }, healed)
             assert.is_true(ctx.player.stateCount > sent) -- 吃完推送了新状态
             assert.is_nil(ctx.player.lastState.slots[2])
             assert.is_nil(ctx.player.lastState.selectedSlot)
             action:Fire(ctx.player, { action = 'SelectSlot', value = 1 }) -- 鱼竿没配 EatPercent：不能吃
             action:Fire(ctx.player, { action = 'EatSlot', value = 1 })
-            assert.is_not_nil(data.data.Containers[bar][1])
+            assert.is_not_nil(data.Data.Containers[bar][1])
             assert.same({ 'carp' }, healed)
         end)
-        mgr.vitals = nil
+        Mgr.Vitals = nil
         if not ok then error(err, 0) end
     end)
 
     it("test_external_item_depletion_broadcasts_state", function()
         ctx.events.ItemBarAction.OnServerEvent:Fire(ctx.player, { action = 'SelectSlot', value = 1 })
-        mgr:GetDataInst(ctx.player):UpdateData(function(data)
-            data.Containers[game_cfg.Items.ContainerId.ItemBar][1].count = 0
+        Mgr:GetDataInst(ctx.player):UpdateData(function(data)
+            data.Containers[GameCfg.Items.ContainerId.ItemBar][1].count = 0
         end, true)
         assert.is_nil(ctx.player.lastState.selectedSlot)
         assert.is_nil(ctx.player.lastState.slots[1])
@@ -211,14 +211,14 @@ describe("道具栏的请求流", function()
         assert.equal(ctx.player.lastState, previous)
         local stranger = { UserId = ctx.player.UserId }
         action:Fire(stranger, { action = 'DiscardSlot', value = 1 })
-        assert.same('starterRod', mgr:GetDataInst(ctx.player):GetItemBarSnapshot().slots[1].itemId)
+        assert.same('starterRod', Mgr:GetDataInst(ctx.player):GetItemBarSnapshot().slots[1].itemId)
     end)
 
     -- #52 新手任务「挂饵」事实（失败方式：取消挂饵 / 挂不存在或已用完的饵也报挂饵；
     --   每次挂饵不带唯一 eventId；别的动作也报挂饵）
     it("test_select_bait_success_notifies_equip_with_distinct_ids", function()
         local facts = {}
-        mgr.Quest = { Notify = function(_, kind, player, payload)
+        Mgr.Quest = { Notify = function(_, kind, player, payload)
             facts[#facts + 1] = { kind = kind, player = player, itemId = payload.itemId, eventId = payload.eventId }
             return true
         end }
@@ -238,11 +238,11 @@ describe("道具栏的请求流", function()
             assert.same(ctx.player, facts[1].player)
             assert.is_not_nil(facts[1].eventId)
             assert.is_not.equal(facts[1].eventId, facts[2].eventId)
-            mgr:GetDataInst(ctx.player):UpdateData(function(state) state.Bait.worm = 0 end, true)
+            Mgr:GetDataInst(ctx.player):UpdateData(function(state) state.Bait.worm = 0 end, true)
             action:Fire(ctx.player, { action = 'SelectBait', value = 'worm' })
             assert.same(2, #facts)
         end)
-        mgr.Quest = nil
+        Mgr.Quest = nil
         if not ok then error(err, 0) end
     end)
 end)

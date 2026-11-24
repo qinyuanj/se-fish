@@ -4,7 +4,7 @@
 -- 重复离场/迟到清理误删新会话；等待玩家已离开或被再次重进替换仍被接纳；跨玩家阻塞；失败后卡住。
 -- it 按旧 LuaUnit 的方法名字典序注册，保持与旧套件一致的案例顺序。
 -- assertIs(state.player, p) 要求对象身份：全仓无 __eq 元方法（已检索确认），故 Lua 的 == 即身份，映射 are.equal。
-local game_cfg = require('common.game_cfg')
+local GameCfg = require('common.game_cfg')
 
 local function signal()
     local s = { handlers = {} }
@@ -75,10 +75,10 @@ describe('TestPlayerLeaveRejoin', function()
     -- 第一步把所有被改状态（4 个全局 + Debug + QaSlot）存进 saved，之后才改任何东西，
     -- 因此夹具中途抛错时 after_each 仍能完整还原，不把失败泄漏给后续案例。
     before_each(function()
-        saved.game, saved.re_util = rawget(_G, 'game'), rawget(_G, 're_util')
+        saved.game, saved.REUtil = rawget(_G, 'game'), rawget(_G, 'REUtil')
         saved.Vector3, saved.Color = rawget(_G, 'Vector3'), rawget(_G, 'Color')
-        saved.Debug, saved.slot = game_cfg.Debug, game_cfg.Save.QaSlot
-        game_cfg.Debug, game_cfg.Save.QaSlot = { Enabled = false }, ''
+        saved.Debug, saved.slot = GameCfg.Debug, GameCfg.Save.QaSlot
+        GameCfg.Debug, GameCfg.Save.QaSlot = { Enabled = false }, ''
         _G.Vector3 = { New = function(x, y, z) return { x = x, y = y, z = z } end }
         _G.Color = { New = function(...) return { ... } end }
         env = { tasks = {}, values = {}, errors = {}, cleanups = {} }
@@ -122,7 +122,7 @@ describe('TestPlayerLeaveRejoin', function()
                 if name == 'DataStoreService' then return { GetDataStore = function() return env.store end } end
             end,
         }
-        _G.re_util = { GetRE = function(_, name)
+        _G.REUtil = { GetRE = function(_, name)
             env.remotes = env.remotes or {}
             if not env.remotes[name] then
                 env.remotes[name] = { OnServerEvent = signal(), FireClient = function() end }
@@ -184,9 +184,9 @@ describe('TestPlayerLeaveRejoin', function()
         drain()
     end)
     after_each(function()
-        _G.game, _G.re_util = saved.game, saved.re_util
+        _G.game, _G.REUtil = saved.game, saved.REUtil
         _G.Vector3, _G.Color = saved.Vector3, saved.Color
-        game_cfg.Debug, game_cfg.Save.QaSlot = saved.Debug, saved.slot
+        GameCfg.Debug, GameCfg.Save.QaSlot = saved.Debug, saved.slot
         saved = {}
         env = nil
     end)
@@ -209,7 +209,7 @@ describe('TestPlayerLeaveRejoin', function()
         assert.same('pending', b.attrs.SaveState)
         drain()
         assertRejoined(b)
-        assert.same(17, env.data:GetDataInst(b).data.FishCoin)
+        assert.same(17, env.data:GetDataInst(b).Data.FishCoin)
         assert.same(17, env.values.u560.coin)
     end)
 
@@ -257,15 +257,15 @@ describe('TestPlayerLeaveRejoin', function()
         assert.same(1, #env.remotes.StoryRead.OnServerEvent.handlers)
         env.remotes.RequestStory.OnServerEvent:Fire(env.a, {})
         fact('worm:story')
-        env.remotes.StoryRead.OnServerEvent:Fire(env.a, { action = 'read', readKey = game_cfg.Story.ReadKey or 'opening' })
+        env.remotes.StoryRead.OnServerEvent:Fire(env.a, { action = 'read', readKey = GameCfg.Story.ReadKey or 'opening' })
         env.players.PlayerRemoving:Fire(env.a)
         local b = join(env.a.UserId)
         drain()
         assertRejoined(b)
         local restored = env.data:GetDataInst(b)
         assert.same(1, restored.Extra.quest.count)
-        assert.is_true(restored.Extra.story.read[game_cfg.Story.ReadKey or 'opening'])
-        assert.is_true(env.values.u560.extra.story.read[game_cfg.Story.ReadKey or 'opening'])
+        assert.is_true(restored.Extra.story.read[GameCfg.Story.ReadKey or 'opening'])
+        assert.is_true(env.values.u560.extra.story.read[GameCfg.Story.ReadKey or 'opening'])
     end)
 
     it('test_waiting_player_removed_and_only_latest_rejoin_is_admitted', function()
@@ -299,7 +299,7 @@ describe('远程事件公开创建入口（common/re_util）', function()
     before_each(function()
         saved = {
             game = rawget(_G, 'game'), remote = rawget(_G, 'RemoteEvent'),
-            reutil = rawget(_G, 're_util'), loaded = package.loaded[MODULE],
+            reutil = rawget(_G, 'REUtil'), loaded = package.loaded[MODULE],
         }
         package.loaded[MODULE] = nil
         _G.game = { GetService = function(_, name)
@@ -309,7 +309,7 @@ describe('远程事件公开创建入口（common/re_util）', function()
     end)
 
     after_each(function()
-        _G.game, _G.RemoteEvent, _G.re_util = saved.game, saved.remote, saved.reutil
+        _G.game, _G.RemoteEvent, _G.REUtil = saved.game, saved.remote, saved.reutil
         package.loaded[MODULE] = saved.loaded
     end)
 
@@ -320,10 +320,10 @@ describe('远程事件公开创建入口（common/re_util）', function()
             events[name] = events[name] or { name = name }
             return events[name]
         end }
-        local re_util = require(MODULE)
-        local first = re_util:GetRE('ShopResult')
+        local REUtil = require(MODULE)
+        local first = REUtil:GetRE('ShopResult')
         assert.are.equal(events['ShopResult'], first)
-        assert.are.equal(first, re_util:GetRE('ShopResult'))
+        assert.are.equal(first, REUtil:GetRE('ShopResult'))
         assert.are.same({ 'ShopResult' }, calls)
     end)
 end)

@@ -1,10 +1,10 @@
-local game_cfg = require('common.game_cfg')
-local fish_catch = require('common.fish_catch')
-local records = require('common.records')
-local signal_router = require('server.world_host.world_signal_router')
+local GameCfg = require('common.game_cfg')
+local FishCatch = require('common.fish_catch')
+local Records = require('common.records')
+local SignalRouter = require('server.world_host.world_signal_router')
 
-local mgr = { Queues = {}, LastSeq = {}, KIND = 'compendium-land', MaxQueue = 16 }
-local isValidPlayer = signal_router.is_valid_player
+local Mgr = { Queues = {}, LastSeq = {}, KIND = 'compendium-land', MaxQueue = 16 }
+local isValidPlayer = SignalRouter.is_valid_player
 
 local function copy(value)
     local out = {}
@@ -21,8 +21,8 @@ local function collection(extra)
     return bag
 end
 
-function mgr:Snapshot(player)
-    local data = self.player_data and self.player_data:GetDataInst(player)
+function Mgr:Snapshot(player)
+    local data = self.PlayerData and self.PlayerData:GetDataInst(player)
     local bag = data and data.Extra and data.Extra.collection or nil
     if not bag or data.LoadState ~= 'ready' then
         return { state = data and data.LoadState == 'loading' and 'loading' or 'unavailable',
@@ -33,8 +33,8 @@ function mgr:Snapshot(player)
         completed = data.Extra.achievements and data.Extra.achievements.final == true }
 end
 
-function mgr:Handle(player, payload)
-    if not isValidPlayer(player) or not records.ValidUserId(player.UserId) or type(payload) ~= 'table' then return end
+function Mgr:Handle(player, payload)
+    if not isValidPlayer(player) or not Records.ValidUserId(player.UserId) or type(payload) ~= 'table' then return end
     local seq = payload.seq
     if type(seq) ~= 'number' or seq ~= math.floor(seq) or seq < 1 or seq > 2147483647 then return end
     local last = self.LastSeq[player.UserId]
@@ -42,12 +42,12 @@ function mgr:Handle(player, payload)
     self.LastSeq[player.UserId] = { player = player, seq = seq }
     local state = self:Snapshot(player)
     state.seq = seq
-    _G.re_util:GetRE('CompendiumState'):FireClient(player, state)
+    _G.REUtil:GetRE('CompendiumState'):FireClient(player, state)
 end
 
-function mgr:Weight(fishId, mult)
-    local species = game_cfg.Fish[fishId]
-    return species and fish_catch.Weight(species, mult) or nil
+function Mgr:Weight(fishId, mult)
+    local species = GameCfg.Fish[fishId]
+    return species and FishCatch.Weight(species, mult) or nil
 end
 
 local function apply(draft, event, weight)
@@ -62,7 +62,7 @@ local function apply(draft, event, weight)
         record = record, count = bag.catches[event.fishId], total = bag.total }
 end
 
-function mgr:RecordLanding(player, event)
+function Mgr:RecordLanding(player, event)
     if not player or type(event) ~= 'table' then return false, 'invalid' end
     local weight = self:Weight(event.fishId, event.mult)
     if not weight or type(event.reelSerial) ~= 'number'
@@ -93,7 +93,7 @@ local function finish_leave(queue)
     end
 end
 
-function mgr:FlushBeforeLeave(player, done)
+function Mgr:FlushBeforeLeave(player, done)
     local queue = player and self.Queues[player.UserId]
     if not queue or queue.player ~= player or (#queue.events == 0 and not queue.writing) then return false end
     queue.leaving, queue.leave = true, done
@@ -102,11 +102,11 @@ function mgr:FlushBeforeLeave(player, done)
     return true
 end
 
-function mgr:Drain(player)
+function Mgr:Drain(player)
     local queue = self.Queues[player.UserId]
     if not queue or queue.player ~= player or queue.writing then return end
     if #queue.events == 0 then finish_leave(queue) return end
-    local data = self.player_data and self.player_data:GetDataInst(player)
+    local data = self.PlayerData and self.PlayerData:GetDataInst(player)
     if not data then return end
     local onlyEvent = #queue.events == 1
     local event = queue.events[1]
@@ -133,15 +133,15 @@ function mgr:Drain(player)
         queue.writing = false
         if not written then
             finish_leave(queue)
-            print('[player_compendium] 图鉴未落账', player.UserId, event.fishId, tostring(result))
+            print('[PlayerCompendium] 图鉴未落账', player.UserId, event.fishId, tostring(result))
             return
         end
-        print('[player_compendium] 图鉴', player.UserId, result.fishId,
+        print('[PlayerCompendium] 图鉴', player.UserId, result.fishId,
             'weight=' .. tostring(result.weight), 'best=' .. tostring(result.best),
             'count=' .. tostring(result.count), 'total=' .. tostring(result.total))
         if self.Quest and self.Quest.RefreshCommitted then self.Quest:RefreshCommitted(player, data) end
-        if result.record and self.records then
-            self.records:NoteLanding(player, result.fishId, result.weight)
+        if result.record and self.Records then
+            self.Records:NoteLanding(player, result.fishId, result.weight)
         end
         if #queue.events > 0 then
             self:Drain(player)
@@ -150,11 +150,11 @@ function mgr:Drain(player)
     end)
 end
 
-function mgr:Update()
+function Mgr:Update()
     for _, queue in pairs(self.Queues) do self:Drain(queue.player) end
 end
 
-function mgr:OnPlayerRemoving(player)
+function Mgr:OnPlayerRemoving(player)
     if not isValidPlayer(player) then return end
     local queue = self.Queues[player.UserId]
     if queue and queue.player == player then self.Queues[player.UserId] = nil end
@@ -162,26 +162,26 @@ function mgr:OnPlayerRemoving(player)
     if request and request.player == player then self.LastSeq[player.UserId] = nil end
 end
 
-function mgr.mount(scope, player_tree, opts)
+function Mgr.mount(scope, player_tree, opts)
     local player = opts.player
     local session = setmetatable({
-        Queues = {}, LastSeq = {}, player_data = opts.player_data, Save = opts.save,
-        Quest = player_tree.quest, records = opts.records,
-    }, { __index = mgr })
+        Queues = {}, LastSeq = {}, PlayerData = opts.player_data, Save = opts.save,
+        Quest = player_tree.quest, Records = opts.records,
+    }, { __index = Mgr })
     player_tree.compendium = session
-    signal_router.bind_player(scope, _G.re_util:GetRE('CompendiumRequest').OnServerEvent, player, function(actor, payload)
-        if _G.re_util:CheckRECD(actor, 'CompendiumRequest', game_cfg.Compendium.RequestCooldownSec) then return end
+    SignalRouter.bind_player(scope, _G.REUtil:GetRE('CompendiumRequest').OnServerEvent, player, function(actor, payload)
+        if _G.REUtil:CheckRECD(actor, 'CompendiumRequest', GameCfg.Compendium.RequestCooldownSec) then return end
         session:Handle(actor, payload)
     end)
     scope:subscribe(opts.clock.on_second, function() session:Drain(player) end)
     scope:on_cleanup(function()
         session:OnPlayerRemoving(player)
-        if session.records and type(session.records.OnPlayerRemoving) == 'function' then
-            session.records:OnPlayerRemoving(player)
+        if session.Records and type(session.Records.OnPlayerRemoving) == 'function' then
+            session.Records:OnPlayerRemoving(player)
         end
         if player_tree.compendium == session then player_tree.compendium = nil end
     end)
     return session
 end
 
-return mgr
+return Mgr

@@ -1,13 +1,13 @@
-local game_cfg = require("common.game_cfg")
-local body_scale = require("common.body_scale")
-local spoke = require("common.packages.spoke.api")
-local spoke_runtime = require("common.packages.spoke.runtime.spoke_runtime")
-local view_util = require("client.views.view_util")
-local State = spoke.State
+local GameCfg = require("common.game_cfg")
+local BodyScale = require("common.body_scale")
+local Spoke = require("common.packages.spoke.api")
+local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
+local ViewUtil = require("client.views.view_util")
+local State = Spoke.State
 
-local shop_view = {}
+local ShopView = {}
 
-shop_view.FailText = {
+ShopView.FailText = {
   coin = "金币不足，可在金币页打开地图商店购买金币",
   full = "背包已满",
   max = "已升至上限",
@@ -18,7 +18,7 @@ shop_view.FailText = {
   stand = "需要更高等级摊位",
 }
 
-shop_view.ShopText = {
+ShopView.ShopText = {
   Close = "关闭",
   Buy = "购买",
   GoPlatformShop = "去地图商店",
@@ -37,9 +37,9 @@ shop_view.ShopText = {
 }
 
 local function near(position, center, character)
-  local dist_sq = view_util.distance_sq_xz(position, center)
+  local dist_sq = ViewUtil.distance_sq_xz(position, center)
   if dist_sq == nil then return false end
-  local radius = body_scale.InteractionRadius(character, game_cfg.Shop.Radius)
+  local radius = BodyScale.InteractionRadius(character, GameCfg.Shop.Radius)
   return dist_sq <= radius * radius
 end
 
@@ -53,7 +53,7 @@ local function close_modal(ctx, id)
   if type(fn) == "function" then fn(id) end
 end
 
-function shop_view.bubble_spec(options)
+function ShopView.bubble_spec(options)
   options = type(options) == "table" and options or {}
   return {
     items = function(es, store)
@@ -72,17 +72,17 @@ function shop_view.bubble_spec(options)
       local entry = item_signal:now()
       local key = "shop:" .. tostring(entry.name or entry.stand.AnchorName)
       local fallback_name = "SceneNodeShop_" .. tostring(entry.name or entry.stand.AnchorName)
-      local node = view_util.create_anchor_scene_node(scope, ctx, entry, game_cfg.Shop.BubbleHeight, "shop", fallback_name)
+      local node = ViewUtil.create_anchor_scene_node(scope, ctx, entry, GameCfg.Shop.BubbleHeight, "shop", fallback_name)
       local title = ctx.create_node(scope, "EUITextLabel", {
         Name = "LabelShopTitle",
         Parent = node,
-        Text = game_cfg.Shop.HintText,
+        Text = GameCfg.Shop.HintText,
       })
       title.TouchEnabled = false
       local button = ctx.create_node(scope, "EUIButton", {
         Name = "BtnShopEnter_" .. tostring(entry.name or entry.stand.AnchorName),
         Parent = node,
-        ButtonText = game_cfg.Shop.HintText,
+        ButtonText = GameCfg.Shop.HintText,
         TouchEnabled = true,
       })
       ctx.connect(scope, button.OnClicked, function()
@@ -119,16 +119,16 @@ end
 
 local function row_state(goods, level, current, purchases)
   if goods.MinShopLevel > level then
-    return "locked", "stand", string.format(shop_view.ShopText.StandLocked, goods.MinShopLevel)
+    return "locked", "stand", string.format(ShopView.ShopText.StandLocked, goods.MinShopLevel)
   end
   if goods.Upgrade then
     current = current or 0
-    if goods.Upgrade.level <= current then return "owned", "level", shop_view.ShopText.Owned end
-    if goods.Upgrade.level > current + 1 then return "locked", "level", shop_view.FailText.level end
+    if goods.Upgrade.level <= current then return "owned", "level", ShopView.ShopText.Owned end
+    if goods.Upgrade.level > current + 1 then return "locked", "level", ShopView.FailText.level end
   end
-  local bought = purchases and purchases[goods.number] or 0
+  local bought = purchases and purchases[goods.Number] or 0
   if (goods.PurchaseLimit or 0) > 0 and bought >= goods.PurchaseLimit then
-    return "owned", "limit", shop_view.ShopText.Owned
+    return "owned", "limit", ShopView.ShopText.Owned
   end
   return "buy", nil, ""
 end
@@ -136,13 +136,13 @@ end
 local function build_rows(ctx, page, level)
   local rows = {}
   local shop = shop_state(ctx) or {}
-  for index, goods in ipairs(game_cfg.Shop.ListForPage(level, page, true)) do
+  for index, goods in ipairs(GameCfg.Shop.ListForPage(level, page, true)) do
     local current = goods.Upgrade and current_upgrade(ctx, goods.Upgrade.kind) or nil
     local state, reason, state_text = row_state(goods, level, current, shop.purchases)
-    local definition = goods.ItemId and game_cfg.Items.Definitions[goods.ItemId] or nil
+    local definition = goods.ItemId and GameCfg.Items.Definitions[goods.ItemId] or nil
     rows[index] = {
       index = index,
-      number = goods.number,
+      number = goods.Number,
       goods = goods,
       name = goods.Name,
       priceText = tostring(goods.Price),
@@ -151,7 +151,7 @@ local function build_rows(ctx, page, level)
       stateText = state_text,
       upgradeLevel = current,
       isNew = goods.MinShopLevel == level,
-      newText = goods.MinShopLevel == level and shop_view.ShopText.New or "",
+      newText = goods.MinShopLevel == level and ShopView.ShopText.New or "",
       icon = definition and definition.Icon or nil,
       selectable = state ~= "owned",
       purchasable = state == "buy",
@@ -163,7 +163,7 @@ end
 local function detail_of(ctx, row)
   if not row then
     return { name = "", desc = "", priceText = "", limitText = "", upgradeText = "",
-      buyText = shop_view.ShopText.Buy, buyEnabled = false }
+      buyText = ShopView.ShopText.Buy, buyEnabled = false }
   end
   local goods = row.goods
   local shop = shop_state(ctx) or {}
@@ -171,9 +171,9 @@ local function detail_of(ctx, row)
   local limit = goods.PurchaseLimit or 0
   local action
   if row.purchasable then action = ctx.store.coin:now() >= (goods.Price or 0) and "buy" or "coin" end
-  local buy_text = shop_view.ShopText.Buy
+  local buy_text = ShopView.ShopText.Buy
   if action == "coin" then
-    buy_text = shop_view.ShopText.GoPlatformShop
+    buy_text = ShopView.ShopText.GoPlatformShop
   elseif not action then
     buy_text = row.stateText
   end
@@ -181,8 +181,8 @@ local function detail_of(ctx, row)
   if goods.Upgrade then
     local current = row.upgradeLevel or 0
     upgrade_text = current >= goods.Upgrade.level
-        and string.format(shop_view.ShopText.UpgradeOwned, current)
-        or string.format(shop_view.ShopText.UpgradeTarget, current, goods.Upgrade.level)
+        and string.format(ShopView.ShopText.UpgradeOwned, current)
+        or string.format(ShopView.ShopText.UpgradeTarget, current, goods.Upgrade.level)
   end
   return {
     number = row.number,
@@ -190,8 +190,8 @@ local function detail_of(ctx, row)
     desc = goods.Desc or "",
     icon = row.icon,
     priceText = row.priceText,
-    limitText = limit > 0 and string.format(shop_view.ShopText.LimitText, bought, limit)
-        or shop_view.ShopText.NoLimit,
+    limitText = limit > 0 and string.format(ShopView.ShopText.LimitText, bought, limit)
+        or ShopView.ShopText.NoLimit,
     upgradeText = upgrade_text,
     buyText = buy_text,
     buyAction = action,
@@ -203,18 +203,18 @@ local function text_node(ctx, scope, parent, name)
   return ctx.create_node(scope, "EUITextLabel", { Name = name, Parent = parent, Text = "" })
 end
 
-function shop_view.modal_spec()
+function ShopView.modal_spec()
   return function(scope, ctx)
     local payload = ctx.store.modal_payload:now() or {}
-    local level = payload.stand and payload.stand.Level or game_cfg.Shop.Stands[1].Level
-    local pages = game_cfg.Shop.Pages
+    local level = payload.stand and payload.stand.Level or GameCfg.Shop.Stands[1].Level
+    local pages = GameCfg.Shop.Pages
     local coin_page = pages[#pages]
-    local page = State.new("shop_view.page", pages[1])
-    local selected = State.new("shop_view.selected", nil)
-    local hint = State.new("shop_view.hint", shop_view.ShopText.CoinPageHint)
+    local page = State.new("ShopView.page", pages[1])
+    local selected = State.new("ShopView.selected", nil)
+    local hint = State.new("ShopView.hint", ShopView.ShopText.CoinPageHint)
     local panel = ctx.create_node(scope, "EUIImage", { Name = "ScreenShop", Visible = true })
     ctx.create_node(scope, "EUITextLabel", {
-      Name = "LabelShopTitle", Parent = panel, Text = game_cfg.Shop.HintText,
+      Name = "LabelShopTitle", Parent = panel, Text = GameCfg.Shop.HintText,
     })
     local coin_label = text_node(ctx, scope, panel, "LabelCurCoin")
     local list_panel = ctx.create_node(scope, "EUIImage", { Name = "ShopListPanel", Parent = panel })
@@ -225,7 +225,7 @@ function shop_view.modal_spec()
     local platform = ctx.create_node(scope, "EUIButton", {
       Name = "BtnOpenPlatformShop", Parent = coin_panel, TouchEnabled = true,
     })
-    text_node(ctx, scope, platform, "LabelOpenPlatformShop").Text = shop_view.ShopText.OpenPlatformShop
+    text_node(ctx, scope, platform, "LabelOpenPlatformShop").Text = ShopView.ShopText.OpenPlatformShop
     local detail = {}
     for _, name in ipairs({ "LabelShopDetailName", "LabelShopDetailDesc", "LabelShopDetailPrice",
         "LabelShopDetailLimit", "LabelShopDetailUpgrade" }) do
@@ -248,16 +248,16 @@ function shop_view.modal_spec()
       })
       indicator.Visible = index == 1
       ctx.connect(scope, tab.OnClicked, function()
-        spoke_runtime.batch(function()
+        SpokeRuntime.batch(function()
           page:set(name)
           selected:set(nil)
-          if name == coin_page then hint:set(shop_view.ShopText.CoinPageHint) end
+          if name == coin_page then hint:set(ShopView.ShopText.CoinPageHint) end
         end)
       end)
     end
 
     local close = ctx.create_node(scope, "EUIButton", {
-      Name = "BtnShopClose", Parent = panel, ButtonText = shop_view.ShopText.Close, TouchEnabled = true,
+      Name = "BtnShopClose", Parent = panel, ButtonText = ShopView.ShopText.Close, TouchEnabled = true,
     })
     ctx.connect(scope, close.OnClicked, function() close_modal(ctx, "shop") end)
 
@@ -317,7 +317,7 @@ function shop_view.modal_spec()
     ctx.connect(scope, buy.OnClicked, function()
       local row = current_rows()[selected:now() or 0]
       if not row then return end
-      if not row.purchasable then notify(ctx, shop_view.FailText[row.reason]) return end
+      if not row.purchasable then notify(ctx, ShopView.FailText[row.reason]) return end
       if ctx.store.coin:now() < (row.goods.Price or 0) then
         page:set(coin_page)
         return
@@ -331,23 +331,23 @@ function shop_view.modal_spec()
     ctx.connect(scope, platform.OnClicked, function()
       local open = ctx.services and ctx.services.open_platform_shop
       if type(open) ~= "function" then
-        hint:set(shop_view.ShopText.PlatformUnavailable)
+        hint:set(ShopView.ShopText.PlatformUnavailable)
         return
       end
       local ok, opened = pcall(open)
       if not ok then
-        hint:set(shop_view.ShopText.PlatformOpenFailed)
-        print("[shop_view] 打开地图商店失败", tostring(opened))
+        hint:set(ShopView.ShopText.PlatformOpenFailed)
+        print("[ShopView] 打开地图商店失败", tostring(opened))
       elseif opened == false then
-        hint:set(shop_view.ShopText.PlatformUnavailable)
+        hint:set(ShopView.ShopText.PlatformUnavailable)
       else
-        hint:set(shop_view.ShopText.PlatformOpened)
+        hint:set(ShopView.ShopText.PlatformOpened)
       end
     end)
   end
 end
 
-function shop_view.presentation_spec()
+function ShopView.presentation_spec()
   return {
     name = "ShopPresentation",
     mount = function(scope, ctx)
@@ -356,21 +356,21 @@ function shop_view.presentation_spec()
         local result = event.payload
         if result.ok then
           if result.action == "UpgradeStorage" then
-            notify(ctx, "扩容成功：道具栏 " .. tostring(game_cfg.Items.InitialItemBarSlots + result.level)
-              .. " 格，背包 " .. tostring(result.level == #game_cfg.Items.UpgradePrices
-                and game_cfg.Items.MaxBackpackSlots
-                or game_cfg.Items.InitialBackpackSlots + result.level * game_cfg.Items.BackpackSlotsPerUpgrade) .. " 格")
+            notify(ctx, "扩容成功：道具栏 " .. tostring(GameCfg.Items.InitialItemBarSlots + result.level)
+              .. " 格，背包 " .. tostring(result.level == #GameCfg.Items.UpgradePrices
+                and GameCfg.Items.MaxBackpackSlots
+                or GameCfg.Items.InitialBackpackSlots + result.level * GameCfg.Items.BackpackSlotsPerUpgrade) .. " 格")
           else
-            local definition = result.itemId and game_cfg.Items.Definitions[result.itemId] or nil
+            local definition = result.itemId and GameCfg.Items.Definitions[result.itemId] or nil
             notify(ctx, "购买成功：" .. tostring(result.name or definition and definition.Name or result.itemId)
               .. "，花费 " .. tostring(result.price) .. " 金币")
           end
         else
-          notify(ctx, shop_view.FailText[result.reason] or "购买失败")
+          notify(ctx, ShopView.FailText[result.reason] or "购买失败")
         end
       end)
     end,
   }
 end
 
-return shop_view
+return ShopView

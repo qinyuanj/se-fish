@@ -70,7 +70,7 @@ builder（`s`）只在 Init/Tick/Bootstrap 窗口内有效：跨窗口只捕获 
 
 ### 4. 合并写入，退出即销毁
 
-一次宿主事件写多个 State 时，用 `spoke_runtime.batch(fn)` 包住（深 require `common.packages.spoke.runtime.spoke_runtime`）：Auto 树的 flush 推迟到最外层返回，同时依赖多个值的 Effect 因此只跑一次。
+一次宿主事件写多个 State 时，用 `SpokeRuntime.batch(fn)` 包住（深 require `common.packages.spoke.runtime.spoke_runtime`）：Auto 树的 flush 推迟到最外层返回，同时依赖多个值的 Effect 因此只跑一次。
 
 树挂在 Unit 上、并要随该 Unit 显式销毁时，用 `spoke_eggy.behaviour(unit, init [, options])`：它在 `Destroying` 时先把 `is_alive` 翻成 false 并完成这次 Auto 刷新，再 `dispose()`。没有 Unit 生命周期就继续 `SpokeTree.spawn`，由消费方在明确退出点调用 `tree:dispose()`。
 
@@ -82,7 +82,7 @@ builder（`s`）只在 Init/Tick/Bootstrap 窗口内有效：跨窗口只捕获 
 
 交付前对着实际运行核对：宿主事件返回后 UI 到了该到的状态、销毁后没有残留订阅、再触发旧事件是安全 no-op、`tree.fault` 为空。出错时先读 fault 的 frame/tree trace，再用事件日志区分 Init、Tick、frame-pop 调度和 Detach。
 
-宿主侧不要用 pcall 包住 flush 或事件回调——核心已经把用户块 fault、树级停 flush、runtime 最终日志边界串起来；也不要为了改变行为去改 `common/packages/spoke/`。
+宿主侧不要用 pcall 包住 flush 或事件回调——核心已经把用户块 fault、树级停 flush、Runtime 最终日志边界串起来；也不要为了改变行为去改 `common/packages/spoke/`。
 
 完成标准：上面每一项都有实际运行结果；没跑过的写明未核对，不用读代码代替运行。
 
@@ -92,7 +92,7 @@ builder（`s`）只在 Init/Tick/Bootstrap 窗口内有效：跨窗口只捕获 
 - builder 只在回调窗口内有效；跨窗口调度用 `s:ports()`，动态 keyed 子树用捕获的 Dock。
 - Ticker 按当前 tree coordinate 取最小 pending Epoch；同一工作单元里的 request 只登记意图，不中途插入另一个 Epoch。
 - Auto 树在发起调用的返回前同步排空；Manual 树由调用方 `tick()` / `flush()`。这个区别是语义，不是宿主性能开关。
-- Trigger 用 dispatch 起始的订阅者快照、FIFO 重入队列和逐订阅者错误隔离；State 默认以 `==` 抑制相同值通知。`spoke_runtime.batch` 只延迟 Auto 树 flush，普通 State subscriber 仍逐次收到每次写入。
+- Trigger 用 dispatch 起始的订阅者快照、FIFO 重入队列和逐订阅者错误隔离；State 默认以 `==` 抑制相同值通知。`SpokeRuntime.batch` 只延迟 Auto 树 flush，普通 State subscriber 仍逐次收到每次写入。
 - 动态依赖按读取槽位换绑，过期槽位回调要抑制；Effect 先清理再重跑，Reaction 跳过首次运行，Memo 保持纯派生，Phase 只在条件为真时挂载块。
 - 用户 Init/Tick 错误进入 fault 传播；cleanup、dispose、Trigger subscriber 与 logger 错误各自隔离，不会中止后续清理或通知。
 

@@ -1,13 +1,13 @@
 -- #297-A3 服务端主入口切换、官方包叶子装配与旧壳淘汰收口契约测试（ADR-0032）：
 -- 失败方式先列：
---   1. server_runtime 未正确透传并装配 attr_leaf / modifier_leaf / ability_leaf / held_rod_leaf / entity_modifiers；
+--   1. ServerRuntime 未正确透传并装配 AttrLeaf / ModifierLeaf / AbilityLeaf / HeldRodLeaf / entity_modifiers；
 --   2. 玩家角色切换或离场后，CharacterAdded/CharacterRemoving 连接、AttrUnit、Modifier 实体、能力管理器或左手持竿残留；
 --   3. 离场玩家对活鱼或其他玩家施加的 DoT 未在离场时清理，导致离线来源继续扣血；
---   4. server/main.lua 未移除旧 MgrAttr / MgrModifier 或未将 mgr_player_data 同步接线至 player_tree。
+--   4. server/main.lua 未移除旧 MgrAttr / MgrModifier 或未将 MgrPlayerData 同步接线至 PlayerTree。
 
-local game_cfg = require("common.game_cfg")
-local spoke_runtime = require("common.packages.spoke.runtime.spoke_runtime")
-local server_runtime = require("server.world_host.server_runtime")
+local GameCfg = require("common.game_cfg")
+local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
+local ServerRuntime = require("server.world_host.server_runtime")
 
 local function make_signal()
   local handlers = {}
@@ -38,12 +38,12 @@ local function make_signal()
 end
 
 local function find_rod_item_id()
-  for id, def in pairs(game_cfg.Items.Definitions) do
+  for id, def in pairs(GameCfg.Items.Definitions) do
     if def.Type == "鱼竿" and def.Visual and def.Visual.Socket then
       return id
     end
   end
-  error("game_cfg.Items.Definitions 中未找到带 Visual.Socket 的鱼竿")
+  error("GameCfg.Items.Definitions 中未找到带 Visual.Socket 的鱼竿")
 end
 
 local function make_ready_data(player, overrides)
@@ -53,7 +53,7 @@ local function make_ready_data(player, overrides)
     Player = player,
     Inited = true,
     LoadState = "ready",
-    data = {
+    Data = {
       FishCoin = overrides.coin or 0,
       Zone = "fishPond",
       UpgradeLevel = 0,
@@ -97,7 +97,7 @@ local function make_character(name, walk_speed)
   return ch
 end
 
-describe("#297-A3 服务端 Spoke 收口：server_runtime 叶子装配与活鱼效果存储", function()
+describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼效果存储", function()
   local saved_vec3, saved_color
 
   before_each(function()
@@ -113,7 +113,7 @@ describe("#297-A3 服务端 Spoke 收口：server_runtime 叶子装配与活鱼�
     saved_vec3, saved_color = nil, nil
   end)
 
-  it("统一装配 attr_leaf / modifier_leaf / ability_leaf / held_rod_leaf 与 entity_modifiers，离场后全量零残留", function()
+  it("统一装配 AttrLeaf / ModifierLeaf / AbilityLeaf / HeldRodLeaf 与 entity_modifiers，离场后全量零残留", function()
     local attr_units, attr_values = {}, {}
     local attr_api = {
       Enums = { AttrComponentType = { Base = 1, BaseExtra = 2, Ratio = 3, Bonus = 4 } },
@@ -178,7 +178,7 @@ describe("#297-A3 服务端 Spoke 收口：server_runtime 叶子装配与活鱼�
     }
 
     local created_units, dot_hits = {}, {}
-    local rt = server_runtime.new({
+    local rt = ServerRuntime.new({
       bait_spots = { Enabled = false },
       initial_now = 100,
       create_unit = function(kind, props)
@@ -232,23 +232,23 @@ describe("#297-A3 服务端 Spoke 收口：server_runtime 叶子装配与活鱼�
     assert.equals(1, #p1.CharacterAdded.handlers)
     assert.equals(1, #p1.CharacterRemoving.handlers)
 
-    -- attr_leaf 投影：体型 1.4、血量上限 420、移速 8 * 1.5 = 12
+    -- AttrLeaf 投影：体型 1.4、血量上限 420、移速 8 * 1.5 = 12
     assert.near(1.4, ch1.scale, 1e-9)
     assert.near(12, ch1.Controller.WalkSpeed, 1e-9)
     assert.is_not_nil(attr_units[ch1])
 
-    -- held_rod_leaf 投影：选中鱼竿格创建挂点 + 模型
+    -- HeldRodLeaf 投影：选中鱼竿格创建挂点 + 模型
     assert.equals(2, #created_units)
     assert.is_false(created_units[1].Destroyed)
     assert.is_false(created_units[2].Destroyed)
 
-    -- ability_leaf 投影：挂载管理器并注册 can_act 施法守卫
+    -- AbilityLeaf 投影：挂载管理器并注册 can_act 施法守卫
     assert.equals(1, #created_managers)
     local guard_fn = next(registered_guards)
     assert.is_not_nil(guard_fn)
     assert.is_true(guard_fn(ch1))
 
-    -- modifier_leaf 投影：施加麻痹阻塞施法与移速，0.5s 后恢复
+    -- ModifierLeaf 投影：施加麻痹阻塞施法与移速，0.5s 后恢复
     assert.is_true(pt1:apply_modifier("paralyze"))
     assert.is_false(guard_fn(ch1))
     assert.equals(0, ch1.Controller.WalkSpeed)
@@ -266,21 +266,21 @@ describe("#297-A3 服务端 Spoke 收口：server_runtime 叶子装配与活鱼�
     assert.are.equal(fish, dot_hits[1].target)
 
     -- sync_from_data(d1) 不得触发反向 mirror_stage1_to_data 覆写替换 d1 内部子表引用
-    local ref_item_bar = d1.data.Containers.itemBar
-    local ref_bait = d1.data.Bait
-    local ref_weapons = d1.data.Weapons
+    local ref_item_bar = d1.Data.Containers.itemBar
+    local ref_bait = d1.Data.Bait
+    local ref_weapons = d1.Data.Weapons
     local ref_held = d1.Extra.inventory.selection.held
     local ref_potions = d1.Extra.growth.potions
     local ref_upgrades = d1.Extra.growth.upgrades
     local ref_cooldowns = d1.Extra.cooldowns
-    d1.data.FishCoin = 321
+    d1.Data.FishCoin = 321
     d1.Extra.growth.potions.item168 = 3
     assert.is_true(pt1:sync_from_data(d1))
     assert.equals(321, pt1.states.coin:now())
     assert.equals(480, pt1.memos.max_health:now())
-    assert.are.equal(ref_item_bar, d1.data.Containers.itemBar)
-    assert.are.equal(ref_bait, d1.data.Bait)
-    assert.are.equal(ref_weapons, d1.data.Weapons)
+    assert.are.equal(ref_item_bar, d1.Data.Containers.itemBar)
+    assert.are.equal(ref_bait, d1.Data.Bait)
+    assert.are.equal(ref_weapons, d1.Data.Weapons)
     assert.are.equal(ref_held, d1.Extra.inventory.selection.held)
     assert.are.equal(ref_potions, d1.Extra.growth.potions)
     assert.are.equal(ref_upgrades, d1.Extra.growth.upgrades)
@@ -313,17 +313,17 @@ describe("#297-A3 服务端 Spoke 收口：server_runtime 叶子装配与活鱼�
     before_each(function()
       saved = {
         game = rawget(_G, "game"),
-        re_util = rawget(_G, "re_util"),
+        REUtil = rawget(_G, "REUtil"),
         reutil = package.loaded["common.re_util"],
         MgrUtil = rawget(_G, "MgrUtil"),
         Vector3 = rawget(_G, "Vector3"),
         Color = rawget(_G, "Color"),
         RemoteEvent = rawget(_G, "RemoteEvent"),
-        Debug = game_cfg.Debug,
-        slot = game_cfg.Save.QaSlot,
+        Debug = GameCfg.Debug,
+        slot = GameCfg.Save.QaSlot,
       }
-      game_cfg.Debug = { Enabled = true, InitialGrants = saved.Debug.InitialGrants }
-      game_cfg.Save.QaSlot = ""
+      GameCfg.Debug = { Enabled = true, InitialGrants = saved.Debug.InitialGrants }
+      GameCfg.Save.QaSlot = ""
       runtime = nil
     end)
 
@@ -332,19 +332,19 @@ describe("#297-A3 服务端 Spoke 收口：server_runtime 叶子装配与活鱼�
         runtime:shutdown()
       end
       _G.game = saved.game
-      _G.re_util = saved.re_util
+      _G.REUtil = saved.REUtil
       package.loaded["common.re_util"] = saved.reutil
       _G.MgrUtil = saved.MgrUtil
       _G.Vector3 = saved.Vector3
       _G.Color = saved.Color
       _G.RemoteEvent = saved.RemoteEvent
-      game_cfg.Debug = saved.Debug
-      game_cfg.Save.QaSlot = saved.slot
+      GameCfg.Debug = saved.Debug
+      GameCfg.Save.QaSlot = saved.slot
       saved = nil
       runtime = nil
     end)
 
-    it("真实运行 server/main.lua：server_runtime.current 就绪、player_data_host 驱动持竿、AttrBridge/ModifierBridge 含麻痹与活鱼 DoT 端到端生效", function()
+    it("真实运行 server/main.lua：ServerRuntime.current 就绪、PlayerDataHost 驱动持竿、AttrBridge/ModifierBridge 含麻痹与活鱼 DoT 端到端生效", function()
       local now = 200
       local tasks, values, created_units, errors, mgrs = {}, {}, {}, {}, {}
       local players_list = {}
@@ -516,10 +516,10 @@ describe("#297-A3 服务端 Spoke 收口：server_runtime 叶子装配与活鱼�
       }, { __index = _G })
 
 
-      _G.re_util = remote_util
+      _G.REUtil = remote_util
       package.loaded["common.re_util"] = remote_util
       runtime = assert(loadfile("server/main.lua", "t", sandbox))()
-      assert.are.equal(runtime, server_runtime.current())
+      assert.are.equal(runtime, ServerRuntime.current())
       assert.is_not_nil(runtime:get_entity_modifiers())
 
       local function drain()
@@ -548,11 +548,11 @@ describe("#297-A3 服务端 Spoke 收口：server_runtime 叶子装配与活鱼�
       local pt = runtime:get_player_tree(9101)
       assert.is_not_nil(pt)
       assert.is_true(#p.CharacterAdded.handlers >= 1)
-      -- 存档就绪首推经 player_tree 树底 on_item_bar_state 严格下发 1 次（无双发）
+      -- 存档就绪首推经 PlayerTree 树底 on_item_bar_state 严格下发 1 次（无双发）
       assert.equals(1, #item_bar_pushes)
       assert.are.equal(p, item_bar_pushes[1].player)
       local bait_unit_count = #created_units
-      assert.equals(#game_cfg.BaitSpots.Spots, bait_unit_count)
+      assert.equals(#GameCfg.BaitSpots.Spots, bait_unit_count)
       assert.equals(1, #re_map.ItemBarAction.OnServerEvent.handlers)
       assert.is_function(runtime.platform.ShopAction)
 
@@ -565,21 +565,21 @@ describe("#297-A3 服务端 Spoke 收口：server_runtime 叶子装配与活鱼�
       assert.is_false(rod_mount.Destroyed)
       assert.is_false(rod_model.Destroyed)
 
-      -- RequestItemBar 主动拉取经 player_tree 强制推送 1 次
+      -- RequestItemBar 主动拉取经 PlayerTree 强制推送 1 次
       re_map.RequestItemBar.OnServerEvent:Fire(p)
       assert.equals(3, #item_bar_pushes)
       assert.equals(1, item_bar_pushes[3].payload.selectedSlot)
 
       local before_batch_pushes = #item_bar_pushes
       local data = mgrs.player_data_host:GetDataInst(p)
-      spoke_runtime.batch(function()
+      SpokeRuntime.batch(function()
         pt:set_coin(888)
         pt:set_upgrade_level(1)
-        data.data.FishCoin = 888
-        data.data.UpgradeLevel = 1
-        data.data.SelectedSlot = nil
+        data.Data.FishCoin = 888
+        data.Data.UpgradeLevel = 1
+        data.Data.SelectedSlot = nil
         mgrs.player_data_host:SyncPlayerTree(p)
-        data.data.FishCoin = 999
+        data.Data.FishCoin = 999
         mgrs.player_data_host:SyncPlayerTree(p)
       end)
       assert.equals(before_batch_pushes + 1, #item_bar_pushes)

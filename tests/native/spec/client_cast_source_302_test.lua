@@ -1,8 +1,8 @@
-local eui = require("tests.support.eui_double")
-local client_store = require("client.store.client_store")
-local root_view = require("client.views.root_view")
-local cast_source_view = require("client.views.cast_source_view")
-local spoke_clock = require("common.spoke_clock")
+local Eui = require("tests.support.eui_double")
+local ClientStore = require("client.store.client_store")
+local RootView = require("client.views.root_view")
+local CastSourceView = require("client.views.cast_source_view")
+local SpokeClock = require("common.spoke_clock")
 
 describe("礁石来源可视化宿主接缝（#302）", function()
   local saved_v3, saved_color
@@ -16,22 +16,22 @@ describe("礁石来源可视化宿主接缝（#302）", function()
   end)
 
   it("同一上钩快照复用来源，脱钩销毁来源与钓线", function()
-    local clock = spoke_clock.new(0)
-    local store, writer = client_store.new({ clock = clock })
-    local root = eui.Node({ Name = "UIRoot" })
+    local clock = SpokeClock.new(0)
+    local store, writer = ClientStore.new({ clock = clock })
+    local root = Eui.Node({ Name = "UIRoot" })
     local units = {}
-    local view = root_view.mount(root, store, {
+    local view = RootView.mount(root, store, {
       services = {
         create_unit = function(kind, props)
-          local unit = eui.Node({ Name = props.Name, Kind = kind, Position = props.Position })
+          local unit = Eui.Node({ Name = props.Name, Kind = kind, Position = props.Position })
           unit.Destroyed = false
           units[#units + 1] = unit
           return unit
         end,
         reel = { active = function() return true end, progress = function() return 75 end },
       },
-      hud = { cast_source_view.spec() },
-      create_node = function(kind, props) return eui.Node({ Kind = kind, Name = props.Name, Parent = props.Parent }) end,
+      hud = { CastSourceView.spec() },
+      create_node = function(kind, props) return Eui.Node({ Kind = kind, Name = props.Name, Parent = props.Parent }) end,
     })
     writer:ingest_event("CastState", { phase = "hooked", castId = 37, fishId = "item81", reelSession = "s37",
       hookPosition = { x = 880, y = 15, z = 144 } })

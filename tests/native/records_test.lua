@@ -9,12 +9,12 @@
 --   6. 延迟重试把过期候选盖到更新的纪录上；写频随上岸次数线性增长。
 --   7. 平台字符串身份被拒收，读回丢失类型或混合历史数字身份时决胜报错；
 --   8. 不同字符串玩家的查询序号/存档串扰，客户端伪造身份或重量污染权威纪录。
--- 迁移说明：三个旧类按 LuaUnit 实际执行序（类名字典序 core → Integration → Service，
+-- 迁移说明：三个旧类按 LuaUnit 实际执行序（类名字典序 Core → Integration → Service，
 --   类内方法字典序）注册为三个 describe / 逐个 it；lu.assertNotEquals 是深不等，映射为 assert.are_not.same。
-local game_cfg = require("common.game_cfg")
-local records = require("common.records")
-local player_data = require("server.data.player_data")
-local random_guard = require("tests.support.random_guard")
+local GameCfg = require("common.game_cfg")
+local Records = require("common.records")
+local PlayerData = require("server.data.player_data")
+local RandomGuard = require("tests.support.random_guard")
 
 local function readSource(path)
   local file = io.open(path, "r")
@@ -27,34 +27,34 @@ local function readSource(path)
 end
 
 describe("全服纪录纯逻辑（common/records）", function()
-  after_each(random_guard.restore)
+  after_each(RandomGuard.restore)
 
   it("test_entry_keeps_weight_and_holder_together", function()
     -- 身份与重量写在同一条记录里：读回时要么两者都在，要么整条不算纪录
-    local entry = records.Entry(1234, 42, "张三")
+    local entry = Records.Entry(1234, 42, "张三")
     assert.same({ w = 1234, u = 42, n = "张三" }, entry)
-    assert.is_nil(records.Valid({ w = 1234 }))
-    assert.is_nil(records.Valid({ u = 42, n = "张三" }))
-    assert.same({ w = 1234, u = "42" }, records.Valid({ w = 1234, u = "42" }))
-    assert.is_nil(records.Valid("1234"))
+    assert.is_nil(Records.Valid({ w = 1234 }))
+    assert.is_nil(Records.Valid({ u = 42, n = "张三" }))
+    assert.same({ w = 1234, u = "42" }, Records.Valid({ w = 1234, u = "42" }))
+    assert.is_nil(Records.Valid("1234"))
     -- 名字超长只降级名字（退兜底），不整条丢掉重量与身份
-    local longName = records.Valid({ w = 1234, u = 42, n = string.rep("x", 200) })
+    local longName = Records.Valid({ w = 1234, u = 42, n = string.rep("x", 200) })
     assert.same({ w = 1234, u = 42, n = nil }, longName)
-    local nameless = records.Valid({ w = 1234, u = 42 })
+    local nameless = Records.Valid({ w = 1234, u = 42 })
     assert.is_nil(nameless.n)
-    assert.same("玩家42", records.Holder(nameless), "显示名缺失退成玩家ID，不拿 ID 冒充名字")
-    assert.same("张三", records.Holder(records.Entry(1234, 42, "张三")))
+    assert.same("玩家42", Records.Holder(nameless), "显示名缺失退成玩家ID，不拿 ID 冒充名字")
+    assert.same("张三", Records.Holder(Records.Entry(1234, 42, "张三")))
   end)
 
   it("test_equal_weight_tiebreak_is_order_independent", function()
-    local a = records.Entry(300, 5, "甲")
-    local b = records.Entry(300, 3, "乙")
-    local first = records.Wins(a, nil) and a or nil
-    if records.Wins(b, first) then
+    local a = Records.Entry(300, 5, "甲")
+    local b = Records.Entry(300, 3, "乙")
+    local first = Records.Wins(a, nil) and a or nil
+    if Records.Wins(b, first) then
       first = b
     end
-    local second = records.Wins(b, nil) and b or nil
-    if records.Wins(a, second) then
+    local second = Records.Wins(b, nil) and b or nil
+    if Records.Wins(a, second) then
       second = a
     end
     assert.same(3, first.u, "先到 5 后到 3 与先到 3 后到 5 结果必须一致")
@@ -64,51 +64,51 @@ describe("全服纪录纯逻辑（common/records）", function()
 
   it("test_heavier_wins_and_lighter_never_overwrites", function()
     -- 决胜：更大者胜；同重量按 UserID 升序（小者保持）；与到达顺序无关
-    local held = records.Entry(200, 7, "甲")
-    assert.is_true(records.Wins(records.Entry(201, 9, "乙"), held))
-    assert.is_false(records.Wins(records.Entry(199, 1, "丙"), held))
-    assert.is_false(records.Wins(records.Entry(200, 7, "甲"), held))
-    assert.is_true(records.Wins(records.Entry(200, 7, "甲"), nil))
-    assert.is_true(records.Wins(records.Entry(200, 7, "甲"), { w = "x" }))
+    local held = Records.Entry(200, 7, "甲")
+    assert.is_true(Records.Wins(Records.Entry(201, 9, "乙"), held))
+    assert.is_false(Records.Wins(Records.Entry(199, 1, "丙"), held))
+    assert.is_false(Records.Wins(Records.Entry(200, 7, "甲"), held))
+    assert.is_true(Records.Wins(Records.Entry(200, 7, "甲"), nil))
+    assert.is_true(Records.Wins(Records.Entry(200, 7, "甲"), { w = "x" }))
   end)
 
   it("test_illegal_and_overflow_weights_are_rejected", function()
     -- 非法值不猜：非数字、非正、NaN、无穷与超越上限都拒绝，绝不四舍五入成假纪录
     for _, bad in ipairs({ nil, "x", {}, true, 0, -1, 0 / 0, math.huge, -math.huge }) do
-      local scaled, reason = records.Scale(bad)
+      local scaled, reason = Records.Scale(bad)
       assert.is_nil(scaled, tostring(bad))
       assert.same("invalid", reason, tostring(bad))
     end
-    local over = game_cfg.records.MaxScaled / game_cfg.records.Scale + 1
-    assert.is_nil(records.Scale(over))
-    assert.same("overflow", select(2, records.Scale(over)))
+    local over = GameCfg.Records.MaxScaled / GameCfg.Records.Scale + 1
+    assert.is_nil(Records.Scale(over))
+    assert.same("overflow", select(2, Records.Scale(over)))
   end)
 
   it("test_platform_string_identity_round_trips_without_coercion", function()
     for _, id in ipairs({ "aU5A95JB9rit0DUl", "00042", "9007199254740993", "arxYUgj/dKsUU0QL", "42" }) do
-      local entry = records.Entry(1234, id, nil)
+      local entry = Records.Entry(1234, id, nil)
       assert.same({ w = 1234, u = id }, entry)
-      assert.same(entry, records.Valid(entry))
-      assert.same(id, records.State(entry).userId)
-      assert.same("玩家" .. id, records.Holder(entry))
+      assert.same(entry, Records.Valid(entry))
+      assert.same(id, Records.State(entry).userId)
+      assert.same("玩家" .. id, Records.Holder(entry))
     end
-    assert.same({ w = 1234, u = 42 }, records.Valid({ w = 1234, u = 42 }), "历史数字保持者原样兼容")
+    assert.same({ w = 1234, u = 42 }, Records.Valid({ w = 1234, u = 42 }), "历史数字保持者原样兼容")
     for _, id in ipairs({ "", false, {}, 0, -1, 1.5, 0 / 0, math.huge, -math.huge }) do
-      assert.is_nil(records.Entry(1234, id))
-      assert.is_nil(records.Valid({ w = 1234, u = id }))
+      assert.is_nil(Records.Entry(1234, id))
+      assert.is_nil(Records.Valid({ w = 1234, u = id }))
     end
   end)
 
   it("test_state_and_text_never_fabricate_a_record", function()
     -- 文案：有纪录/没有纪录/读不到三态在 state 上分开；13-08、13-17 要求后两种对玩家都只显示「未取得数据」
-    local ok = records.State(records.Entry(1234, 42, "张三"))
+    local ok = Records.State(Records.Entry(1234, 42, "张三"))
     assert.same("ok", ok.state)
     assert.same(12.34, ok.weight)
-    assert.same("全服纪录：12.34 kg（张三）", records.Describe(ok))
-    assert.same({ state = "missing" }, records.State(nil))
-    assert.same("全服纪录：未取得数据", records.Describe({ state = "missing" }))
-    assert.same("全服纪录：未取得数据", records.Describe({ state = "unavailable" }))
-    assert.same("全服纪录：未取得数据", records.Describe(nil), "未知状态按未取得数据展示，不展示纪录")
+    assert.same("全服纪录：12.34 kg（张三）", Records.Describe(ok))
+    assert.same({ state = "missing" }, Records.State(nil))
+    assert.same("全服纪录：未取得数据", Records.Describe({ state = "missing" }))
+    assert.same("全服纪录：未取得数据", Records.Describe({ state = "unavailable" }))
+    assert.same("全服纪录：未取得数据", Records.Describe(nil), "未知状态按未取得数据展示，不展示纪录")
   end)
 
   it("test_string_and_legacy_identity_tiebreak_has_a_stable_total_order", function()
@@ -116,7 +116,7 @@ describe("全服纪录纯逻辑（common/records）", function()
     local ids = { 2, 10, "002", "10", "2", "aU5A95JB9rit0DUl", "bU5A95JB9rit0DUl" }
     for i, left in ipairs(ids) do
       for j, right in ipairs(ids) do
-        assert.same(i < j, records.Wins(records.Entry(300, left), records.Entry(300, right)))
+        assert.same(i < j, Records.Wins(Records.Entry(300, left), Records.Entry(300, right)))
       end
     end
   end)
@@ -128,11 +128,11 @@ describe("全服纪录纯逻辑（common/records）", function()
       { 0.01, 1 }, { 0.2, 20 }, { 0.12, 12 }, { 1, 100 }, { 0.5, 50 },
       { 12.34, 1234 }, { 99.99, 9999 }, { 1234.56, 123456 },
     }) do
-      assert.same(pair[2], records.Scale(pair[1]), "重量 " .. tostring(pair[1]))
-      assert.same(pair[1], records.Unscale(pair[2]), "还原必须与写入一致")
+      assert.same(pair[2], Records.Scale(pair[1]), "重量 " .. tostring(pair[1]))
+      assert.same(pair[1], Records.Unscale(pair[2]), "还原必须与写入一致")
     end
-    assert.same(100, game_cfg.records.Scale)
+    assert.same(100, GameCfg.Records.Scale)
     -- 两位小数是存储精度上限：第三位不参与存储，不产生「读回比写入更精确」的假象
-    assert.same(13, records.Scale(0.125))
+    assert.same(13, Records.Scale(0.125))
   end)
 end)

@@ -1,4 +1,4 @@
--- 纯模块单测：ability-presets 的 game_cfg key 解析 / 回写、动作规划、命令行编码，以及
+-- 纯模块单测：ability-presets 的 GameCfg key 解析 / 回写、动作规划、命令行编码，以及
 -- --fix-names 的探针解析 / 修复计划 / unit id 与四步脚本生成（issue #30）。
 -- 不碰编辑器、不起子进程；真实 editor-cli 行为只能在本机编辑器开着地图、编辑态时人工验。
 -- 迁移自 tests/tooling/ability_presets_test.lua（#92，LuaUnit → 原生 Busted）；
@@ -7,7 +7,7 @@
 local ap = require("tools.ability_presets")
 
 local FIXTURE = [[
-game_cfg.Ability = {
+GameCfg.Ability = {
     ManagerPreset = "map://preset/ubdb4a7e737d4eddb87729e9055ba375",
     InitialAbilities = {
         {
@@ -280,7 +280,7 @@ describe("TestAbilityPresetsParse", function()
   end)
 
   -- 真源对得上：直接读仓库的 common/game_cfg.lua，三个 key 都要在、互不重复。
-  -- game_cfg.Ability 结构改动时这条先红，脚本不会在编辑器侧白跑。
+  -- GameCfg.Ability 结构改动时这条先红，脚本不会在编辑器侧白跑。
   it("test_real_gamecfg_parses", function()
     local f = io.open("common/game_cfg.lua", "rb")
     assert.is_not_nil(f)

@@ -1,25 +1,25 @@
-local re_util = {}
+local REUtil = {}
 
 local World = game:GetService("World")
 local RunService = game:GetService("RunService")
 
-re_util.REMap = {}
+REUtil.REMap = {}
 
 
 local RECDCheckMap = {}
 
-function re_util:GetRE(eventName)
-    local targetRE = re_util.REMap[eventName]
+function REUtil:GetRE(eventName)
+    local targetRE = REUtil.REMap[eventName]
     if not targetRE then 
         targetRE = RemoteEvent.New(eventName)
-        re_util.REMap[eventName] = targetRE
-        print("[re_util] RemoteEvent.New", eventName)
+        REUtil.REMap[eventName] = targetRE
+        print("[REUtil] RemoteEvent.New", eventName)
     end
     
     return targetRE
 end
 
-function re_util:CheckRECD(player, reName, duration)
+function REUtil:CheckRECD(player, reName, duration)
     if not duration then duration = 1 end
 
     local pMap = RECDCheckMap[player.UserId]
@@ -45,5 +45,5 @@ if RunService:IsServer() then
     end)
 end
 
-_G.re_util = re_util
-return re_util
+_G.REUtil = REUtil
+return REUtil

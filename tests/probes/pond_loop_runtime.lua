@@ -16,12 +16,12 @@
 -- 所有阶段都由玩家当前存档状态推出，没有外部进度文件。
 -- 冷却全部异步等待（Task:Wait），不会在一个调用里阻塞。
 
-local game_cfg = require('common.game_cfg')
-local math_water_judge = require('common.math_water_judge')
-local mgr_player_data = require('server.player_data_host')
-local server_runtime = require('server.world_host.server_runtime')
+local GameCfg = require('common.game_cfg')
+local MathWaterJudge = require('common.math_water_judge')
+local MgrPlayerData = require('server.player_data_host')
+local ServerRuntime = require('server.world_host.server_runtime')
 local function ground()
-    local runtime = server_runtime.current and server_runtime.current()
+    local runtime = ServerRuntime.current and ServerRuntime.current()
     return runtime and runtime:get_world()
 end
 local MgrLoot = {
@@ -42,10 +42,10 @@ local MgrLoot = {
         return world and world:try_pickup(player, id) or false
     end,
 }
-local interaction_points = require('server.world_host.interaction_points')
-local mgr_save = require('server.save_host')
+local InteractionPoints = require('server.world_host.interaction_points')
+local MgrSave = require('server.save_host')
 local function runtimeCommand(name, player, payload)
-    local runtime = server_runtime.current and server_runtime.current()
+    local runtime = ServerRuntime.current and ServerRuntime.current()
     return runtime and runtime[name](runtime, player, payload) or false
 end
 local interact = { Handle = function(_, player, payload)
@@ -55,17 +55,17 @@ local shop = { Handle = function(_, player, payload)
     return runtimeCommand('dispatch_shop', player, payload)
 end }
 local function findGoodsByNumber(number, level)
-    for _, goods in ipairs(game_cfg.Shop.Goods) do
-        if goods.number == number and goods.MinShopLevel <= level then return goods end
+    for _, goods in ipairs(GameCfg.Shop.Goods) do
+        if goods.Number == number and goods.MinShopLevel <= level then return goods end
     end
 end
-local fish_tree = require('server.world_host.fish_tree')
+local FishTree = require('server.world_host.fish_tree')
 local function runtimeOf()
-    return server_runtime.current and server_runtime.current()
+    return ServerRuntime.current and ServerRuntime.current()
 end
 local function fishHost()
     local runtime = runtimeOf()
-    return (runtime and runtime.fish_host) or fish_tree
+    return (runtime and runtime.fish_host) or FishTree
 end
 local MgrFishUnit = setmetatable({}, {
     __index = function(_, key) return fishHost()[key] end,
@@ -77,11 +77,11 @@ local function equippedWeapon(data)
     if type(held) == 'table' and held.kind == 'weapon' and data:WeaponCount(held.id) > 0 then
         return held.id
     end
-    local selected = data.data and data.data.SelectedWeapon
+    local selected = data.Data and data.Data.SelectedWeapon
     if selected and data:WeaponCount(selected) > 0 then return selected end
     return nil
 end
-local weapon = {
+local Weapon = {
     EquippedWeapon = function(_, data) return equippedWeapon(data) end,
     Attack = function(_, target)
         local runtime = runtimeOf()
@@ -105,7 +105,7 @@ local SETTLE_SEC = 1.5        -- 持久操作（Save:Execute）发出后等待�
 local COMBAT_WAIT_SEC = 90    -- 战斗等待多久没进展就暂停
 local WORM_TARGET = 5         -- 免费补给余量：食用与抛竿共用
 local LAND_STAND = { x = 5, z = -9 } -- 上岸后先正常步行到陆地再放鱼，避开岸外不可达掉落
-local DAGGER = { Id = 'item135', number = 25, MinLevel = 1 }
+local DAGGER = { Id = 'item135', Number = 25, MinLevel = 1 }
 local STAND_SHIFT = 4.4       -- 站位点：从 NPC 锚点向陆地中心移这么远（Radius 5 + Slack 0.5 内）
 local CAST_SPOT = { x = -1.5, z = -12.25 }  -- 面朝 -x 抛竿，落点 x≈-6.5 在 PondNotch/WaterCircle2 内
 
@@ -141,9 +141,9 @@ RT.unreachableLoot = RT.unreachableLoot or {}
 local TAG = RT.tag
 local uid = player.UserId
 
-local re_util = require('common.re_util')
+local REUtil = require('common.re_util')
 local function fishingFor(target)
-    local runtime = server_runtime.current and server_runtime.current()
+    local runtime = ServerRuntime.current and ServerRuntime.current()
     local tree = runtime and runtime:get_player_tree(target and target.UserId)
     return tree and tree.fishing or nil
 end
@@ -152,7 +152,7 @@ local ReelProbe = {}
 RT.castStateHook = RT.castStateHook or { states = {} }
 local stateHook = RT.castStateHook
 stateHook.uid = uid
-local castEvent = re_util:GetRE('CastState')
+local castEvent = REUtil:GetRE('CastState')
 if stateHook.event ~= castEvent then
     stateHook.event = castEvent
     stateHook.originalFireClient = castEvent.FireClient
@@ -180,7 +180,7 @@ function ReelProbe:Accept(target, payload)
     local fishing = fishingFor(target)
     return fishing and fishing:reel('click', payload) or false
 end
-local currentRuntime = server_runtime.current and server_runtime.current()
+local currentRuntime = ServerRuntime.current and ServerRuntime.current()
 if currentRuntime then currentRuntime:push_cast_state(player) end
 
 local function say(kind, ...)
@@ -189,10 +189,10 @@ end
 
 local function fmt(x) return string.format('%.2f', x) end
 
-local function dataOf() return mgr_player_data:GetDataInst(player) end
+local function dataOf() return MgrPlayerData:GetDataInst(player) end
 
-local function coins(data) return data.data.FishCoin or 0 end
-local function worms(data) return data.data.Bait.worm or 0 end
+local function coins(data) return data.Data.FishCoin or 0 end
+local function worms(data) return data.Data.Bait.worm or 0 end
 
 local function snapshot(reason)
     local data = dataOf()
@@ -201,12 +201,12 @@ local function snapshot(reason)
     say('K', reason, 'coin=' .. tostring(coins(data)), 'worm=' .. tostring(worms(data)),
         'eelHead=' .. data:ItemCount('eelHead'), 'duck=' .. data:ItemCount('duck'),
         'garHead=' .. data:ItemCount('garHead'), 'ticket=' .. data:ItemCount('shrimpTicket'),
-        'zone=' .. tostring(data.data.Zone),
+        'zone=' .. tostring(data.Data.Zone),
         'pick=' .. c.pick, 'feed=' .. c.feed .. '/' .. c.feedTry, 'buy=' .. c.buy .. '/' .. c.buyTry,
         'rejected=' .. c.rejected, 'unsettled=' .. c.unsettled, 'cast=' .. c.cast,
         'hooked=' .. c.hooked, 'landed=' .. c.landed, 'dropped=' .. c.dropped, 'attacks=' .. c.attacks,
         'ended=' .. c.kills, 'moves=' .. c.moves, 'deaths=' .. c.deaths, 'flanks=' .. c.flanks,
-        'dagger=' .. data:WeaponCount(DAGGER.Id), 'equipped=' .. tostring(weapon:EquippedWeapon(data)),
+        'dagger=' .. data:WeaponCount(DAGGER.Id), 'equipped=' .. tostring(Weapon:EquippedWeapon(data)),
         RT.legacy and ('legacy{feedTry=' .. RT.legacy.feedTry .. ' buyTry=' .. RT.legacy.buyTry
             .. ' daggerTries=' .. RT.legacy.daggerTries .. ' 未确认}') or 'legacy=none')
 end
@@ -222,10 +222,10 @@ local function charPos()
     return character and character.Position
 end
 
-local zone1 = game_cfg.Zones[1]
+local zone1 = GameCfg.Zones[1]
 local scene1 = zone1.Scene
-local chain = game_cfg.Content.Exchanges[1]
-local route = game_cfg.Ferry.Routes[1]
+local chain = GameCfg.Content.Exchanges[1]
+local route = GameCfg.Ferry.Routes[1]
 
 -- 站位点：锚点向陆地中心移 STAND_SHIFT 米（锚点本身可能在水或高处，只给 x/z）
 local function standPoint(anchorPos)
@@ -239,7 +239,7 @@ local function standPoint(anchorPos)
 end
 
 local function anchorPos(name)
-    local unit = interaction_points:FindAnchor(name)
+    local unit = InteractionPoints:FindAnchor(name)
     return unit and unit.Position
 end
 
@@ -256,7 +256,7 @@ local function pause(reason, point, label)
 end
 
 local function inRangeOf(names, radius, slack)
-    return interaction_points:InRange(player, { AnchorNames = names, Radius = radius, Slack = slack })
+    return InteractionPoints:InRange(player, { AnchorNames = names, Radius = radius, Slack = slack })
 end
 
 -- 去某个 NPC 锚点：不在范围内返回 pause，在范围内返回 nil
@@ -269,7 +269,7 @@ local function needNear(names, radius, slack, label)
 end
 
 -- ========== 库存辅助 ==========
-local function itemBar(data) return data.data.Containers[game_cfg.Items.ContainerId.ItemBar] end
+local function itemBar(data) return data.Data.Containers[GameCfg.Items.ContainerId.ItemBar] end
 
 local function slotOf(data, predicate)
     for slot, entry in pairs(itemBar(data)) do
@@ -278,23 +278,23 @@ local function slotOf(data, predicate)
 end
 
 local function isRodEntry(entry)
-    local def = game_cfg.Items.Definitions[entry.itemId]
+    local def = GameCfg.Items.Definitions[entry.itemId]
     return def and type(def.Level) == 'number'
 end
 
 local function rodSlot(data)
     return slotOf(data, function(entry)
-        local def = game_cfg.Items.Definitions[entry.itemId]
+        local def = GameCfg.Items.Definitions[entry.itemId]
         return def and type(def.Level) == 'number'
     end)
 end
 
-local ids = game_cfg.Items.ContainerId
+local ids = GameCfg.Items.ContainerId
 
 local function freeSlots(data)
     local free = 0
     for _, c in ipairs({ { ids.ItemBar, data:ItemBarCapacity() }, { ids.Backpack, data:BackpackCapacity() } }) do
-        local items = data.data.Containers[c[1]]
+        local items = data.Data.Containers[c[1]]
         for i = 1, c[2] do
             local e = items[i]
             if not e or e.count <= 0 then free = free + 1 end
@@ -307,7 +307,7 @@ end
 local function findEntry(data, predicate)
     local slot, entry = slotOf(data, predicate)
     if slot then return ids.ItemBar, slot, entry end
-    local bp = data.data.Containers[ids.Backpack]
+    local bp = data.Data.Containers[ids.Backpack]
     for i = 1, data:BackpackCapacity() do
         local e = bp[i]
         if e and e.count > 0 and predicate(e) then return ids.Backpack, i, e end
@@ -318,7 +318,7 @@ local function hasRod(data) return (findEntry(data, isRodEntry)) ~= nil end
 
 local KEEP = { duck = true, eelHead = true, garHead = true, shrimpTicket = true }
 local function keepOnBar(entry)
-    local def = game_cfg.Items.Definitions[entry.itemId]
+    local def = GameCfg.Items.Definitions[entry.itemId]
     return KEEP[entry.itemId] or (def and type(def.Level) == 'number')
 end
 
@@ -331,7 +331,7 @@ local function ensureOnBar(data, predicate)
     if data:MoveToItemBar(i) then
         RT.counts.moves = RT.counts.moves + 1
         say('MOVE-SLOT', 'MoveToItemBar', 'backpack#' .. i)
-        mgr_player_data:SendItemBar(player)
+        MgrPlayerData:SendItemBar(player)
         return 'moved'
     end
     local bar = itemBar(data)
@@ -341,7 +341,7 @@ local function ensureOnBar(data, predicate)
             if data:MoveSlot(ids.Backpack, i, ids.ItemBar, s) then
                 RT.counts.moves = RT.counts.moves + 1
                 say('MOVE-SLOT', 'MoveSlot swap', 'backpack#' .. i .. ' <-> bar#' .. s, 'out=' .. tostring(e.itemId))
-                mgr_player_data:SendItemBar(player)
+                MgrPlayerData:SendItemBar(player)
                 return 'moved'
             end
         end
@@ -352,11 +352,11 @@ end
 -- SelectSlot 是开关：已选中再选会取消，所以只在需要切换时调
 local function focus(data, slot)
     if slot == nil then
-        if data.data.SelectedSlot ~= nil then data:SelectSlot(data.data.SelectedSlot) end
-    elseif data.data.SelectedSlot ~= slot then
+        if data.Data.SelectedSlot ~= nil then data:SelectSlot(data.Data.SelectedSlot) end
+    elseif data.Data.SelectedSlot ~= slot then
         data:SelectSlot(slot)
     end
-    mgr_player_data:SendItemBar(player)
+    MgrPlayerData:SendItemBar(player)
 end
 
 local function nextSeq(mgr) return ((mgr.LastSeq[uid]) or 0) + 1 end
@@ -374,7 +374,7 @@ local SETTLE_TIMEOUT_SEC = 8
 local PENDING_KIND = { feed = 'feed', rod = 'buy', dagger = 'buy' }
 
 local function selectedItem(data)
-    local slot = data.data.SelectedSlot
+    local slot = data.Data.SelectedSlot
     local entry = slot and itemBar(data)[slot]
     return entry and entry.count and entry.count > 0 and entry.itemId or nil
 end
@@ -401,7 +401,7 @@ local function settledBy(kind, b, a)
 end
 
 local function savePaused()
-    return mgr_save:IsPaused(uid)
+    return MgrSave:IsPaused(uid)
 end
 
 -- 发出请求后调用：计尝试；accepted 才登记 pendingOp
@@ -459,10 +459,10 @@ local function pickBait()
     if not pos then return pause('角色不可用') end
     local loot, d = nearestBait(pos)
     if not loot then
-        say('WAIT', '场上暂无蚯蚓，等刷新', 'respawnSec=' .. game_cfg.BaitSpots.RespawnSec)
-        return 'wait', game_cfg.BaitSpots.RespawnSec
+        say('WAIT', '场上暂无蚯蚓，等刷新', 'respawnSec=' .. GameCfg.BaitSpots.RespawnSec)
+        return 'wait', GameCfg.BaitSpots.RespawnSec
     end
-    local reach = game_cfg.Loot.PickupRadius + (game_cfg.Loot.PickupSlack or 0)
+    local reach = GameCfg.Loot.PickupRadius + (GameCfg.Loot.PickupSlack or 0)
     if d > reach then
         return pause('拾饵', { x = loot.Position.x, z = loot.Position.z }, '拾饵 spot=' .. tostring(loot.SpotId))
     end
@@ -475,8 +475,8 @@ local function pickBait()
 end
 
 local function feed(data, label)
-    local wait = needNear(game_cfg.Interact.Fishermen[1].AnchorNames,
-        game_cfg.Interact.Fisherman.Radius, game_cfg.Interact.Fisherman.Slack, '喂食钓鱼佬 ' .. label)
+    local wait = needNear(GameCfg.Interact.Fishermen[1].AnchorNames,
+        GameCfg.Interact.Fisherman.Radius, GameCfg.Interact.Fisherman.Slack, '喂食钓鱼佬 ' .. label)
     if wait then return wait end
     local itemId = selectedItem(data)
     local before = ledger(data, itemId)
@@ -487,8 +487,8 @@ local function feed(data, label)
 end
 
 local function buyRod(data)
-    local stand = game_cfg.Shop.Stands[1]
-    local wait = needNear({ stand.AnchorName }, game_cfg.Shop.Radius, game_cfg.Shop.Slack, '钓场商店买竿')
+    local stand = GameCfg.Shop.Stands[1]
+    local wait = needNear({ stand.AnchorName }, GameCfg.Shop.Radius, GameCfg.Shop.Slack, '钓场商店买竿')
     if wait then return wait end
     local before = ledger(data)
     local ok = shop:Handle(player, { action = 'Buy', itemId = 'starterRod', seq = nextShopFeedSeq('shop') })
@@ -498,36 +498,36 @@ local function buyRod(data)
 end
 
 local function daggerPrice()
-    local goods = findGoodsByNumber(DAGGER.number, DAGGER.MinLevel)
+    local goods = findGoodsByNumber(DAGGER.Number, DAGGER.MinLevel)
     return goods and goods.Price
 end
 
 local function buyDagger(data)
     RT.daggerTries = RT.daggerTries or 0
     if RT.daggerTries >= 3 then return pause('匕首购买连续 3 次未到账，检查商店回包/日志') end
-    local stand = game_cfg.Shop.Stands[1]
-    local wait = needNear({ stand.AnchorName }, game_cfg.Shop.Radius, game_cfg.Shop.Slack, '钓场商店买匕首')
+    local stand = GameCfg.Shop.Stands[1]
+    local wait = needNear({ stand.AnchorName }, GameCfg.Shop.Radius, GameCfg.Shop.Slack, '钓场商店买匕首')
     if wait then return wait end
     local before = ledger(data)
-    local ok = shop:Handle(player, { action = 'Buy', number = DAGGER.number, seq = nextShopFeedSeq('shop') })
-    say('BUY', 'dagger#' .. DAGGER.number, 'accepted=' .. tostring(ok), ledgerText(before), 'price=' .. tostring(daggerPrice()))
+    local ok = shop:Handle(player, { action = 'Buy', number = DAGGER.Number, seq = nextShopFeedSeq('shop') })
+    say('BUY', 'dagger#' .. DAGGER.Number, 'accepted=' .. tostring(ok), ledgerText(before), 'price=' .. tostring(daggerPrice()))
     -- daggerTries 只在 accepted 且超时未到账时由 settleOp 累加，到账后清零
-    beginOp('dagger', 'dagger#' .. DAGGER.number, data, ok, nil, before)
+    beginOp('dagger', 'dagger#' .. DAGGER.Number, data, ok, nil, before)
     return 'wait', SETTLE_SEC
 end
 
 -- 装备匕首：SelectWeapon 是开关，只在未选中时调；EquippedWeapon 复核，被别的手持武器压住时才用 HoldWeapon 切换
 local function equipDagger(data)
-    if weapon:EquippedWeapon(data) == DAGGER.Id then return true end
-    if data.data.SelectedWeapon ~= DAGGER.Id then data:SelectWeapon(DAGGER.Id) end
-    if weapon:EquippedWeapon(data) ~= DAGGER.Id then
+    if Weapon:EquippedWeapon(data) == DAGGER.Id then return true end
+    if data.Data.SelectedWeapon ~= DAGGER.Id then data:SelectWeapon(DAGGER.Id) end
+    if Weapon:EquippedWeapon(data) ~= DAGGER.Id then
         local held = data.Extra.inventory.selection.held
         if held.kind == 'weapon' and held.id ~= DAGGER.Id then data:HoldWeapon(DAGGER.Id) end
     end
-    mgr_player_data:SendItemBar(player, true)
-    local ok = weapon:EquippedWeapon(data) == DAGGER.Id
+    MgrPlayerData:SendItemBar(player, true)
+    local ok = Weapon:EquippedWeapon(data) == DAGGER.Id
     RT.counts.dagger = RT.counts.dagger + 1
-    say('EQUIP', DAGGER.Id, 'equipped=' .. tostring(weapon:EquippedWeapon(data)), 'ok=' .. tostring(ok))
+    say('EQUIP', DAGGER.Id, 'equipped=' .. tostring(Weapon:EquippedWeapon(data)), 'ok=' .. tostring(ok))
     return ok
 end
 
@@ -536,33 +536,33 @@ local function validate(data)
     local missing = {}
     local function need(label, ok) if not ok then missing[#missing + 1] = label end end
     local function fn(label, mod, name) need(label .. name, type(mod) == 'table' and type(mod[name]) == 'function') end
-    fn('mgr_player_data:', mgr_player_data, 'GetDataInst') fn('mgr_player_data:', mgr_player_data, 'SendItemBar')
+    fn('MgrPlayerData:', MgrPlayerData, 'GetDataInst') fn('MgrPlayerData:', MgrPlayerData, 'SendItemBar')
     fn('MgrLoot:', MgrLoot, 'Pickup') need('MgrLoot.Loots', type(MgrLoot.Loots) == 'table')
-    for _, name in ipairs({ 'InRange', 'FindAnchor' }) do fn('interaction_points:', interaction_points, name) end
+    for _, name in ipairs({ 'InRange', 'FindAnchor' }) do fn('InteractionPoints:', InteractionPoints, name) end
     fn('interact:', interact, 'Handle') fn('shop:', shop, 'Handle')
     for _, name in ipairs({ 'Cast', 'Reel', 'Drop' }) do fn('CastProbe:', CastProbe, name) end
     need('CastProbe.Sessions', type(CastProbe.Sessions) == 'table')
     fn('ReelProbe:', ReelProbe, 'Accept')
     need('MgrFishUnit.Fish', type(MgrFishUnit.Fish) == 'table')
-    fn('weapon:', weapon, 'Attack') fn('weapon:', weapon, 'EquippedWeapon')
-    fn('ferry_route:', Ferry, 'Handle')
-    need('ferry_route.LastSeq', type(Ferry.LastSeq) == 'table')
+    fn('Weapon:', Weapon, 'Attack') fn('Weapon:', Weapon, 'EquippedWeapon')
+    fn('FerryRoute:', Ferry, 'Handle')
+    need('FerryRoute.LastSeq', type(Ferry.LastSeq) == 'table')
     for _, name in ipairs({ 'SelectSlot', 'SelectBait', 'SelectWeapon', 'HoldWeapon', 'MoveSlot', 'MoveToItemBar',
         'ItemCount', 'WeaponCount', 'GetItemBarSnapshot', 'ItemBarCapacity', 'BackpackCapacity' }) do
         need('data:' .. name, type(data[name]) == 'function')
     end
-    need('data.data.Containers', type(data.data.Containers) == 'table' and type(data.data.Containers[ids.ItemBar]) == 'table'
-        and type(data.data.Containers[ids.Backpack]) == 'table')
-    need('data.data.Weapons', type(data.data.Weapons) == 'table')
-    need('data.data.Bait', type(data.data.Bait) == 'table')
+    need('data.Data.Containers', type(data.Data.Containers) == 'table' and type(data.Data.Containers[ids.ItemBar]) == 'table'
+        and type(data.Data.Containers[ids.Backpack]) == 'table')
+    need('data.Data.Weapons', type(data.Data.Weapons) == 'table')
+    need('data.Data.Bait', type(data.Data.Bait) == 'table')
     need('data.Extra.inventory.selection.held', type(data.Extra) == 'table' and type(data.Extra.inventory) == 'table'
         and type(data.Extra.inventory.selection) == 'table' and type(data.Extra.inventory.selection.held) == 'table')
-    local goods = findGoodsByNumber(DAGGER.number, DAGGER.MinLevel)
+    local goods = findGoodsByNumber(DAGGER.Number, DAGGER.MinLevel)
     need('商店编号 25 = item135', goods and goods.ItemId == DAGGER.Id and type(goods.Price) == 'number')
-    need('game_cfg.Ability.MeleeWeapons.item135', game_cfg.Ability.MeleeWeapons and game_cfg.Ability.MeleeWeapons[DAGGER.Id] ~= nil)
-    need('game_cfg.Ability.Unarmed', game_cfg.Ability.Unarmed ~= nil)
-    local vitals = weapon.Life()
-    need('server_runtime.life:LifeStatus/CanAct', vitals and type(vitals.LifeStatus) == 'function' and type(vitals.CanAct) == 'function')
+    need('GameCfg.Ability.MeleeWeapons.item135', GameCfg.Ability.MeleeWeapons and GameCfg.Ability.MeleeWeapons[DAGGER.Id] ~= nil)
+    need('GameCfg.Ability.Unarmed', GameCfg.Ability.Unarmed ~= nil)
+    local vitals = Weapon.Life()
+    need('ServerRuntime.life:LifeStatus/CanAct', vitals and type(vitals.LifeStatus) == 'function' and type(vitals.CanAct) == 'function')
     if #missing > 0 then
         say('CHECK-FAIL', table.concat(missing, ' | '))
         return false
@@ -578,17 +578,17 @@ local function predictLanding()
     local forward = character.Rotation:GetForward()
     local len = math.sqrt(forward.x * forward.x + forward.z * forward.z)
     if len < 0.01 then return nil end
-    local x = character.Position.x + game_cfg.Casting.Distance * forward.x / len
-    local z = character.Position.z + game_cfg.Casting.Distance * forward.z / len
-    for _, water in ipairs(game_cfg.Water.Zones) do
-        if math_water_judge.InZone(water, { x = x, y = water.SurfaceY, z = z }) then return water, x, z end
+    local x = character.Position.x + GameCfg.Casting.Distance * forward.x / len
+    local z = character.Position.z + GameCfg.Casting.Distance * forward.z / len
+    for _, water in ipairs(GameCfg.Water.Zones) do
+        if MathWaterJudge.InZone(water, { x = x, y = water.SurfaceY, z = z }) then return water, x, z end
     end
     return nil, x, z
 end
 
 local function castRod(data, useDuck)
     local function isRod(entry)
-        local def = game_cfg.Items.Definitions[entry.itemId]
+        local def = GameCfg.Items.Definitions[entry.itemId]
         return def and type(def.Level) == 'number'
     end
     local slot, why = ensureOnBar(data, isRod)
@@ -602,9 +602,9 @@ local function castRod(data, useDuck)
         if duckSlot == 'moved' then return 'wait', 0.4 end
         if not duckSlot then return pause('鸭子饵不在道具栏: ' .. tostring(duckWhy)) end
     end
-    if data.data.SelectedBait ~= bait then
+    if data.Data.SelectedBait ~= bait then
         if not data:SelectBait(bait) then return pause('无法挂饵 ' .. bait) end
-        mgr_player_data:SendItemBar(player)
+        MgrPlayerData:SendItemBar(player)
     end
     local water, lx, lz = predictLanding()
     if not water then
@@ -639,8 +639,8 @@ local function myFish()
 end
 
 local function weaponStats(data)
-    local id = weapon:EquippedWeapon(data)
-    local mcfg = id and game_cfg.Ability.MeleeWeapons[id] or game_cfg.Ability.Unarmed
+    local id = Weapon:EquippedWeapon(data)
+    local mcfg = id and GameCfg.Ability.MeleeWeapons[id] or GameCfg.Ability.Unarmed
     return mcfg.Range, mcfg.IntervalSec
 end
 
@@ -653,7 +653,7 @@ local function isTarget(fishId) return fishId == chain.EliteFish or fishId == ch
 
 -- 可捡/可卖的鱼获：所有鱼的掉落（普通鱼整鱼卖金币，电鳗鳄雀鳝的肉与头）
 local dropIds = {}
-for _, species in pairs(game_cfg.Fish) do
+for _, species in pairs(GameCfg.Fish) do
     for _, drop in ipairs(species.Drops or {}) do dropIds[drop.ItemId] = true end
 end
 
@@ -682,7 +682,7 @@ local function pickDrops()
         end
     end
     if not best then return nil end
-    local reach = game_cfg.Loot.PickupRadius + (game_cfg.Loot.PickupSlack or 0)
+    local reach = GameCfg.Loot.PickupRadius + (GameCfg.Loot.PickupSlack or 0)
     if bd <= reach and freeSlots(dataOf()) == 0 then
         -- 满包：Pickup 会失败。先把可卖的整理上道具栏喂掉腾格；没有可卖的就暂停交给玩家丢弃/整理
         local slot, why = ensureOnBar(dataOf(), function(e) return dropIds[e.itemId] end)
@@ -696,7 +696,7 @@ local function pickDrops()
     if MgrLoot:Pickup(player, best.Id) then
         RT.counts.pick = RT.counts.pick + 1
         say('PICK', best.ItemId, 'loot=' .. tostring(best.Id))
-        local fishDef = game_cfg.Fish[best.ItemId]
+        local fishDef = GameCfg.Fish[best.ItemId]
         if fishDef and fishDef.Grade == 'rare' then
             local _, _, entry = findEntry(dataOf(), function(e) return e.itemId == best.ItemId end)
             local eligible, reason = require('common.lottery_eligibility').Check(entry)
@@ -711,7 +711,7 @@ end
 local function step()
     local data = dataOf()
     if not data then return 'wait', 0.3 end
-    if game_cfg.Debug.Enabled then return pause('Debug.Enabled=true，请用 Debug=false 的新验收槽') end
+    if GameCfg.Debug.Enabled then return pause('Debug.Enabled=true，请用 Debug=false 的新验收槽') end
     if not RT.checked then
         if not validate(data) then return 'pause' end
         RT.checked = true
@@ -719,7 +719,7 @@ local function step()
 
     -- 死亡免费恢复：倒地 15s → 死亡 30s → 原地弱复活（10% 血、半速）。只等待，不治疗不传送；
     -- 复活后继续正常拾饵、喂食；饥饿仍为零时静等会再次饿死，不用等待代替恢复。
-    local vitals = weapon.Life()
+    local vitals = Weapon.Life()
     local life = vitals and vitals:LifeStatus(player) or 'alive'
     if life == 'downed' or life == 'dead' then
         if not RT.lifeSince then
@@ -754,10 +754,10 @@ local function step()
             if combatFish then return 'wait', 0.5 end
             return pickBait()
         end
-        local v = mgr_player_data.vitals or weapon.Life()
+        local v = MgrPlayerData.Vitals or Weapon.Life()
         if v:CanEat(player, 'worm') and data:EatBait('worm') then
             v:Eat(player, 'worm')
-            mgr_player_data:SendItemBar(player)
+            MgrPlayerData:SendItemBar(player)
             say('EAT', 'worm', 'hungerBefore=' .. hunger)
             return 'wait', 0.3
         end
@@ -769,8 +769,8 @@ local function step()
     if RT.pendingUntil and now() < RT.pendingUntil then return 'wait', 0.3 end
 
     -- 0 摆渡：有船票就去 FerryBoat（航线 1），到达虾池即闭环完成
-    if data.data.Zone ~= zone1.Id then
-        say('DONE', '已到达', tostring(data.data.Zone))
+    if data.Data.Zone ~= zone1.Id then
+        say('DONE', '已到达', tostring(data.Data.Zone))
         snapshot('done')
         return 'done'
     end
@@ -798,10 +798,10 @@ local function step()
         local target = isTarget(held.FishId)
         if target and type(hunger) == 'number' and hunger < 180 then
             if worms(data) < 1 then return pickBait() end
-            local v = mgr_player_data.vitals or weapon.Life()
+            local v = MgrPlayerData.Vitals or Weapon.Life()
             if v:CanEat(player, 'worm') and data:EatBait('worm') then
                 v:Eat(player, 'worm')
-                mgr_player_data:SendItemBar(player)
+                MgrPlayerData:SendItemBar(player)
                 say('EAT', 'worm', '战前补给', 'hungerBefore=' .. hunger)
             end
             return 'wait', 0.3
@@ -817,9 +817,9 @@ local function step()
         end
         -- 普通鱼放下即逃（EscapeSec 很短）：不等，立刻挥击，击杀掉落整鱼卖钱攒匕首
         RT.counts.dropped = RT.counts.dropped + 1
-        say('DROP', 'prey', held.FishId, 'weapon=' .. tostring(weapon:EquippedWeapon(data)))
+        say('DROP', 'prey', held.FishId, 'weapon=' .. tostring(Weapon:EquippedWeapon(data)))
         RT.counts.attacks = RT.counts.attacks + 1
-        weapon:Attack(player)
+        Weapon:Attack(player)
         return 'wait', 0.3
     end
     if live then
@@ -862,7 +862,7 @@ local function step()
         end
         if not dist or dist <= range + 1.5 then
             RT.counts.attacks = RT.counts.attacks + 1
-            weapon:Attack(player)
+            Weapon:Attack(player)
         elseif isBoss and now() - RT.combatSince > 5 then
             say('COMBAT', live.FishId, 'state=' .. tostring(live.State), 'dist=' .. fmt(dist),
                 'fish@' .. fmt(p.x) .. ',' .. fmt(p.z))
@@ -969,7 +969,7 @@ end
 
 -- ========== 异步驱动 ==========
 Task:Spawn(function()
-    say('START', 'Debug.Enabled=' .. tostring(game_cfg.Debug.Enabled), 'zone=' .. tostring(dataOf() and dataOf().data.Zone))
+    say('START', 'Debug.Enabled=' .. tostring(GameCfg.Debug.Enabled), 'zone=' .. tostring(dataOf() and dataOf().Data.Zone))
     snapshot('start')
     local lastKind = nil
     while RT.token == myToken do

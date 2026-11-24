@@ -1,8 +1,8 @@
 
-local game_cfg = require("common.game_cfg")
-local number = require("common.number")
+local GameCfg = require("common.game_cfg")
+local Number = require("common.number")
 
-local life_facade = {}
+local LifeFacade = {}
 
 local function is_object(value)
   local kind = type(value)
@@ -30,7 +30,7 @@ local function read_position(character)
 end
 
 ---@param ctx table
-function life_facade.new(ctx)
+function LifeFacade.new(ctx)
   local player_trees = ctx.player_trees
   local active_players = ctx.active_players
   local weapon_sessions = ctx.weapon_sessions
@@ -102,7 +102,7 @@ function life_facade.new(ctx)
   function life:CanEat(player, item_id)
     local tree = tree_of(player)
     if not tree or tree.memos.can_act:now() ~= true then return false end
-    local definition = type(item_id) == "string" and game_cfg.Items.Definitions[item_id]
+    local definition = type(item_id) == "string" and GameCfg.Items.Definitions[item_id]
     return type(definition) == "table" and type(definition.EatPercent) == "number"
   end
 
@@ -116,12 +116,12 @@ function life_facade.new(ctx)
     local max_health_of = get_max_health_of and get_max_health_of() or nil
     if type(max_health_of) == "function" then
       local ok, value = pcall(max_health_of, player)
-      if ok and number.IsFiniteNumber(value) and value >= 1 then return math.floor(value) end
+      if ok and Number.IsFiniteNumber(value) and value >= 1 then return math.floor(value) end
     end
     local tree = tree_of(player)
     local value = tree and tree.memos.max_health and tree.memos.max_health:now()
-    if number.IsFiniteNumber(value) and value >= 1 then return math.floor(value) end
-    return game_cfg.vitals.MaxHealth
+    if Number.IsFiniteNumber(value) and value >= 1 then return math.floor(value) end
+    return GameCfg.Vitals.MaxHealth
   end
 
   function life:SnapshotHealth(player)
@@ -172,7 +172,7 @@ function life_facade.new(ctx)
 
   function life:SetHealth(player, value)
     local tree = tree_of(player)
-    if not tree or not number.IsFiniteNumber(value) then return false end
+    if not tree or not Number.IsFiniteNumber(value) then return false end
     local current = tree.states.health:now()
     if value < current then
       return self:ApplyDamage(player, current - value, self:NewHit(nil, "gm"))
@@ -182,7 +182,7 @@ function life_facade.new(ctx)
     if not controller then return false end
     local ok, err = pcall(function() controller.Health = value end)
     if not ok then
-      print("[life_facade] operation=SetHealth", "player=" .. tostring(player.UserId), tostring(err))
+      print("[LifeFacade] operation=SetHealth", "player=" .. tostring(player.UserId), tostring(err))
       return false
     end
     tree.states.health:set(value)
@@ -191,8 +191,8 @@ function life_facade.new(ctx)
 
   function life:SetHunger(player, value)
     local tree = tree_of(player)
-    if not tree or not number.IsFiniteNumber(value) then return false end
-    local clamped = math.max(0, math.min(game_cfg.vitals.MaxHunger, math.floor(value)))
+    if not tree or not Number.IsFiniteNumber(value) then return false end
+    local clamped = math.max(0, math.min(GameCfg.Vitals.MaxHunger, math.floor(value)))
     tree.states.hunger:set(clamped)
     return true
   end
@@ -208,16 +208,16 @@ function life_facade.new(ctx)
   end
 
   function life:RescueAction(player, payload)
-    if type(payload) ~= "table" or payload.action ~= game_cfg.Rescue.Action then return false end
+    if type(payload) ~= "table" or payload.action ~= GameCfg.Rescue.Action then return false end
     local seq = payload.seq
-    if not number.IsFiniteNumber(seq) or seq ~= math.floor(seq) or seq < 1 or seq > 2147483647 then return false end
+    if not Number.IsFiniteNumber(seq) or seq ~= math.floor(seq) or seq < 1 or seq > 2147483647 then return false end
     local function reply(result)
       if opts.remote and type(opts.remote.GetRE) == "function" then
         opts.remote:GetRE("InteractResult"):FireClient(player, result)
       end
       return result
     end
-    if not number.IsFiniteNumber(payload.targetUserId) then
+    if not Number.IsFiniteNumber(payload.targetUserId) then
       reply({ action = "Rescue", ok = false, reason = "invalid", seq = seq })
       return false
     end
@@ -252,7 +252,7 @@ function life_facade.new(ctx)
       return false
     end
     local dx, dz = from.x - to.x, from.z - to.z
-    if math.sqrt(dx * dx + dz * dz) > game_cfg.Rescue.Range then
+    if math.sqrt(dx * dx + dz * dz) > GameCfg.Rescue.Range then
       reply({ action = "Rescue", ok = false, reason = "too-far", seq = seq, targetUserId = target.UserId })
       return false
     end
@@ -325,4 +325,4 @@ function life_facade.new(ctx)
   return life
 end
 
-return life_facade
+return LifeFacade

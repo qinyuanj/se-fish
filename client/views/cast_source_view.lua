@@ -1,7 +1,7 @@
-local game_cfg = require("common.game_cfg")
-local view_util = require("client.views.view_util")
+local GameCfg = require("common.game_cfg")
+local ViewUtil = require("client.views.view_util")
 
-local cast_source_view = {}
+local CastSourceView = {}
 
 local function vector(p)
   return Vector3.New(p.x, p.y, p.z)
@@ -16,17 +16,17 @@ local function create_world(ctx, kind, props)
 end
 
 local function resolve_reef_hook(state, ctx)
-  local fish = type(state) == "table" and state.fishId and game_cfg.Fish[state.fishId] or nil
+  local fish = type(state) == "table" and state.fishId and GameCfg.Fish[state.fishId] or nil
   local reel = ctx.services and ctx.services.reel
   local active = not reel or type(reel.active) ~= "function" or reel.active(state and state.reelSession)
   if not active or type(state) ~= "table" or state.phase ~= "hooked" or not fish
-    or fish.ZoneId ~= "reefIsland" or type(state.castId) ~= "number" or view_util.read_vec3(state.hookPosition) == nil then
+    or fish.ZoneId ~= "reefIsland" or type(state.castId) ~= "number" or ViewUtil.read_vec3(state.hookPosition) == nil then
     return nil
   end
   return fish
 end
 
-function cast_source_view.spec()
+function CastSourceView.spec()
   return {
     name = "CastSource",
     mount = function(scope, ctx)
@@ -65,23 +65,23 @@ function cast_source_view.spec()
           local p = state.hookPosition
           local ok, created = pcall(create_world, ctx, "WorldUnit", {
             Name = "CastSource_" .. tostring(state.castId), Position = vector(p),
-            RenderMeshId = "official://mesh/" .. tostring(fish.model), PhysicsActive = false, CanQuery = false,
+            RenderMeshId = "official://mesh/" .. tostring(fish.Model), PhysicsActive = false, CanQuery = false,
             ModelColor1 = Color.New(fish.VisualColor[1], fish.VisualColor[2], fish.VisualColor[3], fish.VisualColor[4]),
           })
           if not ok or not created then
             current = nil
-            print("[cast_source_view] 创建来源失败", tostring(created))
+            print("[CastSourceView] 创建来源失败", tostring(created))
             return
           end
           body = created
           local line_ok, created_line = pcall(create_world, ctx, "LinkEffectUnit", {
-            Name = "CastSourceLine_" .. tostring(state.castId), EffectId = game_cfg.Casting.LineEffect,
+            Name = "CastSourceLine_" .. tostring(state.castId), EffectId = GameCfg.Casting.LineEffect,
             Position = vector(p), EndPosition = vector(p),
           })
           if line_ok and created_line then
             line = created_line
           elseif not line_ok then
-            print("[cast_source_view] 创建钓线失败", tostring(created_line))
+            print("[CastSourceView] 创建钓线失败", tostring(created_line))
           end
         end
 
@@ -93,8 +93,8 @@ function cast_source_view.spec()
           if not body or not current then return end
           local target = character()
           local state = ctx.store.cast:now()
-          local dx, dy, dz = view_util.read_vec3(target and target.Position)
-          local ox, oy, oz = view_util.read_vec3(type(state) == "table" and state.hookPosition or nil)
+          local dx, dy, dz = ViewUtil.read_vec3(target and target.Position)
+          local ox, oy, oz = ViewUtil.read_vec3(type(state) == "table" and state.hookPosition or nil)
           if dx == nil or ox == nil then return end
           local reel = ctx.services and ctx.services.reel
           local progress = type(reel) == "table" and type(reel.progress) == "function" and reel.progress() or 50
@@ -112,7 +112,7 @@ function cast_source_view.spec()
             end
           end)
           if not ok then
-            print("[cast_source_view] 更新来源失败", tostring(err))
+            print("[CastSourceView] 更新来源失败", tostring(err))
             clear()
           end
         end)
@@ -123,4 +123,4 @@ function cast_source_view.spec()
   }
 end
 
-return cast_source_view
+return CastSourceView

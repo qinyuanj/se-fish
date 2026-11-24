@@ -1,10 +1,10 @@
--- #89 迁移（原 tests/gameplay/attr_presentation_test.lua），#297-b 迁入 Spoke camera_zoom_view：
+-- #89 迁移（原 tests/gameplay/attr_presentation_test.lua），#297-B 迁入 Spoke CameraZoomView：
 -- 失败方式：派生范围无消费者、非法复制属性扩大距离、相机覆盖其他模式、角色重建残留。
 describe('TestAttrPresentation', function()
     -- 相机刷新尊重其他拥有者，清理时恢复
     it('test_camera_rebuild_restores_old_camera_and_uses_new_character_projection', function()
-        local camera_zoom_view = require('client.views.camera_zoom_view')
-        local ctrl = camera_zoom_view.new_controller()
+        local CameraZoomView = require('client.views.camera_zoom_view')
+        local ctrl = CameraZoomView.new_controller()
         local first = { GetAttribute = function() return 39 end }
         local second = { GetAttribute = function() return 13 end }
         local camera = { Distance = 8, TrackingUnit = first }
@@ -18,8 +18,8 @@ describe('TestAttrPresentation', function()
 
     -- 相机刷新尊重外部改动（他人拥有）并在清理后恢复；新实例不残留上一份
     it('test_camera_refresh_respects_other_owner_and_restores_on_stop', function()
-        local camera_zoom_view = require('client.views.camera_zoom_view')
-        local ctrl = camera_zoom_view.new_controller()
+        local CameraZoomView = require('client.views.camera_zoom_view')
+        local ctrl = CameraZoomView.new_controller()
         local character = { GetAttribute = function() return 52 end }
         local camera = { Distance = 8, TrackingUnit = character }
         assert.is_true(ctrl:refresh(character, camera))
@@ -29,7 +29,7 @@ describe('TestAttrPresentation', function()
         assert.same(12, camera.Distance)
         ctrl:release()
         assert.same(12, camera.Distance)
-        local fresh = camera_zoom_view.new_controller()
+        local fresh = CameraZoomView.new_controller()
         camera.Distance = 8
         assert.is_true(fresh:refresh(character, camera))
         fresh:release()

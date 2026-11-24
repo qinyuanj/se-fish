@@ -1,6 +1,6 @@
-local grill_curve = {}
+local GrillCurve = {}
 
-function grill_curve.Rate(elapsed, cfg)
+function GrillCurve.Rate(elapsed, cfg)
     if type(elapsed) ~= 'number' or elapsed ~= elapsed or elapsed >= math.huge then return nil end
     if elapsed < 0 then elapsed = 0 end
     if elapsed >= cfg.BurnSec then return 0 end
@@ -12,12 +12,12 @@ function grill_curve.Rate(elapsed, cfg)
     return cfg.MaxRate * (1 - falling)
 end
 
-function grill_curve.IsBurnt(elapsed, cfg)
+function GrillCurve.IsBurnt(elapsed, cfg)
     return type(elapsed) == 'number' and elapsed >= cfg.BurnSec
 end
 
-function grill_curve.Format(rate)
+function GrillCurve.Format(rate)
     return string.format('%.2f', rate)
 end
 
-return grill_curve
+return GrillCurve

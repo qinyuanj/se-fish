@@ -4,31 +4,31 @@
 
 | ID | 条款 | 组 | 执行者 | 证据等级 | 状态 | 证据 / 理由 |
 | --- | --- | --- | --- | --- | --- | --- |
-| 7-01 | 金币的来源只有喂食与抽奖两种 | 规则 | agent | a | unverified | — |
-| 7-02 | 金币的消耗去向为钓场商店、升级与返程摆渡 | 规则 | agent | a | unverified | — |
-| 7-03 | 盲盒不消耗金币 | 规则 | agent | a | unverified | — |
-| 7-04 | 金豆用于平台付费，乐园币为平台免费货币，二者与金币互不通用 | 规则 | agent | a | unverified | — |
-| 7-05 | 钓场商店只卖不买，玩家不能把物品卖回商店换取金币 | 规则 | agent | a | unverified | — |
-| 7-06 | 鱼获、多余鱼竿与武器的回收只能通过钓鱼佬的喂食入口完成 | 规则 | agent | a | unverified | — |
-| 7-07 | 每个钓鱼区各有自己的商店老板与商店等级 | 规则 | agent | a | unverified | — |
-| 7-08 | 高等级商店兼容售卖所有最低商店等级不高于当前等级的商品 | 规则 | agent | a | unverified | — |
-| 7-09 | 钓场商店分为钓具、武器、升级、金币四个分页 | 规则 | agent | a | unverified | — |
-| 7-10 | 商品表去掉已作废的编号 27（背包升级 7）后共 50 条，每条落实编号、最低商店等级、分页、价格金币与每人上限 | 规则 | agent | a | unverified | — |
-| 7-11 | 每人上限为 1 的商品每档只能购买一次；上限为 0 表示不限购 | 规则 | agent | a | evidenced | tests/native/spec/07_shop_purchase_limit_test.lua |
-| 7-12 | 首领饵不列入商店售卖，只能通过信物兑换获得 | 规则 | agent | a | unverified | — |
-| 7-13 | 当地新解锁的商品在商店中置顶显示 | 规则 | agent | a | unverified | — |
-| 7-14 | 同一组商品在多次打开商店后保持稳定排序，不随机重排 | 规则 | agent | a | unverified | — |
-| 7-15 | 金币不足时给出提示，并提供地图商店入口 | 规则 | agent | a | unverified | — |
-| 7-16 | 金币页商品经平台适配层购买（真实参数未交付时用共享配置的占位商品 ID 与占位汇率），到账只加金币、不参与金币余额的扣减结算 | 规则 | agent | a | evidenced | tests/native/spec/07_coin_page_placeholder_test.lua |
-| 7-17 | 一次购买在同一次服务端结算中完成扣费与发奖：余额不足或库存无可用格时整体失败，既不扣金币也不发物品（占位支付通道下同一结算口径，不改判定） | 契约 | agent | a | evidenced | tests/native/spec/07_shop_settlement_atomic_test.lua |
-| 7-18 | 购买请求重复提交（重复点击、断线重连后重放）只结算一次，不重复扣费 | 契约 | agent | b | unverified | — |
-| 7-19 | 每人上限为 1 的升级重复购买被拒绝，且不扣金币、不重复加成 | 契约 | agent | b | unverified | — |
-| 7-20 | 购买背包升级后道具栏 +1、背包格 +5，并在当前界面立即生效，无需重进或换图 | 契约 | agent | b | unverified | — |
-| 7-21 | 商店等级与已购升级随存档保存：重连或换会话后可见商品集合与限购状态不变 | 契约 | agent | b | unverified | — |
-| 7-22 | 金币余额以服务端为准，结算后客户端显示的余额与服务端一致 | 契约 | agent | b | unverified | — |
-| 7-23 | 钓场商店、摆渡返程与钓鱼佬兑换共用同一份金币账本，不存在第二套余额 | 契约 | agent | b | unverified | — |
-| 7-24 | 平台适配层不可用（真实参数未交付且占位通道关闭）导致金币页拉不起来时，商店界面仍可正常关闭并返回游戏，不阻塞其它操作 | 契约 | agent | b | unverified | — |
-| 7-25 | 金币页用共享配置里的占位汇率与占位商品 ID 走通购买与到账；真实汇率与商品 ID 由平台后台交付后只替换配置，不改玩法判定 | 规则 | agent | a | evidenced | tests/native/spec/07_coin_page_placeholder_test.lua |
+| 7-01 | 金币的来源只有喂食与抽奖两种 | 规则 | agent | A | unverified | — |
+| 7-02 | 金币的消耗去向为钓场商店、升级与返程摆渡 | 规则 | agent | A | unverified | — |
+| 7-03 | 盲盒不消耗金币 | 规则 | agent | A | unverified | — |
+| 7-04 | 金豆用于平台付费，乐园币为平台免费货币，二者与金币互不通用 | 规则 | agent | A | unverified | — |
+| 7-05 | 钓场商店只卖不买，玩家不能把物品卖回商店换取金币 | 规则 | agent | A | unverified | — |
+| 7-06 | 鱼获、多余鱼竿与武器的回收只能通过钓鱼佬的喂食入口完成 | 规则 | agent | A | unverified | — |
+| 7-07 | 每个钓鱼区各有自己的商店老板与商店等级 | 规则 | agent | A | unverified | — |
+| 7-08 | 高等级商店兼容售卖所有最低商店等级不高于当前等级的商品 | 规则 | agent | A | unverified | — |
+| 7-09 | 钓场商店分为钓具、武器、升级、金币四个分页 | 规则 | agent | A | unverified | — |
+| 7-10 | 商品表去掉已作废的编号 27（背包升级 7）后共 50 条，每条落实编号、最低商店等级、分页、价格金币与每人上限 | 规则 | agent | A | unverified | — |
+| 7-11 | 每人上限为 1 的商品每档只能购买一次；上限为 0 表示不限购 | 规则 | agent | A | evidenced | tests/native/spec/07_shop_purchase_limit_test.lua |
+| 7-12 | 首领饵不列入商店售卖，只能通过信物兑换获得 | 规则 | agent | A | unverified | — |
+| 7-13 | 当地新解锁的商品在商店中置顶显示 | 规则 | agent | A | unverified | — |
+| 7-14 | 同一组商品在多次打开商店后保持稳定排序，不随机重排 | 规则 | agent | A | unverified | — |
+| 7-15 | 金币不足时给出提示，并提供地图商店入口 | 规则 | agent | A | unverified | — |
+| 7-16 | 金币页商品经平台适配层购买（真实参数未交付时用共享配置的占位商品 ID 与占位汇率），到账只加金币、不参与金币余额的扣减结算 | 规则 | agent | A | evidenced | tests/native/spec/07_coin_page_placeholder_test.lua |
+| 7-17 | 一次购买在同一次服务端结算中完成扣费与发奖：余额不足或库存无可用格时整体失败，既不扣金币也不发物品（占位支付通道下同一结算口径，不改判定） | 契约 | agent | A | evidenced | tests/native/spec/07_shop_settlement_atomic_test.lua |
+| 7-18 | 购买请求重复提交（重复点击、断线重连后重放）只结算一次，不重复扣费 | 契约 | agent | B | unverified | — |
+| 7-19 | 每人上限为 1 的升级重复购买被拒绝，且不扣金币、不重复加成 | 契约 | agent | B | unverified | — |
+| 7-20 | 购买背包升级后道具栏 +1、背包格 +5，并在当前界面立即生效，无需重进或换图 | 契约 | agent | B | unverified | — |
+| 7-21 | 商店等级与已购升级随存档保存：重连或换会话后可见商品集合与限购状态不变 | 契约 | agent | B | unverified | — |
+| 7-22 | 金币余额以服务端为准，结算后客户端显示的余额与服务端一致 | 契约 | agent | B | unverified | — |
+| 7-23 | 钓场商店、摆渡返程与钓鱼佬兑换共用同一份金币账本，不存在第二套余额 | 契约 | agent | B | unverified | — |
+| 7-24 | 平台适配层不可用（真实参数未交付且占位通道关闭）导致金币页拉不起来时，商店界面仍可正常关闭并返回游戏，不阻塞其它操作 | 契约 | agent | B | unverified | — |
+| 7-25 | 金币页用共享配置里的占位汇率与占位商品 ID 走通购买与到账；真实汇率与商品 ID 由平台后台交付后只替换配置，不改玩法判定 | 规则 | agent | A | evidenced | tests/native/spec/07_coin_page_placeholder_test.lua |
 
 ## C 级（试玩取证）
 

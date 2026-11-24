@@ -1,9 +1,9 @@
 -- #86 迁移（原 tests/gameplay/hold_operate_mgr_test.lua，#124 统一分发失败方式）：
 -- 首次即消费、重复点击重复扣物、丢弃未接地面物品接口仍扣物、
--- 分发不写回包客户端无从重试、绕开 vitals 直接扣食。
--- 接缝：mgr_player_data:Handle 请求入口。
-local game_cfg = require('common.game_cfg')
-local mgr = require('server.player_data_host')
+-- 分发不写回包客户端无从重试、绕开 Vitals 直接扣食。
+-- 接缝：MgrPlayerData:Handle 请求入口。
+local GameCfg = require('common.game_cfg')
+local Mgr = require('server.player_data_host')
 
 local function signal()
     local callbacks = {}
@@ -24,10 +24,10 @@ describe("持有操作的服务端分发", function()
     -- 与旧 LuaUnit 的每例 setUp/tearDown 同级成对：分发夹具逐例建立、逐例清理。
     before_each(function()
         ctx = { events = {}, eaten = {} }
-        ctx.debug = game_cfg.Debug
-        game_cfg.Debug = { Enabled = false }
-        ctx.oldREUtil = _G.re_util
-        _G.re_util = { CheckRECD = function() return false end, GetRE = function(_, name)
+        ctx.debug = GameCfg.Debug
+        GameCfg.Debug = { Enabled = false }
+        ctx.oldREUtil = _G.REUtil
+        _G.REUtil = { CheckRECD = function() return false end, GetRE = function(_, name)
             if not ctx.events[name] then
                 ctx.events[name] = {
                     OnServerEvent = signal(),
@@ -39,24 +39,24 @@ describe("持有操作的服务端分发", function()
         ctx.player = { UserId = 34010, Character = { Name = 'Eggy' },
             CharacterAdded = signal(), CharacterRemoving = signal() }
         function ctx.player:SetAttribute() end
-        mgr.vitals = { CanEat = function() return true end,
+        Mgr.Vitals = { CanEat = function() return true end,
             Eat = function(_, player, itemId)
                 ctx.eaten[#ctx.eaten + 1] = { player = player, itemId = itemId }
             end }
-        mgr.Save = nil
-        mgr:Start()
-        mgr:OnPlayerAdded(ctx.player)
-        ctx.data = mgr:GetDataInst(ctx.player)
+        Mgr.Save = nil
+        Mgr:Start()
+        Mgr:OnPlayerAdded(ctx.player)
+        ctx.data = Mgr:GetDataInst(ctx.player)
     end)
 
-    -- 分发夹具逐例回收；setUp 中途失败时仍恢复全局与配置（mgr_player_data 是双端共享单例）。
+    -- 分发夹具逐例回收；setUp 中途失败时仍恢复全局与配置（MgrPlayerData 是双端共享单例）。
     after_each(function()
-        if ctx.player then mgr:OnPlayerRemoving(ctx.player) end
-        mgr.vitals = nil
-        mgr.Save = nil
-        mgr.Loot = nil
-        _G.re_util = ctx.oldREUtil
-        game_cfg.Debug = ctx.debug
+        if ctx.player then Mgr:OnPlayerRemoving(ctx.player) end
+        Mgr.Vitals = nil
+        Mgr.Save = nil
+        Mgr.Loot = nil
+        _G.REUtil = ctx.oldREUtil
+        GameCfg.Debug = ctx.debug
     end)
 
     local function operate(payload)
@@ -115,8 +115,8 @@ describe("持有操作的服务端分发", function()
         assert.same(before, ctx.data:GetItemBarSnapshot())
     end)
 
-    -- 切手持与实际使用分两次：首次只切手持不消费，再次才经 vitals 吃掉。
-    -- 两条入口同一 happy path：非持久直接改会话数据；持久走 mgr_save 的 ResolveRequest+Execute，
+    -- 切手持与实际使用分两次：首次只切手持不消费，再次才经 Vitals 吃掉。
+    -- 两条入口同一 happy path：非持久直接改会话数据；持久走 MgrSave 的 ResolveRequest+Execute，
     -- 两步语义整体落在隔离 draft 上（回包与副作用一致，额外核对解析出的操作种类）。
     it("test_operate_eat_first_hold_then_eat", function()
         local entries = {
@@ -126,7 +126,7 @@ describe("持有操作的服务端分发", function()
         for _, entry in ipairs(entries) do
             local resolvedKinds = {}
             if entry.persistent then
-                mgr.Save = {
+                Mgr.Save = {
                     ResolveRequest = function(_, player, data, kind, requestId)
                         resolvedKinds[#resolvedKinds + 1] = kind
                         return { id = '34010:' .. tostring(#resolvedKinds), sequence = #resolvedKinds,
@@ -157,14 +157,14 @@ describe("持有操作的服务端分发", function()
             local third = operate({ action = 'Operate', op = 'eat', slot = 1, seq = 3 })
             assert.same({ ok = false, reason = 'empty' }, third)
             assert.same(eatenBefore + 1, #ctx.eaten)
-            mgr.Save = nil
+            Mgr.Save = nil
         end
     end)
 
     -- 持久模式重放：同 seq 重试只回原结果，不重复扣食。
     it("test_operate_persistent_replay_returns_recorded_result", function()
         local recorded = {}
-        mgr.Save = {
+        Mgr.Save = {
             ResolveRequest = function(_, player, data, kind, requestId)
                 if recorded[requestId] then return recorded[requestId], 'replay' end
                 local operation = { id = '34010:' .. tostring(requestId), sequence = requestId,
@@ -194,7 +194,7 @@ describe("持有操作的服务端分发", function()
         local replayed = operate({ action = 'Operate', op = 'eat', slot = 1, seq = 2 })
         assert.same({ ok = true, op = 'eat', held = false, itemId = 'carp' }, replayed)
         assert.same(1, #ctx.eaten)
-        mgr.Save = nil
+        Mgr.Save = nil
     end)
 
     -- 药水走同一 eat 通道：两步语义不变；按 PotionLimits 累计，超限拒绝且不扣格。
@@ -208,12 +208,12 @@ describe("持有操作的服务端分发", function()
         assert.is_nil(ctx.data:GetItemBarSnapshot().slots[1])
         -- 到上限后拒绝且不扣格（再造一格药水）
         assert.is_true(ctx.data:AddItem('item167', 1.5))
-        ctx.data.Extra.growth.potions.item167 = game_cfg.Items.PotionLimits.item167
+        ctx.data.Extra.growth.potions.item167 = GameCfg.Items.PotionLimits.item167
         operate({ action = 'Operate', op = 'eat', slot = 1 })
         local capped = operate({ action = 'Operate', op = 'eat', slot = 1 })
         assert.same({ ok = false, op = 'eat', reason = 'potion-capped' }, capped)
         assert.same('item167', ctx.data:GetItemBarSnapshot().slots[1].itemId)
-        assert.same(game_cfg.Items.PotionLimits.item167, ctx.data:PotionCount('item167'))
+        assert.same(GameCfg.Items.PotionLimits.item167, ctx.data:PotionCount('item167'))
     end)
 
     -- 换一个槽目标是先切手持：旧手持取消，新槽手持，仍不消费。

@@ -1,6 +1,6 @@
-local game_cfg = require("common.game_cfg")
-local modal = require("client.views.economy_modal")
-local gm_view = {}
+local GameCfg = require("common.game_cfg")
+local Modal = require("client.views.economy_modal")
+local GMView = {}
 
 local function copy(payload)
   local out = {}
@@ -8,30 +8,30 @@ local function copy(payload)
   return out
 end
 
-function gm_view.entry_spec()
+function GMView.entry_spec()
   return {
     name = "GMEntry",
     mount = function(scope, ctx)
-      local button = modal.button(scope, ctx, ctx.root_node, "BtnGMEntry", "GM", function()
+      local button = Modal.button(scope, ctx, ctx.root_node, "BtnGMEntry", "GM", function()
         local services = ctx.services or {}
         if type(services.open_modal) == "function" then services.open_modal("gm") end
       end)
-      button.Visible = game_cfg.Debug and game_cfg.Debug.Enabled == true
+      button.Visible = GameCfg.Debug and GameCfg.Debug.Enabled == true
     end,
   }
 end
 
-function gm_view.modal_spec()
+function GMView.modal_spec()
   return function(scope, ctx)
     local services = ctx.services or {}
-    local panel = modal.panel(scope, ctx, "ScreenGM", "GM 调试面板")
-    local result = modal.label(scope, ctx, panel, "LabelGMResult", "等待操作")
+    local panel = Modal.panel(scope, ctx, "ScreenGM", "GM 调试面板")
+    local result = Modal.label(scope, ctx, panel, "LabelGMResult", "等待操作")
     local function send(payload)
       if type(services.send_gm) == "function" then services.send_gm(copy(payload)) end
     end
     local fishIds = { "eel", "alligatorGar" }
     local others = {}
-    for fishId in pairs(game_cfg.Fish) do
+    for fishId in pairs(GameCfg.Fish) do
       if fishId ~= "eel" and fishId ~= "alligatorGar" then others[#others + 1] = fishId end
     end
     table.sort(others)
@@ -44,25 +44,25 @@ function gm_view.modal_spec()
         local fishId = fishIds[first + index]
         button.Visible = fishId ~= nil
         button.TouchEnabled = fishId ~= nil
-        button.ButtonText = fishId and game_cfg.Fish[fishId].Name or ""
+        button.ButtonText = fishId and GameCfg.Fish[fishId].Name or ""
       end
       if fishPageLabel then fishPageLabel.Text = string.format("鱼类 %d/%d", fishPage, math.max(1, math.ceil(#fishIds / 6))) end
     end
     for index = 1, 6 do
-      fishButtons[index] = modal.button(scope, ctx, panel, "BtnGMNextFish_" .. tostring(index), "", function()
+      fishButtons[index] = Modal.button(scope, ctx, panel, "BtnGMNextFish_" .. tostring(index), "", function()
         local fishId = fishIds[(fishPage - 1) * 6 + index]
         if fishId then send({ action = "NextFish", fishId = fishId }) end
       end)
     end
-    modal.button(scope, ctx, panel, "BtnGMFishPrev", "上一页鱼", function()
+    Modal.button(scope, ctx, panel, "BtnGMFishPrev", "上一页鱼", function()
       fishPage = math.max(1, fishPage - 1)
       refresh_fish()
     end)
-    modal.button(scope, ctx, panel, "BtnGMFishNext", "下一页鱼", function()
+    Modal.button(scope, ctx, panel, "BtnGMFishNext", "下一页鱼", function()
       fishPage = math.min(math.max(1, math.ceil(#fishIds / 6)), fishPage + 1)
       refresh_fish()
     end)
-    fishPageLabel = modal.label(scope, ctx, panel, "LabelGMFishPage", "")
+    fishPageLabel = Modal.label(scope, ctx, panel, "LabelGMFishPage", "")
     refresh_fish()
     local inputs = {}
     for _, field in ipairs({ "coin", "upgradeLevel", "container", "index", "itemId", "count", "mult", "slot" }) do
@@ -85,8 +85,8 @@ function gm_view.modal_spec()
     local actions = {
       { "BtnGMCoin", "+100 金币", { action = "Coin", amount = 100 } },
       { "BtnGMCoinLarge", "+6300 金币", { action = "Coin", amount = 6300 } },
-      { "BtnGMItem", "罗非鱼 ×1", { action = "Item", itemId = game_cfg.Items.Id.Tilapia, count = 1 } },
-      { "BtnGMItemFive", "罗非鱼 ×5", { action = "Item", itemId = game_cfg.Items.Id.Tilapia, count = 5 } },
+      { "BtnGMItem", "罗非鱼 ×1", { action = "Item", itemId = GameCfg.Items.Id.Tilapia, count = 1 } },
+      { "BtnGMItemFive", "罗非鱼 ×5", { action = "Item", itemId = GameCfg.Items.Id.Tilapia, count = 5 } },
       { "BtnGMAddAttack", "挥砍伤害 +25", { action = "AddAttack" } },
       { "BtnGMGetAttack", "查询挥砍伤害", { action = "GetAttack" } },
       { "BtnGMNextFish", "下一条鲈鱼", { action = "NextFish", fishId = "bass" } },
@@ -99,11 +99,11 @@ function gm_view.modal_spec()
       { "BtnGMSelectSaveSlot", "切换存档槽", { action = "SelectSaveSlot", slot = 1 } },
     }
     for _, action in ipairs(actions) do
-      modal.button(scope, ctx, panel, action[1], action[2], function() send(action[3]) end)
+      Modal.button(scope, ctx, panel, action[1], action[2], function() send(action[3]) end)
     end
-    modal.button(scope, ctx, panel, "BtnGMApplyState", "应用状态补丁", function() send(state_payload("ApplyState")) end)
-    modal.button(scope, ctx, panel, "BtnGMSelectNamedSlot", "应用下次进图槽", function() send(state_payload("SelectSaveSlot")) end)
-    modal.close(scope, ctx, panel, "BtnGMClose", "gm")
+    Modal.button(scope, ctx, panel, "BtnGMApplyState", "应用状态补丁", function() send(state_payload("ApplyState")) end)
+    Modal.button(scope, ctx, panel, "BtnGMSelectNamedSlot", "应用下次进图槽", function() send(state_payload("SelectSaveSlot")) end)
+    Modal.close(scope, ctx, panel, "BtnGMClose", "gm")
     scope:effect("GMResultProjection", function(es)
       local value = es:d(ctx.store.gm_result)
       if type(value) ~= "table" then return end
@@ -123,4 +123,4 @@ function gm_view.modal_spec()
   end
 end
 
-return gm_view
+return GMView

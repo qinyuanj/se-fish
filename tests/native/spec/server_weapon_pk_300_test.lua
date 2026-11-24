@@ -1,7 +1,7 @@
 
-local game_cfg = require("common.game_cfg")
-local server_runtime = require("server.world_host.server_runtime")
-local swing_registry = require("server.swing_registry")
+local GameCfg = require("common.game_cfg")
+local ServerRuntime = require("server.world_host.server_runtime")
+local SwingRegistry = require("server.swing_registry")
 
 local function signal()
   local handlers = {}
@@ -22,8 +22,8 @@ end
 
 local function make_player(id, x, z)
   local controller = {
-    Health = game_cfg.vitals.MaxHealth,
-    MaxHealth = game_cfg.vitals.MaxHealth,
+    Health = GameCfg.Vitals.MaxHealth,
+    MaxHealth = GameCfg.Vitals.MaxHealth,
     WalkSpeed = 16,
     HealthChanged = signal(),
     Died = signal(),
@@ -56,22 +56,22 @@ local function make_data(player, overrides)
     Player = player,
     Inited = true,
     LoadState = "ready",
-    data = {
+    Data = {
       FishCoin = 0,
       Zone = "fishPond",
       Weapons = overrides.weapons or {},
       Containers = {
-        [game_cfg.Items.ContainerId.ItemBar] = {},
-        [game_cfg.Items.ContainerId.Backpack] = {},
+        [GameCfg.Items.ContainerId.ItemBar] = {},
+        [GameCfg.Items.ContainerId.Backpack] = {},
       },
     },
     Extra = {
       growth = { potions = {}, upgrades = overrides.upgrades or {} },
       inventory = { selection = { held = overrides.held or {} } },
-      survival = { health = game_cfg.vitals.MaxHealth, hunger = game_cfg.vitals.MaxHunger },
+      survival = { health = GameCfg.Vitals.MaxHealth, hunger = GameCfg.Vitals.MaxHunger },
     },
     MagazineSize = function(self, base)
-      return game_cfg.Shop.MagazineSize(base, self.Extra.growth.upgrades.magazine or 0)
+      return GameCfg.Shop.MagazineSize(base, self.Extra.growth.upgrades.magazine or 0)
     end,
   }
 end
@@ -128,7 +128,7 @@ describe("武器攻击换弹与 PK 过滤宿主接缝（#300）", function()
     data = make_data(player, overrides)
     local other_data = make_data(other, other_overrides)
     casts, rays, ray_hit = {}, {}, nil
-    runtime = server_runtime.new({
+    runtime = ServerRuntime.new({
       initial_now = 1000,
       remote = re,
       player_data = {
@@ -158,7 +158,7 @@ describe("武器攻击换弹与 PK 过滤宿主接缝（#300）", function()
           return true
         end,
         MeleeIndex = function()
-          for _, entry in ipairs(game_cfg.Ability.InitialAbilities or {}) do
+          for _, entry in ipairs(GameCfg.Ability.InitialAbilities or {}) do
             if entry.AnchorBehavior == "melee_hit" then return entry.Index end
           end
           return 0
@@ -190,16 +190,16 @@ describe("武器攻击换弹与 PK 过滤宿主接缝（#300）", function()
   after_each(function()
     if runtime then runtime:shutdown() end
     runtime = nil
-    swing_registry.ClearSwing(1)
-    swing_registry.ClearSwing(2)
+    SwingRegistry.ClearSwing(1)
+    SwingRegistry.ClearSwing(2)
   end)
 
   it("存活未麻痹时可近战，冷却与切武器各自计时，麻痹与离场拒绝并清登记", function()
     boot({ weapons = { item136 = 1, item135 = 1 }, held = { kind = "weapon", id = "item136" } })
     local first = attack()
     assert.is_true(first and first.ok)
-    assert.same(game_cfg.Ability.MeleeWeapons.item136.Damage, first.damage)
-    assert.is_not_nil(swing_registry.PeekSwing(player.UserId))
+    assert.same(GameCfg.Ability.MeleeWeapons.item136.Damage, first.damage)
+    assert.is_not_nil(SwingRegistry.PeekSwing(player.UserId))
     assert.same(1, #casts)
 
     assert.same("cooldown", attack().reason)
@@ -209,17 +209,17 @@ describe("武器攻击换弹与 PK 过滤宿主接缝（#300）", function()
     runtime.clock:advance(0.5)
     assert.is_true(attack().ok)
     assert.same(2, #casts)
-    assert.same(game_cfg.Ability.MeleeWeapons.item135.Damage, swing_registry.PeekSwing(player.UserId).damage)
+    assert.same(GameCfg.Ability.MeleeWeapons.item135.Damage, SwingRegistry.PeekSwing(player.UserId).damage)
 
     runtime:get_player_tree(player.UserId):apply_modifier("paralyze", { duration = 0.5 })
     runtime.clock:step(0)
     assert.same("cannot-act", attack().reason)
-    assert.is_nil(swing_registry.PeekSwing(player.UserId))
+    assert.is_nil(SwingRegistry.PeekSwing(player.UserId))
 
     runtime.clock:advance(1)
     assert.is_true(attack().ok)
     runtime:on_player_removing(player)
-    assert.is_nil(swing_registry.PeekSwing(player.UserId))
+    assert.is_nil(SwingRegistry.PeekSwing(player.UserId))
   end)
 
   it("枪械按弹匣扣弹，空匣自动换弹两秒，切武器不能绕过未完成换弹", function()
@@ -252,13 +252,13 @@ describe("武器攻击换弹与 PK 过滤宿主接缝（#300）", function()
     assert.near(player.Character.Position.x, rays[1].origin.x, 1e-6)
     assert.near(player.Character.Position.y + 1, rays[1].origin.y, 1e-6)
     assert.near(player.Character.Position.z, rays[1].origin.z, 1e-6)
-    assert.near(game_cfg.Ability.GunShared.Range * 0.6, rays[1].direction.y, 1e-6)
-    assert.near(game_cfg.Ability.GunShared.Range * 0.8, rays[1].direction.z, 1e-6)
+    assert.near(GameCfg.Ability.GunShared.Range * 0.6, rays[1].direction.y, 1e-6)
+    assert.near(GameCfg.Ability.GunShared.Range * 0.8, rays[1].direction.z, 1e-6)
 
     runtime.clock:advance(2)
     ray_hit = { Instance = { UnitId = 9 }, Position = { x = 0, y = 4, z = 2 } }
     attack({ x = 0, y = 0, z = 1 })
-    assert.same(game_cfg.vitals.MaxHealth, other.Character.Controller.Health)
+    assert.same(GameCfg.Vitals.MaxHealth, other.Character.Controller.Health)
     local ammo = last_result(events, player).ammo
 
     for _, bad in ipairs({ {}, { x = 0, y = 0, z = 0 }, { x = 0, y = 0 / 0, z = 1 }, { x = 0, y = math.huge, z = 1 } }) do
@@ -273,13 +273,13 @@ describe("武器攻击换弹与 PK 过滤宿主接缝（#300）", function()
     boot({ px = 241, pz = 0, weapons = { item138 = 1 }, held = { kind = "weapon", id = "item138" } }, { px = 242, pz = 0 })
     ray_hit = { Instance = other.Character, Position = { x = 0, y = 2, z = 5 } }
     attack({ x = 0, y = 0, z = 1 })
-    assert.same(game_cfg.vitals.MaxHealth - 20 * 5, other.Character.Controller.Health)
+    assert.same(GameCfg.Vitals.MaxHealth - 20 * 5, other.Character.Controller.Health)
     assert.same(1, last_result(events, player).ammo)
 
     hold(runtime, player, data, nil)
-    data.data.Weapons.item142 = 1
+    data.Data.Weapons.item142 = 1
     hold(runtime, player, data, "item142")
-    other.Character.Controller.Health = game_cfg.vitals.MaxHealth
+    other.Character.Controller.Health = GameCfg.Vitals.MaxHealth
     other.Character.Position = { x = 0, y = 2, z = 4 }
     ray_hit = { Instance = other.Character, Position = { x = 0, y = 2, z = 4 } }
     runtime.clock:advance(2)
@@ -287,7 +287,7 @@ describe("武器攻击换弹与 PK 过滤宿主接缝（#300）", function()
     runtime:get_player_tree(other.UserId).states.health:set(800)
     attack({ x = 0, y = 0, z = 1 })
     assert.same(300, other.Character.Controller.Health)
-    assert.same(game_cfg.vitals.MaxHealth, player.Character.Controller.Health)
+    assert.same(GameCfg.Vitals.MaxHealth, player.Character.Controller.Health)
     assert.same(0, last_result(events, player).ammo)
   end)
 
@@ -295,12 +295,12 @@ describe("武器攻击换弹与 PK 过滤宿主接缝（#300）", function()
     boot({ px = 6.26, pz = -0.71 }, { px = 5, pz = -9 })
     local life = runtime.life
     assert.is_false(life:ApplyHit(life:NewHit(player, "gun"), other, 45))
-    assert.same(game_cfg.vitals.MaxHealth, other.Character.Controller.Health)
+    assert.same(GameCfg.Vitals.MaxHealth, other.Character.Controller.Health)
 
     player.Character.Position = { x = 241, y = 6, z = 0 }
     other.Character.Position = { x = 242, y = 6, z = 0 }
     assert.is_true(life:ApplyHit(life:NewHit(player, "gun"), other, 20))
-    assert.same(game_cfg.vitals.MaxHealth - 20, other.Character.Controller.Health)
+    assert.same(GameCfg.Vitals.MaxHealth - 20, other.Character.Controller.Health)
 
     make_squad()
     assert.is_false(life:ApplyHit(life:NewHit(player, "melee"), other, 20))

@@ -1,7 +1,7 @@
 
-local game_cfg = require("common.game_cfg")
+local GameCfg = require("common.game_cfg")
 
-local pk_damage_filter = {}
+local PkDamageFilter = {}
 
 local function position_of(player)
   local character = player and player.Character
@@ -20,7 +20,7 @@ local function inside(position, zone)
     and position.z > boundary.MinZ and position.z < boundary.MaxZ
 end
 
-function pk_damage_filter.make(opts)
+function PkDamageFilter.make(opts)
   opts = type(opts) == "table" and opts or {}
   return function(hit, target, context)
     local source = hit and hit.sourcePlayer
@@ -30,15 +30,15 @@ function pk_damage_filter.make(opts)
       local ok, same = pcall(party.SameParty, party, source, target)
       if ok and same then return false end
     end
-    local markers = (context and context.zone_markers) or opts.zone_markers
+    local markers = (context and context.ZoneMarkers) or opts.zone_markers
     local snapshot = markers and markers.Zones
-    local zones = opts.zones or game_cfg.Zones or {}
+    local zones = opts.zones or GameCfg.Zones or {}
     for _, config in ipairs(zones) do
       if config.Id == "fishPond" then
         local zone = snapshot and snapshot[config.Id] or config.Scene
         if not (zone and zone.Boundary) then
           if target.UserId == nil then return true end
-          print("[pk_damage_filter] 鱼塘区域未解析，非同队玩家伤害按鱼塘外处理",
+          print("[PkDamageFilter] 鱼塘区域未解析，非同队玩家伤害按鱼塘外处理",
             tostring(source.UserId), tostring(target.UserId))
           return true
         end
@@ -52,4 +52,4 @@ function pk_damage_filter.make(opts)
   end
 end
 
-return pk_damage_filter
+return PkDamageFilter

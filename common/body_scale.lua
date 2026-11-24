@@ -1,14 +1,14 @@
-local game_cfg = require('common.game_cfg')
-local number = require('common.number')
+local GameCfg = require('common.game_cfg')
+local Number = require('common.number')
 
 local M = {}
 
 local function cfg()
-    return game_cfg.Ability.body_scale
+    return GameCfg.Ability.BodyScale
 end
 
 local function isBadNumber(v)
-    return not number.IsFiniteNumber(v)
+    return not Number.IsFiniteNumber(v)
 end
 
 local function potionCount(potions, maxPotions)

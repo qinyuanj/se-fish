@@ -6,14 +6,14 @@ local WORKSPACE = "fixture-host"
 local ENTRIES = {
   client = { { name = "UI", dir = true }, { name = "packages", dir = true } },
   common = { { name = "game_cfg.lua", dir = false }, { name = "packages", dir = true } },
-  server = { { name = "mgr", dir = true }, { name = "packages", dir = true } },
+  server = { { name = "Mgr", dir = true }, { name = "packages", dir = true } },
 }
 local EXPECTED = {
   { rel = "client/UI", dir = true, src = "client/UI", dst = WORKSPACE .. "/client/UI" },
   { rel = "client/packages", dir = true, src = "client/packages", dst = WORKSPACE .. "/client/packages" },
   { rel = "common/game_cfg.lua", dir = false, src = "common/game_cfg.lua", dst = WORKSPACE .. "/common/game_cfg.lua" },
   { rel = "common/packages", dir = true, src = "common/packages", dst = WORKSPACE .. "/common/packages" },
-  { rel = "server/mgr", dir = true, src = "server/mgr", dst = WORKSPACE .. "/server/mgr" },
+  { rel = "server/Mgr", dir = true, src = "server/Mgr", dst = WORKSPACE .. "/server/Mgr" },
   { rel = "server/packages", dir = true, src = "server/packages", dst = WORKSPACE .. "/server/packages" },
 }
 
@@ -38,7 +38,7 @@ local STALE_HOST = {
   client = { { name = "AttrAPI.lua", dir = false }, { name = "UI", dir = true },
     { name = "packages", dir = true } },
   common = ENTRIES.common,
-  server = { { name = "mgr", dir = true }, { name = "Proto", dir = true },
+  server = { { name = "Mgr", dir = true }, { name = "Proto", dir = true },
     { name = "packages", dir = true } },
 }
 local STALE = {

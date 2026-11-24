@@ -2,7 +2,7 @@
 -- 真实 vendor 运算，仅 World/Unit/Controller 是引擎边界替身，不是地图实测。
 -- 迁移自 tests/tooling/attr_rule_probe_test.lua（#92，LuaUnit → 原生 Busted）；
 -- 案例顺序沿用旧入口的类名 + 方法名字典序。夹具自带独立模块环境，不污染 package.loaded / game。
-local probe = require('tools.probes.attr_rule_probe')
+local Probe = require('tools.probes.attr_rule_probe')
 
 -- 每个用例使用独立模块环境，避免污染全量测试的 package.loaded / game。
 local function fixture(options)
@@ -59,7 +59,7 @@ end
 describe("TestAttrRuleProbe", function()
   it("test_actual_config_bounds_and_business_final_clamp", function()
     local context = fixture({ bounds = true })
-    local report = probe.Run(context)
+    local report = Probe.Run(context)
     assert.is_true(report.Ok, report.Error)
     assert.are.equal(1, report.Bounds.Verified)
     assert.is_true(report.BusinessClampVerified)
@@ -67,7 +67,7 @@ describe("TestAttrRuleProbe", function()
 
   it("test_destroy_failure_is_reported_not_swallowed", function()
     local context = fixture({ destroyError = true })
-    local report = probe.Run(context)
+    local report = Probe.Run(context)
     assert.is_false(report.Ok)
     assert.is_false(report.Cleaned)
     assert.matches('清理失败', report.Error, 1, true)
@@ -76,7 +76,7 @@ describe("TestAttrRuleProbe", function()
   it("test_dirty_isolated_target_is_rejected", function()
     local context = fixture()
     assert.is_true(context.AttrAPI.Funcs.EnsureAttrUnit(context.Target) ~= nil)
-    local report = probe.Run(context)
+    local report = Probe.Run(context)
     assert.is_false(report.Ok)
     assert.matches('拒绝污染', report.Error, 1, true)
     assert.is_true(report.Cleaned)
@@ -91,7 +91,7 @@ describe("TestAttrRuleProbe", function()
         calls = calls + 1
         if calls >= failAt then error('取证日志不可用') end
       end
-      local report = probe.Run(context)
+      local report = Probe.Run(context)
       assert.is_false(report.Ok)
       assert.matches('日志回调失败', report.Error, 1, true)
       assert.is_true(report.Cleaned)
@@ -100,11 +100,11 @@ describe("TestAttrRuleProbe", function()
   end)
 
   it("test_mapping_keeps_existing_growth_and_multiplicative_speed", function()
-    local map = probe.Map({ bodyPotions = 10, speedPotions = 20, baseSpeed = 7,
+    local map = Probe.Map({ bodyPotions = 10, speedPotions = 20, baseSpeed = 7,
       weak = true, frost = true, hunger = 400, damageScale = 1.5 })
     assert.are.equal(900, map.MaxHealth.Value)
     assert.near(7.35, map.WalkSpeed.Value, 1e-9)
-    assert.are.equal(3, map.body_scale.Value)
+    assert.are.equal(3, map.BodyScale.Value)
     assert.are.equal(300, map.Hunger.Value)
     assert.are.equal(1.5, map.WeaponDamageScale.Value)
     assert.near(0.05, map.WalkSpeed.Components.Ratio, 1e-9)
@@ -112,7 +112,7 @@ describe("TestAttrRuleProbe", function()
 
   it("test_missing_preset_reports_error_and_still_cleans_up", function()
     local context, logs = fixture({ missing = true })
-    local report = probe.Run(context)
+    local report = Probe.Run(context)
     assert.is_false(report.Ok)
     assert.matches('懒创建失败', report.Error, 1, true)
     assert.is_true(report.Cleaned)
@@ -122,7 +122,7 @@ describe("TestAttrRuleProbe", function()
   it("test_real_vendor_probe_can_repeat_with_complete_cleanup", function()
     for _ = 1, 2 do
       local context, logs, all = fixture()
-      local report = probe.Run(context)
+      local report = Probe.Run(context)
       if not report.Ok then print(table.concat(logs, '\n')) end
       assert.is_true(report.Ok)
       assert.are.equal('offline-engine-double', report.Evidence)

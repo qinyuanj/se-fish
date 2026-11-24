@@ -1,25 +1,25 @@
 
-local eui = require("tests.support.eui_double")
-local client_store = require("client.store.client_store")
-local root_view = require("client.views.root_view")
-local fish_combat_view = require("client.views.fish_combat_view")
-local spoke_clock = require("common.spoke_clock")
+local Eui = require("tests.support.eui_double")
+local ClientStore = require("client.store.client_store")
+local RootView = require("client.views.root_view")
+local FishCombatView = require("client.views.fish_combat_view")
+local SpokeClock = require("common.spoke_clock")
 
 local function mount()
-  local clock = spoke_clock.new(10)
-  local store, writer = client_store.new({ clock = clock })
-  local root = eui.Node({ Name = "UIRoot" })
+  local clock = SpokeClock.new(10)
+  local store, writer = ClientStore.new({ clock = clock })
+  local root = Eui.Node({ Name = "UIRoot" })
   local created = {}
-  local view = root_view.mount(root, store, {
+  local view = RootView.mount(root, store, {
     create_node = function(kind, props)
-      local node = eui.Node(props or {})
+      local node = Eui.Node(props or {})
       node.UnitType = kind
       created[#created + 1] = node
       return node
     end,
     docks = {
-      fish_combat = fish_combat_view.bar_spec(),
-      fish_warning = fish_combat_view.warning_spec(),
+      fish_combat = FishCombatView.bar_spec(),
+      fish_warning = FishCombatView.warning_spec(),
     },
   })
   return { root = root, writer = writer, view = view, created = created }

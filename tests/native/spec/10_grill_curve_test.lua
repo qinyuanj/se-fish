@@ -12,7 +12,7 @@
 --   2. 取出后倍率还在涨，或物品回不到格位、不保持选中；
 --   3. 4.5 秒不烤糊、烤糊后物品还在、3 米内的玩家没吃伤害、操作者收不到烤糊提示；
 --   4. 非鱼获或烤过的鱼获也能投入。
-local game_cfg = require('common.game_cfg')
+local GameCfg = require('common.game_cfg')
 
 local FISH = 'carp'      -- 普通鱼获：可烤
 local NOT_FISH = 'item126' -- 核废料桶：不是鱼获
@@ -34,16 +34,16 @@ describe('条款 10：烧烤倍率与会话规则', function()
   local function drain() while #ctx.queue > 0 do table.remove(ctx.queue, 1)() end end
 
   local function grillAnchor()
-    for _, entity in ipairs(game_cfg.Zones[3].Scene.Entities) do
+    for _, entity in ipairs(GameCfg.Zones[3].Scene.Entities) do
       if entity.Role == 'Grill' then return entity end
     end
   end
 
   before_each(function()
     ctx = { values = {}, queue = {}, now = 1000, events = {}, hits = {}, seq = 0, list = {} }
-    ctx.oldGame, ctx.oldRE = _G.game, _G.re_util
-    ctx.oldDebug = game_cfg.Debug
-    game_cfg.Debug = { Enabled = false }
+    ctx.oldGame, ctx.oldRE = _G.game, _G.REUtil
+    ctx.oldDebug = GameCfg.Debug
+    GameCfg.Debug = { Enabled = false }
     ctx.store = {
       GetAsync = function(_, key) return ctx.values[key] end,
       UpdateAsync = function(_, key, transform)
@@ -62,7 +62,7 @@ describe('条款 10：烧烤倍率与会话规则', function()
       if name == 'World' then return { GetServerTime = function() return ctx.now end } end
       if name == 'Players' then return { GetPlayers = function() return ctx.list end } end
     end }
-    _G.re_util = { CheckRECD = function() return false end, GetRE = function(_, name)
+    _G.REUtil = { CheckRECD = function() return false end, GetRE = function(_, name)
       if not ctx.events[name] then
         ctx.events[name] = { OnServerEvent = signal(),
           FireClient = function(_, player, payload)
@@ -77,19 +77,19 @@ describe('条款 10：烧烤倍率与会话规则', function()
       return ctx.events[name]
     end }
     ctx.events.GrillAction = { OnServerEvent = signal(), FireClient = function() end }
-    ctx.player_data = assert(loadfile('server/data/player_data.lua'))()
+    ctx.PlayerData = assert(loadfile('server/data/player_data.lua'))()
     ctx.save = assert(loadfile('server/save_host.lua'))()
-    ctx.server_runtime = assert(loadfile('server/world_host/server_runtime.lua'))()
+    ctx.ServerRuntime = assert(loadfile('server/world_host/server_runtime.lua'))()
     ctx.datas = {}
-    ctx.runtime = ctx.server_runtime.new({
+    ctx.runtime = ctx.ServerRuntime.new({
       initial_now = ctx.now,
-      remote = _G.re_util,
+      remote = _G.REUtil,
       player_data = { GetDataInst = function(_, player) return ctx.datas[player.UserId] end },
       save = ctx.save,
       players_service = { GetPlayers = function() return ctx.list end },
       world_service = {
         FindFirstChild = function(_, name)
-          if name == game_cfg.Zones[3].Scene.GrillName then
+          if name == GameCfg.Zones[3].Scene.GrillName then
             return { Name = name, Position = ctx.anchorPos }
           end
         end,
@@ -113,8 +113,8 @@ describe('条款 10：烧烤倍率与会话规则', function()
   end)
 
   after_each(function()
-    _G.game, _G.re_util = ctx.oldGame, ctx.oldRE
-    game_cfg.Debug = ctx.oldDebug
+    _G.game, _G.REUtil = ctx.oldGame, ctx.oldRE
+    GameCfg.Debug = ctx.oldDebug
   end)
 
   -- 站在烧烤点旁（1 米内）；atGrill=false 站 100 米外
@@ -122,13 +122,13 @@ describe('条款 10：烧烤倍率与会话规则', function()
     local player = { UserId = id, Name = 'p' .. id, attrs = {}, CharacterAdded = signal(),
       Character = { Position = { x = ctx.anchorPos.x + (atGrill == false and 100 or 1),
         y = ctx.anchorPos.y, z = ctx.anchorPos.z }, Size = { y = 2 },
-        Controller = { Health = game_cfg.vitals.MaxHealth,
+        Controller = { Health = GameCfg.Vitals.MaxHealth,
           TakeDamage = function(self, amount)
             self.Health = math.max(0, self.Health - amount)
             ctx.hits[#ctx.hits + 1] = { category = 'grillBurn', userId = id, amount = amount }
           end } } }
     function player:SetAttribute(key, value) self.attrs[key] = value end
-    local data = ctx.player_data.New(player)
+    local data = ctx.PlayerData.New(player)
     data:Init(true)
     ctx.save:LoadInto(player, data)
     drain()
@@ -167,7 +167,7 @@ describe('条款 10：烧烤倍率与会话规则', function()
 
   local function countItem(data, itemId)
     local total = 0
-    for _, container in pairs(data.data.Containers) do
+    for _, container in pairs(data.Data.Containers) do
       for _, entry in pairs(container) do
         if entry.itemId == itemId and entry.count > 0 then total = total + entry.count end
       end
@@ -232,12 +232,12 @@ describe('条款 10：烧烤倍率与会话规则', function()
     advance(1)
     local reply = act(player, { action = 'Takeout' })
     assert.near(1.25, reply.rate, 0.001)
-    local entry = data.data.Containers[game_cfg.Items.ContainerId.ItemBar][1]
+    local entry = data.Data.Containers[GameCfg.Items.ContainerId.ItemBar][1]
     assert.are.equal(FISH, entry.itemId, '鱼获要放回可用格位')
     assert.are.equal(reply.rate, entry.cooked)
-    assert.are.equal(1, data.data.SelectedSlot, '取出后保持选中')
+    assert.are.equal(1, data.Data.SelectedSlot, '取出后保持选中')
     advance(20)
-    assert.are.equal(1.25, data.data.Containers[game_cfg.Items.ContainerId.ItemBar][1].cooked,
+    assert.are.equal(1.25, data.Data.Containers[GameCfg.Items.ContainerId.ItemBar][1].cooked,
       '倍率取出即冻结，之后再等也不变')
   end)
 
@@ -273,7 +273,7 @@ describe('条款 10：烧烤倍率与会话规则', function()
     local beforePlayer, beforeData = join(9510)
     giveSelected(beforeData, FISH, 1)
     assert.is_true(act(beforePlayer, { action = 'Start' }).ok)
-    advance(game_cfg.Grill.BurnSec - 0.25)
+    advance(GameCfg.Grill.BurnSec - 0.25)
     local taken = act(beforePlayer, { action = 'Takeout' })
     assert.is_true(taken.ok, '4.5 秒前取出不该判烤糊')
     assert.is_true(taken.rate > 0, '4.5 秒前倍率还没降到 0')
@@ -281,7 +281,7 @@ describe('条款 10：烧烤倍率与会话规则', function()
     local player, data = join(9511)
     giveSelected(data, FISH, 1)
     assert.is_true(act(player, { action = 'Start' }).ok)
-    advance(game_cfg.Grill.BurnSec)
+    advance(GameCfg.Grill.BurnSec)
     assert.is_nil(ctx.mgr:GetSession(player), '4.5 秒整会话要结束')
     assert.are.equal('burnt', player.state.state, '4.5 秒整要判烤糊')
     assert.are.equal(0, countItem(data, FISH), '4.5 秒整的鱼获要损毁')

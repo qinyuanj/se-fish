@@ -1,7 +1,7 @@
--- 离线属性边界：驱动真实 attr_leaf + attr_model + body_scale + 官方包 attr_rule.api，仅引擎单位与 World 为替身。
-local model = require('common.attr_model')
-local body_scale = require('common.body_scale')
-local game_cfg = require('common.game_cfg')
+-- 离线属性边界：驱动真实 AttrLeaf + AttrModel + BodyScale + 官方包 attr_rule.api，仅引擎单位与 World 为替身。
+local Model = require('common.attr_model')
+local BodyScale = require('common.body_scale')
+local GameCfg = require('common.game_cfg')
 
 local M = {}
 
@@ -49,13 +49,13 @@ function M.New(playerData, multiplier, opts)
     end
 
     local attrAPI = env.require('server.packages.attr_rule.api')
-    local attr_leaf = env.require('server.world_host.attr_leaf')
+    local AttrLeaf = env.require('server.world_host.attr_leaf')
     local logFn = opts.log or print
 
     local mgr = {
         AttrAPI = attrAPI,
         States = {},
-        player_data = playerData,
+        PlayerData = playerData,
         MoveMultiplierProvider = multiplier,
     }
 
@@ -79,16 +79,16 @@ function M.New(playerData, multiplier, opts)
         if state.baseSpeed then return end
         local controller = state.character and state.character.Controller
         local speed = controller and controller.WalkSpeed
-        state.baseSpeed = type(speed) == 'number' and speed > 0 and speed < math.huge and speed or game_cfg.Ability.MoveSpeed.Base
+        state.baseSpeed = type(speed) == 'number' and speed > 0 and speed < math.huge and speed or GameCfg.Ability.MoveSpeed.Base
     end
 
     function mgr:Input(player)
         self:CaptureBaseSpeed(player)
-        local data = self.player_data and self.player_data:GetDataInst(player)
+        local data = self.PlayerData and self.PlayerData:GetDataInst(player)
         local mult = self.MoveMultiplierProvider and self.MoveMultiplierProvider(player) or 1
         return {
-            bodyPotions = data and data:PotionCount(game_cfg.Ability.body_scale.PotionItem) or 0,
-            speedPotions = data and data:PotionCount(game_cfg.Ability.SpeedPotion.Item) or 0,
+            bodyPotions = data and data:PotionCount(GameCfg.Ability.BodyScale.PotionItem) or 0,
+            speedPotions = data and data:PotionCount(GameCfg.Ability.SpeedPotion.Item) or 0,
             baseSpeed = self:State(player).baseSpeed,
             moveMultiplier = mult,
         }
@@ -97,7 +97,7 @@ function M.New(playerData, multiplier, opts)
     function mgr:Project(player, key, components)
         local state = self:State(player)
         if not state.character then return false, 'no-character' end
-        local cfgOk, cfgErr = attr_leaf.validate_config(self.AttrAPI, key)
+        local cfgOk, cfgErr = AttrLeaf.validate_config(self.AttrAPI, key)
         if not cfgOk then return false, cfgErr end
         if not state.unit then
             local okEx, existing = pcall(self.AttrAPI.Funcs.GetAttrUnit, state.character) -- 兼容测试注入 GetChildren 故障
@@ -106,35 +106,35 @@ function M.New(playerData, multiplier, opts)
             if not okEn or not unit then return false, tostring(okEn and err or unit) end
             state.unit, state.owned = unit, existing == nil
         end
-        return attr_leaf.project_components(self.AttrAPI, state.character, key, components)
+        return AttrLeaf.project_components(self.AttrAPI, state.character, key, components)
     end
 
     function mgr:Plan(player)
-        return model.Plan(self:Input(player))
+        return Model.Plan(self:Input(player))
     end
 
     function mgr:BodyPlan(player)
         local plan = self:Plan(player)
         local ok, scale = self:Project(player, 'PlayerBodyScale', plan.Attributes.PlayerBodyScale)
         if not ok then return nil, scale end
-        plan.Body.Scale = body_scale.Sanitize(scale)
+        plan.Body.Scale = BodyScale.Sanitize(scale)
         return plan.Body
     end
 
     function mgr:MaxHealth(player)
         local plan = self:Plan(player)
         local ok, value = self:Project(player, 'PlayerMaxHealth', plan.Attributes.PlayerMaxHealth)
-        if not ok then error('[attr_leaf] 血量上限投影失败: ' .. tostring(value)) end
-        return math.max(1, math.min(game_cfg.Ability.body_scale.HealthMax, value))
+        if not ok then error('[AttrLeaf] 血量上限投影失败: ' .. tostring(value)) end
+        return math.max(1, math.min(GameCfg.Ability.BodyScale.HealthMax, value))
     end
 
     function mgr:RefreshMoveSpeed(player)
         local plan = self:Plan(player)
         local ok, speed = self:Project(player, 'PlayerWalkSpeed', plan.Attributes.PlayerWalkSpeed)
         if not ok then return false, speed end
-        local okWrite, err = attr_leaf.apply_walk_speed(player.Character, speed)
+        local okWrite, err = AttrLeaf.apply_walk_speed(player.Character, speed)
         if not okWrite then
-            logFn('[attr_leaf] 移速写入失败', player.UserId, tostring(err))
+            logFn('[AttrLeaf] 移速写入失败', player.UserId, tostring(err))
             return false, tostring(err)
         end
         return true
@@ -143,15 +143,15 @@ function M.New(playerData, multiplier, opts)
     function mgr:ApplyBodyScale(player)
         local plan, err = self:BodyPlan(player)
         if not plan then return { Ok = false, Error = err } end
-        local ok, derivedOrErr = attr_leaf.apply_body_presentation(player.Character, plan.Scale, plan.Capped)
-        if not ok then logFn('[attr_leaf] 体型写入失败', player.UserId, tostring(derivedOrErr)) end
+        local ok, derivedOrErr = AttrLeaf.apply_body_presentation(player.Character, plan.Scale, plan.Capped)
+        if not ok then logFn('[AttrLeaf] 体型写入失败', player.UserId, tostring(derivedOrErr)) end
         return {
             Ok = ok,
             Error = not ok and tostring(derivedOrErr) or nil,
             Scale = plan.Scale,
             Health = self:MaxHealth(player),
             Capped = plan.Capped,
-            Derived = ok and derivedOrErr or body_scale.Derive(plan.Scale),
+            Derived = ok and derivedOrErr or BodyScale.Derive(plan.Scale),
         }
     end
 
@@ -159,8 +159,8 @@ function M.New(playerData, multiplier, opts)
         local applied = self:ApplyBodyScale(player)
         local errors = {}
         if not applied.Ok then errors[#errors + 1] = tostring(applied.Error) end
-        if self.vitals and (not self.vitals.GetState or self.vitals:GetState(player)) then
-            local called, ok, err = pcall(self.vitals.RefreshMaxHealth, self.vitals, player) -- 隔离测试替身 vitals 异常
+        if self.Vitals and (not self.Vitals.GetState or self.Vitals:GetState(player)) then
+            local called, ok, err = pcall(self.Vitals.RefreshMaxHealth, self.Vitals, player) -- 隔离测试替身 Vitals 异常
             if not called or not ok then errors[#errors + 1] = 'MaxHealth:' .. tostring(called and err or ok) end
         end
         local ok, err = self:RefreshMoveSpeed(player)
@@ -171,17 +171,17 @@ function M.New(playerData, multiplier, opts)
     end
 
     function mgr:ProjectHunger(player, value)
-        local ok, result = self:Project(player, 'PlayerHunger', model.Plan({ hunger = value }).Attributes.PlayerHunger)
+        local ok, result = self:Project(player, 'PlayerHunger', Model.Plan({ hunger = value }).Attributes.PlayerHunger)
         if not ok then return false, result end
-        return true, math.max(0, math.min(game_cfg.vitals.MaxHunger, math.floor(result)))
+        return true, math.max(0, math.min(GameCfg.Vitals.MaxHunger, math.floor(result)))
     end
 
     function mgr:WeaponDamageScale(player, kind)
         if kind ~= 'melee' and kind ~= 'ranged' and kind ~= 'explosive' then return 1 end
-        local data = self.player_data and self.player_data:GetDataInst(player)
-        local components = model.WeaponComponents(kind, data and data:ShopUpgradeLevel(kind) or 0)
+        local data = self.PlayerData and self.PlayerData:GetDataInst(player)
+        local components = Model.WeaponComponents(kind, data and data:ShopUpgradeLevel(kind) or 0)
         local ok, result = self:Project(player, 'PlayerWeaponDamage_' .. kind, components)
-        if not ok then error('[attr_leaf] 武器属性投影失败: ' .. tostring(result)) end
+        if not ok then error('[AttrLeaf] 武器属性投影失败: ' .. tostring(result)) end
         return result
     end
 
@@ -189,7 +189,7 @@ function M.New(playerData, multiplier, opts)
         local ok, result = pcall(self.ApplyGrowth, self, player) -- 兼容复活时角色未就绪
         if not ok or not result.Ok then
             self:State(player).pending = true
-            logFn('[attr_leaf] 复活属性待重试', player.UserId, tostring(ok and result.Error or result))
+            logFn('[AttrLeaf] 复活属性待重试', player.UserId, tostring(ok and result.Error or result))
             return false
         end
         return true
@@ -198,7 +198,7 @@ function M.New(playerData, multiplier, opts)
     function mgr:OnPlayerAdded(player)
         local ok, err = pcall(self.ApplyGrowth, self, player) -- 兼容入图时角色未就绪
         if not ok or not err.Ok then
-            logFn('[attr_leaf] 初始化待重试', player.UserId, tostring(ok and err.Error or err))
+            logFn('[AttrLeaf] 初始化待重试', player.UserId, tostring(ok and err.Error or err))
             self:State(player).pending = true
         end
     end
@@ -219,7 +219,7 @@ function M.New(playerData, multiplier, opts)
                 else
                     local reason = tostring(ok and type(result) == 'table' and result.Error or result)
                     if state.lastError ~= reason then
-                        logFn('[attr_leaf] 属性重试失败', state.player.UserId, reason)
+                        logFn('[AttrLeaf] 属性重试失败', state.player.UserId, reason)
                         state.lastError = reason
                     end
                 end

@@ -3,16 +3,16 @@
 -- TestFishAiLifecycle 沿用 tests/support/fish_lift 共享夹具；TestAiMigration 用官方 AI vendor 运行时。
 -- describe/it 名称保留旧类名与方法名，并按方法名字典序注册以保持旧套件执行顺序
 -- （旧套件里 TestAiMigration 整体先于 TestFishAiLifecycle，按类名字典序）。
-local loader = require('tests.support.official_ai_vendor_runtime')
-local fish_lift = require('tests.support.fish_lift')
-local game_cfg = require('common.game_cfg')
+local Loader = require('tests.support.official_ai_vendor_runtime')
+local FishLift = require('tests.support.fish_lift')
+local GameCfg = require('common.game_cfg')
 
 describe('TestAiMigration', function()
     local env
 
     before_each(function()
         env = {}
-        env.ai, env.runtime = loader.loadAi()
+        env.ai, env.runtime = Loader.loadAi()
         local e = setmetatable({ Vector3 = { New = env.runtime.Vector }, require = function(name)
             if name == 'server.packages.official_ai_feature.api' then return env.ai end
             if name == 'server.packages.official_ai_feature.behavior_runtime' then return env.runtime.behavior end
@@ -77,7 +77,7 @@ describe('TestAiMigration', function()
 
     it('test_existing_skill_slot_counts_only_confirmed_cast_and_disconnects', function()
         local connected, handler, calls = false, nil, 0
-        env.mgr.ability_api = {
+        env.mgr.AbilityAPI = {
             GetAbility = function() return {} end,
             GetAbilityByScript = function() return { getSignals = function() return { CastStart = {
                 Connect = function(_, fn) connected, handler = true, fn; return {
@@ -85,7 +85,7 @@ describe('TestAiMigration', function()
             } } end } end,
         }
         env.fish.AbilityRecord = { Ready = true, Receiver = env.unit, Entry = { Index = 2 } }
-        env.mgr.ai_api = { Configs = { CMD_ABILITY = 5 }, Funcs = { StopAI = function() end, StopMove = function() end,
+        env.mgr.AiAPI = { Configs = { CMD_ABILITY = 5 }, Funcs = { StopAI = function() end, StopMove = function() end,
             BasicCommand = function(_, command, slot)
                 assert.are.equal(5, command)
                 assert.are.equal(2, slot)
@@ -166,7 +166,7 @@ describe('TestFishAiLifecycle', function()
     local env
 
     before_each(function()
-        env = fish_lift.new()
+        env = FishLift.new()
         env:setUp()
     end)
     after_each(function()
@@ -180,7 +180,7 @@ describe('TestFishAiLifecycle', function()
             Remove = function(_, fish) calls[fish] = (calls[fish] or 0) + 1 end,
             MoveDirection = function() return true end, Stop = function() end,
         }
-        for id in pairs(game_cfg.Fish) do
+        for id in pairs(GameCfg.Fish) do
             local fish = env:land(env.player, id)
             fish.Carrier.Body.OnLiftedBegin:Fire(env.player.Character)
             env.mgr:Drop(env.player)

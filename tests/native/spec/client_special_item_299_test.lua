@@ -1,8 +1,8 @@
 
-local eui = require("tests.support.eui_double")
-local client_store = require("client.store.client_store")
-local root_view = require("client.views.root_view")
-local main_hud_action_buttons_view = require("client.views.main_hud_action_buttons_view")
+local Eui = require("tests.support.eui_double")
+local ClientStore = require("client.store.client_store")
+local RootView = require("client.views.root_view")
+local MainHudActionButtonsView = require("client.views.main_hud_action_buttons_view")
 
 describe("特殊道具统一视图宿主接缝（#299）", function()
   local saved_vector, saved_color
@@ -20,13 +20,13 @@ describe("特殊道具统一视图宿主接缝（#299）", function()
   end)
 
   it("风神之翼与哥斯拉状态下动作键切换，失败回执提示冷却，销毁后不再提示", function()
-    local store, writer = client_store.new({ initial_now = 100 })
+    local store, writer = ClientStore.new({ initial_now = 100 })
     local notices = {}
     local nodes = {}
-    local root = eui.Node({ Name = "UIRoot" })
-    local view = root_view.mount(root, store, {
+    local root = Eui.Node({ Name = "UIRoot" })
+    local view = RootView.mount(root, store, {
       create_node = function(kind, props)
-        local node = eui.Node({
+        local node = Eui.Node({
           Kind = kind,
           Name = props.Name,
           Parent = props.Parent,
@@ -35,14 +35,14 @@ describe("特殊道具统一视图宿主接缝（#299）", function()
           TouchEnabled = props.TouchEnabled,
         })
         if kind == "EUIButton" then
-          node.OnClicked = eui.Signal()
-          node.OnTouchBegan = eui.Signal()
-          node.OnTouchEnded = eui.Signal()
+          node.OnClicked = Eui.Signal()
+          node.OnTouchBegan = Eui.Signal()
+          node.OnTouchEnded = Eui.Signal()
         end
         nodes[node.Name] = node
         return node
       end,
-      hud = { main_hud_action_buttons_view.spec() },
+      hud = { MainHudActionButtonsView.spec() },
       services = {
         notify = function(text)
           notices[#notices + 1] = text

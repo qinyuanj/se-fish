@@ -3,8 +3,8 @@
 -- 业务入口：MgrFishUnit:SpawnLanded + Drop 把沧龙（fish55Elite）/ 哥斯拉（fish56Boss）放下，
 -- 逐帧 Update 推进服务端权威时钟；只观察玩家看得见的三个面：
 --   1. 玩家血量（Controller.Health，所有伤害都走 MgrVitals）；
---   2. 广播给客户端的 gar_bite_notice 预警载荷（client/LocalGarBite 消费的同一份契约）；
---   3. 服务端权威的巡航 / 携带 / 阶段态（fish.Aquatic、fish.carry、fish.Phase、CombatPayload）。
+--   2. 广播给客户端的 GarBiteNotice 预警载荷（client/LocalGarBite 消费的同一份契约）；
+--   3. 服务端权威的巡航 / 携带 / 阶段态（fish.Aquatic、fish.Carry、fish.Phase、CombatPayload）。
 -- 逐招表与阶段表（common/cfg/boss_moves.lua）只做结构断言：阶段表引用的招式必须已经出现在普通招式表里
 -- （12-05 不新增表外招式），阶段阈值不是招式行。
 --
@@ -15,16 +15,16 @@
 --   4. 叼人不选离岛中心最近的玩家，或把玩家带不进真正的水域；
 --   5. 阶段阈值被普通招式循环压住：同一帧该切阶段却先放了爪击。
 
-local cfg = require('common.game_cfg')
-local islet = require('tests.support.isle_combat')
-local boss_moves = require('common.cfg.boss_moves')
+local Cfg = require('common.game_cfg')
+local Islet = require('tests.support.isle_combat')
+local BossMoves = require('common.cfg.boss_moves')
 
 local function need(cond, ...)
     if not cond then error(string.format(...), 2) end
 end
 
 local function mosasaurRow(move)
-    local row = boss_moves.Get('mosasaur', move)
+    local row = BossMoves.Get('mosasaur', move)
     need(row ~= nil, '逐招表缺沧龙的 %s 行', move)
     return row
 end
@@ -35,9 +35,9 @@ describe('第 12 节 阶段与复合组（沧龙 / 哥斯拉）', function()
 
     before_each(function()
         savedExtra = { ability = package.loaded['server.ability_api'] }
-        env = islet.new(7)
+        env = Islet.new(7)
         package.loaded['server.ability_api'] = nil
-        local p = islet.shoreDryPoint(7)
+        local p = Islet.shoreDryPoint(7)
         env.player.Character.Position = env.vec(p.x, p.y, p.z)
         env.player.Character.Controller.Health = 100000
     end)
@@ -81,7 +81,7 @@ describe('第 12 节 阶段与复合组（沧龙 / 哥斯拉）', function()
 
     it('条款 12-35：沧龙移速按表 13，绕岛巡航逐帧不瞬移', function()
         local fish = env:drop('fish55Elite')
-        assert.same(13, cfg.Fish.fish55Elite.Speed)
+        assert.same(13, Cfg.Fish.fish55Elite.Speed)
         local dt, last, moved = 0.05, fish.Carrier.Body.Position, 0
         for _ = 1, 20 do
             env.now = env.now + dt
@@ -106,7 +106,7 @@ describe('第 12 节 阶段与复合组（沧龙 / 哥斯拉）', function()
         local warning = noticesBy('mosasaurLeap')[1]
         assert.is_not_nil(warning, '15 秒没有跃起预警')
         assert.same(leap.Range, warning.range)
-        assert.same(cfg.Ability.Aquatic.LeapWindupSec + cfg.Ability.Aquatic.LeapSec, warning.duration)
+        assert.same(Cfg.Ability.Aquatic.LeapWindupSec + Cfg.Ability.Aquatic.LeapSec, warning.duration)
         assert.is_nil(warning.damage, '预警载荷带了伤害：客户端不得承担结算')
         assert.is_true(require('common.gar_bite_notice').Valid(warning))
         env:advance(17.6) -- 15.0 起手 + 1.0 预警 + 1.5 滞空
@@ -124,7 +124,7 @@ describe('第 12 节 阶段与复合组（沧龙 / 哥斯拉）', function()
     end)
 
     it('条款 12-37：绕岛巡航，咬离岛中心最近的玩家，并叼走入海', function()
-        local scene = cfg.Zones[7].Scene
+        local scene = Cfg.Zones[7].Scene
         local water = scene.Waters[1]
         local fish = env:drop('fish55Elite')
         env:advance(5)
@@ -143,13 +143,13 @@ describe('第 12 节 阶段与复合组（沧龙 / 哥斯拉）', function()
         local peer = joinPeer(env.vec(center.x, center.y, center.z + 5))
         env:advance(15.1)
         env:advance(17.6)
-        assert.is_not_nil(fish.carry, '咬中后没有叼走玩家')
-        assert.same(peer, fish.carry.TargetPlayer, '叼走的不是离岛中心最近的玩家')
+        assert.is_not_nil(fish.Carry, '咬中后没有叼走玩家')
+        assert.same(peer, fish.Carry.TargetPlayer, '叼走的不是离岛中心最近的玩家')
         assert.same(100000, health(), '没有目标资格的岸边玩家被错伤')
         assert.same(100000 - 35 - 300, peer.Character.Controller.Health)
-        local math_water = require('common.math_water_judge')
+        local MathWater = require('common.math_water_judge')
         env:advance(30)
-        assert.is_not_nil(math_water.HitZone(cfg.Water.Zones, peer.Character.Position),
+        assert.is_not_nil(MathWater.HitZone(Cfg.Water.Zones, peer.Character.Position),
             '被叼走的玩家没有进入水域')
         dropPeer()
     end)
@@ -174,7 +174,7 @@ describe('第 12 节 阶段与复合组（沧龙 / 哥斯拉）', function()
             '过程接触不是每秒 150 的独立判定段')
         env:advance(20.65)
         -- 鱼叼着玩家入水后即释放；携带段结束后不得继续补 150，也不得在同一秒结算两次。
-        if fish.carry then
+        if fish.Carry then
             assert.same(100000 - 35 - 300 - 3 * contact.Damage.Value, health(),
                 '过程接触每秒重复结算了多次')
         else
@@ -184,17 +184,17 @@ describe('第 12 节 阶段与复合组（沧龙 / 哥斯拉）', function()
     end)
 
     it('条款 12-45：阶段表与普通招式表分开表达，阈值同帧优先于普通招式循环', function()
-        local phase = boss_moves.Phases.godzilla
+        local phase = BossMoves.Phases.godzilla
         assert.is_not_nil(phase, '逐招表没有独立的哥斯拉阶段表')
         assert.is_not_nil(phase.Thresholds and phase.AttackSets)
-        assert.same(phase.Thresholds, cfg.Ability.boss_phase.Thresholds)
-        assert.same(phase.AttackSets, cfg.Ability.boss_phase.AttackSets)
+        assert.same(phase.Thresholds, Cfg.Ability.BossPhase.Thresholds)
+        assert.same(phase.AttackSets, Cfg.Ability.BossPhase.AttackSets)
         for _, set in pairs(phase.AttackSets) do
             for _, move in ipairs(set) do
-                need(boss_moves.Get('godzilla', move) ~= nil, '阶段表引用了表外招式 %s', move)
+                need(BossMoves.Get('godzilla', move) ~= nil, '阶段表引用了表外招式 %s', move)
             end
         end
-        assert.is_nil(boss_moves.Get('godzilla', 'threshold'), '阶段阈值被写成了招式行')
+        assert.is_nil(BossMoves.Get('godzilla', 'threshold'), '阶段阈值被写成了招式行')
         assert.is_true(#phase.Thresholds[1].PhaseName > 0, '阶段切换没有可读的阶段名')
 
         local fish = env:drop('fish56Boss')

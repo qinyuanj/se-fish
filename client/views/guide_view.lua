@@ -1,15 +1,15 @@
-local main_hud_layout = require("client.main_hud_layout")
-local modal = require("client.views.economy_modal")
-local view_util = require("client.views.view_util")
-local guide_view = {}
+local MainHudLayout = require("client.main_hud_layout")
+local Modal = require("client.views.economy_modal")
+local ViewUtil = require("client.views.view_util")
+local GuideView = {}
 
-function guide_view.spec(options)
+function GuideView.spec(options)
   options = options or {}
   return {
     name = "Guide",
     mount = function(scope, ctx)
-      local resolution = view_util.get_resolution(ctx, options)
-      local rects = main_hud_layout.Compute({ width = resolution.x, height = resolution.y,
+      local resolution = ViewUtil.get_resolution(ctx, options)
+      local rects = MainHudLayout.Compute({ width = resolution.x, height = resolution.y,
         itemBarSlots = 0, reeling = false }).Rects
       local panel, toggle_rect = rects.QuestPanel, rects.QuestToggle
       local background = ctx.create_node(scope, "EUIImage", {
@@ -24,7 +24,7 @@ function guide_view.spec(options)
         FontSize = 24, Color = Color.New(255, 255, 255, 255),
         TextHorizontalAlignment = 1, TextVerticalAlignment = 1,
       })
-      local button = modal.button(scope, ctx, ctx.root_node, "QuestToggle", "", function() end)
+      local button = Modal.button(scope, ctx, ctx.root_node, "QuestToggle", "", function() end)
       button.Position, button.Size = Vector2.New(toggle_rect.x, toggle_rect.y), Vector2.New(toggle_rect.w, toggle_rect.h)
       local toggle_label = ctx.create_node(scope, "EUITextLabel", {
         Parent = ctx.root_node, Name = "QuestToggleLabel", Text = "收起任务",
@@ -43,7 +43,7 @@ function guide_view.spec(options)
       scope:effect("QuestProjection", function(es)
         local quest = es:d(ctx.store.quest)
         shown = type(quest) == "table" and type(quest.text) == "string" and quest.hidden ~= true
-        if shown then label.Text = view_util.wrap_text(quest.text, math.max(1, math.floor((panel.w - 20) / 24))) end
+        if shown then label.Text = ViewUtil.wrap_text(quest.text, math.max(1, math.floor((panel.w - 20) / 24))) end
         render()
       end)
       render()
@@ -51,4 +51,4 @@ function guide_view.spec(options)
   }
 end
 
-return guide_view
+return GuideView

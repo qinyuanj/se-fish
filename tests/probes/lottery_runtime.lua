@@ -14,7 +14,7 @@
 --   5. 专项探针里某个图案的三同发不出对应大奖。
 --
 -- 模拟边界（逐条标注在输出里）：
---   * 业务模块用真实代码：mgr_player_data / MgrLottery / LotteryDraw / lottery_eligibility / game_cfg。
+--   * 业务模块用真实代码：MgrPlayerData / MgrLottery / LotteryDraw / LotteryEligibility / GameCfg。
 --   * 引擎边界是假的：DataStore、RE、锚点；不进编辑器、不开局，真机另行试玩。
 --   * 随机源是固定种子 LCG（确定性复现），不是引擎随机；分布结论只对配置表负责。
 package.path = table.concat({ './?.lua', './?/init.lua', package.path }, ';')
@@ -31,11 +31,11 @@ local function check(name, ok, detail)
 end
 local function quantity(label, value) print(string.format('K %s = %s', label, tostring(value))) end
 
-local game_cfg = require('common.game_cfg')
-local economy_world = require('tests.support.economy_world')
-local ITEM_BAR = game_cfg.Items.ContainerId.ItemBar
+local GameCfg = require('common.game_cfg')
+local EconomyWorld = require('tests.support.economy_world')
+local ITEM_BAR = GameCfg.Items.ContainerId.ItemBar
 
-local world = economy_world.new()
+local world = EconomyWorld.new()
 local data = world.data
 local seq = 0
 local lottery = setmetatable({}, {
@@ -45,14 +45,14 @@ local lottery = setmetatable({}, {
 })
 function lottery:Settle(_, slot)
     seq = seq + 1
-    assert(world:lotteryAction({ action = 'draw', slot = slot, seq = seq }))
+    assert(world:lotteryAction({ action = 'Draw', slot = slot, seq = seq }))
     local result = world:lastResult('LotteryResult')
     assert(result and result.ok, result and result.reason or '无回包')
     return result
 end
 
 -- ===== 第一节：正常路径真实抽样（2 万次）=====
-local n = 20000
+local N = 20000
 local rngState = 138138
 local function lcg(n) -- 固定种子 LCG，返回 1..n 均匀整数（确定性复现）
     rngState = (rngState * 1103515245 + 12345) % 2147483648
@@ -60,7 +60,7 @@ local function lcg(n) -- 固定种子 LCG，返回 1..n 均匀整数（确定性
 end
 lottery.Random = lcg
 
-local patterns = game_cfg.Lottery.Patterns
+local patterns = GameCfg.Lottery.Patterns
 local function patternIndexByName(name)
     for i, p in ipairs(patterns) do if p.name == name then return i end end
 end
@@ -69,9 +69,9 @@ local realPrint = _G.print
 _G.print = function() end
 local pairCount, tripleCount, noneCount = {}, {}, 0
 local coinsPaid, consumed = 0, 0
-for _ = 1, n do
+for _ = 1, N do
     -- 每次投一件未烤极品罗非鱼（基础价 3）：直接摆进第 1 格，走真实 Settle
-    local bar = data.data.Containers[ITEM_BAR]
+    local bar = data.Data.Containers[ITEM_BAR]
     for slot = 1, data:ItemBarCapacity() do bar[slot] = nil end
     bar[1] = { itemId = 'item7', count = 1, containerId = ITEM_BAR }
     local result = assert(lottery:Settle(data, 1))
@@ -88,10 +88,10 @@ for _ = 1, n do
 end
 _G.print = realPrint
 
-print('--- 第一节：正常路径真实抽样（LCG 种子 138138，n=' .. n .. '）---')
-quantity('总抽奖数', n)
+print('--- 第一节：正常路径真实抽样（LCG 种子 138138，N=' .. N .. '）---')
+quantity('总抽奖数', N)
 quantity('投入消耗数', consumed)
-check('投入一件消耗一件', consumed == n, consumed .. '/' .. n)
+check('投入一件消耗一件', consumed == N, consumed .. '/' .. N)
 
 -- 理论概率：恰两同 3·p²·(1−p)，三同 p³
 local totalWeight = 0
@@ -105,8 +105,8 @@ quantity('理论赔付期望(每倍投注)', string.format('%.6f', expectPayout)
 check('配置表期望仍是 2.119671', math.abs(expectPayout - 2.119671) < 1e-9,
     string.format('%.6f', expectPayout))
 
-local betValue = game_cfg.Items.SalePrice('item7')
-local empiricalPayout = coinsPaid / (n * betValue)
+local betValue = GameCfg.Items.SalePrice('item7')
+local empiricalPayout = coinsPaid / (N * betValue)
 quantity('投注价值', betValue)
 quantity('金币总赔付', coinsPaid)
 quantity('经验赔付期望', string.format('%.6f', empiricalPayout))
@@ -118,8 +118,8 @@ for i, p in ipairs(patterns) do
     local prob = p.weight / totalWeight
     local pairTheory = 3 * prob * prob * (1 - prob)
     local tripleTheory = prob * prob * prob
-    local pairGot = (pairCount[i] or 0) / n
-    local tripleGot = (tripleCount[i] or 0) / n
+    local pairGot = (pairCount[i] or 0) / N
+    local tripleGot = (tripleCount[i] or 0) / N
     pairTotal = pairTotal + (pairCount[i] or 0)
     tripleTotal = tripleTotal + (tripleCount[i] or 0)
     quantity(string.format('图案%d %s 两同 理论/经验', i, p.name),
@@ -134,9 +134,9 @@ end
 quantity('两同总数', pairTotal)
 quantity('三同总数', tripleTotal)
 quantity('未中奖数', noneCount)
-check('三种结局覆盖全部抽奖', pairTotal + tripleTotal + noneCount == n)
-check('金币账平：FishCoin == 累计赔付', data.data.FishCoin == coinsPaid,
-    data.data.FishCoin .. ' vs ' .. coinsPaid)
+check('三种结局覆盖全部抽奖', pairTotal + tripleTotal + noneCount == N)
+check('金币账平：FishCoin == 累计赔付', data.Data.FishCoin == coinsPaid,
+    data.Data.FishCoin .. ' vs ' .. coinsPaid)
 
 -- 三同武器应全进独立库存；占格奖品在模拟里被下一次清格覆盖，按结果流计数
 local weaponGrants = 0
@@ -162,7 +162,7 @@ for i, p in ipairs(patterns) do
     bounds[i] = low -- 每轴取该图案区间下界，必中该图案
 end
 for i, p in ipairs(patterns) do
-    local bar = data.data.Containers[ITEM_BAR]
+    local bar = data.Data.Containers[ITEM_BAR]
     for slot = 1, data:ItemBarCapacity() do bar[slot] = nil end
     bar[1] = { itemId = 'item7', count = 1, containerId = ITEM_BAR }
     local roll = bounds[i]
@@ -174,21 +174,21 @@ for i, p in ipairs(patterns) do
         index = index + 1
         return assert(script[index], '专项脚本耗尽')
     end
-    local before = data.data.FishCoin
+    local before = data.Data.FishCoin
     local result = assert(lottery:Settle(data, 1))
     local ok = result.outcome == 'triple' and result.patternName == p.name and result.prize ~= nil
     local placement
     if reward.kind == 'weaponChoice' then
         local itemId = reward.itemKeys[1]
         placement = result.prize.itemId == itemId and data:WeaponCount(itemId) >= 1
-            and data.data.Containers[ITEM_BAR][1] == nil
+            and data.Data.Containers[ITEM_BAR][1] == nil
     else
-        local entry = data.data.Containers[ITEM_BAR][1]
+        local entry = data.Data.Containers[ITEM_BAR][1]
         placement = result.prize.itemId == reward.itemKey and entry ~= nil
             and entry.itemId == reward.itemKey and entry.count == 1
     end
     check(string.format('[专项探针] 图案%d %s 三同发大奖且落位正确（不叠加金币）', i, p.name),
-        ok and placement and result.coins == nil and data.data.FishCoin == before,
+        ok and placement and result.coins == nil and data.Data.FishCoin == before,
         string.format('outcome=%s prize=%s coins=%s', tostring(result.outcome),
             result.prize and tostring(result.prize.itemId) or 'nil', tostring(result.coins)))
 end

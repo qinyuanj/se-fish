@@ -1,6 +1,6 @@
-local vitals = {}
+local Vitals = {}
 
-function vitals.Advance(hunger, seconds, cfg)
+function Vitals.Advance(hunger, seconds, cfg)
     seconds = math.min(math.max(0, math.floor(seconds or 0)), cfg.MaxCatchUpSec or seconds)
     local damage = 0
     for _ = 1, seconds do
@@ -13,8 +13,8 @@ function vitals.Advance(hunger, seconds, cfg)
     return hunger, damage
 end
 
-function vitals.Restore(value, max, percent)
+function Vitals.Restore(value, max, percent)
     return math.min(max, value + math.floor(max * percent / 100))
 end
 
-return vitals
+return Vitals

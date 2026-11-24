@@ -14,7 +14,7 @@ local function swingClock()
     end
     local ok, now = pcall(function() return game:GetService('World'):GetServerTime() end)
     if ok and type(now) == 'number' and now == now and math.abs(now) < math.huge then return now end
-    print('[swing_registry] 读取服务端时钟失败', tostring(now))
+    print('[SwingRegistry] 读取服务端时钟失败', tostring(now))
 end
 local function swingAlive(entry)
     if not entry then return nil end

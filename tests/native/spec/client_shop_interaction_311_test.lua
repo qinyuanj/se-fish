@@ -1,18 +1,18 @@
-local game_cfg = require("common.game_cfg")
-local client_store = require("client.store.client_store")
-local root_view = require("client.views.root_view")
-local shop_view = require("client.views.shop_view")
-local fisherman_view = require("client.views.fisherman_view")
-local eui = require("tests.support.eui_double")
+local GameCfg = require("common.game_cfg")
+local ClientStore = require("client.store.client_store")
+local RootView = require("client.views.root_view")
+local ShopView = require("client.views.shop_view")
+local FishermanView = require("client.views.fisherman_view")
+local Eui = require("tests.support.eui_double")
 
 local function child(root, name) return root:FindFirstChild(name, true) end
 
 local function mount(store, options)
   options = options or {}
-  local root = eui.Node({ Name = "UIRoot" })
-  local view = root_view.mount(root, store, {
-    modals = { shop = shop_view.modal_spec() },
-    docks = { shop = shop_view.bubble_spec({ anchors = options.anchors or {} }) },
+  local root = Eui.Node({ Name = "UIRoot" })
+  local view = RootView.mount(root, store, {
+    modals = { shop = ShopView.modal_spec() },
+    docks = { shop = ShopView.bubble_spec({ anchors = options.anchors or {} }) },
     services = {
       next_seq = options.next_seq,
       send_shop = options.send_shop,
@@ -21,7 +21,7 @@ local function mount(store, options)
       notify = options.notify,
     },
     create_node = function(kind, props)
-      return eui.Node({
+      return Eui.Node({
         Kind = kind,
         Name = props and props.Name,
         Parent = props and props.Parent,
@@ -43,8 +43,8 @@ describe("客户端商店弹窗与场景气泡（#311）", function()
   after_each(function() _G.Vector3 = old_vector end)
 
   it("进入范围建商店气泡，点击开弹窗，切换弹窗和离开范围均对称回收", function()
-    local store, writer = client_store.new({ initial_now = 1000 })
-    local stand = game_cfg.Shop.Stands[1]
+    local store, writer = ClientStore.new({ initial_now = 1000 })
+    local stand = GameCfg.Shop.Stands[1]
     local root = mount(store, {
       anchors = { { stand = stand, name = stand.AnchorName, position = { x = 0, y = 0, z = 0 } } },
       open_modal = function(id, payload) writer:open_modal(id, payload) end,
@@ -56,7 +56,7 @@ describe("客户端商店弹窗与场景气泡（#311）", function()
     writer:update_spatial({ x = 0, y = 0, z = 0 }, {})
     local enter = child(root, "BtnShopEnter_" .. stand.AnchorName)
     assert.is_not_nil(enter)
-    assert.is_true(eui.Click(enter))
+    assert.is_true(Eui.Click(enter))
     local panel = child(root, "ScreenShop")
     local close = child(root, "BtnShopClose")
     assert.is_not_nil(panel)
@@ -77,9 +77,9 @@ describe("客户端商店弹窗与场景气泡（#311）", function()
   end)
 
   it("商品行保留货架等级与升级状态，详情购买只发商品编号", function()
-    local store, writer = client_store.new({ initial_now = 1000 })
+    local store, writer = ClientStore.new({ initial_now = 1000 })
     local sent, seq = {}, 40
-    local stand = game_cfg.Shop.Stands[1]
+    local stand = GameCfg.Shop.Stands[1]
     local root = mount(store, {
       send_shop = function(payload) sent[#sent + 1] = payload end,
       next_seq = function() seq = seq + 1 return seq end,
@@ -88,31 +88,31 @@ describe("客户端商店弹窗与场景气泡（#311）", function()
     })
     writer:set_coin(100)
     writer:open_modal("shop", { stand = stand })
-    local goods = game_cfg.Shop.ListForPage(stand.Level, game_cfg.Shop.Pages[1], true)[1]
+    local goods = GameCfg.Shop.ListForPage(stand.Level, GameCfg.Shop.Pages[1], true)[1]
     local row = child(root, "ShopRow1")
     assert.is_not_nil(row)
-    assert.is_true(eui.Click(row))
+    assert.is_true(Eui.Click(row))
     assert.equals(goods.Name, child(root, "LabelShopDetailName").Text)
-    assert.is_true(eui.Click(child(root, "BtnShopBuyDetail")))
-    assert.same({ action = "Buy", number = goods.number, seq = 41 }, sent[#sent])
+    assert.is_true(Eui.Click(child(root, "BtnShopBuyDetail")))
+    assert.same({ action = "Buy", number = goods.Number, seq = 41 }, sent[#sent])
     assert.is_nil(sent[#sent].price)
     root:Destroy()
     assert.equals(0, row.OnClicked:Count())
   end)
 
   it("钓鱼佬气泡上行喂食，对话与确认弹窗互斥且按钮监听随切换断开", function()
-    local store, writer = client_store.new({ initial_now = 1000 })
-    local npc = game_cfg.Interact.Fishermen[1]
+    local store, writer = ClientStore.new({ initial_now = 1000 })
+    local npc = GameCfg.Interact.Fishermen[1]
     local anchor_name = npc.AnchorNames[1]
     local sent, confirmed, seq = {}, nil, 80
-    local root = eui.Node({ Name = "UIRoot" })
-    root_view.mount(root, store, {
+    local root = Eui.Node({ Name = "UIRoot" })
+    RootView.mount(root, store, {
       modals = {
-        fisherman = fisherman_view.modal_spec(),
-        confirm = fisherman_view.confirm_modal_spec(),
+        fisherman = FishermanView.modal_spec(),
+        confirm = FishermanView.confirm_modal_spec(),
       },
       docks = {
-        fisherman = fisherman_view.bubble_spec({
+        fisherman = FishermanView.bubble_spec({
           anchors = { { npc = npc, name = anchor_name, index = 1, position = { x = 0, y = 0, z = 0 } } },
         }),
       },
@@ -123,7 +123,7 @@ describe("客户端商店弹窗与场景气泡（#311）", function()
         close_modal = function(id) writer:close_modal(id) end,
       },
       create_node = function(kind, props)
-        return eui.Node({
+        return Eui.Node({
           Kind = kind, Name = props and props.Name, Parent = props and props.Parent,
           Visible = props and props.Visible ~= false,
           Text = props and (props.Text or props.ButtonText) or "",
@@ -135,9 +135,9 @@ describe("客户端商店弹窗与场景气泡（#311）", function()
     local feed = child(root, "BtnFishermanFeed1_" .. anchor_name)
     local talk = child(root, "BtnFishermanTalk1_" .. anchor_name)
     assert.is_not_nil(feed)
-    assert.is_true(eui.Click(feed))
+    assert.is_true(Eui.Click(feed))
     assert.same({ target = "fisherman", action = "Feed", seq = 81 }, sent[#sent])
-    assert.is_true(eui.Click(talk))
+    assert.is_true(Eui.Click(talk))
     local dialog = child(root, "FishermanDialog")
     local dialog_close = child(root, "BtnFishermanClose")
     assert.is_not_nil(dialog)
@@ -147,7 +147,7 @@ describe("客户端商店弹窗与场景气泡（#311）", function()
     })
     assert.is_true(dialog.Destroyed)
     assert.equals(0, dialog_close.OnClicked:Count())
-    assert.is_true(eui.Click(child(root, "BtnYes")))
+    assert.is_true(Eui.Click(child(root, "BtnYes")))
     assert.is_true(confirmed)
     assert.is_nil(store.active_modal:now())
     writer:update_spatial({ x = 100, y = 0, z = 0 }, {})
@@ -157,7 +157,7 @@ describe("客户端商店弹窗与场景气泡（#311）", function()
   end)
 
   it("抢救气泡按濒死状态与距离建拆，点击只上行目标玩家和操作身份", function()
-    local store, writer = client_store.new({ initial_now = 1000 })
+    local store, writer = ClientStore.new({ initial_now = 1000 })
     local me = { UserId = 1 }
     local target = {
       UserId = 2,
@@ -166,20 +166,20 @@ describe("客户端商店弹窗与场景气泡（#311）", function()
     }
     local sent, seq = {}, 90
     local players = { me, target }
-    local shared = fisherman_view.rescue_state({
+    local shared = FishermanView.rescue_state({
       get_players = function() return players end,
       get_local_player = function() return me end,
     })
-    local root = eui.Node({ Name = "UIRoot" })
-    root_view.mount(root, store, {
-      hud = { fisherman_view.rescue_driver_spec(shared) },
-      docks = { rescue = fisherman_view.rescue_bubble_spec(shared) },
+    local root = Eui.Node({ Name = "UIRoot" })
+    RootView.mount(root, store, {
+      hud = { FishermanView.rescue_driver_spec(shared) },
+      docks = { rescue = FishermanView.rescue_bubble_spec(shared) },
       services = {
         next_seq = function() seq = seq + 1 return seq end,
         send_interact = function(payload) sent[#sent + 1] = payload end,
       },
       create_node = function(kind, props)
-        return eui.Node({
+        return Eui.Node({
           Kind = kind, Name = props and props.Name, Parent = props and props.Parent,
           Visible = props and props.Visible ~= false,
           Text = props and (props.Text or props.ButtonText) or "",
@@ -191,10 +191,10 @@ describe("客户端商店弹窗与场景气泡（#311）", function()
     writer:advance_clock(0.1)
     local rescue = child(root, "BtnRescue2")
     assert.is_not_nil(rescue)
-    assert.is_true(eui.Click(rescue))
+    assert.is_true(Eui.Click(rescue))
     assert.same({
-      target = game_cfg.Rescue.Target,
-      action = game_cfg.Rescue.Action,
+      target = GameCfg.Rescue.Target,
+      action = GameCfg.Rescue.Action,
       targetUserId = 2,
       seq = 91,
     }, sent[#sent])
@@ -219,7 +219,7 @@ describe("客户端商店弹窗与场景气泡（#311）", function()
   end)
 
   it("抢救驱动平时零 on_frame 空转，同目标稳定时不重复触发 DockSync 重建", function()
-    local store, writer = client_store.new({ initial_now = 1000 })
+    local store, writer = ClientStore.new({ initial_now = 1000 })
     local me = { UserId = 1 }
     local target = {
       UserId = 2,
@@ -227,19 +227,19 @@ describe("客户端商店弹窗与场景气泡（#311）", function()
       GetAttribute = function(_, key) return key == "SurvivalPhase" and "alive" or nil end,
     }
     local reads = 0
-    local shared = fisherman_view.rescue_state({
+    local shared = FishermanView.rescue_state({
       get_players = function()
         reads = reads + 1
         return { me, target }
       end,
       get_local_player = function() return me end,
     })
-    local root = eui.Node({ Name = "UIRoot" })
-    root_view.mount(root, store, {
-      hud = { fisherman_view.rescue_driver_spec(shared) },
-      docks = { rescue = fisherman_view.rescue_bubble_spec(shared) },
+    local root = Eui.Node({ Name = "UIRoot" })
+    RootView.mount(root, store, {
+      hud = { FishermanView.rescue_driver_spec(shared) },
+      docks = { rescue = FishermanView.rescue_bubble_spec(shared) },
       create_node = function(kind, props)
-        return eui.Node({
+        return Eui.Node({
           Kind = kind, Name = props and props.Name, Parent = props and props.Parent,
           Visible = props and props.Visible ~= false,
           Text = props and (props.Text or props.ButtonText) or "",
@@ -269,13 +269,13 @@ describe("客户端商店弹窗与场景气泡（#311）", function()
   end)
 
   it("抢救 busy 回执给玩家提示", function()
-    local store, writer = client_store.new({ initial_now = 1000 })
+    local store, writer = ClientStore.new({ initial_now = 1000 })
     local notices = {}
-    local root = eui.Node({ Name = "UIRoot" })
-    root_view.mount(root, store, {
-      hud = { fisherman_view.presentation_spec() },
+    local root = Eui.Node({ Name = "UIRoot" })
+    RootView.mount(root, store, {
+      hud = { FishermanView.presentation_spec() },
       services = { notify = function(text) notices[#notices + 1] = text end },
-      create_node = function(kind, props) return eui.Node({ Kind = kind, Name = props and props.Name }) end,
+      create_node = function(kind, props) return Eui.Node({ Kind = kind, Name = props and props.Name }) end,
     })
     writer:ingest_event("InteractResult", { action = "Rescue", ok = false, reason = "busy" })
     assert.same({ "正在抢救中" }, notices)
@@ -283,31 +283,31 @@ describe("客户端商店弹窗与场景气泡（#311）", function()
   end)
 
   it("抢救按钮创建失败立即销毁已创建的场景根节点", function()
-    local store, writer = client_store.new({ initial_now = 1000 })
+    local store, writer = ClientStore.new({ initial_now = 1000 })
     local me = { UserId = 1 }
     local target = {
       UserId = 2,
       Character = { Position = { x = 0, y = 0, z = 0 } },
       GetAttribute = function(_, key) return key == "SurvivalPhase" and "downed" or nil end,
     }
-    local shared = fisherman_view.rescue_state({
+    local shared = FishermanView.rescue_state({
       get_players = function() return { me, target } end,
       get_local_player = function() return me end,
     })
     local scene_root
-    local root = eui.Node({ Name = "UIRoot" })
-    root_view.mount(root, store, {
-      hud = { fisherman_view.rescue_driver_spec(shared) },
-      docks = { rescue = fisherman_view.rescue_bubble_spec(shared) },
+    local root = Eui.Node({ Name = "UIRoot" })
+    RootView.mount(root, store, {
+      hud = { FishermanView.rescue_driver_spec(shared) },
+      docks = { rescue = FishermanView.rescue_bubble_spec(shared) },
       services = {
         create_scene_node = function()
-          scene_root = eui.Node({ Name = "RescueSceneRoot" })
+          scene_root = Eui.Node({ Name = "RescueSceneRoot" })
           return scene_root
         end,
       },
       create_node = function(kind, props)
         if kind == "EUIButton" then return nil end
-        return eui.Node({ Kind = kind, Name = props and props.Name })
+        return Eui.Node({ Kind = kind, Name = props and props.Name })
       end,
     })
     writer:update_spatial({ x = 0, y = 0, z = 0 }, {})

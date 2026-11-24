@@ -9,16 +9,16 @@
 --   lua tools/gen_config_anchor_probe.lua           # 重写数据块
 --   lua tools/gen_config_anchor_probe.lua --check   # 只校验是否同步，不同步退出码 1
 -- 同步守卫就是 --check 本身（2026-11-18 起，原 tests/native/config_anchor_baseline_sync_test.lua 已删：
--- 它做的就是这个 --check，重复跑一遍只是把同一个检查算两次）。改动 game_cfg 的锚点名后须重生成再提交。
+-- 它做的就是这个 --check，重复跑一遍只是把同一个检查算两次）。改动 GameCfg 的锚点名后须重生成再提交。
 local M = {}
 M.PROBE = 'tests/probes/config_anchor_resolution.lua'
 M.BEGIN_MARK = '-- >>> GENERATED ANCHOR DATA'
 M.END_MARK = '-- <<< GENERATED ANCHOR DATA'
 
 -- 收集：锚点名 + 来源 + 预期区 + 状态（observed / planned / '-'）
-function M.collect(game_cfg)
+function M.collect(GameCfg)
     local labels, labelByZoneId = {}, {}
-    for index, zone in ipairs(game_cfg.Zones) do
+    for index, zone in ipairs(GameCfg.Zones) do
         labels[index] = string.format('%02d ', index) .. tostring(zone.Name)
         labelByZoneId[zone.Id] = labels[index]
     end
@@ -29,24 +29,24 @@ function M.collect(game_cfg)
             name = tostring(name), state = state or '-' }
     end
     -- 1. 区域标记命名合同（ADR-0013，common/zone_markers.Contract；水域按 Z<i>_Water 前缀枚举，不在清单内）
-    for _, entry in ipairs(require('common.zone_markers').Contract(game_cfg)) do
+    for _, entry in ipairs(require('common.zone_markers').Contract(GameCfg)) do
         add('Marker.' .. entry.Role, labels[entry.ZoneIndex], entry.Name, 'contract')
     end
     -- 2. 钓鱼佬锚点（MgrInteract.FindAnchor 的名字来源）
-    for index, fisherman in ipairs(game_cfg.Interact.Fishermen or {}) do
+    for index, fisherman in ipairs(GameCfg.Interact.Fishermen or {}) do
         for _, name in ipairs(fisherman.AnchorNames or {}) do
             add('Interact.Fishermen', labels[index], name, '-')
         end
     end
-    -- 3. 商店锚点（game_cfg.Shop.Stands 是硬编码字符串，不从 Scene 派生）
-    for index, stand in ipairs((game_cfg.Shop or {}).Stands or {}) do
+    -- 3. 商店锚点（GameCfg.Shop.Stands 是硬编码字符串，不从 Scene 派生）
+    for index, stand in ipairs((GameCfg.Shop or {}).Stands or {}) do
         add('Shop.Stands', labels[index], stand.AnchorName, '-')
     end
     -- 4. 烧烤锚点（MgrGrill.FindAnchor）
-    for _, point in ipairs((game_cfg.Grill or {}).Points or {}) do
+    for _, point in ipairs((GameCfg.Grill or {}).Points or {}) do
         add('Grill.Points', labelByZoneId[point.ZoneId], point.AnchorName, '-')
     end
-    local okRoutes, routes = pcall(function() return game_cfg.Ferry.Routes end)
+    local okRoutes, routes = pcall(function() return GameCfg.Ferry.Routes end)
     if okRoutes and routes then
         for index, route in ipairs(routes) do
             add('Ferry.Outbound', labels[index], route.Outbound and route.Outbound.AnchorName, '-')
@@ -97,8 +97,8 @@ end
 
 local function main(argv)
     local check = argv and argv[1] == '--check'
-    local game_cfg = require('common.game_cfg')
-    local entries, labels = M.collect(game_cfg)
+    local GameCfg = require('common.game_cfg')
+    local entries, labels = M.collect(GameCfg)
     local want = M.renderBlock(entries, labels)
     local text = M.readProbe()
     if not text then

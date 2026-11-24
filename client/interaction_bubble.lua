@@ -1,22 +1,22 @@
-local style = require('common.game_cfg').InteractionBubble
+local Style = require('common.game_cfg').InteractionBubble
 local World = game:GetService('World')
 local Bubble = {}
 
 function Bubble.CreateButton(parent, name, text, x, onClick)
     local button, label
     local ok, err = pcall(function()
-        local color = style.BackgroundColor
+        local color = Style.BackgroundColor
         button = World:CreateUnit('EUIButton', {
             Parent = parent, Name = name, Position = Vector2.New(x, 0),
-            Size = Vector2.New(style.Width, style.Height), ButtonText = '',
-            NormalImage = style.Image, PressImage = style.Image, DisableImage = style.Image,
+            Size = Vector2.New(Style.Width, Style.Height), ButtonText = '',
+            NormalImage = Style.Image, PressImage = Style.Image, DisableImage = Style.Image,
             ButtonNormalColor = Color.New(color[1], color[2], color[3], color[4]),
         })
         assert(button, '按钮创建失败')
         label = World:CreateUnit('EUITextLabel', {
             Parent = parent, Name = name .. 'Text', Position = Vector2.New(x, 0),
-            Size = Vector2.New(style.Width, style.Height),
-            Text = text, FontSize = style.FontSize, TextColor = Color.New(255, 255, 255, 255),
+            Size = Vector2.New(Style.Width, Style.Height),
+            Text = text, FontSize = Style.FontSize, TextColor = Color.New(255, 255, 255, 255),
         })
         assert(label, '文字创建失败')
         label.TouchEnabled = false

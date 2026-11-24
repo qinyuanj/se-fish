@@ -1,15 +1,15 @@
 -- 服务端 modifier_system 官方包单向输出叶子投影层（ADR-0032 §3 / #297-A2）：
---   1. 订阅 player_effects 暴露的槽位/效果信号单向调用 AddModifier（强制 removeMode = 0），
---      禁用包内 DurationFinish / ModifierLoss 业务计时驱动，所有计时与层数主权归 player_effects + spoke_clock；
+--   1. 订阅 PlayerEffects 暴露的槽位/效果信号单向调用 AddModifier（强制 removeMode = 0），
+--      禁用包内 DurationFinish / ModifierLoss 业务计时驱动，所有计时与层数主权归 PlayerEffects + SpokeClock；
 --   2. 在同作用域 s:on_cleanup 中对称调用 RemoveModifier，角色重建与树销毁零残留；
 --   3. 提供独立轻量的活鱼 / 非玩家实体效果施加与清理辅助接口（create_entity_store），
 --      同样遵循 removeMode = 0 与业务时钟主权，供淘汰 MgrModifier 时无缝承接活鱼受击。
 -- 本模块归属 L2（server.world_host），零反向依赖存量旧债务模块。
 
-local game_cfg = require("common.game_cfg")
-local number = require("common.number")
+local GameCfg = require("common.game_cfg")
+local Number = require("common.number")
 
-local modifier_leaf = {}
+local ModifierLeaf = {}
 
 local ALL_KINDS = { "poison", "burn", "frost", "paralyze", "weak" }
 local VALID_KINDS = {
@@ -33,7 +33,7 @@ local function report_error(opts, tag, msg)
   if type(opts.on_error) == "function" then
     opts.on_error(tag .. ": " .. tostring(msg))
   else
-    print("[modifier_leaf]", tag, tostring(msg))
+    print("[ModifierLeaf]", tag, tostring(msg))
   end
 end
 
@@ -49,7 +49,7 @@ local function resolve_source_unit(source)
 end
 
 local function preset_for(kind, opts)
-  local presets = (type(opts) == "table" and opts.presets) or game_cfg.Ability.ModifierPresets or {}
+  local presets = (type(opts) == "table" and opts.presets) or GameCfg.Ability.ModifierPresets or {}
   local preset = presets[kind]
   if type(preset) ~= "string" or preset == "" then
     return nil
@@ -62,9 +62,9 @@ end
 ---@param duration number
 ---@param source any
 ---@return table
-function modifier_leaf.build_add_config(kind, duration, source)
-  local cfg = game_cfg.Ability.StatusEffects and game_cfg.Ability.StatusEffects[kind]
-  local max_stacks = (cfg and number.IsFiniteNumber(cfg.MaxStacks) and cfg.MaxStacks > 0)
+function ModifierLeaf.build_add_config(kind, duration, source)
+  local cfg = GameCfg.Ability.StatusEffects and GameCfg.Ability.StatusEffects[kind]
+  local max_stacks = (cfg and Number.IsFiniteNumber(cfg.MaxStacks) and cfg.MaxStacks > 0)
       and math.floor(cfg.MaxStacks) or 1
   local stack_count_mode = max_stacks > 1 and 2 or 0
   return {
@@ -106,7 +106,7 @@ end
 ---@param source any
 ---@param opts? table
 ---@return any entity, string|nil err
-function modifier_leaf.push_modifier(modifier_api, owner, kind, duration, source, opts)
+function ModifierLeaf.push_modifier(modifier_api, owner, kind, duration, source, opts)
   if not is_object(owner) then
     return nil, "no-owner"
   end
@@ -114,10 +114,10 @@ function modifier_leaf.push_modifier(modifier_api, owner, kind, duration, source
   if not preset then
     return nil, "modifier-preset-missing:" .. tostring(kind)
   end
-  if not number.IsFiniteNumber(duration) or duration <= 0 then
+  if not Number.IsFiniteNumber(duration) or duration <= 0 then
     return nil, "invalid-duration"
   end
-  local add_cfg = modifier_leaf.build_add_config(kind, duration, source)
+  local add_cfg = ModifierLeaf.build_add_config(kind, duration, source)
   local ok_add, result = pcall(modifier_api.AddModifier, owner, preset, add_cfg)
   if not ok_add then
     return nil, tostring(result)
@@ -133,13 +133,13 @@ function modifier_leaf.push_modifier(modifier_api, owner, kind, duration, source
   return entity, nil
 end
 
---- 将单个效果槽位投影到 modifier_system 官方包（供 player_effects.mount 的 on_mount_modifier_leaf 调用）。
+--- 将单个效果槽位投影到 modifier_system 官方包（供 PlayerEffects.mount 的 on_mount_modifier_leaf 调用）。
 ---@param es table EffectBuilder
 ---@param player_tree table
 ---@param kind string
 ---@param _entry? table
 ---@param opts? { modifier_api?: table, presets?: table, on_error?: fun(msg: string) }
-function modifier_leaf.mount_slot(es, player_tree, kind, _entry, opts)
+function ModifierLeaf.mount_slot(es, player_tree, kind, _entry, opts)
   if not VALID_KINDS[kind] then
     return
   end
@@ -168,9 +168,9 @@ function modifier_leaf.mount_slot(es, player_tree, kind, _entry, opts)
       return
     end
 
-    local duration = number.IsFiniteNumber(snap.remaining) and snap.remaining > 0
+    local duration = Number.IsFiniteNumber(snap.remaining) and snap.remaining > 0
         and snap.remaining or snap.duration
-    local entity, err = modifier_leaf.push_modifier(modifier_api, character, kind, duration, snap.source, opts)
+    local entity, err = ModifierLeaf.push_modifier(modifier_api, character, kind, duration, snap.source, opts)
     if not entity then
       report_error(opts, "AddModifier(" .. kind .. ")", err)
       return
@@ -189,9 +189,9 @@ function modifier_leaf.mount_slot(es, player_tree, kind, _entry, opts)
         return
       end
       applied_revision = next_snap.revision
-      local next_dur = number.IsFiniteNumber(next_snap.remaining) and next_snap.remaining > 0
+      local next_dur = Number.IsFiniteNumber(next_snap.remaining) and next_snap.remaining > 0
           and next_snap.remaining or next_snap.duration
-      local updated, update_err = modifier_leaf.push_modifier(
+      local updated, update_err = ModifierLeaf.push_modifier(
         modifier_api,
         character,
         kind,
@@ -208,12 +208,12 @@ function modifier_leaf.mount_slot(es, player_tree, kind, _entry, opts)
   end)
 end
 
---- 返回可直接注入 player_effects.mount({ on_mount_modifier_leaf = ... }) 的挂点回调。
+--- 返回可直接注入 PlayerEffects.mount({ on_mount_modifier_leaf = ... }) 的挂点回调。
 ---@param opts? { modifier_api?: table, presets?: table, on_error?: fun(msg: string) }
 ---@return fun(es: table, player_tree: table, kind: string, entry: table)
-function modifier_leaf.make_slot_mounter(opts)
+function ModifierLeaf.make_slot_mounter(opts)
   return function(es, player_tree, kind, entry)
-    return modifier_leaf.mount_slot(es, player_tree, kind, entry, opts)
+    return ModifierLeaf.mount_slot(es, player_tree, kind, entry, opts)
   end
 end
 
@@ -221,9 +221,9 @@ end
 ---@param s table EffectBuilder
 ---@param player_tree table
 ---@param opts? { modifier_api?: table, presets?: table, on_error?: fun(msg: string) }
-function modifier_leaf.mount(s, player_tree, opts)
+function ModifierLeaf.mount(s, player_tree, opts)
   for _, kind in ipairs(ALL_KINDS) do
-    modifier_leaf.mount_slot(s, player_tree, kind, nil, opts)
+    ModifierLeaf.mount_slot(s, player_tree, kind, nil, opts)
   end
 end
 
@@ -249,23 +249,23 @@ end
 
 local function default_duration_for(kind)
   if kind == "weak" then
-    return game_cfg.Survival.WeakSec
+    return GameCfg.Survival.WeakSec
   end
-  local cfg = game_cfg.Ability.StatusEffects and game_cfg.Ability.StatusEffects[kind]
+  local cfg = GameCfg.Ability.StatusEffects and GameCfg.Ability.StatusEffects[kind]
   return cfg and cfg.DurationSec or 0
 end
 
 local function max_stacks_for(kind)
-  local cfg = game_cfg.Ability.StatusEffects and game_cfg.Ability.StatusEffects[kind]
-  if cfg and number.IsFiniteNumber(cfg.MaxStacks) and cfg.MaxStacks > 0 then
+  local cfg = GameCfg.Ability.StatusEffects and GameCfg.Ability.StatusEffects[kind]
+  if cfg and Number.IsFiniteNumber(cfg.MaxStacks) and cfg.MaxStacks > 0 then
     return math.floor(cfg.MaxStacks)
   end
   return 1
 end
 
 local function dot_cfg_for(kind)
-  local cfg = game_cfg.Ability.StatusEffects and game_cfg.Ability.StatusEffects[kind]
-  if cfg and number.IsFiniteNumber(cfg.TickSec) and cfg.TickSec > 0 and number.IsFiniteNumber(cfg.DamagePerStack) then
+  local cfg = GameCfg.Ability.StatusEffects and GameCfg.Ability.StatusEffects[kind]
+  if cfg and Number.IsFiniteNumber(cfg.TickSec) and cfg.TickSec > 0 and Number.IsFiniteNumber(cfg.DamagePerStack) then
     return cfg
   end
   return nil
@@ -273,12 +273,12 @@ end
 
 --- 创建独立轻量的非玩家实体（活鱼等）效果存储与单向叶子投影器。
 ---@param opts? { modifier_api?: table, presets?: table, now?: fun(): number, on_dot_tick?: fun(target: any, kind: string, damage: number, source: any, stacks: number), on_error?: fun(msg: string) }
-function modifier_leaf.create_entity_store(opts)
+function ModifierLeaf.create_entity_store(opts)
   opts = type(opts) == "table" and opts or {}
   local modifier_api = opts.modifier_api or default_modifier_api()
   local get_now = type(opts.now) == "function" and opts.now or function()
     local ok, t = pcall(function() return game:GetService("World"):GetServerTime() end) -- 离线无引擎时兜底 0
-    return ok and number.IsFiniteNumber(t) and t or 0
+    return ok and Number.IsFiniteNumber(t) and t or 0
   end
 
   local records = {}
@@ -325,7 +325,7 @@ function modifier_leaf.create_entity_store(opts)
       return false, "no-effect-owner"
     end
     local duration = duration_override ~= nil and duration_override or default_duration_for(kind)
-    if not number.IsFiniteNumber(duration) or duration <= 0 then
+    if not Number.IsFiniteNumber(duration) or duration <= 0 then
       return false, "invalid-duration"
     end
 
@@ -350,7 +350,7 @@ function modifier_leaf.create_entity_store(opts)
       end
     end
 
-    local entity, err = modifier_leaf.push_modifier(modifier_api, owner, kind, duration, source, opts)
+    local entity, err = ModifierLeaf.push_modifier(modifier_api, owner, kind, duration, source, opts)
     if not entity then
       if next(record.effects) == nil then
         records[key] = nil
@@ -425,9 +425,9 @@ function modifier_leaf.create_entity_store(opts)
     if self:is_controlled(target) then
       return 0
     end
-    local mult = self:get_remaining(target, "weak") > 0 and game_cfg.Survival.WeakSpeedScale or 1
+    local mult = self:get_remaining(target, "weak") > 0 and GameCfg.Survival.WeakSpeedScale or 1
     if self:get_remaining(target, "frost") > 0 then
-      local frost_cfg = game_cfg.Ability.StatusEffects and game_cfg.Ability.StatusEffects.frost
+      local frost_cfg = GameCfg.Ability.StatusEffects and GameCfg.Ability.StatusEffects.frost
       local slow_pct = frost_cfg and frost_cfg.SlowPercent or 30
       mult = mult * (1 - slow_pct / 100)
     end
@@ -491,4 +491,4 @@ function modifier_leaf.create_entity_store(opts)
   return store
 end
 
-return modifier_leaf
+return ModifierLeaf

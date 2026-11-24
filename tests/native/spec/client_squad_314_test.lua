@@ -1,9 +1,9 @@
 
-local game_cfg = require("common.game_cfg")
-local client_store = require("client.store.client_store")
-local root_view = require("client.views.root_view")
-local squad_view = require("client.views.squad_view")
-local eui = require("tests.support.eui_double")
+local GameCfg = require("common.game_cfg")
+local ClientStore = require("client.store.client_store")
+local RootView = require("client.views.root_view")
+local SquadView = require("client.views.squad_view")
+local Eui = require("tests.support.eui_double")
 
 local function child(root, name) return root:FindFirstChild(name, true) end
 
@@ -20,19 +20,19 @@ end
 
 local function mount(options)
   options = options or {}
-  local store, writer = client_store.new({ initial_now = 100 })
-  local root = eui.Node({ Name = "UIRoot" })
+  local store, writer = ClientStore.new({ initial_now = 100 })
+  local root = Eui.Node({ Name = "UIRoot" })
   local me = options.me or { UserId = 1 }
   local players = options.players or { me }
-  local rescue = squad_view.rescue_state({
+  local rescue = SquadView.rescue_state({
     get_players = function() return players end,
     get_local_player = function() return me end,
   })
-  local view = root_view.mount(root, store, {
-    hud = { squad_view.hud_spec(), squad_view.rescue_driver_spec(rescue) },
+  local view = RootView.mount(root, store, {
+    hud = { SquadView.hud_spec(), SquadView.rescue_driver_spec(rescue) },
     docks = {
-      squad_members = squad_view.member_spec(),
-      squad_rescue = squad_view.rescue_bubble_spec(rescue),
+      squad_members = SquadView.member_spec(),
+      squad_rescue = SquadView.rescue_bubble_spec(rescue),
     },
     services = {
       send_party = options.send_party,
@@ -42,7 +42,7 @@ local function mount(options)
       get_device_resolution = options.get_device_resolution,
     },
     create_node = function(kind, props)
-      local node = eui.Node({
+      local node = Eui.Node({
         Kind = kind, Name = props and props.Name, Parent = props and props.Parent,
         Visible = props and props.Visible ~= false,
         Text = props and (props.Text or props.ButtonText) or "",
@@ -77,8 +77,8 @@ describe("客户端小队 HUD 与队友抢救气泡（#314）", function()
     assert.is_nil(child(ctx.root, "PartyMember1"))
     assert.equals("甲", child(ctx.root, "PartyMemberName2").Text)
     assert.equals("50 / 100", child(ctx.root, "PartyHealthText2").Text)
-    assert.equals(game_cfg.Party.HUD.BarWidth * 0.5, child(ctx.root, "PartyHealthFill2").Size.x)
-    assert.equals(game_cfg.Party.HUD.ColorBlockImage, child(ctx.root, "PartyHealthFill2").Image)
+    assert.equals(GameCfg.Party.HUD.BarWidth * 0.5, child(ctx.root, "PartyHealthFill2").Size.x)
+    assert.equals(GameCfg.Party.HUD.ColorBlockImage, child(ctx.root, "PartyHealthFill2").Image)
     assert.is_true(child(ctx.root, "PartyMember3").Visible)
 
     local row = child(ctx.root, "PartyMember2")
@@ -108,22 +108,22 @@ describe("客户端小队 HUD 与队友抢救气泡（#314）", function()
     } })
     local invite = child(ctx.root, "PartyInvite")
     assert.is_true(invite.Visible)
-    assert.equals("玩家2" .. game_cfg.Party.HUD.InviteText, child(ctx.root, "PartyInviteText").Text)
-    assert.equals("10" .. game_cfg.Party.HUD.InviteCountdownText, child(ctx.root, "PartyInviteCountdown").Text)
+    assert.equals("玩家2" .. GameCfg.Party.HUD.InviteText, child(ctx.root, "PartyInviteText").Text)
+    assert.equals("10" .. GameCfg.Party.HUD.InviteCountdownText, child(ctx.root, "PartyInviteCountdown").Text)
     ctx.writer:advance_clock(3)
-    assert.equals("7" .. game_cfg.Party.HUD.InviteCountdownText, child(ctx.root, "PartyInviteCountdown").Text)
+    assert.equals("7" .. GameCfg.Party.HUD.InviteCountdownText, child(ctx.root, "PartyInviteCountdown").Text)
     ctx.writer:ingest_event("PartyState", { state = "none", members = {}, invite = {
       fromUserId = 2, fromName = "玩家2", expiresInSec = 10, expiresAt = 110,
     } })
-    assert.equals("7" .. game_cfg.Party.HUD.InviteCountdownText, child(ctx.root, "PartyInviteCountdown").Text)
-    assert.is_true(eui.Click(child(ctx.root, "PartyInviteAccept")))
+    assert.equals("7" .. GameCfg.Party.HUD.InviteCountdownText, child(ctx.root, "PartyInviteCountdown").Text)
+    assert.is_true(Eui.Click(child(ctx.root, "PartyInviteAccept")))
     assert.same({ action = "Accept" }, sent[1])
-    assert.is_true(eui.Click(child(ctx.root, "PartyInviteDecline")))
+    assert.is_true(Eui.Click(child(ctx.root, "PartyInviteDecline")))
     assert.same({ action = "Decline" }, sent[2])
     ctx.writer:advance_clock(7)
     assert.is_false(invite.Visible)
     ctx.writer:ingest_event("PartyState", { state = "none", members = {} })
-    assert.is_false(eui.Click(child(ctx.root, "PartyInviteAccept")))
+    assert.is_false(Eui.Click(child(ctx.root, "PartyInviteAccept")))
     assert.equals(2, #sent)
   end)
 
@@ -131,13 +131,13 @@ describe("客户端小队 HUD 与队友抢救气泡（#314）", function()
     local notices = {}
     local ctx = mount({ notify = function(text) notices[#notices + 1] = text end })
     ctx.writer:ingest_event("PartyResult", { action = "Invite", ok = false, reason = "too-far" })
-    assert.equals(game_cfg.Party.HUD.TooFarText, notices[#notices])
+    assert.equals(GameCfg.Party.HUD.TooFarText, notices[#notices])
     ctx.writer:ingest_event("PartyState", snapshot({ member(1, "自己", 300, 300, "alive", true) }, { notice = "full" }))
-    assert.equals(game_cfg.Party.HUD.RestoreFullText, notices[#notices])
+    assert.equals(GameCfg.Party.HUD.RestoreFullText, notices[#notices])
     ctx.writer:ingest_event("PartyState", { state = "none", members = {}, notice = "disbanded" })
-    assert.equals(game_cfg.Party.HUD.DisbandText, notices[#notices])
+    assert.equals(GameCfg.Party.HUD.DisbandText, notices[#notices])
     ctx.writer:ingest_event("PartyState", snapshot({ member(1, "自己", 300, 300, "alive", true) }, { notice = "restored" }))
-    assert.equals(game_cfg.Party.HUD.RestoredText, notices[#notices])
+    assert.equals(GameCfg.Party.HUD.RestoredText, notices[#notices])
   end)
 
   it("队友濒死按距离建抢救气泡，抢救上行，恢复/死亡/退队/超距对称销毁", function()
@@ -156,9 +156,9 @@ describe("客户端小队 HUD 与队友抢救气泡（#314）", function()
     ctx.writer:advance_clock(0.05)
     local button = child(ctx.root, "BtnSquadRescue2")
     assert.is_not_nil(button)
-    assert.equals(game_cfg.Rescue.PromptText, button.Text)
-    assert.is_true(eui.Click(button))
-    assert.same({ target = game_cfg.Rescue.Target, action = game_cfg.Rescue.Action,
+    assert.equals(GameCfg.Rescue.PromptText, button.Text)
+    assert.is_true(Eui.Click(button))
+    assert.same({ target = GameCfg.Rescue.Target, action = GameCfg.Rescue.Action,
       targetUserId = 2, seq = 41 }, sent[1])
 
     ctx.writer:ingest_event("PartyState", snapshot({
@@ -176,7 +176,7 @@ describe("客户端小队 HUD 与队友抢救气泡（#314）", function()
     }))
     ctx.writer:advance_clock(0.05)
     assert.is_not_nil(child(ctx.root, "BtnSquadRescue2"))
-    target.Character.Position.x = game_cfg.Rescue.Range + 1
+    target.Character.Position.x = GameCfg.Rescue.Range + 1
     ctx.writer:advance_clock(0.05)
     assert.is_nil(child(ctx.root, "BtnSquadRescue2"))
     target.Character.Position.x = 1
@@ -214,26 +214,26 @@ describe("客户端小队 HUD 与队友抢救气泡（#314）", function()
     local reads = 0
     local me = { UserId = 1 }
     local teammate = { UserId = 2, Character = { Position = { x = 1, y = 0, z = 0 } } }
-    local store, writer = client_store.new({ initial_now = 100 })
-    local root = eui.Node({ Name = "UIRoot" })
-    local rescue = squad_view.rescue_state({
+    local store, writer = ClientStore.new({ initial_now = 100 })
+    local root = Eui.Node({ Name = "UIRoot" })
+    local rescue = SquadView.rescue_state({
       get_players = function()
         reads = reads + 1
         return { me, teammate }
       end,
       get_local_player = function() return me end,
     })
-    root_view.mount(root, store, {
-      hud = { squad_view.hud_spec(), squad_view.rescue_driver_spec(rescue) },
+    RootView.mount(root, store, {
+      hud = { SquadView.hud_spec(), SquadView.rescue_driver_spec(rescue) },
       docks = {
-        squad_members = squad_view.member_spec(),
-        squad_rescue = squad_view.rescue_bubble_spec(rescue),
+        squad_members = SquadView.member_spec(),
+        squad_rescue = SquadView.rescue_bubble_spec(rescue),
       },
       services = {
         get_device_resolution = function() return { x = 1280, y = 720 } end,
       },
       create_node = function(kind, props)
-        local node = eui.Node({
+        local node = Eui.Node({
           Kind = kind, Name = props and props.Name, Parent = props and props.Parent,
           Visible = props and props.Visible ~= false,
           Text = props and (props.Text or props.ButtonText) or "",
@@ -244,7 +244,7 @@ describe("客户端小队 HUD 与队友抢救气泡（#314）", function()
         return node
       end,
     })
-    local hud = game_cfg.Party.HUD
+    local hud = GameCfg.Party.HUD
     assert.equals(1280 - hud.RowWidth - hud.MarginRight, child(root, "PartyHud").Position.x)
 
     writer:update_spatial({ x = 0, y = 0, z = 0 }, {})

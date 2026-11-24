@@ -1,9 +1,9 @@
 -- 前置：玩家背包或道具栏里有未烤鱼获（食物/极品食物）；最好另有一条未烤信物演示确认流程；
 -- 人站在三区起任一烧烤点 2.5 米内。GM 发放与传送只是环境准备，烤的流程全走真实通道。
 -- 试玩就绪后：editor-cli exec -p server --file <本文件绝对路径> --json。
--- 场景 a：信物优先——不确认先收 token-warn、确认后开烤，约 2 秒取出，日志给倍率（期望 1.50）。
+-- 场景 A：信物优先——不确认先收 token-warn、确认后开烤，约 2 秒取出，日志给倍率（期望 1.50）。
 -- 没有信物时退化为普通鱼开烤取出。
--- 场景 b：非信物鱼开烤后不取出，等烤糊：burnt 推送、烤糊前后血量差（3 米内 30）、只损毁一次。
+-- 场景 B：非信物鱼开烤后不取出，等烤糊：burnt 推送、烤糊前后血量差（3 米内 30）、只损毁一次。
 -- 注意：开烤/取出经 #123 持久协议，会话在异步落账回调里建立，所以全程在协程里轮询等待。
 local cfg = require('common.game_cfg')
 local pd = require('server.player_data_host')
@@ -51,7 +51,7 @@ end
 
 -- 找一条未烤鱼获；wantToken=true 时只要信物，=false 时只要非信物，nil 不限
 local function grillableSlot(wantToken)
-    for containerId, container in pairs(data.data.Containers) do
+    for containerId, container in pairs(data.Data.Containers) do
         for index, entry in pairs(container) do
             local def = entry.itemId and cfg.Items.Definitions[entry.itemId]
             if entry.count > 0 and def and (def.Type == '食物' or def.Type == '极品食物')
@@ -78,7 +78,7 @@ local function health()
 end
 
 local function findCooked(itemId)
-    for _, container in pairs(data.data.Containers) do
+    for _, container in pairs(data.Data.Containers) do
         for _, e in pairs(container) do
             if e.itemId == itemId and e.count > 0 and e.cooked ~= nil then return e end
         end
@@ -95,53 +95,53 @@ local function waitSession()
     end
 end
 
--- 场景 a 开烤：信物先发未确认（期望 token-warn）再确认；普通鱼直接开烤
+-- 场景 A 开烤：信物先发未确认（期望 token-warn）再确认；普通鱼直接开烤
 local cidA, idxA, entryA = grillableSlot(true)
 local tokenA = entryA ~= nil
 if not entryA then cidA, idxA, entryA = grillableSlot(false) end
 if not entryA then log('ABORT 没有未烤鱼获，请先钓鱼') return end
 selectEntry(cidA, idxA)
-log('场景a 投入', entryA.itemId, 'mult=' .. tostring(entryA.mult), 'token=' .. tostring(tokenA))
+log('场景A 投入', entryA.itemId, 'mult=' .. tostring(entryA.mult), 'token=' .. tostring(tokenA))
 if tokenA then
-    _G.re_util:GetRE('GrillAction'):FireServer({ action = 'Start', seq = nextSeq() })
-    log('场景a 信物未确认请求已发（期望 token-warn 且不扣物）')
+    _G.REUtil:GetRE('GrillAction'):FireServer({ action = 'Start', seq = nextSeq() })
+    log('场景A 信物未确认请求已发（期望 token-warn 且不扣物）')
     task:Wait(0.3)
-    log('场景a 信物仍在库存', data:ItemCount(entryA.itemId))
+    log('场景A 信物仍在库存', data:ItemCount(entryA.itemId))
 end
-_G.re_util:GetRE('GrillAction'):FireServer({ action = 'Start', seq = nextSeq(), confirm = true })
+_G.REUtil:GetRE('GrillAction'):FireServer({ action = 'Start', seq = nextSeq(), confirm = true })
 
 task:Spawn(function()
     local session = waitSession()
-    log('场景a 会话', session and session.state, session and session.itemId)
+    log('场景A 会话', session and session.state, session and session.itemId)
     if not session then log('ABORT 开烤未成立') return end
     local startedAt = session.startedAt
     local waitA = 2 - (world:GetServerTime() - startedAt)
     if waitA > 0 then task:Wait(waitA) end
-    _G.re_util:GetRE('GrillAction'):FireServer({ action = 'Takeout', seq = nextSeq() })
+    _G.REUtil:GetRE('GrillAction'):FireServer({ action = 'Takeout', seq = nextSeq() })
     task:Wait(0.5) -- 取出同样是异步落账
     local elapsed = world:GetServerTime() - startedAt
     local back = findCooked(entryA.itemId)
-    log('场景a 取出', 'elapsed=' .. curve.Format(elapsed),
+    log('场景A 取出', 'elapsed=' .. curve.Format(elapsed),
         '曲线倍率=' .. curve.Format(curve.Rate(elapsed, cfg.Grill) or -1),
         '格位cooked=' .. tostring(back and back.cooked),
         'saved.k=' .. tostring(back and back.saved and back.saved.k),
-        '选中格=' .. tostring(data.data.SelectedSlot))
+        '选中格=' .. tostring(data.Data.SelectedSlot))
 
-    -- 场景 b：烤糊（非信物）
+    -- 场景 B：烤糊（非信物）
     local cidB, idxB, entryB = grillableSlot(false)
-    if not entryB then log('场景b 跳过：没有第二条未烤的非信物鱼获') log('观察结束') return end
+    if not entryB then log('场景B 跳过：没有第二条未烤的非信物鱼获') log('观察结束') return end
     selectEntry(cidB, idxB)
-    log('场景b 投入', entryB.itemId)
-    _G.re_util:GetRE('GrillAction'):FireServer({ action = 'Start', seq = nextSeq() })
+    log('场景B 投入', entryB.itemId)
+    _G.REUtil:GetRE('GrillAction'):FireServer({ action = 'Start', seq = nextSeq() })
     local sessionB = waitSession()
-    if not sessionB then log('场景b ABORT 开烤未成立') log('观察结束') return end
+    if not sessionB then log('场景B ABORT 开烤未成立') log('观察结束') return end
     local before = health()
-    log('场景b 等烤糊', '血量前=' .. tostring(before))
+    log('场景B 等烤糊', '血量前=' .. tostring(before))
     local waitB = cfg.Grill.BurnSec + 0.5 - (world:GetServerTime() - sessionB.startedAt)
     if waitB > 0 then task:Wait(waitB) end
     task:Wait(1) -- 再多等一秒，确认只损毁一次
     local after = health()
-    log('场景b 烤糊后', '血量后=' .. tostring(after),
+    log('场景B 烤糊后', '血量后=' .. tostring(after),
         '差值=' .. tostring(before and after and (before - after)),
         '会话=' .. tostring(player.grill_state and player.grill_state.state or '已清'),
         '库存残留=' .. tostring(data:ItemCount(entryB.itemId)),

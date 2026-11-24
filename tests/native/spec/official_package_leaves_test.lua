@@ -1,21 +1,21 @@
--- #297-A2 契约测试：服务端官方包单向输出叶子投影层（attr_leaf / modifier_leaf / ability_leaf）。
+-- #297-A2 契约测试：服务端官方包单向输出叶子投影层（AttrLeaf / ModifierLeaf / AbilityLeaf）。
 -- 失败方式先列：
---   1. attr_leaf 未拒绝地图 Min/Max 钳制配置，或销毁了外部已有 AttrUnit，或角色重建/树销毁泄漏新建 AttrUnit；
---   2. attr_leaf 未同步写入 7 个属性键四分量，或未投影 SetScale / CameraDistance / InteractRange / BodyScaleCapped / WalkSpeed；
---   3. modifier_leaf 未强制传 removeMode = 0，或依赖包内事件驱动业务计时，或槽位退出/角色重建/树销毁未对称 RemoveModifier；
---   4. modifier_leaf 活鱼辅助接口在目标死亡/来源离场/到期后未清理官方包实体或未正确返回减速/麻痹状态；
---   5. ability_leaf 在角色更换/树销毁时未停止技能并销毁管理器，或延迟就绪重试在角色销毁后仍泄漏执行；
---   6. ability_leaf 未按 player_tree.memos.can_act 拦截施法，或无法兼容真机 userdata（newproxy）对象。
+--   1. AttrLeaf 未拒绝地图 Min/Max 钳制配置，或销毁了外部已有 AttrUnit，或角色重建/树销毁泄漏新建 AttrUnit；
+--   2. AttrLeaf 未同步写入 7 个属性键四分量，或未投影 SetScale / CameraDistance / InteractRange / BodyScaleCapped / WalkSpeed；
+--   3. ModifierLeaf 未强制传 removeMode = 0，或依赖包内事件驱动业务计时，或槽位退出/角色重建/树销毁未对称 RemoveModifier；
+--   4. ModifierLeaf 活鱼辅助接口在目标死亡/来源离场/到期后未清理官方包实体或未正确返回减速/麻痹状态；
+--   5. AbilityLeaf 在角色更换/树销毁时未停止技能并销毁管理器，或延迟就绪重试在角色销毁后仍泄漏执行；
+--   6. AbilityLeaf 未按 PlayerTree.memos.can_act 拦截施法，或无法兼容真机 userdata（newproxy）对象。
 
-local game_cfg = require("common.game_cfg")
-local body_scale = require("common.body_scale")
-local spoke_clock = require("common.spoke_clock")
-local spoke_runtime = require("common.packages.spoke.runtime.spoke_runtime")
-local player_tree = require("server.world_host.player_tree")
-local player_effects = require("server.world_host.player_effects")
-local attr_leaf = require("server.world_host.attr_leaf")
-local modifier_leaf = require("server.world_host.modifier_leaf")
-local ability_leaf = require("server.world_host.ability_leaf")
+local GameCfg = require("common.game_cfg")
+local BodyScale = require("common.body_scale")
+local SpokeClock = require("common.spoke_clock")
+local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
+local PlayerTree = require("server.world_host.player_tree")
+local PlayerEffects = require("server.world_host.player_effects")
+local AttrLeaf = require("server.world_host.attr_leaf")
+local ModifierLeaf = require("server.world_host.modifier_leaf")
+local AbilityLeaf = require("server.world_host.ability_leaf")
 
 local function make_ready_data(player, overrides)
   overrides = overrides or {}
@@ -23,7 +23,7 @@ local function make_ready_data(player, overrides)
     Player = player,
     Inited = true,
     LoadState = "ready",
-    data = {
+    Data = {
       FishCoin = overrides.coin or 0,
       Zone = overrides.zone or "fishPond",
       SelectedSlot = overrides.selected_slot,
@@ -37,8 +37,8 @@ local function make_ready_data(player, overrides)
         upgrades = overrides.upgrades or {},
       },
       survival = {
-        health = overrides.health or game_cfg.vitals.MaxHealth,
-        hunger = overrides.hunger or game_cfg.vitals.MaxHunger,
+        health = overrides.health or GameCfg.Vitals.MaxHealth,
+        hunger = overrides.hunger or GameCfg.Vitals.MaxHunger,
         dying = false,
         dead = false,
         weakRemaining = overrides.weak_remaining or 0,
@@ -222,7 +222,7 @@ local function make_userdata_proxy(backing)
   })
 end
 
-describe("attr_leaf：attr_rule 官方包单向叶子投影", function()
+describe("AttrLeaf：attr_rule 官方包单向叶子投影", function()
   local saved_vec3
 
   before_each(function()
@@ -237,13 +237,13 @@ describe("attr_leaf：attr_rule 官方包单向叶子投影", function()
 
   it("单向写入七个属性键四分量与角色表现，并在角色重建与树销毁时仅销毁新建 AttrUnit", function()
     local attr_api, make_unit, world = make_real_attr_sandbox()
-    local clock = spoke_clock.new(100)
+    local clock = SpokeClock.new(100)
     local char1 = make_unit("Character", world)
     char1.Controller.WalkSpeed = 8
     local player = { UserId = 9101, Character = char1 }
     local errors = {}
 
-    local pt = player_tree.spawn({
+    local pt = PlayerTree.spawn({
       player = player,
       data = make_ready_data(player, {
         body_potions = 2,
@@ -254,8 +254,8 @@ describe("attr_leaf：attr_rule 官方包单向叶子投影", function()
       clock = clock,
       mounts = {
         attributes = function(s2, tree)
-          player_effects.mount(s2, tree)
-          attr_leaf.mount(s2, tree, {
+          PlayerEffects.mount(s2, tree)
+          AttrLeaf.mount(s2, tree, {
             attr_api = attr_api,
             on_error = function(msg) errors[#errors + 1] = msg end,
           })
@@ -270,13 +270,13 @@ describe("attr_leaf：attr_rule 官方包单向叶子投影", function()
     assert.equals(420, attr_api.Funcs.GetAttr(char1, "PlayerMaxHealth"))
     assert.near(8 * 1.3, attr_api.Funcs.GetAttr(char1, "PlayerWalkSpeed"), 1e-9)
     assert.equals(210, attr_api.Funcs.GetAttr(char1, "PlayerHunger"))
-    assert.near(game_cfg.Shop.DamageScale("melee", 2), attr_api.Funcs.GetAttr(char1, "PlayerWeaponDamage_melee"), 1e-9)
-    assert.near(game_cfg.Shop.DamageScale("ranged", 1), attr_api.Funcs.GetAttr(char1, "PlayerWeaponDamage_ranged"), 1e-9)
-    assert.near(game_cfg.Shop.DamageScale("explosive", 3), attr_api.Funcs.GetAttr(char1, "PlayerWeaponDamage_explosive"), 1e-9)
+    assert.near(GameCfg.Shop.DamageScale("melee", 2), attr_api.Funcs.GetAttr(char1, "PlayerWeaponDamage_melee"), 1e-9)
+    assert.near(GameCfg.Shop.DamageScale("ranged", 1), attr_api.Funcs.GetAttr(char1, "PlayerWeaponDamage_ranged"), 1e-9)
+    assert.near(GameCfg.Shop.DamageScale("explosive", 3), attr_api.Funcs.GetAttr(char1, "PlayerWeaponDamage_explosive"), 1e-9)
 
     assert.near(1.4, char1.scale, 1e-9)
-    assert.near(body_scale.Derive(1.4).CameraDistance, char1.attrs.CameraDistance, 1e-9)
-    assert.near(body_scale.Derive(1.4).InteractRange, char1.attrs.InteractRange, 1e-9)
+    assert.near(BodyScale.Derive(1.4).CameraDistance, char1.attrs.CameraDistance, 1e-9)
+    assert.near(BodyScale.Derive(1.4).InteractRange, char1.attrs.InteractRange, 1e-9)
     assert.is_false(char1.attrs.BodyScaleCapped)
     assert.near(8 * 1.3, char1.Controller.WalkSpeed, 1e-9)
 
@@ -301,14 +301,14 @@ describe("attr_leaf：attr_rule 官方包单向叶子投影", function()
     -- 再次验证本方新建的 AttrUnit 在树销毁时被对称销毁
     local char3 = make_unit("Character", world)
     local player3 = { UserId = 9102, Character = char3 }
-    local pt3 = player_tree.spawn({
+    local pt3 = PlayerTree.spawn({
       player = player3,
       data = make_ready_data(player3),
       clock = clock,
       mounts = {
         attributes = function(s2, tree)
-          player_effects.mount(s2, tree)
-          attr_leaf.mount(s2, tree, { attr_api = attr_api })
+          PlayerEffects.mount(s2, tree)
+          AttrLeaf.mount(s2, tree, { attr_api = attr_api })
         end,
       },
     })
@@ -331,20 +331,20 @@ describe("attr_leaf：attr_rule 官方包单向叶子投影", function()
       }, { __index = attr_api.Funcs }),
     }, { __index = attr_api })
 
-    local clock = spoke_clock.new(100)
+    local clock = SpokeClock.new(100)
     local char1 = make_unit("Character", world)
     char1.Controller.WalkSpeed = 7
     local player = { UserId = 9103, Character = char1 }
     local errors = {}
 
-    local pt = player_tree.spawn({
+    local pt = PlayerTree.spawn({
       player = player,
       data = make_ready_data(player, { speed_potions = 5 }),
       clock = clock,
       mounts = {
         attributes = function(s2, tree)
-          player_effects.mount(s2, tree)
-          attr_leaf.mount(s2, tree, {
+          PlayerEffects.mount(s2, tree)
+          AttrLeaf.mount(s2, tree, {
             attr_api = clamped_api,
             on_error = function(msg) errors[#errors + 1] = msg end,
           })
@@ -362,10 +362,10 @@ describe("attr_leaf：attr_rule 官方包单向叶子投影", function()
   end)
 end)
 
-describe("modifier_leaf：modifier_system 单向叶子投影与活鱼辅助接口", function()
+describe("ModifierLeaf：modifier_system 单向叶子投影与活鱼辅助接口", function()
   it("强制传 removeMode=0、叠层刷新与角色重建/到期/树销毁对称 RemoveModifier 零残留", function()
     local mod_api, raw_api, env = make_real_modifier_sandbox()
-    local clock = spoke_clock.new(100)
+    local clock = SpokeClock.new(100)
     local char1 = env.unit("char1")
     local died_callbacks = {}
     char1.Died = {
@@ -383,14 +383,14 @@ describe("modifier_leaf：modifier_system 单向叶子投影与活鱼辅助接�
       weak = "test:weak",
     }
 
-    local pt = player_tree.spawn({
+    local pt = PlayerTree.spawn({
       player = player,
       data = make_ready_data(player, { weak_remaining = 20 }),
       clock = clock,
       mounts = {
         attributes = function(s2, tree)
-          player_effects.mount(s2, tree, {
-            on_mount_modifier_leaf = modifier_leaf.make_slot_mounter({
+          PlayerEffects.mount(s2, tree, {
+            on_mount_modifier_leaf = ModifierLeaf.make_slot_mounter({
               modifier_api = mod_api,
               presets = presets,
             }),
@@ -443,7 +443,7 @@ describe("modifier_leaf：modifier_system 单向叶子投影与活鱼辅助接�
       paralyze = "test:paralyze",
       weak = "test:weak",
     }
-    local store = modifier_leaf.create_entity_store({
+    local store = ModifierLeaf.create_entity_store({
       modifier_api = mod_api,
       presets = presets,
       now = function() return now end,
@@ -484,7 +484,7 @@ describe("modifier_leaf：modifier_system 单向叶子投影与活鱼辅助接�
   end)
 end)
 
-describe("ability_leaf：ability_system 单向叶子投影、can_act 门控与 userdata 兼容", function()
+describe("AbilityLeaf：ability_system 单向叶子投影、can_act 门控与 userdata 兼容", function()
   local saved_vec3
 
   before_each(function()
@@ -498,7 +498,7 @@ describe("ability_leaf：ability_system 单向叶子投影、can_act 门控与 u
   end)
 
   it("挂载能力管理器并装配 InitialAbilities（含延迟就绪重试）、can_act 拦截施法，角色更换与树销毁对称停止并销毁", function()
-    local clock = spoke_clock.new(100)
+    local clock = SpokeClock.new(100)
     local created_managers = {}
     local created_anchors = {}
     local attached_anchors = {}
@@ -543,7 +543,7 @@ describe("ability_leaf：ability_system 单向叶子投影、can_act 门控与 u
       }
       function obj:SetAttribute(k, v) self.attrs[k] = v end
       function obj:Destroy() self.destroyed = true; self.Parent = nil end
-      if preset == game_cfg.Ability.ManagerPreset then
+      if preset == GameCfg.Ability.ManagerPreset then
         created_managers[#created_managers + 1] = obj
       else
         created_anchors[#created_anchors + 1] = obj
@@ -558,16 +558,16 @@ describe("ability_leaf：ability_system 单向叶子投影、can_act 门控与 u
     local player = make_userdata_proxy(player_backing)
     local ability_api = make_ability_api()
 
-    local pt = player_tree.spawn({
+    local pt = PlayerTree.spawn({
       player = player,
       data = make_ready_data(player),
       clock = clock,
       mounts = {
         attributes = function(s2, tree)
-          player_effects.mount(s2, tree)
+          PlayerEffects.mount(s2, tree)
         end,
         actions = function(s4, tree)
-          ability_leaf.mount(s4, tree, {
+          AbilityLeaf.mount(s4, tree, {
             ability_api = ability_api,
             create_asset = create_asset,
             attach_anchor = function(anchor, behavior)
@@ -600,13 +600,13 @@ describe("ability_leaf：ability_system 单向叶子投影、can_act 门控与 u
 
     -- can_act 门控：正常可施法，麻痹与濒死时均被拦截
     assert.is_true(active_guard(char1, 0))
-    assert.is_true(ability_leaf.cast_ability(pt, 0, nil, nil, nil, { ability_api = ability_api }))
+    assert.is_true(AbilityLeaf.cast_ability(pt, 0, nil, nil, nil, { ability_api = ability_api }))
     assert.equals(1, #cast_calls)
 
     pt:apply_modifier("paralyze")
     assert.is_false(active_guard(char1, 0))
     assert.is_false(active_guard(player, 0))
-    local cast_ok, cast_err = ability_leaf.cast_ability(pt, 0, nil, nil, nil, { ability_api = ability_api })
+    local cast_ok, cast_err = AbilityLeaf.cast_ability(pt, 0, nil, nil, nil, { ability_api = ability_api })
     assert.is_false(cast_ok)
     assert.equals("cannot-act", cast_err)
     assert.equals(1, #cast_calls)
@@ -630,6 +630,6 @@ describe("ability_leaf：ability_system 单向叶子投影、can_act 门控与 u
     assert.equals(char2, stopped_calls[2].character)
     assert.is_true(created_managers[2].destroyed)
     assert.is_nil(active_guard)
-    assert.is_false(ability_leaf.can_act_for(pt))
+    assert.is_false(AbilityLeaf.can_act_for(pt))
   end)
 end)

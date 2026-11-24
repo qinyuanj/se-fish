@@ -8,9 +8,9 @@
 -- 已单独验证通过（见 issue-90-mapping.md），故按「不遗漏」原则保留，映射清单里记为「旧沉睡用例」。
 -- 旧文件里恢复全局用的是 `for key, value in pairs(saved)`：saved 中值为 nil 的键会被 pairs 跳过，
 -- 替身全局在「迁移前本来就不存在」时不会被清掉。本 spec 改为逐键 rawget 快照 + 显式赋回（含 nil）。
-local damage_notice = require('common.damage_notice')
-local game_cfg = require('common.game_cfg')
-local damage_float = require('client.damage_float')
+local DamageNotice = require('common.damage_notice')
+local GameCfg = require('common.game_cfg')
+local DamageFloat = require('client.damage_float')
 
 describe('TestDamageFloat', function()
     -- 旧 setUp/tearDown 的替身环境逐例建立与恢复：模块单例状态与全局都按案例回滚。
@@ -22,7 +22,7 @@ describe('TestDamageFloat', function()
         }
     end)
     after_each(function()
-        damage_float:Clear()
+        DamageFloat:Clear()
         _G.game = saved.game
         _G.Vector2 = saved.Vector2
         _G.Vector3 = saved.Vector3
@@ -37,7 +37,7 @@ describe('TestDamageFloat', function()
         _G.Color = { New = function(r, g, b, a) return { r = r, g = g, b = b, a = a } end }
         _G.game = { GetService = function(_, name)
             if name == 'CameraService' then return { MainCamera = {}, WorldToViewportPoint = function(_, point)
-                assert.same(5 + game_cfg.damage_float.HeadHeight, point.y)
+                assert.same(5 + GameCfg.DamageFloat.HeadHeight, point.y)
                 return { x = 100, y = 200, z = 2 }, visible
             end } end
             if name == 'World' then return {
@@ -49,36 +49,36 @@ describe('TestDamageFloat', function()
                 end,
             } end
         end }
-        damage_float:Bind({}, { x = 800, y = 600 })
+        DamageFloat:Bind({}, { x = 800, y = 600 })
         local payload = { targetType = 'fish', targetId = 7, amount = 0.5,
             position = { x = 3, y = 5, z = 9 } }
-        damage_float:Show(payload)
+        DamageFloat:Show(payload)
         assert.same(0, #created)
         visible = true
-        damage_float:Show(payload)
+        DamageFloat:Show(payload)
         assert.same('1', created[1].Text)
         assert.same(400, created[1].Position.y)
-        damage_float:Show(payload)
+        DamageFloat:Show(payload)
         assert.same(2, #created)
         assert.not_equals(created[2].Position.x, created[1].Position.x)
         visible = false
         time = 0.5
-        damage_float:Update()
-        assert.is_false(damage_float.Active[1].Node.Visible)
+        DamageFloat:Update()
+        assert.is_false(DamageFloat.Active[1].Node.Visible)
         visible = true
-        damage_float:Update()
-        assert.is_true(damage_float.Active[1].Node.Visible)
+        DamageFloat:Update()
+        assert.is_true(DamageFloat.Active[1].Node.Visible)
         time = 1.1
-        damage_float:Update()
-        assert.same(2, #damage_float.Pool)
+        DamageFloat:Update()
+        assert.same(2, #DamageFloat.Pool)
         payload.amount, payload.critical = 10, true
-        damage_float:Show(payload)
+        DamageFloat:Show(payload)
         assert.same(2, #created)
-        assert.same('10', damage_float.Active[1].Node.Text)
-        assert.same(game_cfg.damage_float.CriticalFontSize, damage_float.Active[1].Node.FontSize)
-        assert.same(1, damage_float.Active[1].Node.Opacity)
-        damage_float:Clear()
-        assert.same(0, #damage_float.Active)
+        assert.same('10', DamageFloat.Active[1].Node.Text)
+        assert.same(GameCfg.DamageFloat.CriticalFontSize, DamageFloat.Active[1].Node.FontSize)
+        assert.same(1, DamageFloat.Active[1].Node.Opacity)
+        DamageFloat:Clear()
+        assert.same(0, #DamageFloat.Active)
         assert.is_true(created[1].Destroyed and created[2].Destroyed)
     end)
 end)
@@ -88,12 +88,12 @@ describe('TestDamageNotice', function()
         local pos = { x = 3, y = 4, z = 5 }
         for _, case in ipairs({ { 10, 7.3, 3 }, { 10, 7.6, 2 },
             { 10, 9.5, 1 }, { 10, 9.9, 1 }, { 4, 0, 4 } }) do
-            local payload = damage_notice.FromHealth(42, case[1], case[2], pos)
-            assert.same(case[3], damage_float.DisplayAmount(payload.amount))
+            local payload = DamageNotice.FromHealth(42, case[1], case[2], pos)
+            assert.same(case[3], DamageFloat.DisplayAmount(payload.amount))
             assert.same(42, payload.targetId)
             assert.same(4, payload.position.y)
         end
-        assert.is_nil(damage_notice.FromHealth(42, 4, 4, pos))
-        assert.is_nil(damage_notice.FromHealth(42, 4, 5, pos))
+        assert.is_nil(DamageNotice.FromHealth(42, 4, 4, pos))
+        assert.is_nil(DamageNotice.FromHealth(42, 4, 5, pos))
     end)
 end)

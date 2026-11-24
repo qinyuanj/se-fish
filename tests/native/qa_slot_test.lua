@@ -1,10 +1,10 @@
--- 验收槽 CLI 的配置文本替换与参数约束；测试不写真实 game_cfg。
+-- 验收槽 CLI 的配置文本替换与参数约束；测试不写真实 GameCfg。
 -- 迁移自 tests/tooling/qa_slot_test.lua（#92，LuaUnit → 原生 Busted）；
 -- 案例顺序沿用旧入口的类名 + 方法名字典序。
 local slot = require('tools.qa_slot')
 
 local sample = table.concat({
-  "game_cfg.Save = {",
+  "GameCfg.Save = {",
   "    Store = 'sefish_save_v1',",
   "    QaSlot = '',",
   "    MaxRetries = 3,",
@@ -18,7 +18,7 @@ describe("TestQaSlot", function()
     end
     assert.is_false(slot.valid_slot(''))
     assert.is_true(slot.valid_slot('qa-first'))
-    assert.is_nil(slot.replace_slot('game_cfg.Save = {\n}\n', 'qa'))
+    assert.is_nil(slot.replace_slot('GameCfg.Save = {\n}\n', 'qa'))
     assert.is_nil(slot.replace_slot(sample:gsub('    MaxRetries', "    QaSlot = 'extra',\n    MaxRetries"), 'qa'))
     local commented = sample:gsub("    QaSlot = '',", "    -- QaSlot = 'old',\n    QaSlot = 'real',")
     assert.are.equal('real', slot.current_slot(commented))

@@ -6,25 +6,25 @@
 -- 旧套件的 setUp/tearDown 是逐例的（每案例各跑一次），因此映射为 before_each/after_each，
 -- 不是 suite 级 setup/teardown；after_each 对未完成的 before_each 幂等（ctx 未建立就跳过）。
 -- describe/it 名沿用旧类名与方法名，案例顺序沿用旧 LuaUnit 的字典序执行序。
-local game_cfg = require('common.game_cfg')
+local GameCfg = require('common.game_cfg')
 
 describe('TestGrowthCleanup', function()
     local ctx
 
     before_each(function()
-        ctx = { savedDebug = game_cfg.Debug }
-        ctx.player_data = assert(loadfile('server/data/player_data.lua'))()
+        ctx = { savedDebug = GameCfg.Debug }
+        ctx.PlayerData = assert(loadfile('server/data/player_data.lua'))()
     end)
 
     -- before_each 中途失败（loadfile 报错）时 ctx 可能只建了一半：恢复要逐项判空。
     after_each(function()
         if ctx and ctx.savedDebug ~= nil then
-            game_cfg.Debug = ctx.savedDebug
+            GameCfg.Debug = ctx.savedDebug
         end
     end)
 
     local function init()
-        local data = ctx.player_data.New({ UserId = 1, SetAttribute = function() end })
+        local data = ctx.PlayerData.New({ UserId = 1, SetAttribute = function() end })
         data:Init()
         return data
     end
@@ -32,7 +32,7 @@ describe('TestGrowthCleanup', function()
     -- 调试开关关闭时不白送任何东西
     it('test_debug_switch_restores_grant_into_containers', function()
         local fresh = assert(loadfile('common/game_cfg.lua'))()
-        game_cfg.Debug = { Enabled = true, InitialGrants = fresh.Debug.InitialGrants }
+        GameCfg.Debug = { Enabled = true, InitialGrants = fresh.Debug.InitialGrants }
         local state = init():GetItemBarSnapshot()
         assert.same('starterRod', state.slots[1].itemId)
         assert.is_true(state.bait.worm >= 1)
@@ -55,7 +55,7 @@ describe('TestGrowthCleanup', function()
         local fresh = assert(loadfile('common/game_cfg.lua'))()
         assert.is_nil(fresh.Items.InitialGrants)
         fresh.Debug.Enabled = false
-        game_cfg.Debug = fresh.Debug
+        GameCfg.Debug = fresh.Debug
         local data = init()
         assert.same({}, data:GetItemBarSnapshot().slots)
         assert.same({}, data:GetItemBarSnapshot().bait)
@@ -63,14 +63,14 @@ describe('TestGrowthCleanup', function()
 
     -- 鱼竿等级筛选是合法逻辑，不能被成长清理一起删掉
     it('test_rod_level_filter_is_kept', function()
-        local fish_catch = require('common.fish_catch')
+        local FishCatch = require('common.fish_catch')
         local rows = {
             { Id = 'low', Bait = 0, RodLevel = 1, DrawWeight = 1 },
             { Id = 'high', Bait = 0, RodLevel = 2, DrawWeight = 1000 },
         }
         local maxRoll = function(n) return n end
-        assert.same('low', fish_catch.Select(rows, 1, nil, maxRoll))
-        assert.same('high', fish_catch.Select(rows, 2, nil, maxRoll))
-        assert.is_nil(fish_catch.Select({ rows[2] }, 1, nil, maxRoll))
+        assert.same('low', FishCatch.Select(rows, 1, nil, maxRoll))
+        assert.same('high', FishCatch.Select(rows, 2, nil, maxRoll))
+        assert.is_nil(FishCatch.Select({ rows[2] }, 1, nil, maxRoll))
     end)
 end)

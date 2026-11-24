@@ -2,8 +2,8 @@
 -- 接缝：MgrFishUnit 的 eel 状态机——5 次放电每秒一次、施法被拒不计数不入睡、5 次满才睡 10 秒、
 -- Busted 案例体在沙箱 _ENV 中，写业务可见的全局（Quaternion）必须用 _G.Quaternion。
 -- describe/it 名称保留旧类名与方法名，并按方法名字典序注册以保持旧套件执行顺序。
-local game_cfg = require('common.game_cfg')
-local fish_escape = require('tests.support.fish_escape')
+local GameCfg = require('common.game_cfg')
+local FishEscape = require('tests.support.fish_escape')
 
 -- 放下一条电鳗；castOk 决定每次施法结果，返回鱼与计数表
 local function droppedEel(env, castOk)
@@ -34,7 +34,7 @@ describe('TestEelCombat', function()
     local env
 
     before_each(function()
-        env = fish_escape.new()
+        env = FishEscape.new()
         env:setUp()
     end)
     after_each(function()
@@ -167,10 +167,10 @@ describe('TestEelCombat', function()
         env.mgr.CombatPublisher = function(payload) published[#published + 1] = payload end
         local fish = env:heldFish(env.player, 'alligatorGar')
         env.mgr:Drop(env.player)
-        local escapeSec = game_cfg.Fish.alligatorGar.EscapeSec
+        local escapeSec = GameCfg.Fish.alligatorGar.EscapeSec
         assert.same({ 'combat', escapeSec, escapeSec }, { published[1].state, published[1].fleeAt, published[1].escapeSec })
         assert.is_nil(published[1].dischargeCount)
-        local refresh = game_cfg.FishCombatLabel.MovingRefreshSec
+        local refresh = GameCfg.FishCombatLabel.MovingRefreshSec
         at(env, 0, 3)
         local count = #published
         at(env, refresh / 2)
@@ -233,33 +233,33 @@ describe('TestEelCombat', function()
         local wakeRotation = fish.Carrier.Body.Rotation
         _G.Quaternion = oldQuaternion
         assert.are.equal('attacking', fish.State)
-        assert.are.equal(game_cfg.Ability.FishAbilities.eel.SleepRollRadians, sleepRotation.z)
+        assert.are.equal(GameCfg.Ability.FishAbilities.eel.SleepRollRadians, sleepRotation.z)
         assert.are_not.equal(sleepRotation.z, wakeRotation.z)
     end)
 end)
 
-local eui = require('tests.support.eui_double')
-local client_store = require('client.store.client_store')
-local root_view = require('client.views.root_view')
-local fish_combat_view = require('client.views.fish_combat_view')
-local spoke_clock = require('common.spoke_clock')
+local Eui = require('tests.support.eui_double')
+local ClientStore = require('client.store.client_store')
+local RootView = require('client.views.root_view')
+local FishCombatView = require('client.views.fish_combat_view')
+local SpokeClock = require('common.spoke_clock')
 
 describe('TestFishCombatLabel', function()
     local env
 
     local function mountView()
-        local clock = spoke_clock.new(90)
-        local store, writer = client_store.new({ clock = clock })
-        local root = eui.Node({ Name = 'UIRoot' })
+        local clock = SpokeClock.new(90)
+        local store, writer = ClientStore.new({ clock = clock })
+        local root = Eui.Node({ Name = 'UIRoot' })
         local created = {}
-        local view = root_view.mount(root, store, {
+        local view = RootView.mount(root, store, {
             create_node = function(kind, props)
-                local node = eui.Node(props or {})
+                local node = Eui.Node(props or {})
                 node.UnitType = kind
                 created[#created + 1] = node
                 return node
             end,
-            docks = { fish_combat = fish_combat_view.bar_spec() },
+            docks = { fish_combat = FishCombatView.bar_spec() },
         })
         return { root = root, writer = writer, view = view, created = created }
     end

@@ -32,7 +32,7 @@ local function unitType(unit)
     return tostring(safe(function() return unit:GetUnitType() end, '?'))
 end
 
--- 与 zone_markers.catalog 同口径：按名唯一，重名拒绝。
+-- 与 ZoneMarkers.catalog 同口径：按名唯一，重名拒绝。
 local function uniqueByName(name, expectType)
     local found = {}
     for _, unit in ipairs(world:GetDescendants()) do

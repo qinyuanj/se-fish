@@ -1,7 +1,7 @@
 -- 逃脱共享夹具：仅提供环境方法，不注册测试案例。
 -- 复用 fish_lift 的方式：以它为 __index 原型（同族统一手法），不再逐方法拷贝。
-local fish_lift = require('tests.support.fish_lift')
-local M = setmetatable({}, { __index = fish_lift })
+local FishLift = require('tests.support.fish_lift')
+local M = setmetatable({}, { __index = FishLift })
 
 --- 建一个空世界壳；调用方随后 :setUp() 搭世界、:tearDown() 拆除
 --- （与 blindbox_world / revive_world 同一构造/拆除入口名）。

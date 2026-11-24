@@ -1,6 +1,6 @@
 # Blender 与 Meshy 使用
 
-定位美术工作区、用无头 Blender 加工模型、用 Meshy 生成模型或做接缝 a 取证前读本文。决定与被拒的备选见 [ADR-0009](../adr/0009-blender-headless-only.md)。
+定位美术工作区、用无头 Blender 加工模型、用 Meshy 生成模型或做接缝 A 取证前读本文。决定与被拒的备选见 [ADR-0009](../adr/0009-blender-headless-only.md)。
 
 ## 工作区导航
 
@@ -56,7 +56,7 @@ lua tools/cli.lua blender --expr "import bpy; print(len(bpy.data.objects))"
 - **自检渲染**：`view_transform` 设 `Standard`，否则 AgX 会把已按显示编码存盘的贴图再压一遍，看起来像全黑。
 - **看图**：`view_image` 要绝对路径，写正斜杠 Windows 形式（`C:/...`）；重渲同名 PNG 可能拿到旧图，换新文件名再看。刚写入的图可能报“文件不存在”，先确认文件在不在或等约 3 秒再看。
 - **贴图投射压暗**：EMIT 投射到 Non-Color 缓冲前，源贴图也要设为 Non-Color，否则按 sRGB 解码会整体压到约 40%。
-- **`ARMATURE_AUTO` 会静默失败**：求解失败或网格有重合点（如切口）时不抛异常、顶点组全空。热权重要在切口之前求；求完核对顶点组非空，失败改用参考网格的顶点组做 data Transfer。
+- **`ARMATURE_AUTO` 会静默失败**：求解失败或网格有重合点（如切口）时不抛异常、顶点组全空。热权重要在切口之前求；求完核对顶点组非空，失败改用参考网格的顶点组做 Data Transfer。
 - **FBX 动画往返**：动画源用已导出的动画 FBX；从 `.blend` 里 `wm.append` 出的 action 绑到同名骨架上位移恒 0。往返固定 **+1 帧**（导出按 `t=frame/fps`，导入按 `frame=t*fps+1`）。导出统一 `add_leaf_bones=False`，否则多出 `*_end` 骨骼。
 - **空动画探针要取全帧**：有些段中间帧正好回到静止姿态，只比首帧与中点会把真动画判成静帧。
 
@@ -80,7 +80,7 @@ REST 后备是美术工作区同级的 `Desktop/dev/eggy/tools/meshy.py`（不�
 
 Codex 的 MCP 注册在仓库内 `.codex/config.toml`（gitignored，不入库），只有 `[mcp_servers.meshy]` 一个条目，启动命令即上节的 `npx -y @meshy-ai/meshy-mcp-server`；文件里不写密钥值。改动后重启会话，核对 `mcp__meshy__*` 工具已注册。**不要注册 Blender MCP**：注册了 agent 就会被诱导去试实时通道。
 
-## 接缝 a 取证
+## 接缝 A 取证
 
 模型动画的导入、播放与判定口径见[美术资产概要「模型动画导入与播放」](../art-asset-overview.md#模型动画导入与播放)。探针按下面顺序调用，`exec` 与 `log grep` 用法见 [editor-cli](editor-cli.md)：
 
@@ -88,7 +88,7 @@ Codex 的 MCP 注册在仓库内 `.codex/config.toml`（gitignored，不入库�
 2. 客户端 exec `tests/probes/seam_a_camera_client.lua`，`log grep SEAMA_CAM` 取相机与焦点坐标。
 3. 服务端 exec 一行 `_G.SeamA = {mesh=..., clip=..., skin=..., cam={...}, focus={...}}`，再 exec `tests/probes/seam_a_anim_server.lua`；参数说明在探针文件头。
 4. 客户端用 `tests/probes/seam_a_view_client.lua` 固定侧机位并隐藏 UI（主界面按钮会挡住鱼身）；服务端用 `tests/probes/seam_a_measure_server.lua` 的 `cube` 在鱼旁摆 1 单位方块。
-5. 等 2 秒后 `screenshot game` 连截 4 帧，用 `uv run -q --with pillow python -I tools/frame_diff.py --box L,T,R,b <帧...>` 比较鱼身区域。
+5. 等 2 秒后 `screenshot game` 连截 4 帧，用 `uv run -q --with pillow python -I tools/frame_diff.py --box L,T,R,B <帧...>` 比较鱼身区域。
 6. 换 `clip` 重跑第 3、5 步；最后用 `clip='NoSuchClip'` 做对照，鱼身区域差异应为 0（裁剪框边缘的远景闪烁不算）。
 7. 量尺寸与碰撞：`NoSuchClip` 静止帧里按同框方块换算，像素/单位 = 方块正面像素 × 方块正面深度 ÷ 鱼所在深度；`seam_a_measure_server.lua` 的 `aabb` 给出碰撞 AABB，播放中重扫可判断碰撞体是否随动画变化。
 8. 还原与清理：`SeamAView` 的 `restore`、`SeamAMeasure` 的 `cleanup`、`SeamA` 的 `cleanup`，确认 `left=0` 后停试玩。

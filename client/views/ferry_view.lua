@@ -1,18 +1,18 @@
 
-local game_cfg = require("common.game_cfg")
-local body_scale = require("common.body_scale")
-local spoke = require("common.packages.spoke.api")
-local view_util = require("client.views.view_util")
+local GameCfg = require("common.game_cfg")
+local BodyScale = require("common.body_scale")
+local Spoke = require("common.packages.spoke.api")
+local ViewUtil = require("client.views.view_util")
 
-local State = spoke.State
+local State = Spoke.State
 
-local ferry_view = {}
+local FerryView = {}
 
 local function zone_name(route_id, action)
-  local route = game_cfg.Ferry.Route(route_id)
+  local route = GameCfg.Ferry.Route(route_id)
   if not route then return "目的地" end
   local zone_id = action == "Return" and route.FromZoneId or route.ToZoneId
-  for _, zone in ipairs(game_cfg.Zones) do
+  for _, zone in ipairs(GameCfg.Zones) do
     if zone.Id == zone_id then return zone.Name end
   end
   return zone_id
@@ -23,12 +23,12 @@ local function on_result(ctx, result)
   if result.ok then
     if result.action == "Board" then
       if result.seconds == nil then
-        view_util.notify(ctx, "已经到" .. zone_name(result.routeId) .. "了")
+        ViewUtil.notify(ctx, "已经到" .. zone_name(result.routeId) .. "了")
       else
-        view_util.notify(ctx, "船票已交，" .. tostring(result.seconds) .. " 秒后开船")
+        ViewUtil.notify(ctx, "船票已交，" .. tostring(result.seconds) .. " 秒后开船")
       end
     elseif result.action == "Return" then
-      view_util.notify(ctx, "已经回到" .. zone_name(result.routeId, "Return") .. "，金币 -" .. tostring(result.price))
+      ViewUtil.notify(ctx, "已经回到" .. zone_name(result.routeId, "Return") .. "，金币 -" .. tostring(result.price))
     end
     return
   end
@@ -44,13 +44,13 @@ local function on_result(ctx, result)
     anchor = "航班取消，船票已退",
     interrupted = "上次航班已取消，船票已退",
   }
-  view_util.notify(ctx, reasons[result.reason] or "摆渡暂时不可用")
+  ViewUtil.notify(ctx, reasons[result.reason] or "摆渡暂时不可用")
 end
 
-function ferry_view.mount(scope, ctx)
+function FerryView.mount(scope, ctx)
   local countdowns = {}
-  local has_countdown = State.new("ferry_view.has_countdown", false)
-  local version = State.new("ferry_view.version", 0)
+  local has_countdown = State.new("FerryView.has_countdown", false)
+  local version = State.new("FerryView.version", 0)
 
   local function prune_and_select(now)
     local soonest
@@ -103,7 +103,7 @@ function ferry_view.mount(scope, ctx)
   end)
 
   scope:phase("FerryCountdownPhase", has_countdown, function(ps)
-    local resolution = view_util.get_resolution(ctx)
+    local resolution = ViewUtil.get_resolution(ctx)
     local label = ctx.create_node(ps, "EUITextLabel", {
       Name = "FerryCountdown",
       Position = Vector2.New((resolution.x or 1920) / 2, (resolution.y or 1080) - 120),
@@ -143,12 +143,12 @@ function ferry_view.mount(scope, ctx)
   scope:on_cleanup(function() countdowns = {} end)
 end
 
-function ferry_view.spec()
-  return { name = "Ferry", mount = ferry_view.mount }
+function FerryView.spec()
+  return { name = "Ferry", mount = FerryView.mount }
 end
 
 local function anchor_of(anchor_name)
-  for _, zone in ipairs(game_cfg.Zones) do
+  for _, zone in ipairs(GameCfg.Zones) do
     for _, entity in ipairs(zone.Scene and zone.Scene.Entities or {}) do
       if entity.Role == "Ferry" and entity.Name == anchor_name then return entity.Position end
     end
@@ -157,11 +157,11 @@ local function anchor_of(anchor_name)
 end
 
 local function near(position, center, radius)
-  local dist_sq = view_util.distance_sq_xz(position, center)
+  local dist_sq = ViewUtil.distance_sq_xz(position, center)
   return dist_sq ~= nil and dist_sq <= radius * radius
 end
 
-function ferry_view.legs_spec()
+function FerryView.legs_spec()
   local seq = 0
   return {
     items = function(es, store)
@@ -169,13 +169,13 @@ function ferry_view.legs_spec()
       local character = es:d(store.local_character)
       if not position then return {} end
       local list = {}
-      for index, route in ipairs(game_cfg.Ferry.Routes) do
+      for index, route in ipairs(GameCfg.Ferry.Routes) do
         for _, leg in ipairs({
           { point = route.Outbound, action = "Board", text = "乘船" },
           { point = route.Return, action = "Return", text = "返程" },
         }) do
           local center = anchor_of(leg.point.AnchorName)
-          local radius = body_scale.InteractionRadius(character, leg.point.Radius)
+          local radius = BodyScale.InteractionRadius(character, leg.point.Radius)
           if near(position, center, radius) then
             list[#list + 1] = { key = "ferry:" .. index .. ":" .. leg.action,
               routeId = route.Id, action = leg.action, text = leg.text,
@@ -213,4 +213,4 @@ function ferry_view.legs_spec()
   }
 end
 
-return ferry_view
+return FerryView

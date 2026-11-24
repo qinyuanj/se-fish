@@ -6,7 +6,7 @@ function Aim:AttackPayload()
     if not camera then return payload end
     local ok,direction=pcall(function() return camera:ViewportPointToRay(0.5,0.5).Direction end)
     if not ok or not direction then
-        print('[weapon_aim] 读取相机瞄准失败',tostring(direction))
+        print('[WeaponAim] 读取相机瞄准失败',tostring(direction))
         return payload
     end
     payload.aim={x=direction.x,y=direction.y,z=direction.z}

@@ -1,14 +1,14 @@
-local game_cfg = require('common.game_cfg')
-local number = require('common.number')
+local GameCfg = require('common.game_cfg')
+local Number = require('common.number')
 
 local M = {}
 
 local function cfg()
-    return game_cfg.Ability.carry
+    return GameCfg.Ability.Carry
 end
 
 local function isBadNumber(v)
-    return not number.IsFiniteNumber(v)
+    return not Number.IsFiniteNumber(v)
 end
 
 local function isBadPoint(p)
@@ -85,7 +85,7 @@ function M.New(carryCfg, host, yaw, now)
     host = host and copy(host) or { x = 0, y = 0, z = 0 }
     local safe = M.SafeOffset(carryCfg.Offset, carryCfg.HostHalfHeight, carryCfg.CarriedHalfHeight)
     return {
-        cfg = carryCfg, host = host, Yaw = num(yaw), GroundY = host.y,
+        Cfg = carryCfg, Host = host, Yaw = num(yaw), GroundY = host.y,
         Offset = safe.Offset, Corrected = safe.Corrected,
         Carried = false, Target = nil, Mount = nil,
         StartedAt = num(now), ReleasedAt = nil,
@@ -99,13 +99,13 @@ end
 
 function M.InRange(state, target)
     if isBadPoint(target) then return false end
-    local dx, dz = target.x - state.host.x, target.z - state.host.z
-    return math.sqrt(dx * dx + dz * dz) <= state.cfg.GrabRange
+    local dx, dz = target.x - state.Host.x, target.z - state.Host.z
+    return math.sqrt(dx * dx + dz * dz) <= state.Cfg.GrabRange
 end
 
 ---@return table { Ok, Reason?, Damage? }
 function M.Attach(state, target, now)
-    if type(state.cfg.Socket) ~= 'string' or state.cfg.Socket == '' then
+    if type(state.Cfg.Socket) ~= 'string' or state.Cfg.Socket == '' then
         return { Ok = false, Reason = 'noSocket' }
     end
     if isBadPoint(target) then return { Ok = false, Reason = 'noTarget' } end
@@ -114,9 +114,9 @@ function M.Attach(state, target, now)
     state.Target = copy(target)
     state.StartedAt = num(now)
     state.ReleasedAt = nil
-    state.Mount = M.MountPoint(state.host, state.Offset, state.Yaw)
+    state.Mount = M.MountPoint(state.Host, state.Offset, state.Yaw)
     state.Stats.Attaches = state.Stats.Attaches + 1
-    return { Ok = true, Damage = state.cfg.GrabDamage, Position = state.Mount }
+    return { Ok = true, Damage = state.Cfg.GrabDamage, Position = state.Mount }
 end
 
 function M.Release(state, now, reason)
@@ -124,7 +124,7 @@ function M.Release(state, now, reason)
     state.Carried = false
     state.ReleasedAt = num(now)
     state.Stats.Releases = state.Stats.Releases + 1
-    local drop = M.DropPoint(state.host, state.Yaw, state.GroundY, state.cfg)
+    local drop = M.DropPoint(state.Host, state.Yaw, state.GroundY, state.Cfg)
     state.Target = nil
     return { Ok = true, Reason = reason or 'manual', DropPoint = drop, Position = drop }
 end
@@ -132,13 +132,13 @@ end
 ---@return table { Position?, Snapped?, Released?, Reason? }
 function M.Follow(state, targetPos, now, dt)
     if not state.Carried then return { Position = nil } end
-    local desired = M.MountPoint(state.host, state.Offset, state.Yaw)
+    local desired = M.MountPoint(state.Host, state.Offset, state.Yaw)
     state.Mount = desired
     if isBadPoint(targetPos) then
         local released = M.Release(state, now, 'nan')
         return { Position = released.DropPoint, Released = true, Reason = 'nan' }
     end
-    if pointDistance(targetPos, desired) > state.cfg.FollowTolerance then
+    if pointDistance(targetPos, desired) > state.Cfg.FollowTolerance then
         state.Stats.Snaps = state.Stats.Snaps + 1
         return { Position = desired, Snapped = true }
     end
@@ -149,11 +149,11 @@ end
 function M.Step(state, now, dt)
     state.Stats.Frames = state.Stats.Frames + 1
     if not state.Carried then return { Released = false, Position = nil } end
-    if num(now) - state.StartedAt >= state.cfg.MaxCarrySec then
+    if num(now) - state.StartedAt >= state.Cfg.MaxCarrySec then
         local released = M.Release(state, now, 'timeout')
         return { Released = true, Reason = 'timeout', DropPoint = released.DropPoint, Position = released.DropPoint }
     end
-    return { Released = false, Position = state.Mount or M.MountPoint(state.host, state.Offset, state.Yaw) }
+    return { Released = false, Position = state.Mount or M.MountPoint(state.Host, state.Offset, state.Yaw) }
 end
 
 return M

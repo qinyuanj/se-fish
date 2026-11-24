@@ -1,33 +1,33 @@
 -- 服务端单玩家会话 Auto SpokeTree（ADR-0032 §1、§2、§3 / #295、#297-A1b）：
 -- 仅在玩家存档加载就绪时生成；树内严格按源码声明顺序排布四段因果流：
 --   1. 存档与库存（SaveInventory：金币/道具栏/背包/武器/鱼饵/选中槽/held/药水/升级/冷却 + ItemBarSnapshot）
---   2. 属性与持续效果派生（Attributes：挂载 player_effects，接管属性派生与持续效果计时主权）
+--   2. 属性与持续效果派生（Attributes：挂载 PlayerEffects，接管属性派生与持续效果计时主权）
 --   3. 生命与生存相位（Survival：外层生命 Phase + 倒计时 platform_pending 门控 + 内层 can_act）
 --   4. 动作、特殊道具与设施会话相位（Actions）
--- 树底挂载纯输出叶子（held_rod_leaf）、单批合并同步 Reaction（ItemBarState 下发 / FishCoin 属性 / 存档镜像）
+-- 树底挂载纯输出叶子（HeldRodLeaf）、单批合并同步 Reaction（ItemBarState 下发 / FishCoin 属性 / 存档镜像）
 -- 与离场终镜像 Reaction（session_alive=false 时同步写回完整镜像，包括 weakRemaining）。
 -- 本模块归属 L2（server.world_host），零反向依赖存量旧债务模块。
 
-local game_cfg = require("common.game_cfg")
-local number = require("common.number")
-local spoke = require("common.packages.spoke.api")
-local spoke_runtime = require("common.packages.spoke.runtime.spoke_runtime")
-local player_effects = require("server.world_host.player_effects")
-local player_life = require("server.world_host.player_life")
-local special_item_phase = require("server.world_host.special_item_phase")
-local fishing_phase = require("server.world_host.fishing_phase")
-local held_rod_leaf = require("server.world_host.held_rod_leaf")
-local player_compendium = require("server.world_host.player_compendium")
-local player_quest = require("server.world_host.player_quest")
-local player_story = require("server.world_host.player_story")
-local player_achievements = require("server.world_host.player_achievements")
-local player_gm = require("server.world_host.player_gm")
+local GameCfg = require("common.game_cfg")
+local Number = require("common.number")
+local Spoke = require("common.packages.spoke.api")
+local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
+local PlayerEffects = require("server.world_host.player_effects")
+local PlayerLife = require("server.world_host.player_life")
+local SpecialItemPhase = require("server.world_host.special_item_phase")
+local FishingPhase = require("server.world_host.fishing_phase")
+local HeldRodLeaf = require("server.world_host.held_rod_leaf")
+local PlayerCompendium = require("server.world_host.player_compendium")
+local PlayerQuest = require("server.world_host.player_quest")
+local PlayerStory = require("server.world_host.player_story")
+local PlayerAchievements = require("server.world_host.player_achievements")
+local PlayerGM = require("server.world_host.player_gm")
 
-local SpokeTree = spoke.SpokeTree
-local Effect = spoke.Effect
-local State = spoke.State
+local SpokeTree = Spoke.SpokeTree
+local Effect = Spoke.Effect
+local State = Spoke.State
 
-local player_tree = {}
+local PlayerTree = {}
 
 local PHASE_NAMES = {
   alive = true,
@@ -69,7 +69,7 @@ local function deep_equal(a, b)
 end
 
 local function is_non_negative_int(value)
-  return number.IsFiniteNumber(value) and value >= 0 and value == math.floor(value)
+  return Number.IsFiniteNumber(value) and value >= 0 and value == math.floor(value)
 end
 
 local function assert_clock(clock)
@@ -78,7 +78,7 @@ local function assert_clock(clock)
       or type(clock.second) ~= "table"
       or type(clock.on_second) ~= "table"
       or type(clock.on_frame) ~= "table" then
-    error("player_tree.spawn 需要有效的 spoke_clock 实例", 3)
+    error("PlayerTree.spawn 需要有效的 SpokeClock 实例", 3)
   end
 end
 
@@ -89,16 +89,16 @@ end
 
 local function assert_ready_player_data(player, data)
   if not is_valid_player(player) then
-    error("player_tree.spawn 需要有效的 player 对象（含 UserId）", 3)
+    error("PlayerTree.spawn 需要有效的 player 对象（含 UserId）", 3)
   end
   if type(data) ~= "table" then
-    error("player_tree.spawn 拒绝未就绪存档：缺少 data", 3)
+    error("PlayerTree.spawn 拒绝未就绪存档：缺少 data", 3)
   end
   if data.Player ~= player then
-    error("player_tree.spawn 拒绝归属不匹配的存档对象", 3)
+    error("PlayerTree.spawn 拒绝归属不匹配的存档对象", 3)
   end
   if data.Inited ~= true or data.LoadState ~= "ready" then
-    error("player_tree.spawn 仅允许在存档就绪后生成（LoadState=" .. tostring(data.LoadState) .. "）", 3)
+    error("PlayerTree.spawn 仅允许在存档就绪后生成（LoadState=" .. tostring(data.LoadState) .. "）", 3)
   end
 end
 
@@ -115,15 +115,15 @@ end
 
 local function compute_item_bar_capacity(upgrade_level)
   local level = is_non_negative_int(upgrade_level) and upgrade_level or 0
-  return game_cfg.Items.InitialItemBarSlots + level
+  return GameCfg.Items.InitialItemBarSlots + level
 end
 
 local function compute_backpack_capacity(upgrade_level)
   local level = is_non_negative_int(upgrade_level) and upgrade_level or 0
-  if level >= #game_cfg.Items.UpgradePrices then
-    return game_cfg.Items.MaxBackpackSlots
+  if level >= #GameCfg.Items.UpgradePrices then
+    return GameCfg.Items.MaxBackpackSlots
   end
-  return game_cfg.Items.InitialBackpackSlots + level * game_cfg.Items.BackpackSlotsPerUpgrade
+  return GameCfg.Items.InitialBackpackSlots + level * GameCfg.Items.BackpackSlotsPerUpgrade
 end
 
 local function copy_slots(items, capacity)
@@ -164,7 +164,7 @@ local function build_item_bar_snapshot(
     bait_out[item_id] = count
   end
 
-  local boss_bait = game_cfg.Casting and game_cfg.Casting.BossBait
+  local boss_bait = GameCfg.Casting and GameCfg.Casting.BossBait
   if type(boss_bait) == "table" then
     local bosses = {}
     for item_id in pairs(boss_bait) do
@@ -233,9 +233,9 @@ local function mount_phase_dock(ps, slot, label)
 end
 
 ---@param opts { player: table, data: table, clock: table, world?: table, logger?: table, effects?: table, create_unit?: fun(unit_type: string, props: table): any, on_item_bar_state?: fun(player: any, snapshot: table, tree: table), on_leave_finalize?: fun(tree: table, player: table, data: table), mounts?: table }
-function player_tree.spawn(opts)
+function PlayerTree.spawn(opts)
   if type(opts) ~= "table" then
-    error("player_tree.spawn 需要参数表", 2)
+    error("PlayerTree.spawn 需要参数表", 2)
   end
   assert_clock(opts.clock)
   assert_ready_player_data(opts.player, opts.data)
@@ -244,9 +244,9 @@ function player_tree.spawn(opts)
   local data = opts.data
   local clock = opts.clock
   local mounts = type(opts.mounts) == "table" and opts.mounts or {}
-  local container_ids = game_cfg.Items.ContainerId
+  local container_ids = GameCfg.Items.ContainerId
 
-  local raw_data = type(data.data) == "table" and data.data or {}
+  local raw_data = type(data.Data) == "table" and data.Data or {}
   local raw_containers = type(raw_data.Containers) == "table" and raw_data.Containers or {}
   local raw_extra = type(data.Extra) == "table" and data.Extra or {}
   local raw_inventory = type(raw_extra.inventory) == "table" and raw_extra.inventory or {}
@@ -259,40 +259,40 @@ function player_tree.spawn(opts)
 
   local ok_char, initial_character = pcall(function() return player.Character end) -- 兼容引擎 userdata 玩家
 
-  local session_alive = State.new("player_tree.session_alive", true)
+  local session_alive = State.new("PlayerTree.session_alive", true)
   local states = {
     -- Stage 1: 存档与库存基础状态
-    coin = State.new("player_tree.coin", raw_data.FishCoin or 0),
-    zone_id = State.new("player_tree.zone_id", raw_data.Zone or (game_cfg.Zones[1] and game_cfg.Zones[1].Id) or "fishPond"),
-    item_bar = State.new("player_tree.item_bar", deep_copy(raw_containers[container_ids.ItemBar] or {})),
-    backpack = State.new("player_tree.backpack", deep_copy(raw_containers[container_ids.Backpack] or {})),
-    weapons = State.new("player_tree.weapons", deep_copy(raw_data.Weapons or raw_inventory.weapons or {})),
-    bait = State.new("player_tree.bait", deep_copy(raw_data.Bait or {})),
-    selected_slot = State.new("player_tree.selected_slot",
+    coin = State.new("PlayerTree.coin", raw_data.FishCoin or 0),
+    zone_id = State.new("PlayerTree.zone_id", raw_data.Zone or (GameCfg.Zones[1] and GameCfg.Zones[1].Id) or "fishPond"),
+    item_bar = State.new("PlayerTree.item_bar", deep_copy(raw_containers[container_ids.ItemBar] or {})),
+    backpack = State.new("PlayerTree.backpack", deep_copy(raw_containers[container_ids.Backpack] or {})),
+    weapons = State.new("PlayerTree.weapons", deep_copy(raw_data.Weapons or raw_inventory.weapons or {})),
+    bait = State.new("PlayerTree.bait", deep_copy(raw_data.Bait or {})),
+    selected_slot = State.new("PlayerTree.selected_slot",
       raw_data.SelectedSlot ~= nil and raw_data.SelectedSlot or raw_selection.slot),
-    selected_bait = State.new("player_tree.selected_bait",
+    selected_bait = State.new("PlayerTree.selected_bait",
       raw_data.SelectedBait ~= nil and raw_data.SelectedBait or raw_selection.bait),
-    selected_weapon = State.new("player_tree.selected_weapon",
+    selected_weapon = State.new("PlayerTree.selected_weapon",
       raw_data.SelectedWeapon ~= nil and raw_data.SelectedWeapon or raw_selection.weapon),
-    held = State.new("player_tree.held", normalize_held(raw_selection.held)),
-    potion_big_count = State.new("player_tree.potion_big_count", raw_potions.item168 or 0),
-    potion_speed_count = State.new("player_tree.potion_speed_count", raw_potions.item167 or 0),
-    upgrade_level = State.new("player_tree.upgrade_level", raw_data.UpgradeLevel or 0),
-    shop_upgrades = State.new("player_tree.shop_upgrades", deep_copy(raw_upgrades)),
-    cooldowns = State.new("player_tree.cooldowns", deep_copy(raw_cooldowns)),
-    save_version = State.new("player_tree.save_version", 0),
-    character = State.new("player_tree.character", ok_char and initial_character or nil),
-    held_rod_retry = State.new("player_tree.held_rod_retry", 0),
+    held = State.new("PlayerTree.held", normalize_held(raw_selection.held)),
+    potion_big_count = State.new("PlayerTree.potion_big_count", raw_potions.item168 or 0),
+    potion_speed_count = State.new("PlayerTree.potion_speed_count", raw_potions.item167 or 0),
+    upgrade_level = State.new("PlayerTree.upgrade_level", raw_data.UpgradeLevel or 0),
+    shop_upgrades = State.new("PlayerTree.shop_upgrades", deep_copy(raw_upgrades)),
+    cooldowns = State.new("PlayerTree.cooldowns", deep_copy(raw_cooldowns)),
+    save_version = State.new("PlayerTree.save_version", 0),
+    character = State.new("PlayerTree.character", ok_char and initial_character or nil),
+    held_rod_retry = State.new("PlayerTree.held_rod_retry", 0),
     -- Stage 2: 持续效果与属性修饰输入
-    base_speed = State.new("player_tree.base_speed", nil),
-    is_weak = State.new("player_tree.is_weak", (raw_survival.weakRemaining or 0) > 0),
-    is_frost = State.new("player_tree.is_frost", false),
-    is_paralyzed = State.new("player_tree.is_paralyzed", false),
+    base_speed = State.new("PlayerTree.base_speed", nil),
+    is_weak = State.new("PlayerTree.is_weak", (raw_survival.weakRemaining or 0) > 0),
+    is_frost = State.new("PlayerTree.is_frost", false),
+    is_paralyzed = State.new("PlayerTree.is_paralyzed", false),
     -- Stage 3: 生命与生存状态
-    health = State.new("player_tree.health", raw_survival.health or game_cfg.vitals.MaxHealth),
-    hunger = State.new("player_tree.hunger", raw_survival.hunger or game_cfg.vitals.MaxHunger),
-    life_phase = State.new("player_tree.life_phase", initial_life_phase(raw_survival)),
-    platform_pending = State.new("player_tree.platform_pending", false),
+    health = State.new("PlayerTree.health", raw_survival.health or GameCfg.Vitals.MaxHealth),
+    hunger = State.new("PlayerTree.hunger", raw_survival.hunger or GameCfg.Vitals.MaxHunger),
+    life_phase = State.new("PlayerTree.life_phase", initial_life_phase(raw_survival)),
+    platform_pending = State.new("PlayerTree.platform_pending", false),
   }
 
   local memos = {}
@@ -338,7 +338,7 @@ function player_tree.spawn(opts)
     end
     local ok_set, err = pcall(set_attr, player, "FishCoin", coin)
     if not ok_set then
-      log_error("[player_tree] sync_fish_coin_attribute 失败", err)
+      log_error("[PlayerTree] sync_fish_coin_attribute 失败", err)
       return
     end
     last_synced_coin = coin
@@ -348,10 +348,10 @@ function player_tree.spawn(opts)
     if type(data) ~= "table" then
       return
     end
-    if type(data.data) ~= "table" then
-      data.data = {}
+    if type(data.Data) ~= "table" then
+      data.Data = {}
     end
-    local d = data.data
+    local d = data.Data
     d.FishCoin = states.coin:now()
     d.Zone = states.zone_id:now()
     d.UpgradeLevel = states.upgrade_level:now()
@@ -431,7 +431,7 @@ function player_tree.spawn(opts)
     end
     local ok, err = pcall(opts.on_item_bar_state, player, deep_copy(snapshot), handle) -- 隔离外围推送回调异常，防止打断树状态同步
     if not ok then
-      log_error("[player_tree] on_item_bar_state 回调失败", err)
+      log_error("[PlayerTree] on_item_bar_state 回调失败", err)
     end
   end
 
@@ -442,7 +442,7 @@ function player_tree.spawn(opts)
       if entry.active then
         local ok, err = pcall(entry.fn, handle, player, data) -- 隔离单个离场回调异常，保证其余终镜像与收尾继续执行
         if not ok then
-          log_error("[player_tree] 离场终镜像回调失败", err)
+          log_error("[PlayerTree] 离场终镜像回调失败", err)
         end
       end
     end
@@ -450,7 +450,7 @@ function player_tree.spawn(opts)
     if type(opts.on_leave_finalize) == "function" then
       local ok, err = pcall(opts.on_leave_finalize, handle, player, data) -- 隔离宿主离场回调异常，避免阻断后续 dispose 协议
       if not ok then
-        log_error("[player_tree] on_leave_finalize 失败", err)
+        log_error("[PlayerTree] on_leave_finalize 失败", err)
       end
     end
   end
@@ -508,7 +508,7 @@ function player_tree.spawn(opts)
       end)
 
       memos.held_visual_item_id = s1:memo("HeldVisualItemId", function(ms)
-        return held_rod_leaf.resolve_visual_item_id(
+        return HeldRodLeaf.resolve_visual_item_id(
           ms:d(states.held),
           ms:d(states.selected_slot),
           ms:d(states.item_bar)
@@ -533,16 +533,16 @@ function player_tree.spawn(opts)
       end)
 
       docks.save_inventory = s1:dock("SaveInventoryDock")
-      if opts.save and opts.player_data and _G.re_util then
+      if opts.save and opts.player_data and _G.REUtil then
         local session_opts = {
           player = player, clock = clock, save = opts.save, player_data = opts.player_data,
           records = opts.records,
         }
-        player_quest.mount(s1, handle, session_opts)
-        player_compendium.mount(s1, handle, session_opts)
-        player_story.mount(s1, handle, session_opts)
-        player_achievements.mount(s1, handle, session_opts)
-        player_gm.mount(s1, handle, session_opts)
+        PlayerQuest.mount(s1, handle, session_opts)
+        PlayerCompendium.mount(s1, handle, session_opts)
+        PlayerStory.mount(s1, handle, session_opts)
+        PlayerAchievements.mount(s1, handle, session_opts)
+        PlayerGM.mount(s1, handle, session_opts)
       end
       if type(mounts.save_inventory) == "function" then
         mounts.save_inventory(s1, handle)
@@ -555,17 +555,17 @@ function player_tree.spawn(opts)
 
       local builtin_effects_dock = s2:dock("BuiltinEffectsDock")
       builtin_effects_dock:effect("default", function(es)
-        player_effects.mount(es, handle, opts.effects)
+        PlayerEffects.mount(es, handle, opts.effects)
       end)
       local builtin_apply_modifier = handle.apply_modifier
 
       docks.attributes = s2:dock("AttributesDock")
       if type(mounts.attributes) == "function" then
         mounts.attributes(s2, handle)
-        -- 若调用方在 mounts.attributes 中显式挂载了自定义 player_effects 实例，拆除内置实例并恢复活跃标志位，避免双份监听。
+        -- 若调用方在 mounts.attributes 中显式挂载了自定义 PlayerEffects 实例，拆除内置实例并恢复活跃标志位，避免双份监听。
         if handle.apply_modifier ~= builtin_apply_modifier then
           builtin_effects_dock:drop("default")
-          spoke_runtime.batch(function()
+          SpokeRuntime.batch(function()
             states.is_weak:set(handle:get_modifier_remaining("weak") > 0)
             states.is_frost:set(handle:get_modifier_remaining("frost") > 0)
             states.is_paralyzed:set(handle:get_modifier_remaining("paralyze") > 0)
@@ -596,14 +596,14 @@ function player_tree.spawn(opts)
       -- 外层存活相位：仅跟随 is_alive，麻痹不退出此相位。
       s3:phase("AlivePhase", memos.is_alive, function(ps)
         mount_phase_dock(ps, phase_slots.alive, "alive")
-        special_item_phase.mount(ps, handle, {
+        SpecialItemPhase.mount(ps, handle, {
           remote = opts.remote,
           create_unit = opts.create_unit,
           players = opts.players,
           fish_units = opts.fish_units,
           fish_carrier = opts.fish_carrier,
         })
-        handle.fishing = fishing_phase.mount(ps, handle, {
+        handle.fishing = FishingPhase.mount(ps, handle, {
           remote = opts.remote,
           world = opts.world_service,
           create_unit = opts.create_unit,
@@ -630,7 +630,7 @@ function player_tree.spawn(opts)
         end)
       end)
 
-      player_life.mount(s3, handle, {
+      PlayerLife.mount(s3, handle, {
         remote = opts.remote,
         save = opts.save,
         player_data = opts.player_data,
@@ -663,14 +663,14 @@ function player_tree.spawn(opts)
     end)
 
     -- 树底纯输出叶子：左手持竿 / 手持外观投影（通过可选注入 create_unit 保持建点台账不变）。
-    held_rod_leaf.mount(s, handle, {
+    HeldRodLeaf.mount(s, handle, {
       create_unit = opts.create_unit,
       on_error = function(msg)
-        log_error("[player_tree]", msg)
+        log_error("[PlayerTree]", msg)
       end,
     })
 
-    -- 树底扩展叶子挂点（供 server_runtime 挂载 attr_leaf / ability_leaf 等官方包纯输出叶子）。
+    -- 树底扩展叶子挂点（供 ServerRuntime 挂载 AttrLeaf / AbilityLeaf 等官方包纯输出叶子）。
     if type(mounts.leaves) == "function" then
       mounts.leaves(s, handle)
     end
@@ -724,13 +724,13 @@ function player_tree.spawn(opts)
     end, { session_alive })
   end)
 
-  handle.tree = SpokeTree.spawn("player_tree:" .. tostring(player.UserId), root, services)
+  handle.tree = SpokeTree.spawn("PlayerTree:" .. tostring(player.UserId), root, services)
 
   function handle:batch(fn)
     if type(fn) ~= "function" then
-      error("player_tree:batch 需要函数", 2)
+      error("PlayerTree:batch 需要函数", 2)
     end
-    return spoke_runtime.batch(fn)
+    return SpokeRuntime.batch(fn)
   end
 
   function handle:set_coin(value)
@@ -829,7 +829,7 @@ function player_tree.spawn(opts)
   end
 
   function handle:set_upgrade_level(level)
-    if not is_non_negative_int(level) or level > #game_cfg.Items.UpgradePrices then
+    if not is_non_negative_int(level) or level > #GameCfg.Items.UpgradePrices then
       return false
     end
     states.upgrade_level:set(level)
@@ -845,8 +845,8 @@ function player_tree.spawn(opts)
   end
 
   function handle:set_shop_upgrade(kind, level)
-    local spec = type(kind) == "string" and game_cfg.Shop and game_cfg.Shop.UpgradeKinds
-        and game_cfg.Shop.UpgradeKinds[kind]
+    local spec = type(kind) == "string" and GameCfg.Shop and GameCfg.Shop.UpgradeKinds
+        and GameCfg.Shop.UpgradeKinds[kind]
     if not spec or not is_non_negative_int(level) or level > spec.MaxLevel then
       return false
     end
@@ -860,7 +860,7 @@ function player_tree.spawn(opts)
     if type(key) ~= "string" or key == "" then
       return false
     end
-    if expires_at ~= nil and not number.IsFiniteNumber(expires_at) then
+    if expires_at ~= nil and not Number.IsFiniteNumber(expires_at) then
       return false
     end
     local next_cooldowns = deep_copy(states.cooldowns:now() or {})
@@ -874,7 +874,7 @@ function player_tree.spawn(opts)
     return true
   end
 
-  --- 将外部（过渡期 player_data）最新字段单批同步进 player_tree Stage 1 状态，仅变更项触发下游重算。
+  --- 将外部（过渡期 PlayerData）最新字段单批同步进 PlayerTree Stage 1 状态，仅变更项触发下游重算。
   ---@param source_data? table
   ---@param sync_opts? { force_push?: boolean }
   function handle:sync_from_data(source_data, sync_opts)
@@ -885,7 +885,7 @@ function player_tree.spawn(opts)
     if type(src) ~= "table" then
       return false
     end
-    local d = type(src.data) == "table" and src.data or {}
+    local d = type(src.Data) == "table" and src.Data or {}
     local c = type(d.Containers) == "table" and d.Containers or {}
     local extra = type(src.Extra) == "table" and src.Extra or {}
     local inv = type(extra.inventory) == "table" and extra.inventory or {}
@@ -928,7 +928,7 @@ function player_tree.spawn(opts)
     if src == data then
       syncing_from_data = true
     end
-    local ok, err = pcall(spoke_runtime.batch, function() -- 仅保证异常时恢复 syncing_from_data，不吞错
+    local ok, err = pcall(SpokeRuntime.batch, function() -- 仅保证异常时恢复 syncing_from_data，不吞错
       if states.coin:now() ~= next_coin then states.coin:set(next_coin) end
       if states.zone_id:now() ~= next_zone then states.zone_id:set(next_zone) end
       if states.upgrade_level:now() ~= next_upgrade then states.upgrade_level:set(next_upgrade) end
@@ -980,13 +980,13 @@ function player_tree.spawn(opts)
   function handle:mount_phase(phase_name, key, block)
     local slot = phase_slots[phase_name]
     if not slot then
-      error("player_tree:mount_phase 未知相位: " .. tostring(phase_name), 2)
+      error("PlayerTree:mount_phase 未知相位: " .. tostring(phase_name), 2)
     end
     if type(key) ~= "string" or key == "" then
-      error("player_tree:mount_phase key 必须是非空字符串", 2)
+      error("PlayerTree:mount_phase key 必须是非空字符串", 2)
     end
     if type(block) ~= "function" then
-      error("player_tree:mount_phase block 必须是函数", 2)
+      error("PlayerTree:mount_phase block 必须是函数", 2)
     end
     if slot.blocks[key] == nil then
       slot.order[#slot.order + 1] = key
@@ -1000,7 +1000,7 @@ function player_tree.spawn(opts)
   function handle:unmount_phase(phase_name, key)
     local slot = phase_slots[phase_name]
     if not slot then
-      error("player_tree:unmount_phase 未知相位: " .. tostring(phase_name), 2)
+      error("PlayerTree:unmount_phase 未知相位: " .. tostring(phase_name), 2)
     end
     if slot.blocks[key] == nil then
       return
@@ -1019,7 +1019,7 @@ function player_tree.spawn(opts)
 
   function handle:register_leave_finalizer(fn)
     if type(fn) ~= "function" then
-      error("player_tree:register_leave_finalizer 需要函数", 2)
+      error("PlayerTree:register_leave_finalizer 需要函数", 2)
     end
     local entry = { fn = fn, active = true }
     finalizers[#finalizers + 1] = entry
@@ -1077,4 +1077,4 @@ function player_tree.spawn(opts)
   return handle
 end
 
-return player_tree
+return PlayerTree

@@ -1,12 +1,12 @@
 
-local game_cfg = require("common.game_cfg")
-local number = require("common.number")
-local spoke = require("common.packages.spoke.api")
+local GameCfg = require("common.game_cfg")
+local Number = require("common.number")
+local Spoke = require("common.packages.spoke.api")
 
-local State = spoke.State
-local squad_dock = {}
+local State = Spoke.State
+local SquadDock = {}
 
-local function cfg() return game_cfg.Party end
+local function cfg() return GameCfg.Party end
 
 local function is_object(value)
   local kind = type(value)
@@ -31,7 +31,7 @@ local function copy_array(values)
   return out
 end
 
-function squad_dock.mount(world, opts)
+function SquadDock.mount(world, opts)
   opts = type(opts) == "table" and opts or {}
   local self = {
     world = world,
@@ -45,7 +45,7 @@ function squad_dock.mount(world, opts)
   }
 
   local function log_failure(operation, player, err)
-    local message = "[squad_dock] " .. tostring(operation) .. " 失败 (uid="
+    local message = "[SquadDock] " .. tostring(operation) .. " 失败 (uid="
       .. tostring(player and player.UserId) .. "): " .. tostring(err)
     local logger = opts.logger
     if logger and type(logger.error) == "function" then
@@ -57,7 +57,7 @@ function squad_dock.mount(world, opts)
 
   local function now()
     local value = world.clock.now()
-    return number.IsFiniteNumber(value) and value or 0
+    return Number.IsFiniteNumber(value) and value or 0
   end
 
   local function fire(player, channel, payload)
@@ -171,7 +171,7 @@ function squad_dock.mount(world, opts)
           local tree = player and opts.lookup_tree and opts.lookup_tree(player)
           if not tree or tree:is_disposed() then return end
           row.health = es:d(tree.states.health)
-          row.maxHealth = tree.memos.max_health and es:d(tree.memos.max_health) or game_cfg.vitals.MaxHealth
+          row.maxHealth = tree.memos.max_health and es:d(tree.memos.max_health) or GameCfg.Vitals.MaxHealth
           row.phase = es:d(tree.states.life_phase)
         end)
         if not ok then
@@ -204,7 +204,7 @@ function squad_dock.mount(world, opts)
 
   local function new_party()
     self.NextId = self.NextId + 1
-    local party = { Id = self.NextId, Members = {}, rows = {}, revision = State.new("squad_dock.revision", 0) }
+    local party = { Id = self.NextId, Members = {}, rows = {}, revision = State.new("SquadDock.revision", 0) }
     self.Parties[party.Id] = party
     mount_party(party)
     return party
@@ -526,4 +526,4 @@ function squad_dock.mount(world, opts)
   return self
 end
 
-return squad_dock
+return SquadDock

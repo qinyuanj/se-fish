@@ -1,14 +1,14 @@
 -- 服务端 ability_system 官方包单向输出叶子投影层（ADR-0032 §3 / #297-A2）：
 --   1. 角色就绪时单向创建并挂载能力管理器（ManagerPreset），装配 InitialAbilities
 --      （CdTime / CastTime / 锚点预设与属性覆盖，经可选回调 attach_anchor 挂接）；
---   2. 将 player_tree 的 can_act 守卫以回调形式注入施法门控（零反向依赖 server.ability_api）；
+--   2. 将 PlayerTree 的 can_act 守卫以回调形式注入施法门控（零反向依赖 server.ability_api）；
 --   3. 角色更换或树销毁时在 s:on_cleanup 中对称停止全部已装配技能并销毁能力管理器；
---   4. 若管理器脚本首帧尚未就绪，依托 spoke_clock.on_frame 托管重试（随 on_cleanup 自动退订，零协程泄漏）。
+--   4. 若管理器脚本首帧尚未就绪，依托 SpokeClock.on_frame 托管重试（随 on_cleanup 自动退订，零协程泄漏）。
 -- 本模块归属 L2（server.world_host），零反向依赖存量旧债务模块，零新增 CreateUnit 建点。
 
-local game_cfg = require("common.game_cfg")
+local GameCfg = require("common.game_cfg")
 
-local ability_leaf = {}
+local AbilityLeaf = {}
 
 local DEFAULT_RETRY_INTERVAL = 0.1
 local DEFAULT_RETRY_COUNT = 50
@@ -35,7 +35,7 @@ local function report_error(opts, user_id, msg)
   if type(opts.on_error) == "function" then
     opts.on_error(msg)
   else
-    print("[ability_leaf]", user_id, msg)
+    print("[AbilityLeaf]", user_id, msg)
   end
 end
 
@@ -127,10 +127,10 @@ local function try_equip_entry(ability_api, character, entry, create_asset, opts
   return true, ability_script, anchor
 end
 
---- 读取 player_tree 的 can_act 守卫结果（树已销毁时一律拒绝施法）。
+--- 读取 PlayerTree 的 can_act 守卫结果（树已销毁时一律拒绝施法）。
 ---@param player_tree table
 ---@return boolean
-function ability_leaf.can_act_for(player_tree)
+function AbilityLeaf.can_act_for(player_tree)
   if type(player_tree) ~= "table" then
     return false
   end
@@ -166,10 +166,10 @@ end
 --- 生成可注入外部施法门控的 can_act 守卫函数（仅拦截归属该玩家树的角色/玩家）。
 ---@param player_tree table
 ---@return fun(unit: any, ability_index?: number): boolean
-function ability_leaf.make_cast_guard(player_tree)
+function AbilityLeaf.make_cast_guard(player_tree)
   return function(unit, _ability_index)
     if unit == nil or unit_matches_player_tree(unit, player_tree) then
-      return ability_leaf.can_act_for(player_tree)
+      return AbilityLeaf.can_act_for(player_tree)
     end
     return true
   end
@@ -183,9 +183,9 @@ end
 ---@param release_target? any
 ---@param opts? { ability_api?: table }
 ---@return boolean ok, string|nil err
-function ability_leaf.cast_ability(player_tree, ability_index, release_point, release_dir, release_target, opts)
+function AbilityLeaf.cast_ability(player_tree, ability_index, release_point, release_dir, release_target, opts)
   opts = type(opts) == "table" and opts or {}
-  if not ability_leaf.can_act_for(player_tree) then
+  if not AbilityLeaf.can_act_for(player_tree) then
     return false, "cannot-act"
   end
   local char_sig = player_tree.states and player_tree.states.character
@@ -208,21 +208,21 @@ function ability_leaf.cast_ability(player_tree, ability_index, release_point, re
   return result == true, err
 end
 
---- 在 player_tree 树底挂载 ability_system 纯输出叶子投影。
+--- 在 PlayerTree 树底挂载 ability_system 纯输出叶子投影。
 ---@param s table EffectBuilder
 ---@param player_tree table
 ---@param opts? { ability_api?: table, create_asset?: fun(preset: string): table, attach_anchor?: fun(anchor: any, behavior: string): boolean, register_cast_guard?: fun(guard: fun(unit: any, index?: number): boolean): (fun()|nil), unregister_cast_guard?: fun(guard: fun(unit: any, index?: number): boolean), manager_preset?: string, initial_abilities?: table[], retry_interval?: number, retry_count?: number, on_error?: fun(msg: string) }
-function ability_leaf.mount(s, player_tree, opts)
+function AbilityLeaf.mount(s, player_tree, opts)
   opts = type(opts) == "table" and opts or {}
   local ability_api = opts.ability_api or default_ability_api()
   local create_asset = type(opts.create_asset) == "function" and opts.create_asset or default_create_asset
-  local manager_preset = opts.manager_preset or game_cfg.Ability.ManagerPreset
-  local initial_abilities = opts.initial_abilities or game_cfg.Ability.InitialAbilities or {}
+  local manager_preset = opts.manager_preset or GameCfg.Ability.ManagerPreset
+  local initial_abilities = opts.initial_abilities or GameCfg.Ability.InitialAbilities or {}
   local retry_interval = opts.retry_interval or DEFAULT_RETRY_INTERVAL
   local retry_count = opts.retry_count or DEFAULT_RETRY_COUNT
   local user_id = player_tree and player_tree.user_id
 
-  local guard = ability_leaf.make_cast_guard(player_tree)
+  local guard = AbilityLeaf.make_cast_guard(player_tree)
 
   return s:effect("Leaf:AbilityScope", function(as)
     -- 1. 注入 can_act 施法守卫，并在树销毁时对称反注册。
@@ -283,7 +283,7 @@ function ability_leaf.mount(s, player_tree, opts)
         end
       end
 
-      -- 首帧未就绪的技能：通过 spoke_clock.on_frame 托管重试，角色离开或树销毁时自动退订。
+      -- 首帧未就绪的技能：通过 SpokeClock.on_frame 托管重试，角色离开或树销毁时自动退订。
       if #pending > 0 and player_tree.clock and player_tree.clock.on_frame then
         cs:subscribe(player_tree.clock.on_frame, function(frame)
           if cancelled or #pending == 0 then
@@ -325,4 +325,4 @@ function ability_leaf.mount(s, player_tree, opts)
   end)
 end
 
-return ability_leaf
+return AbilityLeaf

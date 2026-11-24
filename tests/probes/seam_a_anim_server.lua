@@ -1,4 +1,4 @@
--- #160 接缝 a 取证第 2 步（服务端）：在镜头前建 AnimatedUnit 播放模型动画片段，或清理探针单位。
+-- #160 接缝 A 取证第 2 步（服务端）：在镜头前建 AnimatedUnit 播放模型动画片段，或清理探针单位。
 -- 流程与判定口径见 docs/art-asset-overview.md「模型动画导入与播放」。
 -- 参数先用一次 exec 写进 _G.SeamA，再 exec 本文件（-p server）；结果用 log grep SEAMA_ANIM 取回。
 --   _G.SeamA = {

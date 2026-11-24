@@ -1,13 +1,13 @@
-local game_cfg = {}
-local content_items = require('common.cfg.items')
-local content_fish = require('common.cfg.fish')
-local content_shop = require('common.cfg.shop')
-local content_lottery = require('common.cfg.lottery')
-local content_blindbox = require('common.cfg.blindbox')
-local boss_moves = require('common.cfg.boss_moves')
-local fish_catch = require('common.fish_catch')
+local GameCfg = {}
+local ContentItems = require('common.cfg.items')
+local ContentFish = require('common.cfg.fish')
+local ContentShop = require('common.cfg.shop')
+local ContentLottery = require('common.cfg.lottery')
+local ContentBlindbox = require('common.cfg.blindbox')
+local BossMoves = require('common.cfg.boss_moves')
+local FishCatch = require('common.fish_catch')
 
-game_cfg.Zones = {
+GameCfg.Zones = {
     { Id = 'fishPond', Name = '鱼塘', WaterId = 'fishPond.water', BaitItemId = 'worm', source = '钓鱼表!R2' },
     { Id = 'shrimpPond', Name = '虾池', WaterId = 'shrimpPond.water', BaitItemId = 'sausage', source = '钓鱼表!R16' },
     { Id = 'crabLake', Name = '蟹湖', WaterId = 'crabLake.water', BaitItemId = 'item115', source = '钓鱼表!R30' },
@@ -16,14 +16,14 @@ game_cfg.Zones = {
     { Id = 'reefIsland', Name = '礁石岛', WaterId = 'reefIsland.water', BaitItemId = 'item118', source = '钓鱼表!R72' },
     { Id = 'volcanoIsland', Name = '火山岛', WaterId = 'volcanoIsland.water', BaitItemId = 'item119', source = '钓鱼表!R86' },
 }
-game_cfg.LegacyZoneIdMap = { fishPond1 = 'fishPond', shrimpPond = 'shrimpPond' }
+GameCfg.LegacyZoneIdMap = { fishPond1 = 'fishPond', shrimpPond = 'shrimpPond' }
 
-function game_cfg.ResolveZoneId(id)
-    return game_cfg.LegacyZoneIdMap[id] or id
+function GameCfg.ResolveZoneId(id)
+    return GameCfg.LegacyZoneIdMap[id] or id
 end
 
 
-game_cfg.InteractionBubble = {
+GameCfg.InteractionBubble = {
     Width = 220,
     Height = 84,
     FontSize = 40,
@@ -32,7 +32,7 @@ game_cfg.InteractionBubble = {
     BackgroundColor = { 35, 57, 78, 245 },
 }
 
-game_cfg.Items = {
+GameCfg.Items = {
     ContainerId = { ItemBar = 'itemBar', Backpack = 'backpack', Bait = 'bait' },
     ItemBarSlots = 8,
     InitialItemBarSlots = 2,
@@ -53,11 +53,11 @@ game_cfg.Items = {
         Socket = 'l_weapon',
         Scale = { x = 0.2, y = 0.25, z = 0.2 },
     },
-    Definitions = content_items.Definitions,
-    SourceIdMap = content_items.SourceIdMap,
-    LegacyIdMap = content_items.LegacyIdMap,
+    Definitions = ContentItems.Definitions,
+    SourceIdMap = ContentItems.SourceIdMap,
+    LegacyIdMap = ContentItems.LegacyIdMap,
 }
-game_cfg.vitals = {
+GameCfg.Vitals = {
     HeldDamage = { ItemId = 'item126', DamagePerSec = 1 },
     MaxHealth = 300,
     MaxHunger = 300,
@@ -79,7 +79,7 @@ game_cfg.vitals = {
     FlashThickness = 40,
 }
 
-game_cfg.Survival = {
+GameCfg.Survival = {
     DownedSec = 15,
     DeadSec = 30,
     ReviveHealthPercent = 10,
@@ -104,7 +104,7 @@ game_cfg.Survival = {
     UnavailableText = '操作暂时不可用，请稍后再试',
 }
 
-game_cfg.Rescue = {
+GameCfg.Rescue = {
     Target = 'downedPlayer',
     Action = 'Rescue',
     PromptText = '抢救',
@@ -117,7 +117,7 @@ game_cfg.Rescue = {
     InterruptOnDamage = true,
 }
 
-game_cfg.Party = {
+GameCfg.Party = {
     MaxMembers = 3,
     MinMembers = 2,
     InviteRange = 2,
@@ -154,19 +154,19 @@ game_cfg.Party = {
     },
 }
 
-game_cfg.Debug = {
+GameCfg.Debug = {
     Enabled = false,
     InitialGrants = {
-        { itemId = game_cfg.Items.Id.StarterRod, count = 1, containerId = game_cfg.Items.ContainerId.ItemBar },
-        { itemId = game_cfg.Items.Id.Worm, count = 10, containerId = game_cfg.Items.ContainerId.Bait },
+        { itemId = GameCfg.Items.Id.StarterRod, count = 1, containerId = GameCfg.Items.ContainerId.ItemBar },
+        { itemId = GameCfg.Items.Id.Worm, count = 10, containerId = GameCfg.Items.ContainerId.Bait },
     },
 }
 
-game_cfg.Fish = content_fish.Definitions
-game_cfg.FishSourceIdMap = content_fish.SourceIdMap
-game_cfg.LegacyFishIdMap = content_fish.LegacyIdMap
+GameCfg.Fish = ContentFish.Definitions
+GameCfg.FishSourceIdMap = ContentFish.SourceIdMap
+GameCfg.LegacyFishIdMap = ContentFish.LegacyIdMap
 
-game_cfg.FishUnit = {
+GameCfg.FishUnit = {
     LiftSocket = 'origin',
     LiftSocketOffset = { x = 0, y = 1.9, z = 0 },
     -- 服务端 Lift() 后等 OnLiftedBegin 的确认窗；没确认才重试，最多 LiftAttempts 次
@@ -187,7 +187,7 @@ game_cfg.FishUnit = {
     GlobalEscapePerPlayer = 2,
 }
 
-game_cfg.Loot = {
+GameCfg.Loot = {
     PickupRadius = 2,
     PickupSlack = 0.5,
     GroundRayUp = 1,
@@ -205,7 +205,7 @@ game_cfg.Loot = {
     ItemScale = 0.3,
 }
 
-game_cfg.Save = {
+GameCfg.Save = {
     Store = 'sefish_save_v1',
     KeyPrefix = 'u',
     QaSlot = '',
@@ -214,7 +214,7 @@ game_cfg.Save = {
     AutosaveSec = 60,
 }
 
-game_cfg.records = {
+GameCfg.Records = {
     Store = 'sefish_records_v1',
     KeyPrefix = 'rec:',
     Scale = 100,
@@ -234,14 +234,14 @@ game_cfg.records = {
     },
 }
 
-game_cfg.BaitSpots = {
+GameCfg.BaitSpots = {
     RespawnSec = 15,
     Mesh = 'official://mesh/7000571',
     Scale = 0.3,
     Spots = {},
 }
 
-game_cfg.Quest = {
+GameCfg.Quest = {
     Title = '新手任务',
     NextNotice = '任务完成，下一步：%s',
     DoneText = '新手任务完成！',
@@ -258,7 +258,7 @@ game_cfg.Quest = {
     },
 }
 
-game_cfg.Story = {
+GameCfg.Story = {
     StoryId = nil,
     ReadKey = 'opening',
     Title = '钓鱼怎么这么危险啊喂！',
@@ -273,7 +273,7 @@ game_cfg.Story = {
     },
 }
 
-game_cfg.HookAlert = {
+GameCfg.HookAlert = {
     DurationSec = 3,
     Text = '鱼上钩了！狂点收线',
     HighlightColor = { 255, 190, 40, 255 },
@@ -282,13 +282,13 @@ game_cfg.HookAlert = {
     Volume = 100,
 }
 
-game_cfg.CastFeedback = {
+GameCfg.CastFeedback = {
     SplashDurationSec = 2.5,
     FloatSize = 56,
     FloatColor = { 255, 225, 70, 255 },
 }
 
-game_cfg.Interact = {
+GameCfg.Interact = {
     Fisherman = {
         Radius = 5,
         Slack = 0.5,
@@ -298,7 +298,7 @@ game_cfg.Interact = {
     },
 }
 
-game_cfg.Shop = {
+GameCfg.Shop = {
     Stands = {
         { AnchorName = 'TGUnitShop', Level = 1 },
         { AnchorName = 'TGUnitShopShrimp', Level = 2 },
@@ -313,13 +313,13 @@ game_cfg.Shop = {
     HintText = '看看有什么可买的',
     Radius = 5,
     Slack = 0.5,
-    Pages = content_shop.Pages,
+    Pages = ContentShop.Pages,
     Goods = {},
 }
 
-for _, row in ipairs(content_shop.Goods) do
-    game_cfg.Shop.Goods[#game_cfg.Shop.Goods + 1] = {
-        number = row.number,
+for _, row in ipairs(ContentShop.Goods) do
+    GameCfg.Shop.Goods[#GameCfg.Shop.Goods + 1] = {
+        Number = row.number,
         ItemId = row.itemKey,
         Name = row.itemName,
         Desc = row.description,
@@ -332,52 +332,52 @@ for _, row in ipairs(content_shop.Goods) do
     }
 end
 
-game_cfg.Shop.UpgradeKinds = {}
-for _, row in ipairs(content_shop.Goods) do
+GameCfg.Shop.UpgradeKinds = {}
+for _, row in ipairs(ContentShop.Goods) do
     local upgrade = row.upgrade
     if upgrade then
-        local kind = game_cfg.Shop.UpgradeKinds[upgrade.kind]
+        local kind = GameCfg.Shop.UpgradeKinds[upgrade.kind]
         if not kind then
             kind = { Increment = upgrade.increment, MaxLevel = 0,
                 RoundUp = upgrade.roundUp == true, Prices = {} }
-            game_cfg.Shop.UpgradeKinds[upgrade.kind] = kind
+            GameCfg.Shop.UpgradeKinds[upgrade.kind] = kind
         end
         kind.MaxLevel = math.max(kind.MaxLevel, upgrade.level)
         kind.Prices[upgrade.level] = row.price
     end
 end
 
-function game_cfg.Shop.ListForPage(level, page, includeLocked)
+function GameCfg.Shop.ListForPage(level, page, includeLocked)
     local rows = {}
     if type(level) ~= 'number' or type(page) ~= 'string' then return rows end
-    for _, row in ipairs(game_cfg.Shop.Goods) do
+    for _, row in ipairs(GameCfg.Shop.Goods) do
         if row.Page == page and (includeLocked or row.MinShopLevel <= level) then rows[#rows + 1] = row end
     end
     table.sort(rows, function(a, b)
         local aNew = a.MinShopLevel == level and 0 or 1
         local bNew = b.MinShopLevel == level and 0 or 1
         if aNew ~= bNew then return aNew < bNew end
-        return a.number < b.number
+        return a.Number < b.Number
     end)
     return rows
 end
 
-function game_cfg.Shop.DamageScale(kind, level)
-    local spec = game_cfg.Shop.UpgradeKinds[kind]
+function GameCfg.Shop.DamageScale(kind, level)
+    local spec = GameCfg.Shop.UpgradeKinds[kind]
     if not spec or not spec.Increment or spec.RoundUp or type(level) ~= 'number' then return nil end
     level = math.max(0, math.min(spec.MaxLevel, math.floor(level)))
     return 1 + spec.Increment * level
 end
 
-function game_cfg.Shop.MagazineSize(base, level)
-    local spec = game_cfg.Shop.UpgradeKinds.magazine
+function GameCfg.Shop.MagazineSize(base, level)
+    local spec = GameCfg.Shop.UpgradeKinds.magazine
     if type(base) ~= 'number' or base ~= base or not spec then return nil end
     level = math.max(0, math.min(spec.MaxLevel, math.floor(level or 0)))
     return math.ceil(base * (1 + spec.Increment * level))
 end
 
-game_cfg.Content = { Shop = content_shop, Lottery = content_lottery, Blindbox = content_blindbox }
-game_cfg.Content.Exchanges = {
+GameCfg.Content = { Shop = ContentShop, Lottery = ContentLottery, Blindbox = ContentBlindbox }
+GameCfg.Content.Exchanges = {
     { ZoneId = 'fishPond', EliteFish = 'eel', EliteToken = 'eelHead', BossBait = 'duck', BossFish = 'alligatorGar', BossToken = 'garHead', Result = 'shrimpTicket', source = 'GameSpec.md#8.1-鱼塘' },
     { ZoneId = 'shrimpPond', EliteFish = 'fish15Elite', EliteToken = 'item31', BossBait = 'item121', BossFish = 'fish16Boss', BossToken = 'item32', Result = 'item147', source = 'GameSpec.md#8.1-虾池' },
     { ZoneId = 'crabLake', EliteFish = 'fish23Elite', EliteToken = 'item47', BossBait = 'item122', BossFish = 'fish24Boss', BossToken = 'item48', Result = 'item148', source = 'GameSpec.md#8.1-蟹湖' },
@@ -386,74 +386,74 @@ game_cfg.Content.Exchanges = {
     { ZoneId = 'reefIsland', EliteFish = 'fish47Elite', EliteToken = 'item95', BossBait = 'item125', BossFish = 'fish48Boss', BossToken = 'item96', Result = 'item151', source = 'GameSpec.md#8.1-礁石岛' },
     { ZoneId = 'volcanoIsland', EliteFish = 'fish55Elite', EliteToken = 'item111', BossBait = 'item126', BossFish = 'fish56Boss', BossToken = 'item112', Result = 'achievement.final', source = 'GameSpec.md#8.1-火山岛' },
 }
-game_cfg.Items.CookedFlag = 'cooked'
-game_cfg.Items.CookedPriceScale = 1.5
-function game_cfg.Items.CookRate(entry)
+GameCfg.Items.CookedFlag = 'cooked'
+GameCfg.Items.CookedPriceScale = 1.5
+function GameCfg.Items.CookRate(entry)
     if type(entry) ~= 'table' then return nil end
     local rate = entry.cooked
     if type(rate) ~= 'number' and type(entry.saved) == 'table' then
         rate = entry.saved.k
-        if type(rate) ~= 'number' and entry.saved[game_cfg.Items.CookedFlag] == true then
-            rate = game_cfg.Items.CookedPriceScale
+        if type(rate) ~= 'number' and entry.saved[GameCfg.Items.CookedFlag] == true then
+            rate = GameCfg.Items.CookedPriceScale
         end
     end
     if type(rate) ~= 'number' or rate <= 0 or rate ~= rate or rate >= math.huge then return nil end
     return rate
 end
-function game_cfg.Items.SalePrice(itemId, mult, cooked)
-    local rate = cooked == true and game_cfg.Items.CookedPriceScale
+function GameCfg.Items.SalePrice(itemId, mult, cooked)
+    local rate = cooked == true and GameCfg.Items.CookedPriceScale
         or type(cooked) == 'number' and cooked or nil
-    local species = type(itemId) == 'string' and game_cfg.Fish[itemId]
+    local species = type(itemId) == 'string' and GameCfg.Fish[itemId]
     if species then
-        return rate and fish_catch.CookedPrice(species, mult, rate) or fish_catch.Price(species, mult)
+        return rate and FishCatch.CookedPrice(species, mult, rate) or FishCatch.Price(species, mult)
     end
-    local definition = type(itemId) == 'string' and game_cfg.Items.Definitions[itemId]
+    local definition = type(itemId) == 'string' and GameCfg.Items.Definitions[itemId]
     local base = definition and definition.BasePrice
     if type(base) ~= 'number' then return nil end
     local factor = type(mult) == 'number' and mult or 1
     return math.floor(base * factor * (rate or 1) + 1e-9)
 end
 
-game_cfg.Achievements = {
+GameCfg.Achievements = {
     final = { Name = '通关成就', PlatformId = nil, PlaceholderId = 390001 },
 }
-game_cfg.Compendium = { RefreshSec = 3, RootPollSec = 0.5, RequestCooldownSec = 0.2 }
-game_cfg.AchievementDelivery = { RetrySec = 15 }
-game_cfg.Shop.Catalog = content_shop.Goods
-game_cfg.Shop.Excluded = content_shop.Excluded
+GameCfg.Compendium = { RefreshSec = 3, RootPollSec = 0.5, RequestCooldownSec = 0.2 }
+GameCfg.AchievementDelivery = { RetrySec = 15 }
+GameCfg.Shop.Catalog = ContentShop.Goods
+GameCfg.Shop.Excluded = ContentShop.Excluded
 local LotteryCfg = {}
-for key, value in pairs(content_lottery) do LotteryCfg[key] = value end
-game_cfg.Lottery = LotteryCfg
-game_cfg.Lottery.Radius = 5
-game_cfg.Lottery.Slack = 0.5
-game_cfg.Lottery.BubbleHeight = 7
-game_cfg.Lottery.BubblePreset = game_cfg.Shop.BubblePreset
-game_cfg.Lottery.HintText = '极品食物换大奖'
-game_cfg.Lottery.RuleHintText = '抽奖规则'
-game_cfg.Lottery.ActionCooldownSec = 1
-game_cfg.Lottery.SpinSec = 3
-game_cfg.Lottery.AxisStopIntervalSec = 0.5
-game_cfg.Lottery.AxisOrder = { 'left', 'right', 'middle' }
-game_cfg.Lottery.ResultTimeoutSec = 5
-function game_cfg.Lottery.MachineAnchors()
+for key, value in pairs(ContentLottery) do LotteryCfg[key] = value end
+GameCfg.Lottery = LotteryCfg
+GameCfg.Lottery.Radius = 5
+GameCfg.Lottery.Slack = 0.5
+GameCfg.Lottery.BubbleHeight = 7
+GameCfg.Lottery.BubblePreset = GameCfg.Shop.BubblePreset
+GameCfg.Lottery.HintText = '极品食物换大奖'
+GameCfg.Lottery.RuleHintText = '抽奖规则'
+GameCfg.Lottery.ActionCooldownSec = 1
+GameCfg.Lottery.SpinSec = 3
+GameCfg.Lottery.AxisStopIntervalSec = 0.5
+GameCfg.Lottery.AxisOrder = { 'left', 'right', 'middle' }
+GameCfg.Lottery.ResultTimeoutSec = 5
+function GameCfg.Lottery.MachineAnchors()
     local names = {}
-    for _, zone in ipairs(game_cfg.Zones) do
+    for _, zone in ipairs(GameCfg.Zones) do
         if zone.Scene and zone.Scene.LotteryName then names[#names + 1] = zone.Scene.LotteryName end
     end
     return names
 end
-local blindbox_cfg = {}
-for key, value in pairs(content_blindbox) do blindbox_cfg[key] = value end
-game_cfg.Blindbox = blindbox_cfg
-game_cfg.Blindbox.ActionCooldownSec = 1
-game_cfg.Blindbox.ResultTimeoutSec = 65
-game_cfg.Blindbox.HintText = '盲盒'
-game_cfg.Blindbox.FullNoticeText = '道具栏和背包已满：抽中的物品将落在面前地上，其他玩家可拾取'
-game_cfg.Blindbox.UnavailableText = '盲盒暂未开放，请稍后再试'
+local BlindboxCfg = {}
+for key, value in pairs(ContentBlindbox) do BlindboxCfg[key] = value end
+GameCfg.Blindbox = BlindboxCfg
+GameCfg.Blindbox.ActionCooldownSec = 1
+GameCfg.Blindbox.ResultTimeoutSec = 65
+GameCfg.Blindbox.HintText = '盲盒'
+GameCfg.Blindbox.FullNoticeText = '道具栏和背包已满：抽中的物品将落在面前地上，其他玩家可拾取'
+GameCfg.Blindbox.UnavailableText = '盲盒暂未开放，请稍后再试'
 
 -- 官方购买无订单 ID，也没有取消/失败事件，且禁止用 UserId+goodsId 自行防重。
 -- 本地适配器只能关联 pending flow 并超时兜底；跨会话防重、补发与对账依赖真实平台能力。
-game_cfg.Platform = {
+GameCfg.Platform = {
     BeanCurrency = '金豆',
     FlowTimeoutSec = 60,
     ActionCooldownSec = 1,
@@ -461,8 +461,8 @@ game_cfg.Platform = {
         blindboxSingle = { beans = 10, name = '盲盒单抽' },
         blindboxTen = { beans = 90, name = '盲盒十连' },
         reviveFull = { beans = 5, name = '满血复活' },
-        adrenaline1 = { beans = 1, count = 1, name = '肾上腺素', itemId = game_cfg.Survival.AdrenalineItemId },
-        adrenaline5 = { beans = 4, count = 5, name = '肾上腺素×5', itemId = game_cfg.Survival.AdrenalineItemId },
+        adrenaline1 = { beans = 1, count = 1, name = '肾上腺素', itemId = GameCfg.Survival.AdrenalineItemId },
+        adrenaline5 = { beans = 4, count = 5, name = '肾上腺素×5', itemId = GameCfg.Survival.AdrenalineItemId },
     },
     Ads = {
         revive = { name = '广告满血复活' },
@@ -482,7 +482,7 @@ game_cfg.Platform = {
     TestDriverTitle = '测试支付（仅调试构建）',
 }
 
-game_cfg.Platform.Placeholder = {
+GameCfg.Platform.Placeholder = {
     Enabled = true,
     AllowInPublish = false,
     Label = '占位支付通道',
@@ -510,10 +510,10 @@ game_cfg.Platform.Placeholder = {
     },
 }
 
-game_cfg.Ferry = {
+GameCfg.Ferry = {
 }
 
-game_cfg.Casting = {
+GameCfg.Casting = {
     Distance = 5,
     HookDelaySec = 3,
     ActionCooldownSec = 0.12,
@@ -623,7 +623,7 @@ game_cfg.Casting = {
 
 local sourceCastRows = {}
 local bossBaitCatalog = {}
-for _, species in pairs(game_cfg.Fish) do
+for _, species in pairs(GameCfg.Fish) do
     if species.Grade == 'boss' then
         bossBaitCatalog[species.Bait] = species.Id
     else
@@ -638,20 +638,20 @@ for _, rows in pairs(sourceCastRows) do
         return tonumber(a.source:match('R(%d+)$')) < tonumber(b.source:match('R(%d+)$'))
     end)
 end
-game_cfg.Casting.Catalog = sourceCastRows
-game_cfg.Casting.BossBaitCatalog = bossBaitCatalog
-game_cfg.Casting.Zones['fishPond.water'] = game_cfg.Casting.Zones.WaterCircle2
+GameCfg.Casting.Catalog = sourceCastRows
+GameCfg.Casting.BossBaitCatalog = bossBaitCatalog
+GameCfg.Casting.Zones['fishPond.water'] = GameCfg.Casting.Zones.WaterCircle2
 
-game_cfg.Casting.Zones['volcanoIsland.water'] = sourceCastRows.volcanoIsland
-for _, species in pairs(game_cfg.Fish) do
+GameCfg.Casting.Zones['volcanoIsland.water'] = sourceCastRows.volcanoIsland
+for _, species in pairs(GameCfg.Fish) do
     if species.ZoneId == 'volcanoIsland' then
-        species.model = '7000546'
+        species.Model = '7000546'
         if species.Grade == 'elite' then species.Combat = 'mosasaur' end
         if species.Grade == 'boss' then species.Combat = 'godzilla' end
     end
 end
 
-game_cfg.fish_combat = {
+GameCfg.FishCombat = {
     shrimp = { BiteRange = 2.5, BiteCooldownSec = 2, HeadHalfAngleDeg = 90,
         ActiveSec = 15, StunSec = 5, ClawDamage = 20, TailDamage = 20, KnockHorizontal = 3, KnockUp = 1 },
     dragon = { BiteRange = 2.5, BiteCooldownSec = 1.5, HeadHalfAngleDeg = 90,
@@ -705,7 +705,7 @@ local AttackAnim = {
     Rocket = 'official://animation/24325',
     Throw = 'official://animation/26646',    -- 攻击（目录里的投掷类 25860、26649–26651 运行时加载长度为 0，试玩实测不播）
 }
-game_cfg.Ability = {
+GameCfg.Ability = {
     ManagerPreset = "map://preset/ubdb4a7e737d4eddb87729e9055ba375",
     -- 每次放电 = 一次技能施法（复用挥砍预设，CastSec 是单次施法窗口，须小于放电间隔，否则下一次会被 InCast 拒绝）；
     FishAbilities = {
@@ -812,7 +812,7 @@ game_cfg.Ability = {
         LongPressSec = 0.35,
         Anim = AttackAnim.Throw,
     },
-    body_scale = {
+    BodyScale = {
         Base = 1, Step = 0.2, Max = 3, MaxPotions = 10,
         HealthBase = 300, HealthStepPercent = 20, HealthMax = 900,
         CapsuleHeight = 2, CameraDistance = 13, InteractRange = 2,
@@ -842,7 +842,7 @@ game_cfg.Ability = {
         },
         FallbackBounds = nil,
     },
-    carry = {
+    Carry = {
         Socket = 'LiftSocket',
         Offset = { x = 0, y = 1.6, z = 2.0 },
         HostHalfHeight = 1.2,
@@ -856,25 +856,25 @@ game_cfg.Ability = {
         FallDamage = 0,
     },
     Aquatic = {
-        LeapIntervalSec = boss_moves.Get('mosasaur', 'leap').Schedule.Sec,
+        LeapIntervalSec = BossMoves.Get('mosasaur', 'leap').Schedule.Sec,
         LeapWindupSec = 1, LeapSec = 1.5, LeapHeight = 8,
-        LeapRadius = boss_moves.Get('mosasaur', 'leap').Range,
-        LeapDamage = boss_moves.Get('mosasaur', 'leap').Damage.Value,
-        HeadRadius = boss_moves.Get('mosasaur', 'head').Range,
-        HeadWindupSec = boss_moves.Get('mosasaur', 'head').Warning.WindupSec,
-        HeadDamage = boss_moves.Get('mosasaur', 'head').Damage.Value,
-        GrabDamage = boss_moves.Get('mosasaur', 'bite').Damage.Value,
-        ContactDamage = boss_moves.Get('mosasaur', 'contact').Damage.Value,
-        ContactRange = boss_moves.Get('mosasaur', 'contact').Range,
+        LeapRadius = BossMoves.Get('mosasaur', 'leap').Range,
+        LeapDamage = BossMoves.Get('mosasaur', 'leap').Damage.Value,
+        HeadRadius = BossMoves.Get('mosasaur', 'head').Range,
+        HeadWindupSec = BossMoves.Get('mosasaur', 'head').Warning.WindupSec,
+        HeadDamage = BossMoves.Get('mosasaur', 'head').Damage.Value,
+        GrabDamage = BossMoves.Get('mosasaur', 'bite').Damage.Value,
+        ContactDamage = BossMoves.Get('mosasaur', 'contact').Damage.Value,
+        ContactRange = BossMoves.Get('mosasaur', 'contact').Range,
     },
-    boss_phase = {
-        Thresholds = boss_moves.Phases.godzilla.Thresholds,
-        AttackSets = boss_moves.Phases.godzilla.AttackSets,
-        Attacks = boss_moves.AttackTable('godzilla'),
+    BossPhase = {
+        Thresholds = BossMoves.Phases.godzilla.Thresholds,
+        AttackSets = BossMoves.Phases.godzilla.AttackSets,
+        Attacks = BossMoves.AttackTable('godzilla'),
         Species = { fish56Boss = true },
         Chase = { BiteRange = 4, BiteCooldownSec = 2 },
     },
-    special_item = {
+    SpecialItem = {
         Items = { item169 = 'wings', item170 = 'godzilla' },
         ReLimitSec = 0.1,
         Wings = {
@@ -900,43 +900,43 @@ game_cfg.Ability = {
 
 -- 判定语义见 common/math_water_judge.lua。标记 Position.y 是底面，水面 SurfaceY = Position.y + Size.y；
 -- 运行时 Size 已含 Scale，半宽直接取 Size/2（#12 W-4、#31 实测）。
-game_cfg.Water = { Zones = {}, ZoneIdByWater = {}, ContentWaterIds = {} }
+GameCfg.Water = { Zones = {}, ZoneIdByWater = {}, ContentWaterIds = {} }
 
-game_cfg.Ferry.Routes = {}
+GameCfg.Ferry.Routes = {}
 local ferryLegGeometry = { BoatRange = 6, Radius = 5, Slack = 0.5, BubbleHeight = 6 }
 local returnPrices = { 10, 30, 90, 270, 810, 2430 }
 for index = 1, 6 do
-    local from, to = game_cfg.Zones[index], game_cfg.Zones[index + 1]
+    local from, to = GameCfg.Zones[index], GameCfg.Zones[index + 1]
     local outbound = { AnchorName = index == 1 and 'FerryBoat' or ('Z' .. index .. '_FerryOut'),
-        Ticket = game_cfg.Content.Exchanges[index].Result, CountdownSec = 5, Zone = to.Id }
+        Ticket = GameCfg.Content.Exchanges[index].Result, CountdownSec = 5, Zone = to.Id }
     local back = { AnchorName = index == 1 and 'FerryReturn' or ('Z' .. (index + 1) .. '_FerryReturn'),
         Price = returnPrices[index], Zone = from.Id }
     for key, value in pairs(ferryLegGeometry) do outbound[key], back[key] = value, value end
-    game_cfg.Ferry.Routes[index] = { Id = from.Id .. '>' .. to.Id,
+    GameCfg.Ferry.Routes[index] = { Id = from.Id .. '>' .. to.Id,
         FromZoneId = from.Id, ToZoneId = to.Id, Outbound = outbound, Return = back }
 end
-game_cfg.Ferry.HomeZone = game_cfg.Zones[1].Id
-game_cfg.Ferry.Outbound = game_cfg.Ferry.Routes[1].Outbound
-game_cfg.Ferry.Return = game_cfg.Ferry.Routes[1].Return
-function game_cfg.Ferry.Route(routeId)
+GameCfg.Ferry.HomeZone = GameCfg.Zones[1].Id
+GameCfg.Ferry.Outbound = GameCfg.Ferry.Routes[1].Outbound
+GameCfg.Ferry.Return = GameCfg.Ferry.Routes[1].Return
+function GameCfg.Ferry.Route(routeId)
     if type(routeId) ~= 'string' then return nil end
-    for _, route in ipairs(game_cfg.Ferry.Routes) do
+    for _, route in ipairs(GameCfg.Ferry.Routes) do
         if route.Id == routeId then return route end
     end
 end
 
-game_cfg.Interact.Fishermen = {}
-for index, chain in ipairs(game_cfg.Content.Exchanges) do
-    local zone = game_cfg.Zones[index]
+GameCfg.Interact.Fishermen = {}
+for index, chain in ipairs(GameCfg.Content.Exchanges) do
+    local zone = GameCfg.Zones[index]
     local fishermanName = index == 1 and 'TGUnitFish' or index == 2 and 'TGUnitFishShrimp' or ('Z' .. index .. '_Fisherman')
-    game_cfg.Interact.Fishermen[index] = {
+    GameCfg.Interact.Fishermen[index] = {
         ZoneId = zone.Id, AnchorNames = { fishermanName },
         ModelName = index == 1 and 'FishermanModel' or ('Z' .. index .. '_FishermanModel'),
         Exchange = { [chain.EliteToken] = chain.BossBait, [chain.BossToken] = chain.Result }, Chain = index,
     }
 end
 
-game_cfg.Grill = {
+GameCfg.Grill = {
     Radius = 2, Slack = 0.5, BubbleHeight = 2.5, RiseSec = 2, HoldSec = 0.5, FallSec = 2,
     MaxRate = 1.5, BurnSec = 4.5, BurnDamage = 30, BurnRadius = 3, BubbleText = '烧烤',
     NoFishText = '你没有可烤的鱼', BurntText = '你的鱼烤糊了！', CookedPrefix = '烤',
@@ -944,19 +944,19 @@ game_cfg.Grill = {
     FullText = '背包已满，烤好的鱼先留在烤炉上', TakeoutText = '取出',
     source = '策划案--渔力全开.docx#烧烤',
 }
-game_cfg.Grill.Points = {}
-for index = 3, #game_cfg.Zones do
-    game_cfg.Grill.Points[#game_cfg.Grill.Points + 1] = {
-        ZoneId = game_cfg.Zones[index].Id, AnchorName = 'Z' .. index .. '_Grill',
+GameCfg.Grill.Points = {}
+for index = 3, #GameCfg.Zones do
+    GameCfg.Grill.Points[#GameCfg.Grill.Points + 1] = {
+        ZoneId = GameCfg.Zones[index].Id, AnchorName = 'Z' .. index .. '_Grill',
     }
 end
 
-game_cfg.HighFreqInput = {
+GameCfg.HighFreqInput = {
     WindowSec = 1.0,
     MaxCount = 10,
     AggregateSec = 0.1,
 }
-game_cfg.ReelIn = {
+GameCfg.ReelIn = {
     Initial = 50,
     DecayPerSec = 5,
     ClickGain = 5,
@@ -969,7 +969,7 @@ game_cfg.ReelIn = {
 -- RenderMeshId 的写法：**official://mesh/<模型号>**；PhysicsMeshId 创建时可省略，缺省就取 RenderMeshId
 --   反面样例：official://preset/9000092 也能建出来，但那是空壳（Size=(1,1,1)、无几何）——
 --   别拿预设号当 mesh id。
-game_cfg.fish_carrier = {
+GameCfg.FishCarrier = {
     Models = {
         ["7000544"] = { Name = "大马哈鱼", Mesh = "official://mesh/7000544", Preset = "official://preset/9000092" },
         ["7000545"] = { Name = "旗鱼",    Mesh = "official://mesh/7000545", Preset = "official://preset/9000093" },
@@ -994,7 +994,7 @@ game_cfg.fish_carrier = {
     },
 }
 
-game_cfg.damage_float = {
+GameCfg.DamageFloat = {
     DurationSec = 1,
     RisePixels = 90,
     SpreadPixels = 32,
@@ -1008,7 +1008,7 @@ game_cfg.damage_float = {
     PoolSize = 24,
 }
 
-game_cfg.FishCombatLabel = {
+GameCfg.FishCombatLabel = {
     MovingRefreshSec = 0.5,
     HeadHeight = 2.4,
     Width = 640,
@@ -1020,7 +1020,7 @@ game_cfg.FishCombatLabel = {
     IdleColor = { 255, 255, 255, 255 },
 }
 
-game_cfg.placeholder_assets = require('common.cfg.placeholder_assets')
-game_cfg.placeholder_assets.Apply(game_cfg)
+GameCfg.PlaceholderAssets = require('common.cfg.placeholder_assets')
+GameCfg.PlaceholderAssets.Apply(GameCfg)
 
-return game_cfg
+return GameCfg

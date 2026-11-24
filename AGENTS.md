@@ -21,9 +21,9 @@
 
 ## 修改边界
 
-- **服务端宿主**：宿主服务放在 `server/` 对应职责模块，标记 `SpokeHost = true` 并由 `server/main.lua` 显式注入 `server_runtime`；运行时统一管理启动、玩家加入/离场、帧更新与清理，不恢复 `MgrMap`。
-- **界面**：视图放在 `client/views/`，由 `root_view` 的 Spoke 视图树统一建点和清理，经 `client_store` 读取状态；不恢复 `MgrGameUI` 或旧 `ScreenHandlers` 双轨入口。
-- **共享配置**：数值配置集中在 `common/game_cfg.lua`；技能配置在 `game_cfg.Ability`。
+- **服务端宿主**：宿主服务放在 `server/` 对应职责模块，标记 `SpokeHost = true` 并由 `server/main.lua` 显式注入 `ServerRuntime`；运行时统一管理启动、玩家加入/离场、帧更新与清理，不恢复 `MgrMap`。
+- **界面**：视图放在 `client/views/`，由 `RootView` 的 Spoke 视图树统一建点和清理，经 `ClientStore` 读取状态；不恢复 `MgrGameUI` 或旧 `ScreenHandlers` 双轨入口。
+- **共享配置**：数值配置集中在 `common/game_cfg.lua`；技能配置在 `GameCfg.Ability`。
 - **生成内容**：`data/` 只读，修改须回编辑器重新导出，再用 `sync` 回灌；`unit_scripts/` 由引擎生成，不在本仓库管理。
 
 <!-- [teamai:culture:start] -->
