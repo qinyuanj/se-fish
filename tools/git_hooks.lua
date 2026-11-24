@@ -4,9 +4,11 @@ local exit_code = require('tools.exit_code')
 
 local M = {}
 
+M.MANAGED_HEADER = '# 由 lua tools/cli.lua git-hook-init 安装'
+
 M.HOOK_BODY = table.concat({
   '#!/bin/sh',
-  '# 由 lua tools/cli.lua git-hook-init 安装；不同内容的既有 hook 不会被覆盖。',
+  M.MANAGED_HEADER .. '；不同内容的既有 hook 不会被覆盖。',
   'repo_root=$(git rev-parse --show-toplevel) || exit 1',
   'cd "$repo_root" || exit 1',
   'lua tools/cli.lua test guards || exit $?',
@@ -18,7 +20,7 @@ function M.usage()
   return table.concat({
     '用法: lua tools/cli.lua git-hook-init [--root <检出根>]',
     '  安装本地 pre-commit，提交前依次运行 lua tools/cli.lua test guards 与 lua tools/cli.lua emmylua。',
-    '  --root  目标检出根，默认当前仓库；重复执行幂等，不覆盖其他 hook。',
+    '  --root  目标检出根，默认当前仓库；重复执行幂等，自家旧版 hook 自动升级，不覆盖其他 hook。',
   }, '\n') .. '\n'
 end
 
@@ -49,13 +51,24 @@ local function read_file(path)
   return body
 end
 
+local function is_managed(body)
+  for line in tostring(body or ''):gmatch('[^\r\n]+') do
+    if line:sub(1, #M.MANAGED_HEADER) == M.MANAGED_HEADER then
+      return true
+    end
+  end
+  return false
+end
+
 function M.install(root)
   local path, err, code = M.hook_path(root)
   if not path then return nil, err, code end
   local existing = read_file(path)
   if existing ~= nil then
     if existing == M.HOOK_BODY then return path, 'unchanged', 0 end
-    return nil, '已有不同的 pre-commit，拒绝覆盖: ' .. path, 1
+    if not is_managed(existing) then
+      return nil, '已有不同的 pre-commit，拒绝覆盖: ' .. path, 1
+    end
   end
   seam.ensure_dir(path:match('^(.*)/[^/]+$'))
   local partial = path .. '.partial'
@@ -66,6 +79,23 @@ function M.install(root)
   if not write_ok or close_ok == nil then
     os.remove(partial)
     return nil, '写入 pre-commit 失败: ' .. tostring(write_err or close_err), 1
+  end
+  if existing ~= nil then
+    local backup = path .. '.bak'
+    os.remove(backup)
+    local bak_ok, bak_err = os.rename(path, backup)
+    if not bak_ok then
+      os.remove(partial)
+      return nil, '备份既有 pre-commit 失败: ' .. tostring(bak_err), 1
+    end
+    local ok, rename_err = os.rename(partial, path)
+    if not ok then
+      os.rename(backup, path)
+      os.remove(partial)
+      return nil, '升级 pre-commit 失败: ' .. tostring(rename_err), 1
+    end
+    os.remove(backup)
+    return path, 'updated', 0
   end
   local ok, rename_err = os.rename(partial, path)
   if not ok then
@@ -102,7 +132,9 @@ function M.main(args, env)
     io.stderr:write('git-hook-init: ' .. tostring(result) .. '\n')
     return code or 1
   end
-  io.stdout:write((result == 'unchanged' and '跳过 pre-commit（已安装）: ' or '安装 pre-commit: ') .. path .. '\n')
+  local label = result == 'unchanged' and '跳过 pre-commit（已安装）: '
+    or (result == 'updated' and '升级 pre-commit: ' or '安装 pre-commit: ')
+  io.stdout:write(label .. path .. '\n')
   return 0
 end
 

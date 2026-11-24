@@ -9,6 +9,8 @@ local exit_code = require("tools.exit_code")
 local M = {}
 
 M.VERSION = "0.25.1"
+M.RELEASE_URL = "https://github.com/EmmyLuaLs/emmylua-analyzer-rust/releases/download/"
+  .. M.VERSION .. "/emmylua_check-win32-x64.zip"
 M.CONFIG = ".emmyrc.json"
 M.BASELINE = "tools/emmylua_baseline.txt"
 -- 门禁扫描范围（ADR-0038）：.emmyrc.json 管诊断规则，这里只管 CLI 门禁范围；
@@ -142,7 +144,8 @@ function M.main(args, env)
   local exe = seam.which("emmylua_check")
   if not exe then
     exit_code.unavailable("emmylua: PATH 上找不到 emmylua_check " .. M.VERSION
-      .. "；安装: cargo install emmylua_check --version " .. M.VERSION .. " --locked")
+      .. "；下载预编译包解压入 PATH: " .. M.RELEASE_URL
+      .. " ，或执行: cargo install emmylua_check --version " .. M.VERSION .. " --locked")
   end
   local vcode, vout = seam.capture({ argv = { exe, "--version" } })
   if vcode ~= 0 or not tostring(vout):find(M.VERSION, 1, true) then

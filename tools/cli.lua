@@ -95,7 +95,7 @@ local function usage()
   lines[#lines + 1] = "  0 成功"
   lines[#lines + 1] = "  1 业务失败（含测试失败：busted 的任何非 0 退出码都收成 1）"
   lines[#lines + 1] = "  2 用法错误（未知子命令、模块加载失败、未知参数）"
-  lines[#lines + 1] = "  3 外部工具不可用（busted / editor-cli / Blender / robocopy / curl 缺失）"
+  lines[#lines + 1] = "  3 外部工具不可用（busted / editor-cli / Blender / robocopy / curl / emmylua_check 缺失）"
   lines[#lines + 1] = ""
   lines[#lines + 1] = "  lua tools/cli.lua <子命令> --help   子命令帮助"
   return table.concat(lines, "\n") .. "\n"
