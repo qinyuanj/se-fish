@@ -162,7 +162,7 @@ function Validate.check(cfg)
     check_ledger(cfg, fail, activeGoods)
     local counts = { zones = #(cfg.Zones or {}), fish = count(fish), items = count(items), shop = #goods,
         lottery = #lottery, blindbox = #blindbox, lotteryWeight = lotteryWeight, blindboxWeight = blindboxWeight }
-    for field, expected in pairs({ zones = 7, fish = 98, items = 171, shop = 50, lottery = 7,
+    for field, expected in pairs({ zones = 7, fish = 98, items = 172, shop = 50, lottery = 7,
         blindbox = 42, lotteryWeight = 100, blindboxWeight = 1000 }) do
         if counts[field] ~= expected then fail('GameSpec.md#19', field .. ' 数量/权重应为 ' .. expected .. '，实际 ' .. counts[field]) end
     end
