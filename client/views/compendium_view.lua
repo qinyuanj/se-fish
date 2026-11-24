@@ -1,6 +1,6 @@
 local GameCfg = require("common.game_cfg")
 local Records = require("common.records")
-local Modal = require("client.Views.EconomyModal")
+local Modal = require("client.views.economy_modal")
 local CompendiumView = {}
 
 local GRADES = { normal = "普通", rare = "极品", elite = "精英", boss = "首领" }

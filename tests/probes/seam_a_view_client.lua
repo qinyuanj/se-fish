@@ -11,7 +11,7 @@
 local StarterGui = game:GetService('StarterGui')
 local cams = game:GetService('CameraService')
 local cam = cams.LiveCamera or cams.MainCamera
-local root = require('client.GameUI'):GetUIRoot()
+local root = require('client.game_ui'):GetUIRoot()
 local args = _G.SeamAView or {}
 local function log(...) print('SEAMA_VIEW', ...) end
 if not cam then log('ABORT 没有相机') return end

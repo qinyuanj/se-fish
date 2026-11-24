@@ -1,7 +1,7 @@
 local GameCfg = require("common.game_cfg")
-local ClientStore = require("client.Store.ClientStore")
-local RootView = require("client.Views.RootView")
-local FishermanView = require("client.Views.FishermanView")
+local ClientStore = require("client.store.client_store")
+local RootView = require("client.views.root_view")
+local FishermanView = require("client.views.fisherman_view")
 local Eui = require("tests.support.eui_double")
 
 local function model(scale) return { Scale = { x = scale, y = scale, z = scale } } end

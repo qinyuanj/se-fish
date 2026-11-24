@@ -7,10 +7,10 @@
 
 local Eui = require("tests.support.eui_double")
 local GameCfg = require("common.game_cfg")
-local MainHudLayout = require("client.MainHudLayout")
-local ClientStore = require("client.Store.ClientStore")
-local RootView = require("client.Views.RootView")
-local MainHudVitalsView = require("client.Views.MainHudVitalsView")
+local MainHudLayout = require("client.main_hud_layout")
+local ClientStore = require("client.store.client_store")
+local RootView = require("client.views.root_view")
+local MainHudVitalsView = require("client.views.main_hud_vitals_view")
 
 local function assert_at(node, rect, label)
   assert.is_not_nil(node, label)

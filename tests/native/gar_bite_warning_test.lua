@@ -2,9 +2,9 @@
 -- 失败方式：
 
 local Eui = require('tests.support.eui_double')
-local ClientStore = require('client.Store.ClientStore')
-local RootView = require('client.Views.RootView')
-local FishCombatView = require('client.Views.FishCombatView')
+local ClientStore = require('client.store.client_store')
+local RootView = require('client.views.root_view')
+local FishCombatView = require('client.views.fish_combat_view')
 local SpokeClock = require('common.spoke_clock')
 local GarBiteNotice = require('common.gar_bite_notice')
 local GameCfg = require('common.game_cfg')

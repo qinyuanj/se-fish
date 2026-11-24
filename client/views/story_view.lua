@@ -1,4 +1,4 @@
-local ViewUtil = require("client.Views.ViewUtil")
+local ViewUtil = require("client.views.view_util")
 local StoryView = {}
 
 function StoryView.modal_spec(options)

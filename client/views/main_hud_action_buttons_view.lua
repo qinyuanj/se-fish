@@ -1,4 +1,4 @@
--- Spoke 主 HUD 右侧动作键视图（ADR-0032 / #297-B3b1，归属 L2 client.Views）：
+-- Spoke 主 HUD 右侧动作键视图（ADR-0032 / #297-B3b1，归属 L2 client.views）：
 -- 挂载于 RootView 常驻 HUD 槽位，订阅只读 ClientStore.item_bar / cast / special_item / hud_visible；
 -- 负责右侧 ItemDiscard（丢弃/确认丢弃）与 ItemAction2（抛竿/收竿/点击收线/已上岸/放下/手持与吃/长按飞行/原子吐息冷却）
 -- 的排版、文案、呼吸高亮色、交互上行 RE 与 backpack_open 展开遮挡隐藏；
@@ -7,8 +7,8 @@
 local spoke = require("common.packages.spoke.api")
 local GameCfg = require("common.game_cfg")
 local Number = require("common.number")
-local MainHudLayout = require("client.MainHudLayout")
-local ViewUtil = require("client.Views.ViewUtil")
+local MainHudLayout = require("client.main_hud_layout")
+local ViewUtil = require("client.views.view_util")
 
 local State = spoke.State
 

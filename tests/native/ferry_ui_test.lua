@@ -28,7 +28,7 @@ describe('客户端摆渡统一视图树（RootView × ClientStore）', function
   before_each(function()
     restore = { Vector2 = rawget(_G, 'Vector2'), Vector3 = rawget(_G, 'Vector3'),
       Color = rawget(_G, 'Color'), modules = {} }
-    for _, name in ipairs({ 'common.game_cfg', 'client.Store.ClientStore', 'client.Views.FerryView' }) do
+    for _, name in ipairs({ 'common.game_cfg', 'client.store.client_store', 'client.views.ferry_view' }) do
       restore.modules[name] = package.loaded[name]
       package.loaded[name] = nil
     end
@@ -45,9 +45,9 @@ describe('客户端摆渡统一视图树（RootView × ClientStore）', function
         if entity.Role == 'Ferry' then env.anchor_positions[entity.Name] = entity.Position end
       end
     end
-    local ClientStore = require('client.Store.ClientStore')
-    local RootView = require('client.Views.RootView')
-    local FerryView = require('client.Views.FerryView')
+    local ClientStore = require('client.store.client_store')
+    local RootView = require('client.views.root_view')
+    local FerryView = require('client.views.ferry_view')
     env.store, env.writer = ClientStore.new({ initial_now = 100 })
     env.root = Eui.Node({ Name = 'UIRoot' })
     env.view = RootView.mount(env.root, env.store, {

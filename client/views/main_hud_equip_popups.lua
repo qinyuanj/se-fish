@@ -1,4 +1,4 @@
--- Spoke 主 HUD 武器栏/鱼饵栏及其展开浮层视图（ADR-0032 / #297-B3a，归属 L2 client.Views）：
+-- Spoke 主 HUD 武器栏/鱼饵栏及其展开浮层视图（ADR-0032 / #297-B3a，归属 L2 client.views）：
 -- 挂载于 RootView 常驻 HUD 槽位，订阅只读 ClientStore.item_bar；
 -- 武器栏与鱼饵栏常驻底部栏位，展开浮层由 Phase + Dock 管理候选格生命周期；
 -- 点击遮罩、切换另一栏、选择候选、打开背包、重连或根 UI 销毁均自动零残留销毁节点与连接。
@@ -6,8 +6,8 @@
 local spoke = require("common.packages.spoke.api")
 local GameCfg = require("common.game_cfg")
 local Number = require("common.number")
-local MainHudLayout = require("client.MainHudLayout")
-local ViewUtil = require("client.Views.ViewUtil")
+local MainHudLayout = require("client.main_hud_layout")
+local ViewUtil = require("client.views.view_util")
 
 local Effect = spoke.Effect
 local State = spoke.State

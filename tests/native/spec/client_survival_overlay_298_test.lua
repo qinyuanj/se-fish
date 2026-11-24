@@ -1,8 +1,8 @@
 
 local GameCfg = require("common.game_cfg")
-local ClientStore = require("client.Store.ClientStore")
-local RootView = require("client.Views.RootView")
-local SurvivalOverlayView = require("client.Views.SurvivalOverlayView")
+local ClientStore = require("client.store.client_store")
+local RootView = require("client.views.root_view")
+local SurvivalOverlayView = require("client.views.survival_overlay_view")
 local Eui = require("tests.support.eui_double")
 
 local function mount(store, sent)

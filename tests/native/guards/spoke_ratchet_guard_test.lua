@@ -1,6 +1,6 @@
 -- Spoke 原生重构机械棘轮守卫（#294 / ADR-0032 §4、§5）：
 -- 失败方式先列：
---   1. 新 Spoke 命名空间（common.spoke_clock、server.WorldHost.*、client.Store.*、client.Views.*）
+--   1. 新 Spoke 命名空间（common.spoke_clock、server.WorldHost.*、client.store.*、client.views.*）
 --      反向 require 存量旧债务模块（server.Mgr.*、server.AbilityAPI、server.AbilityBehaviors.*、
 --      client.MgrGameUI、client.ScreenHandlers.*、client.Local*、common.OwnedUnits）→ 破坏单向棘轮；
 --   2. 就地修改 common/packages/spoke/ 或 common/packages/spoke_eggy/ 或与 docs/packages-reference.md
@@ -113,8 +113,8 @@ end
 local function is_spoke_namespace_file(path)
   return path == "common/spoke_clock.lua"
     or path:match("^server/WorldHost/") ~= nil
-    or path:match("^client/Store/") ~= nil
-    or path:match("^client/Views/") ~= nil
+    or path:match("^client/store/") ~= nil
+    or path:match("^client/views/") ~= nil
 end
 
 local function format_breakdown(items)
@@ -314,9 +314,9 @@ describe("Spoke 原生重构机械棘轮守卫", function()
           "server.Data.PlayerData",
           "server.WorldHost.PlayerTree",
           "server.AbilityBehaviors.melee_hit",
-          "client.GameUI",
-          "client.Store.ClientStore",
-          "client.Views.RootView",
+          "client.game_ui",
+          "client.store.client_store",
+          "client.views.root_view",
           "server.AbilityAPI",
         },
         edges = {
@@ -324,9 +324,9 @@ describe("Spoke 原生重构机械棘轮守卫", function()
           { from = "server.WorldHost.PlayerTree", to = "common.spoke_clock" },
           { from = "server.WorldHost.PlayerTree", to = "server.Data.PlayerData" },
           { from = "server.AbilityBehaviors.melee_hit", to = "server.WorldHost.PlayerTree" },
-          { from = "client.Store.ClientStore", to = "common.spoke_clock" },
-          { from = "client.Views.RootView", to = "client.Store.ClientStore" },
-          { from = "client.Views.RootView", to = "client.GameUI" },
+          { from = "client.store.client_store", to = "common.spoke_clock" },
+          { from = "client.views.root_view", to = "client.store.client_store" },
+          { from = "client.views.root_view", to = "client.game_ui" },
           { from = "server.AbilityAPI", to = "server.WorldHost.PlayerTree" },
         },
       })
@@ -335,11 +335,11 @@ describe("Spoke 原生重构机械棘轮守卫", function()
       local invalid_edges = {
         { from = "server.WorldHost.PlayerTree", to = "server.AbilityBehaviors.melee_hit" },
         { from = "server.WorldHost.PlayerTree", to = "server.AbilityAPI" },
-        { from = "client.Store.ClientStore", to = "client.Views.RootView" },
-        { from = "client.Views.RootView", to = "client.MgrGameUI" },
-        { from = "client.Views.RootView", to = "client.ScreenHandlers.ScreenMain" },
-        { from = "client.Views.ReelOverlayView", to = "client.LocalMotorUnitCtrl" },
-        { from = "client.Views.RootView", to = "common.OwnedUnits" },
+        { from = "client.store.client_store", to = "client.views.root_view" },
+        { from = "client.views.root_view", to = "client.MgrGameUI" },
+        { from = "client.views.root_view", to = "client.ScreenHandlers.ScreenMain" },
+        { from = "client.views.reel_overlay_view", to = "client.LocalMotorUnitCtrl" },
+        { from = "client.views.root_view", to = "common.OwnedUnits" },
         { from = "common.spoke_clock", to = "common.OwnedUnits" },
       }
       for _, edge in ipairs(invalid_edges) do

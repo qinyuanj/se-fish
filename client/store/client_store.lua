@@ -1,4 +1,4 @@
--- 客户端只读响应式状态仓库（ADR-0032 / #296，归属 L3 client.Store）：
+-- 客户端只读响应式状态仓库（ADR-0032 / #296，归属 L3 client.store）：
 -- 外围宿主入口持有 writer，将服务端下行 RemoteEvent 与本地角色位置/钓鱼区传感器归一化写入纯 Spoke State/Trigger；
 -- 视图层与旧界面仅持有只读 store，只能通过 s:d / s:subscribe 订阅，无法反向修改仓库内部写入入口。
 

@@ -1,6 +1,6 @@
-local MainHudLayout = require("client.MainHudLayout")
-local Modal = require("client.Views.EconomyModal")
-local ViewUtil = require("client.Views.ViewUtil")
+local MainHudLayout = require("client.main_hud_layout")
+local Modal = require("client.views.economy_modal")
+local ViewUtil = require("client.views.view_util")
 local GuideView = {}
 
 function GuideView.spec(options)

@@ -1,4 +1,4 @@
--- Spoke 相机距离投影视图（ADR-0032 / #297-B，归属 L2 client.Views，取代旧 client/LocalAttr.lua）：
+-- Spoke 相机距离投影视图（ADR-0032 / #297-B，归属 L2 client.views，取代旧 client/LocalAttr.lua）：
 -- 订阅只读 ClientStore 的本地角色与归一化 CameraDistance，按角色体型缩放更新 MainCamera.Distance；
 -- 若检测到玩家或其它系统手动修改过相机距离则自动让权，角色更换或作用域清理时恢复初始距离。
 

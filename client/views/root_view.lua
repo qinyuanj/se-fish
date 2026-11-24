@@ -1,4 +1,4 @@
--- 统一客户端 Spoke 根视图树主干（ADR-0032 / #296，归属 L2 client.Views）：
+-- 统一客户端 Spoke 根视图树主干（ADR-0032 / #296，归属 L2 client.views）：
 -- 挂载于宿主根 UI 节点，经 spoke_eggy.behaviour 绑定 Unit -> Tree 生命周期；
 -- 树内所有动态创建子节点与局部信号均通过 ctx.create_node / ctx.own_node / ctx.connect 在同作用域 on_cleanup 对称释放；
 -- 统一承载常驻 HUD、互斥模态弹窗 Phase、覆盖蒙版 Phase、动态集合 Dock，并在 store.on_reconnect 时整体干净重建。

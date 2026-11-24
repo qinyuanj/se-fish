@@ -9,14 +9,14 @@
 local spoke = require("common.packages.spoke.api")
 local Eui = require("tests.support.eui_double")
 local GameCfg = require("common.game_cfg")
-local MainHudLayout = require("client.MainHudLayout")
-local ClientStore = require("client.Store.ClientStore")
-local RootView = require("client.Views.RootView")
-local MainHudBackpackView = require("client.Views.MainHudBackpackView")
-local MainHudEquipPopups = require("client.Views.MainHudEquipPopups")
-local MainHudItemBarView = require("client.Views.MainHudItemBarView")
-local MainHudVitalsView = require("client.Views.MainHudVitalsView")
-local MainHudActionButtonsView = require("client.Views.MainHudActionButtonsView")
+local MainHudLayout = require("client.main_hud_layout")
+local ClientStore = require("client.store.client_store")
+local RootView = require("client.views.root_view")
+local MainHudBackpackView = require("client.views.main_hud_backpack_view")
+local MainHudEquipPopups = require("client.views.main_hud_equip_popups")
+local MainHudItemBarView = require("client.views.main_hud_item_bar_view")
+local MainHudVitalsView = require("client.views.main_hud_vitals_view")
+local MainHudActionButtonsView = require("client.views.main_hud_action_buttons_view")
 
 local State = spoke.State
 

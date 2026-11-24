@@ -12,7 +12,7 @@ local Cfg = require('common.game_cfg')
 local M = {}
 
 local MODULES = { 'server.WorldHost.FishCarrier', 'server.WorldHost.FishTree',
-    'common.re_util', 'client.Views.GarBiteWarning' }
+    'common.re_util', 'client.views.GarBiteWarning' }
 local GLOBALS = { 'game', 'Vector3', 'Quaternion', 'REUtil', 'Color', 'RemoteEvent' }
 
 local function signal()

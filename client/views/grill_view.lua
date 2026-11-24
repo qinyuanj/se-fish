@@ -3,7 +3,7 @@ local BodyScale = require("common.body_scale")
 local GameCfg = require("common.game_cfg")
 local GrillCurve = require("common.grill_curve")
 local spoke = require("common.packages.spoke.api")
-local ViewUtil = require("client.Views.ViewUtil")
+local ViewUtil = require("client.views.view_util")
 
 local State = spoke.State
 
