@@ -46,6 +46,7 @@ M.commands = {
   { name = "worktree-init", mod = "tools.worktree_init", summary = "把新 worktree 补齐到能跑 test full（复制上游 blender-* skill、安装 pre-commit；幂等）" },
   { name = "git-hook-init", mod = "tools.git_hooks", summary = "安装本地 pre-commit（提交前运行 test guards；幂等且不覆盖其他 hook）" },
   { name = "screenshot", mod = "tools.screenshot", summary = "抓画面存 PNG（缺省后台 PrintWindow，窗口被遮挡也能取当前帧）；--info 只报显示路径与选中的窗口" },
+  { name = "editor", mod = "tools.editor", summary = "打开、查看、停止编辑器与地图：editor [open|status|stop] [--map <id|目录>]" },
 }
 
 -- 被 require（如测试读路由表）时只交出路由表，不执行入口流程。
