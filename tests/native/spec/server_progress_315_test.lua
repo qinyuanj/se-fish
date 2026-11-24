@@ -545,10 +545,10 @@ describe("服务端旧进度玩法的公开宿主等价迁移（#315）", functi
   end)
 
   it("图鉴/任务/剧情/成就已移除无调用的 Start 死代码，且非每帧模块不订阅 on_frame", function()
-    assert.is_nil(require("server.World.PlayerCompendium").Start)
-    assert.is_nil(require("server.World.PlayerQuest").Start)
-    assert.is_nil(require("server.World.PlayerStory").Start)
-    assert.is_nil(require("server.World.PlayerAchievements").Start)
+    assert.is_nil(require("server.WorldHost.PlayerCompendium").Start)
+    assert.is_nil(require("server.WorldHost.PlayerQuest").Start)
+    assert.is_nil(require("server.WorldHost.PlayerStory").Start)
+    assert.is_nil(require("server.WorldHost.PlayerAchievements").Start)
 
     assert.is_true(world:landing("bass", 1.5, 99))
     local beforeWrites = world.recordWrites

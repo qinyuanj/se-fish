@@ -142,7 +142,7 @@ describe('条款 9 PK 伤害过滤', function()
     env.players = assert(loadfile('server/PlayerDataHost.lua'))()
     env.save = assert(loadfile('server/SaveHost.lua'))()
     env.players.Save, env.save.PlayerData = env.save, env.players
-    env.filter = require('server.World.PkDamageFilter').make({
+    env.filter = require('server.WorldHost.PkDamageFilter').make({
       party = env.party, zone_markers = require('common.ZoneMarkers'), zones = env.cfg.Zones,
     })
     -- 生产装配：过滤接缝与区域真源都经 mgr 注入，不缓存队伍归属。

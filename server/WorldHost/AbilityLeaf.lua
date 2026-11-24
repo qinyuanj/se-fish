@@ -4,7 +4,7 @@
 --   2. 将 PlayerTree 的 can_act 守卫以回调形式注入施法门控（零反向依赖 server.AbilityAPI）；
 --   3. 角色更换或树销毁时在 s:on_cleanup 中对称停止全部已装配技能并销毁能力管理器；
 --   4. 若管理器脚本首帧尚未就绪，依托 SpokeClock.on_frame 托管重试（随 on_cleanup 自动退订，零协程泄漏）。
--- 本模块归属 L2（server.World），零反向依赖存量旧债务模块，零新增 CreateUnit 建点。
+-- 本模块归属 L2（server.WorldHost），零反向依赖存量旧债务模块，零新增 CreateUnit 建点。
 
 local GameCfg = require("common.GameCfg")
 

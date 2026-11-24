@@ -5,7 +5,7 @@
 --   3. 单向写入 PlayerBodyScale / PlayerMaxHealth / PlayerWalkSpeed / PlayerHunger
 --      及 PlayerWeaponDamage_<melee|ranged|explosive> 四分量（Base/BaseExtra/Ratio/Bonus）；
 --   4. 单向投影角色 SetScale、CameraDistance / InteractRange / BodyScaleCapped 与 character.Controller.WalkSpeed。
--- 本模块归属 L2（server.World），零反向依赖存量旧债务模块。
+-- 本模块归属 L2（server.WorldHost），零反向依赖存量旧债务模块。
 
 local BodyScale = require("common.BodyScale")
 local GameCfg = require("common.GameCfg")

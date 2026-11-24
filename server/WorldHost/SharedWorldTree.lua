@@ -1,13 +1,13 @@
 -- 服务端共享世界 Auto SpokeTree（ADR-0032 §1 / #295）：
 -- 全局唯一宿主容器，按 GameCfg.Zones 顺序挂载 7 个钓鱼区子域骨架
 -- （地面物品、鱼饵刷新点、摆渡航线 Dock）与全局小队 SquadDock。
--- 本模块归属 L2（server.World），零反向依赖存量旧债务模块。
+-- 本模块归属 L2（server.WorldHost），零反向依赖存量旧债务模块。
 
 local GameCfg = require("common.GameCfg")
 local spoke = require("common.packages.spoke.api")
-local GroundLoot = require("server.World.GroundLoot")
-local FerryRoute = require("server.World.FerryRoute")
-local SquadDock = require("server.World.SquadDock")
+local GroundLoot = require("server.WorldHost.GroundLoot")
+local FerryRoute = require("server.WorldHost.FerryRoute")
+local SquadDock = require("server.WorldHost.SquadDock")
 
 local SpokeTree = spoke.SpokeTree
 local Effect = spoke.Effect

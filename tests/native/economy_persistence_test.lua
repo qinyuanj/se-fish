@@ -9,7 +9,7 @@
 -- 不使用 LuaUnit 断言桥。业务模块经 loadfile 加载，其 _ENV 是真实 _G，
 -- 故 Busted 逐文件沙箱下必须写 _G.game / _G.REUtil 而不是裸赋值。
 local GameCfg = require('common.GameCfg')
-local ServerRuntime = require('server.World.ServerRuntime')
+local ServerRuntime = require('server.WorldHost.ServerRuntime')
 local SpokeClock = require('common.SpokeClock')
 
 describe('TestEconomyPersistence', function()

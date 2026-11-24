@@ -179,7 +179,7 @@ describe('TestPlayerLeaveRejoin', function()
             end,
         }, { __index = _G })
         assert(loadfile('server/main.lua', 't', sandbox))()
-        env.runtime = require('server.World.ServerRuntime').current()
+        env.runtime = require('server.WorldHost.ServerRuntime').current()
         env.a = join(560)
         drain()
     end)

@@ -4,7 +4,7 @@
 local cfg = require('common.GameCfg')
 local ability = require('server.FishAbility')
 local pd = require('server.PlayerDataHost')
-local ServerRuntime = require('server.World.ServerRuntime')
+local ServerRuntime = require('server.WorldHost.ServerRuntime')
 local players, task = game:GetService('Players'), game:GetService('Task')
 local player = players:GetPlayers()[1]
 local data = player and pd:GetDataInst(player)

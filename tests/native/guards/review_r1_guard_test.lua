@@ -11,7 +11,7 @@ end
 
 describe("集成分支 R1 结构硬项", function()
   it("每条活鱼拥有 Auto SpokeTree 和 Lifted/Combat/Escaping Phase，且无集中 Update", function()
-    local source = slurp("server/World/FishTree.lua")
+    local source = slurp("server/WorldHost/FishTree.lua")
     for _, needle in ipairs({
       "SpokeTree.spawn", "LiftedPhase", "CombatPhase", "EscapingPhase",
       ".on_frame", "on_cleanup", "HolderTree",
@@ -25,21 +25,21 @@ describe("集成分支 R1 结构硬项", function()
   end)
 
   it("官方 AI 不保存反向控制状态，也不读取官方 BehaviorRuntime", function()
-    local source = slurp("server/World/FishAi.lua")
+    local source = slurp("server/WorldHost/FishAi.lua")
     for _, forbidden in ipairs({ "BehaviorRuntime", "Mgr.States", "HasActiveMove", "function Mgr:Sync" }) do
       assert.is_false(contains(source, forbidden), "FishAi 仍是反向控制层: " .. forbidden)
     end
   end)
 
   it("特殊道具按 selected 建独立 Phase，根作用域不常驻订阅 on_frame", function()
-    local source = slurp("server/World/SpecialItemPhase.lua")
+    local source = slurp("server/WorldHost/SpecialItemPhase.lua")
     assert.is_true(contains(source, '"WingsPhase"'))
     assert.is_true(contains(source, '"GodzillaPhase"'))
     assert.is_false(contains(source, "ps:subscribe(clock.on_frame"), "存活整个挂载期不得每帧 reconcile")
   end)
 
   it("GroundLoot 远程连接归世界树作用域且使用频控，不保留测试双生产回退", function()
-    local source = slurp("server/World/GroundLoot.lua")
+    local source = slurp("server/WorldHost/GroundLoot.lua")
     assert.is_false(contains(source, "_ground_action_bound"))
     assert.is_false(contains(source, "_ground_request_bound"))
     assert.is_true(contains(source, "CheckRECD"))
@@ -48,7 +48,7 @@ describe("集成分支 R1 结构硬项", function()
   end)
 
   it("生命模块保留重登一次性虚弱复活与离场终镜像结构，且无临时 DBG 调试输出", function()
-    local source = slurp("server/World/PlayerLife.lua")
+    local source = slurp("server/WorldHost/PlayerLife.lua")
     local code = Arch.code_only(source)
     local from = 1
     while true do

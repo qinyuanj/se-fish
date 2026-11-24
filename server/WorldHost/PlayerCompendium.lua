@@ -1,7 +1,7 @@
 local GameCfg = require('common.GameCfg')
 local FishCatch = require('common.FishCatch')
 local Records = require('common.Records')
-local SignalRouter = require('server.World.WorldSignalRouter')
+local SignalRouter = require('server.WorldHost.WorldSignalRouter')
 
 local Mgr = { Queues = {}, LastSeq = {}, KIND = 'compendium-land', MaxQueue = 16 }
 local isValidPlayer = SignalRouter.is_valid_player

@@ -4,7 +4,7 @@ local SpokeClock = require('common.SpokeClock')
 local spoke = require('common.packages.spoke.api')
 local PlayerData = require('server.Data.PlayerData')
 local SwingRegistry = require('server.SwingRegistry')
-local PlayerWeapon = require('server.World.PlayerWeapon')
+local PlayerWeapon = require('server.WorldHost.PlayerWeapon')
 
 local M = {}
 M.__index = M

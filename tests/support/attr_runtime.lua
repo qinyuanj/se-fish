@@ -49,7 +49,7 @@ function M.New(playerData, multiplier, opts)
     end
 
     local attrAPI = env.require('server.packages.attr_rule.api')
-    local AttrLeaf = env.require('server.World.AttrLeaf')
+    local AttrLeaf = env.require('server.WorldHost.AttrLeaf')
     local logFn = opts.log or print
 
     local mgr = {

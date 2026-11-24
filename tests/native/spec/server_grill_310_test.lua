@@ -1,6 +1,6 @@
 
 local GameCfg = require("common.GameCfg")
-local ServerRuntime = require("server.World.ServerRuntime")
+local ServerRuntime = require("server.WorldHost.ServerRuntime")
 local LotteryEligibility = require("common.LotteryEligibility")
 
 local FISH = "carp"

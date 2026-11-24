@@ -38,7 +38,7 @@ M.policy = {
     },
     {
       -- ADR-0032 服务端 Spoke 树（#295）与客户端 Spoke 视图树（#296）归属 L2。
-      ids = { 'server.AbilityBehaviors', 'client.Views', 'server.World' },
+      ids = { 'server.AbilityBehaviors', 'client.Views', 'server.WorldHost' },
       modules = {
         'server.AbilityAPI',
         'server.PlayerDataHost', 'server.SaveHost', 'server.PlatformHost', 'server.FishAbility',
@@ -59,7 +59,7 @@ M.policy = {
       name = 'spoke_no_legacy_reverse_dep',
       from = {
         '^common%.SpokeClock$',
-        '^server%.World$', '^server%.World%.',
+        '^server%.WorldHost$', '^server%.WorldHost%.',
         '^client%.Store$', '^client%.Store%.',
         '^client%.Views$', '^client%.Views%.',
       },

@@ -1,6 +1,6 @@
 
 local GameCfg = require("common.GameCfg")
-local ServerRuntime = require("server.World.ServerRuntime")
+local ServerRuntime = require("server.WorldHost.ServerRuntime")
 
 local function signal()
   local handlers = {}
@@ -366,7 +366,7 @@ describe("全局小队服务端宿主接缝（#314）", function()
   end)
 
   it("兼容 SE 引擎 userdata 玩家与 userdata Position 完成入队、邀请、建队与离场", function()
-    local SharedWorldTree = require("server.World.SharedWorldTree")
+    local SharedWorldTree = require("server.WorldHost.SharedWorldTree")
     local SpokeClock = require("common.SpokeClock")
     local clock = SpokeClock.new(100)
     local events = {}

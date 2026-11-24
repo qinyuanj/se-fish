@@ -39,8 +39,8 @@ describe('TestMeleeHitEffect', function()
     before_each(function()
         saved = { game = rawget(_G, 'game'), Vector3 = rawget(_G, 'Vector3'),
             Quaternion = rawget(_G, 'Quaternion'),
-            carrier = package.loaded['server.World.FishCarrier'],
-            gm = package.loaded['server.World.PlayerGM'],
+            carrier = package.loaded['server.WorldHost.FishCarrier'],
+            gm = package.loaded['server.WorldHost.PlayerGM'],
             ability = package.loaded['server.FishAbility'],
             api = package.loaded['server.AbilityAPI'], swing = package.loaded['server.SwingRegistry'] }
         ctx = { effects = {}, hitsApplied = {} }
@@ -59,8 +59,8 @@ describe('TestMeleeHitEffect', function()
                 return ctx.applyOk
             end,
         }
-        package.loaded['server.World.FishCarrier'] = { ResolveCarrier = function() return nil end }
-        package.loaded['server.World.PlayerGM'] = { GetMeleeDamage = function(_, _, d) return d end }
+        package.loaded['server.WorldHost.FishCarrier'] = { ResolveCarrier = function() return nil end }
+        package.loaded['server.WorldHost.PlayerGM'] = { GetMeleeDamage = function(_, _, d) return d end }
         package.loaded['server.FishAbility'] = { ApplyWeaponEffect = function()
             error('近战特效不应再经 MgrAbility 转发')
         end }
@@ -73,9 +73,9 @@ describe('TestMeleeHitEffect', function()
             local s = ctx.swing; ctx.swing = nil; return s
         end }
         ctx.services = { Vitals = ctx.vitals,
-            FishCarrier = package.loaded['server.World.FishCarrier'], GM = package.loaded['server.World.PlayerGM'],
+            FishCarrier = package.loaded['server.WorldHost.FishCarrier'], GM = package.loaded['server.WorldHost.PlayerGM'],
             Modifier = modifierStub }
-        for _, name in ipairs({ 'server.World.FishCarrier', 'server.World.PlayerGM' }) do
+        for _, name in ipairs({ 'server.WorldHost.FishCarrier', 'server.WorldHost.PlayerGM' }) do
             package.loaded[name] = setmetatable({}, { __index = function()
                 error('近战行为不应再加载上层管理器: ' .. name) end })
         end
@@ -119,8 +119,8 @@ describe('TestMeleeHitEffect', function()
         _G.game = saved.game
         _G.Vector3 = saved.Vector3
         _G.Quaternion = saved.Quaternion
-        package.loaded['server.World.FishCarrier'] = saved.carrier
-        package.loaded['server.World.PlayerGM'] = saved.gm
+        package.loaded['server.WorldHost.FishCarrier'] = saved.carrier
+        package.loaded['server.WorldHost.PlayerGM'] = saved.gm
         package.loaded['server.FishAbility'] = saved.ability
         package.loaded['server.AbilityAPI'] = saved.api
         package.loaded['server.SwingRegistry'] = saved.swing

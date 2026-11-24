@@ -1,5 +1,5 @@
 local GameCfg = require('common.GameCfg')
-local SignalRouter = require('server.World.WorldSignalRouter')
+local SignalRouter = require('server.WorldHost.WorldSignalRouter')
 
 local Mgr = { States = {}, Requested = {} }
 local isValidPlayer = SignalRouter.is_valid_player

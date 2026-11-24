@@ -1,8 +1,8 @@
 -- #136 独立战斗夹具：从真实SpawnLanded/Drop入口生成帝王蟹/蟹老板，用于招式表现取证。
 -- 明确不作为自然抽鱼/从零经济证明；不修改血量、时间、玩家库存或奖励裁决。
-local ServerRuntime = require('server.World.ServerRuntime')
+local ServerRuntime = require('server.WorldHost.ServerRuntime')
 local runtime = ServerRuntime.current()
-local units = (runtime and runtime.fish_host) or require('server.World.FishTree')
+local units = (runtime and runtime.fish_host) or require('server.WorldHost.FishTree')
 local life = runtime and runtime.life
 local player = game:GetService('Players'):GetPlayers()[1]
 if not player or not player.Character then return end

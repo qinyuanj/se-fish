@@ -20,3 +20,4 @@
 - **模型动画验收**：导入、播放与画面判定读[美术资产概要「模型动画导入与播放」](../art-asset-overview.md#模型动画导入与播放)。
 - **验收判据读产物**：判据不读工具或探针自己打印的摘要——探针统计缺失时只从根节点 `FindFirstChild` 取（不递归），嵌套子节点永远「缺失」，这类摘要本身也要有测试。判据落在产物上：节点树回读、`data/UINodes.lua`、`log grep` 的实打实行。`log grep` 追最新进展加 `--max-matches` 大值再 `tail`（默认只留最旧 50 条）；等长时状态一条命令只查一次，别塞 `sleep` 循环（无输出，超时等于零信息），由调用方重试或用后台任务。
 - **sync 回灌的引擎生成物**：`sync` 会把 `EggyAPI.lua` 这样的引擎生成物一并带回仓库；与本次改动无关时单独 `git restore`，并在验收记录里点名，别让无关的 API 刷新混进功能分支。
+- **`code push --delete` 逐条超时**：地图侧多出本地已删的脚本时，`code push --delete --yes` 常常只删掉一条就报 `EDITOR_UNREACHABLE: script_delete failed: Timeout waiting for response to script_delete`（`applied before failure: none`），但那条删除其实已经生效。复核用 `code diff` 的 `only-on-map`，它每轮减一；重复执行直到 0 即可（2026-11-24 清理改名遗留的 8 条实测，`--timeout 60` 不改变表现）。

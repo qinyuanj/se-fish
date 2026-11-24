@@ -4,9 +4,9 @@
 -- 若已拥有信物，在本区钓鱼佬旁选中信物后重跑会执行Feed；摆渡使用正常Board请求。
 local cfg = require('common.GameCfg')
 local pd = require('server.PlayerDataHost')
-local ServerRuntime = require('server.World.ServerRuntime')
+local ServerRuntime = require('server.WorldHost.ServerRuntime')
 local runtime = ServerRuntime.current()
-local units = (runtime and runtime.fish_host) or require('server.World.FishTree')
+local units = (runtime and runtime.fish_host) or require('server.WorldHost.FishTree')
 local life = runtime and runtime.life
 local ferry = runtime and runtime:get_world() and runtime:get_world().ferry
 local function equippedWeapon(d)

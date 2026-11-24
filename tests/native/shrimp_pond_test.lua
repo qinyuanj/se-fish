@@ -74,7 +74,7 @@ describe('虾池最小内容（水区 / 鱼表 / 商店 / 钓鱼佬 / 抛竿）'
       GameCfg = package.loaded['common.GameCfg'],
       REUtil = package.loaded['common.REUtil'],
       MgrPlayerData = package.loaded['server.PlayerDataHost'],
-      MgrFishUnit = package.loaded['server.World.FishTree'],
+      MgrFishUnit = package.loaded['server.WorldHost.FishTree'],
     }
     env = { replies = {}, sent = {}, seq = 0, now = 0 }
     env.cfg = require('tests.support.zone_fixtures').Load()
@@ -92,7 +92,7 @@ describe('虾池最小内容（水区 / 鱼表 / 商店 / 钓鱼佬 / 抛竿）'
     package.loaded['common.GameCfg'] = restore and restore.GameCfg
     package.loaded['common.REUtil'] = restore and restore.REUtil
     package.loaded['server.PlayerDataHost'] = restore and restore.MgrPlayerData
-    package.loaded['server.World.FishTree'] = restore and restore.MgrFishUnit
+    package.loaded['server.WorldHost.FishTree'] = restore and restore.MgrFishUnit
     _G.game = restore and restore.game
     env = nil
     restore = nil

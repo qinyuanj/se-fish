@@ -10,7 +10,7 @@ local GameCfg = require("common.GameCfg")
 local BodyScale = require("common.BodyScale")
 local SpokeClock = require("common.SpokeClock")
 local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
-local PlayerTree = require("server.World.PlayerTree")
+local PlayerTree = require("server.WorldHost.PlayerTree")
 
 local CONTAINER = GameCfg.Items.ContainerId
 
