@@ -571,16 +571,16 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
       assert.equals(1, item_bar_pushes[3].payload.selectedSlot)
 
       local before_batch_pushes = #item_bar_pushes
-      local data = mgrs.PlayerDataHost:GetDataInst(p)
+      local data = mgrs.player_data_host:GetDataInst(p)
       SpokeRuntime.batch(function()
         pt:set_coin(888)
         pt:set_upgrade_level(1)
         data.Data.FishCoin = 888
         data.Data.UpgradeLevel = 1
         data.Data.SelectedSlot = nil
-        mgrs.PlayerDataHost:SyncPlayerTree(p)
+        mgrs.player_data_host:SyncPlayerTree(p)
         data.Data.FishCoin = 999
-        mgrs.PlayerDataHost:SyncPlayerTree(p)
+        mgrs.player_data_host:SyncPlayerTree(p)
       end)
       assert.equals(before_batch_pushes + 1, #item_bar_pushes)
       assert.equals(999, item_bar_pushes[#item_bar_pushes].payload.coin)
@@ -591,12 +591,12 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
 
       data.Extra.growth.potions.item168 = 2
       data.Extra.growth.potions.item167 = 5
-      assert.is_true(mgrs.FishAbility:ApplyGrowth(p).Ok)
+      assert.is_true(mgrs.fish_ability:ApplyGrowth(p).Ok)
       assert.equals(420, runtime.life:MaxHealthOf(p))
       assert.near(1.4, ch.scale, 1e-9)
       assert.near(10.5, c.WalkSpeed, 1e-9)
 
-      assert.is_true(mgrs.FishAbility.Modifier:ApplyWeaponEffect(p, ch, { Kind = "paralyze" }))
+      assert.is_true(mgrs.fish_ability.Modifier:ApplyWeaponEffect(p, ch, { Kind = "paralyze" }))
       assert.is_false(runtime.life:CanAct(p))
       assert.equals(0, c.WalkSpeed)
       now = now + 0.5
@@ -628,7 +628,7 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
       assert.equals(0, #p.CharacterAdded.handlers)
       assert.is_true(rod_mount.Destroyed)
       assert.is_true(rod_model.Destroyed)
-      assert.equals(0, mgrs.FishAbility.Modifier:GetRemaining(fish, "poison"))
+      assert.equals(0, mgrs.fish_ability.Modifier:GetRemaining(fish, "poison"))
     end)
   end)
 end)

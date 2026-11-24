@@ -112,7 +112,7 @@ describe('内容标记纯台账', function()
     assert.is_true(Ledger.Fish[found.Id].implemented, found.Id)
     for _, row in ipairs(cfg.Content.Blindbox.Entries) do
       assert.is_true(Ledger.Blindbox[row.number].implemented, row.source)
-      assert.are.equal('server/WorldHost/PlayerBlindbox.lua', Ledger.Blindbox[row.number].path)
+      assert.are.equal('server/world_host/player_blindbox.lua', Ledger.Blindbox[row.number].path)
     end
   end)
 end)
