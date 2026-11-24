@@ -46,8 +46,8 @@ describe("活鱼血条与预警投影（#309 客户端宿主）", function()
     local env = mount()
     assert.is_true(env.writer:ingest_event("FishCombatState", {
       list = {
-        { id = "f1", fishId = "eel", name = "电鳗", health = 200, maxHealth = 300, label = "放电" },
-        { id = "f2", fishId = "bass", name = "鲈鱼", health = 20, maxHealth = 20, label = "逃脱" },
+        { id = "f1", fishId = "eel", name = "电鳗", health = 200, max_health = 300, label = "放电" },
+        { id = "f2", fishId = "bass", name = "鲈鱼", health = 20, max_health = 20, label = "逃脱" },
       },
     }))
     assert.equals(2, alive_named(env, "FishBar_"))
@@ -60,7 +60,7 @@ describe("活鱼血条与预警投影（#309 客户端宿主）", function()
 
     assert.is_true(env.writer:ingest_event("FishCombatState", {
       list = {
-        { id = "f2", fishId = "bass", name = "鲈鱼", health = 10, maxHealth = 20, label = "逃脱" },
+        { id = "f2", fishId = "bass", name = "鲈鱼", health = 10, max_health = 20, label = "逃脱" },
       },
     }))
     assert.equals(1, alive_named(env, "FishBar_"), "血条残留 " .. tostring(alive_named(env, "FishBar_")))

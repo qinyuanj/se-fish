@@ -314,30 +314,30 @@ function SaveHost:resolve_request(player, data, kind, requestId)
     local s = userId and self.sessions[userId]
     if not s or not self:is_current(userId, s, data) or s.State ~= 'ready'
         or type(kind) ~= 'string' or #kind < 1 or #kind > 80 then return nil, 'invalid' end
-    local requestKey
+    local request_key
     if type(requestId) == 'number' and requestId == math.floor(requestId)
         and requestId >= 1 and requestId <= 2147483647 then
-        requestKey = s.token .. ':' .. kind .. ':' .. requestId
-    elseif type(requestId) == 'table' and type(requestId.requestKey) == 'string'
+        request_key = s.token .. ':' .. kind .. ':' .. requestId
+    elseif type(requestId) == 'table' and type(requestId.request_key) == 'string'
         and type(requestId.id) == 'string' and type(requestId.sequence) == 'number'
         and requestId.kind == kind then
-        requestKey = requestId.requestKey
+        request_key = requestId.request_key
     else return nil, 'invalid' end
     for _, recorded in ipairs(data.save_meta.operations) do
-        if recorded.requestKey == requestKey then
+        if recorded.request_key == request_key then
             if type(requestId) == 'table' and (requestId.id ~= recorded.id
                 or requestId.sequence ~= recorded.sequence or requestId.kind ~= recorded.kind) then
                 return nil, 'identity-conflict'
             end
             return { id = recorded.id, sequence = recorded.sequence, kind = kind,
-                requestKey = recorded.requestKey }, 'replay'
+                request_key = recorded.request_key }, 'replay'
         end
     end
     if type(requestId) == 'table' then return nil, 'expired' end
     if self:is_paused(userId) then return nil, 'pending' end
     local operation = self:next_operation(player, kind)
     if not operation then return nil, 'pending' end
-    operation.requestKey = requestKey
+    operation.request_key = request_key
     return operation, 'new'
 end
 
@@ -359,13 +359,13 @@ function SaveHost:execute(player, data, operation, transform, done)
         or operation.sequence ~= math.floor(operation.sequence) or operation.sequence < 1
         or operation.id ~= tostring(userId) .. ':' .. operation.sequence
         or type(operation.kind) ~= 'string' or #operation.kind < 1 or #operation.kind > 80
-        or operation.requestKey ~= nil and type(operation.requestKey) ~= 'string'
+        or operation.request_key ~= nil and type(operation.request_key) ~= 'string'
         or type(transform) ~= 'function' or type(done) ~= 'function' then return false, 'invalid' end
     local meta = data.save_meta
     for _, recorded in ipairs(meta.operations) do
         if recorded.id == operation.id then
-            if recorded.kind ~= operation.kind or operation.requestKey ~= nil
-                and recorded.requestKey ~= operation.requestKey then return false, 'identity-conflict' end
+            if recorded.kind ~= operation.kind or operation.request_key ~= nil
+                and recorded.request_key ~= operation.request_key then return false, 'identity-conflict' end
             callback('结果重放', userId, done, true, copy(recorded.result))
             return true
         end
@@ -390,7 +390,7 @@ function SaveHost:execute(player, data, operation, transform, done)
         local nextValue = draft:Serialize()
         nextValue.meta.sequence = operation.sequence
         table.insert(nextValue.meta.operations, { id = operation.id, sequence = operation.sequence,
-            kind = operation.kind, requestKey = operation.requestKey, result = copy(result) })
+            kind = operation.kind, request_key = operation.request_key, result = copy(result) })
         while #nextValue.meta.operations > 64 do
             nextValue.meta.floor = table.remove(nextValue.meta.operations, 1).sequence
         end

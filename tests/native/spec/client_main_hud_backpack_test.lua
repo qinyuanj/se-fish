@@ -619,7 +619,7 @@ describe("Spoke 主 HUD 背包入口与背包面板视图（#297-B3c）", functi
     })
     assert.is_nil(view.root.fault)
 
-    writer:update_vitals({ health = 100, maxHealth = 100, hunger = 0, maxHunger = 100 })
+    writer:update_vitals({ health = 100, max_health = 100, hunger = 0, max_hunger = 100 })
     writer:ingest_event("ItemBarState", {
       slotCount = 3,
       selectedSlot = 1,

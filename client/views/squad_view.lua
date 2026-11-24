@@ -116,7 +116,7 @@ function SquadView.member_spec()
       for _, row in ipairs(party.members) do
         if not row.self and #rows < GameCfg.Party.HUD.MaxRows then
           rows[#rows + 1] = {
-            userId = row.userId, name = row.name, health = row.health, maxHealth = row.maxHealth,
+            userId = row.userId, name = row.name, health = row.health, max_health = row.max_health,
             phase = row.phase, index = #rows + 1,
           }
         end
@@ -152,7 +152,7 @@ function SquadView.member_spec()
       scope:effect("PartyMemberProjection", function(es)
         local value = es:d(item_signal)
         local health = value.health or 0
-        local maximum = value.maxHealth or 0
+        local maximum = value.max_health or 0
         row.Position = ViewUtil.vec2(0, (value.index - 1) * hud.RowHeight)
         row.Visible = true
         name.Text = value.name

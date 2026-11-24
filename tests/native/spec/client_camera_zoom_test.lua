@@ -47,11 +47,11 @@ describe("ClientStore 属性汇聚与 CameraZoomView（#297-B）", function()
     })
 
     -- 初始属性立即同步
-    assert.same({ health = 240, maxHealth = 300, hunger = 80, maxHunger = 100 }, {
+    assert.same({ health = 240, max_health = 300, hunger = 80, max_hunger = 100 }, {
       health = store.vitals:now().health,
-      maxHealth = store.vitals:now().maxHealth,
+      max_health = store.vitals:now().max_health,
       hunger = store.vitals:now().hunger,
-      maxHunger = store.vitals:now().maxHunger,
+      max_hunger = store.vitals:now().max_hunger,
     })
     assert.equals(15, store.coin:now())
     assert.equals(1, attr_signals.FishCoin:Count())

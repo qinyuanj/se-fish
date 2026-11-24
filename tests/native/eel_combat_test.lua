@@ -292,7 +292,7 @@ describe('TestFishCombatLabel', function()
         for move, name in pairs({ jab = '蟹钳乱刺', pinch = '蟹钳双击', charge = '冲撞', spin = '旋转' }) do
             assert.is_true(env.writer:ingest_event('FishCombatState', {
                 list = {
-                    { id = 24, fishId = 'fish24Boss', name = '蟹老板', health = 1000, maxHealth = 1200,
+                    { id = 24, fishId = 'fish24Boss', name = '蟹老板', health = 1000, max_health = 1200,
                       move = move, label = name },
                 },
             }))
@@ -308,7 +308,7 @@ describe('TestFishCombatLabel', function()
     it('test_text_shows_discharges_sleep_and_flee_bar', function()
         assert.is_true(env.writer:ingest_event('FishCombatState', {
             list = {
-                { id = 1, fishId = 'eel', name = '电鳗', health = 240, maxHealth = 300, label = '放电 3/5' },
+                { id = 1, fishId = 'eel', name = '电鳗', health = 240, max_health = 300, label = '放电 3/5' },
             },
         }))
         assert.are.equal('电鳗 240/300', aliveByName(env, 'FishBar_1').Text)
@@ -316,7 +316,7 @@ describe('TestFishCombatLabel', function()
 
         assert.is_true(env.writer:ingest_event('FishCombatState', {
             list = {
-                { id = 1, fishId = 'eel', name = '电鳗', health = 180, maxHealth = 300, label = '睡眠 8 秒' },
+                { id = 1, fishId = 'eel', name = '电鳗', health = 180, max_health = 300, label = '睡眠 8 秒' },
             },
         }))
         assert.are.equal('电鳗 180/300', aliveByName(env, 'FishBar_1').Text)
@@ -324,7 +324,7 @@ describe('TestFishCombatLabel', function()
 
         assert.is_true(env.writer:ingest_event('FishCombatState', {
             list = {
-                { id = 2, fishId = 'alligatorGar', name = '鳄雀鳝', health = 500, maxHealth = 500 },
+                { id = 2, fishId = 'alligatorGar', name = '鳄雀鳝', health = 500, max_health = 500 },
             },
         }))
         assert.is_nil(aliveByName(env, 'FishBar_1'))
@@ -350,7 +350,7 @@ describe('TestFishCombatLabel', function()
 
         assert.is_true(env.writer:ingest_event('FishCombatState', {
             list = {
-                { id = 7, fishId = 'eel', name = '电鳗', health = 300, maxHealth = 300, label = '战斗' },
+                { id = 7, fishId = 'eel', name = '电鳗', health = 300, max_health = 300, label = '战斗' },
             },
         }))
         assert.are.equal(1, aliveCount(env, 'FishBar_'))

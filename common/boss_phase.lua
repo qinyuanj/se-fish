@@ -106,9 +106,9 @@ function M.new(bossCfg, now, pos)
 end
 
 ---血量百分比；MaxHealth 非法时返回 nil（本帧不做阶段判定，也不清空已有阶段）
-function M.percent_of(health, maxHealth)
-    if isBadNumber(health) or isBadNumber(maxHealth) or maxHealth <= 0 then return nil end
-    local percent = health / maxHealth * 100
+function M.percent_of(health, max_health)
+    if isBadNumber(health) or isBadNumber(max_health) or max_health <= 0 then return nil end
+    local percent = health / max_health * 100
     if percent < 0 then percent = 0 end
     if percent > 100 then percent = 100 end
     return percent

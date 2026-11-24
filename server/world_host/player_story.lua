@@ -25,7 +25,7 @@ end
 function Mgr:send_fallback(player)
     _G.REUtil:get_re('StoryNotice'):FireClient(player, {
         text = cfg().FallbackText, lines = cfg().Lines or { cfg().FallbackText },
-        readKey = cfg().ReadKey or 'opening', title = cfg().Title or '欢迎来到钓场',
+        read_key = cfg().ReadKey or 'opening', title = cfg().Title or '欢迎来到钓场',
     })
 end
 
@@ -34,8 +34,8 @@ function Mgr:begin(player)
     self.requested[player.UserId] = player
     local data = self.player_data and self.player_data:get_data_inst(player)
     if self.Save and not data then return end
-    local readKey = cfg().ReadKey or 'opening'
-    if data and data.extra.story.read and data.extra.story.read[readKey] then
+    local read_key = cfg().ReadKey or 'opening'
+    if data and data.extra.story.read and data.extra.story.read[read_key] then
         self.requested[player.UserId] = nil
         return
     end
@@ -44,7 +44,7 @@ function Mgr:begin(player)
         if previous.phase == 'fallback' then self:send_fallback(player) end
         return
     end
-    local state = { player = player, phase = 'pending', readKey = readKey }
+    local state = { player = player, phase = 'pending', read_key = read_key }
     self.States[player.UserId] = state
     local storyId = cfg().StoryId
     if storyId == nil or storyId == '' then return self:fallback(player, state, '未配置 storyID') end
@@ -64,13 +64,13 @@ function Mgr:on_signal(name, player, storyId)
         state.deadline = nil
     elseif (name == 'OnStoryEnd' or name == 'OnStorySkip')
         and (state.phase == 'started' or state.phase == 'pending') then
-        self:complete(player, state.readKey, name == 'OnStorySkip' and 'skip' or 'end')
+        self:complete(player, state.read_key, name == 'OnStorySkip' and 'skip' or 'end')
     end
 end
 
-function Mgr:complete(player, readKey, source)
+function Mgr:complete(player, read_key, source)
     local state = player and self.States[player.UserId]
-    if not state or state.player ~= player or readKey ~= state.readKey
+    if not state or state.player ~= player or read_key ~= state.read_key
         or source == 'read' and state.phase ~= 'fallback'
         or source ~= 'read' and source ~= 'end' and source ~= 'skip'
         or state.phase == 'read' or state.phase == 'saving' then return false end
@@ -93,7 +93,7 @@ function Mgr:persist_read(player, state)
     if self.Save and not data then return false end
     if not self.Save then
         state.phase = 'read'
-        _G.REUtil:get_re('StoryState'):FireClient(player, { read = true, readKey = state.readKey })
+        _G.REUtil:get_re('StoryState'):FireClient(player, { read = true, read_key = state.read_key })
         return true
     end
     local operation = self.Save:next_operation(player, 'story-read')
@@ -102,8 +102,8 @@ function Mgr:persist_read(player, state)
     state.phase = 'saving'
     local accepted = self.Save:execute(player, data, operation, function(draft)
         draft.extra.story.read = draft.extra.story.read or {}
-        draft.extra.story.read[state.readKey] = true
-        return { read = true, readKey = state.readKey }
+        draft.extra.story.read[state.read_key] = true
+        return { read = true, read_key = state.read_key }
     end, function(written, result)
         if self.States[player.UserId] ~= state then return end
         if not written then
@@ -111,7 +111,7 @@ function Mgr:persist_read(player, state)
             state.failed = true
             print('[PlayerStory] 已读未落账', player.UserId, tostring(result))
             _G.REUtil:get_re('StoryState'):FireClient(player, {
-                read = false, readKey = state.readKey, text = '已读尚未保存，请稍后重进再试。',
+                read = false, read_key = state.read_key, text = '已读尚未保存，请稍后重进再试。',
             })
             local leave = state.leave
             state.leave = nil
@@ -119,7 +119,7 @@ function Mgr:persist_read(player, state)
             return
         end
         state.phase, state.completeSource, state.deadline = 'read', nil, nil
-        print('[PlayerStory] 已读落账', player.UserId, state.readKey)
+        print('[PlayerStory] 已读落账', player.UserId, state.read_key)
         _G.REUtil:get_re('StoryState'):FireClient(player, result)
         local leave = state.leave
         state.leave = nil
@@ -213,8 +213,8 @@ function Mgr.mount(scope, player_tree, opts)
     end)
     SignalRouter.bind_player(scope, _G.REUtil:get_re('StoryRead').OnServerEvent, player, function(actor, payload)
         if type(payload) ~= 'table' or payload.action ~= 'read'
-            or type(payload.readKey) ~= 'string' or _G.REUtil:check_recd(actor, 'StoryRead', 0.5) then return end
-        session:complete(actor, payload.readKey, 'read')
+            or type(payload.read_key) ~= 'string' or _G.REUtil:check_recd(actor, 'StoryRead', 0.5) then return end
+        session:complete(actor, payload.read_key, 'read')
     end)
     scope:subscribe(opts.clock.on_second, function() session:update() end)
     session:begin(player)

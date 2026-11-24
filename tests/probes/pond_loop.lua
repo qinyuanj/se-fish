@@ -196,9 +196,9 @@ local function combatEnv()
     env:set_up()
     env:prepare()
     env.notices, env.casts, env.hits, env.published = {}, {}, {}, {}
-    local maxHealth = GameCfg.Vitals.MaxHealth or 300
+    local max_health = GameCfg.Vitals.MaxHealth or 300
     for _, p in ipairs({ env.player, env.other }) do
-        p.Character.Controller.Health = maxHealth
+        p.Character.Controller.Health = max_health
         p.Character.Controller.TakeDamage = function(c, d) c.Health = c.Health - d end
     end
     env.other.Character.Position = Vector3.New(500, 2, 500) -- 另一名玩家远离，不参与本局

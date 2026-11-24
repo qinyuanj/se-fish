@@ -114,7 +114,7 @@ function PlayerLottery.mount(scope, tree, opts)
     end
     local result = copy(last.result)
     result.recovered = true
-    result.operation = { id = last.id, sequence = last.sequence, kind = last.kind, requestKey = last.requestKey }
+    result.operation = { id = last.id, sequence = last.sequence, kind = last.kind, request_key = last.request_key }
     reply(result)
   end
 

@@ -1,5 +1,5 @@
 local GameCfg = require('common.game_cfg')
-local DamageFloat = { Active = {}, pool = {}, sequence = {}, pending_cleanup = {} }
+local DamageFloat = { active = {}, pool = {}, sequence = {}, pending_cleanup = {} }
 local cfg = GameCfg.DamageFloat
 
 function DamageFloat.display_amount(amount)
@@ -17,9 +17,9 @@ function DamageFloat:clear()
     end
     for _, node in ipairs(self.pending_cleanup) do destroy(node) end
     self.pending_cleanup = pending
-    for _, entry in ipairs(self.Active) do destroy(entry.node) end
+    for _, entry in ipairs(self.active) do destroy(entry.node) end
     for _, node in ipairs(self.pool) do destroy(node) end
-    self.Active, self.pool, self.sequence = {}, {}, {}
+    self.active, self.pool, self.sequence = {}, {}, {}
     self.root, self.resolution = nil, nil
 end
 
@@ -31,8 +31,8 @@ end
 
 local function valid(payload)
     local p = type(payload) == 'table' and payload.position
-    return type(payload) == 'table' and type(payload.targetType) == 'string'
-        and type(payload.targetId) == 'number' and type(payload.amount) == 'number'
+    return type(payload) == 'table' and type(payload.target_type) == 'string'
+        and type(payload.target_id) == 'number' and type(payload.amount) == 'number'
         and payload.amount > 0 and payload.amount < math.huge and type(p) == 'table'
         and type(p.x) == 'number' and p.x == p.x and math.abs(p.x) < math.huge
         and type(p.y) == 'number' and p.y == p.y and math.abs(p.y) < math.huge
@@ -60,7 +60,7 @@ function DamageFloat:show(payload)
         })
     end
     if not node then return end
-    local key = payload.targetType .. ':' .. tostring(payload.targetId)
+    local key = payload.target_type .. ':' .. tostring(payload.target_id)
     local sequence = (self.sequence[key] or 0) + 1
     self.sequence[key] = sequence
     local spread = ((sequence - 1) % 3 - 1) * cfg.SpreadPixels
@@ -75,9 +75,9 @@ function DamageFloat:show(payload)
     node.Opacity = 1
     node.Visible = true
     node.LocalZOrder = 10
-    local entry = { node = node, Start = game:GetService('World'):GetServerTime(),
-        Position = payload.position, Height = payload.height, spread = spread }
-    self.Active[#self.Active + 1] = entry
+    local entry = { node = node, start = game:GetService('World'):GetServerTime(),
+        position = payload.position, height = payload.height, spread = spread }
+    self.active[#self.active + 1] = entry
 end
 
 function DamageFloat:update()
@@ -94,20 +94,20 @@ function DamageFloat:update()
         end
     end
     local now = game:GetService('World'):GetServerTime()
-    for i = #self.Active, 1, -1 do
-        local entry = self.Active[i]
-        local progress = math.max(0, (now - entry.Start) / cfg.DurationSec)
+    for i = #self.active, 1, -1 do
+        local entry = self.active[i]
+        local progress = math.max(0, (now - entry.start) / cfg.DurationSec)
         if progress >= 1 then
             entry.node.Visible = false
             entry.node.Opacity = 1
-            table.remove(self.Active, i)
+            table.remove(self.active, i)
             if #self.pool < cfg.PoolSize then
                 self.pool[#self.pool + 1] = entry.node
             else
                 entry.node:Destroy()
             end
         else
-            local x, y = self:project(entry.Position, entry.Height)
+            local x, y = self:project(entry.position, entry.height)
             entry.node.Visible = x ~= nil
             if x then
                 entry.node.Position = Vector2.New(x + entry.spread, y + cfg.RisePixels * progress)

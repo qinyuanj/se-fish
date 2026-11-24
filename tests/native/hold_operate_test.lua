@@ -27,7 +27,7 @@ describe("持有与操作的数据层规则", function()
     it("test_all_capacity_levels_move_swap_cancel_keep_instances", function()
         for level, capacity in ipairs({ 5, 10, 15, 20, 25, 30, 40 }) do
             local d = ctx.data
-            assert.is_true(d:ApplyGMPatch({ upgradeLevel = level - 1, coin = 0 }))
+            assert.is_true(d:ApplyGMPatch({ upgrade_level = level - 1, coin = 0 }))
             assert.same(level + 1, d:ItemBarCapacity())
             assert.same(capacity, d:BackpackCapacity())
             while d:AddItem('carp', 1.37) do end

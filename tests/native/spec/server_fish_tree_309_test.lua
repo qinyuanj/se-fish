@@ -220,7 +220,7 @@ describe("活鱼树宿主接缝（#309）", function()
     local left = runtime:fish_snapshot()
     if #left > 0 then
       assert.equals("escape", left[1].phase)
-      assert.is_true(runtime:damage_fish(left[1].id, left[1].maxHealth))
+      assert.is_true(runtime:damage_fish(left[1].id, left[1].max_health))
     end
     assert.equals(0, #runtime:fish_snapshot())
 
@@ -234,7 +234,7 @@ describe("活鱼树宿主接缝（#309）", function()
     assert.equals(1, #runtime:fish_snapshot())
     local before = runtime:get_world():ground_snapshot().list
     local fish = runtime:fish_snapshot()[1]
-    assert.is_true(runtime:damage_fish(fish.id, fish.maxHealth))
+    assert.is_true(runtime:damage_fish(fish.id, fish.max_health))
     local after = runtime:get_world():ground_snapshot().list
     assert.is_true(#after > #before)
     local ids = {}
@@ -256,7 +256,7 @@ describe("活鱼树宿主接缝（#309）", function()
     assert.equals("land", fish.bossPhase)
     assert.is_true(#ai.started >= 1)
 
-    local max_health = fish.maxHealth
+    local max_health = fish.max_health
     assert.is_true(runtime:damage_fish(fish.id, max_health * 0.4))
     fish = runtime:fish_snapshot()[1]
     assert.equals("water", fish.bossPhase)
@@ -365,7 +365,7 @@ describe("活鱼树宿主接缝（#309）", function()
     assert.is_true(attempts >= 2, "启动失败不得提前标记 ai_started")
     assert.is_true(#logs >= 1, "启动失败必须留下模块、操作、对象和错误日志")
     local fish = runtime:fish_snapshot()[1]
-    assert.is_true(runtime:damage_fish(fish.id, fish.maxHealth))
+    assert.is_true(runtime:damage_fish(fish.id, fish.max_health))
     assert.equals(0, #runtime:fish_snapshot())
   end)
 end)

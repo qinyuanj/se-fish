@@ -20,7 +20,7 @@ local life = rt.life
 local oldWeak = pt:get_modifier_remaining('weak')
 local controller = player.Character.Controller
 local function attrs(label)
-    log(label, 'speed=' .. tostring(controller.WalkSpeed), 'maxHealth=' .. tostring(controller.MaxHealth),
+    log(label, 'speed=' .. tostring(controller.WalkSpeed), 'max_health=' .. tostring(controller.MaxHealth),
         'planScale=' .. tostring(ability:body_plan(player).Scale), 'canAct=' .. tostring(life:can_act(player)))
 end
 for n = 152, 166 do

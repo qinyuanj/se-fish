@@ -285,7 +285,7 @@ describe('TestEconomyPersistence', function()
         clear_events()
         assert.is_false(env.shop:handle(env.player, { action = 'Buy', itemId = 'worm', seq = 1 }))
         assert.is_false(env.shop:handle(env.player, { action = 'Buy', seq = 66, operation = first }))
-        local forged = { id = first.id, sequence = first.sequence, kind = first.kind, requestKey = '伪造' }
+        local forged = { id = first.id, sequence = first.sequence, kind = first.kind, request_key = '伪造' }
         assert.is_false(env.shop:handle(env.player, { action = 'Buy', seq = 66, operation = forged }))
         assert.same({}, env.events)
         assert.same(35, env.data.data.FishCoin)

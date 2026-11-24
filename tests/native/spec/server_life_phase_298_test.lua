@@ -148,7 +148,7 @@ local function make_save(data)
         id = tostring(player.UserId) .. ":" .. tostring(seq),
         sequence = seq,
         kind = kind,
-        requestKey = kind .. ":" .. tostring(request_id),
+        request_key = kind .. ":" .. tostring(request_id),
       }, "new"
     end,
     execute = function(_, _, current, operation, transform, done)

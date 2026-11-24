@@ -108,7 +108,7 @@ describe("Spoke 主 HUD 左上状态区与金币视图（#297-B2）", function()
       assert.same({ x = 0.5, y = 0.5 }, env.nodes.LabelCoin.Anchor)
 
       local c = GameCfg.Vitals
-      env.writer:update_vitals({ health = c.MaxHealth, maxHealth = c.MaxHealth, hunger = c.MaxHunger, maxHunger = c.MaxHunger })
+      env.writer:update_vitals({ health = c.MaxHealth, max_health = c.MaxHealth, hunger = c.MaxHunger, max_hunger = c.MaxHunger })
       assert.equals("血 " .. c.MaxHealth, env.nodes.HealthText.Text)
       assert.equals("饥饿度 " .. c.MaxHunger, env.nodes.HungerText.Text)
       for _, label in ipairs({ env.nodes.HealthText, env.nodes.HungerText }) do
@@ -126,7 +126,7 @@ describe("Spoke 主 HUD 左上状态区与金币视图（#297-B2）", function()
     local env = mount_vitals(1080, { initial_now = 100 })
     local cfg = GameCfg.Vitals
 
-    env.writer:update_vitals({ health = 150, maxHealth = 300, hunger = 50, maxHunger = 100 })
+    env.writer:update_vitals({ health = 150, max_health = 300, hunger = 50, max_hunger = 100 })
     env.writer:set_coin(42)
     assert.equals(50, env.nodes.HealthRing.Percent)
     assert.equals(50, env.nodes.HungerRing.Percent)

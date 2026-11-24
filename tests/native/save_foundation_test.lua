@@ -176,7 +176,7 @@ describe('TestSaveFoundation', function()
         drain()
         local replay, replayMode = env.save:resolve_request(nextPlayer, nextData, 'shop', op)
         assert.same('replay', replayMode)
-        assert.same(op.requestKey, replay.requestKey)
+        assert.same(op.request_key, replay.request_key)
         op.id = '60:999'
         assert.is_nil(env.save:resolve_request(nextPlayer, nextData, 'shop', op))
     end)

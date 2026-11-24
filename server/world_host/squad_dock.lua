@@ -171,7 +171,7 @@ function SquadDock.mount(world, opts)
           local tree = player and opts.lookup_tree and opts.lookup_tree(player)
           if not tree or tree:is_disposed() then return end
           row.health = es:d(tree.states.health)
-          row.maxHealth = tree.memos.max_health and es:d(tree.memos.max_health) or GameCfg.Vitals.MaxHealth
+          row.max_health = tree.memos.max_health and es:d(tree.memos.max_health) or GameCfg.Vitals.MaxHealth
           row.phase = es:d(tree.states.life_phase)
         end)
         if not ok then
@@ -265,7 +265,7 @@ function SquadDock.mount(world, opts)
         local health = party.rows[user_id] or {}
         return {
           userId = user_id, name = member.Name or tostring(user_id),
-          health = health.health, maxHealth = health.maxHealth,
+          health = health.health, max_health = health.max_health,
           phase = health.phase or "alive", self = user_id == player.UserId,
         }
       end

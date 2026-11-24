@@ -42,7 +42,7 @@ function StoryView.modal_spec(options)
       if type(payload) ~= "table" then return end
       local services = ctx.services or {}
       if type(services.send_story) == "function" then
-        services.send_story({ action = "read", readKey = payload.readKey or "opening" })
+        services.send_story({ action = "read", read_key = payload.read_key or "opening" })
       end
     end
     read_button, read_label = button("DialogueRead", 160, 300, "已读，开始钓鱼", send_read)
@@ -55,7 +55,7 @@ function StoryView.modal_spec(options)
       body.Text = ViewUtil.wrap_text(lines[page], math.max(12, math.floor((width - 80) / 26)))
       next_button.TouchEnabled = page < #lines
       read_button.TouchEnabled = true
-      read_label.Text = payload.readKey and "已读，开始钓鱼" or "知道了"
+      read_label.Text = payload.read_key and "已读，开始钓鱼" or "知道了"
     end
     render()
     scope:effect("StoryProjection", function(es)

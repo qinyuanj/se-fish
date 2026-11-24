@@ -174,7 +174,7 @@ describe("PlayerTree #297-A1b：单批合并推送、属性即时重算与存档
 
     local snap = pushes[1].snapshot
     assert.equals(550, snap.coin)
-    assert.equals(2, snap.upgradeLevel)
+    assert.equals(2, snap.upgrade_level)
     assert.equals(4, snap.slotCount)
     assert.equals(15, snap.backpackCount)
     assert.equals(2, snap.selectedSlot)

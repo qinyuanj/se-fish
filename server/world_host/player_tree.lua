@@ -189,7 +189,7 @@ local function build_item_bar_snapshot(
     slotCount = slot_count,
     backpack = copy_slots(backpack, backpack_count),
     backpackCount = backpack_count,
-    upgradeLevel = upgrade_level,
+    upgrade_level = upgrade_level,
     bait = bait_out,
     coin = coin,
     selectedSlot = selected_slot,
@@ -232,7 +232,7 @@ local function mount_phase_dock(ps, slot, label)
   end)
 end
 
----@param opts { player: table, data: table, clock: table, world?: table, logger?: table, effects?: table, create_unit?: fun(unit_type: string, props: table): any, on_item_bar_state?: fun(player: any, snapshot: table, tree: table), on_leave_finalize?: fun(tree: table, player: table, data: table), mounts?: table }
+---@param opts table { player: table, data: table, clock: table, world?: table, logger?: table, effects?: table, create_unit?: function, on_item_bar_state?: function, on_leave_finalize?: function, mounts?: table }
 function PlayerTree.spawn(opts)
   if type(opts) ~= "table" then
     error("PlayerTree.spawn 需要参数表", 2)

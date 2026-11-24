@@ -14,7 +14,7 @@ local function snapshot(members, fields)
 end
 
 local function member(id, name, health, max_health, phase, self)
-  return { userId = id, name = name, health = health, maxHealth = max_health,
+  return { userId = id, name = name, health = health, max_health = max_health,
     phase = phase or "alive", self = self == true }
 end
 

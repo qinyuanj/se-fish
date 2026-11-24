@@ -130,7 +130,7 @@ describe("持有操作的服务端分发", function()
                     resolve_request = function(_, player, data, kind, requestId)
                         resolvedKinds[#resolvedKinds + 1] = kind
                         return { id = '34010:' .. tostring(#resolvedKinds), sequence = #resolvedKinds,
-                            kind = kind, requestKey = 'k' .. tostring(#resolvedKinds) }, 'new'
+                            kind = kind, request_key = 'k' .. tostring(#resolvedKinds) }, 'new'
                     end,
                     execute = function(_, player, data, operation, transform, done)
                         local result, reason = transform(data)
@@ -168,7 +168,7 @@ describe("持有操作的服务端分发", function()
             resolve_request = function(_, player, data, kind, requestId)
                 if recorded[requestId] then return recorded[requestId], 'replay' end
                 local operation = { id = '34010:' .. tostring(requestId), sequence = requestId,
-                    kind = kind, requestKey = 'k' .. tostring(requestId) }
+                    kind = kind, request_key = 'k' .. tostring(requestId) }
                 recorded[requestId] = operation
                 return operation, 'new'
             end,

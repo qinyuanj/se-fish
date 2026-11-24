@@ -191,9 +191,9 @@ function MainHudVitalsView.mount(s, ctx, options)
   s:effect("VitalsProjection", function(es)
     local v = es:d(ctx.store.vitals)
     local health = v and v.health or cfg.MaxHealth
-    local max_health = v and v.maxHealth or cfg.MaxHealth
+    local max_health = v and v.max_health or cfg.MaxHealth
     local hunger = v and v.hunger or cfg.MaxHunger
-    local max_hunger = v and v.maxHunger or cfg.MaxHunger
+    local max_hunger = v and v.max_hunger or cfg.MaxHunger
     rings.Health.ring.Percent = vital_percent(health, max_health)
     rings.Hunger.ring.Percent = vital_percent(hunger, max_hunger)
     rings.Health.text.Text = HEALTH_PREFIX .. tostring(health)

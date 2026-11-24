@@ -87,7 +87,7 @@ end
 
 ---@param s table EffectBuilder
 ---@param player_tree table
----@param opts? { create_unit?: fun(unit_type: string, props: table): any, on_error?: fun(msg: string) }
+---@param opts? table { create_unit?: function, on_error?: function }
 function HeldRodLeaf.mount(s, player_tree, opts)
   opts = type(opts) == "table" and opts or {}
 

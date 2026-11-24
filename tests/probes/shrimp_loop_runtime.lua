@@ -46,10 +46,10 @@ if slot and (slot.itemId == 'item31' or slot.itemId == 'item32') then
     if runtime then runtime:dispatch_interact(player, { target = 'fisherman', action = 'Feed', seq = rt.seq }) end
 end
 -- 外部选择rt.routeId后可重跑：日志记录实际航线与扣款，不默认移动玩家。
-if rt.routeId then
-    ferry:handle(player, { action = 'Board', routeId = rt.routeId, seq = rt.seq + 1 })
-    log('摆渡请求', rt.routeId)
-    rt.routeId = nil
+if rt.route_id then
+    ferry:handle(player, { action = 'Board', route_id = rt.route_id, seq = rt.seq + 1 })
+    log('摆渡请求', rt.route_id)
+    rt.route_id = nil
 end
 local last = {}
 task:Spawn(function()

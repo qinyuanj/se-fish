@@ -272,7 +272,7 @@ local function dot_cfg_for(kind)
 end
 
 --- 创建独立轻量的非玩家实体（活鱼等）效果存储与单向叶子投影器。
----@param opts? { modifier_api?: table, presets?: table, now?: fun(): number, on_dot_tick?: fun(target: any, kind: string, damage: number, source: any, stacks: number), on_error?: fun(msg: string) }
+---@param opts? table { modifier_api?: table, presets?: table, now?: function, on_dot_tick?: function, on_error?: function }
 function ModifierLeaf.create_entity_store(opts)
   opts = type(opts) == "table" and opts or {}
   local modifier_api = opts.modifier_api or default_modifier_api()

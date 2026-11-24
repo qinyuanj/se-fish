@@ -584,7 +584,7 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
       end)
       assert.equals(before_batch_pushes + 1, #item_bar_pushes)
       assert.equals(999, item_bar_pushes[#item_bar_pushes].payload.coin)
-      assert.equals(1, item_bar_pushes[#item_bar_pushes].payload.upgradeLevel)
+      assert.equals(1, item_bar_pushes[#item_bar_pushes].payload.upgrade_level)
       assert.is_nil(item_bar_pushes[#item_bar_pushes].payload.selectedSlot)
       -- 重新选回鱼竿格以维持后续测试预期
       re_map.ItemBarAction.OnServerEvent:Fire(p, { action = "SelectSlot", value = 1 })

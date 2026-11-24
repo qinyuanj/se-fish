@@ -156,7 +156,7 @@ function Mgr:record_health(carrier)
 			local payload = DamageNotice.from_health(carrier.body.UnitId, previous, health, position,
 				nil, 'fish', height)
 			if payload then
-				print('[FishCarrier] 实际扣血', payload.targetId, previous, health, payload.amount)
+				print('[FishCarrier] 实际扣血', payload.target_id, previous, health, payload.amount)
 				local sent, err = pcall(self.damage_publisher or DamageNotice.publish, payload)
 				if not sent then print('[FishCarrier] 伤害通知失败', carrier.body.UnitId, tostring(err)) end
 			end
@@ -206,7 +206,7 @@ function Mgr:attach(body, opts)
 	end
 
 	local pos = readPosition(body) or Vector3.New(0, 0, 0)
-	local maxHealth = resolveMaxHealth(opts)
+	local max_health = resolveMaxHealth(opts)
 
 	-- 受击体：与鱼本体同名的受击点。EggyUnit + EnableController 是引擎里唯一「脚本能建、
 	-- 又带 Controller」的单位类型（WorldUnit 挂不上 Controller，#32 的根因）。
@@ -231,15 +231,15 @@ function Mgr:attach(body, opts)
 		return nil
 	end
 
-	controller.MaxHealth = maxHealth
-	controller.Health = maxHealth
+	controller.MaxHealth = max_health
+	controller.Health = max_health
 
 	local carrier = {
 		body = body,
 		receiver = receiver,
 		Controller = controller,
-		MaxHealth = maxHealth,
-		Health = maxHealth,
+		MaxHealth = max_health,
+		Health = max_health,
 		fish_id = opts.fish_id,
 		Player = opts.Player,
 		receiver_offset = opts.receiver_offset or Vector3.New(0, 0, 0),
