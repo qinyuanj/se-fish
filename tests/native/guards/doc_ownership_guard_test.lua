@@ -24,7 +24,6 @@ local CLASSES = {
     '^docs/to%-questionnaire%-',
     '^docs/策划案已确认结论%.md$',
   } },
-  { name = '调研', patterns = { '^docs/research/' } },
   { name = '生成物', patterns = { '^docs/uml/' } },
 }
 
