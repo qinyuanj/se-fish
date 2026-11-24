@@ -1,4 +1,4 @@
--- #264 本地连接夹具的 B 级时序探针（离线模拟，可重跑）。
+-- #264 本地连接夹具的 b 级时序探针（离线模拟，可重跑）。
 -- 运行：仓库根执行 lua tests/probes/local_link_runtime.lua；退出码 0 = 全部通过。
 --
 -- 口径（ADR-0029 第三节第 10 行、条款 1-04 / 19-12）：只证明加入、离开、共享世界状态与小隊 / PK / 抢救
@@ -16,9 +16,9 @@
 --   5. 全员离开再回来后存档键翻倍（服务端留了第二份状态）。
 package.path = table.concat({ './?.lua', './?/init.lua', package.path }, ';')
 
-local ZoneFixtures = require('tests.support.zone_fixtures')
-local GameCfg = require('common.game_cfg')
-ZoneFixtures.Apply(GameCfg)
+local zone_fixtures = require('tests.support.zone_fixtures')
+local game_cfg = require('common.game_cfg')
+zone_fixtures.Apply(game_cfg)
 local Link = assert(loadfile('tests/support/local_link.lua'))()
 
 local MARK = 'LOCALLINK264'
@@ -49,7 +49,7 @@ local function run()
             if seen[key] then unique = false end
             seen[key] = true
             keys[player.UserId] = key
-            if not link:Data(player) then unique = false end
+            if not link:data(player) then unique = false end
         end
         check('每条连接独立读档且存档键唯一', unique)
 
@@ -78,24 +78,24 @@ local function run()
         check('同一份地面实例只结算一次', okCount == 1, okCount)
 
         local target = players[7]
-        link:Hit(nil, target, 'fishAttack', GameCfg.Vitals.MaxHealth + 10)
+        link:Hit(nil, target, 'fishAttack', game_cfg.vitals.MaxHealth + 10)
         check('目标进入濒死', link:Phase(target) == 'downed', link:Phase(target))
         players[8].Character.Position = at(target.Character.Position, 1)
         link:Interact(players[8], { target = 'downedPlayer', action = 'Rescue',
             targetUserId = target.UserId, seq = 1 })
         check('抢救开始', link:Phase(target) == 'rescuing', link:Phase(target))
         link:Leave(players[8])
-        link:Advance(GameCfg.Rescue.DurationSec + 0.1)
+        link:Advance(game_cfg.Rescue.DurationSec + 0.1)
         check('施救者断线后抢救不结算', link:Phase(target) == 'downed', link:Phase(target))
         local health = target.Character.Controller.Health
         local back = link:Join(7008, { position = at(target.Character.Position, 1) })
-        link:Advance(GameCfg.Rescue.DurationSec + 0.1)
+        link:Advance(game_cfg.Rescue.DurationSec + 0.1)
         check('重连不补结算', link:Phase(target) == 'downed' and target.Character.Controller.Health == health)
         players[6].Character.Position = at(target.Character.Position, 1)
         link:Interact(players[6], { target = 'downedPlayer', action = 'Rescue',
             targetUserId = target.UserId, seq = 2 })
-        link:Advance(GameCfg.Rescue.DurationSec + 0.1)
-        local expected = math.floor(GameCfg.Vitals.MaxHealth * GameCfg.Survival.ReviveHealthPercent / 100)
+        link:Advance(game_cfg.Rescue.DurationSec + 0.1)
+        local expected = math.floor(game_cfg.vitals.MaxHealth * game_cfg.Survival.ReviveHealthPercent / 100)
         check('换人重新发起后救起', link:Phase(target) == 'alive'
             and target.Character.Controller.Health == expected, target.Character.Controller.Health)
         local online = link:Online(back)
@@ -111,7 +111,7 @@ local function run()
             for index = 1, 10 do
                 local player = link:Join(7000 + index, { position = at(ARENA, index) })
                 if keys[player.UserId] == link.managers.Save:Key(player.UserId)
-                    and link:Data(player) then restored = restored + 1 end
+                    and link:data(player) then restored = restored + 1 end
             end
             check('第 ' .. round .. ' 轮全员进出后全部恢复', left == 0 and restored == 10,
                 'left=' .. left .. ' restored=' .. restored)

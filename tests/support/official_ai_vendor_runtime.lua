@@ -1,7 +1,7 @@
 -- 加载未修改 vendor 的最小运行环境；game/Task/World/Players 与单位是显式引擎边界。
-local Probe = require('tools.probes.official_ai_probe')
+local probe = require('tools.probes.official_ai_probe')
 
-local Loader = {}
+local loader = {}
 
 local MODULE_PATHS = {
     ['server.packages.official_ai_feature.api'] = 'server/packages/official_ai_feature/api.lua',
@@ -101,7 +101,7 @@ local function newUnit(id, position)
 end
 
 -- deterministic 环境：runFn 返回一个按秒推进的时间回调；Task 调度器轮询所有作业。
-function Loader.loadAi()
+function loader.loadAi()
     local loaded = {}
     local time = { value = 0 }
     local taskService = { tasks = {} }
@@ -196,4 +196,4 @@ function Loader.loadAi()
     }
 end
 
-return Loader
+return loader

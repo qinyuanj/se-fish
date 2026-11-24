@@ -1,4 +1,4 @@
--- 失败方式：内容表被运行期写入污染（#203：重载 GameCfg 后键集合变化、锚点入口指向未解析的场景区域表）；
+-- 失败方式：内容表被运行期写入污染（#203：重载 game_cfg 后键集合变化、锚点入口指向未解析的场景区域表）；
 --   盲盒保底两件与大奖表顺序脱钩；抽奖判奖口径与代码注释不再一致；升级组漏级/重级、背包描述与容量错位。
 -- 源行的编号/价/等级/限购/名称/权重/倍率等口径由 common/content_validation.lua 与 content_validation_test 覆盖，这里不再重列。
 -- 迁移自 tests/gameplay/cfg_shop_lottery_test.lua（#83）；案例顺序沿用旧入口的方法名字典序。
@@ -6,7 +6,7 @@ describe("TestContentCfg", function()
   it("test_blindbox_content_table_holds_no_runtime_keys_across_gamecfg_loads", function()
     local cfgModule, contentModule = 'common.game_cfg', 'common.cfg.blindbox'
     local savedCfg, savedContent = package.loaded[cfgModule], package.loaded[contentModule]
-    -- 测试基线已预加载 GameCfg。单独加载这两个模块，断言失败时也恢复原缓存。
+    -- 测试基线已预加载 game_cfg。单独加载这两个模块，断言失败时也恢复原缓存。
     package.loaded[cfgModule], package.loaded[contentModule] = nil, nil
     local ok, err = pcall(function()
       local content = require(contentModule)
@@ -41,8 +41,8 @@ describe("TestContentCfg", function()
   -- 任何一次 loadfile('common/game_cfg.lua')()（测试重载不换 package.loaded）都会改写它的键，
   -- 而分片跑时没有别的文件把锚点入口装回来，抽奖结算全部被范围校验拒绝。
   it("test_lottery_content_table_holds_no_runtime_keys_across_gamecfg_reload", function()
-    local ZoneFixtures = require('tests.support.zone_fixtures')
-    ZoneFixtures.Load()
+    local zone_fixtures = require('tests.support.zone_fixtures')
+    zone_fixtures.Load()
     local content = require('common.cfg.lottery')
     local before = {}
     for key in pairs(content) do before[#before + 1] = key end

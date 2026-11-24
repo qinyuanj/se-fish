@@ -1,20 +1,20 @@
 -- Spoke 主 HUD 底部道具栏视图（ADR-0032 / #297-B3b2，归属 L2 client.views）：
--- 挂载于 RootView 常驻 HUD 槽位，订阅只读 ClientStore.item_bar；
--- 通过 Dock 增量管理 ItemBarSlot1..N（随 slotCount 2..8 扩容重排与缩容卸载）；
--- 支持点击选槽（SelectSlot）、拖拽换格（MoveSlot）、爆炸物点按直投/长按瞄准手势（PressGesture + ThrowAimPhase）；
+-- 挂载于 root_view 常驻 HUD 槽位，订阅只读 client_store.item_bar；
+-- 通过 Dock 增量管理 ItemBarSlot1..n（随 slotCount 2..8 扩容重排与缩容卸载）；
+-- 支持点击选槽（SelectSlot）、拖拽换格（MoveSlot）、爆炸物点按直投/长按瞄准手势（press_gesture + ThrowAimPhase）；
 -- 响应 backpack_open 展开遮挡隐藏，重连或根 UI 销毁自动零残留清理全部节点与连接。
 
 local spoke = require("common.packages.spoke.api")
-local GameCfg = require("common.game_cfg")
-local Number = require("common.number")
-local MainHudLayout = require("client.main_hud_layout")
-local PressGesture = require("client.press_gesture")
-local ViewUtil = require("client.views.view_util")
+local game_cfg = require("common.game_cfg")
+local number = require("common.number")
+local main_hud_layout = require("client.main_hud_layout")
+local press_gesture = require("client.press_gesture")
+local view_util = require("client.views.view_util")
 
 local Effect = spoke.Effect
 local State = spoke.State
 
-local MainHudItemBarView = {}
+local main_hud_item_bar_view = {}
 
 local BUTTON_IMAGE = "official://image/11017"
 local DRAG_THRESHOLD_PX = 10
@@ -45,7 +45,7 @@ local function read_xy(pos)
     return nil
   end
   local ok, x, y = pcall(function() return pos.x, pos.y end) -- 兼容 Vector2 userdata 坐标读取，异常时视为无效
-  if ok and Number.IsFiniteNumber(x) and Number.IsFiniteNumber(y) then
+  if ok and number.IsFiniteNumber(x) and number.IsFiniteNumber(y) then
     return { x = x, y = y }
   end
   return nil
@@ -64,14 +64,14 @@ end
 
 local function default_fire_re(re_name, payload)
   local ok, err = pcall(function() -- 宿主 RE 通道未就绪或调用异常时记录并安全忽略
-    local re_util = rawget(_G, "REUtil") or require("common.re_util")
+    local re_util = rawget(_G, "re_util") or require("common.re_util")
     local re = re_util and re_util:GetRE(re_name) or nil
     if re ~= nil then
       re:FireServer(payload)
     end
   end)
   if not ok then
-    print("[MainHudItemBarView] 发送 " .. tostring(re_name) .. " 失败", tostring(err))
+    print("[main_hud_item_bar_view] 发送 " .. tostring(re_name) .. " 失败", tostring(err))
   end
 end
 
@@ -81,7 +81,7 @@ local function default_resolve_aim_target(pos)
   end
   local ok_ray, ray = pcall(function() -- 宿主 CameraService 未就绪或射线转换失败时安全回退无目标直投
     local camera = game ~= nil and game:GetService("CameraService") or nil
-    return camera and camera:ScreenPointToRay(pos.x, pos.y, GameCfg.Ability.Throw.Range * 2) or nil
+    return camera and camera:ScreenPointToRay(pos.x, pos.y, game_cfg.Ability.Throw.Range * 2) or nil
   end)
   if not ok_ray or ray == nil then
     return nil
@@ -97,7 +97,7 @@ local function default_resolve_aim_target(pos)
     if p == nil then
       return nil
     end
-    if Number.IsFiniteNumber(p.x) and Number.IsFiniteNumber(p.y) and Number.IsFiniteNumber(p.z) then
+    if number.IsFiniteNumber(p.x) and number.IsFiniteNumber(p.y) and number.IsFiniteNumber(p.z) then
       return { x = p.x, y = p.y, z = p.z }
     end
     return nil
@@ -106,14 +106,14 @@ local function default_resolve_aim_target(pos)
 end
 
 local function clamp_slot_count(state)
-  local items = GameCfg.Items
-  local raw = (type(state) == "table" and Number.IsFiniteNumber(state.slotCount))
+  local items = game_cfg.Items
+  local raw = (type(state) == "table" and number.IsFiniteNumber(state.slotCount))
     and math.floor(state.slotCount) or items.InitialItemBarSlots
   return math.max(items.InitialItemBarSlots, math.min(items.ItemBarSlots, raw))
 end
 
 local function compute_layout(resolution, state)
-  return MainHudLayout.Compute({
+  return main_hud_layout.Compute({
     width = resolution.x,
     height = resolution.y,
     itemBarSlots = clamp_slot_count(state),
@@ -124,7 +124,7 @@ local function item_display_name(entry, def)
   if def == nil then
     return ""
   end
-  local prefix = GameCfg.Items.CookRate(entry) ~= nil and GameCfg.Grill.CookedPrefix or ""
+  local prefix = game_cfg.Items.CookRate(entry) ~= nil and game_cfg.Grill.CookedPrefix or ""
   return prefix .. def.Name
 end
 
@@ -176,11 +176,11 @@ end
 
 --- 挂载底部道具栏动态格位、拖拽换格与爆炸物长按/点按手势视图。
 ---@param s table EffectBuilder
----@param ctx table RootView 上下文 { root_node, store, clock, create_node, own_node, connect }
+---@param ctx table root_view 上下文 { root_node, store, clock, create_node, own_node, connect }
 ---@param options table|nil { get_resolution?, send_action?, on_throw?, on_aim_begin?, resolve_drop_target?, resolve_aim_target?, notify?, now_sec?, backpack_open?, layout? }
-function MainHudItemBarView.mount(s, ctx, options)
+function main_hud_item_bar_view.mount(s, ctx, options)
   options = options or {}
-  local resolution = ViewUtil.get_resolution(ctx, options)
+  local resolution = view_util.get_resolution(ctx, options)
 
   local send_action = options.send_action or function(action, value)
     default_fire_re("ItemBarAction", { action = action, value = value })
@@ -200,7 +200,7 @@ function MainHudItemBarView.mount(s, ctx, options)
   local resolve_drop_target = options.resolve_drop_target
   local on_drop_resolver = options.on_drop_resolver
   local resolve_aim_target = options.resolve_aim_target or default_resolve_aim_target
-  local notify = options.notify or function(text) ViewUtil.notify(ctx, text) end
+  local notify = options.notify or function(text) view_util.notify(ctx, text) end
 
   local function now_sec()
     if type(options.now_sec) == "function" then
@@ -213,11 +213,11 @@ function MainHudItemBarView.mount(s, ctx, options)
       local world = game ~= nil and game:GetService("World") or nil
       return world and world.GetServerTime and world:GetServerTime() or 0
     end)
-    return (ok and Number.IsFiniteNumber(t)) and t or 0
+    return (ok and number.IsFiniteNumber(t)) and t or 0
   end
 
-  local backpack_open = options.backpack_open or State.new("MainHudItemBarView.backpack_open", false)
-  local aim_slot = State.new("MainHudItemBarView.aim_slot", nil)
+  local backpack_open = options.backpack_open or State.new("main_hud_item_bar_view.backpack_open", false)
+  local aim_slot = State.new("main_hud_item_bar_view.aim_slot", nil)
 
   local layout_sig = options.layout or s:memo("ItemBarLayout", function(ms)
     return compute_layout(resolution, ms:d(ctx.store.item_bar))
@@ -236,7 +236,7 @@ function MainHudItemBarView.mount(s, ctx, options)
     end
     for index, rect in pairs(slot_rects) do
       if math.abs(pos.x - rect.x) <= rect.hw and math.abs(pos.y - rect.y) <= rect.hh then
-        return { container = GameCfg.Items.ContainerId.ItemBar, index = index }
+        return { container = game_cfg.Items.ContainerId.ItemBar, index = index }
       end
     end
     return nil
@@ -262,7 +262,7 @@ function MainHudItemBarView.mount(s, ctx, options)
     local state = ctx.store.item_bar:now()
     local slots = type(state) == "table" and type(state.slots) == "table" and state.slots or nil
     local entry = slots and slots[index] or nil
-    local def = entry and GameCfg.Items.Definitions[entry.itemId] or nil
+    local def = entry and game_cfg.Items.Definitions[entry.itemId] or nil
     return def ~= nil and def.Type == "爆炸物"
   end
 
@@ -320,7 +320,7 @@ function MainHudItemBarView.mount(s, ctx, options)
       end
 
       local entry = slots[slot_index]
-      local def = entry ~= nil and GameCfg.Items.Definitions[entry.itemId] or nil
+      local def = entry ~= nil and game_cfg.Items.Definitions[entry.itemId] or nil
       local slot_data = {
         index = slot_index,
         cell = cell,
@@ -378,12 +378,12 @@ function MainHudItemBarView.mount(s, ctx, options)
             end
             local began = read_touch_pos(touch, "BeganPosition")
             drag_source = {
-              container = GameCfg.Items.ContainerId.ItemBar,
+              container = game_cfg.Items.ContainerId.ItemBar,
               index = slot_index,
               began = began,
             }
-            local gesture = PressGesture.New({
-              LongPressSec = GameCfg.Ability.Throw.LongPressSec,
+            local gesture = press_gesture.New({
+              LongPressSec = game_cfg.Ability.Throw.LongPressSec,
             })
             gesture:Begin(now_sec(), began)
             slot_press = { index = slot_index, gesture = gesture }
@@ -399,7 +399,7 @@ function MainHudItemBarView.mount(s, ctx, options)
               slot_press = nil
               return
             end
-            if source ~= nil and source.container == GameCfg.Items.ContainerId.ItemBar
+            if source ~= nil and source.container == game_cfg.Items.ContainerId.ItemBar
               and source.index == slot_index and ended ~= nil and source.began ~= nil then
               if math.abs(ended.x - source.began.x) >= DRAG_THRESHOLD_PX
                 or math.abs(ended.y - source.began.y) >= DRAG_THRESHOLD_PX then
@@ -531,14 +531,14 @@ function MainHudItemBarView.mount(s, ctx, options)
   }
 end
 
---- 返回可供 RootView.mount({ hud = { ... } }) 直接注册的 HUD spec。
-function MainHudItemBarView.spec(options)
+--- 返回可供 root_view.mount({ hud = { ... } }) 直接注册的 HUD spec。
+function main_hud_item_bar_view.spec(options)
   return {
     name = "MainHudItemBar",
     mount = function(s, ctx)
-      MainHudItemBarView.mount(s, ctx, options)
+      main_hud_item_bar_view.mount(s, ctx, options)
     end,
   }
 end
 
-return MainHudItemBarView
+return main_hud_item_bar_view

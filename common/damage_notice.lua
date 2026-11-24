@@ -1,10 +1,10 @@
-local DamageNotice = {}
+local damage_notice = {}
 
-function DamageNotice.Publish(payload)
-    require('common.re_util'):GetRE('DamageNotice'):FireAllClients(payload)
+function damage_notice.Publish(payload)
+    require('common.re_util'):GetRE('damage_notice'):FireAllClients(payload)
 end
 
-function DamageNotice.FromHealth(targetId, previous, current, position, critical, targetType, height)
+function damage_notice.FromHealth(targetId, previous, current, position, critical, targetType, height)
     if type(previous) ~= 'number' or type(current) ~= 'number'
         or previous ~= previous or current ~= current
         or math.abs(previous) == math.huge or math.abs(current) == math.huge
@@ -19,4 +19,4 @@ function DamageNotice.FromHealth(targetId, previous, current, position, critical
     }
 end
 
-return DamageNotice
+return damage_notice

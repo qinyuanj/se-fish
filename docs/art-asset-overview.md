@@ -9,12 +9,12 @@
 - **复用**：骨架与动作复用、程序位移的职责边界见 [ADR-0006](adr/0006-structural-asset-reuse.md)。
 - **尺度、原点与贴图**：制作与导出前按 [ADR-0004](adr/0004-fish-asset-scale.md) 确定比例、原点和贴图组合。
 - **交付**：模型与动画分包导出，文件构成见 [ADR-0004](adr/0004-fish-asset-scale.md)「制作与导出约定」；导入与播放按下文「模型动画导入与播放」执行。路径全为 ASCII，使用英文稳定 ID（`fish_<名>`；普通／极品加 `_normal`／`_premium` 后缀）。交付门槛见「验收」。蒙皮导入器可能拒绝 UCX 碰撞网格：碰撞体在引擎侧搭，Blender 里的碰撞代理只作编辑参考，不随导出交付。
-- **概念图（2026-10-28 定稿，[#156](https://github.com/qinyuanj/se-fish/issues/156)）**：造型在概念图阶段锁定，用户确认后才生成 3D（重出概念图 9 额度，重生成模型 30）。提示词末尾统一加风格描述 `Stylized 3D game creature asset, semi-realistic hand-painted look with clean matte surfaces, natural coloration and true-to-species anatomy, slightly simplified shapes with a bold readable silhouette, not a photograph, plain white background, even soft studio lighting, no cast shadow, whole body in frame`。起点版本缺 `hand-painted`、`matte`、`not a photograph`，非鱼物种会出成照片级（试验记录见 #156）。姿态按身体结构定：鱼侧视、鳍展开；鸟 T 姿态、双腿朝下、腿与翼尖画粗；双足正面 A 姿态；四足低姿态。首领另出三视图，做法见 [Blender 与 Meshy 使用](agents/art-pipeline.md)。
+- **概念图（2026-10-28 定稿，[#156](https://github.com/qinyuanj/se-fish/issues/156)）**：造型在概念图阶段锁定，用户确认后才生成 3D（重出概念图 9 额度，重生成模型 30）。提示词末尾统一加风格描述 `Stylized 3D game creature asset, semi-realistic hand-painted look with clean matte surfaces, natural coloration and true-to-species anatomy, slightly simplified shapes with a bold readable silhouette, not a photograph, plain white background, even soft studio lighting, no cast shadow, whole body in frame`。起点版本缺 `hand-painted`、`matte`、`not a photograph`，非鱼物种会出成照片级（试验记录见 #156）。姿态按身体结构定：鱼侧视、鳍展开；鸟 T 姿态、双腿朝下、腿与翼尖画粗；双足正面 a 姿态；四足低姿态。首领另出三视图，做法见 [Blender 与 Meshy 使用](agents/art-pipeline.md)。
 - **三视图范围（2026-10-28，[#158](https://github.com/qinyuanj/se-fish/issues/158) 三头鲨试点）**：首领走三视图，精英鱼和普通鱼走单图。三头鲨的概念图只露出一张正脸，用三视图生成后三个头都有完整正脸，三叉分颈和背部也与概念图一致。七种精英鱼（电鳗、虾霸、帝王蟹、剑鱼、海象、白头鹰、沧龙）都是单头、常规结构，一张侧视或正面概念图就能交代清楚，多花 9~18 额度（三视图要核对顺序，可能重出）没有收益。精英鱼若出现单图看不到的结构（多头、背部关键特征），按首领处理。
 
 ## 验收
 
-分两道：离线重导入（接缝 B）只证明导出链路自洽；游戏内验收（接缝 A）按 [ADR-0004](adr/0004-fish-asset-scale.md)「验收」一节做。**接缝 A 不做完不得宣布资产可用**，校验报告通过也一样。
+分两道：离线重导入（接缝 b）只证明导出链路自洽；游戏内验收（接缝 a）按 [ADR-0004](adr/0004-fish-asset-scale.md)「验收」一节做。**接缝 a 不做完不得宣布资产可用**，校验报告通过也一样。
 
 - **离线重导入**：逐文件按类型重导入。模型量尺寸、核对网格数并跑网格封闭性审计；蒙皮模型另核对骨骼与权重；纯骨架动画核对骨架兼容性、帧区间与有效运动。报告写到美术工作区该资产目录的 `validation/validation.json`。离线交付门槛只看这份校验脚本报告：`failures` 为空（含网格封闭性硬门槛）才算通过；报告、`mesh` 段或预算文件缺失都算失败。
 - **网格封闭性（硬门槛，口径见 [#112](https://github.com/qinyuanj/se-fish/issues/112)）**：
@@ -27,12 +27,12 @@
 
 ### 模型动画导入与播放
 
-适用于自定义非人形模型。人形角色动画走另一条接口：`HumanUnit` / `EggyUnit` 的 `Animator:LoadAnimation`（如 `GameCfg.Casting.LandedAnimation`），与非人形模型片段的播放接口分开使用。以下流程由 [#159](https://github.com/qinyuanj/se-fish/issues/159) 鳄雀鳝试点验证。
+适用于自定义非人形模型。人形角色动画走另一条接口：`HumanUnit` / `EggyUnit` 的 `Animator:LoadAnimation`（如 `game_cfg.Casting.LandedAnimation`），与非人形模型片段的播放接口分开使用。以下流程由 [#159](https://github.com/qinyuanj/se-fish/issues/159) 鳄雀鳝试点验证。
 
 1. **挂动画**：打开模型 FBX 的「自定义模型导入」对话框，在「模型动画导入」中点「添加模型动画」，加入各段仅骨架的动画 FBX。逐段切换预览，确认骨架能驱动网格，再与模型同一次上传。
 2. **更新引用**：每次上传都生成新的网格资源 ID，记下它并更新待验收单位的引用。
 3. **播放**：用 `AnimatedUnit` 承载网格，单位同步到客户端后（约 0.5 秒）在服务端调用 `PlayAnimation("fish_alligator_gar_Walk", {looped = true, speed = 1})`，多端播放由服务端同步。名称使用导入对话框中的片段名；鳄雀鳝默认显示的是动画文件名。普通模型单位没有此播放接口。
-4. **验画面**：固定镜头，连续截取几帧，核对模型姿态变化，并检查尺寸、站位与骨架匹配。像素差只比较模型区域，排除 UI、水面和镜头移动；同一位置用不存在的片段名做对照，鱼身区域差异应为 0。探针与调用顺序见 [Blender 与 Meshy 使用「接缝 A 取证」](agents/art-pipeline.md#接缝-a-取证)。逐段记录结果，能播只证明播放链路通过，其余接缝 A 项目仍须分别验收。
+4. **验画面**：固定镜头，连续截取几帧，核对模型姿态变化，并检查尺寸、站位与骨架匹配。像素差只比较模型区域，排除 UI、水面和镜头移动；同一位置用不存在的片段名做对照，鱼身区域差异应为 0。探针与调用顺序见 [Blender 与 Meshy 使用「接缝 a 取证」](agents/art-pipeline.md#接缝-a-取证)。逐段记录结果，能播只证明播放链路通过，其余接缝 a 项目仍须分别验收。
 
 **实测陷阱**（[#160](https://github.com/qinyuanj/se-fish/issues/160) 复测）：
 
@@ -43,21 +43,21 @@
 - `AnimatedUnit` 默认 `PhysicsMeshId` 取渲染网格，碰撞 AABB 与静止姿态网格同比例，播放中不随动画变形；动作里的根位移会让画面上的鱼离开碰撞体（#162 `Attack_Bite` 约 1.5 单位）。
 - 单位默认受重力且可碰撞，落地后网格最低点贴地；原点不在底面中心时，单位 `Position.y` 会高出地面同样的距离，可据此核对原点偏差。
 - `AnimatedUnit` 不带 Controller：`AnimatedUnit : WorldUnit`（`EggyAPI.lua` `:5040`）没有 `Health` / `TakeDamage` / `MoveTo` / `Died`。用它承载鱼本体时，血量、受击与死亡信号得另有归属（双单位方案见 [ADR-0030](adr/0030-dual-unit-fish-carrier.md)）。
-- `data/OfficialAsset.lua` 的 `motion` 段不是运行时 ID：同名动作 ID 不同（「钓鱼」在那里是 20880，运行时是 24450）。从 `motion` 段取的 ID 播放不报错，但画面不动（#172 试玩 A/B 确认）。ID 只从手册「状态同步编辑器 · 动作 · 资产目录」取：`lua tools/cli.lua docs search "状态同步编辑器 · 动作 · 资产目录 <动作名>" --docset manual`。
+- `data/OfficialAsset.lua` 的 `motion` 段不是运行时 ID：同名动作 ID 不同（「钓鱼」在那里是 20880，运行时是 24450）。从 `motion` 段取的 ID 播放不报错，但画面不动（#172 试玩 a/b 确认）。ID 只从手册「状态同步编辑器 · 动作 · 资产目录」取：`lua tools/cli.lua docs search "状态同步编辑器 · 动作 · 资产目录 <动作名>" --docset manual`。
 - 官方模型库没有鳗、哥斯拉、三头鲨，动作目录全是角色动作（2026-09 核查）。首领级资产一律自制，不在官方库里找替代。
 
 ## 资产状态
 
 - **罗非鱼**：8268 三角面、1 材质、1K 贴图。2026-10-16 用户口头确认游戏内导入通过，但模型、动画、尺寸各自验到哪、碰撞体怎么搭**没有书面记录**，不能据此推定罗非鱼的网格带有动画片段；导入方式见「模型动画导入与播放」。焊接后有 4 条非流形边（眼/嘴附近的退化微折叠，边长约体长 0.3%~1%），按硬门槛不合格；作基准前先清微面，或单独记录定为基线的决定，不为基线变绿放宽硬性 0 项。
-- **鲤鱼**：网格碎片化（435 连通块、约 49% 开放边、326 游离顶点），校验报告 `failures` 非空。已决定**不重新生成**（Meshy 已实扣 30），优先在 Blender 里修补；修好前不可用，接缝 A 也等修复后再验。
-- **海鸥**（2026-10-22）：接缝 B 通过，网格 1 连通块且硬性 0 项全为 0；接缝 A 未做。
-- **鳄雀鳝**（2026-10-28 更新）：原点改为底面中心后重导出，接缝 B 通过（7820 三角面、导出全长 0.05 即折算游戏内 5 单位、Idle/Walk/Attack）。接缝 A 已核对原点（脚踩地，与单位方块同一平面）、尺寸（约为方块边长 4~5 倍，与 5 单位同一量级），以及三段动画在 `AnimatedUnit` 上能播。当前用网格 `custom://0h1DIiDiCuEpQD9Kj`；首次上传的 `0h1D75CoYl8bow4id` 经 #160 复测同样带片段，场上摆放的单位仍引用它且不是 `AnimatedUnit`。以下未核对，留给首领功能实现：Walk 步幅与 6 m/s 移速是否匹配（是否滑步）、胶囊与挂点位置。
+- **鲤鱼**：网格碎片化（435 连通块、约 49% 开放边、326 游离顶点），校验报告 `failures` 非空。已决定**不重新生成**（Meshy 已实扣 30），优先在 Blender 里修补；修好前不可用，接缝 a 也等修复后再验。
+- **海鸥**（2026-10-22）：接缝 b 通过，网格 1 连通块且硬性 0 项全为 0；接缝 a 未做。
+- **鳄雀鳝**（2026-10-28 更新）：原点改为底面中心后重导出，接缝 b 通过（7820 三角面、导出全长 0.05 即折算游戏内 5 单位、Idle/Walk/Attack）。接缝 a 已核对原点（脚踩地，与单位方块同一平面）、尺寸（约为方块边长 4~5 倍，与 5 单位同一量级），以及三段动画在 `AnimatedUnit` 上能播。当前用网格 `custom://0h1DIiDiCuEpQD9Kj`；首次上传的 `0h1D75CoYl8bow4id` 经 #160 复测同样带片段，场上摆放的单位仍引用它且不是 `AnimatedUnit`。以下未核对，留给首领功能实现：Walk 步幅与 6 m/s 移速是否匹配（是否滑步）、胶囊与挂点位置。
 
 - **引擎临时占位（[#172](https://github.com/qinyuanj/se-fish/issues/172)）**：以下全部是引擎临时占位，正式资源见 [#44](https://github.com/qinyuanj/se-fish/issues/44)；只用引擎内官方资源，不自制、不付费生成。
-  - **出手动作**：官方动画，ID 只配在 `common/game_cfg.lua` 的 `AttackAnim` 表，经 `GameCfg.Ability` 的 `Unarmed`、`MeleeWeapons`、`Guns`、`Throw` 各行 `Anim` 引用；由 `MgrWeapon` 在出手成功后按上半身播放，挥砍预设的 `ABILITY_ANOSTATE_ANIMKEY` 保持空。空手、指虎用拳击类，匕首组用单刀连击，斧组用锤子攻击，枪械按手枪、步枪、机枪、手炮开火分组，投掷用通用「攻击」26646（目录里的「投掷」25860 与「向后/左/右投掷」26649–26651 运行时加载长度为 0，不能播）。ID 取自手册「状态同步编辑器 · 动作 · 资产目录」，取法见上文「实测陷阱」。
-  - **钓鱼佬**：七区都是官方「咸鱼」`official://preset/102179`，场景单位名 01 为 `FishermanModel`，02–07 为 `Z<i>_FishermanModel`（`GameCfg.Interact.Fishermen[i].ModelName`），放在本区「设施」、与本区钓鱼佬触发器同点。
+  - **出手动作**：官方动画，ID 只配在 `common/game_cfg.lua` 的 `AttackAnim` 表，经 `game_cfg.Ability` 的 `Unarmed`、`MeleeWeapons`、`Guns`、`Throw` 各行 `Anim` 引用；由 `MgrWeapon` 在出手成功后按上半身播放，挥砍预设的 `ABILITY_ANOSTATE_ANIMKEY` 保持空。空手、指虎用拳击类，匕首组用单刀连击，斧组用锤子攻击，枪械按手枪、步枪、机枪、手炮开火分组，投掷用通用「攻击」26646（目录里的「投掷」25860 与「向后/左/右投掷」26649–26651 运行时加载长度为 0，不能播）。ID 取自手册「状态同步编辑器 · 动作 · 资产目录」，取法见上文「实测陷阱」。
+  - **钓鱼佬**：七区都是官方「咸鱼」`official://preset/102179`，场景单位名 01 为 `FishermanModel`，02–07 为 `Z<i>_FishermanModel`（`game_cfg.Interact.Fishermen[i].ModelName`），放在本区「设施」、与本区钓鱼佬触发器同点。
   - **抽奖机**：官方资源库没有抽奖机类预设，七区都用官方「电视」`official://preset/1504175` 占位，场景单位名 `Z<i>_LotteryModel`，放在本区「设施」、与本区抽奖点标记 `Z<i>_Lottery`（「基础方块」，mesh 5000001）同点；交互仍以标记为锚点。摆放探针 `tests/probes/zone172_lottery_models.lua`。
-  - **试玩核对（2026-11-04）**：14 个模型贴地，`tests/probes/zone172_model_ground_gap.lua` 全部通过（最大偏差 Z4 抽奖机 -0.063 m，其余在 ±0.03 m 内）；地图已保存，重开后位置不变。出手动作第一版取了 `data/OfficialAsset.lua` 的 ID，试玩 A/B 连拍确认在蛋仔上不动；换成手册动作目录的 ID 后**尚待试玩复核**。
+  - **试玩核对（2026-11-04）**：14 个模型贴地，`tests/probes/zone172_model_ground_gap.lua` 全部通过（最大偏差 Z4 抽奖机 -0.063 m，其余在 ±0.03 m 内）；地图已保存，重开后位置不变。出手动作第一版取了 `data/OfficialAsset.lua` 的 ID，试玩 a/b 连拍确认在蛋仔上不动；换成手册动作目录的 ID 后**尚待试玩复核**。
 
 ## 待定
 

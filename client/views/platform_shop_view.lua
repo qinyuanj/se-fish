@@ -1,13 +1,13 @@
-local GameCfg = require("common.game_cfg")
-local Modal = require("client.views.economy_modal")
+local game_cfg = require("common.game_cfg")
+local modal = require("client.views.economy_modal")
 
-local PlatformShopView = {}
+local platform_shop_view = {}
 
-function PlatformShopView.entry_spec()
+function platform_shop_view.entry_spec()
   return {
     name = "PlatformShopEntry",
     mount = function(scope, ctx)
-      local button = Modal.button(scope, ctx, ctx.root_node, "BtnMapShopEntry", "地图商店", function()
+      local button = modal.button(scope, ctx, ctx.root_node, "BtnMapShopEntry", "地图商店", function()
         local services = ctx.services or {}
         if type(services.open_modal) == "function" then services.open_modal("platform") end
         if type(services.send_platform) == "function" then services.send_platform({ action = "OpenCoinShop" }) end
@@ -21,12 +21,12 @@ function PlatformShopView.entry_spec()
   }
 end
 
-function PlatformShopView.modal_spec()
+function platform_shop_view.modal_spec()
   return function(scope, ctx)
     local services = ctx.services or {}
-    local panel = Modal.panel(scope, ctx, "ScreenPlatform", "地图商店")
-    local result_label = Modal.label(scope, ctx, panel, "LabelPlatformResult", "请选择商品")
-    Modal.close(scope, ctx, panel, "BtnPlatformClose", "platform")
+    local panel = modal.panel(scope, ctx, "ScreenPlatform", "地图商店")
+    local result_label = modal.label(scope, ctx, panel, "LabelPlatformResult", "请选择商品")
+    modal.close(scope, ctx, panel, "BtnPlatformClose", "platform")
     local seq, request_seq = 0, nil
     local awaiting = false
     local buttons, actions = {}, {}
@@ -42,14 +42,14 @@ function PlatformShopView.modal_spec()
     end
 
     local definitions = {}
-    local page = GameCfg.Platform.Placeholder and GameCfg.Platform.Placeholder.CoinPage
+    local page = game_cfg.Platform.Placeholder and game_cfg.Platform.Placeholder.CoinPage
     for _, offer in ipairs(page and page.Offers or {}) do definitions[#definitions + 1] = offer end
     for _, key in ipairs({ "adrenaline1", "adrenaline5" }) do
-      local row = GameCfg.Platform.Goods[key]
+      local row = game_cfg.Platform.Goods[key]
       definitions[#definitions + 1] = { key = key, name = row.name, beans = row.beans }
     end
     for _, offer in ipairs(definitions) do
-      local button = Modal.button(scope, ctx, panel, "BtnPlatformOffer_" .. offer.key, offer.name or offer.key, function()
+      local button = modal.button(scope, ctx, panel, "BtnPlatformOffer_" .. offer.key, offer.name or offer.key, function()
         local action = actions[offer.key]
         if not action or awaiting then return end
         seq = seq + 1
@@ -92,8 +92,8 @@ function PlatformShopView.modal_spec()
         end
       elseif not result.ok then
         awaiting = result.deliveryPending == true or result.reason == "unknown"
-        result_label.Text = result.text or GameCfg.Platform.ReasonText[result.reason]
-          or GameCfg.Platform.UnavailableText
+        result_label.Text = result.text or game_cfg.Platform.ReasonText[result.reason]
+          or game_cfg.Platform.UnavailableText
         notify(result_label.Text)
       end
       refresh_buttons()
@@ -101,4 +101,4 @@ function PlatformShopView.modal_spec()
   end
 end
 
-return PlatformShopView
+return platform_shop_view

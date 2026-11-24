@@ -1,12 +1,12 @@
-local GameCfg = require("common.game_cfg")
-local Modal = require("client.views.economy_modal")
+local game_cfg = require("common.game_cfg")
+local modal = require("client.views.economy_modal")
 
-local BlindboxView = {}
+local blindbox_view = {}
 
 local function prize_names()
   local names = {}
-  for _, key in ipairs(GameCfg.Blindbox.Pity.prizeItemKeys or {}) do
-    for _, entry in ipairs(GameCfg.Blindbox.Entries or {}) do
+  for _, key in ipairs(game_cfg.Blindbox.Pity.prizeItemKeys or {}) do
+    for _, entry in ipairs(game_cfg.Blindbox.Entries or {}) do
       if entry.itemKey == key then names[#names + 1] = entry.itemName break end
     end
   end
@@ -26,11 +26,11 @@ local function result_text(result)
   return table.concat(lines, "\n")
 end
 
-function BlindboxView.entry_spec()
+function blindbox_view.entry_spec()
   return {
     name = "BlindboxEntry",
     mount = function(scope, ctx)
-      local button = Modal.button(scope, ctx, ctx.root_node, "BtnBlindboxEntry", GameCfg.Blindbox.HintText, function()
+      local button = modal.button(scope, ctx, ctx.root_node, "BtnBlindboxEntry", game_cfg.Blindbox.HintText, function()
         local services = ctx.services or {}
         if type(services.open_modal) == "function" then services.open_modal("blindbox") end
         if type(services.request_blindbox_state) == "function" then services.request_blindbox_state() end
@@ -44,12 +44,12 @@ function BlindboxView.entry_spec()
   }
 end
 
-function BlindboxView.modal_spec()
+function blindbox_view.modal_spec()
   return function(scope, ctx)
     local services = ctx.services or {}
-    local panel = Modal.panel(scope, ctx, "ScreenBlindbox", GameCfg.Blindbox.HintText)
-    local pity = Modal.label(scope, ctx, panel, "LabelBlindboxPity", "")
-    local result_label = Modal.label(scope, ctx, panel, "LabelBlindboxResult", "")
+    local panel = modal.panel(scope, ctx, "ScreenBlindbox", game_cfg.Blindbox.HintText)
+    local pity = modal.label(scope, ctx, panel, "LabelBlindboxPity", "")
+    local result_label = modal.label(scope, ctx, panel, "LabelBlindboxResult", "")
     local seq, request_seq, request_id = 0, nil, nil
     local single, ten
     local awaiting, awaiting_elapsed = false, 0
@@ -77,15 +77,15 @@ function BlindboxView.modal_spec()
       single.Disabled, ten.Disabled = awaiting, awaiting
       single.TouchEnabled, ten.TouchEnabled = not awaiting, not awaiting
       pity.Text = string.format("已连续 %d 次未出大奖；再抽 %d 次内必出%s",
-        pity_count, math.max(1, GameCfg.Blindbox.Pity.afterMisses + 1 - pity_count), prize_names())
+        pity_count, math.max(1, game_cfg.Blindbox.Pity.afterMisses + 1 - pity_count), prize_names())
     end
     local function draw(count)
       if awaiting then return end
       local free = free_slots()
       if free and free < count and confirm_full ~= count then
         confirm_full = count
-        notify(GameCfg.Blindbox.FullNoticeText)
-        result_label.Text = GameCfg.Blindbox.FullNoticeText .. "\n再点一次确认抽取"
+        notify(game_cfg.Blindbox.FullNoticeText)
+        result_label.Text = game_cfg.Blindbox.FullNoticeText .. "\n再点一次确认抽取"
         return
       end
       confirm_full = nil
@@ -94,14 +94,14 @@ function BlindboxView.modal_spec()
       awaiting, awaiting_elapsed = true, 0
       refresh_buttons()
       if type(services.send_blindbox) == "function" then
-        services.send_blindbox({ action = "Draw", count = count, seq = seq })
+        services.send_blindbox({ action = "draw", count = count, seq = seq })
       end
     end
-    single = Modal.button(scope, ctx, panel, "BtnBlindboxSingle",
-      string.format("单抽（%d金豆）", GameCfg.Platform.Goods.blindboxSingle.beans), function() draw(1) end)
-    ten = Modal.button(scope, ctx, panel, "BtnBlindboxTen",
-      string.format("十连（%d金豆）", GameCfg.Platform.Goods.blindboxTen.beans), function() draw(10) end)
-    Modal.close(scope, ctx, panel, "BtnBlindboxClose", "blindbox")
+    single = modal.button(scope, ctx, panel, "BtnBlindboxSingle",
+      string.format("单抽（%d金豆）", game_cfg.Platform.Goods.blindboxSingle.beans), function() draw(1) end)
+    ten = modal.button(scope, ctx, panel, "BtnBlindboxTen",
+      string.format("十连（%d金豆）", game_cfg.Platform.Goods.blindboxTen.beans), function() draw(10) end)
+    modal.close(scope, ctx, panel, "BtnBlindboxClose", "blindbox")
 
     scope:effect("BlindboxInventoryProjection", function(es)
       snapshot = es:d(ctx.store.item_bar)
@@ -133,8 +133,8 @@ function BlindboxView.modal_spec()
           notify("购买或交付结果待对账，请勿重复购买；真实订单由平台核对")
         else
           awaiting, awaiting_elapsed = false, 0
-          local text = result.reason == "unavailable" and GameCfg.Blindbox.UnavailableText
-            or GameCfg.Platform.ReasonText[result.reason] or GameCfg.Platform.UnavailableText
+          local text = result.reason == "unavailable" and game_cfg.Blindbox.UnavailableText
+            or game_cfg.Platform.ReasonText[result.reason] or game_cfg.Platform.UnavailableText
           result_label.Text = text
           notify(text)
         end
@@ -161,7 +161,7 @@ function BlindboxView.modal_spec()
       local dt = type(frame) == "table" and frame.dt or frame
       if not awaiting or type(dt) ~= "number" or dt < 0 then return end
       awaiting_elapsed = awaiting_elapsed + dt
-      if awaiting_elapsed >= GameCfg.Blindbox.ResultTimeoutSec then
+      if awaiting_elapsed >= game_cfg.Blindbox.ResultTimeoutSec then
         awaiting_elapsed = 0
         if type(services.send_blindbox) == "function" then
           services.send_blindbox({ action = "Query", count = 1, seq = request_seq, requestId = request_id })
@@ -173,4 +173,4 @@ function BlindboxView.modal_spec()
   end
 end
 
-return BlindboxView
+return blindbox_view

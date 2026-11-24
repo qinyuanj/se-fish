@@ -1,29 +1,29 @@
-local Eui = require("tests.support.eui_double")
-local ClientStore = require("client.store.client_store")
-local RootView = require("client.views.root_view")
-local ReelOverlayView = require("client.views.reel_overlay_view")
-local SpokeClock = require("common.spoke_clock")
+local eui = require("tests.support.eui_double")
+local client_store = require("client.store.client_store")
+local root_view = require("client.views.root_view")
+local reel_overlay_view = require("client.views.reel_overlay_view")
+local spoke_clock = require("common.spoke_clock")
 
-local Host = {}
-function Host.new()
+local host = {}
+function host.new()
   local saved_vector, saved_color = rawget(_G, "Vector2"), rawget(_G, "Color")
   _G.Vector2 = { New = function(x, y) return { x = x, y = y } end }
   _G.Color = { New = function(r, g, b, a) return { r = r, g = g, b = b, a = a } end }
-  local clock = SpokeClock.new(20)
-  local store, writer = ClientStore.new({ clock = clock })
-  local root = Eui.Node({ Name = "UIRoot" })
+  local clock = spoke_clock.new(20)
+  local store, writer = client_store.new({ clock = clock })
+  local root = eui.Node({ Name = "UIRoot" })
   local env = { clock = clock, store = store, writer = writer, root = root, saved_vector = saved_vector, saved_color = saved_color,
     sent = {}, closed = {}, created = {}, reel = {} }
-  env.view = RootView.mount(root, store, {
+  env.view = root_view.mount(root, store, {
     services = {
       reel = env.reel,
       now = function() return clock.now() end,
       send_reel = function(payload) env.sent[#env.sent + 1] = payload end,
       send_close = function(payload) env.closed[#env.closed + 1] = payload end,
     },
-    overlays = { reel = ReelOverlayView.spec() },
+    overlays = { reel = reel_overlay_view.spec() },
     create_node = function(kind, props)
-      local node = Eui.Node({ Kind = kind, Name = props and props.Name,
+      local node = eui.Node({ Kind = kind, Name = props and props.Name,
         Parent = props and props.Parent, Visible = props and props.Visible,
         Text = props and (props.Text or props.ButtonText) or "",
         Position = props and props.Position, Size = props and props.Size,
@@ -48,4 +48,4 @@ function Host.new()
   end
   return env
 end
-return Host
+return host

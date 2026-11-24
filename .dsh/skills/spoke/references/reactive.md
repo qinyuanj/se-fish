@@ -21,7 +21,7 @@
 - 重入 `invoke` 入队而非递归，按 FIFO 逐事件 dispatch。subscriber 抛错只记录并隔离，后续 subscriber 与事件仍继续。
 - 一次 invoke 整体处于 batch：普通 subscriber 仍逐次收到通知，但 Auto 树中的 Effect/Memo 等通知全部 subscriber 后才 flush，因此观察不到 subscriber 序列制造的中间组合值。
 - State 的初始值不通知；`set` 先比较再写入，变化时把新值传给 subscriber。`update(fn)` 读取当前值并复用 `set`，不绕过相等判断。
-- 需要结构相等时传 `equals(old, new)`；核心不做任意 table deep equality。`SpokeRuntime.batch` 不合并普通 State subscriber 的通知。
+- 需要结构相等时传 `equals(old, new)`；核心不做任意 table deep equality。`spoke_runtime.batch` 不合并普通 State subscriber 的通知。
 - 命名单元且初值为 nil 时，构造参数必须同时传 name 和 nil，避免把单字符串当作 initial value。
 
 ## 依赖跟踪：静态订阅与动态槽位
@@ -31,7 +31,7 @@
 每次 block 运行（含重跑）按以下顺序发生：
 
 1. 读取位置归零，但暂不退订旧依赖。
-2. 第 N 次 `s:d(signal)` 对应第 N 槽位：首次读取新增订阅；相同 signal 保留订阅；不同 signal 先退订再换绑。
+2. 第 n 次 `s:d(signal)` 对应第 n 槽位：首次读取新增订阅；相同 signal 保留订阅；不同 signal 先退订再换绑。
 3. 回调携带槽位序号；只有该槽位已在本轮重新读到，回调才调度。换绑或重读前触发的旧依赖属于 stale，必须抑制。
 4. block 结束后退订并删除本轮未读取的尾部槽位；即使用户 block 抛错，也照样收尾。
 5. dispose 同时退订静态与动态依赖，不能遗留回调。

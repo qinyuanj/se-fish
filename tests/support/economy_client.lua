@@ -1,10 +1,10 @@
-local ClientStore = require("client.store.client_store")
-local RootView = require("client.views.root_view")
-local LotteryView = require("client.views.lottery_view")
-local BlindboxView = require("client.views.blindbox_view")
-local PlatformShopView = require("client.views.platform_shop_view")
-local LotteryInteraction = require("client.views.lottery_interaction")
-local Eui = require("tests.support.eui_double")
+local client_store = require("client.store.client_store")
+local root_view = require("client.views.root_view")
+local lottery_view = require("client.views.lottery_view")
+local blindbox_view = require("client.views.blindbox_view")
+local platform_shop_view = require("client.views.platform_shop_view")
+local lottery_interaction = require("client.views.lottery_interaction")
+local eui = require("tests.support.eui_double")
 
 local M = {}
 function M.new(options)
@@ -14,9 +14,9 @@ function M.new(options)
   _G.Vector2 = { New = function(x, y) return { x = x, y = y } end }
   _G.Vector3 = { New = function(x, y, z) return { x = x, y = y, z = z } end }
   _G.Color = { New = function(...) return { ... } end }
-  env.store, env.writer = ClientStore.new()
-  env.root = Eui.Node({ Name = "UIRoot" })
-  env.view = RootView.mount(env.root, env.store, {
+  env.store, env.writer = client_store.new()
+  env.root = eui.Node({ Name = "UIRoot" })
+  env.view = root_view.mount(env.root, env.store, {
     services = {
       open_modal = function(id, payload) env.writer:open_modal(id, payload) end,
       close_modal = function(id) env.writer:close_modal(id) end,
@@ -28,21 +28,21 @@ function M.new(options)
       local_character = function() return options.character end,
       find_lottery_anchor = function(name) return options.anchors and options.anchors[name] or nil end,
       create_lottery_scene_node = function(_, anchor)
-        local node = Eui.Node({ Name = "LotteryBubble" .. tostring(#env.sceneNodes + 1), Visible = false })
+        local node = eui.Node({ Name = "LotteryBubble" .. tostring(#env.sceneNodes + 1), Visible = false })
         node.Anchor = anchor
         env.sceneNodes[#env.sceneNodes + 1] = node
         return node
       end,
     },
-    hud = { BlindboxView.entry_spec(), PlatformShopView.entry_spec() },
-    overlays = options.interaction and { LotteryInteraction.spec() } or {},
+    hud = { blindbox_view.entry_spec(), platform_shop_view.entry_spec() },
+    overlays = options.interaction and { lottery_interaction.spec() } or {},
     modals = {
-      lottery = LotteryView.modal_spec(),
-      blindbox = BlindboxView.modal_spec(),
-      platform = PlatformShopView.modal_spec(),
+      lottery = lottery_view.modal_spec(),
+      blindbox = blindbox_view.modal_spec(),
+      platform = platform_shop_view.modal_spec(),
     },
     create_node = function(kind, props)
-      return Eui.Node({
+      return eui.Node({
         Kind = kind, Name = props and props.Name, Parent = props and props.Parent,
         Visible = props and props.Visible ~= false,
         Text = props and (props.Text or props.ButtonText) or "",
@@ -63,7 +63,7 @@ function M.new(options)
   function env:click(name)
     local node = self:child(name)
     if not node then return false end
-    return Eui.Click(node)
+    return eui.Click(node)
   end
   local function sync_spatial()
     if options.character ~= nil then

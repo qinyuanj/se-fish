@@ -1,19 +1,19 @@
 
-local Number = require('common.number')
+local number = require('common.number')
 
-local RateLimit = {}
+local rate_limit = {}
 
-RateLimit.Result = { Ok = "ok", Dropped = "dropped" }
-RateLimit.Reason = {
+rate_limit.Result = { Ok = "ok", Dropped = "dropped" }
+rate_limit.Reason = {
     BadPayload = "bad-payload",
     Session = "session",
     Order = "order",
 }
 
-RateLimit.PAYLOAD_FIELDS = { "s", "n", "q" }
+rate_limit.PAYLOAD_FIELDS = { "s", "n", "q" }
 
 -- NaN 会毒化 UsedCount/Remaining 并让比较恒为 false，必须显式拒绝。
-local isFiniteNumber = Number.IsFiniteNumber
+local isFiniteNumber = number.IsFiniteNumber
 
 local function checkSessionId(sessionId, where)
     if type(sessionId) ~= "string" or sessionId == "" then
@@ -25,12 +25,12 @@ end
 local Window = {}
 Window.__index = Window
 
-function RateLimit.NewWindow(windowSec, maxCount)
+function rate_limit.NewWindow(windowSec, maxCount)
     if not isFiniteNumber(windowSec) or windowSec <= 0 then
-        error("RateLimit.NewWindow: WindowSec 必须是正数")
+        error("rate_limit.NewWindow: WindowSec 必须是正数")
     end
     if not isFiniteNumber(maxCount) or maxCount < 1 then
-        error("RateLimit.NewWindow: MaxCount 必须是 ≥1 的数")
+        error("rate_limit.NewWindow: MaxCount 必须是 ≥1 的数")
     end
 
     return setmetatable({
@@ -89,11 +89,11 @@ end
 local Aggregator = {}
 Aggregator.__index = Aggregator
 
-function RateLimit.NewAggregator(opts)
+function rate_limit.NewAggregator(opts)
     opts = opts or {}
-    checkSessionId(opts.SessionId, "RateLimit.NewAggregator")
+    checkSessionId(opts.SessionId, "rate_limit.NewAggregator")
     if not isFiniteNumber(opts.AggregateSec) or opts.AggregateSec <= 0 then
-        error("RateLimit.NewAggregator: AggregateSec 必须是正数")
+        error("rate_limit.NewAggregator: AggregateSec 必须是正数")
     end
 
     return setmetatable({
@@ -106,7 +106,7 @@ function RateLimit.NewAggregator(opts)
 end
 
 function Aggregator:SetSession(sessionId)
-    checkSessionId(sessionId, "RateLimit.Aggregator:SetSession")
+    checkSessionId(sessionId, "rate_limit.Aggregator:SetSession")
     self.SessionId = sessionId
     self.Pending = 0
     self.WindowStart = nil
@@ -148,17 +148,17 @@ end
 local Receiver = {}
 Receiver.__index = Receiver
 
-function RateLimit.NewReceiver(opts)
+function rate_limit.NewReceiver(opts)
     opts = opts or {}
     return setmetatable({
         SessionId = opts.SessionId,
-        Window = RateLimit.NewWindow(opts.WindowSec, opts.MaxCount),
+        Window = rate_limit.NewWindow(opts.WindowSec, opts.MaxCount),
         LastSeq = nil,
     }, Receiver)
 end
 
 function Receiver:SetSession(sessionId)
-    checkSessionId(sessionId, "RateLimit.Receiver:SetSession")
+    checkSessionId(sessionId, "rate_limit.Receiver:SetSession")
     self.SessionId = sessionId
     self.LastSeq = nil
     self.Window:Reset()
@@ -171,12 +171,12 @@ function Receiver:EndSession()
 end
 
 local function drop(reason, seq)
-    return { Status = RateLimit.Result.Dropped, Reason = reason, Seq = seq }
+    return { Status = rate_limit.Result.Dropped, Reason = reason, Seq = seq }
 end
 
 function Receiver:Accept(now, msg)
     if type(msg) ~= "table" then
-        return drop(RateLimit.Reason.BadPayload, nil)
+        return drop(rate_limit.Reason.BadPayload, nil)
     end
 
     local n = msg.n
@@ -184,21 +184,21 @@ function Receiver:Accept(now, msg)
     if type(msg.s) ~= "string" or msg.s == ""
         or not isFiniteNumber(n) or n < 1 or n ~= math.floor(n)
         or not isFiniteNumber(q) or q < 1 or q ~= math.floor(q) then
-        return drop(RateLimit.Reason.BadPayload, nil)
+        return drop(rate_limit.Reason.BadPayload, nil)
     end
 
     if self.SessionId == nil or msg.s ~= self.SessionId then
-        return drop(RateLimit.Reason.Session, q)
+        return drop(rate_limit.Reason.Session, q)
     end
 
     if self.LastSeq ~= nil and q <= self.LastSeq then
-        return drop(RateLimit.Reason.Order, q)
+        return drop(rate_limit.Reason.Order, q)
     end
 
     self.LastSeq = q
     local accepted = self.Window:Admit(now, n)
     return {
-        Status = RateLimit.Result.Ok,
+        Status = rate_limit.Result.Ok,
         Requested = math.floor(n),
         Accepted = accepted,
         Seq = q,
@@ -206,4 +206,4 @@ function Receiver:Accept(now, msg)
     }
 end
 
-return RateLimit
+return rate_limit

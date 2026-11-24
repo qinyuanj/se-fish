@@ -13,11 +13,11 @@
 -- 说明：describe 按旧 LuaUnit 的执行顺序登记（类名字节序、其内方法字节序），保持案例顺序一致。
 -- 随机数：烤糊倍率与伤害由服务器时刻（假 World.GetServerTime）一次算出，烤位取场景锚点而非随机点位；
 -- fencing 命名空间），不参与任何断言，因此无需固定或恢复随机数函数。
-local GameCfg = require('common.game_cfg')
-local Curve = require('common.grill_curve')
-local PlayerData = require('server.data.player_data')
-local LotteryEligibility = require('common.lottery_eligibility')
-local ShopFeedHost = require('tests.support.shop_feed_host')
+local game_cfg = require('common.game_cfg')
+local curve = require('common.grill_curve')
+local player_data = require('server.data.player_data')
+local lottery_eligibility = require('common.lottery_eligibility')
+local shop_feed_host = require('tests.support.shop_feed_host')
 
 local function signal()
     local handlers = {}
@@ -33,7 +33,7 @@ local function signal()
 end
 
 local function rate(elapsed)
-    return Curve.Rate(elapsed, GameCfg.Grill)
+    return curve.Rate(elapsed, game_cfg.Grill)
 end
 
 local function vec(x, y, z) return { x = x, y = y, z = z } end
@@ -42,7 +42,7 @@ local function vec(x, y, z) return { x = x, y = y, z = z } end
 describe("烧烤配置对齐策划案", function()
     -- 配置值对齐策划案/docx 与 issue #137 验收
     it("test_anchors_cover_zones_three_to_seven", function()
-        for index, zone in ipairs(GameCfg.Zones) do
+        for index, zone in ipairs(game_cfg.Zones) do
             if index >= 3 then
                 assert.is_not_nil(zone.Scene.GrillName)
             else
@@ -52,7 +52,7 @@ describe("烧烤配置对齐策划案", function()
     end)
 
     it("test_values_match_design_doc", function()
-        local cfg = GameCfg.Grill
+        local cfg = game_cfg.Grill
         assert.is_not_nil(cfg)
         assert.same(2, cfg.Radius)          -- docx：2 米内出现「烧烤」操作
         assert.same(2, cfg.RiseSec)         -- 0-2 秒：1 → 1.5
@@ -75,14 +75,14 @@ describe("烤制倍率的来源", function()
     -- CookRate 统一读取三种来源：顶层数值（内存格位/快照）、saved.k（读档还原）、
     -- 旧布尔 saved.cooked（#127 之前的手工标记，等价烤熟价倍率）；非法值一律 nil
     it("test_sources", function()
-        assert.same(0.75, GameCfg.Items.CookRate({ cooked = 0.75 }))
-        assert.same(1.2, GameCfg.Items.CookRate({ saved = { k = 1.2 } }))
-        assert.same(GameCfg.Items.CookedPriceScale, GameCfg.Items.CookRate({ saved = { cooked = true } }))
-        assert.is_nil(GameCfg.Items.CookRate({}))
-        assert.is_nil(GameCfg.Items.CookRate({ cooked = 0 }))
-        assert.is_nil(GameCfg.Items.CookRate({ cooked = -1 }))
-        assert.is_nil(GameCfg.Items.CookRate({ cooked = 'x' }))
-        assert.is_nil(GameCfg.Items.CookRate(nil))
+        assert.same(0.75, game_cfg.Items.CookRate({ cooked = 0.75 }))
+        assert.same(1.2, game_cfg.Items.CookRate({ saved = { k = 1.2 } }))
+        assert.same(game_cfg.Items.CookedPriceScale, game_cfg.Items.CookRate({ saved = { cooked = true } }))
+        assert.is_nil(game_cfg.Items.CookRate({}))
+        assert.is_nil(game_cfg.Items.CookRate({ cooked = 0 }))
+        assert.is_nil(game_cfg.Items.CookRate({ cooked = -1 }))
+        assert.is_nil(game_cfg.Items.CookRate({ cooked = 'x' }))
+        assert.is_nil(game_cfg.Items.CookRate(nil))
     end)
 end)
 
@@ -91,25 +91,25 @@ describe("烤制值的存档字段", function()
 
     before_each(function()
         ctx = {}
-        ctx.oldDebug = GameCfg.Debug
-        GameCfg.Debug = { Enabled = false }
+        ctx.oldDebug = game_cfg.Debug
+        game_cfg.Debug = { Enabled = false }
         ctx.player = { UserId = 73001, SetAttribute = function() end }
-        ctx.data = PlayerData.New(ctx.player)
+        ctx.data = player_data.New(ctx.player)
         ctx.data:Init()
     end)
 
     after_each(function()
-        GameCfg.Debug = ctx.oldDebug
+        game_cfg.Debug = ctx.oldDebug
     end)
 
-    -- PlayerData 存档字段接缝：曲线下降段取出的倍率 <1，序列化往返不丢、不被 Migrate 拒收
+    -- player_data 存档字段接缝：曲线下降段取出的倍率 <1，序列化往返不丢、不被 Migrate 拒收
     it("test_sub_one_rate_survives_save_roundtrip", function()
         assert.is_true(ctx.data:AddItem('bass', 1.5, 0.75))
         local snapshot = ctx.data:Serialize()
-        local restored = PlayerData.New(ctx.player)
+        local restored = player_data.New(ctx.player)
         restored:Init()
         assert.is_true(restored:ApplySave(snapshot))
-        local entry = restored.Data.Containers[GameCfg.Items.ContainerId.ItemBar][1]
+        local entry = restored.data.Containers[game_cfg.Items.ContainerId.ItemBar][1]
         assert.same(0.75, entry.cooked)
         assert.same(0.75, entry.saved.k)
     end)
@@ -132,15 +132,15 @@ describe("烧烤曲线纯函数", function()
         assert.same(1, rate(0))
         assert.same(1.5, rate(2))
         assert.same(1.5, rate(2.5))
-        assert.is_true(Curve.IsBurnt(4.5, GameCfg.Grill))
-        assert.is_false(Curve.IsBurnt(4.49, GameCfg.Grill))
+        assert.is_true(curve.IsBurnt(4.5, game_cfg.Grill))
+        assert.is_false(curve.IsBurnt(4.49, game_cfg.Grill))
     end)
 
     -- 界面两位小数（策划案：界面显示烧烤时间/倍率两位小数）
     it("test_format_two_decimals", function()
-        assert.same('1.00', Curve.Format(1))
-        assert.same('1.50', Curve.Format(1.5))
-        assert.same('1.25', Curve.Format(rate(1)))
+        assert.same('1.00', curve.Format(1))
+        assert.same('1.50', curve.Format(1.5))
+        assert.same('1.25', curve.Format(rate(1)))
     end)
 
     -- 非法输入：负数按 0 秒（刚投入），非数字不给倍率
@@ -165,16 +165,16 @@ describe("烧烤曲线纯函数", function()
     end)
 end)
 
--- 切片四：吃通道接缝（Operate 两步吃烤鱼时把格位倍率带给 Vitals）
+-- 切片四：吃通道接缝（Operate 两步吃烤鱼时把格位倍率带给 vitals）
 describe("吃通道传递烤制倍率", function()
     local ctx
 
     before_each(function()
         ctx = { events = {}, eaten = {} }
-        ctx.oldRE = _G.REUtil
-        ctx.oldDebug = GameCfg.Debug
-        GameCfg.Debug = { Enabled = false }
-        _G.REUtil = { CheckRECD = function() return false end, GetRE = function(_, name)
+        ctx.oldRE = _G.re_util
+        ctx.oldDebug = game_cfg.Debug
+        game_cfg.Debug = { Enabled = false }
+        _G.re_util = { CheckRECD = function() return false end, GetRE = function(_, name)
             if not ctx.events[name] then
                 ctx.events[name] = { OnServerEvent = signal(),
                     FireClient = function(_, player, payload) player.lastResult = payload end }
@@ -184,7 +184,7 @@ describe("吃通道传递烤制倍率", function()
         ctx.player = { UserId = 9102, Character = { Name = 'Eggy' },
             CharacterAdded = signal(), CharacterRemoving = signal(), SetAttribute = function() end }
         ctx.mgr = assert(loadfile('server/player_data_host.lua'))()
-        ctx.mgr.Vitals = { CanEat = function() return true end,
+        ctx.mgr.vitals = { CanEat = function() return true end,
             Eat = function(_, player, itemId, rate)
                 ctx.eaten[#ctx.eaten + 1] = { itemId = itemId, rate = rate }
                 return true
@@ -198,10 +198,10 @@ describe("吃通道传递烤制倍率", function()
     after_each(function()
         if ctx.mgr then
             if ctx.player then ctx.mgr:OnPlayerRemoving(ctx.player) end
-            ctx.mgr.Vitals = nil
+            ctx.mgr.vitals = nil
         end
-        _G.REUtil = ctx.oldRE
-        GameCfg.Debug = ctx.oldDebug
+        _G.re_util = ctx.oldRE
+        game_cfg.Debug = ctx.oldDebug
     end)
 
     local function operate(payload)
@@ -212,12 +212,12 @@ describe("吃通道传递烤制倍率", function()
     -- #137 审查修复：吃通道走 CookRate 统一口径，#127 之前的旧布尔档 saved.cooked==true 按烤熟价倍率恢复
     it("test_operate_eat_legacy_boolean_archive_passes_scale", function()
         assert.is_true(ctx.data:AddItem('carp', 1.5))
-        local entry = ctx.data.Data.Containers[GameCfg.Items.ContainerId.ItemBar][1]
-        entry.saved = { [GameCfg.Items.CookedFlag] = true }
+        local entry = ctx.data.data.Containers[game_cfg.Items.ContainerId.ItemBar][1]
+        entry.saved = { [game_cfg.Items.CookedFlag] = true }
         operate({ action = 'Operate', op = 'eat', slot = 1 })
         operate({ action = 'Operate', op = 'eat', slot = 1 })
         assert.same(1, #ctx.eaten)
-        assert.same(GameCfg.Items.CookedPriceScale, ctx.eaten[1].rate, '旧布尔档按烤熟价倍率恢复')
+        assert.same(game_cfg.Items.CookedPriceScale, ctx.eaten[1].rate, '旧布尔档按烤熟价倍率恢复')
     end)
 
     it("test_operate_eat_passes_cook_rate", function()
@@ -249,10 +249,10 @@ describe("吃烤鱼的恢复量", function()
         _G.game = { GetService = function(_, name)
             if name == 'World' then return { GetServerTime = function() return ctx.now end } end
         end }
-        local Host = require('tests.support.life_host')
-        ctx.host = Host.start({ now = 500 })
+        local host = require('tests.support.life_host')
+        ctx.host = host.start({ now = 500 })
         ctx.vitals = ctx.host.runtime.life
-        ctx.player = Host.player(9101)
+        ctx.player = host.player(9101)
         ctx.player.Character.Controller.Health = 100
         ctx.controller = ctx.player.Character.Controller
         ctx.host:add(ctx.player)
@@ -298,9 +298,9 @@ describe("回收烤鱼的金币结算", function()
 
     before_each(function()
         ctx = { seq = 0 }
-        ctx.cfg = GameCfg
-        ctx.host = ShopFeedHost.start()
-        ctx.player, ctx.data = ctx.host:join(1, GameCfg.Interact.Fishermen[1].AnchorNames[1])
+        ctx.cfg = game_cfg
+        ctx.host = shop_feed_host.start()
+        ctx.player, ctx.data = ctx.host:join(1, game_cfg.Interact.Fishermen[1].AnchorNames[1])
         ctx.replies = ctx.host.results[1].InteractResult
     end)
 
@@ -324,7 +324,7 @@ describe("回收烤鱼的金币结算", function()
         assert.is_true(ctx.data:AddItem('bass', 2, 0.75))
         assert.is_true(ctx.data:SelectSlot(1))
         assert.is_true(feed())
-        assert.same(9, ctx.data.Data.FishCoin) -- floor(6 × 2 × 0.75)
+        assert.same(9, ctx.data.data.FishCoin) -- floor(6 × 2 × 0.75)
     end)
 
     -- 数值标记的烤过信物不能走兑换链，只按倍率售卖
@@ -334,7 +334,7 @@ describe("回收烤鱼的金币结算", function()
         assert.is_true(feed())
         assert.same(0, ctx.data:ItemCount('eelHead'))
         assert.same(0, ctx.data:ItemCount('duck'), '烤过的精英信物不能再换首领饵')
-        assert.same(12, ctx.data.Data.FishCoin) -- floor(10 × 1 × 1.2)
+        assert.same(12, ctx.data.data.FishCoin) -- floor(10 × 1 × 1.2)
         assert.is_nil(lastReply().exchange)
     end)
 end)
@@ -342,30 +342,30 @@ end)
 describe("烤过物品的抽奖资格", function()
     -- #138 抽奖机守卫（本单先留接口）：烤过信物/极品鱼获哪怕倍率 <1 也算烤过，拒绝投入
     it("test_cooked_rate_below_one_is_still_cooked", function()
-        local ok, reason = LotteryEligibility.Check({ itemId = 'item47', count = 1, mult = 1.2, cooked = 0.75 })
+        local ok, reason = lottery_eligibility.Check({ itemId = 'item47', count = 1, mult = 1.2, cooked = 0.75 })
         assert.is_false(ok)
         assert.same('cooked', reason)
     end)
 
     it("test_uncooked_premium_still_eligible", function()
-        assert.is_true(LotteryEligibility.Check({ itemId = 'item47', count = 1, mult = 1.2 }))
+        assert.is_true(lottery_eligibility.Check({ itemId = 'item47', count = 1, mult = 1.2 }))
     end)
 end)
 
 describe("烤鱼的售价", function()
     -- 旧布尔标记仍是烤熟价 ×1.5
     it("test_legacy_boolean_keeps_cooked_scale", function()
-        assert.same(30, GameCfg.Items.SalePrice('garHead', nil, true))  -- floor(20 × 1 × 1.5)
-        assert.same(18, GameCfg.Items.SalePrice('bass', 2, true))
-        assert.same(12, GameCfg.Items.SalePrice('bass', 2))             -- 未烤原价
+        assert.same(30, game_cfg.Items.SalePrice('garHead', nil, true))  -- floor(20 × 1 × 1.5)
+        assert.same(18, game_cfg.Items.SalePrice('bass', 2, true))
+        assert.same(12, game_cfg.Items.SalePrice('bass', 2))             -- 未烤原价
     end)
 
     -- 取出倍率直接定价：价格 = 基础价 × 个体倍率 × 烤制倍率（#137）
     it("test_numeric_rate_prices", function()
-        assert.same(25, GameCfg.Items.SalePrice('garHead', nil, 1.25))  -- floor(20 × 1 × 1.25)
-        assert.same(10, GameCfg.Items.SalePrice('garHead', nil, 0.5))   -- 下降段取出也值钱
-        assert.same(9, GameCfg.Items.SalePrice('bass', 2, 0.75))        -- floor(6 × 2 × 0.75)
-        assert.same(18, GameCfg.Items.SalePrice('bass', 2, 1.5))        -- floor(6 × 2 × 1.5)
+        assert.same(25, game_cfg.Items.SalePrice('garHead', nil, 1.25))  -- floor(20 × 1 × 1.25)
+        assert.same(10, game_cfg.Items.SalePrice('garHead', nil, 0.5))   -- 下降段取出也值钱
+        assert.same(9, game_cfg.Items.SalePrice('bass', 2, 0.75))        -- floor(6 × 2 × 0.75)
+        assert.same(18, game_cfg.Items.SalePrice('bass', 2, 1.5))        -- floor(6 × 2 × 1.5)
     end)
 end)
 
@@ -375,13 +375,13 @@ describe("烧烤的接线", function()
         local file = assert(io.open('client/main.lua', 'r'))
         local src = file:read('*a')
         file:close()
-        assert.matches('local GrillView = require("client.views.grill_view")', src, nil, true)
-        assert.matches('GrillView.spec()', src, nil, true)
+        assert.matches('local grill_view = require("client.views.grill_view")', src, nil, true)
+        assert.matches('grill_view.spec()', src, nil, true)
         assert.is_nil(src:find('ScreenGrill', 1, true), '旧烧烤屏幕不得再由客户端入口拉起')
         local file2 = assert(io.open('client/views/main_hud_item_bar_view.lua', 'r'))
         local src2 = file2:read('*a')
         file2:close()
-        assert.matches('GameCfg.Grill.CookedPrefix', src2, nil, true)
+        assert.matches('game_cfg.Grill.CookedPrefix', src2, nil, true)
     end)
 
     it("test_server_main_wires_grill", function()
@@ -395,7 +395,7 @@ describe("烧烤的接线", function()
         local runtime = assert(io.open('server/world_host/server_runtime.lua', 'r'))
         local runtime_src = runtime:read('*a')
         runtime:close()
-        assert.matches('PlayerGrill.mount', runtime_src, nil, true)
+        assert.matches('player_grill.mount', runtime_src, nil, true)
         assert.is_not_nil(runtime_src:find('mount_phase("alive", "grill"', 1, true),
             '烧烤会话必须挂在存活相位，离场随相位结算')
     end)

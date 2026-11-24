@@ -3,16 +3,16 @@
 -- 故同类内方法按字典序、同类的方法连续执行，跨类不交错）。
 -- 时间全部由调用方注入（试玩里是 World:GetServerTime() 的秒）：窗口/聚合器/接收器的时刻都是入参，
 -- 本文件不替换任何全局与模块缓存，没有需要逐案例恢复的时间替换；helper 的基线快照/恢复照常逐例生效。
-local GameCfg = require("common.game_cfg")
-local RateLimit = require("common.rate_limit")
+local game_cfg = require("common.game_cfg")
+local rate_limit = require("common.rate_limit")
 
 local function newWindow()
-  return RateLimit.NewWindow(1.0, 10)
+  return rate_limit.NewWindow(1.0, 10)
 end
 
 describe("TestRateLimitAggregator", function()
   local function newAggregator()
-    return RateLimit.NewAggregator({ SessionId = "s-1", AggregateSec = 0.1 })
+    return rate_limit.NewAggregator({ SessionId = "s-1", AggregateSec = 0.1 })
   end
 
   -- 窗口到期产出一个 {s,n,q}：n 是窗口内点击数，q 从 1 开始单调递增。
@@ -57,7 +57,7 @@ describe("TestRateLimitAggregator", function()
     local payload = agg:Collect(0.1)
 
     local allowed = {}
-    for _, name in ipairs(RateLimit.PAYLOAD_FIELDS) do
+    for _, name in ipairs(rate_limit.PAYLOAD_FIELDS) do
       allowed[name] = true
     end
 
@@ -66,18 +66,18 @@ describe("TestRateLimitAggregator", function()
       count = count + 1
       assert.message("载荷多出契约外字段 " .. tostring(name)).is_true(allowed[name])
     end
-    assert.same(#RateLimit.PAYLOAD_FIELDS, count)
+    assert.same(#rate_limit.PAYLOAD_FIELDS, count)
 
     assert.same("s-1", payload.s)
-    assert.is_true(payload.n <= GameCfg.HighFreqInput.MaxCount)
+    assert.is_true(payload.n <= game_cfg.HighFreqInput.MaxCount)
     assert.is_true(payload.q >= 1)
   end)
 
   it("test_rejects_bad_config", function()
-    assert.error_matches(function() RateLimit.NewAggregator({ AggregateSec = 0.1 }) end, "会话 id", nil, true)
-    assert.error_matches(function() RateLimit.NewAggregator({ SessionId = 1, AggregateSec = 0.1 }) end,
+    assert.error_matches(function() rate_limit.NewAggregator({ AggregateSec = 0.1 }) end, "会话 id", nil, true)
+    assert.error_matches(function() rate_limit.NewAggregator({ SessionId = 1, AggregateSec = 0.1 }) end,
       "会话 id", nil, true)
-    assert.error_matches(function() RateLimit.NewAggregator({ SessionId = "s-1", AggregateSec = 0 }) end,
+    assert.error_matches(function() rate_limit.NewAggregator({ SessionId = "s-1", AggregateSec = 0 }) end,
       "AggregateSec", nil, true)
   end)
 
@@ -94,17 +94,17 @@ describe("TestRateLimitAggregator", function()
 end)
 
 describe("TestRateLimitConfig", function()
-  -- GameCfg 的常量与 #15 定案一致，且真能建出窗口/聚合器（配置与逻辑对得上）。
+  -- game_cfg 的常量与 #15 定案一致，且真能建出窗口/聚合器（配置与逻辑对得上）。
   it("test_gamecfg_constants_match_the_decision", function()
-    assert.same(1.0, GameCfg.HighFreqInput.WindowSec)
-    assert.same(10, GameCfg.HighFreqInput.MaxCount)
-    assert.same(0.1, GameCfg.HighFreqInput.AggregateSec)
+    assert.same(1.0, game_cfg.HighFreqInput.WindowSec)
+    assert.same(10, game_cfg.HighFreqInput.MaxCount)
+    assert.same(0.1, game_cfg.HighFreqInput.AggregateSec)
 
-    local cfg = GameCfg.HighFreqInput
-    local win = RateLimit.NewWindow(cfg.WindowSec, cfg.MaxCount)
+    local cfg = game_cfg.HighFreqInput
+    local win = rate_limit.NewWindow(cfg.WindowSec, cfg.MaxCount)
     assert.same(cfg.MaxCount, win:Admit(0, 99))
 
-    local agg = RateLimit.NewAggregator({ SessionId = "s-1", AggregateSec = cfg.AggregateSec })
+    local agg = rate_limit.NewAggregator({ SessionId = "s-1", AggregateSec = cfg.AggregateSec })
     agg:Click(0)
     assert.is_nil(agg:Collect(cfg.AggregateSec / 2))
     assert.same(1, agg:Collect(cfg.AggregateSec).n)
@@ -113,7 +113,7 @@ end)
 
 describe("TestRateLimitReceiver", function()
   local function newReceiver(sessionId)
-    return RateLimit.NewReceiver({ SessionId = sessionId, WindowSec = 1.0, MaxCount = 10 })
+    return rate_limit.NewReceiver({ SessionId = sessionId, WindowSec = 1.0, MaxCount = 10 })
   end
 
   it("test_accepts_current_session_payload", function()
@@ -127,7 +127,7 @@ describe("TestRateLimitReceiver", function()
 
   -- 端到端：客户端聚合出来的载荷原样喂给服务端接收侧（M1 就是这么接的）。
   it("test_aggregator_payload_flows_through_receiver", function()
-    local agg = RateLimit.NewAggregator({ SessionId = "s-1", AggregateSec = 0.1 })
+    local agg = rate_limit.NewAggregator({ SessionId = "s-1", AggregateSec = 0.1 })
     local rx = newReceiver("s-1")
 
     for _ = 1, 12 do
@@ -261,8 +261,8 @@ describe("TestRateLimitWindow", function()
 
   -- 配置非法一律抛错；LuaUnit assertErrorMsgContains 是 plain 子串（不剥 path:line）。
   it("test_rejects_bad_config", function()
-    assert.error_matches(function() RateLimit.NewWindow(0, 10) end, "WindowSec", nil, true)
-    assert.error_matches(function() RateLimit.NewWindow(1.0, 0) end, "MaxCount", nil, true)
+    assert.error_matches(function() rate_limit.NewWindow(0, 10) end, "WindowSec", nil, true)
+    assert.error_matches(function() rate_limit.NewWindow(1.0, 0) end, "MaxCount", nil, true)
   end)
 
   it("test_reset_clears_the_window", function()
@@ -310,12 +310,12 @@ end)
 
 describe('共享有限数校验（common/number）', function()
   it('test_accepts_only_finite_numbers', function()
-    local Number = require('common.number')
+    local number = require('common.number')
     for _, value in ipairs({ 0, -1, 1.5, math.maxinteger, math.mininteger }) do
-      assert.is_true(Number.IsFiniteNumber(value), tostring(value))
+      assert.is_true(number.IsFiniteNumber(value), tostring(value))
     end
     for _, value in ipairs({ 0 / 0, math.huge, -math.huge, '1', true, {}, nil }) do
-      assert.is_false(Number.IsFiniteNumber(value), tostring(value))
+      assert.is_false(number.IsFiniteNumber(value), tostring(value))
     end
   end)
 end)

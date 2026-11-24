@@ -1,44 +1,44 @@
-local AbilityPackageAPI = require("server.packages.ability_system.api")
-local AbilityAPI = { BehaviorServices = {} }
+local ability_package_api = require("server.packages.ability_system.api")
+local ability_api = { BehaviorServices = {} }
 
-local packageCastAbility = AbilityPackageAPI.CastAbility
+local packageCastAbility = ability_package_api.CastAbility
 local castGuard
 local extraGuards = {}
-function AbilityAPI.AddCastGuard(guard)
-	if type(guard) ~= 'function' then error('[AbilityAPI] CastGuard 必须是函数', 2) end
+function ability_api.AddCastGuard(guard)
+	if type(guard) ~= 'function' then error('[ability_api] CastGuard 必须是函数', 2) end
 	extraGuards[#extraGuards + 1] = guard
 end
-function AbilityAPI.SetCastGuard(guard)
-    if guard ~= nil and type(guard) ~= 'function' then error('[AbilityAPI] CastGuard 必须是函数', 2) end
+function ability_api.SetCastGuard(guard)
+    if guard ~= nil and type(guard) ~= 'function' then error('[ability_api] CastGuard 必须是函数', 2) end
     castGuard = guard
 end
-function AbilityAPI.CastAbility(unit, abilityIndex, releasePoint, releaseDir, releaseTarget)
+function ability_api.CastAbility(unit, abilityIndex, releasePoint, releaseDir, releaseTarget)
     if castGuard then
         local ok, allowed = pcall(castGuard, unit, abilityIndex)
-        if not ok then print('[AbilityAPI] 施法守卫失败', tostring(allowed)) end
+        if not ok then print('[ability_api] 施法守卫失败', tostring(allowed)) end
         if not ok or allowed ~= true then return false end
     end
     for _, guard in ipairs(extraGuards) do
         local ok, allowed = pcall(guard, unit, abilityIndex)
-        if not ok then print('[AbilityAPI] 追加施法守卫失败', tostring(allowed)) end
+        if not ok then print('[ability_api] 追加施法守卫失败', tostring(allowed)) end
         if not ok or allowed ~= true then return false end
     end
     return packageCastAbility(unit, abilityIndex, releasePoint, releaseDir, releaseTarget)
 end
 
-local BodyScale = require("common.body_scale")
-local CarryMount = require("common.carry_mount")
+local body_scale = require("common.body_scale")
+local carry_mount = require("common.carry_mount")
 
-function AbilityAPI.SetBodyScale(unit, factor)
+function ability_api.SetBodyScale(unit, factor)
 	if not unit then return { Ok = false, Error = 'no-unit' } end
-	local scale = BodyScale.Sanitize(factor)
+	local scale = body_scale.Sanitize(factor)
 	if type(unit.SetScale) ~= 'function' then return { Ok = false, Error = 'no-set-scale', Scale = scale } end
 	local ok, err = pcall(unit.SetScale, unit, Vector3.New(scale, scale, scale))
 	if not ok then
-		print('[AbilityAPI] SetScale 失败', tostring(err))
+		print('[ability_api] SetScale 失败', tostring(err))
 		return { Ok = false, Error = tostring(err), Scale = scale }
 	end
-	return { Ok = true, Scale = scale, Derived = BodyScale.Derive(scale) }
+	return { Ok = true, Scale = scale, Derived = body_scale.Derive(scale) }
 end
 
 ---挂点附着的落地接口：在宿主下建 SkeletalSocketMount。
@@ -49,13 +49,13 @@ end
 ---@param offset? table { x, y, z } 已净化的挂点位移
 ---@param rotation? any Quaternion 挂点旋转（缺省不写该字段，用预设默认）
 ---@return table { Ok, Mount?, Offset?, Error? }
-function AbilityAPI.AttachToSocket(world, unit, host, socketName, offset, rotation)
+function ability_api.AttachToSocket(world, unit, host, socketName, offset, rotation)
 	if not host then return { Ok = false, Error = 'no-host' } end
 	if type(socketName) ~= 'string' or socketName == '' then return { Ok = false, Error = 'no-socket' } end
 	world = world or game:GetService('World')
-	local pos = CarryMount.SafeOffset(offset or { x = 0, y = 0, z = 0 }, 0, 0).Offset
+	local pos = carry_mount.SafeOffset(offset or { x = 0, y = 0, z = 0 }, 0, 0).Offset
 	local options = {
-		Name = 'CarryMount_' .. tostring(host.Name or 'host'),
+		Name = 'carry_mount_' .. tostring(host.Name or 'host'),
 		Parent = host,
 		SocketName = socketName,
 		SocketOffset = Vector3.New(pos.x, pos.y, pos.z),
@@ -63,14 +63,14 @@ function AbilityAPI.AttachToSocket(world, unit, host, socketName, offset, rotati
 	if rotation ~= nil then options.SocketRotation = rotation end
 	local ok, mount = pcall(world.CreateUnit, world, 'SkeletalSocketMount', options)
 	if not ok or not mount then
-		print('[AbilityAPI] 挂点创建失败', tostring(mount))
+		print('[ability_api] 挂点创建失败', tostring(mount))
 		return { Ok = false, Error = tostring(mount) }
 	end
 	if unit ~= nil then
 		local parentOk, parentErr = pcall(function() unit.Parent = mount end)
 		if not parentOk then
 			pcall(function() mount:Destroy() end)
-			print('[AbilityAPI] 挂点挂载失败', tostring(parentErr))
+			print('[ability_api] 挂点挂载失败', tostring(parentErr))
 			return { Ok = false, Error = tostring(parentErr) }
 		end
 	end
@@ -78,13 +78,13 @@ function AbilityAPI.AttachToSocket(world, unit, host, socketName, offset, rotati
 end
 
 ---@return boolean
-function AbilityAPI.DetachFromSocket(mount)
+function ability_api.DetachFromSocket(mount)
 	if not mount then return false end
 	local ok = pcall(function()
 		if mount.Parent then mount.Parent = nil end
 		mount:Destroy()
 	end)
-	if not ok then print('[AbilityAPI] 挂点销毁失败') end
+	if not ok then print('[ability_api] 挂点销毁失败') end
 	return ok
 end
 
@@ -113,7 +113,7 @@ local AnchorBehaviorLoaders = {
 ---@param anchorScript Script 锚点脚本单位
 ---@param behaviorModule string 锚点行为名（AnchorBehaviorLoaders 的键，如 "melee_hit"）
 ---@return boolean 是否已挂接
-function AbilityAPI.AttachAnchor(anchorScript, behaviorModule)
+function ability_api.AttachAnchor(anchorScript, behaviorModule)
 	if not anchorScript then
 		return false
 	end
@@ -124,12 +124,12 @@ function AbilityAPI.AttachAnchor(anchorScript, behaviorModule)
 		local loadBehavior = AnchorBehaviorLoaders[behaviorModule]
 		local behavior = loadBehavior and loadBehavior()
 		if type(behavior) ~= "table" or type(behavior.Attach) ~= "function" then
-			error("[AbilityAPI] 锚点行为模块不可用: " .. tostring(behaviorModule), 2)
+			error("[ability_api] 锚点行为模块不可用: " .. tostring(behaviorModule), 2)
 		end
-		behavior.Attach(anchorScript, AbilityAPI.BehaviorServices)
+		behavior.Attach(anchorScript, ability_api.BehaviorServices)
 	end
 
 	return true
 end
 
-return AbilityAPI
+return ability_api

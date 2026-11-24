@@ -3,7 +3,7 @@
 -- 每 25 秒旋转 5 秒碰触 30 且同秒槽只结算一次，三招互斥，逃跑 / 移除打断并收起预警。
 -- 沿用 tests/support/fish_combat 共享夹具；describe/it 名称保留旧类名与方法名，
 -- 并按方法名字典序注册以保持旧套件执行顺序。
-local FishCombat = require('tests.support.fish_combat')
+local fish_combat = require('tests.support.fish_combat')
 
 local function drop(env)
     env:prepare()
@@ -23,7 +23,7 @@ describe('TestCrabBossCombat', function()
     local env
 
     before_each(function()
-        env = FishCombat.new()
+        env = fish_combat.new()
         env:setUp()
     end)
     after_each(function()

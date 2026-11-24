@@ -1,31 +1,31 @@
 -- 迁移自 tests/gameplay/gar_bite_warning_test.lua（#85）；行为契约原文见 #134、#141。
 -- 失败方式：
 
-local Eui = require('tests.support.eui_double')
-local ClientStore = require('client.store.client_store')
-local RootView = require('client.views.root_view')
-local FishCombatView = require('client.views.fish_combat_view')
-local SpokeClock = require('common.spoke_clock')
-local GarBiteNotice = require('common.gar_bite_notice')
-local GameCfg = require('common.game_cfg')
+local eui = require('tests.support.eui_double')
+local client_store = require('client.store.client_store')
+local root_view = require('client.views.root_view')
+local fish_combat_view = require('client.views.fish_combat_view')
+local spoke_clock = require('common.spoke_clock')
+local gar_bite_notice = require('common.gar_bite_notice')
+local game_cfg = require('common.game_cfg')
 
-describe('鳄雀鳝上钩预警表现（GarBiteWarning -> FishCombatView）', function()
+describe('鳄雀鳝上钩预警表现（GarBiteWarning -> fish_combat_view）', function()
   local env
 
   local function mountView()
-    local clock = SpokeClock.new(100)
-    local store, writer = ClientStore.new({ clock = clock })
-    local root = Eui.Node({ Name = 'UIRoot' })
+    local clock = spoke_clock.new(100)
+    local store, writer = client_store.new({ clock = clock })
+    local root = eui.Node({ Name = 'UIRoot' })
     local created = {}
-    local view = RootView.mount(root, store, {
+    local view = root_view.mount(root, store, {
       create_node = function(kind, props)
-        local node = Eui.Node(props or {})
+        local node = eui.Node(props or {})
         node.UnitType = kind
         created[#created + 1] = node
         return node
       end,
       docks = {
-        fish_warning = FishCombatView.warning_spec(),
+        fish_warning = fish_combat_view.warning_spec(),
       },
     })
     return { clock = clock, store = store, writer = writer, root = root, view = view, created = created }
@@ -50,7 +50,7 @@ describe('鳄雀鳝上钩预警表现（GarBiteWarning -> FishCombatView）', fu
 
   before_each(function()
     env = mountView()
-    env.cfg = GameCfg.FishCombat.gar
+    env.cfg = game_cfg.fish_combat.gar
   end)
 
   after_each(function()
@@ -59,15 +59,15 @@ describe('鳄雀鳝上钩预警表现（GarBiteWarning -> FishCombatView）', fu
   end)
 
   local function lockNotice(fishId, fx, fz)
-    return GarBiteNotice.Lock(fishId, { x = 1, y = 2, z = 3 }, fx, fz, env.cfg.BiteRange,
+    return gar_bite_notice.Lock(fishId, { x = 1, y = 2, z = 3 }, fx, fz, env.cfg.BiteRange,
       env.cfg.HeadHalfAngleDeg, env.cfg.BiteCooldownSec)
   end
 
   it('test_invalid_payload_ignored_and_asset_failure_does_not_block_next_round', function()
-    assert.is_false(GarBiteNotice.Valid(nil))
-    assert.is_false(GarBiteNotice.Valid(GarBiteNotice.Lock(5, { x = 0 / 0, y = 0, z = 0 }, 1, 0, 2.5, 90, 1.5)))
-    assert.is_false(GarBiteNotice.Valid(GarBiteNotice.Lock(5, { x = 0, y = 0, z = 0 }, 1, 0, 0, 90, 1.5)))
-    assert.is_false(GarBiteNotice.Valid(GarBiteNotice.Lock(5, { x = 0, y = 0, z = 0 }, 1, 0, 2.5, 90, -1)))
+    assert.is_false(gar_bite_notice.Valid(nil))
+    assert.is_false(gar_bite_notice.Valid(gar_bite_notice.Lock(5, { x = 0 / 0, y = 0, z = 0 }, 1, 0, 2.5, 90, 1.5)))
+    assert.is_false(gar_bite_notice.Valid(gar_bite_notice.Lock(5, { x = 0, y = 0, z = 0 }, 1, 0, 0, 90, 1.5)))
+    assert.is_false(gar_bite_notice.Valid(gar_bite_notice.Lock(5, { x = 0, y = 0, z = 0 }, 1, 0, 2.5, 90, -1)))
 
     assert.is_false(env.writer:ingest_event('FishCombatState', nil))
     assert.is_true(env.writer:ingest_event('FishCombatState', {
@@ -76,7 +76,7 @@ describe('鳄雀鳝上钩预警表现（GarBiteWarning -> FishCombatView）', fu
     assert.same(0, #aliveWarnings())
 
     local valid = lockNotice(5, 1, 0)
-    assert.is_true(GarBiteNotice.Valid(valid))
+    assert.is_true(gar_bite_notice.Valid(valid))
     assert.is_true(env.writer:ingest_event('FishCombatState', {
       warnings = { { id = 5, fishId = 5, kind = valid.kind, range = valid.range } },
     }))
@@ -89,9 +89,9 @@ describe('鳄雀鳝上钩预警表现（GarBiteWarning -> FishCombatView）', fu
     assert.same('official://preset/7191', warnCfg.CirclePreset)
     assert.same(10, warnCfg.CircleRadius)
     for _, radius in ipairs({ 5, 10 }) do
-      local payload = GarBiteNotice.Lock(141, { x = 15, y = 2, z = 30 }, 0, 1, radius, 180, 1.5)
+      local payload = gar_bite_notice.Lock(141, { x = 15, y = 2, z = 30 }, 0, 1, radius, 180, 1.5)
       payload.move, payload.shape = 'jump', 'circle'
-      assert.is_true(GarBiteNotice.Valid(payload))
+      assert.is_true(gar_bite_notice.Valid(payload))
       assert.same(radius == 5 and 0.5 or 1, payload.range / warnCfg.CircleRadius)
 
       assert.is_true(env.writer:ingest_event('FishCombatState', {
@@ -101,7 +101,7 @@ describe('鳄雀鳝上钩预警表现（GarBiteWarning -> FishCombatView）', fu
       assert.is_not_nil(node)
       assert.is_true(node.Visible)
 
-      assert.is_true(GarBiteNotice.Valid(GarBiteNotice.Clear(141, 'cancel')))
+      assert.is_true(gar_bite_notice.Valid(gar_bite_notice.Clear(141, 'cancel')))
       assert.is_true(env.writer:ingest_event('FishCombatState', { warnings = {} }))
       assert.is_true(node.Destroyed)
       assert.is_nil(findWarning(141))
@@ -109,11 +109,11 @@ describe('鳄雀鳝上钩预警表现（GarBiteWarning -> FishCombatView）', fu
   end)
 
   it('test_rain_effect_is_distinct_and_cleared_with_warning', function()
-    assert.is_string(GameCfg.FishCombat.dragon.RainEffect)
-    assert.is_not.same(env.cfg.Warning.EffectPreset, GameCfg.FishCombat.dragon.RainEffect)
+    assert.is_string(game_cfg.fish_combat.dragon.RainEffect)
+    assert.is_not.same(env.cfg.Warning.EffectPreset, game_cfg.fish_combat.dragon.RainEffect)
     local payload = lockNotice(8, 0, 1)
     payload.move = 'rain'
-    assert.is_true(GarBiteNotice.Valid(payload))
+    assert.is_true(gar_bite_notice.Valid(payload))
 
     assert.is_true(env.writer:ingest_event('FishCombatState', {
       warnings = { { id = 8, fishId = 8, move = 'rain', kind = 'lock' } },

@@ -3,7 +3,7 @@
 -- 高跃周期与落点范围伤害、位移失败作废招式、追击失败可诊断。
 -- 沿用 tests/support/fish_combat 共享夹具；breakPosition 是引擎拒绝写 Position 的边界代理，逐例回滚。
 -- describe/it 名称保留旧类名与方法名，并按方法名字典序注册以保持旧套件执行顺序。
-local FishCombat = require('tests.support.fish_combat')
+local fish_combat = require('tests.support.fish_combat')
 
 local function vec(x, y, z) return { x = x, y = y, z = z } end
 
@@ -41,7 +41,7 @@ describe('TestForestCombat', function()
     local env
 
     before_each(function()
-        env = FishCombat.new()
+        env = fish_combat.new()
         env:setUp()
     end)
     after_each(function()
@@ -67,7 +67,7 @@ describe('TestForestCombat', function()
             _G.print = savedPrint
             assert.is_true(ok, tostring(err))
             local text = table.concat(lines, '\n')
-            assert.matches('[FishTree]', text, nil, true)
+            assert.matches('[fish_tree]', text, nil, true)
             assert.matches('追击位移失败', text, nil, true)
             assert.matches('fish=' .. tostring(fish.Id), text, nil, true)
             assert.matches('position-write-failed', text, nil, true)

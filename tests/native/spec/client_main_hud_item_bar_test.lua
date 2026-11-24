@@ -1,6 +1,6 @@
 -- #297-B3b2 客户端主 HUD 底部道具栏动态格位、拖拽换格与爆炸物长按手势 Spoke 视图黑盒契约测试。
 -- 失败方式先列：
---   1. 动态槽数（2..8）未按 MainHudLayout 排版、扩容未保留旧格并增挂新格、缩容未销毁多余格或 EUIButton 误写 Color；
+--   1. 动态槽数（2..8）未按 main_hud_layout 排版、扩容未保留旧格并增挂新格、缩容未销毁多余格或 EUIButton 误写 Color；
 --   2. 点击选槽未发送 SelectSlot、选中态高亮错误、烤熟前缀/图标/数量渲染错误；
 --   3. 拖拽跨格未按几何命中发送 MoveSlot，或短距离微动/拖回自身误发 MoveSlot；
 --   4. 爆炸物槽点按未直投、长按未弹出 ThrowAimOverlay 或选点未携带目标落点投掷、投掷后误发 SelectSlot；
@@ -8,17 +8,17 @@
 --   6. 重连重置或根 UI 销毁后遗留槽位/瞄准节点，或 OnClicked/OnTouchBegan/OnTouchEnded 连接未归零。
 
 local spoke = require("common.packages.spoke.api")
-local Eui = require("tests.support.eui_double")
-local GameCfg = require("common.game_cfg")
-local MainHudLayout = require("client.main_hud_layout")
-local ClientStore = require("client.store.client_store")
-local RootView = require("client.views.root_view")
-local MainHudItemBarView = require("client.views.main_hud_item_bar_view")
+local eui = require("tests.support.eui_double")
+local game_cfg = require("common.game_cfg")
+local main_hud_layout = require("client.main_hud_layout")
+local client_store = require("client.store.client_store")
+local root_view = require("client.views.root_view")
+local main_hud_item_bar_view = require("client.views.main_hud_item_bar_view")
 
 local State = spoke.State
 
-local ITEM_ROD = GameCfg.Items.Id.StarterRod
-local ITEM_FISH = GameCfg.Items.Id.Tilapia
+local ITEM_ROD = game_cfg.Items.Id.StarterRod
+local ITEM_FISH = game_cfg.Items.Id.Tilapia
 local ITEM_GRENADE = "item144" -- 爆炸物：手雷
 
 local function assert_at(node, rect, label)
@@ -46,13 +46,13 @@ describe("Spoke 主 HUD 底部道具栏视图（#297-B3b2）", function()
 
   local function mount_hud(opts)
     opts = opts or {}
-    local store, writer = ClientStore.new({ initial_now = 100 })
-    local root_node = Eui.Node({ Name = "UIRoot" })
+    local store, writer = client_store.new({ initial_now = 100 })
+    local root_node = eui.Node({ Name = "UIRoot" })
     local nodes = {}
     local created = {}
 
     local function create_node(kind, props)
-      local node = Eui.Node({
+      local node = eui.Node({
         Name = props.Name,
         Kind = kind,
         Parent = props.Parent,
@@ -60,8 +60,8 @@ describe("Spoke 主 HUD 底部道具栏视图（#297-B3b2）", function()
         Text = props.Text,
         TouchEnabled = props.TouchEnabled,
       })
-      node.OnTouchBegan = Eui.Signal()
-      node.OnTouchEnded = Eui.Signal()
+      node.OnTouchBegan = eui.Signal()
+      node.OnTouchEnded = eui.Signal()
       for k, v in pairs(props) do
         if k ~= "Parent" and k ~= "Name" then
           node[k] = v
@@ -76,10 +76,10 @@ describe("Spoke 主 HUD 底部道具栏视图（#297-B3b2）", function()
       return { x = 1920, y = opts.height or 1080 }
     end
 
-    local view = RootView.mount(root_node, store, {
+    local view = root_view.mount(root_node, store, {
       create_node = create_node,
       hud = {
-        MainHudItemBarView.spec({
+        main_hud_item_bar_view.spec({
           get_resolution = resolution_fn,
           send_action = opts.send_action,
           on_throw = opts.on_throw,
@@ -115,7 +115,7 @@ describe("Spoke 主 HUD 底部道具栏视图（#297-B3b2）", function()
     assert.is_true(env.nodes.ItemBarLabel1.LocalZOrder > env.nodes.ItemBarIcon1.LocalZOrder)
     assert.is_true(env.nodes.ItemBarAmount1.LocalZOrder > env.nodes.ItemBarIcon1.LocalZOrder)
 
-    local layout2 = MainHudLayout.Compute({ width = 1920, height = 1080, itemBarSlots = 2 })
+    local layout2 = main_hud_layout.Compute({ width = 1920, height = 1080, itemBarSlots = 2 })
     assert_at(slot1, layout2.ItemBarSlots[1], "ItemBarSlot1(2)")
     assert_at(slot2, layout2.ItemBarSlots[2], "ItemBarSlot2(2)")
 
@@ -124,7 +124,7 @@ describe("Spoke 主 HUD 底部道具栏视图（#297-B3b2）", function()
       slotCount = 5,
       slots = {},
     })
-    local layout5 = MainHudLayout.Compute({ width = 1920, height = 1080, itemBarSlots = 5 })
+    local layout5 = main_hud_layout.Compute({ width = 1920, height = 1080, itemBarSlots = 5 })
     assert.equals(slot1, env.nodes.ItemBarSlot1)
     assert.equals(slot2, env.nodes.ItemBarSlot2)
     assert_at(slot1, layout5.ItemBarSlots[1], "ItemBarSlot1(5)")
@@ -136,7 +136,7 @@ describe("Spoke 主 HUD 底部道具栏视图（#297-B3b2）", function()
       slotCount = 12,
       slots = {},
     })
-    local layout8 = MainHudLayout.Compute({ width = 1920, height = 1080, itemBarSlots = 8 })
+    local layout8 = main_hud_layout.Compute({ width = 1920, height = 1080, itemBarSlots = 8 })
     assert_at(env.nodes.ItemBarSlot8, layout8.ItemBarSlots[8], "ItemBarSlot8(8)")
     assert.is_nil(env.nodes.ItemBarSlot9)
 
@@ -169,14 +169,14 @@ describe("Spoke 主 HUD 底部道具栏视图（#297-B3b2）", function()
       end,
     })
 
-    local fish_def = GameCfg.Items.Definitions[ITEM_FISH]
-    local rod_def = GameCfg.Items.Definitions[ITEM_ROD]
+    local fish_def = game_cfg.Items.Definitions[ITEM_FISH]
+    local rod_def = game_cfg.Items.Definitions[ITEM_ROD]
 
     env.writer:ingest_event("ItemBarState", {
       slotCount = 4,
       selectedSlot = 2,
       slots = {
-        [1] = { itemId = ITEM_FISH, count = 3, cooked = GameCfg.Items.CookedPriceScale },
+        [1] = { itemId = ITEM_FISH, count = 3, cooked = game_cfg.Items.CookedPriceScale },
         [2] = { itemId = ITEM_ROD, count = 1 },
       },
     })
@@ -184,7 +184,7 @@ describe("Spoke 主 HUD 底部道具栏视图（#297-B3b2）", function()
     -- 第 1 格：烤熟鱼
     assert.is_true(env.nodes.ItemBarIcon1.Visible)
     assert.equals(fish_def.Icon, env.nodes.ItemBarIcon1.Image)
-    assert.equals(GameCfg.Grill.CookedPrefix .. fish_def.Name, env.nodes.ItemBarLabel1.Text)
+    assert.equals(game_cfg.Grill.CookedPrefix .. fish_def.Name, env.nodes.ItemBarLabel1.Text)
     assert.equals("3", env.nodes.ItemBarAmount1.Text)
     assert.same({ 54, 100, 140, 255 }, env.nodes.ItemBarSlot1.ButtonNormalColor)
 
@@ -200,7 +200,7 @@ describe("Spoke 主 HUD 底部道具栏视图（#297-B3b2）", function()
     assert.is_false(env.nodes.ItemBarAmount3.Visible)
 
     -- 点击第 1 格发送 SelectSlot
-    assert.is_true(Eui.Click(env.nodes.ItemBarSlot1))
+    assert.is_true(eui.Click(env.nodes.ItemBarSlot1))
     assert.equals(1, #actions)
     assert.same({ action = "SelectSlot", value = 1 }, actions[1])
 
@@ -223,7 +223,7 @@ describe("Spoke 主 HUD 底部道具栏视图（#297-B3b2）", function()
       },
     })
 
-    local layout = MainHudLayout.Compute({ width = 1920, height = 1080, itemBarSlots = 4 })
+    local layout = main_hud_layout.Compute({ width = 1920, height = 1080, itemBarSlots = 4 })
     local c1, c3 = layout.ItemBarSlots[1], layout.ItemBarSlots[3]
 
     -- 短距微动（< 10px）：不触发 MoveSlot
@@ -243,9 +243,9 @@ describe("Spoke 主 HUD 底部道具栏视图（#297-B3b2）", function()
     assert.same({
       action = "MoveSlot",
       value = {
-        from = GameCfg.Items.ContainerId.ItemBar,
+        from = game_cfg.Items.ContainerId.ItemBar,
         index = 1,
-        target = GameCfg.Items.ContainerId.ItemBar,
+        target = game_cfg.Items.ContainerId.ItemBar,
         slot = 3,
       },
     }, actions[1])
@@ -281,14 +281,14 @@ describe("Spoke 主 HUD 底部道具栏视图（#297-B3b2）", function()
       },
     })
 
-    local layout = MainHudLayout.Compute({ width = 1920, height = 1080, itemBarSlots = 3 })
+    local layout = main_hud_layout.Compute({ width = 1920, height = 1080, itemBarSlots = 3 })
     local c1 = layout.ItemBarSlots[1]
 
     -- 1. 短按爆炸物槽（0.1s < LongPressSec）：直投且消费紧随的 OnClicked（不发 SelectSlot）
     env.nodes.ItemBarSlot1.OnTouchBegan:Fire({ BeganPosition = { x = c1.x, y = c1.y } })
     env.writer:advance_clock(0.1)
     env.nodes.ItemBarSlot1.OnTouchEnded:Fire({ EndedPosition = { x = c1.x, y = c1.y } })
-    assert.is_true(Eui.Click(env.nodes.ItemBarSlot1))
+    assert.is_true(eui.Click(env.nodes.ItemBarSlot1))
     assert.equals(1, #throws)
     assert.same({ slot = 1, target = nil }, throws[1])
     assert.equals(0, #actions)
@@ -297,7 +297,7 @@ describe("Spoke 主 HUD 底部道具栏视图（#297-B3b2）", function()
     env.nodes.ItemBarSlot1.OnTouchBegan:Fire({ BeganPosition = { x = c1.x, y = c1.y } })
     env.writer:advance_clock(0.5)
     env.nodes.ItemBarSlot1.OnTouchEnded:Fire({ EndedPosition = { x = c1.x, y = c1.y } })
-    assert.is_true(Eui.Click(env.nodes.ItemBarSlot1))
+    assert.is_true(eui.Click(env.nodes.ItemBarSlot1))
     assert.equals(0, #actions)
 
     local overlay = env.nodes.ThrowAimOverlay
@@ -317,7 +317,7 @@ describe("Spoke 主 HUD 底部道具栏视图（#297-B3b2）", function()
     env.nodes.ItemBarSlot2.OnTouchBegan:Fire({ BeganPosition = { x = c2.x, y = c2.y } })
     env.writer:advance_clock(0.1)
     env.nodes.ItemBarSlot2.OnTouchEnded:Fire({ EndedPosition = { x = c2.x, y = c2.y } })
-    assert.is_true(Eui.Click(env.nodes.ItemBarSlot2))
+    assert.is_true(eui.Click(env.nodes.ItemBarSlot2))
     assert.equals(2, #throws)
     assert.equals(1, #actions)
     assert.same({ action = "SelectSlot", value = 2 }, actions[1])
@@ -341,7 +341,7 @@ describe("Spoke 主 HUD 底部道具栏视图（#297-B3b2）", function()
     })
 
     -- 先长按进入瞄准态
-    local layout = MainHudLayout.Compute({ width = 1920, height = 1080, itemBarSlots = 3 })
+    local layout = main_hud_layout.Compute({ width = 1920, height = 1080, itemBarSlots = 3 })
     local c1 = layout.ItemBarSlots[1]
     env.nodes.ItemBarSlot1.OnTouchBegan:Fire({ BeganPosition = { x = c1.x, y = c1.y } })
     env.writer:advance_clock(0.5)
@@ -399,7 +399,7 @@ describe("Spoke 主 HUD 底部道具栏视图（#297-B3b2）", function()
     })
 
     -- 进入瞄准态，确保重连时连同 ThrowAimOverlay 一并清理
-    local layout = MainHudLayout.Compute({ width = 1920, height = 1080, itemBarSlots = 4 })
+    local layout = main_hud_layout.Compute({ width = 1920, height = 1080, itemBarSlots = 4 })
     local c1 = layout.ItemBarSlots[1]
     env.nodes.ItemBarSlot1.OnTouchBegan:Fire({ BeganPosition = { x = c1.x, y = c1.y } })
     env.writer:advance_clock(0.5)

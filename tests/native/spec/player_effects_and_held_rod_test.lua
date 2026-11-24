@@ -1,20 +1,20 @@
--- #297-A1a 契约测试：PlayerEffects（属性派生与持续效果计时/层数主权）与 HeldRodLeaf（左手持竿投影）。
+-- #297-A1a 契约测试：player_effects（属性派生与持续效果计时/层数主权）与 held_rod_leaf（左手持竿投影）。
 -- 失败方式先列：
---   1. AttrModel/BodyScale 派生公式漂移，或药水/武器升级超限时未封顶，或角色重建未重新捕获基准移速；
+--   1. attr_model/body_scale 派生公式漂移，或药水/武器升级超限时未封顶，或角色重建未重新捕获基准移速；
 --   2. poison/burn 叠层超 5 层、刷新清零层数或丢失 DoT 跳伤相位/末次来源、来源离场后仍继续扣血；
 --   3. frost 叠加衰减超过 30%，或 weak + frost 未正确叠乘（0.5 * 0.7 = 0.35）；
 --   4. paralyze 0.5s 亚秒到期失灵，或麻痹错误退出外层 alive 相位；
 --   5. weak 在角色空窗期继续流失或角色重建后丢失剩余秒数；
---   6. HeldRodLeaf 在切槽/角色重建/树 dispose 后未逆序销毁模型与挂点，或模型创建失败时泄漏挂点。
+--   6. held_rod_leaf 在切槽/角色重建/树 dispose 后未逆序销毁模型与挂点，或模型创建失败时泄漏挂点。
 
-local GameCfg = require("common.game_cfg")
-local BodyScale = require("common.body_scale")
-local SpokeClock = require("common.spoke_clock")
+local game_cfg = require("common.game_cfg")
+local body_scale = require("common.body_scale")
+local spoke_clock = require("common.spoke_clock")
 local spoke = require("common.packages.spoke.api")
-local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
-local PlayerTree = require("server.world_host.player_tree")
-local PlayerEffects = require("server.world_host.player_effects")
-local HeldRodLeaf = require("server.world_host.held_rod_leaf")
+local spoke_runtime = require("common.packages.spoke.runtime.spoke_runtime")
+local player_tree = require("server.world_host.player_tree")
+local player_effects = require("server.world_host.player_effects")
+local held_rod_leaf = require("server.world_host.held_rod_leaf")
 
 local State = spoke.State
 local Effect = spoke.Effect
@@ -26,7 +26,7 @@ local function make_ready_data(player, overrides)
     Player = player,
     Inited = true,
     LoadState = "ready",
-    Data = {
+    data = {
       FishCoin = overrides.coin or 0,
       Zone = overrides.zone or "fishPond",
       SelectedSlot = overrides.selected_slot,
@@ -40,8 +40,8 @@ local function make_ready_data(player, overrides)
         upgrades = overrides.upgrades or {},
       },
       survival = {
-        health = overrides.health or GameCfg.Vitals.MaxHealth,
-        hunger = overrides.hunger or GameCfg.Vitals.MaxHunger,
+        health = overrides.health or game_cfg.vitals.MaxHealth,
+        hunger = overrides.hunger or game_cfg.vitals.MaxHunger,
         dying = false,
         dead = false,
         weakRemaining = overrides.weak_remaining or 0,
@@ -59,19 +59,19 @@ end
 
 local function spawn_with_effects(opts)
   opts = opts or {}
-  local clock = opts.clock or SpokeClock.new(100)
+  local clock = opts.clock or spoke_clock.new(100)
   local player = opts.player or { UserId = opts.user_id or 7001, Character = opts.character }
   local data = make_ready_data(player, opts.data_overrides)
   local dot_ticks = {}
   local leaf_events = {}
 
-  local pt = PlayerTree.spawn({
+  local pt = player_tree.spawn({
     player = player,
     data = data,
     clock = clock,
     mounts = {
       attributes = function(s2, tree)
-        PlayerEffects.mount(s2, tree, {
+        player_effects.mount(s2, tree, {
           on_dot_tick = function(target_tree, kind, damage, source, stacks)
             dot_ticks[#dot_ticks + 1] = {
               user_id = target_tree.user_id,
@@ -96,7 +96,7 @@ local function spawn_with_effects(opts)
   return pt, clock, dot_ticks, leaf_events
 end
 
-describe("PlayerEffects：确定性属性派生（AttrModel / BodyScale）", function()
+describe("player_effects：确定性属性派生（attr_model / body_scale）", function()
   it("药水成长、武器升级与基准移速变更时确定性重算且正确封顶", function()
     local char1 = make_character(8)
     local pt = spawn_with_effects({
@@ -111,13 +111,13 @@ describe("PlayerEffects：确定性属性派生（AttrModel / BodyScale）", fun
     assert.equals(420, pt.memos.max_health:now())
     assert.near(1.4, pt.memos.body_scale:now(), 1e-9)
     assert.is_false(pt.memos.body_scale_capped:now())
-    assert.near(BodyScale.Derive(1.4).CameraDistance, pt.memos.body_derived:now().CameraDistance, 1e-9)
-    assert.near(BodyScale.Derive(1.4).InteractRange, pt.memos.body_derived:now().InteractRange, 1e-9)
+    assert.near(body_scale.Derive(1.4).CameraDistance, pt.memos.body_derived:now().CameraDistance, 1e-9)
+    assert.near(body_scale.Derive(1.4).InteractRange, pt.memos.body_derived:now().InteractRange, 1e-9)
     assert.near(8 * 1.3, pt.memos.walk_speed:now(), 1e-9)
     assert.near(1.2, pt.memos.weapon_damage_scales:now().melee, 1e-9)
 
     -- 封顶成长：10 变大（900 血、3 倍体型）、20 加速（3 倍速）
-    SpokeRuntime.batch(function()
+    spoke_runtime.batch(function()
       pt.states.potion_big_count:set(99)
       pt.states.potion_speed_count:set(99)
       pt.states.shop_upgrades:set({ melee = 5, ranged = 2, explosive = 1 })
@@ -126,7 +126,7 @@ describe("PlayerEffects：确定性属性派生（AttrModel / BodyScale）", fun
     assert.near(3, pt.memos.body_scale:now(), 1e-9)
     assert.is_true(pt.memos.body_scale_capped:now())
     assert.near(8 * 3, pt.memos.walk_speed:now(), 1e-9)
-    assert.near(GameCfg.Shop.DamageScale("melee", 5), pt.memos.weapon_damage_scales:now().melee, 1e-9)
+    assert.near(game_cfg.Shop.DamageScale("melee", 5), pt.memos.weapon_damage_scales:now().melee, 1e-9)
 
     -- 角色重建后重新捕获新角色基准移速
     local char2 = make_character(10)
@@ -137,7 +137,7 @@ describe("PlayerEffects：确定性属性派生（AttrModel / BodyScale）", fun
   end)
 end)
 
-describe("PlayerEffects：持续效果计时与层数主权", function()
+describe("player_effects：持续效果计时与层数主权", function()
   it("poison 与 burn 叠层上限 5、刷新保留跳伤相位与末次来源、来源离场与到期清空零残留", function()
     local pt, clock, dot_ticks, leaf_events = spawn_with_effects({
       character = make_character(7),
@@ -193,7 +193,7 @@ describe("PlayerEffects：持续效果计时与层数主权", function()
     pt:dispose()
   end)
 
-  it("paralyze 0.5s 亚秒由 SpokeClock.on_frame 驱动，仅关 can_act 与移速归零、不退出 alive 相位", function()
+  it("paralyze 0.5s 亚秒由 spoke_clock.on_frame 驱动，仅关 can_act 与移速归零、不退出 alive 相位", function()
     local pt, clock = spawn_with_effects({
       character = make_character(7),
     })
@@ -279,7 +279,7 @@ describe("PlayerEffects：持续效果计时与层数主权", function()
   end)
 end)
 
-describe("HeldRodLeaf：左手持竿外观纯输出与 on_cleanup 对称销毁", function()
+describe("held_rod_leaf：左手持竿外观纯输出与 on_cleanup 对称销毁", function()
   local saved_vec3, saved_color
 
   before_each(function()
@@ -319,7 +319,7 @@ describe("HeldRodLeaf：左手持竿外观纯输出与 on_cleanup 对称销毁",
     local char1 = setmetatable({}, { __index = { Name = "ProxyChar1" } })
     local char2 = setmetatable({}, { __index = { Name = "ProxyChar2" } })
     local character_state = State.new("character", char1)
-    local item_state = State.new("held_visual_item_id", GameCfg.Items.Id.StarterRod)
+    local item_state = State.new("held_visual_item_id", game_cfg.Items.Id.StarterRod)
 
     local fake_tree = {
       user_id = 8801,
@@ -329,7 +329,7 @@ describe("HeldRodLeaf：左手持竿外观纯输出与 on_cleanup 对称销毁",
 
     local errors = {}
     local root = Effect.new("HeldRodTestRoot", function(s)
-      HeldRodLeaf.mount(s, fake_tree, {
+      held_rod_leaf.mount(s, fake_tree, {
         create_unit = create_unit,
         on_error = function(msg) errors[#errors + 1] = msg end,
       })
@@ -359,7 +359,7 @@ describe("HeldRodLeaf：左手持竿外观纯输出与 on_cleanup 对称销毁",
 
     -- 模型创建失败时自动回滚已建挂点并上报错误
     fail_model = true
-    item_state:set(GameCfg.Items.Id.StarterRod)
+    item_state:set(game_cfg.Items.Id.StarterRod)
     assert.equals(5, #created)
     assert.equals(5, #destroyed)
     assert.equals("HeldRodMount_8801", destroyed[5])
@@ -368,7 +368,7 @@ describe("HeldRodLeaf：左手持竿外观纯输出与 on_cleanup 对称销毁",
     -- 恢复正常后重新持竿，并在 tree:dispose() 时彻底销毁零残留
     fail_model = false
     item_state:set(nil)
-    item_state:set(GameCfg.Items.Id.StarterRod)
+    item_state:set(game_cfg.Items.Id.StarterRod)
     assert.equals(7, #created)
     local before_dispose = #destroyed
     tree:dispose()
@@ -378,10 +378,10 @@ describe("HeldRodLeaf：左手持竿外观纯输出与 on_cleanup 对称销毁",
   end)
 
   it("resolve_visual_item_id 优先鱼竿，其次带 Visual.Socket 的手持武器", function()
-    local rod_id = GameCfg.Items.Id.StarterRod
+    local rod_id = game_cfg.Items.Id.StarterRod
     local bar = { [1] = { itemId = rod_id, count = 1 } }
-    assert.equals(rod_id, HeldRodLeaf.resolve_visual_item_id({ kind = nil }, 1, bar))
-    assert.equals(rod_id, HeldRodLeaf.resolve_visual_item_id({ kind = "slot", slot = 1 }, nil, bar))
-    assert.is_nil(HeldRodLeaf.resolve_visual_item_id({ kind = "slot", slot = 2 }, 1, bar))
+    assert.equals(rod_id, held_rod_leaf.resolve_visual_item_id({ kind = nil }, 1, bar))
+    assert.equals(rod_id, held_rod_leaf.resolve_visual_item_id({ kind = "slot", slot = 1 }, nil, bar))
+    assert.is_nil(held_rod_leaf.resolve_visual_item_id({ kind = "slot", slot = 2 }, 1, bar))
   end)
 end)

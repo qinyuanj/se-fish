@@ -1,23 +1,23 @@
 -- #48 服务端隔离探针；不挂入玩法入口，不修改 vendor 或全局配置。
-local AttrGrowth = require('common.attr_growth')
-local BodyScale = require('common.body_scale')
-local GameCfg = require('common.game_cfg')
-local Probe = {}
+local attr_growth = require('common.attr_growth')
+local body_scale = require('common.body_scale')
+local game_cfg = require('common.game_cfg')
+local probe = {}
 
 -- 可执行迁移映射：只生成计划，不写玩家、Controller 或存档。
 -- 统一顺序为 (Base + BaseExtra) * (1 + Ratio) + Bonus，最后业务钳制。
 -- 永久成长从 PotionCount / WeaponDamageScale 重建，临时效果从权威状态重建；不保存最终值或 Buff 句柄。
-function Probe.Map(snapshot)
+function probe.Map(snapshot)
     local s = snapshot or {}
-    local body = BodyScale.Plan(s.bodyPotions)
-    local baseSpeed = s.baseSpeed or GameCfg.Ability.MoveSpeed.Base
-    local speed = AttrGrowth.EffectiveSpeed(baseSpeed, s.speedPotions, s)
+    local body = body_scale.Plan(s.bodyPotions)
+    local baseSpeed = s.baseSpeed or game_cfg.Ability.MoveSpeed.Base
+    local speed = attr_growth.EffectiveSpeed(baseSpeed, s.speedPotions, s)
     if type(baseSpeed) ~= 'number' or baseSpeed <= 0 or baseSpeed ~= baseSpeed or baseSpeed == math.huge then
-        baseSpeed = GameCfg.Ability.MoveSpeed.Base
+        baseSpeed = game_cfg.Ability.MoveSpeed.Base
     end
-    local hunger = s.hunger or GameCfg.Vitals.MaxHunger
+    local hunger = s.hunger or game_cfg.vitals.MaxHunger
     assert(type(hunger) == 'number' and hunger == hunger and math.abs(hunger) < math.huge, '饥饿度须为有限数')
-    hunger = math.max(0, math.min(GameCfg.Vitals.MaxHunger, math.floor(hunger)))
+    hunger = math.max(0, math.min(game_cfg.vitals.MaxHunger, math.floor(hunger)))
     local damageScale = s.damageScale or 1
     assert(type(damageScale) == 'number' and damageScale >= 1 and damageScale < math.huge, '武器加成须为有限正倍率')
     local function entry(value, base, extra, ratio, min, max, write, restore)
@@ -25,25 +25,25 @@ function Probe.Map(snapshot)
             Min = min, Max = max, Write = write, Restore = restore }
     end
     return {
-        MaxHealth = entry(body.Health, GameCfg.Ability.BodyScale.HealthBase,
-            body.Health - GameCfg.Ability.BodyScale.HealthBase, 0,
-            GameCfg.Ability.BodyScale.HealthBase, body.MaxHealth,
+        MaxHealth = entry(body.Health, game_cfg.Ability.body_scale.HealthBase,
+            body.Health - game_cfg.Ability.body_scale.HealthBase, 0,
+            game_cfg.Ability.body_scale.HealthBase, body.MaxHealth,
             'Controller.MaxHealth；提上限不回血，降上限夹当前血；MgrVitals:RefreshMaxHealth 单点',
-            'PotionCount(item168) → BodyScale.Plan；血量与生命状态仍由 MgrVitals/MgrSurvival 恢复'),
+            'PotionCount(item168) → body_scale.Plan；血量与生命状态仍由 MgrVitals/MgrSurvival 恢复'),
         WalkSpeed = entry(speed, baseSpeed, 0, speed / baseSpeed - 1, 0,
-            baseSpeed * GameCfg.Ability.SpeedPotion.MaxFactor,
+            baseSpeed * game_cfg.Ability.SpeedPotion.MaxFactor,
             'Controller.WalkSpeed；MgrAbility:RefreshMoveSpeed 单点',
             'PotionCount(item167)；一次捕获基础移速；成长×虚弱×霜冻，麻痹为0，再写折合 Ratio'),
-        BodyScale = entry(body.Scale, GameCfg.Ability.BodyScale.Base,
-            body.Scale - GameCfg.Ability.BodyScale.Base, 0, GameCfg.Ability.BodyScale.Base, body.MaxScale,
-            '无 vendor Controller 映射；业务 AbilityAPI.SetBodyScale 应用 SetScale 和派生量',
-            'PotionCount(item168) → BodyScale.Plan；角色重建后整体重套'),
-        Hunger = entry(hunger, hunger, 0, 0, 0, GameCfg.Vitals.MaxHunger,
+        body_scale = entry(body.Scale, game_cfg.Ability.body_scale.Base,
+            body.Scale - game_cfg.Ability.body_scale.Base, 0, game_cfg.Ability.body_scale.Base, body.MaxScale,
+            '无 vendor Controller 映射；业务 ability_api.SetBodyScale 应用 SetScale 和派生量',
+            'PotionCount(item168) → body_scale.Plan；角色重建后整体重套'),
+        Hunger = entry(hunger, hunger, 0, 0, 0, game_cfg.vitals.MaxHunger,
             '无 vendor Controller 映射；MgrVitals:SetHunger + WriteHunger，整秒递减/进食保持原入口',
             '当前饥饿是会话状态；复活回满或 ApplyRevive 最低值；离线规则须由 MgrSurvival 决定，不新增存档'),
         WeaponDamageScale = entry(damageScale, 1, 0, damageScale - 1, 1, nil,
             '无 vendor Controller 映射；MgrWeapon 各伤害入口只乘一次 WeaponDamageScale(kind)',
-            'PlayerData:ShopUpgradeLevel(kind) → GameCfg.Shop.DamageScale；按种类线性相加的升级折合 Ratio'),
+            'player_data:ShopUpgradeLevel(kind) → game_cfg.Shop.DamageScale；按种类线性相加的升级折合 Ratio'),
     }
 end
 
@@ -53,7 +53,7 @@ end
 
 -- context.Target/CreateBuffUnits 必须由调用方提供隔离对象；Run 拥有并销毁它们。
 -- 只调包内 attr_rule.api；所有步骤记录，异常后仍完整清理，清理失败则整体失败。
-function Probe.Run(context)
+function probe.Run(context)
     assert(type(context) == 'table' and context.Target ~= nil and type(context.CreateBuffUnits) == 'function',
         'attr_rule_probe 需要隔离 Target 与 CreateBuffUnits')
     assert(type(context.Log) == 'function', 'attr_rule_probe 需要 Log 回调')
@@ -126,12 +126,12 @@ function Probe.Run(context)
             assertTrue(api.Funcs.SetAttrComponent(target, 'Hunger', row[1], row[2]), '业务顺序分量写入失败')
         end
         local raw = api.Funcs.GetAttr(target, 'Hunger')
-        assertTrue(nearly(raw, 260) and Probe.Map({ hunger = raw }).Hunger.Value == 260, '业务钳制先后顺序错误')
+        assertTrue(nearly(raw, 260) and probe.Map({ hunger = raw }).Hunger.Value == 260, '业务钳制先后顺序错误')
         api.Funcs.SetAttrComponent(target, 'Hunger', c.Bonus, 100)
-        assertTrue(Probe.Map({ hunger = api.Funcs.GetAttr(target, 'Hunger') }).Hunger.Value == GameCfg.Vitals.MaxHunger,
+        assertTrue(probe.Map({ hunger = api.Funcs.GetAttr(target, 'Hunger') }).Hunger.Value == game_cfg.vitals.MaxHunger,
             '业务 Max 钳制错误')
         api.Funcs.SetAttrComponent(target, 'Hunger', c.Base, -1000)
-        assertTrue(Probe.Map({ hunger = api.Funcs.GetAttr(target, 'Hunger') }).Hunger.Value == 0, '业务 Min 钳制错误')
+        assertTrue(probe.Map({ hunger = api.Funcs.GetAttr(target, 'Hunger') }).Hunger.Value == 0, '业务 Min 钳制错误')
         businessClampVerified = true
         log('business-clamp', 'ok', '先公式260，再钳制0/300；不提前夹分量')
 
@@ -196,4 +196,4 @@ function Probe.Run(context)
         Bounds = bounds, BusinessClampVerified = businessClampVerified }
 end
 
-return Probe
+return probe

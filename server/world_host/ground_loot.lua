@@ -1,13 +1,13 @@
 
-local GameCfg = require("common.game_cfg")
-local Number = require("common.number")
-local BodyScale = require("common.body_scale")
+local game_cfg = require("common.game_cfg")
+local number = require("common.number")
+local body_scale = require("common.body_scale")
 local spoke = require("common.packages.spoke.api")
-local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
+local spoke_runtime = require("common.packages.spoke.runtime.spoke_runtime")
 
 local Effect = spoke.Effect
 
-local GroundLoot = {}
+local ground_loot = {}
 
 local function copy_row(row)
   local out = {}
@@ -25,7 +25,7 @@ local function read_pos(pos)
   if type(pos) ~= "table" and type(pos) ~= "userdata" then return nil end
   local ok, x, y, z = pcall(function() return pos.x, pos.y, pos.z end) -- 兼容引擎 Vector3
   if not ok then return nil end
-  if not Number.IsFiniteNumber(x) or not Number.IsFiniteNumber(y) or not Number.IsFiniteNumber(z) then
+  if not number.IsFiniteNumber(x) or not number.IsFiniteNumber(y) or not number.IsFiniteNumber(z) then
     return nil
   end
   return x, y, z
@@ -49,9 +49,9 @@ local function zone_of(zones, zone_id)
 end
 
 local function item_kind(item_id)
-  local definition = type(item_id) == "string" and GameCfg.Items.Definitions[item_id]
+  local definition = type(item_id) == "string" and game_cfg.Items.Definitions[item_id]
   if type(definition) ~= "table" then return nil end
-  if definition.Container == GameCfg.Items.ContainerId.Bait then return "bait" end
+  if definition.Container == game_cfg.Items.ContainerId.Bait then return "bait" end
   if definition.Type == "近战武器" or definition.Type == "远程武器" then return "weapon" end
   return "item"
 end
@@ -72,18 +72,18 @@ end
 
 local function capacities(tree)
   local level = tree.states.upgrade_level and tree.states.upgrade_level:now() or 0
-  if not Number.IsFiniteNumber(level) or level < 0 then level = 0 end
+  if not number.IsFiniteNumber(level) or level < 0 then level = 0 end
   level = math.floor(level)
-  local bar = GameCfg.Items.InitialItemBarSlots + level
-  if bar > GameCfg.Items.ItemBarSlots then bar = GameCfg.Items.ItemBarSlots end
-  local pack = GameCfg.Items.InitialBackpackSlots + level * GameCfg.Items.BackpackSlotsPerUpgrade
-  if pack > GameCfg.Items.MaxBackpackSlots then pack = GameCfg.Items.MaxBackpackSlots end
+  local bar = game_cfg.Items.InitialItemBarSlots + level
+  if bar > game_cfg.Items.ItemBarSlots then bar = game_cfg.Items.ItemBarSlots end
+  local pack = game_cfg.Items.InitialBackpackSlots + level * game_cfg.Items.BackpackSlotsPerUpgrade
+  if pack > game_cfg.Items.MaxBackpackSlots then pack = game_cfg.Items.MaxBackpackSlots end
   return bar, pack
 end
 
 local function can_accept(tree, item_id, count)
   local kind = item_kind(item_id)
-  if kind == nil or not Number.IsFiniteNumber(count) or count < 1 or count ~= math.floor(count) then
+  if kind == nil or not number.IsFiniteNumber(count) or count < 1 or count ~= math.floor(count) then
     return false
   end
   if kind == "bait" or kind == "weapon" then return true end
@@ -132,7 +132,7 @@ local function grant(tree, spec)
   local entry = {
     itemId = spec.itemId,
     count = 1,
-    containerId = GameCfg.Items.ContainerId.ItemBar,
+    containerId = game_cfg.Items.ContainerId.ItemBar,
     mult = spec.mult,
     cooked = spec.cooked,
   }
@@ -141,7 +141,7 @@ local function grant(tree, spec)
     tree:set_item_bar(bar)
     return true
   end
-  entry.containerId = GameCfg.Items.ContainerId.Backpack
+  entry.containerId = game_cfg.Items.ContainerId.Backpack
   local pack, ok_pack = put_into(tree.states.backpack:now() or {}, pack_cap, entry)
   if ok_pack then
     tree:set_backpack(pack)
@@ -151,7 +151,7 @@ local function grant(tree, spec)
 end
 
 local function take_slot(tree, container, index)
-  local source = container == GameCfg.Items.ContainerId.Backpack
+  local source = container == game_cfg.Items.ContainerId.Backpack
     and (tree.states.backpack:now() or {})
     or (tree.states.item_bar:now() or {})
   local entry = source[index]
@@ -162,7 +162,7 @@ local function take_slot(tree, container, index)
   for slot, value in pairs(source) do
     if slot ~= index then next_items[slot] = value end
   end
-  if container == GameCfg.Items.ContainerId.Backpack then
+  if container == game_cfg.Items.ContainerId.Backpack then
     tree:set_backpack(next_items)
   else
     tree:set_item_bar(next_items)
@@ -184,20 +184,20 @@ local function within_reach(player, position)
   local character = player and player.Character
   local pos = character and character.Position
   if pos == nil then return false end
-  local radius = BodyScale.InteractionRadius(character, GameCfg.Loot.PickupRadius) + (GameCfg.Loot.PickupSlack or 0)
+  local radius = body_scale.InteractionRadius(character, game_cfg.Loot.PickupRadius) + (game_cfg.Loot.PickupSlack or 0)
   return distance(pos, position) <= radius
 end
 
-function GroundLoot.mount(world, opts)
+function ground_loot.mount(world, opts)
   opts = type(opts) == "table" and opts or {}
-  local scope = assert(opts.scope, "GroundLoot 必须由 SharedWorldTree 根作用域持有")
+  local scope = assert(opts.scope, "ground_loot 必须由 shared_world_tree 根作用域持有")
   local clock = world.clock
   local create_unit = opts.create_unit
   local zones = world.zones or {}
-  local spots_cfg = opts.bait_spots or GameCfg.BaitSpots
-  local cap = GameCfg.Loot.PerZoneCap
-  local flash_sec = GameCfg.Loot.FlashBeforeRecycleSec
-  local respawn_sec = spots_cfg.RespawnSec or GameCfg.BaitSpots.RespawnSec
+  local spots_cfg = opts.bait_spots or game_cfg.BaitSpots
+  local cap = game_cfg.Loot.PerZoneCap
+  local flash_sec = game_cfg.Loot.FlashBeforeRecycleSec
+  local respawn_sec = spots_cfg.RespawnSec or game_cfg.BaitSpots.RespawnSec
 
   local records = {}
   local order = {}
@@ -243,7 +243,7 @@ function GroundLoot.mount(world, opts)
     end)
     broadcasting = false
     if not ok and opts.logger and type(opts.logger.error) == "function" then
-      opts.logger.error("[GroundLoot] LootState 下发失败", err)
+      opts.logger.error("[ground_loot] LootState 下发失败", err)
     end
   end
 
@@ -298,11 +298,11 @@ function GroundLoot.mount(world, opts)
     zone.ground_loot:effect(key, function(es)
       local unit = nil
       if type(create_unit) == "function" then
-        local mesh = row.kind == "bait" and spots_cfg.Mesh or GameCfg.Loot.ItemMesh
-        local scale = row.kind == "bait" and (spots_cfg.Scale or GameCfg.BaitSpots.Scale) or GameCfg.Loot.ItemScale
+        local mesh = row.kind == "bait" and spots_cfg.Mesh or game_cfg.Loot.ItemMesh
+        local scale = row.kind == "bait" and (spots_cfg.Scale or game_cfg.BaitSpots.Scale) or game_cfg.Loot.ItemScale
         unit = create_unit("WorldUnit", {
-          Name = (row.kind == "bait" and "BaitSpot_" or "GroundLoot_") .. id,
-          Position = vec3(x, y + GameCfg.Loot.Height, z),
+          Name = (row.kind == "bait" and "BaitSpot_" or "ground_loot_") .. id,
+          Position = vec3(x, y + game_cfg.Loot.Height, z),
           RenderMeshId = mesh,
           Scale = vec3(scale, scale, scale),
           PhysicsActive = false,
@@ -316,7 +316,7 @@ function GroundLoot.mount(world, opts)
         if unit ~= nil and type(unit.Destroy) == "function" and unit.Destroyed ~= true then
           local ok_destroy, err_destroy = pcall(function() unit:Destroy() end) -- 宿主单位可能已随场景销毁
           if not ok_destroy and opts.logger and type(opts.logger.error) == "function" then
-            opts.logger.error("[GroundLoot] 单位销毁失败", id, err_destroy)
+            opts.logger.error("[ground_loot] 单位销毁失败", id, err_destroy)
           end
         end
         if records[id] == row then
@@ -467,7 +467,7 @@ function GroundLoot.mount(world, opts)
     if not remote_active or world:is_disposed() or not tree or tree:is_disposed() then return false end
     local remote = opts.remote
     if not skip_cd and type(remote) == "table" and type(remote.CheckRECD) == "function"
-        and remote:CheckRECD(player, channel, GameCfg.Items.ActionCooldownSec) then
+        and remote:CheckRECD(player, channel, game_cfg.Items.ActionCooldownSec) then
       return false
     end
     return true
@@ -528,7 +528,7 @@ function GroundLoot.mount(world, opts)
       if zone and zone.ground_loot then zone.ground_loot:drop(current.key) end
       committed = records[id] == nil
     end
-    SpokeRuntime.batch(commit)
+    spoke_runtime.batch(commit)
     if committed then
       publish()
       reply(player, { ok = true, action = "Pickup", id = id })
@@ -540,7 +540,7 @@ function GroundLoot.mount(world, opts)
 
   function world:on_carrier_killed(killed)
     if world:is_disposed() or type(killed) ~= "table" or (type(killed.position) ~= "table" and type(killed.position) ~= "userdata") then return false end
-    local species = GameCfg.Fish[killed.fishId]
+    local species = game_cfg.Fish[killed.fishId]
     if species == nil then return false end
     local zone_id = killed.zoneId
     if zone_of(zones, zone_id) == nil then
@@ -564,7 +564,7 @@ function GroundLoot.mount(world, opts)
               count = 1,
               mult = killed.mult,
               fishId = killed.fishId,
-              x = origin.x + (index - (total + 1) / 2) * (GameCfg.Loot.DropSpacing or 1),
+              x = origin.x + (index - (total + 1) / 2) * (game_cfg.Loot.DropSpacing or 1),
               y = origin.y or 0,
               z = origin.z,
             })
@@ -583,7 +583,7 @@ function GroundLoot.mount(world, opts)
         if id ~= nil then placed[#placed + 1] = id end
       end
     end
-    SpokeRuntime.batch(commit)
+    spoke_runtime.batch(commit)
     return #placed > 0, placed
   end
 
@@ -591,8 +591,8 @@ function GroundLoot.mount(world, opts)
     if world:is_disposed() then return false, "disposed" end
     local tree = lookup_tree(player)
     if not player_can_act(tree) then return false, "cannot-act" end
-    if not Number.IsFiniteNumber(index) or index ~= math.floor(index) or index < 1 then return false, "bad" end
-    local source = container == GameCfg.Items.ContainerId.Backpack
+    if not number.IsFiniteNumber(index) or index ~= math.floor(index) or index < 1 then return false, "bad" end
+    local source = container == game_cfg.Items.ContainerId.Backpack
       and (tree.states.backpack:now() or {})
       or (tree.states.item_bar:now() or {})
     local entry = source[index]
@@ -616,13 +616,13 @@ function GroundLoot.mount(world, opts)
         count = taken.count,
         mult = taken.mult,
         cooked = taken.cooked,
-        x = x + GameCfg.Loot.DropOffset,
+        x = x + game_cfg.Loot.DropOffset,
         y = y,
         z = z,
       })
       dropped = id ~= nil
     end
-    SpokeRuntime.batch(commit_drop)
+    spoke_runtime.batch(commit_drop)
     reply(player, { ok = dropped == true, action = "Drop", index = index })
     return dropped
   end
@@ -630,4 +630,4 @@ function GroundLoot.mount(world, opts)
   return world
 end
 
-return GroundLoot
+return ground_loot

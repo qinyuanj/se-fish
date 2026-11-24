@@ -1,5 +1,5 @@
 -- 服务端 attr_rule 官方包单向输出叶子投影层（ADR-0032 §3 / #297-A2）：
--- 仅作为纯输出 Leaf Sink 挂载在 PlayerTree 树底：
+-- 仅作为纯输出 Leaf Sink 挂载在 player_tree 树底：
 --   1. 校验 GetAttrConfig，拒绝地图 Min/Max 钳制配置；
 --   2. 角色作用域内 GetAttrUnit / EnsureAttrUnit，仅在新建（existing == nil）时于 on_cleanup 对称销毁；
 --   3. 单向写入 PlayerBodyScale / PlayerMaxHealth / PlayerWalkSpeed / PlayerHunger
@@ -7,11 +7,11 @@
 --   4. 单向投影角色 SetScale、CameraDistance / InteractRange / BodyScaleCapped 与 character.Controller.WalkSpeed。
 -- 本模块归属 L2（server.world_host），零反向依赖存量旧债务模块。
 
-local BodyScale = require("common.body_scale")
-local GameCfg = require("common.game_cfg")
-local Number = require("common.number")
+local body_scale = require("common.body_scale")
+local game_cfg = require("common.game_cfg")
+local number = require("common.number")
 
-local AttrLeaf = {}
+local attr_leaf = {}
 
 local COMPONENT_NAMES = { "Base", "BaseExtra", "Ratio", "Bonus" }
 local WEAPON_KINDS = { "melee", "ranged", "explosive" }
@@ -33,7 +33,7 @@ local function report_error(opts, user_id, msg)
   if type(opts.on_error) == "function" then
     opts.on_error(msg)
   else
-    print("[AttrLeaf]", user_id, msg)
+    print("[attr_leaf]", user_id, msg)
   end
 end
 
@@ -48,7 +48,7 @@ end
 ---@param attr_api table
 ---@param key string
 ---@return boolean ok, string|nil err
-function AttrLeaf.validate_config(attr_api, key)
+function attr_leaf.validate_config(attr_api, key)
   if type(attr_api) ~= "table" or type(attr_api.Funcs) ~= "table" then
     return false, "attr-api-invalid"
   end
@@ -71,14 +71,14 @@ end
 ---@param key string
 ---@param components table
 ---@return boolean ok, number|string value_or_err
-function AttrLeaf.project_components(attr_api, character, key, components)
+function attr_leaf.project_components(attr_api, character, key, components)
   if not is_object(character) then
     return false, "no-character"
   end
   if type(components) ~= "table" then
     return false, "invalid-components:" .. tostring(key)
   end
-  local cfg_ok, cfg_err = AttrLeaf.validate_config(attr_api, key)
+  local cfg_ok, cfg_err = attr_leaf.validate_config(attr_api, key)
   if not cfg_ok then
     return false, cfg_err
   end
@@ -113,12 +113,12 @@ end
 ---@param scale number
 ---@param capped boolean
 ---@return boolean ok, table|string derived_or_err
-function AttrLeaf.apply_body_presentation(character, scale, capped)
+function attr_leaf.apply_body_presentation(character, scale, capped)
   if not is_object(character) then
     return false, "no-character"
   end
-  local sanitized = BodyScale.Sanitize(scale)
-  local derived = BodyScale.Derive(sanitized)
+  local sanitized = body_scale.Sanitize(scale)
+  local derived = body_scale.Derive(sanitized)
   local ok, err = pcall(function()
     character:SetScale(make_vec3(sanitized, sanitized, sanitized))
     character:SetAttribute("CameraDistance", derived.CameraDistance)
@@ -135,7 +135,7 @@ end
 ---@param character any
 ---@param speed number
 ---@return boolean ok, string|nil err
-function AttrLeaf.apply_walk_speed(character, speed)
+function attr_leaf.apply_walk_speed(character, speed)
   if not is_object(character) then
     return false, "no-character"
   end
@@ -143,7 +143,7 @@ function AttrLeaf.apply_walk_speed(character, speed)
   if not ok_ctrl or not is_object(controller) then
     return false, "no-controller"
   end
-  local clamped = Number.IsFiniteNumber(speed) and math.max(0, speed) or 0
+  local clamped = number.IsFiniteNumber(speed) and math.max(0, speed) or 0
   local ok_write, err = pcall(function()
     controller.WalkSpeed = clamped
   end)
@@ -153,11 +153,11 @@ function AttrLeaf.apply_walk_speed(character, speed)
   return true, nil
 end
 
---- 在 PlayerTree 树底挂载 attr_rule 纯输出叶子投影。
+--- 在 player_tree 树底挂载 attr_rule 纯输出叶子投影。
 ---@param s table EffectBuilder
 ---@param player_tree table
 ---@param opts? { attr_api?: table, on_error?: fun(msg: string), on_projected?: fun(summary: table) }
-function AttrLeaf.mount(s, player_tree, opts)
+function attr_leaf.mount(s, player_tree, opts)
   opts = type(opts) == "table" and opts or {}
   local attr_api = opts.attr_api or default_attr_api()
   local user_id = player_tree and player_tree.user_id
@@ -215,14 +215,14 @@ function AttrLeaf.mount(s, player_tree, opts)
 
       -- 1. 体型缩放（PlayerBodyScale）及角色视觉/交互范围投影
       if attrs.PlayerBodyScale then
-        local ok, scale = AttrLeaf.project_components(attr_api, character, "PlayerBodyScale", attrs.PlayerBodyScale)
+        local ok, scale = attr_leaf.project_components(attr_api, character, "PlayerBodyScale", attrs.PlayerBodyScale)
         if not ok then
           record_err("PlayerBodyScale", scale)
         else
-          local sanitized = BodyScale.Sanitize(scale)
+          local sanitized = body_scale.Sanitize(scale)
           summary.values.PlayerBodyScale = sanitized
           local capped = type(attr_plan.Body) == "table" and attr_plan.Body.Capped == true
-          local ok_pres, derived_or_err = AttrLeaf.apply_body_presentation(character, sanitized, capped)
+          local ok_pres, derived_or_err = attr_leaf.apply_body_presentation(character, sanitized, capped)
           if not ok_pres then
             record_err("BodyPresentation", derived_or_err)
           else
@@ -233,11 +233,11 @@ function AttrLeaf.mount(s, player_tree, opts)
 
       -- 2. 血量上限（PlayerMaxHealth）
       if attrs.PlayerMaxHealth then
-        local ok, max_hp = AttrLeaf.project_components(attr_api, character, "PlayerMaxHealth", attrs.PlayerMaxHealth)
+        local ok, max_hp = attr_leaf.project_components(attr_api, character, "PlayerMaxHealth", attrs.PlayerMaxHealth)
         if not ok then
           record_err("PlayerMaxHealth", max_hp)
         else
-          summary.values.PlayerMaxHealth = math.max(1, math.min(GameCfg.Ability.BodyScale.HealthMax, max_hp))
+          summary.values.PlayerMaxHealth = math.max(1, math.min(game_cfg.Ability.body_scale.HealthMax, max_hp))
         end
       end
 
@@ -249,7 +249,7 @@ function AttrLeaf.mount(s, player_tree, opts)
           local ok_prior, current = pcall(function() return controller.WalkSpeed end)
           if ok_prior then prior_speed = current end
         end
-        local ok, walk_speed = AttrLeaf.project_components(attr_api, character, "PlayerWalkSpeed", attrs.PlayerWalkSpeed)
+        local ok, walk_speed = attr_leaf.project_components(attr_api, character, "PlayerWalkSpeed", attrs.PlayerWalkSpeed)
         if not ok then
           record_err("PlayerWalkSpeed", walk_speed)
           player_tree.walk_projection_rejected = true
@@ -258,9 +258,9 @@ function AttrLeaf.mount(s, player_tree, opts)
           end
         else
           player_tree.walk_projection_rejected = false
-          local clamped_speed = Number.IsFiniteNumber(walk_speed) and math.max(0, walk_speed) or 0
+          local clamped_speed = number.IsFiniteNumber(walk_speed) and math.max(0, walk_speed) or 0
           summary.values.PlayerWalkSpeed = clamped_speed
-          local ok_spd, spd_err = AttrLeaf.apply_walk_speed(character, clamped_speed)
+          local ok_spd, spd_err = attr_leaf.apply_walk_speed(character, clamped_speed)
           if not ok_spd then
             record_err("WalkSpeed", spd_err)
           end
@@ -269,11 +269,11 @@ function AttrLeaf.mount(s, player_tree, opts)
 
       -- 4. 饥饿度（PlayerHunger）
       if attrs.PlayerHunger then
-        local ok, hunger = AttrLeaf.project_components(attr_api, character, "PlayerHunger", attrs.PlayerHunger)
+        local ok, hunger = attr_leaf.project_components(attr_api, character, "PlayerHunger", attrs.PlayerHunger)
         if not ok then
           record_err("PlayerHunger", hunger)
         else
-          summary.values.PlayerHunger = math.max(0, math.min(GameCfg.Vitals.MaxHunger, math.floor(hunger)))
+          summary.values.PlayerHunger = math.max(0, math.min(game_cfg.vitals.MaxHunger, math.floor(hunger)))
         end
       end
 
@@ -283,7 +283,7 @@ function AttrLeaf.mount(s, player_tree, opts)
           local comp = weapon_comps[kind]
           if type(comp) == "table" then
             local key = "PlayerWeaponDamage_" .. kind
-            local ok, value = AttrLeaf.project_components(attr_api, character, key, comp)
+            local ok, value = attr_leaf.project_components(attr_api, character, key, comp)
             if not ok then
               record_err(key, value)
             else
@@ -300,4 +300,4 @@ function AttrLeaf.mount(s, player_tree, opts)
   end)
 end
 
-return AttrLeaf
+return attr_leaf

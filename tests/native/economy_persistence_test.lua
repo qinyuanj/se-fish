@@ -7,10 +7,10 @@
 -- assertTrue/assertFalse 严格 true/false → is_true/is_false；assertNil/assertNotNil → is_nil/is_not_nil；
 -- assertNotEquals 是深不等 → not_same；带第 3 参消息的 assertEquals 用 assert.message(...) 前缀承载。
 -- 不使用 LuaUnit 断言桥。业务模块经 loadfile 加载，其 _ENV 是真实 _G，
--- 故 Busted 逐文件沙箱下必须写 _G.game / _G.REUtil 而不是裸赋值。
-local GameCfg = require('common.game_cfg')
-local ServerRuntime = require('server.world_host.server_runtime')
-local SpokeClock = require('common.spoke_clock')
+-- 故 Busted 逐文件沙箱下必须写 _G.game / _G.re_util 而不是裸赋值。
+local game_cfg = require('common.game_cfg')
+local server_runtime = require('server.world_host.server_runtime')
+local spoke_clock = require('common.spoke_clock')
 
 describe('TestEconomyPersistence', function()
     local env
@@ -21,7 +21,7 @@ describe('TestEconomyPersistence', function()
     local drain
     local function join()
         local signal = { Connect = function() return { Disconnect = function() end } end }
-        local controller = { Health = GameCfg.Vitals.MaxHealth, MaxHealth = GameCfg.Vitals.MaxHealth,
+        local controller = { Health = game_cfg.vitals.MaxHealth, MaxHealth = game_cfg.vitals.MaxHealth,
             WalkSpeed = 16, HealthChanged = signal, Died = signal, OnReborn = signal }
         env.player = { UserId = 321, Character = { Position = { x = 0, y = 0, z = 0 },
             Size = { y = 2 }, Controller = controller }, CharacterAdded = signal, CharacterRemoving = signal,
@@ -55,19 +55,19 @@ describe('TestEconomyPersistence', function()
     end
 
     -- 逐例夹具：旧 LuaUnit 每例跑 setUp/tearDown，这里同样用 before_each/after_each。
-    -- 第一步把 7 项被改状态（game / REUtil / MgrPlayerData / Debug / Quest / EatAnimation / Shop.Stands）
+    -- 第一步把 7 项被改状态（game / re_util / mgr_player_data / Debug / Quest / EatAnimation / Shop.Stands）
     -- 全部存进 saved，之后才动任何全局与配置，因此夹具中途抛错时 after_each 仍能完整还原。
     -- Shop.Stands 在旧套件里是案例体末尾手工还原；改由 after_each 统一还原，
     -- 使「断言失败也不把配置泄漏给后续案例」，与其余配置项的清理口径一致。
-    -- GameCfg.Save.QaSlot 由 helper 的根级 before_each/after_each 建基线并逐例恢复。
+    -- game_cfg.Save.QaSlot 由 helper 的根级 before_each/after_each 建基线并逐例恢复。
     before_each(function()
-        saved.game, saved.REUtil, saved.MgrPlayerData = rawget(_G, 'game'), rawget(_G, 'REUtil'), rawget(_G, 'MgrPlayerData')
-        saved.Debug, saved.Quest = GameCfg.Debug, GameCfg.Quest
-        saved.EatAnimation = GameCfg.Interact.Fisherman.EatAnimation
-        saved.Stands = GameCfg.Shop.Stands
-        GameCfg.Debug = { Enabled = false }
-        GameCfg.Interact.Fisherman.EatAnimation = 'eat'
-        GameCfg.Quest = { Steps = { { Kind = 'Buy', ItemId = 'worm', Need = 3, Text = '购买鱼饵' } },
+        saved.game, saved.re_util, saved.mgr_player_data = rawget(_G, 'game'), rawget(_G, 're_util'), rawget(_G, 'mgr_player_data')
+        saved.Debug, saved.Quest = game_cfg.Debug, game_cfg.Quest
+        saved.EatAnimation = game_cfg.Interact.Fisherman.EatAnimation
+        saved.Stands = game_cfg.Shop.Stands
+        game_cfg.Debug = { Enabled = false }
+        game_cfg.Interact.Fisherman.EatAnimation = 'eat'
+        game_cfg.Quest = { Steps = { { Kind = 'Buy', ItemId = 'worm', Need = 3, Text = '购买鱼饵' } },
             Title = '任务', DoneText = '完成', NextNotice = '%s' }
         env = { values = {}, queue = {}, events = {}, plays = 0 }
         env.readFailure, env.writeFailure, env.loseReply = false, false, false
@@ -95,7 +95,7 @@ describe('TestEconomyPersistence', function()
                 FindFirstChild = function() return env.anchor end } end
             if name == 'Players' then return { GetPlayers = function() return { env.player } end } end
         end }
-        _G.REUtil = {
+        _G.re_util = {
             GetRE = function(_, name)
                 env.remotes = env.remotes or {}
                 if not env.remotes[name] then
@@ -120,11 +120,11 @@ describe('TestEconomyPersistence', function()
                 return data and data.Extra.quest or { step = 1, count = 0 }
             end,
         }
-        env.players.Save, env.save.PlayerData = env.save, env.players
-        env.runtime = ServerRuntime.new({
-            clock = SpokeClock.new(100), remote = _G.REUtil,
+        env.players.Save, env.save.player_data = env.save, env.players
+        env.runtime = server_runtime.new({
+            clock = spoke_clock.new(100), remote = _G.re_util,
             on_item_bar_state = function(player, snapshot)
-                _G.REUtil:GetRE('ItemBarState'):FireClient(player, snapshot)
+                _G.re_util:GetRE('ItemBarState'):FireClient(player, snapshot)
             end,
             save = env.save, player_data = env.players,
             players = function() return { env.player } end,
@@ -150,29 +150,29 @@ describe('TestEconomyPersistence', function()
         clearEvents()
     end)
     after_each(function()
-        _G.game, _G.REUtil, _G.MgrPlayerData = saved.game, saved.REUtil, saved.MgrPlayerData
-        GameCfg.Debug, GameCfg.Quest = saved.Debug, saved.Quest
-        GameCfg.Interact.Fisherman.EatAnimation = saved.EatAnimation
-        GameCfg.Shop.Stands = saved.Stands
+        _G.game, _G.re_util, _G.mgr_player_data = saved.game, saved.re_util, saved.mgr_player_data
+        game_cfg.Debug, game_cfg.Quest = saved.Debug, saved.Quest
+        game_cfg.Interact.Fisherman.EatAnimation = saved.EatAnimation
+        game_cfg.Shop.Stands = saved.Stands
         saved = {}
         env = nil
     end)
 
     it('test_backpack_upgrade_row_drives_storage_level_and_persists', function()
-        -- #130 背包升级行（编号 33）并入升级页：走 Save 协议并复用 Data.UpgradeLevel
+        -- #130 背包升级行（编号 33）并入升级页：走 Save 协议并复用 data.UpgradeLevel
         env.data:AddCoin(1000)
         persistSetup()
         assert.is_true(env.shop:Handle(env.player, { action = 'Buy', number = 33, seq = 1 })) -- 背包升级1，100 金
         drain()
-        assert.same(900, env.data.Data.FishCoin)
-        assert.same(1, env.data.Data.UpgradeLevel)
+        assert.same(900, env.data.data.FishCoin)
+        assert.same(1, env.data.data.UpgradeLevel)
         assert.same(3, env.data:ItemBarCapacity())
         assert.same(10, env.data:BackpackCapacity())
         assert.same(1, env.data:PurchaseCount(33))
         join()
         drain()
         local restored = env.players:GetDataInst(env.player)
-        assert.same(1, restored.Data.UpgradeLevel)
+        assert.same(1, restored.data.UpgradeLevel)
         assert.same(1, restored:ShopUpgradeLevel('backpack'))
         assert.same(3, restored:ItemBarCapacity())
         assert.same(1, restored:PurchaseCount(33))
@@ -184,8 +184,8 @@ describe('TestEconomyPersistence', function()
         env.writeFailure = true
         local request = { action = 'Buy', itemId = 'worm', seq = 1 }
         assert.is_true(env.shop:Handle(env.player, request))
-        assert.same(10, env.data.Data.FishCoin)
-        assert.same(0, env.data.Data.Bait.worm or 0)
+        assert.same(10, env.data.data.FishCoin)
+        assert.same(0, env.data.data.Bait.worm or 0)
         assert.is_nil(env.players:GetDataInst(env.player))
         drain()
         assert.same({}, env.events)
@@ -194,8 +194,8 @@ describe('TestEconomyPersistence', function()
         env.writeFailure, env.loseReply = false, true
         env.save:Update()
         drain()
-        assert.same(9, env.data.Data.FishCoin)
-        assert.same(1, env.data.Data.Bait.worm)
+        assert.same(9, env.data.data.FishCoin)
+        assert.same(1, env.data.data.Bait.worm)
         assert.same(1, #messages('ShopResult'))
         assert.is_true(messages('ShopResult')[1].ok)
         assert.is_true(#messages('ItemBarState') > 0)
@@ -203,8 +203,8 @@ describe('TestEconomyPersistence', function()
         join()
         drain()
         local restored = env.players:GetDataInst(env.player)
-        assert.same(9, restored.Data.FishCoin)
-        assert.same(1, restored.Data.Bait.worm)
+        assert.same(9, restored.data.FishCoin)
+        assert.same(1, restored.data.Bait.worm)
     end)
 
     it('test_exchange_keeps_token_until_write_and_publishes_product_after_retry', function()
@@ -213,7 +213,7 @@ describe('TestEconomyPersistence', function()
         persistSetup()
         env.writeFailure = true
         assert.is_true(env.interact:Handle(env.player, { target = 'fisherman', action = 'Feed', seq = 1 }))
-        assert.same('garHead', env.data.Data.Containers.itemBar[1].itemId)
+        assert.same('garHead', env.data.data.Containers.itemBar[1].itemId)
         drain()
         assert.same({}, env.events)
         assert.same(0, env.plays)
@@ -222,7 +222,7 @@ describe('TestEconomyPersistence', function()
         drain()
         assert.same(0, env.data:ItemCount('garHead'))
         assert.same(1, env.data:ItemCount('shrimpTicket'))
-        assert.same(0, env.data.Data.FishCoin)
+        assert.same(0, env.data.data.FishCoin)
         assert.same({ from = 'garHead', to = 'shrimpTicket' }, messages('InteractResult')[1].exchange)
         assert.same(1, env.plays)
         assert.same(0, env.quest:GetState(env.player).count)
@@ -266,8 +266,8 @@ describe('TestEconomyPersistence', function()
         drain()
         assert.same(0, env.data:ItemCount('garHead'))
         assert.same(1, env.data:ItemCount('shrimpTicket'))
-        assert.same('shrimpTicket', env.data.Data.Containers.itemBar[1].itemId)
-        assert.same(0, env.data.Data.FishCoin)
+        assert.same('shrimpTicket', env.data.data.Containers.itemBar[1].itemId)
+        assert.same(0, env.data.data.FishCoin)
         assert.same({ from = 'garHead', to = 'shrimpTicket' }, messages('InteractResult')[1].exchange)
     end)
 
@@ -280,16 +280,16 @@ describe('TestEconomyPersistence', function()
             drain()
             first = first or messages('ShopResult')[1].operation
         end
-        assert.same(35, env.data.Data.FishCoin)
-        assert.same(65, env.data.Data.Bait.worm)
+        assert.same(35, env.data.data.FishCoin)
+        assert.same(65, env.data.data.Bait.worm)
         clearEvents()
         assert.is_false(env.shop:Handle(env.player, { action = 'Buy', itemId = 'worm', seq = 1 }))
         assert.is_false(env.shop:Handle(env.player, { action = 'Buy', seq = 66, operation = first }))
         local forged = { id = first.id, sequence = first.sequence, kind = first.kind, requestKey = '伪造' }
         assert.is_false(env.shop:Handle(env.player, { action = 'Buy', seq = 66, operation = forged }))
         assert.same({}, env.events)
-        assert.same(35, env.data.Data.FishCoin)
-        assert.same(65, env.data.Data.Bait.worm)
+        assert.same(35, env.data.data.FishCoin)
+        assert.same(65, env.data.data.Bait.worm)
     end)
 
     it('test_failed_write_exhaustion_and_failed_load_never_grant', function()
@@ -300,8 +300,8 @@ describe('TestEconomyPersistence', function()
         drain()
         for _ = 1, 4 do env.save:Update() drain() end
         assert.is_nil(env.players:GetDataInst(env.player))
-        assert.same(20, env.data.Data.FishCoin)
-        assert.same(0, env.data.Data.Bait.worm or 0)
+        assert.same(20, env.data.data.FishCoin)
+        assert.same(0, env.data.data.Bait.worm or 0)
         assert.same({}, messages('ItemBarState'))
         assert.same(1, #messages('ShopResult'))
         assert.is_false(messages('ShopResult')[1].ok)
@@ -332,8 +332,8 @@ describe('TestEconomyPersistence', function()
         assert.same({ original }, messages('InteractResult'))
         assert.same({}, messages('ItemBarState'))
         assert.same(0, env.plays)
-        assert.same(1, env.data.Data.FishCoin)
-        assert.same(2, env.data.Data.Bait.worm)
+        assert.same(1, env.data.data.FishCoin)
+        assert.same(2, env.data.data.Bait.worm)
         env.interact:OnPlayerRemoving(env.player)
         join()
         drain()
@@ -347,18 +347,18 @@ describe('TestEconomyPersistence', function()
     end)
 
     it('test_feed_selected_fish_waits_for_write_before_coins_animation_and_quest', function()
-        GameCfg.Quest.Steps[1] = { Kind = 'Feed', Category = 'fish', Need = 3, Text = '喂食鱼获' }
+        game_cfg.Quest.Steps[1] = { Kind = 'Feed', Category = 'fish', Need = 3, Text = '喂食鱼获' }
         assert.is_true(env.data:AddItem('bass', 1.99))
         assert.is_true(env.data:SelectSlot(1))
         persistSetup()
         -- 当前基线从 Serialize 恢复选中态；cherry-pick impl-123 的选择态持久化提交后仍由真实入口重选，seam 不变。
-        if env.data.Data.SelectedSlot ~= 1 then env.data:SelectSlot(1) end
+        if env.data.data.SelectedSlot ~= 1 then env.data:SelectSlot(1) end
         clearEvents()
         local request = { target = 'fisherman', action = 'Feed', seq = 1 }
         env.writeFailure = true
         assert.is_true(env.interact:Handle(env.player, request))
-        assert.same(0, env.data.Data.FishCoin)
-        assert.same('bass', env.data.Data.Containers.itemBar[1].itemId)
+        assert.same(0, env.data.data.FishCoin)
+        assert.same('bass', env.data.data.Containers.itemBar[1].itemId)
         assert.is_nil(env.players:GetDataInst(env.player))
         drain()
         assert.same({}, env.events)
@@ -367,14 +367,14 @@ describe('TestEconomyPersistence', function()
         env.writeFailure = false
         env.save:Update()
         drain()
-        assert.same(11, env.data.Data.FishCoin)
+        assert.same(11, env.data.data.FishCoin)
         assert.same(0, env.data:ItemCount('bass'))
         assert.same(11, messages('InteractResult')[1].coins)
         assert.same(1, env.plays)
         assert.same(1, env.quest:GetState(env.player).count)
         join()
         drain()
-        assert.same(11, env.players:GetDataInst(env.player).Data.FishCoin)
+        assert.same(11, env.players:GetDataInst(env.player).data.FishCoin)
         assert.same(0, env.players:GetDataInst(env.player):ItemCount('bass'))
     end)
 
@@ -388,8 +388,8 @@ describe('TestEconomyPersistence', function()
             assert.is_false(env.interact:Handle(env.player, { target = 'fisherman', action = 'Feed', operation = operation }))
         end
         assert.same({}, env.events)
-        assert.same(5, env.data.Data.FishCoin)
-        assert.same(1, env.data.Data.Bait.worm)
+        assert.same(5, env.data.data.FishCoin)
+        assert.same(1, env.data.data.Bait.worm)
         assert.same(0, env.data:Serialize().meta.sequence)
     end)
 
@@ -407,8 +407,8 @@ describe('TestEconomyPersistence', function()
         drain()
         assert.same({}, env.events)
         local restored = env.players:GetDataInst(env.player)
-        assert.same(20, restored.Data.FishCoin)
-        assert.same(0, restored.Data.Bait.worm or 0)
+        assert.same(20, restored.data.FishCoin)
+        assert.same(0, restored.data.Bait.worm or 0)
         assert.same(0, env.quest:GetState(env.player).count)
     end)
 
@@ -430,7 +430,7 @@ describe('TestEconomyPersistence', function()
         assert.same({ exchange }, messages('InteractResult'))
         assert.same({}, messages('ItemBarState'))
         assert.same(0, env.plays)
-        assert.same(1, env.data.Data.UpgradeLevel)
+        assert.same(1, env.data.data.UpgradeLevel)
         assert.same(1, env.data:ItemCount('shrimpTicket'))
     end)
 
@@ -448,7 +448,7 @@ describe('TestEconomyPersistence', function()
         -- #127 起满格不再是喂食的业务拒绝：信物兑换先交付选中格、再按交付后的容量校验，
         -- 满格也能用本次交付释放出的格位成交；钓鱼佬侧仍然真实的业务拒绝是「选中格为空」。
         -- 取消选中是本次用例的输入，不算「被拒绝的请求改动了数据」。
-        env.data.Data.SelectedSlot = nil
+        env.data.data.SelectedSlot = nil
         before.selectedSlot = nil
         env.interact:Handle(env.player, { target = 'fisherman', action = 'Feed', seq = 1 })
         assert.same('nothing', messages('InteractResult')[1].reason)
@@ -478,7 +478,7 @@ describe('TestEconomyPersistence', function()
         assert.same({ original }, messages('ShopResult'))
         assert.same({}, messages('ItemBarState'))
         assert.same(1, env.quest:GetState(env.player).count)
-        assert.same(19, env.data.Data.FishCoin)
+        assert.same(19, env.data.data.FishCoin)
         env.shop:OnPlayerRemoving(env.player)
         env.quest:OnPlayerRemoving(env.player)
         join()
@@ -487,27 +487,27 @@ describe('TestEconomyPersistence', function()
         clearEvents()
         assert.is_true(env.shop:Handle(env.player, request))
         drain()
-        assert.same(18, env.data.Data.FishCoin)
-        assert.same(2, env.data.Data.Bait.worm)
+        assert.same(18, env.data.data.FishCoin)
+        assert.same(2, env.data.data.Bait.worm)
         assert.not_same(messages('ShopResult')[1].operation.id, original.operation.id)
         clearEvents()
         env.player.Character.Position.x = 999
         assert.is_true(env.shop:Handle(env.player, { action = 'Buy', seq = 99, operation = original.operation }))
         assert.same({ original }, messages('ShopResult'))
         assert.same({}, messages('ItemBarState'))
-        assert.same(18, env.data.Data.FishCoin)
+        assert.same(18, env.data.data.FishCoin)
         assert.same(2, env.quest:GetState(env.player).count, '重进新购买已计数，旧身份重放不得再增加')
     end)
 
     it('test_skip_level_rejected_before_persisting', function()
         -- #130 越级购买在持久前被拒绝：不产生操作、不扣钱、计数为零
-        GameCfg.Shop.Stands = { { AnchorName = 'TGUnitShop', Level = 7 } }
+        game_cfg.Shop.Stands = { { AnchorName = 'TGUnitShop', Level = 7 } }
         env.data:AddCoin(1000)
         persistSetup()
         env.shop:Handle(env.player, { action = 'Buy', number = 50, seq = 1 }) -- 近战 2 级，未买过 1 级
         assert.same('level', messages('ShopResult')[1].reason)
         drain()
-        assert.same(1000, env.data.Data.FishCoin)
+        assert.same(1000, env.data.data.FishCoin)
         assert.same(0, env.data:ShopUpgradeLevel('melee'))
         assert.same(0, env.data:PurchaseCount(50))
         assert.same(0, env.data:Serialize().meta.sequence)
@@ -522,7 +522,7 @@ describe('TestEconomyPersistence', function()
         assert.same(0, env.data:ShopUpgradeLevel('melee')) -- 落账前不生效
         assert.same({}, env.events)
         drain()
-        assert.same(950, env.data.Data.FishCoin)
+        assert.same(950, env.data.data.FishCoin)
         assert.same(1, env.data:ShopUpgradeLevel('melee'))
         assert.same(1, env.data:PurchaseCount(51))
         local result = messages('ShopResult')[1]
@@ -535,7 +535,7 @@ describe('TestEconomyPersistence', function()
         assert.is_true(env.shop:Handle(env.player, { action = 'Buy', number = 51, seq = 1 }))
         assert.same({ result }, messages('ShopResult'))
         assert.same({}, messages('ItemBarState'))
-        assert.same(950, env.data.Data.FishCoin)
+        assert.same(950, env.data.data.FishCoin)
         assert.same(1, env.data:ShopUpgradeLevel('melee'))
         assert.same(1, env.data:PurchaseCount(51))
         -- 重进保持：升级等级与购买计数都在存档里
@@ -544,12 +544,12 @@ describe('TestEconomyPersistence', function()
         local restored = env.players:GetDataInst(env.player)
         assert.same(1, restored:ShopUpgradeLevel('melee'))
         assert.same(1, restored:PurchaseCount(51))
-        assert.same(950, restored.Data.FishCoin)
+        assert.same(950, restored.data.FishCoin)
         -- 重进后重复购买：限购拒绝且不扣钱
         clearEvents()
         assert.is_false(env.shop:Handle(env.player, { action = 'Buy', number = 51, seq = 2 }))
         assert.same('limit', messages('ShopResult')[1].reason)
-        assert.same(950, restored.Data.FishCoin)
+        assert.same(950, restored.data.FishCoin)
         assert.same(1, restored:ShopUpgradeLevel('melee'))
     end)
 
@@ -557,11 +557,11 @@ describe('TestEconomyPersistence', function()
         env.data:AddCoin(100)
         persistSetup()
         assert.is_true(env.shop:Handle(env.player, { action = 'UpgradeStorage', seq = 1, price = 0 }))
-        assert.same(100, env.data.Data.FishCoin)
+        assert.same(100, env.data.data.FishCoin)
         assert.same(2, env.data:ItemBarCapacity())
         assert.same({}, env.events)
         drain()
-        assert.same(0, env.data.Data.FishCoin)
+        assert.same(0, env.data.data.FishCoin)
         assert.same(3, env.data:ItemBarCapacity())
         assert.same(100, messages('ShopResult')[1].price)
         assert.same('UpgradeStorage', messages('ShopResult')[1].action)
@@ -577,7 +577,7 @@ describe('TestEconomyPersistence', function()
         env.writeFailure = true
         local request = { action = 'Buy', number = 51, seq = 1 }
         assert.is_true(env.shop:Handle(env.player, request))
-        assert.same(1000, env.data.Data.FishCoin)
+        assert.same(1000, env.data.data.FishCoin)
         assert.same(0, env.data:ShopUpgradeLevel('melee'))
         drain()
         assert.same({}, env.events)
@@ -585,7 +585,7 @@ describe('TestEconomyPersistence', function()
         env.writeFailure, env.loseReply = false, true
         env.save:Update()
         drain()
-        assert.same(950, env.data.Data.FishCoin)
+        assert.same(950, env.data.data.FishCoin)
         assert.same(1, env.data:ShopUpgradeLevel('melee'))
         assert.same(1, env.data:PurchaseCount(51))
         assert.same(1, #messages('ShopResult'))
@@ -595,6 +595,6 @@ describe('TestEconomyPersistence', function()
         local restored = env.players:GetDataInst(env.player)
         assert.same(1, restored:ShopUpgradeLevel('melee'))
         assert.same(1, restored:PurchaseCount(51))
-        assert.same(950, restored.Data.FishCoin)
+        assert.same(950, restored.data.FishCoin)
     end)
 end)

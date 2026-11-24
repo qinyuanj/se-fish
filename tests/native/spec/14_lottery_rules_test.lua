@@ -15,13 +15,13 @@
 --   3. 两同金币按随机倍率后的价格算，而不是已确定的整数售价；
 --   4. 无两同也发奖，或金币不直接入账户而是生成世界物品；
 --   5. 武器大奖占道具格而不是进独立武器库存。
-local GameCfg = require('common.game_cfg')
-local EconomyWorld = require('tests.support.economy_world')
+local game_cfg = require('common.game_cfg')
+local economy_world = require('tests.support.economy_world')
 
-local ITEM_BAR = GameCfg.Items.ContainerId.ItemBar
+local ITEM_BAR = game_cfg.Items.ContainerId.ItemBar
 
 local function newWorld()
-  local env = EconomyWorld.new()
+  local env = economy_world.new()
   function env:join() end
   function env:cleanup() self:tearDown() end
   function env:bet(itemId, mult)
@@ -52,7 +52,7 @@ describe('条款 14：抽奖机数值规则', function()
     env.rolls = { 1, 23, 100 }
     local accepted, reply = env:draw(1)
     assert.is_true(accepted)
-    assert.are.equal('Draw', reply.action)
+    assert.are.equal('draw', reply.action)
     assert.same({ 1, 2, 7 }, reply.axes)
     -- 累计边界：22 仍落在第 1 个图案，96 落在第 7 个图案
     env:bet(PREMIUM, 1)
@@ -105,7 +105,7 @@ describe('条款 14：抽奖机数值规则', function()
     env.rolls = { 22, 22, 22, 1 }
     local _, reply = env:draw(1)
     assert.are.equal('weapon', reply.prize.kind)
-    local bar = env.data.Data.Containers[ITEM_BAR]
+    local bar = env.data.data.Containers[ITEM_BAR]
     assert.is_nil(bar[1], '投入格位应是空的，大奖不占道具格')
     for _, entry in pairs(bar) do
       assert.are_not.equal(reply.prize.itemId, entry.itemId, '武器大奖不该出现在道具栏')

@@ -1,6 +1,6 @@
 -- #90 迁移：服务端技能接缝（原 tests/gameplay/ability_seams_test.lua，2 类 11 例）。
 -- describe / it 名沿用旧类名与方法名；注册顺序 = 旧套件实际执行顺序（LuaUnit 按 `类名.方法名` 字典序）。
--- #132 T11 原型：服务端接缝（AbilityAPI 的 SetScale / 挂点，MgrFishUnit 的飞行 / 叼人 / 阶段首领）。
+-- #132 T11 原型：服务端接缝（ability_api 的 SetScale / 挂点，MgrFishUnit 的飞行 / 叼人 / 阶段首领）。
 -- 纯逻辑各有自己的用例（原 tests/gameplay/ability_proto_test.lua）；这里只测「接缝有没有被正确驱动」。
 --
 -- 失败方式（先列后写）：
@@ -14,14 +14,14 @@
 -- server.packages.ability_system.api。迁移只把这份真模块在 after_each 里放回快照（含 nil），
 -- 不给 vendor 打桩、不写 package.preload，因此不会把桩泄漏给同进程的其他 spec。
 -- 加载真包 api 需要全局 game 已就位（包内 sub_ability 在加载期读 game），故 before_each 先摆引擎替身再 require。
-local GameCfg = require('common.game_cfg')
+local game_cfg = require('common.game_cfg')
 
 local function vec(x, y, z)
     return { x = x, y = y, z = z }
 end
 
 describe('TestAbilitySeams', function()
-    -- 真实 AbilityAPI（懒加载接缝），加载期需要 RunService:IsServer()
+    -- 真实 ability_api（懒加载接缝），加载期需要 RunService:IsServer()
     local ctx
     local saved
     before_each(function()
@@ -107,14 +107,14 @@ describe('TestAbilitySeams', function()
     end)
 end)
 
--- MgrFishUnit 的驱动：假引擎（World/Players/Vitals/AbilityAPI 全桩），只验证接缝行为
+-- MgrFishUnit 的驱动：假引擎（World/Players/vitals/ability_api 全桩），只验证接缝行为
 describe('TestFishAbilitySeams', function()
     local function newFish(id, fishId, position)
         local body = { UnitId = id, Position = vec(position.x, position.y, position.z), BodyType = 4,
             Parent = nil, LinearVelocity = vec(0, 0, 0), Rotation = nil }
         return { Id = id, FishId = fishId, Owner = nil, Anchor = vec(position.x, position.y, position.z),
-            Carrier = { Body = body, Health = GameCfg.Fish[fishId].Health,
-                MaxHealth = GameCfg.Fish[fishId].Health, Dead = false }, Threat = {} }
+            Carrier = { Body = body, Health = game_cfg.Fish[fishId].Health,
+                MaxHealth = game_cfg.Fish[fishId].Health, Dead = false }, Threat = {} }
     end
 
     local function newPlayer(userId, position)
@@ -160,7 +160,7 @@ describe('TestFishAbilitySeams', function()
         -- 目标裁决适配层按生产接线（server/main.lua）注入
         ctx.mgr.AiTarget = require('server.world_host.fish_ai_target')
         ctx.mgr.World = _G.game:GetService('World')
-        ctx.mgr.Vitals = {
+        ctx.mgr.vitals = {
             CanTakeDamage = function() return true end,
             NewHit = function(_, source, category) return { source = source, category = category, targets = {} } end,
             ApplyHit = function(_, hit, target, amount)
@@ -203,14 +203,14 @@ describe('TestFishAbilitySeams', function()
 
     -- 失败方式 5：阶段首领入水咬中结算伤害并叼走玩家
     it('test_boss_phase_bite_lands_damage_and_grabs_the_player', function()
-        local safe = GameCfg.Zones[7].Scene.SafePoint
+        local safe = game_cfg.Zones[7].Scene.SafePoint
         local fish = newFish(3, 'fish56Boss', { x = safe.x, y = safe.y, z = safe.z })
         ctx.mgr.Fish[fish.Id] = fish
         local player = newPlayer(9, { x = safe.x + 1, y = safe.y, z = safe.z })
         ctx.players = { player }
         -- 50%：入水阶段（咬中 1000）
         fish.Carrier.Health, fish.Carrier.MaxHealth = 5000, 10000
-        fish.Phase = require('common.boss_phase').New(GameCfg.Ability.BossPhase, ctx.now, fish.Carrier.Body.Position)
+        fish.Phase = require('common.boss_phase').New(game_cfg.Ability.boss_phase, ctx.now, fish.Carrier.Body.Position)
         fish.PhaseAt = ctx.now
         fish.Yaw = 0
         for _ = 1, 355 do -- #38 正文沧龙式：15秒跃起，1秒预警+1.5秒腾空后咬中
@@ -224,10 +224,10 @@ describe('TestFishAbilitySeams', function()
         assert.same('fishAttack', ctx.hits[2].category)
         assert.same(player, ctx.hits[2].target)
         -- 咬中即叼走：挂点建出来了，玩家归到携带态
-        assert.is_not_nil(fish.Carry)
-        assert.is_not_nil(fish.CarryMount)
-        assert.same(GameCfg.Ability.Carry.Socket, fish.CarryMount.SocketName)
-        assert.same(player, fish.Carry.TargetPlayer)
+        assert.is_not_nil(fish.carry)
+        assert.is_not_nil(fish.carry_mount)
+        assert.same(game_cfg.Ability.carry.Socket, fish.carry_mount.SocketName)
+        assert.same(player, fish.carry.TargetPlayer)
     end)
 
     -- 失败方式 5：携带跟随容差内不写回、被甩开则钳回挂点、超时放下并销毁挂点
@@ -236,14 +236,14 @@ describe('TestFishAbilitySeams', function()
         ctx.mgr.Fish[fish.Id] = fish
         local player = newPlayer(9, { x = 1, y = 0, z = 0 })
         ctx.players = { player }
-        local CarryMount = require('common.carry_mount')
-        local cfg = GameCfg.Ability.Carry
-        fish.Carry = CarryMount.New(cfg, { x = 0, y = 0, z = 0 }, 0, ctx.now)
-        fish.Carry.GroundY = 2
-        fish.Carry.TargetPlayer = player
-        fish.Carry.LastStepAt = ctx.now
-        assert.is_true(CarryMount.Attach(fish.Carry, { x = 1, y = 0, z = 0 }, ctx.now).Ok)
-        fish.CarryMount = ctx.mounts[#ctx.mounts + 1] or { Destroyed = false, Destroy = function() end }
+        local carry_mount = require('common.carry_mount')
+        local cfg = game_cfg.Ability.carry
+        fish.carry = carry_mount.New(cfg, { x = 0, y = 0, z = 0 }, 0, ctx.now)
+        fish.carry.GroundY = 2
+        fish.carry.TargetPlayer = player
+        fish.carry.LastStepAt = ctx.now
+        assert.is_true(carry_mount.Attach(fish.carry, { x = 1, y = 0, z = 0 }, ctx.now).Ok)
+        fish.carry_mount = ctx.mounts[#ctx.mounts + 1] or { Destroyed = false, Destroy = function() end }
         -- 容差内不写回（避免每帧纠正抖动）
         local before = vec(player.Character.Position.x, player.Character.Position.y, player.Character.Position.z)
         ctx.mgr:UpdateCarry(fish, ctx.now + 0.05)
@@ -251,14 +251,14 @@ describe('TestFishAbilitySeams', function()
         -- 被甩开：整段钳回挂点坐标
         player.Character.Position = vec(999, 0, 999)
         ctx.mgr:UpdateCarry(fish, ctx.now + 0.1)
-        local mount = CarryMount.MountPoint(fish.Carry.Host, fish.Carry.Offset, 0)
+        local mount = carry_mount.MountPoint(fish.carry.host, fish.carry.Offset, 0)
         assert.near(mount.x, player.Character.Position.x, 1e-9)
         assert.near(mount.z, player.Character.Position.z, 1e-9)
-        assert.same(1, fish.Carry.Stats.Snaps)
+        assert.same(1, fish.carry.Stats.Snaps)
         -- 超时：放下玩家、销毁挂点、清携带态
         ctx.mgr:UpdateCarry(fish, ctx.now + cfg.MaxCarrySec + 1)
-        assert.is_nil(fish.Carry)
-        assert.is_nil(fish.CarryMount)
+        assert.is_nil(fish.carry)
+        assert.is_nil(fish.carry_mount)
         assert.same(1, #ctx.detached)
         assert.near(2 + cfg.DropHeight, player.Character.Position.y, 1e-9)
         assert.near(cfg.DropForward, player.Character.Position.z, 1e-9)
@@ -267,15 +267,15 @@ describe('TestFishAbilitySeams', function()
     -- 失败方式 3：飞行边界先取本区场景，未知鱼种回落兜底围栏且仍是有限值
     it('test_flight_bounds_come_from_the_zone_scene_then_the_fallback', function()
         local zone = nil
-        for _, entry in ipairs(GameCfg.Zones) do
+        for _, entry in ipairs(game_cfg.Zones) do
             if entry.Id == 'reefIsland' then zone = entry.Scene end
         end
         local bounds = ctx.mgr:FlightBounds('fish47Elite')
         assert.same(zone.Boundary.MinX, bounds.MinX)
-        assert.same(zone.SafePoint.y + GameCfg.Ability.Flight.MaxHeight, bounds.CeilingY)
+        assert.same(zone.SafePoint.y + game_cfg.Ability.Flight.MaxHeight, bounds.CeilingY)
         -- 未知鱼种用兜底围栏，仍然是有限边界
         local fallback = ctx.mgr:FlightBounds('noSuchFish')
-        assert.same(GameCfg.Ability.Flight.FallbackBounds.MaxX, fallback.MaxX)
+        assert.same(game_cfg.Ability.Flight.FallbackBounds.MaxX, fallback.MaxX)
         assert.is_not.same(math.huge, fallback.CeilingY)
     end)
 
@@ -305,15 +305,15 @@ describe('TestFishAbilitySeams', function()
         local fish = newFish(5, 'fish56Boss', { x = 0, y = 0, z = 0 })
         ctx.mgr.Fish[fish.Id] = fish
         local player = newPlayer(9, { x = 1, y = 0, z = 0 })
-        local CarryMount = require('common.carry_mount')
-        fish.Carry = CarryMount.New(GameCfg.Ability.Carry, { x = 0, y = 0, z = 0 }, 0, ctx.now)
-        fish.Carry.GroundY = 2
-        fish.Carry.TargetPlayer = player
-        CarryMount.Attach(fish.Carry, { x = 1, y = 0, z = 0 }, ctx.now)
+        local carry_mount = require('common.carry_mount')
+        fish.carry = carry_mount.New(game_cfg.Ability.carry, { x = 0, y = 0, z = 0 }, 0, ctx.now)
+        fish.carry.GroundY = 2
+        fish.carry.TargetPlayer = player
+        carry_mount.Attach(fish.carry, { x = 1, y = 0, z = 0 }, ctx.now)
         ctx.mgr:Remove(fish)
-        assert.is_nil(fish.Carry)
+        assert.is_nil(fish.carry)
         assert.is_nil(ctx.mgr.Fish[fish.Id])
-        assert.near(2 + GameCfg.Ability.Carry.DropHeight, player.Character.Position.y, 1e-9)
+        assert.near(2 + game_cfg.Ability.carry.DropHeight, player.Character.Position.y, 1e-9)
     end)
 
     it('test_species_registry_routes_flight_and_boss', function()

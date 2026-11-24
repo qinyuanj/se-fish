@@ -1,7 +1,7 @@
 -- 战斗测试共享环境，不加载或注册任何测试类。
 -- 复用 fish_escape 的方式：以它为 __index 原型（同族统一手法），不再逐方法拷贝。
-local FishEscape = require('tests.support.fish_escape')
-local M = setmetatable({}, { __index = FishEscape })
+local fish_escape = require('tests.support.fish_escape')
+local M = setmetatable({}, { __index = fish_escape })
 
 --- 建一个空世界壳；调用方随后 :setUp() 搭世界、:tearDown() 拆除
 --- （与 blindbox_world / revive_world 同一构造/拆除入口名）。
@@ -12,10 +12,10 @@ end
 function M:setUp()
     self.savedQuaternion = rawget(_G, 'Quaternion')
     self.savedCombatRandom = math.random
-    FishEscape.setUp(self)
+    fish_escape.setUp(self)
     self.vitalsCalls = {}
     self.downed = {}
-    self.mgr.Vitals = {
+    self.mgr.vitals = {
         NewHit = function(_, source, category) return { source = source, category = category } end,
         ApplyHit = function(_, hit, player, amount)
             self.vitalsCalls[#self.vitalsCalls + 1] = { hit, player, amount }
@@ -34,7 +34,7 @@ end
 function M:tearDown()
     if self.savedCombatRandom then math.random = self.savedCombatRandom end
     _G.Quaternion = self.savedQuaternion
-    FishEscape.tearDown(self)
+    fish_escape.tearDown(self)
 end
 
 return M

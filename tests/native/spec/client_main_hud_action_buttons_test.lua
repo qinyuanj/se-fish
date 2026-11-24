@@ -1,23 +1,23 @@
 -- #297-B3b1 客户端主 HUD 右侧 ItemDiscard 与 ItemAction2 动作键 Spoke 视图黑盒契约测试。
 -- 失败方式先列：
---   1. ItemDiscard / ItemAction2 未按 MainHudLayout 排版、EUIButton 误写 Color 属性或文案标签未处于更高 LocalZOrder；
+--   1. ItemDiscard / ItemAction2 未按 main_hud_layout 排版、EUIButton 误写 Color 属性或文案标签未处于更高 LocalZOrder；
 --   2. 不同选中物与收线/持有/特殊态下动作键文案、颜色、可用态或显隐切换与 ScreenMain 不一致；
 --   3. 点击丢弃/吃/抛竿/收竿/放下/吐息或长按飞行未发送对应上行 RE（含 ItemBarAction Operate）；
 --   4. 背包展开（backpack_open=true）未隐藏并禁用右侧两个动作键，或收起后未按当前快照恢复；
 --   5. 重连重置或根 UI 销毁后遗留按钮/标签节点，或 OnClicked / OnTouchBegan / OnTouchEnded 连接未归零。
 
 local spoke = require("common.packages.spoke.api")
-local Eui = require("tests.support.eui_double")
-local GameCfg = require("common.game_cfg")
-local MainHudLayout = require("client.main_hud_layout")
-local ClientStore = require("client.store.client_store")
-local RootView = require("client.views.root_view")
-local MainHudActionButtonsView = require("client.views.main_hud_action_buttons_view")
+local eui = require("tests.support.eui_double")
+local game_cfg = require("common.game_cfg")
+local main_hud_layout = require("client.main_hud_layout")
+local client_store = require("client.store.client_store")
+local root_view = require("client.views.root_view")
+local main_hud_action_buttons_view = require("client.views.main_hud_action_buttons_view")
 
 local State = spoke.State
 
-local ITEM_ROD = GameCfg.Items.Id.StarterRod
-local ITEM_FISH = GameCfg.Items.Id.Tilapia
+local ITEM_ROD = game_cfg.Items.Id.StarterRod
+local ITEM_FISH = game_cfg.Items.Id.Tilapia
 
 local function assert_at(node, rect, label)
   assert.is_not_nil(node, label)
@@ -32,7 +32,7 @@ describe("Spoke 主 HUD 右侧动作键视图（#297-B3b1）", function()
     saved_globals = {
       Vector2 = rawget(_G, "Vector2"),
       Color = rawget(_G, "Color"),
-      REUtil = rawget(_G, "REUtil"),
+      re_util = rawget(_G, "re_util"),
     }
     _G.Vector2 = { New = function(x, y) return { x = x, y = y } end }
     _G.Color = { New = function(...) return { ... } end }
@@ -41,18 +41,18 @@ describe("Spoke 主 HUD 右侧动作键视图（#297-B3b1）", function()
   after_each(function()
     _G.Vector2 = saved_globals.Vector2
     _G.Color = saved_globals.Color
-    _G.REUtil = saved_globals.REUtil
+    _G.re_util = saved_globals.re_util
   end)
 
   local function mount_hud(opts)
     opts = opts or {}
-    local store, writer = ClientStore.new({ initial_now = 100 })
-    local root_node = Eui.Node({ Name = "UIRoot" })
+    local store, writer = client_store.new({ initial_now = 100 })
+    local root_node = eui.Node({ Name = "UIRoot" })
     local nodes = {}
     local created = {}
 
     local function create_node(kind, props)
-      local node = Eui.Node({
+      local node = eui.Node({
         Name = props.Name,
         Kind = kind,
         Parent = props.Parent,
@@ -61,8 +61,8 @@ describe("Spoke 主 HUD 右侧动作键视图（#297-B3b1）", function()
         TouchEnabled = props.TouchEnabled,
       })
       if kind == "EUIButton" then
-        node.OnTouchBegan = Eui.Signal()
-        node.OnTouchEnded = Eui.Signal()
+        node.OnTouchBegan = eui.Signal()
+        node.OnTouchEnded = eui.Signal()
       end
       for k, v in pairs(props) do
         if k ~= "Parent" and k ~= "Name" then
@@ -78,10 +78,10 @@ describe("Spoke 主 HUD 右侧动作键视图（#297-B3b1）", function()
       return { x = 1920, y = opts.height or 1080 }
     end
 
-    local view = RootView.mount(root_node, store, {
+    local view = root_view.mount(root_node, store, {
       create_node = create_node,
       hud = {
-        MainHudActionButtonsView.spec({
+        main_hud_action_buttons_view.spec({
           get_resolution = resolution_fn,
           backpack_open = opts.backpack_open,
           reel_active = opts.reel_active,
@@ -103,9 +103,9 @@ describe("Spoke 主 HUD 右侧动作键视图（#297-B3b1）", function()
     }
   end
 
-  it("按 MainHudLayout 排版、EUIButton 不写 Color、同级高 ZOrder 标签，并随选中物切换文案与显隐", function()
+  it("按 main_hud_layout 排版、EUIButton 不写 Color、同级高 ZOrder 标签，并随选中物切换文案与显隐", function()
     local env = mount_hud({ height = 1080 })
-    local layout = MainHudLayout.Compute({ width = 1920, height = 1080, itemBarSlots = GameCfg.Items.ItemBarSlots })
+    local layout = main_hud_layout.Compute({ width = 1920, height = 1080, itemBarSlots = game_cfg.Items.ItemBarSlots })
 
     local btn_discard = env.nodes.ItemDiscard
     local lbl_discard = env.nodes.BtnDiscardLabel
@@ -143,7 +143,7 @@ describe("Spoke 主 HUD 右侧动作键视图（#297-B3b1）", function()
     assert.same({ 54, 100, 140, 255 }, btn_action.ButtonNormalColor)
 
     -- 2. 选中鱼（未手持 -> 手持XX；已手持 -> 吃XX + 确认丢弃）
-    local fish_name = GameCfg.Items.Definitions[ITEM_FISH].Name
+    local fish_name = game_cfg.Items.Definitions[ITEM_FISH].Name
     env.writer:ingest_event("ItemBarState", {
       slotCount = 4,
       selectedSlot = 2,
@@ -205,7 +205,7 @@ describe("Spoke 主 HUD 右侧动作键视图（#297-B3b1）", function()
 
   it("上钩高亮闪烁仅在活跃窗口内原地更新按钮颜色，绝不触发 ActionButtonsProjection Effect 重跑", function()
     local layout_reads = 0
-    local custom_layout = State.new("Test.action_layout", MainHudLayout.Compute({
+    local custom_layout = State.new("Test.action_layout", main_hud_layout.Compute({
       width = 1920,
       height = 1080,
       itemBarSlots = 4,
@@ -222,13 +222,13 @@ describe("Spoke 主 HUD 右侧动作键视图（#297-B3b1）", function()
       end,
     }
 
-    local store, writer = ClientStore.new({ initial_now = 100 })
-    local root_node = Eui.Node({ Name = "UIRoot" })
+    local store, writer = client_store.new({ initial_now = 100 })
+    local root_node = eui.Node({ Name = "UIRoot" })
     local nodes = {}
     local discard_visible_writes = 0
 
     local function create_node(kind, props)
-      local node = Eui.Node({
+      local node = eui.Node({
         Name = props.Name,
         Kind = kind,
         Parent = props.Parent,
@@ -237,8 +237,8 @@ describe("Spoke 主 HUD 右侧动作键视图（#297-B3b1）", function()
         TouchEnabled = props.TouchEnabled,
       })
       if kind == "EUIButton" then
-        node.OnTouchBegan = Eui.Signal()
-        node.OnTouchEnded = Eui.Signal()
+        node.OnTouchBegan = eui.Signal()
+        node.OnTouchEnded = eui.Signal()
       end
       for k, v in pairs(props) do
         if k ~= "Parent" and k ~= "Name" then
@@ -259,10 +259,10 @@ describe("Spoke 主 HUD 右侧动作键视图（#297-B3b1）", function()
       return node
     end
 
-    local view = RootView.mount(root_node, store, {
+    local view = root_view.mount(root_node, store, {
       create_node = create_node,
       hud = {
-        MainHudActionButtonsView.spec({
+        main_hud_action_buttons_view.spec({
           get_resolution = function() return { x = 1920, y = 1080 } end,
           layout = tracked_layout,
         }),
@@ -276,7 +276,7 @@ describe("Spoke 主 HUD 右侧动作键视图（#297-B3b1）", function()
     local color_t0 = btn_action.ButtonNormalColor
 
     -- 推进多帧闪烁：按钮颜色原地变化，但 ActionButtonsProjection 不得重跑（ItemDiscard.Visible 写入次数为 0）
-    local quarter_period = GameCfg.HookAlert.BreathPeriodSec / 4
+    local quarter_period = game_cfg.HookAlert.BreathPeriodSec / 4
     writer:step_clock(quarter_period, 100 + quarter_period)
     local color_t1 = btn_action.ButtonNormalColor
     assert.equals(writes_before_frames, discard_visible_writes, "on_frame 闪烁不得重建/重跑 ActionButtonsProjection Effect")
@@ -287,7 +287,7 @@ describe("Spoke 主 HUD 右侧动作键视图（#297-B3b1）", function()
     assert.equals(writes_before_frames, discard_visible_writes)
 
     -- 超过高亮时长后恢复常态颜色并退出闪烁 Phase，同样不触发 ActionButtonsProjection 重跑
-    writer:step_clock(GameCfg.HookAlert.DurationSec + 0.5, 100 + GameCfg.HookAlert.DurationSec + 1)
+    writer:step_clock(game_cfg.HookAlert.DurationSec + 0.5, 100 + game_cfg.HookAlert.DurationSec + 1)
     assert.equals(writes_before_frames, discard_visible_writes)
     assert.same({ 54, 100, 140, 255 }, btn_action.ButtonNormalColor)
     assert.same({ 42, 82, 118, 255 }, btn_action.ButtonPressColor)
@@ -298,7 +298,7 @@ describe("Spoke 主 HUD 右侧动作键视图（#297-B3b1）", function()
 
   it("点击 ItemDiscard / ItemAction2 经默认 RE 通道发送 Operate 丢弃/吃、CastAction 与 SpecialItemAction", function()
     local sent = {}
-    _G.REUtil = {
+    _G.re_util = {
       GetRE = function(_, name)
         return {
           FireServer = function(_, payload)
@@ -322,14 +322,14 @@ describe("Spoke 主 HUD 右侧动作键视图（#297-B3b1）", function()
       held = { kind = "slot", slot = 2 },
       slots = { [2] = { itemId = ITEM_FISH, count = 1 } },
     })
-    assert.is_true(Eui.Click(env.nodes.ItemDiscard))
+    assert.is_true(eui.Click(env.nodes.ItemDiscard))
     assert.equals("ItemBarAction", sent[1].name)
     assert.equals("Operate", sent[1].payload.action)
     assert.equals("discard", sent[1].payload.op)
     assert.equals(2, sent[1].payload.slot)
     assert.equals(1, sent[1].payload.seq)
 
-    assert.is_true(Eui.Click(env.nodes.ItemAction2))
+    assert.is_true(eui.Click(env.nodes.ItemAction2))
     assert.equals("ItemBarAction", sent[2].name)
     assert.equals("Operate", sent[2].payload.action)
     assert.equals("eat", sent[2].payload.op)
@@ -342,22 +342,22 @@ describe("Spoke 主 HUD 右侧动作键视图（#297-B3b1）", function()
       selectedSlot = 1,
       slots = { [1] = { itemId = ITEM_ROD, count = 1 } },
     })
-    assert.is_true(Eui.Click(env.nodes.ItemAction2))
+    assert.is_true(eui.Click(env.nodes.ItemAction2))
     assert.equals("CastAction", sent[3].name)
     assert.same({ action = "Cast", slot = 1, itemId = ITEM_ROD }, sent[3].payload)
 
     -- 3. 抛竿在线点击收竿 -> CastAction Reel；上钩点击收线 -> on_reel_click
     env.writer:ingest_event("CastState", { phase = "cast" })
-    assert.is_true(Eui.Click(env.nodes.ItemAction2))
+    assert.is_true(eui.Click(env.nodes.ItemAction2))
     assert.same({ action = "Reel" }, sent[4].payload)
 
     env.writer:ingest_event("CastState", { phase = "hooked", reelSession = 42 })
-    assert.is_true(Eui.Click(env.nodes.ItemAction2))
+    assert.is_true(eui.Click(env.nodes.ItemAction2))
     assert.same({ 42 }, reel_clicks)
 
     -- 4. 持有物点击放下 -> CastAction Drop
     env.writer:ingest_event("CastState", { phase = "idle", holding = { fishId = ITEM_FISH } })
-    assert.is_true(Eui.Click(env.nodes.ItemAction2))
+    assert.is_true(eui.Click(env.nodes.ItemAction2))
     assert.same({ action = "Drop" }, sent[5].payload)
 
     -- 5. 风神之翼长按/松开飞行 -> SpecialItemAction fly
@@ -372,7 +372,7 @@ describe("Spoke 主 HUD 右侧动作键视图（#297-B3b1）", function()
 
     -- 6. 哥斯拉原子吐息 -> SpecialItemAction breath
     env.writer:ingest_event("SpecialItemState", { effect = "godzilla", breathRemaining = 0 })
-    assert.is_true(Eui.Click(env.nodes.ItemAction2))
+    assert.is_true(eui.Click(env.nodes.ItemAction2))
     assert.equals("SpecialItemAction", sent[8].name)
     assert.same({ action = "breath" }, sent[8].payload)
 
@@ -407,7 +407,7 @@ describe("Spoke 主 HUD 右侧动作键视图（#297-B3b1）", function()
     assert.is_false(env.nodes.ItemAction2.Visible)
     assert.is_false(env.nodes.ItemAction2.TouchEnabled)
     assert.is_false(env.nodes.BtnItemActionLabel.Visible)
-    assert.is_false(Eui.Click(env.nodes.ItemDiscard))
+    assert.is_false(eui.Click(env.nodes.ItemDiscard))
     assert.equals(0, #sent_ops)
 
     -- 收起背包：恢复显示并可点击
@@ -416,7 +416,7 @@ describe("Spoke 主 HUD 右侧动作键视图（#297-B3b1）", function()
     assert.is_true(env.nodes.ItemDiscard.TouchEnabled)
     assert.is_true(env.nodes.ItemAction2.Visible)
     assert.is_true(env.nodes.ItemAction2.TouchEnabled)
-    assert.is_true(Eui.Click(env.nodes.ItemDiscard))
+    assert.is_true(eui.Click(env.nodes.ItemDiscard))
     assert.equals(1, #sent_ops)
 
     env.view:dispose()

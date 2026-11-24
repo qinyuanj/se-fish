@@ -9,14 +9,14 @@
 --   6. 两次权威报告之间显示值不衰减，或越出 [0,100]；
 --   7. 服务端 progress 回包不带 q，客户端没法确认在途批次。
 -- it 名字沿用旧方法名，注册顺序 = LuaUnit sortedPairs 的实际执行顺序。
-local ReelDisplay = require('common.reel_display')
+local reel_display = require('common.reel_display')
 
 -- 只读夹具：与旧套件一样在文件顶层共享，用例不修改它。
 local cfg = { Initial = 50, DecayPerSec = 5, ClickGain = 5, Tolerance = 5, ChaseSec = 0.18, PendingTimeoutSec = 1 }
 
-describe('本地收线显示（ReelDisplay）', function()
+describe('本地收线显示（reel_display）', function()
   it('test_beyond_tolerance_chases_smoothly_within_window', function()
-    local d = ReelDisplay.New(0, cfg)
+    local d = reel_display.New(0, cfg)
     d:Authority(0, 40)
     assert.same(50, d:Value(0))
     local mid = d:Value(0.09)
@@ -33,7 +33,7 @@ describe('本地收线显示（ReelDisplay）', function()
   end)
 
   it('test_clamped_batch_is_corrected_downward', function()
-    local d = ReelDisplay.New(0, cfg)
+    local d = reel_display.New(0, cfg)
     for _ = 1, 6 do d:Click(0) end
     d:Sent(1, 6, 0)
     d:Authority(0.1, 59.5, 1)
@@ -41,7 +41,7 @@ describe('本地收线显示（ReelDisplay）', function()
   end)
 
   it('test_click_during_chase_still_gives_feedback', function()
-    local d = ReelDisplay.New(0, cfg)
+    local d = reel_display.New(0, cfg)
     d:Authority(0, 30)
     local before = d:Value(0.09)
     d:Click(0.09)
@@ -50,7 +50,7 @@ describe('本地收线显示（ReelDisplay）', function()
   end)
 
   it('test_click_shows_gain_immediately_and_decays_locally', function()
-    local d = ReelDisplay.New(0, cfg)
+    local d = reel_display.New(0, cfg)
     assert.same(50, d:Value(0))
     d:Click(0)
     assert.same(55, d:Value(0))
@@ -58,7 +58,7 @@ describe('本地收线显示（ReelDisplay）', function()
   end)
 
   it('test_in_flight_clicks_do_not_trigger_false_down_chase', function()
-    local d = ReelDisplay.New(0, cfg)
+    local d = reel_display.New(0, cfg)
     for _ = 1, 4 do d:Click(0) end
     assert.same(70, d:Value(0))
     d:Authority(0.05, 49.75)
@@ -71,7 +71,7 @@ describe('本地收线显示（ReelDisplay）', function()
   end)
 
   it('test_unacknowledged_batch_expires', function()
-    local d = ReelDisplay.New(0, cfg)
+    local d = reel_display.New(0, cfg)
     for _ = 1, 3 do d:Click(0) end
     d:Sent(1, 3, 0)
     d:Authority(1.5, 42.5)
@@ -79,23 +79,23 @@ describe('本地收线显示（ReelDisplay）', function()
   end)
 
   it('test_upward_chase_when_server_ahead', function()
-    local d = ReelDisplay.New(0, cfg)
+    local d = reel_display.New(0, cfg)
     d:Authority(0, 70)
     assert.near(69, d:Value(0.2), 1e-9)
   end)
 
   it('test_value_stays_within_bounds', function()
-    local d = ReelDisplay.New(0, cfg)
+    local d = reel_display.New(0, cfg)
     for _ = 1, 30 do d:Click(0) end
     assert.same(100, d:Value(0))
-    assert.same(0, ReelDisplay.New(0, cfg):Value(100))
-    local e = ReelDisplay.New(0, cfg)
+    assert.same(0, reel_display.New(0, cfg):Value(100))
+    local e = reel_display.New(0, cfg)
     e:Authority(0, 2)
     assert.is_true(e:Value(5) >= 0)
   end)
 
   it('test_within_tolerance_keeps_local_value', function()
-    local d = ReelDisplay.New(0, cfg)
+    local d = reel_display.New(0, cfg)
     d:Authority(0.1, 45.5)
     assert.near(49.5, d:Value(0.1), 1e-9)
     assert.near(48.5, d:Value(0.3), 1e-9)

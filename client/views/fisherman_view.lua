@@ -1,19 +1,19 @@
-local GameCfg = require("common.game_cfg")
-local BodyScale = require("common.body_scale")
-local Dialogue = require("common.npc_dialogue")
+local game_cfg = require("common.game_cfg")
+local body_scale = require("common.body_scale")
+local dialogue = require("common.npc_dialogue")
 local spoke = require("common.packages.spoke.api")
-local ViewUtil = require("client.views.view_util")
-local RescueView = require("client.views.rescue_view")
+local view_util = require("client.views.view_util")
+local rescue_view = require("client.views.rescue_view")
 
 local State = spoke.State
-local FishermanView = {}
+local fisherman_view = {}
 local PULSE_FRAMES = 20
 local PULSE_AMPLITUDE = 0.2
 
 local function near(position, center, character)
-  local dist_sq = ViewUtil.distance_sq_xz(position, center)
+  local dist_sq = view_util.distance_sq_xz(position, center)
   if dist_sq == nil then return false end
-  local radius = BodyScale.InteractionRadius(character, GameCfg.Interact.Fisherman.Radius)
+  local radius = body_scale.InteractionRadius(character, game_cfg.Interact.Fisherman.Radius)
   return dist_sq <= radius * radius
 end
 
@@ -27,7 +27,7 @@ local function close_modal(ctx, id)
   if type(fn) == "function" then fn(id) end
 end
 
-function FishermanView.bubble_spec(options)
+function fisherman_view.bubble_spec(options)
   options = type(options) == "table" and options or {}
   return {
     items = function(es, store)
@@ -46,8 +46,8 @@ function FishermanView.bubble_spec(options)
       local entry = item_signal:now()
       local suffix = tostring(entry.index) .. "_" .. tostring(entry.name)
       local key = "fisherman:" .. tostring(entry.index) .. ":" .. tostring(entry.name)
-      local node = ViewUtil.create_anchor_scene_node(
-        scope, ctx, entry, GameCfg.Interact.Fisherman.BubbleHeight, "fisherman", "SceneNodeFisherman_" .. suffix
+      local node = view_util.create_anchor_scene_node(
+        scope, ctx, entry, game_cfg.Interact.Fisherman.BubbleHeight, "fisherman", "SceneNodeFisherman_" .. suffix
       )
       local talk = ctx.create_node(scope, "EUIButton", {
         Name = "BtnFishermanTalk" .. suffix,
@@ -87,14 +87,14 @@ function FishermanView.bubble_spec(options)
   }
 end
 
-function FishermanView.modal_spec()
+function fisherman_view.modal_spec()
   return function(scope, ctx)
     local payload = ctx.store.modal_payload:now() or {}
     local panel = ctx.create_node(scope, "EUIImage", { Name = "FishermanDialog" })
     ctx.create_node(scope, "EUITextLabel", {
       Name = "LabelFishermanTitle", Parent = panel, Text = "钓鱼佬",
     })
-    local lines = Dialogue.Lines(payload.zoneId) or { GameCfg.Interact.Fisherman.DialogText }
+    local lines = dialogue.Lines(payload.zoneId) or { game_cfg.Interact.Fisherman.DialogText }
     for index, line in ipairs(lines) do
       ctx.create_node(scope, "EUITextLabel", {
         Name = "LabelFishermanLine" .. index,
@@ -109,7 +109,7 @@ function FishermanView.modal_spec()
   end
 end
 
-function FishermanView.confirm_modal_spec()
+function fisherman_view.confirm_modal_spec()
   return function(scope, ctx)
     local payload = ctx.store.modal_payload:now() or {}
     local panel = ctx.create_node(scope, "EUIImage", { Name = "DialogNoticeConfirm" })
@@ -126,7 +126,7 @@ function FishermanView.confirm_modal_spec()
       if type(payload.CallBack) == "function" then
         local ok, err = pcall(payload.CallBack, value)
         if not ok then
-          print("[FishermanView] 确认弹窗回调执行失败", tostring(err))
+          print("[fisherman_view] 确认弹窗回调执行失败", tostring(err))
         end
       end
       close_modal(ctx, "confirm")
@@ -136,32 +136,32 @@ function FishermanView.confirm_modal_spec()
   end
 end
 
-function FishermanView.presentation_spec(options)
+function fisherman_view.presentation_spec(options)
   options = type(options) == "table" and options or {}
   local shared = options.shared or {}
   local models = options.models or {}
   return {
     name = "FishermanPresentation",
     mount = function(scope, ctx)
-      local pulse_active = State.new("FishermanView.pulse_active", false)
+      local pulse_active = State.new("fisherman_view.pulse_active", false)
 
       scope:subscribe(ctx.store.on_server_event, function(event)
         if event.channel ~= "InteractResult" or type(event.payload) ~= "table" then return end
         local result = event.payload
-        if result.action == GameCfg.Rescue.Action and result.reason == "busy" then
-          ViewUtil.notify(ctx, "正在抢救中")
+        if result.action == game_cfg.Rescue.Action and result.reason == "busy" then
+          view_util.notify(ctx, "正在抢救中")
         end
         if not result.ok then
-          if result.reason == "nothing" then ViewUtil.notify(ctx, "未选中可喂食物品")
-          elseif result.reason == "full" then ViewUtil.notify(ctx, "交付失败：产物需要背包空位") end
+          if result.reason == "nothing" then view_util.notify(ctx, "未选中可喂食物品")
+          elseif result.reason == "full" then view_util.notify(ctx, "交付失败：产物需要背包空位") end
           return
         end
         if result.achievement then
-          ViewUtil.notify(ctx, "交付完成：解锁新成果")
+          view_util.notify(ctx, "交付完成：解锁新成果")
         elseif result.exchange then
-          ViewUtil.notify(ctx, "交付完成：" .. tostring(result.exchange.from) .. " → " .. tostring(result.exchange.to))
+          view_util.notify(ctx, "交付完成：" .. tostring(result.exchange.from) .. " → " .. tostring(result.exchange.to))
         elseif result.coins and result.coins > 0 then
-          ViewUtil.notify(ctx, "喂食成功，获得 " .. tostring(result.coins) .. " 金币")
+          view_util.notify(ctx, "喂食成功，获得 " .. tostring(result.coins) .. " 金币")
         end
         shared.pulse_left = PULSE_FRAMES
         pulse_active:set(true)
@@ -189,7 +189,7 @@ function FishermanView.presentation_spec(options)
             model.unit.Scale = Vector3.New(base.x * scale, base.y * scale, base.z * scale)
           end)
           if not ok then
-            print("[FishermanView] 模型缩放失败", index, tostring(err))
+            print("[fisherman_view] 模型缩放失败", index, tostring(err))
             models[index] = nil
           end
           if left <= 0 then
@@ -202,7 +202,7 @@ function FishermanView.presentation_spec(options)
         for _, model in pairs(models) do
           if model.unit and model.baseScale then
             local ok, err = pcall(function() model.unit.Scale = model.baseScale end)
-            if not ok then print("[FishermanView] 模型缩放恢复失败", tostring(err)) end
+            if not ok then print("[fisherman_view] 模型缩放恢复失败", tostring(err)) end
           end
         end
       end)
@@ -210,26 +210,26 @@ function FishermanView.presentation_spec(options)
   }
 end
 
-function FishermanView.rescue_state(options)
-  return RescueView.create_state("FishermanView.rescue_rows", options)
+function fisherman_view.rescue_state(options)
+  return rescue_view.create_state("fisherman_view.rescue_rows", options)
 end
 
-function FishermanView.rescue_driver_spec(shared)
-  return RescueView.driver_spec(shared, {
+function fisherman_view.rescue_driver_spec(shared)
+  return rescue_view.driver_spec(shared, {
     name = "FishermanRescueDriver",
     mode = "world",
   })
 end
 
-function FishermanView.rescue_bubble_spec(shared)
-  return RescueView.bubble_spec(shared, {
+function fisherman_view.rescue_bubble_spec(shared)
+  return rescue_view.bubble_spec(shared, {
     key_prefix = "rescue:",
     scene_kind = "rescue",
     scene_prefix = "SceneNodeRescue_",
     button_prefix = "BtnRescue",
-    log_tag = "[FishermanView]",
+    log_tag = "[fisherman_view]",
     fail_label = "抢救按钮创建失败",
   })
 end
 
-return FishermanView
+return fisherman_view

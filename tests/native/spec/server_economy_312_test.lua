@@ -1,11 +1,11 @@
-local GameCfg = require("common.game_cfg")
-local EconomyWorld = require("tests.support.economy_world")
+local game_cfg = require("common.game_cfg")
+local economy_world = require("tests.support.economy_world")
 
-local ITEM_BAR = GameCfg.Items.ContainerId.ItemBar
+local ITEM_BAR = game_cfg.Items.ContainerId.ItemBar
 
 describe("服务端抽奖机、盲盒与地图商店宿主接缝（#312）", function()
   local world
-  before_each(function() world = EconomyWorld.new() end)
+  before_each(function() world = economy_world.new() end)
   after_each(function()
     if world then world:tearDown() end
     world = nil
@@ -16,12 +16,12 @@ describe("服务端抽奖机、盲盒与地图商店宿主接缝（#312）", fun
     assert.is_false(world:lotteryDraw(1, 1))
     assert.same(1, world.data:ItemCount("carp"))
 
-    world.data.Data.Containers[ITEM_BAR][1] = nil
+    world.data.data.Containers[ITEM_BAR][1] = nil
     world:givePremium("item31", 2, { grilled = true })
     assert.is_false(world:lotteryDraw(1, 2))
     assert.same(1, world.data:ItemCount("item31"))
 
-    world.data.Data.Containers[ITEM_BAR][1] = nil
+    world.data.data.Containers[ITEM_BAR][1] = nil
     world:givePremium("item31", 2)
     world:persistReady()
     world:scriptAxes(96, 100, 5)
@@ -29,8 +29,8 @@ describe("服务端抽奖机、盲盒与地图商店宿主接缝（#312）", fun
     local result = world:lastResult("LotteryResult")
     assert.same(100, result.betValue)
     assert.same(2000, result.coins)
-    assert.same(2000, world.data.Data.FishCoin)
-    assert.is_nil(world.data.Data.Containers[ITEM_BAR][1])
+    assert.same(2000, world.data.data.FishCoin)
+    assert.is_nil(world.data.data.Containers[ITEM_BAR][1])
   end)
 
   it("三同武器大奖进入独立武器库存且不叠加金币", function()
@@ -42,9 +42,9 @@ describe("服务端抽奖机、盲盒与地图商店宿主接缝（#312）", fun
     assert.same("triple", result.outcome)
     assert.same({ kind = "weapon", itemId = "item154", name = "黄金匕首" }, result.prize)
     assert.is_nil(result.coins)
-    assert.same(0, world.data.Data.FishCoin)
+    assert.same(0, world.data.data.FishCoin)
     assert.same(1, world.data:WeaponCount("item154"))
-    assert.is_nil(world.data.Data.Containers[ITEM_BAR][1])
+    assert.is_nil(world.data.data.Containers[ITEM_BAR][1])
   end)
 
   it("test_old_epoch_does_not_block_current_delivery", function()
@@ -96,17 +96,17 @@ describe("服务端抽奖机、盲盒与地图商店宿主接缝（#312）", fun
   end)
 
   it("乐园币购买按原请求重放到账结果且不重复加金币", function()
-    GameCfg.Platform.Placeholder.Enabled = true
+    game_cfg.Platform.Placeholder.Enabled = true
     assert.is_true(world:platformAction({ action = "BuyCoin", goods = "coinPouch", seq = 1 }))
     world:resolvePlatform("success")
-    assert.same(600, world.data.Data.FishCoin)
+    assert.same(600, world.data.data.FishCoin)
     local sequence = world.data:Serialize().meta.sequence
     assert.is_true(world:platformAction({ action = "BuyCoin", goods = "coinPouch", seq = 1 }))
-    assert.same(600, world.data.Data.FishCoin)
+    assert.same(600, world.data.data.FishCoin)
     assert.same(sequence, world.data:Serialize().meta.sequence)
   end)
 
-  it("PlatformHost:Share 兼容 SE 引擎 userdata 玩家对象", function()
+  it("platform_host:Share 兼容 SE 引擎 userdata 玩家对象", function()
     local real_type = _G.type
     local userdata_player = world.player
     local ok_call, err = pcall(function()

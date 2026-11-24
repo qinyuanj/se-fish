@@ -26,7 +26,7 @@ submodule 由指针固定 SHA，纯拷贝由消费方版本台账固定同一个
 
 ## 默认 Auto-first
 
-每个 EUI 面板、玩法实体或 manager 拥有一棵小的 Auto 树。宿主事件回调修改 State 或 Trigger 后，SpokeRuntime 在回调返回前同步完成相关渲染。
+每个 EUI 面板、玩法实体或 manager 拥有一棵小的 Auto 树。宿主事件回调修改 State 或 Trigger 后，spoke_runtime 在回调返回前同步完成相关渲染。
 
 Manual 只保留给三种场景：高频写入合并（一帧内多次写同一状态只渲染一次）、大计算分帧（`tree:tick()` 逐步推进）、单步调试。不要为核心添加 `RunService.Heartbeat` 订阅、`TimerService:CreateTimer` 或宿主全局读取。
 
@@ -52,12 +52,12 @@ end, { name = "Panel" })
 - 树根常用一个首次挂载后不读信号的 Effect 来搭建子结构，因为 `effect`、`memo`、`phase`、`dock` 组合方法在 EffectBuilder 上，而不在普通 Epoch builder 上。
 - join/leave 等结构事件不改变 State 的值，使用静态 Trigger，例如 `s:effect(block, { roster_changed })`；score 等值变化通过 `s:d(state)` 跟踪。
 - 在有效挂载窗口内捕获 `local dock = s:dock(...)` 到 upvalue，宿主事件之后调用 `dock:call(id, epoch)` / `dock:drop(id)`。builder 在窗口外密封，Dock 不是。
-- 同一事件写多个 State 时，用深 require 的 `SpokeRuntime.batch(fn)` 延迟 Auto 树 flush，让同时依赖多个值的 Effect 只看到最外层 release 后的最终组合；普通 State subscriber 仍逐次收到每次写入。
+- 同一事件写多个 State 时，用深 require 的 `spoke_runtime.batch(fn)` 延迟 Auto 树 flush，让同时依赖多个值的 Effect 只看到最外层 release 后的最终组合；普通 State subscriber 仍逐次收到每次写入。
 - 共享状态用单例树加 `s:export` / `s:import`（字符串 key）串起来。
 
 ## 错误处理
 
-核心已经把用户块 fault 包装、树级停止和 Runtime 最终日志边界串起来。宿主侧不要再用 pcall 包住每次 flush 或事件回调；检查 `tree.fault`，需要接管日志时替换 `SpokeError.log` 或提供 logger service。
+核心已经把用户块 fault 包装、树级停止和 runtime 最终日志边界串起来。宿主侧不要再用 pcall 包住每次 flush 或事件回调；检查 `tree.fault`，需要接管日志时替换 `SpokeError.log` 或提供 logger service。
 
 ## 集成评审清单
 

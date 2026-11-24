@@ -1,12 +1,12 @@
-local ReelProgress = {}
-ReelProgress.__index = ReelProgress
+local reel_progress = {}
+reel_progress.__index = reel_progress
 
-function ReelProgress.New(now, cfg)
+function reel_progress.New(now, cfg)
     return setmetatable({ Progress = cfg.Initial, Time = now, ZeroAt = nil,
-        Result = nil, Config = cfg }, ReelProgress)
+        Result = nil, Config = cfg }, reel_progress)
 end
 
-function ReelProgress:Advance(now, count, span)
+function reel_progress:Advance(now, count, span)
     if self.Result then return self.Result end
     now = math.max(now, self.Time)
     local cfg = self.Config
@@ -38,4 +38,4 @@ function ReelProgress:Advance(now, count, span)
     return self.Result
 end
 
-return ReelProgress
+return reel_progress

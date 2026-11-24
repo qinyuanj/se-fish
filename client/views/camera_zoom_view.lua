@@ -1,32 +1,32 @@
--- Spoke 相机距离投影视图（ADR-0032 / #297-B，归属 L2 client.views，取代旧 client/LocalAttr.lua）：
--- 订阅只读 ClientStore 的本地角色与归一化 CameraDistance，按角色体型缩放更新 MainCamera.Distance；
+-- Spoke 相机距离投影视图（ADR-0032 / #297-b，归属 L2 client.views，取代旧 client/LocalAttr.lua）：
+-- 订阅只读 client_store 的本地角色与归一化 CameraDistance，按角色体型缩放更新 MainCamera.Distance；
 -- 若检测到玩家或其它系统手动修改过相机距离则自动让权，角色更换或作用域清理时恢复初始距离。
 
 local spoke = require("common.packages.spoke.api")
-local BodyScale = require("common.body_scale")
-local GameCfg = require("common.game_cfg")
-local Number = require("common.number")
+local body_scale = require("common.body_scale")
+local game_cfg = require("common.game_cfg")
+local number = require("common.number")
 
 local State = spoke.State
 
-local CameraZoomView = {}
+local camera_zoom_view = {}
 
 local function resolve_target_distance(character, preset_distance)
-  if Number.IsFiniteNumber(preset_distance) and preset_distance > 0 then
+  if number.IsFiniteNumber(preset_distance) and preset_distance > 0 then
     return preset_distance
   end
   if character == nil then
     return nil
   end
   local ok, raw = pcall(function() return character:GetAttribute("CameraDistance") end) -- 角色销毁瞬态读取属性可能抛错，安全忽略
-  if not ok or not Number.IsFiniteNumber(raw) or raw <= 0 then
+  if not ok or not number.IsFiniteNumber(raw) or raw <= 0 then
     return nil
   end
-  local base = GameCfg.Ability.BodyScale.CameraDistance
-  if not Number.IsFiniteNumber(base) or base <= 0 then
+  local base = game_cfg.Ability.body_scale.CameraDistance
+  if not number.IsFiniteNumber(base) or base <= 0 then
     return nil
   end
-  return BodyScale.Derive(BodyScale.Sanitize(raw / base)).CameraDistance
+  return body_scale.Derive(body_scale.Sanitize(raw / base)).CameraDistance
 end
 
 local function default_get_camera()
@@ -38,7 +38,7 @@ local function default_get_camera()
 end
 
 --- 创建纯相机投影控制器（无引擎全局耦合，可独立测试与挂载于 Spoke 作用域）。
-function CameraZoomView.new_controller()
+function camera_zoom_view.new_controller()
   local ctrl = {
     camera = nil,
     character = nil,
@@ -95,15 +95,15 @@ function CameraZoomView.new_controller()
   return ctrl
 end
 
---- 挂载到 RootView / Spoke 作用域：响应角色与目标距离变化，并在活跃 Phase 内检测手动改距让权；清理时恢复原始距离。
+--- 挂载到 root_view / Spoke 作用域：响应角色与目标距离变化，并在活跃 Phase 内检测手动改距让权；清理时恢复原始距离。
 ---@param s table EffectBuilder
 ---@param ctx table { store, clock, ... }
 ---@param options table|nil { get_camera?: fun(): any }
-function CameraZoomView.mount(s, ctx, options)
+function camera_zoom_view.mount(s, ctx, options)
   options = options or {}
   local get_camera = options.get_camera or default_get_camera
-  local ctrl = CameraZoomView.new_controller()
-  local yielded_state = State.new("CameraZoomView.yielded", false)
+  local ctrl = camera_zoom_view.new_controller()
+  local yielded_state = State.new("camera_zoom_view.yielded", false)
   local last_error = nil
 
   local function sync(character, distance)
@@ -114,7 +114,7 @@ function CameraZoomView.mount(s, ctx, options)
       local text = tostring(err)
       if last_error ~= text then
         last_error = text
-        print("[CameraZoomView] 相机刷新失败", last_error)
+        print("[camera_zoom_view] 相机刷新失败", last_error)
       end
     else
       last_error = nil
@@ -154,14 +154,14 @@ function CameraZoomView.mount(s, ctx, options)
   return ctrl
 end
 
---- 返回可供 RootView.mount({ hud = { ... } }) 直接注册的 HUD spec。
-function CameraZoomView.spec(options)
+--- 返回可供 root_view.mount({ hud = { ... } }) 直接注册的 HUD spec。
+function camera_zoom_view.spec(options)
   return {
     name = "CameraZoom",
     mount = function(s, ctx)
-      CameraZoomView.mount(s, ctx, options)
+      camera_zoom_view.mount(s, ctx, options)
     end,
   }
 end
 
-return CameraZoomView
+return camera_zoom_view

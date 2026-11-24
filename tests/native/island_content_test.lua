@@ -5,7 +5,7 @@
 -- 只用静态内容表，不需要场景夹具：三座岛的水区几何与场景合同不在本文件的覆盖面里。
 --
 -- 失败方式（先列后写）：
---   1. 岛鱼模型号不在 FishCarrier.Models（官方模型库 7000544–7000563）里，即虚构官方模型号；
+--   1. 岛鱼模型号不在 fish_carrier.Models（官方模型库 7000544–7000563）里，即虚构官方模型号；
 --   2. 信物链 / 渔夫兑换 / 出岛航线三表错位：第 i 行接了别的岛、精英信物换到别岛首领饵、
 --      首领信物换到别岛船票、兑换出的船票名字对不上下一座岛（玩家走到下一岛门口上不了船）；
 --   3. 摊位分级破了：本岛摊位等级不是区序号，本岛鱼饵或本岛最高竿级对应的鱼竿在低级摊位就能买到
@@ -15,30 +15,30 @@
 --      本岛最高竿级也摸不到池里某一行（死行）、首领混进普通抽鱼池。
 --
 -- 留下的六类断言都是行为或跨真源守卫（真源 ↔ 真源）：
---   1. 模型号：岛鱼 Fish[x].Model 必须在 GameCfg.FishCarrier.Models 里。ContentValidation.Check 不查
---      Model 字段，写错的号要到 MgrFishUnit 建鱼时才会炸。
+--   1. 模型号：岛鱼 Fish[x].model 必须在 game_cfg.fish_carrier.Models 里。ContentValidation.Check 不查
+--      model 字段，写错的号要到 MgrFishUnit 建鱼时才会炸。
 --   2. 三表绑定：Content.Exchanges[i] ↔ Interact.Fishermen[i] ↔ Ferry.Routes 的出岛腿必须说同一件事，
 --      船票再按物品表名字对下一座岛。ContentValidation L112-126 只查 Exchanges 内部（鱼种、信物、
 --      兑换物各自存在），跨表错位没人查。
---   3. 摊位分级：本岛摊位等级 = 区序号（ZoneMarkers.Resolve 用 Shop.Stands[i] 找第 i 区摊位锚点）；
+--   3. 摊位分级：本岛摊位等级 = 区序号（zone_markers.Resolve 用 Shop.Stands[i] 找第 i 区摊位锚点）；
 --      本岛鱼饵 Zones[i].BaitItemId 与本岛抽鱼池要求的最高竿级对应的鱼竿是当地新品：
 --      本岛摊位买得到，低一级摊位买不到。
 --   4. 实装翻正：本岛抽鱼池与信物链上的每条鱼 implemented 必须为 true。
---   5. 可达性：在真实抽鱼池上跑 FishCatch.Select——不挂饵竿 1 只出保底行（含极品）、挂本岛饵竿 1
+--   5. 可达性：在真实抽鱼池上跑 fish_catch.Select——不挂饵竿 1 只出保底行（含极品）、挂本岛饵竿 1
 --      抽不到高阶行、岛屿最高竿级摸得到池里每一行、首领由首领饵必出所以不入池。
 --      期望集合按池行的 Bait / RodLevel / Grade 派生，不抄 id 清单。
---   6. 战斗标签在册：Fish[x].Combat 必须在 GameCfg.FishCombat 里有参数表（防御式取值，写错只会静默不攻击）。
+--   6. 战斗标签在册：Fish[x].Combat 必须在 game_cfg.fish_combat 里有参数表（防御式取值，写错只会静默不攻击）。
 --
 -- 砍掉的数值快照与接手方（接不住的就写「不再拦」）：
 --   13 行抽鱼池的逐行数值快照（每行饵 id、权重、竿级的字面量）与逐岛可行域快照 ——
 --     行内字段的合法性（竿级 1–7、权重/价格为正、饵与鱼种存在、编号不重复、七区各有普通池）
---     由 ContentValidation 接；FishCatch.Select 的竿级/饵过滤由 fish_loot_test、shrimp_pond_test、
+--     由 ContentValidation 接；fish_catch.Select 的竿级/饵过滤由 fish_loot_test、shrimp_pond_test、
 --     growth_cleanup_test 接；逐行数字不再拦。可达性本身留在第 5 类（按池行派生）。
 --   水区 Center / HalfX / HalfZ 常量与「两区水区不相交」—— 原来拦的是 tests/support/zone_fixtures
---     自己造的灰盒坐标（基架自测）；进 Water.Zones / ZoneIdByWater 与重叠、越界由 ZoneMarkers.Resolve
+--     自己造的灰盒坐标（基架自测）；进 Water.Zones / ZoneIdByWater 与重叠、越界由 zone_markers.Resolve
 --     自己 error，zone_fixtures.Load 在每个用夹具的测试里都会跑一遍。数值常量不再拦。
---   FishCombat 的二十多个数字 —— 表存在与消费由 beach_combat_test、forest_combat_test、
---     crab_boss_combat_test、king_crab_combat_test 接（直接读 GameCfg.FishCombat.<名字>）；精确数字不再拦。
+--   fish_combat 的二十多个数字 —— 表存在与消费由 beach_combat_test、forest_combat_test、
+--     crab_boss_combat_test、king_crab_combat_test 接（直接读 game_cfg.fish_combat.<名字>）；精确数字不再拦。
 --   票价与 Return.Price 常量 —— ferry_test 的 test_config_pins（10 × 3^(i-1)）接。
 --   摊位价目与具体上架行 —— shop_pages_test 的价格/等级基线 + ContentValidation 的「可用商品的价格/
 --     等级与内容行一致」+ shop_test 的扣费接。
@@ -49,14 +49,14 @@
 --   信物链内部字段（EliteToken / BossToken / Result 等）—— ContentValidation L112-126 接。
 --   GrillName 与烧烤坐标 —— grill_test 的 test_anchors_cover_zones_three_to_seven 接（index ≥ 3 有 GrillName、
 --     更前面的区没有）；坐标本身是 zone_fixtures 的夹具值，不再拦。
---   「摊位锚点名 == 场景合同 ShopName」—— Scene.ShopName 由 ZoneMarkers.Resolve 从
+--   「摊位锚点名 == 场景合同 ShopName」—— Scene.ShopName 由 zone_markers.Resolve 从
 --     Shop.Stands[i].AnchorName 派生，再断言一次等于把实现抄一遍（复述），删。
---   「精英 / 首领鱼带 Combat 标签」—— 标签到 GameCfg.FishCombat 的映射目前没人拦
---     （MgrFishUnit 用 `GameCfg.FishCombat and GameCfg.FishCombat[species.Combat]` 防御式取值，
+--   「精英 / 首领鱼带 Combat 标签」—— 标签到 game_cfg.fish_combat 的映射目前没人拦
+--     （MgrFishUnit 用 `game_cfg.fish_combat and game_cfg.fish_combat[species.Combat]` 防御式取值，
 --     缺表静默不攻击）；明确不再拦。
 local cfg = require('common.game_cfg')
-local FishCatch = require('common.fish_catch')
-local Ledger = require('common.cfg.content_ledger')
+local fish_catch = require('common.fish_catch')
+local ledger = require('common.cfg.content_ledger')
 
 -- 三座岛的参数：Index 是钓鱼区 / 信物链 / 渔夫 / 摊位的序号（蟹湖 3、树林岛 4、沙滩岛 5）。
 -- 水区 ID、鱼种、船票、鱼竿一律按序号从真源派生，不另抄一份 id 清单。
@@ -106,15 +106,15 @@ local function islandSpecies(island)
   return list
 end
 
--- 跑一遍真实抽签，收集 FishCatch.Select 在（竿级, 饵）下能抽到的全部鱼种。
+-- 跑一遍真实抽签，收集 fish_catch.Select 在（竿级, 饵）下能抽到的全部鱼种。
 -- 可用权重和直接用 Select 传给 random 的参数取出，不在这里重写它的过滤条件。
 local function drawSet(rows, rodLevel, baitId)
   local total
-  FishCatch.Select(rows, rodLevel, baitId, function(max) total = max; return 1 end)
+  fish_catch.Select(rows, rodLevel, baitId, function(max) total = max; return 1 end)
   local found = {}
   if not total then return found end
   for roll = 1, total do
-    local id = FishCatch.Select(rows, rodLevel, baitId, function() return roll end)
+    local id = fish_catch.Select(rows, rodLevel, baitId, function() return roll end)
     if id then found[id] = true end
   end
   return found
@@ -123,11 +123,11 @@ end
 describe("TestIslandContent", function()
   -- 模型号真源是官方模型库：鱼种写哪个号，号本身必须在册（防虚构号）
   it("test_island_species_models_are_official", function()
-    local models = cfg.FishCarrier.Models
+    local models = cfg.fish_carrier.Models
     for _, island in ipairs(ISLANDS) do
       for _, species in ipairs(islandSpecies(island)) do
-        assert.is_not_nil(models[species.Model],
-          island.Name .. ' 鱼种 ' .. species.Id .. ' 的模型号 ' .. tostring(species.Model) .. ' 不在官方注册表')
+        assert.is_not_nil(models[species.model],
+          island.Name .. ' 鱼种 ' .. species.Id .. ' 的模型号 ' .. tostring(species.model) .. ' 不在官方注册表')
       end
     end
   end)
@@ -205,13 +205,13 @@ describe("TestIslandContent", function()
   it("test_island_species_are_implemented", function()
     for _, island in ipairs(ISLANDS) do
       for _, species in ipairs(islandSpecies(island)) do
-        assert.is_true(Ledger.Fish[species.Id].implemented,
+        assert.is_true(ledger.Fish[species.Id].implemented,
           island.Name .. ' 鱼种 ' .. species.Id .. ' 未标 implemented 却出现在玩家可遇路径上')
       end
     end
   end)
 
-  -- 可达性：真实抽鱼池上跑 FishCatch.Select——保底（不挂饵竿 1）、门槛（竿 1 不越级）、
+  -- 可达性：真实抽鱼池上跑 fish_catch.Select——保底（不挂饵竿 1）、门槛（竿 1 不越级）、
   -- 池顶（岛屿最高竿级摸得到每一行）、首领不入普通池
   it("test_island_pool_reachability", function()
     for _, island in ipairs(ISLANDS) do
@@ -262,16 +262,16 @@ describe("TestIslandContent", function()
     end
   end)
 
-  -- 战斗标签在册：MgrFishUnit 用 \`GameCfg.FishCombat and GameCfg.FishCombat[tag]\` 防御式取值，
+  -- 战斗标签在册：MgrFishUnit 用 \`game_cfg.fish_combat and game_cfg.fish_combat[tag]\` 防御式取值，
   -- 标签写错不会有任何报错，只是这条鱼在场上永不攻击（追不动、不还手、死了不掉落也不进图鉴）。
   -- 战斗参数表本身由 beach/forest/crab_boss/king_crab 各战斗测试直接消费，这里只钉「标签指得到表」。
   it("test_island_species_combat_tags_are_registered", function()
     for _, island in ipairs(ISLANDS) do
       for _, species in ipairs(islandSpecies(island)) do
         if species.Combat ~= nil then
-          assert.is_not_nil(cfg.FishCombat[species.Combat],
+          assert.is_not_nil(cfg.fish_combat[species.Combat],
             island.Name .. ' 鱼种 ' .. species.Id .. ' 的 Combat 标签 ' .. tostring(species.Combat) ..
-              ' 在 GameCfg.FishCombat 里没有参数')
+              ' 在 game_cfg.fish_combat 里没有参数')
         end
       end
     end

@@ -1,4 +1,4 @@
--- SpokeClock 纯契约测试（#294 / ADR-0032 §4）：
+-- spoke_clock 纯契约测试（#294 / ADR-0032 §4）：
 -- 失败方式先列：
 --   1. 读取引擎全局对象 → 脱离引擎的离线环境或双端初始化阶段即炸；
 --   2. 亚秒步进误触发 1 Hz 整秒状态/触发 → 秒级倒计时与周期结算提前触发或按帧重跑；
@@ -14,7 +14,7 @@ local Effect = spoke.Effect
 local State = spoke.State
 local Phase = spoke.Phase
 
-describe("SpokeClock 消费方确定性时钟契约", function()
+describe("spoke_clock 消费方确定性时钟契约", function()
   local saved_globals
 
   before_each(function()
@@ -39,25 +39,25 @@ describe("SpokeClock 消费方确定性时钟契约", function()
   end)
 
   it("零引擎全局依赖，支持默认与自定义初始时刻并拒绝非法初值", function()
-    local SpokeClock = require("common.spoke_clock")
+    local spoke_clock = require("common.spoke_clock")
 
-    local default_clock = SpokeClock.new()
+    local default_clock = spoke_clock.new()
     assert.equals(0, default_clock.now())
     assert.equals(0, default_clock.second:now())
 
-    local offset_clock = SpokeClock.new(12.75)
+    local offset_clock = spoke_clock.new(12.75)
     assert.equals(12.75, offset_clock.now())
     assert.equals(12, offset_clock.second:now())
 
-    assert.has_error(function() SpokeClock.new(0 / 0) end)
-    assert.has_error(function() SpokeClock.new(math.huge) end)
-    assert.has_error(function() SpokeClock.new(-math.huge) end)
-    assert.has_error(function() SpokeClock.new("10") end)
+    assert.has_error(function() spoke_clock.new(0 / 0) end)
+    assert.has_error(function() spoke_clock.new(math.huge) end)
+    assert.has_error(function() spoke_clock.new(-math.huge) end)
+    assert.has_error(function() spoke_clock.new("10") end)
   end)
 
   it("亚秒步进只更新 now()，跨整秒才推进 1 Hz second 与 on_second", function()
-    local SpokeClock = require("common.spoke_clock")
-    local clock = SpokeClock.new(10.0)
+    local spoke_clock = require("common.spoke_clock")
+    local clock = spoke_clock.new(10.0)
 
     local second_events = {}
     local effect_values = {}
@@ -106,8 +106,8 @@ describe("SpokeClock 消费方确定性时钟契约", function()
   end)
 
   it("单次整秒推进将 second 与 on_second 合并在同一触发批内，Auto 树只 flush 一次", function()
-    local SpokeClock = require("common.spoke_clock")
-    local clock = SpokeClock.new(0)
+    local spoke_clock = require("common.spoke_clock")
+    local clock = spoke_clock.new(0)
     local hunger = State.new("hunger", 100)
     local snapshots = {}
 
@@ -134,8 +134,8 @@ describe("SpokeClock 消费方确定性时钟契约", function()
   end)
 
   it("多秒 advance 逐秒推进并排空，前一秒卸载的 Phase 不会在后续秒里误跑", function()
-    local SpokeClock = require("common.spoke_clock")
-    local clock = SpokeClock.new(0)
+    local spoke_clock = require("common.spoke_clock")
+    local clock = spoke_clock.new(0)
     local alive = State.new("alive", true)
     local hp = State.new("hp", 2)
     local seen_seconds = {}
@@ -167,8 +167,8 @@ describe("SpokeClock 消费方确定性时钟契约", function()
   end)
 
   it("on_frame 每帧传出 dt 与 now，仅供短寿命活跃 Phase 按需订阅且不重建 Effect", function()
-    local SpokeClock = require("common.spoke_clock")
-    local clock = SpokeClock.new(5.0)
+    local spoke_clock = require("common.spoke_clock")
+    local clock = spoke_clock.new(5.0)
     local active = State.new("active", false)
     local mounts = 0
     local frames = {}
@@ -206,8 +206,8 @@ describe("SpokeClock 消费方确定性时钟契约", function()
   end)
 
   it("now() 为非响应式只读函数，严禁暴露逐帧刷新的响应式时刻 State", function()
-    local SpokeClock = require("common.spoke_clock")
-    local clock = SpokeClock.new(1.0)
+    local spoke_clock = require("common.spoke_clock")
+    local clock = spoke_clock.new(1.0)
 
     assert.equals("function", type(clock.now))
     assert.equals(1.0, clock.now())

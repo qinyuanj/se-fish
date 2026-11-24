@@ -10,7 +10,7 @@
   与**玩法实现**（三端业务代码）不是一回事，两者不混用，见 [ADR-0029](../adr/0029-scope-completeness-and-placeholder-first.md) 第二节。
 - **Checkout / 仓库检出**：本仓的 git 工作树（含 worktree），是唯一跑 Lua、测试与工具链的地方；仓库内路径一律相对、`/` 分隔，离开仓库写正斜杠加盘符。
   _Avoid_: 开发端、本机、repo copy
-- **Host directory / 宿主目录**：编辑器 `code init` 绑定的本地 Lua 工程目录，根有 `eggy.json`，是部署目的地；与仓库检出分别管理，两者只经 `deploy` 与 `sync` 往来。路径与绑定方式见下方「工具链」。
+- **host directory / 宿主目录**：编辑器 `code init` 绑定的本地 Lua 工程目录，根有 `eggy.json`，是部署目的地；与仓库检出分别管理，两者只经 `deploy` 与 `sync` 往来。路径与绑定方式见下方「工具链」。
   _Avoid_: 部署端、本机、deploy target
 - **部署树**：镜像进宿主目录的仓库根 `client/`、`common/`、`server/`；仓库根其余内容不部署。宿主内不归本仓库管理的内容由 `sync` 回灌，镜像粒度与操作细节见下方「工具链」。
   _Avoid_: 源码树（指仓库全部时）
@@ -40,7 +40,7 @@ Lua 命令使用 **Lua 5.4**，命令名统一 `lua`，执行前用 `lua -v` 核
 - **QA save slot / QA 存档槽**：试玩验收必须使用。会话开始在试玩前执行 `lua tools/cli.lua qa-slot new`，再执行 `lua tools/cli.lua deploy`；会话内槽位固定，同槽重进不要重新 `new`。
   _Avoid_: 验收存档槽、acceptance-slot、沙盒存档、sandbox save、test save
 - `lua tools/cli.lua qa-slot off` 只切回正式存档配置，不删除任何存档。
-- **Save key / 存档 key**：拼接以 `server/Mgr/MgrSave.lua` 为实现真源。
+- **Save key / 存档 key**：拼接以 `server/mgr/mgr_save.lua` 为实现真源。
   _Avoid_: 存档 ID、档位号、save id
 
 **架构图（dsh-uml-viewer）。** 看图与图上操作用 DSH 的 dsh-uml-viewer 插件面板；根目录 `policy.edn` 是架构图的机器真源，生成图在 `docs/uml/se-fish.edn`（不要手编）。六层职责与依赖方向见 [架构分层与依赖门禁](../architecture.md)，层归属唯一声明在 `tools/arch_policy.lua`。修改三端代码或 `policy.edn` 后用插件工具 `uml_ir` 重新生成图；面板请求的处理顺序与 `validResult` 校验以插件注入规则为准。
@@ -71,7 +71,7 @@ lua tools/cli.lua worktree-init
 - **先列失败方式**：确需单独测试某个系统时，先列出所有可能失败的方式，再写代码；代码写完后不补写单测。
 - **局部开发、全量收尾**：开发期间用 `lua tools/cli.lua test` 验证；业务功能仍按需试玩，收尾执行下面的全部检查。
 - **可复现取证**：每次试玩保留可重跑的触发步骤（`input` 命令、探针文件）与对应证据（`log grep` 命中行、截图路径）。
-- **只写有失败方式的用例**：用例分五类——①行为（分支、边界、失败路径）、②跨真源守卫（`data/` ↔ `GameCfg` ↔ 代码里的 id 引用、表间绑定）、③复述（断言等价于把实现或配置再写一遍）、④重复覆盖（同一行为在多个文件各测一遍）、⑤基架自测（只保护 `tests/support/` 夹具或 `tools/` 工具本身）。只写 ①②；③④⑤不写，遇到就删，删时记一行「原来拦住哪种失败 / 删掉后由谁接手」。门禁型（`arch_policy_test`、`eggy_json_guard_test` 这类挡仓库不变量的）不在此列：一律放 `tests/native/guards/`，走 guards 车道、不计入验收基线的遗留测试数。共享夹具若复刻反直觉的宿主行为，可设独立契约门禁，但必须同时有业务用例消费；否则仍按⑤删除。
+- **只写有失败方式的用例**：用例分五类——①行为（分支、边界、失败路径）、②跨真源守卫（`data/` ↔ `game_cfg` ↔ 代码里的 id 引用、表间绑定）、③复述（断言等价于把实现或配置再写一遍）、④重复覆盖（同一行为在多个文件各测一遍）、⑤基架自测（只保护 `tests/support/` 夹具或 `tools/` 工具本身）。只写 ①②；③④⑤不写，遇到就删，删时记一行「原来拦住哪种失败 / 删掉后由谁接手」。门禁型（`arch_policy_test`、`eggy_json_guard_test` 这类挡仓库不变量的）不在此列：一律放 `tests/native/guards/`，走 guards 车道、不计入验收基线的遗留测试数。共享夹具若复刻反直觉的宿主行为，可设独立契约门禁，但必须同时有业务用例消费；否则仍按⑤删除。
 - **按文件算耗时，不按用例算**：九成用例短于 busted 的一个计时 tick（15.6 ms），删单条用例几乎不减墙钟——减时间靠删或合并**文件**、降低用例里的循环规模。参数矩阵用两两覆盖（每对因子取值至少配过一次）而不是全组合。断言消息只在失败分支里拼（`if not cond then fail(fmt, ...) end`），写在断言参数里等于每个通过的断言都付一次 `string.format` 的钱（`main_hud_layout_test` 实测 2825 ms → 176 ms）。
 
 ## 完成判据
@@ -80,7 +80,7 @@ lua tools/cli.lua worktree-init
 
 | 检查 | 通过条件 |
 |---|---|
-| `lua tools/cli.lua test full`（收尾） | 含 slow 车道，全部用例通过，末行匹配 `N successes / 0 failures / 0 errors / 0 pending : T seconds`，退出码 0 |
+| `lua tools/cli.lua test full`（收尾） | 含 slow 车道，全部用例通过，末行匹配 `n successes / 0 failures / 0 errors / 0 pending : T seconds`，退出码 0 |
 | 美术资产交付（美术校验） | 仓库外的资产校验脚本跑完并产出 `validation/validation.json`，报告里 `failures` 为空（含网格封闭性硬门槛）；只看这份报告，不另开 CI，资产校验不进测试车道。预算文件、`mesh` 段或 `validation.json` 缺失同样算失败，口径见 [美术资产概要「验收」](../art-asset-overview.md#验收) |
 | `lua tools/cli.lua deploy` 后复核 `code validate` | `ok=true`、`data.valid=true`、`data.is_se_map=true`，`data.issues` 与 `meta.warnings` 均为空 |
 | validate 通过后全套试玩 | 每条验收现象都有取证产物；`log trace` 本轮窗口有效且无错误 |

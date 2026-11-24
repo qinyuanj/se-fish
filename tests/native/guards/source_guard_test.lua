@@ -8,7 +8,7 @@
 -- 三端 packages/ 是整包交付的外来件（ADR-0021），不吃第 5、6 条；第 2、3 条照查（包按原始字节交付，路径同样不能错）。
 -- 这边只管源码文本的卫生，所以两边各自独立，改登记表不必动这里。
 local fs = require("tests.support.fs_fixture")
-local Arch = require("tools.arch_policy")
+local arch = require("tools.arch_policy")
 local lfs = require("lfs")
 
 local BUSINESS_ROOTS = { "client", "common", "server" }
@@ -122,7 +122,7 @@ describe("三端源码守卫", function()
   it("test_requires_carry_project_prefix", function()
     scan(business_files(), function(path, src)
       local bad = {}
-      for _, mod in ipairs(Arch.requires(src)) do
+      for _, mod in ipairs(arch.requires(src)) do
         if not mod:match("^client%.") and not mod:match("^common%.") and not mod:match("^server%.") then
           bad[#bad + 1] = path .. " → " .. mod
         end
@@ -136,7 +136,7 @@ describe("三端源码守卫", function()
     for _, path in ipairs(source_files()) do exact[path] = true end
     scan(source_files(), function(path, src)
       local bad = {}
-      for _, mod in ipairs(Arch.requires(src)) do
+      for _, mod in ipairs(arch.requires(src)) do
         local want = mod:gsub("%.", "/") .. ".lua"
         if not exact[want] then
           local near
@@ -161,7 +161,7 @@ describe("三端源码守卫", function()
     local stubs = { EggyAPI = true, EggyEditorAPI = true }
     scan(business_files(), function(path, src)
       local bad = {}
-      for _, mod in ipairs(Arch.requires(src)) do
+      for _, mod in ipairs(arch.requires(src)) do
         if stubs[mod] or stubs[mod:match("[^.]+$")] then
           bad[#bad + 1] = path .. " → " .. mod
         end
@@ -172,10 +172,10 @@ describe("三端源码守卫", function()
 
   it("test_business_code_avoids_sandbox_removed_globals", function()
     scan(business_files(), function(path, src)
-      local code = Arch.code_only(src)
+      local code = arch.code_only(src)
       local bad = {}
       for _, name in ipairs(BANNED_GLOBALS) do
-        -- 同名 local 会遮蔽全局（如 server/data/player_data.lua 的 local debug = GameCfg.Debug），
+        -- 同名 local 会遮蔽全局（如 server/data/player_data.lua 的 local debug = game_cfg.Debug），
         -- 这类文件整份放行：宁可漏报，不误伤。
         local position = not shadows_local(code, name) and code:find("%f[%w_]" .. name .. "%s*[%.:]")
         if position then
@@ -189,7 +189,7 @@ describe("三端源码守卫", function()
   it("test_reentrant_entrypoints_keep_connection_handles", function()
     local matched_entries = 0
     scan(business_files(), function(path, src)
-      local code = Arch.code_only(src)
+      local code = arch.code_only(src)
       local bad = {}
       local entry, entry_indent
       local number = 0
@@ -230,7 +230,7 @@ describe("三端源码守卫", function()
 
   it("test_remote_event_creation_stays_inside_reutil", function()
     scan(business_files(), function(path, src)
-      local code, bad = Arch.code_only(src), {}
+      local code, bad = arch.code_only(src), {}
       local old = code:find("game%s*:%s*CreateRemoteEvent%s*%(")
       if old then
         bad[#bad + 1] = path .. ":" .. line_of(code, old) .. " 使用未公开 game:CreateRemoteEvent"
@@ -238,7 +238,7 @@ describe("三端源码守卫", function()
       if path ~= "common/re_util.lua" then
         local direct = code:find("RemoteEvent%s*%.%s*New%s*%(")
         if direct then
-          bad[#bad + 1] = path .. ":" .. line_of(code, direct) .. " 绕过 REUtil 直接调用 RemoteEvent.New"
+          bad[#bad + 1] = path .. ":" .. line_of(code, direct) .. " 绕过 re_util 直接调用 RemoteEvent.New"
         end
       end
       return bad
@@ -253,7 +253,7 @@ describe("三端源码守卫", function()
     scan(business_files(), function(path, src)
       local realm = path:match("^([^/]+)/")
       if not banned[realm] then return {} end
-      local code, bad, from = Arch.code_only(src), {}, 1
+      local code, bad, from = arch.code_only(src), {}, 1
       while true do
         local first, last = code:find("GetService%s*%(", from)
         if not first then break end
@@ -277,7 +277,7 @@ describe("三端源码守卫", function()
     local checked = 0
     scan(business_files(), function(path, src)
       if not path:match("^server/") then return {} end
-      local code = Arch.code_only(src)
+      local code = arch.code_only(src)
       if not code:find("self%s*%.%s*LastSeq%f[^%w_]") then return {} end
       checked = checked + 1
       local padded = "\n" .. code

@@ -41,7 +41,7 @@ M.commands = {
   { name = "sync",   mod = "tools.sync",   summary = "从宿主回同步配置 / API 存根 / data/" },
   { name = "docs", mod = "tools.docs", summary = "同步并离线检索 SE 官方手册：docs sync [api <页面>] / docs search <查询>" },
   { name = "qa-slot", mod = "tools.qa_slot", summary = "查看、新建或切换 QA 存档槽（试玩前需 deploy）" },
-  { name = "ability-presets", mod = "tools.ability_presets", summary = "重建技能包的编辑器侧预设（复制官方模板、刷壳与属性、回写 GameCfg key）" },
+  { name = "ability-presets", mod = "tools.ability_presets", summary = "重建技能包的编辑器侧预设（复制官方模板、刷壳与属性、回写 game_cfg key）" },
   { name = "blender", mod = "tools.blender", summary = "在 Windows 侧无头 Blender 执行脚本（唯一 Blender 入口，透传 JSON 与退出码）" },
   { name = "worktree-init", mod = "tools.worktree_init", summary = "把新 worktree 补齐到能跑 test full（复制上游 blender-* skill、安装 pre-commit；幂等）" },
   { name = "git-hook-init", mod = "tools.git_hooks", summary = "安装本地 pre-commit（提交前运行 test guards；幂等且不覆盖其他 hook）" },

@@ -1,7 +1,7 @@
-local GameCfg = require("common.game_cfg")
-local ServerRuntime = require("server.world_host.server_runtime")
-local SpokeClock = require("common.spoke_clock")
-local PlayerData = require("server.data.player_data")
+local game_cfg = require("common.game_cfg")
+local server_runtime = require("server.world_host.server_runtime")
+local spoke_clock = require("common.spoke_clock")
+local player_data = require("server.data.player_data")
 
 local function signal()
   local handlers = {}
@@ -18,8 +18,8 @@ local function host()
       FireClient = function() end }
     return events[name]
   end
-  local clock = SpokeClock.new(500)
-  local runtime = ServerRuntime.new({
+  local clock = spoke_clock.new(500)
+  local runtime = server_runtime.new({
     clock = clock, initial_now = 500,
     remote = { GetRE = function(_, name) return event(name) end, CheckRECD = function() return false end },
     player_data = { GetDataInst = function(_, p) return data_of[p.UserId] end },
@@ -41,7 +41,7 @@ local function host()
   runtime:start(); runtime:mark_started()
   return { runtime = runtime, events = events, created = created, clock = clock,
     add = function(_, p)
-      local data = PlayerData.New(p); data:Init(); data.LoadState = "ready"; data.Player = p
+      local data = player_data.New(p); data:Init(); data.LoadState = "ready"; data.Player = p
       data_of[p.UserId] = data; players[#players + 1] = p
       runtime:on_player_added(p); runtime:on_save_ready(p, data)
       return data
@@ -62,7 +62,7 @@ end
 
 describe("TestBaitSpot", function()
   before_each(function()
-    GameCfg.Debug = { Enabled = false, InitialGrants = GameCfg.Debug and GameCfg.Debug.InitialGrants }
+    game_cfg.Debug = { Enabled = false, InitialGrants = game_cfg.Debug and game_cfg.Debug.InitialGrants }
   end)
   it("test_each_configured_spot_spawns_exactly_one_bait", function()
     local env = host()
@@ -138,7 +138,7 @@ describe("TestBaitSpot", function()
     assert.is_true(env.runtime:get_world():place_ground_item("fishPond", {
       kind = "item", itemId = "carp", count = 1, x = 1, y = 0, z = 1,
     }))
-    env.clock:advance(GameCfg.BaitSpots and 15 or 15)
+    env.clock:advance(game_cfg.BaitSpots and 15 or 15)
     local fish = 0
     for _, row in ipairs(env.rows()) do if row.itemId == "carp" then fish = fish + 1 end end
     assert.equals(1, fish)

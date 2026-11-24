@@ -8,38 +8,38 @@
 
 | ID | 条款 | 组 | 执行者 | 证据等级 | 状态 | 证据 / 理由 |
 | --- | --- | --- | --- | --- | --- | --- |
-| 9-01 | 伤害结算只走统一的伤害入口，队友免伤、鱼塘免伤与安全区豁免都作为该入口内的判定分支接入，不另写一套单人伤害路径 | 契约 | agent | B | evidenced | tests/native/spec/09_pk_damage_filter_test.lua |
-| 9-02 | 玩家身份（含所属小队）只由服务端维护，客户端无法通过请求改写自己或他人的队伍归属 | 契约 | agent | A | evidenced | tests/native/spec/server_squad_314_test.lua |
-| 9-03 | 濒死、抢救中、恢复与死亡之间的状态转换只经同一个抢救状态转换接口完成，抢救不能绕过该接口直接改血量或濒死标记 | 契约 | agent | B | evidenced | tests/native/spec/09_rescue_test.lua |
-| 9-04 | 多人同场时活鱼、地面物品、摆渡与设施仍是共享世界里的同一份权威副本，不因当前单人开发而改成按玩家各存一份 | 契约 | agent | B | unverified | — |
-| 9-05 | 伤害、抢救与队伍变更在重复请求、同时触发和断线重连下都只结算一次，重放同一请求不产生第二次效果 | 契约 | agent | B | unverified | — |
+| 9-01 | 伤害结算只走统一的伤害入口，队友免伤、鱼塘免伤与安全区豁免都作为该入口内的判定分支接入，不另写一套单人伤害路径 | 契约 | agent | b | evidenced | tests/native/spec/09_pk_damage_filter_test.lua |
+| 9-02 | 玩家身份（含所属小队）只由服务端维护，客户端无法通过请求改写自己或他人的队伍归属 | 契约 | agent | a | evidenced | tests/native/spec/server_squad_314_test.lua |
+| 9-03 | 濒死、抢救中、恢复与死亡之间的状态转换只经同一个抢救状态转换接口完成，抢救不能绕过该接口直接改血量或濒死标记 | 契约 | agent | b | evidenced | tests/native/spec/09_rescue_test.lua |
+| 9-04 | 多人同场时活鱼、地面物品、摆渡与设施仍是共享世界里的同一份权威副本，不因当前单人开发而改成按玩家各存一份 | 契约 | agent | b | unverified | — |
+| 9-05 | 伤害、抢救与队伍变更在重复请求、同时触发和断线重连下都只结算一次，重放同一请求不产生第二次效果 | 契约 | agent | b | unverified | — |
 
 ## 规则
 
 | ID | 条款 | 组 | 执行者 | 证据等级 | 状态 | 证据 / 理由 |
 | --- | --- | --- | --- | --- | --- | --- |
-| 9-06 | 一支小队最多 3 名玩家，第 4 名玩家无论走邀请还是接受邀请都加不进队伍 | 规则 | agent | A | evidenced | tests/native/spec/server_squad_314_test.lua |
-| 9-07 | 只有在与目标玩家距离 2 米以内时才能发起组队邀请，超出距离的邀请被拒绝且不产生待处理邀请 | 规则 | agent | A | evidenced | tests/native/spec/server_squad_314_test.lua |
-| 9-08 | 邀请发出后 10 秒内未被处理即按拒绝结算，超时后接受邀请不生效、队伍组成不变 | 规则 | agent | B | evidenced | tests/native/spec/server_squad_314_test.lua |
-| 9-09 | 队员离线后自动退出小队，小队名单里不再保留该玩家，人数按减一重算 | 规则 | agent | B | evidenced | tests/native/spec/server_squad_314_test.lua |
-| 9-10 | 小队人数少于 2 人时解散，剩余玩家回到无队伍状态 | 规则 | agent | A | evidenced | tests/native/spec/server_squad_314_test.lua |
-| 9-11 | 队员可以主动离队，离队后立即不再享有该小队的免伤 | 规则 | agent | A | evidenced | tests/native/spec/server_squad_314_test.lua |
-| 9-12 | 同队玩家之间的攻击不造成任何伤害，近战、枪械与范围伤害都按 0 结算 | 规则 | agent | A | evidenced | tests/native/spec/09_pk_damage_filter_test.lua |
-| 9-13 | 鱼塘区内任意两名玩家之间都免伤，不论是否同队 | 规则 | agent | A | evidenced | tests/native/spec/09_pk_damage_filter_test.lua |
-| 9-14 | 鱼塘以外的钓鱼区，非同队玩家之间的攻击正常造成伤害 | 规则 | agent | A | evidenced | tests/native/spec/09_pk_damage_filter_test.lua |
-| 9-15 | PK 的开启不以在线人数达到 8 为条件，人数不足时同一条判定规则仍然成立 | 规则 | agent | A | evidenced | tests/native/spec/09_pk_damage_filter_test.lua |
-| 9-16 | 安全区只约束玩家之间的伤害，不阻止鱼对玩家造成伤害 | 规则 | agent | A | evidenced | tests/native/spec/09_pk_damage_filter_test.lua |
-| 9-17 | 其他玩家可以抢救濒死玩家，濒死者不必只靠本人使用肾上腺素解除 | 规则 | agent | A | evidenced | tests/native/spec/09_rescue_test.lua |
-| 9-18 | 他人抢救成功后，濒死玩家恢复血量上限的 10% | 规则 | agent | A | evidenced | tests/native/spec/09_rescue_test.lua |
+| 9-06 | 一支小队最多 3 名玩家，第 4 名玩家无论走邀请还是接受邀请都加不进队伍 | 规则 | agent | a | evidenced | tests/native/spec/server_squad_314_test.lua |
+| 9-07 | 只有在与目标玩家距离 2 米以内时才能发起组队邀请，超出距离的邀请被拒绝且不产生待处理邀请 | 规则 | agent | a | evidenced | tests/native/spec/server_squad_314_test.lua |
+| 9-08 | 邀请发出后 10 秒内未被处理即按拒绝结算，超时后接受邀请不生效、队伍组成不变 | 规则 | agent | b | evidenced | tests/native/spec/server_squad_314_test.lua |
+| 9-09 | 队员离线后自动退出小队，小队名单里不再保留该玩家，人数按减一重算 | 规则 | agent | b | evidenced | tests/native/spec/server_squad_314_test.lua |
+| 9-10 | 小队人数少于 2 人时解散，剩余玩家回到无队伍状态 | 规则 | agent | a | evidenced | tests/native/spec/server_squad_314_test.lua |
+| 9-11 | 队员可以主动离队，离队后立即不再享有该小队的免伤 | 规则 | agent | a | evidenced | tests/native/spec/server_squad_314_test.lua |
+| 9-12 | 同队玩家之间的攻击不造成任何伤害，近战、枪械与范围伤害都按 0 结算 | 规则 | agent | a | evidenced | tests/native/spec/09_pk_damage_filter_test.lua |
+| 9-13 | 鱼塘区内任意两名玩家之间都免伤，不论是否同队 | 规则 | agent | a | evidenced | tests/native/spec/09_pk_damage_filter_test.lua |
+| 9-14 | 鱼塘以外的钓鱼区，非同队玩家之间的攻击正常造成伤害 | 规则 | agent | a | evidenced | tests/native/spec/09_pk_damage_filter_test.lua |
+| 9-15 | PK 的开启不以在线人数达到 8 为条件，人数不足时同一条判定规则仍然成立 | 规则 | agent | a | evidenced | tests/native/spec/09_pk_damage_filter_test.lua |
+| 9-16 | 安全区只约束玩家之间的伤害，不阻止鱼对玩家造成伤害 | 规则 | agent | a | evidenced | tests/native/spec/09_pk_damage_filter_test.lua |
+| 9-17 | 其他玩家可以抢救濒死玩家，濒死者不必只靠本人使用肾上腺素解除 | 规则 | agent | a | evidenced | tests/native/spec/09_rescue_test.lua |
+| 9-18 | 他人抢救成功后，濒死玩家恢复血量上限的 10% | 规则 | agent | a | evidenced | tests/native/spec/09_rescue_test.lua |
 
 ## 功能
 
 | ID | 条款 | 组 | 执行者 | 证据等级 | 状态 | 证据 / 理由 |
 | --- | --- | --- | --- | --- | --- | --- |
-| 9-19 | 小队系统：组队、邀请、接受与拒绝、主动离队、解散的服务端判定与队伍名单维护 | 功能 | agent | A | evidenced | tests/native/spec/server_squad_314_test.lua |
-| 9-20 | 队伍界面：在 HUD 上显示本队队友及每名队友的当前血量 | 功能 | agent | A | evidenced | tests/native/spec/client_squad_314_test.lua、client/views/squad_view.lua |
-| 9-21 | 收到组队邀请时的界面提示与 10 秒倒计时展示 | 功能 | agent | A | evidenced | tests/native/spec/client_squad_314_test.lua |
-| 9-22 | 队伍归属进入存档，断线重连后按原队伍状态或明确的解散结果恢复 | 功能 | agent | B | evidenced | tests/native/spec/server_squad_314_test.lua |
+| 9-19 | 小队系统：组队、邀请、接受与拒绝、主动离队、解散的服务端判定与队伍名单维护 | 功能 | agent | a | evidenced | tests/native/spec/server_squad_314_test.lua |
+| 9-20 | 队伍界面：在 HUD 上显示本队队友及每名队友的当前血量 | 功能 | agent | a | evidenced | tests/native/spec/client_squad_314_test.lua、client/views/squad_view.lua |
+| 9-21 | 收到组队邀请时的界面提示与 10 秒倒计时展示 | 功能 | agent | a | evidenced | tests/native/spec/client_squad_314_test.lua |
+| 9-22 | 队伍归属进入存档，断线重连后按原队伍状态或明确的解散结果恢复 | 功能 | agent | b | evidenced | tests/native/spec/server_squad_314_test.lua |
 
 ## C 级（试玩取证）
 

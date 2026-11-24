@@ -64,7 +64,7 @@ function M.validate_verdict(out)
 end
 
 -- 解析 `code diff` 文本里的 changelist 行：
--- changelist: only-local=N differs=N only-on-map=N unchanged=N
+-- changelist: only-local=n differs=n only-on-map=n unchanged=n
 function M.parse_changelist(out)
   local line = out:match("changelist:[^\r\n]*")
   if not line then return nil end

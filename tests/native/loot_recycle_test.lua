@@ -1,7 +1,7 @@
-local GameCfg = require("common.game_cfg")
-local ServerRuntime = require("server.world_host.server_runtime")
-local SpokeClock = require("common.spoke_clock")
-local PlayerData = require("server.data.player_data")
+local game_cfg = require("common.game_cfg")
+local server_runtime = require("server.world_host.server_runtime")
+local spoke_clock = require("common.spoke_clock")
+local player_data = require("server.data.player_data")
 
 local function signal()
   local handlers = {}
@@ -10,11 +10,11 @@ local function signal()
 end
 
 local function open(cap)
-  local saved = GameCfg.Loot
+  local saved = game_cfg.Loot
   local loot = {}
   for k, v in pairs(saved) do loot[k] = v end
   if cap then loot.PerZoneCap = cap end
-  GameCfg.Loot = loot
+  game_cfg.Loot = loot
   local created, events = {}, {}
   local function event(name)
     events[name] = events[name] or { clients = {}, OnServerEvent = signal(),
@@ -22,9 +22,9 @@ local function open(cap)
       FireClient = function(self, _, payload) self.clients[#self.clients + 1] = payload end }
     return events[name]
   end
-  local clock = SpokeClock.new(100)
+  local clock = spoke_clock.new(100)
   local data_of, players = {}, {}
-  local runtime = ServerRuntime.new({
+  local runtime = server_runtime.new({
     clock = clock, initial_now = 100,
     remote = { GetRE = function(_, n) return event(n) end, CheckRECD = function() return false end },
     player_data = { GetDataInst = function(_, p) return data_of[p.UserId] end },
@@ -41,7 +41,7 @@ local function open(cap)
   return {
     saved = saved, runtime = runtime, events = events, created = created, clock = clock,
     add = function(_, p)
-      local data = PlayerData.New(p); data:Init(); data.LoadState = "ready"; data.Player = p
+      local data = player_data.New(p); data:Init(); data.LoadState = "ready"; data.Player = p
       data_of[p.UserId] = data; players[#players + 1] = p
       runtime:on_player_added(p); runtime:on_save_ready(p, data)
     end,
@@ -66,16 +66,16 @@ end
 
 describe("TestLootRecycle", function()
   before_each(function()
-    GameCfg.Debug = { Enabled = false, InitialGrants = GameCfg.Debug and GameCfg.Debug.InitialGrants }
+    game_cfg.Debug = { Enabled = false, InitialGrants = game_cfg.Debug and game_cfg.Debug.InitialGrants }
   end)
   local env
   after_each(function()
-    if env then GameCfg.Loot = env.saved; env.runtime:shutdown() end
+    if env then game_cfg.Loot = env.saved; env.runtime:shutdown() end
   end)
 
   it("test_config_has_per_zone_cap_and_flash_seconds", function()
-    assert.equals(200, GameCfg.Loot.PerZoneCap)
-    assert.equals(30, GameCfg.Loot.FlashBeforeRecycleSec)
+    assert.equals(200, game_cfg.Loot.PerZoneCap)
+    assert.equals(30, game_cfg.Loot.FlashBeforeRecycleSec)
   end)
 
   it("test_over_cap_marks_oldest_recycling_and_count_stays_visible_until_flash", function()

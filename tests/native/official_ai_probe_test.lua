@@ -1,13 +1,13 @@
 -- #50：真实 Lua 执行未修改 AI vendor；Task、单位、向量是引擎边界替身，并非试玩实测。
 -- 迁移自 tests/tooling/official_ai_probe_test.lua（#92，LuaUnit → 原生 Busted）；
--- 案例顺序沿用旧入口的类名 + 方法名字典序。Runtime 夹具每次 loadAi() 建立独立模块环境。
-local Probe = require('tools.probes.official_ai_probe')
-local GameCfg = require('common.game_cfg')
+-- 案例顺序沿用旧入口的类名 + 方法名字典序。runtime 夹具每次 loadAi() 建立独立模块环境。
+local probe = require('tools.probes.official_ai_probe')
+local game_cfg = require('common.game_cfg')
 
 describe("TestOfficialAiProbe", function()
   it("test_ability_bridge_reaches_real_ability_api_boundary", function()
-    local Runtime = require('tests.support.official_ai_vendor_runtime')
-    local ai, env = Runtime.loadAi()
+    local runtime = require('tests.support.official_ai_vendor_runtime')
+    local ai, env = runtime.loadAi()
     local unit = env.newUnit(1)
     local manager = { UnitId = 900, attrs = {}, abilities = {}, children = {} }
     function manager:GetChildren() return self.children end
@@ -52,7 +52,7 @@ describe("TestOfficialAiProbe", function()
     local target = env.newUnit(3, env.Vector(4, 0, 0))
     env.players.list = { { Character = target } }
     env.lastCast = nil
-    local report = Probe.Run({ ai = ai, isolated = true, evidence = 'offline',
+    local report = probe.Run({ ai = ai, isolated = true, evidence = 'offline',
       isIsolated = function(u) return u == unit or u == target end,
       createUnit = function() return unit end, destroyUnit = function(u) u:Destroy() end,
       target = target, players = function() return env.players.list end,
@@ -74,7 +74,7 @@ describe("TestOfficialAiProbe", function()
   end)
 
   it("test_all_species_are_mapped_without_a_fixed_limit", function()
-    local rows = Probe.monsterMappings(GameCfg)
+    local rows = probe.monsterMappings(game_cfg)
     local seen = {}
     for _, row in ipairs(rows) do
       assert.is_nil(seen[row.id])
@@ -83,17 +83,17 @@ describe("TestOfficialAiProbe", function()
       assert.is_not_nil(row.retained)
       assert.are.equal('待试玩验证', row.status)
     end
-    for id in pairs(GameCfg.Fish) do assert.is_true(seen[id], id) end
+    for id in pairs(game_cfg.Fish) do assert.is_true(seen[id], id) end
     for _, id in ipairs({ 'fish47Elite', 'fish48Boss', 'fish55Elite', 'fish56Boss' }) do
       assert.is_true(seen[id], id)
     end
     local extra = { Fish = { newcomer = { Id = 'newcomer', Name = '新鱼', Grade = 'elite' } }, Ability = {} }
-    assert.are.equal('未登记行为', Probe.monsterMappings(extra)[1].behavior)
+    assert.are.equal('未登记行为', probe.monsterMappings(extra)[1].behavior)
   end)
 
   it("test_disconnected_signal_does_not_fire_after_cleanup", function()
-    local Runtime = require('tests.support.official_ai_vendor_runtime')
-    local _, env = Runtime.loadAi()
+    local runtime = require('tests.support.official_ai_vendor_runtime')
+    local _, env = runtime.loadAi()
     local unit, calls = env.newUnit(91), 0
     local conn = unit.Destroying:Connect(function() calls = calls + 1 end)
     unit.Destroying:Fire()
@@ -121,7 +121,7 @@ describe("TestOfficialAiProbe", function()
     local starts = 0
     local ai = { Funcs = { StopAI = function() stopped = stopped + 1 end,
       StartAI = function() starts = starts + 1 end } }
-    local gate = Probe.newHandoff(ai, {}, function() writes = writes + 1 end,
+    local gate = probe.newHandoff(ai, {}, function() writes = writes + 1 end,
       function() damage = damage + 1 end, function() end)
     local old = gate:Switch('official')
     local active = gate:Switch('custom')
@@ -141,7 +141,7 @@ describe("TestOfficialAiProbe", function()
   it("test_real_vendor_handoff_restores_new_commands_and_cancels_old_mode", function()
     local ai, env = require('tests.support.official_ai_vendor_runtime').loadAi()
     local unit = env.newUnit(31)
-    local gate = Probe.newHandoff(ai, unit, function(p) unit:SetPosition(p) end, function() end, function() end)
+    local gate = probe.newHandoff(ai, unit, function(p) unit:SetPosition(p) end, function() end, function() end)
     local official = gate:Switch('official')
     ai.Funcs.MoveDirection(unit, env.Vector(1, 0, 0), 0, 0)
     env.task:pump(0.1)
@@ -165,8 +165,8 @@ describe("TestOfficialAiProbe", function()
   end)
 
   it("test_reserved_priority_and_move_threshold_are_inert", function()
-    local Runtime = require('tests.support.official_ai_vendor_runtime')
-    local ai, env = Runtime.loadAi()
+    local runtime = require('tests.support.official_ai_vendor_runtime')
+    local ai, env = runtime.loadAi()
     local unit = env.newUnit(1)
     local far = env.newUnit(2, env.Vector(4, 0, 0))
     local near = env.newUnit(3, env.Vector(2, 0, 0))
@@ -197,7 +197,7 @@ describe("TestOfficialAiProbe", function()
           jumps = u.Controller.jumps }
       end,
     }
-    local report = Probe.Run(context)
+    local report = probe.Run(context)
     assert.is_true(report.ok, table.concat(report.errors, '; '))
     assert.is_true(report.cleaned)
     assert.is_true(#report.evidence >= 7)
@@ -218,15 +218,15 @@ describe("TestOfficialAiProbe", function()
     -- 不用 assert.error_matches：Luassert 会先剥掉错误原文开头的 `^.-:%d+: `，而这里的期望子串正坐在
     -- 被剥的那一段里（探针把内层 error 的 `文件:行号: ` 拼在自己前缀后面），剥完只剩「模拟清理失败」，
     -- 断言就变成检查内层消息了。改取 pcall 原文做整体子串匹配，等价旧 assertErrorMsgContains。
-    local ok, err = pcall(Probe.Run, context)
+    local ok, err = pcall(probe.Run, context)
     assert.is_false(ok, '清理失败必须抛出错误')
     assert.matches('official_ai_probe 清理失败', tostring(err), 1, true)
     assert.is_nil(context.unit)
   end)
 
   it("test_vendor_move_direction_stop_and_resume_boundaries", function()
-    local Runtime = require('tests.support.official_ai_vendor_runtime')
-    local ai, env = Runtime.loadAi()
+    local runtime = require('tests.support.official_ai_vendor_runtime')
+    local ai, env = runtime.loadAi()
     local unit = env.newUnit(1)
     ai.Funcs.MoveDirection(unit, env.Vector(1, 0, 0), 0.2, 0)
     env.task:pump(0.1)

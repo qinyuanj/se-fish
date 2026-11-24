@@ -1,9 +1,9 @@
 -- #84 迁移：空中鱼逃脱与入水回收（原 tests/gameplay/fish_air_escape_test.lua，4 例）。
--- 接缝：真实 MgrFishCarrier / MgrFishUnit / MgrLoot 只换引擎对象与时间——空中鱼 1 秒内不销毁、
+-- 接缝：真实 mgr_fish_carrier / MgrFishUnit / MgrLoot 只换引擎对象与时间——空中鱼 1 秒内不销毁、
 -- 朝最近水区直线逃脱、3 秒重定向、重复放下幂等、入水回收本体与受击体且不产鱼获、1 秒后可击杀且只掉一份。
 -- describe/it 名称保留旧类名与方法名，并按方法名字典序注册以保持旧套件执行顺序。
-local Cfg = require('common.game_cfg')
-local WaterJudge = require('common.math_water_judge')
+local cfg = require('common.game_cfg')
+local water_judge = require('common.math_water_judge')
 
 local AIR_IDS = { 'item81', 'item83', 'item84', 'item85', 'item86',
     'item87', 'item89', 'item90', 'item91', 'item92' }
@@ -78,10 +78,10 @@ function FishAirEscape:setUp()
     end }
     -- #102 现场同步：合同安全点移到区内侧（离本区水岸线 62.5 米），而本文件的时序是按「起点在水岸线外
     -- 32 米」调的（1.05 秒仍在岸上、5 秒后飞进水面被回收），所以起点按本区水岸线自己取，不借 SafePoint。
-    local water = Cfg.Zones[6].Scene.Waters[1]
+    local water = cfg.Zones[6].Scene.Waters[1]
     local startZ = water.Center.z - (water.HalfZ + 32)
     self.player = { UserId = 5701, Character = {
-        Position = vec(water.Center.x, Cfg.Zones[6].Scene.SafePoint.y, startZ), Rotation = _G.Quaternion.FromEulerAngles(0, 0, 0),
+        Position = vec(water.Center.x, cfg.Zones[6].Scene.SafePoint.y, startZ), Rotation = _G.Quaternion.FromEulerAngles(0, 0, 0),
         Controller = { Lift = function() end },
     } }
     _G.game = { GetService = function(_, name)
@@ -94,10 +94,10 @@ function FishAirEscape:setUp()
     -- 目标裁决适配层按生产接线（server/main.lua）由入口注入
     self.mgr.AiTarget = require('server.world_host.fish_ai_target')
     self.mgr:Start()
-    local ServerRuntime = require('server.world_host.server_runtime')
-    local SpokeClock = require('common.spoke_clock')
-    self.runtime = ServerRuntime.new({
-        clock = SpokeClock.new(self.now), initial_now = self.now,
+    local server_runtime = require('server.world_host.server_runtime')
+    local spoke_clock = require('common.spoke_clock')
+    self.runtime = server_runtime.new({
+        clock = spoke_clock.new(self.now), initial_now = self.now,
         remote = { GetRE = function() return { FireAllClients = function() end, FireClient = function() end, OnServerEvent = { Connect = function() return { Disconnect = function() end } end } } end, CheckRECD = function() return false end },
         create_unit = function(_, props)
             local unit = { Destroyed = false, Position = props.Position, ItemId = nil }
@@ -108,7 +108,7 @@ function FishAirEscape:setUp()
     })
     self.runtime:start()
     self.runtime:mark_started()
-    ServerRuntime.set_current(self.runtime)
+    server_runtime.set_current(self.runtime)
     self.loot = { Loots = {} }
     self.carrier:SubscribeDied(function(carrier)
         local fish = self.mgr:FindByCarrier(carrier)
@@ -138,8 +138,8 @@ function FishAirEscape:tearDown()
     end
     if self.runtime then
         self.runtime:shutdown()
-        local runtimeApi = require('server.world_host.server_runtime')
-        if runtimeApi.current and runtimeApi.current() == self.runtime then runtimeApi.set_current(nil) end
+        local runtime_api = require('server.world_host.server_runtime')
+        if runtime_api.current and runtime_api.current() == self.runtime then runtime_api.set_current(nil) end
     end
     for _, name in ipairs(MODULES) do package.loaded[name] = self.modules[name] end
     _G.game = self.saved.game
@@ -200,7 +200,7 @@ describe('TestFishAirEscape', function()
         assert.is_true(body.LinearVelocity.z > 0)
         env.now = 3.05
         env.mgr:Update()
-        assert.near(-Cfg.Fish.item87.Speed, body.LinearVelocity.z, 1e-6)
+        assert.near(-cfg.Fish.item87.Speed, body.LinearVelocity.z, 1e-6)
     end)
 
     it('test_all_normal_and_rare_air_fish_survive_one_second_then_escape_without_loot', function()
@@ -215,13 +215,13 @@ describe('TestFishAirEscape', function()
             assert.are.equal('escaping', fish.State, id)
             assert.is_nil(fish.FleeAt, id)
             assert.is_nil(fish.Flight, id)
-            assert.near(Cfg.Fish[id].Speed * 1.05, body.Position.z - start.z, 1e-6, id)
+            assert.near(cfg.Fish[id].Speed * 1.05, body.Position.z - start.z, 1e-6, id)
             assert.near(0, body.LinearVelocity.x, 1e-6, id)
             assert.is_true(body.LinearVelocity.z > 0, id)
-            assert.is_nil(WaterJudge.HitZone(Cfg.Water.Zones,
+            assert.is_nil(water_judge.HitZone(cfg.Water.Zones,
                 { x = body.Position.x, y = 2, z = body.Position.z }), id)
             assert.same(body.Position, receiver.Position, id)
-            assert.are.equal(Cfg.Fish[id].Health, receiver.Controller.Health, id)
+            assert.are.equal(cfg.Fish[id].Health, receiver.Controller.Health, id)
             env:advance(env.now + 5)
             assert.is_nil(env.mgr.Fish[fish.Id], id)
             assert.is_true(body.Destroyed, id)
@@ -239,7 +239,7 @@ describe('TestFishAirEscape', function()
             local body, receiver = fish.Carrier.Body, fish.Carrier.Receiver
             local controller = receiver.Controller
             env:advance(env.now + 1.05)
-            controller:TakeDamage(Cfg.Fish[id].Health)
+            controller:TakeDamage(cfg.Fish[id].Health)
             controller.Died:Fire()
             env.carrier:NotifyDied(fish.Carrier)
             local found = {}
@@ -259,7 +259,7 @@ describe('TestFishAirEscape', function()
     it('test_special_flight_lifetimes_and_ground_fish_remain_unchanged', function()
         for _, id in ipairs({ 'fish47Elite', 'fish48Boss', 'fish55Elite' }) do
             local fish = env:drop(id)
-            local deadline = env.now + Cfg.Fish[id].EscapeSec
+            local deadline = env.now + cfg.Fish[id].EscapeSec
             assert.are.equal('flying', fish.State, id)
             assert.are.equal(deadline, fish.FleeAt, id)
             env.now = deadline - 0.05

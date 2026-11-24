@@ -1,11 +1,11 @@
-local Modal = require("client.views.economy_modal")
-local MessageView = {}
+local modal = require("client.views.economy_modal")
+local message_view = {}
 
-function MessageView.spec()
+function message_view.spec()
   return {
     name = "Message",
     mount = function(scope, ctx)
-      local label = Modal.label(scope, ctx, ctx.root_node, "LabelMessage", "")
+      local label = modal.label(scope, ctx, ctx.root_node, "LabelMessage", "")
       label.Visible = false
       scope:effect("MessageProjection", function(es)
         local message = es:d(ctx.store.message)
@@ -17,4 +17,4 @@ function MessageView.spec()
   }
 end
 
-return MessageView
+return message_view

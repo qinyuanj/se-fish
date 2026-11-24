@@ -1,11 +1,11 @@
 -- #88 迁移：存档地基（原 tests/gameplay/save_foundation_test.lua，9 例）。
 -- #123 失败方式先列：pending/failed 可变操作与空档写；v1 财产/实例丢失；坏档或未知版本被洗白；
 -- 写成功回包丢失、重试重复扣费；旧会话回调覆盖新会话；操作日志清理后重放；离场/关服漏写。
--- seam：真实 PlayerData 迁移与 MgrSave 公共接口；只替换 Task/DataStore 引擎边界。
+-- seam：真实 player_data 迁移与 mgr_save 公共接口；只替换 Task/DataStore 引擎边界。
 -- it 按旧 LuaUnit 的方法名字典序注册，保持与旧套件一致的案例顺序。
--- 引擎边界替身必须写真实全局（_G.game）：MgrSave 由 loadfile 得到独立 chunk，
+-- 引擎边界替身必须写真实全局（_G.game）：mgr_save 由 loadfile 得到独立 chunk，
 -- 其 _ENV 是真实 _G，Busted 的逐文件沙箱里裸赋值只改沙箱、模块读不到。
-local PlayerData = require('server.data.player_data')
+local player_data = require('server.data.player_data')
 
 describe('TestSaveFoundation', function()
     local env, savedGame
@@ -50,7 +50,7 @@ describe('TestSaveFoundation', function()
 
     local function join(id)
         local player = { UserId = id, SetAttribute = function() end }
-        local data = PlayerData.New(player)
+        local data = player_data.New(player)
         data:Init(true)
         env.save:LoadInto(player, data)
         return player, data
@@ -112,7 +112,7 @@ describe('TestSaveFoundation', function()
             end, function() end))
             drain()
         end
-        assert.same(65, data.Data.FishCoin)
+        assert.same(65, data.data.FishCoin)
         assert.same(64, #data:Serialize().meta.operations)
         local ok, reason = env.save:Execute(player, data, first, function() error('不能重新执行') end, function() end)
         assert.is_false(ok)
@@ -135,20 +135,20 @@ describe('TestSaveFoundation', function()
         assert.is_false(data:AddCoin(999))
         drain()
         assert.is_true(result[1])
-        assert.same(95, data.Data.FishCoin)
+        assert.same(95, data.data.FishCoin)
         local count = data:ItemCount('starterRod')
         local _, rejoined = join(30)
         drain()
         assert.is_true(env.save:Execute(rejoined.Player, rejoined, op, buy, function(ok, value) result = { ok, value } end))
         drain()
-        assert.same(95, rejoined.Data.FishCoin)
+        assert.same(95, rejoined.data.FishCoin)
         assert.same(count, rejoined:ItemCount('starterRod'))
         assert.same(5, result[2].paid)
         assert.same(1, #rejoined:Serialize().meta.operations)
     end)
 
     it('test_pending_rejects_mutation_and_snapshot_until_explicit_new_save', function()
-        local data = PlayerData.New({ UserId = 123, SetAttribute = function() end })
+        local data = player_data.New({ UserId = 123, SetAttribute = function() end })
         data:Init(true)
         assert.same('pending', data.LoadState)
         assert.is_false(data:AddCoin(10))
@@ -200,18 +200,18 @@ describe('TestSaveFoundation', function()
         env.save:Update()
         drain()
         assert.same(1, replies)
-        assert.same(13, data.Data.FishCoin)
+        assert.same(13, data.data.FishCoin)
         assert.same('40:1', data:Serialize().extra.recovery.ticket.operation)
         local stale = data:Serialize()
         local _, current = join(40)
         drain()
         assert.is_false(env.save:Save(40, stale, 'old-session'))
         assert.is_false(data:AddCoin(1))
-        assert.same(13, current.Data.FishCoin)
+        assert.same(13, current.data.FishCoin)
     end)
 
     it('test_v1_migrates_every_instance_and_bad_save_is_atomic', function()
-        local data = PlayerData.New({ UserId = 124, SetAttribute = function() end })
+        local data = player_data.New({ UserId = 124, SetAttribute = function() end })
         data:Init(true)
         local old = { v = 1, coin = 730, up = 1, zone = 'shrimpPond', bait = { worm = 9 },
             bar = { { i = 2, id = 'eelHead', n = 1, m = 1.75 } },
@@ -229,7 +229,7 @@ describe('TestSaveFoundation', function()
         assert.same(1, old.v)
         saved.v = 500
         assert.is_false(data:ApplySave(saved))
-        assert.same(730, data.Data.FishCoin)
+        assert.same(730, data.data.FishCoin)
         old.bar[1].m = 0 / 0
         assert.is_false(data:ApplySave(old))
         assert.same(1, data:ItemCount('eelHead'))

@@ -8,8 +8,8 @@
 --   3. 近战命中盒重放（同一目标重复进盒）导致效果重复叠加超过一次判定段语义。
 --
 -- 技能包替身只提供本案例需要的施法接口，每例还原模块缓存。
-local Weapon = require('tests.support.weapon_world')
-local SwingRegistry = require('server.swing_registry')
+local weapon = require('tests.support.weapon_world')
+local swing_registry = require('server.swing_registry')
 local VENDOR = 'server.packages.ability_system.api'
 
 -- 只替换包内 CastAbility，保持业务守卫的真实实现。
@@ -72,8 +72,8 @@ describe('TestMeleeHitEffect', function()
         package.loaded['server.swing_registry'] = { TakeSwing = function()
             local s = ctx.swing; ctx.swing = nil; return s
         end }
-        ctx.services = { Vitals = ctx.vitals,
-            FishCarrier = package.loaded['server.world_host.fish_carrier'], GM = package.loaded['server.world_host.player_gm'],
+        ctx.services = { vitals = ctx.vitals,
+            fish_carrier = package.loaded['server.world_host.fish_carrier'], GM = package.loaded['server.world_host.player_gm'],
             Modifier = modifierStub }
         for _, name in ipairs({ 'server.world_host.fish_carrier', 'server.world_host.player_gm' }) do
             package.loaded[name] = setmetatable({}, { __index = function()
@@ -186,7 +186,7 @@ end)
 describe('TestPrizeWeaponEffect', function()
     local ctx
     before_each(function()
-        ctx = Weapon.new()
+        ctx = weapon.new()
         ctx:setUp()
     end)
     after_each(function()
@@ -233,23 +233,23 @@ describe('TestPrizeWeaponEffect', function()
     it('test_melee_swing_carries_weapon_effect', function()
         ctx:equip(ctx.player, 'item152')
         assert.is_true(ctx:attack(ctx.player).ok)
-        local swing = SwingRegistry.PeekSwing(ctx.player.UserId)
+        local swing = swing_registry.PeekSwing(ctx.player.UserId)
         assert.same(15, swing.damage)
         assert.same({ Kind = 'poison' }, swing.effect)
         ctx:advance(0.6)
         ctx:equip(ctx.player, 'item135')
         assert.is_true(ctx:attack(ctx.player).ok)
-        assert.message('无特效武器不挂 effect').is_nil(SwingRegistry.PeekSwing(ctx.player.UserId).effect)
+        assert.message('无特效武器不挂 effect').is_nil(swing_registry.PeekSwing(ctx.player.UserId).effect)
         ctx:advance(0.5)
         ctx.data.Extra.inventory.selection.held = { kind = nil, id = nil, slot = nil }
-        ctx.data.Data.SelectedWeapon = nil
+        ctx.data.data.SelectedWeapon = nil
         ctx:attack(ctx.player)
-        assert.is_nil(SwingRegistry.PeekSwing(ctx.player.UserId).effect)
+        assert.is_nil(swing_registry.PeekSwing(ctx.player.UserId).effect)
     end)
 end)
 
 describe('TestSwingEffectPassthrough', function()
-    -- ===== 1. 挥砍登记载荷携带 effect（真实 AbilityAPI 业务入口 + 施法包桩）=====
+    -- ===== 1. 挥砍登记载荷携带 effect（真实 ability_api 业务入口 + 施法包桩）=====
     local ctx
     local saved
     before_each(function()

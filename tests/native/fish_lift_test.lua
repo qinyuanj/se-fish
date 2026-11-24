@@ -2,7 +2,7 @@
 -- 接缝：MgrFishUnit 的服务端抓举流程——上岸自动 Lift、挂点挂载、持有状态推送、任务事实上报。
 -- describe/it 名称沿用旧 LuaUnit 类名与方法名，并用方法名字典序注册，
 -- 保持与旧套件（LuaUnit 按类名、方法名排序执行）一致的加载与执行顺序。
-local FishLift = require('tests.support.fish_lift')
+local fish_lift = require('tests.support.fish_lift')
 
 local function vec(x, y, z)
     return Vector3.New(x, y, z)
@@ -30,7 +30,7 @@ describe('TestFishLift', function()
     -- 逐例夹具：旧 LuaUnit 每个方法都走 setUp/tearDown，这里同样用 before_each/after_each，
     -- 使 setUp 失败时当前层级的 after_each 仍然执行清理。
     before_each(function()
-        env = FishLift.new()
+        env = fish_lift.new()
         env:setUp()
     end)
     after_each(function()

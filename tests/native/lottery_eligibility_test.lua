@@ -5,22 +5,22 @@
 --   3. 烤过的极品鱼获/信物仍能投：库存格位 saved.cooked 标记、快照或读档后的顶层 cooked 任一被漏看；
 --   4. 读档后烤制状态丢失（只剩 slot.k 压缩字段）导致烤过的又变可投；
 --   5. 未知物品、多件、倍率/烤制值越界或类型错的畸形条目被放行，或直接抛错。
--- seam：真实 GameCfg 物品表 + 真实 PlayerData 的 AddItem / 快照 / Serialize / ApplySave。
+-- seam：真实 game_cfg 物品表 + 真实 player_data 的 AddItem / 快照 / Serialize / ApplySave。
 -- 迁移说明：案例按旧 LuaUnit 实际执行序（方法名字典序）逐个 it 注册；
 --   lu.fail(msg) 在 luassert 无对应断言，按语义用 error(msg, 0) 保持原消息不带位置前缀。
-local GameCfg = require("common.game_cfg")
-local Eligibility = require("common.lottery_eligibility")
-local RandomGuard = require("tests.support.random_guard")
+local game_cfg = require("common.game_cfg")
+local eligibility = require("common.lottery_eligibility")
+local random_guard = require("tests.support.random_guard")
 
 local function check(entry)
-  return { Eligibility.Check(entry) }
+  return { eligibility.Check(entry) }
 end
 
-describe("抽奖投入资格（common.lottery_eligibility × PlayerData）", function()
-  after_each(RandomGuard.restore)
+describe("抽奖投入资格（common.lottery_eligibility × player_data）", function()
+  after_each(random_guard.restore)
 
   it("test_cooked_by_inventory_flag_or_snapshot_multiplier_is_rejected", function()
-    local flag = GameCfg.Items.CookedFlag
+    local flag = game_cfg.Items.CookedFlag
     assert.same({ false, "cooked" }, check({ itemId = "item12", count = 1, mult = 1.5, saved = { [flag] = true } }))
     assert.same({ false, "cooked" }, check({ itemId = "eelHead", count = 1, saved = { [flag] = true } }))
     assert.same({ false, "cooked" }, check({ itemId = "garHead", count = 1, cooked = 1.5 }))
@@ -30,7 +30,7 @@ describe("抽奖投入资格（common.lottery_eligibility × PlayerData）", fun
   end)
 
   it("test_malformed_and_unknown_entries_are_rejected_without_error", function()
-    local flag = GameCfg.Items.CookedFlag
+    local flag = game_cfg.Items.CookedFlag
     local cases = {
       { nil, "malformed" },
       { "item7", "malformed" },
@@ -57,24 +57,24 @@ describe("抽奖投入资格（common.lottery_eligibility × PlayerData）", fun
 
   it("test_ordinary_items_are_not_premium", function()
     for _, itemId in ipairs({ "tilapia", "carp", "worm", "shrimpTicket" }) do
-      if GameCfg.Items.Definitions[itemId] then
+      if game_cfg.Items.Definitions[itemId] then
         assert.same({ false, "not-premium" }, check({ itemId = itemId, count = 1 }), itemId)
       end
     end
-    assert.is_not_nil(GameCfg.Items.Definitions.tilapia, "普通鱼样本必须存在")
+    assert.is_not_nil(game_cfg.Items.Definitions.tilapia, "普通鱼样本必须存在")
   end)
 
   it("test_real_inventory_entries_keep_cooked_state_through_snapshot_and_reload", function()
-    local PlayerData = require("server.data.player_data")
-    local data = PlayerData.New({ UserId = 134, SetAttribute = function() end })
+    local player_data = require("server.data.player_data")
+    local data = player_data.New({ UserId = 134, SetAttribute = function() end })
     data:Init()
     assert.is_true(data:AddItem("item9", 1.42))
     assert.is_true(data:AddItem("eelHead", 1.1, 1.5))
     -- Init 自带初始物品占格，道具栏满后落背包：按 itemId 在两个容器里找真实格位
-    local ids = GameCfg.Items.ContainerId
+    local ids = game_cfg.Items.ContainerId
     local function find(player, itemId)
       for _, id in ipairs({ ids.ItemBar, ids.Backpack }) do
-        for _, entry in pairs(player.Data.Containers[id]) do
+        for _, entry in pairs(player.data.Containers[id]) do
           if entry.itemId == itemId then
             return entry
           end
@@ -94,7 +94,7 @@ describe("抽奖投入资格（common.lottery_eligibility × PlayerData）", fun
       end
     end
 
-    local restored = PlayerData.New({ UserId = 135, SetAttribute = function() end })
+    local restored = player_data.New({ UserId = 135, SetAttribute = function() end })
     restored:Init()
     assert.is_true(restored:ApplySave(data:Serialize()))
     assert.same({ true }, check(find(restored, "item9")))
@@ -103,7 +103,7 @@ describe("抽奖投入资格（common.lottery_eligibility × PlayerData）", fun
 
   it("test_uncooked_pond_rares_and_tokens_are_eligible", function()
     for _, itemId in ipairs({ "item7", "item8", "item9", "item10", "item11", "item12", "eelHead", "garHead" }) do
-      assert.same("极品食物", GameCfg.Items.Definitions[itemId].Type, itemId)
+      assert.same("极品食物", game_cfg.Items.Definitions[itemId].Type, itemId)
       assert.same({ true }, check({ itemId = itemId, count = 1, mult = 1.37 }), itemId)
       assert.same({ true }, check({ itemId = itemId }), itemId .. " 缺省件数与倍率")
     end

@@ -218,8 +218,8 @@ function EditorAPI.set_eui_image_texture(node_id, texture_path) end
 ---@param node_id EImage 节点ID
 ---@param r Int R
 ---@param g Int G
----@param b Int B
----@param a Int A
+---@param b Int b
+---@param a Int a
 ---@return Bool 是否成功
 function EditorAPI.set_eui_image_color(node_id, r, g, b, a) end
 
@@ -239,8 +239,8 @@ function EditorAPI.set_eui_label_font_size(node_id, font_size) end
 ---@param node_id ELabel 节点ID
 ---@param r Int R
 ---@param g Int G
----@param b Int B
----@param a Int A
+---@param b Int b
+---@param a Int a
 ---@return Bool 是否成功
 function EditorAPI.set_eui_label_color(node_id, r, g, b, a) end
 
@@ -297,8 +297,8 @@ function EditorAPI.set_eui_button_pressed_image(node_id, texture_path) end
 ---@param node_id EButton 节点ID
 ---@param r Int R
 ---@param g Int G
----@param b Int B
----@param a Int A
+---@param b Int b
+---@param a Int a
 ---@return Bool 是否成功
 function EditorAPI.set_eui_button_text_color(node_id, r, g, b, a) end
 
@@ -318,8 +318,8 @@ function EditorAPI.set_eui_label_font(node_id, font_key) end
 ---@param node_id ELabel 节点ID
 ---@param r Int R
 ---@param g Int G
----@param b Int B
----@param a Int A
+---@param b Int b
+---@param a Int a
 ---@return Bool 是否成功
 function EditorAPI.set_eui_label_background_color(node_id, r, g, b, a) end
 
@@ -339,8 +339,8 @@ function EditorAPI.set_eui_label_outline_enabled(node_id, enabled) end
 ---@param node_id ELabel 节点ID
 ---@param r Int R
 ---@param g Int G
----@param b Int B
----@param a Int A
+---@param b Int b
+---@param a Int a
 ---@return Bool 是否成功
 function EditorAPI.set_eui_label_outline_color(node_id, r, g, b, a) end
 
@@ -366,8 +366,8 @@ function EditorAPI.set_eui_label_shadow_enabled(node_id, enabled) end
 ---@param node_id ELabel 节点ID
 ---@param r Int R
 ---@param g Int G
----@param b Int B
----@param a Int A
+---@param b Int b
+---@param a Int a
 ---@return Bool 是否成功
 function EditorAPI.set_eui_label_shadow_color(node_id, r, g, b, a) end
 
@@ -2241,8 +2241,8 @@ function StateSyncEditorApi.set_eui_image_texture(node_id, texture_path) end
 ---@param node_id EImage 节点ID
 ---@param r Int R
 ---@param g Int G
----@param b Int B
----@param a Int A
+---@param b Int b
+---@param a Int a
 ---@return Bool 是否成功
 function StateSyncEditorApi.set_eui_image_color(node_id, r, g, b, a) end
 
@@ -2262,8 +2262,8 @@ function StateSyncEditorApi.set_eui_label_font_size(node_id, font_size) end
 ---@param node_id ELabel 节点ID
 ---@param r Int R
 ---@param g Int G
----@param b Int B
----@param a Int A
+---@param b Int b
+---@param a Int a
 ---@return Bool 是否成功
 function StateSyncEditorApi.set_eui_label_color(node_id, r, g, b, a) end
 
@@ -2320,8 +2320,8 @@ function StateSyncEditorApi.set_eui_button_pressed_image(node_id, texture_path) 
 ---@param node_id EButton 节点ID
 ---@param r Int R
 ---@param g Int G
----@param b Int B
----@param a Int A
+---@param b Int b
+---@param a Int a
 ---@return Bool 是否成功
 function StateSyncEditorApi.set_eui_button_text_color(node_id, r, g, b, a) end
 
@@ -2341,8 +2341,8 @@ function StateSyncEditorApi.set_eui_label_font(node_id, font_key) end
 ---@param node_id ELabel 节点ID
 ---@param r Int R
 ---@param g Int G
----@param b Int B
----@param a Int A
+---@param b Int b
+---@param a Int a
 ---@return Bool 是否成功
 function StateSyncEditorApi.set_eui_label_background_color(node_id, r, g, b, a) end
 
@@ -2362,8 +2362,8 @@ function StateSyncEditorApi.set_eui_label_outline_enabled(node_id, enabled) end
 ---@param node_id ELabel 节点ID
 ---@param r Int R
 ---@param g Int G
----@param b Int B
----@param a Int A
+---@param b Int b
+---@param a Int a
 ---@return Bool 是否成功
 function StateSyncEditorApi.set_eui_label_outline_color(node_id, r, g, b, a) end
 
@@ -2389,8 +2389,8 @@ function StateSyncEditorApi.set_eui_label_shadow_enabled(node_id, enabled) end
 ---@param node_id ELabel 节点ID
 ---@param r Int R
 ---@param g Int G
----@param b Int B
----@param a Int A
+---@param b Int b
+---@param a Int a
 ---@return Bool 是否成功
 function StateSyncEditorApi.set_eui_label_shadow_color(node_id, r, g, b, a) end
 

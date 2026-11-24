@@ -4,20 +4,20 @@
 
 | ID | 条款 | 组 | 执行者 | 证据等级 | 状态 | 证据 / 理由 |
 | --- | --- | --- | --- | --- | --- | --- |
-| 16-01 | 原物品表完整 171 项，编号 1 到 171 连续无缺号 | 规则 | agent | A | unverified | — |
-| 16-02 | 每项含物品名、类别、食用恢复百分比、基础出售价格金币四个字段 | 规则 | agent | A | unverified | — |
-| 16-03 | 类别取值限定为食物、极品食物、鱼饵、鱼竿、近战武器、远程武器、爆炸物、过关道具、属性道具、特殊道具、自救道具 | 规则 | agent | A | unverified | — |
-| 16-04 | 食物、极品食物与鱼饵可食用 | 规则 | agent | A | evidenced | tests/native/spec/16_item_base_data_test.lua |
-| 16-05 | 药水（表内类别为属性道具的加速药水与变大药水）通过专用使用规则生效，不走普通食用 | 规则 | agent | A | unverified | — |
-| 16-06 | 除食物、极品食物、鱼饵与药水外，其余类别不能走普通食用 | 规则 | agent | A | evidenced | tests/native/spec/16_item_base_data_test.lua |
-| 16-07 | 食用恢复百分比可为负值（科技假饵 -20、夜明珠 -20、绿色钞票 -10、核废料桶 -99），负值表示食用后扣减而非恢复 | 规则 | agent | A | evidenced | tests/native/spec/16_item_base_data_test.lua |
-| 16-08 | 食用恢复百分比在鱼竿、近战武器、远程武器、爆炸物、过关道具、属性道具、特殊道具、自救道具这些类别上恒为 0 | 规则 | agent | A | unverified | — |
-| 16-09 | 信物与首领饵走 §3、§8 的特例，不能只凭类别列推断库存或回收行为 | 规则 | agent | A | unverified | — |
-| 16-10 | 物品表中沧龙肉与沧龙头两行改名为沧龙翅与沧龙尾，售价与恢复比例保持不变 | 规则 | agent | A | unverified | — |
-| 16-11 | 鹰翅膀与三联鲨鱼头的名字统一为单一写法 | 规则 | agent | A | unverified | — |
-| 16-12 | 除上述改名与统一外，其他物品名不自行改动 | 规则 | agent | A | unverified | — |
-| 16-13 | 内容表 common/cfg/items.lua 与物品表逐条对应：171 条的 SourceId 与源表编号一一对齐，并经 common/game_cfg.lua 投影为 GameCfg.Items 供运行期读取 | 契约 | agent | B | unverified | — |
-| 16-14 | 每条的 source 字段记录源表物理行号（含表头），可回查原表 | 契约 | agent | B | unverified | — |
-| 16-15 | BasePrice 仅为回收价，不等于个体倍率后的鱼获售价 | 契约 | agent | B | unverified | — |
-| 16-16 | 无图标的物品不编造资产引用，图标字段留空而不是指向不存在的资源 | 契约 | agent | B | unverified | — |
-| 16-17 | 旧物品 ID 保留，新 ID 固定为 item 加物品表编号，SourceIdMap 供商店与奖池按源表关联 | 契约 | agent | B | unverified | — |
+| 16-01 | 原物品表完整 171 项，编号 1 到 171 连续无缺号 | 规则 | agent | a | unverified | — |
+| 16-02 | 每项含物品名、类别、食用恢复百分比、基础出售价格金币四个字段 | 规则 | agent | a | unverified | — |
+| 16-03 | 类别取值限定为食物、极品食物、鱼饵、鱼竿、近战武器、远程武器、爆炸物、过关道具、属性道具、特殊道具、自救道具 | 规则 | agent | a | unverified | — |
+| 16-04 | 食物、极品食物与鱼饵可食用 | 规则 | agent | a | evidenced | tests/native/spec/16_item_base_data_test.lua |
+| 16-05 | 药水（表内类别为属性道具的加速药水与变大药水）通过专用使用规则生效，不走普通食用 | 规则 | agent | a | unverified | — |
+| 16-06 | 除食物、极品食物、鱼饵与药水外，其余类别不能走普通食用 | 规则 | agent | a | evidenced | tests/native/spec/16_item_base_data_test.lua |
+| 16-07 | 食用恢复百分比可为负值（科技假饵 -20、夜明珠 -20、绿色钞票 -10、核废料桶 -99），负值表示食用后扣减而非恢复 | 规则 | agent | a | evidenced | tests/native/spec/16_item_base_data_test.lua |
+| 16-08 | 食用恢复百分比在鱼竿、近战武器、远程武器、爆炸物、过关道具、属性道具、特殊道具、自救道具这些类别上恒为 0 | 规则 | agent | a | unverified | — |
+| 16-09 | 信物与首领饵走 §3、§8 的特例，不能只凭类别列推断库存或回收行为 | 规则 | agent | a | unverified | — |
+| 16-10 | 物品表中沧龙肉与沧龙头两行改名为沧龙翅与沧龙尾，售价与恢复比例保持不变 | 规则 | agent | a | unverified | — |
+| 16-11 | 鹰翅膀与三联鲨鱼头的名字统一为单一写法 | 规则 | agent | a | unverified | — |
+| 16-12 | 除上述改名与统一外，其他物品名不自行改动 | 规则 | agent | a | unverified | — |
+| 16-13 | 内容表 common/cfg/items.lua 与物品表逐条对应：171 条的 SourceId 与源表编号一一对齐，并经 common/game_cfg.lua 投影为 game_cfg.Items 供运行期读取 | 契约 | agent | b | unverified | — |
+| 16-14 | 每条的 source 字段记录源表物理行号（含表头），可回查原表 | 契约 | agent | b | unverified | — |
+| 16-15 | BasePrice 仅为回收价，不等于个体倍率后的鱼获售价 | 契约 | agent | b | unverified | — |
+| 16-16 | 无图标的物品不编造资产引用，图标字段留空而不是指向不存在的资源 | 契约 | agent | b | unverified | — |
+| 16-17 | 旧物品 ID 保留，新 ID 固定为 item 加物品表编号，SourceIdMap 供商店与奖池按源表关联 | 契约 | agent | b | unverified | — |

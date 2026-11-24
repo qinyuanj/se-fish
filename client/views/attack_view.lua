@@ -1,12 +1,12 @@
 
-local GameCfg = require("common.game_cfg")
-local PressGesture = require("client.press_gesture")
+local game_cfg = require("common.game_cfg")
+local press_gesture = require("client.press_gesture")
 local spoke = require("common.packages.spoke.api")
-local MainHudLayout = require("client.main_hud_layout")
-local ViewUtil = require("client.views.view_util")
+local main_hud_layout = require("client.main_hud_layout")
+local view_util = require("client.views.view_util")
 
 local State = spoke.State
-local AttackView = {}
+local attack_view = {}
 
 local HINTS = {
   ["cannot-act"] = "现在不能攻击",
@@ -36,12 +36,12 @@ local function equipped(item_bar)
 end
 
 local function is_gun(weapon_id)
-  return weapon_id ~= nil and GameCfg.Ability.Guns[weapon_id] ~= nil
+  return weapon_id ~= nil and game_cfg.Ability.Guns[weapon_id] ~= nil
 end
 
 local function attack_rect(ctx)
-  local resolution = ViewUtil.get_resolution(ctx)
-  local layout = MainHudLayout.Compute({
+  local resolution = view_util.get_resolution(ctx)
+  local layout = main_hud_layout.Compute({
     width = resolution.x,
     height = resolution.y,
     slots = 1,
@@ -59,7 +59,7 @@ local function current_now(ctx, services)
   return ctx.clock and ctx.clock.now() or 0
 end
 
-function AttackView.mount(scope, ctx)
+function attack_view.mount(scope, ctx)
   local services = ctx.services or {}
   local active = scope:memo("AttackVisible", function(ms)
     return ms:d(ctx.store.hud_visible) ~= false and equipped(ms:d(ctx.store.item_bar)) ~= nil
@@ -71,16 +71,16 @@ function AttackView.mount(scope, ctx)
     local control = ctx.create_node(ps, "EUILayout", {
       Name = "AttackControl",
       Parent = screen or nil,
-      Position = ViewUtil.vec2(rect.x, rect.y),
-      Size = ViewUtil.vec2(rect.w, rect.h),
+      Position = view_util.vec2(rect.x, rect.y),
+      Size = view_util.vec2(rect.w, rect.h),
     })
     control.TouchEnabled = false
     control.Visible = true
     local button = ctx.create_node(ps, "EUIButton", {
       Name = "BtnAttack",
       Parent = control,
-      Position = ViewUtil.vec2(rect.x, rect.y),
-      Size = ViewUtil.vec2(rect.w, rect.h),
+      Position = view_util.vec2(rect.x, rect.y),
+      Size = view_util.vec2(rect.w, rect.h),
       ButtonText = "",
     })
     button.TouchEnabled = false
@@ -103,13 +103,13 @@ function AttackView.mount(scope, ctx)
       label.Text = is_gun(weapon_id) and "射击" or "攻击"
     end)
 
-    local pressing = State.new("AttackView.pressing", false)
+    local pressing = State.new("attack_view.pressing", false)
     local auto_fired = false
     local next_auto = 0
-    local gesture = PressGesture.New({ LongPressSec = GameCfg.Ability.Throw.LongPressSec })
+    local gesture = press_gesture.New({ LongPressSec = game_cfg.Ability.Throw.LongPressSec })
     local function current_gun()
       local weapon_id = equipped(ctx.store.item_bar:now())
-      return weapon_id and GameCfg.Ability.Guns[weapon_id] or nil
+      return weapon_id and game_cfg.Ability.Guns[weapon_id] or nil
     end
     local function send(action)
       if type(services.send_weapon) ~= "function" then return end
@@ -117,9 +117,9 @@ function AttackView.mount(scope, ctx)
       if action == "attack" and type(services.aim_direction) == "function" then
         local ok, direction = pcall(services.aim_direction)
         if not ok then
-          print("[AttackView] 读取瞄准方向失败", tostring(direction))
-        elseif ViewUtil.is_record(direction) then
-          local x, y, z = ViewUtil.read_vec3(direction)
+          print("[attack_view] 读取瞄准方向失败", tostring(direction))
+        elseif view_util.is_record(direction) then
+          local x, y, z = view_util.read_vec3(direction)
           payload.aim = x ~= nil and { x = x, y = y, z = z } or direction
         end
       end
@@ -162,15 +162,15 @@ function AttackView.mount(scope, ctx)
     end
   end)
 
-  local damage_notice = State.new("AttackView.damage_notice", nil)
+  local damage_notice = State.new("attack_view.damage_notice", nil)
   scope:subscribe(ctx.store.on_server_event, function(event)
     if type(event) ~= "table" then return end
     if event.channel == "WeaponResult" then
       local payload = event.payload
       if type(payload) == "table" and payload.ok == false then
-        ViewUtil.notify(ctx, HINTS[payload.reason] or ("武器操作失败 " .. tostring(payload.reason)))
+        view_util.notify(ctx, HINTS[payload.reason] or ("武器操作失败 " .. tostring(payload.reason)))
       end
-    elseif event.channel == "DamageNotice" and type(event.payload) == "table" then
+    elseif event.channel == "damage_notice" and type(event.payload) == "table" then
       local amount = tonumber(event.payload.amount)
       if amount == nil or amount ~= amount or math.abs(amount) == math.huge then return end
       damage_notice:set({
@@ -181,28 +181,28 @@ function AttackView.mount(scope, ctx)
     end
   end)
 
-  scope:effect("DamageFloat", function(es)
+  scope:effect("damage_float", function(es)
     local notice = es:d(damage_notice)
     if type(notice) ~= "table" then return end
     local node = ctx.create_node(es, "EUITextLabel", {
-      Name = "DamageFloat",
+      Name = "damage_float",
       Text = tostring(notice.amount),
-      Position = ViewUtil.vec2(0, 0),
-      Size = ViewUtil.vec2(120, 40),
+      Position = view_util.vec2(0, 0),
+      Size = view_util.vec2(120, 40),
     })
-    node.TextColor = ViewUtil.color(notice.critical and { 255, 214, 74, 255 } or { 255, 255, 255, 255 })
+    node.TextColor = view_util.color(notice.critical and { 255, 214, 74, 255 } or { 255, 255, 255, 255 })
     node.TouchEnabled = false
     node.Visible = true
   end)
 end
 
-function AttackView.spec()
+function attack_view.spec()
   return {
     name = "Attack",
     mount = function(scope, ctx)
-      AttackView.mount(scope, ctx)
+      attack_view.mount(scope, ctx)
     end,
   }
 end
 
-return AttackView
+return attack_view

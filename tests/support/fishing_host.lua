@@ -1,10 +1,10 @@
-local GameCfg = require("common.game_cfg")
-local ServerRuntime = require("server.world_host.server_runtime")
-local PlayerData = require("server.data.player_data")
+local game_cfg = require("common.game_cfg")
+local server_runtime = require("server.world_host.server_runtime")
+local player_data = require("server.data.player_data")
 
-local Host = {}
-local ROD = GameCfg.Items.Id.StarterRod
-local WORM = GameCfg.Items.Id.Worm
+local host = {}
+local ROD = game_cfg.Items.Id.StarterRod
+local WORM = game_cfg.Items.Id.Worm
 
 local function signal()
   local handlers = {}
@@ -24,7 +24,7 @@ end
 
 local function make_player(id, opts)
   local controller = {
-    Health = GameCfg.Vitals.MaxHealth, MaxHealth = GameCfg.Vitals.MaxHealth, WalkSpeed = 16,
+    Health = game_cfg.vitals.MaxHealth, MaxHealth = game_cfg.vitals.MaxHealth, WalkSpeed = 16,
     HealthChanged = signal(), Died = signal(), OnReborn = signal(),
   }
   function controller:TakeDamage(amount)
@@ -46,7 +46,7 @@ local function make_player(id, opts)
   }
 end
 
-function Host.new(opts)
+function host.new(opts)
   opts = opts or {}
   local env = {
     events = {}, units = {}, compendium = {}, quests = {}, rolls = {}, now = 1000,
@@ -72,10 +72,10 @@ function Host.new(opts)
   }
   for _, name in ipairs({ "CastAction", "ReelInRE", "CloseReelIn", "CastState", "RequestCastState" }) do channel(name) end
   env.player = make_player(opts.user_id or 1, opts)
-  env.data = PlayerData.New(env.player)
+  env.data = player_data.New(env.player)
   env.data:Init()
   assert(env.data:SelectSlot(1))
-  if opts.bait and GameCfg.Casting.BossBait[opts.bait] then
+  if opts.bait and game_cfg.Casting.BossBait[opts.bait] then
     for _ = 1, opts.bait_count or 1 do assert(env.data:AddItem(opts.bait)) end
     assert(env.data:SelectBait(opts.bait))
   elseif opts.bait == false then
@@ -93,7 +93,7 @@ function Host.new(opts)
     env.units[#env.units + 1] = unit
     return unit
   end
-  env.runtime = ServerRuntime.new({
+  env.runtime = server_runtime.new({
     initial_now = env.now,
     remote = remote,
     player_data = {
@@ -164,7 +164,7 @@ function Host.new(opts)
     self.runtime:step(seconds, self.now)
   end
   function env:hook()
-    self:advance(GameCfg.Casting.HookDelaySec)
+    self:advance(game_cfg.Casting.HookDelaySec)
   end
   function env:states(target)
     local rows, found = channel("CastState").clients, {}
@@ -197,4 +197,4 @@ function Host.new(opts)
   return env
 end
 
-return Host
+return host

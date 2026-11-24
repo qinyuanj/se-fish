@@ -1,9 +1,9 @@
-local GameCfg = require("common.game_cfg")
-local Eligibility = require("common.lottery_eligibility")
-local Draw = require("common.lottery_draw")
+local game_cfg = require("common.game_cfg")
+local eligibility = require("common.lottery_eligibility")
+local draw = require("common.lottery_draw")
 
-local PlayerLottery = {}
-local ITEM_BAR = GameCfg.Items.ContainerId.ItemBar
+local player_lottery = {}
+local ITEM_BAR = game_cfg.Items.ContainerId.ItemBar
 
 local function copy(value)
   if type(value) ~= "table" then return value end
@@ -17,40 +17,40 @@ local function settle(target, slot, random)
     or slot < 1 or slot > target:ItemBarCapacity() then
     return nil, "slot"
   end
-  local items = target.Data.Containers[ITEM_BAR]
+  local items = target.data.Containers[ITEM_BAR]
   local entry = items[slot]
   if not entry or entry.count <= 0 then return nil, "slot" end
-  local eligible, reason = Eligibility.Check(entry)
+  local eligible, reason = eligibility.Check(entry)
   if not eligible then return nil, reason end
-  local price = GameCfg.Items.SalePrice(entry.itemId, entry.mult)
+  local price = game_cfg.Items.SalePrice(entry.itemId, entry.mult)
   if not price or price < 1 then return nil, "bad-item" end
-  local axes = Draw.RollAxes(random)
+  local axes = draw.RollAxes(random)
   if not axes then return nil, "roll" end
-  local outcome = Draw.Evaluate(axes)
-  local definition = GameCfg.Items.Definitions[entry.itemId]
+  local outcome = draw.Evaluate(axes)
+  local definition = game_cfg.Items.Definitions[entry.itemId]
   local result = {
-    ok = true, action = "Draw", slot = slot, itemId = entry.itemId,
+    ok = true, action = "draw", slot = slot, itemId = entry.itemId,
     itemName = definition and definition.Name or entry.itemId,
     betValue = price, axes = axes, outcome = outcome.outcome,
-    coinBefore = target.Data.FishCoin,
+    coinBefore = target.data.FishCoin,
   }
   items[slot] = nil
   if outcome.outcome == "pair" then
-    local pattern = GameCfg.Lottery.Patterns[outcome.pattern]
+    local pattern = game_cfg.Lottery.Patterns[outcome.pattern]
     local coins = price * pattern.pairMultiplier
     target:AddCoin(coins, nil, "lottery:pair")
     result.coins, result.multiplier, result.patternName = coins, pattern.pairMultiplier, pattern.name
   elseif outcome.outcome == "triple" then
-    local pattern = GameCfg.Lottery.Patterns[outcome.pattern]
+    local pattern = game_cfg.Lottery.Patterns[outcome.pattern]
     local reward = pattern.tripleReward
     if reward.kind == "weaponChoice" then
-      local itemId = Draw.ChooseWeapon(pattern, random)
+      local itemId = draw.ChooseWeapon(pattern, random)
       if not itemId then
         items[slot] = entry
         return nil, "roll"
       end
       target:GrantWeapon(itemId, 1)
-      local prizeDef = GameCfg.Items.Definitions[itemId]
+      local prizeDef = game_cfg.Items.Definitions[itemId]
       result.prize = { kind = "weapon", itemId = itemId, name = prizeDef and prizeDef.Name or itemId }
     else
       items[slot] = { itemId = reward.itemKey, count = 1, containerId = ITEM_BAR }
@@ -58,11 +58,11 @@ local function settle(target, slot, random)
     end
     result.patternName = pattern.name
   end
-  result.coinAfter = target.Data.FishCoin
+  result.coinAfter = target.data.FishCoin
   return result
 end
 
-function PlayerLottery.mount(scope, tree, opts)
+function player_lottery.mount(scope, tree, opts)
   opts = type(opts) == "table" and opts or {}
   local player, data = tree.player, tree.data
   local save, remote = opts.save, opts.remote
@@ -119,7 +119,7 @@ function PlayerLottery.mount(scope, tree, opts)
   end
 
   local function on_action(actor, payload)
-    if disposed or actor ~= player or type(payload) ~= "table" or payload.action ~= "Draw" then return false end
+    if disposed or actor ~= player or type(payload) ~= "table" or payload.action ~= "draw" then return false end
     local seq = payload.seq
     if payload.operation == nil and (type(seq) ~= "number" or seq ~= math.floor(seq)
       or seq < 1 or seq > 2147483647) then
@@ -137,13 +137,13 @@ function PlayerLottery.mount(scope, tree, opts)
       reply({ ok = false, reason = "range" })
       return false
     end
-    local items = data.Data.Containers[ITEM_BAR]
+    local items = data.data.Containers[ITEM_BAR]
     local entry = slot >= 1 and slot <= data:ItemBarCapacity() and items[slot]
     if not entry or entry.count <= 0 then
       reply({ ok = false, reason = "slot" })
       return false
     end
-    local eligible, reason = Eligibility.Check(entry)
+    local eligible, reason = eligibility.Check(entry)
     if not eligible then
       reply({ ok = false, reason = reason })
       return false
@@ -161,4 +161,4 @@ function PlayerLottery.mount(scope, tree, opts)
   return { handle = on_action, push_state = push_recovered }
 end
 
-return PlayerLottery
+return player_lottery

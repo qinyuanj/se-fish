@@ -5,14 +5,14 @@
 --   2. 摊位等级用错：一区摊能买香肠 / 钓虾竿，或虾池摊买不到；价格不是 2 / 12；
 --   3. 摊位范围复验丢失：不在任何摊位旁也能买，或玩家位置不影响按哪个摊位结算；
 --   4. 虾池鱼表配错：新手竿（竿 1）能出波龙及以上、不挂饵出不了虾米保底、
---      挂香肠竿 1 能出竿 2 的虾，或鱼表行指向 GameCfg.Fish 里不存在的鱼种；
+--      挂香肠竿 1 能出竿 2 的虾，或鱼表行指向 game_cfg.Fish 里不存在的鱼种；
 --   5. 虾池水区没进 Water.Zones（抛竿选不到虾池鱼表），或与一区水区重叠（在虾池抛竿出一区鱼）；
 --   6. 钓鱼佬多锚点回归：一区钓鱼佬失效，或虾池钓鱼佬（TGUnitFishShrimp）旁喂食不结算；
 --   7. 抛竿竿种门：选中的不是竿（无 Level）也能抛，或钓虾竿抛出去竿级按 1 算（抽不出波龙）。
 --   8. 虾池迁移统一模板后残留小池几何、窄边界或旧设施落点，运行时水域与场景合同不一致。
 -- it 名字沿用旧方法名，注册顺序 = LuaUnit sortedPairs 的实际执行顺序。
 
-local Host = require('tests.support.fishing_host')
+local host = require('tests.support.fishing_host')
 
 local function vec(x, y, z) return { x = x, y = y, z = z } end
 
@@ -48,7 +48,7 @@ local function findGoods(itemId, level)
 end
 
 local function collectSelectable(rows, rodLevel, baitId)
-  local FishCatch = require('common.fish_catch')
+  local fish_catch = require('common.fish_catch')
   local total = 0
   for _, row in ipairs(rows) do
     if row.RodLevel <= rodLevel and (row.Bait == 0 or row.Bait == baitId) then
@@ -57,7 +57,7 @@ local function collectSelectable(rows, rodLevel, baitId)
   end
   local found = {}
   for roll = 1, total do
-    local id = FishCatch.Select(rows, rodLevel, baitId, function() return roll end)
+    local id = fish_catch.Select(rows, rodLevel, baitId, function() return roll end)
     found[id] = true
   end
   return found
@@ -71,17 +71,17 @@ describe('虾池最小内容（水区 / 鱼表 / 商店 / 钓鱼佬 / 抛竿）'
     -- 快照先于任何改动：before_each 中途失败时 after_each 仍能还原。
     restore = {
       game = rawget(_G, 'game'),
-      GameCfg = package.loaded['common.game_cfg'],
-      REUtil = package.loaded['common.re_util'],
-      MgrPlayerData = package.loaded['server.player_data_host'],
+      game_cfg = package.loaded['common.game_cfg'],
+      re_util = package.loaded['common.re_util'],
+      mgr_player_data = package.loaded['server.player_data_host'],
       MgrFishUnit = package.loaded['server.world_host.fish_tree'],
     }
     env = { replies = {}, sent = {}, seq = 0, now = 0 }
     env.cfg = require('tests.support.zone_fixtures').Load()
     -- 与 shop_test 同一口径：吃 #49 调试白送的起始库存（鱼竿第 1 格、蚯蚓若干）
     local initial_grants = env.cfg.Debug.InitialGrants
-    local ShopFeedHost = require('tests.support.shop_feed_host')
-    env.host = ShopFeedHost.start({ positions = ANCHORS })
+    local shop_feed_host = require('tests.support.shop_feed_host')
+    env.host = shop_feed_host.start({ positions = ANCHORS })
     env.cfg.Debug = { Enabled = true, InitialGrants = initial_grants }
     env.me, env.data = env.host:join(1, 'TGUnitShop')
     env.replies = env.host.results[1].ShopResult
@@ -89,9 +89,9 @@ describe('虾池最小内容（水区 / 鱼表 / 商店 / 钓鱼佬 / 抛竿）'
 
   after_each(function()
     if env and env.host then env.host:shutdown() end
-    package.loaded['common.game_cfg'] = restore and restore.GameCfg
-    package.loaded['common.re_util'] = restore and restore.REUtil
-    package.loaded['server.player_data_host'] = restore and restore.MgrPlayerData
+    package.loaded['common.game_cfg'] = restore and restore.game_cfg
+    package.loaded['common.re_util'] = restore and restore.re_util
+    package.loaded['server.player_data_host'] = restore and restore.mgr_player_data
     package.loaded['server.world_host.fish_tree'] = restore and restore.MgrFishUnit
     _G.game = restore and restore.game
     env = nil
@@ -163,7 +163,7 @@ describe('虾池最小内容（水区 / 鱼表 / 商店 / 钓鱼佬 / 抛竿）'
     env.data:AddCoin(10, nil, 'test')
     assert.is_false(buy('worm'))
     assert.same('range', lastReason())
-    assert.same(10, env.data.Data.FishCoin)
+    assert.same(10, env.data.data.FishCoin)
   end)
 
   it('test_buy_sausage_at_shrimp_stand_goes_to_bait_counter', function()
@@ -171,15 +171,15 @@ describe('虾池最小内容（水区 / 鱼表 / 商店 / 钓鱼佬 / 抛竿）'
     moveTo('TGUnitShopShrimp')
     env.data:AddCoin(10, nil, 'test')
     assert.is_true(buy('sausage'))
-    assert.same(8, env.data.Data.FishCoin)
-    assert.same(1, env.data.Data.Bait.sausage)
+    assert.same(8, env.data.data.FishCoin)
+    assert.same(1, env.data.data.Bait.sausage)
     assert.is_nil(env.data:GetItemBarSnapshot().slots[2])
     assert.is_true(env.replies[#env.replies].ok)
     assert.same(2, env.replies[#env.replies].price)
   end)
 
   it('test_cast_with_non_rod_selected_rejected', function()
-    local host = Host.new({ position = vec(240, 6, -29), forward = vec(0, 0, -1) })
+    local host = host.new({ position = vec(240, 6, -29), forward = vec(0, 0, -1) })
     assert.is_true(host.data:AddItem('carp'))
     assert.is_true(host.data:SelectSlot(2))
     host:cast({ action = 'Cast', slot = 2, itemId = 'carp' })
@@ -188,7 +188,7 @@ describe('虾池最小内容（水区 / 鱼表 / 商店 / 钓鱼佬 / 抛竿）'
   end)
 
   it('test_cast_with_shrimp_rod_records_pool_zone_and_rod_level', function()
-    local host = Host.new({ position = vec(240, 6, -29), forward = vec(0, 0, -1), bait = 'sausage', bait_count = 1 })
+    local host = host.new({ position = vec(240, 6, -29), forward = vec(0, 0, -1), bait = 'sausage', bait_count = 1 })
     assert.is_true(host.data:AddItem('shrimpRod'))
     assert.is_true(host.data:SelectSlot(2))
     host:cast({ action = 'Cast', slot = 2, itemId = 'shrimpRod' })
@@ -216,23 +216,23 @@ describe('虾池最小内容（水区 / 鱼表 / 商店 / 钓鱼佬 / 抛竿）'
     assert.is_true(env.data:AddItem('riverShrimp'))
     local slot
     for index = 1, 8 do
-      local entry = env.data.Data.Containers.itemBar[index]
+      local entry = env.data.data.Containers.itemBar[index]
       if entry and entry.itemId == 'riverShrimp' then slot = index end
     end
     assert.is_true(env.data:SelectSlot(slot))
     assert.is_true(feed(1))
-    assert.same(10, env.data.Data.FishCoin)
+    assert.same(10, env.data.data.FishCoin)
     assert.is_true(replies[#replies].ok)
     -- 一区钓鱼佬旁同样可用（按区分派：各自只认本区锚点，互不借用）
     moveTo('TGUnitFish')
     assert.is_true(env.data:AddItem('carp'))
     for index = 1, 8 do
-      local entry = env.data.Data.Containers.itemBar[index]
+      local entry = env.data.data.Containers.itemBar[index]
       if entry and entry.itemId == 'carp' then slot = index end
     end
     assert.is_true(env.data:SelectSlot(slot))
     assert.is_true(feed(2))
-    assert.same(14, env.data.Data.FishCoin)
+    assert.same(14, env.data.data.FishCoin)
   end)
 
   it('test_home_stand_cannot_sell_shrimp_goods', function()
@@ -243,9 +243,9 @@ describe('虾池最小内容（水区 / 鱼表 / 商店 / 钓鱼佬 / 抛竿）'
     assert.same('item', lastReason())
     assert.is_false(buy('shrimpRod'))
     assert.same('item', lastReason())
-    assert.same(20, env.data.Data.FishCoin)
+    assert.same(20, env.data.data.FishCoin)
     assert.is_true(buy('worm'))
-    assert.same(19, env.data.Data.FishCoin)
+    assert.same(19, env.data.data.FishCoin)
   end)
 
   it('test_sausage_definition_and_shop_rows', function()
@@ -262,7 +262,7 @@ describe('虾池最小内容（水区 / 鱼表 / 商店 / 钓鱼佬 / 抛竿）'
     assert.same(2, goods.Price)
     assert.same(2, goods.MinShopLevel)
     -- 摊位表：一区摊 1 级、虾池摊 2 级、蟹湖摊 3 级、树林岛摊 4 级、沙滩岛摊 5 级
-    -- （等级语义：第 N 钓鱼区起售竿级 N，#84；蟹湖摊 #136、树林岛摊 #141、沙滩岛摊 #142 接入）
+    -- （等级语义：第 n 钓鱼区起售竿级 n，#84；蟹湖摊 #136、树林岛摊 #141、沙滩岛摊 #142 接入）
     local stands = {}
     for _, stand in ipairs(env.cfg.Shop.Stands) do stands[stand.AnchorName] = stand.Level end
     assert.same({ TGUnitShop = 1, TGUnitShopShrimp = 2, Z3_Shop = 3, Z4_Shop = 4,
@@ -271,12 +271,12 @@ describe('虾池最小内容（水区 / 鱼表 / 商店 / 钓鱼佬 / 抛竿）'
 
   it('test_shrimp_pool_cast_table_gating', function()
     -- 虾池鱼表：竿 1 不挂饵只有虾米保底（含极品）；竿 1 挂香肠不出竿 2 的虾；
-    -- 竿 2 挂香肠六种全可出；每行 Id 都在 GameCfg.Fish
+    -- 竿 2 挂香肠六种全可出；每行 Id 都在 game_cfg.Fish
     local rows = env.cfg.Casting.Zones['shrimpPond.water']
     assert.is_not_nil(rows)
     assert.same(13, #rows)
     for _, row in ipairs(rows) do
-      assert.message(row.Id .. ' 不在 GameCfg.Fish').is_not_nil(env.cfg.Fish[row.Id])
+      assert.message(row.Id .. ' 不在 game_cfg.Fish').is_not_nil(env.cfg.Fish[row.Id])
     end
     assert.same({ shrimp = true, rareShrimp = true }, collectSelectable(rows, 1, nil))
     local rod1 = collectSelectable(rows, 1, 'sausage')
@@ -327,7 +327,7 @@ describe('虾池最小内容（水区 / 鱼表 / 商店 / 钓鱼佬 / 抛竿）'
     moveTo('TGUnitShopShrimp')
     env.data:AddCoin(12, nil, 'test')
     assert.is_true(buy('shrimpRod'))
-    assert.same(0, env.data.Data.FishCoin)
+    assert.same(0, env.data.data.FishCoin)
     assert.same('shrimpRod', env.data:GetItemBarSnapshot().slots[2].itemId)
     assert.is_not_nil(findGoods('shrimpRod', 2))
     assert.is_nil(findGoods('shrimpRod', 1))
@@ -335,7 +335,7 @@ describe('虾池最小内容（水区 / 鱼表 / 商店 / 钓鱼佬 / 抛竿）'
   end)
 
   it('test_starter_rod_without_bait_only_hooks_shrimp', function()
-    local host = Host.new({ position = vec(240, 6, -29), forward = vec(0, 0, -1), bait = false, roll = 1 })
+    local host = host.new({ position = vec(240, 6, -29), forward = vec(0, 0, -1), bait = false, roll = 1 })
     host:cast({ action = 'Cast', slot = 1, itemId = 'starterRod' })
     host:hook()
     assert.are.equal('shrimpPond.water', host:last_state().zoneId)

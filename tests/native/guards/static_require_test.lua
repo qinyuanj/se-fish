@@ -1,5 +1,5 @@
 -- 架构图扫描器才能解析出依赖。失败方式先列：
---   2. GameCfg 新配的锚点行为没登记 → 挂接时报"锚点行为模块不可用"；
+--   2. game_cfg 新配的锚点行为没登记 → 挂接时报"锚点行为模块不可用"；
 --   3. 登记的模块文件被删或包升级改名 → 运行时 require 失败；
 --   4. 登记键与模块文件名不一致 → 按名加载到别的模块；
 --   5. 未登记的名字被静默吞掉 → 配置或节点名写错时没有报错；
@@ -10,7 +10,7 @@
 
 
 local fs = require("tests.support.fs_fixture")
-local Arch = require("tools.arch_policy")
+local arch = require("tools.arch_policy")
 
 local LOCAL_BEHAVIOR_DIR = "server/ability_behaviors"
 local PACKAGE_ANCHOR_DIR = "server/packages/ability_system/anchors"
@@ -69,12 +69,12 @@ local function assert_no_dynamic_require(src, path)
 end
 
 local function configured_anchor_behaviors()
-  local GameCfg = require("common.game_cfg")
+  local game_cfg = require("common.game_cfg")
   local names = {}
-  for _, entry in ipairs(GameCfg.Ability.InitialAbilities or {}) do
+  for _, entry in ipairs(game_cfg.Ability.InitialAbilities or {}) do
     if entry.AnchorBehavior then names[entry.AnchorBehavior] = true end
   end
-  for _, entry in pairs(GameCfg.Ability.FishAbilities or {}) do
+  for _, entry in pairs(game_cfg.Ability.FishAbilities or {}) do
     if entry.AnchorBehavior then names[entry.AnchorBehavior] = true end
   end
   return names
@@ -84,7 +84,7 @@ describe("按名字加载的模块登记", function()
   it("test_anchor_registry_covers_behavior_files_and_config", function()
     local src = read_file("server/ability_api.lua")
     local registry = registry_of(src, "AnchorBehaviorLoaders")
-    -- 本图实现与包内同名时以本图为准（见 AbilityAPI 登记表注释）
+    -- 本图实现与包内同名时以本图为准（见 ability_api 登记表注释）
     local expected = {}
     for _, name in ipairs(lua_module_names(PACKAGE_ANCHOR_DIR)) do
       expected[name] = "server.packages.ability_system.anchors." .. name
@@ -94,7 +94,7 @@ describe("按名字加载的模块登记", function()
     end
     assert.same(expected, registry)
     for name in pairs(configured_anchor_behaviors()) do
-      assert.is_truthy(registry[name], "GameCfg 配置的锚点行为未登记: " .. name)
+      assert.is_truthy(registry[name], "game_cfg 配置的锚点行为未登记: " .. name)
     end
     assert_registry_resolves(registry)
     assert_no_dynamic_require(src, "server/ability_api.lua")
@@ -142,7 +142,7 @@ end)
 describe("字面量 require 的包内模块", function()
   it("test_anchor_framework_module_exists", function()
     local path = "server/packages/ability_system/anchor_logic.lua"
-    assert.is_true(file_exists(path), path .. " 不存在（AbilityAPI 按字面量 require 它）")
+    assert.is_true(file_exists(path), path .. " 不存在（ability_api 按字面量 require 它）")
   end)
 end)
 local function discover_server_hosts()
@@ -176,16 +176,16 @@ end
 describe("宿主组合", function()
   it("test_spoke_hosts_are_explicitly_composed_without_mgr_map", function()
     local src = assert(fs.slurp("server/main.lua"), "读不到 server/main.lua")
-    local main_code = Arch.code_only(src)
+    local main_code = arch.code_only(src)
     assert.is_nil(main_code:find("MgrMap", 1, true), "server/main.lua 不得恢复 MgrMap")
 
-    local runtime_args = assert(main_code:match("ServerRuntime%.new%s*(%b())"),
-      "server/main.lua 找不到 ServerRuntime.new(...) 组合根调用")
+    local runtime_args = assert(main_code:match("server_runtime%.new%s*(%b())"),
+      "server/main.lua 找不到 server_runtime.new(...) 组合根调用")
 
     local problems = {}
     for _, name in ipairs(discover_server_hosts()) do
       local host_path = "server/" .. name .. ".lua"
-      local host_code = Arch.code_only(assert(fs.slurp(host_path), "读不到宿主模块 " .. host_path))
+      local host_code = arch.code_only(assert(fs.slurp(host_path), "读不到宿主模块 " .. host_path))
       if not host_code:find("SpokeHost%s*=%s*true%f[^%w_]") then
         problems[#problems + 1] = host_path .. " 缺少 SpokeHost = true 标记"
       end
@@ -194,7 +194,7 @@ describe("宿主组合", function()
       if not var_name then
         problems[#problems + 1] = name .. " 未在 server/main.lua 组合根加载"
       elseif not runtime_args:find("[%w_]+%s*=%s*" .. var_name .. "%f[^%w_]") then
-        problems[#problems + 1] = name .. "（变量 " .. var_name .. "）未注入 ServerRuntime.new(...)"
+        problems[#problems + 1] = name .. "（变量 " .. var_name .. "）未注入 server_runtime.new(...)"
       end
     end
     table.sort(problems)

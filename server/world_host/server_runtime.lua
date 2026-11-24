@@ -1,44 +1,44 @@
 -- 服务端 Spoke 运行时总控与离场三步协议编排器（ADR-0032 §1、§2、§4 / #295）：
 -- 负责：
---   1. 持有唯一 SpokeClock，接受宿主帧泵（step）驱动；
---   2. 拉起全局唯一 SharedWorldTree（7 个钓鱼区子域骨架 + 全局小队 Dock）；
---   3. 仅在存档加载就绪且服务启动后为在场玩家生成独立 Auto PlayerTree；
+--   1. 持有唯一 spoke_clock，接受宿主帧泵（step）驱动；
+--   2. 拉起全局唯一 shared_world_tree（7 个钓鱼区子域骨架 + 全局小队 Dock）；
+--   3. 仅在存档加载就绪且服务启动后为在场玩家生成独立 Auto player_tree；
 --   4. 编排离场三步协议：前置异步脏写 → Step 1 (session_alive=false 终镜像)
 --      → Step 2 (同步 dispose 逆序拆资源与信号) → Step 3 (宿主持久化序列化 + 异步排空栅栏)；
 --   5. 维护同账号重进排空栅栏（leaving.waiting），防止提前读旧档或覆盖正在落盘的数据。
 -- 本模块归属 L2（server.world_host），零反向依赖存量旧债务模块；过渡接缝全部由 L1 入口以回调注入。
 
-local GameCfg = require("common.game_cfg")
-local Number = require("common.number")
-local SpokeClock = require("common.spoke_clock")
-local SharedWorldTree = require("server.world_host.shared_world_tree")
-local PlayerTree = require("server.world_host.player_tree")
-local AttrLeaf = require("server.world_host.attr_leaf")
-local ModifierLeaf = require("server.world_host.modifier_leaf")
-local AbilityLeaf = require("server.world_host.ability_leaf")
-local PlayerWeapon = require("server.world_host.player_weapon")
-local PlayerGrill = require("server.world_host.player_grill")
-local PlayerShop = require("server.world_host.player_shop")
-local PlayerFisherman = require("server.world_host.player_fisherman")
-local PlayerLottery = require("server.world_host.player_lottery")
-local PlayerBlindbox = require("server.world_host.player_blindbox")
-local PlayerPlatformShop = require("server.world_host.player_platform_shop")
-local SwingRegistry = require("server.swing_registry")
-local PkDamageFilter = require("server.world_host.pk_damage_filter")
-local FishTree = require("server.world_host.fish_tree")
-local FishAiTarget = require("server.world_host.fish_ai_target")
-local WorldRecords = require("server.world_host.world_records")
-local PlayerGM = require("server.world_host.player_gm")
-local LifeFacade = require("server.world_host.life_facade")
+local game_cfg = require("common.game_cfg")
+local number = require("common.number")
+local spoke_clock = require("common.spoke_clock")
+local shared_world_tree = require("server.world_host.shared_world_tree")
+local player_tree = require("server.world_host.player_tree")
+local attr_leaf = require("server.world_host.attr_leaf")
+local modifier_leaf = require("server.world_host.modifier_leaf")
+local ability_leaf = require("server.world_host.ability_leaf")
+local player_weapon = require("server.world_host.player_weapon")
+local player_grill = require("server.world_host.player_grill")
+local player_shop = require("server.world_host.player_shop")
+local player_fisherman = require("server.world_host.player_fisherman")
+local player_lottery = require("server.world_host.player_lottery")
+local player_blindbox = require("server.world_host.player_blindbox")
+local player_platform_shop = require("server.world_host.player_platform_shop")
+local swing_registry = require("server.swing_registry")
+local pk_damage_filter = require("server.world_host.pk_damage_filter")
+local fish_tree = require("server.world_host.fish_tree")
+local fish_ai_target = require("server.world_host.fish_ai_target")
+local world_records = require("server.world_host.world_records")
+local player_gm = require("server.world_host.player_gm")
+local life_facade = require("server.world_host.life_facade")
 
-local ServerRuntime = {}
+local server_runtime = {}
 local current_runtime = nil
 
-function ServerRuntime.current()
+function server_runtime.current()
   return current_runtime
 end
 
-function ServerRuntime.set_current(rt)
+function server_runtime.set_current(rt)
   current_runtime = rt
 end
 
@@ -72,7 +72,7 @@ local function safe_call(logger, label, fn, ...)
     if logger and type(logger.error) == "function" then
       pcall(logger.error, logger, label .. ": " .. tostring(r1)) -- logger 异常不得中断业务回调调度
     else
-      print("[ServerRuntime]", label, tostring(r1))
+      print("[server_runtime]", label, tostring(r1))
     end
     return nil
   end
@@ -87,7 +87,7 @@ local function is_ready_data(player, data)
 end
 
 ---@param opts? table
-function ServerRuntime.new(opts)
+function server_runtime.new(opts)
   opts = type(opts) == "table" and opts or {}
   local player_data = opts.player_data
   local save = opts.save
@@ -96,8 +96,8 @@ function ServerRuntime.new(opts)
   opts.save = save
   opts.platform = platform
 
-  local initial_now = Number.IsFiniteNumber(opts.initial_now) and opts.initial_now or 0
-  local clock = opts.clock or SpokeClock.new(initial_now)
+  local initial_now = number.IsFiniteNumber(opts.initial_now) and opts.initial_now or 0
+  local clock = opts.clock or spoke_clock.new(initial_now)
   local current_players = {}
   local active_players = {}
   local player_trees = {}
@@ -106,7 +106,7 @@ function ServerRuntime.new(opts)
   local re_conns = {}
   local carrier_died_handler = nil
   local bound_shop_action = nil
-  local fish_host = FishTree.new()
+  local fish_host = fish_tree.new()
   fish_host.Clock = clock
   fish_host.AiProjection = opts.ai
   fish_host.Logger = opts.logger
@@ -120,7 +120,7 @@ function ServerRuntime.new(opts)
   fish_host.World = opts.world_service
   fish_host.Cast = opts.cast
   fish_host.Ai = opts.fish_ai
-  fish_host.AiTarget = opts.fish_ai_target or FishAiTarget
+  fish_host.AiTarget = opts.fish_ai_target or fish_ai_target
   fish_host.AbilityApi = opts.ability_api
   fish_host.Ability = opts.fish_ability
   fish_host.Now = function() return clock.now() end
@@ -142,7 +142,7 @@ function ServerRuntime.new(opts)
   local entity_modifiers = nil
   if opts.entity_modifiers then
     local em_opts = type(opts.entity_modifiers) == "table" and opts.entity_modifiers or {}
-    entity_modifiers = ModifierLeaf.create_entity_store({
+    entity_modifiers = modifier_leaf.create_entity_store({
       modifier_api = em_opts.modifier_api,
       presets = em_opts.presets,
       now = function()
@@ -242,7 +242,7 @@ function ServerRuntime.new(opts)
   fish_host.Quest = {
     Notify = function(_, kind, owner, fact) return runtime:notify_quest(kind, owner, fact) end,
   }
-  PlayerGM.configure({
+  player_gm.configure({
     player_data = opts.player_data,
     save = opts.save,
     cast = { SetNextFish = function(_, target, fishId) return runtime:set_next_fish(target, fishId) end },
@@ -263,14 +263,14 @@ function ServerRuntime.new(opts)
     if self.world and not self.world:is_disposed() then
       return self.world
     end
-    self.world = SharedWorldTree.spawn({
+    self.world = shared_world_tree.spawn({
       clock = clock,
       zones = opts.zones,
       logger = opts.logger,
       on_mount_zone = opts.on_mount_zone,
       on_mount_world = function(scope, world)
-        if _G.REUtil then
-          WorldRecords.mount(scope, world, { player_data = opts.player_data })
+        if _G.re_util then
+          world_records.mount(scope, world, { player_data = opts.player_data })
         end
         if type(opts.on_mount_world) == "function" then opts.on_mount_world(scope, world) end
       end,
@@ -477,7 +477,7 @@ function ServerRuntime.new(opts)
 
   function runtime:dispatch_interact(actor, payload)
     if self:is_leaving(actor and actor.UserId) then return false end
-    if type(payload) == "table" and payload.target == GameCfg.Rescue.Target then
+    if type(payload) == "table" and payload.target == game_cfg.Rescue.Target then
       return self.life:RescueAction(actor, payload)
     end
     local fisherman = fisherman_handles[actor and actor.UserId]
@@ -491,10 +491,10 @@ function ServerRuntime.new(opts)
   end
 
   function runtime:step(dt, now)
-    if not Number.IsFiniteNumber(dt) or dt < 0 then
+    if not number.IsFiniteNumber(dt) or dt < 0 then
       return
     end
-    local valid_now = now ~= nil and Number.IsFiniteNumber(now) and now or nil
+    local valid_now = now ~= nil and number.IsFiniteNumber(now) and now or nil
     clock:step(dt, valid_now)
     if has_method(save, "Update") then safe_call(opts.logger, "save_update", function() save:Update() end) end
     if has_method(platform, "Update") then safe_call(opts.logger, "platform_update", function() platform:Update() end) end
@@ -533,7 +533,7 @@ function ServerRuntime.new(opts)
         if opts.logger and type(opts.logger.error) == "function" then
           pcall(opts.logger.error, opts.logger, "on_player_added:SetAttribute (uid=" .. tostring(user_id) .. "): " .. tostring(err)) -- logger 异常不得中断入场排队
         else
-          print("[ServerRuntime]", "on_player_added:SetAttribute", user_id, tostring(err))
+          print("[server_runtime]", "on_player_added:SetAttribute", user_id, tostring(err))
         end
       end
       return
@@ -584,7 +584,7 @@ function ServerRuntime.new(opts)
       end
       if opts.modifier_leaf and effects_opts.on_mount_modifier_leaf == nil then
         local ml_opts = type(opts.modifier_leaf) == "table" and opts.modifier_leaf or nil
-        effects_opts.on_mount_modifier_leaf = ModifierLeaf.make_slot_mounter(ml_opts)
+        effects_opts.on_mount_modifier_leaf = modifier_leaf.make_slot_mounter(ml_opts)
       end
     end
 
@@ -601,11 +601,11 @@ function ServerRuntime.new(opts)
         mounts.leaves = function(s, pt)
           if opts.attr_leaf then
             local al_opts = type(opts.attr_leaf) == "table" and opts.attr_leaf or nil
-            AttrLeaf.mount(s, pt, al_opts)
+            attr_leaf.mount(s, pt, al_opts)
           end
           if opts.ability_leaf then
             local ab_opts = type(opts.ability_leaf) == "table" and opts.ability_leaf or nil
-            AbilityLeaf.mount(s, pt, ab_opts)
+            ability_leaf.mount(s, pt, ab_opts)
           end
           if type(base_leaves) == "function" then
             base_leaves(s, pt)
@@ -618,12 +618,12 @@ function ServerRuntime.new(opts)
     mounts.actions = function(s, pt)
       if type(base_actions) == "function" then base_actions(s, pt) end
       local delivery_epoch = opts.delivery_epoch or tostring(world)
-      local blindbox = PlayerBlindbox.mount(s, pt, {
+      local blindbox = player_blindbox.mount(s, pt, {
         remote = opts.remote, save = opts.save, platform = opts.platform,
         world = world, random = opts.random, delivery_epoch = delivery_epoch,
       })
       blindbox_sessions[user_id] = blindbox
-      local shop = PlayerPlatformShop.mount(s, pt, {
+      local shop = player_platform_shop.mount(s, pt, {
         remote = opts.remote, save = opts.save, platform = opts.platform,
         world = world, delivery_epoch = delivery_epoch,
       })
@@ -639,7 +639,7 @@ function ServerRuntime.new(opts)
       local ok, inst = pcall(opts.player_data.GetDataInst, opts.player_data, player)
       if ok and type(inst) == "table" then tree_data = inst end
     end
-    local player_tree = PlayerTree.spawn({
+    local player_tree = player_tree.spawn({
       player = player,
       data = tree_data,
       clock = clock,
@@ -682,9 +682,9 @@ function ServerRuntime.new(opts)
     active_players[user_id] = player
     player_trees[user_id] = player_tree
     if self.world and self.world.squad then self.world.squad:OnPlayerAdded(player) end
-    SwingRegistry.SetClock(function() return clock.now() end)
+    swing_registry.SetClock(function() return clock.now() end)
     player_tree:mount_phase("alive", "weapon", function(scope)
-      local weapon = PlayerWeapon.mount(scope, player_tree, {
+      local weapon = player_weapon.mount(scope, player_tree, {
         remote = opts.remote,
         save = opts.save,
         physics = opts.physics,
@@ -710,7 +710,7 @@ function ServerRuntime.new(opts)
       end)
     end)
     player_tree:mount_phase("alive", "grill", function(scope)
-      local grill = PlayerGrill.mount(scope, player_tree, {
+      local grill = player_grill.mount(scope, player_tree, {
         remote = opts.remote,
         save = opts.save,
         world = opts.world_service,
@@ -735,7 +735,7 @@ function ServerRuntime.new(opts)
       end)
     end)
     player_tree:mount_phase("alive", "shop", function(scope)
-      local shop = PlayerShop.mount(scope, player_tree, {
+      local shop = player_shop.mount(scope, player_tree, {
         remote = opts.remote,
         save = opts.save,
         quest = player_tree.quest or opts.quest,
@@ -746,7 +746,7 @@ function ServerRuntime.new(opts)
       end)
     end)
     player_tree:mount_phase("alive", "fisherman", function(scope)
-      local fisherman = PlayerFisherman.mount(scope, player_tree, {
+      local fisherman = player_fisherman.mount(scope, player_tree, {
         remote = opts.remote,
         save = opts.save,
         quest = player_tree.quest or opts.quest,
@@ -757,7 +757,7 @@ function ServerRuntime.new(opts)
       end)
     end)
     player_tree:mount_phase("alive", "lottery", function(scope)
-      local lottery = PlayerLottery.mount(scope, player_tree, {
+      local lottery = player_lottery.mount(scope, player_tree, {
         remote = opts.remote, save = opts.save, random = opts.random,
         in_range = opts.lottery_in_range,
       })
@@ -1026,14 +1026,14 @@ function ServerRuntime.new(opts)
   end
 
   local function fish_row(fish)
-    local species = GameCfg.Fish[fish.FishId] or {}
+    local species = game_cfg.Fish[fish.FishId] or {}
     local state = fish.State
     local phase = "lifted"
-    if state == FishTree.State.Escaping then
+    if state == fish_tree.State.Escaping then
       phase = "escape"
-    elseif state == FishTree.State.Wild then
+    elseif state == fish_tree.State.Wild then
       phase = "wild"
-    elseif state ~= FishTree.State.AwaitLift and state ~= FishTree.State.Held then
+    elseif state ~= fish_tree.State.AwaitLift and state ~= fish_tree.State.Held then
       phase = "combat"
     end
     local health = fish.Carrier and fish.Carrier.Health or species.Health
@@ -1043,7 +1043,7 @@ function ServerRuntime.new(opts)
     if fish.FishId == "fish56Boss" then
       bossPhase = ratio > 0.6 and "land" or (ratio > 0.2 and "water" or "enraged")
     end
-    local lifted = state == FishTree.State.AwaitLift or state == FishTree.State.Held
+    local lifted = state == fish_tree.State.AwaitLift or state == fish_tree.State.Held
     return {
       id = fish.Id,
       fishId = fish.FishId,
@@ -1249,7 +1249,7 @@ function ServerRuntime.new(opts)
 
   local damage_filter = opts.damage_filter
   if damage_filter == nil then
-    damage_filter = PkDamageFilter.make({
+    damage_filter = pk_damage_filter.make({
       party = {
         SameParty = function(_, source, target)
           local squad = runtime.world and runtime.world.squad
@@ -1264,7 +1264,7 @@ function ServerRuntime.new(opts)
   runtime._damage_filter = function()
     return damage_filter
   end
-  runtime.life = LifeFacade.new({
+  runtime.life = life_facade.new({
     player_trees = player_trees,
     active_players = active_players,
     weapon_sessions = weapon_sessions,
@@ -1273,12 +1273,12 @@ function ServerRuntime.new(opts)
     get_damage_filter = function() return damage_filter end,
     set_damage_filter = function(filter) damage_filter = filter end,
   })
-  fish_host.Vitals = runtime.life
+  fish_host.vitals = runtime.life
 
   if has_method(player_data, "OnPlayerAdded") then
-    player_data.Runtime = runtime
+    player_data.runtime = runtime
     player_data.Save = save
-    player_data.Vitals = runtime.life
+    player_data.vitals = runtime.life
     player_data.Quest = { Notify = function(_, kind, owner, fact) return runtime:notify_quest(kind, owner, fact) end }
     player_data.Ability = {
       ApplyGrowth = function(_, player)
@@ -1291,13 +1291,13 @@ function ServerRuntime.new(opts)
     }
   end
   if has_method(save, "LoadInto") or has_method(save, "Start") then
-    if has_method(player_data, "SendItemBar") then save.PlayerData = player_data end
+    if has_method(player_data, "SendItemBar") then save.player_data = player_data end
     save.OnReady = function(player, data) runtime:on_save_ready(player, data) end
   end
   if type(platform) == "table" then
     if has_method(platform, "Start") then
       if type(save) == "table" then platform.Save = save end
-      if type(player_data) == "table" then platform.PlayerData = player_data end
+      if type(player_data) == "table" then platform.player_data = player_data end
     end
     if platform.ShopAction == nil then
       bound_shop_action = function(actor, payload)
@@ -1308,12 +1308,12 @@ function ServerRuntime.new(opts)
   end
   if opts.fish_ability then
     opts.fish_ability.Modifier = modifier_service
-    opts.fish_ability.Vitals = runtime.life
+    opts.fish_ability.vitals = runtime.life
     opts.fish_ability.Ai = opts.fish_ai
-    opts.fish_ability.BehaviorServices = { Vitals = runtime.life, Modifier = modifier_service, GM = PlayerGM }
+    opts.fish_ability.BehaviorServices = { vitals = runtime.life, Modifier = modifier_service, GM = player_gm }
   end
 
   return runtime
 end
 
-return ServerRuntime
+return server_runtime

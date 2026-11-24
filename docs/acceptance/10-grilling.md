@@ -4,31 +4,31 @@
 
 | ID | 条款 | 组 | 执行者 | 证据等级 | 状态 | 证据 / 理由 |
 | --- | --- | --- | --- | --- | --- | --- |
-| 10-01 | 烧烤点从第三区（蟹湖）起设置 | 规则 | agent | A | unverified | — |
-| 10-02 | 玩家在烧烤点 2 米范围内可发起操作 | 规则 | agent | A | unverified | — |
-| 10-03 | 只有未烤制的鱼获可以放入烧烤点 | 规则 | agent | A | evidenced | tests/native/spec/10_grill_curve_test.lua |
-| 10-04 | 未烤制信物也可以放入烧烤点，放入前提示烤后失去兑换与抽奖资格 | 规则 | agent | A | unverified | — |
-| 10-05 | 烧烤不是配方合成：一次投入只烤制投入的那一份鱼获，不额外生成不同数量或不同种类的食材 | 规则 | agent | A | unverified | — |
-| 10-06 | 烤制倍率在 0 至 2 秒由 1.00 线性升至 1.50 | 规则 | agent | A | evidenced | tests/native/spec/10_grill_curve_test.lua |
-| 10-07 | 烤制倍率在 2 至 2.5 秒保持 1.50 | 规则 | agent | A | evidenced | tests/native/spec/10_grill_curve_test.lua |
-| 10-08 | 烤制倍率在 2.5 至 4.5 秒由 1.50 线性降至 0.00 | 规则 | agent | A | evidenced | tests/native/spec/10_grill_curve_test.lua |
-| 10-09 | 界面以两位小数显示当前烤制倍率 | 规则 | agent | A | unverified | — |
-| 10-10 | 取出时价格与恢复量同乘取出瞬间的倍率，取出后不再随时间变化 | 规则 | agent | A | evidenced | tests/native/spec/10_grill_curve_test.lua |
-| 10-11 | 4.5 秒仍未取出时鱼获烤糊损毁，从烧烤点消失 | 规则 | agent | A | evidenced | tests/native/spec/10_grill_curve_test.lua |
-| 10-12 | 烤糊瞬间对烧烤点周围 3 米内的玩家各造成 30 点伤害 | 规则 | agent | A | evidenced | tests/native/spec/10_grill_curve_test.lua |
-| 10-13 | 烤糊时向操作者提示「烤糊」 | 规则 | agent | A | evidenced | tests/native/spec/10_grill_curve_test.lua |
-| 10-14 | 取出后物品放回可用格位并保持选中 | 规则 | agent | A | evidenced | tests/native/spec/10_grill_curve_test.lua |
-| 10-15 | 烤过的鱼不可再次放入烧烤点 | 规则 | agent | A | evidenced | tests/native/spec/10_grill_curve_test.lua |
-| 10-16 | 烤过的鱼不可用于抽奖 | 规则 | agent | A | unverified | — |
-| 10-17 | 烤过的信物不可用于兑换 | 规则 | agent | A | unverified | — |
-| 10-18 | 烤制计时由服务端自投入时刻开始，客户端计时偏差不影响倍率结算 | 契约 | agent | B | unverified | — |
-| 10-19 | 烧烤点按玩家独立会话：同一设施可被多名玩家同时使用，各会话物品互不干扰 | 契约 | agent | B | unverified | — |
-| 10-20 | 其他玩家不能取走不属于自己会话的物品 | 契约 | agent | B | unverified | — |
-| 10-21 | 玩家退出（离线）时该会话按当时倍率结清并入库存，或原样退回，不复制也不凭空消失 | 契约 | agent | B | unverified | — |
-| 10-22 | 玩家死亡时该会话按与退出相同的路径结算，不产生物品复制或丢失 | 契约 | agent | B | unverified | — |
-| 10-23 | 断线重连后未结清的烧烤会话仍归属原玩家，可继续取出或收回 | 契约 | agent | B | unverified | — |
-| 10-24 | 库存已满时取出被拒绝，烤鱼留在会话中，不丢失也不复制 | 契约 | agent | B | unverified | — |
-| 10-25 | 同一份物品在任一时刻只存在于一个位置（库存、烧烤会话或世界物品），任何恢复路径都不得让两份同时存在 | 契约 | agent | B | unverified | — |
+| 10-01 | 烧烤点从第三区（蟹湖）起设置 | 规则 | agent | a | unverified | — |
+| 10-02 | 玩家在烧烤点 2 米范围内可发起操作 | 规则 | agent | a | unverified | — |
+| 10-03 | 只有未烤制的鱼获可以放入烧烤点 | 规则 | agent | a | evidenced | tests/native/spec/10_grill_curve_test.lua |
+| 10-04 | 未烤制信物也可以放入烧烤点，放入前提示烤后失去兑换与抽奖资格 | 规则 | agent | a | unverified | — |
+| 10-05 | 烧烤不是配方合成：一次投入只烤制投入的那一份鱼获，不额外生成不同数量或不同种类的食材 | 规则 | agent | a | unverified | — |
+| 10-06 | 烤制倍率在 0 至 2 秒由 1.00 线性升至 1.50 | 规则 | agent | a | evidenced | tests/native/spec/10_grill_curve_test.lua |
+| 10-07 | 烤制倍率在 2 至 2.5 秒保持 1.50 | 规则 | agent | a | evidenced | tests/native/spec/10_grill_curve_test.lua |
+| 10-08 | 烤制倍率在 2.5 至 4.5 秒由 1.50 线性降至 0.00 | 规则 | agent | a | evidenced | tests/native/spec/10_grill_curve_test.lua |
+| 10-09 | 界面以两位小数显示当前烤制倍率 | 规则 | agent | a | unverified | — |
+| 10-10 | 取出时价格与恢复量同乘取出瞬间的倍率，取出后不再随时间变化 | 规则 | agent | a | evidenced | tests/native/spec/10_grill_curve_test.lua |
+| 10-11 | 4.5 秒仍未取出时鱼获烤糊损毁，从烧烤点消失 | 规则 | agent | a | evidenced | tests/native/spec/10_grill_curve_test.lua |
+| 10-12 | 烤糊瞬间对烧烤点周围 3 米内的玩家各造成 30 点伤害 | 规则 | agent | a | evidenced | tests/native/spec/10_grill_curve_test.lua |
+| 10-13 | 烤糊时向操作者提示「烤糊」 | 规则 | agent | a | evidenced | tests/native/spec/10_grill_curve_test.lua |
+| 10-14 | 取出后物品放回可用格位并保持选中 | 规则 | agent | a | evidenced | tests/native/spec/10_grill_curve_test.lua |
+| 10-15 | 烤过的鱼不可再次放入烧烤点 | 规则 | agent | a | evidenced | tests/native/spec/10_grill_curve_test.lua |
+| 10-16 | 烤过的鱼不可用于抽奖 | 规则 | agent | a | unverified | — |
+| 10-17 | 烤过的信物不可用于兑换 | 规则 | agent | a | unverified | — |
+| 10-18 | 烤制计时由服务端自投入时刻开始，客户端计时偏差不影响倍率结算 | 契约 | agent | b | unverified | — |
+| 10-19 | 烧烤点按玩家独立会话：同一设施可被多名玩家同时使用，各会话物品互不干扰 | 契约 | agent | b | unverified | — |
+| 10-20 | 其他玩家不能取走不属于自己会话的物品 | 契约 | agent | b | unverified | — |
+| 10-21 | 玩家退出（离线）时该会话按当时倍率结清并入库存，或原样退回，不复制也不凭空消失 | 契约 | agent | b | unverified | — |
+| 10-22 | 玩家死亡时该会话按与退出相同的路径结算，不产生物品复制或丢失 | 契约 | agent | b | unverified | — |
+| 10-23 | 断线重连后未结清的烧烤会话仍归属原玩家，可继续取出或收回 | 契约 | agent | b | unverified | — |
+| 10-24 | 库存已满时取出被拒绝，烤鱼留在会话中，不丢失也不复制 | 契约 | agent | b | unverified | — |
+| 10-25 | 同一份物品在任一时刻只存在于一个位置（库存、烧烤会话或世界物品），任何恢复路径都不得让两份同时存在 | 契约 | agent | b | unverified | — |
 
 ## C 级（试玩取证）
 

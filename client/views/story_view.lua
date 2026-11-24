@@ -1,10 +1,10 @@
-local ViewUtil = require("client.views.view_util")
-local StoryView = {}
+local view_util = require("client.views.view_util")
+local story_view = {}
 
-function StoryView.modal_spec(options)
+function story_view.modal_spec(options)
   options = options or {}
   return function(scope, ctx)
-    local resolution = ViewUtil.get_resolution(ctx, options)
+    local resolution = view_util.get_resolution(ctx, options)
     local width = math.min(1000, resolution.x - 60)
     local panel = ctx.create_node(scope, "EUIImage", {
       Parent = ctx.root_node, Name = "ScreenStory", Position = Vector2.New(resolution.x / 2, resolution.y / 2),
@@ -52,7 +52,7 @@ function StoryView.modal_spec(options)
       if #lines == 0 then lines = { "" } end
       page = math.max(1, math.min(page, #lines))
       title.Text = tostring(payload.title or "钓鱼佬") .. "  " .. page .. "/" .. #lines
-      body.Text = ViewUtil.wrap_text(lines[page], math.max(12, math.floor((width - 80) / 26)))
+      body.Text = view_util.wrap_text(lines[page], math.max(12, math.floor((width - 80) / 26)))
       next_button.TouchEnabled = page < #lines
       read_button.TouchEnabled = true
       read_label.Text = payload.readKey and "已读，开始钓鱼" or "知道了"
@@ -68,4 +68,4 @@ function StoryView.modal_spec(options)
   end
 end
 
-return StoryView
+return story_view

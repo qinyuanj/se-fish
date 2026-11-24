@@ -12,7 +12,7 @@
 --   3. 离开的人把共享地面实例带走（世界状态跟着连接走）；
 --   4. 离场未结算就重连，服务端留出第二份状态或丢掉第一份；
 --   5. 反复进出后重连恢复不出原来的小隊归属。
-local GameCfg = require('common.game_cfg')
+local game_cfg = require('common.game_cfg')
 local Link = assert(loadfile('tests/support/local_link.lua'))()
 
 -- 鱼塘安全点（区夹具里的 Z1_Safe）与第二区野外点：两处都是场景里真实解析出的坐标。
@@ -47,7 +47,7 @@ describe('条款 1-04 八人以上容量的本地连接路径', function()
     assert.same(10, link:Count(), '十条连接没有同时在线')
     local keys = {}
     for _, player in ipairs(players) do
-      assert.is_not_nil(link:Data(player), player.UserId .. ' 没有读档就绪')
+      assert.is_not_nil(link:data(player), player.UserId .. ' 没有读档就绪')
       assert.is_not_nil(link:Stored(player.UserId), player.UserId .. ' 没写出自己的存档键')
       local key = link.managers.Save:Key(player.UserId)
       assert.is_nil(keys[key], '两条连接共用了同一个存档键：' .. key)
@@ -67,7 +67,7 @@ describe('条款 1-04 八人以上容量的本地连接路径', function()
     -- 野外挨一刀，血量成为「这一份连接自己的状态」
     assert.is_true(link:Hit(players[4], players[5], 'weapon', 30))
     local health = players[5].Character.Controller.Health
-    assert.same(GameCfg.Vitals.MaxHealth - 30, health)
+    assert.same(game_cfg.vitals.MaxHealth - 30, health)
     local loot = link:Loot('bass', { x = ARENA.x, y = ARENA.y, z = ARENA.z })
     assert.is_not_nil(loot, '共享地面实例没生成')
     assert.same(1, #link:LootSnapshot())
@@ -80,12 +80,12 @@ describe('条款 1-04 八人以上容量的本地连接路径', function()
 
     assert.same(2, link.managers.Party:Count(players[1]), '剩下两名队员的小隊没了')
     assert.is_true(link.managers.Party:SameParty(players[1], players[2]))
-    assert.same(GameCfg.Vitals.MaxHealth, players[1].Character.Controller.Health, '别人的离开改了留下的人的血量')
+    assert.same(game_cfg.vitals.MaxHealth, players[1].Character.Controller.Health, '别人的离开改了留下的人的血量')
     assert.same(health, players[5].Character.Controller.Health, '离开的连接带走了自己的血量（读档会回来）')
     assert.is_not_nil(link:Stored(players[1].UserId), '留下的人的存档键被清掉了')
     assert.same(1, #link:LootSnapshot(), '有人离开把共享地面实例带走了')
     for _, index in ipairs({ 1, 2, 6, 7, 10 }) do
-      assert.is_not_nil(link:Data(players[index]), players[index].UserId .. ' 的登录态在别人离开后没了')
+      assert.is_not_nil(link:data(players[index]), players[index].UserId .. ' 的登录态在别人离开后没了')
     end
   end)
 
@@ -109,7 +109,7 @@ describe('条款 1-04 八人以上容量的本地连接路径', function()
     for _, player in ipairs(again) do
       assert.same(keys[player.UserId], link.managers.Save:Key(player.UserId),
         player.UserId .. ' 重连换了一条存档键（状态被复制成第二份）')
-      assert.is_not_nil(link:Data(player), player.UserId .. ' 重连没有读档就绪')
+      assert.is_not_nil(link:data(player), player.UserId .. ' 重连没有读档就绪')
     end
     local values = 0
     for _ in pairs(link.values) do values = values + 1 end
@@ -121,7 +121,7 @@ describe('条款 1-04 八人以上容量的本地连接路径', function()
     assert.is_true(link:Hit(players[1], players[2], 'weapon', 25))
     local before = link.managers.Save:Key(players[2].UserId)
     -- 先制造在途写入，再发出离场且不等它结算：这正是真实断线重连的时序
-    local data = link:Data(players[2])
+    local data = link:data(players[2])
     assert.is_true(link.managers.Save:Save(players[2].UserId, data:Serialize(), 'test'))
     link:LeaveRaw(players[2])
     assert.is_not_nil(link.leaving[players[2].UserId], '离场没有进入结算中')
@@ -131,7 +131,7 @@ describe('条款 1-04 八人以上容量的本地连接路径', function()
     link:Advance(0)
     assert.is_true(link:WaitLeave(3002), '旧会话没有结算完')
     for _ = 1, 10 do link:Advance(0.05) end
-    assert.is_not_nil(link:Data(back), '重连没有读档就绪')
+    assert.is_not_nil(link:data(back), '重连没有读档就绪')
     assert.is_true(link:Online(back), '重连没有进入在线')
     assert.same(before, link.managers.Save:Key(3002), '重连换了另一条存档键（等于第二份状态）')
     local values = 0

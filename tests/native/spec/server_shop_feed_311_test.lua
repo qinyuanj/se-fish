@@ -1,6 +1,6 @@
 
-local GameCfg = require("common.game_cfg")
-local ServerRuntime = require("server.world_host.server_runtime")
+local game_cfg = require("common.game_cfg")
+local server_runtime = require("server.world_host.server_runtime")
 
 local function signal()
   local handlers = {}
@@ -35,11 +35,11 @@ describe("服务端商店与钓鱼佬原子事务（#311）", function()
       Character = {
         Position = vec(center.x, center.y, center.z),
         Size = { y = 2 },
-        Controller = { Health = GameCfg.Vitals.MaxHealth },
+        Controller = { Health = game_cfg.vitals.MaxHealth },
       },
     }
     function player:SetAttribute(key, value) self.attrs[key] = value end
-    local data = ctx.PlayerData.New(player)
+    local data = ctx.player_data.New(player)
     data:Init(true)
     ctx.save:LoadInto(player, data)
     drain()
@@ -55,7 +55,7 @@ describe("服务端商店与钓鱼佬原子事务（#311）", function()
   local function act(player, channel, payload)
     ctx.seq = (ctx.seq or 0) + 1
     payload.seq = payload.seq or ctx.seq
-    _G.REUtil:GetRE(channel).OnServerEvent:Fire(player, payload)
+    _G.re_util:GetRE(channel).OnServerEvent:Fire(player, payload)
     drain()
     local results = player.results and player.results[channel == "ShopAction" and "ShopResult" or "InteractResult"]
     return results and results[#results] or nil
@@ -63,8 +63,8 @@ describe("服务端商店与钓鱼佬原子事务（#311）", function()
 
   before_each(function()
     ctx = { values = {}, queue = {}, events = {}, datas = {}, players = {}, snapshots = {}, plays = {} }
-    ctx.old_game, ctx.old_re, ctx.old_debug = _G.game, _G.REUtil, GameCfg.Debug
-    GameCfg.Debug = { Enabled = false }
+    ctx.old_game, ctx.old_re, ctx.old_debug = _G.game, _G.re_util, game_cfg.Debug
+    game_cfg.Debug = { Enabled = false }
     ctx.store = {
       GetAsync = function(_, key) return ctx.values[key] end,
       UpdateAsync = function(_, key, transform)
@@ -75,10 +75,10 @@ describe("服务端商店与钓鱼佬原子事务（#311）", function()
       SetAsync = function(_, key, value) ctx.values[key] = value end,
     }
     ctx.anchors = {}
-    for _, stand in ipairs(GameCfg.Shop.Stands) do
+    for _, stand in ipairs(game_cfg.Shop.Stands) do
       ctx.anchors[stand.AnchorName] = { Name = stand.AnchorName, Position = vec(0, 0, 0) }
     end
-    for _, npc in ipairs(GameCfg.Interact.Fishermen) do
+    for _, npc in ipairs(game_cfg.Interact.Fishermen) do
       for _, name in ipairs(npc.AnchorNames) do
         ctx.anchors[name] = {
           Name = name,
@@ -100,7 +100,7 @@ describe("服务端商店与钓鱼佬原子事务（#311）", function()
       end
       if name == "Players" then return { GetPlayers = function() return ctx.players end } end
     end }
-    _G.REUtil = {
+    _G.re_util = {
       CheckRECD = function() return false end,
       GetRE = function(_, name)
         if not ctx.events[name] then
@@ -121,23 +121,23 @@ describe("服务端商店与钓鱼佬原子事务（#311）", function()
         return ctx.events[name]
       end,
     }
-    ctx.PlayerData = assert(loadfile("server/data/player_data.lua"))()
+    ctx.player_data = assert(loadfile("server/data/player_data.lua"))()
     ctx.save = assert(loadfile("server/save_host.lua"))()
-    ctx.runtime = ServerRuntime.new({
+    ctx.runtime = server_runtime.new({
       initial_now = 1000,
-      remote = _G.REUtil,
+      remote = _G.re_util,
       player_data = { GetDataInst = function(_, player) return ctx.datas[player.UserId] end },
       save = ctx.save,
       players_service = _G.game:GetService("Players"),
       world_service = _G.game:GetService("World"),
       on_item_bar_state = function(player, snapshot)
-        _G.REUtil:GetRE("ItemBarState"):FireClient(player, snapshot)
+        _G.re_util:GetRE("ItemBarState"):FireClient(player, snapshot)
       end,
       bind_shop_action = function(dispatch)
-        _G.REUtil:GetRE("ShopAction").OnServerEvent:Connect(dispatch)
+        _G.re_util:GetRE("ShopAction").OnServerEvent:Connect(dispatch)
       end,
       bind_interact_action = function(dispatch)
-        _G.REUtil:GetRE("InteractAction").OnServerEvent:Connect(dispatch)
+        _G.re_util:GetRE("InteractAction").OnServerEvent:Connect(dispatch)
       end,
     })
     ctx.runtime:start()
@@ -146,8 +146,8 @@ describe("服务端商店与钓鱼佬原子事务（#311）", function()
 
   after_each(function()
     if ctx.runtime then ctx.runtime:shutdown() end
-    _G.game, _G.REUtil = ctx.old_game, ctx.old_re
-    GameCfg.Debug = ctx.old_debug
+    _G.game, _G.re_util = ctx.old_game, ctx.old_re
+    game_cfg.Debug = ctx.old_debug
   end)
 
   it("购买鱼竿在同一批扣金币、发货并刷新库存快照", function()
@@ -155,7 +155,7 @@ describe("服务端商店与钓鱼佬原子事务（#311）", function()
     local reply = act(player, "ShopAction", { action = "Buy", itemId = "starterRod" })
     assert.is_not_nil(reply)
     assert.is_true(reply.ok)
-    assert.same(15, data.Data.FishCoin)
+    assert.same(15, data.data.FishCoin)
     assert.same(1, data:ItemCount("starterRod"))
     assert.same(15, ctx.snapshots[player.UserId].coin)
   end)
@@ -166,8 +166,8 @@ describe("服务端商店与钓鱼佬原子事务（#311）", function()
     assert.is_not_nil(reply)
     assert.is_true(reply.ok)
     assert.same("UpgradeStorage", reply.action)
-    assert.same(0, data.Data.FishCoin)
-    assert.same(1, data.Data.UpgradeLevel)
+    assert.same(0, data.data.FishCoin)
+    assert.same(1, data.data.UpgradeLevel)
     assert.same(3, ctx.snapshots[player.UserId].slotCount)
     assert.same(10, ctx.snapshots[player.UserId].backpackCount)
   end)
@@ -181,7 +181,7 @@ describe("服务端商店与钓鱼佬原子事务（#311）", function()
     assert.is_true(first.ok)
     assert.is_true(replay.ok)
     assert.same(first.operation.id, replay.operation.id)
-    assert.same(15, data.Data.FishCoin)
+    assert.same(15, data.data.FishCoin)
     assert.same(1, data:ItemCount("starterRod"))
     assert.same(replies + 1, #player.results.ShopResult)
   end)
@@ -195,11 +195,11 @@ describe("服务端商店与钓鱼佬原子事务（#311）", function()
     assert.is_not_nil(reply)
     assert.is_true(reply.ok)
     assert.same(11, reply.coins)
-    assert.same(11, data.Data.FishCoin)
-    assert.is_nil(data.Data.Containers.itemBar[1])
-    assert.is_nil(data.Data.SelectedSlot)
+    assert.same(11, data.data.FishCoin)
+    assert.is_nil(data.data.Containers.itemBar[1])
+    assert.is_nil(data.data.SelectedSlot)
     assert.same(11, ctx.snapshots[player.UserId].coin)
-    assert.same({ GameCfg.Interact.Fisherman.EatAnimation }, ctx.plays)
+    assert.same({ game_cfg.Interact.Fisherman.EatAnimation }, ctx.plays)
   end)
 
   it("信物兑换与产物交付原子完成并使用交付释放的格位", function()
@@ -214,9 +214,9 @@ describe("服务端商店与钓鱼佬原子事务（#311）", function()
     assert.same({ from = "eelHead", to = "duck" }, reply.exchange)
     assert.same(0, data:ItemCount("eelHead"))
     assert.same(1, data:ItemCount("duck"))
-    assert.same("duck", data.Data.Containers.itemBar[1].itemId)
-    assert.same(0, data.Data.FishCoin)
-    assert.is_nil(data.Data.SelectedSlot)
+    assert.same("duck", data.data.Containers.itemBar[1].itemId)
+    assert.same(0, data.data.FishCoin)
+    assert.is_nil(data.data.SelectedSlot)
   end)
 
   it("旧交互管理器拆除后抢救仍经统一宿主按距离受理", function()
@@ -224,11 +224,11 @@ describe("服务端商店与钓鱼佬原子事务（#311）", function()
     local rescuer = join(31107, "fisherman")
     rescuer.Character.Position.x = 102
     ctx.runtime.life:ApplyHit(ctx.runtime.life:NewHit(nil, "fishAttack"), downed,
-      GameCfg.Vitals.MaxHealth + 1)
+      game_cfg.vitals.MaxHealth + 1)
     assert.same("downed", ctx.runtime.life:Phase(downed))
     local reply = act(rescuer, "InteractAction", {
-      target = GameCfg.Rescue.Target,
-      action = GameCfg.Rescue.Action,
+      target = game_cfg.Rescue.Target,
+      action = game_cfg.Rescue.Action,
       targetUserId = downed.UserId,
     })
     assert.is_not_nil(reply)

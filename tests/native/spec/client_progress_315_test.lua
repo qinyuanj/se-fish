@@ -1,12 +1,12 @@
-local GameCfg = require("common.game_cfg")
-local ClientStore = require("client.store.client_store")
-local RootView = require("client.views.root_view")
-local CompendiumView = require("client.views.compendium_view")
-local GuideView = require("client.views.guide_view")
-local MessageView = require("client.views.message_view")
-local StoryView = require("client.views.story_view")
-local GMView = require("client.views.gm_view")
-local Eui = require("tests.support.eui_double")
+local game_cfg = require("common.game_cfg")
+local client_store = require("client.store.client_store")
+local root_view = require("client.views.root_view")
+local compendium_view = require("client.views.compendium_view")
+local guide_view = require("client.views.guide_view")
+local message_view = require("client.views.message_view")
+local story_view = require("client.views.story_view")
+local gm_view = require("client.views.gm_view")
+local eui = require("tests.support.eui_double")
 
 local function child(root, name) return root:FindFirstChild(name, true) end
 
@@ -17,9 +17,9 @@ describe("客户端图鉴纪录与剩余模态宿主接缝（#315）", function(
     _G.Vector2 = { New = function(x, y) return { x = x, y = y } end }
     _G.Color = { New = function(...) return { ... } end }
     sent = { compendium = 0, records = {}, story = {}, gm = {} }
-    store, writer = ClientStore.new()
-    root = Eui.Node({ Name = "UIRoot" })
-    view = RootView.mount(root, store, {
+    store, writer = client_store.new()
+    root = eui.Node({ Name = "UIRoot" })
+    view = root_view.mount(root, store, {
       services = {
         open_modal = function(id, payload) writer:open_modal(id, payload) end,
         close_modal = function(id) writer:close_modal(id) end,
@@ -28,14 +28,14 @@ describe("客户端图鉴纪录与剩余模态宿主接缝（#315）", function(
         send_story = function(payload) sent.story[#sent.story + 1] = payload end,
         send_gm = function(payload) sent.gm[#sent.gm + 1] = payload end,
       },
-      hud = { CompendiumView.entry_spec(), GuideView.spec(), MessageView.spec() },
+      hud = { compendium_view.entry_spec(), guide_view.spec(), message_view.spec() },
       modals = {
-        compendium = CompendiumView.modal_spec(),
-        story = StoryView.modal_spec(),
-        gm = GMView.modal_spec(),
+        compendium = compendium_view.modal_spec(),
+        story = story_view.modal_spec(),
+        gm = gm_view.modal_spec(),
       },
       create_node = function(kind, props)
-        return Eui.Node({
+        return eui.Node({
           Kind = kind, Name = props and props.Name, Parent = props and props.Parent,
           Visible = props and props.Visible, Text = props and props.Text,
           ButtonText = props and props.ButtonText, Position = props and props.Position,
@@ -51,7 +51,7 @@ describe("客户端图鉴纪录与剩余模态宿主接缝（#315）", function(
 
   -- 13-07 / 13-08：五项详情、真实保持者与未取得数据。
   it("图鉴七页九十八项展示个人最大重量与真实全服纪录", function()
-    Eui.Click(child(root, "BtnCompendiumEntry"))
+    eui.Click(child(root, "BtnCompendiumEntry"))
     assert.same(1, sent.compendium)
     assert.is_not_nil(child(root, "ScreenCompendium"))
     local count = 0
@@ -63,7 +63,7 @@ describe("客户端图鉴纪录与剩余模态宿主接缝（#315）", function(
       state = "ready", unlocked = { bass = true }, catches = { bass = 2 },
       weights = { bass = 12.5 }, total = 2,
     })
-    Eui.Click(child(root, "BtnCompendiumFish_bass"))
+    eui.Click(child(root, "BtnCompendiumFish_bass"))
     assert.same("bass", sent.records[#sent.records])
     writer:ingest_event("RecordsState", {
       state = "ok", fishId = "bass", weight = 20, holder = "纪录保持者", userId = 9,
@@ -83,9 +83,9 @@ describe("客户端图鉴纪录与剩余模态宿主接缝（#315）", function(
     local quest_label = child(root, "QuestLabel")
     assert.is_true(child(root, "QuestToggle").Visible)
     assert.matches("拾取蚯蚓", quest_label.Text)
-    Eui.Click(child(root, "QuestToggle"))
+    eui.Click(child(root, "QuestToggle"))
     assert.is_false(quest_label.Visible)
-    Eui.Click(child(root, "QuestToggle"))
+    eui.Click(child(root, "QuestToggle"))
     assert.is_true(quest_label.Visible)
     writer:show_notice("拾取 5 只蚯蚓")
     assert.same("拾取 5 只蚯蚓", child(root, "LabelMessage").Text)
@@ -94,12 +94,12 @@ describe("客户端图鉴纪录与剩余模态宿主接缝（#315）", function(
     local story_title, story_body = child(root, "DialogueTitle"), child(root, "DialogueBody")
     assert.is_true(story_title.Position.y > story_body.Position.y)
     assert.is_true(story_body.Position.y > child(root, "DialogueRead").Position.y)
-    Eui.Click(child(root, "DialogueRead"))
+    eui.Click(child(root, "DialogueRead"))
     assert.same({ action = "read", readKey = "opening" }, sent.story[1])
     writer:ingest_event("StoryState", { read = true, readKey = "opening" })
     assert.is_nil(child(root, "ScreenStory"))
     writer:open_modal("gm")
-    Eui.Click(child(root, "BtnGMCoin"))
+    eui.Click(child(root, "BtnGMCoin"))
     assert.same({ action = "Coin", amount = 100 }, sent.gm[1])
     writer:ingest_event("GMResult", { ok = true, action = "Coin", target = 7 })
     assert.matches("成功", child(root, "LabelGMResult").Text)
@@ -134,7 +134,7 @@ describe("客户端图鉴纪录与剩余模态宿主接缝（#315）", function(
     assert.matches("已收集 1/98", child(root, "LabelCompendiumSummary").Text, 1, true)
     assert.matches("已完成", child(root, "LabelCompendiumAchievement").Text, 1, true)
     assert.is_false(writer:ingest_event("CompendiumState", { seq = 3, unlocked = true, weights = {} }))
-    Eui.Click(child(root, "BtnCompendiumFish_bass"))
+    eui.Click(child(root, "BtnCompendiumFish_bass"))
     assert.matches("尚未钓取", child(root, "LabelCompendiumDetail").Text, 1, true)
     assert.is_true(writer:ingest_event("RecordsState", { seq = 2, fishId = "bass", state = "ok", weight = 3, holder = "新" }))
     assert.is_false(writer:ingest_event("RecordsState", { seq = 1, fishId = "bass", state = "missing" }))
@@ -144,7 +144,7 @@ describe("客户端图鉴纪录与剩余模态宿主接缝（#315）", function(
   -- 13-17：纪录服务不可用时只展示明确的未取得数据。
   it("未取得数据与平台不可用同文案，过期真实纪录保持明确标记", function()
     writer:open_modal("compendium")
-    Eui.Click(child(root, "BtnCompendiumFish_bass"))
+    eui.Click(child(root, "BtnCompendiumFish_bass"))
     writer:ingest_event("RecordsState", { seq = 1, fishId = "bass", state = "missing" })
     assert.matches("未取得数据", child(root, "LabelCompendiumDetail").Text, 1, true)
     writer:ingest_event("RecordsState", { seq = 2, fishId = "bass", state = "unavailable" })
@@ -157,18 +157,18 @@ describe("客户端图鉴纪录与剩余模态宿主接缝（#315）", function(
 
   it("GM 鱼类分页有边界，状态字段按上行意图发送并接收服务器快照", function()
     writer:open_modal("gm")
-    assert.same(GameCfg.Fish.eel.Name, child(root, "BtnGMNextFish_1").ButtonText)
-    Eui.Click(child(root, "BtnGMNextFish_1"))
+    assert.same(game_cfg.Fish.eel.Name, child(root, "BtnGMNextFish_1").ButtonText)
+    eui.Click(child(root, "BtnGMNextFish_1"))
     assert.same({ action = "NextFish", fishId = "eel" }, sent.gm[#sent.gm])
-    Eui.Click(child(root, "BtnGMFishPrev"))
+    eui.Click(child(root, "BtnGMFishPrev"))
     assert.matches("1/", child(root, "LabelGMFishPage").Text, 1, true)
-    Eui.Click(child(root, "BtnGMFishNext"))
+    eui.Click(child(root, "BtnGMFishNext"))
     assert.matches("2/", child(root, "LabelGMFishPage").Text, 1, true)
     assert.is_true(#child(root, "BtnGMNextFish_1").ButtonText > 0)
     child(root, "GMInput_coin").Text = "0"
     child(root, "GMInput_container").Text = "backpack"
     child(root, "GMInput_index").Text = "2"
-    Eui.Click(child(root, "BtnGMApplyState"))
+    eui.Click(child(root, "BtnGMApplyState"))
     assert.same({ action = "ApplyState", coin = 0, container = "backpack", index = 2 }, sent.gm[#sent.gm])
     writer:ingest_event("GMResult", { ok = true, action = "GetState", snapshot = { coin = 0, upgradeLevel = 3 }, status = { slot = "qa-one" } })
     assert.same("0", child(root, "GMInput_coin").Text)
@@ -180,11 +180,11 @@ describe("客户端图鉴纪录与剩余模态宿主接缝（#315）", function(
     writer:ingest_event("QuestState", { text = "12345678901234567890" })
     local label = child(root, "QuestLabel")
     assert.matches("\n", label.Text)
-    Eui.Click(child(root, "QuestToggle"))
+    eui.Click(child(root, "QuestToggle"))
     assert.is_false(label.Visible)
     writer:ingest_event("QuestState", { text = "新的任务" })
     assert.is_false(label.Visible)
-    Eui.Click(child(root, "QuestToggle"))
+    eui.Click(child(root, "QuestToggle"))
     assert.is_true(label.Visible)
     assert.same("新的任务", label.Text)
   end)

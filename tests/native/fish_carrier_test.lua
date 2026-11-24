@@ -3,8 +3,8 @@
 -- 假引擎只在被测函数执行期间挂上（withFakeEngine），测完恢复 _G，不影响别的文件；
 -- Busted 案例体在沙箱 _ENV 里，业务模块读的是真 _G，因此引擎全局必须 rawset 到 _G。
 -- describe/it 名称保留旧类名与方法名，按类名字典序 + 方法名字典序注册以保持旧套件执行顺序。
-local MgrFishCarrier = require('server.world_host.fish_carrier')
-local GameCfg = require('common.game_cfg')
+local mgr_fish_carrier = require('server.world_host.fish_carrier')
+local game_cfg = require('common.game_cfg')
 
 local CARRIER_PATH = 'server/world_host/fish_carrier.lua'
 local MAIN_PATH = 'server/main.lua'
@@ -132,9 +132,9 @@ local function withFakeEngine(world, fn)
 end
 
 local function freshManager()
-  MgrFishCarrier.Carriers = {}
-  MgrFishCarrier.Subscribers = {}
-  return MgrFishCarrier
+  mgr_fish_carrier.Carriers = {}
+  mgr_fish_carrier.Subscribers = {}
+  return mgr_fish_carrier
 end
 
 local SPAWN_OPTS = {
@@ -404,7 +404,7 @@ describe('TestFishCarrierEngine', function()
     for _, carrier in ipairs({ first, second }) do
       local name = carrier.Body.Name
       assert.is_truthy(name, '鱼本体建单位必须带名字')
-      assert.is_truthy(string.find(name, 'FishCarrier', 1, true),
+      assert.is_truthy(string.find(name, 'fish_carrier', 1, true),
         '名字要带模块前缀：' .. tostring(name))
       assert.is_false(name == 'CallerChosen', '调用方不能直接决定鱼本体名字')
     end
@@ -464,45 +464,45 @@ describe('TestFishCarrierHealthConfig', function()
   it('test_bad_max_health_falls_back', function()
     -- 0 / 负数 / nan / inf / 非数：一律回落默认，不把「血量为 0」这种值放行进引擎
     for _, bad in ipairs({ 0, -1, 0 / 0, math.huge, -math.huge, '50', true }) do
-      assert.are.equal(100, MgrFishCarrier.ResolveMaxHealth({ MaxHealth = bad }, {}))
+      assert.are.equal(100, mgr_fish_carrier.ResolveMaxHealth({ MaxHealth = bad }, {}))
     end
   end)
 
   it('test_configured_max_health_would_win_over_default', function()
-    -- 本图配置落盘后（M17 的 GameCfg.FishCarrier）应当被优先采用；没落盘时这条自动跳过
-    local cfg = GameCfg.FishCarrier
+    -- 本图配置落盘后（M17 的 game_cfg.fish_carrier）应当被优先采用；没落盘时这条自动跳过
+    local cfg = game_cfg.fish_carrier
     if not cfg or cfg.MaxHealth == nil then
-      assert.are.equal(100, MgrFishCarrier.ResolveMaxHealth(nil))
+      assert.are.equal(100, mgr_fish_carrier.ResolveMaxHealth(nil))
       return
     end
-    assert.are.equal(cfg.MaxHealth, MgrFishCarrier.ResolveMaxHealth(nil))
+    assert.are.equal(cfg.MaxHealth, mgr_fish_carrier.ResolveMaxHealth(nil))
   end)
 
   it('test_max_health_falls_back_to_engine_default', function()
-    assert.are.equal(100, MgrFishCarrier.ResolveMaxHealth(nil, {}))
-    assert.are.equal(100, MgrFishCarrier.ResolveMaxHealth({}, {}))
+    assert.are.equal(100, mgr_fish_carrier.ResolveMaxHealth(nil, {}))
+    assert.are.equal(100, mgr_fish_carrier.ResolveMaxHealth({}, {}))
   end)
 
   it('test_max_health_priority_is_opts_then_config', function()
-    assert.are.equal(50, MgrFishCarrier.ResolveMaxHealth({ MaxHealth = 50 }, { MaxHealth = 30 }))
-    assert.are.equal(30, MgrFishCarrier.ResolveMaxHealth({}, { MaxHealth = 30 }))
+    assert.are.equal(50, mgr_fish_carrier.ResolveMaxHealth({ MaxHealth = 50 }, { MaxHealth = 30 }))
+    assert.are.equal(30, mgr_fish_carrier.ResolveMaxHealth({}, { MaxHealth = 30 }))
   end)
 
   it('test_mesh_priority_is_opts_then_config', function()
     assert.are.equal('official://mesh/1',
-      MgrFishCarrier.ResolveMesh({ RenderMeshId = 'official://mesh/1' }, { RenderMeshId = 'official://mesh/2' }))
-    assert.are.equal('official://mesh/2', MgrFishCarrier.ResolveMesh({}, { RenderMeshId = 'official://mesh/2' }))
+      mgr_fish_carrier.ResolveMesh({ RenderMeshId = 'official://mesh/1' }, { RenderMeshId = 'official://mesh/2' }))
+    assert.are.equal('official://mesh/2', mgr_fish_carrier.ResolveMesh({}, { RenderMeshId = 'official://mesh/2' }))
   end)
 
   it('test_model_id_is_written_as_official_mesh_uri', function()
     -- M0-V3 实测：official://preset/... 会建出 1×1×1 空壳，只有 official://mesh/<号> 是对的写法
-    assert.are.equal('official://mesh/7000544', MgrFishCarrier.ResolveMesh({ ModelId = 7000544 }, {}))
-    assert.are.equal('official://mesh/7000544', MgrFishCarrier.ResolveMesh({}, { ModelId = '7000544' }))
+    assert.are.equal('official://mesh/7000544', mgr_fish_carrier.ResolveMesh({ ModelId = 7000544 }, {}))
+    assert.are.equal('official://mesh/7000544', mgr_fish_carrier.ResolveMesh({}, { ModelId = '7000544' }))
   end)
 
   it('test_no_mesh_anywhere_is_nil_so_spawn_refuses', function()
-    assert.is_nil(MgrFishCarrier.ResolveMesh({}, {}))
-    assert.is_nil(MgrFishCarrier.ResolveMesh({ ModelId = '' }, {}))
+    assert.is_nil(mgr_fish_carrier.ResolveMesh({}, {}))
+    assert.is_nil(mgr_fish_carrier.ResolveMesh({ ModelId = '' }, {}))
   end)
 end)
 
@@ -528,9 +528,9 @@ describe('TestFishCarrierSeam', function()
     local runtime = readSource('server/world_host/server_runtime.lua')
     local host = readSource('server/world_host/fish_tree.lua')
     assert.is_true(contains(runtime, 'require("server.world_host.fish_tree")'),
-      'ServerRuntime 必须持有 FishTree 公开宿主')
+      'server_runtime 必须持有 fish_tree 公开宿主')
     assert.is_true(contains(host, "require('server.world_host.fish_carrier')"),
-      'FishTree 必须挂接 FishCarrier 受击体')
+      'fish_tree 必须挂接 fish_carrier 受击体')
   end)
 
   it('test_module_does_not_require_the_vendor_package', function()

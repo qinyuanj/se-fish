@@ -1,9 +1,9 @@
 -- 服务端左手持竿 / 手持外观纯输出叶子投影（ADR-0032 §3、§4 / #297-A1a）：
 -- 仅在树底消费 character 与 held_visual_item_id，经注入的 create_unit 单向创建挂点与视觉模型，
 
-local GameCfg = require("common.game_cfg")
+local game_cfg = require("common.game_cfg")
 
-local HeldRodLeaf = {}
+local held_rod_leaf = {}
 
 local function make_vec3(scale)
   return Vector3.New(scale.x, scale.y, scale.z)
@@ -18,17 +18,17 @@ end
 ---@param selected_slot number|nil
 ---@param item_bar table|nil
 ---@return string|nil
-function HeldRodLeaf.resolve_visual_item_id(held, selected_slot, item_bar)
+function held_rod_leaf.resolve_visual_item_id(held, selected_slot, item_bar)
   local slot = type(held) == "table" and held.kind == "slot" and held.slot or nil
   if type(held) ~= "table" or held.kind == nil then
     slot = selected_slot
   end
   local entry = slot and type(item_bar) == "table" and item_bar[slot] or nil
   local item_id = type(entry) == "table" and (entry.count or 0) > 0 and entry.itemId or nil
-  local item = item_id and GameCfg.Items.Definitions[item_id] or nil
+  local item = item_id and game_cfg.Items.Definitions[item_id] or nil
   if not item or item.Type ~= "鱼竿" then
     item_id = type(held) == "table" and held.kind == "weapon" and held.id or nil
-    item = item_id and GameCfg.Items.Definitions[item_id] or nil
+    item = item_id and game_cfg.Items.Definitions[item_id] or nil
   end
   if item and item.Visual and item.Visual.Socket then
     return item_id
@@ -42,17 +42,17 @@ end
 ---@param character any
 ---@param item_id string
 ---@return any mount, any model, string|nil err
-function HeldRodLeaf.create_visual(create_unit, user_id, character, item_id)
+function held_rod_leaf.create_visual(create_unit, user_id, character, item_id)
   if type(create_unit) ~= "function" or character == nil or type(item_id) ~= "string" then
     return nil, nil, "invalid-args"
   end
 
-  local item = GameCfg.Items.Definitions[item_id]
+  local item = game_cfg.Items.Definitions[item_id]
   if not item or not item.Visual or not item.Visual.Socket then
     return nil, nil, "no-visual"
   end
 
-  local cfg = item.Type == "鱼竿" and GameCfg.Items.RodVisual or item.Visual
+  local cfg = item.Type == "鱼竿" and game_cfg.Items.RodVisual or item.Visual
   local uid = tostring(user_id)
 
   local ok_mount, mount = pcall(create_unit, "SkeletalSocketMount", {
@@ -88,7 +88,7 @@ end
 ---@param s table EffectBuilder
 ---@param player_tree table
 ---@param opts? { create_unit?: fun(unit_type: string, props: table): any, on_error?: fun(msg: string) }
-function HeldRodLeaf.mount(s, player_tree, opts)
+function held_rod_leaf.mount(s, player_tree, opts)
   opts = type(opts) == "table" and opts or {}
 
   return s:effect("Leaf:HeldRodProjection", function(es)
@@ -114,14 +114,14 @@ function HeldRodLeaf.mount(s, player_tree, opts)
       return
     end
 
-    local mount, model, err = HeldRodLeaf.create_visual(opts.create_unit, player_tree.user_id, character, item_id)
+    local mount, model, err = held_rod_leaf.create_visual(opts.create_unit, player_tree.user_id, character, item_id)
     if not mount or not model then
       if err and err ~= "no-visual" and err ~= "invalid-args" then
         player_tree._held_rod_failed = true
         if type(opts.on_error) == "function" then
-          opts.on_error("[HeldRodLeaf] 左手持竿投影失败: " .. tostring(err))
+          opts.on_error("[held_rod_leaf] 左手持竿投影失败: " .. tostring(err))
         else
-          print("[HeldRodLeaf] 左手持竿投影失败", player_tree.user_id, tostring(err))
+          print("[held_rod_leaf] 左手持竿投影失败", player_tree.user_id, tostring(err))
         end
       end
       return
@@ -134,4 +134,4 @@ function HeldRodLeaf.mount(s, player_tree, opts)
   end)
 end
 
-return HeldRodLeaf
+return held_rod_leaf

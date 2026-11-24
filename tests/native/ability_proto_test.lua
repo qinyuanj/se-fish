@@ -1,12 +1,12 @@
--- #132 T11 原型（能力 A：三倍体型）单测。纯逻辑在 common/body_scale.lua，数值在 GameCfg.Ability.BodyScale。
+-- #132 T11 原型（能力 a：三倍体型）单测。纯逻辑在 common/body_scale.lua，数值在 game_cfg.Ability.body_scale。
 -- 失败方式（先列后写）：
 --   1. 药水数越界：负数 / 小数 / 非数 / 超过上限仍继续变大；上限那一档没有封顶标记；
 --   2. 倍率污染：NaN / inf / ≤0 / 非数的倍率被写进单位，派生量随之变 NaN；
 --   3. 派生量不是线性放大：胶囊高 / 相机距离 / 交互距离仍按 1 倍算，三倍角色够不到地面物与抛竿点；
 --   4. 挂点位移不随体型放大：三倍角色身上的挂件陷进身体（真机「挂点不穿出」的前置条件）；
 --   5. 血量成长与体型成长脱钩：10 个药水不是 900 血 / 3 倍，或超限后血量继续涨。
--- 迁移自 tests/gameplay/ability_proto_test.lua（#83）。旧入口有 4 个 LuaUnit 类（BodyScale / BossPhase /
--- CarryMount / FlightPath），每类 setUp 只做 require 与取值、没有 tearDown；
+-- 迁移自 tests/gameplay/ability_proto_test.lua（#83）。旧入口有 4 个 LuaUnit 类（body_scale / boss_phase /
+-- carry_mount / flight_path），每类 setUp 只做 require 与取值、没有 tearDown；
 -- 按「类名字典序 + 类内方法名字典序」展开（等价于旧入口对 ClassName.method 全名的排序），
 -- 每类保留逐例 before_each。it 顺序与迁移前逐条对账。
 -- 断言口径：旧 assertEquals 两侧同为 table 时深比较 → assert.same，标量 → assert.are.equal；
@@ -14,15 +14,15 @@
 -- assertIsTrue/assertIsFalse 的别名（要求恰为 true/false）→ is_true / is_false，语义一致。
 
 describe("TestBodyScale", function()
-  local Cfg, BodyScale
+  local cfg, body_scale
 
   before_each(function()
-    Cfg = require('common.game_cfg')
-    BodyScale = require('common.body_scale')
+    cfg = require('common.game_cfg')
+    body_scale = require('common.body_scale')
   end)
 
   it("test_config_matches_spec_linear_growth_and_caps", function()
-    local c = Cfg.Ability.BodyScale
+    local c = cfg.Ability.body_scale
     assert.are.equal(1, c.Base)
     assert.are.equal(0.2, c.Step)
     assert.are.equal(3, c.Max)
@@ -35,13 +35,13 @@ describe("TestBodyScale", function()
   it("test_derive_falls_back_to_one_x_when_factor_is_bad", function()
     local base = { CapsuleHeight = 2, CameraDistance = 6, InteractRange = 2 }
     for _, bad in ipairs({ 0 / 0, math.huge, 0, -1, nil, '3' }) do
-      local derived = BodyScale.Derive(bad, base)
+      local derived = body_scale.Derive(bad, base)
       assert.are.equal(1, derived.Scale, tostring(bad))
       assert.are.equal(2, derived.CapsuleHeight, tostring(bad))
       assert.is_nil(derived.SocketOffset, tostring(bad))
     end
     -- 基准量本身是坏值时也不能产出 NaN
-    local derived = BodyScale.Derive(3, { CapsuleHeight = 0 / 0, CameraDistance = 'x' })
+    local derived = body_scale.Derive(3, { CapsuleHeight = 0 / 0, CameraDistance = 'x' })
     assert.are.equal(0, derived.CapsuleHeight)
     assert.are.equal(0, derived.CameraDistance)
     assert.is_not_nil(derived)
@@ -49,13 +49,13 @@ describe("TestBodyScale", function()
   end)
 
   it("test_derive_scales_capsule_camera_interact_and_socket", function()
-    local c = Cfg.Ability.BodyScale
+    local c = cfg.Ability.body_scale
     local base = { CapsuleHeight = c.CapsuleHeight, CameraDistance = c.CameraDistance,
       InteractRange = c.InteractRange, SocketOffset = { x = 0, y = 2.4, z = 0 } }
-    local one = BodyScale.Derive(1, base)
+    local one = body_scale.Derive(1, base)
     assert.same({ Scale = 1, CapsuleHeight = 2, CameraDistance = 13, InteractRange = 2,
       SocketOffset = { x = 0, y = 2.4, z = 0 } }, one)
-    local three = BodyScale.Derive(3, base)
+    local three = body_scale.Derive(3, base)
     assert.are.equal(6, three.CapsuleHeight)
     assert.are.equal(39, three.CameraDistance)
     assert.are.equal(6, three.InteractRange)
@@ -67,20 +67,20 @@ describe("TestBodyScale", function()
   end)
 
   it("test_plan_grows_linearly_and_caps_at_ten_potions", function()
-    local plan = BodyScale.Plan(0)
+    local plan = body_scale.Plan(0)
     assert.are.equal(1, plan.Scale)
     assert.are.equal(300, plan.Health)
     assert.is_false(plan.Capped)
-    plan = BodyScale.Plan(5)
+    plan = body_scale.Plan(5)
     assert.are.equal(2, plan.Scale)
     assert.are.equal(600, plan.Health)
-    plan = BodyScale.Plan(10)
+    plan = body_scale.Plan(10)
     assert.are.equal(3, plan.Scale)
     assert.are.equal(900, plan.Health)
     assert.is_true(plan.Capped)
     -- 超限不再提升，且仍然给出上限值（业务侧据此拒绝使用，见 GameSpec §2）
     for _, over in ipairs({ 11, 99 }) do
-      local capped = BodyScale.Plan(over)
+      local capped = body_scale.Plan(over)
       assert.are.equal(3, capped.Scale, tostring(over))
       assert.are.equal(900, capped.Health, tostring(over))
       assert.is_true(capped.Capped, tostring(over))
@@ -91,26 +91,26 @@ describe("TestBodyScale", function()
     -- 注意：表构造里的 nil 不占位，旧入口 ipairs 同样只跑到第 3 项（-1 / -0.5 / '3'）。
     -- 这里原样保留，不在迁移中悄悄扩大覆盖范围（要补 0/0 与 inf 请另开单）。
     for _, bad in ipairs({ -1, -0.5, '3', nil, 0 / 0, math.huge }) do
-      local plan = BodyScale.Plan(bad)
+      local plan = body_scale.Plan(bad)
       assert.are.equal(1, plan.Scale, tostring(bad))
       assert.are.equal(300, plan.Health, tostring(bad))
       assert.are.equal(0, plan.Potions, tostring(bad))
     end
     -- 小数不是「非法」而是「不足一个」：向下取整，不把玩家的成长一笔抹掉
-    local floored = BodyScale.Plan(1.5)
+    local floored = body_scale.Plan(1.5)
     assert.are.equal(1, floored.Potions)
     assert.are.equal(1.2, floored.Scale)
     assert.is_false(floored.Capped)
   end)
 
   it("test_sanitize_never_lets_a_bad_factor_through", function()
-    local c = Cfg.Ability.BodyScale
+    local c = cfg.Ability.body_scale
     for _, bad in ipairs({ 0 / 0, math.huge, -math.huge, 0, -2, '2', nil }) do
-      assert.are.equal(c.Base, BodyScale.Sanitize(bad), tostring(bad))
+      assert.are.equal(c.Base, body_scale.Sanitize(bad), tostring(bad))
     end
-    assert.are.equal(2.4, BodyScale.Sanitize(2.4))
-    assert.are.equal(c.Max, BodyScale.Sanitize(99))
-    assert.are.equal(c.Base, BodyScale.Sanitize(0.1))
+    assert.are.equal(2.4, body_scale.Sanitize(2.4))
+    assert.are.equal(c.Max, body_scale.Sanitize(99))
+    assert.are.equal(c.Base, body_scale.Sanitize(0.1))
   end)
 end)
 
@@ -122,12 +122,12 @@ end)
 --   4. 失目标不干净：待发吐息不撤销、目标一回来立刻秒杀、冷却被重置成「白赚」；
 --   5. 死亡残留：死后仍有攻击落地、待发攻击不清空、打断被重复计数。
 describe("TestBossPhase", function()
-  local Cfg, Boss, BossCfg, Target
+  local cfg, Boss, BossCfg, Target
 
   before_each(function()
-    Cfg = require('common.game_cfg')
+    cfg = require('common.game_cfg')
     Boss = require('common.boss_phase')
-    BossCfg = Cfg.Ability.BossPhase
+    BossCfg = cfg.Ability.boss_phase
     Target = { x = 1, y = 0, z = 0 }
   end)
 
@@ -317,33 +317,33 @@ end)
 --   4. 越界携带：超出抓取距离仍能叼走；无挂点/无目标也能叼；
 --   5. 释放不干净：超时或目标出 NaN 后仍处于携带态、能重复释放、落点算不出。
 local function newCarry(cfg, host)
-  local Carry = require('common.carry_mount')
-  return Carry, Carry.New(cfg, host or { x = 0, y = 0, z = 0 }, 0, 100)
+  local carry = require('common.carry_mount')
+  return carry, carry.New(cfg, host or { x = 0, y = 0, z = 0 }, 0, 100)
 end
 
 describe("TestCarryMount", function()
-  local Cfg, Carry, CarryCfg
+  local cfg, carry, CarryCfg
 
   before_each(function()
-    Cfg = require('common.game_cfg')
-    Carry = require('common.carry_mount')
-    CarryCfg = Cfg.Ability.Carry
+    cfg = require('common.game_cfg')
+    carry = require('common.carry_mount')
+    CarryCfg = cfg.Ability.carry
   end)
 
   it("test_attach_needs_a_target_inside_grab_range", function()
     local state
-    Carry, state = newCarry(CarryCfg)
-    assert.is_false(Carry.Attach(state, nil, 100).Ok)
-    assert.are.equal('noTarget', Carry.Attach(state, nil, 100).Reason)
+    carry, state = newCarry(CarryCfg)
+    assert.is_false(carry.Attach(state, nil, 100).Ok)
+    assert.are.equal('noTarget', carry.Attach(state, nil, 100).Reason)
     local far = { x = 99, y = 0, z = 0 }
-    assert.is_false(Carry.Attach(state, far, 100).Ok)
-    assert.are.equal('outOfRange', Carry.Attach(state, far, 100).Reason)
-    assert.is_false(Carry.Carried(state))
+    assert.is_false(carry.Attach(state, far, 100).Ok)
+    assert.are.equal('outOfRange', carry.Attach(state, far, 100).Reason)
+    assert.is_false(carry.Carried(state))
     local near = { x = 1, y = 0, z = 1 }
-    local attach = Carry.Attach(state, near, 100)
+    local attach = carry.Attach(state, near, 100)
     assert.is_true(attach.Ok)
     assert.are.equal(CarryCfg.GrabDamage, attach.Damage)
-    assert.is_true(Carry.Carried(state))
+    assert.is_true(carry.Carried(state))
     -- 没有挂点的宿主不吃这套（不能凭空抱走）
     local bareCfg = { Socket = nil, GrabRange = 2.5, GrabDamage = 300,
       Offset = { x = 0, y = 0, z = 2 }, FollowTolerance = 3, MaxCarrySec = 20 }
@@ -354,52 +354,52 @@ describe("TestCarryMount", function()
 
   it("test_carried_body_is_snapped_back_when_it_drifts", function()
     local state
-    Carry, state = newCarry(CarryCfg)
-    Carry.Attach(state, { x = 1, y = 0, z = 1 }, 100)
-    local mount = Carry.MountPoint(state.Host, state.Offset, state.Yaw)
+    carry, state = newCarry(CarryCfg)
+    carry.Attach(state, { x = 1, y = 0, z = 1 }, 100)
+    local mount = carry.MountPoint(state.host, state.Offset, state.Yaw)
     -- 容差内不动它，避免每帧都被「纠正」而抖动
     local near = { x = mount.x + 0.1, y = mount.y, z = mount.z }
-    local kept = Carry.Follow(state, near, 100, 0.05)
+    local kept = carry.Follow(state, near, 100, 0.05)
     assert.is_false(kept.Snapped)
     assert.same(near, kept.Position)
     assert.are.equal(0, state.Stats.Snaps)
     -- 被甩开后整段钳回挂点
     local away = { x = mount.x + 20, y = mount.y, z = mount.z }
-    local snapped = Carry.Follow(state, away, 100, 0.05)
+    local snapped = carry.Follow(state, away, 100, 0.05)
     assert.is_true(snapped.Snapped)
     assert.same(mount, snapped.Position)
     assert.are.equal(1, state.Stats.Snaps)
     -- NaN 目标直接释放，绝不把 NaN 写回玩家身上
-    local nan = Carry.Follow(state, { x = 0 / 0, y = 1, z = 2 }, 101, 0.05)
+    local nan = carry.Follow(state, { x = 0 / 0, y = 1, z = 2 }, 101, 0.05)
     assert.is_true(nan.Released)
     assert.are.equal('nan', nan.Reason)
-    assert.is_false(Carry.Carried(state))
+    assert.is_false(carry.Carried(state))
     assert.is_false(nan.Position.x ~= nan.Position.x)
   end)
 
   it("test_carry_expires_and_drops_ahead_of_the_host", function()
     local state
-    Carry, state = newCarry(CarryCfg)
-    Carry.Attach(state, { x = 1, y = 0, z = 1 }, 100)
-    state.Host = { x = 0, y = 3, z = 0 }
+    carry, state = newCarry(CarryCfg)
+    carry.Attach(state, { x = 1, y = 0, z = 1 }, 100)
+    state.host = { x = 0, y = 3, z = 0 }
     state.GroundY = 2
     local last = nil
     for step = 1, 600 do
-      last = Carry.Step(state, 100 + step * 0.05, 0.05)
+      last = carry.Step(state, 100 + step * 0.05, 0.05)
       if last.Released then break end
     end
     assert.is_true(last.Released)
     assert.are.equal('timeout', last.Reason)
-    assert.is_false(Carry.Carried(state))
+    assert.is_false(carry.Carried(state))
     -- 落点在宿主前方 DropForward 米、离地 DropHeight 米
     local drop = last.DropPoint
     assert.near(state.GroundY + CarryCfg.DropHeight, drop.y, 1e-9)
     assert.is_true(math.abs(drop.z - CarryCfg.DropForward) < 1e-9)
     -- 释放后不再重复触发，也不残留挂点
-    local again = Carry.Step(state, 200, 0.05)
+    local again = carry.Step(state, 200, 0.05)
     assert.is_false(again.Released)
-    assert.are.equal(false, Carry.Release(state, 200, 'manual').Ok)
-    assert.are.equal('notCarrying', Carry.Release(state, 200, 'manual').Reason)
+    assert.are.equal(false, carry.Release(state, 200, 'manual').Ok)
+    assert.are.equal('notCarrying', carry.Release(state, 200, 'manual').Reason)
   end)
 
   it("test_config_matches_spec", function()
@@ -413,18 +413,18 @@ describe("TestCarryMount", function()
     local need = cfg.HostHalfHeight + cfg.CarriedHalfHeight
     -- 配置里的嘴部挂点本身必须已经在宿主体外
     local offset = { x = cfg.Offset.x, y = cfg.Offset.y, z = cfg.Offset.z }
-    local safe = Carry.SafeOffset(offset, cfg.HostHalfHeight, cfg.CarriedHalfHeight)
+    local safe = carry.SafeOffset(offset, cfg.HostHalfHeight, cfg.CarriedHalfHeight)
     assert.is_false(safe.Corrected, '默认挂点不该需要纠正')
-    assert.is_true(Carry.Length(safe.Offset) >= need, '默认挂点必须清空宿主与携带物')
+    assert.is_true(carry.Length(safe.Offset) >= need, '默认挂点必须清空宿主与携带物')
     -- 贴脸的挂点必须被推出去，且保留原方向
-    local squeezed = Carry.SafeOffset({ x = 0, y = 0.3, z = 0.4 }, cfg.HostHalfHeight, cfg.CarriedHalfHeight)
+    local squeezed = carry.SafeOffset({ x = 0, y = 0.3, z = 0.4 }, cfg.HostHalfHeight, cfg.CarriedHalfHeight)
     assert.is_true(squeezed.Corrected)
-    assert.is_true(Carry.Length(squeezed.Offset) >= need)
+    assert.is_true(carry.Length(squeezed.Offset) >= need)
     assert.is_true(squeezed.Offset.z > 0.4, '必须在原方向上推出去')
     assert.near(0.4 / 0.3, squeezed.Offset.z / squeezed.Offset.y, 1e-9)
     -- 零位移没有方向可用：给一个确定性方向而不是 NaN
-    local zero = Carry.SafeOffset({ x = 0, y = 0, z = 0 }, 1, 1)
-    assert.is_true(Carry.Length(zero.Offset) >= 2)
+    local zero = carry.SafeOffset({ x = 0, y = 0, z = 0 }, 1, 1)
+    assert.is_true(carry.Length(zero.Offset) >= 2)
     assert.is_true(zero.Offset.z > 0)
     assert.are.equal(0, zero.Offset.x)
   end)
@@ -432,36 +432,36 @@ describe("TestCarryMount", function()
   it("test_mount_point_uses_host_pose_and_scaled_offset", function()
     local offset = { x = 0, y = 2, z = 2 }
     local host = { x = 10, y = 5, z = -3 }
-    local point = Carry.MountPoint(host, offset, 0)
+    local point = carry.MountPoint(host, offset, 0)
     assert.same({ x = 10, y = 7, z = -1 }, point)
     -- 转身 90 度：挂点跟着宿主朝向走
-    local turned = Carry.MountPoint(host, offset, math.pi / 2)
+    local turned = carry.MountPoint(host, offset, math.pi / 2)
     assert.near(12, turned.x, 1e-9)
     assert.near(7, turned.y, 1e-9)
     assert.near(-3, turned.z, 1e-9)
     -- 三倍体型：挂点位移随体型放大，挂件才不会陷进放大的身体
-    local BodyScale = require('common.body_scale')
-    local base = { CapsuleHeight = Cfg.Ability.BodyScale.CapsuleHeight,
+    local body_scale = require('common.body_scale')
+    local base = { CapsuleHeight = cfg.Ability.body_scale.CapsuleHeight,
       SocketOffset = { x = 0, y = 2, z = 2 } }
-    local one = BodyScale.Derive(1, base)
-    local three = BodyScale.Derive(3, base)
-    local p1 = Carry.MountPoint(host, one.SocketOffset, 0)
-    local p3 = Carry.MountPoint(host, three.SocketOffset, 0)
+    local one = body_scale.Derive(1, base)
+    local three = body_scale.Derive(3, base)
+    local p1 = carry.MountPoint(host, one.SocketOffset, 0)
+    local p3 = carry.MountPoint(host, three.SocketOffset, 0)
     assert.is_true(p3.y > p1.y and p3.z > p1.z)
     assert.are.equal(11, p3.y)
   end)
 
   it("test_step_without_carry_is_a_noop", function()
     local state
-    Carry, state = newCarry(CarryCfg)
-    local events = Carry.Step(state, 100.05, 0.05)
+    carry, state = newCarry(CarryCfg)
+    local events = carry.Step(state, 100.05, 0.05)
     assert.is_false(events.Released)
     assert.is_nil(events.Position)
     assert.are.equal(1, state.Stats.Frames)
   end)
 end)
 
--- 能力 B：飞行与俯冲（common/flight_path.lua）。
+-- 能力 b：飞行与俯冲（common/flight_path.lua）。
 -- 失败方式（先列后写）：
 --   1. 越界：飞过钓鱼区围栏（借飞行跨区）、超过 20 米高度上限、掉到地面以下；
 --   2. 一帧过大：dt 补算让单帧位移越过围栏（钳制被跳过）；
@@ -474,22 +474,22 @@ local function flightBounds()
 end
 
 local function newFlight(cfg, profile, start)
-  local FlightPath = require('common.flight_path')
-  local state = FlightPath.New(flightBounds(), cfg, profile or {}, start or { x = 0, y = 14, z = 0 }, 100)
-  return FlightPath, state
+  local flight_path = require('common.flight_path')
+  local state = flight_path.New(flightBounds(), cfg, profile or {}, start or { x = 0, y = 14, z = 0 }, 100)
+  return flight_path, state
 end
 
 describe("TestFlightPath", function()
-  local Cfg, Fly, FlightCfg
+  local cfg, Fly, FlightCfg
 
   before_each(function()
-    Cfg = require('common.game_cfg')
+    cfg = require('common.game_cfg')
     Fly = require('common.flight_path')
-    FlightCfg = Cfg.Ability.Flight
+    FlightCfg = cfg.Ability.Flight
   end)
 
   it("test_bounds_come_from_zone_scene_and_cap_the_ceiling", function()
-    local zone = Cfg.Zones[1].Scene
+    local zone = cfg.Zones[1].Scene
     local bounds = Fly.BoundsOf(zone, FlightCfg)
     assert.are.equal(zone.Boundary.MinX, bounds.MinX)
     assert.are.equal(zone.Boundary.MaxZ, bounds.MaxZ)

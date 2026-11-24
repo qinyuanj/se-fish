@@ -1,14 +1,14 @@
-local Gesture = {}
-Gesture.__index = Gesture
+local gesture = {}
+gesture.__index = gesture
 
 local DEFAULTS = {
     LongPressSec = 0.35,
     MoveTolerancePx = 12,
 }
 
-function Gesture.New(opts)
+function gesture.New(opts)
     opts = opts or {}
-    local self = setmetatable({}, Gesture)
+    local self = setmetatable({}, gesture)
     self.LongPressSec = opts.LongPressSec or DEFAULTS.LongPressSec
     self.MoveTolerancePx = opts.MoveTolerancePx or DEFAULTS.MoveTolerancePx
     self.Active = false
@@ -21,7 +21,7 @@ local function movedFar(self, pos)
     return dx * dx + dy * dy > self.MoveTolerancePx * self.MoveTolerancePx
 end
 
-function Gesture:Begin(t, pos)
+function gesture:Begin(t, pos)
     self.Active = true
     self.StartT = t
     self.StartPos = pos and { x = pos.x, y = pos.y } or nil
@@ -30,7 +30,7 @@ function Gesture:Begin(t, pos)
     return true
 end
 
-function Gesture:Update(t)
+function gesture:Update(t)
     if not self.Active then return false end
     if self.Canceled or self.LongFired then return false end
     if t - (self.StartT or t) >= self.LongPressSec then
@@ -40,7 +40,7 @@ function Gesture:Update(t)
     return false
 end
 
-function Gesture:End(t, pos)
+function gesture:End(t, pos)
     if not self.Active then return nil end
     self.Active = false
     if self.LongFired then return 'long' end
@@ -49,9 +49,9 @@ function Gesture:End(t, pos)
     return 'tap'
 end
 
-function Gesture:Move(pos)
+function gesture:Move(pos)
     if not self.Active or self.LongFired then return end
     if movedFar(self, pos) then self.Canceled = true end
 end
 
-return Gesture
+return gesture

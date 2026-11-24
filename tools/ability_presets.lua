@@ -7,11 +7,11 @@
 -- 自定义预设类型，预设一律「复制官方模板 → 改壳源码 / 属性」：
 --   * 技能背包 / 挥砍技能：duplicate-asset 官方模板即用（壳原样）；
 --   * 挥砍锚点：duplicate 后重写壳源码（只声明属性、不挂接——壳在实例化时
---     Parent 还是 World 就会抢跑认错宿主，挂接由根 AbilityAPI.AttachAnchor 补做，
+--     Parent 还是 World 就会抢跑认错宿主，挂接由根 ability_api.AttachAnchor 补做，
 --     见 issue #7），再 change-asset-value 写入属性值。
--- 预设 key 的唯一真源是 common/game_cfg.lua 的 GameCfg.Ability：本命令按 key 查预设，
+-- 预设 key 的唯一真源是 common/game_cfg.lua 的 game_cfg.Ability：本命令按 key 查预设，
 -- 还在就原地重刷壳与属性（可重复执行）；不在就复制模板建新的，并把新 key 回写
--- GameCfg.lua。跑完后照常 lua tools/cli.lua deploy 落地、试玩验证。
+-- game_cfg.lua。跑完后照常 lua tools/cli.lua deploy 落地、试玩验证。
 --
 -- 已知坑（issue #7/#8 实测，Name 那条由 issue #22 运行期探针复核，脚本使用者不必再踩）：
 --   * preset 命令要编辑态，试玩中一律报「需要编辑态」；
@@ -22,7 +22,7 @@
 --     的 string Name）与重刷（只写 SourceCode + attrs）都不碰 Name，日常跑不会新污染；
 --   * change-asset-value 改「壳里已声明的属性」不下发到实例（issue #7 坑 2）——锚点壳
 --     从模板继承的 StartTime/Duration/Phase/TrackIndex 照录命令记录但不依赖它生效；
---     关键值由 MgrAbility 按 GameCfg.Ability 的 AnchorAttributes 在挂接前运行时覆盖；
+--     关键值由 MgrAbility 按 game_cfg.Ability 的 AnchorAttributes 在挂接前运行时覆盖；
 --   * 预设改动不用存盘就进下一场试玩（#22 实测：编辑器内存里改完立刻 play start，运行期已拿到
 --     新值）；但 `deploy` 只镜像 Lua 源码，与预设无关。
 --
@@ -45,7 +45,7 @@
 --   实测提醒：写脏的值经 preset get-asset-value 照样显示原名，看不出类型；告警条数也
 --   数不出中招个数——同一条告警一个 Lua VM 只打一次。
 --
--- 修（`--fix-names` 跑的就是这四步，全在编辑器内存态，不动 GameCfg、保原预设 id、不存盘）：
+-- 修（`--fix-names` 跑的就是这四步，全在编辑器内存态，不动 game_cfg、保原预设 id、不存盘）：
 --   0. 读原名：preset get-asset-value <预设> Name —— 拿到内容（内容本身就是好的，坏的是类型）；
 --   1. preset create-unit-by-asset <预设> --position 0,100,0 --yes —— 从预设建场景单位，
 --      返回的 unit_ids 连子单位一起给，根 = 父不在这一批里的那个；
@@ -115,8 +115,8 @@ M.SPECS = {
   } },
 }
 
--- 从 GameCfg.lua 文本里取出三个预设 key（slot → key）；取不到的槽位值为 nil。
--- 结构约定见 common/game_cfg.lua 的 GameCfg.Ability：技能条目里 AssetId/Anchor 出现在
+-- 从 game_cfg.lua 文本里取出三个预设 key（slot → key）；取不到的槽位值为 nil。
+-- 结构约定见 common/game_cfg.lua 的 game_cfg.Ability：技能条目里 AssetId/Anchor 出现在
 -- AnchorBehavior 之前、且中间没有嵌套表，所以按 `{` 起、不跨 `{` 截到 AnchorBehavior。
 function M.parse_gamecfg(text)
   local keys = {}
@@ -132,14 +132,14 @@ function M.parse_gamecfg(text)
   return keys
 end
 
--- 把 GameCfg 文本里的旧 key 换成新 key；旧 key 必须恰好出现一次，否则返回 nil, 原因。
+-- 把 game_cfg 文本里的旧 key 换成新 key；旧 key 必须恰好出现一次，否则返回 nil, 原因。
 function M.replace_key(text, old_id, new_id)
   local first = text:find(old_id, 1, true)
   if not first then
-    return nil, "GameCfg.lua 里找不到旧 key " .. old_id
+    return nil, "game_cfg.lua 里找不到旧 key " .. old_id
   end
   if text:find(old_id, first + 1, true) then
-    return nil, "旧 key 在 GameCfg.lua 里出现多次，不敢回写: " .. old_id
+    return nil, "旧 key 在 game_cfg.lua 里出现多次，不敢回写: " .. old_id
   end
   return text:sub(1, first - 1) .. new_id .. text:sub(first + #old_id)
 end
@@ -413,7 +413,7 @@ local function probe_name_kind(ctx, key)
 end
 
 -- 四步配方（--fix-names 的核心）：从预设建场景单位 → 用 plain string 改名 → 同步回预设 →
--- 删场景单位。全程编辑器内存态：不改 GameCfg.lua、不存盘、保原预设 id。
+-- 删场景单位。全程编辑器内存态：不改 game_cfg.lua、不存盘、保原预设 id。
 local function apply_name_fix(ctx, key, name, dry_run)
   -- 第 3 步按名字 FindFirstChild 找单位，场景里已有同名（或名字含同串的）单位会同步错对象
   -- ——先查，见到就停。list --name 是子串匹配，宁可保守拦下也不要同步错对象。
@@ -485,7 +485,7 @@ local function apply_name_fix(ctx, key, name, dry_run)
   end
 end
 
--- --fix-names：对 GameCfg.Ability 引用的每个预设查 Name 类型，该修就修，逐个报告前后。
+-- --fix-names：对 game_cfg.Ability 引用的每个预设查 Name 类型，该修就修，逐个报告前后。
 -- 返回失败的预设个数（0 才算全成功）。先只读探完五个预设再动手：计划按初始状态定，
 -- 不会边探边改。
 local function fix_names(ctx, keys, dry_run)
@@ -536,7 +536,7 @@ local function fix_names(ctx, keys, dry_run)
     fail(failed .. " 个预设没能处理（见上面输出）")
   end
   if not dry_run then
-    print("ability-presets --fix-names ok：GameCfg.Ability 引用的预设 Name 全是 Lua string")
+    print("ability-presets --fix-names ok：game_cfg.Ability 引用的预设 Name 全是 Lua string")
     print("（编辑器内存态已修好，未存盘；试玩即时生效，持久化由人类手动存盘决定）")
   end
   return 0
@@ -547,18 +547,18 @@ function M.usage()
     "用法: lua tools/cli.lua ability-presets [--fix-names] [--dry-run] [--editor-instance <pid>]",
     "",
     "重建技能包的编辑器侧预设（技能背包 / 挥砍技能 / 挥砍锚点）：",
-    "GameCfg.Ability 里的 key 还在就原地重刷壳与属性（可重复执行）；不在就复制官方模板",
+    "game_cfg.Ability 里的 key 还在就原地重刷壳与属性（可重复执行）；不在就复制官方模板",
     "建新的，并把新 key 回写 common/game_cfg.lua。",
-    "加 --fix-names 则改跑 Name 类型修复：对 GameCfg.Ability 引用的每个预设查 Name 类型，",
+    "加 --fix-names 则改跑 Name 类型修复：对 game_cfg.Ability 引用的每个预设查 Name 类型，",
     "不是 Lua string 的按「create-unit-by-asset → editor-unit rename → SyncAssetFromUnit →",
-    "删场景单位」四步修回来（保原预设 id、不改 GameCfg.lua、不存盘）。",
+    "删场景单位」四步修回来（保原预设 id、不改 game_cfg.lua、不存盘）。",
     "两种模式都要求编辑器开着本地图且在编辑态（preset 命令试玩中不可用）；多个编辑器实例时",
     "用 --editor-instance <pid> 指定。",
-    "常规模式跑完后：lua tools/cli.lua deploy 落地，试玩验证，再把 GameCfg.lua 的 key 变更提交。",
+    "常规模式跑完后：lua tools/cli.lua deploy 落地，试玩验证，再把 game_cfg.lua 的 key 变更提交。",
     "",
     "选项：",
     "  --fix-names            修预设 Name 的类型（见上），不再跑重建/重刷",
-    "  --dry-run              只做只读探测并打印计划，不写编辑器、不改 GameCfg.lua",
+    "  --dry-run              只做只读探测并打印计划，不写编辑器、不改 game_cfg.lua",
     "  --editor-instance <pid>  透传给每条 editor-cli 命令（多实例时必填）",
     "",
     "两者都不调 map save：预设改动进下一场试玩即时生效，持久化由人类自己手动存盘。",
@@ -600,7 +600,7 @@ local function run(args)
   local keys = M.parse_gamecfg(body)
   for _, spec in ipairs(M.SPECS) do
     if not keys[spec.slot] then
-      fail("从 " .. GAMECFG .. " 取不到预设 key: " .. spec.slot .. "（GameCfg.Ability 结构变了？）")
+      fail("从 " .. GAMECFG .. " 取不到预设 key: " .. spec.slot .. "（game_cfg.Ability 结构变了？）")
     end
   end
 

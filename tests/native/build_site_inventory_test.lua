@@ -10,15 +10,15 @@
 -- `pcall(world.CreateUnit, world, ...)` 的点号取函数都命中，
 -- `print("WARNING: CreateUnit ... failed")` 这类文案落在字符串里，抹掉后不算。
 
-local Arch = require("tools.arch_policy")
+local arch = require("tools.arch_policy")
 local fs = require("tests.support.fs_fixture")
 local lfs = require("lfs")
 
 -- 63：#214 审查修复把商品行子节点的两处建点（图片 / 文字各一支）合成一处驱动表建点，client 40 → 39
 -- 65：#296 客户端 Spoke 根视图树 client/views/root_view.lua 统一动态 UI 建点，client 40 → 41
--- 62：#297-B2 主 HUD 左上状态区迁入 client/views/main_hud_vitals_view.lua（复用 RootView 统一建点），剥离 ScreenMain 3 处建点，client 41 → 38
--- 61：#297-A3 左手持竿投影迁入 HeldRodLeaf，剥离 MgrPlayerData 2 处建点，在 server/main.lua 注入 1 处统一 create_unit，server 净减 1
--- 60：#297-C1 主 HUD 武器/鱼饵浮层与背包面板切流至 Spoke 视图（复用 RootView 统一建点），剥离 ScreenMain 1 处建点，client 38 → 37
+-- 62：#297-B2 主 HUD 左上状态区迁入 client/views/main_hud_vitals_view.lua（复用 root_view 统一建点），剥离 ScreenMain 3 处建点，client 41 → 38
+-- 61：#297-A3 左手持竿投影迁入 held_rod_leaf，剥离 mgr_player_data 2 处建点，在 server/main.lua 注入 1 处统一 create_unit，server 净减 1
+-- 60：#297-C1 主 HUD 武器/鱼饵浮层与背包面板切流至 Spoke 视图（复用 root_view 统一建点），剥离 ScreenMain 1 处建点，client 38 → 37
 -- 58：#297-C2 主 HUD 底部道具栏、拖拽与爆炸物瞄准切流至 Spoke 视图，剥离 ScreenMain 动态格位与瞄准遮罩 2 处建点（含循环内多节点建点），client 37 → 35
 local SITES = 37
 local SITE_ROOTS = { "client", "common", "server" }
@@ -63,7 +63,7 @@ local function count_sites()
   for _, root in ipairs(SITE_ROOTS) do
     local counted = 0
     for _, path in ipairs(lua_files(root)) do
-      for _ in Arch.code_only(source_of(path)):gmatch("[:.]%s*CreateUnit") do
+      for _ in arch.code_only(source_of(path)):gmatch("[:.]%s*CreateUnit") do
         counted = counted + 1
       end
     end

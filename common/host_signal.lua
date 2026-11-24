@@ -1,6 +1,6 @@
-local HostSignal = {}
+local host_signal = {}
 
-function HostSignal.connect(scope, signal, handler)
+function host_signal.connect(scope, signal, handler)
   if scope == nil or signal == nil or type(signal.Connect) ~= "function" then return nil end
   local connection = signal:Connect(handler)
   scope:on_cleanup(function()
@@ -9,4 +9,4 @@ function HostSignal.connect(scope, signal, handler)
   return connection
 end
 
-return HostSignal
+return host_signal
