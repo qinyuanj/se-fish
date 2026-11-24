@@ -1,1052 +1,806 @@
 {:candidates [
  {:score 1.0
   :language "lua"
-  :left {:file "client/DamageFloat.lua", :start-line 27, :end-line 31, :namespace "client.DamageFloat", :name "DamageFloat:Bind"}
-  :right {:file "client/FishCombatLabel.lua", :start-line 55, :end-line 59, :namespace "client.FishCombatLabel", :name "FishCombatLabel:Bind"}
-  :left-nodes 57
-  :right-nodes 57}
+  :left {:file "client/views/camera_zoom_view.lua", :start-line 158, :end-line 165, :namespace "client.views.camera_zoom_view", :name "camera_zoom_view.spec"}
+  :right {:file "client/views/grill_view.lua", :start-line 241, :end-line 248, :namespace "client.views.grill_view", :name "grill_view.spec"}
+  :left-nodes 51
+  :right-nodes 51}
  {:score 1.0
   :language "lua"
-  :left {:file "client/ScreenHandlers/DialogNoticeConfirm.lua", :start-line 59, :end-line 64, :namespace "client.ScreenHandlers.DialogNoticeConfirm", :name "ScreenHandler:Destroy"}
-  :right {:file "client/ScreenHandlers/ScreenMsg.lua", :start-line 65, :end-line 69, :namespace "client.ScreenHandlers.ScreenMsg", :name "ScreenHandler:Destroy"}
-  :left-nodes 48
-  :right-nodes 48}
+  :left {:file "client/views/camera_zoom_view.lua", :start-line 158, :end-line 165, :namespace "client.views.camera_zoom_view", :name "camera_zoom_view.spec"}
+  :right {:file "client/views/main_hud_action_buttons_view.lua", :start-line 544, :end-line 551, :namespace "client.views.main_hud_action_buttons_view", :name "main_hud_action_buttons_view.spec"}
+  :left-nodes 51
+  :right-nodes 51}
  {:score 1.0
   :language "lua"
-  :left {:file "client/ScreenHandlers/ScreenBlindbox.lua", :start-line 73, :end-line 76, :namespace "client.ScreenHandlers.ScreenBlindbox", :name "Screen:SetText"}
-  :right {:file "client/ScreenHandlers/ScreenPlatform.lua", :start-line 61, :end-line 64, :namespace "client.ScreenHandlers.ScreenPlatform", :name "Panel:SetVisible"}
+  :left {:file "client/views/camera_zoom_view.lua", :start-line 158, :end-line 165, :namespace "client.views.camera_zoom_view", :name "camera_zoom_view.spec"}
+  :right {:file "client/views/main_hud_backpack_view.lua", :start-line 554, :end-line 561, :namespace "client.views.main_hud_backpack_view", :name "main_hud_backpack_view.spec"}
+  :left-nodes 51
+  :right-nodes 51}
+ {:score 1.0
+  :language "lua"
+  :left {:file "client/views/camera_zoom_view.lua", :start-line 158, :end-line 165, :namespace "client.views.camera_zoom_view", :name "camera_zoom_view.spec"}
+  :right {:file "client/views/main_hud_equip_popups.lua", :start-line 465, :end-line 472, :namespace "client.views.main_hud_equip_popups", :name "main_hud_equip_popups.spec"}
+  :left-nodes 51
+  :right-nodes 51}
+ {:score 1.0
+  :language "lua"
+  :left {:file "client/views/camera_zoom_view.lua", :start-line 158, :end-line 165, :namespace "client.views.camera_zoom_view", :name "camera_zoom_view.spec"}
+  :right {:file "client/views/main_hud_item_bar_view.lua", :start-line 535, :end-line 542, :namespace "client.views.main_hud_item_bar_view", :name "main_hud_item_bar_view.spec"}
+  :left-nodes 51
+  :right-nodes 51}
+ {:score 1.0
+  :language "lua"
+  :left {:file "client/views/camera_zoom_view.lua", :start-line 158, :end-line 165, :namespace "client.views.camera_zoom_view", :name "camera_zoom_view.spec"}
+  :right {:file "client/views/main_hud_vitals_view.lua", :start-line 244, :end-line 251, :namespace "client.views.main_hud_vitals_view", :name "main_hud_vitals_view.spec"}
+  :left-nodes 51
+  :right-nodes 51}
+ {:score 1.0
+  :language "lua"
+  :left {:file "client/views/fisherman_view.lua", :start-line 20, :end-line 23, :namespace "client.views.fisherman_view", :name "open_modal"}
+  :right {:file "client/views/shop_view.lua", :start-line 46, :end-line 49, :namespace "client.views.shop_view", :name "open_modal"}
+  :left-nodes 65
+  :right-nodes 65}
+ {:score 1.0
+  :language "lua"
+  :left {:file "client/views/fisherman_view.lua", :start-line 25, :end-line 28, :namespace "client.views.fisherman_view", :name "close_modal"}
+  :right {:file "client/views/shop_view.lua", :start-line 51, :end-line 54, :namespace "client.views.shop_view", :name "close_modal"}
   :left-nodes 63
   :right-nodes 63}
  {:score 1.0
   :language "lua"
-  :left {:file "client/ScreenHandlers/ScreenFerry.lua", :start-line 36, :end-line 39, :namespace "client.ScreenHandlers.ScreenFerry", :name "ScreenFerry:Send"}
-  :right {:file "client/ScreenHandlers/ScreenSurvival.lua", :start-line 31, :end-line 34, :namespace "client.ScreenHandlers.ScreenSurvival", :name "Panel:Send"}
-  :left-nodes 81
-  :right-nodes 81}
+  :left {:file "client/views/fisherman_view.lua", :start-line 217, :end-line 222, :namespace "client.views.fisherman_view", :name "fisherman_view.rescue_driver_spec"}
+  :right {:file "client/views/squad_view.lua", :start-line 171, :end-line 176, :namespace "client.views.squad_view", :name "squad_view.rescue_driver_spec"}
+  :left-nodes 42
+  :right-nodes 42}
  {:score 1.0
   :language "lua"
-  :left {:file "client/ScreenHandlers/ScreenGrill.lua", :start-line 31, :end-line 42, :namespace "client.ScreenHandlers.ScreenGrill", :name "create"}
-  :right {:file "client/ScreenHandlers/ScreenSurvival.lua", :start-line 18, :end-line 29, :namespace "client.ScreenHandlers.ScreenSurvival", :name "create"}
-  :left-nodes 202
-  :right-nodes 202}
- {:score 1.0
-  :language "lua"
-  :left {:file "client/packages/ability_system/api.lua", :start-line 88, :end-line 98, :namespace "client.packages.ability_system.api", :name "AbilityClientAPI.RequestStop"}
-  :right {:file "client/packages/ability_system/api.lua", :start-line 104, :end-line 114, :namespace "client.packages.ability_system.api", :name "AbilityClientAPI.RequestSwitchNext"}
-  :left-nodes 99
-  :right-nodes 99}
- {:score 1.0
-  :language "lua"
-  :left {:file "client/packages/ability_system/api.lua", :start-line 88, :end-line 98, :namespace "client.packages.ability_system.api", :name "AbilityClientAPI.RequestStop"}
-  :right {:file "client/packages/ability_system/api.lua", :start-line 121, :end-line 131, :namespace "client.packages.ability_system.api", :name "AbilityClientAPI.RequestAccumulate"}
-  :left-nodes 99
-  :right-nodes 99}
- {:score 1.0
-  :language "lua"
-  :left {:file "client/packages/ability_system/api.lua", :start-line 104, :end-line 114, :namespace "client.packages.ability_system.api", :name "AbilityClientAPI.RequestSwitchNext"}
-  :right {:file "client/packages/ability_system/api.lua", :start-line 121, :end-line 131, :namespace "client.packages.ability_system.api", :name "AbilityClientAPI.RequestAccumulate"}
-  :left-nodes 99
-  :right-nodes 99}
- {:score 1.0
-  :language "lua"
-  :left {:file "client/packages/ability_system/pointer/RectanglePointer.lua", :start-line 11, :end-line 17, :namespace "client.packages.ability_system.pointer.RectanglePointer", :name "RectanglePointer.new"}
-  :right {:file "client/packages/ability_system/pointer/SectorPointer.lua", :start-line 11, :end-line 17, :namespace "client.packages.ability_system.pointer.SectorPointer", :name "SectorPointer.new"}
-  :left-nodes 74
-  :right-nodes 74}
- {:score 1.0
-  :language "lua"
-  :left {:file "client/packages/ability_system/pointer/RectanglePointer.lua", :start-line 19, :end-line 33, :namespace "client.packages.ability_system.pointer.RectanglePointer", :name "RectanglePointer:Create"}
-  :right {:file "client/packages/ability_system/pointer/SectorPointer.lua", :start-line 19, :end-line 33, :namespace "client.packages.ability_system.pointer.SectorPointer", :name "SectorPointer:Create"}
-  :left-nodes 206
-  :right-nodes 206}
- {:score 1.0
-  :language "lua"
-  :left {:file "client/packages/ability_system/strategy/HoldStrategy.lua", :start-line 71, :end-line 77, :namespace "client.packages.ability_system.strategy.HoldStrategy", :name "HoldStrategy:Cancel"}
-  :right {:file "client/packages/ability_system/strategy/HoldStrategy.lua", :start-line 79, :end-line 85, :namespace "client.packages.ability_system.strategy.HoldStrategy", :name "HoldStrategy:Destroy"}
+  :left {:file "client/views/fisherman_view.lua", :start-line 224, :end-line 233, :namespace "client.views.fisherman_view", :name "fisherman_view.rescue_bubble_spec"}
+  :right {:file "client/views/squad_view.lua", :start-line 178, :end-line 187, :namespace "client.views.squad_view", :name "squad_view.rescue_bubble_spec"}
   :left-nodes 70
   :right-nodes 70}
  {:score 1.0
   :language "lua"
-  :left {:file "client/packages/ability_system/ui/nodes/AbilitySlot.lua", :start-line 237, :end-line 243, :namespace "client.packages.ability_system.ui.nodes.AbilitySlot", :name "AbilitySlot._StopCDTimer"}
-  :right {:file "client/packages/ability_system/ui/nodes/AccumulateNode.lua", :start-line 171, :end-line 177, :namespace "client.packages.ability_system.ui.nodes.AccumulateNode", :name "AccumulateNode._StopTimer"}
-  :left-nodes 67
-  :right-nodes 67}
+  :left {:file "client/views/grill_view.lua", :start-line 241, :end-line 248, :namespace "client.views.grill_view", :name "grill_view.spec"}
+  :right {:file "client/views/main_hud_action_buttons_view.lua", :start-line 544, :end-line 551, :namespace "client.views.main_hud_action_buttons_view", :name "main_hud_action_buttons_view.spec"}
+  :left-nodes 51
+  :right-nodes 51}
  {:score 1.0
   :language "lua"
-  :left {:file "client/packages/modifier_system/ClientModifierHandler.lua", :start-line 13, :end-line 27, :namespace "client.packages.modifier_system.ClientModifierHandler", :name "isValidOwner"}
-  :right {:file "client/packages/modifier_system/api.lua", :start-line 16, :end-line 30, :namespace "client.packages.modifier_system.api", :name "isValidOwner"}
-  :left-nodes 158
-  :right-nodes 158}
+  :left {:file "client/views/grill_view.lua", :start-line 241, :end-line 248, :namespace "client.views.grill_view", :name "grill_view.spec"}
+  :right {:file "client/views/main_hud_backpack_view.lua", :start-line 554, :end-line 561, :namespace "client.views.main_hud_backpack_view", :name "main_hud_backpack_view.spec"}
+  :left-nodes 51
+  :right-nodes 51}
  {:score 1.0
   :language "lua"
-  :left {:file "client/packages/modifier_system/api.lua", :start-line 91, :end-line 96, :namespace "client.packages.modifier_system.api", :name "ClearUnitModifiers"}
-  :right {:file "server/packages/modifier_system/api.lua", :start-line 37, :end-line 42, :namespace "server.packages.modifier_system.api", :name "ClearUnitModifiers"}
-  :left-nodes 57
-  :right-nodes 57}
+  :left {:file "client/views/grill_view.lua", :start-line 241, :end-line 248, :namespace "client.views.grill_view", :name "grill_view.spec"}
+  :right {:file "client/views/main_hud_equip_popups.lua", :start-line 465, :end-line 472, :namespace "client.views.main_hud_equip_popups", :name "main_hud_equip_popups.spec"}
+  :left-nodes 51
+  :right-nodes 51}
  {:score 1.0
   :language "lua"
-  :left {:file "client/packages/modifier_system/api.lua", :start-line 170, :end-line 175, :namespace "client.packages.modifier_system.api", :name "GetUnitModifiers"}
-  :right {:file "server/packages/modifier_system/api.lua", :start-line 50, :end-line 55, :namespace "server.packages.modifier_system.api", :name "GetUnitModifiers"}
-  :left-nodes 57
-  :right-nodes 57}
+  :left {:file "client/views/grill_view.lua", :start-line 241, :end-line 248, :namespace "client.views.grill_view", :name "grill_view.spec"}
+  :right {:file "client/views/main_hud_item_bar_view.lua", :start-line 535, :end-line 542, :namespace "client.views.main_hud_item_bar_view", :name "main_hud_item_bar_view.spec"}
+  :left-nodes 51
+  :right-nodes 51}
  {:score 1.0
   :language "lua"
-  :left {:file "client/packages/modifier_system/modifier_system.lua", :start-line 15, :end-line 23, :namespace "client.packages.modifier_system.modifier_system", :name "getTagsComponent"}
-  :right {:file "common/packages/ability_system/registry.lua", :start-line 150, :end-line 158, :namespace "common.packages.ability_system.registry", :name "_getTagsComp"}
-  :left-nodes 70
-  :right-nodes 70}
+  :left {:file "client/views/grill_view.lua", :start-line 241, :end-line 248, :namespace "client.views.grill_view", :name "grill_view.spec"}
+  :right {:file "client/views/main_hud_vitals_view.lua", :start-line 244, :end-line 251, :namespace "client.views.main_hud_vitals_view", :name "main_hud_vitals_view.spec"}
+  :left-nodes 51
+  :right-nodes 51}
  {:score 1.0
   :language "lua"
-  :left {:file "client/packages/modifier_system/modifier_system.lua", :start-line 15, :end-line 23, :namespace "client.packages.modifier_system.modifier_system", :name "getTagsComponent"}
-  :right {:file "server/packages/modifier_system/modifier_system.lua", :start-line 37, :end-line 45, :namespace "server.packages.modifier_system.modifier_system", :name "getTagsComponent"}
-  :left-nodes 70
-  :right-nodes 70}
+  :left {:file "client/views/main_hud_action_buttons_view.lua", :start-line 31, :end-line 37, :namespace "client.views.main_hud_action_buttons_view", :name "place"}
+  :right {:file "client/views/main_hud_backpack_view.lua", :start-line 73, :end-line 79, :namespace "client.views.main_hud_backpack_view", :name "place"}
+  :left-nodes 96
+  :right-nodes 96}
  {:score 1.0
   :language "lua"
-  :left {:file "client/packages/modifier_system/modifier_system.lua", :start-line 548, :end-line 558, :namespace "client.packages.modifier_system.modifier_system", :name "CModifierSystemManager:removeModifier"}
-  :right {:file "client/packages/modifier_system/modifier_system.lua", :start-line 637, :end-line 647, :namespace "client.packages.modifier_system.modifier_system", :name "CModifierSystemManager:pause"}
-  :left-nodes 91
-  :right-nodes 91}
+  :left {:file "client/views/main_hud_action_buttons_view.lua", :start-line 31, :end-line 37, :namespace "client.views.main_hud_action_buttons_view", :name "place"}
+  :right {:file "client/views/main_hud_equip_popups.lua", :start-line 39, :end-line 45, :namespace "client.views.main_hud_equip_popups", :name "place"}
+  :left-nodes 96
+  :right-nodes 96}
  {:score 1.0
   :language "lua"
-  :left {:file "client/packages/modifier_system/modifier_system.lua", :start-line 548, :end-line 558, :namespace "client.packages.modifier_system.modifier_system", :name "CModifierSystemManager:removeModifier"}
-  :right {:file "client/packages/modifier_system/modifier_system.lua", :start-line 654, :end-line 664, :namespace "client.packages.modifier_system.modifier_system", :name "CModifierSystemManager:resume"}
-  :left-nodes 91
-  :right-nodes 91}
+  :left {:file "client/views/main_hud_action_buttons_view.lua", :start-line 39, :end-line 50, :namespace "client.views.main_hud_action_buttons_view", :name "fire_re"}
+  :right {:file "client/views/main_hud_item_bar_view.lua", :start-line 65, :end-line 76, :namespace "client.views.main_hud_item_bar_view", :name "default_fire_re"}
+  :left-nodes 171
+  :right-nodes 171}
  {:score 1.0
   :language "lua"
-  :left {:file "client/packages/modifier_system/modifier_system.lua", :start-line 566, :end-line 576, :namespace "client.packages.modifier_system.modifier_system", :name "CModifierSystemManager:setStackCount"}
-  :right {:file "client/packages/modifier_system/modifier_system.lua", :start-line 584, :end-line 594, :namespace "client.packages.modifier_system.modifier_system", :name "CModifierSystemManager:addStackCount"}
-  :left-nodes 93
-  :right-nodes 93}
+  :left {:file "client/views/main_hud_action_buttons_view.lua", :start-line 89, :end-line 97, :namespace "client.views.main_hud_action_buttons_view", :name "compute_layout"}
+  :right {:file "client/views/main_hud_backpack_view.lua", :start-line 128, :end-line 136, :namespace "client.views.main_hud_backpack_view", :name "compute_layout"}
+  :left-nodes 118
+  :right-nodes 118}
  {:score 1.0
   :language "lua"
-  :left {:file "client/packages/modifier_system/modifier_system.lua", :start-line 566, :end-line 576, :namespace "client.packages.modifier_system.modifier_system", :name "CModifierSystemManager:setStackCount"}
-  :right {:file "client/packages/modifier_system/modifier_system.lua", :start-line 602, :end-line 612, :namespace "client.packages.modifier_system.modifier_system", :name "CModifierSystemManager:addDuration"}
-  :left-nodes 93
-  :right-nodes 93}
- {:score 1.0
-  :language "lua"
-  :left {:file "client/packages/modifier_system/modifier_system.lua", :start-line 566, :end-line 576, :namespace "client.packages.modifier_system.modifier_system", :name "CModifierSystemManager:setStackCount"}
-  :right {:file "client/packages/modifier_system/modifier_system.lua", :start-line 620, :end-line 630, :namespace "client.packages.modifier_system.modifier_system", :name "CModifierSystemManager:setRemainTime"}
-  :left-nodes 93
-  :right-nodes 93}
- {:score 1.0
-  :language "lua"
-  :left {:file "client/packages/modifier_system/modifier_system.lua", :start-line 584, :end-line 594, :namespace "client.packages.modifier_system.modifier_system", :name "CModifierSystemManager:addStackCount"}
-  :right {:file "client/packages/modifier_system/modifier_system.lua", :start-line 602, :end-line 612, :namespace "client.packages.modifier_system.modifier_system", :name "CModifierSystemManager:addDuration"}
-  :left-nodes 93
-  :right-nodes 93}
- {:score 1.0
-  :language "lua"
-  :left {:file "client/packages/modifier_system/modifier_system.lua", :start-line 584, :end-line 594, :namespace "client.packages.modifier_system.modifier_system", :name "CModifierSystemManager:addStackCount"}
-  :right {:file "client/packages/modifier_system/modifier_system.lua", :start-line 620, :end-line 630, :namespace "client.packages.modifier_system.modifier_system", :name "CModifierSystemManager:setRemainTime"}
-  :left-nodes 93
-  :right-nodes 93}
- {:score 1.0
-  :language "lua"
-  :left {:file "client/packages/modifier_system/modifier_system.lua", :start-line 602, :end-line 612, :namespace "client.packages.modifier_system.modifier_system", :name "CModifierSystemManager:addDuration"}
-  :right {:file "client/packages/modifier_system/modifier_system.lua", :start-line 620, :end-line 630, :namespace "client.packages.modifier_system.modifier_system", :name "CModifierSystemManager:setRemainTime"}
-  :left-nodes 93
-  :right-nodes 93}
- {:score 1.0
-  :language "lua"
-  :left {:file "client/packages/modifier_system/modifier_system.lua", :start-line 637, :end-line 647, :namespace "client.packages.modifier_system.modifier_system", :name "CModifierSystemManager:pause"}
-  :right {:file "client/packages/modifier_system/modifier_system.lua", :start-line 654, :end-line 664, :namespace "client.packages.modifier_system.modifier_system", :name "CModifierSystemManager:resume"}
-  :left-nodes 91
-  :right-nodes 91}
- {:score 1.0
-  :language "lua"
-  :left {:file "client/packages/modifier_system/modifier_system.lua", :start-line 779, :end-line 784, :namespace "client.packages.modifier_system.modifier_system", :name "CModifierSystemManager:getModifierHandler"}
-  :right {:file "server/packages/modifier_system/modifier_system.lua", :start-line 165, :end-line 170, :namespace "server.packages.modifier_system.modifier_system", :name "SModifierSystemManager:getContainer"}
-  :left-nodes 40
-  :right-nodes 40}
- {:score 1.0
-  :language "lua"
-  :left {:file "client/packages/modifier_system/modifier_system.lua", :start-line 779, :end-line 784, :namespace "client.packages.modifier_system.modifier_system", :name "CModifierSystemManager:getModifierHandler"}
-  :right {:file "server/packages/modifier_system/modifier_system.lua", :start-line 1296, :end-line 1301, :namespace "server.packages.modifier_system.modifier_system", :name "SModifierSystemManager:getModifierHandler"}
-  :left-nodes 40
-  :right-nodes 40}
- {:score 1.0
-  :language "lua"
-  :left {:file "client/packages/modifier_system/modifier_system.lua", :start-line 802, :end-line 820, :namespace "client.packages.modifier_system.modifier_system", :name "CModifierSystemManager:addTag"}
-  :right {:file "server/packages/modifier_system/modifier_system.lua", :start-line 1325, :end-line 1343, :namespace "server.packages.modifier_system.modifier_system", :name "SModifierSystemManager:addTag"}
-  :left-nodes 168
-  :right-nodes 168}
- {:score 1.0
-  :language "lua"
-  :left {:file "client/packages/modifier_system/modifier_system.lua", :start-line 826, :end-line 849, :namespace "client.packages.modifier_system.modifier_system", :name "CModifierSystemManager:hasTag"}
-  :right {:file "server/packages/modifier_system/modifier_system.lua", :start-line 1349, :end-line 1372, :namespace "server.packages.modifier_system.modifier_system", :name "SModifierSystemManager:hasTag"}
-  :left-nodes 187
-  :right-nodes 187}
- {:score 1.0
-  :language "lua"
-  :left {:file "client/packages/modifier_system/ui/EffectDetailPanel.lua", :start-line 24, :end-line 28, :namespace "client.packages.modifier_system.ui.EffectDetailPanel", :name "log"}
-  :right {:file "client/packages/modifier_system/ui/EffectDetailPanel.lua", :start-line 31, :end-line 35, :namespace "client.packages.modifier_system.ui.EffectDetailPanel", :name "diag"}
-  :left-nodes 27
-  :right-nodes 27}
- {:score 1.0
-  :language "lua"
-  :left {:file "client/packages/modifier_system/ui/EffectDetailPanel.lua", :start-line 24, :end-line 28, :namespace "client.packages.modifier_system.ui.EffectDetailPanel", :name "log"}
-  :right {:file "client/packages/modifier_system/ui/EffectSlotNode.lua", :start-line 26, :end-line 30, :namespace "client.packages.modifier_system.ui.EffectSlotNode", :name "diag"}
-  :left-nodes 27
-  :right-nodes 27}
- {:score 1.0
-  :language "lua"
-  :left {:file "client/packages/modifier_system/ui/EffectDetailPanel.lua", :start-line 24, :end-line 28, :namespace "client.packages.modifier_system.ui.EffectDetailPanel", :name "log"}
-  :right {:file "client/packages/modifier_system/ui/EffectStatusBarUI.lua", :start-line 20, :end-line 24, :namespace "client.packages.modifier_system.ui.EffectStatusBarUI", :name "log"}
-  :left-nodes 27
-  :right-nodes 27}
- {:score 1.0
-  :language "lua"
-  :left {:file "client/packages/modifier_system/ui/EffectDetailPanel.lua", :start-line 24, :end-line 28, :namespace "client.packages.modifier_system.ui.EffectDetailPanel", :name "log"}
-  :right {:file "client/packages/modifier_system/ui/EffectStatusBarUI.lua", :start-line 27, :end-line 31, :namespace "client.packages.modifier_system.ui.EffectStatusBarUI", :name "diag"}
-  :left-nodes 27
-  :right-nodes 27}
- {:score 1.0
-  :language "lua"
-  :left {:file "client/packages/modifier_system/ui/EffectDetailPanel.lua", :start-line 31, :end-line 35, :namespace "client.packages.modifier_system.ui.EffectDetailPanel", :name "diag"}
-  :right {:file "client/packages/modifier_system/ui/EffectSlotNode.lua", :start-line 26, :end-line 30, :namespace "client.packages.modifier_system.ui.EffectSlotNode", :name "diag"}
-  :left-nodes 27
-  :right-nodes 27}
- {:score 1.0
-  :language "lua"
-  :left {:file "client/packages/modifier_system/ui/EffectDetailPanel.lua", :start-line 31, :end-line 35, :namespace "client.packages.modifier_system.ui.EffectDetailPanel", :name "diag"}
-  :right {:file "client/packages/modifier_system/ui/EffectStatusBarUI.lua", :start-line 20, :end-line 24, :namespace "client.packages.modifier_system.ui.EffectStatusBarUI", :name "log"}
-  :left-nodes 27
-  :right-nodes 27}
- {:score 1.0
-  :language "lua"
-  :left {:file "client/packages/modifier_system/ui/EffectDetailPanel.lua", :start-line 31, :end-line 35, :namespace "client.packages.modifier_system.ui.EffectDetailPanel", :name "diag"}
-  :right {:file "client/packages/modifier_system/ui/EffectStatusBarUI.lua", :start-line 27, :end-line 31, :namespace "client.packages.modifier_system.ui.EffectStatusBarUI", :name "diag"}
-  :left-nodes 27
-  :right-nodes 27}
- {:score 1.0
-  :language "lua"
-  :left {:file "client/packages/modifier_system/ui/EffectSlotNode.lua", :start-line 26, :end-line 30, :namespace "client.packages.modifier_system.ui.EffectSlotNode", :name "diag"}
-  :right {:file "client/packages/modifier_system/ui/EffectStatusBarUI.lua", :start-line 20, :end-line 24, :namespace "client.packages.modifier_system.ui.EffectStatusBarUI", :name "log"}
-  :left-nodes 27
-  :right-nodes 27}
- {:score 1.0
-  :language "lua"
-  :left {:file "client/packages/modifier_system/ui/EffectSlotNode.lua", :start-line 26, :end-line 30, :namespace "client.packages.modifier_system.ui.EffectSlotNode", :name "diag"}
-  :right {:file "client/packages/modifier_system/ui/EffectStatusBarUI.lua", :start-line 27, :end-line 31, :namespace "client.packages.modifier_system.ui.EffectStatusBarUI", :name "diag"}
-  :left-nodes 27
-  :right-nodes 27}
- {:score 1.0
-  :language "lua"
-  :left {:file "client/packages/modifier_system/ui/EffectStatusBarUI.lua", :start-line 20, :end-line 24, :namespace "client.packages.modifier_system.ui.EffectStatusBarUI", :name "log"}
-  :right {:file "client/packages/modifier_system/ui/EffectStatusBarUI.lua", :start-line 27, :end-line 31, :namespace "client.packages.modifier_system.ui.EffectStatusBarUI", :name "diag"}
-  :left-nodes 27
-  :right-nodes 27}
- {:score 1.0
-  :language "lua"
-  :left {:file "common/BossPhase.lua", :start-line 34, :end-line 37, :namespace "common.BossPhase", :name "now_"}
-  :right {:file "common/CarryMount.lua", :start-line 28, :end-line 31, :namespace "common.CarryMount", :name "num"}
-  :left-nodes 30
-  :right-nodes 30}
- {:score 1.0
-  :language "lua"
-  :left {:file "common/CarryMount.lua", :start-line 37, :end-line 40, :namespace "common.CarryMount", :name "pointDistance"}
-  :right {:file "server/Mgr/MgrLoot.lua", :start-line 269, :end-line 272, :namespace "server.Mgr.MgrLoot", :name "distance"}
-  :left-nodes 107
-  :right-nodes 107}
- {:score 1.0
-  :language "lua"
-  :left {:file "common/packages/ability_system/Anchor.lua", :start-line 144, :end-line 150, :namespace "common.packages.ability_system.Anchor", :name "Anchor:onBreak"}
-  :right {:file "common/packages/ability_system/Anchor.lua", :start-line 153, :end-line 159, :namespace "common.packages.ability_system.Anchor", :name "Anchor:finish"}
-  :left-nodes 46
-  :right-nodes 46}
- {:score 1.0
-  :language "lua"
-  :left {:file "common/packages/ability_system/event_defs.lua", :start-line 22, :end-line 27, :namespace "common.packages.ability_system.event_defs", :name "AbilityEventDefs.packServerPayload"}
-  :right {:file "common/packages/modifier_system/event_defs.lua", :start-line 38, :end-line 43, :namespace "common.packages.modifier_system.event_defs", :name "eventDefs.packServerPayload"}
-  :left-nodes 38
-  :right-nodes 38}
- {:score 1.0
-  :language "lua"
-  :left {:file "common/packages/ability_system/event_defs.lua", :start-line 74, :end-line 80, :namespace "common.packages.ability_system.event_defs", :name "AbilityEventDefs.createAbilitySignals"}
-  :right {:file "common/packages/ability_system/event_defs.lua", :start-line 84, :end-line 90, :namespace "common.packages.ability_system.event_defs", :name "AbilityEventDefs.createAnchorSignals"}
-  :left-nodes 78
-  :right-nodes 78}
- {:score 1.0
-  :language "lua"
-  :left {:file "common/packages/ability_system/event_defs.lua", :start-line 74, :end-line 80, :namespace "common.packages.ability_system.event_defs", :name "AbilityEventDefs.createAbilitySignals"}
-  :right {:file "common/packages/ability_system/event_defs.lua", :start-line 93, :end-line 99, :namespace "common.packages.ability_system.event_defs", :name "AbilityEventDefs.createManagerSignals"}
-  :left-nodes 78
-  :right-nodes 78}
- {:score 1.0
-  :language "lua"
-  :left {:file "common/packages/ability_system/event_defs.lua", :start-line 84, :end-line 90, :namespace "common.packages.ability_system.event_defs", :name "AbilityEventDefs.createAnchorSignals"}
-  :right {:file "common/packages/ability_system/event_defs.lua", :start-line 93, :end-line 99, :namespace "common.packages.ability_system.event_defs", :name "AbilityEventDefs.createManagerSignals"}
-  :left-nodes 78
-  :right-nodes 78}
- {:score 1.0
-  :language "lua"
-  :left {:file "common/packages/ability_system/event_defs.lua", :start-line 102, :end-line 109, :namespace "common.packages.ability_system.event_defs", :name "AbilityEventDefs.destroySignals"}
-  :right {:file "common/packages/modifier_system/event_defs.lua", :start-line 99, :end-line 107, :namespace "common.packages.modifier_system.event_defs", :name "eventDefs.destroySignals"}
-  :left-nodes 68
-  :right-nodes 68}
- {:score 1.0
-  :language "lua"
-  :left {:file "common/packages/ability_system/event_defs.lua", :start-line 113, :end-line 118, :namespace "common.packages.ability_system.event_defs", :name "AbilityEventDefs.fireEvent"}
-  :right {:file "common/packages/modifier_system/event_defs.lua", :start-line 113, :end-line 118, :namespace "common.packages.modifier_system.event_defs", :name "eventDefs.fireEvent"}
-  :left-nodes 47
-  :right-nodes 47}
- {:score 1.0
-  :language "lua"
-  :left {:file "common/packages/ability_system/registry.lua", :start-line 150, :end-line 158, :namespace "common.packages.ability_system.registry", :name "_getTagsComp"}
-  :right {:file "server/packages/modifier_system/modifier_system.lua", :start-line 37, :end-line 45, :namespace "server.packages.modifier_system.modifier_system", :name "getTagsComponent"}
-  :left-nodes 70
-  :right-nodes 70}
- {:score 1.0
-  :language "lua"
-  :left {:file "common/packages/attr_rule/enums.lua", :start-line 34, :end-line 41, :namespace "common.packages.attr_rule.enums", :name "isValidAttrComponentType"}
-  :right {:file "common/packages/modifier_system/enums.lua", :start-line 180, :end-line 187, :namespace "common.packages.modifier_system.enums", :name "isValidAffectCamp"}
-  :left-nodes 52
-  :right-nodes 52}
- {:score 1.0
-  :language "lua"
-  :left {:file "common/packages/attr_rule/enums.lua", :start-line 34, :end-line 41, :namespace "common.packages.attr_rule.enums", :name "isValidAttrComponentType"}
-  :right {:file "common/packages/modifier_system/enums.lua", :start-line 192, :end-line 199, :namespace "common.packages.modifier_system.enums", :name "isValidPerformanceType"}
-  :left-nodes 52
-  :right-nodes 52}
- {:score 1.0
-  :language "lua"
-  :left {:file "common/packages/attr_rule/enums.lua", :start-line 34, :end-line 41, :namespace "common.packages.attr_rule.enums", :name "isValidAttrComponentType"}
-  :right {:file "common/packages/modifier_system/enums.lua", :start-line 204, :end-line 211, :namespace "common.packages.modifier_system.enums", :name "isValidLostPerformanceType"}
-  :left-nodes 52
-  :right-nodes 52}
- {:score 1.0
-  :language "lua"
-  :left {:file "common/packages/attr_rule/enums.lua", :start-line 34, :end-line 41, :namespace "common.packages.attr_rule.enums", :name "isValidAttrComponentType"}
-  :right {:file "common/packages/modifier_system/enums.lua", :start-line 216, :end-line 223, :namespace "common.packages.modifier_system.enums", :name "isValidEffectAttachPoint"}
-  :left-nodes 52
-  :right-nodes 52}
- {:score 1.0
-  :language "lua"
-  :left {:file "common/packages/attr_rule/enums.lua", :start-line 34, :end-line 41, :namespace "common.packages.attr_rule.enums", :name "isValidAttrComponentType"}
-  :right {:file "common/packages/modifier_system/enums.lua", :start-line 228, :end-line 235, :namespace "common.packages.modifier_system.enums", :name "isValidEffectInherit"}
-  :left-nodes 52
-  :right-nodes 52}
- {:score 1.0
-  :language "lua"
-  :left {:file "common/packages/attr_rule/enums.lua", :start-line 34, :end-line 41, :namespace "common.packages.attr_rule.enums", :name "isValidAttrComponentType"}
-  :right {:file "common/packages/modifier_system/enums.lua", :start-line 240, :end-line 247, :namespace "common.packages.modifier_system.enums", :name "isValidSoundType"}
-  :left-nodes 52
-  :right-nodes 52}
- {:score 1.0
-  :language "lua"
-  :left {:file "common/packages/attr_rule/enums.lua", :start-line 34, :end-line 41, :namespace "common.packages.attr_rule.enums", :name "isValidAttrComponentType"}
-  :right {:file "common/packages/modifier_system/enums.lua", :start-line 252, :end-line 259, :namespace "common.packages.modifier_system.enums", :name "isValidMaterialId"}
-  :left-nodes 52
-  :right-nodes 52}
- {:score 1.0
-  :language "lua"
-  :left {:file "common/packages/attr_rule/enums.lua", :start-line 34, :end-line 41, :namespace "common.packages.attr_rule.enums", :name "isValidAttrComponentType"}
-  :right {:file "common/packages/modifier_system/enums.lua", :start-line 264, :end-line 271, :namespace "common.packages.modifier_system.enums", :name "isValidAttrKey"}
-  :left-nodes 52
-  :right-nodes 52}
- {:score 1.0
-  :language "lua"
-  :left {:file "common/packages/attr_rule/enums.lua", :start-line 34, :end-line 41, :namespace "common.packages.attr_rule.enums", :name "isValidAttrComponentType"}
-  :right {:file "common/packages/modifier_system/enums.lua", :start-line 276, :end-line 283, :namespace "common.packages.modifier_system.enums", :name "isValidAttrType"}
-  :left-nodes 52
-  :right-nodes 52}
- {:score 1.0
-  :language "lua"
-  :left {:file "common/packages/modifier_system/enums.lua", :start-line 180, :end-line 187, :namespace "common.packages.modifier_system.enums", :name "isValidAffectCamp"}
-  :right {:file "common/packages/modifier_system/enums.lua", :start-line 192, :end-line 199, :namespace "common.packages.modifier_system.enums", :name "isValidPerformanceType"}
-  :left-nodes 52
-  :right-nodes 52}
- {:score 1.0
-  :language "lua"
-  :left {:file "common/packages/modifier_system/enums.lua", :start-line 180, :end-line 187, :namespace "common.packages.modifier_system.enums", :name "isValidAffectCamp"}
-  :right {:file "common/packages/modifier_system/enums.lua", :start-line 204, :end-line 211, :namespace "common.packages.modifier_system.enums", :name "isValidLostPerformanceType"}
-  :left-nodes 52
-  :right-nodes 52}
- {:score 1.0
-  :language "lua"
-  :left {:file "common/packages/modifier_system/enums.lua", :start-line 180, :end-line 187, :namespace "common.packages.modifier_system.enums", :name "isValidAffectCamp"}
-  :right {:file "common/packages/modifier_system/enums.lua", :start-line 216, :end-line 223, :namespace "common.packages.modifier_system.enums", :name "isValidEffectAttachPoint"}
-  :left-nodes 52
-  :right-nodes 52}
- {:score 1.0
-  :language "lua"
-  :left {:file "common/packages/modifier_system/enums.lua", :start-line 180, :end-line 187, :namespace "common.packages.modifier_system.enums", :name "isValidAffectCamp"}
-  :right {:file "common/packages/modifier_system/enums.lua", :start-line 228, :end-line 235, :namespace "common.packages.modifier_system.enums", :name "isValidEffectInherit"}
-  :left-nodes 52
-  :right-nodes 52}
- {:score 1.0
-  :language "lua"
-  :left {:file "common/packages/modifier_system/enums.lua", :start-line 180, :end-line 187, :namespace "common.packages.modifier_system.enums", :name "isValidAffectCamp"}
-  :right {:file "common/packages/modifier_system/enums.lua", :start-line 240, :end-line 247, :namespace "common.packages.modifier_system.enums", :name "isValidSoundType"}
-  :left-nodes 52
-  :right-nodes 52}
- {:score 1.0
-  :language "lua"
-  :left {:file "common/packages/modifier_system/enums.lua", :start-line 180, :end-line 187, :namespace "common.packages.modifier_system.enums", :name "isValidAffectCamp"}
-  :right {:file "common/packages/modifier_system/enums.lua", :start-line 252, :end-line 259, :namespace "common.packages.modifier_system.enums", :name "isValidMaterialId"}
-  :left-nodes 52
-  :right-nodes 52}
- {:score 1.0
-  :language "lua"
-  :left {:file "common/packages/modifier_system/enums.lua", :start-line 180, :end-line 187, :namespace "common.packages.modifier_system.enums", :name "isValidAffectCamp"}
-  :right {:file "common/packages/modifier_system/enums.lua", :start-line 264, :end-line 271, :namespace "common.packages.modifier_system.enums", :name "isValidAttrKey"}
-  :left-nodes 52
-  :right-nodes 52}
- {:score 1.0
-  :language "lua"
-  :left {:file "common/packages/modifier_system/enums.lua", :start-line 180, :end-line 187, :namespace "common.packages.modifier_system.enums", :name "isValidAffectCamp"}
-  :right {:file "common/packages/modifier_system/enums.lua", :start-line 276, :end-line 283, :namespace "common.packages.modifier_system.enums", :name "isValidAttrType"}
-  :left-nodes 52
-  :right-nodes 52}
- {:score 1.0
-  :language "lua"
-  :left {:file "common/packages/modifier_system/enums.lua", :start-line 192, :end-line 199, :namespace "common.packages.modifier_system.enums", :name "isValidPerformanceType"}
-  :right {:file "common/packages/modifier_system/enums.lua", :start-line 204, :end-line 211, :namespace "common.packages.modifier_system.enums", :name "isValidLostPerformanceType"}
-  :left-nodes 52
-  :right-nodes 52}
- {:score 1.0
-  :language "lua"
-  :left {:file "common/packages/modifier_system/enums.lua", :start-line 192, :end-line 199, :namespace "common.packages.modifier_system.enums", :name "isValidPerformanceType"}
-  :right {:file "common/packages/modifier_system/enums.lua", :start-line 216, :end-line 223, :namespace "common.packages.modifier_system.enums", :name "isValidEffectAttachPoint"}
-  :left-nodes 52
-  :right-nodes 52}
- {:score 1.0
-  :language "lua"
-  :left {:file "common/packages/modifier_system/enums.lua", :start-line 192, :end-line 199, :namespace "common.packages.modifier_system.enums", :name "isValidPerformanceType"}
-  :right {:file "common/packages/modifier_system/enums.lua", :start-line 228, :end-line 235, :namespace "common.packages.modifier_system.enums", :name "isValidEffectInherit"}
-  :left-nodes 52
-  :right-nodes 52}
- {:score 1.0
-  :language "lua"
-  :left {:file "common/packages/modifier_system/enums.lua", :start-line 192, :end-line 199, :namespace "common.packages.modifier_system.enums", :name "isValidPerformanceType"}
-  :right {:file "common/packages/modifier_system/enums.lua", :start-line 240, :end-line 247, :namespace "common.packages.modifier_system.enums", :name "isValidSoundType"}
-  :left-nodes 52
-  :right-nodes 52}
- {:score 1.0
-  :language "lua"
-  :left {:file "common/packages/modifier_system/enums.lua", :start-line 192, :end-line 199, :namespace "common.packages.modifier_system.enums", :name "isValidPerformanceType"}
-  :right {:file "common/packages/modifier_system/enums.lua", :start-line 252, :end-line 259, :namespace "common.packages.modifier_system.enums", :name "isValidMaterialId"}
-  :left-nodes 52
-  :right-nodes 52}
- {:score 1.0
-  :language "lua"
-  :left {:file "common/packages/modifier_system/enums.lua", :start-line 192, :end-line 199, :namespace "common.packages.modifier_system.enums", :name "isValidPerformanceType"}
-  :right {:file "common/packages/modifier_system/enums.lua", :start-line 264, :end-line 271, :namespace "common.packages.modifier_system.enums", :name "isValidAttrKey"}
-  :left-nodes 52
-  :right-nodes 52}
- {:score 1.0
-  :language "lua"
-  :left {:file "common/packages/modifier_system/enums.lua", :start-line 192, :end-line 199, :namespace "common.packages.modifier_system.enums", :name "isValidPerformanceType"}
-  :right {:file "common/packages/modifier_system/enums.lua", :start-line 276, :end-line 283, :namespace "common.packages.modifier_system.enums", :name "isValidAttrType"}
-  :left-nodes 52
-  :right-nodes 52}
- {:score 1.0
-  :language "lua"
-  :left {:file "common/packages/modifier_system/enums.lua", :start-line 204, :end-line 211, :namespace "common.packages.modifier_system.enums", :name "isValidLostPerformanceType"}
-  :right {:file "common/packages/modifier_system/enums.lua", :start-line 216, :end-line 223, :namespace "common.packages.modifier_system.enums", :name "isValidEffectAttachPoint"}
-  :left-nodes 52
-  :right-nodes 52}
- {:score 1.0
-  :language "lua"
-  :left {:file "common/packages/modifier_system/enums.lua", :start-line 204, :end-line 211, :namespace "common.packages.modifier_system.enums", :name "isValidLostPerformanceType"}
-  :right {:file "common/packages/modifier_system/enums.lua", :start-line 228, :end-line 235, :namespace "common.packages.modifier_system.enums", :name "isValidEffectInherit"}
-  :left-nodes 52
-  :right-nodes 52}
- {:score 1.0
-  :language "lua"
-  :left {:file "common/packages/modifier_system/enums.lua", :start-line 204, :end-line 211, :namespace "common.packages.modifier_system.enums", :name "isValidLostPerformanceType"}
-  :right {:file "common/packages/modifier_system/enums.lua", :start-line 240, :end-line 247, :namespace "common.packages.modifier_system.enums", :name "isValidSoundType"}
-  :left-nodes 52
-  :right-nodes 52}
- {:score 1.0
-  :language "lua"
-  :left {:file "common/packages/modifier_system/enums.lua", :start-line 204, :end-line 211, :namespace "common.packages.modifier_system.enums", :name "isValidLostPerformanceType"}
-  :right {:file "common/packages/modifier_system/enums.lua", :start-line 252, :end-line 259, :namespace "common.packages.modifier_system.enums", :name "isValidMaterialId"}
-  :left-nodes 52
-  :right-nodes 52}
- {:score 1.0
-  :language "lua"
-  :left {:file "common/packages/modifier_system/enums.lua", :start-line 204, :end-line 211, :namespace "common.packages.modifier_system.enums", :name "isValidLostPerformanceType"}
-  :right {:file "common/packages/modifier_system/enums.lua", :start-line 264, :end-line 271, :namespace "common.packages.modifier_system.enums", :name "isValidAttrKey"}
-  :left-nodes 52
-  :right-nodes 52}
- {:score 1.0
-  :language "lua"
-  :left {:file "common/packages/modifier_system/enums.lua", :start-line 204, :end-line 211, :namespace "common.packages.modifier_system.enums", :name "isValidLostPerformanceType"}
-  :right {:file "common/packages/modifier_system/enums.lua", :start-line 276, :end-line 283, :namespace "common.packages.modifier_system.enums", :name "isValidAttrType"}
-  :left-nodes 52
-  :right-nodes 52}
- {:score 1.0
-  :language "lua"
-  :left {:file "common/packages/modifier_system/enums.lua", :start-line 216, :end-line 223, :namespace "common.packages.modifier_system.enums", :name "isValidEffectAttachPoint"}
-  :right {:file "common/packages/modifier_system/enums.lua", :start-line 228, :end-line 235, :namespace "common.packages.modifier_system.enums", :name "isValidEffectInherit"}
-  :left-nodes 52
-  :right-nodes 52}
- {:score 1.0
-  :language "lua"
-  :left {:file "common/packages/modifier_system/enums.lua", :start-line 216, :end-line 223, :namespace "common.packages.modifier_system.enums", :name "isValidEffectAttachPoint"}
-  :right {:file "common/packages/modifier_system/enums.lua", :start-line 240, :end-line 247, :namespace "common.packages.modifier_system.enums", :name "isValidSoundType"}
-  :left-nodes 52
-  :right-nodes 52}
- {:score 1.0
-  :language "lua"
-  :left {:file "common/packages/modifier_system/enums.lua", :start-line 216, :end-line 223, :namespace "common.packages.modifier_system.enums", :name "isValidEffectAttachPoint"}
-  :right {:file "common/packages/modifier_system/enums.lua", :start-line 252, :end-line 259, :namespace "common.packages.modifier_system.enums", :name "isValidMaterialId"}
-  :left-nodes 52
-  :right-nodes 52}
- {:score 1.0
-  :language "lua"
-  :left {:file "common/packages/modifier_system/enums.lua", :start-line 216, :end-line 223, :namespace "common.packages.modifier_system.enums", :name "isValidEffectAttachPoint"}
-  :right {:file "common/packages/modifier_system/enums.lua", :start-line 264, :end-line 271, :namespace "common.packages.modifier_system.enums", :name "isValidAttrKey"}
-  :left-nodes 52
-  :right-nodes 52}
- {:score 1.0
-  :language "lua"
-  :left {:file "common/packages/modifier_system/enums.lua", :start-line 216, :end-line 223, :namespace "common.packages.modifier_system.enums", :name "isValidEffectAttachPoint"}
-  :right {:file "common/packages/modifier_system/enums.lua", :start-line 276, :end-line 283, :namespace "common.packages.modifier_system.enums", :name "isValidAttrType"}
-  :left-nodes 52
-  :right-nodes 52}
- {:score 1.0
-  :language "lua"
-  :left {:file "common/packages/modifier_system/enums.lua", :start-line 228, :end-line 235, :namespace "common.packages.modifier_system.enums", :name "isValidEffectInherit"}
-  :right {:file "common/packages/modifier_system/enums.lua", :start-line 240, :end-line 247, :namespace "common.packages.modifier_system.enums", :name "isValidSoundType"}
-  :left-nodes 52
-  :right-nodes 52}
- {:score 1.0
-  :language "lua"
-  :left {:file "common/packages/modifier_system/enums.lua", :start-line 228, :end-line 235, :namespace "common.packages.modifier_system.enums", :name "isValidEffectInherit"}
-  :right {:file "common/packages/modifier_system/enums.lua", :start-line 252, :end-line 259, :namespace "common.packages.modifier_system.enums", :name "isValidMaterialId"}
-  :left-nodes 52
-  :right-nodes 52}
- {:score 1.0
-  :language "lua"
-  :left {:file "common/packages/modifier_system/enums.lua", :start-line 228, :end-line 235, :namespace "common.packages.modifier_system.enums", :name "isValidEffectInherit"}
-  :right {:file "common/packages/modifier_system/enums.lua", :start-line 264, :end-line 271, :namespace "common.packages.modifier_system.enums", :name "isValidAttrKey"}
-  :left-nodes 52
-  :right-nodes 52}
- {:score 1.0
-  :language "lua"
-  :left {:file "common/packages/modifier_system/enums.lua", :start-line 228, :end-line 235, :namespace "common.packages.modifier_system.enums", :name "isValidEffectInherit"}
-  :right {:file "common/packages/modifier_system/enums.lua", :start-line 276, :end-line 283, :namespace "common.packages.modifier_system.enums", :name "isValidAttrType"}
-  :left-nodes 52
-  :right-nodes 52}
- {:score 1.0
-  :language "lua"
-  :left {:file "common/packages/modifier_system/enums.lua", :start-line 240, :end-line 247, :namespace "common.packages.modifier_system.enums", :name "isValidSoundType"}
-  :right {:file "common/packages/modifier_system/enums.lua", :start-line 252, :end-line 259, :namespace "common.packages.modifier_system.enums", :name "isValidMaterialId"}
-  :left-nodes 52
-  :right-nodes 52}
- {:score 1.0
-  :language "lua"
-  :left {:file "common/packages/modifier_system/enums.lua", :start-line 240, :end-line 247, :namespace "common.packages.modifier_system.enums", :name "isValidSoundType"}
-  :right {:file "common/packages/modifier_system/enums.lua", :start-line 264, :end-line 271, :namespace "common.packages.modifier_system.enums", :name "isValidAttrKey"}
-  :left-nodes 52
-  :right-nodes 52}
- {:score 1.0
-  :language "lua"
-  :left {:file "common/packages/modifier_system/enums.lua", :start-line 240, :end-line 247, :namespace "common.packages.modifier_system.enums", :name "isValidSoundType"}
-  :right {:file "common/packages/modifier_system/enums.lua", :start-line 276, :end-line 283, :namespace "common.packages.modifier_system.enums", :name "isValidAttrType"}
-  :left-nodes 52
-  :right-nodes 52}
- {:score 1.0
-  :language "lua"
-  :left {:file "common/packages/modifier_system/enums.lua", :start-line 252, :end-line 259, :namespace "common.packages.modifier_system.enums", :name "isValidMaterialId"}
-  :right {:file "common/packages/modifier_system/enums.lua", :start-line 264, :end-line 271, :namespace "common.packages.modifier_system.enums", :name "isValidAttrKey"}
-  :left-nodes 52
-  :right-nodes 52}
- {:score 1.0
-  :language "lua"
-  :left {:file "common/packages/modifier_system/enums.lua", :start-line 252, :end-line 259, :namespace "common.packages.modifier_system.enums", :name "isValidMaterialId"}
-  :right {:file "common/packages/modifier_system/enums.lua", :start-line 276, :end-line 283, :namespace "common.packages.modifier_system.enums", :name "isValidAttrType"}
-  :left-nodes 52
-  :right-nodes 52}
- {:score 1.0
-  :language "lua"
-  :left {:file "common/packages/modifier_system/enums.lua", :start-line 264, :end-line 271, :namespace "common.packages.modifier_system.enums", :name "isValidAttrKey"}
-  :right {:file "common/packages/modifier_system/enums.lua", :start-line 276, :end-line 283, :namespace "common.packages.modifier_system.enums", :name "isValidAttrType"}
-  :left-nodes 52
-  :right-nodes 52}
- {:score 1.0
-  :language "lua"
-  :left {:file "common/packages/modifier_system/event_defs.lua", :start-line 78, :end-line 84, :namespace "common.packages.modifier_system.event_defs", :name "eventDefs.createModifierSignals"}
-  :right {:file "common/packages/modifier_system/event_defs.lua", :start-line 89, :end-line 95, :namespace "common.packages.modifier_system.event_defs", :name "eventDefs.createManagerSignals"}
-  :left-nodes 78
-  :right-nodes 78}
- {:score 1.0
-  :language "lua"
-  :left {:file "server/AbilityBehaviors/melee_hit.lua", :start-line 24, :end-line 32, :namespace "server.AbilityBehaviors.melee_hit", :name "_getPosition"}
-  :right {:file "server/packages/ability_system/anchors/melee_hit.lua", :start-line 19, :end-line 27, :namespace "server.packages.ability_system.anchors.melee_hit", :name "_getPosition"}
-  :left-nodes 53
-  :right-nodes 53}
- {:score 1.0
-  :language "lua"
-  :left {:file "server/AbilityBehaviors/melee_hit.lua", :start-line 34, :end-line 42, :namespace "server.AbilityBehaviors.melee_hit", :name "_getYaw"}
-  :right {:file "server/packages/ability_system/anchors/melee_hit.lua", :start-line 29, :end-line 37, :namespace "server.packages.ability_system.anchors.melee_hit", :name "_getYaw"}
-  :left-nodes 56
-  :right-nodes 56}
- {:score 1.0
-  :language "lua"
-  :left {:file "server/AbilityBehaviors/melee_hit.lua", :start-line 45, :end-line 49, :namespace "server.AbilityBehaviors.melee_hit", :name "_rotateYaw"}
-  :right {:file "server/packages/ability_system/anchors/melee_hit.lua", :start-line 40, :end-line 44, :namespace "server.packages.ability_system.anchors.melee_hit", :name "_rotateYaw"}
-  :left-nodes 128
-  :right-nodes 128}
- {:score 1.0
-  :language "lua"
-  :left {:file "server/AbilityBehaviors/melee_hit.lua", :start-line 52, :end-line 62, :namespace "server.AbilityBehaviors.melee_hit", :name "_getAreaTransform"}
-  :right {:file "server/packages/ability_system/anchors/melee_hit.lua", :start-line 47, :end-line 57, :namespace "server.packages.ability_system.anchors.melee_hit", :name "_getAreaTransform"}
-  :left-nodes 102
-  :right-nodes 102}
- {:score 1.0
-  :language "lua"
-  :left {:file "server/AbilityBehaviors/melee_hit.lua", :start-line 64, :end-line 72, :namespace "server.AbilityBehaviors.melee_hit", :name "_safeScale"}
-  :right {:file "server/packages/ability_system/anchors/melee_hit.lua", :start-line 59, :end-line 67, :namespace "server.packages.ability_system.anchors.melee_hit", :name "_safeScale"}
-  :left-nodes 78
-  :right-nodes 78}
- {:score 1.0
-  :language "lua"
-  :left {:file "server/AbilityBehaviors/melee_hit.lua", :start-line 75, :end-line 80, :namespace "server.AbilityBehaviors.melee_hit", :name "_eulerDegToQuat"}
-  :right {:file "server/packages/ability_system/anchors/melee_hit.lua", :start-line 70, :end-line 75, :namespace "server.packages.ability_system.anchors.melee_hit", :name "_eulerDegToQuat"}
-  :left-nodes 91
-  :right-nodes 91}
- {:score 1.0
-  :language "lua"
-  :left {:file "server/AbilityBehaviors/melee_hit.lua", :start-line 82, :end-line 97, :namespace "server.AbilityBehaviors.melee_hit", :name "_isHittable"}
-  :right {:file "server/packages/ability_system/anchors/melee_hit.lua", :start-line 77, :end-line 92, :namespace "server.packages.ability_system.anchors.melee_hit", :name "_isHittable"}
+  :left {:file "client/views/main_hud_action_buttons_view.lua", :start-line 112, :end-line 119, :namespace "client.views.main_hud_action_buttons_view", :name "selected_food"}
+  :right {:file "client/views/main_hud_action_buttons_view.lua", :start-line 121, :end-line 128, :namespace "client.views.main_hud_action_buttons_view", :name "selected_rod"}
   :left-nodes 113
   :right-nodes 113}
  {:score 1.0
   :language "lua"
-  :left {:file "server/AbilityBehaviors/melee_hit.lua", :start-line 99, :end-line 110, :namespace "server.AbilityBehaviors.melee_hit", :name "_isSelf"}
-  :right {:file "server/packages/ability_system/anchors/melee_hit.lua", :start-line 94, :end-line 105, :namespace "server.packages.ability_system.anchors.melee_hit", :name "_isSelf"}
-  :left-nodes 85
-  :right-nodes 85}
+  :left {:file "client/views/main_hud_action_buttons_view.lua", :start-line 544, :end-line 551, :namespace "client.views.main_hud_action_buttons_view", :name "main_hud_action_buttons_view.spec"}
+  :right {:file "client/views/main_hud_backpack_view.lua", :start-line 554, :end-line 561, :namespace "client.views.main_hud_backpack_view", :name "main_hud_backpack_view.spec"}
+  :left-nodes 51
+  :right-nodes 51}
  {:score 1.0
   :language "lua"
-  :left {:file "server/AbilityBehaviors/melee_hit.lua", :start-line 129, :end-line 162, :namespace "server.AbilityBehaviors.melee_hit", :name "_applyHitPower"}
-  :right {:file "server/packages/ability_system/anchors/melee_hit.lua", :start-line 120, :end-line 153, :namespace "server.packages.ability_system.anchors.melee_hit", :name "_applyHitPower"}
-  :left-nodes 432
-  :right-nodes 432}
+  :left {:file "client/views/main_hud_action_buttons_view.lua", :start-line 544, :end-line 551, :namespace "client.views.main_hud_action_buttons_view", :name "main_hud_action_buttons_view.spec"}
+  :right {:file "client/views/main_hud_equip_popups.lua", :start-line 465, :end-line 472, :namespace "client.views.main_hud_equip_popups", :name "main_hud_equip_popups.spec"}
+  :left-nodes 51
+  :right-nodes 51}
  {:score 1.0
   :language "lua"
-  :left {:file "server/AbilityBehaviors/melee_hit.lua", :start-line 164, :end-line 187, :namespace "server.AbilityBehaviors.melee_hit", :name "_createHitSfx"}
-  :right {:file "server/packages/ability_system/anchors/melee_hit.lua", :start-line 155, :end-line 178, :namespace "server.packages.ability_system.anchors.melee_hit", :name "_createHitSfx"}
-  :left-nodes 326
-  :right-nodes 326}
+  :left {:file "client/views/main_hud_action_buttons_view.lua", :start-line 544, :end-line 551, :namespace "client.views.main_hud_action_buttons_view", :name "main_hud_action_buttons_view.spec"}
+  :right {:file "client/views/main_hud_item_bar_view.lua", :start-line 535, :end-line 542, :namespace "client.views.main_hud_item_bar_view", :name "main_hud_item_bar_view.spec"}
+  :left-nodes 51
+  :right-nodes 51}
  {:score 1.0
   :language "lua"
-  :left {:file "server/Data/PlayerData.lua", :start-line 7, :end-line 12, :namespace "server.Data.PlayerData", :name "copy"}
-  :right {:file "server/Mgr/MgrLottery.lua", :start-line 17, :end-line 22, :namespace "server.Mgr.MgrLottery", :name "copy"}
-  :left-nodes 91
-  :right-nodes 91}
+  :left {:file "client/views/main_hud_action_buttons_view.lua", :start-line 544, :end-line 551, :namespace "client.views.main_hud_action_buttons_view", :name "main_hud_action_buttons_view.spec"}
+  :right {:file "client/views/main_hud_vitals_view.lua", :start-line 244, :end-line 251, :namespace "client.views.main_hud_vitals_view", :name "main_hud_vitals_view.spec"}
+  :left-nodes 51
+  :right-nodes 51}
  {:score 1.0
   :language "lua"
-  :left {:file "server/Data/PlayerData.lua", :start-line 7, :end-line 12, :namespace "server.Data.PlayerData", :name "copy"}
-  :right {:file "server/Mgr/MgrSave.lua", :start-line 7, :end-line 12, :namespace "server.Mgr.MgrSave", :name "copy"}
-  :left-nodes 91
-  :right-nodes 91}
+  :left {:file "client/views/main_hud_backpack_view.lua", :start-line 45, :end-line 49, :namespace "client.views.main_hud_backpack_view", :name "make_passive"}
+  :right {:file "client/views/main_hud_equip_popups.lua", :start-line 33, :end-line 37, :namespace "client.views.main_hud_equip_popups", :name "make_passive"}
+  :left-nodes 41
+  :right-nodes 41}
  {:score 1.0
   :language "lua"
-  :left {:file "server/Data/RecordsAdapter.lua", :start-line 29, :end-line 39, :namespace "server.Data.RecordsAdapter", :name "Adapter:Store"}
-  :right {:file "server/Mgr/MgrSave.lua", :start-line 83, :end-line 93, :namespace "server.Mgr.MgrSave", :name "Mgr:GetStore"}
-  :left-nodes 161
-  :right-nodes 161}
+  :left {:file "client/views/main_hud_backpack_view.lua", :start-line 45, :end-line 49, :namespace "client.views.main_hud_backpack_view", :name "make_passive"}
+  :right {:file "client/views/main_hud_item_bar_view.lua", :start-line 37, :end-line 41, :namespace "client.views.main_hud_item_bar_view", :name "make_passive"}
+  :left-nodes 41
+  :right-nodes 41}
  {:score 1.0
   :language "lua"
-  :left {:file "server/Mgr/MgrAbility.lua", :start-line 259, :end-line 262, :namespace "server.Mgr.MgrAbility", :name "controllerOf"}
-  :right {:file "server/Mgr/MgrSurvival.lua", :start-line 30, :end-line 33, :namespace "server.Mgr.MgrSurvival", :name "controllerOf"}
+  :left {:file "client/views/main_hud_backpack_view.lua", :start-line 45, :end-line 49, :namespace "client.views.main_hud_backpack_view", :name "make_passive"}
+  :right {:file "client/views/main_hud_vitals_view.lua", :start-line 23, :end-line 27, :namespace "client.views.main_hud_vitals_view", :name "make_passive"}
+  :left-nodes 41
+  :right-nodes 41}
+ {:score 1.0
+  :language "lua"
+  :left {:file "client/views/main_hud_backpack_view.lua", :start-line 51, :end-line 60, :namespace "client.views.main_hud_backpack_view", :name "read_xy"}
+  :right {:file "client/views/main_hud_item_bar_view.lua", :start-line 43, :end-line 52, :namespace "client.views.main_hud_item_bar_view", :name "read_xy"}
+  :left-nodes 151
+  :right-nodes 151}
+ {:score 1.0
+  :language "lua"
+  :left {:file "client/views/main_hud_backpack_view.lua", :start-line 62, :end-line 71, :namespace "client.views.main_hud_backpack_view", :name "read_touch_pos"}
+  :right {:file "client/views/main_hud_item_bar_view.lua", :start-line 54, :end-line 63, :namespace "client.views.main_hud_item_bar_view", :name "read_touch_pos"}
+  :left-nodes 112
+  :right-nodes 112}
+ {:score 1.0
+  :language "lua"
+  :left {:file "client/views/main_hud_backpack_view.lua", :start-line 73, :end-line 79, :namespace "client.views.main_hud_backpack_view", :name "place"}
+  :right {:file "client/views/main_hud_equip_popups.lua", :start-line 39, :end-line 45, :namespace "client.views.main_hud_equip_popups", :name "place"}
+  :left-nodes 96
+  :right-nodes 96}
+ {:score 1.0
+  :language "lua"
+  :left {:file "client/views/main_hud_backpack_view.lua", :start-line 81, :end-line 92, :namespace "client.views.main_hud_backpack_view", :name "default_fire_item_bar"}
+  :right {:file "client/views/main_hud_equip_popups.lua", :start-line 84, :end-line 95, :namespace "client.views.main_hud_equip_popups", :name "default_fire_item_bar"}
+  :left-nodes 151
+  :right-nodes 151}
+ {:score 1.0
+  :language "lua"
+  :left {:file "client/views/main_hud_backpack_view.lua", :start-line 94, :end-line 109, :namespace "client.views.main_hud_backpack_view", :name "make_button"}
+  :right {:file "client/views/main_hud_item_bar_view.lua", :start-line 131, :end-line 146, :namespace "client.views.main_hud_item_bar_view", :name "make_button"}
+  :left-nodes 244
+  :right-nodes 244}
+ {:score 1.0
+  :language "lua"
+  :left {:file "client/views/main_hud_backpack_view.lua", :start-line 111, :end-line 126, :namespace "client.views.main_hud_backpack_view", :name "make_label"}
+  :right {:file "client/views/main_hud_equip_popups.lua", :start-line 114, :end-line 129, :namespace "client.views.main_hud_equip_popups", :name "make_label"}
+  :left-nodes 189
+  :right-nodes 189}
+ {:score 1.0
+  :language "lua"
+  :left {:file "client/views/main_hud_backpack_view.lua", :start-line 111, :end-line 126, :namespace "client.views.main_hud_backpack_view", :name "make_label"}
+  :right {:file "client/views/main_hud_item_bar_view.lua", :start-line 148, :end-line 163, :namespace "client.views.main_hud_item_bar_view", :name "make_label"}
+  :left-nodes 189
+  :right-nodes 189}
+ {:score 1.0
+  :language "lua"
+  :left {:file "client/views/main_hud_backpack_view.lua", :start-line 111, :end-line 126, :namespace "client.views.main_hud_backpack_view", :name "make_label"}
+  :right {:file "client/views/main_hud_vitals_view.lua", :start-line 66, :end-line 81, :namespace "client.views.main_hud_vitals_view", :name "create_overlay_label"}
+  :left-nodes 189
+  :right-nodes 189}
+ {:score 1.0
+  :language "lua"
+  :left {:file "client/views/main_hud_backpack_view.lua", :start-line 554, :end-line 561, :namespace "client.views.main_hud_backpack_view", :name "main_hud_backpack_view.spec"}
+  :right {:file "client/views/main_hud_equip_popups.lua", :start-line 465, :end-line 472, :namespace "client.views.main_hud_equip_popups", :name "main_hud_equip_popups.spec"}
+  :left-nodes 51
+  :right-nodes 51}
+ {:score 1.0
+  :language "lua"
+  :left {:file "client/views/main_hud_backpack_view.lua", :start-line 554, :end-line 561, :namespace "client.views.main_hud_backpack_view", :name "main_hud_backpack_view.spec"}
+  :right {:file "client/views/main_hud_item_bar_view.lua", :start-line 535, :end-line 542, :namespace "client.views.main_hud_item_bar_view", :name "main_hud_item_bar_view.spec"}
+  :left-nodes 51
+  :right-nodes 51}
+ {:score 1.0
+  :language "lua"
+  :left {:file "client/views/main_hud_backpack_view.lua", :start-line 554, :end-line 561, :namespace "client.views.main_hud_backpack_view", :name "main_hud_backpack_view.spec"}
+  :right {:file "client/views/main_hud_vitals_view.lua", :start-line 244, :end-line 251, :namespace "client.views.main_hud_vitals_view", :name "main_hud_vitals_view.spec"}
+  :left-nodes 51
+  :right-nodes 51}
+ {:score 1.0
+  :language "lua"
+  :left {:file "client/views/main_hud_equip_popups.lua", :start-line 33, :end-line 37, :namespace "client.views.main_hud_equip_popups", :name "make_passive"}
+  :right {:file "client/views/main_hud_item_bar_view.lua", :start-line 37, :end-line 41, :namespace "client.views.main_hud_item_bar_view", :name "make_passive"}
+  :left-nodes 41
+  :right-nodes 41}
+ {:score 1.0
+  :language "lua"
+  :left {:file "client/views/main_hud_equip_popups.lua", :start-line 33, :end-line 37, :namespace "client.views.main_hud_equip_popups", :name "make_passive"}
+  :right {:file "client/views/main_hud_vitals_view.lua", :start-line 23, :end-line 27, :namespace "client.views.main_hud_vitals_view", :name "make_passive"}
+  :left-nodes 41
+  :right-nodes 41}
+ {:score 1.0
+  :language "lua"
+  :left {:file "client/views/main_hud_equip_popups.lua", :start-line 114, :end-line 129, :namespace "client.views.main_hud_equip_popups", :name "make_label"}
+  :right {:file "client/views/main_hud_item_bar_view.lua", :start-line 148, :end-line 163, :namespace "client.views.main_hud_item_bar_view", :name "make_label"}
+  :left-nodes 189
+  :right-nodes 189}
+ {:score 1.0
+  :language "lua"
+  :left {:file "client/views/main_hud_equip_popups.lua", :start-line 114, :end-line 129, :namespace "client.views.main_hud_equip_popups", :name "make_label"}
+  :right {:file "client/views/main_hud_vitals_view.lua", :start-line 66, :end-line 81, :namespace "client.views.main_hud_vitals_view", :name "create_overlay_label"}
+  :left-nodes 189
+  :right-nodes 189}
+ {:score 1.0
+  :language "lua"
+  :left {:file "client/views/main_hud_equip_popups.lua", :start-line 465, :end-line 472, :namespace "client.views.main_hud_equip_popups", :name "main_hud_equip_popups.spec"}
+  :right {:file "client/views/main_hud_item_bar_view.lua", :start-line 535, :end-line 542, :namespace "client.views.main_hud_item_bar_view", :name "main_hud_item_bar_view.spec"}
+  :left-nodes 51
+  :right-nodes 51}
+ {:score 1.0
+  :language "lua"
+  :left {:file "client/views/main_hud_equip_popups.lua", :start-line 465, :end-line 472, :namespace "client.views.main_hud_equip_popups", :name "main_hud_equip_popups.spec"}
+  :right {:file "client/views/main_hud_vitals_view.lua", :start-line 244, :end-line 251, :namespace "client.views.main_hud_vitals_view", :name "main_hud_vitals_view.spec"}
+  :left-nodes 51
+  :right-nodes 51}
+ {:score 1.0
+  :language "lua"
+  :left {:file "client/views/main_hud_item_bar_view.lua", :start-line 37, :end-line 41, :namespace "client.views.main_hud_item_bar_view", :name "make_passive"}
+  :right {:file "client/views/main_hud_vitals_view.lua", :start-line 23, :end-line 27, :namespace "client.views.main_hud_vitals_view", :name "make_passive"}
+  :left-nodes 41
+  :right-nodes 41}
+ {:score 1.0
+  :language "lua"
+  :left {:file "client/views/main_hud_item_bar_view.lua", :start-line 148, :end-line 163, :namespace "client.views.main_hud_item_bar_view", :name "make_label"}
+  :right {:file "client/views/main_hud_vitals_view.lua", :start-line 66, :end-line 81, :namespace "client.views.main_hud_vitals_view", :name "create_overlay_label"}
+  :left-nodes 189
+  :right-nodes 189}
+ {:score 1.0
+  :language "lua"
+  :left {:file "client/views/main_hud_item_bar_view.lua", :start-line 535, :end-line 542, :namespace "client.views.main_hud_item_bar_view", :name "main_hud_item_bar_view.spec"}
+  :right {:file "client/views/main_hud_vitals_view.lua", :start-line 244, :end-line 251, :namespace "client.views.main_hud_vitals_view", :name "main_hud_vitals_view.spec"}
+  :left-nodes 51
+  :right-nodes 51}
+ {:score 1.0
+  :language "lua"
+  :left {:file "client/views/reel_overlay_view.lua", :start-line 50, :end-line 60, :namespace "client.views.reel_overlay_view", :name "make"}
+  :right {:file "client/views/survival_overlay_view.lua", :start-line 43, :end-line 53, :namespace "client.views.survival_overlay_view", :name "make"}
+  :left-nodes 177
+  :right-nodes 177}
+ {:score 1.0
+  :language "lua"
+  :left {:file "client/views/root_view.lua", :start-line 55, :end-line 60, :namespace "client.views.root_view", :name "destroy_node_safely"}
+  :right {:file "server/world_host/ability_leaf.lua", :start-line 42, :end-line 47, :namespace "server.world_host.ability_leaf", :name "safe_destroy"}
   :left-nodes 44
   :right-nodes 44}
  {:score 1.0
   :language "lua"
-  :left {:file "server/Mgr/MgrFerry.lua", :start-line 16, :end-line 19, :namespace "server.Mgr.MgrFerry", :name "flatDistance"}
-  :right {:file "server/Mgr/MgrGrill.lua", :start-line 61, :end-line 64, :namespace "server.Mgr.MgrGrill", :name "flatDistance"}
-  :left-nodes 81
-  :right-nodes 81}
+  :left {:file "client/views/root_view.lua", :start-line 55, :end-line 60, :namespace "client.views.root_view", :name "destroy_node_safely"}
+  :right {:file "server/world_host/attr_leaf.lua", :start-line 40, :end-line 45, :namespace "server.world_host.attr_leaf", :name "safe_destroy"}
+  :left-nodes 44
+  :right-nodes 44}
  {:score 1.0
   :language "lua"
-  :left {:file "server/Mgr/MgrFerry.lua", :start-line 16, :end-line 19, :namespace "server.Mgr.MgrFerry", :name "flatDistance"}
-  :right {:file "server/Mgr/MgrInteract.lua", :start-line 92, :end-line 95, :namespace "server.Mgr.MgrInteract", :name "flatDistance"}
-  :left-nodes 81
-  :right-nodes 81}
+  :left {:file "common/boss_phase.lua", :start-line 22, :end-line 25, :namespace "common.boss_phase", :name "now_"}
+  :right {:file "common/carry_mount.lua", :start-line 18, :end-line 21, :namespace "common.carry_mount", :name "num"}
+  :left-nodes 30
+  :right-nodes 30}
  {:score 1.0
   :language "lua"
-  :left {:file "server/Mgr/MgrFerry.lua", :start-line 16, :end-line 19, :namespace "server.Mgr.MgrFerry", :name "flatDistance"}
-  :right {:file "server/Mgr/MgrWeapon.lua", :start-line 34, :end-line 37, :namespace "server.Mgr.MgrWeapon", :name "distance2D"}
-  :left-nodes 81
-  :right-nodes 81}
- {:score 1.0
-  :language "lua"
-  :left {:file "server/Mgr/MgrFerry.lua", :start-line 36, :end-line 40, :namespace "server.Mgr.MgrFerry", :name "Mgr:Fail"}
-  :right {:file "server/Mgr/MgrSpecialItem.lua", :start-line 75, :end-line 79, :namespace "server.Mgr.MgrSpecialItem", :name "Mgr:Fail"}
-  :left-nodes 73
-  :right-nodes 73}
- {:score 1.0
-  :language "lua"
-  :left {:file "server/Mgr/MgrFishUnit.lua", :start-line 34, :end-line 37, :namespace "server.Mgr.MgrFishUnit", :name "Mgr:Now"}
-  :right {:file "server/Mgr/MgrWeapon.lua", :start-line 39, :end-line 42, :namespace "server.Mgr.MgrWeapon", :name "Mgr:Now"}
-  :left-nodes 56
-  :right-nodes 56}
- {:score 1.0
-  :language "lua"
-  :left {:file "server/Mgr/MgrFishUnit.lua", :start-line 1502, :end-line 1506, :namespace "server.Mgr.MgrFishUnit", :name "zoneScene"}
-  :right {:file "server/Mgr/MgrSpecialItem.lua", :start-line 31, :end-line 35, :namespace "server.Mgr.MgrSpecialItem", :name "zoneScene"}
-  :left-nodes 60
-  :right-nodes 60}
- {:score 1.0
-  :language "lua"
-  :left {:file "server/Mgr/MgrGrill.lua", :start-line 31, :end-line 34, :namespace "server.Mgr.MgrGrill", :name "Mgr:Now"}
-  :right {:file "server/Mgr/MgrPlatform.lua", :start-line 20, :end-line 23, :namespace "server.Mgr.MgrPlatform", :name "Mgr:Now"}
-  :left-nodes 60
-  :right-nodes 60}
- {:score 1.0
-  :language "lua"
-  :left {:file "server/Mgr/MgrGrill.lua", :start-line 31, :end-line 34, :namespace "server.Mgr.MgrGrill", :name "Mgr:Now"}
-  :right {:file "server/Mgr/MgrStory.lua", :start-line 11, :end-line 14, :namespace "server.Mgr.MgrStory", :name "Mgr:Now"}
-  :left-nodes 60
-  :right-nodes 60}
- {:score 1.0
-  :language "lua"
-  :left {:file "server/Mgr/MgrGrill.lua", :start-line 31, :end-line 34, :namespace "server.Mgr.MgrGrill", :name "Mgr:Now"}
-  :right {:file "server/Mgr/MgrSurvival.lua", :start-line 16, :end-line 19, :namespace "server.Mgr.MgrSurvival", :name "Mgr:Now"}
-  :left-nodes 60
-  :right-nodes 60}
- {:score 1.0
-  :language "lua"
-  :left {:file "server/Mgr/MgrGrill.lua", :start-line 31, :end-line 34, :namespace "server.Mgr.MgrGrill", :name "Mgr:Now"}
-  :right {:file "server/Mgr/MgrVitals.lua", :start-line 24, :end-line 27, :namespace "server.Mgr.MgrVitals", :name "Mgr:Now"}
-  :left-nodes 60
-  :right-nodes 60}
- {:score 1.0
-  :language "lua"
-  :left {:file "server/Mgr/MgrGrill.lua", :start-line 48, :end-line 59, :namespace "server.Mgr.MgrGrill", :name "Mgr:FindAnchor"}
-  :right {:file "server/Mgr/MgrInteract.lua", :start-line 79, :end-line 90, :namespace "server.Mgr.MgrInteract", :name "Mgr:FindAnchor"}
-  :left-nodes 149
-  :right-nodes 149}
- {:score 1.0
-  :language "lua"
-  :left {:file "server/Mgr/MgrGrill.lua", :start-line 61, :end-line 64, :namespace "server.Mgr.MgrGrill", :name "flatDistance"}
-  :right {:file "server/Mgr/MgrInteract.lua", :start-line 92, :end-line 95, :namespace "server.Mgr.MgrInteract", :name "flatDistance"}
-  :left-nodes 81
-  :right-nodes 81}
- {:score 1.0
-  :language "lua"
-  :left {:file "server/Mgr/MgrGrill.lua", :start-line 61, :end-line 64, :namespace "server.Mgr.MgrGrill", :name "flatDistance"}
-  :right {:file "server/Mgr/MgrWeapon.lua", :start-line 34, :end-line 37, :namespace "server.Mgr.MgrWeapon", :name "distance2D"}
-  :left-nodes 81
-  :right-nodes 81}
- {:score 1.0
-  :language "lua"
-  :left {:file "server/Mgr/MgrGrill.lua", :start-line 98, :end-line 103, :namespace "server.Mgr.MgrGrill", :name "selectedEntry"}
-  :right {:file "server/Mgr/MgrInteract.lua", :start-line 49, :end-line 54, :namespace "server.Mgr.MgrInteract", :name "selectedEntry"}
-  :left-nodes 97
-  :right-nodes 97}
- {:score 1.0
-  :language "lua"
-  :left {:file "server/Mgr/MgrInteract.lua", :start-line 15, :end-line 27, :namespace "server.Mgr.MgrInteract", :name "resolve"}
-  :right {:file "server/Mgr/MgrLottery.lua", :start-line 25, :end-line 37, :namespace "server.Mgr.MgrLottery", :name "resolve"}
-  :left-nodes 235
-  :right-nodes 235}
- {:score 1.0
-  :language "lua"
-  :left {:file "server/Mgr/MgrInteract.lua", :start-line 15, :end-line 27, :namespace "server.Mgr.MgrInteract", :name "resolve"}
-  :right {:file "server/Mgr/MgrShop.lua", :start-line 10, :end-line 22, :namespace "server.Mgr.MgrShop", :name "resolve"}
-  :left-nodes 235
-  :right-nodes 235}
- {:score 1.0
-  :language "lua"
-  :left {:file "server/Mgr/MgrInteract.lua", :start-line 28, :end-line 34, :namespace "server.Mgr.MgrInteract", :name "execute"}
-  :right {:file "server/Mgr/MgrLottery.lua", :start-line 39, :end-line 45, :namespace "server.Mgr.MgrLottery", :name "execute"}
-  :left-nodes 86
-  :right-nodes 86}
- {:score 1.0
-  :language "lua"
-  :left {:file "server/Mgr/MgrInteract.lua", :start-line 28, :end-line 34, :namespace "server.Mgr.MgrInteract", :name "execute"}
-  :right {:file "server/Mgr/MgrShop.lua", :start-line 24, :end-line 30, :namespace "server.Mgr.MgrShop", :name "execute"}
-  :left-nodes 86
-  :right-nodes 86}
- {:score 1.0
-  :language "lua"
-  :left {:file "server/Mgr/MgrInteract.lua", :start-line 92, :end-line 95, :namespace "server.Mgr.MgrInteract", :name "flatDistance"}
-  :right {:file "server/Mgr/MgrWeapon.lua", :start-line 34, :end-line 37, :namespace "server.Mgr.MgrWeapon", :name "distance2D"}
-  :left-nodes 81
-  :right-nodes 81}
- {:score 1.0
-  :language "lua"
-  :left {:file "server/Mgr/MgrInteract.lua", :start-line 326, :end-line 331, :namespace "server.Mgr.MgrInteract", :name "Mgr:Start"}
-  :right {:file "server/Mgr/MgrShop.lua", :start-line 237, :end-line 242, :namespace "server.Mgr.MgrShop", :name "Mgr:Start"}
-  :left-nodes 84
-  :right-nodes 84}
- {:score 1.0
-  :language "lua"
-  :left {:file "server/Mgr/MgrLottery.lua", :start-line 17, :end-line 22, :namespace "server.Mgr.MgrLottery", :name "copy"}
-  :right {:file "server/Mgr/MgrSave.lua", :start-line 7, :end-line 12, :namespace "server.Mgr.MgrSave", :name "copy"}
+  :left {:file "server/data/player_data.lua", :start-line 7, :end-line 12, :namespace "server.data.player_data", :name "copy"}
+  :right {:file "server/save_host.lua", :start-line 6, :end-line 11, :namespace "server.save_host", :name "copy"}
   :left-nodes 91
   :right-nodes 91}
  {:score 1.0
   :language "lua"
-  :left {:file "server/Mgr/MgrLottery.lua", :start-line 25, :end-line 37, :namespace "server.Mgr.MgrLottery", :name "resolve"}
-  :right {:file "server/Mgr/MgrShop.lua", :start-line 10, :end-line 22, :namespace "server.Mgr.MgrShop", :name "resolve"}
-  :left-nodes 235
-  :right-nodes 235}
+  :left {:file "server/data/player_data.lua", :start-line 7, :end-line 12, :namespace "server.data.player_data", :name "copy"}
+  :right {:file "server/world_host/player_blindbox.lua", :start-line 16, :end-line 21, :namespace "server.world_host.player_blindbox", :name "copy"}
+  :left-nodes 91
+  :right-nodes 91}
  {:score 1.0
   :language "lua"
-  :left {:file "server/Mgr/MgrLottery.lua", :start-line 39, :end-line 45, :namespace "server.Mgr.MgrLottery", :name "execute"}
-  :right {:file "server/Mgr/MgrShop.lua", :start-line 24, :end-line 30, :namespace "server.Mgr.MgrShop", :name "execute"}
-  :left-nodes 86
-  :right-nodes 86}
+  :left {:file "server/data/player_data.lua", :start-line 7, :end-line 12, :namespace "server.data.player_data", :name "copy"}
+  :right {:file "server/world_host/player_lottery.lua", :start-line 8, :end-line 13, :namespace "server.world_host.player_lottery", :name "copy"}
+  :left-nodes 91
+  :right-nodes 91}
  {:score 1.0
   :language "lua"
-  :left {:file "server/Mgr/MgrPlatform.lua", :start-line 20, :end-line 23, :namespace "server.Mgr.MgrPlatform", :name "Mgr:Now"}
-  :right {:file "server/Mgr/MgrStory.lua", :start-line 11, :end-line 14, :namespace "server.Mgr.MgrStory", :name "Mgr:Now"}
+  :left {:file "server/data/player_data.lua", :start-line 7, :end-line 12, :namespace "server.data.player_data", :name "copy"}
+  :right {:file "server/world_host/player_platform_shop.lua", :start-line 49, :end-line 54, :namespace "server.world_host.player_platform_shop", :name "copy"}
+  :left-nodes 91
+  :right-nodes 91}
+ {:score 1.0
+  :language "lua"
+  :left {:file "server/data/player_data.lua", :start-line 53, :end-line 57, :namespace "server.data.player_data", :name "zoneScene"}
+  :right {:file "server/world_host/fish_tree.lua", :start-line 1661, :end-line 1665, :namespace "server.world_host.fish_tree", :name "zoneScene"}
   :left-nodes 60
   :right-nodes 60}
  {:score 1.0
   :language "lua"
-  :left {:file "server/Mgr/MgrPlatform.lua", :start-line 20, :end-line 23, :namespace "server.Mgr.MgrPlatform", :name "Mgr:Now"}
-  :right {:file "server/Mgr/MgrSurvival.lua", :start-line 16, :end-line 19, :namespace "server.Mgr.MgrSurvival", :name "Mgr:Now"}
+  :left {:file "server/data/player_data.lua", :start-line 53, :end-line 57, :namespace "server.data.player_data", :name "zoneScene"}
+  :right {:file "server/world_host/special_item_phase.lua", :start-line 25, :end-line 29, :namespace "server.world_host.special_item_phase", :name "zone_scene"}
   :left-nodes 60
   :right-nodes 60}
  {:score 1.0
   :language "lua"
-  :left {:file "server/Mgr/MgrPlatform.lua", :start-line 20, :end-line 23, :namespace "server.Mgr.MgrPlatform", :name "Mgr:Now"}
-  :right {:file "server/Mgr/MgrVitals.lua", :start-line 24, :end-line 27, :namespace "server.Mgr.MgrVitals", :name "Mgr:Now"}
+  :left {:file "server/data/records_adapter.lua", :start-line 17, :end-line 27, :namespace "server.data.records_adapter", :name "adapter:Store"}
+  :right {:file "server/save_host.lua", :start-line 81, :end-line 91, :namespace "server.save_host", :name "save_host:GetStore"}
+  :left-nodes 161
+  :right-nodes 161}
+ {:score 1.0
+  :language "lua"
+  :left {:file "server/platform_host.lua", :start-line 5, :end-line 8, :namespace "server.platform_host", :name "isValidPlayer"}
+  :right {:file "server/world_host/player_tree.lua", :start-line 85, :end-line 88, :namespace "server.world_host.player_tree", :name "is_valid_player"}
+  :left-nodes 66
+  :right-nodes 66}
+ {:score 1.0
+  :language "lua"
+  :left {:file "server/platform_host.lua", :start-line 14, :end-line 17, :namespace "server.platform_host", :name "platform_host:Now"}
+  :right {:file "server/world_host/player_story.lua", :start-line 11, :end-line 14, :namespace "server.world_host.player_story", :name "mgr:Now"}
   :left-nodes 60
   :right-nodes 60}
  {:score 1.0
   :language "lua"
-  :left {:file "server/Mgr/MgrStory.lua", :start-line 11, :end-line 14, :namespace "server.Mgr.MgrStory", :name "Mgr:Now"}
-  :right {:file "server/Mgr/MgrSurvival.lua", :start-line 16, :end-line 19, :namespace "server.Mgr.MgrSurvival", :name "Mgr:Now"}
-  :left-nodes 60
-  :right-nodes 60}
+  :left {:file "server/platform_host.lua", :start-line 36, :end-line 39, :namespace "server.platform_host", :name "placeholder"}
+  :right {:file "server/world_host/player_platform_shop.lua", :start-line 6, :end-line 9, :namespace "server.world_host.player_platform_shop", :name "placeholder"}
+  :left-nodes 59
+  :right-nodes 59}
  {:score 1.0
   :language "lua"
-  :left {:file "server/Mgr/MgrStory.lua", :start-line 11, :end-line 14, :namespace "server.Mgr.MgrStory", :name "Mgr:Now"}
-  :right {:file "server/Mgr/MgrVitals.lua", :start-line 24, :end-line 27, :namespace "server.Mgr.MgrVitals", :name "Mgr:Now"}
-  :left-nodes 60
-  :right-nodes 60}
+  :left {:file "server/save_host.lua", :start-line 6, :end-line 11, :namespace "server.save_host", :name "copy"}
+  :right {:file "server/world_host/player_blindbox.lua", :start-line 16, :end-line 21, :namespace "server.world_host.player_blindbox", :name "copy"}
+  :left-nodes 91
+  :right-nodes 91}
  {:score 1.0
   :language "lua"
-  :left {:file "server/Mgr/MgrSurvival.lua", :start-line 16, :end-line 19, :namespace "server.Mgr.MgrSurvival", :name "Mgr:Now"}
-  :right {:file "server/Mgr/MgrVitals.lua", :start-line 24, :end-line 27, :namespace "server.Mgr.MgrVitals", :name "Mgr:Now"}
-  :left-nodes 60
-  :right-nodes 60}
+  :left {:file "server/save_host.lua", :start-line 6, :end-line 11, :namespace "server.save_host", :name "copy"}
+  :right {:file "server/world_host/player_lottery.lua", :start-line 8, :end-line 13, :namespace "server.world_host.player_lottery", :name "copy"}
+  :left-nodes 91
+  :right-nodes 91}
  {:score 1.0
   :language "lua"
-  :left {:file "server/Mgr/MgrSurvival.lua", :start-line 35, :end-line 39, :namespace "server.Mgr.MgrSurvival", :name "healthOf"}
-  :right {:file "server/Mgr/MgrVitals.lua", :start-line 131, :end-line 135, :namespace "server.Mgr.MgrVitals", :name "healthOf"}
-  :left-nodes 92
-  :right-nodes 92}
+  :left {:file "server/save_host.lua", :start-line 6, :end-line 11, :namespace "server.save_host", :name "copy"}
+  :right {:file "server/world_host/player_platform_shop.lua", :start-line 49, :end-line 54, :namespace "server.world_host.player_platform_shop", :name "copy"}
+  :left-nodes 91
+  :right-nodes 91}
  {:score 1.0
   :language "lua"
-  :left {:file "server/packages/ability_system/eca.lua", :start-line 1081, :end-line 1088, :namespace "server.packages.ability_system.eca", :name "eca.GetValidTargetsCreature"}
-  :right {:file "server/packages/ability_system/eca.lua", :start-line 1098, :end-line 1105, :namespace "server.packages.ability_system.eca", :name "eca.GetValidTargetsComponent"}
-  :left-nodes 78
-  :right-nodes 78}
+  :left {:file "server/world_host/ability_leaf.lua", :start-line 16, :end-line 19, :namespace "server.world_host.ability_leaf", :name "is_object"}
+  :right {:file "server/world_host/attr_leaf.lua", :start-line 19, :end-line 22, :namespace "server.world_host.attr_leaf", :name "is_object"}
+  :left-nodes 51
+  :right-nodes 51}
  {:score 1.0
   :language "lua"
-  :left {:file "server/packages/ability_system/eca.lua", :start-line 1081, :end-line 1088, :namespace "server.packages.ability_system.eca", :name "eca.GetValidTargetsCreature"}
-  :right {:file "server/packages/ability_system/eca.lua", :start-line 1131, :end-line 1138, :namespace "server.packages.ability_system.eca", :name "eca.GetValidTargetsRole"}
-  :left-nodes 78
-  :right-nodes 78}
+  :left {:file "server/world_host/ability_leaf.lua", :start-line 16, :end-line 19, :namespace "server.world_host.ability_leaf", :name "is_object"}
+  :right {:file "server/world_host/ferry_route.lua", :start-line 12, :end-line 15, :namespace "server.world_host.ferry_route", :name "is_object"}
+  :left-nodes 51
+  :right-nodes 51}
  {:score 1.0
   :language "lua"
-  :left {:file "server/packages/ability_system/eca.lua", :start-line 1098, :end-line 1105, :namespace "server.packages.ability_system.eca", :name "eca.GetValidTargetsComponent"}
-  :right {:file "server/packages/ability_system/eca.lua", :start-line 1131, :end-line 1138, :namespace "server.packages.ability_system.eca", :name "eca.GetValidTargetsRole"}
-  :left-nodes 78
-  :right-nodes 78}
+  :left {:file "server/world_host/ability_leaf.lua", :start-line 16, :end-line 19, :namespace "server.world_host.ability_leaf", :name "is_object"}
+  :right {:file "server/world_host/life_facade.lua", :start-line 7, :end-line 10, :namespace "server.world_host.life_facade", :name "is_object"}
+  :left-nodes 51
+  :right-nodes 51}
  {:score 1.0
   :language "lua"
-  :left {:file "server/packages/ability_system/eca.lua", :start-line 1149, :end-line 1157, :namespace "server.packages.ability_system.eca", :name "eca.GetTargetTypeUnits"}
-  :right {:file "server/packages/ability_system/eca.lua", :start-line 1168, :end-line 1176, :namespace "server.packages.ability_system.eca", :name "eca.GetTargetTypeRoles"}
-  :left-nodes 79
-  :right-nodes 79}
+  :left {:file "server/world_host/ability_leaf.lua", :start-line 16, :end-line 19, :namespace "server.world_host.ability_leaf", :name "is_object"}
+  :right {:file "server/world_host/modifier_leaf.lua", :start-line 23, :end-line 26, :namespace "server.world_host.modifier_leaf", :name "is_object"}
+  :left-nodes 51
+  :right-nodes 51}
  {:score 1.0
   :language "lua"
-  :left {:file "server/packages/modifier_system/ModifierHandler.lua", :start-line 262, :end-line 272, :namespace "server.packages.modifier_system.ModifierHandler", :name "ModifierHandler:getDesc"}
-  :right {:file "server/packages/modifier_system/ModifierHandler.lua", :start-line 282, :end-line 292, :namespace "server.packages.modifier_system.ModifierHandler", :name "ModifierHandler:getName"}
-  :left-nodes 121
-  :right-nodes 121}
+  :left {:file "server/world_host/ability_leaf.lua", :start-line 16, :end-line 19, :namespace "server.world_host.ability_leaf", :name "is_object"}
+  :right {:file "server/world_host/player_life.lua", :start-line 36, :end-line 39, :namespace "server.world_host.player_life", :name "is_object"}
+  :left-nodes 51
+  :right-nodes 51}
  {:score 1.0
   :language "lua"
-  :left {:file "server/packages/modifier_system/ModifierHandler.lua", :start-line 565, :end-line 568, :namespace "server.packages.modifier_system.ModifierHandler", :name "ModifierHandler:_setEndTime"}
-  :right {:file "server/packages/modifier_system/ModifierHandler.lua", :start-line 574, :end-line 577, :namespace "server.packages.modifier_system.ModifierHandler", :name "ModifierHandler:_setTotalDuration"}
-  :left-nodes 49
-  :right-nodes 49}
+  :left {:file "server/world_host/ability_leaf.lua", :start-line 16, :end-line 19, :namespace "server.world_host.ability_leaf", :name "is_object"}
+  :right {:file "server/world_host/server_runtime.lua", :start-line 45, :end-line 48, :namespace "server.world_host.server_runtime", :name "is_object"}
+  :left-nodes 51
+  :right-nodes 51}
  {:score 1.0
   :language "lua"
-  :left {:file "server/packages/modifier_system/modifier_system.lua", :start-line 165, :end-line 170, :namespace "server.packages.modifier_system.modifier_system", :name "SModifierSystemManager:getContainer"}
-  :right {:file "server/packages/modifier_system/modifier_system.lua", :start-line 1296, :end-line 1301, :namespace "server.packages.modifier_system.modifier_system", :name "SModifierSystemManager:getModifierHandler"}
-  :left-nodes 40
-  :right-nodes 40}
+  :left {:file "server/world_host/ability_leaf.lua", :start-line 16, :end-line 19, :namespace "server.world_host.ability_leaf", :name "is_object"}
+  :right {:file "server/world_host/special_item_phase.lua", :start-line 42, :end-line 45, :namespace "server.world_host.special_item_phase", :name "is_object"}
+  :left-nodes 51
+  :right-nodes 51}
  {:score 1.0
   :language "lua"
-  :left {:file "server/packages/official_ai_feature/official_ai_feature.lua", :start-line 809, :end-line 815, :namespace "server.packages.official_ai_feature.official_ai_feature", :name "SOfficialAiFeatureManager.setSearchEnemyPriorityMode"}
-  :right {:file "server/packages/official_ai_feature/official_ai_feature.lua", :start-line 828, :end-line 834, :namespace "server.packages.official_ai_feature.official_ai_feature", :name "SOfficialAiFeatureManager.setSearchEnemyFocusTarget"}
-  :left-nodes 71
-  :right-nodes 71}
+  :left {:file "server/world_host/ability_leaf.lua", :start-line 16, :end-line 19, :namespace "server.world_host.ability_leaf", :name "is_object"}
+  :right {:file "server/world_host/squad_dock.lua", :start-line 11, :end-line 14, :namespace "server.world_host.squad_dock", :name "is_object"}
+  :left-nodes 51
+  :right-nodes 51}
  {:score 1.0
   :language "lua"
-  :left {:file "server/packages/official_ai_feature/official_ai_feature.lua", :start-line 809, :end-line 815, :namespace "server.packages.official_ai_feature.official_ai_feature", :name "SOfficialAiFeatureManager.setSearchEnemyPriorityMode"}
-  :right {:file "server/packages/official_ai_feature/official_ai_feature.lua", :start-line 839, :end-line 845, :namespace "server.packages.official_ai_feature.official_ai_feature", :name "SOfficialAiFeatureManager.setMoveThreshold"}
-  :left-nodes 71
-  :right-nodes 71}
+  :left {:file "server/world_host/ability_leaf.lua", :start-line 34, :end-line 40, :namespace "server.world_host.ability_leaf", :name "report_error"}
+  :right {:file "server/world_host/attr_leaf.lua", :start-line 32, :end-line 38, :namespace "server.world_host.attr_leaf", :name "report_error"}
+  :left-nodes 56
+  :right-nodes 56}
  {:score 1.0
   :language "lua"
-  :left {:file "server/packages/official_ai_feature/official_ai_feature.lua", :start-line 828, :end-line 834, :namespace "server.packages.official_ai_feature.official_ai_feature", :name "SOfficialAiFeatureManager.setSearchEnemyFocusTarget"}
-  :right {:file "server/packages/official_ai_feature/official_ai_feature.lua", :start-line 839, :end-line 845, :namespace "server.packages.official_ai_feature.official_ai_feature", :name "SOfficialAiFeatureManager.setMoveThreshold"}
-  :left-nodes 71
-  :right-nodes 71}
- {:score 0.96875
+  :left {:file "server/world_host/ability_leaf.lua", :start-line 42, :end-line 47, :namespace "server.world_host.ability_leaf", :name "safe_destroy"}
+  :right {:file "server/world_host/attr_leaf.lua", :start-line 40, :end-line 45, :namespace "server.world_host.attr_leaf", :name "safe_destroy"}
+  :left-nodes 44
+  :right-nodes 44}
+ {:score 1.0
   :language "lua"
-  :left {:file "common/packages/modifier_system/event_defs.lua", :start-line 62, :end-line 73, :namespace "common.packages.modifier_system.event_defs", :name "eventDefs.getOrCreateEventUnit"}
-  :right {:file "server/packages/ability_system/event_bridge.lua", :start-line 19, :end-line 29, :namespace "server.packages.ability_system.event_bridge", :name "getOrCreateEventUnit"}
-  :left-nodes 120
-  :right-nodes 117}
- {:score 0.946428571429
+  :left {:file "server/world_host/attr_leaf.lua", :start-line 19, :end-line 22, :namespace "server.world_host.attr_leaf", :name "is_object"}
+  :right {:file "server/world_host/ferry_route.lua", :start-line 12, :end-line 15, :namespace "server.world_host.ferry_route", :name "is_object"}
+  :left-nodes 51
+  :right-nodes 51}
+ {:score 1.0
   :language "lua"
-  :left {:file "client/ScreenHandlers/ScreenSurvival.lua", :start-line 62, :end-line 65, :namespace "client.ScreenHandlers.ScreenSurvival", :name "Panel:Now"}
-  :right {:file "server/Mgr/MgrRecords.lua", :start-line 32, :end-line 35, :namespace "server.Mgr.MgrRecords", :name "now"}
-  :left-nodes 84
+  :left {:file "server/world_host/attr_leaf.lua", :start-line 19, :end-line 22, :namespace "server.world_host.attr_leaf", :name "is_object"}
+  :right {:file "server/world_host/life_facade.lua", :start-line 7, :end-line 10, :namespace "server.world_host.life_facade", :name "is_object"}
+  :left-nodes 51
+  :right-nodes 51}
+ {:score 1.0
+  :language "lua"
+  :left {:file "server/world_host/attr_leaf.lua", :start-line 19, :end-line 22, :namespace "server.world_host.attr_leaf", :name "is_object"}
+  :right {:file "server/world_host/modifier_leaf.lua", :start-line 23, :end-line 26, :namespace "server.world_host.modifier_leaf", :name "is_object"}
+  :left-nodes 51
+  :right-nodes 51}
+ {:score 1.0
+  :language "lua"
+  :left {:file "server/world_host/attr_leaf.lua", :start-line 19, :end-line 22, :namespace "server.world_host.attr_leaf", :name "is_object"}
+  :right {:file "server/world_host/player_life.lua", :start-line 36, :end-line 39, :namespace "server.world_host.player_life", :name "is_object"}
+  :left-nodes 51
+  :right-nodes 51}
+ {:score 1.0
+  :language "lua"
+  :left {:file "server/world_host/attr_leaf.lua", :start-line 19, :end-line 22, :namespace "server.world_host.attr_leaf", :name "is_object"}
+  :right {:file "server/world_host/server_runtime.lua", :start-line 45, :end-line 48, :namespace "server.world_host.server_runtime", :name "is_object"}
+  :left-nodes 51
+  :right-nodes 51}
+ {:score 1.0
+  :language "lua"
+  :left {:file "server/world_host/attr_leaf.lua", :start-line 19, :end-line 22, :namespace "server.world_host.attr_leaf", :name "is_object"}
+  :right {:file "server/world_host/special_item_phase.lua", :start-line 42, :end-line 45, :namespace "server.world_host.special_item_phase", :name "is_object"}
+  :left-nodes 51
+  :right-nodes 51}
+ {:score 1.0
+  :language "lua"
+  :left {:file "server/world_host/attr_leaf.lua", :start-line 19, :end-line 22, :namespace "server.world_host.attr_leaf", :name "is_object"}
+  :right {:file "server/world_host/squad_dock.lua", :start-line 11, :end-line 14, :namespace "server.world_host.squad_dock", :name "is_object"}
+  :left-nodes 51
+  :right-nodes 51}
+ {:score 1.0
+  :language "lua"
+  :left {:file "server/world_host/ferry_route.lua", :start-line 12, :end-line 15, :namespace "server.world_host.ferry_route", :name "is_object"}
+  :right {:file "server/world_host/life_facade.lua", :start-line 7, :end-line 10, :namespace "server.world_host.life_facade", :name "is_object"}
+  :left-nodes 51
+  :right-nodes 51}
+ {:score 1.0
+  :language "lua"
+  :left {:file "server/world_host/ferry_route.lua", :start-line 12, :end-line 15, :namespace "server.world_host.ferry_route", :name "is_object"}
+  :right {:file "server/world_host/modifier_leaf.lua", :start-line 23, :end-line 26, :namespace "server.world_host.modifier_leaf", :name "is_object"}
+  :left-nodes 51
+  :right-nodes 51}
+ {:score 1.0
+  :language "lua"
+  :left {:file "server/world_host/ferry_route.lua", :start-line 12, :end-line 15, :namespace "server.world_host.ferry_route", :name "is_object"}
+  :right {:file "server/world_host/player_life.lua", :start-line 36, :end-line 39, :namespace "server.world_host.player_life", :name "is_object"}
+  :left-nodes 51
+  :right-nodes 51}
+ {:score 1.0
+  :language "lua"
+  :left {:file "server/world_host/ferry_route.lua", :start-line 12, :end-line 15, :namespace "server.world_host.ferry_route", :name "is_object"}
+  :right {:file "server/world_host/server_runtime.lua", :start-line 45, :end-line 48, :namespace "server.world_host.server_runtime", :name "is_object"}
+  :left-nodes 51
+  :right-nodes 51}
+ {:score 1.0
+  :language "lua"
+  :left {:file "server/world_host/ferry_route.lua", :start-line 12, :end-line 15, :namespace "server.world_host.ferry_route", :name "is_object"}
+  :right {:file "server/world_host/special_item_phase.lua", :start-line 42, :end-line 45, :namespace "server.world_host.special_item_phase", :name "is_object"}
+  :left-nodes 51
+  :right-nodes 51}
+ {:score 1.0
+  :language "lua"
+  :left {:file "server/world_host/ferry_route.lua", :start-line 12, :end-line 15, :namespace "server.world_host.ferry_route", :name "is_object"}
+  :right {:file "server/world_host/squad_dock.lua", :start-line 11, :end-line 14, :namespace "server.world_host.squad_dock", :name "is_object"}
+  :left-nodes 51
+  :right-nodes 51}
+ {:score 1.0
+  :language "lua"
+  :left {:file "server/world_host/ferry_route.lua", :start-line 21, :end-line 24, :namespace "server.world_host.ferry_route", :name "flat_distance"}
+  :right {:file "server/world_host/interaction_points.lua", :start-line 5, :end-line 8, :namespace "server.world_host.interaction_points", :name "flat_distance"}
+  :left-nodes 81
   :right-nodes 81}
+ {:score 1.0
+  :language "lua"
+  :left {:file "server/world_host/fish_ai_target.lua", :start-line 13, :end-line 23, :namespace "server.world_host.fish_ai_target", :name "loadAPI"}
+  :right {:file "server/world_host/fish_ai_target.lua", :start-line 25, :end-line 35, :namespace "server.world_host.fish_ai_target", :name "loadRuntime"}
+  :left-nodes 85
+  :right-nodes 85}
+ {:score 1.0
+  :language "lua"
+  :left {:file "server/world_host/fish_tree.lua", :start-line 1661, :end-line 1665, :namespace "server.world_host.fish_tree", :name "zoneScene"}
+  :right {:file "server/world_host/special_item_phase.lua", :start-line 25, :end-line 29, :namespace "server.world_host.special_item_phase", :name "zone_scene"}
+  :left-nodes 60
+  :right-nodes 60}
+ {:score 1.0
+  :language "lua"
+  :left {:file "server/world_host/life_facade.lua", :start-line 7, :end-line 10, :namespace "server.world_host.life_facade", :name "is_object"}
+  :right {:file "server/world_host/modifier_leaf.lua", :start-line 23, :end-line 26, :namespace "server.world_host.modifier_leaf", :name "is_object"}
+  :left-nodes 51
+  :right-nodes 51}
+ {:score 1.0
+  :language "lua"
+  :left {:file "server/world_host/life_facade.lua", :start-line 7, :end-line 10, :namespace "server.world_host.life_facade", :name "is_object"}
+  :right {:file "server/world_host/player_life.lua", :start-line 36, :end-line 39, :namespace "server.world_host.player_life", :name "is_object"}
+  :left-nodes 51
+  :right-nodes 51}
+ {:score 1.0
+  :language "lua"
+  :left {:file "server/world_host/life_facade.lua", :start-line 7, :end-line 10, :namespace "server.world_host.life_facade", :name "is_object"}
+  :right {:file "server/world_host/server_runtime.lua", :start-line 45, :end-line 48, :namespace "server.world_host.server_runtime", :name "is_object"}
+  :left-nodes 51
+  :right-nodes 51}
+ {:score 1.0
+  :language "lua"
+  :left {:file "server/world_host/life_facade.lua", :start-line 7, :end-line 10, :namespace "server.world_host.life_facade", :name "is_object"}
+  :right {:file "server/world_host/special_item_phase.lua", :start-line 42, :end-line 45, :namespace "server.world_host.special_item_phase", :name "is_object"}
+  :left-nodes 51
+  :right-nodes 51}
+ {:score 1.0
+  :language "lua"
+  :left {:file "server/world_host/life_facade.lua", :start-line 7, :end-line 10, :namespace "server.world_host.life_facade", :name "is_object"}
+  :right {:file "server/world_host/squad_dock.lua", :start-line 11, :end-line 14, :namespace "server.world_host.squad_dock", :name "is_object"}
+  :left-nodes 51
+  :right-nodes 51}
+ {:score 1.0
+  :language "lua"
+  :left {:file "server/world_host/life_facade.lua", :start-line 12, :end-line 16, :namespace "server.world_host.life_facade", :name "is_valid_player"}
+  :right {:file "server/world_host/server_runtime.lua", :start-line 50, :end-line 54, :namespace "server.world_host.server_runtime", :name "is_valid_player"}
+  :left-nodes 81
+  :right-nodes 81}
+ {:score 1.0
+  :language "lua"
+  :left {:file "server/world_host/modifier_leaf.lua", :start-line 23, :end-line 26, :namespace "server.world_host.modifier_leaf", :name "is_object"}
+  :right {:file "server/world_host/player_life.lua", :start-line 36, :end-line 39, :namespace "server.world_host.player_life", :name "is_object"}
+  :left-nodes 51
+  :right-nodes 51}
+ {:score 1.0
+  :language "lua"
+  :left {:file "server/world_host/modifier_leaf.lua", :start-line 23, :end-line 26, :namespace "server.world_host.modifier_leaf", :name "is_object"}
+  :right {:file "server/world_host/server_runtime.lua", :start-line 45, :end-line 48, :namespace "server.world_host.server_runtime", :name "is_object"}
+  :left-nodes 51
+  :right-nodes 51}
+ {:score 1.0
+  :language "lua"
+  :left {:file "server/world_host/modifier_leaf.lua", :start-line 23, :end-line 26, :namespace "server.world_host.modifier_leaf", :name "is_object"}
+  :right {:file "server/world_host/special_item_phase.lua", :start-line 42, :end-line 45, :namespace "server.world_host.special_item_phase", :name "is_object"}
+  :left-nodes 51
+  :right-nodes 51}
+ {:score 1.0
+  :language "lua"
+  :left {:file "server/world_host/modifier_leaf.lua", :start-line 23, :end-line 26, :namespace "server.world_host.modifier_leaf", :name "is_object"}
+  :right {:file "server/world_host/squad_dock.lua", :start-line 11, :end-line 14, :namespace "server.world_host.squad_dock", :name "is_object"}
+  :left-nodes 51
+  :right-nodes 51}
+ {:score 1.0
+  :language "lua"
+  :left {:file "server/world_host/modifier_leaf.lua", :start-line 250, :end-line 256, :namespace "server.world_host.modifier_leaf", :name "default_duration_for"}
+  :right {:file "server/world_host/player_effects.lua", :start-line 50, :end-line 56, :namespace "server.world_host.player_effects", :name "default_duration"}
+  :left-nodes 84
+  :right-nodes 84}
+ {:score 1.0
+  :language "lua"
+  :left {:file "server/world_host/player_blindbox.lua", :start-line 16, :end-line 21, :namespace "server.world_host.player_blindbox", :name "copy"}
+  :right {:file "server/world_host/player_lottery.lua", :start-line 8, :end-line 13, :namespace "server.world_host.player_lottery", :name "copy"}
+  :left-nodes 91
+  :right-nodes 91}
+ {:score 1.0
+  :language "lua"
+  :left {:file "server/world_host/player_blindbox.lua", :start-line 16, :end-line 21, :namespace "server.world_host.player_blindbox", :name "copy"}
+  :right {:file "server/world_host/player_platform_shop.lua", :start-line 49, :end-line 54, :namespace "server.world_host.player_platform_shop", :name "copy"}
+  :left-nodes 91
+  :right-nodes 91}
+ {:score 1.0
+  :language "lua"
+  :left {:file "server/world_host/player_blindbox.lua", :start-line 22, :end-line 27, :namespace "server.world_host.player_blindbox", :name "sorted_keys"}
+  :right {:file "server/world_host/player_platform_shop.lua", :start-line 55, :end-line 60, :namespace "server.world_host.player_platform_shop", :name "sorted_keys"}
+  :left-nodes 89
+  :right-nodes 89}
+ {:score 1.0
+  :language "lua"
+  :left {:file "server/world_host/player_grill.lua", :start-line 80, :end-line 88, :namespace "server.world_host.player_grill", :name "reply"}
+  :right {:file "server/world_host/player_grill.lua", :start-line 90, :end-line 98, :namespace "server.world_host.player_grill", :name "push_state"}
+  :left-nodes 115
+  :right-nodes 115}
+ {:score 1.0
+  :language "lua"
+  :left {:file "server/world_host/player_grill.lua", :start-line 80, :end-line 88, :namespace "server.world_host.player_grill", :name "reply"}
+  :right {:file "server/world_host/player_weapon.lua", :start-line 32, :end-line 40, :namespace "server.world_host.player_weapon", :name "reply"}
+  :left-nodes 115
+  :right-nodes 115}
+ {:score 1.0
+  :language "lua"
+  :left {:file "server/world_host/player_grill.lua", :start-line 90, :end-line 98, :namespace "server.world_host.player_grill", :name "push_state"}
+  :right {:file "server/world_host/player_weapon.lua", :start-line 32, :end-line 40, :namespace "server.world_host.player_weapon", :name "reply"}
+  :left-nodes 115
+  :right-nodes 115}
+ {:score 1.0
+  :language "lua"
+  :left {:file "server/world_host/player_life.lua", :start-line 36, :end-line 39, :namespace "server.world_host.player_life", :name "is_object"}
+  :right {:file "server/world_host/server_runtime.lua", :start-line 45, :end-line 48, :namespace "server.world_host.server_runtime", :name "is_object"}
+  :left-nodes 51
+  :right-nodes 51}
+ {:score 1.0
+  :language "lua"
+  :left {:file "server/world_host/player_life.lua", :start-line 36, :end-line 39, :namespace "server.world_host.player_life", :name "is_object"}
+  :right {:file "server/world_host/special_item_phase.lua", :start-line 42, :end-line 45, :namespace "server.world_host.special_item_phase", :name "is_object"}
+  :left-nodes 51
+  :right-nodes 51}
+ {:score 1.0
+  :language "lua"
+  :left {:file "server/world_host/player_life.lua", :start-line 36, :end-line 39, :namespace "server.world_host.player_life", :name "is_object"}
+  :right {:file "server/world_host/squad_dock.lua", :start-line 11, :end-line 14, :namespace "server.world_host.squad_dock", :name "is_object"}
+  :left-nodes 51
+  :right-nodes 51}
+ {:score 1.0
+  :language "lua"
+  :left {:file "server/world_host/player_lottery.lua", :start-line 8, :end-line 13, :namespace "server.world_host.player_lottery", :name "copy"}
+  :right {:file "server/world_host/player_platform_shop.lua", :start-line 49, :end-line 54, :namespace "server.world_host.player_platform_shop", :name "copy"}
+  :left-nodes 91
+  :right-nodes 91}
+ {:score 1.0
+  :language "lua"
+  :left {:file "server/world_host/player_tree.lua", :start-line 75, :end-line 83, :namespace "server.world_host.player_tree", :name "assert_clock"}
+  :right {:file "server/world_host/shared_world_tree.lua", :start-line 17, :end-line 25, :namespace "server.world_host.shared_world_tree", :name "assert_clock"}
+  :left-nodes 123
+  :right-nodes 123}
+ {:score 1.0
+  :language "lua"
+  :left {:file "server/world_host/server_runtime.lua", :start-line 45, :end-line 48, :namespace "server.world_host.server_runtime", :name "is_object"}
+  :right {:file "server/world_host/special_item_phase.lua", :start-line 42, :end-line 45, :namespace "server.world_host.special_item_phase", :name "is_object"}
+  :left-nodes 51
+  :right-nodes 51}
+ {:score 1.0
+  :language "lua"
+  :left {:file "server/world_host/server_runtime.lua", :start-line 45, :end-line 48, :namespace "server.world_host.server_runtime", :name "is_object"}
+  :right {:file "server/world_host/squad_dock.lua", :start-line 11, :end-line 14, :namespace "server.world_host.squad_dock", :name "is_object"}
+  :left-nodes 51
+  :right-nodes 51}
+ {:score 1.0
+  :language "lua"
+  :left {:file "server/world_host/special_item_phase.lua", :start-line 42, :end-line 45, :namespace "server.world_host.special_item_phase", :name "is_object"}
+  :right {:file "server/world_host/squad_dock.lua", :start-line 11, :end-line 14, :namespace "server.world_host.squad_dock", :name "is_object"}
+  :left-nodes 51
+  :right-nodes 51}
+ {:score 0.953488372093
+  :language "lua"
+  :left {:file "server/platform_host.lua", :start-line 5, :end-line 8, :namespace "server.platform_host", :name "isValidPlayer"}
+  :right {:file "server/world_host/world_signal_router.lua", :start-line 7, :end-line 10, :namespace "server.world_host.world_signal_router", :name "WorldSignalRouter.is_valid_player"}
+  :left-nodes 66
+  :right-nodes 69}
+ {:score 0.953488372093
+  :language "lua"
+  :left {:file "server/world_host/player_tree.lua", :start-line 85, :end-line 88, :namespace "server.world_host.player_tree", :name "is_valid_player"}
+  :right {:file "server/world_host/world_signal_router.lua", :start-line 7, :end-line 10, :namespace "server.world_host.world_signal_router", :name "WorldSignalRouter.is_valid_player"}
+  :left-nodes 66
+  :right-nodes 69}
  {:score 0.928571428571
   :language "lua"
-  :left {:file "client/packages/modifier_system/modifier_system.lua", :start-line 38, :end-line 47, :namespace "client.packages.modifier_system.modifier_system", :name "CModifierSystemManager.new"}
-  :right {:file "server/packages/modifier_system/modifier_system.lua", :start-line 77, :end-line 87, :namespace "server.packages.modifier_system.modifier_system", :name "SModifierSystemManager.new"}
-  :left-nodes 150
-  :right-nodes 165}
- {:score 0.925925925926
-  :language "lua"
-  :left {:file "server/packages/ability_system/eca.lua", :start-line 1081, :end-line 1088, :namespace "server.packages.ability_system.eca", :name "eca.GetValidTargetsCreature"}
-  :right {:file "server/packages/ability_system/eca.lua", :start-line 1149, :end-line 1157, :namespace "server.packages.ability_system.eca", :name "eca.GetTargetTypeUnits"}
-  :left-nodes 78
-  :right-nodes 79}
- {:score 0.925925925926
-  :language "lua"
-  :left {:file "server/packages/ability_system/eca.lua", :start-line 1081, :end-line 1088, :namespace "server.packages.ability_system.eca", :name "eca.GetValidTargetsCreature"}
-  :right {:file "server/packages/ability_system/eca.lua", :start-line 1168, :end-line 1176, :namespace "server.packages.ability_system.eca", :name "eca.GetTargetTypeRoles"}
-  :left-nodes 78
-  :right-nodes 79}
- {:score 0.925925925926
-  :language "lua"
-  :left {:file "server/packages/ability_system/eca.lua", :start-line 1098, :end-line 1105, :namespace "server.packages.ability_system.eca", :name "eca.GetValidTargetsComponent"}
-  :right {:file "server/packages/ability_system/eca.lua", :start-line 1149, :end-line 1157, :namespace "server.packages.ability_system.eca", :name "eca.GetTargetTypeUnits"}
-  :left-nodes 78
-  :right-nodes 79}
- {:score 0.925925925926
-  :language "lua"
-  :left {:file "server/packages/ability_system/eca.lua", :start-line 1098, :end-line 1105, :namespace "server.packages.ability_system.eca", :name "eca.GetValidTargetsComponent"}
-  :right {:file "server/packages/ability_system/eca.lua", :start-line 1168, :end-line 1176, :namespace "server.packages.ability_system.eca", :name "eca.GetTargetTypeRoles"}
-  :left-nodes 78
-  :right-nodes 79}
- {:score 0.925925925926
-  :language "lua"
-  :left {:file "server/packages/ability_system/eca.lua", :start-line 1131, :end-line 1138, :namespace "server.packages.ability_system.eca", :name "eca.GetValidTargetsRole"}
-  :right {:file "server/packages/ability_system/eca.lua", :start-line 1149, :end-line 1157, :namespace "server.packages.ability_system.eca", :name "eca.GetTargetTypeUnits"}
-  :left-nodes 78
-  :right-nodes 79}
- {:score 0.925925925926
-  :language "lua"
-  :left {:file "server/packages/ability_system/eca.lua", :start-line 1131, :end-line 1138, :namespace "server.packages.ability_system.eca", :name "eca.GetValidTargetsRole"}
-  :right {:file "server/packages/ability_system/eca.lua", :start-line 1168, :end-line 1176, :namespace "server.packages.ability_system.eca", :name "eca.GetTargetTypeRoles"}
-  :left-nodes 78
-  :right-nodes 79}
- {:score 0.875
-  :language "lua"
-  :left {:file "common/packages/attr_rule/AttrBuffUnit.lua", :start-line 88, :end-line 93, :namespace "common.packages.attr_rule.AttrBuffUnit", :name "AttrBuffUnit.GetTargetUnit"}
-  :right {:file "common/packages/attr_rule/AttrUnit.lua", :start-line 26, :end-line 31, :namespace "common.packages.attr_rule.AttrUnit", :name "getAttrBuffRecord"}
-  :left-nodes 42
-  :right-nodes 39}
- {:score 0.863636363636
-  :language "lua"
-  :left {:file "client/packages/ability_system/pointer/CirclePointer.lua", :start-line 11, :end-line 19, :namespace "client.packages.ability_system.pointer.CirclePointer", :name "CirclePointer.new"}
-  :right {:file "client/packages/ability_system/pointer/RectanglePointer.lua", :start-line 11, :end-line 17, :namespace "client.packages.ability_system.pointer.RectanglePointer", :name "RectanglePointer.new"}
-  :left-nodes 102
-  :right-nodes 74}
- {:score 0.863636363636
-  :language "lua"
-  :left {:file "client/packages/ability_system/pointer/CirclePointer.lua", :start-line 11, :end-line 19, :namespace "client.packages.ability_system.pointer.CirclePointer", :name "CirclePointer.new"}
-  :right {:file "client/packages/ability_system/pointer/SectorPointer.lua", :start-line 11, :end-line 17, :namespace "client.packages.ability_system.pointer.SectorPointer", :name "SectorPointer.new"}
-  :left-nodes 102
-  :right-nodes 74}
- {:score 0.857142857143
-  :language "lua"
-  :left {:file "client/LocalMgrUtil.lua", :start-line 3, :end-line 10, :namespace "client.LocalMgrUtil", :name "MgrUtil:Start"}
-  :right {:file "server/MgrUtil.lua", :start-line 3, :end-line 8, :namespace "server.MgrUtil", :name "MgrUtil:Start"}
-  :left-nodes 110
-  :right-nodes 90}
- {:score 0.855670103093
-  :language "lua"
-  :left {:file "client/ScreenHandlers/ScreenBlindbox.lua", :start-line 29, :end-line 52, :namespace "client.ScreenHandlers.ScreenBlindbox", :name "Screen:Create"}
-  :right {:file "client/ScreenHandlers/ScreenPlatform.lua", :start-line 29, :end-line 47, :namespace "client.ScreenHandlers.ScreenPlatform", :name "Panel:Create"}
-  :left-nodes 331
-  :right-nodes 268}
- {:score 0.854545454545
-  :language "lua"
-  :left {:file "server/packages/official_ai_feature/official_ai_feature.lua", :start-line 21, :end-line 29, :namespace "server.packages.official_ai_feature.official_ai_feature", :name "SOfficialAiFeatureManager.startAI"}
-  :right {:file "server/packages/official_ai_feature/official_ai_feature.lua", :start-line 33, :end-line 42, :namespace "server.packages.official_ai_feature.official_ai_feature", :name "SOfficialAiFeatureManager.stopAI"}
-  :left-nodes 81
+  :left {:file "server/world_host/life_facade.lua", :start-line 25, :end-line 30, :namespace "server.world_host.life_facade", :name "read_position"}
+  :right {:file "server/world_host/modifier_leaf.lua", :start-line 40, :end-line 49, :namespace "server.world_host.modifier_leaf", :name "resolve_source_unit"}
+  :left-nodes 92
   :right-nodes 92}
- {:score 0.850746268657
+ {:score 0.891891891892
   :language "lua"
-  :left {:file "server/Mgr/MgrAttr.lua", :start-line 122, :end-line 130, :namespace "server.Mgr.MgrAttr", :name "Mgr:RefreshAfterRevive"}
-  :right {:file "server/Mgr/MgrAttr.lua", :start-line 131, :end-line 137, :namespace "server.Mgr.MgrAttr", :name "Mgr:OnPlayerAdded"}
-  :left-nodes 130
-  :right-nodes 120}
- {:score 0.848484848485
+  :left {:file "client/views/view_util.lua", :start-line 6, :end-line 9, :namespace "client.views.view_util", :name "view_util.is_record"}
+  :right {:file "server/world_host/ability_leaf.lua", :start-line 16, :end-line 19, :namespace "server.world_host.ability_leaf", :name "is_object"}
+  :left-nodes 54
+  :right-nodes 51}
+ {:score 0.891891891892
   :language "lua"
-  :left {:file "server/Mgr/MgrCast.lua", :start-line 183, :end-line 190, :namespace "server.Mgr.MgrCast", :name "Mgr:Reel"}
-  :right {:file "server/Mgr/MgrCast.lua", :start-line 200, :end-line 206, :namespace "server.Mgr.MgrCast", :name "Mgr:Abort"}
-  :left-nodes 134
-  :right-nodes 109}
- {:score 0.846153846154
+  :left {:file "client/views/view_util.lua", :start-line 6, :end-line 9, :namespace "client.views.view_util", :name "view_util.is_record"}
+  :right {:file "server/world_host/attr_leaf.lua", :start-line 19, :end-line 22, :namespace "server.world_host.attr_leaf", :name "is_object"}
+  :left-nodes 54
+  :right-nodes 51}
+ {:score 0.891891891892
   :language "lua"
-  :left {:file "client/ScreenHandlers/DialogNoticeConfirm.lua", :start-line 18, :end-line 21, :namespace "client.ScreenHandlers.DialogNoticeConfirm", :name "ScreenHandler:Init"}
-  :right {:file "common/RateLimit.lua", :start-line 120, :end-line 125, :namespace "common.RateLimit", :name "Window:Reset"}
-  :left-nodes 39
-  :right-nodes 67}
- {:score 0.846153846154
+  :left {:file "client/views/view_util.lua", :start-line 6, :end-line 9, :namespace "client.views.view_util", :name "view_util.is_record"}
+  :right {:file "server/world_host/ferry_route.lua", :start-line 12, :end-line 15, :namespace "server.world_host.ferry_route", :name "is_object"}
+  :left-nodes 54
+  :right-nodes 51}
+ {:score 0.891891891892
   :language "lua"
-  :left {:file "client/packages/modifier_system/modifier_system.lua", :start-line 213, :end-line 225, :namespace "client.packages.modifier_system.modifier_system", :name "CModifierSystemManager:_unbindSlot"}
-  :right {:file "server/packages/modifier_system/modifier_system.lua", :start-line 211, :end-line 224, :namespace "server.packages.modifier_system.modifier_system", :name "SModifierSystemManager:_removeInstance"}
-  :left-nodes 106
-  :right-nodes 129}
- {:score 0.833333333333
+  :left {:file "client/views/view_util.lua", :start-line 6, :end-line 9, :namespace "client.views.view_util", :name "view_util.is_record"}
+  :right {:file "server/world_host/life_facade.lua", :start-line 7, :end-line 10, :namespace "server.world_host.life_facade", :name "is_object"}
+  :left-nodes 54
+  :right-nodes 51}
+ {:score 0.891891891892
   :language "lua"
-  :left {:file "client/ScreenHandlers/DialogNoticeConfirm.lua", :start-line 48, :end-line 57, :namespace "client.ScreenHandlers.DialogNoticeConfirm", :name "ScreenHandler:CloseScreen"}
-  :right {:file "client/ScreenHandlers/ScreenMsg.lua", :start-line 55, :end-line 63, :namespace "client.ScreenHandlers.ScreenMsg", :name "ScreenHandler:CloseScreen"}
-  :left-nodes 77
-  :right-nodes 66}
- {:score 0.833333333333
+  :left {:file "client/views/view_util.lua", :start-line 6, :end-line 9, :namespace "client.views.view_util", :name "view_util.is_record"}
+  :right {:file "server/world_host/modifier_leaf.lua", :start-line 23, :end-line 26, :namespace "server.world_host.modifier_leaf", :name "is_object"}
+  :left-nodes 54
+  :right-nodes 51}
+ {:score 0.891891891892
   :language "lua"
-  :left {:file "server/Mgr/MgrFishUnit.lua", :start-line 43, :end-line 48, :namespace "server.Mgr.MgrFishUnit", :name "readPosition"}
-  :right {:file "server/Mgr/MgrVitals.lua", :start-line 165, :end-line 171, :namespace "server.Mgr.MgrVitals", :name "readPosition"}
-  :left-nodes 121
-  :right-nodes 136}
- {:score 0.831168831169
+  :left {:file "client/views/view_util.lua", :start-line 6, :end-line 9, :namespace "client.views.view_util", :name "view_util.is_record"}
+  :right {:file "server/world_host/player_life.lua", :start-line 36, :end-line 39, :namespace "server.world_host.player_life", :name "is_object"}
+  :left-nodes 54
+  :right-nodes 51}
+ {:score 0.891891891892
   :language "lua"
-  :left {:file "client/ScreenHandlers/ScreenBlindbox.lua", :start-line 54, :end-line 71, :namespace "client.ScreenHandlers.ScreenBlindbox", :name "Screen:Button"}
-  :right {:file "client/ScreenHandlers/ScreenPlatform.lua", :start-line 49, :end-line 59, :namespace "client.ScreenHandlers.ScreenPlatform", :name "Panel:Button"}
-  :left-nodes 257
-  :right-nodes 212}
- {:score 0.830508474576
+  :left {:file "client/views/view_util.lua", :start-line 6, :end-line 9, :namespace "client.views.view_util", :name "view_util.is_record"}
+  :right {:file "server/world_host/server_runtime.lua", :start-line 45, :end-line 48, :namespace "server.world_host.server_runtime", :name "is_object"}
+  :left-nodes 54
+  :right-nodes 51}
+ {:score 0.891891891892
   :language "lua"
-  :left {:file "client/packages/ability_system/api.lua", :start-line 14, :end-line 27, :namespace "client.packages.ability_system.api", :name "getManagerForUnit"}
-  :right {:file "server/packages/ability_system/api.lua", :start-line 47, :end-line 60, :namespace "server.packages.ability_system.api", :name "getManagerForUnit"}
-  :left-nodes 111
-  :right-nodes 104}
- {:score 0.829268292683
+  :left {:file "client/views/view_util.lua", :start-line 6, :end-line 9, :namespace "client.views.view_util", :name "view_util.is_record"}
+  :right {:file "server/world_host/special_item_phase.lua", :start-line 42, :end-line 45, :namespace "server.world_host.special_item_phase", :name "is_object"}
+  :left-nodes 54
+  :right-nodes 51}
+ {:score 0.891891891892
   :language "lua"
-  :left {:file "client/packages/ability_system/ui/UIManager.lua", :start-line 468, :end-line 475, :namespace "client.packages.ability_system.ui.UIManager", :name "UIManager:_FindControllerByAbility"}
-  :right {:file "server/Mgr/MgrFishUnit.lua", :start-line 2078, :end-line 2082, :namespace "server.Mgr.MgrFishUnit", :name "Mgr:FindByCarrier"}
-  :left-nodes 58
-  :right-nodes 53}
- {:score 0.82
+  :left {:file "client/views/view_util.lua", :start-line 6, :end-line 9, :namespace "client.views.view_util", :name "view_util.is_record"}
+  :right {:file "server/world_host/squad_dock.lua", :start-line 11, :end-line 14, :namespace "server.world_host.squad_dock", :name "is_object"}
+  :left-nodes 54
+  :right-nodes 51}
+ {:score 0.888888888889
   :language "lua"
-  :left {:file "server/Mgr/MgrCast.lua", :start-line 21, :end-line 27, :namespace "server.Mgr.MgrCast", :name "waterZone"}
-  :right {:file "server/Mgr/MgrWeapon.lua", :start-line 363, :end-line 368, :namespace "server.Mgr.MgrWeapon", :name "Mgr:WaterZoneAt"}
-  :left-nodes 81
-  :right-nodes 89}
+  :left {:file "server/world_host/player_blindbox.lua", :start-line 8, :end-line 15, :namespace "server.world_host.player_blindbox", :name "bag"}
+  :right {:file "server/world_host/player_platform_shop.lua", :start-line 38, :end-line 48, :namespace "server.world_host.player_platform_shop", :name "bag"}
+  :left-nodes 176
+  :right-nodes 174}
+ {:score 0.884615384615
+  :language "lua"
+  :left {:file "client/views/attack_view.lua", :start-line 26, :end-line 36, :namespace "client.views.attack_view", :name "equipped"}
+  :right {:file "client/views/main_hud_equip_popups.lua", :start-line 68, :end-line 82, :namespace "client.views.main_hud_equip_popups", :name "equipped_weapon"}
+  :left-nodes 209
+  :right-nodes 215}
+ {:score 0.85
+  :language "lua"
+  :left {:file "client/views/view_util.lua", :start-line 33, :end-line 42, :namespace "client.views.view_util", :name "view_util.distance_sq_xz"}
+  :right {:file "client/views/view_util.lua", :start-line 44, :end-line 54, :namespace "client.views.view_util", :name "view_util.distance_sq_xyz"}
+  :left-nodes 151
+  :right-nodes 182}
+ {:score 0.840909090909
+  :language "lua"
+  :left {:file "client/views/fisherman_view.lua", :start-line 25, :end-line 28, :namespace "client.views.fisherman_view", :name "close_modal"}
+  :right {:file "client/views/shop_view.lua", :start-line 102, :end-line 105, :namespace "client.views.shop_view", :name "notify"}
+  :left-nodes 63
+  :right-nodes 69}
+ {:score 0.840909090909
+  :language "lua"
+  :left {:file "client/views/shop_view.lua", :start-line 51, :end-line 54, :namespace "client.views.shop_view", :name "close_modal"}
+  :right {:file "client/views/shop_view.lua", :start-line 102, :end-line 105, :namespace "client.views.shop_view", :name "notify"}
+  :left-nodes 63
+  :right-nodes 69}
+ {:score 0.824561403509
+  :language "lua"
+  :left {:file "server/world_host/life_facade.lua", :start-line 18, :end-line 23, :namespace "server.world_host.life_facade", :name "read_character"}
+  :right {:file "server/world_host/life_facade.lua", :start-line 25, :end-line 30, :namespace "server.world_host.life_facade", :name "read_position"}
+  :left-nodes 79
+  :right-nodes 92}
+ {:score 0.824561403509
+  :language "lua"
+  :left {:file "server/world_host/life_facade.lua", :start-line 18, :end-line 23, :namespace "server.world_host.life_facade", :name "read_character"}
+  :right {:file "server/world_host/modifier_leaf.lua", :start-line 40, :end-line 49, :namespace "server.world_host.modifier_leaf", :name "resolve_source_unit"}
+  :left-nodes 79
+  :right-nodes 92}
 ]}
