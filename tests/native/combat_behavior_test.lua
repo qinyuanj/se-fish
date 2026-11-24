@@ -7,7 +7,7 @@
 -- 迁移纪律：
 --   * 旧 setUp/tearDown 的替身（全局引擎 + 4 个 package.loaded 管理器模块）改成逐案例 before_each/after_each，
 --     快照在夹具动作之前取，恢复在案例失败时也执行（Busted 的 after_each 在 before_each 抛错后仍跑）；
---   * MgrVitals / MgrFishCarrier / PlayerGM / server.AbilityAPI 都以模块缓存桩注入，行为在
+--   * 生命入口 / FishCarrier / PlayerGM / server.AbilityAPI 都以服务桩注入，行为在
 --     server/AbilityBehaviors/melee_hit.lua 与 eel_discharge.lua 这两个公开接缝上观察，不伸手进实现；
 --   * server/main.lua 的接线守卫读源码断言：assertStrContains 的 plain 子串语义用
 --     assert.matches(needle, haystack, nil, true) 保留（`.` 在 Lua pattern 里是任意字符，不能当 pattern 跑）。
@@ -44,10 +44,9 @@ describe('TestEelDischargeEntry', function()
     local saved
     before_each(function()
         saved = { game = rawget(_G, 'game'),
-            vitals = package.loaded['server.Mgr.MgrVitals'],
             carrier = package.loaded['server.World.FishCarrier'] }
         ctx = { hits = {}, seenHits = {}, hitSerial = 0 }
-        package.loaded['server.Mgr.MgrVitals'] = {
+        ctx.vitals = {
             NewHit = function(_, source, category)
                 ctx.hitSerial = ctx.hitSerial + 1
                 return { id = ctx.hitSerial, source = source, category = category }
@@ -67,10 +66,8 @@ describe('TestEelDischargeEntry', function()
         }
         ctx.inside = { UserId = 1, Character = { Position = vec(1, 0, 0), Controller = { Health = 300 } } }
         ctx.outside = { UserId = 2, Character = { Position = vec(9, 0, 0), Controller = { Health = 300 } } }
-        ctx.services = { Vitals = package.loaded['server.Mgr.MgrVitals'],
+        ctx.services = { Vitals = ctx.vitals,
             FishCarrier = package.loaded['server.World.FishCarrier'] }
-        package.loaded['server.Mgr.MgrVitals'] = setmetatable({}, { __index = function()
-            error('电鳗行为不应再加载 MgrVitals') end })
         package.loaded['server.World.FishCarrier'] = setmetatable({}, { __index = function()
             error('电鳗行为不应再加载 MgrFishCarrier') end })
         _G.game = { GetService = function(_, name)
@@ -79,7 +76,6 @@ describe('TestEelDischargeEntry', function()
     end)
     after_each(function()
         _G.game = saved.game
-        package.loaded['server.Mgr.MgrVitals'] = saved.vitals
         package.loaded['server.World.FishCarrier'] = saved.carrier
     end)
 
@@ -153,7 +149,6 @@ describe('TestMeleeHitEntry', function()
     before_each(function()
         saved = {
             game = rawget(_G, 'game'), Vector3 = rawget(_G, 'Vector3'), Quaternion = rawget(_G, 'Quaternion'),
-            vitals = package.loaded['server.Mgr.MgrVitals'],
             carrier = package.loaded['server.World.FishCarrier'],
             gm = package.loaded['server.World.PlayerGM'],
             vendorApi = package.loaded['server.packages.ability_system.api'],
@@ -180,7 +175,7 @@ describe('TestMeleeHitEntry', function()
                 return s
             end,
         }
-        package.loaded['server.Mgr.MgrVitals'] = {
+        ctx.vitals = {
             NewHit = function(_, source, category)
                 local hit = { source = source, category = category, id = 1 }
                 ctx.createdHit = hit
@@ -195,10 +190,10 @@ describe('TestMeleeHitEntry', function()
             ResolveCarrier = function(_, target) return target == ctx.target and ctx.carrier or nil end,
         }
         package.loaded['server.World.PlayerGM'] = { GetMeleeDamage = function(_, _, damage) return damage end }
-        ctx.services = { Vitals = package.loaded['server.Mgr.MgrVitals'],
+        ctx.services = { Vitals = ctx.vitals,
             FishCarrier = package.loaded['server.World.FishCarrier'], GM = package.loaded['server.World.PlayerGM'],
             Modifier = {} }
-        for _, name in ipairs({ 'server.Mgr.MgrVitals', 'server.World.FishCarrier', 'server.World.PlayerGM' }) do
+        for _, name in ipairs({ 'server.World.FishCarrier', 'server.World.PlayerGM' }) do
             package.loaded[name] = setmetatable({}, { __index = function()
                 error('近战行为不应再加载上层管理器: ' .. name) end })
         end
@@ -221,7 +216,6 @@ describe('TestMeleeHitEntry', function()
         _G.game = saved.game
         _G.Vector3 = saved.Vector3
         _G.Quaternion = saved.Quaternion
-        package.loaded['server.Mgr.MgrVitals'] = saved.vitals
         package.loaded['server.World.FishCarrier'] = saved.carrier
         package.loaded['server.World.PlayerGM'] = saved.gm
         package.loaded['server.AbilityAPI'] = saved.api
@@ -253,7 +247,7 @@ describe('TestMeleeHitEntry', function()
         }
     end
 
-    -- #129：玩家挥砍经 AbilityAPI 登记（MgrWeapon 按 GameCfg 表登记伤害/射程），
+    -- #129：玩家挥砍经 AbilityAPI 登记（PlayerWeapon 按 GameCfg 表登记伤害/射程），
     -- 命中盒由登记射程推导，伤害不再回落到预设属性 25；命中身份与去重口径不变。
     it('test_fish_hit_uses_staged_swing_not_attribute_25', function()
         ctx.swingStaged[7] = { damage = 12, range = 4 }

@@ -6,11 +6,12 @@
 --   1. 特效武器命中后不挂效果（毒匕挥中不中毒）：swing 载荷丢 effect、枪械命中不调应用口；
 --   2. 未命中也挂效果 / 无特效武器也挂效果 / 命中被统一入口拒绝（安全区）仍挂效果；
 --   3. 近战命中盒重放（同一目标重复进盒）导致效果重复叠加超过一次判定段语义。
--- 接缝：SwingRegistry.StageSwing 载荷、MgrWeapon:AttackMelee/AttackGun、melee_hit 的 process_hit
---   成功分支（_applyDamage 返回 true 后直接经 MgrModifier:ApplyWeaponEffect 应用）。
+-- 接缝：SwingRegistry.StageSwing 载荷、PlayerWeapon 的 handle 公开入口、melee_hit 的 process_hit
+--   成功分支（_applyDamage 返回 true 后直接经 Modifier 应用口应用效果）。
 --
 -- 技能包替身只提供本案例需要的施法接口，每例还原模块缓存。
-local PlayerData = require('server.Data.PlayerData')
+local Weapon = require('tests.support.weapon_world')
+local SwingRegistry = require('server.SwingRegistry')
 local VENDOR = 'server.packages.ability_system.api'
 
 -- 只替换包内 CastAbility，保持业务守卫的真实实现。
@@ -33,11 +34,6 @@ local function sig()
     return s
 end
 
-local function weaponPlayer(id)
-    return { UserId = id, Character = { Position = { x = 0, y = 2, z = 0 },
-        Rotation = { GetForward = function() return { x = 0, y = 0, z = 1 } end } } }
-end
-
 describe('TestMeleeHitEffect', function()
     -- ===== 3. melee_hit 行为：命中成功后直接经 MgrModifier 挂特效 =====
     local ctx
@@ -45,7 +41,6 @@ describe('TestMeleeHitEffect', function()
     before_each(function()
         saved = { game = rawget(_G, 'game'), Vector3 = rawget(_G, 'Vector3'),
             Quaternion = rawget(_G, 'Quaternion'),
-            vitals = package.loaded['server.Mgr.MgrVitals'],
             carrier = package.loaded['server.World.FishCarrier'],
             gm = package.loaded['server.World.PlayerGM'],
             ability = package.loaded['server.FishAbility'],
@@ -58,7 +53,7 @@ describe('TestMeleeHitEffect', function()
         ctx.applyOk = true
         _G.Vector3 = { New = vec }
         _G.Quaternion = { FromEulerAngles = function() return {} end }
-        package.loaded['server.Mgr.MgrVitals'] = {
+        ctx.vitals = {
             NewHit = function(_, source, category) return { id = 1, source = source, category = category,
                 targets = {} } end,
             ApplyHit = function(_, hit, target, amount)
@@ -79,10 +74,10 @@ describe('TestMeleeHitEffect', function()
         package.loaded['server.SwingRegistry'] = { TakeSwing = function()
             local s = ctx.swing; ctx.swing = nil; return s
         end }
-        ctx.services = { Vitals = package.loaded['server.Mgr.MgrVitals'],
+        ctx.services = { Vitals = ctx.vitals,
             FishCarrier = package.loaded['server.World.FishCarrier'], GM = package.loaded['server.World.PlayerGM'],
             Modifier = modifierStub }
-        for _, name in ipairs({ 'server.Mgr.MgrVitals', 'server.World.FishCarrier', 'server.World.PlayerGM' }) do
+        for _, name in ipairs({ 'server.World.FishCarrier', 'server.World.PlayerGM' }) do
             package.loaded[name] = setmetatable({}, { __index = function()
                 error('近战行为不应再加载上层管理器: ' .. name) end })
         end
@@ -126,7 +121,6 @@ describe('TestMeleeHitEffect', function()
         _G.game = saved.game
         _G.Vector3 = saved.Vector3
         _G.Quaternion = saved.Quaternion
-        package.loaded['server.Mgr.MgrVitals'] = saved.vitals
         package.loaded['server.World.FishCarrier'] = saved.carrier
         package.loaded['server.World.PlayerGM'] = saved.gm
         package.loaded['server.FishAbility'] = saved.ability
@@ -192,130 +186,68 @@ describe('TestMeleeHitEffect', function()
 end)
 
 describe('TestPrizeWeaponEffect', function()
-    -- ===== 2. MgrWeapon：近战登记带特效、枪械命中挂特效 =====
+    -- ===== 2. PlayerWeapon：近战登记带特效、枪械命中挂特效 =====
     local ctx
-    local saved
     before_each(function()
-        saved = { game = rawget(_G, 'game'), re = rawget(_G, 'REUtil'),
-            api = package.loaded['server.AbilityAPI'], swing = package.loaded['server.SwingRegistry'] }
-        ctx = { now = 1000, casts = {}, swingStaged = {}, replies = {}, applied = {}, effects = {} }
-        ctx.player = weaponPlayer(13921)
-        ctx.other = weaponPlayer(13922)
-        package.loaded['server.SwingRegistry'] = {
-            StageSwing = function(userId, swing) ctx.swingStaged[userId] = swing; return true end,
-            ClearSwing = function(userId) ctx.swingStaged[userId] = nil end,
-            PeekSwing = function(userId) return ctx.swingStaged[userId] end,
-            TakeSwing = function(userId)
-                local s = ctx.swingStaged[userId]; ctx.swingStaged[userId] = nil; return s end,
-        }
-        package.loaded['server.AbilityAPI'] = {
-            CastAbility = function() return true end,
-            AddCastGuard = function(fn) ctx.castGuard = fn end,
-        }
-        _G.REUtil = {
-            GetRE = function(_, name)
-                return { OnServerEvent = { Connect = function() end },
-                    FireClient = function(_, player, payload)
-                        ctx.replies[#ctx.replies + 1] = payload end }
-            end,
-            CheckRECD = function() return nil end,
-        }
-        ctx.rayHit = nil
-        _G.game = { GetService = function(_, name)
-            if name == 'World' then return { GetServerTime = function() return ctx.now end } end
-            if name == 'Players' then return { GetPlayers = function() return { ctx.player, ctx.other } end,
-                GetPlayerFromCharacter = function(_, c)
-                    if c == ctx.player.Character then return ctx.player end
-                    if c == ctx.other.Character then return ctx.other end
-                end }
-            end
-            if name == 'PhysicsService' then return { Raycast = function() return ctx.rayHit end } end
-            return nil
-        end }
-        ctx.mgr = assert(loadfile('tests/support/weapon_mgr_double.lua'))()
-        ctx.data = PlayerData.New({ UserId = 13921, SetAttribute = function() end })
-        ctx.data:Init()
-        ctx.mgr.PlayerData = { GetDataInst = function() return ctx.data end,
-            SendItemBar = function() end }
-        ctx.mgr.Attr = require('tests.support.attr_runtime').New(ctx.mgr.PlayerData)
-        ctx.mgr.Vitals = {
-            CanAct = function() return true end,
-            NewHit = function(_, source, category) return { source = source, category = category } end,
-            ApplyHit = function(_, hit, target, amount)
-                ctx.applied[#ctx.applied + 1] = { target = target, amount = amount }
-                return true, amount
-            end,
-        }
-        ctx.mgr.FishUnit = { Fish = {} }
-        ctx.mgr.FishCarrier = { ResolveCarrier = function() return nil end }
-        -- 注入的持续效果应用口（main.lua 接 MgrModifier）
-        ctx.mgr.Modifier = { ApplyWeaponEffect = function(_, source, target, effect)
-            ctx.effects[#ctx.effects + 1] = { source = source, target = target, effect = effect }
-            return true
-        end }
+        ctx = Weapon.new()
+        ctx:setUp()
     end)
     after_each(function()
-        _G.game = saved.game
-        _G.REUtil = saved.re
-        package.loaded['server.AbilityAPI'] = saved.api
-        package.loaded['server.SwingRegistry'] = saved.swing
+        ctx:tearDown()
     end)
 
     -- 命中被统一入口拒绝（ApplyHit false，如安全区）时不挂效果
     it('test_effect_not_applied_when_damage_rejected', function()
-        ctx.mgr.Vitals.ApplyHit = function() return false end
-        ctx.data:GrantWeapon('item163', 1)
-        ctx.data:HoldWeapon('item163')
+        ctx.applyOk = false
+        ctx:equip(ctx.player, 'item163')
         ctx.rayHit = { Instance = ctx.other.Character, Position = { x = 0, y = 2, z = 5 } }
-        assert.is_true(ctx.mgr:Attack(ctx.player).ok)
+        assert.is_true(ctx:attack(ctx.player).ok)
         assert.same(0, #ctx.effects)
     end)
 
     -- 霜之新星命中挂霜冻；脱靶/无特效枪不挂
     it('test_gun_hit_applies_effect_only_on_hit', function()
-        ctx.data:GrantWeapon('item163', 1)
-        ctx.data:HoldWeapon('item163')
+        ctx:equip(ctx.player, 'item163')
         ctx.rayHit = { Instance = ctx.other.Character, Position = { x = 0, y = 2, z = 5 } }
-        assert.is_true(ctx.mgr:Attack(ctx.player).ok)
+        assert.is_true(ctx:attack(ctx.player).ok)
         assert.same(1, #ctx.effects)
         assert.same(ctx.player, ctx.effects[1].source)
         assert.message("枪击目标已由 GetPlayerFromCharacter 解析为玩家").same(ctx.other, ctx.effects[1].target)
-        assert.same({ Kind = 'frost' }, ctx.effects[1].effect)
+        assert.same('frost', ctx.effects[1].kind)
         -- 脱靶：不挂
         ctx.rayHit = nil
-        ctx.now = 1001.1
-        assert.is_true(ctx.mgr:Attack(ctx.player).ok)
+        ctx:advance(1.1)
+        assert.is_true(ctx:attack(ctx.player).ok)
         assert.same(1, #ctx.effects)
         -- 雷霆之力（麻痹）同样挂载
-        ctx.data:GrantWeapon('item164', 1)
-        ctx.data:HoldWeapon('item164')
+        ctx:equip(ctx.player, 'item164')
         ctx.rayHit = { Instance = ctx.other.Character, Position = { x = 0, y = 2, z = 5 } }
-        ctx.now = 1002.2
-        assert.is_true(ctx.mgr:Attack(ctx.player).ok)
-        assert.same({ Kind = 'paralyze' }, ctx.effects[2].effect)
+        ctx:advance(1.1)
+        assert.is_true(ctx:attack(ctx.player).ok)
+        assert.same('paralyze', ctx.effects[2].kind)
         -- 沙漠之鹰（无特效）命中也不挂
-        ctx.data:GrantWeapon('item162', 1)
-        ctx.data:HoldWeapon('item162')
-        ctx.now = 1003.3
-        assert.is_true(ctx.mgr:Attack(ctx.player).ok)
+        ctx:equip(ctx.player, 'item162')
+        ctx:advance(1.1)
+        assert.is_true(ctx:attack(ctx.player).ok)
         assert.same(2, #ctx.effects)
     end)
 
     -- 毒匕挥砍：登记载荷带毒特效；商店匕首不带
     it('test_melee_swing_carries_weapon_effect', function()
-        ctx.data:GrantWeapon('item152', 1) -- 淬毒匕首
-        ctx.data:HoldWeapon('item152')
-        assert.is_true(ctx.mgr:Attack(ctx.player).ok)
-        assert.same(15, ctx.swingStaged[13921].damage)
-        assert.same({ Kind = 'poison' }, ctx.swingStaged[13921].effect)
-        ctx.now = 1000.6
-        ctx.data:GrantWeapon('item135', 1)
-        ctx.data:HoldWeapon('item135')
-        assert.is_true(ctx.mgr:Attack(ctx.player).ok)
-        assert.message('无特效武器不挂 effect').is_nil(ctx.swingStaged[13921].effect)
-        ctx.now = 1001.1
-        ctx.mgr:Attack(ctx.player) -- 空手也不带
-        assert.is_nil(ctx.swingStaged[13921].effect)
+        ctx:equip(ctx.player, 'item152') -- 淬毒匕首
+        assert.is_true(ctx:attack(ctx.player).ok)
+        local swing = SwingRegistry.PeekSwing(ctx.player.UserId)
+        assert.same(15, swing.damage)
+        assert.same({ Kind = 'poison' }, swing.effect)
+        ctx:advance(0.6)
+        ctx:equip(ctx.player, 'item135')
+        assert.is_true(ctx:attack(ctx.player).ok)
+        assert.message('无特效武器不挂 effect').is_nil(SwingRegistry.PeekSwing(ctx.player.UserId).effect)
+        ctx:advance(0.5)
+        ctx.data.Extra.inventory.selection.held = { kind = nil, id = nil, slot = nil }
+        ctx.data.Data.SelectedWeapon = nil
+        ctx:attack(ctx.player) -- 空手也不带
+        assert.is_nil(SwingRegistry.PeekSwing(ctx.player.UserId).effect)
     end)
 end)
 
