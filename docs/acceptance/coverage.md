@@ -420,7 +420,7 @@
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 13-01 | common/cfg/fish.lua、client/views/compendium_view.lua | tests/native/spec/server_progress_315_test.lua、tests/native/spec/client_progress_315_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 13-02 | client/views/compendium_view.lua、common/game_cfg.lua | tests/native/spec/client_progress_315_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 13-03 | client/views/compendium_view.lua | tests/native/spec/client_progress_315_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 13-03 | client/views/compendium_view.lua | tests/native/spec/client_progress_315_test.lua、tests/native/spec/13_compendium_grade_filter_test.lua | 有 | 缺 | 缺 | 缺 | A |
 | 13-04 | server/world_host/player_compendium.lua、server/world_host/fishing_phase.lua、server/world_host/fish_tree.lua | tests/native/spec/server_progress_315_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 13-05 | server/world_host/player_compendium.lua | tests/native/spec/server_progress_315_test.lua | 缺 | 缺 | 缺 | 缺 | B |
 | 13-06 | server/world_host/player_compendium.lua、server/data/player_data.lua | tests/native/spec/server_progress_315_test.lua | 缺 | 缺 | 缺 | 缺 | A |
