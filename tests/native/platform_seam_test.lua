@@ -6,15 +6,15 @@
 --      发货不走持久操作（重进丢失）；信号重复到达时伪防重吞掉真实购买（订单身份未查证，不拼 UserId+goodsId 防重）；
 --   5. 生命周期错：玩家离开残留 flow，重进后旧回调改新会话；payload 畸形直接报错而不是拒绝。
 --   GoodsPurchaseCompleted 订阅入口；引擎边界（CommodityService / AdvertisementService / World 时钟 /
---   DataStore / RE）全部替身，真实 mgr_save + mgr_player_data 验证发货落账。
+--   DataStore / RE）全部替身，真实 MgrSave + MgrPlayerData 验证发货落账。
 -- 注意：真实平台无订单 ID、购买无取消/失败事件（docs/adr/0036-platform-commerce-and-ads-not-verifiable-in-editor.md），本地接缝只做
 -- pending flow 关联与超时兜底；跨会话防重、补发与对账归 #148，本文件不断言这些能力存在。
 -- it 名字沿用旧方法名，注册顺序 = LuaUnit sortedPairs 的实际执行顺序。
 
-local game_cfg = require('common.game_cfg')
-local economy_world = require('tests.support.economy_world')
+local GameCfg = require('common.game_cfg')
+local EconomyWorld = require('tests.support.economy_world')
 
-local globalNames = { 'game', 're_util', 'mgr_player_data' }
+local globalNames = { 'game', 'REUtil', 'MgrPlayerData' }
 
 local function signal()
   local s = { handlers = {} }
@@ -53,29 +53,29 @@ describe('平台适配层（MgrPlatform）', function()
   before_each(function()
     -- 快照先于任何改动：夹具中途失败时 after_each 仍能还原已改项。
     -- 商品 goodsId 是共享配置表的字段：快照原值，after_each 逐个还原（不是换表，避免突变泄漏）。
-    -- game_cfg.Debug / Save.QaSlot 由 helper 的根级快照兜底，但本夹具把 Debug 换成新表，
+    -- GameCfg.Debug / Save.QaSlot 由 helper 的根级快照兜底，但本夹具把 Debug 换成新表，
     -- 这里再显式快照一次，保证 after_each 幂等（不依赖根级 hook 的执行时机）。
     -- 它跨套件长存；原生逐例隔离后必须快照并还原，否则同一 chunk 的实例会泄漏到后续案例。
     -- #261 占位支付通道也是共享配置：用例会临时关掉它以取证「无可用通道」，逐例还原。
-    restore = { Debug = game_cfg.Debug, PlaceholderEnabled = game_cfg.Platform.Placeholder.Enabled,
-      PlaceholderAllowInPublish = game_cfg.Platform.Placeholder.AllowInPublish }
+    restore = { Debug = GameCfg.Debug, PlaceholderEnabled = GameCfg.Platform.Placeholder.Enabled,
+      PlaceholderAllowInPublish = GameCfg.Platform.Placeholder.AllowInPublish }
     for _, name in ipairs(globalNames) do
       restore[name] = rawget(_G, name)
     end
     restore.oldGoodsIds = {}
-    for key, row in pairs(game_cfg.Platform.Goods) do
+    for key, row in pairs(GameCfg.Platform.Goods) do
       restore.oldGoodsIds[key] = row.goodsId
     end
     -- Ads 行与 Goods 行同口径：用例会在行上写 goodsId / adTag，逐字段快照还原。
     -- （旧套件的 tearDown 只还原了 Goods，漏了 Ads；原生逐例隔离后必须补上，否则跨案例残留。）
     restore.oldAdIds = {}
-    for key, row in pairs(game_cfg.Platform.Ads) do
+    for key, row in pairs(GameCfg.Platform.Ads) do
       restore.oldAdIds[key] = row.goodsId
     end
-    game_cfg.Debug = { Enabled = true }
+    GameCfg.Debug = { Enabled = true }
     -- #249 占位闸门：调试构建里占位面优先于测试驱动器，本套件要取证的是测试 flow，显式关掉占位通道；
     -- 占位通道自身的那条用例在用例里把两把开关都重新打开。
-    game_cfg.Platform.Placeholder.Enabled = false
+    GameCfg.Platform.Placeholder.Enabled = false
     env = { now = 1000, values = {}, queue = {}, events = {}, purchasePanels = {}, adCalls = {},
       replies = {} }
     env.goodsSignal = signal()
@@ -108,17 +108,17 @@ describe('平台适配层（MgrPlatform）', function()
       if name == 'CommodityService' then return env.commodity end
       if name == 'AdvertisementService' then return env.advertisement end
     end })
-    rawset(_G, 're_util', { GetRE = function(_, name)
+    rawset(_G, 'REUtil', { GetRE = function(_, name)
       return { FireClient = function(_, player, value)
         env.events[#env.events + 1] = { name = name, player = player, value = value }
       end, OnServerEvent = signal() }
     end })
-    -- loadfile 每次得到全新的管理器实例表，避免 mgr.Flows / DataMap 跨案例残留。
+    -- loadfile 每次得到全新的管理器实例表，避免 Mgr.Flows / DataMap 跨案例残留。
     env.save = assert(loadfile('server/save_host.lua'))()
     env.players = assert(loadfile('server/player_data_host.lua'))()
     env.platform = assert(loadfile('server/platform_host.lua'))()
-    env.players.Save, env.save.player_data = env.save, env.players
-    env.platform.Save, env.platform.player_data = env.save, env.players
+    env.players.Save, env.save.PlayerData = env.save, env.players
+    env.platform.Save, env.platform.PlayerData = env.save, env.players
     env.platform.Now = function() return env.now end
     env.platform:Start() -- 订阅 GoodsPurchaseCompleted 与 RE 通道
     env.player = { UserId = 1471, Character = { Position = { x = 0, y = 0, z = 0 } },
@@ -135,13 +135,13 @@ describe('平台适配层（MgrPlatform）', function()
       for _, name in ipairs(globalNames) do
         rawset(_G, name, restore[name])
       end
-      game_cfg.Debug = restore.Debug
-      game_cfg.Platform.Placeholder.Enabled = restore.PlaceholderEnabled
-      game_cfg.Platform.Placeholder.AllowInPublish = restore.PlaceholderAllowInPublish
-      for key, row in pairs(game_cfg.Platform.Goods) do
+      GameCfg.Debug = restore.Debug
+      GameCfg.Platform.Placeholder.Enabled = restore.PlaceholderEnabled
+      GameCfg.Platform.Placeholder.AllowInPublish = restore.PlaceholderAllowInPublish
+      for key, row in pairs(GameCfg.Platform.Goods) do
         row.goodsId = restore.oldGoodsIds[key]
       end
-      for key, row in pairs(game_cfg.Platform.Ads) do
+      for key, row in pairs(GameCfg.Platform.Ads) do
         row.goodsId = restore.oldAdIds[key]
       end
     end
@@ -151,40 +151,40 @@ describe('平台适配层（MgrPlatform）', function()
 
   -- 未配置商品（goodsId 空）+ 生产构建（Debug 关）+ 占位通道关闭：购买明确不可用，不建 flow、不发权益
   it('test_ad_flow_availability', function()
-    game_cfg.Debug = { Enabled = false }
-    game_cfg.Platform.Placeholder.Enabled = false
+    GameCfg.Debug = { Enabled = false }
+    GameCfg.Platform.Placeholder.Enabled = false
     local accepted, reason = env.platform:ShowAd(env.player, 'revive', 'revive', function() end)
     assert.is_false(accepted)
     assert.same('unavailable', reason)
-    game_cfg.Debug = { Enabled = true }
+    GameCfg.Debug = { Enabled = true }
     assert.is_true(env.platform:ShowAd(env.player, 'revive', 'revive', function() end))
     assert.is_true(env.platform:HasFlow(env.player))
   end)
 
   -- 肾上腺素五连装：4 金豆发 5 个
   it('test_adrenaline_five_pack_grants_five', function()
-    game_cfg.Platform.Goods.adrenaline5.goodsId = 'goodsAdr5'
-    local shop = economy_world.new()
+    GameCfg.Platform.Goods.adrenaline5.goodsId = 'goodsAdr5'
+    local shop = EconomyWorld.new()
     assert.is_true(shop:platformAction({ action = 'Purchase', goods = 'adrenaline5', seq = 1 }))
     shop:resolvePlatform('success')
-    assert.same(5, shop.data:ItemCount(game_cfg.Survival.AdrenalineItemId))
+    assert.same(5, shop.data:ItemCount(GameCfg.Survival.AdrenalineItemId))
     shop:tearDown()
   end)
 
   -- 肾上腺素发货走持久操作：重进读档仍在
   it('test_adrenaline_grant_survives_reconnect', function()
-    game_cfg.Platform.Goods.adrenaline1.goodsId = 'goodsAdr1'
-    local shop = economy_world.new()
+    GameCfg.Platform.Goods.adrenaline1.goodsId = 'goodsAdr1'
+    local shop = EconomyWorld.new()
     assert.is_true(shop:platformAction({ action = 'Purchase', goods = 'adrenaline1', seq = 1 }))
     shop:resolvePlatform('success')
     shop:reconnect()
-    assert.same(1, shop.data:ItemCount(game_cfg.Survival.AdrenalineItemId))
+    assert.same(1, shop.data:ItemCount(GameCfg.Survival.AdrenalineItemId))
     shop:tearDown()
   end)
 
   -- 已配置商品 + 服务可达：走真实面板，flow 等 GoodsPurchaseCompleted
   it('test_configured_goods_still_use_only_test_flow', function()
-    game_cfg.Platform.Goods.adrenaline1.goodsId = 'goodsAdr1'
+    GameCfg.Platform.Goods.adrenaline1.goodsId = 'goodsAdr1'
     local outcomes = {}
     assert.is_true(env.platform:Purchase(env.player, 'adrenaline1', 'adrenaline',
       function(result) outcomes[#outcomes + 1] = result end))
@@ -199,10 +199,10 @@ describe('平台适配层（MgrPlatform）', function()
 
   -- 无可信订单身份：配置goodsId不能放行生产，旧/重复信号不能结算新测试flow或发货。
   it('test_configured_production_is_fail_closed', function()
-    game_cfg.Platform.Goods.adrenaline1.goodsId = 'goodsAdr1'
-    game_cfg.Platform.Ads.revive.goodsId = 'adRevive'
-    game_cfg.Debug = { Enabled = false }
-    game_cfg.Platform.Placeholder.Enabled = false -- 占位通道也关掉：真实与占位都没有通道
+    GameCfg.Platform.Goods.adrenaline1.goodsId = 'goodsAdr1'
+    GameCfg.Platform.Ads.revive.goodsId = 'adRevive'
+    GameCfg.Debug = { Enabled = false }
+    GameCfg.Platform.Placeholder.Enabled = false -- 占位通道也关掉：真实与占位都没有通道
     local accepted, reason = env.platform:Purchase(env.player, 'adrenaline1', 'adrenaline', function() end)
     assert.is_false(accepted)
     assert.same('unavailable', reason)
@@ -210,7 +210,7 @@ describe('平台适配层（MgrPlatform）', function()
     env.goodsSignal:Fire('goodsAdr1', 1, env.player)
     env.goodsSignal:Fire('goodsAdr1', 1, env.player)
     drain()
-    assert.same(0, env.data:ItemCount(game_cfg.Survival.AdrenalineItemId))
+    assert.same(0, env.data:ItemCount(GameCfg.Survival.AdrenalineItemId))
     assert.same({}, env.purchasePanels)
   end)
 
@@ -229,7 +229,7 @@ describe('平台适配层（MgrPlatform）', function()
     local outcomes = {}
     assert.is_true(env.platform:Purchase(env.player, 'blindboxSingle', 'blindbox',
       function(result) outcomes[#outcomes + 1] = result end))
-    game_cfg.Debug = { Enabled = false } -- 流程进行中切到生产口径
+    GameCfg.Debug = { Enabled = false } -- 流程进行中切到生产口径
     assert.is_false(env.platform:HandleTestAction(env.player, { action = 'ResolveFlow', outcome = 'success' }))
     assert.same({}, outcomes)
     assert.is_true(env.platform:HasFlow(env.player)) -- 没被伪造结算
@@ -256,7 +256,7 @@ describe('平台适配层（MgrPlatform）', function()
     local outcomes = {}
     assert.is_true(env.platform:ShowAd(env.player, 'revive', 'revive',
       function(result) outcomes[#outcomes + 1] = result end))
-    env.now = env.now + game_cfg.Platform.FlowTimeoutSec - 1
+    env.now = env.now + GameCfg.Platform.FlowTimeoutSec - 1
     env.platform:Update()
     assert.same({}, outcomes)
     env.now = env.now + 1
@@ -268,10 +268,10 @@ describe('平台适配层（MgrPlatform）', function()
 
   -- 超时结算后的新 flow：旧的/重复的真实信号仍不与它关联，既不结算也不发货
   it('test_late_old_signal_cannot_settle_new_same_goods_flow', function()
-    game_cfg.Platform.Goods.adrenaline1.goodsId = 'goodsAdr1'
+    GameCfg.Platform.Goods.adrenaline1.goodsId = 'goodsAdr1'
     local outcomes = {}
     env.platform:Purchase(env.player, 'adrenaline1', 'adrenaline', function(r) outcomes[#outcomes + 1] = r end)
-    env.now = env.now + game_cfg.Platform.FlowTimeoutSec
+    env.now = env.now + GameCfg.Platform.FlowTimeoutSec
     env.platform:Update()
     drain()
     env.platform:Purchase(env.player, 'adrenaline1', 'adrenaline', function(r) outcomes[#outcomes + 1] = r end)
@@ -279,7 +279,7 @@ describe('平台适配层（MgrPlatform）', function()
     env.goodsSignal:Fire('goodsAdr1', 1, env.player)
     assert.same({ 'timeout' }, outcomes)
     assert.is_true(env.platform:HasFlow(env.player))
-    assert.same(0, env.data:ItemCount(game_cfg.Survival.AdrenalineItemId))
+    assert.same(0, env.data:ItemCount(GameCfg.Survival.AdrenalineItemId))
   end)
 
   -- 玩家离开清理在飞 flow；重进后旧 flow 不复活
@@ -311,9 +311,9 @@ describe('平台适配层（MgrPlatform）', function()
 
   -- OpenAdrenalineShop / OpenCoinShop：未配置时明确回包不可用，不伪成功
   it('test_shop_entries_reply_unavailable_when_unconfigured', function()
-    local shop = economy_world.new()
-    game_cfg.Debug = { Enabled = false }
-    game_cfg.Platform.Placeholder.Enabled = false
+    local shop = EconomyWorld.new()
+    GameCfg.Debug = { Enabled = false }
+    GameCfg.Platform.Placeholder.Enabled = false
     assert.is_false(shop:platformAction({ action = 'OpenAdrenaline' }))
     assert.is_false(shop:platformAction({ action = 'OpenCoinShop' }))
     local replies = shop:messages('PlatformResult')
@@ -327,8 +327,8 @@ describe('平台适配层（MgrPlatform）', function()
 
   -- 信号不串号：别人的购买完成不解我的 flow；不同商品的信号不解 flow
   it('test_signal_does_not_cross_players_or_goods', function()
-    game_cfg.Platform.Goods.adrenaline1.goodsId = 'goodsAdr1'
-    game_cfg.Platform.Goods.adrenaline5.goodsId = 'goodsAdr5'
+    GameCfg.Platform.Goods.adrenaline1.goodsId = 'goodsAdr1'
+    GameCfg.Platform.Goods.adrenaline5.goodsId = 'goodsAdr5'
     local outcomes = {}
     assert.is_true(env.platform:Purchase(env.player, 'adrenaline1', 'adrenaline',
       function(result) outcomes[#outcomes + 1] = result end))
@@ -345,7 +345,7 @@ describe('平台适配层（MgrPlatform）', function()
     persistReady()
     env.goodsSignal:Fire('goodsAdr1', 1, env.player) -- adrenaline1.goodsId 未配置
     drain()
-    assert.same(0, env.data:ItemCount(game_cfg.Survival.AdrenalineItemId))
+    assert.same(0, env.data:ItemCount(GameCfg.Survival.AdrenalineItemId))
   end)
 
   -- 测试 flow 开 / 关通知客户端驱动按钮；真实平台 flow 不发（生产也就看不到驱动入口）
@@ -361,7 +361,7 @@ describe('平台适配层（MgrPlatform）', function()
     assert.same(2, #closed)
     assert.is_false(closed[2].open)
     env.events = {}
-    game_cfg.Platform.Goods.adrenaline1.goodsId = 'goodsAdr1'
+    GameCfg.Platform.Goods.adrenaline1.goodsId = 'goodsAdr1'
     assert.is_true(env.platform:Purchase(env.player, 'adrenaline1', 'adrenaline', function() end))
     assert.is_true(messages('PlatformResult')[1].open) -- 配置ID仍只允许测试flow
   end)
@@ -369,9 +369,9 @@ describe('平台适配层（MgrPlatform）', function()
   -- 占位通道开着、Debug 关：生产构建经共享配置的占位商品 ID 开占位 flow，测试驱动器碰不到它。
   -- #249 发布构建还须显式 AllowInPublish=true（默认 false 时占位动作一律被拒，见 17 平台边界用例）。
   it('test_placeholder_channel_opens_with_placeholder_goods_id', function()
-    game_cfg.Debug = { Enabled = false }
-    game_cfg.Platform.Placeholder.Enabled = true
-    game_cfg.Platform.Placeholder.AllowInPublish = true
+    GameCfg.Debug = { Enabled = false }
+    GameCfg.Platform.Placeholder.Enabled = true
+    GameCfg.Platform.Placeholder.AllowInPublish = true
     local outcomes = {}
     assert.is_true(env.platform:Purchase(env.player, 'blindboxSingle', 'blindbox',
       function(outcome) outcomes[#outcomes + 1] = outcome end))
@@ -392,8 +392,8 @@ describe('平台适配层（MgrPlatform）', function()
 
   -- 未配置商品（goodsId 空）+ 生产构建（Debug 关）+ 占位通道关闭：购买明确不可用，不建 flow、不发权益
   it('test_unconfigured_goods_unavailable_in_production', function()
-    game_cfg.Debug = { Enabled = false }
-    game_cfg.Platform.Placeholder.Enabled = false
+    GameCfg.Debug = { Enabled = false }
+    GameCfg.Platform.Placeholder.Enabled = false
     local outcomes = {}
     local accepted, reason = env.platform:Purchase(env.player, 'blindboxSingle', 'blindbox',
       function(outcome) outcomes[#outcomes + 1] = outcome end)
@@ -406,13 +406,13 @@ describe('平台适配层（MgrPlatform）', function()
 
   -- 无可信订单身份：真实信号不与 flow 关联，也不凭空发货
   it('test_unmatched_signals_never_grant_without_identity', function()
-    game_cfg.Platform.Goods.adrenaline1.goodsId = 'goodsAdr1'
+    GameCfg.Platform.Goods.adrenaline1.goodsId = 'goodsAdr1'
     persistReady()
     env.goodsSignal:Fire('goodsAdr1', 1, env.player)
     drain()
-    assert.same(0, env.data:ItemCount(game_cfg.Survival.AdrenalineItemId))
+    assert.same(0, env.data:ItemCount(GameCfg.Survival.AdrenalineItemId))
     env.goodsSignal:Fire('goodsAdr1', 1, env.player) -- 第二笔真实购买：仍不发货
     drain()
-    assert.same(0, env.data:ItemCount(game_cfg.Survival.AdrenalineItemId))
+    assert.same(0, env.data:ItemCount(GameCfg.Survival.AdrenalineItemId))
   end)
 end)

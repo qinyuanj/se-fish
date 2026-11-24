@@ -39,10 +39,10 @@ end
 local function seed_repo()
   rmrf(FAKE_REPO)
   fs.mkdirp(FAKE_REPO)
-  write_file(FAKE_REPO .. "/client/UI/a.lua", "-- 客户端 a\n")
-  write_file(FAKE_REPO .. "/client/UI/sub/b.lua", "-- 客户端 b\n")
+  write_file(FAKE_REPO .. "/client/UI/a.lua", "-- 客户端 A\n")
+  write_file(FAKE_REPO .. "/client/UI/sub/b.lua", "-- 客户端 B\n")
   write_file(FAKE_REPO .. "/common/game_cfg.lua", "-- 共享配置\n")
-  write_file(FAKE_REPO .. "/server/mgr/c.lua", "-- 服务端 C\n")
+  write_file(FAKE_REPO .. "/server/Mgr/c.lua", "-- 服务端 C\n")
 end
 
 -- 宿主目录：预置会被 /MIR 删掉的 stale 文件、仓库已删的端根散文件与整棵子树（#167），
@@ -79,10 +79,10 @@ describe("TestDeployCli", function()
     assert.are.equal(0, code, out)
     assert.matches("deploy ok", out, 1, true)
     assert.matches("编辑器收尾跳过", out, 1, true) -- 临时宿主没有 eggy.json
-    assert.are.equal("-- 客户端 a\n", slurp(HOST .. "/client/UI/a.lua"))
-    assert.are.equal("-- 客户端 b\n", slurp(HOST .. "/client/UI/sub/b.lua"))
+    assert.are.equal("-- 客户端 A\n", slurp(HOST .. "/client/UI/a.lua"))
+    assert.are.equal("-- 客户端 B\n", slurp(HOST .. "/client/UI/sub/b.lua"))
     assert.are.equal("-- 共享配置\n", slurp(HOST .. "/common/game_cfg.lua"))
-    assert.are.equal("-- 服务端 C\n", slurp(HOST .. "/server/mgr/c.lua"))
+    assert.are.equal("-- 服务端 C\n", slurp(HOST .. "/server/Mgr/c.lua"))
     assert.is_false(exists(HOST .. "/client/UI/stale.lua"), "宿主多余文件应被 /MIR 删除")
     assert.is_false(exists(HOST .. "/client/AttrAPI.lua"), "仓库已删的端根散文件应被删除")
     assert.is_false(exists(HOST .. "/server/Proto"), "仓库已删的子树应被删除")
@@ -97,7 +97,7 @@ describe("TestDeployCli", function()
     assert.are.equal(0, code, out)
     out, code = run_deploy(nil, HOST)
     assert.are.equal(0, code, out)
-    assert.are.equal("-- 客户端 a\n", slurp(HOST .. "/client/UI/a.lua"))
+    assert.are.equal("-- 客户端 A\n", slurp(HOST .. "/client/UI/a.lua"))
   end)
 
   -- 路径只有一种形式（正斜杠+盘符），反斜杠形式进接缝即归一：同一宿主目录用反斜杠再跑一次。
@@ -106,7 +106,7 @@ describe("TestDeployCli", function()
     assert.is_truthy(backslash_host:match("^%a:\\"), "临时宿主应是 Windows 路径: " .. backslash_host)
     out, code = run_deploy(nil, backslash_host)
     assert.are.equal(0, code, out)
-    assert.are.equal("-- 客户端 a\n", slurp(HOST .. "/client/UI/a.lua"))
+    assert.are.equal("-- 客户端 A\n", slurp(HOST .. "/client/UI/a.lua"))
   end)
 
   -- 反面用例：robocopy 缺失 → preflight 失败、退出码 3、宿主目录一个文件都没建。

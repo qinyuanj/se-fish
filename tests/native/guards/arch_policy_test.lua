@@ -1,5 +1,5 @@
 -- 架构分层与源码图共用一份声明；扫描与判定均可脱离引擎运行。
-local arch = require('tools.arch_policy')
+local Arch = require('tools.arch_policy')
 local fs = require('tests.support.fs_fixture')
 
 local function fixture_policy()
@@ -15,10 +15,10 @@ local function fixture_policy()
   }
 end
 
--- 真实仓库扫描只做一次：arch.scan 只读仓库、每次返回新表，三个用例共享同一张图。
+-- 真实仓库扫描只做一次：Arch.scan 只读仓库、每次返回新表，三个用例共享同一张图。
 local scanned
 local function scan_real()
-  if not scanned then scanned = assert(arch.scan('.', arch.policy)) end
+  if not scanned then scanned = assert(Arch.scan('.', Arch.policy)) end
   return scanned
 end
 
@@ -31,7 +31,7 @@ end
 
 describe('架构分层门禁', function()
   it('解码静态字符串转义并排除带空白的成员调用', function()
-    assert.same({ 'app.rules.a', 'app.rules.b', 'app.rules.c', 'app.rules.d' }, arch.requires([=[
+    assert.same({ 'app.rules.a', 'app.rules.b', 'app.rules.c', 'app.rules.d' }, Arch.requires([=[
       require('app.\x72ules.a')
       require("app.\114ules.b")
       local s = '' .. require('app.rules.c')
@@ -43,7 +43,7 @@ describe('架构分层门禁', function()
   end)
 
   it('识别换行注释与长字符串参数，忽略字符串内的伪调用', function()
-    assert.same({ 'app.rules.a', 'app.rules.b', 'app.rules.c' }, arch.requires([=[
+    assert.same({ 'app.rules.a', 'app.rules.b', 'app.rules.c' }, Arch.requires([=[
       require
       -- 参数前允许注释
       ('app.rules.a')
@@ -54,7 +54,7 @@ describe('架构分层门禁', function()
   end)
 
   it('拒绝模块直接加载自身', function()
-    local result = arch.check(fixture_policy(), {
+    local result = Arch.check(fixture_policy(), {
       modules = { 'app.rules.a' },
       edges = { { from = 'app.rules.a', to = 'app.rules.a' } },
     })
@@ -64,7 +64,7 @@ describe('架构分层门禁', function()
 
   it('允许高层依赖低层并拒绝反向依赖和未分类模块', function()
     local policy = fixture_policy()
-    local accepted = arch.check(policy, {
+    local accepted = Arch.check(policy, {
       modules = { 'app.entry', 'app.rules.fish', 'app.rules.calc', 'app.packages.api' },
       edges = {
         { from = 'app.entry', to = 'app.rules.fish' },
@@ -74,7 +74,7 @@ describe('架构分层门禁', function()
     })
     assert.is_true(accepted.ok, accepted.message)
 
-    local rejected = arch.check(policy, {
+    local rejected = Arch.check(policy, {
       modules = { 'app.rules.fish', 'app.entry', 'app.unknown' },
       edges = { { from = 'app.rules.fish', to = 'app.entry' } },
     })
@@ -83,7 +83,7 @@ describe('架构分层门禁', function()
   end)
 
   it('拒绝同层循环依赖和显式跨端禁向', function()
-    local cyclic = arch.check(fixture_policy(), {
+    local cyclic = Arch.check(fixture_policy(), {
       modules = { 'app.rules.a', 'app.rules.b' },
       edges = {
         { from = 'app.rules.a', to = 'app.rules.b' },
@@ -97,7 +97,7 @@ describe('架构分层门禁', function()
     policy.forbidden = {
       { name = 'common_not_client', from = { '^app%.rules' }, to = { '^app%.entry' } },
     }
-    local result = arch.check(policy, {
+    local result = Arch.check(policy, {
       modules = { 'app.rules.a', 'app.entry' },
       edges = { { from = 'app.rules.a', to = 'app.entry' } },
     })
@@ -106,7 +106,7 @@ describe('架构分层门禁', function()
   end)
 
   it('发现模块无环但命名空间投影成环的反向协作', function()
-    local result = arch.check(fixture_policy(), {
+    local result = Arch.check(fixture_policy(), {
       modules = { 'app.rules.a.one', 'app.rules.a.two', 'app.rules.b.one', 'app.rules.b.two' },
       edges = {
         { from = 'app.rules.a.one', to = 'app.rules.b.one' },
@@ -118,9 +118,9 @@ describe('架构分层门禁', function()
   end)
 
   it('扫描真实 require，忽略注释字符串和 _trigger', function()
-    local names = arch.requires([[
-      local a = require('common.util')
-      local b = require("server.ability_api")
+    local names = Arch.requires([[
+      local A = require('common.util')
+      local B = require("server.ability_api")
       -- require('client.NotReal')
       local text = "require('server.NotReal')"
       obj.require('client.NotReal')
@@ -136,24 +136,24 @@ describe('架构分层门禁', function()
 
   it('真实业务模块全部分类且无反向依赖或循环', function()
     local graph = scan_real()
-    local result = arch.check(arch.policy, graph)
+    local result = Arch.check(Arch.policy, graph)
     assert.is_true(result.ok, result.message)
   end)
 
   it('列出源码中已不存在的分层声明', function()
     local policy = fixture_policy()
     policy.levels[2].modules = { 'app.gone', 'app.kept' }
-    assert.same({ 'app.entry', 'app.gone' }, arch.stale(policy, {
+    assert.same({ 'app.entry', 'app.gone' }, Arch.stale(policy, {
       modules = { 'app.packages', 'app.rules.fish', 'app.kept' },
     }))
   end)
 
   it('真实分层声明的模块与命名空间都在源码中', function()
-    assert.same({}, arch.stale(arch.policy, scan_real()))
+    assert.same({}, Arch.stale(Arch.policy, scan_real()))
   end)
 
   it('三端与 tools 不得 require 测试代码', function()
-    local result = arch.check(arch.policy, {
+    local result = Arch.check(Arch.policy, {
       modules = { 'common.util' },
       edges = {
         { from = 'common.util', to = 'tests.support.baseline' },
@@ -177,8 +177,8 @@ describe('架构分层门禁', function()
       fs.mkdirp(root .. '/server')
       fs.write_file(root .. '/common/util.lua', 'return {}\n')
       fs.write_file(root .. '/tools/probes/gen.lua',
-        "local fixtures = require('tests.support.zone_fixtures')\nlocal util = require('common.util')\n")
-      local result = arch.check(arch.policy, assert(arch.scan(root, arch.policy)))
+        "local Fixtures = require('tests.support.zone_fixtures')\nlocal Util = require('common.util')\n")
+      local result = Arch.check(Arch.policy, assert(Arch.scan(root, Arch.policy)))
       assert.is_false(result.ok)
       assert.equals('forbidden_dependency: tools.probes.gen -> tests.support.zone_fixtures', result.message)
     end)
@@ -188,7 +188,7 @@ describe('架构分层门禁', function()
     local handle = assert(io.open('policy.edn', 'rb'))
     local text = handle:read('*a')
     handle:close()
-    local expected = arch.levels_edn(arch.policy)
+    local expected = Arch.levels_edn(Arch.policy)
     assert.is_true(text:find(expected, 1, true) ~= nil, expected)
     assert.equals(':levels [[:client.packages :server.packages :common.packages]', expected:sub(1, 61))
   end)

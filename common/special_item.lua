@@ -1,14 +1,14 @@
-local game_cfg = require('common.game_cfg')
-local number = require('common.number')
+local GameCfg = require('common.game_cfg')
+local Number = require('common.number')
 
 local M = {}
 
 local function cfg()
-    return game_cfg.Ability.special_item
+    return GameCfg.Ability.SpecialItem
 end
 
 local function isBadNumber(v)
-    return not number.IsFiniteNumber(v)
+    return not Number.IsFiniteNumber(v)
 end
 
 ---@param itemId? string
@@ -18,11 +18,11 @@ function M.Desired(itemId)
     return cfg().Items[itemId]
 end
 
----@param wingsCfg table game_cfg.Ability.special_item.Wings
+---@param wingsCfg table GameCfg.Ability.SpecialItem.Wings
 ---@param state table { Y = number, Airborne = bool }
 ---@param holding bool 长按中
 ---@param dt number 距上一帧的秒数
----@param bounds table flight_path.BoundsOf 的结果（GroundY / CeilingY）
+---@param bounds table FlightPath.BoundsOf 的结果（GroundY / CeilingY）
 ---@return number y, bool airborne
 function M.StepFlightY(wingsCfg, state, holding, dt, bounds)
     local y = state.Y
@@ -43,7 +43,7 @@ function M.StepFlightY(wingsCfg, state, holding, dt, bounds)
     return y, airborne
 end
 
----@param bounds table flight_path.BoundsOf 的结果
+---@param bounds table FlightPath.BoundsOf 的结果
 ---@param x number
 ---@param z number
 ---@return number x, number z, bool clamped
@@ -76,7 +76,7 @@ function M.TickDamages(totalDamage, durationSec, tickSec)
     return plan
 end
 
----@param breathCfg table game_cfg.Ability.special_item.Godzilla.Breath
+---@param breathCfg table GameCfg.Ability.SpecialItem.Godzilla.Breath
 ---@return table ledger { Plan = number[], Targets = { [key] = { Hits = { [tick]=true }, Total = n } } }
 function M.NewBreathLedger(breathCfg)
     return {

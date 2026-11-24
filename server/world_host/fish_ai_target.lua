@@ -1,37 +1,37 @@
-local game_cfg = require('common.game_cfg')
-local policy = require('common.ai_target_policy')
+local GameCfg = require('common.game_cfg')
+local Policy = require('common.ai_target_policy')
 
-local mgr = { policy = policy }
-local ai_api, runtime
+local Mgr = { Policy = Policy }
+local AiAPI, Runtime
 
 local function logFailure(operation, fish, unit, player, err)
-    print(string.format('[fish_ai_target] operation=%s fish=%s unit=%s player=%s error=%s',
+    print(string.format('[FishAiTarget] operation=%s fish=%s unit=%s player=%s error=%s',
         operation, tostring(fish and fish.Id or '-'), tostring(unit and unit.UnitId or '-'),
         tostring(player and player.UserId or '-'), tostring(err)))
 end
 
 local function loadAPI(fish, unit)
-    if ai_api == nil then
+    if AiAPI == nil then
         local ok, module = pcall(require, 'server.packages.official_ai_feature.api')
         if not ok then
             logFailure('RequireOfficialAPI', fish, unit, nil, module)
             return nil
         end
-        ai_api = module
+        AiAPI = module
     end
-    return ai_api
+    return AiAPI
 end
 
 local function loadRuntime(fish, unit)
-    if runtime == nil then
+    if Runtime == nil then
         local ok, module = pcall(require, 'server.packages.official_ai_feature.behavior_runtime')
         if not ok then
             logFailure('RequireOfficialRuntime', fish, unit, nil, module)
             return nil
         end
-        runtime = module
+        Runtime = module
     end
-    return runtime
+    return Runtime
 end
 
 local function receiver(fish)
@@ -39,7 +39,7 @@ local function receiver(fish)
     return carrier and carrier.Receiver or nil
 end
 
-function mgr:State(fish)
+function Mgr:State(fish)
     local unit = receiver(fish)
     if not unit then
         logFailure('ReadOfficialState', fish, nil, nil, 'official AI receiver unavailable')
@@ -55,7 +55,7 @@ function mgr:State(fish)
     return state
 end
 
-function mgr:Focus(fish)
+function Mgr:Focus(fish)
     local state = self:State(fish)
     return state and state.focusTarget or nil
 end
@@ -67,7 +67,7 @@ local function clearFocus(fish, unit, apiTable)
     if not ok then logFailure('ClearOfficialFocus', fish, unit, nil, err) end
 end
 
-function mgr:SetFocus(fish, player, ranked)
+function Mgr:SetFocus(fish, player, ranked)
     local unit = receiver(fish)
     if not unit then
         logFailure('SetFocus', fish, nil, player, 'official AI receiver unavailable')
@@ -79,7 +79,7 @@ function mgr:SetFocus(fish, player, ranked)
         logFailure('SetFocus', fish, unit, player, 'official AI API unavailable')
         return false
     end
-    local config = game_cfg.Ability.AiTarget
+    local config = GameCfg.Ability.AiTarget
     local target = player and player.Character or nil
     local ok, err = pcall(function()
         funcs.SetSearchEnemyPriorityMode(unit, config.PriorityMode)
@@ -103,12 +103,12 @@ function mgr:SetFocus(fish, player, ranked)
     return true
 end
 
-function mgr:Select(fish, candidates)
-    local ranked = self.policy.Order(candidates)
+function Mgr:Select(fish, candidates)
+    local ranked = self.Policy.Order(candidates)
     self:SetFocus(fish, ranked[1] and ranked[1].player or nil, ranked)
     return ranked
 end
 
-function mgr:Start() end
+function Mgr:Start() end
 
-return mgr
+return Mgr

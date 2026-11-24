@@ -1,38 +1,38 @@
-local player_data = require('server.data.player_data')
-local game_cfg = require('common.game_cfg')
-local number = require('common.number')
-local player_data_host = { SpokeHost = true }
+local PlayerData = require('server.data.player_data')
+local GameCfg = require('common.game_cfg')
+local Number = require('common.number')
+local PlayerDataHost = { SpokeHost = true }
 local DataMap = {}
 
-function player_data_host:GetDataInst(player)
+function PlayerDataHost:GetDataInst(player)
     local data = player and DataMap[player.UserId]
     if data and data.Player == player and data.Inited and data.LoadState == 'ready' then return data end
 end
 
-function player_data_host:SendItemBar(player, forcePush)
+function PlayerDataHost:SendItemBar(player, forcePush)
     local data = self:GetDataInst(player)
     if not data then return end
-    if self.vitals and self.vitals.RefreshHeldDamage then self.vitals:RefreshHeldDamage(player, data) end
-    local tree = self.runtime and self.runtime:get_player_tree(player.UserId)
+    if self.Vitals and self.Vitals.RefreshHeldDamage then self.Vitals:RefreshHeldDamage(player, data) end
+    local tree = self.Runtime and self.Runtime:get_player_tree(player.UserId)
     if tree then
         if forcePush then return self:SyncPlayerTree(player, true) end
         return false
     end
-    _G.re_util:GetRE('ItemBarState'):FireClient(player, data:GetItemBarSnapshot())
+    _G.REUtil:GetRE('ItemBarState'):FireClient(player, data:GetItemBarSnapshot())
 end
 
-function player_data_host:SyncPlayerTree(player, forcePush)
-    local tree = self.runtime and self.runtime:get_player_tree(player.UserId)
+function PlayerDataHost:SyncPlayerTree(player, forcePush)
+    local tree = self.Runtime and self.Runtime:get_player_tree(player.UserId)
     local data = self:GetDataInst(player)
     if not tree or not data then return false end
     return tree:sync_from_data(data, forcePush and { force_push = true } or nil)
 end
 
-function player_data_host:OnPlayerAdded(player)
+function PlayerDataHost:OnPlayerAdded(player)
     local current = DataMap[player.UserId]
     if current and current.Player == player then return end
     if current then self:OnPlayerRemoving(current.Player) end
-    local data = player_data.New(player, function(owner, source)
+    local data = PlayerData.New(player, function(owner, source)
         if self:GetDataInst(owner) == source then self:SendItemBar(owner) end
     end)
     DataMap[player.UserId] = data
@@ -41,7 +41,7 @@ function player_data_host:OnPlayerAdded(player)
     self:SendItemBar(player)
 end
 
-function player_data_host:OnPlayerRemoving(player)
+function PlayerDataHost:OnPlayerRemoving(player)
     local data = DataMap[player.UserId]
     if data and data.Player == player then
         DataMap[player.UserId] = nil
@@ -52,7 +52,7 @@ function player_data_host:OnPlayerRemoving(player)
 end
 
 local function isPositiveInt(value)
-    return number.IsFiniteNumber(value) and value == math.floor(value) and value >= 1
+    return Number.IsFiniteNumber(value) and value == math.floor(value) and value >= 1
 end
 
 local function validActionValue(action, value, data)
@@ -67,27 +67,27 @@ local function validActionValue(action, value, data)
 end
 
 local function eatBait(mgr, player, data, value)
-    if mgr.vitals and not mgr.vitals:CanEat(player, value) then return end
-    if data:EatBait(value) and mgr.vitals then mgr.vitals:Eat(player, value) end
+    if mgr.Vitals and not mgr.Vitals:CanEat(player, value) then return end
+    if data:EatBait(value) and mgr.Vitals then mgr.Vitals:Eat(player, value) end
 end
 
 local function eatSlot(mgr, player, data, value)
-    if not mgr.vitals then return end
-    local slot = data.data.SelectedSlot
-    local entry = value == slot and data.data.Containers[game_cfg.Items.ContainerId.ItemBar][slot]
-    if not entry or entry.count <= 0 or not mgr.vitals:CanEat(player, entry.itemId) then return end
-    local cooked = game_cfg.Items.CookRate(entry)
+    if not mgr.Vitals then return end
+    local slot = data.Data.SelectedSlot
+    local entry = value == slot and data.Data.Containers[GameCfg.Items.ContainerId.ItemBar][slot]
+    if not entry or entry.count <= 0 or not mgr.Vitals:CanEat(player, entry.itemId) then return end
+    local cooked = GameCfg.Items.CookRate(entry)
     local itemId = data:EatSlot(slot)
-    if itemId then mgr.vitals:Eat(player, itemId, cooked) end
+    if itemId then mgr.Vitals:Eat(player, itemId, cooked) end
 end
 
-function player_data_host:Operate(player, data, payload)
+function PlayerDataHost:Operate(player, data, payload)
     local function finish(result, operation)
         if operation then result.operation = operation end
-        _G.re_util:GetRE('ItemBarResult'):FireClient(player, result)
+        _G.REUtil:GetRE('ItemBarResult'):FireClient(player, result)
     end
     local function worldOf()
-        local runtime = self.runtime
+        local runtime = self.Runtime
         return runtime and runtime:get_world()
     end
     local op = payload.op
@@ -97,7 +97,7 @@ function player_data_host:Operate(player, data, payload)
         return
     end
     local slot = payload.slot
-    local items = data.data.Containers[game_cfg.Items.ContainerId.ItemBar]
+    local items = data.Data.Containers[GameCfg.Items.ContainerId.ItemBar]
     local entry
     if op == 'attack' then
         if type(weapon) ~= 'string' or data:WeaponCount(weapon) < 1 then
@@ -120,7 +120,7 @@ function player_data_host:Operate(player, data, payload)
             finish({ ok = false, reason = 'empty' })
             return false
         end
-        if op == 'eat' and self.vitals and not self.vitals:CanEat(player, entry.itemId) then
+        if op == 'eat' and self.Vitals and not self.Vitals:CanEat(player, entry.itemId) then
             finish({ ok = false, reason = 'cannot-eat' })
             return false
         end
@@ -135,21 +135,21 @@ function player_data_host:Operate(player, data, payload)
         if op ~= 'discard' or not willDrop then return true end
         local world = worldOf()
         if not world or type(world.try_drop) ~= 'function' then return false end
-        local ok = world:try_drop(player, game_cfg.Items.ContainerId.ItemBar, slot)
+        local ok = world:try_drop(player, GameCfg.Items.ContainerId.ItemBar, slot)
         if not ok then
-            print('[player_data_host] 丢弃未落到地面', player.UserId, tostring(drop and drop.itemId))
+            print('[PlayerDataHost] 丢弃未落到地面', player.UserId, tostring(drop and drop.itemId))
         end
         return ok
     end
     local function settleEffects(result)
-        if op == 'eat' and result.itemId and result.action ~= 'potion' and self.vitals then
-            self.vitals:Eat(player, result.itemId, result.cooked)
+        if op == 'eat' and result.itemId and result.action ~= 'potion' and self.Vitals then
+            self.Vitals:Eat(player, result.itemId, result.cooked)
         end
         local apply = self.Ability and (self.Ability.ApplyGrowth or self.Ability.ApplyBodyScale)
         if result.action == 'potion' and apply then
             local ok, applied = pcall(apply, self.Ability, player)
             if not ok or not applied.Ok then
-                print('[player_data_host] 成长应用失败', player.UserId, tostring(applied))
+                print('[PlayerDataHost] 成长应用失败', player.UserId, tostring(applied))
             end
         end
     end
@@ -166,28 +166,28 @@ function player_data_host:Operate(player, data, payload)
             if not target:HoldSlot(slot) then return nil, 'empty' end
             return { ok = true, op = op, held = true }
         end
-        local heldEntry = target.data.Containers[game_cfg.Items.ContainerId.ItemBar][slot]
+        local heldEntry = target.Data.Containers[GameCfg.Items.ContainerId.ItemBar][slot]
         if not heldEntry or heldEntry.count <= 0 then return nil, 'empty' end
         if op == 'discard' then
             if not dropApi then return nil, 'drop-unavailable' end
             return { ok = true, op = 'discard', held = false, itemId = heldEntry.itemId }
         end
-        local definition = game_cfg.Items.Definitions[heldEntry.itemId]
+        local definition = GameCfg.Items.Definitions[heldEntry.itemId]
         if definition and definition.Type == '属性道具' then
-            local limit = game_cfg.Items.PotionLimits[heldEntry.itemId]
+            local limit = GameCfg.Items.PotionLimits[heldEntry.itemId]
             local count = target.Extra.growth.potions[heldEntry.itemId] or 0
             if limit and count >= limit then return nil, 'potion-capped' end
             target.Extra.growth.potions[heldEntry.itemId] = count + 1
             target:SelectSlot(slot)
             target:UpdateData(function(d)
-                d.Containers[game_cfg.Items.ContainerId.ItemBar][slot] = nil
+                d.Containers[GameCfg.Items.ContainerId.ItemBar][slot] = nil
             end, true)
             return { ok = true, op = 'eat', held = false, itemId = heldEntry.itemId, action = 'potion' }
         end
         target:SelectSlot(slot)
         local itemId = target:EatSlot(slot)
         if not itemId then return nil, 'empty' end
-        return { ok = true, op = 'eat', held = false, itemId = itemId, cooked = game_cfg.Items.CookRate(heldEntry) }
+        return { ok = true, op = 'eat', held = false, itemId = itemId, cooked = GameCfg.Items.CookRate(heldEntry) }
     end
     if self.Save then
         local requestId = payload.operation
@@ -252,10 +252,10 @@ local function notifyEquippedBait(mgr, player, method, value)
         eventId = 'bait:' .. tostring(player.UserId) .. ':' .. tostring(mgr.NextFactId) })
 end
 
-function player_data_host:Start()
-    _G.re_util:GetRE('RequestItemBar').OnServerEvent:Connect(function(player)
-        if _G.re_util:CheckRECD(player, 'RequestItemBar', game_cfg.Items.ActionCooldownSec) then return end
-        local tree = self.runtime and self.runtime:get_player_tree(player.UserId)
+function PlayerDataHost:Start()
+    _G.REUtil:GetRE('RequestItemBar').OnServerEvent:Connect(function(player)
+        if _G.REUtil:CheckRECD(player, 'RequestItemBar', GameCfg.Items.ActionCooldownSec) then return end
+        local tree = self.Runtime and self.Runtime:get_player_tree(player.UserId)
         if tree then self:SyncPlayerTree(player, true) else self:SendItemBar(player, true) end
     end)
     local actions = {
@@ -266,13 +266,13 @@ function player_data_host:Start()
         DiscardSlot = 'DiscardSlot',
         MoveToItemBar = 'MoveToItemBar',
     }
-    _G.re_util:GetRE('ItemBarAction').OnServerEvent:Connect(function(player, payload)
+    _G.REUtil:GetRE('ItemBarAction').OnServerEvent:Connect(function(player, payload)
         local data = self:GetDataInst(player)
         if not data or type(payload) ~= 'table' then return end
         local action = payload.action
         if action == 'Pickup' or action == 'Drop' then
-            if _G.re_util:CheckRECD(player, 'ItemBarAction', game_cfg.Items.ActionCooldownSec) then return end
-            local runtime = self.runtime
+            if _G.REUtil:CheckRECD(player, 'ItemBarAction', GameCfg.Items.ActionCooldownSec) then return end
+            local runtime = self.Runtime
             local world = runtime and runtime:get_world()
             if not world then return end
             if type(world.handle_item_bar_action) == 'function' then
@@ -285,19 +285,19 @@ function player_data_host:Start()
             return
         end
         if action == 'MoveSlot' then
-            local ids = game_cfg.Items.ContainerId
+            local ids = GameCfg.Items.ContainerId
             local from, index, target, slot = payload.from, payload.index, payload.target, payload.slot
             local valid = (from == ids.ItemBar or from == ids.Backpack)
                 and (target == ids.ItemBar or target == ids.Backpack)
                 and isPositiveInt(index)
                 and isPositiveInt(slot)
             if not valid then return end
-            if _G.re_util:CheckRECD(player, 'ItemBarAction', game_cfg.Items.ActionCooldownSec) then return end
+            if _G.REUtil:CheckRECD(player, 'ItemBarAction', GameCfg.Items.ActionCooldownSec) then return end
             if data:MoveSlot(from, index, target, slot) then self:SendItemBar(player) self:SyncPlayerTree(player) end
             return
         end
         if action == 'Operate' then
-            if _G.re_util:CheckRECD(player, 'ItemBarAction', game_cfg.Items.ActionCooldownSec) then return end
+            if _G.REUtil:CheckRECD(player, 'ItemBarAction', GameCfg.Items.ActionCooldownSec) then return end
             self:Operate(player, data, payload)
             return
         end
@@ -305,7 +305,7 @@ function player_data_host:Start()
         if not method then return end
         local value = payload.value
         if not validActionValue(action, value, data) then return end
-        if _G.re_util:CheckRECD(player, 'ItemBarAction', game_cfg.Items.ActionCooldownSec) then return end
+        if _G.REUtil:CheckRECD(player, 'ItemBarAction', GameCfg.Items.ActionCooldownSec) then return end
         if method == 'EatBait' then
             eatBait(self, player, data, value)
             self:SyncPlayerTree(player)
@@ -324,4 +324,4 @@ function player_data_host:Start()
     end)
 end
 
-return player_data_host
+return PlayerDataHost

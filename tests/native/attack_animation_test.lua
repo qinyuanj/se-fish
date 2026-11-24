@@ -7,8 +7,8 @@
 --   4. Animator 缺失或 LoadAnimation 抛错时连带攻击失败；
 --   5. 动作被走跑动画盖掉（未设上半身过滤与 Action 优先级）、循环播放。
 --   6. 每次出手都 LoadAnimation 新 track（自动枪 0.15 秒一发会不停堆积）；优先级赋值不被运行时接受时连带不播。
-local weapon = require('tests.support.weapon_world')
-local game_cfg = require('common.game_cfg')
+local Weapon = require('tests.support.weapon_world')
+local GameCfg = require('common.game_cfg')
 
 local function exportedMotionIds()
     local ids = {}
@@ -29,7 +29,7 @@ local function configuredAnimations(node, path, found)
 end
 
 local function attackSources()
-    local ability = game_cfg.Ability
+    local ability = GameCfg.Ability
     local sources = { { 'Unarmed', ability.Unarmed }, { 'Throw', ability.Throw } }
     for id, row in pairs(ability.MeleeWeapons) do sources[#sources + 1] = { 'MeleeWeapons.' .. id, row } end
     for id, row in pairs(ability.Guns) do sources[#sources + 1] = { 'Guns.' .. id, row } end
@@ -45,9 +45,9 @@ describe('攻击动作配置', function()
         end
     end)
 
-    it('game_cfg 里的官方动画都不取自 OfficialAsset 的 motion 段', function()
+    it('GameCfg 里的官方动画都不取自 OfficialAsset 的 motion 段', function()
         local exported = exportedMotionIds()
-        for _, entry in ipairs(configuredAnimations(game_cfg, 'game_cfg', {})) do
+        for _, entry in ipairs(configuredAnimations(GameCfg, 'GameCfg', {})) do
             assert.is_nil(exported[entry[2]], entry[1] .. ' 用了 OfficialAsset.motion 的 ID: ' .. entry[2])
         end
     end)
@@ -56,7 +56,7 @@ end)
 describe('攻击动作播放', function()
     local ctx
     before_each(function()
-        ctx = weapon.new()
+        ctx = Weapon.new()
         ctx:setUp()
         ctx.tracks = {}
         ctx.player.Character.Animator = { LoadAnimation = function(_, id)
@@ -80,7 +80,7 @@ describe('攻击动作播放', function()
 
     it('空手挥砍成功后播空手动作，上半身、Action 优先级、不循环', function()
         assert.is_true(ctx:attack(ctx.player).ok)
-        assert.same({ game_cfg.Ability.Unarmed.Anim }, played())
+        assert.same({ GameCfg.Ability.Unarmed.Anim }, played())
         local track = ctx.tracks[1]
         assert.same({ 30, 2, false, 1 }, { track.FilterType, track.Priority, track.Looped, track.plays })
     end)
@@ -90,7 +90,7 @@ describe('攻击动作播放', function()
         assert.is_true(ctx:attack(ctx.player).ok)
         ctx:advance(0.1)
         assert.same('cooldown', ctx:attack(ctx.player).reason)
-        assert.same({ game_cfg.Ability.MeleeWeapons.item136.Anim }, played())
+        assert.same({ GameCfg.Ability.MeleeWeapons.item136.Anim }, played())
     end)
 
     it('近战施法失败不播', function()
@@ -106,7 +106,7 @@ describe('攻击动作播放', function()
         assert.same('empty', ctx:attack(ctx.player).reason)
         ctx:advance(0.5)
         assert.same('reloading', ctx:attack(ctx.player).reason)
-        assert.same({ game_cfg.Ability.Guns.item142.Anim }, played())
+        assert.same({ GameCfg.Ability.Guns.item142.Anim }, played())
     end)
 
     it('连续开火复用同一 track', function()
@@ -129,13 +129,13 @@ describe('攻击动作播放', function()
             return track
         end }
         assert.is_true(ctx:attack(ctx.player).ok)
-        assert.same({ game_cfg.Ability.Unarmed.Anim }, played())
+        assert.same({ GameCfg.Ability.Unarmed.Anim }, played())
     end)
 
     it('投掷出手播投掷动作', function()
         local slot = ctx:giveExplosive(ctx.player, 'item143')
         assert.is_true(ctx:throw(ctx.player, slot, { x = 0, y = 2, z = 5 }).ok)
-        assert.same({ game_cfg.Ability.Throw.Anim }, played())
+        assert.same({ GameCfg.Ability.Throw.Anim }, played())
     end)
 
     it('没有 Animator 或加载抛错时攻击照常成功', function()

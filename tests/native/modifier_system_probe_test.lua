@@ -77,13 +77,13 @@ local function engine()
     return e
 end
 
--- #52：业务入口使用真实 Spoke player_effects + modifier_leaf + 真实官方包；替身只提供单位、时钟与伤害边界。
+-- #52：业务入口使用真实 Spoke PlayerEffects + ModifierLeaf + 真实官方包；替身只提供单位、时钟与伤害边界。
 local function business(run)
     local runtime = require('tests.support.modifier_runtime').New(100)
     local modifier = runtime.loadModifier()
     local player = { UserId = 52001, Character = runtime.unit('character') }
     local hits = {}
-    modifier.vitals = {
+    modifier.Vitals = {
         NewHit = function(_, source, category) return { source = source, category = category } end,
         ApplyHit = function(_, hit, target, amount)
             hits[#hits + 1] = { source = hit.source, target = target, amount = amount, category = hit.category }
@@ -93,7 +93,7 @@ local function business(run)
 end
 
 describe("TestModifierProbe", function()
-  -- 失败方式：角色空窗镜像丢 carry；退出重进扣离线时长；重建双计时。
+  -- 失败方式：角色空窗镜像丢 Carry；退出重进扣离线时长；重建双计时。
   it("test_character_gap_mirrors_weak_and_leave_rejoin_preserves_online_remaining", function()
     local host = require('tests.support.life_host').start({ now = 100 })
     local player = host.player and nil
@@ -191,7 +191,7 @@ describe("TestModifierProbe", function()
     local runtime = require('tests.support.modifier_runtime').New(clock)
     local target = { UserId = 49001, Character = runtime.unit('target') }
     local mgr = runtime.loadModifier()
-    mgr.vitals = {
+    mgr.Vitals = {
       NewHit = function(_, source, category) return { source = source, category = category } end,
       ApplyHit = function(_, hit, ref, amount)
         hits[#hits + 1] = { source = hit.source, category = hit.category, target = ref, amount = amount, at = runtime.now }

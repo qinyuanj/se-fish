@@ -1,8 +1,8 @@
-local economy_world = require("tests.support.economy_world")
+local EconomyWorld = require("tests.support.economy_world")
 
 local M = {}
 function M.new()
-  local world = economy_world.new()
+  local world = EconomyWorld.new()
   world.setUp = function() end
   world.draw = world.blindboxDraw
   local last_result = world.lastResult

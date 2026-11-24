@@ -1,35 +1,35 @@
-local game_cfg = require("common.game_cfg")
-local number = require("common.number")
-local spoke_runtime = require("common.packages.spoke.runtime.spoke_runtime")
-local interaction_points = require("server.world_host.interaction_points")
+local GameCfg = require("common.game_cfg")
+local Number = require("common.number")
+local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
+local InteractionPoints = require("server.world_host.interaction_points")
 
-local player_shop = {}
+local PlayerShop = {}
 
 local function item_count(data, item_id)
-  return data.data.Bait[item_id] or data:ItemCount(item_id)
+  return data.Data.Bait[item_id] or data:ItemCount(item_id)
 end
 
 local function find_goods(item_id, level)
-  for _, goods in ipairs(game_cfg.Shop.Goods) do
+  for _, goods in ipairs(GameCfg.Shop.Goods) do
     if goods.ItemId == item_id and goods.MinShopLevel <= level then return goods end
   end
   return nil
 end
 
-local function find_goods_by_number(goods_number, level)
-  if not number.IsFiniteNumber(goods_number) or goods_number ~= math.floor(goods_number) or goods_number < 1 then return nil end
-  for _, goods in ipairs(game_cfg.Shop.Goods) do
-    if goods.number == goods_number and goods.MinShopLevel <= level then return goods end
+local function find_goods_by_number(number, level)
+  if not Number.IsFiniteNumber(number) or number ~= math.floor(number) or number < 1 then return nil end
+  for _, goods in ipairs(GameCfg.Shop.Goods) do
+    if goods.Number == number and goods.MinShopLevel <= level then return goods end
   end
   return nil
 end
 
 local function stand_for(player)
-  for _, stand in ipairs(game_cfg.Shop.Stands) do
-    if interaction_points:InRange(player, {
+  for _, stand in ipairs(GameCfg.Shop.Stands) do
+    if InteractionPoints:InRange(player, {
       AnchorName = stand.AnchorName,
-      Radius = game_cfg.Shop.Radius,
-      Slack = game_cfg.Shop.Slack,
+      Radius = GameCfg.Shop.Radius,
+      Slack = GameCfg.Shop.Slack,
     }) then
       return stand
     end
@@ -38,11 +38,11 @@ local function stand_for(player)
 end
 
 local function backpack_row(data, stand_level)
-  local spec = game_cfg.Shop.UpgradeKinds.backpack
+  local spec = GameCfg.Shop.UpgradeKinds.backpack
   local next_level = data:ShopUpgradeLevel("backpack") + 1
   if not spec or next_level > spec.MaxLevel then return nil, "max" end
   local row
-  for _, goods in ipairs(game_cfg.Shop.Goods) do
+  for _, goods in ipairs(GameCfg.Shop.Goods) do
     if goods.Upgrade and goods.Upgrade.kind == "backpack" and goods.Upgrade.level == next_level
         and goods.MinShopLevel <= stand_level then
       row = goods
@@ -50,47 +50,47 @@ local function backpack_row(data, stand_level)
     end
   end
   if not row then return nil, "level" end
-  if (row.PurchaseLimit or 0) > 0 and data:PurchaseCount(row.number) >= row.PurchaseLimit then
+  if (row.PurchaseLimit or 0) > 0 and data:PurchaseCount(row.Number) >= row.PurchaseLimit then
     return nil, "limit"
   end
   return row
 end
 
 local function settle_purchase(draft, goods)
-  if (goods.PurchaseLimit or 0) > 0 and draft:PurchaseCount(goods.number) >= goods.PurchaseLimit then
+  if (goods.PurchaseLimit or 0) > 0 and draft:PurchaseCount(goods.Number) >= goods.PurchaseLimit then
     return nil, "limit"
   end
   if goods.Upgrade then
     local allowed, failure = draft:CanShopUpgrade(goods.Upgrade)
     if not allowed then return nil, failure end
-    local before_coin = draft.data.FishCoin
+    local before_coin = draft.Data.FishCoin
     if not draft:SpendCoin(goods.Price, function() draft:ApplyShopUpgrade(goods.Upgrade) end,
-        "shop:" .. goods.number) then
+        "shop:" .. goods.Number) then
       return nil, "coin"
     end
-    draft:NotePurchase(goods.number)
+    draft:NotePurchase(goods.Number)
     return {
-      ok = true, action = "Upgrade", number = goods.number, name = goods.Name, price = goods.Price,
+      ok = true, action = "Upgrade", number = goods.Number, name = goods.Name, price = goods.Price,
       kind = goods.Upgrade.kind, level = goods.Upgrade.level,
-      coinBefore = before_coin, coinAfter = draft.data.FishCoin,
+      coinBefore = before_coin, coinAfter = draft.Data.FishCoin,
     }
   end
   local item_id = goods.ItemId
   local allowed, failure = draft:CanGrant(item_id, 1)
   if not allowed then return nil, failure == "full" and "full" or "item" end
-  local before_coin, before_item = draft.data.FishCoin, item_count(draft, item_id)
+  local before_coin, before_item = draft.Data.FishCoin, item_count(draft, item_id)
   if not draft:SpendCoin(goods.Price, function() draft:GrantItem(item_id, 1) end, "shop:" .. item_id) then
     return nil, "coin"
   end
-  draft:NotePurchase(goods.number)
+  draft:NotePurchase(goods.Number)
   return {
-    ok = true, itemId = item_id, number = goods.number, name = goods.Name, price = goods.Price,
-    coinBefore = before_coin, coinAfter = draft.data.FishCoin,
+    ok = true, itemId = item_id, number = goods.Number, name = goods.Name, price = goods.Price,
+    coinBefore = before_coin, coinAfter = draft.Data.FishCoin,
     itemBefore = before_item, itemAfter = item_count(draft, item_id),
   }
 end
 
-function player_shop.mount(scope, tree, opts)
+function PlayerShop.mount(scope, tree, opts)
   opts = type(opts) == "table" and opts or {}
   local player, data, save, remote = tree.player, tree.data, opts.save, opts.remote
   local cleaned = false
@@ -131,20 +131,20 @@ function player_shop.mount(scope, tree, opts)
     local accepted = save:Execute(player, data, operation, function(draft)
       local draft_row, failure = backpack_row(draft, stand.Level)
       if not draft_row then return nil, failure end
-      local before_coin, before_level = draft.data.FishCoin, draft.data.UpgradeLevel
+      local before_coin, before_level = draft.Data.FishCoin, draft.Data.UpgradeLevel
       local upgraded, cost = draft:UpgradeStorage()
       if not upgraded then return nil, cost end
-      draft:NotePurchase(draft_row.number)
+      draft:NotePurchase(draft_row.Number)
       return {
-        ok = true, action = "UpgradeStorage", price = cost, level = draft.data.UpgradeLevel,
-        coinBefore = before_coin, coinAfter = draft.data.FishCoin, levelBefore = before_level,
+        ok = true, action = "UpgradeStorage", price = cost, level = draft.Data.UpgradeLevel,
+        coinBefore = before_coin, coinAfter = draft.Data.FishCoin, levelBefore = before_level,
       }
     end, function(written, result)
       if cleaned then return end
       if not written then fail(nil, result) return end
       result.operation = operation
       result_value = result
-      spoke_runtime.batch(function() tree:sync_from_data(data) end)
+      SpokeRuntime.batch(function() tree:sync_from_data(data) end)
       reply(result)
     end)
     if accepted ~= true then return false end
@@ -181,7 +181,7 @@ function player_shop.mount(scope, tree, opts)
       goods = find_goods(payload.itemId, stand.Level)
     end
     if not goods then return fail(payload.itemId, "item", payload.number) end
-    if (goods.PurchaseLimit or 0) > 0 and data:PurchaseCount(goods.number) >= goods.PurchaseLimit then
+    if (goods.PurchaseLimit or 0) > 0 and data:PurchaseCount(goods.Number) >= goods.PurchaseLimit then
       return fail(payload.itemId, "limit", payload.number)
     end
     local result_value = nil
@@ -197,7 +197,7 @@ function player_shop.mount(scope, tree, opts)
       if not written then fail(payload.itemId, result, payload.number) return end
       result.operation = operation
       result_value = result
-      spoke_runtime.batch(function()
+      SpokeRuntime.batch(function()
         tree:sync_from_data(data)
       end)
       reply(result)
@@ -217,4 +217,4 @@ function player_shop.mount(scope, tree, opts)
   return { handle = handle }
 end
 
-return player_shop
+return PlayerShop

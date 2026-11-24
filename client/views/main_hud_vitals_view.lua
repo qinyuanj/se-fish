@@ -1,16 +1,16 @@
 -- Spoke 主 HUD 左上状态区与金币视图（ADR-0032 / #297-B2，归属 L2 client.views）：
--- 挂载于 root_view 常驻 HUD 槽位，订阅只读 client_store.vitals / coin / clock；
+-- 挂载于 RootView 常驻 HUD 槽位，订阅只读 ClientStore.vitals / coin / clock；
 -- 负责血量环（'血 '）、饥饿环（'饥饿度 '）、4 条饥饿闪烁红边与编辑器预置金币节点（ImageCoin/LabelCoin）排版。
 
-local spoke = require("common.packages.spoke.api")
-local game_cfg = require("common.game_cfg")
-local number = require("common.number")
-local main_hud_layout = require("client.main_hud_layout")
-local view_util = require("client.views.view_util")
+local Spoke = require("common.packages.spoke.api")
+local GameCfg = require("common.game_cfg")
+local Number = require("common.number")
+local MainHudLayout = require("client.main_hud_layout")
+local ViewUtil = require("client.views.view_util")
 
-local State = spoke.State
+local State = Spoke.State
 
-local main_hud_vitals_view = {}
+local MainHudVitalsView = {}
 
 local HEALTH_PREFIX = "血 "
 local HUNGER_PREFIX = "饥饿度 "
@@ -82,21 +82,21 @@ end
 
 --- 挂载左上状态区（血量环、饥饿环、4 条饥饿红边）与预置金币节点排版。
 ---@param s table EffectBuilder
----@param ctx table root_view 上下文 { root_node, store, clock, create_node, own_node, connect }
+---@param ctx table RootView 上下文 { root_node, store, clock, create_node, own_node, connect }
 ---@param options table|nil { get_resolution?, notify?, find_node? }
-function main_hud_vitals_view.mount(s, ctx, options)
+function MainHudVitalsView.mount(s, ctx, options)
   options = options or {}
-  local notify = options.notify or function(text) view_util.notify(ctx, text) end
+  local notify = options.notify or function(text) ViewUtil.notify(ctx, text) end
   local find_node = options.find_node or find_editor_node
 
-  local resolution = view_util.get_resolution(ctx, options)
-  local layout = main_hud_layout.Compute({
+  local resolution = ViewUtil.get_resolution(ctx, options)
+  local layout = MainHudLayout.Compute({
     width = resolution.x,
     height = resolution.y,
-    itemBarSlots = game_cfg.Items.ItemBarSlots,
+    itemBarSlots = GameCfg.Items.ItemBarSlots,
   })
   local rects = layout.Rects
-  local cfg = game_cfg.vitals
+  local cfg = GameCfg.Vitals
 
   -- 1. 编辑器预置金币节点（按名查找并排版，生命周期归属编辑器场景树，不由本视图销毁）
   local label_coin = find_node(ctx.root_node, "LabelCoin")
@@ -104,7 +104,7 @@ function main_hud_vitals_view.mount(s, ctx, options)
   if label_coin ~= nil then
     label_coin.Visible = true
   else
-    print("[main_hud_vitals_view] 找不到 LabelCoin 节点")
+    print("[MainHudVitalsView] 找不到 LabelCoin 节点")
   end
   if image_coin ~= nil then
     image_coin.Visible = true
@@ -164,7 +164,7 @@ function main_hud_vitals_view.mount(s, ctx, options)
     flash_edges[#flash_edges + 1] = edge
   end
 
-  local is_starving = State.new("main_hud_vitals_view.is_starving", false)
+  local is_starving = State.new("MainHudVitalsView.is_starving", false)
 
   -- 4. 主 HUD 关屏显隐对齐 store.hud_visible
   s:effect("VitalsVisibilityProjection", function(es)
@@ -218,7 +218,7 @@ function main_hud_vitals_view.mount(s, ctx, options)
       if next_warn_at == nil or now >= next_warn_at then
         next_warn_at = now + cfg.WarnIntervalSec
         notify(cfg.WarnText)
-        print("[main_hud_vitals_view] 饥饿提示", cfg.WarnText)
+        print("[MainHudVitalsView] 饥饿提示", cfg.WarnText)
       end
     end
 
@@ -240,14 +240,14 @@ function main_hud_vitals_view.mount(s, ctx, options)
   end)
 end
 
---- 返回可供 root_view.mount({ hud = { ... } }) 直接注册的 HUD spec。
-function main_hud_vitals_view.spec(options)
+--- 返回可供 RootView.mount({ hud = { ... } }) 直接注册的 HUD spec。
+function MainHudVitalsView.spec(options)
   return {
     name = "MainHudVitals",
     mount = function(s, ctx)
-      main_hud_vitals_view.mount(s, ctx, options)
+      MainHudVitalsView.mount(s, ctx, options)
     end,
   }
 end
 
-return main_hud_vitals_view
+return MainHudVitalsView

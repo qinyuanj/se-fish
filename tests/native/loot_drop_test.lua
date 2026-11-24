@@ -1,7 +1,7 @@
-local game_cfg = require("common.game_cfg")
-local server_runtime = require("server.world_host.server_runtime")
-local spoke_clock = require("common.spoke_clock")
-local player_data = require("server.data.player_data")
+local GameCfg = require("common.game_cfg")
+local ServerRuntime = require("server.world_host.server_runtime")
+local SpokeClock = require("common.spoke_clock")
+local PlayerData = require("server.data.player_data")
 
 local function signal()
   local handlers = {}
@@ -17,8 +17,8 @@ local function open()
       FireClient = function(self, _, payload) self.clients[#self.clients + 1] = payload end }
     return events[name]
   end
-  local clock = spoke_clock.new(20)
-  local runtime = server_runtime.new({
+  local clock = SpokeClock.new(20)
+  local runtime = ServerRuntime.new({
     clock = clock, initial_now = 20,
     remote = { GetRE = function(_, n) return event(n) end, CheckRECD = function() return false end },
     player_data = { GetDataInst = function(_, p) return data_of[p.UserId] end },
@@ -31,13 +31,13 @@ local function open()
     end,
     bait_spots = { RespawnSec = 15, Spots = {} },
   })
-  runtime:start(); runtime:mark_started(); server_runtime.set_current(runtime)
+  runtime:start(); runtime:mark_started(); ServerRuntime.set_current(runtime)
   local api = { runtime = runtime, events = events, created = created }
   function api:add(id, x, z)
     local p = { UserId = id, attrs = {}, Character = { Position = { x = x or 0, y = 0, z = z or 0 } } }
     function p:SetAttribute(k, v) self.attrs[k] = v end
     function p:GetAttribute(k) return self.attrs[k] end
-    local data = player_data.New(p); data:Init(); data.LoadState = "ready"; data.Player = p
+    local data = PlayerData.New(p); data:Init(); data.LoadState = "ready"; data.Player = p
     data_of[id] = data; players[#players + 1] = p
     runtime:on_player_added(p); runtime:on_save_ready(p, data)
     return p, data
@@ -59,14 +59,14 @@ local function open()
   end
   function api:close()
     runtime:shutdown()
-    if server_runtime.current and server_runtime.current() == runtime then server_runtime.set_current(nil) end
+    if ServerRuntime.current and ServerRuntime.current() == runtime then ServerRuntime.set_current(nil) end
   end
   return api
 end
 
 describe("共享掉落的地面侧", function()
   before_each(function()
-    game_cfg.Debug = { Enabled = false, InitialGrants = game_cfg.Debug and game_cfg.Debug.InitialGrants }
+    GameCfg.Debug = { Enabled = false, InitialGrants = GameCfg.Debug and GameCfg.Debug.InitialGrants }
   end)
   it("test_operate_discard_moves_one_item_to_ground", function()
     local env = open()
@@ -157,11 +157,11 @@ describe("共享掉落的地面侧", function()
   end)
 
   it("test_snapshot_carries_warning_flag", function()
-    local saved = game_cfg.Loot
+    local saved = GameCfg.Loot
     local loot = {}
     for k, v in pairs(saved) do loot[k] = v end
     loot.PerZoneCap = 1
-    game_cfg.Loot = loot
+    GameCfg.Loot = loot
     local env = open()
     local world = env.runtime:get_world()
     world:place_ground_item("fishPond", { kind = "item", itemId = "carp", count = 1, x = 1, y = 0, z = 0 })
@@ -169,7 +169,7 @@ describe("共享掉落的地面侧", function()
     local warned = 0
     for _, row in ipairs(env:rows()) do if row.warn then warned = warned + 1 end end
     assert.equals(1, warned)
-    game_cfg.Loot = saved
+    GameCfg.Loot = saved
     env:close()
   end)
 end)

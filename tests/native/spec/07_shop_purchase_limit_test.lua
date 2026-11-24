@@ -1,10 +1,10 @@
-local game_cfg = require("common.game_cfg")
-local shop_feed_host = require("tests.support.shop_feed_host")
+local GameCfg = require("common.game_cfg")
+local Host = require("tests.support.shop_feed_host")
 
 local LIMITED_ROW, UNLIMITED_ROW = 51, 13
 local function goods(number)
-  for _, row in ipairs(game_cfg.Shop.Goods) do
-    if row.number == number then return row end
+  for _, row in ipairs(GameCfg.Shop.Goods) do
+    if row.Number == number then return row end
   end
   error("未知商品行 " .. tostring(number))
 end
@@ -13,8 +13,8 @@ describe("条款 7-11 商店限购在原子结算内生效", function()
   local host, player, data
 
   before_each(function()
-    host = shop_feed_host.start()
-    player, data = host:join(7001, game_cfg.Shop.Stands[1].AnchorName, function(d)
+    host = Host.start()
+    player, data = host:join(7001, GameCfg.Shop.Stands[1].AnchorName, function(d)
       assert.is_true(d:AddCoin(1000, nil, "test"))
     end)
   end)

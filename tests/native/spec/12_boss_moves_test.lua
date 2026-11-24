@@ -5,7 +5,7 @@
 -- 只观察玩家看得见的三个面：
 --   1. 鱼本体血量（Carrier.Health / MaxHealth，玩家打得到的那条血）；
 --   2. 玩家血量（Controller.Health，所有伤害都走 MgrVitals）；
---   3. 广播给客户端的 gar_bite_notice 预警载荷（client/LocalGarBite 消费的同一份契约）。
+--   3. 广播给客户端的 GarBiteNotice 预警载荷（client/LocalGarBite 消费的同一份契约）。
 -- 服务端招式台账 fish.Phase.AttackLog 由 common/boss_phase.lua 公开维护（探针与台账取「攻击序列」的
 -- 同一入口），这里用它断言冷却调度，不碰任何内部字段。
 --
@@ -15,9 +15,9 @@
 --   3. 吐息不再秒杀，或跺脚伤害 / 范围与表不符；
 --   4. 阶段阈值被普通招式循环压住（该入水时还在出爪击）。
 
-local cfg = require('common.game_cfg')
-local islet = require('tests.support.isle_combat')
-local boss_moves = require('common.cfg.boss_moves')
+local Cfg = require('common.game_cfg')
+local Islet = require('tests.support.isle_combat')
+local BossMoves = require('common.cfg.boss_moves')
 
 -- 循环里的断言只在失败时拼消息（断言参数里的字符串每个通过的断言都要付一次）。
 local function need(cond, ...)
@@ -30,9 +30,9 @@ describe('第 12 节 首领逐招表（哥斯拉）', function()
 
     before_each(function()
         savedExtra = { ability = package.loaded['server.ability_api'] }
-        env = islet.new(7)
+        env = Islet.new(7)
         package.loaded['server.ability_api'] = nil
-        local p = islet.shoreDryPoint(7)
+        local p = Islet.shoreDryPoint(7)
         env.player.Character.Position = env.vec(p.x, p.y, p.z)
     end)
 
@@ -66,7 +66,7 @@ describe('第 12 节 首领逐招表（哥斯拉）', function()
 
     it('条款 12-39：放下哥斯拉即以 25000 血进入战斗态', function()
         local fish = env:drop('fish56Boss')
-        assert.same(25000, cfg.Fish.fish56Boss.Health)
+        assert.same(25000, Cfg.Fish.fish56Boss.Health)
         assert.same(25000, fish.Carrier.MaxHealth)
         assert.same(25000, fish.Carrier.Health)
         assert.is_not_nil(fish.Phase)
@@ -74,7 +74,7 @@ describe('第 12 节 首领逐招表（哥斯拉）', function()
 
     it('条款 12-04：逐招表一招一行、四列齐全，覆盖第 12 节全部精英与首领', function()
         local seen = {}
-        for _, row in ipairs(boss_moves.Rows) do
+        for _, row in ipairs(BossMoves.Rows) do
             local key = row.Fish .. '.' .. row.Move
             need(seen[key] == nil, '逐招表出现重复行：%s', key)
             seen[key] = true
@@ -115,10 +115,10 @@ describe('第 12 节 首领逐招表（哥斯拉）', function()
         for _, key in ipairs({ 'eel', 'gar', 'shrimp', 'dragon', 'kingCrab', 'crabBoss',
             'swordfish', 'shark', 'walrus', 'orca', 'fish47Elite', 'fish48Boss',
             'mosasaur', 'godzilla' }) do
-            need(boss_moves.Index[key] ~= nil, '逐招表漏了 %s', key)
-            local found = cfg.Fish[key] ~= nil
+            need(BossMoves.Index[key] ~= nil, '逐招表漏了 %s', key)
+            local found = Cfg.Fish[key] ~= nil
             if not found then
-                for _, species in pairs(cfg.Fish) do
+                for _, species in pairs(Cfg.Fish) do
                     if species.Combat == key then found = true; break end
                 end
             end
@@ -128,10 +128,10 @@ describe('第 12 节 首领逐招表（哥斯拉）', function()
 
     it('条款 12-05 / 12-46：哥斯拉只有正文与表内的五招，没有凭空新增的追踪攻击', function()
         local names = {}
-        for name in pairs(cfg.Ability.boss_phase.Attacks) do names[#names + 1] = name end
+        for name in pairs(Cfg.Ability.BossPhase.Attacks) do names[#names + 1] = name end
         table.sort(names)
         assert.same({ 'bite', 'breath', 'claw', 'stomp', 'tail' }, names)
-        for _, row in ipairs(boss_moves.Rows) do
+        for _, row in ipairs(BossMoves.Rows) do
             assert.truthy(row.Move ~= 'track' and row.Move ~= 'tracking',
                 '逐招表凭空新增了追踪攻击：' .. row.Fish)
             if row.Fish == 'godzilla' then
@@ -139,7 +139,7 @@ describe('第 12 节 首领逐招表（哥斯拉）', function()
             end
         end
         -- 正文末尾那个孤立的 260 只属于风神翼龙的俯冲（12-34 要求核对映射，不静默丢弃）
-        assert.same(260, boss_moves.Get('fish48Boss', 'dive').Damage.Value)
+        assert.same(260, BossMoves.Get('fish48Boss', 'dive').Damage.Value)
     end)
 
     it('条款 12-40：爪击每 2 秒 50、甩尾每 6 秒 50，吐息 30 秒才起手', function()
@@ -216,13 +216,13 @@ describe('第 12 节 首领逐招表（哥斯拉）', function()
         assert.same('water', fish.Phase.Phase, '血量低于 60% 没有入水')
 
         -- 入水后走沧龙式巡游：15 秒后跃起锁定玩家落点，落地 35 接触伤 + 咬中 1000
-        local bite = cfg.Ability.boss_phase.Thresholds[1].BiteDamage
+        local bite = Cfg.Ability.BossPhase.Thresholds[1].BiteDamage
         assert.same(1000, bite)
         local before = env.player.Character.Controller.Health
         env:advance(18)
         local delta = before - env.player.Character.Controller.Health
         assert.truthy(delta >= bite, '入水咬击没有结算 1000（实际掉血 ' .. tostring(delta) .. '）')
-        assert.is_not_nil(fish.carry, '咬中后没有叼走玩家')
+        assert.is_not_nil(fish.Carry, '咬中后没有叼走玩家')
     end)
 
     it('条款 12-44：低于 20% 重新上岸，伤害 +50%、吐息改为每 10 秒', function()
@@ -269,7 +269,7 @@ describe('第 12 节 首领逐招表（哥斯拉）', function()
         env:advance(2.2)
         local warning = noticesBy('bossStomp')[1]
         assert.is_not_nil(warning)
-        local row = boss_moves.Get('godzilla', 'stomp')
+        local row = BossMoves.Get('godzilla', 'stomp')
         assert.same(row.Warning.Kind, warning.shape)
         assert.same(row.Warning.WindupSec, warning.duration)
         assert.same(row.Range, warning.range)

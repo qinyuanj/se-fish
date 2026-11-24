@@ -1,11 +1,11 @@
 -- #65 P2 配置依赖复解析（编辑器侧，edit mode，只读）。
 -- 复跑：
---   lua tools/gen_config_anchor_probe.lua                        # 按当前 game_cfg 重新生成下面的数据块
+--   lua tools/gen_config_anchor_probe.lua                        # 按当前 GameCfg 重新生成下面的数据块
 --   editor-cli exec --file tests/probes/config_anchor_resolution.lua --expect-edit-mode --timeout 120 --json
 --   editor-cli log grep P2CFG65 --platform editor --context 0 --max-matches 800 --json
 --
 -- 数据块由 `lua tools/gen_config_anchor_probe.lua` 生成，**不要手改数据块**：
--- lua tools/gen_config_anchor_probe.lua --check 会逐字节校验它与当前 game_cfg 同步（不同步退出码 1）。
+-- lua tools/gen_config_anchor_probe.lua --check 会逐字节校验它与当前 GameCfg 同步（不同步退出码 1）。
 --
 -- 为什么清单是生成出来的字面量：编辑器 exec 沙盒里 require 不可用
 -- （sdk.common.lua:830: attempt to call a nil value (field 'require')），且没有 io/os，
@@ -232,7 +232,7 @@ for _, entry in ipairs(anchors) do
     else
         counters.missUnknown = counters.missUnknown + 1
     end
-    rows[#rows + 1] = table.concat({ 'a', entry.source, entry.zone, entry.name,
+    rows[#rows + 1] = table.concat({ 'A', entry.source, entry.zone, entry.name,
         'state=' .. entry.state, 'hits=' .. tostring(#hits), 'inZone=' .. inZone,
         'first=' .. firstPath, 'type=' .. firstType,
         (#hits > 1 and ('extra=' .. extra) or '') }, '|')

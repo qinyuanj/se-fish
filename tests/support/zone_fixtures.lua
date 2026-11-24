@@ -1,8 +1,8 @@
--- 离线测试用假场景：与生产 zone_markers 同一解析路径，坐标只服务行为夹具，不是场景事实。
+-- 离线测试用假场景：与生产 ZoneMarkers 同一解析路径，坐标只服务行为夹具，不是场景事实。
 -- 节点与坐标由严格引擎替身 engine_double 提供，越出真引擎能力的访问直接报错。
 local M = {}
-local zone_markers = require('common.zone_markers')
-local engine = require('tests.support.engine_double')
+local ZoneMarkers = require('common.zone_markers')
+local Engine = require('tests.support.engine_double')
 
 local centers = {
   {x=0,z=0}, {x=240,z=0}, {x=480,z=0}, {x=720,z=0},
@@ -23,15 +23,15 @@ local foldedPoints = {
 
 function M.World()
   local zones = {}
-  local world = engine.World(zones)
+  local world = Engine.World(zones)
   local zoneNames = {'01 鱼塘','02 虾池','03 蟹湖','04 树林岛','05 沙滩岛','06 礁石岛','07 火山岛'}
   for index, center in ipairs(centers) do
-    local walls, points, facilities, waters = engine.Unit({ Name = '空气墙' }), engine.Unit({ Name = '摆渡' }),
-      engine.Unit({ Name = '设施' }), engine.Unit({ Name = '水域' })
-    local zone = engine.Unit({ Name = zoneNames[index], Children = { walls, points, facilities, waters } })
+    local walls, points, facilities, waters = Engine.Unit({ Name = '空气墙' }), Engine.Unit({ Name = '摆渡' }),
+      Engine.Unit({ Name = '设施' }), Engine.Unit({ Name = '水域' })
+    local zone = Engine.Unit({ Name = zoneNames[index], Children = { walls, points, facilities, waters } })
     local function unit(parent, name, x, y, z, sx, sy, sz)
-      local value = engine.Unit({ Name = name, Position = {x=x,y=y,z=z}, Size = {x=sx or 1,y=sy or 1,z=sz or 1} })
-      local children = engine.Children(parent)
+      local value = Engine.Unit({ Name = name, Position = {x=x,y=y,z=z}, Size = {x=sx or 1,y=sy or 1,z=sz or 1} })
+      local children = Engine.Children(parent)
       children[#children + 1] = value
       return value
     end
@@ -71,18 +71,18 @@ function M.World()
     local waterZ = center.z + (index >= 2 and index <= 4 and -44 or 44)
     local waterX = center.x
     local water = unit(waters,index <= 2 and 'Z'..index..'_Water1' or 'Z'..index..'_Water',waterX,2,waterZ,80,1,24)
-    for _, value in ipairs(engine.Children(points)) do
+    for _, value in ipairs(Engine.Children(points)) do
       value.Position.x = center.x + (index >= 2 and index <= 4 and -1 or 1) * (value.Position.x - sceneCenter.x)
       value.Position.z = center.z + (index >= 2 and index <= 4 and -1 or 1) * (value.Position.z - sceneCenter.z)
       if index == 2 and value.Name == 'Z2_FerryReturn' then value.Name = 'FerryReturn' end
     end
-    for _, value in ipairs(engine.Children(facilities)) do
+    for _, value in ipairs(Engine.Children(facilities)) do
       value.Position.x = center.x + (index >= 2 and index <= 4 and -1 or 1) * (value.Position.x - sceneCenter.x)
       value.Position.z = center.z + (index >= 2 and index <= 4 and -1 or 1) * (value.Position.z - sceneCenter.z)
     end
     for name, position in pairs(foldedPoints) do
       for _, parent in ipairs({points, facilities}) do
-        for _, value in ipairs(engine.Children(parent)) do
+        for _, value in ipairs(Engine.Children(parent)) do
           if value.Name == name then value.Position = position end
         end
       end
@@ -90,7 +90,7 @@ function M.World()
     if index == 1 then
       unit(waters,'Z1_Water2',11.5,1.05,-26.5,7,1,7)
       water.Position = {x=-11.75,y=1.183,z=-12.25}
-      engine.SetSize(water, {x=12,y=1,z=12})
+      Engine.SetSize(water, {x=12,y=1,z=12})
     end
     zones[index] = zone
   end
@@ -98,7 +98,7 @@ function M.World()
 end
 
 function M.Apply(cfg)
-  zone_markers.Resolve(M.World(), cfg)
+  ZoneMarkers.Resolve(M.World(), cfg)
   return cfg
 end
 

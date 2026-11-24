@@ -4,29 +4,29 @@
 
 | ID | 条款 | 组 | 执行者 | 证据等级 | 状态 | 证据 / 理由 |
 | --- | --- | --- | --- | --- | --- | --- |
-| 14-01 | 每个钓鱼区各设一台抽奖机，交互范围按该区锚点判定 | 规则 | agent | a | unverified | — |
-| 14-02 | 投入物必须是一件未烤制的极品食物，即极品鱼获或信物 | 规则 | agent | a | unverified | — |
-| 14-03 | 三个轴各自独立抽样，且共用同一套图案权重 | 规则 | agent | a | evidenced | tests/native/spec/14_lottery_rules_test.lua |
-| 14-04 | 三同优先于两同，三同时只发放该图案对应的大奖 | 规则 | agent | a | evidenced | tests/native/spec/14_lottery_rules_test.lua |
-| 14-05 | 恰好两同发放金币，金额为投入物实际价格乘以该图案的两同倍数 | 规则 | agent | a | evidenced | tests/native/spec/14_lottery_rules_test.lua |
-| 14-06 | 无两同时不发放任何奖励 | 规则 | agent | a | evidenced | tests/native/spec/14_lottery_rules_test.lua |
-| 14-07 | 恰好两同的金币期望为投入价值的 2.119671 倍，按表权重与倍数保留，不预先改数 | 规则 | agent | a | unverified | — |
-| 14-08 | 图案的权重与两同倍数按表一一对应：鳄雀鳝 22 配 2、小白龙 20 配 3、蟹老板 18 配 5、三头鲨 16 配 7、虎鲸 14 配 10、风神翼龙 5 配 15、哥斯拉 5 配 20 | 规则 | agent | a | unverified | — |
-| 14-09 | 三同大奖按表对应：匕首组五选一、斧头组五选一、枪械组五选一、加速药水、变大药水、风神之翼、哥斯拉 | 规则 | agent | a | evidenced | tests/native/spec/14_lottery_rules_test.lua |
-| 14-10 | 两同金币按投入物已确定的整数售价计算，不按随机倍率后的价格 | 规则 | agent | a | evidenced | tests/native/spec/14_lottery_rules_test.lua |
-| 14-11 | 停轴在 3 秒后按左、右、中的顺序依次停止 | 规则 | agent | a | unverified | — |
-| 14-12 | 奖项由服务端先定并持久化，动画只做表现，不决定奖项 | 契约 | agent | b | unverified | — |
-| 14-13 | 两同金币直接入账户，不落到世界物品 | 规则 | agent | a | evidenced | tests/native/spec/14_lottery_rules_test.lua |
-| 14-14 | 大奖占用道具格时优先回到投入物释放的格位 | 契约 | agent | b | unverified | — |
-| 14-15 | 三同的武器大奖进入独立武器库存，不占道具栏或背包格 | 规则 | agent | a | evidenced | tests/native/spec/14_lottery_rules_test.lua |
-| 14-16 | 结算后不关窗即可继续选择下一件投入物 | 规则 | agent | a | unverified | — |
-| 14-17 | 重复点击、关窗、死亡、断线都不重复扣物，也不重复发奖 | 契约 | agent | b | unverified | — |
-| 14-18 | 已扣费的抽奖在重进时补推唯一结果供展示，不重新结算、不重复发奖 | 契约 | agent | b | unverified | — |
-| 14-19 | 同一请求重放或重试只回原结果，不产生第二次扣物或第二次发奖 | 契约 | agent | b | unverified | — |
-| 14-20 | 风神之翼选中即背负，长按飞行上升且可控制方向，松开后缓降 | 规则 | agent | a | unverified | — |
-| 14-21 | 风神之翼的高度上限为 20 米，且不可越过钓鱼区边界 | 规则 | agent | a | unverified | — |
-| 14-22 | 哥斯拉道具选中即变身，原子吐息持续 3 秒、正前方 30 米、对每个目标总计 1000 伤害、冷却 20 秒 | 规则 | agent | a | unverified | — |
-| 14-23 | 哥斯拉道具的吐息参数与首领哥斯拉的攻击配置严格分离，互不复用 | 契约 | agent | b | unverified | — |
+| 14-01 | 每个钓鱼区各设一台抽奖机，交互范围按该区锚点判定 | 规则 | agent | A | unverified | — |
+| 14-02 | 投入物必须是一件未烤制的极品食物，即极品鱼获或信物 | 规则 | agent | A | unverified | — |
+| 14-03 | 三个轴各自独立抽样，且共用同一套图案权重 | 规则 | agent | A | evidenced | tests/native/spec/14_lottery_rules_test.lua |
+| 14-04 | 三同优先于两同，三同时只发放该图案对应的大奖 | 规则 | agent | A | evidenced | tests/native/spec/14_lottery_rules_test.lua |
+| 14-05 | 恰好两同发放金币，金额为投入物实际价格乘以该图案的两同倍数 | 规则 | agent | A | evidenced | tests/native/spec/14_lottery_rules_test.lua |
+| 14-06 | 无两同时不发放任何奖励 | 规则 | agent | A | evidenced | tests/native/spec/14_lottery_rules_test.lua |
+| 14-07 | 恰好两同的金币期望为投入价值的 2.119671 倍，按表权重与倍数保留，不预先改数 | 规则 | agent | A | unverified | — |
+| 14-08 | 图案的权重与两同倍数按表一一对应：鳄雀鳝 22 配 2、小白龙 20 配 3、蟹老板 18 配 5、三头鲨 16 配 7、虎鲸 14 配 10、风神翼龙 5 配 15、哥斯拉 5 配 20 | 规则 | agent | A | unverified | — |
+| 14-09 | 三同大奖按表对应：匕首组五选一、斧头组五选一、枪械组五选一、加速药水、变大药水、风神之翼、哥斯拉 | 规则 | agent | A | evidenced | tests/native/spec/14_lottery_rules_test.lua |
+| 14-10 | 两同金币按投入物已确定的整数售价计算，不按随机倍率后的价格 | 规则 | agent | A | evidenced | tests/native/spec/14_lottery_rules_test.lua |
+| 14-11 | 停轴在 3 秒后按左、右、中的顺序依次停止 | 规则 | agent | A | unverified | — |
+| 14-12 | 奖项由服务端先定并持久化，动画只做表现，不决定奖项 | 契约 | agent | B | unverified | — |
+| 14-13 | 两同金币直接入账户，不落到世界物品 | 规则 | agent | A | evidenced | tests/native/spec/14_lottery_rules_test.lua |
+| 14-14 | 大奖占用道具格时优先回到投入物释放的格位 | 契约 | agent | B | unverified | — |
+| 14-15 | 三同的武器大奖进入独立武器库存，不占道具栏或背包格 | 规则 | agent | A | evidenced | tests/native/spec/14_lottery_rules_test.lua |
+| 14-16 | 结算后不关窗即可继续选择下一件投入物 | 规则 | agent | A | unverified | — |
+| 14-17 | 重复点击、关窗、死亡、断线都不重复扣物，也不重复发奖 | 契约 | agent | B | unverified | — |
+| 14-18 | 已扣费的抽奖在重进时补推唯一结果供展示，不重新结算、不重复发奖 | 契约 | agent | B | unverified | — |
+| 14-19 | 同一请求重放或重试只回原结果，不产生第二次扣物或第二次发奖 | 契约 | agent | B | unverified | — |
+| 14-20 | 风神之翼选中即背负，长按飞行上升且可控制方向，松开后缓降 | 规则 | agent | A | unverified | — |
+| 14-21 | 风神之翼的高度上限为 20 米，且不可越过钓鱼区边界 | 规则 | agent | A | unverified | — |
+| 14-22 | 哥斯拉道具选中即变身，原子吐息持续 3 秒、正前方 30 米、对每个目标总计 1000 伤害、冷却 20 秒 | 规则 | agent | A | unverified | — |
+| 14-23 | 哥斯拉道具的吐息参数与首领哥斯拉的攻击配置严格分离，互不复用 | 契约 | agent | B | unverified | — |
 
 ## C 级（试玩取证）
 

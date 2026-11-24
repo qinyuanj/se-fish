@@ -1,6 +1,6 @@
-local game_cfg = require('common.game_cfg')
+local GameCfg = require('common.game_cfg')
 
-local platform_host = { SpokeHost = true, Flows = {}, NextFlowId = 0 }
+local PlatformHost = { SpokeHost = true, Flows = {}, NextFlowId = 0 }
 
 local function isValidPlayer(player)
     local kind = type(player)
@@ -8,16 +8,16 @@ local function isValidPlayer(player)
 end
 
 local function cfg()
-    return game_cfg.Platform
+    return GameCfg.Platform
 end
 
-function platform_host:Now()
+function PlatformHost:Now()
     self.World = self.World or game:GetService('World')
     return self.World:GetServerTime()
 end
 
-function platform_host:Reply(player, payload)
-    _G.re_util:GetRE('PlatformResult'):FireClient(player, payload)
+function PlatformHost:Reply(player, payload)
+    _G.REUtil:GetRE('PlatformResult'):FireClient(player, payload)
 end
 
 local function service(name)
@@ -26,7 +26,7 @@ local function service(name)
 end
 
 local function debugEnabled()
-    return game_cfg.Debug and game_cfg.Debug.Enabled == true
+    return GameCfg.Debug and GameCfg.Debug.Enabled == true
 end
 
 local function configured(row)
@@ -90,7 +90,7 @@ local function placeholderGoodsId(kind, key)
     return id
 end
 
-function platform_host:HasFlow(player)
+function PlatformHost:HasFlow(player)
     local flow = player and self.Flows[player.UserId]
     return flow ~= nil and flow.player == player
 end
@@ -99,7 +99,7 @@ local function notifyTestFlow(mgr, player, flow, open)
     if flow.real then return end
     local ok, err = pcall(mgr.Reply, mgr, player, { ok = true, action = 'TestFlow', open = open,
         kind = flow.kind, key = flow.goods or flow.ad, purpose = flow.purpose })
-    if not ok then print('[platform_host] 测试 flow 通知失败', player.UserId, tostring(err)) end
+    if not ok then print('[PlatformHost] 测试 flow 通知失败', player.UserId, tostring(err)) end
 end
 
 local function notifyPlaceholder(mgr, player, flow, open)
@@ -119,7 +119,7 @@ local function notifyPlaceholder(mgr, player, flow, open)
         currency = (offer and page.Unit) or (row and cfg().BeanCurrency),
         notice = (flow.kind == 'ad' and config.AdsNotice) or config.Notice,
     })
-    if not ok then print('[platform_host] 占位通道通知失败', player.UserId, tostring(err)) end
+    if not ok then print('[PlatformHost] 占位通道通知失败', player.UserId, tostring(err)) end
 end
 
 local function notifyFlow(mgr, player, flow, open)
@@ -130,19 +130,19 @@ end
 local function resolve(mgr, player, flow, outcome, payload)
     if mgr.Flows[player.UserId] == flow then mgr.Flows[player.UserId] = nil end
     notifyFlow(mgr, player, flow, false)
-    print('[platform_host] flow 结算', player.UserId, flow.kind, tostring(flow.goods or flow.ad), outcome)
+    print('[PlatformHost] flow 结算', player.UserId, flow.kind, tostring(flow.goods or flow.ad), outcome)
     if type(flow.onResult) == 'function' then
         local callback = flow.onResult
         local function deliver()
             local ok, err = pcall(callback, outcome, payload)
-            if not ok then print('[platform_host] flow 回调失败', player.UserId, tostring(err)) end
+            if not ok then print('[PlatformHost] flow 回调失败', player.UserId, tostring(err)) end
         end
         local task = game and game.GetService and game:GetService('Task')
         if task and type(task.Spawn) == 'function' then task:Spawn(deliver) else deliver() end
     end
 end
 
-function platform_host:CanPurchase(player, goodsKey)
+function PlatformHost:CanPurchase(player, goodsKey)
     if type(cfg().Goods[goodsKey]) ~= 'table' then return false, 'invalid' end
     if debugEnabled() then return true end
     if placeholderAllowed() and placeholderGoodsId('goods', goodsKey) then return true end
@@ -170,35 +170,35 @@ local function openFlow(self, player, intent, onResult)
         placeholder = label == '占位', onResult = onResult, startedAt = now,
         deadline = now + cfg().FlowTimeoutSec }
     self.Flows[player.UserId] = flow
-    print('[platform_host] flow 建立', player.UserId, intent.kind, tostring(key), label,
+    print('[PlatformHost] flow 建立', player.UserId, intent.kind, tostring(key), label,
         'flow=' .. tostring(flow.id))
     notifyFlow(self, player, flow, true)
     return true
 end
 
-function platform_host:Purchase(player, goodsKey, purpose, onResult)
+function PlatformHost:Purchase(player, goodsKey, purpose, onResult)
     return openFlow(self, player, { kind = 'purchase', goods = goodsKey, purpose = purpose }, onResult)
 end
 
-function platform_host:ShowAd(player, adKey, purpose, onResult)
+function PlatformHost:ShowAd(player, adKey, purpose, onResult)
     return openFlow(self, player, { kind = 'ad', ad = adKey, purpose = purpose }, onResult)
 end
 
-function platform_host:CancelFlow(player)
+function PlatformHost:CancelFlow(player)
     if not self:HasFlow(player) then return false end
-    print('[platform_host] flow 被业务取消', player.UserId)
+    print('[PlatformHost] flow 被业务取消', player.UserId)
     local flow = self.Flows[player.UserId]
     self.Flows[player.UserId] = nil
     notifyFlow(self, player, flow, false)
     return true
 end
 
-function platform_host:OpenCoinFlow(player, key, onResult)
+function PlatformHost:OpenCoinFlow(player, key, onResult)
     if not coinOffer(key) or type(onResult) ~= 'function' then return false end
     return openFlow(self, player, { kind = 'coin', coin = key, purpose = 'coinpage' }, onResult)
 end
 
-function platform_host:ResolvePlaceholder(player, outcome)
+function PlatformHost:ResolvePlaceholder(player, outcome)
     if outcome ~= 'success' and outcome ~= 'cancel' and outcome ~= 'fail' then return false end
     local flow = player and self.Flows[player.UserId]
     if not flow or flow.player ~= player or not flow.placeholder then return false end
@@ -206,14 +206,14 @@ function platform_host:ResolvePlaceholder(player, outcome)
     return true
 end
 
-function platform_host:OnGoodsPurchaseCompleted(goodsId, num, player)
+function PlatformHost:OnGoodsPurchaseCompleted(goodsId, num, player)
     -- 公开信号无订单身份，旧单/重复单无法与当前 flow 安全关联，保持关闭。
-    print('[platform_host] 缺可信交付身份，忽略真实购买信号', tostring(goodsId))
+    print('[PlatformHost] 缺可信交付身份，忽略真实购买信号', tostring(goodsId))
 end
 
-function platform_host:HandleTestAction(player, payload)
+function PlatformHost:HandleTestAction(player, payload)
     if not debugEnabled() then
-        print('[platform_host] 生产构建拒绝测试驱动器', player and player.UserId)
+        print('[PlatformHost] 生产构建拒绝测试驱动器', player and player.UserId)
         return false
     end
     if type(payload) ~= 'table' or payload.action ~= 'ResolveFlow'
@@ -226,7 +226,7 @@ function platform_host:HandleTestAction(player, payload)
     return true
 end
 
-function platform_host:Share(player, purpose)
+function PlatformHost:Share(player, purpose)
     if not isValidPlayer(player) then return false, 'invalid' end
     local share = cfg().Share or {}
     local reason
@@ -241,7 +241,7 @@ function platform_host:Share(player, purpose)
     return false, reason
 end
 
-function platform_host:HandleAction(player, payload)
+function PlatformHost:HandleAction(player, payload)
     if type(payload) ~= 'table' then return false end
     if self.ShopAction and (payload.action == 'OpenAdrenaline' or payload.action == 'OpenCoinShop'
         or payload.action == 'Purchase' or payload.action == 'BuyCoin' or payload.action == 'Query') then
@@ -257,7 +257,7 @@ function platform_host:HandleAction(player, payload)
     return false
 end
 
-function platform_host:Update()
+function PlatformHost:Update()
     local now = self:Now()
     for userId, flow in pairs(self.Flows) do
         if now >= flow.deadline then
@@ -266,11 +266,11 @@ function platform_host:Update()
     end
 end
 
-function platform_host:OnPlayerRemoving(player)
+function PlatformHost:OnPlayerRemoving(player)
     self.Flows[player.UserId] = nil
 end
 
-function platform_host:Start()
+function PlatformHost:Start()
     local commodity = service('CommodityService')
     if commodity and commodity.GoodsPurchaseCompleted then
         local ok, err = pcall(function()
@@ -278,18 +278,18 @@ function platform_host:Start()
                 self:OnGoodsPurchaseCompleted(goodsId, goodsNum, player)
             end)
         end)
-        if not ok then print('[platform_host] 订阅购买完成信号失败', tostring(err)) end
+        if not ok then print('[PlatformHost] 订阅购买完成信号失败', tostring(err)) end
     else
-        print('[platform_host] CommodityService 不可用，平台购买入口全部降级为不可用')
+        print('[PlatformHost] CommodityService 不可用，平台购买入口全部降级为不可用')
     end
-    _G.re_util:GetRE('PlatformAction').OnServerEvent:Connect(function(player, payload)
-        if _G.re_util:CheckRECD(player, 'PlatformAction', cfg().ActionCooldownSec) then return end
+    _G.REUtil:GetRE('PlatformAction').OnServerEvent:Connect(function(player, payload)
+        if _G.REUtil:CheckRECD(player, 'PlatformAction', cfg().ActionCooldownSec) then return end
         self:HandleAction(player, payload)
     end)
-    _G.re_util:GetRE('PlatformTestAction').OnServerEvent:Connect(function(player, payload)
-        if _G.re_util:CheckRECD(player, 'PlatformTestAction', 0.2) then return end
+    _G.REUtil:GetRE('PlatformTestAction').OnServerEvent:Connect(function(player, payload)
+        if _G.REUtil:CheckRECD(player, 'PlatformTestAction', 0.2) then return end
         self:HandleTestAction(player, payload)
     end)
 end
 
-return platform_host
+return PlatformHost

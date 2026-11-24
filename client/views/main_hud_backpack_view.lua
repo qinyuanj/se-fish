@@ -1,20 +1,20 @@
 -- Spoke 主 HUD 背包入口与背包面板视图（ADR-0032 / #297-B3c，归属 L2 client.views）：
--- 挂载于 root_view 常驻 HUD 槽位，订阅只读 client_store.item_bar；
--- 常驻入口 BtnBackpack 实时显示「背包 n 格」并随道具栏扩容重排；
--- 展开态 BackpackPanel 由 Phase + Dock 管理 BackpackSlot1..n 与转入道具栏按钮生命周期；
+-- 挂载于 RootView 常驻 HUD 槽位，订阅只读 ClientStore.item_bar；
+-- 常驻入口 BtnBackpack 实时显示「背包 N 格」并随道具栏扩容重排；
+-- 展开态 BackpackPanel 由 Phase + Dock 管理 BackpackSlot1..N 与转入道具栏按钮生命周期；
 -- 通过共享 backpack_open / open_popup 信号与回调协同控制展开遮挡（关闭装备浮层、隐藏底部装备栏与动作键）；
 -- 关闭面板、重连或根 UI 销毁均自动零残留销毁节点与信号连接。
 
-local spoke = require("common.packages.spoke.api")
-local game_cfg = require("common.game_cfg")
-local number = require("common.number")
-local main_hud_layout = require("client.main_hud_layout")
-local view_util = require("client.views.view_util")
+local Spoke = require("common.packages.spoke.api")
+local GameCfg = require("common.game_cfg")
+local Number = require("common.number")
+local MainHudLayout = require("client.main_hud_layout")
+local ViewUtil = require("client.views.view_util")
 
-local Effect = spoke.Effect
-local State = spoke.State
+local Effect = Spoke.Effect
+local State = Spoke.State
 
-local main_hud_backpack_view = {}
+local MainHudBackpackView = {}
 
 local BUTTON_IMAGE = "official://image/11017"
 local DRAG_THRESHOLD_PX = 10
@@ -53,7 +53,7 @@ local function read_xy(pos)
     return nil
   end
   local ok, x, y = pcall(function() return pos.x, pos.y end) -- 兼容 Vector2 userdata 坐标读取，异常时视为无效
-  if ok and number.IsFiniteNumber(x) and number.IsFiniteNumber(y) then
+  if ok and Number.IsFiniteNumber(x) and Number.IsFiniteNumber(y) then
     return { x = x, y = y }
   end
   return nil
@@ -80,14 +80,14 @@ end
 
 local function default_fire_item_bar(payload)
   local ok, err = pcall(function() -- 宿主 RE 通道未就绪或调用异常时记录并安全忽略
-    local re_util = rawget(_G, "re_util") or require("common.re_util")
+    local re_util = rawget(_G, "REUtil") or require("common.re_util")
     local re = re_util and re_util:GetRE("ItemBarAction") or nil
     if re ~= nil then
       re:FireServer(payload)
     end
   end)
   if not ok then
-    print("[main_hud_backpack_view] 发送 ItemBarAction 失败", tostring(err))
+    print("[MainHudBackpackView] 发送 ItemBarAction 失败", tostring(err))
   end
 end
 
@@ -126,9 +126,9 @@ local function make_label(ctx, scope, name, x, y, w, h, text, font_size, text_co
 end
 
 local function compute_layout(resolution, state)
-  local slot_count = (type(state) == "table" and number.IsFiniteNumber(state.slotCount))
-    and state.slotCount or game_cfg.Items.ItemBarSlots
-  return main_hud_layout.Compute({
+  local slot_count = (type(state) == "table" and Number.IsFiniteNumber(state.slotCount))
+    and state.slotCount or GameCfg.Items.ItemBarSlots
+  return MainHudLayout.Compute({
     width = resolution.x,
     height = resolution.y,
     itemBarSlots = slot_count,
@@ -136,22 +136,22 @@ local function compute_layout(resolution, state)
 end
 
 local function clamp_backpack_count(state)
-  if type(state) ~= "table" or not number.IsFiniteNumber(state.backpackCount) then
+  if type(state) ~= "table" or not Number.IsFiniteNumber(state.backpackCount) then
     return 0
   end
   local n = math.floor(state.backpackCount)
-  return math.max(0, math.min(game_cfg.Items.MaxBackpackSlots, n))
+  return math.max(0, math.min(GameCfg.Items.MaxBackpackSlots, n))
 end
 
 local function item_display_name(entry)
   if type(entry) ~= "table" or entry.itemId == nil then
     return nil
   end
-  local def = game_cfg.Items.Definitions[entry.itemId]
+  local def = GameCfg.Items.Definitions[entry.itemId]
   if def == nil then
     return nil
   end
-  local prefix = game_cfg.Items.CookRate(entry) ~= nil and game_cfg.Grill.CookedPrefix or ""
+  local prefix = GameCfg.Items.CookRate(entry) ~= nil and GameCfg.Grill.CookedPrefix or ""
   return prefix .. def.Name
 end
 
@@ -159,8 +159,8 @@ local function has_free_item_bar_slot(state)
   if type(state) ~= "table" then
     return false
   end
-  local capacity = number.IsFiniteNumber(state.slotCount)
-    and math.floor(state.slotCount) or game_cfg.Items.ItemBarSlots
+  local capacity = Number.IsFiniteNumber(state.slotCount)
+    and math.floor(state.slotCount) or GameCfg.Items.ItemBarSlots
   local slots = type(state.slots) == "table" and state.slots or {}
   for i = 1, capacity do
     if slots[i] == nil then
@@ -178,23 +178,23 @@ end
 
 --- 挂载常驻背包入口按钮与展开态背包面板（Phase + Dock）。
 ---@param s table EffectBuilder
----@param ctx table root_view 上下文 { root_node, store, clock, create_node, own_node, connect }
+---@param ctx table RootView 上下文 { root_node, store, clock, create_node, own_node, connect }
 ---@param options table|nil { get_resolution?, send_action?, backpack_open?, open_popup?, on_open_changed?, resolve_drop_target?, on_drop_resolver?, layout? }
-function main_hud_backpack_view.mount(s, ctx, options)
+function MainHudBackpackView.mount(s, ctx, options)
   options = options or {}
-  local resolution = view_util.get_resolution(ctx, options)
+  local resolution = ViewUtil.get_resolution(ctx, options)
 
   local send_action = options.send_action or function(action, value)
     default_fire_item_bar({ action = action, value = value })
   end
 
-  local backpack_open = options.backpack_open or State.new("main_hud_backpack_view.backpack_open", false)
+  local backpack_open = options.backpack_open or State.new("MainHudBackpackView.backpack_open", false)
   local external_open = options.backpack_open ~= nil
   local open_popup = options.open_popup
   local on_open_changed = options.on_open_changed
   local resolve_drop_target = options.resolve_drop_target
   local on_drop_resolver = options.on_drop_resolver
-  local selected_slot = State.new("main_hud_backpack_view.selected_slot", nil)
+  local selected_slot = State.new("MainHudBackpackView.selected_slot", nil)
   local active_slot_rects = {}
 
   local layout_sig = options.layout or s:memo("BackpackLayout", function(ms)
@@ -207,7 +207,7 @@ function main_hud_backpack_view.mount(s, ctx, options)
     end
     for index, rect in pairs(active_slot_rects) do
       if math.abs(pos.x - rect.x) <= rect.hw and math.abs(pos.y - rect.y) <= rect.hh then
-        return { container = game_cfg.Items.ContainerId.Backpack, index = index }
+        return { container = GameCfg.Items.ContainerId.Backpack, index = index }
       end
     end
     return nil
@@ -285,7 +285,7 @@ function main_hud_backpack_view.mount(s, ctx, options)
     label_backpack.Visible = hud_visible
     btn_backpack.ButtonNormalColor = make_color((hud_visible and is_open) and COLORS.SELECTED or COLORS.NORMAL)
 
-    if type(state) == "table" and number.IsFiniteNumber(state.backpackCount) then
+    if type(state) == "table" and Number.IsFiniteNumber(state.backpackCount) then
       label_backpack.Text = "背包 " .. tostring(math.floor(state.backpackCount)) .. " 格"
     else
       label_backpack.Text = "背包"
@@ -403,7 +403,7 @@ function main_hud_backpack_view.mount(s, ctx, options)
         end
       end
 
-      -- 动态格位 BackpackSlot1..n：按索引键增量同步，扩容新增、缩容卸载
+      -- 动态格位 BackpackSlot1..N：按索引键增量同步，扩容新增、缩容卸载
       local seen = {}
       for index = 1, count do
         local slot_index = index
@@ -449,7 +449,7 @@ function main_hud_backpack_view.mount(s, ctx, options)
                   return
                 end
                 drag_source = {
-                  container = game_cfg.Items.ContainerId.Backpack,
+                  container = GameCfg.Items.ContainerId.Backpack,
                   index = latest.index,
                   began = read_touch_pos(touch, "BeganPosition"),
                 }
@@ -463,7 +463,7 @@ function main_hud_backpack_view.mount(s, ctx, options)
                 end
                 local latest = item_state:now()
                 if source == nil
-                  or source.container ~= game_cfg.Items.ContainerId.Backpack
+                  or source.container ~= GameCfg.Items.ContainerId.Backpack
                   or source.index ~= latest.index then
                   return
                 end
@@ -550,14 +550,14 @@ function main_hud_backpack_view.mount(s, ctx, options)
   }
 end
 
---- 返回可供 root_view.mount({ hud = { ... } }) 直接注册的 HUD spec。
-function main_hud_backpack_view.spec(options)
+--- 返回可供 RootView.mount({ hud = { ... } }) 直接注册的 HUD spec。
+function MainHudBackpackView.spec(options)
   return {
     name = "MainHudBackpack",
     mount = function(s, ctx)
-      main_hud_backpack_view.mount(s, ctx, options)
+      MainHudBackpackView.mount(s, ctx, options)
     end,
   }
 end
 
-return main_hud_backpack_view
+return MainHudBackpackView

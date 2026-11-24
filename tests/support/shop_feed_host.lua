@@ -1,8 +1,8 @@
-local game_cfg = require("common.game_cfg")
-local server_runtime = require("server.world_host.server_runtime")
-local spoke_clock = require("common.spoke_clock")
+local GameCfg = require("common.game_cfg")
+local ServerRuntime = require("server.world_host.server_runtime")
+local SpokeClock = require("common.spoke_clock")
 
-local host = {}
+local Host = {}
 
 local function signal()
   local slots = {}
@@ -28,29 +28,29 @@ local function anchor(name, position)
   }
 end
 
-function host.start(options)
+function Host.start(options)
   options = type(options) == "table" and options or {}
   local host = {
     queue = {}, values = {}, results = {}, snapshots = {}, sync_counts = {}, seq = {}, anchors = {},
     saved = {
       game = rawget(_G, "game"),
-      re_util = rawget(_G, "re_util"),
+      REUtil = rawget(_G, "REUtil"),
       reutil = package.loaded["common.re_util"],
-      debug = game_cfg.Debug,
+      debug = GameCfg.Debug,
     },
   }
-  game_cfg.Debug = { Enabled = false }
-  for index, stand in ipairs(game_cfg.Shop.Stands) do
+  GameCfg.Debug = { Enabled = false }
+  for index, stand in ipairs(GameCfg.Shop.Stands) do
     host.anchors[stand.AnchorName] = anchor(stand.AnchorName,
       options.positions and options.positions[stand.AnchorName] or { x = (index - 1) * 1000, y = 0, z = 0 })
   end
-  for index, npc in ipairs(game_cfg.Interact.Fishermen) do
+  for index, npc in ipairs(GameCfg.Interact.Fishermen) do
     for _, name in ipairs(npc.AnchorNames) do
       host.anchors[name] = anchor(name,
         options.positions and options.positions[name] or { x = 10000 + (index - 1) * 1000, y = 0, z = 0 })
     end
   end
-  host.clock = options.clock or spoke_clock.new(options.now or 100)
+  host.clock = options.clock or SpokeClock.new(options.now or 100)
   host.now = host.clock.now()
   local events = {}
   local function event(name)
@@ -74,7 +74,7 @@ function host.start(options)
     CheckRECD = function() return false end,
   }
   package.loaded["common.re_util"] = host.remote
-  _G.re_util = host.remote
+  _G.REUtil = host.remote
   _G.game = {
     GetService = function(_, name)
       if name == "Task" then
@@ -106,9 +106,9 @@ function host.start(options)
   package.loaded["server.data.player_data"] = nil
   host.save = assert(loadfile("server/save_host.lua"))()
   host.player_data = assert(loadfile("server/player_data_host.lua"))()
-  host.save.player_data = host.player_data
+  host.save.PlayerData = host.player_data
   host.player_data.Save = host.save
-  host.runtime = server_runtime.new({
+  host.runtime = ServerRuntime.new({
     clock = host.clock,
     remote = host.remote,
     on_item_bar_state = function(player, snapshot)
@@ -142,8 +142,8 @@ function host.start(options)
 
   function host:join(user_id, anchor_name, before_ready)
     local controller = {
-      Health = game_cfg.vitals.MaxHealth,
-      MaxHealth = game_cfg.vitals.MaxHealth,
+      Health = GameCfg.Vitals.MaxHealth,
+      MaxHealth = GameCfg.Vitals.MaxHealth,
       WalkSpeed = 16,
       HealthChanged = signal(),
       Died = signal(),
@@ -235,12 +235,12 @@ function host.start(options)
   function host:shutdown()
     self.runtime:shutdown()
     _G.game = self.saved.game
-    _G.re_util = self.saved.re_util
+    _G.REUtil = self.saved.REUtil
     package.loaded["common.re_util"] = self.saved.reutil
-    game_cfg.Debug = self.saved.debug
+    GameCfg.Debug = self.saved.debug
   end
 
   return host
 end
 
-return host
+return Host

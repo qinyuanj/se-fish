@@ -1,20 +1,20 @@
-local game_ui = {}
+local GameUI = {}
 local Players = game:GetService("Players")
 
-function game_ui:GetEuiManager()
+function GameUI:GetEuiManager()
     local lp = Players.LocalPlayer
     if not lp then return nil end
     return lp.PlayerGui.EuiManager
 end
 
-function game_ui:GetUIRoot()
+function GameUI:GetUIRoot()
     local euiMgr = self:GetEuiManager()
     if not euiMgr then return end
 
     return euiMgr:GetRootNode()
 end
 
-function game_ui:FindChildUINode(node, name)
+function GameUI:FindChildUINode(node, name)
     if not node or not name then return nil end
     if not node.GetChildren then return nil end
     local children = node:GetChildren()
@@ -23,14 +23,14 @@ function game_ui:FindChildUINode(node, name)
         if child and child.Name == name then
             return child
         end
-        local nested = game_ui:FindLabelChild(child, name)
+        local nested = GameUI:FindLabelChild(child, name)
         if nested then return nested end
     end
     return nil
 end
 
 
-function game_ui:ApplyText(target, text)
+function GameUI:ApplyText(target, text)
     if not target then return end
     if target.SetText then
         target:SetText(text)
@@ -39,7 +39,7 @@ function game_ui:ApplyText(target, text)
     end
 end
 
-function game_ui:ApplyTextColor(target, color)
+function GameUI:ApplyTextColor(target, color)
     if not target or color == nil then return end
     if target.SetTextColor then
         target:SetTextColor(color)
@@ -48,7 +48,7 @@ function game_ui:ApplyTextColor(target, color)
     end
 end
 
-function game_ui:ReadTextColor(target)
+function GameUI:ReadTextColor(target)
     if not target then return nil end
     if target.GetTextColor then
         return target:GetTextColor()
@@ -58,7 +58,7 @@ function game_ui:ReadTextColor(target)
     return nil
 end
 
-function game_ui:CreateSceneNode(prefabKey, attachUnit, Offset)
+function GameUI:CreateSceneNode(prefabKey, attachUnit, Offset)
     local eui = self:GetEuiManager()
     local Socket = "AttachPoint"
 
@@ -69,6 +69,6 @@ function game_ui:CreateSceneNode(prefabKey, attachUnit, Offset)
     return sceneNode
 end
 
-_G.game_ui = game_ui
+_G.GameUI = GameUI
 
-return game_ui
+return GameUI

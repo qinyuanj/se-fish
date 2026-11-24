@@ -15,8 +15,8 @@
 --
 -- 模拟边界（逐条标注在输出里）：
 --   * 业务模块用真实代码：common/game_cfg（抽鱼池 / 战斗数值 / 商店 / 兑换 / 摆渡）、
---     server/mgr/MgrFishUnit（剑鱼 / 三头鲨状态机）、common/fish_catch（抽鱼）。
---   * 引擎边界是假的：载体、vitals、RE、服务器时刻（探针按帧自增 now）。
+--     server/Mgr/MgrFishUnit（剑鱼 / 三头鲨状态机）、common/fish_catch（抽鱼）。
+--   * 引擎边界是假的：载体、Vitals、RE、服务器时刻（探针按帧自增 now）。
 --   * 高跃落点方向由替换的 math.random（固定 0）钉死为 +x，只验距离与范围。
 --   * 攻击 / 躲避窗口与真机手感未验证 [未查证]：本探针只证明招式按契约结算，不证明“正常单杀可行”。
 package.path = table.concat({ './?.lua', './?/init.lua', package.path }, ';')
@@ -28,30 +28,30 @@ local function check(name, ok, detail)
 end
 local function quantity(label, value) print(string.format('K %s = %s', label, tostring(value))) end
 
-local game_cfg = require('common.game_cfg')
-local fish_catch = require('common.fish_catch')
+local GameCfg = require('common.game_cfg')
+local FishCatch = require('common.fish_catch')
 
 -- ===== 假引擎战斗世界（tests/support/combat_world，复用 fish_escape 测试夹具）=====
-local combat_world = require('tests.support.combat_world')
+local CombatWorld = require('tests.support.combat_world')
 local combat, at, pinRandom, drop =
-    combat_world.new, combat_world.at, combat_world.pinRandom, combat_world.drop
+    CombatWorld.new, CombatWorld.at, CombatWorld.pinRandom, CombatWorld.drop
 
 -- 拆除统一走实例方法（与 blindbox_world / revive_world 同一入口名）
 local function close(env) env:tearDown() end
 
 -- ===== 1. 水区 / 抽鱼池 =====
-local waterId = game_cfg.Zones[4].WaterId
-local rows = game_cfg.Casting.Zones[waterId]
+local waterId = GameCfg.Zones[4].WaterId
+local rows = GameCfg.Casting.Zones[waterId]
 check('树林岛水区进活跃抽鱼池', rows ~= nil, waterId)
 if rows then
     local haveElite = false
     local weightsOk = true
     for _, row in ipairs(rows) do
         if row.Id == 'fish31Elite' then haveElite = true end
-        if not game_cfg.Fish[row.Id] then weightsOk = false end
+        if not GameCfg.Fish[row.Id] then weightsOk = false end
     end
     check('普通抽鱼池13行，加首领饵独立鱼种共14种且含剑鱼', #rows == 13 and haveElite
-        and game_cfg.Casting.BossBait.item123 == 'fish32Boss', #rows)
+        and GameCfg.Casting.BossBait.item123 == 'fish32Boss', #rows)
     check('抽鱼池行都指向已存在的鱼种', weightsOk)
     local function selectAll(rodLevel, baitId)
         local total = 0
@@ -59,7 +59,7 @@ if rows then
             if row.RodLevel <= rodLevel and (row.Bait == 0 or row.Bait == baitId) then total = total + row.DrawWeight end
         end
         local found = {}
-        for roll = 1, total do found[fish_catch.Select(rows, rodLevel, baitId, function() return roll end)] = true end
+        for roll = 1, total do found[FishCatch.Select(rows, rodLevel, baitId, function() return roll end)] = true end
         return found
     end
     local plain = selectAll(1, nil)
@@ -68,8 +68,8 @@ if rows then
     check('挂蚂蟥竿 1 不出竿 4 的鱼', not bait1.item52 and bait1.item49, 'item52=' .. tostring(bait1.item52))
     quantity('抽鱼池行数', #rows)
 end
-check('首领饵 item123 必出三头鲨', game_cfg.Casting.BossBait.item123 == 'fish32Boss',
-    game_cfg.Casting.BossBait.item123)
+check('首领饵 item123 必出三头鲨', GameCfg.Casting.BossBait.item123 == 'fish32Boss',
+    GameCfg.Casting.BossBait.item123)
 
 -- ===== 2. 剑鱼 =====
 do
@@ -80,7 +80,7 @@ do
     at(env, 2)
     check('剑鱼挥头起手预警、2 秒后结算 20', windup and #env.hits == 1 and env.hits[1].amount == 20,
         'windup=' .. tostring(windup) .. ' hits=' .. #env.hits)
-    quantity('剑鱼挥头伤害', game_cfg.fish_combat.swordfish.SwingDamage)
+    quantity('剑鱼挥头伤害', GameCfg.FishCombat.swordfish.SwingDamage)
     close(env)
 end
 do
@@ -97,8 +97,8 @@ do
     local d = dest and math.abs(dest.x - startX - 10) or -1
     check('剑鱼 50 秒高跃：10 米外落地 100', jumped and d < 1e-6 and #env.hits == 1 and env.hits[1].amount == 100,
         'jump=' .. tostring(jumped) .. ' hits=' .. #env.hits)
-    quantity('剑鱼高跃周期秒', game_cfg.fish_combat.swordfish.JumpIntervalSec)
-    quantity('剑鱼高跃落点米', game_cfg.fish_combat.swordfish.JumpDistance)
+    quantity('剑鱼高跃周期秒', GameCfg.FishCombat.swordfish.JumpIntervalSec)
+    quantity('剑鱼高跃落点米', GameCfg.FishCombat.swordfish.JumpDistance)
     close(env)
 end
 
@@ -128,7 +128,7 @@ do
     at(env, 1)
     check('翻滚接触同一秒槽只结算一次 25', once and #env.hits == 2,
         'first=' .. tostring(once) .. ' hits=' .. #env.hits)
-    quantity('三头鲨翻滚接触伤害', game_cfg.fish_combat.shark.RollDamage)
+    quantity('三头鲨翻滚接触伤害', GameCfg.FishCombat.shark.RollDamage)
     close(env)
 end
 do
@@ -145,7 +145,7 @@ do
     local d = dest and math.abs(dest.x - startX - 15) or -1
     check('三头鲨 20 秒高跃：15 米外落地 200', jumped and d < 1e-6 and #env.hits == 1 and env.hits[1].amount == 200,
         'jump=' .. tostring(jumped) .. ' hits=' .. #env.hits)
-    quantity('三头鲨高跃周期秒', game_cfg.fish_combat.shark.JumpIntervalSec)
+    quantity('三头鲨高跃周期秒', GameCfg.FishCombat.shark.JumpIntervalSec)
     close(env)
 end
 
@@ -166,27 +166,27 @@ do
     check('三头鲨 300 秒转逃脱', fish.State == 'escaping')
     close(env)
 end
-quantity('剑鱼逃跑时限秒', game_cfg.Fish.fish31Elite.EscapeSec)
-quantity('三头鲨逃跑时限秒', game_cfg.Fish.fish32Boss.EscapeSec)
+quantity('剑鱼逃跑时限秒', GameCfg.Fish.fish31Elite.EscapeSec)
+quantity('三头鲨逃跑时限秒', GameCfg.Fish.fish32Boss.EscapeSec)
 
 -- ===== 5. 商店 / 兑换 / 摆渡 =====
 do
     local stand
-    for _, row in ipairs(game_cfg.Shop.Stands) do
+    for _, row in ipairs(GameCfg.Shop.Stands) do
         if row.AnchorName == 'Z4_Shop' then stand = row end
     end
     check('Z4_Shop 摊位为 4 级', stand ~= nil and stand.Level == 4)
     local gear = {}
-    for _, row in ipairs(game_cfg.Shop.ListForPage(4, '钓具')) do gear[row.ItemId] = row.Price end
+    for _, row in ipairs(GameCfg.Shop.ListForPage(4, '钓具')) do gear[row.ItemId] = row.Price end
     check('四区买得到普通鱼竿 50 金、蚂蟥 4 金', gear.normalRod == 50 and gear.item116 == 4,
         'rod=' .. tostring(gear.normalRod))
-    local chain = game_cfg.Content.Exchanges[4]
-    local exchange = game_cfg.Interact.Fishermen[4].Exchange
+    local chain = GameCfg.Content.Exchanges[4]
+    local exchange = GameCfg.Interact.Fishermen[4].Exchange
     check('鱼剑换牛腿、三联鲨鱼头换沙滩岛船票',
         chain.EliteToken == 'item63' and chain.BossToken == 'item64'
         and exchange.item63 == 'item123' and exchange.item64 == 'item149')
     local route
-    for _, candidate in ipairs(game_cfg.Ferry.Routes) do
+    for _, candidate in ipairs(GameCfg.Ferry.Routes) do
         if candidate.FromZoneId == 'crabLake' and candidate.ToZoneId == 'forestIsland' then route = candidate end
     end
     check('第四区返程 90 金', route ~= nil and route.Return.Price == 90, route and route.Return.Price)

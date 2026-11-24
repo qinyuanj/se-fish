@@ -1,4 +1,4 @@
--- #162 接缝 a 取证（服务端）：摆 1 单位参照方块，量探针单位的碰撞 AABB，或清理方块。
+-- #162 接缝 A 取证（服务端）：摆 1 单位参照方块，量探针单位的碰撞 AABB，或清理方块。
 -- BasePart.Size 对自定义蒙皮网格和方块都返回 (1,1,1)，不能当尺寸；尺寸看同框方块，碰撞看本探针扫描。
 -- 参数先用一次 exec 写进 _G.SeamAMeasure，再 exec 本文件（-p server）；结果用 log grep SEAMA_MEASURE 取回。
 --   _G.SeamAMeasure = {

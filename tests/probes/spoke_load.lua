@@ -22,7 +22,7 @@ for _, n in ipairs(names) do
   if type(spoke[n]) ~= "table" then missing[#missing + 1] = n end
 end
 check("13 个公共类", #missing == 0, table.concat(missing, ","))
-check("内部类型不外露", spoke.spoke_runtime == nil and spoke.Heap == nil)
+check("内部类型不外露", spoke.SpokeRuntime == nil and spoke.Heap == nil)
 
 local State, Effect, SpokeTree = spoke.State, spoke.Effect, spoke.SpokeTree
 

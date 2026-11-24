@@ -1,16 +1,16 @@
 -- 水圈 CanQuery=true 但没有可命中几何：垂直射线只能命中鱼触发器或地板，不能依赖射线判水。
 -- 改用 (x,z) 轴对齐矩形判定，pos.y <= SurfaceY 算入水；300 次调用 0.12 ms，射线方案 6.21 ms。
--- 配置见 game_cfg.Water.Zones。HalfXZ 直接写运行时该水区的半边尺寸：运行时读到的 Size 已含
+-- 配置见 GameCfg.Water.Zones。HalfXZ 直接写运行时该水区的半边尺寸：运行时读到的 Size 已含
 -- Scale，配置时再乘缩放会翻倍（#12 W-4）。取值与溯源见 issue #25 的 M0 模块线台账（评论 9862）。
 
-local math_water_judge = {}
+local MathWaterJudge = {}
 
 local function finite(value)
     return type(value) == 'number' and value == value and math.abs(value) < math.huge
 end
 
 local function checkZone(index, zone)
-    local where = "math_water_judge.Build: 第 " .. index .. " 个水区"
+    local where = "MathWaterJudge.Build: 第 " .. index .. " 个水区"
 
     if type(zone) ~= "table" then
         error(where .. "不是 table")
@@ -40,39 +40,39 @@ local function checkZone(index, zone)
     end
 end
 
-function math_water_judge.InZone(zone, pos)
+function MathWaterJudge.InZone(zone, pos)
     local center = zone.Center
     return math.abs(pos.x - center.x) <= (zone.HalfX or zone.HalfXZ)
         and math.abs(pos.z - center.z) <= (zone.HalfZ or zone.HalfXZ)
         and pos.y <= zone.SurfaceY
 end
 
-function math_water_judge.HitZone(zones, pos)
+function MathWaterJudge.HitZone(zones, pos)
     for i = 1, #zones do
-        if math_water_judge.InZone(zones[i], pos) then
+        if MathWaterJudge.InZone(zones[i], pos) then
             return zones[i]
         end
     end
     return nil
 end
 
-function math_water_judge.Build(zones)
+function MathWaterJudge.Build(zones)
     if type(zones) ~= "table" or #zones == 0 then
-        error("math_water_judge.Build: 水区配置为空")
+        error("MathWaterJudge.Build: 水区配置为空")
     end
     local ids = {}
     for i = 1, #zones do
         checkZone(i, zones[i])
-        if ids[zones[i].Id] then error('math_water_judge.Build: 重复水域 ' .. zones[i].Id) end
+        if ids[zones[i].Id] then error('MathWaterJudge.Build: 重复水域 ' .. zones[i].Id) end
         ids[zones[i].Id] = true
     end
 
     return function(pos)
-        return math_water_judge.HitZone(zones, pos)
+        return MathWaterJudge.HitZone(zones, pos)
     end
 end
 
-function math_water_judge.Toward(zones, pos)
+function MathWaterJudge.Toward(zones, pos)
     local best, bestX, bestZ
     for _, zone in ipairs(zones) do
         local halfX, halfZ = zone.HalfX or zone.HalfXZ, zone.HalfZ or zone.HalfXZ
@@ -87,7 +87,7 @@ function math_water_judge.Toward(zones, pos)
     return bestX / length, bestZ / length
 end
 
-function math_water_judge.InspectScene(zones, snapshot)
+function MathWaterJudge.InspectScene(zones, snapshot)
     local byName = {}
     for _, entity in ipairs(snapshot) do
         local matches = byName[entity.Name] or {}
@@ -127,4 +127,4 @@ function math_water_judge.InspectScene(zones, snapshot)
     return report
 end
 
-return math_water_judge
+return MathWaterJudge

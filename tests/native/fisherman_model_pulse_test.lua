@@ -1,8 +1,8 @@
-local game_cfg = require("common.game_cfg")
-local client_store = require("client.store.client_store")
-local root_view = require("client.views.root_view")
-local fisherman_view = require("client.views.fisherman_view")
-local eui = require("tests.support.eui_double")
+local GameCfg = require("common.game_cfg")
+local ClientStore = require("client.store.client_store")
+local RootView = require("client.views.root_view")
+local FishermanView = require("client.views.fisherman_view")
+local Eui = require("tests.support.eui_double")
 
 local function model(scale) return { Scale = { x = scale, y = scale, z = scale } } end
 local function base(scale) return { x = scale, y = scale, z = scale } end
@@ -16,25 +16,25 @@ describe("钓鱼佬模型按区脉冲", function()
   after_each(function() _G.Vector3 = old_vector end)
 
   local function mount(models)
-    local store, writer = client_store.new({ initial_now = 1000 })
+    local store, writer = ClientStore.new({ initial_now = 1000 })
     local shared, sent = {}, {}
     local anchors = {}
-    for index, npc in ipairs(game_cfg.Interact.Fishermen) do
+    for index, npc in ipairs(GameCfg.Interact.Fishermen) do
       anchors[#anchors + 1] = {
         npc = npc, name = npc.AnchorNames[1], index = index,
         position = { x = 0, y = 0, z = 0 },
       }
     end
-    local root = eui.Node({ Name = "UIRoot" })
-    root_view.mount(root, store, {
-      hud = { fisherman_view.presentation_spec({ shared = shared, models = models }) },
-      docks = { fisherman = fisherman_view.bubble_spec({ shared = shared, anchors = anchors }) },
+    local root = Eui.Node({ Name = "UIRoot" })
+    RootView.mount(root, store, {
+      hud = { FishermanView.presentation_spec({ shared = shared, models = models }) },
+      docks = { fisherman = FishermanView.bubble_spec({ shared = shared, anchors = anchors }) },
       services = {
         send_interact = function(payload) sent[#sent + 1] = payload end,
         next_seq = function() return #sent + 1 end,
       },
       create_node = function(kind, props)
-        return eui.Node({
+        return Eui.Node({
           Kind = kind, Name = props and props.Name, Parent = props and props.Parent,
           Text = props and (props.Text or props.ButtonText) or "",
           TouchEnabled = kind == "EUIButton",
@@ -43,9 +43,9 @@ describe("钓鱼佬模型按区脉冲", function()
     })
     writer:update_spatial({ x = 0, y = 0, z = 0 }, {})
     local function feed(index)
-      local name = game_cfg.Interact.Fishermen[index].AnchorNames[1]
+      local name = GameCfg.Interact.Fishermen[index].AnchorNames[1]
       local button = root:FindFirstChild("BtnFishermanFeed" .. index .. "_" .. name, true)
-      assert.is_true(eui.Click(button))
+      assert.is_true(Eui.Click(button))
       writer:ingest_event("InteractResult", { ok = true, action = "Feed", coins = 1 })
     end
     return root, writer, sent, feed
@@ -59,7 +59,7 @@ describe("钓鱼佬模型按区脉冲", function()
 
   it("每区一个模型名，01 沿用 FishermanModel，名字互不重复", function()
     local names = {}
-    for index, npc in ipairs(game_cfg.Interact.Fishermen) do names[index] = npc.ModelName end
+    for index, npc in ipairs(GameCfg.Interact.Fishermen) do names[index] = npc.ModelName end
     assert.same({ "FishermanModel", "Z2_FishermanModel", "Z3_FishermanModel", "Z4_FishermanModel",
       "Z5_FishermanModel", "Z6_FishermanModel", "Z7_FishermanModel" }, names)
   end)

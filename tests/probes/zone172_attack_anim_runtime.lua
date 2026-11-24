@@ -8,20 +8,20 @@ local WEAPON = 'unarmed'
 -- PHASE：'hold' 只换手持（换武器模型本身会改画面）、'fire' 只出手、'both' 两步连做；截连帧取证时先 hold 再 fire
 local PHASE = 'both'
 local MARK = 'AAR172'
-local game_cfg = require('common.game_cfg')
-local server_runtime = require('server.world_host.server_runtime')
-local player_data_host = require('server.player_data_host')
-local re_util = require('common.re_util')
-local runtime = assert(server_runtime.current(), MARK .. ': server_runtime 未启动')
-local life = assert(runtime.life, MARK .. ': server_runtime.life 不可用')
+local GameCfg = require('common.game_cfg')
+local ServerRuntime = require('server.world_host.server_runtime')
+local PlayerDataHost = require('server.player_data_host')
+local REUtil = require('common.re_util')
+local runtime = assert(ServerRuntime.current(), MARK .. ': ServerRuntime 未启动')
+local life = assert(runtime.life, MARK .. ': ServerRuntime.life 不可用')
 local player = game:GetService('Players'):GetPlayers()[1]
 assert(player and player.Character, MARK .. ': 没有玩家角色')
-local data = assert(player_data_host:GetDataInst(player), MARK .. ': 存档未就绪')
-local ability = game_cfg.Ability
+local data = assert(PlayerDataHost:GetDataInst(player), MARK .. ': 存档未就绪')
+local ability = GameCfg.Ability
 local anim
 if PHASE ~= 'fire' and WEAPON ~= 'throw' then
   -- HoldWeapon 对已握的同一把再调会收起：空手时借此收起；武器已握时跳过。
-  -- 空手不调 HoldWeapon(nil)：player_data isWeapon 对非字符串参数会索引 false 报错（2026-11-04 试玩实测）。
+  -- 空手不调 HoldWeapon(nil)：PlayerData isWeapon 对非字符串参数会索引 false 报错（2026-11-04 试玩实测）。
   local held = data.Extra.inventory.selection.held
   if WEAPON == 'unarmed' then
     if held.kind == 'weapon' then data:HoldWeapon(held.id) end
@@ -29,12 +29,12 @@ if PHASE ~= 'fire' and WEAPON ~= 'throw' then
     data:GrantWeapon(WEAPON, 1)
     data:HoldWeapon(WEAPON)
   end
-  player_data_host:SyncPlayerTree(player, true)
+  PlayerDataHost:SyncPlayerTree(player, true)
   print(MARK .. '|' .. WEAPON .. '|held=' .. tostring(held.id))
 end
 if PHASE == 'hold' then return end
 local function captureWeaponAction(payload)
-  local event = re_util:GetRE('WeaponResult')
+  local event = REUtil:GetRE('WeaponResult')
   local original = event and event.FireClient
   local reply
   if event and original then
@@ -50,8 +50,8 @@ local function captureWeaponAction(payload)
 end
 if WEAPON == 'throw' then
   anim = ability.Throw.Anim
-  local barId = game_cfg.Items.ContainerId.ItemBar
-  local bar = data.data.Containers[barId]
+  local barId = GameCfg.Items.ContainerId.ItemBar
+  local bar = data.Data.Containers[barId]
   local slot
   for s = 1, data:ItemBarCapacity() do
     local e = bar[s]
@@ -64,10 +64,10 @@ if WEAPON == 'throw' then
       if e and e.itemId == 'item143' and e.count > 0 then slot = s break end
     end
     if not slot then
-      local bp = data.data.Containers[game_cfg.Items.ContainerId.Backpack]
+      local bp = data.Data.Containers[GameCfg.Items.ContainerId.Backpack]
       for i = 1, data:BackpackCapacity() do
         if bp[i] and bp[i].itemId == 'item143' and bp[i].count > 0 then
-          data:MoveSlot(game_cfg.Items.ContainerId.Backpack, i, barId, 1)
+          data:MoveSlot(GameCfg.Items.ContainerId.Backpack, i, barId, 1)
           slot = 1
           break
         end
@@ -75,8 +75,8 @@ if WEAPON == 'throw' then
     end
   end
   assert(slot, MARK .. ': 无法把 item143 放入道具栏')
-  if data.data.SelectedSlot ~= slot then data:SelectSlot(slot) end
-  player_data_host:SyncPlayerTree(player, true)
+  if data.Data.SelectedSlot ~= slot then data:SelectSlot(slot) end
+  PlayerDataHost:SyncPlayerTree(player, true)
   _G.AAR172Seq = (_G.AAR172Seq or 0) + 1
   local accepted, reply = captureWeaponAction({ action = 'throw', slot = slot, seq = _G.AAR172Seq })
   print(MARK .. '|' .. WEAPON .. '|launch accepted=' .. tostring(accepted)

@@ -1,8 +1,8 @@
 
-local game_cfg = require("common.game_cfg")
-local server_runtime = require("server.world_host.server_runtime")
-local spoke_clock = require("common.spoke_clock")
-local spoke_runtime = require("common.packages.spoke.runtime.spoke_runtime")
+local GameCfg = require("common.game_cfg")
+local ServerRuntime = require("server.world_host.server_runtime")
+local SpokeClock = require("common.spoke_clock")
+local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
 
 local ZONE_ID = "fishPond"
 local BAIT_ID = "worm"
@@ -65,7 +65,7 @@ local function host(opts)
   end
 
   local now = opts.now or 1000
-  local clock = spoke_clock.new(now)
+  local clock = SpokeClock.new(now)
   local players = {}
   local data_of = {}
   local events = {}
@@ -83,8 +83,8 @@ local function host(opts)
     return events[name]
   end
 
-  local player_data = require("server.data.player_data")
-  local runtime = server_runtime.new({
+  local PlayerData = require("server.data.player_data")
+  local runtime = ServerRuntime.new({
     clock = clock,
     initial_now = now,
     remote = {
@@ -108,7 +108,7 @@ local function host(opts)
   }
 
   function api:add(player, data)
-    data = data or player_data.New(player)
+    data = data or PlayerData.New(player)
     if not data.Inited then data:Init() end
     data.LoadState = "ready"
     data.Player = player
@@ -174,19 +174,19 @@ describe("钓鱼区地面物品与鱼饵刷新（#301 服务端宿主）", funct
   local saved_loot, saved_spots, saved_debug
 
   before_each(function()
-    saved_loot = game_cfg.Loot
-    saved_spots = game_cfg.BaitSpots
-    saved_debug = game_cfg.Debug
+    saved_loot = GameCfg.Loot
+    saved_spots = GameCfg.BaitSpots
+    saved_debug = GameCfg.Debug
     local loot = {}
     for k, v in pairs(saved_loot) do loot[k] = v end
-    game_cfg.Loot = loot
-    game_cfg.Debug = { Enabled = false, InitialGrants = saved_debug and saved_debug.InitialGrants }
+    GameCfg.Loot = loot
+    GameCfg.Debug = { Enabled = false, InitialGrants = saved_debug and saved_debug.InitialGrants }
   end)
 
   after_each(function()
-    game_cfg.Loot = saved_loot
-    game_cfg.BaitSpots = saved_spots
-    game_cfg.Debug = saved_debug
+    GameCfg.Loot = saved_loot
+    GameCfg.BaitSpots = saved_spots
+    GameCfg.Debug = saved_debug
   end)
 
   it("单区超过 200 件时最早的一件进入 30 秒闪烁并到期销毁", function()
@@ -200,31 +200,31 @@ describe("钓鱼区地面物品与鱼饵刷新（#301 服务端宿主）", funct
 
     local world = env.runtime:get_world()
     assert.is_not_nil(world.place_ground_item)
-    for i = 1, game_cfg.Loot.PerZoneCap do
+    for i = 1, GameCfg.Loot.PerZoneCap do
       local ok = world:place_ground_item(ZONE_ID, {
         kind = "item", itemId = ITEM_ID, count = 1, x = i, y = 0, z = 0,
       })
       assert.is_true(ok)
     end
-    assert.equals(game_cfg.Loot.PerZoneCap, count_rows(env:loot_state(), ZONE_ID))
-    assert.equals(game_cfg.Loot.PerZoneCap, env:alive_units())
+    assert.equals(GameCfg.Loot.PerZoneCap, count_rows(env:loot_state(), ZONE_ID))
+    assert.equals(GameCfg.Loot.PerZoneCap, env:alive_units())
 
     assert.is_true(world:place_ground_item(ZONE_ID, {
       kind = "item", itemId = ITEM_ID, count = 1, x = 999, y = 0, z = 0,
     }))
     local flashing = env:loot_state()
-    assert.equals(game_cfg.Loot.PerZoneCap + 1, count_rows(flashing, ZONE_ID))
+    assert.equals(GameCfg.Loot.PerZoneCap + 1, count_rows(flashing, ZONE_ID))
     local warned = 0
     for _, row in pairs(flashing.list or flashing) do
       if type(row) == "table" and row.warn == true then warned = warned + 1 end
     end
     assert.equals(1, warned)
 
-    env:advance(game_cfg.Loot.FlashBeforeRecycleSec - 1)
-    assert.equals(game_cfg.Loot.PerZoneCap + 1, env:alive_units())
+    env:advance(GameCfg.Loot.FlashBeforeRecycleSec - 1)
+    assert.equals(GameCfg.Loot.PerZoneCap + 1, env:alive_units())
     env:advance(1)
-    assert.equals(game_cfg.Loot.PerZoneCap, env:alive_units())
-    assert.equals(game_cfg.Loot.PerZoneCap, count_rows(env:loot_state(), ZONE_ID))
+    assert.equals(GameCfg.Loot.PerZoneCap, env:alive_units())
+    assert.equals(GameCfg.Loot.PerZoneCap, count_rows(env:loot_state(), ZONE_ID))
     env:shutdown()
     assert.equals(0, env:alive_units())
   end)
@@ -291,8 +291,8 @@ describe("钓鱼区地面物品与鱼饵刷新（#301 服务端宿主）", funct
     assert.equals(0, #(data:GetItemBarSnapshot().slots))
 
     tree.states.life_phase:set("alive")
-    local bar = game_cfg.Items.ContainerId.ItemBar
-    local pack = game_cfg.Items.ContainerId.Backpack
+    local bar = GameCfg.Items.ContainerId.ItemBar
+    local pack = GameCfg.Items.ContainerId.Backpack
     local full_bar, full_pack = {}, {}
     for i = 1, data:ItemBarCapacity() do
       full_bar[i] = { itemId = ITEM_ID, count = 1, containerId = bar }
@@ -347,15 +347,15 @@ describe("钓鱼区地面物品与鱼饵刷新（#301 服务端宿主）", funct
     local loot_before = #env.events.LootState.clients
     local bar_before = #(env.events.ItemBarState and env.events.ItemBarState.clients or {})
     local batches = 0
-    local original = spoke_runtime.batch
-    spoke_runtime.batch = function(fn)
+    local original = SpokeRuntime.batch
+    SpokeRuntime.batch = function(fn)
       batches = batches + 1
       return original(fn)
     end
     local ok_call, err_call = pcall(function()
       fire_pickup(env, player, loot_id)
     end)
-    spoke_runtime.batch = original
+    SpokeRuntime.batch = original
     assert.is_true(ok_call, tostring(err_call))
     assert.is_true(batches >= 1)
     assert.equals(0, env:alive_units())
@@ -368,17 +368,17 @@ describe("钓鱼区地面物品与鱼饵刷新（#301 服务端宿主）", funct
     assert.is_true(#env.events.LootState.clients >= loot_before)
     assert.is_true(#(env.events.ItemBarState and env.events.ItemBarState.clients or {}) >= bar_before)
 
-    local bar = game_cfg.Items.ContainerId.ItemBar
+    local bar = GameCfg.Items.ContainerId.ItemBar
     loot_before = #env.events.LootState.clients
     batches = 0
-    spoke_runtime.batch = function(fn)
+    SpokeRuntime.batch = function(fn)
       batches = batches + 1
       return original(fn)
     end
     ok_call, err_call = pcall(function()
       fire_drop(env, player, { action = "Drop", container = bar, index = 1 })
     end)
-    spoke_runtime.batch = original
+    SpokeRuntime.batch = original
     assert.is_true(ok_call, tostring(err_call))
     assert.is_true(batches >= 1)
     assert.equals(1, env:alive_units())
@@ -396,7 +396,7 @@ describe("钓鱼区地面物品与鱼饵刷新（#301 服务端宿主）", funct
     assert.is_nil(row and row._unused)
   end)
 
-  it("shared_world_tree 销毁后 RequestLoot 与 ItemBarAction 连接全部断开", function()
+  it("SharedWorldTree 销毁后 RequestLoot 与 ItemBarAction 连接全部断开", function()
     local env = host()
     local player = make_player(10, 0, 0)
     env:add(player)

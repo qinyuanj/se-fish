@@ -1,4 +1,4 @@
-local game_cfg = require('common.game_cfg')
+local GameCfg = require('common.game_cfg')
 
 local LotteryDraw = {}
 
@@ -7,7 +7,7 @@ local function rngOf(rng)
 end
 
 local function patterns()
-    return game_cfg.Lottery.Patterns
+    return GameCfg.Lottery.Patterns
 end
 
 function LotteryDraw.RollAxis(rng)

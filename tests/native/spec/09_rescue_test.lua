@@ -5,14 +5,14 @@
 -- 失败方式（先列后写）：
 --   1. 超距请求仍发起抢救、目标不是濒死也能救（9-17）；
 --   2. 恢复量用了全局上限而不是被救者的成长上限（9-18、11-36）；
---   3. 绕过 vitals 的统一 Rescue / ApplyRevive 直接改血量（9-03）；
+--   3. 绕过 Vitals 的统一 Rescue / ApplyRevive 直接改血量（9-03）；
 --   4. 同 seq 重放、两个施救者并发、重连后旧请求重放产生第二次恢复（9-05）；
 --   5. 濒死还掉血、致命伤害直接死亡（11-01、11-03、11-34）；
 --   6. 呼救不发给附近玩家（11-06）；
 --   7. 濒死断线重连仍继续濒死计时，或多结算一次复活（11-35）；
 --   8. 抢救按钮创建失败后泄漏已创建的气泡根节点。
 local function vec(x, y, z) return { x = x, y = y, z = z } end
-local game_cfg = require('common.game_cfg')
+local GameCfg = require('common.game_cfg')
 
 local function signal()
   local slots = {}
@@ -23,7 +23,7 @@ local function signal()
 end
 
 local function newPlayer(userId, x)
-  local controller = { Health = game_cfg.vitals.MaxHealth, MaxHealth = game_cfg.vitals.MaxHealth,
+  local controller = { Health = GameCfg.Vitals.MaxHealth, MaxHealth = GameCfg.Vitals.MaxHealth,
     WalkSpeed = 10, HealthChanged = signal(), Died = signal(), OnReborn = signal() }
   function controller:TakeDamage(amount)
     self.Health = math.max(0, self.Health - amount)
@@ -73,7 +73,7 @@ describe('条款 9/11 他人抢救', function()
   end
 
   local function down(player)
-    env.v:ApplyHit(env.v:NewHit(nil, 'fishAttack'), player, game_cfg.vitals.MaxHealth + 10)
+    env.v:ApplyHit(env.v:NewHit(nil, 'fishAttack'), player, GameCfg.Vitals.MaxHealth + 10)
     assert.same('downed', env.s:Phase(player))
   end
 
@@ -84,12 +84,12 @@ describe('条款 9/11 他人抢救', function()
   end
 
   before_each(function()
-    env = { cfg = game_cfg, now = 100, queue = {}, sent = {}, re = {}, values = {} }
+    env = { cfg = GameCfg, now = 100, queue = {}, sent = {}, re = {}, values = {} }
     env.cfg.Debug = { Enabled = false }
     env.cfg.Save.QaSlot = ''
     env.saved = { game = rawget(_G, 'game'), Vector3 = rawget(_G, 'Vector3'),
       Vector2 = rawget(_G, 'Vector2'), Color = rawget(_G, 'Color'),
-      re_util = rawget(_G, 're_util'), reutil = package.loaded['common.re_util'] }
+      REUtil = rawget(_G, 'REUtil'), reutil = package.loaded['common.re_util'] }
     _G.Vector3 = { New = vec }
     _G.Vector2 = { New = function(x, y) return { x = x, y = y } end }
     _G.Color = { New = function(...) return { ... } end }
@@ -146,13 +146,13 @@ describe('条款 9/11 他人抢救', function()
     end
     local re = { GetRE = function(_, name) return reStub(name) end, CheckRECD = function() return false end }
     package.loaded['common.re_util'] = re
-    _G.re_util = re
+    _G.REUtil = re
 
     package.loaded['server.data.player_data'] = nil
-    env.player_data = require('server.data.player_data')
+    env.PlayerData = require('server.data.player_data')
     env.save = assert(loadfile('server/save_host.lua'))()
     env.players = assert(loadfile('server/player_data_host.lua'))()
-    env.players.Save, env.save.player_data = env.save, env.players
+    env.players.Save, env.save.PlayerData = env.save, env.players
     env.lifeHost = require('tests.support.life_host').start({
       now = env.now or 100, remote = re, player_data = env.players, save = env.save,
       bind_interact_action = function(dispatch)
@@ -171,7 +171,7 @@ describe('条款 9/11 他人抢救', function()
     _G.Vector3 = env.saved.Vector3
     _G.Vector2 = env.saved.Vector2
     _G.Color = env.saved.Color
-    _G.re_util = env.saved.re_util
+    _G.REUtil = env.saved.REUtil
     package.loaded['common.re_util'] = env.saved.reutil
     env = nil
   end)
@@ -198,7 +198,7 @@ describe('条款 9/11 他人抢救', function()
     request(rescuer, { target = 'downedPlayer', action = 'Rescue', targetUserId = downed.UserId, seq = 2 })
     assert.same('busy', lastReply('InteractResult').payload.reason, '抢救中重复点击回 busy')
 
-    advance(game_cfg.Rescue.DurationSec + 0.1)
+    advance(GameCfg.Rescue.DurationSec + 0.1)
     assert.same('alive', env.s:Phase(downed))
     request(join(7005, 1), { target = 'downedPlayer', action = 'Rescue', targetUserId = downed.UserId, seq = 1 })
     assert.is_false(lastReply('InteractResult').payload.ok, '已恢复的目标不能再次被救')
@@ -210,13 +210,13 @@ describe('条款 9/11 他人抢救', function()
     local rescuer = join(7082, 1)
     down(downed)
     -- 把抢救时长拉长到濒死倒计时之后：抢救还没结束，濒死倒计时先到点。
-    local savedDuration = game_cfg.Rescue.DurationSec
-    game_cfg.Rescue.DurationSec = game_cfg.Survival.DownedSec + 5
+    local savedDuration = GameCfg.Rescue.DurationSec
+    GameCfg.Rescue.DurationSec = GameCfg.Survival.DownedSec + 5
     request(rescuer, { target = 'downedPlayer', action = 'Rescue', targetUserId = downed.UserId, seq = 1 })
-    game_cfg.Rescue.DurationSec = savedDuration
+    GameCfg.Rescue.DurationSec = savedDuration
     assert.same('rescuing', env.s:Phase(downed), '抢救先开始')
     local before = #(env.sent.SurvivalState or {})
-    advance(game_cfg.Survival.DownedSec + 0.1)
+    advance(GameCfg.Survival.DownedSec + 0.1)
     local phases = {}
     for index = before + 1, #(env.sent.SurvivalState or {}) do
       phases[#phases + 1] = env.sent.SurvivalState[index].payload.phase
@@ -227,23 +227,23 @@ describe('条款 9/11 他人抢救', function()
 
   -- 9-18 / 11-36：恢复量取被救者的成长上限 10%，夹在上限内。
   it('9-18 11-36 抢救恢复被救者血量上限的 10% 且不超上限', function()
-    assert.same(10, game_cfg.Survival.ReviveHealthPercent)
+    assert.same(10, GameCfg.Survival.ReviveHealthPercent)
     local downed = join(7011, 0)
     local rescuer = join(7012, 1)
     env.lifeHost.runtime._max_health_of = function(player)
       if player == downed then return 900 end
-      return game_cfg.vitals.MaxHealth
+      return GameCfg.Vitals.MaxHealth
     end
     down(downed)
     request(rescuer, { target = 'downedPlayer', action = 'Rescue', targetUserId = downed.UserId, seq = 1 })
-    advance(game_cfg.Rescue.DurationSec + 0.1)
+    advance(GameCfg.Rescue.DurationSec + 0.1)
     assert.same(90, downed.Character.Controller.Health, '900 上限的 10% 是 90')
     assert.is_true(downed.Character.Controller.Health <= downed.Character.Controller.MaxHealth)
     local _, maxHealth = env.v:SnapshotHealth(downed)
     assert.same(900, maxHealth)
   end)
 
-  -- 9-03：血量只能经 vitals 的统一 Rescue 接缝落地；接缝被拒时不产生任何血量写入。
+  -- 9-03：血量只能经 Vitals 的统一 Rescue 接缝落地；接缝被拒时不产生任何血量写入。
   it('9-03 抢救只经统一状态转换接口改血量', function()
     local downed = join(7021, 0)
     local rescuer = join(7022, 1)
@@ -251,14 +251,14 @@ describe('条款 9/11 他人抢救', function()
     request(rescuer, { target = 'downedPlayer', action = 'Rescue', targetUserId = downed.UserId, seq = 1 })
     assert.same('rescuing', env.s:Phase(downed), '抢救已经开始')
     assert.is_true(env.v:CancelRescue(env.v:GetState(downed)), '取消走统一接口')
-    advance(game_cfg.Rescue.DurationSec + 0.1)
+    advance(GameCfg.Rescue.DurationSec + 0.1)
     assert.same('downed', env.s:Phase(downed), '取消后不再结算')
     assert.same(1, downed.Character.Controller.Health, '取消的抢救不写血量')
 
     request(rescuer, { target = 'downedPlayer', action = 'Rescue', targetUserId = downed.UserId, seq = 2 })
-    advance(game_cfg.Rescue.DurationSec + 0.1)
+    advance(GameCfg.Rescue.DurationSec + 0.1)
     assert.same('alive', env.s:Phase(downed))
-    assert.same(math.floor(game_cfg.vitals.MaxHealth * game_cfg.Survival.ReviveHealthPercent / 100),
+    assert.same(math.floor(GameCfg.Vitals.MaxHealth * GameCfg.Survival.ReviveHealthPercent / 100),
       downed.Character.Controller.Health, '放行后只恢复一次')
   end)
 
@@ -271,8 +271,8 @@ describe('条款 9/11 他人抢救', function()
     request(rescuer, { target = 'downedPlayer', action = 'Rescue', targetUserId = downed.UserId, seq = 1 })
     request(rescuer, { target = 'downedPlayer', action = 'Rescue', targetUserId = downed.UserId, seq = 1 })
     request(rival, { target = 'downedPlayer', action = 'Rescue', targetUserId = downed.UserId, seq = 1 })
-    advance(game_cfg.Rescue.DurationSec + 0.1)
-    local expected = math.floor(game_cfg.vitals.MaxHealth * game_cfg.Survival.ReviveHealthPercent / 100)
+    advance(GameCfg.Rescue.DurationSec + 0.1)
+    local expected = math.floor(GameCfg.Vitals.MaxHealth * GameCfg.Survival.ReviveHealthPercent / 100)
     assert.same('alive', env.s:Phase(downed), '抢救结算一次')
     assert.same(expected, downed.Character.Controller.Health, '重复与并发请求只恢复一次')
 
@@ -281,7 +281,7 @@ describe('条款 9/11 他人抢救', function()
     drain()
     local reconnected = join(7032, 1)
     request(reconnected, { target = 'downedPlayer', action = 'Rescue', targetUserId = downed.UserId, seq = 1 })
-    advance(game_cfg.Rescue.DurationSec + 0.1)
+    advance(GameCfg.Rescue.DurationSec + 0.1)
     assert.same(expected, downed.Character.Controller.Health, '重连重放同一请求不产生第二次恢复')
     assert.same('alive', env.s:Phase(downed))
   end)
@@ -305,9 +305,9 @@ describe('条款 9/11 他人抢救', function()
     local back = join(7072, 1)
     request(back, { target = 'downedPlayer', action = 'Rescue', targetUserId = downed.UserId, seq = 2,
       operation = operation })
-    advance(game_cfg.Rescue.DurationSec + 0.1)
+    advance(GameCfg.Rescue.DurationSec + 0.1)
     assert.same('alive', env.s:Phase(downed), '抢救仍然结算一次')
-    assert.same(math.floor(game_cfg.vitals.MaxHealth * game_cfg.Survival.ReviveHealthPercent / 100),
+    assert.same(math.floor(GameCfg.Vitals.MaxHealth * GameCfg.Survival.ReviveHealthPercent / 100),
       downed.Character.Controller.Health, '只恢复一次 10%')
   end)
 
@@ -315,12 +315,12 @@ describe('条款 9/11 他人抢救', function()
   it('11-01 11-03 11-34 致命伤害锁一血濒死，濒死期间不再扣血', function()
     local downed = join(7041, 0)
     local attacker = join(7042, 1)
-    env.v:ApplyHit(env.v:NewHit(attacker, 'fishAttack'), downed, game_cfg.vitals.MaxHealth + 10)
+    env.v:ApplyHit(env.v:NewHit(attacker, 'fishAttack'), downed, GameCfg.Vitals.MaxHealth + 10)
     assert.same('downed', env.s:Phase(downed))
     assert.same(1, downed.Character.Controller.Health, '濒死锁 1 血而不是直接死亡')
     env.v:ApplyDamage(downed, 50, env.v:NewHit(attacker, 'fishAttack'))
     env.v:ApplyDamage(downed, 50, env.v:NewHit(nil, 'hunger'))
-    advance(game_cfg.Survival.DownedSec - 1)
+    advance(GameCfg.Survival.DownedSec - 1)
     assert.same(1, downed.Character.Controller.Health, '其它伤害来源不补算濒死期伤害')
   end)
 
@@ -328,7 +328,7 @@ describe('条款 9/11 他人抢救', function()
   it('11-06 濒死呼救发给附近玩家', function()
     local downed = join(7051, 0)
     join(7052, 5)
-    local far = join(7053, game_cfg.Survival.HelpRadius + 1)
+    local far = join(7053, GameCfg.Survival.HelpRadius + 1)
     down(downed)
     assert.same('downed', downed:GetAttribute('SurvivalPhase'), '相位属性供其他玩家的交互气泡读取')
     local helpCount = #(env.sent.SurvivalHelp or {})
@@ -357,9 +357,9 @@ describe('条款 9/11 他人抢救', function()
     drain()
     env.lifeHost:add(back, env.players:GetDataInst(back))
     drain()
-    advance(game_cfg.Survival.DeadSec + game_cfg.Survival.DownedSec + 5)
+    advance(GameCfg.Survival.DeadSec + GameCfg.Survival.DownedSec + 5)
     assert.same('alive', env.s:Phase(back))
-    assert.same(math.floor(game_cfg.vitals.MaxHealth * game_cfg.Survival.ReviveHealthPercent / 100),
+    assert.same(math.floor(GameCfg.Vitals.MaxHealth * GameCfg.Survival.ReviveHealthPercent / 100),
       back.Character.Controller.Health)
   end)
 end)

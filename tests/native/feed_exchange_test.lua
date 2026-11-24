@@ -10,8 +10,8 @@
 --   4. 扣除与发放不同步：信物扣了产物没发，或发了产物信物还在；金币被兑换改动；
 --   5. 拒绝时缺提示（reason 不是 'full'），或成功回包缺兑换双方，客户端无法给兑换提示；
 --   6. 兑换成功不播吃动作、不推送库存；未选中的信物被误当兑换物。
-local game_cfg = require('common.game_cfg')
-local host = require('tests.support.shop_feed_host')
+local GameCfg = require('common.game_cfg')
+local Host = require('tests.support.shop_feed_host')
 
 describe("喂钓鱼佬的信物兑换", function()
     local ctx
@@ -19,11 +19,11 @@ describe("喂钓鱼佬的信物兑换", function()
     -- 与旧 LuaUnit 的每例 setUp/tearDown 同级成对。
     before_each(function()
         ctx = { seq = 0 }
-        ctx.cfg = game_cfg
-        ctx.host = host.start()
-        ctx.player, ctx.data = ctx.host:join(1, game_cfg.Interact.Fishermen[1].AnchorNames[1])
+        ctx.cfg = GameCfg
+        ctx.host = Host.start()
+        ctx.player, ctx.data = ctx.host:join(1, GameCfg.Interact.Fishermen[1].AnchorNames[1])
         ctx.replies = ctx.host.results[1].InteractResult
-        ctx.anchor = ctx.host.anchors[game_cfg.Interact.Fishermen[1].AnchorNames[1]]
+        ctx.anchor = ctx.host.anchors[GameCfg.Interact.Fishermen[1].AnchorNames[1]]
         ctx.anchor.plays = {}
         ctx.plays = ctx.anchor.plays
     end)
@@ -42,11 +42,11 @@ describe("喂钓鱼佬的信物兑换", function()
     -- 放入物品并返回它实际落在的容器与下标。
     local function give(itemId)
         assert.is_true(ctx.data:AddItem(itemId))
-        local bar = ctx.data.data.Containers.itemBar
+        local bar = ctx.data.Data.Containers.itemBar
         for index = 1, ctx.data:ItemBarCapacity() do
             if bar[index] and bar[index].itemId == itemId then return index, 'itemBar' end
         end
-        local backpack = ctx.data.data.Containers.backpack
+        local backpack = ctx.data.Data.Containers.backpack
         for index = 1, ctx.data:BackpackCapacity() do
             if backpack[index] and backpack[index].itemId == itemId then return index, 'backpack' end
         end
@@ -54,7 +54,7 @@ describe("喂钓鱼佬的信物兑换", function()
 
     local function countItem(itemId)
         local total = 0
-        for _, container in pairs(ctx.data.data.Containers) do
+        for _, container in pairs(ctx.data.Data.Containers) do
             for _, entry in pairs(container) do
                 if entry.itemId == itemId then total = total + entry.count end
             end
@@ -64,7 +64,7 @@ describe("喂钓鱼佬的信物兑换", function()
 
     -- 把道具栏与背包除 keepSlot 外全部填满（用无兑换关系的普通鱼获）
     local function fillExcept(keepSlot)
-        local bar = ctx.data.data.Containers.itemBar
+        local bar = ctx.data.Data.Containers.itemBar
         for index = 1, ctx.data:ItemBarCapacity() do
             if index ~= keepSlot and (not bar[index] or bar[index].count <= 0) then
                 assert.is_true(ctx.data:AddItem('tilapia'))
@@ -79,9 +79,9 @@ describe("喂钓鱼佬的信物兑换", function()
         assert.is_true(feed())
         assert.same(0, countItem('eelHead'))
         assert.same(1, countItem('duck'))
-        assert.same(0, ctx.data.data.FishCoin)
+        assert.same(0, ctx.data.Data.FishCoin)
         assert.same(0, ctx.player.attrs.FishCoin)
-        assert.is_nil(ctx.data.data.SelectedSlot)
+        assert.is_nil(ctx.data.Data.SelectedSlot)
         assert.same(1, ctx.host.sync_counts[1])
         assert.same({ ctx.cfg.Interact.Fisherman.EatAnimation }, ctx.plays)
         local reply = ctx.replies[#ctx.replies]
@@ -98,9 +98,9 @@ describe("喂钓鱼佬的信物兑换", function()
         assert.is_true(feed())
         assert.same(0, countItem('eelHead'))
         assert.same(1, countItem('duck'))
-        assert.same(0, ctx.data.data.FishCoin)
+        assert.same(0, ctx.data.Data.FishCoin)
         assert.same({ ctx.cfg.Interact.Fisherman.EatAnimation }, ctx.plays)
-        local bar = ctx.data.data.Containers.itemBar
+        local bar = ctx.data.Data.Containers.itemBar
         assert.same('duck', bar[slot] and bar[slot].itemId, '产物落进本次交付释放出的格')
         assert.same({ from = 'eelHead', to = 'duck' }, ctx.replies[#ctx.replies].exchange)
     end)
@@ -111,7 +111,7 @@ describe("喂钓鱼佬的信物兑换", function()
         assert.is_true(feed())
         assert.same(0, countItem('garHead'))
         assert.same(1, countItem('shrimpTicket'))
-        assert.same(0, ctx.data.data.FishCoin)
+        assert.same(0, ctx.data.Data.FishCoin)
         assert.same({ from = 'garHead', to = 'shrimpTicket' }, ctx.replies[#ctx.replies].exchange)
     end)
 
@@ -121,7 +121,7 @@ describe("喂钓鱼佬的信物兑换", function()
         assert.is_true(ctx.data:AddItem('tilapia')) -- 道具栏第二格占满
         assert.is_true(ctx.data:SelectSlot(slot))
         assert.is_true(feed())
-        local bar = ctx.data.data.Containers.itemBar
+        local bar = ctx.data.Data.Containers.itemBar
         assert.is_not_nil(bar[slot])
         assert.same('duck', bar[slot].itemId)
         assert.same(1, bar[slot].count)
@@ -129,14 +129,14 @@ describe("喂钓鱼佬的信物兑换", function()
     end)
 
     it("test_selected_token_wins_over_selected_bait", function()
-        ctx.data.data.Bait.worm = 5
+        ctx.data.Data.Bait.worm = 5
         local slot = give('eelHead')
         assert.is_true(ctx.data:SelectSlot(slot))
         assert.is_true(ctx.data:SelectBait('worm'))
         assert.is_true(feed())
         assert.same(1, countItem('duck'))
-        assert.same(5, ctx.data.data.Bait.worm)
-        assert.same(0, ctx.data.data.FishCoin)
+        assert.same(5, ctx.data.Data.Bait.worm)
+        assert.same(0, ctx.data.Data.FishCoin)
     end)
 
     it("test_unselected_token_does_not_block_normal_coin_feed", function()
@@ -144,7 +144,7 @@ describe("喂钓鱼佬的信物兑换", function()
         local fishSlot = give('carp')
         assert.is_true(ctx.data:SelectSlot(fishSlot))
         assert.is_true(feed())
-        assert.same(ctx.cfg.Fish.carp.BasePrice, ctx.data.data.FishCoin)
+        assert.same(ctx.cfg.Fish.carp.BasePrice, ctx.data.Data.FishCoin)
         assert.same(1, countItem('eelHead'))
         assert.same(0, countItem('duck'))
     end)

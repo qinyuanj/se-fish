@@ -1,7 +1,7 @@
 -- Spoke 原生重构机械棘轮守卫（#294 / ADR-0032 §4、§5）：
 -- 失败方式先列：
 --   1. 新 Spoke 命名空间（common.spoke_clock、server.world_host.*、client.store.*、client.views.*）
---      反向 require 存量旧债务模块（server.mgr.*、server.ability_api、server.ability_behaviors.*、
+--      反向 require 存量旧债务模块（server.Mgr.*、server.ability_api、server.ability_behaviors.*、
 --      client.MgrGameUI、client.ScreenHandlers.*、client.Local*、common.OwnedUnits）→ 破坏单向棘轮；
 --   2. 就地修改 common/packages/spoke/ 或 common/packages/spoke_eggy/ 或与 docs/packages-reference.md
 --      记录的上游 SHA 漂移 → 破坏上游双包零扩展边界；
@@ -9,7 +9,7 @@
 --      不降反增 → 重构半途回潮；
 --   4. 新 Spoke 命名空间出现未保存句柄的裸 :Connect( → 局部信号无法在 s:on_cleanup 回收。
 
-local arch = require("tools.arch_policy")
+local Arch = require("tools.arch_policy")
 local sha256 = require("tools.sha256")
 local fs = require("tests.support.fs_fixture")
 local lfs = require("lfs")
@@ -36,19 +36,19 @@ local DEBT_WATERMARKS = {
 }
 
 local REMOVED_FISH_LEGACY_FILES = {
-  "server/mgr/MgrFishUnit.lua",
-  "server/mgr/mgr_fish_carrier.lua",
-  "server/mgr/MgrAi.lua",
-  "server/mgr/MgrAiTarget.lua",
+  "server/Mgr/MgrFishUnit.lua",
+  "server/Mgr/MgrFishCarrier.lua",
+  "server/Mgr/MgrAi.lua",
+  "server/Mgr/MgrAiTarget.lua",
   "client/views/FishCombatLabel.lua",
   "client/views/GarBiteWarning.lua",
 }
 
 local FORBIDDEN_FISH_LEGACY_MODULES = {
-  "server.mgr.MgrFishUnit",
-  "server.mgr.mgr_fish_carrier",
-  "server.mgr.MgrAi",
-  "server.mgr.MgrAiTarget",
+  "server.Mgr.MgrFishUnit",
+  "server.Mgr.MgrFishCarrier",
+  "server.Mgr.MgrAi",
+  "server.Mgr.MgrAiTarget",
   "client.views.FishCombatLabel",
   "client.views.GarBiteWarning",
 }
@@ -102,7 +102,7 @@ local function package_tree_fingerprint(relative_root)
 end
 
 local function is_legacy_debt_file(path)
-  return path:match("^server/mgr/") ~= nil
+  return path:match("^server/Mgr/") ~= nil
     or path == "server/ability_api.lua"
     or path:match("^server/ability_behaviors/") ~= nil
     or path == "client/MgrGameUI.lua"
@@ -306,7 +306,7 @@ end
 describe("Spoke 原生重构机械棘轮守卫", function()
   describe("新 Spoke 命名空间零反向依赖存量旧债务", function()
     it("分层门禁正确分类新 Spoke 命名空间并拦截一切对旧债务的反向依赖", function()
-      local valid = arch.check(arch.policy, {
+      local valid = Arch.check(Arch.policy, {
         modules = {
           "common.spoke_clock",
           "common.game_cfg",
@@ -315,8 +315,8 @@ describe("Spoke 原生重构机械棘轮守卫", function()
           "server.world_host.player_tree",
           "server.ability_behaviors.melee_hit",
           "client.game_ui",
-          "client.store.client_store",
-          "client.views.root_view",
+          "client.store.ClientStore",
+          "client.views.RootView",
           "server.ability_api",
         },
         edges = {
@@ -324,9 +324,9 @@ describe("Spoke 原生重构机械棘轮守卫", function()
           { from = "server.world_host.player_tree", to = "common.spoke_clock" },
           { from = "server.world_host.player_tree", to = "server.data.player_data" },
           { from = "server.ability_behaviors.melee_hit", to = "server.world_host.player_tree" },
-          { from = "client.store.client_store", to = "common.spoke_clock" },
-          { from = "client.views.root_view", to = "client.store.client_store" },
-          { from = "client.views.root_view", to = "client.game_ui" },
+          { from = "client.store.ClientStore", to = "common.spoke_clock" },
+          { from = "client.views.RootView", to = "client.store.ClientStore" },
+          { from = "client.views.RootView", to = "client.game_ui" },
           { from = "server.ability_api", to = "server.world_host.player_tree" },
         },
       })
@@ -335,15 +335,15 @@ describe("Spoke 原生重构机械棘轮守卫", function()
       local invalid_edges = {
         { from = "server.world_host.player_tree", to = "server.ability_behaviors.melee_hit" },
         { from = "server.world_host.player_tree", to = "server.ability_api" },
-        { from = "client.store.client_store", to = "client.views.root_view" },
-        { from = "client.views.root_view", to = "client.MgrGameUI" },
-        { from = "client.views.root_view", to = "client.ScreenHandlers.ScreenMain" },
-        { from = "client.views.reel_overlay_view", to = "client.LocalMotorUnitCtrl" },
-        { from = "client.views.root_view", to = "common.OwnedUnits" },
+        { from = "client.store.ClientStore", to = "client.views.RootView" },
+        { from = "client.views.RootView", to = "client.MgrGameUI" },
+        { from = "client.views.RootView", to = "client.ScreenHandlers.ScreenMain" },
+        { from = "client.views.ReelOverlayView", to = "client.LocalMotorUnitCtrl" },
+        { from = "client.views.RootView", to = "common.OwnedUnits" },
         { from = "common.spoke_clock", to = "common.OwnedUnits" },
       }
       for _, edge in ipairs(invalid_edges) do
-        local result = arch.check(arch.policy, {
+        local result = Arch.check(Arch.policy, {
           modules = { edge.from, edge.to },
           edges = { edge },
         })
@@ -354,8 +354,8 @@ describe("Spoke 原生重构机械棘轮守卫", function()
     end)
 
     it("真实仓库中新 Spoke 命名空间模块零反向依赖且不含无托管裸 :Connect(", function()
-      local graph = assert(arch.scan(".", arch.policy))
-      local result = arch.check(arch.policy, graph)
+      local graph = assert(Arch.scan(".", Arch.policy))
+      local result = Arch.check(Arch.policy, graph)
       local reverse_deps = {}
       for _, violation in ipairs(result.violations) do
         if violation.rule == "spoke_no_legacy_reverse_dep" then
@@ -368,7 +368,7 @@ describe("Spoke 原生重构机械棘轮守卫", function()
       for _, path in ipairs(business_lua_files()) do
         if is_spoke_namespace_file(path) then
           local src = assert(fs.slurp(path), "读不到源码: " .. path)
-          local code = arch.code_only(src)
+          local code = Arch.code_only(src)
           local line_no = 0
           for line in (code .. "\n"):gmatch("([^\n]*)\n") do
             line_no = line_no + 1
@@ -424,7 +424,7 @@ describe("Spoke 原生重构机械棘轮守卫", function()
           for _, problem in ipairs(check_owned_units_bindings(path, src)) do
             bad_bindings[#bad_bindings + 1] = problem
           end
-          local code = arch.code_only(src)
+          local code = Arch.code_only(src)
           local count = 0
           for _ in code:gmatch("%f[%w_]OwnedUnits%s*%.%s*[%w_]+%s*%(") do
             count = count + 1
@@ -448,7 +448,7 @@ describe("Spoke 原生重构机械棘轮守卫", function()
       for _, path in ipairs(business_lua_files()) do
         if is_legacy_debt_file(path) then
           local src = assert(fs.slurp(path), "读不到源码: " .. path)
-          local code = arch.code_only(src)
+          local code = Arch.code_only(src)
           local count = 0
           for _ in code:gmatch(":%s*Connect%s*%(") do
             count = count + 1
@@ -467,17 +467,17 @@ describe("Spoke 原生重构机械棘轮守卫", function()
 
     it("server/main.lua 的 MgrMap 成员数不超过水位线", function()
       local src = assert(fs.slurp("server/main.lua"), "读不到 server/main.lua")
-      local code = arch.code_only(src)
+      local code = Arch.code_only(src)
       local body = code:match("local%s+MgrMap%s*=%s*(%b{})")
       local mgr_files = {}
-      for _, path in ipairs(walk_files("server/mgr", true)) do
+      for _, path in ipairs(walk_files("server/Mgr", true)) do
         if path:match("%.lua$") then
           mgr_files[#mgr_files + 1] = path
         end
       end
       if not body then
         if #mgr_files > 0 then
-          fail("server/main.lua 找不到 local MgrMap 表，但 server/mgr/ 仍有 %d 个模块未清空", #mgr_files)
+          fail("server/main.lua 找不到 local MgrMap 表，但 server/Mgr/ 仍有 %d 个模块未清空", #mgr_files)
         end
         return
       end

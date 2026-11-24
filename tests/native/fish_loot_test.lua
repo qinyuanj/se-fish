@@ -1,8 +1,8 @@
-local game_cfg = require("common.game_cfg")
-local server_runtime = require("server.world_host.server_runtime")
-local spoke_clock = require("common.spoke_clock")
-local ledger = require("common.cfg.content_ledger")
-local player_data = require("server.data.player_data")
+local GameCfg = require("common.game_cfg")
+local ServerRuntime = require("server.world_host.server_runtime")
+local SpokeClock = require("common.spoke_clock")
+local Ledger = require("common.cfg.content_ledger")
+local PlayerData = require("server.data.player_data")
 
 local POND_RARES = {
   { id = "item7", base = "tilapia" }, { id = "item8", base = "carp" }, { id = "item9", base = "knifeFish" },
@@ -10,14 +10,14 @@ local POND_RARES = {
 }
 
 local function selectable(rows, rodLevel, baitId)
-  local fish_catch = require("common.fish_catch")
+  local FishCatch = require("common.fish_catch")
   local total = 0
   for _, row in ipairs(rows) do
     if row.RodLevel <= rodLevel and (row.Bait == 0 or row.Bait == baitId) then total = total + row.DrawWeight end
   end
   local found = {}
   for roll = 1, total do
-    found[fish_catch.Select(rows, rodLevel, baitId, function() return roll end)] = true
+    found[FishCatch.Select(rows, rodLevel, baitId, function() return roll end)] = true
   end
   return found
 end
@@ -54,8 +54,8 @@ local function host()
     return events[name]
   end
   local data_of, players = {}, {}
-  local clock = spoke_clock.new(1000)
-  local runtime = server_runtime.new({
+  local clock = SpokeClock.new(1000)
+  local runtime = ServerRuntime.new({
     clock = clock, initial_now = 1000,
     remote = { GetRE = function(_, name) return event(name) end, CheckRECD = function() return false end },
     player_data = { GetDataInst = function(_, p) return data_of[p.UserId] end },
@@ -71,7 +71,7 @@ local function host()
   runtime:start(); runtime:mark_started()
   local api = { runtime = runtime, events = events, created = created, clock = clock }
   function api:add(p)
-    local data = player_data.New(p); data:Init(); data.LoadState = "ready"; data.Player = p
+    local data = PlayerData.New(p); data:Init(); data.LoadState = "ready"; data.Player = p
     data_of[p.UserId] = data; players[#players + 1] = p
     runtime:on_player_added(p); runtime:on_save_ready(p, data)
     return data
@@ -93,7 +93,7 @@ end
 
 describe("TestFishLoot", function()
   before_each(function()
-    game_cfg.Debug = { Enabled = false, InitialGrants = game_cfg.Debug and game_cfg.Debug.InitialGrants }
+    GameCfg.Debug = { Enabled = false, InitialGrants = GameCfg.Debug and GameCfg.Debug.InitialGrants }
   end)
   it("test_death_spawns_one_static_loot_with_species_and_mult", function()
     local env = host()
@@ -113,7 +113,7 @@ describe("TestFishLoot", function()
     local data = env:add(p)
     local tree = env.runtime:get_player_tree(p.UserId)
     local world = env.runtime:get_world()
-    local bar, pack = game_cfg.Items.ContainerId.ItemBar, game_cfg.Items.ContainerId.Backpack
+    local bar, pack = GameCfg.Items.ContainerId.ItemBar, GameCfg.Items.ContainerId.Backpack
     local full_bar, full_pack = {}, {}
     for i = 1, data:ItemBarCapacity() do full_bar[i] = { itemId = "carp", count = 1, containerId = bar } end
     for i = 1, data:BackpackCapacity() do full_pack[i] = { itemId = "carp", count = 1, containerId = pack } end
@@ -125,8 +125,8 @@ describe("TestFishLoot", function()
   end)
 
   it("test_fish_table_matches_m1_spec", function()
-    local pond = ledger.Fish and ledger.Fish.fishPond
-    assert.is_not_nil(game_cfg.Fish.tilapia)
+    local pond = Ledger.Fish and Ledger.Fish.fishPond
+    assert.is_not_nil(GameCfg.Fish.tilapia)
     if pond then
       local found = selectable(pond, 1, 0)
       assert.is_true(found.tilapia == true or next(found) ~= nil)
@@ -184,7 +184,7 @@ describe("TestFishLoot", function()
 
   it("test_pond_rares_match_source_rows_and_are_catchable", function()
     for _, rare in ipairs(POND_RARES) do
-      assert.is_not_nil(game_cfg.Items.Definitions[rare.id])
+      assert.is_not_nil(GameCfg.Items.Definitions[rare.id])
     end
   end)
 

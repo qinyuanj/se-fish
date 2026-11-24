@@ -1,7 +1,7 @@
-local game_cfg = require("common.game_cfg")
-local server_runtime = require("server.world_host.server_runtime")
-local spoke_clock = require("common.spoke_clock")
-local player_data = require("server.data.player_data")
+local GameCfg = require("common.game_cfg")
+local ServerRuntime = require("server.world_host.server_runtime")
+local SpokeClock = require("common.spoke_clock")
+local PlayerData = require("server.data.player_data")
 
 local function signal()
   local handlers = {}
@@ -11,7 +11,7 @@ end
 
 describe("TestEelLoot", function()
   before_each(function()
-    game_cfg.Debug = { Enabled = false, InitialGrants = game_cfg.Debug and game_cfg.Debug.InitialGrants }
+    GameCfg.Debug = { Enabled = false, InitialGrants = GameCfg.Debug and GameCfg.Debug.InitialGrants }
   end)
   it("test_eel_drops_three_items_and_another_player_can_pick_them", function()
     local events, created, data_of, players = {}, {}, {}, {}
@@ -21,8 +21,8 @@ describe("TestEelLoot", function()
         FireClient = function() end }
       return events[name]
     end
-    local clock = spoke_clock.new(10)
-    local runtime = server_runtime.new({
+    local clock = SpokeClock.new(10)
+    local runtime = ServerRuntime.new({
       clock = clock, initial_now = 10,
       remote = { GetRE = function(_, n) return event(n) end, CheckRECD = function() return false end },
       player_data = { GetDataInst = function(_, p) return data_of[p.UserId] end },
@@ -45,7 +45,7 @@ describe("TestEelLoot", function()
     local other = { UserId = 2, attrs = {}, Character = { Position = { x = 2, y = 0, z = 0 } } }
     function other:SetAttribute() end
     function other:GetAttribute() end
-    local data = player_data.New(other); data:Init(); data.LoadState = "ready"; data.Player = other
+    local data = PlayerData.New(other); data:Init(); data.LoadState = "ready"; data.Player = other
     data_of[2] = data; players[1] = other
     runtime:on_player_added(other); runtime:on_save_ready(other, data)
     local rows = events.LootState.clients[#events.LootState.clients].list

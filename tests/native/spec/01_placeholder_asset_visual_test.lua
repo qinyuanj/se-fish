@@ -5,8 +5,8 @@
 -- 1-15 本身是 C 级试玩条款（状态 blocked）；本文件只取证它的**代码路径**：可见、可打、可放下
 -- 三件事各自走到业务入口，不声称编辑器里已经看到。试玩结论仍归 C 级会话记录。
 --
--- 只走业务入口：common/game_cfg 的应用结果、server/mgr/MgrLoot 的地面实例入口、
--- server/mgr/mgr_fish_carrier 的生成与伤害接缝、server/mgr/MgrFishUnit 的抓举/放下状态机；
+-- 只走业务入口：common/game_cfg 的应用结果、server/Mgr/MgrLoot 的地面实例入口、
+-- server/Mgr/MgrFishCarrier 的生成与伤害接缝、server/Mgr/MgrFishUnit 的抓举/放下状态机；
 -- data/OfficialAsset.lua 是官方资产表的独立真源（编辑器导出、只读），用来判「资源 ID 真的存在」。
 -- 失败方式（先列后写）：
 --   1. 占位层顺手改了判定数值：血量、攻击、速度、逃跑秒、基础重量、基础价、饵、竿级、权重或掉落；
@@ -15,8 +15,8 @@
 --   4. 七区里某条鱼或某个首领缺图标 / 分类模型 / 品级色，或世界模型解析不出 official://mesh；
 --   5. 七区的鱼与首领打不动（统一伤害入口解析不到受击体，或血量不是鱼种血量）；
 --   6. 放下后状态没离开「举着」、本体没回世界，或挂点没销毁。
-local game_cfg = require('common.game_cfg')
-local placeholder_assets = require('common.cfg.placeholder_assets')
+local GameCfg = require('common.game_cfg')
+local PlaceholderAssets = require('common.cfg.placeholder_assets')
 
 local function signal()
   local slots = {}
@@ -51,10 +51,10 @@ local function assert_asset(id, where)
 end
 
 local function worldMesh(species)
-  return 'official://mesh/' .. tostring(species.model)
+  return 'official://mesh/' .. tostring(species.Model)
 end
 
--- 一个最小假世界：够 mgr_fish_carrier:Spawn / MgrFishUnit:SpawnLanded 建本体、受击体与挂点。
+-- 一个最小假世界：够 MgrFishCarrier:Spawn / MgrFishUnit:SpawnLanded 建本体、受击体与挂点。
 local function newWorld()
   local env = { world = {}, units = {}, now = 100 }
   env.world.GetServerTime = function() return env.now end
@@ -104,19 +104,19 @@ local function restoreWorld(saved)
   _G.Color, _G.Quaternion = saved.Color, saved.Quaternion
 end
 
--- 七区 → 鱼与首领：区序来自 game_cfg.Zones，首领以 game_cfg.BossChain 的 BossFish 为准。
+-- 七区 → 鱼与首领：区序来自 GameCfg.Zones，首领以 GameCfg.BossChain 的 BossFish 为准。
 local function zoneSpecies()
   local rows = {}
-  for _, zone in ipairs(game_cfg.Zones) do
+  for _, zone in ipairs(GameCfg.Zones) do
     local fish = {}
-    for id, species in pairs(game_cfg.Fish) do
+    for id, species in pairs(GameCfg.Fish) do
       if species.ZoneId == zone.Id and (species.Grade == 'normal' or species.Grade == 'rare') then
         fish[#fish + 1] = id
       end
     end
     table.sort(fish)
     local boss
-    for _, chain in ipairs(game_cfg.Content.Exchanges) do
+    for _, chain in ipairs(GameCfg.Content.Exchanges) do
       if chain.ZoneId == zone.Id then boss = chain.BossFish end
     end
     rows[#rows + 1] = { id = zone.Id, fish = fish, boss = boss }
@@ -158,7 +158,7 @@ describe('条款 1-14 占位资源只替换显示', function()
     local cfg = synthetic()
     local before = snapshot_numbers(cfg)
     local drops = cfg.Fish.probeElite.Drops
-    placeholder_assets.Apply(cfg)
+    PlaceholderAssets.Apply(cfg)
     for id, species in pairs(cfg.Fish) do
       for _, key in ipairs(JUDGMENT) do
         assert.same(before[id][key], species[key], id .. ' 的判定字段 ' .. key .. ' 被占位层改了')
@@ -190,8 +190,8 @@ describe('条款 1-14 占位资源只替换显示', function()
     meat.Visual = { Mesh = 'official://mesh/2', Scale = { x = 1, y = 1, z = 1 } }
     cfg.Fish.probeElite.VisualColor = { 9, 9, 9, 255 }
     local before = snapshot_numbers(cfg)
-    placeholder_assets.Apply(cfg)
-    placeholder_assets.Apply(cfg)
+    PlaceholderAssets.Apply(cfg)
+    PlaceholderAssets.Apply(cfg)
     assert.are.equal('official://image/1', meat.Icon, '正式图标被占位覆盖')
     assert.same({ 1, 2, 3, 255 }, meat.IconColor)
     assert.are.equal('official://mesh/2', meat.Visual.Mesh)
@@ -206,13 +206,13 @@ describe('条款 1-14 占位资源只替换显示', function()
   -- 占位与正式资源 ID 都要能在官方资产表里解析到；否则「可见」在引擎里是空的。
   it('1-14 占位与正式资源 ID 都指向官方资产表里真实存在的条目', function()
     local fishCount, itemCount = 0, 0
-    for id, species in pairs(game_cfg.Fish) do
+    for id, species in pairs(GameCfg.Fish) do
       fishCount = fishCount + 1
       assert_asset(worldMesh(species), '鱼种 ' .. id .. ' 的世界模型')
       assert.is_not_nil(species.VisualColor, id .. ' 缺品级色')
       assert.same(4, #species.VisualColor, id .. ' 的品级色不是四元色')
     end
-    for id, item in pairs(game_cfg.Items.Definitions) do
+    for id, item in pairs(GameCfg.Items.Definitions) do
       itemCount = itemCount + 1
       assert_asset(item.Icon, '物品 ' .. id .. ' 的图标')
       assert_asset(item.Visual.Mesh, '物品 ' .. id .. ' 的分类模型')
@@ -237,7 +237,7 @@ describe('条款 1-15 七区鱼与首领的代码路径（可见 / 可打 / 可�
     -- Start 里做的是注入 World 与开战斗通道；战斗通道不在本断言范围，只做同一份注入。
     Unit.World = env.world
     Unit.Cast = { PushState = function() end }
-    Unit.vitals = { NewHit = function(_, source, category) return { source = source, category = category } end,
+    Unit.Vitals = { NewHit = function(_, source, category) return { source = source, category = category } end,
       ApplyHit = function(_, _, player, amount) player.Character.Controller:TakeDamage(amount) end }
   end)
 
@@ -253,14 +253,14 @@ describe('条款 1-15 七区鱼与首领的代码路径（可见 / 可打 / 可�
     for _, row in ipairs(rows) do
       assert.is_true(#row.fish > 0, row.id .. ' 没有普通或极品鱼')
       assert.is_not_nil(row.boss, row.id .. ' 没有首领')
-      assert.is_not_nil(game_cfg.Fish[row.boss], row.id .. ' 的首领 ' .. tostring(row.boss) .. ' 不在鱼种表里')
+      assert.is_not_nil(GameCfg.Fish[row.boss], row.id .. ' 的首领 ' .. tostring(row.boss) .. ' 不在鱼种表里')
       for _, id in ipairs(row.fish) do
-        local species = game_cfg.Fish[id]
+        local species = GameCfg.Fish[id]
         assert_asset(worldMesh(species), row.id .. ' 的鱼 ' .. id .. ' 世界模型')
         for _, key in ipairs({ 'VisualColor' }) do
           assert.is_not_nil(species[key], id .. ' 缺 ' .. key)
         end
-        local definition = game_cfg.Items.Definitions[id]
+        local definition = GameCfg.Items.Definitions[id]
         assert.is_not_nil(definition, id .. ' 没有对应的物品定义（举不起来也放不下）')
         assert_asset(definition.Visual.Mesh, id .. ' 的地面模型')
       end
@@ -268,9 +268,9 @@ describe('条款 1-15 七区鱼与首领的代码路径（可见 / 可打 / 可�
   end)
 
   it('1-15 七区的鱼与首领都能经统一伤害入口打到，血量取鱼种血量', function()
-    local host = require('tests.support.life_host')
-    local attacker = host.player(7015)
-    local host = host.start({ now = 0, fish_carrier = Carrier })
+    local Host = require('tests.support.life_host')
+    local attacker = Host.player(7015)
+    local host = Host.start({ now = 0, fish_carrier = Carrier })
     host:add(attacker)
     local vitals = host.runtime.life
     local checked = 0
@@ -278,9 +278,9 @@ describe('条款 1-15 七区鱼与首领的代码路径（可见 / 可打 / 可�
       local ids = { table.unpack(row.fish) }
       ids[#ids + 1] = row.boss
       for _, id in ipairs(ids) do
-        local species = game_cfg.Fish[id]
+        local species = GameCfg.Fish[id]
         local carrier = assert(Carrier:Spawn({ Position = vec(0, 2, 0), FishId = id,
-          MaxHealth = species.Health, ModelId = species.model, GravityEnabled = false }))
+          MaxHealth = species.Health, ModelId = species.Model, GravityEnabled = false }))
         assert.are.equal(species.Health, carrier.Controller.MaxHealth,
           id .. ' 的受击体血量不是鱼种血量')
         local before = carrier.Controller.Health
@@ -308,7 +308,7 @@ describe('条款 1-15 七区鱼与首领的代码路径（可见 / 可打 / 可�
       for _, id in ipairs({ row.boss, row.fish[1] }) do
         local fish = assert(Unit:SpawnLanded(player, { fishId = id, mult = 1.37 }, vec(10, 2, -18)))
         assert.same(Unit.State.AwaitLift, fish.State, id .. ' 上岸后不是待抓举')
-        assert.are.equal('official://mesh/' .. tostring(game_cfg.Fish[id].model),
+        assert.are.equal('official://mesh/' .. tostring(GameCfg.Fish[id].Model),
           fish.Carrier.Body.RenderMeshId, id .. ' 的世界模型不是占位模型')
         assert.is_true(fish.Carrier.Body.Liftable, id .. ' 的本体不可举起')
 

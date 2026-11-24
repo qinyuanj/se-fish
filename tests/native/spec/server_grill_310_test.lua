@@ -1,12 +1,12 @@
 
-local game_cfg = require("common.game_cfg")
-local server_runtime = require("server.world_host.server_runtime")
-local lottery_eligibility = require("common.lottery_eligibility")
+local GameCfg = require("common.game_cfg")
+local ServerRuntime = require("server.world_host.server_runtime")
+local LotteryEligibility = require("common.lottery_eligibility")
 
 local FISH = "carp"
 local TOKEN = "eelHead"
-local ITEM_BAR = game_cfg.Items.ContainerId.ItemBar
-local BACKPACK = game_cfg.Items.ContainerId.Backpack
+local ITEM_BAR = GameCfg.Items.ContainerId.ItemBar
+local BACKPACK = GameCfg.Items.ContainerId.Backpack
 
 local function signal()
   local handlers = {}
@@ -22,7 +22,7 @@ local function signal()
 end
 
 local function grill_anchor()
-  for _, entity in ipairs(game_cfg.Zones[3].Scene.Entities) do
+  for _, entity in ipairs(GameCfg.Zones[3].Scene.Entities) do
     if entity.Role == "Grill" then return entity end
   end
 end
@@ -50,7 +50,7 @@ describe("服务端烧烤点宿主接缝（#310）", function()
         },
         Size = { y = 2 },
         Controller = {
-          Health = game_cfg.vitals.MaxHealth,
+          Health = GameCfg.Vitals.MaxHealth,
           TakeDamage = function(self, amount)
             self.Health = math.max(0, self.Health - amount)
           end,
@@ -58,12 +58,12 @@ describe("服务端烧烤点宿主接缝（#310）", function()
       },
     }
     function player:SetAttribute(key, value) self.attrs[key] = value end
-    player._hp = game_cfg.vitals.MaxHealth
+    player._hp = GameCfg.Vitals.MaxHealth
     return player
   end
 
   local function make_data(player)
-    local data = ctx.player_data.New(player)
+    local data = ctx.PlayerData.New(player)
     data:Init(true)
     ctx.save:LoadInto(player, data)
     drain()
@@ -76,9 +76,9 @@ describe("服务端烧烤点宿主接缝（#310）", function()
       values = {}, queue = {}, events = {}, datas = {}, units = {},
       unit_seq = 0, item_bars = {},
     }
-    ctx.old_game, ctx.old_re = _G.game, _G.re_util
-    ctx.old_debug = game_cfg.Debug
-    game_cfg.Debug = { Enabled = false }
+    ctx.old_game, ctx.old_re = _G.game, _G.REUtil
+    ctx.old_debug = GameCfg.Debug
+    GameCfg.Debug = { Enabled = false }
     ctx.anchor_entity = grill_anchor()
     ctx.anchor = ctx.anchor_entity.Position
     ctx.store = {
@@ -100,7 +100,7 @@ describe("服务端烧烤点宿主接缝（#310）", function()
         return {
           GetServerTime = function() return ctx.runtime and ctx.runtime.clock.now() or 1000 end,
           FindFirstChild = function(_, name)
-            if name == ctx.anchor_entity.Name or name == game_cfg.Zones[3].Scene.GrillName then
+            if name == ctx.anchor_entity.Name or name == GameCfg.Zones[3].Scene.GrillName then
               return { Name = name, Position = ctx.anchor, Destroy = function(self) self.Destroyed = true end }
             end
           end,
@@ -129,7 +129,7 @@ describe("服务端烧烤点宿主接缝（#310）", function()
         }
       end
     end }
-    _G.re_util = {
+    _G.REUtil = {
       CheckRECD = function() return false end,
       GetRE = function(_, name)
         if not ctx.events[name] then
@@ -152,11 +152,11 @@ describe("服务端烧烤点宿主接缝（#310）", function()
         return ctx.events[name]
       end,
     }
-    ctx.player_data = assert(loadfile("server/data/player_data.lua"))()
+    ctx.PlayerData = assert(loadfile("server/data/player_data.lua"))()
     ctx.save = assert(loadfile("server/save_host.lua"))()
-    ctx.runtime = server_runtime.new({
+    ctx.runtime = ServerRuntime.new({
       initial_now = 1000,
-      remote = _G.re_util,
+      remote = _G.REUtil,
       player_data = { GetDataInst = function(_, player) return ctx.datas[player.UserId] end },
       save = ctx.save,
       players_service = _G.game:GetService("Players"),
@@ -165,26 +165,26 @@ describe("服务端烧烤点宿主接缝（#310）", function()
         return _G.game:GetService("World"):CreateUnit(kind, props)
       end,
       on_item_bar_state = function(player, snapshot)
-        _G.re_util:GetRE("ItemBarState"):FireClient(player, snapshot)
+        _G.REUtil:GetRE("ItemBarState"):FireClient(player, snapshot)
       end,
       bind_grill_action = function(dispatch)
-        ctx.events.GrillAction = ctx.events.GrillAction or _G.re_util:GetRE("GrillAction")
+        ctx.events.GrillAction = ctx.events.GrillAction or _G.REUtil:GetRE("GrillAction")
         ctx.events.GrillAction.OnServerEvent:Connect(function(player, payload)
           dispatch(player, payload)
         end)
       end,
     })
-    _G.re_util:GetRE("GrillAction")
-    _G.re_util:GetRE("GrillResult")
-    _G.re_util:GetRE("GrillState")
+    _G.REUtil:GetRE("GrillAction")
+    _G.REUtil:GetRE("GrillResult")
+    _G.REUtil:GetRE("GrillState")
     ctx.runtime:start()
     ctx.runtime:mark_started()
   end)
 
   after_each(function()
     if ctx.runtime then ctx.runtime:shutdown() end
-    _G.game, _G.re_util = ctx.old_game, ctx.old_re
-    game_cfg.Debug = ctx.old_debug
+    _G.game, _G.REUtil = ctx.old_game, ctx.old_re
+    GameCfg.Debug = ctx.old_debug
   end)
 
   local function join(id, at_grill, before_ready)
@@ -226,7 +226,7 @@ describe("服务端烧烤点宿主接缝（#310）", function()
 
   local function count_item(data, item_id)
     local total = 0
-    for _, container in pairs(data.data.Containers) do
+    for _, container in pairs(data.Data.Containers) do
       for _, entry in pairs(container) do
         if entry.itemId == item_id and entry.count > 0 then total = total + entry.count end
       end
@@ -235,7 +235,7 @@ describe("服务端烧烤点宿主接缝（#310）", function()
   end
 
   local function find_entry(data, item_id)
-    for _, container in pairs(data.data.Containers) do
+    for _, container in pairs(data.Data.Containers) do
       for _, entry in pairs(container) do
         if entry.itemId == item_id and entry.count > 0 then return entry end
       end
@@ -296,24 +296,24 @@ describe("服务端烧烤点宿主接缝（#310）", function()
       local reply = act(player, { action = "Takeout" })
       assert.is_true(reply.ok)
       assert.near(case[2], reply.rate, 0.001)
-      local entry = data.data.Containers[ITEM_BAR][1]
+      local entry = data.Data.Containers[ITEM_BAR][1]
       assert.same(FISH, entry.itemId)
       assert.near(case[2], entry.cooked, 0.001)
-      assert.same(1, data.data.SelectedSlot)
+      assert.same(1, data.Data.SelectedSlot)
       advance(20)
-      assert.near(case[2], data.data.Containers[ITEM_BAR][1].cooked, 0.001)
+      assert.near(case[2], data.Data.Containers[ITEM_BAR][1].cooked, 0.001)
       assert.same("idle", player.grill_state.state)
       assert.same(0, live_units())
     end
 
     local premium, premium_data = join(9520)
     give_selected(premium_data, "item7", 1)
-    assert.is_true(lottery_eligibility.Check(premium_data.data.Containers[ITEM_BAR][1]))
+    assert.is_true(LotteryEligibility.Check(premium_data.Data.Containers[ITEM_BAR][1]))
     assert.is_true(act(premium, { action = "Start" }).ok)
     advance(2)
     assert.is_true(act(premium, { action = "Takeout" }).ok)
-    local cooked_premium = premium_data.data.Containers[ITEM_BAR][1]
-    local ok_lottery, reason = lottery_eligibility.Check(cooked_premium)
+    local cooked_premium = premium_data.Data.Containers[ITEM_BAR][1]
+    local ok_lottery, reason = LotteryEligibility.Check(cooked_premium)
     assert.is_false(ok_lottery)
     assert.same("cooked", reason)
 
@@ -323,7 +323,7 @@ describe("服务端烧烤点宿主接缝（#310）", function()
     advance(2)
     assert.is_true(act(token_player, { action = "Takeout" }).ok)
     local cooked_token = find_entry(token_data, TOKEN)
-    assert.is_not_nil(game_cfg.Items.CookRate(cooked_token))
+    assert.is_not_nil(GameCfg.Items.CookRate(cooked_token))
   end)
 
   it("4.5 秒烤糊损毁并只爆炸一次，满格取出冻结后可重试", function()
@@ -332,7 +332,7 @@ describe("服务端烧烤点宿主接缝（#310）", function()
     local far = join(9532, false)
     give_selected(data, FISH, 1)
     assert.is_true(act(player, { action = "Start" }).ok)
-    advance(game_cfg.Grill.BurnSec - 0.25)
+    advance(GameCfg.Grill.BurnSec - 0.25)
     local early = act(player, { action = "Takeout" })
     assert.is_true(early.ok, "4.5 秒前取出不该烤糊")
     assert.is_true(early.rate > 0)
@@ -345,18 +345,18 @@ describe("服务端烧烤点宿主接缝（#310）", function()
     for _, member in ipairs({ burner, near, far }) do
       before[member.UserId] = member.Character.Controller.Health
     end
-    advance(game_cfg.Grill.BurnSec)
+    advance(GameCfg.Grill.BurnSec)
     assert.same(0, count_item(burner_data, FISH))
     assert.same("burnt", burner.grill_state.state)
     assert.same(0, live_units())
     local after = act(burner, { action = "Takeout" })
     assert.is_false(after.ok)
     assert.same("no-session", after.reason)
-    assert.same(before[burner.UserId] - game_cfg.Grill.BurnDamage, burner.Character.Controller.Health)
-    assert.same(before[near.UserId] - game_cfg.Grill.BurnDamage, near.Character.Controller.Health)
+    assert.same(before[burner.UserId] - GameCfg.Grill.BurnDamage, burner.Character.Controller.Health)
+    assert.same(before[near.UserId] - GameCfg.Grill.BurnDamage, near.Character.Controller.Health)
     assert.same(before[far.UserId], far.Character.Controller.Health)
     advance(10)
-    assert.same(before[burner.UserId] - game_cfg.Grill.BurnDamage, burner.Character.Controller.Health)
+    assert.same(before[burner.UserId] - GameCfg.Grill.BurnDamage, burner.Character.Controller.Health)
 
     local full_player, full_data = join(9535)
     give_selected(full_data, FISH, 1)
@@ -370,7 +370,7 @@ describe("服务端烧烤点宿主接缝（#310）", function()
     assert.same("full", full.reason)
     assert.same(0, count_item(full_data, FISH))
     advance(1.5)
-    full_data.data.Containers[BACKPACK][1] = nil
+    full_data.Data.Containers[BACKPACK][1] = nil
     tree:sync_from_data(full_data)
     local retry = act(full_player, { action = "Takeout" })
     assert.is_true(retry.ok)
@@ -383,7 +383,7 @@ describe("服务端烧烤点宿主接缝（#310）", function()
     assert.is_true(act(downed, { action = "Start" }).ok)
     advance(1)
     local tree = ctx.runtime:get_player_tree(downed.UserId)
-    tree:apply_hit(tree:new_hit(nil, "test"), downed, game_cfg.vitals.MaxHealth)
+    tree:apply_hit(tree:new_hit(nil, "test"), downed, GameCfg.Vitals.MaxHealth)
     drain()
     local entry = find_entry(downed_data, FISH)
     assert.is_not_nil(entry)
@@ -441,7 +441,7 @@ describe("服务端烧烤点宿主接缝（#310）", function()
     assert.is_not_nil(entry)
     assert.near(1.25, entry.cooked, 0.001)
     assert.is_nil(recovered_data.Extra.recovery.grill)
-    assert.same(game_cfg.vitals.MaxHealth, recovered.Character.Controller.Health)
+    assert.same(GameCfg.Vitals.MaxHealth, recovered.Character.Controller.Health)
 
     local burnt, burnt_data = join(9561, true, function(data)
       data.Extra.recovery = data.Extra.recovery or {}
@@ -450,8 +450,8 @@ describe("服务端烧烤点宿主接缝（#310）", function()
     drain()
     assert.same(0, count_item(burnt_data, FISH))
     assert.is_nil(burnt_data.Extra.recovery.grill)
-    assert.same(game_cfg.vitals.MaxHealth, burnt.Character.Controller.Health)
-    assert.same(game_cfg.vitals.MaxHealth, recovered.Character.Controller.Health)
+    assert.same(GameCfg.Vitals.MaxHealth, burnt.Character.Controller.Health)
+    assert.same(GameCfg.Vitals.MaxHealth, recovered.Character.Controller.Health)
   end)
 
   it("离场后的迟到存档回调不复活烤制单位也不吞鱼", function()
@@ -522,16 +522,16 @@ describe("服务端烧烤点宿主接缝（#310）", function()
     assert.is_false(act(player, { action = "Takeout" }).ok)
     assert.same(baseline, active_frame_subs, "满格冻结为 ready 后须退出烤制活跃相位并退订 on_frame")
 
-    data.data.Containers[BACKPACK][1] = nil
+    data.Data.Containers[BACKPACK][1] = nil
     ctx.runtime:get_player_tree(player.UserId):sync_from_data(data)
     assert.is_true(act(player, { action = "Takeout" }).ok)
     assert.same(baseline, active_frame_subs)
 
-    data.data.Containers[ITEM_BAR][1] = nil
+    data.Data.Containers[ITEM_BAR][1] = nil
     give_selected(data, FISH, 1)
     assert.is_true(act(player, { action = "Start" }).ok)
     assert.same(baseline + 1, active_frame_subs)
-    advance(game_cfg.Grill.BurnSec)
+    advance(GameCfg.Grill.BurnSec)
     assert.same("burnt", player.grill_state.state)
     assert.same(baseline, active_frame_subs, "烤糊结算后须退订 on_frame")
   end)

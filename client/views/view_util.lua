@@ -1,38 +1,38 @@
 
-local number = require("common.number")
+local Number = require("common.number")
 
-local view_util = {}
+local ViewUtil = {}
 
-function view_util.is_record(value)
+function ViewUtil.is_record(value)
   local kind = type(value)
   return kind == "table" or kind == "userdata"
 end
 
-function view_util.read_vec2(value)
-  if not view_util.is_record(value) then
+function ViewUtil.read_vec2(value)
+  if not ViewUtil.is_record(value) then
     return nil
   end
   local ok, x, y = pcall(function() return value.x, value.y end) -- 兼容引擎 Vector2 userdata 坐标读取
-  if ok and number.IsFiniteNumber(x) and number.IsFiniteNumber(y) then
+  if ok and Number.IsFiniteNumber(x) and Number.IsFiniteNumber(y) then
     return x, y
   end
   return nil
 end
 
-function view_util.read_vec3(value)
-  if not view_util.is_record(value) then
+function ViewUtil.read_vec3(value)
+  if not ViewUtil.is_record(value) then
     return nil
   end
   local ok, x, y, z = pcall(function() return value.x, value.y, value.z end) -- 兼容引擎 Vector3 userdata 坐标读取
-  if ok and number.IsFiniteNumber(x) and number.IsFiniteNumber(y) and number.IsFiniteNumber(z) then
+  if ok and Number.IsFiniteNumber(x) and Number.IsFiniteNumber(y) and Number.IsFiniteNumber(z) then
     return x, y, z
   end
   return nil
 end
 
-function view_util.distance_sq_xz(a, b)
-  local ax, _, az = view_util.read_vec3(a)
-  local bx, _, bz = view_util.read_vec3(b)
+function ViewUtil.distance_sq_xz(a, b)
+  local ax, _, az = ViewUtil.read_vec3(a)
+  local bx, _, bz = ViewUtil.read_vec3(b)
   if ax == nil or bx == nil then
     return nil
   end
@@ -41,9 +41,9 @@ function view_util.distance_sq_xz(a, b)
   return dx * dx + dz * dz
 end
 
-function view_util.distance_sq_xyz(a, b)
-  local ax, ay, az = view_util.read_vec3(a)
-  local bx, by, bz = view_util.read_vec3(b)
+function ViewUtil.distance_sq_xyz(a, b)
+  local ax, ay, az = ViewUtil.read_vec3(a)
+  local bx, by, bz = ViewUtil.read_vec3(b)
   if ax == nil or bx == nil then
     return nil
   end
@@ -54,14 +54,14 @@ function view_util.distance_sq_xyz(a, b)
 end
 
 local function valid_resolution(raw)
-  local x, y = view_util.read_vec2(raw)
+  local x, y = ViewUtil.read_vec2(raw)
   if x ~= nil and y ~= nil and x > 0 and y > 0 then
     return { x = x, y = y }
   end
   return nil
 end
 
-function view_util.get_resolution(ctx, options)
+function ViewUtil.get_resolution(ctx, options)
   if type(options) == "table" and type(options.get_resolution) == "function" then
     local resolved = valid_resolution(options.get_resolution())
     if resolved ~= nil then
@@ -105,7 +105,7 @@ function view_util.get_resolution(ctx, options)
   return { x = 1920, y = 1080 }
 end
 
-function view_util.wrap_text(text, columns)
+function ViewUtil.wrap_text(text, columns)
   local limit = math.max(1, math.floor(tonumber(columns) or 1))
   local out, count = {}, 0
   for character in tostring(text):gmatch("[%z\1-\127\194-\244][\128-\191]*") do
@@ -124,7 +124,7 @@ function view_util.wrap_text(text, columns)
   return table.concat(out)
 end
 
-function view_util.notify(ctx, text)
+function ViewUtil.notify(ctx, text)
   if text == nil or text == "" then
     return
   end
@@ -134,21 +134,21 @@ function view_util.notify(ctx, text)
   end
 end
 
-function view_util.vec2(x, y)
+function ViewUtil.vec2(x, y)
   if Vector2 ~= nil and type(Vector2.New) == "function" then
     return Vector2.New(x, y)
   end
   return { x = x, y = y }
 end
 
-function view_util.color(rgba)
+function ViewUtil.color(rgba)
   if Color ~= nil and type(Color.New) == "function" then
     return Color.New(rgba[1], rgba[2], rgba[3], rgba[4] or 255)
   end
   return rgba
 end
 
-function view_util.create_anchor_scene_node(scope, ctx, entry, height, kind, fallback_name)
+function ViewUtil.create_anchor_scene_node(scope, ctx, entry, height, kind, fallback_name)
   local services = type(ctx) == "table" and ctx.services or nil
   local create_scene = services and (services.create_anchor_scene_node or services.create_scene_node)
   local node
@@ -166,4 +166,4 @@ function view_util.create_anchor_scene_node(scope, ctx, entry, height, kind, fal
   return node
 end
 
-return view_util
+return ViewUtil

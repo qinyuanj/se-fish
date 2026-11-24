@@ -6,22 +6,22 @@
 --   5. 幂等错：同 seq 重试重复扣费/重复发奖；重进后 pity 丢失、State 握手不回包；
 --   6. 生产守卫漏：Debug 关 + 商品未配置时仍放行（应明确 unavailable 不发付费权益）；
 --   7. 并发错：购买 flow 在飞时第二抽被接受（应 busy）；flow 结算串到别的请求。
---   MgrPlatform（#123 持久操作协议），替换引擎边界（game / re_util / DataStore / 时钟）；
+--   MgrPlatform（#123 持久操作协议），替换引擎边界（game / REUtil / DataStore / 时钟）；
 -- 迁移说明：引擎边界夹具下沉到 tests/support/blindbox_world.lua（调用方各自实例化，
 --   互不共享状态）；案例按旧 LuaUnit 实际执行序（方法名字典序）逐个 it 注册。
-local game_cfg = require("common.game_cfg")
-local blindbox_world = require("tests.support.blindbox_world")
-local random_guard = require("tests.support.random_guard")
+local GameCfg = require("common.game_cfg")
+local BlindboxWorld = require("tests.support.blindbox_world")
+local RandomGuard = require("tests.support.random_guard")
 
-describe("盲盒服务端结算（server_runtime × mgr_save × MgrPlatform）", function()
+describe("盲盒服务端结算（ServerRuntime × MgrSave × MgrPlatform）", function()
   local world
   before_each(function()
-    world = blindbox_world.new()
+    world = BlindboxWorld.new()
     world:setUp()
   end)
   after_each(function()
-    -- 但 mgr_save / MgrLoot 读全局 math.random()，故逐案例还原，杜绝泄漏到后续案例。
-    random_guard.restore()
+    -- 但 MgrSave / MgrLoot 读全局 math.random()，故逐案例还原，杜绝泄漏到后续案例。
+    RandomGuard.restore()
     if world then
       world:tearDown()
       world = nil
@@ -95,9 +95,9 @@ describe("盲盒服务端结算（server_runtime × mgr_save × MgrPlatform）",
     for index, outcome in ipairs({ "cancel", "fail", "timeout" }) do
       world.events = {}
       if outcome == "timeout" then
-        assert.is_true(world:blindboxAction({ action = "draw", count = 1, seq = index }))
+        assert.is_true(world:blindboxAction({ action = "Draw", count = 1, seq = index }))
         world:drain()
-        world.now = world.now + game_cfg.Platform.FlowTimeoutSec
+        world.now = world.now + GameCfg.Platform.FlowTimeoutSec
         world.platform:Update()
         world:drain()
       else
@@ -129,10 +129,10 @@ describe("盲盒服务端结算（server_runtime × mgr_save × MgrPlatform）",
   end)
 
   it("test_loot_delivery_key_remains_consumed_after_entity_disappears", function()
-    local server_runtime = require("server.world_host.server_runtime")
-    local spoke_clock = require("common.spoke_clock")
-    local clock = spoke_clock.new(1)
-    local runtime = server_runtime.new({
+    local ServerRuntime = require("server.world_host.server_runtime")
+    local SpokeClock = require("common.spoke_clock")
+    local clock = SpokeClock.new(1)
+    local runtime = ServerRuntime.new({
       clock = clock, initial_now = 1,
       remote = { GetRE = function() return { FireAllClients = function() end, FireClient = function() end, OnServerEvent = { Connect = function() return { Disconnect = function() end } end } } end, CheckRECD = function() return false end },
       create_unit = function() local u = { Destroyed = false } function u:Destroy() self.Destroyed = true end return u end,
@@ -151,11 +151,11 @@ describe("盲盒服务端结算（server_runtime × mgr_save × MgrPlatform）",
     -- 校验：畸形 payload / 非法 count / 非法 seq 一律拒绝，不建 flow、不回包
     assert.is_false(world:blindboxAction(nil))
     assert.is_false(world:blindboxAction({ action = "Peek", count = 1, seq = 1 }))
-    assert.is_false(world:blindboxAction({ action = "draw", count = 3, seq = 1 }))
-    assert.is_false(world:blindboxAction({ action = "draw", count = "10", seq = 1 }))
-    assert.is_false(world:blindboxAction({ action = "draw", count = 1 }))
-    assert.is_false(world:blindboxAction({ action = "draw", count = 1, seq = 0 }))
-    assert.is_false(world:blindboxAction({ action = "draw", count = 1, seq = 1.5 }))
+    assert.is_false(world:blindboxAction({ action = "Draw", count = 3, seq = 1 }))
+    assert.is_false(world:blindboxAction({ action = "Draw", count = "10", seq = 1 }))
+    assert.is_false(world:blindboxAction({ action = "Draw", count = 1 }))
+    assert.is_false(world:blindboxAction({ action = "Draw", count = 1, seq = 0 }))
+    assert.is_false(world:blindboxAction({ action = "Draw", count = 1, seq = 1.5 }))
     assert.is_false(world.platform:HasFlow(world.player))
     assert.same({}, world:messages("BlindboxResult"))
   end)
@@ -208,7 +208,7 @@ describe("盲盒服务端结算（server_runtime × mgr_save × MgrPlatform）",
     world:pump()
     world:drain()
     assert.same(1, #world:groundItems())
-    world:blindboxAction({ action = "draw", count = 1, seq = 1 })
+    world:blindboxAction({ action = "Draw", count = 1, seq = 1 })
     world:drain()
     assert.same(1, #world:groundItems())
     assert.same(12.34, world.data.Extra.collection.weights.item7)
@@ -294,18 +294,18 @@ describe("盲盒服务端结算（server_runtime × mgr_save × MgrPlatform）",
   end)
 
   it("test_pricing_uses_configured_goods", function()
-    -- 单抽 10 金豆、十连 90 金豆：价目来自 game_cfg.Platform.Goods（goodsId 未交付走测试 flow）
-    assert.same(10, game_cfg.Platform.Goods.blindboxSingle.beans)
-    assert.same(90, game_cfg.Platform.Goods.blindboxTen.beans)
+    -- 单抽 10 金豆、十连 90 金豆：价目来自 GameCfg.Platform.Goods（goodsId 未交付走测试 flow）
+    assert.same(10, GameCfg.Platform.Goods.blindboxSingle.beans)
+    assert.same(90, GameCfg.Platform.Goods.blindboxTen.beans)
   end)
 
   it("test_production_build_rejects_unconfigured_goods", function()
     -- 生产守卫（#261）：Debug 关时真实通道仍关闭，占位通道也关掉才是「无可用支付通道」→
     -- 明确 unavailable，不建 flow 不发奖、不落抽奖意向。占位通道开着时的完整路径见
     -- tests/native/spec/15_blindbox_placeholder_settlement_test.lua。
-    game_cfg.Debug = { Enabled = false }
-    game_cfg.Platform.Placeholder.Enabled = false
-    assert.is_true(world:blindboxAction({ action = "draw", count = 1, seq = 1 }))
+    GameCfg.Debug = { Enabled = false }
+    GameCfg.Platform.Placeholder.Enabled = false
+    assert.is_true(world:blindboxAction({ action = "Draw", count = 1, seq = 1 }))
     world:drain()
     local result = world:lastResult()
     assert.is_false(result.ok)
@@ -318,11 +318,11 @@ describe("盲盒服务端结算（server_runtime × mgr_save × MgrPlatform）",
   it("test_production_build_uses_placeholder_channel_not_test_driver", function()
     -- 生产守卫（#261）：Debug 关 + 占位通道开 + 显式 AllowInPublish（#249 闸门）→
     -- 只有占位确认能结算；测试驱动器在生产碰不到占位 flow（不能伪造支付成功），确认前不发奖。
-    game_cfg.Debug = { Enabled = false }
-    game_cfg.Platform.Placeholder.Enabled = true
-    game_cfg.Platform.Placeholder.AllowInPublish = true
+    GameCfg.Debug = { Enabled = false }
+    GameCfg.Platform.Placeholder.Enabled = true
+    GameCfg.Platform.Placeholder.AllowInPublish = true
     world.rolls = { 1000 }
-    assert.is_true(world:blindboxAction({ action = "draw", count = 1, seq = 1 }))
+    assert.is_true(world:blindboxAction({ action = "Draw", count = 1, seq = 1 }))
     world:drain()
     assert.is_false(world.platform:HandleTestAction(world.player,
       { action = "ResolveFlow", outcome = "success" }))
@@ -382,7 +382,7 @@ describe("盲盒服务端结算（server_runtime × mgr_save × MgrPlatform）",
     assert.is_true(world:draw(1, 7, "success"))
     assert.same(1, #world:groundItems())
     world.events = {}
-    assert.is_true(world:blindboxAction({ action = "draw", count = 1, seq = 7 }))
+    assert.is_true(world:blindboxAction({ action = "Draw", count = 1, seq = 7 }))
     world:drain()
     assert.is_false(world.platform:HasFlow(world.player)) -- 重试不再发起购买
     local replay = world:lastResult()
@@ -395,11 +395,11 @@ describe("盲盒服务端结算（server_runtime × mgr_save × MgrPlatform）",
   it("test_second_draw_busy_while_payment_in_flight", function()
     -- 并发：购买 flow 在飞时第二抽 busy 拒绝；第一个 flow 不受影响正常结算
     world.rolls = { 1000 }
-    assert.is_true(world:blindboxAction({ action = "draw", count = 1, seq = 1 }))
+    assert.is_true(world:blindboxAction({ action = "Draw", count = 1, seq = 1 }))
     world:drain()
     assert.is_true(world.platform:HasFlow(world.player))
     world.events = {}
-    assert.is_true(world:blindboxAction({ action = "draw", count = 1, seq = 2 }))
+    assert.is_true(world:blindboxAction({ action = "Draw", count = 1, seq = 2 }))
     local busy = world:lastResult()
     assert.is_false(busy.ok)
     assert.same("busy", busy.reason)
@@ -469,8 +469,8 @@ describe("盲盒服务端结算（server_runtime × mgr_save × MgrPlatform）",
 
   it("test_unavailable_does_not_persist_intent", function()
     -- 真实通道与占位通道都不可用时，连抽奖意向都不落（不留单边状态）。
-    game_cfg.Debug = { Enabled = false }
-    game_cfg.Platform.Placeholder.Enabled = false
+    GameCfg.Debug = { Enabled = false }
+    GameCfg.Platform.Placeholder.Enabled = false
     world:draw(1, 1)
     assert.is_nil(next(world.data.Extra.lottery.intents or {}))
   end)

@@ -1,13 +1,13 @@
-local game_cfg = require("common.game_cfg")
-local spoke_runtime = require("common.packages.spoke.runtime.spoke_runtime")
-local interaction_points = require("server.world_host.interaction_points")
+local GameCfg = require("common.game_cfg")
+local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
+local InteractionPoints = require("server.world_host.interaction_points")
 
-local player_fisherman = {}
-local ITEM_BAR = game_cfg.Items.ContainerId.ItemBar
+local PlayerFisherman = {}
+local ITEM_BAR = GameCfg.Items.ContainerId.ItemBar
 
 local function selected_entry(data)
-  local items = data.data.Containers[ITEM_BAR]
-  local slot = data.data.SelectedSlot
+  local items = data.Data.Containers[ITEM_BAR]
+  local slot = data.Data.SelectedSlot
   local entry = slot and items[slot]
   if entry and entry.count > 0 then return slot, entry end
   return nil
@@ -22,9 +22,9 @@ local function fisherman_point(shared, npc)
 end
 
 local function resolve_fisherman(player)
-  local shared = game_cfg.Interact.Fisherman
-  for _, npc in ipairs(game_cfg.Interact.Fishermen) do
-    local anchor = interaction_points:InRange(player, {
+  local shared = GameCfg.Interact.Fisherman
+  for _, npc in ipairs(GameCfg.Interact.Fishermen) do
+    local anchor = InteractionPoints:InRange(player, {
       AnchorNames = npc.AnchorNames,
       Radius = shared.Radius,
       Slack = shared.Slack,
@@ -37,16 +37,16 @@ end
 local function saleable(data, point)
   local slot, entry = selected_entry(data)
   if entry then
-    local rate = game_cfg.Items.CookRate(entry)
-    local price = game_cfg.Items.SalePrice(entry.itemId, entry.mult, rate)
+    local rate = GameCfg.Items.CookRate(entry)
+    local price = GameCfg.Items.SalePrice(entry.itemId, entry.mult, rate)
     if price then
       return price, function(d) d.Containers[ITEM_BAR][slot] = nil end,
-          entry.itemId, game_cfg.Fish[entry.itemId] and "fish" or "item"
+          entry.itemId, GameCfg.Fish[entry.itemId] and "fish" or "item"
     end
   end
-  local bait_id = data.data.SelectedBait
+  local bait_id = data.Data.SelectedBait
   local price = bait_id and point.BaitPrice[bait_id]
-  local count = bait_id and data.data.Bait[bait_id]
+  local count = bait_id and data.Data.Bait[bait_id]
   if price and type(count) == "number" and count >= 1 then
     return price, function(d) d.Bait[bait_id] = d.Bait[bait_id] - 1 end, bait_id, "bait"
   end
@@ -54,12 +54,12 @@ local function saleable(data, point)
 end
 
 local function item_count(data, item_id)
-  return data.data.Bait[item_id] or data:ItemCount(item_id)
+  return data.Data.Bait[item_id] or data:ItemCount(item_id)
 end
 
 local function exchangeable(data, point)
   local slot, entry = selected_entry(data)
-  local product = entry and game_cfg.Items.CookRate(entry) == nil
+  local product = entry and GameCfg.Items.CookRate(entry) == nil
       and point.Exchange and point.Exchange[entry.itemId]
   if not product then return nil end
   return { slot = slot, tokenId = entry.itemId, product = product }
@@ -73,7 +73,7 @@ local function product_of(product)
 end
 
 local function deliver(target, exchange, product)
-  local items = target.data.Containers[ITEM_BAR]
+  local items = target.Data.Containers[ITEM_BAR]
   local kept = items[exchange.slot]
   if not kept or kept.count <= 0 or kept.itemId ~= exchange.tokenId then return false, "nothing" end
   if product.achievement and target.Extra.achievements and target.Extra.achievements[product.achievement] then
@@ -87,11 +87,11 @@ local function deliver(target, exchange, product)
     items[exchange.slot] = kept
     return false, "full"
   end
-  if target.data.SelectedSlot == exchange.slot then target.data.SelectedSlot = nil end
+  if target.Data.SelectedSlot == exchange.slot then target.Data.SelectedSlot = nil end
   return true
 end
 
-function player_fisherman.mount(scope, tree, opts)
+function PlayerFisherman.mount(scope, tree, opts)
   opts = type(opts) == "table" and opts or {}
   local player, data, save, remote = tree.player, tree.data, opts.save, opts.remote
   local cleaned = false
@@ -109,7 +109,7 @@ function player_fisherman.mount(scope, tree, opts)
     local ok_read, play = pcall(function() return anchor.PlayAnimation end)
     if not ok_read or not play then return end
     local ok, err = pcall(play, anchor, point.EatAnimation)
-    if not ok then print("[player_fisherman] 吃动作播放失败", tostring(err)) end
+    if not ok then print("[PlayerFisherman] 吃动作播放失败", tostring(err)) end
   end
 
   local function resolve(payload)
@@ -135,7 +135,7 @@ function player_fisherman.mount(scope, tree, opts)
     end
     local result_value = nil
     local accepted = save:Execute(player, data, operation, function(draft)
-      local entry = draft.data.Containers[ITEM_BAR][request.slot]
+      local entry = draft.Data.Containers[ITEM_BAR][request.slot]
       if not entry or entry.itemId ~= request.tokenId then return nil, "nothing" end
       local before_token = item_count(draft, request.tokenId)
       local before_product = item_count(draft, request.product)
@@ -143,7 +143,7 @@ function player_fisherman.mount(scope, tree, opts)
       if not changed then return nil, failure end
       local result = {
         ok = true, action = "Feed", exchange = { from = request.tokenId, to = request.product },
-        coinBefore = draft.data.FishCoin, coinAfter = draft.data.FishCoin,
+        coinBefore = draft.Data.FishCoin, coinAfter = draft.Data.FishCoin,
         tokenBefore = before_token, tokenAfter = item_count(draft, request.tokenId),
         itemBefore = before_product, itemAfter = item_count(draft, request.product),
       }
@@ -154,7 +154,7 @@ function player_fisherman.mount(scope, tree, opts)
       if not written then reply({ ok = false, reason = result }) return end
       result.operation = operation
       result_value = result
-      spoke_runtime.batch(function() tree:sync_from_data(data) end)
+      SpokeRuntime.batch(function() tree:sync_from_data(data) end)
       reply(result)
       play_eat(anchor, point)
     end)
@@ -163,13 +163,13 @@ function player_fisherman.mount(scope, tree, opts)
   end
 
   local function feed(operation, point, anchor)
-    local selected_slot, selected_bait = data.data.SelectedSlot, data.data.SelectedBait
+    local selected_slot, selected_bait = data.Data.SelectedSlot, data.Data.SelectedBait
     local result_value = nil
     local accepted = save:Execute(player, data, operation, function(draft)
-      draft.data.SelectedSlot, draft.data.SelectedBait = selected_slot, selected_bait
+      draft.Data.SelectedSlot, draft.Data.SelectedBait = selected_slot, selected_bait
       local earned, consume, item_id, category = saleable(draft, point)
       if not earned then return nil, "nothing" end
-      local before_coin, before_item = draft.data.FishCoin, item_count(draft, item_id)
+      local before_coin, before_item = draft.Data.FishCoin, item_count(draft, item_id)
       if not draft:AddCoin(earned, consume, "feed") then return nil, "nothing" end
       if opts.quest and opts.quest.RecordFact then
         opts.quest:RecordFact(draft, "Feed", {
@@ -178,7 +178,7 @@ function player_fisherman.mount(scope, tree, opts)
       end
       return {
         ok = true, action = "Feed", coins = earned, itemId = item_id, category = category,
-        coinBefore = before_coin, coinAfter = draft.data.FishCoin,
+        coinBefore = before_coin, coinAfter = draft.Data.FishCoin,
         itemBefore = before_item, itemAfter = item_count(draft, item_id),
       }
     end, function(written, result)
@@ -186,7 +186,7 @@ function player_fisherman.mount(scope, tree, opts)
       if not written then reply({ ok = false, reason = result }) return end
       result.operation = operation
       result_value = result
-      spoke_runtime.batch(function() tree:sync_from_data(data) end)
+      SpokeRuntime.batch(function() tree:sync_from_data(data) end)
       reply(result)
       play_eat(anchor, point)
       if opts.quest and opts.quest.RecordFact then
@@ -224,4 +224,4 @@ function player_fisherman.mount(scope, tree, opts)
   return { handle = handle }
 end
 
-return player_fisherman
+return PlayerFisherman

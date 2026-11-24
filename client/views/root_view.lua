@@ -1,15 +1,15 @@
 -- 统一客户端 Spoke 根视图树主干（ADR-0032 / #296，归属 L2 client.views）：
--- 挂载于宿主根 UI 节点，经 spoke_eggy.behaviour 绑定 Unit -> Tree 生命周期；
+-- 挂载于宿主根 UI 节点，经 SpokeEggy.behaviour 绑定 Unit -> Tree 生命周期；
 -- 树内所有动态创建子节点与局部信号均通过 ctx.create_node / ctx.own_node / ctx.connect 在同作用域 on_cleanup 对称释放；
 -- 统一承载常驻 HUD、互斥模态弹窗 Phase、覆盖蒙版 Phase、动态集合 Dock，并在 store.on_reconnect 时整体干净重建。
 
-local spoke = require("common.packages.spoke.api")
-local spoke_eggy = require("common.packages.spoke_eggy.api")
+local Spoke = require("common.packages.spoke.api")
+local SpokeEggy = require("common.packages.spoke_eggy.api")
 
-local Effect = spoke.Effect
-local State = spoke.State
+local Effect = Spoke.Effect
+local State = Spoke.State
 
-local root_view = {}
+local RootView = {}
 
 local function sorted_keys(map)
   local keys = {}
@@ -67,15 +67,15 @@ local function disconnect_safely(conn)
 end
 
 ---@param root_node table 宿主根 UI 节点（须带 Destroying 信号）
----@param store table 只读 client_store
+---@param store table 只读 ClientStore
 ---@param options table|nil { name?, logger?, services?, create_node?, hud?, modals?, overlays?, docks? }
 ---@return table view_handle
-function root_view.mount(root_node, store, options)
+function RootView.mount(root_node, store, options)
   if root_node == nil then
-    error("root_view.mount 需要非空 root_node", 2)
+    error("RootView.mount 需要非空 root_node", 2)
   end
   if type(store) ~= "table" then
-    error("root_view.mount 需要只读 client_store", 2)
+    error("RootView.mount 需要只读 ClientStore", 2)
   end
 
   options = options or {}
@@ -96,7 +96,7 @@ function root_view.mount(root_node, store, options)
   services.root_node = root_node
   services.clock = store.clock
 
-  local behaviour = spoke_eggy.behaviour(root_node, function(s, self)
+  local behaviour = SpokeEggy.behaviour(root_node, function(s, self)
     local ctx = {
       root_node = root_node,
       store = store,
@@ -139,7 +139,7 @@ function root_view.mount(root_node, store, options)
       end
       local node = node_factory(kind, final_props)
       if node == nil then
-        error("root_view 动态创建 UI 节点失败: " .. tostring(kind), 2)
+        error("RootView 动态创建 UI 节点失败: " .. tostring(kind), 2)
       end
       return ctx.own_node(scope, node)
     end
@@ -174,7 +174,7 @@ function root_view.mount(root_node, store, options)
           local is_open = bs:memo("ModalOpen:" .. modal_id, function(ms)
             return ms:d(store.active_modal) == modal_id
           end)
-          bs:phase("modal:" .. modal_id, is_open, function(ps)
+          bs:phase("Modal:" .. modal_id, is_open, function(ps)
             mount_fn(ps, ctx)
           end)
         end
@@ -282,4 +282,4 @@ function root_view.mount(root_node, store, options)
   return handle
 end
 
-return root_view
+return RootView

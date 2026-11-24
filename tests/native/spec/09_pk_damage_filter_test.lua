@@ -1,7 +1,7 @@
 -- 条款 9（docs/acceptance/09-multiplayer-rules.md）：PK 伤害过滤。
 -- 9-01 统一入口；9-12 同队全武器免伤；9-13 鱼塘免伤；9-14 鱼塘外非同队互伤；
 -- 9-15 PK 不以在线人数为条件；9-16 安全区不挡鱼攻击；9-11 离队后立即失去队友免伤。
--- 黑盒入口：server/main.lua 的 MgrMap 装配 vitals / Party / zone_markers / DamageFilter，
+-- 黑盒入口：server/main.lua 的 MgrMap 装配 Vitals / Party / ZoneMarkers / DamageFilter，
 -- 测试只调 mgr 公开方法 NewHit / ApplyHit / PartyAction / SameParty，不直接调被过滤的 ApplyDamage。
 -- 失败方式（先列后写）：
 --   1. 近战、枪械、范围、爆炸里任一类别绕过统一入口，导致同队仍掉血；
@@ -94,7 +94,7 @@ describe('条款 9 PK 伤害过滤', function()
     assert_wiring()
     env = { queue = {}, sent = {}, values = {}, re = {}, now = 100, byCharacter = {},
       game = rawget(_G, 'game'),
-      vector = rawget(_G, 'Vector3'), reutil = rawget(_G, 're_util'), cfg = rawget(package.loaded, 'common.game_cfg') }
+      vector = rawget(_G, 'Vector3'), reutil = rawget(_G, 'REUtil'), cfg = rawget(package.loaded, 'common.game_cfg') }
     _G.Vector3 = { New = vec }
     _G.game = { GetService = function(_, name)
       if name == 'Task' then
@@ -128,8 +128,8 @@ describe('条款 9 PK 伤害过滤', function()
         FireClient = function() end, FireAllClients = function() end, FireServer = function() end }
       return env.re[name]
     end, CheckRECD = function() return false end }
-    _G.re_util, package.loaded['common.re_util'] = re, re
-    -- 真区域解析：鱼塘边界来自与生产同一条 zone_markers 路径，不写死坐标。
+    _G.REUtil, package.loaded['common.re_util'] = re, re
+    -- 真区域解析：鱼塘边界来自与生产同一条 ZoneMarkers 路径，不写死坐标。
     env.zones = assert(loadfile('tests/support/zone_fixtures.lua'))()
     env.cfg = env.zones.Load()
     env.party = {}
@@ -141,16 +141,16 @@ describe('条款 9 PK 伤害过滤', function()
     env.vitals = env.lifeHost.runtime.life
     env.players = assert(loadfile('server/player_data_host.lua'))()
     env.save = assert(loadfile('server/save_host.lua'))()
-    env.players.Save, env.save.player_data = env.save, env.players
+    env.players.Save, env.save.PlayerData = env.save, env.players
     env.filter = require('server.world_host.pk_damage_filter').make({
       party = env.party, zone_markers = require('common.zone_markers'), zones = env.cfg.Zones,
     })
     -- 生产装配：过滤接缝与区域真源都经 mgr 注入，不缓存队伍归属。
     env.vitals.Party = env.party
-    env.vitals.zone_markers = require('common.zone_markers')
+    env.vitals.ZoneMarkers = require('common.zone_markers')
     env.vitals:SetDamageFilter(function(hit, target, mgr) return env.filter(hit, target, mgr) end)
     -- 9-12（review #249）：武器管理器照 main.lua 的接线装进同一套环境（伤害仍只经统一入口）。
-    -- ability_api 在装载时要引擎的 RemoteEvent 全局：补替身并清模块缓存，避免复用别的用例的上下文。
+    -- AbilityAPI 在装载时要引擎的 RemoteEvent 全局：补替身并清模块缓存，避免复用别的用例的上下文。
     env.remoteEvent, env.abilityModule, env.swingModule =
       rawget(_G, 'RemoteEvent'), package.loaded['server.ability_api'], package.loaded['server.swing_registry']
     _G.RemoteEvent = { New = function()
@@ -162,7 +162,7 @@ describe('条款 9 PK 伤害过滤', function()
         local tree = env.lifeHost.runtime:get_player_tree(player.UserId)
         tree:sync_from_data({
           Player = player, Inited = true, LoadState = 'ready',
-          data = { FishCoin = 0, Zone = 'fishPond', Weapons = { [weapon_id] = 1 }, Containers = {} },
+          Data = { FishCoin = 0, Zone = 'fishPond', Weapons = { [weapon_id] = 1 }, Containers = {} },
           Extra = { growth = { potions = {}, upgrades = {} }, inventory = { selection = { held = { kind = 'weapon', id = weapon_id } } }, survival = {} },
         })
         return env.lifeHost.runtime.life:WeaponAction(player, { action = 'attack', aim = aim })
@@ -172,7 +172,7 @@ describe('条款 9 PK 伤害过滤', function()
 
   after_each(function()
     if not env then return end
-    _G.game, _G.Vector3, _G.re_util = env.game, env.vector, env.reutil
+    _G.game, _G.Vector3, _G.REUtil = env.game, env.vector, env.reutil
     _G.RemoteEvent = env.remoteEvent
     package.loaded['server.ability_api'] = env.abilityModule
     package.loaded['server.swing_registry'] = env.swingModule
@@ -237,8 +237,8 @@ describe('条款 9 PK 伤害过滤', function()
   it('9-13 区域快照缺失时非同队互伤放行并留日志，同队仍免伤', function()
     local a = join(1, vec(6.26, 5.01, -0.71))
     local b = join(2, vec(5, 6, -9))
-    local snapshot, scene = env.vitals.zone_markers, env.cfg.Zones[1].Scene
-    env.vitals.zone_markers, env.cfg.Zones[1].Scene = { Zones = {} }, nil
+    local snapshot, scene = env.vitals.ZoneMarkers, env.cfg.Zones[1].Scene
+    env.vitals.ZoneMarkers, env.cfg.Zones[1].Scene = { Zones = {} }, nil
     local printed, rawPrint = {}, print
     _G.print = function(...)
       local parts = {}
@@ -250,7 +250,7 @@ describe('条款 9 PK 伤害过滤', function()
     -- 同一口径下鱼攻击不受这条兜底影响（9-16）。
     local fishHit = hit({ Id = 91, Body = { UnitId = 91 }, Receiver = {} }, b, 'fishAttack', 10)
     _G.print = rawPrint
-    env.vitals.zone_markers, env.cfg.Zones[1].Scene = snapshot, scene
+    env.vitals.ZoneMarkers, env.cfg.Zones[1].Scene = snapshot, scene
     assert.is_true(ok, '区域未解析不能全局误拒非同队玩家互伤')
     assert.same(45, actual)
     assert.same(255, blockedHealth)
@@ -262,7 +262,7 @@ describe('条款 9 PK 伤害过滤', function()
     assert.same(245, b.Character.Controller.Health)
     local logged = false
     for _, line in ipairs(printed) do
-      if line:find('pk_damage_filter', 1, true) then logged = true end
+      if line:find('PkDamageFilter', 1, true) then logged = true end
     end
     assert.is_true(logged, '区域缺失的放行兜底要留下日志')
   end)

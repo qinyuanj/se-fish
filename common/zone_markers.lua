@@ -1,6 +1,6 @@
-local game_cfg = require('common.game_cfg')
+local GameCfg = require('common.game_cfg')
 
-local zone_markers = { Ready = false, Zones = {} }
+local ZoneMarkers = { Ready = false, Zones = {} }
 
 local zoneNames = { '01 鱼塘', '02 虾池', '03 蟹湖', '04 树林岛', '05 沙滩岛', '06 礁石岛', '07 火山岛' }
 -- 客户端 main 早于场景同步完成执行（2026-11-04 实测约早 10 ms），启动时按此节奏重试解析
@@ -117,8 +117,8 @@ local function copyPoint(pointValue)
     return { x = pointValue.x, y = pointValue.y, z = pointValue.z }
 end
 
-function zone_markers.Contract(cfg)
-    cfg = cfg or game_cfg
+function ZoneMarkers.Contract(cfg)
+    cfg = cfg or GameCfg
     local entries = {}
     local function add(zoneIndex, role, name)
         entries[#entries + 1] = { ZoneIndex = zoneIndex, Role = role, Name = name }
@@ -218,10 +218,10 @@ local function resolveZone(markers, cfg, index, snapshot)
     snapshot.ContentWaterIds[zone.WaterId] = zone.Id
 end
 
-function zone_markers.Resolve(world, config)
-    local cfg = config or game_cfg
-    zone_markers.Ready, zone_markers.Zones = false, {}
-    if not world then error('zone_markers.Resolve 需要 World') end
+function ZoneMarkers.Resolve(world, config)
+    local cfg = config or GameCfg
+    ZoneMarkers.Ready, ZoneMarkers.Zones = false, {}
+    if not world then error('ZoneMarkers.Resolve 需要 World') end
     local markers = catalog(world)
     local snapshot = { Zones = {}, Waters = {}, BaitSpots = {}, ZoneIdByWater = {}, ContentWaterIds = {}, Casting = {} }
     for index = 1, #cfg.Zones do resolveZone(markers, cfg, index, snapshot) end
@@ -267,23 +267,23 @@ function zone_markers.Resolve(world, config)
     end
     cfg.Ferry.PlannedRoutes = snapshot.FerryRoutes
     snapshot.Ready = true
-    zone_markers.Ready, zone_markers.Zones = true, snapshot.Zones
+    ZoneMarkers.Ready, ZoneMarkers.Zones = true, snapshot.Zones
     return snapshot
 end
 
-function zone_markers.Start()
+function ZoneMarkers.Start()
     local world, task = game:GetService('World'), game:GetService('Task')
-    local ok, snapshot = pcall(zone_markers.Resolve, world)
+    local ok, snapshot = pcall(ZoneMarkers.Resolve, world)
     local waited = 0
     while not ok and waited < START_WAIT_SEC do
         task:Wait(START_POLL_SEC)
         waited = waited + START_POLL_SEC
-        ok, snapshot = pcall(zone_markers.Resolve, world)
+        ok, snapshot = pcall(ZoneMarkers.Resolve, world)
     end
     if not ok then error(snapshot, 0) end
-    print('[zone_markers] ready', 'waters=' .. #snapshot.Waters, 'baits=' .. #snapshot.BaitSpots,
+    print('[ZoneMarkers] ready', 'waters=' .. #snapshot.Waters, 'baits=' .. #snapshot.BaitSpots,
         'routes=' .. #snapshot.FerryRoutes, 'waitedSec=' .. waited)
     return snapshot
 end
 
-return zone_markers
+return ZoneMarkers

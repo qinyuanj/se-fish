@@ -10,14 +10,14 @@
 --   5. 普通物品（鱼竿、道具、船票）不能回收，或忽略实例倍率、烤熟价没有 ×1.5、鱼获用了商店买入价；
 --   6. 第七区最终成就没落进存档（Extra.achievements），或白占道具格；
 --   7. 只在本区 NPC 才成交：站在别的区（含锚点范围外）也能用别区链兑换。
--- 迁移自 tests/gameplay/exchange_zones_127_test.lua（#83）。旧 setUp 逐例装配夹具（含把 game_cfg
+-- 迁移自 tests/gameplay/exchange_zones_127_test.lua（#83）。旧 setUp 逐例装配夹具（含把 GameCfg
 -- 从模块缓存摘下重装）并预置站位，旧 tearDown 装回缓存与 _G.game；映射为逐例 before_each/after_each，
 -- 保留「setup 失败仍完成清理」的行为。it 顺序沿用旧入口的方法名字典序，与迁移前逐条对账。
 -- 断言口径：旧 assertEquals 两侧同为 table 时是深比较 → assert.same；标量 → assert.are.equal。
 
-local game_cfg = require('common.game_cfg')
-local host = require('tests.support.shop_feed_host')
-local player_data = require('server.data.player_data')
+local GameCfg = require('common.game_cfg')
+local Host = require('tests.support.shop_feed_host')
+local PlayerData = require('server.data.player_data')
 local function vec(x, y, z) return { x = x, y = y, z = z } end
 
 describe("TestExchangeZones", function()
@@ -29,12 +29,12 @@ describe("TestExchangeZones", function()
   -- 每个区的链路用例都从干净库存开始：道具栏只有 2 格，七个区的产物会挤掉后续信物的落点。
   -- seq 不重置：同会话序号严格递增是客户端契约，重放/旧序号一律拒绝
   local function resetInventory()
-    local fresh = player_data.New(t.player)
+    local fresh = PlayerData.New(t.player)
     fresh:Init()
     local save_meta = t.data.SaveMeta
-    t.data.data, t.data.Extra = fresh.data, fresh.Extra
+    t.data.Data, t.data.Extra = fresh.Data, fresh.Extra
     t.data.SaveMeta = save_meta
-    t.data.data.SaveMeta = save_meta
+    t.data.Data.SaveMeta = save_meta
     t.replies, t.plays = {}, {}
     t.host.results[1].InteractResult = t.replies
     t.host.sync_counts[1] = 0
@@ -55,7 +55,7 @@ describe("TestExchangeZones", function()
 
   local function give(itemId, mult)
     assert.is_true(t.data:AddItem(itemId, mult))
-    local bar = t.data.data.Containers[t.cfg.Items.ContainerId.ItemBar]
+    local bar = t.data.Data.Containers[t.cfg.Items.ContainerId.ItemBar]
     for index = 1, t.data:ItemBarCapacity() do
       if bar[index] and bar[index].itemId == itemId and bar[index].mult == mult then return index end
     end
@@ -63,7 +63,7 @@ describe("TestExchangeZones", function()
 
   local function countItem(itemId)
     local total = 0
-    for _, container in pairs(t.data.data.Containers) do
+    for _, container in pairs(t.data.Data.Containers) do
       for _, entry in pairs(container) do
         if entry.itemId == itemId then total = total + entry.count end
       end
@@ -78,9 +78,9 @@ describe("TestExchangeZones", function()
   before_each(function()
     local env = {}
     t = env
-    env.cfg = game_cfg
-    env.host = host.start()
-    env.player, env.data = env.host:join(1, game_cfg.Interact.Fishermen[1].AnchorNames[1])
+    env.cfg = GameCfg
+    env.host = Host.start()
+    env.player, env.data = env.host:join(1, GameCfg.Interact.Fishermen[1].AnchorNames[1])
     env.anchors = env.host.anchors
     env.plays = {}
     for _, anchor in pairs(env.anchors) do
@@ -99,12 +99,12 @@ describe("TestExchangeZones", function()
   -- 烤过的信物只售卖：按烤熟价（基础价 × 倍率 × 1.5）结金币，不再走兑换
   it("test_cooked_token_is_sold_only", function()
     local slot = give('garHead')
-    t.data.data.Containers.itemBar[slot].saved = { [t.cfg.Items.CookedFlag] = true }
+    t.data.Data.Containers.itemBar[slot].saved = { [t.cfg.Items.CookedFlag] = true }
     assert.is_true(t.data:SelectSlot(slot))
     assert.is_true(feed())
     assert.are.equal(0, countItem('garHead'))
     assert.are.equal(0, countItem('shrimpTicket'), '烤过的首领信物不能再换船票')
-    assert.are.equal(30, t.data.data.FishCoin) -- floor(20 × 1 × 1.5)
+    assert.are.equal(30, t.data.Data.FishCoin) -- floor(20 × 1 × 1.5)
     assert.is_nil(lastReply().exchange)
   end)
 
@@ -118,8 +118,8 @@ describe("TestExchangeZones", function()
       assert.is_true(feed(), '第' .. index .. '区精英信物应兑换')
       assert.are.equal(0, countItem(chain.EliteToken))
       assert.are.equal(1, countItem(chain.BossBait))
-      assert.are.equal(0, t.data.data.FishCoin, '兑换不给金币')
-      assert.is_nil(t.data.data.SelectedSlot, '兑换后选中态要归位')
+      assert.are.equal(0, t.data.Data.FishCoin, '兑换不给金币')
+      assert.is_nil(t.data.Data.SelectedSlot, '兑换后选中态要归位')
       assert.same({ from = chain.EliteToken, to = chain.BossBait }, lastReply().exchange)
       assert.same(1, t.host.sync_counts[1], '兑换成功后要推一次库存')
 
@@ -134,7 +134,7 @@ describe("TestExchangeZones", function()
         assert.are.equal(1, countItem(chain.Result))
         assert.same({ from = chain.BossToken, to = chain.Result }, lastReply().exchange)
       end
-      assert.are.equal(0, t.data.data.FishCoin)
+      assert.are.equal(0, t.data.Data.FishCoin)
       assert.same({}, t.plays, '未配置吃动作时交付仍应成交')
     end
   end)
@@ -185,10 +185,10 @@ describe("TestExchangeZones", function()
     while t.data:AddItem('tilapia') do end
     assert.is_false(t.data:AddItem('tilapia'), '前置：道具栏与背包都满了')
     assert.is_true(feed())
-    local bar = t.data.data.Containers.itemBar
+    local bar = t.data.Data.Containers.itemBar
     assert.are.equal('shrimpTicket', bar[slot] and bar[slot].itemId)
     assert.are.equal(0, countItem('garHead'))
-    assert.are.equal(0, t.data.data.FishCoin)
+    assert.are.equal(0, t.data.Data.FishCoin)
     assert.same({ from = 'garHead', to = 'shrimpTicket' }, lastReply().exchange)
   end)
 
@@ -200,7 +200,7 @@ describe("TestExchangeZones", function()
     assert.is_true(feed())
     assert.are.equal(0, countItem('eelHead'))
     assert.are.equal(0, countItem('duck'), '别区信物不能换首领饵')
-    assert.are.equal(t.cfg.Items.SalePrice('eelHead'), t.data.data.FishCoin)
+    assert.are.equal(t.cfg.Items.SalePrice('eelHead'), t.data.Data.FishCoin)
     assert.is_nil(lastReply().exchange)
   end)
 
@@ -211,7 +211,7 @@ describe("TestExchangeZones", function()
     t.player.Character.Position = vec(9999, 0, 9999)
     assert.is_false(feed())
     assert.are.equal(1, countItem('garHead'))
-    assert.are.equal(0, t.data.data.FishCoin)
+    assert.are.equal(0, t.data.Data.FishCoin)
     assert.same({}, t.replies)
   end)
 
@@ -220,28 +220,28 @@ describe("TestExchangeZones", function()
     local rodSlot = give('normalRod')          -- 基础价 25、无倍率
     assert.is_true(t.data:SelectSlot(rodSlot))
     assert.is_true(feed())
-    assert.are.equal(25, t.data.data.FishCoin)
+    assert.are.equal(25, t.data.Data.FishCoin)
     assert.are.equal(0, countItem('normalRod'))
 
     local fishSlot = give('bass', 1.99)        -- 6 × 1.99 = 11
     assert.is_true(t.data:SelectSlot(fishSlot))
     assert.is_true(feed())
-    assert.are.equal(36, t.data.data.FishCoin)
+    assert.are.equal(36, t.data.Data.FishCoin)
 
     local cookedSlot = give('bass', 1.99)
-    t.data.data.Containers.itemBar[cookedSlot].saved = { [t.cfg.Items.CookedFlag] = true }
+    t.data.Data.Containers.itemBar[cookedSlot].saved = { [t.cfg.Items.CookedFlag] = true }
     assert.is_true(t.data:SelectSlot(cookedSlot))
     assert.is_true(feed())                      -- floor(6 × 1.99 × 1.5) = 17
-    assert.are.equal(53, t.data.data.FishCoin)
+    assert.are.equal(53, t.data.Data.FishCoin)
 
     local ticketSlot = give('item147')         -- 蟹湖船票，基础价 1
     assert.is_true(t.data:SelectSlot(ticketSlot))
     assert.is_true(feed())
-    assert.are.equal(54, t.data.data.FishCoin)
+    assert.are.equal(54, t.data.Data.FishCoin)
     assert.are.equal('item', lastReply().category)
   end)
 
-  -- 回收价：鱼获走 fish_catch（含烤熟 ×1.5），其余物品走物品表 BasePrice；查不到的 id 不可回收
+  -- 回收价：鱼获走 FishCatch（含烤熟 ×1.5），其余物品走物品表 BasePrice；查不到的 id 不可回收
   it("test_sale_price_covers_plain_items_fish_mult_and_cooking", function()
     local Items = t.cfg.Items
     assert.are.equal(3, Items.SalePrice('starterRod'))
@@ -249,7 +249,7 @@ describe("TestExchangeZones", function()
     assert.are.equal(1, Items.SalePrice('item147'))                 -- 蟹湖船票
     assert.are.equal(20, Items.SalePrice('garHead'))
     assert.are.equal(30, Items.SalePrice('garHead', nil, true))
-    assert.are.equal(11, Items.SalePrice('bass', 1.99))             -- 与 fish_catch.Price 同源
+    assert.are.equal(11, Items.SalePrice('bass', 1.99))             -- 与 FishCatch.Price 同源
     assert.are.equal(17, Items.SalePrice('bass', 1.99, true))       -- floor(6 × 1.99 × 1.5)
     assert.are.equal(3, Items.SalePrice('tilapia'))
     assert.is_nil(Items.SalePrice('notAnItem'))

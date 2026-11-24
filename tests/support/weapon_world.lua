@@ -1,10 +1,10 @@
 --
-local game_cfg = require('common.game_cfg')
-local spoke_clock = require('common.spoke_clock')
+local GameCfg = require('common.game_cfg')
+local SpokeClock = require('common.spoke_clock')
 local spoke = require('common.packages.spoke.api')
-local player_data = require('server.data.player_data')
-local swing_registry = require('server.swing_registry')
-local player_weapon = require('server.world_host.player_weapon')
+local PlayerData = require('server.data.player_data')
+local SwingRegistry = require('server.swing_registry')
+local PlayerWeapon = require('server.world_host.player_weapon')
 
 local M = {}
 M.__index = M
@@ -36,7 +36,7 @@ function M:setUp()
     local ctx = self
     ctx.saved_print = rawget(_G, 'print')
     ctx.now = 1000
-    ctx.clock = spoke_clock.new(ctx.now)
+    ctx.clock = SpokeClock.new(ctx.now)
     ctx.replies, ctx.applied, ctx.spawnedFish, ctx.visuals = {}, {}, {}, {}
     ctx.casts, ctx.effects = {}, {}
     ctx.order = 0
@@ -102,7 +102,7 @@ function M:setUp()
     }
     ctx.fish_carrier = { ResolveCarrier = function() return nil end }
 
-    swing_registry.SetClock(function() return ctx.clock.now() end)
+    SwingRegistry.SetClock(function() return ctx.clock.now() end)
 
     local specs = ctx.opts.players
     if type(specs) == 'table' and #specs > 0 then
@@ -126,18 +126,18 @@ function M:tearDown()
         session.spokeTree = nil
     end
     self.sessions = {}
-    swing_registry.SetClock(nil)
+    SwingRegistry.SetClock(nil)
     if self.saved_print ~= nil then _G.print = self.saved_print end
     if self.savedWaterZones ~= nil then
-        game_cfg.Water.Zones = self.savedWaterZones
+        GameCfg.Water.Zones = self.savedWaterZones
         self.savedWaterZones = nil
     end
 end
 
---- 注册一名玩家会话并挂载真实 player_weapon；data 缺省时按真实存档新建。
+--- 注册一名玩家会话并挂载真实 PlayerWeapon；data 缺省时按真实存档新建。
 function M:_add(player, data)
     local ctx = self
-    local dataInst = data or player_data.New(player)
+    local dataInst = data or PlayerData.New(player)
     if not dataInst.Inited then dataInst:Init() end
     local tree = {
         player = player,
@@ -197,12 +197,12 @@ end
 
 function M:_mount(session)
     session.spokeTree = spoke.SpokeTree.spawn(spoke.Effect.new('WeaponWorld', function(scope)
-        session.handle = player_weapon.mount(scope, session.tree, session.opts)
+        session.handle = PlayerWeapon.mount(scope, session.tree, session.opts)
     end))
 end
 
---- 把存档最新字段投影进树状态：武器/选中/held 与三类伤害倍率（真源取 player_data:WeaponDamageScale，
---- 与 player_effects 的 attr_model 派生同源）。
+--- 把存档最新字段投影进树状态：武器/选中/held 与三类伤害倍率（真源取 PlayerData:WeaponDamageScale，
+--- 与 PlayerEffects 的 AttrModel 派生同源）。
 function M:sync(player)
     local session = assert(self.sessions[player], '未注册的玩家')
     local snap = session.data:GetItemBarSnapshot()
@@ -229,7 +229,7 @@ function M:equip(player, weaponId)
     assert(data:HoldWeapon(weaponId), '装备武器失败')
 end
 
---- 公开入口：先同步存档投影，再驱动 player_weapon 的 handle。
+--- 公开入口：先同步存档投影，再驱动 PlayerWeapon 的 handle。
 function M:handle(player, payload)
     self:sync(player)
     return assert(self.sessions[player], '未注册的玩家').handle:handle(payload)
@@ -258,7 +258,7 @@ function M:guard(player, unit, index)
     return assert(self.sessions[player], '未注册的玩家').handle:guard(unit, index)
 end
 
---- 玩家离场：销毁其作用域（与 player_tree dispose 同一清理路径），并从 Players 服务列表移除。
+--- 玩家离场：销毁其作用域（与 PlayerTree dispose 同一清理路径），并从 Players 服务列表移除。
 function M:removePlayer(player)
     local session = assert(self.sessions[player], '未注册的玩家')
     if session.spokeTree then session.spokeTree:dispose() end
@@ -291,7 +291,7 @@ function M:giveExplosive(player, itemId, count)
         if entry.itemId == itemId then slot = index break end
     end
     if slot == nil then error('道具栏里没有 ' .. tostring(itemId), 2) end
-    if data.data.SelectedSlot ~= slot and not data:SelectSlot(slot) then
+    if data.Data.SelectedSlot ~= slot and not data:SelectSlot(slot) then
         error('选中爆炸物失败: ' .. tostring(slot), 2)
     end
     return slot
@@ -299,8 +299,8 @@ end
 
 --- 替换水区表（投掷落水判定与保底鱼来源），tearDown 时恢复。
 function M:setWaterZones(zones)
-    if self.savedWaterZones == nil then self.savedWaterZones = game_cfg.Water.Zones end
-    game_cfg.Water.Zones = zones or {}
+    if self.savedWaterZones == nil then self.savedWaterZones = GameCfg.Water.Zones end
+    GameCfg.Water.Zones = zones or {}
 end
 
 function M.lastReply(ctx, player)

@@ -34,7 +34,7 @@ local function player(id)
 end
 
 describe('TestAbilityCastGuard', function()
-    -- 桩只在这个 describe 内存在：after_each 摘掉 preload 与已加载的包 api / 根 ability_api。
+    -- 桩只在这个 describe 内存在：after_each 摘掉 preload 与已加载的包 api / 根 AbilityAPI。
     local saved
     local VENDOR = 'server.packages.ability_system.api'
     before_each(function()
@@ -47,7 +47,7 @@ describe('TestAbilityCastGuard', function()
         package.loaded['server.ability_api'] = saved.api
     end)
 
-    -- 根 ability_api 必须先跑服务端守卫，再进 vendor 的包内 CastAbility；守卫拒绝时包完全不被调用。
+    -- 根 AbilityAPI 必须先跑服务端守卫，再进 vendor 的包内 CastAbility；守卫拒绝时包完全不被调用。
     it('test_root_api_applies_server_guard_before_package_cast', function()
         local impl = {}
         local calls = {}
@@ -72,17 +72,17 @@ end)
 describe('TestCombatBase', function()
     local self_
     before_each(function()
-        local host = require('tests.support.life_host')
+        local Host = require('tests.support.life_host')
         self_ = { notices = {} }
-        self_.host = host.start({
+        self_.host = Host.start({
           now = 100,
           remote = {
             GetRE = function(_, name)
               return {
-                OnServerEvent = host.signal(),
+                OnServerEvent = Host.signal(),
                 FireClient = function() end,
                 FireAllClients = function(_, payload)
-                  if name == 'damage_notice' then self_.notices[#self_.notices + 1] = payload end
+                  if name == 'DamageNotice' then self_.notices[#self_.notices + 1] = payload end
                 end,
               }
             end,
@@ -98,9 +98,9 @@ describe('TestCombatBase', function()
     it('test_fish_damage_uses_same_hit_identity_and_reports_actual_amount', function()
         local carrier = { Body = { UnitId = 91 }, Receiver = {}, Controller = {} }
         local damageCalls = {}
-        local host = require('tests.support.life_host')
+        local Host = require('tests.support.life_host')
         self_.host:shutdown()
-        self_.host = host.start({
+        self_.host = Host.start({
           now = 100,
           fish_carrier = {
             ResolveCarrier = function(_, target)
@@ -223,8 +223,8 @@ describe('TestMgrAbilityActionGuard', function()
         host:add(free)
         host:phase(blocked, 'downed')
         local vitals = host.runtime.life
-        mgr.vitals = vitals
-        mgr.BehaviorServices = { vitals = vitals }
+        mgr.Vitals = vitals
+        mgr.BehaviorServices = { Vitals = vitals }
         mgr:Start()
         assert.same(mgr.BehaviorServices, api.BehaviorServices)
         -- 装配完成后立刻放回真实环境：守卫闭包已捕获 vitals，后续断言不需要假 game

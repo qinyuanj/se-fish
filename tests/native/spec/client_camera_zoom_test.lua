@@ -1,17 +1,17 @@
--- #297-b 客户端 client_store 状态聚合与 Spoke 相机距离投影测试（取代旧 LocalAttr）。
+-- #297-B 客户端 ClientStore 状态聚合与 Spoke 相机距离投影测试（取代旧 LocalAttr）。
 -- 失败方式先列：
---   1. client_store.vitals / coin / camera_distance 未深冻结只读或漏同步 ItemBarState.coin → 视图篡改或金币漂移；
+--   1. ClientStore.vitals / coin / camera_distance 未深冻结只读或漏同步 ItemBarState.coin → 视图篡改或金币漂移；
 --   2. 玩家属性信号连接未随 bind_host:dispose() 断开 → 重复绑定/重连监听泄漏；
 --   3. 相机在他人/玩家手动改距后仍强制覆写，或角色更换/视图销毁后未恢复原始距离 → 相机抢权与残留。
 
-local eui = require("tests.support.eui_double")
-local client_store = require("client.store.client_store")
-local root_view = require("client.views.root_view")
-local camera_zoom_view = require("client.views.camera_zoom_view")
+local Eui = require("tests.support.eui_double")
+local ClientStore = require("client.store.client_store")
+local RootView = require("client.views.root_view")
+local CameraZoomView = require("client.views.camera_zoom_view")
 
-describe("client_store 属性汇聚与 camera_zoom_view（#297-b）", function()
-  it("client_store 深冻结汇聚 vitals / coin / local_character / camera_distance 且在 dispose 后零残留", function()
-    local store, writer = client_store.new({ initial_now = 10 })
+describe("ClientStore 属性汇聚与 CameraZoomView（#297-B）", function()
+  it("ClientStore 深冻结汇聚 vitals / coin / local_character / camera_distance 且在 dispose 后零残留", function()
+    local store, writer = ClientStore.new({ initial_now = 10 })
 
     -- 只读契约校验
     assert.is_nil(store.vitals.set)
@@ -23,15 +23,15 @@ describe("client_store 属性汇聚与 camera_zoom_view（#297-b）", function()
     local attrs = { Health = 240, MaxHealth = 300, Hunger = 80, MaxHunger = 100, FishCoin = 15 }
     local attr_signals = {}
     local function get_sig(key)
-      attr_signals[key] = attr_signals[key] or eui.Signal()
+      attr_signals[key] = attr_signals[key] or Eui.Signal()
       return attr_signals[key]
     end
     local player = { Name = "LocalPlayer" }
     local character = { Name = "Hero", CameraDistance = 26 }
-    local heartbeat = eui.Signal()
+    local heartbeat = Eui.Signal()
     local remote_events = {}
     local function get_re(name)
-      remote_events[name] = remote_events[name] or { OnClientEvent = eui.Signal() }
+      remote_events[name] = remote_events[name] or { OnClientEvent = Eui.Signal() }
       return remote_events[name]
     end
 
@@ -88,7 +88,7 @@ describe("client_store 属性汇聚与 camera_zoom_view（#297-b）", function()
     assert.equals(character, store.local_character:now())
     assert.equals(26, store.camera_distance:now())
 
-    -- 超上限非法数值被 body_scale.Sanitize 钳制到 39，NaN 变为 nil
+    -- 超上限非法数值被 BodyScale.Sanitize 钳制到 39，NaN 变为 nil
     character.CameraDistance = 999
     heartbeat:Fire(0.016)
     assert.equals(39, store.camera_distance:now())
@@ -104,16 +104,16 @@ describe("client_store 属性汇聚与 camera_zoom_view（#297-b）", function()
     assert.equals(0, attr_signals.Health:Count())
   end)
 
-  it("camera_zoom_view 挂载到 root_view：跟随角色缩放、检测手动改距让权、角色切换与销毁时恢复原始距离", function()
-    local store, writer = client_store.new({ initial_now = 0 })
-    local root_node = eui.Node({ Name = "UIRoot" })
+  it("CameraZoomView 挂载到 RootView：跟随角色缩放、检测手动改距让权、角色切换与销毁时恢复原始距离", function()
+    local store, writer = ClientStore.new({ initial_now = 0 })
+    local root_node = Eui.Node({ Name = "UIRoot" })
     local first_char = { Name = "CharA" }
     local second_char = { Name = "CharB" }
     local camera = { Distance = 8, TrackingUnit = first_char }
 
-    local view = root_view.mount(root_node, store, {
+    local view = RootView.mount(root_node, store, {
       hud = {
-        camera_zoom_view.spec({
+        CameraZoomView.spec({
           get_camera = function() return camera end,
         }),
       },
@@ -142,16 +142,16 @@ describe("client_store 属性汇聚与 camera_zoom_view（#297-b）", function()
     assert.equals(12, camera.Distance)
   end)
 
-  it("camera_zoom_view 仅在活跃 Phase 内订阅 on_frame，关屏、无角色或让权后停止逐帧空转", function()
-    local store, writer = client_store.new({ initial_now = 0 })
-    local root_node = eui.Node({ Name = "UIRoot" })
+  it("CameraZoomView 仅在活跃 Phase 内订阅 on_frame，关屏、无角色或让权后停止逐帧空转", function()
+    local store, writer = ClientStore.new({ initial_now = 0 })
+    local root_node = Eui.Node({ Name = "UIRoot" })
     local char = { Name = "Hero" }
     local camera = { Distance = 8, TrackingUnit = char }
     local camera_reads = 0
 
-    local view = root_view.mount(root_node, store, {
+    local view = RootView.mount(root_node, store, {
       hud = {
-        camera_zoom_view.spec({
+        CameraZoomView.spec({
           get_camera = function()
             camera_reads = camera_reads + 1
             return camera

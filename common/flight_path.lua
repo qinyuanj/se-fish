@@ -1,14 +1,14 @@
-local game_cfg = require('common.game_cfg')
-local number = require('common.number')
+local GameCfg = require('common.game_cfg')
+local Number = require('common.number')
 
 local M = {}
 
 local function cfg()
-    return game_cfg.Ability.Flight
+    return GameCfg.Ability.Flight
 end
 
 local function isBadNumber(v)
-    return not number.IsFiniteNumber(v)
+    return not Number.IsFiniteNumber(v)
 end
 
 local function isBadPoint(p)
@@ -19,8 +19,8 @@ local function copy(p)
     return { x = p.x, y = p.y, z = p.z }
 end
 
----@param scene? table game_cfg.Zones[i].Scene
----@param flightCfg? table game_cfg.Ability.Flight
+---@param scene? table GameCfg.Zones[i].Scene
+---@param flightCfg? table GameCfg.Ability.Flight
 ---@return table? bounds { MinX, MaxX, MinZ, MaxZ, BottomY, TopY, GroundY, CeilingY, MaxHeight }
 function M.BoundsOf(scene, flightCfg)
     if type(scene) ~= 'table' then return nil end
@@ -54,7 +54,7 @@ function M.New(bounds, flightCfg, profile, start, now)
     start = start or { x = bounds.MinX, y = bounds.GroundY + (profile.CruiseHeight or flightCfg.CruiseHeight), z = bounds.MinZ }
     now = isBadNumber(now) and 0 or now
     return {
-        Bounds = bounds, cfg = flightCfg, Profile = profile,
+        Bounds = bounds, Cfg = flightCfg, Profile = profile,
         Pos = copy(start), Last = copy(start), Vel = { x = 0, y = 0, z = 0 },
         Phase = 'cruise', Target = nil,
         Center = profile.Center or { x = (bounds.MinX + bounds.MaxX) / 2, z = (bounds.MinZ + bounds.MaxZ) / 2 },
@@ -72,11 +72,11 @@ function M.SetTarget(state, target)
 end
 
 function M.Speed(state)
-    return state.Profile.Speed or state.cfg.Speed
+    return state.Profile.Speed or state.Cfg.Speed
 end
 
 function M.CruiseHeight(state)
-    return state.Profile.CruiseHeight or state.cfg.CruiseHeight
+    return state.Profile.CruiseHeight or state.Cfg.CruiseHeight
 end
 
 local function clampToBounds(state)
@@ -102,11 +102,11 @@ local function clampToBounds(state)
 end
 
 local function driftLimit(state, dt)
-    return M.Speed(state) * state.cfg.MaxStepSec * 2 + state.cfg.DriftTolerance
+    return M.Speed(state) * state.Cfg.MaxStepSec * 2 + state.Cfg.DriftTolerance
 end
 
 local function updateCruise(state, dt, now, events)
-    local profile, c = state.Profile, state.cfg
+    local profile, c = state.Profile, state.Cfg
     local cruiseY = state.Bounds.GroundY + M.CruiseHeight(state)
     local speed = M.Speed(state)
     local dx, dz
@@ -139,7 +139,7 @@ local function updateCruise(state, dt, now, events)
 end
 
 local function updateDive(state, dt, now, events)
-    local c = state.cfg
+    local c = state.Cfg
     local speed = state.Profile.DiveSpeed or c.DiveSpeed
     local target = state.Target
     if target then
@@ -163,7 +163,7 @@ local function updateClimb(state, dt, now, events)
     local speed = M.Speed(state)
     local cruiseY = state.Bounds.GroundY + M.CruiseHeight(state)
     state.Vel.x, state.Vel.z = 0, 0
-    state.Vel.y = state.Profile.ClimbSpeed or state.cfg.ClimbSpeed
+    state.Vel.y = state.Profile.ClimbSpeed or state.Cfg.ClimbSpeed
     if state.Pos.y >= cruiseY - 0.01 then
         state.Pos.y = cruiseY
         state.Phase = 'cruise'
@@ -172,7 +172,7 @@ local function updateClimb(state, dt, now, events)
 end
 
 local function updateLeap(state, dt, now, events)
-    local c = state.cfg
+    local c = state.Cfg
     local apex = state.Profile.LeapHeight or c.LeapHeight
     local progress = 0
     if state.PhaseEndsAt > state.PhaseStartedAt then
@@ -197,8 +197,8 @@ function M.Step(state, now, dt)
     if isBadNumber(now) then now = state.LastAt or 0 end
     state.LastAt = now
     if isBadNumber(dt) or dt < 0 then dt = 0 end
-    if dt > state.cfg.MaxStepSec then
-        dt = state.cfg.MaxStepSec
+    if dt > state.Cfg.MaxStepSec then
+        dt = state.Cfg.MaxStepSec
         state.Stats.StepTruncations = state.Stats.StepTruncations + 1
         events.truncated = true
     end
@@ -229,10 +229,10 @@ function M.Step(state, now, dt)
         if state.Phase == 'cruise' and now >= state.NextDiveAt then
             state.Phase = 'leap'
             state.PhaseStartedAt = now
-            state.PhaseEndsAt = now + (state.Profile.LeapSec or state.cfg.LeapSec)
-            state.NextDiveAt = now + (state.Profile.DiveIntervalSec or state.cfg.DiveIntervalSec)
+            state.PhaseEndsAt = now + (state.Profile.LeapSec or state.Cfg.LeapSec)
+            state.NextDiveAt = now + (state.Profile.DiveIntervalSec or state.Cfg.DiveIntervalSec)
             events.dive = true
-            events.diveDamage = state.Profile.DiveDamage or state.cfg.DiveDamage
+            events.diveDamage = state.Profile.DiveDamage or state.Cfg.DiveDamage
             state.Stats.Dives = state.Stats.Dives + 1
             speed = M.Speed(state)
         elseif state.Phase == 'leap' then

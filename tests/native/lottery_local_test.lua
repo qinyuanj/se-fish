@@ -1,16 +1,16 @@
-local game_cfg = require("common.game_cfg")
-local client_world = require("tests.support.economy_client")
+local GameCfg = require("common.game_cfg")
+local ClientWorld = require("tests.support.economy_client")
 
-describe("抽奖机场景入口（#312 lottery_interaction）", function()
+describe("抽奖机场景入口（#312 LotteryInteraction）", function()
   local env, options, anchorName
   before_each(function()
-    anchorName = game_cfg.Lottery.MachineAnchors()[1]
+    anchorName = GameCfg.Lottery.MachineAnchors()[1]
     options = {
       interaction = true,
       anchors = { [anchorName] = { Name = anchorName, Position = { x = 0, y = 5, z = 0 } } },
       character = { Position = { x = 0, y = 0, z = 0 }, Size = { y = 2 } },
     }
-    env = client_world.new(options)
+    env = ClientWorld.new(options)
   end)
   after_each(function() if env then env:cleanup(); env = nil end end)
 
@@ -21,7 +21,7 @@ describe("抽奖机场景入口（#312 lottery_interaction）", function()
   end)
 
   it("test_bubble_shows_within_radius_and_hides_outside", function()
-    local bubble, radius = env.sceneNodes[1], game_cfg.Lottery.Radius
+    local bubble, radius = env.sceneNodes[1], GameCfg.Lottery.Radius
     options.character.Position.x = radius + 1
     env:step(0)
     assert.is_false(bubble.Visible)
@@ -57,7 +57,7 @@ describe("抽奖机场景入口（#312 lottery_interaction）", function()
   it("test_restart_rebuilds_instead_of_stacking_bubbles", function()
     local first, firstButton = env.sceneNodes[1], env:child("BtnLotteryEnter")
     env:cleanup()
-    env = client_world.new(options)
+    env = ClientWorld.new(options)
     assert.is_true(first.Destroyed)
     assert.same(0, firstButton.OnClicked:Count())
     assert.same(1, #env.sceneNodes)

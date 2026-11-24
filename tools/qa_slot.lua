@@ -1,4 +1,4 @@
--- QA 存档槽配置：离线修改 game_cfg.Save.QaSlot，部署后新局生效。
+-- QA 存档槽配置：离线修改 GameCfg.Save.QaSlot，部署后新局生效。
 -- 只改源码配置，不接入游戏内 GM 通道；正在试玩时不要修改或部署。
 local M = {}
 local CONFIG = 'common/game_cfg.lua'
@@ -21,13 +21,13 @@ function M.valid_slot(slot)
     and slot:match('^[%w_-]+$') ~= nil
 end
 
--- 仅识别 game_cfg.Save 表内的非注释赋值行；格式不符时拒绝写入。
+-- 仅识别 GameCfg.Save 表内的非注释赋值行；格式不符时拒绝写入。
 local function locate(text)
-  local start = text:find('\ngame_cfg.Save%s*=%s*{')
-  if not start and text:match('^game_cfg.Save%s*=%s*{') then start = 0 end
-  if not start then return nil, '找不到 game_cfg.Save 配置' end
+  local start = text:find('\nGameCfg.Save%s*=%s*{')
+  if not start and text:match('^GameCfg.Save%s*=%s*{') then start = 0 end
+  if not start then return nil, '找不到 GameCfg.Save 配置' end
   local finish = text:find('\n}', start + 1, true)
-  if not finish then return nil, 'game_cfg.Save 配置不完整' end
+  if not finish then return nil, 'GameCfg.Save 配置不完整' end
   local section = text:sub(start + 1, finish - 1)
   local count, current, valid, updated = 0, nil, false, {}
   for line in (section .. '\n'):gmatch('([^\n]*)\n') do

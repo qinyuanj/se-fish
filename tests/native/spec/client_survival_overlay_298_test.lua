@@ -1,14 +1,14 @@
 
-local game_cfg = require("common.game_cfg")
-local client_store = require("client.store.client_store")
-local root_view = require("client.views.root_view")
-local survival_overlay_view = require("client.views.survival_overlay_view")
-local eui = require("tests.support.eui_double")
+local GameCfg = require("common.game_cfg")
+local ClientStore = require("client.store.client_store")
+local RootView = require("client.views.root_view")
+local SurvivalOverlayView = require("client.views.survival_overlay_view")
+local Eui = require("tests.support.eui_double")
 
 local function mount(store, sent)
-  local root = eui.Node({ Name = "UIRoot" })
-  local view = root_view.mount(root, store, {
-    overlays = { survival = survival_overlay_view.spec() },
+  local root = Eui.Node({ Name = "UIRoot" })
+  local view = RootView.mount(root, store, {
+    overlays = { survival = SurvivalOverlayView.spec() },
     services = {
       send_survival = function(payload)
         sent[#sent + 1] = payload
@@ -24,7 +24,7 @@ local function mount(store, sent)
       end,
     },
     create_node = function(kind, props)
-      return eui.Node({
+      return Eui.Node({
         Kind = kind,
         Name = props and props.Name,
         Parent = props and props.Parent,
@@ -59,7 +59,7 @@ describe("客户端生存蒙版宿主接缝（#298）", function()
   end)
 
   it("濒死、死亡与平台挂起按旧蒙版名与显隐矩阵建拆，按钮上行 SurvivalAction", function()
-    local store, writer = client_store.new({ initial_now = 100 })
+    local store, writer = ClientStore.new({ initial_now = 100 })
     local sent = {}
     local root = mount(store, sent)
     writer:ingest_event("SurvivalState", {
@@ -80,12 +80,12 @@ describe("客户端生存蒙版宿主接缝（#298）", function()
     assert.is_true(ad.Visible)
     assert.is_false(paid.Visible)
     assert.is_false(weak.Visible)
-    assert.equals(game_cfg.Survival.DownedTitle .. "（" .. "15" .. " 秒）", title.Text)
+    assert.equals(GameCfg.Survival.DownedTitle .. "（" .. "15" .. " 秒）", title.Text)
     assert.equals(330, ad.Position.x)
 
-    assert.is_true(eui.Click(adrenaline))
+    assert.is_true(Eui.Click(adrenaline))
     assert.same({ action = "UseAdrenaline", seq = 1 }, sent[#sent])
-    assert.is_true(eui.Click(ad))
+    assert.is_true(Eui.Click(ad))
     assert.same({ action = "FullRevive", mode = "ad", seq = 2 }, sent[#sent])
 
     writer:ingest_event("SurvivalState", {
@@ -93,7 +93,7 @@ describe("客户端生存蒙版宿主接缝（#298）", function()
       endsAt = 115,
       platformPending = "ad",
     })
-    assert.equals(game_cfg.Survival.PlatformWaitText, title.Text)
+    assert.equals(GameCfg.Survival.PlatformWaitText, title.Text)
     assert.is_false(adrenaline.Visible)
     assert.is_false(ad.Visible)
 
@@ -103,19 +103,19 @@ describe("客户端生存蒙版宿主接缝（#298）", function()
     assert.is_true(ad.Visible)
     assert.equals(10, ad.Position.x)
     assert.equals(330, paid.Position.x)
-    assert.equals(game_cfg.Survival.DeadTitle .. "（" .. "30" .. " 秒）", title.Text)
-    assert.equals(game_cfg.Survival.CallHelpText, sent[#sent].notice)
-    assert.is_true(eui.Click(paid))
+    assert.equals(GameCfg.Survival.DeadTitle .. "（" .. "30" .. " 秒）", title.Text)
+    assert.equals(GameCfg.Survival.CallHelpText, sent[#sent].notice)
+    assert.is_true(Eui.Click(paid))
     assert.same({ action = "FullRevive", mode = "goods", seq = 3 }, sent[#sent])
 
     writer:step_clock(1)
-    assert.equals(game_cfg.Survival.DeadTitle .. "（" .. "29" .. " 秒）", title.Text)
+    assert.equals(GameCfg.Survival.DeadTitle .. "（" .. "29" .. " 秒）", title.Text)
 
     writer:ingest_event("SurvivalState", { phase = "alive", weakUntil = store.clock.now() + 60 })
     assert.is_nil(child(root, "SurvivalBanner"))
     assert.is_not_nil(child(root, "SurvivalWeak"))
     assert.is_true(child(root, "SurvivalWeak").Visible)
-    assert.equals(game_cfg.Survival.WeakText .. "（" .. "60" .. " 秒）", child(root, "SurvivalWeak").Text)
+    assert.equals(GameCfg.Survival.WeakText .. "（" .. "60" .. " 秒）", child(root, "SurvivalWeak").Text)
 
     writer:ingest_event("SurvivalState", { phase = "alive" })
     assert.is_nil(child(root, "SurvivalWeak"))
@@ -124,17 +124,17 @@ describe("客户端生存蒙版宿主接缝（#298）", function()
   end)
 
   it("虚弱倒计时随 clock.second 超时后自动卸载覆盖相位并销毁节点", function()
-    local store, writer = client_store.new({ initial_now = 100 })
+    local store, writer = ClientStore.new({ initial_now = 100 })
     local sent = {}
     local root = mount(store, sent)
     writer:ingest_event("SurvivalState", { phase = "alive", weakUntil = 103 })
     local weak = child(root, "SurvivalWeak")
     assert.is_not_nil(weak)
-    assert.equals(game_cfg.Survival.WeakText .. "（3 秒）", weak.Text)
+    assert.equals(GameCfg.Survival.WeakText .. "（3 秒）", weak.Text)
 
     writer:advance_clock(2)
     assert.is_not_nil(child(root, "SurvivalWeak"))
-    assert.equals(game_cfg.Survival.WeakText .. "（1 秒）", weak.Text)
+    assert.equals(GameCfg.Survival.WeakText .. "（1 秒）", weak.Text)
 
     writer:advance_clock(1)
     assert.is_true(weak.Destroyed)
@@ -143,7 +143,7 @@ describe("客户端生存蒙版宿主接缝（#298）", function()
   end)
 
   it("根节点销毁后蒙版子节点与点击连接零残留", function()
-    local store, writer = client_store.new({ initial_now = 100 })
+    local store, writer = ClientStore.new({ initial_now = 100 })
     local sent = {}
     local root = mount(store, sent)
     writer:ingest_event("SurvivalState", { phase = "downed", endsAt = 115 })

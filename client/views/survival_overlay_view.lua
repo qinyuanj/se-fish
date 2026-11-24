@@ -1,11 +1,11 @@
 
-local game_cfg = require("common.game_cfg")
-local spoke = require("common.packages.spoke.api")
-local view_util = require("client.views.view_util")
+local GameCfg = require("common.game_cfg")
+local Spoke = require("common.packages.spoke.api")
+local ViewUtil = require("client.views.view_util")
 
-local State = spoke.State
+local State = Spoke.State
 
-local survival_overlay_view = {}
+local SurvivalOverlayView = {}
 
 local COLOR_BLOCK = "official://image/11017"
 
@@ -30,13 +30,13 @@ local function send(ctx, seq, action, mode)
     return
   end
   local ok, err = pcall(function()
-    local re = require("common.re_util"):GetRE("SurvivalAction")
-    if re and type(re.FireServer) == "function" then
-      re:FireServer(payload)
+    local Re = require("common.re_util"):GetRE("SurvivalAction")
+    if Re and type(Re.FireServer) == "function" then
+      Re:FireServer(payload)
     end
   end)
   if not ok then
-    print("[survival_overlay_view] 发送 SurvivalAction 失败", tostring(action), tostring(err))
+    print("[SurvivalOverlayView] 发送 SurvivalAction 失败", tostring(action), tostring(err))
   end
 end
 
@@ -53,7 +53,7 @@ local function make(scope, ctx, kind, parent, name, x, y, width, height, props)
 end
 
 local function mount_banner(scope, ctx, survival, seq, noticed_dead)
-  local res = view_util.get_resolution(ctx)
+  local res = ViewUtil.get_resolution(ctx)
   local cx, cy = res.x / 2, res.y / 2
   local banner = make(scope, ctx, "EUIImage", ctx.root_node, "SurvivalBanner", cx - 320, cy - 90, 640, 180, {
     Color = Color.New(0, 0, 0, 160),
@@ -75,7 +75,7 @@ local function mount_banner(scope, ctx, survival, seq, noticed_dead)
     Visible = false,
   })
   make(scope, ctx, "EUITextLabel", adrenaline, "SurvivalAdrenalineText", 0, 0, 300, 80, {
-    Text = game_cfg.Survival.AdrenalineText,
+    Text = GameCfg.Survival.AdrenalineText,
     FontSize = 32,
     TextColor = Color.New(255, 255, 255, 255),
     LocalZOrder = 1,
@@ -88,7 +88,7 @@ local function mount_banner(scope, ctx, survival, seq, noticed_dead)
     Visible = false,
   })
   make(scope, ctx, "EUITextLabel", ad, "SurvivalAdReviveText", 0, 0, 300, 80, {
-    Text = game_cfg.Survival.AdReviveText,
+    Text = GameCfg.Survival.AdReviveText,
     FontSize = 30,
     TextColor = Color.New(255, 255, 255, 255),
     LocalZOrder = 1,
@@ -101,7 +101,7 @@ local function mount_banner(scope, ctx, survival, seq, noticed_dead)
     Visible = false,
   })
   make(scope, ctx, "EUITextLabel", paid, "SurvivalPaidReviveText", 0, 0, 300, 80, {
-    Text = game_cfg.Survival.PaidReviveText,
+    Text = GameCfg.Survival.PaidReviveText,
     FontSize = 30,
     TextColor = Color.New(255, 255, 255, 255),
     LocalZOrder = 1,
@@ -112,9 +112,9 @@ local function mount_banner(scope, ctx, survival, seq, noticed_dead)
     local phase = state.phase
     local pending = state.platformPending and true or false
     local left = math.max(0, math.ceil((state.endsAt or 0) - now_of(ctx)))
-    local base = phase == "rescuing" and game_cfg.Rescue.RescuingTitle
-      or game_cfg.Survival[phase == "dead" and "DeadTitle" or "DownedTitle"]
-    title.Text = pending and game_cfg.Survival.PlatformWaitText or (base .. "（" .. tostring(left) .. " 秒）")
+    local base = phase == "rescuing" and GameCfg.Rescue.RescuingTitle
+      or GameCfg.Survival[phase == "dead" and "DeadTitle" or "DownedTitle"]
+    title.Text = pending and GameCfg.Survival.PlatformWaitText or (base .. "（" .. tostring(left) .. " 秒）")
     adrenaline.Visible = phase == "downed" and not pending
     ad.Visible = (phase == "downed" or phase == "dead") and not pending
     ad.Position = Vector2.New(phase == "downed" and 330 or 10, 20)
@@ -122,7 +122,7 @@ local function mount_banner(scope, ctx, survival, seq, noticed_dead)
     paid.Position = Vector2.New(330, 20)
     if phase == "dead" and not noticed_dead:now() then
       noticed_dead:set(true)
-      view_util.notify(ctx, game_cfg.Survival.CallHelpText)
+      ViewUtil.notify(ctx, GameCfg.Survival.CallHelpText)
     elseif phase ~= "dead" then
       noticed_dead:set(false)
     end
@@ -155,7 +155,7 @@ local function mount_banner(scope, ctx, survival, seq, noticed_dead)
 end
 
 local function mount_weak(scope, ctx, survival)
-  local res = view_util.get_resolution(ctx)
+  local res = ViewUtil.get_resolution(ctx)
   local label = make(scope, ctx, "EUITextLabel", ctx.root_node, "SurvivalWeak", res.x / 2 - 320, res.y - 200, 640, 60, {
     Text = "",
     FontSize = 30,
@@ -167,11 +167,11 @@ local function mount_weak(scope, ctx, survival)
     es:d(ctx.clock.second)
     local left = math.max(0, math.ceil((state.weakUntil or 0) - now_of(ctx)))
     label.Visible = left > 0
-    label.Text = game_cfg.Survival.WeakText .. "（" .. tostring(left) .. " 秒）"
+    label.Text = GameCfg.Survival.WeakText .. "（" .. tostring(left) .. " 秒）"
   end)
 end
 
-function survival_overlay_view.spec()
+function SurvivalOverlayView.spec()
   return {
     name = "SurvivalOverlay",
     when = function(ms, store)
@@ -200,4 +200,4 @@ function survival_overlay_view.spec()
   }
 end
 
-return survival_overlay_view
+return SurvivalOverlayView

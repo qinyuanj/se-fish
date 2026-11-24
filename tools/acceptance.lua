@@ -30,7 +30,7 @@ M.NON_LEGACY_LANES = { 'spec', 'guards' }
 M.VOCABULARY = {
   group = { '契约', '规则', '功能' },
   executor = { 'agent', '人', '试玩', '平台' },
-  level = { 'a', 'b', 'C' },
+  level = { 'A', 'B', 'C' },
   status = { 'unverified', 'evidenced', 'accepted', 'blocked', 'out-of-scope' },
 }
 -- 状态词表再暴露一份：计数、缺口密度与棘轮都按它逐项列。
@@ -178,7 +178,7 @@ function M.clause_mentioned(body, id)
   return body:find('%f[%w]' .. escaped .. '%f[%W]') ~= nil
 end
 
--- GameSpec 的小节：只看 '## n. 标题' 这一种标题；别的层级不算小节。
+-- GameSpec 的小节：只看 '## N. 标题' 这一种标题；别的层级不算小节。
 function M.spec_sections(body)
   local sections = {}
   each_line(body, function(number, line)
@@ -246,7 +246,7 @@ function M.signed(cell)
   return type(cell) == 'string' and cell:find(M.SIGNATURE) ~= nil
 end
 
--- 条款行 = 表格行且首格形如 'n-NN'；表头、分隔行与别处的表都不算条款行。
+-- 条款行 = 表格行且首格形如 'N-NN'；表头、分隔行与别处的表都不算条款行。
 -- 首格形如数字-数字却不是「节号 + 两位序号」的，单独记 clause_id 违规，不静默跳过。
 -- 条款所属小节 = 它上方最近的 '## ' 标题：分片可以有任意张小表、任意个小节，
 -- 只要求「## C 级」小节里的条款等级是 C、「## C 级」以外的条款不是 C（正文见 TEMPLATE 2.1）。
@@ -540,7 +540,7 @@ end
 local function check_spec(matrix, add)
   local sections = matrix.spec.sections
   if #sections ~= M.SPEC_SECTIONS then
-    add('spec_sections', string.format('%s 应有 %d 个「## n. 」小节，实际 %d 个',
+    add('spec_sections', string.format('%s 应有 %d 个「## N. 」小节，实际 %d 个',
       M.SPEC, M.SPEC_SECTIONS, #sections), M.SPEC)
   end
   for index, section in ipairs(sections) do

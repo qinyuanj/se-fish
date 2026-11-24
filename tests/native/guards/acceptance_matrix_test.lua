@@ -9,18 +9,18 @@
 -- shard_unreadable、shard_title、clause_cells、index_unreadable、busted_unreadable、
 -- baseline_unreadable。它们都由同一个 M.scan → M.check 管道产出，先靠真实矩阵与上面这些用例守着；
 -- 补夹具时照本文件的写法：只改坏一处，断言 kinds 精确等于那一条。
-local acceptance = require('tools.acceptance')
+local Acceptance = require('tools.acceptance')
 local fs = require('tests.support.fs_fixture')
 local fixture = require('tests.support.acceptance_fixture')
 
--- 真实仓库只扫一次：arch.scan 那样的惯例，四个用例共享同一份结果。
+-- 真实仓库只扫一次：Arch.scan 那样的惯例，四个用例共享同一份结果。
 local scanned, verified
 local function real_matrix()
-  if not scanned then scanned = acceptance.scan('.') end
+  if not scanned then scanned = Acceptance.scan('.') end
   return scanned
 end
 local function real_verify()
-  if not verified then verified = acceptance.verify('.') end
+  if not verified then verified = Acceptance.verify('.') end
   return verified
 end
 
@@ -47,9 +47,9 @@ describe('验收矩阵门禁', function()
 
   it('真实矩阵恰好覆盖规格的 19 个小节，节号连续', function()
     local matrix = real_matrix()
-    assert.same(acceptance.SPEC_SECTIONS, #matrix.spec.sections)
-    assert.same(acceptance.SPEC_SECTIONS, #matrix.shards)
-    for number = 1, acceptance.SPEC_SECTIONS do
+    assert.same(Acceptance.SPEC_SECTIONS, #matrix.spec.sections)
+    assert.same(Acceptance.SPEC_SECTIONS, #matrix.shards)
+    for number = 1, Acceptance.SPEC_SECTIONS do
       local list = matrix.by_section[number]
       assert.is_not_nil(list, '第 ' .. number .. ' 节没有分片')
       assert.same(1, #list, '第 ' .. number .. ' 节有多份分片')
@@ -63,7 +63,7 @@ describe('验收矩阵门禁', function()
     local legacy = matrix.lanes.legacy
     assert.is_not_nil(legacy, '读不到车道定义')
     assert.is_true(#legacy > 0)
-    local spec_lane = acceptance.lane_files('.', matrix.lanes.config, 'spec')
+    local spec_lane = Acceptance.lane_files('.', matrix.lanes.config, 'spec')
     assert.is_true(#spec_lane > 0, 'spec 车道里没有文件：条款断言还没落地')
     local counted = {}
     for _, path in ipairs(legacy) do counted[path] = true end
@@ -74,14 +74,14 @@ describe('验收矩阵门禁', function()
 
   it('真实实现覆盖表：已贯通小节的非试玩条款没有空落点', function()
     local matrix = real_matrix()
-    assert.is_not_nil(matrix.coverage, '读不到实现覆盖表：' .. acceptance.COVERAGE)
+    assert.is_not_nil(matrix.coverage, '读不到实现覆盖表：' .. Acceptance.COVERAGE)
     local landed = {}
     for _, row in ipairs(matrix.coverage.rows) do
       assert.is_truthy(row.landing ~= nil and row.landing ~= '' and row.landing ~= '—',
         '覆盖表里的 ' .. row.id .. ' 没有代码落点')
       landed[row.id] = true
     end
-    for _, section in ipairs(acceptance.COVERAGE_SECTIONS) do
+    for _, section in ipairs(Acceptance.COVERAGE_SECTIONS) do
       for _, shard in ipairs(matrix.by_section[section] or {}) do
         for _, clause in ipairs(shard.clauses) do
           if clause.executor ~= '试玩' then
@@ -109,7 +109,7 @@ describe('验收矩阵门禁', function()
     after_each(function() fs.rmrf(root) end)
 
     local function verify()
-      local result = acceptance.verify(root)
+      local result = Acceptance.verify(root)
       return result.ok, kinds(result.findings), messages(result.findings)
     end
 
@@ -159,11 +159,11 @@ describe('验收矩阵门禁', function()
     end)
 
     it('条款号按完整 ID 认：9-12 不认 19-12、09-12 与 9-120', function()
-      assert.is_true(acceptance.clause_mentioned('-- 条款 9-12：断言', '9-12'))
-      assert.is_true(acceptance.clause_mentioned('9-12 的断言', '9-12'))
-      assert.is_false(acceptance.clause_mentioned('-- 条款 19-12：断言', '9-12'))
-      assert.is_false(acceptance.clause_mentioned('-- 条款 09-12：断言', '9-12'))
-      assert.is_false(acceptance.clause_mentioned('-- 条款 9-120：断言', '9-12'))
+      assert.is_true(Acceptance.clause_mentioned('-- 条款 9-12：断言', '9-12'))
+      assert.is_true(Acceptance.clause_mentioned('9-12 的断言', '9-12'))
+      assert.is_false(Acceptance.clause_mentioned('-- 条款 19-12：断言', '9-12'))
+      assert.is_false(Acceptance.clause_mentioned('-- 条款 09-12：断言', '9-12'))
+      assert.is_false(Acceptance.clause_mentioned('-- 条款 9-120：断言', '9-12'))
     end)
 
     it('已取证计数低于基线就红', function()
@@ -182,16 +182,16 @@ describe('验收矩阵门禁', function()
 
     it('手改 README 生成块里的一个数字就红', function()
       -- 改合计行的数字：条款数一变，手改的串也不跟着变，用例才稳。
-      fixture.patch(root, acceptance.INDEX, '| 合计 | — |', '| 合计 | — | 9')
+      fixture.patch(root, Acceptance.INDEX, '| 合计 | — |', '| 合计 | — | 9')
       local ok, found, text = verify()
       assert.is_false(ok)
       assert.same({ 'index_stale' }, found, text)
     end)
 
     it('新增条款后不重跑 --write 就红，重跑后恢复且幂等', function()
-      fixture.patch(root, fixture.shard(4), '| 4-01 | 夹具条款：第 4 节第一条 | 规则 | agent | a | unverified | — |',
-        '| 4-01 | 夹具条款：第 4 节第一条 | 规则 | agent | a | unverified | — |\n'
-          .. '| 4-02 | 夹具条款：新加的一条 | 规则 | agent | a | unverified | — |')
+      fixture.patch(root, fixture.shard(4), '| 4-01 | 夹具条款：第 4 节第一条 | 规则 | agent | A | unverified | — |',
+        '| 4-01 | 夹具条款：第 4 节第一条 | 规则 | agent | A | unverified | — |\n'
+          .. '| 4-02 | 夹具条款：新加的一条 | 规则 | agent | A | unverified | — |')
       local ok, found, text = verify()
       assert.is_false(ok)
       assert.same({ 'index_stale' }, found, text)
@@ -204,7 +204,7 @@ describe('验收矩阵门禁', function()
     end)
 
     it('覆盖表的代码落点写成破折号就红', function()
-      fixture.patch(root, acceptance.COVERAGE,
+      fixture.patch(root, Acceptance.COVERAGE,
         '| 1-01 | server/platform_host.lua |', '| 1-01 | — |')
       local ok, found, text = verify()
       assert.is_false(ok)
@@ -212,31 +212,31 @@ describe('验收矩阵门禁', function()
     end)
 
     it('覆盖表的代码落点是不存在的文件就红', function()
-      fixture.patch(root, acceptance.COVERAGE,
-        '| 1-02 | server/platform_host.lua |', '| 1-02 | server/mgr/GonePlatform.lua |')
+      fixture.patch(root, Acceptance.COVERAGE,
+        '| 1-02 | server/platform_host.lua |', '| 1-02 | server/Mgr/GonePlatform.lua |')
       local ok, found, text = verify()
       assert.is_false(ok)
       assert.same({ 'coverage_landing_path' }, found, text)
     end)
 
     it('已贯通小节里的非试玩条款漏登记就红', function()
-      fixture.patch(root, acceptance.COVERAGE,
-        '\n| 1-02 | server/platform_host.lua | — | 缺 | 缺 | 缺 | 缺 | b |', '')
+      fixture.patch(root, Acceptance.COVERAGE,
+        '\n| 1-02 | server/platform_host.lua | — | 缺 | 缺 | 缺 | 缺 | B |', '')
       local ok, found, text = verify()
       assert.is_false(ok)
       assert.same({ 'coverage_clause_missing' }, found, text)
     end)
 
     it('覆盖表的等级与矩阵不一致就红', function()
-      fixture.patch(root, acceptance.COVERAGE,
-        '| 缺 | 缺 | 缺 | 缺 | b |', '| 缺 | 缺 | 缺 | 缺 | a |')
+      fixture.patch(root, Acceptance.COVERAGE,
+        '| 缺 | 缺 | 缺 | 缺 | B |', '| 缺 | 缺 | 缺 | 缺 | A |')
       local ok, found, text = verify()
       assert.is_false(ok)
       assert.same({ 'coverage_level' }, found, text)
     end)
 
     it('覆盖表的关联测试是不存在的文件就红', function()
-      fixture.patch(root, acceptance.COVERAGE, 'tests/native/alpha_test.lua',
+      fixture.patch(root, Acceptance.COVERAGE, 'tests/native/alpha_test.lua',
         'tests/native/gone_test.lua')
       local ok, found, text = verify()
       assert.is_false(ok)
@@ -258,7 +258,7 @@ describe('验收矩阵门禁', function()
     end)
 
     it('GameSpec 里塞一个工单编号就红', function()
-      fixture.patch(root, acceptance.SPEC, '正文。', '正文（见 #123）。')
+      fixture.patch(root, Acceptance.SPEC, '正文。', '正文（见 #123）。')
       local ok, found, text = verify()
       assert.is_false(ok)
       assert.same({ 'spec_issue_ref' }, found, text)
@@ -267,7 +267,7 @@ describe('验收矩阵门禁', function()
     -- 工单编号的四种写法都要认：井号加数字、空白夹着的 # 46、中文「工单46」、英文 issue 46。
     for _, sample in ipairs({ '#123', '# 46', '工单46', 'issue 46' }) do
       it('GameSpec 里的工单编号写法 ' .. sample .. ' 也判红', function()
-        fixture.patch(root, acceptance.SPEC, '正文。', '正文（见 ' .. sample .. '）。')
+        fixture.patch(root, Acceptance.SPEC, '正文。', '正文（见 ' .. sample .. '）。')
         local ok, found, text = verify()
         assert.is_false(ok)
         assert.same({ 'spec_issue_ref' }, found, text)
@@ -282,9 +282,9 @@ describe('验收矩阵门禁', function()
     end)
 
     it('Markdown 标题不是工单编号：## 1. 概述 与 # 12. 标题 都不命中', function()
-      assert.same({}, acceptance.issue_refs('## 1. 概述与范围'))
-      assert.same({}, acceptance.issue_refs('# 12. 精英与首领行为'))
-      assert.same({}, acceptance.issue_refs('| 9-07 | 只有距离 2 米内才能发起组队邀请 |'))
+      assert.same({}, Acceptance.issue_refs('## 1. 概述与范围'))
+      assert.same({}, Acceptance.issue_refs('# 12. 精英与首领行为'))
+      assert.same({}, Acceptance.issue_refs('| 9-07 | 只有距离 2 米内才能发起组队邀请 |'))
     end)
 
     it('条款写成不可判的措辞就红', function()
@@ -295,7 +295,7 @@ describe('验收矩阵门禁', function()
     end)
 
     it('accepted 的证据列没有签署格式就红', function()
-      fixture.patch(root, fixture.shard(3), '| a | evidenced |', '| a | accepted |')
+      fixture.patch(root, fixture.shard(3), '| A | evidenced |', '| A | accepted |')
       -- 生成块里 evidenced 与 accepted 是两列，改了状态要先同步索引，本用例只问签署这一条规则。
       fixture.sync_index(root)
       local ok, found, text = verify()
@@ -317,22 +317,22 @@ describe('验收矩阵门禁', function()
     end)
 
     it('状态写成词表外的 done 就红', function()
-      fixture.patch(root, fixture.shard(5), 'a | unverified |', 'a | done |')
+      fixture.patch(root, fixture.shard(5), 'A | unverified |', 'A | done |')
       fixture.sync_index(root)
       local ok, found, text = verify()
       assert.is_false(ok)
       assert.same({ 'vocabulary' }, found, text)
     end)
 
-    it('C 级小节里的条款写成 a 级就红', function()
-      fixture.patch(root, fixture.shard(1), '| 规则 | 试玩 | C | blocked |', '| 规则 | 试玩 | a | blocked |')
+    it('C 级小节里的条款写成 A 级就红', function()
+      fixture.patch(root, fixture.shard(1), '| 规则 | 试玩 | C | blocked |', '| 规则 | 试玩 | A | blocked |')
       local ok, found, text = verify()
       assert.is_false(ok)
       assert.same({ 'level_section' }, found, text)
     end)
 
     it('C 级条款放在没有「## C 级」的正文表里就红', function()
-      fixture.patch(root, fixture.shard(2), '| 功能 | agent | a | out-of-scope |',
+      fixture.patch(root, fixture.shard(2), '| 功能 | agent | A | out-of-scope |',
         '| 功能 | agent | C | out-of-scope |')
       local ok, found, text = verify()
       assert.is_false(ok)
@@ -354,13 +354,13 @@ describe('验收矩阵门禁', function()
     end)
 
     it('分片节号超出规格小节数就红', function()
-      fs.write_file(root .. '/' .. fixture.shard(acceptance.SPEC_SECTIONS + 1), table.concat({
-        '# ' .. (acceptance.SPEC_SECTIONS + 1) .. '. 夹具小节外多出的一节',
+      fs.write_file(root .. '/' .. fixture.shard(Acceptance.SPEC_SECTIONS + 1), table.concat({
+        '# ' .. (Acceptance.SPEC_SECTIONS + 1) .. '. 夹具小节外多出的一节',
         '',
         '| ID | 条款 | 组 | 执行者 | 证据等级 | 状态 | 证据 / 理由 |',
         '| --- | --- | --- | --- | --- | --- | --- |',
-        string.format('| %d-01 | 夹具条款：超出规格的那条 | 规则 | agent | a | unverified | — |',
-          acceptance.SPEC_SECTIONS + 1),
+        string.format('| %d-01 | 夹具条款：超出规格的那条 | 规则 | agent | A | unverified | — |',
+          Acceptance.SPEC_SECTIONS + 1),
         '',
       }, '\n'))
       fixture.sync_index(root)
@@ -370,7 +370,7 @@ describe('验收矩阵门禁', function()
     end)
 
     it('README 缺少生成块标记就红', function()
-      fixture.patch(root, acceptance.INDEX, acceptance.BEGIN_MARK, '')
+      fixture.patch(root, Acceptance.INDEX, Acceptance.BEGIN_MARK, '')
       local ok, found, text = verify()
       assert.is_false(ok)
       assert.same({ 'index_markers' }, found, text)
@@ -384,7 +384,7 @@ describe('验收矩阵门禁', function()
     end)
 
     it('多一份同节分片就红', function()
-      fs.write_file(root .. '/' .. acceptance.DIR .. '/07-second.md',
+      fs.write_file(root .. '/' .. Acceptance.DIR .. '/07-second.md',
         fs.slurp(root .. '/' .. fixture.shard(7)))
       fixture.sync_index(root)
       local ok, found, text = verify()
@@ -393,9 +393,9 @@ describe('验收矩阵门禁', function()
     end)
 
     it('spec 车道的断言不计入遗留测试', function()
-      local before = #acceptance.scan(root).lanes.legacy
+      local before = #Acceptance.scan(root).lanes.legacy
       fs.write_file(root .. '/tests/native/spec/two_test.lua', '-- 夹具：多一条条款断言。\n')
-      local after = #acceptance.scan(root).lanes.legacy
+      local after = #Acceptance.scan(root).lanes.legacy
       assert.same(before, after, 'spec 新文件不该改变遗留测试数')
     end)
   end)

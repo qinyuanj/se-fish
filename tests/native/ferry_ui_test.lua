@@ -1,9 +1,9 @@
 
-local eui = require('tests.support.eui_double')
+local Eui = require('tests.support.eui_double')
 
 local function vec(x, y, z) return { x = x, y = y, z = z } end
 
-describe('客户端摆渡统一视图树（root_view × client_store）', function()
+describe('客户端摆渡统一视图树（RootView × ClientStore）', function()
   local env
   local restore
 
@@ -45,26 +45,26 @@ describe('客户端摆渡统一视图树（root_view × client_store）', functi
         if entity.Role == 'Ferry' then env.anchor_positions[entity.Name] = entity.Position end
       end
     end
-    local client_store = require('client.store.client_store')
-    local root_view = require('client.views.root_view')
-    local ferry_view = require('client.views.ferry_view')
-    env.store, env.writer = client_store.new({ initial_now = 100 })
-    env.root = eui.Node({ Name = 'UIRoot' })
-    env.view = root_view.mount(env.root, env.store, {
-      hud = { ferry_view.spec() },
-      docks = { ferry = ferry_view.legs_spec() },
+    local ClientStore = require('client.store.client_store')
+    local RootView = require('client.views.root_view')
+    local FerryView = require('client.views.ferry_view')
+    env.store, env.writer = ClientStore.new({ initial_now = 100 })
+    env.root = Eui.Node({ Name = 'UIRoot' })
+    env.view = RootView.mount(env.root, env.store, {
+      hud = { FerryView.spec() },
+      docks = { ferry = FerryView.legs_spec() },
       services = {
         send_ferry = function(payload) env.sent[#env.sent + 1] = payload end,
         notify = function(text) env.notices[#env.notices + 1] = text end,
         create_scene_node = function(position, name)
-          local node = eui.Node({ Name = name, Kind = 'EUISceneNode', Parent = env.root,
+          local node = Eui.Node({ Name = name, Kind = 'EUISceneNode', Parent = env.root,
             Position = position, Visible = true })
           env.created[#env.created + 1] = node
           return node
         end,
       },
       create_node = function(kind, props)
-        local node = eui.Node({ Kind = kind, Name = props and props.Name,
+        local node = Eui.Node({ Kind = kind, Name = props and props.Name,
           Parent = props and props.Parent, Visible = props and props.Visible ~= false,
           Text = props and (props.Text or props.ButtonText) or '',
           ButtonText = props and props.ButtonText,
@@ -93,7 +93,7 @@ describe('客户端摆渡统一视图树（root_view × client_store）', functi
         local button = child('BtnFerry' .. leg.point.AnchorName)
         assert.is_not_nil(button)
         assert.same(leg.text, button.Text)
-        assert.is_true(eui.Click(button))
+        assert.is_true(Eui.Click(button))
         seq = seq + 1
         assert.same({ action = leg.action, routeId = route.Id, seq = seq }, env.sent[#env.sent])
       end

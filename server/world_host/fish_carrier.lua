@@ -1,38 +1,38 @@
 
-local game_cfg = require("common.game_cfg")
-local number = require("common.number")
-local damage_notice = require("common.damage_notice")
+local GameCfg = require("common.game_cfg")
+local Number = require("common.number")
+local DamageNotice = require("common.damage_notice")
 
-local mgr = {}
+local Mgr = {}
 
-mgr.RECEIVER_NAME = "FishHitReceiver"
-mgr.BODY_NAME_PREFIX = "fish_carrier"
-mgr.BodySeq = 0
+Mgr.RECEIVER_NAME = "FishHitReceiver"
+Mgr.BODY_NAME_PREFIX = "FishCarrier"
+Mgr.BodySeq = 0
 
-mgr.DEFAULT_MAX_HEALTH = 100
+Mgr.DEFAULT_MAX_HEALTH = 100
 
-mgr.Carriers = {}
-mgr.Subscribers = {}
+Mgr.Carriers = {}
+Mgr.Subscribers = {}
 
 
 local function isPositiveNumber(v)
-	return number.IsFiniteNumber(v) and v > 0
+	return Number.IsFiniteNumber(v) and v > 0
 end
 
 local function resolveMaxHealth(opts, cfg)
-	cfg = cfg or game_cfg.fish_carrier or {}
+	cfg = cfg or GameCfg.FishCarrier or {}
 	local v = opts and opts.MaxHealth
 	if v == nil then
 		v = cfg.MaxHealth
 	end
 	if not isPositiveNumber(v) then
-		return mgr.DEFAULT_MAX_HEALTH
+		return Mgr.DEFAULT_MAX_HEALTH
 	end
 	return v
 end
 
 local function resolveMesh(opts, cfg)
-	cfg = cfg or game_cfg.fish_carrier or {}
+	cfg = cfg or GameCfg.FishCarrier or {}
 	if opts and opts.RenderMeshId and opts.RenderMeshId ~= "" then
 		return opts.RenderMeshId
 	end
@@ -46,8 +46,8 @@ local function resolveMesh(opts, cfg)
 	return nil
 end
 
-mgr.ResolveMaxHealth = resolveMaxHealth
-mgr.ResolveMesh = resolveMesh
+Mgr.ResolveMaxHealth = resolveMaxHealth
+Mgr.ResolveMesh = resolveMesh
 
 
 local function readPosition(unit)
@@ -88,7 +88,7 @@ local function syncReceiver(carrier, targetPosition)
 	end)
 end
 
-function mgr:SubscribeDied(fn)
+function Mgr:SubscribeDied(fn)
 	if type(fn) ~= "function" then
 		return false
 	end
@@ -96,7 +96,7 @@ function mgr:SubscribeDied(fn)
 	return true
 end
 
-function mgr:UnsubscribeDied(fn)
+function Mgr:UnsubscribeDied(fn)
 	if type(fn) ~= "function" then
 		return false
 	end
@@ -109,18 +109,18 @@ function mgr:UnsubscribeDied(fn)
 	return false
 end
 
-function mgr:SyncPosition(carrier, targetPosition)
+function Mgr:SyncPosition(carrier, targetPosition)
 	carrier.SkipNextAutoSync = targetPosition ~= nil
 	syncReceiver(carrier, targetPosition)
 end
 
-function mgr:SyncAiPosition(carrier)
+function Mgr:SyncAiPosition(carrier)
 	if not carrier or not carrier.AiOwnsMovement then return true end
 	local ok, err = pcall(function()
 		local p = carrier.Receiver.Position
 		for _, key in ipairs({ 'x', 'y', 'z' }) do
 			local value = p and p[key]
-			assert(number.IsFiniteNumber(value), '受击体坐标异常：' .. key)
+			assert(Number.IsFiniteNumber(value), '受击体坐标异常：' .. key)
 		end
 		local offset = carrier.ReceiverOffset or Vector3.New(0, 0, 0)
 		carrier.Body.Position = Vector3.New(p.x - offset.x, p.y - offset.y, p.z - offset.z)
@@ -128,7 +128,7 @@ function mgr:SyncAiPosition(carrier)
 	end)
 	if not ok then
 		carrier.AiOwnsMovement = false
-		print('[fish_carrier] operation=SyncAiPosition', carrier.Body and carrier.Body.UnitId, tostring(err))
+		print('[FishCarrier] operation=SyncAiPosition', carrier.Body and carrier.Body.UnitId, tostring(err))
 	end
 	return ok
 end
@@ -136,7 +136,7 @@ end
 -- 实测（M18 台账 §11.3）：致命那一下引擎**只发 `Died`、不发 `HealthChanged`**，所以两条都要接。
 -- 通知前把 Controller 的真血量同步回记录：致命一击时 Died 早于 HealthChanged，
 -- 订阅者若读 carrier.Health 会看到上一档的值（实测读到 25 而不是 0）。
-function mgr:RecordHealth(carrier)
+function Mgr:RecordHealth(carrier)
 	if not carrier or carrier.Dead or not carrier.Controller then return end
 	local ok, health = pcall(function() return carrier.Controller.Health end)
 	if not ok or type(health) ~= 'number' or health ~= health then return end
@@ -153,20 +153,20 @@ function mgr:RecordHealth(carrier)
 		if position then
 			local heightOk, size = pcall(function() return carrier.Body.Size end)
 			local height = heightOk and size and size.y
-			local payload = damage_notice.FromHealth(carrier.Body.UnitId, previous, health, position,
+			local payload = DamageNotice.FromHealth(carrier.Body.UnitId, previous, health, position,
 				nil, 'fish', height)
 			if payload then
-				print('[fish_carrier] 实际扣血', payload.targetId, previous, health, payload.amount)
-				local sent, err = pcall(self.DamagePublisher or damage_notice.Publish, payload)
-				if not sent then print('[fish_carrier] 伤害通知失败', carrier.Body.UnitId, tostring(err)) end
+				print('[FishCarrier] 实际扣血', payload.targetId, previous, health, payload.amount)
+				local sent, err = pcall(self.DamagePublisher or DamageNotice.Publish, payload)
+				if not sent then print('[FishCarrier] 伤害通知失败', carrier.Body.UnitId, tostring(err)) end
 			end
 		else
-			print('[fish_carrier] 实际扣血缺少受伤位置', carrier.Body.UnitId, previous, health)
+			print('[FishCarrier] 实际扣血缺少受伤位置', carrier.Body.UnitId, previous, health)
 		end
 	end
 end
 
-function mgr:NotifyDied(carrier)
+function Mgr:NotifyDied(carrier)
 	if not carrier or carrier.Dead then
 		return
 	end
@@ -185,7 +185,7 @@ function mgr:NotifyDied(carrier)
 	end
 end
 
-function mgr:ResolveCarrier(target)
+function Mgr:ResolveCarrier(target)
     if not target then return nil end
     for _, carrier in pairs(self.Carriers) do
         if target == carrier or target == carrier.Body or target == carrier.Receiver
@@ -195,7 +195,7 @@ function mgr:ResolveCarrier(target)
     end
 end
 
-function mgr:Attach(body, opts)
+function Mgr:Attach(body, opts)
 	opts = opts or {}
 	local World = rawget(_G, "game") and game:GetService("World") or nil
 	local createUnit = opts.CreateUnit or function(kind, props)
@@ -211,14 +211,14 @@ function mgr:Attach(body, opts)
 	-- 受击体：与鱼本体同名的受击点。EggyUnit + EnableController 是引擎里唯一「脚本能建、
 	-- 又带 Controller」的单位类型（WorldUnit 挂不上 Controller，#32 的根因）。
 	local receiver = createUnit("EggyUnit", {
-		Name = mgr.RECEIVER_NAME .. "_" .. tostring(body.UnitId),
+		Name = Mgr.RECEIVER_NAME .. "_" .. tostring(body.UnitId),
 		Parent = body,
 		Position = pos + (opts.ReceiverOffset or Vector3.New(0, 0, 0)),
 		EnableController = true,
 		Visible = false,
 	})
 	if not receiver then
-		print("[fish_carrier] 受击体创建失败，这条鱼不会被挥砍扣血: " .. tostring(body.UnitId))
+		print("[FishCarrier] 受击体创建失败，这条鱼不会被挥砍扣血: " .. tostring(body.UnitId))
 		return nil
 	end
 
@@ -227,7 +227,7 @@ function mgr:Attach(body, opts)
 		pcall(function()
 			receiver:Destroy()
 		end)
-		print("[fish_carrier] 受击体没有 Controller，伤害接口不成立: " .. tostring(body.UnitId))
+		print("[FishCarrier] 受击体没有 Controller，伤害接口不成立: " .. tostring(body.UnitId))
 		return nil
 	end
 
@@ -248,13 +248,13 @@ function mgr:Attach(body, opts)
 	}
 
 	carrier.HealthConn = controller.HealthChanged:Connect(function()
-		mgr:RecordHealth(carrier)
+		Mgr:RecordHealth(carrier)
 		if carrier.Health <= 0 then
-			mgr:NotifyDied(carrier)
+			Mgr:NotifyDied(carrier)
 		end
 	end)
 	carrier.DiedConn = controller.Died:Connect(function()
-		mgr:NotifyDied(carrier)
+		Mgr:NotifyDied(carrier)
 	end)
 
 	if body.AddNoCollisionPairWithUnit then
@@ -268,7 +268,7 @@ end
 ---建一条鱼载体：鱼本体（WorldUnit + 官方鱼模型）+ 伤害接口
 ---@param opts Table { Position, Rotation, FishId, MaxHealth, RenderMeshId, ModelId, Mass, BodyType, GravityEnabled, LinearDamping, AngularDamping, ReceiverOffset, Player }
 ---@return Table? carrier, string? 失败原因
-function mgr:Spawn(opts)
+function Mgr:Spawn(opts)
 	opts = opts or {}
 	local World = rawget(_G, "game") and game:GetService("World") or nil
 	local createUnit = opts.CreateUnit or function(kind, props)
@@ -282,12 +282,12 @@ function mgr:Spawn(opts)
 		return nil, "no-mesh"
 	end
 
-	local cfg = game_cfg.fish_carrier or {}
-	local species = game_cfg.Fish[opts.FishId]
+	local cfg = GameCfg.FishCarrier or {}
+	local species = GameCfg.Fish[opts.FishId]
 	local tint = species and species.VisualColor
-	mgr.BodySeq = mgr.BodySeq + 1
+	Mgr.BodySeq = Mgr.BodySeq + 1
 	local values = {
-		Name = mgr.BODY_NAME_PREFIX .. "_" .. tostring(mgr.BodySeq) .. "_" .. tostring(opts.FishId or "unknown"),
+		Name = Mgr.BODY_NAME_PREFIX .. "_" .. tostring(Mgr.BodySeq) .. "_" .. tostring(opts.FishId or "unknown"),
 		Position = opts.Position or Vector3.New(0, 0, 0),
 		Rotation = opts.Rotation or Quaternion.FromEulerAngles(0, 0, 0),
 		RenderMeshId = mesh,
@@ -329,7 +329,7 @@ function mgr:Spawn(opts)
 end
 
 ---单点造成的伤害；业务调用必须带 MgrVitals 颁发的命中身份
-function mgr:Damage(carrier, damage, hit)
+function Mgr:Damage(carrier, damage, hit)
 	if not carrier or carrier.Dead or not carrier.Controller
 		or type(hit) ~= 'table' or type(hit.id) ~= 'number' then
 		return false
@@ -341,7 +341,7 @@ function mgr:Damage(carrier, damage, hit)
 	if not beforeOk or type(before) ~= 'number' then return false end
 	local ok, err = pcall(function() carrier.Controller:TakeDamage(damage) end)
 	if not ok then
-		print('[fish_carrier] 受击扣血失败', carrier.Body and carrier.Body.UnitId, tostring(err))
+		print('[FishCarrier] 受击扣血失败', carrier.Body and carrier.Body.UnitId, tostring(err))
 		return false
 	end
 	self:RecordHealth(carrier)
@@ -351,12 +351,12 @@ function mgr:Damage(carrier, damage, hit)
 	local actual = before - after
 	if self.DamageListener then
 		local notified, notifyErr = pcall(self.DamageListener, carrier, actual, hit)
-		if not notified then print('[fish_carrier] 有效伤害通知失败', carrier.Body and carrier.Body.UnitId, tostring(notifyErr)) end
+		if not notified then print('[FishCarrier] 有效伤害通知失败', carrier.Body and carrier.Body.UnitId, tostring(notifyErr)) end
 	end
 	return true, actual
 end
 
-function mgr:Despawn(carrier)
+function Mgr:Despawn(carrier)
 	if not carrier then
 		return
 	end
@@ -384,20 +384,20 @@ function mgr:Despawn(carrier)
 	carrier.Controller = nil
 end
 
-function mgr:Start()
+function Mgr:Start()
 end
 
-function mgr:OnPlayerAdded(player)
+function Mgr:OnPlayerAdded(player)
 end
 
-function mgr:OnPlayerRemoving(player)
+function Mgr:OnPlayerRemoving(player)
 end
 
-function mgr:Update(deltaTime)
+function Mgr:Update(deltaTime)
 	for _, carrier in pairs(self.Carriers) do
 		if carrier.SkipNextAutoSync then carrier.SkipNextAutoSync = nil
 		else syncReceiver(carrier) end
 	end
 end
 
-return mgr
+return Mgr

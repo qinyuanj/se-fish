@@ -1,6 +1,6 @@
 
-local game_cfg = require("common.game_cfg")
-local server_runtime = require("server.world_host.server_runtime")
+local GameCfg = require("common.game_cfg")
+local ServerRuntime = require("server.world_host.server_runtime")
 
 local function signal()
   local handlers = {}
@@ -32,7 +32,7 @@ local function make_character(x, y, z, fx, fz)
     Controller = {
       GravityEnabled = true,
       WalkSpeed = 6,
-      Health = game_cfg.vitals.MaxHealth,
+      Health = GameCfg.Vitals.MaxHealth,
       TakeDamage = function(self, amount) self.Health = self.Health - amount end,
     },
     Calls = {},
@@ -83,21 +83,21 @@ local function make_data(player, item_id, zone)
     Player = player,
     Inited = true,
     LoadState = "ready",
-    data = {
+    Data = {
       FishCoin = 0,
       Zone = zone or "fishPond",
       SelectedSlot = item_id and 1 or nil,
       UpgradeLevel = 0,
       Containers = {
-        [game_cfg.Items.ContainerId.ItemBar] = bar,
-        [game_cfg.Items.ContainerId.Backpack] = {},
+        [GameCfg.Items.ContainerId.ItemBar] = bar,
+        [GameCfg.Items.ContainerId.Backpack] = {},
       },
       Bait = {},
       Weapons = {},
     },
     Extra = {
       cooldowns = {},
-      survival = { health = game_cfg.vitals.MaxHealth, hunger = game_cfg.vitals.MaxHunger },
+      survival = { health = GameCfg.Vitals.MaxHealth, hunger = GameCfg.Vitals.MaxHunger },
     },
   }
 end
@@ -139,9 +139,9 @@ describe("风神之翼与哥斯拉存活相位宿主接缝（#299）", function(
 
   local function select_item(target, item_id)
     local record = target == player and data or other_data
-    local bar = record.data.Containers[game_cfg.Items.ContainerId.ItemBar]
+    local bar = record.Data.Containers[GameCfg.Items.ContainerId.ItemBar]
     bar[1] = item_id and { itemId = item_id, count = 1 } or nil
-    record.data.SelectedSlot = item_id and 1 or nil
+    record.Data.SelectedSlot = item_id and 1 or nil
     runtime:get_player_tree(target.UserId):sync_from_data(record)
   end
 
@@ -157,7 +157,7 @@ describe("风神之翼与哥斯拉存活相位宿主接缝（#299）", function(
     other = make_player(2, 8, 5.01, 40)
     data = make_data(player, item_id)
     other_data = make_data(other, other_item)
-    runtime = server_runtime.new({
+    runtime = ServerRuntime.new({
       damage_filter = function() return true end,
       initial_now = 1000,
       remote = re,
@@ -202,12 +202,12 @@ describe("风神之翼与哥斯拉存活相位宿主接缝（#299）", function(
 
   before_each(function()
     saved_assets = {
-      wing = game_cfg.Ability.special_item.Wings.AppearanceAssetId,
-      skin = game_cfg.Ability.special_item.Godzilla.AppearanceAssetId,
+      wing = GameCfg.Ability.SpecialItem.Wings.AppearanceAssetId,
+      skin = GameCfg.Ability.SpecialItem.Godzilla.AppearanceAssetId,
     }
     fail_model = false
-    game_cfg.Ability.special_item.Wings.AppearanceAssetId = "wingAssetPlaceholder"
-    game_cfg.Ability.special_item.Godzilla.AppearanceAssetId = "godzillaSkinPlaceholder"
+    GameCfg.Ability.SpecialItem.Wings.AppearanceAssetId = "wingAssetPlaceholder"
+    GameCfg.Ability.SpecialItem.Godzilla.AppearanceAssetId = "godzillaSkinPlaceholder"
     _G.Vector3 = { New = vec }
     _G.Quaternion = { Identity = function() return { x = 0, y = 0, z = 0, w = 1 } end }
     _G.Enums = { SkeletalSocketType = { Spine = "socket_body" } }
@@ -216,8 +216,8 @@ describe("风神之翼与哥斯拉存活相位宿主接缝（#299）", function(
   after_each(function()
     if runtime then runtime:shutdown() end
     runtime = nil
-    game_cfg.Ability.special_item.Wings.AppearanceAssetId = saved_assets.wing
-    game_cfg.Ability.special_item.Godzilla.AppearanceAssetId = saved_assets.skin
+    GameCfg.Ability.SpecialItem.Wings.AppearanceAssetId = saved_assets.wing
+    GameCfg.Ability.SpecialItem.Godzilla.AppearanceAssetId = saved_assets.skin
   end)
 
   it("选中风神之翼绑定外观且地面保留重力，长按才接管并升到天花板后缓降落地", function()
@@ -315,12 +315,12 @@ describe("风神之翼与哥斯拉存活相位宿主接缝（#299）", function(
     act(player, { action = "breath" })
     assert.is_true(player.lastResult.ok)
     runtime.clock:step(3)
-    local breath = game_cfg.Ability.special_item.Godzilla.Breath
+    local breath = GameCfg.Ability.SpecialItem.Godzilla.Breath
     assert.equals(1, other.Character.Controller.Health)
     assert.equals("downed", runtime:get_player_tree(other.UserId).states.life_phase:now())
     assert.equals(breath.TotalDamage, carrier.Damage)
     assert.equals(math.floor(breath.DurationSec / breath.TickSec), carrier.Hits)
-    assert.equals(game_cfg.vitals.MaxHealth, player.Character.Controller.Health)
+    assert.equals(GameCfg.Vitals.MaxHealth, player.Character.Controller.Health)
 
     local behind = make_player(3, 6, 5.01, 5)
     local behind_data = make_data(behind, nil)
@@ -337,8 +337,8 @@ describe("风神之翼与哥斯拉存活相位宿主接缝（#299）", function(
     runtime.clock:advance(breath.CooldownSec)
     act(player, { action = "breath" })
     assert.equals("not-godzilla", player.lastResult.reason)
-    assert.equals(game_cfg.vitals.MaxHealth, behind.Character.Controller.Health)
-    assert.equals(game_cfg.vitals.MaxHealth, far.Character.Controller.Health)
+    assert.equals(GameCfg.Vitals.MaxHealth, behind.Character.Controller.Health)
+    assert.equals(GameCfg.Vitals.MaxHealth, far.Character.Controller.Health)
   end)
 
   it("麻痹只拒绝起飞和吐息，不解除翅膀或哥斯拉", function()
@@ -447,7 +447,7 @@ describe("风神之翼与哥斯拉存活相位宿主接缝（#299）", function(
     act(player, { action = "fly", holding = true })
     runtime.clock:step(1)
     assert.is_false(player.Character.Controller.GravityEnabled)
-    data.data.Zone = "coralCoast"
+    data.Data.Zone = "coralCoast"
     runtime:get_player_tree(player.UserId):sync_from_data(data)
     assert.is_true(player.Character.Controller.GravityEnabled)
     assert.is_true(has_call(player.Character, "unbind"))
@@ -464,8 +464,8 @@ describe("风神之翼与哥斯拉存活相位宿主接缝（#299）", function(
   end)
 
   it("外观创建失败时不报告已生效，随后重试成功且失败挂点不残留", function()
-    game_cfg.Ability.special_item.Wings.AppearanceAssetId = nil
-    game_cfg.Ability.special_item.Godzilla.AppearanceAssetId = nil
+    GameCfg.Ability.SpecialItem.Wings.AppearanceAssetId = nil
+    GameCfg.Ability.SpecialItem.Godzilla.AppearanceAssetId = nil
     fail_model = true
     boot("item169")
     assert.is_nil(last_state(events, player) and last_state(events, player).effect)

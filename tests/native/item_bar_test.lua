@@ -1,7 +1,7 @@
 -- #86 迁移（原 tests/gameplay/item_bar_test.lua）：道具栏/背包/鱼饵栏的数据层规则。
--- 接缝：player_data 公共库存接口 + 注入的通知回调。
-local game_cfg = require('common.game_cfg')
-local player_data = require('server.data.player_data')
+-- 接缝：PlayerData 公共库存接口 + 注入的通知回调。
+local GameCfg = require('common.game_cfg')
+local PlayerData = require('server.data.player_data')
 
 local function player()
     local p = { UserId = 34, attributes = {} }
@@ -16,15 +16,15 @@ describe("道具栏与鱼饵栏", function()
     -- #49：进图白送只在调试开关下发放，这些用例沿用它的起始库存（鱼竿在第 1 格、蚯蚓若干）。
     before_each(function()
         ctx = {}
-        ctx.savedGrantDebug = game_cfg.Debug
-        game_cfg.Debug = { Enabled = true, InitialGrants = ctx.savedGrantDebug.InitialGrants }
-        ctx.data = player_data.New(player())
+        ctx.savedGrantDebug = GameCfg.Debug
+        GameCfg.Debug = { Enabled = true, InitialGrants = ctx.savedGrantDebug.InitialGrants }
+        ctx.data = PlayerData.New(player())
         ctx.data:Init()
     end)
 
     -- 调试配置逐例恢复；setUp 中途失败也照样清理。
     after_each(function()
-        game_cfg.Debug = ctx.savedGrantDebug
+        GameCfg.Debug = ctx.savedGrantDebug
     end)
 
     it("test_backpack_requires_transfer_before_use", function()
@@ -42,21 +42,21 @@ describe("道具栏与鱼饵栏", function()
         snapshot = ctx.data:GetItemBarSnapshot()
         assert.is_nil(snapshot.backpack[1])
         assert.same(1.5, snapshot.slots[2].mult)
-        assert.same(game_cfg.Items.ContainerId.ItemBar, snapshot.slots[2].containerId)
+        assert.same(GameCfg.Items.ContainerId.ItemBar, snapshot.slots[2].containerId)
         assert.is_true(ctx.data:SelectSlot(2))
         assert.same('bass', ctx.data:EatSlot(2))
     end)
 
     it("test_chief_bait_occupies_storage_and_debug_grants_overflow_to_backpack", function()
-        local cfg = game_cfg.Debug
-        game_cfg.Debug = { Enabled = true, InitialGrants = {
-            { itemId = 'starterRod', count = 1, containerId = game_cfg.Items.ContainerId.ItemBar },
-            { itemId = 'carp', count = 1, containerId = game_cfg.Items.ContainerId.ItemBar },
-            { itemId = 'bass', count = 1, containerId = game_cfg.Items.ContainerId.ItemBar },
+        local cfg = GameCfg.Debug
+        GameCfg.Debug = { Enabled = true, InitialGrants = {
+            { itemId = 'starterRod', count = 1, containerId = GameCfg.Items.ContainerId.ItemBar },
+            { itemId = 'carp', count = 1, containerId = GameCfg.Items.ContainerId.ItemBar },
+            { itemId = 'bass', count = 1, containerId = GameCfg.Items.ContainerId.ItemBar },
         } }
-        local other = player_data.New(player())
+        local other = PlayerData.New(player())
         other:Init()
-        game_cfg.Debug = cfg
+        GameCfg.Debug = cfg
         assert.same('bass', other:GetItemBarSnapshot().backpack[1].itemId)
         assert.is_true(other:AddItem('duck'))
         assert.same('duck', other:GetItemBarSnapshot().backpack[2].itemId)
@@ -92,7 +92,7 @@ describe("道具栏与鱼饵栏", function()
         assert.is_nil(ctx.data:GetItemBarSnapshot().selectedSlot)
         assert.is_nil(ctx.data:GetItemBarSnapshot().slots[1])
         assert.is_false(ctx.data:DiscardSlot(1))
-        ctx.data.data.Bait.worm = 1
+        ctx.data.Data.Bait.worm = 1
         assert.is_true(ctx.data:SelectBait('worm'))
         assert.same(1, ctx.data:GetItemBarSnapshot().bait.worm)
         assert.is_true(ctx.data:ConsumeSelectedBait())
@@ -103,7 +103,7 @@ describe("道具栏与鱼饵栏", function()
     end)
 
     it("test_eat_and_cast_share_inventory_and_last_eat_clears_selection", function()
-        ctx.data.data.Bait.worm = 2
+        ctx.data.Data.Bait.worm = 2
         assert.is_true(ctx.data:SelectBait('worm'))
         assert.is_true(ctx.data:EatBait('worm'))
         assert.same(1, ctx.data:GetItemBarSnapshot().bait.worm)
@@ -119,7 +119,7 @@ describe("道具栏与鱼饵栏", function()
     it("test_external_depletion_clears_selected_slot", function()
         assert.is_true(ctx.data:SelectSlot(1))
         ctx.data:UpdateData(function(data)
-            data.Containers[game_cfg.Items.ContainerId.ItemBar][1].count = 0
+            data.Containers[GameCfg.Items.ContainerId.ItemBar][1].count = 0
         end)
         assert.is_nil(ctx.data:GetItemBarSnapshot().selectedSlot)
         assert.is_nil(ctx.data:GetItemBarSnapshot().slots[1])
@@ -130,7 +130,7 @@ describe("道具栏与鱼饵栏", function()
         assert.is_false(ok)
         assert.same('coin', reason)
         assert.same(2, ctx.data:GetItemBarSnapshot().slotCount)
-        assert.same(0, ctx.data.data.FishCoin)
+        assert.same(0, ctx.data.Data.FishCoin)
     end)
 
     it("test_initial_snapshot_has_two_slots_and_separate_bait", function()
@@ -146,13 +146,13 @@ describe("道具栏与鱼饵栏", function()
 
     -- 通知走注入的回调，不反查全局管理器。
     it("test_injected_item_bar_notification_without_global_manager", function()
-        local previous = _G.mgr_player_data
-        _G.mgr_player_data = setmetatable({}, { __index = function() error('不应反查管理器') end })
+        local previous = _G.MgrPlayerData
+        _G.MgrPlayerData = setmetatable({}, { __index = function() error('不应反查管理器') end })
         local events = {}
-        local bound = player_data.New(player(), function(owner, data)
+        local bound = PlayerData.New(player(), function(owner, data)
             events[#events + 1] = { owner = owner, data = data }
         end)
-        -- pcall 包住主体：中途失败也要恢复 _G.mgr_player_data，再抛错让本例失败。
+        -- pcall 包住主体：中途失败也要恢复 _G.MgrPlayerData，再抛错让本例失败。
         local ok, err = pcall(function()
             bound:Init()
             bound:SelectBait('worm')
@@ -162,7 +162,7 @@ describe("道具栏与鱼饵栏", function()
             assert.equal(events[1].data, bound)
             bound:Destroy()
         end)
-        _G.mgr_player_data = previous
+        _G.MgrPlayerData = previous
         assert.is_true(ok, tostring(err))
     end)
 
@@ -192,7 +192,7 @@ describe("道具栏与鱼饵栏", function()
     end)
 
     it("test_switch_bait_does_not_spend_old_or_new_until_consume", function()
-        ctx.data.data.Bait.shrimp = 2
+        ctx.data.Data.Bait.shrimp = 2
         assert.is_true(ctx.data:SelectBait('worm'))
         assert.is_true(ctx.data:SelectBait('shrimp'))
         assert.same(10, ctx.data:GetItemBarSnapshot().bait.worm)
@@ -209,7 +209,7 @@ describe("道具栏与鱼饵栏", function()
         ctx.data:UpdateData(function(data) data.Bait.worm = 0 end)
         assert.is_nil(ctx.data:GetItemBarSnapshot().selectedBait)
         assert.is_false(ctx.data:SelectBait('worm'))
-        ctx.data.data.SelectedBait = 'worm'
+        ctx.data.Data.SelectedBait = 'worm'
         local ok, itemId = ctx.data:ConsumeSelectedBait()
         assert.is_false(ok)
         assert.is_nil(itemId)
@@ -219,7 +219,7 @@ describe("道具栏与鱼饵栏", function()
 
     it("test_upgrade_prices_capacity_and_full_grant", function()
         assert.is_true(ctx.data:AddCoin(6300, nil, 'test'))
-        for level, price in ipairs(game_cfg.Items.UpgradePrices) do
+        for level, price in ipairs(GameCfg.Items.UpgradePrices) do
             local ok, paid = ctx.data:UpgradeStorage()
             assert.is_true(ok)
             assert.same(price, paid)
@@ -227,7 +227,7 @@ describe("道具栏与鱼饵栏", function()
             assert.same(2 + level, snapshot.slotCount)
             assert.same(level == 6 and 40 or 5 + 5 * level, snapshot.backpackCount)
         end
-        assert.same(0, ctx.data.data.FishCoin)
+        assert.same(0, ctx.data.Data.FishCoin)
         assert.is_false(ctx.data:UpgradeStorage())
         for _ = 1, 47 do assert.is_true(ctx.data:AddItem('carp', 1)) end
         assert.is_false(ctx.data:AddItem('carp', 1))

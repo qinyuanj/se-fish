@@ -1,17 +1,17 @@
-local game_cfg = require('common.game_cfg')
-local damage_float = { Active = {}, Pool = {}, Sequence = {}, PendingCleanup = {} }
-local cfg = game_cfg.damage_float
+local GameCfg = require('common.game_cfg')
+local DamageFloat = { Active = {}, Pool = {}, Sequence = {}, PendingCleanup = {} }
+local cfg = GameCfg.DamageFloat
 
-function damage_float.DisplayAmount(amount)
+function DamageFloat.DisplayAmount(amount)
     return math.max(1, math.floor(amount + 0.5))
 end
 
-function damage_float:Clear()
+function DamageFloat:Clear()
     local pending = {}
     local function destroy(node)
         local ok, err = pcall(function() node:Destroy() end)
         if not ok then
-            print('[damage_float] 清理节点失败', tostring(err))
+            print('[DamageFloat] 清理节点失败', tostring(err))
             pending[#pending + 1] = node
         end
     end
@@ -23,7 +23,7 @@ function damage_float:Clear()
     self.Root, self.Resolution = nil, nil
 end
 
-function damage_float:Bind(root, resolution)
+function DamageFloat:Bind(root, resolution)
     if self.Root == root then return end
     self:Clear()
     self.Root, self.Resolution = root, resolution
@@ -39,7 +39,7 @@ local function valid(payload)
         and type(p.z) == 'number' and p.z == p.z and math.abs(p.z) < math.huge
 end
 
-function damage_float:Project(position, height)
+function DamageFloat:Project(position, height)
     local camera = game:GetService('CameraService')
     if not camera or not camera.MainCamera or not self.Resolution then return nil end
     local screen, visible = camera:WorldToViewportPoint(Vector3.New(
@@ -48,14 +48,14 @@ function damage_float:Project(position, height)
     return screen.x, self.Resolution.y - screen.y
 end
 
-function damage_float:Show(payload)
+function DamageFloat:Show(payload)
     if not self.Root or not valid(payload) then return end
     local x, y = self:Project(payload.position, payload.height)
     if not x then return end
     local node = table.remove(self.Pool)
     if not node then
         node = game:GetService('World'):CreateUnit('EUITextLabel', {
-            Parent = self.Root, Name = 'damage_float',
+            Parent = self.Root, Name = 'DamageFloat',
             Position = Vector2.New(0, 0), Size = Vector2.New(cfg.Width, cfg.Height),
         })
     end
@@ -80,7 +80,7 @@ function damage_float:Show(payload)
     self.Active[#self.Active + 1] = entry
 end
 
-function damage_float:Update()
+function DamageFloat:Update()
     if not self.Root then return end
     if #self.PendingCleanup > 0 then
         local pending = self.PendingCleanup
@@ -88,7 +88,7 @@ function damage_float:Update()
         for _, node in ipairs(pending) do
             local ok, err = pcall(function() node:Destroy() end)
             if not ok then
-                print('[damage_float] 重试清理失败', tostring(err))
+                print('[DamageFloat] 重试清理失败', tostring(err))
                 self.PendingCleanup[#self.PendingCleanup + 1] = node
             end
         end
@@ -117,4 +117,4 @@ function damage_float:Update()
     end
 end
 
-return damage_float
+return DamageFloat

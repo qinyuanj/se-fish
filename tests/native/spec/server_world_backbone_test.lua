@@ -1,17 +1,17 @@
 -- 服务端 Spoke 运行时主干契约测试（#295 / ADR-0032 §1、§2、§4）：
 -- 失败方式先列：
---   1. shared_world_tree 未包含全部 7 个钓鱼区子域骨架与小队 Dock，或 dispose 后未逆序清理且仍响应时钟；
---   2. 存档未就绪就提前生成 player_tree，或 GameStart 前就绪的玩家被遗漏；
---   3. player_tree 内四段因果顺序未按源码顺序排布，同一 batch 内下游先于上游运行或读取旧派生值；
+--   1. SharedWorldTree 未包含全部 7 个钓鱼区子域骨架与小队 Dock，或 dispose 后未逆序清理且仍响应时钟；
+--   2. 存档未就绪就提前生成 PlayerTree，或 GameStart 前就绪的玩家被遗漏；
+--   3. PlayerTree 内四段因果顺序未按源码顺序排布，同一 batch 内下游先于上游运行或读取旧派生值；
 --   4. 麻痹误退外层生命相位，或 platform_pending 未暂停濒死/死亡倒计时相位；
 --   5. 离场三步协议顺序错乱（未等前置脏写、终镜像晚于 dispose/SaveLeaving），或 dispose 后残留资源/局部信号；
 --   6. 同账号重进期间排空栅栏未阻塞，导致提前读旧档或覆盖正在落盘的数据；
---   7. 单棵 player_tree 抛未捕获异常波及其他 player_tree 或 shared_world_tree，或已 dispose 树仍响应事件。
+--   7. 单棵 PlayerTree 抛未捕获异常波及其他 PlayerTree 或 SharedWorldTree，或已 dispose 树仍响应事件。
 
-local game_cfg = require("common.game_cfg")
-local spoke_clock = require("common.spoke_clock")
+local GameCfg = require("common.game_cfg")
+local SpokeClock = require("common.spoke_clock")
 local spoke = require("common.packages.spoke.api")
-local spoke_runtime = require("common.packages.spoke.runtime.spoke_runtime")
+local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
 local LambdaEpoch = spoke.LambdaEpoch
 
 local function make_signal()
@@ -48,7 +48,7 @@ local function make_ready_data(player, overrides)
     Player = player,
     Inited = overrides.Inited ~= false,
     LoadState = overrides.LoadState or "ready",
-    data = {
+    Data = {
       FishCoin = overrides.coin or 50,
       Zone = overrides.zone or "fishPond",
       SelectedSlot = overrides.selected_slot or 1,
@@ -61,8 +61,8 @@ local function make_ready_data(player, overrides)
         },
       },
       survival = {
-        health = overrides.health or game_cfg.vitals.MaxHealth,
-        hunger = overrides.hunger or game_cfg.vitals.MaxHunger,
+        health = overrides.health or GameCfg.Vitals.MaxHealth,
+        hunger = overrides.hunger or GameCfg.Vitals.MaxHunger,
         dying = overrides.dying or false,
         dead = overrides.dead or false,
         weakRemaining = overrides.weak_remaining or 0,
@@ -87,14 +87,14 @@ local function silent_logger()
   }
 end
 
-describe("服务端 Spoke 主干：shared_world_tree", function()
+describe("服务端 Spoke 主干：SharedWorldTree", function()
   it("以 Auto SpokeTree 挂载 7 个钓鱼区子域骨架与全局小队 Dock，并在 dispose 时逆序清理且不再响应时钟", function()
-    local shared_world_tree = require("server.world_host.shared_world_tree")
-    local clock = spoke_clock.new(10)
+    local SharedWorldTree = require("server.world_host.shared_world_tree")
+    local clock = SpokeClock.new(10)
     local logger = silent_logger()
     local log = {}
 
-    local world = shared_world_tree.spawn({
+    local world = SharedWorldTree.spawn({
       clock = clock,
       logger = logger,
       on_mount_zone = function(s, zone)
@@ -109,7 +109,7 @@ describe("服务端 Spoke 主干：shared_world_tree", function()
     assert.equals(7, #world.zone_list)
 
     local expected_zone_ids = {}
-    for index, zone_cfg in ipairs(game_cfg.Zones) do
+    for index, zone_cfg in ipairs(GameCfg.Zones) do
       expected_zone_ids[index] = zone_cfg.Id
       local zone = world:get_zone(zone_cfg.Id)
       assert.is_not_nil(zone, "缺少钓鱼区子域: " .. zone_cfg.Id)
@@ -175,32 +175,32 @@ describe("服务端 Spoke 主干：shared_world_tree", function()
   end)
 end)
 
-describe("服务端 Spoke 主干：player_tree 因果顺序、双层相位与逆序清理", function()
-  it("存档未就绪或归属不匹配时拒绝生成 player_tree", function()
-    local player_tree = require("server.world_host.player_tree")
-    local clock = spoke_clock.new(0)
+describe("服务端 Spoke 主干：PlayerTree 因果顺序、双层相位与逆序清理", function()
+  it("存档未就绪或归属不匹配时拒绝生成 PlayerTree", function()
+    local PlayerTree = require("server.world_host.player_tree")
+    local clock = SpokeClock.new(0)
     local player = { UserId = 1001 }
     local other = { UserId = 1002 }
 
     assert.has_error(function()
-      player_tree.spawn({ player = player, data = nil, clock = clock })
+      PlayerTree.spawn({ player = player, data = nil, clock = clock })
     end)
     assert.has_error(function()
-      player_tree.spawn({
+      PlayerTree.spawn({
         player = player,
         data = make_ready_data(player, { Inited = false, LoadState = "pending" }),
         clock = clock,
       })
     end)
     assert.has_error(function()
-      player_tree.spawn({
+      PlayerTree.spawn({
         player = player,
         data = make_ready_data(player, { LoadState = "failed" }),
         clock = clock,
       })
     end)
     assert.has_error(function()
-      player_tree.spawn({
+      PlayerTree.spawn({
         player = player,
         data = make_ready_data(other),
         clock = clock,
@@ -209,15 +209,15 @@ describe("服务端 Spoke 主干：player_tree 因果顺序、双层相位与逆
   end)
 
   it("严格按四段因果顺序排布：同一 batch 内上游先算、下游后跑并看到最新派生值", function()
-    local player_tree = require("server.world_host.player_tree")
-    local clock = spoke_clock.new(0)
+    local PlayerTree = require("server.world_host.player_tree")
+    local clock = SpokeClock.new(0)
     local logger = silent_logger()
     local player = { UserId = 2001 }
     local data = make_ready_data(player, { coin = 120, body_potions = 0, speed_potions = 0 })
 
     local order = {}
     local observed = {}
-    local pt = player_tree.spawn({
+    local pt = PlayerTree.spawn({
       player = player,
       data = data,
       clock = clock,
@@ -272,7 +272,7 @@ describe("服务端 Spoke 主干：player_tree 因果顺序、双层相位与逆
 
     -- 同一 batch 内同时改写上游存档状态与虚弱标记，校验下游严格按 1 -> 2 -> 3 -> 4 重算且只看到最终组合值
     order = {}
-    spoke_runtime.batch(function()
+    SpokeRuntime.batch(function()
       pt.states.potion_big_count:set(2)
       pt.states.potion_speed_count:set(5)
       pt.states.is_weak:set(true)
@@ -296,15 +296,15 @@ describe("服务端 Spoke 主干：player_tree 因果顺序、双层相位与逆
   end)
 
   it("双层相位隔离：麻痹仅关闭 can_act 不退出外层存活相位，platform_pending 暂停濒死与死亡倒计时", function()
-    local player_tree = require("server.world_host.player_tree")
-    local clock = spoke_clock.new(0)
+    local PlayerTree = require("server.world_host.player_tree")
+    local clock = SpokeClock.new(0)
     local player = { UserId = 2002 }
     local data = make_ready_data(player)
 
     local alive_mounts, alive_cleanups = 0, 0
     local downed_ticks, dead_ticks = 0, 0
 
-    local pt = player_tree.spawn({
+    local pt = PlayerTree.spawn({
       player = player,
       data = data,
       clock = clock,
@@ -377,8 +377,8 @@ describe("服务端 Spoke 主干：player_tree 因果顺序、双层相位与逆
   end)
 
   it("离场 Step 1 触发终镜像时在场资源仍可读，Step 2 同步 dispose 按逆序拆除资源与局部信号连接零残留", function()
-    local player_tree = require("server.world_host.player_tree")
-    local clock = spoke_clock.new(0)
+    local PlayerTree = require("server.world_host.player_tree")
+    local clock = SpokeClock.new(0)
     local player = { UserId = 2003 }
     local data = make_ready_data(player)
     local local_signal = make_signal()
@@ -386,7 +386,7 @@ describe("服务端 Spoke 主干：player_tree 因果顺序、双层相位与逆
     local destroyed_units = {}
     local signal_hits = 0
 
-    local pt = player_tree.spawn({
+    local pt = PlayerTree.spawn({
       player = player,
       data = data,
       clock = clock,
@@ -463,7 +463,7 @@ describe("服务端 Spoke 主干：player_tree 因果顺序、双层相位与逆
   end)
 end)
 
-describe("服务端 Spoke 主干：server_runtime 离场三步协议、排空栅栏与树级故障隔离", function()
+describe("服务端 Spoke 主干：ServerRuntime 离场三步协议、排空栅栏与树级故障隔离", function()
   local function make_player(user_id)
     return {
       UserId = user_id,
@@ -474,13 +474,13 @@ describe("服务端 Spoke 主干：server_runtime 离场三步协议、排空栅
     }
   end
 
-  it("shared_world_tree 全局唯一启动，且玩家仅在存档就绪与服务启动后才生成专属 player_tree", function()
-    local server_runtime = require("server.world_host.server_runtime")
+  it("SharedWorldTree 全局唯一启动，且玩家仅在存档就绪与服务启动后才生成专属 PlayerTree", function()
+    local ServerRuntime = require("server.world_host.server_runtime")
     local logger = silent_logger()
     local ready_callbacks = {}
     local join_starts = {}
 
-    local rt = server_runtime.new({
+    local rt = ServerRuntime.new({
       initial_now = 100,
       logger = logger,
       on_player_join_start = function(player)
@@ -496,7 +496,7 @@ describe("服务端 Spoke 主干：server_runtime 离场三步协议、排空栅
     assert.are.equal(w1, w2)
     assert.equals(7, #w1.zone_list)
 
-    -- 玩家在 mark_started 前入场并完成存档就绪：先入 ReadyQueue，不提前生成 player_tree
+    -- 玩家在 mark_started 前入场并完成存档就绪：先入 ReadyQueue，不提前生成 PlayerTree
     local p1 = make_player(3001)
     rt:on_player_added(p1)
     assert.same({ p1 }, join_starts)
@@ -506,13 +506,13 @@ describe("服务端 Spoke 主干：server_runtime 离场三步协议、排空栅
     rt:on_save_ready(p1, d1)
     assert.is_nil(rt:get_player_tree(3001))
 
-    -- 未就绪存档被直接拒绝，不生成 player_tree
+    -- 未就绪存档被直接拒绝，不生成 PlayerTree
     local p2 = make_player(3002)
     rt:on_player_added(p2)
     rt:on_save_ready(p2, make_ready_data(p2, { Inited = false, LoadState = "pending" }))
     assert.is_nil(rt:get_player_tree(3002))
 
-    -- mark_started 排空 ReadyQueue，仅已就绪的 p1 生成 player_tree
+    -- mark_started 排空 ReadyQueue，仅已就绪的 p1 生成 PlayerTree
     rt:mark_started()
     local pt1 = rt:get_player_tree(3001)
     assert.is_not_nil(pt1)
@@ -521,7 +521,7 @@ describe("服务端 Spoke 主干：server_runtime 离场三步协议、排空栅
     assert.are.equal(pt1, ready_callbacks[1].tree)
     assert.is_nil(rt:get_player_tree(3002))
 
-    -- 启动后 p2 存档就绪，立即生成专属 player_tree
+    -- 启动后 p2 存档就绪，立即生成专属 PlayerTree
     local d2 = make_ready_data(p2, { coin = 15 })
     rt:on_save_ready(p2, d2)
     local pt2 = rt:get_player_tree(3002)
@@ -535,12 +535,12 @@ describe("服务端 Spoke 主干：server_runtime 离场三步协议、排空栅
   end)
 
   it("启动时非有限 initial_now 降级为 0 且接受非裸表形态（元表代理 / userdata 协议）的玩家对象", function()
-    local server_runtime = require("server.world_host.server_runtime")
+    local ServerRuntime = require("server.world_host.server_runtime")
     local logger = silent_logger()
 
-    local rt_nan = server_runtime.new({ initial_now = 0 / 0, logger = logger })
+    local rt_nan = ServerRuntime.new({ initial_now = 0 / 0, logger = logger })
     assert.equals(0, rt_nan.clock.now())
-    local rt_inf = server_runtime.new({ initial_now = math.huge, logger = logger })
+    local rt_inf = ServerRuntime.new({ initial_now = math.huge, logger = logger })
     assert.equals(0, rt_inf.clock.now())
 
     -- 验证经 __index 读取 UserId / SetAttribute 的代理对象（与引擎 userdata 成员访问口径一致）
@@ -563,7 +563,7 @@ describe("服务端 Spoke 主干：server_runtime 离场三步协议、排空栅
   end)
 
   it("离场三步协议严格按顺序执行，并在同账号重进期间通过排空栅栏防脏读与覆盖写入", function()
-    local server_runtime = require("server.world_host.server_runtime")
+    local ServerRuntime = require("server.world_host.server_runtime")
     local logger = silent_logger()
     local timeline = {}
     local store = {}
@@ -574,7 +574,7 @@ describe("服务端 Spoke 主干：server_runtime 离场三步协议、排空栅
     local sig_hits = 0
 
     local rt
-    rt = server_runtime.new({
+    rt = ServerRuntime.new({
       initial_now = 200,
       logger = logger,
       on_player_join_start = function(player)
@@ -616,16 +616,16 @@ describe("服务端 Spoke 主干：server_runtime 离场三步协议、排空栅
         timeline[#timeline + 1] = "step1:finalize:" .. tostring(player.tag)
           .. ":alive=" .. tostring(player_tree.session_alive:now())
           .. ":handlers=" .. tostring(#local_sig.handlers)
-        data.data.FishCoin = 999
+        data.Data.FishCoin = 999
       end,
       on_player_removing = function(player, was_active)
         local data = data_by_player[player]
         timeline[#timeline + 1] = "step3:serialize:" .. tostring(player.tag)
           .. ":active=" .. tostring(was_active)
-          .. ":coin=" .. tostring(data and data.data.FishCoin or -1)
+          .. ":coin=" .. tostring(data and data.Data.FishCoin or -1)
           .. ":handlers=" .. tostring(#local_sig.handlers)
         -- 模拟异步写档：尚未落入 store，等 pending_drain_done 执行时才真正落盘
-        player.pending_write_coin = data and data.data.FishCoin
+        player.pending_write_coin = data and data.Data.FishCoin
       end,
       after_idle = function(user_id, done)
         timeline[#timeline + 1] = "step3:after_idle_wait:" .. tostring(user_id)
@@ -729,13 +729,13 @@ describe("服务端 Spoke 主干：server_runtime 离场三步协议、排空栅
     rt:shutdown()
   end)
 
-  it("树级故障隔离：单棵 player_tree 抛未捕获异常时其余 player_tree 与 shared_world_tree 正常推进，且已 dispose 树不再响应", function()
-    local server_runtime = require("server.world_host.server_runtime")
+  it("树级故障隔离：单棵 PlayerTree 抛未捕获异常时其余 PlayerTree 与 SharedWorldTree 正常推进，且已 dispose 树不再响应", function()
+    local ServerRuntime = require("server.world_host.server_runtime")
     local logger = silent_logger()
     local world_ticks, b_ticks, a_ticks = 0, 0, 0
     local a_finalized = false
 
-    local rt = server_runtime.new({
+    local rt = ServerRuntime.new({
       initial_now = 0,
       logger = logger,
       on_leave_finalize = function(_, player)
@@ -763,12 +763,12 @@ describe("服务端 Spoke 主干：server_runtime 离场三步协议、排空栅
     local pta = rt:get_player_tree(5001)
     local ptb = rt:get_player_tree(5002)
 
-    -- 玩家 a 在第 2 秒触发未捕获异常（在 Effect Tick 中抛错以触发树级 fault）
+    -- 玩家 A 在第 2 秒触发未捕获异常（在 Effect Tick 中抛错以触发树级 fault）
     pta.docks.actions:effect("FaultyEffect", function(es)
       local sec = es:d(rt.clock.second)
       a_ticks = a_ticks + 1
       if sec >= 2 then
-        error("玩家 a 未捕获业务异常")
+        error("玩家 A 未捕获业务异常")
       end
     end)
 
@@ -784,7 +784,7 @@ describe("服务端 Spoke 主干：server_runtime 离场三步协议、排空栅
     assert.equals(2, b_ticks)
     assert.is_false(pta:is_faulted())
 
-    -- 第 2 秒：玩家 a 抛错并被隔离，不向宿主抛出异常；shared_world_tree 与玩家 b 继续推进
+    -- 第 2 秒：玩家 A 抛错并被隔离，不向宿主抛出异常；SharedWorldTree 与玩家 B 继续推进
     assert.has_no.errors(function()
       rt:step(1, 2)
     end)
@@ -794,14 +794,14 @@ describe("服务端 Spoke 主干：server_runtime 离场三步协议、排空栅
     assert.equals(2, world_ticks)
     assert.equals(3, b_ticks)
 
-    -- 第 3、4 秒：玩家 a 停止 flush，玩家 b 与 shared_world_tree 照常推进
+    -- 第 3、4 秒：玩家 A 停止 flush，玩家 B 与 SharedWorldTree 照常推进
     rt:step(1, 3)
     rt:step(1, 4)
     assert.equals(4, world_ticks)
     assert.equals(5, b_ticks)
     assert.equals(3, a_ticks)
 
-    -- 故障玩家 a 离场时仍可执行终镜像并安全 dispose；玩家 b 离场 dispose 后亦不再响应时钟
+    -- 故障玩家 A 离场时仍可执行终镜像并安全 dispose；玩家 B 离场 dispose 后亦不再响应时钟
     rt:on_player_removing(pa)
     assert.is_true(a_finalized)
     assert.is_true(pta:is_disposed())
@@ -823,18 +823,18 @@ describe("服务端入口接线：server/main.lua 宿主测试双端到端集成
   before_each(function()
     saved = {
       game = rawget(_G, "game"),
-      re_util = rawget(_G, "re_util"),
+      REUtil = rawget(_G, "REUtil"),
       reutil = package.loaded["common.re_util"],
       MgrUtil = rawget(_G, "MgrUtil"),
-      mgr_player_data = rawget(_G, "mgr_player_data"),
+      MgrPlayerData = rawget(_G, "MgrPlayerData"),
       Vector3 = rawget(_G, "Vector3"),
       Color = rawget(_G, "Color"),
       RemoteEvent = rawget(_G, "RemoteEvent"),
-      Debug = game_cfg.Debug,
-      slot = game_cfg.Save.QaSlot,
+      Debug = GameCfg.Debug,
+      slot = GameCfg.Save.QaSlot,
     }
-    game_cfg.Debug = { Enabled = false }
-    game_cfg.Save.QaSlot = ""
+    GameCfg.Debug = { Enabled = false }
+    GameCfg.Save.QaSlot = ""
     _G.Vector3 = { New = function(x, y, z) return { x = x, y = y, z = z } end }
     _G.Color = { New = function(...) return { ... } end }
     _G.RemoteEvent = { New = function()
@@ -849,20 +849,20 @@ describe("服务端入口接线：server/main.lua 宿主测试双端到端集成
       runtime:shutdown()
     end
     _G.game = saved.game
-    _G.re_util = saved.re_util
+    _G.REUtil = saved.REUtil
     package.loaded["common.re_util"] = saved.reutil
     _G.MgrUtil = saved.MgrUtil
-    _G.mgr_player_data = saved.mgr_player_data
+    _G.MgrPlayerData = saved.MgrPlayerData
     _G.Vector3 = saved.Vector3
     _G.Color = saved.Color
     _G.RemoteEvent = saved.RemoteEvent
-    game_cfg.Debug = saved.Debug
-    game_cfg.Save.QaSlot = saved.slot
+    GameCfg.Debug = saved.Debug
+    GameCfg.Save.QaSlot = saved.slot
     saved = nil
     runtime = nil
   end)
 
-  it("真实 server/main.lua 启动唯一 shared_world_tree、Heartbeat 驱动 spoke_clock、存档就绪生成 player_tree 并执行离场三步协议与重进排空", function()
+  it("真实 server/main.lua 启动唯一 SharedWorldTree、Heartbeat 驱动 SpokeClock、存档就绪生成 PlayerTree 并执行离场三步协议与重进排空", function()
     local now = 100
     local tasks, values, errors, mgrs = {}, {}, {}, {}
     local remote_events = {}
@@ -943,11 +943,11 @@ describe("服务端入口接线：server/main.lua 宿主测试双端到端集成
       CastAbility = function() return true end,
     }
 
-    mgrs.save_host = assert(loadfile("server/save_host.lua"))()
-    mgrs.player_data_host = assert(loadfile("server/player_data_host.lua"))()
-    mgrs.platform_host = {}
-    mgrs.fish_ability = { Start = function() end, Update = function() end }
-    _G.re_util = remote_util
+    mgrs.SaveHost = assert(loadfile("server/save_host.lua"))()
+    mgrs.PlayerDataHost = assert(loadfile("server/player_data_host.lua"))()
+    mgrs.PlatformHost = {}
+    mgrs.FishAbility = { Start = function() end, Update = function() end }
+    _G.REUtil = remote_util
     package.loaded["common.re_util"] = remote_util
 
     local sandbox = setmetatable({
@@ -964,16 +964,16 @@ describe("服务端入口接线：server/main.lua 宿主测试双端到端集成
         if path == "server.packages.attr_rule.api" then return attr_api_stub end
         if path == "server.packages.modifier_system.api" then return modifier_api_stub end
         if path == "server.packages.ability_system.api" then return ability_api_stub end
-        if path == "server.save_host" then return mgrs.save_host end
-        if path == "server.player_data_host" then return mgrs.player_data_host end
-        if path == "server.platform_host" then return mgrs.platform_host end
-        if path == "server.fish_ability" then return mgrs.fish_ability end
+        if path == "server.save_host" then return mgrs.SaveHost end
+        if path == "server.player_data_host" then return mgrs.PlayerDataHost end
+        if path == "server.platform_host" then return mgrs.PlatformHost end
+        if path == "server.fish_ability" then return mgrs.FishAbility end
         return require(path)
       end,
     }, { __index = _G })
 
     runtime = assert(loadfile("server/main.lua", "t", sandbox))()
-    assert.is_not_nil(runtime, "server/main.lua 应返回服务端 Spoke runtime 句柄")
+    assert.is_not_nil(runtime, "server/main.lua 应返回服务端 Spoke Runtime 句柄")
 
     local world = runtime:get_world()
     assert.is_not_nil(world)
@@ -983,7 +983,7 @@ describe("服务端入口接线：server/main.lua 宿主测试双端到端集成
     assert.equals(1, #remote_events.FerryAction.OnServerEvent.handlers)
     assert.equals(100, runtime.clock.now())
 
-    -- Heartbeat 每帧驱动 spoke_clock，shared_world_tree 正常接收 1 Hz 推进
+    -- Heartbeat 每帧驱动 SpokeClock，SharedWorldTree 正常接收 1 Hz 推进
     local world_sec_ticks = 0
     world:get_zone("fishPond").bait_spots:effect("HeartbeatProbe", function(es)
       es:subscribe(runtime.clock.on_second, function()
@@ -1013,13 +1013,13 @@ describe("服务端入口接线：server/main.lua 宿主测试双端到端集成
       assert.same({}, errors)
     end
 
-    -- 玩家入场：存档尚未读完前不得生成 player_tree
+    -- 玩家入场：存档尚未读完前不得生成 PlayerTree
     local p1 = make_host_player(6001)
     players_service.PlayerAdded:Fire(p1)
     assert.equals("pending", p1.attrs.SaveState)
     assert.is_nil(runtime:get_player_tree(6001))
 
-    -- 异步读档完成后生成专属 player_tree
+    -- 异步读档完成后生成专属 PlayerTree
     drain()
     assert.equals("ready", p1.attrs.SaveState)
     local pt1 = runtime:get_player_tree(6001)
@@ -1037,12 +1037,12 @@ describe("服务端入口接线：server/main.lua 宿主测试双端到端集成
     assert.equals(1, #local_sig.handlers)
 
     -- 变更金币并触发离场 + 同账号立即重进
-    mgrs.player_data_host:GetDataInst(p1):AddCoin(42)
+    mgrs.PlayerDataHost:GetDataInst(p1):AddCoin(42)
     players_service.PlayerRemoving:Fire(p1)
     local p2 = make_host_player(6001)
     players_service.PlayerAdded:Fire(p2)
 
-    -- 离场异步写档未排空前，p2 必须保持 pending 且无新 player_tree
+    -- 离场异步写档未排空前，p2 必须保持 pending 且无新 PlayerTree
     assert.equals("pending", p2.attrs.SaveState)
     assert.is_nil(runtime:get_player_tree(6001))
     assert.is_true(pt1:is_disposed())
@@ -1053,13 +1053,13 @@ describe("服务端入口接线：server/main.lua 宿主测试双端到端集成
     for i, item in ipairs(order) do idx[item] = i end
     assert.is_true(idx["dispose_cleanup:6001"] ~= nil)
 
-    -- 排空异步落盘后，p2 自动恢复并生成全新 player_tree，金币无丢失无脏读
+    -- 排空异步落盘后，p2 自动恢复并生成全新 PlayerTree，金币无丢失无脏读
     drain()
     assert.equals("ready", p2.attrs.SaveState)
     local pt2 = runtime:get_player_tree(6001)
     assert.is_not_nil(pt2)
     assert.are_not.equal(pt1, pt2)
     assert.equals(42, pt2.states.coin:now())
-    assert.equals(42, mgrs.player_data_host:GetDataInst(p2).data.FishCoin)
+    assert.equals(42, mgrs.PlayerDataHost:GetDataInst(p2).Data.FishCoin)
   end)
 end)

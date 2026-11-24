@@ -5,8 +5,8 @@
 -- 沿用 tests/support/fish_combat 共享夹具。Busted 把案例体放进沙箱 _ENV，
 -- 采集业务日志必须写 _G.print（裸 `print =` 只进沙箱，业务模块读不到）。
 -- describe/it 名称保留旧类名与方法名，并按方法名字典序注册以保持旧套件执行顺序。
-local fish_combat = require('tests.support.fish_combat')
-local game_cfg = require('common.game_cfg')
+local FishCombat = require('tests.support.fish_combat')
+local GameCfg = require('common.game_cfg')
 
 local function vec(x, y, z) return { x = x, y = y, z = z } end
 
@@ -40,7 +40,7 @@ local function breakPosition(fish)
     })
 end
 
-local function walrusParams() return game_cfg.fish_combat.walrus end
+local function walrusParams() return GameCfg.FishCombat.walrus end
 
 -- 推进到 40 秒突击节拍并等预警起手（40 秒帧可能压着上一记甩头的预警，做有界等待）；
 -- 返回起手的 charge move 与鱼身位置（预警 / 冲锋期间位置不变）。
@@ -74,7 +74,7 @@ describe('TestBeachCombat', function()
     local env
 
     before_each(function()
-        env = fish_combat.new()
+        env = FishCombat.new()
         env:setUp()
     end)
     after_each(function()
@@ -96,7 +96,7 @@ describe('TestBeachCombat', function()
             _G.print = savedPrint
             assert.is_true(ok, tostring(err))
             local text = table.concat(lines, '\n')
-            assert.matches('[fish_tree]', text, nil, true)
+            assert.matches('[FishTree]', text, nil, true)
             assert.matches('追击位移失败', text, nil, true)
             assert.matches('fish=' .. tostring(fish.Id), text, nil, true)
             assert.matches('position-write-failed', text, nil, true)
@@ -109,12 +109,12 @@ describe('TestBeachCombat', function()
         chargeDamages = {}
         breakPosition(chargeFish)
         local savedPrint, lines = capturePrint()
-        env.now = move.At + game_cfg.fish_combat.walrus.ChargeWindupSec + 0.2
+        env.now = move.At + GameCfg.FishCombat.walrus.ChargeWindupSec + 0.2
         local ok, err = pcall(function() env.mgr:Update() end)
         _G.print = savedPrint
         assert.is_true(ok, tostring(err))
         local text = table.concat(lines, '\n')
-        assert.matches('[fish_tree]', text, nil, true)
+        assert.matches('[FishTree]', text, nil, true)
         assert.matches('突击位移失败', text, nil, true)
         assert.matches('fish=' .. tostring(chargeFish.Id), text, nil, true)
         assert.matches('position-write-failed', text, nil, true)
@@ -209,7 +209,7 @@ describe('TestBeachCombat', function()
 
     it('test_orca_leap_every_25s_fifteen_m_ten_radius_240', function()
         local fish, damages = drop(env, 'fish40Boss', 20)
-        local params = game_cfg.fish_combat.orca
+        local params = GameCfg.FishCombat.orca
         local savedRandom = math.random
         math.random = function() return 0 end -- 落点方向固定为 +x
         for t = 0.5, 24.5, 0.5 do env.now = t env.mgr:Update() end
@@ -249,7 +249,7 @@ describe('TestBeachCombat', function()
 
     it('test_orca_roar_10s_ranged_30_outside_bite_range', function()
         local fish, damages = drop(env, 'fish40Boss', 2)
-        local params = game_cfg.fish_combat.orca
+        local params = GameCfg.FishCombat.orca
         for t = 0.5, 9.5, 0.5 do env.now = t env.mgr:Update() end
         damages = {}
         env.player.Character.Controller.TakeDamage = function(_, d) damages[#damages + 1] = d end
@@ -277,7 +277,7 @@ describe('TestBeachCombat', function()
         env.now = 10
         env.mgr:Update() -- 虎啸起手
         assert.are.equal('roar', fish.Move.Name)
-        local params = game_cfg.fish_combat.orca
+        local params = GameCfg.FishCombat.orca
         local lock
         for _, notice in ipairs(env.notices) do
             if notice.kind == 'lock' and notice.move == 'roar' then lock = notice end
@@ -333,7 +333,7 @@ describe('TestBeachCombat', function()
             guard = guard + 1
         end
         assert.are.equal('tail', fish.Move.Name)
-        local params = game_cfg.fish_combat.orca
+        local params = GameCfg.FishCombat.orca
         local lock
         for _, notice in ipairs(env.notices) do
             if notice.kind == 'lock' and notice.move == 'tail' then lock = notice end
@@ -388,7 +388,7 @@ describe('TestBeachCombat', function()
         damages = {}
         -- 路径外侧 5 米（> 接触距离 2.5）：不得被冲锋撞到
         env.player.Character.Position = vec(bp.x + 5, 2, bp.z + 10)
-        env.now = move.At + game_cfg.fish_combat.walrus.ChargeWindupSec + 0.3
+        env.now = move.At + GameCfg.FishCombat.walrus.ChargeWindupSec + 0.3
         env.mgr:Update()
         env.now = fish.Move.StrikeAt + 0.1
         env.mgr:Update()

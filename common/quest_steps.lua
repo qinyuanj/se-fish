@@ -1,15 +1,15 @@
-local quest_steps = {}
+local QuestSteps = {}
 
-function quest_steps.New()
+function QuestSteps.New()
     return { step = 1, count = 0, seen = {} }
 end
 
-function quest_steps.Restore(steps, saved)
-    if type(saved) ~= 'table' then return quest_steps.New() end
+function QuestSteps.Restore(steps, saved)
+    if type(saved) ~= 'table' then return QuestSteps.New() end
     local step, count = saved.step, saved.count
     if type(step) ~= 'number' or step ~= math.floor(step) or step < 1 or step > #steps + 1
         or type(count) ~= 'number' or count ~= math.floor(count) or count < 0
-        or count >= (steps[step] and steps[step].Need or 1) then return quest_steps.New() end
+        or count >= (steps[step] and steps[step].Need or 1) then return QuestSteps.New() end
     local state = { step = step, count = count, seen = {} }
     for id, seen in pairs(type(saved.seen) == 'table' and saved.seen or {}) do
         if type(id) == 'string' and seen == true then state.seen[id] = true end
@@ -17,11 +17,11 @@ function quest_steps.Restore(steps, saved)
     return state
 end
 
-function quest_steps.Done(steps, state)
+function QuestSteps.Done(steps, state)
     return state.step > #steps
 end
 
-function quest_steps.Apply(steps, state, fact)
+function QuestSteps.Apply(steps, state, fact)
     local eventId = fact.eventId
     if eventId == nil or state.seen[eventId] then return false end
     local current = steps[state.step]
@@ -35,7 +35,7 @@ function quest_steps.Apply(steps, state, fact)
     return true, true
 end
 
-function quest_steps.Text(steps, state, title, doneText)
+function QuestSteps.Text(steps, state, title, doneText)
     local current = steps[state.step]
     if not current then return doneText end
     local text = string.format('%s %d/%d：%s', title, state.step, #steps, current.Text)
@@ -45,4 +45,4 @@ function quest_steps.Text(steps, state, title, doneText)
     return text
 end
 
-return quest_steps
+return QuestSteps

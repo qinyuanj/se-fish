@@ -1,15 +1,15 @@
 
-local game_cfg = require("common.game_cfg")
-local client_store = require("client.store.client_store")
-local root_view = require("client.views.root_view")
-local attack_view = require("client.views.attack_view")
-local eui = require("tests.support.eui_double")
+local GameCfg = require("common.game_cfg")
+local ClientStore = require("client.store.client_store")
+local RootView = require("client.views.root_view")
+local AttackView = require("client.views.attack_view")
+local Eui = require("tests.support.eui_double")
 
 local function mount(store, sent, notices, opts)
   opts = opts or {}
-  local root = eui.Node({ Name = "UIRoot" })
-  local view = root_view.mount(root, store, {
-    hud = { attack_view.spec() },
+  local root = Eui.Node({ Name = "UIRoot" })
+  local view = RootView.mount(root, store, {
+    hud = { AttackView.spec() },
     services = {
       send_weapon = function(payload) sent[#sent + 1] = payload end,
       notify = function(text) notices[#notices + 1] = text end,
@@ -17,7 +17,7 @@ local function mount(store, sent, notices, opts)
       get_device_resolution = opts.get_device_resolution or function() return { x = 1920, y = 1080 } end,
     },
     create_node = function(kind, props)
-      local node = eui.Node({
+      local node = Eui.Node({
         Kind = kind,
         Name = props and props.Name,
         Parent = props and props.Parent,
@@ -28,8 +28,8 @@ local function mount(store, sent, notices, opts)
         TouchEnabled = kind == "EUIButton",
       })
       if opts.with_touch and kind == "EUIButton" then
-        node.OnTouchBegan = eui.Signal()
-        node.OnTouchEnded = eui.Signal()
+        node.OnTouchBegan = Eui.Signal()
+        node.OnTouchEnded = Eui.Signal()
       end
       return node
     end,
@@ -57,7 +57,7 @@ describe("客户端攻击与瞄准投影宿主接缝（#300）", function()
   end)
 
   it("持武器显示攻击键，点击带相机瞄准上行，失败结果与伤害数字投影后随销毁清掉", function()
-    local store, writer = client_store.new({ initial_now = 100 })
+    local store, writer = ClientStore.new({ initial_now = 100 })
     local sent, notices = {}, {}
     local root = mount(store, sent, notices)
     writer:ingest_event("ItemBarState", {
@@ -72,19 +72,19 @@ describe("客户端攻击与瞄准投影宿主接缝（#300）", function()
     assert.is_true(button.Visible)
     assert.equals("射击", label.Text)
 
-    assert.is_true(eui.Click(button))
+    assert.is_true(Eui.Click(button))
     assert.same({ action = "attack", aim = { x = 0, y = 0.6, z = 0.8 } }, sent[#sent])
 
     writer:ingest_event("WeaponResult", { ok = false, action = "attack", reason = "reloading" })
     assert.equals("换弹中", notices[#notices])
 
-    writer:ingest_event("damage_notice", {
+    writer:ingest_event("DamageNotice", {
       amount = 12.4,
       category = "weapon",
       targetUserId = 2,
       position = { x = 1, y = 2, z = 3 },
     })
-    local floater = child(root, "damage_float")
+    local floater = child(root, "DamageFloat")
     assert.is_not_nil(floater)
     assert.equals("12", floater.Text)
 
@@ -108,7 +108,7 @@ describe("客户端攻击与瞄准投影宿主接缝（#300）", function()
   end)
 
   it("空手不建攻击键，近战文案是攻击", function()
-    local store, writer = client_store.new({ initial_now = 100 })
+    local store, writer = ClientStore.new({ initial_now = 100 })
     local root = mount(store, {}, {})
     writer:ingest_event("ItemBarState", { weapons = {}, held = {}, slots = {} })
     assert.is_nil(child(root, "BtnAttack"))
@@ -118,11 +118,11 @@ describe("客户端攻击与瞄准投影宿主接缝（#300）", function()
       slots = {},
     })
     assert.equals("攻击", child(root, "AttackLabel").Text)
-    assert.is_not_nil(game_cfg.Ability.MeleeWeapons.item136)
+    assert.is_not_nil(GameCfg.Ability.MeleeWeapons.item136)
   end)
 
-  it("长按连发与换弹完全由注入 spoke_clock 短寿命相位驱动，无需引擎 RunService/World", function()
-    local store, writer = client_store.new({ initial_now = 100 })
+  it("长按连发与换弹完全由注入 SpokeClock 短寿命相位驱动，无需引擎 RunService/World", function()
+    local store, writer = ClientStore.new({ initial_now = 100 })
     local sent, notices = {}, {}
     local root = mount(store, sent, notices, { with_touch = true })
 
@@ -131,13 +131,13 @@ describe("客户端攻击与瞄准投影宿主接缝（#300）", function()
       held = { kind = "weapon", id = "item139" },
       slots = {},
     })
-    assert.is_true(game_cfg.Ability.Guns.item139.Auto == true)
+    assert.is_true(GameCfg.Ability.Guns.item139.Auto == true)
     local button = child(root, "BtnAttack")
     button.OnTouchBegan:Fire()
     writer:advance_clock(0.05)
     assert.equals(1, #sent)
     assert.equals("attack", sent[1].action)
-    writer:advance_clock(game_cfg.Ability.Guns.item139.IntervalSec)
+    writer:advance_clock(GameCfg.Ability.Guns.item139.IntervalSec)
     assert.equals(2, #sent)
     button.OnTouchEnded:Fire()
     writer:advance_clock(1.0)
@@ -149,7 +149,7 @@ describe("客户端攻击与瞄准投影宿主接缝（#300）", function()
       slots = {},
     })
     button.OnTouchBegan:Fire()
-    writer:advance_clock(game_cfg.Ability.Throw.LongPressSec + 0.1)
+    writer:advance_clock(GameCfg.Ability.Throw.LongPressSec + 0.1)
     button.OnTouchEnded:Fire()
     assert.equals("reload", sent[#sent].action)
     root:Destroy()

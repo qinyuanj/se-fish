@@ -1,10 +1,10 @@
-local game_cfg = require("common.game_cfg")
-local shop_feed_host = require("tests.support.shop_feed_host")
+local GameCfg = require("common.game_cfg")
+local Host = require("tests.support.shop_feed_host")
 
 local ROW, ROW_ITEM = 14, "starterRod"
 local ROW_PRICE
-for _, row in ipairs(game_cfg.Shop.Goods) do
-  if row.number == ROW then ROW_PRICE = row.Price break end
+for _, row in ipairs(GameCfg.Shop.Goods) do
+  if row.Number == ROW then ROW_PRICE = row.Price break end
 end
 assert(ROW_PRICE)
 
@@ -12,13 +12,13 @@ describe("条款 7-17 商店购买的扣费与发奖在一次结算里落地", f
   local host, player, data, baseline
 
   before_each(function()
-    host = shop_feed_host.start()
+    host = Host.start()
   end)
 
   after_each(function() host:shutdown() end)
 
   local function join(coins, fill)
-    player, data = host:join(7017, game_cfg.Shop.Stands[1].AnchorName, function(d)
+    player, data = host:join(7017, GameCfg.Shop.Stands[1].AnchorName, function(d)
       if coins > 0 then assert.is_true(d:AddCoin(coins, nil, "test")) end
       if fill then while d:AddItem("tilapia") do end end
       baseline = d:ItemCount(ROW_ITEM)
@@ -40,7 +40,7 @@ describe("条款 7-17 商店购买的扣费与发奖在一次结算里落地", f
     assert.same(1000 - price, reply.coinAfter)
     assert.same(baseline, reply.itemBefore)
     assert.same(baseline + 1, reply.itemAfter)
-    assert.same(1000 - price, data.data.FishCoin)
+    assert.same(1000 - price, data.Data.FishCoin)
     assert.same(baseline + 1, data:ItemCount(ROW_ITEM))
   end)
 
@@ -50,7 +50,7 @@ describe("条款 7-17 商店购买的扣费与发奖在一次结算里落地", f
     assert.is_false(reply.ok)
     assert.same("coin", reply.reason)
     assert.is_nil(reply.coinAfter)
-    assert.same(0, data.data.FishCoin)
+    assert.same(0, data.Data.FishCoin)
     assert.same(baseline, data:ItemCount(ROW_ITEM))
   end)
 
@@ -60,7 +60,7 @@ describe("条款 7-17 商店购买的扣费与发奖在一次结算里落地", f
     assert.is_false(reply.ok)
     assert.same("full", reply.reason)
     assert.is_nil(reply.coinAfter)
-    assert.same(1000, data.data.FishCoin)
+    assert.same(1000, data.Data.FishCoin)
     assert.same(baseline, data:ItemCount(ROW_ITEM))
   end)
 end)

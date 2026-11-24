@@ -1,9 +1,9 @@
-local game_cfg = require("common.game_cfg")
-local blindbox_draw = require("common.blindbox_draw")
+local GameCfg = require("common.game_cfg")
+local BlindboxDraw = require("common.blindbox_draw")
 
-local player_blindbox = {}
+local PlayerBlindbox = {}
 
-local function cfg() return game_cfg.Blindbox end
+local function cfg() return GameCfg.Blindbox end
 local function goods(count) return count == 10 and "blindboxTen" or "blindboxSingle" end
 local function bag(data)
   local extra = data.Extra
@@ -40,7 +40,7 @@ local function prune(value)
   for index = 1, #keep - 32 do value.intents[keep[index].key] = nil end
 end
 
-function player_blindbox.mount(scope, tree, opts)
+function PlayerBlindbox.mount(scope, tree, opts)
   opts = type(opts) == "table" and opts or {}
   local player, data = tree.player, tree.data
   local save, platform, remote = opts.save, opts.platform, opts.remote
@@ -101,11 +101,11 @@ function player_blindbox.mount(scope, tree, opts)
   settle = function(draft, count, key)
     local value = bag(draft)
     local before = value.pity or 0
-    local draws, after = blindbox_draw.DrawMany(count, before, random)
+    local draws, after = BlindboxDraw.DrawMany(count, before, random)
     if not draws then return nil, "roll" end
     local grounded = 0
     for index, draw in ipairs(draws) do
-      for fishId, fish in pairs(game_cfg.Fish) do
+      for fishId, fish in pairs(GameCfg.Fish) do
         for _, drop in ipairs(fish.Drops or {}) do
           if drop.ItemId == draw.itemKey then draft.Extra.collection.unlocked[fishId] = true end
         end
@@ -122,7 +122,7 @@ function player_blindbox.mount(scope, tree, opts)
     end
     value.pity = after
     return {
-      ok = true, action = "draw", count = count, draws = draws,
+      ok = true, action = "Draw", count = count, draws = draws,
       pityBefore = before, pityAfter = after, grounded = grounded,
       operation = { id = key },
     }
@@ -175,7 +175,7 @@ function player_blindbox.mount(scope, tree, opts)
           x = origin.x, y = origin.y, z = origin.z + 2,
         })
         if not receipt then
-          print("[player_blindbox] 待交付保留", player.UserId, key, tostring(reason))
+          print("[PlayerBlindbox] 待交付保留", player.UserId, key, tostring(reason))
           return
         end
         write("blindbox:delivery", function(draft)
@@ -214,7 +214,7 @@ function player_blindbox.mount(scope, tree, opts)
 
   local function on_action(actor, payload)
     if disposed or actor ~= player or type(payload) ~= "table"
-      or (payload.action ~= "draw" and payload.action ~= "Query") then
+      or (payload.action ~= "Draw" and payload.action ~= "Query") then
       return false
     end
     local count, seq = payload.count, payload.seq
@@ -306,4 +306,4 @@ function player_blindbox.mount(scope, tree, opts)
   return { handle = on_action, step = pump, push_state = push_state }
 end
 
-return player_blindbox
+return PlayerBlindbox

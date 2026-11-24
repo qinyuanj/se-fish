@@ -7,17 +7,17 @@
 --   4. 虚弱进出由 MgrSurvival 私写 WalkSpeed：退虚弱恢复「进虚弱前」的旧值，虚弱期喝的加速丢失；
 --      或退出时先写速度后清 weakUntil，唯一计算口仍按虚弱算；
 --   5. 鱼被霜冻/麻痹后移速不变；麻痹的鱼仍追咬/施法；
---   6. server/main.lua 漏接 MgrAbility.player_data / Survival、vitals.ActGuard / MaxHealthProvider、
+--   6. server/main.lua 漏接 MgrAbility.PlayerData / Survival、Vitals.ActGuard / MaxHealthProvider、
 --      Survival.SpeedWriter、MgrWeapon.Modifier（单测注入了、生产没接 = 生产里药水数恒 0）。
--- 接缝：mgr_player_data:Handle（ItemBarAction 通道）、player_data 存档往返、MgrSurvival:ApplyWeak/ClearWeak、
+-- 接缝：MgrPlayerData:Handle（ItemBarAction 通道）、PlayerData 存档往返、MgrSurvival:ApplyWeak/ClearWeak、
 --   MgrFishUnit:Speed / UpdateCombat、MgrAbility:CastFish、server/main.lua 源码接线断言。
--- 旧套件的逐例 setUp/tearDown 映射为 before_each/after_each；被替换的全局（game / Vector3 / re_util）、
--- 模块缓存（package.loaded 的 MgrFishUnit 与 common.re_util）与配置（game_cfg.Debug）逐例恢复，
+-- 旧套件的逐例 setUp/tearDown 映射为 before_each/after_each；被替换的全局（game / Vector3 / REUtil）、
+-- 模块缓存（package.loaded 的 MgrFishUnit 与 common.re_util）与配置（GameCfg.Debug）逐例恢复，
 -- after_each 对未完成的 before_each 幂等。describe 顺序沿用旧执行序（类名字典序）。
-local game_cfg = require('common.game_cfg')
-local client_store = require('client.store.client_store')
-local root_view = require('client.views.root_view')
-local attack_view = require('client.views.attack_view')
+local GameCfg = require('common.game_cfg')
+local ClientStore = require('client.store.client_store')
+local RootView = require('client.views.root_view')
+local AttackView = require('client.views.attack_view')
 
 local function signal()
     local callbacks = {}
@@ -91,7 +91,7 @@ describe('TestFishStatusGate', function()
     -- 鱼的移速 = 基础 × 状态因子；效果口故障不拖垮移动
     it('test_speed_multiplies_status_factor', function()
         local fish = { Id = 1, FishId = 'alligatorGar' }
-        local base = game_cfg.Fish.alligatorGar.Speed
+        local base = GameCfg.Fish.alligatorGar.Speed
         assert.same(base, ctx.mgr:Speed(fish))
         ctx.factor = 0.7 -- 霜冻
         assert.near(base * 0.7, ctx.mgr:Speed(fish), 1e-9)
@@ -114,10 +114,10 @@ describe('TestFishStatusGate', function()
         assert.same(vec(0, 0, 0), body.LinearVelocity)
         ctx.now, ctx.factor = ctx.now + 0.5, 0.7
         ctx.mgr:UpdateEscaping(fish, ctx.now)
-        assert.near(game_cfg.Fish.alligatorGar.Speed * 0.7, body.LinearVelocity.x, 1e-9)
+        assert.near(GameCfg.Fish.alligatorGar.Speed * 0.7, body.LinearVelocity.x, 1e-9)
         ctx.now, ctx.factor = ctx.now + 2.5, 1
         ctx.mgr:UpdateEscaping(fish, ctx.now)
-        assert.same(game_cfg.Fish.alligatorGar.Speed, body.LinearVelocity.x)
+        assert.same(GameCfg.Fish.alligatorGar.Speed, body.LinearVelocity.x)
     end)
 end)
 
@@ -126,11 +126,11 @@ describe('TestPrizeGrowthPotion', function()
     local ctx
 
     before_each(function()
-        ctx = { debug = game_cfg.Debug, oldREUtil = _G.re_util, events = {}, growth = {}, bodyOnly = {} }
+        ctx = { debug = GameCfg.Debug, oldREUtil = _G.REUtil, events = {}, growth = {}, bodyOnly = {} }
         local state = ctx
         ctx.mgr = require('server.player_data_host')
-        game_cfg.Debug = { Enabled = false }
-        _G.re_util = { CheckRECD = function() return false end, GetRE = function(_, name)
+        GameCfg.Debug = { Enabled = false }
+        _G.REUtil = { CheckRECD = function() return false end, GetRE = function(_, name)
             if not state.events[name] then
                 state.events[name] = {
                     OnServerEvent = signal(),
@@ -143,7 +143,7 @@ describe('TestPrizeGrowthPotion', function()
             CharacterAdded = signal(), CharacterRemoving = signal() }
         function player:SetAttribute() end
         ctx.player = player
-        ctx.mgr.vitals = { CanEat = function() return true end, Eat = function() end }
+        ctx.mgr.Vitals = { CanEat = function() return true end, Eat = function() end }
         ctx.mgr.Save = nil
         ctx.mgr.Ability = {
             ApplyGrowth = function(_, p) state.growth[#state.growth + 1] = p; return { Ok = true } end,
@@ -158,9 +158,9 @@ describe('TestPrizeGrowthPotion', function()
     after_each(function()
         if not ctx then return end
         if ctx.player then ctx.mgr:OnPlayerRemoving(ctx.player) end
-        ctx.mgr.vitals, ctx.mgr.Save, ctx.mgr.Ability = nil, nil, nil
-        _G.re_util = ctx.oldREUtil
-        game_cfg.Debug = ctx.debug
+        ctx.mgr.Vitals, ctx.mgr.Save, ctx.mgr.Ability = nil, nil, nil
+        _G.REUtil = ctx.oldREUtil
+        GameCfg.Debug = ctx.debug
     end)
 
     local function drink(itemId)
@@ -193,8 +193,8 @@ describe('TestPrizeGrowthPotion', function()
         assert.is_true(ctx.data:GrantWeapon('item165', 1)) -- 黄金AK47
         assert.is_true(ctx.data:GrantWeapon('item152', 1)) -- 淬毒匕首
         local snapshot = ctx.data:Serialize()
-        local player_data = require('server.data.player_data')
-        local again = player_data.New({ UserId = 13961, SetAttribute = function() end })
+        local PlayerData = require('server.data.player_data')
+        local again = PlayerData.New({ UserId = 13961, SetAttribute = function() end })
         again:Init()
         assert.is_true(again:ApplySave(snapshot))
         assert.same(20, again:PotionCount('item167'))
@@ -227,12 +227,12 @@ describe('TestPrizeGrowthWiring', function()
         local file = assert(io.open('server/main.lua', 'r'))
         local src = file:read('*a')
         file:close()
-        assert.matches('player_data = player_data_host', src, nil, true)
-        assert.matches('fish_ability = fish_ability', src, nil, true)
+        assert.matches('player_data = PlayerDataHost', src, nil, true)
+        assert.matches('fish_ability = FishAbility', src, nil, true)
         assert.matches('bind_weapon_action = function(dispatch)', src, nil, true)
-        assert.matches('modifier_leaf = { modifier_api = modifier_package_api }', src, nil, true)
+        assert.matches('modifier_leaf = { modifier_api = ModifierPackageApi }', src, nil, true)
         assert.matches('entity_modifiers = {', src, nil, true)
-        assert.matches('fishHost.vitals = WorldRuntime.life', src, nil, true)
+        assert.matches('fishHost.Vitals = WorldRuntime.life', src, nil, true)
     end)
 end)
 
@@ -240,10 +240,10 @@ end)
 describe('TestPrizeRocketInput', function()
     local ctx
 
-    -- 旧案例在测试体末尾手工还原 game/re_util；断言失败会跳过还原。
+    -- 旧案例在测试体末尾手工还原 game/REUtil；断言失败会跳过还原。
     -- 逐例 before_each/after_each 后，替换的全局无论成败都恢复。
     before_each(function()
-        ctx = { oldGame = _G.game, oldRE = _G.re_util, now = 0, requests = {}, nodes = {} }
+        ctx = { oldGame = _G.game, oldRE = _G.REUtil, now = 0, requests = {}, nodes = {} }
         ctx.heartbeat = signal()
         local state = ctx
         _G.game = { GetService = function(_, name)
@@ -251,12 +251,12 @@ describe('TestPrizeRocketInput', function()
             if name == 'RunService' then return { Heartbeat = state.heartbeat } end
             if name == 'Players' then return { LocalPlayer = { Character = {} } } end
         end }
-        local store, writer = client_store.new({ initial_now = 0 })
+        local store, writer = ClientStore.new({ initial_now = 0 })
         state.writer = writer
         writer:set_hud_visible(true)
         local root = { Name = 'UIRoot', Destroying = signal(), Children = {},
             FindFirstChild = function(_, name) return state.nodes[name] end }
-        ctx.view = root_view.mount(root, store, {
+        ctx.view = RootView.mount(root, store, {
             services = {
                 send_weapon = function(payload)
                     state.requests[#state.requests + 1] = payload.action
@@ -278,7 +278,7 @@ describe('TestPrizeRocketInput', function()
                 if node.Parent and node.Parent.Children then node.Parent.Children[node.Name] = node end
                 return node
             end,
-            hud = { attack_view.spec() },
+            hud = { AttackView.spec() },
         })
         writer:ingest_event('ItemBarState', {
             weapons = { item166 = 1 },
@@ -289,7 +289,7 @@ describe('TestPrizeRocketInput', function()
 
     after_each(function()
         if ctx and ctx.view then ctx.view:dispose() end
-        if ctx then _G.game, _G.re_util = ctx.oldGame, ctx.oldRE end
+        if ctx then _G.game, _G.REUtil = ctx.oldGame, ctx.oldRE end
     end)
 
     it('test_long_press_rocket_requests_repeated_attacks', function()
@@ -303,7 +303,7 @@ describe('TestPrizeRocketInput', function()
         tick(1)
         tick(2)
         ctx.nodes.BtnAttack.OnTouchEnded:Fire()
-        assert.same(1, game_cfg.Ability.Guns.item166.IntervalSec)
+        assert.same(1, GameCfg.Ability.Guns.item166.IntervalSec)
         assert.same({ 'attack', 'attack', 'attack' }, ctx.requests)
     end)
 end)

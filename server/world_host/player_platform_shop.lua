@@ -1,13 +1,13 @@
-local game_cfg = require("common.game_cfg")
+local GameCfg = require("common.game_cfg")
 
-local player_platform_shop = {}
+local PlayerPlatformShop = {}
 
-local function cfg() return game_cfg.Platform end
+local function cfg() return GameCfg.Platform end
 local function placeholder()
   local value = cfg().Placeholder
   return type(value) == "table" and value or nil
 end
-local function debug_enabled() return game_cfg.Debug and game_cfg.Debug.Enabled == true end
+local function debug_enabled() return GameCfg.Debug and GameCfg.Debug.Enabled == true end
 local function placeholder_allowed()
   local value = placeholder()
   return value and value.Enabled == true and (debug_enabled() or value.AllowInPublish == true) or false
@@ -59,7 +59,7 @@ local function sorted_keys(map)
   return keys
 end
 
-function player_platform_shop.mount(scope, tree, opts)
+function PlayerPlatformShop.mount(scope, tree, opts)
   opts = type(opts) == "table" and opts or {}
   local player, data = tree.player, tree.data
   local save, platform, remote = opts.save, opts.platform, opts.remote
@@ -115,11 +115,11 @@ function player_platform_shop.mount(scope, tree, opts)
       local offer = coin_offer(intent.goods)
       local amount = coin_amount(offer)
       if not amount then return nil, "unavailable" end
-      local before = draft.data.FishCoin
+      local before = draft.Data.FishCoin
       if not draft:AddCoin(amount, nil, "coinpage:" .. intent.goods) then return nil, "coin" end
       return {
         ok = true, action = "CoinGrant", goods = intent.goods, name = offer.name,
-        coin = amount, coinBefore = before, coinAfter = draft.data.FishCoin,
+        coin = amount, coinBefore = before, coinAfter = draft.Data.FishCoin,
       }
     end
     local row = cfg().Goods[intent.goods]
@@ -185,7 +185,7 @@ function player_platform_shop.mount(scope, tree, opts)
           x = origin.x, y = origin.y, z = origin.z + 2,
         })
         if not receipt then
-          print("[player_platform_shop] 待交付保留", player.UserId, key, tostring(reason))
+          print("[PlayerPlatformShop] 待交付保留", player.UserId, key, tostring(reason))
           return
         end
         write("platform:delivery", function(draft)
@@ -326,4 +326,4 @@ function player_platform_shop.mount(scope, tree, opts)
   return { handle = on_action, step = pump }
 end
 
-return player_platform_shop
+return PlayerPlatformShop
