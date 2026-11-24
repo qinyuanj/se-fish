@@ -3,6 +3,7 @@
   "standardTools": {
     "sourceRoots": ["client", "common", "server"],
     "exclude": ["server/_trigger", "client/packages", "common/packages", "server/packages"],
-    "mutatorOptions": ["--busted-task", "fast"]
+    "mutatorOptions": ["--busted-task", "fast"],
+    "dryerOptions": ["--threshold", "0.82"]
   }
 }
