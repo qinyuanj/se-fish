@@ -27,7 +27,7 @@
 
 ### 模型动画导入与播放
 
-适用于自定义非人形模型；人形角色的 `Animator` 路径见[技术难点识别 §1](技术难点识别.md#1-非人形鱼--首领的模型与动画)。以下流程由 [#159](https://github.com/qinyuanj/se-fish/issues/159) 鳄雀鳝试点验证。
+适用于自定义非人形模型。人形角色动画走另一条接口：`HumanUnit` / `EggyUnit` 的 `Animator:LoadAnimation`（如 `GameCfg.Casting.LandedAnimation`），与非人形模型片段的播放接口分开使用。以下流程由 [#159](https://github.com/qinyuanj/se-fish/issues/159) 鳄雀鳝试点验证。
 
 1. **挂动画**：打开模型 FBX 的「自定义模型导入」对话框，在「模型动画导入」中点「添加模型动画」，加入各段仅骨架的动画 FBX。逐段切换预览，确认骨架能驱动网格，再与模型同一次上传。
 2. **更新引用**：每次上传都生成新的网格资源 ID，记下它并更新待验收单位的引用。
@@ -42,6 +42,9 @@
 - `BasePart.Size` 对自定义蒙皮网格和官方方块都返回 `(1,1,1)`，不能当尺寸证据；尺寸按同框 1 单位方块换算（[#162](https://github.com/qinyuanj/se-fish/issues/162)）。
 - `AnimatedUnit` 默认 `PhysicsMeshId` 取渲染网格，碰撞 AABB 与静止姿态网格同比例，播放中不随动画变形；动作里的根位移会让画面上的鱼离开碰撞体（#162 `Attack_Bite` 约 1.5 单位）。
 - 单位默认受重力且可碰撞，落地后网格最低点贴地；原点不在底面中心时，单位 `Position.y` 会高出地面同样的距离，可据此核对原点偏差。
+- `AnimatedUnit` 不带 Controller：`AnimatedUnit : WorldUnit`（`EggyAPI.lua` `:5040`）没有 `Health` / `TakeDamage` / `MoveTo` / `Died`。用它承载鱼本体时，血量、受击与死亡信号得另有归属（双单位方案见 [ADR-0030](adr/0030-dual-unit-fish-carrier.md)）。
+- `data/OfficialAsset.lua` 的 `motion` 段不是运行时 ID：同名动作 ID 不同（「钓鱼」在那里是 20880，运行时是 24450）。从 `motion` 段取的 ID 播放不报错，但画面不动（#172 试玩 A/B 确认）。ID 只从手册「状态同步编辑器 · 动作 · 资产目录」取：`lua tools/cli.lua docs search "状态同步编辑器 · 动作 · 资产目录 <动作名>" --docset manual`。
+- 官方模型库没有鳗、哥斯拉、三头鲨，动作目录全是角色动作（2026-09 核查）。首领级资产一律自制，不在官方库里找替代。
 
 ## 资产状态
 
@@ -51,7 +54,7 @@
 - **鳄雀鳝**（2026-10-28 更新）：原点改为底面中心后重导出，接缝 B 通过（7820 三角面、导出全长 0.05 即折算游戏内 5 单位、Idle/Walk/Attack）。接缝 A 已核对原点（脚踩地，与单位方块同一平面）、尺寸（约为方块边长 4~5 倍，与 5 单位同一量级），以及三段动画在 `AnimatedUnit` 上能播。当前用网格 `custom://0h1DIiDiCuEpQD9Kj`；首次上传的 `0h1D75CoYl8bow4id` 经 #160 复测同样带片段，场上摆放的单位仍引用它且不是 `AnimatedUnit`。以下未核对，留给首领功能实现：Walk 步幅与 6 m/s 移速是否匹配（是否滑步）、胶囊与挂点位置。
 
 - **引擎临时占位（[#172](https://github.com/qinyuanj/se-fish/issues/172)）**：以下全部是引擎临时占位，正式资源见 [#44](https://github.com/qinyuanj/se-fish/issues/44)；只用引擎内官方资源，不自制、不付费生成。
-  - **出手动作**：官方动画，ID 只配在 `common/game_cfg.lua` 的 `AttackAnim` 表，经 `GameCfg.Ability` 的 `Unarmed`、`MeleeWeapons`、`Guns`、`Throw` 各行 `Anim` 引用；由 `MgrWeapon` 在出手成功后按上半身播放，挥砍预设的 `ABILITY_ANOSTATE_ANIMKEY` 保持空。空手、指虎用拳击类，匕首组用单刀连击，斧组用锤子攻击，枪械按手枪、步枪、机枪、手炮开火分组，投掷用通用「攻击」26646（目录里的「投掷」25860 与「向后/左/右投掷」26649–26651 运行时加载长度为 0，不能播）。ID 取自手册「状态同步编辑器 · 动作 · 资产目录」，见 [技术难点识别「人形角色动画」](技术难点识别.md)。
+  - **出手动作**：官方动画，ID 只配在 `common/game_cfg.lua` 的 `AttackAnim` 表，经 `GameCfg.Ability` 的 `Unarmed`、`MeleeWeapons`、`Guns`、`Throw` 各行 `Anim` 引用；由 `MgrWeapon` 在出手成功后按上半身播放，挥砍预设的 `ABILITY_ANOSTATE_ANIMKEY` 保持空。空手、指虎用拳击类，匕首组用单刀连击，斧组用锤子攻击，枪械按手枪、步枪、机枪、手炮开火分组，投掷用通用「攻击」26646（目录里的「投掷」25860 与「向后/左/右投掷」26649–26651 运行时加载长度为 0，不能播）。ID 取自手册「状态同步编辑器 · 动作 · 资产目录」，取法见上文「实测陷阱」。
   - **钓鱼佬**：七区都是官方「咸鱼」`official://preset/102179`，场景单位名 01 为 `FishermanModel`，02–07 为 `Z<i>_FishermanModel`（`GameCfg.Interact.Fishermen[i].ModelName`），放在本区「设施」、与本区钓鱼佬触发器同点。
   - **抽奖机**：官方资源库没有抽奖机类预设，七区都用官方「电视」`official://preset/1504175` 占位，场景单位名 `Z<i>_LotteryModel`，放在本区「设施」、与本区抽奖点标记 `Z<i>_Lottery`（「基础方块」，mesh 5000001）同点；交互仍以标记为锚点。摆放探针 `tests/probes/zone172_lottery_models.lua`。
   - **试玩核对（2026-11-04）**：14 个模型贴地，`tests/probes/zone172_model_ground_gap.lua` 全部通过（最大偏差 Z4 抽奖机 -0.063 m，其余在 ±0.03 m 内）；地图已保存，重开后位置不变。出手动作第一版取了 `data/OfficialAsset.lua` 的 ID，试玩 A/B 连拍确认在蛋仔上不动；换成手册动作目录的 ID 后**尚待试玩复核**。

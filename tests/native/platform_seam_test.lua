@@ -1,4 +1,4 @@
--- 迁移自 tests/gameplay/platform_seam_test.lua（#91）；行为契约原文见 #147 T26、docs/技术难点识别.md §4。
+-- 迁移自 tests/gameplay/platform_seam_test.lua（#91）；行为契约原文见 #147 T26、docs/adr/0036-platform-commerce-and-ads-not-verifiable-in-editor.md。
 --   1. 可用性口径错：商品未配置（goodsId 空）却放行购买；Debug 关闭却还能进测试支付成功入口；
 --   2. 流程并发错：同一玩家第二个在飞购买/广告被接受（应 busy），或回调串到别人的 flow；
 --   3. 回调路由错：成功/取消/失败/超时没有各归各的 onResult；超时不触发（免费复活倒计时无法恢复）；
@@ -7,7 +7,7 @@
 --   5. 生命周期错：玩家离开残留 flow，重进后旧回调改新会话；payload 畸形直接报错而不是拒绝。
 --   GoodsPurchaseCompleted 订阅入口；引擎边界（CommodityService / AdvertisementService / World 时钟 /
 --   DataStore / RE）全部替身，真实 MgrSave + MgrPlayerData 验证发货落账。
--- 注意：真实平台无订单 ID、购买无取消/失败事件（docs/技术难点识别.md §4），本地接缝只做
+-- 注意：真实平台无订单 ID、购买无取消/失败事件（docs/adr/0036-platform-commerce-and-ads-not-verifiable-in-editor.md），本地接缝只做
 -- pending flow 关联与超时兜底；跨会话防重、补发与对账归 #148，本文件不断言这些能力存在。
 -- it 名字沿用旧方法名，注册顺序 = LuaUnit sortedPairs 的实际执行顺序。
 

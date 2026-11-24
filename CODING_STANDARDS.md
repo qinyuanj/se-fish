@@ -15,7 +15,7 @@
 
 **约束**（[S0]、[S1]）：用 SE 公开 API，核对签名、对象类型和运行端；可能为空的结果先判空；位置、碰撞、文本等成员须从具备该能力的具体类型访问，普通 table 不能替代引擎数据类型；沙盒的 `getmetatable` 只接受 table。`game`、`Enums`、`Vector3`、`Color`、`Quaternion`、`CFrame`、`RemoteEvent` 是全局入口，`EggyAPI.lua` 只是类型存根。common 模块双端独立运行：table 修改不跨端同步，普通 Lua 变量不跨对局持久化。
 
-**项目规则**：新增或变更 API 调用时，先用 `lua tools/cli.lua docs search <查询>` 查本地官方缓存（为空先 `docs sync`，缺的成员页用 `docs sync api <类型名>` 补），再与 `EggyAPI.lua` 存根核对版本差异；签名、语义与运行端都有依据才算查清，未查到的名称标 `[未查证]`，不作为已可用接口交付。缓存无精确成员时按 [editor-cli 检索](docs/agents/editor-cli.md)兜底，不用通用 Web 搜索替代官方依据。文档与实例不一致时记录并验证；CLI 的编辑时 `editor:GetService(...)` 示例不能用于玩法运行时。取证口径见[技术难点识别](docs/技术难点识别.md#se-lua-手册与-api-取证)。
+**项目规则**：新增或变更 API 调用时，先用 `lua tools/cli.lua docs search <查询>` 查本地官方缓存（为空先 `docs sync`，缺的成员页用 `docs sync api <类型名>` 补），再与 `EggyAPI.lua` 存根核对版本差异；签名、语义与运行端都有依据才算查清，未查到的名称标 `[未查证]`，不作为已可用接口交付。缓存无精确成员时按 [editor-cli 检索](docs/agents/editor-cli.md)兜底，不用通用 Web 搜索替代官方依据。文档与实例不一致时记录并验证；CLI 的编辑时 `editor:GetService(...)` 示例不能用于玩法运行时。
 
 ## 模块与状态归属
 
@@ -30,7 +30,7 @@
 
 ## 跨端通信
 
-**约束**（[S8]）：RemoteEvent 每次传一个可选 payload，多字段合成 table；`OnServerEvent` 的 `player` 由引擎注入，服务端以它确认请求者身份。载荷须可序列化，`CFrame` 等引擎类型先拆成位置、旋转等字段再传（[来源取证](docs/技术难点识别.md#se-lua-手册与-api-取证)）。
+**约束**（[S8]）：RemoteEvent 每次传一个可选 payload，多字段合成 table；`OnServerEvent` 的 `player` 由引擎注入，服务端以它确认请求者身份。载荷须可序列化，`CFrame` 等引擎类型先拆成位置、旋转等字段再传。
 
 | 方向 | 发送 | 接收回调 |
 | --- | --- | --- |
@@ -58,7 +58,7 @@
 
 ## 验证审查
 
-对本次修改涉及的每条规则，检查实现、关键分支与失败路径；引擎交互、通信和生命周期改动覆盖双端行为、非法请求与重复进入；命名按[命名](#命名)核对。验证方式与交付证据见开发工作流的[测试纪律](docs/agents/workflow.md#测试纪律)和[完成判据](docs/agents/workflow.md#完成判据)，缺少证据的标为未验证；来源与版本取证见[技术难点识别](docs/技术难点识别.md#se-lua-手册与-api-取证)。**夹具迁就生产**：生产代码里只为测试存在的分支、历史名兼容或数据一律退回，改夹具；迁移真源时删除绑在旧真源上的断言。
+对本次修改涉及的每条规则，检查实现、关键分支与失败路径；引擎交互、通信和生命周期改动覆盖双端行为、非法请求与重复进入；命名按[命名](#命名)核对。验证方式与交付证据见开发工作流的[测试纪律](docs/agents/workflow.md#测试纪律)和[完成判据](docs/agents/workflow.md#完成判据)，缺少证据的标为未验证；来源与版本取证见[编辑器 CLI 取证](docs/agents/editor-cli.md)。**夹具迁就生产**：生产代码里只为测试存在的分支、历史名兼容或数据一律退回，改夹具；迁移真源时删除绑在旧真源上的断言。
 
 [S0]: https://u5-creator.s3.game.163.com/manual/se/lua/00-from-editor-to-se-lua.html
 [S1]: https://u5-creator.s3.game.163.com/manual/se/lua/01-project-setup-and-entrypoints.html

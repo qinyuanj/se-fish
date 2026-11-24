@@ -2,7 +2,7 @@
 
 **Status**: accepted
 
-鱼同时需要原生抓举和技能伤害，但 SE 引擎把这两项能力放在不同单位类型上：`WorldUnit` 支持 `Liftable`，没有可用 `Controller`；脚本可创建的 `EggyUnit(EnableController=true)` 提供 `Controller.Health/TakeDamage`，却不满足鱼本体的抓举要求。给 `WorldUnit` 补 `Controller`、修改单位元表或只保留一种单位都不能形成完整玩法路径。实测依据见 [技术难点识别「举鱼」](../技术难点识别.md)。
+鱼同时需要原生抓举和技能伤害，但 SE 引擎把这两项能力放在不同单位类型上：`WorldUnit` 支持 `Liftable`，没有可用 `Controller`；脚本可创建的 `EggyUnit(EnableController=true)` 提供 `Controller.Health/TakeDamage`，却不满足鱼本体的抓举要求。给 `WorldUnit` 补 `Controller`、修改单位元表或只保留一种单位都不能形成完整玩法路径。实测依据为 #25 台账 §1 的引擎内成员探测与 M18 复证。
 
 ## 决定
 
