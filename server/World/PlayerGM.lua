@@ -1,38 +1,9 @@
 local GameCfg = require('common.GameCfg')
+local SignalRouter = require('server.World.WorldSignalRouter')
 
 local Mgr = { AttackBonuses = {} }
-local bound_signals = setmetatable({}, { __mode = 'k' })
 local active_trees = {}
-
-local function isValidPlayer(player)
-    local kind = type(player)
-    return (kind == 'table' or kind == 'userdata') and player.UserId ~= nil
-end
-
-local function registerPlayerSignal(scope, signal, player, fn)
-    if not signal then return end
-    local slot = bound_signals[signal]
-    if not slot then
-        local handlers = {}
-        local connection = signal:Connect(function(actor, ...)
-            if not isValidPlayer(actor) then return end
-            local entry = handlers[actor.UserId]
-            if entry and entry.player == actor then
-                entry.fn(actor, ...)
-            end
-        end)
-        slot = { connection = connection, handlers = handlers }
-        bound_signals[signal] = slot
-    end
-    local uid = player.UserId
-    local entry = { player = player, fn = fn }
-    slot.handlers[uid] = entry
-    scope:on_cleanup(function()
-        if slot.handlers[uid] == entry then
-            slot.handlers[uid] = nil
-        end
-    end)
-end
+local isValidPlayer = SignalRouter.is_valid_player
 
 local function syncTarget(self, target, data)
     local tree = isValidPlayer(target) and active_trees[target.UserId] or nil
@@ -201,7 +172,7 @@ function Mgr.mount(scope, player_tree, opts)
     local player = opts.player
     player_tree.gm = Mgr
     active_trees[player.UserId] = player_tree
-    registerPlayerSignal(scope, _G.REUtil:GetRE('GMAction').OnServerEvent, player, function(actor, payload)
+    SignalRouter.bind_player(scope, _G.REUtil:GetRE('GMAction').OnServerEvent, player, function(actor, payload)
         if _G.REUtil:CheckRECD(actor, 'GMAction', GameCfg.Items.ActionCooldownSec) then return end
         Mgr:Handle(actor, payload)
     end)

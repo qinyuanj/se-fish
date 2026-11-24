@@ -1,39 +1,10 @@
 local GameCfg = require('common.GameCfg')
 local FishCatch = require('common.FishCatch')
 local Records = require('common.Records')
+local SignalRouter = require('server.World.WorldSignalRouter')
 
 local Mgr = { Queues = {}, LastSeq = {}, KIND = 'compendium-land', MaxQueue = 16 }
-local bound_signals = setmetatable({}, { __mode = 'k' })
-
-local function isValidPlayer(player)
-    local kind = type(player)
-    return (kind == 'table' or kind == 'userdata') and player.UserId ~= nil
-end
-
-local function registerPlayerSignal(scope, signal, player, fn)
-    if not signal then return end
-    local slot = bound_signals[signal]
-    if not slot then
-        local handlers = {}
-        local connection = signal:Connect(function(actor, ...)
-            if not isValidPlayer(actor) then return end
-            local entry = handlers[actor.UserId]
-            if entry and entry.player == actor then
-                entry.fn(actor, ...)
-            end
-        end)
-        slot = { connection = connection, handlers = handlers }
-        bound_signals[signal] = slot
-    end
-    local uid = player.UserId
-    local entry = { player = player, fn = fn }
-    slot.handlers[uid] = entry
-    scope:on_cleanup(function()
-        if slot.handlers[uid] == entry then
-            slot.handlers[uid] = nil
-        end
-    end)
-end
+local isValidPlayer = SignalRouter.is_valid_player
 
 local function copy(value)
     local out = {}
@@ -200,7 +171,7 @@ function Mgr.mount(scope, player_tree, opts)
         Quest = player_tree.quest, Records = opts.records,
     }, { __index = Mgr })
     player_tree.compendium = session
-    registerPlayerSignal(scope, _G.REUtil:GetRE('CompendiumRequest').OnServerEvent, player, function(actor, payload)
+    SignalRouter.bind_player(scope, _G.REUtil:GetRE('CompendiumRequest').OnServerEvent, player, function(actor, payload)
         if _G.REUtil:CheckRECD(actor, 'CompendiumRequest', GameCfg.Compendium.RequestCooldownSec) then return end
         session:Handle(actor, payload)
     end)

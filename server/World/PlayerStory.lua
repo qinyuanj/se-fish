@@ -1,37 +1,8 @@
 local GameCfg = require('common.GameCfg')
+local SignalRouter = require('server.World.WorldSignalRouter')
 
 local Mgr = { States = {}, Requested = {} }
-local bound_signals = setmetatable({}, { __mode = 'k' })
-
-local function isValidPlayer(player)
-    local kind = type(player)
-    return (kind == 'table' or kind == 'userdata') and player.UserId ~= nil
-end
-
-local function registerPlayerSignal(scope, signal, player, fn)
-    if not signal then return end
-    local slot = bound_signals[signal]
-    if not slot then
-        local handlers = {}
-        local connection = signal:Connect(function(actor, ...)
-            if not isValidPlayer(actor) then return end
-            local entry = handlers[actor.UserId]
-            if entry and entry.player == actor then
-                entry.fn(actor, ...)
-            end
-        end)
-        slot = { connection = connection, handlers = handlers }
-        bound_signals[signal] = slot
-    end
-    local uid = player.UserId
-    local entry = { player = player, fn = fn }
-    slot.handlers[uid] = entry
-    scope:on_cleanup(function()
-        if slot.handlers[uid] == entry then
-            slot.handlers[uid] = nil
-        end
-    end)
-end
+local isValidPlayer = SignalRouter.is_valid_player
 
 local function cfg()
     return GameCfg.Story
@@ -232,17 +203,17 @@ function Mgr.mount(scope, player_tree, opts)
         for _, name in ipairs({ 'OnStoryStart', 'OnStoryEnd', 'OnStorySkip' }) do
             local signal = session.Service[name]
             if signal then
-                registerPlayerSignal(scope, signal, player, function(actor, storyId)
+                SignalRouter.bind_player(scope, signal, player, function(actor, storyId)
                     session:OnSignal(name, actor, storyId)
                 end)
             end
         end
     end
-    registerPlayerSignal(scope, _G.REUtil:GetRE('RequestStory').OnServerEvent, player, function(actor)
+    SignalRouter.bind_player(scope, _G.REUtil:GetRE('RequestStory').OnServerEvent, player, function(actor)
         if _G.REUtil:CheckRECD(actor, 'RequestStory', 0.5) then return end
         session:Begin(actor)
     end)
-    registerPlayerSignal(scope, _G.REUtil:GetRE('StoryRead').OnServerEvent, player, function(actor, payload)
+    SignalRouter.bind_player(scope, _G.REUtil:GetRE('StoryRead').OnServerEvent, player, function(actor, payload)
         if type(payload) ~= 'table' or payload.action ~= 'read'
             or type(payload.readKey) ~= 'string' or _G.REUtil:CheckRECD(actor, 'StoryRead', 0.5) then return end
         session:Complete(actor, payload.readKey, 'read')

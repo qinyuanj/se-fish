@@ -1,6 +1,7 @@
 local GameCfg = require('common.GameCfg')
 local Records = require('common.Records')
 local Adapter = require('server.Data.RecordsAdapter')
+local SignalRouter = require('server.World.WorldSignalRouter')
 
 local Mgr = {
     Adapter = Adapter,
@@ -11,7 +12,6 @@ local Mgr = {
     LastSeqPlayers = {},
     Stats = { Writes = 0, Merged = 0, Failures = 0, Retries = 0, Dropped = 0, Rejected = 0 },
 }
-local bound_signals = setmetatable({}, { __mode = 'k' })
 
 local function cfg() return GameCfg.Records end
 local function task() return game:GetService('Task') end
@@ -21,10 +21,7 @@ local function now()
     return ok and tonumber(value) or 0
 end
 
-local function isValidPlayer(player)
-    local kind = type(player)
-    return (kind == 'table' or kind == 'userdata') and player.UserId ~= nil
-end
+local isValidPlayer = SignalRouter.is_valid_player
 
 local function validPlayerId(player)
     local userId = isValidPlayer(player) and player.UserId or nil
@@ -204,26 +201,6 @@ function Mgr:Reconcile(player, state)
     self:NoteLanding(player, state.fishId, Records.Unscale(best))
 end
 
-local function registerWorldSignal(scope, signal, session)
-    if not signal then return end
-    local slot = bound_signals[signal]
-    if not slot then
-        local entry = { session = nil }
-        local connection = signal:Connect(function(player, payload)
-            local active = entry.session
-            if not active or _G.REUtil:CheckRECD(player, 'RecordsRequest', cfg().RequestCooldownSec) then return end
-            active:Handle(player, payload)
-        end)
-        entry.connection = connection
-        bound_signals[signal] = entry
-        slot = entry
-    end
-    slot.session = session
-    scope:on_cleanup(function()
-        if slot.session == session then slot.session = nil end
-    end)
-end
-
 -- 全服纪录挂在 SharedWorldTree；全局 RE 按信号对象单次绑定，DataStore UpdateAsync 仍是唯一写入边界。
 function Mgr.mount(scope, world, opts)
     local adapter = setmetatable({ Checked = false, Holder = nil }, { __index = Adapter })
@@ -233,7 +210,10 @@ function Mgr.mount(scope, world, opts)
         PlayerData = opts.player_data,
     }, { __index = Mgr })
     world.records = session
-    registerWorldSignal(scope, _G.REUtil:GetRE('RecordsRequest').OnServerEvent, session)
+    SignalRouter.bind_world(scope, _G.REUtil:GetRE('RecordsRequest').OnServerEvent, session, function(player, payload)
+        if _G.REUtil:CheckRECD(player, 'RecordsRequest', cfg().RequestCooldownSec) then return end
+        session:Handle(player, payload)
+    end)
     scope:subscribe(world.clock.on_second, function() session:Update() end)
     scope:on_cleanup(function()
         session.LastSeq = {}

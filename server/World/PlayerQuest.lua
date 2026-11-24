@@ -1,38 +1,8 @@
 local GameCfg = require('common.GameCfg')
 local QuestSteps = require('common.QuestSteps')
+local SignalRouter = require('server.World.WorldSignalRouter')
 
 local Mgr = { States = {}, Players = {}, Queues = {} }
-local bound_signals = setmetatable({}, { __mode = 'k' })
-
-local function isValidPlayer(player)
-    local kind = type(player)
-    return (kind == 'table' or kind == 'userdata') and player.UserId ~= nil
-end
-
-local function registerPlayerSignal(scope, signal, player, fn)
-    if not signal then return end
-    local slot = bound_signals[signal]
-    if not slot then
-        local handlers = {}
-        local connection = signal:Connect(function(actor, ...)
-            if not isValidPlayer(actor) then return end
-            local entry = handlers[actor.UserId]
-            if entry and entry.player == actor then
-                entry.fn(actor, ...)
-            end
-        end)
-        slot = { connection = connection, handlers = handlers }
-        bound_signals[signal] = slot
-    end
-    local uid = player.UserId
-    local entry = { player = player, fn = fn }
-    slot.handlers[uid] = entry
-    scope:on_cleanup(function()
-        if slot.handlers[uid] == entry then
-            slot.handlers[uid] = nil
-        end
-    end)
-end
 
 local function cfg()
     return GameCfg.Quest
@@ -241,7 +211,7 @@ function Mgr.mount(scope, player_tree, opts)
     }, { __index = Mgr })
     player_tree.quest = session
     session:OnPlayerAdded(player)
-    registerPlayerSignal(scope, _G.REUtil:GetRE('RequestQuest').OnServerEvent, player, function(actor)
+    SignalRouter.bind_player(scope, _G.REUtil:GetRE('RequestQuest').OnServerEvent, player, function(actor)
         if _G.REUtil:CheckRECD(actor, 'RequestQuest', 0.5) then return end
         session:OnPlayerAdded(actor)
         session:Publish(actor)

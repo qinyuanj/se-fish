@@ -197,7 +197,7 @@ function PlayerGrill.mount(scope, tree, opts)
     local unit = session.visual
     session.visual = nil
     if unit and type(unit.Destroy) == "function" then
-      pcall(function()
+      pcall(function() -- 兼容引擎 userdata 读取 Destroyed 或单位已被引擎先行销毁
         if not unit.Destroyed then unit:Destroy() end
       end)
     end
