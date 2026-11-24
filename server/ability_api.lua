@@ -1,5 +1,5 @@
 local AbilityPackageAPI = require("server.packages.ability_system.api")
-local AbilityAPI = { BehaviorServices = {} }
+local AbilityAPI = { behavior_services = {} }
 
 local packageCastAbility = AbilityPackageAPI.CastAbility
 local castGuard
@@ -38,7 +38,7 @@ function AbilityAPI.set_body_scale(unit, factor)
 		print('[AbilityAPI] SetScale 失败', tostring(err))
 		return { Ok = false, Error = tostring(err), Scale = scale }
 	end
-	return { Ok = true, Scale = scale, Derived = BodyScale.derive(scale) }
+	return { Ok = true, Scale = scale, derived = BodyScale.derive(scale) }
 end
 
 ---挂点附着的落地接口：在宿主下建 SkeletalSocketMount。
@@ -126,7 +126,7 @@ function AbilityAPI.attach_anchor(anchorScript, behaviorModule)
 		if type(behavior) ~= "table" or type(behavior.Attach) ~= "function" then
 			error("[AbilityAPI] 锚点行为模块不可用: " .. tostring(behaviorModule), 2)
 		end
-		behavior.Attach(anchorScript, AbilityAPI.BehaviorServices)
+		behavior.Attach(anchorScript, AbilityAPI.behavior_services)
 	end
 
 	return true

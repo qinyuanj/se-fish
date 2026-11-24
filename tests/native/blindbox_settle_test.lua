@@ -338,12 +338,12 @@ describe("盲盒服务端结算（ServerRuntime × MgrSave × MgrPlatform）", f
   it("test_query_identity_cannot_create_purchase", function()
     world:draw(1, 1)
     local key = next(world.data.Extra.lottery.intents)
-    local flows = world.platform.NextFlowId
+    local flows = world.platform.next_flow_id
     world:blindbox_action({ action = "Query", count = 1, seq = 1, requestId = key })
-    assert.same(flows, world.platform.NextFlowId)
+    assert.same(flows, world.platform.next_flow_id)
     world:blindbox_action({ action = "Query", count = 1, seq = 99, requestId = "expired" })
     assert.same("expired", world:last_result().reason)
-    assert.same(flows, world.platform.NextFlowId)
+    assert.same(flows, world.platform.next_flow_id)
   end)
 
   it("test_real_paid_write_failure_retains_fact_until_retry", function()

@@ -221,7 +221,7 @@ function AttrLeaf.mount(s, player_tree, opts)
         else
           local sanitized = BodyScale.sanitize(scale)
           summary.values.PlayerBodyScale = sanitized
-          local capped = type(attr_plan.Body) == "table" and attr_plan.Body.Capped == true
+          local capped = type(attr_plan.Body) == "table" and attr_plan.Body.capped == true
           local ok_pres, derived_or_err = AttrLeaf.apply_body_presentation(character, sanitized, capped)
           if not ok_pres then
             record_err("BodyPresentation", derived_or_err)

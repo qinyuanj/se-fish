@@ -4,13 +4,13 @@ local Adapter = require('server.data.records_adapter')
 local SignalRouter = require('server.world_host.world_signal_router')
 
 local Mgr = {
-    Adapter = Adapter,
-    Cache = {},
+    adapter = Adapter,
+    cache = {},
     Pending = {},
-    Reading = {},
+    reading = {},
     LastSeq = {},
     LastSeqPlayers = {},
-    Stats = { Writes = 0, Merged = 0, Failures = 0, Retries = 0, Dropped = 0, Rejected = 0 },
+    Stats = { writes = 0, merged = 0, failures = 0, retries = 0, dropped = 0, rejected = 0 },
 }
 
 local function cfg() return GameCfg.Records end
@@ -29,7 +29,7 @@ local function validPlayerId(player)
 end
 
 local function reject(self, player, fishId, detail, reason)
-    self.Stats.Rejected = self.Stats.Rejected + 1
+    self.Stats.rejected = self.Stats.rejected + 1
     print('[WorldRecords] 全服纪录拒收', player and player.UserId, tostring(fishId), detail, tostring(reason))
     return false, reason
 end
@@ -49,7 +49,7 @@ function Mgr:note_landing(player, fishId, weight)
     if not entry then return reject(self, player, fishId, 'entry', 'invalid') end
     local pending = self.Pending[fishId]
     if pending and pending.entry then
-        self.Stats.Merged = self.Stats.Merged + 1
+        self.Stats.merged = self.Stats.merged + 1
         if Records.wins(entry, pending.entry) then pending.entry = entry end
         return true, 'merged'
     end
@@ -70,7 +70,7 @@ function Mgr:update()
 end
 
 function Mgr:cache_set(fishId, entry, failed)
-    self.Cache[fishId] = { entry = Records.valid(entry), at = now(), failed = failed }
+    self.cache[fishId] = { entry = Records.valid(entry), at = now(), failed = failed }
 end
 
 function Mgr:fresh(cached)
@@ -81,23 +81,23 @@ end
 
 function Mgr:flush(fishId)
     local pending = self.Pending[fishId]
-    if not pending or not pending.entry or pending.Writing then return end
+    if not pending or not pending.entry or pending.writing then return end
     local entry = pending.entry
     pending.entry = nil
-    local cached = self.Cache[fishId]
+    local cached = self.cache[fishId]
     if cached and not cached.failed and not Records.wins(entry, cached.entry) then
         if not pending.entry then self.Pending[fishId] = nil end
         return
     end
-    pending.Writing = true
+    pending.writing = true
     task():Spawn(function()
-        local ok, won, saved, kind = self.Adapter:Submit(fishId, function(current)
+        local ok, won, saved, kind = self.adapter:Submit(fishId, function(current)
             if not Records.wins(entry, current) then return nil end
             return entry
         end)
-        pending.Writing = false
+        pending.writing = false
         if ok then
-            self.Stats.Writes = self.Stats.Writes + (won and 1 or 0)
+            self.Stats.writes = self.Stats.writes + (won and 1 or 0)
             pending.attempts = 0
             if saved then self:cache_set(fishId, saved, nil) end
             if pending.entry then
@@ -107,23 +107,23 @@ function Mgr:flush(fishId)
             end
             return
         end
-        self.Stats.Failures = self.Stats.Failures + 1
+        self.Stats.failures = self.Stats.failures + 1
         pending.attempts = pending.attempts + 1
         if not pending.entry or Records.wins(entry, pending.entry) then pending.entry = entry end
         if pending.attempts > cfg().MaxRetries then
-            self.Stats.Dropped = self.Stats.Dropped + 1
+            self.Stats.dropped = self.Stats.dropped + 1
             self.Pending[fishId] = nil
             print('[WorldRecords] 全服纪录提交放弃（重试耗尽）', fishId, entry.w, entry.u, tostring(kind))
             return
         end
-        self.Stats.Retries = self.Stats.Retries + 1
+        self.Stats.retries = self.Stats.retries + 1
         pending.dueAt = now() + cfg().RetryDelaySec
         print('[WorldRecords] 全服纪录提交失败，稍后重试', fishId, entry.w, entry.u, tostring(kind))
     end)
 end
 
 function Mgr:state(fishId)
-    local cached = self.Cache[fishId]
+    local cached = self.cache[fishId]
     if not cached then return { state = 'unavailable', fishId = fishId, error = 'cold' } end
     if cached.entry then
         local state = Records.state(cached.entry)
@@ -139,25 +139,25 @@ function Mgr:read(fishId, done)
         if done then done({ state = 'unavailable', fishId = fishId, error = 'unknown-fish' }) end
         return
     end
-    local cached = self.Cache[fishId]
+    local cached = self.cache[fishId]
     if cached and self:fresh(cached) then
         if done then done(self:state(fishId)) end
         return
     end
-    local waiting = self.Reading[fishId]
+    local waiting = self.reading[fishId]
     if waiting then
         if done then waiting[#waiting + 1] = done end
         return
     end
-    self.Reading[fishId] = done and { done } or {}
+    self.reading[fishId] = done and { done } or {}
     task():Spawn(function()
-        local ok, entry, kind = self.Adapter:read(fishId)
-        local waiters = self.Reading[fishId] or {}
-        self.Reading[fishId] = nil
+        local ok, entry, kind = self.adapter:read(fishId)
+        local waiters = self.reading[fishId] or {}
+        self.reading[fishId] = nil
         if ok then
             self:cache_set(fishId, entry, nil)
         else
-            local previous = self.Cache[fishId]
+            local previous = self.cache[fishId]
             self:cache_set(fishId, previous and previous.entry or nil, kind)
             print('[WorldRecords] 全服纪录读取失败', fishId, tostring(kind))
         end
@@ -202,10 +202,10 @@ function Mgr:reconcile(player, state)
 end
 
 function Mgr.mount(scope, world, opts)
-    local adapter = setmetatable({ Checked = false, holder = nil }, { __index = Adapter })
+    local adapter = setmetatable({ checked = false, holder = nil }, { __index = Adapter })
     local session = setmetatable({
-        Adapter = adapter, Cache = {}, Pending = {}, Reading = {}, LastSeq = {}, LastSeqPlayers = {},
-        Stats = { Writes = 0, Merged = 0, Failures = 0, Retries = 0, Dropped = 0, Rejected = 0 },
+        adapter = adapter, cache = {}, Pending = {}, reading = {}, LastSeq = {}, LastSeqPlayers = {},
+        Stats = { writes = 0, merged = 0, failures = 0, retries = 0, dropped = 0, rejected = 0 },
         PlayerData = opts.player_data,
     }, { __index = Mgr })
     world.records = session

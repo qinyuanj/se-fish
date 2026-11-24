@@ -1,5 +1,5 @@
 local GameCfg = require('common.game_cfg')
-local DamageFloat = { Active = {}, Pool = {}, Sequence = {}, PendingCleanup = {} }
+local DamageFloat = { Active = {}, Pool = {}, sequence = {}, pending_cleanup = {} }
 local cfg = GameCfg.DamageFloat
 
 function DamageFloat.display_amount(amount)
@@ -15,18 +15,18 @@ function DamageFloat:clear()
             pending[#pending + 1] = node
         end
     end
-    for _, node in ipairs(self.PendingCleanup) do destroy(node) end
-    self.PendingCleanup = pending
+    for _, node in ipairs(self.pending_cleanup) do destroy(node) end
+    self.pending_cleanup = pending
     for _, entry in ipairs(self.Active) do destroy(entry.node) end
     for _, node in ipairs(self.Pool) do destroy(node) end
-    self.Active, self.Pool, self.Sequence = {}, {}, {}
-    self.Root, self.Resolution = nil, nil
+    self.Active, self.Pool, self.sequence = {}, {}, {}
+    self.Root, self.resolution = nil, nil
 end
 
 function DamageFloat:bind(root, resolution)
     if self.Root == root then return end
     self:clear()
-    self.Root, self.Resolution = root, resolution
+    self.Root, self.resolution = root, resolution
 end
 
 local function valid(payload)
@@ -41,11 +41,11 @@ end
 
 function DamageFloat:project(position, height)
     local camera = game:GetService('CameraService')
-    if not camera or not camera.MainCamera or not self.Resolution then return nil end
+    if not camera or not camera.MainCamera or not self.resolution then return nil end
     local screen, visible = camera:WorldToViewportPoint(Vector3.New(
         position.x, position.y + (height or cfg.HeadHeight), position.z))
     if not screen or not visible or screen.z <= 0 then return nil end
-    return screen.x, self.Resolution.y - screen.y
+    return screen.x, self.resolution.y - screen.y
 end
 
 function DamageFloat:show(payload)
@@ -61,8 +61,8 @@ function DamageFloat:show(payload)
     end
     if not node then return end
     local key = payload.targetType .. ':' .. tostring(payload.targetId)
-    local sequence = (self.Sequence[key] or 0) + 1
-    self.Sequence[key] = sequence
+    local sequence = (self.sequence[key] or 0) + 1
+    self.sequence[key] = sequence
     local spread = ((sequence - 1) % 3 - 1) * cfg.SpreadPixels
     local critical = payload.critical == true
     local color = critical and cfg.CriticalColor or cfg.NormalColor
@@ -76,20 +76,20 @@ function DamageFloat:show(payload)
     node.Visible = true
     node.LocalZOrder = 10
     local entry = { node = node, Start = game:GetService('World'):GetServerTime(),
-        Position = payload.position, Height = payload.height, Spread = spread }
+        Position = payload.position, Height = payload.height, spread = spread }
     self.Active[#self.Active + 1] = entry
 end
 
 function DamageFloat:update()
     if not self.Root then return end
-    if #self.PendingCleanup > 0 then
-        local pending = self.PendingCleanup
-        self.PendingCleanup = {}
+    if #self.pending_cleanup > 0 then
+        local pending = self.pending_cleanup
+        self.pending_cleanup = {}
         for _, node in ipairs(pending) do
             local ok, err = pcall(function() node:Destroy() end)
             if not ok then
                 print('[DamageFloat] 重试清理失败', tostring(err))
-                self.PendingCleanup[#self.PendingCleanup + 1] = node
+                self.pending_cleanup[#self.pending_cleanup + 1] = node
             end
         end
     end
@@ -110,7 +110,7 @@ function DamageFloat:update()
             local x, y = self:project(entry.Position, entry.Height)
             entry.node.Visible = x ~= nil
             if x then
-                entry.node.Position = Vector2.New(x + entry.Spread, y + cfg.RisePixels * progress)
+                entry.node.Position = Vector2.New(x + entry.spread, y + cfg.RisePixels * progress)
                 entry.node.Opacity = 1 - progress
             end
         end

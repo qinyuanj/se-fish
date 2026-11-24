@@ -260,7 +260,7 @@ do
         if row.AnchorName == 'Z5_Shop' then stand = row end
     end
     check('Z5_Shop 摊位为 5 级', stand ~= nil and stand.Level == 5
-        and stand.AnchorName == GameCfg.Zones[5].Scene.ShopName)
+        and stand.AnchorName == GameCfg.Zones[5].Scene.shop_name)
     local gear = {}
     for _, row in ipairs(GameCfg.Shop.list_for_page(5, '钓具')) do gear[row.ItemId] = row.Price end
     local weapons = {}

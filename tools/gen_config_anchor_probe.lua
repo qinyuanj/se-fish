@@ -30,7 +30,7 @@ function M.collect(GameCfg)
     end
     -- 1. 区域标记命名合同（ADR-0013，common/zone_markers.contract；水域按 Z<i>_Water 前缀枚举，不在清单内）
     for _, entry in ipairs(require('common.zone_markers').contract(GameCfg)) do
-        add('Marker.' .. entry.Role, labels[entry.ZoneIndex], entry.Name, 'contract')
+        add('Marker.' .. entry.role, labels[entry.zone_index], entry.Name, 'contract')
     end
     -- 2. 钓鱼佬锚点（MgrInteract.find_anchor 的名字来源）
     for index, fisherman in ipairs(GameCfg.Interact.Fishermen or {}) do

@@ -11,7 +11,7 @@ function GuideView.spec(options)
       local resolution = ViewUtil.get_resolution(ctx, options)
       local rects = MainHudLayout.compute({ width = resolution.x, height = resolution.y,
         itemBarSlots = 0, reeling = false }).Rects
-      local panel, toggle_rect = rects.QuestPanel, rects.QuestToggle
+      local panel, toggle_rect = rects.quest_panel, rects.quest_toggle
       local background = ctx.create_node(scope, "EUIImage", {
         Parent = ctx.root_node, Name = "QuestBackground", Position = Vector2.New(panel.x, panel.y),
         Size = Vector2.New(panel.w, panel.h), Image = "official://image/11017",

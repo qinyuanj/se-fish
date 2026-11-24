@@ -416,7 +416,7 @@ function FishingPhase.mount(scope, tree, opts)
         return true
       end
     end
-    local outcome = reel.progress:advance(now, result.Accepted, 0)
+    local outcome = reel.progress:advance(now, result.accepted, 0)
     if outcome then
       finish_reel(outcome, true)
     else
@@ -424,7 +424,7 @@ function FishingPhase.mount(scope, tree, opts)
         action = "progress",
         session = reel.id,
         progress = reel.progress.Progress,
-        accepted = result.Accepted,
+        accepted = result.accepted,
         q = payload.q,
       })
     end

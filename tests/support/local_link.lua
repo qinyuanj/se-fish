@@ -289,8 +289,8 @@ local function handleAdded(env, player)
 end
 
 local function continueRemoving(env, player, leaving)
-    if env.leaving[player.UserId] ~= leaving or leaving.Cleaned then return end
-    leaving.Cleaned = true
+    if env.leaving[player.UserId] ~= leaving or leaving.cleaned then return end
+    leaving.cleaned = true
     local active = env.active[player.UserId] == player
     if active then env.active[player.UserId] = nil end
     if active then env.lifeHost:remove(player) end

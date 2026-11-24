@@ -12,7 +12,7 @@ local HIT_SFX_LIFETIME = 1.0
 local HITTABLE_UNIT_TYPES = {
 	EggyUnit = true,
 	HumanUnit = true,
-	PetUnit = true,
+	pet_unit = true,
 	PhysicsUnit = true,
 }
 

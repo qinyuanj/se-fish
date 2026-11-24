@@ -48,8 +48,8 @@ function Mgr:begin(player)
     self.States[player.UserId] = state
     local storyId = cfg().StoryId
     if storyId == nil or storyId == '' then return self:fallback(player, state, '未配置 storyID') end
-    if not self.Service then return self:fallback(player, state, 'StoryService 不可用') end
-    local ok, err = pcall(function() self.Service:StartStory(player, storyId) end)
+    if not self.service then return self:fallback(player, state, 'StoryService 不可用') end
+    local ok, err = pcall(function() self.service:StartStory(player, storyId) end)
     if not ok then return self:fallback(player, state, 'StartStory 报错 ' .. tostring(err)) end
     print('[PlayerStory] StartStory', player.UserId, storyId)
     if state.phase == 'pending' then state.deadline = self:now() + cfg().StartTimeoutSec end
@@ -195,11 +195,11 @@ function Mgr.mount(scope, player_tree, opts)
         World = { GetServerTime = function() return opts.clock.now() end },
     }, { __index = Mgr })
     local ok, service = pcall(function() return game:GetService('StoryService') end)
-    session.Service = ok and service or nil
+    session.service = ok and service or nil
     player_tree.story = session
-    if session.Service then
+    if session.service then
         for _, name in ipairs({ 'OnStoryStart', 'OnStoryEnd', 'OnStorySkip' }) do
-            local signal = session.Service[name]
+            local signal = session.service[name]
             if signal then
                 SignalRouter.bind_player(scope, signal, player, function(actor, storyId)
                     session:on_signal(name, actor, storyId)

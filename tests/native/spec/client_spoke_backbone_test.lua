@@ -742,7 +742,7 @@ describe("客户端 Spoke 主干契约（#296）", function()
         local cs = _G.ClientSpoke.Store
         assert.has_error(function() cs.survival = {} end)
         assert.has_error(function() cs.survival:now().phase = "dead" end)
-        assert.equals(50, _G.ClientSpoke.Clock.second:now())
+        assert.equals(50, _G.ClientSpoke.clock.second:now())
 
         -- 验证下行远程事件与 Heartbeat 传感均已接通
         remote_events.ItemBarState.OnClientEvent:Fire({ coins = 321 })

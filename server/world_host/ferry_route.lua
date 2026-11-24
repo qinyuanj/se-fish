@@ -199,7 +199,7 @@ function FerryRoute.mount(world, opts)
       SpokeRuntime.batch(function()
         sync_tree(player, data)
         self.Flights[route.Id] = { player = player, operation = operation.id, routeId = route.Id,
-          DepartAt = world.clock.now() + point.CountdownSec }
+          depart_at = world.clock.now() + point.CountdownSec }
         route_states[route.Id]:set({ phase = "countdown", routeId = route.Id,
           operation = operation.id, seconds = point.CountdownSec })
         if route_sailing[route.Id] then route_sailing[route.Id]:set(true) end
@@ -355,7 +355,7 @@ function FerryRoute.mount(world, opts)
       return
     end
     local now = world.clock.now()
-    if now >= flight.DepartAt then
+    if now >= flight.depart_at then
       self.Flights[route.Id] = nil
       SpokeRuntime.batch(function()
         if state then state:set({ phase = "idle", routeId = route.Id }) end
@@ -363,7 +363,7 @@ function FerryRoute.mount(world, opts)
       end)
       self:depart(route, flight)
     elseif state then
-      local seconds = math.max(0, flight.DepartAt - now)
+      local seconds = math.max(0, flight.depart_at - now)
       local current = state:now()
       if math.ceil(seconds) ~= math.ceil(current.seconds or 0) then
         state:set({ phase = "countdown", routeId = route.Id, operation = flight.operation, seconds = seconds })
@@ -386,9 +386,9 @@ function FerryRoute.mount(world, opts)
     local channel = event("FerryState")
     for _, route in ipairs(GameCfg.Ferry.Routes) do
       local flight = self.Flights[route.Id]
-      if flight and flight.DepartAt and now < flight.DepartAt and channel and channel.FireClient then
+      if flight and flight.depart_at and now < flight.depart_at and channel and channel.FireClient then
         channel:FireClient(player, { phase = "countdown", routeId = route.Id, operation = flight.operation,
-          seconds = flight.DepartAt - now })
+          seconds = flight.depart_at - now })
       end
     end
     local data = data_of(player)

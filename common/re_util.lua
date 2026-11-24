@@ -3,16 +3,16 @@ local REUtil = {}
 local World = game:GetService("World")
 local RunService = game:GetService("RunService")
 
-REUtil.REMap = {}
+REUtil.re_map = {}
 
 
 local RECDCheckMap = {}
 
 function REUtil:get_re(eventName)
-    local targetRE = REUtil.REMap[eventName]
+    local targetRE = REUtil.re_map[eventName]
     if not targetRE then 
         targetRE = RemoteEvent.New(eventName)
-        REUtil.REMap[eventName] = targetRE
+        REUtil.re_map[eventName] = targetRE
         print("[REUtil] RemoteEvent.New", eventName)
     end
     

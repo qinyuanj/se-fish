@@ -63,7 +63,7 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
     env.anchors = {}
     for _, zone in ipairs(env.cfg.Zones) do
       for _, entity in ipairs(zone.Scene.Entities) do
-        if entity.Role == 'Ferry' then
+        if entity.role == 'Ferry' then
           env.anchors[entity.Name] = { Position = vec(entity.Position.x, entity.Position.y, entity.Position.z) }
         end
       end

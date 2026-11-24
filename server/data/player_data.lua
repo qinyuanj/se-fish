@@ -48,7 +48,7 @@ local function stripArrayMeta(value, path, seen)
     seen[value] = nil
     return out
 end
-PlayerData.StripArrayMeta = stripArrayMeta
+PlayerData.strip_array_meta = stripArrayMeta
 
 local function zoneScene(zoneId)
     for _, zone in ipairs(GameCfg.Zones or {}) do
@@ -132,7 +132,7 @@ local function hasIndividualMult(itemId)
 end
 
 function PlayerData.new(player, onItemBarChanged)
-    return setmetatable({ Player = player, Inited = false, OnItemBarChanged = onItemBarChanged }, PlayerData)
+    return setmetatable({ Player = player, Inited = false, on_item_bar_changed = onItemBarChanged }, PlayerData)
 end
 
 function PlayerData:Init(waitForLoad)
@@ -922,14 +922,14 @@ function PlayerData:DiscardSlot(index)
 end
 
 function PlayerData:PublishItemBar()
-    if self.OnItemBarChanged then
-        self.OnItemBarChanged(self.Player, self)
+    if self.on_item_bar_changed then
+        self.on_item_bar_changed(self.Player, self)
     end
 end
 
 function PlayerData:UpdateData(updateCallBack, doSync)
     if not self.Inited or not updateCallBack then return end
-    self.Touched = true
+    self.touched = true
     updateCallBack(self.Data)
     self.Revision = (self.Revision or 0) + 1
     local selected = self.Data.SelectedSlot
@@ -952,7 +952,7 @@ end
 function PlayerData:destroy()
     self.Player = nil
     self.Data = nil
-    self.OnItemBarChanged = nil
+    self.on_item_bar_changed = nil
     self.Inited = false
     self.SaveMeta = nil
     self.Revision = nil

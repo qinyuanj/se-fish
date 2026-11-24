@@ -252,7 +252,7 @@ describe('TestForestCombat', function()
         env.now = 180
         env.mgr:update()
         assert.are.equal('escaping', fish.State)
-        assert.is_true(fish.StraightEscape)
+        assert.is_true(fish.straight_escape)
     end)
 
     it('test_swordfish_head_swing_20_damage_on_cadence', function()

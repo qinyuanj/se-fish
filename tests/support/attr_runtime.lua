@@ -143,15 +143,15 @@ function M.new(playerData, multiplier, opts)
     function mgr:apply_body_scale(player)
         local plan, err = self:body_plan(player)
         if not plan then return { Ok = false, Error = err } end
-        local ok, derivedOrErr = AttrLeaf.apply_body_presentation(player.Character, plan.Scale, plan.Capped)
+        local ok, derivedOrErr = AttrLeaf.apply_body_presentation(player.Character, plan.Scale, plan.capped)
         if not ok then logFn('[AttrLeaf] 体型写入失败', player.UserId, tostring(derivedOrErr)) end
         return {
             Ok = ok,
             Error = not ok and tostring(derivedOrErr) or nil,
             Scale = plan.Scale,
             Health = self:max_health(player),
-            Capped = plan.Capped,
-            Derived = ok and derivedOrErr or BodyScale.derive(plan.Scale),
+            capped = plan.capped,
+            derived = ok and derivedOrErr or BodyScale.derive(plan.Scale),
         }
     end
 

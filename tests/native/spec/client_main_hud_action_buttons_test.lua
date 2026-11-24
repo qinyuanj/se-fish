@@ -112,8 +112,8 @@ describe("Spoke 主 HUD 右侧动作键视图（#297-B3b1）", function()
     local btn_action = env.nodes.ItemAction2
     local lbl_action = env.nodes.BtnItemActionLabel
 
-    assert_at(btn_discard, layout.Rects.Discard, "ItemDiscard")
-    assert_at(lbl_discard, layout.Rects.Discard, "BtnDiscardLabel")
+    assert_at(btn_discard, layout.Rects.discard, "ItemDiscard")
+    assert_at(lbl_discard, layout.Rects.discard, "BtnDiscardLabel")
     assert_at(btn_action, layout.Rects.ItemAction, "ItemAction2")
     assert_at(lbl_action, layout.Rects.ItemAction, "BtnItemActionLabel")
 

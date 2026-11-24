@@ -121,8 +121,8 @@ describe("TestRateLimitReceiver", function()
 
     local result = rx:accept(0, { s = "s-1", n = 3, q = 1 })
     assert.same("ok", result.Status)
-    assert.same(3, result.Accepted)
-    assert.is_false(result.Clamped)
+    assert.same(3, result.accepted)
+    assert.is_false(result.clamped)
   end)
 
   -- 端到端：客户端聚合出来的载荷原样喂给服务端接收侧（M1 就是这么接的）。
@@ -138,7 +138,7 @@ describe("TestRateLimitReceiver", function()
     local result = rx:accept(0, payload)
     assert.same("ok", result.Status)
     assert.same(12, result.Requested)
-    assert.same(10, result.Accepted) -- 窗口 1s ≤ 10，多出的 2 次被 clamp
+    assert.same(10, result.accepted) -- 窗口 1s ≤ 10，多出的 2 次被 clamp
     assert.same("order", rx:accept(0.01, payload).Reason) -- 同一个包重放一次被序号挡掉
   end)
 
@@ -175,9 +175,9 @@ describe("TestRateLimitReceiver", function()
 
     local result = rx:accept(0, { s = "s-1", n = 1e9, q = 1 })
     assert.same("ok", result.Status)
-    assert.same(10, result.Accepted)
-    assert.is_true(result.Clamped)
-    assert.same(0, rx:accept(0, { s = "s-1", n = 1, q = 2 }).Accepted)
+    assert.same(10, result.accepted)
+    assert.is_true(result.clamped)
+    assert.same(0, rx:accept(0, { s = "s-1", n = 1, q = 2 }).accepted)
   end)
 
   -- 类型校验在最前：畸形包一律 bad-payload，且不能抛错
@@ -206,9 +206,9 @@ describe("TestRateLimitReceiver", function()
 
     local result = rx:accept(0.1, { s = "s-1", n = 4, q = 2 })
     assert.same("ok", result.Status)
-    assert.same(0, result.Accepted)
+    assert.same(0, result.accepted)
     assert.same(4, result.Requested)
-    assert.is_true(result.Clamped)
+    assert.is_true(result.clamped)
   end)
 
   it("test_session_switch_then_old_payloads_drop", function()
@@ -218,7 +218,7 @@ describe("TestRateLimitReceiver", function()
 
     assert.same("session", rx:accept(0.1, { s = "s-1", n = 1, q = 2 }).Reason)
     -- 新会话的序号从 1 重来也能过（set_session 把 lastSeq 清了），且滑动窗已清零。
-    assert.same(5, rx:accept(0.1, { s = "s-2", n = 5, q = 1 }).Accepted)
+    assert.same(5, rx:accept(0.1, { s = "s-2", n = 5, q = 1 }).accepted)
   end)
 end)
 

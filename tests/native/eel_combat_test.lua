@@ -61,7 +61,7 @@ describe('TestEelCombat', function()
         at(env, 15)
         assert.are.equal('combat', log.published[#log.published - 1].state)
         assert.are.equal('attacking', log.published[#log.published].state)
-        assert.is_true(fish.CombatPublished)
+        assert.is_true(fish.combat_published)
     end)
 
     it('test_combat_fish_is_not_counted_as_escaping', function()
@@ -109,7 +109,7 @@ describe('TestEelCombat', function()
         for t = 15, 15.5, 0.5 do at(env, t) end
         assert.are.equal(6, log.casts)
         assert.are.equal('attacking', fish.State)
-        assert.are.equal(1, fish.Discharges)
+        assert.are.equal(1, fish.discharges)
     end)
 
     it('test_flee_deadline_mid_attack_stops_casting_and_removes_skill', function()
@@ -196,14 +196,14 @@ describe('TestEelCombat', function()
         accept = false
         at(env, 4.1)
         at(env, 4.2)
-        assert.are.equal(1, fish.Discharges)
+        assert.are.equal(1, fish.discharges)
         assert.are.equal('attacking', fish.State)
         accept = true
         at(env, 4.3)
-        assert.are.equal(1, fish.Discharges)
+        assert.are.equal(1, fish.discharges)
         at(env, 4.7)
-        assert.are.equal(2, fish.Discharges)
-        assert.near(5.1, fish.WarnAt, 1e-9)
+        assert.are.equal(2, fish.discharges)
+        assert.near(5.1, fish.warn_at, 1e-9)
     end)
 
     it('test_repeated_updates_at_same_time_discharge_once', function()
@@ -214,7 +214,7 @@ describe('TestEelCombat', function()
         assert.are.equal(1, log.casts)
         for t = 1, 6, 0.5 do at(env, t) end
         assert.truthy(log.casts >= 2)
-        assert.are.equal(log.casts, fish.Discharges) -- 同一时刻重复帧不重复计数
+        assert.are.equal(log.casts, fish.discharges) -- 同一时刻重复帧不重复计数
     end)
 
     it('test_sleep_lies_sideways_and_waking_restores_rotation', function()

@@ -224,9 +224,9 @@ describe('TestMgrAbilityActionGuard', function()
         host:phase(blocked, 'downed')
         local vitals = host.runtime.life
         mgr.Vitals = vitals
-        mgr.BehaviorServices = { Vitals = vitals }
+        mgr.behavior_services = { Vitals = vitals }
         mgr:start()
-        assert.same(mgr.BehaviorServices, api.BehaviorServices)
+        assert.same(mgr.behavior_services, api.behavior_services)
         -- 装配完成后立刻放回真实环境：守卫闭包已捕获 vitals，后续断言不需要假 game
         _G.game = saved.game
         package.loaded['server.ability_api'] = saved.api

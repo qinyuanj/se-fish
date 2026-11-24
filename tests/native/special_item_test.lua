@@ -24,7 +24,7 @@ local SpecialItem = require('common.special_item')
 describe('TestSpecialItem', function()
     local function bounds()
         -- 与 FlightPath.bounds_of 同形的场景合同边界：地面 5 米、上限 20 米
-        return { MinX = -60, MaxX = 60, MinZ = -50, MaxZ = 70, GroundY = 5, CeilingY = 25, MaxHeight = 20 }
+        return { MinX = -60, MaxX = 60, MinZ = -50, MaxZ = 70, GroundY = 5, ceiling_y = 25, MaxHeight = 20 }
     end
 
     -- 失败方式 2：台账按 tick 段结算，每目标总和恰 1000、无重复段
@@ -107,36 +107,36 @@ describe('TestSpecialItem', function()
     it('test_flight_y_climbs_to_ceiling_and_descends_to_ground', function()
         local cfg = GameCfg.Ability.SpecialItem.Wings
         local b = bounds()
-        local state = { Y = b.GroundY, Airborne = false }
+        local state = { Y = b.GroundY, airborne = false }
         -- 长按 10 秒：必须停在 CeilingY，不越过 20 米上限
         for _ = 1, 40 do
             local y, airborne = SpecialItem.step_flight_y(cfg, state, true, 0.25, b)
-            state.Y, state.Airborne = y, airborne
+            state.Y, state.airborne = y, airborne
         end
-        assert.same(b.CeilingY, state.Y)
-        assert.is_true(state.Airborne)
+        assert.same(b.ceiling_y, state.Y)
+        assert.is_true(state.airborne)
         assert.message('y ' .. tostring(state.Y)).is_true(state.Y <= b.GroundY + 20)
         -- 松开 20 秒：必须降回地面并落地
         for _ = 1, 80 do
             local y, airborne = SpecialItem.step_flight_y(cfg, state, false, 0.25, b)
-            state.Y, state.Airborne = y, airborne
+            state.Y, state.airborne = y, airborne
         end
         assert.same(b.GroundY, state.Y)
-        assert.is_false(state.Airborne)
+        assert.is_false(state.airborne)
     end)
 
     -- 失败方式 5：非法 dt 不污染状态（NaN / 负 / 超步长截断）
     it('test_flight_y_rejects_bad_dt', function()
         local cfg = GameCfg.Ability.SpecialItem.Wings
         local b = bounds()
-        local state = { Y = 10, Airborne = true }
+        local state = { Y = 10, airborne = true }
         for _, bad in ipairs({ 0 / 0, math.huge, -1 }) do
             local y = SpecialItem.step_flight_y(cfg, state, true, bad, b)
             assert.message(tostring(bad)).same(10, y)
         end
         -- 超步长截断：1 秒当 MaxStepSec 算，不能一帧飞穿上限
-        local y = SpecialItem.step_flight_y(cfg, { Y = b.CeilingY - 0.5, Airborne = true }, true, 1, b)
-        assert.message('y ' .. tostring(y)).is_true(y <= b.CeilingY)
-        assert.is_true(y <= b.CeilingY - 0.5 + cfg.ClimbSpeed * cfg.MaxStepSec + 1e-9)
+        local y = SpecialItem.step_flight_y(cfg, { Y = b.ceiling_y - 0.5, airborne = true }, true, 1, b)
+        assert.message('y ' .. tostring(y)).is_true(y <= b.ceiling_y)
+        assert.is_true(y <= b.ceiling_y - 0.5 + cfg.ClimbSpeed * cfg.MaxStepSec + 1e-9)
     end)
 end)

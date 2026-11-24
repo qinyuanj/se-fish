@@ -438,7 +438,7 @@ GameCfg.Lottery.ResultTimeoutSec = 5
 function GameCfg.Lottery.machine_anchors()
     local names = {}
     for _, zone in ipairs(GameCfg.Zones) do
-        if zone.Scene and zone.Scene.LotteryName then names[#names + 1] = zone.Scene.LotteryName end
+        if zone.Scene and zone.Scene.lottery_name then names[#names + 1] = zone.Scene.lottery_name end
     end
     return names
 end

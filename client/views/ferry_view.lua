@@ -150,7 +150,7 @@ end
 local function anchor_of(anchor_name)
   for _, zone in ipairs(GameCfg.Zones) do
     for _, entity in ipairs(zone.Scene and zone.Scene.Entities or {}) do
-      if entity.Role == "Ferry" and entity.Name == anchor_name then return entity.Position end
+      if entity.role == "Ferry" and entity.Name == anchor_name then return entity.Position end
     end
   end
   return nil

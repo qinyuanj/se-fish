@@ -46,32 +46,32 @@ describe("TestZoneScene125", function()
     })
     assert.is_nil(report.Ready)
     assert.same({
-      { ZoneId = 'crabLake', ZoneName = '蟹湖', Name = 'CrabWater', Code = 'missing' },
-      { ZoneId = 'crabLake', ZoneName = '蟹湖', Name = 'CrabSafe', Code = 'duplicate' },
-      { ZoneId = 'crabLake', ZoneName = '蟹湖', Name = 'CrabShop', Code = 'position' },
-    }, report.Issues)
+      { ZoneId = 'crabLake', zone_name = '蟹湖', Name = 'CrabWater', code = 'missing' },
+      { ZoneId = 'crabLake', zone_name = '蟹湖', Name = 'CrabSafe', code = 'duplicate' },
+      { ZoneId = 'crabLake', zone_name = '蟹湖', Name = 'CrabShop', code = 'position' },
+    }, report.issues)
     local complete = {}
     for _, e in ipairs(scenes[1].Scene.Entities) do complete[#complete + 1] = e end
     report = Judge.inspect_scene(scenes, complete)
-    assert.is_true(report.EntitiesMatch)
+    assert.is_true(report.entities_match)
     assert.is_nil(report.Ready) -- 名称和位置匹配不等于碰撞、保存或试玩通过。
-    assert.same({ 'crabLake' }, report.PendingZones)
+    assert.same({ 'crabLake' }, report.pending_zones)
     scenes[1].Scene.State = 'resolved'
     report = Judge.inspect_scene(scenes, complete)
     assert.is_nil(report.Ready)
     assert.same({
-      Saved = 'unverified', Synced = 'unverified', Collision = 'unverified', Playtested = 'unverified',
-    }, report.Verification)
+      saved = 'unverified', synced = 'unverified', collision = 'unverified', playtested = 'unverified',
+    }, report.verification)
 
     -- 配置真值：实体与快照点必须是同一张表（不是内容相等）——共享点被复制成两份后，
     -- 改一处另一处不动就漂移，诊断按位置比也会各说一套。
     for _, zone in ipairs(Cfg.Zones) do
       local scene = zone.Scene
       for _, entity in ipairs(scene.Entities) do
-        if entity.Role == 'Safe' then assert.are.equal(scene.SafePoint, entity.Position) end
-        if entity.Role == 'Water' then
+        if entity.role == 'Safe' then assert.are.equal(scene.SafePoint, entity.Position) end
+        if entity.role == 'Water' then
           for _, water in ipairs(scene.Waters) do
-            if water.EntityName == entity.Name then
+            if water.entity_name == entity.Name then
               assert.are.equal(water.Center, entity.Position, entity.Name)
               break
             end
@@ -79,7 +79,7 @@ describe("TestZoneScene125", function()
         end
       end
     end
-    assert.are.equal(Cfg.Zones[1].Scene.BaitSpots.Positions[1], Cfg.BaitSpots.Spots[1].Position)
-    assert.are.equal(Cfg.Zones[7].Scene.Waters[1], Cfg.Zones[7].Scene.CruiseWater)
+    assert.are.equal(Cfg.Zones[1].Scene.BaitSpots.positions[1], Cfg.BaitSpots.Spots[1].Position)
+    assert.are.equal(Cfg.Zones[7].Scene.Waters[1], Cfg.Zones[7].Scene.cruise_water)
   end)
 end)

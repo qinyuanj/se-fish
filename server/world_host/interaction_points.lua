@@ -1,6 +1,6 @@
 local BodyScale = require("common.body_scale")
 
-local InteractionPoints = { Anchors = {} }
+local InteractionPoints = { anchors = {} }
 
 local function flat_distance(a, b)
   local dx, dz = a.x - b.x, a.z - b.z
@@ -8,7 +8,7 @@ local function flat_distance(a, b)
 end
 
 function InteractionPoints:find_anchor(name)
-  local cached = self.Anchors[name]
+  local cached = self.anchors[name]
   if cached then return cached end
   local world = game:GetService("World")
   local ok, unit = pcall(world.FindFirstChild, world, name, true)
@@ -16,7 +16,7 @@ function InteractionPoints:find_anchor(name)
     print("[InteractionPoints] 查找场景锚点失败", name, tostring(unit))
     return nil
   end
-  if unit then self.Anchors[name] = unit end
+  if unit then self.anchors[name] = unit end
   return unit
 end
 

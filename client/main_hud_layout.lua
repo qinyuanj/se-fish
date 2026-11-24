@@ -109,8 +109,8 @@ function MainHudLayout.compute(input)
         HungerRing = rect(x0 + RING * 1.5 + GAP, ringY, RING, RING),
     }
     local coinX = right(status.HungerRing) + GAP + COIN_ICON / 2
-    status.CoinIcon = rect(coinX, ringY, COIN_ICON, COIN_ICON)
-    status.CoinLabel = rect(coinX + COIN_ICON / 2 + 8 + COIN_LABEL_W / 2, ringY, COIN_LABEL_W, COIN_LABEL_H)
+    status.coin_icon = rect(coinX, ringY, COIN_ICON, COIN_ICON)
+    status.coin_label = rect(coinX + COIN_ICON / 2 + 8 + COIN_LABEL_W / 2, ringY, COIN_LABEL_W, COIN_LABEL_H)
 
     local entryY = H - 105
     local entryRight = left(zone.WarningKey) - GAP
@@ -121,18 +121,18 @@ function MainHudLayout.compute(input)
     entries.CompendiumEntry = rect(entries.ShopEntry.x - ENTRY_W - ENTRY_GAP, entryY, ENTRY_W, ENTRY_H)
 
     local hintTop = H - SAFE - 4
-    local hints = { HintPrimary = rect(W / 2, hintTop - 32, 520, 64) }
-    hints.HintSecondary = rect(W / 2, bottom(hints.HintPrimary) - 8 - 28, 520, 56)
-    hints.HintTransient = rect(W / 2, bottom(hints.HintSecondary) - 8 - 30, 740, 60)
+    local hints = { hint_primary = rect(W / 2, hintTop - 32, 520, 64) }
+    hints.hint_secondary = rect(W / 2, bottom(hints.hint_primary) - 8 - 28, 520, 56)
+    hints.hint_transient = rect(W / 2, bottom(hints.hint_secondary) - 8 - 30, 740, 60)
 
     local questTop = ringY - RING / 2 - GAP * 2
     local questBottom = top(stickZone) + GAP
     local questLeft = SAFE + 4
     local quest = {
-        QuestToggle = rect(questLeft + QUEST_TOGGLE_W / 2, questTop - QUEST_TOGGLE_H / 2,
+        quest_toggle = rect(questLeft + QUEST_TOGGLE_W / 2, questTop - QUEST_TOGGLE_H / 2,
             QUEST_TOGGLE_W, QUEST_TOGGLE_H),
     }
-    quest.QuestPanel = rect(questLeft + QUEST_W / 2, bottom(quest.QuestToggle) - 8 - QUEST_PANEL_H / 2,
+    quest.quest_panel = rect(questLeft + QUEST_W / 2, bottom(quest.quest_toggle) - 8 - QUEST_PANEL_H / 2,
         QUEST_W, QUEST_PANEL_H)
     local questBounds = fromEdges(questLeft, questLeft + QUEST_W, questBottom, questTop)
 
@@ -149,18 +149,18 @@ function MainHudLayout.compute(input)
         itemBar[i] = r
         equip['ItemBarSlot' .. i] = r
     end
-    equip.BackpackButton = rect(right(itemBar[slots]) + GROUP_GAP + BACKPACK_W / 2, barY, BACKPACK_W, CELL)
-    equip.BaitBar = rect(right(equip.BackpackButton) + GROUP_GAP + CELL / 2, barY, CELL, CELL)
+    equip.backpack_button = rect(right(itemBar[slots]) + GROUP_GAP + BACKPACK_W / 2, barY, BACKPACK_W, CELL)
+    equip.BaitBar = rect(right(equip.backpack_button) + GROUP_GAP + CELL / 2, barY, CELL, CELL)
     local equipBounds = fromEdges(bandLeft, bandRight, barY - CELL / 2 - 8, barY + CELL / 2 + 8)
 
     local actionBase = top(zone.Jump) + GAP
-    local action = { AttackControl = rect(W - 230, actionBase + ATTACK / 2, ATTACK, ATTACK) }
-    action.ItemAction = rect(left(action.AttackControl) - GAP - ACTION_W / 2, action.AttackControl.y,
+    local action = { attack_control = rect(W - 230, actionBase + ATTACK / 2, ATTACK, ATTACK) }
+    action.ItemAction = rect(left(action.attack_control) - GAP - ACTION_W / 2, action.attack_control.y,
         ACTION_W, ACTION_H)
-    action.Discard = rect(action.AttackControl.x, top(action.AttackControl) + GAP + ACTION_H / 2,
+    action.discard = rect(action.attack_control.x, top(action.attack_control) + GAP + ACTION_H / 2,
         ACTION_W, ACTION_H)
     if input.reeling then
-        action.ReelClose = rect(action.ItemAction.x, top(action.ItemAction) + GAP + ACTION_H / 2,
+        action.reel_close = rect(action.ItemAction.x, top(action.ItemAction) + GAP + ACTION_H / 2,
             ACTION_W, ACTION_H)
     end
 
@@ -171,23 +171,23 @@ function MainHudLayout.compute(input)
     local backpackPanel = rect(W / 2, panelY, BACKPACK_PANEL_W, BACKPACK_PANEL_H)
 
     local regions = {
-        StatusTopLeft = { bounds = bounds(status, 4), Controls = status },
-        EntriesTopRight = { bounds = bounds(entries, 4), Controls = entries },
-        QuestLeft = { bounds = questBounds, Controls = quest },
-        HintTop = { bounds = bounds(hints, 4), Controls = hints },
-        EquipBottom = { bounds = equipBounds, Controls = equip },
-        ActionRight = { bounds = bounds(action, 4), Controls = action },
-        CenterClear = { bounds = centerClear, Controls = {} },
+        StatusTopLeft = { bounds = bounds(status, 4), controls = status },
+        EntriesTopRight = { bounds = bounds(entries, 4), controls = entries },
+        QuestLeft = { bounds = questBounds, controls = quest },
+        HintTop = { bounds = bounds(hints, 4), controls = hints },
+        EquipBottom = { bounds = equipBounds, controls = equip },
+        ActionRight = { bounds = bounds(action, 4), controls = action },
+        CenterClear = { bounds = centerClear, controls = {} },
     }
     local rects = {}
     for _, region in pairs(regions) do
-        for name, r in pairs(region.Controls) do rects[name] = r end
+        for name, r in pairs(region.controls) do rects[name] = r end
     end
     return {
-        Regions = regions, Rects = rects, ItemBarSlots = itemBar,
-        Panels = { BackpackPanel = backpackPanel },
-        Reserved = reserved,
-        Popup = { left = bandLeft, right = left(zone.Roll) - GAP, firstY = top(equipBounds) + GAP + CELL / 2,
+        regions = regions, Rects = rects, ItemBarSlots = itemBar,
+        panels = { BackpackPanel = backpackPanel },
+        reserved = reserved,
+        popup = { left = bandLeft, right = left(zone.Roll) - GAP, firstY = top(equipBounds) + GAP + CELL / 2,
             cell = CELL, step = POPUP_STEP },
     }
 end
@@ -195,7 +195,7 @@ end
 function MainHudLayout.popup_cells(layout, kind, count)
     local bar = layout and layout.Rects and layout.Rects[kind .. 'Bar']
     if not bar or type(count) ~= 'number' or count < 1 then return {} end
-    local p = layout.Popup
+    local p = layout.popup
     local perRow = math.max(1, math.floor((p.right - p.left - p.cell) / p.step) + 1)
     local cells = {}
     local remaining, row = math.floor(count), 0

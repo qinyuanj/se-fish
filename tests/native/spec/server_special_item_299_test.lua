@@ -186,7 +186,7 @@ describe("风神之翼与哥斯拉存活相位宿主接缝（#299）", function(
         end,
         Damage = function(_, carrier, amount)
           carrier.Damage = (carrier.Damage or 0) + amount
-          carrier.Hits = (carrier.Hits or 0) + 1
+          carrier.hits = (carrier.hits or 0) + 1
           return true, amount
         end,
       },
@@ -307,7 +307,7 @@ describe("风神之翼与哥斯拉存活相位宿主接缝（#299）", function(
 
   it("哥斯拉吐息按走廊分段结算其他玩家与活鱼，冷却中、未变身与打自己都被拒绝", function()
     boot("item170")
-    local carrier = { Dead = false, Body = { Position = vec(6, 5.01, 55) }, Damage = 0, Hits = 0 }
+    local carrier = { Dead = false, Body = { Position = vec(6, 5.01, 55) }, Damage = 0, hits = 0 }
     runtime.fish_carrier = runtime.fish_carrier or {}
     local tree = runtime:get_player_tree(player.UserId)
     tree.fish_units = { { Id = "f1", Carrier = carrier } }
@@ -319,7 +319,7 @@ describe("风神之翼与哥斯拉存活相位宿主接缝（#299）", function(
     assert.equals(1, other.Character.Controller.Health)
     assert.equals("downed", runtime:get_player_tree(other.UserId).states.life_phase:now())
     assert.equals(breath.TotalDamage, carrier.Damage)
-    assert.equals(math.floor(breath.DurationSec / breath.TickSec), carrier.Hits)
+    assert.equals(math.floor(breath.DurationSec / breath.TickSec), carrier.hits)
     assert.equals(GameCfg.Vitals.MaxHealth, player.Character.Controller.Health)
 
     local behind = make_player(3, 6, 5.01, 5)

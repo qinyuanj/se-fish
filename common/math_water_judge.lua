@@ -94,13 +94,13 @@ function MathWaterJudge.inspect_scene(zones, snapshot)
         matches[#matches + 1] = entity
         byName[entity.Name] = matches
     end
-    local report = { EntitiesMatch = true, Issues = {}, PendingZones = {}, Verification = {
-        Saved = 'unverified', Synced = 'unverified', Collision = 'unverified', Playtested = 'unverified',
+    local report = { entities_match = true, issues = {}, pending_zones = {}, verification = {
+        saved = 'unverified', synced = 'unverified', collision = 'unverified', playtested = 'unverified',
     } }
     for _, zone in ipairs(zones) do
         local scene = zone.Scene
         if not scene or scene.State ~= 'resolved' then
-            report.PendingZones[#report.PendingZones + 1] = zone.Id
+            report.pending_zones[#report.pending_zones + 1] = zone.Id
         end
         for _, expected in ipairs(scene and scene.Entities or {}) do
             local matches = byName[expected.Name] or {}
@@ -117,13 +117,13 @@ function MathWaterJudge.inspect_scene(zones, snapshot)
                 end
             end
             if code then
-                report.Issues[#report.Issues + 1] = {
-                    ZoneId = zone.Id, ZoneName = zone.Name, Name = expected.Name, Code = code,
+                report.issues[#report.issues + 1] = {
+                    ZoneId = zone.Id, zone_name = zone.Name, Name = expected.Name, code = code,
                 }
             end
         end
     end
-    report.EntitiesMatch = #report.Issues == 0
+    report.entities_match = #report.issues == 0
     return report
 end
 

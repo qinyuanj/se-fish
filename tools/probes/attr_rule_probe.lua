@@ -35,7 +35,7 @@ function Probe.map(snapshot)
             'Controller.WalkSpeed；MgrAbility:RefreshMoveSpeed 单点',
             'PotionCount(item167)；一次捕获基础移速；成长×虚弱×霜冻，麻痹为0，再写折合 Ratio'),
         BodyScale = entry(body.Scale, GameCfg.Ability.BodyScale.Base,
-            body.Scale - GameCfg.Ability.BodyScale.Base, 0, GameCfg.Ability.BodyScale.Base, body.MaxScale,
+            body.Scale - GameCfg.Ability.BodyScale.Base, 0, GameCfg.Ability.BodyScale.Base, body.max_scale,
             '无 vendor Controller 映射；业务 AbilityAPI.SetBodyScale 应用 SetScale 和派生量',
             'PotionCount(item168) → BodyScale.Plan；角色重建后整体重套'),
         Hunger = entry(hunger, hunger, 0, 0, 0, GameCfg.Vitals.MaxHunger,
@@ -192,7 +192,7 @@ function Probe.run(context)
     end
     log('cleanup', #cleanupErrors == 0 and 'ok' or 'error', #cleanupErrors == 0 and '隔离对象已销毁' or table.concat(cleanupErrors, '; '))
     return { Ok = ok and #errors == 0, Error = #errors > 0 and table.concat(errors, '; ') or nil,
-        Cleaned = #cleanupErrors == 0, Evidence = context.Evidence or 'runtime',
+        cleaned = #cleanupErrors == 0, Evidence = context.Evidence or 'runtime',
         bounds = bounds, BusinessClampVerified = businessClampVerified }
 end
 

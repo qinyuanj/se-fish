@@ -129,7 +129,7 @@ describe('TestMainCombatWiring', function()
         for _, needle in ipairs({
             'opts.fish_ability.Vitals = runtime.life',
             'function runtime:damage_fish',
-            'opts.fish_ability.BehaviorServices = {',
+            'opts.fish_ability.behavior_services = {',
             'Vitals = runtime.life',
             'local fishHost = WorldRuntime.fish_host',
             'local FishTree = require("server.world_host.fish_tree")',

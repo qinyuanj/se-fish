@@ -245,7 +245,7 @@ describe('条款 1-15 七区鱼与首领的代码路径（可见 / 可打 / 可�
     restoreWorld(saved)
     package.loaded['server.world_host.fish_carrier'] = nil
     package.loaded['server.world_host.fish_tree'] = nil
-    Carrier.Carriers = {}
+    Carrier.carriers = {}
   end)
 
   it('1-15 七区都有鱼与首领，且都解析得出品级色、图标与世界模型', function()
@@ -280,7 +280,7 @@ describe('条款 1-15 七区鱼与首领的代码路径（可见 / 可打 / 可�
       for _, id in ipairs(ids) do
         local species = GameCfg.Fish[id]
         local carrier = assert(Carrier:spawn({ Position = vec(0, 2, 0), FishId = id,
-          MaxHealth = species.Health, ModelId = species.Model, GravityEnabled = false }))
+          MaxHealth = species.Health, model_id = species.Model, GravityEnabled = false }))
         assert.are.equal(species.Health, carrier.Controller.MaxHealth,
           id .. ' 的受击体血量不是鱼种血量')
         local before = carrier.Controller.Health

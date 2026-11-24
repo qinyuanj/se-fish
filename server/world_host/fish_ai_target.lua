@@ -1,7 +1,7 @@
 local GameCfg = require('common.game_cfg')
 local Policy = require('common.ai_target_policy')
 
-local Mgr = { Policy = Policy }
+local Mgr = { policy = Policy }
 local AiAPI, Runtime
 
 local function logFailure(operation, fish, unit, player, err)
@@ -104,7 +104,7 @@ function Mgr:set_focus(fish, player, ranked)
 end
 
 function Mgr:select(fish, candidates)
-    local ranked = self.Policy.order(candidates)
+    local ranked = self.policy.order(candidates)
     self:set_focus(fish, ranked[1] and ranked[1].player or nil, ranked)
     return ranked
 end

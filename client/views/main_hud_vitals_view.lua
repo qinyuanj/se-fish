@@ -109,8 +109,8 @@ function MainHudVitalsView.mount(s, ctx, options)
   if image_coin ~= nil then
     image_coin.Visible = true
   end
-  place_editor_node(image_coin, rects.CoinIcon)
-  place_editor_node(label_coin, rects.CoinLabel)
+  place_editor_node(image_coin, rects.coin_icon)
+  place_editor_node(label_coin, rects.coin_label)
 
   -- 2. 血量环与饥饿度环（动态节点全部经 ctx.create_node 托管）
   local rings = {}

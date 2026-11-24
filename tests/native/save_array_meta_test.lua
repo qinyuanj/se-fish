@@ -269,7 +269,7 @@ describe('TestSaveArrayMeta', function()
         -- Migrate 会对副本原地改写（LegacyIdMap 改名、bait 合并），剥离必须走深拷贝、不与入参共享子表。
         local shared = { a = 1 }
         local input = { bar = { { i = 1, id = 'shrimpRod' }, __count = 1 }, p = shared, q = shared, keep = 7 }
-        local out = PlayerData.StripArrayMeta(input, 'save')
+        local out = PlayerData.strip_array_meta(input, 'save')
         assert.is_nil(out.bar.__count)
         assert.same('shrimpRod', out.bar[1].id)
         assert.same(7, out.keep)

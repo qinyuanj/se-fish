@@ -68,7 +68,7 @@ describe('TestStatusEffect', function()
             set_cast_guard = function() end,
             set_body_scale = function(character, scale) -- 根 AbilityAPI 为点号调用
                 state.bodyScales[#state.bodyScales + 1] = scale
-                return { Ok = true, Scale = scale, Derived = {} }
+                return { Ok = true, Scale = scale, derived = {} }
             end,
         }
         package.loaded['server.packages.ability_system.api'] = {}
@@ -373,7 +373,7 @@ describe('TestStatusEffect', function()
         local unit = assert(loadfile('server/world_host/fish_tree.lua'))()
         unit.Ability = ctx.mgr
         local fish, carrier = installFish()
-        fish.FishId, fish.StraightEscape, fish.Heading = 'alligatorGar', true, { x = 1, z = 0 }
+        fish.FishId, fish.straight_escape, fish.Heading = 'alligatorGar', true, { x = 1, z = 0 }
         carrier.Body.Position = { x = 9999, y = 500, z = 9999 }
         local base = GameCfg.Fish.alligatorGar.Speed
         ctx.mgr.Modifier:apply_weapon_effect(ctx.player, fish, { Kind = 'frost' })
