@@ -1,5 +1,5 @@
 -- 严格引擎替身（单一来源）：只暴露真引擎已实测的成员，未声明的访问直接报错，避免夹具掩盖生产缺陷。
--- 依据 docs/技术难点识别.md「绕过合同」：World 根没有 GetChildren，递归 FindFirstChild 只在 World 上，
+-- 依据 docs/adr/0035-editor-sdk-enumeration-broken-and-exec-bypass.md 的绕过合同：World 根没有 GetChildren，递归 FindFirstChild 只在 World 上，
 -- Unit:FindFirstChild 只匹配直接子级。测试侧改写场景走 M.Children / M.SetSize，不给替身加字段。
 local M = {}
 

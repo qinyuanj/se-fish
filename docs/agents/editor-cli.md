@@ -14,7 +14,7 @@
 - **风险步逐次确认**：推送、场景写入单独取得用户确认，一次授权只覆盖它点名的那一轮或那一批；不经 `deploy` 的手工 `code push` 算推送。部署（含随行 validate → `code push` → `code diff`）、试玩（起停、`input`、截图取证）、地图保存与重开都不需要授权，直接执行，照「测试纪律」留证据。场景写入以 `APPLY = true` 跑探针：先 `APPLY = false` dry-run 交用户，确认一批执行一批，执行完改回 `APPLY = false`。
 - **场景整理顺序**：空目录清理排在全部建标记批次之后，只处理基线回读时已存在的空目录。删除或挪动场景地面前，先在试玩服务端对受影响区打向下射线，确认其下仍有地面。
 - **编辑态读不到的设置**：编辑态 `editor:GetService('PhysicsService')` 为 nil，地面高度只能在试玩服务端用射线测；编辑态读 World 的 `AOIType`、`StreamingEnabled` 得到 nil，流式加载设置无法经 CLI 确认。
-- **场景枚举**：编辑器侧执行[技术难点识别的绕过合同](../技术难点识别.md#绕过合同四条硬边界)，试玩服务端的例外也写在那里。
+- **场景枚举**：编辑器侧执行 [ADR-0035](../adr/0035-editor-sdk-enumeration-broken-and-exec-bypass.md) 的四条硬边界（绕过合同），试玩服务端的例外也写在那里。
 - **检索失败**：`docs search` 报 HTTP 500 等服务端错误时（0.20.12 的 `editor-api` docset 出现过），改查 `manual` 或编辑器在线时的 `api search-editor` / `api get-editor`。
 - **检索范围**：本图是世界版（SE，`status --json` 的 `editor_mode: "se"`）。`docs search` 查不到问题里的词时先问用户指什么，等确认后再换库或换方向，不自行换库；原点版（FS）的库只在用户点名「原点版 / FS」时才查。
 - **模型动画验收**：导入、播放与画面判定读[美术资产概要「模型动画导入与播放」](../art-asset-overview.md#模型动画导入与播放)。
