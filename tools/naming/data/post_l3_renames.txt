@@ -1,0 +1,20 @@
+# L3 之后已完成迁移的高危旧名（PR #345 / ADR-0037 L4d）
+# 仅用于 tools/naming_guard.lua 旧名字符串守卫，不参与 L3a/L3b 历史重放。
+Active active
+BindCombatChannel bind_combat_channel
+CallBack callback
+CombatRE combat_re
+LastReason last_reason
+LongPressSec long_press_sec
+Msg msg
+Ref ref
+Root root
+maxHealth max_health
+maxHunger max_hunger
+readKey read_key
+requestKey request_key
+routeId route_id
+targetId target_id
+targetType target_type
+upgradeLevel upgrade_level
+upgradeLevels upgrade_levels

@@ -7,7 +7,7 @@
 -- 所以按上下文放行三类「不是方法名」的串：协议字段值、官方服务/属性/节点名、配置枚举；
 -- 表构造里的非协议键、`has_method(x, "Start")`、`x["Attach"]`、普通局部变量一律拦。
 -- 剩下确实属于官方契约的个别点写进 data/string_key_exemptions.txt，逐条带理由。
--- 数据源就是 tools/naming/data/l3a_renames.txt 与 l3b_renames.txt（与 recon/apply 同一份）。
+-- 数据源就是 tools/naming/data/l3a_renames.txt、l3b_renames.txt 与 post_l3_renames.txt（L3a/L3b 与 recon/apply 共用）。
 local lfs = require("lfs")
 
 local M = {}
@@ -69,22 +69,26 @@ local function parse_rows(body)
   return rows
 end
 
--- 映射表：l3a 是 449 个标识符（含局部变量/字段），l3b 是 45 个方法名。
--- 两层的旧名集合合并；新名只用于报错时提示改成什么。
+-- 映射表：l3a 是 449 个标识符（含局部变量/字段），l3b 是 45 个方法名，
+-- post_l3 是 L3 之后（PR #345 / ADR-0037 L4d）补充迁移的高危旧键（可选）。
+-- 三层的旧名集合合并；新名只用于报错时提示改成什么。
 function M.load_names(root)
   local l3a = parse_rows(assert(slurp(join(root, DATA_DIR .. "/l3a_renames.txt")), "缺 l3a 映射"))
   local l3b = parse_rows(assert(slurp(join(root, DATA_DIR .. "/l3b_renames.txt")), "缺 l3b 映射"))
+  local post_l3_body = slurp(join(root, DATA_DIR .. "/post_l3_renames.txt"))
+  local post_l3 = post_l3_body and parse_rows(post_l3_body) or {}
   local new_by_old = {}
   for _, row in ipairs(l3a) do new_by_old[row.old_name] = row.new_name end
   for _, row in ipairs(l3b) do new_by_old[row.old_name] = row.new_name end
-  return { l3a = l3a, l3b = l3b, new_by_old = new_by_old }
+  for _, row in ipairs(post_l3) do new_by_old[row.old_name] = row.new_name end
+  return { l3a = l3a, l3b = l3b, post_l3 = post_l3, new_by_old = new_by_old }
 end
 
 -- 同一个旧名不能同时出现在两层，否则 apply 的先后顺序会决定结果。
 function M.find_duplicate_old_names(names)
   local seen, duplicates = {}, {}
-  for _, layer in ipairs({ "l3a", "l3b" }) do
-    for _, row in ipairs(names[layer]) do
+  for _, layer in ipairs({ "l3a", "l3b", "post_l3" }) do
+    for _, row in ipairs(names[layer] or {}) do
       if seen[row.old_name] then
         duplicates[#duplicates + 1] = row.old_name
       else
@@ -96,15 +100,15 @@ function M.find_duplicate_old_names(names)
 end
 
 -- 两个旧名映射到同一新名会把不同字段静默合并；与旧名唯一同样在加载时拦住。
--- get_state / GetState 这类只差首字母大小写的旧名是同一语义（L3a/L3b 各出现一次），不算冲突。
+-- get_state / GetState / CallBack 这类只差大小写的旧名是同一语义，不算冲突。
 local function normalized_old(name)
-  return name:sub(1, 1):lower() .. name:sub(2)
+  return name:lower()
 end
 
 function M.find_duplicate_new_names(names)
   local seen, duplicates = {}, {}
-  for _, layer in ipairs({ "l3a", "l3b" }) do
-    for _, row in ipairs(names[layer]) do
+  for _, layer in ipairs({ "l3a", "l3b", "post_l3" }) do
+    for _, row in ipairs(names[layer] or {}) do
       local old = normalized_old(row.old_name)
       if seen[row.new_name] and seen[row.new_name] ~= old then
         duplicates[#duplicates + 1] = row.new_name
@@ -262,6 +266,10 @@ local function classify(src, starts, item)
   -- 直接下标：x["Attach"] / { ["Attach"] = ... }
   if previous_nonspace(src, item.start) == "[" and next_nonspace(src, item.finish) == "]" then
     return "字符串下标查找"
+  end
+  -- 显式 rawget/rawset 按名查找：rawget(t, "MaxHealth") / rawset(t, "LongPressSec", v)
+  if prefix:find("raw[gs]et%s*%([^,]+,%s*$") then
+    return "rawget/rawset 按名查找"
   end
   if OFFICIAL_NAMES[item.value] then return nil end
   -- 表值：{ board = "board" }。键名是协议字段时放行（action/kind/name...）。

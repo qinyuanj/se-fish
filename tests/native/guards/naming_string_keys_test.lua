@@ -5,7 +5,7 @@
 --   3. 把守卫写成「所有旧名子串一律禁」→ `action = "board"` 这类协议串、`Kind = 'land'` 这类策划枚举、
 --      `GetService("Players")` 这类官方契约会常红，最后被人静音。
 -- 口径：业务源码里所有旧名字符串字面量都拦；协议字段名、官方服务名/属性名、配置枚举键与已知协议调用走白名单。
--- 映射数据来自 tools/naming/data/l3a_renames.txt 与 l3b_renames.txt（#337 入库的同一份数据）。
+-- 映射数据来自 tools/naming/data/l3a_renames.txt、l3b_renames.txt 与 post_l3_renames.txt。
 local fs = require("tests.support.fs_fixture")
 local guard = require("tools.naming_guard")
 
@@ -119,18 +119,40 @@ local Actions = { board = "Board" }
     assert.matches("没有扫到任何业务文件", reason, 1, true)
   end)
 
+  it("test_rejects_post_l3_and_rawget_rawset_old_keys", function()
+    local bad = guard.scan_source("server/x.lua", [[
+local a = tbl["upgradeLevel"]
+local k = "routeId"
+local h = rawget(tbl, "maxHealth")
+rawset(tbl, "LongPressSec", 1)
+local mh = rawget(tbl, "MaxHealth")
+local z = rawget(_G, "REUtil")
+local t = fish["ActiveUntil"]
+]], {})
+    assert.equals(5, #bad)
+    assert.equals("upgradeLevel", bad[1].literal)
+    assert.equals("routeId", bad[2].literal)
+    assert.equals("maxHealth", bad[3].literal)
+    assert.equals("LongPressSec", bad[4].literal)
+    assert.equals("MaxHealth", bad[5].literal)
+  end)
+
   it("test_mapping_data_is_unique_and_snake_case", function()
     local names = guard.load_names(fs.repo_root())
     local conflicts = guard.find_duplicate_new_names({ l3a = { { old_name = "A", new_name = "x" }, { old_name = "B", new_name = "x" } }, l3b = {} })
     assert.same({ "x" }, conflicts)
     assert.equals(449, #names.l3a)
     assert.equals(45, #names.l3b)
+    assert.equals(18, #names.post_l3)
     assert.equals(0, #guard.find_duplicate_old_names(names))
     assert.equals(0, #guard.find_duplicate_new_names(names))
     for _, row in ipairs(names.l3a) do
       assert.is_truthy(row.new_name:match("^[a-z0-9][a-z0-9_]*$"), row.old_name .. " -> " .. row.new_name)
     end
     for _, row in ipairs(names.l3b) do
+      assert.is_truthy(row.new_name:match("^[a-z0-9][a-z0-9_]*$"), row.old_name .. " -> " .. row.new_name)
+    end
+    for _, row in ipairs(names.post_l3) do
       assert.is_truthy(row.new_name:match("^[a-z0-9][a-z0-9_]*$"), row.old_name .. " -> " .. row.new_name)
     end
   end)
