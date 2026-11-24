@@ -36,6 +36,20 @@ M.VOCABULARY = {
 -- 状态词表再暴露一份：计数、缺口密度与棘轮都按它逐项列。
 M.STATUS = M.VOCABULARY.status
 
+-- 证据面：条款走到哪一步不再由人写，从三类文件反推（#326）。
+-- 断言面按条款号出现即算；C 级条款只有试玩会话的 ✅ 行才算取证。
+M.ASSERTION_LANES = { 'tests/native/spec', 'tests/probes' }
+M.EVIDENCE_DIR = 'evidence'
+M.SESSION_FILE = 'session.md'
+M.SESSION_MARK = '✅'
+-- 例外：正文提到条款号、却不构成该条整体取证的两处。机器分不出「只取证了一段」与
+-- 「注释里写着不归本单」，只能显式记在这里；guard 用例盯着每条例外仍然有命中。
+-- keepEvidence 表示这条例外仍然记下证据路径（部分取证），不带则连路径也不记。
+M.INFER_EXCEPTIONS = {
+  ['9-05'] = { reason = 'spec 只断言抢救一段，伤害与队伍变更两段未取证', keepEvidence = true },
+  ['11-20'] = { reason = 'spec 只在注释里写明「金豆入口不归本单」，没有断言' },
+}
+
 -- 禁用措辞（TEMPLATE 6.1）：这些词把「判不了」伪装成断言。
 -- 只认**独立成句**的用法——词后紧跟句读或到结尾才算命中；「正常流程」「可行走」这类构词不算，
 -- 否则会误伤既有条款（1-18 就写着「连通可行走」）。
@@ -170,12 +184,46 @@ function M.evidence_paths(cell)
   return out
 end
 
+-- 条款号的前后边界：前置或后置的字符不能是数字或连字符。
+-- 词字符边界挡不住日期与版本串——2026-11-04 里的 11-04 前后都是连字符。
+local function clause_boundary(body, first, last)
+  local before = first > 1 and body:sub(first - 1, first - 1) or ''
+  local after = body:sub(last + 1, last + 1)
+  if before ~= '' and (before:match('%d') or before == '-') then return false end
+  if after ~= '' and (after:match('%d') or after == '-') then return false end
+  return true
+end
+
 -- 证据文件里有没有这条条款：要求完整的条款号，前后都不能再贴词字符。
 -- 只比路径前缀证明不了「断言的是这一条」——9-12 不能靠 19-12 或 9-120 蒙过去。
 function M.clause_mentioned(body, id)
   if type(body) ~= 'string' or body == '' or type(id) ~= 'string' or id == '' then return false end
   local escaped = id:gsub('[%W]', '%%%0')
-  return body:find('%f[%w]' .. escaped .. '%f[%W]') ~= nil
+  local from = 1
+  while true do
+    local first, last = body:find('%f[%w]' .. escaped .. '%f[%W]', from)
+    if not first then return false end
+    if clause_boundary(body, first, last) then return true end
+    from = last + 1
+  end
+end
+
+-- 正文里出现的全部条款号（去重、按出现顺序）：用来找证据文件里指向已删条款的孤儿号。
+-- 条款号的形状是「1~2 位节号-两位序号」，三位的 249-10 是工单/评审引用，不是条款。
+function M.clause_ids(body)
+  local out, seen = {}, {}
+  if type(body) ~= 'string' then return out end
+  local from = 1
+  while true do
+    local first, last = body:find('%f[%w]%d%d?%-%d%d%f[%W]', from)
+    if not first then break end
+    if clause_boundary(body, first, last) and not seen[body:sub(first, last)] then
+      seen[body:sub(first, last)] = true
+      out[#out + 1] = body:sub(first, last)
+    end
+    from = last + 1
+  end
+  return out
 end
 
 -- GameSpec 的小节：只看 '## N. 标题' 这一种标题；别的层级不算小节。
@@ -276,6 +324,111 @@ function M.parse_shard(body, path, section)
     end
   end)
   return shard
+end
+
+-- 证据文件：断言面（spec 与 probes 的 .lua）加试玩会话记录（evidence/*/session.md）。
+-- 顺序固定，反推出的路径与计数才幂等。
+function M.evidence_files(root)
+  local out = {}
+  for _, dir in ipairs(M.ASSERTION_LANES) do
+    for _, name in ipairs(list_dir(root, dir)) do
+      if name:match('%.lua$') then out[#out + 1] = { path = dir .. '/' .. name, assertion = true } end
+    end
+  end
+  for _, name in ipairs(list_dir(root, M.EVIDENCE_DIR)) do
+    local path = M.EVIDENCE_DIR .. '/' .. name .. '/' .. M.SESSION_FILE
+    if exists(root, path) then out[#out + 1] = { path = path, session = true } end
+  end
+  return out
+end
+
+-- 试玩会话里标成 ✅ 的条款号：只有这些行说明「这一场真的取证了」。
+-- 同一节可能有 ✅（复核）与 ⛔（观察到不符）两行，✅ 一旦出现就保留；回归是缺陷，不是状态回退。
+function M.session_covered(body)
+  local covered = {}
+  each_line(body, function(_, line)
+    local id, mark = line:match('^%s*|%s*(%d+%-%d%d)%s*|%s*([^|]*)')
+    if id and mark:find(M.SESSION_MARK, 1, true) then covered[id] = true end
+  end)
+  return covered
+end
+
+-- 反推：条款 → 证据路径 → 状态。
+-- 断言面：A/B 条款的条款号出现即算；C 级条款只认试玩会话的 ✅ 行。
+-- 没有证据的 C 级条款一律 blocked（唯一合法阻塞），其余 unverified。
+-- 同时找出证据文件里出现、矩阵里却没有的条款号（孤儿号），供门禁判红。
+function M.infer(matrix, root)
+  local known = {}
+  for _, shard in ipairs(matrix.shards) do
+    for _, clause in ipairs(shard.clauses) do known[clause.id] = known[clause.id] or clause end
+  end
+
+  local hits, orphans, seen_orphans = {}, {}, {}
+  for id in pairs(known) do hits[id] = {} end
+  for _, file in ipairs(M.evidence_files(root)) do
+    local body = read_text(root, file.path)
+    if body then
+      local covered = file.session and M.session_covered(body) or nil
+      for id, clause in pairs(known) do
+        local found
+        if file.session then
+          found = covered[id] == true
+        else
+          found = clause.level ~= 'C' and M.clause_mentioned(body, id)
+        end
+        if found then hits[id][#hits[id] + 1] = file.path end
+      end
+      for _, id in ipairs(M.clause_ids(body)) do
+        local key = id .. '\0' .. file.path
+        if not known[id] and not seen_orphans[key] then
+          seen_orphans[key] = true
+          orphans[#orphans + 1] = { id = id, path = file.path }
+        end
+      end
+    end
+  end
+
+  local result = { status = {}, paths = {}, exceptions = {}, orphans = orphans }
+  for id, clause in pairs(known) do
+    local paths = hits[id]
+    table.sort(paths)
+    local exception = M.INFER_EXCEPTIONS[id]
+    if exception then
+      result.exceptions[#result.exceptions + 1] = { id = id, hits = #paths, reason = exception.reason }
+      if not exception.keepEvidence then paths = {} end
+      result.status[id] = 'unverified'
+    elseif #paths > 0 then
+      result.status[id] = 'evidenced'
+    elseif clause.level == 'C' then
+      result.status[id] = 'blocked'
+    else
+      result.status[id] = 'unverified'
+    end
+    result.paths[id] = paths
+  end
+  table.sort(result.orphans, function(a, b)
+    if a.id ~= b.id then return a.id < b.id end
+    return a.path < b.path
+  end)
+  return result
+end
+
+-- 反推与分片里手写的状态逐条比对（迁移期用；列删掉之后没有可比的写法）。
+-- accepted 只能由人签署，反推最多推到 evidenced，所以 accepted 视作一致。
+function M.inference_drift(matrix)
+  local drift = {}
+  for _, shard in ipairs(matrix.shards) do
+    for _, clause in ipairs(shard.clauses) do
+      local inferred = matrix.inference.status[clause.id]
+      if inferred and inferred ~= clause.status
+          and not (clause.status == 'accepted' and inferred == 'evidenced') then
+        drift[#drift + 1] = { id = clause.id, path = shard.path, line = clause.line,
+          written = clause.status, inferred = inferred }
+      end
+    end
+  end
+  table.sort(drift, function(a, b) return a.id < b.id end)
+  return drift
 end
 
 -- 分片文件：docs/acceptance/NN-*.md；README、TEMPLATE、evidence-levels 等不带两位数字前缀的不是分片。
@@ -504,6 +657,9 @@ function M.scan(root)
   local index_body = read_text(root, M.INDEX)
   matrix.index = { path = M.INDEX, body = index_body, block = index_body and index_block(index_body) or nil }
   if not index_body then problem('index_unreadable', '读不到 ' .. M.INDEX, M.INDEX) end
+
+  -- 状态与证据路径从证据文件反推（#326）：扫描只做一次，计数与门禁都读它。
+  matrix.inference = M.infer(matrix, root)
 
   -- 实现覆盖表：登记行只做扫描与统计，判红在 M.check 的 check_coverage。
   local coverage_body = read_text(root, M.COVERAGE)

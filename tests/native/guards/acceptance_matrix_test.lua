@@ -102,6 +102,39 @@ describe('验收矩阵门禁', function()
     assert.is_true(matrix.counts.evidenced >= 1)
   end)
 
+  it('反推的状态与矩阵手写状态逐条一致', function()
+    local matrix = real_matrix()
+    local drift = Acceptance.inference_drift(matrix)
+    local found = {}
+    for _, item in ipairs(drift) do
+      found[#found + 1] = string.format('%s 手写 %s / 反推 %s', item.id, item.written, item.inferred)
+    end
+    assert.same({}, found, '反推覆盖不了这些条款：' .. table.concat(found, '；'))
+  end)
+
+  it('反推例外仍然命中证据文件，例外不会悄悄失效', function()
+    local matrix = real_matrix()
+    for _, item in ipairs(matrix.inference.exceptions) do
+      assert.is_true(item.hits > 0, string.format('例外 %s 已经没有任何证据文件命中，删掉这条例外', item.id))
+    end
+  end)
+
+  it('证据文件里没有指向已删条款的孤儿号', function()
+    local matrix = real_matrix()
+    local found = {}
+    for _, item in ipairs(matrix.inference.orphans) do
+      found[#found + 1] = string.format('%s 里的 %s', item.path, item.id)
+    end
+    assert.same({}, found, '孤儿条款号：' .. table.concat(found, '；'))
+  end)
+
+  it('条款号的前后边界不认日期、版本与工单引用', function()
+    assert.is_false(Acceptance.clause_mentioned('-- 2026-11-04 实测', '11-04'))
+    assert.is_true(Acceptance.clause_mentioned('-- 条款 11-04：倒计时', '11-04'))
+    assert.same({ '11-04' }, Acceptance.clause_ids('-- 2026-11-04 实测 11-04'))
+    assert.same({}, Acceptance.clause_ids('review #249-10'))
+  end)
+
   describe('夹具：逐项改坏必须判红', function()
     local root = fs.temp_dir()
 
@@ -117,6 +150,28 @@ describe('验收矩阵门禁', function()
       local ok, found, text = verify()
       assert.is_true(ok, text)
       assert.same({}, found)
+    end)
+
+    it('反推：3-02 由 spec 正文取证，C 级 1-03 没有会话记录所以 blocked', function()
+      local matrix = Acceptance.scan(root)
+      assert.same('evidenced', matrix.inference.status['3-02'])
+      assert.same({ fixture.EVIDENCE }, matrix.inference.paths['3-02'])
+      assert.same('blocked', matrix.inference.status['1-03'])
+    end)
+
+    it('C 级条款只有会话 ✅ 行才算取证', function()
+      local dir = root .. '/evidence/2026-11-20-demo'
+      fs.mkdirp(dir)
+      fs.write_file(dir .. '/session.md', table.concat({
+        '| 条款 | 结果 | 依据 |',
+        '| --- | --- | --- |',
+        '| 1-03 | ⏸ | 本场未覆盖 |',
+      }, '\n'))
+      assert.same('blocked', Acceptance.scan(root).inference.status['1-03'])
+      fs.write_file(dir .. '/session.md', '| 1-03 | ✅ | 打开面板可读 |\n')
+      local matrix = Acceptance.scan(root)
+      assert.same('evidenced', matrix.inference.status['1-03'])
+      assert.same({ 'evidence/2026-11-20-demo/session.md' }, matrix.inference.paths['1-03'])
     end)
 
     it('证据路径写成不存在的文件就红', function()
