@@ -1,6 +1,7 @@
--- Markdown 相对链接必须在当前 checkout 可定位；外部 URL、页内锚点与显式 gitignored 路径不查。
+-- Markdown 相对链接必须在当前 checkout 可定位，锚点必须能在目标文档里解析；外部 URL 与显式 gitignored 路径不查。
 local fs = require('tests.support.fs_fixture')
 local seam = require('tools.seam')
+local doc_anchor = require('tests.support.doc_anchor')
 
 local function normalize(path)
   local parts = {}
@@ -60,33 +61,51 @@ local function is_ignored(path, roots)
 end
 
 describe('文档相对链接守卫', function()
-  it('test_agent_documentation_links_resolve', function()
-    local files = { 'AGENTS.md', 'CODING_STANDARDS.md' }
-    for _, name in ipairs(fs.list_dir('docs/agents')) do
-      if name:match('%.md$') then files[#files + 1] = 'docs/agents/' .. name end
+  it('test_markdown_links_and_anchors_resolve', function()
+    local tracked, roots = tracked_paths(), ignored_roots()
+    local files = {}
+    for path in pairs(tracked.files) do
+      if path:match('%.md$') then files[#files + 1] = path end
     end
-    local roots, tracked, bad = ignored_roots(), tracked_paths(), {}
+    table.sort(files)
+    local bad = {}
     for _, file in ipairs(files) do
-      local src = assert(fs.slurp(file), '读不到文档 ' .. file)
+      local src = assert(doc_anchor.read(file), '读不到文档 ' .. file)
       local dir = file:match('^(.*)/[^/]+$') or ''
-      for target in src:gmatch('%[[^]]*%]%(([^)]+)%)') do
-        local path = target:match('^<([^>]+)>') or target:match('^(%S+)')
-        path = path and path:match('^([^#]*)')
-        if path and path ~= '' and not path:match('^%a[%w+.-]*:') and not path:match('^//')
+      for position, target in src:gmatch('()%[[^]]*%]%(([^)]+)%)') do
+        local link = target:match('^<([^>]+)>') or target:match('^(%S+)')
+        link = link and link:gsub('%%(%x%x)', function(hex) return string.char(tonumber(hex, 16)) end)
+        local path = link and link:match('^([^#]*)')
+        path = path and path:gsub(':%d+$', '')
+        local anchor = link and link:match('#(.+)$')
+        local flagged, reason = false, ''
+        if path == '' then
+          if anchor and anchor ~= '' and not doc_anchor.exists(src, anchor) then
+            flagged, reason = true, '（锚点不存在）'
+          end
+        elseif path and not path:match('^%a[%w+.-]*:') and not path:match('^//')
             and not path:match('^[/\\]') then
-          path = path:gsub('%%(%x%x)', function(hex) return string.char(tonumber(hex, 16)) end)
           local resolved = normalize((dir == '' and '' or dir .. '/') .. path)
           local exists = resolved and (tracked.files[resolved] or tracked.dirs[resolved])
           if not resolved or (not is_ignored(resolved, roots) and not exists) then
-            local position = assert(src:find(target, 1, true))
-            local line = select(2, src:sub(1, position):gsub('\n', '')) + 1
-            bad[#bad + 1] = file .. ':' .. line .. ' -> ' .. target
+            flagged = true
+          elseif anchor and anchor ~= '' and tracked.files[resolved] then
+            local body = doc_anchor.read(resolved)
+            if not body or not doc_anchor.exists(body, anchor) then
+              flagged, reason = true, '（锚点不存在）'
+            end
           end
+        end
+        if flagged then
+          local line = select(2, src:sub(1, position - 1):gsub('\n', '')) + 1
+          bad[file .. ':' .. line .. ' -> ' .. target .. reason] = true
         end
       end
     end
-    table.sort(bad)
-    assert.same({}, bad)
+    local list = {}
+    for entry in pairs(bad) do list[#list + 1] = entry end
+    table.sort(list)
+    assert.same({}, list)
   end)
 
   -- 反向守卫：docs/research/ 里放的是跨轮复用的调研，没人指向它等于不存在。
