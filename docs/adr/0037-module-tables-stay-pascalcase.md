@@ -32,7 +32,7 @@ common/packages/spoke/runtime/epoch.lua             function Epoch:compare_to() 
 - L2 的改名（提交 `1a12310`，384 文件 / 1159 处绑定）整支回退；L1 不动。
 - 回退用 `git revert` 完成，而不是反向脚本：旧名里有 `REUtil`、`UIManager`、`UIConsts` 这类连续大写，snake→Pascal 机械反推会推错成 `ReUtil`。
 - 新增守卫：`local X = require(...)` 的 `X` 必须是 Pascal 形，否则口径会漂回 snake（原 L2 的门禁只有文件名）。
-- `docs/engine-keys.md` 的正反例随之更新（`DamageFloat:Show` → `DamageFloat:show`）。
+- 正反例随之更新：`DamageFloat:Show` → `DamageFloat:show`（自研：类型留 Pascal、方法改 snake）；引擎键与官方名清单见 [ADR-0034 附录](0034-self-written-code-snake-case.md)。
 - **`*/packages/` 整包一律不参与命名迁移**（三个端各一个）：上游整包与本仓维护的自研包同等处理，包内文件、模块表、方法名都保持原样，跟随各自上游口径。命名门禁本来就跳过这些目录，这条把口径写死，避免「自研包要不要跟进」反复讨论。
 - **实现官方/包内接口的方法名跟随接口**：自研模块若实现包内声明的接口方法（如 ability 锚点接口的 `M.Attach`），该方法名保持接口原样；语义不同的自研同名方法照常改 snake，两者同名不冲突。L3b 落地时 `Attach` 就按这条处理：包内接口一侧 7 处保持，自研 `CarryMount.attach`/`FishAi:attach` 改 snake。
 - **字段名与引号里的运行期字符串绑定的，保持原样**（L4a 确认 25 个）：11 个冻结计时动态键（`ActiveUntil/SpecialAt/JabAt/PinchAt/ChargeAt/JumpAt/RoarAt/TailAt/ClawAt/NextReefDiveAt/NextThrowAt`，`fish_tree.lua` 用 `for key in ipairs({'…'}) do fish[key]`）、7 个 `layout.Regions[region]` 区域名、6 个 `nodes[node.Name]`/`Rects[kind.."Bar"]` 节点名、包内 `Enums.CreateResult`。改字段不改字符串就是静默 nil，收益不抵风险。
