@@ -33,11 +33,11 @@ local FishCatch = require('common.fish_catch')
 
 -- ===== 假引擎战斗世界（tests/support/combat_world，复用 fish_escape 测试夹具）=====
 local CombatWorld = require('tests.support.combat_world')
-local combat, at, pinRandom, drop =
-    CombatWorld.new, CombatWorld.at, CombatWorld.pinRandom, CombatWorld.drop
+local combat, at, pin_random, drop =
+    CombatWorld.new, CombatWorld.at, CombatWorld.pin_random, CombatWorld.drop
 
 -- 拆除统一走实例方法（与 blindbox_world / revive_world 同一入口名）
-local function close(env) env:tearDown() end
+local function close(env) env:tear_down() end
 
 -- ===== 1. 水区 / 抽鱼池 =====
 local waterId = GameCfg.Zones[4].WaterId
@@ -59,7 +59,7 @@ if rows then
             if row.RodLevel <= rodLevel and (row.Bait == 0 or row.Bait == baitId) then total = total + row.DrawWeight end
         end
         local found = {}
-        for roll = 1, total do found[FishCatch.Select(rows, rodLevel, baitId, function() return roll end)] = true end
+        for roll = 1, total do found[FishCatch.select(rows, rodLevel, baitId, function() return roll end)] = true end
         return found
     end
     local plain = selectAll(1, nil)
@@ -85,7 +85,7 @@ do
 end
 do
     local env = combat()
-    pinRandom(env)
+    pin_random(env)
     local fish = drop(env, 'fish31Elite', 20)
     at(env, 0)
     at(env, 50)
@@ -116,7 +116,7 @@ end
 do
     local env = combat()
     local fish = drop(env, 'fish32Boss', 20)
-    env.mgr:NoteDamage(fish, env.player, 30)
+    env.mgr:note_damage(fish, env.player, 30)
     local bp = fish.Carrier.Body.Position
     env.other.Character.Position = Vector3.New(bp.x, 2, bp.z + 2)
     at(env, 0)
@@ -133,7 +133,7 @@ do
 end
 do
     local env = combat()
-    pinRandom(env)
+    pin_random(env)
     local fish = drop(env, 'fish32Boss', 20)
     at(env, 0)
     at(env, 20)
@@ -177,7 +177,7 @@ do
     end
     check('Z4_Shop 摊位为 4 级', stand ~= nil and stand.Level == 4)
     local gear = {}
-    for _, row in ipairs(GameCfg.Shop.ListForPage(4, '钓具')) do gear[row.ItemId] = row.Price end
+    for _, row in ipairs(GameCfg.Shop.list_for_page(4, '钓具')) do gear[row.ItemId] = row.Price end
     check('四区买得到普通鱼竿 50 金、蚂蟥 4 金', gear.normalRod == 50 and gear.item116 == 4,
         'rod=' .. tostring(gear.normalRod))
     local chain = GameCfg.Content.Exchanges[4]

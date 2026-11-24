@@ -10,7 +10,7 @@ local function patterns()
     return GameCfg.Lottery.Patterns
 end
 
-function LotteryDraw.RollAxis(rng)
+function LotteryDraw.roll_axis(rng)
     local list = patterns()
     local total = 0
     for _, pattern in ipairs(list) do total = total + pattern.weight end
@@ -24,18 +24,18 @@ function LotteryDraw.RollAxis(rng)
     return nil
 end
 
-function LotteryDraw.RollAxes(rng)
+function LotteryDraw.roll_axes(rng)
     local source = rngOf(rng)
     local axes = {}
     for axis = 1, 3 do
-        local number = LotteryDraw.RollAxis(source)
+        local number = LotteryDraw.roll_axis(source)
         if not number then return nil end
         axes[axis] = number
     end
     return axes
 end
 
-function LotteryDraw.Evaluate(axes)
+function LotteryDraw.evaluate(axes)
     if type(axes) ~= 'table' then return { outcome = 'none' } end
     local a, b, c = axes[1], axes[2], axes[3]
     if a == nil or b == nil or c == nil then return { outcome = 'none' } end
@@ -46,7 +46,7 @@ function LotteryDraw.Evaluate(axes)
     return { outcome = 'none' }
 end
 
-function LotteryDraw.ChooseWeapon(pattern, rng)
+function LotteryDraw.choose_weapon(pattern, rng)
     local reward = type(pattern) == 'table' and pattern.tripleReward
     if type(reward) ~= 'table' or reward.kind ~= 'weaponChoice' then return nil end
     local keys = reward.itemKeys

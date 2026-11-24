@@ -34,7 +34,7 @@ function LotteryInteraction.spec()
       local function update(stored_pos, stored_character)
         local current = resolve_character(stored_character)
         local pos = stored_pos or (current and current.Position) or nil
-        local radius = BodyScale.InteractionRadius(current, GameCfg.Lottery.Radius)
+        local radius = BodyScale.interaction_radius(current, GameCfg.Lottery.Radius)
         local radius_sq = radius * radius
         local near_machine = nil
         for _, bubble in ipairs(bubbles) do
@@ -56,7 +56,7 @@ function LotteryInteraction.spec()
         end
       end
 
-      for _, name in ipairs(GameCfg.Lottery.MachineAnchors()) do
+      for _, name in ipairs(GameCfg.Lottery.machine_anchors()) do
         local anchor = type(services.find_lottery_anchor) == "function" and services.find_lottery_anchor(name) or nil
         if not anchor or not anchor.Position then
           print("[LotteryInteraction] 找不到抽奖机锚点", name)

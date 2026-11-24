@@ -53,7 +53,7 @@ function Dialogue.Lines(zoneId)
     return lines
 end
 
-function Dialogue.Describe(zoneId)
+function Dialogue.describe(zoneId)
     local lines = Dialogue.Lines(zoneId)
     return lines and table.concat(lines, '\n') or nil
 end

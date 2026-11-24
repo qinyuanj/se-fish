@@ -6,7 +6,7 @@ local SurvivalOverlayView = require("client.views.survival_overlay_view")
 local Eui = require("tests.support.eui_double")
 
 local function mount(store, sent)
-  local root = Eui.Node({ Name = "UIRoot" })
+  local root = Eui.node({ Name = "UIRoot" })
   local view = RootView.mount(root, store, {
     overlays = { survival = SurvivalOverlayView.spec() },
     services = {
@@ -24,7 +24,7 @@ local function mount(store, sent)
       end,
     },
     create_node = function(kind, props)
-      return Eui.Node({
+      return Eui.node({
         Kind = kind,
         Name = props and props.Name,
         Parent = props and props.Parent,
@@ -83,9 +83,9 @@ describe("客户端生存蒙版宿主接缝（#298）", function()
     assert.equals(GameCfg.Survival.DownedTitle .. "（" .. "15" .. " 秒）", title.Text)
     assert.equals(330, ad.Position.x)
 
-    assert.is_true(Eui.Click(adrenaline))
+    assert.is_true(Eui.click(adrenaline))
     assert.same({ action = "UseAdrenaline", seq = 1 }, sent[#sent])
-    assert.is_true(Eui.Click(ad))
+    assert.is_true(Eui.click(ad))
     assert.same({ action = "FullRevive", mode = "ad", seq = 2 }, sent[#sent])
 
     writer:ingest_event("SurvivalState", {
@@ -105,7 +105,7 @@ describe("客户端生存蒙版宿主接缝（#298）", function()
     assert.equals(330, paid.Position.x)
     assert.equals(GameCfg.Survival.DeadTitle .. "（" .. "30" .. " 秒）", title.Text)
     assert.equals(GameCfg.Survival.CallHelpText, sent[#sent].notice)
-    assert.is_true(Eui.Click(paid))
+    assert.is_true(Eui.click(paid))
     assert.same({ action = "FullRevive", mode = "goods", seq = 3 }, sent[#sent])
 
     writer:step_clock(1)

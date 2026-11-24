@@ -50,12 +50,12 @@ describe("Spoke 主 HUD 背包入口与背包面板视图（#297-B3c）", functi
   local function mount_hud(opts)
     opts = opts or {}
     local store, writer = ClientStore.new({ initial_now = 100 })
-    local root_node = Eui.Node({ Name = "UIRoot" })
+    local root_node = Eui.node({ Name = "UIRoot" })
     local nodes = {}
     local created = {}
 
     local function create_node(kind, props)
-      local node = Eui.Node({
+      local node = Eui.node({
         Name = props.Name,
         Kind = kind,
         Parent = props.Parent,
@@ -128,13 +128,13 @@ describe("Spoke 主 HUD 背包入口与背包面板视图（#297-B3c）", functi
       backpackCount = 5,
       backpack = {},
     })
-    local layout2 = MainHudLayout.Compute({ width = 1920, height = 1080, itemBarSlots = 2 })
+    local layout2 = MainHudLayout.compute({ width = 1920, height = 1080, itemBarSlots = 2 })
     assert_at(env.nodes.BtnBackpack, layout2.Rects.BackpackButton, "BtnBackpack(2)")
     assert_at(env.nodes.LabelBackpack, layout2.Rects.BackpackButton, "LabelBackpack(2)")
     assert.equals("背包 5 格", env.nodes.LabelBackpack.Text)
 
     -- 展开背包：挂载 BackpackSlot1..5
-    assert.is_true(Eui.Click(env.nodes.BtnBackpack))
+    assert.is_true(Eui.click(env.nodes.BtnBackpack))
     local slot1 = env.nodes.BackpackSlot1
     local slot5 = env.nodes.BackpackSlot5
     assert.is_not_nil(slot1)
@@ -150,7 +150,7 @@ describe("Spoke 主 HUD 背包入口与背包面板视图（#297-B3c）", functi
       backpackCount = 10,
       backpack = {},
     })
-    local layout5 = MainHudLayout.Compute({ width = 1920, height = 1080, itemBarSlots = 5 })
+    local layout5 = MainHudLayout.compute({ width = 1920, height = 1080, itemBarSlots = 5 })
     assert_at(env.nodes.BtnBackpack, layout5.Rects.BackpackButton, "BtnBackpack(5)")
     assert.equals("背包 10 格", env.nodes.LabelBackpack.Text)
     assert.equals(slot1, env.nodes.BackpackSlot1)
@@ -188,7 +188,7 @@ describe("Spoke 主 HUD 背包入口与背包面板视图（#297-B3c）", functi
     })
 
     -- 点击入口展开面板
-    assert.is_true(Eui.Click(env.nodes.BtnBackpack))
+    assert.is_true(Eui.click(env.nodes.BtnBackpack))
     local panel = env.nodes.BackpackPanel
     local btn_close = env.nodes.BtnBackpackClose
     local slot1 = env.nodes.BackpackSlot1
@@ -205,12 +205,12 @@ describe("Spoke 主 HUD 背包入口与背包面板视图（#297-B3c）", functi
     assert.is_false(env.nodes.BtnMoveToItemBar.Visible)
 
     -- 点击空格不产生选格
-    assert.is_false(Eui.Click(slot3))
+    assert.is_false(Eui.click(slot3))
     assert.is_false(env.nodes.BtnMoveToItemBar.Visible)
 
     -- 点击第 1 格：高亮切换并显示「转入道具栏」按钮
     local normal_color = slot2.ButtonNormalColor
-    assert.is_true(Eui.Click(slot1))
+    assert.is_true(Eui.click(slot1))
     assert.same({ 36, 130, 94, 255 }, slot1.ButtonNormalColor)
     assert.same(normal_color, slot2.ButtonNormalColor)
     assert.is_true(env.nodes.BtnMoveToItemBar.Visible)
@@ -218,7 +218,7 @@ describe("Spoke 主 HUD 背包入口与背包面板视图（#297-B3c）", functi
     assert.equals("转入道具栏", env.nodes.LabelMoveToItemBar.Text)
 
     -- 点击面板关闭按钮：Phase 卸载，面板/关闭键/全部格位均销毁且连接归零
-    assert.is_true(Eui.Click(btn_close))
+    assert.is_true(Eui.click(btn_close))
     assert.is_true(panel.Destroyed)
     assert.is_true(btn_close.Destroyed)
     assert.is_true(slot1.Destroyed)
@@ -227,11 +227,11 @@ describe("Spoke 主 HUD 背包入口与背包面板视图（#297-B3c）", functi
     assert.equals(0, slot1.OnClicked:Count())
 
     -- 再次展开时选格状态已复位，点 BtnBackpack 自身也可收起
-    assert.is_true(Eui.Click(env.nodes.BtnBackpack))
+    assert.is_true(Eui.click(env.nodes.BtnBackpack))
     local panel2 = env.nodes.BackpackPanel
     assert.is_nil(panel2.Destroyed)
     assert.is_false(env.nodes.BtnMoveToItemBar.Visible)
-    assert.is_true(Eui.Click(env.nodes.BtnBackpack))
+    assert.is_true(Eui.click(env.nodes.BtnBackpack))
     assert.is_true(panel2.Destroyed)
 
     env.view:dispose()
@@ -241,7 +241,7 @@ describe("Spoke 主 HUD 背包入口与背包面板视图（#297-B3c）", functi
     local sent = {}
     local prev_re_util = rawget(_G, "REUtil")
     _G.REUtil = {
-      GetRE = function(_, name)
+      get_re = function(_, name)
         return {
           FireServer = function(_, payload)
             sent[#sent + 1] = { name = name, payload = payload }
@@ -264,9 +264,9 @@ describe("Spoke 主 HUD 背包入口与背包面板视图（#297-B3c）", functi
         },
       })
 
-      assert.is_true(Eui.Click(env.nodes.BtnBackpack))
-      assert.is_true(Eui.Click(env.nodes.BackpackSlot2))
-      assert.is_true(Eui.Click(env.nodes.BtnMoveToItemBar))
+      assert.is_true(Eui.click(env.nodes.BtnBackpack))
+      assert.is_true(Eui.click(env.nodes.BackpackSlot2))
+      assert.is_true(Eui.click(env.nodes.BtnMoveToItemBar))
       assert.equals(1, #sent)
       assert.equals("ItemBarAction", sent[1].name)
       assert.same({ action = "MoveToItemBar", value = 2 }, sent[1].payload)
@@ -286,7 +286,7 @@ describe("Spoke 主 HUD 背包入口与背包面板视图（#297-B3c）", functi
       assert.is_true(env.nodes.BtnMoveToItemBar.Visible)
       assert.is_false(env.nodes.BtnMoveToItemBar.TouchEnabled)
       assert.equals("道具栏已满", env.nodes.LabelMoveToItemBar.Text)
-      assert.is_false(Eui.Click(env.nodes.BtnMoveToItemBar))
+      assert.is_false(Eui.click(env.nodes.BtnMoveToItemBar))
       assert.equals(1, #sent)
 
       -- 当选中格物品被移出后，自动清空选中并隐藏转入按钮
@@ -336,7 +336,7 @@ describe("Spoke 主 HUD 背包入口与背包面板视图（#297-B3c）", functi
     })
 
     -- 先打开武器浮层
-    assert.is_true(Eui.Click(env.nodes.WeaponBar))
+    assert.is_true(Eui.click(env.nodes.WeaponBar))
     local dismiss = env.nodes.PopupDismiss
     assert.is_not_nil(dismiss)
     assert.equals("Weapon", open_popup:now())
@@ -344,7 +344,7 @@ describe("Spoke 主 HUD 背包入口与背包面板视图（#297-B3c）", functi
     assert.is_true(env.nodes.BaitBar.Visible)
 
     -- 点击背包入口：装备浮层立即销毁，武器栏/鱼饵栏隐藏且不可点，外部遮挡回调收到 true
-    assert.is_true(Eui.Click(env.nodes.BtnBackpack))
+    assert.is_true(Eui.click(env.nodes.BtnBackpack))
     assert.is_true(backpack_open:now())
     assert.is_nil(open_popup:now())
     assert.is_true(dismiss.Destroyed)
@@ -355,7 +355,7 @@ describe("Spoke 主 HUD 背包入口与背包面板视图（#297-B3c）", functi
     assert.is_true(occlusion_log[#occlusion_log])
 
     -- 关闭背包：武器栏与鱼饵栏恢复可见可点，外部遮挡回调收到 false
-    assert.is_true(Eui.Click(env.nodes.BtnBackpackClose))
+    assert.is_true(Eui.click(env.nodes.BtnBackpackClose))
     assert.is_false(backpack_open:now())
     assert.is_true(env.nodes.WeaponBar.Visible)
     assert.is_true(env.nodes.WeaponBar.TouchEnabled)
@@ -382,8 +382,8 @@ describe("Spoke 主 HUD 背包入口与背包面板视图（#297-B3c）", functi
       },
     })
 
-    assert.is_true(Eui.Click(env.nodes.BtnBackpack))
-    assert.is_true(Eui.Click(env.nodes.BackpackSlot1))
+    assert.is_true(Eui.click(env.nodes.BtnBackpack))
+    assert.is_true(Eui.click(env.nodes.BackpackSlot1))
     assert.is_true(backpack_open:now())
 
     local first_batch = {}
@@ -411,7 +411,7 @@ describe("Spoke 主 HUD 背包入口与背包面板视图（#297-B3c）", functi
         [1] = { itemId = ITEM_ROD, count = 1 },
       },
     })
-    assert.is_true(Eui.Click(env.nodes.BtnBackpack))
+    assert.is_true(Eui.click(env.nodes.BtnBackpack))
     assert.is_nil(env.nodes.BackpackPanel.Destroyed)
 
     -- 2. 宿主根 UI 销毁：全部节点销毁，全部 OnClicked 连接归零，外部状态复位
@@ -431,14 +431,14 @@ describe("Spoke 主 HUD 背包入口与背包面板视图（#297-B3c）", functi
 
   it("支持背包内换格与道具栏↔背包双向跨容器拖拽发送 MoveSlot", function()
     local store, writer = ClientStore.new({ initial_now = 100 })
-    local root_node = Eui.Node({ Name = "UIRoot" })
+    local root_node = Eui.node({ Name = "UIRoot" })
     local nodes = {}
     local actions = {}
     local backpack_open = State.new("Test.drag_backpack_open", false)
     local resolvers = {}
 
     local function create_node(kind, props)
-      local node = Eui.Node({
+      local node = Eui.node({
         Name = props.Name,
         Kind = kind,
         Parent = props.Parent,
@@ -504,7 +504,7 @@ describe("Spoke 主 HUD 背包入口与背包面板视图（#297-B3c）", functi
     })
 
     -- 展开背包：底部道具栏保持可见
-    assert.is_true(Eui.Click(nodes.BtnBackpack))
+    assert.is_true(Eui.click(nodes.BtnBackpack))
     assert.is_true(nodes.ItemBarSlot1.Visible)
     assert.is_true(nodes.BackpackSlot1.Visible)
 
@@ -559,17 +559,17 @@ describe("Spoke 主 HUD 背包入口与背包面板视图（#297-B3c）", functi
 
   it("关屏 hud_visible=false 时全主 HUD 常驻与展开节点零残留隐藏，重新开屏恢复", function()
     local store, writer = ClientStore.new({ initial_now = 100 })
-    local root_node = Eui.Node({ Name = "UIRoot" })
-    local screen_main = Eui.Node({ Name = "ScreenMain", Parent = root_node })
+    local root_node = Eui.node({ Name = "UIRoot" })
+    local screen_main = Eui.node({ Name = "ScreenMain", Parent = root_node })
     local nodes = {
-      ImageCoin = Eui.Node({ Name = "ImageCoin", Parent = screen_main }),
-      LabelCoin = Eui.Node({ Name = "LabelCoin", Parent = screen_main }),
+      ImageCoin = Eui.node({ Name = "ImageCoin", Parent = screen_main }),
+      LabelCoin = Eui.node({ Name = "LabelCoin", Parent = screen_main }),
     }
     local backpack_open = State.new("Test.hide_backpack_open", false)
     local open_popup = State.new("Test.hide_open_popup", nil)
 
     local function create_node(kind, props)
-      local node = Eui.Node({
+      local node = Eui.node({
         Name = props.Name,
         Kind = kind,
         Parent = props.Parent,
@@ -631,7 +631,7 @@ describe("Spoke 主 HUD 背包入口与背包面板视图（#297-B3c）", functi
     })
 
     -- 打开背包面板后执行关屏
-    assert.is_true(Eui.Click(nodes.BtnBackpack))
+    assert.is_true(Eui.click(nodes.BtnBackpack))
     local panel = nodes.BackpackPanel
     assert.is_not_nil(panel)
 

@@ -48,7 +48,7 @@ describe("抛竿与等待上钩（ServerRuntime）", function()
 
   it("test_downed_player_cannot_cast", function()
     env = Host.new()
-    env.runtime.life:ApplyDamage(env.player, GameCfg.Vitals.MaxHealth)
+    env.runtime.life:apply_damage(env.player, GameCfg.Vitals.MaxHealth)
     env:cast()
     assert.is_nil(env:last_state())
     assert.are.equal(0, env:alive_units("CastLine_"))

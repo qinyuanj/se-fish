@@ -34,7 +34,7 @@ local function grillable(entry)
   local definition = GameCfg.Items.Definitions[entry.itemId]
   if not definition then return false end
   if definition.Type ~= "食物" and definition.Type ~= "极品食物" then return false end
-  return GameCfg.Items.CookRate(entry) == nil
+  return GameCfg.Items.cook_rate(entry) == nil
 end
 
 local function selected_entry(data)
@@ -78,8 +78,8 @@ local function ensure_recovery(data)
 end
 
 local function reply(remote, player, payload)
-  if remote and type(remote.GetRE) == "function" then
-    local ok, event = pcall(remote.GetRE, remote, "GrillResult")
+  if remote and type(remote.get_re) == "function" then
+    local ok, event = pcall(remote.get_re, remote, "GrillResult")
     if ok and event and type(event.FireClient) == "function" then
       pcall(event.FireClient, event, player, payload)
     end
@@ -88,8 +88,8 @@ local function reply(remote, player, payload)
 end
 
 local function push_state(remote, player, payload)
-  if remote and type(remote.GetRE) == "function" then
-    local ok, event = pcall(remote.GetRE, remote, "GrillState")
+  if remote and type(remote.get_re) == "function" then
+    local ok, event = pcall(remote.get_re, remote, "GrillState")
     if ok and event and type(event.FireClient) == "function" then
       pcall(event.FireClient, event, player, payload)
     end
@@ -120,7 +120,7 @@ local function anchor_in_range(player, world, cache)
   for _, point in ipairs(cfg().Points or {}) do
     local anchor = find_anchor(world, point.AnchorName, cache)
     local center = anchor and anchor.Position
-    local radius = BodyScale.InteractionRadius(character, cfg().Radius) + (cfg().Slack or 0)
+    local radius = BodyScale.interaction_radius(character, cfg().Radius) + (cfg().Slack or 0)
     if center and flat_distance(pos, center) <= radius then
       return point.AnchorName, anchor
     end
@@ -131,8 +131,8 @@ end
 local function rate_of(session, now)
   if session.rate ~= nil then return session.rate end
   local elapsed = now - (session.startedAt or now)
-  if GrillCurve.IsBurnt(elapsed, cfg()) then return 0 end
-  return GrillCurve.Rate(elapsed, cfg())
+  if GrillCurve.is_burnt(elapsed, cfg()) then return 0 end
+  return GrillCurve.rate(elapsed, cfg())
 end
 
 local function pending_rate(pending, now)
@@ -140,8 +140,8 @@ local function pending_rate(pending, now)
   if pending.cooked ~= nil then return pending.cooked end
   if type(pending.at) ~= "number" then return nil end
   local elapsed = now - pending.at
-  if GrillCurve.IsBurnt(elapsed, cfg()) then return 0 end
-  return GrillCurve.Rate(elapsed, cfg())
+  if GrillCurve.is_burnt(elapsed, cfg()) then return 0 end
+  return GrillCurve.rate(elapsed, cfg())
 end
 
 function PlayerGrill.mount(scope, tree, opts)
@@ -249,16 +249,16 @@ function PlayerGrill.mount(scope, tree, opts)
     if not save or not data then return false, "unavailable" end
     local operation, mode
     if seq == nil then
-      operation = save:NextOperation(player, kind)
+      operation = save:next_operation(player, kind)
       mode = operation and "new" or "pending"
     else
-      operation, mode = save:ResolveRequest(player, data, kind, seq)
+      operation, mode = save:resolve_request(player, data, kind, seq)
     end
     if not operation then
       if mode == "replay" then return true, "replay" end
       return false, tostring(mode or "invalid")
     end
-    local accepted = save:Execute(player, data, operation, transform, function(written, result)
+    local accepted = save:execute(player, data, operation, transform, function(written, result)
       if done then done(written == true, result) end
     end)
     return accepted == true, accepted and "accepted" or "rejected"
@@ -422,11 +422,11 @@ function PlayerGrill.mount(scope, tree, opts)
       return fail(remote, player, "out-of-range", seq)
     end
     local now = clock.now()
-    if session.state == "cooking" and GrillCurve.IsBurnt(now - (session.startedAt or now), cfg()) then
+    if session.state == "cooking" and GrillCurve.is_burnt(now - (session.startedAt or now), cfg()) then
       settle_burn()
       return fail(remote, player, "burnt", seq)
     end
-    local rate = session.rate or GrillCurve.Rate(now - session.startedAt, cfg())
+    local rate = session.rate or GrillCurve.rate(now - session.startedAt, cfg())
     local item_id, mult = session.itemId, session.mult
     local frozen = false
     local accepted, mode = execute("grill:takeout", seq, function(draft)
@@ -495,7 +495,7 @@ function PlayerGrill.mount(scope, tree, opts)
         settle_current(now, "downed")
         return
       end
-      if GrillCurve.IsBurnt(now - (session.startedAt or now), cfg()) then
+      if GrillCurve.is_burnt(now - (session.startedAt or now), cfg()) then
         settle_burn()
       end
     end)

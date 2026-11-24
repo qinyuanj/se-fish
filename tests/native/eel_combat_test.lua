@@ -11,23 +11,23 @@ local function droppedEel(env, castOk)
     local log = { casts = 0, removed = 0, published = {} }
     env.castOk = castOk or function() return true end
     env.mgr.Ability = {
-        EquipFish = function() return true end,
-        CastFish = function()
+        equip_fish = function() return true end,
+        cast_fish = function()
             if not env.castOk() then return false end
             log.casts = log.casts + 1
             return true
         end,
-        RemoveFish = function() log.removed = log.removed + 1 end,
+        remove_fish = function() log.removed = log.removed + 1 end,
     }
-    env.mgr.CombatPublisher = function(payload) log.published[#log.published + 1] = payload end
-    local fish = env:heldFish(env.player, 'eel')
-    env.mgr:Drop(env.player)
+    env.mgr.combat_publisher = function(payload) log.published[#log.published + 1] = payload end
+    local fish = env:held_fish(env.player, 'eel')
+    env.mgr:drop(env.player)
     return fish, log
 end
 
 local function at(env, now, times)
     env.now = now
-    for _ = 1, times or 1 do env.mgr:Update() end
+    for _ = 1, times or 1 do env.mgr:update() end
 end
 
 describe('TestEelCombat', function()
@@ -35,10 +35,10 @@ describe('TestEelCombat', function()
 
     before_each(function()
         env = FishEscape.new()
-        env:setUp()
+        env:set_up()
     end)
     after_each(function()
-        env:tearDown()
+        env:tear_down()
     end)
 
     it('test_client_snapshots_follow_state_changes', function()
@@ -67,13 +67,13 @@ describe('TestEelCombat', function()
     it('test_combat_fish_is_not_counted_as_escaping', function()
         -- 再放普通鱼不能提前清掉尚未到逃跑时限的精英鱼。
         env:prepare()
-        local eel = env:heldFish(env.player, 'eel')
-        env.mgr:Drop(env.player)
+        local eel = env:held_fish(env.player, 'eel')
+        env.mgr:drop(env.player)
         env.now = 1
-        local normal = env:heldFish(env.player, 'bass')
-        env.mgr:Drop(env.player)
+        local normal = env:held_fish(env.player, 'bass')
+        env.mgr:drop(env.player)
         assert.same(eel, env.mgr.Fish[eel.Id])
-        assert.same({ normal }, env.mgr:Escaping())
+        assert.same({ normal }, env.mgr:escaping())
     end)
 
     it('test_escape_goes_straight_and_vanishes_in_water', function()
@@ -85,7 +85,7 @@ describe('TestEelCombat', function()
         at(env, 184)
         assert.same(heading, fish.Heading)
         fish.Carrier.Body.Position = Vector3.New(-11.75, 5, -12.25)
-        env.mgr:Update()
+        env.mgr:update()
         assert.is_nil(env.mgr.Fish[fish.Id])
     end)
 
@@ -131,12 +131,12 @@ describe('TestEelCombat', function()
         local fish, log = droppedEel(env)
         at(env, 0)
         at(env, 1)
-        assert.is_not.is_nil(env.mgr:TakeKilled(fish))
+        assert.is_not.is_nil(env.mgr:take_killed(fish))
         assert.are.equal(1, log.removed)
         assert.same({ id = fish.Id, state = 'gone' }, log.published[#log.published])
         at(env, 2)
         assert.are.equal(1, log.casts)
-        assert.is_nil(env.mgr:TakeKilled(fish))
+        assert.is_nil(env.mgr:take_killed(fish))
     end)
 
     it('test_large_dt_neither_bursts_nor_swallows_sleep', function()
@@ -162,11 +162,11 @@ describe('TestEelCombat', function()
         -- 逃跑时限条与鳄雀鳝共用：会移动的精英按限频补发坐标，不带放电字段，逃跑时标签收起。
         env:prepare()
         local published = {}
-        env.mgr.Ability = { EquipFish = function() return true end, CastFish = function() return true end,
-            RemoveFish = function() end }
-        env.mgr.CombatPublisher = function(payload) published[#published + 1] = payload end
-        local fish = env:heldFish(env.player, 'alligatorGar')
-        env.mgr:Drop(env.player)
+        env.mgr.Ability = { equip_fish = function() return true end, cast_fish = function() return true end,
+            remove_fish = function() end }
+        env.mgr.combat_publisher = function(payload) published[#published + 1] = payload end
+        local fish = env:held_fish(env.player, 'alligatorGar')
+        env.mgr:drop(env.player)
         local escapeSec = GameCfg.Fish.alligatorGar.EscapeSec
         assert.same({ 'combat', escapeSec, escapeSec }, { published[1].state, published[1].fleeAt, published[1].escapeSec })
         assert.is_nil(published[1].dischargeCount)
@@ -223,10 +223,10 @@ describe('TestEelCombat', function()
         local rotation = setmetatable({}, { __mul = function(_, value) return value end })
         -- Busted 案例体在沙箱 _ENV：业务模块读的是真 _G，必须写 _G.Quaternion
         _G.Quaternion = { FromEulerAngles = function(x, y, z) return { x = x, y = y, z = z } end }
-        env.mgr.Ability = { EquipFish = function() end, CastFish = function() return true end }
-        local fish = env:heldFish(env.player, 'eel')
+        env.mgr.Ability = { equip_fish = function() end, cast_fish = function() return true end }
+        local fish = env:held_fish(env.player, 'eel')
         fish.Carrier.Body.Rotation = rotation
-        env.mgr:Drop(env.player)
+        env.mgr:drop(env.player)
         for t = 0, 5.5, 0.5 do at(env, t) end
         local sleepRotation = fish.Carrier.Body.Rotation
         at(env, 15)
@@ -250,11 +250,11 @@ describe('TestFishCombatLabel', function()
     local function mountView()
         local clock = SpokeClock.new(90)
         local store, writer = ClientStore.new({ clock = clock })
-        local root = Eui.Node({ Name = 'UIRoot' })
+        local root = Eui.node({ Name = 'UIRoot' })
         local created = {}
         local view = RootView.mount(root, store, {
             create_node = function(kind, props)
-                local node = Eui.Node(props or {})
+                local node = Eui.node(props or {})
                 node.UnitType = kind
                 created[#created + 1] = node
                 return node

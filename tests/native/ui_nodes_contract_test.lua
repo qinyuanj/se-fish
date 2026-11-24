@@ -21,7 +21,7 @@ local function collect_names(node, seen, duplicates)
     if seen[name] then duplicates[name] = true end
     seen[name] = true
   end
-  for _, node_child in pairs(node.Children or {}) do collect_names(node_child, seen, duplicates) end
+  for _, node_child in pairs(node.children or {}) do collect_names(node_child, seen, duplicates) end
 end
 
 describe("商店统一视图的动态节点合同", function()
@@ -29,7 +29,7 @@ describe("商店统一视图的动态节点合同", function()
   before_each(function()
     local store
     store, writer = ClientStore.new({ initial_now = 1000 })
-    root = Eui.Node({ Name = "UIRoot" })
+    root = Eui.node({ Name = "UIRoot" })
     RootView.mount(root, store, {
       modals = { shop = ShopView.modal_spec() },
       services = {
@@ -37,7 +37,7 @@ describe("商店统一视图的动态节点合同", function()
         close_modal = function(id) writer:close_modal(id) end,
       },
       create_node = function(kind, props)
-        return Eui.Node({ Kind = kind, Name = props and props.Name, Parent = props and props.Parent,
+        return Eui.node({ Kind = kind, Name = props and props.Name, Parent = props and props.Parent,
           Text = props and (props.Text or props.ButtonText) or "", TouchEnabled = kind == "EUIButton" })
       end,
     })
@@ -53,7 +53,7 @@ describe("商店统一视图的动态节点合同", function()
       assert.same(page, child(root, "LabelShopPage" .. index).Text)
       assert.is_not_nil(child(root, "ImageShopTabIndicator" .. index))
     end
-    assert.is_true(Eui.Click(child(root, "ShopRow1")))
+    assert.is_true(Eui.click(child(root, "ShopRow1")))
     for _, name in ipairs({ "ShopRow1", "ShopRowName1", "ShopRowPrice1", "ShopRowState1",
         "ShopRowNew1", "ShopRowIcon1", "ShopRowBackground1", "ShopRowCoin1" }) do
       assert.is_not_nil(child(root, name), name)
@@ -73,7 +73,7 @@ describe("商店统一视图的动态节点合同", function()
     local seen, duplicates = {}, {}
     collect_names(child(root, "ScreenShop"), seen, duplicates)
     assert.same({}, duplicates)
-    local rows = GameCfg.Shop.ListForPage(GameCfg.Shop.Stands[1].Level, GameCfg.Shop.Pages[1], true)
+    local rows = GameCfg.Shop.list_for_page(GameCfg.Shop.Stands[1].Level, GameCfg.Shop.Pages[1], true)
     assert.is_not_nil(child(root, "ShopRow" .. #rows))
     assert.is_nil(child(root, "ShopRow" .. (#rows + 1)))
   end)

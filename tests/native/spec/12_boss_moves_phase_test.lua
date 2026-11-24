@@ -1,10 +1,10 @@
 -- 条款 12-35 / 12-36 / 12-37 / 12-38 / 12-45（第 12 节「阶段与复合组」，#259）。
 --
--- 业务入口：MgrFishUnit:SpawnLanded + Drop 把沧龙（fish55Elite）/ 哥斯拉（fish56Boss）放下，
--- 逐帧 Update 推进服务端权威时钟；只观察玩家看得见的三个面：
+-- 业务入口：MgrFishUnit:spawn_landed + drop 把沧龙（fish55Elite）/ 哥斯拉（fish56Boss）放下，
+-- 逐帧 update 推进服务端权威时钟；只观察玩家看得见的三个面：
 --   1. 玩家血量（Controller.Health，所有伤害都走 MgrVitals）；
 --   2. 广播给客户端的 GarBiteNotice 预警载荷（client/LocalGarBite 消费的同一份契约）；
---   3. 服务端权威的巡航 / 携带 / 阶段态（fish.Aquatic、fish.Carry、fish.Phase、CombatPayload）。
+--   3. 服务端权威的巡航 / 携带 / 阶段态（fish.Aquatic、fish.Carry、fish.Phase、combat_payload）。
 -- 逐招表与阶段表（common/cfg/boss_moves.lua）只做结构断言：阶段表引用的招式必须已经出现在普通招式表里
 -- （12-05 不新增表外招式），阶段阈值不是招式行。
 --
@@ -24,7 +24,7 @@ local function need(cond, ...)
 end
 
 local function mosasaurRow(move)
-    local row = BossMoves.Get('mosasaur', move)
+    local row = BossMoves.get('mosasaur', move)
     need(row ~= nil, '逐招表缺沧龙的 %s 行', move)
     return row
 end
@@ -37,13 +37,13 @@ describe('第 12 节 阶段与复合组（沧龙 / 哥斯拉）', function()
         savedExtra = { ability = package.loaded['server.ability_api'] }
         env = Islet.new(7)
         package.loaded['server.ability_api'] = nil
-        local p = Islet.shoreDryPoint(7)
+        local p = Islet.shore_dry_point(7)
         env.player.Character.Position = env.vec(p.x, p.y, p.z)
         env.player.Character.Controller.Health = 100000
     end)
 
     after_each(function()
-        env:tearDown()
+        env:tear_down()
         package.loaded['server.ability_api'] = savedExtra.ability
     end)
 
@@ -85,7 +85,7 @@ describe('第 12 节 阶段与复合组（沧龙 / 哥斯拉）', function()
         local dt, last, moved = 0.05, fish.Carrier.Body.Position, 0
         for _ = 1, 20 do
             env.now = env.now + dt
-            env.mgr:Update()
+            env.mgr:update()
             local p = fish.Carrier.Body.Position
             local step = math.sqrt((p.x - last.x) ^ 2 + (p.z - last.z) ^ 2)
             need(step <= 13 * dt + 1e-6, '巡航单帧位移 %s 超过表内移速 13', step)
@@ -108,7 +108,7 @@ describe('第 12 节 阶段与复合组（沧龙 / 哥斯拉）', function()
         assert.same(leap.Range, warning.range)
         assert.same(Cfg.Ability.Aquatic.LeapWindupSec + Cfg.Ability.Aquatic.LeapSec, warning.duration)
         assert.is_nil(warning.damage, '预警载荷带了伤害：客户端不得承担结算')
-        assert.is_true(require('common.gar_bite_notice').Valid(warning))
+        assert.is_true(require('common.gar_bite_notice').valid(warning))
         env:advance(17.6) -- 15.0 起手 + 1.0 预警 + 1.5 滞空
         assert.same(100000 - leap.Damage.Value - 300, health(), '砸击与咬中没有各结算一次')
         assert.same(100000 - leap.Damage.Value, peer.Character.Controller.Health)
@@ -149,7 +149,7 @@ describe('第 12 节 阶段与复合组（沧龙 / 哥斯拉）', function()
         assert.same(100000 - 35 - 300, peer.Character.Controller.Health)
         local MathWater = require('common.math_water_judge')
         env:advance(30)
-        assert.is_not_nil(MathWater.HitZone(Cfg.Water.Zones, peer.Character.Position),
+        assert.is_not_nil(MathWater.hit_zone(Cfg.Water.Zones, peer.Character.Position),
             '被叼走的玩家没有进入水域')
         dropPeer()
     end)
@@ -191,10 +191,10 @@ describe('第 12 节 阶段与复合组（沧龙 / 哥斯拉）', function()
         assert.same(phase.AttackSets, Cfg.Ability.BossPhase.AttackSets)
         for _, set in pairs(phase.AttackSets) do
             for _, move in ipairs(set) do
-                need(BossMoves.Get('godzilla', move) ~= nil, '阶段表引用了表外招式 %s', move)
+                need(BossMoves.get('godzilla', move) ~= nil, '阶段表引用了表外招式 %s', move)
             end
         end
-        assert.is_nil(BossMoves.Get('godzilla', 'threshold'), '阶段阈值被写成了招式行')
+        assert.is_nil(BossMoves.get('godzilla', 'threshold'), '阶段阈值被写成了招式行')
         assert.is_true(#phase.Thresholds[1].PhaseName > 0, '阶段切换没有可读的阶段名')
 
         local fish = env:drop('fish56Boss')
@@ -213,6 +213,6 @@ describe('第 12 节 阶段与复合组（沧龙 / 哥斯拉）', function()
             if attack.Name == 'claw' then after = after + 1 end
         end
         assert.same(before, after, '切阶段的同一帧仍落了普通招式')
-        assert.same('water', env.mgr:CombatPayload(fish).phase, '阶段切换没有发布给客户端表现')
+        assert.same('water', env.mgr:combat_payload(fish).phase, '阶段切换没有发布给客户端表现')
     end)
 end)

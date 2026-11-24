@@ -24,7 +24,7 @@ local function send_reel(ctx, payload)
     return
   end
   local ok, err = pcall(function()
-    local Re = require("common.re_util"):GetRE("ReelInRE")
+    local Re = require("common.re_util"):get_re("ReelInRE")
     if Re and type(Re.FireServer) == "function" then Re:FireServer(payload) end
   end)
   if not ok then
@@ -39,7 +39,7 @@ local function send_close(ctx, payload)
     return
   end
   local ok, err = pcall(function()
-    local Re = require("common.re_util"):GetRE("CloseReelIn")
+    local Re = require("common.re_util"):get_re("CloseReelIn")
     if Re and type(Re.FireServer) == "function" then Re:FireServer(payload) end
   end)
   if not ok then
@@ -79,7 +79,7 @@ function ReelOverlayView.spec(options)
     mount = function(scope, ctx)
       local cast = ctx.store.cast:now() or {}
       local session = valid_session(cast.reelSession) and cast.reelSession or nil
-      local aggregator = session and RateLimit.NewAggregator({
+      local aggregator = session and RateLimit.new_aggregator({
         SessionId = session, AggregateSec = GameCfg.HighFreqInput.AggregateSec,
       }) or nil
       local display = session and ReelDisplay.New(now_of(ctx), GameCfg.ReelIn) or nil
@@ -136,7 +136,7 @@ function ReelOverlayView.spec(options)
         if not valid_session(id) or closed:now() == id then return false end
         if session == id then return true end
         session = id
-        aggregator = RateLimit.NewAggregator({ SessionId = id, AggregateSec = GameCfg.HighFreqInput.AggregateSec })
+        aggregator = RateLimit.new_aggregator({ SessionId = id, AggregateSec = GameCfg.HighFreqInput.AggregateSec })
         display = ReelDisplay.New(now_of(ctx), GameCfg.ReelIn)
         set_progress(GameCfg.ReelIn.Initial)
         return true
@@ -144,9 +144,9 @@ function ReelOverlayView.spec(options)
 
       local function flush(final)
         if not aggregator then return end
-        local payload = final and aggregator:Flush() or aggregator:Collect(now_of(ctx))
+        local payload = final and aggregator:flush() or aggregator:collect(now_of(ctx))
         if payload then
-          if display then display:Sent(payload.q, payload.n, now_of(ctx)) end
+          if display then display:sent(payload.q, payload.n, now_of(ctx)) end
           send_reel(ctx, payload)
         end
       end
@@ -167,9 +167,9 @@ function ReelOverlayView.spec(options)
       local click_fn = function(id)
         if not session or (id ~= nil and id ~= session) or not aggregator then return false end
         local now = now_of(ctx)
-        aggregator:Click(now)
+        aggregator:click(now)
         if display then
-          display:Click(now)
+          display:click(now)
           set_progress(display:Value(now))
         end
         return true
@@ -207,7 +207,7 @@ function ReelOverlayView.spec(options)
         end
         last_payload = payload
         if display and (payload.action == "progress" or payload.action == "started") then
-          display:Authority(now_of(ctx), payload.progress, payload.q)
+          display:authority(now_of(ctx), payload.progress, payload.q)
         end
         set_progress(payload.progress)
         if payload.action == "landed" or payload.action == "unhooked" then

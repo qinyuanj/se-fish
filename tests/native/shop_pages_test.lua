@@ -24,18 +24,18 @@ describe("钓场商店货架表", function()
     -- 按基础线性叠加：scale = 1 + increment × level（满级 +70%/+50%/+60%）
     it("test_damage_scale_is_linear_on_base", function()
         local shop = GameCfg.Shop
-        assert.is_not_nil(shop.DamageScale, '缺伤害加成函数')
-        assert.near(1.0, shop.DamageScale('melee', 0), 1e-9)
-        assert.near(1.1, shop.DamageScale('melee', 1), 1e-9)
-        assert.near(1.7, shop.DamageScale('melee', 7), 1e-9)
-        assert.near(1.5, shop.DamageScale('ranged', 5), 1e-9)
-        assert.near(1.6, shop.DamageScale('explosive', 3), 1e-9)
+        assert.is_not_nil(shop.damage_scale, '缺伤害加成函数')
+        assert.near(1.0, shop.damage_scale('melee', 0), 1e-9)
+        assert.near(1.1, shop.damage_scale('melee', 1), 1e-9)
+        assert.near(1.7, shop.damage_scale('melee', 7), 1e-9)
+        assert.near(1.5, shop.damage_scale('ranged', 5), 1e-9)
+        assert.near(1.6, shop.damage_scale('explosive', 3), 1e-9)
         -- 非线性就过不了：复利 1.1^7 ≈ 1.9487 ≠ 1.7
-        assert.is_true(math.abs(shop.DamageScale('melee', 7) - 1.1 ^ 7) > 0.1)
+        assert.is_true(math.abs(shop.damage_scale('melee', 7) - 1.1 ^ 7) > 0.1)
         -- 弹容不是伤害加成；未知种类与越界等级钳制
-        assert.is_nil(shop.DamageScale('magazine', 1))
-        assert.near(1.7, shop.DamageScale('melee', 99), 1e-9)
-        assert.near(1.0, shop.DamageScale('melee', -3), 1e-9)
+        assert.is_nil(shop.damage_scale('magazine', 1))
+        assert.near(1.7, shop.damage_scale('melee', 99), 1e-9)
+        assert.near(1.0, shop.damage_scale('melee', -3), 1e-9)
     end)
     it("test_goods_is_full_50_rows_with_pages_and_numbers", function()
         local goods = GameCfg.Shop.Goods
@@ -79,63 +79,63 @@ describe("钓场商店货架表", function()
     -- 分页过滤 + 新品置顶 + 同组按编号稳定升序
     it("test_list_for_page_filters_sorts_and_pins_new", function()
         local shop = GameCfg.Shop
-        assert.is_not_nil(shop.ListForPage, '缺分页列表函数')
+        assert.is_not_nil(shop.list_for_page, '缺分页列表函数')
         local function numbers(rows)
             local out = {}
             for i, row in ipairs(rows) do out[i] = row.Number end
             return out
         end
         -- 1 级摊位钓具页：蚯蚓/新手鱼竿都是当地新品
-        assert.same({ 13, 14 }, numbers(shop.ListForPage(1, '钓具')))
+        assert.same({ 13, 14 }, numbers(shop.list_for_page(1, '钓具')))
         -- 2 级：新品香肠(11)/钓虾竿(12) 置顶，其余按编号
-        assert.same({ 11, 12, 13, 14 }, numbers(shop.ListForPage(2, '钓具')))
+        assert.same({ 11, 12, 13, 14 }, numbers(shop.list_for_page(2, '钓具')))
         -- 7 级：新品科技假饵(1)/不科学鱼竿(2) 置顶，恰好与原序一致
-        local all = numbers(shop.ListForPage(7, '钓具'))
+        local all = numbers(shop.list_for_page(7, '钓具'))
         assert.same(14, #all)
         for i = 1, 14 do assert.same(i, all[i]) end
         -- 3 级升级页：新品 = 背包3(31)/远程1(38)/爆炸1(44)/近战3(49)，其余按编号稳定序
-        assert.same({ 31, 38, 44, 49, 32, 33, 41, 50, 51 }, numbers(shop.ListForPage(3, '升级')))
+        assert.same({ 31, 38, 44, 49, 32, 33, 41, 50, 51 }, numbers(shop.list_for_page(3, '升级')))
         -- 等级不够不上架：1 级摊位的武器页只有近战 1 级两件（指虎 26、匕首 25）
-        assert.same({ 25, 26 }, numbers(shop.ListForPage(1, '武器')))
+        assert.same({ 25, 26 }, numbers(shop.list_for_page(1, '武器')))
         -- 金币页没有金币定价商品（平台购买是外部交付参数）
-        assert.same({}, shop.ListForPage(7, '金币'))
+        assert.same({}, shop.list_for_page(7, '金币'))
         -- 未知页与非法等级容错
-        assert.same({}, shop.ListForPage(1, '不存在'))
+        assert.same({}, shop.list_for_page(1, '不存在'))
     end)
 
     -- 弹容 = ceil(base × (1 + 0.5×level))：向上取整，满级 +150%
     it("test_magazine_size_rounds_up", function()
         local shop = GameCfg.Shop
-        assert.is_not_nil(shop.MagazineSize, '缺弹容函数')
-        assert.same(10, shop.MagazineSize(10, 0))
-        assert.same(8, shop.MagazineSize(5, 1))   -- 狙击 5→7.5→8
-        assert.same(10, shop.MagazineSize(5, 2))
-        assert.same(13, shop.MagazineSize(5, 3))  -- 12.5→13
-        assert.same(5, shop.MagazineSize(2, 3))   -- 霰弹 2→5
-        assert.same(3, shop.MagazineSize(1, 3))   -- 火箭筒 1→2.5→3
-        assert.same(75, shop.MagazineSize(30, 3))
-        assert.same(25, shop.MagazineSize(10, 3))
+        assert.is_not_nil(shop.magazine_size, '缺弹容函数')
+        assert.same(10, shop.magazine_size(10, 0))
+        assert.same(8, shop.magazine_size(5, 1))   -- 狙击 5→7.5→8
+        assert.same(10, shop.magazine_size(5, 2))
+        assert.same(13, shop.magazine_size(5, 3))  -- 12.5→13
+        assert.same(5, shop.magazine_size(2, 3))   -- 霰弹 2→5
+        assert.same(3, shop.magazine_size(1, 3))   -- 火箭筒 1→2.5→3
+        assert.same(75, shop.magazine_size(30, 3))
+        assert.same(25, shop.magazine_size(10, 3))
         -- 钳制：0 级与超上限
-        assert.same(10, shop.MagazineSize(10, -1))
-        assert.same(25, shop.MagazineSize(10, 99))
+        assert.same(10, shop.magazine_size(10, -1))
+        assert.same(25, shop.magazine_size(10, 99))
     end)
 
     -- 满级实战结果（基础值来自 GameCfg.Ability，与商店表一致）
     it("test_max_level_results_match_ticket", function()
         local shop, ability = GameCfg.Shop, GameCfg.Ability
         -- 近战 +70%：指虎 10→17、匕首 15→25.5、斧头 40→68
-        assert.near(17, ability.MeleeWeapons.item134.Damage * shop.DamageScale('melee', 7), 1e-9)
-        assert.near(25.5, ability.MeleeWeapons.item135.Damage * shop.DamageScale('melee', 7), 1e-9)
-        assert.near(68, ability.MeleeWeapons.item136.Damage * shop.DamageScale('melee', 7), 1e-9)
+        assert.near(17, ability.MeleeWeapons.item134.Damage * shop.damage_scale('melee', 7), 1e-9)
+        assert.near(25.5, ability.MeleeWeapons.item135.Damage * shop.damage_scale('melee', 7), 1e-9)
+        assert.near(68, ability.MeleeWeapons.item136.Damage * shop.damage_scale('melee', 7), 1e-9)
         -- 远程 +50%：手枪 10→15、狙击 200→300；火箭筒两段都只归远程：500→750、溅射 100→150
-        assert.near(15, ability.Guns.item137.Damage * shop.DamageScale('ranged', 5), 1e-9)
-        assert.near(300, ability.Guns.item141.Damage * shop.DamageScale('ranged', 5), 1e-9)
-        assert.near(750, ability.Guns.item142.Damage * shop.DamageScale('ranged', 5), 1e-9)
-        assert.near(150, ability.Guns.item142.Splash.Damage * shop.DamageScale('ranged', 5), 1e-9)
+        assert.near(15, ability.Guns.item137.Damage * shop.damage_scale('ranged', 5), 1e-9)
+        assert.near(300, ability.Guns.item141.Damage * shop.damage_scale('ranged', 5), 1e-9)
+        assert.near(750, ability.Guns.item142.Damage * shop.damage_scale('ranged', 5), 1e-9)
+        assert.near(150, ability.Guns.item142.Splash.Damage * shop.damage_scale('ranged', 5), 1e-9)
         -- 爆炸物 +60%：鞭炮 50→80、手雷 100→160、炸药 150→240
-        assert.near(80, ability.Explosives.item143.Damage * shop.DamageScale('explosive', 3), 1e-9)
-        assert.near(160, ability.Explosives.item144.Damage * shop.DamageScale('explosive', 3), 1e-9)
-        assert.near(240, ability.Explosives.item145.Damage * shop.DamageScale('explosive', 3), 1e-9)
+        assert.near(80, ability.Explosives.item143.Damage * shop.damage_scale('explosive', 3), 1e-9)
+        assert.near(160, ability.Explosives.item144.Damage * shop.damage_scale('explosive', 3), 1e-9)
+        assert.near(240, ability.Explosives.item145.Damage * shop.damage_scale('explosive', 3), 1e-9)
     end)
 
     -- 升级参数由商店表行派生：种类、级数、增量、逐级价格
@@ -165,7 +165,7 @@ end)
 -- ===== PlayerData 成长与限购状态（#130 持久字段）=====
 -- 失败方式：升级等级/购买次数不走持久字段（重进丢失）；越级或重复升级生效；满级继续扣钱；
 -- 武器购买被背包满格误拒（武器独立库存不占格）；损坏的 growth 存档被静默接受。
-local function newData(userId)
+local function new_data(userId)
     local data = PlayerData.New({ UserId = userId, SetAttribute = function() end })
     data:Init()
     return data
@@ -181,7 +181,7 @@ end
 describe("商店成长与限购", function()
 
     it("test_apply_upgrade_is_one_level_at_a_time", function()
-        local data = newData(102)
+        local data = new_data(102)
         local melee1, melee2 = upgradeRow(51).Upgrade, upgradeRow(50).Upgrade -- 近战 1/2 级
         assert.same('melee', melee1.kind)
         -- 越级：0 级直接买 2 级拒绝
@@ -191,21 +191,21 @@ describe("商店成长与限购", function()
         -- 逐级：1 级生效
         assert.is_true(data:CanShopUpgrade(melee1))
         assert.is_true(data:ApplyShopUpgrade(melee1))
-        assert.same(1, data:ShopUpgradeLevel('melee'))
-        assert.near(1.1, data:WeaponDamageScale('melee'), 1e-9)
+        assert.same(1, data:shop_upgrade_level('melee'))
+        assert.near(1.1, data:weapon_damage_scale('melee'), 1e-9)
         -- 重复：再买 1 级拒绝
         local okRepeat, reasonRepeat = data:CanShopUpgrade(melee1)
         assert.is_false(okRepeat)
         assert.same('level', reasonRepeat)
         -- 2 级生效后伤害 1.2
         assert.is_true(data:ApplyShopUpgrade(melee2))
-        assert.near(1.2, data:WeaponDamageScale('melee'), 1e-9)
+        assert.near(1.2, data:weapon_damage_scale('melee'), 1e-9)
     end)
 
     it("test_backpack_upgrade_drives_storage_level", function()
-        local data = newData(104)
+        local data = new_data(104)
         assert.is_true(data:ApplyShopUpgrade(upgradeRow(33).Upgrade)) -- 背包升级 1
-        assert.same(1, data:ShopUpgradeLevel('backpack'))
+        assert.same(1, data:shop_upgrade_level('backpack'))
         assert.same(1, data.Data.UpgradeLevel)
         assert.same(3, data:ItemBarCapacity())
         assert.same(10, data:BackpackCapacity())
@@ -216,19 +216,19 @@ describe("商店成长与限购", function()
     end)
 
     it("test_max_level_reports_max", function()
-        local data = newData(103)
+        local data = new_data(103)
         for level = 1, 3 do
             assert.is_true(data:ApplyShopUpgrade(upgradeRow(({ 41, 40, 39 })[level]).Upgrade)) -- 弹容 1/2/3
         end
-        assert.same(3, data:ShopUpgradeLevel('magazine'))
-        assert.same(13, data:MagazineSize(5))
+        assert.same(3, data:shop_upgrade_level('magazine'))
+        assert.same(13, data:magazine_size(5))
         local ok, reason = data:CanShopUpgrade({ kind = 'magazine', level = 3, increment = 0.5 })
         assert.is_false(ok)
         assert.same('max', reason)
     end)
 
     it("test_migrate_rejects_corrupt_growth", function()
-        local data = newData(109)
+        local data = new_data(109)
         data:NotePurchase(13)
         assert.is_true(data:ApplyShopUpgrade(upgradeRow(51).Upgrade))
         local snapshot = data:Serialize()
@@ -236,7 +236,7 @@ describe("商店成长与限购", function()
         local corrupt1 = data:Migrate(snapshot)
         assert.is_not_nil(corrupt1)
         corrupt1.extra.growth.upgrades.melee = 99
-        local restored = newData(109)
+        local restored = new_data(109)
         assert.is_false(restored:ApplySave(corrupt1))
         -- 购买次数非整数
         local corrupt2 = data:Migrate(snapshot)
@@ -248,18 +248,18 @@ describe("商店成长与限购", function()
         assert.is_false(restored:ApplySave(corrupt3))
         -- 完好快照仍能恢复
         assert.is_true(restored:ApplySave(data:Migrate(snapshot)))
-        assert.same(1, restored:ShopUpgradeLevel('melee'))
+        assert.same(1, restored:shop_upgrade_level('melee'))
         assert.same(1, restored:PurchaseCount(13))
     end)
 
     it("test_purchase_count_persists_across_save", function()
-        local data = newData(106)
+        local data = new_data(106)
         assert.same(0, data:PurchaseCount(13))
         data:NotePurchase(13)
         data:NotePurchase(13)
         data:NotePurchase(51)
         assert.same(2, data:PurchaseCount(13))
-        local restored = newData(106)
+        local restored = new_data(106)
         assert.is_true(restored:ApplySave(data:Serialize()))
         assert.same(2, restored:PurchaseCount(13))
         assert.same(1, restored:PurchaseCount(51))
@@ -267,7 +267,7 @@ describe("商店成长与限购", function()
     end)
 
     it("test_unknown_or_bad_upgrade_rejected", function()
-        local data = newData(105)
+        local data = new_data(105)
         local ok, reason = data:CanShopUpgrade({ kind = 'gold', level = 1 })
         assert.is_false(ok)
         assert.same('bad', reason)
@@ -275,29 +275,29 @@ describe("商店成长与限购", function()
     end)
 
     it("test_upgrade_levels_persist_across_save", function()
-        local data = newData(107)
+        local data = new_data(107)
         assert.is_true(data:ApplyShopUpgrade(upgradeRow(51).Upgrade)) -- 近战 1
         assert.is_true(data:ApplyShopUpgrade(upgradeRow(50).Upgrade)) -- 近战 2
         assert.is_true(data:ApplyShopUpgrade(upgradeRow(33).Upgrade)) -- 背包 1
-        local restored = newData(107)
+        local restored = new_data(107)
         assert.is_true(restored:ApplySave(data:Serialize()))
-        assert.same(2, restored:ShopUpgradeLevel('melee'))
-        assert.same(1, restored:ShopUpgradeLevel('backpack'))
-        assert.near(1.2, restored:WeaponDamageScale('melee'), 1e-9)
+        assert.same(2, restored:shop_upgrade_level('melee'))
+        assert.same(1, restored:shop_upgrade_level('backpack'))
+        assert.near(1.2, restored:weapon_damage_scale('melee'), 1e-9)
         assert.same(3, restored:ItemBarCapacity())
     end)
     it("test_upgrade_levels_start_at_zero", function()
-        local data = newData(101)
+        local data = new_data(101)
         for _, kind in ipairs({ 'melee', 'ranged', 'explosive', 'magazine', 'backpack' }) do
-            assert.same(0, data:ShopUpgradeLevel(kind), kind)
+            assert.same(0, data:shop_upgrade_level(kind), kind)
         end
-        assert.same(1, data:WeaponDamageScale('melee'))
-        assert.same(5, data:MagazineSize(5))
+        assert.same(1, data:weapon_damage_scale('melee'))
+        assert.same(5, data:magazine_size(5))
     end)
 
     -- 武器进独立库存（#124），购买不受道具栏/背包满格影响
     it("test_weapon_purchase_not_blocked_by_full_slots", function()
-        local data = newData(108)
+        local data = new_data(108)
         while data:AddItem('carp') do end -- 填满道具栏与背包
         assert.is_true(data:CanGrant('item134', 1), '武器不占格，满格不应拒绝')
         assert.is_true(data:GrantItem('item134', 1))

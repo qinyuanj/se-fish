@@ -67,7 +67,7 @@ local function clearFocus(fish, unit, apiTable)
     if not ok then logFailure('ClearOfficialFocus', fish, unit, nil, err) end
 end
 
-function Mgr:SetFocus(fish, player, ranked)
+function Mgr:set_focus(fish, player, ranked)
     local unit = receiver(fish)
     if not unit then
         logFailure('SetFocus', fish, nil, player, 'official AI receiver unavailable')
@@ -103,9 +103,9 @@ function Mgr:SetFocus(fish, player, ranked)
     return true
 end
 
-function Mgr:Select(fish, candidates)
-    local ranked = self.Policy.Order(candidates)
-    self:SetFocus(fish, ranked[1] and ranked[1].player or nil, ranked)
+function Mgr:select(fish, candidates)
+    local ranked = self.Policy.order(candidates)
+    self:set_focus(fish, ranked[1] and ranked[1].player or nil, ranked)
     return ranked
 end
 

@@ -39,7 +39,7 @@ end
 local function fire_re(channel, payload)
   local ok, err = pcall(function() -- 宿主 RE 通道未就绪或调用异常时记录并安全忽略
     local re_util = rawget(_G, "REUtil") or require("common.re_util")
-    local re = re_util and re_util:GetRE(channel) or nil
+    local re = re_util and re_util:get_re(channel) or nil
     if re ~= nil then
       re:FireServer(payload)
     end
@@ -87,9 +87,9 @@ local function make_label(ctx, scope, name, rect, text)
 end
 
 local function compute_layout(resolution, item_bar)
-  local slot_count = (type(item_bar) == "table" and Number.IsFiniteNumber(item_bar.slotCount))
+  local slot_count = (type(item_bar) == "table" and Number.is_finite_number(item_bar.slotCount))
     and item_bar.slotCount or GameCfg.Items.ItemBarSlots
-  return MainHudLayout.Compute({
+  return MainHudLayout.compute({
     width = resolution.x,
     height = resolution.y,
     itemBarSlots = slot_count,
@@ -302,7 +302,7 @@ function MainHudActionButtonsView.mount(s, ctx, options)
     local special_item = es:d(ctx.store.special_item)
     if type(special_item) == "table"
       and special_item.effect == "godzilla"
-      and Number.IsFiniteNumber(special_item.breathRemaining)
+      and Number.is_finite_number(special_item.breathRemaining)
       and special_item.breathRemaining > 0 then
       breath_until = ctx.clock.now() + special_item.breathRemaining
       breath_active:set(true)

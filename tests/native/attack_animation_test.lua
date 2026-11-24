@@ -57,7 +57,7 @@ describe('攻击动作播放', function()
     local ctx
     before_each(function()
         ctx = Weapon.new()
-        ctx:setUp()
+        ctx:set_up()
         ctx.tracks = {}
         ctx.player.Character.Animator = { LoadAnimation = function(_, id)
             local track = { id = id, plays = 0 }
@@ -67,7 +67,7 @@ describe('攻击动作播放', function()
         end }
     end)
     after_each(function()
-        ctx:tearDown()
+        ctx:tear_down()
     end)
 
     local function played()
@@ -94,7 +94,7 @@ describe('攻击动作播放', function()
     end)
 
     it('近战施法失败不播', function()
-        ctx.ability.CastAbility = function() return false end
+        ctx.ability.cast_ability = function() return false end
         assert.same('cast-failed', ctx:attack(ctx.player).reason)
         assert.same({}, played())
     end)
@@ -133,7 +133,7 @@ describe('攻击动作播放', function()
     end)
 
     it('投掷出手播投掷动作', function()
-        local slot = ctx:giveExplosive(ctx.player, 'item143')
+        local slot = ctx:give_explosive(ctx.player, 'item143')
         assert.is_true(ctx:throw(ctx.player, slot, { x = 0, y = 2, z = 5 }).ok)
         assert.same({ GameCfg.Ability.Throw.Anim }, played())
     end)

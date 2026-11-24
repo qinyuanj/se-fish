@@ -12,8 +12,8 @@ describe('TestAiMigration', function()
 
     before_each(function()
         env = {}
-        env.ai, env.runtime = Loader.loadAi()
-        local e = setmetatable({ Vector3 = { New = env.runtime.Vector }, require = function(name)
+        env.ai, env.runtime = Loader.load_ai()
+        local e = setmetatable({ Vector3 = { New = env.runtime.vector }, require = function(name)
             if name == 'server.packages.official_ai_feature.api' then return env.ai end
             if name == 'server.packages.official_ai_feature.behavior_runtime' then return env.runtime.behavior end
             return require(name)
@@ -23,13 +23,13 @@ describe('TestAiMigration', function()
         env.fish = { Id = 1, Carrier = { Receiver = env.unit, Body = env.runtime.newUnit(5302) } }
     end)
     after_each(function()
-        -- 旧类没有 tearDown：vendor 运行时是用例内新建的独立实例，不写进程全局，无需回滚。
+        -- 旧类没有 tear_down：vendor 运行时是用例内新建的独立实例，不写进程全局，无需回滚。
         env = nil
     end)
 
     it('test_chase_parameter_changes_take_effect_on_same_target', function()
         local target = env.runtime.newUnit(5303)
-        target.Position = env.runtime.Vector(10, 0, 0)
+        target.Position = env.runtime.vector(10, 0, 0)
         env.mgr:Chase(env.fish, target, 3, 1, 30)
         env.runtime.task:pump(0.1)
         env.mgr:Chase(env.fish, target, 3, 15, 30)
@@ -45,31 +45,31 @@ describe('TestAiMigration', function()
     it('test_completed_vendor_chase_resumes_same_target_without_restarting_active_task', function()
         -- 失败方式：同目标到距自然结束后退远，缓存仍报运行；参数变化被忽略。
         local target = env.runtime.newUnit(5303)
-        target.Position = env.runtime.Vector(20, 0, 0)
+        target.Position = env.runtime.vector(20, 0, 0)
         assert.is_true(env.mgr:Chase(env.fish, target, 3, 2.5, 30))
         env.runtime.task:pump(0.1)
         local tasks = #env.runtime.task.tasks
         assert.is_true(env.mgr:Chase(env.fish, target, 3, 2.5, 30))
         assert.are.equal(tasks, #env.runtime.task.tasks)
-        target.Position = env.runtime.Vector(1, 0, 0)
+        target.Position = env.runtime.vector(1, 0, 0)
         env.runtime.task:pump(0.1)
         assert.are.equal(0, env.runtime.vecLen(env.unit.Controller.moves[#env.unit.Controller.moves]))
         assert.is_true(env.mgr:Chase(env.fish, target, 3, 2.5, 30))
-        target.Position = env.runtime.Vector(20, 0, 0)
+        target.Position = env.runtime.vector(20, 0, 0)
         assert.is_true(env.mgr:Chase(env.fish, target, 3, 2.5, 30))
         env.runtime.task:pump(0.2)
         assert.are.equal(1, env.unit.Controller.moves[#env.unit.Controller.moves].x)
     end)
 
     it('test_death_revokes_commands_and_restart_rebuilds', function()
-        local v = env.runtime.Vector
-        env.mgr:MoveDirection(env.fish, v(1, 0, 0), 3)
+        local v = env.runtime.vector
+        env.mgr:move_direction(env.fish, v(1, 0, 0), 3)
         env.runtime.task:pump(0.1)
         env.mgr:Stop()
         env.mgr:Start()
-        assert.is_true(env.mgr:MoveDirection(env.fish, v(0, 0, 1), 3))
+        assert.is_true(env.mgr:move_direction(env.fish, v(0, 0, 1), 3))
         env.runtime.task:pump(0.1)
-        env.mgr:Remove(env.fish)
+        env.mgr:remove(env.fish)
         env.runtime.task:pump(1)
         assert.is_false(env.fish.Carrier.AiOwnsMovement)
         assert.are.equal(0, env.runtime.vecLen(env.unit.Controller.moves[#env.unit.Controller.moves]))
@@ -84,7 +84,7 @@ describe('TestAiMigration', function()
                     Disconnect = function() connected = false end } end,
             } } end } end,
         }
-        env.fish.AbilityRecord = { Ready = true, Receiver = env.unit, Entry = { Index = 2 } }
+        env.fish.AbilityRecord = { Ready = true, Receiver = env.unit, entry = { Index = 2 } }
         env.mgr.AiAPI = { Configs = { CMD_ABILITY = 5 }, Funcs = { StopAI = function() end, StopMove = function() end,
             BasicCommand = function(_, command, slot)
                 assert.are.equal(5, command)
@@ -92,9 +92,9 @@ describe('TestAiMigration', function()
                 calls = calls + 1
                 if calls == 2 then handler() end
             end } }
-        assert.is_false(env.mgr:CastFish(env.fish))
+        assert.is_false(env.mgr:cast_fish(env.fish))
         assert.is_false(connected)
-        assert.is_true(env.mgr:CastFish(env.fish))
+        assert.is_true(env.mgr:cast_fish(env.fish))
         assert.is_false(connected)
         assert.are.equal(2, calls)
     end)
@@ -107,26 +107,26 @@ describe('TestAiMigration', function()
     end)
 
     it('test_invalid_official_position_revokes_ownership_without_poisoning_body', function()
-        local v = env.runtime.Vector
-        env.mgr:MoveDirection(env.fish, v(1, 0, 0), 3)
+        local v = env.runtime.vector
+        env.mgr:move_direction(env.fish, v(1, 0, 0), 3)
         env.unit.Position = v(0 / 0, 0, 0)
         local carrier_host = require('server.world_host.fish_carrier')
-        assert.is_false(carrier_host:SyncAiPosition(env.fish.Carrier))
+        assert.is_false(carrier_host:sync_ai_position(env.fish.Carrier))
         assert.is_false(env.fish.Carrier.AiOwnsMovement)
         assert.are.equal(0, env.fish.Carrier.Body.Position.x)
     end)
 
     it('test_official_move_yields_to_trajectory_and_rebuilds_after_control', function()
-        local v = env.runtime.Vector
-        assert.is_true(env.mgr:MoveDirection(env.fish, v(1, 0, 0), 3))
+        local v = env.runtime.vector
+        assert.is_true(env.mgr:move_direction(env.fish, v(1, 0, 0), 3))
         env.runtime.task:pump(0.1)
         assert.are.equal(1, env.unit.Controller.moves[#env.unit.Controller.moves].x)
         env.mgr:Pause(env.fish, true)
         env.runtime.task:pump(0.1)
         assert.are.equal(0, env.runtime.vecLen(env.unit.Controller.moves[#env.unit.Controller.moves]))
-        assert.is_false(env.mgr:MoveDirection(env.fish, v(0, 0, 1), 3))
+        assert.is_false(env.mgr:move_direction(env.fish, v(0, 0, 1), 3))
         env.mgr:Pause(env.fish, false)
-        assert.is_true(env.mgr:MoveDirection(env.fish, v(0, 0, 1), 3))
+        assert.is_true(env.mgr:move_direction(env.fish, v(0, 0, 1), 3))
         env.runtime.task:pump(0.1)
         assert.are.equal(1, env.unit.Controller.moves[#env.unit.Controller.moves].z)
         env.mgr:Custom(env.fish)
@@ -137,8 +137,8 @@ describe('TestAiMigration', function()
 
     it('test_target_character_replacement_rebuilds_chase_without_old_target', function()
         local a, b = env.runtime.newUnit(5303), env.runtime.newUnit(5304)
-        a.Position = env.runtime.Vector(20, 0, 0)
-        b.Position = env.runtime.Vector(0, 0, 20)
+        a.Position = env.runtime.vector(20, 0, 0)
+        b.Position = env.runtime.vector(0, 0, 20)
         env.mgr:Chase(env.fish, a, 3, 1, 30)
         env.runtime.task:pump(0.1)
         env.mgr:Chase(env.fish, b, 3, 1, 30)
@@ -152,7 +152,7 @@ describe('TestAiMigration', function()
     end)
 
     it('test_trajectory_fish_enters_official_stop_and_returns_receiver_to_body', function()
-        local v = env.runtime.Vector
+        local v = env.runtime.vector
         env.unit.Position = v(90, 10, 90)
         env.fish.Carrier.Body.Position = v(1, 2, 3)
         assert.is_true(env.mgr:Custom(env.fish))
@@ -167,26 +167,26 @@ describe('TestFishAiLifecycle', function()
 
     before_each(function()
         env = FishLift.new()
-        env:setUp()
+        env:set_up()
     end)
     after_each(function()
-        env:tearDown()
+        env:tear_down()
     end)
 
     it('test_every_configured_fish_hands_off_on_release_and_remove', function()
         local calls = {}
         env.mgr.Ai = {
             Custom = function(_, fish) calls[fish] = (calls[fish] or 0) + 1; return true end,
-            Remove = function(_, fish) calls[fish] = (calls[fish] or 0) + 1 end,
-            MoveDirection = function() return true end, Stop = function() end,
+            remove = function(_, fish) calls[fish] = (calls[fish] or 0) + 1 end,
+            move_direction = function() return true end, Stop = function() end,
         }
         for id in pairs(GameCfg.Fish) do
             local fish = env:land(env.player, id)
             fish.Carrier.Body.OnLiftedBegin:Fire(env.player.Character)
-            env.mgr:Drop(env.player)
+            env.mgr:drop(env.player)
             assert.is_not.is_nil(calls[fish], '未交接鱼种：' .. id)
             local before = calls[fish]
-            env.mgr:Remove(fish)
+            env.mgr:remove(fish)
             assert.is_true(calls[fish] > before, '未清理鱼种：' .. id)
         end
     end)
@@ -194,7 +194,7 @@ describe('TestFishAiLifecycle', function()
     it('test_failed_handoff_does_not_start_business_move', function()
         env.mgr.Ai = { Custom = function() return false end, Stop = function() end }
         local fish = env:land(env.player)
-        env.mgr:StartMove(fish, 'peck', { x = 0, y = 0, z = 0 }, nil, nil, 1, 2, 3)
+        env.mgr:start_move(fish, 'peck', { x = 0, y = 0, z = 0 }, nil, nil, 1, 2, 3)
         assert.is_nil(fish.Move)
     end)
 

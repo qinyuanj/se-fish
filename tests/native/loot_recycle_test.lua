@@ -26,8 +26,8 @@ local function open(cap)
   local data_of, players = {}, {}
   local runtime = ServerRuntime.new({
     clock = clock, initial_now = 100,
-    remote = { GetRE = function(_, n) return event(n) end, CheckRECD = function() return false end },
-    player_data = { GetDataInst = function(_, p) return data_of[p.UserId] end },
+    remote = { get_re = function(_, n) return event(n) end, check_recd = function() return false end },
+    player_data = { get_data_inst = function(_, p) return data_of[p.UserId] end },
     players = function() return players end,
     create_unit = function()
       local unit = { Destroyed = false }

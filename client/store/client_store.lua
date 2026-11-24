@@ -172,21 +172,21 @@ local function default_vitals()
 end
 
 local function sanitize_vital_field(raw, fallback)
-  if Number.IsFiniteNumber(raw) then
+  if Number.is_finite_number(raw) then
     return math.floor(raw)
   end
   return fallback
 end
 
 local function normalize_camera_distance(raw)
-  if not Number.IsFiniteNumber(raw) or raw <= 0 then
+  if not Number.is_finite_number(raw) or raw <= 0 then
     return nil
   end
   local base = GameCfg.Ability.BodyScale.CameraDistance
-  if not Number.IsFiniteNumber(base) or base <= 0 then
+  if not Number.is_finite_number(base) or base <= 0 then
     return nil
   end
-  return BodyScale.Derive(BodyScale.Sanitize(raw / base)).CameraDistance
+  return BodyScale.derive(BodyScale.sanitize(raw / base)).CameraDistance
 end
 
 local function sanitize_position(pos)
@@ -202,7 +202,7 @@ local function sanitize_position(pos)
   if not ok then
     return nil, false
   end
-  if not Number.IsFiniteNumber(x) or not Number.IsFiniteNumber(y) or not Number.IsFiniteNumber(z) then
+  if not Number.is_finite_number(x) or not Number.is_finite_number(y) or not Number.is_finite_number(z) then
     return nil, false
   end
   return freeze_snapshot({ x = x, y = y, z = z }, 0, "ClientStore.position"), true
@@ -216,8 +216,8 @@ local function resolve_zone(pos, zones)
     local scene = zones[zone.Id]
     local bounds = scene and scene.Boundary
     if type(bounds) == "table"
-        and Number.IsFiniteNumber(bounds.MinX) and Number.IsFiniteNumber(bounds.MaxX)
-        and Number.IsFiniteNumber(bounds.MinZ) and Number.IsFiniteNumber(bounds.MaxZ) then
+        and Number.is_finite_number(bounds.MinX) and Number.is_finite_number(bounds.MaxX)
+        and Number.is_finite_number(bounds.MinZ) and Number.is_finite_number(bounds.MaxZ) then
       if pos.x >= bounds.MinX and pos.x <= bounds.MaxX
           and pos.z >= bounds.MinZ and pos.z <= bounds.MaxZ then
         return zone.Id, zone.Name
@@ -237,8 +237,8 @@ local function normalize_survival(payload)
   end
   return freeze_snapshot({
     phase = phase,
-    endsAt = Number.IsFiniteNumber(payload.endsAt) and payload.endsAt or nil,
-    weakUntil = Number.IsFiniteNumber(payload.weakUntil) and payload.weakUntil or nil,
+    endsAt = Number.is_finite_number(payload.endsAt) and payload.endsAt or nil,
+    weakUntil = Number.is_finite_number(payload.weakUntil) and payload.weakUntil or nil,
     platformPending = payload.platformPending and true or nil,
   }, 0, "ClientStore.survival")
 end
@@ -256,14 +256,14 @@ local function normalize_party(payload)
   local members = {}
   for i, member in ipairs(payload.members) do
     if type(member) ~= "table"
-        or not Number.IsFiniteNumber(member.userId)
+        or not Number.is_finite_number(member.userId)
         or type(member.name) ~= "string" then
       return nil
     end
-    if member.health ~= nil and not Number.IsFiniteNumber(member.health) then
+    if member.health ~= nil and not Number.is_finite_number(member.health) then
       return nil
     end
-    if member.maxHealth ~= nil and not Number.IsFiniteNumber(member.maxHealth) then
+    if member.maxHealth ~= nil and not Number.is_finite_number(member.maxHealth) then
       return nil
     end
     if member.phase ~= nil and not VALID_SURVIVAL_PHASES[member.phase] then
@@ -278,18 +278,18 @@ local function normalize_party(payload)
       self = member.self == true or nil,
     }
   end
-  if payload.state == "party" and (not Number.IsFiniteNumber(payload.partyId) or #members < 1) then
+  if payload.state == "party" and (not Number.is_finite_number(payload.partyId) or #members < 1) then
     return nil
   end
   local invite = nil
   if payload.invite ~= nil then
     if type(payload.invite) ~= "table"
-        or not Number.IsFiniteNumber(payload.invite.fromUserId)
-        or not Number.IsFiniteNumber(payload.invite.expiresInSec)
+        or not Number.is_finite_number(payload.invite.fromUserId)
+        or not Number.is_finite_number(payload.invite.expiresInSec)
         or payload.invite.expiresInSec < 0 then
       return nil
     end
-    if payload.invite.expiresAt ~= nil and not Number.IsFiniteNumber(payload.invite.expiresAt) then
+    if payload.invite.expiresAt ~= nil and not Number.is_finite_number(payload.invite.expiresAt) then
       return nil
     end
     invite = {
@@ -330,7 +330,7 @@ local function default_host()
   local World = game:GetService("World")
   return {
     get_re = function(name)
-      return REUtil:GetRE(name)
+      return REUtil:get_re(name)
     end,
     heartbeat = RunService.Heartbeat,
     get_server_time = function()
@@ -433,7 +433,7 @@ function ClientStore.new(options)
     for _, key in ipairs({ "unlocked", "weights", "catches" }) do
       if payload[key] ~= nil and type(payload[key]) ~= "table" then return nil end
     end
-    if payload.total ~= nil and not Number.IsFiniteNumber(payload.total) then return nil end
+    if payload.total ~= nil and not Number.is_finite_number(payload.total) then return nil end
     return normalize_table_snapshot(payload)
   end
 
@@ -459,7 +459,7 @@ function ClientStore.new(options)
   end
 
   local function apply_item_bar_snapshot(_, payload)
-    if type(payload) == "table" and Number.IsFiniteNumber(payload.coin) then
+    if type(payload) == "table" and Number.is_finite_number(payload.coin) then
       states.coin:set(math.floor(payload.coin))
     end
   end
@@ -493,7 +493,7 @@ function ClientStore.new(options)
     states.shop:set(freeze_snapshot({
       purchases = purchases, upgradeLevels = upgrade_levels, upgradeLevel = upgrade_level,
     }, 0, "ClientStore.shop"))
-    if Number.IsFiniteNumber(payload.coinAfter) then
+    if Number.is_finite_number(payload.coinAfter) then
       states.coin:set(math.floor(payload.coinAfter))
     end
   end
@@ -569,8 +569,8 @@ function ClientStore.new(options)
   end
 
   function writer:step_clock(dt, now)
-    local safe_dt = (Number.IsFiniteNumber(dt) and dt >= 0) and dt or 0
-    local safe_now = Number.IsFiniteNumber(now) and now or nil
+    local safe_dt = (Number.is_finite_number(dt) and dt >= 0) and dt or 0
+    local safe_now = Number.is_finite_number(now) and now or nil
     clock:step(safe_dt, safe_now)
   end
 
@@ -585,7 +585,7 @@ function ClientStore.new(options)
     local entry = snapshot_handlers[channel]
     if entry ~= nil then
       if entry.ordered_seq and type(payload) == "table"
-        and Number.IsFiniteNumber(payload.seq) and Number.IsFiniteNumber(snapshot_seq[channel])
+        and Number.is_finite_number(payload.seq) and Number.is_finite_number(snapshot_seq[channel])
         and payload.seq <= snapshot_seq[channel] then
         return false
       end
@@ -593,7 +593,7 @@ function ClientStore.new(options)
       if normalized == nil then
         return false
       end
-      if type(payload) == "table" and Number.IsFiniteNumber(payload.seq) then
+      if type(payload) == "table" and Number.is_finite_number(payload.seq) then
         snapshot_seq[channel] = payload.seq
       end
       SpokeRuntime.batch(function()
@@ -634,7 +634,7 @@ function ClientStore.new(options)
   end
 
   function writer:set_coin(value)
-    if not Number.IsFiniteNumber(value) then
+    if not Number.is_finite_number(value) then
       return false
     end
     states.coin:set(math.floor(value))
@@ -654,7 +654,7 @@ function ClientStore.new(options)
     }, 0, "ClientStore.vitals")
     SpokeRuntime.batch(function()
       states.vitals:set(next_vitals)
-      if Number.IsFiniteNumber(input.coin) then
+      if Number.is_finite_number(input.coin) then
         states.coin:set(math.floor(input.coin))
       end
     end)
@@ -818,11 +818,11 @@ function ClientStore.new(options)
       local raw_max_hunger = tonumber(read_player_attr(player, "MaxHunger"))
       local raw_coin = include_coin and tonumber(read_player_attr(player, "FishCoin")) or nil
       self:update_vitals({
-        health = Number.IsFiniteNumber(raw_health) and raw_health or c.MaxHealth,
-        maxHealth = Number.IsFiniteNumber(raw_max_health) and raw_max_health or c.MaxHealth,
-        hunger = Number.IsFiniteNumber(raw_hunger) and raw_hunger or c.MaxHunger,
-        maxHunger = Number.IsFiniteNumber(raw_max_hunger) and raw_max_hunger or c.MaxHunger,
-        coin = Number.IsFiniteNumber(raw_coin) and raw_coin or nil,
+        health = Number.is_finite_number(raw_health) and raw_health or c.MaxHealth,
+        maxHealth = Number.is_finite_number(raw_max_health) and raw_max_health or c.MaxHealth,
+        hunger = Number.is_finite_number(raw_hunger) and raw_hunger or c.MaxHunger,
+        maxHunger = Number.is_finite_number(raw_max_hunger) and raw_max_hunger or c.MaxHunger,
+        coin = Number.is_finite_number(raw_coin) and raw_coin or nil,
       })
     end
 
@@ -843,7 +843,7 @@ function ClientStore.new(options)
               return
             end
             local raw = type(read_player_attr) == "function" and tonumber(read_player_attr(player, "FishCoin")) or nil
-            if Number.IsFiniteNumber(raw) then
+            if Number.is_finite_number(raw) then
               self:set_coin(raw)
             end
           end)

@@ -64,7 +64,7 @@ end
 ---@return table
 function ModifierLeaf.build_add_config(kind, duration, source)
   local cfg = GameCfg.Ability.StatusEffects and GameCfg.Ability.StatusEffects[kind]
-  local max_stacks = (cfg and Number.IsFiniteNumber(cfg.MaxStacks) and cfg.MaxStacks > 0)
+  local max_stacks = (cfg and Number.is_finite_number(cfg.MaxStacks) and cfg.MaxStacks > 0)
       and math.floor(cfg.MaxStacks) or 1
   local stack_count_mode = max_stacks > 1 and 2 or 0
   return {
@@ -114,7 +114,7 @@ function ModifierLeaf.push_modifier(modifier_api, owner, kind, duration, source,
   if not preset then
     return nil, "modifier-preset-missing:" .. tostring(kind)
   end
-  if not Number.IsFiniteNumber(duration) or duration <= 0 then
+  if not Number.is_finite_number(duration) or duration <= 0 then
     return nil, "invalid-duration"
   end
   local add_cfg = ModifierLeaf.build_add_config(kind, duration, source)
@@ -168,7 +168,7 @@ function ModifierLeaf.mount_slot(es, player_tree, kind, _entry, opts)
       return
     end
 
-    local duration = Number.IsFiniteNumber(snap.remaining) and snap.remaining > 0
+    local duration = Number.is_finite_number(snap.remaining) and snap.remaining > 0
         and snap.remaining or snap.duration
     local entity, err = ModifierLeaf.push_modifier(modifier_api, character, kind, duration, snap.source, opts)
     if not entity then
@@ -189,7 +189,7 @@ function ModifierLeaf.mount_slot(es, player_tree, kind, _entry, opts)
         return
       end
       applied_revision = next_snap.revision
-      local next_dur = Number.IsFiniteNumber(next_snap.remaining) and next_snap.remaining > 0
+      local next_dur = Number.is_finite_number(next_snap.remaining) and next_snap.remaining > 0
           and next_snap.remaining or next_snap.duration
       local updated, update_err = ModifierLeaf.push_modifier(
         modifier_api,
@@ -257,7 +257,7 @@ end
 
 local function max_stacks_for(kind)
   local cfg = GameCfg.Ability.StatusEffects and GameCfg.Ability.StatusEffects[kind]
-  if cfg and Number.IsFiniteNumber(cfg.MaxStacks) and cfg.MaxStacks > 0 then
+  if cfg and Number.is_finite_number(cfg.MaxStacks) and cfg.MaxStacks > 0 then
     return math.floor(cfg.MaxStacks)
   end
   return 1
@@ -265,7 +265,7 @@ end
 
 local function dot_cfg_for(kind)
   local cfg = GameCfg.Ability.StatusEffects and GameCfg.Ability.StatusEffects[kind]
-  if cfg and Number.IsFiniteNumber(cfg.TickSec) and cfg.TickSec > 0 and Number.IsFiniteNumber(cfg.DamagePerStack) then
+  if cfg and Number.is_finite_number(cfg.TickSec) and cfg.TickSec > 0 and Number.is_finite_number(cfg.DamagePerStack) then
     return cfg
   end
   return nil
@@ -278,7 +278,7 @@ function ModifierLeaf.create_entity_store(opts)
   local modifier_api = opts.modifier_api or default_modifier_api()
   local get_now = type(opts.now) == "function" and opts.now or function()
     local ok, t = pcall(function() return game:GetService("World"):GetServerTime() end) -- 离线无引擎时兜底 0
-    return ok and Number.IsFiniteNumber(t) and t or 0
+    return ok and Number.is_finite_number(t) and t or 0
   end
 
   local records = {}
@@ -325,7 +325,7 @@ function ModifierLeaf.create_entity_store(opts)
       return false, "no-effect-owner"
     end
     local duration = duration_override ~= nil and duration_override or default_duration_for(kind)
-    if not Number.IsFiniteNumber(duration) or duration <= 0 then
+    if not Number.is_finite_number(duration) or duration <= 0 then
       return false, "invalid-duration"
     end
 

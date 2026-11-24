@@ -15,11 +15,11 @@ describe('鳄雀鳝上钩预警表现（GarBiteWarning -> FishCombatView）', fu
   local function mountView()
     local clock = SpokeClock.new(100)
     local store, writer = ClientStore.new({ clock = clock })
-    local root = Eui.Node({ Name = 'UIRoot' })
+    local root = Eui.node({ Name = 'UIRoot' })
     local created = {}
     local view = RootView.mount(root, store, {
       create_node = function(kind, props)
-        local node = Eui.Node(props or {})
+        local node = Eui.node(props or {})
         node.UnitType = kind
         created[#created + 1] = node
         return node
@@ -59,15 +59,15 @@ describe('鳄雀鳝上钩预警表现（GarBiteWarning -> FishCombatView）', fu
   end)
 
   local function lockNotice(fishId, fx, fz)
-    return GarBiteNotice.Lock(fishId, { x = 1, y = 2, z = 3 }, fx, fz, env.cfg.BiteRange,
+    return GarBiteNotice.lock(fishId, { x = 1, y = 2, z = 3 }, fx, fz, env.cfg.BiteRange,
       env.cfg.HeadHalfAngleDeg, env.cfg.BiteCooldownSec)
   end
 
   it('test_invalid_payload_ignored_and_asset_failure_does_not_block_next_round', function()
-    assert.is_false(GarBiteNotice.Valid(nil))
-    assert.is_false(GarBiteNotice.Valid(GarBiteNotice.Lock(5, { x = 0 / 0, y = 0, z = 0 }, 1, 0, 2.5, 90, 1.5)))
-    assert.is_false(GarBiteNotice.Valid(GarBiteNotice.Lock(5, { x = 0, y = 0, z = 0 }, 1, 0, 0, 90, 1.5)))
-    assert.is_false(GarBiteNotice.Valid(GarBiteNotice.Lock(5, { x = 0, y = 0, z = 0 }, 1, 0, 2.5, 90, -1)))
+    assert.is_false(GarBiteNotice.valid(nil))
+    assert.is_false(GarBiteNotice.valid(GarBiteNotice.lock(5, { x = 0 / 0, y = 0, z = 0 }, 1, 0, 2.5, 90, 1.5)))
+    assert.is_false(GarBiteNotice.valid(GarBiteNotice.lock(5, { x = 0, y = 0, z = 0 }, 1, 0, 0, 90, 1.5)))
+    assert.is_false(GarBiteNotice.valid(GarBiteNotice.lock(5, { x = 0, y = 0, z = 0 }, 1, 0, 2.5, 90, -1)))
 
     assert.is_false(env.writer:ingest_event('FishCombatState', nil))
     assert.is_true(env.writer:ingest_event('FishCombatState', {
@@ -76,7 +76,7 @@ describe('鳄雀鳝上钩预警表现（GarBiteWarning -> FishCombatView）', fu
     assert.same(0, #aliveWarnings())
 
     local valid = lockNotice(5, 1, 0)
-    assert.is_true(GarBiteNotice.Valid(valid))
+    assert.is_true(GarBiteNotice.valid(valid))
     assert.is_true(env.writer:ingest_event('FishCombatState', {
       warnings = { { id = 5, fishId = 5, kind = valid.kind, range = valid.range } },
     }))
@@ -89,9 +89,9 @@ describe('鳄雀鳝上钩预警表现（GarBiteWarning -> FishCombatView）', fu
     assert.same('official://preset/7191', warnCfg.CirclePreset)
     assert.same(10, warnCfg.CircleRadius)
     for _, radius in ipairs({ 5, 10 }) do
-      local payload = GarBiteNotice.Lock(141, { x = 15, y = 2, z = 30 }, 0, 1, radius, 180, 1.5)
+      local payload = GarBiteNotice.lock(141, { x = 15, y = 2, z = 30 }, 0, 1, radius, 180, 1.5)
       payload.move, payload.shape = 'jump', 'circle'
-      assert.is_true(GarBiteNotice.Valid(payload))
+      assert.is_true(GarBiteNotice.valid(payload))
       assert.same(radius == 5 and 0.5 or 1, payload.range / warnCfg.CircleRadius)
 
       assert.is_true(env.writer:ingest_event('FishCombatState', {
@@ -101,7 +101,7 @@ describe('鳄雀鳝上钩预警表现（GarBiteWarning -> FishCombatView）', fu
       assert.is_not_nil(node)
       assert.is_true(node.Visible)
 
-      assert.is_true(GarBiteNotice.Valid(GarBiteNotice.Clear(141, 'cancel')))
+      assert.is_true(GarBiteNotice.valid(GarBiteNotice.Clear(141, 'cancel')))
       assert.is_true(env.writer:ingest_event('FishCombatState', { warnings = {} }))
       assert.is_true(node.Destroyed)
       assert.is_nil(findWarning(141))
@@ -113,7 +113,7 @@ describe('鳄雀鳝上钩预警表现（GarBiteWarning -> FishCombatView）', fu
     assert.is_not.same(env.cfg.Warning.EffectPreset, GameCfg.FishCombat.dragon.RainEffect)
     local payload = lockNotice(8, 0, 1)
     payload.move = 'rain'
-    assert.is_true(GarBiteNotice.Valid(payload))
+    assert.is_true(GarBiteNotice.valid(payload))
 
     assert.is_true(env.writer:ingest_event('FishCombatState', {
       warnings = { { id = 8, fishId = 8, move = 'rain', kind = 'lock' } },

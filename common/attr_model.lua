@@ -10,9 +10,9 @@ end
 local function components(base, extra, ratio)
     return { Base = base, BaseExtra = extra or 0, Ratio = ratio or 0, Bonus = 0 }
 end
-function M.Plan(input)
+function M.plan(input)
     input = input or {}
-    local body = BodyScale.Plan(input.bodyPotions)
+    local body = BodyScale.plan(input.bodyPotions)
     local speedCfg = GameCfg.Ability.SpeedPotion
     local growth = math.min(speedCfg.MaxFactor, 1 + speedCfg.StepPercent / 100 * count(input.speedPotions, speedCfg.MaxPotions))
     local base = finite(input.baseSpeed) and input.baseSpeed > 0 and input.baseSpeed or GameCfg.Ability.MoveSpeed.Base
@@ -25,10 +25,10 @@ function M.Plan(input)
         PlayerHunger = components(hunger),
     } }
 end
-function M.WeaponComponents(kind, level)
+function M.weapon_components(kind, level)
     local spec = GameCfg.Shop.UpgradeKinds[kind]
     local maximum = spec and spec.MaxLevel or 0
-    local scale = GameCfg.Shop.DamageScale(kind, count(level, maximum)) or 1
+    local scale = GameCfg.Shop.damage_scale(kind, count(level, maximum)) or 1
     return components(1, 0, scale - 1)
 end
 return M

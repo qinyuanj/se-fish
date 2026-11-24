@@ -1,6 +1,6 @@
 -- 仓库根执行 lua tools/validate_content.lua；单行输出数量并逐行列出来源与错误。
 local cfg = require('common.game_cfg')
-local result = require('common.content_validation').Check(cfg)
+local result = require('common.content_validation').check(cfg)
 local counts = result.counts
 print(('内容基线：钓鱼区 %d、鱼种 %d、物品 %d、商店 %d、抽奖图案 %d（权重 %d）、盲盒 %d（权重 %d）')
     :format(counts.zones, counts.fish, counts.items, counts.shop,

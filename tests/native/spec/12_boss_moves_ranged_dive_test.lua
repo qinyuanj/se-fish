@@ -1,7 +1,7 @@
 -- 条款 12-13 / 12-14 / 12-21 / 12-24 / 12-26 / 12-28 / 12-30 / 12-31 / 12-32 / 12-33 / 12-34
 -- 远程与俯冲组逐招表（spec #249 / ticket #258）。
 --
--- 接缝（与 lead 约定）：MgrFishUnit:SpawnLanded + Drop 放下鱼，逐帧 Update 推进服务端权威时钟；
+-- 接缝（与 lead 约定）：MgrFishUnit:spawn_landed + drop 放下鱼，逐帧 update 推进服务端权威时钟；
 -- 只观察玩家可观察的三个面：玩家血量（MgrVitals 结算）、GarBiteNotice 广播载荷（客户端只画预警）、
 -- 逐招表公开行（common/cfg/boss_moves.lua）。测试进程不加载任何客户端命中代码：
 -- 伤害仍然落地，证明远程投射物命中判定不依赖客户端。
@@ -61,17 +61,17 @@ describe('第 12 节 远程与俯冲组逐招表', function()
 
     after_each(function()
         for index = #restore, 1, -1 do restore[index]() end
-        if env then env:tearDown() end
+        if env then env:tear_down() end
         package.loaded['server.ability_api'] = savedAbility
         env = nil
     end)
 
     -- 放下一条鱼；同一用例换鱼时先拆掉的上一份世界，避免多个服务端时钟同时推进。
     local function drop(id, zone)
-        if env then env:tearDown() end
+        if env then env:tear_down() end
         env = Islet.new(zone)
         env.player.Character.Controller.Health = 100000
-        local p = Islet.shoreDryPoint(zone)
+        local p = Islet.shore_dry_point(zone)
         env.player.Character.Position = env.vec(p.x, p.y, p.z)
         local controller = env.player.Character.Controller
         local take = controller.TakeDamage
@@ -105,7 +105,7 @@ describe('第 12 节 远程与俯冲组逐招表', function()
 
     -- 把逐招表的一格改成哨兵值：服务端若真以表为准，落地伤害必须跟着变。
     local function sentinel(key, move, value)
-        local row = BossMoves.Get(key, move)
+        local row = BossMoves.get(key, move)
         need(row ~= nil, '逐招表漏了 %s.%s', key, move)
         local old = row.Damage.Value
         row.Damage.Value = value
@@ -121,11 +121,11 @@ describe('第 12 节 远程与俯冲组逐招表', function()
         local landings = { self = true, target = true, random = true }
         for _, group in ipairs(GROUP) do
             local names = {}
-            for _, row in ipairs(BossMoves.ForFish(group.key)) do names[#names + 1] = row.Move end
+            for _, row in ipairs(BossMoves.for_fish(group.key)) do names[#names + 1] = row.Move end
             table.sort(names)
             assert.same(ALL_MOVES[group.key], names, group.key .. ' 的招式集合与 §12 不符')
             for _, entry in ipairs(group.moves) do
-                local row = BossMoves.Get(group.key, entry.name)
+                local row = BossMoves.get(group.key, entry.name)
                 need(row ~= nil, '逐招表漏了 %s.%s', group.key, entry.name)
                 need(row.Clause == entry.clause, '%s.%s 的条款 ID 应为 %s', group.key, entry.name, entry.clause)
                 need(deliveries[row.Delivery], '%s.%s 的投送方式不可辨', group.key, entry.name)
@@ -137,10 +137,10 @@ describe('第 12 节 远程与俯冲组逐招表', function()
             end
         end
         -- 表 → 服务端参数的映射必须是公开入口；改表数值必须能改到服务端结算用的字段。
-        need(type(BossMoves.CombatParams) == 'function', '逐招表缺少 CombatParams 映射入口')
-        local params = BossMoves.CombatParams({}, 'dragon')
-        assert.is_true(near(params.RainRadius, BossMoves.Get('dragon', 'rain').Range))
-        assert.is_true(near(params.RainDamage, BossMoves.Get('dragon', 'rain').Damage.Value))
+        need(type(BossMoves.combat_params) == 'function', '逐招表缺少 CombatParams 映射入口')
+        local params = BossMoves.combat_params({}, 'dragon')
+        assert.is_true(near(params.RainRadius, BossMoves.get('dragon', 'rain').Range))
+        assert.is_true(near(params.RainDamage, BossMoves.get('dragon', 'rain').Damage.Value))
     end)
 
     it('条款 12-13 / 12-14：小白龙雨云与俯冲分别按表结算，预警锁定落点后才命中', function()
@@ -148,16 +148,16 @@ describe('第 12 节 远程与俯冲组逐招表', function()
         sentinel('dragon', 'dive', 47)
         local fish = drop('fish16Boss', 2)
         local rainLock = untilLock('rain', 31)
-        local rainRow = BossMoves.Get('dragon', 'rain')
+        local rainRow = BossMoves.get('dragon', 'rain')
         assert.same('circle', rainLock.shape)
         assert.same(rainRow.Range, rainLock.range)
-        assert.is_true(GarBiteNotice.Valid(rainLock))
+        assert.is_true(GarBiteNotice.valid(rainLock))
         assert.is_false(hasHit(73), '雨云预警未发就先结算了伤害')
         env:advance(env.now + 1.2)
         assert.is_true(hasHit(73), '雨云伤害没有按表内数值结算')
 
         local diveLock = untilLock('dive', 38)
-        local diveRow = BossMoves.Get('dragon', 'dive')
+        local diveRow = BossMoves.get('dragon', 'dive')
         assert.same(diveRow.Range, diveLock.range, '俯冲预警范围与表不符')
         local dest = fish.Move and fish.Move.Destination
         need(dest ~= nil, '俯冲没有锁定落点')
@@ -175,7 +175,7 @@ describe('第 12 节 远程与俯冲组逐招表', function()
             sentinel(key, 'jump', mark)
             local fish = drop(id, zone)
             local notice = untilLock('jump', 55)
-            local row = BossMoves.Get(key, 'jump')
+            local row = BossMoves.get(key, 'jump')
             assert.same('circle', notice.shape)
             assert.same(row.Range, notice.range)
             assert.is_false(hasHit(mark), '高跃预警未发就先结算了落地伤害')
@@ -193,7 +193,7 @@ describe('第 12 节 远程与俯冲组逐招表', function()
         sentinel('walrus', 'charge', 121)
         local fish = drop('fish39Elite', 5)
         local notice = untilLock('charge', 41)
-        local row = BossMoves.Get('walrus', 'charge')
+        local row = BossMoves.get('walrus', 'charge')
         assert.same(row.Warning.Kind, notice.shape, '直线突击的预警形状与表不符')
         assert.same(row.Schedule.Distance, notice.range, '走廊长度与表不符')
         assert.is_false(hasHit(121), '突击起手帧不得结算')
@@ -209,14 +209,14 @@ describe('第 12 节 远程与俯冲组逐招表', function()
         sentinel('orca', 'jump', 241)
         drop('fish40Boss', 5)
         local roar = untilLock('roar', 11)
-        local roarRow = BossMoves.Get('orca', 'roar')
+        local roarRow = BossMoves.get('orca', 'roar')
         assert.same(roarRow.Range, roar.range)
         assert.is_false(hasHit(31), '虎啸预警未发就先结算')
         env:advance(env.now + 1.2)
         assert.is_true(hasHit(31), '虎啸没有按表内数值结算')
 
         local jump = untilLock('jump', 27)
-        local jumpRow = BossMoves.Get('orca', 'jump')
+        local jumpRow = BossMoves.get('orca', 'jump')
         assert.same(jumpRow.Range, jump.range)
         assert.is_false(hasHit(241), '鲸跃预警未发就先结算')
         env.player.Character.Position = env.vec(jump.position.x, jump.position.y, jump.position.z)
@@ -227,15 +227,15 @@ describe('第 12 节 远程与俯冲组逐招表', function()
     it('条款 12-31 / 12-32 / 12-33 / 12-34：白头鹰俯冲与风神翼龙投掷 / 追踪俯冲的独立伤害不丢映射', function()
         -- 12-31 / 12-32：这两只鱼声明了 Combat 标签，但逐招表按鱼种 Id 登记；
         -- 反查必须落回表里的行，否则预警形状与范围会静默退回默认值。
-        assert.same('fish47Elite', BossMoves.KeyOf({ Combat = 'eagle' }, 'fish47Elite'))
-        assert.same('fish48Boss', BossMoves.KeyOf({ Combat = 'pterosaur' }, 'fish48Boss'))
-        assert.same('eel', BossMoves.KeyOf({ Combat = 'eel' }, 'fish22Elite'))
-        assert.same(100, BossMoves.Get('fish48Boss', 'throw').Damage.Value, '12-32 的正文投掷伤害丢失')
-        assert.same(260, BossMoves.Get('fish48Boss', 'dive').Damage.Value, '12-34 的正文俯冲伤害不得静默丢弃')
+        assert.same('fish47Elite', BossMoves.key_of({ Combat = 'eagle' }, 'fish47Elite'))
+        assert.same('fish48Boss', BossMoves.key_of({ Combat = 'pterosaur' }, 'fish48Boss'))
+        assert.same('eel', BossMoves.key_of({ Combat = 'eel' }, 'fish22Elite'))
+        assert.same(100, BossMoves.get('fish48Boss', 'throw').Damage.Value, '12-32 的正文投掷伤害丢失')
+        assert.same(260, BossMoves.get('fish48Boss', 'dive').Damage.Value, '12-34 的正文俯冲伤害不得静默丢弃')
         sentinel('fish47Elite', 'dive', 31)
         drop('fish47Elite', 6)
         local notice = untilLock('airDive', 21)
-        local row = BossMoves.Get('fish47Elite', 'dive')
+        local row = BossMoves.get('fish47Elite', 'dive')
         assert.same(row.Range, notice.range)
         assert.is_false(hasHit(31), '白头鹰俯冲预警未发就先结算')
         env:advance(env.now + 2)
@@ -247,14 +247,14 @@ describe('第 12 节 远程与俯冲组逐招表', function()
         sentinel('fish48Boss', 'dive', 261)
         drop('fish48Boss', 6)
         local thrown = untilLock('airThrow', 5)
-        local throwRow = BossMoves.Get('fish48Boss', 'throw')
+        local throwRow = BossMoves.get('fish48Boss', 'throw')
         assert.same(throwRow.Range, thrown.range)
         assert.is_false(hasHit(101), '投掷预警未发就先结算')
         env:advance(env.now + 1.3)
         assert.is_true(hasHit(101), '投掷伤害没有按表内数值结算')
 
         local dove = untilLock('airDive', 21)
-        local diveRow = BossMoves.Get('fish48Boss', 'dive')
+        local diveRow = BossMoves.get('fish48Boss', 'dive')
         assert.same(diveRow.Range, dove.range)
         assert.is_false(hasHit(261), '俯冲预警未发就先结算')
         env.player.Character.Position = env.vec(dove.position.x, dove.position.y, dove.position.z)

@@ -13,7 +13,7 @@ local Eligibility = require("common.lottery_eligibility")
 local RandomGuard = require("tests.support.random_guard")
 
 local function check(entry)
-  return { Eligibility.Check(entry) }
+  return { Eligibility.check(entry) }
 end
 
 describe("抽奖投入资格（common.lottery_eligibility × PlayerData）", function()

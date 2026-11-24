@@ -70,8 +70,8 @@ local function make_data(player, overrides)
       inventory = { selection = { held = overrides.held or {} } },
       survival = { health = GameCfg.Vitals.MaxHealth, hunger = GameCfg.Vitals.MaxHunger },
     },
-    MagazineSize = function(self, base)
-      return GameCfg.Shop.MagazineSize(base, self.Extra.growth.upgrades.magazine or 0)
+    magazine_size = function(self, base)
+      return GameCfg.Shop.magazine_size(base, self.Extra.growth.upgrades.magazine or 0)
     end,
   }
 end
@@ -105,7 +105,7 @@ describe("武器攻击换弹与 PK 过滤宿主接缝（#300）", function()
   local function boot(overrides, other_overrides)
     events = {}
     local re = {
-      GetRE = function(_, name)
+      get_re = function(_, name)
         events[name] = events[name] or {
           clients = {},
           OnServerEvent = signal(),
@@ -118,11 +118,11 @@ describe("武器攻击换弹与 PK 过滤宿主接缝（#300）", function()
         }
         return events[name]
       end,
-      CheckRECD = function() return false end,
+      check_recd = function() return false end,
     }
-    re:GetRE("WeaponAction")
-    re:GetRE("WeaponResult")
-    re:GetRE("PartyAction")
+    re:get_re("WeaponAction")
+    re:get_re("WeaponResult")
+    re:get_re("PartyAction")
     player = make_player(1, overrides and overrides.px or 0, overrides and overrides.pz or 0)
     other = make_player(2, other_overrides and other_overrides.px or 4, other_overrides and other_overrides.pz or 0)
     data = make_data(player, overrides)
@@ -132,7 +132,7 @@ describe("武器攻击换弹与 PK 过滤宿主接缝（#300）", function()
       initial_now = 1000,
       remote = re,
       player_data = {
-        GetDataInst = function(_, target)
+        get_data_inst = function(_, target)
           if target == player then return data end
           if target == other then return other_data end
         end,
@@ -153,7 +153,7 @@ describe("武器攻击换弹与 PK 过滤宿主接缝（#300）", function()
         end,
       },
       ability = {
-        CastAbility = function(unit, index)
+        cast_ability = function(unit, index)
           casts[#casts + 1] = { unit = unit, index = index }
           return true
         end,
@@ -190,8 +190,8 @@ describe("武器攻击换弹与 PK 过滤宿主接缝（#300）", function()
   after_each(function()
     if runtime then runtime:shutdown() end
     runtime = nil
-    SwingRegistry.ClearSwing(1)
-    SwingRegistry.ClearSwing(2)
+    SwingRegistry.clear_swing(1)
+    SwingRegistry.clear_swing(2)
   end)
 
   it("存活未麻痹时可近战，冷却与切武器各自计时，麻痹与离场拒绝并清登记", function()
@@ -199,7 +199,7 @@ describe("武器攻击换弹与 PK 过滤宿主接缝（#300）", function()
     local first = attack()
     assert.is_true(first and first.ok)
     assert.same(GameCfg.Ability.MeleeWeapons.item136.Damage, first.damage)
-    assert.is_not_nil(SwingRegistry.PeekSwing(player.UserId))
+    assert.is_not_nil(SwingRegistry.peek_swing(player.UserId))
     assert.same(1, #casts)
 
     assert.same("cooldown", attack().reason)
@@ -209,17 +209,17 @@ describe("武器攻击换弹与 PK 过滤宿主接缝（#300）", function()
     runtime.clock:advance(0.5)
     assert.is_true(attack().ok)
     assert.same(2, #casts)
-    assert.same(GameCfg.Ability.MeleeWeapons.item135.Damage, SwingRegistry.PeekSwing(player.UserId).damage)
+    assert.same(GameCfg.Ability.MeleeWeapons.item135.Damage, SwingRegistry.peek_swing(player.UserId).damage)
 
     runtime:get_player_tree(player.UserId):apply_modifier("paralyze", { duration = 0.5 })
     runtime.clock:step(0)
     assert.same("cannot-act", attack().reason)
-    assert.is_nil(SwingRegistry.PeekSwing(player.UserId))
+    assert.is_nil(SwingRegistry.peek_swing(player.UserId))
 
     runtime.clock:advance(1)
     assert.is_true(attack().ok)
     runtime:on_player_removing(player)
-    assert.is_nil(SwingRegistry.PeekSwing(player.UserId))
+    assert.is_nil(SwingRegistry.peek_swing(player.UserId))
   end)
 
   it("枪械按弹匣扣弹，空匣自动换弹两秒，切武器不能绕过未完成换弹", function()
@@ -294,22 +294,22 @@ describe("武器攻击换弹与 PK 过滤宿主接缝（#300）", function()
   it("鱼塘内非同队免伤，鱼塘外与离队后扣血，鱼攻击不被安全区挡住", function()
     boot({ px = 6.26, pz = -0.71 }, { px = 5, pz = -9 })
     local life = runtime.life
-    assert.is_false(life:ApplyHit(life:NewHit(player, "gun"), other, 45))
+    assert.is_false(life:apply_hit(life:new_hit(player, "gun"), other, 45))
     assert.same(GameCfg.Vitals.MaxHealth, other.Character.Controller.Health)
 
     player.Character.Position = { x = 241, y = 6, z = 0 }
     other.Character.Position = { x = 242, y = 6, z = 0 }
-    assert.is_true(life:ApplyHit(life:NewHit(player, "gun"), other, 20))
+    assert.is_true(life:apply_hit(life:new_hit(player, "gun"), other, 20))
     assert.same(GameCfg.Vitals.MaxHealth - 20, other.Character.Controller.Health)
 
     make_squad()
-    assert.is_false(life:ApplyHit(life:NewHit(player, "melee"), other, 20))
+    assert.is_false(life:apply_hit(life:new_hit(player, "melee"), other, 20))
     squad_action(player, { action = "Leave" })
-    assert.is_true(life:ApplyHit(life:NewHit(player, "melee"), other, 20))
+    assert.is_true(life:apply_hit(life:new_hit(player, "melee"), other, 20))
 
     local fish = { Id = 91 }
     local before = other.Character.Controller.Health
-    assert.is_true(life:ApplyHit(life:NewHit(fish, "fishAttack"), other, 10))
+    assert.is_true(life:apply_hit(life:new_hit(fish, "fishAttack"), other, 10))
     assert.same(before - 10, other.Character.Controller.Health)
   end)
 

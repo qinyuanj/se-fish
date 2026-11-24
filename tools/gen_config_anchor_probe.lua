@@ -28,11 +28,11 @@ function M.collect(GameCfg)
         entries[#entries + 1] = { source = source, zone = zoneLabel or '-',
             name = tostring(name), state = state or '-' }
     end
-    -- 1. 区域标记命名合同（ADR-0013，common/zone_markers.Contract；水域按 Z<i>_Water 前缀枚举，不在清单内）
-    for _, entry in ipairs(require('common.zone_markers').Contract(GameCfg)) do
+    -- 1. 区域标记命名合同（ADR-0013，common/zone_markers.contract；水域按 Z<i>_Water 前缀枚举，不在清单内）
+    for _, entry in ipairs(require('common.zone_markers').contract(GameCfg)) do
         add('Marker.' .. entry.Role, labels[entry.ZoneIndex], entry.Name, 'contract')
     end
-    -- 2. 钓鱼佬锚点（MgrInteract.FindAnchor 的名字来源）
+    -- 2. 钓鱼佬锚点（MgrInteract.find_anchor 的名字来源）
     for index, fisherman in ipairs(GameCfg.Interact.Fishermen or {}) do
         for _, name in ipairs(fisherman.AnchorNames or {}) do
             add('Interact.Fishermen', labels[index], name, '-')
@@ -42,7 +42,7 @@ function M.collect(GameCfg)
     for index, stand in ipairs((GameCfg.Shop or {}).Stands or {}) do
         add('Shop.Stands', labels[index], stand.AnchorName, '-')
     end
-    -- 4. 烧烤锚点（MgrGrill.FindAnchor）
+    -- 4. 烧烤锚点（MgrGrill.find_anchor）
     for _, point in ipairs((GameCfg.Grill or {}).Points or {}) do
         add('Grill.Points', labelByZoneId[point.ZoneId], point.AnchorName, '-')
     end
@@ -63,7 +63,7 @@ function M.collect(GameCfg)
 end
 
 -- 渲染数据块（含两条标记之间的全部文本，便于 --check 与测试逐字节比对）
-function M.renderBlock(entries, labels)
+function M.render_block(entries, labels)
     local out = { M.BEGIN_MARK .. '（由 tools/gen_config_anchor_probe.lua 生成）' }
     local zoneParts = {}
     for _, label in ipairs(labels) do zoneParts[#zoneParts + 1] = "'" .. label .. "'" end
@@ -79,7 +79,7 @@ function M.renderBlock(entries, labels)
 end
 
 -- 从探针文件里抠出数据块（含标记行）
-function M.extractBlock(source)
+function M.extract_block(source)
     local beginAt = source:find(M.BEGIN_MARK, 1, true)
     if not beginAt then return nil end
     local endAt = source:find(M.END_MARK, 1, true)
@@ -87,7 +87,7 @@ function M.extractBlock(source)
     return source:sub(beginAt, endAt + #M.END_MARK - 1)
 end
 
-function M.readProbe()
+function M.read_probe()
     local file = io.open(M.PROBE, 'rb')
     if not file then return nil end
     local text = file:read('*a')
@@ -99,13 +99,13 @@ local function main(argv)
     local check = argv and argv[1] == '--check'
     local GameCfg = require('common.game_cfg')
     local entries, labels = M.collect(GameCfg)
-    local want = M.renderBlock(entries, labels)
-    local text = M.readProbe()
+    local want = M.render_block(entries, labels)
+    local text = M.read_probe()
     if not text then
         print('探针文件读不到：' .. M.PROBE)
         os.exit(1)
     end
-    local got = M.extractBlock(text)
+    local got = M.extract_block(text)
     if check then
         if got == want then
             print(('配置锚点数据块已同步：%d 条锚点、%d 个区'):format(#entries, #labels))

@@ -24,7 +24,7 @@ end
 local function resolve_fisherman(player)
   local shared = GameCfg.Interact.Fisherman
   for _, npc in ipairs(GameCfg.Interact.Fishermen) do
-    local anchor = InteractionPoints:InRange(player, {
+    local anchor = InteractionPoints:in_range(player, {
       AnchorNames = npc.AnchorNames,
       Radius = shared.Radius,
       Slack = shared.Slack,
@@ -37,8 +37,8 @@ end
 local function saleable(data, point)
   local slot, entry = selected_entry(data)
   if entry then
-    local rate = GameCfg.Items.CookRate(entry)
-    local price = GameCfg.Items.SalePrice(entry.itemId, entry.mult, rate)
+    local rate = GameCfg.Items.cook_rate(entry)
+    local price = GameCfg.Items.sale_price(entry.itemId, entry.mult, rate)
     if price then
       return price, function(d) d.Containers[ITEM_BAR][slot] = nil end,
           entry.itemId, GameCfg.Fish[entry.itemId] and "fish" or "item"
@@ -59,7 +59,7 @@ end
 
 local function exchangeable(data, point)
   local slot, entry = selected_entry(data)
-  local product = entry and GameCfg.Items.CookRate(entry) == nil
+  local product = entry and GameCfg.Items.cook_rate(entry) == nil
       and point.Exchange and point.Exchange[entry.itemId]
   if not product then return nil end
   return { slot = slot, tokenId = entry.itemId, product = product }
@@ -98,8 +98,8 @@ function PlayerFisherman.mount(scope, tree, opts)
   local last_seq = 0
 
   local function reply(payload)
-    if remote and type(remote.GetRE) == "function" then
-      remote:GetRE("InteractResult"):FireClient(player, payload)
+    if remote and type(remote.get_re) == "function" then
+      remote:get_re("InteractResult"):FireClient(player, payload)
     end
     return payload
   end
@@ -116,10 +116,10 @@ function PlayerFisherman.mount(scope, tree, opts)
     local request_id = payload.operation
     if request_id ~= nil and type(request_id) ~= "table" then return nil, false end
     if request_id == nil then request_id = payload.seq end
-    local operation, mode = save:ResolveRequest(player, data, "interact:fisherman", request_id)
+    local operation, mode = save:resolve_request(player, data, "interact:fisherman", request_id)
     if not operation then return nil, false end
     if mode ~= "replay" then return operation end
-    local accepted = save:Execute(player, data, operation, function() return nil, "expired" end,
+    local accepted = save:execute(player, data, operation, function() return nil, "expired" end,
       function(ok, result)
         if ok then result.operation = operation reply(result) end
       end)
@@ -129,12 +129,12 @@ function PlayerFisherman.mount(scope, tree, opts)
   local function exchange(operation, point, anchor, request)
     local product = product_of(request.product)
     if not product then return false end
-    if save:IsPaused(player.UserId) then
+    if save:is_paused(player.UserId) then
       reply({ ok = false, reason = "临时本局暂停信物兑换，请先保存到存档" })
       return false
     end
     local result_value = nil
-    local accepted = save:Execute(player, data, operation, function(draft)
+    local accepted = save:execute(player, data, operation, function(draft)
       local entry = draft.Data.Containers[ITEM_BAR][request.slot]
       if not entry or entry.itemId ~= request.tokenId then return nil, "nothing" end
       local before_token = item_count(draft, request.tokenId)
@@ -165,14 +165,14 @@ function PlayerFisherman.mount(scope, tree, opts)
   local function feed(operation, point, anchor)
     local selected_slot, selected_bait = data.Data.SelectedSlot, data.Data.SelectedBait
     local result_value = nil
-    local accepted = save:Execute(player, data, operation, function(draft)
+    local accepted = save:execute(player, data, operation, function(draft)
       draft.Data.SelectedSlot, draft.Data.SelectedBait = selected_slot, selected_bait
       local earned, consume, item_id, category = saleable(draft, point)
       if not earned then return nil, "nothing" end
       local before_coin, before_item = draft.Data.FishCoin, item_count(draft, item_id)
       if not draft:AddCoin(earned, consume, "feed") then return nil, "nothing" end
-      if opts.quest and opts.quest.RecordFact then
-        opts.quest:RecordFact(draft, "Feed", {
+      if opts.quest and opts.quest.record_fact then
+        opts.quest:record_fact(draft, "Feed", {
           itemId = item_id, category = category, eventId = operation.id,
         })
       end
@@ -189,10 +189,10 @@ function PlayerFisherman.mount(scope, tree, opts)
       SpokeRuntime.batch(function() tree:sync_from_data(data) end)
       reply(result)
       play_eat(anchor, point)
-      if opts.quest and opts.quest.RecordFact then
-        if opts.quest.RefreshCommitted then opts.quest:RefreshCommitted(player, data) end
-      elseif opts.quest and opts.quest.Notify then
-        opts.quest:Notify("Feed", player, {
+      if opts.quest and opts.quest.record_fact then
+        if opts.quest.refresh_committed then opts.quest:refresh_committed(player, data) end
+      elseif opts.quest and opts.quest.notify then
+        opts.quest:notify("Feed", player, {
           itemId = result.itemId, category = result.category, eventId = operation.id,
         })
       end

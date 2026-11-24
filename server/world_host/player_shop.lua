@@ -17,7 +17,7 @@ local function find_goods(item_id, level)
 end
 
 local function find_goods_by_number(number, level)
-  if not Number.IsFiniteNumber(number) or number ~= math.floor(number) or number < 1 then return nil end
+  if not Number.is_finite_number(number) or number ~= math.floor(number) or number < 1 then return nil end
   for _, goods in ipairs(GameCfg.Shop.Goods) do
     if goods.Number == number and goods.MinShopLevel <= level then return goods end
   end
@@ -26,7 +26,7 @@ end
 
 local function stand_for(player)
   for _, stand in ipairs(GameCfg.Shop.Stands) do
-    if InteractionPoints:InRange(player, {
+    if InteractionPoints:in_range(player, {
       AnchorName = stand.AnchorName,
       Radius = GameCfg.Shop.Radius,
       Slack = GameCfg.Shop.Slack,
@@ -39,7 +39,7 @@ end
 
 local function backpack_row(data, stand_level)
   local spec = GameCfg.Shop.UpgradeKinds.backpack
-  local next_level = data:ShopUpgradeLevel("backpack") + 1
+  local next_level = data:shop_upgrade_level("backpack") + 1
   if not spec or next_level > spec.MaxLevel then return nil, "max" end
   local row
   for _, goods in ipairs(GameCfg.Shop.Goods) do
@@ -97,8 +97,8 @@ function PlayerShop.mount(scope, tree, opts)
   local last_seq = 0
 
   local function reply(payload)
-    if remote and type(remote.GetRE) == "function" then
-      remote:GetRE("ShopResult"):FireClient(player, payload)
+    if remote and type(remote.get_re) == "function" then
+      remote:get_re("ShopResult"):FireClient(player, payload)
     end
     return payload
   end
@@ -112,10 +112,10 @@ function PlayerShop.mount(scope, tree, opts)
     local request_id = payload.operation
     if request_id ~= nil and type(request_id) ~= "table" then return nil, false end
     if request_id == nil then request_id = payload.seq end
-    local operation, mode = save:ResolveRequest(player, data, "shop", request_id)
+    local operation, mode = save:resolve_request(player, data, "shop", request_id)
     if not operation then return nil, false end
     if mode ~= "replay" then return operation end
-    local accepted = save:Execute(player, data, operation, function() return nil, "expired" end,
+    local accepted = save:execute(player, data, operation, function() return nil, "expired" end,
       function(ok, result)
         if ok then result.operation = operation reply(result) end
       end)
@@ -128,7 +128,7 @@ function PlayerShop.mount(scope, tree, opts)
     local row, reason = backpack_row(data, stand.Level)
     if not row then return fail(nil, reason) end
     local result_value = nil
-    local accepted = save:Execute(player, data, operation, function(draft)
+    local accepted = save:execute(player, data, operation, function(draft)
       local draft_row, failure = backpack_row(draft, stand.Level)
       if not draft_row then return nil, failure end
       local before_coin, before_level = draft.Data.FishCoin, draft.Data.UpgradeLevel
@@ -185,11 +185,11 @@ function PlayerShop.mount(scope, tree, opts)
       return fail(payload.itemId, "limit", payload.number)
     end
     local result_value = nil
-    local accepted = save:Execute(player, data, operation, function(draft)
+    local accepted = save:execute(player, data, operation, function(draft)
       local result, failure = settle_purchase(draft, goods)
       if not result then return nil, failure end
-      if opts.quest and opts.quest.RecordFact then
-        opts.quest:RecordFact(draft, "Buy", { itemId = result.itemId, eventId = operation.id })
+      if opts.quest and opts.quest.record_fact then
+        opts.quest:record_fact(draft, "Buy", { itemId = result.itemId, eventId = operation.id })
       end
       return result
     end, function(written, result)
@@ -201,10 +201,10 @@ function PlayerShop.mount(scope, tree, opts)
         tree:sync_from_data(data)
       end)
       reply(result)
-      if opts.quest and opts.quest.RecordFact then
-        if opts.quest.RefreshCommitted then opts.quest:RefreshCommitted(player, data) end
-      elseif opts.quest and opts.quest.Notify then
-        opts.quest:Notify("Buy", player, {
+      if opts.quest and opts.quest.record_fact then
+        if opts.quest.refresh_committed then opts.quest:refresh_committed(player, data) end
+      elseif opts.quest and opts.quest.notify then
+        opts.quest:notify("Buy", player, {
           itemId = result.itemId, number = result.number, eventId = operation.id,
         })
       end

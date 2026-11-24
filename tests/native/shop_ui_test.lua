@@ -11,7 +11,7 @@ describe("钓场商店统一视图行为", function()
   local old_vector
 
   local function rows_for(page)
-    return GameCfg.Shop.ListForPage(ctx.stand.Level, page, true)
+    return GameCfg.Shop.list_for_page(ctx.stand.Level, page, true)
   end
 
   local function row_index(number, page)
@@ -21,11 +21,11 @@ describe("钓场商店统一视图行为", function()
   end
 
   local function select_number(number, page)
-    if page then Eui.Click(child(ctx.root, "BtnShopPage" .. assert((function()
+    if page then Eui.click(child(ctx.root, "BtnShopPage" .. assert((function()
       for index, name in ipairs(GameCfg.Shop.Pages) do if name == page then return index end end
     end)()))) end
     local index = assert(row_index(number, page))
-    return Eui.Click(child(ctx.root, "ShopRow" .. index)), index
+    return Eui.click(child(ctx.root, "ShopRow" .. index)), index
   end
 
   before_each(function()
@@ -33,7 +33,7 @@ describe("钓场商店统一视图行为", function()
     _G.Vector3 = { New = function(x, y, z) return { x = x, y = y, z = z } end }
     ctx = { sent = {}, notices = {}, seq = 10, stand = GameCfg.Shop.Stands[2] }
     ctx.store, ctx.writer = ClientStore.new({ initial_now = 1000 })
-    ctx.root = Eui.Node({ Name = "UIRoot" })
+    ctx.root = Eui.node({ Name = "UIRoot" })
     RootView.mount(ctx.root, ctx.store, {
       modals = { shop = ShopView.modal_spec() },
       docks = { shop = ShopView.bubble_spec({ anchors = { {
@@ -53,7 +53,7 @@ describe("钓场商店统一视图行为", function()
         end,
       },
       create_node = function(kind, props)
-        return Eui.Node({
+        return Eui.node({
           Kind = kind, Name = props and props.Name, Parent = props and props.Parent,
           Visible = props and props.Visible ~= false,
           Text = props and (props.Text or props.ButtonText) or "",
@@ -63,7 +63,7 @@ describe("钓场商店统一视图行为", function()
     })
     ctx.writer:set_coin(77)
     ctx.writer:update_spatial({ x = 0, y = 0, z = 0 }, {})
-    assert.is_true(Eui.Click(child(ctx.root, "BtnShopEnter_" .. ctx.stand.AnchorName)))
+    assert.is_true(Eui.click(child(ctx.root, "BtnShopEnter_" .. ctx.stand.AnchorName)))
   end)
 
   after_each(function()
@@ -86,7 +86,7 @@ describe("钓场商店统一视图行为", function()
     local coin_page = GameCfg.Shop.Pages[#GameCfg.Shop.Pages]
     for index, page in ipairs(GameCfg.Shop.Pages) do
       if page ~= coin_page then select_number(rows_for(page)[1].Number, page) end
-      assert.is_true(Eui.Click(child(ctx.root, "BtnShopPage" .. index)))
+      assert.is_true(Eui.click(child(ctx.root, "BtnShopPage" .. index)))
       assert.same(page ~= coin_page, child(ctx.root, "ShopListPanel").Visible)
       assert.same(page == coin_page, child(ctx.root, "ShopCoinPanel").Visible)
       assert.same("", child(ctx.root, "LabelShopDetailName").Text)
@@ -113,11 +113,11 @@ describe("钓场商店统一视图行为", function()
   end)
 
   it("升级页完整列出所有行，无图标商品不显示白色占位", function()
-    Eui.Click(child(ctx.root, "BtnShopPage3"))
+    Eui.click(child(ctx.root, "BtnShopPage3"))
     local rows = rows_for("升级")
     for index = 1, #rows do assert.is_not_nil(child(ctx.root, "ShopRow" .. index)) end
     assert.is_nil(child(ctx.root, "ShopRow" .. (#rows + 1)))
-    assert.is_true(Eui.Click(child(ctx.root, "ShopRow1")))
+    assert.is_true(Eui.click(child(ctx.root, "ShopRow1")))
     assert.is_false(child(ctx.root, "ImageShopDetailIcon").Visible)
     assert.is_false(child(ctx.root, "ShopRowIcon1").Visible)
   end)
@@ -130,7 +130,7 @@ describe("钓场商店统一视图行为", function()
     assert.same(goods.Name, child(ctx.root, "LabelShopDetailName").Text)
     assert.same(goods.Desc, child(ctx.root, "LabelShopDetailDesc").Text)
     assert.same(tostring(goods.Price), child(ctx.root, "LabelShopDetailPrice").Text)
-    assert.is_true(Eui.Click(child(ctx.root, "BtnShopBuyDetail")))
+    assert.is_true(Eui.click(child(ctx.root, "BtnShopBuyDetail")))
     assert.same({ action = "Buy", number = 12, seq = 11 }, ctx.sent[1])
     assert.is_nil(ctx.sent[1].itemId)
     assert.is_nil(ctx.sent[1].price)
@@ -146,25 +146,25 @@ describe("钓场商店统一视图行为", function()
     ctx.writer:set_coin(0)
     select_number(12)
     assert.same(ShopView.ShopText.GoPlatformShop, child(ctx.root, "LabelShopBuyDetail").Text)
-    assert.is_true(Eui.Click(child(ctx.root, "BtnShopBuyDetail")))
+    assert.is_true(Eui.click(child(ctx.root, "BtnShopBuyDetail")))
     assert.same(0, #ctx.sent)
     assert.is_true(child(ctx.root, "ShopCoinPanel").Visible)
     assert.is_false(child(ctx.root, "ShopListPanel").Visible)
   end)
 
   it("地图商店不可用、成功和抛错都有明确反馈且可返回其他页", function()
-    Eui.Click(child(ctx.root, "BtnShopPage4"))
+    Eui.click(child(ctx.root, "BtnShopPage4"))
     ctx.platform_available = false
-    Eui.Click(child(ctx.root, "BtnOpenPlatformShop"))
+    Eui.click(child(ctx.root, "BtnOpenPlatformShop"))
     assert.same(ShopView.ShopText.PlatformUnavailable, child(ctx.root, "LabelCoinPageHint").Text)
     assert.same(0, ctx.platform_opened or 0)
     ctx.platform_available = true
-    Eui.Click(child(ctx.root, "BtnOpenPlatformShop"))
+    Eui.click(child(ctx.root, "BtnOpenPlatformShop"))
     assert.same(1, ctx.platform_opened)
     ctx.platform_error = true
-    Eui.Click(child(ctx.root, "BtnOpenPlatformShop"))
+    Eui.click(child(ctx.root, "BtnOpenPlatformShop"))
     assert.same(ShopView.ShopText.PlatformOpenFailed, child(ctx.root, "LabelCoinPageHint").Text)
-    Eui.Click(child(ctx.root, "BtnShopPage1"))
+    Eui.click(child(ctx.root, "BtnShopPage1"))
     assert.is_true(child(ctx.root, "ShopListPanel").Visible)
     assert.same(0, #ctx.sent)
   end)
@@ -174,7 +174,7 @@ describe("钓场商店统一视图行为", function()
     assert.same("科技假饵", child(ctx.root, "LabelShopDetailName").Text)
     assert.matches("需 7 级摊位", child(ctx.root, "LabelShopBuyDetail").Text, 1, true)
     assert.is_true(child(ctx.root, "BtnShopBuyDetail").Disabled)
-    assert.is_true(Eui.Click(child(ctx.root, "BtnShopBuyDetail")))
+    assert.is_true(Eui.click(child(ctx.root, "BtnShopBuyDetail")))
     assert.same(0, #ctx.sent)
     assert.same(ShopView.FailText.stand, ctx.notices[#ctx.notices])
   end)

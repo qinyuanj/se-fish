@@ -23,10 +23,10 @@ describe("特殊道具统一视图宿主接缝（#299）", function()
     local store, writer = ClientStore.new({ initial_now = 100 })
     local notices = {}
     local nodes = {}
-    local root = Eui.Node({ Name = "UIRoot" })
+    local root = Eui.node({ Name = "UIRoot" })
     local view = RootView.mount(root, store, {
       create_node = function(kind, props)
-        local node = Eui.Node({
+        local node = Eui.node({
           Kind = kind,
           Name = props.Name,
           Parent = props.Parent,

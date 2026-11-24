@@ -51,8 +51,8 @@ function PlayerBlindbox.mount(scope, tree, opts)
   local lastSeq = nil
 
   local function reply(payload)
-    if disposed or not remote or type(remote.GetRE) ~= "function" then return end
-    local ok, event = pcall(remote.GetRE, remote, "BlindboxResult")
+    if disposed or not remote or type(remote.get_re) ~= "function" then return end
+    local ok, event = pcall(remote.get_re, remote, "BlindboxResult")
     if ok and event then event:FireClient(player, payload) end
   end
   local function sync_tree()
@@ -80,10 +80,10 @@ function PlayerBlindbox.mount(scope, tree, opts)
   end
   local function write(kind, transform, done)
     if disposed or working then return false, "pending" end
-    local op, why = save:NextOperation(player, kind)
+    local op, why = save:next_operation(player, kind)
     if not op then return false, why or "pending" end
     working = true
-    local accepted, reason = save:Execute(player, data, op, transform, function(ok, result)
+    local accepted, reason = save:execute(player, data, op, transform, function(ok, result)
       working = nil
       if ok then sync_tree() end
       done(ok, result, op)
@@ -101,7 +101,7 @@ function PlayerBlindbox.mount(scope, tree, opts)
   settle = function(draft, count, key)
     local value = bag(draft)
     local before = value.pity or 0
-    local draws, after = BlindboxDraw.DrawMany(count, before, random)
+    local draws, after = BlindboxDraw.draw_many(count, before, random)
     if not draws then return nil, "roll" end
     local grounded = 0
     for index, draw in ipairs(draws) do
@@ -201,7 +201,7 @@ function PlayerBlindbox.mount(scope, tree, opts)
         recovery = {
           requestId = key, seq = intent.seq,
           reason = intent.state == "awaiting" and not outcomes[key]
-            and not platform:HasFlow(player) and "unknown" or "pending",
+            and not platform:has_flow(player) and "unknown" or "pending",
         }
         break
       end
@@ -244,7 +244,7 @@ function PlayerBlindbox.mount(scope, tree, opts)
       reply({ ok = false, reason = "expired", seq = seq })
       return true
     end
-    local available, unavailable = platform:CanPurchase(player, goods(count))
+    local available, unavailable = platform:can_purchase(player, goods(count))
     if not available then
       reply({ ok = false, reason = unavailable })
       return true
@@ -265,7 +265,7 @@ function PlayerBlindbox.mount(scope, tree, opts)
       reply({ ok = false, reason = "expired" })
       return true
     end
-    if platform:HasFlow(player) or working then
+    if platform:has_flow(player) or working then
       reply({ ok = false, reason = "busy" })
       return true
     end
@@ -279,7 +279,7 @@ function PlayerBlindbox.mount(scope, tree, opts)
       return { ok = true }
     end, function(written, reason)
       if not written then reply({ ok = false, reason = reason }) return end
-      local opened, failure = platform:Purchase(player, goods(count), "blindbox", function(outcome)
+      local opened, failure = platform:purchase(player, goods(count), "blindbox", function(outcome)
         if disposed then return end
         outcomes[key] = outcome
         if outcome ~= "success" then

@@ -90,16 +90,16 @@ local function boot(overrides)
   local options = {
     initial_now = 1000,
     remote = {
-      GetRE = function()
+      get_re = function()
         return {
           OnServerEvent = signal(),
           FireClient = function() end,
           FireAllClients = function() end,
         }
       end,
-      CheckRECD = function() return false end,
+      check_recd = function() return false end,
     },
-    player_data = { GetDataInst = function() return nil end },
+    player_data = { get_data_inst = function() return nil end },
     create_unit = function(_, props)
       seq = seq + 1
       local unit = {
@@ -181,7 +181,7 @@ describe("活鱼树宿主接缝（#309）", function()
     local again = make_player(2, 12, -20)
     join(runtime, again)
     assert.is_true(runtime:receive_landed(again, { fishId = "bass", mult = 1, x = 12, y = 2, z = -18 }))
-    runtime.life:ApplyDamage(again, GameCfg.Vitals.MaxHealth)
+    runtime.life:apply_damage(again, GameCfg.Vitals.MaxHealth)
     local downed = runtime:fish_snapshot(again.UserId)[1]
     assert.not_equals("lifted", downed.phase)
 
@@ -310,7 +310,7 @@ describe("活鱼树宿主接缝（#309）", function()
     local broadcasts, carrier_updates = {}, 0
     local runtime = boot({
       remote = {
-        GetRE = function(_, name)
+        get_re = function(_, name)
           return {
             OnServerEvent = signal(),
             FireClient = function() end,
@@ -319,10 +319,10 @@ describe("活鱼树宿主接缝（#309）", function()
             end,
           }
         end,
-        CheckRECD = function() return false end,
+        check_recd = function() return false end,
       },
       fish_carrier = {
-        Update = function() carrier_updates = carrier_updates + 1 end,
+        update = function() carrier_updates = carrier_updates + 1 end,
       },
     })
     local player = make_player(10)
@@ -332,7 +332,7 @@ describe("活鱼树宿主接缝（#309）", function()
     assert.equals(0, #broadcasts, "无活鱼时不得每帧发空 FishCombatState")
     assert.equals(2, carrier_updates, "ServerRuntime:step 须驱动 FishCarrier:Update")
 
-    local spawned = runtime.fish_host:SpawnLanded(player, { fishId = "bass", mult = 1.2 }, { x = 10, y = 2, z = -18 })
+    local spawned = runtime.fish_host:spawn_landed(player, { fishId = "bass", mult = 1.2 }, { x = 10, y = 2, z = -18 })
     assert.is_not_nil(spawned)
     runtime:step(0.1, 1000.3)
     assert.equals(1, #broadcasts)

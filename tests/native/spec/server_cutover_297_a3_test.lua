@@ -412,8 +412,8 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
       local re_map = {}
       local item_bar_pushes = {}
       local remote_util = {
-        CheckRECD = function() return false end,
-        GetRE = function(_, name)
+        check_recd = function() return false end,
+        get_re = function(_, name)
           if not re_map[name] then
             re_map[name] = {
               OnServerEvent = make_signal(),
@@ -571,16 +571,16 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
       assert.equals(1, item_bar_pushes[3].payload.selectedSlot)
 
       local before_batch_pushes = #item_bar_pushes
-      local data = mgrs.player_data_host:GetDataInst(p)
+      local data = mgrs.player_data_host:get_data_inst(p)
       SpokeRuntime.batch(function()
         pt:set_coin(888)
         pt:set_upgrade_level(1)
         data.Data.FishCoin = 888
         data.Data.UpgradeLevel = 1
         data.Data.SelectedSlot = nil
-        mgrs.player_data_host:SyncPlayerTree(p)
+        mgrs.player_data_host:sync_player_tree(p)
         data.Data.FishCoin = 999
-        mgrs.player_data_host:SyncPlayerTree(p)
+        mgrs.player_data_host:sync_player_tree(p)
       end)
       assert.equals(before_batch_pushes + 1, #item_bar_pushes)
       assert.equals(999, item_bar_pushes[#item_bar_pushes].payload.coin)
@@ -591,23 +591,23 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
 
       data.Extra.growth.potions.item168 = 2
       data.Extra.growth.potions.item167 = 5
-      assert.is_true(mgrs.fish_ability:ApplyGrowth(p).Ok)
-      assert.equals(420, runtime.life:MaxHealthOf(p))
+      assert.is_true(mgrs.fish_ability:apply_growth(p).Ok)
+      assert.equals(420, runtime.life:max_health_of(p))
       assert.near(1.4, ch.scale, 1e-9)
       assert.near(10.5, c.WalkSpeed, 1e-9)
 
-      assert.is_true(mgrs.fish_ability.Modifier:ApplyWeaponEffect(p, ch, { Kind = "paralyze" }))
-      assert.is_false(runtime.life:CanAct(p))
+      assert.is_true(mgrs.fish_ability.Modifier:apply_weapon_effect(p, ch, { Kind = "paralyze" }))
+      assert.is_false(runtime.life:can_act(p))
       assert.equals(0, c.WalkSpeed)
       now = now + 0.5
       heartbeat:Fire(0.5)
-      assert.is_true(runtime.life:CanAct(p))
+      assert.is_true(runtime.life:can_act(p))
       assert.near(10.5, c.WalkSpeed, 1e-9)
 
-      -- ModifierBridge：活鱼挂毒经 Heartbeat 推进触发 MgrVitals:ApplyHit DoT
+      -- ModifierBridge：活鱼挂毒经 Heartbeat 推进触发 MgrVitals:apply_hit DoT
       local dot_hits = {}
-      local orig_apply_hit = runtime.life.ApplyHit
-      runtime.life.ApplyHit = function(self, hit, target, amount)
+      local orig_apply_hit = runtime.life.apply_hit
+      runtime.life.apply_hit = function(self, hit, target, amount)
         dot_hits[#dot_hits + 1] = { target = target, amount = amount, category = hit.category }
         return true
       end
@@ -619,7 +619,7 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
       assert.equals(1, #dot_hits)
       assert.are.equal(fish, dot_hits[1].target)
       assert.equals("dot", dot_hits[1].category)
-      runtime.life.ApplyHit = orig_apply_hit
+      runtime.life.apply_hit = orig_apply_hit
 
       -- 离场后：连接断开、左手持竿销毁、活鱼毒效果按来源清理
       players_service.PlayerRemoving:Fire(p)
@@ -628,7 +628,7 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
       assert.equals(0, #p.CharacterAdded.handlers)
       assert.is_true(rod_mount.Destroyed)
       assert.is_true(rod_model.Destroyed)
-      assert.equals(0, mgrs.fish_ability.Modifier:GetRemaining(fish, "poison"))
+      assert.equals(0, mgrs.fish_ability.Modifier:get_remaining(fish, "poison"))
     end)
   end)
 end)

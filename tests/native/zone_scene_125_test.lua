@@ -1,7 +1,7 @@
--- #125 失败方式：无穷值或重名水域让 Build 静默返回判定器、长方形水域被当成正方形
+-- #125 失败方式：无穷值或重名水域让 build 静默返回判定器、长方形水域被当成正方形
 -- （贴边 0.1m 误判）、场景诊断把缺实体/重名/错位报成通过，以及场景实体与快照点不再共享同一张
 -- 坐标表（复制成两份后改一处另一处不动）。
--- 迁移自 tests/gameplay/zone_scene_125_test.lua（#83）。单类 TestZoneScene125，无 setUp/tearDown。
+-- 迁移自 tests/gameplay/zone_scene_125_test.lua（#83）。单类 TestZoneScene125，无 set_up/tear_down。
 -- 断言口径：旧 assertEquals 对 table 是深比较 → assert.same；旧 assertIs 要求同一引用
 -- → 用 assert.are.equal（就是 `==`，深比较的 same 会把「共享同一表」弱化成「内容相等」而漏判）。
 -- 七区几何、SafePoint 与航线 Destination、返程票价已由 zone_layout_plan_test 与 ferry_test
@@ -13,17 +13,17 @@ describe("TestZoneScene125", function()
   it("test_invalid_geometry_fails_before_a_judge_is_returned", function()
     for _, bad in ipairs({ math.huge, -math.huge, 0 / 0 }) do
       assert.error_matches(function()
-        Judge.Build({ { Id = '坏水域', Center = { x = bad, z = 0 }, HalfXZ = 1, SurfaceY = 2 } })
+        Judge.build({ { Id = '坏水域', Center = { x = bad, z = 0 }, HalfXZ = 1, SurfaceY = 2 } })
       end, '有限', nil, true)
     end
     local zone = { Id = '重复', Center = { x = 0, z = 0 }, HalfXZ = 1, SurfaceY = 2 }
     assert.error_matches(function()
-      Judge.Build({ zone, zone })
+      Judge.build({ zone, zone })
     end, '重复', nil, true)
   end)
 
   it("test_rectangular_water_preserves_dry_bank_and_inclusive_edges", function()
-    local judge = Judge.Build({ {
+    local judge = Judge.build({ {
       Id = '巡航水面', Center = { x = 10, z = 20 },
       HalfX = 30, HalfZ = 5, SurfaceY = 2,
     } })
@@ -39,7 +39,7 @@ describe("TestZoneScene125", function()
       { Name = 'CrabSafe', Position = { x = 260, y = 6, z = 100 } },
       { Name = 'CrabShop', Position = { x = 250, y = 5, z = 100 } },
     } } } }
-    local report = Judge.InspectScene(scenes, {
+    local report = Judge.inspect_scene(scenes, {
       { Name = 'CrabSafe', Position = { x = 260, y = 6, z = 100 } },
       { Name = 'CrabSafe', Position = { x = 260, y = 6, z = 100 } },
       { Name = 'CrabShop', Position = { x = 250, y = 5, z = 110 } },
@@ -52,12 +52,12 @@ describe("TestZoneScene125", function()
     }, report.Issues)
     local complete = {}
     for _, e in ipairs(scenes[1].Scene.Entities) do complete[#complete + 1] = e end
-    report = Judge.InspectScene(scenes, complete)
+    report = Judge.inspect_scene(scenes, complete)
     assert.is_true(report.EntitiesMatch)
     assert.is_nil(report.Ready) -- 名称和位置匹配不等于碰撞、保存或试玩通过。
     assert.same({ 'crabLake' }, report.PendingZones)
     scenes[1].Scene.State = 'resolved'
-    report = Judge.InspectScene(scenes, complete)
+    report = Judge.inspect_scene(scenes, complete)
     assert.is_nil(report.Ready)
     assert.same({
       Saved = 'unverified', Synced = 'unverified', Collision = 'unverified', Playtested = 'unverified',

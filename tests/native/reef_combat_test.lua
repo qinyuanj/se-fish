@@ -2,11 +2,11 @@
 -- describe / it 名沿用旧类名与方法名；注册顺序 = 旧套件实际执行顺序（单类，方法按字典序）。
 -- #37 失败方式（编码前列出）：空中鱼仍不可抽取；飞过水面即消失；投掷未执行或重复结算；
 -- 预警不锁落点导致无法躲避；俯冲不预警；死亡/超时留下攻击；本体与受击体错帧。
--- 接缝：真实业务管理器的 SpawnLanded/Drop/Update、RemoteEvent 和 Controller 血量。
+-- 接缝：真实业务管理器的 spawn_landed/drop/update、RemoteEvent 和 Controller 血量。
 -- 仅替换引擎对象、时间和 RemoteEvent，不替换业务管理器；不作为编辑器 E2E 证据。
 --
 -- 假引擎世界搬到 tests/support/isle_combat.lua：旧套件里 volcano_combat 用
--- `TestVolcanoCombat.setUp = TestReefCombat.setUp` 直接继承这份夹具（靠 LuaUnit 的全局类名互访），
+-- `TestVolcanoCombat.set_up = TestReefCombat.set_up` 直接继承这份夹具（靠 LuaUnit 的全局类名互访），
 -- Busted 下两个 spec 各自 open/close 同一个 support 模块，逐案例新建世界，口径不变。
 local Cfg = require('common.game_cfg')
 local Islet = require('tests.support.isle_combat')
@@ -18,7 +18,7 @@ describe('TestReefCombat', function()
         env = Islet.new(6)
     end)
     after_each(function()
-        env:tearDown()
+        env:tear_down()
     end)
 
     -- 失败方式：空中普通鱼与企鹅朝最近水区逃脱，且不因「一秒时限」被提前移除。
@@ -64,18 +64,18 @@ describe('TestReefCombat', function()
         host:dispose()
     end)
 
-    -- 官方 AI 的停止/恢复是外部边界，业务驱动与预警/Vitals 仍走真实 Update。
+    -- 官方 AI 的停止/恢复是外部边界，业务驱动与预警/Vitals 仍走真实 update。
     it('test_control_cancels_air_warning_and_never_hits_old_locked_point', function()
         local fish = env:drop('fish48Boss')
         env:advance(4)
         local attack = fish.AirAttacks.airThrow
         assert.is_not_nil(attack)
         env.mgr.Ai = { Stopped = true, Sync = function() return true end, Pause = function() end, Custom = function() end }
-        env.mgr:Update()
+        env.mgr:update()
         assert.same({ kind = 'clear', fishId = attack.Id, reason = 'controlled' }, env.notices[#env.notices])
         env:advance(6)
         env.mgr.Ai.Stopped = false
-        env.mgr:Update()
+        env.mgr:update()
         assert.same(300, env.player.Character.Controller.Health)
         assert.is_nil(fish.AirAttacks.airThrow)
         env.mgr.Ai = nil
@@ -86,11 +86,11 @@ describe('TestReefCombat', function()
         local fish = env:drop('fish48Boss')
         env:advance(3)
         env.mgr.Ai = { Stopped = true, Sync = function() return true end, Pause = function() end, Custom = function() end }
-        env.mgr:Update()
+        env.mgr:update()
         local throwAt, diveAt = fish.NextThrowAt, fish.NextReefDiveAt
         env:advance(13)
         env.mgr.Ai.Stopped = false
-        env.mgr:Update()
+        env.mgr:update()
         assert.near(throwAt + 10, fish.NextThrowAt, 1e-6)
         assert.near(diveAt + 10, fish.NextReefDiveAt, 1e-6)
         assert.is_nil(fish.AirAttacks.airThrow)
@@ -118,7 +118,7 @@ describe('TestReefCombat', function()
         local water = Cfg.Zones[6].Scene.Waters[1]
         fish.Carrier.Body.Position = env.vec(water.Center.x, water.SurfaceY + 12, water.Center.z)
         -- 重新起飞以这条真实世界坐标作为轨迹起点。
-        env.mgr:StartFlight(fish, env.now)
+        env.mgr:start_flight(fish, env.now)
         env:advance(0.05)
         assert.same('flying', fish.State)
         assert.same(fish.Carrier.Body.Position, fish.Carrier.Receiver.Position)
@@ -135,8 +135,8 @@ describe('TestReefCombat', function()
         assert.same(300, env.player.Character.Controller.Health)
         env:advance(5.3)
         assert.same(200, env.player.Character.Controller.Health)
-        env.mgr:Update()
-        env.mgr:Update()
+        env.mgr:update()
+        env.mgr:update()
         assert.same(200, env.player.Character.Controller.Health)
     end)
 
@@ -144,7 +144,7 @@ describe('TestReefCombat', function()
     it('test_reef_fish_enter_normal_draw_pool_and_distinguish_air_source', function()
         local FishCatch = require('common.fish_catch')
         local rows = Cfg.Casting.Zones['reefIsland.water']
-        assert.same('item81', FishCatch.Select(rows, 1, nil, function() return 0 end))
+        assert.same('item81', FishCatch.select(rows, 1, nil, function() return 0 end))
         assert.same('air', Cfg.Fish.item81.CatchSource)
         assert.same('water', Cfg.Fish.item82.CatchSource)
         assert.same('water', Cfg.Fish.item88.CatchSource)
@@ -180,17 +180,17 @@ describe('TestReefCombat', function()
         local FishCombatView = require('client.views.fish_combat_view')
         local SpokeClock = require('common.spoke_clock')
         local n = require('common.gar_bite_notice')
-        local p = n.Lock(-37, { x = 0, y = 6, z = 0 }, 0, 1, 5, 180, 1.2)
+        local p = n.lock(-37, { x = 0, y = 6, z = 0 }, 0, 1, 5, 180, 1.2)
         p.move, p.shape, p.flightOrigin = 'airThrow', 'circle', { x = 0, y = 21, z = 0 }
-        assert.is_true(n.Valid(p))
+        assert.is_true(n.valid(p))
 
         local clock = SpokeClock.new(0)
         local store, writer = ClientStore.new({ clock = clock })
-        local root = Eui.Node({ Name = 'UIRoot' })
+        local root = Eui.node({ Name = 'UIRoot' })
         local created = {}
         local view = RootView.mount(root, store, {
             create_node = function(kind, props)
-                local node = Eui.Node(props or {})
+                local node = Eui.node(props or {})
                 node.UnitType = kind
                 created[#created + 1] = node
                 return node
@@ -205,7 +205,7 @@ describe('TestReefCombat', function()
             if not node.Destroyed and node.Name == 'FishWarn_-37' then warnNode = node end
         end
         assert.is_not_nil(warnNode)
-        assert.is_true(n.Valid(n.Clear(-37, 'miss')))
+        assert.is_true(n.valid(n.Clear(-37, 'miss')))
         assert.is_true(writer:ingest_event('FishCombatState', { warnings = {} }))
         assert.is_true(warnNode.Destroyed)
         view:dispose()

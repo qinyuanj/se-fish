@@ -90,7 +90,7 @@ local function migrator(id) return PlayerData.New(player(id)) end
 describe('TestSaveArrayMeta', function()
     local env, savedGame
 
-    -- 逐例夹具：旧 LuaUnit 对每个方法都跑 setUp/tearDown，这里同样用 before_each/after_each，
+    -- 逐例夹具：旧 LuaUnit 对每个方法都跑 set_up/tear_down，这里同样用 before_each/after_each，
     -- 因此只调 Migrate 的案例也一样会建立引擎边界替身（与旧套件一致）。
     -- before_each 第一步保存 _G.game，夹具中途抛错时 after_each 仍能恢复全局。
     before_each(function()
@@ -164,7 +164,7 @@ describe('TestSaveArrayMeta', function()
         local p = { UserId = 80, SetAttribute = function(_, key, value) env.attributes[key] = value end }
         local data = PlayerData.New(p)
         data:Init(true)
-        env.save:LoadInto(p, data)
+        env.save:load_into(p, data)
         drain()
         assert.same('ready', env.attributes.SaveState)
         assert.same('ready', data.LoadState)
@@ -187,12 +187,12 @@ describe('TestSaveArrayMeta', function()
         local p = { UserId = 81, SetAttribute = function() end }
         local data = PlayerData.New(p)
         data:Init(true)
-        env.save:LoadInto(p, data)
+        env.save:load_into(p, data)
         drain()
-        local op = env.save:NextOperation(p, 'probe')
+        local op = env.save:next_operation(p, 'probe')
         local result
         -- 写回包带 __count：修复前 value.meta 会把标记带进 data.SaveMeta 并写进下一次快照。
-        assert.is_true(env.save:Execute(p, data, op, function(draft)
+        assert.is_true(env.save:execute(p, data, op, function(draft)
             draft:AddCoin(3)
             return { awarded = 3 }
         end, function(ok, value) result = { ok, value } end))

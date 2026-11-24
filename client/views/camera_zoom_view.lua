@@ -12,21 +12,21 @@ local State = Spoke.State
 local CameraZoomView = {}
 
 local function resolve_target_distance(character, preset_distance)
-  if Number.IsFiniteNumber(preset_distance) and preset_distance > 0 then
+  if Number.is_finite_number(preset_distance) and preset_distance > 0 then
     return preset_distance
   end
   if character == nil then
     return nil
   end
   local ok, raw = pcall(function() return character:GetAttribute("CameraDistance") end) -- 角色销毁瞬态读取属性可能抛错，安全忽略
-  if not ok or not Number.IsFiniteNumber(raw) or raw <= 0 then
+  if not ok or not Number.is_finite_number(raw) or raw <= 0 then
     return nil
   end
   local base = GameCfg.Ability.BodyScale.CameraDistance
-  if not Number.IsFiniteNumber(base) or base <= 0 then
+  if not Number.is_finite_number(base) or base <= 0 then
     return nil
   end
-  return BodyScale.Derive(BodyScale.Sanitize(raw / base)).CameraDistance
+  return BodyScale.derive(BodyScale.sanitize(raw / base)).CameraDistance
 end
 
 local function default_get_camera()

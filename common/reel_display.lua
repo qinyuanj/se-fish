@@ -10,7 +10,7 @@ function ReelDisplay.New(now, cfg)
         Local = cfg.Initial, LocalAt = now, Unsent = 0, InFlight = {}, Chase = nil }, ReelDisplay)
 end
 
-function ReelDisplay:PendingClicks()
+function ReelDisplay:pending_clicks()
     local count = self.Unsent
     for _, batch in ipairs(self.InFlight) do count = count + batch.n end
     return count
@@ -18,7 +18,7 @@ end
 
 function ReelDisplay:Target(now)
     return clamp(self.Auth - self.Cfg.DecayPerSec * (now - self.AuthAt)
-        + self:PendingClicks() * self.Cfg.ClickGain)
+        + self:pending_clicks() * self.Cfg.ClickGain)
 end
 
 function ReelDisplay:Value(now)
@@ -34,7 +34,7 @@ function ReelDisplay:Value(now)
     return clamp(self.Local - self.Cfg.DecayPerSec * (now - self.LocalAt))
 end
 
-function ReelDisplay:Click(now)
+function ReelDisplay:click(now)
     local gain = self.Cfg.ClickGain
     self.Unsent = self.Unsent + 1
     if self.Chase then
@@ -44,12 +44,12 @@ function ReelDisplay:Click(now)
     end
 end
 
-function ReelDisplay:Sent(q, n, now)
+function ReelDisplay:sent(q, n, now)
     self.Unsent = math.max(0, self.Unsent - n)
     self.InFlight[#self.InFlight + 1] = { q = q, n = n, At = now }
 end
 
-function ReelDisplay:Authority(now, progress, q)
+function ReelDisplay:authority(now, progress, q)
     if type(progress) ~= 'number' or progress ~= progress then return end
     local shown = self:Value(now)
     local kept = {}

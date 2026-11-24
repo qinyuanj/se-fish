@@ -39,33 +39,33 @@ describe('TestAttrPresentation', function()
     -- 交互半径按体型派生缩放，非法属性回落基础半径
     it('test_interaction_radius_scales_and_falls_back_for_invalid_attributes', function()
         local body = require('common.body_scale')
-        local value = body.Derive(3).InteractRange
+        local value = body.derive(3).InteractRange
         local character = { GetAttribute = function() return value end }
-        assert.same(12, body.InteractionRadius(character, 4))
+        assert.same(12, body.interaction_radius(character, 4))
         value = math.huge
-        assert.same(4, body.InteractionRadius(character, 4))
-        value = body.Derive(100).InteractRange
-        assert.same(12, body.InteractionRadius(character, 4))
+        assert.same(4, body.interaction_radius(character, 4))
+        value = body.derive(100).InteractRange
+        assert.same(12, body.interaction_radius(character, 4))
     end)
 
     -- 服务端判定按体型缩放半径，同时保留 slack；没有角色时拒绝
     it('test_server_range_scales_radius_but_keeps_slack_and_rejects_missing_character', function()
         local mgr = require('server.world_host.interaction_points')
         local anchor = { Position = { x = 0, z = 0 } }
-        mgr.FindAnchor = function() return anchor end
-        local value = require('common.body_scale').Derive(3).InteractRange
+        mgr.find_anchor = function() return anchor end
+        local value = require('common.body_scale').derive(3).InteractRange
         local character = { Position = { x = 12.5, z = 0 }, GetAttribute = function() return value end }
         local p = { Character = character }
         local point = { AnchorName = 'test', Radius = 4, Slack = 0.5 }
-        assert.same(anchor, mgr:InRange(p, point))
+        assert.same(anchor, mgr:in_range(p, point))
         character.Position.x = 12.51
-        assert.is_nil(mgr:InRange(p, point))
+        assert.is_nil(mgr:in_range(p, point))
         value = math.huge
         character.Position.x = 4.5
-        assert.same(anchor, mgr:InRange(p, point))
+        assert.same(anchor, mgr:in_range(p, point))
         character.Position.x = 4.51
-        assert.is_nil(mgr:InRange(p, point))
+        assert.is_nil(mgr:in_range(p, point))
         p.Character = nil
-        assert.is_nil(mgr:InRange(p, point))
+        assert.is_nil(mgr:in_range(p, point))
     end)
 end)

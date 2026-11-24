@@ -62,12 +62,12 @@ describe('条款 15-21 / 15-01 / 15-09 / 15-10 / 15-11 盲盒占位支付通道�
     end
 
     local function draw(count, seq)
-        assert.is_true(world:blindboxAction({ action = 'Draw', count = count, seq = seq }))
+        assert.is_true(world:blindbox_action({ action = 'Draw', count = count, seq = seq }))
     end
 
     -- 占位通道的确认 / 取消：客户端在确认面板上按下的那一格
     local function settle(outcome)
-        local accepted = world.platform:HandleAction(world.player, { action = 'PlaceholderOutcome', outcome = outcome })
+        local accepted = world.platform:handle_action(world.player, { action = 'PlaceholderOutcome', outcome = outcome })
         world:drain()
         return accepted
     end
@@ -75,7 +75,7 @@ describe('条款 15-21 / 15-01 / 15-09 / 15-10 / 15-11 盲盒占位支付通道�
     before_each(function()
         assert_wiring()
         world = BlindboxWorld.new()
-        world:setUp()
+        world:set_up()
         -- #249 占位闸门：占位通道随调试构建放行（发布构建要显式 AllowInPublish）；
         -- 本文件证的是占位通道整条路径，不走调试构建的测试驱动器。
         GameCfg.Debug = { Enabled = true }
@@ -86,7 +86,7 @@ describe('条款 15-21 / 15-01 / 15-09 / 15-10 / 15-11 盲盒占位支付通道�
     after_each(function()
         GameCfg.Platform.Placeholder.Enabled = savedPlaceholder
         RandomGuard.restore()
-        if world then world:tearDown(); world = nil end
+        if world then world:tear_down(); world = nil end
     end)
 
     it('单抽与十连的占位通道上报金豆价目，并注明不发放真实付费权益', function()
@@ -115,7 +115,7 @@ describe('条款 15-21 / 15-01 / 15-09 / 15-10 / 15-11 盲盒占位支付通道�
         assert.same(0, world.data:ItemCount(LAST_ITEM), '确认前不得发奖')
         assert.same(0, world.data.Extra.lottery.pity, '确认前不得推进保底计数')
         assert.is_true(settle('success'))
-        local result = world:lastResult()
+        local result = world:last_result()
         assert.is_true(result.ok, result.reason)
         assert.same(1, #result.draws)
         assert.same(LAST_ITEM, result.draws[1].itemKey)
@@ -129,12 +129,12 @@ describe('条款 15-21 / 15-01 / 15-09 / 15-10 / 15-11 盲盒占位支付通道�
         draw(1, 1)
         local result = nil
         assert.is_true(settle('cancel'))
-        result = world:lastResult()
+        result = world:last_result()
         assert.is_false(result.ok)
         assert.same('cancel', result.reason)
         assert.same(0, world.data:ItemCount(LAST_ITEM), '取消不得发奖')
         assert.same(0, world.data.Extra.lottery.pity, '取消不得推进保底')
-        assert.is_false(world.platform:HasFlow(world.player))
+        assert.is_false(world.platform:has_flow(world.player))
         -- 不残留半截状态：下一次抽取仍能开通道
         world.rolls = { MISS_ROLL }
         draw(1, 2)
@@ -145,14 +145,14 @@ describe('条款 15-21 / 15-01 / 15-09 / 15-10 / 15-11 盲盒占位支付通道�
         world.rolls = { MISS_ROLL }
         draw(1, 1)
         world.now = world.now + GameCfg.Platform.FlowTimeoutSec
-        world.platform:Update()
+        world.platform:update()
         world:drain()
-        local result = world:lastResult()
+        local result = world:last_result()
         assert.is_false(result.ok)
         assert.same('timeout', result.reason)
         assert.same(0, world.data:ItemCount(LAST_ITEM), '超时不得发奖')
         assert.same(0, world.data.Extra.lottery.pity, '超时不得推进保底')
-        assert.is_false(world.platform:HasFlow(world.player))
+        assert.is_false(world.platform:has_flow(world.player))
     end)
 
     it('重复确认不重复发奖', function()
@@ -171,7 +171,7 @@ describe('条款 15-21 / 15-01 / 15-09 / 15-10 / 15-11 盲盒占位支付通道�
         world.rolls = { 1 }
         draw(1, 1)
         assert.is_true(settle('success'))
-        local first = world:lastResult()
+        local first = world:last_result()
         assert.is_true(first.draws[1].guaranteed)
         assert.same(GUARANTEE_A, first.draws[1].itemKey)
         assert.is_true(first.draws[1].jackpot)
@@ -181,7 +181,7 @@ describe('条款 15-21 / 15-01 / 15-09 / 15-10 / 15-11 盲盒占位支付通道�
         world.rolls = { 2 }
         draw(1, 2)
         assert.is_true(settle('success'))
-        local second = world:lastResult()
+        local second = world:last_result()
         assert.is_true(second.draws[1].guaranteed)
         assert.same(GUARANTEE_B, second.draws[1].itemKey)
     end)
@@ -191,7 +191,7 @@ describe('条款 15-21 / 15-01 / 15-09 / 15-10 / 15-11 盲盒占位支付通道�
         world.rolls = { MISS_ROLL }
         draw(1, 1)
         assert.is_true(settle('success'))
-        local miss = world:lastResult()
+        local miss = world:last_result()
         assert.is_false(miss.draws[1].guaranteed, '未满 49 抽不得保底')
         assert.same(49, miss.pityAfter)
         assert.same(49, world.data.Extra.lottery.pity)
@@ -200,7 +200,7 @@ describe('条款 15-21 / 15-01 / 15-09 / 15-10 / 15-11 盲盒占位支付通道�
         world.rolls = { 5 }
         draw(1, 2)
         assert.is_true(settle('success'))
-        local jackpot = world:lastResult()
+        local jackpot = world:last_result()
         assert.is_true(jackpot.draws[1].jackpot)
         assert.is_false(jackpot.draws[1].guaranteed)
         assert.same(0, jackpot.pityAfter)

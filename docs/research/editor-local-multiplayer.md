@@ -49,7 +49,7 @@
 - `running=true`、`editor_state="playing"`、`in_game_runtime=true`、`edit_mode=false`。
 - `editor_mode="se"`、`is_se_mode=true`、`play_session="dd43567"`。
 - 当前只列出一个已注册编辑器实例：PID 42444、HTTP 19859，安装工程目录 `C:\FeverApps\party_pc`。
-- 只读 `Get-Process -Name client` 也只返回一个 `client.exe` 进程：PID 42444，路径 `C:\FeverApps\party_pc\bin\client.exe`。该文件没有可读 `FileVersion/ProductVersion`，编辑器版本以窗口画面为准。
+- 只读 `get-Process -Name client` 也只返回一个 `client.exe` 进程：PID 42444，路径 `C:\FeverApps\party_pc\bin\client.exe`。该文件没有可读 `FileVersion/ProductVersion`，编辑器版本以窗口画面为准。
 
 这只能证明**调查时只有一个实例**，不能证明编辑器不支持多开；官方多开公告见 E7。
 

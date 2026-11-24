@@ -8,7 +8,7 @@ REUtil.REMap = {}
 
 local RECDCheckMap = {}
 
-function REUtil:GetRE(eventName)
+function REUtil:get_re(eventName)
     local targetRE = REUtil.REMap[eventName]
     if not targetRE then 
         targetRE = RemoteEvent.New(eventName)
@@ -19,7 +19,7 @@ function REUtil:GetRE(eventName)
     return targetRE
 end
 
-function REUtil:CheckRECD(player, reName, duration)
+function REUtil:check_recd(player, reName, duration)
     if not duration then duration = 1 end
 
     local pMap = RECDCheckMap[player.UserId]

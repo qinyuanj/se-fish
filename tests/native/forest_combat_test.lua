@@ -13,8 +13,8 @@ local function drop(env, fishId, dz)
     local damages = {}
     env.player.Character.Controller.Health = 9000
     env.player.Character.Controller.TakeDamage = function(_, d) damages[#damages + 1] = d end
-    local fish = env:heldFish(env.player, fishId)
-    env.mgr:Drop(env.player)
+    local fish = env:held_fish(env.player, fishId)
+    env.mgr:drop(env.player)
     assert.are.equal('combat', fish.State)
     local p = fish.Carrier.Body.Position
     env.player.Character.Position = vec(p.x, 2, p.z + (dz or 2))
@@ -42,17 +42,17 @@ describe('TestForestCombat', function()
 
     before_each(function()
         env = FishCombat.new()
-        env:setUp()
+        env:set_up()
     end)
     after_each(function()
-        env:tearDown()
+        env:tear_down()
     end)
 
     it('test_chase_failure_logs_module_operation_fish_and_error', function()
         for _, id in ipairs({ 'fish31Elite', 'fish32Boss' }) do
             local fish, damages = drop(env, id, 20)
             env.now = 0
-            env.mgr:Update()
+            env.mgr:update()
             breakPosition(fish)
             local savedPrint, lines = _G.print, {}
             -- Busted 把案例体放在沙箱 _ENV 里（写全局只进 context.env），
@@ -63,7 +63,7 @@ describe('TestForestCombat', function()
                 lines[#lines + 1] = table.concat(words, ' ')
             end
             env.now = 1
-            local ok, err = pcall(function() env.mgr:Update() end)
+            local ok, err = pcall(function() env.mgr:update() end)
             _G.print = savedPrint
             assert.is_true(ok, tostring(err))
             local text = table.concat(lines, '\n')
@@ -72,16 +72,16 @@ describe('TestForestCombat', function()
             assert.matches('fish=' .. tostring(fish.Id), text, nil, true)
             assert.matches('position-write-failed', text, nil, true)
             assert.same({}, damages)
-            env.mgr:Remove(fish)
+            env.mgr:remove(fish)
         end
     end)
 
     it('test_combat_payload_carries_move_names', function()
         local fish = drop(env, 'fish32Boss', 2)
         local payloads = {}
-        env.mgr.CombatPublisher = function(payload) payloads[#payloads + 1] = payload end
+        env.mgr.combat_publisher = function(payload) payloads[#payloads + 1] = payload end
         env.now = 0
-        env.mgr:Update()
+        env.mgr:update()
         assert.are.equal('sweep', payloads[#payloads].move)
         assert.are.equal('fish32Boss', payloads[#payloads].fishId)
     end)
@@ -94,24 +94,24 @@ describe('TestForestCombat', function()
             local fish, damages = drop(env, 'fish31Elite', 20)
             local savedRandom = math.random
             math.random = function() return 0 end
-            env.mgr:Update()
+            env.mgr:update()
             env.now = 50
-            env.mgr:Update()
+            env.mgr:update()
             assert.are.equal('jump', fish.Move.Name)
             local dest = fish.Move.Destination
             math.random = savedRandom
             env.player.Character.Position = vec(dest.x, 2, dest.z) -- 落点范围内有玩家
             breakPosition(fish)
             env.now = 50 + 1.5 * case.progress
-            env.mgr:Update() -- 位移失败帧
+            env.mgr:update() -- 位移失败帧
             assert.is_nil(fish.Move, case.name .. '位移失败必须取消招式 / 收起预警')
             assert.same({}, damages, case.name .. '位移失败不得按预定落点结算落地伤害')
             if case.progress < 1 then
                 env.now = 50 + 1.5
-                env.mgr:Update() -- 到点也不得补结算
+                env.mgr:update() -- 到点也不得补结算
                 assert.same({}, damages, '取消后不得补结算落地伤害')
             end
-            env.mgr:Remove(fish)
+            env.mgr:remove(fish)
         end
     end)
 
@@ -120,10 +120,10 @@ describe('TestForestCombat', function()
         local savedRandom = math.random
         math.random = function() return 0 end
         env.now = 0
-        env.mgr:Update()
+        env.mgr:update()
         env.notices = {}
         env.now = 50
-        env.mgr:Update()
+        env.mgr:update()
         math.random = savedRandom
         local lock
         for _, notice in ipairs(env.notices) do
@@ -141,13 +141,13 @@ describe('TestForestCombat', function()
         local rolled = {}
         env.other.Character.Controller.TakeDamage = function(_, d) rolled[#rolled + 1] = d end
         env.now = 0
-        env.mgr:Update()
+        env.mgr:update()
         local start = fish.Carrier.Body.Position
         -- 第二名玩家摆在「本该滚到」的位置（追击路径中段）
         env.other.Character.Position = vec(start.x, 2, start.z + 10)
         breakPosition(fish) -- 位移失败：鱼实际没有滚过去
         env.now = 1
-        env.mgr:Update()
+        env.mgr:update()
         assert.same({}, rolled, '位移失败不得按未到达的滚动路径结算接触')
     end)
 
@@ -157,25 +157,25 @@ describe('TestForestCombat', function()
         local body = fish.Carrier.Body
         local z0 = body.Position.z
         env.now = 0
-        env.mgr:Update()
+        env.mgr:update()
         env.now = 0.5
-        env.mgr:Update()
+        env.mgr:update()
         assert.near(12 * 0.5, body.Position.z - z0, 1e-6)
         env.now = 300
-        env.mgr:Update()
+        env.mgr:update()
         assert.are.equal('escaping', fish.State)
     end)
 
     it('test_shark_head_sweep_25_on_three_second_cadence', function()
         local fish, damages = drop(env, 'fish32Boss', 2)
         env.now = 0
-        env.mgr:Update()
+        env.mgr:update()
         assert.are.equal('sweep', fish.Move.Name)
         assert.same({}, damages, '起手帧只是预警')
-        env.mgr:Update()
+        env.mgr:update()
         assert.same({}, damages)
         env.now = 3
-        env.mgr:Update()
+        env.mgr:update()
         assert.same({ 25 }, damages)
     end)
 
@@ -185,21 +185,21 @@ describe('TestForestCombat', function()
         local savedRandom = math.random
         math.random = function() return 0 end
         env.now = 0
-        env.mgr:Update()
+        env.mgr:update()
         env.now = 19.9
-        env.mgr:Update()
+        env.mgr:update()
         assert.is_nil(fish.Move, '20 秒前不得起跳')
         env.now = 20
         damages = {} -- 只记录本次高跃，此前真实翻滚接触另有用例覆盖
         env.player.Character.Controller.TakeDamage = function(_, d) damages[#damages + 1] = d end
-        env.mgr:Update()
+        env.mgr:update()
         assert.are.equal('jump', fish.Move.Name)
         local dest = fish.Move.Destination
         assert.near(15, dest.x - body.Position.x, 1e-6)
         math.random = savedRandom
         env.player.Character.Position = vec(dest.x, 2, dest.z)
         env.now = 20 + 1.5
-        env.mgr:Update()
+        env.mgr:update()
         assert.same({ 200 }, damages)
     end)
 
@@ -210,29 +210,29 @@ describe('TestForestCombat', function()
         local rolled = {}
         env.other.Character.Controller.TakeDamage = function(_, d) rolled[#rolled + 1] = d end
         -- 仇恨落在远处玩家：追击目标仍是 player，贴身的 other 被“滚到”
-        env.mgr:NoteDamage(fish, env.player, 30)
+        env.mgr:note_damage(fish, env.player, 30)
         env.other.Character.Position = vec(body.Position.x, 2, body.Position.z + 2)
         env.now = 0
-        env.mgr:Update()
+        env.mgr:update()
         env.now = 0.1
-        env.mgr:Update() -- 首个真实滚动帧才结算接触
+        env.mgr:update() -- 首个真实滚动帧才结算接触
         assert.same({ 25 }, rolled)
-        env.mgr:Update() -- 同秒槽重复帧不重复结算
+        env.mgr:update() -- 同秒槽重复帧不重复结算
         assert.same({ 25 }, rolled)
         -- 下一秒槽再结算一次
         env.other.Character.Position = vec(body.Position.x, 2, body.Position.z + 2)
         env.now = 1
-        env.mgr:Update()
+        env.mgr:update()
         assert.same({ 25, 25 }, rolled)
     end)
 
     it('test_shark_roll_contact_hits_the_single_chased_target', function()
         local fish, damages = drop(env, 'fish32Boss', 20) -- other 已倒下，唯一玩家就是目标
         env.now = 0
-        env.mgr:Update() -- 首帧 dt=0 不位移
+        env.mgr:update() -- 首帧 dt=0 不位移
         assert.same({}, damages)
         env.now = 2
-        env.mgr:Update() -- 翻滚 17.5 米贴到咬距边缘：滚到唯一玩家
+        env.mgr:update() -- 翻滚 17.5 米贴到咬距边缘：滚到唯一玩家
         assert.same({ 25 }, damages, '单人追击也要结算翻滚接触伤害')
         assert.is_nil(fish.Move, '接触伤害是独立段，不与扫头同帧并发')
     end)
@@ -243,14 +243,14 @@ describe('TestForestCombat', function()
         local body = fish.Carrier.Body
         local z0 = body.Position.z
         env.now = 0
-        env.mgr:Update() -- 首帧 dt=0，不位移
+        env.mgr:update() -- 首帧 dt=0，不位移
         assert.near(z0, body.Position.z, 1e-9)
         env.now = 0.5
-        env.mgr:Update()
+        env.mgr:update()
         assert.near(12 * 0.5, body.Position.z - z0, 1e-6, '追击步长 = Speed × dt')
         assert.is_nil(fish.Move, '追击帧不起手')
         env.now = 180
-        env.mgr:Update()
+        env.mgr:update()
         assert.are.equal('escaping', fish.State)
         assert.is_true(fish.StraightEscape)
     end)
@@ -258,13 +258,13 @@ describe('TestForestCombat', function()
     it('test_swordfish_head_swing_20_damage_on_cadence', function()
         local fish, damages = drop(env, 'fish31Elite', 2)
         env.now = 0
-        env.mgr:Update()
+        env.mgr:update()
         assert.are.equal('swing', fish.Move.Name)
         assert.same({}, damages, '起手帧只是预警')
-        env.mgr:Update() -- 同击重复帧不重复结算
+        env.mgr:update() -- 同击重复帧不重复结算
         assert.same({}, damages)
         env.now = 2 -- SwingCooldownSec
-        env.mgr:Update()
+        env.mgr:update()
         assert.same({ 20 }, damages)
         assert.are.equal(1, #env.vitalsCalls)
         assert.same(fish, env.vitalsCalls[1][1].source)
@@ -272,15 +272,15 @@ describe('TestForestCombat', function()
         -- 预警中绕到身后（仍在咬距内）：锁定朝向不跟着转头，结算落空
         local p = fish.Carrier.Body.Position
         env.now = 2.1
-        env.mgr:Update() -- 冷却过后重新起手，朝向锁定 +z
+        env.mgr:update() -- 冷却过后重新起手，朝向锁定 +z
         assert.are.equal('swing', fish.Move.Name)
         assert.near(1, fish.Facing.z, 1e-9)
         env.player.Character.Position = vec(p.x, 2, p.z - 2)
         env.now = 2.5
-        env.mgr:Update() -- 预警中不转头
+        env.mgr:update() -- 预警中不转头
         assert.near(1, fish.Facing.z, 1e-9)
         env.now = 2.1 + 2
-        env.mgr:Update() -- 结算帧：身后算后身，不结算
+        env.mgr:update() -- 结算帧：身后算后身，不结算
         assert.same({ 20 }, damages)
     end)
 
@@ -290,12 +290,12 @@ describe('TestForestCombat', function()
         local savedRandom = math.random
         math.random = function() return 0 end -- 落点方向固定为 +x
         env.now = 0
-        env.mgr:Update()
+        env.mgr:update()
         env.now = 49.9
-        env.mgr:Update()
+        env.mgr:update()
         assert.is_nil(fish.Move, '50 秒前不得起跳')
         env.now = 50
-        env.mgr:Update()
+        env.mgr:update()
         assert.are.equal('jump', fish.Move.Name)
         local dest = fish.Move.Destination
         assert.near(10, dest.x - body.Position.x, 1e-6, '随机 10 米外落点')
@@ -304,10 +304,10 @@ describe('TestForestCombat', function()
         -- 落在落点 5 米内的玩家吃 100
         env.player.Character.Position = vec(dest.x, 2, dest.z)
         env.now = 50 + 1.5 * 0.5
-        env.mgr:Update()
+        env.mgr:update()
         assert.same({}, damages, '飞行中不结算')
         env.now = 50 + 1.5
-        env.mgr:Update()
+        env.mgr:update()
         assert.same({ 100 }, damages)
         assert.near(dest.x, body.Position.x, 1e-6, '落地停在落点')
     end)

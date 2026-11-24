@@ -2,7 +2,7 @@
 -- 9-01 统一入口；9-12 同队全武器免伤；9-13 鱼塘免伤；9-14 鱼塘外非同队互伤；
 -- 9-15 PK 不以在线人数为条件；9-16 安全区不挡鱼攻击；9-11 离队后立即失去队友免伤。
 -- 黑盒入口：server/main.lua 的 MgrMap 装配 Vitals / Party / ZoneMarkers / DamageFilter，
--- 测试只调 mgr 公开方法 NewHit / ApplyHit / PartyAction / SameParty，不直接调被过滤的 ApplyDamage。
+-- 测试只调 mgr 公开方法 new_hit / apply_hit / PartyAction / same_party，不直接调被过滤的 apply_damage。
 -- 失败方式（先列后写）：
 --   1. 近战、枪械、范围、爆炸里任一类别绕过统一入口，导致同队仍掉血；
 --   2. 过滤器缓存队伍归属，离队后同队免伤仍生效；
@@ -33,7 +33,7 @@ local function assert_wiring()
   end
 end
 
-local function newPlayer(userId, position)
+local function new_player(userId, position)
   local player = { UserId = userId, Name = 'p' .. userId, attrs = {} }
   player.Character = { Position = position or vec(0, 0, 0), Size = { x = 1, y = 2, z = 1 },
     Controller = {
@@ -66,8 +66,8 @@ describe('条款 9 PK 伤害过滤', function()
   end
 
   local function join(userId, position)
-    local player = newPlayer(userId, position)
-    env.players:OnPlayerAdded(player)
+    local player = new_player(userId, position)
+    env.players:on_player_added(player)
     env.lifeHost:add(player)
     drain()
     return player
@@ -83,11 +83,11 @@ describe('条款 9 PK 伤害过滤', function()
   local function makeTeam(a, b)
     request(a, 'Invite', { targetUserId = b.UserId })
     request(b, 'Accept')
-    assert.is_true(env.party:SameParty(a, b))
+    assert.is_true(env.party:same_party(a, b))
   end
 
   local function hit(source, target, category, amount)
-    return env.vitals:ApplyHit(env.vitals:NewHit(source, category), target, amount or 30)
+    return env.vitals:apply_hit(env.vitals:new_hit(source, category), target, amount or 30)
   end
 
   before_each(function()
@@ -123,19 +123,19 @@ describe('条款 9 PK 伤害过滤', function()
         return { Instance = target.Character, Position = env.shotAt or { x = 0, y = 0, z = 0 } }
       end } end
     end }
-    local re = { GetRE = function(_, name)
+    local re = { get_re = function(_, name)
       env.re[name] = env.re[name] or { OnServerEvent = signal(), OnClientEvent = signal(),
         FireClient = function() end, FireAllClients = function() end, FireServer = function() end }
       return env.re[name]
-    end, CheckRECD = function() return false end }
+    end, check_recd = function() return false end }
     _G.REUtil, package.loaded['common.re_util'] = re, re
     -- 真区域解析：鱼塘边界来自与生产同一条 ZoneMarkers 路径，不写死坐标。
     env.zones = assert(loadfile('tests/support/zone_fixtures.lua'))()
-    env.cfg = env.zones.Load()
+    env.cfg = env.zones.load()
     env.party = {}
-    function env.party:SameParty(a, b)
+    function env.party:same_party(a, b)
       local squad = env.lifeHost and env.lifeHost.runtime.world.squad
-      return squad and squad:SameParty(a, b) or false
+      return squad and squad:same_party(a, b) or false
     end
     env.lifeHost = require('tests.support.life_host').start({ now = 0, remote = re })
     env.vitals = env.lifeHost.runtime.life
@@ -148,7 +148,7 @@ describe('条款 9 PK 伤害过滤', function()
     -- 生产装配：过滤接缝与区域真源都经 mgr 注入，不缓存队伍归属。
     env.vitals.Party = env.party
     env.vitals.ZoneMarkers = require('common.zone_markers')
-    env.vitals:SetDamageFilter(function(hit, target, mgr) return env.filter(hit, target, mgr) end)
+    env.vitals:set_damage_filter(function(hit, target, mgr) return env.filter(hit, target, mgr) end)
     -- 9-12（review #249）：武器管理器照 main.lua 的接线装进同一套环境（伤害仍只经统一入口）。
     -- AbilityAPI 在装载时要引擎的 RemoteEvent 全局：补替身并清模块缓存，避免复用别的用例的上下文。
     env.remoteEvent, env.abilityModule, env.swingModule =
@@ -165,7 +165,7 @@ describe('条款 9 PK 伤害过滤', function()
           Data = { FishCoin = 0, Zone = 'fishPond', Weapons = { [weapon_id] = 1 }, Containers = {} },
           Extra = { growth = { potions = {}, upgrades = {} }, inventory = { selection = { held = { kind = 'weapon', id = weapon_id } } }, survival = {} },
         })
-        return env.lifeHost.runtime.life:WeaponAction(player, { action = 'attack', aim = aim })
+        return env.lifeHost.runtime.life:weapon_action(player, { action = 'attack', aim = aim })
       end,
     }
   end)
@@ -219,7 +219,7 @@ describe('条款 9 PK 伤害过滤', function()
     env.weapon:AttackGun(a, 'item137', gun, {}, vec(1, 0, 0))
     assert.same(300, b.Character.Controller.Health, '同队玩家被枪械命中也不掉血')
     request(a, 'Leave', {})
-    assert.is_false(env.party:SameParty(a, b))
+    assert.is_false(env.party:same_party(a, b))
     env.now = env.now + gun.IntervalSec + 1
     env.lifeHost.runtime.clock:advance(gun.IntervalSec + 1)
     env.weapon:AttackGun(a, 'item137', gun, {}, vec(1, 0, 0))

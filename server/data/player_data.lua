@@ -67,7 +67,7 @@ local function insideBoundary(point, bounds)
 end
 
 function PlayerData:ResolveSafePoint()
-    local scene = zoneScene(GameCfg.ResolveZoneId(self.Data.Zone))
+    local scene = zoneScene(GameCfg.resolve_zone_id(self.Data.Zone))
     if not scene or not scene.Boundary or not finitePoint(scene.SafePoint) then return nil, false end
     local mark = self.Extra.travel.safePoint
     if insideBoundary(mark, scene.Boundary) then
@@ -80,7 +80,7 @@ end
 
 function PlayerData:NoteSafePoint()
     if not self.Inited then return end
-    local scene = zoneScene(GameCfg.ResolveZoneId(self.Data.Zone))
+    local scene = zoneScene(GameCfg.resolve_zone_id(self.Data.Zone))
     if not scene or not scene.Boundary then return end
     self:ResolveSafePoint()
     local character = self.Player and self.Player.Character
@@ -98,7 +98,7 @@ local function defaults(zone)
         survival = { health = GameCfg.Vitals.MaxHealth, hunger = GameCfg.Vitals.MaxHunger,
             weakRemaining = 0, dyingRemaining = 0, deadRemaining = 0, dying = false, dead = false },
         collection = { weights = {}, unlocked = {} }, quest = { step = 1, count = 0 },
-        story = { read = {} }, travel = { arrived = {}, zone = GameCfg.ResolveZoneId(zone), safePoint = {} },
+        story = { read = {} }, travel = { arrived = {}, zone = GameCfg.resolve_zone_id(zone), safePoint = {} },
         lottery = { pity = 0 }, achievements = {}, recovery = {}, cooldowns = {},
         party = { id = 0 },
     }
@@ -305,7 +305,7 @@ function PlayerData:Serialize()
     self.Extra.inventory.selection.bait = self.Data.SelectedBait
     self.Extra.inventory.selection.weapon = self.Data.SelectedWeapon
     self.Extra.inventory.weapons = copy(self.Data.Weapons)
-    self.Extra.travel.zone = GameCfg.ResolveZoneId(self.Data.Zone)
+    self.Extra.travel.zone = GameCfg.resolve_zone_id(self.Data.Zone)
     return {
         v = 2,
         extra = copy(self.Extra),
@@ -510,7 +510,7 @@ local function isWeapon(itemId)
     return definition ~= nil and (definition.Type == '近战武器' or definition.Type == '远程武器')
 end
 
-function PlayerData:ShopUpgradeLevel(kind)
+function PlayerData:shop_upgrade_level(kind)
     if kind == 'backpack' then
         return self.Inited and self.Data.UpgradeLevel or 0
     end
@@ -535,7 +535,7 @@ function PlayerData:CanShopUpgrade(upgrade)
     if type(upgrade) ~= 'table' or type(upgrade.kind) ~= 'string' then return false, 'bad' end
     local spec = GameCfg.Shop.UpgradeKinds[upgrade.kind]
     if not spec or not integer(upgrade.level, 1, spec.MaxLevel) then return false, 'bad' end
-    local current = self:ShopUpgradeLevel(upgrade.kind)
+    local current = self:shop_upgrade_level(upgrade.kind)
     if current >= spec.MaxLevel then return false, 'max' end
     if upgrade.level ~= current + 1 then return false, 'level' end
     return true
@@ -552,14 +552,14 @@ function PlayerData:ApplyShopUpgrade(upgrade)
     return true
 end
 
-function PlayerData:WeaponDamageScale(kind)
+function PlayerData:weapon_damage_scale(kind)
     if not self.Inited then return 1 end
-    return GameCfg.Shop.DamageScale(kind, self:ShopUpgradeLevel(kind)) or 1
+    return GameCfg.Shop.damage_scale(kind, self:shop_upgrade_level(kind)) or 1
 end
 
-function PlayerData:MagazineSize(base)
+function PlayerData:magazine_size(base)
     if not self.Inited or type(base) ~= 'number' then return base end
-    return GameCfg.Shop.MagazineSize(base, self:ShopUpgradeLevel('magazine'))
+    return GameCfg.Shop.magazine_size(base, self:shop_upgrade_level('magazine'))
 end
 
 function PlayerData:GrantWeapon(itemId, count)
@@ -575,7 +575,7 @@ function PlayerData:WeaponCount(itemId)
     return self.Inited and self.Data.Weapons[itemId] or 0
 end
 
-function PlayerData:PotionCount(itemId)
+function PlayerData:potion_count(itemId)
     return self.Inited and self.Extra.growth.potions[itemId] or 0
 end
 

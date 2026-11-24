@@ -7,12 +7,12 @@ if _G.Reef37ClientConns then
 end
 local re=require('common.re_util')
 _G.Reef37ClientConns={
-    re:GetRE('GarBiteNotice').OnClientEvent:Connect(function(p)
+    re:get_re('GarBiteNotice').OnClientEvent:Connect(function(p)
         if p.move=='airThrow' or p.move=='airDive' or (type(p.fishId)=='number' and p.fishId<0) then
             print('REEF37_CLIENT_NOTICE',p.kind,p.fishId,p.ownerFishId,p.move,p.position,p.reason)
         end
     end),
-    re:GetRE('CastState').OnClientEvent:Connect(function(p)
+    re:get_re('CastState').OnClientEvent:Connect(function(p)
         print('REEF37_CLIENT_CAST',p.phase,p.fishId,p.catchSource,p.hookPosition)
     end),
 }

@@ -1,6 +1,6 @@
 -- #138 T17 抽奖机运行探针（离线模拟，只证明逻辑，不当真机验收）。
 -- 运行：在仓库根执行 `lua tests/probes/lottery_runtime.lua`；退出码 0 = 全部通过。
--- 第一节（正常路径）：真实抽样 —— 用确定性种子的 LCG 替换 MgrLottery.Random（系统边界注入点），
+-- 第一节（正常路径）：真实抽样 —— 用确定性种子的 LCG 替换 MgrLottery.random（系统边界注入点），
 --   三轴与武器组内抽样都走真实 LotteryDraw 代码，不指定图案；2 万次抽奖的经验分布与
 --   配置表理论值对账（两同/三同/未中奖占比、赔付期望 2.119671、投入产出守恒）。
 -- 第二节（[专项探针]）：低概率三同路径用脚本化序列逐图案强制触发，验证大奖发放与落位；
@@ -43,10 +43,10 @@ local lottery = setmetatable({}, {
         if key == 'Random' then world.randomOverride = value else rawset(self, key, value) end
     end,
 })
-function lottery:Settle(_, slot)
+function lottery:settle(_, slot)
     seq = seq + 1
-    assert(world:lotteryAction({ action = 'Draw', slot = slot, seq = seq }))
-    local result = world:lastResult('LotteryResult')
+    assert(world:lottery_action({ action = 'Draw', slot = slot, seq = seq }))
+    local result = world:last_result('LotteryResult')
     assert(result and result.ok, result and result.reason or '无回包')
     return result
 end
@@ -58,7 +58,7 @@ local function lcg(n) -- 固定种子 LCG，返回 1..n 均匀整数（确定性
     rngState = (rngState * 1103515245 + 12345) % 2147483648
     return rngState % n + 1
 end
-lottery.Random = lcg
+lottery.random = lcg
 
 local patterns = GameCfg.Lottery.Patterns
 local function patternIndexByName(name)
@@ -70,11 +70,11 @@ _G.print = function() end
 local pairCount, tripleCount, noneCount = {}, {}, 0
 local coinsPaid, consumed = 0, 0
 for _ = 1, N do
-    -- 每次投一件未烤极品罗非鱼（基础价 3）：直接摆进第 1 格，走真实 Settle
+    -- 每次投一件未烤极品罗非鱼（基础价 3）：直接摆进第 1 格，走真实 settle
     local bar = data.Data.Containers[ITEM_BAR]
     for slot = 1, data:ItemBarCapacity() do bar[slot] = nil end
     bar[1] = { itemId = 'item7', count = 1, containerId = ITEM_BAR }
-    local result = assert(lottery:Settle(data, 1))
+    local result = assert(lottery:settle(data, 1))
     consumed = consumed + 1
     if result.outcome == 'pair' then
         local index = assert(patternIndexByName(result.patternName))
@@ -105,7 +105,7 @@ quantity('理论赔付期望(每倍投注)', string.format('%.6f', expectPayout)
 check('配置表期望仍是 2.119671', math.abs(expectPayout - 2.119671) < 1e-9,
     string.format('%.6f', expectPayout))
 
-local betValue = GameCfg.Items.SalePrice('item7')
+local betValue = GameCfg.Items.sale_price('item7')
 local empiricalPayout = coinsPaid / (N * betValue)
 quantity('投注价值', betValue)
 quantity('金币总赔付', coinsPaid)
@@ -170,12 +170,12 @@ for i, p in ipairs(patterns) do
     local script = { roll, roll, roll }
     if reward.kind == 'weaponChoice' then script[4] = 1 end -- 组内取第 1 件
     local index = 0
-    lottery.Random = function()
+    lottery.random = function()
         index = index + 1
         return assert(script[index], '专项脚本耗尽')
     end
     local before = data.Data.FishCoin
-    local result = assert(lottery:Settle(data, 1))
+    local result = assert(lottery:settle(data, 1))
     local ok = result.outcome == 'triple' and result.patternName == p.name and result.prize ~= nil
     local placement
     if reward.kind == 'weaponChoice' then
@@ -194,5 +194,5 @@ for i, p in ipairs(patterns) do
 end
 
 print(string.format('--- 探针合计：%d 通过，%d 失败 ---', Pass, Fail))
-world:tearDown()
+world:tear_down()
 os.exit(Fail == 0 and 0 or 1)

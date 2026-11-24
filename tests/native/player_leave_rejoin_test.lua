@@ -58,20 +58,20 @@ describe('TestPlayerLeaveRejoin', function()
     end
 
     local function fact(id)
-        assert.is_true(env.quest:Notify('PickBait', env.a, { itemId = 'worm', eventId = id }))
+        assert.is_true(env.quest:notify('PickBait', env.a, { itemId = 'worm', eventId = id }))
     end
 
     local function assertRejoined(p)
         assert.same('ready', p.attrs.SaveState)
-        assert.is_not_nil(env.data:GetDataInst(p))
+        assert.is_not_nil(env.data:get_data_inst(p))
         local life = env.runtime and env.runtime.life
         local state = life and life:GetState(p)
         assert.are.equal(p, state and state.player)
-        assert.same('alive', life:LifeStatus(p))
-        assert.is_true(life:CanAct(p))
+        assert.same('alive', life:life_status(p))
+        assert.is_true(life:can_act(p))
     end
 
-    -- 逐例夹具：旧 LuaUnit 每例跑 setUp/tearDown，这里同样用 before_each/after_each。
+    -- 逐例夹具：旧 LuaUnit 每例跑 set_up/tear_down，这里同样用 before_each/after_each。
     -- 第一步把所有被改状态（4 个全局 + Debug + QaSlot）存进 saved，之后才改任何东西，
     -- 因此夹具中途抛错时 after_each 仍能完整还原，不把失败泄漏给后续案例。
     before_each(function()
@@ -122,13 +122,13 @@ describe('TestPlayerLeaveRejoin', function()
                 if name == 'DataStoreService' then return { GetDataStore = function() return env.store end } end
             end,
         }
-        _G.REUtil = { GetRE = function(_, name)
+        _G.REUtil = { get_re = function(_, name)
             env.remotes = env.remotes or {}
             if not env.remotes[name] then
                 env.remotes[name] = { OnServerEvent = signal(), FireClient = function() end }
             end
             return env.remotes[name]
-        end, CheckRECD = function() return false end }
+        end, check_recd = function() return false end }
         _G.RemoteEvent = { New = function() return {
             OnServerEvent = signal(), OnClientEvent = signal(),
             FireServer = function() end, FireClient = function() end,
@@ -157,8 +157,8 @@ describe('TestPlayerLeaveRejoin', function()
         env.save = assert(loadfile('server/save_host.lua'))()
         env.data = assert(loadfile('server/player_data_host.lua'))()
         env.quest = {
-            Notify = function(_, kind, player, payload) return env.runtime:notify_quest(kind, player, payload) end,
-            GetState = function(_, player) return env.data:GetDataInst(player).Extra.quest end,
+            notify = function(_, kind, player, payload) return env.runtime:notify_quest(kind, player, payload) end,
+            GetState = function(_, player) return env.data:get_data_inst(player).Extra.quest end,
         }
         local sandbox = setmetatable({
             print = function(...)
@@ -174,7 +174,7 @@ describe('TestPlayerLeaveRejoin', function()
                 if path == 'server.save_host' then return env.save end
                 if path == 'server.player_data_host' then return env.data end
                 if path == 'server.platform_host' then return {} end
-                if path == 'server.fish_ability' then return { Start = function() end, Update = function() end } end
+                if path == 'server.fish_ability' then return { Start = function() end, update = function() end } end
                 return require(path)
             end,
         }, { __index = _G })
@@ -192,24 +192,24 @@ describe('TestPlayerLeaveRejoin', function()
     end)
 
     it('test_dead_old_vitals_does_not_block_new_living_player', function()
-        env.runtime.life:ApplyHit(env.runtime.life:NewHit(nil, 'fishAttack'), env.a, 999)
-        assert.is_false(env.runtime.life:CanAct(env.a))
+        env.runtime.life:apply_hit(env.runtime.life:new_hit(nil, 'fishAttack'), env.a, 999)
+        assert.is_false(env.runtime.life:can_act(env.a))
         fact('worm:dead')
         env.players.PlayerRemoving:Fire(env.a)
         local b = join(env.a.UserId)
         drain()
         assertRejoined(b)
-        assert.is_true(env.runtime.life:CanAct(b))
+        assert.is_true(env.runtime.life:can_act(b))
     end)
 
     it('test_final_leave_snapshot_is_drained_before_new_claim', function()
-        env.data:GetDataInst(env.a):AddCoin(17)
+        env.data:get_data_inst(env.a):AddCoin(17)
         env.players.PlayerRemoving:Fire(env.a)
         local b = join(env.a.UserId)
         assert.same('pending', b.attrs.SaveState)
         drain()
         assertRejoined(b)
-        assert.same(17, env.data:GetDataInst(b).Data.FishCoin)
+        assert.same(17, env.data:get_data_inst(b).Data.FishCoin)
         assert.same(17, env.values.u560.coin)
     end)
 
@@ -244,7 +244,7 @@ describe('TestPlayerLeaveRejoin', function()
         assert.same('ready', other.attrs.SaveState)
         assert.same('pending', b.attrs.SaveState)
         env.failWrite = true
-        for _ = 1, 3 do env.save:Update() drain() end
+        for _ = 1, 3 do env.save:update() drain() end
         env.failWrite = false
         drain()
         -- 旧写失败关闭屏障，新玩家仍可从最后确认的存档恢复。
@@ -262,7 +262,7 @@ describe('TestPlayerLeaveRejoin', function()
         local b = join(env.a.UserId)
         drain()
         assertRejoined(b)
-        local restored = env.data:GetDataInst(b)
+        local restored = env.data:get_data_inst(b)
         assert.same(1, restored.Extra.quest.count)
         assert.is_true(restored.Extra.story.read[GameCfg.Story.ReadKey or 'opening'])
         assert.is_true(env.values.u560.extra.story.read[GameCfg.Story.ReadKey or 'opening'])
@@ -274,7 +274,7 @@ describe('TestPlayerLeaveRejoin', function()
         local b = join(env.a.UserId)
         env.players.PlayerRemoving:Fire(b)
         drain()
-        assert.is_nil(env.data:GetDataInst(b))
+        assert.is_nil(env.data:get_data_inst(b))
         assert.is_nil(env.save.Sessions[b.UserId])
         assert.is_nil(env.runtime.life:GetState(b))
         local c = join(env.a.UserId)
@@ -287,7 +287,7 @@ describe('TestPlayerLeaveRejoin', function()
         env.players.PlayerRemoving:Fire(d)
         drain()
         assertRejoined(e)
-        assert.is_nil(env.data:GetDataInst(d))
+        assert.is_nil(env.data:get_data_inst(d))
         assert.same(2, env.quest:GetState(e).count)
     end)
 end)
@@ -321,9 +321,9 @@ describe('远程事件公开创建入口（common/re_util）', function()
             return events[name]
         end }
         local REUtil = require(MODULE)
-        local first = REUtil:GetRE('ShopResult')
+        local first = REUtil:get_re('ShopResult')
         assert.are.equal(events['ShopResult'], first)
-        assert.are.equal(first, REUtil:GetRE('ShopResult'))
+        assert.are.equal(first, REUtil:get_re('ShopResult'))
         assert.are.same({ 'ShopResult' }, calls)
     end)
 end)

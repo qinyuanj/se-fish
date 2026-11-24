@@ -4,7 +4,7 @@
 --   2. 存档未就绪就提前生成 PlayerTree，或 GameStart 前就绪的玩家被遗漏；
 --   3. PlayerTree 内四段因果顺序未按源码顺序排布，同一 batch 内下游先于上游运行或读取旧派生值；
 --   4. 麻痹误退外层生命相位，或 platform_pending 未暂停濒死/死亡倒计时相位；
---   5. 离场三步协议顺序错乱（未等前置脏写、终镜像晚于 dispose/SaveLeaving），或 dispose 后残留资源/局部信号；
+--   5. 离场三步协议顺序错乱（未等前置脏写、终镜像晚于 dispose/save_leaving），或 dispose 后残留资源/局部信号；
 --   6. 同账号重进期间排空栅栏未阻塞，导致提前读旧档或覆盖正在落盘的数据；
 --   7. 单棵 PlayerTree 抛未捕获异常波及其他 PlayerTree 或 SharedWorldTree，或已 dispose 树仍响应事件。
 
@@ -678,7 +678,7 @@ describe("服务端 Spoke 主干：ServerRuntime 离场三步协议、排空栅�
     rt:on_save_ready(b1, db1)
     assert.is_not_nil(rt:get_player_tree(4002))
 
-    -- 前置脏写完成：固定顺序跑 Step 1（终镜像）→ Step 2（同步 dispose 逆序清信号）→ Step 3（序列化 + AfterIdle 等待）
+    -- 前置脏写完成：固定顺序跑 Step 1（终镜像）→ Step 2（同步 dispose 逆序清信号）→ Step 3（序列化 + after_idle 等待）
     local resume = pending_flush_resume
     pending_flush_resume = nil
     resume()
@@ -913,7 +913,7 @@ describe("服务端入口接线：server/main.lua 宿主测试双端到端集成
       end,
     }
     local remote_util = {
-      GetRE = function(_, name)
+      get_re = function(_, name)
         if not remote_events[name] then
           remote_events[name] = { OnServerEvent = make_signal(), FireClient = function() end }
         end
@@ -946,7 +946,7 @@ describe("服务端入口接线：server/main.lua 宿主测试双端到端集成
     mgrs.SaveHost = assert(loadfile("server/save_host.lua"))()
     mgrs.PlayerDataHost = assert(loadfile("server/player_data_host.lua"))()
     mgrs.PlatformHost = {}
-    mgrs.FishAbility = { Start = function() end, Update = function() end }
+    mgrs.FishAbility = { Start = function() end, update = function() end }
     _G.REUtil = remote_util
     package.loaded["common.re_util"] = remote_util
 
@@ -1037,7 +1037,7 @@ describe("服务端入口接线：server/main.lua 宿主测试双端到端集成
     assert.equals(1, #local_sig.handlers)
 
     -- 变更金币并触发离场 + 同账号立即重进
-    mgrs.PlayerDataHost:GetDataInst(p1):AddCoin(42)
+    mgrs.PlayerDataHost:get_data_inst(p1):AddCoin(42)
     players_service.PlayerRemoving:Fire(p1)
     local p2 = make_host_player(6001)
     players_service.PlayerAdded:Fire(p2)
@@ -1060,6 +1060,6 @@ describe("服务端入口接线：server/main.lua 宿主测试双端到端集成
     assert.is_not_nil(pt2)
     assert.are_not.equal(pt1, pt2)
     assert.equals(42, pt2.states.coin:now())
-    assert.equals(42, mgrs.PlayerDataHost:GetDataInst(p2).Data.FishCoin)
+    assert.equals(42, mgrs.PlayerDataHost:get_data_inst(p2).Data.FishCoin)
   end)
 end)

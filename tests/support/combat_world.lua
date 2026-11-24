@@ -6,15 +6,15 @@ local FishEscape = require('tests.support.fish_escape')
 -- 复用 fish_escape 的方式：以它为 __index 原型（同族统一手法），不再逐方法拷贝。
 local M = setmetatable({}, { __index = FishEscape })
 
---- 建世界：内部已 setUp + prepare，返回的 env 直接可用；调用方负责在案例结束时 :tearDown()。
+--- 建世界：内部已 set_up + prepare，返回的 env 直接可用；调用方负责在案例结束时 :tear_down()。
 --- 拆除入口名与 blindbox_world / revive_world 相同，但**构造入口语义不同**：那三个的 new()
---- 只返回空壳、要调用方再 :setUp()，本夹具的既有调用方（探针、生命周期回归）
+--- 只返回空壳、要调用方再 :set_up()，本夹具的既有调用方（探针、生命周期回归）
 --- 都按「拿起来就用」写，故这里 new() 直接搭好世界。
---- 本文件的两个约定：生命周期走实例方法（:setUp / :tearDown），世界操作是不收 self 的普通函数，
+--- 本文件的两个约定：生命周期走实例方法（:set_up / :tear_down），世界操作是不收 self 的普通函数，
 --- 由调用方以 `CombatWorld.at(env, now)` 这类形态调用；继承自 fish_escape 的方法仍走实例。
 function M.new()
     local env = setmetatable({}, { __index = M })
-    env:setUp()
+    env:set_up()
     env:prepare()
     env.hits, env.notices = {}, {}
     for _, p in ipairs({ env.player, env.other }) do
@@ -23,30 +23,30 @@ function M.new()
     end
     -- 第二名玩家默认远离战斗点，避免落点范围 / 翻滚 / 突击判定的无关命中（需要贴身时由调用方显式摆位）
     env.other.Character.Position = Vector3.New(500, 2, 500)
-    env.mgr.PublishBite = function(_, payload) env.notices[#env.notices + 1] = payload end
-    env.mgr.CombatPublisher = function() end
+    env.mgr.publish_bite = function(_, payload) env.notices[#env.notices + 1] = payload end
+    env.mgr.combat_publisher = function() end
     env.mgr.Vitals = {
-        NewHit = function(_, source, category) return { source = source, category = category } end,
-        ApplyHit = function(_, _, player, amount)
+        new_hit = function(_, source, category) return { source = source, category = category } end,
+        apply_hit = function(_, _, player, amount)
             env.hits[#env.hits + 1] = { player = player, amount = amount }
             return true, amount
         end,
-        CanTakeDamage = function() return true end,
+        can_take_damage = function() return true end,
     }
     return env
 end
 
--- 恢复 pinRandom 替换的全局随机并拆除夹具
-function M:tearDown()
+-- 恢复 pin_random 替换的全局随机并拆除夹具
+function M:tear_down()
     if self.savedRandom then math.random = self.savedRandom end
-    FishEscape.tearDown(self)
+    FishEscape.tear_down(self)
 end
 
 -- 推进到服务器时刻 now 并跑一帧
-function M.at(env, now) env.now = now env.mgr:Update() end
+function M.at(env, now) env.now = now env.mgr:update() end
 
--- 固定随机方向：高跃 / 鲸跃落点朝 +x（表现细化，只钉距离与范围）；tearDown 时恢复
-function M.pinRandom(env)
+-- 固定随机方向：高跃 / 鲸跃落点朝 +x（表现细化，只钉距离与范围）；tear_down 时恢复
+function M.pin_random(env)
     env.savedRandom = math.random
     math.random = function() return 0 end
 end
@@ -54,9 +54,9 @@ end
 -- 放下一条战斗鱼并把目标玩家摆到鱼身 (0, dz) 处
 function M.drop(env, fishId, dz)
     local p = env.player.Character.Position
-    local fish = env.mgr:SpawnLanded(env.player, { fishId = fishId, mult = 1 }, Vector3.New(p.x, 2, p.z + 2))
+    local fish = env.mgr:spawn_landed(env.player, { fishId = fishId, mult = 1 }, Vector3.New(p.x, 2, p.z + 2))
     fish.Carrier.Body.OnLiftedBegin:Fire(env.player.Character)
-    env.mgr:Drop(env.player)
+    env.mgr:drop(env.player)
     local bp = fish.Carrier.Body.Position
     env.player.Character.Position = Vector3.New(bp.x, 2, bp.z + (dz or 2))
     return fish

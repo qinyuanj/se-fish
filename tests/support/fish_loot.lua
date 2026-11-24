@@ -3,7 +3,7 @@
 local FishLift = require('tests.support.fish_lift')
 local M = setmetatable({}, { __index = FishLift })
 
---- 建一个空世界壳；调用方随后 :setUp() 搭世界、:tearDown() 拆除
+--- 建一个空世界壳；调用方随后 :set_up() 搭世界、:tear_down() 拆除
 --- （与 blindbox_world / revive_world 同一构造/拆除入口名）。
 function M.new()
     return setmetatable({}, { __index = M })
@@ -15,7 +15,7 @@ local function vec(x, y, z)
     end })
 end
 
-function M:setUp()
+function M:set_up()
     self.savedColor = _G.Color
     self.lootModule = package.loaded['server.world_host.ground_loot']
     self.lootSaved = true
@@ -23,10 +23,10 @@ function M:setUp()
     -- 拾饵消费者可能已经开启调试，保留它传入的原始基线。
     self.savedGrantDebug = self.savedGrantDebug or require('common.game_cfg').Debug
     require('common.game_cfg').Debug = { Enabled = true, InitialGrants = self.savedGrantDebug.InitialGrants }
-    FishLift.setUp(self)
+    FishLift.set_up(self)
     local env = self
     self.diedSubs = {}
-    package.loaded['server.world_host.fish_carrier'].SubscribeDied = function(_, fn)
+    package.loaded['server.world_host.fish_carrier'].subscribe_died = function(_, fn)
         env.diedSubs[#env.diedSubs + 1] = fn
         return true
     end
@@ -54,10 +54,10 @@ function M:setUp()
     self.loot = { Loots = {}, Start = function() end }
 end
 
-function M:tearDown()
+function M:tear_down()
     if self.lootSaved then
-        -- setUp 未完成时也按已保存状态回滚，避免半成品环境遗留到下一轮。
-        local ok, err = pcall(function() FishLift.tearDown(self) end)
+        -- set_up 未完成时也按已保存状态回滚，避免半成品环境遗留到下一轮。
+        local ok, err = pcall(function() FishLift.tear_down(self) end)
         _G.Color = self.savedColor
         if self.savedGrantDebug then require('common.game_cfg').Debug = self.savedGrantDebug end
         package.loaded['server.world_host.ground_loot'] = self.lootModule
@@ -65,14 +65,14 @@ function M:tearDown()
         if not ok then error(err, 0) end
         return
     end
-    FishLift.tearDown(self)
+    FishLift.tear_down(self)
 end
 
 function M:kill(fish)
     for _, fn in ipairs(self.diedSubs) do fn(fish.Carrier) end
 end
 
-function M:lootUnits()
+function M:loot_units()
     local list = {}
     for _, unit in ipairs(self.created) do
         if unit.UnitType == 'WorldUnit' and tostring(unit.Name):find('^FishLoot_') and not unit.Destroyed then
@@ -82,7 +82,7 @@ function M:lootUnits()
     return list
 end
 
-function M:onlyLoot()
+function M:only_loot()
     local ids = {}
     for id in pairs(self.loot.Loots) do ids[#ids + 1] = id end
     assert(#ids == 1, '预期只有一份鱼获')

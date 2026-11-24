@@ -43,7 +43,7 @@ local function channels()
         end
         return registry[name]
     end
-    return { posts = posts, GetRE = function(_, name) return channel(name) end }
+    return { posts = posts, get_re = function(_, name) return channel(name) end }
 end
 
 describe('条款 17-18：分享任务的占位入口', function()
@@ -59,15 +59,15 @@ describe('条款 17-18：分享任务的占位入口', function()
         GameCfg.Platform.Placeholder.AllowInPublish = false
         env = { now = 0, posts = nil }
         env.re = channels()
-        _G.REUtil = { GetRE = env.re.GetRE, CheckRECD = function() return false end }
+        _G.REUtil = { get_re = env.re.get_re, check_recd = function() return false end }
         env.player = { UserId = 26303, SetAttribute = function() end }
         env.data = assert(loadfile('server/data/player_data.lua'))().New(env.player, function() end)
         env.data:Init()
         env.platform = assert(loadfile('server/platform_host.lua'))()
-        env.platform.PlayerData = { GetDataInst = function(_, player) return player == env.player and env.data end,
-            SendItemBar = function() end }
-        env.platform.Save = { NextOperation = function() return { id = '26303:1' } end,
-            Execute = function(_, player, data, operation, transform, done)
+        env.platform.PlayerData = { get_data_inst = function(_, player) return player == env.player and env.data end,
+            send_item_bar = function() end }
+        env.platform.Save = { next_operation = function() return { id = '26303:1' } end,
+            execute = function(_, player, data, operation, transform, done)
                 local accepted, result = transform(data)
                 if not accepted then return false, 'rejected' end
                 if done then done(true, result) end
@@ -85,7 +85,7 @@ describe('条款 17-18：分享任务的占位入口', function()
     end)
 
     -- 平台回包统一走 PlatformResult 通道（客户端据此显示提示），按 action 分辨是哪件事。
-    local function lastReply()
+    local function last_reply()
         local list = env.re.posts.PlatformResult or {}
         return list[#list]
     end
@@ -97,7 +97,7 @@ describe('条款 17-18：分享任务的占位入口', function()
         local itemId = GameCfg.Survival.AdrenalineItemId
         local before = env.data:ItemCount(itemId)
         assert.is_false(env.platform:Share(env.player, 'tutorial'))
-        local reply = lastReply()
+        local reply = last_reply()
         assert.is_table(reply, '分享入口必须有回包，不能静默吞掉')
         assert.is_false(reply.ok)
         assert.same('Share', reply.action)
@@ -110,9 +110,9 @@ describe('条款 17-18：分享任务的占位入口', function()
     end)
 
     it('经平台操作通道进来的分享请求同样有明确回包', function()
-        local handled = env.platform:HandleAction(env.player, { action = 'Share', purpose = 'tutorial' })
+        local handled = env.platform:handle_action(env.player, { action = 'Share', purpose = 'tutorial' })
         assert.is_true(handled, '分享请求要被受理，不许丢掉')
-        local reply = lastReply()
+        local reply = last_reply()
         assert.is_table(reply)
         assert.same('placeholder', reply.reason)
         assert.same('tutorial', reply.purpose)
@@ -133,7 +133,7 @@ describe('条款 17-18：分享任务的占位入口', function()
         local itemId = GameCfg.Survival.AdrenalineItemId
         local items = shop.data:ItemCount(itemId)
         local coin = shop.data.Data.FishCoin
-        local function lastReply() return shop:lastResult('PlatformResult') end
+        local function last_reply() return shop:last_result('PlatformResult') end
         local function assert_not_open(reply, what)
             assert.is_table(reply, what .. ' 被拒时必须回包，不能静默')
             assert.is_false(reply.ok, what .. ' 不得回成功')
@@ -142,25 +142,25 @@ describe('条款 17-18：分享任务的占位入口', function()
                 what .. ' 的回执没说明未开放')
             assert.same(items, shop.data:ItemCount(itemId), what .. ' 被拒时不得发物品')
             assert.same(coin, shop.data.Data.FishCoin, what .. ' 被拒时不得改金币')
-            assert.is_false(shop.platform:HasFlow(shop.player), what .. ' 被拒时不得建平台 flow')
+            assert.is_false(shop.platform:has_flow(shop.player), what .. ' 被拒时不得建平台 flow')
         end
-        assert.is_true(shop:platformAction({ action = 'Purchase', goods = 'adrenaline1', seq = 1 }))
-        assert_not_open(lastReply(), '占位支付')
-        assert.is_false(shop:platformAction({ action = 'OpenCoinShop' }))
-        local coinShop = lastReply()
+        assert.is_true(shop:platform_action({ action = 'Purchase', goods = 'adrenaline1', seq = 1 }))
+        assert_not_open(last_reply(), '占位支付')
+        assert.is_false(shop:platform_action({ action = 'OpenCoinShop' }))
+        local coinShop = last_reply()
         assert.same('CoinShop', coinShop.action)
         assert_not_open(coinShop, '金币页入口')
         assert.is_nil(coinShop.offers, '闸门关闭时不得报出可购买价目')
-        assert.is_true(shop:platformAction({ action = 'BuyCoin', goods = 'coinPouch', seq = 1 }))
-        assert_not_open(lastReply(), '金币页购买')
-        local adOpened, adReason = shop.platform:ShowAd(shop.player, 'revive', 'revive', function()
+        assert.is_true(shop:platform_action({ action = 'BuyCoin', goods = 'coinPouch', seq = 1 }))
+        assert_not_open(last_reply(), '金币页购买')
+        local adOpened, adReason = shop.platform:show_ad(shop.player, 'revive', 'revive', function()
             error('闸门关闭时不得建广告 flow')
         end)
         assert.is_false(adOpened)
         assert.same('not_open', adReason)
-        assert.is_true(shop.platform:HandleAction(shop.player, { action = 'Share', purpose = 'tutorial' }))
-        assert_not_open(lastReply(), '分享')
-        shop:tearDown()
+        assert.is_true(shop.platform:handle_action(shop.player, { action = 'Share', purpose = 'tutorial' }))
+        assert_not_open(last_reply(), '分享')
+        shop:tear_down()
     end)
 
     it('19-13 发布构建显式打开 AllowInPublish 后占位通道恢复可用', function()
@@ -168,17 +168,17 @@ describe('条款 17-18：分享任务的占位入口', function()
         GameCfg.Debug.Enabled = false
         GameCfg.Platform.Placeholder.Enabled = true
         GameCfg.Platform.Placeholder.AllowInPublish = true
-        assert.is_true(shop:platformAction({ action = 'OpenCoinShop' }))
-        local coinShop = shop:lastResult('PlatformResult')
+        assert.is_true(shop:platform_action({ action = 'OpenCoinShop' }))
+        local coinShop = shop:last_result('PlatformResult')
         assert.is_true(coinShop.ok)
         assert.same('CoinShop', coinShop.action)
         assert.is_table(coinShop.offers)
         assert.is_true(#coinShop.offers > 0)
-        assert.is_true(shop:platformAction({ action = 'Purchase', goods = 'adrenaline1', seq = 1 }))
-        local opened = shop:lastResult('PlatformResult')
+        assert.is_true(shop:platform_action({ action = 'Purchase', goods = 'adrenaline1', seq = 1 }))
+        local opened = shop:last_result('PlatformResult')
         assert.same('PlaceholderFlow', opened.action)
         assert.is_true(opened.open)
-        shop:tearDown()
+        shop:tear_down()
     end)
 
 
@@ -196,8 +196,8 @@ describe('条款 17-18：分享任务的占位入口', function()
         local itemId = GameCfg.Survival.AdrenalineItemId
         local before = env.data:ItemCount(itemId)
         -- 分享：不再以「未开放」拒绝，回到占位入口自身的原因与文案；仍不发真实权益
-        assert.is_true(env.platform:HandleAction(env.player, { action = 'Share', purpose = 'tutorial' }))
-        local share = lastReply()
+        assert.is_true(env.platform:handle_action(env.player, { action = 'Share', purpose = 'tutorial' }))
+        local share = last_reply()
         assert.is_table(share)
         assert.same('Share', share.action)
         assert.is_false(share.ok)
@@ -206,16 +206,16 @@ describe('条款 17-18：分享任务的占位入口', function()
         assert.same(coin, env.data.Data.FishCoin, '占位分享不得改金币')
         assert.same(before, env.data:ItemCount(itemId), '占位分享不得发物品')
         -- 占位广告：能开出占位 flow，参数来自共享配置的占位广告位
-        assert.is_true(env.platform:ShowAd(env.player, 'revive', 'revive', function() end),
+        assert.is_true(env.platform:show_ad(env.player, 'revive', 'revive', function() end),
             '显式开放后占位广告应能开出 flow')
-        local flow = lastReply()
+        local flow = last_reply()
         assert.same('PlaceholderFlow', flow.action)
         assert.is_true(flow.open)
         assert.same('ad', flow.kind)
         assert.same(GameCfg.Platform.Placeholder.Ads.revive, flow.goodsId,
             '占位广告位参数必须来自共享配置')
-        assert.is_true(env.platform:HasFlow(env.player))
+        assert.is_true(env.platform:has_flow(env.player))
         -- 收起 flow，避免影响同一用例后续断言
-        assert.is_true(env.platform:ResolvePlaceholder(env.player, 'cancel'))
+        assert.is_true(env.platform:resolve_placeholder(env.player, 'cancel'))
     end)
 end)

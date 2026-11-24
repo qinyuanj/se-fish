@@ -19,7 +19,7 @@ ShopView.FailText = {
 }
 
 ShopView.ShopText = {
-  Close = "关闭",
+  close = "关闭",
   Buy = "购买",
   GoPlatformShop = "去地图商店",
   OpenPlatformShop = "打开地图商店",
@@ -39,7 +39,7 @@ ShopView.ShopText = {
 local function near(position, center, character)
   local dist_sq = ViewUtil.distance_sq_xz(position, center)
   if dist_sq == nil then return false end
-  local radius = BodyScale.InteractionRadius(character, GameCfg.Shop.Radius)
+  local radius = BodyScale.interaction_radius(character, GameCfg.Shop.Radius)
   return dist_sq <= radius * radius
 end
 
@@ -136,7 +136,7 @@ end
 local function build_rows(ctx, page, level)
   local rows = {}
   local shop = shop_state(ctx) or {}
-  for index, goods in ipairs(GameCfg.Shop.ListForPage(level, page, true)) do
+  for index, goods in ipairs(GameCfg.Shop.list_for_page(level, page, true)) do
     local current = goods.Upgrade and current_upgrade(ctx, goods.Upgrade.kind) or nil
     local state, reason, state_text = row_state(goods, level, current, shop.purchases)
     local definition = goods.ItemId and GameCfg.Items.Definitions[goods.ItemId] or nil
@@ -257,7 +257,7 @@ function ShopView.modal_spec()
     end
 
     local close = ctx.create_node(scope, "EUIButton", {
-      Name = "BtnShopClose", Parent = panel, ButtonText = ShopView.ShopText.Close, TouchEnabled = true,
+      Name = "BtnShopClose", Parent = panel, ButtonText = ShopView.ShopText.close, TouchEnabled = true,
     })
     ctx.connect(scope, close.OnClicked, function() close_modal(ctx, "shop") end)
 

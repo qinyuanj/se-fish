@@ -1,7 +1,7 @@
 -- 条款 12-39 / 12-40 / 12-41 / 12-42 / 12-43 / 12-44 / 12-45 / 12-46 与
 -- 12-04 / 12-05（docs/acceptance/12-elite-boss-behavior.md，#256）。
 --
--- 业务入口：MgrFishUnit:SpawnLanded + Drop 把哥斯拉放下，逐帧 Update 推进服务端权威时钟；
+-- 业务入口：MgrFishUnit:spawn_landed + drop 把哥斯拉放下，逐帧 update 推进服务端权威时钟；
 -- 只观察玩家看得见的三个面：
 --   1. 鱼本体血量（Carrier.Health / MaxHealth，玩家打得到的那条血）；
 --   2. 玩家血量（Controller.Health，所有伤害都走 MgrVitals）；
@@ -32,12 +32,12 @@ describe('第 12 节 首领逐招表（哥斯拉）', function()
         savedExtra = { ability = package.loaded['server.ability_api'] }
         env = Islet.new(7)
         package.loaded['server.ability_api'] = nil
-        local p = Islet.shoreDryPoint(7)
+        local p = Islet.shore_dry_point(7)
         env.player.Character.Position = env.vec(p.x, p.y, p.z)
     end)
 
     after_each(function()
-        env:tearDown()
+        env:tear_down()
         package.loaded['server.ability_api'] = savedExtra.ability
     end)
 
@@ -139,7 +139,7 @@ describe('第 12 节 首领逐招表（哥斯拉）', function()
             end
         end
         -- 正文末尾那个孤立的 260 只属于风神翼龙的俯冲（12-34 要求核对映射，不静默丢弃）
-        assert.same(260, BossMoves.Get('fish48Boss', 'dive').Damage.Value)
+        assert.same(260, BossMoves.get('fish48Boss', 'dive').Damage.Value)
     end)
 
     it('条款 12-40：爪击每 2 秒 50、甩尾每 6 秒 50，吐息 30 秒才起手', function()
@@ -195,7 +195,7 @@ describe('第 12 节 首领逐招表（哥斯拉）', function()
         stand(fish, 8) -- 正前 8 米，在吐息 10 米内
         env:advance(31.6)
         assert.same(1, env.player.Character.Controller.Health, '吐息没有把目标打进濒死')
-        assert.same('downed', env.vitals:LifeStatus(env.player))
+        assert.same('downed', env.vitals:life_status(env.player))
 
         local warning = noticesBy('bossBreath')[1]
         assert.is_not_nil(warning)
@@ -203,7 +203,7 @@ describe('第 12 节 首领逐招表（哥斯拉）', function()
         assert.same(2, warning.width)
         assert.same(1.5, warning.duration)
         -- 客户端的合法性门禁必须接受这份载荷（LocalGarBite 只画合法的预警）
-        assert.is_true(require('common.gar_bite_notice').Valid(warning))
+        assert.is_true(require('common.gar_bite_notice').valid(warning))
     end)
 
     it('条款 12-43：血量低于 60% 入水，切换沧龙式攻击，咬中 1000', function()
@@ -269,10 +269,10 @@ describe('第 12 节 首领逐招表（哥斯拉）', function()
         env:advance(2.2)
         local warning = noticesBy('bossStomp')[1]
         assert.is_not_nil(warning)
-        local row = BossMoves.Get('godzilla', 'stomp')
+        local row = BossMoves.get('godzilla', 'stomp')
         assert.same(row.Warning.Kind, warning.shape)
         assert.same(row.Warning.WindupSec, warning.duration)
         assert.same(row.Range, warning.range)
-        assert.is_true(require('common.gar_bite_notice').Valid(warning))
+        assert.is_true(require('common.gar_bite_notice').valid(warning))
     end)
 end)

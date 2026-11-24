@@ -54,7 +54,7 @@ local function worldMesh(species)
   return 'official://mesh/' .. tostring(species.Model)
 end
 
--- 一个最小假世界：够 MgrFishCarrier:Spawn / MgrFishUnit:SpawnLanded 建本体、受击体与挂点。
+-- 一个最小假世界：够 MgrFishCarrier:Spawn / MgrFishUnit:spawn_landed 建本体、受击体与挂点。
 local function newWorld()
   local env = { world = {}, units = {}, now = 100 }
   env.world.GetServerTime = function() return env.now end
@@ -236,9 +236,9 @@ describe('条款 1-15 七区鱼与首领的代码路径（可见 / 可打 / 可�
     Unit = assert(loadfile('server/world_host/fish_tree.lua'))()
     -- Start 里做的是注入 World 与开战斗通道；战斗通道不在本断言范围，只做同一份注入。
     Unit.World = env.world
-    Unit.Cast = { PushState = function() end }
-    Unit.Vitals = { NewHit = function(_, source, category) return { source = source, category = category } end,
-      ApplyHit = function(_, _, player, amount) player.Character.Controller:TakeDamage(amount) end }
+    Unit.cast = { PushState = function() end }
+    Unit.Vitals = { new_hit = function(_, source, category) return { source = source, category = category } end,
+      apply_hit = function(_, _, player, amount) player.Character.Controller:TakeDamage(amount) end }
   end)
 
   after_each(function()
@@ -285,7 +285,7 @@ describe('条款 1-15 七区鱼与首领的代码路径（可见 / 可打 / 可�
           id .. ' 的受击体血量不是鱼种血量')
         local before = carrier.Controller.Health
         local expected = math.min(7, species.Health)
-        local ok, actual = vitals:ApplyHit(vitals:NewHit(nil, 'weapon'), carrier.Receiver, 7)
+        local ok, actual = vitals:apply_hit(vitals:new_hit(nil, 'weapon'), carrier.Receiver, 7)
         assert.is_true(ok, id .. ' 打不动：统一入口没有结算')
         assert.same(expected, actual, id .. ' 的实际伤害不是命中值（按剩余血量夹取）')
         assert.same(before - expected, carrier.Controller.Health, id .. ' 的血量没有下降')
@@ -306,7 +306,7 @@ describe('条款 1-15 七区鱼与首领的代码路径（可见 / 可打 / 可�
     local drops = 0
     for _, row in ipairs(rows) do
       for _, id in ipairs({ row.boss, row.fish[1] }) do
-        local fish = assert(Unit:SpawnLanded(player, { fishId = id, mult = 1.37 }, vec(10, 2, -18)))
+        local fish = assert(Unit:spawn_landed(player, { fishId = id, mult = 1.37 }, vec(10, 2, -18)))
         assert.same(Unit.State.AwaitLift, fish.State, id .. ' 上岸后不是待抓举')
         assert.are.equal('official://mesh/' .. tostring(GameCfg.Fish[id].Model),
           fish.Carrier.Body.RenderMeshId, id .. ' 的世界模型不是占位模型')
@@ -314,13 +314,13 @@ describe('条款 1-15 七区鱼与首领的代码路径（可见 / 可打 / 可�
 
         fish.Carrier.Body.OnLiftedBegin:Fire(character)
         assert.same(Unit.State.Held, fish.State, id .. ' 没有被举起')
-        assert.same(fish, Unit:GetHeld(player))
+        assert.same(fish, Unit:get_held(player))
 
-        assert.is_true(Unit:Drop(player), id .. ' 放不下')
+        assert.is_true(Unit:drop(player), id .. ' 放不下')
         -- 普通鱼与极品鱼放下后回到世界逃水；精英与首领放下后直接进入战斗/飞行，
         -- 所以这里只判「离开了举着状态」，具体去向由各自的战斗用例覆盖。
         assert.are_not.equal(Unit.State.Held, fish.State, id .. ' 放下后仍在举着状态')
-        assert.is_nil(Unit:GetHeld(player), id .. ' 放下后仍记着持有')
+        assert.is_nil(Unit:get_held(player), id .. ' 放下后仍记着持有')
         assert.is_nil(fish.Mount, id .. ' 放下后挂点没清空')
         assert.is_true(fish.Carrier.Body.Parent == env.world or fish.Carrier.Body.Destroyed == true,
           id .. ' 放下后本体没有回世界')

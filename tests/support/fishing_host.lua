@@ -65,8 +65,8 @@ function Host.new(opts)
   end
   env.channel = channel
   local remote = {
-    GetRE = function(_, name) return channel(name) end,
-    CheckRECD = function(_, _, key)
+    get_re = function(_, name) return channel(name) end,
+    check_recd = function(_, _, key)
       return opts.cooldown == true and key == "CastAction"
     end,
   }
@@ -97,17 +97,17 @@ function Host.new(opts)
     initial_now = env.now,
     remote = remote,
     player_data = {
-      GetDataInst = function(_, target) if target == env.player then return env.data end end,
-      SendItemBar = function() end,
+      get_data_inst = function(_, target) if target == env.player then return env.data end end,
+      send_item_bar = function() end,
     },
     world_service = { CreateUnit = function(_, kind, props) return create_unit(kind, props) end },
     create_unit = create_unit,
     fish_unit = {
-      CanCast = function() return opts.holding ~= true end,
-      HeldInfo = function() return nil end,
-      GetHeld = function() return nil end,
-      Drop = function() end,
-      SpawnLanded = function(_, owner, catch, position)
+      can_cast = function() return opts.holding ~= true end,
+      held_info = function() return nil end,
+      get_held = function() return nil end,
+      drop = function() end,
+      spawn_landed = function(_, owner, catch, position)
         if opts.spawn_fails then return nil, "spawn-failed" end
         seq = seq + 1
         local fish = { Id = seq, Owner = owner, FishId = catch.fishId, Mult = catch.mult,
@@ -117,11 +117,11 @@ function Host.new(opts)
         return fish
       end,
     },
-    compendium = { RecordLanding = function(_, owner, catch)
+    compendium = { record_landing = function(_, owner, catch)
       env.compendium[#env.compendium + 1] = { player = owner, fishId = catch.fishId, mult = catch.mult }
       return true
     end },
-    quest = { Notify = function(_, kind, owner, fact)
+    quest = { notify = function(_, kind, owner, fact)
       env.quests[#env.quests + 1] = { kind = kind, player = owner, fact = fact }
     end },
     random = function(...)

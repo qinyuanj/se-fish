@@ -19,7 +19,7 @@ local function breath_cfg()
 end
 
 local function finite(value)
-  return Number.IsFiniteNumber(value)
+  return Number.is_finite_number(value)
 end
 
 local function zone_scene(zone_id)
@@ -140,8 +140,8 @@ function SpecialItemPhase.mount(ps, player_tree, opts)
   end
 
   local function fire_client(name, payload)
-    if not remote or type(remote.GetRE) ~= "function" then return end
-    local ok, event = pcall(remote.GetRE, remote, name)
+    if not remote or type(remote.get_re) ~= "function" then return end
+    local ok, event = pcall(remote.get_re, remote, name)
     if ok and event and type(event.FireClient) == "function" then
       pcall(event.FireClient, event, player, payload)
     end
@@ -176,7 +176,7 @@ function SpecialItemPhase.mount(ps, player_tree, opts)
       ready = breath_ready_at
     end
     if type(ready) ~= "number" then return 0 end
-    return SpecialItem.CooldownRemaining(ready - breath_cfg().CooldownSec, now(), breath_cfg().CooldownSec)
+    return SpecialItem.cooldown_remaining(ready - breath_cfg().CooldownSec, now(), breath_cfg().CooldownSec)
   end
 
   local function publish()
@@ -354,7 +354,7 @@ function SpecialItemPhase.mount(ps, player_tree, opts)
       suspended_item = nil
     end
     if suspended then return nil end
-    return SpecialItem.Desired(selected)
+    return SpecialItem.desired(selected)
   end
 
   local function reconcile()
@@ -385,17 +385,17 @@ function SpecialItemPhase.mount(ps, player_tree, opts)
       return
     end
     local scene = zone_scene(states.zone_id:now())
-    local bounds = scene and FlightPath.BoundsOf(scene, GameCfg.Ability.Flight)
+    local bounds = scene and FlightPath.bounds_of(scene, GameCfg.Ability.Flight)
     if not bounds then return end
     if not flight_ground_y then flight_ground_y = pos.y end
     bounds.GroundY = flight_ground_y
     bounds.CeilingY = math.min(bounds.CeilingY, flight_ground_y + bounds.MaxHeight)
     if not set_gravity(false) then return end
-    local y, next_airborne = SpecialItem.StepFlightY(wings, {
+    local y, next_airborne = SpecialItem.step_flight_y(wings, {
       Y = flight_y or pos.y,
       Airborne = airborne,
     }, holding, dt, bounds)
-    local x, z = SpecialItem.ClampXZ(bounds, pos.x, pos.z)
+    local x, z = SpecialItem.clamp_xz(bounds, pos.x, pos.z)
     write_position(character, x, y, z)
     flight_y = y
     airborne = next_airborne
@@ -465,12 +465,12 @@ function SpecialItemPhase.mount(ps, player_tree, opts)
   local function update_breath(current)
     if not breath then return end
     local bc = breath_cfg()
-    local plan = breath.ledger.Plan
+    local plan = breath.ledger.plan
     while breath.tick <= #plan and current + 1e-9 >= breath.cast_at + (breath.tick - 1) * bc.TickSec do
       local tick = breath.tick
       for _, target in ipairs(breath_targets()) do
         if in_corridor(breath.origin, breath.forward, target.pos, bc) then
-          local amount = SpecialItem.BreathHit(breath.ledger, target.key, tick)
+          local amount = SpecialItem.breath_hit(breath.ledger, target.key, tick)
           if amount then target.apply(amount) end
         end
       end
@@ -511,7 +511,7 @@ function SpecialItemPhase.mount(ps, player_tree, opts)
     breath = {
       cast_at = current,
       tick = 1,
-      ledger = SpecialItem.NewBreathLedger(bc),
+      ledger = SpecialItem.new_breath_ledger(bc),
       origin = { x = pos.x, y = pos.y, z = pos.z },
       forward = flat_forward(character_of().Rotation),
     }
@@ -527,8 +527,8 @@ function SpecialItemPhase.mount(ps, player_tree, opts)
     reconcile()
     if payload.action == "fly" then
       local release = payload.holding ~= true
-      if not release and remote and type(remote.CheckRECD) == "function" then
-        local limited = remote:CheckRECD(player, "SpecialItemAction", cfg().ReLimitSec)
+      if not release and remote and type(remote.check_recd) == "function" then
+        local limited = remote:check_recd(player, "SpecialItemAction", cfg().ReLimitSec)
         if limited then return end
       end
       if restoring or effect ~= "wings" or memos.can_act:now() ~= true then
@@ -539,8 +539,8 @@ function SpecialItemPhase.mount(ps, player_tree, opts)
       return true
     end
     if payload.action == "breath" then
-      if remote and type(remote.CheckRECD) == "function" then
-        local limited = remote:CheckRECD(player, "SpecialItemAction", cfg().ReLimitSec)
+      if remote and type(remote.check_recd) == "function" then
+        local limited = remote:check_recd(player, "SpecialItemAction", cfg().ReLimitSec)
         if limited then return end
       end
       return cast_breath()
@@ -551,8 +551,8 @@ function SpecialItemPhase.mount(ps, player_tree, opts)
     if sender ~= player or (player_tree.tree and player_tree.tree.is_detached == true) or player_tree.session_alive:now() == false then
       return false
     end
-    if remote and type(remote.CheckRECD) == "function" then
-      if remote:CheckRECD(player, "SpecialItemStateRequest", cfg().ReLimitSec) then return false end
+    if remote and type(remote.check_recd) == "function" then
+      if remote:check_recd(player, "SpecialItemStateRequest", cfg().ReLimitSec) then return false end
     end
     publish()
     return true

@@ -78,10 +78,10 @@ local POPUP_STEP = 86
 local CENTER_HALF_W, CENTER_HALF_H_RATIO = 280, 0.18
 
 -- input = { width, height, itemBarSlots, reeling }
--- 返回 { Regions = { 区域名 = { Bounds, Controls } }, Rects = 扁平索引,
+-- 返回 { Regions = { 区域名 = { bounds, Controls } }, Rects = 扁平索引,
 --        ItemBarSlots = { 第 1..N 格 }, Panels = { BackpackPanel }, Reserved = { { name, rect } },
---        Popup = 候选行参数（供 PopupCells） }
-function MainHudLayout.Compute(input)
+--        Popup = 候选行参数（供 popup_cells） }
+function MainHudLayout.compute(input)
     input = type(input) == 'table' and input or {}
     local W = type(input.width) == 'number' and input.width or DESIGN_W
     local H = type(input.height) == 'number' and input.height or 1080
@@ -171,13 +171,13 @@ function MainHudLayout.Compute(input)
     local backpackPanel = rect(W / 2, panelY, BACKPACK_PANEL_W, BACKPACK_PANEL_H)
 
     local regions = {
-        StatusTopLeft = { Bounds = bounds(status, 4), Controls = status },
-        EntriesTopRight = { Bounds = bounds(entries, 4), Controls = entries },
-        QuestLeft = { Bounds = questBounds, Controls = quest },
-        HintTop = { Bounds = bounds(hints, 4), Controls = hints },
-        EquipBottom = { Bounds = equipBounds, Controls = equip },
-        ActionRight = { Bounds = bounds(action, 4), Controls = action },
-        CenterClear = { Bounds = centerClear, Controls = {} },
+        StatusTopLeft = { bounds = bounds(status, 4), Controls = status },
+        EntriesTopRight = { bounds = bounds(entries, 4), Controls = entries },
+        QuestLeft = { bounds = questBounds, Controls = quest },
+        HintTop = { bounds = bounds(hints, 4), Controls = hints },
+        EquipBottom = { bounds = equipBounds, Controls = equip },
+        ActionRight = { bounds = bounds(action, 4), Controls = action },
+        CenterClear = { bounds = centerClear, Controls = {} },
     }
     local rects = {}
     for _, region in pairs(regions) do
@@ -192,7 +192,7 @@ function MainHudLayout.Compute(input)
     }
 end
 
-function MainHudLayout.PopupCells(layout, kind, count)
+function MainHudLayout.popup_cells(layout, kind, count)
     local bar = layout and layout.Rects and layout.Rects[kind .. 'Bar']
     if not bar or type(count) ~= 'number' or count < 1 then return {} end
     local p = layout.Popup
@@ -212,7 +212,7 @@ function MainHudLayout.PopupCells(layout, kind, count)
     return cells
 end
 
-function MainHudLayout.Bounds(rects, pad)
+function MainHudLayout.bounds(rects, pad)
     return bounds(rects or {}, pad or 0)
 end
 

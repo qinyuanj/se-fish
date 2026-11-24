@@ -10,7 +10,7 @@ local State = require("common.packages.spoke.api").State
 local FishingPhase = {}
 
 local function finite(value)
-  return Number.IsFiniteNumber(value)
+  return Number.is_finite_number(value)
 end
 
 local function now_of(tree)
@@ -40,7 +40,7 @@ end
 local function water_zone(x, z)
   local zones = GameCfg.Water and GameCfg.Water.Zones or {}
   for _, candidate in ipairs(zones) do
-    if MathWaterJudge.InZone(candidate, { x = x, y = candidate.SurfaceY, z = z }) then
+    if MathWaterJudge.in_zone(candidate, { x = x, y = candidate.SurfaceY, z = z }) then
       return candidate
     end
   end
@@ -123,24 +123,24 @@ function FishingPhase.mount(scope, tree, opts)
   end
 
   local function fire_cast(payload)
-    if not remote or type(remote.GetRE) ~= "function" then return end
-    local ok, event = pcall(remote.GetRE, remote, "CastState")
+    if not remote or type(remote.get_re) ~= "function" then return end
+    local ok, event = pcall(remote.get_re, remote, "CastState")
     if ok and event and type(event.FireClient) == "function" then
       event:FireClient(player, payload)
     end
   end
 
   local function fire_reel(payload)
-    if not remote or type(remote.GetRE) ~= "function" then return end
-    local ok, event = pcall(remote.GetRE, remote, "ReelInRE")
+    if not remote or type(remote.get_re) ~= "function" then return end
+    local ok, event = pcall(remote.get_re, remote, "ReelInRE")
     if ok and event and type(event.FireClient) == "function" then
       event:FireClient(player, payload)
     end
   end
 
   local function holding_info()
-    if fish_unit and type(fish_unit.HeldInfo) == "function" then
-      local ok, info = pcall(fish_unit.HeldInfo, fish_unit, player)
+    if fish_unit and type(fish_unit.held_info) == "function" then
+      local ok, info = pcall(fish_unit.held_info, fish_unit, player)
       if ok then return copy_holding(info) end
     end
     return nil
@@ -194,7 +194,7 @@ function FishingPhase.mount(scope, tree, opts)
     if tree.memos and tree.memos.can_act and tree.memos.can_act:now() ~= true then
       return false, "cannotAct"
     end
-    if fish_unit and type(fish_unit.CanCast) == "function" and fish_unit:CanCast(player) ~= true then
+    if fish_unit and type(fish_unit.can_cast) == "function" and fish_unit:can_cast(player) ~= true then
       return false, "holding"
     end
     return true
@@ -236,8 +236,8 @@ function FishingPhase.mount(scope, tree, opts)
       })
       return false
     end
-    if remote and type(remote.CheckRECD) == "function"
-      and remote:CheckRECD(player, "CastAction", GameCfg.Casting.ActionCooldownSec) then
+    if remote and type(remote.check_recd) == "function"
+      and remote:check_recd(player, "CastAction", GameCfg.Casting.ActionCooldownSec) then
       publish("cooldown")
       return false
     end
@@ -260,8 +260,8 @@ function FishingPhase.mount(scope, tree, opts)
     active_frame:set(true)
     create_line(session.castId, landing)
     publish()
-    if quest and type(quest.Notify) == "function" then
-      quest:Notify("CastWater", player, {
+    if quest and type(quest.notify) == "function" then
+      quest:notify("CastWater", player, {
         itemId = bait_id,
         eventId = "cast:" .. tostring(player.UserId) .. ":" .. tostring(session.castId),
       })
@@ -276,7 +276,7 @@ function FishingPhase.mount(scope, tree, opts)
     local forced = GameCfg.Debug and GameCfg.Debug.Enabled and next_fish or nil
     local fish_id = forced and forced.fishId or boss
     if not fish_id then
-      fish_id = FishCatch.Select(
+      fish_id = FishCatch.select(
         GameCfg.Casting.Zones[session.zoneId],
         session.rodLevel,
         session.baitId,
@@ -294,11 +294,11 @@ function FishingPhase.mount(scope, tree, opts)
     session.mult = FishCatch.Multiplier(random_fn)
     session.reelSerial = next_reel_id
     session.reelSession = tostring(next_reel_id) .. ":" .. tostring(player.UserId)
-    local receiver = RateLimit.NewReceiver({
+    local receiver = RateLimit.new_receiver({
       WindowSec = GameCfg.HighFreqInput.WindowSec,
       MaxCount = GameCfg.HighFreqInput.MaxCount,
     })
-    receiver:SetSession(session.reelSession)
+    receiver:set_session(session.reelSession)
     reel = {
       id = session.reelSession,
       receiver = receiver,
@@ -317,7 +317,7 @@ function FishingPhase.mount(scope, tree, opts)
     if not session or not reel or session.phase ~= "hooked" then return end
     local current = session
     local current_reel = reel
-    current_reel.receiver:EndSession()
+    current_reel.receiver:end_session()
     reel = nil
     if outcome == "landed" then
       current.phase = "landed"
@@ -339,8 +339,8 @@ function FishingPhase.mount(scope, tree, opts)
   end
 
   function land_fish(current)
-    if compendium and type(compendium.RecordLanding) == "function" then
-      local ok, recorded, reason = pcall(compendium.RecordLanding, compendium, player, {
+    if compendium and type(compendium.record_landing) == "function" then
+      local ok, recorded, reason = pcall(compendium.record_landing, compendium, player, {
         fishId = current.fishId, mult = current.mult, reelSerial = current.reelSerial,
       })
       if not ok then
@@ -353,7 +353,7 @@ function FishingPhase.mount(scope, tree, opts)
     local origin = character and character.Position
     local rotation = character and character.Rotation
     if origin and rotation and type(rotation.GetForward) == "function" and fish_unit
-      and type(fish_unit.SpawnLanded) == "function" then
+      and type(fish_unit.spawn_landed) == "function" then
       local forward = rotation:GetForward()
       local length = forward and math.sqrt(forward.x * forward.x + forward.z * forward.z) or 0
       local dx, dz = 0, 0
@@ -366,7 +366,7 @@ function FishingPhase.mount(scope, tree, opts)
         y = origin.y + GameCfg.Casting.LandingHeight,
         z = origin.z + dz,
       }
-      local ok, fish, err = pcall(fish_unit.SpawnLanded, fish_unit, player, {
+      local ok, fish, err = pcall(fish_unit.spawn_landed, fish_unit, player, {
         fishId = current.fishId, mult = current.mult,
       }, position)
       if not ok then
@@ -375,8 +375,8 @@ function FishingPhase.mount(scope, tree, opts)
         print("[FishingPhase] 上岸生成活鱼失败", player.UserId, current.fishId, tostring(err))
       end
     end
-    if quest and type(quest.Notify) == "function" then
-      quest:Notify("Land", player, {
+    if quest and type(quest.notify) == "function" then
+      quest:notify("Land", player, {
         itemId = current.fishId,
         eventId = "reel:" .. tostring(current.reelSession),
       })
@@ -396,11 +396,11 @@ function FishingPhase.mount(scope, tree, opts)
       return false
     end
     local now = now_of(tree)
-    local result = reel.receiver:Accept(now, payload)
+    local result = reel.receiver:accept(now, payload)
     if result.Status ~= RateLimit.Result.Ok then return false end
     local grace_deadline = reel.progress.ZeroAt and reel.progress.ZeroAt + GameCfg.ReelIn.GraceSec
     if grace_deadline and now > grace_deadline then
-      local expired = reel.progress:Advance(now)
+      local expired = reel.progress:advance(now)
       if expired then
         finish_reel(expired, true)
         return true
@@ -410,13 +410,13 @@ function FishingPhase.mount(scope, tree, opts)
     if (reel.decayedAt or math.floor(reel.progress.Time)) < whole then
       local from = reel.decayedAt or math.floor(reel.progress.Time)
       reel.decayedAt = whole
-      local decayed = reel.progress:Advance(from + (whole - from))
+      local decayed = reel.progress:advance(from + (whole - from))
       if decayed then
         finish_reel(decayed, true)
         return true
       end
     end
-    local outcome = reel.progress:Advance(now, result.Accepted, 0)
+    local outcome = reel.progress:advance(now, result.Accepted, 0)
     if outcome then
       finish_reel(outcome, true)
     else
@@ -433,7 +433,7 @@ function FishingPhase.mount(scope, tree, opts)
 
   local function close_reel(payload)
     if not reel or type(payload) ~= "table" or payload.session ~= reel.id then return false end
-    reel.progress:Advance(now_of(tree))
+    reel.progress:advance(now_of(tree))
     finish_reel(reel and reel.progress and reel.progress.Result or "unhooked", true)
     return true
   end
@@ -441,8 +441,8 @@ function FishingPhase.mount(scope, tree, opts)
   local function reel_back()
     if not session then return false end
     if session.phase ~= "cast" and session.phase ~= "unhooked" then return false end
-    if remote and type(remote.CheckRECD) == "function"
-      and remote:CheckRECD(player, "CastAction", GameCfg.Casting.ActionCooldownSec) then
+    if remote and type(remote.check_recd) == "function"
+      and remote:check_recd(player, "CastAction", GameCfg.Casting.ActionCooldownSec) then
       return false
     end
     clear_session()
@@ -450,12 +450,12 @@ function FishingPhase.mount(scope, tree, opts)
   end
 
   local function drop_held()
-    if not fish_unit or type(fish_unit.Drop) ~= "function" then return false end
-    if remote and type(remote.CheckRECD) == "function"
-      and remote:CheckRECD(player, "CastAction", GameCfg.Casting.ActionCooldownSec) then
+    if not fish_unit or type(fish_unit.drop) ~= "function" then return false end
+    if remote and type(remote.check_recd) == "function"
+      and remote:check_recd(player, "CastAction", GameCfg.Casting.ActionCooldownSec) then
       return false
     end
-    fish_unit:Drop(player)
+    fish_unit:drop(player)
     return true
   end
 
@@ -475,7 +475,7 @@ function FishingPhase.mount(scope, tree, opts)
     if (reel.decayedAt or math.floor(reel.progress.Time)) < whole then
       local from = reel.decayedAt or math.floor(reel.progress.Time)
       reel.decayedAt = whole
-      local outcome = reel.progress:Advance(from + (whole - from))
+      local outcome = reel.progress:advance(from + (whole - from))
       if outcome then
         finish_reel(outcome, true)
         return
@@ -490,7 +490,7 @@ function FishingPhase.mount(scope, tree, opts)
     end
     if reel and session and session.phase == "hooked" and reel.progress.ZeroAt
       and now > reel.progress.ZeroAt + GameCfg.ReelIn.GraceSec then
-      local outcome = reel.progress:Advance(now)
+      local outcome = reel.progress:advance(now)
       if outcome then finish_reel(outcome, true) end
     end
   end
@@ -515,7 +515,7 @@ function FishingPhase.mount(scope, tree, opts)
 
   scope:on_cleanup(function()
     if reel then
-      reel.receiver:EndSession()
+      reel.receiver:end_session()
       reel = nil
     end
     local had = session

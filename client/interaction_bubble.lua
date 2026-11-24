@@ -2,7 +2,7 @@ local Style = require('common.game_cfg').InteractionBubble
 local World = game:GetService('World')
 local Bubble = {}
 
-function Bubble.CreateButton(parent, name, text, x, onClick)
+function Bubble.create_button(parent, name, text, x, onClick)
     local button, label
     local ok, err = pcall(function()
         local color = Style.BackgroundColor

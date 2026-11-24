@@ -68,8 +68,8 @@ function PlayerPlatformShop.mount(scope, tree, opts)
   local outcomes = {}
 
   local function reply(payload)
-    if disposed or not remote or type(remote.GetRE) ~= "function" then return end
-    local ok, event = pcall(remote.GetRE, remote, "PlatformResult")
+    if disposed or not remote or type(remote.get_re) ~= "function" then return end
+    local ok, event = pcall(remote.get_re, remote, "PlatformResult")
     if ok and event then event:FireClient(player, payload) end
   end
   local function sync_tree()
@@ -94,10 +94,10 @@ function PlayerPlatformShop.mount(scope, tree, opts)
   end
   local function write(kind, transform, done)
     if disposed or working then return false, "pending" end
-    local operation, reason = save:NextOperation(player, kind)
+    local operation, reason = save:next_operation(player, kind)
     if not operation then return false, reason or "pending" end
     working = true
-    local accepted, failure = save:Execute(player, data, operation, transform, function(ok, result)
+    local accepted, failure = save:execute(player, data, operation, transform, function(ok, result)
       working = nil
       if ok then sync_tree() end
       done(ok, result, operation)
@@ -263,7 +263,7 @@ function PlayerPlatformShop.mount(scope, tree, opts)
       reply({ ok = false, reason = "expired", seq = seq })
       return true
     end
-    if platform:HasFlow(player) or working then
+    if platform:has_flow(player) or working then
       reply({ ok = false, reason = "busy", seq = seq })
       return true
     end
@@ -278,7 +278,7 @@ function PlayerPlatformShop.mount(scope, tree, opts)
     else
       local row = cfg().Goods[goodsKey]
       if not row or not row.itemId then return false end
-      local available, reason = platform:CanPurchase(player, goodsKey)
+      local available, reason = platform:can_purchase(player, goodsKey)
       if not available then
         reply({ ok = false, action = "Purchase", goods = goodsKey, reason = reason, text = closed_text(reason) })
         return true
@@ -304,9 +304,9 @@ function PlayerPlatformShop.mount(scope, tree, opts)
       end
       local opened, openFailure
       if kind == "coin" then
-        opened, openFailure = platform:OpenCoinFlow(player, goodsKey, on_outcome)
+        opened, openFailure = platform:open_coin_flow(player, goodsKey, on_outcome)
       else
-        opened, openFailure = platform:Purchase(player, goodsKey, "adrenaline", on_outcome)
+        opened, openFailure = platform:purchase(player, goodsKey, "adrenaline", on_outcome)
       end
       if not opened then
         outcomes[key] = openFailure or "unavailable"

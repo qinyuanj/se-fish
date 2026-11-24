@@ -8,11 +8,11 @@ local SpokeClock = require("common.spoke_clock")
 local function mount()
   local clock = SpokeClock.new(10)
   local store, writer = ClientStore.new({ clock = clock })
-  local root = Eui.Node({ Name = "UIRoot" })
+  local root = Eui.node({ Name = "UIRoot" })
   local created = {}
   local view = RootView.mount(root, store, {
     create_node = function(kind, props)
-      local node = Eui.Node(props or {})
+      local node = Eui.node(props or {})
       node.UnitType = kind
       created[#created + 1] = node
       return node

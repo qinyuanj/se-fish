@@ -88,10 +88,10 @@ local function host(opts)
     clock = clock,
     initial_now = now,
     remote = {
-      GetRE = function(_, name) return event(name) end,
-      CheckRECD = function() return false end,
+      get_re = function(_, name) return event(name) end,
+      check_recd = function() return false end,
     },
-    player_data = { GetDataInst = function(_, player) return data_of[player.UserId] end },
+    player_data = { get_data_inst = function(_, player) return data_of[player.UserId] end },
     players = function() return players end,
     create_unit = opts.create_unit or create_unit,
     zones = opts.zones,

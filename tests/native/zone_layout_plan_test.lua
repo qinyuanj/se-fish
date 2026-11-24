@@ -8,7 +8,7 @@ local function findChild(parent, name)
 end
 
 local function freshConfig()
-  return Fixtures.Load()
+  return Fixtures.load()
 end
 
 describe('#164 场景标记读取合同', function()
@@ -22,7 +22,7 @@ describe('#164 场景标记读取合同', function()
       assert.are.equal('resolved', zone.Scene.State)
       assert.are.equal(index == 1 and 5 or 2, #zone.Scene.BaitSpots.Positions)
       assert.is_true(#zone.Scene.Waters > 0)
-      assert.is_nil(zone.Scene.Land)
+      assert.is_nil(zone.Scene.land)
       for _, water in ipairs(zone.Scene.Waters) do
         assert.are.equal(zone.Id, water.ZoneId)
         assert.are.equal(cfg.Casting.Zones[zone.WaterId], cfg.Casting.Zones[water.Id])
@@ -39,11 +39,11 @@ describe('#164 场景标记读取合同', function()
     local previous = cfg.Zones[1].Scene
     local world = Fixtures.World()
     local zone = findChild(world, '01 鱼塘')
-    local ferry = Engine.Children(findChild(zone, '摆渡'))
+    local ferry = Engine.children(findChild(zone, '摆渡'))
     for index, unit in ipairs(ferry) do
       if unit.Name == 'Z1_Safe' then table.remove(ferry, index) break end
     end
-    assert.error_matches(function() ZoneMarkers.Resolve(world, cfg) end, 'Z1_Safe', nil, true)
+    assert.error_matches(function() ZoneMarkers.resolve(world, cfg) end, 'Z1_Safe', nil, true)
     assert.is_false(ZoneMarkers.Ready)
     assert.are.equal(previous, cfg.Zones[1].Scene)
   end)
@@ -52,11 +52,11 @@ describe('#164 场景标记读取合同', function()
     local cfg = freshConfig()
     local destination = cfg.Ferry.Routes[1].Outbound.Destination
     local world = Fixtures.World()
-    local ferry = Engine.Children(findChild(findChild(world, '07 火山岛'), '摆渡'))
+    local ferry = Engine.children(findChild(findChild(world, '07 火山岛'), '摆渡'))
     for index, unit in ipairs(ferry) do
       if unit.Name == 'Z7_FerryReturn' then table.remove(ferry, index) break end
     end
-    assert.error_matches(function() ZoneMarkers.Resolve(world, cfg) end, 'Z7_FerryReturn', nil, true)
+    assert.error_matches(function() ZoneMarkers.resolve(world, cfg) end, 'Z7_FerryReturn', nil, true)
     assert.are.equal(destination, cfg.Ferry.Routes[1].Outbound.Destination)
     assert.is_false(ZoneMarkers.Ready)
     assert.are.same({}, ZoneMarkers.Zones)
@@ -66,26 +66,26 @@ describe('#164 场景标记读取合同', function()
     local cfg = freshConfig()
     local world = Fixtures.World()
     local grill = findChild(findChild(findChild(world, '03 蟹湖'), '设施'), 'Z3_Grill')
-    local facilities = Engine.Children(findChild(findChild(world, '03 蟹湖'), '设施'))
+    local facilities = Engine.children(findChild(findChild(world, '03 蟹湖'), '设施'))
     for index, unit in ipairs(facilities) do
       if unit == grill then table.remove(facilities, index) break end
     end
-    local other = Engine.Children(findChild(findChild(world, '04 树林岛'), '设施'))
+    local other = Engine.children(findChild(findChild(world, '04 树林岛'), '设施'))
     other[#other + 1] = grill
-    assert.error_matches(function() ZoneMarkers.Resolve(world, cfg) end, '不在所属区', nil, true)
+    assert.error_matches(function() ZoneMarkers.resolve(world, cfg) end, '不在所属区', nil, true)
 
     world = Fixtures.World()
     local lottery = findChild(findChild(findChild(world, '02 虾池'), '设施'), 'Z2_Lottery')
     lottery.Position = { x = -10000, y = 0, z = 0 }
-    assert.error_matches(function() ZoneMarkers.Resolve(world, cfg) end, '越出本区边界', nil, true)
+    assert.error_matches(function() ZoneMarkers.resolve(world, cfg) end, '越出本区边界', nil, true)
   end)
 
   it('其他区出现同名单位也算重名', function()
     local cfg = freshConfig()
     local world = Fixtures.World()
-    local decor = Engine.Children(findChild(findChild(world, '05 沙滩岛'), '设施'))
+    local decor = Engine.children(findChild(findChild(world, '05 沙滩岛'), '设施'))
     decor[#decor + 1] = Engine.Unit({ Name = 'Z3_Grill', Position = { x = 0, y = 0, z = 0 } })
-    assert.error_matches(function() ZoneMarkers.Resolve(world, cfg) end, '重名', nil, true)
+    assert.error_matches(function() ZoneMarkers.resolve(world, cfg) end, '重名', nil, true)
   end)
 
   it('重名标记明确失败', function()
@@ -94,9 +94,9 @@ describe('#164 场景标记读取合同', function()
     local zone = findChild(world, '01 鱼塘')
     local ferry = findChild(zone, '摆渡')
     local safe = findChild(ferry, 'Z1_Safe')
-    local children = Engine.Children(ferry)
+    local children = Engine.children(ferry)
     children[#children + 1] = safe
-    assert.error_matches(function() ZoneMarkers.Resolve(world, cfg) end, '重名', nil, true)
+    assert.error_matches(function() ZoneMarkers.resolve(world, cfg) end, '重名', nil, true)
     assert.is_false(ZoneMarkers.Ready)
   end)
 
@@ -108,8 +108,8 @@ describe('#164 场景标记读取合同', function()
       local waters = findChild(zone, '水域')
       local water = findChild(waters, 'Z1_Water1')
       local size = water.Size
-      Engine.SetSize(water, { x = bad, y = size.y, z = size.z })
-      assert.error_matches(function() ZoneMarkers.Resolve(world, cfg) end, '尺寸非法', nil, true)
+      Engine.set_size(water, { x = bad, y = size.y, z = size.z })
+      assert.error_matches(function() ZoneMarkers.resolve(world, cfg) end, '尺寸非法', nil, true)
       assert.is_false(ZoneMarkers.Ready)
     end)
   end
@@ -122,7 +122,7 @@ describe('#164 场景标记读取合同', function()
     local primary = findChild(waters, 'Z1_Water1')
     local extra = findChild(waters, 'Z1_Water2')
     extra.Position = { x = primary.Position.x, y = primary.Position.y, z = primary.Position.z }
-    assert.error_matches(function() ZoneMarkers.Resolve(world, cfg) end, '水域重叠', nil, true)
+    assert.error_matches(function() ZoneMarkers.resolve(world, cfg) end, '水域重叠', nil, true)
     assert.is_false(ZoneMarkers.Ready)
   end)
 

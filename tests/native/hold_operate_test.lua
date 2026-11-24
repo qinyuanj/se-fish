@@ -9,7 +9,7 @@ local PlayerData = require('server.data.player_data')
 describe("持有与操作的数据层规则", function()
     local ctx
 
-    -- 与旧 LuaUnit 的每例 setUp/tearDown 同级成对：库存实例逐例新建，配置逐例恢复。
+    -- 与旧 LuaUnit 的每例 set_up/tear_down 同级成对：库存实例逐例新建，配置逐例恢复。
     before_each(function()
         ctx = {}
         ctx.debug = GameCfg.Debug
@@ -18,7 +18,7 @@ describe("持有与操作的数据层规则", function()
         ctx.data:Init()
     end)
 
-    -- 配置逐例恢复；setUp 中途失败也照样清理。
+    -- 配置逐例恢复；set_up 中途失败也照样清理。
     after_each(function()
         GameCfg.Debug = ctx.debug
     end)

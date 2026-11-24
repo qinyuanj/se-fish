@@ -1,6 +1,6 @@
 -- 相机中央瞄准：公开 CameraService:ViewportPointToRay 的 x/y 是 [0,1]，Ray.Direction 为 Vector3。
 local Aim = {}
-function Aim:AttackPayload()
+function Aim:attack_payload()
     local payload = {action='attack'}
     local camera=game:GetService('CameraService')
     if not camera then return payload end

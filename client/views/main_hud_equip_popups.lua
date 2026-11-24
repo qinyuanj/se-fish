@@ -84,7 +84,7 @@ end
 local function default_fire_item_bar(payload)
   local ok, err = pcall(function() -- 宿主 RE 通道未就绪或调用异常时记录并安全忽略
     local re_util = rawget(_G, "REUtil") or require("common.re_util")
-    local re = re_util and re_util:GetRE("ItemBarAction") or nil
+    local re = re_util and re_util:get_re("ItemBarAction") or nil
     if re ~= nil then
       re:FireServer(payload)
     end
@@ -213,7 +213,7 @@ end
 local function compute_layout(resolution, state)
   local slot_count = (type(state) == "table" and type(state.slotCount) == "number")
     and state.slotCount or GameCfg.Items.ItemBarSlots
-  return MainHudLayout.Compute({
+  return MainHudLayout.compute({
     width = resolution.x,
     height = resolution.y,
     itemBarSlots = slot_count,
@@ -378,7 +378,7 @@ function MainHudEquipPopups.mount(s, ctx, options)
         end
       end
 
-      local rects = MainHudLayout.PopupCells(layout, kind, #list)
+      local rects = MainHudLayout.popup_cells(layout, kind, #list)
       local seen = {}
 
       for i, candidate in ipairs(list) do
@@ -452,7 +452,7 @@ function MainHudEquipPopups.mount(s, ctx, options)
         cell_dock:drop(dock_key)
       end
 
-      local plate_rect = MainHudLayout.Bounds(rects, 4)
+      local plate_rect = MainHudLayout.bounds(rects, 4)
       if plate_rect ~= nil and plates[kind] ~= nil then
         place(plates[kind], plate_rect)
         plates[kind].Visible = true

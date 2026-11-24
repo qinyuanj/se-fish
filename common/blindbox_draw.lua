@@ -69,7 +69,7 @@ function BlindboxDraw.Draw(pity, rng)
     }
 end
 
-function BlindboxDraw.DrawMany(count, pity, rng)
+function BlindboxDraw.draw_many(count, pity, rng)
     if type(count) ~= 'number' or count ~= math.floor(count) or count < 1 or count > 10 then
         return nil
     end

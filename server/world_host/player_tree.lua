@@ -69,7 +69,7 @@ local function deep_equal(a, b)
 end
 
 local function is_non_negative_int(value)
-  return Number.IsFiniteNumber(value) and value >= 0 and value == math.floor(value)
+  return Number.is_finite_number(value) and value >= 0 and value == math.floor(value)
 end
 
 local function assert_clock(clock)
@@ -860,7 +860,7 @@ function PlayerTree.spawn(opts)
     if type(key) ~= "string" or key == "" then
       return false
     end
-    if expires_at ~= nil and not Number.IsFiniteNumber(expires_at) then
+    if expires_at ~= nil and not Number.is_finite_number(expires_at) then
       return false
     end
     local next_cooldowns = deep_copy(states.cooldowns:now() or {})

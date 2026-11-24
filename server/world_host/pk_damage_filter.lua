@@ -26,8 +26,8 @@ function PkDamageFilter.make(opts)
     local source = hit and hit.sourcePlayer
     if not source or not target or source == target then return true end
     local party = (context and context.Party) or opts.party
-    if party and type(party.SameParty) == "function" then
-      local ok, same = pcall(party.SameParty, party, source, target)
+    if party and type(party.same_party) == "function" then
+      local ok, same = pcall(party.same_party, party, source, target)
       if ok and same then return false end
     end
     local markers = (context and context.ZoneMarkers) or opts.zone_markers

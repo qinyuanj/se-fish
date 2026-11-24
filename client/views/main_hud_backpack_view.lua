@@ -53,7 +53,7 @@ local function read_xy(pos)
     return nil
   end
   local ok, x, y = pcall(function() return pos.x, pos.y end) -- 兼容 Vector2 userdata 坐标读取，异常时视为无效
-  if ok and Number.IsFiniteNumber(x) and Number.IsFiniteNumber(y) then
+  if ok and Number.is_finite_number(x) and Number.is_finite_number(y) then
     return { x = x, y = y }
   end
   return nil
@@ -81,7 +81,7 @@ end
 local function default_fire_item_bar(payload)
   local ok, err = pcall(function() -- 宿主 RE 通道未就绪或调用异常时记录并安全忽略
     local re_util = rawget(_G, "REUtil") or require("common.re_util")
-    local re = re_util and re_util:GetRE("ItemBarAction") or nil
+    local re = re_util and re_util:get_re("ItemBarAction") or nil
     if re ~= nil then
       re:FireServer(payload)
     end
@@ -126,9 +126,9 @@ local function make_label(ctx, scope, name, x, y, w, h, text, font_size, text_co
 end
 
 local function compute_layout(resolution, state)
-  local slot_count = (type(state) == "table" and Number.IsFiniteNumber(state.slotCount))
+  local slot_count = (type(state) == "table" and Number.is_finite_number(state.slotCount))
     and state.slotCount or GameCfg.Items.ItemBarSlots
-  return MainHudLayout.Compute({
+  return MainHudLayout.compute({
     width = resolution.x,
     height = resolution.y,
     itemBarSlots = slot_count,
@@ -136,7 +136,7 @@ local function compute_layout(resolution, state)
 end
 
 local function clamp_backpack_count(state)
-  if type(state) ~= "table" or not Number.IsFiniteNumber(state.backpackCount) then
+  if type(state) ~= "table" or not Number.is_finite_number(state.backpackCount) then
     return 0
   end
   local n = math.floor(state.backpackCount)
@@ -151,7 +151,7 @@ local function item_display_name(entry)
   if def == nil then
     return nil
   end
-  local prefix = GameCfg.Items.CookRate(entry) ~= nil and GameCfg.Grill.CookedPrefix or ""
+  local prefix = GameCfg.Items.cook_rate(entry) ~= nil and GameCfg.Grill.CookedPrefix or ""
   return prefix .. def.Name
 end
 
@@ -159,7 +159,7 @@ local function has_free_item_bar_slot(state)
   if type(state) ~= "table" then
     return false
   end
-  local capacity = Number.IsFiniteNumber(state.slotCount)
+  local capacity = Number.is_finite_number(state.slotCount)
     and math.floor(state.slotCount) or GameCfg.Items.ItemBarSlots
   local slots = type(state.slots) == "table" and state.slots or {}
   for i = 1, capacity do
@@ -285,7 +285,7 @@ function MainHudBackpackView.mount(s, ctx, options)
     label_backpack.Visible = hud_visible
     btn_backpack.ButtonNormalColor = make_color((hud_visible and is_open) and COLORS.SELECTED or COLORS.NORMAL)
 
-    if type(state) == "table" and Number.IsFiniteNumber(state.backpackCount) then
+    if type(state) == "table" and Number.is_finite_number(state.backpackCount) then
       label_backpack.Text = "背包 " .. tostring(math.floor(state.backpackCount)) .. " 格"
     else
       label_backpack.Text = "背包"

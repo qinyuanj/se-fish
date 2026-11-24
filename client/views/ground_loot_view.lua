@@ -32,7 +32,7 @@ function GroundLootView.pick_nearest(store, radius)
   local loot = store.loot and store.loot:now() or nil
   if position == nil then return nil end
   local base_radius = radius or GameCfg.Loot.PickupRadius
-  local effective = BodyScale.InteractionRadius(character, base_radius)
+  local effective = BodyScale.interaction_radius(character, base_radius)
   local limit_sq = effective * effective
   local best_id, best_dist = nil, nil
   for _, row in ipairs(rows_of(loot)) do
@@ -53,7 +53,7 @@ function GroundLootView.bubble_spec(options)
       local loot = es:d(store.loot)
       local position = es:d(store.position)
       local character = es:d(store.local_character)
-      local radius = options.radius or BodyScale.InteractionRadius(character, base_radius)
+      local radius = options.radius or BodyScale.interaction_radius(character, base_radius)
       local list = {}
       for _, row in ipairs(rows_of(loot)) do
         if near(position, row, radius) then
@@ -105,7 +105,7 @@ function GroundLootView.aim_toggle_spec(options)
           return false
         end
         local character = ms:d(ctx.store.local_character)
-        local radius = options.radius or BodyScale.InteractionRadius(character, base_radius)
+        local radius = options.radius or BodyScale.interaction_radius(character, base_radius)
         local loot = ms:d(ctx.store.loot)
         for _, row in ipairs(rows_of(loot)) do
           if near(position, row, radius) then

@@ -12,7 +12,7 @@ end
 describe("道具栏与鱼饵栏", function()
     local ctx
 
-    -- 与旧 LuaUnit 的每例 setUp/tearDown 同级成对。
+    -- 与旧 LuaUnit 的每例 set_up/tear_down 同级成对。
     -- #49：进图白送只在调试开关下发放，这些用例沿用它的起始库存（鱼竿在第 1 格、蚯蚓若干）。
     before_each(function()
         ctx = {}
@@ -22,7 +22,7 @@ describe("道具栏与鱼饵栏", function()
         ctx.data:Init()
     end)
 
-    -- 调试配置逐例恢复；setUp 中途失败也照样清理。
+    -- 调试配置逐例恢复；set_up 中途失败也照样清理。
     after_each(function()
         GameCfg.Debug = ctx.savedGrantDebug
     end)

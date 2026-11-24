@@ -7,7 +7,7 @@ local SpokeClock = require("common.spoke_clock")
 local function mount()
   local clock = SpokeClock.new(20)
   local store, writer = ClientStore.new({ clock = clock })
-  local root = Eui.Node({ Name = "UIRoot" })
+  local root = Eui.node({ Name = "UIRoot" })
   local sent, closed, created = {}, {}, {}
   local reel = {}
   local view = RootView.mount(root, store, {
@@ -19,7 +19,7 @@ local function mount()
     },
     overlays = { reel = ReelOverlayView.spec() },
     create_node = function(kind, props)
-      local node = Eui.Node({
+      local node = Eui.node({
         Kind = kind, Name = props and props.Name, Parent = props and props.Parent,
         Visible = props and props.Visible, Text = props and (props.Text or props.ButtonText) or "",
         Position = props and props.Position, Size = props and props.Size,
@@ -76,7 +76,7 @@ describe("客户端收线覆盖层宿主接缝（#302）", function()
     env.writer:ingest_event("CastState", { phase = "hooked", reelSession = "s1", castId = 1 })
     env.writer:ingest_event("ReelInRE", { action = "started", session = "s1", progress = 50 })
     local close = child(env, "BtnReelClose")
-    assert.is_true(Eui.Click(close))
+    assert.is_true(Eui.click(close))
     assert.are.same({ session = "s1" }, env.closed[1])
     assert.is_nil(child(env, "ReelMask"))
 

@@ -114,7 +114,7 @@ local function make_real_modifier_sandbox()
     e.units[#e.units + 1] = u
     function u:GetAttribute(k) return self.attrs[k] end
     function u:SetAttribute(k, v) self.attrs[k] = v end
-    function u:GetComponent() return nil end
+    function u:get_component() return nil end
     function u:IsA(kind) return kind == "BindableEvent" and name == "BindableEvent" end
     function u:GetChildren()
       local out = {}
@@ -270,13 +270,13 @@ describe("AttrLeaf：attr_rule 官方包单向叶子投影", function()
     assert.equals(420, attr_api.Funcs.GetAttr(char1, "PlayerMaxHealth"))
     assert.near(8 * 1.3, attr_api.Funcs.GetAttr(char1, "PlayerWalkSpeed"), 1e-9)
     assert.equals(210, attr_api.Funcs.GetAttr(char1, "PlayerHunger"))
-    assert.near(GameCfg.Shop.DamageScale("melee", 2), attr_api.Funcs.GetAttr(char1, "PlayerWeaponDamage_melee"), 1e-9)
-    assert.near(GameCfg.Shop.DamageScale("ranged", 1), attr_api.Funcs.GetAttr(char1, "PlayerWeaponDamage_ranged"), 1e-9)
-    assert.near(GameCfg.Shop.DamageScale("explosive", 3), attr_api.Funcs.GetAttr(char1, "PlayerWeaponDamage_explosive"), 1e-9)
+    assert.near(GameCfg.Shop.damage_scale("melee", 2), attr_api.Funcs.GetAttr(char1, "PlayerWeaponDamage_melee"), 1e-9)
+    assert.near(GameCfg.Shop.damage_scale("ranged", 1), attr_api.Funcs.GetAttr(char1, "PlayerWeaponDamage_ranged"), 1e-9)
+    assert.near(GameCfg.Shop.damage_scale("explosive", 3), attr_api.Funcs.GetAttr(char1, "PlayerWeaponDamage_explosive"), 1e-9)
 
     assert.near(1.4, char1.scale, 1e-9)
-    assert.near(BodyScale.Derive(1.4).CameraDistance, char1.attrs.CameraDistance, 1e-9)
-    assert.near(BodyScale.Derive(1.4).InteractRange, char1.attrs.InteractRange, 1e-9)
+    assert.near(BodyScale.derive(1.4).CameraDistance, char1.attrs.CameraDistance, 1e-9)
+    assert.near(BodyScale.derive(1.4).InteractRange, char1.attrs.InteractRange, 1e-9)
     assert.is_false(char1.attrs.BodyScaleCapped)
     assert.near(8 * 1.3, char1.Controller.WalkSpeed, 1e-9)
 

@@ -26,11 +26,11 @@ local ANCHORS = {
 
 local function newInteract()
   return {
-    FindAnchor = function(_, name)
+    find_anchor = function(_, name)
       local pos = ANCHORS[name]
       return pos and { Name = name, Position = pos } or nil
     end,
-    InRange = function(_, player, point)
+    in_range = function(_, player, point)
       local pos = player.Character and player.Character.Position
       local anchor = ANCHORS[point.AnchorName]
       if not pos or not anchor then return nil end
@@ -57,7 +57,7 @@ local function collectSelectable(rows, rodLevel, baitId)
   end
   local found = {}
   for roll = 1, total do
-    local id = FishCatch.Select(rows, rodLevel, baitId, function() return roll end)
+    local id = FishCatch.select(rows, rodLevel, baitId, function() return roll end)
     found[id] = true
   end
   return found
@@ -77,7 +77,7 @@ describe('虾池最小内容（水区 / 鱼表 / 商店 / 钓鱼佬 / 抛竿）'
       MgrFishUnit = package.loaded['server.world_host.fish_tree'],
     }
     env = { replies = {}, sent = {}, seq = 0, now = 0 }
-    env.cfg = require('tests.support.zone_fixtures').Load()
+    env.cfg = require('tests.support.zone_fixtures').load()
     -- 与 shop_test 同一口径：吃 #49 调试白送的起始库存（鱼竿第 1 格、蚯蚓若干）
     local initial_grants = env.cfg.Debug.InitialGrants
     local ShopFeedHost = require('tests.support.shop_feed_host')

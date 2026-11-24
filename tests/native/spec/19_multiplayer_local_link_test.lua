@@ -5,7 +5,7 @@
 -- 各自走通，并且连接进出不会让这些状态错位。真实多人环境（真机、真网络、真并发）不在断言范围。
 --
 -- 只走业务入口：本地连接夹具 tests/support/local_link.lua 复现 server/main.lua 的连接生命周期，
--- 小隊与抢救都经登记的 RemoteEvent（PartyAction / InteractAction），伤害走统一入口 MgrVitals:ApplyHit，
+-- 小隊与抢救都经登记的 RemoteEvent（PartyAction / InteractAction），伤害走统一入口 MgrVitals:apply_hit，
 -- 共享世界状态读 MgrLoot 的快照。引擎边界用替身。
 -- 失败方式（先列后写）：
 --   1. 8 条连接下，同队免伤或野外 PK 只剩单对用例里的效果（过滤读的是连接时刻的快照）；
@@ -28,13 +28,13 @@ describe('条款 19-12 本地连接夹具下的多人代码路径', function()
   local link
 
   before_each(function() link = Link.open() end)
-  after_each(function() if link then link:Close() end end)
+  after_each(function() if link then link:close() end end)
 
   -- 连接身份必须唯一：同一 UserId 再连一次等于换了一个玩家对象，会盖掉前一条连接。
   local function joinMany(count, position, firstId)
     local players = {}
     for index = 1, count do
-      players[index] = link:Join((firstId or 5000) + index, { position = position or at(ARENA, index) })
+      players[index] = link:join((firstId or 5000) + index, { position = position or at(ARENA, index) })
     end
     return players
   end
@@ -42,7 +42,7 @@ describe('条款 19-12 本地连接夹具下的多人代码路径', function()
   local function squad(a, b)
     link:Party(a, { action = 'Invite', targetUserId = b.UserId })
     link:Party(b, { action = 'Accept' })
-    assert.is_true(link.managers.Party:SameParty(a, b), '小队没有建立')
+    assert.is_true(link.managers.Party:same_party(a, b), '小队没有建立')
   end
 
   local function down(player)
@@ -90,17 +90,17 @@ describe('条款 19-12 本地连接夹具下的多人代码路径', function()
   it('19-12 共享地面实例对所有连接同一份，进出不改它，两人抢同一份只结算一次', function()
     local players = joinMany(8)
     local loot = assert(link:Loot('bass', at(ARENA, 0)), '共享地面实例没生成')
-    assert.same(1, #link:LootSnapshot())
+    assert.same(1, #link:loot_snapshot())
     local seen = joinMany(1, at(ARENA, 0), 5100)
-    assert.same(1, #link:LootSnapshot(), '新连接看不到已有的共享实例')
-    assert.is_true(link:Leave(seen[1]))
-    assert.same(1, #link:LootSnapshot(), '一条连接离开把共享实例带走了')
+    assert.same(1, #link:loot_snapshot(), '新连接看不到已有的共享实例')
+    assert.is_true(link:leave(seen[1]))
+    assert.same(1, #link:loot_snapshot(), '一条连接离开把共享实例带走了')
 
     players[1].Character.Position = at(ARENA, 0)
     players[2].Character.Position = at(ARENA, 0.5)
-    assert.is_true(link:Pickup(players[1], loot.id or loot.Id), '第一个人拾取失败')
-    assert.is_false(link:Pickup(players[2], loot.Id), '第二个人还能拾到同一份')
-    assert.same(0, #link:LootSnapshot())
+    assert.is_true(link:pickup(players[1], loot.id or loot.Id), '第一个人拾取失败')
+    assert.is_false(link:pickup(players[2], loot.Id), '第二个人还能拾到同一份')
+    assert.same(0, #link:loot_snapshot())
     local okCount = 0
     for _, message in ipairs(link.sent.LootResult or {}) do
       if message.payload and message.payload.ok == true then okCount = okCount + 1 end
@@ -114,7 +114,7 @@ describe('条款 19-12 本地连接夹具下的多人代码路径', function()
     down(downed)
     players[6].Character.Position = at(downed.Character.Position, 1)
     rescue(players[6], downed)
-    link:Advance(GameCfg.Rescue.DurationSec + 0.1)
+    link:advance(GameCfg.Rescue.DurationSec + 0.1)
     local expected = math.floor(GameCfg.Vitals.MaxHealth * GameCfg.Survival.ReviveHealthPercent / 100)
     assert.same('alive', link:Phase(downed), '抢救没有把被救者拉起来')
     assert.same(expected, downed.Character.Controller.Health, '恢复量不是被救者上限的比例')
@@ -124,21 +124,21 @@ describe('条款 19-12 本地连接夹具下的多人代码路径', function()
     players[8].Character.Position = at(target.Character.Position, 1)
     rescue(players[8], target, 2)
     assert.same('rescuing', link:Phase(target), '抢救没有开始')
-    assert.is_true(link:Leave(players[8]))
-    link:Advance(GameCfg.Rescue.DurationSec + 0.1)
+    assert.is_true(link:leave(players[8]))
+    link:advance(GameCfg.Rescue.DurationSec + 0.1)
     assert.same('downed', link:Phase(target), '施救者断线后抢救仍结算了')
     local health = target.Character.Controller.Health
 
-    local back = link:Join(5008, { position = at(target.Character.Position, 1) })
-    link:Advance(GameCfg.Rescue.DurationSec + 0.1)
+    local back = link:join(5008, { position = at(target.Character.Position, 1) })
+    link:advance(GameCfg.Rescue.DurationSec + 0.1)
     assert.same('downed', link:Phase(target), '重连把中断的抢救补结算了')
     assert.same(health, target.Character.Controller.Health, '重连改了被救者的血量')
 
     players[6].Character.Position = at(target.Character.Position, 1)
     rescue(players[6], target, 3)
-    link:Advance(GameCfg.Rescue.DurationSec + 0.1)
+    link:advance(GameCfg.Rescue.DurationSec + 0.1)
     assert.same('alive', link:Phase(target), '重连后由别人重新发起仍然救不起来')
-    local online = link:Online(back)
+    local online = link:online(back)
     assert.is_true(online, '重连的连接没有回到在线')
   end)
 end)

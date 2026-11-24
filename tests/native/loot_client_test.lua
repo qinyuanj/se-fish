@@ -7,11 +7,11 @@ local GameCfg = require("common.game_cfg")
 
 local function mount()
   local store, writer = ClientStore.new({ clock = SpokeClock.new(1) })
-  local root = Eui.Node({ Name = "UIRoot" })
+  local root = Eui.node({ Name = "UIRoot" })
   local created, sent = {}, {}
   RootView.mount(root, store, {
     create_node = function(kind, props)
-      local node = Eui.Node(props or {})
+      local node = Eui.node(props or {})
       node.UnitType = kind
       created[#created + 1] = node
       return node
@@ -39,7 +39,7 @@ describe("地面拾取气泡", function()
     env.writer:update_spatial({ x = 0, y = 0, z = 0 }, {})
     local btn
     for _, node in ipairs(env.created) do if node.Name == "BtnPickup_7" then btn = node end end
-    assert.is_true(Eui.Click(btn))
+    assert.is_true(Eui.click(btn))
     assert.same({ { action = "Pickup", value = 7 } }, env.sent)
   end)
 

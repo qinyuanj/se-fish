@@ -11,7 +11,7 @@ function Host.new()
   _G.Color = { New = function(r, g, b, a) return { r = r, g = g, b = b, a = a } end }
   local clock = SpokeClock.new(20)
   local store, writer = ClientStore.new({ clock = clock })
-  local root = Eui.Node({ Name = "UIRoot" })
+  local root = Eui.node({ Name = "UIRoot" })
   local env = { clock = clock, store = store, writer = writer, root = root, saved_vector = saved_vector, saved_color = saved_color,
     sent = {}, closed = {}, created = {}, reel = {} }
   env.view = RootView.mount(root, store, {
@@ -23,7 +23,7 @@ function Host.new()
     },
     overlays = { reel = ReelOverlayView.spec() },
     create_node = function(kind, props)
-      local node = Eui.Node({ Kind = kind, Name = props and props.Name,
+      local node = Eui.node({ Kind = kind, Name = props and props.Name,
         Parent = props and props.Parent, Visible = props and props.Visible,
         Text = props and (props.Text or props.ButtonText) or "",
         Position = props and props.Position, Size = props and props.Size,

@@ -105,13 +105,13 @@ local function _applyDamage(target, damage, owner, hit)
 	if not damage or damage == 0.0 or not hit then
 		return false
 	end
-	if M.Services.FishCarrier:ResolveCarrier(target) then
-		return (M.Services.Vitals:ApplyHit(hit, target, damage))
+	if M.Services.FishCarrier:resolve_carrier(target) then
+		return (M.Services.Vitals:apply_hit(hit, target, damage))
 	end
 	local players = game:GetService("Players")
 	local targetPlayer = players and players.GetPlayerFromCharacter and players:GetPlayerFromCharacter(target)
 	if targetPlayer then
-		return (M.Services.Vitals:ApplyHit(hit, targetPlayer, damage))
+		return (M.Services.Vitals:apply_hit(hit, targetPlayer, damage))
 	end
 	return false
 end
@@ -246,7 +246,7 @@ function M.Attach(anchor_script, services)
 		local player = game:GetService("Players"):GetPlayerFromCharacter(owner)
 		local swing = nil
 		if player then
-			swing = SwingRegistry.TakeSwing(player.UserId)
+			swing = SwingRegistry.take_swing(player.UserId)
 			if not swing then
 				print("[melee_hit] 玩家挥砍缺少服务端登记，只播表现不结算伤害 uid=" .. tostring(player.UserId))
 			end
@@ -267,9 +267,9 @@ function M.Attach(anchor_script, services)
 			state.effect = swing.effect
 		end
 		if player then
-			hit_damage = M.Services.GM:GetMeleeDamage(player, hit_damage)
+			hit_damage = M.Services.GM:get_melee_damage(player, hit_damage)
 		end
-		state.hit = M.Services.Vitals:NewHit(player or owner, "weapon")
+		state.hit = M.Services.Vitals:new_hit(player or owner, "weapon")
 		local hit_power = anchor_script:GetAttribute("ABILITY_ANOSTATE_HITPOWER") or 0.0
 		local weapon_prefab = anchor_script:GetAttribute("ABILITY_ANOSTATE_USE_PERFAB") or ""
 		local anim_id = anchor_script:GetAttribute("ABILITY_ANOSTATE_ANIMKEY") or ""
@@ -385,8 +385,8 @@ function M.Attach(anchor_script, services)
 				_applyHitPower(target, hit_power, owner)
 				_createHitSfx(anchor_script, target)
 				local modifier = M.Services.Modifier
-				if player and state and state.effect and modifier and modifier.ApplyWeaponEffect then
-					local ok, err = pcall(modifier.ApplyWeaponEffect, modifier, player, target, state.effect)
+				if player and state and state.effect and modifier and modifier.apply_weapon_effect then
+					local ok, err = pcall(modifier.apply_weapon_effect, modifier, player, target, state.effect)
 					if not ok then print("[melee_hit] 武器特效应用失败", tostring(err)) end
 				end
 			end

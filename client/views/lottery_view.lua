@@ -57,17 +57,17 @@ function LotteryView.modal_spec()
       local slot = snapshot and snapshot.selectedSlot
       local entry = slot and snapshot.slots and snapshot.slots[slot] or nil
       selected_slot = entry and slot or nil
-      local enabled = entry ~= nil and Eligibility.Check(entry) == true and not awaiting and not spinning
+      local enabled = entry ~= nil and Eligibility.check(entry) == true and not awaiting and not spinning
       draw.Disabled = not enabled
       draw.TouchEnabled = enabled
       if not entry then
         bet.Text = "请先在道具栏选中一件极品食物"
-      elseif Eligibility.Check(entry) then
+      elseif Eligibility.check(entry) then
         local definition = GameCfg.Items.Definitions[entry.itemId]
-        local value = GameCfg.Items.SalePrice(entry.itemId, entry.mult) or 0
+        local value = GameCfg.Items.sale_price(entry.itemId, entry.mult) or 0
         bet.Text = string.format("投注：%s（价值 %d 金币）", definition and definition.Name or entry.itemId, value)
       else
-        local _, reason = Eligibility.Check(entry)
+        local _, reason = Eligibility.check(entry)
         bet.Text = FAIL_TEXT[reason] or "这件物品不能抽奖"
       end
     end

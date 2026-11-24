@@ -239,19 +239,19 @@ for fishKey, boss in pairs(M.Phases) do
 end
 
 ---取一行；鱼键或招式不存在时返回 nil（调用方负责退化）。
-function M.Get(fishKey, move)
+function M.get(fishKey, move)
     local fish = M.Index[fishKey]
     return fish and fish[move] or nil
 end
 
-function M.KeyOf(species, fishId)
+function M.key_of(species, fishId)
     local combat = species and species.Combat
     if combat and M.Index[combat] then return combat end
     return fishId
 end
 
 ---某只鱼的全部招式行，按书写顺序（= AttackSets 的确定性顺序）。
-function M.ForFish(fishKey)
+function M.for_fish(fishKey)
     local rows = {}
     for _, row in ipairs(M.Rows) do
         if row.Fish == fishKey then rows[#rows + 1] = row end
@@ -259,9 +259,9 @@ function M.ForFish(fishKey)
     return rows
 end
 
-function M.AttackTable(fishKey)
+function M.attack_table(fishKey)
     local attacks = {}
-    for _, row in ipairs(M.ForFish(fishKey)) do
+    for _, row in ipairs(M.for_fish(fishKey)) do
         local attack = { Range = row.Range }
         if type(row.Schedule.Sec) == 'number' then attack.IntervalSec = row.Schedule.Sec end
         if row.Damage.Kind == 'flat' or row.Damage.Kind == 'contact' then
@@ -278,8 +278,8 @@ function M.AttackTable(fishKey)
     return attacks
 end
 
-function M.WarningOf(fishKey, move)
-    local row = M.Get(fishKey, move)
+function M.warning_of(fishKey, move)
+    local row = M.get(fishKey, move)
     if not row then return nil end
     return { Kind = row.Warning.Kind, Shape = row.Warning.Kind,
         WindupSec = row.Warning.WindupSec, Width = row.Warning.Width,
@@ -309,7 +309,7 @@ local function column(row, name)
     return nil
 end
 
-function M.CombatParams(params, fishKey)
+function M.combat_params(params, fishKey)
     local out = {}
     for key, value in pairs(params or {}) do out[key] = value end
     for _, row in ipairs(M.Rows) do

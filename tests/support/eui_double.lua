@@ -32,9 +32,9 @@ function M.Signal()
   }
 end
 
--- spec: { Name?, Kind?, Parent?, Children?, Visible?=true, Text?, TouchEnabled?, OnClicked?, Destroying? }。
+-- spec: { Name?, Kind?, Parent?, children?, Visible?=true, Text?, TouchEnabled?, OnClicked?, Destroying? }。
 -- Disabled 由调用方显式写入，避免构造参数掩盖属性写入顺序。
-function M.Node(spec)
+function M.node(spec)
   spec = spec or {}
   local fields = {
     Name = spec.Name,
@@ -44,7 +44,7 @@ function M.Node(spec)
     Anchor = spec.Anchor or { x = 0.5, y = 0.5 },
     Position = spec.Position,
     Size = spec.Size,
-    Children = spec.Children or {},
+    children = spec.children or {},
     TouchEnabled = spec.TouchEnabled,
     OnClicked = spec.OnClicked or M.Signal(),
     Destroying = spec.Destroying or M.Signal(),
@@ -58,9 +58,9 @@ function M.Node(spec)
   })
 
   function fields:FindFirstChild(name, recursive)
-    local hit = self.Children[name]
+    local hit = self.children[name]
     if hit or not recursive then return hit end
-    for _, child in pairs(self.Children) do
+    for _, child in pairs(self.children) do
       hit = child:FindFirstChild(name, true)
       if hit then return hit end
     end
@@ -70,12 +70,12 @@ function M.Node(spec)
     if self.Destroyed then return end
     self.Destroyed = true
     local parent = self.Parent
-    if parent and parent.Children and parent.Children[self.Name] == self then
-      parent.Children[self.Name] = nil
+    if parent and parent.children and parent.children[self.Name] == self then
+      parent.children[self.Name] = nil
     end
     self.Parent = nil
-    local children = self.Children
-    self.Children = {}
+    local children = self.children
+    self.children = {}
     self.Destroying:Fire()
     for _, child in pairs(children) do child:Destroy() end
   end
@@ -83,13 +83,13 @@ function M.Node(spec)
   if spec.Parent then
     assert(spec.Name, '挂到父节点的 EUI 节点必须有 Name')
     node.Parent = spec.Parent
-    spec.Parent.Children[spec.Name] = node
+    spec.Parent.children[spec.Name] = node
   end
   return node
 end
 
 -- 返回是否命中；命中才转发 OnClicked。Disabled 不在这里重复门控。
-function M.Click(node, ...)
+function M.click(node, ...)
   if node.Destroyed or not node.Visible or not node.TouchEnabled then return false end
   node.OnClicked:Fire(...)
   return true

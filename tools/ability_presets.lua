@@ -7,7 +7,7 @@
 -- 自定义预设类型，预设一律「复制官方模板 → 改壳源码 / 属性」：
 --   * 技能背包 / 挥砍技能：duplicate-asset 官方模板即用（壳原样）；
 --   * 挥砍锚点：duplicate 后重写壳源码（只声明属性、不挂接——壳在实例化时
---     Parent 还是 World 就会抢跑认错宿主，挂接由根 AbilityAPI.AttachAnchor 补做，
+--     Parent 还是 World 就会抢跑认错宿主，挂接由根 AbilityAPI.attach_anchor 补做，
 --     见 issue #7），再 change-asset-value 写入属性值。
 -- 预设 key 的唯一真源是 common/game_cfg.lua 的 GameCfg.Ability：本命令按 key 查预设，
 -- 还在就原地重刷壳与属性（可重复执行）；不在就复制模板建新的，并把新 key 回写

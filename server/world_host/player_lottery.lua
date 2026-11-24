@@ -20,13 +20,13 @@ local function settle(target, slot, random)
   local items = target.Data.Containers[ITEM_BAR]
   local entry = items[slot]
   if not entry or entry.count <= 0 then return nil, "slot" end
-  local eligible, reason = Eligibility.Check(entry)
+  local eligible, reason = Eligibility.check(entry)
   if not eligible then return nil, reason end
-  local price = GameCfg.Items.SalePrice(entry.itemId, entry.mult)
+  local price = GameCfg.Items.sale_price(entry.itemId, entry.mult)
   if not price or price < 1 then return nil, "bad-item" end
-  local axes = Draw.RollAxes(random)
+  local axes = Draw.roll_axes(random)
   if not axes then return nil, "roll" end
-  local outcome = Draw.Evaluate(axes)
+  local outcome = Draw.evaluate(axes)
   local definition = GameCfg.Items.Definitions[entry.itemId]
   local result = {
     ok = true, action = "Draw", slot = slot, itemId = entry.itemId,
@@ -44,7 +44,7 @@ local function settle(target, slot, random)
     local pattern = GameCfg.Lottery.Patterns[outcome.pattern]
     local reward = pattern.tripleReward
     if reward.kind == "weaponChoice" then
-      local itemId = Draw.ChooseWeapon(pattern, random)
+      local itemId = Draw.choose_weapon(pattern, random)
       if not itemId then
         items[slot] = entry
         return nil, "roll"
@@ -71,8 +71,8 @@ function PlayerLottery.mount(scope, tree, opts)
   local lastSeq = nil
 
   local function reply(payload)
-    if disposed or not remote or type(remote.GetRE) ~= "function" then return end
-    local ok, event = pcall(remote.GetRE, remote, "LotteryResult")
+    if disposed or not remote or type(remote.get_re) ~= "function" then return end
+    local ok, event = pcall(remote.get_re, remote, "LotteryResult")
     if ok and event then event:FireClient(player, payload) end
   end
 
@@ -82,7 +82,7 @@ function PlayerLottery.mount(scope, tree, opts)
 
   local function execute(operation, transform, done)
     if not operation or not save then return false end
-    return save:Execute(player, data, operation, transform, function(written, result)
+    return save:execute(player, data, operation, transform, function(written, result)
       if written then
         result.operation = operation
         sync_tree()
@@ -95,7 +95,7 @@ function PlayerLottery.mount(scope, tree, opts)
     local requestId = payload.operation
     if requestId ~= nil and type(requestId) ~= "table" then return nil, false end
     if requestId == nil then requestId = payload.seq end
-    local operation, mode = save:ResolveRequest(player, data, "lottery", requestId)
+    local operation, mode = save:resolve_request(player, data, "lottery", requestId)
     if not operation then return nil, false end
     if mode ~= "replay" then return operation end
     local accepted = execute(operation, function() return nil, "expired" end, function(ok, result)
@@ -143,7 +143,7 @@ function PlayerLottery.mount(scope, tree, opts)
       reply({ ok = false, reason = "slot" })
       return false
     end
-    local eligible, reason = Eligibility.Check(entry)
+    local eligible, reason = Eligibility.check(entry)
     if not eligible then
       reply({ ok = false, reason = reason })
       return false

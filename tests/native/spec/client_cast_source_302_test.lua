@@ -18,12 +18,12 @@ describe("礁石来源可视化宿主接缝（#302）", function()
   it("同一上钩快照复用来源，脱钩销毁来源与钓线", function()
     local clock = SpokeClock.new(0)
     local store, writer = ClientStore.new({ clock = clock })
-    local root = Eui.Node({ Name = "UIRoot" })
+    local root = Eui.node({ Name = "UIRoot" })
     local units = {}
     local view = RootView.mount(root, store, {
       services = {
         create_unit = function(kind, props)
-          local unit = Eui.Node({ Name = props.Name, Kind = kind, Position = props.Position })
+          local unit = Eui.node({ Name = props.Name, Kind = kind, Position = props.Position })
           unit.Destroyed = false
           units[#units + 1] = unit
           return unit
@@ -31,7 +31,7 @@ describe("礁石来源可视化宿主接缝（#302）", function()
         reel = { active = function() return true end, progress = function() return 75 end },
       },
       hud = { CastSourceView.spec() },
-      create_node = function(kind, props) return Eui.Node({ Kind = kind, Name = props.Name, Parent = props.Parent }) end,
+      create_node = function(kind, props) return Eui.node({ Kind = kind, Name = props.Name, Parent = props.Parent }) end,
     })
     writer:ingest_event("CastState", { phase = "hooked", castId = 37, fishId = "item81", reelSession = "s37",
       hookPosition = { x = 880, y = 15, z = 144 } })

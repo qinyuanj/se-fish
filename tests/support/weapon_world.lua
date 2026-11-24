@@ -9,7 +9,7 @@ local PlayerWeapon = require('server.world_host.player_weapon')
 local M = {}
 M.__index = M
 
---- 建一个空世界壳；调用方随后 :setUp() 搭世界、:tearDown() 拆除
+--- 建一个空世界壳；调用方随后 :set_up() 搭世界、:tear_down() 拆除
 --- （与 blindbox_world / revive_world 同一构造/拆除入口名）。
 --- opts.players = { { player, data? }, ... } 可指定世界内玩家；缺省 42 / 43 两名玩家。
 function M.new(opts)
@@ -32,7 +32,7 @@ local function state(name, value)
     return spoke.State.new('WeaponWorld.' .. name, value)
 end
 
-function M:setUp()
+function M:set_up()
     local ctx = self
     ctx.saved_print = rawget(_G, 'print')
     ctx.now = 1000
@@ -46,14 +46,14 @@ function M:setUp()
     ctx.save = ctx.opts.save
 
     ctx.remote = {
-        GetRE = function(_, name)
+        get_re = function(_, name)
             return { FireClient = function(_, player, payload)
                 ctx.replies[#ctx.replies + 1] = { name = name, player = player, payload = payload }
             end }
         end,
     }
     ctx.ability = {
-        CastAbility = function(unit, index)
+        cast_ability = function(unit, index)
             ctx.casts[#ctx.casts + 1] = { unit = unit, index = index }
             return true
         end,
@@ -90,7 +90,7 @@ function M:setUp()
     }
     ctx.fish_unit = {
         Fish = {},
-        SpawnBlastFish = function(_, fishId, mult, pos, owner)
+        spawn_blast_fish = function(_, fishId, mult, pos, owner)
             ctx.order = ctx.order + 1
             ctx.spawnedFish[#ctx.spawnedFish + 1] = {
                 order = ctx.order, fishId = fishId, mult = mult, pos = pos, owner = owner,
@@ -100,9 +100,9 @@ function M:setUp()
             return { Id = id }
         end,
     }
-    ctx.fish_carrier = { ResolveCarrier = function() return nil end }
+    ctx.fish_carrier = { resolve_carrier = function() return nil end }
 
-    SwingRegistry.SetClock(function() return ctx.clock.now() end)
+    SwingRegistry.set_clock(function() return ctx.clock.now() end)
 
     local specs = ctx.opts.players
     if type(specs) == 'table' and #specs > 0 then
@@ -118,7 +118,7 @@ function M:setUp()
     ctx.data = ctx.sessions[ctx.player] and ctx.sessions[ctx.player].data or nil
 end
 
-function M:tearDown()
+function M:tear_down()
     for _, session in pairs(self.sessions or {}) do
         if session.spokeTree then
             pcall(function() session.spokeTree:dispose() end)
@@ -126,7 +126,7 @@ function M:tearDown()
         session.spokeTree = nil
     end
     self.sessions = {}
-    SwingRegistry.SetClock(nil)
+    SwingRegistry.set_clock(nil)
     if self.saved_print ~= nil then _G.print = self.saved_print end
     if self.savedWaterZones ~= nil then
         GameCfg.Water.Zones = self.savedWaterZones
@@ -201,7 +201,7 @@ function M:_mount(session)
     end))
 end
 
---- 把存档最新字段投影进树状态：武器/选中/held 与三类伤害倍率（真源取 PlayerData:WeaponDamageScale，
+--- 把存档最新字段投影进树状态：武器/选中/held 与三类伤害倍率（真源取 PlayerData:weapon_damage_scale，
 --- 与 PlayerEffects 的 AttrModel 派生同源）。
 function M:sync(player)
     local session = assert(self.sessions[player], '未注册的玩家')
@@ -211,7 +211,7 @@ function M:sync(player)
     session.tree.states.weapons:set(snap and snap.weapons or {})
     local scales = {}
     for _, kind in ipairs({ 'melee', 'ranged', 'explosive' }) do
-        scales[kind] = session.data:WeaponDamageScale(kind)
+        scales[kind] = session.data:weapon_damage_scale(kind)
     end
     session.tree.memos.weapon_damage_scales:set(scales)
 end
@@ -239,19 +239,19 @@ function M:attack(player, payload)
     local message = { action = 'attack' }
     for key, value in pairs(payload or {}) do message[key] = value end
     self:handle(player, message)
-    return M.lastReply(self, player)
+    return M.last_reply(self, player)
 end
 
 function M:throw(player, slot, target, extra)
     local payload = { action = 'throw', slot = slot, target = target }
     for key, value in pairs(extra or {}) do payload[key] = value end
     self:handle(player, payload)
-    return M.lastReply(self, player)
+    return M.last_reply(self, player)
 end
 
 function M:reload(player)
     self:handle(player, { action = 'reload' })
-    return M.lastReply(self, player)
+    return M.last_reply(self, player)
 end
 
 function M:guard(player, unit, index)
@@ -259,7 +259,7 @@ function M:guard(player, unit, index)
 end
 
 --- 玩家离场：销毁其作用域（与 PlayerTree dispose 同一清理路径），并从 Players 服务列表移除。
-function M:removePlayer(player)
+function M:remove_player(player)
     local session = assert(self.sessions[player], '未注册的玩家')
     if session.spokeTree then session.spokeTree:dispose() end
     session.spokeTree = nil
@@ -280,7 +280,7 @@ function M:remount(player, patch)
 end
 
 --- 给某名玩家的道具栏发一件爆炸物并选中它，返回槽位。失败才拼消息（避免每次通过都付拼接）。
-function M:giveExplosive(player, itemId, count)
+function M:give_explosive(player, itemId, count)
     local data = assert(self.sessions[player], '未注册的玩家').data
     for _ = 1, count or 1 do
         if not data:AddItem(itemId) then error('道具栏放不下 ' .. tostring(itemId), 2) end
@@ -297,13 +297,13 @@ function M:giveExplosive(player, itemId, count)
     return slot
 end
 
---- 替换水区表（投掷落水判定与保底鱼来源），tearDown 时恢复。
-function M:setWaterZones(zones)
+--- 替换水区表（投掷落水判定与保底鱼来源），tear_down 时恢复。
+function M:set_water_zones(zones)
     if self.savedWaterZones == nil then self.savedWaterZones = GameCfg.Water.Zones end
     GameCfg.Water.Zones = zones or {}
 end
 
-function M.lastReply(ctx, player)
+function M.last_reply(ctx, player)
     for index = #ctx.replies, 1, -1 do
         local record = ctx.replies[index]
         if record.player == player then return record.payload end

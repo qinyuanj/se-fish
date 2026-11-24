@@ -8,12 +8,12 @@ local function cfg()
 end
 
 local function isBadNumber(v)
-    return not Number.IsFiniteNumber(v)
+    return not Number.is_finite_number(v)
 end
 
 ---@param itemId? string
 ---@return string? effect
-function M.Desired(itemId)
+function M.desired(itemId)
     if type(itemId) ~= 'string' then return nil end
     return cfg().Items[itemId]
 end
@@ -22,9 +22,9 @@ end
 ---@param state table { Y = number, Airborne = bool }
 ---@param holding bool 长按中
 ---@param dt number 距上一帧的秒数
----@param bounds table FlightPath.BoundsOf 的结果（GroundY / CeilingY）
+---@param bounds table FlightPath.bounds_of 的结果（GroundY / CeilingY）
 ---@return number y, bool airborne
-function M.StepFlightY(wingsCfg, state, holding, dt, bounds)
+function M.step_flight_y(wingsCfg, state, holding, dt, bounds)
     local y = state.Y
     local airborne = state.Airborne == true
     if isBadNumber(dt) or dt < 0 then return y, airborne end
@@ -43,11 +43,11 @@ function M.StepFlightY(wingsCfg, state, holding, dt, bounds)
     return y, airborne
 end
 
----@param bounds table FlightPath.BoundsOf 的结果
+---@param bounds table FlightPath.bounds_of 的结果
 ---@param x number
 ---@param z number
 ---@return number x, number z, bool clamped
-function M.ClampXZ(bounds, x, z)
+function M.clamp_xz(bounds, x, z)
     local clamped = false
     if isBadNumber(x) then x = (bounds.MinX + bounds.MaxX) / 2 clamped = true end
     if isBadNumber(z) then z = (bounds.MinZ + bounds.MaxZ) / 2 clamped = true end
@@ -62,7 +62,7 @@ end
 ---@param durationSec number 吐息持续秒数（3）
 ---@param tickSec number 结算间隔（0.25）
 ---@return number[] plan 每段伤害（正整数，和恰为 totalDamage）
-function M.TickDamages(totalDamage, durationSec, tickSec)
+function M.tick_damages(totalDamage, durationSec, tickSec)
     local count = math.floor(durationSec / tickSec + 1e-9)
     if count < 1 then count = 1 end
     local base = math.floor(totalDamage / count)
@@ -77,21 +77,21 @@ function M.TickDamages(totalDamage, durationSec, tickSec)
 end
 
 ---@param breathCfg table GameCfg.Ability.SpecialItem.Godzilla.Breath
----@return table ledger { Plan = number[], Targets = { [key] = { Hits = { [tick]=true }, Total = n } } }
-function M.NewBreathLedger(breathCfg)
+---@return table ledger { plan = number[], Targets = { [key] = { Hits = { [tick]=true }, Total = n } } }
+function M.new_breath_ledger(breathCfg)
     return {
-        Plan = M.TickDamages(breathCfg.TotalDamage, breathCfg.DurationSec, breathCfg.TickSec),
+        plan = M.tick_damages(breathCfg.TotalDamage, breathCfg.DurationSec, breathCfg.TickSec),
         Targets = {},
     }
 end
 
----@param ledger table NewBreathLedger 的结果
+---@param ledger table new_breath_ledger 的结果
 ---@param targetKey string 目标身份（玩家 'player:<UserId>' / 鱼 'fish:<Id>'）
----@param tick number 段序号（1..#Plan）
+---@param tick number 段序号（1..#plan）
 ---@return number? amount
-function M.BreathHit(ledger, targetKey, tick)
+function M.breath_hit(ledger, targetKey, tick)
     if type(targetKey) ~= 'string' or type(tick) ~= 'number' then return nil end
-    local amount = ledger.Plan[tick]
+    local amount = ledger.plan[tick]
     if not amount then return nil end
     local entry = ledger.Targets[targetKey]
     if not entry then
@@ -108,7 +108,7 @@ end
 ---@param now number
 ---@param cooldownSec number
 ---@return number remaining
-function M.CooldownRemaining(lastCastAt, now, cooldownSec)
+function M.cooldown_remaining(lastCastAt, now, cooldownSec)
     if isBadNumber(lastCastAt) or isBadNumber(now) then return 0 end
     local remaining = lastCastAt + cooldownSec - now
     if remaining < 0 then return 0 end

@@ -16,7 +16,7 @@ local runtime = assert(ServerRuntime.current(), MARK .. ': ServerRuntime 未启�
 local life = assert(runtime.life, MARK .. ': ServerRuntime.life 不可用')
 local player = game:GetService('Players'):GetPlayers()[1]
 assert(player and player.Character, MARK .. ': 没有玩家角色')
-local data = assert(PlayerDataHost:GetDataInst(player), MARK .. ': 存档未就绪')
+local data = assert(PlayerDataHost:get_data_inst(player), MARK .. ': 存档未就绪')
 local ability = GameCfg.Ability
 local anim
 if PHASE ~= 'fire' and WEAPON ~= 'throw' then
@@ -29,12 +29,12 @@ if PHASE ~= 'fire' and WEAPON ~= 'throw' then
     data:GrantWeapon(WEAPON, 1)
     data:HoldWeapon(WEAPON)
   end
-  PlayerDataHost:SyncPlayerTree(player, true)
+  PlayerDataHost:sync_player_tree(player, true)
   print(MARK .. '|' .. WEAPON .. '|held=' .. tostring(held.id))
 end
 if PHASE == 'hold' then return end
 local function captureWeaponAction(payload)
-  local event = REUtil:GetRE('WeaponResult')
+  local event = REUtil:get_re('WeaponResult')
   local original = event and event.FireClient
   local reply
   if event and original then
@@ -43,7 +43,7 @@ local function captureWeaponAction(payload)
       return original(self, target, body)
     end
   end
-  local ok, accepted = pcall(life.WeaponAction, life, player, payload)
+  local ok, accepted = pcall(life.weapon_action, life, player, payload)
   if event and original then event.FireClient = original end
   if not ok then error(accepted) end
   return accepted, reply
@@ -76,7 +76,7 @@ if WEAPON == 'throw' then
   end
   assert(slot, MARK .. ': 无法把 item143 放入道具栏')
   if data.Data.SelectedSlot ~= slot then data:SelectSlot(slot) end
-  PlayerDataHost:SyncPlayerTree(player, true)
+  PlayerDataHost:sync_player_tree(player, true)
   _G.AAR172Seq = (_G.AAR172Seq or 0) + 1
   local accepted, reply = captureWeaponAction({ action = 'throw', slot = slot, seq = _G.AAR172Seq })
   print(MARK .. '|' .. WEAPON .. '|launch accepted=' .. tostring(accepted)

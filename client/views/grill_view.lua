@@ -146,7 +146,7 @@ function GrillView.mount(scope, ctx, options)
       end
       local rate = snapshot.rate
       if rate == nil then
-        rate = GrillCurve.Rate(elapsed, cfg()) or 0
+        rate = GrillCurve.rate(elapsed, cfg()) or 0
       end
       local time_text = "已烤 " .. GrillCurve.Format(elapsed) .. " 秒"
       local rate_text = "倍率 " .. GrillCurve.Format(rate)
@@ -257,7 +257,7 @@ function GrillView.bubble_spec(options)
       if position == nil then
         return list
       end
-      local radius = BodyScale.InteractionRadius(character, cfg().Radius)
+      local radius = BodyScale.interaction_radius(character, cfg().Radius)
       local radius_sq = radius * radius
       for index, entry in ipairs(options.anchors or {}) do
         local dist_sq = ViewUtil.distance_sq_xz(position, entry.position)

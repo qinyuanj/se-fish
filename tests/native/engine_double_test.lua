@@ -4,8 +4,8 @@ local Fixtures = require('tests.support.zone_fixtures')
 
 local function world()
   local marker = Engine.Unit({ Name = 'Z1_Safe', Position = { x = 1, y = 2, z = 3 }, Size = { x = 4, y = 5, z = 6 } })
-  local folder = Engine.Unit({ Name = '摆渡', Children = { marker } })
-  local zone = Engine.Unit({ Name = '01 鱼塘', Children = { folder } })
+  local folder = Engine.Unit({ Name = '摆渡', children = { marker } })
+  local zone = Engine.Unit({ Name = '01 鱼塘', children = { folder } })
   return Engine.World({ zone }), zone, folder, marker
 end
 

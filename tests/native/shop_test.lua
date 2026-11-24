@@ -13,7 +13,7 @@ local Host = require('tests.support.shop_feed_host')
 describe("钓场商店购买", function()
     local ctx
 
-    -- 与旧 LuaUnit 的每例 setUp/tearDown 同级成对。
+    -- 与旧 LuaUnit 的每例 set_up/tear_down 同级成对。
     -- #49：进图白送只在调试开关下发放，这些用例沿用它的起始库存（鱼竿在第 1 格、蚯蚓若干）。
     before_each(function()
         ctx = { seq = 0 }
@@ -26,7 +26,7 @@ describe("钓场商店购买", function()
         ctx.replies = ctx.host.results[1].ShopResult
     end)
 
-    -- 调试开关与商店表逐例恢复；setUp 中途失败也照样清理。
+    -- 调试开关与商店表逐例恢复；set_up 中途失败也照样清理。
     after_each(function()
         ctx.host:shutdown()
         ctx.cfg.Shop = ctx.savedShop
@@ -116,18 +116,18 @@ describe("钓场商店购买", function()
         ctx.data:AddCoin(1000, nil, 'test')
         assert.is_true(buyNumber(51)) -- 近战武器升级1，50 金
         assert.same(950, ctx.data.Data.FishCoin)
-        assert.same(1, ctx.data:ShopUpgradeLevel('melee'))
+        assert.same(1, ctx.data:shop_upgrade_level('melee'))
         local last = ctx.replies[#ctx.replies]
         assert.same('近战武器升级1', last.name)
         assert.same(51, last.number)
         assert.same('melee', last.kind)
         assert.same(1, last.level)
-        assert.near(1.1, ctx.data:WeaponDamageScale('melee'), 1e-9)
+        assert.near(1.1, ctx.data:weapon_damage_scale('melee'), 1e-9)
         -- 重复升级：限购拒绝，钱与等级都不动
         assert.is_false(buyNumber(51))
         assert.same('limit', lastReason())
         assert.same(950, ctx.data.Data.FishCoin)
-        assert.same(1, ctx.data:ShopUpgradeLevel('melee'))
+        assert.same(1, ctx.data:shop_upgrade_level('melee'))
     end)
 
     -- 新档 5 金币可买 5 金新手鱼竿（#130 验收）；失败方式：定价错或余额校验错导致买不了/扣错
@@ -156,17 +156,17 @@ describe("钓场商店购买", function()
         ctx.me.Character.Position.x = ctx.host.anchors.Z7_Shop.Position.x
         ctx.data:AddCoin(35000, nil, 'test')
         for _, number in ipairs({ 51, 50, 49, 48, 47, 46, 45 }) do assert.is_true(buyNumber(number)) end
-        assert.same(7, ctx.data:ShopUpgradeLevel('melee'))
-        assert.near(1.7, ctx.data:WeaponDamageScale('melee'), 1e-9)
+        assert.same(7, ctx.data:shop_upgrade_level('melee'))
+        assert.near(1.7, ctx.data:weapon_damage_scale('melee'), 1e-9)
         for _, number in ipairs({ 38, 37, 36, 35, 34 }) do assert.is_true(buyNumber(number)) end
-        assert.same(5, ctx.data:ShopUpgradeLevel('ranged'))
-        assert.near(1.5, ctx.data:WeaponDamageScale('ranged'), 1e-9)
+        assert.same(5, ctx.data:shop_upgrade_level('ranged'))
+        assert.near(1.5, ctx.data:weapon_damage_scale('ranged'), 1e-9)
         for _, number in ipairs({ 41, 40, 39 }) do assert.is_true(buyNumber(number)) end
-        assert.same(3, ctx.data:ShopUpgradeLevel('magazine'))
-        assert.same(13, ctx.data:MagazineSize(5))
+        assert.same(3, ctx.data:shop_upgrade_level('magazine'))
+        assert.same(13, ctx.data:magazine_size(5))
         for _, number in ipairs({ 44, 43, 42 }) do assert.is_true(buyNumber(number)) end
-        assert.same(3, ctx.data:ShopUpgradeLevel('explosive'))
-        assert.near(1.6, ctx.data:WeaponDamageScale('explosive'), 1e-9)
+        assert.same(3, ctx.data:shop_upgrade_level('explosive'))
+        assert.near(1.6, ctx.data:weapon_damage_scale('explosive'), 1e-9)
         -- 满级后再买任一级：限购拒绝且不扣钱
         local coin = ctx.data.Data.FishCoin
         assert.is_false(buyNumber(45))
@@ -323,7 +323,7 @@ describe("钓场商店购买", function()
         assert.is_false(buyNumber(50)) -- 近战 2 级，未买过 1 级
         assert.same('level', lastReason())
         assert.same(1000, ctx.data.Data.FishCoin)
-        assert.same(0, ctx.data:ShopUpgradeLevel('melee'))
+        assert.same(0, ctx.data:shop_upgrade_level('melee'))
     end)
 
     -- 武器不占格：满格也能买（#130 修正 CanGrant）

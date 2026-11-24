@@ -4,7 +4,7 @@ local Records = {}
 
 local function cfg() return GameCfg.Records end
 
-function Records.ValidUserId(userId)
+function Records.valid_user_id(userId)
     if type(userId) == 'string' then return userId ~= '' end
     return type(userId) == 'number' and userId < math.huge
         and userId >= 1 and userId == math.floor(userId)
@@ -19,55 +19,55 @@ function Records.Scale(weight)
     return scaled
 end
 
-function Records.Unscale(scaled)
+function Records.unscale(scaled)
     if type(scaled) ~= 'number' or scaled ~= math.floor(scaled) or scaled < 1 then return nil end
     return scaled / cfg().Scale
 end
 
-function Records.Entry(scaled, userId, name)
+function Records.entry(scaled, userId, name)
     if type(scaled) ~= 'number' or scaled ~= math.floor(scaled) or scaled < 1
         or scaled > cfg().MaxScaled then return nil, 'invalid' end
-    if not Records.ValidUserId(userId) then return nil, 'invalid' end
+    if not Records.valid_user_id(userId) then return nil, 'invalid' end
     local display = type(name) == 'string' and name ~= '' and #name <= cfg().MaxNameLength and name or nil
     return { w = scaled, u = userId, n = display }
 end
 
-function Records.Valid(entry)
+function Records.valid(entry)
     if type(entry) ~= 'table' then return nil end
     local scaled = entry.w
     if type(scaled) ~= 'number' or scaled ~= math.floor(scaled) or scaled < 1
         or scaled > cfg().MaxScaled then return nil end
     local userId = entry.u
-    if not Records.ValidUserId(userId) then return nil end
+    if not Records.valid_user_id(userId) then return nil end
     local name = entry.n
     if name ~= nil and (type(name) ~= 'string' or #name > cfg().MaxNameLength) then name = nil end
     return { w = scaled, u = userId, n = name }
 end
 
-function Records.Wins(candidate, current)
-    local next_ = Records.Valid(candidate)
+function Records.wins(candidate, current)
+    local next_ = Records.valid(candidate)
     if not next_ then return false end
-    local held = Records.Valid(current)
+    local held = Records.valid(current)
     if not held then return true end
     if next_.w ~= held.w then return next_.w > held.w end
     if type(next_.u) ~= type(held.u) then return type(next_.u) == 'number' end
     return next_.u < held.u
 end
 
-function Records.Holder(entry)
-    local valid = Records.Valid(entry)
+function Records.holder(entry)
+    local valid = Records.valid(entry)
     if not valid then return nil end
     return valid.n or (cfg().HolderFallback:format(valid.u))
 end
 
 function Records.State(entry)
-    local valid = Records.Valid(entry)
+    local valid = Records.valid(entry)
     if not valid then return { state = 'missing' } end
     return { state = 'ok', scaled = valid.w, weight = valid.w / cfg().Scale,
-        userId = valid.u, name = valid.n, holder = Records.Holder(valid) }
+        userId = valid.u, name = valid.n, holder = Records.holder(valid) }
 end
 
-function Records.Describe(state)
+function Records.describe(state)
     local texts = cfg().Texts
     if type(state) ~= 'table' or state.state == 'unavailable' then return texts.Unavailable end
     if state.state ~= 'ok' then return texts.Missing end

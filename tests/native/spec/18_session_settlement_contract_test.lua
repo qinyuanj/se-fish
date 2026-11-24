@@ -19,7 +19,7 @@ local function signal()
   }
 end
 
-local function newPlayer(userId, position)
+local function new_player(userId, position)
   local player = { UserId = userId, teleports = 0 }
   player.Character = { Position = position,
     SetPosition = function(self, pos) self.Position = pos player.teleports = player.teleports + 1 end }
@@ -44,13 +44,13 @@ describe('条款 18 存档会话与结算身份', function()
     return env.sent[name] or {}
   end
 
-  local function lastReply(name)
+  local function last_reply(name)
     local list = replies(name)
     return list[#list]
   end
 
   local function seedSnapshot(uid)
-    local seed = env.PlayerData.New(newPlayer(uid, vec(0, 0, 0)))
+    local seed = env.PlayerData.New(new_player(uid, vec(0, 0, 0)))
     seed:Init()
     return seed:Serialize()
   end
@@ -60,20 +60,20 @@ describe('条款 18 存档会话与结算身份', function()
   end
 
   local function ready(uid, position, snapshot)
-    local player = newPlayer(uid, position or vec(0, 5, 0))
+    local player = new_player(uid, position or vec(0, 5, 0))
     local originalSet = player.Character.SetPosition
     player.Character.SetPosition = function(self, pos)
       env.savedLanding = { x = pos.x, y = pos.y, z = pos.z }
       originalSet(self, pos)
     end
     if snapshot then env.values[env.cfg.Save.KeyPrefix .. tostring(uid)] = snapshot end
-    env.players:OnPlayerAdded(player)
+    env.players:on_player_added(player)
     drain()
-    return player, env.players:GetDataInst(player)
+    return player, env.players:get_data_inst(player)
   end
 
   before_each(function()
-    env = { cfg = require('tests.support.zone_fixtures').Load() }
+    env = { cfg = require('tests.support.zone_fixtures').load() }
     env.cfg.Debug = { Enabled = false }
     env.savedWorldModules = {}
     for name, value in pairs(package.loaded) do
@@ -109,7 +109,7 @@ describe('条款 18 存档会话与结算身份', function()
     end }
 
     local reStub = {
-      GetRE = function(_, name)
+      get_re = function(_, name)
         env.sent[name] = env.sent[name] or {}
         if not env.events[name] then
           env.events[name] = {
@@ -122,7 +122,7 @@ describe('条款 18 存档会话与结算身份', function()
         end
         return env.events[name]
       end,
-      CheckRECD = function() return false end,
+      check_recd = function() return false end,
     }
     package.loaded['common.re_util'] = reStub
     _G.REUtil = reStub
@@ -131,7 +131,7 @@ describe('条款 18 存档会话与结算身份', function()
     env.save = assert(loadfile('server/save_host.lua'))()
     env.players = assert(loadfile('server/player_data_host.lua'))()
     env.players.Save, env.save.PlayerData = env.save, env.players
-    env.ferry = { OnlinePlayers = function() return {} end }
+    env.ferry = { online_players = function() return {} end }
     env.anchors = {}
     for _, zone in ipairs(env.cfg.Zones) do
       for _, entity in ipairs(zone.Scene.Entities) do
@@ -141,35 +141,35 @@ describe('条款 18 存档会话与结算身份', function()
       end
     end
     env.interact = {
-      InRange = function(_, player, point)
+      in_range = function(_, player, point)
         local anchor = env.anchors[point.AnchorName]
         local pos = player.Character and player.Character.Position
         if not anchor or not pos then return nil end
         local dx, dz = pos.x - anchor.Position.x, pos.z - anchor.Position.z
         return math.sqrt(dx * dx + dz * dz) <= point.Radius + point.Slack and anchor or nil
       end,
-      FindAnchor = function(_, name) return env.anchors[name] end,
+      find_anchor = function(_, name) return env.anchors[name] end,
     }
     env.route = env.cfg.Ferry.Routes[1]
     local ServerRuntime = require('server.world_host.server_runtime')
     env.runtime = ServerRuntime.new({
       initial_now = env.now, zones = env.cfg.Zones, remote = reStub,
       player_data = env.players, save = env.save, interact = env.interact,
-      players_service = { GetPlayers = function() return env.ferry.OnlinePlayers() end },
+      players_service = { GetPlayers = function() return env.ferry.online_players() end },
       world_service = _G.game:GetService('World'),
       bind_ferry_action = function(dispatch)
-        reStub:GetRE('FerryAction').OnServerEvent:Connect(function(player, payload)
+        reStub:get_re('FerryAction').OnServerEvent:Connect(function(player, payload)
           return dispatch(player, payload)
         end)
       end,
     })
-    function env.ferry:Update()
+    function env.ferry:update()
       local dt = math.max(0, env.now - env.runtime.clock.now())
       env.runtime:step(dt, env.now)
     end
     function env.ferry:Handle(player, payload)
-      self:Update()
-      return reStub:GetRE('FerryAction').OnServerEvent:Fire(player, payload) == true
+      self:update()
+      return reStub:get_re('FerryAction').OnServerEvent:Fire(player, payload) == true
     end
     env.runtime:start()
     env.runtime:mark_started()
@@ -203,8 +203,8 @@ describe('条款 18 存档会话与结算身份', function()
     assert.same(20, storeSnapshot(uid).coin)
 
     -- 同 UserId 重进：旧会话被替换，其快照从业务入口再次写入必须被拒。
-    local rejoined = newPlayer(uid, vec(1, 5, 1))
-    env.players:OnPlayerAdded(rejoined)
+    local rejoined = new_player(uid, vec(1, 5, 1))
+    env.players:on_player_added(rejoined)
     drain()
     assert.is_false(env.save:Save(uid, old, 'late-callback'))
     assert.same(20, storeSnapshot(uid).coin)
@@ -212,10 +212,10 @@ describe('条款 18 存档会话与结算身份', function()
     -- 版本校验：外部把 revision 改掉后，当前会话的写入也不能盖过去。
     local stored = storeSnapshot(uid)
     stored.meta.revision = stored.meta.revision + 5
-    local fresh = env.players:GetDataInst(rejoined)
+    local fresh = env.players:get_data_inst(rejoined)
     assert.is_true(env.save:Save(uid, fresh:Serialize(), 'version-check'))
     drain()
-    assert.is_true(env.save:IsPaused(uid), '会话与版本冲突必须关闭写入屏障')
+    assert.is_true(env.save:is_paused(uid), '会话与版本冲突必须关闭写入屏障')
     assert.same(stored.meta.revision, storeSnapshot(uid).meta.revision)
   end)
 
@@ -231,7 +231,7 @@ describe('条款 18 存档会话与结算身份', function()
 
     assert.is_true(env.ferry:Handle(player, { action = 'Board', routeId = env.route.Id, seq = 1 }))
     drain()
-    local first = lastReply('FerryResult').payload
+    local first = last_reply('FerryResult').payload
     assert.is_true(first.ok, tostring(first.reason))
     assert.is_not_nil(first.operation)
     assert.same(0, data:ItemCount(env.route.Outbound.Ticket))
@@ -240,7 +240,7 @@ describe('条款 18 存档会话与结算身份', function()
     assert.is_true(env.ferry:Handle(player, { action = 'Board', routeId = env.route.Id, seq = 2,
       requestId = first.operation }))
     drain()
-    local replay = lastReply('FerryResult').payload
+    local replay = last_reply('FerryResult').payload
     assert.is_true(replay.ok)
     assert.same(first.operation.id, replay.operation.id)
     assert.same(0, data:ItemCount(env.route.Outbound.Ticket))
@@ -262,7 +262,7 @@ describe('条款 18 存档会话与结算身份', function()
     -- 会话被写失败关闭后内存实例不再可读；以持久快照判断船票有没有被先扣。
     local persisted = storeSnapshot(uid)
     assert.same(env.route.Outbound.Ticket, persisted.bar[1].id, '写档失败不能先扣票')
-    local failed = lastReply('FerryResult')
+    local failed = last_reply('FerryResult')
     assert.is_false(failed ~= nil and failed.ok == true)
   end)
 
@@ -276,14 +276,14 @@ describe('条款 18 存档会话与结算身份', function()
     player.Character.Position = vec(anchor.x, anchor.y, anchor.z)
     env.ferry:Handle(player, { action = 'Board', routeId = env.route.Id, seq = 1 })
     drain()
-    local operation = lastReply('FerryResult').payload.operation
+    local operation = last_reply('FerryResult').payload.operation
     assert.is_not_nil(operation)
 
-    env.players:OnPlayerRemoving(player)
+    env.players:on_player_removing(player)
     local rejoined, fresh = ready(uid, vec(0, 5, 0))
-    env.ferry.OnlinePlayers = function() return { rejoined } end
+    env.ferry.online_players = function() return { rejoined } end
     env.now = env.now + 1
-    env.ferry:Update()
+    env.ferry:update()
     drain()
     assert.same(1, fresh:ItemCount(env.route.Outbound.Ticket), '未完成的船票应回退一次')
 
@@ -306,28 +306,28 @@ describe('条款 18 存档会话与结算身份', function()
 
     env.cfg.Debug = { Enabled = true }
     env.cfg.Platform.Placeholder.Enabled = false
-    assert.is_true(shop:platformAction({ action = 'Purchase', goods = 'adrenaline1', seq = 1 }))
-    local opened = shop:lastResult('PlatformResult')
+    assert.is_true(shop:platform_action({ action = 'Purchase', goods = 'adrenaline1', seq = 1 }))
+    local opened = shop:last_result('PlatformResult')
     assert.is_not_nil(opened, '购买必须有支付回包')
     assert.same('TestFlow', opened.action, tostring(opened.reason))
     assert.is_true(opened.open)
-    shop:resolvePlatform('success')
-    local first = shop:lastResult('PlatformResult')
+    shop:resolve_platform('success')
+    local first = shop:last_result('PlatformResult')
     assert.is_true(first.ok, tostring(first.reason))
     assert.is_not_nil(first.requestId, '回执要带可重试的请求身份')
     assert.same(1, first.granted)
     assert.same(1, shop.data:ItemCount(itemId))
     assert.same(before + 3, #snapshot().meta.operations, '支付意图、已支付与发奖各落一笔')
 
-    shop:clearEvents()
-    assert.is_true(shop:platformAction({ action = 'Query', seq = 2, requestId = first.requestId }))
-    local replay = shop:lastResult('PlatformResult')
+    shop:clear_events()
+    assert.is_true(shop:platform_action({ action = 'Query', seq = 2, requestId = first.requestId }))
+    local replay = shop:last_result('PlatformResult')
     assert.is_true(replay.ok)
     assert.same(first.requestId, replay.requestId, '重放认得原请求身份')
     assert.same(1, replay.granted, '回执仍是原来那一次发放')
     assert.same(1, shop.data:ItemCount(itemId), '重放不得重复发奖')
     assert.same(before + 3, #snapshot().meta.operations, '重放不得再记一笔发放')
-    shop:tearDown()
+    shop:tear_down()
   end)
 
 
@@ -435,8 +435,8 @@ describe('条款 18 存档会话与结算身份', function()
     local broken = seedSnapshot(uid)
     broken.v, broken.coin = 99, 77
     env.values[env.cfg.Save.KeyPrefix .. tostring(uid)] = broken
-    local player = newPlayer(uid, vec(0, 5, 0))
-    env.players:OnPlayerAdded(player)
+    local player = new_player(uid, vec(0, 5, 0))
+    env.players:on_player_added(player)
     drain()
     assert.same('failed', env.save:Status(uid).loadState)
     assert.same(77, storeSnapshot(uid).coin, '坏档必须原样保留')
@@ -445,12 +445,12 @@ describe('条款 18 存档会话与结算身份', function()
 
     -- 存档尚未就绪时，摆渡结算入口直接拒绝，不扣票也不动其他财产。
     local uid2 = 5208
-    local pending = newPlayer(uid2, vec(0, 5, 0))
-    env.players:OnPlayerAdded(pending)
+    local pending = new_player(uid2, vec(0, 5, 0))
+    env.players:on_player_added(pending)
     assert.same('pending', env.save:Status(uid2).loadState)
     assert.is_false(env.ferry:Handle(pending,
       { action = 'Board', routeId = env.route.Id, seq = 1 }))
-    assert.is_nil(lastReply('FerryResult')) -- 未就绪不回成功包
+    assert.is_nil(last_reply('FerryResult')) -- 未就绪不回成功包
     drain()
   end)
 
@@ -459,15 +459,15 @@ describe('条款 18 存档会话与结算身份', function()
     local uid = 5206
     local player, data = ready(uid)
     -- 世界侧活鱼与地面物品（共享对象）不是玩家财产。
-    local world = { liveFish = { { id = 'fishA' } }, groundItems = { { id = 'dropA' } } }
-    env.players.Loot = { Items = world.groundItems, Fish = world.liveFish }
+    local world = { liveFish = { { id = 'fishA' } }, ground_items = { { id = 'dropA' } } }
+    env.players.Loot = { Items = world.ground_items, Fish = world.liveFish }
     data:AddCoin(9)
     assert.is_true(env.save:Save(uid, data:Serialize(), 'test'))
     drain()
     local stored = storeSnapshot(uid)
     assert.same(9, stored.coin)
     assert.is_nil(stored.liveFish)
-    assert.is_nil(stored.groundItems)
+    assert.is_nil(stored.ground_items)
     assert.is_nil(stored.world)
     assert.is_nil(stored.extra.world)
     assert.same('table', type(stored.extra.recovery), '个人会话恢复记录独立存在')

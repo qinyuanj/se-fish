@@ -57,87 +57,87 @@ function LifeFacade.new(ctx)
     return nil
   end
 
-  function life:GetTree(player)
+  function life:get_tree(player)
     return tree_of(player)
   end
 
-  function life:PlayerFromUnit(unit)
+  function life:player_from_unit(unit)
     return player_from_unit(unit)
   end
 
-  function life:LifeStatus(player)
+  function life:life_status(player)
     local tree = tree_of(player)
     return tree and tree.states.life_phase:now() or nil
   end
 
-  function life:IsDowned(player)
-    local phase = self:LifeStatus(player)
+  function life:is_downed(player)
+    local phase = self:life_status(player)
     return phase == "downed" or phase == "rescuing"
   end
 
-  function life:IsRescuing(player)
-    return self:LifeStatus(player) == "rescuing"
+  function life:is_rescuing(player)
+    return self:life_status(player) == "rescuing"
   end
 
-  function life:PlayerByUserId(user_id)
+  function life:player_by_user_id(user_id)
     for _, player in pairs(active_players) do
       if player.UserId == user_id then return player end
     end
     return nil
   end
 
-  function life:IsDead(player)
-    return self:LifeStatus(player) == "dead"
+  function life:is_dead(player)
+    return self:life_status(player) == "dead"
   end
 
-  function life:CanAct(player)
+  function life:can_act(player)
     local tree = tree_of(player)
     return tree ~= nil and tree.memos.can_act:now() == true
   end
 
-  function life:CanTakeDamage(player)
-    return self:LifeStatus(player) == "alive"
+  function life:can_take_damage(player)
+    return self:life_status(player) == "alive"
   end
 
-  function life:CanEat(player, item_id)
+  function life:can_eat(player, item_id)
     local tree = tree_of(player)
     if not tree or tree.memos.can_act:now() ~= true then return false end
     local definition = type(item_id) == "string" and GameCfg.Items.Definitions[item_id]
     return type(definition) == "table" and type(definition.EatPercent) == "number"
   end
 
-  function life:Eat(player, item_id, cook_rate)
+  function life:eat(player, item_id, cook_rate)
     local tree = tree_of(player)
     if not tree then return false end
     return tree:eat(item_id, cook_rate)
   end
 
-  function life:MaxHealthOf(player)
+  function life:max_health_of(player)
     local max_health_of = get_max_health_of and get_max_health_of() or nil
     if type(max_health_of) == "function" then
       local ok, value = pcall(max_health_of, player)
-      if ok and Number.IsFiniteNumber(value) and value >= 1 then return math.floor(value) end
+      if ok and Number.is_finite_number(value) and value >= 1 then return math.floor(value) end
     end
     local tree = tree_of(player)
     local value = tree and tree.memos.max_health and tree.memos.max_health:now()
-    if Number.IsFiniteNumber(value) and value >= 1 then return math.floor(value) end
+    if Number.is_finite_number(value) and value >= 1 then return math.floor(value) end
     return GameCfg.Vitals.MaxHealth
   end
 
-  function life:SnapshotHealth(player)
+  function life:snapshot_health(player)
     local tree = tree_of(player)
     if not tree then return nil, nil end
-    return math.max(0, math.floor(tree.states.health:now())), self:MaxHealthOf(player)
+    return math.max(0, math.floor(tree.states.health:now())), self:max_health_of(player)
   end
 
-  function life:SetDamageFilter(filter)
+  function life:set_damage_filter(filter)
     if set_damage_filter then set_damage_filter(filter) end
     for _, tree in pairs(player_trees) do
       if tree.set_damage_filter then tree:set_damage_filter(filter or false) end
     end
   end
 
-  function life:NewHit(source, category)
+  function life:new_hit(source, category)
     hit_seq = hit_seq + 1
     local source_player = tree_of(source) and source or player_from_unit(source)
     return {
@@ -149,11 +149,11 @@ function LifeFacade.new(ctx)
     }
   end
 
-  function life:ResolveHitSource(hit)
+  function life:resolve_hit_source(hit)
     return type(hit) == "table" and hit.sourcePlayer or nil
   end
 
-  function life:ApplyHit(hit, target, amount)
+  function life:apply_hit(hit, target, amount)
     local player = tree_of(target) and target or player_from_unit(target)
     local tree = tree_of(player) or tree_of(hit and hit.sourcePlayer)
     if not tree then
@@ -165,17 +165,17 @@ function LifeFacade.new(ctx)
     return tree:apply_hit(hit, target, amount)
   end
 
-  function life:ApplyDamage(player, amount, hit)
-    local ok = self:ApplyHit(hit or self:NewHit(nil, "damage"), player, amount)
+  function life:apply_damage(player, amount, hit)
+    local ok = self:apply_hit(hit or self:new_hit(nil, "damage"), player, amount)
     return ok
   end
 
-  function life:SetHealth(player, value)
+  function life:set_health(player, value)
     local tree = tree_of(player)
-    if not tree or not Number.IsFiniteNumber(value) then return false end
+    if not tree or not Number.is_finite_number(value) then return false end
     local current = tree.states.health:now()
     if value < current then
-      return self:ApplyDamage(player, current - value, self:NewHit(nil, "gm"))
+      return self:apply_damage(player, current - value, self:new_hit(nil, "gm"))
     end
     local character = read_character(player)
     local controller = character and character.Controller
@@ -189,16 +189,16 @@ function LifeFacade.new(ctx)
     return true
   end
 
-  function life:SetHunger(player, value)
+  function life:set_hunger(player, value)
     local tree = tree_of(player)
-    if not tree or not Number.IsFiniteNumber(value) then return false end
+    if not tree or not Number.is_finite_number(value) then return false end
     local clamped = math.max(0, math.min(GameCfg.Vitals.MaxHunger, math.floor(value)))
     tree.states.hunger:set(clamped)
     return true
   end
 
   function life:Phase(player)
-    return self:LifeStatus(player)
+    return self:life_status(player)
   end
 
   function life:GetState(player)
@@ -207,30 +207,30 @@ function LifeFacade.new(ctx)
     return { player = player, phase = tree.states.life_phase:now(), tree = tree }
   end
 
-  function life:RescueAction(player, payload)
+  function life:rescue_action(player, payload)
     if type(payload) ~= "table" or payload.action ~= GameCfg.Rescue.Action then return false end
     local seq = payload.seq
-    if not Number.IsFiniteNumber(seq) or seq ~= math.floor(seq) or seq < 1 or seq > 2147483647 then return false end
+    if not Number.is_finite_number(seq) or seq ~= math.floor(seq) or seq < 1 or seq > 2147483647 then return false end
     local function reply(result)
-      if opts.remote and type(opts.remote.GetRE) == "function" then
-        opts.remote:GetRE("InteractResult"):FireClient(player, result)
+      if opts.remote and type(opts.remote.get_re) == "function" then
+        opts.remote:get_re("InteractResult"):FireClient(player, result)
       end
       return result
     end
-    if not Number.IsFiniteNumber(payload.targetUserId) then
+    if not Number.is_finite_number(payload.targetUserId) then
       reply({ action = "Rescue", ok = false, reason = "invalid", seq = seq })
       return false
     end
-    local data = opts.player_data and opts.player_data:GetDataInst(player)
+    local data = opts.player_data and opts.player_data:get_data_inst(player)
     local save = opts.save
     if not data or not save then return false end
     local request_id = payload.operation
     if request_id ~= nil and type(request_id) ~= "table" then return false end
     if request_id == nil then request_id = seq end
-    local operation, mode = save:ResolveRequest(player, data, "rescue", request_id)
+    local operation, mode = save:resolve_request(player, data, "rescue", request_id)
     if not operation then return false end
     if mode == "replay" then
-      return save:Execute(player, data, operation, function() return nil, "expired" end,
+      return save:execute(player, data, operation, function() return nil, "expired" end,
         function(ok, result)
           if ok then result.operation = operation reply(result) end
         end) == true
@@ -256,17 +256,17 @@ function LifeFacade.new(ctx)
       reply({ action = "Rescue", ok = false, reason = "too-far", seq = seq, targetUserId = target.UserId })
       return false
     end
-    local can, reason = self:CanRescue(target, player)
+    local can, reason = self:can_rescue(target, player)
     if not can then
       reply({ action = "Rescue", ok = false, reason = reason, seq = seq, targetUserId = target.UserId })
       return false
     end
-    local started, why = self:BeginRescue(target, player)
-    return save:Execute(player, data, operation, function()
+    local started, why = self:begin_rescue(target, player)
+    return save:execute(player, data, operation, function()
       return { ok = started == true, action = "Rescue", targetUserId = target.UserId, reason = why }
     end, function(written, result)
       if not written then
-        if started then self:CancelRescue(self:GetState(target)) end
+        if started then self:cancel_rescue(self:GetState(target)) end
         reply({ action = "Rescue", ok = false, reason = tostring(result), seq = seq, targetUserId = target.UserId })
         return
       end
@@ -275,7 +275,7 @@ function LifeFacade.new(ctx)
     end) == true
   end
 
-  function life:CanRescue(target, rescuer)
+  function life:can_rescue(target, rescuer)
     local tree = tree_of(target)
     if not tree or type(tree._accept_rescue) ~= "function" then return false, "not-downed" end
     local phase = tree.states.life_phase:now()
@@ -284,24 +284,24 @@ function LifeFacade.new(ctx)
     return true
   end
 
-  function life:BeginRescue(target, rescuer)
+  function life:begin_rescue(target, rescuer)
     local rescuer_tree = tree_of(rescuer)
     if not rescuer_tree then return false, "no-rescuer" end
     return rescuer_tree:begin_rescue(target)
   end
 
-  function life:CancelRescue(state)
+  function life:cancel_rescue(state)
     local tree = state and tree_of(state.player or state)
     if not tree or type(tree.cancel_rescue) ~= "function" then return false end
     return tree:cancel_rescue() == true
   end
 
-  function life:RequestAction(player, kind)
+  function life:request_action(player, kind)
     local tree = tree_of(player)
     return tree ~= nil and tree:request_action(kind) == true
   end
 
-  function life:WeaponAction(player, payload)
+  function life:weapon_action(player, payload)
     local tree = tree_of(player)
     if not tree then return false end
     local weapon = weapon_sessions[player.UserId]
@@ -309,7 +309,7 @@ function LifeFacade.new(ctx)
     return weapon:handle(payload) == true
   end
 
-  function life:WeaponCastGuard(unit, index)
+  function life:weapon_cast_guard(unit, index)
     for _, weapon in pairs(weapon_sessions) do
       if type(weapon.guard) == "function" and weapon:guard(unit, index) ~= true then
         return false

@@ -36,7 +36,7 @@ describe('客户端摆渡统一视图树（RootView × ClientStore）', function
     _G.Vector3 = { New = vec }
     _G.Color = { New = function(...) return { ... } end }
     env = { sent = {}, notices = {}, created = {} }
-    env.cfg = require('tests.support.zone_fixtures').Load()
+    env.cfg = require('tests.support.zone_fixtures').load()
     env.routes = env.cfg.Ferry.Routes
     env.route = env.routes[1]
     env.anchor_positions = {}
@@ -49,7 +49,7 @@ describe('客户端摆渡统一视图树（RootView × ClientStore）', function
     local RootView = require('client.views.root_view')
     local FerryView = require('client.views.ferry_view')
     env.store, env.writer = ClientStore.new({ initial_now = 100 })
-    env.root = Eui.Node({ Name = 'UIRoot' })
+    env.root = Eui.node({ Name = 'UIRoot' })
     env.view = RootView.mount(env.root, env.store, {
       hud = { FerryView.spec() },
       docks = { ferry = FerryView.legs_spec() },
@@ -57,14 +57,14 @@ describe('客户端摆渡统一视图树（RootView × ClientStore）', function
         send_ferry = function(payload) env.sent[#env.sent + 1] = payload end,
         notify = function(text) env.notices[#env.notices + 1] = text end,
         create_scene_node = function(position, name)
-          local node = Eui.Node({ Name = name, Kind = 'EUISceneNode', Parent = env.root,
+          local node = Eui.node({ Name = name, Kind = 'EUISceneNode', Parent = env.root,
             Position = position, Visible = true })
           env.created[#env.created + 1] = node
           return node
         end,
       },
       create_node = function(kind, props)
-        local node = Eui.Node({ Kind = kind, Name = props and props.Name,
+        local node = Eui.node({ Kind = kind, Name = props and props.Name,
           Parent = props and props.Parent, Visible = props and props.Visible ~= false,
           Text = props and (props.Text or props.ButtonText) or '',
           ButtonText = props and props.ButtonText,
@@ -93,7 +93,7 @@ describe('客户端摆渡统一视图树（RootView × ClientStore）', function
         local button = child('BtnFerry' .. leg.point.AnchorName)
         assert.is_not_nil(button)
         assert.same(leg.text, button.Text)
-        assert.is_true(Eui.Click(button))
+        assert.is_true(Eui.click(button))
         seq = seq + 1
         assert.same({ action = leg.action, routeId = route.Id, seq = seq }, env.sent[#env.sent])
       end

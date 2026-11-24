@@ -2,7 +2,7 @@
 -- 失败方式先列：
 --   1. ItemDiscard / ItemAction2 未按 MainHudLayout 排版、EUIButton 误写 Color 属性或文案标签未处于更高 LocalZOrder；
 --   2. 不同选中物与收线/持有/特殊态下动作键文案、颜色、可用态或显隐切换与 ScreenMain 不一致；
---   3. 点击丢弃/吃/抛竿/收竿/放下/吐息或长按飞行未发送对应上行 RE（含 ItemBarAction Operate）；
+--   3. 点击丢弃/吃/抛竿/收竿/放下/吐息或长按飞行未发送对应上行 RE（含 ItemBarAction operate）；
 --   4. 背包展开（backpack_open=true）未隐藏并禁用右侧两个动作键，或收起后未按当前快照恢复；
 --   5. 重连重置或根 UI 销毁后遗留按钮/标签节点，或 OnClicked / OnTouchBegan / OnTouchEnded 连接未归零。
 
@@ -47,12 +47,12 @@ describe("Spoke 主 HUD 右侧动作键视图（#297-B3b1）", function()
   local function mount_hud(opts)
     opts = opts or {}
     local store, writer = ClientStore.new({ initial_now = 100 })
-    local root_node = Eui.Node({ Name = "UIRoot" })
+    local root_node = Eui.node({ Name = "UIRoot" })
     local nodes = {}
     local created = {}
 
     local function create_node(kind, props)
-      local node = Eui.Node({
+      local node = Eui.node({
         Name = props.Name,
         Kind = kind,
         Parent = props.Parent,
@@ -105,7 +105,7 @@ describe("Spoke 主 HUD 右侧动作键视图（#297-B3b1）", function()
 
   it("按 MainHudLayout 排版、EUIButton 不写 Color、同级高 ZOrder 标签，并随选中物切换文案与显隐", function()
     local env = mount_hud({ height = 1080 })
-    local layout = MainHudLayout.Compute({ width = 1920, height = 1080, itemBarSlots = GameCfg.Items.ItemBarSlots })
+    local layout = MainHudLayout.compute({ width = 1920, height = 1080, itemBarSlots = GameCfg.Items.ItemBarSlots })
 
     local btn_discard = env.nodes.ItemDiscard
     local lbl_discard = env.nodes.BtnDiscardLabel
@@ -205,7 +205,7 @@ describe("Spoke 主 HUD 右侧动作键视图（#297-B3b1）", function()
 
   it("上钩高亮闪烁仅在活跃窗口内原地更新按钮颜色，绝不触发 ActionButtonsProjection Effect 重跑", function()
     local layout_reads = 0
-    local custom_layout = State.new("Test.action_layout", MainHudLayout.Compute({
+    local custom_layout = State.new("Test.action_layout", MainHudLayout.compute({
       width = 1920,
       height = 1080,
       itemBarSlots = 4,
@@ -223,12 +223,12 @@ describe("Spoke 主 HUD 右侧动作键视图（#297-B3b1）", function()
     }
 
     local store, writer = ClientStore.new({ initial_now = 100 })
-    local root_node = Eui.Node({ Name = "UIRoot" })
+    local root_node = Eui.node({ Name = "UIRoot" })
     local nodes = {}
     local discard_visible_writes = 0
 
     local function create_node(kind, props)
-      local node = Eui.Node({
+      local node = Eui.node({
         Name = props.Name,
         Kind = kind,
         Parent = props.Parent,
@@ -299,7 +299,7 @@ describe("Spoke 主 HUD 右侧动作键视图（#297-B3b1）", function()
   it("点击 ItemDiscard / ItemAction2 经默认 RE 通道发送 Operate 丢弃/吃、CastAction 与 SpecialItemAction", function()
     local sent = {}
     _G.REUtil = {
-      GetRE = function(_, name)
+      get_re = function(_, name)
         return {
           FireServer = function(_, payload)
             sent[#sent + 1] = { name = name, payload = payload }
@@ -322,42 +322,42 @@ describe("Spoke 主 HUD 右侧动作键视图（#297-B3b1）", function()
       held = { kind = "slot", slot = 2 },
       slots = { [2] = { itemId = ITEM_FISH, count = 1 } },
     })
-    assert.is_true(Eui.Click(env.nodes.ItemDiscard))
+    assert.is_true(Eui.click(env.nodes.ItemDiscard))
     assert.equals("ItemBarAction", sent[1].name)
     assert.equals("Operate", sent[1].payload.action)
     assert.equals("discard", sent[1].payload.op)
     assert.equals(2, sent[1].payload.slot)
     assert.equals(1, sent[1].payload.seq)
 
-    assert.is_true(Eui.Click(env.nodes.ItemAction2))
+    assert.is_true(Eui.click(env.nodes.ItemAction2))
     assert.equals("ItemBarAction", sent[2].name)
     assert.equals("Operate", sent[2].payload.action)
     assert.equals("eat", sent[2].payload.op)
     assert.equals(2, sent[2].payload.slot)
     assert.equals(2, sent[2].payload.seq)
 
-    -- 2. 选中鱼竿点击抛竿 -> CastAction Cast
+    -- 2. 选中鱼竿点击抛竿 -> CastAction cast
     env.writer:ingest_event("ItemBarState", {
       slotCount = 4,
       selectedSlot = 1,
       slots = { [1] = { itemId = ITEM_ROD, count = 1 } },
     })
-    assert.is_true(Eui.Click(env.nodes.ItemAction2))
+    assert.is_true(Eui.click(env.nodes.ItemAction2))
     assert.equals("CastAction", sent[3].name)
     assert.same({ action = "Cast", slot = 1, itemId = ITEM_ROD }, sent[3].payload)
 
-    -- 3. 抛竿在线点击收竿 -> CastAction Reel；上钩点击收线 -> on_reel_click
+    -- 3. 抛竿在线点击收竿 -> CastAction reel；上钩点击收线 -> on_reel_click
     env.writer:ingest_event("CastState", { phase = "cast" })
-    assert.is_true(Eui.Click(env.nodes.ItemAction2))
+    assert.is_true(Eui.click(env.nodes.ItemAction2))
     assert.same({ action = "Reel" }, sent[4].payload)
 
     env.writer:ingest_event("CastState", { phase = "hooked", reelSession = 42 })
-    assert.is_true(Eui.Click(env.nodes.ItemAction2))
+    assert.is_true(Eui.click(env.nodes.ItemAction2))
     assert.same({ 42 }, reel_clicks)
 
-    -- 4. 持有物点击放下 -> CastAction Drop
+    -- 4. 持有物点击放下 -> CastAction drop
     env.writer:ingest_event("CastState", { phase = "idle", holding = { fishId = ITEM_FISH } })
-    assert.is_true(Eui.Click(env.nodes.ItemAction2))
+    assert.is_true(Eui.click(env.nodes.ItemAction2))
     assert.same({ action = "Drop" }, sent[5].payload)
 
     -- 5. 风神之翼长按/松开飞行 -> SpecialItemAction fly
@@ -372,7 +372,7 @@ describe("Spoke 主 HUD 右侧动作键视图（#297-B3b1）", function()
 
     -- 6. 哥斯拉原子吐息 -> SpecialItemAction breath
     env.writer:ingest_event("SpecialItemState", { effect = "godzilla", breathRemaining = 0 })
-    assert.is_true(Eui.Click(env.nodes.ItemAction2))
+    assert.is_true(Eui.click(env.nodes.ItemAction2))
     assert.equals("SpecialItemAction", sent[8].name)
     assert.same({ action = "breath" }, sent[8].payload)
 
@@ -407,7 +407,7 @@ describe("Spoke 主 HUD 右侧动作键视图（#297-B3b1）", function()
     assert.is_false(env.nodes.ItemAction2.Visible)
     assert.is_false(env.nodes.ItemAction2.TouchEnabled)
     assert.is_false(env.nodes.BtnItemActionLabel.Visible)
-    assert.is_false(Eui.Click(env.nodes.ItemDiscard))
+    assert.is_false(Eui.click(env.nodes.ItemDiscard))
     assert.equals(0, #sent_ops)
 
     -- 收起背包：恢复显示并可点击
@@ -416,7 +416,7 @@ describe("Spoke 主 HUD 右侧动作键视图（#297-B3b1）", function()
     assert.is_true(env.nodes.ItemDiscard.TouchEnabled)
     assert.is_true(env.nodes.ItemAction2.Visible)
     assert.is_true(env.nodes.ItemAction2.TouchEnabled)
-    assert.is_true(Eui.Click(env.nodes.ItemDiscard))
+    assert.is_true(Eui.click(env.nodes.ItemDiscard))
     assert.equals(1, #sent_ops)
 
     env.view:dispose()

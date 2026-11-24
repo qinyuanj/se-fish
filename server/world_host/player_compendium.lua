@@ -21,8 +21,8 @@ local function collection(extra)
     return bag
 end
 
-function Mgr:Snapshot(player)
-    local data = self.PlayerData and self.PlayerData:GetDataInst(player)
+function Mgr:snapshot(player)
+    local data = self.PlayerData and self.PlayerData:get_data_inst(player)
     local bag = data and data.Extra and data.Extra.collection or nil
     if not bag or data.LoadState ~= 'ready' then
         return { state = data and data.LoadState == 'loading' and 'loading' or 'unavailable',
@@ -34,20 +34,20 @@ function Mgr:Snapshot(player)
 end
 
 function Mgr:Handle(player, payload)
-    if not isValidPlayer(player) or not Records.ValidUserId(player.UserId) or type(payload) ~= 'table' then return end
+    if not isValidPlayer(player) or not Records.valid_user_id(player.UserId) or type(payload) ~= 'table' then return end
     local seq = payload.seq
     if type(seq) ~= 'number' or seq ~= math.floor(seq) or seq < 1 or seq > 2147483647 then return end
     local last = self.LastSeq[player.UserId]
     if last and last.player == player and seq <= last.seq then return end
     self.LastSeq[player.UserId] = { player = player, seq = seq }
-    local state = self:Snapshot(player)
+    local state = self:snapshot(player)
     state.seq = seq
-    _G.REUtil:GetRE('CompendiumState'):FireClient(player, state)
+    _G.REUtil:get_re('CompendiumState'):FireClient(player, state)
 end
 
-function Mgr:Weight(fishId, mult)
+function Mgr:weight(fishId, mult)
     local species = GameCfg.Fish[fishId]
-    return species and FishCatch.Weight(species, mult) or nil
+    return species and FishCatch.weight(species, mult) or nil
 end
 
 local function apply(draft, event, weight)
@@ -62,9 +62,9 @@ local function apply(draft, event, weight)
         record = record, count = bag.catches[event.fishId], total = bag.total }
 end
 
-function Mgr:RecordLanding(player, event)
+function Mgr:record_landing(player, event)
     if not player or type(event) ~= 'table' then return false, 'invalid' end
-    local weight = self:Weight(event.fishId, event.mult)
+    local weight = self:weight(event.fishId, event.mult)
     if not weight or type(event.reelSerial) ~= 'number'
         or event.reelSerial ~= math.floor(event.reelSerial) or event.reelSerial < 1 then
         return false, 'invalid'
@@ -80,7 +80,7 @@ function Mgr:RecordLanding(player, event)
     if #queue.events >= self.MaxQueue then return false, 'busy' end
     queue.events[#queue.events + 1] = { reelSerial = event.reelSerial,
         fishId = event.fishId, mult = event.mult }
-    local mode = self:Drain(player)
+    local mode = self:drain(player)
     if mode == 'replay' or mode == 'invalid' then return false, mode end
     return true
 end
@@ -93,24 +93,24 @@ local function finish_leave(queue)
     end
 end
 
-function Mgr:FlushBeforeLeave(player, done)
+function Mgr:flush_before_leave(player, done)
     local queue = player and self.Queues[player.UserId]
     if not queue or queue.player ~= player or (#queue.events == 0 and not queue.writing) then return false end
     queue.leaving, queue.leave = true, done
-    self:Drain(player)
+    self:drain(player)
     finish_leave(queue)
     return true
 end
 
-function Mgr:Drain(player)
+function Mgr:drain(player)
     local queue = self.Queues[player.UserId]
     if not queue or queue.player ~= player or queue.writing then return end
     if #queue.events == 0 then finish_leave(queue) return end
-    local data = self.PlayerData and self.PlayerData:GetDataInst(player)
+    local data = self.PlayerData and self.PlayerData:get_data_inst(player)
     if not data then return end
     local onlyEvent = #queue.events == 1
     local event = queue.events[1]
-    local operation, mode = self.Save:ResolveRequest(player, data, self.KIND, event.reelSerial)
+    local operation, mode = self.Save:resolve_request(player, data, self.KIND, event.reelSerial)
     if not operation then
         if mode ~= 'pending' then
             table.remove(queue.events, 1)
@@ -121,11 +121,11 @@ function Mgr:Drain(player)
     end
     table.remove(queue.events, 1)
     if mode == 'replay' then finish_leave(queue) return onlyEvent and 'replay' or nil end
-    local weight = self:Weight(event.fishId, event.mult)
+    local weight = self:weight(event.fishId, event.mult)
     queue.writing = true
-    self.Save:Execute(player, data, operation, function(draft)
-        if self.Quest and self.Quest.RecordFact then
-            self.Quest:RecordFact(draft, 'Land', { itemId = event.fishId,
+    self.Save:execute(player, data, operation, function(draft)
+        if self.Quest and self.Quest.record_fact then
+            self.Quest:record_fact(draft, 'Land', { itemId = event.fishId,
                 eventId = 'reel:' .. tostring(event.reelSerial) })
         end
         return apply(draft, event, weight)
@@ -139,22 +139,22 @@ function Mgr:Drain(player)
         print('[PlayerCompendium] 图鉴', player.UserId, result.fishId,
             'weight=' .. tostring(result.weight), 'best=' .. tostring(result.best),
             'count=' .. tostring(result.count), 'total=' .. tostring(result.total))
-        if self.Quest and self.Quest.RefreshCommitted then self.Quest:RefreshCommitted(player, data) end
+        if self.Quest and self.Quest.refresh_committed then self.Quest:refresh_committed(player, data) end
         if result.record and self.Records then
-            self.Records:NoteLanding(player, result.fishId, result.weight)
+            self.Records:note_landing(player, result.fishId, result.weight)
         end
         if #queue.events > 0 then
-            self:Drain(player)
+            self:drain(player)
         end
         finish_leave(queue)
     end)
 end
 
-function Mgr:Update()
-    for _, queue in pairs(self.Queues) do self:Drain(queue.player) end
+function Mgr:update()
+    for _, queue in pairs(self.Queues) do self:drain(queue.player) end
 end
 
-function Mgr:OnPlayerRemoving(player)
+function Mgr:on_player_removing(player)
     if not isValidPlayer(player) then return end
     local queue = self.Queues[player.UserId]
     if queue and queue.player == player then self.Queues[player.UserId] = nil end
@@ -169,15 +169,15 @@ function Mgr.mount(scope, player_tree, opts)
         Quest = player_tree.quest, Records = opts.records,
     }, { __index = Mgr })
     player_tree.compendium = session
-    SignalRouter.bind_player(scope, _G.REUtil:GetRE('CompendiumRequest').OnServerEvent, player, function(actor, payload)
-        if _G.REUtil:CheckRECD(actor, 'CompendiumRequest', GameCfg.Compendium.RequestCooldownSec) then return end
+    SignalRouter.bind_player(scope, _G.REUtil:get_re('CompendiumRequest').OnServerEvent, player, function(actor, payload)
+        if _G.REUtil:check_recd(actor, 'CompendiumRequest', GameCfg.Compendium.RequestCooldownSec) then return end
         session:Handle(actor, payload)
     end)
-    scope:subscribe(opts.clock.on_second, function() session:Drain(player) end)
+    scope:subscribe(opts.clock.on_second, function() session:drain(player) end)
     scope:on_cleanup(function()
-        session:OnPlayerRemoving(player)
-        if session.Records and type(session.Records.OnPlayerRemoving) == 'function' then
-            session.Records:OnPlayerRemoving(player)
+        session:on_player_removing(player)
+        if session.Records and type(session.Records.on_player_removing) == 'function' then
+            session.Records:on_player_removing(player)
         end
         if player_tree.compendium == session then player_tree.compendium = nil end
     end)

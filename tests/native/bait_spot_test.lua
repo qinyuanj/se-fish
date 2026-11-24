@@ -21,8 +21,8 @@ local function host()
   local clock = SpokeClock.new(500)
   local runtime = ServerRuntime.new({
     clock = clock, initial_now = 500,
-    remote = { GetRE = function(_, name) return event(name) end, CheckRECD = function() return false end },
-    player_data = { GetDataInst = function(_, p) return data_of[p.UserId] end },
+    remote = { get_re = function(_, name) return event(name) end, check_recd = function() return false end },
+    player_data = { get_data_inst = function(_, p) return data_of[p.UserId] end },
     players = function() return players end,
     create_unit = function(_, props)
       local unit = { Destroyed = false, Name = props.Name }

@@ -40,7 +40,7 @@ local function run()
     local ok, err = pcall(function()
         local players = {}
         for index = 1, 10 do
-            players[index] = link:Join(7000 + index, { position = at(ARENA, index) })
+            players[index] = link:join(7000 + index, { position = at(ARENA, index) })
         end
         check('10 条连接同时在线', link:Count() == 10, link:Count())
         local keys, seen, unique = {}, {}, true
@@ -55,7 +55,7 @@ local function run()
 
         link:Party(players[1], { action = 'Invite', targetUserId = players[2].UserId })
         link:Party(players[2], { action = 'Accept' })
-        check('小队建立', link.managers.Party:SameParty(players[1], players[2]))
+        check('小队建立', link.managers.Party:same_party(players[1], players[2]))
         check('同队免伤', link:Hit(players[1], players[2], 'weapon', 30) == false)
         check('野外 PK 结算', link:Hit(players[1], players[4], 'weapon', 30) == true)
         players[1].Character.Position = POND
@@ -63,14 +63,14 @@ local function run()
         check('鱼塘安全区免伤', link:Hit(players[1], players[3], 'weapon', 30) == false)
 
         local loot = assert(link:Loot('bass', ARENA))
-        local seen = link:Join(7101, { position = ARENA })
-        check('共享地面实例对新连接可见', #link:LootSnapshot() == 1 and loot.Id == link:LootSnapshot()[1].id)
-        link:Leave(seen)
-        check('有人离开后共享地面实例还在', #link:LootSnapshot() == 1)
+        local seen = link:join(7101, { position = ARENA })
+        check('共享地面实例对新连接可见', #link:loot_snapshot() == 1 and loot.Id == link:loot_snapshot()[1].id)
+        link:leave(seen)
+        check('有人离开后共享地面实例还在', #link:loot_snapshot() == 1)
         players[1].Character.Position = ARENA
         players[2].Character.Position = at(ARENA, 0.5)
-        check('第一个人拾取成功', link:Pickup(players[1], loot.Id) == true)
-        check('第二个人抢不到同一份', link:Pickup(players[2], loot.Id) == false)
+        check('第一个人拾取成功', link:pickup(players[1], loot.Id) == true)
+        check('第二个人抢不到同一份', link:pickup(players[2], loot.Id) == false)
         local okCount = 0
         for _, message in ipairs(link.sent.LootResult or {}) do
             if message.payload and message.payload.ok == true then okCount = okCount + 1 end
@@ -84,32 +84,32 @@ local function run()
         link:Interact(players[8], { target = 'downedPlayer', action = 'Rescue',
             targetUserId = target.UserId, seq = 1 })
         check('抢救开始', link:Phase(target) == 'rescuing', link:Phase(target))
-        link:Leave(players[8])
-        link:Advance(GameCfg.Rescue.DurationSec + 0.1)
+        link:leave(players[8])
+        link:advance(GameCfg.Rescue.DurationSec + 0.1)
         check('施救者断线后抢救不结算', link:Phase(target) == 'downed', link:Phase(target))
         local health = target.Character.Controller.Health
-        local back = link:Join(7008, { position = at(target.Character.Position, 1) })
-        link:Advance(GameCfg.Rescue.DurationSec + 0.1)
+        local back = link:join(7008, { position = at(target.Character.Position, 1) })
+        link:advance(GameCfg.Rescue.DurationSec + 0.1)
         check('重连不补结算', link:Phase(target) == 'downed' and target.Character.Controller.Health == health)
         players[6].Character.Position = at(target.Character.Position, 1)
         link:Interact(players[6], { target = 'downedPlayer', action = 'Rescue',
             targetUserId = target.UserId, seq = 2 })
-        link:Advance(GameCfg.Rescue.DurationSec + 0.1)
+        link:advance(GameCfg.Rescue.DurationSec + 0.1)
         local expected = math.floor(GameCfg.Vitals.MaxHealth * GameCfg.Survival.ReviveHealthPercent / 100)
         check('换人重新发起后救起', link:Phase(target) == 'alive'
             and target.Character.Controller.Health == expected, target.Character.Controller.Health)
-        local online = link:Online(back)
+        local online = link:online(back)
         check('重连的连接在线', online)
 
         for round = 1, 2 do
             for index = 1, 10 do
-                local player = link.online[7000 + index]
-                if player then link:Leave(player) end
+                local player = link.online_players[7000 + index]
+                if player then link:leave(player) end
             end
             local left = link:Count()
             local restored = 0
             for index = 1, 10 do
-                local player = link:Join(7000 + index, { position = at(ARENA, index) })
+                local player = link:join(7000 + index, { position = at(ARENA, index) })
                 if keys[player.UserId] == link.managers.Save:Key(player.UserId)
                     and link:Data(player) then restored = restored + 1 end
             end
@@ -120,9 +120,9 @@ local function run()
         for _ in pairs(link.values) do values = values + 1 end
         -- 10 条主连接 + 1 条中途加入又离开的旁观连接：各一条键，没有第二份状态
         check('存档键数等于连接过的身份数（没有复制第二份状态）', values == 11, values)
-        print(string.format('%s 存档键=%d 在线=%d 地面实例=%d', MARK, values, link:Count(), #link:LootSnapshot()))
+        print(string.format('%s 存档键=%d 在线=%d 地面实例=%d', MARK, values, link:Count(), #link:loot_snapshot()))
     end)
-    link:Close()
+    link:close()
     if not ok then error(err, 0) end
 end
 

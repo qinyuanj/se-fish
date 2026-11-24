@@ -25,7 +25,7 @@ local function read_pos(pos)
   if type(pos) ~= "table" and type(pos) ~= "userdata" then return nil end
   local ok, x, y, z = pcall(function() return pos.x, pos.y, pos.z end) -- 兼容引擎 Vector3
   if not ok then return nil end
-  if not Number.IsFiniteNumber(x) or not Number.IsFiniteNumber(y) or not Number.IsFiniteNumber(z) then
+  if not Number.is_finite_number(x) or not Number.is_finite_number(y) or not Number.is_finite_number(z) then
     return nil
   end
   return x, y, z
@@ -72,7 +72,7 @@ end
 
 local function capacities(tree)
   local level = tree.states.upgrade_level and tree.states.upgrade_level:now() or 0
-  if not Number.IsFiniteNumber(level) or level < 0 then level = 0 end
+  if not Number.is_finite_number(level) or level < 0 then level = 0 end
   level = math.floor(level)
   local bar = GameCfg.Items.InitialItemBarSlots + level
   if bar > GameCfg.Items.ItemBarSlots then bar = GameCfg.Items.ItemBarSlots end
@@ -83,7 +83,7 @@ end
 
 local function can_accept(tree, item_id, count)
   local kind = item_kind(item_id)
-  if kind == nil or not Number.IsFiniteNumber(count) or count < 1 or count ~= math.floor(count) then
+  if kind == nil or not Number.is_finite_number(count) or count < 1 or count ~= math.floor(count) then
     return false
   end
   if kind == "bait" or kind == "weapon" then return true end
@@ -184,7 +184,7 @@ local function within_reach(player, position)
   local character = player and player.Character
   local pos = character and character.Position
   if pos == nil then return false end
-  local radius = BodyScale.InteractionRadius(character, GameCfg.Loot.PickupRadius) + (GameCfg.Loot.PickupSlack or 0)
+  local radius = BodyScale.interaction_radius(character, GameCfg.Loot.PickupRadius) + (GameCfg.Loot.PickupSlack or 0)
   return distance(pos, position) <= radius
 end
 
@@ -207,14 +207,14 @@ function GroundLoot.mount(world, opts)
 
   local function reply(player, payload)
     local remote = opts.remote
-    if type(remote) ~= "table" or type(remote.GetRE) ~= "function" then return end
-    local event = remote:GetRE("LootResult")
+    if type(remote) ~= "table" or type(remote.get_re) ~= "function" then return end
+    local event = remote:get_re("LootResult")
     if event and type(event.FireClient) == "function" then event:FireClient(player, payload) end
   end
 
   local function publish()
     local remote = opts.remote
-    if type(remote) ~= "table" or type(remote.GetRE) ~= "function" then return end
+    if type(remote) ~= "table" or type(remote.get_re) ~= "function" then return end
     local list = {}
     for _, id in ipairs(order) do
       local row = records[id]
@@ -239,7 +239,7 @@ function GroundLoot.mount(world, opts)
     if broadcasting then return end
     broadcasting = true
     local ok, err = pcall(function() -- 下行失败不回滚权威地面集合
-      remote:GetRE("LootState"):FireAllClients(payload)
+      remote:get_re("LootState"):FireAllClients(payload)
     end)
     broadcasting = false
     if not ok and opts.logger and type(opts.logger.error) == "function" then
@@ -466,8 +466,8 @@ function GroundLoot.mount(world, opts)
     local tree = lookup_tree(player)
     if not remote_active or world:is_disposed() or not tree or tree:is_disposed() then return false end
     local remote = opts.remote
-    if not skip_cd and type(remote) == "table" and type(remote.CheckRECD) == "function"
-        and remote:CheckRECD(player, channel, GameCfg.Items.ActionCooldownSec) then
+    if not skip_cd and type(remote) == "table" and type(remote.check_recd) == "function"
+        and remote:check_recd(player, channel, GameCfg.Items.ActionCooldownSec) then
       return false
     end
     return true
@@ -486,7 +486,7 @@ function GroundLoot.mount(world, opts)
   function world:handle_loot_request(player, skip_cd)
     if not allow_remote(player, "RequestLoot", skip_cd) then return false end
     local remote = opts.remote
-    if type(remote) ~= "table" or type(remote.GetRE) ~= "function" then return false end
+    if type(remote) ~= "table" or type(remote.get_re) ~= "function" then return false end
     local list = {}
     for _, id in ipairs(order) do
       local row = records[id]
@@ -498,7 +498,7 @@ function GroundLoot.mount(world, opts)
         }
       end
     end
-    local state = remote:GetRE("LootState")
+    local state = remote:get_re("LootState")
     if state and type(state.FireClient) == "function" then
       state:FireClient(player, { list = list })
       return true
@@ -591,7 +591,7 @@ function GroundLoot.mount(world, opts)
     if world:is_disposed() then return false, "disposed" end
     local tree = lookup_tree(player)
     if not player_can_act(tree) then return false, "cannot-act" end
-    if not Number.IsFiniteNumber(index) or index ~= math.floor(index) or index < 1 then return false, "bad" end
+    if not Number.is_finite_number(index) or index ~= math.floor(index) or index < 1 then return false, "bad" end
     local source = container == GameCfg.Items.ContainerId.Backpack
       and (tree.states.backpack:now() or {})
       or (tree.states.item_bar:now() or {})

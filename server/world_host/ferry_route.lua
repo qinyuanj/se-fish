@@ -55,28 +55,28 @@ function FerryRoute.mount(world, opts)
   end
 
   local function event(name)
-    if not is_object(remote) or type(remote.GetRE) ~= "function" then return nil end
-    local ok, value = pcall(remote.GetRE, remote, name)
+    if not is_object(remote) or type(remote.get_re) ~= "function" then return nil end
+    local ok, value = pcall(remote.get_re, remote, name)
     return ok and value or nil
   end
 
-  function handle:Reply(player, payload)
+  function handle:reply(player, payload)
     local channel = event("FerryResult")
     if channel and type(channel.FireClient) == "function" then channel:FireClient(player, payload) end
   end
 
-  function handle:Broadcast(payload)
+  function handle:broadcast(payload)
     local channel = event("FerryState")
     if channel and type(channel.FireAllClients) == "function" then channel:FireAllClients(payload) end
   end
 
   function handle:Fail(player, action, reason)
     log("请求拒绝", player and player.UserId, action, tostring(reason))
-    self:Reply(player, { ok = false, action = action, reason = reason })
+    self:reply(player, { ok = false, action = action, reason = reason })
     return false
   end
 
-  function handle:OnlinePlayers()
+  function handle:online_players()
     if type(opts.online_players) == "function" then return opts.online_players() end
     if players_service and type(players_service.GetPlayers) == "function" then
       local ok, list = pcall(players_service.GetPlayers, players_service)
@@ -86,13 +86,13 @@ function FerryRoute.mount(world, opts)
   end
 
   local function data_of(player)
-    if not player_data or type(player_data.GetDataInst) ~= "function" then return nil end
-    local ok, data = pcall(player_data.GetDataInst, player_data, player)
+    if not player_data or type(player_data.get_data_inst) ~= "function" then return nil end
+    local ok, data = pcall(player_data.get_data_inst, player_data, player)
     return ok and data or nil
   end
 
   local function is_paused(user_id)
-    return save ~= nil and type(save.IsPaused) == "function" and save:IsPaused(user_id) or false
+    return save ~= nil and type(save.is_paused) == "function" and save:is_paused(user_id) or false
   end
 
   local function sync_tree(player, data)
@@ -104,7 +104,7 @@ function FerryRoute.mount(world, opts)
     end
   end
 
-  function handle:Teleport(player, dest)
+  function handle:teleport(player, dest)
     local character = player and player.Character
     if not character then
       log("传送失败", player and player.UserId, "角色缺失")
@@ -127,14 +127,14 @@ function FerryRoute.mount(world, opts)
     return ok
   end
 
-  function handle:Settle(player, data, kind, transform, done, operation)
-    if not save or type(save.NextOperation) ~= "function" or type(save.Execute) ~= "function" then
+  function handle:settle(player, data, kind, transform, done, operation)
+    if not save or type(save.next_operation) ~= "function" or type(save.execute) ~= "function" then
       return false, "save"
     end
-    operation = operation or save:NextOperation(player, kind)
+    operation = operation or save:next_operation(player, kind)
     if not operation then return false, "save" end
     local outcome
-    local accepted, reason = save:Execute(player, data, operation, transform, function(ok, result)
+    local accepted, reason = save:execute(player, data, operation, transform, function(ok, result)
       outcome = ok
       if not ok then log("结算失败", player.UserId, operation.id, kind, tostring(result)) end
       done(ok, result)
@@ -143,12 +143,12 @@ function FerryRoute.mount(world, opts)
     return accepted and outcome ~= false, reason
   end
 
-  function handle:PendingFlight(route_id)
+  function handle:pending_flight(route_id)
     return self.BoardPending[route_id] or self.Flights[route_id]
   end
 
-  function handle:FinishTravel(player, data, record, delivered, reason, done)
-    return self:Settle(player, data, delivered and "ferry:confirm" or "ferry:refund", function(draft)
+  function handle:finish_travel(player, data, record, delivered, reason, done)
+    return self:settle(player, data, delivered and "ferry:confirm" or "ferry:refund", function(draft)
       local pending = draft.Extra.recovery.ferry
       if not pending or pending.operation ~= record.operation then return nil, "recovery" end
       if delivered then
@@ -178,14 +178,14 @@ function FerryRoute.mount(world, opts)
     end)
   end
 
-  function handle:Board(player, data, route, operation)
+  function handle:board(player, data, route, operation)
     local point = route.Outbound
-    if self:PendingFlight(route.Id) then return self:Fail(player, "Board", "sailing") end
-    if not interact or not interact:InRange(player, point) then return self:Fail(player, "Board", "range") end
+    if self:pending_flight(route.Id) then return self:Fail(player, "Board", "sailing") end
+    if not interact or not interact:in_range(player, point) then return self:Fail(player, "Board", "range") end
     local session = save.Sessions[player.UserId]
     local flight = { player = player, operation = operation.id, routeId = route.Id }
     self.BoardPending[route.Id] = flight
-    local accepted, reason = self:Settle(player, data, "ferry:board", function(draft)
+    local accepted, reason = self:settle(player, data, "ferry:board", function(draft)
       if not draft:ConsumeItem(point.Ticket) then return nil, "ticket" end
       draft.Extra.recovery.ferry = { operation = operation.id, identity = operation, action = "Board",
         routeId = route.Id, ticket = point.Ticket, zone = point.Zone, state = "pending" }
@@ -193,7 +193,7 @@ function FerryRoute.mount(world, opts)
         operation = operation }
     end, function(ok, result)
       if self.BoardPending[route.Id] ~= flight
-          or not save:IsCurrent(player.UserId, session, data) then return end
+          or not save:is_current(player.UserId, session, data) then return end
       self.BoardPending[route.Id] = nil
       if not ok then self:Fail(player, "Board", result) return end
       SpokeRuntime.batch(function()
@@ -204,9 +204,9 @@ function FerryRoute.mount(world, opts)
           operation = operation.id, seconds = point.CountdownSec })
         if route_sailing[route.Id] then route_sailing[route.Id]:set(true) end
       end)
-      self:Broadcast({ phase = "countdown", routeId = route.Id, operation = operation.id,
+      self:broadcast({ phase = "countdown", routeId = route.Id, operation = operation.id,
         seconds = point.CountdownSec })
-      self:Reply(player, result)
+      self:reply(player, result)
     end, operation)
     if not accepted and self.BoardPending[route.Id] == flight then
       self.BoardPending[route.Id] = nil
@@ -215,14 +215,14 @@ function FerryRoute.mount(world, opts)
     return accepted
   end
 
-  function handle:ReturnBack(player, data, route, operation)
+  function handle:return_back(player, data, route, operation)
     local point = route.Return
-    if not interact or not interact:InRange(player, point) then return self:Fail(player, "Return", "range") end
+    if not interact or not interact:in_range(player, point) then return self:Fail(player, "Return", "range") end
     local record = { operation = operation.id, identity = operation, action = "Return", routeId = route.Id,
       price = point.Price, state = "pending", zone = point.Zone }
     self.ReturnPending[player.UserId] = record
     local outcome
-    local accepted, reason = self:Settle(player, data, "ferry:return", function(draft)
+    local accepted, reason = self:settle(player, data, "ferry:return", function(draft)
       if not draft:SpendCoin(point.Price, nil, "ferry:return") then return nil, "coin" end
       draft.Extra.recovery.ferry = record
       return { ok = true, action = "Return", routeId = route.Id, price = point.Price, operation = operation }
@@ -235,12 +235,12 @@ function FerryRoute.mount(world, opts)
         return
       end
       sync_tree(player, data)
-      local delivered = self:Teleport(player, point.Destination)
+      local delivered = self:teleport(player, point.Destination)
       outcome = delivered
-      self:FinishTravel(player, data, record, delivered, "teleport", function(written, final)
+      self:finish_travel(player, data, record, delivered, "teleport", function(written, final)
         if self.ReturnPending[player.UserId] ~= record then return end
         self.ReturnPending[player.UserId] = nil
-        if written then self:Reply(player, final) else self:Fail(player, "Return", final) end
+        if written then self:reply(player, final) else self:Fail(player, "Return", final) end
       end)
     end, operation)
     if not accepted and outcome == nil then
@@ -250,63 +250,63 @@ function FerryRoute.mount(world, opts)
     return accepted and outcome ~= false
   end
 
-  function handle:Recover(player, data)
+  function handle:recover(player, data)
     local record = data and data.Extra and data.Extra.recovery and data.Extra.recovery.ferry
     if not record then return false end
-    local flight = record.routeId and self:PendingFlight(record.routeId)
+    local flight = record.routeId and self:pending_flight(record.routeId)
     if flight and flight.player == player and flight.operation == record.operation then return true end
     if self.Recoveries[player.UserId] then return true end
     self.Recoveries[player.UserId] = player
-    local accepted = self:FinishTravel(player, data, record, false, "interrupted", function(ok, result)
+    local accepted = self:finish_travel(player, data, record, false, "interrupted", function(ok, result)
       if self.Recoveries[player.UserId] == player then self.Recoveries[player.UserId] = nil end
-      if ok then self:Reply(player, result) end
+      if ok then self:reply(player, result) end
     end)
     if not accepted then self.Recoveries[player.UserId] = nil end
     return true
   end
 
-  function handle:Depart(route, flight)
+  function handle:depart(route, flight)
     local point = route.Outbound
-    local anchor = interact and interact:FindAnchor(point.AnchorName)
+    local anchor = interact and interact:find_anchor(point.AnchorName)
     local center = anchor and anchor.Position
     if not center then
       log("找不到摆渡锚点，本次航班取消并退票", route.Id, point.AnchorName)
       local data = data_of(flight.player)
       local record = data and data.Extra.recovery.ferry
       if record then
-        self:FinishTravel(flight.player, data, record, false, "anchor", function(ok, result)
-          if ok then self:Reply(flight.player, result) end
+        self:finish_travel(flight.player, data, record, false, "anchor", function(ok, result)
+          if ok then self:reply(flight.player, result) end
         end)
       end
-      self:Broadcast({ phase = "cancelled", routeId = route.Id, operation = flight.operation, reason = "anchor" })
+      self:broadcast({ phase = "cancelled", routeId = route.Id, operation = flight.operation, reason = "anchor" })
       return
     end
     local payer = flight.player
     local delivered_count = 0
-    for _, player in ipairs(self:OnlinePlayers()) do
+    for _, player in ipairs(self:online_players()) do
       if left_players[player.UserId] ~= player then
         local data = data_of(player)
         local pos = player.Character and player.Character.Position
         local aboard = pos and flat_distance(pos, center) <= point.BoatRange
         if data and data.Inited and not is_paused(player.UserId) then
-          local delivered = aboard and self:Teleport(player, point.Destination)
+          local delivered = aboard and self:teleport(player, point.Destination)
           if delivered then delivered_count = delivered_count + 1 end
           if player == payer and data.Extra.recovery.ferry then
             local record = data.Extra.recovery.ferry
             if delivered then record.zone = point.Zone end
             local reason = not delivered and (aboard and "teleport" or "not_aboard") or nil
-            self:FinishTravel(player, data, record, delivered, reason, function(ok, result)
-              if ok then self:Reply(player, result) end
+            self:finish_travel(player, data, record, delivered, reason, function(ok, result)
+              if ok then self:reply(player, result) end
             end)
           elseif delivered then
-            self:Settle(player, data, "ferry:ride", function(draft)
+            self:settle(player, data, "ferry:ride", function(draft)
               draft:SetZone(point.Zone)
               mark_arrival(draft, point.Zone)
               return { ok = true, action = "Board", routeId = route.Id }
             end, function(ok, result)
               if ok then
                 sync_tree(player, data)
-                self:Reply(player, result)
+                self:reply(player, result)
               end
             end)
           end
@@ -314,9 +314,9 @@ function FerryRoute.mount(world, opts)
       end
     end
     if delivered_count == 0 then
-      self:Broadcast({ phase = "cancelled", routeId = route.Id, operation = flight.operation, reason = "empty" })
+      self:broadcast({ phase = "cancelled", routeId = route.Id, operation = flight.operation, reason = "empty" })
     else
-      self:Broadcast({ phase = "departed", routeId = route.Id, operation = flight.operation })
+      self:broadcast({ phase = "departed", routeId = route.Id, operation = flight.operation })
     end
   end
 
@@ -327,13 +327,13 @@ function FerryRoute.mount(world, opts)
     end
   end
 
-  function handle:UpdateRecoveries()
+  function handle:update_recoveries()
     if self.disposed then return end
-    for _, player in ipairs(self:OnlinePlayers()) do
+    for _, player in ipairs(self:online_players()) do
       if is_valid_player(player) and left_players[player.UserId] ~= player then
         local data = data_of(player)
         if data and data.Inited and not is_paused(player.UserId) then
-          self:Recover(player, data)
+          self:recover(player, data)
           if recovery_watch_users[player.UserId]
               and not (data.Extra and data.Extra.recovery and data.Extra.recovery.ferry)
               and not self.Recoveries[player.UserId] then
@@ -345,7 +345,7 @@ function FerryRoute.mount(world, opts)
     sync_recovery_watch()
   end
 
-  function handle:StepRoute(route)
+  function handle:step_route(route)
     if self.disposed then return end
     local flight = self.Flights[route.Id]
     local state = route_states[route.Id]
@@ -361,7 +361,7 @@ function FerryRoute.mount(world, opts)
         if state then state:set({ phase = "idle", routeId = route.Id }) end
         if sailing then sailing:set(false) end
       end)
-      self:Depart(route, flight)
+      self:depart(route, flight)
     elseif state then
       local seconds = math.max(0, flight.DepartAt - now)
       local current = state:now()
@@ -371,15 +371,15 @@ function FerryRoute.mount(world, opts)
     end
   end
 
-  function handle:Update()
+  function handle:update()
     if self.disposed then return end
-    self:UpdateRecoveries()
+    self:update_recoveries()
     for _, route in ipairs(GameCfg.Ferry.Routes) do
-      self:StepRoute(route)
+      self:step_route(route)
     end
   end
 
-  function handle:OnPlayerAdded(player)
+  function handle:on_player_added(player)
     if not is_valid_player(player) then return end
     left_players[player.UserId] = nil
     local now = world.clock.now()
@@ -393,7 +393,7 @@ function FerryRoute.mount(world, opts)
     end
     local data = data_of(player)
     if data and data.Inited and not is_paused(player.UserId) then
-      self:Recover(player, data)
+      self:recover(player, data)
       if recovery_watch_users[player.UserId]
           and not (data.Extra and data.Extra.recovery and data.Extra.recovery.ferry)
           and not self.Recoveries[player.UserId] then
@@ -403,7 +403,7 @@ function FerryRoute.mount(world, opts)
     end
   end
 
-  function handle:OnPlayerRemoving(player)
+  function handle:on_player_removing(player)
     if not is_valid_player(player) then return end
     local interrupted = false
     left_players[player.UserId] = player
@@ -427,7 +427,7 @@ function FerryRoute.mount(world, opts)
           if route_states[route_id] then route_states[route_id]:set({ phase = "idle", routeId = route_id }) end
           if route_sailing[route_id] then route_sailing[route_id]:set(false) end
         end)
-        self:Broadcast({ phase = "cancelled", routeId = route_id, operation = flight.operation,
+        self:broadcast({ phase = "cancelled", routeId = route_id, operation = flight.operation,
           reason = "payer_left" })
       end
     end
@@ -437,36 +437,36 @@ function FerryRoute.mount(world, opts)
     end
   end
 
-  local Actions = { Board = "Board", Return = "ReturnBack" }
+  local Actions = { Board = "board", Return = "return_back" }
   function handle:Handle(player, payload)
     if self.disposed or not is_valid_player(player) or type(payload) ~= "table" then return false end
     local method = Actions[payload.action]
     local seq = payload.seq
     if not method or type(seq) ~= "number" or seq ~= math.floor(seq) then return false end
-    local route = GameCfg.Ferry.Route(payload.routeId)
+    local route = GameCfg.Ferry.route(payload.routeId)
     if not route then return self:Fail(player, payload.action, "route") end
     local data = data_of(player)
     if not data then return false end
-    if not save or type(save.ResolveRequest) ~= "function" or not data.Inited or is_paused(player.UserId) then
+    if not save or type(save.resolve_request) ~= "function" or not data.Inited or is_paused(player.UserId) then
       return self:Fail(player, payload.action, "save")
     end
     local kind = payload.action == "Board" and "ferry:board" or "ferry:return"
-    local operation, status = save:ResolveRequest(player, data, kind, payload.requestId or seq)
+    local operation, status = save:resolve_request(player, data, kind, payload.requestId or seq)
     if not operation then return self:Fail(player, payload.action, status) end
     if status == "replay" then
       if payload.requestId == nil then return false end
-      local flight = self:PendingFlight(route.Id)
+      local flight = self:pending_flight(route.Id)
       local active = flight and flight.player == player and flight.operation == operation.id
       if data.Extra.recovery.ferry and not active then
-        self:Recover(player, data)
+        self:recover(player, data)
         local final = data.Extra.recovery.ferryFinal and data.Extra.recovery.ferryFinal[operation.id]
-        if final then self:Reply(player, final) return true end
+        if final then self:reply(player, final) return true end
         return self:Fail(player, payload.action, "pending")
       end
-      return self:Settle(player, data, kind, function() return nil, "replay" end, function(ok, result)
+      return self:settle(player, data, kind, function() return nil, "replay" end, function(ok, result)
         if ok then
           local final = data.Extra.recovery.ferryFinal and data.Extra.recovery.ferryFinal[operation.id]
-          self:Reply(player, final or result)
+          self:reply(player, final or result)
         else
           self:Fail(player, payload.action, result)
         end
@@ -476,7 +476,7 @@ function FerryRoute.mount(world, opts)
     if last and seq <= last then return false end
     self.LastSeq[player.UserId] = seq
     if data.Extra.recovery.ferry then
-      self:Recover(player, data)
+      self:recover(player, data)
       return self:Fail(player, payload.action, "pending")
     end
     return self[method](self, player, data, route, operation)
@@ -492,13 +492,13 @@ function FerryRoute.mount(world, opts)
         route_sailing[route.Id] = sailing
         scope:call(Effect.new("FerryClock:" .. route.Id, function(es)
           if index == 1 then
-            es:subscribe(world.clock.on_second, function() handle:UpdateRecoveries() end)
+            es:subscribe(world.clock.on_second, function() handle:update_recoveries() end)
             es:phase("FerryRecoveryWatch", recovery_watch_active, function(ps)
-              ps:subscribe(world.clock.on_frame, function() handle:UpdateRecoveries() end)
+              ps:subscribe(world.clock.on_frame, function() handle:update_recoveries() end)
             end)
           end
           es:phase("FerrySailing:" .. route.Id, sailing, function(ps)
-            ps:subscribe(world.clock.on_frame, function() handle:StepRoute(route) end)
+            ps:subscribe(world.clock.on_frame, function() handle:step_route(route) end)
           end)
         end))
         scope:on_cleanup(function()
