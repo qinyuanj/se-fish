@@ -38,7 +38,9 @@ L3 最危险：同一张 table 里既有自研字段也有引擎键，改错一�
 
 ## 迁移分三层落地
 
-L1 按端三个 PR（`common` → `server` → `client`，依赖方向由内向外），每个 PR 内同步 `tools/arch_policy.lua` 的 50 个模块 id 与 `:59-64` 的前缀棘轮、`policy.edn` 与重生成的 `docs/uml/se-fish.edn`、`coverage.md` 对应行、tests；每个 PR 跑 `lua tools/cli.lua test full`。三端合并后做**一次** `deploy` + 试玩验证（不是每 PR 都推）。L2、L3 各自独立 PR，在 L1 验证通过之后；L3 动工前先枚举上述五类官方键做成判别清单。
+L1 的实际落地方式（原计划「按端三个 PR」，执行时改为并行 + 收口）：一个分支、两端各自在独立 worktree 里只做文件改名与 `require` 替换，**共享写面由 root 收口**——`tools/arch_policy.lua` 的 50 个模块 id 与 `:59-64` 前缀棘轮、`policy.edn` 投影、`coverage.md`、六个双端测试（`arch_policy_test`、`weapon_system_test`、`grill_test`、`attr_presentation_test`、`prize_growth_wiring_test`、`spec/11_ad_revive_placeholder_test`）。三端合并后跑一次 `lua tools/cli.lua test full`，再做**一次** `deploy` + 试玩验证。
+
+并行之所以能这么切：`client` 与 `server` 互不 `require`（实测各 0 条），两端重叠的写面只有 6 个双端测试与上述共享文件；`coverage.md` 单行常混两端（如 6-33 行），`arch_policy.lua` 有 9 行同一行同时出现 client 与 server 命名，`policy.edn` 的 `:levels` 是单行——这三处正是并行改必然冲突、且错了不报错的地方。
 
 门禁在 L1 完成后开启（先开会让全仓常红）：三端文件名与目录名必须 snake_case，豁免名单外一律失败；`require` 大小写精确匹配已有守卫。
 
@@ -59,6 +61,8 @@ ADR-0033 的「新增目录或脚本前逐个核对内置服务名」保留为�
 - `coverage.md` 的 494 处 landing / test 路径有 [acceptance_matrix_test](../../tests/native/guards/acceptance_matrix_test.lua) 守着，不改就红；`policy.edn:7` 与 `docs/uml/se-fish.edn` 是生成物，改名后重新生成而不手编。
 - `client/InteractionBubble.lua` 全仓无任何 `require`（只有 `GameCfg:26` 一个配置键），是疑似死代码；L1 照改，不顺手删。
 - 历史记录（`docs/adr/00xx` 正文、`evidence/`）里的旧名不改，以本文件附录的映射表兜底。
+- **棘轮前缀写成 Lua 模式**：`'^server%.WorldHost%.'` 里是 `%.` 而不是 `.`，普通的「命名空间 token 替换」覆盖不到它。L1 时这条漏改过，`arch_policy` 的门禁当场静默失效——抓到它的是 `spoke_ratchet_guard_test` 的反向依赖用例，不是 arch_policy 自己的测试。凡是从命名空间派生的**模式串**，改名后必须单独扫一遍 `%.` + 大写字母的形态。
+- **守卫里硬编码命名约定的启发式**：`static_require_test` 的宿主发现靠 `^(.+Host)%.lua$` 匹配「名字以 Host 结尾」，改成 snake_case 后一个都扫不到。改名要让这类启发式跟着换（`^(.+_host)%.lua$`），否则守卫从「拦住问题」静默变成「永远失败」或「永远通过」。
 
 ## 附录：L1 旧名 → 新名
 

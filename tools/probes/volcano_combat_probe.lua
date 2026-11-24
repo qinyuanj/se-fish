@@ -9,9 +9,9 @@
 -- 6. Snapshot 只回读本地成就与送达标记；平台ID缺失时只能记为缺证。
 -- Cleanup(id) 仅清本探针创建的鱼；测试过程中原有主循环持续运行。
 local Probe={Owned={}}
-local ServerRuntime=require('server.WorldHost.ServerRuntime')
-local FishTree=require('server.WorldHost.FishTree')
-local Data=require('server.PlayerDataHost')
+local ServerRuntime=require('server.world_host.server_runtime')
+local FishTree=require('server.world_host.fish_tree')
+local Data=require('server.player_data_host')
 local Cfg=require('common.game_cfg')
 local function fishHost()
     local runtime=ServerRuntime.current and ServerRuntime.current()
