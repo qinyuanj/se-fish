@@ -1,9 +1,9 @@
 -- 迁移自 tests/gameplay/rod_visual_test.lua（#85）。
 -- it 名字沿用旧方法名，注册顺序 = LuaUnit sortedPairs 的实际执行顺序。
 
-local GameCfg = require('common.GameCfg')
-local Mgr = require('server.PlayerDataHost')
-local ServerRuntime = require('server.WorldHost.ServerRuntime')
+local GameCfg = require('common.game_cfg')
+local Mgr = require('server.player_data_host')
+local ServerRuntime = require('server.world_host.server_runtime')
 
 local function signal()
   local callbacks = {}
@@ -26,14 +26,14 @@ describe('鱼竿外观挂载（PlayerDataHost）', function()
     -- #49：进图白送只在调试开关下发放，这些用例沿用它的起始库存（鱼竿在第 1 格、蚯蚓若干）
     -- 快照先于任何改动，夹具中途失败时 after_each 仍能还原。
     restore = {
-      GrantDebug = require('common.GameCfg').Debug,
+      GrantDebug = require('common.game_cfg').Debug,
       game = _G.game,
       Vector3 = _G.Vector3,
       Color = _G.Color,
       REUtil = _G.REUtil,
     }
     env = { failKind = nil, created = {}, events = {} }
-    require('common.GameCfg').Debug = { Enabled = true, InitialGrants = restore.GrantDebug.InitialGrants }
+    require('common.game_cfg').Debug = { Enabled = true, InitialGrants = restore.GrantDebug.InitialGrants }
     local world = { CreateUnit = function(_, kind, props)
       if env.failKind == kind then return nil end
       local unit = { Kind = kind, Destroyed = false }
@@ -84,7 +84,7 @@ describe('鱼竿外观挂载（PlayerDataHost）', function()
   after_each(function()
     -- 顺序与旧 tearDown 一致：先还原 Debug 开关，再送走玩家，最后还原全局。
     if restore then
-      require('common.GameCfg').Debug = restore.GrantDebug
+      require('common.game_cfg').Debug = restore.GrantDebug
     end
     if env and env.runtime then
       env.runtime:shutdown()

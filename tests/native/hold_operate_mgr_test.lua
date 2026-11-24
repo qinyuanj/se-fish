@@ -2,8 +2,8 @@
 -- 首次即消费、重复点击重复扣物、丢弃未接地面物品接口仍扣物、
 -- 分发不写回包客户端无从重试、绕开 Vitals 直接扣食。
 -- 接缝：MgrPlayerData:Handle 请求入口。
-local GameCfg = require('common.GameCfg')
-local Mgr = require('server.PlayerDataHost')
+local GameCfg = require('common.game_cfg')
+local Mgr = require('server.player_data_host')
 
 local function signal()
     local callbacks = {}

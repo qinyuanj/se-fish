@@ -12,7 +12,7 @@
 --   3. 离开的人把共享地面实例带走（世界状态跟着连接走）；
 --   4. 离场未结算就重连，服务端留出第二份状态或丢掉第一份；
 --   5. 反复进出后重连恢复不出原来的小隊归属。
-local GameCfg = require('common.GameCfg')
+local GameCfg = require('common.game_cfg')
 local Link = assert(loadfile('tests/support/local_link.lua'))()
 
 -- 鱼塘安全点（区夹具里的 Z1_Safe）与第二区野外点：两处都是场景里真实解析出的坐标。

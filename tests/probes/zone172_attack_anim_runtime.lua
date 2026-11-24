@@ -8,10 +8,10 @@ local WEAPON = 'unarmed'
 -- PHASE：'hold' 只换手持（换武器模型本身会改画面）、'fire' 只出手、'both' 两步连做；截连帧取证时先 hold 再 fire
 local PHASE = 'both'
 local MARK = 'AAR172'
-local GameCfg = require('common.GameCfg')
-local ServerRuntime = require('server.WorldHost.ServerRuntime')
-local PlayerDataHost = require('server.PlayerDataHost')
-local REUtil = require('common.REUtil')
+local GameCfg = require('common.game_cfg')
+local ServerRuntime = require('server.world_host.server_runtime')
+local PlayerDataHost = require('server.player_data_host')
+local REUtil = require('common.re_util')
 local runtime = assert(ServerRuntime.current(), MARK .. ': ServerRuntime 未启动')
 local life = assert(runtime.life, MARK .. ': ServerRuntime.life 不可用')
 local player = game:GetService('Players'):GetPlayers()[1]

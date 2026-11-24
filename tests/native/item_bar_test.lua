@@ -1,7 +1,7 @@
 -- #86 迁移（原 tests/gameplay/item_bar_test.lua）：道具栏/背包/鱼饵栏的数据层规则。
 -- 接缝：PlayerData 公共库存接口 + 注入的通知回调。
-local GameCfg = require('common.GameCfg')
-local PlayerData = require('server.Data.PlayerData')
+local GameCfg = require('common.game_cfg')
+local PlayerData = require('server.data.player_data')
 
 local function player()
     local p = { UserId = 34, attributes = {} }

@@ -13,10 +13,10 @@
 -- 说明：describe 按旧 LuaUnit 的执行顺序登记（类名字节序、其内方法字节序），保持案例顺序一致。
 -- 随机数：烤糊倍率与伤害由服务器时刻（假 World.GetServerTime）一次算出，烤位取场景锚点而非随机点位；
 -- fencing 命名空间），不参与任何断言，因此无需固定或恢复随机数函数。
-local GameCfg = require('common.GameCfg')
-local Curve = require('common.GrillCurve')
-local PlayerData = require('server.Data.PlayerData')
-local LotteryEligibility = require('common.LotteryEligibility')
+local GameCfg = require('common.game_cfg')
+local Curve = require('common.grill_curve')
+local PlayerData = require('server.data.player_data')
+local LotteryEligibility = require('common.lottery_eligibility')
 local ShopFeedHost = require('tests.support.shop_feed_host')
 
 local function signal()
@@ -183,7 +183,7 @@ describe("吃通道传递烤制倍率", function()
         end }
         ctx.player = { UserId = 9102, Character = { Name = 'Eggy' },
             CharacterAdded = signal(), CharacterRemoving = signal(), SetAttribute = function() end }
-        ctx.mgr = assert(loadfile('server/PlayerDataHost.lua'))()
+        ctx.mgr = assert(loadfile('server/player_data_host.lua'))()
         ctx.mgr.Vitals = { CanEat = function() return true end,
             Eat = function(_, player, itemId, rate)
                 ctx.eaten[#ctx.eaten + 1] = { itemId = itemId, rate = rate }
@@ -375,10 +375,10 @@ describe("烧烤的接线", function()
         local file = assert(io.open('client/main.lua', 'r'))
         local src = file:read('*a')
         file:close()
-        assert.matches('local GrillView = require("client.Views.GrillView")', src, nil, true)
+        assert.matches('local GrillView = require("client.views.grill_view")', src, nil, true)
         assert.matches('GrillView.spec()', src, nil, true)
         assert.is_nil(src:find('ScreenGrill', 1, true), '旧烧烤屏幕不得再由客户端入口拉起')
-        local file2 = assert(io.open('client/Views/MainHudItemBarView.lua', 'r'))
+        local file2 = assert(io.open('client/views/main_hud_item_bar_view.lua', 'r'))
         local src2 = file2:read('*a')
         file2:close()
         assert.matches('GameCfg.Grill.CookedPrefix', src2, nil, true)
@@ -392,7 +392,7 @@ describe("烧烤的接线", function()
         assert.matches('GrillAction', src, nil, true)
         assert.is_nil(src:find('MgrGrill', 1, true), '旧烧烤管理器不得再挂进服务端入口')
         assert.is_nil(src:find('MgrMap.MgrGrill.Loot'), '满格走 ready 冻结重试，不接 MgrLoot')
-        local runtime = assert(io.open('server/WorldHost/ServerRuntime.lua', 'r'))
+        local runtime = assert(io.open('server/world_host/server_runtime.lua', 'r'))
         local runtime_src = runtime:read('*a')
         runtime:close()
         assert.matches('PlayerGrill.mount', runtime_src, nil, true)

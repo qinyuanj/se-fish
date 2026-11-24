@@ -8,8 +8,8 @@
 --   6. 同账号重进期间排空栅栏未阻塞，导致提前读旧档或覆盖正在落盘的数据；
 --   7. 单棵 PlayerTree 抛未捕获异常波及其他 PlayerTree 或 SharedWorldTree，或已 dispose 树仍响应事件。
 
-local GameCfg = require("common.GameCfg")
-local SpokeClock = require("common.SpokeClock")
+local GameCfg = require("common.game_cfg")
+local SpokeClock = require("common.spoke_clock")
 local spoke = require("common.packages.spoke.api")
 local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
 local LambdaEpoch = spoke.LambdaEpoch
@@ -89,7 +89,7 @@ end
 
 describe("服务端 Spoke 主干：SharedWorldTree", function()
   it("以 Auto SpokeTree 挂载 7 个钓鱼区子域骨架与全局小队 Dock，并在 dispose 时逆序清理且不再响应时钟", function()
-    local SharedWorldTree = require("server.WorldHost.SharedWorldTree")
+    local SharedWorldTree = require("server.world_host.shared_world_tree")
     local clock = SpokeClock.new(10)
     local logger = silent_logger()
     local log = {}
@@ -177,7 +177,7 @@ end)
 
 describe("服务端 Spoke 主干：PlayerTree 因果顺序、双层相位与逆序清理", function()
   it("存档未就绪或归属不匹配时拒绝生成 PlayerTree", function()
-    local PlayerTree = require("server.WorldHost.PlayerTree")
+    local PlayerTree = require("server.world_host.player_tree")
     local clock = SpokeClock.new(0)
     local player = { UserId = 1001 }
     local other = { UserId = 1002 }
@@ -209,7 +209,7 @@ describe("服务端 Spoke 主干：PlayerTree 因果顺序、双层相位与逆�
   end)
 
   it("严格按四段因果顺序排布：同一 batch 内上游先算、下游后跑并看到最新派生值", function()
-    local PlayerTree = require("server.WorldHost.PlayerTree")
+    local PlayerTree = require("server.world_host.player_tree")
     local clock = SpokeClock.new(0)
     local logger = silent_logger()
     local player = { UserId = 2001 }
@@ -296,7 +296,7 @@ describe("服务端 Spoke 主干：PlayerTree 因果顺序、双层相位与逆�
   end)
 
   it("双层相位隔离：麻痹仅关闭 can_act 不退出外层存活相位，platform_pending 暂停濒死与死亡倒计时", function()
-    local PlayerTree = require("server.WorldHost.PlayerTree")
+    local PlayerTree = require("server.world_host.player_tree")
     local clock = SpokeClock.new(0)
     local player = { UserId = 2002 }
     local data = make_ready_data(player)
@@ -377,7 +377,7 @@ describe("服务端 Spoke 主干：PlayerTree 因果顺序、双层相位与逆�
   end)
 
   it("离场 Step 1 触发终镜像时在场资源仍可读，Step 2 同步 dispose 按逆序拆除资源与局部信号连接零残留", function()
-    local PlayerTree = require("server.WorldHost.PlayerTree")
+    local PlayerTree = require("server.world_host.player_tree")
     local clock = SpokeClock.new(0)
     local player = { UserId = 2003 }
     local data = make_ready_data(player)
@@ -475,7 +475,7 @@ describe("服务端 Spoke 主干：ServerRuntime 离场三步协议、排空栅�
   end
 
   it("SharedWorldTree 全局唯一启动，且玩家仅在存档就绪与服务启动后才生成专属 PlayerTree", function()
-    local ServerRuntime = require("server.WorldHost.ServerRuntime")
+    local ServerRuntime = require("server.world_host.server_runtime")
     local logger = silent_logger()
     local ready_callbacks = {}
     local join_starts = {}
@@ -535,7 +535,7 @@ describe("服务端 Spoke 主干：ServerRuntime 离场三步协议、排空栅�
   end)
 
   it("启动时非有限 initial_now 降级为 0 且接受非裸表形态（元表代理 / userdata 协议）的玩家对象", function()
-    local ServerRuntime = require("server.WorldHost.ServerRuntime")
+    local ServerRuntime = require("server.world_host.server_runtime")
     local logger = silent_logger()
 
     local rt_nan = ServerRuntime.new({ initial_now = 0 / 0, logger = logger })
@@ -563,7 +563,7 @@ describe("服务端 Spoke 主干：ServerRuntime 离场三步协议、排空栅�
   end)
 
   it("离场三步协议严格按顺序执行，并在同账号重进期间通过排空栅栏防脏读与覆盖写入", function()
-    local ServerRuntime = require("server.WorldHost.ServerRuntime")
+    local ServerRuntime = require("server.world_host.server_runtime")
     local logger = silent_logger()
     local timeline = {}
     local store = {}
@@ -730,7 +730,7 @@ describe("服务端 Spoke 主干：ServerRuntime 离场三步协议、排空栅�
   end)
 
   it("树级故障隔离：单棵 PlayerTree 抛未捕获异常时其余 PlayerTree 与 SharedWorldTree 正常推进，且已 dispose 树不再响应", function()
-    local ServerRuntime = require("server.WorldHost.ServerRuntime")
+    local ServerRuntime = require("server.world_host.server_runtime")
     local logger = silent_logger()
     local world_ticks, b_ticks, a_ticks = 0, 0, 0
     local a_finalized = false
@@ -824,7 +824,7 @@ describe("服务端入口接线：server/main.lua 宿主测试双端到端集成
     saved = {
       game = rawget(_G, "game"),
       REUtil = rawget(_G, "REUtil"),
-      reutil = package.loaded["common.REUtil"],
+      reutil = package.loaded["common.re_util"],
       MgrUtil = rawget(_G, "MgrUtil"),
       MgrPlayerData = rawget(_G, "MgrPlayerData"),
       Vector3 = rawget(_G, "Vector3"),
@@ -850,7 +850,7 @@ describe("服务端入口接线：server/main.lua 宿主测试双端到端集成
     end
     _G.game = saved.game
     _G.REUtil = saved.REUtil
-    package.loaded["common.REUtil"] = saved.reutil
+    package.loaded["common.re_util"] = saved.reutil
     _G.MgrUtil = saved.MgrUtil
     _G.MgrPlayerData = saved.MgrPlayerData
     _G.Vector3 = saved.Vector3
@@ -943,12 +943,12 @@ describe("服务端入口接线：server/main.lua 宿主测试双端到端集成
       CastAbility = function() return true end,
     }
 
-    mgrs.SaveHost = assert(loadfile("server/SaveHost.lua"))()
-    mgrs.PlayerDataHost = assert(loadfile("server/PlayerDataHost.lua"))()
+    mgrs.SaveHost = assert(loadfile("server/save_host.lua"))()
+    mgrs.PlayerDataHost = assert(loadfile("server/player_data_host.lua"))()
     mgrs.PlatformHost = {}
     mgrs.FishAbility = { Start = function() end, Update = function() end }
     _G.REUtil = remote_util
-    package.loaded["common.REUtil"] = remote_util
+    package.loaded["common.re_util"] = remote_util
 
     local sandbox = setmetatable({
       print = function(...)
@@ -958,16 +958,16 @@ describe("服务端入口接线：server/main.lua 宿主测试双端到端集成
         end
       end,
       require = function(path)
-        if path == "common.REUtil" then return remote_util end
+        if path == "common.re_util" then return remote_util end
         if path == "server.MgrUtil" then return { Start = function() end } end
-        if path == "common.ZoneMarkers" then return { Start = function() end } end
+        if path == "common.zone_markers" then return { Start = function() end } end
         if path == "server.packages.attr_rule.api" then return attr_api_stub end
         if path == "server.packages.modifier_system.api" then return modifier_api_stub end
         if path == "server.packages.ability_system.api" then return ability_api_stub end
-        if path == "server.SaveHost" then return mgrs.SaveHost end
-        if path == "server.PlayerDataHost" then return mgrs.PlayerDataHost end
-        if path == "server.PlatformHost" then return mgrs.PlatformHost end
-        if path == "server.FishAbility" then return mgrs.FishAbility end
+        if path == "server.save_host" then return mgrs.SaveHost end
+        if path == "server.player_data_host" then return mgrs.PlayerDataHost end
+        if path == "server.platform_host" then return mgrs.PlatformHost end
+        if path == "server.fish_ability" then return mgrs.FishAbility end
         return require(path)
       end,
     }, { __index = _G })

@@ -6,8 +6,8 @@
 -- → 用 assert.are.equal（就是 `==`，深比较的 same 会把「共享同一表」弱化成「内容相等」而漏判）。
 -- 七区几何、SafePoint 与航线 Destination、返程票价已由 zone_layout_plan_test 与 ferry_test
 -- 对同一份快照断言，这里不再重算。
-local Judge = require('common.MathWaterJudge')
-local Cfg = require('common.GameCfg')
+local Judge = require('common.math_water_judge')
+local Cfg = require('common.game_cfg')
 
 describe("TestZoneScene125", function()
   it("test_invalid_geometry_fails_before_a_judge_is_returned", function()

@@ -42,13 +42,13 @@ local function newInteract()
 end
 
 local function findGoods(itemId, level)
-  for _, goods in ipairs(require('common.GameCfg').Shop.Goods) do
+  for _, goods in ipairs(require('common.game_cfg').Shop.Goods) do
     if goods.ItemId == itemId and goods.MinShopLevel <= level then return goods end
   end
 end
 
 local function collectSelectable(rows, rodLevel, baitId)
-  local FishCatch = require('common.FishCatch')
+  local FishCatch = require('common.fish_catch')
   local total = 0
   for _, row in ipairs(rows) do
     if row.RodLevel <= rodLevel and (row.Bait == 0 or row.Bait == baitId) then
@@ -71,10 +71,10 @@ describe('虾池最小内容（水区 / 鱼表 / 商店 / 钓鱼佬 / 抛竿）'
     -- 快照先于任何改动：before_each 中途失败时 after_each 仍能还原。
     restore = {
       game = rawget(_G, 'game'),
-      GameCfg = package.loaded['common.GameCfg'],
-      REUtil = package.loaded['common.REUtil'],
-      MgrPlayerData = package.loaded['server.PlayerDataHost'],
-      MgrFishUnit = package.loaded['server.WorldHost.FishTree'],
+      GameCfg = package.loaded['common.game_cfg'],
+      REUtil = package.loaded['common.re_util'],
+      MgrPlayerData = package.loaded['server.player_data_host'],
+      MgrFishUnit = package.loaded['server.world_host.fish_tree'],
     }
     env = { replies = {}, sent = {}, seq = 0, now = 0 }
     env.cfg = require('tests.support.zone_fixtures').Load()
@@ -89,10 +89,10 @@ describe('虾池最小内容（水区 / 鱼表 / 商店 / 钓鱼佬 / 抛竿）'
 
   after_each(function()
     if env and env.host then env.host:shutdown() end
-    package.loaded['common.GameCfg'] = restore and restore.GameCfg
-    package.loaded['common.REUtil'] = restore and restore.REUtil
-    package.loaded['server.PlayerDataHost'] = restore and restore.MgrPlayerData
-    package.loaded['server.WorldHost.FishTree'] = restore and restore.MgrFishUnit
+    package.loaded['common.game_cfg'] = restore and restore.GameCfg
+    package.loaded['common.re_util'] = restore and restore.REUtil
+    package.loaded['server.player_data_host'] = restore and restore.MgrPlayerData
+    package.loaded['server.world_host.fish_tree'] = restore and restore.MgrFishUnit
     _G.game = restore and restore.game
     env = nil
     restore = nil

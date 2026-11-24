@@ -9,7 +9,7 @@
 --   * 挥砍锚点：duplicate 后重写壳源码（只声明属性、不挂接——壳在实例化时
 --     Parent 还是 World 就会抢跑认错宿主，挂接由根 AbilityAPI.AttachAnchor 补做，
 --     见 issue #7），再 change-asset-value 写入属性值。
--- 预设 key 的唯一真源是 common/GameCfg.lua 的 GameCfg.Ability：本命令按 key 查预设，
+-- 预设 key 的唯一真源是 common/game_cfg.lua 的 GameCfg.Ability：本命令按 key 查预设，
 -- 还在就原地重刷壳与属性（可重复执行）；不在就复制模板建新的，并把新 key 回写
 -- GameCfg.lua。跑完后照常 lua tools/cli.lua deploy 落地、试玩验证。
 --
@@ -78,7 +78,7 @@ local exit_code = require("tools.exit_code")
 
 local M = {}
 
-local GAMECFG = "common/GameCfg.lua"
+local GAMECFG = "common/game_cfg.lua"
 local SHELL_DIR = "tools/ability_presets"
 
 -- --fix-names 用：建场景单位的位置（离地高、跑完就删）与两个 exec 脚本落点
@@ -116,7 +116,7 @@ M.SPECS = {
 }
 
 -- 从 GameCfg.lua 文本里取出三个预设 key（slot → key）；取不到的槽位值为 nil。
--- 结构约定见 common/GameCfg.lua 的 GameCfg.Ability：技能条目里 AssetId/Anchor 出现在
+-- 结构约定见 common/game_cfg.lua 的 GameCfg.Ability：技能条目里 AssetId/Anchor 出现在
 -- AnchorBehavior 之前、且中间没有嵌套表，所以按 `{` 起、不跨 `{` 截到 AnchorBehavior。
 function M.parse_gamecfg(text)
   local keys = {}
@@ -548,7 +548,7 @@ function M.usage()
     "",
     "重建技能包的编辑器侧预设（技能背包 / 挥砍技能 / 挥砍锚点）：",
     "GameCfg.Ability 里的 key 还在就原地重刷壳与属性（可重复执行）；不在就复制官方模板",
-    "建新的，并把新 key 回写 common/GameCfg.lua。",
+    "建新的，并把新 key 回写 common/game_cfg.lua。",
     "加 --fix-names 则改跑 Name 类型修复：对 GameCfg.Ability 引用的每个预设查 Name 类型，",
     "不是 Lua string 的按「create-unit-by-asset → editor-unit rename → SyncAssetFromUnit →",
     "删场景单位」四步修回来（保原预设 id、不改 GameCfg.lua、不存盘）。",

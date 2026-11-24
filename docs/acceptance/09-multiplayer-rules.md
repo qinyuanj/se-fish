@@ -37,7 +37,7 @@
 | ID | 条款 | 组 | 执行者 | 证据等级 | 状态 | 证据 / 理由 |
 | --- | --- | --- | --- | --- | --- | --- |
 | 9-19 | 小队系统：组队、邀请、接受与拒绝、主动离队、解散的服务端判定与队伍名单维护 | 功能 | agent | A | evidenced | tests/native/spec/server_squad_314_test.lua |
-| 9-20 | 队伍界面：在 HUD 上显示本队队友及每名队友的当前血量 | 功能 | agent | A | evidenced | tests/native/spec/client_squad_314_test.lua、client/Views/SquadView.lua |
+| 9-20 | 队伍界面：在 HUD 上显示本队队友及每名队友的当前血量 | 功能 | agent | A | evidenced | tests/native/spec/client_squad_314_test.lua、client/views/squad_view.lua |
 | 9-21 | 收到组队邀请时的界面提示与 10 秒倒计时展示 | 功能 | agent | A | evidenced | tests/native/spec/client_squad_314_test.lua |
 | 9-22 | 队伍归属进入存档，断线重连后按原队伍状态或明确的解散结果恢复 | 功能 | agent | B | evidenced | tests/native/spec/server_squad_314_test.lua |
 

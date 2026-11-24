@@ -14,7 +14,7 @@
 --   7. 吃动作失败（锚点没有动画）连带裁决失败。
 -- it 名字沿用旧方法名，注册顺序 = LuaUnit sortedPairs 的实际执行顺序。
 
-local GameCfg = require('common.GameCfg')
+local GameCfg = require('common.game_cfg')
 local Host = require('tests.support.shop_feed_host')
 local function vec(x, y, z) return { x = x, y = y, z = z } end
 
@@ -94,8 +94,8 @@ describe('向钓鱼佬喂食换金币（PlayerFisherman）', function()
 
   it('test_fish_coin_has_single_write_entry', function()
     local writers = 0
-    for _, path in ipairs({ 'server/Data/PlayerData.lua', 'server/WorldHost/PlayerFisherman.lua',
-      'server/PlayerDataHost.lua', 'server/WorldHost/GroundLoot.lua' }) do
+    for _, path in ipairs({ 'server/data/player_data.lua', 'server/world_host/player_fisherman.lua',
+      'server/player_data_host.lua', 'server/world_host/ground_loot.lua' }) do
       local file = assert(io.open(path, 'r'))
       local text = file:read('a')
       file:close()
@@ -106,7 +106,7 @@ describe('向钓鱼佬喂食换金币（PlayerFisherman）', function()
   end)
 
   it('test_fish_price_is_floor_of_base_times_mult_and_defaults_to_one', function()
-    local FishCatch = assert(loadfile('common/FishCatch.lua'))()
+    local FishCatch = assert(loadfile('common/fish_catch.lua'))()
     assert.same(11, FishCatch.Price(env.cfg.Fish.bass, 1.99))   -- 6 × 1.99 = 11.94
     assert.same(9, FishCatch.Price(env.cfg.Fish.goldfish, 1.15)) -- 8 × 1.15 = 9.2
     assert.same(4, FishCatch.Price(env.cfg.Fish.tilapia, 1.5))   -- 3 × 1.5 = 4.5

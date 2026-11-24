@@ -1,8 +1,8 @@
 local Eui = require("tests.support.eui_double")
-local ClientStore = require("client.Store.ClientStore")
-local RootView = require("client.Views.RootView")
-local ReelOverlayView = require("client.Views.ReelOverlayView")
-local SpokeClock = require("common.SpokeClock")
+local ClientStore = require("client.store.client_store")
+local RootView = require("client.views.root_view")
+local ReelOverlayView = require("client.views.reel_overlay_view")
+local SpokeClock = require("common.spoke_clock")
 
 local Host = {}
 function Host.new()

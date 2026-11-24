@@ -1,8 +1,8 @@
-local GameCfg = require("common.GameCfg")
-local ClientStore = require("client.Store.ClientStore")
-local RootView = require("client.Views.RootView")
-local ShopView = require("client.Views.ShopView")
-local FishermanView = require("client.Views.FishermanView")
+local GameCfg = require("common.game_cfg")
+local ClientStore = require("client.store.client_store")
+local RootView = require("client.views.root_view")
+local ShopView = require("client.views.shop_view")
+local FishermanView = require("client.views.fisherman_view")
 local Eui = require("tests.support.eui_double")
 
 local function child(root, name) return root:FindFirstChild(name, true) end

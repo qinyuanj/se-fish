@@ -15,9 +15,9 @@
 -- 保留「setup 失败仍完成清理」的行为。it 顺序沿用旧入口的方法名字典序，与迁移前逐条对账。
 -- 断言口径：旧 assertEquals 两侧同为 table 时是深比较 → assert.same；标量 → assert.are.equal。
 
-local GameCfg = require('common.GameCfg')
+local GameCfg = require('common.game_cfg')
 local Host = require('tests.support.shop_feed_host')
-local PlayerData = require('server.Data.PlayerData')
+local PlayerData = require('server.data.player_data')
 local function vec(x, y, z) return { x = x, y = y, z = z } end
 
 describe("TestExchangeZones", function()

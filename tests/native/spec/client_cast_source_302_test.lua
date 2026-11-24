@@ -1,8 +1,8 @@
 local Eui = require("tests.support.eui_double")
-local ClientStore = require("client.Store.ClientStore")
-local RootView = require("client.Views.RootView")
-local CastSourceView = require("client.Views.CastSourceView")
-local SpokeClock = require("common.SpokeClock")
+local ClientStore = require("client.store.client_store")
+local RootView = require("client.views.root_view")
+local CastSourceView = require("client.views.cast_source_view")
+local SpokeClock = require("common.spoke_clock")
 
 describe("礁石来源可视化宿主接缝（#302）", function()
   local saved_v3, saved_color

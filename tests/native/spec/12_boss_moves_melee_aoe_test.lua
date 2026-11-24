@@ -11,10 +11,10 @@
 --   3. 头部区判定失效（绕后仍咬中）/ 表外招式被排进循环；
 --   4. 活动 15 / 30 秒后的眩晕窗口被抬后或不生效。
 
-local Cfg = require('common.GameCfg')
+local Cfg = require('common.game_cfg')
 local Islet = require('tests.support.isle_combat')
-local BossMoves = require('common.cfg.BossMoves')
-local GarBiteNotice = require('common.GarBiteNotice')
+local BossMoves = require('common.cfg.boss_moves')
+local GarBiteNotice = require('common.gar_bite_notice')
 
 local function need(cond, fmt, ...)
     if not cond then error(string.format(fmt, ...), 2) end
@@ -31,16 +31,16 @@ describe('第 12 节 逐招表（近战与范围组）', function()
     local env, savedAbility, hp
 
     before_each(function()
-        savedAbility = package.loaded['server.AbilityAPI']
+        savedAbility = package.loaded['server.ability_api']
         env = Islet.new(1)
         env.player.Character.Controller.Health = 100000 -- 长时间节拍断言不被 300 血上限截断
-        package.loaded['server.AbilityAPI'] = nil
+        package.loaded['server.ability_api'] = nil
         hp = function() return env.player.Character.Controller.Health end
     end)
 
     after_each(function()
         env:tearDown()
-        package.loaded['server.AbilityAPI'] = savedAbility
+        package.loaded['server.ability_api'] = savedAbility
     end)
 
     local function dropNear(id, distance)

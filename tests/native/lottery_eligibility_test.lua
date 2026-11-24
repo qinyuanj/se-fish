@@ -8,15 +8,15 @@
 -- seam：真实 GameCfg 物品表 + 真实 PlayerData 的 AddItem / 快照 / Serialize / ApplySave。
 -- 迁移说明：案例按旧 LuaUnit 实际执行序（方法名字典序）逐个 it 注册；
 --   lu.fail(msg) 在 luassert 无对应断言，按语义用 error(msg, 0) 保持原消息不带位置前缀。
-local GameCfg = require("common.GameCfg")
-local Eligibility = require("common.LotteryEligibility")
+local GameCfg = require("common.game_cfg")
+local Eligibility = require("common.lottery_eligibility")
 local RandomGuard = require("tests.support.random_guard")
 
 local function check(entry)
   return { Eligibility.Check(entry) }
 end
 
-describe("抽奖投入资格（common.LotteryEligibility × PlayerData）", function()
+describe("抽奖投入资格（common.lottery_eligibility × PlayerData）", function()
   after_each(RandomGuard.restore)
 
   it("test_cooked_by_inventory_flag_or_snapshot_multiplier_is_rejected", function()
@@ -65,7 +65,7 @@ describe("抽奖投入资格（common.LotteryEligibility × PlayerData）", func
   end)
 
   it("test_real_inventory_entries_keep_cooked_state_through_snapshot_and_reload", function()
-    local PlayerData = require("server.Data.PlayerData")
+    local PlayerData = require("server.data.player_data")
     local data = PlayerData.New({ UserId = 134, SetAttribute = function() end })
     data:Init()
     assert.is_true(data:AddItem("item9", 1.42))

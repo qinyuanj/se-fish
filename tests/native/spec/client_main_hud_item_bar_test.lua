@@ -9,11 +9,11 @@
 
 local spoke = require("common.packages.spoke.api")
 local Eui = require("tests.support.eui_double")
-local GameCfg = require("common.GameCfg")
-local MainHudLayout = require("client.MainHudLayout")
-local ClientStore = require("client.Store.ClientStore")
-local RootView = require("client.Views.RootView")
-local MainHudItemBarView = require("client.Views.MainHudItemBarView")
+local GameCfg = require("common.game_cfg")
+local MainHudLayout = require("client.main_hud_layout")
+local ClientStore = require("client.store.client_store")
+local RootView = require("client.views.root_view")
+local MainHudItemBarView = require("client.views.main_hud_item_bar_view")
 
 local State = spoke.State
 

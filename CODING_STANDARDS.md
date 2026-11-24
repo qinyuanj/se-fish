@@ -4,11 +4,12 @@
 
 ## 命名
 
-**项目规则**（`client/`、`server/`、`common/`，人工核对）：
+**项目规则**（`client/`、`server/`、`common/` 自写代码；迁移分层与豁免清单见 [ADR-0034](docs/adr/0034-self-written-code-snake-case.md)）：
 
-- 文件、目录与 `require` 命名空间用 PascalCase，与模块表同名：`common/FishCatch.lua` → `FishCatch`。
-- 其余标识符一律 snake_case：局部变量、参数、函数与方法名、table 字段、协议字段（`fish_count`、`get_reel_state`）；常量用 UPPER_SNAKE_CASE。
-- 外部契约名照原样：官方 API 成员（`OnServerEvent`）、`data/` 导出字段、对应策划表列的配置字段、`packages/` 上游包。存量 PascalCase 名称不单独改名，本次新增或改名的按本节执行。
+- 文件、目录、`require` 命名空间与模块表变量名逐段同名，一律 snake_case：`common/fish_catch.lua` → `local fish_catch = require("common.fish_catch")`。
+- 其余标识符一律 snake_case：局部变量、参数、函数与方法名、自研 table 字段、协议字段（`fish_count`、`get_reel_state`）；常量用 UPPER_SNAKE_CASE。
+- 官方与引擎的名字照原样（大写不管），五类：官方 API 成员与内置服务名（`OnServerEvent`、`World`、`*Service`）；EUI 节点与单位属性表键（`Name`、`Text`、`FontSize`、`Parent`、`Visible`）、Spoke 作用域名与运行期单位名字符串；`data/` 导出字段与 `EggyAPI.lua` 存根；对应策划表列的配置字段；`packages/` 上游整包（含 `*_Script.lua` / `*_LocalScript.lua`）、`unit_scripts/`、编辑器生成物。
+- 存量按 L1 文件与 `require` → L2 模块表变量 → L3 方法与自研字段三层迁移；未迁移的存量 PascalCase 名称不单独改名，随该层迁移一次到位。
 
 ## API 与运行端
 
@@ -39,8 +40,8 @@
 
 **项目规则**（依据 [S8]）：
 
-- 通过 [REUtil](common/REUtil.lua) 获取已有事件，双端共用事件名与协议定义；改旧的多实参消息时同时迁移收发两端。
-- 服务端按五层校验：身份 → 类型 → 频率 → 业务条件 → 结果下发，全部通过后才改权威状态；[RateLimit](common/RateLimit.lua) 管滑动窗，`CheckRECD` 是每通道固定窗口的粗拦截，限频不替代其他校验。数值字段须经 [Number.IsFiniteNumber](common/Number.lua) 排除 `NaN` 与 `±math.huge`，再判整数、范围。
+- 通过 [REUtil](common/re_util.lua) 获取已有事件，双端共用事件名与协议定义；改旧的多实参消息时同时迁移收发两端。
+- 服务端按五层校验：身份 → 类型 → 频率 → 业务条件 → 结果下发，全部通过后才改权威状态；[RateLimit](common/rate_limit.lua) 管滑动窗，`CheckRECD` 是每通道固定窗口的粗拦截，限频不替代其他校验。数值字段须经 [Number.IsFiniteNumber](common/number.lua) 排除 `NaN` 与 `±math.huge`，再判整数、范围。
 - 客户端先监听响应再发请求，收到快照先校验结构再更新显示；要覆盖迟加入或重连时，提供只读、幂等的 ready / snapshot 握手。
 - 玩家离开时清理按玩家保存的限频表与临时请求状态。
 

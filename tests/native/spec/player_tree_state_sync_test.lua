@@ -6,11 +6,11 @@
 --   4. 持竿模型未随切槽/切换 held/角色重建/离场 dispose 自动逆序清理；
 --   5. 离线/离场 Step 1 终镜像未完整写回 weakRemaining（含角色空窗暂停态）及第一因果段最新库存状态。
 
-local GameCfg = require("common.GameCfg")
-local BodyScale = require("common.BodyScale")
-local SpokeClock = require("common.SpokeClock")
+local GameCfg = require("common.game_cfg")
+local BodyScale = require("common.body_scale")
+local SpokeClock = require("common.spoke_clock")
 local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
-local PlayerTree = require("server.WorldHost.PlayerTree")
+local PlayerTree = require("server.world_host.player_tree")
 
 local CONTAINER = GameCfg.Items.ContainerId
 

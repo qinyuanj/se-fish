@@ -4,7 +4,7 @@
 -- 专门验证关闭调试/切换槽的用例仍在自己的 setUp 或测试体里覆盖并恢复这些字段。
 local M = {}
 
-local GameCfg = require("common.GameCfg")
+local GameCfg = require("common.game_cfg")
 local ZoneFixtures = require("tests.support.zone_fixtures")
 
 ZoneFixtures.Apply(GameCfg)

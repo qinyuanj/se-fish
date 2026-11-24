@@ -9,7 +9,7 @@
 --   6. 两次权威报告之间显示值不衰减，或越出 [0,100]；
 --   7. 服务端 progress 回包不带 q，客户端没法确认在途批次。
 -- it 名字沿用旧方法名，注册顺序 = LuaUnit sortedPairs 的实际执行顺序。
-local ReelDisplay = require('common.ReelDisplay')
+local ReelDisplay = require('common.reel_display')
 
 -- 只读夹具：与旧套件一样在文件顶层共享，用例不修改它。
 local cfg = { Initial = 50, DecayPerSec = 5, ClickGain = 5, Tolerance = 5, ChaseSec = 0.18, PendingTimeoutSec = 1 }

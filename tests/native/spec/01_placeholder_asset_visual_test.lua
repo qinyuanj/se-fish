@@ -5,7 +5,7 @@
 -- 1-15 本身是 C 级试玩条款（状态 blocked）；本文件只取证它的**代码路径**：可见、可打、可放下
 -- 三件事各自走到业务入口，不声称编辑器里已经看到。试玩结论仍归 C 级会话记录。
 --
--- 只走业务入口：common/GameCfg 的应用结果、server/Mgr/MgrLoot 的地面实例入口、
+-- 只走业务入口：common/game_cfg 的应用结果、server/Mgr/MgrLoot 的地面实例入口、
 -- server/Mgr/MgrFishCarrier 的生成与伤害接缝、server/Mgr/MgrFishUnit 的抓举/放下状态机；
 -- data/OfficialAsset.lua 是官方资产表的独立真源（编辑器导出、只读），用来判「资源 ID 真的存在」。
 -- 失败方式（先列后写）：
@@ -15,8 +15,8 @@
 --   4. 七区里某条鱼或某个首领缺图标 / 分类模型 / 品级色，或世界模型解析不出 official://mesh；
 --   5. 七区的鱼与首领打不动（统一伤害入口解析不到受击体，或血量不是鱼种血量）；
 --   6. 放下后状态没离开「举着」、本体没回世界，或挂点没销毁。
-local GameCfg = require('common.GameCfg')
-local PlaceholderAssets = require('common.cfg.PlaceholderAssets')
+local GameCfg = require('common.game_cfg')
+local PlaceholderAssets = require('common.cfg.placeholder_assets')
 
 local function signal()
   local slots = {}
@@ -231,9 +231,9 @@ describe('条款 1-15 七区鱼与首领的代码路径（可见 / 可打 / 可�
   before_each(function()
     env = newWorld()
     saved = installWorld(env)
-    Carrier = assert(loadfile('server/WorldHost/FishCarrier.lua'))()
-    package.loaded['server.WorldHost.FishCarrier'] = Carrier
-    Unit = assert(loadfile('server/WorldHost/FishTree.lua'))()
+    Carrier = assert(loadfile('server/world_host/fish_carrier.lua'))()
+    package.loaded['server.world_host.fish_carrier'] = Carrier
+    Unit = assert(loadfile('server/world_host/fish_tree.lua'))()
     -- Start 里做的是注入 World 与开战斗通道；战斗通道不在本断言范围，只做同一份注入。
     Unit.World = env.world
     Unit.Cast = { PushState = function() end }
@@ -243,8 +243,8 @@ describe('条款 1-15 七区鱼与首领的代码路径（可见 / 可打 / 可�
 
   after_each(function()
     restoreWorld(saved)
-    package.loaded['server.WorldHost.FishCarrier'] = nil
-    package.loaded['server.WorldHost.FishTree'] = nil
+    package.loaded['server.world_host.fish_carrier'] = nil
+    package.loaded['server.world_host.fish_tree'] = nil
     Carrier.Carriers = {}
   end)
 

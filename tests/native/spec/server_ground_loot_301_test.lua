@@ -1,7 +1,7 @@
 
-local GameCfg = require("common.GameCfg")
-local ServerRuntime = require("server.WorldHost.ServerRuntime")
-local SpokeClock = require("common.SpokeClock")
+local GameCfg = require("common.game_cfg")
+local ServerRuntime = require("server.world_host.server_runtime")
+local SpokeClock = require("common.spoke_clock")
 local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
 
 local ZONE_ID = "fishPond"
@@ -83,7 +83,7 @@ local function host(opts)
     return events[name]
   end
 
-  local PlayerData = require("server.Data.PlayerData")
+  local PlayerData = require("server.data.player_data")
   local runtime = ServerRuntime.new({
     clock = clock,
     initial_now = now,

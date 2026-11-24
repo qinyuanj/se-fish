@@ -1,5 +1,5 @@
 -- 原生 Busted（#87 迁移自 tests/gameplay/blindbox_draw_test.lua 的 TestBlindboxDraw）。
--- #147 T26 盲盒抽样纯逻辑（common/BlindboxDraw.lua，GameSpec §15 与地图盲盒表）失败方式先列：
+-- #147 T26 盲盒抽样纯逻辑（common/blindbox_draw.lua，GameSpec §15 与地图盲盒表）失败方式先列：
 --   1. 权重区间错位：累计权重边界归属错（roll 恰等于累计值时归错项）、rng 越界/非数不拒绝；
 --   2. 保底时机错：连续 48 次未中就触发保底，或 49 次未中的第 50 抽不保底；
 --   3. 保底奖项错：保底出的不是极品美人鱼/极品蛇颈龙，或两件不等概率；
@@ -7,10 +7,10 @@
 --   5. 十连逐抽错：十连中途出大奖后，余下的抽数仍沿用旧计数（应逐抽结算、立即重置）；
 --   6. 倍率/价格口径错：结果带非 1 的个体倍率，或基础售价与地图盲盒表不符（钉表）。
 -- seam：BlindboxDraw.Draw / DrawMany（纯函数）；随机数经 rng(n)（返回 1..n 均匀整数）注入，
---   脚本化序列锁定边界；配置真源是 common/cfg/Blindbox.lua（权重和 1000、期望 166.075 已有钉表）。
+--   脚本化序列锁定边界；配置真源是 common/cfg/blindbox.lua（权重和 1000、期望 166.075 已有钉表）。
 -- 迁移说明：案例按旧 LuaUnit 实际执行序（方法名字典序）逐个 it 注册；断言按语义映射，见 issue-87-mapping.md。
-local BlindboxDraw = require("common.BlindboxDraw")
-local BlindboxCfg = require("common.cfg.Blindbox")
+local BlindboxDraw = require("common.blindbox_draw")
+local BlindboxCfg = require("common.cfg.blindbox")
 local RandomGuard = require("tests.support.random_guard")
 
 -- 脚本化 RNG：按队列逐个吐 roll（1..n），耗尽报错
@@ -26,7 +26,7 @@ local function scripted(rolls)
   end
 end
 
-describe("盲盒抽样纯逻辑（common/BlindboxDraw）", function()
+describe("盲盒抽样纯逻辑（common/blindbox_draw）", function()
   -- 逐案例随机函数守卫：本批随机全部经 rng 参数注入，没有替换 math.random，
   -- 但 MgrSave / MgrLoot 会读全局 math.random()，故逐案例还原，杜绝替换泄漏到后续案例。
   after_each(RandomGuard.restore)

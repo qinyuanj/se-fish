@@ -7,15 +7,15 @@
 --   5. AbilityLeaf 在角色更换/树销毁时未停止技能并销毁管理器，或延迟就绪重试在角色销毁后仍泄漏执行；
 --   6. AbilityLeaf 未按 PlayerTree.memos.can_act 拦截施法，或无法兼容真机 userdata（newproxy）对象。
 
-local GameCfg = require("common.GameCfg")
-local BodyScale = require("common.BodyScale")
-local SpokeClock = require("common.SpokeClock")
+local GameCfg = require("common.game_cfg")
+local BodyScale = require("common.body_scale")
+local SpokeClock = require("common.spoke_clock")
 local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
-local PlayerTree = require("server.WorldHost.PlayerTree")
-local PlayerEffects = require("server.WorldHost.PlayerEffects")
-local AttrLeaf = require("server.WorldHost.AttrLeaf")
-local ModifierLeaf = require("server.WorldHost.ModifierLeaf")
-local AbilityLeaf = require("server.WorldHost.AbilityLeaf")
+local PlayerTree = require("server.world_host.player_tree")
+local PlayerEffects = require("server.world_host.player_effects")
+local AttrLeaf = require("server.world_host.attr_leaf")
+local ModifierLeaf = require("server.world_host.modifier_leaf")
+local AbilityLeaf = require("server.world_host.ability_leaf")
 
 local function make_ready_data(player, overrides)
   overrides = overrides or {}

@@ -7,11 +7,11 @@
 --   4. 目标离场（玩家退出/鱼移除）后状态不清理，DOT 打空目标、查询泄漏；
 --   5. BodyPlan 读不存在的 player.Data 恒为 0（#132 原型死代码），存档里的药水永远不生效。
 -- 接缝：loadfile 取全新 MgrAbility 实例；桩 _G.game（World:GetServerTime 可控时钟、Players）、
---   server.AbilityAPI 与技能包 server.packages.ability_system.api（加载即注册事件，不可载真包）；
+--   server.ability_api 与技能包 server.packages.ability_system.api（加载即注册事件，不可载真包）；
 --   Vitals/PlayerData/Survival 以假实现注入（与 main.lua 的接线同形状）。
 -- 旧 setUp/tearDown 逐例映射为 before_each/after_each：替换的全局（game / Vector3）、模块缓存
 -- before_each 幂等。describe/it 名沿用旧类名与方法名，案例顺序沿用旧 LuaUnit 的字典序执行序。
-local GameCfg = require('common.GameCfg')
+local GameCfg = require('common.game_cfg')
 
 local function signal()
     local callbacks = {}
@@ -45,9 +45,9 @@ describe('TestStatusEffect', function()
         ctx = {
             now = 100,
             savedGame = rawget(_G, 'game'),
-            savedAPI = package.loaded['server.AbilityAPI'],
+            savedAPI = package.loaded['server.ability_api'],
             savedPackageAPI = package.loaded['server.packages.ability_system.api'],
-            savedMgr = package.loaded['server.FishAbility'],
+            savedMgr = package.loaded['server.fish_ability'],
             bodyScales = {},
             hits = {},
             refreshedMaxHealth = {},
@@ -64,7 +64,7 @@ describe('TestStatusEffect', function()
             if name == 'Task' then return { Spawn = function() end, Wait = function() end } end
             return {}
         end }
-        package.loaded['server.AbilityAPI'] = {
+        package.loaded['server.ability_api'] = {
             SetCastGuard = function() end,
             SetBodyScale = function(character, scale) -- 根 AbilityAPI 为点号调用
                 state.bodyScales[#state.bodyScales + 1] = scale
@@ -72,7 +72,7 @@ describe('TestStatusEffect', function()
             end,
         }
         package.loaded['server.packages.ability_system.api'] = {}
-        state.mgr = assert(loadfile('server/FishAbility.lua'))()
+        state.mgr = assert(loadfile('server/fish_ability.lua'))()
         -- 假 Vitals：记录 DOT 结算（统一入口证据）
         state.mgr.Vitals = {
             NewHit = function(_, source, category) return { source = source, category = category, targets = {} } end,
@@ -107,9 +107,9 @@ describe('TestStatusEffect', function()
     after_each(function()
         if not ctx then return end
         _G.game = ctx.savedGame
-        package.loaded['server.AbilityAPI'] = ctx.savedAPI
+        package.loaded['server.ability_api'] = ctx.savedAPI
         package.loaded['server.packages.ability_system.api'] = ctx.savedPackageAPI
-        package.loaded['server.FishAbility'] = ctx.savedMgr
+        package.loaded['server.fish_ability'] = ctx.savedMgr
     end)
 
     local function advance(sec)
@@ -370,7 +370,7 @@ describe('TestStatusEffect', function()
     it('test_straight_escape_uses_real_status_expiration', function()
         local oldVector = _G.Vector3
         _G.Vector3 = { New = function(x, y, z) return { x = x, y = y, z = z } end }
-        local unit = assert(loadfile('server/WorldHost/FishTree.lua'))()
+        local unit = assert(loadfile('server/world_host/fish_tree.lua'))()
         unit.Ability = ctx.mgr
         local fish, carrier = installFish()
         fish.FishId, fish.StraightEscape, fish.Heading = 'alligatorGar', true, { x = 1, z = 0 }

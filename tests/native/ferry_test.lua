@@ -43,9 +43,9 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
       modules = {},
     }
     for name, value in pairs(package.loaded) do
-      if name == 'common.GameCfg' or name == 'common.REUtil'
-          or name == 'server.Data.PlayerData' or name == 'server.PlayerDataHost'
-          or name:match('^server%.WorldHost%.') then
+      if name == 'common.game_cfg' or name == 'common.re_util'
+          or name == 'server.data.player_data' or name == 'server.player_data_host'
+          or name:match('^server%.world_host%.') then
         restore.modules[name] = value
         package.loaded[name] = nil
       end
@@ -58,8 +58,8 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
     env.route = env.routes[1]
     _G.Vector3 = { New = vec }
 
-    package.loaded['server.Data.PlayerData'] = nil
-    env.PlayerDataClass = require('server.Data.PlayerData')
+    package.loaded['server.data.player_data'] = nil
+    env.PlayerDataClass = require('server.data.player_data')
     env.anchors = {}
     for _, zone in ipairs(env.cfg.Zones) do
       for _, entity in ipairs(zone.Scene.Entities) do
@@ -99,9 +99,9 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
       end,
       CheckRECD = function() return false end,
     }
-    package.loaded['common.REUtil'] = reStub
+    package.loaded['common.re_util'] = reStub
     _G.REUtil = reStub
-    package.loaded['server.PlayerDataHost'] = {
+    package.loaded['server.player_data_host'] = {
       GetDataInst = function(_, player) return env.data[player.UserId] end,
       SendItemBar = function() end,
     }
@@ -119,7 +119,7 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
         return anchor
       end,
     }
-    env.mgr.PlayerData = package.loaded['server.PlayerDataHost']
+    env.mgr.PlayerData = package.loaded['server.player_data_host']
     env.mgr.OnlinePlayers = function() return env.players end
     env.store = {
       GetAsync = function(_, key) return env.values[key] end,
@@ -142,11 +142,11 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
       if name == 'Players' then return { GetPlayers = function() return env.players end } end
       if name == 'DataStoreService' then return { GetDataStore = function() return env.store end } end
     end }
-    env.save = assert(loadfile('server/SaveHost.lua'))()
+    env.save = assert(loadfile('server/save_host.lua'))()
     env.mgr.Save = env.save
     for _, player in ipairs(env.players) do env.save:LoadInto(player, env.data[player.UserId]) end
 
-    local ServerRuntime = require('server.WorldHost.ServerRuntime')
+    local ServerRuntime = require('server.world_host.server_runtime')
     env.runtime = ServerRuntime.new({
       initial_now = env.now,
       zones = env.cfg.Zones,
@@ -188,9 +188,9 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
   after_each(function()
     if env and env.runtime then env.runtime:shutdown() end
     for name in pairs(package.loaded) do
-      if name == 'common.GameCfg' or name == 'common.REUtil'
-          or name == 'server.Data.PlayerData' or name == 'server.PlayerDataHost'
-          or name:match('^server%.WorldHost%.') then
+      if name == 'common.game_cfg' or name == 'common.re_util'
+          or name == 'server.data.player_data' or name == 'server.player_data_host'
+          or name:match('^server%.world_host%.') then
         package.loaded[name] = nil
       end
     end
@@ -784,7 +784,7 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
     assert.message('返回服务端操作身份供跨会话补发').is_not_nil(operation)
     env.mgr:OnPlayerRemoving(player)
     player = newPlayer(1, 101, 6, 103)
-    data = assert(loadfile('server/Data/PlayerData.lua'))().New(player)
+    data = assert(loadfile('server/data/player_data.lua'))().New(player)
     env.players[1], env.data[1] = player, data
     env.save:LoadInto(player, data)
     assert.is_true(env.mgr:Handle(player,

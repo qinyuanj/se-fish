@@ -9,7 +9,7 @@
 --
 -- 为什么清单是生成出来的字面量：编辑器 exec 沙盒里 require 不可用
 -- （sdk.common.lua:830: attempt to call a nil value (field 'require')），且没有 io/os，
--- 探针既不能自己加载 common/GameCfg.lua，也不能读外部数据文件。
+-- 探针既不能自己加载 common/game_cfg.lua，也不能读外部数据文件。
 --
 -- 用途：P2 要求每批修改前「重解析名称、类型、层级、当前变换及配置依赖」。本探针把配置里
 -- 被运行时**按名查找**的锚点逐条在七区现场重新解析：是否存在、命中几个、命中在哪条层级路径、

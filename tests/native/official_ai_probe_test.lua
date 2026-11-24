@@ -2,7 +2,7 @@
 -- 迁移自 tests/tooling/official_ai_probe_test.lua（#92，LuaUnit → 原生 Busted）；
 -- 案例顺序沿用旧入口的类名 + 方法名字典序。Runtime 夹具每次 loadAi() 建立独立模块环境。
 local Probe = require('tools.probes.official_ai_probe')
-local GameCfg = require('common.GameCfg')
+local GameCfg = require('common.game_cfg')
 
 describe("TestOfficialAiProbe", function()
   it("test_ability_bridge_reaches_real_ability_api_boundary", function()

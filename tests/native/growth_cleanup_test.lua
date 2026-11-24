@@ -6,14 +6,14 @@
 -- 旧套件的 setUp/tearDown 是逐例的（每案例各跑一次），因此映射为 before_each/after_each，
 -- 不是 suite 级 setup/teardown；after_each 对未完成的 before_each 幂等（ctx 未建立就跳过）。
 -- describe/it 名沿用旧类名与方法名，案例顺序沿用旧 LuaUnit 的字典序执行序。
-local GameCfg = require('common.GameCfg')
+local GameCfg = require('common.game_cfg')
 
 describe('TestGrowthCleanup', function()
     local ctx
 
     before_each(function()
         ctx = { savedDebug = GameCfg.Debug }
-        ctx.PlayerData = assert(loadfile('server/Data/PlayerData.lua'))()
+        ctx.PlayerData = assert(loadfile('server/data/player_data.lua'))()
     end)
 
     -- before_each 中途失败（loadfile 报错）时 ctx 可能只建了一半：恢复要逐项判空。
@@ -31,7 +31,7 @@ describe('TestGrowthCleanup', function()
 
     -- 调试开关关闭时不白送任何东西
     it('test_debug_switch_restores_grant_into_containers', function()
-        local fresh = assert(loadfile('common/GameCfg.lua'))()
+        local fresh = assert(loadfile('common/game_cfg.lua'))()
         GameCfg.Debug = { Enabled = true, InitialGrants = fresh.Debug.InitialGrants }
         local state = init():GetItemBarSnapshot()
         assert.same('starterRod', state.slots[1].itemId)
@@ -41,7 +41,7 @@ describe('TestGrowthCleanup', function()
 
     -- 校验全部钓鱼区鱼行的权重与鱼竿等级
     it('test_draw_weight_and_rod_level_are_valid', function()
-        local fresh = assert(loadfile('common/GameCfg.lua'))()
+        local fresh = assert(loadfile('common/game_cfg.lua'))()
         for _, rows in pairs(fresh.Casting.Zones) do
             for _, row in ipairs(rows) do
                 assert.message(row.Id).is_true(type(row.DrawWeight) == 'number' and row.DrawWeight > 0)
@@ -52,7 +52,7 @@ describe('TestGrowthCleanup', function()
 
     -- 白送挂在 Debug 开关下：关闭后物品栏与鱼饵栏都空
     it('test_no_free_grant_when_debug_is_disabled', function()
-        local fresh = assert(loadfile('common/GameCfg.lua'))()
+        local fresh = assert(loadfile('common/game_cfg.lua'))()
         assert.is_nil(fresh.Items.InitialGrants)
         fresh.Debug.Enabled = false
         GameCfg.Debug = fresh.Debug
@@ -63,7 +63,7 @@ describe('TestGrowthCleanup', function()
 
     -- 鱼竿等级筛选是合法逻辑，不能被成长清理一起删掉
     it('test_rod_level_filter_is_kept', function()
-        local FishCatch = require('common.FishCatch')
+        local FishCatch = require('common.fish_catch')
         local rows = {
             { Id = 'low', Bait = 0, RodLevel = 1, DrawWeight = 1 },
             { Id = 'high', Bait = 0, RodLevel = 2, DrawWeight = 1000 },

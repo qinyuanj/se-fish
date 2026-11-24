@@ -7,14 +7,14 @@
 --   5. weak 在角色空窗期继续流失或角色重建后丢失剩余秒数；
 --   6. HeldRodLeaf 在切槽/角色重建/树 dispose 后未逆序销毁模型与挂点，或模型创建失败时泄漏挂点。
 
-local GameCfg = require("common.GameCfg")
-local BodyScale = require("common.BodyScale")
-local SpokeClock = require("common.SpokeClock")
+local GameCfg = require("common.game_cfg")
+local BodyScale = require("common.body_scale")
+local SpokeClock = require("common.spoke_clock")
 local spoke = require("common.packages.spoke.api")
 local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
-local PlayerTree = require("server.WorldHost.PlayerTree")
-local PlayerEffects = require("server.WorldHost.PlayerEffects")
-local HeldRodLeaf = require("server.WorldHost.HeldRodLeaf")
+local PlayerTree = require("server.world_host.player_tree")
+local PlayerEffects = require("server.world_host.player_effects")
+local HeldRodLeaf = require("server.world_host.held_rod_leaf")
 
 local State = spoke.State
 local Effect = spoke.Effect

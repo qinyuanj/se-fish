@@ -4,7 +4,7 @@
 --
 -- 迁移纪律：
 --   * 全部走 pcall 失败路径，断言的就是「失败之后清理做到哪一步」，因此不改成功路径、不放宽断言；
---   * 旧 setUp 一开始就记下全局 game 与 package.loaded['server.AbilityAPI']，teardown 原样放回。
+--   * 旧 setUp 一开始就记下全局 game 与 package.loaded['server.ability_api']，teardown 原样放回。
 --     这里改成逐案例 before_each/after_each：已验证 Busted 在 before_each 抛错时仍执行 after_each
 --     （探针记录见 issue-90-mapping.md），所以「夹具建到一半失败也清理」与 LuaUnit 语义一致；
 --     after_each 只读快照里已有的字段，不会把没替换过的环境写成别的值。
@@ -17,7 +17,7 @@ local saved
 describe('TestEelAbilityFailure', function()
     local ctx
     before_each(function()
-        saved = { game = rawget(_G, 'game'), api = package.loaded['server.AbilityAPI'], vendor = package.loaded['server.packages.ability_system.api'] }
+        saved = { game = rawget(_G, 'game'), api = package.loaded['server.ability_api'], vendor = package.loaded['server.packages.ability_system.api'] }
         ctx = { jobs = {}, destroyed = 0 }
         ctx.manager = { Destroy = function()
             if ctx.failDestroy then error('destroy-failed') end
@@ -34,13 +34,13 @@ describe('TestEelAbilityFailure', function()
         ctx.api = {}
         ctx.vendor = { AddAbility = function() error('add-failed') end }
         package.loaded['server.packages.ability_system.api'] = ctx.vendor
-        package.loaded['server.AbilityAPI'] = ctx.api
-        ctx.mgr = assert(loadfile('server/FishAbility.lua'))()
+        package.loaded['server.ability_api'] = ctx.api
+        ctx.mgr = assert(loadfile('server/fish_ability.lua'))()
         ctx.fish = { Id = 1, FishId = 'eel', Carrier = { Receiver = {} } }
     end)
     after_each(function()
         _G.game = saved.game
-        package.loaded['server.AbilityAPI'] = saved.api
+        package.loaded['server.ability_api'] = saved.api
         package.loaded['server.packages.ability_system.api'] = saved.vendor
     end)
 

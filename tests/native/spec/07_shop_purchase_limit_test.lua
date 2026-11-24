@@ -1,4 +1,4 @@
-local GameCfg = require("common.GameCfg")
+local GameCfg = require("common.game_cfg")
 local Host = require("tests.support.shop_feed_host")
 
 local LIMITED_ROW, UNLIMITED_ROW = 51, 13

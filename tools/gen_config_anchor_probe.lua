@@ -1,9 +1,9 @@
--- #65 P2 配置锚点清单生成器：把 common/GameCfg.lua 里被运行时**按名查找**的锚点名，
+-- #65 P2 配置锚点清单生成器：把 common/game_cfg.lua 里被运行时**按名查找**的锚点名，
 -- 离线解析成字面量数据块，写进 tests/probes/config_anchor_resolution.lua 的两条标记之间。
 --
 -- 为什么离线生成：编辑器 exec 沙盒（edit mode）里 require 不可用
 -- （sdk.common.lua:830: attempt to call a nil value (field 'require')），且没有 io/os，
--- 探针既不能自己加载 common/GameCfg.lua，也不能读外部数据文件。
+-- 探针既不能自己加载 common/game_cfg.lua，也不能读外部数据文件。
 --
 -- 用法（仓库根执行）：
 --   lua tools/gen_config_anchor_probe.lua           # 重写数据块
@@ -28,8 +28,8 @@ function M.collect(GameCfg)
         entries[#entries + 1] = { source = source, zone = zoneLabel or '-',
             name = tostring(name), state = state or '-' }
     end
-    -- 1. 区域标记命名合同（ADR-0013，common/ZoneMarkers.Contract；水域按 Z<i>_Water 前缀枚举，不在清单内）
-    for _, entry in ipairs(require('common.ZoneMarkers').Contract(GameCfg)) do
+    -- 1. 区域标记命名合同（ADR-0013，common/zone_markers.Contract；水域按 Z<i>_Water 前缀枚举，不在清单内）
+    for _, entry in ipairs(require('common.zone_markers').Contract(GameCfg)) do
         add('Marker.' .. entry.Role, labels[entry.ZoneIndex], entry.Name, 'contract')
     end
     -- 2. 钓鱼佬锚点（MgrInteract.FindAnchor 的名字来源）
@@ -97,7 +97,7 @@ end
 
 local function main(argv)
     local check = argv and argv[1] == '--check'
-    local GameCfg = require('common.GameCfg')
+    local GameCfg = require('common.game_cfg')
     local entries, labels = M.collect(GameCfg)
     local want = M.renderBlock(entries, labels)
     local text = M.readProbe()

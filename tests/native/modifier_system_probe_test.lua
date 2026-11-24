@@ -199,7 +199,7 @@ describe("TestModifierProbe", function()
     }
     local source, source2 = {}, {}
     local report = require('tools.probes.modifier_system_probe').VerifyBusinessDot({
-      cfg = require('common.GameCfg'), source = source, source2 = source2, dotTarget = target,
+      cfg = require('common.game_cfg'), source = source, source2 = source2, dotTarget = target,
       now = function() return clock end,
       wait = function(s) runtime.wait(s); clock = runtime.now; mgr:Update() end,
       businessDot = {
@@ -273,7 +273,7 @@ describe("TestModifierProbe", function()
 
   it("test_mapping_preserves_refresh_only_and_legacy_remaining", function()
     local probe = require('tools.probes.modifier_system_probe')
-    local cfg = require('common.GameCfg')
+    local cfg = require('common.game_cfg')
     local mappings = probe.BuildMappings(cfg)
     assert.are.equal(5, mappings.poison.maxStackCount)
     assert.are.equal(mappings.poison.TickSec, cfg.Ability.StatusEffects.poison.TickSec)
@@ -306,7 +306,7 @@ describe("TestModifierProbe", function()
         local report = require('tools.probes.modifier_system_probe').Run({
           isolated = true, isIsolated = function(u) return u == owner or u == source or u == source2 end,
           owner = owner, source = source, source2 = source2,
-          api = api, cfg = require('common.GameCfg'), evidence = 'offline', wait = e.wait,
+          api = api, cfg = require('common.game_cfg'), evidence = 'offline', wait = e.wait,
           assets = { poison = 'test:poison', burn = 'test:burn', frost = 'test:frost',
             paralyze = 'test:paralyze', weak = 'test:weak' },
           log = function(line) e.logs[#e.logs + 1] = line end,

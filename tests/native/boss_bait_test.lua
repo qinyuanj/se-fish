@@ -1,4 +1,4 @@
-local GameCfg = require("common.GameCfg")
+local GameCfg = require("common.game_cfg")
 local Host = require("tests.support.fishing_host")
 
 describe("首领饵必出首领（ServerRuntime × PlayerData）", function()

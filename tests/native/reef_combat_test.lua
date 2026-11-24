@@ -8,7 +8,7 @@
 -- 假引擎世界搬到 tests/support/isle_combat.lua：旧套件里 volcano_combat 用
 -- `TestVolcanoCombat.setUp = TestReefCombat.setUp` 直接继承这份夹具（靠 LuaUnit 的全局类名互访），
 -- Busted 下两个 spec 各自 open/close 同一个 support 模块，逐案例新建世界，口径不变。
-local Cfg = require('common.GameCfg')
+local Cfg = require('common.game_cfg')
 local Islet = require('tests.support.isle_combat')
 local Host = require('tests.support.fishing_host')
 
@@ -142,7 +142,7 @@ describe('TestReefCombat', function()
 
     -- 失败方式：空中鱼仍不可抽取（进不了普通抽取池）；抓取来源口径 air/water 被合并。
     it('test_reef_fish_enter_normal_draw_pool_and_distinguish_air_source', function()
-        local FishCatch = require('common.FishCatch')
+        local FishCatch = require('common.fish_catch')
         local rows = Cfg.Casting.Zones['reefIsland.water']
         assert.same('item81', FishCatch.Select(rows, 1, nil, function() return 0 end))
         assert.same('air', Cfg.Fish.item81.CatchSource)
@@ -175,11 +175,11 @@ describe('TestReefCombat', function()
 
     it('test_throw_client_displays_falling_body_and_clear_destroys_it', function()
         local Eui = require('tests.support.eui_double')
-        local ClientStore = require('client.Store.ClientStore')
-        local RootView = require('client.Views.RootView')
-        local FishCombatView = require('client.Views.FishCombatView')
-        local SpokeClock = require('common.SpokeClock')
-        local n = require('common.GarBiteNotice')
+        local ClientStore = require('client.store.client_store')
+        local RootView = require('client.views.root_view')
+        local FishCombatView = require('client.views.fish_combat_view')
+        local SpokeClock = require('common.spoke_clock')
+        local n = require('common.gar_bite_notice')
         local p = n.Lock(-37, { x = 0, y = 6, z = 0 }, 0, 1, 5, 180, 1.2)
         p.move, p.shape, p.flightOrigin = 'airThrow', 'circle', { x = 0, y = 21, z = 0 }
         assert.is_true(n.Valid(p))

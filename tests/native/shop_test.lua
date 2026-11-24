@@ -7,7 +7,7 @@
 --   5. 同一请求（同一 seq）重放结算两次、旧 seq 仍结算，或新 seq 不能再次购买；
 --   6. 鱼竿进了鱼饵库存、蚯蚓占了道具栏格；
 --   7. 失败时不回失败原因（客户端无从提示），成功后不推送库存（HUD 与库存不一致）。
-local GameCfg = require('common.GameCfg')
+local GameCfg = require('common.game_cfg')
 local Host = require('tests.support.shop_feed_host')
 
 describe("钓场商店购买", function()

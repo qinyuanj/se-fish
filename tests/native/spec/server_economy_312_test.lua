@@ -1,4 +1,4 @@
-local GameCfg = require("common.GameCfg")
+local GameCfg = require("common.game_cfg")
 local EconomyWorld = require("tests.support.economy_world")
 
 local ITEM_BAR = GameCfg.Items.ContainerId.ItemBar

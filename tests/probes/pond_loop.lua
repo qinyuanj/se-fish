@@ -45,8 +45,8 @@ local function event(text)
     Timeline[#Timeline + 1] = string.format('t=%7.1fs %s', Clock, text)
 end
 
-local GameCfg = require('common.GameCfg')
-local FishCatch = require('common.FishCatch')
+local GameCfg = require('common.game_cfg')
+local FishCatch = require('common.fish_catch')
 
 -- 估算常数（模拟耗时，不是实测）
 local SIM = {
@@ -315,7 +315,7 @@ local function handleNormal(fishId, mult)
         if not Stats.premiumKept and entry then
             local copy = {}
             for k, v in pairs(entry) do copy[k] = v end
-            local okElig, Eligibility = pcall(require, 'common.LotteryEligibility')
+            local okElig, Eligibility = pcall(require, 'common.lottery_eligibility')
             Stats.premiumKept = { itemId = fishId, entry = copy,
                 eligibleInBar = okElig and (Eligibility.Check(entry) == true) or nil }
             event(string.format('钓到极品 %s x%.2f（先验抽奖资格，再卖掉攒钱）', fishId, mult))
@@ -472,7 +472,7 @@ check('拾到电鳗头', headSlot ~= nil)
 local exchangedDuck = false
 if headSlot then
     local headEntry = select(2, slotOf('eelHead'))
-    local okHead = require('common.LotteryEligibility').Check(headEntry)
+    local okHead = require('common.lottery_eligibility').Check(headEntry)
     check('电鳗头（未烤信物）有抽奖资格', okHead == true)
     data:SelectSlot(headSlot)
     Clock = Clock + SIM.FishermanWalkSec
@@ -570,7 +570,7 @@ if garSlot then
 end
 
 -- ===== 8. 极品资格与个人最大重量 =====
-local okElig, Eligibility = pcall(require, 'common.LotteryEligibility')
+local okElig, Eligibility = pcall(require, 'common.lottery_eligibility')
 if okElig then
     if Stats.premiumKept then
         check('钓到的未烤极品在道具栏里有抽奖资格（' .. Stats.premiumKept.itemId .. '，卖前判定）',
@@ -585,7 +585,7 @@ if okElig then
     local okNormal, reason = Eligibility.Check({ itemId = 'bass', count = 1, mult = 1.2 })
     check('普通鱼无抽奖资格（not-premium）', okNormal == false and reason == 'not-premium', reason)
 else
-    check('LotteryEligibility 模块可用', false, '等待集成：common/LotteryEligibility 缺失')
+    check('LotteryEligibility 模块可用', false, '等待集成：common/lottery_eligibility 缺失')
 end
 local premiumRows, premiumWeights = 0, {}
 for _, row in ipairs(GameCfg.Casting.Zones.WaterCircle2) do

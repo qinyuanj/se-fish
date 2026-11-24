@@ -3,8 +3,8 @@
 -- 故同类内方法按字典序、同类的方法连续执行，跨类不交错）。
 -- 时间全部由调用方注入（试玩里是 World:GetServerTime() 的秒）：窗口/聚合器/接收器的时刻都是入参，
 -- 本文件不替换任何全局与模块缓存，没有需要逐案例恢复的时间替换；helper 的基线快照/恢复照常逐例生效。
-local GameCfg = require("common.GameCfg")
-local RateLimit = require("common.RateLimit")
+local GameCfg = require("common.game_cfg")
+local RateLimit = require("common.rate_limit")
 
 local function newWindow()
   return RateLimit.NewWindow(1.0, 10)
@@ -225,7 +225,7 @@ end)
 describe("TestRateLimitWindow", function()
   -- 非法批量（nan / 负数 / 非数字）一律按 0 采纳，不抛错。
   -- 注意 nan 不是靠 math.floor 挡的（math.floor(nan) 返回 nan，不抛错），而是靠 Admit 入口的有限性校验挡的：
-  -- 放 nan 进窗口账目会让限流静默失效，见 common/RateLimit.lua 的 isFiniteNumber 注释。
+  -- 放 nan 进窗口账目会让限流静默失效，见 common/rate_limit.lua 的 isFiniteNumber 注释。
   it("test_bad_count_is_zero_not_an_error", function()
     local win = newWindow()
 
@@ -308,9 +308,9 @@ describe("TestRateLimitWindow", function()
   end)
 end)
 
-describe('共享有限数校验（common/Number）', function()
+describe('共享有限数校验（common/number）', function()
   it('test_accepts_only_finite_numbers', function()
-    local Number = require('common.Number')
+    local Number = require('common.number')
     for _, value in ipairs({ 0, -1, 1.5, math.maxinteger, math.mininteger }) do
       assert.is_true(Number.IsFiniteNumber(value), tostring(value))
     end

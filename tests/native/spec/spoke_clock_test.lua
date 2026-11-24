@@ -39,7 +39,7 @@ describe("SpokeClock 消费方确定性时钟契约", function()
   end)
 
   it("零引擎全局依赖，支持默认与自定义初始时刻并拒绝非法初值", function()
-    local SpokeClock = require("common.SpokeClock")
+    local SpokeClock = require("common.spoke_clock")
 
     local default_clock = SpokeClock.new()
     assert.equals(0, default_clock.now())
@@ -56,7 +56,7 @@ describe("SpokeClock 消费方确定性时钟契约", function()
   end)
 
   it("亚秒步进只更新 now()，跨整秒才推进 1 Hz second 与 on_second", function()
-    local SpokeClock = require("common.SpokeClock")
+    local SpokeClock = require("common.spoke_clock")
     local clock = SpokeClock.new(10.0)
 
     local second_events = {}
@@ -106,7 +106,7 @@ describe("SpokeClock 消费方确定性时钟契约", function()
   end)
 
   it("单次整秒推进将 second 与 on_second 合并在同一触发批内，Auto 树只 flush 一次", function()
-    local SpokeClock = require("common.SpokeClock")
+    local SpokeClock = require("common.spoke_clock")
     local clock = SpokeClock.new(0)
     local hunger = State.new("hunger", 100)
     local snapshots = {}
@@ -134,7 +134,7 @@ describe("SpokeClock 消费方确定性时钟契约", function()
   end)
 
   it("多秒 advance 逐秒推进并排空，前一秒卸载的 Phase 不会在后续秒里误跑", function()
-    local SpokeClock = require("common.SpokeClock")
+    local SpokeClock = require("common.spoke_clock")
     local clock = SpokeClock.new(0)
     local alive = State.new("alive", true)
     local hp = State.new("hp", 2)
@@ -167,7 +167,7 @@ describe("SpokeClock 消费方确定性时钟契约", function()
   end)
 
   it("on_frame 每帧传出 dt 与 now，仅供短寿命活跃 Phase 按需订阅且不重建 Effect", function()
-    local SpokeClock = require("common.SpokeClock")
+    local SpokeClock = require("common.spoke_clock")
     local clock = SpokeClock.new(5.0)
     local active = State.new("active", false)
     local mounts = 0
@@ -206,7 +206,7 @@ describe("SpokeClock 消费方确定性时钟契约", function()
   end)
 
   it("now() 为非响应式只读函数，严禁暴露逐帧刷新的响应式时刻 State", function()
-    local SpokeClock = require("common.SpokeClock")
+    local SpokeClock = require("common.spoke_clock")
     local clock = SpokeClock.new(1.0)
 
     assert.equals("function", type(clock.now))

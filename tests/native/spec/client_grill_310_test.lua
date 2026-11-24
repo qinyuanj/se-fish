@@ -1,8 +1,8 @@
 
-local GameCfg = require("common.GameCfg")
-local ClientStore = require("client.Store.ClientStore")
-local RootView = require("client.Views.RootView")
-local GrillView = require("client.Views.GrillView")
+local GameCfg = require("common.game_cfg")
+local ClientStore = require("client.store.client_store")
+local RootView = require("client.views.root_view")
+local GrillView = require("client.views.grill_view")
 local Eui = require("tests.support.eui_double")
 
 local function mount(store, opts)

@@ -10,8 +10,8 @@
 -- 都只返回布尔，语义不变）。
 -- 注意：capturePrint 必须改写真实全局 `_G.print`。Busted 对案例文件套逐文件沙箱，
 -- 裸赋值 `print = fn` 只改沙箱副本，被测模块（其 _ENV 是真实 _G）看不到，日志会全部漏捕获。
-local GameCfg = require('common.GameCfg')
-local PlayerData = require('server.Data.PlayerData')
+local GameCfg = require('common.game_cfg')
+local PlayerData = require('server.data.player_data')
 
 local function copy(value)
     if type(value) ~= 'table' then return value end
@@ -113,7 +113,7 @@ describe('TestSaveArrayMeta', function()
             if name == 'World' then return { GetServerTime = function() return 100 end } end
             if name == 'Players' then return { GetPlayers = function() return {} end } end
         end }
-        env.save = assert(loadfile('server/SaveHost.lua'))()
+        env.save = assert(loadfile('server/save_host.lua'))()
     end)
     after_each(function()
         _G.game = savedGame

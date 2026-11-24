@@ -1,7 +1,7 @@
 -- 离线属性边界：驱动真实 AttrLeaf + AttrModel + BodyScale + 官方包 attr_rule.api，仅引擎单位与 World 为替身。
-local Model = require('common.AttrModel')
-local BodyScale = require('common.BodyScale')
-local GameCfg = require('common.GameCfg')
+local Model = require('common.attr_model')
+local BodyScale = require('common.body_scale')
+local GameCfg = require('common.game_cfg')
 
 local M = {}
 
@@ -49,7 +49,7 @@ function M.New(playerData, multiplier, opts)
     end
 
     local attrAPI = env.require('server.packages.attr_rule.api')
-    local AttrLeaf = env.require('server.WorldHost.AttrLeaf')
+    local AttrLeaf = env.require('server.world_host.attr_leaf')
     local logFn = opts.log or print
 
     local mgr = {

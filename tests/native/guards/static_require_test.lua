@@ -5,14 +5,14 @@
 --   5. 未登记的名字被静默吞掉 → 配置或节点名写错时没有报错；
 --   6. 回退成拼字符串的 require → 图上依赖再次丢失。
 -- 登记覆盖（1~4、6）只读源码文本校对，与 grill_test 的接线断言同口径；失败路径（5）加载真实模块验证。
--- 包内锚点框架 anchor_logic.lua 不进任何登记表（server/AbilityAPI.lua 直接按字面量 require 它），
+-- 包内锚点框架 anchor_logic.lua 不进任何登记表（server/ability_api.lua 直接按字面量 require 它），
 -- 文件被删或包升级改名同样只在运行时炸，由文末「字面量 require 的包内模块」单独登记。
 
 
 local fs = require("tests.support.fs_fixture")
 local Arch = require("tools.arch_policy")
 
-local LOCAL_BEHAVIOR_DIR = "server/AbilityBehaviors"
+local LOCAL_BEHAVIOR_DIR = "server/ability_behaviors"
 local PACKAGE_ANCHOR_DIR = "server/packages/ability_system/anchors"
 
 local function read_file(path)
@@ -69,7 +69,7 @@ local function assert_no_dynamic_require(src, path)
 end
 
 local function configured_anchor_behaviors()
-  local GameCfg = require("common.GameCfg")
+  local GameCfg = require("common.game_cfg")
   local names = {}
   for _, entry in ipairs(GameCfg.Ability.InitialAbilities or {}) do
     if entry.AnchorBehavior then names[entry.AnchorBehavior] = true end
@@ -82,7 +82,7 @@ end
 
 describe("按名字加载的模块登记", function()
   it("test_anchor_registry_covers_behavior_files_and_config", function()
-    local src = read_file("server/AbilityAPI.lua")
+    local src = read_file("server/ability_api.lua")
     local registry = registry_of(src, "AnchorBehaviorLoaders")
     -- 本图实现与包内同名时以本图为准（见 AbilityAPI 登记表注释）
     local expected = {}
@@ -90,14 +90,14 @@ describe("按名字加载的模块登记", function()
       expected[name] = "server.packages.ability_system.anchors." .. name
     end
     for _, name in ipairs(lua_module_names(LOCAL_BEHAVIOR_DIR)) do
-      expected[name] = "server.AbilityBehaviors." .. name
+      expected[name] = "server.ability_behaviors." .. name
     end
     assert.same(expected, registry)
     for name in pairs(configured_anchor_behaviors()) do
       assert.is_truthy(registry[name], "GameCfg 配置的锚点行为未登记: " .. name)
     end
     assert_registry_resolves(registry)
-    assert_no_dynamic_require(src, "server/AbilityAPI.lua")
+    assert_no_dynamic_require(src, "server/ability_api.lua")
   end)
 end)
 
@@ -125,13 +125,13 @@ describe("未登记名字的失败路径", function()
   it("test_unregistered_anchor_behavior_errors", function()
     local vendor = "server.packages.ability_system.api"
     local anchorLogic = "server.packages.ability_system.anchor_logic"
-    save({ "game" }, { vendor, anchorLogic, "server.AbilityAPI" })
+    save({ "game" }, { vendor, anchorLogic, "server.ability_api" })
     _G.game = { GetService = function() return nil end }
     package.loaded[vendor] = nil
     package.preload[vendor] = function() return {} end
     local attached = {}
     package.loaded[anchorLogic] = { Attach = function(script) attached[#attached + 1] = script end }
-    local api = assert(loadfile("server/AbilityAPI.lua"))()
+    local api = assert(loadfile("server/ability_api.lua"))()
     local anchor = {}
     assert.error_matches(function() api.AttachAnchor(anchor, "no_such_behavior") end,
       "锚点行为模块不可用: no_such_behavior", nil, true)
@@ -148,9 +148,9 @@ end)
 local function discover_server_hosts()
   local hosts = {}
   for _, file in ipairs(fs.list_dir("server")) do
-    local name = file:match("^(.+Host)%.lua$")
-    if not name and file == "FishAbility.lua" then
-      name = "FishAbility"
+    local name = file:match("^(.+_host)%.lua$")
+    if not name and file == "fish_ability.lua" then
+      name = "fish_ability"
     end
     if name then
       hosts[#hosts + 1] = name

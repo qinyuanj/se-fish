@@ -11,7 +11,7 @@
 -- pending flow 关联与超时兜底；跨会话防重、补发与对账归 #148，本文件不断言这些能力存在。
 -- it 名字沿用旧方法名，注册顺序 = LuaUnit sortedPairs 的实际执行顺序。
 
-local GameCfg = require('common.GameCfg')
+local GameCfg = require('common.game_cfg')
 local EconomyWorld = require('tests.support.economy_world')
 
 local globalNames = { 'game', 'REUtil', 'MgrPlayerData' }
@@ -114,9 +114,9 @@ describe('平台适配层（MgrPlatform）', function()
       end, OnServerEvent = signal() }
     end })
     -- loadfile 每次得到全新的管理器实例表，避免 Mgr.Flows / DataMap 跨案例残留。
-    env.save = assert(loadfile('server/SaveHost.lua'))()
-    env.players = assert(loadfile('server/PlayerDataHost.lua'))()
-    env.platform = assert(loadfile('server/PlatformHost.lua'))()
+    env.save = assert(loadfile('server/save_host.lua'))()
+    env.players = assert(loadfile('server/player_data_host.lua'))()
+    env.platform = assert(loadfile('server/platform_host.lua'))()
     env.players.Save, env.save.PlayerData = env.save, env.players
     env.platform.Save, env.platform.PlayerData = env.save, env.players
     env.platform.Now = function() return env.now end

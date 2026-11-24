@@ -73,7 +73,7 @@ describe("客户端 Spoke 主干契约（#296）", function()
 
   describe("客户端只读响应式状态仓库（ClientStore）", function()
     it("只读状态面禁止视图层调用写入接口或篡改字段，且隔离时钟驱动接口", function()
-      local ClientStore = require("client.Store.ClientStore")
+      local ClientStore = require("client.store.client_store")
       local store, writer = ClientStore.new({ initial_now = 10 })
 
       -- 视图侧只读面不暴露任何写入方法或写侧引用
@@ -132,7 +132,7 @@ describe("客户端 Spoke 主干契约（#296）", function()
 
     it("宿主绑定一次性连接下行 RemoteEvent 与 Heartbeat，归一化写入并在单次 batch 内同步位置与钓鱼区", function()
       local spoke = require("common.packages.spoke.api")
-      local ClientStore = require("client.Store.ClientStore")
+      local ClientStore = require("client.store.client_store")
       local store, writer = ClientStore.new({ initial_now = 100 })
 
       local remote_events = {}
@@ -309,8 +309,8 @@ describe("客户端 Spoke 主干契约（#296）", function()
     end
 
     it("承载常驻 HUD、互斥模态弹窗 Phase、覆盖蒙版 Phase 与动态集合 Dock，切换与移除零残留", function()
-      local ClientStore = require("client.Store.ClientStore")
-      local RootView = require("client.Views.RootView")
+      local ClientStore = require("client.store.client_store")
+      local RootView = require("client.views.root_view")
       local store, writer = ClientStore.new({ initial_now = 0 })
       local root_node = Eui.Node({ Name = "UIRoot" })
       local create_node = make_factory()
@@ -501,8 +501,8 @@ describe("客户端 Spoke 主干契约（#296）", function()
     end)
 
     it("重连重置与根 UI 节点销毁均清空全部动态子节点与点击信号连接，零悬空与重复监听", function()
-      local ClientStore = require("client.Store.ClientStore")
-      local RootView = require("client.Views.RootView")
+      local ClientStore = require("client.store.client_store")
+      local RootView = require("client.views.root_view")
       local store, writer = ClientStore.new({ initial_now = 0 })
       local root_node = Eui.Node({ Name = "UIRoot" })
       local create_node, created = make_factory()
@@ -577,24 +577,24 @@ describe("客户端 Spoke 主干契约（#296）", function()
 
     it("client/main.lua 在宿主测试双下真实装配只读 ClientSpoke、绑定事件传感并挂载 RootView", function()
       local stub_modules = {
-        "common.ZoneMarkers",
-        "common.REUtil",
-        "common.Util",
-        "client.GameUI",
+        "common.zone_markers",
+        "common.re_util",
+        "common.util",
+        "client.game_ui",
         "client.LocalMgrUtil",
         "client.LocalMotorUnitCtrl",
         "client.LocalLoot",
-        "client.Views.LotteryView",
-        "client.Views.BlindboxView",
-        "client.Views.PlatformShopView",
-        "client.Views.LotteryInteraction",
-        "client.Views.FerryView",
-        "client.Views.GarBiteWarning",
+        "client.views.lottery_view",
+        "client.views.blindbox_view",
+        "client.views.platform_shop_view",
+        "client.views.lottery_interaction",
+        "client.views.ferry_view",
+        "client.views.GarBiteWarning",
         "client.packages.ability_system.api",
-        "client.Store.ClientStore",
-        "client.Views.RootView",
-        "client.Views.CameraZoomView",
-        "client.Views.MainHudVitalsView",
+        "client.store.client_store",
+        "client.views.root_view",
+        "client.views.camera_zoom_view",
+        "client.views.main_hud_vitals_view",
       }
       local saved_loaded = {}
       for _, name in ipairs(stub_modules) do
@@ -628,8 +628,8 @@ describe("客户端 Spoke 主干契约（#296）", function()
       local ok, err = pcall(function()
         _G.Vector2 = { New = function(x, y) return { x = x, y = y } end }
         _G.Color = { New = function(...) return { ... } end }
-        package.loaded["common.ZoneMarkers"] = { Start = noop, Zones = zones }
-        package.loaded["common.REUtil"] = {
+        package.loaded["common.zone_markers"] = { Start = noop, Zones = zones }
+        package.loaded["common.re_util"] = {
           GetRE = function(_, name)
             if not remote_events[name] then
               remote_events[name] = {
@@ -649,38 +649,38 @@ describe("客户端 Spoke 主干契约（#296）", function()
             return { GetDeviceResolution = function() return { x = 1920, y = 1080 } end }
           end,
         }
-        package.loaded["client.GameUI"] = game_ui_stub
+        package.loaded["client.game_ui"] = game_ui_stub
         _G.GameUI = game_ui_stub
         package.loaded["client.packages.ability_system.api"] = { StartClientLifecycle = noop }
-        package.loaded["common.Util"] = nil
+        package.loaded["common.util"] = nil
         for _, name in ipairs({
           "client.LocalMgrUtil", "client.LocalMotorUnitCtrl",
           "client.LocalLoot",
-          "client.Views.GarBiteWarning",
+          "client.views.GarBiteWarning",
         }) do
           package.loaded[name] = noop_module
         end
         local empty_spec = function() return { name = "EconomyEntry", mount = noop } end
         local empty_modal = function() return noop end
-        package.loaded["client.Views.LotteryView"] = { modal_spec = empty_modal }
-        package.loaded["client.Views.BlindboxView"] = { entry_spec = empty_spec, modal_spec = empty_modal }
-        package.loaded["client.Views.PlatformShopView"] = { entry_spec = empty_spec, modal_spec = empty_modal }
-        package.loaded["client.Views.LotteryInteraction"] = { spec = empty_spec }
-        package.loaded["client.Views.FerryView"] = { spec = empty_spec, legs_spec = empty_spec }
+        package.loaded["client.views.lottery_view"] = { modal_spec = empty_modal }
+        package.loaded["client.views.blindbox_view"] = { entry_spec = empty_spec, modal_spec = empty_modal }
+        package.loaded["client.views.platform_shop_view"] = { entry_spec = empty_spec, modal_spec = empty_modal }
+        package.loaded["client.views.lottery_interaction"] = { spec = empty_spec }
+        package.loaded["client.views.ferry_view"] = { spec = empty_spec, legs_spec = empty_spec }
 
         -- 强制重新加载真实 ClientStore / Views 以绑定到 stub 后的 ZoneMarkers / REUtil
-        package.loaded["client.Store.ClientStore"] = nil
-        package.loaded["client.Views.RootView"] = nil
-        package.loaded["client.Views.CameraZoomView"] = nil
-        package.loaded["client.Views.MainHudVitalsView"] = nil
-        local root_view_module = require("client.Views.RootView")
+        package.loaded["client.store.client_store"] = nil
+        package.loaded["client.views.root_view"] = nil
+        package.loaded["client.views.camera_zoom_view"] = nil
+        package.loaded["client.views.main_hud_vitals_view"] = nil
+        local root_view_module = require("client.views.root_view")
         local real_mount = root_view_module.mount
         root_view_module.mount = function(rn, st, opts)
           mounted_options = opts
           mounted_view = real_mount(rn, st, opts)
           return mounted_view
         end
-        package.loaded["client.Views.GrillView"] = nil
+        package.loaded["client.views.grill_view"] = nil
 
         _G.MgrGameUI = {
           HideLiftButton = noop,
@@ -796,7 +796,7 @@ describe("客户端 Spoke 主干契约（#296）", function()
     end)
 
     it("ClientStore reset_session 完整重置 shop 状态（含 purchases/upgradeLevels/upgradeLevel）", function()
-      local ClientStore = require("client.Store.ClientStore")
+      local ClientStore = require("client.store.client_store")
       local store, writer = ClientStore.new({ initial_now = 10 })
       assert.is_true(writer:ingest_event("ShopResult", {
         ok = true, action = "UpgradeStorage", number = 5, kind = "rod", level = 2, coinAfter = 88,

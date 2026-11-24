@@ -1,7 +1,7 @@
 -- #48 服务端隔离探针；不挂入玩法入口，不修改 vendor 或全局配置。
-local AttrGrowth = require('common.AttrGrowth')
-local BodyScale = require('common.BodyScale')
-local GameCfg = require('common.GameCfg')
+local AttrGrowth = require('common.attr_growth')
+local BodyScale = require('common.body_scale')
+local GameCfg = require('common.game_cfg')
 local Probe = {}
 
 -- 可执行迁移映射：只生成计划，不写玩家、Controller 或存档。

@@ -17,16 +17,16 @@ end
 
 function M:setUp()
     self.savedColor = _G.Color
-    self.lootModule = package.loaded['server.WorldHost.GroundLoot']
+    self.lootModule = package.loaded['server.world_host.ground_loot']
     self.lootSaved = true
     _G.Color = { New = function(r, g, b, a) return { r = r, g = g, b = b, a = a } end }
     -- 拾饵消费者可能已经开启调试，保留它传入的原始基线。
-    self.savedGrantDebug = self.savedGrantDebug or require('common.GameCfg').Debug
-    require('common.GameCfg').Debug = { Enabled = true, InitialGrants = self.savedGrantDebug.InitialGrants }
+    self.savedGrantDebug = self.savedGrantDebug or require('common.game_cfg').Debug
+    require('common.game_cfg').Debug = { Enabled = true, InitialGrants = self.savedGrantDebug.InitialGrants }
     FishLift.setUp(self)
     local env = self
     self.diedSubs = {}
-    package.loaded['server.WorldHost.FishCarrier'].SubscribeDied = function(_, fn)
+    package.loaded['server.world_host.fish_carrier'].SubscribeDied = function(_, fn)
         env.diedSubs[#env.diedSubs + 1] = fn
         return true
     end
@@ -41,7 +41,7 @@ function M:setUp()
         return get(s, name)
     end }
     self.data = {}
-    local PlayerData = assert(loadfile('server/Data/PlayerData.lua'))()
+    local PlayerData = assert(loadfile('server/data/player_data.lua'))()
     for _, player in ipairs({ self.player, self.other }) do
         player.SetAttribute = function() end
         local data = PlayerData.New(player)
@@ -59,8 +59,8 @@ function M:tearDown()
         -- setUp 未完成时也按已保存状态回滚，避免半成品环境遗留到下一轮。
         local ok, err = pcall(function() FishLift.tearDown(self) end)
         _G.Color = self.savedColor
-        if self.savedGrantDebug then require('common.GameCfg').Debug = self.savedGrantDebug end
-        package.loaded['server.WorldHost.GroundLoot'] = self.lootModule
+        if self.savedGrantDebug then require('common.game_cfg').Debug = self.savedGrantDebug end
+        package.loaded['server.world_host.ground_loot'] = self.lootModule
         self.lootSaved = nil
         if not ok then error(err, 0) end
         return

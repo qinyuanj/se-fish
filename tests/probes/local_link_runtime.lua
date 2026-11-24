@@ -17,7 +17,7 @@
 package.path = table.concat({ './?.lua', './?/init.lua', package.path }, ';')
 
 local ZoneFixtures = require('tests.support.zone_fixtures')
-local GameCfg = require('common.GameCfg')
+local GameCfg = require('common.game_cfg')
 ZoneFixtures.Apply(GameCfg)
 local Link = assert(loadfile('tests/support/local_link.lua'))()
 

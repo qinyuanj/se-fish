@@ -11,7 +11,7 @@
 --   3. 取消或超时仍发奖、仍推进保底（单边落地，扣费与发奖不对称）；
 --   4. 重复确认重复发奖；
 --   5. 保底边界错：49 抽未中不保底、或未满 49 抽就保底、或保底只出固定一件、或出大奖后计数没清零。
-local GameCfg = require('common.GameCfg')
+local GameCfg = require('common.game_cfg')
 local BlindboxWorld = require('tests.support.blindbox_world')
 local RandomGuard = require('tests.support.random_guard')
 

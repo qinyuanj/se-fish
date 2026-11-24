@@ -12,7 +12,7 @@
 --   7. 濒死断线重连仍继续濒死计时，或多结算一次复活（11-35）；
 --   8. 抢救按钮创建失败后泄漏已创建的气泡根节点。
 local function vec(x, y, z) return { x = x, y = y, z = z } end
-local GameCfg = require('common.GameCfg')
+local GameCfg = require('common.game_cfg')
 
 local function signal()
   local slots = {}
@@ -89,7 +89,7 @@ describe('条款 9/11 他人抢救', function()
     env.cfg.Save.QaSlot = ''
     env.saved = { game = rawget(_G, 'game'), Vector3 = rawget(_G, 'Vector3'),
       Vector2 = rawget(_G, 'Vector2'), Color = rawget(_G, 'Color'),
-      REUtil = rawget(_G, 'REUtil'), reutil = package.loaded['common.REUtil'] }
+      REUtil = rawget(_G, 'REUtil'), reutil = package.loaded['common.re_util'] }
     _G.Vector3 = { New = vec }
     _G.Vector2 = { New = function(x, y) return { x = x, y = y } end }
     _G.Color = { New = function(...) return { ... } end }
@@ -145,13 +145,13 @@ describe('条款 9/11 他人抢救', function()
       return env.re[name]
     end
     local re = { GetRE = function(_, name) return reStub(name) end, CheckRECD = function() return false end }
-    package.loaded['common.REUtil'] = re
+    package.loaded['common.re_util'] = re
     _G.REUtil = re
 
-    package.loaded['server.Data.PlayerData'] = nil
-    env.PlayerData = require('server.Data.PlayerData')
-    env.save = assert(loadfile('server/SaveHost.lua'))()
-    env.players = assert(loadfile('server/PlayerDataHost.lua'))()
+    package.loaded['server.data.player_data'] = nil
+    env.PlayerData = require('server.data.player_data')
+    env.save = assert(loadfile('server/save_host.lua'))()
+    env.players = assert(loadfile('server/player_data_host.lua'))()
     env.players.Save, env.save.PlayerData = env.save, env.players
     env.lifeHost = require('tests.support.life_host').start({
       now = env.now or 100, remote = re, player_data = env.players, save = env.save,
@@ -172,7 +172,7 @@ describe('条款 9/11 他人抢救', function()
     _G.Vector2 = env.saved.Vector2
     _G.Color = env.saved.Color
     _G.REUtil = env.saved.REUtil
-    package.loaded['common.REUtil'] = env.saved.reutil
+    package.loaded['common.re_util'] = env.saved.reutil
     env = nil
   end)
 

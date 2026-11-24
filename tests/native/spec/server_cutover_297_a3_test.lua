@@ -5,9 +5,9 @@
 --   3. 离场玩家对活鱼或其他玩家施加的 DoT 未在离场时清理，导致离线来源继续扣血；
 --   4. server/main.lua 未移除旧 MgrAttr / MgrModifier 或未将 MgrPlayerData 同步接线至 PlayerTree。
 
-local GameCfg = require("common.GameCfg")
+local GameCfg = require("common.game_cfg")
 local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
-local ServerRuntime = require("server.WorldHost.ServerRuntime")
+local ServerRuntime = require("server.world_host.server_runtime")
 
 local function make_signal()
   local handlers = {}
@@ -314,7 +314,7 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
       saved = {
         game = rawget(_G, "game"),
         REUtil = rawget(_G, "REUtil"),
-        reutil = package.loaded["common.REUtil"],
+        reutil = package.loaded["common.re_util"],
         MgrUtil = rawget(_G, "MgrUtil"),
         Vector3 = rawget(_G, "Vector3"),
         Color = rawget(_G, "Color"),
@@ -333,7 +333,7 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
       end
       _G.game = saved.game
       _G.REUtil = saved.REUtil
-      package.loaded["common.REUtil"] = saved.reutil
+      package.loaded["common.re_util"] = saved.reutil
       _G.MgrUtil = saved.MgrUtil
       _G.Vector3 = saved.Vector3
       _G.Color = saved.Color
@@ -493,31 +493,31 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
           end
         end,
         require = function(path)
-          if path == "common.REUtil" then return remote_util end
+          if path == "common.re_util" then return remote_util end
           if path == "server.MgrUtil" then return { Start = function() end } end
-          if path == "common.ZoneMarkers" then return { Start = function() end } end
+          if path == "common.zone_markers" then return { Start = function() end } end
           if path == "server.packages.attr_rule.api" then return attr_api_stub end
           if path == "server.packages.modifier_system.api" then return modifier_api_stub end
           if path == "server.packages.ability_system.api" then return ability_api_stub end
-          if path == "server.AbilityAPI" then
+          if path == "server.ability_api" then
             if not mgrs._AbilityAPI then
-              mgrs._AbilityAPI = assert(loadfile("server/AbilityAPI.lua", "t", sandbox))()
+              mgrs._AbilityAPI = assert(loadfile("server/ability_api.lua", "t", sandbox))()
             end
             return mgrs._AbilityAPI
           end
-          if path == "server.SaveHost" or path == "server.PlayerDataHost" or path == "server.FishAbility" then
+          if path == "server.save_host" or path == "server.player_data_host" or path == "server.fish_ability" then
             local name = path:match("([%w_]+)$")
             if not mgrs[name] then mgrs[name] = assert(loadfile(path:gsub("%.", "/") .. ".lua", "t", sandbox))() end
             return mgrs[name]
           end
-          if path == "server.PlatformHost" then return {} end
+          if path == "server.platform_host" then return {} end
           return require(path)
         end,
       }, { __index = _G })
 
 
       _G.REUtil = remote_util
-      package.loaded["common.REUtil"] = remote_util
+      package.loaded["common.re_util"] = remote_util
       runtime = assert(loadfile("server/main.lua", "t", sandbox))()
       assert.are.equal(runtime, ServerRuntime.current())
       assert.is_not_nil(runtime:get_entity_modifiers())
@@ -571,16 +571,16 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
       assert.equals(1, item_bar_pushes[3].payload.selectedSlot)
 
       local before_batch_pushes = #item_bar_pushes
-      local data = mgrs.PlayerDataHost:GetDataInst(p)
+      local data = mgrs.player_data_host:GetDataInst(p)
       SpokeRuntime.batch(function()
         pt:set_coin(888)
         pt:set_upgrade_level(1)
         data.Data.FishCoin = 888
         data.Data.UpgradeLevel = 1
         data.Data.SelectedSlot = nil
-        mgrs.PlayerDataHost:SyncPlayerTree(p)
+        mgrs.player_data_host:SyncPlayerTree(p)
         data.Data.FishCoin = 999
-        mgrs.PlayerDataHost:SyncPlayerTree(p)
+        mgrs.player_data_host:SyncPlayerTree(p)
       end)
       assert.equals(before_batch_pushes + 1, #item_bar_pushes)
       assert.equals(999, item_bar_pushes[#item_bar_pushes].payload.coin)
@@ -591,12 +591,12 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
 
       data.Extra.growth.potions.item168 = 2
       data.Extra.growth.potions.item167 = 5
-      assert.is_true(mgrs.FishAbility:ApplyGrowth(p).Ok)
+      assert.is_true(mgrs.fish_ability:ApplyGrowth(p).Ok)
       assert.equals(420, runtime.life:MaxHealthOf(p))
       assert.near(1.4, ch.scale, 1e-9)
       assert.near(10.5, c.WalkSpeed, 1e-9)
 
-      assert.is_true(mgrs.FishAbility.Modifier:ApplyWeaponEffect(p, ch, { Kind = "paralyze" }))
+      assert.is_true(mgrs.fish_ability.Modifier:ApplyWeaponEffect(p, ch, { Kind = "paralyze" }))
       assert.is_false(runtime.life:CanAct(p))
       assert.equals(0, c.WalkSpeed)
       now = now + 0.5
@@ -628,7 +628,7 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
       assert.equals(0, #p.CharacterAdded.handlers)
       assert.is_true(rod_mount.Destroyed)
       assert.is_true(rod_model.Destroyed)
-      assert.equals(0, mgrs.FishAbility.Modifier:GetRemaining(fish, "poison"))
+      assert.equals(0, mgrs.fish_ability.Modifier:GetRemaining(fish, "poison"))
     end)
   end)
 end)

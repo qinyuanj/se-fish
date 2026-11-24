@@ -6,11 +6,11 @@
 --   4. 重连重置或根 UI 销毁后遗留浮层/栏位节点，或按钮 OnClicked 信号连接未归零。
 
 local Eui = require("tests.support.eui_double")
-local GameCfg = require("common.GameCfg")
-local MainHudLayout = require("client.MainHudLayout")
-local ClientStore = require("client.Store.ClientStore")
-local RootView = require("client.Views.RootView")
-local MainHudEquipPopups = require("client.Views.MainHudEquipPopups")
+local GameCfg = require("common.game_cfg")
+local MainHudLayout = require("client.main_hud_layout")
+local ClientStore = require("client.store.client_store")
+local RootView = require("client.views.root_view")
+local MainHudEquipPopups = require("client.views.main_hud_equip_popups")
 
 local WEAPON_KNIFE = "item135"
 local WEAPON_PISTOL = "item137"

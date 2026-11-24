@@ -279,10 +279,10 @@ describe("TestAbilityPresetsParse", function()
     assert.are.equal("map://preset/ucc500ac3aac4b749fd9bee03b57e4d5", keys.melee_anchor)
   end)
 
-  -- 真源对得上：直接读仓库的 common/GameCfg.lua，三个 key 都要在、互不重复。
+  -- 真源对得上：直接读仓库的 common/game_cfg.lua，三个 key 都要在、互不重复。
   -- GameCfg.Ability 结构改动时这条先红，脚本不会在编辑器侧白跑。
   it("test_real_gamecfg_parses", function()
-    local f = io.open("common/GameCfg.lua", "rb")
+    local f = io.open("common/game_cfg.lua", "rb")
     assert.is_not_nil(f)
     local body = f:read("a")
     f:close()

@@ -5,9 +5,9 @@
 --   3. 相机在他人/玩家手动改距后仍强制覆写，或角色更换/视图销毁后未恢复原始距离 → 相机抢权与残留。
 
 local Eui = require("tests.support.eui_double")
-local ClientStore = require("client.Store.ClientStore")
-local RootView = require("client.Views.RootView")
-local CameraZoomView = require("client.Views.CameraZoomView")
+local ClientStore = require("client.store.client_store")
+local RootView = require("client.views.root_view")
+local CameraZoomView = require("client.views.camera_zoom_view")
 
 describe("ClientStore 属性汇聚与 CameraZoomView（#297-B）", function()
   it("ClientStore 深冻结汇聚 vitals / coin / local_character / camera_distance 且在 dispose 后零残留", function()

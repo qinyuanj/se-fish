@@ -12,7 +12,7 @@
 --   2. 取出后倍率还在涨，或物品回不到格位、不保持选中；
 --   3. 4.5 秒不烤糊、烤糊后物品还在、3 米内的玩家没吃伤害、操作者收不到烤糊提示；
 --   4. 非鱼获或烤过的鱼获也能投入。
-local GameCfg = require('common.GameCfg')
+local GameCfg = require('common.game_cfg')
 
 local FISH = 'carp'      -- 普通鱼获：可烤
 local NOT_FISH = 'item126' -- 核废料桶：不是鱼获
@@ -77,9 +77,9 @@ describe('条款 10：烧烤倍率与会话规则', function()
       return ctx.events[name]
     end }
     ctx.events.GrillAction = { OnServerEvent = signal(), FireClient = function() end }
-    ctx.PlayerData = assert(loadfile('server/Data/PlayerData.lua'))()
-    ctx.save = assert(loadfile('server/SaveHost.lua'))()
-    ctx.ServerRuntime = assert(loadfile('server/WorldHost/ServerRuntime.lua'))()
+    ctx.PlayerData = assert(loadfile('server/data/player_data.lua'))()
+    ctx.save = assert(loadfile('server/save_host.lua'))()
+    ctx.ServerRuntime = assert(loadfile('server/world_host/server_runtime.lua'))()
     ctx.datas = {}
     ctx.runtime = ctx.ServerRuntime.new({
       initial_now = ctx.now,
@@ -266,7 +266,7 @@ describe('条款 10：烧烤倍率与会话规则', function()
     assert.are.equal('burnt', player.state.state, '操作者收到烤糊状态')
   end)
 
-  -- 10-11 边界：判定点是 elapsed >= BurnSec（4.5 秒整已糊，4.5 秒前未糊，见 common/GrillCurve.lua）。
+  -- 10-11 边界：判定点是 elapsed >= BurnSec（4.5 秒整已糊，4.5 秒前未糊，见 common/grill_curve.lua）。
   -- 失败方式：边界写成 > 或 <，4.5 秒整不糊 / 4.5 秒前就糊。
   it('10-11 4.5 秒整已烤糊、4.5 秒前尚未烤糊', function()
     -- 4.5 秒前（BurnSec - 0.25 秒）取出仍成功，倍率尚未归零

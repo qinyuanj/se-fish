@@ -7,7 +7,7 @@
 -- 迁移自 tests/gameplay/placeholder_assets_test.lua（#83）。旧入口的 setUp/tearDown 是逐例执行的，
 -- 因此这里映射为 before_each/after_each；模块缓存与全局在 after_each 一律恢复，
 -- 测试体中途失败也不把半成品环境留给后续案例。
-local GameCfg = require('common.GameCfg')
+local GameCfg = require('common.game_cfg')
 
 describe("TestPlaceholderAssets", function()
   local env

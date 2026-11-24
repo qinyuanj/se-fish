@@ -2,8 +2,8 @@
 -- （物品表!R8 / 钓鱼表!R14），不能静默放行，也不能只报「有错」而不给定位。
 -- 全量配置零错误与各表计数由 lua tools/validate_content.lua 接手（它就是同一 Check 的入口）。
 -- 迁移自 tests/gameplay/content_validation_test.lua（#83）；案例顺序沿用旧入口的方法名字典序。
-local Validate = require('common.ContentValidation')
-local cfg = require('common.GameCfg')
+local Validate = require('common.content_validation')
+local cfg = require('common.game_cfg')
 
 describe("TestContentValidation", function()
   it("test_broken_exchange_reports_row", function()
@@ -27,7 +27,7 @@ describe("TestContentValidation", function()
 end)
 
 -- #251 实现标记纯台账的静态门禁自检（与内容校验同源，不新增遗留测试文件）
-local Ledger = require('common.cfg.ContentLedger')
+local Ledger = require('common.cfg.content_ledger')
 
 local GROUPS = { Fish = cfg.Fish, Items = cfg.Items.Definitions, Shop = cfg.Content.Shop.Goods,
     Lottery = cfg.Content.Lottery.Patterns, Blindbox = cfg.Content.Blindbox.Entries }
@@ -61,7 +61,7 @@ describe('内容标记纯台账', function()
   it('标记未实现但已有实现路径判红', function()
     local entry = Ledger.Blindbox[1]
     local oldImplemented, oldPath = entry.implemented, entry.path
-    entry.implemented, entry.path = false, 'server/WorldHost/PlayerBlindbox.lua'
+    entry.implemented, entry.path = false, 'server/world_host/player_blindbox.lua'
     local ok, err = frozen(function()
       local result = Validate.Check(cfg)
       assert.matches('标记为未实现但已有实现路径', table.concat(result.errors, '\n'), nil, true)
@@ -112,7 +112,7 @@ describe('内容标记纯台账', function()
     assert.is_true(Ledger.Fish[found.Id].implemented, found.Id)
     for _, row in ipairs(cfg.Content.Blindbox.Entries) do
       assert.is_true(Ledger.Blindbox[row.number].implemented, row.source)
-      assert.are.equal('server/WorldHost/PlayerBlindbox.lua', Ledger.Blindbox[row.number].path)
+      assert.are.equal('server/world_host/player_blindbox.lua', Ledger.Blindbox[row.number].path)
     end
   end)
 end)

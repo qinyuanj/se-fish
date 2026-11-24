@@ -1,7 +1,7 @@
 -- Spoke 原生重构机械棘轮守卫（#294 / ADR-0032 §4、§5）：
 -- 失败方式先列：
---   1. 新 Spoke 命名空间（common.SpokeClock、server.WorldHost.*、client.Store.*、client.Views.*）
---      反向 require 存量旧债务模块（server.Mgr.*、server.AbilityAPI、server.AbilityBehaviors.*、
+--   1. 新 Spoke 命名空间（common.spoke_clock、server.world_host.*、client.store.*、client.views.*）
+--      反向 require 存量旧债务模块（server.Mgr.*、server.ability_api、server.ability_behaviors.*、
 --      client.MgrGameUI、client.ScreenHandlers.*、client.Local*、common.OwnedUnits）→ 破坏单向棘轮；
 --   2. 就地修改 common/packages/spoke/ 或 common/packages/spoke_eggy/ 或与 docs/packages-reference.md
 --      记录的上游 SHA 漂移 → 破坏上游双包零扩展边界；
@@ -40,8 +40,8 @@ local REMOVED_FISH_LEGACY_FILES = {
   "server/Mgr/MgrFishCarrier.lua",
   "server/Mgr/MgrAi.lua",
   "server/Mgr/MgrAiTarget.lua",
-  "client/FishCombatLabel.lua",
-  "client/LocalGarBite.lua",
+  "client/views/FishCombatLabel.lua",
+  "client/views/GarBiteWarning.lua",
 }
 
 local FORBIDDEN_FISH_LEGACY_MODULES = {
@@ -49,8 +49,8 @@ local FORBIDDEN_FISH_LEGACY_MODULES = {
   "server.Mgr.MgrFishCarrier",
   "server.Mgr.MgrAi",
   "server.Mgr.MgrAiTarget",
-  "client.FishCombatLabel",
-  "client.LocalGarBite",
+  "client.views.FishCombatLabel",
+  "client.views.GarBiteWarning",
 }
 
 local BUSINESS_ROOTS = { "client", "common", "server" }
@@ -103,18 +103,18 @@ end
 
 local function is_legacy_debt_file(path)
   return path:match("^server/Mgr/") ~= nil
-    or path == "server/AbilityAPI.lua"
-    or path:match("^server/AbilityBehaviors/") ~= nil
+    or path == "server/ability_api.lua"
+    or path:match("^server/ability_behaviors/") ~= nil
     or path == "client/MgrGameUI.lua"
     or path:match("^client/Local[^/]+%.lua$") ~= nil
     or path:match("^client/ScreenHandlers/") ~= nil
 end
 
 local function is_spoke_namespace_file(path)
-  return path == "common/SpokeClock.lua"
-    or path:match("^server/WorldHost/") ~= nil
-    or path:match("^client/Store/") ~= nil
-    or path:match("^client/Views/") ~= nil
+  return path == "common/spoke_clock.lua"
+    or path:match("^server/world_host/") ~= nil
+    or path:match("^client/store/") ~= nil
+    or path:match("^client/views/") ~= nil
 end
 
 local function format_breakdown(items)
@@ -308,39 +308,39 @@ describe("Spoke 原生重构机械棘轮守卫", function()
     it("分层门禁正确分类新 Spoke 命名空间并拦截一切对旧债务的反向依赖", function()
       local valid = Arch.check(Arch.policy, {
         modules = {
-          "common.SpokeClock",
-          "common.GameCfg",
+          "common.spoke_clock",
+          "common.game_cfg",
           "common.packages.spoke.api",
-          "server.Data.PlayerData",
-          "server.WorldHost.PlayerTree",
-          "server.AbilityBehaviors.melee_hit",
-          "client.GameUI",
-          "client.Store.ClientStore",
-          "client.Views.RootView",
-          "server.AbilityAPI",
+          "server.data.player_data",
+          "server.world_host.player_tree",
+          "server.ability_behaviors.melee_hit",
+          "client.game_ui",
+          "client.store.ClientStore",
+          "client.views.RootView",
+          "server.ability_api",
         },
         edges = {
-          { from = "common.SpokeClock", to = "common.packages.spoke.api" },
-          { from = "server.WorldHost.PlayerTree", to = "common.SpokeClock" },
-          { from = "server.WorldHost.PlayerTree", to = "server.Data.PlayerData" },
-          { from = "server.AbilityBehaviors.melee_hit", to = "server.WorldHost.PlayerTree" },
-          { from = "client.Store.ClientStore", to = "common.SpokeClock" },
-          { from = "client.Views.RootView", to = "client.Store.ClientStore" },
-          { from = "client.Views.RootView", to = "client.GameUI" },
-          { from = "server.AbilityAPI", to = "server.WorldHost.PlayerTree" },
+          { from = "common.spoke_clock", to = "common.packages.spoke.api" },
+          { from = "server.world_host.player_tree", to = "common.spoke_clock" },
+          { from = "server.world_host.player_tree", to = "server.data.player_data" },
+          { from = "server.ability_behaviors.melee_hit", to = "server.world_host.player_tree" },
+          { from = "client.store.ClientStore", to = "common.spoke_clock" },
+          { from = "client.views.RootView", to = "client.store.ClientStore" },
+          { from = "client.views.RootView", to = "client.game_ui" },
+          { from = "server.ability_api", to = "server.world_host.player_tree" },
         },
       })
       assert.is_true(valid.ok, valid.message)
 
       local invalid_edges = {
-        { from = "server.WorldHost.PlayerTree", to = "server.AbilityBehaviors.melee_hit" },
-        { from = "server.WorldHost.PlayerTree", to = "server.AbilityAPI" },
-        { from = "client.Store.ClientStore", to = "client.Views.RootView" },
-        { from = "client.Views.RootView", to = "client.MgrGameUI" },
-        { from = "client.Views.RootView", to = "client.ScreenHandlers.ScreenMain" },
-        { from = "client.Views.ReelOverlayView", to = "client.LocalMotorUnitCtrl" },
-        { from = "client.Views.RootView", to = "common.OwnedUnits" },
-        { from = "common.SpokeClock", to = "common.OwnedUnits" },
+        { from = "server.world_host.player_tree", to = "server.ability_behaviors.melee_hit" },
+        { from = "server.world_host.player_tree", to = "server.ability_api" },
+        { from = "client.store.ClientStore", to = "client.views.RootView" },
+        { from = "client.views.RootView", to = "client.MgrGameUI" },
+        { from = "client.views.RootView", to = "client.ScreenHandlers.ScreenMain" },
+        { from = "client.views.ReelOverlayView", to = "client.LocalMotorUnitCtrl" },
+        { from = "client.views.RootView", to = "common.OwnedUnits" },
+        { from = "common.spoke_clock", to = "common.OwnedUnits" },
       }
       for _, edge in ipairs(invalid_edges) do
         local result = Arch.check(Arch.policy, {

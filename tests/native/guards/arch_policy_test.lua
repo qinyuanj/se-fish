@@ -119,13 +119,13 @@ describe('架构分层门禁', function()
 
   it('扫描真实 require，忽略注释字符串和 _trigger', function()
     local names = Arch.requires([[
-      local A = require('common.Util')
-      local B = require("server.AbilityAPI")
+      local A = require('common.util')
+      local B = require("server.ability_api")
       -- require('client.NotReal')
       local text = "require('server.NotReal')"
       obj.require('client.NotReal')
     ]])
-    assert.same({ 'common.Util', 'server.AbilityAPI' }, names)
+    assert.same({ 'common.util', 'server.ability_api' }, names)
 
     local graph = scan_real()
     assert.is_true(#graph.modules > 100)
@@ -154,9 +154,9 @@ describe('架构分层门禁', function()
 
   it('三端与 tools 不得 require 测试代码', function()
     local result = Arch.check(Arch.policy, {
-      modules = { 'common.Util' },
+      modules = { 'common.util' },
       edges = {
-        { from = 'common.Util', to = 'tests.support.baseline' },
+        { from = 'common.util', to = 'tests.support.baseline' },
         { from = 'tools.gen_config_anchor_probe', to = 'tests.support.zone_fixtures' },
         { from = 'tests.support.baseline', to = 'tests.support.zone_fixtures' },
       },
@@ -164,7 +164,7 @@ describe('架构分层门禁', function()
     assert.is_false(result.ok)
     local found = {}
     for _, item in ipairs(result.violations) do found[#found + 1] = item.rule .. ': ' .. item.from end
-    assert.same({ 'no_test_imports: common.Util', 'no_test_imports: tools.gen_config_anchor_probe' }, found)
+    assert.same({ 'no_test_imports: common.util', 'no_test_imports: tools.gen_config_anchor_probe' }, found)
   end)
 
   describe('扫描 tools 对测试代码的依赖', function()
@@ -175,9 +175,9 @@ describe('架构分层门禁', function()
       fs.rmrf(root)
       fs.mkdirp(root .. '/client')
       fs.mkdirp(root .. '/server')
-      fs.write_file(root .. '/common/Util.lua', 'return {}\n')
+      fs.write_file(root .. '/common/util.lua', 'return {}\n')
       fs.write_file(root .. '/tools/probes/gen.lua',
-        "local Fixtures = require('tests.support.zone_fixtures')\nlocal Util = require('common.Util')\n")
+        "local Fixtures = require('tests.support.zone_fixtures')\nlocal Util = require('common.util')\n")
       local result = Arch.check(Arch.policy, assert(Arch.scan(root, Arch.policy)))
       assert.is_false(result.ok)
       assert.equals('forbidden_dependency: tools.probes.gen -> tests.support.zone_fixtures', result.message)

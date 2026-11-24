@@ -94,7 +94,7 @@ describe('条款 9 PK 伤害过滤', function()
     assert_wiring()
     env = { queue = {}, sent = {}, values = {}, re = {}, now = 100, byCharacter = {},
       game = rawget(_G, 'game'),
-      vector = rawget(_G, 'Vector3'), reutil = rawget(_G, 'REUtil'), cfg = rawget(package.loaded, 'common.GameCfg') }
+      vector = rawget(_G, 'Vector3'), reutil = rawget(_G, 'REUtil'), cfg = rawget(package.loaded, 'common.game_cfg') }
     _G.Vector3 = { New = vec }
     _G.game = { GetService = function(_, name)
       if name == 'Task' then
@@ -128,7 +128,7 @@ describe('条款 9 PK 伤害过滤', function()
         FireClient = function() end, FireAllClients = function() end, FireServer = function() end }
       return env.re[name]
     end, CheckRECD = function() return false end }
-    _G.REUtil, package.loaded['common.REUtil'] = re, re
+    _G.REUtil, package.loaded['common.re_util'] = re, re
     -- 真区域解析：鱼塘边界来自与生产同一条 ZoneMarkers 路径，不写死坐标。
     env.zones = assert(loadfile('tests/support/zone_fixtures.lua'))()
     env.cfg = env.zones.Load()
@@ -139,24 +139,24 @@ describe('条款 9 PK 伤害过滤', function()
     end
     env.lifeHost = require('tests.support.life_host').start({ now = 0, remote = re })
     env.vitals = env.lifeHost.runtime.life
-    env.players = assert(loadfile('server/PlayerDataHost.lua'))()
-    env.save = assert(loadfile('server/SaveHost.lua'))()
+    env.players = assert(loadfile('server/player_data_host.lua'))()
+    env.save = assert(loadfile('server/save_host.lua'))()
     env.players.Save, env.save.PlayerData = env.save, env.players
-    env.filter = require('server.WorldHost.PkDamageFilter').make({
-      party = env.party, zone_markers = require('common.ZoneMarkers'), zones = env.cfg.Zones,
+    env.filter = require('server.world_host.pk_damage_filter').make({
+      party = env.party, zone_markers = require('common.zone_markers'), zones = env.cfg.Zones,
     })
     -- 生产装配：过滤接缝与区域真源都经 mgr 注入，不缓存队伍归属。
     env.vitals.Party = env.party
-    env.vitals.ZoneMarkers = require('common.ZoneMarkers')
+    env.vitals.ZoneMarkers = require('common.zone_markers')
     env.vitals:SetDamageFilter(function(hit, target, mgr) return env.filter(hit, target, mgr) end)
     -- 9-12（review #249）：武器管理器照 main.lua 的接线装进同一套环境（伤害仍只经统一入口）。
     -- AbilityAPI 在装载时要引擎的 RemoteEvent 全局：补替身并清模块缓存，避免复用别的用例的上下文。
     env.remoteEvent, env.abilityModule, env.swingModule =
-      rawget(_G, 'RemoteEvent'), package.loaded['server.AbilityAPI'], package.loaded['server.SwingRegistry']
+      rawget(_G, 'RemoteEvent'), package.loaded['server.ability_api'], package.loaded['server.swing_registry']
     _G.RemoteEvent = { New = function()
       return { OnServerEvent = { Connect = function() return { Disconnect = function() end } end } }
     end }
-    package.loaded['server.AbilityAPI'], package.loaded['server.SwingRegistry'] = nil, nil
+    package.loaded['server.ability_api'], package.loaded['server.swing_registry'] = nil, nil
     env.weapon = {
       AttackGun = function(_, player, weapon_id, _, _, aim)
         local tree = env.lifeHost.runtime:get_player_tree(player.UserId)
@@ -174,9 +174,9 @@ describe('条款 9 PK 伤害过滤', function()
     if not env then return end
     _G.game, _G.Vector3, _G.REUtil = env.game, env.vector, env.reutil
     _G.RemoteEvent = env.remoteEvent
-    package.loaded['server.AbilityAPI'] = env.abilityModule
-    package.loaded['server.SwingRegistry'] = env.swingModule
-    package.loaded['common.GameCfg'] = env.cfg
+    package.loaded['server.ability_api'] = env.abilityModule
+    package.loaded['server.swing_registry'] = env.swingModule
+    package.loaded['common.game_cfg'] = env.cfg
     env = nil
   end)
 

@@ -75,7 +75,7 @@ describe("TestQaSlotWrite", function()
     original_dir = assert(lfs.currentdir())
     ROOT = make_temp_root()
     assert(lfs.mkdir(ROOT .. "/common"))
-    CONFIG = ROOT .. "/common/GameCfg.lua"
+    CONFIG = ROOT .. "/common/game_cfg.lua"
     TEMP = CONFIG .. ".qa-slot.tmp"
     local f = assert(io.open(CONFIG, "wb"))
     f:write(SAMPLE)

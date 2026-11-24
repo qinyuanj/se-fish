@@ -1,8 +1,8 @@
 -- QA 存档槽配置：离线修改 GameCfg.Save.QaSlot，部署后新局生效。
 -- 只改源码配置，不接入游戏内 GM 通道；正在试玩时不要修改或部署。
 local M = {}
-local CONFIG = 'common/GameCfg.lua'
-local TEMP = 'common/GameCfg.lua.qa-slot.tmp'
+local CONFIG = 'common/game_cfg.lua'
+local TEMP = 'common/game_cfg.lua.qa-slot.tmp'
 
 function M.usage()
   return table.concat({

@@ -3,7 +3,7 @@
 --
 -- 接缝（与 lead 约定）：MgrFishUnit:SpawnLanded + Drop 放下鱼，逐帧 Update 推进服务端权威时钟；
 -- 只观察玩家可观察的三个面：玩家血量（MgrVitals 结算）、GarBiteNotice 广播载荷（客户端只画预警）、
--- 逐招表公开行（common/cfg/BossMoves.lua）。测试进程不加载任何客户端命中代码：
+-- 逐招表公开行（common/cfg/boss_moves.lua）。测试进程不加载任何客户端命中代码：
 -- 伤害仍然落地，证明远程投射物命中判定不依赖客户端。
 --
 -- 失败方式（编码前列出）：
@@ -12,10 +12,10 @@
 --   3. 预警未先于命中，或结算不落在预警锁定的落点；
 --   4. 风神翼龙投掷 100 / 俯冲 260 的映射被静默丢弃。
 
-local Cfg = require('common.GameCfg')
+local Cfg = require('common.game_cfg')
 local Islet = require('tests.support.isle_combat')
-local BossMoves = require('common.cfg.BossMoves')
-local GarBiteNotice = require('common.GarBiteNotice')
+local BossMoves = require('common.cfg.boss_moves')
+local GarBiteNotice = require('common.gar_bite_notice')
 
 local function need(cond, ...)
     if not cond then error(string.format(...), 2) end
@@ -55,14 +55,14 @@ describe('第 12 节 远程与俯冲组逐招表', function()
 
     before_each(function()
         restore, hits = {}, {}
-        savedAbility = package.loaded['server.AbilityAPI']
-        package.loaded['server.AbilityAPI'] = nil
+        savedAbility = package.loaded['server.ability_api']
+        package.loaded['server.ability_api'] = nil
     end)
 
     after_each(function()
         for index = #restore, 1, -1 do restore[index]() end
         if env then env:tearDown() end
-        package.loaded['server.AbilityAPI'] = savedAbility
+        package.loaded['server.ability_api'] = savedAbility
         env = nil
     end)
 

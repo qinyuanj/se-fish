@@ -1,4 +1,4 @@
-local GameCfg = require("common.GameCfg")
+local GameCfg = require("common.game_cfg")
 local Host = require("tests.support.fishing_host")
 
 describe("抛竿与等待上钩（ServerRuntime）", function()

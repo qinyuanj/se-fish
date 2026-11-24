@@ -1,9 +1,9 @@
 -- modifier_system 离线边界：驱动真实 SpokeClock + PlayerTree + PlayerEffects + ModifierLeaf
 -- （含活鱼 entity_store）与真实官方包 modifier_system.api；仅引擎单位、事件与 Timer 为替身。
-local GameCfg = require('common.GameCfg')
-local SpokeClock = require('common.SpokeClock')
-local PlayerTree = require('server.WorldHost.PlayerTree')
-local ModifierLeaf = require('server.WorldHost.ModifierLeaf')
+local GameCfg = require('common.game_cfg')
+local SpokeClock = require('common.spoke_clock')
+local PlayerTree = require('server.world_host.player_tree')
+local ModifierLeaf = require('server.world_host.modifier_leaf')
 
 local Runtime = {}
 

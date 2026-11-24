@@ -1,6 +1,6 @@
 -- 由 tests/native/hook_cleanup_test.lua 以子进程执行的故意失败夹具。
 -- 文件名故意不匹配 _test 且 fixtures/ 不在任何车道 ROOT 内，不进入 Busted 发现范围。
-local GameCfg = require("common.GameCfg")
+local GameCfg = require("common.game_cfg")
 
 local function rec(tag)
   io.stdout:write("EV:" .. tag .. "\n")

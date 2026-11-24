@@ -6,7 +6,7 @@
 -- 采集业务日志必须写 _G.print（裸 `print =` 只进沙箱，业务模块读不到）。
 -- describe/it 名称保留旧类名与方法名，并按方法名字典序注册以保持旧套件执行顺序。
 local FishCombat = require('tests.support.fish_combat')
-local GameCfg = require('common.GameCfg')
+local GameCfg = require('common.game_cfg')
 
 local function vec(x, y, z) return { x = x, y = y, z = z } end
 

@@ -4,7 +4,7 @@
 -- 沿用 tests/support/fish_combat 共享夹具（含 Quaternion / math.random 的保存与还原）。
 -- describe/it 名称保留旧类名与方法名，并按方法名字典序注册以保持旧套件执行顺序。
 local FishCombat = require('tests.support.fish_combat')
-local GameCfg = require('common.GameCfg')
+local GameCfg = require('common.game_cfg')
 
 local function vec(x, y, z) return { x = x, y = y, z = z } end
 
@@ -201,7 +201,7 @@ describe('TestGarCombat', function()
     end)
 
     it('test_notice_protocol_validation', function()
-        local N = require('common.GarBiteNotice')
+        local N = require('common.gar_bite_notice')
         local lock = N.Lock(3, vec(1, 2, 3), 1, 0, 2.5, 90, 1.5)
         assert.is_true(N.Valid(lock))
         assert.near(math.pi / 2, lock.yaw, 1e-9)

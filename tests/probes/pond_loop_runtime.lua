@@ -16,10 +16,10 @@
 -- 所有阶段都由玩家当前存档状态推出，没有外部进度文件。
 -- 冷却全部异步等待（Task:Wait），不会在一个调用里阻塞。
 
-local GameCfg = require('common.GameCfg')
-local MathWaterJudge = require('common.MathWaterJudge')
-local MgrPlayerData = require('server.PlayerDataHost')
-local ServerRuntime = require('server.WorldHost.ServerRuntime')
+local GameCfg = require('common.game_cfg')
+local MathWaterJudge = require('common.math_water_judge')
+local MgrPlayerData = require('server.player_data_host')
+local ServerRuntime = require('server.world_host.server_runtime')
 local function ground()
     local runtime = ServerRuntime.current and ServerRuntime.current()
     return runtime and runtime:get_world()
@@ -42,8 +42,8 @@ local MgrLoot = {
         return world and world:try_pickup(player, id) or false
     end,
 }
-local InteractionPoints = require('server.WorldHost.InteractionPoints')
-local MgrSave = require('server.SaveHost')
+local InteractionPoints = require('server.world_host.interaction_points')
+local MgrSave = require('server.save_host')
 local function runtimeCommand(name, player, payload)
     local runtime = ServerRuntime.current and ServerRuntime.current()
     return runtime and runtime[name](runtime, player, payload) or false
@@ -59,7 +59,7 @@ local function findGoodsByNumber(number, level)
         if goods.Number == number and goods.MinShopLevel <= level then return goods end
     end
 end
-local FishTree = require('server.WorldHost.FishTree')
+local FishTree = require('server.world_host.fish_tree')
 local function runtimeOf()
     return ServerRuntime.current and ServerRuntime.current()
 end
@@ -141,7 +141,7 @@ RT.unreachableLoot = RT.unreachableLoot or {}
 local TAG = RT.tag
 local uid = player.UserId
 
-local REUtil = require('common.REUtil')
+local REUtil = require('common.re_util')
 local function fishingFor(target)
     local runtime = ServerRuntime.current and ServerRuntime.current()
     local tree = runtime and runtime:get_player_tree(target and target.UserId)
@@ -699,7 +699,7 @@ local function pickDrops()
         local fishDef = GameCfg.Fish[best.ItemId]
         if fishDef and fishDef.Grade == 'rare' then
             local _, _, entry = findEntry(dataOf(), function(e) return e.itemId == best.ItemId end)
-            local eligible, reason = require('common.LotteryEligibility').Check(entry)
+            local eligible, reason = require('common.lottery_eligibility').Check(entry)
             say('LOTTERY', best.ItemId, 'eligible=' .. tostring(eligible), 'reason=' .. tostring(reason))
         end
         snapshot('loot')

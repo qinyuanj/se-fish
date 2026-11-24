@@ -1,14 +1,14 @@
--- 纯模块单测：水判定 common/MathWaterJudge.lua（M0-V1）。
+-- 纯模块单测：水判定 common/math_water_judge.lua（M0-V1）。
 -- 判定只读 pos 的 x/y/z、不碰引擎，所以这里能用普通 table 当坐标（试玩里传 Vector3 是同一套字段）。
 -- 六个边界用例（#12 的验收：中心 / 水下 / 空中 / 贴边 ±0.1m / 远处陆地）+ 配置口径，
 -- 用的就是 GameCfg.Water.Zones 的真值，改配置把边界改错了这里先红。
 -- 末尾还钉住 GameCfg.FishCarrier 的 mesh id 写法与模型号号段（M0-V3 / #31）——那是 GameCfg 的另一处
--- 实测配置真值，写错鱼建不出来（F-7 的 [未查证] 已消除，见 common/GameCfg.lua 该段注释）。
+-- 实测配置真值，写错鱼建不出来（F-7 的 [未查证] 已消除，见 common/game_cfg.lua 该段注释）。
 -- 迁移自 tests/gameplay/water_judge_test.lua（#83）。旧入口有 5 个 LuaUnit 类，按「类名字典序 +
 -- 类内方法名字典序」展开（等价于旧入口对 ClassName.method 全名的排序）；本文件无 setUp/tearDown，
 -- 因此不额外注册钩子。it 顺序与迁移前逐条对账。
-local GameCfg = require("common.GameCfg")
-local MathWaterJudge = require("common.MathWaterJudge")
+local GameCfg = require("common.game_cfg")
+local MathWaterJudge = require("common.math_water_judge")
 
 -- 本图 2026-09-24 水平扩建两倍后的编辑器回读值：
 --   WaterCircle1 Position(-11.75, 1.05, 27.75) Size(6, 1, 6) Scale(2, 1, 2)

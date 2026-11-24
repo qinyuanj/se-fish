@@ -2,12 +2,12 @@
 --   16-04 食物、极品食物与鱼饵可食用；
 --   16-06 除食物、极品食物、鱼饵与药水外，其余类别不能走普通食用；
 --   16-07 食用恢复百分比可为负值，负值表示食用后扣减而非恢复。
-local GameCfg = require('common.GameCfg')
+local GameCfg = require('common.game_cfg')
 
 -- 前提守卫：本文件复现的是 main.lua 的接线，而不是自造一套协作关系。
 local WIRING = {
     'local fishHost = WorldRuntime.fish_host',
-    'local PlayerDataHost = require("server.PlayerDataHost")',
+    'local PlayerDataHost = require("server.player_data_host")',
 }
 
 local function assert_wiring()
