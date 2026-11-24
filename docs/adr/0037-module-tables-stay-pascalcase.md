@@ -33,6 +33,7 @@ common/packages/spoke/runtime/epoch.lua             function Epoch:compare_to() 
 - 回退用 `git revert` 完成，而不是反向脚本：旧名里有 `REUtil`、`UIManager`、`UIConsts` 这类连续大写，snake→Pascal 机械反推会推错成 `ReUtil`。
 - 新增守卫：`local X = require(...)` 的 `X` 必须是 Pascal 形，否则口径会漂回 snake（原 L2 的门禁只有文件名）。
 - `docs/engine-keys.md` 的正反例随之更新（`DamageFloat:Show` → `DamageFloat:show`）。
+- **`*/packages/` 整包一律不参与命名迁移**（三个端各一个）：上游整包与本仓维护的自研包同等处理，包内文件、模块表、方法名都保持原样，跟随各自上游口径。命名门禁本来就跳过这些目录，这条把口径写死，避免「自研包要不要跟进」反复讨论。
 
 ## 拒绝的备选
 
