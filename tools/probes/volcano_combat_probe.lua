@@ -62,8 +62,8 @@ function Probe.snapshot(player,id)
     local data=Data:get_data_inst(player)
     local result={at=Fish:now(),exists=fish~=nil and Fish.Fish[id]==fish,
         player=point(player.Character),playerHealth=player.Character and player.Character.Controller.Health,
-        localCompleted=data and data.Extra.achievements and data.Extra.achievements.final,
-        platformDelivered=data and data.Extra.achievementDelivered and data.Extra.achievementDelivered.final,
+        localCompleted=data and data.extra.achievements and data.extra.achievements.final,
+        platformDelivered=data and data.extra.achievementDelivered and data.extra.achievementDelivered.final,
         platformConfigured=type(Cfg.Achievements.final.PlatformId)=='number'}
     if result.exists then
         result.body,result.receiver=point(fish.carrier.body),point(fish.carrier.receiver)

@@ -291,7 +291,7 @@ function M:give_explosive(player, itemId, count)
         if entry.itemId == itemId then slot = index break end
     end
     if slot == nil then error('道具栏里没有 ' .. tostring(itemId), 2) end
-    if data.Data.selected_slot ~= slot and not data:SelectSlot(slot) then
+    if data.data.selected_slot ~= slot and not data:SelectSlot(slot) then
         error('选中爆炸物失败: ' .. tostring(slot), 2)
     end
     return slot

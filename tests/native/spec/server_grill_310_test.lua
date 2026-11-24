@@ -226,7 +226,7 @@ describe("服务端烧烤点宿主接缝（#310）", function()
 
   local function count_item(data, item_id)
     local total = 0
-    for _, container in pairs(data.Data.containers) do
+    for _, container in pairs(data.data.containers) do
       for _, entry in pairs(container) do
         if entry.itemId == item_id and entry.count > 0 then total = total + entry.count end
       end
@@ -235,7 +235,7 @@ describe("服务端烧烤点宿主接缝（#310）", function()
   end
 
   local function find_entry(data, item_id)
-    for _, container in pairs(data.Data.containers) do
+    for _, container in pairs(data.data.containers) do
       for _, entry in pairs(container) do
         if entry.itemId == item_id and entry.count > 0 then return entry end
       end
@@ -296,23 +296,23 @@ describe("服务端烧烤点宿主接缝（#310）", function()
       local reply = act(player, { action = "Takeout" })
       assert.is_true(reply.ok)
       assert.near(case[2], reply.rate, 0.001)
-      local entry = data.Data.containers[ITEM_BAR][1]
+      local entry = data.data.containers[ITEM_BAR][1]
       assert.same(FISH, entry.itemId)
       assert.near(case[2], entry.cooked, 0.001)
-      assert.same(1, data.Data.selected_slot)
+      assert.same(1, data.data.selected_slot)
       advance(20)
-      assert.near(case[2], data.Data.containers[ITEM_BAR][1].cooked, 0.001)
+      assert.near(case[2], data.data.containers[ITEM_BAR][1].cooked, 0.001)
       assert.same("idle", player.grill_state.state)
       assert.same(0, live_units())
     end
 
     local premium, premium_data = join(9520)
     give_selected(premium_data, "item7", 1)
-    assert.is_true(LotteryEligibility.check(premium_data.Data.containers[ITEM_BAR][1]))
+    assert.is_true(LotteryEligibility.check(premium_data.data.containers[ITEM_BAR][1]))
     assert.is_true(act(premium, { action = "Start" }).ok)
     advance(2)
     assert.is_true(act(premium, { action = "Takeout" }).ok)
-    local cooked_premium = premium_data.Data.containers[ITEM_BAR][1]
+    local cooked_premium = premium_data.data.containers[ITEM_BAR][1]
     local ok_lottery, reason = LotteryEligibility.check(cooked_premium)
     assert.is_false(ok_lottery)
     assert.same("cooked", reason)
@@ -370,7 +370,7 @@ describe("服务端烧烤点宿主接缝（#310）", function()
     assert.same("full", full.reason)
     assert.same(0, count_item(full_data, FISH))
     advance(1.5)
-    full_data.Data.containers[BACKPACK][1] = nil
+    full_data.data.containers[BACKPACK][1] = nil
     tree:sync_from_data(full_data)
     local retry = act(full_player, { action = "Takeout" })
     assert.is_true(retry.ok)
@@ -403,7 +403,7 @@ describe("服务端烧烤点宿主接缝（#310）", function()
     local left = find_entry(leave_data, FISH)
     assert.is_not_nil(left)
     assert.near(1.25, left.cooked, 0.02)
-    assert.is_nil(leave_data.Extra.recovery and leave_data.Extra.recovery.grill)
+    assert.is_nil(leave_data.extra.recovery and leave_data.extra.recovery.grill)
     assert.same(0, live_units())
 
     local blocked, blocked_data = join(9542)
@@ -415,7 +415,7 @@ describe("服务端烧烤点宿主接缝（#310）", function()
     ctx.runtime:on_player_removing(blocked)
     drain()
     assert.same(0, count_item(blocked_data, FISH))
-    local pending = blocked_data.Extra.recovery and blocked_data.Extra.recovery.grill
+    local pending = blocked_data.extra.recovery and blocked_data.extra.recovery.grill
     assert.is_not_nil(pending)
     assert.near(1.5, pending.cooked, 0.001)
     assert.same(0, live_units())
@@ -434,22 +434,22 @@ describe("服务端烧烤点宿主接缝（#310）", function()
 
   it("重进按冻结倍率恢复，离线已烤糊只清标记不爆炸", function()
     local recovered, recovered_data = join(9560, true, function(data)
-      data.Extra.recovery = data.Extra.recovery or {}
-      data.Extra.recovery.grill = { itemId = FISH, mult = 1.5, cooked = 1.25 }
+      data.extra.recovery = data.extra.recovery or {}
+      data.extra.recovery.grill = { itemId = FISH, mult = 1.5, cooked = 1.25 }
     end)
     local entry = find_entry(recovered_data, FISH)
     assert.is_not_nil(entry)
     assert.near(1.25, entry.cooked, 0.001)
-    assert.is_nil(recovered_data.Extra.recovery.grill)
+    assert.is_nil(recovered_data.extra.recovery.grill)
     assert.same(GameCfg.Vitals.MaxHealth, recovered.Character.Controller.Health)
 
     local burnt, burnt_data = join(9561, true, function(data)
-      data.Extra.recovery = data.Extra.recovery or {}
-      data.Extra.recovery.grill = { itemId = FISH, mult = 1.5, at = 990 }
+      data.extra.recovery = data.extra.recovery or {}
+      data.extra.recovery.grill = { itemId = FISH, mult = 1.5, at = 990 }
     end)
     drain()
     assert.same(0, count_item(burnt_data, FISH))
-    assert.is_nil(burnt_data.Extra.recovery.grill)
+    assert.is_nil(burnt_data.extra.recovery.grill)
     assert.same(GameCfg.Vitals.MaxHealth, burnt.Character.Controller.Health)
     assert.same(GameCfg.Vitals.MaxHealth, recovered.Character.Controller.Health)
   end)
@@ -463,7 +463,7 @@ describe("服务端烧烤点宿主接缝（#310）", function()
     drain()
     assert.same(0, live_units())
     assert.is_nil(ctx.runtime:get_player_tree(player.UserId))
-    local pending = data.Extra.recovery and data.Extra.recovery.grill
+    local pending = data.extra.recovery and data.extra.recovery.grill
     assert.is_true(count_item(data, FISH) == 1 or (pending and pending.itemId == FISH) ~= nil)
   end)
 
@@ -522,12 +522,12 @@ describe("服务端烧烤点宿主接缝（#310）", function()
     assert.is_false(act(player, { action = "Takeout" }).ok)
     assert.same(baseline, active_frame_subs, "满格冻结为 ready 后须退出烤制活跃相位并退订 on_frame")
 
-    data.Data.containers[BACKPACK][1] = nil
+    data.data.containers[BACKPACK][1] = nil
     ctx.runtime:get_player_tree(player.UserId):sync_from_data(data)
     assert.is_true(act(player, { action = "Takeout" }).ok)
     assert.same(baseline, active_frame_subs)
 
-    data.Data.containers[ITEM_BAR][1] = nil
+    data.data.containers[ITEM_BAR][1] = nil
     give_selected(data, FISH, 1)
     assert.is_true(act(player, { action = "Start" }).ok)
     assert.same(baseline + 1, active_frame_subs)

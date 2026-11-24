@@ -162,8 +162,8 @@ describe('条款 9 PK 伤害过滤', function()
         local tree = env.lifeHost.runtime:get_player_tree(player.UserId)
         tree:sync_from_data({
           Player = player, inited = true, load_state = 'ready',
-          Data = { FishCoin = 0, Zone = 'fishPond', weapons = { [weapon_id] = 1 }, containers = {} },
-          Extra = { growth = { potions = {}, upgrades = {} }, inventory = { selection = { held = { kind = 'weapon', id = weapon_id } } }, survival = {} },
+          data = { FishCoin = 0, Zone = 'fishPond', weapons = { [weapon_id] = 1 }, containers = {} },
+          extra = { growth = { potions = {}, upgrades = {} }, inventory = { selection = { held = { kind = 'weapon', id = weapon_id } } }, survival = {} },
         })
         return env.lifeHost.runtime.life:weapon_action(player, { action = 'attack', aim = aim })
       end,

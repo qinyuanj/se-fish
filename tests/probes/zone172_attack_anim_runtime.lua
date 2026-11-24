@@ -22,7 +22,7 @@ local anim
 if PHASE ~= 'fire' and WEAPON ~= 'throw' then
   -- HoldWeapon 对已握的同一把再调会收起：空手时借此收起；武器已握时跳过。
   -- 空手不调 HoldWeapon(nil)：PlayerData isWeapon 对非字符串参数会索引 false 报错（2026-11-04 试玩实测）。
-  local held = data.Extra.inventory.selection.held
+  local held = data.extra.inventory.selection.held
   if WEAPON == 'unarmed' then
     if held.kind == 'weapon' then data:HoldWeapon(held.id) end
   elseif not (held.kind == 'weapon' and held.id == WEAPON) then
@@ -51,7 +51,7 @@ end
 if WEAPON == 'throw' then
   anim = ability.Throw.Anim
   local barId = GameCfg.Items.ContainerId.ItemBar
-  local bar = data.Data.containers[barId]
+  local bar = data.data.containers[barId]
   local slot
   for s = 1, data:ItemBarCapacity() do
     local e = bar[s]
@@ -64,7 +64,7 @@ if WEAPON == 'throw' then
       if e and e.itemId == 'item143' and e.count > 0 then slot = s break end
     end
     if not slot then
-      local bp = data.Data.containers[GameCfg.Items.ContainerId.Backpack]
+      local bp = data.data.containers[GameCfg.Items.ContainerId.Backpack]
       for i = 1, data:BackpackCapacity() do
         if bp[i] and bp[i].itemId == 'item143' and bp[i].count > 0 then
           data:MoveSlot(GameCfg.Items.ContainerId.Backpack, i, barId, 1)
@@ -75,7 +75,7 @@ if WEAPON == 'throw' then
     end
   end
   assert(slot, MARK .. ': 无法把 item143 放入道具栏')
-  if data.Data.selected_slot ~= slot then data:SelectSlot(slot) end
+  if data.data.selected_slot ~= slot then data:SelectSlot(slot) end
   PlayerDataHost:sync_player_tree(player, true)
   _G.AAR172Seq = (_G.AAR172Seq or 0) + 1
   local accepted, reply = captureWeaponAction({ action = 'throw', slot = slot, seq = _G.AAR172Seq })

@@ -23,12 +23,12 @@ local function make_ready_data(player, overrides)
     Player = player,
     inited = true,
     load_state = "ready",
-    Data = {
+    data = {
       FishCoin = overrides.coin or 0,
       Zone = overrides.zone or "fishPond",
       selected_slot = overrides.selected_slot,
     },
-    Extra = {
+    extra = {
       growth = {
         potions = {
           item168 = overrides.body_potions or 0,

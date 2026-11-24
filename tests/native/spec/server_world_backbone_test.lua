@@ -48,12 +48,12 @@ local function make_ready_data(player, overrides)
     Player = player,
     inited = overrides.inited ~= false,
     load_state = overrides.load_state or "ready",
-    Data = {
+    data = {
       FishCoin = overrides.coin or 50,
       Zone = overrides.zone or "fishPond",
       selected_slot = overrides.selected_slot or 1,
     },
-    Extra = {
+    extra = {
       growth = {
         potions = {
           item168 = overrides.body_potions or 0,
@@ -616,16 +616,16 @@ describe("服务端 Spoke 主干：ServerRuntime 离场三步协议、排空栅�
         timeline[#timeline + 1] = "step1:finalize:" .. tostring(player.tag)
           .. ":alive=" .. tostring(player_tree.session_alive:now())
           .. ":handlers=" .. tostring(#local_sig.handlers)
-        data.Data.FishCoin = 999
+        data.data.FishCoin = 999
       end,
       on_player_removing = function(player, was_active)
         local data = data_by_player[player]
         timeline[#timeline + 1] = "step3:serialize:" .. tostring(player.tag)
           .. ":active=" .. tostring(was_active)
-          .. ":coin=" .. tostring(data and data.Data.FishCoin or -1)
+          .. ":coin=" .. tostring(data and data.data.FishCoin or -1)
           .. ":handlers=" .. tostring(#local_sig.handlers)
         -- 模拟异步写档：尚未落入 store，等 pending_drain_done 执行时才真正落盘
-        player.pending_write_coin = data and data.Data.FishCoin
+        player.pending_write_coin = data and data.data.FishCoin
       end,
       after_idle = function(user_id, done)
         timeline[#timeline + 1] = "step3:after_idle_wait:" .. tostring(user_id)
@@ -1060,6 +1060,6 @@ describe("服务端入口接线：server/main.lua 宿主测试双端到端集成
     assert.is_not_nil(pt2)
     assert.are_not.equal(pt1, pt2)
     assert.equals(42, pt2.states.coin:now())
-    assert.equals(42, mgrs.PlayerDataHost:get_data_inst(p2).Data.FishCoin)
+    assert.equals(42, mgrs.PlayerDataHost:get_data_inst(p2).data.FishCoin)
   end)
 end)

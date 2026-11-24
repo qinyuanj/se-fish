@@ -90,17 +90,17 @@ local player, data = host:join(13401, GameCfg.Interact.Fishermen[1].AnchorNames[
 local ITEM_BAR = GameCfg.Items.ContainerId.ItemBar
 check('新档：Debug 关闭', GameCfg.Debug.Enabled == false)
 check('新档：金币 0、无鱼竿、无武器、无鱼饵',
-    (data.Data.FishCoin or 0) == 0 and data:ItemCount('starterRod') == 0
-    and data:WeaponCount('item135') == 0 and (data.Data.Bait.worm or 0) == 0,
-    string.format('coin=%s rod=%d dagger=%d worm=%s', tostring(data.Data.FishCoin), data:ItemCount('starterRod'),
-        data:WeaponCount('item135'), tostring(data.Data.Bait.worm)))
+    (data.data.FishCoin or 0) == 0 and data:ItemCount('starterRod') == 0
+    and data:WeaponCount('item135') == 0 and (data.data.Bait.worm or 0) == 0,
+    string.format('coin=%s rod=%d dagger=%d worm=%s', tostring(data.data.FishCoin), data:ItemCount('starterRod'),
+        data:WeaponCount('item135'), tostring(data.data.Bait.worm)))
 save:save_explicit(player.UserId, data, function() end)
 drain()
 
 local Seq = 0
 local function nextSeq() Seq = Seq + 1 return Seq end
 local function slotOf(itemId)
-    local items = data.Data.containers[ITEM_BAR]
+    local items = data.data.containers[ITEM_BAR]
     for slot = 1, data:ItemBarCapacity() do
         local entry = items[slot]
         if entry and entry.count > 0 and entry.itemId == itemId then return slot, entry end
@@ -111,13 +111,13 @@ local BACKPACK = GameCfg.Items.ContainerId.Backpack
 local function ensureBar(itemId)
     local slot = slotOf(itemId)
     if slot then return slot end
-    local pack = data.Data.containers[BACKPACK] or {}
+    local pack = data.data.containers[BACKPACK] or {}
     local index
     for i = 1, data:BackpackCapacity() do
         if pack[i] and pack[i].count > 0 and pack[i].itemId == itemId then index = i break end
     end
     if not index then return nil end
-    local bar = data.Data.containers[ITEM_BAR]
+    local bar = data.data.containers[ITEM_BAR]
     local target
     for s = 1, data:ItemBarCapacity() do if not bar[s] then target = s break end end
     if not target then
@@ -132,19 +132,19 @@ local Stats = { coinsEarned = 0, coinsSpent = 0, baitPicked = 0, casts = 0, catc
     fishSold = 0, fishCoins = 0, safeFails = 0, daggerAt = nil, castsToDagger = nil }
 
 local function feedSelected(what)
-    local before = data.Data.FishCoin or 0
+    local before = data.data.FishCoin or 0
     host:send(player, 'InteractAction', { target = 'fisherman', action = 'Feed', seq = nextSeq() })
     drain()
     local result = host:last(player, 'InteractResult') or {}
-    local gained = (data.Data.FishCoin or 0) - before
+    local gained = (data.data.FishCoin or 0) - before
     if gained > 0 then Stats.coinsEarned = Stats.coinsEarned + gained end
     return result, gained
 end
 local function buy(itemId)
-    local before = data.Data.FishCoin or 0
+    local before = data.data.FishCoin or 0
     host:send(player, 'ShopAction', { action = 'Buy', itemId = itemId, seq = nextSeq() })
     drain()
-    local spent = before - (data.Data.FishCoin or 0)
+    local spent = before - (data.data.FishCoin or 0)
     if spent > 0 then Stats.coinsSpent = Stats.coinsSpent + spent end
     return spent
 end
@@ -167,7 +167,7 @@ end
 -- ===== 2. 拾饵 → 卖饵 → 买竿 =====
 local picked = baitTrip()
 event(string.format('拾饵 %d 只（免费点位）', picked))
-check('免费拾饵：一趟拾到点位数量的蚯蚓', picked == #GameCfg.BaitSpots.Spots and data.Data.Bait.worm == picked,
+check('免费拾饵：一趟拾到点位数量的蚯蚓', picked == #GameCfg.BaitSpots.Spots and data.data.Bait.worm == picked,
     'picked=' .. picked)
 data:SelectBait('worm')
 Clock = Clock + SIM.FishermanWalkSec
@@ -175,14 +175,14 @@ local wormPrice = GameCfg.Interact.Fisherman.BaitPrice.worm
 local rodPrice
 for _, row in ipairs(GameCfg.Shop.Catalog) do if row.itemKey == 'starterRod' then rodPrice = row.price end end
 local sold = 0
-while (data.Data.FishCoin or 0) < rodPrice and (data.Data.Bait.worm or 0) > 0 do
+while (data.data.FishCoin or 0) < rodPrice and (data.data.Bait.worm or 0) > 0 do
     local _, gained = feedSelected('worm')
     if gained ~= wormPrice then break end
     sold = sold + 1
 end
-event(string.format('喂钓鱼佬卖饵 %d 只，金币 %d', sold, data.Data.FishCoin or 0))
-check('卖饵按 BaitPrice 结算并攒够鱼竿钱', (data.Data.FishCoin or 0) >= rodPrice,
-    string.format('coin=%s rodPrice=%s', tostring(data.Data.FishCoin), tostring(rodPrice)))
+event(string.format('喂钓鱼佬卖饵 %d 只，金币 %d', sold, data.data.FishCoin or 0))
+check('卖饵按 BaitPrice 结算并攒够鱼竿钱', (data.data.FishCoin or 0) >= rodPrice,
+    string.format('coin=%s rodPrice=%s', tostring(data.data.FishCoin), tostring(rodPrice)))
 Clock = Clock + SIM.ShopWalkSec
 local spent = buy('starterRod')
 event(string.format('买新手鱼竿 -%d 金', spent))
@@ -288,7 +288,7 @@ local function castOnce()
         data:UpdateData(function(d) d.containers[ITEM_BAR][slot] = nil end, true)
         fishId = GameCfg.Casting.BossBait.duck
     else
-        local baitId = (data.Data.Bait.worm or 0) > 0 and 'worm' or nil
+        local baitId = (data.data.Bait.worm or 0) > 0 and 'worm' or nil
         data:SelectBait(baitId)
         local ok = data:ConsumeSelectedBait()
         if not ok then return nil end
@@ -333,7 +333,7 @@ local function fishUntil(stop, limit)
     local guard = 0
     while not stop() and guard < limit do
         guard = guard + 1
-        if (data.Data.Bait.worm or 0) == 0 and not slotOf('duck') then
+        if (data.data.Bait.worm or 0) == 0 and not slotOf('duck') then
             local got = baitTrip()
             event(string.format('补饵 %d 只', got))
         end
@@ -359,8 +359,8 @@ local function safeFailEel(mult)
     local cfgEel = GameCfg.Ability.FishAbilities.eel
     local fp = fish.carrier.body.Position
     env.player.Character.Position = Vector3.New(fp.x + cfgEel.Radius + 3, fp.y, fp.z) -- 退出放电半径
-    local coin, heads, meats, worms = data.Data.FishCoin, data:ItemCount('eelHead'), data:ItemCount('eelMeat'),
-        data.Data.Bait.worm or 0
+    local coin, heads, meats, worms = data.data.FishCoin, data:ItemCount('eelHead'), data:ItemCount('eelMeat'),
+        data.data.Bait.worm or 0
     local start, dt = env.now, 0.5
     local fleeAt = fish.flee_at
     local escapedAt, goneAt
@@ -383,11 +383,11 @@ local function safeFailEel(mult)
     check(tag .. '：到逃跑时限（' .. GameCfg.Fish.eel.EscapeSec .. ' 秒）才转逃脱',
         escapedAt ~= nil and escapedAt >= fleeAt and escapedAt - fleeAt <= dt + 1e-6,
         string.format('fleeAt=%s escapedAt=%s', tostring(fleeAt), tostring(escapedAt)))
-    check(tag .. '：回水后移除，无掉落、金币与库存不变', goneAt ~= nil and data.Data.FishCoin == coin
+    check(tag .. '：回水后移除，无掉落、金币与库存不变', goneAt ~= nil and data.data.FishCoin == coin
         and data:ItemCount('eelHead') == heads and data:ItemCount('eelMeat') == meats
-        and (data.Data.Bait.worm or 0) == worms,
+        and (data.data.Bait.worm or 0) == worms,
         string.format('goneAt=%s coin=%s->%s head=%d', tostring(goneAt), tostring(coin),
-            tostring(data.Data.FishCoin), data:ItemCount('eelHead')))
+            tostring(data.data.FishCoin), data:ItemCount('eelHead')))
     -- 玩家不等电鳗逃完：走开后继续钓（逃脱在后台进行），只计走开的时间
     Clock = Clock + SIM.RetreatSec
     event(string.format('%s：没匕首，放下电鳗走开（%.0f 秒后回水消失，无损失）', tag,
@@ -400,8 +400,8 @@ for _, row in ipairs(GameCfg.Shop.Catalog) do if row.itemKey == 'item135' then d
 local guard = 0
 while data:WeaponCount('item135') == 0 and guard < 50 do
     guard = guard + 1
-    local fishId, mult = fishUntil(function() return (data.Data.FishCoin or 0) >= daggerPrice end, 400)
-    if (data.Data.FishCoin or 0) >= daggerPrice then
+    local fishId, mult = fishUntil(function() return (data.data.FishCoin or 0) >= daggerPrice end, 400)
+    if (data.data.FishCoin or 0) >= daggerPrice then
         Clock = Clock + SIM.ShopWalkSec
         local cost = buy('item135')
         Stats.daggerAt, Stats.castsToDagger = Clock, Stats.casts
@@ -476,12 +476,12 @@ if headSlot then
     check('电鳗头（未烤信物）有抽奖资格', okHead == true)
     data:SelectSlot(headSlot)
     Clock = Clock + SIM.FishermanWalkSec
-    local coin = data.Data.FishCoin
+    local coin = data.data.FishCoin
     local result = feedSelected('eelHead')
     exchangedDuck = result.ok == true and result.exchange and result.exchange.to == 'duck'
     event('电鳗头喂钓鱼佬 → ' .. tostring(result.exchange and result.exchange.to))
     check('电鳗头兑换鸭子（1:1、不给金币）', exchangedDuck and slotOf('duck') ~= nil
-        and data:ItemCount('eelHead') == 0 and data.Data.FishCoin == coin, result.reason)
+        and data:ItemCount('eelHead') == 0 and data.data.FishCoin == coin, result.reason)
 end
 -- 电鳗肉卖掉
 for _ = 1, 2 do
@@ -601,9 +601,9 @@ check('WaterCircle2 共 13 行，其中极品 6 行权重 2/2/2/8/6/4',
 check('个人最大重量随钓获刷新（> 0）', Stats.maxWeight > 0, Stats.maxWeight)
 
 -- ===== 9. 经济与耗时自洽 =====
-check('金币非负且收支可复算', (data.Data.FishCoin or 0) >= 0
-    and data.Data.FishCoin == Stats.coinsEarned - Stats.coinsSpent,
-    string.format('coin=%s earned=%d spent=%d', tostring(data.Data.FishCoin), Stats.coinsEarned, Stats.coinsSpent))
+check('金币非负且收支可复算', (data.data.FishCoin or 0) >= 0
+    and data.data.FishCoin == Stats.coinsEarned - Stats.coinsSpent,
+    string.format('coin=%s earned=%d spent=%d', tostring(data.data.FishCoin), Stats.coinsEarned, Stats.coinsSpent))
 check('闭环耗时为正', Clock > 0, Clock)
 
 -- ===== 10. 经济阻塞估算：新档 → 买竿 → 买匕首，多种子自然抽样（纯配置 + FishCatch，不走管理器）=====
@@ -680,7 +680,7 @@ quantity('抛竿次数', Stats.casts)
 quantity('拾饵次数 / 只数', Stats.baitTrips .. ' / ' .. Stats.baitPicked)
 quantity('钓获', table.concat(catchList, ' '))
 quantity('击杀数', Stats.kills)
-quantity('金币收入 / 支出 / 结余', Stats.coinsEarned .. ' / ' .. Stats.coinsSpent .. ' / ' .. tostring(data.Data.FishCoin))
+quantity('金币收入 / 支出 / 结余', Stats.coinsEarned .. ' / ' .. Stats.coinsSpent .. ' / ' .. tostring(data.data.FishCoin))
 quantity('卖鱼条数 / 卖鱼收入', Stats.fishSold .. ' / ' .. Stats.fishCoins)
 quantity('买匕首时刻（秒）/ 当时抛竿数', tostring(Stats.daggerAt) .. ' / ' .. tostring(Stats.castsToDagger))
 quantity('没匕首时电鳗安全失败次数', Stats.safeFails)

@@ -158,7 +158,7 @@ describe('TestPlayerLeaveRejoin', function()
         env.data = assert(loadfile('server/player_data_host.lua'))()
         env.quest = {
             notify = function(_, kind, player, payload) return env.runtime:notify_quest(kind, player, payload) end,
-            get_state = function(_, player) return env.data:get_data_inst(player).Extra.quest end,
+            get_state = function(_, player) return env.data:get_data_inst(player).extra.quest end,
         }
         local sandbox = setmetatable({
             print = function(...)
@@ -209,7 +209,7 @@ describe('TestPlayerLeaveRejoin', function()
         assert.same('pending', b.attrs.SaveState)
         drain()
         assertRejoined(b)
-        assert.same(17, env.data:get_data_inst(b).Data.FishCoin)
+        assert.same(17, env.data:get_data_inst(b).data.FishCoin)
         assert.same(17, env.values.u560.coin)
     end)
 
@@ -263,8 +263,8 @@ describe('TestPlayerLeaveRejoin', function()
         drain()
         assertRejoined(b)
         local restored = env.data:get_data_inst(b)
-        assert.same(1, restored.Extra.quest.count)
-        assert.is_true(restored.Extra.story.read[GameCfg.Story.ReadKey or 'opening'])
+        assert.same(1, restored.extra.quest.count)
+        assert.is_true(restored.extra.story.read[GameCfg.Story.ReadKey or 'opening'])
         assert.is_true(env.values.u560.extra.story.read[GameCfg.Story.ReadKey or 'opening'])
     end)
 

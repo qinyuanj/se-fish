@@ -17,7 +17,7 @@ local function settle(target, slot, random)
     or slot < 1 or slot > target:ItemBarCapacity() then
     return nil, "slot"
   end
-  local items = target.Data.containers[ITEM_BAR]
+  local items = target.data.containers[ITEM_BAR]
   local entry = items[slot]
   if not entry or entry.count <= 0 then return nil, "slot" end
   local eligible, reason = Eligibility.check(entry)
@@ -32,7 +32,7 @@ local function settle(target, slot, random)
     ok = true, action = "Draw", slot = slot, itemId = entry.itemId,
     itemName = definition and definition.Name or entry.itemId,
     betValue = price, axes = axes, outcome = outcome.outcome,
-    coinBefore = target.Data.FishCoin,
+    coinBefore = target.data.FishCoin,
   }
   items[slot] = nil
   if outcome.outcome == "pair" then
@@ -58,7 +58,7 @@ local function settle(target, slot, random)
     end
     result.patternName = pattern.name
   end
-  result.coinAfter = target.Data.FishCoin
+  result.coinAfter = target.data.FishCoin
   return result
 end
 
@@ -137,7 +137,7 @@ function PlayerLottery.mount(scope, tree, opts)
       reply({ ok = false, reason = "range" })
       return false
     end
-    local items = data.Data.containers[ITEM_BAR]
+    local items = data.data.containers[ITEM_BAR]
     local entry = slot >= 1 and slot <= data:ItemBarCapacity() and items[slot]
     if not entry or entry.count <= 0 then
       reply({ ok = false, reason = "slot" })

@@ -93,7 +93,7 @@ describe('条款 17-18：分享任务的占位入口', function()
     it('平台分享能力未开通时回明确占位，不点了没反应', function()
         -- 开放情况是生产开关（共享配置）：默认未开通。
         assert.is_false(GameCfg.Platform.Share.Enabled)
-        local coin = env.data.Data.FishCoin
+        local coin = env.data.data.FishCoin
         local itemId = GameCfg.Survival.AdrenalineItemId
         local before = env.data:ItemCount(itemId)
         assert.is_false(env.platform:Share(env.player, 'tutorial'))
@@ -105,7 +105,7 @@ describe('条款 17-18：分享任务的占位入口', function()
         assert.same(GameCfg.Platform.Share.UnavailableText, reply.text)
         assert.is_true(#reply.text > 0, '占位也要有玩家可读文案')
         -- 占位不发真实权益：金币与商品件数都不动。
-        assert.same(coin, env.data.Data.FishCoin)
+        assert.same(coin, env.data.data.FishCoin)
         assert.same(before, env.data:ItemCount(itemId))
     end)
 
@@ -132,7 +132,7 @@ describe('条款 17-18：分享任务的占位入口', function()
         GameCfg.Platform.Placeholder.AllowInPublish = false
         local itemId = GameCfg.Survival.AdrenalineItemId
         local items = shop.data:ItemCount(itemId)
-        local coin = shop.data.Data.FishCoin
+        local coin = shop.data.data.FishCoin
         local function last_reply() return shop:last_result('PlatformResult') end
         local function assert_not_open(reply, what)
             assert.is_table(reply, what .. ' 被拒时必须回包，不能静默')
@@ -141,7 +141,7 @@ describe('条款 17-18：分享任务的占位入口', function()
             assert.is_truthy(tostring(reply.text):find('未开放', 1, true) ~= nil,
                 what .. ' 的回执没说明未开放')
             assert.same(items, shop.data:ItemCount(itemId), what .. ' 被拒时不得发物品')
-            assert.same(coin, shop.data.Data.FishCoin, what .. ' 被拒时不得改金币')
+            assert.same(coin, shop.data.data.FishCoin, what .. ' 被拒时不得改金币')
             assert.is_false(shop.platform:has_flow(shop.player), what .. ' 被拒时不得建平台 flow')
         end
         assert.is_true(shop:platform_action({ action = 'Purchase', goods = 'adrenaline1', seq = 1 }))
@@ -192,7 +192,7 @@ describe('条款 17-18：分享任务的占位入口', function()
         GameCfg.Debug.Enabled = false
         GameCfg.Platform.Placeholder.Enabled = true
         GameCfg.Platform.Placeholder.AllowInPublish = true
-        local coin = env.data.Data.FishCoin
+        local coin = env.data.data.FishCoin
         local itemId = GameCfg.Survival.AdrenalineItemId
         local before = env.data:ItemCount(itemId)
         -- 分享：不再以「未开放」拒绝，回到占位入口自身的原因与文案；仍不发真实权益
@@ -203,7 +203,7 @@ describe('条款 17-18：分享任务的占位入口', function()
         assert.is_false(share.ok)
         assert.same('placeholder', share.reason, '显式开放后分享应回到占位入口，而不是「未开放」')
         assert.same(GameCfg.Platform.Share.UnavailableText, share.text)
-        assert.same(coin, env.data.Data.FishCoin, '占位分享不得改金币')
+        assert.same(coin, env.data.data.FishCoin, '占位分享不得改金币')
         assert.same(before, env.data:ItemCount(itemId), '占位分享不得发物品')
         -- 占位广告：能开出占位 flow，参数来自共享配置的占位广告位
         assert.is_true(env.platform:show_ad(env.player, 'revive', 'revive', function() end),

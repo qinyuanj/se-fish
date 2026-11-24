@@ -246,9 +246,9 @@ function PlayerTree.spawn(opts)
   local mounts = type(opts.mounts) == "table" and opts.mounts or {}
   local container_ids = GameCfg.Items.ContainerId
 
-  local raw_data = type(data.Data) == "table" and data.Data or {}
+  local raw_data = type(data.data) == "table" and data.data or {}
   local raw_containers = type(raw_data.containers) == "table" and raw_data.containers or {}
-  local raw_extra = type(data.Extra) == "table" and data.Extra or {}
+  local raw_extra = type(data.extra) == "table" and data.extra or {}
   local raw_inventory = type(raw_extra.inventory) == "table" and raw_extra.inventory or {}
   local raw_selection = type(raw_inventory.selection) == "table" and raw_inventory.selection or {}
   local raw_growth = type(raw_extra.growth) == "table" and raw_extra.growth or {}
@@ -348,10 +348,10 @@ function PlayerTree.spawn(opts)
     if type(data) ~= "table" then
       return
     end
-    if type(data.Data) ~= "table" then
-      data.Data = {}
+    if type(data.data) ~= "table" then
+      data.data = {}
     end
-    local d = data.Data
+    local d = data.data
     d.FishCoin = states.coin:now()
     d.Zone = states.zone_id:now()
     d.upgrade_level = states.upgrade_level:now()
@@ -366,10 +366,10 @@ function PlayerTree.spawn(opts)
     d.selected_bait = states.selected_bait:now()
     d.selected_weapon = states.selected_weapon:now()
 
-    if type(data.Extra) ~= "table" then
-      data.Extra = {}
+    if type(data.extra) ~= "table" then
+      data.extra = {}
     end
-    local extra = data.Extra
+    local extra = data.extra
     if type(extra.inventory) ~= "table" then
       extra.inventory = {}
     end
@@ -403,10 +403,10 @@ function PlayerTree.spawn(opts)
       mirror_stage1_to_data()
     end
 
-    if type(data.Extra) ~= "table" then
-      data.Extra = {}
+    if type(data.extra) ~= "table" then
+      data.extra = {}
     end
-    local extra = data.Extra
+    local extra = data.extra
     if type(extra.survival) ~= "table" then
       extra.survival = {}
     end
@@ -885,9 +885,9 @@ function PlayerTree.spawn(opts)
     if type(src) ~= "table" then
       return false
     end
-    local d = type(src.Data) == "table" and src.Data or {}
+    local d = type(src.data) == "table" and src.data or {}
     local c = type(d.containers) == "table" and d.containers or {}
-    local extra = type(src.Extra) == "table" and src.Extra or {}
+    local extra = type(src.extra) == "table" and src.extra or {}
     local inv = type(extra.inventory) == "table" and extra.inventory or {}
     local sel = type(inv.selection) == "table" and inv.selection or {}
     local growth = type(extra.growth) == "table" and extra.growth or {}

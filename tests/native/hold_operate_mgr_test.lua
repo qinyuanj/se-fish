@@ -208,7 +208,7 @@ describe("持有操作的服务端分发", function()
         assert.is_nil(ctx.data:GetItemBarSnapshot().slots[1])
         -- 到上限后拒绝且不扣格（再造一格药水）
         assert.is_true(ctx.data:AddItem('item167', 1.5))
-        ctx.data.Extra.growth.potions.item167 = GameCfg.Items.PotionLimits.item167
+        ctx.data.extra.growth.potions.item167 = GameCfg.Items.PotionLimits.item167
         operate({ action = 'Operate', op = 'eat', slot = 1 })
         local capped = operate({ action = 'Operate', op = 'eat', slot = 1 })
         assert.same({ ok = false, op = 'eat', reason = 'potion-capped' }, capped)

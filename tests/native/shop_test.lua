@@ -68,7 +68,7 @@ describe("钓场商店购买", function()
     it("test_buy_number_ignores_client_price", function()
         ctx.data:AddCoin(100, nil, 'test')
         assert.is_true(buyNumber(51, { price = 1 }))
-        assert.same(50, ctx.data.Data.FishCoin)
+        assert.same(50, ctx.data.data.FishCoin)
     end)
 
     -- 编号路径的等级门槛与作废编号
@@ -78,16 +78,16 @@ describe("钓场商店购买", function()
         ctx.data:AddCoin(100, nil, 'test')
         assert.is_false(buyNumber(27)) -- 作废编号不在货架
         assert.same('item', lastReason())
-        assert.same(100, ctx.data.Data.FishCoin)
+        assert.same(100, ctx.data.data.FishCoin)
     end)
 
     -- 编号购买普通商品（鱼饵进计数库存），响应带名称与编号
     it("test_buy_regular_goods_by_number", function()
-        local worms = ctx.data.Data.Bait.worm
+        local worms = ctx.data.data.Bait.worm
         ctx.data:AddCoin(10, nil, 'test')
         assert.is_true(buyNumber(13)) -- 蚯蚓 1 金
-        assert.same(worms + 1, ctx.data.Data.Bait.worm)
-        assert.same(9, ctx.data.Data.FishCoin)
+        assert.same(worms + 1, ctx.data.data.Bait.worm)
+        assert.same(9, ctx.data.data.FishCoin)
         local last = ctx.replies[#ctx.replies]
         assert.is_true(last.ok)
         assert.same(13, last.number)
@@ -98,14 +98,14 @@ describe("钓场商店购买", function()
     it("test_buy_rod_and_worm_into_their_containers", function()
         local synced = ctx.host.sync_counts and ctx.host.sync_counts[1] or 0
         ctx.data:AddCoin(6, nil, 'test')
-        local worms = ctx.data.Data.Bait.worm
+        local worms = ctx.data.data.Bait.worm
         assert.is_true(buy('starterRod'))
-        assert.same(1, ctx.data.Data.FishCoin)
+        assert.same(1, ctx.data.data.FishCoin)
         local slots = ctx.data:GetItemBarSnapshot().slots
         assert.same('starterRod', slots[2].itemId)
         assert.is_true(buy('worm'))
-        assert.same(0, ctx.data.Data.FishCoin)
-        assert.same(worms + 1, ctx.data.Data.Bait.worm)
+        assert.same(0, ctx.data.data.FishCoin)
+        assert.same(worms + 1, ctx.data.data.Bait.worm)
         assert.is_nil(ctx.data:GetItemBarSnapshot().slots[3])
         assert.is_true(ctx.replies[#ctx.replies].ok)
         assert.same(synced + 2, ctx.host.sync_counts[1])
@@ -115,7 +115,7 @@ describe("钓场商店购买", function()
     it("test_buy_upgrade_row_by_number_settles_once", function()
         ctx.data:AddCoin(1000, nil, 'test')
         assert.is_true(buyNumber(51)) -- 近战武器升级1，50 金
-        assert.same(950, ctx.data.Data.FishCoin)
+        assert.same(950, ctx.data.data.FishCoin)
         assert.same(1, ctx.data:shop_upgrade_level('melee'))
         local last = ctx.replies[#ctx.replies]
         assert.same('近战武器升级1', last.name)
@@ -126,7 +126,7 @@ describe("钓场商店购买", function()
         -- 重复升级：限购拒绝，钱与等级都不动
         assert.is_false(buyNumber(51))
         assert.same('limit', lastReason())
-        assert.same(950, ctx.data.Data.FishCoin)
+        assert.same(950, ctx.data.data.FishCoin)
         assert.same(1, ctx.data:shop_upgrade_level('melee'))
     end)
 
@@ -134,7 +134,7 @@ describe("钓场商店购买", function()
     it("test_five_coin_profile_buys_starter_rod", function()
         ctx.data:AddCoin(5, nil, 'test')
         assert.is_true(buy('starterRod'))
-        assert.same(0, ctx.data.Data.FishCoin)
+        assert.same(0, ctx.data.data.FishCoin)
         assert.is_true(ctx.replies[#ctx.replies].ok)
     end)
 
@@ -143,10 +143,10 @@ describe("钓场商店购买", function()
         for _ = 1, 7 do ctx.data:AddItem('carp', 1) end
         assert.is_false(buy('starterRod'))
         assert.same('full', lastReason())
-        assert.same(20, ctx.data.Data.FishCoin)
+        assert.same(20, ctx.data.data.FishCoin)
         -- 蚯蚓不占格，满格照样能买
         assert.is_true(buy('worm'))
-        assert.same(19, ctx.data.Data.FishCoin)
+        assert.same(19, ctx.data.data.FishCoin)
     end)
 
     -- 逐级链路与逐级价格（7 级摊位）：近战/远程/弹容/爆炸物满级
@@ -168,10 +168,10 @@ describe("钓场商店购买", function()
         assert.same(3, ctx.data:shop_upgrade_level('explosive'))
         assert.near(1.6, ctx.data:weapon_damage_scale('explosive'), 1e-9)
         -- 满级后再买任一级：限购拒绝且不扣钱
-        local coin = ctx.data.Data.FishCoin
+        local coin = ctx.data.data.FishCoin
         assert.is_false(buyNumber(45))
         assert.same('limit', lastReason())
-        assert.same(coin, ctx.data.Data.FishCoin)
+        assert.same(coin, ctx.data.data.FishCoin)
         -- 逐级总价：近战 6350 + 远程 15500 + 弹容 4200 + 爆炸 8400
         assert.same(6350 + 15500 + 4200 + 8400, 35000 - coin)
     end)
@@ -180,7 +180,7 @@ describe("钓场商店购买", function()
         ctx.data:AddCoin(4, nil, 'test')
         assert.is_false(buy('starterRod'))
         assert.same('coin', lastReason())
-        assert.same(4, ctx.data.Data.FishCoin)
+        assert.same(4, ctx.data.data.FishCoin)
         assert.is_nil(ctx.data:GetItemBarSnapshot().slots[2])
     end)
 
@@ -191,23 +191,23 @@ describe("钓场商店购买", function()
         -- 1 级摊位逐级扩容成功，且把行 33（背包升级1）计入购买次数
         ctx.seq = ctx.seq + 1
         assert.is_true(send({ action = 'UpgradeStorage', seq = ctx.seq }))
-        assert.same(1, ctx.data.Data.upgrade_level)
+        assert.same(1, ctx.data.data.upgrade_level)
         assert.same(1, ctx.data:PurchaseCount(33))
-        assert.same(9900, ctx.data.Data.FishCoin)
+        assert.same(9900, ctx.data.data.FishCoin)
         -- 限购：级别回滚后行 33 仍计数 1/1 → 'limit' 且不扣钱
-        ctx.data.Data.upgrade_level = 0
+        ctx.data.data.upgrade_level = 0
         ctx.seq = ctx.seq + 1
         assert.is_false(send({ action = 'UpgradeStorage', seq = ctx.seq }))
         assert.same('limit', lastReason())
-        assert.same(9900, ctx.data.Data.FishCoin)
+        assert.same(9900, ctx.data.data.FishCoin)
         -- 摊位等级门槛：1 级摊位已升 1 级，下一级（行 32）需 2 级摊位 → 'level'
-        ctx.data.Data.upgrade_level = 1
-        ctx.data.Extra.growth.purchases['33'] = 0
+        ctx.data.data.upgrade_level = 1
+        ctx.data.extra.growth.purchases['33'] = 0
         ctx.seq = ctx.seq + 1
         assert.is_false(send({ action = 'UpgradeStorage', seq = ctx.seq }))
         assert.same('level', lastReason())
         -- 满级：6 级后再扩 → 'max'
-        ctx.data.Data.upgrade_level = 6
+        ctx.data.data.upgrade_level = 6
         ctx.seq = ctx.seq + 1
         assert.is_false(send({ action = 'UpgradeStorage', seq = ctx.seq }))
         assert.same('max', lastReason())
@@ -227,7 +227,7 @@ describe("钓场商店购买", function()
         assert.is_false(send({ action = 'Sell', itemId = 'worm', seq = 100 }))
         assert.is_false(send({ action = 'Buy', itemId = 'worm', seq = 1.5 }))
         assert.is_false(send({ action = 'Buy', itemId = 'worm' }))
-        assert.same(5, ctx.data.Data.FishCoin)
+        assert.same(5, ctx.data.data.FishCoin)
     end)
 
     it("test_out_of_range_is_rejected", function()
@@ -235,7 +235,7 @@ describe("钓场商店购买", function()
         ctx.me.Character.Position.x = 100000
         assert.is_false(buy('starterRod'))
         assert.same('range', lastReason())
-        assert.same(5, ctx.data.Data.FishCoin)
+        assert.same(5, ctx.data.data.FishCoin)
     end)
 
     it("test_prices_come_from_shop_table", function()
@@ -257,9 +257,9 @@ describe("钓场商店购买", function()
         local replay = { action = 'Buy', itemId = 'starterRod', seq = ctx.seq }
         assert.is_true(send(replay), '同操作重放返回原成功结果但不重复结算')
         assert.is_false(send({ action = 'Buy', itemId = 'starterRod', seq = ctx.seq - 1 }))
-        assert.same(10, ctx.data.Data.FishCoin)
+        assert.same(10, ctx.data.data.FishCoin)
         assert.is_true(buy('starterRod'))
-        assert.same(5, ctx.data.Data.FishCoin)
+        assert.same(5, ctx.data.data.FishCoin)
         local rods = 0
         for _, slot in pairs(ctx.data:GetItemBarSnapshot().slots) do
             if slot.itemId == 'starterRod' then rods = rods + 1 end
@@ -294,12 +294,12 @@ describe("钓场商店购买", function()
         ctx.seq = ctx.seq + 1
         local request = { action = 'UpgradeStorage', seq = ctx.seq, price = 0 }
         assert.is_true(send(request))
-        assert.same(0, ctx.data.Data.FishCoin)
+        assert.same(0, ctx.data.data.FishCoin)
         assert.same(3, ctx.data:GetItemBarSnapshot().slotCount)
         assert.same(10, ctx.data:GetItemBarSnapshot().backpackCount)
         assert.is_true(send(request), '扩容重放返回原成功结果但不重复扣款')
         assert.same(3, ctx.data:GetItemBarSnapshot().slotCount)
-        assert.same(0, ctx.data.Data.FishCoin)
+        assert.same(0, ctx.data.data.FishCoin)
     end)
 
     it("test_upgrade_rejects_insufficient_coin_and_range", function()
@@ -322,7 +322,7 @@ describe("钓场商店购买", function()
         ctx.data:AddCoin(1000, nil, 'test')
         assert.is_false(buyNumber(50)) -- 近战 2 级，未买过 1 级
         assert.same('level', lastReason())
-        assert.same(1000, ctx.data.Data.FishCoin)
+        assert.same(1000, ctx.data.data.FishCoin)
         assert.same(0, ctx.data:shop_upgrade_level('melee'))
     end)
 
@@ -332,7 +332,7 @@ describe("钓场商店购买", function()
         while ctx.data:AddItem('carp', 1) do end
         assert.is_true(buy('item134'))
         assert.same(1, ctx.data:WeaponCount('item134'))
-        assert.same(976, ctx.data.Data.FishCoin)
+        assert.same(976, ctx.data.data.FishCoin)
         local last = ctx.replies[#ctx.replies]
         assert.same('指虎', last.name)
         assert.same(26, last.number)
@@ -346,7 +346,7 @@ describe("钓场商店购买", function()
         end
         -- 客户端带的价格不采用
         assert.is_true(buy('starterRod', { price = 0 }))
-        assert.same(0, ctx.data.Data.FishCoin)
+        assert.same(0, ctx.data.data.FishCoin)
         -- 摊位等级不够的商品不上架
         ctx.cfg.Shop = setmetatable({ Stands = { { AnchorName = 'TGUnitShop', Level = 1 } }, Goods = {
             { ItemId = 'worm', Price = 1, Page = '钓具', MinShopLevel = 2, PurchaseLimit = 0 },
@@ -354,6 +354,6 @@ describe("钓场商店购买", function()
         ctx.data:AddCoin(1, nil, 'test')
         assert.is_false(buy('worm'))
         assert.same('item', lastReason())
-        assert.same(1, ctx.data.Data.FishCoin)
+        assert.same(1, ctx.data.data.FishCoin)
     end)
 end)

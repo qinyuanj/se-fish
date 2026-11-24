@@ -533,7 +533,7 @@ local function consume_throwable(session, player, slot, item_id, payload)
   local save = session.opts.save
   local data = session.tree.data
   if not save then
-    local container = data.Data and data.Data.containers and data.Data.containers[GameCfg.Items.ContainerId.ItemBar]
+    local container = data.data and data.data.containers and data.data.containers[GameCfg.Items.ContainerId.ItemBar]
     local entry = container and container[slot]
     if not entry or (entry.count or 0) <= 0 or entry.itemId ~= item_id then
       return fail(session.remote, player, "throw", "empty", { slot = slot })
@@ -564,7 +564,7 @@ local function consume_throwable(session, player, slot, item_id, payload)
     end) == true
   end
   return save:execute(player, data, operation, function(draft)
-    local container = draft.Data.containers[GameCfg.Items.ContainerId.ItemBar]
+    local container = draft.data.containers[GameCfg.Items.ContainerId.ItemBar]
     local entry = container and container[slot]
     if not entry or (entry.count or 0) <= 0 or entry.itemId ~= item_id then return nil, "empty" end
     if type(draft.UpdateData) == "function" then

@@ -480,7 +480,7 @@ describe('条款 11 广告满血复活（占位广告位）', function()
     local player = join(7140)
     down(player)
     local data = env.players:get_data_inst(player)
-    local coinBefore = data.Data.FishCoin
+    local coinBefore = data.data.FishCoin
     local itemsBefore = data:ItemCount(GameCfg.Survival.AdrenalineItemId)
     for _, outcome in ipairs({ 'cancel', 'fail' }) do
       adRequest(player, #outcome)
@@ -490,7 +490,7 @@ describe('条款 11 广告满血复活（占位广告位）', function()
     assert.same('dead', env.s:phase(player))
     goodsRequest(player, 9)
     confirm(player, 'cancel')
-    assert.same(coinBefore, data.Data.FishCoin, '取消 / 失败不得改动金豆或金币')
+    assert.same(coinBefore, data.data.FishCoin, '取消 / 失败不得改动金豆或金币')
     assert.same(itemsBefore, data:ItemCount(GameCfg.Survival.AdrenalineItemId), '取消 / 失败不得发物品')
     assert.same(0, countPayload('PlatformResult', function(payload)
       return payload.action == 'Grant' or payload.action == 'CoinGrant'

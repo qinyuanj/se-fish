@@ -141,7 +141,7 @@ describe('TestSave', function()
 
     it('test_autosave_periodically_saves_online_players', function()
         env.players = { env.me }
-        env.data.Data.FishCoin = 33
+        env.data.data.FishCoin = 33
         env.save:update() -- 第一次只定下一次存档时刻
         assert.same(0, env.store.data[env.save:key(1)].coin)
         env.now = env.now + env.cfg.Save.AutosaveSec - 1
@@ -163,14 +163,14 @@ describe('TestSave', function()
         env.save:start()
         assert.is_not_nil(env.boundClose)
         env.players = { env.me }
-        env.data.Data.FishCoin = 44
+        env.data.data.FishCoin = 44
         env.boundClose()
         assert.same(44, env.store.data[env.save:key(1)].coin)
         assert.same('shutdown', env.save.ledger[1].LastReason)
     end)
 
     it('test_commit_uses_update_async_and_survives_cas_conflict', function()
-        env.data.Data.FishCoin = 10
+        env.data.data.FishCoin = 10
         env.casConflicts = 1 -- transform 会被调两次（模拟冲突重算）
         local ok = env.save:commit(1, env.data:Serialize(), 'exchange:eelHead')
         assert.is_true(ok)
@@ -185,7 +185,7 @@ describe('TestSave', function()
         assert.same(10, env.store.data[env.save:key(1)].coin)
         -- 记账失败重试：第一次 update 失败也能补上
         env.failUpdate = 1
-        env.data.Data.FishCoin = 11
+        env.data.data.FishCoin = 11
         assert.is_true(env.save:commit(1, env.data:Serialize(), 'ferry:ticket'))
         assert.same(11, env.store.data[env.save:key(1)].coin)
     end)
@@ -193,9 +193,9 @@ describe('TestSave', function()
     it('test_enqueue_merges_to_latest_snapshot_per_player', function()
         -- 排空任务还没跑就连来两笔：只落最新快照（旧 Set 不会盖新 commit，反之同理）
         env.deferSpawn = true
-        env.data.Data.FishCoin = 10
+        env.data.data.FishCoin = 10
         assert.is_true(env.save:Save(1, env.data:Serialize(), 'a'))
-        env.data.Data.FishCoin = 20
+        env.data.data.FishCoin = 20
         assert.is_true(env.save:commit(1, env.data:Serialize(), 'b'))
         assert.same(0, #env.ops) -- 还没排空
         env.flushSpawns()
@@ -256,12 +256,12 @@ describe('TestSave', function()
     end)
 
     it('test_load_into_applies_save_and_syncs_client', function()
-        env.data.Data.FishCoin = 66
+        env.data.data.FishCoin = 66
         assert.is_true(env.data:AddItem('duck'))
         env.store.data[env.save:key(9)] = env.data:Serialize()
         local player9, d9 = env.new_data(9)
         env.save:load_into(player9, d9)
-        assert.same(66, d9.Data.FishCoin)
+        assert.same(66, d9.data.FishCoin)
         assert.same(1, d9:ItemCount('duck'))
         assert.same(1, env.syncs) -- 恢复后推了一次 ItemBarState
         -- 新档同样发送 ready 快照。
@@ -270,12 +270,12 @@ describe('TestSave', function()
     end)
 
     it('test_load_into_never_discards_old_property_because_of_touched_flag', function()
-        env.data.Data.FishCoin = 66
+        env.data.data.FishCoin = 66
         env.store.data[env.save:key(9)] = env.data:Serialize()
         local player9, d9 = env.new_data(9)
         d9.touched = true
         env.save:load_into(player9, d9)
-        assert.same(66, d9.Data.FishCoin)
+        assert.same(66, d9.data.FishCoin)
         assert.same(1, env.syncs)
     end)
 
@@ -288,18 +288,18 @@ describe('TestSave', function()
         assert.same(2, #env.waits) -- 每次失败等 RetryDelaySec
         -- 永远失败：返回 nil，内存态不变；GetAsync 总调用次数 = 3(成功路) + MaxRetries(失败路)
         env.failGet = 99
-        env.data.Data.FishCoin = 77
+        env.data.data.FishCoin = 77
         assert.is_nil(env.save:load(1))
-        assert.same(77, env.data.Data.FishCoin)
+        assert.same(77, env.data.data.FishCoin)
         assert.same(3 + env.cfg.Save.MaxRetries, #env.ops)
     end)
 
     it('test_save_failure_keeps_memory_and_reports', function()
         env.failUpdate = 99
-        env.data.Data.FishCoin = 88
+        env.data.data.FishCoin = 88
         -- 失败保留原 job 与写身份，恢复后 update 再排空。
         assert.is_true(env.save:Save(1, env.data:Serialize(), 'test'))
-        assert.same(88, env.data.Data.FishCoin)
+        assert.same(88, env.data.data.FishCoin)
         assert.same(0, env.store.data[env.save:key(1)].coin)
         assert.same(env.cfg.Save.MaxRetries - 1, #env.waits)
         env.failUpdate = 0
@@ -309,9 +309,9 @@ describe('TestSave', function()
 
     it('test_serialize_roundtrip_restores_coin_slots_bait_upgrade_zone', function()
         local d = env.data
-        d.Data.FishCoin = 45
-        d.Data.upgrade_level = 1
-        d.Data.Zone = 'shrimpPond'
+        d.data.FishCoin = 45
+        d.data.upgrade_level = 1
+        d.data.Zone = 'shrimpPond'
         assert.is_true(d:AddItem('duck'))
         assert.is_true(d:AddItem('shrimpTicket'))
         assert.is_true(d:AddBait('sausage', 3))
@@ -322,14 +322,14 @@ describe('TestSave', function()
         -- 全新玩家读档
         local player2, d2 = env.new_data(2)
         assert.is_true(d2:ApplySave(snapshot))
-        assert.same(45, d2.Data.FishCoin)
-        assert.same(1, d2.Data.upgrade_level)
-        assert.same('shrimpPond', d2.Data.Zone)
-        assert.same(3, d2.Data.Bait.sausage)
-        assert.same(d.Data.Bait.worm, d2.Data.Bait.worm) -- 白送蚯蚓也在
+        assert.same(45, d2.data.FishCoin)
+        assert.same(1, d2.data.upgrade_level)
+        assert.same('shrimpPond', d2.data.Zone)
+        assert.same(3, d2.data.Bait.sausage)
+        assert.same(d.data.Bait.worm, d2.data.Bait.worm) -- 白送蚯蚓也在
         -- 格子位置逐项一致（含 mult）
-        local bar1 = d.Data.containers.itemBar
-        local bar2 = d2.Data.containers.itemBar
+        local bar1 = d.data.containers.itemBar
+        local bar2 = d2.data.containers.itemBar
         for i = 1, 8 do
             local a, b = bar1[i], bar2[i]
             if a then
@@ -339,8 +339,8 @@ describe('TestSave', function()
                 assert.message('itemBar ' .. i).is_nil(b)
             end
         end
-        local bp1 = d.Data.containers.backpack
-        local bp2 = d2.Data.containers.backpack
+        local bp1 = d.data.containers.backpack
+        local bp2 = d2.data.containers.backpack
         for i = 1, 10 do
             local a, b = bp1[i], bp2[i]
             if a then

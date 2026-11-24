@@ -73,8 +73,8 @@ end
 
 local function eatSlot(mgr, player, data, value)
     if not mgr.Vitals then return end
-    local slot = data.Data.selected_slot
-    local entry = value == slot and data.Data.containers[GameCfg.Items.ContainerId.ItemBar][slot]
+    local slot = data.data.selected_slot
+    local entry = value == slot and data.data.containers[GameCfg.Items.ContainerId.ItemBar][slot]
     if not entry or entry.count <= 0 or not mgr.Vitals:can_eat(player, entry.itemId) then return end
     local cooked = GameCfg.Items.cook_rate(entry)
     local itemId = data:EatSlot(slot)
@@ -97,7 +97,7 @@ function PlayerDataHost:operate(player, data, payload)
         return
     end
     local slot = payload.slot
-    local items = data.Data.containers[GameCfg.Items.ContainerId.ItemBar]
+    local items = data.data.containers[GameCfg.Items.ContainerId.ItemBar]
     local entry
     if op == 'attack' then
         if type(weapon) ~= 'string' or data:WeaponCount(weapon) < 1 then
@@ -126,7 +126,7 @@ function PlayerDataHost:operate(player, data, payload)
         end
         return true
     end
-    local heldNow = data.Extra.inventory.selection.held
+    local heldNow = data.extra.inventory.selection.held
     local willDrop = op == 'discard' and heldNow.kind == 'slot' and heldNow.slot == slot
     local function reserveDrop()
         return true, nil
@@ -154,7 +154,7 @@ function PlayerDataHost:operate(player, data, payload)
         end
     end
     local function transform(target)
-        local held = target.Extra.inventory.selection.held
+        local held = target.extra.inventory.selection.held
         if op == 'attack' then
             if held.kind == 'weapon' and held.id == weapon then
                 return nil, 'combat-pending'
@@ -166,7 +166,7 @@ function PlayerDataHost:operate(player, data, payload)
             if not target:HoldSlot(slot) then return nil, 'empty' end
             return { ok = true, op = op, held = true }
         end
-        local heldEntry = target.Data.containers[GameCfg.Items.ContainerId.ItemBar][slot]
+        local heldEntry = target.data.containers[GameCfg.Items.ContainerId.ItemBar][slot]
         if not heldEntry or heldEntry.count <= 0 then return nil, 'empty' end
         if op == 'discard' then
             if not dropApi then return nil, 'drop-unavailable' end
@@ -175,9 +175,9 @@ function PlayerDataHost:operate(player, data, payload)
         local definition = GameCfg.Items.Definitions[heldEntry.itemId]
         if definition and definition.Type == '属性道具' then
             local limit = GameCfg.Items.PotionLimits[heldEntry.itemId]
-            local count = target.Extra.growth.potions[heldEntry.itemId] or 0
+            local count = target.extra.growth.potions[heldEntry.itemId] or 0
             if limit and count >= limit then return nil, 'potion-capped' end
-            target.Extra.growth.potions[heldEntry.itemId] = count + 1
+            target.extra.growth.potions[heldEntry.itemId] = count + 1
             target:SelectSlot(slot)
             target:UpdateData(function(d)
                 d.containers[GameCfg.Items.ContainerId.ItemBar][slot] = nil

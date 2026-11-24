@@ -11,12 +11,12 @@ local life = runtime and runtime.life
 local ferry = runtime and runtime:get_world() and runtime:get_world().ferry
 local function equippedWeapon(d)
     if not d then return nil end
-    local held = d.Extra and d.Extra.inventory and d.Extra.inventory.selection
-        and d.Extra.inventory.selection.held
+    local held = d.extra and d.extra.inventory and d.extra.inventory.selection
+        and d.extra.inventory.selection.held
     if type(held) == 'table' and held.kind == 'weapon' and d:WeaponCount(held.id) > 0 then
         return held.id
     end
-    local selected = d.Data and d.Data.selected_weapon
+    local selected = d.data and d.data.selected_weapon
     if selected and d:WeaponCount(selected) > 0 then return selected end
     return nil
 end
@@ -32,7 +32,7 @@ local token = rt.token
 local tag = 'S135-' .. tostring(math.floor(world:GetServerTime()))
 local function log(...) print('SHRIMP135', tag, ...) end
 local function ledger()
-    log('库存', 'coin=' .. tostring(data.Data.FishCoin), 'zone=' .. tostring(data.Data.Zone),
+    log('库存', 'coin=' .. tostring(data.data.FishCoin), 'zone=' .. tostring(data.data.Zone),
         'tail=' .. data:ItemCount('item31'), 'pearl=' .. data:ItemCount('item121'),
         'tendon=' .. data:ItemCount('item32'), 'ticket=' .. data:ItemCount('item147'),
         'weapon=' .. tostring(equippedWeapon(data)))
