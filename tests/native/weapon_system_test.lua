@@ -6,7 +6,7 @@
 -- #129 失败方式先列：见 .scratch/129/progress.md。
 -- 验收锁定：数值与商店表/票面一致（空手 5/0.5/2，不再 25）；挥砍登记驱动命中盒与伤害；
 -- 服务端射速/弹量/换弹（2 秒）权威，切枪与重连不绕过；霰弹 5×20、火箭筒 500+5 米 100；
--- 投掷一发一件走 #123 协议（重放不重复扣）、20 米钳制、落水 3–5 条当地 1 级普通鱼后算伤害、
+-- 投掷一发一件走 #123 协议（重放不重复扣）、20 米钳制、落水 3–5 条当地 1 级竿可钓鱼（排除首领专用饵强制召唤行）后算伤害、
 -- 5 米爆炸、普通投掷召唤不出首领；装备/选中重进恢复、弹匣按满匣恢复。
 --
 -- 每例只替换包内 CastAbility，并在 after_each 还原 preload 与模块缓存。
@@ -430,40 +430,6 @@ describe('TestMgrWeaponThrow', function()
         return 0.5
     end
 
-    it('test_blast_candidates_exclude_boss_elite_rare_and_high_rod', function()
-        local excluded = false
-        for _, row in ipairs(GameCfg.Casting.Zones['shrimpPond.water']) do
-            local species = GameCfg.Fish[row.Id]
-            if species.Grade ~= 'normal' or row.RodLevel ~= 1 then excluded = true end
-        end
-        assert.is_true(excluded, '虾池鱼表里没有应被排除的条目，断言会空转')
-
-        local function sweep(zoneId, center, playerZ)
-            ctx:set_water_zones({ { Id = zoneId, Center = { x = center.x, y = center.y - 1, z = center.z },
-                HalfXZ = 6, SurfaceY = center.y } })
-            ctx.player.Character.Position = { x = center.x, y = 2, z = playerZ }
-            local seen = {}
-            for _, roll in ipairs({ 0, 0.34, 0.67, 0.99 }) do
-                local slot = ctx:give_explosive(ctx.player, 'item143')
-                ctx.random = function(a, b) if a and b then return b end return roll end
-                assert.is_true(ctx:throw(ctx.player, slot, center).ok)
-                ctx:advance(FlightSec() + 0.01)
-                for _, fish in ipairs(ctx.spawnedFish) do
-                    local species = GameCfg.Fish[fish.fishId]
-                    assert.same('normal', species.Grade)
-                    assert.same(1, species.RodLevel)
-                    seen[fish.fishId] = true
-                end
-            end
-            return seen
-        end
-
-        local seen = sweep('shrimpPond.water', { x = 100, y = 2.183, z = 100 }, 112)
-        assert.is_true(seen.shrimp and seen.riverShrimp and seen.crayfish,
-            '扫过随机序列后仍应见到三个合规候选')
-        sweep('WaterCircle2', { x = -11.75, y = 2.183, z = -12.25 }, -28)
-    end)
-
     it('test_land_detonation_5m_radius_no_fish_skips_thrower', function()
         local slot = ctx:give_explosive(ctx.player, 'item144')
         ctx.other.Character.Position = { x = 0, y = 2, z = 14.9 }  -- 4.9 米内
@@ -718,8 +684,8 @@ describe('TestMgrWeaponThrow', function()
             assert.same(ctx.player, f.owner)
             assert.same(1, f.mult)
             local species = GameCfg.Fish[f.fishId]
-            assert.same('normal', species.Grade) -- 普通投掷召唤不出首领/精英/极品
-            assert.same(1, species.RodLevel)
+            assert.is_true(species.RodLevel <= GameCfg.Ability.Throw.FishRodLevel)
+            assert.is_not.same('boss', species.Grade)
             -- 保底鱼在伤害之前生成
             for _, a in ipairs(ctx.applied) do assert.is_true(a.order > f.order) end
         end

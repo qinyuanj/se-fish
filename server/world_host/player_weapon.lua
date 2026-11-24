@@ -282,12 +282,29 @@ local function resolve_landing(player, target)
   return { x = tx, y = ty, z = tz }, zone
 end
 
+local function is_boss_summon_row(row, species)
+  local casting = GameCfg.Casting
+  if not casting then return false end
+  local bait = row.Bait ~= nil and row.Bait or (species and species.Bait)
+  local has_bait = bait ~= nil and bait ~= 0
+  for _, map in ipairs({ casting.BossBait or false, casting.BossBaitCatalog or false }) do
+    if type(map) == "table" then
+      if has_bait and map[bait] ~= nil then return true end
+      for _, boss_id in pairs(map) do
+        if boss_id == row.Id then return true end
+      end
+    end
+  end
+  return false
+end
+
 local function blast_candidates(rows)
   local out = {}
   local rod = ability().Throw.FishRodLevel
   for _, row in ipairs(rows or {}) do
     local species = row.Id and GameCfg.Fish[row.Id]
-    if species and row.RodLevel == rod and species.Grade == "normal" then
+    if species and type(row.RodLevel) == "number" and row.RodLevel <= rod
+      and not is_boss_summon_row(row, species) then
       out[#out + 1] = { id = row.Id, weight = row.DrawWeight or 1 }
     end
   end
@@ -312,7 +329,7 @@ local function spawn_blast_fish(opts, zone, landing, player)
   local rows = GameCfg.Casting and GameCfg.Casting.Zones and GameCfg.Casting.Zones[zone.Id]
   local candidates = blast_candidates(rows)
   if #candidates == 0 then
-    print("[PlayerWeapon] 爆炸落水但该水区没有 1 级普通鱼保底", zone.Id)
+    print("[PlayerWeapon] 爆炸落水但该水区没有 1 级竿候选鱼", zone.Id)
     return 0
   end
   local throw_cfg = ability().Throw

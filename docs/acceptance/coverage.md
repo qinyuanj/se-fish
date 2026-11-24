@@ -184,7 +184,7 @@
 | 6-10 | server/world_host/player_weapon.lua | tests/native/weapon_system_test.lua、tests/native/combat_behavior_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 6-11 | server/world_host/player_weapon.lua、client/weapon_aim.lua | tests/native/weapon_system_test.lua、tests/native/combat_behavior_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 6-12 | server/world_host/player_weapon.lua | tests/native/weapon_system_test.lua、tests/native/combat_behavior_test.lua | 缺 | 缺 | 缺 | 缺 | A |
-| 6-13 | server/world_host/player_weapon.lua、common/fish_catch.lua、server/world_host/fish_tree.lua | tests/native/weapon_system_test.lua、tests/native/combat_behavior_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 6-13 | server/world_host/player_weapon.lua、common/fish_catch.lua、server/world_host/fish_tree.lua | tests/native/weapon_system_test.lua、tests/native/combat_behavior_test.lua、tests/native/spec/06_blast_fish_test.lua | 有 | 有 | 缺 | 缺 | A |
 | 6-14 | common/cfg/shop.lua、server/world_host/player_shop.lua、server/world_host/player_weapon.lua、common/attr_model.lua、server/world_host/attr_leaf.lua | tests/native/prize_growth_wiring_test.lua、tests/native/shop_test.lua、tests/native/attr_migration_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 6-15 | common/cfg/shop.lua、server/world_host/player_shop.lua、server/world_host/player_weapon.lua、common/attr_model.lua、server/world_host/attr_leaf.lua | tests/native/prize_growth_wiring_test.lua、tests/native/shop_test.lua、tests/native/attr_migration_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 6-16 | common/cfg/shop.lua、server/world_host/player_shop.lua、server/world_host/player_weapon.lua、common/attr_model.lua、server/world_host/attr_leaf.lua | tests/native/prize_growth_wiring_test.lua、tests/native/shop_test.lua、tests/native/attr_migration_test.lua | 缺 | 缺 | 缺 | 缺 | A |
