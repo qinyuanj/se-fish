@@ -2,6 +2,11 @@ local GameCfg = require('common.GameCfg')
 
 local PlatformHost = { SpokeHost = true, Flows = {}, NextFlowId = 0 }
 
+local function isValidPlayer(player)
+    local kind = type(player)
+    return (kind == 'table' or kind == 'userdata') and player.UserId ~= nil
+end
+
 local function cfg()
     return GameCfg.Platform
 end
@@ -145,7 +150,7 @@ function PlatformHost:CanPurchase(player, goodsKey)
 end
 
 local function openFlow(self, player, intent, onResult)
-    if not player or not player.UserId then return false, 'invalid' end
+    if not isValidPlayer(player) then return false, 'invalid' end
     if self:HasFlow(player) then return false, 'busy' end
     local key = intent.kind == 'coin' and intent.coin or (intent.kind == 'ad' and intent.ad or intent.goods)
     local row = intent.kind == 'coin' and coinOffer(key)
@@ -222,7 +227,7 @@ function PlatformHost:HandleTestAction(player, payload)
 end
 
 function PlatformHost:Share(player, purpose)
-    if type(player) ~= 'table' or player.UserId == nil then return false, 'invalid' end
+    if not isValidPlayer(player) then return false, 'invalid' end
     local share = cfg().Share or {}
     local reason
     if share.Enabled ~= true and not placeholderAllowed() then

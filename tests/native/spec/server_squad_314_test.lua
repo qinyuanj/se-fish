@@ -367,4 +367,57 @@ describe("全局小队服务端宿主接缝（#314）", function()
     assert.equals(1, #ctx:state(1).members)
     assert.equals(1, ctx:state(1).members[1].userId)
   end)
+
+  it("兼容 SE 引擎 userdata 玩家与 userdata Position 完成入队、邀请、建队与离场", function()
+    local SharedWorldTree = require("server.World.SharedWorldTree")
+    local SpokeClock = require("common.SpokeClock")
+    local clock = SpokeClock.new(100)
+    local events = {}
+    local function channel(name)
+      events[name] = events[name] or {
+        clients = {},
+        FireClient = function(self, player, payload)
+          self.clients[#self.clients + 1] = { player = player, value = payload }
+        end,
+      }
+      return events[name]
+    end
+    local p1 = make_player(701, 100, 0)
+    local p2 = make_player(702, 101, 0)
+    local datas = {
+      [701] = make_data(p1),
+      [702] = make_data(p2),
+    }
+    local world = SharedWorldTree.spawn({
+      clock = clock,
+      remote = { GetRE = function(_, name) return channel(name) end },
+      player_data = { GetDataInst = function(_, player) return datas[player.UserId] end },
+      session_epoch = "userdata-squad-test",
+    })
+    local userdata_objects = {
+      [p1] = true,
+      [p2] = true,
+      [p1.Character.Position] = true,
+      [p2.Character.Position] = true,
+    }
+    local real_type = _G.type
+    local ok, err = pcall(function()
+      _G.type = function(value)
+        if userdata_objects[value] then return "userdata" end
+        return real_type(value)
+      end
+      world.squad:OnPlayerAdded(p1)
+      world.squad:OnPlayerAdded(p2)
+      assert.is_true(world.squad:Handle(p1, { action = "Invite", targetUserId = 702 }))
+      assert.is_true(world.squad:Handle(p2, { action = "Accept", fromUserId = 701 }))
+      assert.is_true(world.squad:SameParty(p1, p2))
+      assert.equals(2, world.squad:Count(p1))
+      world.squad:OnPlayerRemoving(p2)
+      assert.is_false(world.squad:SameParty(p1, p2))
+      assert.equals(0, world.squad:Count(p1))
+    end)
+    _G.type = real_type
+    world:dispose()
+    if not ok then error(err, 0) end
+  end)
 end)

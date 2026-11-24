@@ -14,6 +14,15 @@ local State = spoke.State
 
 local FerryRoute = {}
 
+local function is_object(value)
+  local kind = type(value)
+  return kind == "table" or kind == "userdata"
+end
+
+local function is_valid_player(player)
+  return is_object(player) and player.UserId ~= nil
+end
+
 local function flat_distance(a, b)
   local dx, dz = a.x - b.x, a.z - b.z
   return math.sqrt(dx * dx + dz * dz)
@@ -41,14 +50,17 @@ function FerryRoute.mount(world, opts)
     disposed = false,
   }
   local route_states = {}
-  local left_players = {}
+  local route_sailing = {}
+  local left_players = setmetatable({}, { __mode = "v" })
+  local recovery_watch_users = {}
+  local recovery_watch_active = State.new("FerryRoute.recovery_watch", false)
 
   local function log(...)
     print("[FerryRoute]", ...)
   end
 
   local function event(name)
-    if type(remote) ~= "table" or type(remote.GetRE) ~= "function" then return nil end
+    if not is_object(remote) or type(remote.GetRE) ~= "function" then return nil end
     local ok, value = pcall(remote.GetRE, remote, name)
     return ok and value or nil
   end
@@ -195,6 +207,7 @@ function FerryRoute.mount(world, opts)
           DepartAt = world.clock.now() + point.CountdownSec }
         route_states[route.Id]:set({ phase = "countdown", routeId = route.Id,
           operation = operation.id, seconds = point.CountdownSec })
+        if route_sailing[route.Id] then route_sailing[route.Id]:set(true) end
       end)
       self:Broadcast({ phase = "countdown", routeId = route.Id, operation = operation.id,
         seconds = point.CountdownSec })
@@ -312,34 +325,67 @@ function FerryRoute.mount(world, opts)
     end
   end
 
-  function handle:Update()
+  local function sync_recovery_watch()
+    local active = next(recovery_watch_users) ~= nil
+    if recovery_watch_active:now() ~= active then
+      recovery_watch_active:set(active)
+    end
+  end
+
+  function handle:UpdateRecoveries()
     if self.disposed then return end
     for _, player in ipairs(self:OnlinePlayers()) do
-      if left_players[player.UserId] ~= player then
+      if is_valid_player(player) and left_players[player.UserId] ~= player then
         local data = data_of(player)
-        if data and data.Inited and not is_paused(player.UserId) then self:Recover(player, data) end
+        if data and data.Inited and not is_paused(player.UserId) then
+          self:Recover(player, data)
+          if recovery_watch_users[player.UserId]
+              and not (data.Extra and data.Extra.recovery and data.Extra.recovery.ferry)
+              and not self.Recoveries[player.UserId] then
+            recovery_watch_users[player.UserId] = nil
+          end
+        end
       end
     end
+    sync_recovery_watch()
+  end
+
+  function handle:StepRoute(route)
+    if self.disposed then return end
+    local flight = self.Flights[route.Id]
+    local state = route_states[route.Id]
+    local sailing = route_sailing[route.Id]
+    if not flight then
+      if sailing and sailing:now() then sailing:set(false) end
+      return
+    end
     local now = world.clock.now()
-    for _, route in ipairs(GameCfg.Ferry.Routes) do
-      local flight = self.Flights[route.Id]
-      local state = route_states[route.Id]
-      if flight and now >= flight.DepartAt then
-        self.Flights[route.Id] = nil
+    if now >= flight.DepartAt then
+      self.Flights[route.Id] = nil
+      SpokeRuntime.batch(function()
         if state then state:set({ phase = "idle", routeId = route.Id }) end
-        self:Depart(route, flight)
-      elseif flight and state then
-        local seconds = math.max(0, flight.DepartAt - now)
-        local current = state:now()
-        if math.ceil(seconds) ~= math.ceil(current.seconds or 0) then
-          state:set({ phase = "countdown", routeId = route.Id, operation = flight.operation, seconds = seconds })
-        end
+        if sailing then sailing:set(false) end
+      end)
+      self:Depart(route, flight)
+    elseif state then
+      local seconds = math.max(0, flight.DepartAt - now)
+      local current = state:now()
+      if math.ceil(seconds) ~= math.ceil(current.seconds or 0) then
+        state:set({ phase = "countdown", routeId = route.Id, operation = flight.operation, seconds = seconds })
       end
     end
   end
 
+  function handle:Update()
+    if self.disposed then return end
+    self:UpdateRecoveries()
+    for _, route in ipairs(GameCfg.Ferry.Routes) do
+      self:StepRoute(route)
+    end
+  end
+
   function handle:OnPlayerAdded(player)
-    if not player then return end
+    if not is_valid_player(player) then return end
     left_players[player.UserId] = nil
     local now = world.clock.now()
     local channel = event("FerryState")
@@ -351,31 +397,54 @@ function FerryRoute.mount(world, opts)
       end
     end
     local data = data_of(player)
-    if data and data.Inited and not is_paused(player.UserId) then self:Recover(player, data) end
+    if data and data.Inited and not is_paused(player.UserId) then
+      self:Recover(player, data)
+      if recovery_watch_users[player.UserId]
+          and not (data.Extra and data.Extra.recovery and data.Extra.recovery.ferry)
+          and not self.Recoveries[player.UserId] then
+        recovery_watch_users[player.UserId] = nil
+        sync_recovery_watch()
+      end
+    end
   end
 
   function handle:OnPlayerRemoving(player)
-    if not player then return end
+    if not is_valid_player(player) then return end
+    local interrupted = false
     left_players[player.UserId] = player
     self.LastSeq[player.UserId] = nil
     self.Recoveries[player.UserId] = nil
-    self.ReturnPending[player.UserId] = nil
+    if self.ReturnPending[player.UserId] then
+      interrupted = true
+      self.ReturnPending[player.UserId] = nil
+    end
     for route_id, flight in pairs(self.BoardPending) do
-      if flight.player == player then self.BoardPending[route_id] = nil end
+      if flight.player == player then
+        interrupted = true
+        self.BoardPending[route_id] = nil
+      end
     end
     for route_id, flight in pairs(self.Flights) do
       if flight.player == player then
+        interrupted = true
         self.Flights[route_id] = nil
-        if route_states[route_id] then route_states[route_id]:set({ phase = "idle", routeId = route_id }) end
+        SpokeRuntime.batch(function()
+          if route_states[route_id] then route_states[route_id]:set({ phase = "idle", routeId = route_id }) end
+          if route_sailing[route_id] then route_sailing[route_id]:set(false) end
+        end)
         self:Broadcast({ phase = "cancelled", routeId = route_id, operation = flight.operation,
           reason = "payer_left" })
       end
+    end
+    if interrupted then
+      recovery_watch_users[player.UserId] = true
+      sync_recovery_watch()
     end
   end
 
   local Actions = { Board = "Board", Return = "ReturnBack" }
   function handle:Handle(player, payload)
-    if self.disposed or type(payload) ~= "table" then return false end
+    if self.disposed or not is_valid_player(player) or type(payload) ~= "table" then return false end
     local method = Actions[payload.action]
     local seq = payload.seq
     if not method or type(seq) ~= "number" or seq ~= math.floor(seq) then return false end
@@ -423,15 +492,28 @@ function FerryRoute.mount(world, opts)
     if zone and zone.ferry_routes then
       zone.ferry_routes:call(route.Id, LambdaEpoch.new("FerryRoute:" .. route.Id, function(scope)
         local state = State.new("FerryRoute." .. route.Id, { phase = "idle", routeId = route.Id })
+        local sailing = State.new("FerryRoute.sailing." .. route.Id, false)
         route_states[route.Id] = state
-        if index == 1 then
-          scope:call(Effect.new("FerryClock", function(es)
-            es:subscribe(world.clock.on_frame, function() handle:Update() end)
-          end))
-        end
+        route_sailing[route.Id] = sailing
+        scope:call(Effect.new("FerryClock:" .. route.Id, function(es)
+          if index == 1 then
+            es:subscribe(world.clock.on_second, function() handle:UpdateRecoveries() end)
+            es:phase("FerryRecoveryWatch", recovery_watch_active, function(ps)
+              ps:subscribe(world.clock.on_frame, function() handle:UpdateRecoveries() end)
+            end)
+          end
+          es:phase("FerrySailing:" .. route.Id, sailing, function(ps)
+            ps:subscribe(world.clock.on_frame, function() handle:StepRoute(route) end)
+          end)
+        end))
         scope:on_cleanup(function()
           route_states[route.Id] = nil
-          if index == 1 then handle.disposed = true end
+          route_sailing[route.Id] = nil
+          if index == 1 then
+            handle.disposed = true
+            handle.LastSeq = {}
+            recovery_watch_users = {}
+          end
           local flight = handle.Flights[route.Id]
           if flight then handle.Flights[route.Id] = nil end
           handle.BoardPending[route.Id] = nil

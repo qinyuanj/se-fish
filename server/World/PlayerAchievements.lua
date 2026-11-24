@@ -77,15 +77,9 @@ function Mgr:Update()
 end
 
 function Mgr:OnPlayerRemoving(player)
+    if not player or player.UserId == nil then return end
     self.RetryAt[player.UserId],self.Busy[player.UserId]=nil,nil
 end
-
-function Mgr:Start()
-    self.World=game:GetService('World')
-    self.Players=game:GetService('Players')
-    self.Archive=game:GetService('ArchiveService')
-end
-
 
 -- 成就补交由玩家树的 SpokeClock 驱动；本地完成标记先于平台交付，失败保留补交。
 function Mgr.mount(scope, player_tree, opts)

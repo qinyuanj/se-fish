@@ -1,6 +1,8 @@
 local GameCfg = require('common.GameCfg')
+local SignalRouter = require('server.World.WorldSignalRouter')
 
-local Mgr = { States = {}, Requested = {}, Connections = {} }
+local Mgr = { States = {}, Requested = {} }
+local isValidPlayer = SignalRouter.is_valid_player
 
 local function cfg()
     return GameCfg.Story
@@ -179,52 +181,19 @@ function Mgr:Update()
 end
 
 function Mgr:OnPlayerRemoving(player)
-    if player then
+    if isValidPlayer(player) then
         if self.Requested[player.UserId] == player then self.Requested[player.UserId] = nil end
         local state = self.States[player.UserId]
         if state and state.player == player then self.States[player.UserId] = nil end
     end
 end
 
-function Mgr:Start()
-    for _, connection in ipairs(self.Connections) do connection:Disconnect() end
-    self.Connections = {}
-    self.World = game:GetService('World')
-    local ok, service = pcall(function() return game:GetService('StoryService') end)
-    self.Service = ok and service or nil
-    if not ok then print('[PlayerStory] StoryService 不可用', tostring(service)) end
-    if self.Service then
-        for _, name in ipairs({ 'OnStoryStart', 'OnStoryEnd', 'OnStorySkip' }) do
-            local signal = self.Service[name]
-            if signal then
-                self.Connections[#self.Connections + 1] = signal:Connect(function(player, storyId)
-                    self:OnSignal(name, player, storyId)
-                end)
-            end
-        end
-    end
-    self.Connections[#self.Connections + 1] = _G.REUtil:GetRE('RequestStory').OnServerEvent:Connect(function(player)
-        if _G.REUtil:CheckRECD(player, 'RequestStory', 0.5) then return end
-        self:Begin(player)
-    end)
-    self.Connections[#self.Connections + 1] = _G.REUtil:GetRE('StoryRead').OnServerEvent:Connect(function(player, payload)
-        if type(payload) ~= 'table' or payload.action ~= 'read' or type(payload.readKey) ~= 'string'
-            or _G.REUtil:CheckRECD(player, 'StoryRead', 0.5) then return end
-        self:Complete(player, payload.readKey, 'read')
-    end)
-end
-
-
-local function managed_connect(scope, signal, callback)
-    local connection = signal:Connect(callback)
-    scope:on_cleanup(function() connection:Disconnect() end)
-end
-
--- 剧情服务与已读请求均挂在玩家树作用域；正式资源不可用时仍投影可读对话。
+-- 剧情服务与已读请求均挂在玩家树作用域；全局信号按对象单次绑定并按 UserId O(1) 路由，
+-- 仅用秒级心跳检查启动超时与失败重试。
 function Mgr.mount(scope, player_tree, opts)
     local player = opts.player
     local session = setmetatable({
-        States = {}, Requested = {}, Connections = {}, PlayerData = opts.player_data, Save = opts.save,
+        States = {}, Requested = {}, PlayerData = opts.player_data, Save = opts.save,
         World = { GetServerTime = function() return opts.clock.now() end },
     }, { __index = Mgr })
     local ok, service = pcall(function() return game:GetService('StoryService') end)
@@ -234,22 +203,22 @@ function Mgr.mount(scope, player_tree, opts)
         for _, name in ipairs({ 'OnStoryStart', 'OnStoryEnd', 'OnStorySkip' }) do
             local signal = session.Service[name]
             if signal then
-                managed_connect(scope, signal, function(actor, storyId)
-                    if actor == player then session:OnSignal(name, actor, storyId) end
+                SignalRouter.bind_player(scope, signal, player, function(actor, storyId)
+                    session:OnSignal(name, actor, storyId)
                 end)
             end
         end
     end
-    managed_connect(scope, _G.REUtil:GetRE('RequestStory').OnServerEvent, function(actor)
-        if actor ~= player or _G.REUtil:CheckRECD(actor, 'RequestStory', 0.5) then return end
+    SignalRouter.bind_player(scope, _G.REUtil:GetRE('RequestStory').OnServerEvent, player, function(actor)
+        if _G.REUtil:CheckRECD(actor, 'RequestStory', 0.5) then return end
         session:Begin(actor)
     end)
-    managed_connect(scope, _G.REUtil:GetRE('StoryRead').OnServerEvent, function(actor, payload)
-        if actor ~= player or type(payload) ~= 'table' or payload.action ~= 'read'
+    SignalRouter.bind_player(scope, _G.REUtil:GetRE('StoryRead').OnServerEvent, player, function(actor, payload)
+        if type(payload) ~= 'table' or payload.action ~= 'read'
             or type(payload.readKey) ~= 'string' or _G.REUtil:CheckRECD(actor, 'StoryRead', 0.5) then return end
         session:Complete(actor, payload.readKey, 'read')
     end)
-    scope:subscribe(opts.clock.on_frame, function() session:Update() end)
+    scope:subscribe(opts.clock.on_second, function() session:Update() end)
     session:Begin(player)
     scope:on_cleanup(function()
         session:OnPlayerRemoving(player)

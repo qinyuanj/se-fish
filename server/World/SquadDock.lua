@@ -12,10 +12,19 @@ local SquadDock = {}
 
 local function cfg() return GameCfg.Party end
 
+local function is_object(value)
+  local kind = type(value)
+  return kind == "table" or kind == "userdata"
+end
+
+local function is_valid_player(player)
+  return is_object(player) and player.UserId ~= nil
+end
+
 local function flat_distance(a, b)
   local ac, bc = a and a.Character, b and b.Character
   local ap, bp = ac and ac.Position, bc and bc.Position
-  if type(ap) ~= "table" or type(bp) ~= "table" then return nil end
+  if not is_object(ap) or not is_object(bp) then return nil end
   local dx, dz = (ap.x or 0) - (bp.x or 0), (ap.z or 0) - (bp.z or 0)
   return math.sqrt(dx * dx + dz * dz)
 end
@@ -446,7 +455,7 @@ function SquadDock.mount(world, opts)
   end
 
   function self:Handle(player, payload)
-    if type(player) ~= "table" or player.UserId == nil or type(payload) ~= "table" then return false end
+    if not is_valid_player(player) or type(payload) ~= "table" then return false end
     local action = payload.action
     if action == "Invite" then self:Invite(player, payload.targetUserId)
     elseif action == "Accept" then self:Accept(player, payload.fromUserId)
@@ -491,13 +500,13 @@ function SquadDock.mount(world, opts)
   end
 
   function self:OnPlayerAdded(player)
-    if type(player) ~= "table" or player.UserId == nil then return end
+    if not is_valid_player(player) then return end
     self.Online[player.UserId] = player
     self:Restore(player)
   end
 
   function self:OnPlayerRemoving(player)
-    if type(player) ~= "table" or player.UserId == nil then return end
+    if not is_valid_player(player) then return end
     local user_id = player.UserId
     if self:PartyIdOf(player) then self:Leave(player, "offline") end
     local invite = self.Invites[user_id]

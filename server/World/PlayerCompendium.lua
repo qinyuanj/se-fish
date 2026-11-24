@@ -1,8 +1,10 @@
 local GameCfg = require('common.GameCfg')
 local FishCatch = require('common.FishCatch')
 local Records = require('common.Records')
+local SignalRouter = require('server.World.WorldSignalRouter')
 
 local Mgr = { Queues = {}, LastSeq = {}, KIND = 'compendium-land', MaxQueue = 16 }
+local isValidPlayer = SignalRouter.is_valid_player
 
 local function copy(value)
     local out = {}
@@ -32,7 +34,7 @@ function Mgr:Snapshot(player)
 end
 
 function Mgr:Handle(player, payload)
-    if not player or not Records.ValidUserId(player.UserId) or type(payload) ~= 'table' then return end
+    if not isValidPlayer(player) or not Records.ValidUserId(player.UserId) or type(payload) ~= 'table' then return end
     local seq = payload.seq
     if type(seq) ~= 'number' or seq ~= math.floor(seq) or seq < 1 or seq > 2147483647 then return end
     local last = self.LastSeq[player.UserId]
@@ -41,20 +43,6 @@ function Mgr:Handle(player, payload)
     local state = self:Snapshot(player)
     state.seq = seq
     _G.REUtil:GetRE('CompendiumState'):FireClient(player, state)
-end
-
-function Mgr:Start()
-    if self.Connection then self.Connection:Disconnect() end
-    self.Connection = _G.REUtil:GetRE('CompendiumRequest').OnServerEvent:Connect(function(player, payload)
-        if not player or not Records.ValidUserId(player.UserId) then return end
-        if _G.REUtil:CheckRECD(player, 'CompendiumRequest', GameCfg.Compendium.RequestCooldownSec) then return end
-        self:Handle(player, payload)
-    end)
-end
-
-function Mgr:Stop()
-    if self.Connection then self.Connection:Disconnect() end
-    self.Connection, self.LastSeq = nil, {}
 end
 
 function Mgr:Weight(fishId, mult)
@@ -155,6 +143,9 @@ function Mgr:Drain(player)
         if result.record and self.Records then
             self.Records:NoteLanding(player, result.fishId, result.weight)
         end
+        if #queue.events > 0 then
+            self:Drain(player)
+        end
         finish_leave(queue)
     end)
 end
@@ -164,19 +155,15 @@ function Mgr:Update()
 end
 
 function Mgr:OnPlayerRemoving(player)
+    if not isValidPlayer(player) then return end
     local queue = self.Queues[player.UserId]
     if queue and queue.player == player then self.Queues[player.UserId] = nil end
     local request = self.LastSeq[player.UserId]
     if request and request.player == player then self.LastSeq[player.UserId] = nil end
 end
 
-
-local function managed_connect(scope, signal, callback)
-    local connection = signal:Connect(callback)
-    scope:on_cleanup(function() connection:Disconnect() end)
-end
-
--- 图鉴会话由 PlayerTree Stage 1 拥有；队列、查询去重与存档生命周期随玩家树销毁。
+-- 图鉴会话由 PlayerTree Stage 1 拥有；全局 RE 按信号对象单次绑定并按 UserId O(1) 路由，
+-- 队列由上岸与落账回调事件驱动，仅以秒级心跳兜底重试。
 function Mgr.mount(scope, player_tree, opts)
     local player = opts.player
     local session = setmetatable({
@@ -184,13 +171,16 @@ function Mgr.mount(scope, player_tree, opts)
         Quest = player_tree.quest, Records = opts.records,
     }, { __index = Mgr })
     player_tree.compendium = session
-    managed_connect(scope, _G.REUtil:GetRE('CompendiumRequest').OnServerEvent, function(actor, payload)
-        if actor ~= player or _G.REUtil:CheckRECD(actor, 'CompendiumRequest', GameCfg.Compendium.RequestCooldownSec) then return end
+    SignalRouter.bind_player(scope, _G.REUtil:GetRE('CompendiumRequest').OnServerEvent, player, function(actor, payload)
+        if _G.REUtil:CheckRECD(actor, 'CompendiumRequest', GameCfg.Compendium.RequestCooldownSec) then return end
         session:Handle(actor, payload)
     end)
-    scope:subscribe(opts.clock.on_frame, function() session:Drain(player) end)
+    scope:subscribe(opts.clock.on_second, function() session:Drain(player) end)
     scope:on_cleanup(function()
         session:OnPlayerRemoving(player)
+        if session.Records and type(session.Records.OnPlayerRemoving) == 'function' then
+            session.Records:OnPlayerRemoving(player)
+        end
         if player_tree.compendium == session then player_tree.compendium = nil end
     end)
     return session

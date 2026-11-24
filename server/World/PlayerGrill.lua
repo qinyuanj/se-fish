@@ -7,8 +7,10 @@
 local GameCfg = require("common.GameCfg")
 local BodyScale = require("common.BodyScale")
 local GrillCurve = require("common.GrillCurve")
+local spoke = require("common.packages.spoke.api")
 local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
 
+local State = spoke.State
 local PlayerGrill = {}
 
 local ITEM_BAR = GameCfg.Items.ContainerId.ItemBar
@@ -162,6 +164,13 @@ function PlayerGrill.mount(scope, tree, opts)
     create_unit = opts.create_unit,
   }
   local cleaned = false
+  local is_cooking = State.new("PlayerGrill.is_cooking", false)
+
+  local function set_cooking(active)
+    if not cleaned and is_cooking:now() ~= active then
+      is_cooking:set(active)
+    end
+  end
 
   local function sync_tree()
     if type(tree.sync_from_data) == "function" then
@@ -187,8 +196,10 @@ function PlayerGrill.mount(scope, tree, opts)
   local function destroy_visual()
     local unit = session.visual
     session.visual = nil
-    if unit and type(unit.Destroy) == "function" and not unit.Destroyed then
-      pcall(unit.Destroy, unit)
+    if unit and type(unit.Destroy) == "function" then
+      pcall(function() -- 兼容引擎 userdata 读取 Destroyed 或单位已被引擎先行销毁
+        if not unit.Destroyed then unit:Destroy() end
+      end)
     end
   end
 
@@ -200,6 +211,7 @@ function PlayerGrill.mount(scope, tree, opts)
     session.rate = nil
     session.anchorName = nil
     session.anchor = nil
+    set_cooking(false)
     destroy_visual()
   end
 
@@ -391,6 +403,7 @@ function PlayerGrill.mount(scope, tree, opts)
         session.anchorName = anchor_name
         session.anchor = anchor
         session.exploded = nil
+        set_cooking(true)
       end)
       spawn_visual()
       reply(remote, player, value)
@@ -435,6 +448,7 @@ function PlayerGrill.mount(scope, tree, opts)
         if tostring(value) == "full" then
           session.state = "ready"
           session.rate = rate
+          set_cooking(false)
           publish()
         end
         fail(remote, player, tostring(value or "rejected"), seq)
@@ -472,19 +486,25 @@ function PlayerGrill.mount(scope, tree, opts)
   try_recover(clock.now())
   if session.state == "idle" then publish() end
 
-  scope:subscribe(clock.on_frame, function(frame)
-    local now = frame and frame.now or clock.now()
-    if session.state ~= "cooking" then
-      try_recover(now)
-      return
+  scope:subscribe(clock.on_second, function()
+    if session.state == "idle" then
+      try_recover(clock.now())
     end
-    if tree.memos.is_alive:now() ~= true then
-      settle_current(now, "downed")
-      return
-    end
-    if GrillCurve.IsBurnt(now - (session.startedAt or now), cfg()) then
-      settle_burn()
-    end
+  end)
+
+  -- 短寿命烤制活跃相位（最多 4.5 秒）：仅在烤制进行中按需订阅 on_frame，空闲与满格冻结时零帧轮询。
+  scope:phase("GrillCooking", is_cooking, function(ps)
+    ps:subscribe(clock.on_frame, function(frame)
+      local now = frame and frame.now or clock.now()
+      if session.state ~= "cooking" then return end
+      if tree.memos.is_alive:now() ~= true then
+        settle_current(now, "downed")
+        return
+      end
+      if GrillCurve.IsBurnt(now - (session.startedAt or now), cfg()) then
+        settle_burn()
+      end
+    end)
   end)
 
   scope:on_cleanup(function()

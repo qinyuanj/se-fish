@@ -423,4 +423,144 @@ describe("服务端旧进度玩法的公开宿主等价迁移（#315）", functi
     world:request("GMAction", { action = "NextFish", fishId = "not-a-fish" })
     assert.is_false(world:lastResult("GMResult").ok)
   end)
+
+  it("GM 增删鱼币、发物品、ApplyState 与 ReadState 在 PlayerTree 存在时立即同步库存与 HUD", function()
+    local tree = assert(world.runtime:get_player_tree(world.player.UserId))
+    world:clearEvents()
+
+    world:request("GMAction", { action = "Coin", amount = 50 })
+    assert.same(50, tree.states.coin:now())
+    assert.same(50, tree:get_item_bar_snapshot().coin)
+    local hud = world:lastResult("ItemBarState")
+    assert.is_not_nil(hud)
+    assert.same(50, hud.coin)
+
+    world:clearEvents()
+    world:request("GMAction", { action = "Item", itemId = "starterRod", count = 1 })
+    assert.same("starterRod", tree:get_item_bar_snapshot().slots[1].itemId)
+    assert.same("starterRod", world:lastResult("ItemBarState").slots[1].itemId)
+
+    world:request("GMAction", { action = "SaveState" })
+    assert.is_true(world:lastResult("GMResult").ok)
+
+    world:clearEvents()
+    world:request("GMAction", { action = "ApplyState", coin = 321 })
+    assert.same(321, tree.states.coin:now())
+    assert.same(321, world:lastResult("ItemBarState").coin)
+
+    world:clearEvents()
+    world:request("GMAction", { action = "ReadState" })
+    assert.same(50, tree.states.coin:now())
+    assert.same(50, world:lastResult("ItemBarState").coin)
+
+    local other = world:addPlayer(2601, "跨目标")
+    local otherTree = assert(world.runtime:get_player_tree(other.UserId))
+    world:clearEvents()
+    world:request("GMAction", { action = "Coin", amount = 88, target = other.UserId })
+    assert.same(88, otherTree.states.coin:now())
+    local pushedToOther = false
+    for _, ev in ipairs(world.events) do
+      if ev.name == "ItemBarState" and ev.player == other and ev.value.coin == 88 then
+        pushedToOther = true
+      end
+    end
+    assert.is_true(pushedToOther)
+  end)
+
+  it("多玩家并发挂载与重连时全局 RE 仅单次 Connect，不呈 O(N) 扇出且按 UserId 隔离", function()
+    local p2 = world:addPlayer(2701, "乙")
+    local p3 = world:addPlayer(2702, "丙")
+    local p4 = world:addPlayer(2703, "丁")
+
+    for _, channel in ipairs({
+      "CompendiumRequest", "RequestQuest", "RequestStory", "StoryRead", "GMAction", "RecordsRequest",
+    }) do
+      assert.same(1, world.channels[channel].OnServerEvent.connects,
+        channel .. " 不得随在线玩家数线性重复 Connect")
+    end
+
+    world:clearEvents()
+    world:fire("GMAction", { action = "Coin", amount = 13 }, p2)
+    world:drain()
+    assert.same(13, world.players:GetDataInst(p2).Data.FishCoin)
+    assert.same(0, world.players:GetDataInst(p3).Data.FishCoin)
+    assert.same(0, world.players:GetDataInst(p4).Data.FishCoin)
+
+    world:clearEvents()
+    world:fire("CompendiumRequest", { seq = 1 }, p3)
+    world:drain()
+    local replies = 0
+    for _, ev in ipairs(world.events) do
+      if ev.name == "CompendiumState" then
+        replies = replies + 1
+        assert.same(p3, ev.player)
+      end
+    end
+    assert.same(1, replies)
+
+    -- 离场后注销路由，原玩家再发消息不触发回包也不报错，且重连仍维持单次 Connect
+    world.runtime:on_player_removing(p3)
+    world:drain()
+    world:clearEvents()
+    world:fire("CompendiumRequest", { seq = 2 }, p3)
+    world:drain()
+    assert.same(0, #world:messages("CompendiumState"))
+
+    world:reconnect()
+    for _, channel in ipairs({
+      "CompendiumRequest", "RequestQuest", "RequestStory", "StoryRead", "GMAction", "RecordsRequest",
+    }) do
+      assert.same(1, world.channels[channel].OnServerEvent.connects,
+        channel .. " 重连后仍应保持单次 Connect")
+    end
+  end)
+
+  it("玩家离场清理图鉴与全服纪录的 LastSeq，重连后 seq=1 正常受理", function()
+    world:request("CompendiumRequest", { seq = 10 })
+    assert.same(10, world:lastResult("CompendiumState").seq)
+    world:clearEvents()
+    world:request("CompendiumRequest", { seq = 5 })
+    assert.is_nil(world:lastResult("CompendiumState"))
+
+    world:request("RecordsRequest", { fishId = "bass", seq = 10 })
+    assert.same(10, world:lastResult("RecordsState").seq)
+    world:clearEvents()
+    world:request("RecordsRequest", { fishId = "bass", seq = 5 })
+    assert.is_nil(world:lastResult("RecordsState"))
+
+    local records = world.runtime:get_world().records
+    local uid = world.player.UserId
+    assert.same(10, records.LastSeq[uid])
+
+    local oldPlayer = world.player
+    world.runtime:on_player_removing(oldPlayer)
+    world.platform:OnPlayerRemoving(oldPlayer)
+    world.players:OnPlayerRemoving(oldPlayer)
+    world:drain()
+    assert.is_nil(records.LastSeq[uid], "玩家离场后 WorldRecords.LastSeq 须清理")
+
+    -- 同 UserId 重新上线后，客户端从 seq=1 重新编号应立即受理
+    local back = world:addPlayer(uid, "重连玩家")
+    world:usePlayer(back)
+    world:clearEvents()
+    world:request("CompendiumRequest", { seq = 1 })
+    assert.same(1, world:lastResult("CompendiumState").seq)
+    world:request("RecordsRequest", { fishId = "bass", seq = 1 })
+    assert.same(1, world:lastResult("RecordsState").seq)
+  end)
+
+  it("图鉴/任务/剧情/成就已移除无调用的 Start 死代码，且非每帧模块不订阅 on_frame", function()
+    assert.is_nil(require("server.World.PlayerCompendium").Start)
+    assert.is_nil(require("server.World.PlayerQuest").Start)
+    assert.is_nil(require("server.World.PlayerStory").Start)
+    assert.is_nil(require("server.World.PlayerAchievements").Start)
+
+    -- 推进不足 1 秒（仅触发 on_frame 不触发 on_second）不应提前触发秒级纪录刷盘，跨整秒后正常刷盘
+    assert.is_true(world:landing("bass", 1.5, 99))
+    local beforeWrites = world.recordWrites
+    world:advance(0.2)
+    assert.same(beforeWrites, world.recordWrites)
+    world:advance(GameCfg.Records.FlushIntervalSec)
+    assert.is_true(world.recordWrites > beforeWrites)
+  end)
 end)
