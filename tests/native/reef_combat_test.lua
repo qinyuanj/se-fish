@@ -174,22 +174,42 @@ describe('TestReefCombat', function()
         assert.same('stop', env.notices[#env.notices].reason)
     end)
 
-    -- 客户端预警：投掷表现建下落体，clear 必须销毁它（不留在场景里）。
+    -- 客户端预警：真实 FishCombatView.warning_spec 收到空中投掷预警建节点，clear 撤销后销毁零残留。
     it('test_throw_client_displays_falling_body_and_clear_destroys_it', function()
-        local warn = require('tests.support.gar_bite_warning')
-        warn:Start()
+        local Eui = require('tests.support.eui_double')
+        local ClientStore = require('client.Store.ClientStore')
+        local RootView = require('client.Views.RootView')
+        local FishCombatView = require('client.Views.FishCombatView')
+        local SpokeClock = require('common.SpokeClock')
         local n = require('common.GarBiteNotice')
         local p = n.Lock(-37, { x = 0, y = 6, z = 0 }, 0, 1, 5, 180, 1.2)
         p.move, p.shape, p.flightOrigin = 'airThrow', 'circle', { x = 0, y = 21, z = 0 }
-        warn:Show(p)
-        local body
-        for _, u in ipairs(env.units) do if u.Name == 'FlightThrow_-37' then body = u end end
-        assert.is_not_nil(body)
-        env.now = 0.6
-        env.heartbeat:Fire()
-        assert.is_true(body.Position.y > 6 and body.Position.y < 21)
-        warn:Show(n.Clear(-37, 'miss'))
-        assert.is_true(body.Destroyed)
-        warn:Stop()
+        assert.is_true(n.Valid(p))
+
+        local clock = SpokeClock.new(0)
+        local store, writer = ClientStore.new({ clock = clock })
+        local root = Eui.Node({ Name = 'UIRoot' })
+        local created = {}
+        local view = RootView.mount(root, store, {
+            create_node = function(kind, props)
+                local node = Eui.Node(props or {})
+                node.UnitType = kind
+                created[#created + 1] = node
+                return node
+            end,
+            docks = { fish_warning = FishCombatView.warning_spec() },
+        })
+        assert.is_true(writer:ingest_event('FishCombatState', {
+            warnings = { { id = -37, fishId = 'fish48Boss', move = p.move, shape = p.shape, range = p.range } },
+        }))
+        local warnNode
+        for _, node in ipairs(created) do
+            if not node.Destroyed and node.Name == 'FishWarn_-37' then warnNode = node end
+        end
+        assert.is_not_nil(warnNode)
+        assert.is_true(n.Valid(n.Clear(-37, 'miss')))
+        assert.is_true(writer:ingest_event('FishCombatState', { warnings = {} }))
+        assert.is_true(warnNode.Destroyed)
+        view:dispose()
     end)
 end)

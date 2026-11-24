@@ -160,7 +160,7 @@ describe('第 6 节 官方 AI 目标选择接线（哥斯拉贯通）', function
         assert.same(env.player.Character.Position, cp)
 
         local text = table.concat(logs, '\n')
-        assert.is_truthy(text:find('[MgrAiTarget]', 1, true), '日志缺模块名')
+        assert.is_truthy(text:find('[FishAiTarget]', 1, true) or text:find('[MgrAiTarget]', 1, true), '日志缺模块名')
         assert.is_truthy(text:find('SetFocus', 1, true), '日志缺官方登记操作名')
         assert.is_truthy(text:find(tostring(fish.Id), 1, true), '日志缺鱼标识')
         assert.is_truthy(text:find(tostring(fish.Carrier.Receiver.UnitId), 1, true), '日志缺单位标识')
@@ -190,7 +190,7 @@ describe('第 6 节 官方 AI 目标选择接线（哥斯拉贯通）', function
         assert.same(env.player, selected, '官方 API 加载失败阻断了业务伤害优先目标')
 
         local text = table.concat(logs, '\n')
-        assert.is_truthy(text:find('[MgrAiTarget]', 1, true), '日志缺模块名')
+        assert.is_truthy(text:find('[FishAiTarget]', 1, true) or text:find('[MgrAiTarget]', 1, true), '日志缺模块名')
         assert.is_truthy(text:find('RequireOfficialAPI', 1, true), '日志缺官方 API 加载操作名')
         assert.is_truthy(text:find(tostring(fish.Id), 1, true), '日志缺鱼标识')
         assert.is_truthy(text:find(tostring(fish.Carrier.Receiver.UnitId), 1, true), '日志缺单位标识')
@@ -213,7 +213,7 @@ describe('第 6 节 官方 AI 目标选择接线（哥斯拉贯通）', function
         assert.is_true(ok, tostring(selected))
         assert.same(env.rival, selected, '官方焦点登记失败阻断了业务 override')
         local text = table.concat(logs, '\n')
-        assert.is_truthy(text:find('[MgrAiTarget]', 1, true), '日志缺模块名')
+        assert.is_truthy(text:find('[FishAiTarget]', 1, true) or text:find('[MgrAiTarget]', 1, true), '日志缺模块名')
         assert.is_truthy(text:find('SetFocus', 1, true), '日志缺焦点注册操作名')
         assert.is_truthy(text:find(tostring(fish.Id), 1, true), '日志缺鱼标识')
         assert.is_truthy(text:find(tostring(env.rival.UserId), 1, true), '日志缺目标玩家标识')
@@ -235,7 +235,7 @@ describe('第 6 节 官方 AI 目标选择接线（哥斯拉贯通）', function
         assert.is_true(ok, tostring(state))
         assert.is_nil(state)
         local text = table.concat(logs, '\n')
-        assert.is_truthy(text:find('[MgrAiTarget]', 1, true), '日志缺模块名')
+        assert.is_truthy(text:find('[FishAiTarget]', 1, true) or text:find('[MgrAiTarget]', 1, true), '日志缺模块名')
         assert.is_truthy(text:find('ReadOfficialState', 1, true), '日志缺状态读取操作名')
         assert.is_truthy(text:find(tostring(fish.Id), 1, true), '日志缺鱼标识')
         assert.is_truthy(text:find(tostring(fish.Carrier.Receiver.UnitId), 1, true), '日志缺单位标识')
@@ -435,7 +435,7 @@ describe('第 6 节：逐招表按 KeyOf 反查', function()
 end)
 
 -- 6-26：霜之新星（枪械大奖特效）经武器命中业务入口挂 3 秒霜冻，重复命中只刷新不叠加。
--- 业务入口：MgrWeapon:Attack；效果由真 MgrModifier + 真 modifier_system 持有，
+-- 业务入口：PlayerWeapon（SpokeTree 挂载）；效果由真 MgrModifier + 真 modifier_system 持有，
 -- 预设键取 GameCfg.Ability.ModifierPresets（不用测试替身）。只替引擎边界：射线、角色、RE、时钟。
 describe('接线验收：霜之新星命中经武器入口挂霜冻（6-26）', function()
     local ctx
@@ -467,7 +467,7 @@ describe('接线验收：霜之新星命中经武器入口挂霜冻（6-26）', 
                 return { Connect = function() return { Disconnect = function() end } end }
             end
             return { OnServerEvent = signal(), OnClientEvent = signal(),
-                FireClient = function(_, payload) record[#record + 1] = payload end }
+                FireClient = function(_, _player, payload) record[#record + 1] = payload end }
         end }
 
         env.player = { UserId = 91, Character = { Position = v3(0, 0, 0),
@@ -486,23 +486,51 @@ describe('接线验收：霜之新星命中经武器入口挂霜冻（6-26）', 
         env.data = { GetItemBarSnapshot = function()
                 return { held = { kind = 'weapon', id = 'item163' }, weapons = { item163 = 1 } }
             end, MagazineSize = function(_, base) return base end }
-        env.weapon = assert(loadfile('tests/support/weapon_mgr_double.lua'))()
-        env.weapon.PlayerData = { GetDataInst = function() return env.data end }
-        env.weapon.Attr = { WeaponDamageScale = function() return 1 end }
-        env.weapon.Vitals = { CanAct = function() return true end,
-            NewHit = function(_, source, category)
-                return { source = source, sourcePlayer = source, category = category }
+        local SpokeClock = require('common.SpokeClock')
+        local spoke = require('common.packages.spoke.api')
+        local PlayerWeapon = require('server.World.PlayerWeapon')
+        env.clock = SpokeClock.new(env.now)
+        local heldState = spoke.State.new('AiTarget626.held', { kind = 'weapon', id = 'item163' })
+        local selectedState = spoke.State.new('AiTarget626.selected', nil)
+        local weaponsState = spoke.State.new('AiTarget626.weapons', { item163 = 1 })
+        local canActState = spoke.State.new('AiTarget626.can_act', true)
+        local scalesState = spoke.State.new('AiTarget626.scales', { melee = 1, ranged = 1, explosive = 1 })
+        local fakeTree = {
+            player = env.player, data = env.data, clock = env.clock,
+            states = { held = heldState, selected_weapon = selectedState, weapons = weaponsState },
+            memos = { can_act = canActState, weapon_damage_scales = scalesState },
+            get_item_bar_snapshot = function() return env.data:GetItemBarSnapshot() end,
+        }
+        local weaponHandle
+        env.spokeTree = spoke.SpokeTree.spawn(spoke.Effect.new('AiTarget626', function(scope)
+            weaponHandle = PlayerWeapon.mount(scope, fakeTree, {
+                remote = _G.REUtil,
+                new_hit = function(source, category)
+                    return { source = source, sourcePlayer = source, category = category }
+                end,
+                apply_hit = function(hit, target, amount)
+                    if target ~= env.target then return false end
+                    env.damage = (env.damage or 0) + amount
+                    return true
+                end,
+                apply_effect = function(source, target, kind)
+                    return env.modifier:ApplyWeaponEffect(source, target, { Kind = kind })
+                end,
+            })
+        end))
+        env.weapon = {
+            Attack = function(_, _player, aim)
+                env.clock:step(math.max(0, env.now - env.clock.now()), env.now)
+                weaponHandle:handle({ action = 'attack', aim = aim })
+                local replies = env.sent.WeaponResult
+                return replies and replies[#replies] or nil
             end,
-            ApplyHit = function(_, hit, target, amount)
-                if target ~= env.target then return false end
-                env.damage = (env.damage or 0) + amount
-                return true
-            end }
-        env.weapon.Modifier = env.modifier
+        }
     end)
 
     after_each(function()
         if not ctx then return end
+        if ctx.spokeTree then ctx.spokeTree:dispose() end
         _G.game, _G.Vector3, _G.REUtil = ctx.saved.game, ctx.saved.vector, ctx.saved.reutil
         package.loaded['common.REUtil'] = ctx.saved.re
         ctx = nil
