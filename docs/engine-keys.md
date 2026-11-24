@@ -2,7 +2,7 @@
 
 用途：L3 要改「方法名与自研 table 字段」（874 个方法 / 406 个 `GameCfg` 字段，见 [ADR-0034](adr/0034-self-written-code-snake-case.md) L3 行）。本文件是**排除清单**：命中即不改。五类豁免出处：[CODING_STANDARDS.md:11](../CODING_STANDARDS.md) 与 ADR-0034「官方契约原样」。
 
-总则：**引擎手册或引擎存根（`EggyAPI.lua`）能查到的名字不改；`data/` 里的字段不改；引号里的运行期名字不改；能与 `docs/design/` 列或数值对上的不改。** 正反对照：`DamageFloat:Show` → `DamageFloat:show`（自研：类型留 Pascal、方法改 snake）；`OnServerEvent`（官方，不动）。
+总则：**引擎手册或引擎存根（`EggyAPI.lua`）能查到的名字不改；`data/` 里的字段不改；引号里的运行期名字不改；能与 `docs/design/` 列或数值对上的不改；`*/packages/` 整包（含自研包）不改。** 正反对照：`DamageFloat:Show` → `DamageFloat:show`（自研：类型留 Pascal、方法改 snake）；`OnServerEvent`（官方，不动）。
 
 自查入口：`lua tools/cli.lua docs search <词>`（实测可用；任务书里的 `tools/cli.cua` 在本仓不存在，真实入口见 [tools/cli.lua:42](../tools/cli.lua)）。缓存 `.toolcache/se-manual`，缺页时 `lua tools/cli.lua docs sync` 或 `lua tools/cli.lua docs sync api <类型名>`（[tools/docs.lua:353-355](../tools/docs.lua)）。
 
