@@ -358,7 +358,7 @@
 | 12-03 | common/cfg/boss_moves.lua | tests/native/spec/12_boss_moves_test.lua | 有 | 缺 | 缺 | 缺 | A |
 | 12-04 | common/cfg/boss_moves.lua、server/world_host/fish_tree.lua | tests/native/spec/12_boss_moves_test.lua | 有 | 缺 | 缺 | 缺 | A |
 | 12-05 | common/cfg/boss_moves.lua | tests/native/spec/12_boss_moves_test.lua | 有 | 缺 | 缺 | 缺 | A |
-| 12-06 | server/world_host/fish_tree.lua、common/game_cfg.lua | tests/native/boss_bait_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 12-06 | server/world_host/fish_tree.lua、common/game_cfg.lua | tests/native/spec/12_boss_moves_ranged_dive_test.lua、tests/native/boss_bait_test.lua | 有 | 缺 | 缺 | 缺 | A |
 | 12-07 | common/cfg/boss_moves.lua、common/game_cfg.lua、server/world_host/fish_tree.lua| tests/native/spec/12_boss_moves_melee_aoe_test.lua、tests/native/eel_combat_test.lua| 有| 缺 | 缺 | 缺 | A |
 | 12-08 | common/cfg/boss_moves.lua、common/game_cfg.lua、server/world_host/fish_tree.lua、common/gar_bite_notice.lua| tests/native/spec/12_boss_moves_melee_aoe_test.lua、tests/native/gar_combat_test.lua| 有| 缺 | 缺 | 缺 | A |
 | 12-09 | common/cfg/boss_moves.lua、server/world_host/fish_tree.lua| tests/native/spec/12_boss_moves_melee_aoe_test.lua、tests/native/gar_combat_test.lua| 有| 有| 缺 | 缺 | A |
@@ -381,7 +381,7 @@
 | 12-26 | common/cfg/boss_moves.lua、common/game_cfg.lua、server/world_host/fish_tree.lua | tests/native/spec/12_boss_moves_ranged_dive_test.lua | 有 | 缺 | 缺 | 缺 | A |
 | 12-27 | common/game_cfg.lua、server/world_host/fish_tree.lua | tests/native/beach_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
 | 12-28 | common/cfg/boss_moves.lua、common/game_cfg.lua、server/world_host/fish_tree.lua | tests/native/spec/12_boss_moves_ranged_dive_test.lua | 有 | 缺 | 缺 | 缺 | A |
-| 12-29 | common/game_cfg.lua、server/world_host/fish_tree.lua | tests/native/beach_combat_test.lua | 缺 | 缺 | 缺 | 缺 | A |
+| 12-29 | common/cfg/boss_moves.lua、common/game_cfg.lua、server/world_host/fish_tree.lua | tests/native/spec/12_boss_moves_ranged_dive_test.lua、tests/native/beach_combat_test.lua | 有 | 缺 | 缺 | 缺 | A |
 | 12-30 | common/cfg/boss_moves.lua、common/game_cfg.lua、server/world_host/fish_tree.lua | tests/native/spec/12_boss_moves_ranged_dive_test.lua | 有 | 缺 | 缺 | 缺 | A |
 | 12-31 | common/cfg/boss_moves.lua、common/game_cfg.lua、server/world_host/fish_tree.lua | tests/native/spec/12_boss_moves_ranged_dive_test.lua | 有 | 缺 | 缺 | 缺 | A |
 | 12-32 | common/cfg/boss_moves.lua、common/game_cfg.lua、server/world_host/fish_tree.lua | tests/native/spec/12_boss_moves_ranged_dive_test.lua | 有 | 缺 | 缺 | 缺 | A |

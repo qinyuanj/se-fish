@@ -261,4 +261,91 @@ describe('第 12 节 远程与俯冲组逐招表', function()
         env:advance(env.now + 2)
         assert.is_true(hasHit(261), '追踪俯冲伤害没有按表内数值结算')
     end)
+
+    it('条款 12-06：普通来源精英与首领在待举/举起时不战斗，首次放下进入战斗且爆破鱼不进战斗', function()
+        local function checkLiftToCombat(id)
+            if env then env:tear_down() end
+            env = Islet.new(5)
+            local p = Islet.shore_dry_point(5)
+            env.player.Character.Position = env.vec(p.x, p.y, p.z)
+            local fish = assert(env.mgr:spawn_landed(env.player, { fishId = id, mult = 1 }, env.player.Character.Position))
+            assert.same(env.mgr.State.await_lift, fish.State, id .. ' 上岸后应处于待举起状态')
+            env:advance(env.now + 0.5)
+            assert.same(env.mgr.State.await_lift, fish.State, id .. ' 待举起期间不得进入战斗')
+
+            fish.carrier.body.OnLiftedBegin:Fire(env.player.Character)
+            assert.same(env.mgr.State.held, fish.State, id .. ' 举起后应处于持有状态')
+            env:advance(env.now + 0.5)
+            assert.same(env.mgr.State.held, fish.State, id .. ' 举起期间不得进入战斗')
+
+            assert.is_true(env.mgr:drop(env.player), id .. ' 放下失败')
+            assert.same(env.mgr.State.Combat, fish.State, id .. ' 首次放下后应进入战斗')
+        end
+
+        checkLiftToCombat('fish39Elite')
+        checkLiftToCombat('fish40Boss')
+
+        local blast = assert(env.mgr:spawn_blast_fish('fish39Elite', 1, env.player.Character.Position, env.player))
+        assert.same(env.mgr.State.wild, blast.State, '爆破鱼生成后应处于 wild 状态')
+        env:advance(env.now + 1.0)
+        assert.is_not_equal(env.mgr.State.Combat, blast.State, '爆破鱼不得进入战斗状态')
+    end)
+
+    it('条款 12-29：虎鲸甩尾无目标不空放且保留至目标出现，周期、范围与伤害均以逐招表为准', function()
+        -- ① 无有效目标推进超 10 秒不空放，目标出现后受招式互斥约束并立即在下次可攻击时触发。
+        drop('fish40Boss', 5)
+        env.player.Character.Controller.Health = 0
+        env:advance(12)
+        assert.is_nil(lockOf('roar'), '无有效目标时虎啸不得空放')
+        assert.is_nil(lockOf('tail'), '无有效目标时甩尾不得空放')
+
+        env.player.Character.Controller.Health = 100000
+        env:advance(env.now + 0.1)
+        assert.is_not_nil(lockOf('roar'), '目标出现后优先级更高的虎啸应先起手')
+        assert.is_nil(lockOf('tail'), '招式互斥期间甩尾不得同时起手')
+        local tailNotice = untilLock('tail', env.now + 2)
+        assert.is_not_nil(tailNotice, '虎啸结束后保留的甩尾应立即起手')
+
+        -- ② 哨兵篡改逐招表 Damage.Value / Range / Schedule.Sec，验证首次/后续周期、范围与伤害均以表为准。
+        local tailRow = BossMoves.get('orca', 'tail')
+        local roarRow = BossMoves.get('orca', 'roar')
+        local oldDamage, oldRange, oldTailSec, oldRoarSec =
+            tailRow.Damage.Value, tailRow.Range, tailRow.Schedule.Sec, roarRow.Schedule.Sec
+        tailRow.Damage.Value = 167
+        tailRow.Range = 7
+        tailRow.Schedule.Sec = 6
+        roarRow.Schedule.Sec = 99
+        restore[#restore + 1] = function()
+            tailRow.Damage.Value = oldDamage
+            tailRow.Range = oldRange
+            tailRow.Schedule.Sec = oldTailSec
+            roarRow.Schedule.Sec = oldRoarSec
+        end
+
+        hits = {}
+        local fish = drop('fish40Boss', 5)
+        env:advance(5.5)
+        assert.is_nil(lockOf('tail'), '未到篡改后的首次周期 6 秒不得提前起手')
+        local firstTail = untilLock('tail', 6.5)
+        assert.same(7, firstTail.range, '甩尾预警范围应以逐招表为准')
+
+        local facing = fish.facing or { x = 0, z = 1 }
+        local fpos = fish.carrier.body.Position
+        env.player.Character.Position = env.vec(fpos.x - facing.x * 5.5, fpos.y, fpos.z - facing.z * 5.5)
+        env:advance(env.now + 1.0)
+        assert.is_true(hasHit(167), '甩尾应按逐招表扩展后的范围与伤害命中后方目标')
+
+        local function tailCount()
+            local count = 0
+            for _, notice in ipairs(env.notices) do
+                if notice.kind == 'lock' and notice.move == 'tail' then count = count + 1 end
+            end
+            return count
+        end
+        assert.same(1, tailCount())
+        env:advance(11.5)
+        assert.same(1, tailCount(), '未到篡改后的后续周期不得提前二次起手')
+        env:advance(12.5)
+        assert.same(2, tailCount(), '后续甩尾周期应以逐招表为准')
+    end)
 end)
