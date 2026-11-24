@@ -45,7 +45,7 @@ function Runtime.New(clock)
         e.units[#e.units + 1] = u
         function u:GetAttribute(k) return self.attrs[k] end
         function u:SetAttribute(k, v) self.attrs[k] = v end
-        function u:GetComponent() return nil end
+        function u:get_component() return nil end
         function u:IsA(kind) return kind == 'BindableEvent' end
         function u:GetChildren()
             local result = {}
@@ -123,7 +123,7 @@ function Runtime.New(clock)
         advance_spoke_to(e.now)
     end
 
-    function e.loadModifier()
+    function e.load_modifier()
         local loaded = {}
         local env = setmetatable({ game = e.game, RemoteEvent = e.remote }, { __index = _G })
         env.require = function(name)
@@ -151,9 +151,9 @@ function Runtime.New(clock)
         }
 
         local function apply_dot(target, damage, source)
-            if mgr.Vitals and mgr.Vitals.NewHit and mgr.Vitals.ApplyHit then
-                local hit = mgr.Vitals:NewHit(source, 'dot')
-                mgr.Vitals:ApplyHit(hit, target, damage)
+            if mgr.Vitals and mgr.Vitals.new_hit and mgr.Vitals.apply_hit then
+                local hit = mgr.Vitals:new_hit(source, 'dot')
+                mgr.Vitals:apply_hit(hit, target, damage)
             end
         end
 
@@ -193,8 +193,8 @@ function Runtime.New(clock)
         local function resolve_entity(target)
             if type(target) ~= 'table' then return target end
             if target.Carrier then return target end
-            if mgr.Vitals and mgr.Vitals.FishCarrier and mgr.Vitals.FishCarrier.ResolveCarrier then
-                local carrier = mgr.Vitals.FishCarrier:ResolveCarrier(target)
+            if mgr.Vitals and mgr.Vitals.FishCarrier and mgr.Vitals.FishCarrier.resolve_carrier then
+                local carrier = mgr.Vitals.FishCarrier:resolve_carrier(target)
                 if carrier then return { Carrier = carrier, Ref = target } end
             end
             return target
@@ -233,8 +233,8 @@ function Runtime.New(clock)
                                 initialized = true
                                 return
                             end
-                            if not mgr.Departing[player.UserId] and mgr.Ability and mgr.Ability.RefreshMoveSpeed then
-                                mgr.Ability:RefreshMoveSpeed(player)
+                            if not mgr.Departing[player.UserId] and mgr.Ability and mgr.Ability.refresh_move_speed then
+                                mgr.Ability:refresh_move_speed(player)
                             end
                         end)
                     end,
@@ -257,8 +257,8 @@ function Runtime.New(clock)
                 local prev_mult = pt.memos.move_multiplier:now()
                 local ok, err = pt:apply_modifier(kind, { duration = seconds, source = source })
                 if ok and pt.memos.move_multiplier:now() == prev_mult
-                    and not self.Departing[player.UserId] and self.Ability and self.Ability.RefreshMoveSpeed then
-                    self.Ability:RefreshMoveSpeed(player)
+                    and not self.Departing[player.UserId] and self.Ability and self.Ability.refresh_move_speed then
+                    self.Ability:refresh_move_speed(player)
                 end
                 return ok, err
             end
@@ -269,11 +269,11 @@ function Runtime.New(clock)
             return entity_store:apply(source, ent, kind, seconds)
         end
 
-        function mgr:ApplyWeaponEffect(source, target, effect)
+        function mgr:apply_weapon_effect(source, target, effect)
             return self:Apply(source, target, type(effect) == 'table' and effect.Kind or nil)
         end
 
-        function mgr:GetRemaining(target, kind)
+        function mgr:get_remaining(target, kind)
             local player = resolve_player(target)
             if player then
                 local pt = self.PlayerTrees[player.UserId]
@@ -283,7 +283,7 @@ function Runtime.New(clock)
             return entity_store:get_remaining(resolve_entity(target), kind)
         end
 
-        function mgr:IsControlled(target)
+        function mgr:is_controlled(target)
             local player = resolve_player(target)
             if player then
                 local pt = self.PlayerTrees[player.UserId]
@@ -292,7 +292,7 @@ function Runtime.New(clock)
             return entity_store:is_controlled(resolve_entity(target))
         end
 
-        function mgr:GetMoveMultiplier(target)
+        function mgr:get_move_multiplier(target)
             local player = resolve_player(target)
             if player then
                 local pt = self.PlayerTrees[player.UserId]
@@ -314,7 +314,7 @@ function Runtime.New(clock)
             entity_store:clear(resolve_entity(target), kind)
         end
 
-        function mgr:ClearTarget(target, keepWeak)
+        function mgr:clear_target(target, keepWeak)
             local player = resolve_player(target)
             if player then
                 local pt = self.PlayerTrees[player.UserId]
@@ -326,12 +326,12 @@ function Runtime.New(clock)
             entity_store:clear_target(resolve_entity(target))
         end
 
-        function mgr:Update()
+        function mgr:update()
             advance_spoke_to(e.now)
             entity_store:step(e.now)
         end
 
-        function mgr:OnCharacterRemoving(player)
+        function mgr:on_character_removing(player)
             self.Departing[player.UserId] = true
             local pt = self.PlayerTrees[player.UserId]
             if pt and not pt:is_disposed() then
@@ -339,22 +339,22 @@ function Runtime.New(clock)
             end
         end
 
-        function mgr:OnCharacterAdded(player)
+        function mgr:on_character_added(player)
             self.Departing[player.UserId] = nil
             local pt = self.PlayerTrees[player.UserId]
             if pt and not pt:is_disposed() then
                 pt:set_character(player.Character)
-                -- 若原角色直接替换（未经过 OnCharacterRemoving），确保非 weak 效果被清理
+                -- 若原角色直接替换（未经过 on_character_removing），确保非 weak 效果被清理
                 pt:clear_all_modifiers(true)
             end
         end
 
-        function mgr:OnPlayerAdded(player)
+        function mgr:on_player_added(player)
             self.Departing[player.UserId] = nil
             ensure_player_tree(player)
         end
 
-        function mgr:OnPlayerRemoving(player)
+        function mgr:on_player_removing(player)
             self.Departing[player.UserId] = true
             local pt = self.PlayerTrees[player.UserId]
             if pt then
@@ -377,9 +377,9 @@ function Runtime.New(clock)
 end
 
 -- 旧生存测试接入真实 SpokeClock + PlayerEffects + ModifierLeaf；速度投影是可观测边界，不复制效果计时。
-function Runtime.AttachSurvival(survival, now)
+function Runtime.attach_survival(survival, now)
     local e = Runtime.New(now())
-    local modifier = e.loadModifier()
+    local modifier = e.load_modifier()
     local syncing = false
     local function sync(player)
         if not syncing then
@@ -393,19 +393,19 @@ function Runtime.AttachSurvival(survival, now)
             for k, v in pairs(unit) do if player.Character[k] == nil then player.Character[k] = v end end
         end
     end
-    local apply, left = modifier.Apply, modifier.GetRemaining
+    local apply, left = modifier.Apply, modifier.get_remaining
     function modifier:Apply(source, target, kind, seconds) sync(target); return apply(self, source, target, kind, seconds) end
-    function modifier:GetRemaining(target, kind) sync(target); return left(self, target, kind) end
+    function modifier:get_remaining(target, kind) sync(target); return left(self, target, kind) end
     local bases = {}
     survival.Modifier = modifier
-    survival.SpeedWriter = { RefreshMoveSpeed = function(_, player)
+    survival.SpeedWriter = { refresh_move_speed = function(_, player)
         local controller = player.Character and player.Character.Controller
         if not controller then return false end
         bases[player.UserId] = bases[player.UserId] or controller.WalkSpeed
-        controller.WalkSpeed = bases[player.UserId] * modifier:GetMoveMultiplier(player)
+        controller.WalkSpeed = bases[player.UserId] * modifier:get_move_multiplier(player)
         return true
     end }
-    modifier.Ability = { RefreshMoveSpeed = function(_, player) return survival.SpeedWriter:RefreshMoveSpeed(player) end }
+    modifier.Ability = { refresh_move_speed = function(_, player) return survival.SpeedWriter:refresh_move_speed(player) end }
     return modifier
 end
 

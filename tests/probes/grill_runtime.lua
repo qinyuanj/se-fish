@@ -11,7 +11,7 @@ local curve = require('common.grill_curve')
 local world, task = game:GetService('World'), game:GetService('Task')
 local player = game:GetService('Players'):GetPlayers()[1]
 if not player then print('GRILL137 ABORT 没有玩家') return end
-local data = pd:GetDataInst(player)
+local data = pd:get_data_inst(player)
 if not data then print('GRILL137 ABORT 存档未就绪') return end
 _G.Grill137 = _G.Grill137 or { token = 0, seq = 137000 }
 local rt = _G.Grill137
@@ -55,7 +55,7 @@ local function grillableSlot(wantToken)
         for index, entry in pairs(container) do
             local def = entry.itemId and cfg.Items.Definitions[entry.itemId]
             if entry.count > 0 and def and (def.Type == '食物' or def.Type == '极品食物')
-                and cfg.Items.CookRate(entry) == nil
+                and cfg.Items.cook_rate(entry) == nil
                 and (wantToken == nil or isToken(entry.itemId) == wantToken) then
                 return containerId, index, entry
             end
@@ -103,12 +103,12 @@ if not entryA then log('ABORT 没有未烤鱼获，请先钓鱼') return end
 selectEntry(cidA, idxA)
 log('场景A 投入', entryA.itemId, 'mult=' .. tostring(entryA.mult), 'token=' .. tostring(tokenA))
 if tokenA then
-    _G.REUtil:GetRE('GrillAction'):FireServer({ action = 'Start', seq = nextSeq() })
+    _G.REUtil:get_re('GrillAction'):FireServer({ action = 'Start', seq = nextSeq() })
     log('场景A 信物未确认请求已发（期望 token-warn 且不扣物）')
     task:Wait(0.3)
     log('场景A 信物仍在库存', data:ItemCount(entryA.itemId))
 end
-_G.REUtil:GetRE('GrillAction'):FireServer({ action = 'Start', seq = nextSeq(), confirm = true })
+_G.REUtil:get_re('GrillAction'):FireServer({ action = 'Start', seq = nextSeq(), confirm = true })
 
 task:Spawn(function()
     local session = waitSession()
@@ -117,12 +117,12 @@ task:Spawn(function()
     local startedAt = session.startedAt
     local waitA = 2 - (world:GetServerTime() - startedAt)
     if waitA > 0 then task:Wait(waitA) end
-    _G.REUtil:GetRE('GrillAction'):FireServer({ action = 'Takeout', seq = nextSeq() })
+    _G.REUtil:get_re('GrillAction'):FireServer({ action = 'Takeout', seq = nextSeq() })
     task:Wait(0.5) -- 取出同样是异步落账
     local elapsed = world:GetServerTime() - startedAt
     local back = findCooked(entryA.itemId)
     log('场景A 取出', 'elapsed=' .. curve.Format(elapsed),
-        '曲线倍率=' .. curve.Format(curve.Rate(elapsed, cfg.Grill) or -1),
+        '曲线倍率=' .. curve.Format(curve.rate(elapsed, cfg.Grill) or -1),
         '格位cooked=' .. tostring(back and back.cooked),
         'saved.k=' .. tostring(back and back.saved and back.saved.k),
         '选中格=' .. tostring(data.Data.SelectedSlot))
@@ -132,7 +132,7 @@ task:Spawn(function()
     if not entryB then log('场景B 跳过：没有第二条未烤的非信物鱼获') log('观察结束') return end
     selectEntry(cidB, idxB)
     log('场景B 投入', entryB.itemId)
-    _G.REUtil:GetRE('GrillAction'):FireServer({ action = 'Start', seq = nextSeq() })
+    _G.REUtil:get_re('GrillAction'):FireServer({ action = 'Start', seq = nextSeq() })
     local sessionB = waitSession()
     if not sessionB then log('场景B ABORT 开烤未成立') log('观察结束') return end
     local before = health()

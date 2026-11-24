@@ -5,7 +5,7 @@
 -- 末尾还钉住 GameCfg.FishCarrier 的 mesh id 写法与模型号号段（M0-V3 / #31）——那是 GameCfg 的另一处
 -- 实测配置真值，写错鱼建不出来（F-7 的 [未查证] 已消除，见 common/game_cfg.lua 该段注释）。
 -- 迁移自 tests/gameplay/water_judge_test.lua（#83）。旧入口有 5 个 LuaUnit 类，按「类名字典序 +
--- 类内方法名字典序」展开（等价于旧入口对 ClassName.method 全名的排序）；本文件无 setUp/tearDown，
+-- 类内方法名字典序」展开（等价于旧入口对 ClassName.method 全名的排序）；本文件无 set_up/tear_down，
 -- 因此不额外注册钩子。it 顺序与迁移前逐条对账。
 local GameCfg = require("common.game_cfg")
 local MathWaterJudge = require("common.math_water_judge")
@@ -44,9 +44,9 @@ local function at(x, y, z)
   return { x = x, y = y, z = z }
 end
 
--- 落到水圈的判定统一用装配出来的判定器（与业务同一条路径），不直接调 InZone。
+-- 落到水圈的判定统一用装配出来的判定器（与业务同一条路径），不直接调 in_zone。
 local function inWater(pos)
-  return MathWaterJudge.Build(zones())(pos) ~= nil
+  return MathWaterJudge.build(zones())(pos) ~= nil
 end
 
 local PRESET_PREFIX = "official://preset/"
@@ -142,7 +142,7 @@ describe("TestWaterJudgeBoundary", function()
 
   -- 5) 贴边 +0.1m：超出半宽 0.1m 不算在水里。
   it("test_edge_outside_by_point_one_meter_is_not_in_water", function()
-    assert.is_false(MathWaterJudge.InZone(zoneById("fishPond.water"),
+    assert.is_false(MathWaterJudge.in_zone(zoneById("fishPond.water"),
       at(CENTER_X + OUTER_HALF + 0.1, UNDER_WATER_Y, CENTER_Z)))
   end)
 
@@ -155,18 +155,18 @@ end)
 describe("TestWaterJudgeConfig", function()
   -- 配错要当场报错，不能静默退化成「永远不在水里」。
   it("test_build_rejects_empty_zones", function()
-    assert.error_matches(function() MathWaterJudge.Build({}) end, "水区配置为空", nil, true)
+    assert.error_matches(function() MathWaterJudge.build({}) end, "水区配置为空", nil, true)
   end)
 
   it("test_build_rejects_missing_field", function()
     assert.error_matches(function()
-      MathWaterJudge.Build({ { Id = "Bad", Center = { x = 0, z = 0 }, HalfXZ = 1.0 } })
+      MathWaterJudge.build({ { Id = "Bad", Center = { x = 0, z = 0 }, HalfXZ = 1.0 } })
     end, "SurfaceY", nil, true)
   end)
 
   it("test_build_rejects_non_positive_half_width", function()
     assert.error_matches(function()
-      MathWaterJudge.Build({ { Id = "Bad", Center = { x = 0, z = 0 }, HalfXZ = 0, SurfaceY = 1.0 } })
+      MathWaterJudge.build({ { Id = "Bad", Center = { x = 0, z = 0 }, HalfXZ = 0, SurfaceY = 1.0 } })
     end, "HalfXZ", nil, true)
   end)
 
@@ -193,9 +193,9 @@ describe("TestWaterJudgeSemantics", function()
     assert.is_true(inWater(at(CENTER_X, SURFACE_Y, CENTER_Z + OUTER_HALF)))
   end)
 
-  -- 同心时按配置顺序命中排在前的那个（Build 的行为契约，M1 按水区选鱼表要看这个）。
+  -- 同心时按配置顺序命中排在前的那个（build 的行为契约，M1 按水区选鱼表要看这个）。
   it("test_build_returns_the_first_matching_zone", function()
-    local judge = MathWaterJudge.Build(zones())
+    local judge = MathWaterJudge.build(zones())
     local hit = judge(at(CENTER_X, UNDER_WATER_Y, CENTER_Z))
     assert.are.equal("fishPond.water", hit.Id)
     assert.is_nil(judge(at(CENTER_X, AIR_Y, CENTER_Z)))
@@ -206,8 +206,8 @@ describe("TestWaterJudgeSemantics", function()
     local outer = zoneById("fishPond.water")
     local inner = { Center = outer.Center, HalfXZ = 3, SurfaceY = outer.SurfaceY }
     local pos = at(CENTER_X + 5.0, UNDER_WATER_Y, CENTER_Z)
-    assert.is_true(MathWaterJudge.InZone(outer, pos))
-    assert.is_false(MathWaterJudge.InZone(inner, pos))
+    assert.is_true(MathWaterJudge.in_zone(outer, pos))
+    assert.is_false(MathWaterJudge.in_zone(inner, pos))
   end)
 
   -- 水面 y≈2.183 高于大地板表面 y=2.0（#31 改正：Position.y 是底面、Size.y 是包围盒半长）：
@@ -222,7 +222,7 @@ describe("TestWaterJudgeSemantics", function()
   -- Z 轴与 X 轴对称（判定是「水平方框」不是圆）。
   it("test_z_axis_edge_matches_x_axis", function()
     assert.is_true(inWater(at(CENTER_X, UNDER_WATER_Y, CENTER_Z + OUTER_HALF - 0.1)))
-    assert.is_false(MathWaterJudge.InZone(zoneById("fishPond.water"),
+    assert.is_false(MathWaterJudge.in_zone(zoneById("fishPond.water"),
       at(CENTER_X, UNDER_WATER_Y, CENTER_Z + OUTER_HALF + 0.1)))
   end)
 end)
@@ -237,7 +237,7 @@ describe("TestWaterJudgeToward", function()
 
   it("test_points_to_nearest_edge_not_center", function()
     local long = rect("long", 10, 20, -200, 200)
-    local dx, dz = MathWaterJudge.Toward({ long }, { x = 0, z = 150 })
+    local dx, dz = MathWaterJudge.toward({ long }, { x = 0, z = 150 })
     assert.are.equal(1, dx)
     assert.are.equal(0, dz)
   end)
@@ -245,13 +245,13 @@ describe("TestWaterJudgeToward", function()
   it("test_picks_nearest_rect_by_edge_distance", function()
     local bigFar = rect("big", -400, -30, -400, 400)
     local smallNear = rect("small", 5, 9, -2, 2)
-    local dx, dz = MathWaterJudge.Toward({ bigFar, smallNear }, { x = 0, z = 0 })
+    local dx, dz = MathWaterJudge.toward({ bigFar, smallNear }, { x = 0, z = 0 })
     assert.are.equal(1, dx)
     assert.are.equal(0, dz)
   end)
 
   it("test_returns_nil_inside_or_without_waters", function()
-    assert.is_nil(MathWaterJudge.Toward({ rect("a", -1, 1, -1, 1) }, { x = 0, z = 0 }))
-    assert.is_nil(MathWaterJudge.Toward({}, { x = 0, z = 0 }))
+    assert.is_nil(MathWaterJudge.toward({ rect("a", -1, 1, -1, 1) }, { x = 0, z = 0 }))
+    assert.is_nil(MathWaterJudge.toward({}, { x = 0, z = 0 }))
   end)
 end)

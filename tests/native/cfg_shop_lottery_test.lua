@@ -42,7 +42,7 @@ describe("TestContentCfg", function()
   -- 而分片跑时没有别的文件把锚点入口装回来，抽奖结算全部被范围校验拒绝。
   it("test_lottery_content_table_holds_no_runtime_keys_across_gamecfg_reload", function()
     local ZoneFixtures = require('tests.support.zone_fixtures')
-    ZoneFixtures.Load()
+    ZoneFixtures.load()
     local content = require('common.cfg.lottery')
     local before = {}
     for key in pairs(content) do before[#before + 1] = key end
@@ -50,14 +50,14 @@ describe("TestContentCfg", function()
     for key, value in pairs(content) do
       assert.are_not.equal('function', type(value), '内容表不能承载运行期函数：' .. tostring(key))
     end
-    local anchors = require('common.game_cfg').Lottery.MachineAnchors
+    local anchors = require('common.game_cfg').Lottery.machine_anchors
     assert(loadfile('common/game_cfg.lua'))()
     local after = {}
     for key in pairs(content) do after[#after + 1] = key end
     table.sort(after)
     assert.same(before, after)
     -- 重载换不掉已加载模块表上的可调用入口：函数指针原样，锚点仍取同一份场景解析结果
-    assert.is_true(anchors == require('common.game_cfg').Lottery.MachineAnchors)
+    assert.is_true(anchors == require('common.game_cfg').Lottery.machine_anchors)
     assert.same({ 'Z1_Lottery', 'Z2_Lottery', 'Z3_Lottery', 'Z4_Lottery', 'Z5_Lottery', 'Z6_Lottery', 'Z7_Lottery' },
       anchors())
     -- 判奖口径只留两个字符串（common/lottery_draw.lua 的判奖注释按它们写死）；权重、倍率、五件武器组、

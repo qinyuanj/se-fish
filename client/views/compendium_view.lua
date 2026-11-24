@@ -101,7 +101,7 @@ function CompendiumView.modal_spec()
         row.button.ButtonText = (bag.unlocked and bag.unlocked[row.id]) and row.fish.Name or "？？？"
         if row.id == selected then
           local personal = bag.weights and bag.weights[row.id] or nil
-          local recordText = Records.Describe(record)
+          local recordText = Records.describe(record)
           if type(record) == "table" and record.stale then recordText = recordText .. "（数据可能过期）" end
           detail.Text = string.format("%s｜品级：%s｜钓鱼区：%s\n个人最大钓取重量：%s\n全服纪录：%s",
             unlocked and row.fish.Name or "？？？", GRADES[row.fish.Grade] or tostring(row.fish.Grade),

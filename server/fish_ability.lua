@@ -53,7 +53,7 @@ local function createAnchor(abilityScript, entry)
         anchor:Destroy()
         return nil
     end
-	local ok, err = pcall(AbilityAPI.AttachAnchor, anchor, entry.AnchorBehavior)
+	local ok, err = pcall(AbilityAPI.attach_anchor, anchor, entry.AnchorBehavior)
 	if not ok or err ~= true then
 		print("[FishAbility] 锚点挂接失败: " .. tostring(err))
         local removed, removeError = pcall(function() anchor:Destroy() end)
@@ -63,13 +63,13 @@ local function createAnchor(abilityScript, entry)
 	return anchor
 end
 
-function FishAbility:RemoveFish(fish)
-    if self.Modifier then self.Modifier:ClearTarget(fish) end
+function FishAbility:remove_fish(fish)
+    if self.Modifier then self.Modifier:clear_target(fish) end
     local record = fish.AbilityRecord
     if not record then return end
     record.Cancelled = true
     if record.Ready then
-        local ok, err = pcall(AbilityPackageAPI.StopAbility, record.Receiver, record.Entry.Index)
+        local ok, err = pcall(AbilityPackageAPI.StopAbility, record.Receiver, record.entry.Index)
         if not ok then print('[FishAbility] 停止鱼技能失败', fish.Id, tostring(err)) end
     end
     local ok, err = pcall(function() record.Manager:Destroy() end)
@@ -84,7 +84,7 @@ function FishAbility:RemoveFish(fish)
     fish.AbilityRecord = nil
 end
 
-function FishAbility:EquipFish(fish)
+function FishAbility:equip_fish(fish)
     if fish.AbilityRecord then return true end
     local species = GameCfg.Fish[fish.FishId]
     local entry = GameCfg.Ability.FishAbilities[species.Combat]
@@ -92,14 +92,14 @@ function FishAbility:EquipFish(fish)
     if not entry or not receiver then return false end
     local manager = createManager(receiver, GameCfg.Ability.ManagerPreset)
     if not manager then return false end
-    local record = { Manager = manager, Receiver = receiver, Entry = entry }
+    local record = { Manager = manager, Receiver = receiver, entry = entry }
     fish.AbilityRecord = record
     Task:Spawn(function()
         local ok, err = pcall(function()
         for _ = 1, EQUIP_RETRY_COUNT do
             if record.Cancelled then return end
-            if fish.Carrier.Dead then self:RemoveFish(fish) return end
-            local ability = AbilityPackageAPI.AddAbility(receiver, entry.AssetId, entry.Index)
+            if fish.Carrier.Dead then self:remove_fish(fish) return end
+            local ability = AbilityPackageAPI.add_ability(receiver, entry.AssetId, entry.Index)
             if ability then
                 ability:SetAttribute('CastTime', entry.CastSec)
                 ability:SetAttribute('CdTime', 0)
@@ -109,7 +109,7 @@ function FishAbility:EquipFish(fish)
                     AnchorAttributes = { Duration = 0, StartTime = 0, DischargeRadius = entry.Radius,
                         DischargeDamage = entry.Damage or species.Attack },
                 })
-                if not anchor then self:RemoveFish(fish) return end
+                if not anchor then self:remove_fish(fish) return end
                 record.Ready = true
                 print('[FishAbility] 电鳗技能就绪', fish.Id)
                 return
@@ -118,25 +118,25 @@ function FishAbility:EquipFish(fish)
         end
         if not record.Cancelled then
             print('[FishAbility] 电鳗技能装配超时', fish.Id)
-            self:RemoveFish(fish)
+            self:remove_fish(fish)
         end
         end)
         if not ok then
             print('[FishAbility] 电鳗技能装配失败', fish.Id, tostring(err))
-            self:RemoveFish(fish)
+            self:remove_fish(fish)
         end
     end)
     return true
 end
 
-function FishAbility:CastFish(fish)
+function FishAbility:cast_fish(fish)
     local record = fish.AbilityRecord
     if not record or not record.Ready or record.Cancelled or fish.Carrier.Dead then return false end
-    if self.Ai then return self.Ai:CastFish(fish) end
-    return AbilityAPI.CastAbility(record.Receiver, record.Entry.Index)
+    if self.Ai then return self.Ai:cast_fish(fish) end
+    return AbilityAPI.cast_ability(record.Receiver, record.entry.Index)
 end
 
-function FishAbility:CanCast(unit)
+function FishAbility:can_cast(unit)
 	local player = unit and unit.UserId and unit or nil
 	if not player and unit then
 		local players = game:GetService("Players")
@@ -148,30 +148,30 @@ function FishAbility:CanCast(unit)
 	end
 	if not player then return true end
 	if not self.Vitals then return true end
-	return self.Vitals:CanAct(player)
+	return self.Vitals:can_act(player)
 end
 
-function FishAbility:PotionCount(player, itemId)
-	if not self.PlayerData or not self.PlayerData.GetDataInst then return 0 end
+function FishAbility:potion_count(player, itemId)
+	if not self.PlayerData or not self.PlayerData.get_data_inst then return 0 end
 	local ok, count = pcall(function()
-		local data = self.PlayerData:GetDataInst(player)
-		return data and data:PotionCount(itemId) or 0
+		local data = self.PlayerData:get_data_inst(player)
+		return data and data:potion_count(itemId) or 0
 	end)
 	if ok and type(count) == 'number' then return count end
 	return 0
 end
 
-function FishAbility:BodyPlan(player)
-	return self.Attr:BodyPlan(player)
+function FishAbility:body_plan(player)
+	return self.Attr:body_plan(player)
 end
 
-function FishAbility:ApplyBodyScale(player)
-	return self.Attr:ApplyBodyScale(player)
+function FishAbility:apply_body_scale(player)
+	return self.Attr:apply_body_scale(player)
 end
 
 
-function FishAbility:CaptureBaseSpeed(player)
-	return self.Attr:CaptureBaseSpeed(player)
+function FishAbility:capture_base_speed(player)
+	return self.Attr:capture_base_speed(player)
 end
 
 function FishAbility:MaxHealth(player)
@@ -187,8 +187,8 @@ local function queueSpeed(self, player, err)
 	return false, tostring(err)
 end
 
-function FishAbility:RefreshMoveSpeed(player)
-	local ok, err = self.Attr:RefreshMoveSpeed(player)
+function FishAbility:refresh_move_speed(player)
+	local ok, err = self.Attr:refresh_move_speed(player)
 	if not ok then
 		return queueSpeed(self, player, err)
 	end
@@ -196,8 +196,8 @@ function FishAbility:RefreshMoveSpeed(player)
 	return true
 end
 
-function FishAbility:ApplyGrowth(player)
-	local applied = self.Attr:ApplyGrowth(player)
+function FishAbility:apply_growth(player)
+	local applied = self.Attr:apply_growth(player)
 	local retryGrowth = not applied.Ok
 	if retryGrowth then
 		self.PendingGrowth = self.PendingGrowth or {}
@@ -207,54 +207,54 @@ function FishAbility:ApplyGrowth(player)
 end
 
 
-function FishAbility:Now()
+function FishAbility:now()
 	local ok, now = pcall(function() return World:GetServerTime() end)
 	return ok and now or 0
 end
 
-function FishAbility:UpdateEffects()
-	return self.Modifier:Update()
+function FishAbility:update_effects()
+	return self.Modifier:update()
 end
 
-function FishAbility:IsParalyzed(player)
-	return self.Modifier:IsControlled(player)
+function FishAbility:is_paralyzed(player)
+	return self.Modifier:is_controlled(player)
 end
 
-function FishAbility:FishSpeedFactor(fish)
-	return self.Modifier:GetMoveMultiplier(fish)
+function FishAbility:fish_speed_factor(fish)
+	return self.Modifier:get_move_multiplier(fish)
 end
 
-function FishAbility:FishParalyzed(fish)
-	return self.Modifier:IsControlled(fish)
+function FishAbility:fish_paralyzed(fish)
+	return self.Modifier:is_controlled(fish)
 end
 
 function FishAbility:Start()
 	AbilityAPI.BehaviorServices = self.BehaviorServices
-	AbilityAPI.SetCastGuard(function(unit, index) return self:CanCast(unit) end)
+	AbilityAPI.set_cast_guard(function(unit, index) return self:can_cast(unit) end)
 end
 
-function FishAbility:OnPlayerAdded(player)
+function FishAbility:on_player_added(player)
 	-- 玩家角色能力管理器挂载与角色生命周期监听已迁至 PlayerTree / AbilityLeaf；
 	-- 角色就绪时补做一次成长与血量上限首刷。
 	if player and player.Character then
-		self:CaptureBaseSpeed(player)
-		self:ApplyGrowth(player)
+		self:capture_base_speed(player)
+		self:apply_growth(player)
 	end
 end
 
-function FishAbility:OnPlayerRemoving(player)
+function FishAbility:on_player_removing(player)
 	if self.PendingGrowth then self.PendingGrowth[player.UserId] = nil end
 	if self.PendingSpeed then self.PendingSpeed[player.UserId] = nil end
 end
 
-function FishAbility:Update(deltaTime)
-    for fish in pairs(self.PendingFishCleanup) do self:RemoveFish(fish) end
+function FishAbility:update(deltaTime)
+    for fish in pairs(self.PendingFishCleanup) do self:remove_fish(fish) end
     local retrySpeed = {}
     for uid, player in pairs(self.PendingSpeed or {}) do retrySpeed[uid] = player end
     for uid, player in pairs(retrySpeed) do
-        if self.PendingSpeed and self.PendingSpeed[uid] == player then self:RefreshMoveSpeed(player) end
+        if self.PendingSpeed and self.PendingSpeed[uid] == player then self:refresh_move_speed(player) end
     end
-    for _, player in pairs(self.PendingGrowth or {}) do self:ApplyGrowth(player) end
+    for _, player in pairs(self.PendingGrowth or {}) do self:apply_growth(player) end
 end
 
 return FishAbility

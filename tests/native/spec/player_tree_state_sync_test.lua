@@ -189,9 +189,9 @@ describe("PlayerTree #297-A1b：单批合并推送、属性即时重算与存档
     -- Stage 2 属性派生即时重算
     assert.equals(480, pt.memos.max_health:now())
     assert.near(1.6, pt.memos.body_scale:now(), 1e-9)
-    assert.near(BodyScale.Derive(1.6).CameraDistance, pt.memos.body_derived:now().CameraDistance, 1e-9)
+    assert.near(BodyScale.derive(1.6).CameraDistance, pt.memos.body_derived:now().CameraDistance, 1e-9)
     assert.near(8 * 1.4, pt.memos.walk_speed:now(), 1e-9)
-    assert.near(GameCfg.Shop.DamageScale("melee", 2), pt.memos.weapon_damage_scales:now().melee, 1e-9)
+    assert.near(GameCfg.Shop.damage_scale("melee", 2), pt.memos.weapon_damage_scales:now().melee, 1e-9)
 
     -- 存档镜像已同步写回 data.Data / data.Extra
     assert.equals(550, data.Data.FishCoin)

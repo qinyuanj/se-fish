@@ -30,7 +30,7 @@ function Gesture:Begin(t, pos)
     return true
 end
 
-function Gesture:Update(t)
+function Gesture:update(t)
     if not self.Active then return false end
     if self.Canceled or self.LongFired then return false end
     if t - (self.StartT or t) >= self.LongPressSec then

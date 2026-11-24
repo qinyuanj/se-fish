@@ -1,5 +1,5 @@
 -- #179 主界面布局模块（client.main_hud_layout）：纯函数，只断言约束，不断言具体坐标。
--- 接缝：MainHudLayout.Compute(input) 的输出矩形 + MainHudLayout.PopupCells(layout, kind, count)。
+-- 接缝：MainHudLayout.compute(input) 的输出矩形 + MainHudLayout.popup_cells(layout, kind, count)。
 --
 -- 动手前列出的失败方式（本文件逐条覆盖）：
 --   1. 常驻控件两两重叠（结束收线压攻击键、提示行互叠、入口组叠在一起……）；
@@ -17,7 +17,7 @@
 -- 参数矩阵（提速，2026-11-18）：原来是「屏高 × 格数 × 是否收线」的 16 组全组合。
 -- 有意义的只是三个因子的两两组合——每个屏高都配过两种格数、两种收线态，每个格数也都配过
 -- 两种收线态。改成 8 组两两覆盖后，任一「对」因子取值仍各出现一次；被略去的 8 组只会
--- 让三个因子同时取到第三档，不产生新的几何约束（Compute 是纯函数，同组输入只算一次）。
+-- 让三个因子同时取到第三档，不产生新的几何约束（compute 是纯函数，同组输入只算一次）。
 --
 -- 断言消息（同一轮提速）：以前每个「通过」的断言也拼一次 string.format 与 describe_rect，
 -- 单是 popup 用例就有数万次格式化，是文件级 2.2 s 的主要来源。现在只在失败分支里拼。
@@ -87,7 +87,7 @@ local function residents(layout)
     return out
 end
 
--- Compute 是纯函数（test_compute_is_pure_and_rejects_bad_input 逐条断言）：同样的输入只算一次。
+-- compute 是纯函数（test_compute_is_pure_and_rejects_bad_input 逐条断言）：同样的输入只算一次。
 local LAYOUTS = {}
 
 local function each_case(fn)
@@ -96,7 +96,7 @@ local function each_case(fn)
         local key = string.format('%d:%d:%s', height, slots, tostring(reeling))
         local layout = LAYOUTS[key]
         if not layout then
-            layout = MainHudLayout.Compute({ width = 1920, height = height,
+            layout = MainHudLayout.compute({ width = 1920, height = height,
                 itemBarSlots = slots, reeling = reeling })
             LAYOUTS[key] = layout
         end
@@ -120,11 +120,11 @@ describe('主界面布局模块', function()
         each_case(function(layout, case)
             for _, region in ipairs(REGION_NAMES) do
                 local entry = layout.Regions[region]
-                if type(entry) ~= 'table' or type(entry.Bounds) ~= 'table' then
+                if type(entry) ~= 'table' or type(entry.bounds) ~= 'table' then
                     fail('%s %s 区域或边界缺失', case, region)
                 end
                 for name, rect in pairs(entry.Controls) do
-                    if not inside(rect, entry.Bounds) then
+                    if not inside(rect, entry.bounds) then
                         fail('%s %s.%s 越出自己的区域', case, region, name)
                     end
                     if rect ~= layout.Rects[name] then
@@ -190,7 +190,7 @@ describe('主界面布局模块', function()
 
     it('test_top_reserved_follow_screen_top', function()
         -- 左上系统按钮组实测在 1238 高时离顶 77–181；换算到 886 高时仍贴着顶部，而不是留在原 y
-        local low = MainHudLayout.Compute({ width = 1920, height = 886, itemBarSlots = 2 })
+        local low = MainHudLayout.compute({ width = 1920, height = 886, itemBarSlots = 2 })
         local found
         for _, zone in ipairs(low.Reserved) do
             local left, _, _, top = edges(zone.rect)
@@ -203,11 +203,11 @@ describe('主界面布局模块', function()
         each_case(function(layout, case, input)
             -- 角色周围至少留出 ±240 × ±150 的空白
             local core = { x = 960, y = input.height / 2, w = 480, h = 300 }
-            if not inside(core, layout.Regions.CenterClear.Bounds) then
+            if not inside(core, layout.Regions.CenterClear.bounds) then
                 fail('%s 中央留空区不足 ±240 × ±150', case)
             end
             for _, item in ipairs(residents(layout)) do
-                if overlaps(item.rect, layout.Regions.CenterClear.Bounds) then
+                if overlaps(item.rect, layout.Regions.CenterClear.bounds) then
                     fail('%s 中央留空区内有 %s', case, item.name)
                 end
             end
@@ -241,7 +241,7 @@ describe('主界面布局模块', function()
 
     it('test_quest_width_at_most_quarter_screen', function()
         each_case(function(layout, case)
-            local bounds = layout.Regions.QuestLeft.Bounds
+            local bounds = layout.Regions.QuestLeft.bounds
             if bounds.w > 1920 / 4 then fail('%s 任务区宽 %.0f 超过屏幕 1/4', case, bounds.w) end
             assert.is_not_nil(layout.Rects.QuestPanel, case)
             assert.is_not_nil(layout.Rects.QuestToggle, case)
@@ -304,7 +304,7 @@ describe('主界面布局模块', function()
             for kind, count in pairs(max) do
                 local bar = layout.Rects[kind .. 'Bar']
                 for n = 1, count do
-                    local cells = MainHudLayout.PopupCells(layout, kind, n)
+                    local cells = MainHudLayout.popup_cells(layout, kind, n)
                     if #cells ~= n then
                         fail('%s %s 候选 %d 只生成 %d 格', case, kind, n, #cells)
                     end
@@ -336,13 +336,13 @@ describe('主界面布局模块', function()
     end)
 
     it('test_compute_is_pure_and_rejects_bad_input', function()
-        local a = MainHudLayout.Compute({ width = 1920, height = 1080, itemBarSlots = 8 })
-        local b = MainHudLayout.Compute({ width = 1920, height = 1080, itemBarSlots = 8 })
+        local a = MainHudLayout.compute({ width = 1920, height = 1080, itemBarSlots = 8 })
+        local b = MainHudLayout.compute({ width = 1920, height = 1080, itemBarSlots = 8 })
         assert.same(a, b)
         assert.is_not.equal(a, b) -- 每次返回新表，调用方改动不串到下一次
         -- 道具栏格数越界时夹到 2–8
-        assert.same(8, #MainHudLayout.Compute({ width = 1920, height = 1080, itemBarSlots = 20 }).ItemBarSlots)
-        assert.same(2, #MainHudLayout.Compute({ width = 1920, height = 1080, itemBarSlots = 0 }).ItemBarSlots)
-        assert.same(2, #MainHudLayout.Compute({ width = 1920, height = 1080 }).ItemBarSlots)
+        assert.same(8, #MainHudLayout.compute({ width = 1920, height = 1080, itemBarSlots = 20 }).ItemBarSlots)
+        assert.same(2, #MainHudLayout.compute({ width = 1920, height = 1080, itemBarSlots = 0 }).ItemBarSlots)
+        assert.same(2, #MainHudLayout.compute({ width = 1920, height = 1080 }).ItemBarSlots)
     end)
 end)

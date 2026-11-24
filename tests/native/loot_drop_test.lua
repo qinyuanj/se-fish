@@ -20,8 +20,8 @@ local function open()
   local clock = SpokeClock.new(20)
   local runtime = ServerRuntime.new({
     clock = clock, initial_now = 20,
-    remote = { GetRE = function(_, n) return event(n) end, CheckRECD = function() return false end },
-    player_data = { GetDataInst = function(_, p) return data_of[p.UserId] end },
+    remote = { get_re = function(_, n) return event(n) end, check_recd = function() return false end },
+    player_data = { get_data_inst = function(_, p) return data_of[p.UserId] end },
     players = function() return players end,
     create_unit = function()
       local unit = { Destroyed = false }
@@ -93,7 +93,7 @@ describe("共享掉落的地面侧", function()
     assert.equals(1, env:alive())
     local id = env:rows()[1].id
     env:pickup(a, id)
-    env:pickup(env.runtime.life:PlayerByUserId(2), id)
+    env:pickup(env.runtime.life:player_by_user_id(2), id)
     local held, other = 0, 0
     for _, slot in pairs(env.runtime:get_player_tree(1):get_item_bar_snapshot().slots) do
       if type(slot) == "table" and slot.itemId == "carp" then held = held + 1 end

@@ -15,16 +15,16 @@
 --      本岛最高竿级也摸不到池里某一行（死行）、首领混进普通抽鱼池。
 --
 -- 留下的六类断言都是行为或跨真源守卫（真源 ↔ 真源）：
---   1. 模型号：岛鱼 Fish[x].Model 必须在 GameCfg.FishCarrier.Models 里。ContentValidation.Check 不查
+--   1. 模型号：岛鱼 Fish[x].Model 必须在 GameCfg.FishCarrier.Models 里。ContentValidation.check 不查
 --      Model 字段，写错的号要到 MgrFishUnit 建鱼时才会炸。
 --   2. 三表绑定：Content.Exchanges[i] ↔ Interact.Fishermen[i] ↔ Ferry.Routes 的出岛腿必须说同一件事，
 --      船票再按物品表名字对下一座岛。ContentValidation L112-126 只查 Exchanges 内部（鱼种、信物、
 --      兑换物各自存在），跨表错位没人查。
---   3. 摊位分级：本岛摊位等级 = 区序号（ZoneMarkers.Resolve 用 Shop.Stands[i] 找第 i 区摊位锚点）；
+--   3. 摊位分级：本岛摊位等级 = 区序号（ZoneMarkers.resolve 用 Shop.Stands[i] 找第 i 区摊位锚点）；
 --      本岛鱼饵 Zones[i].BaitItemId 与本岛抽鱼池要求的最高竿级对应的鱼竿是当地新品：
 --      本岛摊位买得到，低一级摊位买不到。
 --   4. 实装翻正：本岛抽鱼池与信物链上的每条鱼 implemented 必须为 true。
---   5. 可达性：在真实抽鱼池上跑 FishCatch.Select——不挂饵竿 1 只出保底行（含极品）、挂本岛饵竿 1
+--   5. 可达性：在真实抽鱼池上跑 FishCatch.select——不挂饵竿 1 只出保底行（含极品）、挂本岛饵竿 1
 --      抽不到高阶行、岛屿最高竿级摸得到池里每一行、首领由首领饵必出所以不入池。
 --      期望集合按池行的 Bait / RodLevel / Grade 派生，不抄 id 清单。
 --   6. 战斗标签在册：Fish[x].Combat 必须在 GameCfg.FishCombat 里有参数表（防御式取值，写错只会静默不攻击）。
@@ -32,11 +32,11 @@
 -- 砍掉的数值快照与接手方（接不住的就写「不再拦」）：
 --   13 行抽鱼池的逐行数值快照（每行饵 id、权重、竿级的字面量）与逐岛可行域快照 ——
 --     行内字段的合法性（竿级 1–7、权重/价格为正、饵与鱼种存在、编号不重复、七区各有普通池）
---     由 ContentValidation 接；FishCatch.Select 的竿级/饵过滤由 fish_loot_test、shrimp_pond_test、
+--     由 ContentValidation 接；FishCatch.select 的竿级/饵过滤由 fish_loot_test、shrimp_pond_test、
 --     growth_cleanup_test 接；逐行数字不再拦。可达性本身留在第 5 类（按池行派生）。
 --   水区 Center / HalfX / HalfZ 常量与「两区水区不相交」—— 原来拦的是 tests/support/zone_fixtures
---     自己造的灰盒坐标（基架自测）；进 Water.Zones / ZoneIdByWater 与重叠、越界由 ZoneMarkers.Resolve
---     自己 error，zone_fixtures.Load 在每个用夹具的测试里都会跑一遍。数值常量不再拦。
+--     自己造的灰盒坐标（基架自测）；进 Water.Zones / ZoneIdByWater 与重叠、越界由 ZoneMarkers.resolve
+--     自己 error，zone_fixtures.load 在每个用夹具的测试里都会跑一遍。数值常量不再拦。
 --   FishCombat 的二十多个数字 —— 表存在与消费由 beach_combat_test、forest_combat_test、
 --     crab_boss_combat_test、king_crab_combat_test 接（直接读 GameCfg.FishCombat.<名字>）；精确数字不再拦。
 --   票价与 Return.Price 常量 —— ferry_test 的 test_config_pins（10 × 3^(i-1)）接。
@@ -49,7 +49,7 @@
 --   信物链内部字段（EliteToken / BossToken / Result 等）—— ContentValidation L112-126 接。
 --   GrillName 与烧烤坐标 —— grill_test 的 test_anchors_cover_zones_three_to_seven 接（index ≥ 3 有 GrillName、
 --     更前面的区没有）；坐标本身是 zone_fixtures 的夹具值，不再拦。
---   「摊位锚点名 == 场景合同 ShopName」—— Scene.ShopName 由 ZoneMarkers.Resolve 从
+--   「摊位锚点名 == 场景合同 ShopName」—— Scene.ShopName 由 ZoneMarkers.resolve 从
 --     Shop.Stands[i].AnchorName 派生，再断言一次等于把实现抄一遍（复述），删。
 --   「精英 / 首领鱼带 Combat 标签」—— 标签到 GameCfg.FishCombat 的映射目前没人拦
 --     （MgrFishUnit 用 `GameCfg.FishCombat and GameCfg.FishCombat[species.Combat]` 防御式取值，
@@ -106,15 +106,15 @@ local function islandSpecies(island)
   return list
 end
 
--- 跑一遍真实抽签，收集 FishCatch.Select 在（竿级, 饵）下能抽到的全部鱼种。
--- 可用权重和直接用 Select 传给 random 的参数取出，不在这里重写它的过滤条件。
+-- 跑一遍真实抽签，收集 FishCatch.select 在（竿级, 饵）下能抽到的全部鱼种。
+-- 可用权重和直接用 select 传给 random 的参数取出，不在这里重写它的过滤条件。
 local function drawSet(rows, rodLevel, baitId)
   local total
-  FishCatch.Select(rows, rodLevel, baitId, function(max) total = max; return 1 end)
+  FishCatch.select(rows, rodLevel, baitId, function(max) total = max; return 1 end)
   local found = {}
   if not total then return found end
   for roll = 1, total do
-    local id = FishCatch.Select(rows, rodLevel, baitId, function() return roll end)
+    local id = FishCatch.select(rows, rodLevel, baitId, function() return roll end)
     if id then found[id] = true end
   end
   return found
@@ -167,7 +167,7 @@ describe("TestIslandContent", function()
     local function shelf(level)
       local index = {}
       for _, page in ipairs(pages) do
-        for _, row in ipairs(cfg.Shop.ListForPage(level, page)) do
+        for _, row in ipairs(cfg.Shop.list_for_page(level, page)) do
           if row.ItemId then index[row.ItemId] = row end
         end
       end
@@ -211,7 +211,7 @@ describe("TestIslandContent", function()
     end
   end)
 
-  -- 可达性：真实抽鱼池上跑 FishCatch.Select——保底（不挂饵竿 1）、门槛（竿 1 不越级）、
+  -- 可达性：真实抽鱼池上跑 FishCatch.select——保底（不挂饵竿 1）、门槛（竿 1 不越级）、
   -- 池顶（岛屿最高竿级摸得到每一行）、首领不入普通池
   it("test_island_pool_reachability", function()
     for _, island in ipairs(ISLANDS) do

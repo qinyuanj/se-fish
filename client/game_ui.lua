@@ -1,20 +1,20 @@
 local GameUI = {}
 local Players = game:GetService("Players")
 
-function GameUI:GetEuiManager()
+function GameUI:get_eui_manager()
     local lp = Players.LocalPlayer
     if not lp then return nil end
     return lp.PlayerGui.EuiManager
 end
 
-function GameUI:GetUIRoot()
-    local euiMgr = self:GetEuiManager()
+function GameUI:get_ui_root()
+    local euiMgr = self:get_eui_manager()
     if not euiMgr then return end
 
     return euiMgr:GetRootNode()
 end
 
-function GameUI:FindChildUINode(node, name)
+function GameUI:find_child_ui_node(node, name)
     if not node or not name then return nil end
     if not node.GetChildren then return nil end
     local children = node:GetChildren()
@@ -30,7 +30,7 @@ function GameUI:FindChildUINode(node, name)
 end
 
 
-function GameUI:ApplyText(target, text)
+function GameUI:apply_text(target, text)
     if not target then return end
     if target.SetText then
         target:SetText(text)
@@ -39,7 +39,7 @@ function GameUI:ApplyText(target, text)
     end
 end
 
-function GameUI:ApplyTextColor(target, color)
+function GameUI:apply_text_color(target, color)
     if not target or color == nil then return end
     if target.SetTextColor then
         target:SetTextColor(color)
@@ -48,7 +48,7 @@ function GameUI:ApplyTextColor(target, color)
     end
 end
 
-function GameUI:ReadTextColor(target)
+function GameUI:read_text_color(target)
     if not target then return nil end
     if target.GetTextColor then
         return target:GetTextColor()
@@ -58,8 +58,8 @@ function GameUI:ReadTextColor(target)
     return nil
 end
 
-function GameUI:CreateSceneNode(prefabKey, attachUnit, Offset)
-    local eui = self:GetEuiManager()
+function GameUI:create_scene_node(prefabKey, attachUnit, Offset)
+    local eui = self:get_eui_manager()
     local Socket = "AttachPoint"
 
     if not Offset then Offset = Vector3(0, 5, 0) end

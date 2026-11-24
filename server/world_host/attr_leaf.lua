@@ -1,6 +1,6 @@
 -- 服务端 attr_rule 官方包单向输出叶子投影层（ADR-0032 §3 / #297-A2）：
 -- 仅作为纯输出 Leaf Sink 挂载在 PlayerTree 树底：
---   1. 校验 GetAttrConfig，拒绝地图 Min/Max 钳制配置；
+--   1. 校验 get_attr_config，拒绝地图 Min/Max 钳制配置；
 --   2. 角色作用域内 GetAttrUnit / EnsureAttrUnit，仅在新建（existing == nil）时于 on_cleanup 对称销毁；
 --   3. 单向写入 PlayerBodyScale / PlayerMaxHealth / PlayerWalkSpeed / PlayerHunger
 --      及 PlayerWeaponDamage_<melee|ranged|explosive> 四分量（Base/BaseExtra/Ratio/Bonus）；
@@ -52,7 +52,7 @@ function AttrLeaf.validate_config(attr_api, key)
   if type(attr_api) ~= "table" or type(attr_api.Funcs) ~= "table" then
     return false, "attr-api-invalid"
   end
-  local get_cfg = attr_api.Funcs.GetAttrConfig
+  local get_cfg = attr_api.Funcs.get_attr_config
   if type(get_cfg) == "function" then
     local ok, config = pcall(get_cfg, key)
     if not ok then
@@ -117,8 +117,8 @@ function AttrLeaf.apply_body_presentation(character, scale, capped)
   if not is_object(character) then
     return false, "no-character"
   end
-  local sanitized = BodyScale.Sanitize(scale)
-  local derived = BodyScale.Derive(sanitized)
+  local sanitized = BodyScale.sanitize(scale)
+  local derived = BodyScale.derive(sanitized)
   local ok, err = pcall(function()
     character:SetScale(make_vec3(sanitized, sanitized, sanitized))
     character:SetAttribute("CameraDistance", derived.CameraDistance)
@@ -143,7 +143,7 @@ function AttrLeaf.apply_walk_speed(character, speed)
   if not ok_ctrl or not is_object(controller) then
     return false, "no-controller"
   end
-  local clamped = Number.IsFiniteNumber(speed) and math.max(0, speed) or 0
+  local clamped = Number.is_finite_number(speed) and math.max(0, speed) or 0
   local ok_write, err = pcall(function()
     controller.WalkSpeed = clamped
   end)
@@ -219,7 +219,7 @@ function AttrLeaf.mount(s, player_tree, opts)
         if not ok then
           record_err("PlayerBodyScale", scale)
         else
-          local sanitized = BodyScale.Sanitize(scale)
+          local sanitized = BodyScale.sanitize(scale)
           summary.values.PlayerBodyScale = sanitized
           local capped = type(attr_plan.Body) == "table" and attr_plan.Body.Capped == true
           local ok_pres, derived_or_err = AttrLeaf.apply_body_presentation(character, sanitized, capped)
@@ -258,7 +258,7 @@ function AttrLeaf.mount(s, player_tree, opts)
           end
         else
           player_tree.walk_projection_rejected = false
-          local clamped_speed = Number.IsFiniteNumber(walk_speed) and math.max(0, walk_speed) or 0
+          local clamped_speed = Number.is_finite_number(walk_speed) and math.max(0, walk_speed) or 0
           summary.values.PlayerWalkSpeed = clamped_speed
           local ok_spd, spd_err = AttrLeaf.apply_walk_speed(character, clamped_speed)
           if not ok_spd then

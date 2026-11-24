@@ -16,7 +16,7 @@ local function cookedState(entry)
     return cooked ~= nil or flag == true
 end
 
-function LotteryEligibility.Check(entry)
+function LotteryEligibility.check(entry)
     if type(entry) ~= 'table' or type(entry.itemId) ~= 'string' then return false, 'malformed' end
     if entry.count ~= nil and entry.count ~= 1 then return false, 'malformed' end
     local mult = entry.mult

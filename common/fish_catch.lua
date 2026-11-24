@@ -1,6 +1,6 @@
 local FishCatch = {}
 
-function FishCatch.Select(rows, rodLevel, baitId, random)
+function FishCatch.select(rows, rodLevel, baitId, random)
     local available, total = {}, 0
     for _, row in ipairs(rows or {}) do
         if row.RodLevel <= rodLevel and (row.Bait == 0 or row.Bait == baitId) then
@@ -25,7 +25,7 @@ local function percent(mult)
     return math.floor(mult * 100 + 0.5)
 end
 
-function FishCatch.Weight(species, mult)
+function FishCatch.weight(species, mult)
     return math.floor(species.BaseWeight * percent(mult) + 0.5 + 1e-9) / 100
 end
 
@@ -33,7 +33,7 @@ function FishCatch.Price(species, mult)
     return math.floor(species.BasePrice * percent(mult or 1) / 100 + 1e-9)
 end
 
-function FishCatch.CookedPrice(species, mult, rate)
+function FishCatch.cooked_price(species, mult, rate)
     return math.floor(species.BasePrice * percent(mult or 1) / 100 * (rate or 1.5) + 1e-9)
 end
 

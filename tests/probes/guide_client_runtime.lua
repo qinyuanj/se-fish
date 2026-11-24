@@ -7,7 +7,7 @@ if _G.Guide40Links then
 end
 _G.Guide40Links = {}
 local function listen(name, callback)
-    _G.Guide40Links[#_G.Guide40Links + 1] = REUtil:GetRE(name).OnClientEvent:Connect(callback)
+    _G.Guide40Links[#_G.Guide40Links + 1] = REUtil:get_re(name).OnClientEvent:Connect(callback)
 end
 listen('QuestState', function(state)
     print('GUIDE40_QUEST', state.step, state.count, state.need, state.done, state.text)
@@ -18,6 +18,6 @@ end)
 listen('StoryState', function(state)
     print('GUIDE40_STORY_STATE', state.readKey, state.read, state.text)
 end)
-REUtil:GetRE('RequestQuest'):FireServer()
-REUtil:GetRE('RequestStory'):FireServer()
+REUtil:get_re('RequestQuest'):FireServer()
+REUtil:get_re('RequestStory'):FireServer()
 print('GUIDE40_CLIENT_READY')

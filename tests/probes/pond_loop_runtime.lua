@@ -5,7 +5,7 @@
 -- 取证：editor-cli log grep 'PONDLOOP' --play-session <id> --json（每行带唯一标记 PL<UserId>-<起点秒>）。
 --
 -- 只走正常业务意图：与客户端事件处理函数同一入口
---   拾饵   MgrLoot:Pickup(player, id)            （ItemBarAction.Pickup 的处理函数）
+--   拾饵   MgrLoot:pickup(player, id)            （ItemBarAction.pickup 的处理函数）
 --   选中   data:SelectSlot / data:SelectBait      （ItemBarAction 的同名方法）
 --   整理   data:MoveToItemBar / data:MoveSlot(from, index, target, slot)（背包/道具栏满时的合法换格）
 -- 成长：正常击杀卖鱼；空手追鱼失败时可拾免费蚯蚓喂食攒匕首（50），买到并装备后再打电鳗/鳄雀鳝。
@@ -37,7 +37,7 @@ local MgrLoot = {
                 Position = { x = row.x, y = row.y, z = row.z } }
         end
     end }),
-    Pickup = function(_, player, id)
+    pickup = function(_, player, id)
         local world = ground()
         return world and world:try_pickup(player, id) or false
     end,
@@ -86,7 +86,7 @@ local Weapon = {
     Attack = function(_, target)
         local runtime = runtimeOf()
         local life = runtime and runtime.life
-        return life and life:WeaponAction(target, { action = 'attack' }) or false
+        return life and life:weapon_action(target, { action = 'attack' }) or false
     end,
     Life = function()
         local runtime = runtimeOf()
@@ -101,7 +101,7 @@ local Players = game:GetService('Players')
 
 local STEP_SEC = 0.5          -- 常规轮询间隔
 local CLICK_SEC = 0.25        -- 收线批次间隔（每批 2 击，≤ 8 击/秒，低于 HighFreqInput.MaxCount）
-local SETTLE_SEC = 1.5        -- 持久操作（Save:Execute）发出后等待落账
+local SETTLE_SEC = 1.5        -- 持久操作（Save:execute）发出后等待落账
 local COMBAT_WAIT_SEC = 90    -- 战斗等待多久没进展就暂停
 local WORM_TARGET = 5         -- 免费补给余量：食用与抛竿共用
 local LAND_STAND = { x = 5, z = -9 } -- 上岸后先正常步行到陆地再放鱼，避开岸外不可达掉落
@@ -152,7 +152,7 @@ local ReelProbe = {}
 RT.castStateHook = RT.castStateHook or { states = {} }
 local stateHook = RT.castStateHook
 stateHook.uid = uid
-local castEvent = REUtil:GetRE('CastState')
+local castEvent = REUtil:get_re('CastState')
 if stateHook.event ~= castEvent then
     stateHook.event = castEvent
     stateHook.originalFireClient = castEvent.FireClient
@@ -164,19 +164,19 @@ if stateHook.event ~= castEvent then
     end
 end
 CastProbe.Sessions = setmetatable({}, { __index = function(_, key) return stateHook.states[key] end })
-function CastProbe:Cast(target, payload)
+function CastProbe:cast(target, payload)
     local fishing = fishingFor(target)
     return fishing and fishing:cast(payload) or false
 end
-function CastProbe:Reel(target)
+function CastProbe:reel(target)
     local fishing = fishingFor(target)
     return fishing and fishing:cast({ action = 'Reel' }) or false
 end
-function CastProbe:Drop(target)
+function CastProbe:drop(target)
     local fishing = fishingFor(target)
     return fishing and fishing:cast({ action = 'Drop' }) or false
 end
-function ReelProbe:Accept(target, payload)
+function ReelProbe:accept(target, payload)
     local fishing = fishingFor(target)
     return fishing and fishing:reel('click', payload) or false
 end
@@ -189,7 +189,7 @@ end
 
 local function fmt(x) return string.format('%.2f', x) end
 
-local function dataOf() return MgrPlayerData:GetDataInst(player) end
+local function dataOf() return MgrPlayerData:get_data_inst(player) end
 
 local function coins(data) return data.Data.FishCoin or 0 end
 local function worms(data) return data.Data.Bait.worm or 0 end
@@ -229,7 +229,7 @@ local route = GameCfg.Ferry.Routes[1]
 
 -- 站位点：锚点向陆地中心移 STAND_SHIFT 米（锚点本身可能在水或高处，只给 x/z）
 local function standPoint(anchorPos)
-    local land = scene1.Land
+    local land = scene1.land
     local cx, cz = (land.MinX + land.MaxX) / 2, (land.MinZ + land.MaxZ) / 2
     local dx, dz = cx - anchorPos.x, cz - anchorPos.z
     local len = math.sqrt(dx * dx + dz * dz)
@@ -239,7 +239,7 @@ local function standPoint(anchorPos)
 end
 
 local function anchorPos(name)
-    local unit = InteractionPoints:FindAnchor(name)
+    local unit = InteractionPoints:find_anchor(name)
     return unit and unit.Position
 end
 
@@ -256,7 +256,7 @@ local function pause(reason, point, label)
 end
 
 local function inRangeOf(names, radius, slack)
-    return InteractionPoints:InRange(player, { AnchorNames = names, Radius = radius, Slack = slack })
+    return InteractionPoints:in_range(player, { AnchorNames = names, Radius = radius, Slack = slack })
 end
 
 -- 去某个 NPC 锚点：不在范围内返回 pause，在范围内返回 nil
@@ -331,7 +331,7 @@ local function ensureOnBar(data, predicate)
     if data:MoveToItemBar(i) then
         RT.counts.moves = RT.counts.moves + 1
         say('MOVE-SLOT', 'MoveToItemBar', 'backpack#' .. i)
-        MgrPlayerData:SendItemBar(player)
+        MgrPlayerData:send_item_bar(player)
         return 'moved'
     end
     local bar = itemBar(data)
@@ -341,7 +341,7 @@ local function ensureOnBar(data, predicate)
             if data:MoveSlot(ids.Backpack, i, ids.ItemBar, s) then
                 RT.counts.moves = RT.counts.moves + 1
                 say('MOVE-SLOT', 'MoveSlot swap', 'backpack#' .. i .. ' <-> bar#' .. s, 'out=' .. tostring(e.itemId))
-                MgrPlayerData:SendItemBar(player)
+                MgrPlayerData:send_item_bar(player)
                 return 'moved'
             end
         end
@@ -356,7 +356,7 @@ local function focus(data, slot)
     elseif data.Data.SelectedSlot ~= slot then
         data:SelectSlot(slot)
     end
-    MgrPlayerData:SendItemBar(player)
+    MgrPlayerData:send_item_bar(player)
 end
 
 local function nextSeq(mgr) return ((mgr.LastSeq[uid]) or 0) + 1 end
@@ -367,7 +367,7 @@ local function nextShopFeedSeq(kind)
 end
 
 -- ========== 交易落账观测 ==========
--- Handle 返回 true 只表示请求被接受，结果随 Save:Execute 异步落账。feed/buy 计确认到账数，feedTry/buyTry 计尝试数；
+-- Handle 返回 true 只表示请求被接受，结果随 Save:execute 异步落账。feed/buy 计确认到账数，feedTry/buyTry 计尝试数；
 -- accepted=false 只记 rejected，不进 pendingOp、不算未到账。pendingOp 记发出前 coin/worm/weapon/rod/所选物品数量，
 -- 等 data.Inited 且 Save 未暂停后按 settledBy 分种类判定：满足记到账（SETTLED），超时仍不满足记 unsettled。
 local SETTLE_TIMEOUT_SEC = 8
@@ -401,7 +401,7 @@ local function settledBy(kind, b, a)
 end
 
 local function savePaused()
-    return MgrSave:IsPaused(uid)
+    return MgrSave:is_paused(uid)
 end
 
 -- 发出请求后调用：计尝试；accepted 才登记 pendingOp
@@ -466,7 +466,7 @@ local function pickBait()
     if d > reach then
         return pause('拾饵', { x = loot.Position.x, z = loot.Position.z }, '拾饵 spot=' .. tostring(loot.SpotId))
     end
-    if MgrLoot:Pickup(player, loot.Id) then
+    if MgrLoot:pickup(player, loot.Id) then
         RT.counts.pick = RT.counts.pick + 1
         say('PICK', 'worm', 'spot=' .. tostring(loot.SpotId), 'loot=' .. tostring(loot.Id))
         snapshot('pick')
@@ -524,7 +524,7 @@ local function equipDagger(data)
         local held = data.Extra.inventory.selection.held
         if held.kind == 'weapon' and held.id ~= DAGGER.Id then data:HoldWeapon(DAGGER.Id) end
     end
-    MgrPlayerData:SendItemBar(player, true)
+    MgrPlayerData:send_item_bar(player, true)
     local ok = Weapon:EquippedWeapon(data) == DAGGER.Id
     RT.counts.dagger = RT.counts.dagger + 1
     say('EQUIP', DAGGER.Id, 'equipped=' .. tostring(Weapon:EquippedWeapon(data)), 'ok=' .. tostring(ok))
@@ -562,7 +562,7 @@ local function validate(data)
     need('GameCfg.Ability.MeleeWeapons.item135', GameCfg.Ability.MeleeWeapons and GameCfg.Ability.MeleeWeapons[DAGGER.Id] ~= nil)
     need('GameCfg.Ability.Unarmed', GameCfg.Ability.Unarmed ~= nil)
     local vitals = Weapon.Life()
-    need('ServerRuntime.life:LifeStatus/CanAct', vitals and type(vitals.LifeStatus) == 'function' and type(vitals.CanAct) == 'function')
+    need('ServerRuntime.life:LifeStatus/CanAct', vitals and type(vitals.life_status) == 'function' and type(vitals.can_act) == 'function')
     if #missing > 0 then
         say('CHECK-FAIL', table.concat(missing, ' | '))
         return false
@@ -581,7 +581,7 @@ local function predictLanding()
     local x = character.Position.x + GameCfg.Casting.Distance * forward.x / len
     local z = character.Position.z + GameCfg.Casting.Distance * forward.z / len
     for _, water in ipairs(GameCfg.Water.Zones) do
-        if MathWaterJudge.InZone(water, { x = x, y = water.SurfaceY, z = z }) then return water, x, z end
+        if MathWaterJudge.in_zone(water, { x = x, y = water.SurfaceY, z = z }) then return water, x, z end
     end
     return nil, x, z
 end
@@ -604,14 +604,14 @@ local function castRod(data, useDuck)
     end
     if data.Data.SelectedBait ~= bait then
         if not data:SelectBait(bait) then return pause('无法挂饵 ' .. bait) end
-        MgrPlayerData:SendItemBar(player)
+        MgrPlayerData:send_item_bar(player)
     end
     local water, lx, lz = predictLanding()
     if not water then
         return pause('落点不在水里(' .. (lx and (fmt(lx) .. ',' .. fmt(lz)) or 'nil') .. ')，站到抛竿位并朝 -x 走入',
             CAST_SPOT, '抛竿位（面朝 -x）')
     end
-    CastProbe:Cast(player, { action = 'Cast', slot = slot, itemId = entry.itemId })
+    CastProbe:cast(player, { action = 'Cast', slot = slot, itemId = entry.itemId })
     RT.counts.cast = RT.counts.cast + 1
     say('CAST', 'bait=' .. bait, 'water=' .. tostring(water.Id))
     return 'wait', 0.4
@@ -621,7 +621,7 @@ local function reelClick(current)
     local session = current.session
     if RT.reelFor ~= session.reelSession then RT.reelFor, RT.reelQ = session.reelSession, 0 end
     RT.reelQ = RT.reelQ + 1
-    ReelProbe:Accept(player, { s = session.reelSession, n = 2, q = RT.reelQ })
+    ReelProbe:accept(player, { s = session.reelSession, n = 2, q = RT.reelQ })
 end
 
 -- ========== 鱼与战利品 ==========
@@ -629,7 +629,7 @@ end
 local function myFish()
     local held, live, prey
     for _, fish in pairs(MgrFishUnit.Fish) do
-        if fish.Owner == player or fish.Holder == player then
+        if fish.Owner == player or fish.holder == player then
             if fish.State == 'held' then held = fish
             elseif fish.FishId == chain.EliteFish or fish.FishId == chain.BossFish then live = live or fish
             elseif not RT.ignore[fish.Id] then prey = prey or fish end
@@ -684,7 +684,7 @@ local function pickDrops()
     if not best then return nil end
     local reach = GameCfg.Loot.PickupRadius + (GameCfg.Loot.PickupSlack or 0)
     if bd <= reach and freeSlots(dataOf()) == 0 then
-        -- 满包：Pickup 会失败。先把可卖的整理上道具栏喂掉腾格；没有可卖的就暂停交给玩家丢弃/整理
+        -- 满包：pickup 会失败。先把可卖的整理上道具栏喂掉腾格；没有可卖的就暂停交给玩家丢弃/整理
         local slot, why = ensureOnBar(dataOf(), function(e) return dropIds[e.itemId] end)
         if slot == 'moved' then return 'wait', 0.4 end
         if slot then focus(dataOf(), slot) return feed(dataOf(), 'full-bag sell') end
@@ -693,13 +693,13 @@ local function pickDrops()
     if bd > reach then
         return pause('拾取鱼获', { x = best.Position.x, z = best.Position.z }, '拾取鱼获 ' .. best.ItemId)
     end
-    if MgrLoot:Pickup(player, best.Id) then
+    if MgrLoot:pickup(player, best.Id) then
         RT.counts.pick = RT.counts.pick + 1
         say('PICK', best.ItemId, 'loot=' .. tostring(best.Id))
         local fishDef = GameCfg.Fish[best.ItemId]
         if fishDef and fishDef.Grade == 'rare' then
             local _, _, entry = findEntry(dataOf(), function(e) return e.itemId == best.ItemId end)
-            local eligible, reason = require('common.lottery_eligibility').Check(entry)
+            local eligible, reason = require('common.lottery_eligibility').check(entry)
             say('LOTTERY', best.ItemId, 'eligible=' .. tostring(eligible), 'reason=' .. tostring(reason))
         end
         snapshot('loot')
@@ -720,7 +720,7 @@ local function step()
     -- 死亡免费恢复：倒地 15s → 死亡 30s → 原地弱复活（10% 血、半速）。只等待，不治疗不传送；
     -- 复活后继续正常拾饵、喂食；饥饿仍为零时静等会再次饿死，不用等待代替恢复。
     local vitals = Weapon.Life()
-    local life = vitals and vitals:LifeStatus(player) or 'alive'
+    local life = vitals and vitals:life_status(player) or 'alive'
     if life == 'downed' or life == 'dead' then
         if not RT.lifeSince then
             RT.lifeSince = now()
@@ -755,9 +755,9 @@ local function step()
             return pickBait()
         end
         local v = MgrPlayerData.Vitals or Weapon.Life()
-        if v:CanEat(player, 'worm') and data:EatBait('worm') then
-            v:Eat(player, 'worm')
-            MgrPlayerData:SendItemBar(player)
+        if v:can_eat(player, 'worm') and data:EatBait('worm') then
+            v:eat(player, 'worm')
+            MgrPlayerData:send_item_bar(player)
             say('EAT', 'worm', 'hungerBefore=' .. hunger)
             return 'wait', 0.3
         end
@@ -799,9 +799,9 @@ local function step()
         if target and type(hunger) == 'number' and hunger < 180 then
             if worms(data) < 1 then return pickBait() end
             local v = MgrPlayerData.Vitals or Weapon.Life()
-            if v:CanEat(player, 'worm') and data:EatBait('worm') then
-                v:Eat(player, 'worm')
-                MgrPlayerData:SendItemBar(player)
+            if v:can_eat(player, 'worm') and data:EatBait('worm') then
+                v:eat(player, 'worm')
+                MgrPlayerData:send_item_bar(player)
                 say('EAT', 'worm', '战前补给', 'hungerBefore=' .. hunger)
             end
             return 'wait', 0.3
@@ -809,7 +809,7 @@ local function step()
         if flat(charPos(), LAND_STAND) > 1 then
             return pause('先把鱼带到陆地再放下', LAND_STAND, '陆地放鱼 ' .. held.FishId)
         end
-        CastProbe:Drop(player)
+        CastProbe:drop(player)
         RT.combatSince = now()
         if target then
             say('DROP', 'target', held.FishId)
@@ -919,7 +919,7 @@ local function step()
             end
             return 'wait', 0.5
         elseif phase == 'unhooked' then
-            CastProbe:Reel(player)
+            CastProbe:reel(player)
             say('REEL-IN', 'unhooked 收竿')
             return 'wait', 0.4
         end

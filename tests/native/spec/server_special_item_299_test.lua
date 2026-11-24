@@ -106,14 +106,14 @@ local function make_re()
   local events = {}
   return {
     events = events,
-    CheckRECD = function() return false end,
-    GetRE = function(_, name)
+    check_recd = function() return false end,
+    get_re = function(_, name)
       events[name] = events[name] or {
         clients = {},
         OnServerEvent = signal(),
         FireClient = function(self, target, payload)
           self.clients[#self.clients + 1] = { player = target, value = payload }
-          if name == "SpecialItemResult" then target.lastResult = payload end
+          if name == "SpecialItemResult" then target.last_result = payload end
           if name == "SpecialItemState" then target.lastState = payload end
         end,
       }
@@ -162,7 +162,7 @@ describe("风神之翼与哥斯拉存活相位宿主接缝（#299）", function(
       initial_now = 1000,
       remote = re,
       player_data = {
-        GetDataInst = function(_, target)
+        get_data_inst = function(_, target)
           if target == player then return data end
           if target == other then return other_data end
         end,
@@ -181,7 +181,7 @@ describe("风神之翼与哥斯拉存活相位宿主接缝（#299）", function(
       end,
       fish_carrier = {
         Fish = {},
-        ResolveCarrier = function(_, target)
+        resolve_carrier = function(_, target)
           return type(target) == "table" and target.Carrier or nil
         end,
         Damage = function(_, carrier, amount)
@@ -262,8 +262,8 @@ describe("风神之翼与哥斯拉存活相位宿主接缝（#299）", function(
     runtime.clock:step(0.5)
     assert.equals(y, player.Character.Position.y)
     assert.is_true(player.Character.Controller.GravityEnabled)
-    assert.is_false(player.lastResult.ok)
-    assert.equals("not-wings", player.lastResult.reason)
+    assert.is_false(player.last_result.ok)
+    assert.equals("not-wings", player.last_result.reason)
 
     select_item(player, "item169")
     act(player, { action = "fly", holding = true })
@@ -313,7 +313,7 @@ describe("风神之翼与哥斯拉存活相位宿主接缝（#299）", function(
     tree.fish_units = { { Id = "f1", Carrier = carrier } }
 
     act(player, { action = "breath" })
-    assert.is_true(player.lastResult.ok)
+    assert.is_true(player.last_result.ok)
     runtime.clock:step(3)
     local breath = GameCfg.Ability.SpecialItem.Godzilla.Breath
     assert.equals(1, other.Character.Controller.Health)
@@ -330,13 +330,13 @@ describe("风神之翼与哥斯拉存活相位宿主接缝（#299）", function(
     runtime:on_player_added(far)
     runtime:on_save_ready(far, make_data(far, nil))
     act(player, { action = "breath" })
-    assert.is_false(player.lastResult.ok)
-    assert.equals("cooldown", player.lastResult.reason)
+    assert.is_false(player.last_result.ok)
+    assert.equals("cooldown", player.last_result.reason)
 
     select_item(player, "carp")
     runtime.clock:advance(breath.CooldownSec)
     act(player, { action = "breath" })
-    assert.equals("not-godzilla", player.lastResult.reason)
+    assert.equals("not-godzilla", player.last_result.reason)
     assert.equals(GameCfg.Vitals.MaxHealth, behind.Character.Controller.Health)
     assert.equals(GameCfg.Vitals.MaxHealth, far.Character.Controller.Health)
   end)
@@ -356,13 +356,13 @@ describe("风神之翼与哥斯拉存活相位宿主接缝（#299）", function(
     select_item(player, "item170")
     assert.equals("godzilla", last_state(events, player).effect)
     act(player, { action = "breath" })
-    assert.is_false(player.lastResult.ok)
+    assert.is_false(player.last_result.ok)
     assert.is_false(has_call(player.Character, "resetSkin"))
     runtime.clock:advance(1)
     assert.is_true(tree.memos.can_act:now())
     assert.equals("godzilla", last_state(events, player).effect)
     act(player, { action = "breath" })
-    assert.is_true(player.lastResult.ok)
+    assert.is_true(player.last_result.ok)
   end)
 
   it("濒死、死亡与离场对称回收外观和重力，复活后不残留翅膀", function()
@@ -394,7 +394,7 @@ describe("风神之翼与哥斯拉存活相位宿主接缝（#299）", function(
   it("离场终镜像写下吐息剩余冷却，重登后续上且不复活滞空", function()
     boot("item170")
     act(player, { action = "breath" })
-    assert.is_true(player.lastResult.ok)
+    assert.is_true(player.last_result.ok)
     runtime.clock:advance(2)
     runtime:on_player_removing(player)
     local remaining = data.Extra.cooldowns.godzillaBreath
@@ -410,8 +410,8 @@ describe("风神之翼与哥斯拉存活相位宿主接缝（#299）", function(
     runtime:on_save_ready(rejoined, next_data)
     runtime.clock:advance(6)
     act(rejoined, { action = "breath" })
-    assert.is_false(rejoined.lastResult.ok)
-    assert.equals("cooldown", rejoined.lastResult.reason)
+    assert.is_false(rejoined.last_result.ok)
+    assert.equals("cooldown", rejoined.last_result.reason)
     assert.equals("godzilla", last_state(events, rejoined).effect)
     assert.is_true(rejoined.Character.Controller.GravityEnabled)
     assert.near(12, last_state(events, rejoined).breathRemaining, 0.6)
@@ -428,7 +428,7 @@ describe("风神之翼与哥斯拉存活相位宿主接缝（#299）", function(
 
     runtime.clock:advance(46)
     assert.equals("alive", tree.states.life_phase:now())
-    re.CheckRECD = function() return true end
+    re.check_recd = function() return true end
     act(player, { action = "fly", holding = true })
     act(player, { action = "fly", holding = false })
     runtime.clock:step(0.5)
@@ -442,7 +442,7 @@ describe("风神之翼与哥斯拉存活相位宿主接缝（#299）", function(
     act(stranger, { action = "fly", holding = true })
     runtime.clock:step(0.3)
     assert.equals(5.01, stranger.Character.Position.y)
-    assert.is_nil(stranger.lastResult)
+    assert.is_nil(stranger.last_result)
 
     act(player, { action = "fly", holding = true })
     runtime.clock:step(1)

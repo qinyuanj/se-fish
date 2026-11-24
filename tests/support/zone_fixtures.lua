@@ -28,10 +28,10 @@ function M.World()
   for index, center in ipairs(centers) do
     local walls, points, facilities, waters = Engine.Unit({ Name = '空气墙' }), Engine.Unit({ Name = '摆渡' }),
       Engine.Unit({ Name = '设施' }), Engine.Unit({ Name = '水域' })
-    local zone = Engine.Unit({ Name = zoneNames[index], Children = { walls, points, facilities, waters } })
+    local zone = Engine.Unit({ Name = zoneNames[index], children = { walls, points, facilities, waters } })
     local function unit(parent, name, x, y, z, sx, sy, sz)
       local value = Engine.Unit({ Name = name, Position = {x=x,y=y,z=z}, Size = {x=sx or 1,y=sy or 1,z=sz or 1} })
-      local children = Engine.Children(parent)
+      local children = Engine.children(parent)
       children[#children + 1] = value
       return value
     end
@@ -71,18 +71,18 @@ function M.World()
     local waterZ = center.z + (index >= 2 and index <= 4 and -44 or 44)
     local waterX = center.x
     local water = unit(waters,index <= 2 and 'Z'..index..'_Water1' or 'Z'..index..'_Water',waterX,2,waterZ,80,1,24)
-    for _, value in ipairs(Engine.Children(points)) do
+    for _, value in ipairs(Engine.children(points)) do
       value.Position.x = center.x + (index >= 2 and index <= 4 and -1 or 1) * (value.Position.x - sceneCenter.x)
       value.Position.z = center.z + (index >= 2 and index <= 4 and -1 or 1) * (value.Position.z - sceneCenter.z)
       if index == 2 and value.Name == 'Z2_FerryReturn' then value.Name = 'FerryReturn' end
     end
-    for _, value in ipairs(Engine.Children(facilities)) do
+    for _, value in ipairs(Engine.children(facilities)) do
       value.Position.x = center.x + (index >= 2 and index <= 4 and -1 or 1) * (value.Position.x - sceneCenter.x)
       value.Position.z = center.z + (index >= 2 and index <= 4 and -1 or 1) * (value.Position.z - sceneCenter.z)
     end
     for name, position in pairs(foldedPoints) do
       for _, parent in ipairs({points, facilities}) do
-        for _, value in ipairs(Engine.Children(parent)) do
+        for _, value in ipairs(Engine.children(parent)) do
           if value.Name == name then value.Position = position end
         end
       end
@@ -90,7 +90,7 @@ function M.World()
     if index == 1 then
       unit(waters,'Z1_Water2',11.5,1.05,-26.5,7,1,7)
       water.Position = {x=-11.75,y=1.183,z=-12.25}
-      Engine.SetSize(water, {x=12,y=1,z=12})
+      Engine.set_size(water, {x=12,y=1,z=12})
     end
     zones[index] = zone
   end
@@ -98,11 +98,11 @@ function M.World()
 end
 
 function M.Apply(cfg)
-  ZoneMarkers.Resolve(M.World(), cfg)
+  ZoneMarkers.resolve(M.World(), cfg)
   return cfg
 end
 
-function M.Load()
+function M.load()
   package.loaded['common.game_cfg'] = nil
   return M.Apply(require('common.game_cfg'))
 end

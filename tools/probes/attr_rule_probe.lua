@@ -6,12 +6,12 @@ local Probe = {}
 
 -- 可执行迁移映射：只生成计划，不写玩家、Controller 或存档。
 -- 统一顺序为 (Base + BaseExtra) * (1 + Ratio) + Bonus，最后业务钳制。
--- 永久成长从 PotionCount / WeaponDamageScale 重建，临时效果从权威状态重建；不保存最终值或 Buff 句柄。
+-- 永久成长从 potion_count / weapon_damage_scale 重建，临时效果从权威状态重建；不保存最终值或 Buff 句柄。
 function Probe.Map(snapshot)
     local s = snapshot or {}
-    local body = BodyScale.Plan(s.bodyPotions)
+    local body = BodyScale.plan(s.bodyPotions)
     local baseSpeed = s.baseSpeed or GameCfg.Ability.MoveSpeed.Base
-    local speed = AttrGrowth.EffectiveSpeed(baseSpeed, s.speedPotions, s)
+    local speed = AttrGrowth.effective_speed(baseSpeed, s.speedPotions, s)
     if type(baseSpeed) ~= 'number' or baseSpeed <= 0 or baseSpeed ~= baseSpeed or baseSpeed == math.huge then
         baseSpeed = GameCfg.Ability.MoveSpeed.Base
     end
@@ -22,7 +22,7 @@ function Probe.Map(snapshot)
     assert(type(damageScale) == 'number' and damageScale >= 1 and damageScale < math.huge, '武器加成须为有限正倍率')
     local function entry(value, base, extra, ratio, min, max, write, restore)
         return { Value = value, Components = { Base = base, BaseExtra = extra, Ratio = ratio, Bonus = 0 },
-            Min = min, Max = max, Write = write, Restore = restore }
+            Min = min, Max = max, Write = write, restore = restore }
     end
     return {
         MaxHealth = entry(body.Health, GameCfg.Ability.BodyScale.HealthBase,
@@ -41,7 +41,7 @@ function Probe.Map(snapshot)
         Hunger = entry(hunger, hunger, 0, 0, 0, GameCfg.Vitals.MaxHunger,
             '无 vendor Controller 映射；MgrVitals:SetHunger + WriteHunger，整秒递减/进食保持原入口',
             '当前饥饿是会话状态；复活回满或 ApplyRevive 最低值；离线规则须由 MgrSurvival 决定，不新增存档'),
-        WeaponDamageScale = entry(damageScale, 1, 0, damageScale - 1, 1, nil,
+        weapon_damage_scale = entry(damageScale, 1, 0, damageScale - 1, 1, nil,
             '无 vendor Controller 映射；MgrWeapon 各伤害入口只乘一次 WeaponDamageScale(kind)',
             'PlayerData:ShopUpgradeLevel(kind) → GameCfg.Shop.DamageScale；按种类线性相加的升级折合 Ratio'),
     }
@@ -51,9 +51,9 @@ local function nearly(a, b)
     return math.abs((a or 0) - (b or 0)) < 1e-9
 end
 
--- context.Target/CreateBuffUnits 必须由调用方提供隔离对象；Run 拥有并销毁它们。
+-- context.Target/CreateBuffUnits 必须由调用方提供隔离对象；run 拥有并销毁它们。
 -- 只调包内 attr_rule.api；所有步骤记录，异常后仍完整清理，清理失败则整体失败。
-function Probe.Run(context)
+function Probe.run(context)
     assert(type(context) == 'table' and context.Target ~= nil and type(context.CreateBuffUnits) == 'function',
         'attr_rule_probe 需要隔离 Target 与 CreateBuffUnits')
     assert(type(context.Log) == 'function', 'attr_rule_probe 需要 Log 回调')
@@ -121,7 +121,7 @@ function Probe.Run(context)
         end
         -- 饥饿无 Controller 映射：先让真实包完成公式，再按业务上限钳制。
         -- (400+100)*0.5+10=260；提前夹 Base 为300则为210，断言能区分顺序。
-        assertTrue(api.Funcs.GetAttrConfig('Hunger') == nil, 'Hunger 已有配置，需要按实际配置重新核对业务接缝')
+        assertTrue(api.Funcs.get_attr_config('Hunger') == nil, 'Hunger 已有配置，需要按实际配置重新核对业务接缝')
         for _, row in ipairs({ { c.Base, 400 }, { c.BaseExtra, 100 }, { c.Ratio, -0.5 }, { c.Bonus, 10 } }) do
             assertTrue(api.Funcs.SetAttrComponent(target, 'Hunger', row[1], row[2]), '业务顺序分量写入失败')
         end
@@ -193,7 +193,7 @@ function Probe.Run(context)
     log('cleanup', #cleanupErrors == 0 and 'ok' or 'error', #cleanupErrors == 0 and '隔离对象已销毁' or table.concat(cleanupErrors, '; '))
     return { Ok = ok and #errors == 0, Error = #errors > 0 and table.concat(errors, '; ') or nil,
         Cleaned = #cleanupErrors == 0, Evidence = context.Evidence or 'runtime',
-        Bounds = bounds, BusinessClampVerified = businessClampVerified }
+        bounds = bounds, BusinessClampVerified = businessClampVerified }
 end
 
 return Probe

@@ -1,5 +1,5 @@
 -- 条款 11 广告满血复活（占位广告位与濒死路径）：docs/acceptance/11-downed-death-revive.md
--- 方法（PlatformRevive / FullRevive / Update 的暂停分支）；客户端入口走 ScreenSurvival 的 SurvivalState
+-- 方法（PlatformRevive / FullRevive / update 的暂停分支）；客户端入口走 ScreenSurvival 的 SurvivalState
 -- 广播渲染（EUI 替身）。复活动作只有 FullRevive 一个落点，广告不另造复活路径。
 -- 失败方式（先列后写）：
 --   1. 广告位未交付时广告复活直接回 unavailable，占位路径没接上（11-38）；
@@ -37,7 +37,7 @@ local function signal()
   }
 end
 
-local function newPlayer(userId, x)
+local function new_player(userId, x)
   local controller = { Health = GameCfg.Vitals.MaxHealth, MaxHealth = GameCfg.Vitals.MaxHealth,
     WalkSpeed = 10, HealthChanged = signal(), Died = signal(), OnReborn = signal() }
   function controller:TakeDamage(amount)
@@ -86,21 +86,21 @@ describe('条款 11 广告满血复活（占位广告位）', function()
     drain()
   end
 
-  local function platformAction(player, payload)
+  local function platform_action(player, payload)
     env.re.PlatformAction.OnServerEvent:Fire(player, payload)
     drain()
   end
 
   local function join(userId)
-    local player = newPlayer(userId)
-    env.players:OnPlayerAdded(player)
-    env.lifeHost:add(player, env.players:GetDataInst(player))
+    local player = new_player(userId)
+    env.players:on_player_added(player)
+    env.lifeHost:add(player, env.players:get_data_inst(player))
     drain()
     return player
   end
 
   local function down(player)
-    env.v:ApplyHit(env.v:NewHit(nil, 'fishAttack'), player, GameCfg.Vitals.MaxHealth + 10)
+    env.v:apply_hit(env.v:new_hit(nil, 'fishAttack'), player, GameCfg.Vitals.MaxHealth + 10)
     assert.same('downed', env.s:Phase(player))
   end
 
@@ -119,8 +119,8 @@ describe('条款 11 广告满血复活（占位广告位）', function()
   end
 
   local function confirm(player, outcome)
-    local accepted = env.platform:HasFlow(player)
-    platformAction(player, { action = 'PlaceholderOutcome', outcome = outcome })
+    local accepted = env.platform:has_flow(player)
+    platform_action(player, { action = 'PlaceholderOutcome', outcome = outcome })
     return accepted
   end
 
@@ -215,7 +215,7 @@ describe('条款 11 广告满血复活（占位广告位）', function()
       end
       return env.re[name]
     end
-    local re = { GetRE = function(_, name) return reStub(name) end, CheckRECD = function() return false end }
+    local re = { get_re = function(_, name) return reStub(name) end, check_recd = function() return false end }
     package.loaded['common.re_util'] = re
     _G.REUtil = re
 
@@ -226,7 +226,7 @@ describe('条款 11 广告满血复活（占位广告位）', function()
     env.platform = assert(loadfile('server/platform_host.lua'))()
     env.players.Save, env.save.PlayerData = env.save, env.players
     env.platform.Save, env.platform.PlayerData = env.save, env.players
-    env.platform.Now = function() return env.now end
+    env.platform.now = function() return env.now end
     env.lifeHost = require('tests.support.life_host').start({
       now = env.now or 100, remote = re, player_data = env.players, save = env.save,
       platform = env.platform,
@@ -274,7 +274,7 @@ describe('条款 11 广告满血复活（占位广告位）', function()
     assert.same('not_open', refused.reason, '闸门关闭必须给出「未开放」这一原因')
     assert.is_truthy(tostring(refused.text):find('未开放', 1, true) ~= nil, '回执没说明未开放')
     assert.is_nil(flowOpen(), '闸门关闭时不得拉起占位广告通道')
-    assert.is_false(env.platform:HasFlow(player), '闸门关闭时不得建平台 flow')
+    assert.is_false(env.platform:has_flow(player), '闸门关闭时不得建平台 flow')
     assert.same('downed', env.s:Phase(player), '闸门关闭时不得复活')
     assert.same(health, player.Character.Controller.Health, '闸门关闭时不得回血')
     assert.same(beforeHunger, hunger(player), '闸门关闭时不得补饥饿')
@@ -343,7 +343,7 @@ describe('条款 11 广告满血复活（占位广告位）', function()
       down(player)
       if entry == 'dead' then advance(GameCfg.Survival.DownedSec) end
       assert.same(entry, env.s:Phase(player))
-      assert.is_true(env.v:SetHunger(player, 0))
+      assert.is_true(env.v:set_hunger(player, 0))
       adRequest(player, 1)
       assert.is_not_nil(flowOpen(), entry .. ' 入口没有拉起广告流程')
       confirm(player, 'success')
@@ -400,11 +400,11 @@ describe('条款 11 广告满血复活（占位广告位）', function()
     end
     if outcome == 'timeout' then
       catchUp(GameCfg.Platform.FlowTimeoutSec)
-      env.platform:Update()
+      env.platform:update()
       drain()
     else
       catchUp(7)
-      platformAction(player, { action = 'PlaceholderOutcome', outcome = outcome })
+      platform_action(player, { action = 'PlaceholderOutcome', outcome = outcome })
     end
   end
 
@@ -479,7 +479,7 @@ describe('条款 11 广告满血复活（占位广告位）', function()
   it('11-31 取消或失败不扣金豆、不发权益', function()
     local player = join(7140)
     down(player)
-    local data = env.players:GetDataInst(player)
+    local data = env.players:get_data_inst(player)
     local coinBefore = data.Data.FishCoin
     local itemsBefore = data:ItemCount(GameCfg.Survival.AdrenalineItemId)
     for _, outcome in ipairs({ 'cancel', 'fail' }) do
@@ -535,12 +535,12 @@ describe('条款 11 广告满血复活（占位广告位）', function()
       '占位广告通道必须注明不发放真实付费权益')
 
     -- 真实平台购买完成信号没有可信交付身份：不得当成已支付来结算复活
-    env.platform:OnGoodsPurchaseCompleted(opened.goodsId, 1, player)
+    env.platform:on_goods_purchase_completed(opened.goodsId, 1, player)
     assert.same('downed', env.s:Phase(player), '真实平台信号不能结算占位广告复活')
 
     confirm(player, 'success')
     assert.same('alive', env.s:Phase(player))
-    local data = env.players:GetDataInst(player)
+    local data = env.players:get_data_inst(player)
     assert.same(0, data:ItemCount(GameCfg.Survival.AdrenalineItemId), '占位广告成功不得发平台权益')
     assert.same(0, countPayload('PlatformResult', function(payload)
       return payload.action == 'Grant' or payload.action == 'CoinGrant'
@@ -597,9 +597,9 @@ describe('条款 11 广告复活入口（客户端）', function()
     ctx = { now = 1000, nodes = {}, requests = {}, events = {}, notices = {},
       heartbeats = signal(), saved = {
         game = rawget(_G, 'game'), Vector2 = rawget(_G, 'Vector2'), Color = rawget(_G, 'Color'),
-        LocalMsgNotice = rawget(_G, 'LocalMsgNotice'), reutil = package.loaded['common.re_util'] } }
+        local_msg_notice = rawget(_G, 'LocalMsgNotice'), reutil = package.loaded['common.re_util'] } }
     local env = ctx
-    _G.LocalMsgNotice = function(msg) env.notices[#env.notices + 1] = msg end
+    _G.local_msg_notice = function(msg) env.notices[#env.notices + 1] = msg end
     _G.Vector2 = { New = function(x, y) return { x = x, y = y } end }
     _G.Color = { New = function(...) return { ... } end }
     local world = {
@@ -652,7 +652,7 @@ describe('条款 11 广告复活入口（客户端）', function()
     _G.game = saved.game
     _G.Vector2 = saved.Vector2
     _G.Color = saved.Color
-    _G.LocalMsgNotice = saved.LocalMsgNotice
+    _G.local_msg_notice = saved.local_msg_notice
     ctx = nil
   end)
 

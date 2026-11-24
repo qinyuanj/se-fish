@@ -25,7 +25,7 @@ local isValidPlayer = SignalRouter.is_valid_player
 
 local function validPlayerId(player)
     local userId = isValidPlayer(player) and player.UserId or nil
-    return Records.ValidUserId(userId)
+    return Records.valid_user_id(userId)
 end
 
 local function reject(self, player, fishId, detail, reason)
@@ -34,7 +34,7 @@ local function reject(self, player, fishId, detail, reason)
     return false, reason
 end
 
-function Mgr:NoteLanding(player, fishId, weight)
+function Mgr:note_landing(player, fishId, weight)
     if type(fishId) ~= 'string' or not GameCfg.Fish[fishId] then
         return reject(self, player, fishId, 'unknown-fish', 'fish')
     end
@@ -45,12 +45,12 @@ function Mgr:NoteLanding(player, fishId, weight)
     if not scaled then
         return reject(self, player, fishId, 'weight=' .. tostring(weight), reason)
     end
-    local entry = Records.Entry(scaled, player.UserId, player.Name)
+    local entry = Records.entry(scaled, player.UserId, player.Name)
     if not entry then return reject(self, player, fishId, 'entry', 'invalid') end
     local pending = self.Pending[fishId]
     if pending and pending.entry then
         self.Stats.Merged = self.Stats.Merged + 1
-        if Records.Wins(entry, pending.entry) then pending.entry = entry end
+        if Records.wins(entry, pending.entry) then pending.entry = entry end
         return true, 'merged'
     end
     if pending then
@@ -62,44 +62,44 @@ function Mgr:NoteLanding(player, fishId, weight)
     return true, 'queued'
 end
 
-function Mgr:Update()
+function Mgr:update()
     local current = now()
     for fishId, pending in pairs(self.Pending) do
-        if pending.entry and current >= pending.dueAt then self:Flush(fishId) end
+        if pending.entry and current >= pending.dueAt then self:flush(fishId) end
     end
 end
 
-function Mgr:CacheSet(fishId, entry, failed)
-    self.Cache[fishId] = { entry = Records.Valid(entry), at = now(), failed = failed }
+function Mgr:cache_set(fishId, entry, failed)
+    self.Cache[fishId] = { entry = Records.valid(entry), at = now(), failed = failed }
 end
 
-function Mgr:Fresh(cached)
+function Mgr:fresh(cached)
     local age = now() - (cached.at or 0)
     if cached.failed or not cached.entry then return age < cfg().MissCacheTtlSec end
     return age < cfg().HolderCacheTtlSec
 end
 
-function Mgr:Flush(fishId)
+function Mgr:flush(fishId)
     local pending = self.Pending[fishId]
     if not pending or not pending.entry or pending.Writing then return end
     local entry = pending.entry
     pending.entry = nil
     local cached = self.Cache[fishId]
-    if cached and not cached.failed and not Records.Wins(entry, cached.entry) then
+    if cached and not cached.failed and not Records.wins(entry, cached.entry) then
         if not pending.entry then self.Pending[fishId] = nil end
         return
     end
     pending.Writing = true
     task():Spawn(function()
         local ok, won, saved, kind = self.Adapter:Submit(fishId, function(current)
-            if not Records.Wins(entry, current) then return nil end
+            if not Records.wins(entry, current) then return nil end
             return entry
         end)
         pending.Writing = false
         if ok then
             self.Stats.Writes = self.Stats.Writes + (won and 1 or 0)
             pending.attempts = 0
-            if saved then self:CacheSet(fishId, saved, nil) end
+            if saved then self:cache_set(fishId, saved, nil) end
             if pending.entry then
                 pending.dueAt = now() + cfg().FlushIntervalSec
             else
@@ -109,7 +109,7 @@ function Mgr:Flush(fishId)
         end
         self.Stats.Failures = self.Stats.Failures + 1
         pending.attempts = pending.attempts + 1
-        if not pending.entry or Records.Wins(entry, pending.entry) then pending.entry = entry end
+        if not pending.entry or Records.wins(entry, pending.entry) then pending.entry = entry end
         if pending.attempts > cfg().MaxRetries then
             self.Stats.Dropped = self.Stats.Dropped + 1
             self.Pending[fishId] = nil
@@ -140,7 +140,7 @@ function Mgr:Read(fishId, done)
         return
     end
     local cached = self.Cache[fishId]
-    if cached and self:Fresh(cached) then
+    if cached and self:fresh(cached) then
         if done then done(self:State(fishId)) end
         return
     end
@@ -155,10 +155,10 @@ function Mgr:Read(fishId, done)
         local waiters = self.Reading[fishId] or {}
         self.Reading[fishId] = nil
         if ok then
-            self:CacheSet(fishId, entry, nil)
+            self:cache_set(fishId, entry, nil)
         else
             local previous = self.Cache[fishId]
-            self:CacheSet(fishId, previous and previous.entry or nil, kind)
+            self:cache_set(fishId, previous and previous.entry or nil, kind)
             print('[WorldRecords] 全服纪录读取失败', fishId, tostring(kind))
         end
         local state = self:State(fishId)
@@ -166,7 +166,7 @@ function Mgr:Read(fishId, done)
     end)
 end
 
-function Mgr:OnPlayerRemoving(player)
+function Mgr:on_player_removing(player)
     if isValidPlayer(player) then
         self.LastSeq[player.UserId] = nil
         if self.LastSeqPlayers then self.LastSeqPlayers[player.UserId] = nil end
@@ -186,34 +186,34 @@ function Mgr:Handle(player, payload)
     if self.LastSeqPlayers then self.LastSeqPlayers[player.UserId] = player end
     self:Read(fishId, function(state)
         state.seq = seq
-        self:Reconcile(player, state)
-        local re = _G.REUtil and _G.REUtil:GetRE('RecordsState')
+        self:reconcile(player, state)
+        local re = _G.REUtil and _G.REUtil:get_re('RecordsState')
         if re then re:FireClient(player, state) end
     end)
 end
 
-function Mgr:Reconcile(player, state)
+function Mgr:reconcile(player, state)
     if state.state == 'unavailable' then return end
-    local data = self.PlayerData and self.PlayerData:GetDataInst(player)
+    local data = self.PlayerData and self.PlayerData:get_data_inst(player)
     local best = data and data.PersonalBestScaled and data:PersonalBestScaled(state.fishId)
     if not best then return end
     if state.state == 'ok' and best <= state.scaled then return end
-    self:NoteLanding(player, state.fishId, Records.Unscale(best))
+    self:note_landing(player, state.fishId, Records.unscale(best))
 end
 
 function Mgr.mount(scope, world, opts)
-    local adapter = setmetatable({ Checked = false, Holder = nil }, { __index = Adapter })
+    local adapter = setmetatable({ Checked = false, holder = nil }, { __index = Adapter })
     local session = setmetatable({
         Adapter = adapter, Cache = {}, Pending = {}, Reading = {}, LastSeq = {}, LastSeqPlayers = {},
         Stats = { Writes = 0, Merged = 0, Failures = 0, Retries = 0, Dropped = 0, Rejected = 0 },
         PlayerData = opts.player_data,
     }, { __index = Mgr })
     world.records = session
-    SignalRouter.bind_world(scope, _G.REUtil:GetRE('RecordsRequest').OnServerEvent, session, function(player, payload)
-        if _G.REUtil:CheckRECD(player, 'RecordsRequest', cfg().RequestCooldownSec) then return end
+    SignalRouter.bind_world(scope, _G.REUtil:get_re('RecordsRequest').OnServerEvent, session, function(player, payload)
+        if _G.REUtil:check_recd(player, 'RecordsRequest', cfg().RequestCooldownSec) then return end
         session:Handle(player, payload)
     end)
-    scope:subscribe(world.clock.on_second, function() session:Update() end)
+    scope:subscribe(world.clock.on_second, function() session:update() end)
     scope:on_cleanup(function()
         session.LastSeq = {}
         session.LastSeqPlayers = {}

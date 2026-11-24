@@ -54,13 +54,13 @@ end
 local function make_save()
   local seq = 0
   return {
-    ResolveRequest = function(_, player, _, kind, request_id)
+    resolve_request = function(_, player, _, kind, request_id)
       if type(request_id) ~= "number" then return nil end
       seq = seq + 1
       return { id = tostring(player.UserId) .. ":" .. seq, sequence = seq, kind = kind,
         requestKey = kind .. ":" .. tostring(request_id) }, "new"
     end,
-    Execute = function(_, _, _, _, transform, done)
+    execute = function(_, _, _, _, transform, done)
       local ok, result, reason = pcall(transform)
       if not ok or type(result) ~= "table" then done(false, ok and reason or tostring(result))
       else done(true, result) end
@@ -84,7 +84,7 @@ local function boot(ids, options)
     }
     return ctx.events[name]
   end
-  local re = { GetRE = function(_, name) return event(name) end, CheckRECD = function() return false end }
+  local re = { get_re = function(_, name) return event(name) end, check_recd = function() return false end }
   ctx.re = re
   for _, id in ipairs(ids or { 1, 2 }) do
     local player = make_player(id, 100 + id, 0)
@@ -93,7 +93,7 @@ local function boot(ids, options)
   end
   ctx.runtime = ServerRuntime.new({
     initial_now = 100, remote = re,
-    player_data = { GetDataInst = function(_, player)
+    player_data = { get_data_inst = function(_, player)
       if ctx.fail_read == player.UserId then error(ctx.fail_reason or "party-save-unavailable") end
       return ctx.data[player.UserId]
     end },
@@ -149,7 +149,7 @@ local function boot(ids, options)
     return nil
   end
   function ctx:hit(source, target, amount)
-    return self.runtime.life:ApplyHit(self.runtime.life:NewHit(source, "melee"), target, amount)
+    return self.runtime.life:apply_hit(self.runtime.life:new_hit(source, "melee"), target, amount)
   end
   function ctx:close() if self.runtime then self.runtime:shutdown() end self.runtime = nil end
   ctx:join_all()
@@ -387,8 +387,8 @@ describe("全局小队服务端宿主接缝（#314）", function()
     }
     local world = SharedWorldTree.spawn({
       clock = clock,
-      remote = { GetRE = function(_, name) return channel(name) end },
-      player_data = { GetDataInst = function(_, player) return datas[player.UserId] end },
+      remote = { get_re = function(_, name) return channel(name) end },
+      player_data = { get_data_inst = function(_, player) return datas[player.UserId] end },
       session_epoch = "userdata-squad-test",
     })
     local userdata_objects = {
@@ -403,14 +403,14 @@ describe("全局小队服务端宿主接缝（#314）", function()
         if userdata_objects[value] then return "userdata" end
         return real_type(value)
       end
-      world.squad:OnPlayerAdded(p1)
-      world.squad:OnPlayerAdded(p2)
+      world.squad:on_player_added(p1)
+      world.squad:on_player_added(p2)
       assert.is_true(world.squad:Handle(p1, { action = "Invite", targetUserId = 702 }))
       assert.is_true(world.squad:Handle(p2, { action = "Accept", fromUserId = 701 }))
-      assert.is_true(world.squad:SameParty(p1, p2))
+      assert.is_true(world.squad:same_party(p1, p2))
       assert.equals(2, world.squad:Count(p1))
-      world.squad:OnPlayerRemoving(p2)
-      assert.is_false(world.squad:SameParty(p1, p2))
+      world.squad:on_player_removing(p2)
+      assert.is_false(world.squad:same_party(p1, p2))
       assert.equals(0, world.squad:Count(p1))
     end)
     _G.type = real_type

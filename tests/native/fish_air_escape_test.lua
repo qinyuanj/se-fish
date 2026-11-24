@@ -35,7 +35,7 @@ end
 -- 因此引擎全局必须显式写 _G.xxx；Color 也自建桩，不依赖旧套件里的残留。
 local FishAirEscape = {}
 
-function FishAirEscape:setUp()
+function FishAirEscape:set_up()
     self.saved = { game = rawget(_G, 'game'), Vector3 = rawget(_G, 'Vector3'),
         Quaternion = rawget(_G, 'Quaternion'), Color = rawget(_G, 'Color') }
     self.modules = {}
@@ -89,7 +89,7 @@ function FishAirEscape:setUp()
         if name == 'Players' then return { GetPlayers = function() return { env.player } end } end
     end }
     self.carrier = require('server.world_host.fish_carrier')
-    self.carrier.DamagePublisher = function() end
+    self.carrier.damage_publisher = function() end
     self.mgr = require('server.world_host.fish_tree')
     -- 目标裁决适配层按生产接线（server/main.lua）由入口注入
     self.mgr.AiTarget = require('server.world_host.fish_ai_target')
@@ -98,7 +98,7 @@ function FishAirEscape:setUp()
     local SpokeClock = require('common.spoke_clock')
     self.runtime = ServerRuntime.new({
         clock = SpokeClock.new(self.now), initial_now = self.now,
-        remote = { GetRE = function() return { FireAllClients = function() end, FireClient = function() end, OnServerEvent = { Connect = function() return { Disconnect = function() end } end } } end, CheckRECD = function() return false end },
+        remote = { get_re = function() return { FireAllClients = function() end, FireClient = function() end, OnServerEvent = { Connect = function() return { Disconnect = function() end } end } } end, check_recd = function() return false end },
         create_unit = function(_, props)
             local unit = { Destroyed = false, Position = props.Position, ItemId = nil }
             function unit:Destroy() self.Destroyed = true end
@@ -110,9 +110,9 @@ function FishAirEscape:setUp()
     self.runtime:mark_started()
     ServerRuntime.set_current(self.runtime)
     self.loot = { Loots = {} }
-    self.carrier:SubscribeDied(function(carrier)
-        local fish = self.mgr:FindByCarrier(carrier)
-        local killed = fish and self.mgr:TakeKilled(fish)
+    self.carrier:subscribe_died(function(carrier)
+        local fish = self.mgr:find_by_carrier(carrier)
+        local killed = fish and self.mgr:take_killed(fish)
         if not killed then return end
         local ok, placed = self.runtime:get_world():on_carrier_killed({
             fishId = killed.fishId, mult = killed.mult, position = killed.position, zoneId = 'reefIsland',
@@ -130,10 +130,10 @@ function FishAirEscape:setUp()
     end)
 end
 
-function FishAirEscape:tearDown()
-    -- 即使 setUp 只走到一半也要恢复进程状态：先清鱼与停管理器，再回滚全局与模块缓存。
+function FishAirEscape:tear_down()
+    -- 即使 set_up 只走到一半也要恢复进程状态：先清鱼与停管理器，再回滚全局与模块缓存。
     if self.mgr then
-        for _, fish in pairs(self.mgr.Fish) do self.mgr:Remove(fish) end
+        for _, fish in pairs(self.mgr.Fish) do self.mgr:remove(fish) end
         self.mgr:Stop()
     end
     if self.runtime then
@@ -150,14 +150,14 @@ end
 
 -- 放下鱼：落地后举起再松手，返回空中鱼
 function FishAirEscape:drop(id)
-    local fish = assert(self.mgr:SpawnLanded(self.player, { fishId = id, mult = 1.57 },
+    local fish = assert(self.mgr:spawn_landed(self.player, { fishId = id, mult = 1.57 },
         self.player.Character.Position))
     fish.Carrier.Body.OnLiftedBegin:Fire(self.player.Character)
-    assert.is_true(self.mgr:Drop(self.player))
+    assert.is_true(self.mgr:drop(self.player))
     return fish
 end
 
--- 假引擎只模拟 Kinematic 速度积分；逃脱决策及入水回收全部经过真实 Update。
+-- 假引擎只模拟 Kinematic 速度积分；逃脱决策及入水回收全部经过真实 update。
 function FishAirEscape:advance(to)
     while self.now < to - 1e-8 do
         local dt = math.min(0.05, to - self.now)
@@ -169,8 +169,8 @@ function FishAirEscape:advance(to)
             end
         end
         self.now = self.now + dt
-        self.mgr:Update()
-        self.carrier:Update()
+        self.mgr:update()
+        self.carrier:update()
     end
 end
 
@@ -179,10 +179,10 @@ describe('TestFishAirEscape', function()
 
     before_each(function()
         env = setmetatable({}, { __index = FishAirEscape })
-        env:setUp()
+        env:set_up()
     end)
     after_each(function()
-        env:tearDown()
+        env:tear_down()
     end)
 
     it('test_air_fish_rehead_after_three_seconds_and_release_is_idempotent', function()
@@ -196,10 +196,10 @@ describe('TestFishAirEscape', function()
         -- 挪到礁石岛水区北侧：到三秒整点后应由朝北改为朝南。
         body.Position = vec(480, body.Position.y, 390)
         env.now = 2.95
-        env.mgr:Update()
+        env.mgr:update()
         assert.is_true(body.LinearVelocity.z > 0)
         env.now = 3.05
-        env.mgr:Update()
+        env.mgr:update()
         assert.near(-Cfg.Fish.item87.Speed, body.LinearVelocity.z, 1e-6)
     end)
 
@@ -218,7 +218,7 @@ describe('TestFishAirEscape', function()
             assert.near(Cfg.Fish[id].Speed * 1.05, body.Position.z - start.z, 1e-6, id)
             assert.near(0, body.LinearVelocity.x, 1e-6, id)
             assert.is_true(body.LinearVelocity.z > 0, id)
-            assert.is_nil(WaterJudge.HitZone(Cfg.Water.Zones,
+            assert.is_nil(WaterJudge.hit_zone(Cfg.Water.Zones,
                 { x = body.Position.x, y = 2, z = body.Position.z }), id)
             assert.same(body.Position, receiver.Position, id)
             assert.are.equal(Cfg.Fish[id].Health, receiver.Controller.Health, id)
@@ -229,7 +229,7 @@ describe('TestFishAirEscape', function()
             assert.is_nil(fish.Carrier.Receiver, id)
             assert.is_nil(env.carrier.Carriers[body.UnitId], id)
             assert.is_nil(next(env.loot.Loots), id)
-            assert.is_nil(env.mgr:TakeKilled(fish), id)
+            assert.is_nil(env.mgr:take_killed(fish), id)
         end
     end)
 
@@ -241,7 +241,7 @@ describe('TestFishAirEscape', function()
             env:advance(env.now + 1.05)
             controller:TakeDamage(Cfg.Fish[id].Health)
             controller.Died:Fire()
-            env.carrier:NotifyDied(fish.Carrier)
+            env.carrier:notify_died(fish.Carrier)
             local found = {}
             for _, loot in pairs(env.loot.Loots) do
                 if loot.FishId == id then found[#found + 1] = loot end
@@ -263,22 +263,22 @@ describe('TestFishAirEscape', function()
             assert.are.equal('flying', fish.State, id)
             assert.are.equal(deadline, fish.FleeAt, id)
             env.now = deadline - 0.05
-            env.mgr:Update()
+            env.mgr:update()
             assert.same(fish, env.mgr.Fish[fish.Id], id)
             assert.are.equal('flying', fish.State, id)
             env.now = deadline
-            env.mgr:Update()
+            env.mgr:update()
             assert.same(fish, env.mgr.Fish[fish.Id], id)
             assert.are.equal('escaping', fish.State, id)
-            env.mgr:Remove(fish)
+            env.mgr:remove(fish)
         end
         local ground = env:drop('item82')
         assert.are.equal('escaping', ground.State)
         assert.is_nil(ground.FleeAt)
-        env.mgr:Remove(ground)
-        local wild = assert(env.mgr:SpawnBlastFish('item81', 1.57, env.player.Character.Position, env.player))
+        env.mgr:remove(ground)
+        local wild = assert(env.mgr:spawn_blast_fish('item81', 1.57, env.player.Character.Position, env.player))
         env.now = wild.WildUntil
-        env.mgr:Update()
+        env.mgr:update()
         assert.is_nil(env.mgr.Fish[wild.Id])
         assert.is_nil(next(env.loot.Loots))
     end)

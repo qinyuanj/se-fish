@@ -34,7 +34,7 @@ function SaveHost:Key(userId)
     local slot = session and session.Current or self.QaSlot
     return cfg().KeyPrefix .. tostring(userId) .. (slot ~= '' and ':qa:' .. slot or '')
 end
-function SaveHost:Session(userId)
+function SaveHost:session(userId)
     self:Key(userId)
     if not self.Sessions[userId] then
         self.Sessions[userId] = { Current = self.QaSlot, Next = self.QaSlot, Paused = false }
@@ -42,15 +42,15 @@ function SaveHost:Session(userId)
     return self.Sessions[userId]
 end
 function SaveHost:Status(userId)
-    local s = self:Session(userId)
+    local s = self:session(userId)
     return { currentSlot = s.Current, nextSlot = s.Next, autosavePaused = s.Paused,
         loadState = s.State or 'pending', error = s.Error, revision = s.Revision, epoch = s.Epoch }
 end
-function SaveHost:IsPaused(userId)
+function SaveHost:is_paused(userId)
     local s = self.Sessions[userId]
     return not s or s.State ~= 'ready' or s.Paused or s.Transition or false
 end
-function SaveHost:IsCurrent(userId, session, data)
+function SaveHost:is_current(userId, session, data)
     return self.Sessions[userId] == session and session.Data == data and data.Player == session.Player
 end
 function SaveHost:Fail(userId, session, reason)
@@ -62,7 +62,7 @@ function SaveHost:Fail(userId, session, reason)
     end
     print('[SaveHost] 读写屏障关闭', userId, tostring(session.Token), reason)
 end
-function SaveHost:AfterIdle(userId, fn)
+function SaveHost:after_idle(userId, fn)
     if not self.Flying[userId] and not self.Pending[userId] then callback('AfterIdle', userId, fn) return end
     self.Waiters[userId] = self.Waiters[userId] or {}
     table.insert(self.Waiters[userId], fn)
@@ -71,14 +71,14 @@ function SaveHost:Finish(userId)
     self.Flying[userId] = nil
     if self.Pending[userId] then
         if self.Pending[userId].RetryRounds then return end
-        self:Drain(userId)
+        self:drain(userId)
         return
     end
     local callbacks = self.Waiters[userId] or {}
     self.Waiters[userId] = nil
     for _, fn in ipairs(callbacks) do callback('AfterIdle', userId, fn) end
 end
-function SaveHost:GetStore()
+function SaveHost:get_store()
     if self.StoreChecked then return self.Store end
     self.StoreChecked = true
     local ok, store = pcall(function() return game:GetService('DataStoreService'):GetDataStore(cfg().Store) end)
@@ -89,7 +89,7 @@ function SaveHost:GetStore()
     self.Store = store
     return store
 end
-function SaveHost:WithRetry(label, fn)
+function SaveHost:with_retry(label, fn)
     for attempt = 1, cfg().MaxRetries do
         local ok, value = pcall(fn)
         if ok then return true, value end
@@ -98,28 +98,28 @@ function SaveHost:WithRetry(label, fn)
     end
     return false, nil
 end
-function SaveHost:Load(userId)
-    local store = self:GetStore()
+function SaveHost:load(userId)
+    local store = self:get_store()
     if not store then return nil, 'failed' end
     local key = self:Key(userId)
-    local ok, value = self:WithRetry('读档 ' .. tostring(userId), function() return store:GetAsync(key) end)
+    local ok, value = self:with_retry('读档 ' .. tostring(userId), function() return store:GetAsync(key) end)
     if not ok then return nil, 'failed' end
     return value, value == nil and 'missing' or 'found'
 end
-function SaveHost:EstimateSize(value)
+function SaveHost:estimate_size(value)
     if type(value) == 'string' then return #value end
     if type(value) == 'number' then return 8 end
     if type(value) ~= 'table' then return 1 end
     local total = 2
-    for k, v in pairs(value) do total = total + self:EstimateSize(k) + self:EstimateSize(v) + 2 end
+    for k, v in pairs(value) do total = total + self:estimate_size(k) + self:estimate_size(v) + 2 end
     return total
 end
-function SaveHost:WithinBudget(snapshot)
-    return self:EstimateSize(snapshot) <= 256 * 1024
+function SaveHost:within_budget(snapshot)
+    return self:estimate_size(snapshot) <= 256 * 1024
 end
-function SaveHost:NoteWrite(userId, snapshot, reason)
+function SaveHost:note_write(userId, snapshot, reason)
     local ledger = self.Ledger[userId] or { Writes = 0 }
-    ledger.Writes, ledger.Bytes = ledger.Writes + 1, self:EstimateSize(snapshot)
+    ledger.Writes, ledger.Bytes = ledger.Writes + 1, self:estimate_size(snapshot)
     ledger.LastReason, ledger.Revision = reason, snapshot.meta.revision
     ledger.OperationCount = #snapshot.meta.operations
     self.Ledger[userId] = ledger
@@ -127,8 +127,8 @@ function SaveHost:NoteWrite(userId, snapshot, reason)
         'bytes=' .. ledger.Bytes, 'writes=' .. ledger.Writes, 'ops=' .. ledger.OperationCount)
 end
 
-function SaveHost:RestoreLanding(userId, player, data, session)
-    if not self:IsCurrent(userId, session, data) then return end
+function SaveHost:restore_landing(userId, player, data, session)
+    if not self:is_current(userId, session, data) then return end
     local point, corrected = data:ResolveSafePoint()
     if not corrected or not point then return end
     local function teleport(character)
@@ -148,9 +148,9 @@ function SaveHost:RestoreLanding(userId, player, data, session)
     end)
 end
 
-function SaveHost:LoadInto(player, data)
+function SaveHost:load_into(player, data)
     local userId = player.UserId
-    local previous = self:Session(userId)
+    local previous = self:session(userId)
     if previous.Data and previous.Data ~= data then
         previous.Data.Inited, previous.Data.LoadState = false, 'stale'
     end
@@ -163,20 +163,20 @@ function SaveHost:LoadInto(player, data)
     player:SetAttribute('SaveState', 'pending')
     local function load()
         task():Spawn(function()
-            if not self:IsCurrent(userId, s, data) then return end
-            local store = self:GetStore()
+            if not self:is_current(userId, s, data) then return end
+            local store = self:get_store()
             if not store then self:Fail(userId, s, '存档服务不可用') return end
-            local okSlot, slot = self:WithRetry('读取槽选择 ' .. userId, function()
+            local okSlot, slot = self:with_retry('读取槽选择 ' .. userId, function()
                 return store:GetAsync(cfg().KeyPrefix .. userId .. ':gm-slot')
             end)
-            if not self:IsCurrent(userId, s, data) then return end
+            if not self:is_current(userId, s, data) then return end
             if not okSlot or slot ~= nil and slot ~= '' and not validSlot(slot) then
                 self:Fail(userId, s, '槽选择读取失败或损坏') return
             end
             if slot ~= nil then s.Current, s.Next = slot, slot end
             s.Key = self:Key(userId)
-            local loaded, status = self:Load(userId)
-            if not self:IsCurrent(userId, s, data) then return end
+            local loaded, status = self:load(userId)
+            if not self:is_current(userId, s, data) then return end
             if status == 'failed' then self:Fail(userId, s, '读取失败，不初始化新档') return end
             local candidate, reason
             if loaded == nil then
@@ -187,10 +187,10 @@ function SaveHost:LoadInto(player, data)
                 candidate, reason = data:Migrate(loaded)
             end
             if not candidate then self:Fail(userId, s, reason) return end
-            if not self:WithinBudget(candidate) then self:Fail(userId, s, '存档容量超预算') return end
-            local ok, claimed = self:WithRetry('认领会话 ' .. userId, function()
+            if not self:within_budget(candidate) then self:Fail(userId, s, '存档容量超预算') return end
+            local ok, claimed = self:with_retry('认领会话 ' .. userId, function()
                 return store:UpdateAsync(s.Key, function(current)
-                    if not self:IsCurrent(userId, s, data) then return nil end
+                    if not self:is_current(userId, s, data) then return nil end
                     if current and current.meta and current.meta.session == s.Token then return current end
                     if not equal(current, loaded) then return nil end
                     local nextValue = copy(candidate)
@@ -200,18 +200,18 @@ function SaveHost:LoadInto(player, data)
                     return nextValue
                 end)
             end)
-            if not self:IsCurrent(userId, s, data) then return end
+            if not self:is_current(userId, s, data) then return end
             if not ok or not claimed or claimed.meta.session ~= s.Token then
                 self:Fail(userId, s, '会话认领失败或版本冲突') return
             end
             s.State, s.Revision, s.Epoch = 'ready', claimed.meta.revision, claimed.meta.epoch
             if not data:CompleteLoad(claimed) then self:Fail(userId, s, '恢复数据无效') return end
-            self:RestoreLanding(userId, player, data, s)
-            self:NoteWrite(userId, claimed, status == 'missing' and 'new' or 'load')
+            self:restore_landing(userId, player, data, s)
+            self:note_write(userId, claimed, status == 'missing' and 'new' or 'load')
             player:SetAttribute('SaveState', 'ready')
             print('[SaveHost] ready', userId, s.Token, 'coin=' .. claimed.coin, 'sequence=' .. claimed.meta.sequence)
-            if self.OnReady then self.OnReady(player, data) end
-            if self.PlayerData then self.PlayerData:SendItemBar(player, true) end
+            if self.on_ready then self.on_ready(player, data) end
+            if self.PlayerData then self.PlayerData:send_item_bar(player, true) end
         end)
     end
     if previous.SlotChoosing then
@@ -220,25 +220,25 @@ function SaveHost:LoadInto(player, data)
     else load() end
 end
 
-function SaveHost:WriteJob(userId, job)
-    local s = job.Session
+function SaveHost:write_job(userId, job)
+    local s = job.session
     if self.Sessions[userId] ~= s then return false, 'stale' end
     if not job.BaseRevision then
         job.BaseRevision = s.Revision
-        job.Snapshot.meta.revision = s.Revision + 1
-        job.Snapshot.meta.epoch, job.Snapshot.meta.session = s.Epoch, s.Token
+        job.snapshot.meta.revision = s.Revision + 1
+        job.snapshot.meta.epoch, job.snapshot.meta.session = s.Epoch, s.Token
         s.WriteSequence = (s.WriteSequence or 0) + 1
         job.Id = s.Token .. ':write:' .. s.WriteSequence
-        job.Snapshot.meta.write = job.Id
+        job.snapshot.meta.write = job.Id
     end
-    local ok, value = self:WithRetry('写档 ' .. userId .. ' ' .. job.Reason, function()
+    local ok, value = self:with_retry('写档 ' .. userId .. ' ' .. job.Reason, function()
         return self.Store:UpdateAsync(job.Key, function(current)
             if self.Sessions[userId] ~= s then return nil end
             if type(current) ~= 'table' or type(current.meta) ~= 'table'
                 or current.meta.session ~= s.Token or current.meta.epoch ~= s.Epoch then return nil end
             if current.meta.write == job.Id then return current end
             if current.meta.revision ~= job.BaseRevision then return nil end
-            return copy(job.Snapshot)
+            return copy(job.snapshot)
         end)
     end)
     if self.Sessions[userId] ~= s then return false, 'stale' end
@@ -251,25 +251,25 @@ function SaveHost:WriteJob(userId, job)
     if s.Data and s.Data.Player == s.Player then
         s.Data.SaveMeta = PlayerData.StripArrayMeta(value.meta, 'stored.meta')
     end
-    self:NoteWrite(userId, value, job.Reason)
+    self:note_write(userId, value, job.Reason)
     return true, value
 end
 local function appendJob(current, job)
     if not current then return job end
-    if not current.BaseRevision and not current.Done and not current.After then return job end
+    if not current.BaseRevision and not current.done and not current.After then return job end
     local last = current
     while last.After do last = last.After end
     last.After = job
     return current
 end
-function SaveHost:Drain(userId)
+function SaveHost:drain(userId)
     if self.Flying[userId] then return end
     self.Flying[userId] = true
     task():Spawn(function()
         while self.Pending[userId] do
             local job = self.Pending[userId]
             self.Pending[userId] = nil
-            local ok, result = self:WriteJob(userId, job)
+            local ok, result = self:write_job(userId, job)
             if not ok and result == 'retry' and not job.NoRetry then
                 job.RetryRounds = (job.RetryRounds or 0) + 1
                 if job.RetryRounds <= 3 then
@@ -278,13 +278,13 @@ function SaveHost:Drain(userId)
                     break
                 end
                 print('[SaveHost] 写档重试耗尽，关闭会话', userId, job.Reason)
-                self:Fail(userId, job.Session, '写档重试耗尽')
+                self:Fail(userId, job.session, '写档重试耗尽')
             end
-            callback('写入结果', userId, job.Done, ok, result)
-            if not ok and result == 'retry' and job.Session.State == 'failed' then
+            callback('写入结果', userId, job.done, ok, result)
+            if not ok and result == 'retry' and job.session.State == 'failed' then
                 local current = job.After
                 while current do
-                    callback('后续写入取消', userId, current.Done, false, '写档失败')
+                    callback('后续写入取消', userId, current.done, false, '写档失败')
                     current = current.After
                 end
                 self.Pending[userId] = nil
@@ -295,24 +295,24 @@ function SaveHost:Drain(userId)
         self:Finish(userId)
     end)
 end
-function SaveHost:Enqueue(userId, snapshot, reason, done)
+function SaveHost:enqueue(userId, snapshot, reason, done)
     local s = self.Sessions[userId]
-    if not s or s.State ~= 'ready' or s.Paused or s.Transition or not self:GetStore()
+    if not s or s.State ~= 'ready' or s.Paused or s.Transition or not self:get_store()
         or not s.Data or not s.Data.Inited or not snapshot or not s.Data:IsValidSave(snapshot)
-        or not self:WithinBudget(snapshot) or snapshot.meta.session ~= s.Token then return false end
-    local job = { Session = s, Key = s.Key, Snapshot = copy(snapshot), Reason = reason or 'save', Done = done,
+        or not self:within_budget(snapshot) or snapshot.meta.session ~= s.Token then return false end
+    local job = { session = s, Key = s.Key, snapshot = copy(snapshot), Reason = reason or 'save', done = done,
         NoRetry = reason == 'gm' }
     self.Pending[userId] = appendJob(self.Pending[userId], job)
-    self:Drain(userId)
+    self:drain(userId)
     return true
 end
-function SaveHost:Save(userId, snapshot, reason) return self:Enqueue(userId, snapshot, reason) end
-function SaveHost:Commit(userId, snapshot, reason) return self:Enqueue(userId, snapshot, reason) end
+function SaveHost:Save(userId, snapshot, reason) return self:enqueue(userId, snapshot, reason) end
+function SaveHost:commit(userId, snapshot, reason) return self:enqueue(userId, snapshot, reason) end
 
-function SaveHost:ResolveRequest(player, data, kind, requestId)
+function SaveHost:resolve_request(player, data, kind, requestId)
     local userId = player and player.UserId
     local s = userId and self.Sessions[userId]
-    if not s or not self:IsCurrent(userId, s, data) or s.State ~= 'ready'
+    if not s or not self:is_current(userId, s, data) or s.State ~= 'ready'
         or type(kind) ~= 'string' or #kind < 1 or #kind > 80 then return nil, 'invalid' end
     local requestKey
     if type(requestId) == 'number' and requestId == math.floor(requestId)
@@ -334,17 +334,17 @@ function SaveHost:ResolveRequest(player, data, kind, requestId)
         end
     end
     if type(requestId) == 'table' then return nil, 'expired' end
-    if self:IsPaused(userId) then return nil, 'pending' end
-    local operation = self:NextOperation(player, kind)
+    if self:is_paused(userId) then return nil, 'pending' end
+    local operation = self:next_operation(player, kind)
     if not operation then return nil, 'pending' end
     operation.requestKey = requestKey
     return operation, 'new'
 end
 
 -- 身份由服务端颁发，调用者必须保留原身份重试；不能把客户端自报 id 当凭证。
-function SaveHost:NextOperation(player, kind)
+function SaveHost:next_operation(player, kind)
     local s = self.Sessions[player.UserId]
-    if not s or s.Player ~= player or self:IsPaused(player.UserId) or not s.Data.Inited
+    if not s or s.Player ~= player or self:is_paused(player.UserId) or not s.Data.Inited
         or type(kind) ~= 'string' or #kind < 1 or #kind > 80 then return nil end
     local sequence = s.Data.SaveMeta.sequence + 1
     return { id = tostring(player.UserId) .. ':' .. sequence, sequence = sequence, kind = kind }
@@ -352,9 +352,9 @@ end
 
 -- transform 只改隔离 draft 并返回可序列化结果；外部实体交接由调用方在成功回调按操作身份确认。
 -- 扣费、发奖、恢复记录和结果一次落在同键，失败时 draft 不向玩家发布。
-function SaveHost:Execute(player, data, operation, transform, done)
+function SaveHost:execute(player, data, operation, transform, done)
     local userId, s = player.UserId, self.Sessions[player.UserId]
-    if not s or not self:IsCurrent(userId, s, data) or s.State ~= 'ready' or not data.Inited
+    if not s or not self:is_current(userId, s, data) or s.State ~= 'ready' or not data.Inited
         or type(operation) ~= 'table' or type(operation.sequence) ~= 'number'
         or operation.sequence ~= math.floor(operation.sequence) or operation.sequence < 1
         or operation.id ~= tostring(userId) .. ':' .. operation.sequence
@@ -371,11 +371,11 @@ function SaveHost:Execute(player, data, operation, transform, done)
         end
     end
     if operation.sequence <= meta.sequence then return false, 'expired' end
-    if self:IsPaused(userId) then return false, 'pending' end
+    if self:is_paused(userId) then return false, 'pending' end
     if operation.sequence ~= meta.sequence + 1 then return false, 'out-of-order' end
     s.Transition = true
-    self:AfterIdle(userId, function()
-        if not self:IsCurrent(userId, s, data) then return end
+    self:after_idle(userId, function()
+        if not self:is_current(userId, s, data) then return end
         local snapshot = data:Serialize()
         local draft = PlayerData.New({ UserId = userId, SetAttribute = function() end })
         draft:Init()
@@ -394,15 +394,15 @@ function SaveHost:Execute(player, data, operation, transform, done)
         while #nextValue.meta.operations > 64 do
             nextValue.meta.floor = table.remove(nextValue.meta.operations, 1).sequence
         end
-        if not data:IsValidSave(nextValue) or not self:WithinBudget(nextValue) then
+        if not data:IsValidSave(nextValue) or not self:within_budget(nextValue) then
             s.Transition = false
             callback('结算容量拒绝', userId, done, false, 'invalid-result-or-budget')
             return
         end
         data.Inited = false
-        local job = { Session = s, Key = s.Key, Snapshot = nextValue, Reason = operation.kind,
-            Done = function(written, value)
-                if not self:IsCurrent(userId, s, data) then return end
+        local job = { session = s, Key = s.Key, snapshot = nextValue, Reason = operation.kind,
+            done = function(written, value)
+                if not self:is_current(userId, s, data) then return end
                 s.Transition = false
                 if written then
                     data.Inited = true
@@ -418,20 +418,20 @@ function SaveHost:Execute(player, data, operation, transform, done)
                 end
             end }
         self.Pending[userId] = job
-        self:Drain(userId)
+        self:drain(userId)
     end)
     return true
 end
 
-function SaveHost:ApplyTemporary(userId, data, patch, done)
-    local s = self:Session(userId)
-    if s.Transition or s.State ~= 'ready' or not self:IsCurrent(userId, s, data) then
+function SaveHost:apply_temporary(userId, data, patch, done)
+    local s = self:session(userId)
+    if s.Transition or s.State ~= 'ready' or not self:is_current(userId, s, data) then
         return false, '存档尚未就绪'
     end
     s.Transition = true
     local accepted, failure = true, nil
-    self:AfterIdle(userId, function()
-        if not self:IsCurrent(userId, s, data) then return end
+    self:after_idle(userId, function()
+        if not self:is_current(userId, s, data) then return end
         local ok, reason = data:ApplyGMPatch(patch)
         accepted, failure = ok, reason
         if ok then s.Paused = true end
@@ -440,16 +440,16 @@ function SaveHost:ApplyTemporary(userId, data, patch, done)
     end)
     return accepted, failure
 end
-function SaveHost:SaveExplicit(userId, data, done)
-    local s = self:Session(userId)
-    if s.Transition or s.State ~= 'ready' or not self:IsCurrent(userId, s, data) then return false, '存档尚未就绪' end
+function SaveHost:save_explicit(userId, data, done)
+    local s = self:session(userId)
+    if s.Transition or s.State ~= 'ready' or not self:is_current(userId, s, data) then return false, '存档尚未就绪' end
     s.Transition = true
-    self:AfterIdle(userId, function()
-        if not self:IsCurrent(userId, s, data) then return end
+    self:after_idle(userId, function()
+        if not self:is_current(userId, s, data) then return end
         local snapshot = data:Serialize()
         s.Transition, s.Paused = false, false
-        local accepted = self:Enqueue(userId, snapshot, 'gm', function(ok, result)
-            if not self:IsCurrent(userId, s, data) then return end
+        local accepted = self:enqueue(userId, snapshot, 'gm', function(ok, result)
+            if not self:is_current(userId, s, data) then return end
             s.Paused = not ok
             callback('GM 保存', userId, done, ok, ok and nil or result)
         end)
@@ -460,16 +460,16 @@ function SaveHost:SaveExplicit(userId, data, done)
     end)
     return true
 end
-function SaveHost:ReadExplicit(userId, data, done)
-    local s = self:Session(userId)
-    if s.Transition or s.State ~= 'ready' or not self:IsCurrent(userId, s, data) then return false, '存档尚未就绪' end
+function SaveHost:read_explicit(userId, data, done)
+    local s = self:session(userId)
+    if s.Transition or s.State ~= 'ready' or not self:is_current(userId, s, data) then return false, '存档尚未就绪' end
     s.Transition = true
-    self:AfterIdle(userId, function()
+    self:after_idle(userId, function()
         task():Spawn(function()
-            if not self:IsCurrent(userId, s, data) then return end
+            if not self:is_current(userId, s, data) then return end
             local revision = data.Revision
-            local value, status = self:Load(userId)
-            if not self:IsCurrent(userId, s, data) then return end
+            local value, status = self:load(userId)
+            if not self:is_current(userId, s, data) then return end
             local valid = status == 'found' and data.Revision == revision and data:IsValidSave(value)
                 and value.meta and value.meta.session == s.Token and value.meta.revision == s.Revision
             if valid then data:ApplySave(value) end
@@ -480,13 +480,13 @@ function SaveHost:ReadExplicit(userId, data, done)
     end)
     return true
 end
-function SaveHost:SelectNextSlot(userId, slot, done)
+function SaveHost:select_next_slot(userId, slot, done)
     if slot ~= '' and not validSlot(slot) then return false, '存档槽须为 1—40 位字母、数字、下划线或连字符' end
-    local s, store = self:Session(userId), self:GetStore()
+    local s, store = self:session(userId), self:get_store()
     if s.SlotChoosing or not store then return false, '槽选择进行中或服务不可用' end
     s.SlotChoosing = true
     task():Spawn(function()
-        local ok = self:WithRetry('选择槽 ' .. userId, function()
+        local ok = self:with_retry('选择槽 ' .. userId, function()
             store:SetAsync(cfg().KeyPrefix .. userId .. ':gm-slot', slot)
         end)
         if ok and self.Sessions[userId] == s then s.Next = slot end
@@ -499,19 +499,19 @@ function SaveHost:SelectNextSlot(userId, slot, done)
     end)
     return true
 end
-function SaveHost:ReleaseSession(userId, player)
+function SaveHost:release_session(userId, player)
     local s = self.Sessions[userId]
     if not s or player and s.Player ~= player then return end
     s.Leaving = true
-    self:AfterIdle(userId, function() if self.Sessions[userId] == s then self.Sessions[userId] = nil end end)
+    self:after_idle(userId, function() if self.Sessions[userId] == s then self.Sessions[userId] = nil end end)
 end
-function SaveHost:SaveLeaving(player, data)
+function SaveHost:save_leaving(player, data)
     local s = self.Sessions[player.UserId]
     if not s or s.Player ~= player or s.Data ~= data then return end
     if data and data.Inited then self:Save(player.UserId, data:Serialize(), 'leave') end
 end
-function SaveHost:Update()
-    for userId in pairs(self.Pending) do self:Drain(userId) end
+function SaveHost:update()
+    for userId in pairs(self.Pending) do self:drain(userId) end
     local now = game:GetService('World'):GetServerTime()
     local interval = cfg().AutosaveSec
     if not interval or interval <= 0 then return end
@@ -520,7 +520,7 @@ function SaveHost:Update()
     self.NextAutosaveAt = now + interval
     if self.PlayerData then
         for _, player in ipairs(game:GetService('Players'):GetPlayers()) do
-            local data = self.PlayerData:GetDataInst(player)
+            local data = self.PlayerData:get_data_inst(player)
             if data then self:Save(player.UserId, data:Serialize(), 'autosave') end
         end
     end
@@ -530,13 +530,13 @@ function SaveHost:Start()
         game:BindToClose(function()
             if self.PlayerData then
                 for _, player in ipairs(game:GetService('Players'):GetPlayers()) do
-                    local data = self.PlayerData:GetDataInst(player)
+                    local data = self.PlayerData:get_data_inst(player)
                     if data then self:Save(player.UserId, data:Serialize(), 'shutdown') end
                 end
             end
             for _ = 1, 25 do
                 if next(self.Pending) == nil and next(self.Flying) == nil then return end
-                for userId in pairs(self.Pending) do self:Drain(userId) end
+                for userId in pairs(self.Pending) do self:drain(userId) end
                 task():Wait(1)
             end
             print('[SaveHost] 关服刷新未排空，请核对台账')

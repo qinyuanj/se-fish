@@ -43,7 +43,7 @@ local function newController()
     return c
 end
 
-local function newPlayer(id)
+local function new_player(id)
     local p = { UserId = id, Name = 'p' .. id, attrs = {}, CharacterAdded = signal() }
     p.Character = { Controller = newController(), Position = { x = 0, y = 0, z = 0 }, Size = { y = 2 } }
     function p:SetAttribute(key, value) self.attrs[key] = value end
@@ -60,7 +60,7 @@ describe('条款 16-04 / 16-06 / 16-07：物品食用规则', function()
         local Host = require('tests.support.life_host')
         env = { host = Host.start({ now = 0 }) }
         env.Vitals = env.host.runtime.life
-        env.player = newPlayer(7001)
+        env.player = new_player(7001)
         env.host:add(env.player)
     end)
 
@@ -69,7 +69,7 @@ describe('条款 16-04 / 16-06 / 16-07：物品食用规则', function()
     end)
 
     it('食物、极品食物与鱼饵可食用，恢复或扣减按恢复百分比生效', function()
-        -- 负恢复项（如 item119）会真的扣血，扣到 0 之后 CanAct 就拒绝一切进食——所以每件物品
+        -- 负恢复项（如 item119）会真的扣血，扣到 0 之后 can_act 就拒绝一切进食——所以每件物品
         -- 各用一个新玩家，并把物品按 ID 排序，用例结果不随 pairs 的遍历顺序或进程哈希种子漂移。
         local ids = {}
         for id, item in pairs(GameCfg.Items.Definitions) do
@@ -79,14 +79,14 @@ describe('条款 16-04 / 16-06 / 16-07：物品食用规则', function()
         local checked = 0
         for _, id in ipairs(ids) do
             local item = GameCfg.Items.Definitions[id]
-            local player = newPlayer(7100 + checked)
+            local player = new_player(7100 + checked)
             env.host:add(player)
             checked = checked + 1
-            assert.is_true(env.Vitals:CanEat(player, id), '可食用类别被拒：' .. id)
-            env.Vitals:SetHunger(player, 100)
+            assert.is_true(env.Vitals:can_eat(player, id), '可食用类别被拒：' .. id)
+            env.Vitals:set_hunger(player, 100)
             local before = env.Vitals:GetState(player).tree.states.hunger:now()
             local healthBefore = player.Character.Controller.Health
-            assert.is_true(env.Vitals:Eat(player, id), '可食用类别吃不下：' .. id)
+            assert.is_true(env.Vitals:eat(player, id), '可食用类别吃不下：' .. id)
             local after = env.Vitals:GetState(player).tree.states.hunger:now()
             if item.EatPercent > 0 then
                 assert.is_true(after > before, '正恢复没有回饥饿：' .. id)
@@ -106,8 +106,8 @@ describe('条款 16-04 / 16-06 / 16-07：物品食用规则', function()
         for id, item in pairs(GameCfg.Items.Definitions) do
             if not EDIBLE[item.Type] then
                 checked = checked + 1
-                assert.is_false(env.Vitals:CanEat(env.player, id), '非食用类别被当成可吃：' .. id)
-                assert.is_false(env.Vitals:Eat(env.player, id), '非食用类别吃成功：' .. id)
+                assert.is_false(env.Vitals:can_eat(env.player, id), '非食用类别被当成可吃：' .. id)
+                assert.is_false(env.Vitals:eat(env.player, id), '非食用类别吃成功：' .. id)
             end
         end
         assert.is_true(checked > 0, '物品表里没有非食用项')

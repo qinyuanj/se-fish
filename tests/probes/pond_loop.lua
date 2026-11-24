@@ -11,7 +11,7 @@
 --   3. 抛竿不扣饵、挂鸭子不必出鳄雀鳝、没挂饵也能钓到要饵的鱼；
 --   4. 电鳗一轮放电不是 5 次、间隔不是 1 秒、放完不睡或睡眠不足 10 秒、睡眠中仍放电；
 --   5. 鳄雀鳝不锁定朝向：玩家绕到身后仍被咬（绕后无效），或正前方头部区反而不咬；
---   6. 载体死亡事件重复到达时重复掉落 / 重复发信物（TakeKilled 不幂等）；
+--   6. 载体死亡事件重复到达时重复掉落 / 重复发信物（take_killed 不幂等）；
 --   7. 电鳗头不换鸭子、鳄雀鳝头不换船票，兑换多给金币或丢失信物以外的库存；
 --   8. 个人最大重量不随更重的一条刷新；极品（item7～item12、信物头）资格判断错，烤过的仍可投抽奖机；
 --   9. 模拟时间线失控（金币为负、耗时为负或远超逃跑时限），经济 K 值无法复算；
@@ -19,9 +19,9 @@
 --  11. 攒匕首钱存在经济阻塞（某些自然抽样下永远攒不够），或跳过匕首直接空手挑战电鳗（没验证武器成长）。
 --
 -- 模拟边界（逐条标注在输出里）：
---     MgrLoot:Give / OnCarrierDied（拾取发放与掉落）、MgrFishUnit（电鳗 / 鳄雀鳝战斗状态机）、
+--     MgrLoot:Give / on_carrier_died（拾取发放与掉落）、MgrFishUnit（电鳗 / 鳄雀鳝战斗状态机）、
 --     FishCatch（抽鱼与倍率）、LotteryEligibility（极品资格）。
---   * 引擎边界是假的：场景锚点、物理射线、技能施放（CastFish 只计数）、玩家命中（按武器间隔扣载体血量）。
+--   * 引擎边界是假的：场景锚点、物理射线、技能施放（cast_fish 只计数）、玩家命中（按武器间隔扣载体血量）。
 --   * 抽鱼与倍率用「确定性 RNG」（固定种子 LCG，替换 FishCatch 的 random 参数），不直接指定鱼种或倍率。
 --   * 走位 / 收线 / 上岸动作的耗时是估算常数（见 SIM），不是实测；卖鱼往返不单独计时。
 --   * 安全失败时电鳗的逃脱位移由探针按 LinearVelocity × dt 积分（假引擎无物理），回水判定走真实 MgrFishUnit。
@@ -82,7 +82,7 @@ local economyGame = _G.game
 local save, players = host.save, host.player_data
 local function drain() host:drain() end
 
-local loot = { Loots = {}, Pickup = function() return false end, Give = function() return false end, OnCarrierDied = function() end }
+local loot = { Loots = {}, pickup = function() return false end, Give = function() return false end, on_carrier_died = function() end }
 
 local player, data = host:join(13401, GameCfg.Interact.Fishermen[1].AnchorNames[1])
 
@@ -94,7 +94,7 @@ check('新档：金币 0、无鱼竿、无武器、无鱼饵',
     and data:WeaponCount('item135') == 0 and (data.Data.Bait.worm or 0) == 0,
     string.format('coin=%s rod=%d dagger=%d worm=%s', tostring(data.Data.FishCoin), data:ItemCount('starterRod'),
         data:WeaponCount('item135'), tostring(data.Data.Bait.worm)))
-save:SaveExplicit(player.UserId, data, function() end)
+save:save_explicit(player.UserId, data, function() end)
 drain()
 
 local Seq = 0
@@ -193,7 +193,7 @@ check('买竿扣 ' .. tostring(rodPrice) .. ' 金并入库', spent == rodPrice a
 local FishEscape = require('tests.support.fish_escape')
 local function combatEnv()
     local env = FishEscape.new()
-    env:setUp()
+    env:set_up()
     env:prepare()
     env.notices, env.casts, env.hits, env.published = {}, {}, {}, {}
     local maxHealth = GameCfg.Vitals.MaxHealth or 300
@@ -202,12 +202,12 @@ local function combatEnv()
         p.Character.Controller.TakeDamage = function(c, d) c.Health = c.Health - d end
     end
     env.other.Character.Position = Vector3.New(500, 2, 500) -- 另一名玩家远离，不参与本局
-    env.mgr.PublishBite = function(_, payload) env.notices[#env.notices + 1] = payload end
-    env.mgr.CombatPublisher = function(payload) env.published[#env.published + 1] = payload end
+    env.mgr.publish_bite = function(_, payload) env.notices[#env.notices + 1] = payload end
+    env.mgr.combat_publisher = function(payload) env.published[#env.published + 1] = payload end
     env.mgr.Ability = {
-        EquipFish = function() return true end,
+        equip_fish = function() return true end,
         -- 技能施放只计数；5 米内的玩家记一次模拟命中（伤害取配置）
-        CastFish = function(_, fish)
+        cast_fish = function(_, fish)
             env.casts[#env.casts + 1] = env.now
             local eel = GameCfg.Ability.FishAbilities.eel
             local p, q = fish.Carrier.Body.Position, env.player.Character.Position
@@ -217,20 +217,20 @@ local function combatEnv()
             end
             return true
         end,
-        RemoveFish = function() end,
+        remove_fish = function() end,
     }
     env.mgr.Vitals = {
-        NewHit = function(_, source, category) return { source = source, category = category } end,
-        ApplyHit = function(_, _, _, amount)
+        new_hit = function(_, source, category) return { source = source, category = category } end,
+        apply_hit = function(_, _, _, amount)
             env.hits[#env.hits + 1] = { source = 'gar', amount = amount }
             return true, amount
         end,
-        CanTakeDamage = function() return true end,
+        can_take_damage = function() return true end,
     }
     return env
 end
 local function closeEnv(env)
-    env:tearDown()
+    env:tear_down()
     _G.game = economyGame
 end
 local function weapon()
@@ -247,7 +247,7 @@ local function killAndLoot(env, fish, onTick)
     while health > 0 do
         env.now = env.now + w.IntervalSec
         if onTick then onTick(env, fish) end
-        env.mgr:Update()
+        env.mgr:update()
         if env.mgr.Fish[fish.Id] ~= fish then return nil, env.now - start end
         health = health - w.Damage
     end
@@ -256,9 +256,9 @@ local function killAndLoot(env, fish, onTick)
     loot.Spawn = function(_, fishId, mult, _, itemId)
         drops[#drops + 1] = { fishId = fishId, itemId = itemId or fishId, mult = mult }
     end
-    loot:OnCarrierDied(fish.Carrier)
+    loot:on_carrier_died(fish.Carrier)
     local first = #drops
-    loot:OnCarrierDied(fish.Carrier) -- 重复死亡事件
+    loot:on_carrier_died(fish.Carrier) -- 重复死亡事件
     loot.Spawn = nil
     loot.FishUnit = nil
     Stats.kills = Stats.kills + 1
@@ -275,7 +275,7 @@ local function noteCatch(fishId, mult)
     local species = GameCfg.Fish[fishId]
     Stats.catches[fishId] = (Stats.catches[fishId] or 0) + 1
     if species.BaseWeight then
-        local weight = FishCatch.Weight(species, mult)
+        local weight = FishCatch.weight(species, mult)
         if weight > Stats.maxWeight then Stats.maxWeight, Stats.maxWeightFish = weight, fishId end
     end
 end
@@ -292,7 +292,7 @@ local function castOnce()
         data:SelectBait(baitId)
         local ok = data:ConsumeSelectedBait()
         if not ok then return nil end
-        fishId = FishCatch.Select(GameCfg.Casting.Zones.WaterCircle2, 1, baitId or 0, rng)
+        fishId = FishCatch.select(GameCfg.Casting.Zones.WaterCircle2, 1, baitId or 0, rng)
     end
     Stats.casts = Stats.casts + 1
     Clock = Clock + GameCfg.Casting.HookDelaySec + SIM.ReelSec + GameCfg.Casting.LandedHoldSec
@@ -317,7 +317,7 @@ local function handleNormal(fishId, mult)
             for k, v in pairs(entry) do copy[k] = v end
             local okElig, Eligibility = pcall(require, 'common.lottery_eligibility')
             Stats.premiumKept = { itemId = fishId, entry = copy,
-                eligibleInBar = okElig and (Eligibility.Check(entry) == true) or nil }
+                eligibleInBar = okElig and (Eligibility.check(entry) == true) or nil }
             event(string.format('钓到极品 %s x%.2f（先验抽奖资格，再卖掉攒钱）', fishId, mult))
         end
     end
@@ -351,11 +351,11 @@ end
 -- 引擎边界：载体位移由探针按 LinearVelocity × dt 积分（假引擎没有物理）。
 local function safeFailEel(mult)
     local env = combatEnv()
-    local fish = env.mgr:SpawnLanded(env.player, { fishId = 'eel', mult = mult or 1.5 },
+    local fish = env.mgr:spawn_landed(env.player, { fishId = 'eel', mult = mult or 1.5 },
         env.player.Character.Position + Vector3.New(0, 0, 2))
     fish.Carrier.Body.OnLiftedBegin:Fire(env.player.Character)
-    env.mgr:Drop(env.player)
-    local canCast = env.mgr:CanCast(env.player)
+    env.mgr:drop(env.player)
+    local canCast = env.mgr:can_cast(env.player)
     local cfgEel = GameCfg.Ability.FishAbilities.eel
     local fp = fish.Carrier.Body.Position
     env.player.Character.Position = Vector3.New(fp.x + cfgEel.Radius + 3, fp.y, fp.z) -- 退出放电半径
@@ -371,7 +371,7 @@ local function safeFailEel(mult)
         if fish.State == 'escaping' and v then
             body.Position = Vector3.New(body.Position.x + v.x * dt, body.Position.y, body.Position.z + v.z * dt)
         end
-        env.mgr:Update()
+        env.mgr:update()
         if not escapedAt and fish.State == 'escaping' then escapedAt = env.now end
         if env.mgr.Fish[fish.Id] ~= fish then goneAt = env.now break end
     end
@@ -425,10 +425,10 @@ local eelDrops, eelKillSec, eelFirst
 if eelFish == 'eel' then
     event('钓出电鳗')
     local env = combatEnv()
-    local fish = env.mgr:SpawnLanded(env.player, { fishId = 'eel', mult = eelM or 1.5 },
+    local fish = env.mgr:spawn_landed(env.player, { fishId = 'eel', mult = eelM or 1.5 },
         env.player.Character.Position + Vector3.New(0, 0, 2))
     fish.Carrier.Body.OnLiftedBegin:Fire(env.player.Character)
-    env.mgr:Drop(env.player)
+    env.mgr:drop(env.player)
     local fp = fish.Carrier.Body.Position
     env.player.Character.Position = Vector3.New(fp.x + 1.5, fp.y, fp.z) -- 贴身近战
     local cfgEel = GameCfg.Ability.FishAbilities.eel
@@ -472,7 +472,7 @@ check('拾到电鳗头', headSlot ~= nil)
 local exchangedDuck = false
 if headSlot then
     local headEntry = select(2, slotOf('eelHead'))
-    local okHead = require('common.lottery_eligibility').Check(headEntry)
+    local okHead = require('common.lottery_eligibility').check(headEntry)
     check('电鳗头（未烤信物）有抽奖资格', okHead == true)
     data:SelectSlot(headSlot)
     Clock = Clock + SIM.FishermanWalkSec
@@ -500,10 +500,10 @@ if exchangedDuck then
     if fishId == 'alligatorGar' then
         event('钓出鳄雀鳝')
         local env = combatEnv()
-        local fish = env.mgr:SpawnLanded(env.player, { fishId = 'alligatorGar', mult = mult },
+        local fish = env.mgr:spawn_landed(env.player, { fishId = 'alligatorGar', mult = mult },
             env.player.Character.Position + Vector3.New(0, 0, 2))
         fish.Carrier.Body.OnLiftedBegin:Fire(env.player.Character)
-        env.mgr:Drop(env.player)
+        env.mgr:drop(env.player)
         local params = GameCfg.FishCombat.gar
         local fp = fish.Carrier.Body.Position
         -- 第一口站在正前方头部区挨咬；之后每次锁定后立刻绕到身后（咬距内）
@@ -522,10 +522,10 @@ if exchangedDuck then
             end
         end
         env.now = env.now
-        env.mgr:Update() -- 第一口起咬
+        env.mgr:update() -- 第一口起咬
         env.lastAim = fish.BiteAim
         env.now = env.now + params.BiteCooldownSec
-        env.mgr:Update() -- 第一口结算（正前方）
+        env.mgr:update() -- 第一口结算（正前方）
         firstLockSeen = true
         local ticks = env.now
         garDrops = select(1, killAndLoot(env, fish, tick))
@@ -577,12 +577,12 @@ if okElig then
             Stats.premiumKept.eligibleInBar == true)
         local cookedEntry = { itemId = Stats.premiumKept.itemId, count = 1, mult = Stats.premiumKept.entry.mult,
             saved = { [GameCfg.Items.CookedFlag] = true } }
-        local okCooked, reason = Eligibility.Check(cookedEntry)
+        local okCooked, reason = Eligibility.check(cookedEntry)
         check('烤过的极品失去资格（cooked）', okCooked == false and reason == 'cooked', reason)
     else
         check('闭环内钓到至少 1 条极品（确定性 RNG）', false, '未钓到极品，换种子或加长闭环')
     end
-    local okNormal, reason = Eligibility.Check({ itemId = 'bass', count = 1, mult = 1.2 })
+    local okNormal, reason = Eligibility.check({ itemId = 'bass', count = 1, mult = 1.2 })
     check('普通鱼无抽奖资格（not-premium）', okNormal == false and reason == 'not-premium', reason)
 else
     check('LotteryEligibility 模块可用', false, '等待集成：common/lottery_eligibility 缺失')
@@ -628,7 +628,7 @@ local function econRun(seed)
         if worm == 0 then trip() end
         local bait = worm > 0 and 'worm' or 0
         if worm > 0 then worm = worm - 1 end
-        local id = FishCatch.Select(zone, 1, bait, r)
+        local id = FishCatch.select(zone, 1, bait, r)
         local m = FishCatch.Multiplier(r)
         casts = casts + 1
         t = t + GameCfg.Casting.HookDelaySec + SIM.ReelSec + GameCfg.Casting.LandedHoldSec

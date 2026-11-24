@@ -133,7 +133,7 @@ describe("未登记名字的失败路径", function()
     package.loaded[anchorLogic] = { Attach = function(script) attached[#attached + 1] = script end }
     local api = assert(loadfile("server/ability_api.lua"))()
     local anchor = {}
-    assert.error_matches(function() api.AttachAnchor(anchor, "no_such_behavior") end,
+    assert.error_matches(function() api.attach_anchor(anchor, "no_such_behavior") end,
       "锚点行为模块不可用: no_such_behavior", nil, true)
     assert.same({ anchor }, attached)
   end)

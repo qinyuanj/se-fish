@@ -58,7 +58,7 @@ describe('TestAbilitySeams', function()
 
     it('test_attach_to_socket_creates_a_cleared_mount', function()
         local host = { Name = 'fish56Boss' }
-        local attached = ctx.api.AttachToSocket(ctx.world, nil, host, 'LiftSocket', vec(0, 0.1, 0.1))
+        local attached = ctx.api.attach_to_socket(ctx.world, nil, host, 'LiftSocket', vec(0, 0.1, 0.1))
         assert.is_true(attached.Ok)
         assert.same('SkeletalSocketMount', attached.Mount.UnitType)
         assert.same(host, attached.Mount.Parent)
@@ -67,24 +67,24 @@ describe('TestAbilitySeams', function()
         assert.is_true(attached.Offset.z >= 0.1)
         assert.is_true(attached.Mount.SocketOffset.x == 0)
         -- 无挂点名 / 无宿主一律拒绝，不建孤儿单位
-        assert.same('no-socket', ctx.api.AttachToSocket(ctx.world, nil, host, nil, nil).Error)
-        assert.same('no-host', ctx.api.AttachToSocket(ctx.world, nil, nil, 'LiftSocket', nil).Error)
+        assert.same('no-socket', ctx.api.attach_to_socket(ctx.world, nil, host, nil, nil).Error)
+        assert.same('no-host', ctx.api.attach_to_socket(ctx.world, nil, nil, 'LiftSocket', nil).Error)
         assert.same(1, #ctx.created)
     end)
 
     it('test_detach_destroys_the_mount_only_once', function()
-        local attached = ctx.api.AttachToSocket(ctx.world, nil, { Name = 'boss' }, 'LiftSocket', vec(0, 2, 0))
-        assert.is_true(ctx.api.DetachFromSocket(attached.Mount))
+        local attached = ctx.api.attach_to_socket(ctx.world, nil, { Name = 'boss' }, 'LiftSocket', vec(0, 2, 0))
+        assert.is_true(ctx.api.detach_from_socket(attached.Mount))
         assert.is_true(attached.Mount.Destroyed)
-        assert.is_false(ctx.api.DetachFromSocket(nil))
+        assert.is_false(ctx.api.detach_from_socket(nil))
     end)
 
     it('test_set_body_scale_reports_failure_instead_of_throwing', function()
-        assert.same('no-unit', ctx.api.SetBodyScale(nil, 2).Error)
-        local noScale = ctx.api.SetBodyScale({}, 2)
+        assert.same('no-unit', ctx.api.set_body_scale(nil, 2).Error)
+        local noScale = ctx.api.set_body_scale({}, 2)
         assert.is_false(noScale.Ok)
         assert.same('no-set-scale', noScale.Error)
-        local broken = ctx.api.SetBodyScale({ SetScale = function() error('引擎拒绝') end }, 2)
+        local broken = ctx.api.set_body_scale({ SetScale = function() error('引擎拒绝') end }, 2)
         assert.is_false(broken.Ok)
         assert.same(2, broken.Scale)
     end)
@@ -92,7 +92,7 @@ describe('TestAbilitySeams', function()
     it('test_set_body_scale_sanitizes_and_writes_a_uniform_scale', function()
         local written = nil
         local unit = { SetScale = function(_, scale) written = scale end }
-        local applied = ctx.api.SetBodyScale(unit, 3)
+        local applied = ctx.api.set_body_scale(unit, 3)
         assert.is_true(applied.Ok)
         assert.same(3, applied.Scale)
         assert.same(vec(3, 3, 3), written)
@@ -100,7 +100,7 @@ describe('TestAbilitySeams', function()
         -- 非法倍率净化成 1 倍，绝不把 NaN 写进单位
         for _, bad in ipairs({ 0 / 0, math.huge, -1, 0, 'x', nil }) do
             written = nil
-            local result = ctx.api.SetBodyScale(unit, bad)
+            local result = ctx.api.set_body_scale(unit, bad)
             assert.message(tostring(bad)).is_true(result.Ok)
             assert.message(tostring(bad)).same(vec(1, 1, 1), written)
         end
@@ -117,7 +117,7 @@ describe('TestFishAbilitySeams', function()
                 MaxHealth = GameCfg.Fish[fishId].Health, Dead = false }, Threat = {} }
     end
 
-    local function newPlayer(userId, position)
+    local function new_player(userId, position)
         return { UserId = userId, Character = { Position = vec(position.x, position.y, position.z),
             Controller = { Health = 100, MaxHealth = 100 } } }
     end
@@ -139,17 +139,17 @@ describe('TestFishAbilitySeams', function()
             if name == 'Players' then return { GetPlayers = function() return ctx.players end } end
             return {}
         end }
-        package.loaded['server.world_host.fish_carrier'] = { Spawn = function() return nil end, Despawn = function() end,
-            SyncPosition = function() end }
+        package.loaded['server.world_host.fish_carrier'] = { Spawn = function() return nil end, despawn = function() end,
+            sync_position = function() end }
         package.loaded['server.ability_api'] = {
-            AttachToSocket = function(_, unit, host, socketName, offset)
+            attach_to_socket = function(_, unit, host, socketName, offset)
                 local mount = { UnitType = 'SkeletalSocketMount', Parent = host, SocketName = socketName,
                     SocketOffset = offset, Destroyed = false }
                 function mount:Destroy() self.Destroyed = true end
                 ctx.mounts[#ctx.mounts + 1] = mount
                 return { Ok = true, Mount = mount, Offset = offset }
             end,
-            DetachFromSocket = function(mount)
+            detach_from_socket = function(mount)
                 ctx.detached[#ctx.detached + 1] = mount
                 return true
             end,
@@ -161,9 +161,9 @@ describe('TestFishAbilitySeams', function()
         ctx.mgr.AiTarget = require('server.world_host.fish_ai_target')
         ctx.mgr.World = _G.game:GetService('World')
         ctx.mgr.Vitals = {
-            CanTakeDamage = function() return true end,
-            NewHit = function(_, source, category) return { source = source, category = category, targets = {} } end,
-            ApplyHit = function(_, hit, target, amount)
+            can_take_damage = function() return true end,
+            new_hit = function(_, source, category) return { source = source, category = category, targets = {} } end,
+            apply_hit = function(_, hit, target, amount)
                 ctx.hits[#ctx.hits + 1] = { target = target, amount = amount, category = hit.category }
                 return true
             end,
@@ -183,20 +183,20 @@ describe('TestFishAbilitySeams', function()
     it('test_air_strike_focuses_the_attacker_then_the_nearest_one', function()
         local fish = newFish(2, 'fish47Elite', { x = 0, y = 14, z = 0 })
         ctx.mgr.Fish[fish.Id] = fish
-        local far = newPlayer(1, { x = 40, y = 0, z = 0 })
-        local near = newPlayer(2, { x = 1, y = 0, z = 0 })
+        local far = new_player(1, { x = 40, y = 0, z = 0 })
+        local near = new_player(2, { x = 1, y = 0, z = 0 })
         ctx.players = { far, near }
         local pos = fish.Carrier.Body.Position
         -- 没被打过：取最近的
-        local target = ctx.mgr:ChooseTarget(fish, pos, { AggroRange = 60 })
+        local target = ctx.mgr:choose_target(fish, pos, { AggroRange = 60 })
         assert.same(near, target)
         -- 空中被远处的玩家打中：威胁优先，改盯打它的人
-        ctx.mgr:NoteDamage(fish, far, 500)
-        target = ctx.mgr:ChooseTarget(fish, pos, { AggroRange = 60 })
+        ctx.mgr:note_damage(fish, far, 500)
+        target = ctx.mgr:choose_target(fish, pos, { AggroRange = 60 })
         assert.message('空中受击后应改盯攻击者').same(far, target)
         -- 攻击者死亡：仇恨立即失效，回落最近目标
         far.Character.Controller.Health = 0
-        target = ctx.mgr:ChooseTarget(fish, pos, { AggroRange = 60 })
+        target = ctx.mgr:choose_target(fish, pos, { AggroRange = 60 })
         assert.same(near, target)
         assert.message('失效目标要从仇恨表里清掉').is_nil(fish.Threat[far])
     end)
@@ -206,7 +206,7 @@ describe('TestFishAbilitySeams', function()
         local safe = GameCfg.Zones[7].Scene.SafePoint
         local fish = newFish(3, 'fish56Boss', { x = safe.x, y = safe.y, z = safe.z })
         ctx.mgr.Fish[fish.Id] = fish
-        local player = newPlayer(9, { x = safe.x + 1, y = safe.y, z = safe.z })
+        local player = new_player(9, { x = safe.x + 1, y = safe.y, z = safe.z })
         ctx.players = { player }
         -- 50%：入水阶段（咬中 1000）
         fish.Carrier.Health, fish.Carrier.MaxHealth = 5000, 10000
@@ -215,7 +215,7 @@ describe('TestFishAbilitySeams', function()
         fish.Yaw = 0
         for _ = 1, 355 do -- #38 正文沧龙式：15秒跃起，1秒预警+1.5秒腾空后咬中
             ctx.now = ctx.now + 0.05
-            ctx.mgr:UpdateBossPhase(fish, ctx.now, fish.Carrier.Body.Position)
+            ctx.mgr:update_boss_phase(fish, ctx.now, fish.Carrier.Body.Position)
         end
         assert.same('water', fish.Phase.Phase)
         assert.same(2, #ctx.hits)
@@ -234,7 +234,7 @@ describe('TestFishAbilitySeams', function()
     it('test_carry_follows_snaps_and_releases_with_the_mount', function()
         local fish = newFish(4, 'fish56Boss', { x = 0, y = 0, z = 0 })
         ctx.mgr.Fish[fish.Id] = fish
-        local player = newPlayer(9, { x = 1, y = 0, z = 0 })
+        local player = new_player(9, { x = 1, y = 0, z = 0 })
         ctx.players = { player }
         local CarryMount = require('common.carry_mount')
         local cfg = GameCfg.Ability.Carry
@@ -246,17 +246,17 @@ describe('TestFishAbilitySeams', function()
         fish.CarryMount = ctx.mounts[#ctx.mounts + 1] or { Destroyed = false, Destroy = function() end }
         -- 容差内不写回（避免每帧纠正抖动）
         local before = vec(player.Character.Position.x, player.Character.Position.y, player.Character.Position.z)
-        ctx.mgr:UpdateCarry(fish, ctx.now + 0.05)
+        ctx.mgr:update_carry(fish, ctx.now + 0.05)
         assert.same(before.x, player.Character.Position.x)
         -- 被甩开：整段钳回挂点坐标
         player.Character.Position = vec(999, 0, 999)
-        ctx.mgr:UpdateCarry(fish, ctx.now + 0.1)
-        local mount = CarryMount.MountPoint(fish.Carry.Host, fish.Carry.Offset, 0)
+        ctx.mgr:update_carry(fish, ctx.now + 0.1)
+        local mount = CarryMount.mount_point(fish.Carry.Host, fish.Carry.Offset, 0)
         assert.near(mount.x, player.Character.Position.x, 1e-9)
         assert.near(mount.z, player.Character.Position.z, 1e-9)
         assert.same(1, fish.Carry.Stats.Snaps)
         -- 超时：放下玩家、销毁挂点、清携带态
-        ctx.mgr:UpdateCarry(fish, ctx.now + cfg.MaxCarrySec + 1)
+        ctx.mgr:update_carry(fish, ctx.now + cfg.MaxCarrySec + 1)
         assert.is_nil(fish.Carry)
         assert.is_nil(fish.CarryMount)
         assert.same(1, #ctx.detached)
@@ -270,11 +270,11 @@ describe('TestFishAbilitySeams', function()
         for _, entry in ipairs(GameCfg.Zones) do
             if entry.Id == 'reefIsland' then zone = entry.Scene end
         end
-        local bounds = ctx.mgr:FlightBounds('fish47Elite')
+        local bounds = ctx.mgr:flight_bounds('fish47Elite')
         assert.same(zone.Boundary.MinX, bounds.MinX)
         assert.same(zone.SafePoint.y + GameCfg.Ability.Flight.MaxHeight, bounds.CeilingY)
         -- 未知鱼种用兜底围栏，仍然是有限边界
-        local fallback = ctx.mgr:FlightBounds('noSuchFish')
+        local fallback = ctx.mgr:flight_bounds('noSuchFish')
         assert.same(GameCfg.Ability.Flight.FallbackBounds.MaxX, fallback.MaxX)
         assert.is_not.same(math.huge, fallback.CeilingY)
     end)
@@ -283,14 +283,14 @@ describe('TestFishAbilitySeams', function()
     it('test_flying_writes_back_a_position_inside_the_fence', function()
         local fish = newFish(1, 'fish47Elite', { x = 0, y = 14, z = 0 })
         ctx.mgr.Fish[fish.Id] = fish
-        local bounds = ctx.mgr:FlightBounds(fish.FishId)
+        local bounds = ctx.mgr:flight_bounds(fish.FishId)
         -- 起点故意放到围栏外：驱动一帧必须把它夹回本区
         fish.Carrier.Body.Position = vec(bounds.MaxX + 200, bounds.CeilingY + 50, bounds.MaxZ + 200)
-        assert.is_true(ctx.mgr:StartFlight(fish, ctx.now))
+        assert.is_true(ctx.mgr:start_flight(fish, ctx.now))
         assert.same('flying', fish.State)
         for _ = 1, 60 do
             ctx.now = ctx.now + 0.05
-            ctx.mgr:UpdateFlying(fish, ctx.now)
+            ctx.mgr:update_flying(fish, ctx.now)
         end
         local pos = fish.Carrier.Body.Position
         assert.message('x ' .. tostring(pos.x)).is_true(pos.x <= bounds.MaxX and pos.x >= bounds.MinX)
@@ -300,28 +300,28 @@ describe('TestFishAbilitySeams', function()
         assert.is_true(#fish.Flight.ClampLog > 0)
     end)
 
-    -- 失败方式 5：Remove 必须先放下携带中的玩家，再清鱼
+    -- 失败方式 5：remove 必须先放下携带中的玩家，再清鱼
     it('test_remove_drops_a_carried_player_before_clearing_the_fish', function()
         local fish = newFish(5, 'fish56Boss', { x = 0, y = 0, z = 0 })
         ctx.mgr.Fish[fish.Id] = fish
-        local player = newPlayer(9, { x = 1, y = 0, z = 0 })
+        local player = new_player(9, { x = 1, y = 0, z = 0 })
         local CarryMount = require('common.carry_mount')
         fish.Carry = CarryMount.New(GameCfg.Ability.Carry, { x = 0, y = 0, z = 0 }, 0, ctx.now)
         fish.Carry.GroundY = 2
         fish.Carry.TargetPlayer = player
         CarryMount.Attach(fish.Carry, { x = 1, y = 0, z = 0 }, ctx.now)
-        ctx.mgr:Remove(fish)
+        ctx.mgr:remove(fish)
         assert.is_nil(fish.Carry)
         assert.is_nil(ctx.mgr.Fish[fish.Id])
         assert.near(2 + GameCfg.Ability.Carry.DropHeight, player.Character.Position.y, 1e-9)
     end)
 
     it('test_species_registry_routes_flight_and_boss', function()
-        assert.same(20, ctx.mgr:FlightProfile('fish47Elite').DiveIntervalSec)
-        assert.same('leap', ctx.mgr:FlightProfile('fish55Elite').Mode)
-        assert.same(260, ctx.mgr:FlightProfile('fish48Boss').DiveDamage)
-        assert.is_nil(ctx.mgr:FlightProfile('eel'))
-        assert.is_true(ctx.mgr:BossPhaseEnabled('fish56Boss'))
-        assert.is_false(ctx.mgr:BossPhaseEnabled('fish47Elite'))
+        assert.same(20, ctx.mgr:flight_profile('fish47Elite').DiveIntervalSec)
+        assert.same('leap', ctx.mgr:flight_profile('fish55Elite').Mode)
+        assert.same(260, ctx.mgr:flight_profile('fish48Boss').DiveDamage)
+        assert.is_nil(ctx.mgr:flight_profile('eel'))
+        assert.is_true(ctx.mgr:boss_phase_enabled('fish56Boss'))
+        assert.is_false(ctx.mgr:boss_phase_enabled('fish47Elite'))
     end)
 end)

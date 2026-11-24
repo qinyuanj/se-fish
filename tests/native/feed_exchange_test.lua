@@ -16,7 +16,7 @@ local Host = require('tests.support.shop_feed_host')
 describe("喂钓鱼佬的信物兑换", function()
     local ctx
 
-    -- 与旧 LuaUnit 的每例 setUp/tearDown 同级成对。
+    -- 与旧 LuaUnit 的每例 set_up/tear_down 同级成对。
     before_each(function()
         ctx = { seq = 0 }
         ctx.cfg = GameCfg
@@ -28,7 +28,7 @@ describe("喂钓鱼佬的信物兑换", function()
         ctx.plays = ctx.anchor.plays
     end)
 
-    -- 配置模块缓存与全局逐例恢复；setUp 中途失败也照样清理。
+    -- 配置模块缓存与全局逐例恢复；set_up 中途失败也照样清理。
     after_each(function()
         ctx.host:shutdown()
     end)

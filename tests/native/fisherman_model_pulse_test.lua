@@ -25,7 +25,7 @@ describe("钓鱼佬模型按区脉冲", function()
         position = { x = 0, y = 0, z = 0 },
       }
     end
-    local root = Eui.Node({ Name = "UIRoot" })
+    local root = Eui.node({ Name = "UIRoot" })
     RootView.mount(root, store, {
       hud = { FishermanView.presentation_spec({ shared = shared, models = models }) },
       docks = { fisherman = FishermanView.bubble_spec({ shared = shared, anchors = anchors }) },
@@ -34,7 +34,7 @@ describe("钓鱼佬模型按区脉冲", function()
         next_seq = function() return #sent + 1 end,
       },
       create_node = function(kind, props)
-        return Eui.Node({
+        return Eui.node({
           Kind = kind, Name = props and props.Name, Parent = props and props.Parent,
           Text = props and (props.Text or props.ButtonText) or "",
           TouchEnabled = kind == "EUIButton",
@@ -45,7 +45,7 @@ describe("钓鱼佬模型按区脉冲", function()
     local function feed(index)
       local name = GameCfg.Interact.Fishermen[index].AnchorNames[1]
       local button = root:FindFirstChild("BtnFishermanFeed" .. index .. "_" .. name, true)
-      assert.is_true(Eui.Click(button))
+      assert.is_true(Eui.click(button))
       writer:ingest_event("InteractResult", { ok = true, action = "Feed", coins = 1 })
     end
     return root, writer, sent, feed

@@ -88,7 +88,7 @@ describe("ClientStore 属性汇聚与 CameraZoomView（#297-B）", function()
     assert.equals(character, store.local_character:now())
     assert.equals(26, store.camera_distance:now())
 
-    -- 超上限非法数值被 BodyScale.Sanitize 钳制到 39，NaN 变为 nil
+    -- 超上限非法数值被 BodyScale.sanitize 钳制到 39，NaN 变为 nil
     character.CameraDistance = 999
     heartbeat:Fire(0.016)
     assert.equals(39, store.camera_distance:now())
@@ -106,7 +106,7 @@ describe("ClientStore 属性汇聚与 CameraZoomView（#297-B）", function()
 
   it("CameraZoomView 挂载到 RootView：跟随角色缩放、检测手动改距让权、角色切换与销毁时恢复原始距离", function()
     local store, writer = ClientStore.new({ initial_now = 0 })
-    local root_node = Eui.Node({ Name = "UIRoot" })
+    local root_node = Eui.node({ Name = "UIRoot" })
     local first_char = { Name = "CharA" }
     local second_char = { Name = "CharB" }
     local camera = { Distance = 8, TrackingUnit = first_char }
@@ -144,7 +144,7 @@ describe("ClientStore 属性汇聚与 CameraZoomView（#297-B）", function()
 
   it("CameraZoomView 仅在活跃 Phase 内订阅 on_frame，关屏、无角色或让权后停止逐帧空转", function()
     local store, writer = ClientStore.new({ initial_now = 0 })
-    local root_node = Eui.Node({ Name = "UIRoot" })
+    local root_node = Eui.node({ Name = "UIRoot" })
     local char = { Name = "Hero" }
     local camera = { Distance = 8, TrackingUnit = char }
     local camera_reads = 0

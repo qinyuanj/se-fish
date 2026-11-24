@@ -13,7 +13,7 @@ local GameCfg = require('common.game_cfg')
 local DamageFloat = require('client.damage_float')
 
 describe('TestDamageFloat', function()
-    -- 旧 setUp/tearDown 的替身环境逐例建立与恢复：模块单例状态与全局都按案例回滚。
+    -- 旧 set_up/tear_down 的替身环境逐例建立与恢复：模块单例状态与全局都按案例回滚。
     local saved
     before_each(function()
         saved = {
@@ -49,7 +49,7 @@ describe('TestDamageFloat', function()
                 end,
             } end
         end }
-        DamageFloat:Bind({}, { x = 800, y = 600 })
+        DamageFloat:bind({}, { x = 800, y = 600 })
         local payload = { targetType = 'fish', targetId = 7, amount = 0.5,
             position = { x = 3, y = 5, z = 9 } }
         DamageFloat:Show(payload)
@@ -63,20 +63,20 @@ describe('TestDamageFloat', function()
         assert.not_equals(created[2].Position.x, created[1].Position.x)
         visible = false
         time = 0.5
-        DamageFloat:Update()
-        assert.is_false(DamageFloat.Active[1].Node.Visible)
+        DamageFloat:update()
+        assert.is_false(DamageFloat.Active[1].node.Visible)
         visible = true
-        DamageFloat:Update()
-        assert.is_true(DamageFloat.Active[1].Node.Visible)
+        DamageFloat:update()
+        assert.is_true(DamageFloat.Active[1].node.Visible)
         time = 1.1
-        DamageFloat:Update()
+        DamageFloat:update()
         assert.same(2, #DamageFloat.Pool)
         payload.amount, payload.critical = 10, true
         DamageFloat:Show(payload)
         assert.same(2, #created)
-        assert.same('10', DamageFloat.Active[1].Node.Text)
-        assert.same(GameCfg.DamageFloat.CriticalFontSize, DamageFloat.Active[1].Node.FontSize)
-        assert.same(1, DamageFloat.Active[1].Node.Opacity)
+        assert.same('10', DamageFloat.Active[1].node.Text)
+        assert.same(GameCfg.DamageFloat.CriticalFontSize, DamageFloat.Active[1].node.FontSize)
+        assert.same(1, DamageFloat.Active[1].node.Opacity)
         DamageFloat:Clear()
         assert.same(0, #DamageFloat.Active)
         assert.is_true(created[1].Destroyed and created[2].Destroyed)
@@ -88,12 +88,12 @@ describe('TestDamageNotice', function()
         local pos = { x = 3, y = 4, z = 5 }
         for _, case in ipairs({ { 10, 7.3, 3 }, { 10, 7.6, 2 },
             { 10, 9.5, 1 }, { 10, 9.9, 1 }, { 4, 0, 4 } }) do
-            local payload = DamageNotice.FromHealth(42, case[1], case[2], pos)
-            assert.same(case[3], DamageFloat.DisplayAmount(payload.amount))
+            local payload = DamageNotice.from_health(42, case[1], case[2], pos)
+            assert.same(case[3], DamageFloat.display_amount(payload.amount))
             assert.same(42, payload.targetId)
             assert.same(4, payload.position.y)
         end
-        assert.is_nil(DamageNotice.FromHealth(42, 4, 4, pos))
-        assert.is_nil(DamageNotice.FromHealth(42, 4, 5, pos))
+        assert.is_nil(DamageNotice.from_health(42, 4, 4, pos))
+        assert.is_nil(DamageNotice.from_health(42, 4, 5, pos))
     end)
 end)

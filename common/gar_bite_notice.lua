@@ -5,7 +5,7 @@ local function finite(v)
 end
 
 ---起咬预警：fishId 为 MgrFishUnit 的鱼编号，(fx,fz) 为锁定的头部朝向（单位向量）
-function GarBiteNotice.Lock(fishId, pos, fx, fz, range, halfAngleDeg, duration)
+function GarBiteNotice.lock(fishId, pos, fx, fz, range, halfAngleDeg, duration)
     return {
         kind = 'lock', fishId = fishId,
         position = { x = pos.x, y = pos.y, z = pos.z },
@@ -18,7 +18,7 @@ function GarBiteNotice.Clear(fishId, reason)
     return { kind = 'clear', fishId = fishId, reason = reason }
 end
 
-function GarBiteNotice.Valid(payload)
+function GarBiteNotice.valid(payload)
     if type(payload) ~= 'table' or type(payload.fishId) ~= 'number' then return false end
     if payload.kind == 'clear' then return true end
     if payload.kind ~= 'lock' then return false end
@@ -28,8 +28,8 @@ function GarBiteNotice.Valid(payload)
         and finite(payload.duration) and payload.duration > 0
 end
 
-function GarBiteNotice.Publish(payload)
-    require('common.re_util'):GetRE(GarBiteNotice.EventName):FireAllClients(payload)
+function GarBiteNotice.publish(payload)
+    require('common.re_util'):get_re(GarBiteNotice.EventName):FireAllClients(payload)
 end
 
 return GarBiteNotice

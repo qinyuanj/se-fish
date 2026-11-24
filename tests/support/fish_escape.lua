@@ -3,7 +3,7 @@
 local FishLift = require('tests.support.fish_lift')
 local M = setmetatable({}, { __index = FishLift })
 
---- 建一个空世界壳；调用方随后 :setUp() 搭世界、:tearDown() 拆除
+--- 建一个空世界壳；调用方随后 :set_up() 搭世界、:tear_down() 拆除
 --- （与 blindbox_world / revive_world 同一构造/拆除入口名）。
 function M.new()
     return setmetatable({}, { __index = M })
@@ -29,7 +29,7 @@ function M:prepare()
     end }
 end
 
-function M:heldFish(player, fishId, mult)
+function M:held_fish(player, fishId, mult)
     player = player or self.player
     local fish = self:land(player, fishId, mult)
     fish.Carrier.Body.OnLiftedBegin:Fire(player.Character)

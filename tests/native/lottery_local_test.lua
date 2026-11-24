@@ -4,7 +4,7 @@ local ClientWorld = require("tests.support.economy_client")
 describe("抽奖机场景入口（#312 LotteryInteraction）", function()
   local env, options, anchorName
   before_each(function()
-    anchorName = GameCfg.Lottery.MachineAnchors()[1]
+    anchorName = GameCfg.Lottery.machine_anchors()[1]
     options = {
       interaction = true,
       anchors = { [anchorName] = { Name = anchorName, Position = { x = 0, y = 5, z = 0 } } },

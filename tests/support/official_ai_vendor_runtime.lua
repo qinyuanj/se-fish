@@ -19,16 +19,16 @@ local MODULE_PATHS = {
     ['common.packages.ability_system.util'] = 'common/packages/ability_system/util.lua',
 }
 
-local function Vector(x, y, z)
+local function vector(x, y, z)
     local v = { x = x or 0, y = y or 0, z = z or 0 }
     function v:Length() return math.sqrt(self.x * self.x + self.y * self.y + self.z * self.z) end
-    function v:GetNormalized()
+    function v:get_normalized()
         local len = self:Length()
-        return len <= 0 and nil or Vector(self.x / len, self.y / len, self.z / len)
+        return len <= 0 and nil or vector(self.x / len, self.y / len, self.z / len)
     end
     return setmetatable(v, {
-        __add = function(a, b) return Vector(a.x + b.x, a.y + b.y, a.z + b.z) end,
-        __sub = function(a, b) return Vector(a.x - b.x, a.y - b.y, a.z - b.z) end,
+        __add = function(a, b) return vector(a.x + b.x, a.y + b.y, a.z + b.z) end,
+        __sub = function(a, b) return vector(a.x - b.x, a.y - b.y, a.z - b.z) end,
     })
 end
 local function vecLen(v)
@@ -38,14 +38,14 @@ end
 
 local function vecNorm(v)
     local len = vecLen(v)
-    return len <= 0 and nil or Vector(v.x / len, v.y / len, v.z / len)
+    return len <= 0 and nil or vector(v.x / len, v.y / len, v.z / len)
 end
 
 local function tracer(unit)
     local copy = { UnitId = unit.UnitId, Position = unit.Position, Controller = unit.Controller,
         Parent = unit.Parent, Destroying = unit.Destroying, children = unit.children,
         GetPosition = unit.GetPosition, SetPosition = unit.SetPosition, GetChildren = unit.GetChildren,
-        HasAnyTags = unit.HasAnyTags, HasAllTags = unit.HasAllTags }
+        has_any_tags = unit.has_any_tags, has_all_tags = unit.has_all_tags }
     return copy
 end
 
@@ -85,9 +85,9 @@ end
 
 local function newUnit(id, position)
     local unit = { UnitId = id, Parent = true, Controller = newController(),
-        Position = position or Vector(), Destroying = signal(), children = {} }
-    function unit:HasAnyTags(tags) return #tags > 0 and false or false end
-    function unit:HasAllTags(tags) return #tags == 0 end
+        Position = position or vector(), Destroying = signal(), children = {} }
+    function unit:has_any_tags(tags) return #tags > 0 and false or false end
+    function unit:has_all_tags(tags) return #tags == 0 end
     function unit:GetPosition() return self.Position end
     function unit:SetPosition(position) self.Position = position end
     function unit:GetChildren() return self.children end
@@ -101,7 +101,7 @@ local function newUnit(id, position)
 end
 
 -- deterministic 环境：runFn 返回一个按秒推进的时间回调；Task 调度器轮询所有作业。
-function Loader.loadAi()
+function Loader.load_ai()
     local loaded = {}
     local time = { value = 0 }
     local taskService = { tasks = {} }
@@ -151,12 +151,12 @@ function Loader.loadAi()
     end
     local world = {}
     function world:GetServerTime() return time.value end
-    function world:GetUnitRelationShip() return 1 end
+    function world:get_unit_relation_ship() return 1 end
     function world:CreateAsset(assetId)
         local script = { assetId = assetId, attrs = {}, tags = {}, children = {} }
         function script:SetAttribute(key, value) self.attrs[key] = value end
         function script:GetAttribute(key) return self.attrs[key] end
-        function script:GetComponent() return nil end
+        function script:get_component() return nil end
         function script:GetChildren() return self.children end
         function script:Destroy() self.destroyed = true end
         return { script }
@@ -168,7 +168,7 @@ function Loader.loadAi()
         if name == 'RunService' then return { IsServer = function() return false end } end
     end }
     local Env = {}
-    local envMath = setmetatable({ Vector3 = Vector }, { __index = math })
+    local envMath = setmetatable({ Vector3 = vector }, { __index = math })
     for key, value in pairs(_G) do Env[key] = value end
     Env.game = envGame
     Env.math = envMath
@@ -191,7 +191,7 @@ function Loader.loadAi()
     return ai, {
         behavior = loaded['server.packages.official_ai_feature.behavior_runtime'],
         time = time, task = taskService, players = players, world = world,
-        Vector = Vector, vecLen = vecLen, vecNorm = vecNorm, newUnit = newUnit,
+        vector = vector, vecLen = vecLen, vecNorm = vecNorm, newUnit = newUnit,
         registry = loaded['common.packages.ability_system.registry'],
     }
 end

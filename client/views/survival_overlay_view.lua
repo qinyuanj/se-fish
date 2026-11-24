@@ -30,7 +30,7 @@ local function send(ctx, seq, action, mode)
     return
   end
   local ok, err = pcall(function()
-    local Re = require("common.re_util"):GetRE("SurvivalAction")
+    local Re = require("common.re_util"):get_re("SurvivalAction")
     if Re and type(Re.FireServer) == "function" then
       Re:FireServer(payload)
     end

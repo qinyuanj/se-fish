@@ -10,7 +10,7 @@ local State = Spoke.State
 local PlayerLife = {}
 
 local function finite_number(value)
-  return Number.IsFiniteNumber(value)
+  return Number.is_finite_number(value)
 end
 
 local function positive_amount(value)
@@ -86,7 +86,7 @@ function PlayerLife.mount(s3, player_tree, opts)
   local player_data = opts.player_data
   local remote = opts.remote
   local raw = {}
-  local seeded = player_data and type(player_data.GetDataInst) == "function" and select(2, pcall(player_data.GetDataInst, player_data, player)) or data
+  local seeded = player_data and type(player_data.get_data_inst) == "function" and select(2, pcall(player_data.get_data_inst, player_data, player)) or data
   if type(seeded) == "table" and type(seeded.Extra) == "table" and type(seeded.Extra.survival) == "table" then
     raw = seeded.Extra.survival
   end
@@ -139,16 +139,16 @@ function PlayerLife.mount(s3, player_tree, opts)
   end
 
   function current_data()
-    if player_data and type(player_data.GetDataInst) == "function" then
-      local ok, inst = pcall(player_data.GetDataInst, player_data, player)
+    if player_data and type(player_data.get_data_inst) == "function" then
+      local ok, inst = pcall(player_data.get_data_inst, player_data, player)
       if ok and type(inst) == "table" then return inst end
     end
     return data
   end
 
   local function fire_client(name, payload)
-    if not remote or type(remote.GetRE) ~= "function" then return end
-    local ok, event = pcall(remote.GetRE, remote, name)
+    if not remote or type(remote.get_re) ~= "function" then return end
+    local ok, event = pcall(remote.get_re, remote, name)
     if ok and event and type(event.FireClient) == "function" then
       pcall(event.FireClient, event, player, payload)
     end
@@ -426,8 +426,8 @@ function PlayerLife.mount(s3, player_tree, opts)
   end
 
   function publish_notice(actual, hit)
-    if not (remote and type(remote.GetRE) == "function") or not (actual > 0) then return end
-    local event = remote:GetRE("DamageNotice")
+    if not (remote and type(remote.get_re) == "function") or not (actual > 0) then return end
+    local event = remote:get_re("DamageNotice")
     if event and type(event.FireAllClients) == "function" then
       pcall(event.FireAllClients, event, {
         amount = actual,
@@ -477,8 +477,8 @@ function PlayerLife.mount(s3, player_tree, opts)
       return false
     end
     if not positive_amount(amount) then return false end
-    if fish_carrier and type(fish_carrier.ResolveCarrier) == "function" then
-      local ok, carrier = pcall(fish_carrier.ResolveCarrier, fish_carrier, target)
+    if fish_carrier and type(fish_carrier.resolve_carrier) == "function" then
+      local ok, carrier = pcall(fish_carrier.resolve_carrier, fish_carrier, target)
       if ok and carrier then
         local key = "carrier:" .. tostring(carrier)
         if hit.targets[key] then return false end
@@ -544,7 +544,7 @@ function PlayerLife.mount(s3, player_tree, opts)
     local rate = 1
     if finite_number(cook_rate) and cook_rate > 0 then rate = cook_rate end
     local percent = definition.EatPercent * rate
-    local hunger = Vitals.Restore(states.hunger:now(), vitals_cfg.MaxHunger, percent)
+    local hunger = Vitals.restore(states.hunger:now(), vitals_cfg.MaxHunger, percent)
     states.hunger:set(hunger)
     if percent < 0 then
       local damage = math.floor(max_health() * -percent / 100)
@@ -553,7 +553,7 @@ function PlayerLife.mount(s3, player_tree, opts)
       end
     else
       local health = read_health(player) or states.health:now()
-      local restored = Vitals.Restore(math.floor(health), max_health(), percent)
+      local restored = Vitals.restore(math.floor(health), max_health(), percent)
       set_controller_health(restored)
     end
     write_vitals()
@@ -645,15 +645,15 @@ function PlayerLife.mount(s3, player_tree, opts)
   local function try_recover()
     if recover_flying or not recovering:now() then return end
     local inst = current_data()
-    if not inst or not save_api or type(save_api.ResolveRequest) ~= "function" then return end
-    local operation, mode = save_api:ResolveRequest(player, inst, "survival:recover", episode:now() + 1)
+    if not inst or not save_api or type(save_api.resolve_request) ~= "function" then return end
+    local operation, mode = save_api:resolve_request(player, inst, "survival:recover", episode:now() + 1)
     if mode == "replay" then
       recovering:set(false)
       return
     end
-    if not operation or type(save_api.Execute) ~= "function" then return end
+    if not operation or type(save_api.execute) ~= "function" then return end
     recover_flying = true
-    local accepted = save_api:Execute(player, inst, operation, function(draft)
+    local accepted = save_api:execute(player, inst, operation, function(draft)
       local mark = draft.Extra and draft.Extra.survival
       if type(mark) ~= "table" then return nil, "no-mark" end
       mark.dying, mark.dead = false, false
@@ -716,12 +716,12 @@ function PlayerLife.mount(s3, player_tree, opts)
         end
         return fail("no-adrenaline")
       end
-      local operation, mode = save_api:ResolveRequest(player, inst, "survival:adrenaline", seq)
+      local operation, mode = save_api:resolve_request(player, inst, "survival:adrenaline", seq)
       if mode == "replay" then return fail("replay") end
       if not operation then return fail(tostring(mode)) end
       local token = episode:now()
       adrenaline_flying = true
-      local accepted, why = save_api:Execute(player, inst, operation, function(draft)
+      local accepted, why = save_api:execute(player, inst, operation, function(draft)
         if type(draft.ConsumeItem) ~= "function" or not draft:ConsumeItem(item_id) then
           return nil, "no-adrenaline"
         end
@@ -777,10 +777,10 @@ function PlayerLife.mount(s3, player_tree, opts)
       platform:set(pending)
       states.platform_pending:set(true)
       local accepted, reason
-      if mode == "ad" and type(platform_api.ShowAd) == "function" then
-        accepted, reason = platform_api:ShowAd(player, "revive", "revive", on_result)
-      elseif mode == "goods" and type(platform_api.Purchase) == "function" then
-        accepted, reason = platform_api:Purchase(player, "reviveFull", "revive", on_result)
+      if mode == "ad" and type(platform_api.show_ad) == "function" then
+        accepted, reason = platform_api:show_ad(player, "revive", "revive", on_result)
+      elseif mode == "goods" and type(platform_api.purchase) == "function" then
+        accepted, reason = platform_api:purchase(player, "reviveFull", "revive", on_result)
       end
       if not accepted then
         if platform:now() == pending then
@@ -803,8 +803,8 @@ function PlayerLife.mount(s3, player_tree, opts)
       if last_help_at and now - last_help_at < survival_cfg.HelpCooldownSec then return end
       last_help_at = now
       help_index = (help_index % #survival_cfg.HelpCries) + 1
-      if remote and type(remote.GetRE) == "function" and type(opts.players) == "function" then
-        local ok, event = pcall(remote.GetRE, remote, "SurvivalHelp")
+      if remote and type(remote.get_re) == "function" and type(opts.players) == "function" then
+        local ok, event = pcall(remote.get_re, remote, "SurvivalHelp")
         local origin = position_of(player)
         if ok and event and origin then
           for _, other in ipairs(opts.players()) do
@@ -823,8 +823,8 @@ function PlayerLife.mount(s3, player_tree, opts)
 
   function player_tree:handle_survival_action(payload, skip_cd)
     if player_tree:is_disposed() or type(payload) ~= "table" then return false end
-    if not skip_cd and remote and type(remote.CheckRECD) == "function"
-        and remote:CheckRECD(player, "SurvivalAction", GameCfg.Items.ActionCooldownSec) then
+    if not skip_cd and remote and type(remote.check_recd) == "function"
+        and remote:check_recd(player, "SurvivalAction", GameCfg.Items.ActionCooldownSec) then
       return false
     end
     on_action(payload)
@@ -842,7 +842,7 @@ function PlayerLife.mount(s3, player_tree, opts)
       if sec > last_hunger_sec then
         local elapsed = math.min(sec - last_hunger_sec, vitals_cfg.MaxCatchUpSec)
         last_hunger_sec = sec
-        local hunger, damage = Vitals.Advance(states.hunger:now(), elapsed, vitals_cfg)
+        local hunger, damage = Vitals.advance(states.hunger:now(), elapsed, vitals_cfg)
         if hunger ~= states.hunger:now() then states.hunger:set(hunger) end
         if carrying_barrel(current_data()) then
           apply_damage(vitals_cfg.HeldDamage.DamagePerSec * elapsed, player_tree:new_hit(nil, "heldItem"))

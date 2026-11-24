@@ -9,7 +9,7 @@ local State = Spoke.State
 local FerryView = {}
 
 local function zone_name(route_id, action)
-  local route = GameCfg.Ferry.Route(route_id)
+  local route = GameCfg.Ferry.route(route_id)
   if not route then return "目的地" end
   local zone_id = action == "Return" and route.FromZoneId or route.ToZoneId
   for _, zone in ipairs(GameCfg.Zones) do
@@ -175,7 +175,7 @@ function FerryView.legs_spec()
           { point = route.Return, action = "Return", text = "返程" },
         }) do
           local center = anchor_of(leg.point.AnchorName)
-          local radius = BodyScale.InteractionRadius(character, leg.point.Radius)
+          local radius = BodyScale.interaction_radius(character, leg.point.Radius)
           if near(position, center, radius) then
             list[#list + 1] = { key = "ferry:" .. index .. ":" .. leg.action,
               routeId = route.Id, action = leg.action, text = leg.text,

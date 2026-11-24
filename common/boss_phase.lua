@@ -8,7 +8,7 @@ local function cfg()
 end
 
 local function isBadNumber(v)
-    return not Number.IsFiniteNumber(v)
+    return not Number.is_finite_number(v)
 end
 
 local function isPoint(p)
@@ -106,7 +106,7 @@ function M.New(bossCfg, now, pos)
 end
 
 ---血量百分比；MaxHealth 非法时返回 nil（本帧不做阶段判定，也不清空已有阶段）
-function M.PercentOf(health, maxHealth)
+function M.percent_of(health, maxHealth)
     if isBadNumber(health) or isBadNumber(maxHealth) or maxHealth <= 0 then return nil end
     local percent = health / maxHealth * 100
     if percent < 0 then percent = 0 end
@@ -119,7 +119,7 @@ end
 ---@param dt number
 ---@param input table { Health, MaxHealth, Alive, Target, Pos? }
 ---@return table events { Phase, PhaseChanged?, From?, To?, Skipped?, Percent, Attack?, Interrupted?, Reason? }
-function M.Update(state, now, dt, input)
+function M.update(state, now, dt, input)
     now = now_(now)
     input = input or {}
     state.Stats.Frames = state.Stats.Frames + 1
@@ -141,7 +141,7 @@ function M.Update(state, now, dt, input)
     state.Target = isPoint(input.Target) and copy(input.Target) or nil
     if isPoint(input.Pos) then state.Pos = copy(input.Pos) end
 
-    local percent = M.PercentOf(input.Health, input.MaxHealth)
+    local percent = M.percent_of(input.Health, input.MaxHealth)
     if percent then
         state.Percent = percent
         local target = 1
@@ -186,7 +186,7 @@ function M.Update(state, now, dt, input)
             local pending = state.Pending
             state.Pending = nil
             state.Cooldown[pending.Name] = now + intervalOf(state, pending.Name)
-            events.Attack = M.Land(state, now, pending)
+            events.Attack = M.land(state, now, pending)
         end
         return events
     end
@@ -200,7 +200,7 @@ function M.Update(state, now, dt, input)
                     Damage = damageOf(state, name), Lethal = attack.OneShot == true }
             else
                 state.Cooldown[name] = now + intervalOf(state, name)
-                events.Attack = M.Land(state, now, { Name = name, Damage = damageOf(state, name),
+                events.Attack = M.land(state, now, { Name = name, Damage = damageOf(state, name),
                     Lethal = attack.OneShot == true })
             end
             return events
@@ -209,14 +209,14 @@ function M.Update(state, now, dt, input)
     return events
 end
 
-function M.Land(state, now, attack)
+function M.land(state, now, attack)
     local landed = { At = now, Name = attack.Name, Damage = attack.Damage, Lethal = attack.Lethal == true }
     state.Stats.Attacks = state.Stats.Attacks + 1
     if #state.AttackLog < 64 then state.AttackLog[#state.AttackLog + 1] = landed end
     return landed
 end
 
-function M.Winding(state)
+function M.winding(state)
     return state.Pending ~= nil
 end
 

@@ -70,8 +70,8 @@ function Host.start(options)
   end
   host.events = events
   host.remote = {
-    GetRE = function(_, name) return event(name) end,
-    CheckRECD = function() return false end,
+    get_re = function(_, name) return event(name) end,
+    check_recd = function() return false end,
   }
   package.loaded["common.re_util"] = host.remote
   _G.REUtil = host.remote
@@ -178,9 +178,9 @@ function Host.start(options)
     self.results[user_id] = { ShopResult = {}, InteractResult = {} }
     self.players = self.players or {}
     self.players[#self.players + 1] = player
-    self.player_data:OnPlayerAdded(player)
+    self.player_data:on_player_added(player)
     self:drain()
-    local data = assert(self.player_data:GetDataInst(player))
+    local data = assert(self.player_data:get_data_inst(player))
     if before_ready then before_ready(data) end
     self.runtime:on_player_added(player)
     self.runtime:on_save_ready(player, data)
@@ -190,7 +190,7 @@ function Host.start(options)
 
   function host:leave(player)
     self.runtime:on_player_removing(player)
-    self.player_data:OnPlayerRemoving(player)
+    self.player_data:on_player_removing(player)
     self:drain()
     for index, candidate in ipairs(self.players or {}) do
       if candidate == player then table.remove(self.players, index) break end
@@ -198,9 +198,9 @@ function Host.start(options)
   end
 
   function host:rejoin(player)
-    self.player_data:OnPlayerAdded(player)
+    self.player_data:on_player_added(player)
     self:drain()
-    local data = assert(self.player_data:GetDataInst(player))
+    local data = assert(self.player_data:get_data_inst(player))
     self.players = self.players or {}
     self.players[#self.players + 1] = player
     self.results[player.UserId] = { ShopResult = {}, InteractResult = {} }

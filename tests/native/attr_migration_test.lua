@@ -2,7 +2,7 @@
 -- 失败方式：永久成长重复累加、默认100污染、重复乘区、写入失败误报、重建/退出残留。
 -- 接缝：MgrAttr公开刷新/读取，真实包内 attr_rule.api，仅Unit/World为离线引擎替身。
 -- fixture 用独立 env + 自己的 require 缓存 loadfile 出整套沙盒，不写 _G 也不写 package.loaded，
--- 因此旧套件没有 setUp/tearDown、原生侧同样不需要逐例恢复。
+-- 因此旧套件没有 set_up/tear_down、原生侧同样不需要逐例恢复。
 -- describe/it 名沿用旧类名与方法名，案例顺序沿用旧 LuaUnit 的字典序执行序。
 local function fixture(logs)
     local all = {}
@@ -28,10 +28,10 @@ local function fixture(logs)
     end
     local player = { UserId = 51, Character = unit('Character', world) }
     local data = { body = 2, speed = 3, level = 2 }
-    function data:PotionCount(id) return id == 'item167' and self.speed or self.body end
-    function data:ShopUpgradeLevel() return self.level end
+    function data:potion_count(id) return id == 'item167' and self.speed or self.body end
+    function data:shop_upgrade_level() return self.level end
     local mgr = require('tests.support.attr_runtime').New(
-        { GetDataInst = function() return data end },
+        { get_data_inst = function() return data end },
         function() return 0.35 end,
         { log = logFn }
     )
@@ -43,65 +43,65 @@ describe('TestAttrMigration', function()
     it('test_capped_growth_and_paralysis_clear_without_residue', function()
         local mgr, p, data = fixture()
         data.body, data.speed = 1000, 1000
-        mgr.MoveMultiplierProvider = function() return 0 end
-        assert.is_true(mgr:ApplyGrowth(p).Ok)
+        mgr.move_multiplier_provider = function() return 0 end
+        assert.is_true(mgr:apply_growth(p).Ok)
         assert.same(900, mgr:MaxHealth(p))
         assert.same(3, p.Character.scale)
         assert.same(0, p.Character.Controller.WalkSpeed)
-        mgr.MoveMultiplierProvider = function() return 1 end
-        assert.is_true(mgr:RefreshMoveSpeed(p))
+        mgr.move_multiplier_provider = function() return 1 end
+        assert.is_true(mgr:refresh_move_speed(p))
         assert.same(21, p.Character.Controller.WalkSpeed)
     end)
 
     -- 角色重建与离开都释放自己拥有的属性单位
     it('test_character_rebuild_and_leave_release_owned_attr_units', function()
         local mgr, p, _, all, unit, world = fixture()
-        assert.is_true(mgr:ApplyGrowth(p).Ok)
+        assert.is_true(mgr:apply_growth(p).Ok)
         local first = mgr.AttrAPI.Funcs.GetAttrUnit(p.Character)
         p.Character = unit('Character', world)
         p.Character.Controller.WalkSpeed = 8
-        assert.is_true(mgr:ApplyGrowth(p).Ok)
+        assert.is_true(mgr:apply_growth(p).Ok)
         assert.is_true(first.destroyed)
         assert.near(3.64, p.Character.Controller.WalkSpeed, 1e-8)
         local current = mgr.AttrAPI.Funcs.GetAttrUnit(p.Character)
-        mgr:OnPlayerRemoving(p)
+        mgr:on_player_removing(p)
         assert.is_true(current.destroyed)
     end)
 
     -- 饥饿与武器伤害走 vendor，不新开存档权威
     it('test_hunger_and_weapon_use_vendor_without_new_save_authority', function()
         local mgr, p, data = fixture()
-        local ok, hunger = mgr:ProjectHunger(p, 1000)
+        local ok, hunger = mgr:project_hunger(p, 1000)
         assert.is_true(ok)
         assert.same(300, hunger)
-        assert.same(0, select(2, mgr:ProjectHunger(p, -2)))
-        assert.near(1.2, mgr:WeaponDamageScale(p, 'melee'), 1e-8)
+        assert.same(0, select(2, mgr:project_hunger(p, -2)))
+        assert.near(1.2, mgr:weapon_damage_scale(p, 'melee'), 1e-8)
         data.level = 3
-        assert.near(1.3, mgr:WeaponDamageScale(p, 'melee'), 1e-8)
-        assert.near(1.3, mgr:WeaponDamageScale(p, 'melee'), 1e-8)
+        assert.near(1.3, mgr:weapon_damage_scale(p, 'melee'), 1e-8)
+        assert.near(1.3, mgr:weapon_damage_scale(p, 'melee'), 1e-8)
     end)
 
     -- 角色迟到时重试捕获真实基准速
     it('test_missing_character_retry_captures_real_base_when_character_arrives', function()
         local mgr, p, _, _, unit, world = fixture()
         p.Character = nil
-        mgr:OnPlayerAdded(p)
+        mgr:on_player_added(p)
         p.Character = unit('Character', world)
         p.Character.Controller.WalkSpeed = 10
-        mgr:Update()
+        mgr:update()
         assert.near(4.55, p.Character.Controller.WalkSpeed, 1e-8)
     end)
 
     -- 真实 vendor 成长幂等，移动只组合一个乘区
     it('test_real_vendor_growth_is_idempotent_and_combines_one_move_multiplier', function()
         local mgr, p = fixture()
-        local a = mgr:ApplyGrowth(p)
+        local a = mgr:apply_growth(p)
         assert.message(a.Error).is_true(a.Ok)
         assert.same(420, mgr:MaxHealth(p))
         assert.near(3.185, p.Character.Controller.WalkSpeed, 1e-8)
         assert.same(1.4, p.Character.scale)
-        assert.same(require('common.body_scale').Derive(1.4).InteractRange, p.Character.attrs.InteractRange)
-        assert.is_true(mgr:ApplyGrowth(p).Ok)
+        assert.same(require('common.body_scale').derive(1.4).InteractRange, p.Character.attrs.InteractRange)
+        assert.is_true(mgr:apply_growth(p).Ok)
         assert.near(3.185, p.Character.Controller.WalkSpeed, 1e-8)
     end)
 
@@ -110,34 +110,34 @@ describe('TestAttrMigration', function()
         local logs = {}
         local mgr, p, _, _, unit, world = fixture(logs)
         p.Character = nil
-        mgr:OnPlayerAdded(p)
+        mgr:on_player_added(p)
         p.Character = unit('Character', world)
         local broken = true
         local children = p.Character.GetChildren
         function p.Character:GetChildren() if broken then error('vendor-owner-unavailable') end return children(self) end
         local before = #logs
-        mgr:Update()
+        mgr:update()
         assert.same(before + 1, #logs)
         assert.matches('[AttrLeaf] 属性重试失败 51', logs[#logs], nil, true)
         assert.matches('vendor-owner-unavailable', logs[#logs], nil, true)
-        mgr:Update()
+        mgr:update()
         assert.same(before + 1, #logs)
         broken = false
         local config = { Min = 0 }
-        mgr.AttrAPI.Funcs.GetAttrConfig = function() return config end
-        mgr:Update()
+        mgr.AttrAPI.Funcs.get_attr_config = function() return config end
+        mgr:update()
         assert.same(before + 2, #logs)
         assert.matches('业务属性键不允许地图钳制配置', logs[#logs], nil, true)
         config = nil
-        mgr:Update()
+        mgr:update()
         assert.near(3.185, p.Character.Controller.WalkSpeed, 1e-8)
         config = { Min = 0 }
-        mgr:RefreshAfterRevive(p)
+        mgr:refresh_after_revive(p)
         local nextBefore = #logs
-        mgr:Update()
+        mgr:update()
         assert.same(nextBefore + 1, #logs)
-        mgr:OnPlayerRemoving(p)
-        mgr:Update()
+        mgr:on_player_removing(p)
+        mgr:update()
         assert.same(nextBefore + 1, #logs)
     end)
 
@@ -146,8 +146,8 @@ describe('TestAttrMigration', function()
         local mgr, p, data = fixture()
         data.body = 10
         local host = require('tests.support.life_host').start({
-          now = 100, growth_writer = function(player) mgr:ApplyGrowth(player) end,
-          platform = { ShowAd = function(_, _, _, _, on_result)
+          now = 100, growth_writer = function(player) mgr:apply_growth(player) end,
+          platform = { show_ad = function(_, _, _, _, on_result)
             on_result('success')
             return true
           end },
@@ -155,18 +155,18 @@ describe('TestAttrMigration', function()
         host.runtime._max_health_of = function() return mgr:MaxHealth(p) end
         host:add(p)
         local life = host.runtime.life
-        assert.is_true(mgr:ApplyGrowth(p).Ok)
-        assert.same(900, life:MaxHealthOf(p))
-        assert.is_true(life:SetHealth(p, 300))
-        assert.is_true(life:SetHunger(p, 100))
-        assert.is_true(life:Eat(p, 'goldfish'))
+        assert.is_true(mgr:apply_growth(p).Ok)
+        assert.same(900, life:max_health_of(p))
+        assert.is_true(life:set_health(p, 300))
+        assert.is_true(life:set_hunger(p, 100))
+        assert.is_true(life:eat(p, 'goldfish'))
         assert.same(570, p.Character.Controller.Health)
         assert.same(190, p:GetAttribute('Hunger'))
         host:phase(p, 'dead')
         p.Character.scale = 1
         p.Character.Controller.WalkSpeed = 7
         host.events.SurvivalAction.OnServerEvent:Fire(p, { action = 'FullRevive', mode = 'ad', seq = 1 })
-        assert.same('alive', life:LifeStatus(p))
+        assert.same('alive', life:life_status(p))
         assert.same(3, p.Character.scale)
         assert.near(3.185, p.Character.Controller.WalkSpeed, 1e-8)
         assert.same(900, p.Character.Controller.Health)
@@ -182,12 +182,12 @@ describe('TestAttrMigration', function()
         p.Character.Controller = setmetatable({}, { __index = values, __newindex = function(_, k, v)
             if deny and k == 'WalkSpeed' then error('write-denied') end values[k] = v
         end })
-        local result = mgr:ApplyGrowth(p)
+        local result = mgr:apply_growth(p)
         assert.is_false(result.Ok)
         assert.matches('write-denied', result.Error, nil, true)
         data.speed = 20 deny = false
-        mgr.MoveMultiplierProvider = function() return 1 end
-        assert.is_true(mgr:ApplyGrowth(p).Ok)
+        mgr.move_multiplier_provider = function() return 1 end
+        assert.is_true(mgr:apply_growth(p).Ok)
         assert.same(21, values.WalkSpeed)
     end)
 end)

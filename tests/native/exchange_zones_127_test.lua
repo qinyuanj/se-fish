@@ -10,8 +10,8 @@
 --   5. 普通物品（鱼竿、道具、船票）不能回收，或忽略实例倍率、烤熟价没有 ×1.5、鱼获用了商店买入价；
 --   6. 第七区最终成就没落进存档（Extra.achievements），或白占道具格；
 --   7. 只在本区 NPC 才成交：站在别的区（含锚点范围外）也能用别区链兑换。
--- 迁移自 tests/gameplay/exchange_zones_127_test.lua（#83）。旧 setUp 逐例装配夹具（含把 GameCfg
--- 从模块缓存摘下重装）并预置站位，旧 tearDown 装回缓存与 _G.game；映射为逐例 before_each/after_each，
+-- 迁移自 tests/gameplay/exchange_zones_127_test.lua（#83）。旧 set_up 逐例装配夹具（含把 GameCfg
+-- 从模块缓存摘下重装）并预置站位，旧 tear_down 装回缓存与 _G.game；映射为逐例 before_each/after_each，
 -- 保留「setup 失败仍完成清理」的行为。it 顺序沿用旧入口的方法名字典序，与迁移前逐条对账。
 -- 断言口径：旧 assertEquals 两侧同为 table 时是深比较 → assert.same；标量 → assert.are.equal。
 
@@ -71,7 +71,7 @@ describe("TestExchangeZones", function()
     return total
   end
 
-  local function lastReply()
+  local function last_reply()
     return t.replies[#t.replies]
   end
 
@@ -105,7 +105,7 @@ describe("TestExchangeZones", function()
     assert.are.equal(0, countItem('garHead'))
     assert.are.equal(0, countItem('shrimpTicket'), '烤过的首领信物不能再换船票')
     assert.are.equal(30, t.data.Data.FishCoin) -- floor(20 × 1 × 1.5)
-    assert.is_nil(lastReply().exchange)
+    assert.is_nil(last_reply().exchange)
   end)
 
   -- 七区链：每区未烤精英信物 → 本区首领饵，未烤首领信物 → 本区产物（第七区是最终成就）
@@ -120,7 +120,7 @@ describe("TestExchangeZones", function()
       assert.are.equal(1, countItem(chain.BossBait))
       assert.are.equal(0, t.data.Data.FishCoin, '兑换不给金币')
       assert.is_nil(t.data.Data.SelectedSlot, '兑换后选中态要归位')
-      assert.same({ from = chain.EliteToken, to = chain.BossBait }, lastReply().exchange)
+      assert.same({ from = chain.EliteToken, to = chain.BossBait }, last_reply().exchange)
       assert.same(1, t.host.sync_counts[1], '兑换成功后要推一次库存')
 
       local bossSlot = give(chain.BossToken)
@@ -129,10 +129,10 @@ describe("TestExchangeZones", function()
       assert.are.equal(0, countItem(chain.BossToken))
       if chain.Result == 'achievement.final' then
         assert.is_true(t.data.Extra.achievements.final, '第七区要写最终成就')
-        assert.are.equal('final', lastReply().achievement)
+        assert.are.equal('final', last_reply().achievement)
       else
         assert.are.equal(1, countItem(chain.Result))
-        assert.same({ from = chain.BossToken, to = chain.Result }, lastReply().exchange)
+        assert.same({ from = chain.BossToken, to = chain.Result }, last_reply().exchange)
       end
       assert.are.equal(0, t.data.Data.FishCoin)
       assert.same({}, t.plays, '未配置吃动作时交付仍应成交')
@@ -150,7 +150,7 @@ describe("TestExchangeZones", function()
     assert.is_false(feed())
     assert.are.equal(1, countItem('item112'))
     assert.is_true(t.data.Extra.achievements.final)
-    assert.are.equal('already-completed', lastReply().reason)
+    assert.are.equal('already-completed', last_reply().reason)
   end)
 
   -- 配置：每区一个钓鱼佬，锚点与兑换链都按本区派生，共享表现参数仍在 Fisherman
@@ -189,7 +189,7 @@ describe("TestExchangeZones", function()
     assert.are.equal('shrimpTicket', bar[slot] and bar[slot].itemId)
     assert.are.equal(0, countItem('garHead'))
     assert.are.equal(0, t.data.Data.FishCoin)
-    assert.same({ from = 'garHead', to = 'shrimpTicket' }, lastReply().exchange)
+    assert.same({ from = 'garHead', to = 'shrimpTicket' }, last_reply().exchange)
   end)
 
   -- 只在本区成交：站在第二区 NPC 边用第一区信物，按普通物品回收而不是兑换
@@ -200,8 +200,8 @@ describe("TestExchangeZones", function()
     assert.is_true(feed())
     assert.are.equal(0, countItem('eelHead'))
     assert.are.equal(0, countItem('duck'), '别区信物不能换首领饵')
-    assert.are.equal(t.cfg.Items.SalePrice('eelHead'), t.data.Data.FishCoin)
-    assert.is_nil(lastReply().exchange)
+    assert.are.equal(t.cfg.Items.sale_price('eelHead'), t.data.Data.FishCoin)
+    assert.is_nil(last_reply().exchange)
   end)
 
   -- 超出范围（含站在别的区）不结算，也不误伤库存
@@ -238,21 +238,21 @@ describe("TestExchangeZones", function()
     assert.is_true(t.data:SelectSlot(ticketSlot))
     assert.is_true(feed())
     assert.are.equal(54, t.data.Data.FishCoin)
-    assert.are.equal('item', lastReply().category)
+    assert.are.equal('item', last_reply().category)
   end)
 
   -- 回收价：鱼获走 FishCatch（含烤熟 ×1.5），其余物品走物品表 BasePrice；查不到的 id 不可回收
   it("test_sale_price_covers_plain_items_fish_mult_and_cooking", function()
     local Items = t.cfg.Items
-    assert.are.equal(3, Items.SalePrice('starterRod'))
-    assert.are.equal(4, Items.SalePrice('starterRod', nil, true))   -- floor(3 × 1.5)
-    assert.are.equal(1, Items.SalePrice('item147'))                 -- 蟹湖船票
-    assert.are.equal(20, Items.SalePrice('garHead'))
-    assert.are.equal(30, Items.SalePrice('garHead', nil, true))
-    assert.are.equal(11, Items.SalePrice('bass', 1.99))             -- 与 FishCatch.Price 同源
-    assert.are.equal(17, Items.SalePrice('bass', 1.99, true))       -- floor(6 × 1.99 × 1.5)
-    assert.are.equal(3, Items.SalePrice('tilapia'))
-    assert.is_nil(Items.SalePrice('notAnItem'))
-    assert.is_nil(Items.SalePrice(nil))
+    assert.are.equal(3, Items.sale_price('starterRod'))
+    assert.are.equal(4, Items.sale_price('starterRod', nil, true))   -- floor(3 × 1.5)
+    assert.are.equal(1, Items.sale_price('item147'))                 -- 蟹湖船票
+    assert.are.equal(20, Items.sale_price('garHead'))
+    assert.are.equal(30, Items.sale_price('garHead', nil, true))
+    assert.are.equal(11, Items.sale_price('bass', 1.99))             -- 与 FishCatch.Price 同源
+    assert.are.equal(17, Items.sale_price('bass', 1.99, true))       -- floor(6 × 1.99 × 1.5)
+    assert.are.equal(3, Items.sale_price('tilapia'))
+    assert.is_nil(Items.sale_price('notAnItem'))
+    assert.is_nil(Items.sale_price(nil))
   end)
 end)

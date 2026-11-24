@@ -76,14 +76,14 @@ function M.start(opts)
     return events[name]
   end
   local remote = opts.remote or {
-    GetRE = function(_, name) return event(name) end,
-    CheckRECD = function() return false end,
+    get_re = function(_, name) return event(name) end,
+    check_recd = function() return false end,
   }
   local runtime = ServerRuntime.new({
     clock = clock,
     initial_now = now,
     remote = remote,
-    player_data = opts.player_data or { GetDataInst = function(_, player) return data_of[player.UserId] end },
+    player_data = opts.player_data or { get_data_inst = function(_, player) return data_of[player.UserId] end },
     save = opts.save,
     platform = opts.platform,
     fish_carrier = opts.fish_carrier,
@@ -99,10 +99,10 @@ function M.start(opts)
     zone_markers = opts.zone_markers,
     bind_interact_action = opts.bind_interact_action,
     bind_party_action = opts.bind_party_action or function(dispatch)
-      remote:GetRE("PartyAction").OnServerEvent:Connect(function(player, payload) dispatch(player, payload) end)
+      remote:get_re("PartyAction").OnServerEvent:Connect(function(player, payload) dispatch(player, payload) end)
     end,
     bind_party_state_request = opts.bind_party_state_request or function(dispatch)
-      remote:GetRE("PartyStateRequest").OnServerEvent:Connect(function(player) dispatch(player) end)
+      remote:get_re("PartyStateRequest").OnServerEvent:Connect(function(player) dispatch(player) end)
     end,
   })
   runtime:start()

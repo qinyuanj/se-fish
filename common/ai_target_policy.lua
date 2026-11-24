@@ -1,12 +1,12 @@
 local M = {}
 
-function M.Compare(a, b)
+function M.compare(a, b)
     if a.damage ~= b.damage then return a.damage > b.damage end
     if a.distance ~= b.distance then return a.distance < b.distance end
     return (tonumber(a.userId) or math.huge) < (tonumber(b.userId) or math.huge)
 end
 
-function M.Order(candidates)
+function M.order(candidates)
     local ranked = {}
     for _, row in ipairs(candidates or {}) do
         if row and row.player then
@@ -16,7 +16,7 @@ function M.Order(candidates)
                 userId = row.player.UserId }
         end
     end
-    table.sort(ranked, M.Compare)
+    table.sort(ranked, M.compare)
     return ranked
 end
 

@@ -13,7 +13,7 @@ function ViewUtil.read_vec2(value)
     return nil
   end
   local ok, x, y = pcall(function() return value.x, value.y end) -- 兼容引擎 Vector2 userdata 坐标读取
-  if ok and Number.IsFiniteNumber(x) and Number.IsFiniteNumber(y) then
+  if ok and Number.is_finite_number(x) and Number.is_finite_number(y) then
     return x, y
   end
   return nil
@@ -24,7 +24,7 @@ function ViewUtil.read_vec3(value)
     return nil
   end
   local ok, x, y, z = pcall(function() return value.x, value.y, value.z end) -- 兼容引擎 Vector3 userdata 坐标读取
-  if ok and Number.IsFiniteNumber(x) and Number.IsFiniteNumber(y) and Number.IsFiniteNumber(z) then
+  if ok and Number.is_finite_number(x) and Number.is_finite_number(y) and Number.is_finite_number(z) then
     return x, y, z
   end
   return nil

@@ -18,7 +18,7 @@ describe("客户端抽奖机、盲盒与地图商店模态弹窗（#312）", fun
     _G.Color = { New = function(...) return { ... } end }
     sent = { lottery = {}, blindbox = {}, platform = {} }
     store, writer = ClientStore.new()
-    root = Eui.Node({ Name = "UIRoot" })
+    root = Eui.node({ Name = "UIRoot" })
     view = RootView.mount(root, store, {
       services = {
         open_modal = function(id, payload) writer:open_modal(id, payload) end,
@@ -34,7 +34,7 @@ describe("客户端抽奖机、盲盒与地图商店模态弹窗（#312）", fun
         platform = PlatformShopView.modal_spec(),
       },
       create_node = function(kind, props)
-        return Eui.Node({
+        return Eui.node({
           Kind = kind,
           Name = props and props.Name,
           Parent = props and props.Parent,
@@ -61,7 +61,7 @@ describe("客户端抽奖机、盲盒与地图商店模态弹窗（#312）", fun
     writer:open_modal("lottery")
     local lottery = child(root, "ScreenLottery")
     assert.is_not_nil(lottery)
-    Eui.Click(child(root, "BtnLotteryDraw"))
+    Eui.click(child(root, "BtnLotteryDraw"))
     assert.same({ action = "Draw", slot = 1, seq = 1 }, sent.lottery[1])
     writer:ingest_event("LotteryResult", { ok = true, recovered = true, axes = { 1, 1, 2 }, outcome = "pair", coins = 8 })
     assert.matches("8", child(root, "LabelLotteryResult").Text)
@@ -70,7 +70,7 @@ describe("客户端抽奖机、盲盒与地图商店模态弹窗（#312）", fun
     assert.is_true(lottery.Destroyed)
     local blindbox = child(root, "ScreenBlindbox")
     assert.is_not_nil(blindbox)
-    Eui.Click(child(root, "BtnBlindboxSingle"))
+    Eui.click(child(root, "BtnBlindboxSingle"))
     assert.same({ action = "Draw", count = 1, seq = 1 }, sent.blindbox[1])
     writer:ingest_event("BlindboxResult", { ok = true, pityAfter = 1, draws = { { itemKey = "item7" } } })
     assert.matches("item7", child(root, "LabelBlindboxResult").Text)
@@ -85,23 +85,23 @@ describe("客户端抽奖机、盲盒与地图商店模态弹窗（#312）", fun
     })
     local offerButton = child(root, "BtnPlatformOffer_coinPouch")
     assert.equals(1, offerButton.OnClicked:Count())
-    assert.is_true(Eui.Click(offerButton), string.format("destroyed=%s visible=%s touch=%s",
+    assert.is_true(Eui.click(offerButton), string.format("destroyed=%s visible=%s touch=%s",
       tostring(offerButton.Destroyed), tostring(offerButton.Visible), tostring(offerButton.TouchEnabled)))
     assert.same({ action = "BuyCoin", goods = "coinPouch", seq = 1 }, sent.platform[1])
 
     local platformPanel = child(root, "ScreenPlatform")
-    Eui.Click(child(root, "BtnPlatformClose"))
+    Eui.click(child(root, "BtnPlatformClose"))
     assert.is_nil(store.active_modal:now())
     assert.is_true(platformPanel.Destroyed)
   end)
 
   it("常驻入口打开对应弹窗，根 UI 销毁后节点与监听零残留", function()
     local blindboxEntry = child(root, "BtnBlindboxEntry")
-    Eui.Click(blindboxEntry)
+    Eui.click(blindboxEntry)
     assert.equals("blindbox", store.active_modal:now())
     writer:open_modal("platform")
     local platformEntry = child(root, "BtnMapShopEntry")
-    Eui.Click(platformEntry)
+    Eui.click(platformEntry)
     assert.same({ action = "OpenCoinShop" }, sent.platform[1])
     local panel = child(root, "ScreenPlatform")
     local close = child(root, "BtnPlatformClose")

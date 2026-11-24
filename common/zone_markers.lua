@@ -117,7 +117,7 @@ local function copyPoint(pointValue)
     return { x = pointValue.x, y = pointValue.y, z = pointValue.z }
 end
 
-function ZoneMarkers.Contract(cfg)
+function ZoneMarkers.contract(cfg)
     cfg = cfg or GameCfg
     local entries = {}
     local function add(zoneIndex, role, name)
@@ -218,7 +218,7 @@ local function resolveZone(markers, cfg, index, snapshot)
     snapshot.ContentWaterIds[zone.WaterId] = zone.Id
 end
 
-function ZoneMarkers.Resolve(world, config)
+function ZoneMarkers.resolve(world, config)
     local cfg = config or GameCfg
     ZoneMarkers.Ready, ZoneMarkers.Zones = false, {}
     if not world then error('ZoneMarkers.Resolve 需要 World') end
@@ -273,12 +273,12 @@ end
 
 function ZoneMarkers.Start()
     local world, task = game:GetService('World'), game:GetService('Task')
-    local ok, snapshot = pcall(ZoneMarkers.Resolve, world)
+    local ok, snapshot = pcall(ZoneMarkers.resolve, world)
     local waited = 0
     while not ok and waited < START_WAIT_SEC do
         task:Wait(START_POLL_SEC)
         waited = waited + START_POLL_SEC
-        ok, snapshot = pcall(ZoneMarkers.Resolve, world)
+        ok, snapshot = pcall(ZoneMarkers.resolve, world)
     end
     if not ok then error(snapshot, 0) end
     print('[ZoneMarkers] ready', 'waters=' .. #snapshot.Waters, 'baits=' .. #snapshot.BaitSpots,

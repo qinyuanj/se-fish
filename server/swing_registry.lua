@@ -4,7 +4,7 @@ local SWING_TTL_SEC = 1.5
 local SWING_FUTURE_SKEW_SEC = 0.5
 local swings = {}
 local clock_now = nil
-function M.SetClock(now)
+function M.set_clock(now)
     clock_now = type(now) == 'function' and now or nil
 end
 local function swingClock()
@@ -24,7 +24,7 @@ local function swingAlive(entry)
     if now - entry.at > SWING_TTL_SEC then return nil end
     return entry
 end
-function M.StageSwing(userId, swing)
+function M.stage_swing(userId, swing)
     local validId = type(userId) == 'number' and userId == userId and math.abs(userId) < math.huge
         or type(userId) == 'string' and userId ~= ''
     if not validId or type(swing) ~= 'table' then return false end
@@ -36,15 +36,15 @@ function M.StageSwing(userId, swing)
     swings[userId] = { damage = swing.damage, range = swing.range, effect = swing.effect, at = now }
     return true
 end
-function M.PeekSwing(userId)
+function M.peek_swing(userId)
     local entry = swingAlive(swings[userId])
     if not entry then swings[userId] = nil end
     return entry
 end
-function M.ClearSwing(userId)
+function M.clear_swing(userId)
     swings[userId] = nil
 end
-function M.TakeSwing(userId)
+function M.take_swing(userId)
     local entry = swingAlive(swings[userId])
     swings[userId] = nil
     return entry

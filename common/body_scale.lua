@@ -8,7 +8,7 @@ local function cfg()
 end
 
 local function isBadNumber(v)
-    return not Number.IsFiniteNumber(v)
+    return not Number.is_finite_number(v)
 end
 
 local function potionCount(potions, maxPotions)
@@ -20,7 +20,7 @@ end
 
 ---@param potions any 变大药水个数（非法值按 0 处理）
 ---@return table { Scale, Health, Potions, Capped, MaxScale, MaxHealth }
-function M.Plan(potions)
+function M.plan(potions)
     local c = cfg()
     local stepsByScale = math.floor((c.Max - c.Base) / c.Step + 1e-9)
     local maxPotions = math.min(c.MaxPotions, stepsByScale)
@@ -38,7 +38,7 @@ end
 
 ---@param scale any
 ---@return number
-function M.Sanitize(scale)
+function M.sanitize(scale)
     local c = cfg()
     if isBadNumber(scale) or scale <= 0 then return c.Base end
     if scale < c.Base then return c.Base end
@@ -53,10 +53,10 @@ end
 
 ---@param base? table { CapsuleHeight, CameraDistance, InteractRange, SocketOffset={x,y,z} }
 ---@return table { Scale, CapsuleHeight, CameraDistance, InteractRange, SocketOffset? }
-function M.Derive(scale, base)
+function M.derive(scale, base)
     local c = cfg()
     base = base or c
-    local factor = M.Sanitize(scale)
+    local factor = M.sanitize(scale)
     local derived = {
         Scale = factor,
         CapsuleHeight = positiveOrZero(base.CapsuleHeight) * factor,
@@ -74,10 +74,10 @@ function M.Derive(scale, base)
     return derived
 end
 
-function M.InteractionRadius(character, baseRadius)
+function M.interaction_radius(character, baseRadius)
     if not character or not character.GetAttribute then return baseRadius end
     local range = character:GetAttribute('InteractRange')
     if isBadNumber(range) or range <= 0 or cfg().InteractRange <= 0 then return baseRadius end
-    return baseRadius * M.Sanitize(range / cfg().InteractRange)
+    return baseRadius * M.sanitize(range / cfg().InteractRange)
 end
 return M

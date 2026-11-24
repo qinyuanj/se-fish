@@ -6,7 +6,7 @@
 --   4. 三同不优先：三同被两同分支抢走大奖；
 --   5. 武器组五选一的组内随机越界或拿错组；
 --   6. 静态期望漂移：权重/倍数改动后两同金币期望偏离原表 2.119671。
--- seam：common.lottery_draw 的 RollAxis / RollAxes / Evaluate / ChooseWeapon，注入确定性 RNG（系统边界：随机数）。
+-- seam：common.lottery_draw 的 roll_axis / roll_axes / evaluate / choose_weapon，注入确定性 RNG（系统边界：随机数）。
 -- 迁移说明：案例按旧 LuaUnit 实际执行序（方法名字典序）逐个 it 注册；
 --   唯一的 assertAlmostEquals(实际, 期望, 容差) 映射为 assert.near(期望, 实际, 容差)。
 local GameCfg = require("common.game_cfg")
@@ -31,29 +31,29 @@ describe("抽奖机纯逻辑（common/lottery_draw）", function()
   it("test_choose_weapon_picks_uniformly_within_the_group", function()
     local pattern1 = GameCfg.Lottery.Patterns[1]
     for index, itemKey in ipairs(pattern1.tripleReward.itemKeys) do
-      assert.same(itemKey, Draw.ChooseWeapon(pattern1, function()
+      assert.same(itemKey, Draw.choose_weapon(pattern1, function()
         return index
       end))
     end
     -- 非武器组（加速药水）没有组内选择
-    assert.is_nil(Draw.ChooseWeapon(GameCfg.Lottery.Patterns[4], function()
+    assert.is_nil(Draw.choose_weapon(GameCfg.Lottery.Patterns[4], function()
       return 1
     end))
   end)
 
   it("test_evaluate_triple_first_then_exactly_two", function()
-    assert.same({ outcome = "triple", pattern = 4 }, Draw.Evaluate({ 4, 4, 4 }))
+    assert.same({ outcome = "triple", pattern = 4 }, Draw.evaluate({ 4, 4, 4 }))
     -- 恰两同：三种位置组合都是两同，图案取相同那一对
-    assert.same({ outcome = "pair", pattern = 2 }, Draw.Evaluate({ 2, 2, 5 }))
-    assert.same({ outcome = "pair", pattern = 2 }, Draw.Evaluate({ 5, 2, 2 }))
-    assert.same({ outcome = "pair", pattern = 2 }, Draw.Evaluate({ 2, 5, 2 }))
-    assert.same({ outcome = "none" }, Draw.Evaluate({ 1, 2, 3 }))
+    assert.same({ outcome = "pair", pattern = 2 }, Draw.evaluate({ 2, 2, 5 }))
+    assert.same({ outcome = "pair", pattern = 2 }, Draw.evaluate({ 5, 2, 2 }))
+    assert.same({ outcome = "pair", pattern = 2 }, Draw.evaluate({ 2, 5, 2 }))
+    assert.same({ outcome = "none" }, Draw.evaluate({ 1, 2, 3 }))
   end)
 
   it("test_roll_axes_samples_three_times_independently", function()
     local rolls = { 1, 43, 96 } -- 鳄雀鳝 / 蟹老板 / 哥斯拉
     local index = 0
-    local axes = Draw.RollAxes(function()
+    local axes = Draw.roll_axes(function()
       index = index + 1
       return rolls[index]
     end)
@@ -69,10 +69,10 @@ describe("抽奖机纯逻辑（common/lottery_draw）", function()
     }
     for _, bound in ipairs(bounds) do
       local lo, hi, number = bound[1], bound[2], bound[3]
-      assert.same(number, Draw.RollAxis(function()
+      assert.same(number, Draw.roll_axis(function()
         return lo
       end), "下界 " .. lo)
-      assert.same(number, Draw.RollAxis(function()
+      assert.same(number, Draw.roll_axis(function()
         return hi
       end), "上界 " .. hi)
     end

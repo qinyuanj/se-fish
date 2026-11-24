@@ -114,8 +114,8 @@ describe("抛竿上钩收线举鱼宿主接缝（#302）", function()
     overrides = overrides or {}
     events, units, rolls, compendium, quests = {}, {}, {}, {}, {}
     local re = {
-      GetRE = function(_, name) return channel(name) end,
-      CheckRECD = function(_, actor, key)
+      get_re = function(_, name) return channel(name) end,
+      check_recd = function(_, actor, key)
         if overrides.cooldown and key == "CastAction" then return true end
         return false
       end,
@@ -143,10 +143,10 @@ describe("抛竿上钩收线举鱼宿主接缝（#302）", function()
       initial_now = 1000,
       remote = re,
       player_data = {
-        GetDataInst = function(_, target)
+        get_data_inst = function(_, target)
           if target == player then return data end
         end,
-        SendItemBar = function() end,
+        send_item_bar = function() end,
       },
       world_service = {
         CreateUnit = function(_, kind, props)
@@ -173,11 +173,11 @@ describe("抛竿上钩收线举鱼宿主接缝（#302）", function()
         return unit
       end,
       fish_unit = {
-        CanCast = function() return overrides.holding ~= true end,
-        HeldInfo = function() return nil end,
-        GetHeld = function() return nil end,
-        Drop = function() end,
-        SpawnLanded = function(_, owner, catch, position)
+        can_cast = function() return overrides.holding ~= true end,
+        held_info = function() return nil end,
+        get_held = function() return nil end,
+        drop = function() end,
+        spawn_landed = function(_, owner, catch, position)
           if overrides.spawn_fails then return nil, "spawn-failed" end
           seq = seq + 1
           local fish = {
@@ -194,13 +194,13 @@ describe("抛竿上钩收线举鱼宿主接缝（#302）", function()
         end,
       },
       compendium = {
-        RecordLanding = function(_, owner, catch)
+        record_landing = function(_, owner, catch)
           compendium[#compendium + 1] = { player = owner, fishId = catch.fishId, mult = catch.mult }
           return true
         end,
       },
       quest = {
-        Notify = function(_, kind, owner, fact)
+        notify = function(_, kind, owner, fact)
           quests[#quests + 1] = { kind = kind, player = owner, fact = fact }
         end,
       },
@@ -378,7 +378,7 @@ describe("抛竿上钩收线举鱼宿主接缝（#302）", function()
     cast()
     hook()
     local before = alive_units("CastLine_")
-    runtime.life:ApplyDamage(player, GameCfg.Vitals.MaxHealth)
+    runtime.life:apply_damage(player, GameCfg.Vitals.MaxHealth)
     assert.are.equal("idle", last_cast().phase)
     assert.are.equal(0, alive_units("CastLine_"))
 

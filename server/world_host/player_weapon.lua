@@ -16,7 +16,7 @@ local function ability()
 end
 
 local function finite(value)
-  return Number.IsFiniteNumber(value)
+  return Number.is_finite_number(value)
 end
 
 local function vec(x, y, z)
@@ -30,8 +30,8 @@ local function distance2d(a, b)
 end
 
 local function reply(remote, player, payload)
-  if remote and type(remote.GetRE) == "function" then
-    local ok, event = pcall(remote.GetRE, remote, "WeaponResult")
+  if remote and type(remote.get_re) == "function" then
+    local ok, event = pcall(remote.get_re, remote, "WeaponResult")
     if ok and event and type(event.FireClient) == "function" then
       pcall(event.FireClient, event, player, payload)
     end
@@ -60,8 +60,8 @@ local function equipped_weapon(tree)
 end
 
 local function magazine_size(data, base)
-  if data and type(data.MagazineSize) == "function" then
-    local ok, size = pcall(data.MagazineSize, data, base)
+  if data and type(data.magazine_size) == "function" then
+    local ok, size = pcall(data.magazine_size, data, base)
     if ok and finite(size) then return size end
   end
   return base
@@ -150,7 +150,7 @@ local function cast_melee(opts, player)
   local index = melee_index(opts)
   local character = character_of(player)
   if index == nil or not character then return false end
-  local caster = opts.ability and opts.ability.CastAbility
+  local caster = opts.ability and opts.ability.cast_ability
   if type(caster) ~= "function" then return false end
   local ok, cast = pcall(caster, character, index)
   if not ok then
@@ -240,8 +240,8 @@ local function gun_hit(opts, player, aim)
   local target = players and type(players.GetPlayerFromCharacter) == "function"
     and players:GetPlayerFromCharacter(hit.Instance) or nil
   if target then return target, hit_pos end
-  if opts.fish_carrier and type(opts.fish_carrier.ResolveCarrier) == "function" then
-    local carrier = opts.fish_carrier:ResolveCarrier(hit.Instance)
+  if opts.fish_carrier and type(opts.fish_carrier.resolve_carrier) == "function" then
+    local carrier = opts.fish_carrier:resolve_carrier(hit.Instance)
     if carrier then return carrier, hit_pos end
   end
   return nil, hit_pos
@@ -249,7 +249,7 @@ end
 
 local function water_zone_at(x, z)
   for _, zone in ipairs(GameCfg.Water.Zones or {}) do
-    if MathWaterJudge.InZone(zone, { x = x, y = zone.SurfaceY, z = z }) then return zone end
+    if MathWaterJudge.in_zone(zone, { x = x, y = zone.SurfaceY, z = z }) then return zone end
   end
   return nil
 end
@@ -308,7 +308,7 @@ local function pick_blast_fish(candidates, random)
 end
 
 local function spawn_blast_fish(opts, zone, landing, player)
-  if not opts.fish_unit or type(opts.fish_unit.SpawnBlastFish) ~= "function" then return 0 end
+  if not opts.fish_unit or type(opts.fish_unit.spawn_blast_fish) ~= "function" then return 0 end
   local rows = GameCfg.Casting and GameCfg.Casting.Zones and GameCfg.Casting.Zones[zone.Id]
   local candidates = blast_candidates(rows)
   if #candidates == 0 then
@@ -322,7 +322,7 @@ local function spawn_blast_fish(opts, zone, landing, player)
     local fish_id = pick_blast_fish(candidates, random)
     local angle = random() * math.pi * 2
     local radius = 0.5 + random() * 1.5
-    opts.fish_unit:SpawnBlastFish(fish_id, 1, {
+    opts.fish_unit:spawn_blast_fish(fish_id, 1, {
       x = landing.x + math.cos(angle) * radius,
       y = zone.SurfaceY,
       z = landing.z + math.sin(angle) * radius,
@@ -457,12 +457,12 @@ local function attack_melee(session, player, weapon_id)
   end
   local scale = weapon_id and damage_scale(session.tree, "melee") or 1
   local damage = cfg.Damage * scale
-  if not SwingRegistry.StageSwing(player.UserId, { damage = damage, range = cfg.Range, effect = cfg.Effect }) then
+  if not SwingRegistry.stage_swing(player.UserId, { damage = damage, range = cfg.Range, effect = cfg.Effect }) then
     return fail(session.remote, player, "attack", "swing-unavailable", { weapon = weapon_id })
   end
   session.melee_at[key] = now
   if not cast_melee(session.opts, player) then
-    SwingRegistry.ClearSwing(player.UserId)
+    SwingRegistry.clear_swing(player.UserId)
     return fail(session.remote, player, "attack", "cast-failed", { weapon = weapon_id })
   end
   play_anim(session.tracks, player, cfg.Anim)
@@ -542,7 +542,7 @@ local function consume_throwable(session, player, slot, item_id, payload)
     launch(session, player, item_id, payload.target)
     return reply(session.remote, player, { ok = true, action = "throw", itemId = item_id, slot = slot })
   end
-  if type(save.ResolveRequest) ~= "function" or type(save.Execute) ~= "function" then
+  if type(save.resolve_request) ~= "function" or type(save.execute) ~= "function" then
     return fail(session.remote, player, "throw", "unavailable")
   end
   local request_id = payload.operation
@@ -550,20 +550,20 @@ local function consume_throwable(session, player, slot, item_id, payload)
     return fail(session.remote, player, "throw", "bad-operation")
   end
   if request_id == nil then request_id = payload.seq end
-  local operation, mode = save:ResolveRequest(player, data, "throw", request_id)
+  local operation, mode = save:resolve_request(player, data, "throw", request_id)
   if not operation then
     if mode == "replay" then return true end
     return fail(session.remote, player, "throw", "unavailable")
   end
   if mode == "replay" then
-    return save:Execute(player, data, operation, function() return nil, "expired" end, function(ok, result)
+    return save:execute(player, data, operation, function() return nil, "expired" end, function(ok, result)
       if ok then
         result.operation = operation
         reply(session.remote, player, result)
       end
     end) == true
   end
-  return save:Execute(player, data, operation, function(draft)
+  return save:execute(player, data, operation, function(draft)
     local container = draft.Data.Containers[GameCfg.Items.ContainerId.ItemBar]
     local entry = container and container[slot]
     if not entry or (entry.count or 0) <= 0 or entry.itemId ~= item_id then return nil, "empty" end
@@ -595,7 +595,7 @@ local function on_action(session, player, payload)
       return false
     end
     if session.tree.memos.can_act:now() ~= true then
-      SwingRegistry.ClearSwing(player.UserId)
+      SwingRegistry.clear_swing(player.UserId)
       fail(session.remote, player, "attack", "cannot-act")
       return true
     end
@@ -693,14 +693,14 @@ function PlayerWeapon.mount(scope, tree, opts)
     es:d(tree.states.weapons)
     local weapon_id = equipped_weapon(tree)
     if session.equipped ~= weapon_id then
-      SwingRegistry.ClearSwing(player.UserId)
+      SwingRegistry.clear_swing(player.UserId)
     end
     session.equipped = weapon_id
   end)
 
   scope:on_cleanup(function()
     clear_reload(session)
-    SwingRegistry.ClearSwing(player.UserId)
+    SwingRegistry.clear_swing(player.UserId)
     session.cleaned = true
     for index = #session.flying, 1, -1 do
       local flight = session.flying[index]
@@ -726,7 +726,7 @@ function PlayerWeapon.mount(scope, tree, opts)
       end
       if owner == nil and character_of(player) == unit then owner = player end
       if owner == nil then return true end
-      return SwingRegistry.PeekSwing(owner.UserId) ~= nil
+      return SwingRegistry.peek_swing(owner.UserId) ~= nil
     end,
   }
 end

@@ -38,14 +38,14 @@ function Mgr:Pause(fish, paused)
         local record = fish.AbilityRecord
         if record and record.Ready and not state.Paused then
             local api = self.AbilityAPI or require('server.packages.ability_system.api')
-            local ok, err = pcall(api.StopAbility, record.Receiver, record.Entry.Index)
+            local ok, err = pcall(api.StopAbility, record.Receiver, record.entry.Index)
             if not ok then print('[FishAi] operation=PauseAbility', 'fish=' .. tostring(fish.Id), tostring(err)) end
         end
     end
     state.Paused = paused == true
 end
 
-function Mgr:Command(fish, mode, target, direction, speed, distance, range)
+function Mgr:command(fish, mode, target, direction, speed, distance, range)
     local state = leaf(fish)
     if self.Stopped or state.Paused then return false end
     local carrier = fish.Carrier
@@ -79,7 +79,7 @@ function Mgr:Command(fish, mode, target, direction, speed, distance, range)
         self.AiAPI.Funcs.StartAI(unit)
         self.AiAPI.Funcs.StopMove(unit, 0)
         if mode == 'direction' then
-            self.AiAPI.Funcs.MoveDirection(unit, direction, 0, 0)
+            self.AiAPI.Funcs.move_direction(unit, direction, 0, 0)
         else
             self.AiAPI.Funcs.ChaseTarget(unit, target, range or 0, distance or 0.1, 0, nil, 0, 1)
         end
@@ -97,17 +97,17 @@ function Mgr:Command(fish, mode, target, direction, speed, distance, range)
     return true
 end
 
-function Mgr:MoveDirection(fish, direction, speed)
-    return self:Command(fish, 'direction', nil, direction, speed)
+function Mgr:move_direction(fish, direction, speed)
+    return self:command(fish, 'direction', nil, direction, speed)
 end
 
 function Mgr:Chase(fish, target, speed, distance, range)
-    return self:Command(fish, 'chase', target, nil, speed, distance, range)
+    return self:command(fish, 'chase', target, nil, speed, distance, range)
 end
 
 -- BasicCommand 不返回施法结果；只认可既有槽位在本次调用内同步发出的 CastStart。
 -- 零蓄力避免 vendor 创建不受 StopAI 管理的延迟施法任务。
-function Mgr:CastFish(fish)
+function Mgr:cast_fish(fish)
     local state = leaf(fish)
     local record = fish.AbilityRecord
     if self.Stopped or state.Paused or not record or not record.Ready
@@ -115,12 +115,12 @@ function Mgr:CastFish(fish)
     local api = self.AbilityAPI or require('server.packages.ability_system.api')
     local connection, started = nil, false
     local ok, err = pcall(function()
-        local script = api.GetAbility(record.Receiver, record.Entry.Index)
+        local script = api.GetAbility(record.Receiver, record.entry.Index)
         local handler = script and api.GetAbilityByScript(script)
         local signals = handler and handler.getSignals and handler.getSignals()
         if not signals or not signals.CastStart then return end
         connection = signals.CastStart:Connect(function() started = true end)
-        self.AiAPI.Funcs.BasicCommand(record.Receiver, self.AiAPI.Configs.CMD_ABILITY, record.Entry.Index)
+        self.AiAPI.Funcs.BasicCommand(record.Receiver, self.AiAPI.Configs.CMD_ABILITY, record.entry.Index)
     end)
     if connection then connection:Disconnect() end
     if not ok then
@@ -140,7 +140,7 @@ function Mgr:Attach(fish)
     return true
 end
 
-function Mgr:Remove(fish)
+function Mgr:remove(fish)
     if not fish then return true end
     local ok = self:Custom(fish)
     fish.AiLeaf = nil

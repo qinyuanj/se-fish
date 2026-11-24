@@ -8,18 +8,18 @@ describe("抽奖机服务端原子结算（#312 ServerRuntime 宿主）", functi
     world = World.new()
   end)
   after_each(function()
-    if world then world:tearDown(); world = nil end
+    if world then world:tear_down(); world = nil end
   end)
 
   local function give(itemId, mult)
-    world:givePremium(itemId, mult)
-    world:persistReady()
+    world:give_premium(itemId, mult)
+    world:persist_ready()
   end
 
   it("test_bet_value_uses_individual_mult_and_never_cooked_price", function()
     give("item31", 2)
     world.rolls = { 96, 100, 5 }
-    assert.is_true(world:lotteryDraw(1, 1))
+    assert.is_true(world:lottery_draw(1, 1))
     local result = world:messages("LotteryResult")[1]
     assert.same(100, result.betValue)
     assert.same(2000, result.coins)
@@ -29,11 +29,11 @@ describe("抽奖机服务端原子结算（#312 ServerRuntime 宿主）", functi
   it("test_consecutive_draws_settle_independently", function()
     give("item7", 1.5)
     assert.is_true(world.data:AddItem("item31"))
-    world:persistReady()
+    world:persist_ready()
     world.rolls = { 1, 22, 23 }
-    assert.is_true(world:lotteryDraw(1, 1))
+    assert.is_true(world:lottery_draw(1, 1))
     world.rolls = { 96, 96, 1 }
-    assert.is_true(world:lotteryDraw(2, 2))
+    assert.is_true(world:lottery_draw(2, 2))
     local results = world:messages("LotteryResult")
     assert.same(2, #results)
     assert.same(1000, results[2].coins)
@@ -45,15 +45,15 @@ describe("抽奖机服务端原子结算（#312 ServerRuntime 宿主）", functi
   it("test_duplicate_seq_and_operation_replay_return_the_unique_result", function()
     give("item7")
     world.rolls = { 1, 22, 23 }
-    assert.is_true(world:lotteryDraw(1, 1))
+    assert.is_true(world:lottery_draw(1, 1))
     local first = world:messages("LotteryResult")[1]
-    world:clearEvents()
-    assert.is_true(world:lotteryAction({ action = "Draw", slot = 1, seq = 1 }))
+    world:clear_events()
+    assert.is_true(world:lottery_action({ action = "Draw", slot = 1, seq = 1 }))
     local seqReplay = world:messages("LotteryResult")
     assert.same(1, #seqReplay)
     assert.same(first.coins, seqReplay[1].coins)
-    world:clearEvents()
-    assert.is_true(world:lotteryAction({ action = "Draw", slot = 1, seq = 2, operation = first.operation }))
+    world:clear_events()
+    assert.is_true(world:lottery_action({ action = "Draw", slot = 1, seq = 2, operation = first.operation }))
     local replayed = world:messages("LotteryResult")
     assert.same(1, #replayed)
     assert.same(first.coins, replayed[1].coins)
@@ -66,9 +66,9 @@ describe("抽奖机服务端原子结算（#312 ServerRuntime 宿主）", functi
     give("item7")
     world.rolls = { 1, 22, 23 }
     world.failWrites = true
-    assert.is_true(world:lotteryDraw(1, 1))
+    assert.is_true(world:lottery_draw(1, 1))
     for _ = 1, 4 do
-      world.save:Update()
+      world.save:update()
       world:drain()
     end
     assert.same(0, world.data.Data.FishCoin)
@@ -80,7 +80,7 @@ describe("抽奖机服务端原子结算（#312 ServerRuntime 宿主）", functi
   it("test_no_pair_consumes_only_the_bet", function()
     give("item7")
     world.rolls = { 1, 23, 43 }
-    assert.is_true(world:lotteryDraw(1, 1))
+    assert.is_true(world:lottery_draw(1, 1))
     local result = world:messages("LotteryResult")[1]
     assert.is_true(result.ok)
     assert.same("none", result.outcome)
@@ -96,9 +96,9 @@ describe("抽奖机服务端原子结算（#312 ServerRuntime 宿主）", functi
     assert.is_true(world.data:AddItem("item7", nil, 1.5))
     assert.is_true(world.data:AddItem("item31"))
     world.data.Data.Containers[ITEM_BAR][3].saved = { cooked = true }
-    world:persistReady()
+    world:persist_ready()
     for slot, reason in ipairs({ "not-premium", "cooked", "cooked" }) do
-      world:lotteryDraw(slot, slot)
+      world:lottery_draw(slot, slot)
       local result = world:messages("LotteryResult")[slot]
       assert.is_false(result.ok)
       assert.same(reason, result.reason)
@@ -113,7 +113,7 @@ describe("抽奖机服务端原子结算（#312 ServerRuntime 宿主）", functi
   it("test_pair_pays_actual_bet_value_times_multiplier_and_consumes_one", function()
     give("item7", 1.5)
     world.rolls = { 1, 22, 23 }
-    assert.is_true(world:lotteryDraw(1, 1))
+    assert.is_true(world:lottery_draw(1, 1))
     local result = world:messages("LotteryResult")[1]
     assert.is_true(result.ok)
     assert.same("pair", result.outcome)
@@ -130,9 +130,9 @@ describe("抽奖机服务端原子结算（#312 ServerRuntime 宿主）", functi
   it("test_pending_window_second_handle_is_dropped_silently", function()
     give("item7")
     world.rolls = { 1, 22, 23 }
-    assert.is_true(world:lotteryAction({ action = "Draw", slot = 1, seq = 1 }, false))
+    assert.is_true(world:lottery_action({ action = "Draw", slot = 1, seq = 1 }, false))
     local before = #world.events
-    assert.is_false(world:lotteryAction({ action = "Draw", slot = 1, seq = 2 }, false))
+    assert.is_false(world:lottery_action({ action = "Draw", slot = 1, seq = 2 }, false))
     assert.same(before, #world.events)
     world:drain()
     assert.same(1, #world:messages("LotteryResult"))
@@ -142,14 +142,14 @@ describe("抽奖机服务端原子结算（#312 ServerRuntime 宿主）", functi
     give("item7")
     world.rolls = { 1, 1, 23 }
     world.inRange = false
-    world:lotteryDraw(1, 1)
+    world:lottery_draw(1, 1)
     local range = world:messages("LotteryResult")[1]
     assert.is_false(range.ok)
     assert.same("range", range.reason)
     assert.same(1, world.data:ItemCount("item7"))
     world.inRange = true
     for _, slot in ipairs({ 0, 100, 2, "x", 1.5 }) do
-      assert.is_false(world:lotteryAction({ action = "Draw", slot = slot, seq = 10 }))
+      assert.is_false(world:lottery_action({ action = "Draw", slot = slot, seq = 10 }))
     end
     assert.same(1, world.data:ItemCount("item7"))
     assert.same(0, world.data.Data.FishCoin)
@@ -160,14 +160,14 @@ describe("抽奖机服务端原子结算（#312 ServerRuntime 宿主）", functi
     it("test_recovered_result_pushed_once_" .. entry, function()
       give("item31")
       world.rolls = { 61, 70, 76 }
-      assert.is_true(world:lotteryDraw(1, 1))
+      assert.is_true(world:lottery_draw(1, 1))
       local settled = world:messages("LotteryResult")[1]
-      world:clearEvents()
+      world:clear_events()
       world:reconnect()
-      world.data = world.players:GetDataInst(world.player)
+      world.data = world.players:get_data_inst(world.player)
       if entry == "state_request" then
-        world:clearEvents()
-        assert.is_true(world:lotteryState())
+        world:clear_events()
+        assert.is_true(world:lottery_state())
       end
       local recovered = world:messages("LotteryResult")
       assert.same(1, #recovered)
@@ -183,7 +183,7 @@ describe("抽奖机服务端原子结算（#312 ServerRuntime 宿主）", functi
   it("test_triple_item_returns_to_the_freed_slot", function()
     give("item31")
     world.rolls = { 61, 70, 76 }
-    assert.is_true(world:lotteryDraw(1, 1))
+    assert.is_true(world:lottery_draw(1, 1))
     local result = world:messages("LotteryResult")[1]
     assert.same("triple", result.outcome)
     assert.same({ kind = "item", itemId = "item167", name = "加速药水" }, result.prize)

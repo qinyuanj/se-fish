@@ -151,7 +151,7 @@ describe('向钓鱼佬喂食换金币（PlayerFisherman）', function()
     env.data:SelectSlot(1)              -- 新手鱼竿（BasePrice = 3）
     assert.same(1, env.data.Data.SelectedSlot)
     assert.is_true(feed())
-    assert.same(env.cfg.Items.SalePrice('starterRod'), env.data.Data.FishCoin)
+    assert.same(env.cfg.Items.sale_price('starterRod'), env.data.Data.FishCoin)
     assert.is_nil(env.data.Data.Containers.itemBar[1])
     assert.same('starterRod', env.replies[#env.replies].itemId)
     assert.same('item', env.replies[#env.replies].category)

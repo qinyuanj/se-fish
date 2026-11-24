@@ -111,8 +111,8 @@ describe("PlayerEffects：确定性属性派生（AttrModel / BodyScale）", fun
     assert.equals(420, pt.memos.max_health:now())
     assert.near(1.4, pt.memos.body_scale:now(), 1e-9)
     assert.is_false(pt.memos.body_scale_capped:now())
-    assert.near(BodyScale.Derive(1.4).CameraDistance, pt.memos.body_derived:now().CameraDistance, 1e-9)
-    assert.near(BodyScale.Derive(1.4).InteractRange, pt.memos.body_derived:now().InteractRange, 1e-9)
+    assert.near(BodyScale.derive(1.4).CameraDistance, pt.memos.body_derived:now().CameraDistance, 1e-9)
+    assert.near(BodyScale.derive(1.4).InteractRange, pt.memos.body_derived:now().InteractRange, 1e-9)
     assert.near(8 * 1.3, pt.memos.walk_speed:now(), 1e-9)
     assert.near(1.2, pt.memos.weapon_damage_scales:now().melee, 1e-9)
 
@@ -126,7 +126,7 @@ describe("PlayerEffects：确定性属性派生（AttrModel / BodyScale）", fun
     assert.near(3, pt.memos.body_scale:now(), 1e-9)
     assert.is_true(pt.memos.body_scale_capped:now())
     assert.near(8 * 3, pt.memos.walk_speed:now(), 1e-9)
-    assert.near(GameCfg.Shop.DamageScale("melee", 5), pt.memos.weapon_damage_scales:now().melee, 1e-9)
+    assert.near(GameCfg.Shop.damage_scale("melee", 5), pt.memos.weapon_damage_scales:now().melee, 1e-9)
 
     -- 角色重建后重新捕获新角色基准移速
     local char2 = make_character(10)

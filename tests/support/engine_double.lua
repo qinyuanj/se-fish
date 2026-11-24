@@ -1,6 +1,6 @@
 -- 严格引擎替身（单一来源）：只暴露真引擎已实测的成员，未声明的访问直接报错，避免夹具掩盖生产缺陷。
 -- 依据 docs/adr/0035-editor-sdk-enumeration-broken-and-exec-bypass.md 的绕过合同：World 根没有 GetChildren，递归 FindFirstChild 只在 World 上，
--- Unit:FindFirstChild 只匹配直接子级。测试侧改写场景走 M.Children / M.SetSize，不给替身加字段。
+-- Unit:FindFirstChild 只匹配直接子级。测试侧改写场景走 M.children / M.set_size，不给替身加字段。
 local M = {}
 
 local states = setmetatable({}, { __mode = 'k' })
@@ -10,13 +10,13 @@ local VectorMeta = {
   __newindex = function(_, key) error('Vector3 不可写成员 ' .. tostring(key), 2) end,
 }
 
-function M.Vector(x, y, z)
+function M.vector(x, y, z)
   return setmetatable({ x = x, y = y, z = z }, VectorMeta)
 end
 
 local function toVector(value)
   if value == nil then return nil end
-  return M.Vector(value.x, value.y, value.z)
+  return M.vector(value.x, value.y, value.z)
 end
 
 local function descendants(node, out)
@@ -76,11 +76,11 @@ local unitWritable = {
   Position = function(state, value) state.position = toVector(value) end,
 }
 
--- spec: { Name, Position?, Size?, Children? }；坐标可传任意带 x/y/z 的表，入口统一转成严格坐标。
+-- spec: { Name, Position?, Size?, children? }；坐标可传任意带 x/y/z 的表，入口统一转成严格坐标。
 function M.Unit(spec)
   return strict('Unit', {
     name = spec.Name, position = toVector(spec.Position), size = toVector(spec.Size),
-    children = spec.Children or {},
+    children = spec.children or {},
   }, unitMembers, unitWritable)
 end
 
@@ -94,11 +94,11 @@ function M.World(children)
 end
 
 -- 测试侧句柄：返回节点的活子级列表，增删即改场景；生产代码只能经 GetChildren 拿到副本。
-function M.Children(node)
+function M.children(node)
   return states[node].children
 end
 
-function M.SetSize(unit, size)
+function M.set_size(unit, size)
   states[unit].size = toVector(size)
 end
 

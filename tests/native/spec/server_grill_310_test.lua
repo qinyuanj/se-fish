@@ -65,7 +65,7 @@ describe("服务端烧烤点宿主接缝（#310）", function()
   local function make_data(player)
     local data = ctx.PlayerData.New(player)
     data:Init(true)
-    ctx.save:LoadInto(player, data)
+    ctx.save:load_into(player, data)
     drain()
     ctx.datas[player.UserId] = data
     return data
@@ -130,8 +130,8 @@ describe("服务端烧烤点宿主接缝（#310）", function()
       end
     end }
     _G.REUtil = {
-      CheckRECD = function() return false end,
-      GetRE = function(_, name)
+      check_recd = function() return false end,
+      get_re = function(_, name)
         if not ctx.events[name] then
           ctx.events[name] = {
             OnServerEvent = signal(),
@@ -157,7 +157,7 @@ describe("服务端烧烤点宿主接缝（#310）", function()
     ctx.runtime = ServerRuntime.new({
       initial_now = 1000,
       remote = _G.REUtil,
-      player_data = { GetDataInst = function(_, player) return ctx.datas[player.UserId] end },
+      player_data = { get_data_inst = function(_, player) return ctx.datas[player.UserId] end },
       save = ctx.save,
       players_service = _G.game:GetService("Players"),
       world_service = _G.game:GetService("World"),
@@ -165,18 +165,18 @@ describe("服务端烧烤点宿主接缝（#310）", function()
         return _G.game:GetService("World"):CreateUnit(kind, props)
       end,
       on_item_bar_state = function(player, snapshot)
-        _G.REUtil:GetRE("ItemBarState"):FireClient(player, snapshot)
+        _G.REUtil:get_re("ItemBarState"):FireClient(player, snapshot)
       end,
       bind_grill_action = function(dispatch)
-        ctx.events.GrillAction = ctx.events.GrillAction or _G.REUtil:GetRE("GrillAction")
+        ctx.events.GrillAction = ctx.events.GrillAction or _G.REUtil:get_re("GrillAction")
         ctx.events.GrillAction.OnServerEvent:Connect(function(player, payload)
           dispatch(player, payload)
         end)
       end,
     })
-    _G.REUtil:GetRE("GrillAction")
-    _G.REUtil:GetRE("GrillResult")
-    _G.REUtil:GetRE("GrillState")
+    _G.REUtil:get_re("GrillAction")
+    _G.REUtil:get_re("GrillResult")
+    _G.REUtil:get_re("GrillState")
     ctx.runtime:start()
     ctx.runtime:mark_started()
   end)
@@ -308,12 +308,12 @@ describe("服务端烧烤点宿主接缝（#310）", function()
 
     local premium, premium_data = join(9520)
     give_selected(premium_data, "item7", 1)
-    assert.is_true(LotteryEligibility.Check(premium_data.Data.Containers[ITEM_BAR][1]))
+    assert.is_true(LotteryEligibility.check(premium_data.Data.Containers[ITEM_BAR][1]))
     assert.is_true(act(premium, { action = "Start" }).ok)
     advance(2)
     assert.is_true(act(premium, { action = "Takeout" }).ok)
     local cooked_premium = premium_data.Data.Containers[ITEM_BAR][1]
-    local ok_lottery, reason = LotteryEligibility.Check(cooked_premium)
+    local ok_lottery, reason = LotteryEligibility.check(cooked_premium)
     assert.is_false(ok_lottery)
     assert.same("cooked", reason)
 
@@ -323,7 +323,7 @@ describe("服务端烧烤点宿主接缝（#310）", function()
     advance(2)
     assert.is_true(act(token_player, { action = "Takeout" }).ok)
     local cooked_token = find_entry(token_data, TOKEN)
-    assert.is_not_nil(GameCfg.Items.CookRate(cooked_token))
+    assert.is_not_nil(GameCfg.Items.cook_rate(cooked_token))
   end)
 
   it("4.5 秒烤糊损毁并只爆炸一次，满格取出冻结后可重试", function()
@@ -391,7 +391,7 @@ describe("服务端烧烤点宿主接缝（#310）", function()
     assert.same("idle", downed.grill_state.state)
     assert.same(0, live_units())
     advance(10)
-    local health = select(1, ctx.runtime.life:SnapshotHealth(downed))
+    local health = select(1, ctx.runtime.life:snapshot_health(downed))
     assert.same(1, health)
 
     local leaver, leave_data = join(9541)

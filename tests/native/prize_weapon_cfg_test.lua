@@ -6,7 +6,7 @@
 -- 接缝：common/game_cfg.lua 的 Ability 段是纯数据，loadfile 取全新实例断言。
 -- 逐项数值（伤害/间隔/弹匣/溅射/叠层/特效开关）等于把配置再写一遍；真行为由 weapon_system_test、
 -- prize_weapon_effect_test、status_effect_test 在攻击与结算路径上验。
--- 迁移自 tests/gameplay/prize_weapon_cfg_test.lua（#83）；旧 setUp 逐例执行，映射为 before_each。
+-- 迁移自 tests/gameplay/prize_weapon_cfg_test.lua（#83）；旧 set_up 逐例执行，映射为 before_each。
 describe("TestPrizeWeaponCfg", function()
   local cfg, Items, Lottery
 

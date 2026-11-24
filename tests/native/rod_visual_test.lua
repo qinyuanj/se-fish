@@ -46,7 +46,7 @@ describe('鱼竿外观挂载（PlayerDataHost）', function()
     _G.Vector3 = { New = function(x, y, z) return { x = x, y = y, z = z } end }
     -- 鱼竿模型带 ModelColor1，服务端要 Color.New；原生逐例隔离后不能再蹭别的套件的残留全局。
     _G.Color = { New = function(...) return { ... } end }
-    _G.REUtil = { CheckRECD = function() return false end, GetRE = function(_, name)
+    _G.REUtil = { check_recd = function() return false end, get_re = function(_, name)
       if not env.events[name] then
         env.events[name] = {
           OnServerEvent = signal(),
@@ -65,14 +65,14 @@ describe('鱼竿外观挂载（PlayerDataHost）', function()
         return world:CreateUnit(kind, props)
       end,
       on_item_bar_state = function(p, snapshot)
-        _G.REUtil:GetRE('ItemBarState'):FireClient(p, snapshot)
+        _G.REUtil:get_re('ItemBarState'):FireClient(p, snapshot)
       end,
     })
     env.runtime:start()
     env.runtime:mark_started()
     env.join = function(p)
       env.runtime:on_player_added(p)
-      local data = Mgr:GetDataInst(p)
+      local data = Mgr:get_data_inst(p)
       if data then env.runtime:on_save_ready(p, data) end
     end
     env.leave = function(p)
@@ -82,7 +82,7 @@ describe('鱼竿外观挂载（PlayerDataHost）', function()
   end)
 
   after_each(function()
-    -- 顺序与旧 tearDown 一致：先还原 Debug 开关，再送走玩家，最后还原全局。
+    -- 顺序与旧 tear_down 一致：先还原 Debug 开关，再送走玩家，最后还原全局。
     if restore then
       require('common.game_cfg').Debug = restore.GrantDebug
     end
@@ -90,7 +90,7 @@ describe('鱼竿外观挂载（PlayerDataHost）', function()
       env.runtime:shutdown()
     end
     if env and env.player then
-      Mgr:OnPlayerRemoving(env.player)
+      Mgr:on_player_removing(env.player)
     end
       if restore then
       _G.game = restore.game
@@ -120,8 +120,8 @@ describe('鱼竿外观挂载（PlayerDataHost）', function()
     assert.is_true(env.created[3].Destroyed)
     assert.same(3, #env.created)
     env.failKind = nil
-    Mgr:SendItemBar(env.player)
-    Mgr:SyncPlayerTree(env.player)
+    Mgr:send_item_bar(env.player)
+    Mgr:sync_player_tree(env.player)
     assert.same(5, #env.created)
     assert.is_false(env.created[4].Destroyed)
     assert.is_false(env.created[5].Destroyed)
@@ -150,10 +150,10 @@ describe('鱼竿外观挂载（PlayerDataHost）', function()
     env.player.CharacterAdded:Fire(env.player.Character)
     assert.same(4, #env.created)
     assert.are.equal(env.player.Character, env.created[3].Parent)
-    Mgr:GetDataInst(env.player):UpdateData(function(data)
+    Mgr:get_data_inst(env.player):UpdateData(function(data)
       data.Containers[GameCfg.Items.ContainerId.ItemBar][1].count = 0
     end, true)
-    Mgr:SyncPlayerTree(env.player)
+    Mgr:sync_player_tree(env.player)
     assert.is_true(env.created[3].Destroyed)
     assert.is_true(env.created[4].Destroyed)
     assert.is_nil(env.player.lastState.selectedSlot)
@@ -200,8 +200,8 @@ describe('鱼竿外观挂载（PlayerDataHost）', function()
     assert.same({ x = 0.2, y = 0.25, z = 0.2 }, model.Scale)
     assert.is_false(model.PhysicsActive)
     assert.is_false(model.CanCollide)
-    Mgr:SendItemBar(env.player)
-    Mgr:SyncPlayerTree(env.player)
+    Mgr:send_item_bar(env.player)
+    Mgr:sync_player_tree(env.player)
     assert.same(2, #env.created)
     select(1)
     assert.is_true(mount.Destroyed)

@@ -7,7 +7,7 @@ local function flat_distance(a, b)
   return math.sqrt(dx * dx + dz * dz)
 end
 
-function InteractionPoints:FindAnchor(name)
+function InteractionPoints:find_anchor(name)
   local cached = self.Anchors[name]
   if cached then return cached end
   local world = game:GetService("World")
@@ -20,16 +20,16 @@ function InteractionPoints:FindAnchor(name)
   return unit
 end
 
-function InteractionPoints:InRange(player, point)
+function InteractionPoints:in_range(player, point)
   local character = player and player.Character
   local position = character and character.Position
   if not position then return nil end
   local names = point.AnchorNames or { point.AnchorName }
   for _, name in ipairs(names) do
-    local anchor = self:FindAnchor(name)
+    local anchor = self:find_anchor(name)
     local center = anchor and anchor.Position
     if center and flat_distance(position, center)
-        <= BodyScale.InteractionRadius(character, point.Radius) + (point.Slack or 0) then
+        <= BodyScale.interaction_radius(character, point.Radius) + (point.Slack or 0) then
       return anchor
     end
   end

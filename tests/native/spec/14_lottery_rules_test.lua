@@ -23,14 +23,14 @@ local ITEM_BAR = GameCfg.Items.ContainerId.ItemBar
 local function newWorld()
   local env = EconomyWorld.new()
   function env:join() end
-  function env:cleanup() self:tearDown() end
+  function env:cleanup() self:tear_down() end
   function env:bet(itemId, mult)
-    self:givePremium(itemId, mult)
-    self:persistReady()
+    self:give_premium(itemId, mult)
+    self:persist_ready()
   end
   function env:draw(seq)
-    local accepted = self:lotteryDraw(1, seq)
-    return accepted, self:lastResult('LotteryResult')
+    local accepted = self:lottery_draw(1, seq)
+    return accepted, self:last_result('LotteryResult')
   end
   return env
 end

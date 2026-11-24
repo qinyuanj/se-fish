@@ -19,9 +19,9 @@ describe('条款 5-01：七区鱼种数量', function()
     for _, name in ipairs({ 'game', 'Vector2', 'Color', 'MgrGameUI' }) do
       env.saved[name] = rawget(_G, name)
     end
-    package.loaded['common.re_util'] = { GetRE = function() return { FireServer = function() end } end }
+    package.loaded['common.re_util'] = { get_re = function() return { FireServer = function() end } end }
     package.loaded['client.game_ui'] = {
-      GetEuiManager = function() return { GetDeviceResolution = function() return { x = 1920, y = 1080 } end } end,
+      get_eui_manager = function() return { GetDeviceResolution = function() return { x = 1920, y = 1080 } end } end,
     }
     _G.game = { GetService = function() return {} end }
     _G.Vector2 = { New = function(x, y) return { x = x, y = y } end }

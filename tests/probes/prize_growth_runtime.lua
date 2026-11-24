@@ -7,7 +7,7 @@ local pd = require('server.player_data_host')
 local ServerRuntime = require('server.world_host.server_runtime')
 local players, task = game:GetService('Players'), game:GetService('Task')
 local player = players:GetPlayers()[1]
-local data = player and pd:GetDataInst(player)
+local data = player and pd:get_data_inst(player)
 local rt = ServerRuntime.current()
 local pt = player and rt and rt:get_player_tree(player.UserId)
 if not data or not pt or not player.Character or not player.Character.Controller then
@@ -21,7 +21,7 @@ local oldWeak = pt:get_modifier_remaining('weak')
 local controller = player.Character.Controller
 local function attrs(label)
     log(label, 'speed=' .. tostring(controller.WalkSpeed), 'maxHealth=' .. tostring(controller.MaxHealth),
-        'planScale=' .. tostring(ability:BodyPlan(player).Scale), 'canAct=' .. tostring(life:CanAct(player)))
+        'planScale=' .. tostring(ability:body_plan(player).Scale), 'canAct=' .. tostring(life:can_act(player)))
 end
 for n = 152, 166 do
     local id = 'item' .. tostring(n)
@@ -34,10 +34,10 @@ task:Spawn(function()
     local ok, err = pcall(function()
         pt:clear_all_modifiers(false)
         growth.item167, growth.item168 = 20, 10
-        ability:ApplyGrowth(player)
+        ability:apply_growth(player)
         attrs('成长20/10')
         growth.item167, growth.item168 = 21, 11
-        ability:ApplyGrowth(player)
+        ability:apply_growth(player)
         attrs('夹值21/11（非饮用通道）')
         growth.item167, growth.item168 = 20, 10
         pt:apply_modifier('weak', { duration = 60 }); attrs('虚弱'); pt:clear_modifier('weak'); attrs('虚弱消退')
@@ -64,6 +64,6 @@ task:Spawn(function()
     growth.item167, growth.item168 = oldSpeed, oldBody
     pt:clear_all_modifiers(false)
     if oldWeak > 0 then pt:apply_modifier('weak', { duration = oldWeak }) end
-    ability:ApplyGrowth(player)
+    ability:apply_growth(player)
     log('恢复完成', 'ok=' .. tostring(ok), 'error=' .. tostring(err))
 end)

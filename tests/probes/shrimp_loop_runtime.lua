@@ -1,7 +1,7 @@
 -- #135 虾池真实试玩探针：只走公开请求与正常装备攻击，不加金币/库存、不改血量/时间/坐标。
 -- 试玩就绪后：editor-cli exec -p server --file <本文件绝对路径> --json。
 -- 持续输出每招、伤害前后血量和收招；需玩家正常钓出鱼并放到岸上，再站到目标鱼攻击距离内。
--- 若已拥有信物，在本区钓鱼佬旁选中信物后重跑会执行Feed；摆渡使用正常Board请求。
+-- 若已拥有信物，在本区钓鱼佬旁选中信物后重跑会执行Feed；摆渡使用正常board请求。
 local cfg = require('common.game_cfg')
 local pd = require('server.player_data_host')
 local ServerRuntime = require('server.world_host.server_runtime')
@@ -23,7 +23,7 @@ end
 local world, task = game:GetService('World'), game:GetService('Task')
 local player = game:GetService('Players'):GetPlayers()[1]
 if not player then print('SHRIMP135 ABORT 没有玩家') return end
-local data = pd:GetDataInst(player)
+local data = pd:get_data_inst(player)
 if not data then print('SHRIMP135 ABORT 存档未就绪') return end
 _G.Shrimp135 = _G.Shrimp135 or { token = 0, seq = 135000 }
 local rt = _G.Shrimp135
@@ -70,7 +70,7 @@ task:Spawn(function()
                 -- 自然购买的金币近战武器才计正常击杀；探针不装备或赠送武器。
                 if weapon and p and cp and (p.x-cp.x)^2 + (p.z-cp.z)^2 <= weapon.Range^2 then
                     local before = fish.Carrier.Health
-                    local ok = life and life:WeaponAction(player, { action = 'attack' }) or false
+                    local ok = life and life:weapon_action(player, { action = 'attack' }) or false
                     if ok then log('正常攻击', fish.FishId, weaponId, 'before=' .. tostring(before)) end
                 end
             end

@@ -41,7 +41,7 @@ end
 
 local function attack_rect(ctx)
   local resolution = ViewUtil.get_resolution(ctx)
-  local layout = MainHudLayout.Compute({
+  local layout = MainHudLayout.compute({
     width = resolution.x,
     height = resolution.y,
     slots = 1,
@@ -127,7 +127,7 @@ function AttackView.mount(scope, ctx)
     end
     local function tick()
       local t = current_now(ctx, services)
-      gesture:Update(t)
+      gesture:update(t)
       local gun = current_gun()
       if gun and gun.Auto and t >= next_auto then
         next_auto = t + (gun.IntervalSec or 0.2)

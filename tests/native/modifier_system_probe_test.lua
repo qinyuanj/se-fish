@@ -2,7 +2,7 @@
 -- 迁移自 tests/tooling/modifier_system_probe_test.lua（#92，LuaUnit → 原生 Busted）；
 -- 案例顺序沿用旧入口的类名 + 方法名字典序。
 -- 需要替换 _G.game / _G.RemoteEvent 与 modifier_system 模块缓存的用例，其环境保存/恢复写在
--- business()/隔离段里、对未完成用例幂等（等价旧入口的逐例 setUp/tearDown）。
+-- business()/隔离段里、对未完成用例幂等（等价旧入口的逐例 set_up/tear_down）。
 local function engine()
     local e = { now = 100, timers = {}, units = {}, logs = {} }
     local function signal()
@@ -23,7 +23,7 @@ local function engine()
         e.units[#e.units + 1] = u
         function u:GetAttribute(k) return self.attrs[k] end
         function u:SetAttribute(k, v) self.attrs[k] = v end
-        function u:GetComponent() return nil end
+        function u:get_component() return nil end
         function u:IsA(kind) return kind == 'BindableEvent' and name == 'BindableEvent' end
         function u:FindFirstChild(childName)
             for _, child in ipairs(e.units) do
@@ -80,12 +80,12 @@ end
 -- #52：业务入口使用真实 Spoke PlayerEffects + ModifierLeaf + 真实官方包；替身只提供单位、时钟与伤害边界。
 local function business(run)
     local runtime = require('tests.support.modifier_runtime').New(100)
-    local modifier = runtime.loadModifier()
+    local modifier = runtime.load_modifier()
     local player = { UserId = 52001, Character = runtime.unit('character') }
     local hits = {}
     modifier.Vitals = {
-        NewHit = function(_, source, category) return { source = source, category = category } end,
-        ApplyHit = function(_, hit, target, amount)
+        new_hit = function(_, source, category) return { source = source, category = category } end,
+        apply_hit = function(_, hit, target, amount)
             hits[#hits + 1] = { source = hit.source, target = target, amount = amount, category = hit.category }
         end,
     }
@@ -139,12 +139,12 @@ describe("TestModifierProbe", function()
       assert.is_true(mgr:Apply(nil, player, 'weak', 17))
       assert.is_true(mgr:Apply(nil, player, 'burn'))
       e.wait(2)
-      mgr:OnCharacterRemoving(player)
+      mgr:on_character_removing(player)
       player.Character:Destroy()
       player.Character = e.unit('new-character')
-      mgr:OnCharacterAdded(player)
-      assert.are.equal(15, mgr:GetRemaining(player, 'weak'))
-      assert.are.equal(0, mgr:GetRemaining(player, 'burn'))
+      mgr:on_character_added(player)
+      assert.are.equal(15, mgr:get_remaining(player, 'weak'))
+      assert.are.equal(0, mgr:get_remaining(player, 'burn'))
     end)
   end)
 
@@ -166,22 +166,22 @@ describe("TestModifierProbe", function()
       assert.is_true(mgr:Apply(nil, player, 'paralyze', 5))
       e.wait(2)
       for _, fn in ipairs(died.callbacks) do fn() end
-      assert.are.equal(18, mgr:GetRemaining(player, 'weak'))
-      assert.is_true(mgr:IsControlled(player))
+      assert.are.equal(18, mgr:get_remaining(player, 'weak'))
+      assert.is_true(mgr:is_controlled(player))
     end)
   end)
 
   it("test_business_death_rebuild_and_source_leave_do_not_keep_old_dot", function()
     business(function(e, mgr, player, hits)
       local source = { UserId = 2, Character = e.unit('source') }
-      assert.is_true(mgr:ApplyWeaponEffect(source, player, { Kind = 'burn' }))
-      mgr:OnCharacterAdded(player)
-      e.wait(4); mgr:Update()
+      assert.is_true(mgr:apply_weapon_effect(source, player, { Kind = 'burn' }))
+      mgr:on_character_added(player)
+      e.wait(4); mgr:update()
       assert.are.equal(0, #hits)
       assert.are.equal(0, #mgr.ModifierAPI.GetUnitModifiers(player.Character))
-      assert.is_true(mgr:ApplyWeaponEffect(source, player, { Kind = 'poison' }))
-      mgr:OnPlayerRemoving(source)
-      e.wait(4); mgr:Update()
+      assert.is_true(mgr:apply_weapon_effect(source, player, { Kind = 'poison' }))
+      mgr:on_player_removing(source)
+      e.wait(4); mgr:update()
       assert.are.equal(0, #hits)
     end)
   end)
@@ -190,45 +190,45 @@ describe("TestModifierProbe", function()
     local clock, hits = 100, {}
     local runtime = require('tests.support.modifier_runtime').New(clock)
     local target = { UserId = 49001, Character = runtime.unit('target') }
-    local mgr = runtime.loadModifier()
+    local mgr = runtime.load_modifier()
     mgr.Vitals = {
-      NewHit = function(_, source, category) return { source = source, category = category } end,
-      ApplyHit = function(_, hit, ref, amount)
+      new_hit = function(_, source, category) return { source = source, category = category } end,
+      apply_hit = function(_, hit, ref, amount)
         hits[#hits + 1] = { source = hit.source, category = hit.category, target = ref, amount = amount, at = runtime.now }
       end,
     }
     local source, source2 = {}, {}
-    local report = require('tools.probes.modifier_system_probe').VerifyBusinessDot({
+    local report = require('tools.probes.modifier_system_probe').verify_business_dot({
       cfg = require('common.game_cfg'), source = source, source2 = source2, dotTarget = target,
       now = function() return clock end,
-      wait = function(s) runtime.wait(s); clock = runtime.now; mgr:Update() end,
+      wait = function(s) runtime.wait(s); clock = runtime.now; mgr:update() end,
       businessDot = {
-        apply = function(src, ref, kind) return mgr:ApplyWeaponEffect(src, ref, { Kind = kind }) end,
+        apply = function(src, ref, kind) return mgr:apply_weapon_effect(src, ref, { Kind = kind }) end,
         hits = function() return hits end,
-        clear = function() mgr:ClearTarget(target) end,
+        clear = function() mgr:clear_target(target) end,
       },
     })
     assert.are.equal('business', report.owner)
     assert.is_true(report.ok)
     assert.are.equal(3, report.kinds.poison.count)
     assert.are.equal(3, report.kinds.burn.count)
-    assert.are.equal(0, mgr:GetRemaining(target, 'poison'))
-    assert.are.equal(0, mgr:GetRemaining(target, 'burn'))
+    assert.are.equal(0, mgr:get_remaining(target, 'poison'))
+    assert.are.equal(0, mgr:get_remaining(target, 'burn'))
   end)
 
   it("test_business_modifier_stacks_uses_latest_source_and_retains_dot_phase", function()
     business(function(e, mgr, player, hits)
       local first, latest = { UserId = 1, Character = e.unit('first') }, { UserId = 2, Character = e.unit('latest') }
-      assert.is_true(mgr:ApplyWeaponEffect(first, player, { Kind = 'poison' }))
+      assert.is_true(mgr:apply_weapon_effect(first, player, { Kind = 'poison' }))
       e.wait(0.5)
-      assert.is_true(mgr:ApplyWeaponEffect(latest, player, { Kind = 'poison' }))
-      e.wait(0.5); mgr:Update()
+      assert.is_true(mgr:apply_weapon_effect(latest, player, { Kind = 'poison' }))
+      e.wait(0.5); mgr:update()
       assert.are.equal(1, #hits)
       assert.same({ source = latest, target = player, amount = 2, category = 'dot' }, hits[1])
       e.wait(3)
-      mgr:Update()
+      mgr:update()
       assert.are.equal(3, #hits)
-      assert.are.equal(0, mgr:GetRemaining(player, 'poison'))
+      assert.are.equal(0, mgr:get_remaining(player, 'poison'))
       assert.are.equal(0, #mgr.ModifierAPI.GetUnitModifiers(player.Character))
     end)
   end)
@@ -237,44 +237,44 @@ describe("TestModifierProbe", function()
     business(function(e, mgr, player)
       assert.is_true(mgr:Apply(nil, player, 'weak', 17))
       assert.is_true(mgr:Apply(nil, player, 'frost'))
-      assert.are.equal(0.35, mgr:GetMoveMultiplier(player))
+      assert.are.equal(0.35, mgr:get_move_multiplier(player))
       e.wait(1)
       assert.is_true(mgr:Apply(nil, player, 'frost'))
       local entity = mgr.ModifierAPI.GetUnitModifiers(player.Character, 'test:frost')[1]
       assert.are.equal(1, entity:GetAttribute('CurrCount'))
-      assert.are.equal(3, mgr:GetRemaining(player, 'frost'))
+      assert.are.equal(3, mgr:get_remaining(player, 'frost'))
       assert.is_true(mgr:Apply(nil, player, 'paralyze'))
-      assert.is_true(mgr:IsControlled(player))
-      assert.are.equal(0, mgr:GetMoveMultiplier(player))
+      assert.is_true(mgr:is_controlled(player))
+      assert.are.equal(0, mgr:get_move_multiplier(player))
       e.wait(0.5)
-      assert.is_false(mgr:IsControlled(player))
-      assert.are.equal(0.35, mgr:GetMoveMultiplier(player))
+      assert.is_false(mgr:is_controlled(player))
+      assert.are.equal(0.35, mgr:get_move_multiplier(player))
       e.wait(3)
-      assert.are.equal(0.5, mgr:GetMoveMultiplier(player))
-      local remaining = mgr:GetRemaining(player, 'weak')
-      mgr:OnPlayerRemoving(player)
+      assert.are.equal(0.5, mgr:get_move_multiplier(player))
+      local remaining = mgr:get_remaining(player, 'weak')
+      mgr:on_player_removing(player)
       e.wait(300)
       assert.is_true(mgr:Apply(nil, player, 'weak', remaining))
-      assert.are.equal(12.5, mgr:GetRemaining(player, 'weak'))
+      assert.are.equal(12.5, mgr:get_remaining(player, 'weak'))
     end)
   end)
 
   it("test_leaving_target_does_not_refresh_destroyed_growth_owner_and_cleanup_is_idempotent", function()
     business(function(e, mgr, player)
-      mgr.Ability = { RefreshMoveSpeed = function() error('退出后禁止刷新属性') end }
+      mgr.Ability = { refresh_move_speed = function() error('退出后禁止刷新属性') end }
       mgr.Ability = nil
       assert.is_true(mgr:Apply(nil, player, 'weak', 17))
-      mgr.Ability = { RefreshMoveSpeed = function() error('退出后禁止刷新属性') end }
-      mgr:OnPlayerRemoving(player)
-      mgr:OnPlayerRemoving(player)
-      assert.are.equal(0, mgr:GetRemaining(player, 'weak'))
+      mgr.Ability = { refresh_move_speed = function() error('退出后禁止刷新属性') end }
+      mgr:on_player_removing(player)
+      mgr:on_player_removing(player)
+      assert.are.equal(0, mgr:get_remaining(player, 'weak'))
     end)
   end)
 
   it("test_mapping_preserves_refresh_only_and_legacy_remaining", function()
     local probe = require('tools.probes.modifier_system_probe')
     local cfg = require('common.game_cfg')
-    local mappings = probe.BuildMappings(cfg)
+    local mappings = probe.build_mappings(cfg)
     assert.are.equal(5, mappings.poison.maxStackCount)
     assert.are.equal(mappings.poison.TickSec, cfg.Ability.StatusEffects.poison.TickSec)
     assert.are.equal(mappings.poison.DamagePerStack, cfg.Ability.StatusEffects.poison.DamagePerStack)
@@ -284,9 +284,9 @@ describe("TestModifierProbe", function()
     assert.are.equal(0, mappings.frost.stackCountMode)
     assert.is_true(mappings.frost.stackable)
     assert.are.equal(0.5, mappings.paralyze.duration)
-    assert.are.equal(17, probe.WeakRemaining({ Extra = { survival = { weakRemaining = 17 } } }, 60))
-    assert.are.equal(60, probe.WeakRemaining({ Extra = { survival = { weakRemaining = 999 } } }, 60))
-    assert.are.equal(0, probe.WeakRemaining({ Extra = { survival = { weakUntil = 999 } } }, 60))
+    assert.are.equal(17, probe.weak_remaining({ Extra = { survival = { weakRemaining = 17 } } }, 60))
+    assert.are.equal(60, probe.weak_remaining({ Extra = { survival = { weakRemaining = 999 } } }, 60))
+    assert.are.equal(0, probe.weak_remaining({ Extra = { survival = { weakUntil = 999 } } }, 60))
   end)
 
   it("test_real_vendor_public_api_reruns_and_cleans_isolated_objects", function()
@@ -303,7 +303,7 @@ describe("TestModifierProbe", function()
       local api = require('server.packages.modifier_system.api')
       for _ = 1, 2 do
         local owner, source, source2 = e.unit('owner'), e.unit('source'), e.unit('source2')
-        local report = require('tools.probes.modifier_system_probe').Run({
+        local report = require('tools.probes.modifier_system_probe').run({
           isolated = true, isIsolated = function(u) return u == owner or u == source or u == source2 end,
           owner = owner, source = source, source2 = source2,
           api = api, cfg = require('common.game_cfg'), evidence = 'offline', wait = e.wait,
@@ -328,6 +328,6 @@ describe("TestModifierProbe", function()
 
   it("test_run_rejects_unowned_targets_without_api_calls", function()
     local probe = require('tools.probes.modifier_system_probe')
-    assert.error_matches(function() return probe.Run({}) end, '隔离', nil, true)
+    assert.error_matches(function() return probe.run({}) end, '隔离', nil, true)
   end)
 end)

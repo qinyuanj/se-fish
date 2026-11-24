@@ -38,11 +38,11 @@ local FishCatch = require('common.fish_catch')
 
 -- ===== 假引擎战斗世界（tests/support/combat_world，复用 fish_escape 测试夹具）=====
 local CombatWorld = require('tests.support.combat_world')
-local combat, at, pinRandom, drop =
-    CombatWorld.new, CombatWorld.at, CombatWorld.pinRandom, CombatWorld.drop
+local combat, at, pin_random, drop =
+    CombatWorld.new, CombatWorld.at, CombatWorld.pin_random, CombatWorld.drop
 
 -- 拆除统一走实例方法（与 blindbox_world / revive_world 同一入口名）
-local function close(env) env:tearDown() end
+local function close(env) env:tear_down() end
 
 -- 推进到 40 秒突击节拍并等预警起手（40 秒帧可能压着上一记甩头的预警，做有界等待）
 local function startCharge(env, fish)
@@ -51,13 +51,13 @@ local function startCharge(env, fish)
     local guard = 0
     while (not fish.Move or fish.Move.Name ~= 'charge') and guard < 50 do
         env.now = env.now + 0.1
-        env.mgr:Update()
+        env.mgr:update()
         guard = guard + 1
     end
     return fish.Move, fish.Carrier.Body.Position
 end
 
--- 从预警记录里捞某招的 Lock payload（双轴审查 P2：预警形状 / 半径必须与真实危险区一致）
+-- 从预警记录里捞某招的 lock payload（双轴审查 P2：预警形状 / 半径必须与真实危险区一致）
 local function findLock(env, moveName)
     local lock
     for _, notice in ipairs(env.notices) do
@@ -86,7 +86,7 @@ if rows then
             if row.RodLevel <= rodLevel and (row.Bait == 0 or row.Bait == baitId) then total = total + row.DrawWeight end
         end
         local found = {}
-        for roll = 1, total do found[FishCatch.Select(rows, rodLevel, baitId, function() return roll end)] = true end
+        for roll = 1, total do found[FishCatch.select(rows, rodLevel, baitId, function() return roll end)] = true end
         return found
     end
     local plain = selectAll(1, nil)
@@ -189,7 +189,7 @@ do
     local guard = 0
     while (not fish.Move or fish.Move.Name ~= 'tail') and guard < 50 do
         env.now = env.now + 0.1
-        env.mgr:Update()
+        env.mgr:update()
         guard = guard + 1
     end
     env.hits = {} -- 虎啸结算（身前目标 30）不计入甩尾判定
@@ -210,14 +210,14 @@ do
 end
 do
     local env = combat()
-    pinRandom(env)
+    pin_random(env)
     local fish = drop(env, 'fish40Boss', 20)
     for t = 0.5, 24.5, 0.5 do at(env, t) end
     at(env, 25)
     local guard = 0
     while (not fish.Move or fish.Move.Name ~= 'jump') and guard < 50 do
         env.now = env.now + 0.1
-        env.mgr:Update()
+        env.mgr:update()
         guard = guard + 1
     end
     local jumped = fish.Move and fish.Move.Name == 'jump'
@@ -262,9 +262,9 @@ do
     check('Z5_Shop 摊位为 5 级', stand ~= nil and stand.Level == 5
         and stand.AnchorName == GameCfg.Zones[5].Scene.ShopName)
     local gear = {}
-    for _, row in ipairs(GameCfg.Shop.ListForPage(5, '钓具')) do gear[row.ItemId] = row.Price end
+    for _, row in ipairs(GameCfg.Shop.list_for_page(5, '钓具')) do gear[row.ItemId] = row.Price end
     local weapons = {}
-    for _, row in ipairs(GameCfg.Shop.ListForPage(5, '武器')) do weapons[row.ItemId] = row.Price end
+    for _, row in ipairs(GameCfg.Shop.list_for_page(5, '武器')) do weapons[row.ItemId] = row.Price end
     check('五区买得到椰子 5 金、专业鱼竿 100 金、自动步枪 1000 金',
         gear.item117 == 5 and gear.proRod == 100 and weapons.item140 == 1000,
         'coconut=' .. tostring(gear.item117) .. ' rod=' .. tostring(gear.proRod))

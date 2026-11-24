@@ -17,7 +17,7 @@ function M.restore()
 end
 
 --- 当前 math.random 是否仍是加载期的原生函数（供案例自检，不做替换）。
-function M.isPristine()
+function M.is_pristine()
   return rawequal(rawget(math, "random"), pristine.random)
     and rawequal(rawget(math, "randomseed"), pristine.randomseed)
 end

@@ -1,7 +1,7 @@
 -- #89 迁移（原 tests/gameplay/prize_growth_wiring_test.lua，#139 T18 大奖成长切片 6）：
 -- 成长与持续效果的生产接线。
 -- 失败方式（先列后写）：
---   1. 喝药后只重算体型（#132 的 ApplyBodyScale），移速与血量上限不跟着成长；
+--   1. 喝药后只重算体型（#132 的 apply_body_scale），移速与血量上限不跟着成长；
 --   2. 第 21 个加速 / 第 11 个变大被接受或扣格；第 20 / 10 个被拒；超限仍触发成长应用；
 --   3. 重进（Serialize → ApplySave）丢药水次数或抽奖武器；
 --   4. 虚弱进出由 MgrSurvival 私写 WalkSpeed：退虚弱恢复「进虚弱前」的旧值，虚弱期喝的加速丢失；
@@ -10,8 +10,8 @@
 --   6. server/main.lua 漏接 MgrAbility.PlayerData / Survival、Vitals.ActGuard / MaxHealthProvider、
 --      Survival.SpeedWriter、MgrWeapon.Modifier（单测注入了、生产没接 = 生产里药水数恒 0）。
 -- 接缝：MgrPlayerData:Handle（ItemBarAction 通道）、PlayerData 存档往返、MgrSurvival:ApplyWeak/ClearWeak、
---   MgrFishUnit:Speed / UpdateCombat、MgrAbility:CastFish、server/main.lua 源码接线断言。
--- 旧套件的逐例 setUp/tearDown 映射为 before_each/after_each；被替换的全局（game / Vector3 / REUtil）、
+--   MgrFishUnit:Speed / update_combat、MgrAbility:cast_fish、server/main.lua 源码接线断言。
+-- 旧套件的逐例 set_up/tear_down 映射为 before_each/after_each；被替换的全局（game / Vector3 / REUtil）、
 -- 模块缓存（package.loaded 的 MgrFishUnit 与 common.re_util）与配置（GameCfg.Debug）逐例恢复，
 -- after_each 对未完成的 before_each 幂等。describe 顺序沿用旧执行序（类名字典序）。
 local GameCfg = require('common.game_cfg')
@@ -53,9 +53,9 @@ describe('TestFishStatusGate', function()
         ctx.mgr = assert(loadfile('server/world_host/fish_tree.lua'))()
         ctx.factor, ctx.paralyzed = 1, false
         ctx.mgr.Ability = {
-            FishSpeedFactor = function() return state.factor end,
-            FishParalyzed = function() return state.paralyzed end,
-            RemoveFish = function() end,
+            fish_speed_factor = function() return state.factor end,
+            fish_paralyzed = function() return state.paralyzed end,
+            remove_fish = function() end,
         }
     end)
 
@@ -74,17 +74,17 @@ describe('TestFishStatusGate', function()
             'UpdateKingCrabCombat', 'UpdateCrabBossCombat', 'StunFish' }) do
             ctx.mgr[name] = function() dispatched[#dispatched + 1] = name end
         end
-        ctx.mgr.RefreshMovingCombat = function() end
-        ctx.mgr.BossPhaseEnabled = function() return false end
+        ctx.mgr.refresh_moving_combat = function() end
+        ctx.mgr.boss_phase_enabled = function() return false end
         local body = { Position = vec(9999, 500, 9999) } -- 远离任何水域，不触发入水逃脱
         local fish = { Id = 2, FishId = 'alligatorGar', State = 'combat', FleeAt = ctx.now + 100,
             Carrier = { Body = body } }
         ctx.paralyzed = true
-        ctx.mgr:UpdateCombat(fish, ctx.now)
+        ctx.mgr:update_combat(fish, ctx.now)
         assert.message('麻痹期间不追咬/不施法').same({}, dispatched)
         assert.same(vec(0, 0, 0), body.LinearVelocity)
         ctx.paralyzed = false
-        ctx.mgr:UpdateCombat(fish, ctx.now)
+        ctx.mgr:update_combat(fish, ctx.now)
         assert.same({ 'UpdateChase' }, dispatched)
     end)
 
@@ -98,7 +98,7 @@ describe('TestFishStatusGate', function()
         ctx.factor = 0 -- 麻痹
         assert.same(0, ctx.mgr:Speed(fish))
         -- 效果口故障不拖垮移动：按 1 处理
-        ctx.mgr.Ability.FishSpeedFactor = function() error('boom') end
+        ctx.mgr.Ability.fish_speed_factor = function() error('boom') end
         assert.same(base, ctx.mgr:Speed(fish))
         ctx.mgr.Ability = nil
         assert.same(base, ctx.mgr:Speed(fish))
@@ -110,13 +110,13 @@ describe('TestFishStatusGate', function()
         local fish = { Id = 3, FishId = 'alligatorGar', StraightEscape = true,
             Heading = { x = 1, z = 0 }, Carrier = { Body = body } }
         ctx.factor = 0
-        ctx.mgr:UpdateEscaping(fish, ctx.now)
+        ctx.mgr:update_escaping(fish, ctx.now)
         assert.same(vec(0, 0, 0), body.LinearVelocity)
         ctx.now, ctx.factor = ctx.now + 0.5, 0.7
-        ctx.mgr:UpdateEscaping(fish, ctx.now)
+        ctx.mgr:update_escaping(fish, ctx.now)
         assert.near(GameCfg.Fish.alligatorGar.Speed * 0.7, body.LinearVelocity.x, 1e-9)
         ctx.now, ctx.factor = ctx.now + 2.5, 1
-        ctx.mgr:UpdateEscaping(fish, ctx.now)
+        ctx.mgr:update_escaping(fish, ctx.now)
         assert.same(GameCfg.Fish.alligatorGar.Speed, body.LinearVelocity.x)
     end)
 end)
@@ -130,11 +130,11 @@ describe('TestPrizeGrowthPotion', function()
         local state = ctx
         ctx.mgr = require('server.player_data_host')
         GameCfg.Debug = { Enabled = false }
-        _G.REUtil = { CheckRECD = function() return false end, GetRE = function(_, name)
+        _G.REUtil = { check_recd = function() return false end, get_re = function(_, name)
             if not state.events[name] then
                 state.events[name] = {
                     OnServerEvent = signal(),
-                    FireClient = function(_, player, payload) player.lastResult = payload end,
+                    FireClient = function(_, player, payload) player.last_result = payload end,
                 }
             end
             return state.events[name]
@@ -143,21 +143,21 @@ describe('TestPrizeGrowthPotion', function()
             CharacterAdded = signal(), CharacterRemoving = signal() }
         function player:SetAttribute() end
         ctx.player = player
-        ctx.mgr.Vitals = { CanEat = function() return true end, Eat = function() end }
+        ctx.mgr.Vitals = { can_eat = function() return true end, eat = function() end }
         ctx.mgr.Save = nil
         ctx.mgr.Ability = {
-            ApplyGrowth = function(_, p) state.growth[#state.growth + 1] = p; return { Ok = true } end,
-            ApplyBodyScale = function(_, p) state.bodyOnly[#state.bodyOnly + 1] = p; return { Ok = true } end,
+            apply_growth = function(_, p) state.growth[#state.growth + 1] = p; return { Ok = true } end,
+            apply_body_scale = function(_, p) state.bodyOnly[#state.bodyOnly + 1] = p; return { Ok = true } end,
         }
         ctx.mgr:Start()
-        ctx.mgr:OnPlayerAdded(player)
-        ctx.data = ctx.mgr:GetDataInst(player)
+        ctx.mgr:on_player_added(player)
+        ctx.data = ctx.mgr:get_data_inst(player)
     end)
 
     -- before_each 中途失败也要拆掉注入的假管理器与全局
     after_each(function()
         if not ctx then return end
-        if ctx.player then ctx.mgr:OnPlayerRemoving(ctx.player) end
+        if ctx.player then ctx.mgr:on_player_removing(ctx.player) end
         ctx.mgr.Vitals, ctx.mgr.Save, ctx.mgr.Ability = nil, nil, nil
         _G.REUtil = ctx.oldREUtil
         GameCfg.Debug = ctx.debug
@@ -167,7 +167,7 @@ describe('TestPrizeGrowthPotion', function()
         assert.is_true(ctx.data:AddItem(itemId, 1))
         local function operate()
             ctx.events.ItemBarAction.OnServerEvent:Fire(ctx.player, { action = 'Operate', op = 'eat', slot = 1 })
-            return ctx.player.lastResult
+            return ctx.player.last_result
         end
         operate() -- 第一下拿起
         return operate()
@@ -177,10 +177,10 @@ describe('TestPrizeGrowthPotion', function()
     it('test_body_potion_10th_applies_growth_11th_rejected', function()
         ctx.data.Extra.growth.potions.item168 = 9
         assert.is_true(drink('item168').ok)
-        assert.same(10, ctx.data:PotionCount('item168'))
+        assert.same(10, ctx.data:potion_count('item168'))
         assert.same(1, #ctx.growth)
         assert.same('potion-capped', drink('item168').reason)
-        assert.same(10, ctx.data:PotionCount('item168'))
+        assert.same(10, ctx.data:potion_count('item168'))
         assert.same(1, #ctx.growth)
     end)
 
@@ -197,8 +197,8 @@ describe('TestPrizeGrowthPotion', function()
         local again = PlayerData.New({ UserId = 13961, SetAttribute = function() end })
         again:Init()
         assert.is_true(again:ApplySave(snapshot))
-        assert.same(20, again:PotionCount('item167'))
-        assert.same(10, again:PotionCount('item168'))
+        assert.same(20, again:potion_count('item167'))
+        assert.same(10, again:potion_count('item168'))
         assert.same(1, again:WeaponCount('item165'))
         assert.same(1, again:WeaponCount('item152'))
     end)
@@ -208,13 +208,13 @@ describe('TestPrizeGrowthPotion', function()
         ctx.data.Extra.growth.potions.item167 = 19
         local twentieth = drink('item167')
         assert.is_true(twentieth.ok)
-        assert.same(20, ctx.data:PotionCount('item167'))
+        assert.same(20, ctx.data:potion_count('item167'))
         assert.message('喝药后走整体成长应用（体型+血量上限+移速），不只是体型').same(1, #ctx.growth)
         assert.same(ctx.player, ctx.growth[1])
         assert.same(0, #ctx.bodyOnly)
         local capped = drink('item167')
         assert.same({ ok = false, op = 'eat', reason = 'potion-capped' }, capped)
-        assert.same(20, ctx.data:PotionCount('item167'))
+        assert.same(20, ctx.data:potion_count('item167'))
         assert.message('超限不扣格').same('item167', ctx.data:GetItemBarSnapshot().slots[1].itemId)
         assert.message('超限不再触发成长应用').same(1, #ctx.growth)
     end)
@@ -254,7 +254,7 @@ describe('TestPrizeRocketInput', function()
         local store, writer = ClientStore.new({ initial_now = 0 })
         state.writer = writer
         writer:set_hud_visible(true)
-        local root = { Name = 'UIRoot', Destroying = signal(), Children = {},
+        local root = { Name = 'UIRoot', Destroying = signal(), children = {},
             FindFirstChild = function(_, name) return state.nodes[name] end }
         ctx.view = RootView.mount(root, store, {
             services = {
@@ -275,7 +275,7 @@ describe('TestPrizeRocketInput', function()
                     Visible = true,
                 }
                 state.nodes[node.Name] = node
-                if node.Parent and node.Parent.Children then node.Parent.Children[node.Name] = node end
+                if node.Parent and node.Parent.children then node.Parent.children[node.Name] = node end
                 return node
             end,
             hud = { AttackView.spec() },

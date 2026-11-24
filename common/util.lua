@@ -4,7 +4,7 @@ local RunService = game:GetService("RunService")
 local World = game:GetService("World")
 local REUtil = require("common.re_util")
 
-function Util:WaitForChild(rootObj, childName, waitTime)
+function Util:wait_for_child(rootObj, childName, waitTime)
 	if not rootObj then
 		return 
 	end
@@ -23,45 +23,45 @@ function Util:WaitForChild(rootObj, childName, waitTime)
 	return
 end	
 
-function Util:MsgNotice(player, msg, duration, textColor)
+function Util:msg_notice(player, msg, duration, textColor)
 	if RunService:IsServer() then
-		REUtil:GetRE("MsgNoticeRE"):FireClient(player, msg, duration, textColor)
+		REUtil:get_re("MsgNoticeRE"):FireClient(player, msg, duration, textColor)
 		return
 	end
 
-	if not _G.LocalMsgNotice then 
+	if not _G.local_msg_notice then 
 		print("_G.LocalMsgNotice 未初始化")
 		return 
 	end
 
-	_G.LocalMsgNotice(msg, duration, textColor)
+	_G.local_msg_notice(msg, duration, textColor)
 end
 
-function Util:GlobalMsgNotice(msg, duration, textColor)
+function Util:global_msg_notice(msg, duration, textColor)
 	if RunService:IsClient() then
 		print("GlobalMsgNotice 只在服务端调用")
 		return
 	end
 
-	REUtil:GetRE("MsgNoticeRE"):FireAllClients(msg, duration, textColor)
+	REUtil:get_re("MsgNoticeRE"):FireAllClients(msg, duration, textColor)
 end
 
 if RunService:IsClient() then
 	local Players = game:GetService("Players")
 	local LocalPlayer = Players.LocalPlayer
-	REUtil:GetRE("MsgNoticeRE").OnClientEvent:Connect(function(msg, duration, textColor) 
-		Util:MsgNotice(LocalPlayer, msg, duration, textColor)
+	REUtil:get_re("MsgNoticeRE").OnClientEvent:Connect(function(msg, duration, textColor) 
+		Util:msg_notice(LocalPlayer, msg, duration, textColor)
 	end)
 end
 
 
 if RunService:IsServer() then
-	REUtil:GetRE("GlobalMarquee").OnServerEvent:Connect(function(p, msg) 
+	REUtil:get_re("GlobalMarquee").OnServerEvent:Connect(function(p, msg) 
 		Util:GlobalMarquee(msg)
 	end)
 end
 
-function Util:SplitString(inputstr, sep) 
+function Util:split_string(inputstr, sep) 
 	if sep == nil then
         sep = "%s"
     end
@@ -75,7 +75,7 @@ function Util:SplitString(inputstr, sep)
 	return t
 end
 
-function Util:RandomDirection(detailRange, ignoreY)
+function Util:random_direction(detailRange, ignoreY)
 	if not detailRange then
 		detailRange = 10
 	end
@@ -103,7 +103,7 @@ local NumWithStrMap = {
 	},
 }
 
-function Util:DesignNumber(value, keepNum)
+function Util:design_number(value, keepNum)
 	if value < 0 then return tostring(value) end
 
 	local curNumInfo = nil

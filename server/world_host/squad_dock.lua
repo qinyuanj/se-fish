@@ -38,7 +38,7 @@ function SquadDock.mount(world, opts)
     Parties = {},
     PartyOf = {},
     Invites = {},
-    Online = {},
+    online = {},
     NextId = 0,
     Epoch = nil,
     WaitingRestore = {},
@@ -57,48 +57,48 @@ function SquadDock.mount(world, opts)
 
   local function now()
     local value = world.clock.now()
-    return Number.IsFiniteNumber(value) and value or 0
+    return Number.is_finite_number(value) and value or 0
   end
 
   local function fire(player, channel, payload)
-    if not player or not opts.remote or type(opts.remote.GetRE) ~= "function" then return end
+    if not player or not opts.remote or type(opts.remote.get_re) ~= "function" then return end
     local ok, err = pcall(function()
-      opts.remote:GetRE(channel):FireClient(player, payload)
+      opts.remote:get_re(channel):FireClient(player, payload)
     end)
     if not ok then log_failure("下发 " .. channel, player, err) end
   end
 
-  function self:PartyIdOf(player)
+  function self:party_id_of(player)
     local id = player and self.PartyOf[player.UserId]
     if id and self.Parties[id] then return id end
     return nil
   end
 
   function self:Members(player)
-    local party = self.Parties[self:PartyIdOf(player) or 0]
+    local party = self.Parties[self:party_id_of(player) or 0]
     local out = {}
     if not party then return out end
     for _, user_id in ipairs(party.Members) do
-      local member = self.Online[user_id]
+      local member = self.online[user_id]
       if member then out[#out + 1] = member end
     end
     return out
   end
 
   function self:Count(player)
-    local party = self.Parties[self:PartyIdOf(player) or 0]
+    local party = self.Parties[self:party_id_of(player) or 0]
     return party and #party.Members or 0
   end
 
-  function self:SameParty(a, b)
-    local id = a and self:PartyIdOf(a)
-    return id ~= nil and b ~= nil and self:PartyIdOf(b) == id
+  function self:same_party(a, b)
+    local id = a and self:party_id_of(a)
+    return id ~= nil and b ~= nil and self:party_id_of(b) == id
   end
 
-  function self:DataOf(player)
+  function self:data_of(player)
     local player_data = opts.player_data
-    if not player_data or not player or type(player_data.GetDataInst) ~= "function" then return nil end
-    local ok, data = pcall(player_data.GetDataInst, player_data, player)
+    if not player_data or not player or type(player_data.get_data_inst) ~= "function" then return nil end
+    local ok, data = pcall(player_data.get_data_inst, player_data, player)
     if not ok then
       log_failure("读取玩家存档 GetDataInst", player, data)
       return nil
@@ -106,7 +106,7 @@ function SquadDock.mount(world, opts)
     return data
   end
 
-  function self:SessionEpoch()
+  function self:session_epoch()
     if not self.Epoch then
       if type(opts.session_epoch) == "function" then
         local ok, value = pcall(opts.session_epoch)
@@ -119,8 +119,8 @@ function SquadDock.mount(world, opts)
     return self.Epoch
   end
 
-  function self:SavePartyId(player, id)
-    local data = self:DataOf(player)
+  function self:save_party_id(player, id)
+    local data = self:data_of(player)
     if not data or type(data.Extra) ~= "table" then
       log_failure("写入小队归属 SavePartyId", player, "玩家存档或 Extra 不可用")
       return false, "save-failed"
@@ -128,12 +128,12 @@ function SquadDock.mount(world, opts)
     if type(data.Extra.party) ~= "table" then data.Extra.party = { id = 0 } end
     local party_id = id or 0
     data.Extra.party.id = party_id
-    data.Extra.party.epoch = party_id > 0 and self:SessionEpoch() or nil
+    data.Extra.party.epoch = party_id > 0 and self:session_epoch() or nil
     return true
   end
 
-  function self:SavedParty(player)
-    local data = self:DataOf(player)
+  function self:saved_party(player)
+    local data = self:data_of(player)
     local party = data and data.Extra and data.Extra.party
     local id = party and party.id
     if type(id) ~= "number" or id ~= math.floor(id) or id <= 0 then return nil end
@@ -143,19 +143,19 @@ function SquadDock.mount(world, opts)
   local function party_effect_key(id) return "Squad:" .. tostring(id) end
   local function member_effect_key(id) return "Member:" .. tostring(id) end
 
-  function self:Push(player, notice)
-    fire(player, "PartyState", self:SnapshotOf(player, notice))
+  function self:push(player, notice)
+    fire(player, "PartyState", self:snapshot_of(player, notice))
   end
 
-  function self:PushParty(party, notice)
+  function self:push_party(party, notice)
     if not party or party.disbanded then return end
     for _, user_id in ipairs(copy_array(party.Members)) do
-      local player = self.Online[user_id]
-      if player then self:Push(player, notice) end
+      local player = self.online[user_id]
+      if player then self:push(player, notice) end
     end
   end
 
-  function self:Reply(player, action, ok, reason)
+  function self:reply(player, action, ok, reason)
     fire(player, "PartyResult", { action = action, ok = ok == true, reason = reason })
   end
 
@@ -167,7 +167,7 @@ function SquadDock.mount(world, opts)
       s:effect("ObservePlayerTree", function(es)
         local row = { phase = "alive" }
         local ok, err = pcall(function()
-          local player = self.Online[user_id]
+          local player = self.online[user_id]
           local tree = player and opts.lookup_tree and opts.lookup_tree(player)
           if not tree or tree:is_disposed() then return end
           row.health = es:d(tree.states.health)
@@ -175,7 +175,7 @@ function SquadDock.mount(world, opts)
           row.phase = es:d(tree.states.life_phase)
         end)
         if not ok then
-          log_failure("跨树读取小队成员生命", self.Online[user_id], err)
+          log_failure("跨树读取小队成员生命", self.online[user_id], err)
           row = { phase = "alive" }
         end
         party.rows[user_id] = row
@@ -192,7 +192,7 @@ function SquadDock.mount(world, opts)
     world.squads:effect(party_effect_key(party.Id), function(s)
       party.member_dock = s:dock("SquadMembers")
       s:reaction("MergedPartyState", function()
-        self:PushParty(party)
+        self:push_party(party)
       end, { party.revision })
       for _, user_id in ipairs(party.Members) do mount_member(party, user_id) end
       s:on_cleanup(function()
@@ -210,9 +210,9 @@ function SquadDock.mount(world, opts)
     return party
   end
 
-  function self:AddMember(party, player)
+  function self:add_member(party, player)
     if self.PartyOf[player.UserId] then return false, "already-in-party" end
-    local ok, reason = self:SavePartyId(player, party.Id)
+    local ok, reason = self:save_party_id(player, party.Id)
     if not ok then return false, reason or "save-failed" end
     party.Members[#party.Members + 1] = player.UserId
     self.PartyOf[player.UserId] = party.Id
@@ -220,7 +220,7 @@ function SquadDock.mount(world, opts)
     return true
   end
 
-  function self:RemoveMember(party, player)
+  function self:remove_member(party, player)
     local removed_index
     for index, user_id in ipairs(party.Members) do
       if user_id == player.UserId then
@@ -241,14 +241,14 @@ function SquadDock.mount(world, opts)
     mount_member(party, player.UserId)
   end
 
-  function self:SnapshotOf(player, notice)
+  function self:snapshot_of(player, notice)
     local snapshot = { state = "none", members = {} }
-    local party_id = self:PartyIdOf(player)
+    local party_id = self:party_id_of(player)
     local party = party_id and self.Parties[party_id]
     local invite = self.Invites[player.UserId]
     if invite then
       local left = math.max(0, math.ceil(invite.ExpiresAt - now()))
-      local from = self.Online[invite.FromUserId]
+      local from = self.online[invite.FromUserId]
       snapshot.invite = {
         fromUserId = invite.FromUserId,
         fromName = from and from.Name or nil,
@@ -260,7 +260,7 @@ function SquadDock.mount(world, opts)
       snapshot.state = "party"
       snapshot.partyId = party.Id
       local function row(user_id)
-        local member = self.Online[user_id]
+        local member = self.online[user_id]
         if not member then return nil end
         local health = party.rows[user_id] or {}
         return {
@@ -282,52 +282,52 @@ function SquadDock.mount(world, opts)
     return snapshot
   end
 
-  function self:Invite(player, target_user_id)
+  function self:invite(player, target_user_id)
     if type(target_user_id) ~= "number" then
-      self:Reply(player, "Invite", false, "invalid")
+      self:reply(player, "Invite", false, "invalid")
       return
     end
-    if self:PartyIdOf(player) and self:Count(player) >= cfg().MaxMembers then
-      self:Reply(player, "Invite", false, "full")
+    if self:party_id_of(player) and self:Count(player) >= cfg().MaxMembers then
+      self:reply(player, "Invite", false, "full")
       return
     end
-    local target = self.Online[target_user_id]
-    if not target then self:Reply(player, "Invite", false, "offline") return end
-    if self:PartyIdOf(target) then self:Reply(player, "Invite", false, "target-in-party") return end
+    local target = self.online[target_user_id]
+    if not target then self:reply(player, "Invite", false, "offline") return end
+    if self:party_id_of(target) then self:reply(player, "Invite", false, "target-in-party") return end
     local distance = flat_distance(player, target)
     if not distance or distance > cfg().InviteRange then
-      self:Reply(player, "Invite", false, "too-far")
+      self:reply(player, "Invite", false, "too-far")
       return
     end
     self.Invites[target_user_id] = { FromUserId = player.UserId, ExpiresAt = now() + cfg().InviteTimeoutSec }
-    self:Reply(player, "Invite", true)
-    self:Push(target)
+    self:reply(player, "Invite", true)
+    self:push(target)
   end
 
-  function self:Accept(player, from_user_id)
+  function self:accept(player, from_user_id)
     local invite = self.Invites[player.UserId]
-    if not invite then self:Reply(player, "Accept", false, "no-invite") return end
+    if not invite then self:reply(player, "Accept", false, "no-invite") return end
     if invite.ExpiresAt <= now() then
       self.Invites[player.UserId] = nil
-      self:Reply(player, "Accept", false, "expired")
-      self:Push(player)
+      self:reply(player, "Accept", false, "expired")
+      self:push(player)
       return
     end
     if type(from_user_id) == "number" and invite.FromUserId ~= from_user_id then
-      self:Reply(player, "Accept", false, "no-invite")
+      self:reply(player, "Accept", false, "no-invite")
       return
     end
-    local from = self.Online[invite.FromUserId]
+    local from = self.online[invite.FromUserId]
     if not from then
       self.Invites[player.UserId] = nil
-      self:Reply(player, "Accept", false, "offline")
-      self:Push(player)
+      self:reply(player, "Accept", false, "offline")
+      self:push(player)
       return
     end
-    if self:PartyIdOf(player) then self:Reply(player, "Accept", false, "already-in-party") return end
-    local party = self.Parties[self:PartyIdOf(from) or 0]
+    if self:party_id_of(player) then self:reply(player, "Accept", false, "already-in-party") return end
+    local party = self.Parties[self:party_id_of(from) or 0]
     if party and #party.Members >= cfg().MaxMembers then
-      self:Reply(player, "Accept", false, "full")
+      self:reply(player, "Accept", false, "full")
       return
     end
     local created = false
@@ -336,46 +336,46 @@ function SquadDock.mount(world, opts)
       created = true
     end
     local ok, reason = true, nil
-    if created then ok, reason = self:AddMember(party, from) end
-    if ok then ok, reason = self:AddMember(party, player) end
-    if not ok and created and self:PartyIdOf(from) then
-      self:RemoveMember(party, from)
-      self:SavePartyId(from, 0)
+    if created then ok, reason = self:add_member(party, from) end
+    if ok then ok, reason = self:add_member(party, player) end
+    if not ok and created and self:party_id_of(from) then
+      self:remove_member(party, from)
+      self:save_party_id(from, 0)
     end
     if not ok then
-      self:Reply(player, "Accept", false, reason or "save-failed")
-      if not self:PartyIdOf(from) and #party.Members == 0 then
+      self:reply(player, "Accept", false, reason or "save-failed")
+      if not self:party_id_of(from) and #party.Members == 0 then
         party.disbanded = true
         self.Parties[party.Id] = nil
         world.squads:drop(party_effect_key(party.Id))
       end
-      self:Push(player)
-      self:Push(from)
+      self:push(player)
+      self:push(from)
       return
     end
     self.Invites[player.UserId] = nil
-    self:Reply(player, "Accept", true)
-    self:PushParty(party, "joined")
+    self:reply(player, "Accept", true)
+    self:push_party(party, "joined")
   end
 
-  function self:Decline(player)
+  function self:decline(player)
     local invite = self.Invites[player.UserId]
-    if not invite then self:Reply(player, "Decline", false, "no-invite") return end
+    if not invite then self:reply(player, "Decline", false, "no-invite") return end
     self.Invites[player.UserId] = nil
-    self:Reply(player, "Decline", true)
-    self:Push(player)
+    self:reply(player, "Decline", true)
+    self:push(player)
   end
 
-  function self:Disband(party, notice, skip_user_id)
+  function self:disband(party, notice, skip_user_id)
     local previous = {}
     for _, user_id in ipairs(party.Members) do
-      local member = self.Online[user_id]
+      local member = self.online[user_id]
       if member then
-        local ok, reason = self:SavePartyId(member, 0)
+        local ok, reason = self:save_party_id(member, 0)
         if not ok then
           for uid, saved in pairs(previous) do
-            local rollback = self.Online[uid]
-            if rollback then self:SavePartyId(rollback, saved) end
+            local rollback = self.online[uid]
+            if rollback then self:save_party_id(rollback, saved) end
           end
           return false, reason or "save-failed"
         end
@@ -386,142 +386,142 @@ function SquadDock.mount(world, opts)
     self.Parties[party.Id] = nil
     for _, user_id in ipairs(party.Members) do
       if user_id ~= skip_user_id then self.PartyOf[user_id] = nil end
-      local member = self.Online[user_id]
+      local member = self.online[user_id]
       if member then
         self.Invites[member.UserId] = nil
-        self:Push(member, notice or "disbanded")
+        self:push(member, notice or "disbanded")
       end
     end
     world.squads:drop(party_effect_key(party.Id))
     return true
   end
 
-  function self:RetryRestore(skip_user_id)
+  function self:retry_restore(skip_user_id)
     local waiting = self.WaitingRestore
     self.WaitingRestore = {}
     for _, user_id in ipairs(waiting) do
       if user_id ~= skip_user_id then
-        local member = self.Online[user_id]
-        if member and not self:PartyIdOf(member) then self:Restore(member) end
+        local member = self.online[user_id]
+        if member and not self:party_id_of(member) then self:restore(member) end
       end
     end
   end
 
-  function self:Leave(player, reason)
-    local party_id = self:PartyIdOf(player)
+  function self:leave(player, reason)
+    local party_id = self:party_id_of(player)
     if not party_id then
-      if reason ~= "offline" then self:Reply(player, "Leave", true) end
-      self:Push(player)
+      if reason ~= "offline" then self:reply(player, "Leave", true) end
+      self:push(player)
       return true
     end
     local party = self.Parties[party_id]
-    local removed_index = self:RemoveMember(party, player)
+    local removed_index = self:remove_member(party, player)
     if reason ~= "offline" then
-      local ok, why = self:SavePartyId(player, 0)
+      local ok, why = self:save_party_id(player, 0)
       if not ok then
         restore_member(party, player, removed_index)
-        self:Reply(player, "Leave", false, why)
-        self:PushParty(party)
+        self:reply(player, "Leave", false, why)
+        self:push_party(party)
         return false
       end
     end
     if #party.Members < cfg().MinMembers then
-      local ok, why = self:Disband(party, reason == "offline" and "disbanded" or "left", reason == "offline" and player.UserId or nil)
+      local ok, why = self:disband(party, reason == "offline" and "disbanded" or "left", reason == "offline" and player.UserId or nil)
       if not ok then
         if reason == "offline" then
-          self:PushParty(party)
+          self:push_party(party)
         else
           restore_member(party, player, removed_index)
-          self:SavePartyId(player, party.Id)
-          self:PushParty(party)
+          self:save_party_id(player, party.Id)
+          self:push_party(party)
         end
-        if reason ~= "offline" then self:Reply(player, "Leave", false, why) end
+        if reason ~= "offline" then self:reply(player, "Leave", false, why) end
         return false
       end
     else
-      self:PushParty(party)
-      self:RetryRestore()
+      self:push_party(party)
+      self:retry_restore()
     end
-    if reason ~= "offline" then self:Reply(player, "Leave", true) end
-    self:Push(player, "left")
-    self:RetryRestore(player.UserId)
+    if reason ~= "offline" then self:reply(player, "Leave", true) end
+    self:push(player, "left")
+    self:retry_restore(player.UserId)
     return true
   end
 
   function self:Handle(player, payload)
     if not is_valid_player(player) or type(payload) ~= "table" then return false end
     local action = payload.action
-    if action == "Invite" then self:Invite(player, payload.targetUserId)
-    elseif action == "Accept" then self:Accept(player, payload.fromUserId)
-    elseif action == "Decline" then self:Decline(player)
-    elseif action == "Leave" then self:Leave(player)
+    if action == "Invite" then self:invite(player, payload.targetUserId)
+    elseif action == "Accept" then self:accept(player, payload.fromUserId)
+    elseif action == "Decline" then self:decline(player)
+    elseif action == "Leave" then self:leave(player)
     else return false end
     return true
   end
 
-  function self:Update()
+  function self:update()
     local expired = {}
     for user_id, invite in pairs(self.Invites) do
       if invite.ExpiresAt <= now() then
         expired[#expired + 1] = user_id
         self.Invites[user_id] = nil
-        self:Reply(self.Online[user_id], "Invite", false, "expired")
+        self:reply(self.online[user_id], "Invite", false, "expired")
       end
     end
-    for _, user_id in ipairs(expired) do self:Push(self.Online[user_id]) end
+    for _, user_id in ipairs(expired) do self:push(self.online[user_id]) end
   end
 
-  function self:Restore(player)
-    local saved_id, saved_epoch = self:SavedParty(player)
-    if not saved_id then self:Push(player) return end
+  function self:restore(player)
+    local saved_id, saved_epoch = self:saved_party(player)
+    if not saved_id then self:push(player) return end
     local party = self.Parties[saved_id]
-    if saved_epoch ~= self:SessionEpoch() or not party then
-      if self:SavePartyId(player, 0) then self:Push(player, "disbanded") end
+    if saved_epoch ~= self:session_epoch() or not party then
+      if self:save_party_id(player, 0) then self:push(player, "disbanded") end
       return
     end
     if #party.Members >= cfg().MaxMembers then
       self.WaitingRestore[#self.WaitingRestore + 1] = player.UserId
-      self:Push(player, "full")
+      self:push(player, "full")
       return
     end
-    local ok = self:AddMember(party, player)
+    local ok = self:add_member(party, player)
     if ok then
-      self:PushParty(party)
-      self:Push(player, "restored")
+      self:push_party(party)
+      self:push(player, "restored")
     else
-      self:Push(player, "save-failed")
+      self:push(player, "save-failed")
     end
   end
 
-  function self:OnPlayerAdded(player)
+  function self:on_player_added(player)
     if not is_valid_player(player) then return end
-    self.Online[player.UserId] = player
-    self:Restore(player)
+    self.online[player.UserId] = player
+    self:restore(player)
   end
 
-  function self:OnPlayerRemoving(player)
+  function self:on_player_removing(player)
     if not is_valid_player(player) then return end
     local user_id = player.UserId
-    if self:PartyIdOf(player) then self:Leave(player, "offline") end
+    if self:party_id_of(player) then self:leave(player, "offline") end
     local invite = self.Invites[user_id]
     if invite then
       self.Invites[user_id] = nil
-      local from = self.Online[invite.FromUserId]
-      if from then self:Push(from) end
+      local from = self.online[invite.FromUserId]
+      if from then self:push(from) end
     end
     for target_id, pending in pairs(self.Invites) do
       if pending.FromUserId == user_id then
         self.Invites[target_id] = nil
-        local target = self.Online[target_id]
-        if target then self:Push(target) end
+        local target = self.online[target_id]
+        if target then self:push(target) end
       end
     end
-    self.Online[user_id] = nil
+    self.online[user_id] = nil
   end
 
   world.squad = self
   world.squads:effect("SquadRuntime", function(s)
-    s:subscribe(world.clock.on_second, function() self:Update() end)
+    s:subscribe(world.clock.on_second, function() self:update() end)
   end)
   return self
 end

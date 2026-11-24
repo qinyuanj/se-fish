@@ -15,7 +15,7 @@ function M.new(options)
   _G.Vector3 = { New = function(x, y, z) return { x = x, y = y, z = z } end }
   _G.Color = { New = function(...) return { ... } end }
   env.store, env.writer = ClientStore.new()
-  env.root = Eui.Node({ Name = "UIRoot" })
+  env.root = Eui.node({ Name = "UIRoot" })
   env.view = RootView.mount(env.root, env.store, {
     services = {
       open_modal = function(id, payload) env.writer:open_modal(id, payload) end,
@@ -28,7 +28,7 @@ function M.new(options)
       local_character = function() return options.character end,
       find_lottery_anchor = function(name) return options.anchors and options.anchors[name] or nil end,
       create_lottery_scene_node = function(_, anchor)
-        local node = Eui.Node({ Name = "LotteryBubble" .. tostring(#env.sceneNodes + 1), Visible = false })
+        local node = Eui.node({ Name = "LotteryBubble" .. tostring(#env.sceneNodes + 1), Visible = false })
         node.Anchor = anchor
         env.sceneNodes[#env.sceneNodes + 1] = node
         return node
@@ -42,7 +42,7 @@ function M.new(options)
       platform = PlatformShopView.modal_spec(),
     },
     create_node = function(kind, props)
-      return Eui.Node({
+      return Eui.node({
         Kind = kind, Name = props and props.Name, Parent = props and props.Parent,
         Visible = props and props.Visible ~= false,
         Text = props and (props.Text or props.ButtonText) or "",
@@ -63,7 +63,7 @@ function M.new(options)
   function env:click(name)
     local node = self:child(name)
     if not node then return false end
-    return Eui.Click(node)
+    return Eui.click(node)
   end
   local function sync_spatial()
     if options.character ~= nil then

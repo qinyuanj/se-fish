@@ -4,7 +4,7 @@ function QuestSteps.New()
     return { step = 1, count = 0, seen = {} }
 end
 
-function QuestSteps.Restore(steps, saved)
+function QuestSteps.restore(steps, saved)
     if type(saved) ~= 'table' then return QuestSteps.New() end
     local step, count = saved.step, saved.count
     if type(step) ~= 'number' or step ~= math.floor(step) or step < 1 or step > #steps + 1
@@ -17,7 +17,7 @@ function QuestSteps.Restore(steps, saved)
     return state
 end
 
-function QuestSteps.Done(steps, state)
+function QuestSteps.done(steps, state)
     return state.step > #steps
 end
 

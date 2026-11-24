@@ -6,13 +6,13 @@ local methods = {
 }
 function Behaviors.Step(mgr, fish, now, pos, params, combat)
     if combat == 'shrimp' or combat == 'dragon' then
-        mgr:UpdateShrimpCombat(fish, now, pos, params, combat)
+        mgr:update_shrimp_combat(fish, now, pos, params, combat)
     elseif combat == 'kingCrab' and now >= (fish.ActiveUntil or math.huge) then
-        mgr:StunFish(fish, now, params)
+        mgr:stun_fish(fish, now, params)
     elseif methods[combat] then
         mgr[methods[combat]](mgr, fish, now, pos, params)
     else
-        mgr:UpdateChase(fish, now, pos, params)
+        mgr:update_chase(fish, now, pos, params)
     end
 end
 return Behaviors

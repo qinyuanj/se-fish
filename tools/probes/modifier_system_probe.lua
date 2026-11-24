@@ -2,7 +2,7 @@
 -- 从仓库外手动装载；本文件不在部署树，不注册 manager、不改预设或存档。
 local Probe = {}
 
-function Probe.BuildMappings(cfg)
+function Probe.build_mappings(cfg)
     local effects = cfg.Ability.StatusEffects
     local result = {}
     for _, kind in ipairs({ 'poison', 'burn', 'frost', 'paralyze', 'weak' }) do
@@ -26,7 +26,7 @@ end
 
 -- 旧档明确是剩余秒数，不使用 weakUntil，也不减去墙钟离线时长。
 -- 濒死/死亡旧档优先交给现存复活结算，不能凭该函数抢先恢复虚弱。
-function Probe.WeakRemaining(data, maximum)
+function Probe.weak_remaining(data, maximum)
     local mark = data and data.Extra and data.Extra.survival
     if type(mark) ~= 'table' or mark.dying or mark.dead then return 0 end
     local value = mark.weakRemaining
@@ -35,8 +35,8 @@ function Probe.WeakRemaining(data, maximum)
 end
 
 -- 验证当前业务拥有者，不在探针重新实现DOT算法，不宣称vendor原生调度。
--- businessDot适配必须绑定隔离业务实例；hits返回NewHit/ApplyHit边界的真实记录。
-function Probe.VerifyBusinessDot(c)
+-- businessDot适配必须绑定隔离业务实例；hits返回new_hit/apply_hit边界的真实记录。
+function Probe.verify_business_dot(c)
     local seam = assert(c.businessDot, '需要隔离业务DOT接缝')
     local report = { owner = 'business', kinds = {}, ok = false }
     local ok, err = pcall(function()
@@ -87,7 +87,7 @@ end
 -- dispose() 销毁本轮全部隔离单位（包含失败创建后未注册的子实体）。
 -- log(line) 留证；evidence='engine' 仅限真实 SE server，否则必须标 'offline'。
 -- 无自动调用入口：当前编辑器 preflight 阻塞，不可执行本探针。
-function Probe.Run(context)
+function Probe.run(context)
     local c = context or {}
     assert(c.isolated == true and type(c.isIsolated) == 'function', '必须明确隔离对象归属')
     for _, unit in ipairs({ c.owner, c.source, c.source2 }) do
@@ -122,13 +122,13 @@ function Probe.Run(context)
     local ok, err = pcall(function()
         if c.businessDot then
             assert(c.dotTarget and c.isIsolated(c.dotTarget), '业务DOT目标必须明确隔离')
-            report.dot = Probe.VerifyBusinessDot(c)
+            report.dot = Probe.verify_business_dot(c)
             check('DOT.业务调度跳数相位末跳来源', report.dot.ok, '业务拥有者；非vendor原生')
         else
             report.dot = { owner = 'business', missing = '缺少隔离业务DOT接缝，vendor自身不调度DOT，跳数/相位/末跳缺证' }
             log('DOT.缺证 ' .. report.dot.missing)
         end
-        local mappings, seen = Probe.BuildMappings(c.cfg), {}
+        local mappings, seen = Probe.build_mappings(c.cfg), {}
         for _, kind in ipairs({ 'poison', 'burn', 'frost', 'paralyze', 'weak' }) do
             local key = c.assets and c.assets[kind]
             assert(type(key) == 'string' and key ~= '' and not seen[key], '五效果需要不同预设: ' .. kind)
@@ -196,7 +196,7 @@ function Probe.Run(context)
         -- 虚弱断线不能靠 Pause 保留已销毁实体：保存剩余秒数，重进重建实例。
         local key, conf = c.assets.weak, mappings.weak
         conf.source = c.source
-        local remaining = Probe.WeakRemaining(c.legacyData, conf.duration)
+        local remaining = Probe.weak_remaining(c.legacyData, conf.duration)
         if remaining == 0 then remaining = 17 end -- 人工旧档样例，不读取真实玩家存档。
         check('weak.旧档重建', api.AddModifier(c.owner, key, conf) == api.Enums.CreateResult.Added)
         local entity = one(key)
@@ -207,7 +207,7 @@ function Probe.Run(context)
         c.wait(2) -- 离线墙钟仅流逝，不更改持久剩余秒数。
         check('weak.重进重建', api.AddModifier(c.owner, key, conf) == api.Enums.CreateResult.Added)
         entity = one(key)
-        local restored = Probe.WeakRemaining(mark, conf.duration)
+        local restored = Probe.weak_remaining(mark, conf.duration)
         api.SetModifierRemainTime(entity, restored)
         check('weak.离线不扣时间', near(api.GetRemainingTimeByKey(c.owner, key), remaining), restored)
         check('weak.RemoveModifier', api.RemoveModifier(entity) == true)

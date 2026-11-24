@@ -22,7 +22,7 @@ local WorldRuntime
 
 local function serverNow()
     local ok, now = pcall(WorldService.GetServerTime, WorldService) -- 引擎早期阶段可能未就绪
-    if ok and Number.IsFiniteNumber(now) then return now end
+    if ok and Number.is_finite_number(now) then return now end
     return nil
 end
 
@@ -37,8 +37,8 @@ local function registerCastGuard(guard)
         activeCastGuards[guard] = nil
     end
 end
-if type(AbilityAPI.AddCastGuard) == "function" then
-    AbilityAPI.AddCastGuard(function(unit, abilityIndex)
+if type(AbilityAPI.add_cast_guard) == "function" then
+    AbilityAPI.add_cast_guard(function(unit, abilityIndex)
         for guard in pairs(activeCastGuards) do
             if guard(unit, abilityIndex) ~= true then return false end
         end
@@ -49,23 +49,23 @@ end
 local function applyDotHit(target, damage, source)
     local life = WorldRuntime and WorldRuntime.life
     if life then
-        life:ApplyHit(life:NewHit(source, "dot"), target, damage)
+        life:apply_hit(life:new_hit(source, "dot"), target, damage)
     end
 end
 
 local function attrTree(player)
     if not player or not WorldRuntime then return nil end
     local tree = WorldRuntime:get_player_tree(player.UserId)
-    if tree then PlayerDataHost:SyncPlayerTree(player) end
+    if tree then PlayerDataHost:sync_player_tree(player) end
     return tree
 end
 
 local AttrBridge = {}
-function AttrBridge:CaptureBaseSpeed(player)
+function AttrBridge:capture_base_speed(player)
     local tree = attrTree(player)
     return tree and tree:capture_base_speed() or nil
 end
-function AttrBridge:BodyPlan(player)
+function AttrBridge:body_plan(player)
     local tree = attrTree(player)
     if not tree then return nil, "no-player-tree" end
     return tree.memos.attr_plan:now().Body
@@ -74,11 +74,11 @@ function AttrBridge:MaxHealth(player)
     local tree = attrTree(player)
     return tree and tree.memos.max_health:now() or GameCfg.Vitals.MaxHealth
 end
-function AttrBridge:RefreshMaxHealth(player)
+function AttrBridge:refresh_max_health(player)
     local tree = attrTree(player)
     if not tree then return false, "no-player-tree" end
     local cap = tree.memos.max_health:now()
-    if not Number.IsFiniteNumber(cap) or cap < 1 then return false, "bad-max" end
+    if not Number.is_finite_number(cap) or cap < 1 then return false, "bad-max" end
     cap = math.floor(cap)
     local character = tree.states.character:now()
     local controller = character and character.Controller
@@ -89,17 +89,17 @@ function AttrBridge:RefreshMaxHealth(player)
     end)
     if not ok then return false, tostring(err) end
     local current = tree.states.health:now()
-    if WorldRuntime.life and Number.IsFiniteNumber(current) and current > cap then
-        WorldRuntime.life:SetHealth(player, cap)
+    if WorldRuntime.life and Number.is_finite_number(current) and current > cap then
+        WorldRuntime.life:set_health(player, cap)
     end
     return true
 end
-function AttrBridge:RefreshMoveSpeed(player)
+function AttrBridge:refresh_move_speed(player)
     local tree = attrTree(player)
     if not tree then return false, "no-player-tree" end
     return AttrLeaf.apply_walk_speed(tree.states.character:now(), tree.memos.walk_speed:now())
 end
-function AttrBridge:ApplyBodyScale(player)
+function AttrBridge:apply_body_scale(player)
     local tree = attrTree(player)
     if not tree then return { Ok = false, Error = "no-player-tree" } end
     local character = tree.states.character:now()
@@ -116,13 +116,13 @@ function AttrBridge:ApplyBodyScale(player)
         Derived = ok and derivedOrErr or tree.memos.body_derived:now(),
     }
 end
-function AttrBridge:ApplyGrowth(player)
-    local applied = self:ApplyBodyScale(player)
+function AttrBridge:apply_growth(player)
+    local applied = self:apply_body_scale(player)
     local errors = {}
     if not applied.Ok then errors[#errors + 1] = tostring(applied.Error) end
-    local okHealth, healthErr = self:RefreshMaxHealth(player)
+    local okHealth, healthErr = self:refresh_max_health(player)
     if not okHealth then errors[#errors + 1] = "MaxHealth:" .. tostring(healthErr) end
-    local okSpeed, speedErr = self:RefreshMoveSpeed(player)
+    local okSpeed, speedErr = self:refresh_move_speed(player)
     if not okSpeed then errors[#errors + 1] = tostring(speedErr) end
     applied.Ok = #errors == 0
     if not applied.Ok then applied.Error = table.concat(errors, "; ") end
@@ -131,9 +131,9 @@ end
 FishAbility.Attr = AttrBridge
 
 local function bindRE(name, cooldown, handler, requireTable)
-    _G.REUtil:GetRE(name).OnServerEvent:Connect(function(player, payload)
+    _G.REUtil:get_re(name).OnServerEvent:Connect(function(player, payload)
         if requireTable and type(payload) ~= "table" then return end
-        if cooldown and _G.REUtil:CheckRECD(player, name, cooldown) then return end
+        if cooldown and _G.REUtil:check_recd(player, name, cooldown) then return end
         handler(player, payload)
     end)
 end
@@ -153,8 +153,8 @@ WorldRuntime = ServerRuntime.new({
     delivery_epoch = tostring({}),
     lottery_in_range = function(player)
         local cfg = GameCfg.Lottery
-        return InteractionPoints:InRange(player, {
-            AnchorNames = cfg.MachineAnchors(), Radius = cfg.Radius, Slack = cfg.Slack,
+        return InteractionPoints:in_range(player, {
+            AnchorNames = cfg.machine_anchors(), Radius = cfg.Radius, Slack = cfg.Slack,
         })
     end,
     fish_units = function()
@@ -222,7 +222,7 @@ WorldRuntime = ServerRuntime.new({
             dispatch(player, "close", payload)
         end, true)
     end,
-    ability = { CastAbility = AbilityAPI.CastAbility },
+    ability = { cast_ability = AbilityAPI.cast_ability },
     register_cast_guard = registerCastGuard,
     create_unit = function(unit_type, props)
         return WorldService:CreateUnit(unit_type, props)
@@ -237,15 +237,15 @@ WorldRuntime = ServerRuntime.new({
         stop = function(_, fish_id)
             local host = WorldRuntime and WorldRuntime.fish_host
             local fish = host and host.Fish[fish_id]
-            if fish then FishAi:Remove(fish) end
+            if fish then FishAi:remove(fish) end
             return true
         end,
         command = function(_, fish, ...)
-            return FishAi:Command(fish, ...)
+            return FishAi:command(fish, ...)
         end,
     },
     on_item_bar_state = function(player, snapshot)
-        _G.REUtil:GetRE('ItemBarState'):FireClient(player, snapshot)
+        _G.REUtil:get_re('ItemBarState'):FireClient(player, snapshot)
     end,
     player_effects = {
         on_dot_tick = function(pt, _kind, damage, source)
@@ -256,7 +256,7 @@ WorldRuntime = ServerRuntime.new({
     modifier_leaf = { modifier_api = ModifierPackageApi },
     ability_leaf = {
         ability_api = AbilityPackageApi,
-        attach_anchor = AbilityAPI.AttachAnchor,
+        attach_anchor = AbilityAPI.attach_anchor,
         register_cast_guard = registerCastGuard,
     },
     entity_modifiers = {
@@ -272,10 +272,10 @@ local fishHost = WorldRuntime.fish_host
 fishHost.Vitals = WorldRuntime.life
 fishHost.Ai = FishAi
 FishAi.FishUnit = fishHost
-FishCarrier.DamageListener = function(carrier, actual, hit)
-    local fish = carrier and fishHost:FindByCarrier(carrier)
+FishCarrier.damage_listener = function(carrier, actual, hit)
+    local fish = carrier and fishHost:find_by_carrier(carrier)
     local attacker = hit and hit.sourcePlayer
-    if fish and attacker then fishHost:NoteDamage(fish, attacker, actual) end
+    if fish and attacker then fishHost:note_damage(fish, attacker, actual) end
 end
 fishHost:Start()
 

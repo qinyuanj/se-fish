@@ -12,10 +12,10 @@ local Weapon = require('tests.support.weapon_world')
 local SwingRegistry = require('server.swing_registry')
 local VENDOR = 'server.packages.ability_system.api'
 
--- 只替换包内 CastAbility，保持业务守卫的真实实现。
+-- 只替换包内 cast_ability，保持业务守卫的真实实现。
 local function stubPackageApi(castAbility)
     local impl = {}
-    impl.CastAbility = castAbility or function() return true end
+    impl.cast_ability = castAbility or function() return true end
     return impl
 end
 
@@ -52,24 +52,24 @@ describe('TestMeleeHitEffect', function()
         _G.Vector3 = { New = vec }
         _G.Quaternion = { FromEulerAngles = function() return {} end }
         ctx.vitals = {
-            NewHit = function(_, source, category) return { id = 1, source = source, category = category,
+            new_hit = function(_, source, category) return { id = 1, source = source, category = category,
                 targets = {} } end,
-            ApplyHit = function(_, hit, target, amount)
+            apply_hit = function(_, hit, target, amount)
                 ctx.hitsApplied[#ctx.hitsApplied + 1] = { target = target, amount = amount }
                 return ctx.applyOk
             end,
         }
-        package.loaded['server.world_host.fish_carrier'] = { ResolveCarrier = function() return nil end }
-        package.loaded['server.world_host.player_gm'] = { GetMeleeDamage = function(_, _, d) return d end }
-        package.loaded['server.fish_ability'] = { ApplyWeaponEffect = function()
+        package.loaded['server.world_host.fish_carrier'] = { resolve_carrier = function() return nil end }
+        package.loaded['server.world_host.player_gm'] = { get_melee_damage = function(_, _, d) return d end }
+        package.loaded['server.fish_ability'] = { apply_weapon_effect = function()
             error('近战特效不应再经 MgrAbility 转发')
         end }
-        local modifierStub = { ApplyWeaponEffect = function(_, source, target, effect)
+        local modifierStub = { apply_weapon_effect = function(_, source, target, effect)
             ctx.effects[#ctx.effects + 1] = { source = source, target = target, effect = effect }
             return true
         end }
         package.loaded['server.ability_api'] = {}
-        package.loaded['server.swing_registry'] = { TakeSwing = function()
+        package.loaded['server.swing_registry'] = { take_swing = function()
             local s = ctx.swing; ctx.swing = nil; return s
         end }
         ctx.services = { Vitals = ctx.vitals,
@@ -162,7 +162,7 @@ describe('TestMeleeHitEffect', function()
     it('test_effect_applied_after_successful_damage_once_per_swing', function()
         ctx.anchorStart:Fire()
         assert.message('登记挥砍后应建命中盒').is_not_nil(ctx.hitBox)
-        -- 目标是玩家角色才会走 ApplyHit 玩家分支；这里目标不是玩家也不是鱼 → 不结算不挂
+        -- 目标是玩家角色才会走 apply_hit 玩家分支；这里目标不是玩家也不是鱼 → 不结算不挂
         ctx.hitBox.OnTriggerEnter:Fire(ctx.target)
         assert.same(0, #ctx.hitsApplied)
         assert.same(0, #ctx.effects)
@@ -187,13 +187,13 @@ describe('TestPrizeWeaponEffect', function()
     local ctx
     before_each(function()
         ctx = Weapon.new()
-        ctx:setUp()
+        ctx:set_up()
     end)
     after_each(function()
-        ctx:tearDown()
+        ctx:tear_down()
     end)
 
-    -- 命中被统一入口拒绝（ApplyHit false，如安全区）时不挂效果
+    -- 命中被统一入口拒绝（apply_hit false，如安全区）时不挂效果
     it('test_effect_not_applied_when_damage_rejected', function()
         ctx.applyOk = false
         ctx:equip(ctx.player, 'item163')
@@ -233,18 +233,18 @@ describe('TestPrizeWeaponEffect', function()
     it('test_melee_swing_carries_weapon_effect', function()
         ctx:equip(ctx.player, 'item152')
         assert.is_true(ctx:attack(ctx.player).ok)
-        local swing = SwingRegistry.PeekSwing(ctx.player.UserId)
+        local swing = SwingRegistry.peek_swing(ctx.player.UserId)
         assert.same(15, swing.damage)
         assert.same({ Kind = 'poison' }, swing.effect)
         ctx:advance(0.6)
         ctx:equip(ctx.player, 'item135')
         assert.is_true(ctx:attack(ctx.player).ok)
-        assert.message('无特效武器不挂 effect').is_nil(SwingRegistry.PeekSwing(ctx.player.UserId).effect)
+        assert.message('无特效武器不挂 effect').is_nil(SwingRegistry.peek_swing(ctx.player.UserId).effect)
         ctx:advance(0.5)
         ctx.data.Extra.inventory.selection.held = { kind = nil, id = nil, slot = nil }
         ctx.data.Data.SelectedWeapon = nil
         ctx:attack(ctx.player)
-        assert.is_nil(SwingRegistry.PeekSwing(ctx.player.UserId).effect)
+        assert.is_nil(SwingRegistry.peek_swing(ctx.player.UserId).effect)
     end)
 end)
 
@@ -273,12 +273,12 @@ describe('TestSwingEffectPassthrough', function()
     end)
 
     it('test_swing_carries_effect_through_stage_and_take', function()
-        ctx.api.StageSwing(7, { damage = 15, range = 3, effect = { Kind = 'poison' } })
-        local swing = ctx.api.TakeSwing(7)
+        ctx.api.stage_swing(7, { damage = 15, range = 3, effect = { Kind = 'poison' } })
+        local swing = ctx.api.take_swing(7)
         assert.same(15, swing.damage)
         assert.same({ Kind = 'poison' }, swing.effect)
         -- 无特效挥砍：effect 字段为 nil（不残留上一次登记）
-        ctx.api.StageSwing(7, { damage = 5, range = 2 })
-        assert.is_nil(ctx.api.TakeSwing(7).effect)
+        ctx.api.stage_swing(7, { damage = 5, range = 2 })
+        assert.is_nil(ctx.api.take_swing(7).effect)
     end)
 end)

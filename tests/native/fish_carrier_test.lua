@@ -1,4 +1,4 @@
--- 三块接缝：1) 血量/模型号解析纯函数；2) 假引擎驱动 Spawn → 挨打 → Update 跟随 → Despawn 全链路；
+-- 三块接缝：1) 血量/模型号解析纯函数；2) 假引擎驱动 Spawn → 挨打 → update 跟随 → despawn 全链路；
 -- 3) 接缝守卫（源码文本校对）：受击体 EnableController、不 require 包内模块、MgrMap 注册、官方 melee_hit 契约。
 -- 假引擎只在被测函数执行期间挂上（withFakeEngine），测完恢复 _G，不影响别的文件；
 -- Busted 案例体在沙箱 _ENV 里，业务模块读的是真 _G，因此引擎全局必须 rawset 到 _G。
@@ -181,11 +181,11 @@ describe('TestFishCarrierEngine', function()
     withFakeEngine(world, function()
       local carrier = mgr:Spawn(SPAWN_OPTS)
       carrier.Controller.Health = 10
-      assert.same(carrier, mgr:ResolveCarrier(carrier.Receiver))
+      assert.same(carrier, mgr:resolve_carrier(carrier.Receiver))
       assert.is_false(mgr:Damage(carrier, 5))
       assert.are.equal(10, carrier.Controller.Health)
       local seen = {}
-      mgr.DamageListener = function(target, actual, hit)
+      mgr.damage_listener = function(target, actual, hit)
         seen[#seen + 1] = { target, actual, hit }
       end
       local hit = { id = 7, category = 'weapon' }
@@ -194,14 +194,14 @@ describe('TestFishCarrierEngine', function()
       assert.are.equal(10, actual)
       assert.same({ { carrier, 10, hit } }, seen)
     end)
-    mgr.DamageListener = nil
+    mgr.damage_listener = nil
   end)
 
   it('test_damage_reports_effective_health_once_for_every_path', function()
     local mgr = freshManager()
     local world = newFakeWorld()
     local notices = {}
-    mgr.DamagePublisher = function(payload) notices[#notices + 1] = payload end
+    mgr.damage_publisher = function(payload) notices[#notices + 1] = payload end
     withFakeEngine(world, function()
       local carrier = mgr:Spawn(SPAWN_OPTS)
       carrier.Controller:TakeDamage(2.7)
@@ -220,7 +220,7 @@ describe('TestFishCarrierEngine', function()
       assert.are.equal(4, notices[1].amount)
       assert.are.equal(0, carrier.Health)
     end)
-    mgr.DamagePublisher = nil
+    mgr.damage_publisher = nil
   end)
 
   it('test_damping_options_are_forwarded_to_the_body', function()
@@ -249,7 +249,7 @@ describe('TestFishCarrierEngine', function()
       return mgr:Spawn(SPAWN_OPTS)
     end)
     local seen
-    mgr:SubscribeDied(function(c)
+    mgr:subscribe_died(function(c)
       seen = c.Health
     end)
     withFakeEngine(world, function()
@@ -268,13 +268,13 @@ describe('TestFishCarrierEngine', function()
       return mgr:Spawn(SPAWN_OPTS)
     end)
     local deaths = 0
-    mgr:SubscribeDied(function()
+    mgr:subscribe_died(function()
       deaths = deaths + 1
     end)
 
     local bodyId = carrier.Body.UnitId
     withFakeEngine(world, function()
-      mgr:Despawn(carrier)
+      mgr:despawn(carrier)
     end)
 
     assert.is_nil(mgr.Carriers[bodyId])
@@ -288,10 +288,10 @@ describe('TestFishCarrierEngine', function()
     withFakeEngine(world, function()
       local carrier = mgr:Spawn(SPAWN_OPTS)
       local target = Vector3.New(20, 15, 30)
-      mgr:SyncPosition(carrier, target)
+      mgr:sync_position(carrier, target)
       assert.same(target + carrier.ReceiverOffset, carrier.Receiver.Position)
       assert.same({ x = 20, y = 15, z = 30 }, carrier.LastPosition)
-      mgr:Update(0.03) -- pairs 顺序可在脚本写回之后跑默认同步，不能再用旧本体位置覆盖。
+      mgr:update(0.03) -- pairs 顺序可在脚本写回之后跑默认同步，不能再用旧本体位置覆盖。
       assert.same(target + carrier.ReceiverOffset, carrier.Receiver.Position)
     end)
   end)
@@ -300,7 +300,7 @@ describe('TestFishCarrierEngine', function()
     local mgr = freshManager()
     local world = newFakeWorld()
     local notices = {}
-    mgr.DamagePublisher = function(payload) notices[#notices + 1] = payload end
+    mgr.damage_publisher = function(payload) notices[#notices + 1] = payload end
     withFakeEngine(world, function()
       local carrier = mgr:Spawn(SPAWN_OPTS)
       carrier.Body.GetPosition = function() error('unit destroyed') end
@@ -308,7 +308,7 @@ describe('TestFishCarrierEngine', function()
       assert.are.equal(1, notices[1].position.x)
       assert.are.equal(0.5, notices[1].amount)
     end)
-    mgr.DamagePublisher = nil
+    mgr.damage_publisher = nil
   end)
 
   it('test_melee_damage_reduces_health_and_death_fires_once', function()
@@ -320,7 +320,7 @@ describe('TestFishCarrierEngine', function()
     end)
 
     local deaths = 0
-    mgr:SubscribeDied(function()
+    mgr:subscribe_died(function()
       deaths = deaths + 1
     end)
 
@@ -344,7 +344,7 @@ describe('TestFishCarrierEngine', function()
     local mgr = freshManager()
     local world = newFakeWorld()
     local notices = {}
-    mgr.DamagePublisher = function(payload) notices[#notices + 1] = payload end
+    mgr.damage_publisher = function(payload) notices[#notices + 1] = payload end
     withFakeEngine(world, function()
       local carrier = mgr:Spawn(SPAWN_OPTS)
       carrier.Controller.Health = 4
@@ -355,7 +355,7 @@ describe('TestFishCarrierEngine', function()
       assert.are.equal(1, #notices)
       assert.are.equal(4, notices[1].amount)
     end)
-    mgr.DamagePublisher = nil
+    mgr.damage_publisher = nil
   end)
 
   it('test_receiver_is_a_controller_bearing_child_of_the_body', function()
@@ -432,7 +432,7 @@ describe('TestFishCarrierEngine', function()
     -- 举着 / 逃脱 / 落地：鱼本体动到哪，受击体跟到哪（引擎没有给 EggyUnit 的子节点跟随开关）
     withFakeEngine(world, function()
       carrier.Body.Position = newVector3(10, 20, 30)
-      mgr:Update(0.03)
+      mgr:update(0.03)
     end)
     assert.are.equal(10, carrier.Receiver.Position.x)
     assert.are.equal(20, carrier.Receiver.Position.y)
@@ -443,7 +443,7 @@ describe('TestFishCarrierEngine', function()
     local mgr = freshManager()
     local world = newFakeWorld()
     local notices = {}
-    mgr.DamagePublisher = function(payload) notices[#notices + 1] = payload end
+    mgr.damage_publisher = function(payload) notices[#notices + 1] = payload end
     withFakeEngine(world, function()
       local carrier = mgr:Spawn(SPAWN_OPTS)
       carrier.Controller.HealthChanged:Fire(50)
@@ -454,7 +454,7 @@ describe('TestFishCarrierEngine', function()
       assert.are.equal(1, #notices)
       assert.near(0.1, notices[1].amount, 0.00001)
     end)
-    mgr.DamagePublisher = nil
+    mgr.damage_publisher = nil
   end)
 end)
 
@@ -514,17 +514,17 @@ describe('TestFishCarrierSeam', function()
     local mgr = freshManager()
     local calls = {}
     local carrier = { Dead = false }
-    mgr:SubscribeDied(function(c)
+    mgr:subscribe_died(function(c)
       calls[#calls + 1] = c
     end)
-    mgr:NotifyDied(carrier)
-    mgr:NotifyDied(carrier)
+    mgr:notify_died(carrier)
+    mgr:notify_died(carrier)
     assert.are.equal(1, #calls)
     assert.is_true(carrier.Dead)
   end)
 
   it('test_manager_is_registered_in_the_mgr_map', function()
-    -- 不进 MgrMap 就没有 Start/Update，受击体也不会跟着鱼走
+    -- 不进 MgrMap 就没有 Start/update，受击体也不会跟着鱼走
     local runtime = readSource('server/world_host/server_runtime.lua')
     local host = readSource('server/world_host/fish_tree.lua')
     assert.is_true(contains(runtime, 'require("server.world_host.fish_tree")'),

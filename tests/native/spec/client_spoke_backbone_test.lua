@@ -11,9 +11,9 @@ local spoke_eggy = require("common.packages.spoke_eggy.api")
 describe("客户端 Spoke 主干契约（#296）", function()
   describe("EUI 测试双 Destroying 生命周期与 spoke_eggy.behaviour 联动", function()
     it("宿主 UI 节点销毁与父级级联销毁均自动触发 spoke_eggy 清理且幂等", function()
-      local root = Eui.Node({ Name = "UIRoot" })
-      local panel = Eui.Node({ Name = "SpokePanel", Parent = root })
-      local btn = Eui.Node({ Name = "CloseBtn", Parent = panel, TouchEnabled = true })
+      local root = Eui.node({ Name = "UIRoot" })
+      local panel = Eui.node({ Name = "SpokePanel", Parent = root })
+      local btn = Eui.node({ Name = "CloseBtn", Parent = panel, TouchEnabled = true })
 
       local alive_history = {}
       local cleanup_count = 0
@@ -35,7 +35,7 @@ describe("客户端 Spoke 主干契约（#296）", function()
       assert.is_nil(behaviour.root.fault)
       assert.is_true(behaviour.is_alive:now())
       assert.same({ true }, alive_history)
-      assert.is_true(Eui.Click(btn))
+      assert.is_true(Eui.click(btn))
       assert.equals(1, clicks)
 
       -- 销毁父节点时，级联触发子节点 Destroying，spoke_eggy 先翻 is_alive 再拆树清理
@@ -294,7 +294,7 @@ describe("客户端 Spoke 主干契约（#296）", function()
       local created = {}
       local function create_node(kind, props)
         props = props or {}
-        local node = Eui.Node({
+        local node = Eui.node({
           Name = props.Name or (kind .. "_" .. tostring(#created + 1)),
           Kind = kind,
           Parent = props.Parent,
@@ -312,7 +312,7 @@ describe("客户端 Spoke 主干契约（#296）", function()
       local ClientStore = require("client.store.client_store")
       local RootView = require("client.views.root_view")
       local store, writer = ClientStore.new({ initial_now = 0 })
-      local root_node = Eui.Node({ Name = "UIRoot" })
+      local root_node = Eui.node({ Name = "UIRoot" })
       local create_node = make_factory()
 
       local hud_mounts = 0
@@ -420,7 +420,7 @@ describe("客户端 Spoke 主干契约（#296）", function()
       assert.is_truthy(shop_btn)
       assert.is_nil(shop_btn.Destroyed)
       assert.equals(1, shop_btn.OnClicked:Count())
-      assert.is_true(Eui.Click(shop_btn))
+      assert.is_true(Eui.click(shop_btn))
       assert.equals(1, modal_clicks.shop)
 
       writer:open_modal("compendium")
@@ -429,14 +429,14 @@ describe("客户端 Spoke 主干契约（#296）", function()
       assert.equals(0, shop_btn.OnClicked:Count())
       assert.is_nil(comp_btn.Destroyed)
       assert.equals(1, comp_btn.OnClicked:Count())
-      assert.is_true(Eui.Click(comp_btn))
+      assert.is_true(Eui.click(comp_btn))
       assert.equals(1, modal_clicks.compendium)
       -- 弹窗切换不重建常驻 HUD
       assert.equals(1, hud_mounts)
 
       -- 点击弹窗内部的关闭按钮（回调中同步卸载自身 Phase）应干净销毁全部节点与连接
       local comp_close = modal_nodes.compendium_close
-      assert.is_true(Eui.Click(comp_close))
+      assert.is_true(Eui.click(comp_close))
       assert.is_nil(store.active_modal:now())
       assert.is_true(comp_btn.Destroyed)
       assert.is_true(comp_close.Destroyed)
@@ -449,7 +449,7 @@ describe("客户端 Spoke 主干契约（#296）", function()
       assert.is_truthy(revive_btn)
       assert.is_nil(revive_btn.Destroyed)
       assert.equals(1, revive_btn.OnClicked:Count())
-      assert.is_true(Eui.Click(revive_btn))
+      assert.is_true(Eui.click(revive_btn))
       assert.equals(1, overlay_clicks)
 
       writer:set_overlay("aim", true)
@@ -480,7 +480,7 @@ describe("客户端 Spoke 主干契约（#296）", function()
       assert.equals("丙:150", row20.Text)
       assert.equals(1, dock_mounts["u:10"])
       assert.equals(1, row10.OnClicked:Count())
-      assert.is_true(Eui.Click(row10))
+      assert.is_true(Eui.click(row10))
       assert.equals(1, dock_clicks["u:10"])
 
       -- 乙掉血、丙离队：乙复用原节点刷新，丙节点销毁且信号断开
@@ -504,7 +504,7 @@ describe("客户端 Spoke 主干契约（#296）", function()
       local ClientStore = require("client.store.client_store")
       local RootView = require("client.views.root_view")
       local store, writer = ClientStore.new({ initial_now = 0 })
-      local root_node = Eui.Node({ Name = "UIRoot" })
+      local root_node = Eui.node({ Name = "UIRoot" })
       local create_node, created = make_factory()
 
       local hud_btn = nil
@@ -555,14 +555,14 @@ describe("客户端 Spoke 主干契约（#296）", function()
       assert.are_not.equal(first_hud_btn, second_hud_btn)
       assert.is_nil(second_hud_btn.Destroyed)
       assert.equals(1, second_hud_btn.OnClicked:Count())
-      assert.is_true(Eui.Click(second_hud_btn))
+      assert.is_true(Eui.click(second_hud_btn))
       assert.equals(1, hud_clicks)
 
       -- 重连后重新打开弹窗，只绑定 1 份监听
       writer:open_modal("lottery")
       local second_modal_btn = modal_btn
       assert.equals(1, second_modal_btn.OnClicked:Count())
-      assert.is_true(Eui.Click(second_modal_btn))
+      assert.is_true(Eui.click(second_modal_btn))
       assert.equals(1, modal_clicks)
 
       -- 宿主根 UI 节点销毁 → spoke_eggy.behaviour 自动销毁整棵根视图树
@@ -614,7 +614,7 @@ describe("客户端 Spoke 主干契约（#296）", function()
       local remote_events = {}
       local server_now = 50.0
       local char_pos = { x = 12, y = 2, z = 8 }
-      local ui_root = Eui.Node({ Name = "MainUIRoot" })
+      local ui_root = Eui.node({ Name = "MainUIRoot" })
       local created_hud_nodes = {}
       local mounted_view
       local mounted_options
@@ -630,7 +630,7 @@ describe("客户端 Spoke 主干契约（#296）", function()
         _G.Color = { New = function(...) return { ... } end }
         package.loaded["common.zone_markers"] = { Start = noop, Zones = zones }
         package.loaded["common.re_util"] = {
-          GetRE = function(_, name)
+          get_re = function(_, name)
             if not remote_events[name] then
               remote_events[name] = {
                 OnClientEvent = Eui.Signal(),
@@ -644,8 +644,8 @@ describe("客户端 Spoke 主干契约（#296）", function()
           end,
         }
         local game_ui_stub = {
-          GetUIRoot = function() return ui_root end,
-          GetEuiManager = function()
+          get_ui_root = function() return ui_root end,
+          get_eui_manager = function()
             return { GetDeviceResolution = function() return { x = 1920, y = 1080 } end }
           end,
         }
@@ -704,7 +704,7 @@ describe("客户端 Spoke 主干契约（#296）", function()
                 FindFirstChild = function() return nil end,
                 CreateUnit = function(_, kind, props)
                   props = props or {}
-                  local node = Eui.Node({
+                  local node = Eui.node({
                     Name = props.Name or (kind .. "_" .. tostring(#created_hud_nodes + 1)),
                     Kind = kind,
                     Parent = props.Parent,
@@ -772,7 +772,7 @@ describe("客户端 Spoke 主干契约（#296）", function()
         mounted_options.services.set_overlay("aim_pickup", true)
         local aim_mask = ui_root:FindFirstChild("AimPickupMask", true)
         assert.is_not_nil(aim_mask)
-        assert.is_true(Eui.Click(aim_mask))
+        assert.is_true(Eui.click(aim_mask))
         assert.same({ action = "Pickup", value = "loot-near" }, fired.ItemBarAction[#fired.ItemBarAction])
         assert.is_nil(ui_root:FindFirstChild("AimPickupMask", true))
         assert.is_true(#created_hud_nodes > 0)

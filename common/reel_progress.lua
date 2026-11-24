@@ -6,7 +6,7 @@ function ReelProgress.New(now, cfg)
         Result = nil, Config = cfg }, ReelProgress)
 end
 
-function ReelProgress:Advance(now, count, span)
+function ReelProgress:advance(now, count, span)
     if self.Result then return self.Result end
     now = math.max(now, self.Time)
     local cfg = self.Config

@@ -43,19 +43,19 @@ describe("Spoke 主 HUD 左上状态区与金币视图（#297-B2）", function()
   local function mount_vitals(height, opts)
     opts = opts or {}
     local store, writer = ClientStore.new({ initial_now = opts.initial_now or 100 })
-    local root_node = Eui.Node({ Name = "UIRoot" })
+    local root_node = Eui.node({ Name = "UIRoot" })
     local nodes = {}
     local created = {}
     local notices = {}
 
     if not opts.missing_coin then
-      local screen_main = Eui.Node({ Name = "ScreenMain", Parent = root_node })
-      nodes.ImageCoin = Eui.Node({ Name = "ImageCoin", Parent = screen_main })
-      nodes.LabelCoin = Eui.Node({ Name = "LabelCoin", Parent = screen_main })
+      local screen_main = Eui.node({ Name = "ScreenMain", Parent = root_node })
+      nodes.ImageCoin = Eui.node({ Name = "ImageCoin", Parent = screen_main })
+      nodes.LabelCoin = Eui.node({ Name = "LabelCoin", Parent = screen_main })
     end
 
     local function create_node(kind, props)
-      local node = Eui.Node({
+      local node = Eui.node({
         Name = props.Name,
         Kind = kind,
         Parent = props.Parent,
@@ -97,7 +97,7 @@ describe("Spoke 主 HUD 左上状态区与金币视图（#297-B2）", function()
   for _, height in ipairs({ 886, 1080, 1238, 1440 }) do
     it("多分辨率排版对齐 MainHudLayout 且满值文案不截断不重叠_" .. height, function()
       local env = mount_vitals(height)
-      local layout = MainHudLayout.Compute({ width = 1920, height = height, itemBarSlots = 8 })
+      local layout = MainHudLayout.compute({ width = 1920, height = height, itemBarSlots = 8 })
       local r = layout.Rects
 
       assert_at(env.nodes.HealthRing, r.HealthRing, "HealthRing")
@@ -204,8 +204,8 @@ describe("Spoke 主 HUD 左上状态区与金币视图（#297-B2）", function()
 
   it("分辨率读取兼容非 1080p 与代理 FindFirstChild，非法分辨率安全回退 1920x1080", function()
     local store, writer = ClientStore.new({ initial_now = 10 })
-    local image_coin = Eui.Node({ Name = "ImageCoin" })
-    local label_coin = Eui.Node({ Name = "LabelCoin" })
+    local image_coin = Eui.node({ Name = "ImageCoin" })
+    local label_coin = Eui.node({ Name = "LabelCoin" })
     local proxy_nodes = { ImageCoin = image_coin, LabelCoin = label_coin }
     local root_node = {
       Name = "ProxyRoot",
@@ -220,7 +220,7 @@ describe("Spoke 主 HUD 左上状态区与金币视图（#297-B2）", function()
         get_device_resolution = function() return { x = 1920, y = 886 } end,
       },
       create_node = function(kind, props)
-        local node = Eui.Node({ Name = props.Name, Kind = kind, Visible = props.Visible, Text = props.Text })
+        local node = Eui.node({ Name = props.Name, Kind = kind, Visible = props.Visible, Text = props.Text })
         for k, v in pairs(props) do
           if k ~= "Parent" and k ~= "Name" then node[k] = v end
         end
@@ -230,7 +230,7 @@ describe("Spoke 主 HUD 左上状态区与金币视图（#297-B2）", function()
       hud = { MainHudVitalsView.spec() },
     })
     assert.is_nil(view.root.fault)
-    local layout_886 = MainHudLayout.Compute({ width = 1920, height = 886, itemBarSlots = 8 })
+    local layout_886 = MainHudLayout.compute({ width = 1920, height = 886, itemBarSlots = 8 })
     assert_at(nodes.HealthRing, layout_886.Rects.HealthRing, "HealthRing @886")
     assert_at(image_coin, layout_886.Rects.CoinIcon, "ImageCoin @886")
     assert_at(label_coin, layout_886.Rects.CoinLabel, "LabelCoin @886")
@@ -239,12 +239,12 @@ describe("Spoke 主 HUD 左上状态区与金币视图（#297-B2）", function()
     view:dispose()
 
     local nodes_fb = {}
-    local view_fb = RootView.mount(Eui.Node({ Name = "FallbackRoot" }), store, {
+    local view_fb = RootView.mount(Eui.node({ Name = "FallbackRoot" }), store, {
       services = {
         get_device_resolution = function() return { x = 0 / 0, y = 0 } end,
       },
       create_node = function(kind, props)
-        local node = Eui.Node({ Name = props.Name, Kind = kind, Visible = props.Visible, Text = props.Text })
+        local node = Eui.node({ Name = props.Name, Kind = kind, Visible = props.Visible, Text = props.Text })
         for k, v in pairs(props) do
           if k ~= "Parent" and k ~= "Name" then node[k] = v end
         end
@@ -253,7 +253,7 @@ describe("Spoke 主 HUD 左上状态区与金币视图（#297-B2）", function()
       end,
       hud = { MainHudVitalsView.spec() },
     })
-    local layout_1080 = MainHudLayout.Compute({ width = 1920, height = 1080, itemBarSlots = 8 })
+    local layout_1080 = MainHudLayout.compute({ width = 1920, height = 1080, itemBarSlots = 8 })
     assert_at(nodes_fb.HealthRing, layout_1080.Rects.HealthRing, "HealthRing fallback @1080")
     view_fb:dispose()
   end)

@@ -114,7 +114,7 @@ local function make_real_modifier_sandbox()
     e.units[#e.units + 1] = u
     function u:GetAttribute(k) return self.attrs[k] end
     function u:SetAttribute(k, v) self.attrs[k] = v end
-    function u:GetComponent() return nil end
+    function u:get_component() return nil end
     function u:IsA(kind) return kind == "BindableEvent" and name == "BindableEvent" end
     function u:GetChildren()
       local out = {}
@@ -270,13 +270,13 @@ describe("AttrLeaf：attr_rule 官方包单向叶子投影", function()
     assert.equals(420, attr_api.Funcs.GetAttr(char1, "PlayerMaxHealth"))
     assert.near(8 * 1.3, attr_api.Funcs.GetAttr(char1, "PlayerWalkSpeed"), 1e-9)
     assert.equals(210, attr_api.Funcs.GetAttr(char1, "PlayerHunger"))
-    assert.near(GameCfg.Shop.DamageScale("melee", 2), attr_api.Funcs.GetAttr(char1, "PlayerWeaponDamage_melee"), 1e-9)
-    assert.near(GameCfg.Shop.DamageScale("ranged", 1), attr_api.Funcs.GetAttr(char1, "PlayerWeaponDamage_ranged"), 1e-9)
-    assert.near(GameCfg.Shop.DamageScale("explosive", 3), attr_api.Funcs.GetAttr(char1, "PlayerWeaponDamage_explosive"), 1e-9)
+    assert.near(GameCfg.Shop.damage_scale("melee", 2), attr_api.Funcs.GetAttr(char1, "PlayerWeaponDamage_melee"), 1e-9)
+    assert.near(GameCfg.Shop.damage_scale("ranged", 1), attr_api.Funcs.GetAttr(char1, "PlayerWeaponDamage_ranged"), 1e-9)
+    assert.near(GameCfg.Shop.damage_scale("explosive", 3), attr_api.Funcs.GetAttr(char1, "PlayerWeaponDamage_explosive"), 1e-9)
 
     assert.near(1.4, char1.scale, 1e-9)
-    assert.near(BodyScale.Derive(1.4).CameraDistance, char1.attrs.CameraDistance, 1e-9)
-    assert.near(BodyScale.Derive(1.4).InteractRange, char1.attrs.InteractRange, 1e-9)
+    assert.near(BodyScale.derive(1.4).CameraDistance, char1.attrs.CameraDistance, 1e-9)
+    assert.near(BodyScale.derive(1.4).InteractRange, char1.attrs.InteractRange, 1e-9)
     assert.is_false(char1.attrs.BodyScaleCapped)
     assert.near(8 * 1.3, char1.Controller.WalkSpeed, 1e-9)
 
@@ -322,7 +322,7 @@ describe("AttrLeaf：attr_rule 官方包单向叶子投影", function()
     local attr_api, make_unit, world = make_real_attr_sandbox()
     local clamped_api = setmetatable({
       Funcs = setmetatable({
-        GetAttrConfig = function(key)
+        get_attr_config = function(key)
           if key == "PlayerWalkSpeed" then
             return { Min = 0, Max = 10 }
           end
@@ -509,7 +509,7 @@ describe("AbilityLeaf：ability_system 单向叶子投影、can_act 门控与 us
 
     local function make_ability_api()
       return {
-        AddAbility = function(character, asset_id, index)
+        add_ability = function(character, asset_id, index)
           add_attempts = add_attempts + 1
           if add_attempts < ready_after then
             return nil
@@ -528,7 +528,7 @@ describe("AbilityLeaf：ability_system 单向叶子投影、can_act 门控与 us
           stopped_calls[#stopped_calls + 1] = { character = character, index = index }
           return true
         end,
-        CastAbility = function(character, index)
+        cast_ability = function(character, index)
           cast_calls[#cast_calls + 1] = { character = character, index = index }
           return true
         end,
@@ -585,7 +585,7 @@ describe("AbilityLeaf：ability_system 单向叶子投影、can_act 门控与 us
       },
     })
 
-    -- 首帧已创建管理器并挂在 char1 下；第 1 次 AddAbility 未就绪，挂起重试
+    -- 首帧已创建管理器并挂在 char1 下；第 1 次 add_ability 未就绪，挂起重试
     assert.equals(1, #created_managers)
     assert.equals(char1, created_managers[1].Parent)
     assert.equals(0, #created_anchors)

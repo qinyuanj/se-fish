@@ -8,13 +8,13 @@ local Trigger = Spoke.Trigger
 local SpokeClock = {}
 
 local function assert_finite_number(value, label)
-  if not Number.IsFiniteNumber(value) then
+  if not Number.is_finite_number(value) then
     error(label .. " 必须是有限数字", 3)
   end
 end
 
 local function assert_non_negative_finite(value, label)
-  if not Number.IsFiniteNumber(value) or value < 0 then
+  if not Number.is_finite_number(value) or value < 0 then
     error(label .. " 必须是非负有限数字", 3)
   end
 end

@@ -6,7 +6,7 @@
 --   4. 大奖重置错：抽出大奖不清零连续未中计数，或未中大奖反而清零；
 --   5. 十连逐抽错：十连中途出大奖后，余下的抽数仍沿用旧计数（应逐抽结算、立即重置）；
 --   6. 倍率/价格口径错：结果带非 1 的个体倍率，或基础售价与地图盲盒表不符（钉表）。
--- seam：BlindboxDraw.Draw / DrawMany（纯函数）；随机数经 rng(n)（返回 1..n 均匀整数）注入，
+-- seam：BlindboxDraw.Draw / draw_many（纯函数）；随机数经 rng(n)（返回 1..n 均匀整数）注入，
 --   脚本化序列锁定边界；配置真源是 common/cfg/blindbox.lua（权重和 1000、期望 166.075 已有钉表）。
 -- 迁移说明：案例按旧 LuaUnit 实际执行序（方法名字典序）逐个 it 注册；断言按语义映射，见 issue-87-mapping.md。
 local BlindboxDraw = require("common.blindbox_draw")
@@ -38,9 +38,9 @@ describe("盲盒抽样纯逻辑（common/blindbox_draw）", function()
   end)
 
   it("test_draw_many_rejects_bad_count_and_bad_roll", function()
-    assert.is_nil(BlindboxDraw.DrawMany(0, 0, scripted({})))
-    assert.is_nil(BlindboxDraw.DrawMany(11, 0, scripted({})))
-    local draws = BlindboxDraw.DrawMany(2, 0, scripted({ 1, 9999 }))
+    assert.is_nil(BlindboxDraw.draw_many(0, 0, scripted({})))
+    assert.is_nil(BlindboxDraw.draw_many(11, 0, scripted({})))
+    local draws = BlindboxDraw.draw_many(2, 0, scripted({ 1, 9999 }))
     assert.is_nil(draws) -- 任一抽 rng 越界整批不成立（不落账，调用方不结算）
   end)
 
@@ -96,7 +96,7 @@ describe("盲盒抽样纯逻辑（common/blindbox_draw）", function()
 
   it("test_ten_draws_cross_the_guarantee_line", function()
     local rolls = { 1000, 1000, 1000, 1000, 2, 1000, 1000, 1000, 1000, 1000 }
-    local draws, pityAfter = BlindboxDraw.DrawMany(10, 45, scripted(rolls))
+    local draws, pityAfter = BlindboxDraw.draw_many(10, 45, scripted(rolls))
     assert.same(10, #draws)
     for index = 1, 4 do
       assert.is_false(draws[index].guaranteed)
@@ -115,7 +115,7 @@ describe("盲盒抽样纯逻辑（common/blindbox_draw）", function()
     for _ = 1, 9 do
       rolls[#rolls + 1] = 1000
     end
-    local draws, pityAfter = BlindboxDraw.DrawMany(10, 0, scripted(rolls))
+    local draws, pityAfter = BlindboxDraw.draw_many(10, 0, scripted(rolls))
     assert.same(10, #draws)
     assert.is_true(draws[1].jackpot)
     assert.same(0, draws[1].pityAfter)

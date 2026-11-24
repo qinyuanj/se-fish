@@ -45,7 +45,7 @@ local function read_xy(pos)
     return nil
   end
   local ok, x, y = pcall(function() return pos.x, pos.y end) -- 兼容 Vector2 userdata 坐标读取，异常时视为无效
-  if ok and Number.IsFiniteNumber(x) and Number.IsFiniteNumber(y) then
+  if ok and Number.is_finite_number(x) and Number.is_finite_number(y) then
     return { x = x, y = y }
   end
   return nil
@@ -65,7 +65,7 @@ end
 local function default_fire_re(re_name, payload)
   local ok, err = pcall(function() -- 宿主 RE 通道未就绪或调用异常时记录并安全忽略
     local re_util = rawget(_G, "REUtil") or require("common.re_util")
-    local re = re_util and re_util:GetRE(re_name) or nil
+    local re = re_util and re_util:get_re(re_name) or nil
     if re ~= nil then
       re:FireServer(payload)
     end
@@ -97,7 +97,7 @@ local function default_resolve_aim_target(pos)
     if p == nil then
       return nil
     end
-    if Number.IsFiniteNumber(p.x) and Number.IsFiniteNumber(p.y) and Number.IsFiniteNumber(p.z) then
+    if Number.is_finite_number(p.x) and Number.is_finite_number(p.y) and Number.is_finite_number(p.z) then
       return { x = p.x, y = p.y, z = p.z }
     end
     return nil
@@ -107,13 +107,13 @@ end
 
 local function clamp_slot_count(state)
   local items = GameCfg.Items
-  local raw = (type(state) == "table" and Number.IsFiniteNumber(state.slotCount))
+  local raw = (type(state) == "table" and Number.is_finite_number(state.slotCount))
     and math.floor(state.slotCount) or items.InitialItemBarSlots
   return math.max(items.InitialItemBarSlots, math.min(items.ItemBarSlots, raw))
 end
 
 local function compute_layout(resolution, state)
-  return MainHudLayout.Compute({
+  return MainHudLayout.compute({
     width = resolution.x,
     height = resolution.y,
     itemBarSlots = clamp_slot_count(state),
@@ -124,7 +124,7 @@ local function item_display_name(entry, def)
   if def == nil then
     return ""
   end
-  local prefix = GameCfg.Items.CookRate(entry) ~= nil and GameCfg.Grill.CookedPrefix or ""
+  local prefix = GameCfg.Items.cook_rate(entry) ~= nil and GameCfg.Grill.CookedPrefix or ""
   return prefix .. def.Name
 end
 
@@ -213,7 +213,7 @@ function MainHudItemBarView.mount(s, ctx, options)
       local world = game ~= nil and game:GetService("World") or nil
       return world and world.GetServerTime and world:GetServerTime() or 0
     end)
-    return (ok and Number.IsFiniteNumber(t)) and t or 0
+    return (ok and Number.is_finite_number(t)) and t or 0
   end
 
   local backpack_open = options.backpack_open or State.new("MainHudItemBarView.backpack_open", false)

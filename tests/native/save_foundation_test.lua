@@ -10,7 +10,7 @@ local PlayerData = require('server.data.player_data')
 describe('TestSaveFoundation', function()
     local env, savedGame
 
-    -- 逐例夹具：旧 LuaUnit 每例都跑 setUp/tearDown，这里同样用 before_each/after_each。
+    -- 逐例夹具：旧 LuaUnit 每例都跑 set_up/tear_down，这里同样用 before_each/after_each。
     -- before_each 第一步保存 _G.game 原值，因此夹具中途抛错时 after_each 仍能恢复全局。
     before_each(function()
         savedGame = rawget(_G, 'game')
@@ -52,15 +52,15 @@ describe('TestSaveFoundation', function()
         local player = { UserId = id, SetAttribute = function() end }
         local data = PlayerData.New(player)
         data:Init(true)
-        env.save:LoadInto(player, data)
+        env.save:load_into(player, data)
         return player, data
     end
 
     it('test_callback_failure_does_not_block_following_write', function()
         local player, data = join(61)
         drain()
-        local op = env.save:NextOperation(player, 'bonus')
-        assert.is_true(env.save:Execute(player, data, op, function(draft)
+        local op = env.save:next_operation(player, 'bonus')
+        assert.is_true(env.save:execute(player, data, op, function(draft)
             draft:AddCoin(1)
             return { paid = 1 }
         end, function() error('回包失败') end))
@@ -104,9 +104,9 @@ describe('TestSaveFoundation', function()
         drain()
         local first
         for i = 1, 65 do
-            local op = env.save:NextOperation(player, 'reward')
+            local op = env.save:next_operation(player, 'reward')
             first = first or op
-            assert.is_true(env.save:Execute(player, data, op, function(draft)
+            assert.is_true(env.save:execute(player, data, op, function(draft)
                 draft:AddCoin(1)
                 return { coin = i }
             end, function() end))
@@ -114,7 +114,7 @@ describe('TestSaveFoundation', function()
         end
         assert.same(65, data.Data.FishCoin)
         assert.same(64, #data:Serialize().meta.operations)
-        local ok, reason = env.save:Execute(player, data, first, function() error('不能重新执行') end, function() end)
+        local ok, reason = env.save:execute(player, data, first, function() error('不能重新执行') end, function() end)
         assert.is_false(ok)
         assert.same('expired', reason)
     end)
@@ -123,7 +123,7 @@ describe('TestSaveFoundation', function()
         local player, data = join(30)
         drain()
         data:AddCoin(100)
-        local op = env.save:NextOperation(player, 'buy-rod')
+        local op = env.save:next_operation(player, 'buy-rod')
         local result
         env.loseReply = true
         local function buy(draft)
@@ -131,7 +131,7 @@ describe('TestSaveFoundation', function()
             draft:GrantItem('starterRod', 1)
             return { paid = 5, item = 'starterRod' }
         end
-        assert.is_true(env.save:Execute(player, data, op, buy, function(ok, value) result = { ok, value } end))
+        assert.is_true(env.save:execute(player, data, op, buy, function(ok, value) result = { ok, value } end))
         assert.is_false(data:AddCoin(999))
         drain()
         assert.is_true(result[1])
@@ -139,7 +139,7 @@ describe('TestSaveFoundation', function()
         local count = data:ItemCount('starterRod')
         local _, rejoined = join(30)
         drain()
-        assert.is_true(env.save:Execute(rejoined.Player, rejoined, op, buy, function(ok, value) result = { ok, value } end))
+        assert.is_true(env.save:execute(rejoined.Player, rejoined, op, buy, function(ok, value) result = { ok, value } end))
         drain()
         assert.same(95, rejoined.Data.FishCoin)
         assert.same(count, rejoined:ItemCount('starterRod'))
@@ -163,10 +163,10 @@ describe('TestSaveFoundation', function()
     it('test_resolve_request_replays_only_exact_identity_after_rejoin', function()
         local player, data = join(60)
         drain()
-        local op, mode = env.save:ResolveRequest(player, data, 'shop', 7)
+        local op, mode = env.save:resolve_request(player, data, 'shop', 7)
         assert.same('new', mode)
         local result
-        assert.is_true(env.save:Execute(player, data, op, function(draft)
+        assert.is_true(env.save:execute(player, data, op, function(draft)
             draft:AddCoin(9)
             return { awarded = 9 }
         end, function(ok, value) result = value end))
@@ -174,21 +174,21 @@ describe('TestSaveFoundation', function()
         assert.same(9, result.awarded)
         local nextPlayer, nextData = join(60)
         drain()
-        local replay, replayMode = env.save:ResolveRequest(nextPlayer, nextData, 'shop', op)
+        local replay, replayMode = env.save:resolve_request(nextPlayer, nextData, 'shop', op)
         assert.same('replay', replayMode)
         assert.same(op.requestKey, replay.requestKey)
         op.id = '60:999'
-        assert.is_nil(env.save:ResolveRequest(nextPlayer, nextData, 'shop', op))
+        assert.is_nil(env.save:resolve_request(nextPlayer, nextData, 'shop', op))
     end)
 
     it('test_retry_queue_preserves_operation_and_rejects_old_session_write', function()
         local player, data = join(40)
         drain()
         data:AddCoin(20)
-        local op = env.save:NextOperation(player, 'ticket')
+        local op = env.save:next_operation(player, 'ticket')
         env.writeFailure = true
         local replies = 0
-        assert.is_true(env.save:Execute(player, data, op, function(draft)
+        assert.is_true(env.save:execute(player, data, op, function(draft)
             draft:SpendCoin(7)
             draft.Extra.recovery.ticket = { operation = op.id, destination = 'shrimpPond', state = 'pending' }
             return { paid = 7 }
@@ -197,7 +197,7 @@ describe('TestSaveFoundation', function()
         assert.same(0, replies)
         assert.is_false(data.Inited)
         env.writeFailure = false
-        env.save:Update()
+        env.save:update()
         drain()
         assert.same(1, replies)
         assert.same(13, data.Data.FishCoin)

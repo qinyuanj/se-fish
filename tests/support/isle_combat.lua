@@ -1,11 +1,11 @@
 -- #90 迁移期共享夹具：礁石岛 / 火山岛战斗用例的假引擎世界。
--- 原 tests/gameplay/reef_combat_test.lua 的 setUp/tearDown/drop/advance 被
--- tests/gameplay/volcano_combat_test.lua 直接继承（`TestVolcanoCombat.setUp = function(self) TestReefCombat.setUp(self) ...`）。
+-- 原 tests/gameplay/reef_combat_test.lua 的 set_up/tear_down/drop/advance 被
+-- tests/gameplay/volcano_combat_test.lua 直接继承（`TestVolcanoCombat.set_up = function(self) TestReefCombat.set_up(self) ...`）。
 -- LuaUnit 靠全局类名互访实现复用；Busted 每个 spec 是独立 chunk，describe 之间不共享实例方法，
 -- 所以把这份世界搬到 support 模块，两个 spec 各开各的（与旧套件「每案例新建世界」的口径一致）。
 --
 -- 只替换引擎对象、时间与 RemoteEvent，不替换业务管理器：真实 MgrFishCarrier / MgrFishUnit / MgrVitals
--- 全部走 require，SpawnLanded / Drop / Update 与对外预警都在真实实现上观察。
+-- 全部走 require，spawn_landed / drop / update 与对外预警都在真实实现上观察。
 -- 因此这不是编辑器 E2E 证据。
 local Cfg = require('common.game_cfg')
 
@@ -31,7 +31,7 @@ end
 --- 「岸边干地」起点：本区中线上、水岸线向内 32 米处（干地）。
 --- #102 现场同步后合同安全点挪到了区内侧（离本区水岸线 62.5 米），而入水/逃脱类用例的时序是按
 --- 「起点在水岸线外 32 米」调的 —— 这些用例要的只是「岸边」这个位置，所以按水岸线自己取，不借 SafePoint。
-function M.shoreDryPoint(zoneIndex)
+function M.shore_dry_point(zoneIndex)
     local scene = Cfg.Zones[zoneIndex].Scene
     local water = scene.Waters[1]
     local boundary = scene.Boundary
@@ -40,7 +40,7 @@ function M.shoreDryPoint(zoneIndex)
     return vec(water.Center.x, scene.SafePoint.y, water.Center.z + inland * (halfZ + 32))
 end
 
--- 建世界并接线三个真实管理器；返回的 env 供 spec 逐案例持有，env:tearDown() 负责拆除。
+-- 建世界并接线三个真实管理器；返回的 env 供 spec 逐案例持有，env:tear_down() 负责拆除。
 -- env 字段：now / notices / players / castStates / units / heartbeat / world / carrier / mgr / vitals / player。
 function M.new(zoneIndex)
     local env = setmetatable({}, { __index = M })
@@ -98,7 +98,7 @@ function M.new(zoneIndex)
     env.vitals = env.lifeHost.runtime.life
     env.mgr.Vitals = env.vitals
     env.mgr:Start()
-    local safe = M.shoreDryPoint(zoneIndex or 6)
+    local safe = M.shore_dry_point(zoneIndex or 6)
     local c = { Health = 300, HealthChanged = signal(), Died = signal(), Lift = function() end }
     function c:TakeDamage(d) self.Health = math.max(0, self.Health - d); self.HealthChanged:Fire(self.Health) end
     env.player = { UserId = 3701, Character = { Controller = c, Position = vec(safe.x, safe.y, safe.z),
@@ -106,14 +106,14 @@ function M.new(zoneIndex)
         CharacterAdded = signal(), CharacterRemoving = signal(), SetAttribute = function() end }
     env.players[1] = env.player
     env.lifeHost:add(env.player)
-    env.mgr:OnPlayerAdded(env.player)
+    env.mgr:on_player_added(env.player)
     return env
 end
 
--- 拆除顺序与旧 tearDown 一致：先清鱼、停管理器，再回灌模块缓存与全局（含 nil 也写回 nil）。
-function M:tearDown()
+-- 拆除顺序与旧 tear_down 一致：先清鱼、停管理器，再回灌模块缓存与全局（含 nil 也写回 nil）。
+function M:tear_down()
     local env = self
-    for _, fish in pairs(env.mgr.Fish) do env.mgr:Remove(fish) end
+    for _, fish in pairs(env.mgr.Fish) do env.mgr:remove(fish) end
     env.mgr:Stop()
     env.lifeHost:shutdown()
     for _, name in ipairs(MODULES) do package.loaded[name] = env.modules[name] end
@@ -122,9 +122,9 @@ end
 
 -- 放下鱼并确认返回严格 true（旧用例这里是 lu.assertTrue；support 模块不依赖 luassert 的表形 assert）。
 function M.drop(env, id)
-    local fish = assert(env.mgr:SpawnLanded(env.player, { fishId = id, mult = 1 }, env.player.Character.Position))
+    local fish = assert(env.mgr:spawn_landed(env.player, { fishId = id, mult = 1 }, env.player.Character.Position))
     fish.Carrier.Body.OnLiftedBegin:Fire(env.player.Character)
-    local dropped = env.mgr:Drop(env.player)
+    local dropped = env.mgr:drop(env.player)
     if dropped ~= true then
         error('MgrFishUnit:Drop 未返回 true：' .. tostring(dropped))
     end
@@ -134,7 +134,7 @@ end
 function M.advance(env, to)
     while env.now < to - 1e-8 do
         env.now = math.min(to, env.now + 0.05)
-        env.mgr:Update()
+        env.mgr:update()
     end
 end
 

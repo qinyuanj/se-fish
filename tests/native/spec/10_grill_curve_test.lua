@@ -62,7 +62,7 @@ describe('条款 10：烧烤倍率与会话规则', function()
       if name == 'World' then return { GetServerTime = function() return ctx.now end } end
       if name == 'Players' then return { GetPlayers = function() return ctx.list end } end
     end }
-    _G.REUtil = { CheckRECD = function() return false end, GetRE = function(_, name)
+    _G.REUtil = { check_recd = function() return false end, get_re = function(_, name)
       if not ctx.events[name] then
         ctx.events[name] = { OnServerEvent = signal(),
           FireClient = function(_, player, payload)
@@ -84,7 +84,7 @@ describe('条款 10：烧烤倍率与会话规则', function()
     ctx.runtime = ctx.ServerRuntime.new({
       initial_now = ctx.now,
       remote = _G.REUtil,
-      player_data = { GetDataInst = function(_, player) return ctx.datas[player.UserId] end },
+      player_data = { get_data_inst = function(_, player) return ctx.datas[player.UserId] end },
       save = ctx.save,
       players_service = { GetPlayers = function() return ctx.list end },
       world_service = {
@@ -130,7 +130,7 @@ describe('条款 10：烧烤倍率与会话规则', function()
     function player:SetAttribute(key, value) self.attrs[key] = value end
     local data = ctx.PlayerData.New(player)
     data:Init(true)
-    ctx.save:LoadInto(player, data)
+    ctx.save:load_into(player, data)
     drain()
     ctx.datas[id] = data
     ctx.list[#ctx.list + 1] = player

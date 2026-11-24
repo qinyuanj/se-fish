@@ -7,7 +7,7 @@ local Eui = require("tests.support.eui_double")
 
 local function mount(store, sent, notices, opts)
   opts = opts or {}
-  local root = Eui.Node({ Name = "UIRoot" })
+  local root = Eui.node({ Name = "UIRoot" })
   local view = RootView.mount(root, store, {
     hud = { AttackView.spec() },
     services = {
@@ -17,7 +17,7 @@ local function mount(store, sent, notices, opts)
       get_device_resolution = opts.get_device_resolution or function() return { x = 1920, y = 1080 } end,
     },
     create_node = function(kind, props)
-      local node = Eui.Node({
+      local node = Eui.node({
         Kind = kind,
         Name = props and props.Name,
         Parent = props and props.Parent,
@@ -72,7 +72,7 @@ describe("客户端攻击与瞄准投影宿主接缝（#300）", function()
     assert.is_true(button.Visible)
     assert.equals("射击", label.Text)
 
-    assert.is_true(Eui.Click(button))
+    assert.is_true(Eui.click(button))
     assert.same({ action = "attack", aim = { x = 0, y = 0.6, z = 0.8 } }, sent[#sent])
 
     writer:ingest_event("WeaponResult", { ok = false, action = "attack", reason = "reloading" })

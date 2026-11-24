@@ -90,7 +90,7 @@ function MainHudVitalsView.mount(s, ctx, options)
   local find_node = options.find_node or find_editor_node
 
   local resolution = ViewUtil.get_resolution(ctx, options)
-  local layout = MainHudLayout.Compute({
+  local layout = MainHudLayout.compute({
     width = resolution.x,
     height = resolution.y,
     itemBarSlots = GameCfg.Items.ItemBarSlots,

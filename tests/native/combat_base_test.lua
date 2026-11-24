@@ -47,24 +47,24 @@ describe('TestAbilityCastGuard', function()
         package.loaded['server.ability_api'] = saved.api
     end)
 
-    -- 根 AbilityAPI 必须先跑服务端守卫，再进 vendor 的包内 CastAbility；守卫拒绝时包完全不被调用。
+    -- 根 AbilityAPI 必须先跑服务端守卫，再进 vendor 的包内 cast_ability；守卫拒绝时包完全不被调用。
     it('test_root_api_applies_server_guard_before_package_cast', function()
         local impl = {}
         local calls = {}
-        impl.CastAbility = function(unit, index) calls[#calls + 1] = { unit, index } return true end
+        impl.cast_ability = function(unit, index) calls[#calls + 1] = { unit, index } return true end
         package.preload[VENDOR] = function() return impl end
         package.loaded[VENDOR] = nil
         package.loaded['server.ability_api'] = nil
         local api = assert(loadfile('server/ability_api.lua'))()
         local allowed, unit = false, {}
-        api.SetCastGuard(function(candidate, index)
+        api.set_cast_guard(function(candidate, index)
             assert.same({ unit, 2 }, { candidate, index })
             return allowed
         end)
-        assert.is_false(api.CastAbility(unit, 2))
+        assert.is_false(api.cast_ability(unit, 2))
         assert.same({}, calls)
         allowed = true
-        assert.is_true(api.CastAbility(unit, 2))
+        assert.is_true(api.cast_ability(unit, 2))
         assert.same(1, #calls)
     end)
 end)
@@ -77,7 +77,7 @@ describe('TestCombatBase', function()
         self_.host = Host.start({
           now = 100,
           remote = {
-            GetRE = function(_, name)
+            get_re = function(_, name)
               return {
                 OnServerEvent = Host.signal(),
                 FireClient = function() end,
@@ -86,7 +86,7 @@ describe('TestCombatBase', function()
                 end,
               }
             end,
-            CheckRECD = function() return false end,
+            check_recd = function() return false end,
           },
         })
         self_.v = self_.host.runtime.life
@@ -103,7 +103,7 @@ describe('TestCombatBase', function()
         self_.host = Host.start({
           now = 100,
           fish_carrier = {
-            ResolveCarrier = function(_, target)
+            resolve_carrier = function(_, target)
                 if target == carrier or target == carrier.Receiver then return carrier, 'fish:91' end
             end,
             Damage = function(_, target, amount, hit)
@@ -115,11 +115,11 @@ describe('TestCombatBase', function()
         self_.v = self_.host.runtime.life
         self_.host:add(self_.a)
         self_.host:add(self_.b)
-        local hit = self_.v:NewHit(self_.a.Character, 'weapon')
-        local ok, actual = self_.v:ApplyHit(hit, carrier, 10)
+        local hit = self_.v:new_hit(self_.a.Character, 'weapon')
+        local ok, actual = self_.v:apply_hit(hit, carrier, 10)
         assert.is_true(ok)
         assert.same(7, actual)
-        assert.is_false(self_.v:ApplyHit(hit, carrier.Receiver, 10))
+        assert.is_false(self_.v:apply_hit(hit, carrier.Receiver, 10))
         assert.same(1, #damageCalls)
         assert.same(10, damageCalls[1][2])
         assert.same(self_.a, damageCalls[1][3].sourcePlayer)
@@ -127,31 +127,31 @@ describe('TestCombatBase', function()
     end)
 
     it('test_gm_health_reduction_uses_gm_category', function()
-        assert.is_true(self_.v:SetHealth(self_.a, 200))
+        assert.is_true(self_.v:set_health(self_.a, 200))
         assert.same(200, self_.a.Character.Controller.Health)
         assert.same('gm', self_.notices[#self_.notices].category)
     end)
 
     it('test_hunger_damage_carries_hunger_category', function()
-        self_.v:SetHunger(self_.a, 0)
+        self_.v:set_hunger(self_.a, 0)
         self_.host:advance(1)
         assert.same('hunger', self_.notices[#self_.notices].category)
         assert.same(295, self_.a.Character.Controller.Health)
     end)
 
     it('test_negative_eat_is_blocked_while_downed', function()
-        -- 濒死锁血：负食用同样不能绕过状态判定（CanEat 已用 CanAct 互斥）
+        -- 濒死锁血：负食用同样不能绕过状态判定（can_eat 已用 can_act 互斥）
         self_.host:phase(self_.a, 'downed')
-        assert.is_false(self_.v:CanEat(self_.a, 'item126'))
-        assert.is_false(self_.v:Eat(self_.a, 'item126'))
+        assert.is_false(self_.v:can_eat(self_.a, 'item126'))
+        assert.is_false(self_.v:eat(self_.a, 'item126'))
         assert.same(300, self_.a.Character.Controller.Health)
         assert.same(0, #self_.notices)
     end)
 
     it('test_negative_eat_uses_unified_damage_entry_with_eat_category', function()
-        -- 负食用（如核废料桶 item126 EatPercent=-99）必须走 ApplyDamage 单点，携带 eat 类别，
+        -- 负食用（如核废料桶 item126 EatPercent=-99）必须走 apply_damage 单点，携带 eat 类别，
         -- 跳字通知与实际扣血一致；旧路 SetControllerHealth 直扣不会产生通知
-        assert.is_true(self_.v:Eat(self_.a, 'item126'))
+        assert.is_true(self_.v:eat(self_.a, 'item126'))
         assert.same('eat', self_.notices[#self_.notices].category)
         assert.same(3, self_.a.Character.Controller.Health)
         assert.same(1, #self_.notices)
@@ -159,38 +159,38 @@ describe('TestCombatBase', function()
     end)
 
     it('test_same_hit_is_once_per_target_and_actual_damage_matches_notice', function()
-        local hit = self_.v:NewHit(nil, 'grill')
-        local ok, amount = self_.v:ApplyHit(hit, self_.a, 25)
+        local hit = self_.v:new_hit(nil, 'grill')
+        local ok, amount = self_.v:apply_hit(hit, self_.a, 25)
         assert.is_true(ok)
         assert.same(25, amount)
-        assert.is_false(self_.v:ApplyHit(hit, self_.a.Character, 25))
-        assert.is_true(self_.v:ApplyHit(hit, self_.b, 25))
+        assert.is_false(self_.v:apply_hit(hit, self_.a.Character, 25))
+        assert.is_true(self_.v:apply_hit(hit, self_.b, 25))
         assert.same({ 275, 275 }, { self_.a.Character.Controller.Health, self_.b.Character.Controller.Health })
         assert.same({ 2, 25, 25 }, { #self_.notices, self_.notices[1].amount, self_.notices[2].amount })
-        assert.is_false(self_.v:ApplyHit(hit, self_.a, 0 / 0))
+        assert.is_false(self_.v:apply_hit(hit, self_.a, 0 / 0))
     end)
 
     it('test_source_alias_life_hook_and_zone_filter_stay_in_entry', function()
-        local hit = self_.v:NewHit(self_.b.Character, 'weapon')
-        assert.same(self_.b, self_.v:ResolveHitSource(hit))
+        local hit = self_.v:new_hit(self_.b.Character, 'weapon')
+        assert.same(self_.b, self_.v:resolve_hit_source(hit))
         local filtered = 0
-        self_.v:SetDamageFilter(function(incoming, target)
+        self_.v:set_damage_filter(function(incoming, target)
             filtered = filtered + 1
             assert.same(self_.b, incoming.sourcePlayer)
             return incoming.category ~= 'weapon'
         end)
-        assert.is_false(self_.v:ApplyHit(hit, self_.a, 10))
+        assert.is_false(self_.v:apply_hit(hit, self_.a, 10))
         assert.same(300, self_.a.Character.Controller.Health)
-        self_.v:SetDamageFilter(nil)
-        assert.is_true(self_.v:ApplyHit(hit, self_.a.Character, 10))
+        self_.v:set_damage_filter(nil)
+        assert.is_true(self_.v:apply_hit(hit, self_.a.Character, 10))
 
         self_.a.Character.Controller.Health = 5
-        local lethal = self_.v:NewHit(self_.b, 'fishAttack')
-        local ok, actual = self_.v:ApplyHit(lethal, self_.a, 10)
+        local lethal = self_.v:new_hit(self_.b, 'fishAttack')
+        local ok, actual = self_.v:apply_hit(lethal, self_.a, 10)
         assert.is_true(ok)
         assert.same(4, actual)
-        assert.is_true(self_.v:IsDowned(self_.a))
-        assert.is_false(self_.v:ApplyHit(self_.v:NewHit(self_.b, 'fishAttack'), self_.a, 1))
+        assert.is_true(self_.v:is_downed(self_.a))
+        assert.is_false(self_.v:apply_hit(self_.v:new_hit(self_.b, 'fishAttack'), self_.a, 1))
         local rescued = self_.host:tree(self_.b):begin_rescue(self_.a)
         assert.is_true(rescued)
     end)
@@ -213,7 +213,7 @@ describe('TestMgrAbilityActionGuard', function()
     it('test_player_cast_is_blocked_by_vitals_state', function()
         local guard
         package.loaded['server.packages.ability_system.api'] = {}
-        local api = { SetCastGuard = function(fn) guard = fn end }
+        local api = { set_cast_guard = function(fn) guard = fn end }
         package.loaded['server.ability_api'] = api
         _G.game = { GetService = function() return {} end }
         local mgr = assert(loadfile('server/fish_ability.lua'))()
@@ -232,9 +232,9 @@ describe('TestMgrAbilityActionGuard', function()
         package.loaded['server.ability_api'] = saved.api
         package.loaded['server.packages.ability_system.api'] = saved.vendorApi
         assert.is_not_nil(guard)
-        assert.is_false(mgr:CanCast(blocked))
+        assert.is_false(mgr:can_cast(blocked))
         assert.is_false(guard(blocked, 0))
-        assert.is_true(mgr:CanCast(free))
+        assert.is_true(mgr:can_cast(free))
         assert.is_true(guard(free, 0))
     end)
 end)

@@ -18,7 +18,7 @@ GameCfg.Zones = {
 }
 GameCfg.LegacyZoneIdMap = { fishPond1 = 'fishPond', shrimpPond = 'shrimpPond' }
 
-function GameCfg.ResolveZoneId(id)
+function GameCfg.resolve_zone_id(id)
     return GameCfg.LegacyZoneIdMap[id] or id
 end
 
@@ -347,7 +347,7 @@ for _, row in ipairs(ContentShop.Goods) do
     end
 end
 
-function GameCfg.Shop.ListForPage(level, page, includeLocked)
+function GameCfg.Shop.list_for_page(level, page, includeLocked)
     local rows = {}
     if type(level) ~= 'number' or type(page) ~= 'string' then return rows end
     for _, row in ipairs(GameCfg.Shop.Goods) do
@@ -362,14 +362,14 @@ function GameCfg.Shop.ListForPage(level, page, includeLocked)
     return rows
 end
 
-function GameCfg.Shop.DamageScale(kind, level)
+function GameCfg.Shop.damage_scale(kind, level)
     local spec = GameCfg.Shop.UpgradeKinds[kind]
     if not spec or not spec.Increment or spec.RoundUp or type(level) ~= 'number' then return nil end
     level = math.max(0, math.min(spec.MaxLevel, math.floor(level)))
     return 1 + spec.Increment * level
 end
 
-function GameCfg.Shop.MagazineSize(base, level)
+function GameCfg.Shop.magazine_size(base, level)
     local spec = GameCfg.Shop.UpgradeKinds.magazine
     if type(base) ~= 'number' or base ~= base or not spec then return nil end
     level = math.max(0, math.min(spec.MaxLevel, math.floor(level or 0)))
@@ -388,7 +388,7 @@ GameCfg.Content.Exchanges = {
 }
 GameCfg.Items.CookedFlag = 'cooked'
 GameCfg.Items.CookedPriceScale = 1.5
-function GameCfg.Items.CookRate(entry)
+function GameCfg.Items.cook_rate(entry)
     if type(entry) ~= 'table' then return nil end
     local rate = entry.cooked
     if type(rate) ~= 'number' and type(entry.saved) == 'table' then
@@ -400,12 +400,12 @@ function GameCfg.Items.CookRate(entry)
     if type(rate) ~= 'number' or rate <= 0 or rate ~= rate or rate >= math.huge then return nil end
     return rate
 end
-function GameCfg.Items.SalePrice(itemId, mult, cooked)
+function GameCfg.Items.sale_price(itemId, mult, cooked)
     local rate = cooked == true and GameCfg.Items.CookedPriceScale
         or type(cooked) == 'number' and cooked or nil
     local species = type(itemId) == 'string' and GameCfg.Fish[itemId]
     if species then
-        return rate and FishCatch.CookedPrice(species, mult, rate) or FishCatch.Price(species, mult)
+        return rate and FishCatch.cooked_price(species, mult, rate) or FishCatch.Price(species, mult)
     end
     local definition = type(itemId) == 'string' and GameCfg.Items.Definitions[itemId]
     local base = definition and definition.BasePrice
@@ -435,7 +435,7 @@ GameCfg.Lottery.SpinSec = 3
 GameCfg.Lottery.AxisStopIntervalSec = 0.5
 GameCfg.Lottery.AxisOrder = { 'left', 'right', 'middle' }
 GameCfg.Lottery.ResultTimeoutSec = 5
-function GameCfg.Lottery.MachineAnchors()
+function GameCfg.Lottery.machine_anchors()
     local names = {}
     for _, zone in ipairs(GameCfg.Zones) do
         if zone.Scene and zone.Scene.LotteryName then names[#names + 1] = zone.Scene.LotteryName end
@@ -794,7 +794,7 @@ GameCfg.Ability = {
     },
     SpeedPotion = { Item = 'item167', StepPercent = 10, MaxPotions = 20, MaxFactor = 3 },
     -- 角色基础移速：BaseController 默认 WalkSpeed 7.0（editor-cli manual BaseController.mdx 已核实）；
-    -- 运行时以角色入图时捕获的控制器速度为准（MgrAbility:CaptureBaseSpeed），此值仅为兜底。
+    -- 运行时以角色入图时捕获的控制器速度为准（MgrAbility:capture_base_speed），此值仅为兜底。
     MoveSpeed = { Base = 7 },
     Explosives = {
         item143 = { Damage = 50 },
@@ -856,21 +856,21 @@ GameCfg.Ability = {
         FallDamage = 0,
     },
     Aquatic = {
-        LeapIntervalSec = BossMoves.Get('mosasaur', 'leap').Schedule.Sec,
+        LeapIntervalSec = BossMoves.get('mosasaur', 'leap').Schedule.Sec,
         LeapWindupSec = 1, LeapSec = 1.5, LeapHeight = 8,
-        LeapRadius = BossMoves.Get('mosasaur', 'leap').Range,
-        LeapDamage = BossMoves.Get('mosasaur', 'leap').Damage.Value,
-        HeadRadius = BossMoves.Get('mosasaur', 'head').Range,
-        HeadWindupSec = BossMoves.Get('mosasaur', 'head').Warning.WindupSec,
-        HeadDamage = BossMoves.Get('mosasaur', 'head').Damage.Value,
-        GrabDamage = BossMoves.Get('mosasaur', 'bite').Damage.Value,
-        ContactDamage = BossMoves.Get('mosasaur', 'contact').Damage.Value,
-        ContactRange = BossMoves.Get('mosasaur', 'contact').Range,
+        LeapRadius = BossMoves.get('mosasaur', 'leap').Range,
+        LeapDamage = BossMoves.get('mosasaur', 'leap').Damage.Value,
+        HeadRadius = BossMoves.get('mosasaur', 'head').Range,
+        HeadWindupSec = BossMoves.get('mosasaur', 'head').Warning.WindupSec,
+        HeadDamage = BossMoves.get('mosasaur', 'head').Damage.Value,
+        GrabDamage = BossMoves.get('mosasaur', 'bite').Damage.Value,
+        ContactDamage = BossMoves.get('mosasaur', 'contact').Damage.Value,
+        ContactRange = BossMoves.get('mosasaur', 'contact').Range,
     },
     BossPhase = {
         Thresholds = BossMoves.Phases.godzilla.Thresholds,
         AttackSets = BossMoves.Phases.godzilla.AttackSets,
-        Attacks = BossMoves.AttackTable('godzilla'),
+        Attacks = BossMoves.attack_table('godzilla'),
         Species = { fish56Boss = true },
         Chase = { BiteRange = 4, BiteCooldownSec = 2 },
     },
@@ -918,7 +918,7 @@ end
 GameCfg.Ferry.HomeZone = GameCfg.Zones[1].Id
 GameCfg.Ferry.Outbound = GameCfg.Ferry.Routes[1].Outbound
 GameCfg.Ferry.Return = GameCfg.Ferry.Routes[1].Return
-function GameCfg.Ferry.Route(routeId)
+function GameCfg.Ferry.route(routeId)
     if type(routeId) ~= 'string' then return nil end
     for _, route in ipairs(GameCfg.Ferry.Routes) do
         if route.Id == routeId then return route end

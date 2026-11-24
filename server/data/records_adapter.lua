@@ -15,14 +15,14 @@ local function classify(err)
 end
 
 function Adapter:Store()
-    if self.Checked then return self.Holder end
+    if self.Checked then return self.holder end
     self.Checked = true
     local ok, store = pcall(function() return game:GetService('DataStoreService'):GetDataStore(cfg().Store) end)
     if not ok or not store then
         print('[RecordsAdapter] DataStore 不可用，全服纪录按暂不可用处理', tostring(store))
         return nil
     end
-    self.Holder = store
+    self.holder = store
     return store
 end
 
@@ -38,7 +38,7 @@ function Adapter:Read(fishId)
     local key = self:Key(fishId)
     local ok, value = pcall(function() return store:GetAsync(key) end)
     if not ok then return false, nil, classify(value) end
-    return true, Records.Valid(value), nil
+    return true, Records.valid(value), nil
 end
 
 -- 提交候选：decide(current) 在 CAS 变换里执行。返回 (ok, won, 当前值, 错误类别)：
@@ -51,7 +51,7 @@ function Adapter:Submit(fishId, decide)
     local seen, won
     local ok, value = pcall(function()
         return store:UpdateAsync(key, function(current)
-            local valid = Records.Valid(current)
+            local valid = Records.valid(current)
             seen = valid
             local next_ = decide(valid)
             if not next_ then return nil end -- 放弃：不产生写入
@@ -60,7 +60,7 @@ function Adapter:Submit(fishId, decide)
         end)
     end)
     if not ok then return false, nil, nil, classify(value) end
-    if won then return true, true, Records.Valid(value), nil end
+    if won then return true, true, Records.valid(value), nil end
     return true, false, seen, nil
 end
 

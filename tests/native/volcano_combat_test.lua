@@ -3,11 +3,11 @@
 -- #38 失败方式（编码前列出）：沧龙砸击永不落地/重复伤害、巡航不叼人、不移入水域；
 -- 哥斯拉吐息零伤害、跟踪必中、无方向；阶段被携带挡住/跨阈值重复切换/旧预警残留；
 -- 正常血量死亡、逃跑时限、玩家离线后还结算旧招。
--- 接缝沿用 #37 的真实管理器 SpawnLanded/Drop/Update、Controller 和对外预警。
+-- 接缝沿用 #37 的真实管理器 spawn_landed/drop/update、Controller 和对外预警。
 --
--- 旧文件靠 `TestVolcanoCombat.setUp = TestReefCombat.setUp` 继承礁石岛夹具（LuaUnit 的全局类名互访）。
+-- 旧文件靠 `TestVolcanoCombat.set_up = TestReefCombat.set_up` 继承礁石岛夹具（LuaUnit 的全局类名互访）。
 -- Busted 下两个 spec 各自 require 同一份 tests/support/isle_combat.lua，逐案例 open/close；
--- 本岛的差异只有：出生点换 7 号区岸边干地（Islet.shoreDryPoint）、摘掉 server.ability_api 的模块缓存；
+-- 本岛的差异只有：出生点换 7 号区岸边干地（Islet.shore_dry_point）、摘掉 server.ability_api 的模块缓存；
 -- RemoteEvent 与礁石共用完整替身，close 后再恢复 AbilityAPI。
 local Cfg = require('common.game_cfg')
 local Islet = require('tests.support.isle_combat')
@@ -20,12 +20,12 @@ describe('TestVolcanoCombat', function()
         env = Islet.new(7)
         package.loaded['server.ability_api'] = nil
         -- #102 现场同步：出生点用「岸边干地」（水岸线向内 32 米），不跟随移到区内侧的合同安全点 ——
-        -- 本文件的入水/携带用例时序是按这个距离调的（见 tests/support/isle_combat.lua 的 shoreDryPoint）。
-        local p = Islet.shoreDryPoint(7)
+        -- 本文件的入水/携带用例时序是按这个距离调的（见 tests/support/isle_combat.lua 的 shore_dry_point）。
+        local p = Islet.shore_dry_point(7)
         env.player.Character.Position = env.vec(p.x, p.y, p.z)
     end)
     after_each(function()
-        env:tearDown()
+        env:tear_down()
         package.loaded['server.ability_api'] = savedExtra.ability
     end)
 
@@ -35,13 +35,13 @@ describe('TestVolcanoCombat', function()
         local p = fish.Carrier.Body.Position
         env.player.Character.Position = env.vec(p.x, p.y, p.z + 8)
         env.now = 30
-        env.mgr:Update()
+        env.mgr:update()
         local warning = env.notices[#env.notices]
         assert.is_not_nil(warning)
         assert.same('bossBreath', warning.move)
         env.player.Character.Position = env.vec(p.x + 4, p.y, p.z + 8)
         env.now = 32
-        env.mgr:Update()
+        env.mgr:update()
         assert.same(1000, env.player.Character.Controller.Health)
     end)
 
@@ -50,20 +50,20 @@ describe('TestVolcanoCombat', function()
         env.player.Character.Controller.Health = 1000
         env:drop('fish56Boss')
         env.now = 30
-        env.mgr:Update()
+        env.mgr:update()
         env.now = 30.1
-        env.mgr:Update()
+        env.mgr:update()
         env.now = 30.2
-        env.mgr:Update()
+        env.mgr:update()
         local warning = env.notices[#env.notices]
         assert.is_not_nil(warning)
         assert.same('bossBreath', warning.move)
         assert.same('line', warning.shape)
         assert.is_true(env.player.Character.Controller.Health > 0)
         env.now = 31.8
-        env.mgr:Update()
+        env.mgr:update()
         assert.same(1, env.player.Character.Controller.Health)
-        assert.same('downed', env.vitals:LifeStatus(env.player))
+        assert.same('downed', env.vitals:life_status(env.player))
         assert.same('clear', env.notices[#env.notices].kind)
     end)
 
@@ -82,7 +82,7 @@ describe('TestVolcanoCombat', function()
         while env.now < 19.7 - 1e-8 do
             peer.Character.Position = fish.Carrier.Body.Position
             env.now = math.min(19.7, env.now + 0.05)
-            env.mgr:Update()
+            env.mgr:update()
         end
         env.lifeHost.runtime:on_player_removing(peer)
         env.players[2] = nil
@@ -96,19 +96,19 @@ describe('TestVolcanoCombat', function()
         env:advance(15.1)
         local controlled = true
         env.mgr.Ai = { Pause = function() end, Custom = function() return true end, Sync = function() return true end,
-            Remove = function() end, Stop = function() end }
-        env.mgr.Ability = { FishParalyzed = function() return controlled end, RemoveFish = function() end }
+            remove = function() end, Stop = function() end }
+        env.mgr.Ability = { fish_paralyzed = function() return controlled end, remove_fish = function() end }
         env.now = 15.2
-        env.mgr:Update()
+        env.mgr:update()
         assert.same('clear', env.notices[#env.notices].kind)
         assert.same('controlled', env.notices[#env.notices].reason)
         env.now = 40
-        env.mgr:Update()
+        env.mgr:update()
         controlled = false
         env.now = 40.1
-        env.mgr:Update()
+        env.mgr:update()
         env.now = 41
-        env.mgr:Update()
+        env.mgr:update()
         assert.same('clear', env.notices[#env.notices].kind)
         env.mgr.Ai = nil
     end)
@@ -118,27 +118,27 @@ describe('TestVolcanoCombat', function()
         local fish = env:drop('fish56Boss')
         env.player.Character.Controller.Health = 1000
         env.now = 30
-        env.mgr:Update()
+        env.mgr:update()
         env.now = 30.1
-        env.mgr:Update()
+        env.mgr:update()
         env.now = 30.2
-        env.mgr:Update()
+        env.mgr:update()
         fish.Carrier.Receiver.Controller:TakeDamage(21000)
-        env.mgr:Update()
+        env.mgr:update()
         assert.same('clear', env.notices[#env.notices].kind)
         assert.same('enraged', fish.Phase.Phase)
         assert.same(1, fish.Phase.Stats.Transitions)
         env.now = 41
-        env.mgr:Update()
+        env.mgr:update()
         env.now = 41.1
-        env.mgr:Update()
+        env.mgr:update()
         env.now = 41.2
-        env.mgr:Update()
-        env.mgr:OnPlayerRemoving(env.player)
+        env.mgr:update()
+        env.mgr:on_player_removing(env.player)
         assert.same('clear', env.notices[#env.notices].kind)
-        env.mgr:Remove(fish)
+        env.mgr:remove(fish)
         env.now = 60
-        env.mgr:Update()
+        env.mgr:update()
         assert.is_true(env.player.Character.Controller.Health > 0)
     end)
 
@@ -148,11 +148,11 @@ describe('TestVolcanoCombat', function()
         local fish = env:drop('fish55Elite')
         env:advance(15.1)
         env.now = 17.7
-        env.mgr:Update()
+        env.mgr:update()
         assert.is_not_nil(fish.Carry)
         assert.same('mosasaurHead', env.notices[#env.notices].move)
         env.now = 18.6
-        env.mgr:Update()
+        env.mgr:update()
         assert.same('clear', env.notices[#env.notices].kind)
         assert.same('head', env.notices[#env.notices].reason)
     end)
@@ -162,9 +162,9 @@ describe('TestVolcanoCombat', function()
         local fish = env:drop('fish55Elite')
         env:advance(15.1)
         env.now = 17.7
-        env.mgr:Update()
+        env.mgr:update()
         assert.same(1, env.player.Character.Controller.Health)
-        assert.same('downed', env.vitals:LifeStatus(env.player))
+        assert.same('downed', env.vitals:life_status(env.player))
         assert.is_nil(fish.Carry)
         assert.is_nil(fish.CarryMount)
     end)
@@ -186,11 +186,11 @@ describe('TestVolcanoCombat', function()
             env:advance(env.now + 15.1)
             env:advance(env.now + 2.6)
             assert.same(1, controller.Health)
-            assert.same('downed', env.vitals:LifeStatus(env.player))
+            assert.same('downed', env.vitals:life_status(env.player))
             assert.same('clear', env.notices[#env.notices].kind)
             assert.is_nil(fish.BossWarn)
             assert.is_nil(fish.Aquatic.HeadAt)
-            env.mgr:Remove(fish)
+            env.mgr:remove(fish)
         end
     end)
 
@@ -205,7 +205,7 @@ describe('TestVolcanoCombat', function()
         assert.is_true(env.player.Character.Controller.Health <= 665)
         local MathWater = require('common.math_water_judge')
         env:advance(25)
-        assert.is_not_nil(MathWater.HitZone(Cfg.Water.Zones, env.player.Character.Position))
+        assert.is_not_nil(MathWater.hit_zone(Cfg.Water.Zones, env.player.Character.Position))
     end)
 
     -- 表/正文并集失败方式：有爪击却漏掉正文独立跺脚（2秒、脚边10米150）。
@@ -235,18 +235,18 @@ describe('TestVolcanoCombat', function()
         env.player.Character.Controller.Health = 5000
         local fish = env:drop('fish56Boss')
         fish.Carrier.Receiver.Controller:TakeDamage(11000)
-        env.mgr:Update()
+        env.mgr:update()
         env:advance(5)
         local MathWater = require('common.math_water_judge')
-        assert.is_not_nil(MathWater.HitZone(Cfg.Water.Zones, fish.Carrier.Body.Position))
+        assert.is_not_nil(MathWater.hit_zone(Cfg.Water.Zones, fish.Carrier.Body.Position))
         env:advance(18)
         assert.is_not_nil(fish.Carry)
         fish.Carrier.Receiver.Controller:TakeDamage(10000)
-        env.mgr:Update()
+        env.mgr:update()
         assert.is_nil(fish.Carry)
-        assert.is_nil(MathWater.HitZone(Cfg.Water.Zones, fish.Carrier.Body.Position))
-        env.mgr:Update()
-        env.mgr:Update()
+        assert.is_nil(MathWater.hit_zone(Cfg.Water.Zones, fish.Carrier.Body.Position))
+        env.mgr:update()
+        env.mgr:update()
         assert.same(2, fish.Phase.Stats.Transitions)
         assert.same('enraged', fish.Phase.Phase)
     end)

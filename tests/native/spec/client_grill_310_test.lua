@@ -10,7 +10,7 @@ local function mount(store, opts)
   local sent = opts.sent or {}
   local notices = opts.notices or {}
   local shared = GrillView.new_shared()
-  local root = Eui.Node({ Name = "UIRoot" })
+  local root = Eui.node({ Name = "UIRoot" })
   local view = RootView.mount(root, store, {
     hud = { GrillView.spec({ shared = shared }) },
     docks = opts.anchors and {
@@ -22,7 +22,7 @@ local function mount(store, opts)
       now = function() return store.clock.now() end,
     },
     create_node = function(kind, props)
-      return Eui.Node({
+      return Eui.node({
         Kind = kind,
         Name = props and props.Name,
         Parent = props and props.Parent,
@@ -81,10 +81,10 @@ describe("客户端烧烤视图宿主接缝（#310）", function()
     assert.equals("已烤 1.00 秒", time.Text)
 
     local takeout = child(root, "GrillTakeout")
-    assert.is_true(Eui.Click(takeout))
+    assert.is_true(Eui.click(takeout))
     assert.same({ action = "Takeout", seq = 1 }, sent[#sent])
 
-    assert.is_true(Eui.Click(takeout))
+    assert.is_true(Eui.click(takeout))
     assert.same({ action = "Takeout", seq = 2 }, sent[#sent])
 
     writer:ingest_event("GrillState", { state = "burnt" })
@@ -120,20 +120,20 @@ describe("客户端烧烤视图宿主接缝（#310）", function()
     local bubble = child(root, "BtnGrill1")
     assert.is_not_nil(bubble)
 
-    assert.is_true(Eui.Click(bubble))
+    assert.is_true(Eui.click(bubble))
     assert.same({ action = "Start", seq = 1 }, sent[#sent])
 
     writer:ingest_event("GrillResult", { ok = false, reason = "token-warn" })
     assert.equals(GameCfg.Grill.TokenWarnText, notices[#notices])
     writer:advance_clock(2)
-    assert.is_true(Eui.Click(bubble))
+    assert.is_true(Eui.click(bubble))
     assert.same({ action = "Start", seq = 2, confirm = true }, sent[#sent])
 
     writer:ingest_event("GrillState", { state = "cooking", itemId = "carp", startedAt = 1002 })
     assert.is_not_nil(child(root, "GrillPanel"))
-    assert.is_true(Eui.Click(child(root, "GrillClose")))
+    assert.is_true(Eui.click(child(root, "GrillClose")))
     assert.is_nil(child(root, "GrillPanel"))
-    assert.is_true(Eui.Click(bubble))
+    assert.is_true(Eui.click(bubble))
     assert.same({ action = "Query", seq = 3 }, sent[#sent])
     assert.is_not_nil(child(root, "GrillPanel"))
 

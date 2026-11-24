@@ -13,7 +13,7 @@ local PULSE_AMPLITUDE = 0.2
 local function near(position, center, character)
   local dist_sq = ViewUtil.distance_sq_xz(position, center)
   if dist_sq == nil then return false end
-  local radius = BodyScale.InteractionRadius(character, GameCfg.Interact.Fisherman.Radius)
+  local radius = BodyScale.interaction_radius(character, GameCfg.Interact.Fisherman.Radius)
   return dist_sq <= radius * radius
 end
 

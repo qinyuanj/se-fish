@@ -40,23 +40,23 @@ local function checkZone(index, zone)
     end
 end
 
-function MathWaterJudge.InZone(zone, pos)
+function MathWaterJudge.in_zone(zone, pos)
     local center = zone.Center
     return math.abs(pos.x - center.x) <= (zone.HalfX or zone.HalfXZ)
         and math.abs(pos.z - center.z) <= (zone.HalfZ or zone.HalfXZ)
         and pos.y <= zone.SurfaceY
 end
 
-function MathWaterJudge.HitZone(zones, pos)
+function MathWaterJudge.hit_zone(zones, pos)
     for i = 1, #zones do
-        if MathWaterJudge.InZone(zones[i], pos) then
+        if MathWaterJudge.in_zone(zones[i], pos) then
             return zones[i]
         end
     end
     return nil
 end
 
-function MathWaterJudge.Build(zones)
+function MathWaterJudge.build(zones)
     if type(zones) ~= "table" or #zones == 0 then
         error("MathWaterJudge.Build: 水区配置为空")
     end
@@ -68,11 +68,11 @@ function MathWaterJudge.Build(zones)
     end
 
     return function(pos)
-        return MathWaterJudge.HitZone(zones, pos)
+        return MathWaterJudge.hit_zone(zones, pos)
     end
 end
 
-function MathWaterJudge.Toward(zones, pos)
+function MathWaterJudge.toward(zones, pos)
     local best, bestX, bestZ
     for _, zone in ipairs(zones) do
         local halfX, halfZ = zone.HalfX or zone.HalfXZ, zone.HalfZ or zone.HalfXZ
@@ -87,7 +87,7 @@ function MathWaterJudge.Toward(zones, pos)
     return bestX / length, bestZ / length
 end
 
-function MathWaterJudge.InspectScene(zones, snapshot)
+function MathWaterJudge.inspect_scene(zones, snapshot)
     local byName = {}
     for _, entity in ipairs(snapshot) do
         local matches = byName[entity.Name] or {}

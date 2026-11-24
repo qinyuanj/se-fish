@@ -9,8 +9,8 @@ local function drop(env, id)
     env:prepare()
     env.player.Character.Controller.Health = 2000
     env.player.Character.Controller.TakeDamage = function() end
-    local fish = env:heldFish(env.player, id)
-    env.mgr:Drop(env.player)
+    local fish = env:held_fish(env.player, id)
+    env.mgr:drop(env.player)
     local p = fish.Carrier.Body.Position
     env.player.Character.Position = { x = p.x, y = p.y, z = p.z + 1 }
     env.other.Character.Controller.Health = 0
@@ -22,55 +22,55 @@ describe('TestShrimpCombat', function()
 
     before_each(function()
         env = FishCombat.new()
-        env:setUp()
+        env:set_up()
     end)
     after_each(function()
-        env:tearDown()
+        env:tear_down()
     end)
 
     it('test_airborne_dive_over_water_survives_and_timeout_lands', function()
         local fish = drop(env, 'fish16Boss')
-        env.now = 30; env.mgr:Update()
-        env.now = 36; env.mgr:Update()
+        env.now = 30; env.mgr:update()
+        env.now = 36; env.mgr:update()
         local ground = fish.Move.Center.y
         fish.Carrier.Body.Position = { x = 240, y = ground + 3, z = -44 }
-        env.now = 37; env.mgr:Update()
+        env.now = 37; env.mgr:update()
         assert.is_not.equal('escaping', fish.State)
-        env.now = fish.FleeAt; env.mgr:Update()
+        env.now = fish.FleeAt; env.mgr:update()
         assert.are.equal(ground, fish.Carrier.Body.Position.y)
         assert.is_nil(fish.Move)
     end)
 
     it('test_dragon_rain_six_ticks_then_dive_and_stun_are_mutually_exclusive', function()
         local fish = drop(env, 'fish16Boss')
-        env.mgr:Update()
-        env.now = 1.5; env.mgr:Update()
+        env.mgr:update()
+        env.now = 1.5; env.mgr:update()
         assert.are.equal(50, env.vitalsCalls[1][3])
-        env.now = 30; env.mgr:Update()
+        env.now = 30; env.mgr:update()
         assert.are.equal('rain', fish.Move.Name)
         local start = #env.vitalsCalls
         for t = 31, 36 do
-            env.now = t; env.mgr:Update(); env.mgr:Update()
+            env.now = t; env.mgr:update(); env.mgr:update()
         end
         assert.are.equal(6, #env.vitalsCalls - start)
         assert.are.equal('dive', fish.Move.Name)
-        env.now = 37; env.mgr:Update()
+        env.now = 37; env.mgr:update()
         assert.is_true(fish.Carrier.Body.Position.y > fish.Move.Center.y)
-        env.now = 38; env.mgr:Update(); env.mgr:Update()
+        env.now = 38; env.mgr:update(); env.mgr:update()
         assert.are.equal(7, #env.vitalsCalls - start)
         assert.are.equal('stunned', fish.State)
         assert.are.equal(43, fish.WakeAt)
-        env.now = 42.9; env.mgr:Update()
+        env.now = 42.9; env.mgr:update()
         assert.are.equal(7, #env.vitalsCalls - start)
-        env.now = 60; env.mgr:Update()
+        env.now = 60; env.mgr:update()
         assert.are.equal('rain', fish.Move.Name)
     end)
 
     it('test_rain_jitter_keeps_six_slots_without_extending_duration', function()
         local fish = drop(env, 'fish16Boss')
-        env.now = 30; env.mgr:Update()
+        env.now = 30; env.mgr:update()
         for _, t in ipairs({ 31.01, 32.02, 33.03, 34.04, 35.05, 36.01 }) do
-            env.now = t; env.mgr:Update(); env.mgr:Update()
+            env.now = t; env.mgr:update(); env.mgr:update()
         end
         assert.are.equal(6, #env.vitalsCalls)
         assert.are.equal('dive', fish.Move.Name)
@@ -78,8 +78,8 @@ describe('TestShrimpCombat', function()
 
     it('test_rain_large_dt_does_not_retroactively_hit_new_arrival', function()
         local fish = drop(env, 'fish16Boss')
-        env.now = 30; env.mgr:Update()
-        env.now = 36; env.mgr:Update(); env.mgr:Update()
+        env.now = 30; env.mgr:update()
+        env.now = 36; env.mgr:update(); env.mgr:update()
         assert.are.equal(1, #env.vitalsCalls)
         assert.are.equal('dive', fish.Move.Name)
         local notice = env.notices[#env.notices]
@@ -89,14 +89,14 @@ describe('TestShrimpCombat', function()
 
     it('test_remove_and_timeout_cancel_moves_and_stun', function()
         local fish = drop(env, 'fish16Boss')
-        env.now = 30; env.mgr:Update()
-        env.mgr:Remove(fish)
-        env.now = 40; env.mgr:Update()
+        env.now = 30; env.mgr:update()
+        env.mgr:remove(fish)
+        env.now = 40; env.mgr:update()
         assert.is_nil(fish.Move)
         assert.are.equal(0, #env.vitalsCalls)
         fish = drop(env, 'fish15Elite')
-        env.mgr:Update()
-        env.now = fish.FleeAt; env.mgr:Update()
+        env.mgr:update()
+        env.now = fish.FleeAt; env.mgr:update()
         assert.are.equal('escaping', fish.State)
         assert.is_nil(fish.Move)
         assert.is_nil(fish.WakeAt)
@@ -106,24 +106,24 @@ describe('TestShrimpCombat', function()
         local fish = drop(env, 'fish15Elite')
         local p = fish.Carrier.Body.Position
         env.player.Character.Position = { x = p.x + 10, y = p.y, z = p.z }
-        env.mgr:Update()
-        env.now = 1; env.mgr:Update()
+        env.mgr:update()
+        env.now = 1; env.mgr:update()
         assert.near(p.x + 7.5, fish.Carrier.Body.Position.x, 1e-6)
-        env.now = 2; env.mgr:Update()
+        env.now = 2; env.mgr:update()
         assert.is_not.is_nil(fish.Move)
         env.downed[env.player] = true
         local payloads = {}
-        env.mgr.CombatPublisher = function(payload) payloads[#payloads + 1] = payload end
-        env.mgr:Update()
+        env.mgr.combat_publisher = function(payload) payloads[#payloads + 1] = payload end
+        env.mgr:update()
         assert.is_nil(fish.MoveName)
         assert.is_nil(payloads[#payloads].move)
     end)
 
     it('test_shrimp_combo_is_two_hits_then_tail_with_no_duplicate_frame', function()
         local fish = drop(env, 'fish15Elite')
-        env.mgr:Update()
+        env.mgr:update()
         assert.is_not.is_nil(fish.Move)
-        for _, t in ipairs({ 2, 4, 6 }) do env.now = t; env.mgr:Update(); env.mgr:Update() end
+        for _, t in ipairs({ 2, 4, 6 }) do env.now = t; env.mgr:update(); env.mgr:update() end
         assert.are.equal(3, #env.vitalsCalls)
         for _, call in ipairs(env.vitalsCalls) do assert.are.equal(20, call[3]) end
         local p = fish.Carrier.Body.Position
@@ -133,50 +133,50 @@ describe('TestShrimpCombat', function()
 
     it('test_shrimp_stun_cancels_warning_and_restarts_after_five_seconds', function()
         local fish = drop(env, 'fish15Elite')
-        env.mgr:Update()
-        env.now = 15; env.mgr:Update()
+        env.mgr:update()
+        env.now = 15; env.mgr:update()
         assert.are.equal('stunned', fish.State)
         assert.is_nil(fish.Move)
         assert.are.equal(20, fish.WakeAt)
-        env.now = 19.9; env.mgr:Update()
+        env.now = 19.9; env.mgr:update()
         assert.are.equal(0, #env.vitalsCalls)
-        env.now = 20; env.mgr:Update()
+        env.now = 20; env.mgr:update()
         assert.are.equal('combat', fish.State)
         assert.is_not.is_nil(fish.Move)
     end)
 
     it('test_stun_wake_and_warning_cancel_do_not_accumulate_chase_time', function()
         local fish = drop(env, 'fish15Elite')
-        env.mgr:Update()
-        env.now = 15; env.mgr:Update()
+        env.mgr:update()
+        env.now = 15; env.mgr:update()
         local p = fish.Carrier.Body.Position
         env.player.Character.Position = { x = p.x + 50, y = p.y, z = p.z }
-        env.now = 20; env.mgr:Update()
+        env.now = 20; env.mgr:update()
         assert.same(p, fish.Carrier.Body.Position)
-        env.now = 21; env.mgr:Update()
+        env.now = 21; env.mgr:update()
         assert.near(p.x + 8, fish.Carrier.Body.Position.x, 1e-6)
         env.player.Character.Position = { x = p.x + 9, y = p.y, z = p.z }
-        env.now = 22; env.mgr:Update()
+        env.now = 22; env.mgr:update()
         assert.is_not.is_nil(fish.Move)
         local before = fish.Carrier.Body.Position
         env.player.Character.Position = { x = p.x + 50, y = p.y, z = p.z }
-        env.now = 24; env.mgr:Update()
+        env.now = 24; env.mgr:update()
         assert.same(before, fish.Carrier.Body.Position)
-        env.now = 25; env.mgr:Update()
+        env.now = 25; env.mgr:update()
         assert.near(before.x + 8, fish.Carrier.Body.Position.x, 1e-6)
     end)
 
     it('test_tail_rejected_hit_does_not_displace_and_downed_cancels', function()
         local fish = drop(env, 'fish15Elite')
-        env.mgr:Update()
-        env.now = 2; env.mgr:Update()
-        env.now = 4; env.mgr:Update()
+        env.mgr:update()
+        env.now = 2; env.mgr:update()
+        env.now = 4; env.mgr:update()
         local cp = env.player.Character.Position
-        env.mgr.Vitals.ApplyHit = function() return false end
-        env.now = 6; env.mgr:Update()
+        env.mgr.Vitals.apply_hit = function() return false end
+        env.now = 6; env.mgr:update()
         assert.same(cp, env.player.Character.Position)
         env.downed[env.player] = true
-        env.mgr:Update()
+        env.mgr:update()
         assert.is_nil(fish.Move)
     end)
 end)

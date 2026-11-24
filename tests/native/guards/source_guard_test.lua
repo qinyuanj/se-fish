@@ -15,11 +15,11 @@ local BUSINESS_ROOTS = { "client", "common", "server" }
 local BANNED_GLOBALS = { "io", "os", "package", "debug" }
 local REENTRANT_ENTRIES = {
   mount = true,
-  OnPlayerAdded = true,
+  on_player_added = true,
   Attach = true,
-  Bind = true,
+  bind = true,
   bind_host = true,
-  WatchCharacter = true,
+  watch_character = true,
 }
 
 local function is_reentrant_entry(path, name)

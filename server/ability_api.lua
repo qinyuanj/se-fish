@@ -1,18 +1,18 @@
 local AbilityPackageAPI = require("server.packages.ability_system.api")
 local AbilityAPI = { BehaviorServices = {} }
 
-local packageCastAbility = AbilityPackageAPI.CastAbility
+local packageCastAbility = AbilityPackageAPI.cast_ability
 local castGuard
 local extraGuards = {}
-function AbilityAPI.AddCastGuard(guard)
+function AbilityAPI.add_cast_guard(guard)
 	if type(guard) ~= 'function' then error('[AbilityAPI] CastGuard 必须是函数', 2) end
 	extraGuards[#extraGuards + 1] = guard
 end
-function AbilityAPI.SetCastGuard(guard)
+function AbilityAPI.set_cast_guard(guard)
     if guard ~= nil and type(guard) ~= 'function' then error('[AbilityAPI] CastGuard 必须是函数', 2) end
     castGuard = guard
 end
-function AbilityAPI.CastAbility(unit, abilityIndex, releasePoint, releaseDir, releaseTarget)
+function AbilityAPI.cast_ability(unit, abilityIndex, releasePoint, releaseDir, releaseTarget)
     if castGuard then
         local ok, allowed = pcall(castGuard, unit, abilityIndex)
         if not ok then print('[AbilityAPI] 施法守卫失败', tostring(allowed)) end
@@ -29,16 +29,16 @@ end
 local BodyScale = require("common.body_scale")
 local CarryMount = require("common.carry_mount")
 
-function AbilityAPI.SetBodyScale(unit, factor)
+function AbilityAPI.set_body_scale(unit, factor)
 	if not unit then return { Ok = false, Error = 'no-unit' } end
-	local scale = BodyScale.Sanitize(factor)
+	local scale = BodyScale.sanitize(factor)
 	if type(unit.SetScale) ~= 'function' then return { Ok = false, Error = 'no-set-scale', Scale = scale } end
 	local ok, err = pcall(unit.SetScale, unit, Vector3.New(scale, scale, scale))
 	if not ok then
 		print('[AbilityAPI] SetScale 失败', tostring(err))
 		return { Ok = false, Error = tostring(err), Scale = scale }
 	end
-	return { Ok = true, Scale = scale, Derived = BodyScale.Derive(scale) }
+	return { Ok = true, Scale = scale, Derived = BodyScale.derive(scale) }
 end
 
 ---挂点附着的落地接口：在宿主下建 SkeletalSocketMount。
@@ -49,11 +49,11 @@ end
 ---@param offset? table { x, y, z } 已净化的挂点位移
 ---@param rotation? any Quaternion 挂点旋转（缺省不写该字段，用预设默认）
 ---@return table { Ok, Mount?, Offset?, Error? }
-function AbilityAPI.AttachToSocket(world, unit, host, socketName, offset, rotation)
+function AbilityAPI.attach_to_socket(world, unit, host, socketName, offset, rotation)
 	if not host then return { Ok = false, Error = 'no-host' } end
 	if type(socketName) ~= 'string' or socketName == '' then return { Ok = false, Error = 'no-socket' } end
 	world = world or game:GetService('World')
-	local pos = CarryMount.SafeOffset(offset or { x = 0, y = 0, z = 0 }, 0, 0).Offset
+	local pos = CarryMount.safe_offset(offset or { x = 0, y = 0, z = 0 }, 0, 0).Offset
 	local options = {
 		Name = 'CarryMount_' .. tostring(host.Name or 'host'),
 		Parent = host,
@@ -78,7 +78,7 @@ function AbilityAPI.AttachToSocket(world, unit, host, socketName, offset, rotati
 end
 
 ---@return boolean
-function AbilityAPI.DetachFromSocket(mount)
+function AbilityAPI.detach_from_socket(mount)
 	if not mount then return false end
 	local ok = pcall(function()
 		if mount.Parent then mount.Parent = nil end
@@ -113,7 +113,7 @@ local AnchorBehaviorLoaders = {
 ---@param anchorScript Script 锚点脚本单位
 ---@param behaviorModule string 锚点行为名（AnchorBehaviorLoaders 的键，如 "melee_hit"）
 ---@return boolean 是否已挂接
-function AbilityAPI.AttachAnchor(anchorScript, behaviorModule)
+function AbilityAPI.attach_anchor(anchorScript, behaviorModule)
 	if not anchorScript then
 		return false
 	end

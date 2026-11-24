@@ -5,7 +5,7 @@
 -- #129：玩家挥砍只认 AbilityAPI 挥砍登记（伤害/射程来自 GameCfg 表），未登记不结算。
 --
 -- 迁移纪律：
---   * 旧 setUp/tearDown 的替身（全局引擎 + 4 个 package.loaded 管理器模块）改成逐案例 before_each/after_each，
+--   * 旧 set_up/tear_down 的替身（全局引擎 + 4 个 package.loaded 管理器模块）改成逐案例 before_each/after_each，
 --     快照在夹具动作之前取，恢复在案例失败时也执行（Busted 的 after_each 在 before_each 抛错后仍跑）；
 --     server/ability_behaviors/melee_hit.lua 与 eel_discharge.lua 这两个公开接缝上观察，不伸手进实现；
 --   * server/main.lua 的接线守卫读源码断言：assertStrContains 的 plain 子串语义用
@@ -46,11 +46,11 @@ describe('TestEelDischargeEntry', function()
             carrier = package.loaded['server.world_host.fish_carrier'] }
         ctx = { hits = {}, seenHits = {}, hitSerial = 0 }
         ctx.vitals = {
-            NewHit = function(_, source, category)
+            new_hit = function(_, source, category)
                 ctx.hitSerial = ctx.hitSerial + 1
                 return { id = ctx.hitSerial, source = source, category = category }
             end,
-            ApplyHit = function(_, hit, player, amount)
+            apply_hit = function(_, hit, player, amount)
                 local key = tostring(hit.id) .. ':' .. tostring(player.UserId)
                 if ctx.seenHits[key] then return false end
                 ctx.seenHits[key] = true
@@ -61,7 +61,7 @@ describe('TestEelDischargeEntry', function()
         ctx.owner = { Position = vec(0, 0, 0) }
         ctx.carrier = { Receiver = ctx.owner }
         package.loaded['server.world_host.fish_carrier'] = {
-            ResolveCarrier = function(_, unit) return unit == ctx.owner and ctx.carrier or nil end,
+            resolve_carrier = function(_, unit) return unit == ctx.owner and ctx.carrier or nil end,
         }
         ctx.inside = { UserId = 1, Character = { Position = vec(1, 0, 0), Controller = { Health = 300 } } }
         ctx.outside = { UserId = 2, Character = { Position = vec(9, 0, 0), Controller = { Health = 300 } } }
@@ -81,14 +81,14 @@ describe('TestEelDischargeEntry', function()
     it('test_discharge_uses_fish_hit_and_replay_does_not_double_apply', function()
         local behavior = assert(loadfile('server/ability_behaviors/eel_discharge.lua'))()
         behavior.Services = ctx.services
-        assert.same(1, behavior.Discharge(ctx.owner, 5, 15))
+        assert.same(1, behavior.discharge(ctx.owner, 5, 15))
         assert.same(1, #ctx.hits)
         assert.same(ctx.carrier, ctx.hits[1][1].source)
         assert.same('fishAttack', ctx.hits[1][1].category)
         assert.same(ctx.inside, ctx.hits[1][2])
         local replay = { id = 99, source = ctx.carrier, category = 'fishAttack' }
-        assert.same(1, behavior.Discharge(ctx.owner, 5, 15, replay))
-        assert.same(0, behavior.Discharge(ctx.owner, 5, 15, replay))
+        assert.same(1, behavior.discharge(ctx.owner, 5, 15, replay))
+        assert.same(0, behavior.discharge(ctx.owner, 5, 15, replay))
         assert.same(2, #ctx.hits)
     end)
 
@@ -99,11 +99,11 @@ describe('TestEelDischargeEntry', function()
         behavior.Services = ctx.services
         ctx.inside.Character.Position = vec(3, 0, 4)
         ctx.outside.Character.Position = vec(5.01, 0, 0)
-        assert.same(1, behavior.Discharge(ctx.owner, eel.Radius, eel.Damage))
+        assert.same(1, behavior.discharge(ctx.owner, eel.Radius, eel.Damage))
         assert.same(ctx.inside, ctx.hits[1][2])
         assert.same(10, ctx.hits[1][3])
         ctx.inside.Character.Controller.Health = 0
-        assert.same(0, behavior.Discharge(ctx.owner, eel.Radius, eel.Damage))
+        assert.same(0, behavior.discharge(ctx.owner, eel.Radius, eel.Damage))
         local fired
         local anchor = {
             FindFirstChild = function() return { Connect = function(_, fn) fired = fn return { Disconnect = function() end } end } end,
@@ -168,27 +168,27 @@ describe('TestMeleeHitEntry', function()
         -- #129：玩家挥砍只认 AbilityAPI 登记值；测试用假登记模块，不经真实包链
         package.loaded['server.ability_api'] = {}
         package.loaded['server.swing_registry'] = {
-            TakeSwing = function(userId)
+            take_swing = function(userId)
                 local s = ctx.swingStaged[userId]
                 ctx.swingStaged[userId] = nil
                 return s
             end,
         }
         ctx.vitals = {
-            NewHit = function(_, source, category)
+            new_hit = function(_, source, category)
                 local hit = { source = source, category = category, id = 1 }
                 ctx.createdHit = hit
                 return hit
             end,
-            ApplyHit = function(_, hit, target, amount)
+            apply_hit = function(_, hit, target, amount)
                 ctx.hits[#ctx.hits + 1] = { hit, target, amount }
                 return true, amount
             end,
         }
         package.loaded['server.world_host.fish_carrier'] = {
-            ResolveCarrier = function(_, target) return target == ctx.target and ctx.carrier or nil end,
+            resolve_carrier = function(_, target) return target == ctx.target and ctx.carrier or nil end,
         }
-        package.loaded['server.world_host.player_gm'] = { GetMeleeDamage = function(_, _, damage) return damage end }
+        package.loaded['server.world_host.player_gm'] = { get_melee_damage = function(_, _, damage) return damage end }
         ctx.services = { Vitals = ctx.vitals,
             FishCarrier = package.loaded['server.world_host.fish_carrier'], GM = package.loaded['server.world_host.player_gm'],
             Modifier = {} }

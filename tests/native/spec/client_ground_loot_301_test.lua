@@ -13,7 +13,7 @@ local function mount(opts)
   opts = opts or {}
   local clock = SpokeClock.new(10)
   local store, writer = ClientStore.new({ clock = clock })
-  local root = Eui.Node({ Name = "UIRoot" })
+  local root = Eui.node({ Name = "UIRoot" })
   local created = {}
   local sent = {}
   local notices = {}
@@ -23,7 +23,7 @@ local function mount(opts)
       notify = function(text) notices[#notices + 1] = text end,
     },
     create_node = function(kind, props)
-      local node = Eui.Node(props or {})
+      local node = Eui.node(props or {})
       node.UnitType = kind
       created[#created + 1] = node
       return node
@@ -81,7 +81,7 @@ describe("地面气泡与瞄准拾取（#301 客户端宿主）", function()
     assert.equals(1, alive_named(env, "BtnPickup_"))
     local btn = node_named(env, "BtnPickup_loot-1")
     assert.is_not_nil(btn)
-    assert.is_true(Eui.Click(btn))
+    assert.is_true(Eui.click(btn))
     assert.same({ { action = "Pickup", value = "loot-1" } }, env.sent)
 
     env.writer:update_spatial({ x = 30, y = 0, z = 30 }, {})
@@ -117,15 +117,15 @@ describe("地面气泡与瞄准拾取（#301 客户端宿主）", function()
 
     local toggle = node_named(env, "BtnAimPickup")
     assert.is_not_nil(toggle)
-    assert.is_true(Eui.Click(toggle))
+    assert.is_true(Eui.click(toggle))
     local mask = node_named(env, "AimPickupMask")
     assert.is_not_nil(mask)
 
-    assert.is_true(Eui.Click(mask))
+    assert.is_true(Eui.click(mask))
     assert.same({ { action = "Pickup", value = "near" } }, env.sent)
     assert.is_nil(node_named(env, "AimPickupMask"))
 
-    assert.is_true(Eui.Click(toggle))
+    assert.is_true(Eui.click(toggle))
     assert.is_not_nil(node_named(env, "AimPickupMask"))
     env.writer:update_spatial({ x = 50, y = 0, z = 50 }, {})
     assert.is_nil(node_named(env, "AimPickupMask"))

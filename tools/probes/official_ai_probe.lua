@@ -1,5 +1,5 @@
 -- #50 服务端隔离探针；不自动加载、不挂 manager、不改正式鱼或配置。
--- 由获准的运行环境 loadfile 后调用 Probe.Run(context)，本轮禁止执行编辑器。
+-- 由获准的运行环境 loadfile 后调用 Probe.run(context)，本轮禁止执行编辑器。
 local Probe = {}
 
 local retained = {
@@ -16,7 +16,7 @@ local retained = {
 }
 
 -- 逐项遍历实际配置，包含尚未 implemented 的条目；未知行为明确标出，不能缩减范围。
-function Probe.monsterMappings(cfg)
+function Probe.monster_mappings(cfg)
     local rows = {}
     local ability = cfg.Ability or {}
     for id, fish in pairs(cfg.Fish) do
@@ -52,8 +52,8 @@ function Probe.monsterMappings(cfg)
     return rows
 end
 
--- 探针入口。context 必须注入隔离对象与观测边界；Run 结束后单位与临时状态必须清理。
-function Probe.Run(context)
+-- 探针入口。context 必须注入隔离对象与观测边界；run 结束后单位与临时状态必须清理。
+function Probe.run(context)
     local c = context or {}
     assert(c.ai and c.createUnit and c.destroyUnit and c.players and c.now and c.wait and c.vector,
         'official_ai_probe 需要隔离 context 与时间/向量边界')
@@ -81,7 +81,7 @@ function Probe.Run(context)
         unit = assert(c.createUnit(), '创建隔离单位失败')
         assert(c.isIsolated(unit), '拒绝非隔离单位')
         local ai, v = c.ai, c.vector
-        ai.Funcs.MoveDirection(unit, v(1, 0, 0), 0.3, 0)
+        ai.Funcs.move_direction(unit, v(1, 0, 0), 0.3, 0)
         c.wait(0.1); observe('移动方向', 'moving', true)
         ai.Funcs.StopMove(unit, 0.3)
         c.wait(0.1); observe('停止移动', 'stopped', true)
@@ -119,19 +119,19 @@ function Probe.Run(context)
             c.wait(0.1); observe('技能指令', 'castObserved', true)
         else missing('技能指令', '无隔离技能预设与技能观测') end
         -- 交接门卫只控制业务回调；vendor取消通过停止后再次观测证明。
-        local gate = Probe.newHandoff(ai, unit, function(p) unit:SetPosition(p) end,
+        local gate = Probe.new_handoff(ai, unit, function(p) unit:SetPosition(p) end,
             function(damage) if c.applyHit then c.applyHit(damage) end end, log)
-        local old = gate:Switch('official')
-        ai.Funcs.MoveDirection(unit, v(1, 0, 0), 0, 0)
+        local old = gate:switch('official')
+        ai.Funcs.move_direction(unit, v(1, 0, 0), 0, 0)
         c.wait(0.1)
-        local custom = gate:Switch('custom')
+        local custom = gate:switch('custom')
         assert(not gate:Write(old, v(99, 99, 99)), '旧代次未撤权')
         assert(gate:Write(custom, unit:GetPosition()), '自定义轨迹未获得写入权')
-        local control = gate:Switch('controlled')
+        local control = gate:switch('controlled')
         assert(not gate:Write(control, v(99, 99, 99)) and not gate:Hit(control, 'control', 1), '控制态未禁用写入/伤害')
         c.wait(0.2); observe('轨迹交接取消官方移动', 'stopped', true)
-        gate:Switch('official')
-        ai.Funcs.MoveDirection(unit, v(0, 0, 1), 0.2, 0)
+        gate:switch('official')
+        ai.Funcs.move_direction(unit, v(0, 0, 1), 0.2, 0)
         c.wait(0.1); observe('控制解除恢复官方', 'moving', true)
         missing('Nav', '未提供真实 FindingPathUnit，导航与避障不能由离线向量证明')
         missing('仇恨注入', 'vendor优先级/焦点/阈值为预留接口，当前不生效；业务需维护目标')
@@ -151,10 +151,10 @@ function Probe.Run(context)
 end
 
 -- 交接门卫：每次切换先撤销旧方写入权并停官方 AI；回调必须各自判断接收到的 token。
-function Probe.newHandoff(ai, unit, applyPosition, applyHit, log)
+function Probe.new_handoff(ai, unit, applyPosition, applyHit, log)
     log = log or print
     local gate = { generation = 0, owner = nil, appliedHits = {} }
-    function gate:Switch(mode)
+    function gate:switch(mode)
         assert(mode == 'official' or mode == 'custom' or mode == 'controlled', '未知交接模式')
         self.generation = self.generation + 1
         self.owner = nil -- 先撤权，接口失败也不能保留旧写入权。

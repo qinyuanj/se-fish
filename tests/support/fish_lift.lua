@@ -2,7 +2,7 @@
 local M = {}
 local State = require('common.packages.spoke.api').State
 
---- 建一个空世界壳；调用方随后 :setUp() 搭世界、:tearDown() 拆除
+--- 建一个空世界壳；调用方随后 :set_up() 搭世界、:tear_down() 拆除
 --- （与 blindbox_world / revive_world 同一构造/拆除入口名）。
 function M.new()
     return setmetatable({}, { __index = M })
@@ -28,7 +28,7 @@ local function vec(x, y, z)
     end })
 end
 
-function M:setUp()
+function M:set_up()
     local env = self
     self.saved = { game = rawget(_G, 'game'), Vector3 = rawget(_G, 'Vector3'),
         RaycastParams = rawget(_G, 'RaycastParams') }
@@ -73,8 +73,8 @@ function M:setUp()
             env.spawned[#env.spawned + 1] = carrier
             return carrier
         end,
-        Despawn = function(_, carrier) env.despawned[#env.despawned + 1] = carrier end,
-        SyncAiPosition = function(_, carrier)
+        despawn = function(_, carrier) env.despawned[#env.despawned + 1] = carrier end,
+        sync_ai_position = function(_, carrier)
             if not carrier.AiOwnsMovement then return true end
             local p, offset = carrier.Receiver.Position, carrier.ReceiverOffset or vec(0, 0, 0)
             if not p or p.x ~= p.x or p.y ~= p.y or p.z ~= p.z then return false end
@@ -85,17 +85,17 @@ function M:setUp()
     package.loaded['server.world_host.fish_tree'] = nil
     self.mgr = assert(loadfile('server/world_host/fish_tree.lua'))()
     self.holder_trees = {}
-    self.mgr.GetPlayerTree = function(_, player)
+    self.mgr.get_player_tree = function(_, player)
         return player and self.holder_trees[player.UserId] or nil
     end
-    local died = self.mgr.OnDied
-    self.mgr.OnDied = function(host, player)
+    local died = self.mgr.on_died
+    self.mgr.on_died = function(host, player)
         local tree = player and self.holder_trees[player.UserId]
         if tree then tree.memos.is_alive:set(false) end
         return died(host, player)
     end
-    local removing = self.mgr.OnPlayerRemoving
-    self.mgr.OnPlayerRemoving = function(host, player)
+    local removing = self.mgr.on_player_removing
+    self.mgr.on_player_removing = function(host, player)
         local tree = player and self.holder_trees[player.UserId]
         if tree then tree.session_alive:set(false) end
         return removing(host, player)
@@ -103,13 +103,13 @@ function M:setUp()
     -- 目标裁决适配层由入口注入（生产见 server/main.lua）；夹具照生产接线补上，不走模块内 require。
     self.mgr.AiTarget = require('server.world_host.fish_ai_target')
     self.pushed = {}
-    self.mgr.Cast = { PushState = function(_, player) env.pushed[#env.pushed + 1] = player end }
+    self.mgr.cast = { PushState = function(_, player) env.pushed[#env.pushed + 1] = player end }
     self.mgr:Start()
-    self.player = self:newPlayer(7, vec(10, 2, -20))
-    self.other = self:newPlayer(8, vec(30, 2, -20))
+    self.player = self:new_player(7, vec(10, 2, -20))
+    self.other = self:new_player(8, vec(30, 2, -20))
 end
 
-function M:newPlayer(id, position)
+function M:new_player(id, position)
     local env = self
     local character
     character = { Position = position, Rotation = { GetForward = function() return vec(0, 0, 1) end },
@@ -122,13 +122,13 @@ function M:newPlayer(id, position)
     self.holder_trees[id] = tree
     character.Controller.Died:Connect(function() tree.memos.is_alive:set(false) end)
     self.players[#self.players + 1] = player
-    self.mgr:OnPlayerAdded(player)
+    self.mgr:on_player_added(player)
     return player
 end
 
-function M:tearDown()
+function M:tear_down()
     if not self.saved then return end
-    -- 即使 setUp 只走到一半也恢复已保存的进程状态；Stop 失败最后传播。
+    -- 即使 set_up 只走到一半也恢复已保存的进程状态；Stop 失败最后传播。
     local ok, err = pcall(function() if self.mgr then self.mgr:Stop() end end)
     if self.modules then
         for _, name in ipairs({ 'server.world_host.fish_carrier', 'server.world_host.fish_tree' }) do
@@ -144,7 +144,7 @@ end
 
 function M:land(player, fishId, mult)
     local c = player.Character.Position
-    return self.mgr:SpawnLanded(player, { fishId = fishId or 'bass', mult = mult or 1.37 }, vec(c.x, c.y, c.z + 2))
+    return self.mgr:spawn_landed(player, { fishId = fishId or 'bass', mult = mult or 1.37 }, vec(c.x, c.y, c.z + 2))
 end
 
 function M:mounts()

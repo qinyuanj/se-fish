@@ -37,8 +37,8 @@
 - **效果清除规则**：效果预设壳新增「清除规则」`RemoveMode`，默认 `1`（击败后清除），拥有者触发引擎死亡信号时移除效果。本图生死由 `MgrSurvival` 管理，`MgrModifier` 获得效果时显式传 `removeMode = 0`，保持旧包「死亡不清效果」的行为。
 - **效果阻断与打断**：预设的 `ForbidTags` 命中已有效果时获得结果为 `Blocked`，`RemoveTags` 会移除带对应标签的已有效果；本图预设未配置这两项。`MgrModifier` 把 `Added` / `Reobtained` 以外的结果都当失败处理。
 - **效果状态栏 UI**：客户端效果管理器启动后自动拉起 `ui/EffectStatusBarUI`，按 `UIType=EffectStatusBar` 或节点名「效果状态栏」找界面节点。本图没有这个节点，界面不显示；循环每 0.5 秒重查一次，约 30 秒后打一条「未找到可用的效果状态栏」提示，属预期。
-- **技能覆盖装配**：`AddAbility` 指定的槽位被另一预设占用时，旧包返回失败，新包先移除旧技能再装配。本图初始技能与鱼技能各占一个槽位，不触发覆盖。
-- **客户端施法竞态守卫**：包内 `CastAbility` 新增末参数 `fromClient`，只有包自带的客户端施法请求传 `true`；`server/ability_api.lua` 的守卫转发不传，行为与旧包一致。
+- **技能覆盖装配**：`add_ability` 指定的槽位被另一预设占用时，旧包返回失败，新包先移除旧技能再装配。本图初始技能与鱼技能各占一个槽位，不触发覆盖。
+- **客户端施法竞态守卫**：包内 `cast_ability` 新增末参数 `fromClient`，只有包自带的客户端施法请求传 `true`；`server/ability_api.lua` 的守卫转发不传，行为与旧包一致。
 - ECA（两个包的 `eca.lua`）、技能 `event_bridge.lua` 与 `common/.../enums.lua` 随包进来，本图未接入；锚点 `caster_add_buff` 按惯例在 `AnchorBehaviorLoaders` 登记，未配置使用。
 
 ## 导入不可逆

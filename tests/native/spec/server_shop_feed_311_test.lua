@@ -41,7 +41,7 @@ describe("服务端商店与钓鱼佬原子事务（#311）", function()
     function player:SetAttribute(key, value) self.attrs[key] = value end
     local data = ctx.PlayerData.New(player)
     data:Init(true)
-    ctx.save:LoadInto(player, data)
+    ctx.save:load_into(player, data)
     drain()
     if before_ready then before_ready(data) end
     ctx.datas[id] = data
@@ -55,7 +55,7 @@ describe("服务端商店与钓鱼佬原子事务（#311）", function()
   local function act(player, channel, payload)
     ctx.seq = (ctx.seq or 0) + 1
     payload.seq = payload.seq or ctx.seq
-    _G.REUtil:GetRE(channel).OnServerEvent:Fire(player, payload)
+    _G.REUtil:get_re(channel).OnServerEvent:Fire(player, payload)
     drain()
     local results = player.results and player.results[channel == "ShopAction" and "ShopResult" or "InteractResult"]
     return results and results[#results] or nil
@@ -101,8 +101,8 @@ describe("服务端商店与钓鱼佬原子事务（#311）", function()
       if name == "Players" then return { GetPlayers = function() return ctx.players end } end
     end }
     _G.REUtil = {
-      CheckRECD = function() return false end,
-      GetRE = function(_, name)
+      check_recd = function() return false end,
+      get_re = function(_, name)
         if not ctx.events[name] then
           ctx.events[name] = {
             OnServerEvent = signal(),
@@ -126,18 +126,18 @@ describe("服务端商店与钓鱼佬原子事务（#311）", function()
     ctx.runtime = ServerRuntime.new({
       initial_now = 1000,
       remote = _G.REUtil,
-      player_data = { GetDataInst = function(_, player) return ctx.datas[player.UserId] end },
+      player_data = { get_data_inst = function(_, player) return ctx.datas[player.UserId] end },
       save = ctx.save,
       players_service = _G.game:GetService("Players"),
       world_service = _G.game:GetService("World"),
       on_item_bar_state = function(player, snapshot)
-        _G.REUtil:GetRE("ItemBarState"):FireClient(player, snapshot)
+        _G.REUtil:get_re("ItemBarState"):FireClient(player, snapshot)
       end,
       bind_shop_action = function(dispatch)
-        _G.REUtil:GetRE("ShopAction").OnServerEvent:Connect(dispatch)
+        _G.REUtil:get_re("ShopAction").OnServerEvent:Connect(dispatch)
       end,
       bind_interact_action = function(dispatch)
-        _G.REUtil:GetRE("InteractAction").OnServerEvent:Connect(dispatch)
+        _G.REUtil:get_re("InteractAction").OnServerEvent:Connect(dispatch)
       end,
     })
     ctx.runtime:start()
@@ -223,7 +223,7 @@ describe("服务端商店与钓鱼佬原子事务（#311）", function()
     local downed = join(31106, "fisherman")
     local rescuer = join(31107, "fisherman")
     rescuer.Character.Position.x = 102
-    ctx.runtime.life:ApplyHit(ctx.runtime.life:NewHit(nil, "fishAttack"), downed,
+    ctx.runtime.life:apply_hit(ctx.runtime.life:new_hit(nil, "fishAttack"), downed,
       GameCfg.Vitals.MaxHealth + 1)
     assert.same("downed", ctx.runtime.life:Phase(downed))
     local reply = act(rescuer, "InteractAction", {

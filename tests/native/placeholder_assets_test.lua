@@ -4,7 +4,7 @@
 --   2. 已有正式图标的物品被占位表覆盖，正式交付无法直接替换；
 --   3. 特殊道具模型创建失败时挂点残留，随后重试叠加；
 --   4. 恢复后占位模型或挂点残留。
--- 迁移自 tests/gameplay/placeholder_assets_test.lua（#83）。旧入口的 setUp/tearDown 是逐例执行的，
+-- 迁移自 tests/gameplay/placeholder_assets_test.lua（#83）。旧入口的 set_up/tear_down 是逐例执行的，
 -- 因此这里映射为 before_each/after_each；模块缓存与全局在 after_each 一律恢复，
 -- 测试体中途失败也不把半成品环境留给后续案例。
 local GameCfg = require('common.game_cfg')

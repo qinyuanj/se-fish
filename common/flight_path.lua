@@ -8,7 +8,7 @@ local function cfg()
 end
 
 local function isBadNumber(v)
-    return not Number.IsFiniteNumber(v)
+    return not Number.is_finite_number(v)
 end
 
 local function isBadPoint(p)
@@ -22,7 +22,7 @@ end
 ---@param scene? table GameCfg.Zones[i].Scene
 ---@param flightCfg? table GameCfg.Ability.Flight
 ---@return table? bounds { MinX, MaxX, MinZ, MaxZ, BottomY, TopY, GroundY, CeilingY, MaxHeight }
-function M.BoundsOf(scene, flightCfg)
+function M.bounds_of(scene, flightCfg)
     if type(scene) ~= 'table' then return nil end
     local b = scene.Boundary
     if type(b) ~= 'table' then return nil end
@@ -54,7 +54,7 @@ function M.New(bounds, flightCfg, profile, start, now)
     start = start or { x = bounds.MinX, y = bounds.GroundY + (profile.CruiseHeight or flightCfg.CruiseHeight), z = bounds.MinZ }
     now = isBadNumber(now) and 0 or now
     return {
-        Bounds = bounds, Cfg = flightCfg, Profile = profile,
+        bounds = bounds, Cfg = flightCfg, Profile = profile,
         Pos = copy(start), Last = copy(start), Vel = { x = 0, y = 0, z = 0 },
         Phase = 'cruise', Target = nil,
         Center = profile.Center or { x = (bounds.MinX + bounds.MaxX) / 2, z = (bounds.MinZ + bounds.MaxZ) / 2 },
@@ -67,7 +67,7 @@ function M.New(bounds, flightCfg, profile, start, now)
     }
 end
 
-function M.SetTarget(state, target)
+function M.set_target(state, target)
     state.Target = (type(target) == 'table' and not isBadPoint(target)) and copy(target) or nil
 end
 
@@ -80,7 +80,7 @@ function M.CruiseHeight(state)
 end
 
 local function clampToBounds(state)
-    local b, p = state.Bounds, state.Pos
+    local b, p = state.bounds, state.Pos
     local clamped = 0
     local function clampAxis(axis, min, max)
         local v = p[axis]
@@ -107,7 +107,7 @@ end
 
 local function updateCruise(state, dt, now, events)
     local profile, c = state.Profile, state.Cfg
-    local cruiseY = state.Bounds.GroundY + M.CruiseHeight(state)
+    local cruiseY = state.bounds.GroundY + M.CruiseHeight(state)
     local speed = M.Speed(state)
     local dx, dz
     if state.Target then
@@ -152,7 +152,7 @@ local function updateDive(state, dt, now, events)
         state.Vel.x, state.Vel.z = 0, 0
         state.Vel.y = -speed
     end
-    local floor = state.Bounds.GroundY
+    local floor = state.bounds.GroundY
     if now >= state.PhaseEndsAt or state.Pos.y <= floor + 0.01 then
         state.Phase = 'climb'
     end
@@ -161,7 +161,7 @@ end
 
 local function updateClimb(state, dt, now, events)
     local speed = M.Speed(state)
-    local cruiseY = state.Bounds.GroundY + M.CruiseHeight(state)
+    local cruiseY = state.bounds.GroundY + M.CruiseHeight(state)
     state.Vel.x, state.Vel.z = 0, 0
     state.Vel.y = state.Profile.ClimbSpeed or state.Cfg.ClimbSpeed
     if state.Pos.y >= cruiseY - 0.01 then
@@ -183,7 +183,7 @@ local function updateLeap(state, dt, now, events)
         state.NextDiveAt = now + (state.Profile.DiveIntervalSec or c.DiveIntervalSec)
         return M.Speed(state)
     end
-    state.Pos.y = state.Bounds.GroundY + apex * math.sin(math.pi * progress)
+    state.Pos.y = state.bounds.GroundY + apex * math.sin(math.pi * progress)
     state.Vel.y = 0
     return M.Speed(state)
 end

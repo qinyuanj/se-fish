@@ -3,7 +3,7 @@
 --   1. 调试开关关闭时进图仍白送鱼竿 / 蚯蚓，与拾饵、喂食、购买并存成两套正式获取路径；
 --   2. 白送配置仍挂在物品表下、与 GM 不是同一个开关；开关打开后白送不生效或发错容器；
 --   3. 清理时把合法的鱼竿等级筛选一起删了：要求等级高于鱼竿的鱼也能钓上，或等级够的鱼钓不上。
--- 旧套件的 setUp/tearDown 是逐例的（每案例各跑一次），因此映射为 before_each/after_each，
+-- 旧套件的 set_up/tear_down 是逐例的（每案例各跑一次），因此映射为 before_each/after_each，
 -- 不是 suite 级 setup/teardown；after_each 对未完成的 before_each 幂等（ctx 未建立就跳过）。
 -- describe/it 名沿用旧类名与方法名，案例顺序沿用旧 LuaUnit 的字典序执行序。
 local GameCfg = require('common.game_cfg')
@@ -69,8 +69,8 @@ describe('TestGrowthCleanup', function()
             { Id = 'high', Bait = 0, RodLevel = 2, DrawWeight = 1000 },
         }
         local maxRoll = function(n) return n end
-        assert.same('low', FishCatch.Select(rows, 1, nil, maxRoll))
-        assert.same('high', FishCatch.Select(rows, 2, nil, maxRoll))
-        assert.is_nil(FishCatch.Select({ rows[2] }, 1, nil, maxRoll))
+        assert.same('low', FishCatch.select(rows, 1, nil, maxRoll))
+        assert.same('high', FishCatch.select(rows, 2, nil, maxRoll))
+        assert.is_nil(FishCatch.select({ rows[2] }, 1, nil, maxRoll))
     end)
 end)

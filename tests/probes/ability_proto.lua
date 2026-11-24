@@ -66,10 +66,10 @@ print('== A 三倍体型与挂点坐标')
 local B = GameCfg.Ability.BodyScale
 local Carry = GameCfg.Ability.Carry
 
-local plan0 = BodyScale.Plan(0)
-local plan10 = BodyScale.Plan(10)
-local plan11 = BodyScale.Plan(11)
-local planBad = BodyScale.Plan(0 / 0)
+local plan0 = BodyScale.plan(0)
+local plan10 = BodyScale.plan(10)
+local plan11 = BodyScale.plan(11)
+local planBad = BodyScale.plan(0 / 0)
 quantity('A 体型 0 瓶', string.format('scale=%.1f health=%.0f capped=%s',
     plan0.Scale, plan0.Health, tostring(plan0.Capped)))
 quantity('A 体型 10 瓶', string.format('scale=%.1f health=%.0f capped=%s',
@@ -81,15 +81,15 @@ check('A 超出上限的瓶数不越界', plan11.Scale == B.Max and plan11.Potio
 check('A NaN 瓶数按 0 处理（不污染体型）',
     planBad.Scale == B.Base and planBad.Health == B.HealthBase)
 check('A 倍率净化：NaN/负数/超上限都落回有限值',
-    BodyScale.Sanitize(0 / 0) == 1 and BodyScale.Sanitize(-2) == 1 and BodyScale.Sanitize(99) == B.Max)
+    BodyScale.sanitize(0 / 0) == 1 and BodyScale.sanitize(-2) == 1 and BodyScale.sanitize(99) == B.Max)
 
--- 挂点位移按体型放大（与真实宿主同口径：base 提供 SocketOffset，Derive 逐轴乘倍率）
+-- 挂点位移按体型放大（与真实宿主同口径：base 提供 SocketOffset，derive 逐轴乘倍率）
 local base = {
     CapsuleHeight = B.CapsuleHeight, CameraDistance = B.CameraDistance,
     InteractRange = B.InteractRange, SocketOffset = Carry.Offset,
 }
-local d1 = BodyScale.Derive(1, base)
-local d3 = BodyScale.Derive(3, base)
+local d1 = BodyScale.derive(1, base)
+local d3 = BodyScale.derive(3, base)
 quantity('A 派生量 1 倍', string.format('capsule=%.1f camera=%.1f interact=%.1f',
     d1.CapsuleHeight, d1.CameraDistance, d1.InteractRange))
 quantity('A 派生量 3 倍', string.format('capsule=%.1f camera=%.1f interact=%.1f',
@@ -100,8 +100,8 @@ check('A 胶囊/相机/交互距离随倍率等比放大',
 
 local Host = { x = 100, y = 2, z = 50 }   -- 两条身份共用的宿主（哥斯拉）位置
 local Yaw = math.pi / 2                    -- 宿主朝向：+x
-local mount1 = CarryMount.MountPoint(Host, d1.SocketOffset, Yaw)
-local mount3 = CarryMount.MountPoint(Host, d3.SocketOffset, Yaw)
+local mount1 = CarryMount.mount_point(Host, d1.SocketOffset, Yaw)
+local mount3 = CarryMount.mount_point(Host, d3.SocketOffset, Yaw)
 quantity('A 挂点世界坐标 1 倍', fmt(mount1))
 quantity('A 挂点世界坐标 3 倍', fmt(mount3))
 local delta1 = { x = mount1.x - Host.x, y = mount1.y - Host.y, z = mount1.z - Host.z }
@@ -112,8 +112,8 @@ check('A 挂点坐标随体型等比外推（3 倍 = 1 倍 × 3）',
 check('A 两种体型下挂点坐标都是有限值', finitePoint(mount1) and finitePoint(mount3))
 
 -- 挂点不穿出：中心距 ≥ 宿主半高 + 携带物半高（两者都随体型放大，比值不变）
-local safe1 = CarryMount.SafeOffset(d1.SocketOffset, Carry.HostHalfHeight, Carry.CarriedHalfHeight)
-local safe3 = CarryMount.SafeOffset(d3.SocketOffset, Carry.HostHalfHeight * 3, Carry.CarriedHalfHeight * 3)
+local safe1 = CarryMount.safe_offset(d1.SocketOffset, Carry.HostHalfHeight, Carry.CarriedHalfHeight)
+local safe3 = CarryMount.safe_offset(d3.SocketOffset, Carry.HostHalfHeight * 3, Carry.CarriedHalfHeight * 3)
 quantity('A 挂点位移长度 1 倍 / 3 倍',
     string.format('%.3f / %.3f（净空要求 %.3f / %.3f）',
         CarryMount.Length(d1.SocketOffset), CarryMount.Length(d3.SocketOffset),
@@ -121,12 +121,12 @@ quantity('A 挂点位移长度 1 倍 / 3 倍',
         (Carry.HostHalfHeight + Carry.CarriedHalfHeight) * 3))
 check('A 1 倍与 3 倍体型下挂点都在宿主体外（无需纠正）',
     safe1.Corrected == false and safe3.Corrected == false)
-local tight = CarryMount.SafeOffset({ x = 0, y = 0.1, z = 0.1 }, Carry.HostHalfHeight, Carry.CarriedHalfHeight)
+local tight = CarryMount.safe_offset({ x = 0, y = 0.1, z = 0.1 }, Carry.HostHalfHeight, Carry.CarriedHalfHeight)
 quantity('A 贴脸位移纠正后', fmt(tight.Offset))
 check('A 贴脸位移被判为穿出并推出到净空距离', tight.Corrected == true
     and CarryMount.Length(tight.Offset) >= Carry.HostHalfHeight + Carry.CarriedHalfHeight - 1e-9)
 check('A 零位移兜底不产出 NaN 方向',
-    finitePoint(CarryMount.SafeOffset({ x = 0, y = 0, z = 0 }, 1, 1).Offset))
+    finitePoint(CarryMount.safe_offset({ x = 0, y = 0, z = 0 }, 1, 1).Offset))
 
 -- =====================================================================================
 -- B 飞行：围栏钳制、俯冲节奏、坏值与漂移防护
@@ -137,19 +137,19 @@ local zone = nil
 for _, entry in ipairs(GameCfg.Zones) do
     if entry.Id == 'reefIsland' then zone = entry.Scene end
 end
-local bounds = FlightPath.BoundsOf(zone, F)
+local bounds = FlightPath.bounds_of(zone, F)
 check('B 钓鱼区场景合同给出了有限围栏', bounds ~= nil and finite(bounds.MinX) and finite(bounds.CeilingY))
 quantity('B 围栏', string.format('x[%.1f,%.1f] z[%.1f,%.1f] ground=%.1f ceiling=%.1f',
     bounds.MinX, bounds.MaxX, bounds.MinZ, bounds.MaxZ, bounds.GroundY, bounds.CeilingY))
 check('B 高度上限 = 地面 + MaxFlightHeight（#125 合同的 20 米）',
     math.abs(bounds.CeilingY - (bounds.GroundY + bounds.MaxHeight)) < 1e-9)
-check('B 场景缺失时返回 nil（无边界不飞）', FlightPath.BoundsOf(nil, F) == nil
-    and FlightPath.BoundsOf({}, F) == nil)
+check('B 场景缺失时返回 nil（无边界不飞）', FlightPath.bounds_of(nil, F) == nil
+    and FlightPath.bounds_of({}, F) == nil)
 
 -- 目标故意放到围栏外（用身份 1002 的远点）：飞行每帧都会被夹回本区
 local fly = FlightPath.New(bounds, F, F.Species.fish47Elite,
     { x = 0, y = bounds.GroundY + 12, z = 0 }, 0)
-FlightPath.SetTarget(fly, Players[2].Pos)
+FlightPath.set_target(fly, Players[2].Pos)
 local violations = 0
 local now = 0
 for _ = 1, 1210 do    -- 60.5 秒，按 0.05 秒一帧
@@ -178,7 +178,7 @@ check('B 俯冲按 20 秒节奏触发（60 秒内 3 次）', fly.Stats.Dives == 
 -- 坏值与漂移：新状态单独验，不干扰上面的钳制记录
 local guard = FlightPath.New(bounds, F, F.Species.fish48Boss,
     { x = 0, y = bounds.GroundY + 15, z = 0 }, 0)
-FlightPath.SetTarget(guard, Players[1].Pos)
+FlightPath.set_target(guard, Players[1].Pos)
 guard.Pos.x = 0 / 0
 local nanEvent = FlightPath.Step(guard, 1, 0.05)
 quantity('B NaN 恢复后坐标', fmt(nanEvent.position or guard.Pos))
@@ -201,7 +201,7 @@ local volcano = nil
 for _, entry in ipairs(GameCfg.Zones) do
     if entry.Id == 'volcanoIsland' then volcano = entry.Scene end
 end
-local leapBounds = FlightPath.BoundsOf(volcano, F)
+local leapBounds = FlightPath.bounds_of(volcano, F)
 check('B 火山岛（沧龙所在区）场景合同给出有限围栏',
     leapBounds ~= nil and finite(leapBounds.MinX) and finite(leapBounds.CeilingY))
 quantity('B 火山岛围栏', string.format('x[%.1f,%.1f] z[%.1f,%.1f] ground=%.1f ceiling=%.1f',
@@ -231,7 +231,7 @@ print('== C 巡航叼人')
 local carry = CarryMount.New(Carry, Host, Yaw, 0)
 carry.GroundY = Host.y
 quantity('C 挂点位移', fmt(carry.Offset))
-quantity('C 挂点世界坐标', fmt(CarryMount.MountPoint(Host, carry.Offset, Yaw)))
+quantity('C 挂点世界坐标', fmt(CarryMount.mount_point(Host, carry.Offset, Yaw)))
 check('C 宿主外挂点（净空足够，无需纠正）', carry.Corrected == false
     and CarryMount.Length(carry.Offset) >= Carry.HostHalfHeight + Carry.CarriedHalfHeight)
 
@@ -240,7 +240,7 @@ check('C 超出抓取距离不叼', tooFar.Ok == false and tooFar.Reason == 'out
 local grabbed = CarryMount.Attach(carry, Players[1].Pos, 0)
 quantity('C 咬中伤害', grabbed.Damage)
 check('C 就近身份 1001 被叼走（咬中 300）', grabbed.Ok == true and grabbed.Damage == Carry.GrabDamage)
-check('C 叼中时的挂点坐标有限', finitePoint(CarryMount.MountPoint(carry.Host, carry.Offset, carry.Yaw)))
+check('C 叼中时的挂点坐标有限', finitePoint(CarryMount.mount_point(carry.Host, carry.Offset, carry.Yaw)))
 
 Players[1].Pos = { x = Host.x + 1, y = Host.y, z = Host.z + 1 }   -- 容差内的小幅漂移
 local hold = CarryMount.Follow(carry, Players[1].Pos, 0.05, 0.05)
@@ -250,13 +250,13 @@ local snapped = CarryMount.Follow(carry, Players[1].Pos, 0.1, 0.05)
 quantity('C 甩开后钳回坐标', fmt(snapped.Position))
 check('C 超出容差整段钳回挂点并计数',
     snapped.Snapped == true and carry.Stats.Snaps == 1
-    and samePoint(snapped.Position, CarryMount.MountPoint(carry.Host, carry.Offset, carry.Yaw)))
+    and samePoint(snapped.Position, CarryMount.mount_point(carry.Host, carry.Offset, carry.Yaw)))
 local timedOut = CarryMount.Step(carry, Carry.MaxCarrySec, 0.05)
-quantity('C 超时落点', fmt(timedOut.DropPoint or {}))
+quantity('C 超时落点', fmt(timedOut.drop_point or {}))
 check('C 超时自动释放（落点有限、离地 DropHeight）',
     timedOut.Released == true and timedOut.Reason == 'timeout'
-    and finitePoint(timedOut.DropPoint)
-    and math.abs(timedOut.DropPoint.y - (carry.GroundY + Carry.DropHeight)) < 1e-9)
+    and finitePoint(timedOut.drop_point)
+    and math.abs(timedOut.drop_point.y - (carry.GroundY + Carry.DropHeight)) < 1e-9)
 check('C 重复释放是空操作', CarryMount.Release(carry, Carry.MaxCarrySec + 1, 'again').Reason == 'notCarrying')
 
 -- 第二个身份：同一个宿主的下一次叼人
@@ -276,7 +276,7 @@ check('C 目标坐标坏值立即释放且落点有限（不把 NaN 写回玩家
 print('== D 分阶段首领')
 local Boss = GameCfg.Ability.BossPhase
 local boss = BossPhase.New(Boss, 0, { x = 100, y = 2, z = 50 })
-local jumped = BossPhase.Update(boss, 0.05, 0.05, {
+local jumped = BossPhase.update(boss, 0.05, 0.05, {
     Health = 1000, MaxHealth = 10000, Alive = true,
     Target = Players[1].Pos, Pos = { x = 100, y = 2, z = 50 },
 })
@@ -285,7 +285,7 @@ quantity('D 一帧跨两阈值', string.format('from=%s to=%s skipped=[%s] perce
 check('D 一帧跨两阈值只进最终合法阶段',
     jumped.PhaseChanged == true and jumped.From == 'normal' and jumped.To == 'enraged'
     and #jumped.Skipped == 1 and jumped.Skipped[1] == 'water' and boss.Stats.Skipped == 1)
-local healed = BossPhase.Update(boss, 1, 0.95, {
+local healed = BossPhase.update(boss, 1, 0.95, {
     Health = 9000, MaxHealth = 10000, Alive = true, Target = Players[1].Pos,
 })
 check('D 阶段只升级不倒退（回血不退回）',
@@ -306,19 +306,19 @@ local inRange = { x = 104, y = 2, z = 50 }   -- 身份 1001：距首领 4 米，
 local outRange = { x = 130, y = 2, z = 50 }  -- 身份 1002：距首领 30 米，射程外
 
 local w = BossPhase.New(breathOnly, 0, { x = 100, y = 2, z = 50 })
-BossPhase.Update(w, 10, 10, { Health = 25000, MaxHealth = 25000, Alive = true, Target = inRange })
-check('D 到期吐息先起手再落地（不是瞬发）', BossPhase.Winding(w) == true)
-local interrupted = BossPhase.Update(w, 10.1, 0.1, {
+BossPhase.update(w, 10, 10, { Health = 25000, MaxHealth = 25000, Alive = true, Target = inRange })
+check('D 到期吐息先起手再落地（不是瞬发）', BossPhase.winding(w) == true)
+local interrupted = BossPhase.update(w, 10.1, 0.1, {
     Health = 25000, MaxHealth = 25000, Alive = true, Target = nil,
 })
 check('D 途中失目标立即撤销起手并重新计时',
     interrupted.Interrupted == true and interrupted.Reason == 'lostTarget'
-    and BossPhase.Winding(w) == false and w.Stats.Interrupts == 1)
+    and BossPhase.winding(w) == false and w.Stats.Interrupts == 1)
 -- 目标回来后重新计时 10 秒 + 起手 1.5 秒才应落地：这里跑满 12 秒，检查中间没有补发
 local landed, earlyAttacks = nil, 0
 for step = 1, 240 do
     local at = 10.1 + step * 0.05
-    local event = BossPhase.Update(w, at, 0.05, {
+    local event = BossPhase.update(w, at, 0.05, {
         Health = 25000, MaxHealth = 25000, Alive = true, Target = inRange })
     if event.Attack then
         landed = event.Attack
@@ -333,21 +333,21 @@ check('D 重新计时满后吐息正常落地（原子吐息为秒杀）',
 
 -- 射程门：两个身份一近一远，超过 10 米不出招
 local range = BossPhase.New(breathOnly, 0, { x = 100, y = 2, z = 50 })
-BossPhase.Update(range, 10, 10, { Health = 25000, MaxHealth = 25000, Alive = true, Target = outRange })
+BossPhase.update(range, 10, 10, { Health = 25000, MaxHealth = 25000, Alive = true, Target = outRange })
 for step = 1, 10 do
-    BossPhase.Update(range, 10 + step * 0.2, 0.2, {
+    BossPhase.update(range, 10 + step * 0.2, 0.2, {
         Health = 25000, MaxHealth = 25000, Alive = true, Target = outRange })
 end
-check('D 正前 10 米外（身份 1002）不出手', range.Stats.Attacks == 0 and BossPhase.Winding(range) == false)
+check('D 正前 10 米外（身份 1002）不出手', range.Stats.Attacks == 0 and BossPhase.winding(range) == false)
 
 -- 死亡打断：起手中死亡 → 撤销且之后不再有攻击
 local dead = BossPhase.New(breathOnly, 0, { x = 100, y = 2, z = 50 })
-BossPhase.Update(dead, 10, 10, { Health = 25000, MaxHealth = 25000, Alive = true, Target = inRange })
-local died = BossPhase.Update(dead, 10.1, 0.1, { Health = 0, MaxHealth = 25000, Alive = false })
+BossPhase.update(dead, 10, 10, { Health = 25000, MaxHealth = 25000, Alive = true, Target = inRange })
+local died = BossPhase.update(dead, 10.1, 0.1, { Health = 0, MaxHealth = 25000, Alive = false })
 check('D 起手中死亡被识别为打断',
-    died.Interrupted == true and died.Reason == 'death' and BossPhase.Winding(dead) == false)
+    died.Interrupted == true and died.Reason == 'death' and BossPhase.winding(dead) == false)
 for step = 1, 40 do
-    BossPhase.Update(dead, 10.1 + step * 0.2, 0.2, { Health = 0, MaxHealth = 25000, Alive = false })
+    BossPhase.update(dead, 10.1 + step * 0.2, 0.2, { Health = 0, MaxHealth = 25000, Alive = false })
 end
 quantity('D 死亡后攻击序列', #dead.AttackLog .. ' 条（预期 0）')
 check('D 死亡后不再有任何攻击落地且打断只计一次',

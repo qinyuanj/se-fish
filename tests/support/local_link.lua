@@ -6,11 +6,11 @@
 -- 夹具结论不替代它。用例与探针里不得把夹具通过写成「容量已验收」「多人已验收」。
 --
 -- 不加生产代码分支、不读管理器私有表。引擎边界（Task / World / DataStoreService / Players /
--- RunService / PhysicsService / Vector3 / Vector2 / Color / REUtil）用替身，Close 时逐项还原。
+-- RunService / PhysicsService / Vector3 / Vector2 / Color / REUtil）用替身，close 时逐项还原。
 --
 -- 与 server/main.lua 的接线一一对应：WIRING 逐行核对，接线一改这里先红（先红再改夹具，别让夹具漂走）。
--- 在 main.lua 里也有 OnPlayerAdded / BeforeLeave 钩子，它们的路径不在本夹具声明的覆盖范围里。
--- MgrLoot 只用于共享地面实例（SpawnItem / Pickup / Snapshot），**不调 Start**：点位鱼饵刷新
+-- 在 main.lua 里也有 on_player_added / BeforeLeave 钩子，它们的路径不在本夹具声明的覆盖范围里。
+-- MgrLoot 只用于共享地面实例（SpawnItem / pickup / snapshot），**不调 Start**：点位鱼饵刷新
 -- 与区上限回收由 MgrLoot 自己的用例覆盖，连接夹具不替它起刷新区。
 
 local M = {}
@@ -48,16 +48,16 @@ function M.assert_wiring()
     end
 end
 
--- 就绪顺序照 server/main.lua 的 OnReady：先操作角色与生命状态的那批，再其余管理器。
+-- 就绪顺序照 server/main.lua 的 on_ready：先操作角色与生命状态的那批，再其余管理器。
 local READY_FIRST = { 'Vitals', 'Survival' }
 local READY_REST = {}
--- 离场顺序照 ContinuePlayerRemoving：终镜像先于序列化，序列化先于其余管理器的 OnPlayerRemoving。
+-- 离场顺序照 ContinuePlayerRemoving：终镜像先于序列化，序列化先于其余管理器的 on_player_removing。
 local LEAVING_REST = { 'Vitals', 'Survival' }
 
 -- 前向声明：M:Start 与 handleAdded 的读档回调都转发到它（实现见下方连接生命周期段）。
 local onReady
 
-local function newPlayer(env, userId, position, name)
+local function new_player(env, userId, position, name)
     local controller = {
         Health = env.cfg.Vitals.MaxHealth, MaxHealth = env.cfg.Vitals.MaxHealth, WalkSpeed = 10,
         HealthChanged = signal(), Died = signal(), OnReborn = signal(),
@@ -80,7 +80,7 @@ local function newPlayer(env, userId, position, name)
 end
 
 --- 建一套连接夹具：装引擎替身、加载并装配管理器，但不 Start。
---- 调用方随后 link:Start()（等价 GameStart），结束时必须 link:Close()。
+--- 调用方随后 link:Start()（等价 GameStart），结束时必须 link:close()。
 function M.new(opts)
     opts = opts or {}
     local GameCfg = require('common.game_cfg')
@@ -169,7 +169,7 @@ function M.new(opts)
         end,
         BindToClose = function() end,
     }
-    local re = { GetRE = function(_, name) return reStub(name) end, CheckRECD = function() return false end }
+    local re = { get_re = function(_, name) return reStub(name) end, check_recd = function() return false end }
     package.loaded['common.re_util'] = re
     _G.REUtil = re
 
@@ -190,9 +190,9 @@ function M.new(opts)
 
     mgr.Save.PlayerData = mgr.PlayerData
     mgr.PlayerData.Save = mgr.Save
-    function mgr.Party:SameParty(a, b)
+    function mgr.Party:same_party(a, b)
         local squad = env.lifeHost and env.lifeHost.runtime.world.squad
-        return squad and squad:SameParty(a, b) or false
+        return squad and squad:same_party(a, b) or false
     end
     function mgr.Party:Count(player)
         local squad = env.lifeHost and env.lifeHost.runtime.world.squad
@@ -202,7 +202,7 @@ function M.new(opts)
     env.lifeHost = require('tests.support.life_host').start({
       now = env.now, remote = re, player_data = mgr.PlayerData, save = mgr.Save,
       bind_interact_action = function(dispatch)
-        re:GetRE('InteractAction').OnServerEvent:Connect(function(player, payload)
+        re:get_re('InteractAction').OnServerEvent:Connect(function(player, payload)
           dispatch(player, payload)
         end)
       end,
@@ -212,9 +212,9 @@ function M.new(opts)
     mgr.PlayerData.Vitals = mgr.Vitals
     mgr.Vitals.Party = mgr.Party
     mgr.Vitals.ZoneMarkers = ZoneMarkers
-    mgr.Vitals:SetDamageFilter(env.filter())
+    mgr.Vitals:set_damage_filter(env.filter())
 
-    env.player = function(self, userId, position, name) return newPlayer(self, userId, position, name) end
+    env.player = function(self, userId, position, name) return new_player(self, userId, position, name) end
     return setmetatable(env, { __index = M })
 end
 
@@ -228,21 +228,21 @@ function M:Tick()
     error('Task 队列未收敛')
 end
 
-function M:Advance(seconds)
+function M:advance(seconds)
     self.now = self.now + (seconds or 0)
     if self.started then
         self.lifeHost.clock:advance(seconds or 0)
         self.now = self.lifeHost.clock.now()
-        self.managers.Save:Update()
+        self.managers.Save:update()
     end
     return self:Tick()
 end
 
 function M:Start()
     M.assert_wiring()
-    -- 读档就绪回调：main.lua 用 MgrSave.OnReady 分发第一批管理器的 OnPlayerAdded，
+    -- 读档就绪回调：main.lua 用 MgrSave.on_ready 分发第一批管理器的 on_player_added，
     -- 这里接同一个入口，而不是自己另写一套「加入后初始化」。
-    self.managers.Save.OnReady = function(player, data) onReady(self, player, data) end
+    self.managers.Save.on_ready = function(player, data) onReady(self, player, data) end
     for _, name in ipairs({ 'Save', 'PlayerData' }) do
         local manager = self.managers[name]
         if manager.Start then manager.Start(manager) end
@@ -250,7 +250,7 @@ function M:Start()
     self.started = true
     for userId, entry in pairs(self.ready) do
         self.ready[userId] = nil
-        self.managers.Save.OnReady(entry[1], entry[2])
+        self.managers.Save.on_ready(entry[1], entry[2])
     end
     return self:Tick()
 end
@@ -260,7 +260,7 @@ end
 onReady = function(env, player, data)
     local userId = player.UserId
     if env.current[userId] ~= player or env.leaving[userId]
-        or env.managers.PlayerData:GetDataInst(player) ~= data or env.active[userId] == player then
+        or env.managers.PlayerData:get_data_inst(player) ~= data or env.active[userId] == player then
         return
     end
     if not env.started then env.ready[userId] = { player, data } return end
@@ -268,11 +268,11 @@ onReady = function(env, player, data)
     env.lifeHost:add(player, data)
     for _, name in ipairs(READY_FIRST) do
         local manager = env.managers[name]
-        if manager.OnPlayerAdded then manager:OnPlayerAdded(player) end
+        if manager.on_player_added then manager:on_player_added(player) end
     end
     for _, name in ipairs(READY_REST) do
         local manager = env.managers[name]
-        if manager.OnPlayerAdded then manager:OnPlayerAdded(player) end
+        if manager.on_player_added then manager:on_player_added(player) end
     end
 end
 
@@ -285,7 +285,7 @@ local function handleAdded(env, player)
     end
     env.online[player.UserId] = player
     env.current[player.UserId] = player
-    env.managers.PlayerData:OnPlayerAdded(player)
+    env.managers.PlayerData:on_player_added(player)
 end
 
 local function continueRemoving(env, player, leaving)
@@ -294,14 +294,14 @@ local function continueRemoving(env, player, leaving)
     local active = env.active[player.UserId] == player
     if active then env.active[player.UserId] = nil end
     if active then env.lifeHost:remove(player) end
-    env.managers.PlayerData:OnPlayerRemoving(player)
+    env.managers.PlayerData:on_player_removing(player)
     if active then
         for _, name in ipairs(LEAVING_REST) do
             local manager = env.managers[name]
-            if manager.OnPlayerRemoving then manager:OnPlayerRemoving(player) end
+            if manager.on_player_removing then manager:on_player_removing(player) end
         end
     end
-    env.managers.Save:AfterIdle(player.UserId, function()
+    env.managers.Save:after_idle(player.UserId, function()
         if env.leaving[player.UserId] ~= leaving then return end
         env.leaving[player.UserId], env.current[player.UserId] = nil, nil
         env.online[player.UserId] = nil
@@ -324,54 +324,54 @@ local function handleRemoving(env, player)
 end
 
 --- 一条虚拟连接加入：userId 是连接身份，position/name 只服务场景相关判定。
---- 就绪前返回 nil；用 Join 表示「等到读档就绪」，JoinRaw 表示「只是发出加入」。
-function M:JoinRaw(userId, opts)
+--- 就绪前返回 nil；用 join 表示「等到读档就绪」，join_raw 表示「只是发出加入」。
+function M:join_raw(userId, opts)
     opts = opts or {}
     local player = self:player(userId, opts.position, opts.name)
     handleAdded(self, player)
     return player
 end
 
-function M:Join(userId, opts)
-    local player = self:JoinRaw(userId, opts)
+function M:join(userId, opts)
+    local player = self:join_raw(userId, opts)
     for _ = 1, 20 do
         self:Tick()
-        if self.managers.PlayerData:GetDataInst(player) then return player end
-        self:Advance(0.05)
+        if self.managers.PlayerData:get_data_inst(player) then return player end
+        self:advance(0.05)
     end
     error('连接 ' .. tostring(userId) .. ' 未在 20 轮内就绪')
 end
 
 --- 一条虚拟连接离开；返回 true 表示按在线玩家清理，false 表示重复 / 迟到回调被忽略。
-function M:Leave(player)
+function M:leave(player)
     if self.current[player.UserId] ~= player then handleRemoving(self, player) return false end
     handleRemoving(self, player)
     for _ = 1, 20 do
         self:Tick()
         if not self.leaving[player.UserId] then break end
-        self:Advance(0.05)
+        self:advance(0.05)
     end
     return true
 end
 
 --- 只发出离场，不推进任何 Task：给「离场未结算时重连」这类跨连接时序用。
---- 调用方自己用 Tick/Advance 决定何时结算（真实断线就是离场与结算之间还有空档）。
-function M:LeaveRaw(player)
+--- 调用方自己用 Tick/advance 决定何时结算（真实断线就是离场与结算之间还有空档）。
+function M:leave_raw(player)
     handleRemoving(self, player)
     return self
 end
 
---- 等到这条连接真正离场结算完（AfterIdle 回调跑完）。
-function M:WaitLeave(userId)
+--- 等到这条连接真正离场结算完（after_idle 回调跑完）。
+function M:wait_leave(userId)
     for _ = 1, 20 do
         self:Tick()
         if not self.leaving[userId] then return true end
-        self:Advance(0.05)
+        self:advance(0.05)
     end
     return false
 end
 
-function M:Online(player)
+function M:online(player)
     return player ~= nil and self.active[player.UserId] == player
 end
 
@@ -385,24 +385,24 @@ end
 
 -- ===== 业务入口（与客户端同一条通道）=====
 
-function M:Request(name, player, payload)
+function M:request(name, player, payload)
     self.re[name].OnServerEvent:Fire(player, payload)
     return self:Tick()
 end
 
-function M:Party(player, payload) return self:Request('PartyAction', player, payload) end
+function M:Party(player, payload) return self:request('PartyAction', player, payload) end
 
-function M:Interact(player, payload) return self:Request('InteractAction', player, payload) end
+function M:Interact(player, payload) return self:request('InteractAction', player, payload) end
 
-function M:Reply(name)
+function M:reply(name)
     local list = self.sent[name] or {}
     return list[#list]
 end
 
---- 统一伤害入口：与武器 / 鱼攻击走同一个 ApplyHit。
+--- 统一伤害入口：与武器 / 鱼攻击走同一个 apply_hit。
 function M:Hit(source, target, category, amount)
     local vitals = self.managers.Vitals
-    return vitals:ApplyHit(vitals:NewHit(source, category), target, amount)
+    return vitals:apply_hit(vitals:new_hit(source, category), target, amount)
 end
 
 --- 共享地面实例：不经过库存，直接在世界里落一份（盲盒溢出、丢弃补偿同一入口）。
@@ -419,12 +419,12 @@ function M:Loot(itemId, position, mult)
     return row
 end
 
-function M:LootSnapshot()
+function M:loot_snapshot()
     local world = self.lifeHost and self.lifeHost.runtime:get_world()
     return world and world:ground_snapshot().list or {}
 end
 
-function M:Pickup(player, lootId)
+function M:pickup(player, lootId)
     local world = self.lifeHost and self.lifeHost.runtime:get_world()
     if not world then return false end
     local ok = world:try_pickup(player, lootId)
@@ -432,9 +432,9 @@ function M:Pickup(player, lootId)
 end
 
 --- 存档快照：MgrSave 的键与值，读档就绪后可核对「服务端没丢状态」。
-function M:Stored(userId) return self.values[self.managers.Save:Key(userId)] end
+function M:stored(userId) return self.values[self.managers.Save:Key(userId)] end
 
-function M:Data(player) return self.managers.PlayerData:GetDataInst(player) end
+function M:Data(player) return self.managers.PlayerData:get_data_inst(player) end
 
 function M:Save(player)
     local data = self:Data(player)
@@ -447,7 +447,7 @@ function M:Phase(player) return self.managers.Survival:Phase(player) end
 
 -- ===== 拆除 =====
 
-function M:Close()
+function M:close()
     local saved = self.saved
     _G.game, _G.Vector3, _G.Vector2 = saved.game, saved.Vector3, saved.Vector2
     _G.Color, _G.REUtil, _G.task = saved.Color, saved.REUtil, saved.task
@@ -458,7 +458,7 @@ function M:Close()
     return self
 end
 
---- 一案例一套夹具：new + Start，返回 link；用完 Close。
+--- 一案例一套夹具：new + Start，返回 link；用完 close。
 function M.open(opts)
     local link = M.new(opts)
     link:Start()

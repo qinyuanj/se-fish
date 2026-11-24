@@ -6,7 +6,7 @@
 --   4. 挂点位移不随体型放大：三倍角色身上的挂件陷进身体（真机「挂点不穿出」的前置条件）；
 --   5. 血量成长与体型成长脱钩：10 个药水不是 900 血 / 3 倍，或超限后血量继续涨。
 -- 迁移自 tests/gameplay/ability_proto_test.lua（#83）。旧入口有 4 个 LuaUnit 类（BodyScale / BossPhase /
--- CarryMount / FlightPath），每类 setUp 只做 require 与取值、没有 tearDown；
+-- CarryMount / FlightPath），每类 set_up 只做 require 与取值、没有 tear_down；
 -- 按「类名字典序 + 类内方法名字典序」展开（等价于旧入口对 ClassName.method 全名的排序），
 -- 每类保留逐例 before_each。it 顺序与迁移前逐条对账。
 -- 断言口径：旧 assertEquals 两侧同为 table 时深比较 → assert.same，标量 → assert.are.equal；
@@ -35,13 +35,13 @@ describe("TestBodyScale", function()
   it("test_derive_falls_back_to_one_x_when_factor_is_bad", function()
     local base = { CapsuleHeight = 2, CameraDistance = 6, InteractRange = 2 }
     for _, bad in ipairs({ 0 / 0, math.huge, 0, -1, nil, '3' }) do
-      local derived = BodyScale.Derive(bad, base)
+      local derived = BodyScale.derive(bad, base)
       assert.are.equal(1, derived.Scale, tostring(bad))
       assert.are.equal(2, derived.CapsuleHeight, tostring(bad))
       assert.is_nil(derived.SocketOffset, tostring(bad))
     end
     -- 基准量本身是坏值时也不能产出 NaN
-    local derived = BodyScale.Derive(3, { CapsuleHeight = 0 / 0, CameraDistance = 'x' })
+    local derived = BodyScale.derive(3, { CapsuleHeight = 0 / 0, CameraDistance = 'x' })
     assert.are.equal(0, derived.CapsuleHeight)
     assert.are.equal(0, derived.CameraDistance)
     assert.is_not_nil(derived)
@@ -52,10 +52,10 @@ describe("TestBodyScale", function()
     local c = Cfg.Ability.BodyScale
     local base = { CapsuleHeight = c.CapsuleHeight, CameraDistance = c.CameraDistance,
       InteractRange = c.InteractRange, SocketOffset = { x = 0, y = 2.4, z = 0 } }
-    local one = BodyScale.Derive(1, base)
+    local one = BodyScale.derive(1, base)
     assert.same({ Scale = 1, CapsuleHeight = 2, CameraDistance = 13, InteractRange = 2,
       SocketOffset = { x = 0, y = 2.4, z = 0 } }, one)
-    local three = BodyScale.Derive(3, base)
+    local three = BodyScale.derive(3, base)
     assert.are.equal(6, three.CapsuleHeight)
     assert.are.equal(39, three.CameraDistance)
     assert.are.equal(6, three.InteractRange)
@@ -67,20 +67,20 @@ describe("TestBodyScale", function()
   end)
 
   it("test_plan_grows_linearly_and_caps_at_ten_potions", function()
-    local plan = BodyScale.Plan(0)
+    local plan = BodyScale.plan(0)
     assert.are.equal(1, plan.Scale)
     assert.are.equal(300, plan.Health)
     assert.is_false(plan.Capped)
-    plan = BodyScale.Plan(5)
+    plan = BodyScale.plan(5)
     assert.are.equal(2, plan.Scale)
     assert.are.equal(600, plan.Health)
-    plan = BodyScale.Plan(10)
+    plan = BodyScale.plan(10)
     assert.are.equal(3, plan.Scale)
     assert.are.equal(900, plan.Health)
     assert.is_true(plan.Capped)
     -- 超限不再提升，且仍然给出上限值（业务侧据此拒绝使用，见 GameSpec §2）
     for _, over in ipairs({ 11, 99 }) do
-      local capped = BodyScale.Plan(over)
+      local capped = BodyScale.plan(over)
       assert.are.equal(3, capped.Scale, tostring(over))
       assert.are.equal(900, capped.Health, tostring(over))
       assert.is_true(capped.Capped, tostring(over))
@@ -91,13 +91,13 @@ describe("TestBodyScale", function()
     -- 注意：表构造里的 nil 不占位，旧入口 ipairs 同样只跑到第 3 项（-1 / -0.5 / '3'）。
     -- 这里原样保留，不在迁移中悄悄扩大覆盖范围（要补 0/0 与 inf 请另开单）。
     for _, bad in ipairs({ -1, -0.5, '3', nil, 0 / 0, math.huge }) do
-      local plan = BodyScale.Plan(bad)
+      local plan = BodyScale.plan(bad)
       assert.are.equal(1, plan.Scale, tostring(bad))
       assert.are.equal(300, plan.Health, tostring(bad))
       assert.are.equal(0, plan.Potions, tostring(bad))
     end
     -- 小数不是「非法」而是「不足一个」：向下取整，不把玩家的成长一笔抹掉
-    local floored = BodyScale.Plan(1.5)
+    local floored = BodyScale.plan(1.5)
     assert.are.equal(1, floored.Potions)
     assert.are.equal(1.2, floored.Scale)
     assert.is_false(floored.Capped)
@@ -106,11 +106,11 @@ describe("TestBodyScale", function()
   it("test_sanitize_never_lets_a_bad_factor_through", function()
     local c = Cfg.Ability.BodyScale
     for _, bad in ipairs({ 0 / 0, math.huge, -math.huge, 0, -2, '2', nil }) do
-      assert.are.equal(c.Base, BodyScale.Sanitize(bad), tostring(bad))
+      assert.are.equal(c.Base, BodyScale.sanitize(bad), tostring(bad))
     end
-    assert.are.equal(2.4, BodyScale.Sanitize(2.4))
-    assert.are.equal(c.Max, BodyScale.Sanitize(99))
-    assert.are.equal(c.Base, BodyScale.Sanitize(0.1))
+    assert.are.equal(2.4, BodyScale.sanitize(2.4))
+    assert.are.equal(c.Max, BodyScale.sanitize(99))
+    assert.are.equal(c.Base, BodyScale.sanitize(0.1))
   end)
 end)
 
@@ -143,7 +143,7 @@ describe("TestBossPhase", function()
     while from + step * 0.05 <= upto + 1e-9 do
       step = step + 1
       local now = from + step * 0.05
-      local events = Boss.Update(state, now, 0.05, inp)
+      local events = Boss.update(state, now, 0.05, inp)
       if events.Attack then fired[#fired + 1] = events.Attack end
       if events.Interrupted then fired.Interrupted = events.Reason end
     end
@@ -199,7 +199,7 @@ describe("TestBossPhase", function()
     assert.is_not_nil(state.Pending)
     local attacks = state.Stats.Attacks
     inp.Alive = false
-    local events = Boss.Update(state, 30.25, 0.05, inp)
+    local events = Boss.update(state, 30.25, 0.05, inp)
     assert.is_true(events.Interrupted)
     assert.are.equal('death', events.Reason)
     assert.is_nil(events.Attack)
@@ -209,7 +209,7 @@ describe("TestBossPhase", function()
     local after = run(state, 30.25, 45.25, inp)
     assert.are.equal(0, #after)
     assert.are.equal(attacks, state.Stats.Attacks)
-    assert.is_false(Boss.Update(state, 45.3, 0.05, inp).Interrupted, '打断只算一次')
+    assert.is_false(Boss.update(state, 45.3, 0.05, inp).Interrupted, '打断只算一次')
   end)
 
   it("test_enraged_buffs_damage_and_shortens_the_breath", function()
@@ -235,8 +235,8 @@ describe("TestBossPhase", function()
 
   it("test_one_frame_crossing_two_thresholds_lands_in_one_phase", function()
     local state = Boss.New(BossCfg, 0)
-    Boss.Update(state, 0.1, 0.1, input(10000, Target))
-    local events = Boss.Update(state, 0.2, 0.1, input(500, Target))
+    Boss.update(state, 0.1, 0.1, input(10000, Target))
+    local events = Boss.update(state, 0.2, 0.1, input(500, Target))
     assert.are.equal('enraged', events.Phase)
     assert.is_true(events.PhaseChanged)
     assert.are.equal(1, state.Stats.Transitions, '一帧只算一次切换')
@@ -250,12 +250,12 @@ describe("TestBossPhase", function()
   it("test_thresholds_escalate_only_below_the_line", function()
     local state = Boss.New(BossCfg, 0)
     -- 满血：正常阶段，也没有日志
-    assert.are.equal('normal', Boss.Update(state, 0.1, 0.1, input(10000, Target)).Phase)
+    assert.are.equal('normal', Boss.update(state, 0.1, 0.1, input(10000, Target)).Phase)
     -- 正好 60% / 20% 不入下一阶段（正文是「低于 60%」「低于 20%」）
-    assert.are.equal('normal', Boss.Update(state, 0.2, 0.1, input(6000, Target)).Phase)
-    assert.are.equal('water', Boss.Update(state, 0.3, 0.1, input(5990, Target)).Phase)
-    assert.are.equal('water', Boss.Update(state, 0.4, 0.1, input(2000, Target)).Phase)
-    assert.are.equal('enraged', Boss.Update(state, 0.5, 0.1, input(1990, Target)).Phase)
+    assert.are.equal('normal', Boss.update(state, 0.2, 0.1, input(6000, Target)).Phase)
+    assert.are.equal('water', Boss.update(state, 0.3, 0.1, input(5990, Target)).Phase)
+    assert.are.equal('water', Boss.update(state, 0.4, 0.1, input(2000, Target)).Phase)
+    assert.are.equal('enraged', Boss.update(state, 0.5, 0.1, input(1990, Target)).Phase)
     assert.are.equal(2, state.Stats.Transitions)
     assert.are.equal(2, #state.Log)
     assert.are.equal('normal', state.Log[1].From)
@@ -264,7 +264,7 @@ describe("TestBossPhase", function()
     assert.are.equal('enraged', state.Log[2].To)
     -- 同一档内血量反复变化不产生新日志；回血也不退回上一阶段（只进不退，见模块说明）
     for i = 1, 20 do
-      Boss.Update(state, 0.6 + i * 0.05, 0.05, input(1900 + i * 10, Target))
+      Boss.update(state, 0.6 + i * 0.05, 0.05, input(1900 + i * 10, Target))
     end
     assert.are.equal(2, state.Stats.Transitions)
     assert.are.equal(2, #state.Log)
@@ -293,7 +293,7 @@ describe("TestBossPhase", function()
     assert.near(30 + BossCfg.Attacks.breath.WindupSec, state.Pending.ReadyAt, 0.15)
     local attacks = state.Stats.Attacks
     inp.Target = nil
-    local events = Boss.Update(state, 30.25, 0.05, inp)
+    local events = Boss.update(state, 30.25, 0.05, inp)
     assert.is_true(events.Interrupted)
     assert.are.equal('lostTarget', events.Reason)
     assert.is_nil(events.Attack)
@@ -338,12 +338,12 @@ describe("TestCarryMount", function()
     local far = { x = 99, y = 0, z = 0 }
     assert.is_false(Carry.Attach(state, far, 100).Ok)
     assert.are.equal('outOfRange', Carry.Attach(state, far, 100).Reason)
-    assert.is_false(Carry.Carried(state))
+    assert.is_false(Carry.carried(state))
     local near = { x = 1, y = 0, z = 1 }
     local attach = Carry.Attach(state, near, 100)
     assert.is_true(attach.Ok)
     assert.are.equal(CarryCfg.GrabDamage, attach.Damage)
-    assert.is_true(Carry.Carried(state))
+    assert.is_true(Carry.carried(state))
     -- 没有挂点的宿主不吃这套（不能凭空抱走）
     local bareCfg = { Socket = nil, GrabRange = 2.5, GrabDamage = 300,
       Offset = { x = 0, y = 0, z = 2 }, FollowTolerance = 3, MaxCarrySec = 20 }
@@ -356,7 +356,7 @@ describe("TestCarryMount", function()
     local state
     Carry, state = newCarry(CarryCfg)
     Carry.Attach(state, { x = 1, y = 0, z = 1 }, 100)
-    local mount = Carry.MountPoint(state.Host, state.Offset, state.Yaw)
+    local mount = Carry.mount_point(state.Host, state.Offset, state.Yaw)
     -- 容差内不动它，避免每帧都被「纠正」而抖动
     local near = { x = mount.x + 0.1, y = mount.y, z = mount.z }
     local kept = Carry.Follow(state, near, 100, 0.05)
@@ -373,7 +373,7 @@ describe("TestCarryMount", function()
     local nan = Carry.Follow(state, { x = 0 / 0, y = 1, z = 2 }, 101, 0.05)
     assert.is_true(nan.Released)
     assert.are.equal('nan', nan.Reason)
-    assert.is_false(Carry.Carried(state))
+    assert.is_false(Carry.carried(state))
     assert.is_false(nan.Position.x ~= nan.Position.x)
   end)
 
@@ -390,9 +390,9 @@ describe("TestCarryMount", function()
     end
     assert.is_true(last.Released)
     assert.are.equal('timeout', last.Reason)
-    assert.is_false(Carry.Carried(state))
+    assert.is_false(Carry.carried(state))
     -- 落点在宿主前方 DropForward 米、离地 DropHeight 米
-    local drop = last.DropPoint
+    local drop = last.drop_point
     assert.near(state.GroundY + CarryCfg.DropHeight, drop.y, 1e-9)
     assert.is_true(math.abs(drop.z - CarryCfg.DropForward) < 1e-9)
     -- 释放后不再重复触发，也不残留挂点
@@ -413,17 +413,17 @@ describe("TestCarryMount", function()
     local need = cfg.HostHalfHeight + cfg.CarriedHalfHeight
     -- 配置里的嘴部挂点本身必须已经在宿主体外
     local offset = { x = cfg.Offset.x, y = cfg.Offset.y, z = cfg.Offset.z }
-    local safe = Carry.SafeOffset(offset, cfg.HostHalfHeight, cfg.CarriedHalfHeight)
+    local safe = Carry.safe_offset(offset, cfg.HostHalfHeight, cfg.CarriedHalfHeight)
     assert.is_false(safe.Corrected, '默认挂点不该需要纠正')
     assert.is_true(Carry.Length(safe.Offset) >= need, '默认挂点必须清空宿主与携带物')
     -- 贴脸的挂点必须被推出去，且保留原方向
-    local squeezed = Carry.SafeOffset({ x = 0, y = 0.3, z = 0.4 }, cfg.HostHalfHeight, cfg.CarriedHalfHeight)
+    local squeezed = Carry.safe_offset({ x = 0, y = 0.3, z = 0.4 }, cfg.HostHalfHeight, cfg.CarriedHalfHeight)
     assert.is_true(squeezed.Corrected)
     assert.is_true(Carry.Length(squeezed.Offset) >= need)
     assert.is_true(squeezed.Offset.z > 0.4, '必须在原方向上推出去')
     assert.near(0.4 / 0.3, squeezed.Offset.z / squeezed.Offset.y, 1e-9)
     -- 零位移没有方向可用：给一个确定性方向而不是 NaN
-    local zero = Carry.SafeOffset({ x = 0, y = 0, z = 0 }, 1, 1)
+    local zero = Carry.safe_offset({ x = 0, y = 0, z = 0 }, 1, 1)
     assert.is_true(Carry.Length(zero.Offset) >= 2)
     assert.is_true(zero.Offset.z > 0)
     assert.are.equal(0, zero.Offset.x)
@@ -432,10 +432,10 @@ describe("TestCarryMount", function()
   it("test_mount_point_uses_host_pose_and_scaled_offset", function()
     local offset = { x = 0, y = 2, z = 2 }
     local host = { x = 10, y = 5, z = -3 }
-    local point = Carry.MountPoint(host, offset, 0)
+    local point = Carry.mount_point(host, offset, 0)
     assert.same({ x = 10, y = 7, z = -1 }, point)
     -- 转身 90 度：挂点跟着宿主朝向走
-    local turned = Carry.MountPoint(host, offset, math.pi / 2)
+    local turned = Carry.mount_point(host, offset, math.pi / 2)
     assert.near(12, turned.x, 1e-9)
     assert.near(7, turned.y, 1e-9)
     assert.near(-3, turned.z, 1e-9)
@@ -443,10 +443,10 @@ describe("TestCarryMount", function()
     local BodyScale = require('common.body_scale')
     local base = { CapsuleHeight = Cfg.Ability.BodyScale.CapsuleHeight,
       SocketOffset = { x = 0, y = 2, z = 2 } }
-    local one = BodyScale.Derive(1, base)
-    local three = BodyScale.Derive(3, base)
-    local p1 = Carry.MountPoint(host, one.SocketOffset, 0)
-    local p3 = Carry.MountPoint(host, three.SocketOffset, 0)
+    local one = BodyScale.derive(1, base)
+    local three = BodyScale.derive(3, base)
+    local p1 = Carry.mount_point(host, one.SocketOffset, 0)
+    local p3 = Carry.mount_point(host, three.SocketOffset, 0)
     assert.is_true(p3.y > p1.y and p3.z > p1.z)
     assert.are.equal(11, p3.y)
   end)
@@ -490,7 +490,7 @@ describe("TestFlightPath", function()
 
   it("test_bounds_come_from_zone_scene_and_cap_the_ceiling", function()
     local zone = Cfg.Zones[1].Scene
-    local bounds = Fly.BoundsOf(zone, FlightCfg)
+    local bounds = Fly.bounds_of(zone, FlightCfg)
     assert.are.equal(zone.Boundary.MinX, bounds.MinX)
     assert.are.equal(zone.Boundary.MaxZ, bounds.MaxZ)
     assert.are.equal(zone.SafePoint.y, bounds.GroundY)
@@ -500,11 +500,11 @@ describe("TestFlightPath", function()
     for k, v in pairs(zone.Boundary) do patched[k] = v end
     patched.MaxFlightHeight = nil
     assert.are.equal(zone.SafePoint.y + FlightCfg.MaxHeight,
-      Fly.BoundsOf({ Boundary = patched, SafePoint = zone.SafePoint }, FlightCfg).CeilingY)
+      Fly.bounds_of({ Boundary = patched, SafePoint = zone.SafePoint }, FlightCfg).CeilingY)
     -- 没有围栏就没有飞行（不能无边界乱飞）
-    assert.is_nil(Fly.BoundsOf(nil, FlightCfg))
-    assert.is_nil(Fly.BoundsOf({ SafePoint = zone.SafePoint }, FlightCfg))
-    assert.is_nil(Fly.BoundsOf({ Boundary = { MinX = 0 / 0 } }, FlightCfg))
+    assert.is_nil(Fly.bounds_of(nil, FlightCfg))
+    assert.is_nil(Fly.bounds_of({ SafePoint = zone.SafePoint }, FlightCfg))
+    assert.is_nil(Fly.bounds_of({ Boundary = { MinX = 0 / 0 } }, FlightCfg))
   end)
 
   it("test_ceiling_clamp_keeps_the_fish_under_the_flight_ceiling", function()
@@ -527,7 +527,7 @@ describe("TestFlightPath", function()
   it("test_dive_cadence_and_recovery_without_target", function()
     local state
     Fly, state = newFlight(FlightCfg, { CruiseHeight = 12, DiveIntervalSec = 20, DiveDamage = 30 })
-    Fly.SetTarget(state, { x = 0, y = 2, z = 0 })
+    Fly.set_target(state, { x = 0, y = 2, z = 0 })
     local now, dives, minY = 100, 0, state.Pos.y
     for step = 1, 1210 do -- 60.5 秒（第 3 次俯冲在 60 秒整触发，多跑半秒避免边界抖动）
       now = now + 0.05
@@ -549,7 +549,7 @@ describe("TestFlightPath", function()
     assert.are.equal('cruise', state.Phase)
     assert.are.equal(3, state.Stats.Dives, '爬回过程不得再触发俯冲')
     -- 无目标时只巡航，不俯冲
-    Fly.SetTarget(state, nil)
+    Fly.set_target(state, nil)
     local solo = 0
     for step = 1, 600 do
       now = now + 0.05
@@ -575,7 +575,7 @@ describe("TestFlightPath", function()
   it("test_huge_dt_cannot_step_over_the_fence", function()
     local state
     Fly, state = newFlight(FlightCfg, { CruiseHeight = 12, DiveIntervalSec = 20 })
-    Fly.SetTarget(state, { x = 500, y = 12, z = 0 })
+    Fly.set_target(state, { x = 500, y = 12, z = 0 })
     local before = state.Pos.x
     Fly.Step(state, 101, 5) -- 一帧补算 5 秒
     assert.is_true(state.Pos.x - before <= FlightCfg.MaxStepSec * FlightCfg.DiveSpeed + 1e-9)
@@ -609,7 +609,7 @@ describe("TestFlightPath", function()
   it("test_target_outside_bounds_is_clamped_every_frame", function()
     local state
     Fly, state = newFlight(FlightCfg, { CruiseHeight = 12, DiveIntervalSec = 20 })
-    Fly.SetTarget(state, { x = 999, y = 999, z = -999 })
+    Fly.set_target(state, { x = 999, y = 999, z = -999 })
     local clamps = 0
     for step = 1, 600 do
       local events = Fly.Step(state, 100 + step * 0.05, 0.05)

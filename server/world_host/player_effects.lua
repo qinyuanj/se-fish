@@ -4,7 +4,7 @@
 --   2. 按 SpokeClock 驱动计时：weak 走 1 Hz on_second（角色空窗暂停、重建保留），
 --      paralyze（0.5s 亚秒）走短寿命 on_frame 仅置 is_paralyzed=true（不退出 alive 相位），
 --      poison / burn / frost 仅在活跃槽位内推进 DoT 与精准到期；
---   3. 确定性派生 AttrModel / BodyScale / WeaponComponents（max_health、body_scale、
+--   3. 确定性派生 AttrModel / BodyScale / weapon_components（max_health、body_scale、
 --      body_derived、move_multiplier、move_speed_scale、walk_speed、weapon_damage_*）；
 --   4. 为 A2 的 modifier_system 叶子投影预留 on_mount_modifier_leaf 纯输出挂点。
 -- 本模块归属 L2（server.world_host），零反向依赖存量旧债务模块。
@@ -30,7 +30,7 @@ local VALID_KINDS = {
 }
 
 local function finite_positive(value)
-  return Number.IsFiniteNumber(value) and value > 0
+  return Number.is_finite_number(value) and value > 0
 end
 
 local function read_walk_speed(character)
@@ -65,7 +65,7 @@ end
 
 local function dot_cfg_of(kind)
   local cfg = GameCfg.Ability.StatusEffects and GameCfg.Ability.StatusEffects[kind]
-  if cfg and finite_positive(cfg.TickSec) and Number.IsFiniteNumber(cfg.DamagePerStack) then
+  if cfg and finite_positive(cfg.TickSec) and Number.is_finite_number(cfg.DamagePerStack) then
     return cfg
   end
   return nil
@@ -453,7 +453,7 @@ function PlayerEffects.mount(s2, player_tree, opts)
     local base_speed = ms:d(states.base_speed)
     local move_mult = ms:d(memos.move_multiplier)
     local hunger = ms:d(states.hunger)
-    return AttrModel.Plan({
+    return AttrModel.plan({
       bodyPotions = body_potions,
       speedPotions = speed_potions,
       baseSpeed = base_speed,
@@ -475,7 +475,7 @@ function PlayerEffects.mount(s2, player_tree, opts)
   end)
 
   memos.body_derived = s2:memo("BodyDerived", function(ms)
-    return BodyScale.Derive(ms:d(memos.body_scale))
+    return BodyScale.derive(ms:d(memos.body_scale))
   end)
 
   memos.move_speed_scale = s2:memo("MoveSpeedScale", function(ms)
@@ -490,9 +490,9 @@ function PlayerEffects.mount(s2, player_tree, opts)
   memos.weapon_damage_components = s2:memo("WeaponDamageComponents", function(ms)
     local upgrades = ms:d(states.shop_upgrades) or {}
     return {
-      melee = AttrModel.WeaponComponents("melee", upgrades.melee or 0),
-      ranged = AttrModel.WeaponComponents("ranged", upgrades.ranged or 0),
-      explosive = AttrModel.WeaponComponents("explosive", upgrades.explosive or 0),
+      melee = AttrModel.weapon_components("melee", upgrades.melee or 0),
+      ranged = AttrModel.weapon_components("ranged", upgrades.ranged or 0),
+      explosive = AttrModel.weapon_components("explosive", upgrades.explosive or 0),
     }
   end)
 

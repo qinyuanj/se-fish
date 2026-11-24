@@ -132,8 +132,8 @@ local function make_re()
   return {
     events = events,
     util = {
-      GetRE = function(_, name) return event(name) end,
-      CheckRECD = function() return false end,
+      get_re = function(_, name) return event(name) end,
+      check_recd = function() return false end,
     },
   }
 end
@@ -141,7 +141,7 @@ end
 local function make_save(data)
   local seq = 0
   return {
-    ResolveRequest = function(_, player, current, kind, request_id)
+    resolve_request = function(_, player, current, kind, request_id)
       if current ~= data or type(request_id) ~= "number" then return nil, "invalid" end
       seq = seq + 1
       return {
@@ -151,7 +151,7 @@ local function make_save(data)
         requestKey = kind .. ":" .. tostring(request_id),
       }, "new"
     end,
-    Execute = function(_, _, current, operation, transform, done)
+    execute = function(_, _, current, operation, transform, done)
       if current ~= data then return false, "invalid" end
       local ok, result, reason = pcall(transform, data)
       if not ok or type(result) ~= "table" then
@@ -193,7 +193,7 @@ describe("玩家生命双层相位宿主接缝（#298）", function()
   local function boot(overrides, other_overrides)
     events = make_re().events
     local re = {
-      GetRE = function(_, name)
+      get_re = function(_, name)
         events[name] = events[name] or {
           clients = {},
           OnServerEvent = signal(),
@@ -206,7 +206,7 @@ describe("玩家生命双层相位宿主接缝（#298）", function()
         }
         return events[name]
       end,
-      CheckRECD = function() return false end,
+      check_recd = function() return false end,
     }
     player = make_player(1, 0, 0)
     other = make_player(2, 1, 0)
@@ -218,7 +218,7 @@ describe("玩家生命双层相位宿主接缝（#298）", function()
       initial_now = 100,
       remote = re,
       player_data = {
-        GetDataInst = function(_, target)
+        get_data_inst = function(_, target)
           if target == player then return data end
           if target == other then return other_data end
         end,
@@ -226,11 +226,11 @@ describe("玩家生命双层相位宿主接缝（#298）", function()
       save = make_save(data),
       platform = {
         pending = nil,
-        ShowAd = function(self, _, _, _, on_result)
+        show_ad = function(self, _, _, _, on_result)
           self.pending = on_result
           return true
         end,
-        Purchase = function(self, _, _, _, on_result)
+        purchase = function(self, _, _, _, on_result)
           self.pending = on_result
           return true
         end,
@@ -470,22 +470,22 @@ describe("玩家生命双层相位宿主接缝（#298）", function()
       bait_spots = { Enabled = false },
       initial_now = 200,
       remote = {
-        GetRE = function(_, name)
+        get_re = function(_, name)
           events[name] = events[name] or { clients = {}, OnServerEvent = signal(),
             FireClient = function(self, target, payload)
               self.clients[#self.clients + 1] = { player = target, value = payload }
             end }
           return events[name]
         end,
-        CheckRECD = function() return false end,
+        check_recd = function() return false end,
       },
-      player_data = { GetDataInst = function() return restored end },
+      player_data = { get_data_inst = function() return restored end },
       save = {
-        ResolveRequest = function()
+        resolve_request = function()
           calls = calls + 1
           return { id = "1:1", sequence = 1, kind = "survival:recover" }, "new"
         end,
-        Execute = function(_, _, current, _, transform, done)
+        execute = function(_, _, current, _, transform, done)
           transform(current)
           done(true, { ok = true })
           return true
@@ -523,7 +523,7 @@ describe("玩家生命双层相位宿主接缝（#298）", function()
     runtime = ServerRuntime.new({
       bait_spots = { Enabled = false },
       initial_now = 300,
-      player_data = { GetDataInst = function() return restored end },
+      player_data = { get_data_inst = function() return restored end },
       save = make_save(restored),
     })
     runtime:start()
@@ -561,13 +561,13 @@ describe("玩家生命双层相位宿主接缝（#298）", function()
       return rows
     end
     assert.same({}, notices())
-    assert.is_true(life:SetHealth(player, 200))
+    assert.is_true(life:set_health(player, 200))
     local sent = notices()
     assert.equals(1, #sent)
     assert.equals(100, sent[1].amount)
     assert.equals(player.UserId, sent[1].targetUserId)
-    assert.is_true(life:SetHealth(player, 300))
-    assert.is_true(life:Eat(player, "goldfish"))
+    assert.is_true(life:set_health(player, 300))
+    assert.is_true(life:eat(player, "goldfish"))
     assert.equals(1, #notices())
     local controller = player.Character.Controller
     controller.Health = controller.Health - 2.4
@@ -577,12 +577,12 @@ describe("玩家生命双层相位宿主接缝（#298）", function()
     assert.near(2.4, sent[2].amount, 0.00001)
     controller.HealthChanged:Fire(controller.Health)
     assert.equals(2, #notices())
-    assert.is_true(life:SetHunger(player, 0))
+    assert.is_true(life:set_hunger(player, 0))
     runtime:step(1)
     sent = notices()
     assert.equals(3, #sent)
     assert.equals(GameCfg.Vitals.StarveDamagePerSec, sent[3].amount)
-    assert.is_true(life:SetHealth(player, 4))
+    assert.is_true(life:set_health(player, 4))
     local before = #notices()
     local tree = runtime:get_player_tree(player.UserId)
     assert.is_true(tree:apply_hit(tree:new_hit(other, "fishAttack"), player, 100))
@@ -590,7 +590,7 @@ describe("玩家生命双层相位宿主接缝（#298）", function()
     assert.equals(before + 1, #sent)
     assert.equals(3, sent[#sent].amount, "致命一击锁 1 血，只报被扣掉的差额")
     assert.equals(1, player.Character.Controller.Health)
-    assert.equals("downed", life:LifeStatus(player))
+    assert.equals("downed", life:life_status(player))
   end)
 
   it("控制器写入失败不提交 SetHealth 或虚弱复活的权威状态", function()
@@ -606,17 +606,17 @@ describe("玩家生命双层相位宿主接缝（#298）", function()
     })
     player.Character.Controller = denied
     local before = tree.states.health:now()
-    assert.is_false(life:SetHealth(player, before + 1))
+    assert.is_false(life:set_health(player, before + 1))
     assert.equals(before, tree.states.health:now())
-    assert.equals("alive", life:LifeStatus(player))
+    assert.equals("alive", life:life_status(player))
 
     player.Character.Controller = original
     assert.is_true(tree:apply_hit(tree:new_hit(other, "fishAttack"), player, 9999))
     runtime.clock:advance(GameCfg.Survival.DownedSec)
-    assert.equals("dead", life:LifeStatus(player))
+    assert.equals("dead", life:life_status(player))
     player.Character.Controller = denied
     runtime.clock:advance(GameCfg.Survival.DeadSec)
-    assert.equals("dead", life:LifeStatus(player))
+    assert.equals("dead", life:life_status(player))
     assert.equals(1, tree.states.health:now())
   end)
 

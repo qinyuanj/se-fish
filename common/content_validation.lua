@@ -53,7 +53,7 @@ local function check_ledger(cfg, fail, activeGoods)
     end
 end
 
-function Validate.Check(cfg)
+function Validate.check(cfg)
     local errors = {}
     local function fail(source, message) errors[#errors + 1] = tostring(source or '配置') .. ': ' .. message end
     local zones, waters, zoneSeen = {}, {}, {}
