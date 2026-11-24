@@ -54,7 +54,7 @@ local function startCharge(env, fish)
         env.mgr:update()
         guard = guard + 1
     end
-    return fish.Move, fish.Carrier.Body.Position
+    return fish.Move, fish.carrier.body.Position
 end
 
 -- 从预警记录里捞某招的 lock payload（双轴审查 P2：预警形状 / 半径必须与真实危险区一致）
@@ -117,12 +117,12 @@ do
     local move, bp = startCharge(env, fish)
     env.hits = {}
     env.player.Character.Position = Vector3.New(bp.x, 2, bp.z + 10) -- 冲锋路径上
-    at(env, move.At + GameCfg.FishCombat.walrus.ChargeWindupSec + 0.3)
+    at(env, move.at + GameCfg.FishCombat.walrus.ChargeWindupSec + 0.3)
     local midNoHit = #env.hits == 0
-    at(env, move.StrikeAt + 0.1)
+    at(env, move.strike_at + 0.1)
     check('海象 40 秒突击：冲锋 20 米、路径上的玩家吃一次 120',
         move.Name == 'charge' and midNoHit and #env.hits == 1 and env.hits[1].amount == 120
-        and math.abs(fish.Carrier.Body.Position.z - bp.z - GameCfg.FishCombat.walrus.ChargeDistance) < 1e-6,
+        and math.abs(fish.carrier.body.Position.z - bp.z - GameCfg.FishCombat.walrus.ChargeDistance) < 1e-6,
         'move=' .. tostring(move.Name) .. ' hits=' .. #env.hits)
     local chargeLock = findLock(env, 'charge')
     check('突击预警覆盖 20 米冲锋走廊', chargeLock ~= nil
@@ -138,7 +138,7 @@ do
     local move, bp = startCharge(env, fish)
     env.hits = {}
     env.player.Character.Position = Vector3.New(bp.x + 5, 2, bp.z + 10) -- 路径外侧 5 米
-    at(env, move.StrikeAt + 0.1)
+    at(env, move.strike_at + 0.1)
     check('海象突击不撞路径外的玩家', #env.hits == 0, 'hits=' .. #env.hits)
     close(env)
 end
@@ -159,7 +159,7 @@ do
     local env = combat()
     local fish = drop(env, 'fish40Boss', 2)
     for t = 0.5, 9.5, 0.5 do at(env, t) end
-    local bp = fish.Carrier.Body.Position
+    local bp = fish.carrier.body.Position
     env.hits = {}
     env.player.Character.Position = Vector3.New(bp.x, 2, bp.z + 12) -- 咬距外、虎啸射程内
     at(env, 10)
@@ -180,8 +180,8 @@ end
 do
     local env = combat()
     local fish = drop(env, 'fish40Boss', 2)
-    env.other.Character.Position = Vector3.New(fish.Carrier.Body.Position.x, 2,
-        fish.Carrier.Body.Position.z - 4) -- 身后 4 米
+    env.other.Character.Position = Vector3.New(fish.carrier.body.Position.x, 2,
+        fish.carrier.body.Position.z - 4) -- 身后 4 米
     for t = 0.5, 9.5, 0.5 do at(env, t) end
     env.hits = {}
     at(env, 10) -- 虎啸（与甩尾同为 10 秒节拍，优先级压住）
@@ -193,7 +193,7 @@ do
         guard = guard + 1
     end
     env.hits = {} -- 虎啸结算（身前目标 30）不计入甩尾判定
-    at(env, fish.Move.StrikeAt + 0.1)
+    at(env, fish.Move.strike_at + 0.1)
     local rearOnly = true
     for _, hit in ipairs(env.hits) do
         if hit.player ~= env.other or hit.amount ~= 160 then rearOnly = false end
@@ -221,8 +221,8 @@ do
         guard = guard + 1
     end
     local jumped = fish.Move and fish.Move.Name == 'jump'
-    local dest = jumped and fish.Move.Destination
-    local startX = fish.Carrier.Body.Position.x
+    local dest = jumped and fish.Move.destination
+    local startX = fish.carrier.body.Position.x
     env.hits = {}
     if dest then env.player.Character.Position = Vector3.New(dest.x, 2, dest.z) end
     at(env, env.now + GameCfg.FishCombat.orca.JumpSec)

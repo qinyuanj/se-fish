@@ -77,7 +77,7 @@ describe('条款 10：烧烤倍率与会话规则', function()
       return ctx.events[name]
     end }
     ctx.events.GrillAction = { OnServerEvent = signal(), FireClient = function() end }
-    ctx.PlayerData = assert(loadfile('server/data/player_data.lua'))()
+    ctx.player_data = assert(loadfile('server/data/player_data.lua'))()
     ctx.save = assert(loadfile('server/save_host.lua'))()
     ctx.ServerRuntime = assert(loadfile('server/world_host/server_runtime.lua'))()
     ctx.datas = {}
@@ -128,7 +128,7 @@ describe('条款 10：烧烤倍率与会话规则', function()
             ctx.hits[#ctx.hits + 1] = { category = 'grillBurn', userId = id, amount = amount }
           end } } }
     function player:SetAttribute(key, value) self.attrs[key] = value end
-    local data = ctx.PlayerData.new(player)
+    local data = ctx.player_data.new(player)
     data:Init(true)
     ctx.save:load_into(player, data)
     drain()
@@ -167,7 +167,7 @@ describe('条款 10：烧烤倍率与会话规则', function()
 
   local function countItem(data, itemId)
     local total = 0
-    for _, container in pairs(data.Data.Containers) do
+    for _, container in pairs(data.Data.containers) do
       for _, entry in pairs(container) do
         if entry.itemId == itemId and entry.count > 0 then total = total + entry.count end
       end
@@ -232,12 +232,12 @@ describe('条款 10：烧烤倍率与会话规则', function()
     advance(1)
     local reply = act(player, { action = 'Takeout' })
     assert.near(1.25, reply.rate, 0.001)
-    local entry = data.Data.Containers[GameCfg.Items.ContainerId.ItemBar][1]
+    local entry = data.Data.containers[GameCfg.Items.ContainerId.ItemBar][1]
     assert.are.equal(FISH, entry.itemId, '鱼获要放回可用格位')
     assert.are.equal(reply.rate, entry.cooked)
-    assert.are.equal(1, data.Data.SelectedSlot, '取出后保持选中')
+    assert.are.equal(1, data.Data.selected_slot, '取出后保持选中')
     advance(20)
-    assert.are.equal(1.25, data.Data.Containers[GameCfg.Items.ContainerId.ItemBar][1].cooked,
+    assert.are.equal(1.25, data.Data.containers[GameCfg.Items.ContainerId.ItemBar][1].cooked,
       '倍率取出即冻结，之后再等也不变')
   end)
 

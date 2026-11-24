@@ -32,7 +32,7 @@ describe('TestVolcanoCombat', function()
     it('test_breath_has_reachable_range_and_player_can_dodge_sideways', function()
         env.player.Character.Controller.Health = 1000
         local fish = env:drop('fish56Boss')
-        local p = fish.Carrier.Body.Position
+        local p = fish.carrier.body.Position
         env.player.Character.Position = env.vec(p.x, p.y, p.z + 8)
         env.now = 30
         env.mgr:update()
@@ -75,12 +75,12 @@ describe('TestVolcanoCombat', function()
         local controller = { Health = 1000 }
         function controller:TakeDamage(amount) self.Health = math.max(0, self.Health - amount) end
         local peer = { UserId = 3802, SetAttribute = function() end,
-            Character = { Controller = controller, Position = fish.Carrier.Body.Position } }
+            Character = { Controller = controller, Position = fish.carrier.body.Position } }
         env.players[2] = peer
         env.lifeHost:add(peer)
         controller.Health = 1000
         while env.now < 19.7 - 1e-8 do
-            peer.Character.Position = fish.Carrier.Body.Position
+            peer.Character.Position = fish.carrier.body.Position
             env.now = math.min(19.7, env.now + 0.05)
             env.mgr:update()
         end
@@ -95,7 +95,7 @@ describe('TestVolcanoCombat', function()
         env:drop('fish55Elite')
         env:advance(15.1)
         local controlled = true
-        env.mgr.Ai = { pause = function() end, custom = function() return true end, Sync = function() return true end,
+        env.mgr.ai = { pause = function() end, custom = function() return true end, Sync = function() return true end,
             remove = function() end, stop = function() end }
         env.mgr.Ability = { fish_paralyzed = function() return controlled end, remove_fish = function() end }
         env.now = 15.2
@@ -110,7 +110,7 @@ describe('TestVolcanoCombat', function()
         env.now = 41
         env.mgr:update()
         assert.same('clear', env.notices[#env.notices].kind)
-        env.mgr.Ai = nil
+        env.mgr.ai = nil
     end)
 
     -- 跨两个阈值只算一次切换；离线与死亡都要清掉待结算的吐息。
@@ -123,11 +123,11 @@ describe('TestVolcanoCombat', function()
         env.mgr:update()
         env.now = 30.2
         env.mgr:update()
-        fish.Carrier.Receiver.Controller:TakeDamage(21000)
+        fish.carrier.receiver.Controller:TakeDamage(21000)
         env.mgr:update()
         assert.same('clear', env.notices[#env.notices].kind)
         assert.same('enraged', fish.Phase.Phase)
-        assert.same(1, fish.Phase.Stats.transitions)
+        assert.same(1, fish.Phase.stats.transitions)
         env.now = 41
         env.mgr:update()
         env.now = 41.1
@@ -188,7 +188,7 @@ describe('TestVolcanoCombat', function()
             assert.same(1, controller.Health)
             assert.same('downed', env.vitals:life_status(env.player))
             assert.same('clear', env.notices[#env.notices].kind)
-            assert.is_nil(fish.BossWarn)
+            assert.is_nil(fish.boss_warn)
             assert.is_nil(fish.Aquatic.head_at)
             env.mgr:remove(fish)
         end
@@ -212,7 +212,7 @@ describe('TestVolcanoCombat', function()
     it('test_stomp_warns_with_ten_metre_radius_and_deals_documented_damage', function()
         env.player.Character.Controller.Health = 1000
         local fish = env:drop('fish56Boss')
-        local p = fish.Carrier.Body.Position
+        local p = fish.carrier.body.Position
         env.player.Character.Position = env.vec(p.x, p.y, p.z + 8)
         env:advance(2.1)
         assert.same('bossStomp', env.notices[#env.notices].move)
@@ -234,20 +234,20 @@ describe('TestVolcanoCombat', function()
     it('test_water_phase_reaches_water_and_enrage_interrupts_carry_and_old_warning_once', function()
         env.player.Character.Controller.Health = 5000
         local fish = env:drop('fish56Boss')
-        fish.Carrier.Receiver.Controller:TakeDamage(11000)
+        fish.carrier.receiver.Controller:TakeDamage(11000)
         env.mgr:update()
         env:advance(5)
         local MathWater = require('common.math_water_judge')
-        assert.is_not_nil(MathWater.hit_zone(Cfg.Water.Zones, fish.Carrier.Body.Position))
+        assert.is_not_nil(MathWater.hit_zone(Cfg.Water.Zones, fish.carrier.body.Position))
         env:advance(18)
         assert.is_not_nil(fish.Carry)
-        fish.Carrier.Receiver.Controller:TakeDamage(10000)
+        fish.carrier.receiver.Controller:TakeDamage(10000)
         env.mgr:update()
         assert.is_nil(fish.Carry)
-        assert.is_nil(MathWater.hit_zone(Cfg.Water.Zones, fish.Carrier.Body.Position))
+        assert.is_nil(MathWater.hit_zone(Cfg.Water.Zones, fish.carrier.body.Position))
         env.mgr:update()
         env.mgr:update()
-        assert.same(2, fish.Phase.Stats.transitions)
+        assert.same(2, fish.Phase.stats.transitions)
         assert.same('enraged', fish.Phase.Phase)
     end)
 end)

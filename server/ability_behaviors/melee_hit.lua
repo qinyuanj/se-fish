@@ -3,7 +3,7 @@ local SwingRegistry = require("server.swing_registry")
 local HostSignal = require("common.host_signal")
 local SpokeEggy = require("common.packages.spoke_eggy.api")
 
-local M = { Services = {} }
+local M = { services = {} }
 
 local SwingSeq = 0
 
@@ -105,13 +105,13 @@ local function _applyDamage(target, damage, owner, hit)
 	if not damage or damage == 0.0 or not hit then
 		return false
 	end
-	if M.Services.FishCarrier:resolve_carrier(target) then
-		return (M.Services.Vitals:apply_hit(hit, target, damage))
+	if M.services.FishCarrier:resolve_carrier(target) then
+		return (M.services.Vitals:apply_hit(hit, target, damage))
 	end
 	local players = game:GetService("Players")
 	local targetPlayer = players and players.GetPlayerFromCharacter and players:GetPlayerFromCharacter(target)
 	if targetPlayer then
-		return (M.Services.Vitals:apply_hit(hit, targetPlayer, damage))
+		return (M.services.Vitals:apply_hit(hit, targetPlayer, damage))
 	end
 	return false
 end
@@ -177,9 +177,9 @@ local function _createHitSfx(anchor_script, target)
 end
 
 function M.Attach(anchor_script, services)
-	if services then M.Services = services end
+	if services then M.services = services end
 	for _, name in ipairs({ 'Vitals', 'FishCarrier', 'GM', 'Modifier' }) do
-		assert(M.Services[name], '[melee_hit] 缺少行为依赖: ' .. name)
+		assert(M.services[name], '[melee_hit] 缺少行为依赖: ' .. name)
 	end
 	local RunService = game:GetService("RunService")
 	if not RunService:IsServer() then
@@ -267,9 +267,9 @@ function M.Attach(anchor_script, services)
 			state.effect = swing.effect
 		end
 		if player then
-			hit_damage = M.Services.GM:get_melee_damage(player, hit_damage)
+			hit_damage = M.services.GM:get_melee_damage(player, hit_damage)
 		end
-		state.hit = M.Services.Vitals:new_hit(player or owner, "weapon")
+		state.hit = M.services.Vitals:new_hit(player or owner, "weapon")
 		local hit_power = anchor_script:GetAttribute("ABILITY_ANOSTATE_HITPOWER") or 0.0
 		local weapon_prefab = anchor_script:GetAttribute("ABILITY_ANOSTATE_USE_PERFAB") or ""
 		local anim_id = anchor_script:GetAttribute("ABILITY_ANOSTATE_ANIMKEY") or ""
@@ -384,7 +384,7 @@ function M.Attach(anchor_script, services)
 					"target=" .. tostring(tid), "damage=" .. tostring(hit_damage))
 				_applyHitPower(target, hit_power, owner)
 				_createHitSfx(anchor_script, target)
-				local modifier = M.Services.Modifier
+				local modifier = M.services.Modifier
 				if player and state and state.effect and modifier and modifier.apply_weapon_effect then
 					local ok, err = pcall(modifier.apply_weapon_effect, modifier, player, target, state.effect)
 					if not ok then print("[melee_hit] 武器特效应用失败", tostring(err)) end

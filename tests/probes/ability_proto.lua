@@ -53,11 +53,11 @@ end
 -- 多身份：1001 = 近岛玩家（会被叼走），1002 = 外圈玩家（诱导越界 / 远距离打鱼）
 -- =====================================================================================
 local Players = {
-    { UserId = 1001, Pos = { x = 101.0, y = 2, z = 52.0 }, Tag = 'P1001' },
-    { UserId = 1002, Pos = { x = 999.0, y = 0, z = 999.0 }, Tag = 'P1002' },
+    { UserId = 1001, pos = { x = 101.0, y = 2, z = 52.0 }, Tag = 'P1001' },
+    { UserId = 1002, pos = { x = 999.0, y = 0, z = 999.0 }, Tag = 'P1002' },
 }
-print('== 身份：' .. Players[1].Tag .. ' 近岛 ' .. fmt(Players[1].Pos)
-    .. ' / ' .. Players[2].Tag .. ' 远点 ' .. fmt(Players[2].Pos))
+print('== 身份：' .. Players[1].Tag .. ' 近岛 ' .. fmt(Players[1].pos)
+    .. ' / ' .. Players[2].Tag .. ' 远点 ' .. fmt(Players[2].pos))
 
 -- =====================================================================================
 -- A 三倍体型：药水成长、派生量与缩放后的挂点坐标
@@ -140,31 +140,31 @@ end
 local bounds = FlightPath.bounds_of(zone, F)
 check('B 钓鱼区场景合同给出了有限围栏', bounds ~= nil and finite(bounds.MinX) and finite(bounds.ceiling_y))
 quantity('B 围栏', string.format('x[%.1f,%.1f] z[%.1f,%.1f] ground=%.1f ceiling=%.1f',
-    bounds.MinX, bounds.MaxX, bounds.MinZ, bounds.MaxZ, bounds.GroundY, bounds.ceiling_y))
+    bounds.MinX, bounds.MaxX, bounds.MinZ, bounds.MaxZ, bounds.ground_y, bounds.ceiling_y))
 check('B 高度上限 = 地面 + MaxFlightHeight（#125 合同的 20 米）',
-    math.abs(bounds.ceiling_y - (bounds.GroundY + bounds.MaxHeight)) < 1e-9)
+    math.abs(bounds.ceiling_y - (bounds.ground_y + bounds.MaxHeight)) < 1e-9)
 check('B 场景缺失时返回 nil（无边界不飞）', FlightPath.bounds_of(nil, F) == nil
     and FlightPath.bounds_of({}, F) == nil)
 
 -- 目标故意放到围栏外（用身份 1002 的远点）：飞行每帧都会被夹回本区
 local fly = FlightPath.new(bounds, F, F.Species.fish47Elite,
-    { x = 0, y = bounds.GroundY + 12, z = 0 }, 0)
-FlightPath.set_target(fly, Players[2].Pos)
+    { x = 0, y = bounds.ground_y + 12, z = 0 }, 0)
+FlightPath.set_target(fly, Players[2].pos)
 local violations = 0
 local now = 0
 for _ = 1, 1210 do    -- 60.5 秒，按 0.05 秒一帧
     now = now + 0.05
     FlightPath.step(fly, now, 0.05)
-    local p = fly.Pos
+    local p = fly.pos
     if p.x > bounds.MaxX + 1e-9 or p.x < bounds.MinX - 1e-9
         or p.z > bounds.MaxZ + 1e-9 or p.z < bounds.MinZ - 1e-9
         or p.y > bounds.ceiling_y + 1e-9 then
         violations = violations + 1
     end
 end
-quantity('B 60.5 秒后坐标', fmt(fly.Pos))
+quantity('B 60.5 秒后坐标', fmt(fly.pos))
 quantity('B Stats', string.format('frames=%d clamps=%d dives=%d trunc=%d',
-    fly.Stats.frames, fly.Stats.clamps, fly.Stats.dives, fly.Stats.step_truncations))
+    fly.stats.frames, fly.stats.clamps, fly.stats.dives, fly.stats.step_truncations))
 quantity('B 越界钳制记录条数', #fly.clamp_log)
 for index = 1, math.min(#fly.clamp_log, 4) do
     local entry = fly.clamp_log[index]
@@ -172,28 +172,28 @@ for index = 1, math.min(#fly.clamp_log, 4) do
         index, entry.axis, entry.from, entry.to, entry.phase))
 end
 check('B 全程没有任何一帧飞出围栏', violations == 0, 'violations=' .. violations)
-check('B 越界被钳制并计数（ClampLog 非空）', fly.Stats.clamps > 0 and #fly.clamp_log > 0)
-check('B 俯冲按 20 秒节奏触发（60 秒内 3 次）', fly.Stats.dives == 3, 'dives=' .. fly.Stats.dives)
+check('B 越界被钳制并计数（ClampLog 非空）', fly.stats.clamps > 0 and #fly.clamp_log > 0)
+check('B 俯冲按 20 秒节奏触发（60 秒内 3 次）', fly.stats.dives == 3, 'dives=' .. fly.stats.dives)
 
 -- 坏值与漂移：新状态单独验，不干扰上面的钳制记录
 local guard = FlightPath.new(bounds, F, F.Species.fish48Boss,
-    { x = 0, y = bounds.GroundY + 15, z = 0 }, 0)
-FlightPath.set_target(guard, Players[1].Pos)
-guard.Pos.x = 0 / 0
+    { x = 0, y = bounds.ground_y + 15, z = 0 }, 0)
+FlightPath.set_target(guard, Players[1].pos)
+guard.pos.x = 0 / 0
 local nanEvent = FlightPath.step(guard, 1, 0.05)
-quantity('B NaN 恢复后坐标', fmt(nanEvent.position or guard.Pos))
+quantity('B NaN 恢复后坐标', fmt(nanEvent.position or guard.pos))
 check('B NaN 被识别并退回上一合法点（速度清零）',
-    nanEvent.nan == true and guard.Stats.nan_recoveries == 1
-    and finitePoint(guard.Pos) and guard.Vel.x == 0 and guard.Vel.y == 0 and guard.Vel.z == 0)
-guard.Pos = { x = guard.Last.x + 500, y = guard.Last.y, z = guard.Last.z }
+    nanEvent.nan == true and guard.stats.nan_recoveries == 1
+    and finitePoint(guard.pos) and guard.vel.x == 0 and guard.vel.y == 0 and guard.vel.z == 0)
+guard.pos = { x = guard.last.x + 500, y = guard.last.y, z = guard.last.z }
 local driftEvent = FlightPath.step(guard, 2, 0.05)
-quantity('B 漂移钳回后坐标', fmt(driftEvent.position or guard.Pos))
+quantity('B 漂移钳回后坐标', fmt(driftEvent.position or guard.pos))
 check('B 被外力顶飞时整段钳回（不瞬移）',
-    driftEvent.drift == true and guard.Stats.drifts == 1 and samePoint(guard.Pos, guard.Last))
+    driftEvent.drift == true and guard.stats.drifts == 1 and samePoint(guard.pos, guard.last))
 local huge = FlightPath.step(guard, 3, 5)   -- dt 过大：截断成最大步长
 check('B 超大 dt 被截断（补算不得一帧跨过围栏）',
-    huge.truncated == true and guard.Stats.step_truncations == 1)
-check('B 防护后坐标始终有限（无 NaN/漂移残留）', finitePoint(guard.Pos))
+    huge.truncated == true and guard.stats.step_truncations == 1)
+check('B 防护后坐标始终有限（无 NaN/漂移残留）', finitePoint(guard.pos))
 
 -- 跃起（沧龙 fish55Elite：每 15 秒高高跃起）：抛物线到 LeapHeight 再回到水面高度。
 -- 用沧龙自己的钓鱼区（volcanoIsland）围栏，而不是白头鹰所在的礁岛。
@@ -205,23 +205,23 @@ local leapBounds = FlightPath.bounds_of(volcano, F)
 check('B 火山岛（沧龙所在区）场景合同给出有限围栏',
     leapBounds ~= nil and finite(leapBounds.MinX) and finite(leapBounds.ceiling_y))
 quantity('B 火山岛围栏', string.format('x[%.1f,%.1f] z[%.1f,%.1f] ground=%.1f ceiling=%.1f',
-    leapBounds.MinX, leapBounds.MaxX, leapBounds.MinZ, leapBounds.MaxZ, leapBounds.GroundY,
+    leapBounds.MinX, leapBounds.MaxX, leapBounds.MinZ, leapBounds.MaxZ, leapBounds.ground_y,
     leapBounds.ceiling_y))
 local center = { x = (leapBounds.MinX + leapBounds.MaxX) / 2, z = (leapBounds.MinZ + leapBounds.MaxZ) / 2 }
 local leap = FlightPath.new(leapBounds, F, F.Species.fish55Elite,
-    { x = center.x, y = leapBounds.GroundY, z = center.z }, 0)
+    { x = center.x, y = leapBounds.ground_y, z = center.z }, 0)
 local apex, leapViolations = 0, 0
 for step = 1, 400 do    -- 20 秒
     FlightPath.step(leap, step * 0.05, 0.05)
-    if leap.Pos.y - leapBounds.GroundY > apex then apex = leap.Pos.y - leapBounds.GroundY end
-    if leap.Pos.y > leapBounds.ceiling_y + 1e-9 or leap.Pos.y < leapBounds.GroundY - 1e-9 then
+    if leap.pos.y - leapBounds.ground_y > apex then apex = leap.pos.y - leapBounds.ground_y end
+    if leap.pos.y > leapBounds.ceiling_y + 1e-9 or leap.pos.y < leapBounds.ground_y - 1e-9 then
         leapViolations = leapViolations + 1
     end
 end
 quantity('B 沧龙跃起最高点（相对水面）', string.format('%.3f（配置 LeapHeight=%.1f）', apex, F.LeapHeight))
-quantity('B 沧龙 20 秒内跃起次数 / 结束阶段', string.format('%d / %s', leap.Stats.dives, leap.Phase))
+quantity('B 沧龙 20 秒内跃起次数 / 结束阶段', string.format('%d / %s', leap.stats.dives, leap.Phase))
 check('B 沧龙跃起达到配置高度并落回水面（不越界）',
-    leap.Stats.dives == 1 and apex > F.LeapHeight * 0.95 and apex <= F.LeapHeight
+    leap.stats.dives == 1 and apex > F.LeapHeight * 0.95 and apex <= F.LeapHeight
     and leapViolations == 0 and leap.Phase == 'cruise')
 
 -- =====================================================================================
@@ -229,41 +229,41 @@ check('B 沧龙跃起达到配置高度并落回水面（不越界）',
 -- =====================================================================================
 print('== C 巡航叼人')
 local carry = CarryMount.new(Carry, Host, Yaw, 0)
-carry.GroundY = Host.y
+carry.ground_y = Host.y
 quantity('C 挂点位移', fmt(carry.Offset))
 quantity('C 挂点世界坐标', fmt(CarryMount.mount_point(Host, carry.Offset, Yaw)))
 check('C 宿主外挂点（净空足够，无需纠正）', carry.corrected == false
     and CarryMount.length(carry.Offset) >= Carry.HostHalfHeight + Carry.CarriedHalfHeight)
 
-local tooFar = CarryMount.attach(carry, Players[2].Pos, 0)
+local tooFar = CarryMount.attach(carry, Players[2].pos, 0)
 check('C 超出抓取距离不叼', tooFar.Ok == false and tooFar.Reason == 'outOfRange')
-local grabbed = CarryMount.attach(carry, Players[1].Pos, 0)
+local grabbed = CarryMount.attach(carry, Players[1].pos, 0)
 quantity('C 咬中伤害', grabbed.Damage)
 check('C 就近身份 1001 被叼走（咬中 300）', grabbed.Ok == true and grabbed.Damage == Carry.GrabDamage)
-check('C 叼中时的挂点坐标有限', finitePoint(CarryMount.mount_point(carry.Host, carry.Offset, carry.Yaw)))
+check('C 叼中时的挂点坐标有限', finitePoint(CarryMount.mount_point(carry.host, carry.Offset, carry.Yaw)))
 
-Players[1].Pos = { x = Host.x + 1, y = Host.y, z = Host.z + 1 }   -- 容差内的小幅漂移
-local hold = CarryMount.follow(carry, Players[1].Pos, 0.05, 0.05)
-check('C 容差内不写回（避免每帧抖动）', hold.snapped == false and samePoint(hold.Position, Players[1].Pos))
-Players[1].Pos = { x = 999, y = 0, z = 999 }                      -- 被甩开
-local snapped = CarryMount.follow(carry, Players[1].Pos, 0.1, 0.05)
+Players[1].pos = { x = Host.x + 1, y = Host.y, z = Host.z + 1 }   -- 容差内的小幅漂移
+local hold = CarryMount.follow(carry, Players[1].pos, 0.05, 0.05)
+check('C 容差内不写回（避免每帧抖动）', hold.snapped == false and samePoint(hold.Position, Players[1].pos))
+Players[1].pos = { x = 999, y = 0, z = 999 }                      -- 被甩开
+local snapped = CarryMount.follow(carry, Players[1].pos, 0.1, 0.05)
 quantity('C 甩开后钳回坐标', fmt(snapped.Position))
 check('C 超出容差整段钳回挂点并计数',
-    snapped.snapped == true and carry.Stats.snaps == 1
-    and samePoint(snapped.Position, CarryMount.mount_point(carry.Host, carry.Offset, carry.Yaw)))
+    snapped.snapped == true and carry.stats.snaps == 1
+    and samePoint(snapped.Position, CarryMount.mount_point(carry.host, carry.Offset, carry.Yaw)))
 local timedOut = CarryMount.step(carry, Carry.MaxCarrySec, 0.05)
 quantity('C 超时落点', fmt(timedOut.drop_point or {}))
 check('C 超时自动释放（落点有限、离地 DropHeight）',
     timedOut.released == true and timedOut.Reason == 'timeout'
     and finitePoint(timedOut.drop_point)
-    and math.abs(timedOut.drop_point.y - (carry.GroundY + Carry.DropHeight)) < 1e-9)
+    and math.abs(timedOut.drop_point.y - (carry.ground_y + Carry.DropHeight)) < 1e-9)
 check('C 重复释放是空操作', CarryMount.release(carry, Carry.MaxCarrySec + 1, 'again').Reason == 'notCarrying')
 
 -- 第二个身份：同一个宿主的下一次叼人
 local carry2 = CarryMount.new(Carry, Host, Yaw, 0)
-carry2.GroundY = Host.y
-Players[2].Pos = { x = Host.x + 1, y = Host.y, z = Host.z }
-local grabbed2 = CarryMount.attach(carry2, Players[2].Pos, 100)
+carry2.ground_y = Host.y
+Players[2].pos = { x = Host.x + 1, y = Host.y, z = Host.z }
+local grabbed2 = CarryMount.attach(carry2, Players[2].pos, 100)
 check('C 同一宿主可叼起第二个身份 1002', grabbed2.Ok == true and carry2.Target ~= nil)
 local nanTarget = CarryMount.follow(carry2, { x = 0 / 0, y = Host.y, z = 0 }, 100.5, 0.05)
 quantity('C 目标坏值时的落点', fmt(nanTarget.Position or {}))
@@ -278,21 +278,21 @@ local Boss = GameCfg.Ability.BossPhase
 local boss = BossPhase.new(Boss, 0, { x = 100, y = 2, z = 50 })
 local jumped = BossPhase.update(boss, 0.05, 0.05, {
     Health = 1000, MaxHealth = 10000, alive = true,
-    Target = Players[1].Pos, Pos = { x = 100, y = 2, z = 50 },
+    Target = Players[1].pos, pos = { x = 100, y = 2, z = 50 },
 })
 quantity('D 一帧跨两阈值', string.format('from=%s to=%s skipped=[%s] percent=%.1f',
     tostring(jumped.From), tostring(jumped.to), table.concat(jumped.skipped or {}, ','), jumped.Percent))
 check('D 一帧跨两阈值只进最终合法阶段',
     jumped.phase_changed == true and jumped.From == 'normal' and jumped.to == 'enraged'
-    and #jumped.skipped == 1 and jumped.skipped[1] == 'water' and boss.Stats.skipped == 1)
+    and #jumped.skipped == 1 and jumped.skipped[1] == 'water' and boss.stats.skipped == 1)
 local healed = BossPhase.update(boss, 1, 0.95, {
-    Health = 9000, MaxHealth = 10000, alive = true, Target = Players[1].Pos,
+    Health = 9000, MaxHealth = 10000, alive = true, Target = Players[1].pos,
 })
 check('D 阶段只升级不倒退（回血不退回）',
     healed.phase_changed == nil and healed.Phase == 'enraged' and boss.Percent == 90)
 for index, entry in ipairs(boss.Log) do
     print(string.format('K D 切换序列[%d] t=%.2f %s -> %s percent=%.1f skipped=[%s]',
-        index, entry.At, tostring(entry.From), tostring(entry.to), entry.Percent or -1,
+        index, entry.at, tostring(entry.From), tostring(entry.to), entry.Percent or -1,
         table.concat(entry.skipped or {}, ',')))
 end
 
@@ -313,7 +313,7 @@ local interrupted = BossPhase.update(w, 10.1, 0.1, {
 })
 check('D 途中失目标立即撤销起手并重新计时',
     interrupted.interrupted == true and interrupted.Reason == 'lostTarget'
-    and BossPhase.winding(w) == false and w.Stats.interrupts == 1)
+    and BossPhase.winding(w) == false and w.stats.interrupts == 1)
 -- 目标回来后重新计时 10 秒 + 起手 1.5 秒才应落地：这里跑满 12 秒，检查中间没有补发
 local landed, earlyAttacks = nil, 0
 for step = 1, 240 do
@@ -322,12 +322,12 @@ for step = 1, 240 do
         Health = 25000, MaxHealth = 25000, alive = true, Target = inRange })
     if event.Attack then
         landed = event.Attack
-        if event.Attack.At < 20.1 then earlyAttacks = earlyAttacks + 1 end
+        if event.Attack.at < 20.1 then earlyAttacks = earlyAttacks + 1 end
     end
 end
 check('D 目标回来不会立刻补发秒杀（重新计时窗口内无落地）', earlyAttacks == 0)
 quantity('D 重新计时后落地', landed and string.format('t=%.2f name=%s lethal=%s',
-    landed.At, landed.Name, tostring(landed.lethal)) or 'nil')
+    landed.at, landed.Name, tostring(landed.lethal)) or 'nil')
 check('D 重新计时满后吐息正常落地（原子吐息为秒杀）',
     landed ~= nil and landed.Name == 'breath' and landed.lethal == true)
 
@@ -338,7 +338,7 @@ for step = 1, 10 do
     BossPhase.update(range, 10 + step * 0.2, 0.2, {
         Health = 25000, MaxHealth = 25000, alive = true, Target = outRange })
 end
-check('D 正前 10 米外（身份 1002）不出手', range.Stats.Attacks == 0 and BossPhase.winding(range) == false)
+check('D 正前 10 米外（身份 1002）不出手', range.stats.Attacks == 0 and BossPhase.winding(range) == false)
 
 -- 死亡打断：起手中死亡 → 撤销且之后不再有攻击
 local dead = BossPhase.new(breathOnly, 0, { x = 100, y = 2, z = 50 })
@@ -351,7 +351,7 @@ for step = 1, 40 do
 end
 quantity('D 死亡后攻击序列', #dead.attack_log .. ' 条（预期 0）')
 check('D 死亡后不再有任何攻击落地且打断只计一次',
-    #dead.attack_log == 0 and dead.Stats.interrupts == 1 and dead.Stats.Attacks == 0)
+    #dead.attack_log == 0 and dead.stats.interrupts == 1 and dead.stats.Attacks == 0)
 
 -- =====================================================================================
 print(string.format('== 探针结果：%d 通过 / %d 失败', Pass, Fail))

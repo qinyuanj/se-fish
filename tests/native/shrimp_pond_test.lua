@@ -154,7 +154,7 @@ describe('虾池最小内容（水区 / 鱼表 / 商店 / 钓鱼佬 / 抛竿）'
     end
     assert.is_not_nil(runtimeWater)
     assert.same(scene.Waters[1].Center, runtimeWater.Center)
-    assert.same(scene.SafePoint, env.cfg.Ferry.Routes[1].Outbound.Destination)
+    assert.same(scene.SafePoint, env.cfg.Ferry.Routes[1].Outbound.destination)
   end)
 
   it('test_buy_away_from_all_stands_rejected', function()
@@ -216,7 +216,7 @@ describe('虾池最小内容（水区 / 鱼表 / 商店 / 钓鱼佬 / 抛竿）'
     assert.is_true(env.data:AddItem('riverShrimp'))
     local slot
     for index = 1, 8 do
-      local entry = env.data.Data.Containers.itemBar[index]
+      local entry = env.data.Data.containers.itemBar[index]
       if entry and entry.itemId == 'riverShrimp' then slot = index end
     end
     assert.is_true(env.data:SelectSlot(slot))
@@ -227,7 +227,7 @@ describe('虾池最小内容（水区 / 鱼表 / 商店 / 钓鱼佬 / 抛竿）'
     moveTo('TGUnitFish')
     assert.is_true(env.data:AddItem('carp'))
     for index = 1, 8 do
-      local entry = env.data.Data.Containers.itemBar[index]
+      local entry = env.data.Data.containers.itemBar[index]
       if entry and entry.itemId == 'carp' then slot = index end
     end
     assert.is_true(env.data:SelectSlot(slot))

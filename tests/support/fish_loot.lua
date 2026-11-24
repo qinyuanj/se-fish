@@ -69,7 +69,7 @@ function M:tear_down()
 end
 
 function M:kill(fish)
-    for _, fn in ipairs(self.diedSubs) do fn(fish.Carrier) end
+    for _, fn in ipairs(self.diedSubs) do fn(fish.carrier) end
 end
 
 function M:loot_units()

@@ -115,8 +115,8 @@ function M.start(opts)
       function player:GetAttribute(key) return self.attrs[key] end
     end
     data = data or PlayerData.new(player)
-    if not data.Inited then data:Init() end
-    data.LoadState = "ready"
+    if not data.inited then data:Init() end
+    data.load_state = "ready"
     data.Player = player
     data_of[player.UserId] = data
     players[#players + 1] = player

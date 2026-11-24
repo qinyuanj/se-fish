@@ -55,9 +55,9 @@ end
 function M.drop(env, fishId, dz)
     local p = env.player.Character.Position
     local fish = env.mgr:spawn_landed(env.player, { fishId = fishId, mult = 1 }, Vector3.New(p.x, 2, p.z + 2))
-    fish.Carrier.Body.OnLiftedBegin:Fire(env.player.Character)
+    fish.carrier.body.OnLiftedBegin:Fire(env.player.Character)
     env.mgr:drop(env.player)
-    local bp = fish.Carrier.Body.Position
+    local bp = fish.carrier.body.Position
     env.player.Character.Position = Vector3.New(bp.x, 2, bp.z + (dz or 2))
     return fish
 end

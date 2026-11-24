@@ -21,12 +21,12 @@ local function make_ready_data(player, overrides)
   overrides = overrides or {}
   return {
     Player = player,
-    Inited = true,
-    LoadState = "ready",
+    inited = true,
+    load_state = "ready",
     Data = {
       FishCoin = overrides.coin or 0,
       Zone = overrides.zone or "fishPond",
-      SelectedSlot = overrides.selected_slot,
+      selected_slot = overrides.selected_slot,
     },
     Extra = {
       growth = {
@@ -453,7 +453,7 @@ describe("ModifierLeaf：modifier_system 单向叶子投影与活鱼辅助接口
     })
 
     local receiver = env.unit("fish_receiver")
-    local fish = { Id = "fish_1", Carrier = { Receiver = receiver, Dead = false } }
+    local fish = { Id = "fish_1", carrier = { receiver = receiver, dead = false } }
     local attacker = { UserId = 888, Character = env.unit("attacker") }
 
     assert.is_true(store:apply_weapon_effect(attacker, fish, { Kind = "frost" }))
@@ -475,7 +475,7 @@ describe("ModifierLeaf：modifier_system 单向叶子投影与活鱼辅助接口
     assert.equals(0, store:get_move_multiplier(fish))
 
     -- 载体死亡后 step 自动清除全部官方包实体
-    fish.Carrier.Dead = true
+    fish.carrier.dead = true
     now = 201.2
     store:step(now)
     assert.equals(0, #raw_api.GetUnitModifiers(receiver))

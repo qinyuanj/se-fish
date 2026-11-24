@@ -52,7 +52,7 @@ function Probe.Damage(id,amount)
     local Fish=fishHost()
     local fish=assert(Probe.owned[id],'不是探针创建的鱼')
     assert(Fish.Fish[id]==fish and amount>0 and amount==math.floor(amount),'目标或伤害无效')
-    fish.Carrier.Receiver.Controller:TakeDamage(amount)
+    fish.carrier.receiver.Controller:TakeDamage(amount)
     log('阶段触发伤害 '..tostring(amount),id)
 end
 
@@ -66,12 +66,12 @@ function Probe.snapshot(player,id)
         platformDelivered=data and data.Extra.achievementDelivered and data.Extra.achievementDelivered.final,
         platformConfigured=type(Cfg.Achievements.final.PlatformId)=='number'}
     if result.exists then
-        result.body,result.receiver=point(fish.Carrier.Body),point(fish.Carrier.Receiver)
-        result.health,result.maxHealth=fish.Carrier.Health,fish.Carrier.MaxHealth
+        result.body,result.receiver=point(fish.carrier.body),point(fish.carrier.receiver)
+        result.health,result.maxHealth=fish.carrier.Health,fish.carrier.MaxHealth
         result.state,result.phase=fish.State,fish.Phase and fish.Phase.Phase
-        result.transitions=fish.Phase and fish.Phase.Stats.transitions
+        result.transitions=fish.Phase and fish.Phase.stats.transitions
         result.carry=fish.Carry and fish.Carry.target_player.UserId
-        result.warning=fish.BossWarn~=nil
+        result.warning=fish.boss_warn~=nil
     end
     log('snapshot',id)
     return result

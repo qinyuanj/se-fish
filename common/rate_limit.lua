@@ -38,14 +38,14 @@ function RateLimit.new_window(windowSec, maxCount)
         MaxCount = math.floor(maxCount),
         bursts = {},
         first = 1,
-        Last = 0,
+        last = 0,
         used_count = 0,
     }, Window)
 end
 
 function Window:trim(now)
     local deadline = now - self.WindowSec
-    while self.first <= self.Last and self.bursts[self.first].Time <= deadline do
+    while self.first <= self.last and self.bursts[self.first].Time <= deadline do
         self.used_count = self.used_count - self.bursts[self.first].Count
         self.bursts[self.first] = nil
         self.first = self.first + 1
@@ -72,8 +72,8 @@ function Window:admit(now, count)
         return 0
     end
 
-    self.Last = self.Last + 1
-    self.bursts[self.Last] = { Time = now, Count = accepted }
+    self.last = self.last + 1
+    self.bursts[self.last] = { Time = now, Count = accepted }
     self.used_count = self.used_count + accepted
     return accepted
 end
@@ -81,7 +81,7 @@ end
 function Window:reset()
     self.bursts = {}
     self.first = 1
-    self.Last = 0
+    self.last = 0
     self.used_count = 0
 end
 
@@ -91,15 +91,15 @@ Aggregator.__index = Aggregator
 
 function RateLimit.new_aggregator(opts)
     opts = opts or {}
-    checkSessionId(opts.SessionId, "RateLimit.NewAggregator")
+    checkSessionId(opts.session_id, "RateLimit.NewAggregator")
     if not isFiniteNumber(opts.AggregateSec) or opts.AggregateSec <= 0 then
         error("RateLimit.NewAggregator: AggregateSec 必须是正数")
     end
 
     return setmetatable({
-        SessionId = opts.SessionId,
+        session_id = opts.session_id,
         AggregateSec = opts.AggregateSec,
-        Pending = 0,
+        pending = 0,
         window_start = nil,
         seq = 0,
     }, Aggregator)
@@ -107,21 +107,21 @@ end
 
 function Aggregator:set_session(sessionId)
     checkSessionId(sessionId, "RateLimit.Aggregator:SetSession")
-    self.SessionId = sessionId
-    self.Pending = 0
+    self.session_id = sessionId
+    self.pending = 0
     self.window_start = nil
     self.seq = 0
 end
 
 function Aggregator:click(now)
-    if self.Pending == 0 then
+    if self.pending == 0 then
         self.window_start = now
     end
-    self.Pending = self.Pending + 1
+    self.pending = self.pending + 1
 end
 
 function Aggregator:collect(now)
-    if self.Pending == 0 or now - self.window_start < self.AggregateSec then
+    if self.pending == 0 or now - self.window_start < self.AggregateSec then
         return nil
     end
 
@@ -129,19 +129,19 @@ function Aggregator:collect(now)
 end
 
 function Aggregator:flush()
-    if self.Pending == 0 then
+    if self.pending == 0 then
         return nil
     end
 
     self.seq = self.seq + 1
-    local payload = { s = self.SessionId, n = self.Pending, q = self.seq }
-    self.Pending = 0
+    local payload = { s = self.session_id, n = self.pending, q = self.seq }
+    self.pending = 0
     self.window_start = nil
     return payload
 end
 
 function Aggregator:pending_count()
-    return self.Pending
+    return self.pending
 end
 
 
@@ -151,22 +151,22 @@ Receiver.__index = Receiver
 function RateLimit.new_receiver(opts)
     opts = opts or {}
     return setmetatable({
-        SessionId = opts.SessionId,
+        session_id = opts.session_id,
         window = RateLimit.new_window(opts.WindowSec, opts.MaxCount),
-        LastSeq = nil,
+        last_seq = nil,
     }, Receiver)
 end
 
 function Receiver:set_session(sessionId)
     checkSessionId(sessionId, "RateLimit.Receiver:SetSession")
-    self.SessionId = sessionId
-    self.LastSeq = nil
+    self.session_id = sessionId
+    self.last_seq = nil
     self.window:reset()
 end
 
 function Receiver:end_session()
-    self.SessionId = nil
-    self.LastSeq = nil
+    self.session_id = nil
+    self.last_seq = nil
     self.window:reset()
 end
 
@@ -187,19 +187,19 @@ function Receiver:accept(now, msg)
         return drop(RateLimit.Reason.bad_payload, nil)
     end
 
-    if self.SessionId == nil or msg.s ~= self.SessionId then
+    if self.session_id == nil or msg.s ~= self.session_id then
         return drop(RateLimit.Reason.session, q)
     end
 
-    if self.LastSeq ~= nil and q <= self.LastSeq then
+    if self.last_seq ~= nil and q <= self.last_seq then
         return drop(RateLimit.Reason.order, q)
     end
 
-    self.LastSeq = q
+    self.last_seq = q
     local accepted = self.window:admit(now, n)
     return {
         Status = RateLimit.Result.Ok,
-        Requested = math.floor(n),
+        requested = math.floor(n),
         accepted = accepted,
         seq = q,
         clamped = accepted < math.floor(n),

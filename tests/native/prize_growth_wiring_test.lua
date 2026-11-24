@@ -77,8 +77,8 @@ describe('TestFishStatusGate', function()
         ctx.mgr.refresh_moving_combat = function() end
         ctx.mgr.boss_phase_enabled = function() return false end
         local body = { Position = vec(9999, 500, 9999) } -- 远离任何水域，不触发入水逃脱
-        local fish = { Id = 2, FishId = 'alligatorGar', State = 'combat', FleeAt = ctx.now + 100,
-            Carrier = { Body = body } }
+        local fish = { Id = 2, fish_id = 'alligatorGar', State = 'combat', flee_at = ctx.now + 100,
+            carrier = { body = body } }
         ctx.paralyzed = true
         ctx.mgr:update_combat(fish, ctx.now)
         assert.message('麻痹期间不追咬/不施法').same({}, dispatched)
@@ -90,7 +90,7 @@ describe('TestFishStatusGate', function()
 
     -- 鱼的移速 = 基础 × 状态因子；效果口故障不拖垮移动
     it('test_speed_multiplies_status_factor', function()
-        local fish = { Id = 1, FishId = 'alligatorGar' }
+        local fish = { Id = 1, fish_id = 'alligatorGar' }
         local base = GameCfg.Fish.alligatorGar.Speed
         assert.same(base, ctx.mgr:speed(fish))
         ctx.factor = 0.7 -- 霜冻
@@ -107,8 +107,8 @@ describe('TestFishStatusGate', function()
     -- 直线逃跑每帧刷新状态速度：不等 TurnSec 转向
     it('test_straight_escape_refreshes_status_velocity_each_frame', function()
         local body = { Position = vec(9999, 500, 9999) }
-        local fish = { Id = 3, FishId = 'alligatorGar', straight_escape = true,
-            Heading = { x = 1, z = 0 }, Carrier = { Body = body } }
+        local fish = { Id = 3, fish_id = 'alligatorGar', straight_escape = true,
+            heading = { x = 1, z = 0 }, carrier = { body = body } }
         ctx.factor = 0
         ctx.mgr:update_escaping(fish, ctx.now)
         assert.same(vec(0, 0, 0), body.LinearVelocity)

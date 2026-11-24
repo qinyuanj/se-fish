@@ -221,10 +221,10 @@ function MainHudActionButtonsView.mount(s, ctx, options)
     or compute_layout(resolution, ctx.store.item_bar:now())
 
   -- 1. 创建 ItemDiscard / ItemAction2 按钮与同级高 ZOrder 文案标签（全部由 ctx.create_node 托管）
-  local btn_discard = make_button(ctx, s, "ItemDiscard", initial_layout.Rects.discard)
-  local label_discard = make_label(ctx, s, "BtnDiscardLabel", initial_layout.Rects.discard, "丢弃选中物")
-  local btn_action = make_button(ctx, s, "ItemAction2", initial_layout.Rects.ItemAction)
-  local label_action = make_label(ctx, s, "BtnItemActionLabel", initial_layout.Rects.ItemAction, "抛竿")
+  local btn_discard = make_button(ctx, s, "ItemDiscard", initial_layout.rects.discard)
+  local label_discard = make_label(ctx, s, "BtnDiscardLabel", initial_layout.rects.discard, "丢弃选中物")
+  local btn_action = make_button(ctx, s, "ItemAction2", initial_layout.rects.item_action)
+  local label_action = make_label(ctx, s, "BtnItemActionLabel", initial_layout.rects.item_action, "抛竿")
 
   -- 2. 原子吐息冷却（1Hz on_second）与上钩呼吸高亮（活跃期 on_frame 原地改色，绝不重建 Effect）
   local breath_until = nil
@@ -362,10 +362,10 @@ function MainHudActionButtonsView.mount(s, ctx, options)
     local layout = es:d(layout_sig) or compute_layout(resolution, item_bar)
     local reel_flag = reel_active_sig ~= nil and (es:d(reel_active_sig) == true) or is_reel_active_fn(cast) == true
 
-    place(btn_discard, layout.Rects.discard)
-    place(label_discard, layout.Rects.discard)
-    place(btn_action, layout.Rects.ItemAction)
-    place(label_action, layout.Rects.ItemAction)
+    place(btn_discard, layout.rects.discard)
+    place(label_discard, layout.rects.discard)
+    place(btn_action, layout.rects.item_action)
+    place(label_action, layout.rects.item_action)
 
     if occluded or not hud_visible then
       btn_discard.Visible = false

@@ -1,11 +1,11 @@
 local HostSignal = require("common.host_signal")
 local SpokeEggy = require("common.packages.spoke_eggy.api")
 
-local M = { Services = {} }
+local M = { services = {} }
 
 function M.discharge(owner, radius, damage, hit)
-    local Vitals = assert(M.Services.Vitals, '[EelDischarge] 缺少 Vitals 注入')
-    local FishCarrier = assert(M.Services.FishCarrier, '[EelDischarge] 缺少 FishCarrier 注入')
+    local Vitals = assert(M.services.Vitals, '[EelDischarge] 缺少 Vitals 注入')
+    local FishCarrier = assert(M.services.FishCarrier, '[EelDischarge] 缺少 FishCarrier 注入')
     hit = hit or Vitals:new_hit(FishCarrier:resolve_carrier(owner) or owner, 'fishAttack')
     local position = owner.Position
     local hits = 0
@@ -27,7 +27,7 @@ function M.discharge(owner, radius, damage, hit)
 end
 
 function M.Attach(anchor, services)
-    if services then M.Services = services end
+    if services then M.services = services end
     local start = anchor:FindFirstChild('AnchorStart')
     if not start then error('[EelDischarge] 缺少 AnchorStart') end
     return SpokeEggy.behaviour(anchor, function(scope)

@@ -10,7 +10,7 @@ function GuideView.spec(options)
     mount = function(scope, ctx)
       local resolution = ViewUtil.get_resolution(ctx, options)
       local rects = MainHudLayout.compute({ width = resolution.x, height = resolution.y,
-        itemBarSlots = 0, reeling = false }).Rects
+        itemBarSlots = 0, reeling = false }).rects
       local panel, toggle_rect = rects.quest_panel, rects.quest_toggle
       local background = ctx.create_node(scope, "EUIImage", {
         Parent = ctx.root_node, Name = "QuestBackground", Position = Vector2.New(panel.x, panel.y),

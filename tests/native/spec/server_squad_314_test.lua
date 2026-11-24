@@ -41,8 +41,8 @@ end
 
 local function make_data(player, saved_party)
   return {
-    Player = player, Inited = true, LoadState = "ready",
-    Data = { FishCoin = 0, Zone = "shrimpPond", Containers = {} },
+    Player = player, inited = true, load_state = "ready",
+    Data = { FishCoin = 0, Zone = "shrimpPond", containers = {} },
     Extra = {
       growth = { potions = {}, upgrades = {} },
       survival = { health = GameCfg.Vitals.MaxHealth, hunger = GameCfg.Vitals.MaxHunger },

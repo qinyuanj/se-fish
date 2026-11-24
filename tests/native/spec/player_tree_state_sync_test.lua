@@ -45,23 +45,23 @@ local function make_ready_data(player, overrides)
   overrides = overrides or {}
   return {
     Player = player,
-    Inited = true,
-    LoadState = "ready",
+    inited = true,
+    load_state = "ready",
     Data = {
       FishCoin = overrides.coin or 100,
       Zone = overrides.zone or "fishPond",
-      UpgradeLevel = overrides.upgrade_level or 0,
-      Containers = {
+      upgrade_level = overrides.upgrade_level or 0,
+      containers = {
         [CONTAINER.ItemBar] = overrides.item_bar or {
           [1] = { itemId = GameCfg.Items.Id.StarterRod, count = 1, containerId = CONTAINER.ItemBar },
         },
         [CONTAINER.Backpack] = overrides.backpack or {},
       },
       Bait = overrides.bait or { item31 = 5 },
-      Weapons = overrides.weapons or {},
-      SelectedSlot = overrides.selected_slot,
-      SelectedBait = overrides.selected_bait,
-      SelectedWeapon = overrides.selected_weapon,
+      weapons = overrides.weapons or {},
+      selected_slot = overrides.selected_slot,
+      selected_bait = overrides.selected_bait,
+      selected_weapon = overrides.selected_weapon,
     },
     Extra = {
       inventory = {
@@ -195,12 +195,12 @@ describe("PlayerTree #297-A1b：单批合并推送、属性即时重算与存档
 
     -- 存档镜像已同步写回 data.Data / data.Extra
     assert.equals(550, data.Data.FishCoin)
-    assert.equals(2, data.Data.UpgradeLevel)
+    assert.equals(2, data.Data.upgrade_level)
     assert.equals(3, data.Extra.growth.potions.item168)
     assert.equals(4, data.Extra.growth.potions.item167)
     assert.equals(2, data.Extra.growth.upgrades.melee)
     assert.equals(125, data.Extra.cooldowns.breath)
-    assert.equals(boss_bait_id, data.Data.Containers[CONTAINER.ItemBar][2].itemId)
+    assert.equals(boss_bait_id, data.Data.containers[CONTAINER.ItemBar][2].itemId)
 
     pt:dispose()
   end)

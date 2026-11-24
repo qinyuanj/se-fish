@@ -191,23 +191,23 @@ describe("钓场商店购买", function()
         -- 1 级摊位逐级扩容成功，且把行 33（背包升级1）计入购买次数
         ctx.seq = ctx.seq + 1
         assert.is_true(send({ action = 'UpgradeStorage', seq = ctx.seq }))
-        assert.same(1, ctx.data.Data.UpgradeLevel)
+        assert.same(1, ctx.data.Data.upgrade_level)
         assert.same(1, ctx.data:PurchaseCount(33))
         assert.same(9900, ctx.data.Data.FishCoin)
         -- 限购：级别回滚后行 33 仍计数 1/1 → 'limit' 且不扣钱
-        ctx.data.Data.UpgradeLevel = 0
+        ctx.data.Data.upgrade_level = 0
         ctx.seq = ctx.seq + 1
         assert.is_false(send({ action = 'UpgradeStorage', seq = ctx.seq }))
         assert.same('limit', lastReason())
         assert.same(9900, ctx.data.Data.FishCoin)
         -- 摊位等级门槛：1 级摊位已升 1 级，下一级（行 32）需 2 级摊位 → 'level'
-        ctx.data.Data.UpgradeLevel = 1
+        ctx.data.Data.upgrade_level = 1
         ctx.data.Extra.growth.purchases['33'] = 0
         ctx.seq = ctx.seq + 1
         assert.is_false(send({ action = 'UpgradeStorage', seq = ctx.seq }))
         assert.same('level', lastReason())
         -- 满级：6 级后再扩 → 'max'
-        ctx.data.Data.UpgradeLevel = 6
+        ctx.data.Data.upgrade_level = 6
         ctx.seq = ctx.seq + 1
         assert.is_false(send({ action = 'UpgradeStorage', seq = ctx.seq }))
         assert.same('max', lastReason())

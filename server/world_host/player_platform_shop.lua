@@ -76,8 +76,8 @@ function PlayerPlatformShop.mount(scope, tree, opts)
     if not disposed then tree:sync_from_data(data) end
   end
   local function current_token()
-    local session = save and save.Sessions[player.UserId]
-    return session and session.Token or nil
+    local session = save and save.sessions[player.UserId]
+    return session and session.token or nil
   end
   local function publish(result, key)
     local response = copy(result)

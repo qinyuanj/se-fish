@@ -85,7 +85,7 @@ describe('TestStatusEffect', function()
             FishCarrier = nil, -- 按需在各用例里装
         }
         -- 假 PlayerData / Survival
-        state.mgr.PlayerData = { get_data_inst = function() return {
+        state.mgr.player_data = { get_data_inst = function() return {
             potion_count = function(_, itemId) return state.potions[itemId] or 0 end } end }
         state.mgr.Survival = { GetState = function()
             return state.weak and { weakUntil = state.now + 60 } or nil
@@ -94,14 +94,14 @@ describe('TestStatusEffect', function()
         state.mgr.Modifier = state.runtime.load_modifier()
         state.mgr.Modifier.Vitals = state.mgr.Vitals
         state.mgr.Modifier.Ability = state.mgr
-        state.mgr.Attr = require('tests.support.attr_runtime').new(state.mgr.PlayerData,
+        state.mgr.attr = require('tests.support.attr_runtime').new(state.mgr.player_data,
             function(p) return state.mgr.Modifier:get_move_multiplier(p) end)
         local character = state.runtime.unit('character')
         character.Controller = { WalkSpeed = 7 }
         function character:SetScale(v) state.bodyScales[#state.bodyScales + 1] = v.x end
         state.player = { UserId = 13901, Character = character,
             CharacterAdded = signal(), CharacterRemoving = signal() }
-        state.mgr.Attr.Vitals = state.mgr.Vitals
+        state.mgr.attr.Vitals = state.mgr.Vitals
     end)
 
     after_each(function()
@@ -120,10 +120,10 @@ describe('TestStatusEffect', function()
     end
 
     local function installFish()
-        local carrier = { Body = ctx.runtime.unit('fish'), Dead = false }
-        local fish = { Id = 77, Carrier = carrier }
+        local carrier = { body = ctx.runtime.unit('fish'), dead = false }
+        local fish = { Id = 77, carrier = carrier }
         ctx.mgr.Vitals.FishCarrier = { resolve_carrier = function(_, target)
-            if target == fish or target == carrier or target == carrier.Body then return carrier end
+            if target == fish or target == carrier or target == carrier.body then return carrier end
         end }
         return fish, carrier
     end
@@ -162,7 +162,7 @@ describe('TestStatusEffect', function()
         local bare = { UserId = 13905 }
         ctx.mgr:capture_base_speed(bare)
         ctx.mgr:refresh_move_speed(bare)
-        assert.same(GameCfg.Ability.MoveSpeed.Base, ctx.mgr.Attr:state(bare).baseSpeed, '无控制器回落配置基准')
+        assert.same(GameCfg.Ability.MoveSpeed.Base, ctx.mgr.attr:state(bare).baseSpeed, '无控制器回落配置基准')
     end)
 
     -- 刷新已过期状态视为全新（层数不继承）
@@ -181,7 +181,7 @@ describe('TestStatusEffect', function()
         advance(1)
         assert.same(1, #ctx.hits)
         assert.same(4, ctx.hits[1].amount)
-        carrier.Dead = true
+        carrier.dead = true
         advance(0.1)
         advance(1) -- 到期前不再跳
         assert.message('死鱼不再吃 DOT').same(1, #ctx.hits)
@@ -256,8 +256,8 @@ describe('TestStatusEffect', function()
         assert.same(3, plan.Scale)
         assert.same(900, plan.Health)
         -- #132 死代码回归：引擎玩家没有 .Data 字段也不报错、按 0 个处理
-        ctx.mgr.PlayerData = nil
-        ctx.mgr.Attr.PlayerData = nil
+        ctx.mgr.player_data = nil
+        ctx.mgr.attr.player_data = nil
         assert.same(1, ctx.mgr:body_plan(ctx.player).Scale)
         assert.same(300, ctx.mgr:max_health(ctx.player))
     end)
@@ -281,10 +281,10 @@ describe('TestStatusEffect', function()
         ctx.mgr:capture_base_speed(ctx.player)
         ctx.mgr.Modifier:apply_weapon_effect(ctx.player, ctx.player, { Kind = 'poison' })
         ctx.mgr:on_player_removing(ctx.player)
-        ctx.mgr.Attr:on_player_removing(ctx.player)
+        ctx.mgr.attr:on_player_removing(ctx.player)
         ctx.mgr.Modifier:on_player_removing(ctx.player)
         assert.same(0, ctx.mgr.Modifier:get_remaining(ctx.player, 'poison'))
-        assert.is_nil(ctx.mgr.Attr.States[13901])
+        assert.is_nil(ctx.mgr.attr.States[13901])
         advance(2)
         assert.message('离场后不再跳').same(0, #ctx.hits)
     end)
@@ -373,20 +373,20 @@ describe('TestStatusEffect', function()
         local unit = assert(loadfile('server/world_host/fish_tree.lua'))()
         unit.Ability = ctx.mgr
         local fish, carrier = installFish()
-        fish.FishId, fish.straight_escape, fish.Heading = 'alligatorGar', true, { x = 1, z = 0 }
-        carrier.Body.Position = { x = 9999, y = 500, z = 9999 }
+        fish.fish_id, fish.straight_escape, fish.heading = 'alligatorGar', true, { x = 1, z = 0 }
+        carrier.body.Position = { x = 9999, y = 500, z = 9999 }
         local base = GameCfg.Fish.alligatorGar.Speed
         ctx.mgr.Modifier:apply_weapon_effect(ctx.player, fish, { Kind = 'frost' })
         ctx.mgr.Modifier:apply_weapon_effect(ctx.player, fish, { Kind = 'paralyze' })
         unit:update_escaping(fish, ctx.now)
-        assert.same(0, carrier.Body.LinearVelocity.x)
+        assert.same(0, carrier.body.LinearVelocity.x)
         advance(0.5)
         unit:update_escaping(fish, ctx.now)
-        assert.near(base * 0.7, carrier.Body.LinearVelocity.x, 1e-9)
+        assert.near(base * 0.7, carrier.body.LinearVelocity.x, 1e-9)
         advance(2.5)
         unit:update_escaping(fish, ctx.now)
         _G.Vector3 = oldVector
-        assert.same(base, carrier.Body.LinearVelocity.x)
+        assert.same(base, carrier.body.LinearVelocity.x)
     end)
 
     -- 无法解析的目标不建状态

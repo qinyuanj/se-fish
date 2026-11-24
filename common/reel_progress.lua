@@ -2,7 +2,7 @@ local ReelProgress = {}
 ReelProgress.__index = ReelProgress
 
 function ReelProgress.new(now, cfg)
-    return setmetatable({ Progress = cfg.Initial, Time = now, ZeroAt = nil,
+    return setmetatable({ Progress = cfg.Initial, Time = now, zero_at = nil,
         Result = nil, config = cfg }, ReelProgress)
 end
 
@@ -17,11 +17,11 @@ function ReelProgress:advance(now, count, span)
             local before = self.Progress
             self.Progress = math.max(0, before - cfg.DecayPerSec * elapsed)
             if before > 0 and self.Progress == 0 then
-                self.ZeroAt = self.Time + before / cfg.DecayPerSec
+                self.zero_at = self.Time + before / cfg.DecayPerSec
             end
             self.Time = at
         end
-        if self.ZeroAt and at > self.ZeroAt + cfg.GraceSec then
+        if self.zero_at and at > self.zero_at + cfg.GraceSec then
             self.Result = 'unhooked'
         end
     end
@@ -31,7 +31,7 @@ function ReelProgress:advance(now, count, span)
         step(first + (now - first) * i / count)
         if self.Result then return self.Result end
         self.Progress = math.min(100, self.Progress + cfg.ClickGain)
-        if self.Progress > 0 then self.ZeroAt = nil end
+        if self.Progress > 0 then self.zero_at = nil end
         if self.Progress == 100 then self.Result = 'landed' end
     end
     step(now)

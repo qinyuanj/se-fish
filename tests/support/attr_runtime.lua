@@ -55,7 +55,7 @@ function M.new(playerData, multiplier, opts)
     local mgr = {
         AttrAPI = attrAPI,
         States = {},
-        PlayerData = playerData,
+        player_data = playerData,
         move_multiplier_provider = multiplier,
     }
 
@@ -84,7 +84,7 @@ function M.new(playerData, multiplier, opts)
 
     function mgr:input(player)
         self:capture_base_speed(player)
-        local data = self.PlayerData and self.PlayerData:get_data_inst(player)
+        local data = self.player_data and self.player_data:get_data_inst(player)
         local mult = self.move_multiplier_provider and self.move_multiplier_provider(player) or 1
         return {
             bodyPotions = data and data:potion_count(GameCfg.Ability.BodyScale.PotionItem) or 0,
@@ -115,22 +115,22 @@ function M.new(playerData, multiplier, opts)
 
     function mgr:body_plan(player)
         local plan = self:plan(player)
-        local ok, scale = self:project(player, 'PlayerBodyScale', plan.Attributes.PlayerBodyScale)
+        local ok, scale = self:project(player, 'PlayerBodyScale', plan.attributes.PlayerBodyScale)
         if not ok then return nil, scale end
-        plan.Body.Scale = BodyScale.sanitize(scale)
-        return plan.Body
+        plan.body.Scale = BodyScale.sanitize(scale)
+        return plan.body
     end
 
     function mgr:max_health(player)
         local plan = self:plan(player)
-        local ok, value = self:project(player, 'PlayerMaxHealth', plan.Attributes.PlayerMaxHealth)
+        local ok, value = self:project(player, 'PlayerMaxHealth', plan.attributes.PlayerMaxHealth)
         if not ok then error('[AttrLeaf] 血量上限投影失败: ' .. tostring(value)) end
         return math.max(1, math.min(GameCfg.Ability.BodyScale.HealthMax, value))
     end
 
     function mgr:refresh_move_speed(player)
         local plan = self:plan(player)
-        local ok, speed = self:project(player, 'PlayerWalkSpeed', plan.Attributes.PlayerWalkSpeed)
+        local ok, speed = self:project(player, 'PlayerWalkSpeed', plan.attributes.PlayerWalkSpeed)
         if not ok then return false, speed end
         local okWrite, err = AttrLeaf.apply_walk_speed(player.Character, speed)
         if not okWrite then
@@ -171,14 +171,14 @@ function M.new(playerData, multiplier, opts)
     end
 
     function mgr:project_hunger(player, value)
-        local ok, result = self:project(player, 'PlayerHunger', Model.plan({ hunger = value }).Attributes.PlayerHunger)
+        local ok, result = self:project(player, 'PlayerHunger', Model.plan({ hunger = value }).attributes.PlayerHunger)
         if not ok then return false, result end
         return true, math.max(0, math.min(GameCfg.Vitals.MaxHunger, math.floor(result)))
     end
 
     function mgr:weapon_damage_scale(player, kind)
         if kind ~= 'melee' and kind ~= 'ranged' and kind ~= 'explosive' then return 1 end
-        local data = self.PlayerData and self.PlayerData:get_data_inst(player)
+        local data = self.player_data and self.player_data:get_data_inst(player)
         local components = Model.weapon_components(kind, data and data:shop_upgrade_level(kind) or 0)
         local ok, result = self:project(player, 'PlayerWeaponDamage_' .. kind, components)
         if not ok then error('[AttrLeaf] 武器属性投影失败: ' .. tostring(result)) end

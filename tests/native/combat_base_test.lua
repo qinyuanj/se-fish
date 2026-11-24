@@ -96,7 +96,7 @@ describe('TestCombatBase', function()
     end)
 
     it('test_fish_damage_uses_same_hit_identity_and_reports_actual_amount', function()
-        local carrier = { Body = { UnitId = 91 }, Receiver = {}, Controller = {} }
+        local carrier = { body = { UnitId = 91 }, receiver = {}, Controller = {} }
         local damageCalls = {}
         local Host = require('tests.support.life_host')
         self_.host:shutdown()
@@ -104,7 +104,7 @@ describe('TestCombatBase', function()
           now = 100,
           fish_carrier = {
             resolve_carrier = function(_, target)
-                if target == carrier or target == carrier.Receiver then return carrier, 'fish:91' end
+                if target == carrier or target == carrier.receiver then return carrier, 'fish:91' end
             end,
             Damage = function(_, target, amount, hit)
                 damageCalls[#damageCalls + 1] = { target, amount, hit }
@@ -119,7 +119,7 @@ describe('TestCombatBase', function()
         local ok, actual = self_.v:apply_hit(hit, carrier, 10)
         assert.is_true(ok)
         assert.same(7, actual)
-        assert.is_false(self_.v:apply_hit(hit, carrier.Receiver, 10))
+        assert.is_false(self_.v:apply_hit(hit, carrier.receiver, 10))
         assert.same(1, #damageCalls)
         assert.same(10, damageCalls[1][2])
         assert.same(self_.a, damageCalls[1][3].sourcePlayer)

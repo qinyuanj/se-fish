@@ -220,12 +220,12 @@ describe('条款 11 广告满血复活（占位广告位）', function()
     _G.REUtil = re
 
     package.loaded['server.data.player_data'] = nil
-    env.PlayerData = require('server.data.player_data')
+    env.player_data = require('server.data.player_data')
     env.save = assert(loadfile('server/save_host.lua'))()
     env.players = assert(loadfile('server/player_data_host.lua'))()
     env.platform = assert(loadfile('server/platform_host.lua'))()
-    env.players.Save, env.save.PlayerData = env.save, env.players
-    env.platform.Save, env.platform.PlayerData = env.save, env.players
+    env.players.Save, env.save.player_data = env.save, env.players
+    env.platform.Save, env.platform.player_data = env.save, env.players
     env.platform.now = function() return env.now end
     env.lifeHost = require('tests.support.life_host').start({
       now = env.now or 100, remote = re, player_data = env.players, save = env.save,

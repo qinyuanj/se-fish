@@ -64,7 +64,7 @@ describe('条款 17-18：分享任务的占位入口', function()
         env.data = assert(loadfile('server/data/player_data.lua'))().new(env.player, function() end)
         env.data:Init()
         env.platform = assert(loadfile('server/platform_host.lua'))()
-        env.platform.PlayerData = { get_data_inst = function(_, player) return player == env.player and env.data end,
+        env.platform.player_data = { get_data_inst = function(_, player) return player == env.player and env.data end,
             send_item_bar = function() end }
         env.platform.Save = { next_operation = function() return { id = '26303:1' } end,
             execute = function(_, player, data, operation, transform, done)

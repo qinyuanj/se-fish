@@ -52,13 +52,13 @@ end
 local function make_data(player)
   return {
     Player = player,
-    Inited = true,
-    LoadState = "ready",
+    inited = true,
+    load_state = "ready",
     Data = {
       FishCoin = 0,
       Zone = "fishPond",
-      Weapons = {},
-      Containers = {
+      weapons = {},
+      containers = {
         [GameCfg.Items.ContainerId.ItemBar] = {},
         [GameCfg.Items.ContainerId.Backpack] = {},
       },
@@ -297,7 +297,7 @@ describe("活鱼树宿主接缝（#309）", function()
     assert.equals(2, #rows)
     local doomed = runtime.fish_host.Fish[rows[1].id]
     assert.is_true(runtime:fault_fish(rows[1].id, "boom"))
-    assert.is_not_nil(doomed.Tree.fault, "fault_fish 须实证真实 SpokeTree 故障隔离")
+    assert.is_not_nil(doomed.tree.fault, "fault_fish 须实证真实 SpokeTree 故障隔离")
     runtime:step(0, 1001)
     assert.is_false(tree:is_faulted())
     assert.is_false(runtime:get_world():is_disposed())

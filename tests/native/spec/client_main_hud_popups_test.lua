@@ -109,10 +109,10 @@ describe("Spoke 主 HUD 武器栏/鱼饵栏与展开浮层视图（#297-B3a）",
     })
 
     local layout = MainHudLayout.compute({ width = 1920, height = 1080, itemBarSlots = 5 })
-    assert_at(env.nodes.WeaponBar, layout.Rects.WeaponBar, "WeaponBar")
-    assert_at(env.nodes.WeaponBarLabel, layout.Rects.WeaponBar, "WeaponBarLabel")
-    assert_at(env.nodes.BaitBar, layout.Rects.BaitBar, "BaitBar")
-    assert_at(env.nodes.BaitBarLabel, layout.Rects.BaitBar, "BaitBarLabel")
+    assert_at(env.nodes.WeaponBar, layout.rects.WeaponBar, "WeaponBar")
+    assert_at(env.nodes.WeaponBarLabel, layout.rects.WeaponBar, "WeaponBarLabel")
+    assert_at(env.nodes.BaitBar, layout.rects.BaitBar, "BaitBar")
+    assert_at(env.nodes.BaitBarLabel, layout.rects.BaitBar, "BaitBarLabel")
 
     local pistol_name = GameCfg.Items.Definitions[WEAPON_PISTOL].Name
     local worm_name = GameCfg.Items.Definitions[ids.Worm].Name

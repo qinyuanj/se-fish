@@ -16,7 +16,7 @@ local function drop(env, fishId, dz)
     local fish = env:held_fish(env.player, fishId)
     env.mgr:drop(env.player)
     assert.are.equal('combat', fish.State)
-    local p = fish.Carrier.Body.Position
+    local p = fish.carrier.body.Position
     env.player.Character.Position = vec(p.x, 2, p.z + (dz or 2))
     env.other.Character.Controller.Health = 0
     return fish, damages
@@ -24,8 +24,8 @@ end
 
 -- 把载体 Body 换成「写 Position 会报错、其余透传」的代理，模拟引擎位移失败（真实边界）。
 local function breakPosition(fish)
-    local real = fish.Carrier.Body
-    fish.Carrier.Body = setmetatable({}, {
+    local real = fish.carrier.body
+    fish.carrier.body = setmetatable({}, {
         __index = function(_, key)
             if key == 'Position' then return real.Position end
             return real[key]
@@ -98,7 +98,7 @@ describe('TestForestCombat', function()
             env.now = 50
             env.mgr:update()
             assert.are.equal('jump', fish.Move.Name)
-            local dest = fish.Move.Destination
+            local dest = fish.Move.destination
             math.random = savedRandom
             env.player.Character.Position = vec(dest.x, 2, dest.z) -- 落点范围内有玩家
             breakPosition(fish)
@@ -142,7 +142,7 @@ describe('TestForestCombat', function()
         env.other.Character.Controller.TakeDamage = function(_, d) rolled[#rolled + 1] = d end
         env.now = 0
         env.mgr:update()
-        local start = fish.Carrier.Body.Position
+        local start = fish.carrier.body.Position
         -- 第二名玩家摆在「本该滚到」的位置（追击路径中段）
         env.other.Character.Position = vec(start.x, 2, start.z + 10)
         breakPosition(fish) -- 位移失败：鱼实际没有滚过去
@@ -153,8 +153,8 @@ describe('TestForestCombat', function()
 
     it('test_shark_drop_chases_and_flees_at_300', function()
         local fish = drop(env, 'fish32Boss', 20)
-        assert.are.equal(300, fish.FleeAt)
-        local body = fish.Carrier.Body
+        assert.are.equal(300, fish.flee_at)
+        local body = fish.carrier.body
         local z0 = body.Position.z
         env.now = 0
         env.mgr:update()
@@ -181,7 +181,7 @@ describe('TestForestCombat', function()
 
     it('test_shark_jumps_every_20s_fifteen_meters_ten_radius_two_hundred', function()
         local fish, damages = drop(env, 'fish32Boss', 20)
-        local body = fish.Carrier.Body
+        local body = fish.carrier.body
         local savedRandom = math.random
         math.random = function() return 0 end
         env.now = 0
@@ -194,7 +194,7 @@ describe('TestForestCombat', function()
         env.player.Character.Controller.TakeDamage = function(_, d) damages[#damages + 1] = d end
         env.mgr:update()
         assert.are.equal('jump', fish.Move.Name)
-        local dest = fish.Move.Destination
+        local dest = fish.Move.destination
         assert.near(15, dest.x - body.Position.x, 1e-6)
         math.random = savedRandom
         env.player.Character.Position = vec(dest.x, 2, dest.z)
@@ -205,7 +205,7 @@ describe('TestForestCombat', function()
 
     it('test_shark_roll_contact_25_dedup_per_second_slot', function()
         local fish = drop(env, 'fish32Boss', 20) -- 目标玩家在 20 米外
-        local body = fish.Carrier.Body
+        local body = fish.carrier.body
         env.other.Character.Controller.Health = 9000
         local rolled = {}
         env.other.Character.Controller.TakeDamage = function(_, d) rolled[#rolled + 1] = d end
@@ -239,8 +239,8 @@ describe('TestForestCombat', function()
 
     it('test_swordfish_drop_chases_and_flees_at_180', function()
         local fish = drop(env, 'fish31Elite', 20)
-        assert.are.equal(180, fish.FleeAt)
-        local body = fish.Carrier.Body
+        assert.are.equal(180, fish.flee_at)
+        local body = fish.carrier.body
         local z0 = body.Position.z
         env.now = 0
         env.mgr:update() -- 首帧 dt=0，不位移
@@ -270,15 +270,15 @@ describe('TestForestCombat', function()
         assert.same(fish, env.vitalsCalls[1][1].source)
         assert.are.equal('fishAttack', env.vitalsCalls[1][1].category)
         -- 预警中绕到身后（仍在咬距内）：锁定朝向不跟着转头，结算落空
-        local p = fish.Carrier.Body.Position
+        local p = fish.carrier.body.Position
         env.now = 2.1
         env.mgr:update() -- 冷却过后重新起手，朝向锁定 +z
         assert.are.equal('swing', fish.Move.Name)
-        assert.near(1, fish.Facing.z, 1e-9)
+        assert.near(1, fish.facing.z, 1e-9)
         env.player.Character.Position = vec(p.x, 2, p.z - 2)
         env.now = 2.5
         env.mgr:update() -- 预警中不转头
-        assert.near(1, fish.Facing.z, 1e-9)
+        assert.near(1, fish.facing.z, 1e-9)
         env.now = 2.1 + 2
         env.mgr:update() -- 结算帧：身后算后身，不结算
         assert.same({ 20 }, damages)
@@ -286,7 +286,7 @@ describe('TestForestCombat', function()
 
     it('test_swordfish_jumps_every_50s_ten_meters_five_radius_hundred', function()
         local fish, damages = drop(env, 'fish31Elite', 20)
-        local body = fish.Carrier.Body
+        local body = fish.carrier.body
         local savedRandom = math.random
         math.random = function() return 0 end -- 落点方向固定为 +x
         env.now = 0
@@ -297,7 +297,7 @@ describe('TestForestCombat', function()
         env.now = 50
         env.mgr:update()
         assert.are.equal('jump', fish.Move.Name)
-        local dest = fish.Move.Destination
+        local dest = fish.Move.destination
         assert.near(10, dest.x - body.Position.x, 1e-6, '随机 10 米外落点')
         assert.near(0, dest.z - body.Position.z, 1e-6)
         math.random = savedRandom

@@ -70,7 +70,7 @@ describe("持有与操作的数据层规则", function()
         assert.is_true(ok)
         assert.same('duck', bait)
         assert.same(0, ctx.data:ItemCount('duck'))
-        assert.is_nil(ctx.data.Data.SelectedBait)
+        assert.is_nil(ctx.data.Data.selected_bait)
     end)
 
     -- 重进恢复合法：手持持久化往返，槽位/武器失效时清空而不是悬空。

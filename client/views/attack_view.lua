@@ -46,7 +46,7 @@ local function attack_rect(ctx)
     height = resolution.y,
     slots = 1,
   })
-  return layout and layout.Rects and layout.Rects.attack_control or { x = 1690, y = 430, w = 160, h = 160 }
+  return layout and layout.rects and layout.rects.attack_control or { x = 1690, y = 430, w = 160, h = 160 }
 end
 
 local function current_now(ctx, services)

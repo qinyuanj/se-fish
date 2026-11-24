@@ -235,13 +235,13 @@ local function resolve_entity_owner(target, allow_dead)
   if not is_object(target) then
     return nil, nil, nil
   end
-  local ok_carrier, carrier = pcall(function() return target.Carrier end) -- 兼容引擎 userdata 直接作为非玩家目标
+  local ok_carrier, carrier = pcall(function() return target.carrier end) -- 兼容引擎 userdata 直接作为非玩家目标
   if ok_carrier and is_object(carrier) then
-    local ok_dead, dead = pcall(function() return carrier.Dead end) -- 兼容只读载体字段
+    local ok_dead, dead = pcall(function() return carrier.dead end) -- 兼容只读载体字段
     if not allow_dead and ok_dead and dead then
       return nil, nil, carrier
     end
-    local owner = carrier.Receiver or carrier.Body
+    local owner = carrier.receiver or carrier.body
     return carrier, owner, carrier
   end
   return target, target, nil
@@ -303,7 +303,7 @@ function ModifierLeaf.create_entity_store(opts)
       return
     end
     while st.next_tick_at and st.next_tick_at <= now and st.next_tick_at <= st.expires_at + 1e-9 do
-      if record.carrier and record.carrier.Dead then
+      if record.carrier and record.carrier.dead then
         return
       end
       if records[record.key] ~= record or record.effects[kind] ~= st then
@@ -390,7 +390,7 @@ function ModifierLeaf.create_entity_store(opts)
     end
     for _, record in ipairs(snapshot) do
       if records[record.key] == record then
-        if record.carrier and record.carrier.Dead then
+        if record.carrier and record.carrier.dead then
           self:clear_target(record.target)
         else
           for _, kind in ipairs(ALL_KINDS) do

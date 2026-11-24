@@ -41,13 +41,13 @@ local function phaseIndex(bossCfg, phase)
 end
 
 local function phaseEntry(state)
-    local list = chain(state.Cfg)
-    return list[phaseIndex(state.Cfg, state.Phase)]
+    local list = chain(state.cfg)
+    return list[phaseIndex(state.cfg, state.Phase)]
 end
 
 local function attackSet(state)
-    local set = state.Cfg.AttackSets and state.Cfg.AttackSets[state.Phase]
-    return set or state.Cfg.AttackSets.normal
+    local set = state.cfg.AttackSets and state.cfg.AttackSets[state.Phase]
+    return set or state.cfg.AttackSets.normal
 end
 
 local function intervalOf(state, name)
@@ -55,14 +55,14 @@ local function intervalOf(state, name)
     if name == 'breath' and entry and not isBadNumber(entry.BreathIntervalSec) then
         return entry.BreathIntervalSec
     end
-    local attack = state.Cfg.Attacks[name]
+    local attack = state.cfg.Attacks[name]
     if not attack or isBadNumber(attack.IntervalSec) then return 1 end
     return attack.IntervalSec
 end
 
 local function damageOf(state, name)
     local entry = phaseEntry(state)
-    local attack = state.Cfg.Attacks[name] or {}
+    local attack = state.cfg.Attacks[name] or {}
     local damage = attack.Damage
     if name == 'bite' and entry and not isBadNumber(entry.BiteDamage) then
         damage = entry.BiteDamage
@@ -75,18 +75,18 @@ local function damageOf(state, name)
 end
 
 local function resetCooldowns(state, now)
-    state.Cooldown = {}
+    state.cooldown = {}
     for _, name in ipairs(attackSet(state)) do
-        state.Cooldown[name] = now + intervalOf(state, name)
+        state.cooldown[name] = now + intervalOf(state, name)
     end
-    state.Pending = nil
+    state.pending = nil
 end
 
 local function withinRange(state, name)
-    local attack = state.Cfg.Attacks[name]
+    local attack = state.cfg.Attacks[name]
     if not attack or isBadNumber(attack.Range) then return true end
     if not state.Target then return false end
-    local dx, dz = state.Target.x - state.Pos.x, state.Target.z - state.Pos.z
+    local dx, dz = state.Target.x - state.pos.x, state.Target.z - state.pos.z
     return math.sqrt(dx * dx + dz * dz) <= attack.Range
 end
 
@@ -96,10 +96,10 @@ end
 function M.new(bossCfg, now, pos)
     bossCfg = bossCfg or cfg()
     local state = {
-        Cfg = bossCfg, Phase = 'normal', alive = true, Target = nil, Pending = nil,
-        Percent = 100, Pos = pos and copy(pos) or { x = 0, y = 0, z = 0 },
-        Cooldown = {}, Log = {}, attack_log = {},
-        Stats = { frames = 0, transitions = 0, skipped = 0, Attacks = 0, interrupts = 0 },
+        cfg = bossCfg, Phase = 'normal', alive = true, Target = nil, pending = nil,
+        Percent = 100, pos = pos and copy(pos) or { x = 0, y = 0, z = 0 },
+        cooldown = {}, Log = {}, attack_log = {},
+        stats = { frames = 0, transitions = 0, skipped = 0, Attacks = 0, interrupts = 0 },
     }
     resetCooldowns(state, now_(now))
     return state
@@ -122,35 +122,35 @@ end
 function M.update(state, now, dt, input)
     now = now_(now)
     input = input or {}
-    state.Stats.frames = state.Stats.frames + 1
+    state.stats.frames = state.stats.frames + 1
     local events = { Phase = state.Phase, Percent = state.Percent, interrupted = false }
 
     if input.alive == false then
-        if state.Pending then
+        if state.pending then
             events.interrupted = true
             events.Reason = 'death'
-            state.Stats.interrupts = state.Stats.interrupts + 1
-            state.Log[#state.Log + 1] = { At = now, Kind = 'interrupt', Reason = 'death',
-                Attack = state.Pending.Name }
+            state.stats.interrupts = state.stats.interrupts + 1
+            state.Log[#state.Log + 1] = { at = now, Kind = 'interrupt', Reason = 'death',
+                Attack = state.pending.Name }
         end
-        state.Pending = nil
+        state.pending = nil
         state.alive = false
         return events
     end
     state.alive = true
     state.Target = isPoint(input.Target) and copy(input.Target) or nil
-    if isPoint(input.Pos) then state.Pos = copy(input.Pos) end
+    if isPoint(input.pos) then state.pos = copy(input.pos) end
 
     local percent = M.percent_of(input.Health, input.MaxHealth)
     if percent then
         state.Percent = percent
         local target = 1
-        for index, threshold in ipairs(state.Cfg.Thresholds) do
+        for index, threshold in ipairs(state.cfg.Thresholds) do
             if percent < threshold.Percent then target = index + 1 end
         end
-        local current = phaseIndex(state.Cfg, state.Phase)
+        local current = phaseIndex(state.cfg, state.Phase)
         if target > current then
-            local list = chain(state.Cfg)
+            local list = chain(state.cfg)
             local skipped = {}
             for index = current + 1, target - 1 do
                 skipped[#skipped + 1] = list[index].Phase
@@ -160,9 +160,9 @@ function M.update(state, now, dt, input)
             events.to = list[target].Phase
             events.skipped = skipped
             state.Phase = list[target].Phase
-            state.Stats.transitions = state.Stats.transitions + 1
-            state.Stats.skipped = state.Stats.skipped + #skipped
-            state.Log[#state.Log + 1] = { At = now, Kind = 'phase', From = events.From,
+            state.stats.transitions = state.stats.transitions + 1
+            state.stats.skipped = state.stats.skipped + #skipped
+            state.Log[#state.Log + 1] = { at = now, Kind = 'phase', From = events.From,
                 to = events.to, Percent = percent, skipped = skipped }
             resetCooldowns(state, now)
         end
@@ -170,36 +170,36 @@ function M.update(state, now, dt, input)
     events.Phase = state.Phase
     events.Percent = state.Percent
 
-    if state.Pending and not state.Target then
-        local name = state.Pending.Name
-        state.Pending = nil
+    if state.pending and not state.Target then
+        local name = state.pending.Name
+        state.pending = nil
         events.interrupted = true
         events.Reason = 'lostTarget'
-        state.Stats.interrupts = state.Stats.interrupts + 1
-        state.Cooldown[name] = now + intervalOf(state, name)
-        state.Log[#state.Log + 1] = { At = now, Kind = 'interrupt', Reason = 'lostTarget', Attack = name }
+        state.stats.interrupts = state.stats.interrupts + 1
+        state.cooldown[name] = now + intervalOf(state, name)
+        state.Log[#state.Log + 1] = { at = now, Kind = 'interrupt', Reason = 'lostTarget', Attack = name }
     end
     if not state.Target then return events end
 
-    if state.Pending then
-        if now >= state.Pending.ready_at then
-            local pending = state.Pending
-            state.Pending = nil
-            state.Cooldown[pending.Name] = now + intervalOf(state, pending.Name)
+    if state.pending then
+        if now >= state.pending.ready_at then
+            local pending = state.pending
+            state.pending = nil
+            state.cooldown[pending.Name] = now + intervalOf(state, pending.Name)
             events.Attack = M.land(state, now, pending)
         end
         return events
     end
 
     for _, name in ipairs(attackSet(state)) do
-        local readyAt = state.Cooldown[name] or 0
+        local readyAt = state.cooldown[name] or 0
         if now >= readyAt and withinRange(state, name) then
-            local attack = state.Cfg.Attacks[name] or {}
+            local attack = state.cfg.Attacks[name] or {}
             if not isBadNumber(attack.WindupSec) and attack.WindupSec > 0 then
-                state.Pending = { Name = name, ready_at = now + attack.WindupSec,
+                state.pending = { Name = name, ready_at = now + attack.WindupSec,
                     Damage = damageOf(state, name), lethal = attack.OneShot == true }
             else
-                state.Cooldown[name] = now + intervalOf(state, name)
+                state.cooldown[name] = now + intervalOf(state, name)
                 events.Attack = M.land(state, now, { Name = name, Damage = damageOf(state, name),
                     lethal = attack.OneShot == true })
             end
@@ -210,14 +210,14 @@ function M.update(state, now, dt, input)
 end
 
 function M.land(state, now, attack)
-    local landed = { At = now, Name = attack.Name, Damage = attack.Damage, lethal = attack.lethal == true }
-    state.Stats.Attacks = state.Stats.Attacks + 1
+    local landed = { at = now, Name = attack.Name, Damage = attack.Damage, lethal = attack.lethal == true }
+    state.stats.Attacks = state.stats.Attacks + 1
     if #state.attack_log < 64 then state.attack_log[#state.attack_log + 1] = landed end
     return landed
 end
 
 function M.winding(state)
-    return state.Pending ~= nil
+    return state.pending ~= nil
 end
 
 return M

@@ -339,8 +339,8 @@ function SpecialItemPhase.mount(ps, player_tree, opts)
     local record = player_tree.data
     local data_part = type(record) == "table" and record.Data or nil
     if type(data_part) == "table" then
-      local containers = type(data_part.Containers) == "table" and data_part.Containers or {}
-      return selected_item_id(containers[GameCfg.Items.ContainerId.ItemBar], data_part.SelectedSlot)
+      local containers = type(data_part.containers) == "table" and data_part.containers or {}
+      return selected_item_id(containers[GameCfg.Items.ContainerId.ItemBar], data_part.selected_slot)
     end
     return selected_item_id(states.item_bar:now(), states.selected_slot:now())
   end
@@ -388,7 +388,7 @@ function SpecialItemPhase.mount(ps, player_tree, opts)
     local bounds = scene and FlightPath.bounds_of(scene, GameCfg.Ability.Flight)
     if not bounds then return end
     if not flight_ground_y then flight_ground_y = pos.y end
-    bounds.GroundY = flight_ground_y
+    bounds.ground_y = flight_ground_y
     bounds.ceiling_y = math.min(bounds.ceiling_y, flight_ground_y + bounds.MaxHeight)
     if not set_gravity(false) then return end
     local y, next_airborne = SpecialItem.step_flight_y(wings, {
@@ -438,10 +438,10 @@ function SpecialItemPhase.mount(ps, player_tree, opts)
     if type(fish) ~= "table" and player_tree.fish_units then fish = player_tree.fish_units end
     if type(fish) == "table" then
       for _, entry in pairs(fish) do
-        local carrier = entry and (entry.Carrier or entry)
-        local body = carrier and carrier.Body
+        local carrier = entry and (entry.carrier or entry)
+        local body = carrier and carrier.body
         local pos = body and read_position(body) or read_position(carrier)
-        if carrier and not carrier.Dead and pos then
+        if carrier and not carrier.dead and pos then
           targets[#targets + 1] = {
             key = "fish:" .. tostring(entry.Id or carrier.Id or "unknown"),
             pos = pos,

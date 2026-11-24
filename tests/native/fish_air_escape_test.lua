@@ -124,7 +124,7 @@ function FishAirEscape:set_up()
                 if item.id == id then row = item end
             end
             if row then
-                self.loot.Loots[id] = { FishId = killed.fishId, ItemId = row.itemId, Mult = row.mult, Position = { x = row.x, y = row.y, z = row.z } }
+                self.loot.Loots[id] = { fish_id = killed.fishId, ItemId = row.itemId, mult = row.mult, Position = { x = row.x, y = row.y, z = row.z } }
             end
         end
     end)
@@ -152,7 +152,7 @@ end
 function FishAirEscape:drop(id)
     local fish = assert(self.mgr:spawn_landed(self.player, { fishId = id, mult = 1.57 },
         self.player.Character.Position))
-    fish.Carrier.Body.OnLiftedBegin:Fire(self.player.Character)
+    fish.carrier.body.OnLiftedBegin:Fire(self.player.Character)
     assert.is_true(self.mgr:drop(self.player))
     return fish
 end
@@ -163,7 +163,7 @@ function FishAirEscape:advance(to)
         local dt = math.min(0.05, to - self.now)
         for _, fish in pairs(self.mgr.Fish) do
             if fish.State == 'escaping' then
-                local body = fish.Carrier.Body
+                local body = fish.carrier.body
                 local p, v = body.Position, body.LinearVelocity
                 body.Position = vec(p.x + v.x * dt, p.y + v.y * dt, p.z + v.z * dt)
             end
@@ -187,7 +187,7 @@ describe('TestFishAirEscape', function()
 
     it('test_air_fish_rehead_after_three_seconds_and_release_is_idempotent', function()
         local fish = env:drop('item87')
-        local body = fish.Carrier.Body
+        local body = fish.carrier.body
         local escapeAt = fish.escape_at
         env:advance(1.05)
         body.OnLiftedEnd:Fire()
@@ -206,14 +206,14 @@ describe('TestFishAirEscape', function()
     it('test_all_normal_and_rare_air_fish_survive_one_second_then_escape_without_loot', function()
         for _, id in ipairs(AIR_IDS) do
             local fish = env:drop(id)
-            local body, receiver = fish.Carrier.Body, fish.Carrier.Receiver
+            local body, receiver = fish.carrier.body, fish.carrier.receiver
             local start = body.Position
             env:advance(env.now + 1.05)
             assert.same(fish, env.mgr.Fish[fish.Id], id)
             assert.is_false(body.Destroyed == true, id)
             assert.is_false(receiver.Destroyed == true, id)
             assert.are.equal('escaping', fish.State, id)
-            assert.is_nil(fish.FleeAt, id)
+            assert.is_nil(fish.flee_at, id)
             assert.is_nil(fish.Flight, id)
             assert.near(Cfg.Fish[id].Speed * 1.05, body.Position.z - start.z, 1e-6, id)
             assert.near(0, body.LinearVelocity.x, 1e-6, id)
@@ -226,7 +226,7 @@ describe('TestFishAirEscape', function()
             assert.is_nil(env.mgr.Fish[fish.Id], id)
             assert.is_true(body.Destroyed, id)
             assert.is_true(receiver.Destroyed, id)
-            assert.is_nil(fish.Carrier.Receiver, id)
+            assert.is_nil(fish.carrier.receiver, id)
             assert.is_nil(env.carrier.carriers[body.UnitId], id)
             assert.is_nil(next(env.loot.Loots), id)
             assert.is_nil(env.mgr:take_killed(fish), id)
@@ -236,18 +236,18 @@ describe('TestFishAirEscape', function()
     it('test_kill_after_one_second_keeps_correct_loot_once_and_cleans_receiver', function()
         for _, id in ipairs({ 'item81', 'item87' }) do
             local fish = env:drop(id)
-            local body, receiver = fish.Carrier.Body, fish.Carrier.Receiver
+            local body, receiver = fish.carrier.body, fish.carrier.receiver
             local controller = receiver.Controller
             env:advance(env.now + 1.05)
             controller:TakeDamage(Cfg.Fish[id].Health)
             controller.Died:Fire()
-            env.carrier:notify_died(fish.Carrier)
+            env.carrier:notify_died(fish.carrier)
             local found = {}
             for _, loot in pairs(env.loot.Loots) do
-                if loot.FishId == id then found[#found + 1] = loot end
+                if loot.fish_id == id then found[#found + 1] = loot end
             end
             assert.are.equal(1, #found, id)
-            assert.same({ id, 1.57 }, { found[1].ItemId, found[1].Mult }, id)
+            assert.same({ id, 1.57 }, { found[1].ItemId, found[1].mult }, id)
             assert.are.equal(body.Position.x, found[1].Position.x, id)
             assert.are.equal(body.Position.z, found[1].Position.z, id)
             assert.is_true(body.Destroyed, id)
@@ -261,7 +261,7 @@ describe('TestFishAirEscape', function()
             local fish = env:drop(id)
             local deadline = env.now + Cfg.Fish[id].EscapeSec
             assert.are.equal('flying', fish.State, id)
-            assert.are.equal(deadline, fish.FleeAt, id)
+            assert.are.equal(deadline, fish.flee_at, id)
             env.now = deadline - 0.05
             env.mgr:update()
             assert.same(fish, env.mgr.Fish[fish.Id], id)
@@ -274,7 +274,7 @@ describe('TestFishAirEscape', function()
         end
         local ground = env:drop('item82')
         assert.are.equal('escaping', ground.State)
-        assert.is_nil(ground.FleeAt)
+        assert.is_nil(ground.flee_at)
         env.mgr:remove(ground)
         local wild = assert(env.mgr:spawn_blast_fish('item81', 1.57, env.player.Character.Position, env.player))
         env.now = wild.wild_until

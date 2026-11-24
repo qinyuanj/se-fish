@@ -45,7 +45,7 @@ describe('第 12 节 逐招表（近战与范围组）', function()
 
     local function dropNear(id, distance)
         local fish = env:drop(id)
-        local p = fish.Carrier.Body.Position
+        local p = fish.carrier.body.Position
         env.player.Character.Position = env.vec(p.x, p.y, p.z + (distance or 1.5))
         return fish
     end
@@ -109,19 +109,19 @@ describe('第 12 节 逐招表（近战与范围组）', function()
         local attackStart = env.now
         local fish = dropNear('eel', 4) -- 5 米放电圈内
         -- 夹具的 Rotation 没有 __mul；侧躺表现只需要一次可乘的旋转值。
-        local rotMt = getmetatable(fish.CombatRotation) or {}
+        local rotMt = getmetatable(fish.combat_rotation) or {}
         rotMt.__mul = function(a) return a end
-        setmetatable(fish.CombatRotation, rotMt)
+        setmetatable(fish.combat_rotation, rotMt)
         env:advance(4.7)
         assert.same(start - 5 * 10, hp(), '放电不是每秒 10、共 5 次')
         assert.same(5, fish.discharges)
         warningIsRow('discharge')
         env:advance(5.2)
         assert.same('sleeping', fish.State)
-        need(math.abs((fish.WakeAt - attackStart) - 15) < 0.4,
-            '放电 5 秒后应睡眠 10 秒，实际窗口 %s', fish.WakeAt - attackStart)
-        need(math.abs((fish.WakeAt - env.now) - 10) < 0.4,
-            '入睡后应保持 10 秒，实际 %s', fish.WakeAt - env.now)
+        need(math.abs((fish.wake_at - attackStart) - 15) < 0.4,
+            '放电 5 秒后应睡眠 10 秒，实际窗口 %s', fish.wake_at - attackStart)
+        need(math.abs((fish.wake_at - env.now) - 10) < 0.4,
+            '入睡后应保持 10 秒，实际 %s', fish.wake_at - env.now)
         assert.same(start - 50, hp(), '睡眠期间不应继续放电')
         -- 「睡眠中可受击」：服务端受击/死亡入口在睡眠态仍然成立。
         assert.is_not_nil(env.mgr:take_killed(fish))
@@ -149,7 +149,7 @@ describe('第 12 节 逐招表（近战与范围组）', function()
         local start = hp()
         local fish = dropNear(id, 1.5)
         env:advance(0.2) -- 已锁定朝向并起咬
-        local p = fish.Carrier.Body.Position
+        local p = fish.carrier.body.Position
         env.player.Character.Position = env.vec(p.x, p.y, p.z - 1.5) -- 绕到后身，仍在咬距内
         local before = hp()
         env:advance(1.6)
@@ -190,7 +190,7 @@ describe('第 12 节 逐招表（近战与范围组）', function()
         local fish = dropNear('fish15Elite', 1.5)
         env:advance(15.1)
         assert.same('stunned', fish.State)
-        need(math.abs(fish.WakeAt - 20) < 1e-6, '虾霸应到 20 秒醒来，实际 %s', fish.WakeAt)
+        need(math.abs(fish.wake_at - 20) < 1e-6, '虾霸应到 20 秒醒来，实际 %s', fish.wake_at)
         local before = hp()
         env:advance(19.9)
         assert.same(before, hp(), '眩晕期间不应出招')
@@ -223,7 +223,7 @@ describe('第 12 节 逐招表（近战与范围组）', function()
         local fish = dropNear('fish23Elite', 1.5)
         env:advance(30.1)
         assert.same('stunned', fish.State)
-        need(math.abs(fish.WakeAt - 35) < 1e-6, '帝王蟹应到 35 秒醒来，实际 %s', fish.WakeAt)
+        need(math.abs(fish.wake_at - 35) < 1e-6, '帝王蟹应到 35 秒醒来，实际 %s', fish.wake_at)
         local before = hp()
         env:advance(34.9)
         assert.same(before, hp(), '眩晕期间不应乱刺')

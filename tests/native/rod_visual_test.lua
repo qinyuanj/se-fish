@@ -151,7 +151,7 @@ describe('鱼竿外观挂载（PlayerDataHost）', function()
     assert.same(4, #env.created)
     assert.are.equal(env.player.Character, env.created[3].Parent)
     Mgr:get_data_inst(env.player):UpdateData(function(data)
-      data.Containers[GameCfg.Items.ContainerId.ItemBar][1].count = 0
+      data.containers[GameCfg.Items.ContainerId.ItemBar][1].count = 0
     end, true)
     Mgr:sync_player_tree(env.player)
     assert.is_true(env.created[3].Destroyed)

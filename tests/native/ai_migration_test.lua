@@ -20,7 +20,7 @@ describe('TestAiMigration', function()
         end }, { __index = _G })
         env.mgr = assert(loadfile('server/world_host/fish_ai.lua', 't', e))()
         env.unit = env.runtime.newUnit(5301)
-        env.fish = { Id = 1, Carrier = { Receiver = env.unit, Body = env.runtime.newUnit(5302) } }
+        env.fish = { Id = 1, carrier = { receiver = env.unit, body = env.runtime.newUnit(5302) } }
     end)
     after_each(function()
         -- 旧类没有 tear_down：vendor 运行时是用例内新建的独立实例，不写进程全局，无需回滚。
@@ -71,7 +71,7 @@ describe('TestAiMigration', function()
         env.runtime.task:pump(0.1)
         env.mgr:remove(env.fish)
         env.runtime.task:pump(1)
-        assert.is_false(env.fish.Carrier.ai_owns_movement)
+        assert.is_false(env.fish.carrier.ai_owns_movement)
         assert.are.equal(0, env.runtime.vecLen(env.unit.Controller.moves[#env.unit.Controller.moves]))
     end)
 
@@ -84,8 +84,8 @@ describe('TestAiMigration', function()
                     Disconnect = function() connected = false end } end,
             } } end } end,
         }
-        env.fish.ability_record = { Ready = true, Receiver = env.unit, entry = { Index = 2 } }
-        env.mgr.AiAPI = { Configs = { CMD_ABILITY = 5 }, Funcs = { StopAI = function() end, StopMove = function() end,
+        env.fish.ability_record = { ready = true, receiver = env.unit, entry = { Index = 2 } }
+        env.mgr.ai_api = { Configs = { CMD_ABILITY = 5 }, Funcs = { StopAI = function() end, StopMove = function() end,
             BasicCommand = function(_, command, slot)
                 assert.are.equal(5, command)
                 assert.are.equal(2, slot)
@@ -111,9 +111,9 @@ describe('TestAiMigration', function()
         env.mgr:move_direction(env.fish, v(1, 0, 0), 3)
         env.unit.Position = v(0 / 0, 0, 0)
         local carrier_host = require('server.world_host.fish_carrier')
-        assert.is_false(carrier_host:sync_ai_position(env.fish.Carrier))
-        assert.is_false(env.fish.Carrier.ai_owns_movement)
-        assert.are.equal(0, env.fish.Carrier.Body.Position.x)
+        assert.is_false(carrier_host:sync_ai_position(env.fish.carrier))
+        assert.is_false(env.fish.carrier.ai_owns_movement)
+        assert.are.equal(0, env.fish.carrier.body.Position.x)
     end)
 
     it('test_official_move_yields_to_trajectory_and_rebuilds_after_control', function()
@@ -131,7 +131,7 @@ describe('TestAiMigration', function()
         assert.are.equal(1, env.unit.Controller.moves[#env.unit.Controller.moves].z)
         env.mgr:custom(env.fish)
         env.runtime.task:pump(0.1)
-        assert.is_false(env.fish.Carrier.ai_owns_movement)
+        assert.is_false(env.fish.carrier.ai_owns_movement)
         assert.are.equal(0, env.runtime.vecLen(env.unit.Controller.moves[#env.unit.Controller.moves]))
     end)
 
@@ -154,7 +154,7 @@ describe('TestAiMigration', function()
     it('test_trajectory_fish_enters_official_stop_and_returns_receiver_to_body', function()
         local v = env.runtime.vector
         env.unit.Position = v(90, 10, 90)
-        env.fish.Carrier.Body.Position = v(1, 2, 3)
+        env.fish.carrier.body.Position = v(1, 2, 3)
         assert.is_true(env.mgr:custom(env.fish))
         assert.are.equal(1, env.unit.Position.x)
         assert.is_not.is_nil(env.unit.Controller.moves[1])
@@ -175,14 +175,14 @@ describe('TestFishAiLifecycle', function()
 
     it('test_every_configured_fish_hands_off_on_release_and_remove', function()
         local calls = {}
-        env.mgr.Ai = {
+        env.mgr.ai = {
             custom = function(_, fish) calls[fish] = (calls[fish] or 0) + 1; return true end,
             remove = function(_, fish) calls[fish] = (calls[fish] or 0) + 1 end,
             move_direction = function() return true end, stop = function() end,
         }
         for id in pairs(GameCfg.Fish) do
             local fish = env:land(env.player, id)
-            fish.Carrier.Body.OnLiftedBegin:Fire(env.player.Character)
+            fish.carrier.body.OnLiftedBegin:Fire(env.player.Character)
             env.mgr:drop(env.player)
             assert.is_not.is_nil(calls[fish], '未交接鱼种：' .. id)
             local before = calls[fish]
@@ -192,21 +192,21 @@ describe('TestFishAiLifecycle', function()
     end)
 
     it('test_failed_handoff_does_not_start_business_move', function()
-        env.mgr.Ai = { custom = function() return false end, stop = function() end }
+        env.mgr.ai = { custom = function() return false end, stop = function() end }
         local fish = env:land(env.player)
         env.mgr:start_move(fish, 'peck', { x = 0, y = 0, z = 0 }, nil, nil, 1, 2, 3)
         assert.is_nil(fish.Move)
     end)
 
     it('test_stop_cancels_pending_bite_and_start_preserves_escape_deadline', function()
-        env.mgr.Ai = { custom = function() return true end, pause = function() end,
+        env.mgr.ai = { custom = function() return true end, pause = function() end,
             stop = function(self) self.Stopped = true end, start = function(self) self.Stopped = false end }
         local fish = env:land(env.player)
-        fish.BiteAim = { Target = env.player, StrikeAt = 1 }
-        fish.FleeAt = 30
+        fish.bite_aim = { Target = env.player, strike_at = 1 }
+        fish.flee_at = 30
         env.mgr:stop()
-        assert.is_nil(fish.BiteAim)
+        assert.is_nil(fish.bite_aim)
         env.mgr:start()
-        assert.are.equal(30, fish.FleeAt)
+        assert.are.equal(30, fish.flee_at)
     end)
 end)

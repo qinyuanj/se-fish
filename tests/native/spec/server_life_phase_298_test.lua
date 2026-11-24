@@ -69,13 +69,13 @@ local function make_data(player, overrides)
   }
   return {
     Player = player,
-    Inited = true,
-    LoadState = "ready",
+    inited = true,
+    load_state = "ready",
     Data = {
       FishCoin = overrides.coin or 0,
       Zone = overrides.zone or "fishPond",
-      Containers = containers,
-      SelectedSlot = overrides.selected_slot,
+      containers = containers,
+      selected_slot = overrides.selected_slot,
     },
     Extra = {
       growth = { potions = {}, upgrades = {} },
@@ -91,7 +91,7 @@ local function make_data(player, overrides)
     },
     ItemCount = function(self, item_id)
       local total = 0
-      for _, container in pairs(self.Data.Containers) do
+      for _, container in pairs(self.Data.containers) do
         for _, entry in pairs(container) do
           if entry.itemId == item_id and (entry.count or 0) > 0 then
             total = total + entry.count
@@ -101,7 +101,7 @@ local function make_data(player, overrides)
       return total
     end,
     ConsumeItem = function(self, item_id)
-      for _, container in pairs(self.Data.Containers) do
+      for _, container in pairs(self.Data.containers) do
         for _, entry in pairs(container) do
           if entry.itemId == item_id and (entry.count or 0) > 0 then
             entry.count = entry.count - 1
@@ -234,7 +234,7 @@ describe("玩家生命双层相位宿主接缝（#298）", function()
           self.pending = on_result
           return true
         end,
-        ShopAction = function(_, payload)
+        shop_action = function(_, payload)
           return type(payload) == "table" and payload.action == "OpenAdrenaline"
         end,
         finish = function(self, outcome)
@@ -280,7 +280,7 @@ describe("玩家生命双层相位宿主接缝（#298）", function()
     local tree = runtime:get_player_tree(player.UserId)
     runtime.clock:advance(1)
     assert.equals(GameCfg.Vitals.MaxHealth - 1, tree.states.health:now())
-    data.Data.Containers[GameCfg.Items.ContainerId.Backpack] = {}
+    data.Data.containers[GameCfg.Items.ContainerId.Backpack] = {}
     tree:sync_from_data(data)
     local health = tree.states.health:now()
     runtime.clock:advance(1)

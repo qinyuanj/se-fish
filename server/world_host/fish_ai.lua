@@ -1,6 +1,6 @@
 local AiAPI = require('server.packages.official_ai_feature.api')
 
-local Mgr = { AiAPI = AiAPI }
+local Mgr = { ai_api = AiAPI }
 
 local function leaf(fish)
     if not fish.ai_leaf then fish.ai_leaf = {} end
@@ -9,13 +9,13 @@ end
 
 function Mgr:custom(fish)
     local state = leaf(fish)
-    local carrier = fish.Carrier
+    local carrier = fish.carrier
     if state.Mode or not state.initialized then
         local ok, err = pcall(function()
-            self.AiAPI.Funcs.StopAI(carrier.Receiver)
-            self.AiAPI.Funcs.StopMove(carrier.Receiver, 0)
-            local p, offset = carrier.Body.Position, carrier.ReceiverOffset
-            carrier.Receiver.Position = Vector3.New(p.x + (offset and offset.x or 0),
+            self.ai_api.Funcs.StopAI(carrier.receiver)
+            self.ai_api.Funcs.StopMove(carrier.receiver, 0)
+            local p, offset = carrier.body.Position, carrier.receiver_offset
+            carrier.receiver.Position = Vector3.New(p.x + (offset and offset.x or 0),
                 p.y + (offset and offset.y or 0), p.z + (offset and offset.z or 0))
         end)
         state.Mode, state.Target, state.Direction = nil, nil, nil
@@ -36,20 +36,20 @@ function Mgr:pause(fish, paused)
     if paused then
         self:custom(fish)
         local record = fish.ability_record
-        if record and record.Ready and not state.Paused then
+        if record and record.ready and not state.paused then
             local api = self.AbilityAPI or require('server.packages.ability_system.api')
-            local ok, err = pcall(api.StopAbility, record.Receiver, record.entry.Index)
+            local ok, err = pcall(api.StopAbility, record.receiver, record.entry.Index)
             if not ok then print('[FishAi] operation=PauseAbility', 'fish=' .. tostring(fish.Id), tostring(err)) end
         end
     end
-    state.Paused = paused == true
+    state.paused = paused == true
 end
 
 function Mgr:command(fish, mode, target, direction, speed, distance, range)
     local state = leaf(fish)
-    if self.Stopped or state.Paused then return false end
-    local carrier = fish.Carrier
-    local unit = carrier and carrier.Receiver
+    if self.Stopped or state.paused then return false end
+    local carrier = fish.carrier
+    local unit = carrier and carrier.receiver
     if not unit or not unit.Controller then
         print('[FishAi] operation=Command', 'fish=' .. tostring(fish.Id), 'missing-controller')
         return false
@@ -72,16 +72,16 @@ function Mgr:command(fish, mode, target, direction, speed, distance, range)
     end
     if not self:custom(fish) then return false end
     local ok, err = pcall(function()
-        local p, offset = carrier.Body.Position, carrier.ReceiverOffset
+        local p, offset = carrier.body.Position, carrier.receiver_offset
         unit.Position = Vector3.New(p.x + (offset and offset.x or 0),
             p.y + (offset and offset.y or 0), p.z + (offset and offset.z or 0))
         unit.Controller.WalkSpeed = speed
-        self.AiAPI.Funcs.StartAI(unit)
-        self.AiAPI.Funcs.StopMove(unit, 0)
+        self.ai_api.Funcs.StartAI(unit)
+        self.ai_api.Funcs.StopMove(unit, 0)
         if mode == 'direction' then
-            self.AiAPI.Funcs.MoveDirection(unit, direction, 0, 0)
+            self.ai_api.Funcs.MoveDirection(unit, direction, 0, 0)
         else
-            self.AiAPI.Funcs.ChaseTarget(unit, target, range or 0, distance or 0.1, 0, nil, 0, 1)
+            self.ai_api.Funcs.ChaseTarget(unit, target, range or 0, distance or 0.1, 0, nil, 0, 1)
         end
     end)
     if not ok then
@@ -110,17 +110,17 @@ end
 function Mgr:cast_fish(fish)
     local state = leaf(fish)
     local record = fish.ability_record
-    if self.Stopped or state.Paused or not record or not record.Ready
-        or record.cancelled or fish.Carrier.Dead then return false end
+    if self.Stopped or state.paused or not record or not record.ready
+        or record.cancelled or fish.carrier.dead then return false end
     local api = self.AbilityAPI or require('server.packages.ability_system.api')
     local connection, started = nil, false
     local ok, err = pcall(function()
-        local script = api.GetAbility(record.Receiver, record.entry.Index)
+        local script = api.GetAbility(record.receiver, record.entry.Index)
         local handler = script and api.GetAbilityByScript(script)
         local signals = handler and handler.getSignals and handler.getSignals()
         if not signals or not signals.CastStart then return end
         connection = signals.CastStart:Connect(function() started = true end)
-        self.AiAPI.Funcs.BasicCommand(record.Receiver, self.AiAPI.Configs.CMD_ABILITY, record.entry.Index)
+        self.ai_api.Funcs.BasicCommand(record.receiver, self.ai_api.Configs.CMD_ABILITY, record.entry.Index)
     end)
     if connection then connection:Disconnect() end
     if not ok then
@@ -131,8 +131,8 @@ function Mgr:cast_fish(fish)
 end
 
 function Mgr:attach(fish)
-    local carrier = fish and fish.Carrier
-    if not carrier or not carrier.Receiver or not carrier.Receiver.Controller then
+    local carrier = fish and fish.carrier
+    if not carrier or not carrier.receiver or not carrier.receiver.Controller then
         print('[FishAi] operation=Attach', 'fish=' .. tostring(fish and fish.Id), 'missing-receiver')
         return false
     end
@@ -144,7 +144,7 @@ function Mgr:remove(fish)
     if not fish then return true end
     local ok = self:custom(fish)
     fish.ai_leaf = nil
-    if fish.Carrier then fish.Carrier.ai_owns_movement = false end
+    if fish.carrier then fish.carrier.ai_owns_movement = false end
     return ok
 end
 

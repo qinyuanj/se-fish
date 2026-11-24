@@ -21,7 +21,7 @@ _G.Platform147Seq = (_G.Platform147Seq or 147000) + 10
 local seq = _G.Platform147Seq
 local function ready()
     for _ = 1, 100 do
-        if not save.Flying[p.UserId] and not save.Pending[p.UserId] then return true end
+        if not save.flying[p.UserId] and not save.pending[p.UserId] then return true end
         task:Wait(0.1)
     end
     return false

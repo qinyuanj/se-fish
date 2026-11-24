@@ -117,8 +117,8 @@ describe('平台适配层（MgrPlatform）', function()
     env.save = assert(loadfile('server/save_host.lua'))()
     env.players = assert(loadfile('server/player_data_host.lua'))()
     env.platform = assert(loadfile('server/platform_host.lua'))()
-    env.players.Save, env.save.PlayerData = env.save, env.players
-    env.platform.Save, env.platform.PlayerData = env.save, env.players
+    env.players.Save, env.save.player_data = env.save, env.players
+    env.platform.Save, env.platform.player_data = env.save, env.players
     env.platform.now = function() return env.now end
     env.platform:start() -- 订阅 GoodsPurchaseCompleted 与 RE 通道
     env.player = { UserId = 1471, Character = { Position = { x = 0, y = 0, z = 0 } },

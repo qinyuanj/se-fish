@@ -70,7 +70,7 @@ describe('TestDamageFloat', function()
         assert.is_true(DamageFloat.Active[1].node.Visible)
         time = 1.1
         DamageFloat:update()
-        assert.same(2, #DamageFloat.Pool)
+        assert.same(2, #DamageFloat.pool)
         payload.amount, payload.critical = 10, true
         DamageFloat:show(payload)
         assert.same(2, #created)

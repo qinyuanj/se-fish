@@ -68,7 +68,7 @@ end
 function AttrBridge:body_plan(player)
     local tree = attrTree(player)
     if not tree then return nil, "no-player-tree" end
-    return tree.memos.attr_plan:now().Body
+    return tree.memos.attr_plan:now().body
 end
 function AttrBridge:max_health(player)
     local tree = attrTree(player)
@@ -128,7 +128,7 @@ function AttrBridge:apply_growth(player)
     if not applied.Ok then applied.Error = table.concat(errors, "; ") end
     return applied
 end
-FishAbility.Attr = AttrBridge
+FishAbility.attr = AttrBridge
 
 local function bindRE(name, cooldown, handler, requireTable)
     _G.REUtil:get_re(name).OnServerEvent:Connect(function(player, payload)
@@ -270,7 +270,7 @@ WorldRuntime = ServerRuntime.new({
 ServerRuntime.set_current(WorldRuntime)
 local fishHost = WorldRuntime.fish_host
 fishHost.Vitals = WorldRuntime.life
-fishHost.Ai = FishAi
+fishHost.ai = FishAi
 FishAi.FishUnit = fishHost
 FishCarrier.damage_listener = function(carrier, actual, hit)
     local fish = carrier and fishHost:find_by_carrier(carrier)

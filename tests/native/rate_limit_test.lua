@@ -12,7 +12,7 @@ end
 
 describe("TestRateLimitAggregator", function()
   local function newAggregator()
-    return RateLimit.new_aggregator({ SessionId = "s-1", AggregateSec = 0.1 })
+    return RateLimit.new_aggregator({ session_id = "s-1", AggregateSec = 0.1 })
   end
 
   -- 窗口到期产出一个 {s,n,q}：n 是窗口内点击数，q 从 1 开始单调递增。
@@ -75,9 +75,9 @@ describe("TestRateLimitAggregator", function()
 
   it("test_rejects_bad_config", function()
     assert.error_matches(function() RateLimit.new_aggregator({ AggregateSec = 0.1 }) end, "会话 id", nil, true)
-    assert.error_matches(function() RateLimit.new_aggregator({ SessionId = 1, AggregateSec = 0.1 }) end,
+    assert.error_matches(function() RateLimit.new_aggregator({ session_id = 1, AggregateSec = 0.1 }) end,
       "会话 id", nil, true)
-    assert.error_matches(function() RateLimit.new_aggregator({ SessionId = "s-1", AggregateSec = 0 }) end,
+    assert.error_matches(function() RateLimit.new_aggregator({ session_id = "s-1", AggregateSec = 0 }) end,
       "AggregateSec", nil, true)
   end)
 
@@ -104,7 +104,7 @@ describe("TestRateLimitConfig", function()
     local win = RateLimit.new_window(cfg.WindowSec, cfg.MaxCount)
     assert.same(cfg.MaxCount, win:admit(0, 99))
 
-    local agg = RateLimit.new_aggregator({ SessionId = "s-1", AggregateSec = cfg.AggregateSec })
+    local agg = RateLimit.new_aggregator({ session_id = "s-1", AggregateSec = cfg.AggregateSec })
     agg:click(0)
     assert.is_nil(agg:collect(cfg.AggregateSec / 2))
     assert.same(1, agg:collect(cfg.AggregateSec).n)
@@ -113,7 +113,7 @@ end)
 
 describe("TestRateLimitReceiver", function()
   local function newReceiver(sessionId)
-    return RateLimit.new_receiver({ SessionId = sessionId, WindowSec = 1.0, MaxCount = 10 })
+    return RateLimit.new_receiver({ session_id = sessionId, WindowSec = 1.0, MaxCount = 10 })
   end
 
   it("test_accepts_current_session_payload", function()
@@ -127,7 +127,7 @@ describe("TestRateLimitReceiver", function()
 
   -- 端到端：客户端聚合出来的载荷原样喂给服务端接收侧（M1 就是这么接的）。
   it("test_aggregator_payload_flows_through_receiver", function()
-    local agg = RateLimit.new_aggregator({ SessionId = "s-1", AggregateSec = 0.1 })
+    local agg = RateLimit.new_aggregator({ session_id = "s-1", AggregateSec = 0.1 })
     local rx = newReceiver("s-1")
 
     for _ = 1, 12 do
@@ -137,7 +137,7 @@ describe("TestRateLimitReceiver", function()
 
     local result = rx:accept(0, payload)
     assert.same("ok", result.Status)
-    assert.same(12, result.Requested)
+    assert.same(12, result.requested)
     assert.same(10, result.accepted) -- 窗口 1s ≤ 10，多出的 2 次被 clamp
     assert.same("order", rx:accept(0.01, payload).Reason) -- 同一个包重放一次被序号挡掉
   end)
@@ -207,7 +207,7 @@ describe("TestRateLimitReceiver", function()
     local result = rx:accept(0.1, { s = "s-1", n = 4, q = 2 })
     assert.same("ok", result.Status)
     assert.same(0, result.accepted)
-    assert.same(4, result.Requested)
+    assert.same(4, result.requested)
     assert.is_true(result.clamped)
   end)
 

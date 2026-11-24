@@ -35,8 +35,8 @@ local function loadRuntime(fish, unit)
 end
 
 local function receiver(fish)
-    local carrier = fish and fish.Carrier
-    return carrier and carrier.Receiver or nil
+    local carrier = fish and fish.carrier
+    return carrier and carrier.receiver or nil
 end
 
 function Mgr:state(fish)

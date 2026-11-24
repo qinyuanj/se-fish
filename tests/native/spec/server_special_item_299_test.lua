@@ -81,19 +81,19 @@ local function make_data(player, item_id, zone)
   if item_id then bar[1] = { itemId = item_id, count = 1 } end
   return {
     Player = player,
-    Inited = true,
-    LoadState = "ready",
+    inited = true,
+    load_state = "ready",
     Data = {
       FishCoin = 0,
       Zone = zone or "fishPond",
-      SelectedSlot = item_id and 1 or nil,
-      UpgradeLevel = 0,
-      Containers = {
+      selected_slot = item_id and 1 or nil,
+      upgrade_level = 0,
+      containers = {
         [GameCfg.Items.ContainerId.ItemBar] = bar,
         [GameCfg.Items.ContainerId.Backpack] = {},
       },
       Bait = {},
-      Weapons = {},
+      weapons = {},
     },
     Extra = {
       cooldowns = {},
@@ -139,9 +139,9 @@ describe("风神之翼与哥斯拉存活相位宿主接缝（#299）", function(
 
   local function select_item(target, item_id)
     local record = target == player and data or other_data
-    local bar = record.Data.Containers[GameCfg.Items.ContainerId.ItemBar]
+    local bar = record.Data.containers[GameCfg.Items.ContainerId.ItemBar]
     bar[1] = item_id and { itemId = item_id, count = 1 } or nil
-    record.Data.SelectedSlot = item_id and 1 or nil
+    record.Data.selected_slot = item_id and 1 or nil
     runtime:get_player_tree(target.UserId):sync_from_data(record)
   end
 
@@ -182,7 +182,7 @@ describe("风神之翼与哥斯拉存活相位宿主接缝（#299）", function(
       fish_carrier = {
         Fish = {},
         resolve_carrier = function(_, target)
-          return type(target) == "table" and target.Carrier or nil
+          return type(target) == "table" and target.carrier or nil
         end,
         Damage = function(_, carrier, amount)
           carrier.Damage = (carrier.Damage or 0) + amount
@@ -307,10 +307,10 @@ describe("风神之翼与哥斯拉存活相位宿主接缝（#299）", function(
 
   it("哥斯拉吐息按走廊分段结算其他玩家与活鱼，冷却中、未变身与打自己都被拒绝", function()
     boot("item170")
-    local carrier = { Dead = false, Body = { Position = vec(6, 5.01, 55) }, Damage = 0, hits = 0 }
+    local carrier = { dead = false, body = { Position = vec(6, 5.01, 55) }, Damage = 0, hits = 0 }
     runtime.fish_carrier = runtime.fish_carrier or {}
     local tree = runtime:get_player_tree(player.UserId)
-    tree.fish_units = { { Id = "f1", Carrier = carrier } }
+    tree.fish_units = { { Id = "f1", carrier = carrier } }
 
     act(player, { action = "breath" })
     assert.is_true(player.last_result.ok)

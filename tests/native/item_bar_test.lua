@@ -119,7 +119,7 @@ describe("道具栏与鱼饵栏", function()
     it("test_external_depletion_clears_selected_slot", function()
         assert.is_true(ctx.data:SelectSlot(1))
         ctx.data:UpdateData(function(data)
-            data.Containers[GameCfg.Items.ContainerId.ItemBar][1].count = 0
+            data.containers[GameCfg.Items.ContainerId.ItemBar][1].count = 0
         end)
         assert.is_nil(ctx.data:GetItemBarSnapshot().selectedSlot)
         assert.is_nil(ctx.data:GetItemBarSnapshot().slots[1])
@@ -209,7 +209,7 @@ describe("道具栏与鱼饵栏", function()
         ctx.data:UpdateData(function(data) data.Bait.worm = 0 end)
         assert.is_nil(ctx.data:GetItemBarSnapshot().selectedBait)
         assert.is_false(ctx.data:SelectBait('worm'))
-        ctx.data.Data.SelectedBait = 'worm'
+        ctx.data.Data.selected_bait = 'worm'
         local ok, itemId = ctx.data:ConsumeSelectedBait()
         assert.is_false(ok)
         assert.is_nil(itemId)

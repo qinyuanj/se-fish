@@ -43,7 +43,7 @@ describe('TestFishEscape', function()
         env.player.Character.Rotation = { GetForward = function() return vec(1, 0, 0) end }
         local fish = env:held_fish(env.player, 'bass', 1.4)
         assert.is_true(env.mgr:drop(env.player))
-        local body = fish.Carrier.Body
+        local body = fish.carrier.body
         assert.are.equal(0, threw)
         assert.are.equal('escaping', fish.State)
         assert.same(env.world, body.Parent)
@@ -55,8 +55,8 @@ describe('TestFishEscape', function()
         -- 墙外水区已覆盖南岸，这个落点朝南即可回水。
         assert.is_true(body.LinearVelocity.z < 0)
         assert.is_nil(env.mgr:get_held(env.player))
-        assert.are.equal('bass', fish.FishId)
-        assert.are.equal(1.4, fish.Mult)
+        assert.are.equal('bass', fish.fish_id)
+        assert.are.equal(1.4, fish.mult)
         assert.same(env.player, env.pushed[#env.pushed])
     end)
 
@@ -69,15 +69,15 @@ describe('TestFishEscape', function()
         env.mgr:drop(env.player)
         assert.is_nil(env.mgr.Fish[first.Id])
         assert.same(second, env.mgr.Fish[second.Id])
-        assert.same(first.Carrier, env.despawned[1])
+        assert.same(first.carrier, env.despawned[1])
     end)
 
     it('test_engine_lift_end_releases_through_same_path', function()
         env:prepare()
         local fish = env:held_fish()
-        fish.Carrier.Body.OnLiftedEnd:Fire()
+        fish.carrier.body.OnLiftedEnd:Fire()
         assert.are.equal('escaping', fish.State)
-        assert.near(3, speed(fish.Carrier.Body.LinearVelocity), 1e-6)
+        assert.near(3, speed(fish.carrier.body.LinearVelocity), 1e-6)
     end)
 
     it('test_global_cap_is_online_times_two_and_kicks_oldest', function()
@@ -108,18 +108,18 @@ describe('TestFishEscape', function()
         env:prepare()
         local waiting = env:land(env.other, 'carp', 1)
         waiting.Anchor = vec(-11.75, 5, -12.25)
-        waiting.Carrier.Body.Position = waiting.Anchor
+        waiting.carrier.body.Position = waiting.Anchor
         local held = env:held_fish(env.player)
-        held.Carrier.Body.Position = vec(-11, 3, -13)
+        held.carrier.body.Position = vec(-11, 3, -13)
         env.mgr:update()
         assert.is_not.is_nil(env.mgr.Fish[waiting.Id])
         assert.is_not.is_nil(env.mgr.Fish[held.Id])
         env.mgr:drop(env.player)
         -- 岸上高度 y=3 高于水面 2.183，(x,z) 在池塘里就算入水
-        held.Carrier.Body.Position = vec(-10, 3, -12)
+        held.carrier.body.Position = vec(-10, 3, -12)
         env.mgr:update()
         assert.is_nil(env.mgr.Fish[held.Id])
-        assert.same(held.Carrier, env.despawned[#env.despawned])
+        assert.same(held.carrier, env.despawned[#env.despawned])
     end)
 
     it('test_other_player_cannot_drop_my_fish', function()
@@ -133,7 +133,7 @@ describe('TestFishEscape', function()
         env:prepare()
         local fish = env:held_fish()
         env.mgr:drop(env.player)
-        local body = fish.Carrier.Body
+        local body = fish.carrier.body
         local trigger = { Name = 'TGUnitShop', IsA = function(_, name) return name == 'TriggerUnit' end }
         local ghost = { Name = 'Ghost', CanCollide = false }
         env.hits = { { Instance = trigger, Distance = 0.5 }, { Instance = env.other.Character, Distance = 0.6 },
@@ -153,14 +153,14 @@ describe('TestFishEscape', function()
         for _, unit in ipairs(env.rays[1].params.FilterDescendantsInstances) do excluded[unit] = true end
         assert.is_true(excluded[env.player.Character])
         assert.is_true(excluded[body])
-        assert.is_true(excluded[fish.Carrier.Receiver])
+        assert.is_true(excluded[fish.carrier.receiver])
     end)
 
     it('test_reheads_toward_the_nearest_zone_after_moving', function()
         env:prepare()
         local fish = env:held_fish()
         env.mgr:drop(env.player)
-        local body = fish.Carrier.Body
+        local body = fish.carrier.body
         -- 虾池水面中心 (240,-44)，南北边缘 -56/-32：两个落点均在水区之外、离虾池最近。
         body.Position = vec(240, 1, -28)
         env.now = env.now + 3.05
@@ -182,13 +182,13 @@ describe('TestFishEscape', function()
         env:prepare()
         local fish = env:held_fish()
         assert.is_true(env.mgr:drop(env.player))
-        local velocity = fish.Carrier.Body.LinearVelocity
+        local velocity = fish.carrier.body.LinearVelocity
         local escapedAt = fish.escape_at
         env.now = 0.5
         assert.is_false(env.mgr:drop(env.player))
-        fish.Carrier.Body.OnLiftedEnd:Fire()
+        fish.carrier.body.OnLiftedEnd:Fire()
         env.player.Character.Controller.Died:Fire()
-        assert.same(velocity, fish.Carrier.Body.LinearVelocity)
+        assert.same(velocity, fish.carrier.body.LinearVelocity)
         assert.are.equal(escapedAt, fish.escape_at)
     end)
 
@@ -196,7 +196,7 @@ describe('TestFishEscape', function()
         env:prepare()
         local fish = env:held_fish()
         env.mgr:drop(env.player)
-        local body = fish.Carrier.Body
+        local body = fish.carrier.body
         local start = body.LinearVelocity
         -- 被别的方向带偏后，3 秒整点重新朝水
         body.LinearVelocity = vec(0, 0, -3)

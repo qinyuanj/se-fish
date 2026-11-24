@@ -44,7 +44,7 @@ describe("TestZoneScene125", function()
       { Name = 'CrabSafe', Position = { x = 260, y = 6, z = 100 } },
       { Name = 'CrabShop', Position = { x = 250, y = 5, z = 110 } },
     })
-    assert.is_nil(report.Ready)
+    assert.is_nil(report.ready)
     assert.same({
       { ZoneId = 'crabLake', zone_name = '蟹湖', Name = 'CrabWater', code = 'missing' },
       { ZoneId = 'crabLake', zone_name = '蟹湖', Name = 'CrabSafe', code = 'duplicate' },
@@ -54,11 +54,11 @@ describe("TestZoneScene125", function()
     for _, e in ipairs(scenes[1].Scene.Entities) do complete[#complete + 1] = e end
     report = Judge.inspect_scene(scenes, complete)
     assert.is_true(report.entities_match)
-    assert.is_nil(report.Ready) -- 名称和位置匹配不等于碰撞、保存或试玩通过。
+    assert.is_nil(report.ready) -- 名称和位置匹配不等于碰撞、保存或试玩通过。
     assert.same({ 'crabLake' }, report.pending_zones)
     scenes[1].Scene.State = 'resolved'
     report = Judge.inspect_scene(scenes, complete)
-    assert.is_nil(report.Ready)
+    assert.is_nil(report.ready)
     assert.same({
       saved = 'unverified', synced = 'unverified', collision = 'unverified', playtested = 'unverified',
     }, report.verification)

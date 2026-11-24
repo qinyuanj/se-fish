@@ -35,12 +35,12 @@ function SquadDock.mount(world, opts)
   opts = type(opts) == "table" and opts or {}
   local self = {
     world = world,
-    Parties = {},
-    PartyOf = {},
-    Invites = {},
+    parties = {},
+    party_of = {},
+    invites = {},
     online = {},
-    NextId = 0,
-    Epoch = nil,
+    next_id = 0,
+    epoch = nil,
     waiting_restore = {},
   }
 
@@ -69,13 +69,13 @@ function SquadDock.mount(world, opts)
   end
 
   function self:party_id_of(player)
-    local id = player and self.PartyOf[player.UserId]
-    if id and self.Parties[id] then return id end
+    local id = player and self.party_of[player.UserId]
+    if id and self.parties[id] then return id end
     return nil
   end
 
   function self:members(player)
-    local party = self.Parties[self:party_id_of(player) or 0]
+    local party = self.parties[self:party_id_of(player) or 0]
     local out = {}
     if not party then return out end
     for _, user_id in ipairs(party.Members) do
@@ -86,7 +86,7 @@ function SquadDock.mount(world, opts)
   end
 
   function self:Count(player)
-    local party = self.Parties[self:party_id_of(player) or 0]
+    local party = self.parties[self:party_id_of(player) or 0]
     return party and #party.Members or 0
   end
 
@@ -107,16 +107,16 @@ function SquadDock.mount(world, opts)
   end
 
   function self:session_epoch()
-    if not self.Epoch then
+    if not self.epoch then
       if type(opts.session_epoch) == "function" then
         local ok, value = pcall(opts.session_epoch)
-        if ok and value ~= nil then self.Epoch = tostring(value) end
+        if ok and value ~= nil then self.epoch = tostring(value) end
       elseif opts.session_epoch ~= nil then
-        self.Epoch = tostring(opts.session_epoch)
+        self.epoch = tostring(opts.session_epoch)
       end
-      self.Epoch = self.Epoch or (tostring(now()) .. ":" .. tostring({}))
+      self.epoch = self.epoch or (tostring(now()) .. ":" .. tostring({}))
     end
-    return self.Epoch
+    return self.epoch
   end
 
   function self:save_party_id(player, id)
@@ -203,19 +203,19 @@ function SquadDock.mount(world, opts)
   end
 
   local function new_party()
-    self.NextId = self.NextId + 1
-    local party = { Id = self.NextId, Members = {}, rows = {}, revision = State.new("SquadDock.revision", 0) }
-    self.Parties[party.Id] = party
+    self.next_id = self.next_id + 1
+    local party = { Id = self.next_id, Members = {}, rows = {}, revision = State.new("SquadDock.revision", 0) }
+    self.parties[party.Id] = party
     mount_party(party)
     return party
   end
 
   function self:add_member(party, player)
-    if self.PartyOf[player.UserId] then return false, "already-in-party" end
+    if self.party_of[player.UserId] then return false, "already-in-party" end
     local ok, reason = self:save_party_id(player, party.Id)
     if not ok then return false, reason or "save-failed" end
     party.Members[#party.Members + 1] = player.UserId
-    self.PartyOf[player.UserId] = party.Id
+    self.party_of[player.UserId] = party.Id
     mount_member(party, player.UserId)
     return true
   end
@@ -229,7 +229,7 @@ function SquadDock.mount(world, opts)
         break
       end
     end
-    self.PartyOf[player.UserId] = nil
+    self.party_of[player.UserId] = nil
     if party.member_dock then party.member_dock:drop(member_effect_key(player.UserId)) end
     party.rows[player.UserId] = nil
     return removed_index
@@ -237,20 +237,20 @@ function SquadDock.mount(world, opts)
 
   local function restore_member(party, player, index)
     table.insert(party.Members, math.min(index or (#party.Members + 1), #party.Members + 1), player.UserId)
-    self.PartyOf[player.UserId] = party.Id
+    self.party_of[player.UserId] = party.Id
     mount_member(party, player.UserId)
   end
 
   function self:snapshot_of(player, notice)
     local snapshot = { state = "none", members = {} }
     local party_id = self:party_id_of(player)
-    local party = party_id and self.Parties[party_id]
-    local invite = self.Invites[player.UserId]
+    local party = party_id and self.parties[party_id]
+    local invite = self.invites[player.UserId]
     if invite then
       local left = math.max(0, math.ceil(invite.expires_at - now()))
-      local from = self.online[invite.FromUserId]
+      local from = self.online[invite.from_user_id]
       snapshot.invite = {
-        fromUserId = invite.FromUserId,
+        fromUserId = invite.from_user_id,
         fromName = from and from.Name or nil,
         expiresInSec = left,
         expiresAt = invite.expires_at,
@@ -299,33 +299,33 @@ function SquadDock.mount(world, opts)
       self:reply(player, "Invite", false, "too-far")
       return
     end
-    self.Invites[target_user_id] = { FromUserId = player.UserId, expires_at = now() + cfg().InviteTimeoutSec }
+    self.invites[target_user_id] = { from_user_id = player.UserId, expires_at = now() + cfg().InviteTimeoutSec }
     self:reply(player, "Invite", true)
     self:push(target)
   end
 
   function self:accept(player, from_user_id)
-    local invite = self.Invites[player.UserId]
+    local invite = self.invites[player.UserId]
     if not invite then self:reply(player, "Accept", false, "no-invite") return end
     if invite.expires_at <= now() then
-      self.Invites[player.UserId] = nil
+      self.invites[player.UserId] = nil
       self:reply(player, "Accept", false, "expired")
       self:push(player)
       return
     end
-    if type(from_user_id) == "number" and invite.FromUserId ~= from_user_id then
+    if type(from_user_id) == "number" and invite.from_user_id ~= from_user_id then
       self:reply(player, "Accept", false, "no-invite")
       return
     end
-    local from = self.online[invite.FromUserId]
+    local from = self.online[invite.from_user_id]
     if not from then
-      self.Invites[player.UserId] = nil
+      self.invites[player.UserId] = nil
       self:reply(player, "Accept", false, "offline")
       self:push(player)
       return
     end
     if self:party_id_of(player) then self:reply(player, "Accept", false, "already-in-party") return end
-    local party = self.Parties[self:party_id_of(from) or 0]
+    local party = self.parties[self:party_id_of(from) or 0]
     if party and #party.Members >= cfg().MaxMembers then
       self:reply(player, "Accept", false, "full")
       return
@@ -346,22 +346,22 @@ function SquadDock.mount(world, opts)
       self:reply(player, "Accept", false, reason or "save-failed")
       if not self:party_id_of(from) and #party.Members == 0 then
         party.disbanded = true
-        self.Parties[party.Id] = nil
+        self.parties[party.Id] = nil
         world.squads:drop(party_effect_key(party.Id))
       end
       self:push(player)
       self:push(from)
       return
     end
-    self.Invites[player.UserId] = nil
+    self.invites[player.UserId] = nil
     self:reply(player, "Accept", true)
     self:push_party(party, "joined")
   end
 
   function self:decline(player)
-    local invite = self.Invites[player.UserId]
+    local invite = self.invites[player.UserId]
     if not invite then self:reply(player, "Decline", false, "no-invite") return end
-    self.Invites[player.UserId] = nil
+    self.invites[player.UserId] = nil
     self:reply(player, "Decline", true)
     self:push(player)
   end
@@ -383,12 +383,12 @@ function SquadDock.mount(world, opts)
       end
     end
     party.disbanded = true
-    self.Parties[party.Id] = nil
+    self.parties[party.Id] = nil
     for _, user_id in ipairs(party.Members) do
-      if user_id ~= skip_user_id then self.PartyOf[user_id] = nil end
+      if user_id ~= skip_user_id then self.party_of[user_id] = nil end
       local member = self.online[user_id]
       if member then
-        self.Invites[member.UserId] = nil
+        self.invites[member.UserId] = nil
         self:push(member, notice or "disbanded")
       end
     end
@@ -414,7 +414,7 @@ function SquadDock.mount(world, opts)
       self:push(player)
       return true
     end
-    local party = self.Parties[party_id]
+    local party = self.parties[party_id]
     local removed_index = self:remove_member(party, player)
     if reason ~= "offline" then
       local ok, why = self:save_party_id(player, 0)
@@ -461,10 +461,10 @@ function SquadDock.mount(world, opts)
 
   function self:update()
     local expired = {}
-    for user_id, invite in pairs(self.Invites) do
+    for user_id, invite in pairs(self.invites) do
       if invite.expires_at <= now() then
         expired[#expired + 1] = user_id
-        self.Invites[user_id] = nil
+        self.invites[user_id] = nil
         self:reply(self.online[user_id], "Invite", false, "expired")
       end
     end
@@ -474,7 +474,7 @@ function SquadDock.mount(world, opts)
   function self:restore(player)
     local saved_id, saved_epoch = self:saved_party(player)
     if not saved_id then self:push(player) return end
-    local party = self.Parties[saved_id]
+    local party = self.parties[saved_id]
     if saved_epoch ~= self:session_epoch() or not party then
       if self:save_party_id(player, 0) then self:push(player, "disbanded") end
       return
@@ -503,15 +503,15 @@ function SquadDock.mount(world, opts)
     if not is_valid_player(player) then return end
     local user_id = player.UserId
     if self:party_id_of(player) then self:leave(player, "offline") end
-    local invite = self.Invites[user_id]
+    local invite = self.invites[user_id]
     if invite then
-      self.Invites[user_id] = nil
-      local from = self.online[invite.FromUserId]
+      self.invites[user_id] = nil
+      local from = self.online[invite.from_user_id]
       if from then self:push(from) end
     end
-    for target_id, pending in pairs(self.Invites) do
-      if pending.FromUserId == user_id then
-        self.Invites[target_id] = nil
+    for target_id, pending in pairs(self.invites) do
+      if pending.from_user_id == user_id then
+        self.invites[target_id] = nil
         local target = self.online[target_id]
         if target then self:push(target) end
       end

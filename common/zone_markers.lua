@@ -1,6 +1,6 @@
 local GameCfg = require('common.game_cfg')
 
-local ZoneMarkers = { Ready = false, Zones = {} }
+local ZoneMarkers = { ready = false, Zones = {} }
 
 local zoneNames = { '01 鱼塘', '02 虾池', '03 蟹湖', '04 树林岛', '05 沙滩岛', '06 礁石岛', '07 火山岛' }
 -- 客户端 main 早于场景同步完成执行（2026-11-04 实测约早 10 ms），启动时按此节奏重试解析
@@ -220,7 +220,7 @@ end
 
 function ZoneMarkers.resolve(world, config)
     local cfg = config or GameCfg
-    ZoneMarkers.Ready, ZoneMarkers.Zones = false, {}
+    ZoneMarkers.ready, ZoneMarkers.Zones = false, {}
     if not world then error('ZoneMarkers.Resolve 需要 World') end
     local markers = catalog(world)
     local snapshot = { Zones = {}, Waters = {}, BaitSpots = {}, ZoneIdByWater = {}, ContentWaterIds = {}, Casting = {} }
@@ -244,8 +244,8 @@ function ZoneMarkers.resolve(world, config)
     end
 
     for _, route in ipairs(cfg.Ferry.Routes) do
-        route.Outbound.Destination = snapshot.Zones[route.ToZoneId].SafePoint
-        route.Return.Destination = snapshot.Zones[route.FromZoneId].SafePoint
+        route.Outbound.destination = snapshot.Zones[route.ToZoneId].SafePoint
+        route.Return.destination = snapshot.Zones[route.FromZoneId].SafePoint
     end
     for _, zone in ipairs(cfg.Zones) do zone.Scene = snapshot.Zones[zone.Id] end
     cfg.Water.Zones = snapshot.Waters
@@ -266,8 +266,8 @@ function ZoneMarkers.resolve(world, config)
         }
     end
     cfg.Ferry.planned_routes = snapshot.ferry_routes
-    snapshot.Ready = true
-    ZoneMarkers.Ready, ZoneMarkers.Zones = true, snapshot.Zones
+    snapshot.ready = true
+    ZoneMarkers.ready, ZoneMarkers.Zones = true, snapshot.Zones
     return snapshot
 end
 

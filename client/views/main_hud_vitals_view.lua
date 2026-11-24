@@ -95,7 +95,7 @@ function MainHudVitalsView.mount(s, ctx, options)
     height = resolution.y,
     itemBarSlots = GameCfg.Items.ItemBarSlots,
   })
-  local rects = layout.Rects
+  local rects = layout.rects
   local cfg = GameCfg.Vitals
 
   -- 1. 编辑器预置金币节点（按名查找并排版，生命周期归属编辑器场景树，不由本视图销毁）

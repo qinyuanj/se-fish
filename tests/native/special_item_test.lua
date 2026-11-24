@@ -24,7 +24,7 @@ local SpecialItem = require('common.special_item')
 describe('TestSpecialItem', function()
     local function bounds()
         -- 与 FlightPath.bounds_of 同形的场景合同边界：地面 5 米、上限 20 米
-        return { MinX = -60, MaxX = 60, MinZ = -50, MaxZ = 70, GroundY = 5, ceiling_y = 25, MaxHeight = 20 }
+        return { MinX = -60, MaxX = 60, MinZ = -50, MaxZ = 70, ground_y = 5, ceiling_y = 25, MaxHeight = 20 }
     end
 
     -- 失败方式 2：台账按 tick 段结算，每目标总和恰 1000、无重复段
@@ -107,7 +107,7 @@ describe('TestSpecialItem', function()
     it('test_flight_y_climbs_to_ceiling_and_descends_to_ground', function()
         local cfg = GameCfg.Ability.SpecialItem.Wings
         local b = bounds()
-        local state = { Y = b.GroundY, airborne = false }
+        local state = { Y = b.ground_y, airborne = false }
         -- 长按 10 秒：必须停在 CeilingY，不越过 20 米上限
         for _ = 1, 40 do
             local y, airborne = SpecialItem.step_flight_y(cfg, state, true, 0.25, b)
@@ -115,13 +115,13 @@ describe('TestSpecialItem', function()
         end
         assert.same(b.ceiling_y, state.Y)
         assert.is_true(state.airborne)
-        assert.message('y ' .. tostring(state.Y)).is_true(state.Y <= b.GroundY + 20)
+        assert.message('y ' .. tostring(state.Y)).is_true(state.Y <= b.ground_y + 20)
         -- 松开 20 秒：必须降回地面并落地
         for _ = 1, 80 do
             local y, airborne = SpecialItem.step_flight_y(cfg, state, false, 0.25, b)
             state.Y, state.airborne = y, airborne
         end
-        assert.same(b.GroundY, state.Y)
+        assert.same(b.ground_y, state.Y)
         assert.is_false(state.airborne)
     end)
 

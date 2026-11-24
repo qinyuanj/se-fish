@@ -51,19 +51,19 @@ local function make_ready_data(player, overrides)
   local rod_id = find_rod_item_id()
   return {
     Player = player,
-    Inited = true,
-    LoadState = "ready",
+    inited = true,
+    load_state = "ready",
     Data = {
       FishCoin = overrides.coin or 0,
       Zone = "fishPond",
-      UpgradeLevel = 0,
-      Containers = {
+      upgrade_level = 0,
+      containers = {
         itemBar = overrides.item_bar or { [1] = { itemId = rod_id, count = 1 } },
         backpack = {},
       },
       Bait = {},
-      Weapons = {},
-      SelectedSlot = overrides.selected_slot,
+      weapons = {},
+      selected_slot = overrides.selected_slot,
     },
     Extra = {
       inventory = {
@@ -258,7 +258,7 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
 
     -- 活鱼 entity_modifiers：挂毒跳伤 + 玩家离场自动清源
     local fish_body = make_character("FishBody", 5)
-    local fish = { Id = 77, Carrier = { Receiver = fish_body, Dead = false } }
+    local fish = { Id = 77, carrier = { receiver = fish_body, dead = false } }
     local em = rt:get_entity_modifiers()
     assert.is_true(em:apply(p1, fish, "poison"))
     rt:step(1.0, 101.5)
@@ -266,9 +266,9 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
     assert.are.equal(fish, dot_hits[1].target)
 
     -- sync_from_data(d1) 不得触发反向 mirror_stage1_to_data 覆写替换 d1 内部子表引用
-    local ref_item_bar = d1.Data.Containers.itemBar
+    local ref_item_bar = d1.Data.containers.itemBar
     local ref_bait = d1.Data.Bait
-    local ref_weapons = d1.Data.Weapons
+    local ref_weapons = d1.Data.weapons
     local ref_held = d1.Extra.inventory.selection.held
     local ref_potions = d1.Extra.growth.potions
     local ref_upgrades = d1.Extra.growth.upgrades
@@ -278,9 +278,9 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
     assert.is_true(pt1:sync_from_data(d1))
     assert.equals(321, pt1.states.coin:now())
     assert.equals(480, pt1.memos.max_health:now())
-    assert.are.equal(ref_item_bar, d1.Data.Containers.itemBar)
+    assert.are.equal(ref_item_bar, d1.Data.containers.itemBar)
     assert.are.equal(ref_bait, d1.Data.Bait)
-    assert.are.equal(ref_weapons, d1.Data.Weapons)
+    assert.are.equal(ref_weapons, d1.Data.weapons)
     assert.are.equal(ref_held, d1.Extra.inventory.selection.held)
     assert.are.equal(ref_potions, d1.Extra.growth.potions)
     assert.are.equal(ref_upgrades, d1.Extra.growth.upgrades)
@@ -554,7 +554,7 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
       local bait_unit_count = #created_units
       assert.equals(#GameCfg.BaitSpots.Spots, bait_unit_count)
       assert.equals(1, #re_map.ItemBarAction.OnServerEvent.handlers)
-      assert.is_function(runtime.platform.ShopAction)
+      assert.is_function(runtime.platform.shop_action)
 
       re_map.ItemBarAction.OnServerEvent:Fire(p, { action = "SelectSlot", value = 1 })
       assert.equals(2, #item_bar_pushes)
@@ -576,8 +576,8 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
         pt:set_coin(888)
         pt:set_upgrade_level(1)
         data.Data.FishCoin = 888
-        data.Data.UpgradeLevel = 1
-        data.Data.SelectedSlot = nil
+        data.Data.upgrade_level = 1
+        data.Data.selected_slot = nil
         mgrs.player_data_host:sync_player_tree(p)
         data.Data.FishCoin = 999
         mgrs.player_data_host:sync_player_tree(p)
@@ -612,7 +612,7 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
         return true
       end
       local fish_body = make_character("MainFish", 5)
-      local fish = { Id = 88, Carrier = { Receiver = fish_body, Dead = false } }
+      local fish = { Id = 88, carrier = { receiver = fish_body, dead = false } }
       assert.is_true(runtime:get_entity_modifiers():apply_weapon_effect(p, fish, { Kind = "poison" }))
       now = now + 1.0
       heartbeat:Fire(1.0)

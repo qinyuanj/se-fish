@@ -46,12 +46,12 @@ local function make_ready_data(player, overrides)
   overrides = overrides or {}
   local data = {
     Player = player,
-    Inited = overrides.Inited ~= false,
-    LoadState = overrides.LoadState or "ready",
+    inited = overrides.inited ~= false,
+    load_state = overrides.load_state or "ready",
     Data = {
       FishCoin = overrides.coin or 50,
       Zone = overrides.zone or "fishPond",
-      SelectedSlot = overrides.selected_slot or 1,
+      selected_slot = overrides.selected_slot or 1,
     },
     Extra = {
       growth = {
@@ -188,14 +188,14 @@ describe("服务端 Spoke 主干：PlayerTree 因果顺序、双层相位与逆�
     assert.has_error(function()
       PlayerTree.spawn({
         player = player,
-        data = make_ready_data(player, { Inited = false, LoadState = "pending" }),
+        data = make_ready_data(player, { inited = false, load_state = "pending" }),
         clock = clock,
       })
     end)
     assert.has_error(function()
       PlayerTree.spawn({
         player = player,
-        data = make_ready_data(player, { LoadState = "failed" }),
+        data = make_ready_data(player, { load_state = "failed" }),
         clock = clock,
       })
     end)
@@ -509,7 +509,7 @@ describe("服务端 Spoke 主干：ServerRuntime 离场三步协议、排空栅�
     -- 未就绪存档被直接拒绝，不生成 PlayerTree
     local p2 = make_player(3002)
     rt:on_player_added(p2)
-    rt:on_save_ready(p2, make_ready_data(p2, { Inited = false, LoadState = "pending" }))
+    rt:on_save_ready(p2, make_ready_data(p2, { inited = false, load_state = "pending" }))
     assert.is_nil(rt:get_player_tree(3002))
 
     -- mark_started 排空 ReadyQueue，仅已就绪的 p1 生成 PlayerTree

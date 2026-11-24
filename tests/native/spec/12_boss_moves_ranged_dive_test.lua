@@ -159,7 +159,7 @@ describe('第 12 节 远程与俯冲组逐招表', function()
         local diveLock = untilLock('dive', 38)
         local diveRow = BossMoves.get('dragon', 'dive')
         assert.same(diveRow.Range, diveLock.range, '俯冲预警范围与表不符')
-        local dest = fish.Move and fish.Move.Destination
+        local dest = fish.Move and fish.Move.destination
         need(dest ~= nil, '俯冲没有锁定落点')
         assert.is_true(near(dest.x, diveLock.position.x))
         assert.is_true(near(dest.z, diveLock.position.z))
@@ -179,7 +179,7 @@ describe('第 12 节 远程与俯冲组逐招表', function()
             assert.same('circle', notice.shape)
             assert.same(row.Range, notice.range)
             assert.is_false(hasHit(mark), '高跃预警未发就先结算了落地伤害')
-            local dest = fish.Move and fish.Move.Destination
+            local dest = fish.Move and fish.Move.destination
             need(dest ~= nil, '高跃没有锁定落点')
             assert.is_true(near(dest.x, notice.position.x))
             assert.is_true(near(dest.z, notice.position.z))
@@ -197,7 +197,7 @@ describe('第 12 节 远程与俯冲组逐招表', function()
         assert.same(row.Warning.Kind, notice.shape, '直线突击的预警形状与表不符')
         assert.same(row.Schedule.Distance, notice.range, '走廊长度与表不符')
         assert.is_false(hasHit(121), '突击起手帧不得结算')
-        local facing = fish.Facing or { x = 0, z = 1 }
+        local facing = fish.facing or { x = 0, z = 1 }
         env.player.Character.Position = env.vec(notice.position.x + facing.x * 10,
             notice.position.y, notice.position.z + facing.z * 10)
         env:advance(env.now + 3.2)

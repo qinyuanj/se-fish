@@ -59,7 +59,7 @@ describe('TestEelDischargeEntry', function()
             end,
         }
         ctx.owner = { Position = vec(0, 0, 0) }
-        ctx.carrier = { Receiver = ctx.owner }
+        ctx.carrier = { receiver = ctx.owner }
         package.loaded['server.world_host.fish_carrier'] = {
             resolve_carrier = function(_, unit) return unit == ctx.owner and ctx.carrier or nil end,
         }
@@ -80,7 +80,7 @@ describe('TestEelDischargeEntry', function()
 
     it('test_discharge_uses_fish_hit_and_replay_does_not_double_apply', function()
         local behavior = assert(loadfile('server/ability_behaviors/eel_discharge.lua'))()
-        behavior.Services = ctx.services
+        behavior.services = ctx.services
         assert.same(1, behavior.discharge(ctx.owner, 5, 15))
         assert.same(1, #ctx.hits)
         assert.same(ctx.carrier, ctx.hits[1][1].source)
@@ -96,7 +96,7 @@ describe('TestEelDischargeEntry', function()
     it('test_formal_radius_boundary_and_dead_targets', function()
         local eel = GameCfg.Ability.FishAbilities.eel
         local behavior = assert(loadfile('server/ability_behaviors/eel_discharge.lua'))()
-        behavior.Services = ctx.services
+        behavior.services = ctx.services
         ctx.inside.Character.Position = vec(3, 0, 4)
         ctx.outside.Character.Position = vec(5.01, 0, 0)
         assert.same(1, behavior.discharge(ctx.owner, eel.Radius, eel.Damage))
@@ -164,7 +164,7 @@ describe('TestMeleeHitEntry', function()
         ctx.target = { UnitId = 80, UnitType = 'EggyUnit', Position = vec(1, 0, 0), Controller = {
             TakeDamage = function() ctx.controllerCalls = ctx.controllerCalls + 1 end,
         } }
-        ctx.carrier = { Receiver = ctx.target }
+        ctx.carrier = { receiver = ctx.target }
         -- #129：玩家挥砍只认 AbilityAPI 登记值；测试用假登记模块，不经真实包链
         package.loaded['server.ability_api'] = {}
         package.loaded['server.swing_registry'] = {

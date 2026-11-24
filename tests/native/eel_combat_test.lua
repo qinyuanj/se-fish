@@ -80,11 +80,11 @@ describe('TestEelCombat', function()
         local fish = droppedEel(env)
         at(env, 180)
         assert.are.equal('escaping', fish.State)
-        local heading = fish.Heading
+        local heading = fish.heading
         env.hits = { { Instance = { Name = 'Wall' }, Distance = 1 } }
         at(env, 184)
-        assert.same(heading, fish.Heading)
-        fish.Carrier.Body.Position = Vector3.New(-11.75, 5, -12.25)
+        assert.same(heading, fish.heading)
+        fish.carrier.body.Position = Vector3.New(-11.75, 5, -12.25)
         env.mgr:update()
         assert.is_nil(env.mgr.Fish[fish.Id])
     end)
@@ -102,7 +102,7 @@ describe('TestEelCombat', function()
         end
         at(env, 5)
         assert.are.equal('sleeping', fish.State)
-        assert.are.equal(15, fish.WakeAt)
+        assert.are.equal(15, fish.wake_at)
         at(env, 14.99)
         assert.are.equal(5, log.casts)
         assert.are.equal('sleeping', fish.State)
@@ -151,7 +151,7 @@ describe('TestEelCombat', function()
         for t = 5, 8, 0.5 do at(env, t) end
         assert.are.equal(5, log.casts)
         assert.are.equal('sleeping', fish.State)
-        assert.near(18, fish.WakeAt, 1e-9)
+        assert.near(18, fish.wake_at, 1e-9)
         at(env, 17.9)
         assert.are.equal(5, log.casts)
         for t = 18, 18.5, 0.5 do at(env, t) end
@@ -225,12 +225,12 @@ describe('TestEelCombat', function()
         _G.Quaternion = { FromEulerAngles = function(x, y, z) return { x = x, y = y, z = z } end }
         env.mgr.Ability = { equip_fish = function() end, cast_fish = function() return true end }
         local fish = env:held_fish(env.player, 'eel')
-        fish.Carrier.Body.Rotation = rotation
+        fish.carrier.body.Rotation = rotation
         env.mgr:drop(env.player)
         for t = 0, 5.5, 0.5 do at(env, t) end
-        local sleepRotation = fish.Carrier.Body.Rotation
+        local sleepRotation = fish.carrier.body.Rotation
         at(env, 15)
-        local wakeRotation = fish.Carrier.Body.Rotation
+        local wakeRotation = fish.carrier.body.Rotation
         _G.Quaternion = oldQuaternion
         assert.are.equal('attacking', fish.State)
         assert.are.equal(GameCfg.Ability.FishAbilities.eel.SleepRollRadians, sleepRotation.z)

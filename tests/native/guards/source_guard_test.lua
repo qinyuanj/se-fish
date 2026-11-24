@@ -278,12 +278,12 @@ describe("三端源码守卫", function()
     scan(business_files(), function(path, src)
       if not path:match("^server/") then return {} end
       local code = Arch.code_only(src)
-      if not code:find("self%s*%.%s*LastSeq%f[^%w_]") then return {} end
+      if not code:find("self%s*%.%s*last_seq%f[^%w_]") then return {} end
       checked = checked + 1
       local padded = "\n" .. code
       local first, last, indent = padded:find("\n([ \t]*)function%s+[%w_.]+%s*:%s*on_player_removing%s*%b()")
       if not first then
-        return { path .. " 使用 self.LastSeq 但没有 on_player_removing" }
+        return { path .. " 使用 self.last_seq 但没有 on_player_removing" }
       end
       local body_end = padded:find("\n" .. indent .. "end%f[^%w_]", last + 1)
         or padded:find("\n" .. indent .. "function%s", last + 1)
@@ -298,7 +298,7 @@ describe("三端源码守卫", function()
             if statement:sub(equal + 1, equal + 1) ~= "="
                 and not statement:sub(equal - 1, equal - 1):match("[=~<>]") then
               local lhs, rhs = statement:sub(1, equal - 1), statement:sub(equal + 1)
-              if lhs:find("self%s*%.%s*LastSeq%f[^%w_]") and rhs:find("nil%f[^%w_]") then
+              if lhs:find("self%s*%.%s*last_seq%f[^%w_]") and rhs:find("nil%f[^%w_]") then
                 cleared = true
               end
             end
@@ -306,9 +306,9 @@ describe("三端源码守卫", function()
           end
         end
       end
-      if not cleared then return { path .. " 的 on_player_removing 没有给 self.LastSeq 赋 nil" } end
+      if not cleared then return { path .. " 的 on_player_removing 没有给 self.last_seq 赋 nil" } end
       return {}
     end)
-    assert.is_true(checked > 0, "未扫到任何使用 self.LastSeq 的服务端模块，扫描口径失效")
+    assert.is_true(checked > 0, "未扫到任何使用 self.last_seq 的服务端模块，扫描口径失效")
   end)
 end)

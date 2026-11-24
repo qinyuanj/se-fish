@@ -77,7 +77,7 @@ local function equippedWeapon(data)
     if type(held) == 'table' and held.kind == 'weapon' and data:WeaponCount(held.id) > 0 then
         return held.id
     end
-    local selected = data.Data and data.Data.SelectedWeapon
+    local selected = data.Data and data.Data.selected_weapon
     if selected and data:WeaponCount(selected) > 0 then return selected end
     return nil
 end
@@ -163,7 +163,7 @@ if stateHook.event ~= castEvent then
         return stateHook.originalFireClient(self, target, payload)
     end
 end
-CastProbe.Sessions = setmetatable({}, { __index = function(_, key) return stateHook.states[key] end })
+CastProbe.sessions = setmetatable({}, { __index = function(_, key) return stateHook.states[key] end })
 function CastProbe:cast(target, payload)
     local fishing = fishingFor(target)
     return fishing and fishing:cast(payload) or false
@@ -269,7 +269,7 @@ local function needNear(names, radius, slack, label)
 end
 
 -- ========== 库存辅助 ==========
-local function itemBar(data) return data.Data.Containers[GameCfg.Items.ContainerId.ItemBar] end
+local function itemBar(data) return data.Data.containers[GameCfg.Items.ContainerId.ItemBar] end
 
 local function slotOf(data, predicate)
     for slot, entry in pairs(itemBar(data)) do
@@ -294,7 +294,7 @@ local ids = GameCfg.Items.ContainerId
 local function freeSlots(data)
     local free = 0
     for _, c in ipairs({ { ids.ItemBar, data:ItemBarCapacity() }, { ids.Backpack, data:BackpackCapacity() } }) do
-        local items = data.Data.Containers[c[1]]
+        local items = data.Data.containers[c[1]]
         for i = 1, c[2] do
             local e = items[i]
             if not e or e.count <= 0 then free = free + 1 end
@@ -307,7 +307,7 @@ end
 local function findEntry(data, predicate)
     local slot, entry = slotOf(data, predicate)
     if slot then return ids.ItemBar, slot, entry end
-    local bp = data.Data.Containers[ids.Backpack]
+    local bp = data.Data.containers[ids.Backpack]
     for i = 1, data:BackpackCapacity() do
         local e = bp[i]
         if e and e.count > 0 and predicate(e) then return ids.Backpack, i, e end
@@ -352,14 +352,14 @@ end
 -- SelectSlot 是开关：已选中再选会取消，所以只在需要切换时调
 local function focus(data, slot)
     if slot == nil then
-        if data.Data.SelectedSlot ~= nil then data:SelectSlot(data.Data.SelectedSlot) end
-    elseif data.Data.SelectedSlot ~= slot then
+        if data.Data.selected_slot ~= nil then data:SelectSlot(data.Data.selected_slot) end
+    elseif data.Data.selected_slot ~= slot then
         data:SelectSlot(slot)
     end
     MgrPlayerData:send_item_bar(player)
 end
 
-local function nextSeq(mgr) return ((mgr.LastSeq[uid]) or 0) + 1 end
+local function nextSeq(mgr) return ((mgr.last_seq[uid]) or 0) + 1 end
 local function nextShopFeedSeq(kind)
     local key = kind .. 'Seq'
     RT[key] = (RT[key] or 0) + 1
@@ -374,7 +374,7 @@ local SETTLE_TIMEOUT_SEC = 8
 local PENDING_KIND = { feed = 'feed', rod = 'buy', dagger = 'buy' }
 
 local function selectedItem(data)
-    local slot = data.Data.SelectedSlot
+    local slot = data.Data.selected_slot
     local entry = slot and itemBar(data)[slot]
     return entry and entry.count and entry.count > 0 and entry.itemId or nil
 end
@@ -519,7 +519,7 @@ end
 -- 装备匕首：SelectWeapon 是开关，只在未选中时调；EquippedWeapon 复核，被别的手持武器压住时才用 HoldWeapon 切换
 local function equipDagger(data)
     if Weapon:EquippedWeapon(data) == DAGGER.Id then return true end
-    if data.Data.SelectedWeapon ~= DAGGER.Id then data:SelectWeapon(DAGGER.Id) end
+    if data.Data.selected_weapon ~= DAGGER.Id then data:SelectWeapon(DAGGER.Id) end
     if Weapon:EquippedWeapon(data) ~= DAGGER.Id then
         local held = data.Extra.inventory.selection.held
         if held.kind == 'weapon' and held.id ~= DAGGER.Id then data:HoldWeapon(DAGGER.Id) end
@@ -541,19 +541,19 @@ local function validate(data)
     for _, name in ipairs({ 'InRange', 'FindAnchor' }) do fn('InteractionPoints:', InteractionPoints, name) end
     fn('interact:', interact, 'Handle') fn('shop:', shop, 'Handle')
     for _, name in ipairs({ 'Cast', 'Reel', 'Drop' }) do fn('CastProbe:', CastProbe, name) end
-    need('CastProbe.Sessions', type(CastProbe.Sessions) == 'table')
+    need('CastProbe.Sessions', type(CastProbe.sessions) == 'table')
     fn('ReelProbe:', ReelProbe, 'Accept')
     need('MgrFishUnit.Fish', type(MgrFishUnit.Fish) == 'table')
     fn('Weapon:', Weapon, 'Attack') fn('Weapon:', Weapon, 'EquippedWeapon')
     fn('FerryRoute:', Ferry, 'Handle')
-    need('FerryRoute.LastSeq', type(Ferry.LastSeq) == 'table')
+    need('FerryRoute.LastSeq', type(Ferry.last_seq) == 'table')
     for _, name in ipairs({ 'SelectSlot', 'SelectBait', 'SelectWeapon', 'HoldWeapon', 'MoveSlot', 'MoveToItemBar',
         'ItemCount', 'WeaponCount', 'GetItemBarSnapshot', 'ItemBarCapacity', 'BackpackCapacity' }) do
         need('data:' .. name, type(data[name]) == 'function')
     end
-    need('data.Data.Containers', type(data.Data.Containers) == 'table' and type(data.Data.Containers[ids.ItemBar]) == 'table'
-        and type(data.Data.Containers[ids.Backpack]) == 'table')
-    need('data.Data.Weapons', type(data.Data.Weapons) == 'table')
+    need('data.Data.Containers', type(data.Data.containers) == 'table' and type(data.Data.containers[ids.ItemBar]) == 'table'
+        and type(data.Data.containers[ids.Backpack]) == 'table')
+    need('data.Data.Weapons', type(data.Data.weapons) == 'table')
     need('data.Data.Bait', type(data.Data.Bait) == 'table')
     need('data.Extra.inventory.selection.held', type(data.Extra) == 'table' and type(data.Extra.inventory) == 'table'
         and type(data.Extra.inventory.selection) == 'table' and type(data.Extra.inventory.selection.held) == 'table')
@@ -602,7 +602,7 @@ local function castRod(data, useDuck)
         if duckSlot == 'moved' then return 'wait', 0.4 end
         if not duckSlot then return pause('鸭子饵不在道具栏: ' .. tostring(duckWhy)) end
     end
-    if data.Data.SelectedBait ~= bait then
+    if data.Data.selected_bait ~= bait then
         if not data:SelectBait(bait) then return pause('无法挂饵 ' .. bait) end
         MgrPlayerData:send_item_bar(player)
     end
@@ -631,7 +631,7 @@ local function myFish()
     for _, fish in pairs(MgrFishUnit.Fish) do
         if fish.Owner == player or fish.holder == player then
             if fish.State == 'held' then held = fish
-            elseif fish.FishId == chain.EliteFish or fish.FishId == chain.BossFish then live = live or fish
+            elseif fish.fish_id == chain.EliteFish or fish.fish_id == chain.BossFish then live = live or fish
             elseif not RT.ignore[fish.Id] then prey = prey or fish end
         end
     end
@@ -645,7 +645,7 @@ local function weaponStats(data)
 end
 
 local function fishPos(fish)
-    local ok, p = pcall(function() return fish.Carrier.Body.Position end)
+    local ok, p = pcall(function() return fish.carrier.body.Position end)
     return ok and p or nil
 end
 
@@ -662,8 +662,8 @@ local function flankPoint(fish, range)
     local p = fishPos(fish)
     if not p then return nil end
     local fx, fz
-    pcall(function() local f = fish.Carrier.Body.Rotation:GetForward() fx, fz = f.x, f.z end)
-    if not fx and fish.Heading then fx, fz = fish.Heading.x, fish.Heading.z end
+    pcall(function() local f = fish.carrier.body.Rotation:GetForward() fx, fz = f.x, f.z end)
+    if not fx and fish.heading then fx, fz = fish.heading.x, fish.heading.z end
     local len = fx and math.sqrt(fx * fx + fz * fz) or 0
     if len < 0.01 then return nil end
     fx, fz = fx / len, fz / len
@@ -740,7 +740,7 @@ local function step()
         snapshot('revive')
     end
     if not charPos() then return pause('角色不可用（重生中）') end
-    if not data.Inited or savePaused() then
+    if not data.inited or savePaused() then
         return 'wait', 0.3
     end
     -- 存档放行后先核对上一笔 feed/buy 是否到账，结清前不发起新动作
@@ -787,7 +787,7 @@ local function step()
     -- 1 鱼的处理：举着的鱼放下（目标鱼放下后打，其余任其逃脱）；存活目标鱼持续攻击
     local held, live = myFish()
     if held then
-        local landedSession = CastProbe.Sessions[uid]
+        local landedSession = CastProbe.sessions[uid]
         local rs = landedSession and landedSession.session
         if rs and rs.phase == 'landed' and RT.landedFor ~= rs.reelSession then
             RT.landedFor = rs.reelSession
@@ -795,7 +795,7 @@ local function step()
             RT.catches[#RT.catches + 1] = rs.fishId
             say('LAND', rs.fishId, 'mult=' .. tostring(rs.mult))
         end
-        local target = isTarget(held.FishId)
+        local target = isTarget(held.fish_id)
         if target and type(hunger) == 'number' and hunger < 180 then
             if worms(data) < 1 then return pickBait() end
             local v = MgrPlayerData.Vitals or Weapon.Life()
@@ -807,17 +807,17 @@ local function step()
             return 'wait', 0.3
         end
         if flat(charPos(), LAND_STAND) > 1 then
-            return pause('先把鱼带到陆地再放下', LAND_STAND, '陆地放鱼 ' .. held.FishId)
+            return pause('先把鱼带到陆地再放下', LAND_STAND, '陆地放鱼 ' .. held.fish_id)
         end
         CastProbe:drop(player)
         RT.combatSince = now()
         if target then
-            say('DROP', 'target', held.FishId)
+            say('DROP', 'target', held.fish_id)
             return 'wait', 0.6
         end
         -- 普通鱼放下即逃（EscapeSec 很短）：不等，立刻挥击，击杀掉落整鱼卖钱攒匕首
         RT.counts.dropped = RT.counts.dropped + 1
-        say('DROP', 'prey', held.FishId, 'weapon=' .. tostring(Weapon:EquippedWeapon(data)))
+        say('DROP', 'prey', held.fish_id, 'weapon=' .. tostring(Weapon:EquippedWeapon(data)))
         RT.counts.attacks = RT.counts.attacks + 1
         Weapon:Attack(player)
         return 'wait', 0.3
@@ -827,12 +827,12 @@ local function step()
         local range, interval = weaponStats(data)
         local p, me = fishPos(live), charPos()
         local dist = p and me and flat(p, me) or nil
-        local isBoss = isTarget(live.FishId)
+        local isBoss = isTarget(live.fish_id)
         if isBoss and data:WeaponCount(DAGGER.Id) < 1 then
             if not RT.ignore[live.Id] then
                 RT.ignore[live.Id] = true
-                say('EARLY-BOSS', live.FishId, '尚无匕首，正常退开等待逃跑，不挑战')
-                return pause('提前钓到首领，先安全退开', { x = 5, z = 0 }, '安全退开 ' .. live.FishId)
+                say('EARLY-BOSS', live.fish_id, '尚无匕首，正常退开等待逃跑，不挑战')
+                return pause('提前钓到首领，先安全退开', { x = 5, z = 0 }, '安全退开 ' .. live.fish_id)
             end
             return 'wait', 1
         end
@@ -840,23 +840,23 @@ local function step()
             -- 普通鱼：只在射程附近挥击；跑远或超过 8 秒就放弃（不追、不传送），不影响主流程
             if now() - RT.combatSince > 8 or (dist and dist > range + 6) then
                 RT.ignore[live.Id] = true
-                say('PREY-LOST', live.FishId, 'dist=' .. (dist and fmt(dist) or 'nil'))
+                say('PREY-LOST', live.fish_id, 'dist=' .. (dist and fmt(dist) or 'nil'))
                 return 'wait', 0.3
             end
         elseif p and (not RT.flanked[live.Id]
-            or (live.FishId == chain.BossFish and live.BiteAim
-                and RT.flanked[live.Id] ~= live.BiteAim.StrikeAt)) then
+            or (live.fish_id == chain.BossFish and live.bite_aim
+                and RT.flanked[live.Id] ~= live.bite_aim.strike_at)) then
             -- 鳄雀鳝每口重新锁定，按本口结算时刻重新提示走位。
-            RT.flanked[live.Id] = live.BiteAim and live.BiteAim.StrikeAt or true
+            RT.flanked[live.Id] = live.bite_aim and live.bite_aim.strike_at or true
             local pt, fx, fz = flankPoint(live, range)
             if pt and me then
                 local mx, mz = me.x - p.x, me.z - p.z
                 local ml = math.sqrt(mx * mx + mz * mz)
                 local front = ml > 0.01 and (fx * mx + fz * mz) / ml or 1
                 RT.counts.flanks = RT.counts.flanks + 1
-                say('FLANK', live.FishId, 'front=' .. fmt(front), 'state=' .. tostring(live.State))
+                say('FLANK', live.fish_id, 'front=' .. fmt(front), 'state=' .. tostring(live.State))
                 if front > 0.3 then
-                    return pause('战斗：你在 ' .. live.FishId .. ' 正前方，先绕后再打', pt, '绕后 ' .. live.FishId)
+                    return pause('战斗：你在 ' .. live.fish_id .. ' 正前方，先绕后再打', pt, '绕后 ' .. live.fish_id)
                 end
             end
         end
@@ -864,11 +864,11 @@ local function step()
             RT.counts.attacks = RT.counts.attacks + 1
             Weapon:Attack(player)
         elseif isBoss and now() - RT.combatSince > 5 then
-            say('COMBAT', live.FishId, 'state=' .. tostring(live.State), 'dist=' .. fmt(dist),
+            say('COMBAT', live.fish_id, 'state=' .. tostring(live.State), 'dist=' .. fmt(dist),
                 'fish@' .. fmt(p.x) .. ',' .. fmt(p.z))
             if now() - RT.combatSince > COMBAT_WAIT_SEC then
                 local pt = flankPoint(live, range) or { x = p.x, z = p.z }
-                return pause('战斗超时/太远', pt, '靠近(绕后) ' .. live.FishId)
+                return pause('战斗超时/太远', pt, '靠近(绕后) ' .. live.fish_id)
             end
         end
         return 'wait', interval + 0.05
@@ -898,7 +898,7 @@ local function step()
 
     -- 3 有首领饵就必钓首领
     local hasDuck = data:ItemCount(chain.BossBait) >= 1
-    local session = CastProbe.Sessions[uid]
+    local session = CastProbe.sessions[uid]
     if session then
         local phase = session.session.phase
         if phase == 'hooked' then

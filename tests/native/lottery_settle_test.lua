@@ -72,7 +72,7 @@ describe("抽奖机服务端原子结算（#312 ServerRuntime 宿主）", functi
       world:drain()
     end
     assert.same(0, world.data.Data.FishCoin)
-    assert.same("item7", world.data.Data.Containers[ITEM_BAR][1].itemId)
+    assert.same("item7", world.data.Data.containers[ITEM_BAR][1].itemId)
     assert.same({}, world:messages("ItemBarState"))
     assert.is_false(world:messages("LotteryResult")[1].ok)
   end)
@@ -87,15 +87,15 @@ describe("抽奖机服务端原子结算（#312 ServerRuntime 宿主）", functi
     assert.is_nil(result.coins)
     assert.is_nil(result.prize)
     assert.same(0, world.data.Data.FishCoin)
-    assert.is_nil(world.data.Data.Containers[ITEM_BAR][1])
+    assert.is_nil(world.data.Data.containers[ITEM_BAR][1])
   end)
 
   it("test_non_premium_cooked_and_grilled_token_are_rejected", function()
-    world.data.Data.UpgradeLevel = 1
+    world.data.Data.upgrade_level = 1
     assert.is_true(world.data:AddItem("carp"))
     assert.is_true(world.data:AddItem("item7", nil, 1.5))
     assert.is_true(world.data:AddItem("item31"))
-    world.data.Data.Containers[ITEM_BAR][3].saved = { cooked = true }
+    world.data.Data.containers[ITEM_BAR][3].saved = { cooked = true }
     world:persist_ready()
     for slot, reason in ipairs({ "not-premium", "cooked", "cooked" }) do
       world:lottery_draw(slot, slot)
@@ -122,7 +122,7 @@ describe("抽奖机服务端原子结算（#312 ServerRuntime 宿主）", functi
     assert.same(8, result.coins)
     assert.same({ 1, 1, 2 }, result.axes)
     assert.same(8, world.data.Data.FishCoin)
-    assert.is_nil(world.data.Data.Containers[ITEM_BAR][1])
+    assert.is_nil(world.data.Data.containers[ITEM_BAR][1])
     assert.same(0, result.coinBefore)
     assert.same(8, result.coinAfter)
   end)
@@ -187,7 +187,7 @@ describe("抽奖机服务端原子结算（#312 ServerRuntime 宿主）", functi
     local result = world:messages("LotteryResult")[1]
     assert.same("triple", result.outcome)
     assert.same({ kind = "item", itemId = "item167", name = "加速药水" }, result.prize)
-    local item = world.data.Data.Containers[ITEM_BAR][1]
+    local item = world.data.Data.containers[ITEM_BAR][1]
     assert.same("item167", item.itemId)
     assert.same(1, item.count)
     assert.is_nil(item.mult)

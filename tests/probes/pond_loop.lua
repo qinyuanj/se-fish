@@ -100,7 +100,7 @@ drain()
 local Seq = 0
 local function nextSeq() Seq = Seq + 1 return Seq end
 local function slotOf(itemId)
-    local items = data.Data.Containers[ITEM_BAR]
+    local items = data.Data.containers[ITEM_BAR]
     for slot = 1, data:ItemBarCapacity() do
         local entry = items[slot]
         if entry and entry.count > 0 and entry.itemId == itemId then return slot, entry end
@@ -111,13 +111,13 @@ local BACKPACK = GameCfg.Items.ContainerId.Backpack
 local function ensureBar(itemId)
     local slot = slotOf(itemId)
     if slot then return slot end
-    local pack = data.Data.Containers[BACKPACK] or {}
+    local pack = data.Data.containers[BACKPACK] or {}
     local index
     for i = 1, data:BackpackCapacity() do
         if pack[i] and pack[i].count > 0 and pack[i].itemId == itemId then index = i break end
     end
     if not index then return nil end
-    local bar = data.Data.Containers[ITEM_BAR]
+    local bar = data.Data.containers[ITEM_BAR]
     local target
     for s = 1, data:ItemBarCapacity() do if not bar[s] then target = s break end end
     if not target then
@@ -210,7 +210,7 @@ local function combatEnv()
         cast_fish = function(_, fish)
             env.casts[#env.casts + 1] = env.now
             local eel = GameCfg.Ability.FishAbilities.eel
-            local p, q = fish.Carrier.Body.Position, env.player.Character.Position
+            local p, q = fish.carrier.body.Position, env.player.Character.Position
             local dx, dz = p.x - q.x, p.z - q.z
             if dx * dx + dz * dz <= eel.Radius * eel.Radius then
                 env.hits[#env.hits + 1] = { source = 'eel', amount = eel.Damage or GameCfg.Fish.eel.Attack }
@@ -240,7 +240,7 @@ end
 
 -- 打死并结算：命中由模拟判定（每 IntervalSec 一击）；载体死亡事件投递两次验证防重；掉落经 MgrLoot 结算
 local function killAndLoot(env, fish, onTick)
-    local species = GameCfg.Fish[fish.FishId]
+    local species = GameCfg.Fish[fish.fish_id]
     local _, w = weapon()
     local health = species.Health
     local start = env.now
@@ -256,9 +256,9 @@ local function killAndLoot(env, fish, onTick)
     loot.Spawn = function(_, fishId, mult, _, itemId)
         drops[#drops + 1] = { fishId = fishId, itemId = itemId or fishId, mult = mult }
     end
-    loot:on_carrier_died(fish.Carrier)
+    loot:on_carrier_died(fish.carrier)
     local first = #drops
-    loot:on_carrier_died(fish.Carrier) -- 重复死亡事件
+    loot:on_carrier_died(fish.carrier) -- 重复死亡事件
     loot.Spawn = nil
     loot.FishUnit = nil
     Stats.kills = Stats.kills + 1
@@ -285,7 +285,7 @@ local function castOnce()
     local slot = ensureBar('duck')
     local fishId
     if slot then
-        data:UpdateData(function(d) d.Containers[ITEM_BAR][slot] = nil end, true)
+        data:UpdateData(function(d) d.containers[ITEM_BAR][slot] = nil end, true)
         fishId = GameCfg.Casting.BossBait.duck
     else
         local baitId = (data.Data.Bait.worm or 0) > 0 and 'worm' or nil
@@ -353,20 +353,20 @@ local function safeFailEel(mult)
     local env = combatEnv()
     local fish = env.mgr:spawn_landed(env.player, { fishId = 'eel', mult = mult or 1.5 },
         env.player.Character.Position + Vector3.New(0, 0, 2))
-    fish.Carrier.Body.OnLiftedBegin:Fire(env.player.Character)
+    fish.carrier.body.OnLiftedBegin:Fire(env.player.Character)
     env.mgr:drop(env.player)
     local canCast = env.mgr:can_cast(env.player)
     local cfgEel = GameCfg.Ability.FishAbilities.eel
-    local fp = fish.Carrier.Body.Position
+    local fp = fish.carrier.body.Position
     env.player.Character.Position = Vector3.New(fp.x + cfgEel.Radius + 3, fp.y, fp.z) -- 退出放电半径
     local coin, heads, meats, worms = data.Data.FishCoin, data:ItemCount('eelHead'), data:ItemCount('eelMeat'),
         data.Data.Bait.worm or 0
     local start, dt = env.now, 0.5
-    local fleeAt = fish.FleeAt
+    local fleeAt = fish.flee_at
     local escapedAt, goneAt
     while env.now - start < GameCfg.Fish.eel.EscapeSec + 300 do
         env.now = env.now + dt
-        local body = fish.Carrier.Body
+        local body = fish.carrier.body
         local v = body.LinearVelocity
         if fish.State == 'escaping' and v then
             body.Position = Vector3.New(body.Position.x + v.x * dt, body.Position.y, body.Position.z + v.z * dt)
@@ -427,15 +427,15 @@ if eelFish == 'eel' then
     local env = combatEnv()
     local fish = env.mgr:spawn_landed(env.player, { fishId = 'eel', mult = eelM or 1.5 },
         env.player.Character.Position + Vector3.New(0, 0, 2))
-    fish.Carrier.Body.OnLiftedBegin:Fire(env.player.Character)
+    fish.carrier.body.OnLiftedBegin:Fire(env.player.Character)
     env.mgr:drop(env.player)
-    local fp = fish.Carrier.Body.Position
+    local fp = fish.carrier.body.Position
     env.player.Character.Position = Vector3.New(fp.x + 1.5, fp.y, fp.z) -- 贴身近战
     local cfgEel = GameCfg.Ability.FishAbilities.eel
     local sleepSeen, wakeAt, castsBeforeSleep
     eelDrops, eelKillSec, eelFirst = killAndLoot(env, fish, function(e, f)
         if f.State == 'sleeping' and not sleepSeen then
-            sleepSeen, wakeAt, castsBeforeSleep = e.now, f.WakeAt, #e.casts
+            sleepSeen, wakeAt, castsBeforeSleep = e.now, f.wake_at, #e.casts
         end
     end)
     local startAt = env.casts[1]
@@ -502,20 +502,20 @@ if exchangedDuck then
         local env = combatEnv()
         local fish = env.mgr:spawn_landed(env.player, { fishId = 'alligatorGar', mult = mult },
             env.player.Character.Position + Vector3.New(0, 0, 2))
-        fish.Carrier.Body.OnLiftedBegin:Fire(env.player.Character)
+        fish.carrier.body.OnLiftedBegin:Fire(env.player.Character)
         env.mgr:drop(env.player)
         local params = GameCfg.FishCombat.gar
-        local fp = fish.Carrier.Body.Position
+        local fp = fish.carrier.body.Position
         -- 第一口站在正前方头部区挨咬；之后每次锁定后立刻绕到身后（咬距内）
         env.player.Character.Position = Vector3.New(fp.x, fp.y, fp.z + 1)
         local circled = 0
         local firstLockSeen = false
         local function tick(e, f)
-            local aim = f.BiteAim
-            if aim and f.Facing then
+            local aim = f.bite_aim
+            if aim and f.facing then
                 if firstLockSeen and aim ~= e.lastAim then
-                    local p = f.Carrier.Body.Position
-                    e.player.Character.Position = Vector3.New(p.x - f.Facing.x * 1.5, p.y, p.z - f.Facing.z * 1.5)
+                    local p = f.carrier.body.Position
+                    e.player.Character.Position = Vector3.New(p.x - f.facing.x * 1.5, p.y, p.z - f.facing.z * 1.5)
                     circled = circled + 1
                 end
                 e.lastAim = aim
@@ -523,7 +523,7 @@ if exchangedDuck then
         end
         env.now = env.now
         env.mgr:update() -- 第一口起咬
-        env.lastAim = fish.BiteAim
+        env.lastAim = fish.bite_aim
         env.now = env.now + params.BiteCooldownSec
         env.mgr:update() -- 第一口结算（正前方）
         firstLockSeen = true

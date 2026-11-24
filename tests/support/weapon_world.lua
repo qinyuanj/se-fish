@@ -96,7 +96,7 @@ function M:set_up()
                 order = ctx.order, fishId = fishId, mult = mult, pos = pos, owner = owner,
             }
             local id = 1000 + #ctx.spawnedFish
-            ctx.fish_unit.Fish[id] = { Id = id, Carrier = { Body = { Position = pos } } }
+            ctx.fish_unit.Fish[id] = { Id = id, carrier = { body = { Position = pos } } }
             return { Id = id }
         end,
     }
@@ -138,7 +138,7 @@ end
 function M:_add(player, data)
     local ctx = self
     local dataInst = data or PlayerData.new(player)
-    if not dataInst.Inited then dataInst:Init() end
+    if not dataInst.inited then dataInst:Init() end
     local tree = {
         player = player,
         data = dataInst,
@@ -291,7 +291,7 @@ function M:give_explosive(player, itemId, count)
         if entry.itemId == itemId then slot = index break end
     end
     if slot == nil then error('道具栏里没有 ' .. tostring(itemId), 2) end
-    if data.Data.SelectedSlot ~= slot and not data:SelectSlot(slot) then
+    if data.Data.selected_slot ~= slot and not data:SelectSlot(slot) then
         error('选中爆炸物失败: ' .. tostring(slot), 2)
     end
     return slot

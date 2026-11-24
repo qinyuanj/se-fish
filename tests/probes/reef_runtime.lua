@@ -28,31 +28,31 @@ if not fish then return end
 _G.Reef37Fish=fish
 task:Delay(2,function()
     if runNumber~=_G.Reef37Token or units.Fish[fish.Id]~=fish then return end
-    print('REEF37_DROP',units:drop(player),fish.State,fish.Carrier.Health)
+    print('REEF37_DROP',units:drop(player),fish.State,fish.carrier.Health)
     task:Spawn(function()
         local started=world:GetServerTime()
         local last
         local maxTargetError=0
         while runNumber == _G.Reef37Token and units.Fish[fish.Id]==fish and world:GetServerTime()-started<35 do
-            local body,receiver=fish.Carrier.Body,fish.Carrier.Receiver
+            local body,receiver=fish.carrier.body,fish.carrier.receiver
             local bp,rp=body.Position,receiver and receiver.Position
             local bodyError=rp and math.sqrt((bp.x-rp.x)^2+(bp.y-rp.y)^2+(bp.z-rp.z)^2)
-            local flight=fish.Flight and fish.Flight.Pos
-            local offset=fish.Carrier.ReceiverOffset
+            local flight=fish.Flight and fish.Flight.pos
+            local offset=fish.carrier.receiver_offset
             local target=flight and {x=flight.x+offset.x,y=flight.y+offset.y,z=flight.z+offset.z}
             local error=rp and target and math.sqrt((target.x-rp.x)^2+(target.y-rp.y)^2+(target.z-rp.z)^2)
             if error then maxTargetError=math.max(maxTargetError,error) end
-            local dive=fish.AirAttacks and fish.AirAttacks.airDive
-            local throw=fish.AirAttacks and fish.AirAttacks.airThrow
+            local dive=fish.air_attacks and fish.air_attacks.airDive
+            local throw=fish.air_attacks and fish.air_attacks.airThrow
             local phase=fish.State..':'..tostring(dive and dive.Id)..':'..tostring(throw and throw.Id)
             if phase~=last or (error and error>0.05) then
-                print('REEF37_FRAME',fish.Id,phase,fish.Carrier.Health,player.Character.Controller.Health,
+                print('REEF37_FRAME',fish.Id,phase,fish.carrier.Health,player.Character.Controller.Health,
                     bp,'targetError',error,'bodyReadError',bodyError,world:GetServerTime()-started)
                 last=phase
             end
             task:Wait(0.1)
         end
-        print('REEF37_END',fish.Id,fish.State,fish.Carrier.Health,world:GetServerTime()-started,
+        print('REEF37_END',fish.Id,fish.State,fish.carrier.Health,world:GetServerTime()-started,
             'maxTargetError',maxTargetError)
     end)
 end)

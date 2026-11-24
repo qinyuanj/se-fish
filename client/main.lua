@@ -191,7 +191,7 @@ Task:Spawn(function()
                 hud_entry_rect = function(name)
                     local eui = get_eui_manager()
                     local resolution = eui and eui:GetDeviceResolution() or { x = 1920, y = 1080 }
-                    return MainHudLayout.compute({ width = resolution.x, height = resolution.y }).Rects[name]
+                    return MainHudLayout.compute({ width = resolution.x, height = resolution.y }).rects[name]
                 end,
                 send_ferry = function(payload)
                     REUtil:get_re("FerryAction"):FireServer(payload)
