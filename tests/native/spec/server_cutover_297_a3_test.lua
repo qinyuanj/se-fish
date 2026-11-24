@@ -551,14 +551,21 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
       -- 存档就绪首推经 PlayerTree 树底 on_item_bar_state 严格下发 1 次（无双发）
       assert.equals(1, #item_bar_pushes)
       assert.are.equal(p, item_bar_pushes[1].player)
+      -- 默认启用 #301 固定鱼饵点，且 ItemBarAction 单一监听不双触发、PlatformHost.ShopAction 已绑定
+      local bait_unit_count = #created_units
+      assert.equals(#GameCfg.BaitSpots.Spots, bait_unit_count)
+      assert.equals(1, #re_map.ItemBarAction.OnServerEvent.handlers)
+      assert.is_function(runtime.platform.ShopAction)
 
       -- 经 ItemBarAction 选中鱼竿 -> PlayerDataHost 同步 -> 树底合并推送（仅 +1 次，无双发）与 HeldRodLeaf 建点
       re_map.ItemBarAction.OnServerEvent:Fire(p, { action = "SelectSlot", value = 1 })
       assert.equals(2, #item_bar_pushes)
       assert.equals(1, item_bar_pushes[2].payload.selectedSlot)
-      assert.equals(2, #created_units)
-      assert.is_false(created_units[1].Destroyed)
-      assert.is_false(created_units[2].Destroyed)
+      assert.equals(bait_unit_count + 2, #created_units)
+      local rod_mount = created_units[bait_unit_count + 1]
+      local rod_model = created_units[bait_unit_count + 2]
+      assert.is_false(rod_mount.Destroyed)
+      assert.is_false(rod_model.Destroyed)
 
       -- RequestItemBar 主动拉取经 PlayerTree 强制推送 1 次
       re_map.RequestItemBar.OnServerEvent:Fire(p)
@@ -593,8 +600,8 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
       assert.near(1.4, ch.scale, 1e-9)
       assert.near(10.5, c.WalkSpeed, 1e-9)
 
-      -- ModifierBridge：玩家麻痹阻塞 CanAct 与移速，Heartbeat 推进 0.5s 恢复
-      assert.is_true(mgrs.FishAbility.Modifier:ApplyWeaponEffect(p, p, { Kind = "paralyze" }))
+      -- ModifierBridge：传入 Character 目标（如 melee_hit）经 player_tree_of 路由到玩家树，麻痹阻塞 CanAct 与移速，Heartbeat 推进 0.5s 恢复
+      assert.is_true(mgrs.FishAbility.Modifier:ApplyWeaponEffect(p, ch, { Kind = "paralyze" }))
       assert.is_false(runtime.life:CanAct(p))
       assert.equals(0, c.WalkSpeed)
       now = now + 0.5
@@ -624,8 +631,8 @@ describe("#297-A3 服务端 Spoke 收口：ServerRuntime 叶子装配与活鱼�
       drain()
       assert.is_nil(runtime:get_player_tree(9101))
       assert.equals(0, #p.CharacterAdded.handlers)
-      assert.is_true(created_units[1].Destroyed)
-      assert.is_true(created_units[2].Destroyed)
+      assert.is_true(rod_mount.Destroyed)
+      assert.is_true(rod_model.Destroyed)
       assert.equals(0, mgrs.FishAbility.Modifier:GetRemaining(fish, "poison"))
     end)
   end)

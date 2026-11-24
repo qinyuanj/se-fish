@@ -36,11 +36,16 @@ local function read_health(player)
   return nil
 end
 
+local function is_object(value)
+  local kind = type(value)
+  return kind == "table" or kind == "userdata"
+end
+
 local function position_of(player)
   local ok, pos = pcall(function()
     return player.Character and player.Character.Position
-  end)
-  if ok and type(pos) == "table" then return pos end
+  end) -- 兼容引擎 userdata 角色
+  if ok and is_object(pos) then return pos end
   return nil
 end
 
@@ -229,12 +234,16 @@ function PlayerLife.mount(s3, player_tree, opts)
     local mark = mark_table()
     if mark then
       local now = clock.now()
+      local pending = platform:now()
+      local paused = type(pending) == "table" and math.max(0, now - (pending.startedAt or now)) or 0
+      local downed_at = downed_until:now()
+      local dead_at = dead_until:now()
       mark.health = states.health:now()
       mark.hunger = states.hunger:now()
       mark.dying = phase == "downed" or phase == "rescuing"
       mark.dead = phase == "dead"
-      mark.dyingRemaining = mark.dying and ceil_remaining(downed_until:now(), now) or 0
-      mark.deadRemaining = mark.dead and ceil_remaining(dead_until:now(), now) or 0
+      mark.dyingRemaining = (mark.dying and downed_at) and ceil_remaining(downed_at + paused, now) or 0
+      mark.deadRemaining = (mark.dead and dead_at) and ceil_remaining(dead_at + paused, now) or 0
       local weak = player_tree.get_modifier_remaining and player_tree:get_modifier_remaining("weak") or 0
       mark.weakRemaining = math.max(0, math.ceil(weak))
     end
@@ -434,8 +443,9 @@ function PlayerLife.mount(s3, player_tree, opts)
   end
 
   local function resolve_player(target)
-    if type(target) ~= "table" then return nil end
-    if target.UserId ~= nil and opts.lookup_tree and opts.lookup_tree(target.UserId) then
+    if not is_object(target) then return nil end
+    local ok_uid, uid = pcall(function() return target.UserId end) -- 兼容引擎 userdata 玩家与非玩家单位
+    if ok_uid and uid ~= nil and opts.lookup_tree and opts.lookup_tree(uid) then
       return target
     end
     if target == player then return player end
@@ -445,7 +455,10 @@ function PlayerLife.mount(s3, player_tree, opts)
   function player_tree:new_hit(source, category)
     hit_seq = hit_seq + 1
     local source_player = nil
-    if type(source) == "table" and source.UserId ~= nil then source_player = source end
+    if is_object(source) then
+      local ok_uid, uid = pcall(function() return source.UserId end) -- 兼容引擎 userdata 来源
+      if ok_uid and uid ~= nil then source_player = source end
+    end
     return {
       id = hit_seq,
       category = category,
@@ -812,24 +825,15 @@ function PlayerLife.mount(s3, player_tree, opts)
     end
   end
 
-  if remote and type(remote.GetRE) == "function" then
-    local ok, event = pcall(remote.GetRE, remote, "SurvivalAction")
-    if ok and event and event.OnServerEvent and type(event.OnServerEvent.Connect) == "function" then
-      local conn
-      conn = event.OnServerEvent:Connect(function(sender, payload)
-        if sender ~= player or player_tree:is_disposed() or type(payload) ~= "table" then return end
-        if type(remote.CheckRECD) == "function"
-            and remote:CheckRECD(player, "SurvivalAction", GameCfg.Items.ActionCooldownSec) then
-          return
-        end
-        on_action(payload)
-      end)
-      s3:on_cleanup(function()
-        if conn and type(conn.Disconnect) == "function" then
-          pcall(conn.Disconnect, conn)
-        end
-      end)
+  -- 宿主外围统一连接 SurvivalAction 后路由到活跃 PlayerTree，避免树内按玩家重复 Connect。
+  function player_tree:handle_survival_action(payload, skip_cd)
+    if player_tree:is_disposed() or type(payload) ~= "table" then return false end
+    if not skip_cd and remote and type(remote.CheckRECD) == "function"
+        and remote:CheckRECD(player, "SurvivalAction", GameCfg.Items.ActionCooldownSec) then
+      return false
     end
+    on_action(payload)
+    return true
   end
 
   local function on_second()
@@ -889,44 +893,54 @@ function PlayerLife.mount(s3, player_tree, opts)
     rescue_sec = sec
     on_second()
   end)
-  s3:subscribe(clock.on_frame, function(frame)
-    local now = frame and frame.now or clock.now()
-    local phase = states.life_phase:now()
-    if not platform:now() then
-      if phase == "downed" and not adrenaline_flying and downed_until:now()
-          and now + 1e-9 >= downed_until:now() then
-        enter_dead(false)
+
+  -- 仅在非存活倒计时/抢救（短寿命相位且未被平台弹窗暂停）按需订阅 on_frame，存活常态与弹窗暂停期零 on_frame 订阅。
+  local need_frame_watch = s3:memo("NeedLifeFrameWatch", function(ms)
+    local phase = ms:d(states.life_phase)
+    local paused = ms:d(platform)
+    return phase ~= "alive" and (phase == "rescuing" or not paused)
+  end)
+  s3:phase("LifeCountdownFrame", need_frame_watch, function(rs)
+    rs:subscribe(clock.on_frame, function(frame)
+      if player_tree:is_disposed() or player_tree.session_alive:now() == false then return end
+      local now = frame and frame.now or clock.now()
+      local phase = states.life_phase:now()
+      if not platform:now() then
+        if phase == "downed" and not adrenaline_flying and downed_until:now()
+            and now + 1e-9 >= downed_until:now() then
+          enter_dead(false)
+          return
+        end
+        if phase == "dead" and not recovering:now() and dead_until:now()
+            and now + 1e-9 >= dead_until:now() then
+          weak_revive()
+          return
+        end
+      end
+      if phase ~= "rescuing" then return end
+      local current = rescue:now()
+      if not current then return end
+      local rescuer = current.by
+      local rescuer_tree = opts.lookup_tree and rescuer and opts.lookup_tree(rescuer.UserId)
+      local from = position_of(rescuer)
+      local moved = from and current.startPos
+        and horizontal_distance(from, current.startPos) > (rescue_cfg.InterruptMoveMeters or 1)
+      local health = read_health(rescuer)
+      local hurt = rescue_cfg.InterruptOnDamage and health and current.health and health < current.health
+      local rescuer_down = not rescuer_tree or rescuer_tree.states.life_phase:now() ~= "alive"
+      if moved or hurt or rescuer_down or not from or not position_of(player) then
+        cancel_rescue()
         return
       end
-      if phase == "dead" and not recovering:now() and dead_until:now()
-          and now + 1e-9 >= dead_until:now() then
-        weak_revive()
-        return
+      if now + 1e-9 >= current.endAt then
+        if downed_until:now() and now + 1e-9 >= downed_until:now() and not platform:now() then
+          enter_dead(false)
+        else
+          rescue:set(nil)
+          rescue_success()
+        end
       end
-    end
-    if phase ~= "rescuing" then return end
-    local current = rescue:now()
-    if not current then return end
-    local rescuer = current.by
-    local rescuer_tree = opts.lookup_tree and rescuer and opts.lookup_tree(rescuer.UserId)
-    local from = position_of(rescuer)
-    local moved = from and current.startPos
-      and horizontal_distance(from, current.startPos) > (rescue_cfg.InterruptMoveMeters or 1)
-    local health = read_health(rescuer)
-    local hurt = rescue_cfg.InterruptOnDamage and health and current.health and health < current.health
-    local rescuer_down = not rescuer_tree or rescuer_tree.states.life_phase:now() ~= "alive"
-    if moved or hurt or rescuer_down or not from or not position_of(player) then
-      cancel_rescue()
-      return
-    end
-    if now + 1e-9 >= current.endAt then
-      if downed_until:now() and now + 1e-9 >= downed_until:now() and not platform:now() then
-        enter_dead(false)
-      else
-        rescue:set(nil)
-        rescue_success()
-      end
-    end
+    end)
   end)
 
   noticed_health = read_health(player)
@@ -946,7 +960,7 @@ function PlayerLife.mount(s3, player_tree, opts)
       note_health(next_health)
     end)
     s3:on_cleanup(function()
-      if conn and conn.Disconnect then pcall(conn.Disconnect, conn) end
+      if conn and conn.Disconnect then pcall(conn.Disconnect, conn) end -- 角色控制器可能已随引擎卸载
     end)
   end
   if controller and controller.Died and type(controller.Died.Connect) == "function" then
@@ -956,7 +970,7 @@ function PlayerLife.mount(s3, player_tree, opts)
       if states.life_phase:now() == "alive" then enter_dead(true) end
     end)
     s3:on_cleanup(function()
-      if conn and conn.Disconnect then pcall(conn.Disconnect, conn) end
+      if conn and conn.Disconnect then pcall(conn.Disconnect, conn) end -- 角色控制器可能已随引擎卸载
     end)
   end
 

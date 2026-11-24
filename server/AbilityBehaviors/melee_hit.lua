@@ -196,15 +196,17 @@ function M.Attach(anchor_script, services)
 
 	return spoke_eggy.behaviour(anchor_script, function(scope)
 	local state = nil
+	local swing_dock = scope:dock("MeleeSwing")
 
 	local function _cleanup()
+		swing_dock:drop("active")
 		if not state then
 			return
 		end
 		if state.enter_conn then
 			pcall(function()
 				state.enter_conn:Disconnect()
-			end)
+			end) -- 触发器或信号可能已先卸载
 			state.enter_conn = nil
 		end
 		if state.tu and state.tu.UnitId then
@@ -383,15 +385,17 @@ function M.Attach(anchor_script, services)
 				_applyHitPower(target, hit_power, owner)
 				_createHitSfx(anchor_script, target)
 				local modifier = M.Services.Modifier
-				if player and state and state.effect and modifier.ApplyWeaponEffect then
+				if player and state and state.effect and modifier and modifier.ApplyWeaponEffect then
 					local ok, err = pcall(modifier.ApplyWeaponEffect, modifier, player, target, state.effect)
 					if not ok then print("[melee_hit] 武器特效应用失败", tostring(err)) end
 				end
 			end
 		end
 
-		state.enter_conn = HostSignal.listen(tu.OnTriggerEnter, function(other_unit)
-			process_hit(other_unit)
+		swing_dock:effect("active", function(swing_scope)
+			state.enter_conn = HostSignal.connect(swing_scope, tu.OnTriggerEnter, function(other_unit)
+				process_hit(other_unit)
+			end)
 		end)
 
 		local Physics = game:GetService("PhysicsService")

@@ -44,8 +44,13 @@ local function flat_forward(rotation)
   return { x = fx / len, z = fz / len }
 end
 
+local function is_object(value)
+  local kind = type(value)
+  return kind == "table" or kind == "userdata"
+end
+
 local function in_corridor(origin, forward, pos, breath)
-  if type(pos) ~= "table" or not finite(pos.x) or not finite(pos.y) or not finite(pos.z) then
+  if not is_object(pos) or not finite(pos.x) or not finite(pos.y) or not finite(pos.z) then
     return false
   end
   local dx, dz = pos.x - origin.x, pos.z - origin.z
@@ -58,8 +63,8 @@ local function in_corridor(origin, forward, pos, breath)
 end
 
 local function read_position(character)
-  local ok, pos = pcall(function() return character and character.Position end)
-  if ok and type(pos) == "table" and finite(pos.x) and finite(pos.y) and finite(pos.z) then
+  local ok, pos = pcall(function() return character and character.Position end) -- 兼容引擎 userdata 角色
+  if ok and is_object(pos) and finite(pos.x) and finite(pos.y) and finite(pos.z) then
     return pos
   end
 end
@@ -558,28 +563,19 @@ function SpecialItemPhase.mount(ps, player_tree, opts)
     return true
   end
 
-  if remote and type(remote.GetRE) == "function" then
-    local ok_action, action_event = pcall(remote.GetRE, remote, "SpecialItemAction")
-    if ok_action and action_event and action_event.OnServerEvent
-        and type(action_event.OnServerEvent.Connect) == "function" then
-      local conn = action_event.OnServerEvent:Connect(function(sender, payload)
-        on_action(sender, payload)
-      end)
-      ps:on_cleanup(function()
-        if conn and type(conn.Disconnect) == "function" then pcall(conn.Disconnect, conn) end
-      end)
-    end
-    local ok_query, query_event = pcall(remote.GetRE, remote, "SpecialItemStateRequest")
-    if ok_query and query_event and query_event.OnServerEvent
-        and type(query_event.OnServerEvent.Connect) == "function" then
-      local conn = query_event.OnServerEvent:Connect(function(sender)
-        on_query(sender)
-      end)
-      ps:on_cleanup(function()
-        if conn and type(conn.Disconnect) == "function" then pcall(conn.Disconnect, conn) end
-      end)
-    end
+  -- 宿主外围统一连接 SpecialItemAction / SpecialItemStateRequest 后路由到存活相位。
+  local mounted = true
+  function player_tree:handle_special_item_action(payload)
+    if not mounted then return false end
+    return on_action(player, payload)
   end
+  function player_tree:handle_special_item_query()
+    if not mounted then return false end
+    return on_query(player)
+  end
+  ps:on_cleanup(function()
+    mounted = false
+  end)
 
   local retries = 0
   local retry_after = 0

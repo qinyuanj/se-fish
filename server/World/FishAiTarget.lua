@@ -5,7 +5,7 @@ local Mgr = { Policy = Policy }
 local AiAPI, Runtime
 
 local function logFailure(operation, fish, unit, player, err)
-    print(string.format('[MgrAiTarget] operation=%s fish=%s unit=%s player=%s error=%s',
+    print(string.format('[FishAiTarget] operation=%s fish=%s unit=%s player=%s error=%s',
         operation, tostring(fish and fish.Id or '-'), tostring(unit and unit.UnitId or '-'),
         tostring(player and player.UserId or '-'), tostring(err)))
 end

@@ -6,7 +6,7 @@ local GameCfg = require("common.GameCfg")
 local AbilityAPI = require("server.AbilityAPI")
 local AbilityPackageAPI = require("server.packages.ability_system.api")
 
-local FishAbility = { PendingFishCleanup = {} }
+local FishAbility = { SpokeHost = true, PendingFishCleanup = {} }
 
 local EQUIP_RETRY_INTERVAL = 0.1
 local EQUIP_RETRY_COUNT = 50

@@ -29,6 +29,7 @@ local FishTree = require("server.World.FishTree")
 local FishAiTarget = require("server.World.FishAiTarget")
 local WorldRecords = require("server.World.WorldRecords")
 local PlayerGM = require("server.World.PlayerGM")
+local LifeFacade = require("server.World.LifeFacade")
 
 local ServerRuntime = {}
 local current_runtime = nil
@@ -41,9 +42,25 @@ function ServerRuntime.set_current(rt)
   current_runtime = rt
 end
 
+local function is_object(value)
+  local kind = type(value)
+  return kind == "table" or kind == "userdata"
+end
+
 local function is_valid_player(player)
-  local kind = type(player)
-  return (kind == "table" or kind == "userdata") and player.UserId ~= nil
+  if not is_object(player) then return false end
+  local ok, uid = pcall(function() return player.UserId end) -- 兼容引擎 userdata 玩家
+  return ok and uid ~= nil
+end
+
+local function read_character(player)
+  if not is_object(player) then return nil end
+  local ok, ch = pcall(function() return player.Character end) -- 兼容引擎 userdata 玩家
+  return ok and ch or nil
+end
+
+local function has_method(target, name)
+  return type(target) == "table" and type(target[name]) == "function"
 end
 
 local function safe_call(logger, label, fn, ...)
@@ -75,9 +92,6 @@ function ServerRuntime.new(opts)
   local player_data = opts.player_data
   local save = opts.save
   local platform = opts.platform
-  local default_player_data = player_data and player_data.SpokeHost == true or false
-  local default_save = save and save.SpokeHost == true or false
-  local default_platform = platform and platform.SpokeHost == true or false
   opts.player_data = player_data
   opts.save = save
   opts.platform = platform
@@ -87,15 +101,20 @@ function ServerRuntime.new(opts)
   local current_players = {}
   local active_players = {}
   local player_trees = {}
-  local fish_trees = {}
-  local fish_order = {}
-  local next_fish_id = 0
+  local fish_dirty = false
+  local last_fish_signature = ""
+  local re_conns = {}
+  local carrier_died_handler = nil
+  local bound_shop_action = nil
   local fish_host = FishTree.new()
   fish_host.Clock = clock
   fish_host.AiProjection = opts.ai
   fish_host.Logger = opts.logger
   fish_host.GetPlayerTree = function(_, player)
-    return type(player) == "table" and player_trees[player.UserId] or nil
+    return is_valid_player(player) and player_trees[player.UserId] or nil
+  end
+  fish_host.OnStateChanged = function()
+    fish_dirty = true
   end
   fish_host.CreateUnit = opts.create_unit
   fish_host.World = opts.world_service
@@ -152,11 +171,19 @@ function ServerRuntime.new(opts)
 
   -- 持续效果只沿 PlayerTree 或非玩家实体存储路由，供活鱼技能和官方锚点共用。
   local function player_tree_of(target)
-    if not target then return nil end
-    local ok_uid, uid = pcall(function() return target.UserId end)
-    if ok_uid and uid ~= nil then return player_trees[uid] end
-    for player, tree in pairs(player_trees) do
-      if player == target or player.Character == target then return tree end
+    if not is_object(target) then return nil end
+    local ok_uid, uid = pcall(function() return target.UserId end) -- 兼容引擎 userdata 玩家或角色
+    if ok_uid and uid ~= nil then
+      local tree = player_trees[uid]
+      if tree and not tree:is_disposed() then return tree end
+    end
+    for _, tree in pairs(player_trees) do
+      if tree and not tree:is_disposed() then
+        local owner = tree.player
+        if owner == target or read_character(owner) == target then
+          return tree
+        end
+      end
     end
     return nil
   end
@@ -257,10 +284,19 @@ function ServerRuntime.new(opts)
       players_service = opts.players_service,
       session_epoch = opts.session_epoch or opts.delivery_epoch,
       lookup_tree = function(player)
-        if type(player) ~= "table" then return nil end
+        if not is_valid_player(player) then return nil end
         return player_trees[player.UserId]
       end,
     })
+    local function connect_re(channel, handler)
+      local remote = opts.remote
+      if type(remote) ~= "table" or type(remote.GetRE) ~= "function" then return end
+      local ok, event = pcall(remote.GetRE, remote, channel)
+      if ok and event and event.OnServerEvent and type(event.OnServerEvent.Connect) == "function" then
+        local conn = event.OnServerEvent:Connect(handler)
+        if conn then re_conns[#re_conns + 1] = conn end
+      end
+    end
     if not self._ferry_bound then
       self._ferry_bound = true
       if type(opts.bind_ferry_action) == "function" then
@@ -286,10 +322,83 @@ function ServerRuntime.new(opts)
         end)
       end
     end
-    if default_player_data then safe_call(opts.logger, "player_data_start", function() player_data:Start() end) end
-    if default_save then safe_call(opts.logger, "save_start", function() save:Start() end) end
-    if default_platform then safe_call(opts.logger, "platform_start", function() platform:Start() end) end
-    if opts.fish_ability and type(opts.fish_ability.Start) == "function" then
+    if not self._core_re_bound then
+      self._core_re_bound = true
+      local function on_survival(actor, payload, skip_cd)
+        if not is_valid_player(actor) or self:is_leaving(actor.UserId) then return false end
+        local tree = player_trees[actor.UserId]
+        if tree and type(tree.handle_survival_action) == "function" then
+          return tree:handle_survival_action(payload, skip_cd)
+        end
+        return false
+      end
+      if type(opts.bind_survival_action) == "function" then
+        opts.bind_survival_action(function(actor, payload) return on_survival(actor, payload, true) end)
+      else
+        connect_re("SurvivalAction", function(actor, payload) on_survival(actor, payload, false) end)
+      end
+
+      local function on_special_action(actor, payload)
+        if not is_valid_player(actor) or self:is_leaving(actor.UserId) then return false end
+        local tree = player_trees[actor.UserId]
+        if tree and type(tree.handle_special_item_action) == "function" then
+          return tree:handle_special_item_action(payload)
+        end
+        return false
+      end
+      local function on_special_query(actor)
+        if not is_valid_player(actor) or self:is_leaving(actor.UserId) then return false end
+        local tree = player_trees[actor.UserId]
+        if tree and type(tree.handle_special_item_query) == "function" then
+          return tree:handle_special_item_query()
+        end
+        return false
+      end
+      if type(opts.bind_special_item_action) == "function" then
+        opts.bind_special_item_action(on_special_action, on_special_query)
+      else
+        connect_re("SpecialItemAction", on_special_action)
+        connect_re("SpecialItemStateRequest", on_special_query)
+      end
+
+      local function on_loot_request(actor, skip_cd)
+        if not is_valid_player(actor) or self:is_leaving(actor.UserId) then return false end
+        local world = self.world
+        if world and type(world.handle_loot_request) == "function" then
+          return world:handle_loot_request(actor, skip_cd)
+        end
+        return false
+      end
+      if type(opts.bind_loot_request) == "function" then
+        opts.bind_loot_request(function(actor) return on_loot_request(actor, true) end)
+      else
+        connect_re("RequestLoot", function(actor) on_loot_request(actor, false) end)
+      end
+
+      local function on_item_bar_action(actor, payload, skip_cd)
+        if not is_valid_player(actor) or self:is_leaving(actor.UserId) then return false end
+        local world = self.world
+        if world and type(world.handle_item_bar_action) == "function" then
+          return world:handle_item_bar_action(actor, payload, skip_cd)
+        end
+        return false
+      end
+      if type(opts.bind_item_bar_action) == "function" then
+        opts.bind_item_bar_action(function(actor, payload) return on_item_bar_action(actor, payload, true) end)
+      elseif opts.bind_item_bar_action ~= false and not has_method(player_data, "Start") then
+        connect_re("ItemBarAction", function(actor, payload) on_item_bar_action(actor, payload, false) end)
+      end
+    end
+    if not carrier_died_handler and has_method(opts.fish_carrier, "SubscribeDied") then
+      carrier_died_handler = function(carrier)
+        fish_host:OnCarrierDied(carrier)
+      end
+      opts.fish_carrier:SubscribeDied(carrier_died_handler)
+    end
+    if has_method(player_data, "Start") then safe_call(opts.logger, "player_data_start", function() player_data:Start() end) end
+    if has_method(save, "Start") then safe_call(opts.logger, "save_start", function() save:Start() end) end
+    if has_method(platform, "Start") then safe_call(opts.logger, "platform_start", function() platform:Start() end) end
+    if has_method(opts.fish_ability, "Start") then
       safe_call(opts.logger, "fish_ability_start", function() opts.fish_ability:Start() end)
     end
     return self.world
@@ -390,10 +499,13 @@ function ServerRuntime.new(opts)
     end
     local valid_now = now ~= nil and Number.IsFiniteNumber(now) and now or nil
     clock:step(dt, valid_now)
-    if default_save and type(save.Update) == "function" then safe_call(opts.logger, "save_update", function() save:Update() end) end
-    if default_platform and type(platform.Update) == "function" then safe_call(opts.logger, "platform_update", function() platform:Update() end) end
-    if opts.fish_ability and type(opts.fish_ability.Update) == "function" then
+    if has_method(save, "Update") then safe_call(opts.logger, "save_update", function() save:Update() end) end
+    if has_method(platform, "Update") then safe_call(opts.logger, "platform_update", function() platform:Update() end) end
+    if has_method(opts.fish_ability, "Update") then
       safe_call(opts.logger, "fish_ability_update", function() opts.fish_ability:Update(dt) end)
+    end
+    if has_method(opts.fish_carrier, "Update") then
+      safe_call(opts.logger, "fish_carrier_update", function() opts.fish_carrier:Update(dt) end)
     end
     for _, weapon in pairs(weapon_sessions) do
       if type(weapon.step) == "function" then weapon:step(clock.now()) end
@@ -433,7 +545,7 @@ function ServerRuntime.new(opts)
     if self.world and self.world.ferry then self.world.ferry:OnPlayerAdded(player) end
     if type(opts.on_player_join_start) == "function" then
       safe_call(opts.logger, "on_player_join_start", opts.on_player_join_start, player)
-    elseif default_player_data then
+    elseif has_method(player_data, "OnPlayerAdded") then
       safe_call(opts.logger, "player_data_added", function() player_data:OnPlayerAdded(player) end)
     end
   end
@@ -449,7 +561,8 @@ function ServerRuntime.new(opts)
     if type(opts.is_player_data_current) == "function" then
       local current_ok = safe_call(opts.logger, "is_player_data_current", opts.is_player_data_current, player, data)
       if not current_ok then return nil end
-    elseif default_player_data and player_data:GetDataInst(player) ~= data then
+    elseif has_method(player_data, "OnPlayerAdded") and has_method(player_data, "GetDataInst")
+        and player_data:GetDataInst(player) ~= data then
       return nil
     end
     if active_players[user_id] == player then
@@ -592,14 +705,7 @@ function ServerRuntime.new(opts)
           return runtime.life:ApplyHit(hit, target, amount)
         end,
         apply_effect = function(source, target, kind)
-          local target_tree = player_trees[target and target.UserId]
-          if target_tree and type(target_tree.apply_modifier) == "function" then
-            return target_tree:apply_modifier(kind, { source = source })
-          end
-          if entity_modifiers then
-            return entity_modifiers:apply(source, target, kind)
-          end
-          return false
+          return modifier_service:Apply(source, target, kind)
         end,
       })
       weapon_sessions[user_id] = weapon
@@ -818,6 +924,7 @@ function ServerRuntime.new(opts)
     if player_tree then
       player_tree:dispose()
     end
+    runtime:_publish_fish()
 
     -- 清理离场玩家施加给其他玩家或活鱼/非玩家实体的持续效果，防止离线来源继续 DoT。
     for _, other_tree in pairs(player_trees) do
@@ -833,8 +940,10 @@ function ServerRuntime.new(opts)
     if type(opts.on_player_removing) == "function" then
       safe_call(opts.logger, "on_player_removing", opts.on_player_removing, player, was_active)
     else
-      if default_player_data then safe_call(opts.logger, "player_data_removing", function() player_data:OnPlayerRemoving(player) end) end
-      if default_platform and type(platform.OnPlayerRemoving) == "function" then
+      if has_method(player_data, "OnPlayerRemoving") then
+        safe_call(opts.logger, "player_data_removing", function() player_data:OnPlayerRemoving(player) end)
+      end
+      if has_method(platform, "OnPlayerRemoving") then
         safe_call(opts.logger, "platform_removing", function() platform:OnPlayerRemoving(player) end)
       end
     end
@@ -854,7 +963,7 @@ function ServerRuntime.new(opts)
 
     if type(opts.after_idle) == "function" then
       opts.after_idle(user_id, finish_drain)
-    elseif default_save then
+    elseif has_method(save, "AfterIdle") then
       save:AfterIdle(user_id, finish_drain)
     else
       finish_drain()
@@ -879,8 +988,6 @@ function ServerRuntime.new(opts)
     leaving = { cleaned = false, waiting = nil }
     leaving_players[user_id] = leaving
     if self.world and self.world.ferry then self.world.ferry:OnPlayerRemoving(player) end
-    fish_host:OnPlayerRemoving(player)
-    self:_publish_fish()
     local queued = ready_queue[user_id]
     if queued and queued[1] == player then
       ready_queue[user_id] = nil
@@ -889,18 +996,37 @@ function ServerRuntime.new(opts)
   end
 
   local function holder_tree_of(player)
-    if type(player) ~= "table" then return nil end
+    if not is_valid_player(player) then return nil end
     return player_trees[player.UserId]
   end
 
-  local function drop_fish_record(id)
-    local fish = fish_trees[id]
-    if fish == nil then return end
-    fish_trees[id] = nil
-    for index, value in ipairs(fish_order) do
-      if value == id then table.remove(fish_order, index) break end
+  local function sorted_fish_list()
+    local ids = {}
+    for id, fish in pairs(fish_host.Fish) do
+      if type(fish) == "table" then ids[#ids + 1] = id end
     end
-    if fish_host.Fish[fish.Id] == fish then fish_host:Remove(fish) end
+    table.sort(ids, function(a, b)
+      if type(a) == "number" and type(b) == "number" then return a < b end
+      return tostring(a) < tostring(b)
+    end)
+    local out = {}
+    for _, id in ipairs(ids) do
+      local fish = fish_host.Fish[id]
+      if fish ~= nil then out[#out + 1] = fish end
+    end
+    return out
+  end
+
+  local function prune_faulted_fish()
+    local faulted = {}
+    for _, fish in pairs(fish_host.Fish) do
+      if type(fish) == "table" and fish.Tree and fish.Tree.fault ~= nil then
+        faulted[#faulted + 1] = fish
+      end
+    end
+    for _, fish in ipairs(faulted) do
+      fish_host:Remove(fish)
+    end
   end
 
   local function fish_row(fish)
@@ -940,23 +1066,40 @@ function ServerRuntime.new(opts)
     }
   end
 
+  local function fish_signature(rows)
+    if #rows == 0 then return "" end
+    local parts = {}
+    for i, row in ipairs(rows) do
+      parts[i] = table.concat({
+        tostring(row.id),
+        tostring(row.phase),
+        tostring(row.bossPhase),
+        tostring(row.grounded),
+        tostring(row.health),
+        tostring(row.label),
+        tostring(row.holderId),
+        tostring(row.ownerId),
+        tostring(row.warning),
+      }, "|")
+    end
+    return table.concat(parts, ";")
+  end
+
   function runtime:_publish_fish()
-    local list, warnings, gone = {}, {}, {}
-    for _, id in ipairs(fish_order) do
-      local fish = fish_trees[id]
-      if fish ~= nil then
-        if fish_host.Fish[fish.Id] ~= fish then
-          gone[#gone + 1] = id
-        else
-          local row = fish_row(fish)
-          list[#list + 1] = row
-          if type(row.warning) == "table" then
-            warnings[#warnings + 1] = row.warning
-          end
-        end
+    prune_faulted_fish()
+    local list, warnings = {}, {}
+    for _, fish in ipairs(sorted_fish_list()) do
+      local row = fish_row(fish)
+      list[#list + 1] = row
+      if type(row.warning) == "table" then
+        warnings[#warnings + 1] = row.warning
       end
     end
-    for _, id in ipairs(gone) do drop_fish_record(id) end
+    local sig = fish_signature(list)
+    if not fish_dirty and sig == last_fish_signature then return end
+    fish_dirty = false
+    if sig == last_fish_signature then return end
+    last_fish_signature = sig
     local remote = opts.remote
     if type(remote) ~= "table" or type(remote.GetRE) ~= "function" then return end
     local event = remote:GetRE("FishCombatState")
@@ -1014,12 +1157,8 @@ function ServerRuntime.new(opts)
       mult = catch.mult,
     }, position)
     if fish == nil then return false, err end
-    next_fish_id = next_fish_id + 1
-    local id = fish.Id
-    fish_trees[id] = fish
-    fish_order[#fish_order + 1] = id
     self:_publish_fish()
-    return true, id
+    return true, fish.Id
   end
 
   function runtime:drop_fish(player)
@@ -1030,21 +1169,19 @@ function ServerRuntime.new(opts)
   end
 
   function runtime:fish_snapshot(user_id)
+    prune_faulted_fish()
     local list = {}
-    for _, id in ipairs(fish_order) do
-      local fish = fish_trees[id]
-      if fish and fish_host.Fish[fish.Id] == fish then
-        local row = fish_row(fish)
-        if user_id == nil or row.holderId == user_id or row.ownerId == user_id then
-          list[#list + 1] = row
-        end
+    for _, fish in ipairs(sorted_fish_list()) do
+      local row = fish_row(fish)
+      if user_id == nil or row.holderId == user_id or row.ownerId == user_id then
+        list[#list + 1] = row
       end
     end
     return list
   end
 
   function runtime:damage_fish(id, amount)
-    local fish = fish_trees[id]
+    local fish = fish_host.Fish[id]
     if fish == nil then return false end
     local ok = fish_host:DamageFish(fish, amount)
     self:_publish_fish()
@@ -1052,12 +1189,14 @@ function ServerRuntime.new(opts)
   end
 
   function runtime:fault_fish(id, reason)
-    local fish = fish_trees[id]
+    local fish = fish_host.Fish[id]
     if fish == nil then return false end
-    fish.Fault = reason or "fish"
-    drop_fish_record(id)
+    local faulted = fish_host:Fault(fish, reason)
+    if faulted then
+      fish_host:Remove(fish)
+    end
     self:_publish_fish()
-    return true
+    return faulted
   end
 
   function runtime:shutdown()
@@ -1075,9 +1214,25 @@ function ServerRuntime.new(opts)
         pt:dispose()
       end
     end
-    local fish_ids = {}
-    for id in pairs(fish_trees) do fish_ids[#fish_ids + 1] = id end
-    for _, id in ipairs(fish_ids) do drop_fish_record(id) end
+    for _, fish in ipairs(sorted_fish_list()) do
+      fish_host:Remove(fish)
+    end
+    for i = #re_conns, 1, -1 do
+      local conn = re_conns[i]
+      re_conns[i] = nil
+      if conn and type(conn.Disconnect) == "function" then
+        pcall(conn.Disconnect, conn) -- 远程事件连接可能已先随宿主卸载
+      end
+    end
+    self._core_re_bound = false
+    if carrier_died_handler and has_method(opts.fish_carrier, "UnsubscribeDied") then
+      opts.fish_carrier:UnsubscribeDied(carrier_died_handler)
+      carrier_died_handler = nil
+    end
+    if bound_shop_action and type(platform) == "table" and platform.ShopAction == bound_shop_action then
+      platform.ShopAction = nil
+      bound_shop_action = nil
+    end
     if self.world then
       self.world:dispose()
     end
@@ -1088,13 +1243,14 @@ function ServerRuntime.new(opts)
     active_players = {}
     leaving_players = {}
     ready_queue = {}
+    fish_dirty = false
+    last_fish_signature = ""
     self._started = false
     if current_runtime == self then
       current_runtime = nil
     end
   end
 
-  local hit_seq = 0
   local damage_filter = opts.damage_filter
   if damage_filter == nil then
     damage_filter = PkDamageFilter.make({
@@ -1109,296 +1265,28 @@ function ServerRuntime.new(opts)
     })
   end
   runtime._max_health_of = opts.max_health_of
-  runtime.life = {}
-  fish_host.Vitals = runtime.life
-  local life = runtime.life
-
-  local function tree_of(player)
-    if type(player) ~= "table" or player.UserId == nil then return nil end
-    local tree = player_trees[player.UserId]
-    if tree and not tree:is_disposed() then return tree end
-    return nil
-  end
-
-  local function player_from_unit(unit)
-    if type(unit) ~= "table" then return nil end
-    for _, player in pairs(active_players) do
-      if player == unit or player.Character == unit then return player end
-    end
-    return nil
-  end
-
-  function life:GetTree(player)
-    return tree_of(player)
-  end
-
-  function life:PlayerFromUnit(unit)
-    return player_from_unit(unit)
-  end
-
-  function life:LifeStatus(player)
-    local tree = tree_of(player)
-    return tree and tree.states.life_phase:now() or nil
-  end
-
-  function life:IsDowned(player)
-    local phase = self:LifeStatus(player)
-    return phase == "downed" or phase == "rescuing"
-  end
-
-  function life:IsRescuing(player)
-    return self:LifeStatus(player) == "rescuing"
-  end
-
-  function life:PlayerByUserId(user_id)
-    for _, player in pairs(active_players) do
-      if player.UserId == user_id then return player end
-    end
-    return nil
-  end
-
-  function life:IsDead(player)
-    return self:LifeStatus(player) == "dead"
-  end
-
-  function life:CanAct(player)
-    local tree = tree_of(player)
-    return tree ~= nil and tree.memos.can_act:now() == true
-  end
-
-  function life:CanTakeDamage(player)
-    return self:LifeStatus(player) == "alive"
-  end
-
-  function life:CanEat(player, item_id)
-    local tree = tree_of(player)
-    if not tree or tree.memos.can_act:now() ~= true then return false end
-    local definition = type(item_id) == "string" and GameCfg.Items.Definitions[item_id]
-    return type(definition) == "table" and type(definition.EatPercent) == "number"
-  end
-
-  function life:Eat(player, item_id, cook_rate)
-    local tree = tree_of(player)
-    if not tree then return false end
-    return tree:eat(item_id, cook_rate)
-  end
-
-  function life:MaxHealthOf(player)
-    if type(runtime._max_health_of) == "function" then
-      local ok, value = pcall(runtime._max_health_of, player)
-      if ok and Number.IsFiniteNumber(value) and value >= 1 then return math.floor(value) end
-    end
-    local tree = tree_of(player)
-    local value = tree and tree.memos.max_health and tree.memos.max_health:now()
-    if Number.IsFiniteNumber(value) and value >= 1 then return math.floor(value) end
-    return GameCfg.Vitals.MaxHealth
-  end
-
-  function life:SnapshotHealth(player)
-    local tree = tree_of(player)
-    if not tree then return nil, nil end
-    return math.max(0, math.floor(tree.states.health:now())), self:MaxHealthOf(player)
-  end
-
-  function life:SetDamageFilter(filter)
-    damage_filter = filter
-    for _, tree in pairs(player_trees) do
-      if tree.set_damage_filter then tree:set_damage_filter(filter or false) end
-    end
-  end
-
-  function life:NewHit(source, category)
-    hit_seq = hit_seq + 1
-    local source_player = tree_of(source) and source or player_from_unit(source)
-    return {
-      id = hit_seq,
-      source = source,
-      category = category,
-      sourcePlayer = source_player,
-      targets = {},
-    }
-  end
-
-  function life:ResolveHitSource(hit)
-    return type(hit) == "table" and hit.sourcePlayer or nil
-  end
-
-  function life:ApplyHit(hit, target, amount)
-    local player = tree_of(target) and target or player_from_unit(target)
-    local tree = tree_of(player) or tree_of(hit and hit.sourcePlayer)
-    if not tree then
-      for _, candidate in pairs(player_trees) do
-        if candidate and not candidate:is_disposed() then tree = candidate break end
-      end
-    end
-    if not tree then return false end
-    return tree:apply_hit(hit, target, amount)
-  end
-
-  function life:ApplyDamage(player, amount, hit)
-    local ok = self:ApplyHit(hit or self:NewHit(nil, "damage"), player, amount)
-    return ok
-  end
-
-  function life:SetHealth(player, value)
-    local tree = tree_of(player)
-    if not tree or not Number.IsFiniteNumber(value) then return false end
-    local current = tree.states.health:now()
-    if value < current then
-      return self:ApplyDamage(player, current - value, self:NewHit(nil, "gm"))
-    end
-    local controller = player.Character and player.Character.Controller
-    if not controller then return false end
-    local ok, err = pcall(function() controller.Health = value end)
-    if not ok then
-      print("[ServerRuntime] operation=SetHealth", "player=" .. tostring(player.UserId), tostring(err))
-      return false
-    end
-    tree.states.health:set(value)
-    return true
-  end
-
-  function life:SetHunger(player, value)
-    local tree = tree_of(player)
-    if not tree or not Number.IsFiniteNumber(value) then return false end
-    local clamped = math.max(0, math.min(GameCfg.Vitals.MaxHunger, math.floor(value)))
-    tree.states.hunger:set(clamped)
-    return true
-  end
-
-  function life:Phase(player)
-    return self:LifeStatus(player)
-  end
-
-  function life:GetState(player)
-    local tree = tree_of(player)
-    if not tree then return nil end
-    return { player = player, phase = tree.states.life_phase:now(), tree = tree }
-  end
-
-  function life:RescueAction(player, payload)
-    if type(payload) ~= "table" or payload.action ~= GameCfg.Rescue.Action then return false end
-    local seq = payload.seq
-    if type(seq) ~= "number" or seq ~= math.floor(seq) or seq < 1 or seq > 2147483647 then return false end
-    local function reply(result)
-      if opts.remote and type(opts.remote.GetRE) == "function" then
-        opts.remote:GetRE("InteractResult"):FireClient(player, result)
-      end
-      return result
-    end
-    if type(payload.targetUserId) ~= "number" then
-      reply({ action = "Rescue", ok = false, reason = "invalid", seq = seq })
-      return false
-    end
-    local data = opts.player_data and opts.player_data:GetDataInst(player)
-    local save = opts.save
-    if not data or not save then return false end
-    local request_id = payload.operation
-    if request_id ~= nil and type(request_id) ~= "table" then return false end
-    if request_id == nil then request_id = seq end
-    local operation, mode = save:ResolveRequest(player, data, "rescue", request_id)
-    if not operation then return false end
-    if mode == "replay" then
-      return save:Execute(player, data, operation, function() return nil, "expired" end,
-        function(ok, result)
-          if ok then result.operation = operation reply(result) end
-        end) == true
-    end
-    local target = nil
-    for _, candidate in pairs(active_players) do
-      if candidate.UserId == payload.targetUserId then target = candidate break end
-    end
-    local target_tree = target and player_trees[target.UserId]
-    local phase = target_tree and target_tree.states.life_phase:now()
-    if not target or (phase ~= "downed" and phase ~= "rescuing") then
-      reply({ action = "Rescue", ok = false, reason = "not-downed", seq = seq, targetUserId = payload.targetUserId })
-      return false
-    end
-    local from = player.Character and player.Character.Position
-    local to = target.Character and target.Character.Position
-    if not from or not to then
-      reply({ action = "Rescue", ok = false, reason = "no-position", seq = seq, targetUserId = target.UserId })
-      return false
-    end
-    local dx, dz = from.x - to.x, from.z - to.z
-    if math.sqrt(dx * dx + dz * dz) > GameCfg.Rescue.Range then
-      reply({ action = "Rescue", ok = false, reason = "too-far", seq = seq, targetUserId = target.UserId })
-      return false
-    end
-    local can, reason = self:CanRescue(target, player)
-    if not can then
-      reply({ action = "Rescue", ok = false, reason = reason, seq = seq, targetUserId = target.UserId })
-      return false
-    end
-    local started, why = self:BeginRescue(target, player)
-    return save:Execute(player, data, operation, function()
-      return { ok = started == true, action = "Rescue", targetUserId = target.UserId, reason = why }
-    end, function(written, result)
-      if not written then
-        if started then self:CancelRescue(self:GetState(target)) end
-        reply({ action = "Rescue", ok = false, reason = tostring(result), seq = seq, targetUserId = target.UserId })
-        return
-      end
-      result.operation = operation
-      reply(result)
-    end) == true
-  end
-
-  function life:CanRescue(target, rescuer)
-    local tree = tree_of(target)
-    if not tree or type(tree._accept_rescue) ~= "function" then return false, "not-downed" end
-    local phase = tree.states.life_phase:now()
-    if phase == "rescuing" then return false, "busy" end
-    if phase ~= "downed" then return false, "not-downed" end
-    return true
-  end
-
-  function life:BeginRescue(target, rescuer)
-    local rescuer_tree = tree_of(rescuer)
-    if not rescuer_tree then return false, "no-rescuer" end
-    return rescuer_tree:begin_rescue(target)
-  end
-
-  function life:CancelRescue(state)
-    local tree = state and tree_of(state.player or state)
-    if not tree or type(tree.cancel_rescue) ~= "function" then return false end
-    return tree:cancel_rescue() == true
-  end
-
-  function life:RequestAction(player, kind)
-    local tree = tree_of(player)
-    return tree ~= nil and tree:request_action(kind) == true
-  end
-
-  function life:WeaponAction(player, payload)
-    local tree = tree_of(player)
-    if not tree then return false end
-    local weapon = weapon_sessions[player.UserId]
-    if not weapon or type(weapon.handle) ~= "function" then return false end
-    return weapon:handle(payload) == true
-  end
-
-  function life:WeaponCastGuard(unit, index)
-    for _, weapon in pairs(weapon_sessions) do
-      if type(weapon.guard) == "function" and weapon:guard(unit, index) ~= true then
-        return false
-      end
-    end
-    return true
-  end
-
   runtime._damage_filter = function()
     return damage_filter
   end
+  runtime.life = LifeFacade.new({
+    player_trees = player_trees,
+    active_players = active_players,
+    weapon_sessions = weapon_sessions,
+    opts = opts,
+    get_max_health_of = function() return runtime._max_health_of end,
+    get_damage_filter = function() return damage_filter end,
+    set_damage_filter = function(filter) damage_filter = filter end,
+  })
+  fish_host.Vitals = runtime.life
 
-  if default_player_data then
+  if has_method(player_data, "OnPlayerAdded") then
     player_data.Runtime = runtime
     player_data.Save = save
     player_data.Vitals = runtime.life
     player_data.Quest = { Notify = function(_, kind, owner, fact) return runtime:notify_quest(kind, owner, fact) end }
     player_data.Ability = {
       ApplyGrowth = function(_, player)
-        local tree = player_trees[player.UserId]
+        local tree = is_valid_player(player) and player_trees[player.UserId]
         local data = player_data:GetDataInst(player)
         if not tree or not data then return { Ok = false } end
         tree:sync_from_data(data)
@@ -1406,13 +1294,21 @@ function ServerRuntime.new(opts)
       end,
     }
   end
-  if default_save then
-    if default_player_data then save.PlayerData = player_data end
+  if has_method(save, "LoadInto") or has_method(save, "Start") then
+    if has_method(player_data, "SendItemBar") then save.PlayerData = player_data end
     save.OnReady = function(player, data) runtime:on_save_ready(player, data) end
   end
-  if default_platform then
-    if default_save then platform.Save = save end
-    if default_player_data then platform.PlayerData = player_data end
+  if type(platform) == "table" then
+    if has_method(platform, "Start") then
+      if type(save) == "table" then platform.Save = save end
+      if type(player_data) == "table" then platform.PlayerData = player_data end
+    end
+    if platform.ShopAction == nil then
+      bound_shop_action = function(actor, payload)
+        return runtime:platform_shop_action(actor, payload)
+      end
+      platform.ShopAction = bound_shop_action
+    end
   end
   if opts.fish_ability then
     opts.fish_ability.Modifier = modifier_service

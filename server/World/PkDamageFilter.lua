@@ -8,8 +8,8 @@ local PkDamageFilter = {}
 local function position_of(player)
   local character = player and player.Character
   if not character then return nil end
-  local ok, value = pcall(function() return character.Position end)
-  if not ok or type(value) ~= "table" then return nil end
+  local ok, value = pcall(function() return character.Position end) -- 兼容引擎 userdata 位置
+  if not ok or (type(value) ~= "table" and type(value) ~= "userdata") then return nil end
   local x, z = tonumber(value.x), tonumber(value.z)
   if not x or not z then return nil end
   return { x = x, z = z }

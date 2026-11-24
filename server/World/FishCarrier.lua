@@ -96,6 +96,19 @@ function Mgr:SubscribeDied(fn)
 	return true
 end
 
+function Mgr:UnsubscribeDied(fn)
+	if type(fn) ~= "function" then
+		return false
+	end
+	for i = #self.Subscribers, 1, -1 do
+		if self.Subscribers[i] == fn then
+			table.remove(self.Subscribers, i)
+			return true
+		end
+	end
+	return false
+end
+
 function Mgr:SyncPosition(carrier, targetPosition)
 	carrier.SkipNextAutoSync = targetPosition ~= nil
 	syncReceiver(carrier, targetPosition)
@@ -144,12 +157,12 @@ function Mgr:RecordHealth(carrier)
 			local payload = DamageNotice.FromHealth(carrier.Body.UnitId, previous, health, position,
 				nil, 'fish', height)
 			if payload then
-				print('[MgrFishCarrier] 实际扣血', payload.targetId, previous, health, payload.amount)
+				print('[FishCarrier] 实际扣血', payload.targetId, previous, health, payload.amount)
 				local sent, err = pcall(self.DamagePublisher or DamageNotice.Publish, payload)
-				if not sent then print('[MgrFishCarrier] 伤害通知失败', carrier.Body.UnitId, tostring(err)) end
+				if not sent then print('[FishCarrier] 伤害通知失败', carrier.Body.UnitId, tostring(err)) end
 			end
 		else
-			print('[MgrFishCarrier] 实际扣血缺少受伤位置', carrier.Body.UnitId, previous, health)
+			print('[FishCarrier] 实际扣血缺少受伤位置', carrier.Body.UnitId, previous, health)
 		end
 	end
 end
@@ -206,7 +219,7 @@ function Mgr:Attach(body, opts)
 		Visible = false,
 	})
 	if not receiver then
-		print("[MgrFishCarrier] 受击体创建失败，这条鱼不会被挥砍扣血: " .. tostring(body.UnitId))
+		print("[FishCarrier] 受击体创建失败，这条鱼不会被挥砍扣血: " .. tostring(body.UnitId))
 		return nil
 	end
 
@@ -215,7 +228,7 @@ function Mgr:Attach(body, opts)
 		pcall(function()
 			receiver:Destroy()
 		end)
-		print("[MgrFishCarrier] 受击体没有 Controller，伤害接口不成立: " .. tostring(body.UnitId))
+		print("[FishCarrier] 受击体没有 Controller，伤害接口不成立: " .. tostring(body.UnitId))
 		return nil
 	end
 
@@ -329,7 +342,7 @@ function Mgr:Damage(carrier, damage, hit)
 	if not beforeOk or type(before) ~= 'number' then return false end
 	local ok, err = pcall(function() carrier.Controller:TakeDamage(damage) end)
 	if not ok then
-		print('[MgrFishCarrier] 受击扣血失败', carrier.Body and carrier.Body.UnitId, tostring(err))
+		print('[FishCarrier] 受击扣血失败', carrier.Body and carrier.Body.UnitId, tostring(err))
 		return false
 	end
 	self:RecordHealth(carrier)
@@ -339,7 +352,7 @@ function Mgr:Damage(carrier, damage, hit)
 	local actual = before - after
 	if self.DamageListener then
 		local notified, notifyErr = pcall(self.DamageListener, carrier, actual, hit)
-		if not notified then print('[MgrFishCarrier] 有效伤害通知失败', carrier.Body and carrier.Body.UnitId, tostring(notifyErr)) end
+		if not notified then print('[FishCarrier] 有效伤害通知失败', carrier.Body and carrier.Body.UnitId, tostring(notifyErr)) end
 	end
 	return true, actual
 end
