@@ -239,8 +239,8 @@ describe('条款 9/11 他人抢救', function()
     advance(GameCfg.Rescue.DurationSec + 0.1)
     assert.same(90, downed.Character.Controller.Health, '900 上限的 10% 是 90')
     assert.is_true(downed.Character.Controller.Health <= downed.Character.Controller.MaxHealth)
-    local _, maxHealth = env.v:snapshot_health(downed)
-    assert.same(900, maxHealth)
+    local _, max_health = env.v:snapshot_health(downed)
+    assert.same(900, max_health)
   end)
 
   -- 9-03：血量只能经 Vitals 的统一 Rescue 接缝落地；接缝被拒时不产生任何血量写入。

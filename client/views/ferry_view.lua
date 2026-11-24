@@ -23,12 +23,12 @@ local function on_result(ctx, result)
   if result.ok then
     if result.action == "Board" then
       if result.seconds == nil then
-        ViewUtil.notify(ctx, "已经到" .. zone_name(result.routeId) .. "了")
+        ViewUtil.notify(ctx, "已经到" .. zone_name(result.route_id) .. "了")
       else
         ViewUtil.notify(ctx, "船票已交，" .. tostring(result.seconds) .. " 秒后开船")
       end
     elseif result.action == "Return" then
-      ViewUtil.notify(ctx, "已经回到" .. zone_name(result.routeId, "Return") .. "，金币 -" .. tostring(result.price))
+      ViewUtil.notify(ctx, "已经回到" .. zone_name(result.route_id, "Return") .. "，金币 -" .. tostring(result.price))
     end
     return
   end
@@ -59,8 +59,8 @@ function FerryView.mount(scope, ctx)
       if remaining <= 0 then
         countdowns[route_id] = nil
       elseif not soonest or remaining < soonest.remaining
-          or (remaining == soonest.remaining and route_id < soonest.routeId) then
-        soonest = { routeId = route_id, operation = row.operation, remaining = remaining }
+          or (remaining == soonest.remaining and route_id < soonest.route_id) then
+        soonest = { route_id = route_id, operation = row.operation, remaining = remaining }
       end
     end
     return soonest
@@ -78,8 +78,8 @@ function FerryView.mount(scope, ctx)
   end
 
   local function on_state(snapshot)
-    if type(snapshot) ~= "table" or type(snapshot.routeId) ~= "string" then return end
-    local route_id = snapshot.routeId
+    if type(snapshot) ~= "table" or type(snapshot.route_id) ~= "string" then return end
+    local route_id = snapshot.route_id
     if snapshot.phase == "countdown" then
       local seconds = tonumber(snapshot.seconds) or 5
       countdowns[route_id] = { ends_at = ctx.clock.now() + seconds, operation = snapshot.operation }
@@ -125,7 +125,7 @@ function FerryView.mount(scope, ctx)
         end
         return
       end
-      local text = string.format("前往%s %d 秒", zone_name(soonest.routeId), math.ceil(soonest.remaining))
+      local text = string.format("前往%s %d 秒", zone_name(soonest.route_id), math.ceil(soonest.remaining))
       if text ~= last_text then
         last_text = text
         label.Text = text
@@ -178,7 +178,7 @@ function FerryView.legs_spec()
           local radius = BodyScale.interaction_radius(character, leg.point.Radius)
           if near(position, center, radius) then
             list[#list + 1] = { key = "ferry:" .. index .. ":" .. leg.action,
-              routeId = route.Id, action = leg.action, text = leg.text,
+              route_id = route.Id, action = leg.action, text = leg.text,
               point = leg.point, center = center }
           end
         end
@@ -206,7 +206,7 @@ function FerryView.legs_spec()
       })
       ctx.connect(scope, button.OnClicked, function()
         seq = seq + 1
-        local payload = { action = item.action, routeId = item.routeId, seq = seq }
+        local payload = { action = item.action, route_id = item.route_id, seq = seq }
         if type(services.send_ferry) == "function" then services.send_ferry(payload) end
       end)
     end,

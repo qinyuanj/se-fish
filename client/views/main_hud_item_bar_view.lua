@@ -383,7 +383,7 @@ function MainHudItemBarView.mount(s, ctx, options)
               began = began,
             }
             local gesture = PressGesture.new({
-              LongPressSec = GameCfg.Ability.Throw.LongPressSec,
+              long_press_sec = GameCfg.Ability.Throw.LongPressSec,
             })
             gesture:begin(now_sec(), began)
             slot_press = { index = slot_index, gesture = gesture }

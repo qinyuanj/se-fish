@@ -50,7 +50,7 @@ describe('TestDamageFloat', function()
             } end
         end }
         DamageFloat:bind({}, { x = 800, y = 600 })
-        local payload = { targetType = 'fish', targetId = 7, amount = 0.5,
+        local payload = { target_type = 'fish', target_id = 7, amount = 0.5,
             position = { x = 3, y = 5, z = 9 } }
         DamageFloat:show(payload)
         assert.same(0, #created)
@@ -64,21 +64,21 @@ describe('TestDamageFloat', function()
         visible = false
         time = 0.5
         DamageFloat:update()
-        assert.is_false(DamageFloat.Active[1].node.Visible)
+        assert.is_false(DamageFloat.active[1].node.Visible)
         visible = true
         DamageFloat:update()
-        assert.is_true(DamageFloat.Active[1].node.Visible)
+        assert.is_true(DamageFloat.active[1].node.Visible)
         time = 1.1
         DamageFloat:update()
         assert.same(2, #DamageFloat.pool)
         payload.amount, payload.critical = 10, true
         DamageFloat:show(payload)
         assert.same(2, #created)
-        assert.same('10', DamageFloat.Active[1].node.Text)
-        assert.same(GameCfg.DamageFloat.CriticalFontSize, DamageFloat.Active[1].node.FontSize)
-        assert.same(1, DamageFloat.Active[1].node.Opacity)
+        assert.same('10', DamageFloat.active[1].node.Text)
+        assert.same(GameCfg.DamageFloat.CriticalFontSize, DamageFloat.active[1].node.FontSize)
+        assert.same(1, DamageFloat.active[1].node.Opacity)
         DamageFloat:clear()
-        assert.same(0, #DamageFloat.Active)
+        assert.same(0, #DamageFloat.active)
         assert.is_true(created[1].Destroyed and created[2].Destroyed)
     end)
 end)
@@ -90,7 +90,7 @@ describe('TestDamageNotice', function()
             { 10, 9.5, 1 }, { 10, 9.9, 1 }, { 4, 0, 4 } }) do
             local payload = DamageNotice.from_health(42, case[1], case[2], pos)
             assert.same(case[3], DamageFloat.display_amount(payload.amount))
-            assert.same(42, payload.targetId)
+            assert.same(42, payload.target_id)
             assert.same(4, payload.position.y)
         end
         assert.is_nil(DamageNotice.from_health(42, 4, 4, pos))

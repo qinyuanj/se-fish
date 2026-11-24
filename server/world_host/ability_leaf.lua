@@ -211,7 +211,7 @@ end
 --- 在 PlayerTree 树底挂载 ability_system 纯输出叶子投影。
 ---@param s table EffectBuilder
 ---@param player_tree table
----@param opts? { ability_api?: table, create_asset?: fun(preset: string): table, attach_anchor?: fun(anchor: any, behavior: string): boolean, register_cast_guard?: fun(guard: fun(unit: any, index?: number): boolean): (fun()|nil), unregister_cast_guard?: fun(guard: fun(unit: any, index?: number): boolean), manager_preset?: string, initial_abilities?: table[], retry_interval?: number, retry_count?: number, on_error?: fun(msg: string) }
+---@param opts? table { ability_api?: table, create_asset?: function, attach_anchor?: function, register_cast_guard?: function, unregister_cast_guard?: function, manager_preset?: string, initial_abilities?: table[], retry_interval?: number, retry_count?: number, on_error?: function }
 function AbilityLeaf.mount(s, player_tree, opts)
   opts = type(opts) == "table" and opts or {}
   local ability_api = opts.ability_api or default_ability_api()

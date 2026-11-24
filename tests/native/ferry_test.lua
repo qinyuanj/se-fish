@@ -217,12 +217,12 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
 
   local function board(userId, seq, route)
     route = route or env.route
-    return env.mgr:handle(env.players[userId], { action = 'Board', routeId = route.Id, seq = seq })
+    return env.mgr:handle(env.players[userId], { action = 'Board', route_id = route.Id, seq = seq })
   end
 
   local function back(userId, seq, route)
     route = route or env.route
-    return env.mgr:handle(env.players[userId], { action = 'Return', routeId = route.Id, seq = seq })
+    return env.mgr:handle(env.players[userId], { action = 'Return', route_id = route.Id, seq = seq })
   end
 
   local function standAt(userId, name, offsetX, offsetZ)
@@ -263,7 +263,7 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
     local operation = last_reply(1).operation
     local broadcasts = #env.broadcasts
     assert.is_true(env.mgr:handle(env.players[1],
-      { action = 'Board', routeId = env.route.Id, seq = 2, requestId = operation }))
+      { action = 'Board', route_id = env.route.Id, seq = 2, requestId = operation }))
     assert.is_true(last_reply(1).ok)
     assert.same(broadcasts, #env.broadcasts)
     assert.same(0, env.data[1]:ItemCount(env.route.Outbound.Ticket))
@@ -280,7 +280,7 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
     assert.same('countdown', env.broadcasts[1].phase)
     assert.is_true(last_reply(1).ok)
     assert.same('countdown', (env.broadcasts[#env.broadcasts]).phase)
-    assert.same(env.route.Id, (env.broadcasts[#env.broadcasts]).routeId)
+    assert.same(env.route.Id, (env.broadcasts[#env.broadcasts]).route_id)
   end)
 
   it('test_board_waits_for_durable_ticket_before_publishing_countdown', function()
@@ -376,9 +376,9 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
     local data = env.PlayerDataClass.new(player)
     env.players[1], env.data[1] = player, data
     env.save:load_into(player, data)
-    assert.is_true(env.mgr:handle(player, { action = 'Board', routeId = env.route.Id, seq = 1,
+    assert.is_true(env.mgr:handle(player, { action = 'Board', route_id = env.route.Id, seq = 1,
       requestId = operation }))
-    assert.same({ ok = true, action = 'Board', routeId = env.route.Id, price = nil, operation = operation },
+    assert.same({ ok = true, action = 'Board', route_id = env.route.Id, price = nil, operation = operation },
       last_reply(1))
     assert.same(0, player.teleports)
     assert.same(1, data.extra.travel.arrived[env.route.ToZoneId])
@@ -414,7 +414,7 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
     assert.is_nil(env.data[1].extra.travel.arrived[env.route.ToZoneId])
     assert.same(1, env.data[1]:ItemCount(env.route.Outbound.Ticket))
     assert.same('not_aboard', last_reply(1).reason)
-    assert.same({ phase = 'cancelled', routeId = env.route.Id, operation = operation, reason = 'empty' },
+    assert.same({ phase = 'cancelled', route_id = env.route.Id, operation = operation, reason = 'empty' },
       env.broadcasts[2])
     assert.same(2, #env.broadcasts)
     env.mgr:update()
@@ -434,8 +434,8 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
     assert.same(1, env.data[1]:ItemCount(env.route.Outbound.Ticket))
     assert.same('not_aboard', last_reply(1).reason)
     assert.same(1, env.players[2].teleports)
-    assert.same({ ok = true, action = 'Board', routeId = env.route.Id }, last_reply(2))
-    assert.same({ phase = 'departed', routeId = env.route.Id, operation = operation }, env.broadcasts[2])
+    assert.same({ ok = true, action = 'Board', route_id = env.route.Id }, last_reply(2))
+    assert.same({ phase = 'departed', route_id = env.route.Id, operation = operation }, env.broadcasts[2])
     assert.same(2, #env.broadcasts)
   end)
 
@@ -451,7 +451,7 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
     assert.same(1, env.data[1]:ItemCount(env.route.Outbound.Ticket))
     assert.same('teleport', last_reply(1).reason)
     assert.same(1, env.players[2].teleports)
-    assert.same({ phase = 'departed', routeId = env.route.Id, operation = operation }, env.broadcasts[2])
+    assert.same({ phase = 'departed', route_id = env.route.Id, operation = operation }, env.broadcasts[2])
   end)
 
   it('test_departure_skips_player_without_character', function()
@@ -478,12 +478,12 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
     assert.same('fishPond', env.data[3].data.Zone)
     local operation = last_reply(1).operation.id
     assert.same({
-      { phase = 'countdown', routeId = env.route.Id, operation = operation, seconds = 5 },
-      { phase = 'departed', routeId = env.route.Id, operation = operation },
+      { phase = 'countdown', route_id = env.route.Id, operation = operation, seconds = 5 },
+      { phase = 'departed', route_id = env.route.Id, operation = operation },
     }, env.broadcasts)
-    assert.same({ ok = true, action = 'Board', routeId = env.route.Id, price = nil,
+    assert.same({ ok = true, action = 'Board', route_id = env.route.Id, price = nil,
       operation = last_reply(1).operation, reason = nil, seconds = nil }, last_reply(1))
-    assert.same({ ok = true, action = 'Board', routeId = env.route.Id }, last_reply(2))
+    assert.same({ ok = true, action = 'Board', route_id = env.route.Id }, last_reply(2))
     assert.is_nil(last_reply(3))
   end)
 
@@ -524,13 +524,13 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
     assert.is_true(env.data[1]:AddItem(route.Outbound.Ticket))
     standAt(1, route.Outbound.AnchorName)
     for _, forged in ipairs({ 'fishPond>volcanoIsland', 'Z9', 1, true, '' }) do
-      assert.is_false(env.mgr:handle(env.players[1], { action = 'Board', routeId = forged, seq = 1 }))
+      assert.is_false(env.mgr:handle(env.players[1], { action = 'Board', route_id = forged, seq = 1 }))
       assert.same('route', last_reply(1).reason)
     end
     assert.is_false(env.mgr:handle(env.players[1], { action = 'Board', seq = 1 }))
     assert.same('route', last_reply(1).reason)
     assert.is_false(env.mgr:handle(env.players[1],
-      { action = 'Return', routeId = route.Id .. 'x', seq = 1 }))
+      { action = 'Return', route_id = route.Id .. 'x', seq = 1 }))
     assert.same('route', last_reply(1).reason)
     assert.message('拒收不动账').same(1, env.data[1]:ItemCount(route.Outbound.Ticket))
     assert.same(0, #env.broadcasts)
@@ -561,7 +561,7 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
     drain()
     assert.same(1, #env.broadcasts)
     assert.same('countdown', env.broadcasts[1].phase)
-    assert.same(env.route.Id, env.broadcasts[1].routeId)
+    assert.same(env.route.Id, env.broadcasts[1].route_id)
     assert.same(last_reply(2).operation.id, env.broadcasts[1].operation)
     assert.same(0, env.data[2]:ItemCount(env.route.Outbound.Ticket))
     assert.is_false(last_reply(1) and last_reply(1).ok or false)
@@ -586,8 +586,8 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
     local operation = last_reply(1).operation.id
     assert.same('anchor', last_reply(1).reason)
     assert.same({
-      { phase = 'countdown', routeId = env.route.Id, operation = operation, seconds = 5 },
-      { phase = 'cancelled', routeId = env.route.Id, operation = operation, reason = 'anchor' },
+      { phase = 'countdown', route_id = env.route.Id, operation = operation, seconds = 5 },
+      { phase = 'cancelled', route_id = env.route.Id, operation = operation, reason = 'anchor' },
     }, env.broadcasts)
   end)
 
@@ -596,8 +596,8 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
     env.mgr.Save = nil
     assert.is_false(board(1, 1))
     env.mgr.Save = env.save
-    assert.is_false(env.mgr:handle(env.players[1], { action = 'Board', routeId = env.route.Id, seq = 2,
-      requestId = { id = '1:99', sequence = 99, kind = 'ferry:board', requestKey = 'forged' } }))
+    assert.is_false(env.mgr:handle(env.players[1], { action = 'Board', route_id = env.route.Id, seq = 2,
+      requestId = { id = '1:99', sequence = 99, kind = 'ferry:board', request_key = 'forged' } }))
     assert.is_false(board(1, math.huge))
     assert.same(1, env.data[1]:ItemCount(env.route.Outbound.Ticket))
     assert.same(0, #env.broadcasts)
@@ -623,14 +623,14 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
     assert.is_true(board(2, 1, routeB))
     local operationA, operationB = last_reply(1).operation.id, last_reply(2).operation.id
     env.mgr:on_player_removing(env.players[1])
-    assert.same({ phase = 'cancelled', routeId = routeA.Id, operation = operationA,
+    assert.same({ phase = 'cancelled', route_id = routeA.Id, operation = operationA,
       reason = 'payer_left' }, env.broadcasts[3])
     assert.same(3, #env.broadcasts)
     -- B 到点照常开船，把 B 船上的人带走，且没有另一班次的 cancelled。
     env.now = env.now + routeB.Outbound.CountdownSec
     env.mgr:update()
     assert.same(routeB.ToZoneId, env.data[2].data.Zone)
-    assert.same({ phase = 'departed', routeId = routeB.Id, operation = operationB }, env.broadcasts[4])
+    assert.same({ phase = 'departed', route_id = routeB.Id, operation = operationB }, env.broadcasts[4])
     assert.same(4, #env.broadcasts)
   end)
 
@@ -657,7 +657,7 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
     env.now = env.now + 2
     env.mgr:on_player_added(env.players[3])
     assert.same(sent + 1, #env.sent.FerryState)
-    assert.same({ userId = 3, payload = { phase = 'countdown', routeId = env.route.Id,
+    assert.same({ userId = 3, payload = { phase = 'countdown', route_id = env.route.Id,
       operation = operation, seconds = 3 } }, env.sent.FerryState[#env.sent.FerryState])
     assert.same(1, #env.broadcasts)
     env.now = env.now + 2.9
@@ -688,7 +688,7 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
     assert.same(broadcasts, #env.broadcasts)
     env.now = env.now + env.route.Outbound.CountdownSec
     env.mgr:update()
-    assert.same({ phase = 'cancelled', routeId = env.route.Id, operation = operation, reason = 'payer_left' },
+    assert.same({ phase = 'cancelled', route_id = env.route.Id, operation = operation, reason = 'payer_left' },
       env.broadcasts[#env.broadcasts])
   end)
 
@@ -767,7 +767,7 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
     assert.is_false(last_reply(1).ok)
     local operation = last_reply(1).operation
     assert.is_true(env.mgr:handle(player,
-      { action = 'Return', routeId = env.route.Id, seq = 2, requestId = operation }))
+      { action = 'Return', route_id = env.route.Id, seq = 2, requestId = operation }))
     assert.same('teleport', last_reply(1).reason)
     assert.same(40, data.data.FishCoin)
     env.save:load_into(player, data)
@@ -788,7 +788,7 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
     env.players[1], env.data[1] = player, data
     env.save:load_into(player, data)
     assert.is_true(env.mgr:handle(player,
-      { action = 'Return', routeId = env.route.Id, seq = 1, requestId = operation }))
+      { action = 'Return', route_id = env.route.Id, seq = 1, requestId = operation }))
     assert.same(40 - env.route.Return.Price, data.data.FishCoin)
     assert.same(0, player.teleports)
     assert.is_true(last_reply(1).ok)
@@ -862,7 +862,7 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
     assert.same(0, env.data[3]:ItemCount(routeB.Outbound.Ticket))
     assert.same(1, env.data[3].extra.travel.arrived[routeB.ToZoneId])
     assert.same('departed', (env.broadcasts[#env.broadcasts]).phase)
-    assert.same(routeB.Id, (env.broadcasts[#env.broadcasts]).routeId)
+    assert.same(routeB.Id, (env.broadcasts[#env.broadcasts]).route_id)
   end)
 
   it('test_second_ticket_on_same_route_rejected_not_consumed', function()

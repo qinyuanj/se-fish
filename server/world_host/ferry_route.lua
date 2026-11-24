@@ -162,7 +162,7 @@ function FerryRoute.mount(world, opts)
         return nil, "coin"
       end
       draft.extra.recovery.ferry = nil
-      local result = { ok = delivered, action = record.action, routeId = record.routeId,
+      local result = { ok = delivered, action = record.action, route_id = record.route_id,
         price = record.price, operation = record.identity, reason = not delivered and reason or nil }
       local finals = {}
       for _, prior in ipairs(draft.save_meta.operations) do
@@ -183,13 +183,13 @@ function FerryRoute.mount(world, opts)
     if self:pending_flight(route.Id) then return self:fail(player, "Board", "sailing") end
     if not interact or not interact:in_range(player, point) then return self:fail(player, "Board", "range") end
     local session = save.sessions[player.UserId]
-    local flight = { player = player, operation = operation.id, routeId = route.Id }
+    local flight = { player = player, operation = operation.id, route_id = route.Id }
     self.board_pending[route.Id] = flight
     local accepted, reason = self:settle(player, data, "ferry:board", function(draft)
       if not draft:ConsumeItem(point.Ticket) then return nil, "ticket" end
       draft.extra.recovery.ferry = { operation = operation.id, identity = operation, action = "Board",
-        routeId = route.Id, ticket = point.Ticket, zone = point.Zone, state = "pending" }
-      return { ok = true, action = "Board", routeId = route.Id, seconds = point.CountdownSec,
+        route_id = route.Id, ticket = point.Ticket, zone = point.Zone, state = "pending" }
+      return { ok = true, action = "Board", route_id = route.Id, seconds = point.CountdownSec,
         operation = operation }
     end, function(ok, result)
       if self.board_pending[route.Id] ~= flight
@@ -198,13 +198,13 @@ function FerryRoute.mount(world, opts)
       if not ok then self:fail(player, "Board", result) return end
       SpokeRuntime.batch(function()
         sync_tree(player, data)
-        self.flights[route.Id] = { player = player, operation = operation.id, routeId = route.Id,
+        self.flights[route.Id] = { player = player, operation = operation.id, route_id = route.Id,
           depart_at = world.clock.now() + point.CountdownSec }
-        route_states[route.Id]:set({ phase = "countdown", routeId = route.Id,
+        route_states[route.Id]:set({ phase = "countdown", route_id = route.Id,
           operation = operation.id, seconds = point.CountdownSec })
         if route_sailing[route.Id] then route_sailing[route.Id]:set(true) end
       end)
-      self:broadcast({ phase = "countdown", routeId = route.Id, operation = operation.id,
+      self:broadcast({ phase = "countdown", route_id = route.Id, operation = operation.id,
         seconds = point.CountdownSec })
       self:reply(player, result)
     end, operation)
@@ -218,14 +218,14 @@ function FerryRoute.mount(world, opts)
   function handle:return_back(player, data, route, operation)
     local point = route.Return
     if not interact or not interact:in_range(player, point) then return self:fail(player, "Return", "range") end
-    local record = { operation = operation.id, identity = operation, action = "Return", routeId = route.Id,
+    local record = { operation = operation.id, identity = operation, action = "Return", route_id = route.Id,
       price = point.Price, state = "pending", zone = point.Zone }
     self.return_pending[player.UserId] = record
     local outcome
     local accepted, reason = self:settle(player, data, "ferry:return", function(draft)
       if not draft:SpendCoin(point.Price, nil, "ferry:return") then return nil, "coin" end
       draft.extra.recovery.ferry = record
-      return { ok = true, action = "Return", routeId = route.Id, price = point.Price, operation = operation }
+      return { ok = true, action = "Return", route_id = route.Id, price = point.Price, operation = operation }
     end, function(ok, result)
       if self.return_pending[player.UserId] ~= record then return end
       if not ok then
@@ -253,7 +253,7 @@ function FerryRoute.mount(world, opts)
   function handle:recover(player, data)
     local record = data and data.extra and data.extra.recovery and data.extra.recovery.ferry
     if not record then return false end
-    local flight = record.routeId and self:pending_flight(record.routeId)
+    local flight = record.route_id and self:pending_flight(record.route_id)
     if flight and flight.player == player and flight.operation == record.operation then return true end
     if self.recoveries[player.UserId] then return true end
     self.recoveries[player.UserId] = player
@@ -278,7 +278,7 @@ function FerryRoute.mount(world, opts)
           if ok then self:reply(flight.player, result) end
         end)
       end
-      self:broadcast({ phase = "cancelled", routeId = route.Id, operation = flight.operation, reason = "anchor" })
+      self:broadcast({ phase = "cancelled", route_id = route.Id, operation = flight.operation, reason = "anchor" })
       return
     end
     local payer = flight.player
@@ -302,7 +302,7 @@ function FerryRoute.mount(world, opts)
             self:settle(player, data, "ferry:ride", function(draft)
               draft:SetZone(point.Zone)
               mark_arrival(draft, point.Zone)
-              return { ok = true, action = "Board", routeId = route.Id }
+              return { ok = true, action = "Board", route_id = route.Id }
             end, function(ok, result)
               if ok then
                 sync_tree(player, data)
@@ -314,9 +314,9 @@ function FerryRoute.mount(world, opts)
       end
     end
     if delivered_count == 0 then
-      self:broadcast({ phase = "cancelled", routeId = route.Id, operation = flight.operation, reason = "empty" })
+      self:broadcast({ phase = "cancelled", route_id = route.Id, operation = flight.operation, reason = "empty" })
     else
-      self:broadcast({ phase = "departed", routeId = route.Id, operation = flight.operation })
+      self:broadcast({ phase = "departed", route_id = route.Id, operation = flight.operation })
     end
   end
 
@@ -358,7 +358,7 @@ function FerryRoute.mount(world, opts)
     if now >= flight.depart_at then
       self.flights[route.Id] = nil
       SpokeRuntime.batch(function()
-        if state then state:set({ phase = "idle", routeId = route.Id }) end
+        if state then state:set({ phase = "idle", route_id = route.Id }) end
         if sailing then sailing:set(false) end
       end)
       self:depart(route, flight)
@@ -366,7 +366,7 @@ function FerryRoute.mount(world, opts)
       local seconds = math.max(0, flight.depart_at - now)
       local current = state:now()
       if math.ceil(seconds) ~= math.ceil(current.seconds or 0) then
-        state:set({ phase = "countdown", routeId = route.Id, operation = flight.operation, seconds = seconds })
+        state:set({ phase = "countdown", route_id = route.Id, operation = flight.operation, seconds = seconds })
       end
     end
   end
@@ -387,7 +387,7 @@ function FerryRoute.mount(world, opts)
     for _, route in ipairs(GameCfg.Ferry.Routes) do
       local flight = self.flights[route.Id]
       if flight and flight.depart_at and now < flight.depart_at and channel and channel.FireClient then
-        channel:FireClient(player, { phase = "countdown", routeId = route.Id, operation = flight.operation,
+        channel:FireClient(player, { phase = "countdown", route_id = route.Id, operation = flight.operation,
           seconds = flight.depart_at - now })
       end
     end
@@ -424,10 +424,10 @@ function FerryRoute.mount(world, opts)
         interrupted = true
         self.flights[route_id] = nil
         SpokeRuntime.batch(function()
-          if route_states[route_id] then route_states[route_id]:set({ phase = "idle", routeId = route_id }) end
+          if route_states[route_id] then route_states[route_id]:set({ phase = "idle", route_id = route_id }) end
           if route_sailing[route_id] then route_sailing[route_id]:set(false) end
         end)
-        self:broadcast({ phase = "cancelled", routeId = route_id, operation = flight.operation,
+        self:broadcast({ phase = "cancelled", route_id = route_id, operation = flight.operation,
           reason = "payer_left" })
       end
     end
@@ -443,7 +443,7 @@ function FerryRoute.mount(world, opts)
     local method = Actions[payload.action]
     local seq = payload.seq
     if not method or type(seq) ~= "number" or seq ~= math.floor(seq) then return false end
-    local route = GameCfg.Ferry.route(payload.routeId)
+    local route = GameCfg.Ferry.route(payload.route_id)
     if not route then return self:fail(player, payload.action, "route") end
     local data = data_of(player)
     if not data then return false end
@@ -486,7 +486,7 @@ function FerryRoute.mount(world, opts)
     local zone = world.zones[route.FromZoneId]
     if zone and zone.ferry_routes then
       zone.ferry_routes:call(route.Id, LambdaEpoch.new("FerryRoute:" .. route.Id, function(scope)
-        local state = State.new("FerryRoute." .. route.Id, { phase = "idle", routeId = route.Id })
+        local state = State.new("FerryRoute." .. route.Id, { phase = "idle", route_id = route.Id })
         local sailing = State.new("FerryRoute.sailing." .. route.Id, false)
         route_states[route.Id] = state
         route_sailing[route.Id] = sailing

@@ -106,7 +106,7 @@ function AttackView.mount(scope, ctx)
     local pressing = State.new("AttackView.pressing", false)
     local auto_fired = false
     local next_auto = 0
-    local gesture = PressGesture.new({ LongPressSec = GameCfg.Ability.Throw.LongPressSec })
+    local gesture = PressGesture.new({ long_press_sec = GameCfg.Ability.Throw.LongPressSec })
     local function current_gun()
       local weapon_id = equipped(ctx.store.item_bar:now())
       return weapon_id and GameCfg.Ability.Guns[weapon_id] or nil

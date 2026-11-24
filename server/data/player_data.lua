@@ -249,7 +249,7 @@ function PlayerData:Migrate(snapshot)
         local held = extra.inventory.selection.held
         if type(held) ~= 'table' or held.kind ~= nil and held.kind ~= 'slot' and held.kind ~= 'weapon'
             or held.id ~= nil and type(held.id) ~= 'string'
-            or held.slot ~= nil and not integer(held.slot, 1, max) then return nil, '手持状态损坏' end
+            or held.slot ~= nil and not integer(held.slot, 1, GameCfg.Items.InitialItemBarSlots + saved.up) then return nil, '手持状态损坏' end
         for itemId, count in pairs(extra.inventory.weapons) do
             local def = GameCfg.Items.Definitions[itemId]
             if not def or def.Type ~= '近战武器' and def.Type ~= '远程武器'
@@ -270,7 +270,7 @@ function PlayerData:Migrate(snapshot)
         for _, op in ipairs(meta.operations) do
             if type(op) ~= 'table' or not integer(op.sequence, last + 1, meta.sequence)
                 or type(op.id) ~= 'string' or type(op.kind) ~= 'string' or type(op.result) ~= 'table'
-                or op.requestKey ~= nil and type(op.requestKey) ~= 'string' then
+                or op.request_key ~= nil and type(op.request_key) ~= 'string' then
                 return nil, '操作日志损坏'
             end
             last = op.sequence
@@ -369,7 +369,7 @@ function PlayerData:ApplyGMPatch(patch)
         return type(n) == 'number' and n == math.floor(n) and n >= min and n <= max
     end
     local coin = patch.coin == nil and self.data.FishCoin or patch.coin
-    local level = patch.upgradeLevel == nil and self.data.upgrade_level or patch.upgradeLevel
+    local level = patch.upgrade_level == nil and self.data.upgrade_level or patch.upgrade_level
     if not int(coin, 0, math.maxinteger) or not int(level, 0, #GameCfg.Items.UpgradePrices) then
         return false, '金币或扩容等级无效'
     end
@@ -456,7 +456,7 @@ function PlayerData:GetItemBarSnapshot()
         slotCount = self:ItemBarCapacity(),
         backpack = copySlots(self.data.containers[GameCfg.Items.ContainerId.Backpack], self:BackpackCapacity()),
         backpackCount = self:BackpackCapacity(),
-        upgradeLevel = self.data.upgrade_level,
+        upgrade_level = self.data.upgrade_level,
         bait = bait,
         coin = self.data.FishCoin,
         selectedSlot = self.data.selected_slot,

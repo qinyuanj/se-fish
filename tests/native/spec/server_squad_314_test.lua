@@ -58,7 +58,7 @@ local function make_save()
       if type(request_id) ~= "number" then return nil end
       seq = seq + 1
       return { id = tostring(player.UserId) .. ":" .. seq, sequence = seq, kind = kind,
-        requestKey = kind .. ":" .. tostring(request_id) }, "new"
+        request_key = kind .. ":" .. tostring(request_id) }, "new"
     end,
     execute = function(_, _, _, _, transform, done)
       local ok, result, reason = pcall(transform)

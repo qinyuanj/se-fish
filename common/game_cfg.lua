@@ -918,10 +918,10 @@ end
 GameCfg.Ferry.HomeZone = GameCfg.Zones[1].Id
 GameCfg.Ferry.Outbound = GameCfg.Ferry.Routes[1].Outbound
 GameCfg.Ferry.Return = GameCfg.Ferry.Routes[1].Return
-function GameCfg.Ferry.route(routeId)
-    if type(routeId) ~= 'string' then return nil end
+function GameCfg.Ferry.route(route_id)
+    if type(route_id) ~= 'string' then return nil end
     for _, route in ipairs(GameCfg.Ferry.Routes) do
-        if route.Id == routeId then return route end
+        if route.Id == route_id then return route end
     end
 end
 

@@ -229,7 +229,7 @@ describe('条款 18 存档会话与结算身份', function()
     player.Character.Position = vec(anchor.x, anchor.y, anchor.z)
     local before = #storeSnapshot(uid).meta.operations
 
-    assert.is_true(env.ferry:handle(player, { action = 'Board', routeId = env.route.Id, seq = 1 }))
+    assert.is_true(env.ferry:handle(player, { action = 'Board', route_id = env.route.Id, seq = 1 }))
     drain()
     local first = last_reply('FerryResult').payload
     assert.is_true(first.ok, tostring(first.reason))
@@ -237,7 +237,7 @@ describe('条款 18 存档会话与结算身份', function()
     assert.same(0, data:ItemCount(env.route.Outbound.Ticket))
     assert.same(before + 1, #storeSnapshot(uid).meta.operations)
 
-    assert.is_true(env.ferry:handle(player, { action = 'Board', routeId = env.route.Id, seq = 2,
+    assert.is_true(env.ferry:handle(player, { action = 'Board', route_id = env.route.Id, seq = 2,
       requestId = first.operation }))
     drain()
     local replay = last_reply('FerryResult').payload
@@ -257,7 +257,7 @@ describe('条款 18 存档会话与结算身份', function()
     assert.is_true(env.save:Save(uid, data:Serialize(), 'test'))
     drain()
     env.writeFailure = true
-    env.ferry:handle(player, { action = 'Board', routeId = env.route.Id, seq = 1 })
+    env.ferry:handle(player, { action = 'Board', route_id = env.route.Id, seq = 1 })
     drain()
     -- 会话被写失败关闭后内存实例不再可读；以持久快照判断船票有没有被先扣。
     local persisted = storeSnapshot(uid)
@@ -274,7 +274,7 @@ describe('条款 18 存档会话与结算身份', function()
     assert.is_true(data:AddItem(env.route.Outbound.Ticket))
     local anchor = env.anchors[env.route.Outbound.AnchorName].Position
     player.Character.Position = vec(anchor.x, anchor.y, anchor.z)
-    env.ferry:handle(player, { action = 'Board', routeId = env.route.Id, seq = 1 })
+    env.ferry:handle(player, { action = 'Board', route_id = env.route.Id, seq = 1 })
     drain()
     local operation = last_reply('FerryResult').payload.operation
     assert.is_not_nil(operation)
@@ -288,7 +288,7 @@ describe('条款 18 存档会话与结算身份', function()
     assert.same(1, fresh:ItemCount(env.route.Outbound.Ticket), '未完成的船票应回退一次')
 
     local before = #storeSnapshot(uid).meta.operations
-    assert.is_true(env.ferry:handle(rejoined, { action = 'Board', routeId = env.route.Id, seq = 2,
+    assert.is_true(env.ferry:handle(rejoined, { action = 'Board', route_id = env.route.Id, seq = 2,
       requestId = operation }))
     drain()
     assert.same(1, fresh:ItemCount(env.route.Outbound.Ticket))
@@ -449,7 +449,7 @@ describe('条款 18 存档会话与结算身份', function()
     env.players:on_player_added(pending)
     assert.same('pending', env.save:status(uid2).loadState)
     assert.is_false(env.ferry:handle(pending,
-      { action = 'Board', routeId = env.route.Id, seq = 1 }))
+      { action = 'Board', route_id = env.route.Id, seq = 1 }))
     assert.is_nil(last_reply('FerryResult')) -- 未就绪不回成功包
     drain()
   end)

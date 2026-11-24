@@ -1037,8 +1037,8 @@ function ServerRuntime.new(opts)
       phase = "combat"
     end
     local health = fish.carrier and fish.carrier.Health or species.Health
-    local maxHealth = species.Health or 0
-    local ratio = maxHealth > 0 and (health or 0) / maxHealth or 0
+    local max_health = species.Health or 0
+    local ratio = max_health > 0 and (health or 0) / max_health or 0
     local bossPhase = nil
     if fish.fish_id == "fish56Boss" then
       bossPhase = ratio > 0.6 and "land" or (ratio > 0.2 and "water" or "enraged")
@@ -1054,7 +1054,7 @@ function ServerRuntime.new(opts)
       bossPhase = bossPhase,
       grounded = not lifted,
       health = health,
-      maxHealth = maxHealth,
+      max_health = max_health,
       label = fish.MoveName or (phase == "combat" and "战斗" or (phase == "escape" and "逃脱" or "举鱼")),
       warning = fish.Warning,
       holderId = fish.holder and fish.holder.UserId or nil,

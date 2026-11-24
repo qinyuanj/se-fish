@@ -668,9 +668,9 @@ describe('TestMgrWeaponThrow', function()
             resolve_request = function(_, player, data, kind, requestId)
                 assert.same('throw', kind)
                 if requestId == 7 and ctx.replayed then
-                    return { id = '42:1', sequence = 1, kind = 'throw', requestKey = 'k' }, 'replay'
+                    return { id = '42:1', sequence = 1, kind = 'throw', request_key = 'k' }, 'replay'
                 end
-                return { id = '42:1', sequence = 1, kind = 'throw', requestKey = 'k' }, 'new'
+                return { id = '42:1', sequence = 1, kind = 'throw', request_key = 'k' }, 'new'
             end,
             execute = function(_, player, data, operation, transform, done)
                 if ctx.replayed then
@@ -831,7 +831,7 @@ end)
 describe('TestPressGesture', function()
     it('test_tap_and_long_press_and_move_cancel', function()
         local Gesture = require('client.press_gesture')
-        local g = Gesture.new({ LongPressSec = 0.35 })
+        local g = Gesture.new({ long_press_sec = 0.35 })
         g:begin(10, { x = 100, y = 100 })
         assert.same('tap', g:finish(10.1, { x = 103, y = 101 }))
         g:begin(20, { x = 100, y = 100 })

@@ -156,18 +156,18 @@ local function vitals_equals(a, b)
     return false
   end
   return a.health == b.health
-    and a.maxHealth == b.maxHealth
+    and a.max_health == b.max_health
     and a.hunger == b.hunger
-    and a.maxHunger == b.maxHunger
+    and a.max_hunger == b.max_hunger
 end
 
 local function default_vitals()
   local c = GameCfg.Vitals
   return freeze_snapshot({
     health = c.MaxHealth,
-    maxHealth = c.MaxHealth,
+    max_health = c.MaxHealth,
     hunger = c.MaxHunger,
-    maxHunger = c.MaxHunger,
+    max_hunger = c.MaxHunger,
   }, 0, "ClientStore.vitals")
 end
 
@@ -263,7 +263,7 @@ local function normalize_party(payload)
     if member.health ~= nil and not Number.is_finite_number(member.health) then
       return nil
     end
-    if member.maxHealth ~= nil and not Number.is_finite_number(member.maxHealth) then
+    if member.max_health ~= nil and not Number.is_finite_number(member.max_health) then
       return nil
     end
     if member.phase ~= nil and not VALID_SURVIVAL_PHASES[member.phase] then
@@ -273,7 +273,7 @@ local function normalize_party(payload)
       userId = member.userId,
       name = member.name,
       health = member.health,
-      maxHealth = member.maxHealth,
+      max_health = member.max_health,
       phase = member.phase or "alive",
       self = member.self == true or nil,
     }
@@ -311,8 +311,8 @@ end
 local function default_shop()
   return freeze_snapshot({
     purchases = {},
-    upgradeLevels = {},
-    upgradeLevel = 0,
+    upgrade_levels = {},
+    upgrade_level = 0,
   }, 0, "ClientStore.shop")
 end
 
@@ -451,7 +451,7 @@ function ClientStore.new(options)
   local function apply_story_snapshot(normalized)
     if normalized.read == true and states.active_modal:now() == "story" then
       local current = states.modal_payload:now()
-      if type(current) ~= "table" or current.readKey == nil or current.readKey == normalized.readKey then
+      if type(current) ~= "table" or current.read_key == nil or current.read_key == normalized.read_key then
         states.active_modal:set(nil)
         states.modal_payload:set(nil)
       end
@@ -481,8 +481,8 @@ function ClientStore.new(options)
     local previous = states.shop:now()
     local purchases, upgrade_levels = {}, {}
     for key, value in pairs(previous.purchases or {}) do purchases[key] = value end
-    for key, value in pairs(previous.upgradeLevels or {}) do upgrade_levels[key] = value end
-    local upgrade_level = previous.upgradeLevel or 0
+    for key, value in pairs(previous.upgrade_levels or {}) do upgrade_levels[key] = value end
+    local upgrade_level = previous.upgrade_level or 0
     if payload.ok then
       if payload.number then purchases[payload.number] = (purchases[payload.number] or 0) + 1 end
       if payload.kind and payload.level then
@@ -491,7 +491,7 @@ function ClientStore.new(options)
       if payload.action == "UpgradeStorage" and payload.level then upgrade_level = payload.level end
     end
     states.shop:set(freeze_snapshot({
-      purchases = purchases, upgradeLevels = upgrade_levels, upgradeLevel = upgrade_level,
+      purchases = purchases, upgrade_levels = upgrade_levels, upgrade_level = upgrade_level,
     }, 0, "ClientStore.shop"))
     if Number.is_finite_number(payload.coinAfter) then
       states.coin:set(math.floor(payload.coinAfter))
@@ -648,9 +648,9 @@ function ClientStore.new(options)
     local cur = states.vitals:now()
     local next_vitals = freeze_snapshot({
       health = sanitize_vital_field(input.health, cur.health),
-      maxHealth = sanitize_vital_field(input.maxHealth, cur.maxHealth),
+      max_health = sanitize_vital_field(input.max_health, cur.max_health),
       hunger = sanitize_vital_field(input.hunger, cur.hunger),
-      maxHunger = sanitize_vital_field(input.maxHunger, cur.maxHunger),
+      max_hunger = sanitize_vital_field(input.max_hunger, cur.max_hunger),
     }, 0, "ClientStore.vitals")
     SpokeRuntime.batch(function()
       states.vitals:set(next_vitals)
@@ -819,9 +819,9 @@ function ClientStore.new(options)
       local raw_coin = include_coin and tonumber(read_player_attr(player, "FishCoin")) or nil
       self:update_vitals({
         health = Number.is_finite_number(raw_health) and raw_health or c.MaxHealth,
-        maxHealth = Number.is_finite_number(raw_max_health) and raw_max_health or c.MaxHealth,
+        max_health = Number.is_finite_number(raw_max_health) and raw_max_health or c.MaxHealth,
         hunger = Number.is_finite_number(raw_hunger) and raw_hunger or c.MaxHunger,
-        maxHunger = Number.is_finite_number(raw_max_hunger) and raw_max_hunger or c.MaxHunger,
+        max_hunger = Number.is_finite_number(raw_max_hunger) and raw_max_hunger or c.MaxHunger,
         coin = Number.is_finite_number(raw_coin) and raw_coin or nil,
       })
     end

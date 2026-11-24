@@ -112,9 +112,9 @@ local function current_upgrade(ctx, kind)
   local shop = shop_state(ctx) or {}
   if kind == "backpack" then
     local item_bar = ctx.store.item_bar:now() or {}
-    return math.max(shop.upgradeLevel or 0, item_bar.upgradeLevel or 0)
+    return math.max(shop.upgrade_level or 0, item_bar.upgrade_level or 0)
   end
-  return shop.upgradeLevels and shop.upgradeLevels[kind] or 0
+  return shop.upgrade_levels and shop.upgrade_levels[kind] or 0
 end
 
 local function row_state(goods, level, current, purchases)
@@ -149,7 +149,7 @@ local function build_rows(ctx, page, level)
       state = state,
       reason = reason,
       stateText = state_text,
-      upgradeLevel = current,
+      upgrade_level = current,
       isNew = goods.MinShopLevel == level,
       newText = goods.MinShopLevel == level and ShopView.shop_text.New or "",
       icon = definition and definition.Icon or nil,
@@ -179,7 +179,7 @@ local function detail_of(ctx, row)
   end
   local upgrade_text = ""
   if goods.Upgrade then
-    local current = row.upgradeLevel or 0
+    local current = row.upgrade_level or 0
     upgrade_text = current >= goods.Upgrade.level
         and string.format(ShopView.shop_text.upgrade_owned, current)
         or string.format(ShopView.shop_text.upgrade_target, current, goods.Upgrade.level)

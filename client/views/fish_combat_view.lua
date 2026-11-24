@@ -23,7 +23,7 @@ end
 local function bar_text(row)
   local name = row.name or row.fishId or "鱼"
   local health = row.health or 0
-  local max_health = row.maxHealth or health
+  local max_health = row.max_health or health
   return tostring(name) .. " " .. tostring(health) .. "/" .. tostring(max_health)
 end
 

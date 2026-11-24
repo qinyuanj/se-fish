@@ -112,7 +112,7 @@ describe("客户端 Spoke 主干契约（#296）", function()
       writer:ingest_event("PartyState", {
         state = "party",
         partyId = 3,
-        members = { { userId = 1, name = "甲", health = 300, maxHealth = 300 } },
+        members = { { userId = 1, name = "甲", health = 300, max_health = 300 } },
       })
 
       assert.has_error(function() store.survival:now().phase = "dead" end)
@@ -199,8 +199,8 @@ describe("客户端 Spoke 主干契约（#296）", function()
         state = "party",
         partyId = 7,
         members = {
-          { userId = 1, name = "甲", health = 300, maxHealth = 300, self = true },
-          { userId = 2, name = "乙", health = 120, maxHealth = 300 },
+          { userId = 1, name = "甲", health = 300, max_health = 300, self = true },
+          { userId = 2, name = "乙", health = 120, max_health = 300 },
         },
       })
       assert.equals("party", store.party:now().state)
@@ -470,8 +470,8 @@ describe("客户端 Spoke 主干契约（#296）", function()
         state = "party",
         partyId = 1,
         members = {
-          { userId = 10, name = "乙", health = 300, maxHealth = 300 },
-          { userId = 20, name = "丙", health = 150, maxHealth = 300 },
+          { userId = 10, name = "乙", health = 300, max_health = 300 },
+          { userId = 20, name = "丙", health = 150, max_health = 300 },
         },
       })
       local row10 = dock_nodes["u:10"]
@@ -488,7 +488,7 @@ describe("客户端 Spoke 主干契约（#296）", function()
         state = "party",
         partyId = 1,
         members = {
-          { userId = 10, name = "乙", health = 120, maxHealth = 300 },
+          { userId = 10, name = "乙", health = 120, max_health = 300 },
         },
       })
       assert.equals(row10, dock_nodes["u:10"])
@@ -795,21 +795,21 @@ describe("客户端 Spoke 主干契约（#296）", function()
       end
     end)
 
-    it("ClientStore reset_session 完整重置 shop 状态（含 purchases/upgradeLevels/upgradeLevel）", function()
+    it("ClientStore reset_session 完整重置 shop 状态（含 purchases/upgrade_levels/upgrade_level）", function()
       local ClientStore = require("client.store.client_store")
       local store, writer = ClientStore.new({ initial_now = 10 })
       assert.is_true(writer:ingest_event("ShopResult", {
         ok = true, action = "UpgradeStorage", number = 5, kind = "rod", level = 2, coinAfter = 88,
       }))
       assert.equals(1, store.shop:now().purchases[5])
-      assert.equals(2, store.shop:now().upgradeLevels.rod)
-      assert.equals(2, store.shop:now().upgradeLevel)
+      assert.equals(2, store.shop:now().upgrade_levels.rod)
+      assert.equals(2, store.shop:now().upgrade_level)
       assert.equals(88, store.coin:now())
 
       writer:reset_session("reconnect")
       assert.same({}, store.shop:now().purchases)
-      assert.same({}, store.shop:now().upgradeLevels)
-      assert.equals(0, store.shop:now().upgradeLevel)
+      assert.same({}, store.shop:now().upgrade_levels)
+      assert.equals(0, store.shop:now().upgrade_level)
       assert.equals(0, store.coin:now())
     end)
   end)

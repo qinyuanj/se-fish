@@ -778,7 +778,7 @@ local function step()
         focus(data, nil)
         local wait = needNear({ route.Outbound.AnchorName }, route.Outbound.Radius, route.Outbound.Slack, '摆渡上船')
         if wait then return wait end
-        local ok = Ferry:handle(player, { action = 'Board', routeId = route.Id, seq = nextSeq(Ferry) })
+        local ok = Ferry:handle(player, { action = 'Board', route_id = route.Id, seq = nextSeq(Ferry) })
         say('FERRY', 'Board accepted=' .. tostring(ok))
         RT.pendingUntil = now() + route.Outbound.CountdownSec + 2
         return 'wait', 1

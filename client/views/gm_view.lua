@@ -65,7 +65,7 @@ function GMView.modal_spec()
     fishPageLabel = Modal.label(scope, ctx, panel, "LabelGMFishPage", "")
     refresh_fish()
     local inputs = {}
-    for _, field in ipairs({ "coin", "upgradeLevel", "container", "index", "itemId", "count", "mult", "slot" }) do
+    for _, field in ipairs({ "coin", "upgrade_level", "container", "index", "itemId", "count", "mult", "slot" }) do
       inputs[field] = ctx.create_node(scope, "EUIInputField", { Parent = panel, Name = "GMInput_" .. field, Text = "" })
     end
     local function state_payload(action)
@@ -73,7 +73,7 @@ function GMView.modal_spec()
       for field, input in pairs(inputs) do
         local text = input.Text
         if type(text) == "string" and text ~= "" then
-          if field == "coin" or field == "upgradeLevel" or field == "index" or field == "count" or field == "mult" then
+          if field == "coin" or field == "upgrade_level" or field == "index" or field == "count" or field == "mult" then
             payload[field] = tonumber(text)
           else
             payload[field] = text
@@ -116,7 +116,7 @@ function GMView.modal_spec()
       local snapshot = value.snapshot
       if type(snapshot) == "table" then
         if snapshot.coin ~= nil then inputs.coin.Text = tostring(snapshot.coin) end
-        if snapshot.upgradeLevel ~= nil then inputs.upgradeLevel.Text = tostring(snapshot.upgradeLevel) end
+        if snapshot.upgrade_level ~= nil then inputs.upgrade_level.Text = tostring(snapshot.upgrade_level) end
         if value.status and value.status.slot ~= nil then inputs.slot.Text = tostring(value.status.slot) end
       end
     end)
