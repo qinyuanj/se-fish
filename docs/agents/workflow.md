@@ -93,6 +93,12 @@ lua tools/cli.lua worktree-init
 
 **人工验收**：质量工具由人在 dsh-uml-viewer 插件面板上发起，标准工具环境（含 crapper 要求的 cluacov 1.0.0）由人按插件文档准备。agent 在交付说明里把 `uml_crap`、`uml_mutate`、`uml_dry` 列为待人工在面板发起的项；是否通过以插件发布的结果记录和 `.metrics/` 快照为准。
 
+## 提 PR 与叠栈合并
+
+- **先合底层，再改基合上层**：B 栈在 A 上时，合 A 后把 B 的 base 改成 `main` 再合。
+- **合底层不要删基分支**：GitHub 在基分支被删时会直接关闭下游 PR，且重建同名基分支也无法重开（#326 实测），只能从同一 head 分支新开一个 PR 承接。确认上层已改基或已合入后再删。
+- **合并前确认 `mergeStateStatus` 为 `CLEAN`**：`full` 是 `main` 唯一的 required status check，pending 与 blocked 都不算通过。
+
 ## 产物归属
 
 执行过程产物（调研全文、验证台账、验收记录、开发计划）贴进对应 issue 的评论；`docs/` 只留长期参考（术语、技术难点、ADR、跨轮复用的技术选型调查）。放进 `docs/research/` 的文档必须从 `AGENTS.md`、`docs/agents/` 或 ADR 留一条指针——没人指向的调研等于不存在，`doc_link_guard_test` 会拦下零引用的 research 文档。`eggy-dev-plan` 默认的 `docs/plan/` 输出在本仓库改为 issue 评论。
