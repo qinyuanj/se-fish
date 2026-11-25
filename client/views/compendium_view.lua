@@ -12,9 +12,10 @@ local GRADE_ORDER = {
 }
 local RANK = { normal = 1, rare = 2, elite = 3, boss = 4 }
 
+-- EUI 的 Position 是节点中心、原点在父节点左下角：布局表写的是左上角，落点要加半个尺寸。
 local function set_rect(node, x, y, w, h)
   if type(Vector2) == "table" and type(Vector2.New) == "function" then
-    node.Position = Vector2.New(x, y)
+    node.Position = Vector2.New(x + w / 2, y + h / 2)
     node.Size = Vector2.New(w, h)
   end
 end

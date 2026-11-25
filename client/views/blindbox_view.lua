@@ -37,7 +37,7 @@ function BlindboxView.entry_spec()
       end)
       local rect = type((ctx.services or {}).hud_entry_rect) == "function" and ctx.services.hud_entry_rect("BlindboxEntry") or nil
       if rect then
-        button.Position = Vector2.New(rect.x - rect.w / 2, rect.y - rect.h / 2)
+        button.Position = Vector2.New(rect.x, rect.y)
         button.Size = Vector2.New(rect.w, rect.h)
       end
     end,
