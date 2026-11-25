@@ -21,7 +21,7 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: 检出仓库
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: 判定变更范围（纯文档快速路径 / 兜底全量）
         id: changes
@@ -109,7 +109,7 @@ jobs:
       - name: 缓存 emmylua_check 0.25.1
         id: cache-emmylua
         if: steps.changes.outputs.docs_only != 'true'
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: .emmylua
           key: ${{ runner.os }}-emmylua-0.25.1-577982E6-v1
