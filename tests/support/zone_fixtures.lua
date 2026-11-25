@@ -97,8 +97,10 @@ function M.World()
   return world
 end
 
+local apply_world
 function M.apply(cfg)
-  ZoneMarkers.resolve(M.World(), cfg)
+  apply_world = apply_world or M.World()
+  ZoneMarkers.resolve(apply_world, cfg)
   return cfg
 end
 

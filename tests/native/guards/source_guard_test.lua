@@ -87,6 +87,22 @@ local function source_of(path)
   return sources_memo[path]
 end
 
+local requires_memo = {}
+local function requires_of(path)
+  if not requires_memo[path] then
+    requires_memo[path] = Arch.requires(source_of(path))
+  end
+  return requires_memo[path]
+end
+
+local code_only_memo = {}
+local function code_only_of(path)
+  if not code_only_memo[path] then
+    code_only_memo[path] = Arch.code_only(source_of(path))
+  end
+  return code_only_memo[path]
+end
+
 local function shadows_local(code, name)
   for decl in code:gmatch("local%s+([%w_,%s]+)") do
     for candidate in decl:gmatch("[%w_]+") do
@@ -122,7 +138,7 @@ describe("三端源码守卫", function()
   it("test_requires_carry_project_prefix", function()
     scan(business_files(), function(path, src)
       local bad = {}
-      for _, mod in ipairs(Arch.requires(src)) do
+      for _, mod in ipairs(requires_of(path)) do
         if not mod:match("^client%.") and not mod:match("^common%.") and not mod:match("^server%.") then
           bad[#bad + 1] = path .. " → " .. mod
         end
@@ -136,7 +152,7 @@ describe("三端源码守卫", function()
     for _, path in ipairs(source_files()) do exact[path] = true end
     scan(source_files(), function(path, src)
       local bad = {}
-      for _, mod in ipairs(Arch.requires(src)) do
+      for _, mod in ipairs(requires_of(path)) do
         local want = mod:gsub("%.", "/") .. ".lua"
         if not exact[want] then
           local near
@@ -161,7 +177,7 @@ describe("三端源码守卫", function()
     local stubs = { EggyAPI = true, EggyEditorAPI = true }
     scan(business_files(), function(path, src)
       local bad = {}
-      for _, mod in ipairs(Arch.requires(src)) do
+      for _, mod in ipairs(requires_of(path)) do
         if stubs[mod] or stubs[mod:match("[^.]+$")] then
           bad[#bad + 1] = path .. " → " .. mod
         end
@@ -172,7 +188,7 @@ describe("三端源码守卫", function()
 
   it("test_business_code_avoids_sandbox_removed_globals", function()
     scan(business_files(), function(path, src)
-      local code = Arch.code_only(src)
+      local code = code_only_of(path)
       local bad = {}
       for _, name in ipairs(BANNED_GLOBALS) do
         -- 同名 local 会遮蔽全局（如 server/data/player_data.lua 的 local debug = GameCfg.Debug），
@@ -189,7 +205,7 @@ describe("三端源码守卫", function()
   it("test_reentrant_entrypoints_keep_connection_handles", function()
     local matched_entries = 0
     scan(business_files(), function(path, src)
-      local code = Arch.code_only(src)
+      local code = code_only_of(path)
       local bad = {}
       local entry, entry_indent
       local number = 0
@@ -230,7 +246,7 @@ describe("三端源码守卫", function()
 
   it("test_remote_event_creation_stays_inside_reutil", function()
     scan(business_files(), function(path, src)
-      local code, bad = Arch.code_only(src), {}
+      local code, bad = code_only_of(path), {}
       local old = code:find("game%s*:%s*CreateRemoteEvent%s*%(")
       if old then
         bad[#bad + 1] = path .. ":" .. line_of(code, old) .. " 使用未公开 game:CreateRemoteEvent"
@@ -253,7 +269,7 @@ describe("三端源码守卫", function()
     scan(business_files(), function(path, src)
       local realm = path:match("^([^/]+)/")
       if not banned[realm] then return {} end
-      local code, bad, from = Arch.code_only(src), {}, 1
+      local code, bad, from = code_only_of(path), {}, 1
       while true do
         local first, last = code:find("GetService%s*%(", from)
         if not first then break end
@@ -277,7 +293,7 @@ describe("三端源码守卫", function()
     local checked = 0
     scan(business_files(), function(path, src)
       if not path:match("^server/") then return {} end
-      local code = Arch.code_only(src)
+      local code = code_only_of(path)
       if not code:find("self%s*%.%s*last_seq%f[^%w_]") then return {} end
       checked = checked + 1
       local padded = "\n" .. code
