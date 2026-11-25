@@ -34,6 +34,7 @@ Lua 命令使用 **Lua 5.4**，命令名统一 `lua`，执行前用 `lua -v` 核
 - **Test lane / 测试车道**五条：单测放 `tests/native/`，slow 放 `tests/native/slow/`，**条款断言**放 `tests/native/spec/`，**门禁型**放 `tests/native/guards/`，美术放 `tests/native/art/`（**美术 optional**，Blender 用例不进 full，用 `lua tools/cli.lua test art` 单独跑）；共享夹具放 `tests/support/`，探针放 `tests/probes/`（手工探针，不入任何车道）。日常运行 `lua tools/cli.lua test`（缺省 fast），收尾运行 `lua tools/cli.lua test full`（= fast + slow + spec），单独跑条款或门禁用 `lua tools/cli.lua test spec` / `lua tools/cli.lua test guards`；`--` 之后的参数原样透传给 busted。车道真源是根目录 `.busted`，共享初始化在 `tests/native/helper.lua`。
   _Avoid_: 验收车道、代码收尾门、lane（单独使用时）、test suite、test group
   - `busted` 命令：`test` 子命令与人手 shell 统一用 PATH 上的 `busted`（不在 PATH 时 CLI 退出码 3）。它由 LuaRocks 装在 `%APPDATA%\luarocks\bin`，该目录必须在 PATH 里；安装命令 `luarocks --local install busted` 在 Git Bash 里执行。
+  - `--jobs N`：把车道按文件分给 N 个 busted 进程并跑（1..8，缺省 1 即串行）。文件表从 `.busted` 现读、按文件字节数装箱；写固定路径的车道段（slow、art）始终串行，段序与 `.busted` 的 ROOT 顺序相同，用例执行顺序因此不变。12 逻辑核实测 fast 约 15 秒 → 4.3 秒、full 约 27 秒 → 10 秒、guards 5.3 秒 → 1.9 秒；8 路之后收益饱和（每路都要重新读盘）。并行时 `--` 之后只收 busted 选项：再给 ROOT 参数与分片冲突，按用法错误退 2。
 
 ### 试玩存档隔离
 
@@ -82,7 +83,7 @@ lua tools/cli.lua worktree-init
 
 | 检查 | 通过条件 |
 |---|---|
-| `lua tools/cli.lua test full`（收尾） | 含 slow 车道，全部用例通过，末行匹配 `N successes / 0 failures / 0 errors / 0 pending : T seconds`，退出码 0 |
+| `lua tools/cli.lua test full`（收尾） | 含 slow 车道，全部用例通过，末行匹配 `N successes / 0 failures / 0 errors / 0 pending : T seconds`，退出码 0。`--jobs N` 并行时这一行由工具把各分片聚合后最后打印，T 是两位小数的墙钟（串行时是 busted 自己那行） |
 | `lua tools/cli.lua emmylua`（本地门禁） | `emmylua_check 0.25.1` 跑完且没有基线外诊断，退出码 0；CI 随 `full` 强制执行 |
 | 美术资产交付（美术校验） | 仓库外的资产校验脚本跑完并产出 `validation/validation.json`，报告里 `failures` 为空（含网格封闭性硬门槛）；只看这份报告，不另开 CI，资产校验不进测试车道。预算文件、`mesh` 段或 `validation.json` 缺失同样算失败，口径见 [美术资产概要「验收」](../art-asset-overview.md#验收) |
 | `lua tools/cli.lua deploy` 后复核 `code validate` | `ok=true`、`data.valid=true`、`data.is_se_map=true`，`data.issues` 与 `meta.warnings` 均为空 |

@@ -40,17 +40,26 @@ end
 
 local temp_counter = 0
 
+-- 进程标记：本模块加载时取一次。没有 getpid 可用，改用「进程启动至今的墙钟微秒」——
+-- 分片并行时各进程的启动时刻相差几十毫秒，这个数不会撞（不用 math.random：random_guard 会
+-- 换掉 math.random 的引用，夹具不该依赖它）。
+local PROCESS_TOKEN = string.format("%d", math.floor(os.clock() * 1000000 + 0.5))
+
 -- 在仓库 tmp/ 下建一个唯一临时目录并返回其正斜杠路径。
+-- 名字里必须有进程标记：调用方（用例）用完会 rmrf 掉返回的目录，而 auto-insulate 每个文件
+-- 重新加载本模块、计数器回到 1；两个分片进程在同一秒各要一次临时目录就会算出一模一样的名字，
+-- 先删掉的那个把名字让了出去，另一个进程占下后，先前的进程又往同一个路径里重建夹具
+-- （acceptance_matrix_test 实测：分片并跑时 docs/acceptance 被别的进程删空）。
+-- 名字带进程标记之后这种回收不会发生；lfs.mkdir 的原子性再兜一层，撞上就换下一个序号。
 function M.temp_dir()
   local base = M.repo_root() .. "/tmp"
   M.mkdirp(base)
-  local dir
-  repeat
+  for _ = 1, 1000 do
     temp_counter = temp_counter + 1
-    dir = base .. "/fs-fixture-" .. tostring(os.time()) .. "-" .. tostring(temp_counter)
-  until not M.exists(dir)
-  M.mkdirp(dir)
-  return dir
+    local dir = string.format("%s/fs-fixture-%d-%s-%d", base, os.time(), PROCESS_TOKEN, temp_counter)
+    if lfs.mkdir(dir) then return dir end
+  end
+  error(string.format("fs_fixture.temp_dir: 无法在 %s 下创建临时目录", base), 0)
 end
 
 function M.slurp(path)

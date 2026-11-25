@@ -96,6 +96,12 @@ function M.is_dir(path)
   return lfs.attributes(tostring(path), "mode") == "directory"
 end
 
+-- 文件字节数；不存在或不是文件返回 nil。
+function M.size(path)
+  if path == nil then return nil end
+  return lfs.attributes(tostring(path), "size")
+end
+
 -- 打开目录迭代器。调用方已确认目标是目录，所以这里的失败是真错误（权限、句柄耗尽）；
 -- 不能返回空表——deploy 会把读不出的宿主目录当成「没有残留」而放行。
 local function open_dir(path)
@@ -302,14 +308,16 @@ function M.which(name)
   return nil
 end
 
-local function env_prefix(env)
+-- 环境变量前缀：一条一条的 `set "K=V"`，怎么拼由调用方决定
+-- （spawn 用 && 串进同一行，spawn_bg 写成 batch 的独立行）。
+local function env_assignments(env)
   local parts = {}
   if not env then return parts end
   local keys = {}
   for k in pairs(env) do keys[#keys + 1] = k end
   table.sort(keys)
   for _, k in ipairs(keys) do
-    parts[#parts + 1] = "set " .. M.quote(tostring(k) .. "=" .. tostring(env[k])) .. " &&"
+    parts[#parts + 1] = "set " .. M.quote(tostring(k) .. "=" .. tostring(env[k]))
   end
   return parts
 end
@@ -327,7 +335,7 @@ function M.spawn(spec)
   if spec.cwd then
     parts[#parts + 1] = "cd /d " .. M.quote(spec.cwd) .. " &&"
   end
-  for _, prefix in ipairs(env_prefix(spec.env)) do parts[#parts + 1] = prefix end
+  for _, assign in ipairs(env_assignments(spec.env)) do parts[#parts + 1] = assign .. " &&" end
 
   local rendered = {}
   for i = 1, #argv do rendered[i] = M.quote(argv[i]) end
@@ -348,6 +356,129 @@ function M.spawn(spec)
   end
   local _, _, code = os.execute(line)
   return tonumber(code) or 1
+end
+
+-- ============================ 并发子进程 ============================
+
+local bg_counter = 0
+
+-- 每次并发调用独占一个临时目录；原子性同 capture_dir（lfs.mkdir 成功即占住名字）。
+local function bg_dir(base)
+  for _ = 1, 1000 do
+    bg_counter = bg_counter + 1
+    local dir = string.format("%s/seam-bg-%d-%06d", base, os.time(), bg_counter)
+    if lfs.mkdir(dir) then return dir end
+  end
+  error(string.format("seam.spawn_bg: 无法在 %s 下创建临时目录", base), 0)
+end
+
+-- 并发形状：argv 与 spawn 完全一样，只把「起来」与「等完」拆成两步。
+-- 需要它的理由只有一个：spawn 走 os.execute，会一直等到子进程退出，而测试分片要并跑就得
+-- 先把所有分片都起来，再按完成顺序收。
+-- 落地方式是给每次调用写一份 run.cmd 再 `start /B` 起后台：命令行的拼法仍是接缝这一份
+-- （quote / env_assignments / cd /d），调用方依旧只交 argv；单行上限照旧断言。
+-- 子进程把 stdout+stderr 合并进 out.log，退出码写 code.txt，最后写 done.txt 当完成标记。
+-- 判完成看 done.txt 而不是 out.log 的非空：done.txt 由 batch 最后一行写，它出现即说明
+-- 前一行（code.txt）已经写完并关闭，不会读到半个数字。
+-- spec = { argv, cwd, env, tmp_dir=<? 默认 tmp> }。返回句柄，交给 bg_done / bg_output / bg_close。
+function M.spawn_bg(spec)
+  assert(type(spec) == "table", "spawn_bg 需要一个 table 参数")
+  local argv = spec.argv
+  assert(type(argv) == "table" and #argv > 0, "spawn_bg.argv 必须是非空字符串数组")
+
+  -- 临时目录必须绝对化：run.cmd 里会 cd 到 spec.cwd，相对路径的日志文件会被解析到那边去；
+  -- 而且 `start` 拿相对路径（哪怕文件真的在）不会去当前目录找，只会静默什么都不做。
+  local base, base_err = M.absolute(spec.tmp_dir or "tmp")
+  assert(base, "spawn_bg.tmp_dir 无效: " .. tostring(base_err))
+  M.ensure_dir(base)
+  local dir = bg_dir(base)
+
+  local handle = {
+    dir = dir,
+    cmd = dir .. "/run.cmd",
+    out = dir .. "/out.log",
+    code = dir .. "/code.txt",
+    done = dir .. "/done.txt",
+  }
+
+  local rendered = {}
+  for i = 1, #argv do rendered[i] = M.quote(argv[i]) end
+  local command = table.concat(rendered, " ")
+
+  local lines = { "@echo off" }
+  if spec.cwd then lines[#lines + 1] = "cd /d " .. M.quote(spec.cwd) end
+  for _, assign in ipairs(env_assignments(spec.env)) do lines[#lines + 1] = assign end
+  -- 批处理目标必须用 call 调：在 batch 里直接写另一个 batch 会把控制权交给它，回来时
+  -- 整份 run.cmd 已经结束，后面的退出码与完成标记一行都不会执行（busted 正是 .bat）。
+  -- 可执行文件不加 call，保持与 spawn 同一种调用形态。
+  local lead = ""
+  if argv[1]:match("%.[Bb][Aa][Tt]$") or argv[1]:match("%.[Cc][Mm][Dd]$") or not argv[1]:match("%.[%w]+$") then
+    lead = "call "
+  end
+  lines[#lines + 1] = lead .. command .. " > " .. M.quote(handle.out) .. " 2>&1"
+  lines[#lines + 1] = ">" .. M.quote(handle.code) .. " echo %ERRORLEVEL%"
+  lines[#lines + 1] = ">" .. M.quote(handle.done) .. " echo ok"
+
+  local longest = 0
+  for _, text in ipairs(lines) do
+    if #text > longest then longest = #text end
+  end
+  if longest > CMD_LINE_LIMIT then
+    rmrf(dir)
+    error(string.format("并发子进程的单行超过 cmd %d 字符上限（实际 %d 字符）：%s...",
+      CMD_LINE_LIMIT, longest, command:sub(1, 160)), 0)
+  end
+
+  local file = assert(io.open(handle.cmd, "wb"), handle.cmd .. " 建不出来")
+  file:write(table.concat(lines, "\r\n") .. "\r\n")
+  file:close()
+
+  -- start 的第一个引号参数被当成窗口标题，必须显式给空串，否则带空格的路径会被当标题吞掉。
+  local _, _, code = os.execute("@start /B " .. M.quote("") .. " " .. M.quote(handle.cmd) .. " > nul 2>&1")
+  if code ~= 0 then
+    local output = read_file(handle.out)
+    error(string.format("seam.spawn_bg: start 起不来（退出码 %s）：%s\n%s",
+      tostring(code), handle.cmd, output), 0)
+  end
+  -- start 找不到目标时退出码仍是 0（静默什么都不做），所以还要求证据：子进程一启动就建 out.log
+  -- （重定向在命令跑之前就建好），3 秒内两样都没有，就是这次并发调用没起来。
+  for _ = 1, 150 do
+    if M.exists(handle.out) or M.exists(handle.done) then return handle end
+    M.sleep(20)
+  end
+  error(string.format("seam.spawn_bg: start 之后 3 秒内没有生成 %s，子进程没起来：%s",
+    handle.out, handle.cmd), 0)
+end
+
+-- 子进程结束了吗：结束返回退出码，还在跑返回 nil。
+function M.bg_done(handle)
+  assert(type(handle) == "table" and handle.done, "bg_done 需要一个 spawn_bg 返回的句柄")
+  if not M.exists(handle.done) then return nil end
+  return tonumber((read_file(handle.code):gsub("%s", ""))) or 1
+end
+
+-- 子进程到目前为止的输出（stdout 与 stderr 合并）。只能在 bg_done 返回退出码之后读全文。
+function M.bg_output(handle)
+  assert(type(handle) == "table" and handle.out, "bg_output 需要一个 spawn_bg 返回的句柄")
+  return read_file(handle.out)
+end
+
+-- 删掉这次并发调用的临时目录（日志已读走时调用）。
+-- 删两轮：子进程收尾时可能正好在我们的「列名字、删文件、rmdir」之间再落一个文件，
+-- rmdir 于是因为目录非空失败，留下一个只剩 done.txt 的空壳（实测见过）。
+function M.bg_close(handle)
+  if type(handle) ~= "table" or not handle.dir then return end
+  for _ = 1, 3 do
+    rmrf(handle.dir)
+    if not M.exists(handle.dir) then return end
+  end
+end
+
+-- 亚秒等待。Windows 没有内置的亚秒 sleep（timeout 最小 1 秒，ping 的包间隔固定 1 秒），
+-- 起一个进程去睡比本进程空转更贵，所以这里就空转：只在轮询并发子进程时用，单次几十毫秒。
+function M.sleep(ms)
+  local deadline = os.clock() + (tonumber(ms) or 0) / 1000
+  while os.clock() < deadline do end
 end
 
 -- ============================ 路径推导 ============================

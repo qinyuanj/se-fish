@@ -11,7 +11,7 @@ agent 与人工均在 Windows 原生环境工作（仓库在 `D:`，编辑器与
 - **唯一接缝 `tools/seam.lua`**：全仓唯一发起外部进程与文件系统探测的模块。`preflight()` 检查外部工具就位；`quote()` 封装 cmd 引用；`which()` 按 `PATH` 遍历 `.exe`/`.bat` 并真实调用 `--version` 验证有输出，避开 WindowsApps 0 字节假壳（如 `python3`）。
 - **路径只有一种形式**：仓库内用相对路径；离开仓库一律正斜杠 + 盘符（`C:/...`），反斜杠进接缝即归一。
 - **文件系统探测纯 Lua**：存在性、递归枚举、建目录、绝对化与递归删除统一用 `lfs` + `io`/`os`，不设 shell 降级。
-- **子进程只有一种形状**：`seam.spawn{ argv, cwd, env, stdout, stderr }` 只收 `argv` 数组，不收整条命令串；断言 cmd 8191 字符上限。
+- **子进程只收 `argv`**：`seam.spawn{ argv, cwd, env, stdout, stderr }` 阻塞等完，`seam.spawn_bg` 同一份 argv 形状起完不等（并发用它，日志与退出码落临时目录，由 `bg_done` / `bg_output` / `bg_close` 收）；两者都不收整条命令串，都断言 cmd 8191 字符上限。
 - **解释器名统一**：Lua 5.4 只认 `lua`（硬检查在 `tools/cli.lua`），Blender 运行器只认 `python`。
 
 ## 拒绝的方案
