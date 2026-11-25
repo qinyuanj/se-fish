@@ -466,15 +466,18 @@ function M.bg_output(handle)
   return read_file(handle.out)
 end
 
--- 删掉这次并发调用的临时目录（日志已读走时调用）。
--- 删两轮：子进程收尾时可能正好在我们的「列名字、删文件、rmdir」之间再落一个文件，
--- rmdir 于是因为目录非空失败，留下一个只剩 done.txt 的空壳（实测见过）。
+-- 删掉这次并发调用的临时目录（日志已读走时调用）。删不干净返回 false，由调用方决定要不要提示。
+-- 不能只删一次：完成标记由子进程最后一行写，我们读到时它往往还没退出，句柄没关，
+-- 这时 lfs.dir 或 os.remove 会撞上共享冲突、整轮什么都没删掉（实测留下过完整的 run.cmd/out.log）。
+-- 所以中间退避再试。
 function M.bg_close(handle)
-  if type(handle) ~= "table" or not handle.dir then return end
-  for _ = 1, 3 do
+  if type(handle) ~= "table" or not handle.dir then return true end
+  for _ = 1, 10 do
     rmrf(handle.dir)
-    if not M.exists(handle.dir) then return end
+    if not M.exists(handle.dir) then return true end
+    M.sleep(50)
   end
+  return false
 end
 
 -- 亚秒等待。Windows 没有内置的亚秒 sleep（timeout 最小 1 秒，ping 的包间隔固定 1 秒），
