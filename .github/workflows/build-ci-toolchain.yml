@@ -58,7 +58,7 @@ jobs:
           Write-Host "SHA-256: $hash"
 
       - name: 上传构建产物供密封自检
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ci-toolchain-win-x64
           path: |
@@ -72,7 +72,7 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: 下载构建产物
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: ci-toolchain-win-x64
 
@@ -98,7 +98,7 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: 下载构建产物
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: ci-toolchain-win-x64
 
