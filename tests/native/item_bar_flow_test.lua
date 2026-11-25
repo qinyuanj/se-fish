@@ -1,5 +1,5 @@
 -- #86 迁移（原 tests/gameplay/item_bar_flow_test.lua）：道具栏动作的服务端请求流。
--- 接缝：ItemBarAction / RequestItemBar 的 OnServerEvent 与 ItemBarState 回包。
+-- 被测入口：ItemBarAction / RequestItemBar 请求处理与 ItemBarState 回包；启用点：注入 RemoteEvent 替身。
 local GameCfg = require('common.game_cfg')
 local Mgr = require('server.player_data_host')
 local ServerRuntime = require('server.world_host.server_runtime')

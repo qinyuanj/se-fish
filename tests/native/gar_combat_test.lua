@@ -1,5 +1,5 @@
 -- #84 迁移：鳄雀鳝首领战与头部攻击绕后（原 tests/gameplay/gar_combat_test.lua，13 例）。
--- 接缝：MgrFishUnit 的战斗状态机——放下进入 combat、追最近的活人、咬合约（咬距/冷却/鱼种攻击）、
+-- 覆盖范围：FishTree 的战斗状态机——放下进入 combat、追最近的活人、咬合约（咬距/冷却/鱼种攻击）、
 -- 预警锁定朝向、目标失效即取消、逃跑时限转直线逃脱、预警协议校验。
 -- 沿用 tests/support/fish_combat 共享夹具（含 Quaternion / math.random 的保存与还原）。
 -- describe/it 名称保留旧类名与方法名，并按方法名字典序注册以保持旧套件执行顺序。

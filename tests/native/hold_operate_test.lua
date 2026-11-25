@@ -2,7 +2,7 @@
 -- 失败方式先列：满格互换吞物/复制、取消拖拽仍移动、跨容器倍率丢失；
 -- 首领饵从背包使用、普通饵/武器占格；选中即消费、重复操作重复扣物；
 -- 非法身份/状态绕过持久屏障、落地失败扣物、重进手持悬空。
--- 接缝：PlayerData 公共库存/选择接口。
+-- 被测入口：PlayerData 公共库存与选择接口。
 local GameCfg = require('common.game_cfg')
 local PlayerData = require('server.data.player_data')
 

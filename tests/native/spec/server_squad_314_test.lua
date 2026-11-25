@@ -161,7 +161,7 @@ local function party_id(ctx, id)
   return state and state.state == "party" and state.partyId or nil
 end
 
-describe("全局小队服务端宿主接缝（#314）", function()
+describe("全局小队服务端宿主入口（#314）", function()
   local ctx
   after_each(function() if ctx then ctx:close() ctx = nil end end)
 

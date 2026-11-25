@@ -6,7 +6,7 @@
 --   4. 编排离场三步协议：前置异步脏写 → Step 1 (session_alive=false 终镜像)
 --      → Step 2 (同步 dispose 逆序拆资源与信号) → Step 3 (宿主持久化序列化 + 异步排空栅栏)；
 --   5. 维护同账号重进排空栅栏（leaving.waiting），防止提前读旧档或覆盖正在落盘的数据。
--- 本模块归属 L2（server.world_host），零反向依赖存量旧债务模块；过渡接缝全部由 L1 入口以回调注入。
+-- 本模块归属 L2（server.world_host），零反向依赖存量旧债务模块；迁移过渡回调全部由 L1 入口注入。
 
 local EngineRead = require("common.engine_read")
 local GameCfg = require("common.game_cfg")

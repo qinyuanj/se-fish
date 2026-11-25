@@ -57,7 +57,7 @@ local function make_player(id)
   }
 end
 
-describe("抛竿上钩收线举鱼宿主接缝（#302）", function()
+describe("抛竿上钩收线举鱼宿主入口（#302）", function()
   local runtime, events, player, data, units, rolls, compendium, quests
   local saved_vector, saved_color
 

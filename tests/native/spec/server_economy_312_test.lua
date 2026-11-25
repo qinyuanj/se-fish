@@ -3,7 +3,7 @@ local EconomyWorld = require("tests.support.economy_world")
 
 local ITEM_BAR = GameCfg.Items.ContainerId.ItemBar
 
-describe("服务端抽奖机、盲盒与地图商店宿主接缝（#312）", function()
+describe("服务端抽奖机、盲盒与地图商店宿主入口（#312）", function()
   local world
   before_each(function() world = EconomyWorld.new() end)
   after_each(function()

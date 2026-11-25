@@ -12,6 +12,19 @@ local Arch = require("tools.arch_policy")
 local lfs = require("lfs")
 
 local BUSINESS_ROOTS = { "client", "common", "server" }
+local VOCABULARY_ROOTS = { "client", "common", "server", "tools", "tests" }
+local SEAM_FILE_ALLOWLIST = {
+  ["tools/seam.lua"] = true,
+  ["tests/native/ability_seams_test.lua"] = true,
+  ["tests/native/platform_seam_test.lua"] = true,
+}
+local SEAM_LABEL_PATTERNS = {
+  "%-%-%s*接缝[：:]",
+  "%-%-%s*被测接缝[：:]",
+  "%-%-%s*测试接缝",
+  "%-%-%s*[Ss][Ee][Aa][Mm][：:]",
+  "describe%s*%(%s*[\"'][^\"']*宿主接缝",
+}
 local BANNED_GLOBALS = { "io", "os", "package", "debug" }
 local REENTRANT_ENTRIES = {
   mount = true,
@@ -48,12 +61,14 @@ local function is_dir(path)
   return lfs.attributes(path, "mode") == "directory"
 end
 
-local function walk(dir, out)
+local function walk(dir, out, all_files, skip_packages)
   for _, name in ipairs(fs.list_dir(dir)) do
     local full = dir .. "/" .. name
     if is_dir(full) then
-      walk(full, out)
-    elseif name:match("%.lua$") then
+      if not (skip_packages and name == "packages") then
+        walk(full, out, all_files, skip_packages)
+      end
+    elseif all_files or name:match("%.lua$") then
       out[#out + 1] = full
     end
   end
@@ -67,6 +82,13 @@ local function source_files()
   for _, root in ipairs(BUSINESS_ROOTS) do walk(root, out) end
   table.sort(out)
   source_files_memo = out
+  return out
+end
+
+local function vocabulary_files()
+  local out = {}
+  for _, root in ipairs(VOCABULARY_ROOTS) do walk(root, out, true, true) end
+  table.sort(out)
   return out
 end
 
@@ -326,5 +348,50 @@ describe("三端源码守卫", function()
       return {}
     end)
     assert.is_true(checked > 0, "未扫到任何使用 self.last_seq 的服务端模块，扫描口径失效")
+  end)
+end)
+
+local function seam_label_violation(src)
+  for _, pattern in ipairs(SEAM_LABEL_PATTERNS) do
+    if src:match(pattern) then return pattern end
+  end
+  return nil
+end
+
+describe("工程用语守卫", function()
+  it("test_seam_file_names_stay_within_allowlist", function()
+    local files = vocabulary_files()
+    assert.is_true(#files > 0, "工程用语文件名扫描为空，扫描口径失效")
+    local bad = {}
+    for _, path in ipairs(files) do
+      if path:lower():find("seam", 1, true) and not SEAM_FILE_ALLOWLIST[path] then
+        bad[#bad + 1] = path .. " 不在 seam 文件名白名单内"
+      end
+    end
+    table.sort(bad)
+    assert.same({}, bad)
+  end)
+
+  it("test_generic_seam_labels_are_rejected", function()
+    local bad_samples = {
+      "-- " .. "接缝：被测入口",
+      "-- 被测" .. "接缝：AbilityAPI",
+      "-- 测试" .. "接缝",
+      "-- " .. "Seam: tools.seam",
+      'describe("业务' .. '宿主接缝（#1）")',
+    }
+    for _, src in ipairs(bad_samples) do
+      assert.is_true(seam_label_violation(src) ~= nil)
+    end
+    assert.is_nil(seam_label_violation("-- 拼接接缝：几何拼合处"))
+    assert.is_nil(seam_label_violation('describe("宿主入口（#1）")'))
+
+    local test_files = walk("tests", {})
+    assert.is_true(#test_files > 0, "测试接缝标签扫描为空，扫描口径失效")
+    scan(test_files, function(path, src)
+      local pattern = seam_label_violation(src)
+      if pattern then return { path .. " 含泛化接缝标签：" .. pattern } end
+      return {}
+    end)
   end)
 end)

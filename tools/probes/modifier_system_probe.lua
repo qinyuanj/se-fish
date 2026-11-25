@@ -37,24 +37,24 @@ end
 -- 验证当前业务拥有者，不在探针重新实现DOT算法，不宣称vendor原生调度。
 -- businessDot适配必须绑定隔离业务实例；hits返回new_hit/apply_hit边界的真实记录。
 function Probe.verify_business_dot(c)
-    local seam = assert(c.businessDot, '需要隔离业务DOT接缝')
+    local dot_spy = assert(c.businessDot, '需要隔离业务DOT记录器')
     local report = { owner = 'business', kinds = {}, ok = false }
     local ok, err = pcall(function()
         for _, kind in ipairs({ 'poison', 'burn' }) do
             local cfg = c.cfg.Ability.StatusEffects[kind]
-            seam.clear()
-            local offset, start = #seam.hits(), c.now()
-            assert(seam.apply(c.source, c.dotTarget, kind), '业务DOT首次应用失败')
+            dot_spy.clear()
+            local offset, start = #dot_spy.hits(), c.now()
+            assert(dot_spy.apply(c.source, c.dotTarget, kind), '业务DOT首次应用失败')
             c.wait(cfg.TickSec * 0.5)
-            assert(#seam.hits() == offset, '首跳提前')
-            assert(seam.apply(c.source2, c.dotTarget, kind), '业务DOT刷新失败')
+            assert(#dot_spy.hits() == offset, '首跳提前')
+            assert(dot_spy.apply(c.source2, c.dotTarget, kind), '业务DOT刷新失败')
             c.wait(cfg.TickSec * 0.5)
-            local hits = seam.hits()
+            local hits = dot_spy.hits()
             assert(#hits == offset + 1, '刷新改变相位或首跳缺失')
             assert(math.abs(hits[#hits].at - start - cfg.TickSec) < 0.001, '刷新重置相位')
             -- 到期越过时仍补齐<=到期时刻的跳，再清除业务状态。
             c.wait(cfg.DurationSec)
-            hits = seam.hits()
+            hits = dot_spy.hits()
             local expected = math.floor((cfg.DurationSec + cfg.TickSec * 0.5) / cfg.TickSec)
             assert(#hits - offset == expected, '跳数或到期末跳错误')
             for index = offset + 1, #hits do
@@ -64,17 +64,17 @@ function Probe.verify_business_dot(c)
             end
             local finalCount = #hits
             c.wait(cfg.TickSec)
-            assert(#seam.hits() == finalCount, '到期后仍伤害')
+            assert(#dot_spy.hits() == finalCount, '到期后仍伤害')
             -- 独立新样例：不刷新，expiresAt恰等于最后一跳，验证<=而非<。
-            seam.clear()
-            offset = #seam.hits()
-            assert(seam.apply(c.source, c.dotTarget, kind), '业务DOT末跳样例应用失败')
+            dot_spy.clear()
+            offset = #dot_spy.hits()
+            assert(dot_spy.apply(c.source, c.dotTarget, kind), '业务DOT末跳样例应用失败')
             c.wait(cfg.DurationSec)
-            assert(#seam.hits() - offset == math.floor(cfg.DurationSec / cfg.TickSec), '到期边界末跳丢失')
+            assert(#dot_spy.hits() - offset == math.floor(cfg.DurationSec / cfg.TickSec), '到期边界末跳丢失')
             report.kinds[kind] = { count = expected, phaseRetained = true, finalTick = true, latestSource = true }
         end
     end)
-    local cleaned, cleanupErr = pcall(seam.clear)
+    local cleaned, cleanupErr = pcall(dot_spy.clear)
     if not ok then error(err, 0) end
     if not cleaned then error('业务DOT清理失败: ' .. tostring(cleanupErr), 0) end
     report.ok = true
@@ -125,7 +125,7 @@ function Probe.run(context)
             report.dot = Probe.verify_business_dot(c)
             check('DOT.业务调度跳数相位末跳来源', report.dot.ok, '业务拥有者；非vendor原生')
         else
-            report.dot = { owner = 'business', missing = '缺少隔离业务DOT接缝，vendor自身不调度DOT，跳数/相位/末跳缺证' }
+            report.dot = { owner = 'business', missing = '缺少隔离业务DOT记录器，vendor自身不调度DOT，跳数/相位/末跳缺证' }
             log('DOT.缺证 ' .. report.dot.missing)
         end
         local mappings, seen = Probe.build_mappings(c.cfg), {}

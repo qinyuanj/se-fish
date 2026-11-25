@@ -1,5 +1,5 @@
 -- #84 迁移：放下逃脱与在逃数量上限（原 tests/gameplay/fish_escape_test.lua，11 例）。
--- 接缝：MgrFishUnit 的放下→逃脱链路——释放路径幂等、朝水转向、射线限频、入水吞掉与在逃上限。
+-- 覆盖范围：FishTree 的放下→逃脱链路——释放路径幂等、朝水转向、射线限频、入水吞掉与在逃上限。
 -- 沿用 tests/support/fish_escape 共享夹具；describe/it 名称保留旧类名与方法名，
 -- 并按方法名字典序注册以保持与旧套件一致的执行顺序。
 local FishEscape = require('tests.support.fish_escape')

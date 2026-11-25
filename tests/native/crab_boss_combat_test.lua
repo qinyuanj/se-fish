@@ -1,5 +1,5 @@
 -- #84 迁移：蟹老板首领战（原 tests/gameplay/crab_boss_combat_test.lua，8 例）。
--- 接缝：MgrFishUnit 的 crabBoss 状态机——正面蟹钳双击每击 20 / 冷却 4 秒、每 30 秒冲撞 20、
+-- 覆盖范围：FishTree 的 crabBoss 状态机——正面蟹钳双击每击 20 / 冷却 4 秒、每 30 秒冲撞 20、
 -- 每 25 秒旋转 5 秒碰触 30 且同秒槽只结算一次，三招互斥，逃跑 / 移除打断并收起预警。
 -- 沿用 tests/support/fish_combat 共享夹具；describe/it 名称保留旧类名与方法名，
 -- 并按方法名字典序注册以保持旧套件执行顺序。

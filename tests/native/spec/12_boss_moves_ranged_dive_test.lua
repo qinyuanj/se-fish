@@ -1,7 +1,7 @@
 -- 条款 12-13 / 12-14 / 12-21 / 12-24 / 12-26 / 12-28 / 12-30 / 12-31 / 12-32 / 12-33 / 12-34
 -- 远程与俯冲组逐招表（spec #249 / ticket #258）。
 --
--- 接缝（与 lead 约定）：MgrFishUnit:spawn_landed + drop 放下鱼，逐帧 update 推进服务端权威时钟；
+-- 被测入口：FishTree:spawn_landed + drop 放下鱼，逐帧 update 推进服务端权威时钟；
 -- 只观察玩家可观察的三个面：玩家血量（MgrVitals 结算）、GarBiteNotice 广播载荷（客户端只画预警）、
 -- 逐招表公开行（common/cfg/boss_moves.lua）。测试进程不加载任何客户端命中代码：
 -- 伤害仍然落地，证明远程投射物命中判定不依赖客户端。

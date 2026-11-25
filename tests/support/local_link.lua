@@ -198,7 +198,7 @@ function M.new(opts)
         local squad = env.lifeHost and env.lifeHost.runtime.world.squad
         return squad and squad:Count(player) or 0
     end
-    -- #255 生产接线：统一伤害入口的过滤函数由 MgrPkFilter 工厂实例化，只读注入的权威接缝。
+    -- #255 生产接线：统一伤害入口的过滤函数由 MgrPkFilter 工厂实例化，只读注入的权威队伍与区域入口。
     env.lifeHost = require('tests.support.life_host').start({
       now = env.now, remote = re, player_data = mgr.PlayerData, save = mgr.Save,
       bind_interact_action = function(dispatch)

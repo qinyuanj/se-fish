@@ -1,5 +1,5 @@
 -- 迁移自 tests/gameplay/reel_progress_test.lua（#85）。
--- 被测接缝：common.reel_progress 的收线进度推进（上岸 / 脱钩 / 抢救窗口）。
+-- 被测入口：common.reel_progress 的收线进度推进（上岸 / 脱钩 / 抢救窗口）。
 -- it 名字沿用旧方法名，注册顺序 = LuaUnit sortedPairs 的实际执行顺序。
 local Core = require('common.reel_progress')
 local cfg = require('common.game_cfg').ReelIn

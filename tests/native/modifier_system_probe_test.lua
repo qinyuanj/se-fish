@@ -1,4 +1,4 @@
--- #49 专属离线测试：公开探针接缝；失败方式见仓库外 notes.txt。
+-- #49 专属离线测试：公开特征探针入口；失败方式见仓库外 notes.txt。
 -- 迁移自 tests/tooling/modifier_system_probe_test.lua（#92，LuaUnit → 原生 Busted）；
 -- 案例顺序沿用旧入口的类名 + 方法名字典序。
 -- 需要替换 _G.game / _G.RemoteEvent 与 modifier_system 模块缓存的用例，其环境保存/恢复写在

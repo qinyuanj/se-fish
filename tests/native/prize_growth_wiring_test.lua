@@ -9,8 +9,7 @@
 --   5. 鱼被霜冻/麻痹后移速不变；麻痹的鱼仍追咬/施法；
 --   6. server/main.lua 漏接 MgrAbility.PlayerData / Survival、Vitals.ActGuard / MaxHealthProvider、
 --      Survival.SpeedWriter、MgrWeapon.Modifier（单测注入了、生产没接 = 生产里药水数恒 0）。
--- 接缝：MgrPlayerData:Handle（ItemBarAction 通道）、PlayerData 存档往返、MgrSurvival:ApplyWeak/ClearWeak、
---   MgrFishUnit:Speed / update_combat、MgrAbility:cast_fish、server/main.lua 源码接线断言。
+-- 被测入口：ItemBarAction 分发、PlayerData 存档往返、生存虚弱、FishTree 移速/战斗与源码接线断言；启用点：_G 引擎替身。
 -- 旧套件的逐例 set_up/tear_down 映射为 before_each/after_each；被替换的全局（game / Vector3 / REUtil）、
 -- 模块缓存（package.loaded 的 MgrFishUnit 与 common.re_util）与配置（GameCfg.Debug）逐例恢复，
 -- after_each 对未完成的 before_each 幂等。describe 顺序沿用旧执行序（类名字典序）。

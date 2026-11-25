@@ -1,6 +1,6 @@
 -- #89 迁移（原 tests/gameplay/attr_migration_test.lua）：
 -- 失败方式：永久成长重复累加、默认100污染、重复乘区、写入失败误报、重建/退出残留。
--- 接缝：MgrAttr公开刷新/读取，真实包内 attr_rule.api，仅Unit/World为离线引擎替身。
+-- 被测入口：属性宿主公开刷新/读取与真实 attr_rule.api；启用点：独立沙盒注入 Unit/World 引擎替身。
 -- fixture 用独立 env + 自己的 require 缓存 loadfile 出整套沙盒，不写 _G 也不写 package.loaded，
 -- 因此旧套件没有 set_up/tear_down、原生侧同样不需要逐例恢复。
 -- describe/it 名沿用旧类名与方法名，案例顺序沿用旧 LuaUnit 的字典序执行序。

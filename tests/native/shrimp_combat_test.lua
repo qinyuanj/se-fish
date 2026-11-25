@@ -1,5 +1,5 @@
 -- #84 迁移：虾池精英 / 首领战斗（原 tests/gameplay/shrimp_combat_test.lua，10 例）。
--- 接缝：MgrFishUnit 的 shrimp / dragon 状态机——连击两下 20 后接尾刺位移、雨云 6 个秒槽不延长不追溯、
+-- 覆盖范围：FishTree 的 shrimp / dragon 状态机——连击两下 20 后接尾刺位移、雨云 6 个秒槽不延长不追溯、
 -- 俯冲与眩晕互斥、脚本化追击按 dt 位移且不越过咬距、移除与逃跑时限清招式与预警。
 -- 沿用 tests/support/fish_combat 共享夹具；describe/it 名称保留旧类名与方法名，
 -- 并按方法名字典序注册以保持旧套件执行顺序。

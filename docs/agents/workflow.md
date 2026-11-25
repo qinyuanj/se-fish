@@ -5,6 +5,8 @@
 ## 工程用语
 
 - **se-fish**：本图的 Lua 源码仓库。
+- **Seam / 接缝**：不修改调用处源码即可切换行为的位置。声明时必须配对指明启用点（`Enabling Point`），且至少具备两个适配器。本仓工具链唯一实例为 `tools/seam.lua`，见 [ADR-0017](../adr/0017-windows-native-only.md)。
+  _Avoid_: 把零外部依赖的被测入口、防腐层（`ACL`）、`Fake`、`Spy`、夹具（`Fixture` / `Harness`）、探针（`Probe`）或迁移过渡回调统称为「接缝」。各类位置使用各自专词。
 - **Business scope / 业务范围**：质量工具与架构图共用的源码集合，不含任何 `packages/` 子树；机器真源是根目录 `uml-quality.json` 与 `policy.edn`，决策见 [ADR-0021](../adr/0021-packages-outside-business-scope.md)。
   _Avoid_: 业务树、指标采集范围、mutation 范围、scope（单独使用时）
   与**玩法实现**（三端业务代码）不是一回事，两者不混用，见 [ADR-0029](../adr/0029-scope-completeness-and-placeholder-first.md) 第二节。

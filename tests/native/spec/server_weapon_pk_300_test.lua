@@ -90,7 +90,7 @@ local function hold(runtime, player, data, weapon_id)
   runtime:get_player_tree(player.UserId):sync_from_data(data)
 end
 
-describe("武器攻击换弹与 PK 过滤宿主接缝（#300）", function()
+describe("武器攻击换弹与 PK 过滤宿主入口（#300）", function()
   local runtime, events, player, other, data, casts, rays, ray_hit
 
   local function squad_action(actor, payload)

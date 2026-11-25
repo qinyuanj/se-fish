@@ -351,7 +351,7 @@ describe('TestEconomyPersistence', function()
         assert.is_true(env.data:AddItem('bass', 1.99))
         assert.is_true(env.data:SelectSlot(1))
         persistSetup()
-        -- 当前基线从 Serialize 恢复选中态；cherry-pick impl-123 的选择态持久化提交后仍由真实入口重选，seam 不变。
+        -- 当前基线从 Serialize 恢复选中态；cherry-pick impl-123 的选择态持久化提交后仍由真实入口重选，公开入口不变。
         if env.data.data.selected_slot ~= 1 then env.data:SelectSlot(1) end
         clear_events()
         local request = { target = 'fisherman', action = 'Feed', seq = 1 }

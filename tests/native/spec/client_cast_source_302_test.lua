@@ -4,7 +4,7 @@ local RootView = require("client.views.root_view")
 local CastSourceView = require("client.views.cast_source_view")
 local SpokeClock = require("common.spoke_clock")
 
-describe("礁石来源可视化宿主接缝（#302）", function()
+describe("礁石来源可视化宿主入口（#302）", function()
   local saved_v3, saved_color
   before_each(function()
     saved_v3, saved_color = rawget(_G, "Vector3"), rawget(_G, "Color")

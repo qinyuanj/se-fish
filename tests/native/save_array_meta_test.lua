@@ -4,7 +4,7 @@
 -- 把所有老档判成「库存结构损坏」→ 读写屏障永久关闭。
 -- 本单失败方式先列：合法存档因平台元数据被拒（本文件主测）；剥离时顺手放松校验放行真损坏档；
 -- 长度以 __count 为准而非实际条数；平台元数据被带回内存并写回库；无标记的旧档受影响。
--- seam：真实 PlayerData.Migrate/CompleteLoad 与 MgrSave 公共接口；只替换 Task/DataStore 引擎边界。
+-- 被测入口：真实 PlayerData.Migrate/CompleteLoad 与 SaveHost 公共接口；启用点：_G.game 注入 Task/DataStore Fake。
 -- it 按旧 LuaUnit 的方法名字典序注册，保持与旧套件一致的案例顺序。
 -- 断言映射：assertEquals 的 table 深比较由 assert.same 承接；assertFalse 是严格 false（rawequal / hasCountKey
 -- 都只返回布尔，语义不变）。

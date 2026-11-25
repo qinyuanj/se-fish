@@ -1,4 +1,4 @@
--- #48：公开探针与映射接缝；失败方式先记录于仓库外 attr/notes.txt。
+-- #48：公开特征探针入口与属性映射；失败方式先记录于仓库外 attr/notes.txt。
 -- 真实 vendor 运算，仅 World/Unit/Controller 是引擎边界替身，不是地图实测。
 -- 迁移自 tests/tooling/attr_rule_probe_test.lua（#92，LuaUnit → 原生 Busted）；
 -- 案例顺序沿用旧入口的类名 + 方法名字典序。夹具自带独立模块环境，不污染 package.loaded / game。

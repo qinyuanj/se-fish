@@ -6,7 +6,7 @@
 --   3. 移速多写口：成长/虚弱/霜冻/麻痹各自写 WalkSpeed，恢复顺序丢成长（#131 已知边界根因）；
 --   4. 目标离场（玩家退出/鱼移除）后状态不清理，DOT 打空目标、查询泄漏；
 --   5. body_plan 读不存在的 player.Data 恒为 0（#132 原型死代码），存档里的药水永远不生效。
--- 接缝：loadfile 取全新 MgrAbility 实例；桩 _G.game（World:GetServerTime 可控时钟、Players）、
+-- 启用点：注入可控时钟与引擎替身，Vitals/PlayerData/Survival 以替身注入：
 --   server.ability_api 与技能包 server.packages.ability_system.api（加载即注册事件，不可载真包）；
 --   Vitals/PlayerData/Survival 以假实现注入（与 main.lua 的接线同形状）。
 -- 旧 set_up/tear_down 逐例映射为 before_each/after_each：替换的全局（game / Vector3）、模块缓存

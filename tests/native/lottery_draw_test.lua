@@ -6,7 +6,7 @@
 --   4. 三同不优先：三同被两同分支抢走大奖；
 --   5. 武器组五选一的组内随机越界或拿错组；
 --   6. 静态期望漂移：权重/倍数改动后两同金币期望偏离原表 2.119671。
--- seam：common.lottery_draw 的 roll_axis / roll_axes / evaluate / choose_weapon，注入确定性 RNG（系统边界：随机数）。
+-- 被测入口：common.lottery_draw 的 roll_axis / roll_axes / evaluate / choose_weapon；启用点：参数注入确定性 RNG。
 -- 迁移说明：案例按旧 LuaUnit 实际执行序（方法名字典序）逐个 it 注册；
 --   唯一的 assertAlmostEquals(实际, 期望, 容差) 映射为 assert.near(期望, 实际, 容差)。
 local GameCfg = require("common.game_cfg")

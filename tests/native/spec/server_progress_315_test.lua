@@ -2,7 +2,7 @@ local GameCfg = require("common.game_cfg")
 local FishCatch = require("common.fish_catch")
 local EconomyWorld = require("tests.support.economy_world")
 
-describe("服务端图鉴、纪录与玩家进度宿主接缝（#315）", function()
+describe("服务端图鉴、纪录与玩家进度宿主入口（#315）", function()
   local world, platformId
   before_each(function()
     platformId = GameCfg.Achievements.final.PlatformId

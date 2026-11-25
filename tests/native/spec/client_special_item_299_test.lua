@@ -4,7 +4,7 @@ local ClientStore = require("client.store.client_store")
 local RootView = require("client.views.root_view")
 local MainHudActionButtonsView = require("client.views.main_hud_action_buttons_view")
 
-describe("特殊道具统一视图宿主接缝（#299）", function()
+describe("特殊道具统一视图宿主入口（#299）", function()
   local saved_vector, saved_color
 
   before_each(function()

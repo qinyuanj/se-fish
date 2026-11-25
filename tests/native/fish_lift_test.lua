@@ -1,5 +1,5 @@
 -- #84 迁移：举鱼与新手任务事实（原 tests/gameplay/fish_lift_test.lua，12 例）。
--- 接缝：MgrFishUnit 的服务端抓举流程——上岸自动 Lift、挂点挂载、持有状态推送、任务事实上报。
+-- 覆盖范围：FishTree 的服务端抓举流程——上岸自动 Lift、挂点挂载、持有状态推送、任务事实上报。
 -- describe/it 名称沿用旧 LuaUnit 类名与方法名，并用方法名字典序注册，
 -- 保持与旧套件（LuaUnit 按类名、方法名排序执行）一致的加载与执行顺序。
 local FishLift = require('tests.support.fish_lift')

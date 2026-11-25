@@ -1,5 +1,5 @@
 -- #84 迁移：帝王蟹精英战（原 tests/gameplay/king_crab_combat_test.lua，6 例）。
--- 接缝：MgrFishUnit 的 kingCrab 状态机——进咬距起手乱刺预警、5 秒一轮左右钳各 3 下每下 15、
+-- 覆盖范围：FishTree 的 kingCrab 状态机——进咬距起手乱刺预警、5 秒一轮左右钳各 3 下每下 15、
 -- 同刺段重复帧不双结算且掉帧不追溯补刺，每活动 30 秒眩晕 5 秒，逃跑 / 移除打断并收起预警。
 -- 沿用 tests/support/fish_combat 共享夹具；describe/it 名称保留旧类名与方法名，
 -- 并按方法名字典序注册以保持旧套件执行顺序。

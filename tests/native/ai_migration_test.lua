@@ -1,5 +1,5 @@
 -- #84 迁移：AI 生命周期与官方 AI 接管（原 tests/gameplay/ai_migration_test.lua，3 + 9 例）。
--- 接缝：包内 AI API → MgrAi → 实际载体交接；以及 MgrFishUnit 侧的释放 / 删除必交接、失败交接不启动业务移动。
+-- 覆盖范围：包内 AI API → FishAi → 实际载体交接，以及 FishTree 侧释放/删除必交接、失败交接不启动业务移动。
 -- TestFishAiLifecycle 沿用 tests/support/fish_lift 共享夹具；TestAiMigration 用官方 AI vendor 运行时。
 -- describe/it 名称保留旧类名与方法名，并按方法名字典序注册以保持旧套件执行顺序
 -- （旧套件里 TestAiMigration 整体先于 TestFishAiLifecycle，按类名字典序）。
