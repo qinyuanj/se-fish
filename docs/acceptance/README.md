@@ -3,7 +3,7 @@
 > 本文件是《渔力全开》规格的条款入口。`docs/GameSpec.md` 的每个小节对应本目录下的一份分片：一条条款是一句能独立判真假的话，证据等级写成文案的行尾后缀，走到哪一步由脚本从证据文件反推。
 > **Acceptance matrix / 验收矩阵**：_Avoid_: 验收清单、测试清单、验收文档、checklist
 > 两列格式、等级口径与新增条款的入口见 [TEMPLATE.md](TEMPLATE.md)；可照抄的示范样本是 [09-multiplayer-rules.md](09-multiplayer-rules.md)。
-> 范围口径见 [ADR-0029](../adr/0029-scope-completeness-and-placeholder-first.md)：**规格内没有永久出界**，外部渠道事项进它的生产开关台账，不再写成阻塞。
+> 范围口径见 [ADR-0029](../adr/0029-scope-completeness-and-placeholder-first.md)：**规格内没有永久出界**，外部渠道事项进[生产开关台账](production-switches.md)，不再写成阻塞。
 > 每份分片带三节驾驶说明：从玩家视角怎么走到这个功能、用 `tools/cli.lua` 怎么从零走一遍、容易踩的坑。状态不手写：A/B 级看 `tests/native/spec/` 与 `tests/probes/` 的正文，C 级看 `evidence/*/session.md` 的 `✅` 行。
 > 本文件**不含手写计数**：各节条数与状态分布由扫描脚本写入下方生成块，手改会被门禁判红。
 > 接手先读 [交接说明](handover.md)：矩阵满屏 `unverified` 是正常状态、A/B/C 三档证据怎么补、怎么新增条款。

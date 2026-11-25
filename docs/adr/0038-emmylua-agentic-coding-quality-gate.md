@@ -22,7 +22,6 @@ EmmyLua Analyzer Rust 是另一个产品：VSCode 插件 `tangzx.emmylua` 本机
 ## 后果
 
 - `docs/agents/workflow.md` 的工具链与完成判据收录新子命令；`tools/git_hooks.lua` 的 pre-commit 增加诊断门禁，`git-hook-init` / `worktree-init` 支持识别自家签名头并自动升级旧版 `pre-commit`（第三方 hook 仍拒绝覆盖）。
-- 落地实测：临时 `common/emmylua_gate_probe.lua` 引入一条 `undefined-global` 时门禁退出码 1 并指向该行；删除后退出码 0。`test guards` 96/0、`test full` 1659/0。
 - `emmylua_check` 是外部工具，Windows 实机调用以本 ADR 落地时的安装为准；版本升级必须同时更新本 ADR、CI（含预编译包 SHA-256）与 `tools/emmylua.lua` 的 `VERSION`（2026-11-24 复盘收口）。
 - 字符串键与动态字段的改名盲区仍由 #337 的旧名字符串键守卫覆盖；EmmyLua 的诊断不能替代该守卫。
 - EmmyLua 是专有工具名，原样保留，不进 `GLOSSARY.md`。

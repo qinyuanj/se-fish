@@ -6,16 +6,16 @@
 
 ## 按任务读取
 
-- **探索代码**：先读 `docs/agents/domain.md`，按其中指引读取领域资料；ADR 放在 `docs/adr/`。
+- **探索代码**：先读 `docs/agents/domain.md`，按其中指引读取领域资料；ADR 索引在 `docs/adr/README.md`。
 - **玩法与术语**：玩法与系统设计以 `docs/design/` 为准（策划案原文与数值表）；起名或写玩家可见文案前查 `GLOSSARY.md`。
-- **技术方案**：涉及平台能力、工具链或生命周期前，先读 `docs/adr/` 里相关条目，剩余能力缺口与待实测项见 [#323](https://github.com/qinyuanj/se-fish/issues/323)；策划案内部矛盾与数值缺口一律记在 [`docs/to-questionnaire-策划案内部矛盾.md`](docs/to-questionnaire-策划案内部矛盾.md)（未定的题），定案后移进 [策划案已确认结论](docs/策划案已确认结论.md)。
+- **技术方案**：涉及平台能力、工具链或生命周期前，先查 `docs/adr/README.md` 读相关条目，剩余能力缺口与待实测项见 [#323](https://github.com/qinyuanj/se-fish/issues/323)；策划案内部矛盾与数值缺口一律记在 [`docs/to-questionnaire-策划案内部矛盾.md`](docs/to-questionnaire-策划案内部矛盾.md)（未定的题），定案后移进 [策划案已确认结论](docs/策划案已确认结论.md)。
 - **编码与审查**：编写或审查 SE 业务 Lua 前，读 `CODING_STANDARDS.md`。
 - **命名与改名**：批量改名（codemod）与旧名字符串键检查走 `lua tools/cli.lua naming [--recon|--apply|--check]`（#337），改名前先跑 `--recon` 看清单。
 - **开发工作流**：修改代码、运行测试、同步宿主或操作编辑器前，以及整理过程产物时，读 `docs/agents/workflow.md`。
 - **截图**：取证统一走 `lua tools/cli.lua screenshot`，细节见 `docs/agents/editor-cli.md`「截图」条。
 - **架构导航**：需要模块依赖全景、评估改动影响或从图上操作时，打开 dsh-uml-viewer 插件面板；图由根目录 `policy.edn` 生成到 `docs/uml/se-fish.edn`（不要手编），操作规则由插件注入。
 - **架构分层**：新增模块、调整模块职责或依赖方向前，读 `docs/architecture.md`；层归属与门禁唯一声明在 `tools/arch_policy.lua`。
-- **spoke 运行时**：写或评审调用 `common.packages.spoke.*` 或 `common.packages.spoke_eggy.*` 的代码前，读 `.dsh/skills/spoke/`（库与技能都是上游 spoke 仓库的整包拷贝，两边都不就地修改）；宿主包独立成包、依赖单向，见 [ADR-0024](docs/adr/0024-introduce-spoke-eggy-host-package.md)。技能 `references/eggy-integration.md` 允许消费方自选 submodule 或纯拷贝：本仓取纯拷贝，SHA 记账在 [packages 参考](docs/packages-reference.md)。
+- **spoke 运行时**：写或评审调用 `common.packages.spoke.*` 或 `common.packages.spoke_eggy.*` 的代码前，读 `.dsh/skills/spoke/`（库与技能都是上游 spoke 仓库的整包拷贝，两边都不就地修改）；宿主包独立成包、依赖单向，见 [ADR-0022](docs/adr/0022-introduce-spoke-runtime.md)。技能 `references/eggy-integration.md` 允许消费方自选 submodule 或纯拷贝：本仓取纯拷贝，SHA 记账在 [packages 参考](docs/packages-reference.md)。
 - **美术资产**：定位美术工作区文件、用 Blender 或 Meshy 前读 `docs/agents/art-pipeline.md`；验收资产前读 `docs/art-asset-overview.md`「验收」，尺寸口径见 `docs/adr/0004-fish-asset-scale.md`。Blender 只走无头：一律 `lua tools/cli.lua blender`，跳过上游 blender-* skill 的 Live/MCP 段落，见 `docs/adr/0009-blender-headless-only.md`。
 - **验收与条款**：判断某项做完没有、新增待办或收口工单前，先读 `docs/acceptance/README.md`（条款入口）；两列格式、等级后缀与新增条款的受控入口见 `docs/acceptance/TEMPLATE.md`，已关闭旧单的未完成项去向见 `docs/acceptance/legacy-ledger.md`。
 - **Issue**：读写前看 `docs/agents/issue-tracker.md`；打 triage 标签前看 `docs/agents/triage-labels.md`。单据在 GitHub `qinyuanj/se-fish`，用 `gh` 操作。

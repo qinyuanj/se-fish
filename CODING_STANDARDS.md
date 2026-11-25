@@ -4,14 +4,14 @@
 
 ## 命名
 
-**项目规则**（`client/`、`server/`、`common/` 自写代码；迁移分层与豁免见 [ADR-0034](docs/adr/0034-self-written-code-snake-case.md)，模块表口径见 [ADR-0037](docs/adr/0037-module-tables-stay-pascalcase.md)）：
+**项目规则**（`client/`、`server/`、`common/` 自写代码；分层口径与豁免见 [ADR-0034](docs/adr/0034-self-written-code-snake-case.md)）：
 
 - 文件、目录与 `require` 命名空间一律 snake_case：`common/fish_catch.lua` → `require("common.fish_catch")`。
 - 模块表与类型名用 PascalCase，取文件名的驼峰形：`local FishCatch = require("common.fish_catch")`、`local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")`。**类型与值不同形**，读代码一眼分得开；官方类型（`State`、`World`）同理，不再单列豁免。
 - 其余标识符一律 snake_case：局部变量、参数、函数与方法名、自研 table 字段、协议字段（`fish_count`、`get_reel_state`）；常量用 UPPER_SNAKE_CASE。
 - 官方与引擎的名字照原样（大写不管），五类：官方 API 成员与内置服务名（`OnServerEvent`、`World`、`*Service`）；EUI 节点与单位属性表键（`Name`、`Text`、`FontSize`、`Parent`、`Visible`）、Spoke 作用域名与运行期单位名字符串；`data/` 导出字段与 `EggyAPI.lua` 存根；对应策划表列的配置字段；**所有 `*/packages/` 整包**（`client/packages/`、`common/packages/`、`server/packages/`，含上游整包与本仓维护的自研包，如 `*_Script.lua` / `*_LocalScript.lua`）、`unit_scripts/`、编辑器生成物。
 - **实现官方或包内声明的接口时，方法名跟随接口**，不改成 snake（例：ability 锚点接口的 `M.Attach`，包内按名调用，改了断链）；同名的自研方法若语义不同（例：`CarryMount.attach`），照常按自研规则改 snake——两者同名不冲突。
-- 存量按 L1 文件与 `require` → L3 方法与自研字段两层迁移（L2 模块表名已随 ADR-0037 定为 Pascal，不再迁移）；未迁移的存量 PascalCase 名称不单独改名，随该层迁移一次到位。
+- 存量按 L1 文件与 `require` → L3 方法与自研字段两层迁移（L2 模块表名已随 ADR-0034 定为 Pascal，不再迁移）；未迁移的存量 PascalCase 名称不单独改名，随该层迁移一次到位。
 
 ## API 与运行端
 

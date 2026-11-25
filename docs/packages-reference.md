@@ -81,7 +81,7 @@
 | 升级 | 从上游检出整体重拷 `common/packages/spoke/` 与技能，再更新本表 SHA |
 | 约束 | 不就地修改包内文件；不搬上游 `tests/`；不改写上游技能 |
 
-`spoke_eggy` 是同一次同步引入的 SE 宿主层，独立成包、不嵌进核心，边界见 [ADR-0024](adr/0024-introduce-spoke-eggy-host-package.md)。
+`spoke_eggy` 是同一次同步引入的 SE 宿主层，独立成包、不嵌进核心，边界见 [ADR-0022](adr/0022-introduce-spoke-runtime.md)。
 
 | 项 | 值 |
 |---|---|

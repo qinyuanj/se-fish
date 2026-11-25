@@ -2,7 +2,7 @@
 
 > 给接手这个仓库的人。看完这一页，你应当知道三件事：矩阵满屏 `unverified` 是**正常状态**，下一步该从哪取活，以及证据怎么补。
 >
-> 规则以这四份文件为准，本文件只解释怎么用：[README.md](README.md)（入口与脚本生成的计数）、[TEMPLATE.md](TEMPLATE.md)（新增条款的唯一入口）、[证据分级](evidence-levels.md)（A/B/C 三档怎么判）、[遗留台账](legacy-ledger.md)（七张旧单的未完成项去向）；范围与延后理由见 [ADR-0027](../adr/0027-clause-matrix-as-sole-acceptance-surface.md)、[ADR-0028](../adr/0028-solo-clear-on-shared-world.md)、[ADR-0029](../adr/0029-scope-completeness-and-placeholder-first.md) 与 [ADR-0039](../adr/0039-acceptance-surface-as-feature-files.md)（验收面收敛为功能文件）。
+> 规则以这五份文件为准，本文件只解释怎么用：[README.md](README.md)（入口与脚本生成的计数）、[TEMPLATE.md](TEMPLATE.md)（新增条款的唯一入口）、[证据分级](evidence-levels.md)（A/B/C 三档怎么判）、[遗留台账](legacy-ledger.md)（七张旧单的未完成项去向）、[生产开关台账](production-switches.md)（外部渠道与发布前清单）；范围与口径见 [ADR-0028](../adr/0028-solo-clear-on-shared-world.md)、[ADR-0029](../adr/0029-scope-completeness-and-placeholder-first.md) 与 [ADR-0039](../adr/0039-acceptance-surface-as-feature-files.md)。
 >
 > 本文件与它们冲突时以它们为准，并且把冲突摆到台面上——不要默默按其中一边做。
 
@@ -71,7 +71,7 @@
 | --- | --- | --- |
 | 跑通 `tests/native/` 的旧测试 | 条款证据 | 九成是实现自检、没有条款 ID；它们通过只说明实现没坏，不说明规矩成立 |
 | 单次快照（一张截图、一段日志、一次成功） | B 级 | 判不出重连、迟到回调、超时与争抢；不可重跑就不是 B |
-| 编辑器内模拟平台回调成功 | 平台条款验收 | 真实平台结论只能在真实平台取；这类条款按适配层口径记 `unverified`，真实渠道结论单列进 ADR-0029 的生产开关台账 |
+| 编辑器内模拟平台回调成功 | 平台条款验收 | 真实平台结论只能在真实平台取；这类条款按适配层口径记 `unverified`，真实渠道结论单列进[生产开关台账](production-switches.md) |
 | 一处满足（一条分支、一个鱼种、一次成功） | 整条要求 | 条款写的是「谁在什么条件下做什么」，条件没覆盖完就不成立；该拆就拆，别拿一处充数 |
 | 写完了、代码看过了、PR 合了 | 取证 | 那是「做完了」，不是「验证过了」 |
 | 证据文件只在注释里提到条款号 | 取证 | 那是引用，不是断言；在 `M.INFER_EXCEPTIONS` 里显式登记，不靠文案绕过 |
@@ -98,21 +98,9 @@ lua tools/cli.lua acceptance --update-baseline # 证据变多后抬基线（单�
 
 ## 五、延后范围
 
-> 本节说的是**批次延后**，不是条款出界：规格内没有永久出界（[ADR-0029](../adr/0029-scope-completeness-and-placeholder-first.md) 第一节）。9-19～9-23 随 E 批次（多人规则组）恢复排期，不是出界。
+> 本节说的是**批次延后**，不是条款出界：规格内没有永久出界（[ADR-0029](../adr/0029-scope-completeness-and-placeholder-first.md)）。
 
-下列内容本轮不做，**不是放弃**。范围与恢复条件取自 [ADR-0027](../adr/0027-clause-matrix-as-sole-acceptance-surface.md) 的「后果」一节：
-
-> **延后的批次与恢复条件**（与 #240 的批次表一致）：
->   - **D 通关取证**、**E 多人规则组**、**F A 级断言铺开**、**G B 级探针补齐**、**H 旧测试清账**。
->   - 恢复条件：D/E 等业务代码（第 12–16 节与多人接缝）合入集成分支、接口稳定之后启动；F 与 G 按分片逐节推进，每转一条 `evidenced` 都顺手抬一次基线；H 与新证据同步进行。
-
-两条口径是否还一致，用一条命令自查：
-
-```bash
-grep -n 'D 通关取证\|恢复条件：D/E' docs/adr/0027-*.md docs/acceptance/handover.md
-```
-
-两侧都应命中同一串字。若有人改了 ADR 的批次表而没改这里（或反过来），先修这里，并把差异说明写进提交。
+A/B 级断言与探针按分片逐节推进，每转一条 `evidenced` 顺手抬一次基线；C 级试玩条款（`blocked`）在编辑器试玩会话中按节整批取证；真实渠道与多人联机验证单列进[生产开关台账](production-switches.md)。
 
 ## 六、文档可达性
 
@@ -122,5 +110,5 @@ grep -n 'D 通关取证\|恢复条件：D/E' docs/adr/0027-*.md docs/acceptance/
 
 ## 七、这份说明怎么维护
 
-- 改口径先改上游：范围改 ADR-0027 与 ADR-0039、写法改 TEMPLATE、分级改 evidence-levels，最后才回来改本文。
+- 改口径先改上游：范围改 ADR-0029 与 ADR-0039、写法改 TEMPLATE、分级改 evidence-levels，最后才回来改本文。
 - 本文不含手写计数：矩阵数字摘自 `lua tools/cli.lua acceptance --check` 的输出（取样日期 2026-11-24）；再引用时注明新的取样日期。

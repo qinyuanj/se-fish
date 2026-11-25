@@ -2,7 +2,7 @@
 
 **Status**: accepted（2026-09-22 取证，2026-11-24 收口成本条 ADR）
 
-付费与广告是唯一「代码写完了也不能证明它对」的一块：能力本身存在，但验证只能发生在真实平台上。这条 ADR 只记**能力事实与接缝后果**，不重述决策链——订单身份怎么定在 [ADR-0031](0031-persistent-operation-identity.md)，参数缺位怎么占位、真实渠道怎么单列在 [ADR-0029](0029-scope-completeness-and-placeholder-first.md) 第四节。
+付费与广告是唯一「代码写完了也不能证明它对」的一块：能力本身存在，但验证只能发生在真实平台上。这条 ADR 只记**能力事实与接缝后果**，不重述决策链——订单身份怎么定在 [ADR-0031](0031-persistent-operation-identity.md)，参数缺位怎么占位在 [ADR-0029](0029-scope-completeness-and-placeholder-first.md)，真实渠道单列在[生产开关台账](../acceptance/production-switches.md)。
 
 ## 能力事实
 
@@ -17,8 +17,8 @@
 
 1. **订单身份自研**：发货不依赖平台给的单号，按 [ADR-0031](0031-persistent-operation-identity.md) 的持久操作生成并落账，平台事件只是触发器。
 2. **超时兜底是唯一收口**：取消、失败、成功三种收尾都不许只靠回调——没有取消 / 失败事件，`failEvent` 也不保证触发，所以每个在飞流程必须有自己的超时终点，超时即按失败结算并释放 busy。
-3. **广告与商品只在真实平台取结论**：编辑器内的任何「跑通了」只证明适配层代码路径完整，一律记为占位结论，进 [ADR-0029](0029-scope-completeness-and-placeholder-first.md) 台账，不改条款状态。
-4. **真实参数集中在配置**：商品 ID、广告位进 `common/GameCfg.lua` 的 `Platform` 段；真实参数到位后只替换配置，不改玩法判定。
+3. **广告与商品只在真实平台取结论**：编辑器内的任何「跑通了」只证明适配层代码路径完整，一律记为占位结论，进[生产开关台账](../acceptance/production-switches.md)，不改条款状态。
+4. **真实参数集中在配置**：商品 ID、广告位进 `common/game_cfg.lua` 的 `Platform` 段；真实参数到位后只替换配置，不改玩法判定。
 
 ## 后果
 
