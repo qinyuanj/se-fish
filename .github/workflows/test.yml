@@ -85,33 +85,26 @@ jobs:
           "LUA_PATH=$dest\share\lua\5.4\?.lua;$dest\share\lua\5.4\?\init.lua;.\?.lua;.\?\init.lua" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           "LUA_CPATH=$dest\lib\lua\5.4\?.dll;.\?.dll" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
-      - name: 探针：宿主规格
+      - name: 计算并行度（2× 核数，下限 4、上限 8）
+        id: jobs
         run: |
-          Write-Host "NUMBER_OF_PROCESSORS=$env:NUMBER_OF_PROCESSORS"
+          # 宿主规格与实测（public 标准 runner：EPYC 7763，2 核 / 4 逻辑核 / 16 GB）：
+          # full 串行 24.0 秒；--jobs 2 15.8 秒、4 13.2 秒、8 12.3 秒。
+          # 分片墙钟由最慢那片决定，片数多于核数时收益来自把尾巴切碎；上限对齐 tools/test.lua 的 MAX_JOBS。
+          $cpu = [int]$env:NUMBER_OF_PROCESSORS
+          if ($cpu -lt 1) { $cpu = 2 }
+          $jobs = [Math]::Min([Math]::Max($cpu * 2, 4), 8)
           Get-CimInstance Win32_Processor | Select-Object Name, NumberOfCores, NumberOfLogicalProcessors | Format-List
-          Get-CimInstance Win32_ComputerSystem | Select-Object TotalPhysicalMemory | Format-List
-          Get-PSDrive C | Select-Object Used, Free | Format-List
-
-      - name: 探针：串行与并行耗时
-        run: |
-          $sw = [Diagnostics.Stopwatch]::StartNew()
-          lua tools/cli.lua test full
-          $sw.Stop()
-          Write-Host "PROBE 串行 full: $($sw.Elapsed.TotalSeconds)s"
-          foreach ($j in 2, 4, 8) {
-            $sw = [Diagnostics.Stopwatch]::StartNew()
-            lua tools/cli.lua test full --jobs $j
-            $sw.Stop()
-            Write-Host "PROBE --jobs $j full: $($sw.Elapsed.TotalSeconds)s"
-          }
+          Write-Host "NUMBER_OF_PROCESSORS=$cpu → --jobs $jobs"
+          "jobs=$jobs" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 
       - name: 运行 guards 测试车道（纯文档快速路径）
         if: steps.changes.outputs.docs_only == 'true'
-        run: lua tools/cli.lua test guards
+        run: lua tools/cli.lua test guards --jobs ${{ steps.jobs.outputs.jobs }}
 
       - name: 运行 full 测试车道
         if: steps.changes.outputs.docs_only != 'true'
-        run: lua tools/cli.lua test full
+        run: lua tools/cli.lua test full --jobs ${{ steps.jobs.outputs.jobs }}
 
       - name: 缓存 emmylua_check 0.25.1
         id: cache-emmylua
