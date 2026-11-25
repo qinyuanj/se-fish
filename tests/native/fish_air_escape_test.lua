@@ -90,7 +90,12 @@ function FishAirEscape:set_up()
     end }
     self.carrier = require('server.world_host.fish_carrier')
     self.carrier.damage_publisher = function() end
+    local Spoke = require('common.packages.spoke.api')
     self.mgr = require('server.world_host.fish_tree')
+    self.mgr.clock = {
+        now = function() return env.now end,
+        on_frame = Spoke.Trigger.new('TestFishAirEscapeFrame'),
+    }
     -- 目标裁决适配层按生产接线（server/main.lua）由入口注入
     self.mgr.AiTarget = require('server.world_host.fish_ai_target')
     self.mgr:start()

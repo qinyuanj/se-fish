@@ -106,8 +106,8 @@ function ServerRuntime.new(opts)
   local re_conns = {}
   local carrier_died_handler = nil
   local bound_shop_action = nil
-  local fish_host = FishTree.new()
-  fish_host.clock = clock
+  local fish_host = FishTree.new({ clock = clock })
+  -- clock 已在构造期显式注入
   fish_host.ai_projection = opts.ai
   fish_host.logger = opts.logger
   fish_host.get_player_tree = function(_, player)

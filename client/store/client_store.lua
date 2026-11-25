@@ -335,7 +335,7 @@ local function default_host()
     heartbeat = RunService.Heartbeat,
     get_server_time = function()
       local ok, now = pcall(function() return World:GetServerTime() end) -- 宿主时钟未就绪或异常时安全降级为 dt 步进
-      return ok and now or nil
+      if not ok then print("[ClientStore] 读取宿主时钟失败", tostring(now)) end; return (ok and Number.is_finite_number(now)) and now or nil
     end,
     get_local_player = function()
       return Players.LocalPlayer

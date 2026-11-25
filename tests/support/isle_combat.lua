@@ -89,8 +89,13 @@ function M.new(zoneIndex)
         FireAllClients = function(_, p) if name == 'GarBiteNotice' then env.notices[#env.notices + 1] = p end end,
         FireClient = function(_, player, p) if name == 'CastState' then env.castStates[#env.castStates + 1] = p end end,
         OnServerEvent = signal(), OnClientEvent = signal() } end }
+    local Spoke = require('common.packages.spoke.api')
     env.carrier = require('server.world_host.fish_carrier')
     env.mgr = require('server.world_host.fish_tree')
+    env.mgr.clock = {
+        now = function() return env.now end,
+        on_frame = Spoke.Trigger.new('TestIsleCombatFrame'),
+    }
     -- 目标裁决适配层按生产接线（server/main.lua）由入口注入，MgrFishUnit 自身不再 require 它。
     env.mgr.AiTarget = require('server.world_host.fish_ai_target')
     local LifeHost = require('tests.support.life_host')

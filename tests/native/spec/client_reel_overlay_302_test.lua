@@ -14,6 +14,7 @@ local function mount()
     services = {
       reel = reel,
       now = function() return clock.now() end,
+      get_device_resolution = function() return { x = 1920, y = 1080 } end,
       send_reel = function(payload) sent[#sent + 1] = payload end,
       send_close = function(payload) closed[#closed + 1] = payload end,
     },

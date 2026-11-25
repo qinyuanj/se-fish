@@ -10,8 +10,7 @@ local GarBiteNotice = require('common.gar_bite_notice')
 local BossMoves = require('common.cfg.boss_moves')
 local FishBehaviors = require('server.fish_behaviors')
 local Spoke = require('common.packages.spoke.api')
-local SpokeTree, Effect, State = Spoke.SpokeTree, Spoke.Effect, Spoke.State
-
+local SpokeTree, Effect, State = Spoke.SpokeTree, Spoke.Effect, Spoke.State; local validate_clock ---@type fun(clock: any, caller?: string): table
 local function abilityApi(self)
     return self.ability_api
 end
@@ -45,8 +44,9 @@ local function distanceSq(pos, cp)
 end
 
 function Mgr:now()
-    local world = self.World or service('World')
-    return world:GetServerTime()
+    local clock = rawget(self, 'clock')
+    if type(clock) == 'table' and type(clock.now) == 'function' then return clock.now() end
+    local world = self.World or service('World'); if not world or type(world.GetServerTime) ~= 'function' then error('FishTree:now 缺少注入时钟或 World', 2) end; return world:GetServerTime()
 end
 
 local function isBadNumber(v)
@@ -108,10 +108,10 @@ function Mgr:set_state(fish, value)
 end
 
 function Mgr:frame_clock()
-    if not self.clock then
-        self.clock = { on_frame = Spoke.Trigger.new('FishHostFrame') }
-    end
-    return self.clock
+    -- 时钟须显式注入
+    -- 禁止隐式创建共享 Trigger
+    local clock = rawget(self, 'clock')
+    return validate_clock(clock, 'FishTree:frame_clock')
 end
 
 local function lifePhase(state)
@@ -2493,9 +2493,9 @@ function Mgr:update()
     self:enforce_escape_cap(nil)
 end
 
-function Mgr.new()
-  local host = { Fish = {}, next_id = 0, held = {}, links = {} }
-  return setmetatable(host, { __index = Mgr })
+function Mgr.new(opts)
+  local clock = type(opts) == 'table' and opts.clock or nil; validate_clock(clock, 'FishTree.new')
+  return setmetatable({ Fish = {}, next_id = 0, held = {}, links = {}, clock = clock }, { __index = Mgr })
 end
 
 function Mgr:damage_fish(fish, amount)
@@ -2524,6 +2524,13 @@ function Mgr:fault(fish, reason)
     error(tostring(reason or 'fish'), 0)
   end)
   return fish.tree.fault ~= nil
+end
+
+validate_clock = function(clock, caller)
+  if type(clock) ~= 'table' or type(clock.now) ~= 'function' or type(clock.on_frame) ~= 'table' then
+    error(tostring(caller or 'FishTree') .. ' 缺少有效的注入时钟（需包含 now 与 on_frame）', 3)
+  end
+  return clock
 end
 
 return Mgr

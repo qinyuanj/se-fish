@@ -61,48 +61,48 @@ local function valid_resolution(raw)
   return nil
 end
 
+local function try_read_res(label, fn)
+  local ok, raw = pcall(fn)
+  if ok then return valid_resolution(raw) end
+  print("[ViewUtil] 读取分辨率失败", label, tostring(raw))
+  return nil
+end
 function ViewUtil.get_resolution(ctx, options)
   if type(options) == "table" and type(options.get_resolution) == "function" then
-    local resolved = valid_resolution(options.get_resolution())
-    if resolved ~= nil then
-      return resolved
-    end
+    local resolved = try_read_res("options.get_resolution", options.get_resolution)
+    if resolved ~= nil then return resolved end
   end
 
   local services = type(ctx) == "table" and ctx.services or nil
   if type(services) == "table" then
     if type(services.get_device_resolution) == "function" then
-      local resolved = valid_resolution(services.get_device_resolution())
-      if resolved ~= nil then
-        return resolved
-      end
+      local resolved = try_read_res("services.get_device_resolution", services.get_device_resolution)
+      if resolved ~= nil then return resolved end
     end
     local fallback_res = services.resolution
-    if type(fallback_res) == "function" then
-      fallback_res = fallback_res()
-    end
-    local resolved = valid_resolution(fallback_res)
-    if resolved ~= nil then
-      return resolved
-    end
+    local resolved = type(fallback_res) == "function" and try_read_res("services.resolution", fallback_res) or valid_resolution(fallback_res)
+    if resolved ~= nil then return resolved end
   end
 
   if game ~= nil then
-    local ok, raw = pcall(function() -- 宿主 EUI 管理器未就绪或分辨率接口异常时安全回退默认分辨率
+    local ok, raw = pcall(function() -- 宿主 EUI 管理器未就绪或分辨率接口异常时记录并返回 nil
       local players = game:GetService("Players")
+      -- 优先通过本地玩家读取宿主 EuiManager
+      -- 若不可用则记日志返回 nil
+      -- 不再回退 1920x1080
       local lp = players and players.LocalPlayer
       local eui_mgr = lp and lp.PlayerGui and lp.PlayerGui.EuiManager or nil
       return eui_mgr and eui_mgr:GetDeviceResolution() or nil
     end)
-    if ok then
+    if not ok then
+      print("[ViewUtil] 读取宿主 EUI 分辨率失败", tostring(raw))
+    else
       local resolved = valid_resolution(raw)
-      if resolved ~= nil then
-        return resolved
-      end
+      if resolved ~= nil then return resolved end
     end
   end
-
-  return { x = 1920, y = 1080 }
+  print("[ViewUtil] 未获取到有效设备分辨率，返回 nil")
+  return nil
 end
 
 function ViewUtil.wrap_text(text, columns)
@@ -164,6 +164,30 @@ function ViewUtil.create_anchor_scene_node(scope, ctx, entry, height, kind, fall
     node.Name = fallback_name
   end
   return node
+end
+
+function ViewUtil.resolve_clock(ctx, label, override_now)
+  if type(override_now) == "function" then
+    return override_now
+  end
+  local services = type(ctx) == "table" and ctx.services or nil
+  if type(services) == "table" and type(services.now) == "function" then
+    return services.now
+  end
+  local clock = type(ctx) == "table" and ctx.clock or nil
+  if type(clock) == "table" and type(clock.now) == "function" then
+    return clock.now
+  end
+  error("[" .. tostring(label or "ViewUtil") .. "] 缺少注入时钟（services.now 或 ctx.clock.now）", 3)
+end
+
+function ViewUtil.read_now(clock_now, label)
+  local ok, value = pcall(clock_now)
+  if ok and Number.is_finite_number(value) then
+    return value
+  end
+  print("[" .. tostring(label or "ViewUtil") .. "] 读取时钟失败", tostring(value))
+  return nil
 end
 
 return ViewUtil

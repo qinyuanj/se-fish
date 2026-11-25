@@ -41,32 +41,32 @@ end
 
 local function attack_rect(ctx)
   local resolution = ViewUtil.get_resolution(ctx)
+  if resolution == nil then
+    return nil
+  end
   local layout = MainHudLayout.compute({
     width = resolution.x,
     height = resolution.y,
     slots = 1,
   })
-  return layout and layout.rects and layout.rects.attack_control or { x = 1690, y = 430, w = 160, h = 160 }
-end
-
-local function current_now(ctx, services)
-  if type(services.now) == "function" then
-    local value = services.now()
-    if type(value) == "number" then
-      return value
-    end
-  end
-  return ctx.clock and ctx.clock.now() or 0
+  return layout and layout.rects and layout.rects.attack_control or nil
 end
 
 function AttackView.mount(scope, ctx)
   local services = ctx.services or {}
+  local clock_now = ViewUtil.resolve_clock(ctx, "AttackView")
+  local function now_of()
+    return ViewUtil.read_now(clock_now, "AttackView")
+  end
   local active = scope:memo("AttackVisible", function(ms)
     return ms:d(ctx.store.hud_visible) ~= false and equipped(ms:d(ctx.store.item_bar)) ~= nil
   end)
 
   scope:phase("AttackButton", active, function(ps)
     local rect = attack_rect(ctx)
+    if rect == nil then
+      return
+    end
     local screen = ctx.root_node and ctx.root_node.FindFirstChild and ctx.root_node:FindFirstChild("ScreenMain", true)
     local control = ctx.create_node(ps, "EUILayout", {
       Name = "AttackControl",
@@ -126,7 +126,7 @@ function AttackView.mount(scope, ctx)
       services.send_weapon(payload)
     end
     local function tick()
-      local t = current_now(ctx, services)
+      local t = now_of(); if t == nil then return end
       gesture:update(t)
       local gun = current_gun()
       if gun and gun.Auto and t >= next_auto then
@@ -137,14 +137,13 @@ function AttackView.mount(scope, ctx)
     end
     if button.OnTouchBegan and button.OnTouchEnded then
       ctx.connect(ps, button.OnTouchBegan, function()
-        auto_fired = false
-        next_auto = 0
-        gesture:begin(current_now(ctx, services))
-        pressing:set(true)
+        local t = now_of(); if t == nil then return end
+        auto_fired = false; next_auto = 0; gesture:begin(t); pressing:set(true)
       end)
       ctx.connect(ps, button.OnTouchEnded, function()
         pressing:set(false)
-        local result = gesture:finish(current_now(ctx, services))
+        local t = now_of(); if t == nil then return end
+        local result = gesture:finish(t)
         if result == "tap" then
           if not auto_fired then send("attack") end
         elseif result == "long" then

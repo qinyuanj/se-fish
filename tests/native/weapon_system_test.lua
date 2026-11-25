@@ -173,7 +173,12 @@ describe('TestMgrFishUnitBlastFish', function()
             if name == 'Players' then return { GetPlayers = function() return {} end } end
             return nil
         end }
+        local Spoke = require('common.packages.spoke.api')
         ctx.mgr = assert(loadfile('server/world_host/fish_tree.lua'))()
+        ctx.mgr.clock = {
+            now = function() return ctx.now end,
+            on_frame = Spoke.Trigger.new('TestWeaponFishFrame'),
+        }
         ctx.owner = { UserId = 55 }
     end)
     after_each(function()

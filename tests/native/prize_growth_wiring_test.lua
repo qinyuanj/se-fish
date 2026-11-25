@@ -262,6 +262,7 @@ describe('TestPrizeRocketInput', function()
                     state.requests[#state.requests + 1] = payload.action
                 end,
                 now = function() return state.now end,
+                get_device_resolution = function() return { x = 1920, y = 1080 } end,
             },
             create_node = function(_, props)
                 local node = {

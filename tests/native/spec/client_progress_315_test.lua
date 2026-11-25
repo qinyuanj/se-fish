@@ -21,6 +21,7 @@ describe("客户端图鉴纪录与剩余模态宿主接缝（#315）", function(
     root = Eui.node({ Name = "UIRoot" })
     view = RootView.mount(root, store, {
       services = {
+        get_device_resolution = function() return { x = 1920, y = 1080 } end,
         open_modal = function(id, payload) writer:open_modal(id, payload) end,
         close_modal = function(id) writer:close_modal(id) end,
         request_compendium = function() sent.compendium = sent.compendium + 1 end,

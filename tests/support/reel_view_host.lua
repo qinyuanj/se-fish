@@ -18,6 +18,7 @@ function Host.new()
     services = {
       reel = env.reel,
       now = function() return clock.now() end,
+      get_device_resolution = function() return { x = 1920, y = 1080 } end,
       send_reel = function(payload) env.sent[#env.sent + 1] = payload end,
       send_close = function(payload) env.closed[#env.closed + 1] = payload end,
     },

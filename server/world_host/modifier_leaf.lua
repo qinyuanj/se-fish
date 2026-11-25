@@ -276,10 +276,10 @@ end
 function ModifierLeaf.create_entity_store(opts)
   opts = type(opts) == "table" and opts or {}
   local modifier_api = opts.modifier_api or default_modifier_api()
-  local get_now = type(opts.now) == "function" and opts.now or function()
-    local ok, t = pcall(function() return game:GetService("World"):GetServerTime() end) -- 离线无引擎时兜底 0
-    return ok and Number.is_finite_number(t) and t or 0
+  if type(opts.now) ~= "function" then
+    error("[ModifierLeaf] create_entity_store 需要注入有效的 now 时钟函数", 2)
   end
+  local get_now = opts.now
 
   local records = {}
   local store = {}

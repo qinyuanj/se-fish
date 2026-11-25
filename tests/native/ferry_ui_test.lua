@@ -54,6 +54,7 @@ describe('客户端摆渡统一视图树（RootView × ClientStore）', function
       hud = { FerryView.spec() },
       docks = { ferry = FerryView.legs_spec() },
       services = {
+        get_device_resolution = function() return { x = 1920, y = 1080 } end,
         send_ferry = function(payload) env.sent[#env.sent + 1] = payload end,
         notify = function(text) env.notices[#env.notices + 1] = text end,
         create_scene_node = function(position, name)
