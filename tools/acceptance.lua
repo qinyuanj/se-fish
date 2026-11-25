@@ -251,9 +251,14 @@ end
 -- 没有证据的 C 级条款一律 blocked（唯一合法阻塞），其余 unverified。
 -- 同时找出证据文件里出现、矩阵里却没有的条款号（孤儿号），供门禁判红。
 function M.infer(matrix, root)
-  local known = {}
+  local known, non_standard = {}, {}
   for _, shard in ipairs(matrix.shards) do
-    for _, clause in ipairs(shard.clauses) do known[clause.id] = known[clause.id] or clause end
+    for _, clause in ipairs(shard.clauses) do
+      if not known[clause.id] then
+        known[clause.id] = clause
+        if not clause.id:match('^%d%d?%-%d%d$') then non_standard[#non_standard + 1] = clause end
+      end
+    end
   end
 
   local hits, orphans, seen_orphans = {}, {}, {}
@@ -261,17 +266,25 @@ function M.infer(matrix, root)
   for _, file in ipairs(M.evidence_files(root)) do
     local body = read_text(root, file.path)
     if body then
-      local covered = file.session and M.session_covered(body) or nil
-      for id, clause in pairs(known) do
-        local found
-        if file.session then
-          found = covered[id] == true
-        else
-          found = clause.level ~= 'C' and M.clause_mentioned(body, id)
+      local ids = M.clause_ids(body)
+      if file.session then
+        for id in pairs(M.session_covered(body)) do
+          if known[id] then hits[id][#hits[id] + 1] = file.path end
         end
-        if found then hits[id][#hits[id] + 1] = file.path end
+      else
+        for _, id in ipairs(ids) do
+          local clause = known[id]
+          if clause and clause.level ~= 'C' then
+            hits[id][#hits[id] + 1] = file.path
+          end
+        end
+        for _, clause in ipairs(non_standard) do
+          if clause.level ~= 'C' and M.clause_mentioned(body, clause.id) then
+            hits[clause.id][#hits[clause.id] + 1] = file.path
+          end
+        end
       end
-      for _, id in ipairs(M.clause_ids(body)) do
+      for _, id in ipairs(ids) do
         local key = id .. '\0' .. file.path
         if not known[id] and not seen_orphans[key] then
           seen_orphans[key] = true

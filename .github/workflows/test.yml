@@ -8,6 +8,12 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read
+
+concurrency:
+  # PR 分支同组抢占取消旧 run；push(main) 按 run_id 独立分组，避免被默认 queue: single 覆盖
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   full:
@@ -16,19 +22,91 @@ jobs:
     steps:
       - name: 检出仓库
         uses: actions/checkout@v4
+
+      - name: 判定变更范围（纯文档快速路径 / 兜底全量）
+        id: changes
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $docsOnly = 'false'
+          $reason = '非 PR 事件，兜底全量'
+
+          if ('${{ github.event_name }}' -eq 'pull_request') {
+            try {
+              $files = @(gh api --paginate "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" --jq '.[].filename')
+              if ($LASTEXITCODE -ne 0 -or $files.Count -eq 0) {
+                $reason = "PR 文件列表获取失败或为空（exit=$LASTEXITCODE, count=$($files.Count)），兜底全量"
+              } else {
+                # 严格文档白名单（Fail-Closed）：
+                # 排除 docs/agents/art-pipeline.md（tests/native/blender_cli_test.lua 会读取其小节标题）
+                $allDocs = $true
+                foreach ($f in $files) {
+                  $isRootDoc = $f -match '^(README|AGENTS|GLOSSARY|CODING_STANDARDS)\.md$'
+                  $isDocsMd = ($f -match '^docs/.*\.md$') -and ($f -ne 'docs/agents/art-pipeline.md')
+                  if (-not ($isRootDoc -or $isDocsMd)) {
+                    $allDocs = $false
+                    $reason = "命中非纯文档白名单文件: $f"
+                    break
+                  }
+                }
+                if ($allDocs) {
+                  $docsOnly = 'true'
+                  $reason = "全部 $($files.Count) 个变更文件均命中纯文档白名单，走 guards 快速路径"
+                }
+              }
+            } catch {
+              $reason = "变更检测异常（$($_.Exception.Message)），兜底全量"
+            }
+          }
+
+          Write-Host "docs_only=$docsOnly ($reason)"
+          "docs_only=$docsOnly" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: 缓存 Lua / LuaRocks / Busted
+        id: cache-hererocks
+        uses: actions/cache@v4
+        with:
+          path: .hererocks
+          key: ${{ runner.os }}-hererocks-ec31d070-lua5.4.6-luarocks3.12.2-busted2.3.0-1-v1
+
       - name: 配置 MSVC
+        if: steps.cache-hererocks.outputs.cache-hit != 'true'
         uses: step-security/msvc-dev-cmd@v1
-      - name: 安装 Lua 5.4.6 与 LuaRocks 3.12.2
+
+      - name: 安装 Lua 5.4.6、LuaRocks 3.12.2 与 Busted 2.3.0
+        if: steps.cache-hererocks.outputs.cache-hit != 'true'
         # 固定 hererocks 提交锁定安装器源码；gh-actions-luarocks 会在 Windows 上执行 Unix configure，不采用
         run: |
           python -m pip install "hererocks @ https://github.com/luarocks/hererocks/archive/ec31d070ae0076415c0175a2006b29496494d37a.zip"
           python -m hererocks .hererocks --lua 5.4.6 --luarocks 3.12.2 --target vs
+          $bin = (Resolve-Path .hererocks/bin).Path
+          $env:PATH = "$bin;$env:PATH"
+          luarocks install busted 2.3.0-1
+
+      - name: 将 .hererocks/bin 加入 PATH
+        run: |
           "$(Resolve-Path .hererocks/bin)" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
-      - name: 安装 Busted 2.3.0
-        run: luarocks install busted 2.3.0-1
+
+      - name: 运行 guards 测试车道（纯文档快速路径）
+        if: steps.changes.outputs.docs_only == 'true'
+        run: lua tools/cli.lua test guards
+
       - name: 运行 full 测试车道
+        if: steps.changes.outputs.docs_only != 'true'
         run: lua tools/cli.lua test full
+
+      - name: 缓存 emmylua_check 0.25.1
+        id: cache-emmylua
+        if: steps.changes.outputs.docs_only != 'true'
+        uses: actions/cache@v4
+        with:
+          path: .emmylua
+          key: ${{ runner.os }}-emmylua-0.25.1-577982E6-v1
+
       - name: 安装 emmylua_check 0.25.1
+        if: steps.changes.outputs.docs_only != 'true' && steps.cache-emmylua.outputs.cache-hit != 'true'
         run: |
           New-Item -ItemType Directory -Force -Path .emmylua | Out-Null
           Invoke-WebRequest -Uri "https://github.com/EmmyLuaLs/emmylua-analyzer-rust/releases/download/0.25.1/emmylua_check-win32-x64.zip" -OutFile ".emmylua/emmylua_check.zip"
@@ -36,6 +114,11 @@ jobs:
           $expected = "577982E68D925972D8AE35F54B5F384AD77A84A2E31E340BD663D1EFD2EF5983"
           if ($actual -ne $expected) { throw "emmylua_check.zip SHA-256 不匹配: $actual != $expected" }
           Expand-Archive -Path ".emmylua/emmylua_check.zip" -DestinationPath ".emmylua" -Force
-          "$(Resolve-Path .emmylua)" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+          Remove-Item ".emmylua/emmylua_check.zip" -Force
+
       - name: 运行 EmmyLua 诊断门禁
-        run: lua tools/cli.lua emmylua
+        if: steps.changes.outputs.docs_only != 'true'
+        run: |
+          "$(Resolve-Path .emmylua)" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+          $env:PATH = "$((Resolve-Path .emmylua).Path);$env:PATH"
+          lua tools/cli.lua emmylua
