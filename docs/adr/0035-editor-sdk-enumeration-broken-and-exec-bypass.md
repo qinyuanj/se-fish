@@ -29,7 +29,7 @@
 
 ## 已知副作用与附带事实
 
-**沙盒能力边界**（#65 P2 实测）：`exec` 的编辑器沙盒里 `require` 存在但不可用（`sdk.common.lua:830: attempt to call a nil value (field 'require')`），`io` / `os` / `loadfile` / `package` 全部缺席。所以探针**不能**加载 `common/GameCfg.lua`、也读不了外部数据文件；任何配置派生的清单必须离线生成后以字面量嵌入（做法见 `tools/gen_config_anchor_probe.lua` 与 fast 车道的同步守卫）。另：`EffectUnit` 不是 `SpaceUnit`，`GetPosition()` 回读 nil，不能把 nil 当坐标 0。
+**沙盒能力边界**（#65 P2 实测）：`exec` 的编辑器沙盒里 `require` 存在但不可用（`sdk.common.lua:830: attempt to call a nil value (field 'require')`），`io` / `os` / `loadfile` / `package` 全部缺席。所以探针**不能**加载 `common/game_cfg.lua`、也读不了外部数据文件；任何配置派生的清单必须离线生成后以字面量嵌入（做法见 `tools/gen_config_anchor_probe.lua` 与 fast 车道的同步守卫）。另：`EffectUnit` 不是 `SpaceUnit`，`GetPosition()` 回读 nil，不能把 nil 当坐标 0。
 
 **坐标形态**：编辑态 `Unit.Position` 是数组 `[1]` / `[2]` / `[3]`（`.x` 为 nil）；运行时是 `Vector3`，用 `.x` / `.y` / `.z`。同一段坐标逻辑跨两端复用时先按端取分量。
 

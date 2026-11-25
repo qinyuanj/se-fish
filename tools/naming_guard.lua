@@ -17,7 +17,7 @@ local SKIP_DIR_NAMES = { packages = true, _trigger = true }
 local DATA_DIR = "tools/naming/data"
 
 -- 官方契约上下文：出现在这些调用/字段里的字符串是引擎/协议名字，不是自研方法名。
--- 出处：ADR-0034「官方契约原样」五类豁免与迁移索引附录（docs/adr/0034-self-written-code-snake-case.md）；新增前先确认真是官方或线上协议。
+-- 出处：ADR-0034「官方契约与边界一律原样」（docs/adr/0034-self-written-code-snake-case.md）；新增前先确认真是官方或线上协议。
 local OFFICIAL_CONTEXT = {
   "action", "GetService", "GetAttribute", "SetAttribute", "read_player_attr",
   "attr", "get_re", "send", "Name", "Parent", "FindFirstChild", "CreateUnit",
@@ -70,7 +70,7 @@ local function parse_rows(body)
 end
 
 -- 映射表：l3a 是 449 个标识符（含局部变量/字段），l3b 是 45 个方法名，
--- post_l3 是 L3 之后（PR #345 / ADR-0037 L4d）补充迁移的高危旧键（可选）。
+-- post_l3 是 L3 之后（PR #345 / ADR-0034 L4d）补充迁移的高危旧键（可选）。
 -- 三层的旧名集合合并；新名只用于报错时提示改成什么。
 function M.load_names(root)
   local l3a = parse_rows(assert(slurp(join(root, DATA_DIR .. "/l3a_renames.txt")), "缺 l3a 映射"))
