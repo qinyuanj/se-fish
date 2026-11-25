@@ -23,3 +23,4 @@
 - **sync 回灌的引擎生成物**：`sync` 会把 `EggyAPI.lua` 这样的引擎生成物一并带回仓库；与本次改动无关时单独 `git restore`，并在验收记录里点名，别让无关的 API 刷新混进功能分支。
 - **`code push --delete` 逐条超时**：地图侧多出本地已删的脚本时，`code push --delete --yes` 常常只删掉一条就报 `EDITOR_UNREACHABLE: script_delete failed: Timeout waiting for response to script_delete`（`applied before failure: none`），但那条删除其实已经生效。复核用 `code diff` 的 `only-on-map`，它每轮减一；重复执行直到 0 即可（2026-11-24 清理改名遗留的 8 条实测，`--timeout 60` 不改变表现）。
 - **本地模拟多人不可用**：截至编辑器 1.0.37 / editor-cli 0.20.17，没有「单次试玩加入多个虚拟玩家、生成真实 `Player`」的入口；NPC（`World:CreateUnit` 的 `EggyUnit`）不能替代真实玩家，多人验收必须真实第二客户端。结论与未验证项见 [ADR-0040](../adr/0040-local-multiplayer-not-simulatable-in-editor.md)。
+- **宿主 `log.txt` 清理**：`lua tools/cli.lua deploy` 日常检查宿主目录根的 `log.txt`，超过 `512 KB` 或距上次修改超过 `4h` 时直接删除，未达阈值不触碰，文件被编辑器占用时打印提示并跳过。

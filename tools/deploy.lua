@@ -19,6 +19,7 @@ local workspace = require("tools.eggy_workspace")
 local plan = require("tools.deploy_plan")
 local seam = require("tools.seam")
 local finalize = require("tools.editor_finalize")
+local host_log = require("tools.host_log")
 local exit_code = require("tools.exit_code")
 
 local M = {}
@@ -195,6 +196,9 @@ local function run_deploy(clean_only)
   end
 
   print("deploy ok → " .. WS)
+
+  -- 日常清理：宿主 log.txt 超过 512KB 或 4 小时未写入时直接删除，文件被占用时安全跳过。
+  host_log.maybe_clean(WS)
 
   local ok, err, code = finalize.run(WS)
   if not ok then

@@ -102,6 +102,12 @@ function M.size(path)
   return lfs.attributes(tostring(path), "size")
 end
 
+-- 文件最后修改时间（Unix 秒）；不存在返回 nil。
+function M.mtime(path)
+  if path == nil then return nil end
+  return lfs.attributes(tostring(path), "modification")
+end
+
 -- 打开目录迭代器。调用方已确认目标是目录，所以这里的失败是真错误（权限、句柄耗尽）；
 -- 不能返回空表——deploy 会把读不出的宿主目录当成「没有残留」而放行。
 local function open_dir(path)
