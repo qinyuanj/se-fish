@@ -1,4 +1,6 @@
 
+local ModuleCache = require('tests.support.module_cache')
+
 local function vec(x, y, z) return { x = x, y = y, z = z } end
 
 local function signal()
@@ -142,7 +144,8 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
       if name == 'Players' then return { GetPlayers = function() return env.players end } end
       if name == 'DataStoreService' then return { GetDataStore = function() return env.store end } end
     end }
-    env.save = assert(loadfile('server/save_host.lua'))()
+    -- 每例重建存档宿主：模块表要新，源码不必重新编译（helper 装的 module_cache 复用编译结果）。
+    env.save = assert(ModuleCache.loadfile('server/save_host.lua'))()
     env.mgr.Save = env.save
     for _, player in ipairs(env.players) do env.save:load_into(player, env.data[player.UserId]) end
 
@@ -784,7 +787,7 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
     assert.message('返回服务端操作身份供跨会话补发').is_not_nil(operation)
     env.mgr:on_player_removing(player)
     player = new_player(1, 101, 6, 103)
-    data = assert(loadfile('server/data/player_data.lua'))().new(player)
+    data = assert(ModuleCache.loadfile('server/data/player_data.lua'))().new(player)
     env.players[1], env.data[1] = player, data
     env.save:load_into(player, data)
     assert.is_true(env.mgr:handle(player,

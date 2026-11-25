@@ -40,17 +40,29 @@ end
 
 local temp_counter = 0
 
+-- 进程标记：同一次跑批里每个分片进程一个，由 tools/test.lua 通过 SE_TEST_PROCESS 发号
+-- （分片号拼在跑批号后面）。不靠时钟：MSVC 的 clock() 只有毫秒粒度，并起的进程会撞在同一毫秒，
+-- 而撞同一毫秒正是要拦的那个 bug。直接跑 busted（不经 tools/test.lua）时退回进程时钟值：
+-- 那种情形一个进程独占 tmp/，进程内序号已经够用。
+-- 也不用 math.random：tests/support/random_guard.lua 会换掉它的引用，夹具不该依赖它。
+local PROCESS_TOKEN = os.getenv("SE_TEST_PROCESS")
+  or string.format("%d", math.floor(os.clock() * 1000 + 0.5))
+
 -- 在仓库 tmp/ 下建一个唯一临时目录并返回其正斜杠路径。
+-- 名字里必须有进程标记：调用方（用例）用完会 rmrf 掉返回的目录，而 auto-insulate 每个文件
+-- 重新加载本模块、计数器回到 1；两个分片进程在同一秒各要一次临时目录就会算出一模一样的名字，
+-- 先删掉的那个把名字让了出去，另一个进程占下后，先前的进程又往同一个路径里重建夹具
+-- （acceptance_matrix_test 实测：分片并跑时 docs/acceptance 被别的进程删空）。
+-- 名字带进程标记之后这种回收不会发生；lfs.mkdir 的原子性再兜一层，撞上就换下一个序号。
 function M.temp_dir()
   local base = M.repo_root() .. "/tmp"
   M.mkdirp(base)
-  local dir
-  repeat
+  for _ = 1, 1000 do
     temp_counter = temp_counter + 1
-    dir = base .. "/fs-fixture-" .. tostring(os.time()) .. "-" .. tostring(temp_counter)
-  until not M.exists(dir)
-  M.mkdirp(dir)
-  return dir
+    local dir = string.format("%s/fs-fixture-%d-%s-%d", base, os.time(), PROCESS_TOKEN, temp_counter)
+    if lfs.mkdir(dir) then return dir end
+  end
+  error(string.format("fs_fixture.temp_dir: 无法在 %s 下创建临时目录", base), 0)
 end
 
 function M.slurp(path)
