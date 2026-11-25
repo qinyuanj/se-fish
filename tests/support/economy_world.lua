@@ -147,8 +147,8 @@ function M.new()
     save = env.save,
     platform = env.platform,
     player_data = env.players,
-    random = function()
-      if env.randomOverride then return env.randomOverride() end
+    random = function(...)
+      if env.randomOverride then return env.randomOverride(...) end
       local roll = table.remove(env.rolls, 1)
       assert(roll, "测试脚本 RNG 序列耗尽")
       return roll

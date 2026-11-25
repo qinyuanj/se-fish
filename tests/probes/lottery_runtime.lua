@@ -1,7 +1,7 @@
 -- #138 T17 抽奖机运行探针（离线模拟，只证明逻辑，不当真机验收）。
 -- 运行：在仓库根执行 `lua tests/probes/lottery_runtime.lua`；退出码 0 = 全部通过。
--- 第一节（正常路径）：真实抽样 —— 用确定性种子的 LCG 替换 MgrLottery.random（系统边界注入点），
---   三轴与武器组内抽样都走真实 LotteryDraw 代码，不指定图案；2 万次抽奖的经验分布与
+-- 第一节（正常路径）：真实抽样 —— 用确定性种子的 LCG 注入 EconomyWorld.randomOverride（系统边界注入点），
+--   三轴与武器组内抽样都走真实 PlayerLottery + LotteryDraw 代码，不指定图案；2 万次抽奖的经验分布与
 --   配置表理论值对账（两同/三同/未中奖占比、赔付期望 2.119671、投入产出守恒）。
 -- 第二节（[专项探针]）：低概率三同路径用脚本化序列逐图案强制触发，验证大奖发放与落位；
 --   这是明确标识的专项验证，不作为正常通关证据。
@@ -14,7 +14,7 @@
 --   5. 专项探针里某个图案的三同发不出对应大奖。
 --
 -- 模拟边界（逐条标注在输出里）：
---   * 业务模块用真实代码：MgrPlayerData / MgrLottery / LotteryDraw / LotteryEligibility / GameCfg。
+--   * 业务模块用真实代码：ServerRuntime / PlayerDataHost / PlayerLottery / LotteryDraw / LotteryEligibility / GameCfg。
 --   * 引擎边界是假的：DataStore、RE、锚点；不进编辑器、不开局，真机另行试玩。
 --   * 随机源是固定种子 LCG（确定性复现），不是引擎随机；分布结论只对配置表负责。
 package.path = table.concat({ './?.lua', './?/init.lua', package.path }, ';')
@@ -38,14 +38,10 @@ local ITEM_BAR = GameCfg.Items.ContainerId.ItemBar
 local world = EconomyWorld.new()
 local data = world.data
 local seq = 0
-local lottery = setmetatable({}, {
-    __newindex = function(self, key, value)
-        if key == 'Random' then world.randomOverride = value else rawset(self, key, value) end
-    end,
-})
-function lottery:settle(_, slot)
+local function draw_slot(slot)
     seq = seq + 1
-    assert(world:lottery_action({ action = 'Draw', slot = slot, seq = seq }))
+    world:clear_events()
+    assert(world:lottery_draw(slot, seq))
     local result = world:last_result('LotteryResult')
     assert(result and result.ok, result and result.reason or '无回包')
     return result
@@ -58,7 +54,7 @@ local function lcg(n) -- 固定种子 LCG，返回 1..n 均匀整数（确定性
     rngState = (rngState * 1103515245 + 12345) % 2147483648
     return rngState % n + 1
 end
-lottery.random = lcg
+world.randomOverride = lcg
 
 local patterns = GameCfg.Lottery.Patterns
 local function patternIndexByName(name)
@@ -70,11 +66,11 @@ _G.print = function() end
 local pairCount, tripleCount, noneCount = {}, {}, 0
 local coinsPaid, consumed = 0, 0
 for _ = 1, N do
-    -- 每次投一件未烤极品罗非鱼（基础价 3）：直接摆进第 1 格，走真实 settle
+    -- 每次投一件未烤极品罗非鱼（基础价 3）：直接摆进第 1 格，走真实抽奖运行时
     local bar = data.data.containers[ITEM_BAR]
     for slot = 1, data:ItemBarCapacity() do bar[slot] = nil end
     bar[1] = { itemId = 'item7', count = 1, containerId = ITEM_BAR }
-    local result = assert(lottery:settle(data, 1))
+    local result = assert(draw_slot(1))
     consumed = consumed + 1
     if result.outcome == 'pair' then
         local index = assert(patternIndexByName(result.patternName))
@@ -170,12 +166,12 @@ for i, p in ipairs(patterns) do
     local script = { roll, roll, roll }
     if reward.kind == 'weaponChoice' then script[4] = 1 end -- 组内取第 1 件
     local index = 0
-    lottery.random = function()
+    world.randomOverride = function()
         index = index + 1
         return assert(script[index], '专项脚本耗尽')
     end
     local before = data.data.FishCoin
-    local result = assert(lottery:settle(data, 1))
+    local result = assert(draw_slot(1))
     local ok = result.outcome == 'triple' and result.patternName == p.name and result.prize ~= nil
     local placement
     if reward.kind == 'weaponChoice' then

@@ -264,13 +264,13 @@ local function gun_hit(opts, player, aim)
     end
   end
   local ray_origin, ray_dir = vec(origin.x, origin.y, origin.z), vec(fx * range, fy * range, fz * range)
-  local ok, hit = pcall(function()
-    return physics:Raycast(ray_origin, ray_dir, params)
-  end)
-  if not ok and physics.Raycast then
-    ok, hit = pcall(physics.Raycast, ray_origin, ray_dir, params)
+  -- 仅使用 SE 引擎 PhysicsService:Raycast 冒号签名
+  local ok, hit = pcall(function() return physics:Raycast(ray_origin, ray_dir, params) end)
+  if not ok then
+    print("[PlayerWeapon] 射线检测失败", player and player.UserId, tostring(hit))
+    return nil, end_pos
   end
-  if not ok or (type(hit) ~= "table" and type(hit) ~= "userdata") or not hit.Instance then return nil, end_pos end
+  if (type(hit) ~= "table" and type(hit) ~= "userdata") or not hit.Instance then return nil, end_pos end
   local hit_pos = hit.Position or end_pos
   local players = service("Players", opts.players_service)
   local target = players and type(players.GetPlayerFromCharacter) == "function"

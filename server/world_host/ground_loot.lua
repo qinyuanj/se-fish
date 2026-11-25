@@ -267,12 +267,14 @@ function GroundLoot.mount(world, opts)
 
   local function place(zone_id, spec)
     if type(spec) ~= "table" or type(spec.itemId) ~= "string" then return nil end
+    if spec.Position ~= nil or spec.Count ~= nil or spec.SpotId ~= nil then return nil end
+    local count = spec.count == nil and 1 or spec.count
+    if not Number.is_finite_number(count) or count < 1 or count ~= math.floor(count) then return nil end
+    if spec.spotId ~= nil and type(spec.spotId) ~= "string" then return nil end
     local zone = zone_of(zones, zone_id)
     if zone == nil or zone.ground_loot == nil then return nil end
     local x, y, z = read_pos(spec)
-    if x == nil then
-      x, y, z = read_pos(spec.position or spec.Position)
-    end
+    if x == nil then x, y, z = read_pos(spec.position) end
     if x == nil then return nil end
     next_id = next_id + 1
     local id = tostring(next_id)
@@ -282,14 +284,12 @@ function GroundLoot.mount(world, opts)
       key = key,
       kind = spec.kind or "item",
       itemId = spec.itemId,
-      count = spec.count or spec.Count or 1,
+      count = count,
       mult = spec.mult,
       cooked = spec.cooked,
-      x = x,
-      y = y,
-      z = z,
+      x = x, y = y, z = z,
       zoneId = zone_id,
-      spotId = spec.spotId or spec.SpotId,
+      spotId = spec.spotId,
       warn = false,
       recycle_at = nil,
     }

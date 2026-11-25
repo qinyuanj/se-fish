@@ -407,4 +407,42 @@ describe("钓鱼区地面物品与鱼饵刷新（#301 服务端宿主）", funct
     env.events.ItemBarAction.OnServerEvent:Fire(player, { action = "Pickup", value = "1" })
     assert.equals(before, #env.events.LootState.clients)
   end)
+
+  it("GroundLoot.place 拒绝旧大小写别名键与非法字段输入", function()
+    local env = host({
+      bait_spots = { RespawnSec = 15, Mesh = "mesh", Scale = 0.3, Spots = {} },
+    })
+    local world = env.runtime:get_world()
+    assert.is_false(world:place_ground_item(ZONE_ID, {
+      kind = "item", itemId = ITEM_ID, Position = { x = 1, y = 0, z = 1 },
+    }))
+    assert.is_false(world:place_ground_item(ZONE_ID, {
+      kind = "item", itemId = ITEM_ID, x = 1, y = 0, z = 1, Count = 2,
+    }))
+    assert.is_false(world:place_ground_item(ZONE_ID, {
+      kind = "item", itemId = ITEM_ID, x = 1, y = 0, z = 1, SpotId = "a",
+    }))
+    assert.is_false(world:place_ground_item(ZONE_ID, {
+      kind = "item", itemId = ITEM_ID, x = 1, y = 0, z = 1, count = 0,
+    }))
+    assert.is_false(world:place_ground_item(ZONE_ID, {
+      kind = "item", itemId = ITEM_ID, x = 1, y = 0, z = 1, count = 1.5,
+    }))
+    assert.is_false(world:place_ground_item(ZONE_ID, {
+      kind = "item", itemId = ITEM_ID, x = 1, y = 0, z = 1, spotId = 123,
+    }))
+    local receipt, reason = world:place_delivery("bad:alias", ZONE_ID, {
+      kind = "item", itemId = ITEM_ID, Position = { x = 1, y = 0, z = 1 },
+    })
+    assert.is_nil(receipt)
+    assert.equals("rejected", reason)
+    assert.equals(0, env:alive_units())
+    assert.equals(0, #(world:ground_snapshot().list))
+    -- 小写单一字段口径正常接受
+    assert.is_true(world:place_ground_item(ZONE_ID, {
+      kind = "item", itemId = ITEM_ID, count = 1, position = { x = 2, y = 0, z = 3 }, spotId = "ok-spot",
+    }))
+    assert.equals(1, env:alive_units())
+    env:shutdown()
+  end)
 end)

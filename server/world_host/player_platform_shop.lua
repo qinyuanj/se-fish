@@ -179,11 +179,11 @@ function PlayerPlatformShop.mount(scope, tree, opts)
     if not origin or not world or type(world.place_delivery) ~= "function" then return end
     for _, key in ipairs(sorted_keys(value.deliveries)) do
       local delivery = value.deliveries[key]
-      if delivery.epoch == nil or delivery.epoch == opts.delivery_epoch then
-        local receipt, reason = world:place_delivery(key, "fishPond", {
-          kind = "item", itemId = delivery.itemId, count = 1, mult = 1,
-          x = origin.x, y = origin.y, z = origin.z + 2,
-        })
+      if delivery.epoch == nil then
+        print("[PlayerPlatformShop] 跳过缺少 epoch 的遗留待交付", player.UserId, key)
+      elseif delivery.epoch == opts.delivery_epoch then
+        local receipt, reason = world:place_delivery(key, "fishPond", { kind = "item", itemId = delivery.itemId,
+          count = 1, mult = 1, x = origin.x, y = origin.y, z = origin.z + 2 })
         if not receipt then
           print("[PlayerPlatformShop] 待交付保留", player.UserId, key, tostring(reason))
           return

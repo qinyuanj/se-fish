@@ -5,19 +5,19 @@ local Mgr = { attack_bonuses = {} }
 local active_trees = {}
 local isValidPlayer = SignalRouter.is_valid_player
 
-local function syncTarget(self, target, data)
-    local tree = isValidPlayer(target) and active_trees[target.UserId] or nil
-    local hasLiveTree = tree ~= nil and tree.player == target and not tree:is_disposed()
+local function sync_target(self, target, data)
     if self.player_data and type(self.player_data.send_item_bar) == 'function' then
-        local synced = self.player_data:send_item_bar(target, true)
-        if hasLiveTree and not self.player_data.runtime and type(tree.sync_from_data) == 'function' then
-            tree:sync_from_data(data, { force_push = true })
-        end
-        return synced
-    elseif hasLiveTree and type(tree.sync_from_data) == 'function' then
+        return self.player_data:send_item_bar(target, true)
+    end
+    local tree = isValidPlayer(target) and active_trees[target.UserId] or nil
+    if type(tree) ~= 'table' or tree.player ~= target then return false end
+    if type(tree.is_disposed) == 'function' and tree:is_disposed() then return false end
+    if type(tree.sync_from_data) == 'function' then
         return tree:sync_from_data(data, { force_push = true })
     end
+    return false
 end
+
 
 local AttackStep = 25
 local BaseAttack = 0
@@ -124,7 +124,7 @@ function Mgr:handle(player, payload)
         or method == 'ReadState' or method == 'SelectSaveSlot' or method == 'GetState') then
         local function finish(ok, reason)
             if ok and (method == 'ApplyState' or method == 'ReadState') then
-                syncTarget(self, target, data)
+                sync_target(self, target, data)
             end
             self:reply(player, { ok = ok, action = payload.action, target = target.UserId,
                 reason = reason, status = self.Save:status(target.UserId),
@@ -153,7 +153,7 @@ function Mgr:handle(player, payload)
     print('[PlayerGM]', ok and '发放' or '拒绝', player and player.UserId, '->', target and target.UserId,
         tostring(payload.action), tostring(payload.amount or payload.itemId or payload.value or payload.scene or payload.fishId), tostring(payload.count or ''))
     if ok and method ~= 'next_fish' and method ~= 'add_attack' and method ~= 'get_attack' then
-        syncTarget(self, target, data)
+        sync_target(self, target, data)
     end
     self:reply(player, { ok = ok, action = payload.action, target = target and target.UserId,
         damage = ok and (method == 'add_attack' or method == 'get_attack') and self:get_melee_damage(target, BaseAttack) or nil,

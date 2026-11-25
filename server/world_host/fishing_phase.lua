@@ -383,6 +383,19 @@ function FishingPhase.mount(scope, tree, opts)
     end
   end
 
+  local function advance_whole_second_decay(active_reel, now)
+    local whole = math.floor(now)
+    local from = active_reel.decayedAt or math.floor(active_reel.progress.Time)
+    if from >= whole then return false, nil end
+    active_reel.decayedAt = whole
+    local decay_outcome = active_reel.progress:advance(whole)
+    if decay_outcome then
+      finish_reel(decay_outcome, true)
+      return true, decay_outcome
+    end
+    return true, nil
+  end
+
   local function accept_clicks(payload)
     if not reel or not session or session.phase ~= "hooked" then return false end
     if type(payload) ~= "table" or payload.s ~= reel.id then return false end
@@ -406,16 +419,8 @@ function FishingPhase.mount(scope, tree, opts)
         return true
       end
     end
-    local whole = math.floor(now)
-    if (reel.decayedAt or math.floor(reel.progress.Time)) < whole then
-      local from = reel.decayedAt or math.floor(reel.progress.Time)
-      reel.decayedAt = whole
-      local decayed = reel.progress:advance(from + (whole - from))
-      if decayed then
-        finish_reel(decayed, true)
-        return true
-      end
-    end
+    local _, decayed = advance_whole_second_decay(reel, now)
+    if decayed then return true end
     local outcome = reel.progress:advance(now, result.accepted, 0)
     if outcome then
       finish_reel(outcome, true)
@@ -471,15 +476,9 @@ function FishingPhase.mount(scope, tree, opts)
     end
     if not reel or session.phase ~= "hooked" then return end
     local now = now_of(tree)
-    local whole = math.floor(now)
-    if (reel.decayedAt or math.floor(reel.progress.Time)) < whole then
-      local from = reel.decayedAt or math.floor(reel.progress.Time)
-      reel.decayedAt = whole
-      local outcome = reel.progress:advance(from + (whole - from))
-      if outcome then
-        finish_reel(outcome, true)
-        return
-      end
+    local stepped, decay_outcome = advance_whole_second_decay(reel, now)
+    if decay_outcome then return end
+    if stepped then
       reel.lastReport = now
       fire_reel({
         action = "progress",
@@ -488,6 +487,7 @@ function FishingPhase.mount(scope, tree, opts)
         accepted = 0,
       })
     end
+
     if reel and session and session.phase == "hooked" and reel.progress.zero_at
       and now > reel.progress.zero_at + GameCfg.ReelIn.GraceSec then
       local outcome = reel.progress:advance(now)

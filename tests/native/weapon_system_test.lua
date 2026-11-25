@@ -323,6 +323,30 @@ describe('TestMgrWeapon', function()
         assert.same(0, #ctx.applied)
     end)
 
+    it('test_gun_raycast_uses_single_colon_signature_without_fallback_retry', function()
+        ctx:equip(ctx.player, 'item137')
+        local calls = 0
+        ctx.physics.Raycast = function(self, origin, direction)
+            calls = calls + 1
+            assert.are.equal(ctx.physics, self)
+            assert.is_table(origin)
+            assert.is_table(direction)
+            error('raycast-failed')
+        end
+        local logs = {}
+        _G.print = function(...)
+            local parts = {}
+            for i = 1, select('#', ...) do parts[i] = tostring(select(i, ...)) end
+            logs[#logs + 1] = table.concat(parts, '\t')
+        end
+        assert.is_true(ctx:attack(ctx.player).ok)
+        assert.same(1, calls)
+        assert.same(0, #ctx.applied)
+        local joined = table.concat(logs, '\n')
+        assert.is_truthy(joined:find('[PlayerWeapon]', 1, true))
+        assert.is_truthy(joined:find('raycast-failed', 1, true))
+    end)
+
     it('test_manual_reload_two_seconds_not_bypassed_by_switching', function()
         ctx:equip(ctx.player, 'item137')
         assert.is_true(ctx.data:GrantWeapon('item141', 1))
