@@ -20,8 +20,10 @@ local function chunk_of(path)
 end
 
 local function cached_searcher(name)
-  local path = package.searchpath(name, package.path)
-  if not path then return "\n\tno file '" .. name .. "'" end
+  -- 找不到时把 searchpath 的「试过哪些路径」原样交出去：require 会把它拼进错误信息。
+  -- 全仓的模块解析都经过这个 searcher，报错不能退化成一句空话。
+  local path, not_found = package.searchpath(name, package.path)
+  if not path then return not_found end
   return chunk_of(path), path
 end
 
@@ -33,7 +35,10 @@ function M.install()
 end
 
 -- 显式 loadfile 的位置复用同一个缓存（返回编译好的 chunk，调用方自己执行）。
-function M.loadfile(path)
+-- 只收一个 path：loadfile 还有 (mode, env) 两个参数，带 env 的 chunk 各自绑不同的 _ENV，
+-- 缓存起来就会把世界换错。要 env 的地方直接用原生 loadfile。
+function M.loadfile(path, ...)
+  assert(select("#", ...) == 0, "module_cache.loadfile 只接受一个参数；需要 mode/env 请直接用 loadfile")
   return chunk_of(path)
 end
 

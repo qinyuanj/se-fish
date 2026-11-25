@@ -8,10 +8,11 @@
 -- 分片并行：--jobs N 把一段车道按文件分给 N 个 busted 进程并跑，缺省 1（串行，行为与以前完全一致：
 -- 一条命令、busted 自己按 .busted 发现文件、输出直接到控制台）。
 -- 并行时文件表从 .busted 现读（车道真源只有这一份，这里不抄第二份），按文件字节数做 LPT 装箱；
--- 写固定路径的车道段（slow、art）不分片，单独成段串行跑。段序与 .busted 的 ROOT 顺序一致，
--- 所以用例的执行顺序与串行跑时相同。
+-- 写固定路径的车道段（slow、art）不分片，单独成段串行跑。段序与 .busted 的 ROOT 顺序一致；
+-- 每片内部仍按文件名字典序跑，但跨片是并发的，所以用例的整体交错顺序与串行跑时不同
+-- （文件级隔离靠 .busted 的 auto-insulate，不靠顺序）。
 -- 并行时末行是聚合出来的 `N successes / M failures / E errors / P pending : T seconds`，
--- T 取整秒墙钟：分片互相争用，各分片自报的时间求和没有意义。
+-- T 是两位小数的墙钟：分片互相争用，各分片自报的时间求和没有意义。
 local seam = require("tools.seam")
 local exit_code = require("tools.exit_code")
 
@@ -126,7 +127,7 @@ local function load_config(root)
 end
 
 -- 车道分段：连续的、可以并跑的 ROOT 合成一段；不能并跑的 ROOT 各自成段（段内可以多个）。
--- 段序与 .busted 的 ROOT 顺序一致，用例的执行顺序因此不变。
+-- 段序与 .busted 的 ROOT 顺序一致；跨段是有先后的，段内分片是并发的。
 local function segments_of(task)
   local segments = {}
   for _, dir in ipairs(task.ROOT) do
@@ -139,6 +140,32 @@ local function segments_of(task)
     end
   end
   return segments
+end
+
+-- SERIAL_ROOTS 的键抄的是 .busted ROOT 的目录字面量：车道改名或换目录后这里会静默失配，
+-- 本该串行的段就会悄悄并行，回到跨进程抢写固定路径。所以每次并行前核对一遍。
+local function stale_serial_roots(cfg)
+  local seen = {}
+  for _, task in pairs(cfg) do
+    if type(task) == "table" and type(task.ROOT) == "table" then
+      for _, dir in ipairs(task.ROOT) do seen[dir] = true end
+    end
+  end
+  local stale = {}
+  for dir in pairs(M.SERIAL_ROOTS) do
+    if not seen[dir] then stale[#stale + 1] = dir end
+  end
+  table.sort(stale)
+  return stale
+end
+
+-- lane 级可以覆盖 _all 的发现口径：busted 是 _all 与任务级合并、任务级优先，
+-- 这里只看 _all 会在车道写了 pattern/recursive 时与 busted 自己的发现分叉（静默少跑）。
+local function lane_setting(task, all, key, default)
+  local value = task[key]
+  if value == nil then value = all[key] end
+  if value == nil then return default end
+  return value
 end
 
 -- 一个 ROOT 下的测试文件（相对仓库根，按名排序）。
@@ -204,13 +231,14 @@ local SUMMARY = "(%d+) successes? / (%d+) failures? / (%d+) errors? / (%d+) pend
 -- 取最后一次命中：分片输出里本该只有一条，留出「输出里恰好引用了这句话」的余地。
 local function summary_of(text)
   local found
-  for successes, failures, errors, pending, seconds in text:gmatch(SUMMARY) do
+  -- 第 5 个捕获（各分片自报的秒数）只用来确认这一行是汇总行：分片互相争用，求和没有意义，
+  -- 末行的 T 用本进程的墙钟差值。
+  for successes, failures, errors, pending in text:gmatch(SUMMARY) do
     found = {
       successes = tonumber(successes),
       failures = tonumber(failures),
       errors = tonumber(errors),
       pending = tonumber(pending),
-      seconds = tonumber(seconds),
     }
   end
   return found
@@ -223,18 +251,38 @@ local function print_block(header, output)
   if output:sub(-1) ~= "\n" then io.stdout:write("\n") end
 end
 
+-- 分片卡死时 done.txt 永不出现（分片被杀、run.cmd 被目标 batch 里的裸 exit 提前打断、
+-- 磁盘满写不出标记），空转等待就会一直等下去，既不结束也不计 errors。给整段一个墙钟上限：
+-- 超时的分片按崩溃计（code=nil → 无汇总行 → errors+1），日志目录留着。
+local SHARD_TIMEOUT = 600
+
 -- 分片并跑：先全部起来，再按完成顺序收。哪片先完就先打哪片，失败现场不必等别的分片。
 local function run_shards(root, tmp_dir, plans)
+  local started = os.clock()
   local items = {}
   for i, plan in ipairs(plans) do
     items[i] = {
       index = i,
       count = #plan.files,
-      handle = seam.spawn_bg({ argv = plan.argv, cwd = root, tmp_dir = tmp_dir }),
+      handle = seam.spawn_bg({ argv = plan.argv, cwd = root, tmp_dir = tmp_dir, env = plan.env }),
     }
   end
   local finished = 0
   while finished < #items do
+    if os.clock() - started > SHARD_TIMEOUT then
+      for _, item in ipairs(items) do
+        if not item.reported then
+          item.reported = true
+          item.code = nil
+          item.output = seam.bg_output(item.handle)
+          finished = finished + 1
+          print_block(string.format(
+            "--- 分片 %d/%d（%d 个文件）超过 %d 秒没有完成，按崩溃计 ---\n--- 日志目录 %s ---",
+            item.index, #items, item.count, SHARD_TIMEOUT, item.handle.dir), item.output)
+        end
+      end
+      break
+    end
     for _, item in ipairs(items) do
       if not item.reported then
         local code = seam.bg_done(item.handle)
@@ -255,7 +303,8 @@ local function run_shards(root, tmp_dir, plans)
         end
       end
     end
-    if finished < #items then seam.sleep(20) end
+    -- 50 ms 一轮：分片是秒级的，多等几十毫秒不影响墙钟，却少空转一些。
+    if finished < #items then seam.sleep(50) end
   end
   return items
 end
@@ -277,18 +326,26 @@ function M.main(args, env)
     return exit_code.UNAVAILABLE
   end
   local root = repo_root(env)
+  -- 子进程身份：夹具要一个「同一次跑批里每个分片都不同」的标记。时钟给不了这个保证
+  -- （MSVC 的 clock() 只有毫秒粒度，并起的进程会撞在同一毫秒），所以由跑批的人显式发号。
+  local run_token = string.format("%d-%d", os.time(), math.floor(os.clock() * 1000 + 0.5))
+  local function child_env(shard)
+    return { SE_TEST_PROCESS = shard and (run_token .. "-" .. shard) or run_token }
+  end
   local base_argv = { busted, "--run=" .. opts.lane }
   for _, a in ipairs(opts.rest) do base_argv[#base_argv + 1] = a end
 
-  -- 串行就是原来的行为，一条命令跑到底。
+  -- 串行就是原来的行为，一条命令跑到底（只多一个进程身份环境变量）。
   if opts.jobs <= 1 then
-    if seam.spawn({ argv = base_argv, cwd = root }) ~= 0 then return exit_code.FAILURE end
+    if seam.spawn({ argv = base_argv, cwd = root, env = child_env() }) ~= 0 then return exit_code.FAILURE end
     return exit_code.OK
   end
 
   -- 并行：busted 的 ROOT 参数交给分片后就没法按车道发现文件了，宁可报用法错误也不猜。
+  -- 只拦「确实是路径」的参数：busted 还有空格取值的写法（如 `--filter pat`），值不以 - 开头，
+  -- 按「不以 - 开头就是 ROOT」判会把人引到错误的改法上。
   for _, a in ipairs(opts.rest) do
-    if a:sub(1, 1) ~= "-" then
+    if seam.is_dir(root .. "/" .. a) or seam.is_dir(a) then
       io.stderr:write("test: -- 之后的 " .. a .. " 是 busted 的 ROOT 参数，与 --jobs 分片冲突；"
         .. "去掉 --jobs，或去掉这个参数\n")
       return 2
@@ -304,6 +361,13 @@ function M.main(args, env)
   local all = cfg._all or {}
   if type(task) ~= "table" or type(task.ROOT) ~= "table" or #task.ROOT == 0 then
     io.stderr:write("test: .busted 的车道 " .. opts.lane .. " 没有 ROOT，无法分片\n")
+    return exit_code.FAILURE
+  end
+
+  local stale = stale_serial_roots(cfg)
+  if #stale > 0 then
+    io.stderr:write("test: SERIAL_ROOTS 里有 .busted 已经不用的 ROOT（改车道时漏了同步）："
+      .. table.concat(stale, ", ") .. "\n")
     return exit_code.FAILURE
   end
 
@@ -338,13 +402,15 @@ function M.main(args, env)
       local argv = { busted, "--run=" .. opts.lane }
       for _, a in ipairs(opts.rest) do argv[#argv + 1] = a end
       for _, dir in ipairs(segment.roots) do argv[#argv + 1] = dir end
-      local code, output = seam.capture({ argv = argv, cwd = root, tmp_dir = tmp_dir })
+      local code, output = seam.capture({ argv = argv, cwd = root, tmp_dir = tmp_dir, env = child_env() })
       print_block("", output)
       account(code, output)
     else
       local files = {}
+      local recursive = lane_setting(task, all, "recursive", false) == true
+      local pattern = lane_setting(task, all, "pattern", "_spec")
       for _, dir in ipairs(segment.roots) do
-        local found, find_err = root_files(root, dir, all.recursive == true, all.pattern or "_spec")
+        local found, find_err = root_files(root, dir, recursive, pattern)
         if not found then
           io.stderr:write("test: " .. find_err .. "\n")
           return exit_code.FAILURE
@@ -360,7 +426,7 @@ function M.main(args, env)
         local argv = { busted, "--run=" .. opts.lane }
         for _, a in ipairs(opts.rest) do argv[#argv + 1] = a end
         for _, file in ipairs(bucket.files) do argv[#argv + 1] = file end
-        plans[#plans + 1] = { argv = argv, files = bucket.files }
+        plans[#plans + 1] = { argv = argv, files = bucket.files, env = child_env(tostring(#plans + 1)) }
       end
       io.stdout:write(string.format("--- 并行段 %s：%d 个文件分 %d 片 ---\n", dirs, #files, #plans))
       for _, item in ipairs(run_shards(root, tmp_dir, plans)) do
@@ -369,11 +435,16 @@ function M.main(args, env)
     end
   end
 
+  -- 提示写在契约行之前、走 stdout：末行必须始终是契约行（`2>&1` 收流时也一样），
+  -- 崩片场景恰恰最需要那行被脚本判读。
+  if totals.crashed > 0 then
+    io.stdout:write(string.format("test: %d 个分片没有输出汇总行（没跑完或超时），已计入 errors\n", totals.crashed))
+  end
+  if totals.successes + totals.failures + totals.errors == 0 then
+    io.stdout:write("test: 这次一条用例都没有跑到（--filter 是否写错？），0 成功不等于通过\n")
+  end
   io.stdout:write(string.format("%d successes / %d failures / %d errors / %d pending : %.2f seconds\n",
     totals.successes, totals.failures, totals.errors, totals.pending, os.clock() - started))
-  if totals.crashed > 0 then
-    io.stderr:write(string.format("test: %d 个分片没有输出汇总行（没跑完），已计入 errors\n", totals.crashed))
-  end
   if failed or totals.failures + totals.errors > 0 then return exit_code.FAILURE end
   return exit_code.OK
 end

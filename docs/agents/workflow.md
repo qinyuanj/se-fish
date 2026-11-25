@@ -34,7 +34,7 @@ Lua 命令使用 **Lua 5.4**，命令名统一 `lua`，执行前用 `lua -v` 核
 - **Test lane / 测试车道**五条：单测放 `tests/native/`，slow 放 `tests/native/slow/`，**条款断言**放 `tests/native/spec/`，**门禁型**放 `tests/native/guards/`，美术放 `tests/native/art/`（**美术 optional**，Blender 用例不进 full，用 `lua tools/cli.lua test art` 单独跑）；共享夹具放 `tests/support/`，探针放 `tests/probes/`（手工探针，不入任何车道）。日常运行 `lua tools/cli.lua test`（缺省 fast），收尾运行 `lua tools/cli.lua test full`（= fast + slow + spec），单独跑条款或门禁用 `lua tools/cli.lua test spec` / `lua tools/cli.lua test guards`；`--` 之后的参数原样透传给 busted。车道真源是根目录 `.busted`，共享初始化在 `tests/native/helper.lua`。
   _Avoid_: 验收车道、代码收尾门、lane（单独使用时）、test suite、test group
   - `busted` 命令：`test` 子命令与人手 shell 统一用 PATH 上的 `busted`（不在 PATH 时 CLI 退出码 3）。它由 LuaRocks 装在 `%APPDATA%\luarocks\bin`，该目录必须在 PATH 里；安装命令 `luarocks --local install busted` 在 Git Bash 里执行。
-  - `--jobs N`：把车道按文件分给 N 个 busted 进程并跑（1..8，缺省 1 即串行）。文件表从 `.busted` 现读、按文件字节数装箱；写固定路径的车道段（slow、art）始终串行，段序与 `.busted` 的 ROOT 顺序相同，用例执行顺序因此不变。12 逻辑核实测 fast 约 15 秒 → 4.3 秒、full 约 27 秒 → 10 秒、guards 5.3 秒 → 1.9 秒；8 路之后收益饱和（每路都要重新读盘）。并行时 `--` 之后只收 busted 选项：再给 ROOT 参数与分片冲突，按用法错误退 2。
+  - `--jobs N`：把车道按文件分给 N 个 busted 进程并跑（1..8，缺省 1 即串行）。文件表从 `.busted` 现读、按文件字节数装箱；写固定路径的车道段（slow、art）始终串行，段序与 `.busted` 的 ROOT 顺序相同；每片内部按文件名字典序跑，跨片并发，所以用例的整体交错顺序与串行不同（文件级隔离靠 `.busted` 的 auto-insulate，不靠顺序）。12 逻辑核实测 fast 约 15 秒 → 4.3 秒、full 约 27 秒 → 10 秒、guards 5.3 秒 → 1.9 秒；8 路之后收益饱和（每路都要重新读盘）。并行时 `--` 之后只收 busted 选项：再给 ROOT 参数与分片冲突，按用法错误退 2。
 
 ### 试玩存档隔离
 

@@ -222,29 +222,29 @@ local function read_file(path)
   return body
 end
 
-local capture_counter = 0
+local dir_counter = 0
 
--- 每次 capture 独占一个临时目录：lfs.mkdir 是原子的，同名已被别的进程占住就换下一个，
--- 两个进程（例如 hook 与手动 test 同时跑）不会抢同一个输出文件。
-local function capture_dir(base)
+-- 每个子进程调用独占一个临时目录：lfs.mkdir 是原子的，同名已被别的进程占住就换下一个，
+-- 两个进程（例如 hook 与手动 test 同时跑）不会抢同一个目录。capture 与 spawn_bg 共用这一份。
+local function unique_dir(base, prefix, label)
   for _ = 1, 1000 do
-    capture_counter = capture_counter + 1
-    local dir = string.format("%s/seam-capture-%d-%06d", base, os.time(), capture_counter)
+    dir_counter = dir_counter + 1
+    local dir = string.format("%s/%s-%d-%06d", base, prefix, os.time(), dir_counter)
     if lfs.mkdir(dir) then return dir end
   end
-  error(string.format("seam.capture: 无法在 %s 下创建临时目录", base), 0)
+  error(string.format("%s: 无法在 %s 下创建临时目录", label, base), 0)
 end
 
 -- 跑一条命令并读回 stdout+stderr：只收 argv，不收整条命令串（ADR-0017）。
--- spec = { argv=<字符串数组>, cwd=<?>, tmp_dir=<? 默认 tmp> }
+-- spec = { argv=<字符串数组>, cwd=<?>, env=<?>, tmp_dir=<? 默认 tmp> }
 -- 内部仍是 spawn：两路输出重定向到临时文件，读完即删。返回 退出码, 输出文本。
 function M.capture(spec)
   assert(type(spec) == "table", "capture 需要一个 table 参数")
   local base = M.normalize(spec.tmp_dir or "tmp")
   M.ensure_dir(base)
-  local dir = capture_dir(base)
+  local dir = unique_dir(base, "seam-capture", "seam.capture")
   local out = dir .. "/out.log"
-  local code = M.spawn({ argv = spec.argv, cwd = spec.cwd, stdout = out, stderr = out })
+  local code = M.spawn({ argv = spec.argv, cwd = spec.cwd, env = spec.env, stdout = out, stderr = out })
   local body = read_file(out)
   os.remove(out)
   lfs.rmdir(dir)
@@ -322,6 +322,21 @@ local function env_assignments(env)
   return parts
 end
 
+-- argv 逐个 cmd 引用后拼成一行：spawn 与 spawn_bg 共用这一份，拼法只有这里一处。
+local function render_argv(argv)
+  local rendered = {}
+  for i = 1, #argv do rendered[i] = M.quote(argv[i]) end
+  return table.concat(rendered, " ")
+end
+
+-- cmd 的单行上限。超了要在起进程之前断言，否则 cmd 会截断命令、跑出莫名其妙的结果。
+local function assert_line_limit(text, label)
+  if #text > CMD_LINE_LIMIT then
+    error(string.format("%s：命令行超过 cmd %d 字符上限（实际 %d 字符）：%s...",
+      label, CMD_LINE_LIMIT, #text, text:sub(1, 160)), 0)
+  end
+end
+
 -- 唯一子进程形状：只收 argv，不收整条命令串。
 -- spec = { argv=<字符串数组>, cwd=<?>, env=<table|nil>, stdout=<?文件>, stderr=<?文件> }
 -- cmd 引用、cd /d、set 前缀、输出重定向都由本函数拼；超过 8191 字符断言报错。
@@ -337,9 +352,7 @@ function M.spawn(spec)
   end
   for _, assign in ipairs(env_assignments(spec.env)) do parts[#parts + 1] = assign .. " &&" end
 
-  local rendered = {}
-  for i = 1, #argv do rendered[i] = M.quote(argv[i]) end
-  local command = table.concat(rendered, " ")
+  local command = render_argv(argv)
 
   if spec.stdout and spec.stderr and spec.stdout == spec.stderr then
     command = command .. " > " .. M.quote(spec.stdout) .. " 2>&1"
@@ -350,26 +363,18 @@ function M.spawn(spec)
   parts[#parts + 1] = command
 
   local line = "@" .. table.concat(parts, " ")
-  if #line > CMD_LINE_LIMIT then
-    error(string.format("命令行超过 cmd %d 字符上限（实际 %d 字符）：%s...",
-      CMD_LINE_LIMIT, #line, line:sub(1, 160)), 0)
-  end
+  assert_line_limit(line, "seam.spawn")
   local _, _, code = os.execute(line)
   return tonumber(code) or 1
 end
 
 -- ============================ 并发子进程 ============================
 
-local bg_counter = 0
-
--- 每次并发调用独占一个临时目录；原子性同 capture_dir（lfs.mkdir 成功即占住名字）。
-local function bg_dir(base)
-  for _ = 1, 1000 do
-    bg_counter = bg_counter + 1
-    local dir = string.format("%s/seam-bg-%d-%06d", base, os.time(), bg_counter)
-    if lfs.mkdir(dir) then return dir end
-  end
-  error(string.format("seam.spawn_bg: 无法在 %s 下创建临时目录", base), 0)
+-- 目标是不是「cmd 会把控制权交给它」的那种：批处理要 call，否则 run.cmd 后面的退出码与
+-- 完成标记一行都不会执行；没有扩展名的命令同样要 call（PATH 上命中的往往正是 .bat）。
+local function needs_call(cmd)
+  if cmd:match("%.[Bb][Aa][Tt]$") or cmd:match("%.[Cc][Mm][Dd]$") then return true end
+  return not cmd:match("%.[%w]+$")
 end
 
 -- 并发形状：argv 与 spawn 完全一样，只把「起来」与「等完」拆成两步。
@@ -391,7 +396,7 @@ function M.spawn_bg(spec)
   local base, base_err = M.absolute(spec.tmp_dir or "tmp")
   assert(base, "spawn_bg.tmp_dir 无效: " .. tostring(base_err))
   M.ensure_dir(base)
-  local dir = bg_dir(base)
+  local dir = unique_dir(base, "seam-bg", "seam.spawn_bg")
 
   local handle = {
     dir = dir,
@@ -401,32 +406,29 @@ function M.spawn_bg(spec)
     done = dir .. "/done.txt",
   }
 
-  local rendered = {}
-  for i = 1, #argv do rendered[i] = M.quote(argv[i]) end
-  local command = table.concat(rendered, " ")
+  local command = render_argv(argv)
 
   local lines = { "@echo off" }
-  if spec.cwd then lines[#lines + 1] = "cd /d " .. M.quote(spec.cwd) end
   for _, assign in ipairs(env_assignments(spec.env)) do lines[#lines + 1] = assign end
   -- 批处理目标必须用 call 调：在 batch 里直接写另一个 batch 会把控制权交给它，回来时
   -- 整份 run.cmd 已经结束，后面的退出码与完成标记一行都不会执行（busted 正是 .bat）。
   -- 可执行文件不加 call，保持与 spawn 同一种调用形态。
-  local lead = ""
-  if argv[1]:match("%.[Bb][Aa][Tt]$") or argv[1]:match("%.[Cc][Mm][Dd]$") or not argv[1]:match("%.[%w]+$") then
-    lead = "call "
-  end
-  lines[#lines + 1] = lead .. command .. " > " .. M.quote(handle.out) .. " 2>&1"
+  local lead = needs_call(argv[1]) and "call " or ""
+  -- cd 与命令并到同一行：cd 失败时命令不该照跑（跑在错误的 cwd 里比直接失败更难查），
+  -- 这个语义与 spawn 的 `cd /d ... &&` 对齐。
+  local prefix = ""
+  if spec.cwd then prefix = "cd /d " .. M.quote(spec.cwd) .. " && " end
+  lines[#lines + 1] = prefix .. lead .. command .. " > " .. M.quote(handle.out) .. " 2>&1"
   lines[#lines + 1] = ">" .. M.quote(handle.code) .. " echo %ERRORLEVEL%"
   lines[#lines + 1] = ">" .. M.quote(handle.done) .. " echo ok"
 
-  local longest = 0
+  local longest = ""
   for _, text in ipairs(lines) do
-    if #text > longest then longest = #text end
+    if #text > #longest then longest = text end
   end
-  if longest > CMD_LINE_LIMIT then
+  if #longest > CMD_LINE_LIMIT then
     rmrf(dir)
-    error(string.format("并发子进程的单行超过 cmd %d 字符上限（实际 %d 字符）：%s...",
-      CMD_LINE_LIMIT, longest, command:sub(1, 160)), 0)
+    assert_line_limit(longest, "seam.spawn_bg")
   end
 
   local file = assert(io.open(handle.cmd, "wb"), handle.cmd .. " 建不出来")
@@ -442,11 +444,12 @@ function M.spawn_bg(spec)
   end
   -- start 找不到目标时退出码仍是 0（静默什么都不做），所以还要求证据：子进程一启动就建 out.log
   -- （重定向在命令跑之前就建好），3 秒内两样都没有，就是这次并发调用没起来。
-  for _ = 1, 150 do
+  -- 窗口给到 10 秒：8 路同起、叠上杀软扫描时，进程真正起来可能要几秒，宁可多等也别误判成没起来。
+  for _ = 1, 200 do
     if M.exists(handle.out) or M.exists(handle.done) then return handle end
-    M.sleep(20)
+    M.sleep(50)
   end
-  error(string.format("seam.spawn_bg: start 之后 3 秒内没有生成 %s，子进程没起来：%s",
+  error(string.format("seam.spawn_bg: start 之后 10 秒内没有生成 %s，子进程没起来：%s",
     handle.out, handle.cmd), 0)
 end
 
@@ -475,7 +478,8 @@ function M.bg_close(handle)
 end
 
 -- 亚秒等待。Windows 没有内置的亚秒 sleep（timeout 最小 1 秒，ping 的包间隔固定 1 秒），
--- 起一个进程去睡比本进程空转更贵，所以这里就空转：只在轮询并发子进程时用，单次几十毫秒。
+-- 起一个进程去睡比本进程空转更贵，所以这里就空转：只在轮询并发子进程时用。
+-- 空转是占满一个核的，调用方要自己把间隔放大（分片是秒级的，50~100 ms 一轮不影响墙钟）。
 function M.sleep(ms)
   local deadline = os.clock() + (tonumber(ms) or 0) / 1000
   while os.clock() < deadline do end

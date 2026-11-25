@@ -40,10 +40,13 @@ end
 
 local temp_counter = 0
 
--- 进程标记：本模块加载时取一次。没有 getpid 可用，改用「进程启动至今的墙钟微秒」——
--- 分片并行时各进程的启动时刻相差几十毫秒，这个数不会撞（不用 math.random：random_guard 会
--- 换掉 math.random 的引用，夹具不该依赖它）。
-local PROCESS_TOKEN = string.format("%d", math.floor(os.clock() * 1000000 + 0.5))
+-- 进程标记：同一次跑批里每个分片进程一个，由 tools/test.lua 通过 SE_TEST_PROCESS 发号
+-- （分片号拼在跑批号后面）。不靠时钟：MSVC 的 clock() 只有毫秒粒度，并起的进程会撞在同一毫秒，
+-- 而撞同一毫秒正是要拦的那个 bug。直接跑 busted（不经 tools/test.lua）时退回进程时钟值：
+-- 那种情形一个进程独占 tmp/，进程内序号已经够用。
+-- 也不用 math.random：tests/support/random_guard.lua 会换掉它的引用，夹具不该依赖它。
+local PROCESS_TOKEN = os.getenv("SE_TEST_PROCESS")
+  or string.format("%d", math.floor(os.clock() * 1000 + 0.5))
 
 -- 在仓库 tmp/ 下建一个唯一临时目录并返回其正斜杠路径。
 -- 名字里必须有进程标记：调用方（用例）用完会 rmrf 掉返回的目录，而 auto-insulate 每个文件
