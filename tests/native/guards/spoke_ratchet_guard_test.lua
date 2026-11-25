@@ -79,7 +79,9 @@ local function walk_files(root, skip_packages, out)
   return out
 end
 
+local business_lua_files_memo
 local function business_lua_files()
+  if business_lua_files_memo then return business_lua_files_memo end
   local out = {}
   for _, root in ipairs(BUSINESS_ROOTS) do
     for _, path in ipairs(walk_files(root, true)) do
@@ -89,7 +91,24 @@ local function business_lua_files()
     end
   end
   table.sort(out)
+  business_lua_files_memo = out
   return out
+end
+
+local sources_memo = {}
+local function source_of(path)
+  if not sources_memo[path] then
+    sources_memo[path] = fs.slurp(path)
+  end
+  return sources_memo[path]
+end
+
+local code_only_memo = {}
+local function code_only_of(path, src)
+  if not code_only_memo[path] then
+    code_only_memo[path] = Arch.code_only(src)
+  end
+  return code_only_memo[path]
 end
 
 local function package_tree_fingerprint(relative_root)
@@ -368,8 +387,8 @@ describe("Spoke 原生重构机械棘轮守卫", function()
       local bad_connects = {}
       for _, path in ipairs(business_lua_files()) do
         if is_spoke_namespace_file(path) then
-          local src = assert(fs.slurp(path), "读不到源码: " .. path)
-          local code = Arch.code_only(src)
+          local src = assert(source_of(path), "读不到源码: " .. path)
+          local code = src:find("Connect", 1, true) and code_only_of(path, src) or ""
           local line_no = 0
           for line in (code .. "\n"):gmatch("([^\n]*)\n") do
             line_no = line_no + 1
@@ -421,18 +440,20 @@ describe("Spoke 原生重构机械棘轮守卫", function()
       local bad_bindings = {}
       for _, path in ipairs(business_lua_files()) do
         if path ~= "common/OwnedUnits.lua" then
-          local src = assert(fs.slurp(path), "读不到源码: " .. path)
+          local src = assert(source_of(path), "读不到源码: " .. path)
           for _, problem in ipairs(check_owned_units_bindings(path, src)) do
             bad_bindings[#bad_bindings + 1] = problem
           end
-          local code = Arch.code_only(src)
-          local count = 0
-          for _ in code:gmatch("%f[%w_]OwnedUnits%s*%.%s*[%w_]+%s*%(") do
-            count = count + 1
-          end
-          if count > 0 then
-            total = total + count
-            detail[#detail + 1] = string.format("  %s = %d", path, count)
+          if src:find("OwnedUnits", 1, true) then
+            local code = code_only_of(path, src)
+            local count = 0
+            for _ in code:gmatch("%f[%w_]OwnedUnits%s*%.%s*[%w_]+%s*%(") do
+              count = count + 1
+            end
+            if count > 0 then
+              total = total + count
+              detail[#detail + 1] = string.format("  %s = %d", path, count)
+            end
           end
         end
       end
@@ -448,8 +469,8 @@ describe("Spoke 原生重构机械棘轮守卫", function()
       local detail = {}
       for _, path in ipairs(business_lua_files()) do
         if is_legacy_debt_file(path) then
-          local src = assert(fs.slurp(path), "读不到源码: " .. path)
-          local code = Arch.code_only(src)
+          local src = assert(source_of(path), "读不到源码: " .. path)
+          local code = src:find("Connect", 1, true) and code_only_of(path, src) or ""
           local count = 0
           for _ in code:gmatch(":%s*Connect%s*%(") do
             count = count + 1
@@ -467,8 +488,8 @@ describe("Spoke 原生重构机械棘轮守卫", function()
     end)
 
     it("server/main.lua 的 MgrMap 成员数不超过水位线", function()
-      local src = assert(fs.slurp("server/main.lua"), "读不到 server/main.lua")
-      local code = Arch.code_only(src)
+      local src = assert(source_of("server/main.lua"), "读不到 server/main.lua")
+      local code = code_only_of("server/main.lua", src)
       local body = code:match("local%s+MgrMap%s*=%s*(%b{})")
       local mgr_files = {}
       for _, path in ipairs(walk_files("server/Mgr", true)) do
@@ -497,7 +518,7 @@ describe("Spoke 原生重构机械棘轮守卫", function()
       end
       local hits = {}
       for _, path in ipairs(business_lua_files()) do
-        local text = fs.slurp(path) or ""
+        local text = source_of(path) or ""
         for _, name in ipairs(FORBIDDEN_FISH_LEGACY_MODULES) do
           if text:find(name, 1, true) then
             hits[#hits + 1] = path .. " -> " .. name
