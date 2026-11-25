@@ -8,6 +8,7 @@
 --   5. 维护同账号重进排空栅栏（leaving.waiting），防止提前读旧档或覆盖正在落盘的数据。
 -- 本模块归属 L2（server.world_host），零反向依赖存量旧债务模块；过渡接缝全部由 L1 入口以回调注入。
 
+local EngineRead = require("common.engine_read")
 local GameCfg = require("common.game_cfg")
 local Number = require("common.number")
 local SpokeClock = require("common.spoke_clock")
@@ -42,21 +43,18 @@ function ServerRuntime.set_current(rt)
   current_runtime = rt
 end
 
-local function is_object(value)
-  local kind = type(value)
-  return kind == "table" or kind == "userdata"
-end
-
+-- 统一经 EngineRead 判定玩家有效性，区分缺失、销毁与读取异常。
 local function is_valid_player(player)
-  if not is_object(player) then return false end
-  local ok, uid = pcall(function() return player.UserId end) -- 兼容引擎 userdata 玩家
-  return ok and uid ~= nil
+  return EngineRead.is_valid_player(player, "ServerRuntime.is_valid_player")
 end
 
+-- 统一经 EngineRead 读取玩家当前角色对象。
 local function read_character(player)
-  if not is_object(player) then return nil end
-  local ok, ch = pcall(function() return player.Character end) -- 兼容引擎 userdata 玩家
-  return ok and ch or nil
+  local ok, ch = EngineRead.read_character(player, "ServerRuntime.read_character")
+  if ok then
+    return ch
+  end
+  return nil
 end
 
 local function has_method(target, name)
@@ -170,17 +168,16 @@ function ServerRuntime.new(opts)
   end
 
   local function player_tree_of(target)
-    if not is_object(target) then return nil end
-    local ok_uid, uid = pcall(function() return target.UserId end) -- 兼容引擎 userdata 玩家或角色
+    if not EngineRead.is_object(target) then return nil end
+    local ok_uid, uid = EngineRead.read_user_id(target, { context = "ServerRuntime.player_tree_of", logger = opts.logger })
     if ok_uid and uid ~= nil then
-      local tree = player_trees[uid]
-      if tree and not tree:is_disposed() then return tree end
+      local found = player_trees[uid]
+      if type(found) == "table" and not found:is_disposed() then return found end
     end
-    for _, tree in pairs(player_trees) do
-      if tree and not tree:is_disposed() then
-        local owner = tree.player
-        if owner == target or read_character(owner) == target then
-          return tree
+    for _, candidate in pairs(player_trees) do
+      if candidate and not candidate:is_disposed() then
+        if candidate.player == target or read_character(candidate.player) == target then
+          return candidate
         end
       end
     end
@@ -189,7 +186,10 @@ function ServerRuntime.new(opts)
 
   local function entity_target(target)
     if not target then return nil end
-    local ok_carrier, carrier = pcall(function() return target.carrier end)
+    local ok_carrier, carrier = EngineRead.read_field(target, "carrier", {
+      context = "ServerRuntime.entity_target",
+      logger = opts.logger,
+    })
     if ok_carrier and carrier then return target end
     local carrier_host = opts.fish_carrier
     local resolved = carrier_host and carrier_host.resolve_carrier and carrier_host:resolve_carrier(target)
@@ -290,7 +290,7 @@ function ServerRuntime.new(opts)
     local function connect_re(channel, handler)
       local remote = opts.remote
       if type(remote) ~= "table" or type(remote.get_re) ~= "function" then return end
-      local ok, event = pcall(remote.get_re, remote, channel)
+      local ok, event = EngineRead.call_method(remote, "get_re", { context = "ServerRuntime.connect_re:" .. tostring(channel), logger = opts.logger }, channel)
       if ok and event and event.OnServerEvent and type(event.OnServerEvent.Connect) == "function" then
         local conn = event.OnServerEvent:Connect(handler)
         if conn then re_conns[#re_conns + 1] = conn end
@@ -528,14 +528,14 @@ function ServerRuntime.new(opts)
     local leaving = leaving_players[user_id]
     if leaving then
       leaving.waiting = player
-      local ok, err = pcall(player.SetAttribute, player, "SaveState", "pending")
-      if not ok then
-        if opts.logger and type(opts.logger.error) == "function" then
-          pcall(opts.logger.error, opts.logger, "on_player_added:SetAttribute (uid=" .. tostring(user_id) .. "): " .. tostring(err)) -- logger 异常不得中断入场排队
-        else
-          print("[ServerRuntime]", "on_player_added:SetAttribute", user_id, tostring(err))
-        end
-      end
+      EngineRead.write_attribute(
+        player, "SaveState",
+        "pending",
+        {
+          context = "ServerRuntime.on_player_added (uid=" .. tostring(user_id) .. ")",
+          logger = opts.logger,
+        }
+      )
       return
     end
     current_players[user_id] = player
@@ -1216,8 +1216,8 @@ function ServerRuntime.new(opts)
     for i = #re_conns, 1, -1 do
       local conn = re_conns[i]
       re_conns[i] = nil
-      if conn and type(conn.Disconnect) == "function" then
-        pcall(conn.Disconnect, conn) -- 远程事件连接可能已先随宿主卸载
+      if conn ~= nil then
+        EngineRead.disconnect(conn, { context = "ServerRuntime.shutdown", logger = opts.logger })
       end
     end
     self._core_re_bound = false

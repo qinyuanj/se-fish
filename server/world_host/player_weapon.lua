@@ -1,4 +1,4 @@
-
+local EngineRead = require("common.engine_read")
 local GameCfg = require("common.game_cfg")
 local Number = require("common.number")
 local MathWaterJudge = require("common.math_water_judge")
@@ -19,9 +19,10 @@ local function finite(value)
   return Number.is_finite_number(value)
 end
 
-local function vec(x, y, z)
-  if Vector3 then return Vector3.New(x, y, z) end
-  return { x = x, y = y, z = z }
+local function vec(x, y, z, context)
+  local ok, v = EngineRead.new_vector3(x, y, z, context or "PlayerWeapon.vec")
+  if ok then return v end
+  return nil
 end
 
 local function distance2d(a, b)
@@ -30,11 +31,8 @@ local function distance2d(a, b)
 end
 
 local function reply(remote, player, payload)
-  if remote and type(remote.get_re) == "function" then
-    local ok, event = pcall(remote.get_re, remote, "WeaponResult")
-    if ok and event and type(event.FireClient) == "function" then
-      pcall(event.FireClient, event, player, payload)
-    end
+  if remote ~= nil then
+    EngineRead.fire_client(remote, "WeaponResult", player, payload, "PlayerWeapon.reply")
   end
   return payload
 end
@@ -75,45 +73,46 @@ local function damage_scale(tree, kind)
 end
 
 local function character_of(player)
-  local ok, character = pcall(function() return player and player.Character end)
+  local ok, character = EngineRead.read_character(player, "PlayerWeapon.character_of")
   if ok then return character end
   return nil
 end
 
-local function is_object(value)
-  local kind = type(value)
-  return kind == "table" or kind == "userdata"
-end
-
 local function forward_of(character, user_id)
-  if not is_object(character) then
+  if not EngineRead.is_object(character) then
     print("[PlayerWeapon] 角色朝向读取失败", tostring(user_id), "no-character")
     return nil
   end
-  local ok, forward = pcall(function()
-    return character.Rotation:GetForward()
-  end)
-  if not ok then
-    print("[PlayerWeapon] 角色朝向读取失败", tostring(user_id), tostring(forward))
+  local ok_rot, rotation, rot_reason = EngineRead.read_field(
+    character, "Rotation", "PlayerWeapon.forward_of"
+  )
+  if not ok_rot then
+    print(
+      "[PlayerWeapon] 角色朝向读取失败",
+      tostring(user_id),
+      tostring(rot_reason)
+    )
     return nil
   end
-  if not is_object(forward) then
-    print("[PlayerWeapon] 角色朝向读取失败", tostring(user_id), "invalid-forward")
+  local ok_fwd, forward, fwd_reason = EngineRead.call_method(
+    rotation, "GetForward", "PlayerWeapon.forward_of"
+  )
+  if not ok_fwd then
+    print("[PlayerWeapon] 角色朝向读取失败", tostring(user_id), tostring(fwd_reason))
     return nil
   end
-  local ok_xyz, vec_xyz = pcall(function()
-    return { x = forward.x, y = forward.y, z = forward.z }
-  end)
-  if not ok_xyz then
-    print("[PlayerWeapon] 角色朝向读取失败", tostring(user_id), tostring(vec_xyz))
+  local ok_v, v, vec_reason = EngineRead.read_vec3(
+    forward,
+    "PlayerWeapon.forward_of"
+  )
+  if not ok_v or not v then
+    print(
+      "[PlayerWeapon] 角色朝向读取失败",
+      tostring(user_id), tostring(vec_reason)
+    )
     return nil
   end
-  local fx, fy, fz = vec_xyz.x, vec_xyz.y, vec_xyz.z
-  if type(fx) ~= "number" or type(fy) ~= "number" or type(fz) ~= "number"
-    or not finite(fx) or not finite(fy) or not finite(fz) then
-    print("[PlayerWeapon] 角色朝向读取失败", tostring(user_id), "non-finite-forward")
-    return nil
-  end
+  local fx, fy, fz = v.x, v.y, v.z
   local length = math.sqrt(fx * fx + fy * fy + fz * fz)
   if not finite(length) or length < 1e-6 then
     print("[PlayerWeapon] 角色朝向读取失败", tostring(user_id), "zero-forward")
@@ -124,7 +123,8 @@ end
 
 local function play_anim(tracks, player, anim)
   local character = character_of(player)
-  if not (anim and character and character.Animator) then return false end
+  local ok_anim, animator = EngineRead.read_field(character, "Animator", "PlayerWeapon.play_anim")
+  if not (anim and ok_anim and animator) then return false end
   local ok, err = pcall(function()
     local by_character = tracks[character]
     if not by_character then
@@ -133,12 +133,12 @@ local function play_anim(tracks, player, anim)
     end
     local track = by_character[anim]
     if not track then
-      track = character.Animator:LoadAnimation(anim)
+      track = animator:LoadAnimation(anim)
       track.FilterType = ATTACK_ANIM_FILTER
       track.Looped = false
-      local priority_ok, priority_err = pcall(function() track.Priority = ATTACK_ANIM_PRIORITY end)
+      local priority_ok = EngineRead.write_field(track, "Priority", ATTACK_ANIM_PRIORITY, "PlayerWeapon.play_anim")
       if not priority_ok then
-        print("[PlayerWeapon] 出手动作优先级设置失败，按默认优先级播", tostring(anim), tostring(priority_err))
+        print("[PlayerWeapon] 出手动作优先级设置失败，按默认优先级播", tostring(anim))
       end
       by_character[anim] = track
     end
@@ -162,7 +162,7 @@ end
 
 local function service(name, injected)
   if injected ~= nil then return injected end
-  local ok, value = pcall(function() return game:GetService(name) end)
+  local ok, value = EngineRead.get_service(name, "PlayerWeapon.service:" .. tostring(name))
   if ok then return value end
   return nil
 end
@@ -218,11 +218,9 @@ local function radial_damage(opts, center, radius, amount, hit, skip)
       skipped = target == skip
     end
     if not skipped then
-      local pos = character_of(target) and character_of(target).Position
-      local dist = pos and distance2d(center, pos) or -1
-      if pos and dist <= radius then
-        local applied = opts.apply_hit(hit, target, amount) == true
-        if applied then damaged = damaged + 1 end
+      local ok_pos, pos = EngineRead.read_player_position(target, "PlayerWeapon.radial_damage")
+      if ok_pos and pos and distance2d(center, pos) <= radius then
+        if opts.apply_hit(hit, target, amount) == true then damaged = damaged + 1 end
       end
     end
   end
@@ -230,9 +228,11 @@ local function radial_damage(opts, center, radius, amount, hit, skip)
   if fish and type(fish.Fish) == "table" then
     for _, entry in pairs(fish.Fish) do
       local body = entry.carrier and entry.carrier.body
-      local pos = body and body.Position
-      if pos and distance2d(center, pos) <= radius then
-        if opts.apply_hit(hit, entry.carrier, amount) == true then damaged = damaged + 1 end
+      local ok_pos, pos = EngineRead.read_position(body, "PlayerWeapon.radial_damage.fish")
+      if ok_pos and pos and distance2d(center, pos) <= radius then
+        if opts.apply_hit(hit, entry.carrier, amount) == true then
+          damaged = damaged + 1
+        end
       end
     end
   end
@@ -241,13 +241,13 @@ end
 
 local function gun_hit(opts, player, aim)
   local character = character_of(player)
-  local pos = character and character.Position
-  if not pos then return nil, nil end
+  local ok_pos, pos = EngineRead.read_position(character, "PlayerWeapon.gun_hit")
+  if not ok_pos or not pos then return nil, nil end
   local fx, fy, fz
-  if aim then
-    fx, fy, fz = aim.x, aim.y, aim.z
+  if aim then fx, fy, fz = aim.x, aim.y, aim.z
   else
-    fx, fy, fz = forward_of(character, player and player.UserId)
+    local _, uid = EngineRead.read_user_id(player, "PlayerWeapon.gun_hit")
+    fx, fy, fz = forward_of(character, uid)
     if not fx then return nil, nil end
   end
   local range = ability().GunShared.Range or 30
@@ -258,26 +258,26 @@ local function gun_hit(opts, player, aim)
   local params = nil
   if RaycastParams then
     local ok, created = pcall(RaycastParams.New)
-    if ok and created then
-      created.FilterDescendantsInstances = { character }
-      params = created
-    end
+    if ok and created then created.FilterDescendantsInstances = { character }; params = created end
   end
-  local ray_origin, ray_dir = vec(origin.x, origin.y, origin.z), vec(fx * range, fy * range, fz * range)
+  local ray_origin = vec(origin.x, origin.y, origin.z, "PlayerWeapon.gun_hit.origin")
+  local ray_dir = vec(fx * range, fy * range, fz * range, "PlayerWeapon.gun_hit.dir")
+  if not ray_origin or not ray_dir then return nil, end_pos end
   -- 仅使用 SE 引擎 PhysicsService:Raycast 冒号签名
   local ok, hit = pcall(function() return physics:Raycast(ray_origin, ray_dir, params) end)
   if not ok then
     print("[PlayerWeapon] 射线检测失败", player and player.UserId, tostring(hit))
     return nil, end_pos
   end
-  if (type(hit) ~= "table" and type(hit) ~= "userdata") or not hit.Instance then return nil, end_pos end
-  local hit_pos = hit.Position or end_pos
+  local ok_inst, hit_inst = EngineRead.read_field(hit, "Instance", "PlayerWeapon.gun_hit")
+  if not ok_inst or not hit_inst then return nil, end_pos end
+  local hit_pos = select(2, EngineRead.read_position(hit, "PlayerWeapon.gun_hit")) or end_pos
   local players = service("Players", opts.players_service)
   local target = players and type(players.GetPlayerFromCharacter) == "function"
-    and players:GetPlayerFromCharacter(hit.Instance) or nil
+    and players:GetPlayerFromCharacter(hit_inst) or nil
   if target then return target, hit_pos end
   if opts.fish_carrier and type(opts.fish_carrier.resolve_carrier) == "function" then
-    local carrier = opts.fish_carrier:resolve_carrier(hit.Instance)
+    local carrier = opts.fish_carrier:resolve_carrier(hit_inst)
     if carrier then return carrier, hit_pos end
   end
   return nil, hit_pos
@@ -292,7 +292,8 @@ end
 
 local function resolve_landing(player, target)
   local character = character_of(player)
-  local pos = character and character.Position
+  local ok_pos, raw_pos = EngineRead.read_position(character, "PlayerWeapon.resolve_landing")
+  local pos = ok_pos and raw_pos or nil
   local throw_cfg = ability().Throw
   local tx, ty, tz
   if type(target) == "table" and finite(target.x) and finite(target.y) and finite(target.z) then
@@ -397,11 +398,8 @@ local function detonate(session, flight)
   local damage = explosive.Damage * scale
   if flight.zone then
     local ok, err = pcall(spawn_blast_fish, session.opts, flight.zone, flight.landing, flight.player)
-    if ok then
-      print("[PlayerWeapon] 爆炸落水", flight.zone.Id, flight.item_id, "保底鱼=" .. tostring(err))
-    else
-      print("[PlayerWeapon] 爆炸落水保底鱼失败", flight.zone.Id, flight.item_id, tostring(err))
-    end
+    if ok then print("[PlayerWeapon] 爆炸落水", flight.zone.Id, flight.item_id, "保底鱼=" .. tostring(err))
+    else print("[PlayerWeapon] 爆炸落水保底鱼失败", flight.zone.Id, flight.item_id, tostring(err)) end
   end
   local hit = session.opts.new_hit and session.opts.new_hit(flight.player, "explosive") or nil
   local damaged = radial_damage(session.opts, flight.landing, ability().Throw.ExplosionRadius,
@@ -429,15 +427,18 @@ local function step_flights(session, now)
     if t >= 1 then
       table.remove(session.flying, index)
       if flight.visual then
-        local destroyed, err = pcall(function() flight.visual:Destroy() end)
-        if not destroyed then
-          print("[PlayerWeapon] 视觉销毁失败", flight.player and flight.player.UserId,
-            flight.item_id, tostring(err))
+        local ok_d, _, reason_d = EngineRead.destroy_unit(flight.visual, "PlayerWeapon.step_flights")
+        if not ok_d then
+          print("[PlayerWeapon] 视觉销毁失败", flight.player and flight.player.UserId, flight.item_id, reason_d)
         end
       end
       detonate(session, flight)
     elseif flight.visual then
-      pcall(function() flight.visual.Position = flight_position(flight, math.max(0, t)) end) -- 视觉位姿失败不影响结算
+      local next_pos = flight_position(flight, math.max(0, t))
+      local pos_vec = vec(next_pos.x, next_pos.y, next_pos.z, "PlayerWeapon.step_flights.pos")
+      if pos_vec then
+        EngineRead.write_field(flight.visual, "Position", pos_vec, "PlayerWeapon.step_flights") -- 视觉位姿失败不影响结算
+      end
     end
   end
   if #session.flying == 0 and session.has_flights then
@@ -449,11 +450,12 @@ local function create_visual(session, player, flight)
   session.throw_seq = session.throw_seq + 1
   local world = service("World", session.opts.world)
   if not world or type(world.CreateUnit) ~= "function" then return nil end
+  local p = flight_position(flight, 0)
+  local pos_vec, scale_vec = vec(p.x, p.y, p.z, "PlayerWeapon.create_visual.pos"), vec(1, 1, 1, "PlayerWeapon.create_visual.scale")
+  if not pos_vec or not scale_vec then return nil end
   local ok, visual = pcall(world.CreateUnit, world, "TriggerUnit", {
     Name = "ThrowProjectile_" .. tostring(player.UserId) .. "_" .. tostring(session.throw_seq),
-    PhysicsMeshId = THROW_VISUAL_MESH,
-    Position = flight_position(flight, 0),
-    Scale = vec(1, 1, 1),
+    PhysicsMeshId = THROW_VISUAL_MESH, Position = pos_vec, Scale = scale_vec,
   })
   if ok and visual then return visual end
   print("[PlayerWeapon] 投掷物视觉创建失败（不影响结算）", tostring(visual))
@@ -462,15 +464,13 @@ end
 
 local function launch(session, player, item_id, target, pre_landing, pre_zone)
   local landing, zone = pre_landing, pre_zone
-  if not landing then
-    landing, zone = resolve_landing(player, target)
-  end
+  if not landing then landing, zone = resolve_landing(player, target) end
   if not landing then return nil end
-  local character = character_of(player)
+  local ok_pos, from_pos = EngineRead.read_player_position(player, "PlayerWeapon.launch")
   local flight = {
     player = player,
     item_id = item_id,
-    from = character and character.Position or nil,
+    from = ok_pos and from_pos or nil,
     landing = landing,
     zone = zone,
     start_at = session.now(),
@@ -806,10 +806,7 @@ function PlayerWeapon.mount(scope, tree, opts)
     for index = #session.flying, 1, -1 do
       local flight = session.flying[index]
       if flight.visual then
-        local destroyed, err = pcall(function() flight.visual:Destroy() end)
-        if not destroyed then
-          print("[PlayerWeapon] 清理阶段投掷物视觉销毁失败", player.UserId, flight.item_id, tostring(err))
-        end
+        EngineRead.destroy_unit(flight.visual, "PlayerWeapon.on_cleanup")
       end
       session.flying[index] = nil
     end

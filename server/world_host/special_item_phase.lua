@@ -1,4 +1,4 @@
-
+local EngineRead = require("common.engine_read")
 local GameCfg = require("common.game_cfg")
 local FlightPath = require("common.flight_path")
 local Number = require("common.number")
@@ -29,8 +29,7 @@ local function zone_scene(zone_id)
 end
 
 local function is_object(value)
-  local kind = type(value)
-  return kind == "table" or kind == "userdata"
+  return EngineRead.is_object(value)
 end
 
 local function flat_forward(rotation, user_id)
@@ -38,32 +37,31 @@ local function flat_forward(rotation, user_id)
     print("[SpecialItemPhase] 角色旋转读取失败", tostring(user_id), "no-rotation")
     return nil
   end
-  local ok, forward = pcall(function()
-    return rotation:GetForward()
-  end)
-  if not ok then
-    print("[SpecialItemPhase] 角色朝向读取失败", tostring(user_id), tostring(forward))
+  local ok_fwd, forward, fwd_reason = EngineRead.call_method(
+    rotation, "GetForward", "SpecialItemPhase.flat_forward"
+  )
+  if not ok_fwd then
+    print(
+      "[SpecialItemPhase] 角色朝向读取失败",
+      tostring(user_id),
+      tostring(fwd_reason)
+    )
     return nil
   end
-  if not is_object(forward) then
-    print("[SpecialItemPhase] 角色朝向读取失败", tostring(user_id), "invalid-forward")
+  local ok_v, vec, vec_reason = EngineRead.read_vec3(
+    forward, "SpecialItemPhase.flat_forward")
+  if not ok_v or not vec then
+    print("[SpecialItemPhase] 角色朝向读取失败", tostring(user_id), tostring(vec_reason))
     return nil
   end
-  local ok_xz, coords = pcall(function()
-    return { x = forward.x, z = forward.z }
-  end)
-  if not ok_xz then
-    print("[SpecialItemPhase] 角色朝向读取失败", tostring(user_id), tostring(coords))
-    return nil
-  end
-  local fx, fz = coords.x, coords.z
-  if type(fx) ~= "number" or type(fz) ~= "number" or not finite(fx) or not finite(fz) then
-    print("[SpecialItemPhase] 角色朝向读取失败", tostring(user_id), "non-finite-forward")
-    return nil
-  end
+  local fx, fz = vec.x, vec.z
   local len = math.sqrt(fx * fx + fz * fz)
   if not finite(len) or len < 1e-6 then
-    print("[SpecialItemPhase] 角色水平朝向无效", tostring(user_id), "zero-flat-forward")
+    print(
+      "[SpecialItemPhase] 角色水平朝向无效",
+      tostring(user_id),
+      "zero-flat-forward"
+    )
     return nil
   end
   return { x = fx / len, z = fz / len }
@@ -83,16 +81,19 @@ local function in_corridor(origin, forward, pos, breath)
 end
 
 local function read_position(character)
-  local ok, pos = pcall(function() return character and character.Position end) -- 兼容引擎 userdata 角色
-  if ok and is_object(pos) and finite(pos.x) and finite(pos.y) and finite(pos.z) then
+  local ok, pos = EngineRead.read_position(character, "SpecialItemPhase.read_position")
+  if ok then
     return pos
   end
+  return nil
 end
 
 local function write_position(character, x, y, z)
-  pcall(function()
-    character.Position = Vector3.New(x, y, z)
-  end)
+  local ok_vec, pos_vec = EngineRead.new_vector3(x, y, z, "SpecialItemPhase.write_position")
+  if not ok_vec then
+    return false
+  end
+  return EngineRead.write_field(character, "Position", pos_vec, "SpecialItemPhase.write_position")
 end
 
 local function selected_item_id(item_bar, selected_slot)
@@ -135,14 +136,13 @@ function SpecialItemPhase.mount(ps, player_tree, opts)
   local restoring = false
   local selected_phase = State.new("SpecialItemPhase.selected", nil)
   local cleanup_active = State.new("SpecialItemPhase.cleanup_active", false)
-  local cleanup_character = nil
-
-  local function now()
-    return clock.now()
-  end
-
+  local cleanup_character ---@type any
+  local function now() return clock.now() end
   local function character_of()
-    return cleanup_character or states.character:now() or player.Character
+    local ch = cleanup_character or states.character:now()
+    if ch then return ch end
+    local ok, current = EngineRead.read_character(player, "SpecialItemPhase.character_of")
+    return ok and current or nil
   end
 
   local function log_failure(key, object, err)
@@ -165,11 +165,11 @@ function SpecialItemPhase.mount(ps, player_tree, opts)
   end
 
   local function fire_client(name, payload)
-    if not remote or type(remote.get_re) ~= "function" then return end
-    local ok, event = pcall(remote.get_re, remote, name)
-    if ok and event and type(event.FireClient) == "function" then
-      pcall(event.FireClient, event, player, payload)
-    end
+    EngineRead.fire_client(
+      remote, name,
+      player, payload,
+      "SpecialItemPhase.fire_client"
+    )
   end
 
   local function reply(payload)
@@ -421,7 +421,7 @@ function SpecialItemPhase.mount(ps, player_tree, opts)
       airborne = airborne,
     }, holding, dt, bounds)
     local x, z = SpecialItem.clamp_xz(bounds, pos.x, pos.z)
-    write_position(character, x, y, z)
+    if not write_position(character, x, y, z) then return end
     flight_y = y
     airborne = next_airborne
     if not airborne then
@@ -439,10 +439,11 @@ function SpecialItemPhase.mount(ps, player_tree, opts)
       if ok and type(list) == "table" then
         for _, other in ipairs(list) do
           if other ~= player then
-            local pos = read_position(other.Character)
-            if pos then
+            local ok_pos, pos = EngineRead.read_player_position(other, "SpecialItemPhase.breath_targets")
+            local ok_uid, other_uid = EngineRead.read_user_id(other, "SpecialItemPhase.breath_targets")
+            if ok_pos and pos then
               targets[#targets + 1] = {
-                key = "player:" .. tostring(other.UserId),
+                key = "player:" .. tostring(ok_uid and other_uid or nil),
                 pos = pos,
                 apply = function(amount)
                   if type(player_tree.apply_hit) == "function" then
@@ -472,10 +473,7 @@ function SpecialItemPhase.mount(ps, player_tree, opts)
             pos = pos,
             apply = function(amount)
               local hit = player_tree:new_hit(player, "specialBreath")
-              if type(player_tree.apply_hit) == "function" then
-                local applied = player_tree:apply_hit(hit, carrier, amount)
-                if applied then return end
-              end
+              if type(player_tree.apply_hit) == "function" and player_tree:apply_hit(hit, carrier, amount) then return end
               if fish_carrier and type(fish_carrier.Damage) == "function" then
                 fish_carrier:Damage(carrier, amount, hit)
               end
@@ -532,9 +530,11 @@ function SpecialItemPhase.mount(ps, player_tree, opts)
     if not pos then return fail("breath", "no-character") end
     local bc = breath_cfg()
     if breath_remaining() > 0 then return fail("breath", "cooldown") end
-    local rot_ok, rotation = pcall(function() return character.Rotation end)
+    local rot_ok, rotation, rot_reason = EngineRead.read_field(
+      character, "Rotation", "SpecialItemPhase.cast_breath"
+    )
     if not rot_ok then
-      print("[SpecialItemPhase] 角色旋转读取失败", tostring(player and player.UserId), tostring(rotation))
+      print("[SpecialItemPhase] 角色旋转读取失败", tostring(player and player.UserId), tostring(rot_reason))
       return fail("breath", "no-forward")
     end
     local forward = flat_forward(rotation, player and player.UserId)

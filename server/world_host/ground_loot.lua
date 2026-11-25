@@ -1,4 +1,4 @@
-
+local EngineRead = require("common.engine_read")
 local GameCfg = require("common.game_cfg")
 local Number = require("common.number")
 local BodyScale = require("common.body_scale")
@@ -21,14 +21,13 @@ local function vec3(x, y, z)
   return Vector3.New(x, y, z)
 end
 
+-- 统一经 EngineRead 读取三维坐标，区分缺失、销毁与异常。
 local function read_pos(pos)
-  if type(pos) ~= "table" and type(pos) ~= "userdata" then return nil end
-  local ok, x, y, z = pcall(function() return pos.x, pos.y, pos.z end) -- 兼容引擎 Vector3
-  if not ok then return nil end
-  if not Number.is_finite_number(x) or not Number.is_finite_number(y) or not Number.is_finite_number(z) then
+  local ok, vec = EngineRead.read_vec3(pos, "GroundLoot.read_pos")
+  if not ok or vec == nil then
     return nil
   end
-  return x, y, z
+  return vec.x, vec.y, vec.z
 end
 
 local function distance(a, b)
@@ -181,9 +180,10 @@ local function player_can_act(tree)
 end
 
 local function within_reach(player, position)
-  local character = player and player.Character
-  local pos = character and character.Position
-  if pos == nil then return false end
+  local ok_ch, character = EngineRead.read_character(player, "GroundLoot.within_reach")
+  if not ok_ch or character == nil then return false end
+  local ok_pos, pos = EngineRead.read_position(character, "GroundLoot.within_reach")
+  if not ok_pos or pos == nil then return false end
   local radius = BodyScale.interaction_radius(character, GameCfg.Loot.PickupRadius) + (GameCfg.Loot.PickupSlack or 0)
   return distance(pos, position) <= radius
 end
@@ -313,11 +313,11 @@ function GroundLoot.mount(world, opts)
       end
       row.unit = unit
       es:on_cleanup(function()
-        if unit ~= nil and type(unit.Destroy) == "function" and unit.Destroyed ~= true then
-          local ok_destroy, err_destroy = pcall(function() unit:Destroy() end) -- 宿主单位可能已随场景销毁
-          if not ok_destroy and opts.logger and type(opts.logger.error) == "function" then
-            opts.logger.error("[GroundLoot] 单位销毁失败", id, err_destroy)
-          end
+        if unit ~= nil then
+          EngineRead.destroy_unit(unit, {
+            context = "GroundLoot.cleanup:" .. tostring(id),
+            logger = opts.logger,
+          })
         end
         if records[id] == row then
           records[id] = nil
@@ -597,8 +597,8 @@ function GroundLoot.mount(world, opts)
       or (tree.states.item_bar:now() or {})
     local entry = source[index]
     if type(entry) ~= "table" or (entry.count or 0) <= 0 then return false, "empty" end
-    local pos = player.Character and player.Character.Position
-    local x, y, z = read_pos(pos)
+    local ok_pos, pos = EngineRead.read_player_position(player, { context = "GroundLoot.try_drop", logger = opts.logger })
+    local x, y, z = read_pos(ok_pos and pos or nil)
     if x == nil then return false, "no-character" end
     local zone_id = tree.states.zone_id:now()
     if zone_of(zones, zone_id) == nil then

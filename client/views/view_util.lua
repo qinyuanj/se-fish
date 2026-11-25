@@ -1,31 +1,24 @@
-
+local EngineRead = require("common.engine_read")
 local Number = require("common.number")
 
 local ViewUtil = {}
 
 function ViewUtil.is_record(value)
-  local kind = type(value)
-  return kind == "table" or kind == "userdata"
+  return EngineRead.is_object(value)
 end
 
 function ViewUtil.read_vec2(value)
-  if not ViewUtil.is_record(value) then
-    return nil
-  end
-  local ok, x, y = pcall(function() return value.x, value.y end) -- 兼容引擎 Vector2 userdata 坐标读取
-  if ok and Number.is_finite_number(x) and Number.is_finite_number(y) then
-    return x, y
+  local ok, vec = EngineRead.read_vec2(value, "ViewUtil.read_vec2")
+  if ok and vec ~= nil then
+    return vec.x, vec.y
   end
   return nil
 end
 
 function ViewUtil.read_vec3(value)
-  if not ViewUtil.is_record(value) then
-    return nil
-  end
-  local ok, x, y, z = pcall(function() return value.x, value.y, value.z end) -- 兼容引擎 Vector3 userdata 坐标读取
-  if ok and Number.is_finite_number(x) and Number.is_finite_number(y) and Number.is_finite_number(z) then
-    return x, y, z
+  local ok, vec = EngineRead.read_vec3(value, "ViewUtil.read_vec3")
+  if ok and vec ~= nil then
+    return vec.x, vec.y, vec.z
   end
   return nil
 end
@@ -85,19 +78,24 @@ function ViewUtil.get_resolution(ctx, options)
   end
 
   if game ~= nil then
-    local ok, raw = pcall(function() -- 宿主 EUI 管理器未就绪或分辨率接口异常时记录并返回 nil
-      local players = game:GetService("Players")
-      -- 优先通过本地玩家读取宿主 EuiManager
-      -- 若不可用则记日志返回 nil
-      -- 不再回退 1920x1080
-      local lp = players and players.LocalPlayer
-      local eui_mgr = lp and lp.PlayerGui and lp.PlayerGui.EuiManager or nil
-      return eui_mgr and eui_mgr:GetDeviceResolution() or nil
-    end)
+    local function read_eui_raw()
+      local ok_p, players, reason_p = EngineRead.get_service("Players", "ViewUtil.get_resolution")
+      if not ok_p then return false, reason_p end
+      local ok_lp, lp, reason_lp = EngineRead.read_field(players, "LocalPlayer", "ViewUtil.get_resolution")
+      if not ok_lp then return reason_lp == "missing", reason_lp end
+      local ok_pg, pg, reason_pg = EngineRead.read_field(lp, "PlayerGui", "ViewUtil.get_resolution")
+      if not ok_pg then return reason_pg == "missing", reason_pg end
+      local ok_eui, eui_mgr, reason_eui = EngineRead.read_field(pg, "EuiManager", "ViewUtil.get_resolution")
+      if not ok_eui then return reason_eui == "missing", reason_eui end
+      local ok_raw, raw, reason_raw = EngineRead.call_method(eui_mgr, "GetDeviceResolution", "ViewUtil.get_resolution")
+      if not ok_raw then return reason_raw == "missing", reason_raw end
+      return true, raw
+    end
+    local ok, raw_or_reason = read_eui_raw()
     if not ok then
-      print("[ViewUtil] 读取宿主 EUI 分辨率失败", tostring(raw))
+      print("[ViewUtil] 读取宿主 EUI 分辨率失败", tostring(raw_or_reason))
     else
-      local resolved = valid_resolution(raw)
+      local resolved = valid_resolution(raw_or_reason)
       if resolved ~= nil then return resolved end
     end
   end
@@ -160,8 +158,9 @@ function ViewUtil.create_anchor_scene_node(scope, ctx, entry, height, kind, fall
       Visible = true,
     })
   end
-  if node ~= nil and node.Name == nil then
-    node.Name = fallback_name
+  local ok_name, existing_name = EngineRead.read_field(node, "Name", "ViewUtil.create_anchor_scene_node")
+  if node ~= nil and (not ok_name or existing_name == nil) then
+    EngineRead.write_field(node, "Name", fallback_name, "ViewUtil.create_anchor_scene_node")
   end
   return node
 end

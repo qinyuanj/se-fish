@@ -1,39 +1,20 @@
-
+local EngineRead = require("common.engine_read")
 local GameCfg = require("common.game_cfg")
 
 local PkDamageFilter = {}
 
-local function is_finite(value)
-  return type(value) == "number" and value == value and value ~= math.huge and value ~= -math.huge
-end
-
-local function is_object(value)
-  local kind = type(value)
-  return kind == "table" or kind == "userdata"
-end
-
 local function user_id_of(player)
-  if not is_object(player) then return nil end
-  local ok, uid = pcall(function() return player.UserId end) -- 兼容引擎 userdata 玩家
+  local ok, uid = EngineRead.read_user_id(player, "PkDamageFilter.user_id_of")
   if not ok then return nil end
   return uid
 end
 
 local function position_of(player)
-  if not is_object(player) then return nil, "invalid-player" end
-  local ok_char, character = pcall(function() return player.Character end) -- 兼容引擎 userdata 玩家
-  if not ok_char then return nil, tostring(character) end
-  if not is_object(character) then return nil, "no-character" end
-  local ok_pos, value = pcall(function() return character.Position end) -- 兼容引擎 userdata 位置
-  if not ok_pos then return nil, tostring(value) end
-  if not is_object(value) then return nil, "invalid-position" end
-  local ok_xz, coords = pcall(function() return { x = value.x, z = value.z } end) -- 兼容引擎 userdata 分量
-  if not ok_xz then return nil, tostring(coords) end
-  local x, z = tonumber(coords.x), tonumber(coords.z)
-  if not is_finite(x) or not is_finite(z) then
-    return nil, "non-finite-position"
+  local ok, pos, reason = EngineRead.read_player_position(player, "PkDamageFilter.position_of")
+  if not ok or pos == nil then
+    return nil, reason or "missing"
   end
-  return { x = x, z = z }, nil
+  return { x = pos.x, z = pos.z }, nil
 end
 
 local function inside(position, zone)
