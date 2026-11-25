@@ -28,20 +28,45 @@ local function zone_scene(zone_id)
   end
 end
 
-local function flat_forward(rotation)
-  local ok, forward = pcall(function()
-    return rotation and rotation.GetForward and rotation:GetForward()
-  end)
-  local fx = ok and forward and forward.x or 0
-  local fz = ok and forward and forward.z or 1
-  local len = math.sqrt(fx * fx + fz * fz)
-  if len < 1e-6 then return { x = 0, z = 1 } end
-  return { x = fx / len, z = fz / len }
-end
-
 local function is_object(value)
   local kind = type(value)
   return kind == "table" or kind == "userdata"
+end
+
+local function flat_forward(rotation, user_id)
+  if not is_object(rotation) then
+    print("[SpecialItemPhase] 角色旋转读取失败", tostring(user_id), "no-rotation")
+    return nil
+  end
+  local ok, forward = pcall(function()
+    return rotation:GetForward()
+  end)
+  if not ok then
+    print("[SpecialItemPhase] 角色朝向读取失败", tostring(user_id), tostring(forward))
+    return nil
+  end
+  if not is_object(forward) then
+    print("[SpecialItemPhase] 角色朝向读取失败", tostring(user_id), "invalid-forward")
+    return nil
+  end
+  local ok_xz, coords = pcall(function()
+    return { x = forward.x, z = forward.z }
+  end)
+  if not ok_xz then
+    print("[SpecialItemPhase] 角色朝向读取失败", tostring(user_id), tostring(coords))
+    return nil
+  end
+  local fx, fz = coords.x, coords.z
+  if type(fx) ~= "number" or type(fz) ~= "number" or not finite(fx) or not finite(fz) then
+    print("[SpecialItemPhase] 角色朝向读取失败", tostring(user_id), "non-finite-forward")
+    return nil
+  end
+  local len = math.sqrt(fx * fx + fz * fz)
+  if not finite(len) or len < 1e-6 then
+    print("[SpecialItemPhase] 角色水平朝向无效", tostring(user_id), "zero-flat-forward")
+    return nil
+  end
+  return { x = fx / len, z = fz / len }
 end
 
 local function in_corridor(origin, forward, pos, breath)
@@ -502,10 +527,18 @@ function SpecialItemPhase.mount(ps, player_tree, opts)
   local function cast_breath()
     if restoring or effect ~= "godzilla" then return fail("breath", "not-godzilla") end
     if memos.can_act:now() ~= true then return fail("breath", "not-alive") end
-    local pos = read_position(character_of())
+    local character = character_of()
+    local pos = read_position(character)
     if not pos then return fail("breath", "no-character") end
     local bc = breath_cfg()
     if breath_remaining() > 0 then return fail("breath", "cooldown") end
+    local rot_ok, rotation = pcall(function() return character.Rotation end)
+    if not rot_ok then
+      print("[SpecialItemPhase] 角色旋转读取失败", tostring(player and player.UserId), tostring(rotation))
+      return fail("breath", "no-forward")
+    end
+    local forward = flat_forward(rotation, player and player.UserId)
+    if not forward then return fail("breath", "no-forward") end
     local current = now()
     write_cooldown(bc.CooldownSec)
     breath = {
@@ -513,7 +546,7 @@ function SpecialItemPhase.mount(ps, player_tree, opts)
       tick = 1,
       ledger = SpecialItem.new_breath_ledger(bc),
       origin = { x = pos.x, y = pos.y, z = pos.z },
-      forward = flat_forward(character_of().Rotation),
+      forward = forward,
     }
     reply({ ok = true, action = "breath", endsAt = current + bc.DurationSec })
     publish()
@@ -694,6 +727,7 @@ function SpecialItemPhase.mount(ps, player_tree, opts)
     flight_y = nil
     flight_ground_y = nil
     reconcile()
+    return not restoring
   end
 
   function player_tree:special_item_effect()

@@ -80,15 +80,46 @@ local function character_of(player)
   return nil
 end
 
-local function forward_of(character)
-  local fx, fy, fz = 0, 0, 1
-  if character then
-    pcall(function()
-      local forward = character.Rotation:GetForward()
-      fx, fy, fz = forward.x or 0, forward.y or 0, forward.z or 1
-    end)
+local function is_object(value)
+  local kind = type(value)
+  return kind == "table" or kind == "userdata"
+end
+
+local function forward_of(character, user_id)
+  if not is_object(character) then
+    print("[PlayerWeapon] 角色朝向读取失败", tostring(user_id), "no-character")
+    return nil
   end
-  return fx, fy, fz
+  local ok, forward = pcall(function()
+    return character.Rotation:GetForward()
+  end)
+  if not ok then
+    print("[PlayerWeapon] 角色朝向读取失败", tostring(user_id), tostring(forward))
+    return nil
+  end
+  if not is_object(forward) then
+    print("[PlayerWeapon] 角色朝向读取失败", tostring(user_id), "invalid-forward")
+    return nil
+  end
+  local ok_xyz, vec_xyz = pcall(function()
+    return { x = forward.x, y = forward.y, z = forward.z }
+  end)
+  if not ok_xyz then
+    print("[PlayerWeapon] 角色朝向读取失败", tostring(user_id), tostring(vec_xyz))
+    return nil
+  end
+  local fx, fy, fz = vec_xyz.x, vec_xyz.y, vec_xyz.z
+  if type(fx) ~= "number" or type(fy) ~= "number" or type(fz) ~= "number"
+    or not finite(fx) or not finite(fy) or not finite(fz) then
+    print("[PlayerWeapon] 角色朝向读取失败", tostring(user_id), "non-finite-forward")
+    return nil
+  end
+  local length = math.sqrt(fx * fx + fy * fy + fz * fz)
+  if not finite(length) or length < 1e-6 then
+    print("[PlayerWeapon] 角色朝向读取失败", tostring(user_id), "zero-forward")
+    return nil
+  end
+  return fx / length, fy / length, fz / length
 end
 
 local function play_anim(tracks, player, anim)
@@ -212,8 +243,13 @@ local function gun_hit(opts, player, aim)
   local character = character_of(player)
   local pos = character and character.Position
   if not pos then return nil, nil end
-  local fx, fy, fz = forward_of(character)
-  if aim then fx, fy, fz = aim.x, aim.y, aim.z end
+  local fx, fy, fz
+  if aim then
+    fx, fy, fz = aim.x, aim.y, aim.z
+  else
+    fx, fy, fz = forward_of(character, player and player.UserId)
+    if not fx then return nil, nil end
+  end
   local range = ability().GunShared.Range or 30
   local origin = { x = pos.x, y = pos.y + 1, z = pos.z }
   local end_pos = { x = origin.x + fx * range, y = origin.y + fy * range, z = origin.z + fz * range }
@@ -262,9 +298,14 @@ local function resolve_landing(player, target)
   if type(target) == "table" and finite(target.x) and finite(target.y) and finite(target.z) then
     tx, ty, tz = target.x, target.y, target.z
   else
-    local fx, _, fz = forward_of(character)
+    local fx, _, fz = forward_of(character, player and player.UserId)
+    if not fx or not fz then return nil, nil end
     local len = math.sqrt(fx * fx + fz * fz)
-    if len > 0.001 then fx, fz = fx / len, fz / len end
+    if not finite(len) or len < 1e-6 then
+      print("[PlayerWeapon] 角色水平朝向无效，取消投掷落点计算", tostring(player and player.UserId))
+      return nil, nil
+    end
+    fx, fz = fx / len, fz / len
     tx = (pos and pos.x or 0) + fx * throw_cfg.Range
     ty = pos and pos.y or 0
     tz = (pos and pos.z or 0) + fz * throw_cfg.Range
@@ -419,8 +460,12 @@ local function create_visual(session, player, flight)
   return nil
 end
 
-local function launch(session, player, item_id, target)
-  local landing, zone = resolve_landing(player, target)
+local function launch(session, player, item_id, target, pre_landing, pre_zone)
+  local landing, zone = pre_landing, pre_zone
+  if not landing then
+    landing, zone = resolve_landing(player, target)
+  end
+  if not landing then return nil end
   local character = character_of(player)
   local flight = {
     player = player,
@@ -520,16 +565,19 @@ local function attack_gun(session, player, weapon_id, cfg, aim)
     print("[PlayerWeapon] 空匣自动换弹", player.UserId, weapon_id)
     return fail(session.remote, player, "attack", "empty", { weapon = weapon_id, autoReload = true })
   end
-  mag.ammo = mag.ammo - 1
-  session.fire_at[weapon_id] = now
-  play_anim(session.tracks, player, cfg.Anim)
-  local scale = damage_scale(session.tree, "ranged")
   local fx, fy, fz
   if aim then
     fx, fy, fz = aim.x, aim.y, aim.z
   else
-    fx, fy, fz = forward_of(character_of(player))
+    fx, fy, fz = forward_of(character_of(player), player and player.UserId)
+    if not fx then
+      return fail(session.remote, player, "attack", "no-forward", { weapon = weapon_id })
+    end
   end
+  mag.ammo = mag.ammo - 1
+  session.fire_at[weapon_id] = now
+  play_anim(session.tracks, player, cfg.Anim)
+  local scale = damage_scale(session.tree, "ranged")
   local dirs = pellet_directions(fx, fy, fz, cfg.Pellets or 1, cfg.SpreadDeg)
   local damage = cfg.Damage * scale
   local hit_count = 0
@@ -582,8 +630,12 @@ local function consume_throwable(session, player, slot, item_id, payload)
     if not entry or (entry.count or 0) <= 0 or entry.itemId ~= item_id then
       return fail(session.remote, player, "throw", "empty", { slot = slot })
     end
+    local landing, zone = resolve_landing(player, payload.target)
+    if not landing then
+      return fail(session.remote, player, "throw", "no-forward", { slot = slot })
+    end
     if entry.count > 1 then entry.count = entry.count - 1 else container[slot] = nil end
-    launch(session, player, item_id, payload.target)
+    launch(session, player, item_id, payload.target, landing, zone)
     return reply(session.remote, player, { ok = true, action = "throw", itemId = item_id, slot = slot })
   end
   if type(save.resolve_request) ~= "function" or type(save.execute) ~= "function" then
@@ -607,6 +659,11 @@ local function consume_throwable(session, player, slot, item_id, payload)
       end
     end) == true
   end
+  local landing, zone = resolve_landing(player, payload.target)
+  if not landing then
+    fail(session.remote, player, "throw", "no-forward", { slot = slot })
+    return false
+  end
   return save:execute(player, data, operation, function(draft)
     local container = draft.data.containers[GameCfg.Items.ContainerId.ItemBar]
     local entry = container and container[slot]
@@ -626,7 +683,7 @@ local function consume_throwable(session, player, slot, item_id, payload)
     end
     result.operation = operation
     reply(session.remote, player, result)
-    launch(session, player, item_id, payload.target)
+    launch(session, player, item_id, payload.target, landing, zone)
   end) == true
 end
 

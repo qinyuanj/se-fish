@@ -267,6 +267,64 @@ describe('条款 9 PK 伤害过滤', function()
     assert.is_true(logged, '区域缺失的放行兜底要留下日志')
   end)
 
+  -- #365 失败方式：安全区内攻击者或目标位置读取失败时若按鱼塘外处理，会误放行玩家间伤害。
+  it('9-13 玩家位置读取失败时保守拦截玩家间伤害并留日志，不影响鱼攻击与正常判定', function()
+    local a = join(1, vec(6.26, 5.01, -0.71))
+    local b = join(2, vec(5, 6, -9))
+    local printed, rawPrint = {}, print
+    local okRun, err = pcall(function()
+      _G.print = function(...)
+        local parts = {}
+        for index = 1, select('#', ...) do parts[index] = tostring((select(index, ...))) end
+        printed[#printed + 1] = table.concat(parts, ' ')
+      end
+      local throwingChar = setmetatable({}, {
+        __index = function(_, key)
+          if key == 'Position' then error('pos-read-denied') end
+        end,
+      })
+      local cases = {
+        function() a.Character.Position = nil end,
+        function() a.Character = throwingChar end,
+        function() a.Character.Position = vec(0 / 0, 5, -1) end,
+        function() a.Character = nil end,
+        function() b.Character.Position = nil end,
+        function() b.Character = setmetatable({ Controller = b.Character.Controller }, {
+          __index = function(_, key)
+            if key == 'Position' then error('target-pos-denied') end
+          end,
+        }) end,
+        function() b.Character.Position = vec(5, 6, math.huge) end,
+      }
+      local origA, origB = a.Character, b.Character
+      for _, corrupt in ipairs(cases) do
+        a.Character, b.Character = origA, origB
+        a.Character.Position = vec(6.26, 5.01, -0.71)
+        b.Character.Position = vec(5, 6, -9)
+        local beforeLogs = #printed
+        corrupt()
+        assert.is_false(hit(a, b, 'gun', 45))
+        assert.same(300, origB.Controller.Health)
+        local logged = false
+        for index = beforeLogs + 1, #printed do
+          if printed[index]:find('PkDamageFilter', 1, true) then logged = true break end
+        end
+        assert.is_true(logged)
+      end
+      a.Character, b.Character = origA, origB
+      a.Character.Position = nil
+      local fish = { Id = 91, body = { UnitId = 91 }, receiver = {}, Position = vec(0, 2, 0) }
+      assert.is_true(hit(fish, b, 'fishAttack', 20))
+      assert.same(280, b.Character.Controller.Health)
+      a.Character.Position = vec(241, 6, 0)
+      b.Character.Position = vec(242, 6, 0)
+      assert.is_true(hit(a, b, 'gun', 30))
+      assert.same(250, b.Character.Controller.Health)
+    end)
+    _G.print = rawPrint
+    if not okRun then error(err, 0) end
+  end)
+
   it('9-14：鱼塘外非同队玩家攻击扣血，同队仍免伤', function()
     local a = join(3, vec(241, 6, 0))
     local b = join(4, vec(242, 6, 0))

@@ -110,10 +110,22 @@ function FerryRoute.mount(world, opts)
       log("传送失败", player and player.UserId, "角色缺失")
       return false
     end
-    local tree = type(lookup_tree) == "function" and lookup_tree(player) or nil
-    if tree and type(tree.suspend_special_item) == "function" then
-      local ok, err = pcall(tree.suspend_special_item, tree)
-      if not ok then log("特殊道具挂起失败", player.UserId, tostring(err)) end
+    local tree
+    if type(lookup_tree) == "function" then
+      local tree_ok, found = pcall(lookup_tree, player)
+      if not tree_ok then
+        log("传送中止：查询玩家树失败", player.UserId, tostring(found))
+        return false
+      end
+      tree = found
+    end
+    if type(tree) == "table" and type(tree.suspend_special_item) == "function" then
+      local suspend_ok, suspend_result = pcall(tree.suspend_special_item, tree)
+      if not suspend_ok or suspend_result == false then
+        log("传送中止：特殊道具挂起失败", player.UserId,
+          suspend_ok and "returned-false" or tostring(suspend_result))
+        return false
+      end
     end
     local ok, err = pcall(function()
       local pos = Vector3.New(dest.x, dest.y, dest.z)
