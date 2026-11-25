@@ -1,0 +1,127 @@
+name: build-ci-toolchain
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "目标 GitHub Release tag（用于发布预构建 CI 工具链）"
+        required: true
+        default: "ci-toolchain-v1"
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: build-windows-toolchain
+    runs-on: windows-latest
+    steps:
+      - name: 配置 MSVC
+        uses: step-security/msvc-dev-cmd@v1
+
+      - name: 编译 Lua 5.4.6、LuaRocks 3.12.2 与 Busted 2.3.0-1
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python -m pip install "hererocks @ https://github.com/luarocks/hererocks/archive/ec31d070ae0076415c0175a2006b29496494d37a.zip"
+          python -m hererocks .hererocks --lua 5.4.6 --luarocks 3.12.2 --target vs
+          $bin = (Resolve-Path .hererocks/bin).Path
+          $env:PATH = "$bin;$env:PATH"
+          luarocks install busted 2.3.0-1
+
+      - name: 重写可重定位包装脚本并打包
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          # 重写 busted.bat 使用 %~dp0 相对路径，消除绝对路径硬编码
+          $bustedScript = Get-ChildItem -Path ".hererocks/lib/luarocks/rocks-5.4/busted" -Recurse -Filter "busted" | Select-Object -First 1
+          if (-not $bustedScript) { throw "找不到 busted 入口脚本" }
+          $rootFull = (Resolve-Path ".hererocks").Path
+          $relScript = $bustedScript.FullName.Substring($rootFull.Length + 1)
+
+          $batContent = @(
+            '@echo off'
+            'setlocal'
+            'set "ROOT=%~dp0.."'
+            'set "LUA_PATH=%ROOT%\share\lua\5.4\?.lua;%ROOT%\share\lua\5.4\?\init.lua;.\?.lua;.\?\init.lua"'
+            'set "LUA_CPATH=%ROOT%\lib\lua\5.4\?.dll;.\?.dll"'
+            "`"%~dp0lua.exe`" `"%ROOT%\$relScript`" %*"
+          ) -join "`r`n"
+          Set-Content -Path ".hererocks/bin/busted.bat" -Value $batContent -Encoding ascii
+
+          $archive = "ci-toolchain-lua5.4.6-busted2.3.0-1-win-x64.zip"
+          Compress-Archive -Path ".hererocks/*" -DestinationPath $archive -Force
+          $hash = (Get-FileHash $archive -Algorithm SHA256).Hash.ToUpperInvariant()
+          "$hash  $archive" | Set-Content -Path "$archive.sha256" -Encoding ascii
+          Write-Host "Archive: $archive"
+          Write-Host "SHA-256: $hash"
+
+      - name: 上传构建产物供密封自检
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-toolchain-win-x64
+          path: |
+            ci-toolchain-lua5.4.6-busted2.3.0-1-win-x64.zip
+            ci-toolchain-lua5.4.6-busted2.3.0-1-win-x64.zip.sha256
+          retention-days: 1
+
+  verify:
+    name: verify-relocatable-without-msvc
+    needs: build
+    runs-on: windows-latest
+    steps:
+      - name: 下载构建产物
+        uses: actions/download-artifact@v4
+        with:
+          name: ci-toolchain-win-x64
+
+      - name: 在异目录且无 MSVC 环境下验证可运行性
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $archive = "ci-toolchain-lua5.4.6-busted2.3.0-1-win-x64.zip"
+          $dest = Join-Path $env:RUNNER_TEMP "verify-relocated-toolchain"
+          Expand-Archive -Path $archive -DestinationPath $dest -Force
+
+          $env:PATH = "$(Join-Path $dest 'bin');$env:PATH"
+          $env:LUA_PATH = "$dest\share\lua\5.4\?.lua;$dest\share\lua\5.4\?\init.lua;.\?.lua;.\?\init.lua"
+          $env:LUA_CPATH = "$dest\lib\lua\5.4\?.dll;.\?.dll"
+
+          lua -v
+          lua -e "local lfs = require('lfs'); print('lfs ok:', lfs._VERSION)"
+          busted --version
+
+  publish:
+    name: publish-release
+    needs: verify
+    runs-on: windows-latest
+    steps:
+      - name: 下载构建产物
+        uses: actions/download-artifact@v4
+        with:
+          name: ci-toolchain-win-x64
+
+      - name: 发布或更新 GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $archive = "ci-toolchain-lua5.4.6-busted2.3.0-1-win-x64.zip"
+          $shaFile = "$archive.sha256"
+          $shaText = (Get-Content $shaFile -Raw).Trim()
+
+          gh release view $env:TAG --repo "${{ github.repository }}" 2>$null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $env:TAG $archive $shaFile --clobber --repo "${{ github.repository }}"
+          } else {
+            gh release create $env:TAG $archive $shaFile `
+              --repo "${{ github.repository }}" `
+              --title "CI Toolchain ($env:TAG)" `
+              --notes "预构建 Windows CI 工具链：Lua 5.4.6 + LuaRocks 3.12.2 + Busted 2.3.0-1（已通过无 MSVC 异目录自检）。`n`n``````text`n$shaText`n``````"
+          }
+
+          "### 已发布 CI 预构建工具链 ($env:TAG)" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          "``````text`n$shaText`n``````" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8

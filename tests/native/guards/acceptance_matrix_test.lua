@@ -16,7 +16,11 @@ local function real_matrix()
   return scanned
 end
 local function real_verify()
-  if not verified then verified = Acceptance.verify('.') end
+  if not verified then
+    local matrix = real_matrix()
+    local findings = Acceptance.check(matrix)
+    verified = { ok = #findings == 0, findings = findings, counts = matrix.counts, matrix = matrix }
+  end
   return verified
 end
 
