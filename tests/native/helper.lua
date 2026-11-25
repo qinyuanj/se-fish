@@ -31,6 +31,10 @@ end
 local baseline = require("tests.support.baseline")
 baseline.apply()
 
+-- 复用模块源码的编译结果：夹具重建世界时清掉 package.loaded 再 require，模块表照样全新，
+-- 只是不再逐例重新解析源码（ferry_test 的世界宿主 35 个模块：18.6 ms 里 14.6 ms 是编译）。
+require("tests.support.module_cache").install()
+
 return function(busted)
   local snapshot
   busted.executors.before_each(function()
