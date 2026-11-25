@@ -64,30 +64,26 @@ jobs:
           Write-Host "docs_only=$docsOnly ($reason)"
           "docs_only=$docsOnly" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 
-      - name: 缓存 Lua / LuaRocks / Busted
-        id: cache-hererocks
-        uses: actions/cache@v4
-        with:
-          path: .hererocks
-          key: ${{ runner.os }}-hererocks-ec31d070-lua5.4.6-luarocks3.12.2-busted2.3.0-1-v1
-
-      - name: 配置 MSVC
-        if: steps.cache-hererocks.outputs.cache-hit != 'true'
-        uses: step-security/msvc-dev-cmd@v1
-
-      - name: 安装 Lua 5.4.6、LuaRocks 3.12.2 与 Busted 2.3.0
-        if: steps.cache-hererocks.outputs.cache-hit != 'true'
-        # 固定 hererocks 提交锁定安装器源码；gh-actions-luarocks 会在 Windows 上执行 Unix configure，不采用
+      - name: 安装预构建 Lua 5.4.6 / LuaRocks 3.12.2 / Busted 2.3.0-1
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          python -m pip install "hererocks @ https://github.com/luarocks/hererocks/archive/ec31d070ae0076415c0175a2006b29496494d37a.zip"
-          python -m hererocks .hererocks --lua 5.4.6 --luarocks 3.12.2 --target vs
-          $bin = (Resolve-Path .hererocks/bin).Path
-          $env:PATH = "$bin;$env:PATH"
-          luarocks install busted 2.3.0-1
-
-      - name: 将 .hererocks/bin 加入 PATH
-        run: |
-          "$(Resolve-Path .hererocks/bin)" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+          $ErrorActionPreference = 'Stop'
+          $archive = "ci-toolchain-lua5.4.6-busted2.3.0-1-win-x64.zip"
+          $expected = "B936BF844DC22B14CA9FFF38AFF32B72D1D41D703612EDA50629E88C38E53103"
+          $dest = Join-Path $env:RUNNER_TEMP "ci-toolchain"
+          New-Item -ItemType Directory -Force -Path $dest | Out-Null
+          gh release download ci-toolchain-v1 --repo "${{ github.repository }}" --pattern $archive --dir $env:RUNNER_TEMP --clobber
+          if ($LASTEXITCODE -ne 0) { throw "下载预构建工具链失败（exit=$LASTEXITCODE）" }
+          $zipPath = Join-Path $env:RUNNER_TEMP $archive
+          $actual = (Get-FileHash $zipPath -Algorithm SHA256).Hash.ToUpperInvariant()
+          if ($actual -ne $expected) { throw "$archive SHA-256 不匹配: $actual != $expected" }
+          Expand-Archive -Path $zipPath -DestinationPath $dest -Force
+          Remove-Item $zipPath -Force
+          "$(Join-Path $dest 'bin')" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+          "LUA_PATH=$dest\share\lua\5.4\?.lua;$dest\share\lua\5.4\?\init.lua;.\?.lua;.\?\init.lua" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "LUA_CPATH=$dest\lib\lua\5.4\?.dll;.\?.dll" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: 运行 guards 测试车道（纯文档快速路径）
         if: steps.changes.outputs.docs_only == 'true'
