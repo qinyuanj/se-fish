@@ -1,4 +1,4 @@
-
+local EngineRead = require("common.engine_read")
 local GameCfg = require("common.game_cfg")
 local Spoke = require("common.packages.spoke.api")
 local ViewUtil = require("client.views.view_util")
@@ -27,29 +27,17 @@ local function is_downed_or_rescuing(phase)
 end
 
 local function read_player_user_id(player)
-  if not ViewUtil.is_record(player) then
-    return nil
-  end
-  local ok, user_id = pcall(function() return player.UserId end) -- 兼容 SE Player userdata 字段读取
+  local ok, user_id = EngineRead.read_user_id(player, "RescueView.read_player_user_id")
   return ok and user_id or nil
 end
 
 local function read_player_phase(player)
-  if not ViewUtil.is_record(player) then
-    return nil
-  end
-  local ok, phase = pcall(function() return player.GetAttribute and player:GetAttribute("SurvivalPhase") or nil end) -- 兼容 SE Player userdata 属性读取
+  local ok, phase = EngineRead.read_attribute(player, "SurvivalPhase", "RescueView.read_player_phase")
   return ok and phase or nil
 end
 
 local function read_player_position(player)
-  if not ViewUtil.is_record(player) then
-    return nil
-  end
-  local ok, pos = pcall(function() -- 兼容 SE Player/Character userdata 销毁瞬态坐标读取
-    local character = player.Character
-    return character and character.Position or nil
-  end)
+  local ok, pos = EngineRead.read_player_position(player, "RescueView.read_player_position")
   return ok and pos or nil
 end
 
@@ -184,8 +172,8 @@ function RescueView.bubble_spec(shared, config)
         TouchEnabled = true,
       })
       if not ok then
-        if node and type(node.Destroy) == "function" then
-          node:Destroy()
+        if node ~= nil then
+          EngineRead.destroy_unit(node, "RescueView.bubble_spec.cleanup")
         end
         print(log_tag .. " " .. fail_label, tostring(button))
         return

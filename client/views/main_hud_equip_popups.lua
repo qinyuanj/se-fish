@@ -226,7 +226,7 @@ end
 ---@param options table|nil { get_resolution?, send_action?, send_operate?, open_popup?, backpack_open?, layout? }
 function MainHudEquipPopups.mount(s, ctx, options)
   options = options or {}
-  local resolution = ViewUtil.get_resolution(ctx, options)
+  local resolution = ViewUtil.get_resolution(ctx, options); if resolution == nil and options.layout == nil then return end
 
   local op_seq = 0
   local send_action = options.send_action or function(action, value)

@@ -1,31 +1,24 @@
-
+local EngineRead = require("common.engine_read")
 local Number = require("common.number")
 
 local ViewUtil = {}
 
 function ViewUtil.is_record(value)
-  local kind = type(value)
-  return kind == "table" or kind == "userdata"
+  return EngineRead.is_object(value)
 end
 
 function ViewUtil.read_vec2(value)
-  if not ViewUtil.is_record(value) then
-    return nil
-  end
-  local ok, x, y = pcall(function() return value.x, value.y end) -- 兼容引擎 Vector2 userdata 坐标读取
-  if ok and Number.is_finite_number(x) and Number.is_finite_number(y) then
-    return x, y
+  local ok, vec = EngineRead.read_vec2(value, "ViewUtil.read_vec2")
+  if ok and vec ~= nil then
+    return vec.x, vec.y
   end
   return nil
 end
 
 function ViewUtil.read_vec3(value)
-  if not ViewUtil.is_record(value) then
-    return nil
-  end
-  local ok, x, y, z = pcall(function() return value.x, value.y, value.z end) -- 兼容引擎 Vector3 userdata 坐标读取
-  if ok and Number.is_finite_number(x) and Number.is_finite_number(y) and Number.is_finite_number(z) then
-    return x, y, z
+  local ok, vec = EngineRead.read_vec3(value, "ViewUtil.read_vec3")
+  if ok and vec ~= nil then
+    return vec.x, vec.y, vec.z
   end
   return nil
 end
@@ -61,48 +54,53 @@ local function valid_resolution(raw)
   return nil
 end
 
+local function try_read_res(label, fn)
+  local ok, raw = pcall(fn)
+  if ok then return valid_resolution(raw) end
+  print("[ViewUtil] 读取分辨率失败", label, tostring(raw))
+  return nil
+end
 function ViewUtil.get_resolution(ctx, options)
   if type(options) == "table" and type(options.get_resolution) == "function" then
-    local resolved = valid_resolution(options.get_resolution())
-    if resolved ~= nil then
-      return resolved
-    end
+    local resolved = try_read_res("options.get_resolution", options.get_resolution)
+    if resolved ~= nil then return resolved end
   end
 
   local services = type(ctx) == "table" and ctx.services or nil
   if type(services) == "table" then
     if type(services.get_device_resolution) == "function" then
-      local resolved = valid_resolution(services.get_device_resolution())
-      if resolved ~= nil then
-        return resolved
-      end
+      local resolved = try_read_res("services.get_device_resolution", services.get_device_resolution)
+      if resolved ~= nil then return resolved end
     end
     local fallback_res = services.resolution
-    if type(fallback_res) == "function" then
-      fallback_res = fallback_res()
-    end
-    local resolved = valid_resolution(fallback_res)
-    if resolved ~= nil then
-      return resolved
-    end
+    local resolved = type(fallback_res) == "function" and try_read_res("services.resolution", fallback_res) or valid_resolution(fallback_res)
+    if resolved ~= nil then return resolved end
   end
 
   if game ~= nil then
-    local ok, raw = pcall(function() -- 宿主 EUI 管理器未就绪或分辨率接口异常时安全回退默认分辨率
-      local players = game:GetService("Players")
-      local lp = players and players.LocalPlayer
-      local eui_mgr = lp and lp.PlayerGui and lp.PlayerGui.EuiManager or nil
-      return eui_mgr and eui_mgr:GetDeviceResolution() or nil
-    end)
-    if ok then
-      local resolved = valid_resolution(raw)
-      if resolved ~= nil then
-        return resolved
-      end
+    local function read_eui_raw()
+      local ok_p, players, reason_p = EngineRead.get_service("Players", "ViewUtil.get_resolution")
+      if not ok_p then return false, reason_p end
+      local ok_lp, lp, reason_lp = EngineRead.read_field(players, "LocalPlayer", "ViewUtil.get_resolution")
+      if not ok_lp then return reason_lp == "missing", reason_lp end
+      local ok_pg, pg, reason_pg = EngineRead.read_field(lp, "PlayerGui", "ViewUtil.get_resolution")
+      if not ok_pg then return reason_pg == "missing", reason_pg end
+      local ok_eui, eui_mgr, reason_eui = EngineRead.read_field(pg, "EuiManager", "ViewUtil.get_resolution")
+      if not ok_eui then return reason_eui == "missing", reason_eui end
+      local ok_raw, raw, reason_raw = EngineRead.call_method(eui_mgr, "GetDeviceResolution", "ViewUtil.get_resolution")
+      if not ok_raw then return reason_raw == "missing", reason_raw end
+      return true, raw
+    end
+    local ok, raw_or_reason = read_eui_raw()
+    if not ok then
+      print("[ViewUtil] 读取宿主 EUI 分辨率失败", tostring(raw_or_reason))
+    else
+      local resolved = valid_resolution(raw_or_reason)
+      if resolved ~= nil then return resolved end
     end
   end
-
-  return { x = 1920, y = 1080 }
+  print("[ViewUtil] 未获取到有效设备分辨率，返回 nil")
+  return nil
 end
 
 function ViewUtil.wrap_text(text, columns)
@@ -160,10 +158,35 @@ function ViewUtil.create_anchor_scene_node(scope, ctx, entry, height, kind, fall
       Visible = true,
     })
   end
-  if node ~= nil and node.Name == nil then
-    node.Name = fallback_name
+  local ok_name, existing_name = EngineRead.read_field(node, "Name", "ViewUtil.create_anchor_scene_node")
+  if node ~= nil and (not ok_name or existing_name == nil) then
+    EngineRead.write_field(node, "Name", fallback_name, "ViewUtil.create_anchor_scene_node")
   end
   return node
+end
+
+function ViewUtil.resolve_clock(ctx, label, override_now)
+  if type(override_now) == "function" then
+    return override_now
+  end
+  local services = type(ctx) == "table" and ctx.services or nil
+  if type(services) == "table" and type(services.now) == "function" then
+    return services.now
+  end
+  local clock = type(ctx) == "table" and ctx.clock or nil
+  if type(clock) == "table" and type(clock.now) == "function" then
+    return clock.now
+  end
+  error("[" .. tostring(label or "ViewUtil") .. "] 缺少注入时钟（services.now 或 ctx.clock.now）", 3)
+end
+
+function ViewUtil.read_now(clock_now, label)
+  local ok, value = pcall(clock_now)
+  if ok and Number.is_finite_number(value) then
+    return value
+  end
+  print("[" .. tostring(label or "ViewUtil") .. "] 读取时钟失败", tostring(value))
+  return nil
 end
 
 return ViewUtil

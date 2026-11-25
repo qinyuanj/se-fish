@@ -7,17 +7,16 @@
 --   6. 生产守卫漏：Debug 关 + 商品未配置时仍放行（应明确 unavailable 不发付费权益）；
 --   7. 并发错：购买 flow 在飞时第二抽被接受（应 busy）；flow 结算串到别的请求。
 --   MgrPlatform（#123 持久操作协议），替换引擎边界（game / REUtil / DataStore / 时钟）；
--- 迁移说明：引擎边界夹具下沉到 tests/support/blindbox_world.lua（调用方各自实例化，
+-- 迁移说明：引擎边界夹具统一复用 tests/support/economy_world.lua（调用方各自实例化，
 --   互不共享状态）；案例按旧 LuaUnit 实际执行序（方法名字典序）逐个 it 注册。
 local GameCfg = require("common.game_cfg")
-local BlindboxWorld = require("tests.support.blindbox_world")
+local EconomyWorld = require("tests.support.economy_world")
 local RandomGuard = require("tests.support.random_guard")
 
 describe("盲盒服务端结算（ServerRuntime × MgrSave × MgrPlatform）", function()
   local world
   before_each(function()
-    world = BlindboxWorld.new()
-    world:set_up()
+    world = EconomyWorld.new()
   end)
   after_each(function()
     -- 但 MgrSave / MgrLoot 读全局 math.random()，故逐案例还原，杜绝泄漏到后续案例。
@@ -30,7 +29,7 @@ describe("盲盒服务端结算（ServerRuntime × MgrSave × MgrPlatform）", f
 
   it("test_collection_unlock_without_catch_record", function()
     world.rolls = { 1000 }
-    world:draw(1, 1, "success")
+    world:blindbox_draw(1, 1, "success")
     world:drain()
     assert.is_true(world.data.extra.collection.unlocked["item7"])
     assert.same({}, world.data.extra.collection.weights)
@@ -52,7 +51,7 @@ describe("盲盒服务端结算（ServerRuntime × MgrSave × MgrPlatform）", f
       return execute(mgr, player, data, op, transform, done)
     end
     world.rolls = { 1000 }
-    world:draw(1, 1, "success")
+    world:blindbox_draw(1, 1, "success")
     assert.same(1, #world:ground_items())
     assert.is_not_nil(next(world.data.extra.lottery.deliveries))
     world.save.execute = execute
@@ -71,10 +70,10 @@ describe("盲盒服务端结算（ServerRuntime × MgrSave × MgrPlatform）", f
     world:persist_ready()
     world.failDeliveries = true
     world.rolls = { 1000 }
-    world:draw(1, 1, "success")
+    world:blindbox_draw(1, 1, "success")
     world:pump()
     world:drain()
-    assert.is_true(world:last_result().deliveryPending)
+    assert.is_true(world:last_result("BlindboxResult").deliveryPending)
     assert.same(0, #world:ground_items())
     world:reconnect()
     world.data = world.players:get_data_inst(world.player)
@@ -101,9 +100,9 @@ describe("盲盒服务端结算（ServerRuntime × MgrSave × MgrPlatform）", f
         world.platform:update()
         world:drain()
       else
-        assert.is_true(world:draw(1, index, outcome))
+        assert.is_true(world:blindbox_draw(1, index, outcome))
       end
-      local result = world:last_result()
+      local result = world:last_result("BlindboxResult")
       assert.is_false(result.ok)
       assert.same(outcome, result.reason)
     end
@@ -117,8 +116,8 @@ describe("盲盒服务端结算（ServerRuntime × MgrSave × MgrPlatform）", f
     end
     world:persist_ready()
     world.rolls = { 1000 }
-    assert.is_true(world:draw(1, 1, "success"))
-    local result = world:last_result()
+    assert.is_true(world:blindbox_draw(1, 1, "success"))
+    local result = world:last_result("BlindboxResult")
     assert.is_true(result.ok)
     assert.is_true(result.draws[1].landed)
     assert.same(1, result.grounded)
@@ -165,8 +164,8 @@ describe("盲盒服务端结算（ServerRuntime × MgrSave × MgrPlatform）", f
     world.data.extra.lottery.pity = 30
     world:persist_ready()
     world.rolls = { 3 } -- 极品美人鱼权重区
-    assert.is_true(world:draw(1, 1, "success"))
-    local result = world:last_result()
+    assert.is_true(world:blindbox_draw(1, 1, "success"))
+    local result = world:last_result("BlindboxResult")
     assert.is_true(result.draws[1].jackpot)
     assert.is_false(result.draws[1].guaranteed)
     assert.same(0, world.data.extra.lottery.pity)
@@ -174,10 +173,10 @@ describe("盲盒服务端结算（ServerRuntime × MgrSave × MgrPlatform）", f
   end)
 
   it("test_new_request_receives_original_pending_identity", function()
-    world:draw(1, 1)
+    world:blindbox_draw(1, 1)
     local key = next(world.data.extra.lottery.intents)
-    world:draw(1, 2)
-    local result = world:last_result()
+    world:blindbox_draw(1, 2)
+    local result = world:last_result("BlindboxResult")
     assert.same(2, result.seq)
     assert.same(1, result.originalSeq)
     assert.same(key, result.requestId)
@@ -185,8 +184,8 @@ describe("盲盒服务端结算（ServerRuntime × MgrSave × MgrPlatform）", f
     world.platform:handle_test_action(world.player, { action = "ResolveFlow", outcome = "success" })
     world:drain()
     world:blindbox_action({ action = "Query", count = 1, seq = 1, requestId = key })
-    assert.is_true(world:last_result().ok)
-    assert.same(1, world:last_result().seq)
+    assert.is_true(world:last_result("BlindboxResult").ok)
+    assert.same(1, world:last_result("BlindboxResult").seq)
     assert.same(1, world.data:ItemCount("item7"))
   end)
 
@@ -199,9 +198,9 @@ describe("盲盒服务端结算（ServerRuntime × MgrSave × MgrPlatform）", f
     local character = world.player.Character
     world.player.Character = nil
     world.rolls = { 1000 }
-    world:draw(1, 1, "success")
+    world:blindbox_draw(1, 1, "success")
     assert.same(0, #world:ground_items())
-    assert.is_true(world:last_result().deliveryPending)
+    assert.is_true(world:last_result("BlindboxResult").deliveryPending)
     assert.is_true(world.data.extra.collection.unlocked.item7)
     assert.same(12.34, world.data.extra.collection.weights.item7)
     world.player.Character = character
@@ -230,7 +229,7 @@ describe("盲盒服务端结算（ServerRuntime × MgrSave × MgrPlatform）", f
 
   it("test_paid_write_sync_rejection_keeps_recoverable_intent", function()
     world.rolls = { 1000 }
-    world:draw(1, 1)
+    world:blindbox_draw(1, 1)
     world:drain()
     local execute = world.save.execute
     world.save.execute = function(mgr, player, data, op, transform, done)
@@ -241,8 +240,8 @@ describe("盲盒服务端结算（ServerRuntime × MgrSave × MgrPlatform）", f
     end
     world.platform:handle_test_action(world.player, { action = "ResolveFlow", outcome = "success" })
     world:drain()
-    assert.same("expired", world:last_result().reason)
-    assert.is_true(world:last_result().deliveryPending)
+    assert.same("expired", world:last_result("BlindboxResult").reason)
+    assert.is_true(world:last_result("BlindboxResult").deliveryPending)
     world.save.execute = execute
     world:reconnect()
     world.data = world.players:get_data_inst(world.player)
@@ -256,7 +255,7 @@ describe("盲盒服务端结算（ServerRuntime × MgrSave × MgrPlatform）", f
     -- 审查失败方式：支付等待期别的操作推进 sequence；execute 同步拒绝；落地失败/无角色；
     -- 落地成功确认写失败后重进；盲盒收集解锁不改钓取纪录。
     world.rolls = { 1000 }
-    world:draw(1, 1)
+    world:blindbox_draw(1, 1)
     world:drain()
     local op = assert(world.save:resolve_request(world.player, world.data, "other", 1))
     assert.is_true(world.save:execute(world.player, world.data, op, function(draft)
@@ -270,15 +269,15 @@ describe("盲盒服务端结算（ServerRuntime × MgrSave × MgrPlatform）", f
     world:pump()
     world:drain()
     assert.same(1, world.data:ItemCount("item7"))
-    assert.is_true(world:last_result().ok)
+    assert.is_true(world:last_result("BlindboxResult").ok)
   end)
 
   it("test_pity_survives_reconnect_and_state_sync", function()
     -- 重进：pity 从存档恢复，State 握手回包当前计数
     world.rolls = { 1000, 1000, 1000 }
-    assert.is_true(world:draw(1, 1, "success"))
-    assert.is_true(world:draw(1, 2, "success"))
-    assert.is_true(world:draw(1, 3, "success"))
+    assert.is_true(world:blindbox_draw(1, 1, "success"))
+    assert.is_true(world:blindbox_draw(1, 2, "success"))
+    assert.is_true(world:blindbox_draw(1, 3, "success"))
     assert.same(3, world.data.extra.lottery.pity)
     world.events = {}
     world:reconnect() -- 离开后新对象读档
@@ -287,7 +286,7 @@ describe("盲盒服务端结算（ServerRuntime × MgrSave × MgrPlatform）", f
     assert.same(3, restored.extra.lottery.pity)
     world:blindbox_state()
     world:pump()
-    local state = world:last_result()
+    local state = world:last_result("BlindboxResult")
     assert.is_true(state.ok)
     assert.same("State", state.action)
     assert.same(3, state.pity)
@@ -307,7 +306,7 @@ describe("盲盒服务端结算（ServerRuntime × MgrSave × MgrPlatform）", f
     GameCfg.Platform.Placeholder.Enabled = false
     assert.is_true(world:blindbox_action({ action = "Draw", count = 1, seq = 1 }))
     world:drain()
-    local result = world:last_result()
+    local result = world:last_result("BlindboxResult")
     assert.is_false(result.ok)
     assert.same("unavailable", result.reason)
     assert.same(0, world.data:ItemCount("item7"))
@@ -336,19 +335,19 @@ describe("盲盒服务端结算（ServerRuntime × MgrSave × MgrPlatform）", f
   end)
 
   it("test_query_identity_cannot_create_purchase", function()
-    world:draw(1, 1)
+    world:blindbox_draw(1, 1)
     local key = next(world.data.extra.lottery.intents)
     local flows = world.platform.next_flow_id
     world:blindbox_action({ action = "Query", count = 1, seq = 1, requestId = key })
     assert.same(flows, world.platform.next_flow_id)
     world:blindbox_action({ action = "Query", count = 1, seq = 99, requestId = "expired" })
-    assert.same("expired", world:last_result().reason)
+    assert.same("expired", world:last_result("BlindboxResult").reason)
     assert.same(flows, world.platform.next_flow_id)
   end)
 
   it("test_real_paid_write_failure_retains_fact_until_retry", function()
     world.rolls = { 1000 }
-    world:draw(1, 1)
+    world:blindbox_draw(1, 1)
     world.failWrites = true
     world.platform:handle_test_action(world.player, { action = "ResolveFlow", outcome = "success" })
     world:drain()
@@ -367,7 +366,7 @@ describe("盲盒服务端结算（ServerRuntime × MgrSave × MgrPlatform）", f
 
   it("test_real_write_failure_prevents_payment_open", function()
     world.failWrites = true
-    world:draw(1, 1)
+    world:blindbox_draw(1, 1)
     assert.is_false(world.platform:has_flow(world.player))
     assert.same(0, world.data:ItemCount("item7"))
     world.failWrites = false
@@ -379,13 +378,13 @@ describe("盲盒服务端结算（ServerRuntime × MgrSave × MgrPlatform）", f
     end
     world:persist_ready()
     world.rolls = { 1000 }
-    assert.is_true(world:draw(1, 7, "success"))
+    assert.is_true(world:blindbox_draw(1, 7, "success"))
     assert.same(1, #world:ground_items())
     world.events = {}
     assert.is_true(world:blindbox_action({ action = "Draw", count = 1, seq = 7 }))
     world:drain()
     assert.is_false(world.platform:has_flow(world.player)) -- 重试不再发起购买
-    local replay = world:last_result()
+    local replay = world:last_result("BlindboxResult")
     assert.is_true(replay.ok)
     assert.same("item7", replay.draws[1].itemKey)
     assert.same(1, #world:ground_items())
@@ -400,7 +399,7 @@ describe("盲盒服务端结算（ServerRuntime × MgrSave × MgrPlatform）", f
     assert.is_true(world.platform:has_flow(world.player))
     world.events = {}
     assert.is_true(world:blindbox_action({ action = "Draw", count = 1, seq = 2 }))
-    local busy = world:last_result()
+    local busy = world:last_result("BlindboxResult")
     assert.is_false(busy.ok)
     assert.same("busy", busy.reason)
     assert.is_true(world.platform:handle_test_action(world.player,
@@ -413,10 +412,10 @@ describe("盲盒服务端结算（ServerRuntime × MgrSave × MgrPlatform）", f
   it("test_single_draw_grants_after_payment_success", function()
     -- 单抽：购买成功后抽中物进道具栏，pity 落账，回包带逐抽明细
     world.rolls = { 1000 } -- 末权重：极品罗非鱼
-    assert.is_true(world:draw(1, 1, "success"))
+    assert.is_true(world:blindbox_draw(1, 1, "success"))
     assert.same(1, world.data:ItemCount("item7"))
     assert.same(1, world.data.extra.lottery.pity)
-    local result = world:last_result()
+    local result = world:last_result("BlindboxResult")
     assert.is_true(result.ok)
     assert.same(1, result.count)
     assert.same(1, #result.draws)
@@ -432,8 +431,8 @@ describe("盲盒服务端结算（ServerRuntime × MgrSave × MgrPlatform）", f
     world.data.extra.lottery.pity = 45
     world:persist_ready()
     world.rolls = { 1000, 1000, 1000, 1000, 2, 1000, 1000, 1000, 1000, 1000 }
-    assert.is_true(world:draw(10, 1, "success"))
-    local result = world:last_result()
+    assert.is_true(world:blindbox_draw(10, 1, "success"))
+    local result = world:last_result("BlindboxResult")
     assert.is_true(result.ok)
     assert.same(10, #result.draws)
     assert.same(45, result.pityBefore)
@@ -455,35 +454,35 @@ describe("盲盒服务端结算（ServerRuntime × MgrSave × MgrPlatform）", f
   it("test_terminal_retention_and_safe_expiry", function()
     for seq = 1, 40 do
       world.rolls = { 1000 }
-      world:draw(1, seq, "cancel")
+      world:blindbox_draw(1, seq, "cancel")
     end
     local n = 0
     for _ in pairs(world.data.extra.lottery.intents) do
       n = n + 1
     end
     assert.is_true(n <= 32)
-    world:draw(1, 1)
+    world:blindbox_draw(1, 1)
     assert.is_false(world.platform:has_flow(world.player))
-    assert.same("expired", world:last_result().reason)
+    assert.same("expired", world:last_result("BlindboxResult").reason)
   end)
 
   it("test_unavailable_does_not_persist_intent", function()
     -- 真实通道与占位通道都不可用时，连抽奖意向都不落（不留单边状态）。
     GameCfg.Debug = { Enabled = false }
     GameCfg.Platform.Placeholder.Enabled = false
-    world:draw(1, 1)
+    world:blindbox_draw(1, 1)
     assert.is_nil(next(world.data.extra.lottery.intents or {}))
   end)
 
   it("test_unknown_payment_blocks_new_session_purchase", function()
-    world:draw(1, 1)
+    world:blindbox_draw(1, 1)
     world:reconnect()
     world:blindbox_state()
     world:pump()
     world:drain()
-    world:draw(1, 2)
+    world:blindbox_draw(1, 2)
     assert.is_false(world.platform:has_flow(world.player))
-    assert.same("unknown", world:last_result().reason)
+    assert.same("unknown", world:last_result("BlindboxResult").reason)
   end)
 
   it("test_unknown_previous_world_delivery_requires_reconciliation", function()
@@ -492,7 +491,7 @@ describe("盲盒服务端结算（ServerRuntime × MgrSave × MgrPlatform）", f
     world:persist_ready()
     world.failDeliveries = true
     world.rolls = { 1000 }
-    world:draw(1, 1, "success")
+    world:blindbox_draw(1, 1, "success")
     for _, delivery in pairs(world.data.extra.lottery.deliveries) do
       delivery.epoch = "old-world"
     end
@@ -501,5 +500,33 @@ describe("盲盒服务端结算（ServerRuntime × MgrSave × MgrPlatform）", f
     world:drain()
     assert.is_not_nil(next(world.data.extra.lottery.deliveries))
     assert.same(0, #world:ground_items())
+  end)
+
+  it("test_missing_epoch_delivery_is_skipped_and_logged", function()
+    local b = world.data.extra.lottery
+    b.deliveries = {
+      legacy = { itemId = "item7" },
+      current = { epoch = "test-world", itemId = "item7" },
+    }
+    world:persist_ready()
+    local logs = {}
+    local saved_print = _G.print
+    _G.print = function(...)
+      local parts = {}
+      for i = 1, select("#", ...) do parts[i] = tostring(select(i, ...)) end
+      logs[#logs + 1] = table.concat(parts, "\t")
+    end
+    local ok, err = pcall(function()
+      world:pump()
+      world:drain()
+    end)
+    _G.print = saved_print
+    assert.is_true(ok, tostring(err))
+    assert.same(1, #world:ground_items())
+    assert.is_not_nil(world.data.extra.lottery.deliveries.legacy)
+    assert.is_nil(world.data.extra.lottery.deliveries.current)
+    local joined = table.concat(logs, "\n")
+    assert.is_truthy(joined:find("[PlayerBlindbox]", 1, true))
+    assert.is_truthy(joined:find("legacy", 1, true))
   end)
 end)

@@ -341,6 +341,75 @@ describe("风神之翼与哥斯拉存活相位宿主接缝（#299）", function(
     assert.equals(GameCfg.Vitals.MaxHealth, far.Character.Controller.Health)
   end)
 
+  -- #365 失败方式：角色旋转读取失败若回退 (0,0,1)，哥斯拉吐息会朝 +Z 造成伤害并误进冷却。
+  it("哥斯拉吐息在旋转读取失败时拒绝触发、不朝 +Z 结算伤害也不进冷却", function()
+    boot("item170")
+    local target_z = make_player(3, 6, 5.01, 55)
+    runtime:on_player_added(target_z)
+    runtime:on_save_ready(target_z, make_data(target_z, nil))
+    local carrier = { dead = false, body = { Position = vec(6, 5.01, 55) }, Damage = 0, hits = 0 }
+    runtime:get_player_tree(player.UserId).fish_units = { { Id = "f1", carrier = carrier } }
+
+    local logs, raw_print = {}, print
+    local ok_run, err = pcall(function()
+      _G.print = function(...)
+        local parts = {}
+        for i = 1, select("#", ...) do parts[i] = tostring(select(i, ...)) end
+        logs[#logs + 1] = table.concat(parts, "\t")
+      end
+      local orig_char = player.Character
+      local orig_rot = orig_char.Rotation
+      local cases = {
+        function() orig_char.Rotation = nil end,
+        function()
+          orig_char.Rotation = { GetForward = function() error("rot-denied") end }
+        end,
+        function()
+          orig_char.Rotation = { GetForward = function() return { x = 0, y = 1, z = 0 } end }
+        end,
+        function()
+          orig_char.Rotation = { GetForward = function() return { x = 0 / 0, y = 0, z = 1 } end }
+        end,
+        function()
+          player.Character = setmetatable({ Position = orig_char.Position, Controller = orig_char.Controller }, {
+            __index = function(_, key)
+              if key == "Rotation" then error("rotation-prop-denied") end
+            end,
+          })
+          runtime:get_player_tree(player.UserId).states.character:set(player.Character)
+        end,
+      }
+      for _, corrupt in ipairs(cases) do
+        player.Character = orig_char
+        orig_char.Rotation = orig_rot
+        runtime:get_player_tree(player.UserId).states.character:set(orig_char)
+        local before_logs = #logs
+        corrupt()
+        act(player, { action = "breath" })
+        assert.is_false(player.last_result.ok)
+        assert.equals("no-forward", player.last_result.reason)
+        runtime.clock:step(3)
+        assert.equals(GameCfg.Vitals.MaxHealth, target_z.Character.Controller.Health)
+        assert.equals(0, carrier.Damage)
+        local state = last_state(events, player)
+        assert.equals(0, state and state.breathRemaining or 0)
+        local logged = false
+        for i = before_logs + 1, #logs do
+          if logs[i]:find("[SpecialItemPhase]", 1, true) then logged = true break end
+        end
+        assert.is_true(logged)
+      end
+      -- 恢复正常旋转后立刻可成功吐息（说明未误扣冷却）
+      player.Character = orig_char
+      orig_char.Rotation = orig_rot
+      runtime:get_player_tree(player.UserId).states.character:set(orig_char)
+      act(player, { action = "breath" })
+      assert.is_true(player.last_result.ok)
+    end)
+    _G.print = raw_print
+    if not ok_run then error(err, 0) end
+  end)
+
   it("麻痹只拒绝起飞和吐息，不解除翅膀或哥斯拉", function()
     boot("item169")
     local tree = runtime:get_player_tree(player.UserId)

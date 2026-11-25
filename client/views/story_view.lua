@@ -4,7 +4,7 @@ local StoryView = {}
 function StoryView.modal_spec(options)
   options = options or {}
   return function(scope, ctx)
-    local resolution = ViewUtil.get_resolution(ctx, options)
+    local resolution = ViewUtil.get_resolution(ctx, options); if resolution == nil then return end
     local width = math.min(1000, resolution.x - 60)
     local panel = ctx.create_node(scope, "EUIImage", {
       Parent = ctx.root_node, Name = "ScreenStory", Position = Vector2.New(resolution.x / 2, resolution.y / 2),

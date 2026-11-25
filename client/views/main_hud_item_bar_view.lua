@@ -179,8 +179,8 @@ end
 ---@param ctx table RootView 上下文 { root_node, store, clock, create_node, own_node, connect }
 ---@param options table|nil { get_resolution?, send_action?, on_throw?, on_aim_begin?, resolve_drop_target?, resolve_aim_target?, notify?, now_sec?, backpack_open?, layout? }
 function MainHudItemBarView.mount(s, ctx, options)
-  options = options or {}
-  local resolution = ViewUtil.get_resolution(ctx, options)
+  options = options or {}; local clock_now = ViewUtil.resolve_clock(ctx, "MainHudItemBarView", options.now_sec)
+  local resolution = ViewUtil.get_resolution(ctx, options); if resolution == nil and options.layout == nil then return end
 
   local send_action = options.send_action or function(action, value)
     default_fire_re("ItemBarAction", { action = action, value = value })
@@ -203,17 +203,17 @@ function MainHudItemBarView.mount(s, ctx, options)
   local notify = options.notify or function(text) ViewUtil.notify(ctx, text) end
 
   local function now_sec()
-    if type(options.now_sec) == "function" then
-      return options.now_sec()
-    end
-    if ctx.clock ~= nil and type(ctx.clock.now) == "function" then
-      return ctx.clock.now()
-    end
-    local ok, t = pcall(function() -- 宿主 World 时钟未就绪时安全回退 0
-      local world = game ~= nil and game:GetService("World") or nil
-      return world and world.GetServerTime and world:GetServerTime() or 0
-    end)
-    return (ok and Number.is_finite_number(t)) and t or 0
+    return ViewUtil.read_now(clock_now, "MainHudItemBarView")
+    -- 时钟由入口或 options.now_sec 显式注入
+    -- 运行期读取失败记日志返回 nil
+    -- 跳过本次手势时间结算
+    -- 不回退 World:GetServerTime()
+    -- 也不再回退 0
+    -- 确保多端时钟一致
+    -- 避免长按误判
+    -- #367 时钟显式注入契约
+    -- 保持挂载期报错校验
+    -- 校验通过后绑定槽位
   end
 
   local backpack_open = options.backpack_open or State.new("MainHudItemBarView.backpack_open", false)
@@ -373,8 +373,7 @@ function MainHudItemBarView.mount(s, ctx, options)
           local nodes = { background = background, icon = icon, label = label, count = count }
 
           ctx.connect(cs, background.OnTouchBegan, function(touch)
-            if ctx.store.hud_visible:now() == false then
-              return
+            if ctx.store.hud_visible:now() == false then return
             end
             local began = read_touch_pos(touch, "BeganPosition")
             drag_source = {
@@ -382,10 +381,11 @@ function MainHudItemBarView.mount(s, ctx, options)
               index = slot_index,
               began = began,
             }
+            local now = now_sec(); if now == nil then return end
             local gesture = PressGesture.new({
               long_press_sec = GameCfg.Ability.Throw.LongPressSec,
             })
-            gesture:begin(now_sec(), began)
+            gesture:begin(now, began)
             slot_press = { index = slot_index, gesture = gesture }
           end)
 
@@ -424,7 +424,7 @@ function MainHudItemBarView.mount(s, ctx, options)
             if not is_explosive_slot(slot_index) then
               return
             end
-            local result = press.gesture:finish(now_sec(), ended)
+            local now = now_sec(); if now == nil then return end; local result = press.gesture:finish(now, ended)
             if result == "tap" then
               throw_handled = { index = slot_index, valid = true }
               on_throw(slot_index, nil)
@@ -500,7 +500,7 @@ function MainHudItemBarView.mount(s, ctx, options)
   end)
 
   s:phase("ThrowAimPhase", aim_active, function(ps)
-    local w, h = resolution.x, resolution.y
+    if resolution == nil then return end; local w, h = resolution.x, resolution.y
     local overlay = make_button(
       ctx, ps, "ThrowAimOverlay", w / 2, h / 2, w, h,
       COLORS.AIM_NORMAL, COLORS.AIM_PRESS

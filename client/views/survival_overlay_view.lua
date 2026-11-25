@@ -12,15 +12,8 @@ local COLOR_BLOCK = "official://image/11017"
 local function services_of(ctx)
   return ctx.services or {}
 end
-
-local function now_of(ctx)
-  local services = services_of(ctx)
-  if type(services.now) == "function" then
-    local value = services.now()
-    if type(value) == "number" then return value end
-  end
-  return ctx.clock and ctx.clock.now() or 0
-end
+local function now_of_fn(ctx) return ViewUtil.resolve_clock(ctx, "SurvivalOverlayView") end
+local function read_now(clock_now) return ViewUtil.read_now(clock_now, "SurvivalOverlayView") end
 
 local function send(ctx, seq, action, mode)
   local services = services_of(ctx)
@@ -52,8 +45,8 @@ local function make(scope, ctx, kind, parent, name, x, y, width, height, props)
   return node
 end
 
-local function mount_banner(scope, ctx, survival, seq, noticed_dead)
-  local res = ViewUtil.get_resolution(ctx)
+local function mount_banner(scope, ctx, survival, seq, noticed_dead, clock_now)
+  local res = ViewUtil.get_resolution(ctx); if res == nil then return end
   local cx, cy = res.x / 2, res.y / 2
   local banner = make(scope, ctx, "EUIImage", ctx.root_node, "SurvivalBanner", cx - 320, cy - 90, 640, 180, {
     Color = Color.New(0, 0, 0, 160),
@@ -110,11 +103,17 @@ local function mount_banner(scope, ctx, survival, seq, noticed_dead)
   local function refresh()
     local state = survival:now() or {}
     local phase = state.phase
-    local pending = state.platformPending and true or false
-    local left = math.max(0, math.ceil((state.endsAt or 0) - now_of(ctx)))
-    local base = phase == "rescuing" and GameCfg.Rescue.RescuingTitle
-      or GameCfg.Survival[phase == "dead" and "DeadTitle" or "DownedTitle"]
-    title.Text = pending and GameCfg.Survival.PlatformWaitText or (base .. "（" .. tostring(left) .. " 秒）")
+    local pending = state.platformPending == true
+    if pending then
+      title.Text = GameCfg.Survival.PlatformWaitText
+    else
+      local now = read_now(clock_now)
+      if now ~= nil then
+        local left = math.max(0, math.ceil((state.endsAt or 0) - now))
+        local base = phase == "rescuing" and GameCfg.Rescue.RescuingTitle or GameCfg.Survival[phase == "dead" and "DeadTitle" or "DownedTitle"]
+        title.Text = base .. "（" .. tostring(left) .. " 秒）"
+      end
+    end
     adrenaline.Visible = phase == "downed" and not pending
     ad.Visible = (phase == "downed" or phase == "dead") and not pending
     ad.Position = Vector2.New(phase == "downed" and 330 or 10, 20)
@@ -154,8 +153,8 @@ local function mount_banner(scope, ctx, survival, seq, noticed_dead)
   end
 end
 
-local function mount_weak(scope, ctx, survival)
-  local res = ViewUtil.get_resolution(ctx)
+local function mount_weak(scope, ctx, survival, clock_now)
+  local res = ViewUtil.get_resolution(ctx); if res == nil then return end
   local label = make(scope, ctx, "EUITextLabel", ctx.root_node, "SurvivalWeak", res.x / 2 - 320, res.y - 200, 640, 60, {
     Text = "",
     FontSize = 30,
@@ -165,7 +164,8 @@ local function mount_weak(scope, ctx, survival)
   scope:effect("SurvivalWeakRefresh", function(es)
     local state = es:d(survival) or {}
     es:d(ctx.clock.second)
-    local left = math.max(0, math.ceil((state.weakUntil or 0) - now_of(ctx)))
+    local now = read_now(clock_now); if now == nil then return end
+    local left = math.max(0, math.ceil((state.weakUntil or 0) - now))
     label.Visible = left > 0
     label.Text = GameCfg.Survival.WeakText .. "（" .. tostring(left) .. " 秒）"
   end)
@@ -184,6 +184,7 @@ function SurvivalOverlayView.spec()
       return type(weak_until) == "number" and weak_until > ms:d(store.clock.second)
     end,
     mount = function(scope, ctx)
+      local clock_now = now_of_fn(ctx)
       local survival = ctx.store.survival
       local seq = State.new("SurvivalOverlay.seq", 0)
       local noticed_dead = State.new("SurvivalOverlay.noticed_dead", false)
@@ -193,9 +194,9 @@ function SurvivalOverlayView.spec()
         return phase == "downed" or phase == "rescuing" or phase == "dead"
       end)
       scope:phase("SurvivalBannerPhase", banner_when, function(ps)
-        mount_banner(ps, ctx, survival, seq, noticed_dead)
+        mount_banner(ps, ctx, survival, seq, noticed_dead, clock_now)
       end)
-      mount_weak(scope, ctx, survival)
+      mount_weak(scope, ctx, survival, clock_now)
     end,
   }
 end

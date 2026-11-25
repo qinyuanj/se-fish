@@ -1,4 +1,4 @@
-
+local EngineRead = require("common.engine_read")
 local GameCfg = require("common.game_cfg")
 local Spoke = require("common.packages.spoke.api")
 local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
@@ -55,19 +55,19 @@ function FerryRoute.mount(world, opts)
   end
 
   local function event(name)
-    if not is_object(remote) or type(remote.get_re) ~= "function" then return nil end
-    local ok, value = pcall(remote.get_re, remote, name)
-    return ok and value or nil
+    if not EngineRead.is_object(remote) or type(remote.get_re) ~= "function" then log("远程通道服务不可用", tostring(name), "missing-remote"); return nil, "missing-remote" end
+    local ok, value, reason = EngineRead.call_method(remote, "get_re", "FerryRoute.event:" .. tostring(name), name)
+    if not ok then log("获取远程通道失败", tostring(name), tostring(reason)); return nil, reason or "read_error" end; if not EngineRead.is_object(value) then log("远程通道缺失", tostring(name), "missing-channel"); return nil, "missing-channel" end; return value, nil
   end
 
   function handle:reply(player, payload)
-    local channel = event("FerryResult")
-    if channel and type(channel.FireClient) == "function" then channel:FireClient(player, payload) end
+    local channel, err = event("FerryResult"); if not channel then return false, err end
+    local ok, _, reason = EngineRead.call_method(channel, "FireClient", "FerryRoute.reply", player, payload); if not ok then log("FerryResult 下发失败", player and player.UserId, tostring(reason)); return false, reason end; return true
   end
 
   function handle:broadcast(payload)
-    local channel = event("FerryState")
-    if channel and type(channel.FireAllClients) == "function" then channel:FireAllClients(payload) end
+    local channel, err = event("FerryState"); if not channel then return false, err end
+    local ok, _, reason = EngineRead.call_method(channel, "FireAllClients", "FerryRoute.broadcast", payload); if not ok then log("FerryState 广播失败", tostring(reason)); return false, reason end; return true
   end
 
   function handle:fail(player, action, reason)
@@ -77,18 +77,18 @@ function FerryRoute.mount(world, opts)
   end
 
   function handle:online_players()
-    if type(opts.online_players) == "function" then return opts.online_players() end
-    if players_service and type(players_service.GetPlayers) == "function" then
-      local ok, list = pcall(players_service.GetPlayers, players_service)
-      if ok and type(list) == "table" then return list end
+    if type(opts.online_players) == "function" then
+      local ok, list = pcall(opts.online_players); if ok and type(list) == "table" then return list, nil end
+      local err = ok and ("invalid-list:" .. type(list)) or tostring(list); log("读取在线玩家失败", "opts.online_players", err); return nil, err
     end
-    return {}
+    if not EngineRead.is_object(players_service) or type(players_service.GetPlayers) ~= "function" then log("读取在线玩家失败", "Players", "missing-service"); return nil, "missing-service" end
+    local ok, list, reason = EngineRead.call_method(players_service, "GetPlayers", "FerryRoute.online_players"); if not ok then log("读取在线玩家失败", "Players.GetPlayers", tostring(reason)); return nil, reason or "read_error" end; if type(list) ~= "table" then log("读取在线玩家失败", "Players.GetPlayers", "invalid-list:" .. type(list)); return nil, "invalid-list" end; return list, nil
   end
 
   local function data_of(player)
-    if not player_data or type(player_data.get_data_inst) ~= "function" then return nil end
-    local ok, data = pcall(player_data.get_data_inst, player_data, player)
-    return ok and data or nil
+    local uid = is_valid_player(player) and player.UserId or nil
+    if not player_data or type(player_data.get_data_inst) ~= "function" then log("玩家数据服务不可用", uid, "missing-player-data"); return nil, "missing-player-data" end
+    local ok, data = pcall(player_data.get_data_inst, player_data, player); if not ok then log("读取玩家数据失败", uid, tostring(data)); return nil, tostring(data) end; if data ~= nil and type(data) ~= "table" then log("玩家数据格式异常", uid, type(data)); return nil, "invalid-player-data" end; return data, nil
   end
 
   local function is_paused(user_id)
@@ -110,10 +110,22 @@ function FerryRoute.mount(world, opts)
       log("传送失败", player and player.UserId, "角色缺失")
       return false
     end
-    local tree = type(lookup_tree) == "function" and lookup_tree(player) or nil
-    if tree and type(tree.suspend_special_item) == "function" then
-      local ok, err = pcall(tree.suspend_special_item, tree)
-      if not ok then log("特殊道具挂起失败", player.UserId, tostring(err)) end
+    local tree
+    if type(lookup_tree) == "function" then
+      local tree_ok, found = pcall(lookup_tree, player)
+      if not tree_ok then
+        log("传送中止：查询玩家树失败", player.UserId, tostring(found))
+        return false
+      end
+      tree = found
+    end
+    if type(tree) == "table" and type(tree.suspend_special_item) == "function" then
+      local suspend_ok, suspend_result = pcall(tree.suspend_special_item, tree)
+      if not suspend_ok or suspend_result == false then
+        log("传送中止：特殊道具挂起失败", player.UserId,
+          suspend_ok and "returned-false" or tostring(suspend_result))
+        return false
+      end
     end
     local ok, err = pcall(function()
       local pos = Vector3.New(dest.x, dest.y, dest.z)
@@ -271,7 +283,8 @@ function FerryRoute.mount(world, opts)
     local center = anchor and anchor.Position
     if not center then
       log("找不到摆渡锚点，本次航班取消并退票", route.Id, point.AnchorName)
-      local data = data_of(flight.player)
+      local data, data_err = data_of(flight.player)
+      if data_err then log("取消航班退票读取数据失败", route.Id, flight.player and flight.player.UserId, tostring(data_err)) end
       local record = data and data.extra.recovery.ferry
       if record then
         self:finish_travel(flight.player, data, record, false, "anchor", function(ok, result)
@@ -281,42 +294,41 @@ function FerryRoute.mount(world, opts)
       self:broadcast({ phase = "cancelled", route_id = route.Id, operation = flight.operation, reason = "anchor" })
       return
     end
-    local payer = flight.player
-    local delivered_count = 0
-    for _, player in ipairs(self:online_players()) do
+    local players, players_err = self:online_players()
+    if not players then
+      log("发船中止：在线玩家读取失败，取消航班并尝试退票", route.Id, tostring(players_err))
+      local payer_data, payer_err = data_of(flight.player)
+      if payer_err then log("发船取消退票读取数据失败", route.Id, flight.player and flight.player.UserId, tostring(payer_err))
+      else local record = payer_data and payer_data.extra and payer_data.extra.recovery and payer_data.extra.recovery.ferry; if record then self:finish_travel(flight.player, payer_data, record, false, "service_error", function(ok, result) if ok then self:reply(flight.player, result) end end) end end
+      self:broadcast({ phase = "cancelled", route_id = route.Id, operation = flight.operation, reason = "service_error" }); return false, players_err
+    end
+    local payer, delivered_count = flight.player, 0
+    for _, player in ipairs(players) do
       if left_players[player.UserId] ~= player then
-        local data = data_of(player)
+        local data, data_err = data_of(player)
         local pos = player.Character and player.Character.Position
         local aboard = pos and flat_distance(pos, center) <= point.BoatRange
-        if data and data.inited and not is_paused(player.UserId) then
+        if not data_err and data and data.inited and not is_paused(player.UserId) then
           local delivered = aboard and self:teleport(player, point.destination)
           if delivered then delivered_count = delivered_count + 1 end
           if player == payer and data.extra.recovery.ferry then
-            local record = data.extra.recovery.ferry
-            if delivered then record.zone = point.Zone end
+            local record = data.extra.recovery.ferry; if delivered then record.zone = point.Zone end
             local reason = not delivered and (aboard and "teleport" or "not_aboard") or nil
             self:finish_travel(player, data, record, delivered, reason, function(ok, result)
               if ok then self:reply(player, result) end
             end)
           elseif delivered then
             self:settle(player, data, "ferry:ride", function(draft)
-              draft:SetZone(point.Zone)
-              mark_arrival(draft, point.Zone)
+              draft:SetZone(point.Zone); mark_arrival(draft, point.Zone)
               return { ok = true, action = "Board", route_id = route.Id }
-            end, function(ok, result)
-              if ok then
-                sync_tree(player, data)
-                self:reply(player, result)
-              end
-            end)
+            end, function(ok, result) if ok then sync_tree(player, data); self:reply(player, result) end end)
           end
         end
       end
     end
     if delivered_count == 0 then
       self:broadcast({ phase = "cancelled", route_id = route.Id, operation = flight.operation, reason = "empty" })
-    else
-      self:broadcast({ phase = "departed", route_id = route.Id, operation = flight.operation })
+    else self:broadcast({ phase = "departed", route_id = route.Id, operation = flight.operation })
     end
   end
 
@@ -328,21 +340,21 @@ function FerryRoute.mount(world, opts)
   end
 
   function handle:update_recoveries()
-    if self.disposed then return end
-    for _, player in ipairs(self:online_players()) do
+    if self.disposed then return false, "disposed" end
+    local players, players_err = self:online_players()
+    if not players then return false, players_err end
+    local first_err ---@type string?
+    for _, player in ipairs(players) do
       if is_valid_player(player) and left_players[player.UserId] ~= player then
-        local data = data_of(player)
-        if data and data.inited and not is_paused(player.UserId) then
+        local data, data_err = data_of(player)
+        if data_err then first_err = first_err or data_err
+        elseif data and data.inited and not is_paused(player.UserId) then
           self:recover(player, data)
-          if recovery_watch_users[player.UserId]
-              and not (data.extra and data.extra.recovery and data.extra.recovery.ferry)
-              and not self.recoveries[player.UserId] then
-            recovery_watch_users[player.UserId] = nil
-          end
+          if recovery_watch_users[player.UserId] and not (data.extra and data.extra.recovery and data.extra.recovery.ferry) and not self.recoveries[player.UserId] then recovery_watch_users[player.UserId] = nil end
         end
       end
     end
-    sync_recovery_watch()
+    sync_recovery_watch(); if first_err then return false, first_err end; return true
   end
 
   function handle:step_route(route)
@@ -380,27 +392,27 @@ function FerryRoute.mount(world, opts)
   end
 
   function handle:on_player_added(player)
-    if not is_valid_player(player) then return end
+    if not is_valid_player(player) then return false, "invalid-player" end
     left_players[player.UserId] = nil
-    local now = world.clock.now()
-    local channel = event("FerryState")
+    local now, channel, ch_err = world.clock.now(), nil, nil
     for _, route in ipairs(GameCfg.Ferry.Routes) do
       local flight = self.flights[route.Id]
-      if flight and flight.depart_at and now < flight.depart_at and channel and channel.FireClient then
-        channel:FireClient(player, { phase = "countdown", route_id = route.Id, operation = flight.operation,
-          seconds = flight.depart_at - now })
+      if flight and flight.depart_at and now < flight.depart_at then
+        if channel == nil and ch_err == nil then channel, ch_err = event("FerryState") end
+        if channel then
+          local ok_send, _, reason_send = EngineRead.call_method(channel, "FireClient", "FerryRoute.on_player_added", player, { phase = "countdown", route_id = route.Id, operation = flight.operation, seconds = flight.depart_at - now })
+          if not ok_send then log("入场同步航班倒计时失败", player.UserId, route.Id, tostring(reason_send)) end
+        end
       end
     end
-    local data = data_of(player)
+    local data, data_err = data_of(player); if data_err then return false, data_err end
     if data and data.inited and not is_paused(player.UserId) then
       self:recover(player, data)
-      if recovery_watch_users[player.UserId]
-          and not (data.extra and data.extra.recovery and data.extra.recovery.ferry)
-          and not self.recoveries[player.UserId] then
-        recovery_watch_users[player.UserId] = nil
-        sync_recovery_watch()
+      if recovery_watch_users[player.UserId] and not (data.extra and data.extra.recovery and data.extra.recovery.ferry) and not self.recoveries[player.UserId] then
+        recovery_watch_users[player.UserId] = nil; sync_recovery_watch()
       end
     end
+    return true
   end
 
   function handle:on_player_removing(player)
@@ -445,8 +457,8 @@ function FerryRoute.mount(world, opts)
     if not method or type(seq) ~= "number" or seq ~= math.floor(seq) then return false end
     local route = GameCfg.Ferry.route(payload.route_id)
     if not route then return self:fail(player, payload.action, "route") end
-    local data = data_of(player)
-    if not data then return false end
+    local data, data_err = data_of(player)
+    if data_err then self:fail(player, payload.action, "data_error"); return false, data_err elseif not data then return false end
     if not save or type(save.resolve_request) ~= "function" or not data.inited or is_paused(player.UserId) then
       return self:fail(player, payload.action, "save")
     end

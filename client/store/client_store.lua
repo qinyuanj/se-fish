@@ -9,6 +9,7 @@ local BodyScale = require("common.body_scale")
 local GameCfg = require("common.game_cfg")
 local Number = require("common.number")
 local ZoneMarkers = require("common.zone_markers")
+local EngineRead = require("common.engine_read")
 
 local State = Spoke.State
 local Trigger = Spoke.Trigger
@@ -193,19 +194,18 @@ local function sanitize_position(pos)
   if pos == nil then
     return nil, true
   end
-  if type(pos) ~= "table" and type(pos) ~= "userdata" then
+  local ok, vec = EngineRead.read_vec3(
+    pos,
+    "ClientStore.sanitize_position"
+  )
+  if not ok or vec == nil then
     return nil, false
   end
-  local ok, x, y, z = pcall(function() -- 兼容引擎 Vector3 userdata 瞬态坐标读取，异常视为无效位置
-    return pos.x, pos.y, pos.z
-  end)
-  if not ok then
-    return nil, false
-  end
-  if not Number.is_finite_number(x) or not Number.is_finite_number(y) or not Number.is_finite_number(z) then
-    return nil, false
-  end
-  return freeze_snapshot({ x = x, y = y, z = z }, 0, "ClientStore.position"), true
+  return freeze_snapshot({
+    x = vec.x,
+    y = vec.y,
+    z = vec.z,
+  }, 0, "ClientStore.position"), true
 end
 
 local function resolve_zone(pos, zones)
@@ -334,40 +334,40 @@ local function default_host()
     end,
     heartbeat = RunService.Heartbeat,
     get_server_time = function()
-      local ok, now = pcall(function() return World:GetServerTime() end) -- 宿主时钟未就绪或异常时安全降级为 dt 步进
-      return ok and now or nil
+      local ok, now = EngineRead.call_method(World, "GetServerTime", "ClientStore.default_host.get_server_time") -- 宿主时钟未就绪或异常时安全降级为 dt 步进
+      return (ok and Number.is_finite_number(now)) and now or nil
     end,
     get_local_player = function()
-      return Players.LocalPlayer
+      local ok, player = EngineRead.read_field(Players, "LocalPlayer", "ClientStore.default_host.get_local_player")
+      return ok and player or nil
     end,
     get_local_character = function()
-      local ok, character = pcall(function() -- 角色销毁/切换瞬态读取 Character 可能抛错，安全忽略等待下一帧
-        local player = Players.LocalPlayer
-        return player and player.Character or nil
-      end)
-      return ok and character or nil
+      local ok_p, player = EngineRead.read_field(Players, "LocalPlayer", "ClientStore.default_host.get_local_character")
+      if not ok_p then return nil end
+      local ok_ch, character = EngineRead.read_character(player, "ClientStore.default_host.get_local_character")
+      return ok_ch and character or nil
     end,
     get_local_position = function()
-      local ok, pos = pcall(function() -- 角色销毁/切换瞬态读取 Position 可能抛错，安全忽略等待下一帧
-        local player = Players.LocalPlayer
-        local character = player and player.Character
-        return character and character.Position or nil
-      end)
-      return ok and pos or nil
+      local ok_p, player = EngineRead.read_field(Players, "LocalPlayer", "ClientStore.default_host.get_local_position")
+      if not ok_p then return nil end
+      local ok_pos, pos = EngineRead.read_player_position(player, "ClientStore.default_host.get_local_position")
+      return ok_pos and pos or nil
     end,
     read_player_attr = function(player, key)
-      if player == nil then return nil end
-      local ok, val = pcall(function() return player:GetAttribute(key) end) -- 宿主玩家属性读取异常时安全回退
+      local ok, val = EngineRead.read_attribute(
+        player,
+        key,
+        "ClientStore.default_host.read_player_attr"
+      )
       return ok and val or nil
     end,
     read_char_attr = function(character, key)
-      if character == nil then return nil end
-      local ok, val = pcall(function() return character:GetAttribute(key) end) -- 角色销毁瞬态读取属性可能抛错，安全回退
+      local ok, val = EngineRead.read_attribute(character,
+        key, "ClientStore.default_host.read_char_attr")
       return ok and val or nil
     end,
     get_player_attr_signal = function(player, key)
-      if player == nil then return nil end
-      local ok, sig = pcall(function() return player:GetAttributeChangedSignal(key) end) -- 兼容未实现属性信号的环境
+      local ok, sig = EngineRead.call_method(player, "GetAttributeChangedSignal", "ClientStore.default_host.get_player_attr_signal", key)
       return ok and sig or nil
     end,
     get_zones = function()

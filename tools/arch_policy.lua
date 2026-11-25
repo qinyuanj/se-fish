@@ -32,7 +32,7 @@ M.policy = {
         'client.damage_float', 'client.game_ui', 'client.interaction_bubble',
         'client.main_hud_layout', 'client.press_gesture', 'client.weapon_aim',
         'server.fish_behaviors',
-        'common.damage_notice', 'common.gar_bite_notice', 'common.re_util',
+        'common.damage_notice', 'common.engine_read', 'common.gar_bite_notice', 'common.re_util',
         'common.teleport_util', 'common.util',
       },
     },

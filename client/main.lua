@@ -8,44 +8,44 @@ local Spoke = require("common.packages.spoke.api")
 local ClientStore = require("client.store.client_store")
 local RootView = require("client.views.root_view")
 local CameraZoomView = require("client.views.camera_zoom_view")
-local MainHudVitalsView = require("client.views.main_hud_vitals_view")
-local MainHudEquipPopups = require("client.views.main_hud_equip_popups")
-local MainHudBackpackView = require("client.views.main_hud_backpack_view")
-local MainHudItemBarView = require("client.views.main_hud_item_bar_view")
-local MainHudActionButtonsView = require("client.views.main_hud_action_buttons_view")
-local AttackView = require("client.views.attack_view")
-local WeaponAim = require("client.weapon_aim")
-local SurvivalOverlayView = require("client.views.survival_overlay_view")
-local GroundLootView = require("client.views.ground_loot_view")
-local FishCombatView = require("client.views.fish_combat_view")
-local GrillView = require("client.views.grill_view")
-local LotteryView = require("client.views.lottery_view")
-local BlindboxView = require("client.views.blindbox_view")
-local PlatformShopView = require("client.views.platform_shop_view")
-local LotteryInteraction = require("client.views.lottery_interaction")
-local MainHudLayout = require("client.main_hud_layout")
-local Util = require("common.util")
-local FerryView = require("client.views.ferry_view")
-local ReelOverlayView = require("client.views.reel_overlay_view")
-local CastSourceView = require("client.views.cast_source_view")
-local ShopView = require("client.views.shop_view")
-local FishermanView = require("client.views.fisherman_view")
-local CompendiumView = require("client.views.compendium_view")
-local GuideView = require("client.views.guide_view")
-local MessageView = require("client.views.message_view")
-local StoryView = require("client.views.story_view")
-local GMView = require("client.views.gm_view")
-local SquadView = require("client.views.squad_view")
-local REUtil = require("common.re_util")
-local GameUI = require("client.game_ui")
-
+local MainHudVitalsView = require("client.views.main_hud_vitals_view"); local MainHudEquipPopups = require("client.views.main_hud_equip_popups"); local MainHudBackpackView = require("client.views.main_hud_backpack_view")
+local MainHudItemBarView = require("client.views.main_hud_item_bar_view"); local MainHudActionButtonsView = require("client.views.main_hud_action_buttons_view"); local AttackView = require("client.views.attack_view")
+local WeaponAim = require("client.weapon_aim"); local SurvivalOverlayView = require("client.views.survival_overlay_view"); local GroundLootView = require("client.views.ground_loot_view")
+local FishCombatView = require("client.views.fish_combat_view"); local GrillView = require("client.views.grill_view"); local LotteryView = require("client.views.lottery_view")
+local BlindboxView = require("client.views.blindbox_view"); local PlatformShopView = require("client.views.platform_shop_view"); local LotteryInteraction = require("client.views.lottery_interaction")
+local MainHudLayout = require("client.main_hud_layout"); local Util = require("common.util"); local FerryView = require("client.views.ferry_view")
+local ReelOverlayView = require("client.views.reel_overlay_view"); local CastSourceView = require("client.views.cast_source_view"); local ShopView = require("client.views.shop_view")
+local FishermanView = require("client.views.fisherman_view"); local CompendiumView = require("client.views.compendium_view"); local GuideView = require("client.views.guide_view")
+local MessageView = require("client.views.message_view"); local StoryView = require("client.views.story_view"); local GMView = require("client.views.gm_view")
+local SquadView = require("client.views.squad_view"); local REUtil = require("common.re_util"); local GameUI = require("client.game_ui")
 local Task = game:GetService("Task")
 local World = game:GetService("World")
 local Players = game:GetService("Players")
+local get_eui_manager
+
+local function read_device_resolution()
+    local eui = get_eui_manager and get_eui_manager() or nil
+    if not eui or type(eui.GetDeviceResolution) ~= "function" then
+        print("[client.main] EUI 未就绪，无法读取设备分辨率")
+        return nil
+    end
+    local ok, raw = pcall(function() return eui:GetDeviceResolution() end)
+    if not ok then
+        print("[client.main] 读取设备分辨率失败", tostring(raw))
+        return nil
+    end
+    local ok_x, x = pcall(function() return raw and raw.x or nil end)
+    local ok_y, y = pcall(function() return raw and raw.y or nil end)
+    if ok_x and ok_y and Number.is_finite_number(x) and Number.is_finite_number(y) and x > 0 and y > 0 then
+        return { x = x, y = y }
+    end
+    print("[client.main] 设备分辨率无效", tostring(raw))
+    return nil
+end
 
 -- 客户端 Spoke 响应式主干（ADR-0032 / #296）：
-local ok_now, initial_now = pcall(function() return World:GetServerTime() end) -- 启动瞬间宿主时钟可能未就绪，异常时安全回退 0
-local client_clock = SpokeClock.new(ok_now and Number.is_finite_number(initial_now) and initial_now or 0)
+local ok_now, initial_now = pcall(function() return World:GetServerTime() end) -- 启动瞬间宿主时钟可能未就绪
+if not ok_now or not Number.is_finite_number(initial_now) then print("[client.main] 启动读取宿主时钟失败", tostring(initial_now)); initial_now = nil end; local client_clock = SpokeClock.new(initial_now)
 local client_store, client_store_writer = ClientStore.new({ clock = client_clock })
 client_store_writer:bind_host()
 _G.local_msg_notice = function(text) client_store_writer:show_notice(text) end
@@ -110,7 +110,7 @@ local function send_item_bar(payload)
     REUtil:get_re("ItemBarAction"):FireServer(payload)
 end
 
-local function get_eui_manager()
+get_eui_manager = function()
     local player = Players.LocalPlayer
     local eui = player and player.PlayerGui and player.PlayerGui.EuiManager or nil
     if not eui and type(GameUI.get_eui_manager) == "function" then
@@ -189,8 +189,8 @@ Task:Spawn(function()
                     return GameUI:create_scene_node(preset, anchor, offset)
                 end,
                 hud_entry_rect = function(name)
-                    local eui = get_eui_manager()
-                    local resolution = eui and eui:GetDeviceResolution() or { x = 1920, y = 1080 }
+                    local resolution = read_device_resolution()
+                    if resolution == nil then return nil end
                     return MainHudLayout.compute({ width = resolution.x, height = resolution.y }).rects[name]
                 end,
                 send_ferry = function(payload)
@@ -199,9 +199,9 @@ Task:Spawn(function()
                 create_scene_node_at = create_scene_node_at,
                 create_anchor_scene_node = create_anchor_scene_node,
                 get_device_resolution = function()
-                    local eui = get_eui_manager()
-                    return eui and eui:GetDeviceResolution() or { x = 1920, y = 1080 }
+                    return read_device_resolution()
                 end,
+                -- 分辨率不可用时返回 nil，不硬编码 1920x1080
                 send_grill = function(payload)
                     if type(payload) ~= "table" then return end
                     local body = {}
@@ -373,8 +373,8 @@ Task:Spawn(function()
 end)
 
 local StarterGui = game:GetService("StarterGui")
-pcall(function() StarterGui:SetCoreGuiEnabled(Enums.CoreGuiType.LiftButton, false) end) -- 兼容部分宿主环境未开放 CoreGui 隐藏接口
-pcall(function() StarterGui:SetCoreGuiEnabled(Enums.CoreGuiType.Health, false) end) -- 兼容部分宿主环境未开放 CoreGui 隐藏接口
+local function disable_core_gui(name) local ok, err = pcall(function() StarterGui:SetCoreGuiEnabled(Enums.CoreGuiType[name], false) end); if not ok then print("[client.main] StarterGui:SetCoreGuiEnabled 失败", "CoreGuiType." .. name, tostring(err)) end end -- 兼容部分宿主环境未开放 CoreGui 隐藏接口
+disable_core_gui("LiftButton"); disable_core_gui("Health")
 
 local AbilityAPI = require("client.packages.ability_system.api")
 if AbilityAPI then

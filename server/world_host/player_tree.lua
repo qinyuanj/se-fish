@@ -7,7 +7,7 @@
 -- 树底挂载纯输出叶子（HeldRodLeaf）、单批合并同步 Reaction（ItemBarState 下发 / FishCoin 属性 / 存档镜像）
 -- 与离场终镜像 Reaction（session_alive=false 时同步写回完整镜像，包括 weakRemaining）。
 -- 本模块归属 L2（server.world_host），零反向依赖存量旧债务模块。
-
+local EngineRead = require("common.engine_read")
 local GameCfg = require("common.game_cfg")
 local Number = require("common.number")
 local Spoke = require("common.packages.spoke.api")
@@ -83,8 +83,7 @@ local function assert_clock(clock)
 end
 
 local function is_valid_player(player)
-  local kind = type(player)
-  return (kind == "table" or kind == "userdata") and player.UserId ~= nil
+  return EngineRead.is_valid_player(player, "PlayerTree.is_valid_player")
 end
 
 local function assert_ready_player_data(player, data)
@@ -257,7 +256,7 @@ function PlayerTree.spawn(opts)
   local raw_survival = type(raw_extra.survival) == "table" and raw_extra.survival or {}
   local raw_cooldowns = type(raw_extra.cooldowns) == "table" and raw_extra.cooldowns or {}
 
-  local ok_char, initial_character = pcall(function() return player.Character end) -- 兼容引擎 userdata 玩家
+  local ok_char, initial_character = EngineRead.read_character(player, { context = "PlayerTree.spawn", logger = opts.logger })
 
   local session_alive = State.new("PlayerTree.session_alive", true)
   local states = {
@@ -332,13 +331,11 @@ function PlayerTree.spawn(opts)
     if coin == last_synced_coin then
       return
     end
-    local ok_has, set_attr = pcall(function() return player.SetAttribute end) -- 兼容引擎 userdata 读取 SetAttribute 成员
-    if not ok_has or type(set_attr) ~= "function" then
-      return
-    end
-    local ok_set, err = pcall(set_attr, player, "FishCoin", coin)
+    local ok_set = EngineRead.write_attribute(player, "FishCoin", coin, {
+      context = "PlayerTree.sync_fish_coin_attribute (uid=" .. tostring(player.UserId) .. ")",
+      logger = opts.logger,
+    })
     if not ok_set then
-      log_error("[PlayerTree] sync_fish_coin_attribute 失败", err)
       return
     end
     last_synced_coin = coin
@@ -467,35 +464,38 @@ function PlayerTree.spawn(opts)
     end
 
     -- 托管玩家角色生命周期信号（CharacterAdded / CharacterRemoving），树销毁时对称断开，零泄漏。
-    local ok_added_sig, added_sig = pcall(function() return player.CharacterAdded end) -- 兼容引擎 userdata 或精简替身对象
-    if ok_added_sig and added_sig ~= nil and added_sig.Connect ~= nil then
-      local ok_conn, conn_added = pcall(added_sig.Connect, added_sig, function(character)
-        if not handle:is_disposed() then
-          states.character:set(character)
-        end
-      end) -- 兼容只读/异常信号对象
-      if ok_conn and conn_added ~= nil then
+    local function bind_character_signal(signal_name, on_fire)
+      local ok_sig, sig = EngineRead.read_field(player, signal_name, {
+        context = "PlayerTree." .. signal_name,
+        logger = opts.logger,
+      })
+      if not ok_sig or sig == nil then
+        return
+      end
+      local ok_conn, conn = EngineRead.call_method(sig, "Connect", {
+        context = "PlayerTree." .. signal_name .. ".Connect",
+        logger = opts.logger,
+      }, on_fire)
+      if ok_conn and conn ~= nil then
         s:on_cleanup(function()
-          pcall(conn_added.Disconnect, conn_added) -- 玩家或信号可能已随引擎卸载
+          EngineRead.disconnect(conn, { context = "PlayerTree." .. signal_name .. ".cleanup", logger = opts.logger })
         end)
       end
     end
 
-    local ok_rem_sig, rem_sig = pcall(function() return player.CharacterRemoving end) -- 兼容引擎 userdata 或精简替身对象
-    if ok_rem_sig and rem_sig ~= nil and rem_sig.Connect ~= nil then
-      local ok_conn, conn_rem = pcall(rem_sig.Connect, rem_sig, function(character)
-        if not handle:is_disposed() then
-          if character == nil or states.character:now() == character then
-            states.character:set(nil)
-          end
-        end
-      end) -- 兼容只读/异常信号对象
-      if ok_conn and conn_rem ~= nil then
-        s:on_cleanup(function()
-          pcall(conn_rem.Disconnect, conn_rem) -- 玩家或信号可能已随引擎卸载
-        end)
+    bind_character_signal("CharacterAdded", function(character)
+      if not handle:is_disposed() then
+        states.character:set(character)
       end
-    end
+    end)
+
+    bind_character_signal("CharacterRemoving", function(character)
+      if not handle:is_disposed() then
+        if character == nil or states.character:now() == character then
+          states.character:set(nil)
+        end
+      end
+    end)
 
     -- 1. 存档与库存（SaveInventory）
     s:effect("Stage1:SaveInventory", function(s1)
@@ -921,8 +921,8 @@ function PlayerTree.spawn(opts)
     local upgrades_copy = upgrades_changed and deep_copy(upgrades) or nil
     local cds_changed = not deep_equal(states.cooldowns:now(), cds)
     local cds_copy = cds_changed and deep_copy(cds) or nil
-    local ok_ch, ch = pcall(function() return player.Character end) -- 兼容引擎 userdata 玩家
-
+    local ok_ch, ch = EngineRead.read_character(player, { context = "PlayerTree.sync_from_data", logger = opts.logger })
+    local next_ch = ok_ch and ch or nil
     local prev_pushed_snapshot = last_pushed_snapshot
     local prev_syncing = syncing_from_data
     if src == data then
@@ -944,7 +944,7 @@ function PlayerTree.spawn(opts)
       if states.potion_speed_count:now() ~= next_speed then states.potion_speed_count:set(next_speed) end
       if upgrades_changed then states.shop_upgrades:set(upgrades_copy) end
       if cds_changed then states.cooldowns:set(cds_copy) end
-      if ok_ch and states.character:now() ~= ch then states.character:set(ch) end
+      if states.character:now() ~= next_ch then states.character:set(next_ch) end
       if handle._held_rod_failed then
         states.held_rod_retry:set(states.held_rod_retry:now() + 1)
       end

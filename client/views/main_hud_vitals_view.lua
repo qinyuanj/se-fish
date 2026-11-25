@@ -89,7 +89,7 @@ function MainHudVitalsView.mount(s, ctx, options)
   local notify = options.notify or function(text) ViewUtil.notify(ctx, text) end
   local find_node = options.find_node or find_editor_node
 
-  local resolution = ViewUtil.get_resolution(ctx, options)
+  local resolution = ViewUtil.get_resolution(ctx, options); if resolution == nil then return end
   local layout = MainHudLayout.compute({
     width = resolution.x,
     height = resolution.y,

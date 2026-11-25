@@ -890,6 +890,92 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
     assert.same(env.route.Return.destination.x, env.players[1].Character.Position.x)
   end)
 
+  -- #365 失败方式：摆渡传送前挂起特殊道具失败若继续传送，会带特殊道具强行跨区且跳过失败退票。
+  it('test_board_aborts_teleport_and_refunds_when_suspend_special_item_fails', function()
+    assert.is_true(env.data[1]:AddItem(env.route.Outbound.Ticket))
+    assert.is_true(board(1, 1))
+    local origin = {
+      x = env.players[1].Character.Position.x,
+      y = env.players[1].Character.Position.y,
+      z = env.players[1].Character.Position.z,
+    }
+    local tree = assert(env.runtime:get_player_tree(1))
+    tree.suspend_special_item = function() error('suspend-denied') end
+    local logs, raw_print = {}, print
+    local ok_run, err = pcall(function()
+      _G.print = function(...)
+        local parts = {}
+        for i = 1, select('#', ...) do parts[i] = tostring(select(i, ...)) end
+        logs[#logs + 1] = table.concat(parts, '\t')
+      end
+      sail()
+    end)
+    _G.print = raw_print
+    if not ok_run then error(err, 0) end
+    assert.same(0, env.players[1].teleports)
+    assert.same(origin, env.players[1].Character.Position)
+    assert.same('fishPond', env.data[1].data.Zone)
+    assert.is_nil(env.data[1].extra.travel.arrived[env.route.ToZoneId])
+    assert.same(1, env.data[1]:ItemCount(env.route.Outbound.Ticket))
+    assert.is_false(last_reply(1).ok)
+    assert.same('teleport', last_reply(1).reason)
+    -- 船上其他未故障乘客正常传送
+    assert.same(1, env.players[2].teleports)
+    local logged = false
+    for _, line in ipairs(logs) do
+      if line:find('[FerryRoute]', 1, true) and line:find('特殊道具挂起失败', 1, true) then
+        logged = true
+        break
+      end
+    end
+    assert.is_true(logged)
+  end)
+
+  it('test_return_aborts_teleport_and_refunds_when_suspend_special_item_fails', function()
+    local point = env.route.Return
+    standAt(1, point.AnchorName)
+    local origin = {
+      x = env.players[1].Character.Position.x,
+      y = env.players[1].Character.Position.y,
+      z = env.players[1].Character.Position.z,
+    }
+    env.data[1].data.Zone = env.route.ToZoneId
+    assert.is_true(env.data[1]:AddCoin(point.Price, nil, 'test'))
+    local tree = assert(env.runtime:get_player_tree(1))
+    local logs, raw_print = {}, print
+    local ok_run, err = pcall(function()
+      _G.print = function(...)
+        local parts = {}
+        for i = 1, select('#', ...) do parts[i] = tostring(select(i, ...)) end
+        logs[#logs + 1] = table.concat(parts, '\t')
+      end
+      for seq, impl in ipairs({
+        function() return false end,
+        function() error('suspend-return-denied') end,
+      }) do
+        local before_logs = #logs
+        tree.suspend_special_item = impl
+        assert.is_false(back(1, seq))
+        assert.same(0, env.players[1].teleports)
+        assert.same(origin, env.players[1].Character.Position)
+        assert.same(env.route.ToZoneId, env.data[1].data.Zone)
+        assert.same(point.Price, env.data[1].data.FishCoin)
+        assert.is_false(last_reply(1).ok)
+        assert.same('teleport', last_reply(1).reason)
+        local logged = false
+        for i = before_logs + 1, #logs do
+          if logs[i]:find('[FerryRoute]', 1, true) and logs[i]:find('特殊道具挂起失败', 1, true) then
+            logged = true
+            break
+          end
+        end
+        assert.is_true(logged)
+      end
+    end)
+    _G.print = raw_print
+    if not ok_run then error(err, 0) end
+  end)
+
   it('test_zone_defaults_to_home', function()
     assert.same('fishPond', env.data[1].data.Zone)
   end)

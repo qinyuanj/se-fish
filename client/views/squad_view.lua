@@ -34,7 +34,7 @@ function SquadView.hud_spec()
     name = "SquadHud",
     mount = function(scope, ctx)
       local hud = GameCfg.Party.HUD
-      local screen = ViewUtil.get_resolution(ctx)
+      local screen = ViewUtil.get_resolution(ctx); if screen == nil then return end
       local panel = ctx.create_node(scope, "EUILayout", {
         Name = "PartyHud", Visible = false,
         Position = ViewUtil.vec2(screen.x - hud.RowWidth - hud.MarginRight, hud.MarginTop),

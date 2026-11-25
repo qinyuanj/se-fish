@@ -103,10 +103,10 @@ function FerryView.mount(scope, ctx)
   end)
 
   scope:phase("FerryCountdownPhase", has_countdown, function(ps)
-    local resolution = ViewUtil.get_resolution(ctx)
+    local resolution = ViewUtil.get_resolution(ctx); if resolution == nil then return end
     local label = ctx.create_node(ps, "EUITextLabel", {
       Name = "FerryCountdown",
-      Position = Vector2.New((resolution.x or 1920) / 2, (resolution.y or 1080) - 120),
+      Position = Vector2.New(resolution.x / 2, resolution.y - 120),
       Size = Vector2.New(360, 60),
       Text = "",
       FontSize = 36,

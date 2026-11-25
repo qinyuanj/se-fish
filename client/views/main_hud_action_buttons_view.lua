@@ -187,7 +187,7 @@ end
 ---@param options table|nil { get_resolution?, backpack_open?, layout?, reel_active?, is_reel_active?, on_reel_click?, send_operate?, send_cast?, send_special? }
 function MainHudActionButtonsView.mount(s, ctx, options)
   options = options or {}
-  local resolution = ViewUtil.get_resolution(ctx, options)
+  local resolution = ViewUtil.get_resolution(ctx, options); if resolution == nil and options.layout == nil then return end
   local backpack_open = options.backpack_open
   local reel_active_sig = options.reel_active
   local is_reel_active_fn = options.is_reel_active or default_is_reel_active

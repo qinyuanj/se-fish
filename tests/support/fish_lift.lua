@@ -83,7 +83,13 @@ function M:set_up()
         end,
     }
     package.loaded['server.world_host.fish_tree'] = nil
+    local Spoke = require('common.packages.spoke.api')
+    local env = self
     self.mgr = assert(loadfile('server/world_host/fish_tree.lua'))()
+    self.mgr.clock = {
+        now = function() return env.now end,
+        on_frame = Spoke.Trigger.new('TestFishLiftFrame'),
+    }
     self.holder_trees = {}
     self.mgr.get_player_tree = function(_, player)
         return player and self.holder_trees[player.UserId] or nil

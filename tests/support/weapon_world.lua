@@ -10,7 +10,7 @@ local M = {}
 M.__index = M
 
 --- 建一个空世界壳；调用方随后 :set_up() 搭世界、:tear_down() 拆除
---- （与 blindbox_world / revive_world 同一构造/拆除入口名）。
+--- （与 revive_world 同一构造/拆除入口名）。
 --- opts.players = { { player, data? }, ... } 可指定世界内玩家；缺省 42 / 43 两名玩家。
 function M.new(opts)
     return setmetatable({ opts = type(opts) == 'table' and opts or {} }, M)
@@ -58,13 +58,8 @@ function M:set_up()
             return true
         end,
     }
-    ctx.physics = { Raycast = function(...)
-        local origin, direction
-        if select('#', ...) >= 4 then
-            origin, direction = select(2, ...), select(3, ...)
-        else
-            origin, direction = select(1, ...), select(2, ...)
-        end
+    ctx.physics = { Raycast = function(self, origin, direction, _)
+        assert(self == ctx.physics, 'PhysicsService:Raycast 必须使用冒号调用')
         ctx.lastRay = { o = origin, d = direction }
         ctx.rays[#ctx.rays + 1] = ctx.lastRay
         if type(ctx.rayHit) == 'function' then

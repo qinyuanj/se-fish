@@ -8,7 +8,7 @@ function GuideView.spec(options)
   return {
     name = "Guide",
     mount = function(scope, ctx)
-      local resolution = ViewUtil.get_resolution(ctx, options)
+      local resolution = ViewUtil.get_resolution(ctx, options); if resolution == nil then return end
       local rects = MainHudLayout.compute({ width = resolution.x, height = resolution.y,
         itemBarSlots = 0, reeling = false }).rects
       local panel, toggle_rect = rects.quest_panel, rects.quest_toggle

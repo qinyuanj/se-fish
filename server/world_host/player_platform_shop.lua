@@ -1,4 +1,4 @@
-local GameCfg = require("common.game_cfg")
+local EngineRead = require("common.engine_read"); local GameCfg = require("common.game_cfg")
 
 local PlayerPlatformShop = {}
 
@@ -68,9 +68,9 @@ function PlayerPlatformShop.mount(scope, tree, opts)
   local outcomes = {}
 
   local function reply(payload)
-    if disposed or not remote or type(remote.get_re) ~= "function" then return end
-    local ok, event = pcall(remote.get_re, remote, "PlatformResult")
-    if ok and event then event:FireClient(player, payload) end
+    if disposed then return false, "disposed" end
+    local ok, _, reason = EngineRead.fire_client(remote, "PlatformResult", player, payload, "PlayerPlatformShop.reply")
+    if not ok then print("[PlayerPlatformShop] PlatformResult 下发失败", player and player.UserId, payload and payload.action, tostring(reason)); return false, reason end; return true
   end
   local function sync_tree()
     if not disposed then tree:sync_from_data(data) end
@@ -179,11 +179,11 @@ function PlayerPlatformShop.mount(scope, tree, opts)
     if not origin or not world or type(world.place_delivery) ~= "function" then return end
     for _, key in ipairs(sorted_keys(value.deliveries)) do
       local delivery = value.deliveries[key]
-      if delivery.epoch == nil or delivery.epoch == opts.delivery_epoch then
-        local receipt, reason = world:place_delivery(key, "fishPond", {
-          kind = "item", itemId = delivery.itemId, count = 1, mult = 1,
-          x = origin.x, y = origin.y, z = origin.z + 2,
-        })
+      if delivery.epoch == nil then
+        print("[PlayerPlatformShop] 跳过缺少 epoch 的遗留待交付", player.UserId, key)
+      elseif delivery.epoch == opts.delivery_epoch then
+        local receipt, reason = world:place_delivery(key, "fishPond", { kind = "item", itemId = delivery.itemId,
+          count = 1, mult = 1, x = origin.x, y = origin.y, z = origin.z + 2 })
         if not receipt then
           print("[PlayerPlatformShop] 待交付保留", player.UserId, key, tostring(reason))
           return

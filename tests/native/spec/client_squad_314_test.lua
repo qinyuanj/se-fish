@@ -39,7 +39,7 @@ local function mount(options)
       send_interact = options.send_interact,
       next_seq = options.next_seq,
       notify = options.notify,
-      get_device_resolution = options.get_device_resolution,
+      get_device_resolution = options.get_device_resolution or function() return { x = 1920, y = 1080 } end,
     },
     create_node = function(kind, props)
       local node = Eui.node({

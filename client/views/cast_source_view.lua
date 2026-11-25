@@ -1,17 +1,20 @@
+local EngineRead = require("common.engine_read")
 local GameCfg = require("common.game_cfg")
 local ViewUtil = require("client.views.view_util")
 
 local CastSourceView = {}
 
-local function vector(p)
-  return Vector3.New(p.x, p.y, p.z)
-end
+local function vector(p) return Vector3.New(p.x, p.y, p.z) end
 
+---@return any
 local function create_world(ctx, kind, props)
   local services = ctx.services or {}
   if type(services.create_unit) == "function" then return services.create_unit(kind, props) end
-  local ok, world = pcall(function() return game:GetService("World") end) -- 宿主 World 服务未就绪时安全回退
-  if ok and world and type(world.CreateUnit) == "function" then return world:CreateUnit(kind, props) end
+  local ok_w, world = EngineRead.get_service("World", "CastSourceView.create_world")
+  if ok_w and world ~= nil and type(world.CreateUnit) == "function" then
+    local ok_c, created = pcall(function() return world:CreateUnit(kind, props) end)
+    if ok_c then return created else print("[CastSourceView] operation=create_world", tostring(kind), tostring(created)) end
+  end
   return nil
 end
 
@@ -37,16 +40,21 @@ function CastSourceView.spec()
       local function character()
         local stored = ctx.store.local_character and ctx.store.local_character:now()
         if stored then return stored end
-        local ok, player = pcall(function() return game:GetService("Players").LocalPlayer end) -- 宿主 Players 服务未就绪时安全回退
-        return ok and player and player.Character or nil
+        local ok_p, players = EngineRead.get_service("Players", "CastSourceView.character")
+        if not ok_p then return nil end
+        local ok_lp, player = EngineRead.read_field(players, "LocalPlayer", "CastSourceView.character")
+        if not ok_lp then return nil end
+        local ok_ch, ch = EngineRead.read_character(player, "CastSourceView.character")
+        return ok_ch and ch or nil
       end
 
       scope:phase("CastSourceActivePhase", active, function(ps)
-        local body, line, current = nil, nil, nil
+        local body, current = nil, nil
+        local line ---@type any
         local function clear()
           for _, unit in ipairs({ body, line }) do
-            if unit and type(unit.Destroy) == "function" then
-              pcall(unit.Destroy, unit) -- 世界单位可能已随场景销毁，忽略重复销毁异常
+            if unit ~= nil then
+              EngineRead.destroy_unit(unit, "CastSourceView.clear")
             end
           end
           body, line, current = nil, nil, nil
@@ -93,26 +101,37 @@ function CastSourceView.spec()
           if not body or not current then return end
           local target = character()
           local state = ctx.store.cast:now()
-          local dx, dy, dz = ViewUtil.read_vec3(target and target.Position)
+          local ok_tpos, tpos = EngineRead.read_position(target, "CastSourceView.on_frame")
+          local dx, dy, dz = ViewUtil.read_vec3(ok_tpos and tpos or nil)
           local ox, oy, oz = ViewUtil.read_vec3(type(state) == "table" and state.hookPosition or nil)
           if dx == nil or ox == nil then return end
           local reel = ctx.services and ctx.services.reel
-          local progress = type(reel) == "table" and type(reel.progress) == "function" and reel.progress() or 50
-          local t = math.min(1, math.max(0, ((progress or 50) - 50) / 50))
-          local p = Vector3.New(
+          local raw_progress = type(reel) == "table" and type(reel.progress) == "function" and reel.progress() or 50
+          local progress = tonumber(raw_progress) or 50
+          local t = math.min(1, math.max(0, (progress - 50) / 50)) ---@type number
+          local ok_v, p = EngineRead.new_vector3(
             ox + (dx - ox) * t,
             oy + (dy + 2 - oy) * t,
-            oz + (dz - oz) * t
+            oz + (dz - oz) * t,
+            "CastSourceView.on_frame"
           )
-          local ok, err = pcall(function()
-            body.Position = p
-            if line then
-              line.Position = Vector3.New(dx, dy + 1, dz)
-              line.EndPosition = p
+          if not ok_v then
+            clear()
+            return
+          end
+          local ok_b = EngineRead.write_field(body, "Position", p, "CastSourceView.on_frame")
+          local ok_l = true
+          if line then
+            local ok_lv, line_pos = EngineRead.new_vector3(dx, dy + 1, dz, "CastSourceView.on_frame")
+            if not ok_lv then
+              ok_l = false
+            else
+              ok_l = EngineRead.write_field(line, "Position", line_pos, "CastSourceView.on_frame")
+                and EngineRead.write_field(line, "EndPosition", p, "CastSourceView.on_frame")
             end
-          end)
-          if not ok then
-            print("[CastSourceView] 更新来源失败", tostring(err))
+          end
+          if not ok_b or not ok_l then
+            print("[CastSourceView] 更新来源失败")
             clear()
           end
         end)

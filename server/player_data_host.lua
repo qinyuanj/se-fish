@@ -11,14 +11,14 @@ end
 
 function PlayerDataHost:send_item_bar(player, forcePush)
     local data = self:get_data_inst(player)
-    if not data then return end
+    if not data then return false end
     if self.Vitals and self.Vitals.RefreshHeldDamage then self.Vitals:RefreshHeldDamage(player, data) end
     local tree = self.runtime and self.runtime:get_player_tree(player.UserId)
     if tree then
-        if forcePush then return self:sync_player_tree(player, true) end
-        return false
+        return forcePush and self:sync_player_tree(player, true) or false
     end
-    _G.REUtil:get_re('ItemBarState'):FireClient(player, data:GetItemBarSnapshot())
+    print('[PlayerDataHost] 缺少 PlayerTree，无法同步 ItemBarState', player and player.UserId)
+    return false
 end
 
 function PlayerDataHost:sync_player_tree(player, forcePush)
@@ -255,8 +255,8 @@ end
 function PlayerDataHost:start()
     _G.REUtil:get_re('RequestItemBar').OnServerEvent:Connect(function(player)
         if _G.REUtil:check_recd(player, 'RequestItemBar', GameCfg.Items.ActionCooldownSec) then return end
-        local tree = self.runtime and self.runtime:get_player_tree(player.UserId)
-        if tree then self:sync_player_tree(player, true) else self:send_item_bar(player, true) end
+        -- 统一经 send_item_bar 走 PlayerTree 同步推送
+        self:send_item_bar(player, true)
     end)
     local actions = {
         SelectSlot = 'SelectSlot',

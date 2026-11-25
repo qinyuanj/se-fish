@@ -415,4 +415,40 @@ describe('平台适配层（MgrPlatform）', function()
     drain()
     assert.same(0, env.data:ItemCount(GameCfg.Survival.AdrenalineItemId))
   end)
+
+  -- 缺 epoch 的遗留待交付记录被拒绝派发并记录日志，同时不阻塞当前 epoch 记录
+  it('test_missing_epoch_delivery_is_skipped_and_logged', function()
+    local shop = EconomyWorld.new()
+    local saved_print = _G.print
+    local logs = {}
+    local ok, err = pcall(function()
+      shop.data.extra.platformShop = {
+        intents = {},
+        deliveries = {
+          legacy = { itemId = GameCfg.Survival.AdrenalineItemId },
+          current = { epoch = 'test-world', itemId = GameCfg.Survival.AdrenalineItemId },
+        },
+      }
+      shop:persist_ready()
+      _G.print = function(...)
+        local parts = {}
+        for i = 1, select('#', ...) do parts[i] = tostring(select(i, ...)) end
+        logs[#logs + 1] = table.concat(parts, '\t')
+      end
+      shop:pump()
+      shop:drain()
+    end)
+    _G.print = saved_print
+    local ground_count = #shop:ground_items()
+    local legacy_left = shop.data.extra.platformShop.deliveries.legacy
+    local current_left = shop.data.extra.platformShop.deliveries.current
+    shop:tear_down()
+    assert.is_true(ok, tostring(err))
+    assert.same(1, ground_count)
+    assert.is_not_nil(legacy_left)
+    assert.is_nil(current_left)
+    local joined = table.concat(logs, '\n')
+    assert.is_truthy(joined:find('[PlayerPlatformShop]', 1, true))
+    assert.is_truthy(joined:find('legacy', 1, true))
+  end)
 end)

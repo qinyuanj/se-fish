@@ -2,6 +2,7 @@
 -- 接缝：ItemBarAction / RequestItemBar 的 OnServerEvent 与 ItemBarState 回包。
 local GameCfg = require('common.game_cfg')
 local Mgr = require('server.player_data_host')
+local ServerRuntime = require('server.world_host.server_runtime')
 
 local function signal()
     local callbacks = {}
@@ -24,6 +25,11 @@ describe("道具栏的请求流", function()
         ctx.savedGrantDebug = GameCfg.Debug
         GameCfg.Debug = { Enabled = true, InitialGrants = ctx.savedGrantDebug.InitialGrants }
         ctx.previousREUtil = _G.REUtil
+        ctx.previousRuntime = Mgr.runtime
+        ctx.previousVitals = Mgr.Vitals
+        ctx.previousQuest = Mgr.Quest
+        ctx.previousSave = Mgr.Save
+        ctx.previousAbility = Mgr.Ability
         _G.REUtil = { check_recd = function(_, player, name, duration)
             if not ctx.enableCooldown then return false end
             assert.same('ItemBarAction', name)
@@ -44,16 +50,38 @@ describe("道具栏的请求流", function()
             end
             return ctx.events[name]
         end }
+        ctx.runtime = ServerRuntime.new({
+            player_data = Mgr,
+            bait_spots = { Enabled = false },
+            on_item_bar_state = function(p, snapshot)
+                _G.REUtil:get_re('ItemBarState'):FireClient(p, snapshot)
+            end,
+        })
+        ctx.runtime:start()
+        ctx.runtime:mark_started()
+        ctx.join = function(p)
+            ctx.runtime:on_player_added(p)
+            local data = Mgr:get_data_inst(p)
+            if data then ctx.runtime:on_save_ready(p, data) end
+        end
+        ctx.leave = function(p)
+            ctx.runtime:on_player_removing(p)
+        end
         ctx.player = { UserId = 341, attrs = {}, CharacterAdded = signal(), CharacterRemoving = signal() }
         function ctx.player:SetAttribute(key, value) self.attrs[key] = value end
-        Mgr:start()
-        Mgr:on_player_added(ctx.player)
+        ctx.join(ctx.player)
     end)
 
     -- 配置、全局与玩家实例逐例回收；set_up 中途失败也照样清理。
     after_each(function()
         GameCfg.Debug = ctx.savedGrantDebug
+        if ctx.runtime then ctx.runtime:shutdown() end
         if ctx.player then Mgr:on_player_removing(ctx.player) end
+        Mgr.runtime = ctx.previousRuntime
+        Mgr.Vitals = ctx.previousVitals
+        Mgr.Quest = ctx.previousQuest
+        Mgr.Save = ctx.previousSave
+        Mgr.Ability = ctx.previousAbility
         _G.REUtil = ctx.previousREUtil
     end)
 
@@ -87,13 +115,13 @@ describe("道具栏的请求流", function()
         ctx.enableCooldown = true
         local other = { UserId = 342, CharacterAdded = signal(), CharacterRemoving = signal() }
         function other:SetAttribute() end
-        Mgr:on_player_added(other)
+        ctx.join(other)
         local action = ctx.events.ItemBarAction.OnServerEvent
         action:Fire(ctx.player, { action = 'EatBait', value = 'worm' })
         action:Fire(other, { action = 'EatBait', value = 'worm' })
         assert.same(9, ctx.player.lastState.bait.worm)
         assert.same(9, other.lastState.bait.worm)
-        Mgr:on_player_removing(other)
+        ctx.leave(other)
     end)
 
     -- 请求通道的回包面：每个有效动作（含数据层直接消耗与客户端主动拉取）都推一次新的
@@ -118,6 +146,7 @@ describe("道具栏的请求流", function()
         action:Fire(ctx.player, { action = 'SelectBait', value = 'worm' })
         previous = ctx.player.lastState
         assert.is_true((data:ConsumeSelectedBait()))
+        Mgr:sync_player_tree(ctx.player)
         assert.is_not.equal(ctx.player.lastState, previous)
         assert.same(0, ctx.player.lastState.bait.worm)
         assert.is_nil(ctx.player.lastState.selectedBait)
@@ -196,6 +225,7 @@ describe("道具栏的请求流", function()
         Mgr:get_data_inst(ctx.player):UpdateData(function(data)
             data.containers[GameCfg.Items.ContainerId.ItemBar][1].count = 0
         end, true)
+        Mgr:sync_player_tree(ctx.player)
         assert.is_nil(ctx.player.lastState.selectedSlot)
         assert.is_nil(ctx.player.lastState.slots[1])
     end)
@@ -244,5 +274,32 @@ describe("道具栏的请求流", function()
         end)
         Mgr.Quest = nil
         if not ok then error(err, 0) end
+    end)
+
+    it("test_send_item_bar_without_player_tree_logs_and_skips_direct_fire", function()
+        local isolated = assert(loadfile('server/player_data_host.lua'))()
+        local lone = { UserId = 349, attrs = {}, CharacterAdded = signal(), CharacterRemoving = signal() }
+        function lone:SetAttribute(key, value) self.attrs[key] = value end
+        local logs = {}
+        local saved_print = _G.print
+        _G.print = function(...)
+            local parts = {}
+            for i = 1, select('#', ...) do parts[i] = tostring(select(i, ...)) end
+            logs[#logs + 1] = table.concat(parts, '\t')
+        end
+        local result
+        local ok, err = pcall(function()
+            isolated:on_player_added(lone)
+            result = isolated:send_item_bar(lone, true)
+            isolated:on_player_removing(lone)
+        end)
+        _G.print = saved_print
+        assert.is_true(ok, tostring(err))
+        assert.is_false(result)
+        assert.is_nil(lone.lastState)
+        assert.is_nil(lone.stateCount)
+        local joined = table.concat(logs, '\n')
+        assert.is_truthy(joined:find('[PlayerDataHost]', 1, true))
+        assert.is_truthy(joined:find('PlayerTree', 1, true))
     end)
 end)

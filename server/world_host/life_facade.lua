@@ -1,33 +1,32 @@
-
+local EngineRead = require("common.engine_read")
 local GameCfg = require("common.game_cfg")
 local Number = require("common.number")
 
 local LifeFacade = {}
 
-local function is_object(value)
-  local kind = type(value)
-  return kind == "table" or kind == "userdata"
-end
-
-local function is_valid_player(player)
-  if not is_object(player) then return false end
-  local ok, uid = pcall(function() return player.UserId end) -- 兼容引擎 userdata 玩家
-  return ok and uid ~= nil
-end
-
 local function read_character(player)
-  if not is_object(player) then return nil end
-  local ok, ch = pcall(function() return player.Character end) -- 兼容引擎 userdata 玩家
-  if ok then return ch end
+  local ok, ch = EngineRead.read_character(player, "LifeFacade.read_character")
+  if ok then
+    return ch
+  end
   return nil
 end
 
-local function read_position(character)
-  if not is_object(character) then return nil end
-  local ok, pos = pcall(function() return character.Position end) -- 兼容引擎 Vector3 userdata
-  if ok and is_object(pos) then return pos end
-  return nil
-end
+-- 生命门面（LifeFacade）：
+-- 统一经 L3 common.engine_read 读取/校验玩家、角色、位置与控制器血量，
+-- 与 ServerRuntime 共用同一引擎对象读取边界，不再保留本地静默 pcall 兜底。
+-- 内部 helper 约定：
+--   1. tree_of(player)：经 EngineRead.read_user_id 读取并校验玩家子树存活；
+--   2. player_from_unit(unit)：在活跃玩家列表内匹配单位本体或其当前角色；
+--   3. set_health(player, value)：经 EngineRead.write_health 写入并回读确认后再提交权威状态；
+--   4. rescue_action(player, payload)：经 EngineRead.read_user_id 与 read_player_position 校距。
+--
+-- 对外门面接口：
+--   get_tree / player_from_unit / life_status / is_downed / is_rescuing / player_by_user_id /
+--   is_dead / can_act / can_take_damage / can_eat / eat / max_health_of / snapshot_health /
+--   set_damage_filter / new_hit / resolve_hit_source / apply_hit / apply_damage / set_health /
+--   set_hunger / phase / get_state / rescue_action / can_rescue / begin_rescue / cancel_rescue /
+--   request_action / weapon_action / weapon_cast_guard。
 
 ---@param ctx table
 function LifeFacade.new(ctx)
@@ -43,14 +42,15 @@ function LifeFacade.new(ctx)
   local life = {}
 
   local function tree_of(player)
-    if not is_valid_player(player) then return nil end
-    local tree = player_trees[player.UserId]
+    local ok, uid = EngineRead.read_user_id(player, "LifeFacade.tree_of")
+    if not ok then return nil end
+    local tree = player_trees[uid]
     if tree and not tree:is_disposed() then return tree end
     return nil
   end
 
   local function player_from_unit(unit)
-    if not is_object(unit) then return nil end
+    if not EngineRead.is_object(unit) then return nil end
     for _, player in pairs(active_players) do
       if player == unit or read_character(player) == unit then return player end
     end
@@ -81,7 +81,7 @@ function LifeFacade.new(ctx)
 
   function life:player_by_user_id(user_id)
     for _, player in pairs(active_players) do
-      if player.UserId == user_id then return player end
+      if user_id ~= nil and select(2, EngineRead.read_user_id(player, "LifeFacade.player_by_user_id")) == user_id then return player end
     end
     return nil
   end
@@ -172,17 +172,17 @@ function LifeFacade.new(ctx)
 
   function life:set_health(player, value)
     local tree = tree_of(player)
-    if not tree or not Number.is_finite_number(value) then return false end
+    if not tree or not Number.is_finite_number(value) then
+      return false
+    end
     local current = tree.states.health:now()
     if value < current then
       return self:apply_damage(player, current - value, self:new_hit(nil, "gm"))
     end
-    local character = read_character(player)
-    local controller = character and character.Controller
-    if not controller then return false end
-    local ok, err = pcall(function() controller.Health = value end)
-    if not ok then
-      print("[LifeFacade] operation=SetHealth", "player=" .. tostring(player.UserId), tostring(err))
+    if not EngineRead.write_health(
+      player, value,
+      { context = "LifeFacade.set_health", logger = opts.logger }
+    ) then
       return false
     end
     tree.states.health:set(value)
@@ -221,8 +221,7 @@ function LifeFacade.new(ctx)
       reply({ action = "Rescue", ok = false, reason = "invalid", seq = seq })
       return false
     end
-    local data = opts.player_data and opts.player_data:get_data_inst(player)
-    local save = opts.save
+    local data, save = opts.player_data and opts.player_data:get_data_inst(player), opts.save
     if not data or not save then return false end
     local request_id = payload.operation
     if request_id ~= nil and type(request_id) ~= "table" then return false end
@@ -231,24 +230,27 @@ function LifeFacade.new(ctx)
     if not operation then return false end
     if mode == "replay" then
       return save:execute(player, data, operation, function() return nil, "expired" end,
-        function(ok, result)
-          if ok then result.operation = operation reply(result) end
-        end) == true
+        function(ok, result) if ok then result.operation = operation reply(result) end end) == true
     end
     local target = nil
     for _, candidate in pairs(active_players) do
-      if candidate.UserId == payload.targetUserId then target = candidate break end
+      local ok_uid, uid = EngineRead.read_user_id(candidate, "LifeFacade.rescue_action")
+      if ok_uid and uid == payload.targetUserId then
+        target = candidate
+        break
+      end
     end
-    local target_tree = target and player_trees[target.UserId]
+    local ok_tuid, target_uid = EngineRead.read_user_id(target, "LifeFacade.rescue_action")
+    local target_tree = ok_tuid and player_trees[target_uid]
     local phase = target_tree and target_tree.states.life_phase:now()
-    if not target or (phase ~= "downed" and phase ~= "rescuing") then
+    if not target or not ok_tuid or (phase ~= "downed" and phase ~= "rescuing") then
       reply({ action = "Rescue", ok = false, reason = "not-downed", seq = seq, targetUserId = payload.targetUserId })
       return false
     end
-    local from = read_position(read_character(player))
-    local to = read_position(read_character(target))
-    if not from or not to then
-      reply({ action = "Rescue", ok = false, reason = "no-position", seq = seq, targetUserId = target.UserId })
+    local ok_from, from = EngineRead.read_player_position(player, "LifeFacade.rescue_action.from")
+    local ok_to, to = EngineRead.read_player_position(target, "LifeFacade.rescue_action.to")
+    if not ok_from or not ok_to or not from or not to then
+      reply({ action = "Rescue", ok = false, reason = "no-position", seq = seq, targetUserId = target_uid })
       return false
     end
     local dx, dz = from.x - to.x, from.z - to.z
@@ -262,9 +264,7 @@ function LifeFacade.new(ctx)
       return false
     end
     local started, why = self:begin_rescue(target, player)
-    return save:execute(player, data, operation, function()
-      return { ok = started == true, action = "Rescue", targetUserId = target.UserId, reason = why }
-    end, function(written, result)
+    return save:execute(player, data, operation, function() return { ok = started == true, action = "Rescue", targetUserId = target.UserId, reason = why } end, function(written, result)
       if not written then
         if started then self:cancel_rescue(self:get_state(target)) end
         reply({ action = "Rescue", ok = false, reason = tostring(result), seq = seq, targetUserId = target.UserId })

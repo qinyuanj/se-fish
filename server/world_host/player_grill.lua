@@ -1,4 +1,4 @@
-
+local EngineRead = require("common.engine_read")
 local GameCfg = require("common.game_cfg")
 local BodyScale = require("common.body_scale")
 local GrillCurve = require("common.grill_curve")
@@ -78,21 +78,21 @@ local function ensure_recovery(data)
 end
 
 local function reply(remote, player, payload)
-  if remote and type(remote.get_re) == "function" then
-    local ok, event = pcall(remote.get_re, remote, "GrillResult")
-    if ok and event and type(event.FireClient) == "function" then
-      pcall(event.FireClient, event, player, payload)
-    end
+  local ok, _, reason = EngineRead.fire_client(remote, "GrillResult", player, payload, "PlayerGrill.reply")
+  if not ok then
+    print("[PlayerGrill] GrillResult 下发失败", player and player.UserId, payload and payload.action, tostring(reason))
   end
   return payload
 end
 
+
+
+
+-- 推送当前烧烤状态到客户端，失败记录带上下文日志。
 local function push_state(remote, player, payload)
-  if remote and type(remote.get_re) == "function" then
-    local ok, event = pcall(remote.get_re, remote, "GrillState")
-    if ok and event and type(event.FireClient) == "function" then
-      pcall(event.FireClient, event, player, payload)
-    end
+  local ok, _, reason = EngineRead.fire_client(remote, "GrillState", player, payload, "PlayerGrill.push_state")
+  if not ok then
+    print("[PlayerGrill] GrillState 推送失败", player and player.UserId, payload and payload.state, tostring(reason))
   end
   return payload
 end
@@ -191,10 +191,10 @@ function PlayerGrill.mount(scope, tree, opts)
   local function destroy_visual()
     local unit = session.visual
     session.visual = nil
-    if unit and type(unit.Destroy) == "function" then
-      pcall(function() -- 兼容引擎 userdata 读取 Destroyed 或单位已被引擎先行销毁
-        if not unit.Destroyed then unit:Destroy() end
-      end)
+    if unit then
+      local ok_d, _, reason_d = EngineRead.destroy_unit(unit, "PlayerGrill.destroy_visual")
+      if not ok_d and reason_d ~= "destroyed" then
+        print("[PlayerGrill] 烤制单位销毁失败", player and player.UserId, tostring(reason_d)) end
     end
   end
 
@@ -235,7 +235,7 @@ function PlayerGrill.mount(scope, tree, opts)
     local players = {}
     if type(opts.players) == "function" then
       local ok, list = pcall(opts.players)
-      if ok and type(list) == "table" then players = list end
+      if ok and type(list) == "table" then players = list else print("[PlayerGrill] 读取爆炸范围内玩家失败", player and player.UserId, ok and ("invalid=" .. type(list)) or tostring(list)) end
     end
     for _, other in pairs(players) do
       local pos = other and other.Character and other.Character.Position

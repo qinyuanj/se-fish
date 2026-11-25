@@ -182,7 +182,7 @@ end
 ---@param options table|nil { get_resolution?, send_action?, backpack_open?, open_popup?, on_open_changed?, resolve_drop_target?, on_drop_resolver?, layout? }
 function MainHudBackpackView.mount(s, ctx, options)
   options = options or {}
-  local resolution = ViewUtil.get_resolution(ctx, options)
+  local resolution = ViewUtil.get_resolution(ctx, options); if resolution == nil and options.layout == nil then return end
 
   local send_action = options.send_action or function(action, value)
     default_fire_item_bar({ action = action, value = value })

@@ -173,7 +173,12 @@ describe('TestMgrFishUnitBlastFish', function()
             if name == 'Players' then return { GetPlayers = function() return {} end } end
             return nil
         end }
+        local Spoke = require('common.packages.spoke.api')
         ctx.mgr = assert(loadfile('server/world_host/fish_tree.lua'))()
+        ctx.mgr.clock = {
+            now = function() return ctx.now end,
+            on_frame = Spoke.Trigger.new('TestWeaponFishFrame'),
+        }
         ctx.owner = { UserId = 55 }
     end)
     after_each(function()
@@ -323,6 +328,30 @@ describe('TestMgrWeapon', function()
         assert.same(0, #ctx.applied)
     end)
 
+    it('test_gun_raycast_uses_single_colon_signature_without_fallback_retry', function()
+        ctx:equip(ctx.player, 'item137')
+        local calls = 0
+        ctx.physics.Raycast = function(self, origin, direction)
+            calls = calls + 1
+            assert.are.equal(ctx.physics, self)
+            assert.is_table(origin)
+            assert.is_table(direction)
+            error('raycast-failed')
+        end
+        local logs = {}
+        _G.print = function(...)
+            local parts = {}
+            for i = 1, select('#', ...) do parts[i] = tostring(select(i, ...)) end
+            logs[#logs + 1] = table.concat(parts, '\t')
+        end
+        assert.is_true(ctx:attack(ctx.player).ok)
+        assert.same(1, calls)
+        assert.same(0, #ctx.applied)
+        local joined = table.concat(logs, '\n')
+        assert.is_truthy(joined:find('[PlayerWeapon]', 1, true))
+        assert.is_truthy(joined:find('raycast-failed', 1, true))
+    end)
+
     it('test_manual_reload_two_seconds_not_bypassed_by_switching', function()
         ctx:equip(ctx.player, 'item137')
         assert.is_true(ctx.data:GrantWeapon('item141', 1))
@@ -399,6 +428,53 @@ describe('TestMgrWeapon', function()
         assert.same(0, ctx.casts[1].index) -- GameCfg 挥砍槽位
         assert.same(ctx.player.Character, ctx.casts[1].unit)
         assert.is_true(Weapon.last_reply(ctx, ctx.player).ok)
+    end)
+
+    -- #365 失败方式：无 aim 时角色朝向读取失败若回退 (0,0,1)，会朝 +Z 误射并消耗弹药/进冷却。
+    it('test_gun_rejects_fire_when_forward_unavailable', function()
+        ctx:equip(ctx.player, 'item137')
+        ctx.other.Character.Position = { x = 0, y = 2, z = 5 }
+        ctx.rayHit = { Instance = ctx.other.Character, Position = { x = 0, y = 2, z = 5 } }
+        local logs = {}
+        _G.print = function(...)
+            local parts = {}
+            for i = 1, select('#', ...) do parts[i] = tostring(select(i, ...)) end
+            logs[#logs + 1] = table.concat(parts, '\t')
+        end
+        local broken = {
+            nil,
+            { GetForward = function() error('rot-denied') end },
+            { GetForward = function() return { x = 0, y = 0, z = 0 } end },
+            { GetForward = function() return { x = 0 / 0, y = 0, z = 1 } end },
+        }
+        for index = 1, 4 do
+            local beforeLogs = #logs
+            ctx.player.Character.Rotation = broken[index]
+            local reply = ctx:attack(ctx.player)
+            assert.is_false(reply.ok)
+            assert.same('no-forward', reply.reason)
+            assert.same(0, #ctx.rays)
+            assert.same(0, #ctx.applied)
+            local logged = false
+            for j = beforeLogs + 1, #logs do
+                if logs[j]:find('[PlayerWeapon]', 1, true) then logged = true break end
+            end
+            assert.is_true(logged)
+        end
+        -- 显式携带合法 aim 不依赖角色 Rotation，应照常射击
+        ctx.player.Character.Rotation = nil
+        local aimed = ctx:attack(ctx.player, { aim = { x = 1, y = 0, z = 0 } })
+        assert.is_true(aimed.ok)
+        assert.same(9, aimed.ammo)
+        assert.same(1, #ctx.rays)
+        assert.near(GameCfg.Ability.GunShared.Range, ctx.lastRay.d.x, 1e-6)
+        assert.near(0, ctx.lastRay.d.z, 1e-6)
+        -- 恢复正常朝向且过了射速后，无 aim 仍可正常开火
+        ctx:advance(1)
+        ctx.player.Character.Rotation = { GetForward = function() return { x = 0, y = 0, z = 1 } end }
+        local recovered = ctx:attack(ctx.player)
+        assert.is_true(recovered.ok)
+        assert.same(8, recovered.ammo)
     end)
 end)
 
@@ -690,6 +766,39 @@ describe('TestMgrWeaponThrow', function()
             for _, a in ipairs(ctx.applied) do assert.is_true(a.order > f.order) end
         end
         assert.is_true(#ctx.applied > 0) -- 随后按 5 米半径结算爆炸
+    end)
+
+    -- #365 失败方式：无 target 投掷时角色朝向不可读若回退 (0,0,1)，会扣爆炸物并朝 +Z 乱扔。
+    it('test_throw_without_target_rejects_when_forward_unavailable', function()
+        local slot = ctx:give_explosive(ctx.player, 'item144', 1)
+        ctx.other.Character.Position = { x = 0, y = 2, z = 20 }
+        local logs = {}
+        _G.print = function(...)
+            local parts = {}
+            for i = 1, select('#', ...) do parts[i] = tostring(select(i, ...)) end
+            logs[#logs + 1] = table.concat(parts, '\t')
+        end
+        local broken = {
+            nil,
+            { GetForward = function() error('throw-rot-denied') end },
+            { GetForward = function() return { x = 0, y = 1, z = 0 } end },
+        }
+        for index = 1, 3 do
+            local beforeLogs = #logs
+            ctx.player.Character.Rotation = broken[index]
+            local reply = ctx:throw(ctx.player, slot, nil)
+            assert.is_false(reply.ok)
+            assert.same('no-forward', reply.reason)
+            assert.same(1, ctx.data:ItemCount('item144'))
+            assert.same(0, #ctx.visuals)
+            local logged = false
+            for j = beforeLogs + 1, #logs do
+                if logs[j]:find('[PlayerWeapon]', 1, true) then logged = true break end
+            end
+            assert.is_true(logged)
+        end
+        ctx:advance(FlightSec() + 0.5)
+        assert.same(0, #ctx.applied)
     end)
 end)
 

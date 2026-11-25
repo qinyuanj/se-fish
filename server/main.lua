@@ -21,9 +21,9 @@ local AttrLeaf = require("server.world_host.attr_leaf")
 local WorldRuntime
 
 local function serverNow()
-    local ok, now = pcall(WorldService.GetServerTime, WorldService) -- 引擎早期阶段可能未就绪
+    local ok, now = pcall(WorldService.GetServerTime, WorldService)
     if ok and Number.is_finite_number(now) then return now end
-    return nil
+    print("[server.main] 读取宿主时钟失败", tostring(now)); return nil
 end
 
 local AttrPackageApi = require("server.packages.attr_rule.api")
@@ -139,7 +139,7 @@ local function bindRE(name, cooldown, handler, requireTable)
 end
 
 WorldRuntime = ServerRuntime.new({
-    initial_now = serverNow() or 0,
+    initial_now = serverNow(),
     remote = _G.REUtil,
     player_data = PlayerDataHost,
     save = SaveHost,
@@ -286,9 +286,9 @@ end
 local function HandlePlayerRemoving(player)
     WorldRuntime:on_player_removing(player)
 end
-
 local function HandleTimeUpdate(deltaTime)
-    WorldRuntime:step(deltaTime, serverNow())
+    local now = serverNow()
+    if now == nil then WorldRuntime:step(deltaTime) else WorldRuntime:step(deltaTime, now) end
 end
 
 Players.PlayerAdded:Connect(HandlePlayerAdded)
