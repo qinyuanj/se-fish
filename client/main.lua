@@ -373,8 +373,8 @@ Task:Spawn(function()
 end)
 
 local StarterGui = game:GetService("StarterGui")
-pcall(function() StarterGui:SetCoreGuiEnabled(Enums.CoreGuiType.LiftButton, false) end) -- 兼容部分宿主环境未开放 CoreGui 隐藏接口
-pcall(function() StarterGui:SetCoreGuiEnabled(Enums.CoreGuiType.Health, false) end) -- 兼容部分宿主环境未开放 CoreGui 隐藏接口
+local function disable_core_gui(name) local ok, err = pcall(function() StarterGui:SetCoreGuiEnabled(Enums.CoreGuiType[name], false) end); if not ok then print("[client.main] StarterGui:SetCoreGuiEnabled 失败", "CoreGuiType." .. name, tostring(err)) end end -- 兼容部分宿主环境未开放 CoreGui 隐藏接口
+disable_core_gui("LiftButton"); disable_core_gui("Health")
 
 local AbilityAPI = require("client.packages.ability_system.api")
 if AbilityAPI then

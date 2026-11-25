@@ -1087,21 +1087,21 @@ function ServerRuntime.new(opts)
     for _, fish in ipairs(sorted_fish_list()) do
       local row = fish_row(fish)
       list[#list + 1] = row
-      if type(row.warning) == "table" then
-        warnings[#warnings + 1] = row.warning
-      end
+      if type(row.warning) == "table" then warnings[#warnings + 1] = row.warning end
     end
     local sig = fish_signature(list)
-    if not fish_dirty and sig == last_fish_signature then return end
-    fish_dirty = false
-    if sig == last_fish_signature then return end
-    last_fish_signature = sig
-    local remote = opts.remote
-    if type(remote) ~= "table" or type(remote.get_re) ~= "function" then return end
-    local event = remote:get_re("FishCombatState")
-    if event and type(event.FireAllClients) == "function" then
-      pcall(function() event:FireAllClients({ list = list, warnings = warnings }) end) -- 下行失败不回滚权威活鱼
+    if not fish_dirty and sig == last_fish_signature then return true end
+    if sig == last_fish_signature then fish_dirty = false; return true end
+    local ctx = { context = "ServerRuntime._publish_fish", logger = opts.logger }
+    local ok_ev, event, reason_ev = EngineRead.call_method(opts.remote, "get_re", ctx, "FishCombatState")
+    if not ok_ev or not event then
+      fish_dirty = true
+      if opts.logger and type(opts.logger.error) == "function" then pcall(opts.logger.error, opts.logger, "[ServerRuntime] _publish_fish 获取通道失败: " .. tostring(reason_ev or "missing")) else print("[ServerRuntime] _publish_fish 获取通道失败", tostring(reason_ev or "missing")) end
+      return false
     end
+    local ok_send, _, reason_send = EngineRead.call_method(event, "FireAllClients", ctx, { list = list, warnings = warnings })
+    if not ok_send then fish_dirty = true; if opts.logger and type(opts.logger.error) == "function" then pcall(opts.logger.error, opts.logger, "[ServerRuntime] _publish_fish 发送失败: " .. tostring(reason_send)) else print("[ServerRuntime] _publish_fish 发送失败", tostring(reason_send)) end; return false end
+    fish_dirty = false; last_fish_signature = sig; return true
   end
 
   function runtime:lottery_action(player, payload)
@@ -1178,10 +1178,10 @@ function ServerRuntime.new(opts)
 
   function runtime:damage_fish(id, amount)
     local fish = fish_host.Fish[id]
-    if fish == nil then return false end
-    local ok = fish_host:damage_fish(fish, amount)
-    self:_publish_fish()
-    return ok
+    if fish == nil then return false, "not-found" end
+    local ok, err = fish_host:damage_fish(fish, amount)
+    if ok then self:_publish_fish() end
+    return ok, err
   end
 
   function runtime:fault_fish(id, reason)

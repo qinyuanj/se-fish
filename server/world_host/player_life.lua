@@ -158,7 +158,7 @@ function PlayerLife.mount(s3, player_tree, opts)
   end
 
   local function fire_client(name, payload)
-    EngineRead.fire_client(remote, name, player, payload, "PlayerLife.fire_client")
+    local ok, _, reason = EngineRead.fire_client(remote, name, player, payload, "PlayerLife.fire_client"); if not ok then print("[PlayerLife] 下行消息发送失败", player and player.UserId, tostring(name), tostring(reason)); return false, reason end; return true
   end
 
   local function reply(payload)
@@ -247,48 +247,48 @@ function PlayerLife.mount(s3, player_tree, opts)
   end
 
   local function apply_walk(base_override)
-    if player_tree.walk_projection_rejected then return end
-    local controller = controller_of(player)
-    if not controller then return end
+    if player_tree.walk_projection_rejected then return false, "rejected" end
+    local ok_ctrl, controller, reason_ctrl = EngineRead.read_controller(player, "PlayerLife.apply_walk")
+    if not ok_ctrl or not controller then if reason_ctrl ~= "missing" then print("[PlayerLife] apply_walk 读取控制器失败", player and player.UserId, tostring(reason_ctrl)) end; return false, reason_ctrl or "missing" end
     local base = base_override
+    if not finite_number(base) or base <= 0 then base = memos.walk_speed and memos.walk_speed:now() end
     if not finite_number(base) or base <= 0 then
-      base = memos.walk_speed and memos.walk_speed:now()
+      local ok, current, reason_read = EngineRead.read_field(controller, "WalkSpeed", "PlayerLife.apply_walk")
+      if not ok and reason_read ~= "missing" then print("[PlayerLife] apply_walk 读取移速失败", player and player.UserId, tostring(reason_read)); return false, reason_read end
+      if ok and finite_number(current) and current > 0 and not player_tree:get_modifier_remaining("weak") then base = current end
     end
-    if not finite_number(base) or base <= 0 then
-      local ok, current = EngineRead.read_field(controller, "WalkSpeed", "PlayerLife.apply_walk")
-      if ok and finite_number(current) and current > 0 and not player_tree:get_modifier_remaining("weak") then
-        base = current
-      end
-    end
-    local paralyzed = states.is_paralyzed:now() == true
-    local speed = base
+    local paralyzed, speed, failed_err = states.is_paralyzed:now() == true, base, nil
     if finite_number(base) then
       if paralyzed then speed = 0 end
-      EngineRead.write_field(controller, "WalkSpeed", speed, "PlayerLife.apply_walk")
+      local ok_w, _, reason_w = EngineRead.write_field(controller, "WalkSpeed", speed, "PlayerLife.apply_walk")
+      if not ok_w then failed_err = reason_w or "write_error"; print("[PlayerLife] apply_walk 写入移速失败", player and player.UserId, "speed=" .. tostring(speed), tostring(failed_err)) end
     end
     if type(speed_writer) == "function" then
-      pcall(speed_writer, player, speed)
+      local ok_sw, res_sw = pcall(speed_writer, player, speed)
+      if not ok_sw or res_sw == false then local err = not ok_sw and tostring(res_sw) or "returned-false"; print("[PlayerLife] apply_walk speed_writer 失败", player and player.UserId, "speed=" .. tostring(speed), err); failed_err = failed_err or err end
     end
+    if failed_err then return false, failed_err end; return true
   end
 
   local function reapply_growth()
-    local controller = controller_of(player)
+    local ok_ctrl, controller, reason_ctrl = EngineRead.read_controller(player, "PlayerLife.reapply_growth")
+    if not ok_ctrl and reason_ctrl ~= "missing" then print("[PlayerLife] reapply_growth 读取控制器失败", player and player.UserId, tostring(reason_ctrl)) end
     local before
-    if controller then
-      local ok, current = EngineRead.read_field(controller, "WalkSpeed", "PlayerLife.reapply_growth.before")
-      if ok then before = current end
+    if ok_ctrl and controller then
+      local ok, current, reason_b = EngineRead.read_field(controller, "WalkSpeed", "PlayerLife.reapply_growth.before")
+      if ok then before = current elseif reason_b ~= "missing" then print("[PlayerLife] reapply_growth 读取原移速失败", player and player.UserId, tostring(reason_b)) end
     end
+    local growth_err = nil
     if type(growth_writer) == "function" then
-      pcall(growth_writer, player)
+      local ok_gw, res_gw = pcall(growth_writer, player)
+      if not ok_gw or res_gw == false or (type(res_gw) == "table" and res_gw.Ok == false) then growth_err = not ok_gw and tostring(res_gw) or (type(res_gw) == "table" and tostring(res_gw.Error or "returned-false") or "returned-false"); print("[PlayerLife] reapply_growth growth_writer 失败", player and player.UserId, growth_err) end
     end
     local grown
-    if controller and type(growth_writer) == "function" then
-      local ok, current = EngineRead.read_field(controller, "WalkSpeed", "PlayerLife.reapply_growth.after")
-      if ok and finite_number(current) and current > 0 and current ~= before then
-        grown = current
-      end
+    if not growth_err and ok_ctrl and controller and type(growth_writer) == "function" then
+      local ok, current, reason_a = EngineRead.read_field(controller, "WalkSpeed", "PlayerLife.reapply_growth.after")
+      if ok and finite_number(current) and current > 0 and current ~= before then grown = current elseif not ok and reason_a ~= "missing" then print("[PlayerLife] reapply_growth 读取成长后移速失败", player and player.UserId, tostring(reason_a)) end
     end
-    apply_walk(grown)
+    local walk_ok, walk_err = apply_walk(grown); if growth_err then return false, growth_err end; if not walk_ok then return false, walk_err end; return true
   end
 
   local function clear_combat_effects()
@@ -312,7 +312,7 @@ function PlayerLife.mount(s3, player_tree, opts)
     end)
     clear_combat_effects()
     if type(on_downed) == "function" then
-      pcall(on_downed, player)
+      local ok_d, err_d = pcall(on_downed, player); if not ok_d then print("[PlayerLife] on_downed 回调失败", player and player.UserId, tostring(err_d)) end
     end
     publish()
     return true
@@ -359,7 +359,7 @@ function PlayerLife.mount(s3, player_tree, opts)
     elseif player_tree.clear_modifier then
       player_tree:clear_modifier("weak")
     end
-    reapply_growth()
+    local ok_growth, growth_err = reapply_growth(); if not ok_growth then print("[PlayerLife] revive_to 重算成长或移速失败", player and player.UserId, tostring(growth_err)) end
     publish()
     return true
   end
@@ -393,15 +393,15 @@ function PlayerLife.mount(s3, player_tree, opts)
   end
 
   local function publish_notice(actual, hit)
-    if not (remote and type(remote.get_re) == "function") or not (actual > 0) then return end
-    local ok_ev, event = EngineRead.call_method(remote, "get_re", "PlayerLife.publish_notice", "DamageNotice")
-    if ok_ev and event then
-      local _, uid = EngineRead.read_user_id(player, "PlayerLife.publish_notice")
-      local ok_pos, pos = EngineRead.read_player_position(player, "PlayerLife.publish_notice")
-      EngineRead.call_method(event, "FireAllClients", "PlayerLife.publish_notice", {
-        amount = actual, category = hit and hit.category, targetUserId = uid, position = ok_pos and pos or nil,
-      })
-    end
+    if not (actual > 0) then return false, "non-positive" end
+    local _, uid = EngineRead.read_user_id(player, "PlayerLife.publish_notice")
+    local ok_ev, event, reason_ev = EngineRead.call_method(remote, "get_re", "PlayerLife.publish_notice", "DamageNotice")
+    if not ok_ev or not event then print("[PlayerLife] DamageNotice 通道获取失败", uid, tostring(reason_ev or "missing")); return false, reason_ev or "missing" end
+    local ok_pos, pos = EngineRead.read_player_position(player, "PlayerLife.publish_notice")
+    local ok_send, _, reason_send = EngineRead.call_method(event, "FireAllClients", "PlayerLife.publish_notice", {
+      amount = actual, category = hit and hit.category, targetUserId = uid, position = ok_pos and pos or nil,
+    })
+    if not ok_send then print("[PlayerLife] DamageNotice 广播失败", uid, tostring(reason_send)); return false, reason_send end; return true
   end
   local suppress_health_note = false
   local function apply_damage(amount, hit)
@@ -712,7 +712,7 @@ function PlayerLife.mount(s3, player_tree, opts)
       local count = type(inst.ItemCount) == "function" and inst:ItemCount(item_id) or 0
       if count < 1 then
         if platform_api and type(platform_api.shop_action) == "function" then
-          pcall(platform_api.shop_action, player, { action = "OpenAdrenaline" })
+          local ok_shop, err_shop = pcall(platform_api.shop_action, player, { action = "OpenAdrenaline" }); if not ok_shop then print("[PlayerLife] OpenAdrenaline 回调失败", player and player.UserId, tostring(err_shop)) end
         end
         return fail("no-adrenaline")
       end
@@ -803,17 +803,17 @@ function PlayerLife.mount(s3, player_tree, opts)
       if last_help_at and now - last_help_at < survival_cfg.HelpCooldownSec then return end
       last_help_at = now
       help_index = (help_index % #survival_cfg.HelpCries) + 1
-      if remote and type(remote.get_re) == "function" and type(opts.players) == "function" then
-        local ok, event = EngineRead.call_method(remote, "get_re", "PlayerLife.CallHelp", "SurvivalHelp")
+      if type(opts.players) == "function" then
+        local ok, event, reason_ev = EngineRead.call_method(remote, "get_re", "PlayerLife.CallHelp", "SurvivalHelp")
         local origin = position_of(player)
-        if ok and event and origin then
+        if not ok or not event then print("[PlayerLife] SurvivalHelp 通道获取失败", player and player.UserId, tostring(reason_ev or "missing"))
+        elseif origin then
           local _, uid = EngineRead.read_user_id(player, "PlayerLife.CallHelp")
           local _, pname = EngineRead.read_field(player, "Name", "PlayerLife.CallHelp")
           for _, other in ipairs(opts.players()) do
             if other ~= player and distance3(origin, position_of(other)) <= survival_cfg.HelpRadius then
-              EngineRead.call_method(event, "FireClient", "PlayerLife.CallHelp", other, {
-                userId = uid, name = pname, text = survival_cfg.HelpCries[help_index],
-              })
+              local ok_send, _, reason_send = EngineRead.call_method(event, "FireClient", "PlayerLife.CallHelp", other, { userId = uid, name = pname, text = survival_cfg.HelpCries[help_index] })
+              if not ok_send then print("[PlayerLife] SurvivalHelp 下发失败", uid, other and other.UserId, tostring(reason_send)) end
             end
           end
         end
@@ -1002,6 +1002,8 @@ function PlayerLife.mount(s3, player_tree, opts)
   end
 
   player_tree._life_finish = finish_spawn
+  player_tree.apply_walk = function(_, base_override) return apply_walk(base_override) end
+  player_tree.reapply_growth = function(_) return reapply_growth() end
   action_seq = action_seq
 end
 

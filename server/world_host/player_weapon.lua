@@ -31,9 +31,9 @@ local function distance2d(a, b)
 end
 
 local function reply(remote, player, payload)
-  if remote ~= nil then
-    EngineRead.fire_client(remote, "WeaponResult", player, payload, "PlayerWeapon.reply")
-  end
+  local ok, _, reason = EngineRead.fire_client(remote, "WeaponResult", player, payload, "PlayerWeapon.reply")
+  if not ok then
+    print("[PlayerWeapon] WeaponResult 下发失败", player and player.UserId, payload and payload.action, tostring(reason)) end
   return payload
 end
 
@@ -60,7 +60,7 @@ end
 local function magazine_size(data, base)
   if data and type(data.magazine_size) == "function" then
     local ok, size = pcall(data.magazine_size, data, base)
-    if ok and finite(size) then return size end
+    if ok and finite(size) then return size end; print("[PlayerWeapon] magazine_size 计算失败，回退基础弹匣", data.Player and data.Player.UserId, ok and ("invalid=" .. tostring(size)) or tostring(size))
   end
   return base
 end
@@ -162,9 +162,9 @@ end
 
 local function service(name, injected)
   if injected ~= nil then return injected end
-  local ok, value = EngineRead.get_service(name, "PlayerWeapon.service:" .. tostring(name))
+  local ok, value, reason = EngineRead.get_service(name, "PlayerWeapon.service:" .. tostring(name))
   if ok then return value end
-  return nil
+  print("[PlayerWeapon] 获取服务失败", tostring(name), tostring(reason)); return nil
 end
 
 local function melee_index(opts)
@@ -206,7 +206,7 @@ local function radial_damage(opts, center, radius, amount, hit, skip)
   local list = {}
   if players and type(players.GetPlayers) == "function" then
     local ok, got = pcall(players.GetPlayers, players)
-    if ok and type(got) == "table" then list = got end
+    if ok and type(got) == "table" then list = got else print("[PlayerWeapon] radial_damage 读取在线玩家失败", ok and ("invalid=" .. type(got)) or tostring(got)) end
   end
   for _, target in ipairs(list) do
     local skipped = false
@@ -258,7 +258,7 @@ local function gun_hit(opts, player, aim)
   local params = nil
   if RaycastParams then
     local ok, created = pcall(RaycastParams.New)
-    if ok and created then created.FilterDescendantsInstances = { character }; params = created end
+    if ok and created then created.FilterDescendantsInstances = { character }; params = created else print("[PlayerWeapon] RaycastParams.New 失败", player and player.UserId, tostring(created)) end
   end
   local ray_origin = vec(origin.x, origin.y, origin.z, "PlayerWeapon.gun_hit.origin")
   local ray_dir = vec(fx * range, fy * range, fz * range, "PlayerWeapon.gun_hit.dir")
@@ -436,9 +436,9 @@ local function step_flights(session, now)
     elseif flight.visual then
       local next_pos = flight_position(flight, math.max(0, t))
       local pos_vec = vec(next_pos.x, next_pos.y, next_pos.z, "PlayerWeapon.step_flights.pos")
-      if pos_vec then
-        EngineRead.write_field(flight.visual, "Position", pos_vec, "PlayerWeapon.step_flights") -- 视觉位姿失败不影响结算
-      end
+      if not pos_vec then print("[PlayerWeapon] 投掷物视觉位姿构造失败", flight.player and flight.player.UserId, flight.item_id)
+      else local ok_pos, _, reason_pos = EngineRead.write_field(flight.visual, "Position", pos_vec, "PlayerWeapon.step_flights")
+        if not ok_pos then print("[PlayerWeapon] 投掷物视觉位姿更新失败", flight.player and flight.player.UserId, flight.item_id, tostring(reason_pos)) end end
     end
   end
   if #session.flying == 0 and session.has_flights then

@@ -1,4 +1,4 @@
-local GameCfg = require("common.game_cfg")
+local EngineRead = require("common.engine_read"); local GameCfg = require("common.game_cfg")
 local Eligibility = require("common.lottery_eligibility")
 local Draw = require("common.lottery_draw")
 
@@ -71,9 +71,9 @@ function PlayerLottery.mount(scope, tree, opts)
   local lastSeq = nil
 
   local function reply(payload)
-    if disposed or not remote or type(remote.get_re) ~= "function" then return end
-    local ok, event = pcall(remote.get_re, remote, "LotteryResult")
-    if ok and event then event:FireClient(player, payload) end
+    if disposed then return false, "disposed" end
+    local ok, _, reason = EngineRead.fire_client(remote, "LotteryResult", player, payload, "PlayerLottery.reply")
+    if not ok then print("[PlayerLottery] LotteryResult 下发失败", player and player.UserId, payload and payload.action, tostring(reason)); return false, reason end; return true
   end
 
   local function sync_tree()

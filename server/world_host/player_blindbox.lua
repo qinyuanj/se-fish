@@ -1,4 +1,4 @@
-local GameCfg = require("common.game_cfg")
+local EngineRead = require("common.engine_read"); local GameCfg = require("common.game_cfg")
 local BlindboxDraw = require("common.blindbox_draw")
 
 local PlayerBlindbox = {}
@@ -51,9 +51,9 @@ function PlayerBlindbox.mount(scope, tree, opts)
   local lastSeq = nil
 
   local function reply(payload)
-    if disposed or not remote or type(remote.get_re) ~= "function" then return end
-    local ok, event = pcall(remote.get_re, remote, "BlindboxResult")
-    if ok and event then event:FireClient(player, payload) end
+    if disposed then return false, "disposed" end
+    local ok, _, reason = EngineRead.fire_client(remote, "BlindboxResult", player, payload, "PlayerBlindbox.reply")
+    if not ok then print("[PlayerBlindbox] BlindboxResult 下发失败", player and player.UserId, payload and payload.action, tostring(reason)); return false, reason end; return true
   end
   local function sync_tree()
     if not disposed then tree:sync_from_data(data) end

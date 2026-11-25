@@ -1,4 +1,4 @@
-local GameCfg = require('common.game_cfg')
+local EngineRead = require('common.engine_read'); local GameCfg = require('common.game_cfg')
 local Number = require('common.number')
 local FishCatch = require('common.fish_catch')
 local MathWaterJudge = require('common.math_water_judge')
@@ -2499,20 +2499,70 @@ function Mgr.new(opts)
 end
 
 function Mgr:damage_fish(fish, amount)
-  if type(fish) ~= 'table' or self.Fish[fish.Id] ~= fish then return false end
-  if not Number.is_finite_number(amount) or amount <= 0 then return false end
+  if type(fish) ~= 'table' or self.Fish[fish.Id] ~= fish then return false, 'invalid-fish' end
+  if not Number.is_finite_number(amount) or amount <= 0 then return false, 'invalid-amount' end
   local carrier = fish.carrier
-  if not carrier then return false end
-  local health = (carrier.Health or 0) - amount
-  if health < 0 then health = 0 end
-  carrier.Health = health
-  if carrier.Controller then
-    pcall(function() carrier.Controller.Health = health end)
+  if not carrier then return false, 'missing-carrier' end
+  local logger = rawget(self, 'logger')
+  local ctx = { context = 'FishTree.damage_fish (fish=' .. tostring(fish.Id) .. ')', logger = logger }
+  local function log_fail(stage, err)
+    local msg = string.format('[FishTree] damage_fish %s失败 fish=%s error=%s', stage, tostring(fish.Id), tostring(err))
+    if logger and type(logger.error) == 'function' then
+      pcall(logger.error, logger, msg)
+    else
+      print(msg)
+    end
   end
+  local ok_cur, cur_health, reason_cur = EngineRead.read_field(carrier, 'Health', ctx)
+  if not ok_cur then
+    if reason_cur ~= 'missing' then
+      log_fail('读取载体血量', reason_cur)
+      return false, reason_cur
+    end
+    cur_health = 0
+  elseif not Number.is_finite_number(cur_health) then
+    log_fail('读取载体血量', 'non-finite:' .. tostring(cur_health))
+    return false, 'invalid-health'
+  end
+  local health = cur_health - amount
+  if health < 0 then health = 0 end
+  local ok_ctrl, controller, reason_ctrl = EngineRead.read_field(carrier, 'Controller', ctx)
+  if not ok_ctrl and reason_ctrl ~= 'missing' then
+    log_fail('读取控制器', reason_ctrl)
+    return false, reason_ctrl
+  end
+  local prev_ctrl_health = nil
+  if ok_ctrl and controller then
+    local ok_ch, ch_val = EngineRead.read_field(controller, 'Health', ctx)
+    if ok_ch then prev_ctrl_health = ch_val end
+    local ok_cw, _, reason_cw = EngineRead.write_field(controller, 'Health', health, ctx)
+    if not ok_cw then
+      log_fail('写入控制器血量', reason_cw)
+      return false, reason_cw
+    end
+  end
+  local ok_hw, _, reason_hw = EngineRead.write_field(carrier, 'Health', health, ctx)
+  if not ok_hw then
+    if ok_ctrl and controller and prev_ctrl_health ~= nil then
+      EngineRead.write_field(controller, 'Health', prev_ctrl_health, ctx)
+    end
+    log_fail('写入载体血量', reason_hw)
+    return false, reason_hw
+  end
+  local on_state_changed = rawget(self, 'on_state_changed')
   if health <= 0 then
-    self:on_carrier_died(carrier)
-  elseif type(self.on_state_changed) == 'function' then
-    self.on_state_changed(fish)
+    local ok_died, died_res = pcall(self.on_carrier_died, self, carrier)
+    if not ok_died or died_res == false then
+      local err = not ok_died and tostring(died_res) or 'on-carrier-died-failed'
+      log_fail('写入击杀状态', err)
+      return false, err
+    end
+  elseif type(on_state_changed) == 'function' then
+    local ok_chg, chg_err = pcall(on_state_changed, fish)
+    if not ok_chg then
+      log_fail('通知状态变更', chg_err)
+      return false, tostring(chg_err)
+    end
   end
   return true
 end
