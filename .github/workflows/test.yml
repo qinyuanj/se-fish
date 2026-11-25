@@ -85,6 +85,26 @@ jobs:
           "LUA_PATH=$dest\share\lua\5.4\?.lua;$dest\share\lua\5.4\?\init.lua;.\?.lua;.\?\init.lua" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           "LUA_CPATH=$dest\lib\lua\5.4\?.dll;.\?.dll" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
+      - name: 探针：宿主规格
+        run: |
+          Write-Host "NUMBER_OF_PROCESSORS=$env:NUMBER_OF_PROCESSORS"
+          Get-CimInstance Win32_Processor | Select-Object Name, NumberOfCores, NumberOfLogicalProcessors | Format-List
+          Get-CimInstance Win32_ComputerSystem | Select-Object TotalPhysicalMemory | Format-List
+          Get-PSDrive C | Select-Object Used, Free | Format-List
+
+      - name: 探针：串行与并行耗时
+        run: |
+          $sw = [Diagnostics.Stopwatch]::StartNew()
+          lua tools/cli.lua test full
+          $sw.Stop()
+          Write-Host "PROBE 串行 full: $($sw.Elapsed.TotalSeconds)s"
+          foreach ($j in 2, 4, 8) {
+            $sw = [Diagnostics.Stopwatch]::StartNew()
+            lua tools/cli.lua test full --jobs $j
+            $sw.Stop()
+            Write-Host "PROBE --jobs $j full: $($sw.Elapsed.TotalSeconds)s"
+          }
+
       - name: 运行 guards 测试车道（纯文档快速路径）
         if: steps.changes.outputs.docs_only == 'true'
         run: lua tools/cli.lua test guards
