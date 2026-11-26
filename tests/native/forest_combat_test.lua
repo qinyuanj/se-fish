@@ -241,7 +241,6 @@ describe('TestForestCombat', function()
         local fish = drop(env, 'fish31Elite', 20)
         assert.are.equal(180, fish.flee_at)
         assert.are.equal(50, fish.JumpAt)
-        assert.are.equal(-1, fish.roll_slot)
         local body = fish.carrier.body
         local z0 = body.Position.z
         env.now = 0

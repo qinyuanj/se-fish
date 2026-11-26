@@ -35,6 +35,28 @@ local function dropNear(env, dx, dz)
     return fish, p, damages
 end
 
+-- 在真实引擎属性写入边界注入故障，其余载体行为保持不变。
+local function breakLinearVelocity(fish)
+    local real = fish.carrier.body
+    fish.carrier.body = setmetatable({}, {
+        __index = function(_, key) return real[key] end,
+        __newindex = function(_, key, value)
+            if key == 'LinearVelocity' then error('velocity-write-failed') end
+            real[key] = value
+        end,
+    })
+end
+
+local function capturePrint()
+    local saved, lines = _G.print, {}
+    _G.print = function(...)
+        local words = {}
+        for _, value in ipairs({ ... }) do words[#words + 1] = tostring(value) end
+        lines[#lines + 1] = table.concat(words, ' ')
+    end
+    return saved, lines
+end
+
 describe('TestGarCombat', function()
     local env
 
@@ -44,6 +66,74 @@ describe('TestGarCombat', function()
     end)
     after_each(function()
         env:tear_down()
+    end)
+
+    it('test_chase_velocity_failure_logs_and_does_not_start_bite', function()
+        local fish, _, damages = dropNear(env, 10, 0)
+        breakLinearVelocity(fish)
+        local savedPrint, lines = capturePrint()
+        local ok, err = pcall(function() env.mgr:update() end)
+        _G.print = savedPrint
+        assert.is_true(ok, tostring(err))
+        local text = table.concat(lines, '\n')
+        assert.matches('[FishTree]', text, nil, true)
+        assert.matches('追击 LinearVelocity 失败', text, nil, true)
+        assert.matches('fish=' .. tostring(fish.Id), text, nil, true)
+        assert.matches('velocity-write-failed', text, nil, true)
+        assert.is_nil(fish.bite_aim)
+        assert.same({}, damages)
+    end)
+
+    it('test_lock_velocity_failure_aborts_bite_warning', function()
+        local fish, _, damages = dropNear(env, 0, 2)
+        breakLinearVelocity(fish)
+        local savedPrint, lines = capturePrint()
+        local ok, err = pcall(function() env.mgr:update() end)
+        _G.print = savedPrint
+        assert.is_true(ok, tostring(err))
+        local text = table.concat(lines, '\n')
+        assert.matches('锁定前停速 LinearVelocity 失败', text, nil, true)
+        assert.matches('fish=' .. tostring(fish.Id), text, nil, true)
+        assert.matches('velocity-write-failed', text, nil, true)
+        assert.is_nil(fish.bite_aim)
+        assert.is_nil(lastNotice(env, 'lock'))
+        assert.same({}, damages)
+    end)
+
+    it('test_idle_velocity_failure_logs_and_returns_without_bite', function()
+        local fish, _, damages = dropNear(env, 0, 2)
+        env.downed[env.player] = true
+        env.downed[env.other] = true
+        breakLinearVelocity(fish)
+        local savedPrint, lines = capturePrint()
+        local ok, err = pcall(function() env.mgr:update() end)
+        _G.print = savedPrint
+        assert.is_true(ok, tostring(err))
+        local text = table.concat(lines, '\n')
+        assert.matches('无目标停速 LinearVelocity 失败', text, nil, true)
+        assert.matches('fish=' .. tostring(fish.Id), text, nil, true)
+        assert.matches('velocity-write-failed', text, nil, true)
+        assert.is_nil(fish.bite_aim)
+        assert.same({}, damages)
+    end)
+
+    it('test_active_bite_velocity_failure_cancels_without_damage', function()
+        local fish, _, damages = dropNear(env, 0, 2)
+        env.mgr:update()
+        assert.is_not.is_nil(fish.bite_aim)
+        breakLinearVelocity(fish)
+        env.now = gar().BiteCooldownSec
+        local savedPrint, lines = capturePrint()
+        local ok, err = pcall(function() env.mgr:update() end)
+        _G.print = savedPrint
+        assert.is_true(ok, tostring(err))
+        local text = table.concat(lines, '\n')
+        assert.matches('追咬停速 LinearVelocity 失败', text, nil, true)
+        assert.matches('fish=' .. tostring(fish.Id), text, nil, true)
+        assert.matches('velocity-write-failed', text, nil, true)
+        assert.is_nil(fish.bite_aim)
+        assert.are.equal('cancel', lastNotice(env, 'clear').reason)
+        assert.same({}, damages)
     end)
 
     it('test_bite_is_skipped_when_vitals_entry_is_not_wired', function()
@@ -75,12 +165,19 @@ describe('TestGarCombat', function()
         assert.near(0, body.LinearVelocity.z, 1e-6)
         local cd = GameCfg.FishCombat.gar.BiteCooldownSec
         env.now = cd
+        local savedPrint, lines = capturePrint()
         env.mgr:update()
+        _G.print = savedPrint
         assert.same({ 30 }, damages)
         assert.are.equal(1, #env.vitalsCalls)
         assert.same(fish, env.vitalsCalls[1][1].source)
         assert.are.equal('fishAttack', env.vitalsCalls[1][1].category)
         assert.same(env.player, env.vitalsCalls[1][2])
+        assert.are.equal(30, env.vitalsCalls[1][3])
+        assert.are.equal('bite', lastNotice(env, 'clear').reason)
+        local text = table.concat(lines, '\n')
+        assert.matches('[FishTree] 首领追咬 alligatorGar 30 fish=' .. tostring(fish.Id), text, nil, true)
+        assert.not_matches('[FishTree] 命中', text, nil, true)
         env.now = cd + 0.1
         env.mgr:update()
         assert.same({ 30 }, damages)

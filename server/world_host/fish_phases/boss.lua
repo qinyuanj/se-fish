@@ -273,12 +273,16 @@ function BossPhase.install(Mgr, context)
         end
     end
 
-    function Mgr:hit(fish, target, damage, kind)
+    function Mgr:hit(fish, target, damage, kind, log_label)
         if not target or not self.Vitals or type(damage) ~= 'number' or damage <= 0 then return false end
         local hit = self.Vitals:new_hit(fish, 'fishAttack')
         local applied = self.Vitals:apply_hit(hit, target, damage)
         if applied then
-            print('[FishTree] 命中', kind or 'attack', fish.fish_id, damage, 'fish=' .. tostring(fish.Id))
+            if log_label then
+                print('[FishTree] ' .. log_label, fish.fish_id, damage, 'fish=' .. tostring(fish.Id))
+            else
+                print('[FishTree] 命中', kind or 'attack', fish.fish_id, damage, 'fish=' .. tostring(fish.Id))
+            end
         end
         return applied == true
     end
