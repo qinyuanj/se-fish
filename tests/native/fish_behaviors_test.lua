@@ -1,4 +1,4 @@
--- 注册表失败方式：行为参数错位、重复键被覆盖、配置未知键静默注册。
+-- 公开行为合同：init/step 参数顺序；注册完整性结构合同由 fish_behavior_registry_guard_test 持有。
 local species_modules = {
     'server.fish_behaviors.shrimp',
     'server.fish_behaviors.crab',
@@ -48,24 +48,4 @@ describe('FishBehaviors', function()
         assert.same({ 'mgr', fish, 11, 'pos', params, 'shrimp' }, calls.step)
     end)
 
-    it('test_duplicate_combat_key_fails_during_module_merge', function()
-        local ok, err = pcall(load_registry, {
-            ['server.fish_behaviors.shrimp'] = { shrimp = {} },
-            ['server.fish_behaviors.crab'] = { shrimp = {} },
-        })
-        assert.is_false(ok)
-        assert.is_truthy(tostring(err):match('重复.*shrimp'))
-    end)
-
-    it('test_unknown_config_key_fails_during_module_merge', function()
-        local ok, err = pcall(load_registry, {
-            ['server.fish_behaviors.shark'] = { notConfigured = {} },
-        })
-        assert.is_false(ok)
-        assert.is_truthy(tostring(err):match('配置未知键.*notConfigured'))
-    end)
-
-    it('test_gar_is_explicitly_registered', function()
-        assert.is_true(require('server.fish_behaviors').has('gar'))
-    end)
 end)
