@@ -151,6 +151,7 @@ function PlayerGrill.mount(scope, tree, opts)
   local remote = opts.remote
   local save = opts.save
   local clock = tree.clock
+  ---@type table<string, any>
   local session = {
     player = player,
     state = "idle",
@@ -476,6 +477,12 @@ function PlayerGrill.mount(scope, tree, opts)
       return true
     end
     return false
+  end
+
+  if tree.actions and tree.actions.grill then
+    scope:subscribe(tree.actions.grill, function(event)
+      event.result = on_action(player, event.payload)
+    end)
   end
 
   try_recover(clock.now())

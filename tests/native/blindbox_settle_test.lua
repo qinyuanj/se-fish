@@ -220,6 +220,7 @@ describe("盲盒服务端结算（ServerRuntime × MgrSave × MgrPlatform）", f
       current = { epoch = "test-world", itemId = "item7" },
     }
     world:persist_ready()
+    world:reconnect()
     world:pump()
     world:drain()
     assert.same(1, #world:ground_items())
@@ -517,6 +518,7 @@ describe("盲盒服务端结算（ServerRuntime × MgrSave × MgrPlatform）", f
       logs[#logs + 1] = table.concat(parts, "\t")
     end
     local ok, err = pcall(function()
+      world:reconnect()
       world:pump()
       world:drain()
     end)

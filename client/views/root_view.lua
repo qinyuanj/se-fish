@@ -80,7 +80,7 @@ function RootView.mount(root_node, store, options)
 
   options = options or {}
   local node_factory = options.create_node or default_create_node
-  local hud_specs = options.hud or {}
+  local hud_option = options.hud or {}
   local modal_specs = options.modals or {}
   local overlay_specs = options.overlays or {}
   local dock_specs = options.docks or {}
@@ -157,6 +157,10 @@ function RootView.mount(root_node, store, options)
 
     local function mount_body(bs)
       -- 1. 常驻 HUD：挂载于根视图树，不受弹窗切换重建影响
+      local hud_specs = hud_option
+      if type(hud_specs) == "function" then
+        hud_specs = hud_specs(bs, ctx)
+      end
       for index, spec in ipairs(hud_specs) do
         local hud_name = spec.name or ("Hud_" .. tostring(index))
         local mount_fn = spec.mount
@@ -209,6 +213,7 @@ function RootView.mount(root_node, store, options)
         if type(spec) == "table" and type(spec.mount) == "function" then
           local dock = bs:dock("Dock:" .. dock_id)
           active_docks[dock_id] = dock
+          ---@type table<string, { state: { set: fun(self: table, value: any) } }>
           local entries = {}
           bs:on_cleanup(function()
             if active_docks[dock_id] == dock then
@@ -271,11 +276,11 @@ function RootView.mount(root_node, store, options)
     is_alive = behaviour.is_alive,
   }
 
-  function handle:get_dock(dock_id)
+  function handle.get_dock(_, dock_id)
     return active_docks[dock_id]
   end
 
-  function handle:dispose()
+  function handle.dispose(_)
     behaviour:dispose()
   end
 

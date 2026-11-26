@@ -44,19 +44,38 @@ function PlayerBlindbox.mount(scope, tree, opts)
   opts = type(opts) == "table" and opts or {}
   local player, data = tree.player, tree.data
   local save, platform, remote = opts.save, opts.platform, opts.remote
+  local State = opts.state
   local random = opts.random or math.random
-  local working = false
-  local disposed = false
-  local outcomes = {}
-  local lastSeq = nil
+  local working = false ---@type boolean?
+  local lifecycle = { disposed = false } ---@type { disposed: boolean }
+  ---@return boolean
+  local function is_disposed() return lifecycle.disposed end
+  local outcomes = {} ---@type table<string, string?>
+  local lastSeq = nil ---@type number?
+  local frame_active = State.new("PlayerBlindbox.frame_active", false)
+
+  local function sync_frame_active()
+    if lifecycle.disposed then return end
+    local value = bag(data)
+    local active = next(value.deliveries) ~= nil
+    if not active then
+      for _, intent in pairs(value.intents) do
+        if intent.state == "awaiting" or intent.state == "paid" then
+          active = true
+          break
+        end
+      end
+    end
+    frame_active:set(active)
+  end
 
   local function reply(payload)
-    if disposed then return false, "disposed" end
+    if lifecycle.disposed then return false, "disposed" end
     local ok, _, reason = EngineRead.fire_client(remote, "BlindboxResult", player, payload, "PlayerBlindbox.reply")
     if not ok then print("[PlayerBlindbox] BlindboxResult 下发失败", player and player.UserId, payload and payload.action, tostring(reason)); return false, reason end; return true
   end
   local function sync_tree()
-    if not disposed then tree:sync_from_data(data) end
+    if not lifecycle.disposed then tree:sync_from_data(data) end
   end
   local function current_token()
     local session = save and save.sessions[player.UserId]
@@ -79,13 +98,14 @@ function PlayerBlindbox.mount(scope, tree, opts)
     reply(response)
   end
   local function write(kind, transform, done)
-    if disposed or working then return false, "pending" end
+    if lifecycle.disposed or working then return false, "pending" end
     local op, why = save:next_operation(player, kind)
     if not op then return false, why or "pending" end
     working = true
     local accepted, reason = save:execute(player, data, op, transform, function(ok, result)
       working = nil
       if ok then sync_tree() end
+      sync_frame_active()
       done(ok, result, op)
     end)
     if not accepted then
@@ -96,7 +116,7 @@ function PlayerBlindbox.mount(scope, tree, opts)
   end
 
   local settle
-  local pump
+  local pump ---@type fun()
 
   settle = function(draft, count, key)
     local value = bag(draft)
@@ -129,7 +149,9 @@ function PlayerBlindbox.mount(scope, tree, opts)
   end
 
   pump = function()
-    if disposed or working then return end
+    if lifecycle.disposed then return end
+    sync_frame_active()
+    if working then return end
     local value = bag(data)
     for _, key in ipairs(sorted_keys(value.intents)) do
       local intent = value.intents[key]
@@ -213,7 +235,7 @@ function PlayerBlindbox.mount(scope, tree, opts)
   end
 
   local function on_action(actor, payload)
-    if disposed or actor ~= player or type(payload) ~= "table"
+    if lifecycle.disposed or actor ~= player or type(payload) ~= "table"
       or (payload.action ~= "Draw" and payload.action ~= "Query") then
       return false
     end
@@ -280,7 +302,7 @@ function PlayerBlindbox.mount(scope, tree, opts)
     end, function(written, reason)
       if not written then reply({ ok = false, reason = reason }) return end
       local opened, failure = platform:purchase(player, goods(count), "blindbox", function(outcome)
-        if disposed then return end
+        if is_disposed() then return end
         outcomes[key] = outcome
         if outcome ~= "success" then
           reply({ ok = false, reason = outcome, seq = seq, requestId = key })
@@ -297,8 +319,20 @@ function PlayerBlindbox.mount(scope, tree, opts)
     return true
   end
 
+  if tree.actions and tree.actions.blindbox then
+    scope:subscribe(tree.actions.blindbox, function(event)
+      event.result = on_action(player, event.payload)
+    end)
+    scope:subscribe(tree.actions.blindbox_state, function(event)
+      push_state()
+      event.result = true
+    end)
+  end
+  scope:phase("BlindboxActiveFrame", frame_active, function(frame_scope)
+    frame_scope:subscribe(tree.clock.on_frame, function() pump() end)
+  end)
   scope:on_cleanup(function()
-    disposed = true
+    lifecycle.disposed = true
     outcomes = {}
   end)
   push_state()

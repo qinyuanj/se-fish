@@ -2,12 +2,16 @@ local EngineRead = require("common.engine_read"); local GameCfg = require("commo
 
 local PlayerPlatformShop = {}
 
+---@return any
 local function cfg() return GameCfg.Platform end
+---@return table?
 local function placeholder()
   local value = cfg().Placeholder
   return type(value) == "table" and value or nil
 end
+---@return boolean
 local function debug_enabled() return GameCfg.Debug and GameCfg.Debug.Enabled == true end
+---@return boolean
 local function placeholder_allowed()
   local value = placeholder()
   return value and value.Enabled == true and (debug_enabled() or value.AllowInPublish == true) or false
@@ -19,16 +23,21 @@ end
 local function closed_text(reason)
   return reason == "not_open" and cfg().NotOpenText or cfg().UnavailableText
 end
+---@return table?
 local function coin_offer(key)
-  local page = placeholder() and placeholder().CoinPage
+  local value = placeholder()
+  local page = value and value.CoinPage
   local offers = type(page) == "table" and page.Offers or nil
   if type(offers) ~= "table" or type(key) ~= "string" then return nil end
   for _, offer in ipairs(offers) do
     if offer.key == key then return offer end
   end
 end
+---@param offer table?
+---@return integer?
 local function coin_amount(offer)
-  local page = placeholder() and placeholder().CoinPage
+  local value = placeholder()
+  local page = value and value.CoinPage
   local unit = page and page.CoinPerUnit
   if type(offer) ~= "table" or type(offer.price) ~= "number" or type(unit) ~= "number" or unit <= 0 then
     return nil
@@ -63,17 +72,36 @@ function PlayerPlatformShop.mount(scope, tree, opts)
   opts = type(opts) == "table" and opts or {}
   local player, data = tree.player, tree.data
   local save, platform, remote = opts.save, opts.platform, opts.remote
-  local working = false
-  local disposed = false
-  local outcomes = {}
+  local State = opts.state
+  local working = false ---@type boolean?
+  local lifecycle = { disposed = false } ---@type { disposed: boolean }
+  ---@return boolean
+  local function is_disposed() return lifecycle.disposed end
+  local outcomes = {} ---@type table<string, string?>
+  local frame_active = State.new("PlayerPlatformShop.frame_active", false)
+
+  local function sync_frame_active()
+    if lifecycle.disposed then return end
+    local value = bag(data)
+    local active = next(value.deliveries) ~= nil
+    if not active then
+      for _, intent in pairs(value.intents) do
+        if intent.state == "awaiting" or intent.state == "paid" then
+          active = true
+          break
+        end
+      end
+    end
+    frame_active:set(active)
+  end
 
   local function reply(payload)
-    if disposed then return false, "disposed" end
+    if lifecycle.disposed then return false, "disposed" end
     local ok, _, reason = EngineRead.fire_client(remote, "PlatformResult", player, payload, "PlayerPlatformShop.reply")
     if not ok then print("[PlayerPlatformShop] PlatformResult 下发失败", player and player.UserId, payload and payload.action, tostring(reason)); return false, reason end; return true
   end
   local function sync_tree()
-    if not disposed then tree:sync_from_data(data) end
+    if not lifecycle.disposed then tree:sync_from_data(data) end
   end
   local function current_token()
     local session = save and save.sessions[player.UserId]
@@ -93,13 +121,14 @@ function PlayerPlatformShop.mount(scope, tree, opts)
     reply(response)
   end
   local function write(kind, transform, done)
-    if disposed or working then return false, "pending" end
+    if lifecycle.disposed or working then return false, "pending" end
     local operation, reason = save:next_operation(player, kind)
     if not operation then return false, reason or "pending" end
     working = true
     local accepted, failure = save:execute(player, data, operation, transform, function(ok, result)
       working = nil
       if ok then sync_tree() end
+      sync_frame_active()
       done(ok, result, operation)
     end)
     if not accepted then
@@ -109,10 +138,11 @@ function PlayerPlatformShop.mount(scope, tree, opts)
     return accepted, failure
   end
 
-  local pump
+  local pump ---@type fun()
   local function settle(draft, intent, key)
     if intent.kind == "coin" then
       local offer = coin_offer(intent.goods)
+      if not offer then return nil, "unavailable" end
       local amount = coin_amount(offer)
       if not amount then return nil, "unavailable" end
       local before = draft.data.FishCoin
@@ -144,7 +174,9 @@ function PlayerPlatformShop.mount(scope, tree, opts)
   end
 
   pump = function()
-    if disposed or working then return end
+    if lifecycle.disposed then return end
+    sync_frame_active()
+    if working then return end
     local value = bag(data)
     for _, key in ipairs(sorted_keys(value.intents)) do
       local intent = value.intents[key]
@@ -217,8 +249,9 @@ function PlayerPlatformShop.mount(scope, tree, opts)
     return true
   end
   local function open_coin_shop()
-    local page = placeholder() and placeholder().CoinPage
-    if not placeholder_allowed() or type(page) ~= "table" or type(page.Offers) ~= "table" then
+    local value = placeholder()
+    local page = value and value.CoinPage
+    if not value or not placeholder_allowed() or type(page) ~= "table" or type(page.Offers) ~= "table" then
       local reason = closed_reason()
       reply({ ok = false, action = "CoinShop", reason = reason, text = closed_text(reason) })
       return false
@@ -232,13 +265,13 @@ function PlayerPlatformShop.mount(scope, tree, opts)
     end
     reply({
       ok = true, action = "CoinShop", offers = offers, rate = page.CoinPerUnit,
-      currency = page.Unit, notice = placeholder().Notice,
+      currency = page.Unit, notice = value.Notice,
     })
     return true
   end
 
   local function on_action(actor, payload)
-    if disposed or actor ~= player or type(payload) ~= "table" then return false end
+    if lifecycle.disposed or actor ~= player or type(payload) ~= "table" then return false end
     if payload.action == "OpenAdrenaline" then return open_adrenaline() end
     if payload.action == "OpenCoinShop" then return open_coin_shop() end
     if payload.action ~= "Purchase" and payload.action ~= "BuyCoin" and payload.action ~= "Query" then return false end
@@ -267,7 +300,7 @@ function PlayerPlatformShop.mount(scope, tree, opts)
       reply({ ok = false, reason = "busy", seq = seq })
       return true
     end
-    local kind = payload.action == "BuyCoin" and "coin" or "goods"
+    local kind = payload.action == "BuyCoin" and "coin" or "goods" ---@type string
     local goodsKey = payload.goods
     if kind == "coin" then
       if not coin_offer(goodsKey) or not placeholder_allowed() then
@@ -295,7 +328,7 @@ function PlayerPlatformShop.mount(scope, tree, opts)
     end, function(written, failure)
       if not written then reply({ ok = false, reason = failure }) return end
       local function on_outcome(outcome)
-        if disposed then return end
+        if is_disposed() then return end
         outcomes[key] = outcome
         if outcome ~= "success" then
           reply({ ok = false, action = payload.action, goods = goodsKey, reason = outcome, requestId = key, seq = seq })
@@ -318,8 +351,16 @@ function PlayerPlatformShop.mount(scope, tree, opts)
     return true
   end
 
+  if tree.actions and tree.actions.platform_shop then
+    scope:subscribe(tree.actions.platform_shop, function(event)
+      event.result = on_action(player, event.payload)
+    end)
+  end
+  scope:phase("PlatformShopActiveFrame", frame_active, function(frame_scope)
+    frame_scope:subscribe(tree.clock.on_frame, function() pump() end)
+  end)
   scope:on_cleanup(function()
-    disposed = true
+    lifecycle.disposed = true
     outcomes = {}
   end)
   pump()

@@ -156,6 +156,15 @@ function PlayerLottery.mount(scope, tree, opts)
     end)
   end
 
+  if tree.actions and tree.actions.lottery then
+    scope:subscribe(tree.actions.lottery, function(event)
+      event.result = on_action(player, event.payload)
+    end)
+    scope:subscribe(tree.actions.lottery_state, function(event)
+      push_recovered()
+      event.result = true
+    end)
+  end
   scope:on_cleanup(function() disposed = true end)
   push_recovered()
   return { handle = on_action, push_state = push_recovered }

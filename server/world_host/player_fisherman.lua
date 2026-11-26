@@ -220,6 +220,11 @@ function PlayerFisherman.mount(scope, tree, opts)
     return feed(operation, point, anchor)
   end
 
+  if tree.actions and tree.actions.interact then
+    scope:subscribe(tree.actions.interact, function(event)
+      event.result = handle(player, event.payload)
+    end)
+  end
   scope:on_cleanup(function() cleaned = true end)
   return { handle = handle }
 end

@@ -767,6 +767,8 @@ function PlayerWeapon.mount(scope, tree, opts)
   opts = type(opts) == "table" and opts or {}
   local player = tree.player
   local has_flights = State.new("PlayerWeapon.has_flights", false)
+  ---@type table<integer, table<string, any>>
+  local flying = {}
   local session = {
     tree = tree,
     opts = opts,
@@ -775,7 +777,7 @@ function PlayerWeapon.mount(scope, tree, opts)
     melee_at = {},
     fire_at = {},
     mags = {},
-    flying = {},
+    flying = flying,
     has_flights = has_flights,
     tracks = setmetatable({}, { __mode = "k" }),
     throw_seq = 0,
@@ -798,6 +800,12 @@ function PlayerWeapon.mount(scope, tree, opts)
     end
     session.equipped = weapon_id
   end)
+
+  if tree.actions and tree.actions.weapon then
+    scope:subscribe(tree.actions.weapon, function(event)
+      event.result = on_action(session, player, event.payload)
+    end)
+  end
 
   scope:on_cleanup(function()
     clear_reload(session)

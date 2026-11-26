@@ -3,6 +3,27 @@ local EconomyWorld = require("tests.support.economy_world")
 
 local ITEM_BAR = GameCfg.Items.ContainerId.ItemBar
 
+local function track_frame_subscriptions(world)
+  local on_frame = world.runtime.clock.on_frame
+  local original_subscribe = on_frame.subscribe
+  local active = 0
+  on_frame.subscribe = function(self, callback)
+    local handle = original_subscribe(self, callback)
+    local original_dispose = handle.dispose
+    local counted = true
+    active = active + 1
+    handle.dispose = function(disposable)
+      if counted then
+        counted = false
+        active = active - 1
+      end
+      return original_dispose(disposable)
+    end
+    return handle
+  end
+  return function() return active end
+end
+
 describe("服务端抽奖机、盲盒与地图商店宿主入口（#312）", function()
   local world
   before_each(function() world = EconomyWorld.new() end)
@@ -54,6 +75,7 @@ describe("服务端抽奖机、盲盒与地图商店宿主入口（#312）", fun
       current = { epoch = "test-world", itemId = "item7" },
     }
     world:persist_ready()
+    world:reconnect()
     world:pump()
     assert.same(1, #world:ground_items())
     assert.is_not_nil(world.data.extra.lottery.deliveries.old)
@@ -104,6 +126,95 @@ describe("服务端抽奖机、盲盒与地图商店宿主入口（#312）", fun
     assert.is_true(world:platform_action({ action = "BuyCoin", goods = "coinPouch", seq = 1 }))
     assert.same(600, world.data.data.FishCoin)
     assert.same(sequence, world.data:Serialize().meta.sequence)
+  end)
+
+  it("盲盒仅待处理期间按需订阅帧，交付重试后退出且新工作可恢复", function()
+    while world.data:AddItem("carp") do end
+    world:persist_ready()
+    local active_frames = track_frame_subscriptions(world)
+    world:reconnect()
+    assert.same(0, active_frames(), "空闲盲盒与平台商店不得常驻 on_frame")
+
+    world.rolls = { 1000 }
+    world.failDeliveries = true
+    assert.is_true(world:blindbox_draw(1, 1))
+    assert.same(1, active_frames(), "awaiting intent 应恢复盲盒帧订阅")
+    world:clear_events()
+    world:resolve_platform("success")
+    assert.same(1, active_frames(), "待交付记录存在时必须继续重试")
+    world:pump()
+    assert.same(1, active_frames())
+
+    world.failDeliveries = false
+    world:pump()
+    assert.same(0, active_frames(), "交付完成后必须退订")
+    assert.same(1, #world:ground_items())
+    assert.is_nil(next(world.data.extra.lottery.deliveries))
+    local delivery_notices = world:messages("BlindboxResult")
+    assert.same({ true, false }, {
+      delivery_notices[1] and delivery_notices[1].deliveryPending,
+      delivery_notices[2] and delivery_notices[2].deliveryPending,
+    })
+
+    assert.is_true(world:blindbox_draw(1, 2))
+    assert.same(1, active_frames(), "空闲后新购买必须重新激活")
+    world:resolve_platform("cancel")
+    assert.same(0, active_frames())
+
+    assert.is_true(world:blindbox_draw(1, 3))
+    assert.same(1, active_frames())
+    world.runtime:on_player_removing(world.player)
+    world.platform:on_player_removing(world.player)
+    world:drain()
+    assert.same(0, active_frames(), "dispose 必须退订活跃盲盒 Phase")
+    local notices_before_frame = #world:messages("BlindboxResult")
+    world:pump()
+    assert.same(notices_before_frame, #world:messages("BlindboxResult"), "dispose 后不得再运行购买回调")
+  end)
+
+  it("平台商店仅待处理期间按需订阅帧，交付重试后退出且新工作可恢复", function()
+    while world.data:AddItem("carp") do end
+    world:persist_ready()
+    local active_frames = track_frame_subscriptions(world)
+    world:reconnect()
+    assert.same(0, active_frames(), "空闲盲盒与平台商店不得常驻 on_frame")
+
+    world.failDeliveries = true
+    assert.is_true(world:platform_action({ action = "Purchase", goods = "adrenaline1", seq = 1 }))
+    assert.same(1, active_frames(), "awaiting intent 应恢复平台商店帧订阅")
+    world:clear_events()
+    world:resolve_platform("success")
+    assert.same(1, active_frames(), "待交付记录存在时必须继续重试")
+    world:pump()
+    assert.same(1, active_frames())
+
+    world.failDeliveries = false
+    world:pump()
+    assert.same(0, active_frames(), "交付完成后必须退订")
+    assert.same(1, #world:ground_items())
+    assert.is_nil(next(world.data.extra.platformShop.deliveries))
+    local delivery_notices = {}
+    for _, notice in ipairs(world:messages("PlatformResult")) do
+      if notice.action == "Grant" then delivery_notices[#delivery_notices + 1] = notice end
+    end
+    assert.same(2, #delivery_notices)
+    assert.is_true(delivery_notices[1].deliveryPending)
+    assert.is_nil(delivery_notices[2].deliveryPending)
+
+    assert.is_true(world:platform_action({ action = "Purchase", goods = "adrenaline1", seq = 2 }))
+    assert.same(1, active_frames(), "空闲后新购买必须重新激活")
+    world:resolve_platform("cancel")
+    assert.same(0, active_frames())
+
+    assert.is_true(world:platform_action({ action = "Purchase", goods = "adrenaline1", seq = 3 }))
+    assert.same(1, active_frames())
+    world.runtime:on_player_removing(world.player)
+    world.platform:on_player_removing(world.player)
+    world:drain()
+    assert.same(0, active_frames(), "dispose 必须退订活跃平台商店 Phase")
+    local notices_before_frame = #world:messages("PlatformResult")
+    world:pump()
+    assert.same(notices_before_frame, #world:messages("PlatformResult"), "dispose 后不得再运行购买回调")
   end)
 
   it("PlatformHost:Share 兼容 SE 引擎 userdata 玩家对象", function()

@@ -17,13 +17,6 @@ local PlayerTree = require("server.world_host.player_tree")
 local AttrLeaf = require("server.world_host.attr_leaf")
 local ModifierLeaf = require("server.world_host.modifier_leaf")
 local AbilityLeaf = require("server.world_host.ability_leaf")
-local PlayerWeapon = require("server.world_host.player_weapon")
-local PlayerGrill = require("server.world_host.player_grill")
-local PlayerShop = require("server.world_host.player_shop")
-local PlayerFisherman = require("server.world_host.player_fisherman")
-local PlayerLottery = require("server.world_host.player_lottery")
-local PlayerBlindbox = require("server.world_host.player_blindbox")
-local PlayerPlatformShop = require("server.world_host.player_platform_shop")
 local SwingRegistry = require("server.swing_registry")
 local PkDamageFilter = require("server.world_host.pk_damage_filter")
 local FishTree = require("server.world_host.fish_tree")
@@ -98,12 +91,16 @@ function ServerRuntime.new(opts)
   local clock = opts.clock or SpokeClock.new(initial_now)
   local current_players = {}
   local active_players = {}
+  ---@type table<any, any>
   local player_trees = {}
   local fish_dirty = false
   local last_fish_signature = ""
   local re_conns = {}
+  ---@type function?
   local carrier_died_handler = nil
+  ---@type function?
   local bound_shop_action = nil
+  ---@type table<string, any>
   local fish_host = FishTree.new({ clock = clock })
   -- clock 已在构造期显式注入
   fish_host.ai_projection = opts.ai
@@ -128,15 +125,9 @@ function ServerRuntime.new(opts)
     return list
   end
   local leaving_players = {}
+  ---@type table<any, any>
   local ready_queue = {}
 
-  local weapon_sessions = {}
-  local grill_handles = {}
-  local shop_handles = {}
-  local fisherman_handles = {}
-  local lottery_sessions = {}
-  local blindbox_sessions = {}
-  local platform_shop_sessions = {}
   local entity_modifiers = nil
   if opts.entity_modifiers then
     local em_opts = type(opts.entity_modifiers) == "table" and opts.entity_modifiers or {}
@@ -151,6 +142,7 @@ function ServerRuntime.new(opts)
     })
   end
 
+  ---@type table<string, any>
   local runtime = {
     clock = clock,
     world = nil,
@@ -197,7 +189,7 @@ function ServerRuntime.new(opts)
   end
 
   local modifier_service = {}
-  function modifier_service:apply(source, target, kind, seconds)
+  function modifier_service.apply(_, source, target, kind, seconds)
     local tree = player_tree_of(target)
     if tree then return tree:apply_modifier(kind, { duration = seconds, source = source }) end
     if entity_modifiers then return entity_modifiers:apply(source, entity_target(target), kind, seconds) end
@@ -206,36 +198,36 @@ function ServerRuntime.new(opts)
   function modifier_service:apply_weapon_effect(source, target, effect)
     return self:apply(source, target, type(effect) == "table" and effect.Kind or nil)
   end
-  function modifier_service:get_remaining(target, kind)
+  function modifier_service.get_remaining(_, target, kind)
     local tree = player_tree_of(target)
     if tree then return tree:get_modifier_remaining(kind) end
     if entity_modifiers then return entity_modifiers:get_remaining(entity_target(target), kind) end
     return 0
   end
-  function modifier_service:is_controlled(target)
+  function modifier_service.is_controlled(_, target)
     local tree = player_tree_of(target)
     if tree then return tree.states.is_paralyzed:now() == true end
     if entity_modifiers then return entity_modifiers:is_controlled(entity_target(target)) end
     return false
   end
-  function modifier_service:get_move_multiplier(target)
+  function modifier_service.get_move_multiplier(_, target)
     local tree = player_tree_of(target)
     if tree then return tree.memos.move_multiplier:now() end
     if entity_modifiers then return entity_modifiers:get_move_multiplier(entity_target(target)) end
     return 1
   end
-  function modifier_service:clear(target, kind)
+  function modifier_service.clear(_, target, kind)
     local tree = player_tree_of(target)
     if tree then return tree:clear_modifier(kind) end
     if entity_modifiers then return entity_modifiers:clear(entity_target(target), kind) end
     return false
   end
-  function modifier_service:clear_target(target, keepWeak)
+  function modifier_service.clear_target(_, target, keepWeak)
     local tree = player_tree_of(target)
     if tree then tree:clear_all_modifiers(keepWeak) return end
     if entity_modifiers then entity_modifiers:clear_target(entity_target(target)) end
   end
-  function modifier_service:update()
+  function modifier_service.update(_)
     if entity_modifiers then entity_modifiers:step(clock.now()) end
   end
 
@@ -423,7 +415,7 @@ function ServerRuntime.new(opts)
     return self.world
   end
 
-  function runtime:get_player_tree(user_id)
+  function runtime.get_player_tree(_, user_id)
     return player_trees[user_id]
   end
 
@@ -442,7 +434,7 @@ function ServerRuntime.new(opts)
     return quest and quest:notify(kind, player, payload) or false
   end
 
-  function runtime:push_cast_state(player)
+  function runtime.push_cast_state(_, player)
     local tree = player and player_trees[player.UserId]
     if tree and tree.fishing and type(tree.fishing.push_state) == "function" then
       tree.fishing.push_state()
@@ -451,7 +443,7 @@ function ServerRuntime.new(opts)
     return false
   end
 
-  function runtime:abort_cast(player)
+  function runtime.abort_cast(_, player)
     local tree = player and player_trees[player.UserId]
     if tree and tree.fishing and type(tree.fishing.abort) == "function" then
       return tree.fishing.abort() == true
@@ -459,7 +451,7 @@ function ServerRuntime.new(opts)
     return false
   end
 
-  function runtime:set_next_fish(player, fish_id)
+  function runtime.set_next_fish(_, player, fish_id)
     local tree = player and player_trees[player.UserId]
     if tree and tree.fishing and type(tree.fishing.set_next_fish) == "function" then
       return tree.fishing.set_next_fish(fish_id) == true
@@ -467,11 +459,11 @@ function ServerRuntime.new(opts)
     return false
   end
 
-  function runtime:get_entity_modifiers()
+  function runtime.get_entity_modifiers(_)
     return entity_modifiers
   end
 
-  function runtime:is_leaving(user_id)
+  function runtime.is_leaving(_, user_id)
     return leaving_players[user_id] ~= nil
   end
 
@@ -480,17 +472,17 @@ function ServerRuntime.new(opts)
     if type(payload) == "table" and payload.target == GameCfg.Rescue.Target then
       return self.life:rescue_action(actor, payload)
     end
-    local fisherman = fisherman_handles[actor and actor.UserId]
-    return fisherman and fisherman.handle(actor, payload) or false
+    local tree = player_trees[actor and actor.UserId]
+    return tree and tree:dispatch_action("interact", payload) or false
   end
 
   function runtime:dispatch_shop(actor, payload)
     if self:is_leaving(actor and actor.UserId) then return false end
-    local shop = shop_handles[actor and actor.UserId]
-    return shop and shop.handle(actor, payload) or false
+    local tree = player_trees[actor and actor.UserId]
+    return tree and tree:dispatch_action("shop", payload) or false
   end
 
-  function runtime:step(dt, now)
+  function runtime.step(_, dt, now)
     if not Number.is_finite_number(dt) or dt < 0 then
       return
     end
@@ -503,15 +495,6 @@ function ServerRuntime.new(opts)
     end
     if has_method(opts.fish_carrier, "update") then
       safe_call(opts.logger, "fish_carrier_update", function() opts.fish_carrier:update(dt) end)
-    end
-    for _, weapon in pairs(weapon_sessions) do
-      if type(weapon.step) == "function" then weapon:step(clock.now()) end
-    end
-    for _, blindbox in pairs(blindbox_sessions) do
-      if type(blindbox.step) == "function" then blindbox.step() end
-    end
-    for _, shop in pairs(platform_shop_sessions) do
-      if type(shop.step) == "function" then shop.step() end
     end
     if entity_modifiers then
       entity_modifiers:step(clock.now())
@@ -614,26 +597,6 @@ function ServerRuntime.new(opts)
       end
     end
 
-    local base_actions = base_mounts and base_mounts.actions
-    mounts.actions = function(s, pt)
-      if type(base_actions) == "function" then base_actions(s, pt) end
-      local delivery_epoch = opts.delivery_epoch or tostring(world)
-      local blindbox = PlayerBlindbox.mount(s, pt, {
-        remote = opts.remote, save = opts.save, platform = opts.platform,
-        world = world, random = opts.random, delivery_epoch = delivery_epoch,
-      })
-      blindbox_sessions[user_id] = blindbox
-      local shop = PlayerPlatformShop.mount(s, pt, {
-        remote = opts.remote, save = opts.save, platform = opts.platform,
-        world = world, delivery_epoch = delivery_epoch,
-      })
-      platform_shop_sessions[user_id] = shop
-      s:on_cleanup(function()
-        if blindbox_sessions[user_id] == blindbox then blindbox_sessions[user_id] = nil end
-        if platform_shop_sessions[user_id] == shop then platform_shop_sessions[user_id] = nil end
-      end)
-    end
-
     local tree_data = data
     if opts.player_data and type(opts.player_data.get_data_inst) == "function" then
       local ok, inst = pcall(opts.player_data.get_data_inst, opts.player_data, player)
@@ -661,15 +624,24 @@ function ServerRuntime.new(opts)
       player_data = opts.player_data,
       platform = opts.platform,
       fish_carrier = opts.fish_carrier,
+      delivery_epoch = opts.delivery_epoch,
+      physics = opts.physics,
+      weapon_fish_unit = opts.fish_unit,
+      players_service = opts.players_service,
+      ability = opts.ability,
+      lottery_in_range = opts.lottery_in_range,
+      new_hit = function(source, category) return runtime.life:new_hit(source, category) end,
+      apply_hit = function(hit, target, amount) return runtime.life:apply_hit(hit, target, amount) end,
+      apply_effect = function(source, target, kind) return modifier_service:apply(source, target, kind) end,
       damage_filter = runtime._damage_filter,
       damage_context = function() return runtime.life end,
       speed_writer = opts.speed_writer,
       growth_writer = opts.growth_writer,
-      max_health_of = function(player) return runtime._max_health_of and runtime._max_health_of(player) end,
+      max_health_of = function(target_player) return runtime._max_health_of and runtime._max_health_of(target_player) end,
       on_downed = opts.on_player_downed,
       fish_units = opts.fish_units,
-      lookup_tree = function(user_id)
-        return player_trees[user_id]
+      lookup_tree = function(target_user_id)
+        return player_trees[target_user_id]
       end,
       players = function()
         local list = {}
@@ -683,89 +655,6 @@ function ServerRuntime.new(opts)
     player_trees[user_id] = player_tree
     if self.world and self.world.squad then self.world.squad:on_player_added(player) end
     SwingRegistry.set_clock(function() return clock.now() end)
-    player_tree:mount_phase("alive", "weapon", function(scope)
-      local weapon = PlayerWeapon.mount(scope, player_tree, {
-        remote = opts.remote,
-        save = opts.save,
-        physics = opts.physics,
-        players_service = opts.players_service,
-        ability = opts.ability,
-        fish_unit = opts.fish_unit,
-        fish_carrier = opts.fish_carrier,
-        world = opts.world_service,
-        random = opts.random,
-        new_hit = function(source, category)
-          return runtime.life:new_hit(source, category)
-        end,
-        apply_hit = function(hit, target, amount)
-          return runtime.life:apply_hit(hit, target, amount)
-        end,
-        apply_effect = function(source, target, kind)
-          return modifier_service:apply(source, target, kind)
-        end,
-      })
-      weapon_sessions[user_id] = weapon
-      scope:on_cleanup(function()
-        if weapon_sessions[user_id] == weapon then weapon_sessions[user_id] = nil end
-      end)
-    end)
-    player_tree:mount_phase("alive", "grill", function(scope)
-      local grill = PlayerGrill.mount(scope, player_tree, {
-        remote = opts.remote,
-        save = opts.save,
-        world = opts.world_service,
-        create_unit = opts.create_unit,
-        players = function()
-          local list = {}
-          for _, active in pairs(active_players) do
-            list[#list + 1] = active
-          end
-          return list
-        end,
-        new_hit = function(source, category)
-          return runtime.life:new_hit(source, category)
-        end,
-        apply_hit = function(hit, target, amount)
-          return runtime.life:apply_hit(hit, target, amount)
-        end,
-      })
-      grill_handles[user_id] = grill
-      scope:on_cleanup(function()
-        if grill_handles[user_id] == grill then grill_handles[user_id] = nil end
-      end)
-    end)
-    player_tree:mount_phase("alive", "shop", function(scope)
-      local shop = PlayerShop.mount(scope, player_tree, {
-        remote = opts.remote,
-        save = opts.save,
-        quest = player_tree.quest or opts.quest,
-      })
-      shop_handles[user_id] = shop
-      scope:on_cleanup(function()
-        if shop_handles[user_id] == shop then shop_handles[user_id] = nil end
-      end)
-    end)
-    player_tree:mount_phase("alive", "fisherman", function(scope)
-      local fisherman = PlayerFisherman.mount(scope, player_tree, {
-        remote = opts.remote,
-        save = opts.save,
-        quest = player_tree.quest or opts.quest,
-      })
-      fisherman_handles[user_id] = fisherman
-      scope:on_cleanup(function()
-        if fisherman_handles[user_id] == fisherman then fisherman_handles[user_id] = nil end
-      end)
-    end)
-    player_tree:mount_phase("alive", "lottery", function(scope)
-      local lottery = PlayerLottery.mount(scope, player_tree, {
-        remote = opts.remote, save = opts.save, random = opts.random,
-        in_range = opts.lottery_in_range,
-      })
-      lottery_sessions[user_id] = lottery
-      scope:on_cleanup(function()
-        if lottery_sessions[user_id] == lottery then lottery_sessions[user_id] = nil end
-      end)
-    end)
     if player_tree.set_damage_filter and runtime._damage_filter then
       player_tree:set_damage_filter(runtime._damage_filter())
     end
@@ -787,8 +676,8 @@ function ServerRuntime.new(opts)
       if type(opts.bind_cast_action) == "function" then
         opts.bind_cast_action(function(actor, payload)
           if runtime:is_leaving(actor and actor.UserId) then return false end
-          local player_tree = player_trees[actor and actor.UserId]
-          local fishing = player_tree and player_tree.fishing
+          local cast_tree = player_trees[actor and actor.UserId]
+          local fishing = cast_tree and cast_tree.fishing
           if not fishing then return false end
           return fishing:cast(payload)
         end)
@@ -796,8 +685,8 @@ function ServerRuntime.new(opts)
       if type(opts.bind_reel_action) == "function" then
         opts.bind_reel_action(function(actor, kind, payload)
           if runtime:is_leaving(actor and actor.UserId) then return false end
-          local player_tree = player_trees[actor and actor.UserId]
-          local fishing = player_tree and player_tree.fishing
+          local reel_tree = player_trees[actor and actor.UserId]
+          local fishing = reel_tree and reel_tree.fishing
           if not fishing then return false end
           return fishing:reel(kind, payload)
         end)
@@ -823,18 +712,12 @@ function ServerRuntime.new(opts)
       runtime._economy_bound = true
       if type(opts.bind_lottery_action) == "function" then
         opts.bind_lottery_action(function(actor, payload)
-          if runtime:is_leaving(actor and actor.UserId) then return false end
-          local lottery = lottery_sessions[actor and actor.UserId]
-          if lottery and type(lottery.handle) == "function" then return lottery.handle(actor, payload) end
-          return false
+          return runtime:lottery_action(actor, payload)
         end)
       end
       if type(opts.bind_blindbox_action) == "function" then
         opts.bind_blindbox_action(function(actor, payload)
-          if runtime:is_leaving(actor and actor.UserId) then return false end
-          local blindbox = blindbox_sessions[actor and actor.UserId]
-          if blindbox and type(blindbox.handle) == "function" then return blindbox.handle(actor, payload) end
-          return false
+          return runtime:blindbox_action(actor, payload)
         end)
       end
     end
@@ -843,11 +726,8 @@ function ServerRuntime.new(opts)
       if type(opts.bind_grill_action) == "function" then
         opts.bind_grill_action(function(actor, payload)
           if runtime:is_leaving(actor and actor.UserId) then return false end
-          local grill = grill_handles[actor and actor.UserId]
-          if grill and type(grill.handle) == "function" then
-            return grill.handle(actor, payload)
-          end
-          return false
+          local tree = player_trees[actor and actor.UserId]
+          return tree and tree:dispatch_action("grill", payload) or false
         end)
       end
     end
@@ -981,6 +861,7 @@ function ServerRuntime.new(opts)
     if current_players[user_id] ~= player then
       return
     end
+    ---@type { cleaned: boolean, waiting: any }
     leaving = { cleaned = false, waiting = nil }
     leaving_players[user_id] = leaving
     if self.world and self.world.ferry then self.world.ferry:on_player_removing(player) end
@@ -1081,7 +962,7 @@ function ServerRuntime.new(opts)
     return table.concat(parts, ";")
   end
 
-  function runtime:_publish_fish()
+  function runtime._publish_fish(_)
     prune_faulted_fish()
     local list, warnings = {}, {}
     for _, fish in ipairs(sorted_fish_list()) do
@@ -1104,41 +985,34 @@ function ServerRuntime.new(opts)
     fish_dirty = false; last_fish_signature = sig; return true
   end
 
-  function runtime:lottery_action(player, payload)
+  function runtime.lottery_action(_, player, payload)
     if runtime:is_leaving(player and player.UserId) then return false end
-    local lottery = lottery_sessions[player and player.UserId]
-    if not lottery or type(lottery.handle) ~= "function" then return false end
-    return lottery.handle(player, payload)
+    local tree = player_trees[player and player.UserId]
+    return tree and tree:dispatch_action("lottery", payload) or false
   end
 
-  function runtime:blindbox_action(player, payload)
+  function runtime.blindbox_action(_, player, payload)
     if runtime:is_leaving(player and player.UserId) then return false end
-    local blindbox = blindbox_sessions[player and player.UserId]
-    if not blindbox or type(blindbox.handle) ~= "function" then return false end
-    return blindbox.handle(player, payload)
+    local tree = player_trees[player and player.UserId]
+    return tree and tree:dispatch_action("blindbox", payload) or false
   end
 
-  function runtime:lottery_state(player)
+  function runtime.lottery_state(_, player)
     if runtime:is_leaving(player and player.UserId) then return false end
-    local lottery = lottery_sessions[player and player.UserId]
-    if not lottery or type(lottery.push_state) ~= "function" then return false end
-    lottery.push_state()
-    return true
+    local tree = player_trees[player and player.UserId]
+    return tree and tree:dispatch_action("lottery_state") or false
   end
 
-  function runtime:blindbox_state(player)
+  function runtime.blindbox_state(_, player)
     if runtime:is_leaving(player and player.UserId) then return false end
-    local blindbox = blindbox_sessions[player and player.UserId]
-    if not blindbox or type(blindbox.push_state) ~= "function" then return false end
-    blindbox.push_state()
-    return true
+    local tree = player_trees[player and player.UserId]
+    return tree and tree:dispatch_action("blindbox_state") or false
   end
 
-  function runtime:platform_shop_action(player, payload)
+  function runtime.platform_shop_action(_, player, payload)
     if runtime:is_leaving(player and player.UserId) then return false end
-    local shop = platform_shop_sessions[player and player.UserId]
-    if not shop or type(shop.handle) ~= "function" then return false end
-    return shop.handle(player, payload)
+    local tree = player_trees[player and player.UserId]
+    return tree and tree:dispatch_action("platform_shop", payload) or false
   end
 
   function runtime:receive_landed(player, catch)
@@ -1164,7 +1038,7 @@ function ServerRuntime.new(opts)
     return dropped
   end
 
-  function runtime:fish_snapshot(user_id)
+  function runtime.fish_snapshot(_, user_id)
     prune_faulted_fish()
     local list = {}
     for _, fish in ipairs(sorted_fish_list()) do
@@ -1267,7 +1141,6 @@ function ServerRuntime.new(opts)
   runtime.life = LifeFacade.new({
     player_trees = player_trees,
     active_players = active_players,
-    weapon_sessions = weapon_sessions,
     opts = opts,
     get_max_health_of = function() return runtime._max_health_of end,
     get_damage_filter = function() return damage_filter end,
