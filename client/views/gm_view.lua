@@ -25,7 +25,7 @@ function GMView.modal_spec()
   return function(scope, ctx)
     local services = ctx.services or {}
     local panel = Modal.panel(scope, ctx, "ScreenGM", "GM 调试面板")
-    local result = Modal.label(scope, ctx, panel, "LabelGMResult", "等待操作")
+    local result = Modal.place(Modal.label(scope, ctx, panel, "LabelGMResult", "等待操作"), 20, 54, 860, 30)
     local function send(payload)
       if type(services.send_gm) == "function" then services.send_gm(copy(payload)) end
     end
@@ -49,24 +49,29 @@ function GMView.modal_spec()
       if fishPageLabel then fishPageLabel.Text = string.format("鱼类 %d/%d", fishPage, math.max(1, math.ceil(#fishIds / 6))) end
     end
     for index = 1, 6 do
-      fishButtons[index] = Modal.button(scope, ctx, panel, "BtnGMNextFish_" .. tostring(index), "", function()
+      fishButtons[index] = Modal.place(Modal.button(scope, ctx, panel, "BtnGMNextFish_" .. tostring(index), "", function()
         local fishId = fishIds[(fishPage - 1) * 6 + index]
         if fishId then send({ action = "NextFish", fishId = fishId }) end
-      end)
+      end), 20 + (index - 1) * 144, 134, 136, 36)
     end
-    Modal.button(scope, ctx, panel, "BtnGMFishPrev", "上一页鱼", function()
+    Modal.place(Modal.button(scope, ctx, panel, "BtnGMFishPrev", "上一页鱼", function()
       fishPage = math.max(1, fishPage - 1)
       refresh_fish()
-    end)
-    Modal.button(scope, ctx, panel, "BtnGMFishNext", "下一页鱼", function()
+    end), 20, 92, 120, 34)
+    Modal.place(Modal.button(scope, ctx, panel, "BtnGMFishNext", "下一页鱼", function()
       fishPage = math.min(math.max(1, math.ceil(#fishIds / 6)), fishPage + 1)
       refresh_fish()
-    end)
-    fishPageLabel = Modal.label(scope, ctx, panel, "LabelGMFishPage", "")
+    end), 300, 92, 120, 34)
+    fishPageLabel = Modal.place(Modal.label(scope, ctx, panel, "LabelGMFishPage", ""), 150, 92, 140, 34)
     refresh_fish()
     local inputs = {}
-    for _, field in ipairs({ "coin", "upgrade_level", "container", "index", "itemId", "count", "mult", "slot" }) do
-      inputs[field] = ctx.create_node(scope, "EUIInputField", { Parent = panel, Name = "GMInput_" .. field, Text = "" })
+    local input_fields = { "coin", "upgrade_level", "container", "index", "itemId", "count", "mult", "slot" }
+    for index, field in ipairs(input_fields) do
+      local col = (index - 1) % 4
+      local row_idx = math.floor((index - 1) / 4)
+      inputs[field] = Modal.place(
+        ctx.create_node(scope, "EUIInputField", { Parent = panel, Name = "GMInput_" .. field, Text = "" }),
+        20 + col * 218, 182 + row_idx * 42, 206, 34)
     end
     local function state_payload(action)
       local payload = { action = action }
@@ -98,11 +103,16 @@ function GMView.modal_spec()
       { "BtnGMReadState", "显式读档", { action = "ReadState" } },
       { "BtnGMSelectSaveSlot", "切换存档槽", { action = "SelectSaveSlot", slot = 1 } },
     }
-    for _, action in ipairs(actions) do
-      Modal.button(scope, ctx, panel, action[1], action[2], function() send(action[3]) end)
+    local function place_action(btn, idx)
+      local col = (idx - 1) % 5
+      local row_idx = math.floor((idx - 1) / 5)
+      Modal.place(btn, 20 + col * 174, 274 + row_idx * 48, 164, 40)
     end
-    Modal.button(scope, ctx, panel, "BtnGMApplyState", "应用状态补丁", function() send(state_payload("ApplyState")) end)
-    Modal.button(scope, ctx, panel, "BtnGMSelectNamedSlot", "应用下次进图槽", function() send(state_payload("SelectSaveSlot")) end)
+    for index, action in ipairs(actions) do
+      place_action(Modal.button(scope, ctx, panel, action[1], action[2], function() send(action[3]) end), index)
+    end
+    place_action(Modal.button(scope, ctx, panel, "BtnGMApplyState", "应用状态补丁", function() send(state_payload("ApplyState")) end), #actions + 1)
+    place_action(Modal.button(scope, ctx, panel, "BtnGMSelectNamedSlot", "应用下次进图槽", function() send(state_payload("SelectSaveSlot")) end), #actions + 2)
     Modal.close(scope, ctx, panel, "BtnGMClose", "gm")
     scope:effect("GMResultProjection", function(es)
       local value = es:d(ctx.store.gm_result)

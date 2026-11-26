@@ -21,12 +21,12 @@ function LotteryView.modal_spec()
   return function(scope, ctx)
     local services = ctx.services or {}
     local panel = Modal.panel(scope, ctx, "ScreenLottery", "抽奖机")
-    local bet = Modal.label(scope, ctx, panel, "LabelLotteryBet", "")
-    local result_label = Modal.label(scope, ctx, panel, "LabelLotteryResult", "")
+    local bet = Modal.place(Modal.label(scope, ctx, panel, "LabelLotteryBet", ""), 20, 68, 860, 48)
+    local result_label = Modal.place(Modal.label(scope, ctx, panel, "LabelLotteryResult", ""), 20, 290, 860, 90)
     local reels = {
-      left = Modal.label(scope, ctx, panel, "LabelReelLeft", "?"),
-      right = Modal.label(scope, ctx, panel, "LabelReelRight", "?"),
-      middle = Modal.label(scope, ctx, panel, "LabelReelMiddle", "?"),
+      left = Modal.place(Modal.label(scope, ctx, panel, "LabelReelLeft", "?"), 60, 144, 240, 120),
+      middle = Modal.place(Modal.label(scope, ctx, panel, "LabelReelMiddle", "?"), 330, 144, 240, 120),
+      right = Modal.place(Modal.label(scope, ctx, panel, "LabelReelRight", "?"), 600, 144, 240, 120),
     }
     local seq, request_seq = 0, nil
     local draw
@@ -72,7 +72,7 @@ function LotteryView.modal_spec()
       end
     end
 
-    draw = Modal.button(scope, ctx, panel, "BtnLotteryDraw", "抽奖", function()
+    draw = Modal.place(Modal.button(scope, ctx, panel, "BtnLotteryDraw", "抽奖", function()
       if awaiting or spinning or not selected_slot then return end
       seq = seq + 1
       request_seq = seq
@@ -81,7 +81,7 @@ function LotteryView.modal_spec()
       if type(services.send_lottery) == "function" then
         services.send_lottery({ action = "Draw", slot = selected_slot, seq = seq })
       end
-    end)
+    end), 330, 410, 240, 64)
     Modal.close(scope, ctx, panel, "BtnLotteryClose", "lottery")
 
     scope:effect("LotteryBetProjection", function(es)
