@@ -102,7 +102,7 @@ local function load_registry(overrides)
     return ok, result
 end
 
-describe('FishBehaviorSeamGuard', function()
+describe('FishBehaviorRegistryGuard', function()
     it('宿主生命周期与相位源码不含九键字面量（注释除外）', function()
         local failures = combat_literals('server/world_host/fish_tree.lua')
         for name in lfs.dir('server/world_host/fish_phases') do

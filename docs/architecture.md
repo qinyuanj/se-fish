@@ -24,7 +24,7 @@
 - `common.util` 含引擎等待、通知和 `REUtil` 依赖，不是纯 foundation；它与 `REUtil` 同处 L3。
 - `common.game_cfg` 含配置解析与玩法计算，归 L4；纯配置内容归 L5 的 `common.cfg`。
 - `server.ability_api` 与本图技能行为同属 L2。行为需要的 `Vitals`、`FishCarrier`、`GM`、`Modifier` 由 `server/main.lua` 通过 `AbilityAPI.BehaviorServices` 注入，行为不得反向加载宿主组合根。
-- `server.fish_behaviors` 注册表在加载时拒绝已配置未注册、配置未知和重复的 `Combat` 键；`FishTree` 与 `CombatPhase` 只保留生命周期、状态优先级、战斗原语、协议和资源清理，不持有物种键字面量或物种招式本体。物种模块不得静态依赖 `server.world_host`。
+- `server.fish_behaviors` 注册表在加载时拒绝已配置未注册、配置未知和重复的 `Combat` 键；`FishTree` 与 `CombatPhase` 只保留生命周期、状态优先级、战斗原语、协议和资源清理。对 `GameCfg.FishCombat` 注册行为，宿主不持有物种键字面量或物种招式本体；电鳗仍属 `GameCfg.Ability` / `update_eel` 路径，不扩大本次迁移。物种模块不得静态依赖 `server.world_host`。
 - `server.swing_registry` 独立持有带 TTL、一次性消费的挥砍登记，`server.world_host.player_weapon` 与 `melee_hit` 共同依赖它。时钟异常时拒绝登记与消费；失效读取、施法失败及玩家退出时清除登记，施法失败回复失败。
 - 武器持续效果由 `server/world_host/modifier_leaf.lua`（经 `PlayerTree`/`PlayerEffects` 与 `entity_modifiers`）实现，近战行为与枪击不经过 `FishAbility` 转发。
 - 三端脚本目录与文件名不得与 SE 内置服务名同名（`World`、`MapData`、`Game`、`Camps`、`*Service` 一类）：编辑器按服务名索引脚本树，同名目录在同步时被整棵跳过并报 warn「不会生效」（2026-11-24 实测 `server/World/`）。服务端世界宿主包因此叫 `server/world_host`（[ADR-0033](adr/0033-script-names-must-not-shadow-se-services.md)）；新增顶层目录或脚本文件前先按此核对。
