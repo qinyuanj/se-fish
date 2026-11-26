@@ -72,11 +72,12 @@ function PlatformShopView.modal_spec()
         awaiting = false
         for key in pairs(buttons) do actions[key] = nil end
         for _, offer in ipairs(result.offers or {}) do
+          ---@type table|userdata|nil
           local button = buttons[offer.key]
           if button then
             actions[offer.key] = result.action == "CoinShop" and "BuyCoin" or "Purchase"
-            button.ButtonText = string.format("%s（%s）", offer.name or offer.key,
-              tostring(offer.price or offer.beans or 0))
+            Modal.set_button_text(button, string.format("%s（%s）", offer.name or offer.key,
+              tostring(offer.price or offer.beans or 0)))
           end
         end
         result_label.Text = result.notice or "请选择商品"

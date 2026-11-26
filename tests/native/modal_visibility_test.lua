@@ -35,6 +35,15 @@ local function is_background_node(node)
   return tostring(node.Name or ""):match("^ShopRowBackground") ~= nil
 end
 
+local function has_visible_text(node, text)
+  for _, child_node in pairs(node.children) do
+    if child_node.Visible ~= false and child_node.Text == text and (child_node.FontSize or 0) > 0 then
+      return true
+    end
+  end
+  return false
+end
+
 local function assert_tree_layout_valid(parent, modal_label)
   if parent == nil then error(modal_label .. " 缺少容器节点") end
   local psize = parent.Size
@@ -59,6 +68,10 @@ local function assert_tree_layout_valid(parent, modal_label)
       end
       if not is_background_node(node) then
         siblings[#siblings + 1] = { node = node, l = l, r = r, b = b, t = t }
+      end
+      if node.Kind == "EUIButton" and type(node.ButtonText) == "string" and node.ButtonText ~= ""
+          and not has_visible_text(node, node.ButtonText) then
+        error(string.format("%s 按钮 %s 缺少可见文字", modal_label, tostring(node.Name)))
       end
       if next(node.children) ~= nil then
         assert_tree_layout_valid(node, modal_label)
@@ -124,6 +137,7 @@ describe("弹窗定位与配色", function()
           Size = props and props.Size,
           TouchEnabled = kind == "EUIButton",
         })
+        node.FontSize = props and props.FontSize
         if props and props.ButtonText ~= nil then
           node.ButtonText = props.ButtonText
         end
@@ -175,6 +189,11 @@ describe("弹窗定位与配色", function()
     assert.is_true(summary.Position.y > detail.Position.y)
     assert.is_true(detail.Position.y > fish_btn.Parent.Position.y)
     assert.is_true(fish_btn.Position.x > 0 and fish_btn.Position.y > 0)
+
+    Eui.click(child(root, "BtnCompendiumGrade_rare"))
+    assert_tree_layout_valid(panel, "图鉴极品页")
+    Eui.click(child(root, "BtnCompendiumPage_2"))
+    assert_tree_layout_valid(panel, "图鉴第二区极品页")
   end)
 
   it("地图商店、抽奖机、盲盒、GM、钓场商店弹窗内部控件互不重叠且不越出面板", function()

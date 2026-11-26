@@ -44,7 +44,7 @@ function GMView.modal_spec()
         local fishId = fishIds[first + index]
         button.Visible = fishId ~= nil
         button.TouchEnabled = fishId ~= nil
-        button.ButtonText = fishId and GameCfg.Fish[fishId].Name or ""
+        Modal.set_button_text(button, fishId and GameCfg.Fish[fishId].Name or "")
       end
       if fishPageLabel then fishPageLabel.Text = string.format("鱼类 %d/%d", fishPage, math.max(1, math.ceil(#fishIds / 6))) end
     end

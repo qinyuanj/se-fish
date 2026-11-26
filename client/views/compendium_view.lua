@@ -134,7 +134,7 @@ function CompendiumView.modal_spec()
           Modal.place(row.button, 0, 0, 276, 40, 40)
           visible_index = visible_index + 1
         end
-        row.button.ButtonText = (bag.unlocked and bag.unlocked[row.id]) and row.fish.Name or "？？？"
+        Modal.set_button_text(row.button, (bag.unlocked and bag.unlocked[row.id]) and row.fish.Name or "？？？")
         if row.id == selected then
           local personal = bag.weights and bag.weights[row.id] or nil
           local recordText = Records.describe(record)
