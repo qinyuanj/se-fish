@@ -1,4 +1,4 @@
--- #84 迁移：虾池精英 / 首领战斗（原 tests/gameplay/shrimp_combat_test.lua，10 例）。
+-- #84 迁移：虾池精英 / 首领战斗（原 tests/gameplay/shrimp_combat_test.lua，12 例）。
 -- 覆盖范围：FishTree 的 shrimp / dragon 状态机——连击两下 20 后接尾刺位移、雨云 6 个秒槽不延长不追溯、
 -- 俯冲与眩晕互斥、脚本化追击按 dt 位移且不越过咬距、移除与逃跑时限清招式与预警。
 -- 沿用 tests/support/fish_combat 共享夹具；describe/it 名称保留旧类名与方法名，
@@ -64,6 +64,20 @@ describe('TestShrimpCombat', function()
         assert.are.equal(7, #env.vitalsCalls - start)
         env.now = 60; env.mgr:update()
         assert.are.equal('rain', fish.Move.Name)
+    end)
+
+    it('test_drop_initializes_dragon_rhythm', function()
+        local fish = drop(env, 'fish16Boss')
+        assert.are.equal(30, fish.ActiveUntil)
+        assert.are.equal(30, fish.SpecialAt)
+        assert.are.equal(0, fish.combo)
+    end)
+
+    it('test_drop_initializes_shrimp_rhythm', function()
+        local fish = drop(env, 'fish15Elite')
+        assert.are.equal(15, fish.ActiveUntil)
+        assert.are.equal(0, fish.SpecialAt)
+        assert.are.equal(0, fish.combo)
     end)
 
     it('test_rain_jitter_keeps_six_slots_without_extending_duration', function()
