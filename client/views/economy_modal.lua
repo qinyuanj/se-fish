@@ -11,21 +11,11 @@ local PANEL_W, PANEL_H = 900, 600
 local TITLE_FONT = 30
 local LABEL_FONT = 26
 
-EconomyModal.PANEL_W = PANEL_W
-EconomyModal.PANEL_H = PANEL_H
-
 local function make_color(rgba)
   if type(Color) ~= "table" or type(Color.New) ~= "function" then
     return nil
   end
   return Color.New(rgba[1], rgba[2], rgba[3], rgba[4])
-end
-
-local function make_vec2(x, y)
-  if type(Vector2) == "table" and type(Vector2.New) == "function" then
-    return Vector2.New(x, y)
-  end
-  return { x = x, y = y }
 end
 
 ---@param node table|userdata
@@ -77,8 +67,8 @@ function EconomyModal.place(node, x, y, w, h, parent_h)
     local _, py = read_xy(parent and read_field(parent, "Size") or nil)
     ph = py or PANEL_H
   end
-  node.Position = make_vec2(x + w / 2, ph - y - h / 2)
-  node.Size = make_vec2(w, h)
+  node.Position = Vector2.New(x + w / 2, ph - y - h / 2)
+  node.Size = Vector2.New(w, h)
   return node
 end
 
@@ -86,7 +76,7 @@ function EconomyModal.panel(scope, ctx, name, title)
   local cx, cy = panel_center(ctx)
   local panel = ctx.create_node(scope, "EUIImage", {
     Parent = ctx.root_node, Name = name, Visible = true,
-    Position = make_vec2(cx, cy), Size = make_vec2(PANEL_W, PANEL_H),
+    Position = Vector2.New(cx, cy), Size = Vector2.New(PANEL_W, PANEL_H),
     Image = ColorBlockImage,
   })
   local bg = make_color(PANEL_BG)

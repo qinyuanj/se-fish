@@ -8,7 +8,7 @@ local function child(root, name) return root:FindFirstChild(name, true) end
 
 describe("钓场商店统一视图行为", function()
   local ctx
-  local old_vector
+  local old_vector, old_vector2
 
   local function rows_for(page)
     return GameCfg.Shop.list_for_page(ctx.stand.Level, page, true)
@@ -30,7 +30,9 @@ describe("钓场商店统一视图行为", function()
 
   before_each(function()
     old_vector = rawget(_G, "Vector3")
+    old_vector2 = rawget(_G, "Vector2")
     _G.Vector3 = { New = function(x, y, z) return { x = x, y = y, z = z } end }
+    _G.Vector2 = { New = function(x, y) return { x = x, y = y } end }
     ctx = { sent = {}, notices = {}, seq = 10, stand = GameCfg.Shop.Stands[2] }
     ctx.store, ctx.writer = ClientStore.new({ initial_now = 1000 })
     ctx.root = Eui.node({ Name = "UIRoot" })
@@ -69,6 +71,7 @@ describe("钓场商店统一视图行为", function()
   after_each(function()
     ctx.root:Destroy()
     _G.Vector3 = old_vector
+    _G.Vector2 = old_vector2
   end)
 
   it("打开显示全部页签、第一页与实时金币，详情为空且不可购买", function()

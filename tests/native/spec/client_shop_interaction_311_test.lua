@@ -35,12 +35,17 @@ local function mount(store, options)
 end
 
 describe("客户端商店弹窗与场景气泡（#311）", function()
-  local old_vector
+  local old_vector, old_vector2
   before_each(function()
     old_vector = rawget(_G, "Vector3")
+    old_vector2 = rawget(_G, "Vector2")
     _G.Vector3 = { New = function(x, y, z) return { x = x, y = y, z = z } end }
+    _G.Vector2 = { New = function(x, y) return { x = x, y = y } end }
   end)
-  after_each(function() _G.Vector3 = old_vector end)
+  after_each(function()
+    _G.Vector3 = old_vector
+    _G.Vector2 = old_vector2
+  end)
 
   it("进入范围建商店气泡，点击开弹窗，切换弹窗和离开范围均对称回收", function()
     local store, writer = ClientStore.new({ initial_now = 1000 })

@@ -1,6 +1,6 @@
 -- 弹窗可见性与内部布局：
 -- #276/#378 守住面板落在界面中心、面板与按钮带不透明底色；
--- #379 守住六个弹窗内部可见控件按 EUI 中心语义（原点左下、Y 向上）落点，互不重叠且不越出父容器。
+-- #379 守住六个弹窗内部可见控件按 EUI 中心语义（原点左下、Y 向上）落点，除背景节点外，其余同级控件互不重叠且不越出父容器。
 local GameCfg = require("common.game_cfg")
 local ClientStore = require("client.store.client_store")
 local RootView = require("client.views.root_view")
@@ -36,10 +36,14 @@ local function is_background_node(node)
 end
 
 local function assert_tree_layout_valid(parent, modal_label)
-  assert.is_not_nil(parent, modal_label .. " 缺少容器节点")
+  if parent == nil then error(modal_label .. " 缺少容器节点") end
   local psize = parent.Size
-  assert.is_table(psize, modal_label .. " 容器缺少 Size: " .. tostring(parent.Name))
-  assert.is_true(psize.x > 0 and psize.y > 0, modal_label .. " 容器尺寸非法: " .. tostring(parent.Name))
+  if type(psize) ~= "table" then
+    error(modal_label .. " 容器缺少 Size: " .. tostring(parent.Name))
+  end
+  if not (psize.x > 0 and psize.y > 0) then
+    error(modal_label .. " 容器尺寸非法: " .. tostring(parent.Name))
+  end
 
   local siblings = {}
   for _, node in pairs(parent.children) do
