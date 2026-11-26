@@ -123,50 +123,6 @@ function CombatPhase.install(Mgr, context)
             string.format('facing=%.2f,%.2f', facing.x, facing.z), 'fish=' .. tostring(fish.Id))
     end
 
-    function Mgr:update_chase(fish, now, pos, params)
-        local species = GameCfg.Fish[fish.fish_id]
-        local body = fish.carrier.body
-        local aim = fish.bite_aim
-        if aim then
-            local valid, apos = self:is_target_valid(aim.Target, pos, params)
-            if not valid or not withinBite(pos, apos, params) then
-                self:end_bite(fish, 'cancel')
-            else
-                pcall(function() body.LinearVelocity = Vector3.New(0, 0, 0) end)
-                if now < aim.strike_at then return end
-                if FishBehaviorKit.in_head_zone(pos, fish.facing, apos, params) then
-                    self:end_bite(fish, 'bite')
-                    local hit = self.Vitals:new_hit(fish, 'fishAttack')
-                    self.Vitals:apply_hit(hit, aim.Target, species.Attack)
-                    print('[FishTree] 首领追咬', fish.fish_id, species.Attack, 'fish=' .. tostring(fish.Id))
-                else
-                    self:end_bite(fish, 'miss')
-                    print('[FishTree] 首领咬空（绕后）', fish.fish_id, 'target=' .. tostring(aim.Target.UserId),
-                        'fish=' .. tostring(fish.Id))
-                end
-            end
-        end
-        local target, tpos = self:choose_target(fish, pos, params)
-        if not target then
-            if self.ai then self.ai:custom(fish) end
-            pcall(function() body.LinearVelocity = Vector3.New(0, 0, 0) end)
-            return
-        end
-        if not withinBite(pos, tpos, params) then
-            local ux, uz = flatDirection(tpos.x - pos.x, tpos.z - pos.z)
-            local speed = self:speed(fish)
-            self:face(fish, ux, uz, params)
-            if self.ai then
-                self.ai:Chase(fish, target.Character, speed, params.BiteRange, params.AggroRange)
-                return
-            end
-            pcall(function() body.LinearVelocity = Vector3.New((ux or 0) * speed, 0, (uz or 0) * speed) end)
-            return
-        end
-        pcall(function() body.LinearVelocity = Vector3.New(0, 0, 0) end)
-        self:lock_bite(fish, target, pos, tpos, now, params)
-    end
-
     function Mgr:end_move(fish, reason)
         if not fish.Move then return end
         fish.Move, fish.MoveName = nil, nil

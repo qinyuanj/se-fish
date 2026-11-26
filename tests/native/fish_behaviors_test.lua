@@ -62,4 +62,8 @@ describe('FishBehaviors', function()
         assert.is_false(ok)
         assert.is_truthy(tostring(err):match('配置未知键.*notConfigured'))
     end)
+
+    it('test_gar_is_explicitly_registered', function()
+        assert.is_true(require('server.fish_behaviors').has('gar'))
+    end)
 end)

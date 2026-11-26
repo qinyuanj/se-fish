@@ -9,9 +9,10 @@ local SwordfishBehaviors = require('server.fish_behaviors.swordfish')
 local SharkBehaviors = require('server.fish_behaviors.shark')
 local WalrusBehaviors = require('server.fish_behaviors.walrus')
 local OrcaBehaviors = require('server.fish_behaviors.orca')
+local GarBehaviors = require('server.fish_behaviors.gar')
 local modules = {
     ShrimpBehaviors, CrabBehaviors, SwordfishBehaviors,
-    SharkBehaviors, WalrusBehaviors, OrcaBehaviors,
+    SharkBehaviors, WalrusBehaviors, OrcaBehaviors, GarBehaviors,
 }
 for _, module in ipairs(modules) do
     for combat, behavior in pairs(module) do
@@ -32,8 +33,6 @@ local function legacy_step(mgr, fish, now, pos, params, combat)
         mgr:update_shrimp_combat(fish, now, pos, params, combat)
     elseif combat == 'kingCrab' and now >= (fish.ActiveUntil or math.huge) then
         mgr:stun_fish(fish, now, params)
-    elseif combat == 'gar' then
-        mgr:update_chase(fish, now, pos, params)
     elseif legacy_methods[combat] then
         mgr[legacy_methods[combat]](mgr, fish, now, pos, params)
     else
