@@ -25,7 +25,7 @@ function PlatformShopView.modal_spec()
   return function(scope, ctx)
     local services = ctx.services or {}
     local panel = Modal.panel(scope, ctx, "ScreenPlatform", "地图商店")
-    local result_label = Modal.label(scope, ctx, panel, "LabelPlatformResult", "请选择商品")
+    local result_label = Modal.place(Modal.label(scope, ctx, panel, "LabelPlatformResult", "请选择商品"), 20, 64, 860, 64)
     Modal.close(scope, ctx, panel, "BtnPlatformClose", "platform")
     local seq, request_seq = 0, nil
     local awaiting = false
@@ -48,7 +48,7 @@ function PlatformShopView.modal_spec()
       local row = GameCfg.Platform.Goods[key]
       definitions[#definitions + 1] = { key = key, name = row.name, beans = row.beans }
     end
-    for _, offer in ipairs(definitions) do
+    for index, offer in ipairs(definitions) do
       local button = Modal.button(scope, ctx, panel, "BtnPlatformOffer_" .. offer.key, offer.name or offer.key, function()
         local action = actions[offer.key]
         if not action or awaiting then return end
@@ -60,7 +60,7 @@ function PlatformShopView.modal_spec()
           services.send_platform({ action = action, goods = offer.key, seq = seq })
         end
       end)
-      buttons[offer.key] = button
+      buttons[offer.key] = Modal.place(button, 20 + ((index - 1) % 2) * 440, 148 + math.floor((index - 1) / 2) * 72, 420, 56)
     end
     refresh_buttons()
 
@@ -72,11 +72,12 @@ function PlatformShopView.modal_spec()
         awaiting = false
         for key in pairs(buttons) do actions[key] = nil end
         for _, offer in ipairs(result.offers or {}) do
+          ---@type table|userdata|nil
           local button = buttons[offer.key]
           if button then
             actions[offer.key] = result.action == "CoinShop" and "BuyCoin" or "Purchase"
-            button.ButtonText = string.format("%s（%s）", offer.name or offer.key,
-              tostring(offer.price or offer.beans or 0))
+            Modal.set_button_text(button, string.format("%s（%s）", offer.name or offer.key,
+              tostring(offer.price or offer.beans or 0)))
           end
         end
         result_label.Text = result.notice or "请选择商品"

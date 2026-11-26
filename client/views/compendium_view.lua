@@ -12,14 +12,6 @@ local GRADE_ORDER = {
 }
 local RANK = { normal = 1, rare = 2, elite = 3, boss = 4 }
 
--- EUI 的 Position 是节点中心、原点在父节点左下角：布局表写的是左上角，落点要加半个尺寸。
-local function set_rect(node, x, y, w, h)
-  if type(Vector2) == "table" and type(Vector2.New) == "function" then
-    node.Position = Vector2.New(x + w / 2, y + h / 2)
-    node.Size = Vector2.New(w, h)
-  end
-end
-
 local function apply_active_style(btn, active)
   if type(Color) == "table" and type(Color.New) == "function" then
     btn.ButtonNormalColor = active and Color.New(255, 200, 80, 255) or Color.New(70, 80, 95, 255)
@@ -104,12 +96,9 @@ function CompendiumView.modal_spec()
   return function(scope, ctx)
     local services = ctx.services or {}
     local panel = Modal.panel(scope, ctx, "ScreenCompendium", "图鉴与全服纪录")
-    local summary = Modal.label(scope, ctx, panel, "LabelCompendiumSummary", "图鉴加载中")
-    local achievement = Modal.label(scope, ctx, panel, "LabelCompendiumAchievement", "通关成就：数据暂不可用")
-    local detail = Modal.label(scope, ctx, panel, "LabelCompendiumDetail", "选择一条鱼查看纪录")
-    set_rect(summary, 20, 146, 420, 28)
-    set_rect(achievement, 460, 146, 420, 28)
-    set_rect(detail, 20, 180, 860, 72)
+    local summary = Modal.place(Modal.label(scope, ctx, panel, "LabelCompendiumSummary", "图鉴加载中"), 20, 150, 420, 30)
+    local achievement = Modal.place(Modal.label(scope, ctx, panel, "LabelCompendiumAchievement", "通关成就：数据暂不可用"), 460, 150, 420, 30)
+    local detail = Modal.place(Modal.label(scope, ctx, panel, "LabelCompendiumDetail", "选择一条鱼查看纪录"), 20, 190, 860, 90)
 
     local page = 1
     local grade = "normal"
@@ -141,11 +130,11 @@ function CompendiumView.modal_spec()
         if is_visible then
           local col = visible_index % 3
           local row_idx = math.floor(visible_index / 3)
-          set_rect(row.node, 20 + col * 280, 260 + row_idx * 44, 260, 36)
-          set_rect(row.button, 0, 0, 260, 36)
+          Modal.place(row.node, 20 + col * 288, 294 + row_idx * 48, 276, 40)
+          Modal.place(row.button, 0, 0, 276, 40, 40)
           visible_index = visible_index + 1
         end
-        row.button.ButtonText = (bag.unlocked and bag.unlocked[row.id]) and row.fish.Name or "？？？"
+        Modal.set_button_text(row.button, (bag.unlocked and bag.unlocked[row.id]) and row.fish.Name or "？？？")
         if row.id == selected then
           local personal = bag.weights and bag.weights[row.id] or nil
           local recordText = Records.describe(record)
@@ -163,11 +152,15 @@ function CompendiumView.modal_spec()
       local zoneIndex = 1
       for indexZone, zone in ipairs(GameCfg.Zones) do if zone.Id == item.fish.ZoneId then zoneIndex = indexZone break end end
       local node = ctx.create_node(scope, "EUIImage", { Parent = panel, Name = "CompendiumRow_" .. tostring(index), Visible = false })
+      if type(Color) == "table" and type(Color.New) == "function" then
+        node.Color = Color.New(0, 0, 0, 0)
+      end
       local button = Modal.button(scope, ctx, node, "BtnCompendiumFish_" .. item.id, item.fish.Name, function()
         selected, record = item.id, nil
         if type(services.request_records) == "function" then services.request_records(item.id) end
         refresh()
       end)
+      Modal.place(button, 0, 0, 276, 40, 40)
       views[#views + 1] = { id = item.id, fish = item.fish, zone = zoneIndex, node = node, button = button }
     end
 
@@ -176,7 +169,7 @@ function CompendiumView.modal_spec()
         page = index
         refresh()
       end)
-      set_rect(btn, 20 + (index - 1) * 120, 56, 112, 36)
+      Modal.place(btn, 20 + (index - 1) * 124, 58, 116, 36)
       page_buttons[index] = btn
     end
 
@@ -185,12 +178,11 @@ function CompendiumView.modal_spec()
         grade = item.id
         refresh()
       end)
-      set_rect(btn, 20 + (index - 1) * 140, 100, 128, 36)
+      Modal.place(btn, 20 + (index - 1) * 140, 104, 128, 36)
       grade_buttons[item.id] = btn
     end
 
-    local close_btn = Modal.close(scope, ctx, panel, "BtnCompendiumClose", "compendium")
-    set_rect(close_btn, 800, 12, 80, 36)
+    Modal.close(scope, ctx, panel, "BtnCompendiumClose", "compendium")
 
     scope:effect("CompendiumProjection", function(es)
       snapshot = es:d(ctx.store.compendium)

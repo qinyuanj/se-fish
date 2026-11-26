@@ -25,8 +25,10 @@ local function collect_names(node, seen, duplicates)
 end
 
 describe("商店统一视图的动态节点合同", function()
-  local root, writer
+  local root, writer, old_vector2
   before_each(function()
+    old_vector2 = rawget(_G, "Vector2")
+    _G.Vector2 = { New = function(x, y) return { x = x, y = y } end }
     local store
     store, writer = ClientStore.new({ initial_now = 1000 })
     root = Eui.node({ Name = "UIRoot" })
@@ -44,7 +46,10 @@ describe("商店统一视图的动态节点合同", function()
     writer:set_coin(100)
     writer:open_modal("shop", { stand = GameCfg.Shop.Stands[1] })
   end)
-  after_each(function() root:Destroy() end)
+  after_each(function()
+    root:Destroy()
+    _G.Vector2 = old_vector2
+  end)
 
   it("关键控件与所有页签都按公开名字创建", function()
     for _, name in ipairs(REQUIRED) do assert.is_not_nil(child(root, name), name) end

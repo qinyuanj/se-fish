@@ -48,8 +48,8 @@ function BlindboxView.modal_spec()
   return function(scope, ctx)
     local services = ctx.services or {}
     local panel = Modal.panel(scope, ctx, "ScreenBlindbox", GameCfg.Blindbox.HintText)
-    local pity = Modal.label(scope, ctx, panel, "LabelBlindboxPity", "")
-    local result_label = Modal.label(scope, ctx, panel, "LabelBlindboxResult", "")
+    local pity = Modal.place(Modal.label(scope, ctx, panel, "LabelBlindboxPity", ""), 20, 64, 860, 44)
+    local result_label = Modal.place(Modal.label(scope, ctx, panel, "LabelBlindboxResult", ""), 20, 196, 860, 384)
     local seq, request_seq, request_id = 0, nil, nil
     local single, ten
     local awaiting, awaiting_elapsed = false, 0
@@ -97,10 +97,10 @@ function BlindboxView.modal_spec()
         services.send_blindbox({ action = "Draw", count = count, seq = seq })
       end
     end
-    single = Modal.button(scope, ctx, panel, "BtnBlindboxSingle",
-      string.format("单抽（%d金豆）", GameCfg.Platform.Goods.blindboxSingle.beans), function() draw(1) end)
-    ten = Modal.button(scope, ctx, panel, "BtnBlindboxTen",
-      string.format("十连（%d金豆）", GameCfg.Platform.Goods.blindboxTen.beans), function() draw(10) end)
+    single = Modal.place(Modal.button(scope, ctx, panel, "BtnBlindboxSingle",
+      string.format("单抽（%d金豆）", GameCfg.Platform.Goods.blindboxSingle.beans), function() draw(1) end), 140, 124, 280, 56)
+    ten = Modal.place(Modal.button(scope, ctx, panel, "BtnBlindboxTen",
+      string.format("十连（%d金豆）", GameCfg.Platform.Goods.blindboxTen.beans), function() draw(10) end), 480, 124, 280, 56)
     Modal.close(scope, ctx, panel, "BtnBlindboxClose", "blindbox")
 
     scope:effect("BlindboxInventoryProjection", function(es)

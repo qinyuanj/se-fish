@@ -2,6 +2,7 @@ local GameCfg = require("common.game_cfg")
 local BodyScale = require("common.body_scale")
 local Spoke = require("common.packages.spoke.api")
 local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
+local Modal = require("client.views.economy_modal")
 local ViewUtil = require("client.views.view_util")
 local State = Spoke.State
 
@@ -212,40 +213,43 @@ function ShopView.modal_spec()
     local page = State.new("ShopView.page", pages[1])
     local selected = State.new("ShopView.selected", nil)
     local hint = State.new("ShopView.hint", ShopView.shop_text.coin_page_hint)
-    local panel = ctx.create_node(scope, "EUIImage", { Name = "ScreenShop", Visible = true })
-    ctx.create_node(scope, "EUITextLabel", {
-      Name = "LabelShopTitle", Parent = panel, Text = GameCfg.Shop.HintText,
-    })
-    local coin_label = text_node(ctx, scope, panel, "LabelCurCoin")
-    local list_panel = ctx.create_node(scope, "EUIImage", { Name = "ShopListPanel", Parent = panel })
-    local list = ctx.create_node(scope, "EUIImage", { Name = "ShopList", Parent = list_panel })
-    local coin_panel = ctx.create_node(scope, "EUIImage", { Name = "ShopCoinPanel", Parent = panel })
-    local detail_panel = ctx.create_node(scope, "EUIImage", { Name = "ShopDetailPanel", Parent = panel })
-    local hint_label = text_node(ctx, scope, coin_panel, "LabelCoinPageHint")
-    local platform = ctx.create_node(scope, "EUIButton", {
+    local panel = Modal.panel(scope, ctx, "ScreenShop", GameCfg.Shop.HintText)
+    local coin_label = Modal.place(text_node(ctx, scope, panel, "LabelCurCoin"), 620, 60, 260, 36)
+    local list_panel = Modal.place(ctx.create_node(scope, "EUIImage", { Name = "ShopListPanel", Parent = panel }), 20, 108, 520, 472)
+    local list = Modal.place(ctx.create_node(scope, "EUIImage", { Name = "ShopList", Parent = list_panel }), 0, 0, 520, 472, 472)
+    local coin_panel = Modal.place(ctx.create_node(scope, "EUIImage", { Name = "ShopCoinPanel", Parent = panel }), 20, 108, 860, 472)
+    local detail_panel = Modal.place(ctx.create_node(scope, "EUIImage", { Name = "ShopDetailPanel", Parent = panel }), 556, 108, 324, 472)
+    local hint_label = Modal.place(text_node(ctx, scope, coin_panel, "LabelCoinPageHint"), 40, 120, 780, 64, 472)
+    local platform = Modal.place(ctx.create_node(scope, "EUIButton", {
       Name = "BtnOpenPlatformShop", Parent = coin_panel, TouchEnabled = true,
-    })
-    text_node(ctx, scope, platform, "LabelOpenPlatformShop").Text = ShopView.shop_text.open_platform_shop
+    }), 300, 220, 260, 60, 472)
+    Modal.place(text_node(ctx, scope, platform, "LabelOpenPlatformShop"), 0, 0, 260, 60, 60).Text = ShopView.shop_text.open_platform_shop
     local detail = {}
-    for _, name in ipairs({ "LabelShopDetailName", "LabelShopDetailDesc", "LabelShopDetailPrice",
-        "LabelShopDetailLimit", "LabelShopDetailUpgrade" }) do
-      detail[name] = text_node(ctx, scope, detail_panel, name)
+    local detail_layout = {
+      { "LabelShopDetailName", 88, 12, 224, 36 },
+      { "LabelShopDetailPrice", 118, 52, 194, 28 },
+      { "LabelShopDetailDesc", 12, 90, 300, 140 },
+      { "LabelShopDetailLimit", 12, 242, 300, 36 },
+      { "LabelShopDetailUpgrade", 12, 288, 300, 36 },
+    }
+    for _, spec in ipairs(detail_layout) do
+      detail[spec[1]] = Modal.place(text_node(ctx, scope, detail_panel, spec[1]), spec[2], spec[3], spec[4], spec[5], 472)
     end
-    local detail_icon = ctx.create_node(scope, "EUIImage", { Name = "ImageShopDetailIcon", Parent = detail_panel })
-    local detail_coin = ctx.create_node(scope, "EUIImage", { Name = "ImageShopDetailCoin", Parent = detail_panel })
-    local buy = ctx.create_node(scope, "EUIButton", {
+    local detail_icon = Modal.place(ctx.create_node(scope, "EUIImage", { Name = "ImageShopDetailIcon", Parent = detail_panel }), 12, 12, 64, 64, 472)
+    local detail_coin = Modal.place(ctx.create_node(scope, "EUIImage", { Name = "ImageShopDetailCoin", Parent = detail_panel }), 88, 54, 24, 24, 472)
+    local buy = Modal.place(ctx.create_node(scope, "EUIButton", {
       Name = "BtnShopBuyDetail", Parent = detail_panel, TouchEnabled = false,
-    })
-    local buy_label = text_node(ctx, scope, buy, "LabelShopBuyDetail")
+    }), 42, 396, 240, 56, 472)
+    local buy_label = Modal.place(text_node(ctx, scope, buy, "LabelShopBuyDetail"), 0, 0, 240, 56, 56)
 
     for index, name in ipairs(pages) do
-      local tab = ctx.create_node(scope, "EUIButton", {
+      local tab = Modal.place(ctx.create_node(scope, "EUIButton", {
         Name = "BtnShopPage" .. index, Parent = panel, TouchEnabled = true,
-      })
-      text_node(ctx, scope, tab, "LabelShopPage" .. index).Text = name
-      local indicator = ctx.create_node(scope, "EUIImage", {
+      }), 20 + (index - 1) * 144, 60, 134, 36)
+      Modal.place(text_node(ctx, scope, tab, "LabelShopPage" .. index), 0, 0, 134, 30, 36).Text = name
+      local indicator = Modal.place(ctx.create_node(scope, "EUIImage", {
         Name = "ImageShopTabIndicator" .. index, Parent = tab,
-      })
+      }), 0, 31, 134, 5, 36)
       indicator.Visible = index == 1
       ctx.connect(scope, tab.OnClicked, function()
         SpokeRuntime.batch(function()
@@ -256,10 +260,7 @@ function ShopView.modal_spec()
       end)
     end
 
-    local close = ctx.create_node(scope, "EUIButton", {
-      Name = "BtnShopClose", Parent = panel, ButtonText = ShopView.shop_text.close, TouchEnabled = true,
-    })
-    ctx.connect(scope, close.OnClicked, function() close_modal(ctx, "shop") end)
+    Modal.close(scope, ctx, panel, "BtnShopClose", "shop")
 
     local function current_rows()
       if page:now() == coin_page then return {} end
@@ -283,18 +284,20 @@ function ShopView.modal_spec()
       end
       local rows = current_rows()
       for index, row in ipairs(rows) do
-        local button = ctx.create_node(es, "EUIButton", {
+        local col = (index - 1) % 2
+        local row_idx = math.floor((index - 1) / 2)
+        local button = Modal.place(ctx.create_node(es, "EUIButton", {
           Name = "ShopRow" .. index, Parent = list, TouchEnabled = row.selectable,
-        })
-        text_node(ctx, es, button, "ShopRowName" .. index).Text = row.name
-        text_node(ctx, es, button, "ShopRowPrice" .. index).Text = row.priceText
-        text_node(ctx, es, button, "ShopRowState" .. index).Text = row.stateText
-        text_node(ctx, es, button, "ShopRowNew" .. index).Text = row.newText
-        local icon = ctx.create_node(es, "EUIImage", { Name = "ShopRowIcon" .. index, Parent = button })
+        }), 4 + col * 258, 4 + row_idx * 38, 250, 34, 472)
+        Modal.place(text_node(ctx, es, button, "ShopRowName" .. index), 36, 3, 104, 28, 34).Text = row.name
+        Modal.place(text_node(ctx, es, button, "ShopRowPrice" .. index), 164, 3, 40, 28, 34).Text = row.priceText
+        Modal.place(text_node(ctx, es, button, "ShopRowState" .. index), 206, 3, 40, 14, 34).Text = row.stateText
+        Modal.place(text_node(ctx, es, button, "ShopRowNew" .. index), 206, 17, 40, 14, 34).Text = row.newText
+        local icon = Modal.place(ctx.create_node(es, "EUIImage", { Name = "ShopRowIcon" .. index, Parent = button }), 4, 3, 28, 28, 34)
         icon.Visible = row.icon ~= nil and row.icon ~= ""
         if row.icon then icon.Image = row.icon end
-        ctx.create_node(es, "EUIImage", { Name = "ShopRowBackground" .. index, Parent = button })
-        ctx.create_node(es, "EUIImage", { Name = "ShopRowCoin" .. index, Parent = button })
+        Modal.place(ctx.create_node(es, "EUIImage", { Name = "ShopRowBackground" .. index, Parent = button }), 0, 0, 250, 34, 34)
+        Modal.place(ctx.create_node(es, "EUIImage", { Name = "ShopRowCoin" .. index, Parent = button }), 142, 7, 20, 20, 34)
         ctx.connect(es, button.OnClicked, function()
           if row.selectable then selected:set(index) end
         end)
