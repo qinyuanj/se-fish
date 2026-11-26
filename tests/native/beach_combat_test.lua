@@ -346,6 +346,38 @@ describe('TestBeachCombat', function()
 
     -- ===== 海象 =====
 
+    it('test_walrus_charge_cancels_when_target_dies_during_windup', function()
+        local fish, damages = drop(env, 'fish39Elite', 20)
+        local move = startCharge(env, fish)
+        damages = {}
+        env.player.Character.Controller.Health = 0
+        env.now = move.at + walrusParams().ChargeWindupSec - 0.5
+        env.mgr:update()
+        assert.is_nil(fish.Move, '前摇目标失效必须立即取消突击')
+        assert.same({}, damages, '取消的突击不得结算伤害')
+        env.now = move.at + walrusParams().ChargeWindupSec + 0.5
+        env.mgr:update()
+        assert.same({}, damages, '取消后到达原定冲锋时间也不得补结算')
+    end)
+
+    it('test_walrus_charge_deduplicates_player_across_frames', function()
+        local fish, damages = drop(env, 'fish39Elite', 20)
+        local params = walrusParams()
+        local move, bp = startCharge(env, fish)
+        damages = {}
+        env.player.Character.Controller.TakeDamage = function(_, d) damages[#damages + 1] = d end
+        env.player.Character.Position = vec(bp.x, 2, bp.z + 2)
+        env.now = move.at + params.ChargeWindupSec + 0.1
+        env.mgr:update()
+        assert.same({ 120 }, damages, '玩家进入突击走廊时结算一次')
+        env.now = move.at + params.ChargeWindupSec + 0.2
+        env.mgr:update()
+        assert.same({ 120 }, damages, '同一玩家连续两帧处于接触范围仍只结算一次')
+        env.now = move.strike_at + 0.1
+        env.mgr:update()
+        assert.same({ 120 }, damages, '收招帧不得重复结算同一玩家')
+    end)
+
     it('test_walrus_charge_displacement_failure_cancels_without_damage', function()
         local fish, damages = drop(env, 'fish39Elite', 20)
         local params = walrusParams()
