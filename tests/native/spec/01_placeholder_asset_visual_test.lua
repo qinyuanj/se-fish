@@ -5,8 +5,8 @@
 -- 1-15 本身是 C 级试玩条款（状态 blocked）；本文件只取证它的**代码路径**：可见、可打、可放下
 -- 三件事各自走到业务入口，不声称编辑器里已经看到。试玩结论仍归 C 级会话记录。
 --
--- 只走业务入口：common/game_cfg 的应用结果、server/Mgr/MgrLoot 的地面实例入口、
--- server/Mgr/MgrFishCarrier 的生成与伤害接缝、server/Mgr/MgrFishUnit 的抓举/放下状态机；
+-- 只走业务入口：common/game_cfg 的应用结果、地面掉落物实例入口、
+-- FishCarrier 的生成与受击入口、FishTree 的抓举/放下状态机；
 -- data/OfficialAsset.lua 是官方资产表的独立真源（编辑器导出、只读），用来判「资源 ID 真的存在」。
 -- 失败方式（先列后写）：
 --   1. 占位层顺手改了判定数值：血量、攻击、速度、逃跑秒、基础重量、基础价、饵、竿级、权重或掉落；

@@ -44,7 +44,7 @@ local function alive(env)
   return n
 end
 
-describe("客户端收线覆盖层宿主接缝（#302）", function()
+describe("客户端收线覆盖层宿主入口（#302）", function()
   local saved_vector, saved_color
   before_each(function()
     saved_vector, saved_color = rawget(_G, "Vector2"), rawget(_G, "Color")

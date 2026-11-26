@@ -7,7 +7,7 @@
 -- 迁移纪律：
 --   * 旧 set_up/tear_down 的替身（全局引擎 + 4 个 package.loaded 管理器模块）改成逐案例 before_each/after_each，
 --     快照在夹具动作之前取，恢复在案例失败时也执行（Busted 的 after_each 在 before_each 抛错后仍跑）；
---     server/ability_behaviors/melee_hit.lua 与 eel_discharge.lua 这两个公开接缝上观察，不伸手进实现；
+--     server/ability_behaviors/melee_hit.lua 与 eel_discharge.lua 这两个公开行为入口上观察，不伸手进实现；
 --   * server/main.lua 的接线守卫读源码断言：assertStrContains 的 plain 子串语义用
 --     assert.matches(needle, haystack, nil, true) 保留（`.` 在 Lua pattern 里是任意字符，不能当 pattern 跑）。
 local GameCfg = require('common.game_cfg')

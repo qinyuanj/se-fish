@@ -27,7 +27,7 @@ local function grill_anchor()
   end
 end
 
-describe("服务端烧烤点宿主接缝（#310）", function()
+describe("服务端烧烤点宿主入口（#310）", function()
   local ctx
 
   local function drain()

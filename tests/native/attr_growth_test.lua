@@ -6,7 +6,7 @@
 --      恢复顺序依赖导致成长丢失（#131 已知边界的根因）；
 --   3. 非法输入（负数/小数/NaN/非数）把属性带偏；
 --   4. 血量上限与 BodyScale 钉表漂移（两处各算一遍）。
--- 接缝：纯逻辑模块，不碰引擎；数值全部来自 GameCfg 钉表（SpeedPotion/Survival/StatusEffects/BodyScale）。
+-- 被测入口：common.attr_growth 纯函数，不碰引擎；数值全部来自 GameCfg 钉表（SpeedPotion/Survival/StatusEffects/BodyScale）。
 -- describe/it 名沿用旧类名与方法名，案例顺序沿用旧 LuaUnit 的字典序执行序。
 local GameCfg = require('common.game_cfg')
 local AttrGrowth = require('common.attr_growth')

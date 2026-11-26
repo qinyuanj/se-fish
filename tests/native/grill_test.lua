@@ -102,7 +102,7 @@ describe("烤制值的存档字段", function()
         GameCfg.Debug = ctx.oldDebug
     end)
 
-    -- PlayerData 存档字段接缝：曲线下降段取出的倍率 <1，序列化往返不丢、不被 Migrate 拒收
+    -- PlayerData 存档往返契约：曲线下降段取出的倍率 <1，序列化往返不丢、不被 Migrate 拒收
     it("test_sub_one_rate_survives_save_roundtrip", function()
         assert.is_true(ctx.data:AddItem('bass', 1.5, 0.75))
         local snapshot = ctx.data:Serialize()
@@ -165,7 +165,7 @@ describe("烧烤曲线纯函数", function()
     end)
 end)
 
--- 切片四：吃通道接缝（operate 两步吃烤鱼时把格位倍率带给 Vitals）
+-- 切片四：吃通道接线（operate 两步吃烤鱼时把格位倍率带给 Vitals）
 describe("吃通道传递烤制倍率", function()
     local ctx
 

@@ -260,7 +260,7 @@ describe('第 6 节 官方 AI 目标选择接线（哥斯拉贯通）', function
         env:advance(0.6)
         assert.is_nil(officialFocus(fish), '离线玩家仍被选中')
 
-        -- 濒死：生命接缝拒伤（与 MgrSurvival:Hooks 同语义），累计伤害最高也不参与选择。
+        -- 濒死：生命入口拒伤（与生存濒死语义一致），累计伤害最高也不参与选择。
         -- 断言读业务裁决口 choose_target：官方包只在目标单位失效时清焦点，血量锁 1 的濒死者
         -- 单位仍然有效，不能拿镜面焦点当「没被选中」的证据。
         local wounded = spawn(3703)

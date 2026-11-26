@@ -43,7 +43,7 @@ local function child(root, name)
   return root:FindFirstChild(name, true)
 end
 
-describe("客户端生存蒙版宿主接缝（#298）", function()
+describe("客户端生存蒙版宿主入口（#298）", function()
   local saved_vector, saved_color
 
   before_each(function()

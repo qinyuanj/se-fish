@@ -131,7 +131,7 @@ local function last_state(events, player)
   return found
 end
 
-describe("风神之翼与哥斯拉存活相位宿主接缝（#299）", function()
+describe("风神之翼与哥斯拉存活相位宿主入口（#299）", function()
   local runtime, events, re, player, other, data, other_data
   local saved_assets
   local created

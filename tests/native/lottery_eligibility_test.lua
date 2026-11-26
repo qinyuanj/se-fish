@@ -5,7 +5,7 @@
 --   3. 烤过的极品鱼获/信物仍能投：库存格位 saved.cooked 标记、快照或读档后的顶层 cooked 任一被漏看；
 --   4. 读档后烤制状态丢失（只剩 slot.k 压缩字段）导致烤过的又变可投；
 --   5. 未知物品、多件、倍率/烤制值越界或类型错的畸形条目被放行，或直接抛错。
--- seam：真实 GameCfg 物品表 + 真实 PlayerData 的 AddItem / 快照 / Serialize / ApplySave。
+-- 被测入口：common.lottery_eligibility 配合真实 GameCfg 物品表与 PlayerData 公共接口。
 -- 迁移说明：案例按旧 LuaUnit 实际执行序（方法名字典序）逐个 it 注册；
 --   lu.fail(msg) 在 luassert 无对应断言，按语义用 error(msg, 0) 保持原消息不带位置前缀。
 local GameCfg = require("common.game_cfg")

@@ -3,7 +3,7 @@
 -- #38 失败方式（编码前列出）：沧龙砸击永不落地/重复伤害、巡航不叼人、不移入水域；
 -- 哥斯拉吐息零伤害、跟踪必中、无方向；阶段被携带挡住/跨阈值重复切换/旧预警残留；
 -- 正常血量死亡、逃跑时限、玩家离线后还结算旧招。
--- 接缝沿用 #37 的真实管理器 spawn_landed/drop/update、Controller 和对外预警。
+-- 被测入口与启用点沿用 #37（isle_combat 夹具替换引擎边界，驱动真实 spawn_landed/drop/update）。
 --
 -- 旧文件靠 `TestVolcanoCombat.set_up = TestReefCombat.set_up` 继承礁石岛夹具（LuaUnit 的全局类名互访）。
 -- Busted 下两个 spec 各自 require 同一份 tests/support/isle_combat.lua，逐案例 open/close；

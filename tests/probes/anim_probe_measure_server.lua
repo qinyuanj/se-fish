@@ -1,18 +1,18 @@
--- #162 接缝 A 取证（服务端）：摆 1 单位参照方块，量探针单位的碰撞 AABB，或清理方块。
+-- #162 动画与碰撞特征探针取证（服务端）：摆 1 单位参照方块，量探针单位的碰撞 AABB，或清理方块。
 -- BasePart.Size 对自定义蒙皮网格和方块都返回 (1,1,1)，不能当尺寸；尺寸看同框方块，碰撞看本探针扫描。
--- 参数先用一次 exec 写进 _G.SeamAMeasure，再 exec 本文件（-p server）；结果用 log grep SEAMA_MEASURE 取回。
---   _G.SeamAMeasure = {
+-- 参数先用一次 exec 写进 _G.AnimProbeMeasure，再 exec 本文件（-p server）；结果用 log grep ANIM_PROBE_MEASURE 取回。
+--   _G.AnimProbeMeasure = {
 --     action = 'aabb',                -- 'cube' | 'aabb'（默认）| 'cleanup'
 --     at = {x, y, z},                 -- cube：方块底面中心（方块原点在底面）
 --     range = 10,                     -- aabb：单方向最大扫描距离
 --   }
--- aabb 用 0.01 小盒沿三轴逐 0.02 探测 SeamAAnimProbe 的碰撞 AABB；GetPartBoundsInBox 判的是 AABB，
+-- aabb 用 0.01 小盒沿三轴逐 0.02 探测 AnimProbeUnit 的碰撞 AABB；GetPartBoundsInBox 判的是 AABB，
 -- 任一过 AABB 内点的轴线都能扫出该轴完整范围。播放中重扫可判断碰撞体是否随动画变化。
-local CUBE, PROBE, CUBE_MESH = 'SeamACube', 'SeamAAnimProbe', 'official://mesh/59268'
+local CUBE, PROBE, CUBE_MESH = 'AnimProbeCube', 'AnimProbeUnit', 'official://mesh/59268'
 local STEP = 0.02
 local world, physics = game:GetService('World'), game:GetService('PhysicsService')
-local args = _G.SeamAMeasure or {}
-local function log(...) print('SEAMA_MEASURE', ...) end
+local args = _G.AnimProbeMeasure or {}
+local function log(...) print('ANIM_PROBE_MEASURE', ...) end
 
 local function find(name)
     local found = {}

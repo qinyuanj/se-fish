@@ -145,7 +145,7 @@ describe('条款 9 PK 伤害过滤', function()
     env.filter = require('server.world_host.pk_damage_filter').make({
       party = env.party, zone_markers = require('common.zone_markers'), zones = env.cfg.Zones,
     })
-    -- 生产装配：过滤接缝与区域真源都经 mgr 注入，不缓存队伍归属。
+    -- 生产装配：过滤函数与区域真源都经宿主注入，不缓存队伍归属。
     env.vitals.Party = env.party
     env.vitals.ZoneMarkers = require('common.zone_markers')
     env.vitals:set_damage_filter(function(hit, target, mgr) return env.filter(hit, target, mgr) end)

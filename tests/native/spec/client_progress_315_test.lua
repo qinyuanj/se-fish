@@ -10,7 +10,7 @@ local Eui = require("tests.support.eui_double")
 
 local function child(root, name) return root:FindFirstChild(name, true) end
 
-describe("客户端图鉴纪录与剩余模态宿主接缝（#315）", function()
+describe("客户端图鉴纪录与剩余模态宿主入口（#315）", function()
   local root, store, writer, view, sent, oldVector, oldColor
   before_each(function()
     oldVector, oldColor = rawget(_G, "Vector2"), rawget(_G, "Color")

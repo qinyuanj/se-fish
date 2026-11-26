@@ -60,7 +60,7 @@
 
 ## 验证审查
 
-对本次修改涉及的每条规则，检查实现、关键分支与失败路径；引擎交互、通信和生命周期改动覆盖双端行为、非法请求与重复进入；命名按[命名](#命名)核对。验证方式与交付证据见开发工作流的[测试纪律](docs/agents/workflow.md#测试纪律)和[完成判据](docs/agents/workflow.md#完成判据)，缺少证据的标为未验证；来源与版本取证见[编辑器 CLI 取证](docs/agents/editor-cli.md)。**夹具迁就生产**：生产代码里只为测试存在的分支、历史名兼容或数据一律退回，改夹具；迁移真源时删除绑在旧真源上的断言。
+对本次修改涉及的每条规则，检查实现、关键分支与失败路径；引擎交互、通信和生命周期改动覆盖双端行为、非法请求与重复进入；命名按[命名](#命名)核对。验证方式与交付证据见开发工作流的[测试纪律](docs/agents/workflow.md#测试纪律)和[完成判据](docs/agents/workflow.md#完成判据)，缺少证据的标为未验证；来源与版本取证见[编辑器 CLI 取证](docs/agents/editor-cli.md)。**夹具迁就生产**：生产代码里只为测试存在的分支、历史名兼容或数据一律退回，改夹具；迁移真源时删除绑在旧真源上的断言。零外部依赖的纯计算与配置模块不设接缝，直接调公开入口断言。
 
 [S0]: https://u5-creator.s3.game.163.com/manual/se/lua/00-from-editor-to-se-lua.html
 [S1]: https://u5-creator.s3.game.163.com/manual/se/lua/01-project-setup-and-entrypoints.html

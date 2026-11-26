@@ -243,7 +243,7 @@ describe('条款 9/11 他人抢救', function()
     assert.same(900, max_health)
   end)
 
-  -- 9-03：血量只能经 Vitals 的统一 Rescue 接缝落地；接缝被拒时不产生任何血量写入。
+  -- 9-03：血量只能经 Vitals 的统一 Rescue 入口落地；请求被拒时不产生任何血量写入。
   it('9-03 抢救只经统一状态转换接口改血量', function()
     local downed = join(7021, 0)
     local rescuer = join(7022, 1)

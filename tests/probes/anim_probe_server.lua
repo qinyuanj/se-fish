@@ -1,20 +1,20 @@
--- #160 接缝 A 取证第 2 步（服务端）：在镜头前建 AnimatedUnit 播放模型动画片段，或清理探针单位。
+-- #160 动画与碰撞特征探针取证第 2 步（服务端）：在镜头前建 AnimatedUnit 播放模型动画片段，或清理探针单位。
 -- 流程与判定口径见 docs/art-asset-overview.md「模型动画导入与播放」。
--- 参数先用一次 exec 写进 _G.SeamA，再 exec 本文件（-p server）；结果用 log grep SEAMA_ANIM 取回。
---   _G.SeamA = {
+-- 参数先用一次 exec 写进 _G.AnimProbe，再 exec 本文件（-p server）；结果用 log grep ANIM_PROBE_ANIM 取回。
+--   _G.AnimProbe = {
 --     action = 'play',                         -- 'play'（默认）或 'cleanup'
 --     mesh = 'custom://0h1DIiDiCuEpQD9Kj',     -- 网格资源 URI
 --     clip = 'fish_alligator_gar_Walk',        -- 导入对话框里的完整片段名
 --     skin = nil,                              -- 可选皮肤 URI
---     cam = {x, y, z}, focus = {x, y, z},      -- 取自 seam_a_camera_client.lua 的输出
+--     cam = {x, y, z}, focus = {x, y, z},      -- 取自 anim_probe_camera_client.lua 的输出
 --     dist = 4.5,                              -- 焦点前方的水平距离
 --   }
 -- 探针单位只保留一个：重跑 play 换网格或片段时先删旧单位再按当前镜头重建。
 -- GetAnimationState 对任意片段名都可能返回 isPlaying=true，这里打印它只作留痕，在播与否看截图。
-local NAME = 'SeamAAnimProbe'
+local NAME = 'AnimProbeUnit'
 local world = game:GetService('World')
-local args = _G.SeamA or {}
-local function log(...) print('SEAMA_ANIM', ...) end
+local args = _G.AnimProbe or {}
+local function log(...) print('ANIM_PROBE_ANIM', ...) end
 
 local function findProbes()
     local found = {}

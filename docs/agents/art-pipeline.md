@@ -1,6 +1,6 @@
 # Blender 与 Meshy 使用
 
-定位美术工作区、用无头 Blender 加工模型、用 Meshy 生成模型或做接缝 A 取证前读本文。决定与被拒的备选见 [ADR-0009](../adr/0009-blender-headless-only.md)。
+定位美术工作区、用无头 Blender 加工模型、用 Meshy 生成模型或做动画与碰撞特征探针取证前读本文。决定与被拒的备选见 [ADR-0009](../adr/0009-blender-headless-only.md)。
 
 ## 工作区导航
 
@@ -135,18 +135,18 @@ REST 后备是美术工作区同级的 `Desktop/dev/eggy/tools/meshy.py`（不�
 
 Codex 的 MCP 注册在仓库内 `.codex/config.toml`（gitignored，不入库），只有 `[mcp_servers.meshy]` 一个条目，启动命令即上节的 `npx -y @meshy-ai/meshy-mcp-server`；文件里不写密钥值。改动后重启会话，核对 `mcp__meshy__*` 工具已注册。**不要注册 Blender MCP**：注册了 agent 就会被诱导去试实时通道。
 
-## 接缝 A 取证
+## 动画与碰撞特征探针取证
 
 模型动画的导入、播放与判定口径见[美术资产概要「模型动画导入与播放」](../art-asset-overview.md#模型动画导入与播放)。探针按下面顺序调用，`exec` 与 `log grep` 用法见 [editor-cli](editor-cli.md)：
 
 1. 进试玩，等游戏 UI 加载完；连截 2 帧，md5 相同就先 `input joystick` 让角色动一下，确认画面在刷新。
-2. 客户端 exec `tests/probes/seam_a_camera_client.lua`，`log grep SEAMA_CAM` 取相机与焦点坐标。
-3. 服务端 exec 一行 `_G.SeamA = {mesh=..., clip=..., skin=..., cam={...}, focus={...}}`，再 exec `tests/probes/seam_a_anim_server.lua`；参数说明在探针文件头。
-4. 客户端用 `tests/probes/seam_a_view_client.lua` 固定侧机位并隐藏 UI（主界面按钮会挡住鱼身）；服务端用 `tests/probes/seam_a_measure_server.lua` 的 `cube` 在鱼旁摆 1 单位方块。
+2. 客户端 exec `tests/probes/anim_probe_camera_client.lua`，`log grep ANIM_PROBE_CAM` 取相机与焦点坐标。
+3. 服务端 exec 一行 `_G.AnimProbe = {mesh=..., clip=..., skin=..., cam={...}, focus={...}}`，再 exec `tests/probes/anim_probe_server.lua`；参数说明在探针文件头。
+4. 客户端用 `tests/probes/anim_probe_view_client.lua` 固定侧机位并隐藏 UI（主界面按钮会挡住鱼身）；服务端用 `tests/probes/anim_probe_measure_server.lua` 的 `cube` 在鱼旁摆 1 单位方块。
 5. 等 2 秒后 `screenshot game` 连截 4 帧，用 `uv run -q --with pillow python -I tools/frame_diff.py --box L,T,R,B <帧...>` 比较鱼身区域。
 6. 换 `clip` 重跑第 3、5 步；最后用 `clip='NoSuchClip'` 做对照，鱼身区域差异应为 0（裁剪框边缘的远景闪烁不算）。
-7. 量尺寸与碰撞：`NoSuchClip` 静止帧里按同框方块换算，像素/单位 = 方块正面像素 × 方块正面深度 ÷ 鱼所在深度；`seam_a_measure_server.lua` 的 `aabb` 给出碰撞 AABB，播放中重扫可判断碰撞体是否随动画变化。
-8. 还原与清理：`SeamAView` 的 `restore`、`SeamAMeasure` 的 `cleanup`、`SeamA` 的 `cleanup`，确认 `left=0` 后停试玩。
+7. 量尺寸与碰撞：`NoSuchClip` 静止帧里按同框方块换算，像素/单位 = 方块正面像素 × 方块正面深度 ÷ 鱼所在深度；`anim_probe_measure_server.lua` 的 `aabb` 给出碰撞 AABB，播放中重扫可判断碰撞体是否随动画变化。
+8. 还原与清理：`AnimProbeView` 的 `restore`、`AnimProbeMeasure` 的 `cleanup`、`AnimProbe` 的 `cleanup`，确认 `left=0` 后停试玩。
 
 鳄雀鳝基准（2026-10-28）：镜头距离 `dist=7`，裁剪框 `520,270,860,345`，Walk / Idle / Attack 变化像素 187~3235，`NoSuchClip` 为 0。
 

@@ -1,11 +1,11 @@
 -- #90 迁移：服务端技能接缝（原 tests/gameplay/ability_seams_test.lua，2 类 11 例）。
 -- describe / it 名沿用旧类名与方法名；注册顺序 = 旧套件实际执行顺序（LuaUnit 按 `类名.方法名` 字典序）。
--- #132 T11 原型：服务端接缝（AbilityAPI 的 SetScale / 挂点，MgrFishUnit 的飞行 / 叼人 / 阶段首领）。
--- 纯逻辑各有自己的用例（原 tests/gameplay/ability_proto_test.lua）；这里只测「接缝有没有被正确驱动」。
+-- #132 T11：职责分两块——1) AbilityAPI 防腐层（ACL：非法倍率净化、异常转结构化结果、挂点净空）；
+-- 2) FishTree / FishAbility 跨引擎接缝驱动（启用点：before_each 注入 _G 引擎替身与字段替身）。
 --
 -- 失败方式（先列后写）：
---   1. 体型接缝把 NaN/非法倍率写进单位，或单位不支持 SetScale 时直接抛错把调用方打断；
---   2. 挂点接缝建出来的位移没净空（挂件陷进宿主）；无挂点名也能建；销毁失败还返回成功；
+--   1. 体型防腐层把 NaN/非法倍率写进单位，或单位不支持 SetScale 时直接抛错把调用方打断；
+--   2. 挂点防腐层建出来的位移没净空（挂件陷进宿主）；无挂点名也能建；销毁失败还返回成功；
 --   3. 飞行驱动不写回引擎，或写回时越过本区围栏（借飞行跨区）；
 --   4. 空中受击不改变索敌：被打的鱼不找打它的玩家，只按最近挑人；
 --   5. 阶段首领的招式不结算伤害、咬中不叼人；携带跟随不写回玩家位置、超时不放下。
@@ -21,7 +21,7 @@ local function vec(x, y, z)
 end
 
 describe('TestAbilitySeams', function()
-    -- 真实 AbilityAPI（懒加载接缝），加载期需要 RunService:IsServer()
+    -- 真实 AbilityAPI 防腐层；启用点：before_each 注入 _G.game / Vector3 替身
     local ctx
     local saved
     before_each(function()
@@ -107,7 +107,7 @@ describe('TestAbilitySeams', function()
     end)
 end)
 
--- MgrFishUnit 的驱动：假引擎（World/Players/Vitals/AbilityAPI 全桩），只验证接缝行为
+-- FishAbility / FishTree 驱动：启用点为注入的引擎与依赖替身（World/Players/Vitals/AbilityAPI）
 describe('TestFishAbilitySeams', function()
     local function newFish(id, fishId, position)
         local body = { UnitId = id, Position = vec(position.x, position.y, position.z), BodyType = 4,

@@ -1,5 +1,5 @@
 -- #84 迁移：树林岛精英 / 首领战斗（原 tests/gameplay/forest_combat_test.lua，14 例）。
--- 接缝：MgrFishUnit 战斗状态机——剑鱼挥头 20 / 三头鲨扫头 25、翻滚接触独立段按秒槽去重、
+-- 覆盖范围：FishTree 战斗状态机——剑鱼挥头 20 / 三头鲨扫头 25、翻滚接触独立段按秒槽去重、
 -- 高跃周期与落点范围伤害、位移失败作废招式、追击失败可诊断。
 -- 沿用 tests/support/fish_combat 共享夹具；breakPosition 是引擎拒绝写 Position 的边界代理，逐例回滚。
 -- describe/it 名称保留旧类名与方法名，并按方法名字典序注册以保持旧套件执行顺序。

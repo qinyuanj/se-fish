@@ -1,7 +1,7 @@
 -- #88 迁移：存档地基（原 tests/gameplay/save_foundation_test.lua，9 例）。
 -- #123 失败方式先列：pending/failed 可变操作与空档写；v1 财产/实例丢失；坏档或未知版本被洗白；
 -- 写成功回包丢失、重试重复扣费；旧会话回调覆盖新会话；操作日志清理后重放；离场/关服漏写。
--- seam：真实 PlayerData 迁移与 MgrSave 公共接口；只替换 Task/DataStore 引擎边界。
+-- 被测入口：真实 PlayerData 迁移与 SaveHost 公共接口；启用点：_G.game 注入 Task/DataStore Fake。
 -- it 按旧 LuaUnit 的方法名字典序注册，保持与旧套件一致的案例顺序。
 -- 引擎边界替身必须写真实全局（_G.game）：MgrSave 由 loadfile 得到独立 chunk，
 -- 其 _ENV 是真实 _G，Busted 的逐文件沙箱里裸赋值只改沙箱、模块读不到。

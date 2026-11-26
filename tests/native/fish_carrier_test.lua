@@ -1,5 +1,5 @@
--- 三块接缝：1) 血量/模型号解析纯函数；2) 假引擎驱动 Spawn → 挨打 → update 跟随 → despawn 全链路；
--- 3) 接缝守卫（源码文本校对）：受击体 EnableController、不 require 包内模块、MgrMap 注册、官方 melee_hit 契约。
+-- 覆盖三部分：1) 血量/模型号解析纯函数；2) 引擎替身驱动 Spawn → 挨打 → update 跟随 → despawn 全链路；
+-- 3) 源码契约守卫：受击体 EnableController、不 require 包内模块、ServerRuntime 挂接、官方 melee_hit 契约。
 -- 假引擎只在被测函数执行期间挂上（withFakeEngine），测完恢复 _G，不影响别的文件；
 -- Busted 案例体在沙箱 _ENV 里，业务模块读的是真 _G，因此引擎全局必须 rawset 到 _G。
 -- describe/it 名称保留旧类名与方法名，按类名字典序 + 方法名字典序注册以保持旧套件执行顺序。
@@ -149,7 +149,7 @@ local SPAWN_OPTS = {
 
 describe('TestFishCarrierEngine', function()
   it('test_attach_destroys_the_orphan_receiver_when_controller_is_missing', function()
-    -- 防御路径：受击体建出来了、但引擎没给它 Controller（EnableController 这条接缝变了）。
+    -- 防御路径：受击体建出来了、但引擎没给它 Controller（EnableController 引擎契约失效）。
     -- #32 的教训是这种事不能静默；受击体还是鱼本体的子节点，留着就是个跟着鱼跑的孤儿。
     local mgr = freshManager()
     local world = newFakeWorld()
@@ -365,7 +365,7 @@ describe('TestFishCarrierEngine', function()
       return mgr:spawn(SPAWN_OPTS)
     end)
 
-    -- #32 的接缝：受击体带 EnableController，包内 _applyDamage 才找得到 target.Controller
+    -- #32 跨包契约：受击体带 EnableController，包内 _applyDamage 才找得到 target.Controller
     assert.are.equal(true, carrier.receiver.EnableController)
     assert.are.equal('EggyUnit', carrier.receiver.UnitType)
     assert.is_true(carrier.receiver.Parent == carrier.body)
@@ -506,7 +506,7 @@ describe('TestFishCarrierHealthConfig', function()
   end)
 end)
 
--- ===== 3. 接缝守卫（源码文本校对）=====
+-- ===== 3. 源码契约守卫（源码文本校对）=====
 
 describe('TestFishCarrierSeam', function()
   it('test_death_is_notified_once', function()
@@ -534,14 +534,14 @@ describe('TestFishCarrierSeam', function()
   end)
 
   it('test_module_does_not_require_the_vendor_package', function()
-    -- 业务层不直接 require 包内模块：接缝是双端根聚合入口
+    -- 业务层不直接 require 包内模块：统一走双端根聚合入口
     local src = readSource(CARRIER_PATH)
     assert.is_false(contains(src, 'require("server.packages'), '不得 require 包内模块')
     assert.is_false(contains(src, 'require("client.packages'), '不得 require 包内模块')
   end)
 
   it('test_receiver_is_created_with_enable_controller', function()
-    -- #32 的唯一接缝：没有这句，包内 _applyDamage 找不到 target.Controller，伤害静默归零
+    -- #32 跨包契约：没有这句，包内 _applyDamage 找不到 target.Controller，伤害静默归零
     local src = readSource(CARRIER_PATH)
     assert.is_true(contains(src, 'EnableController = true'), '受击体必须带 EnableController = true')
     assert.is_true(contains(src, 'createUnit("EggyUnit"'), '受击体必须是带 Controller 的单位类型')
@@ -549,7 +549,7 @@ describe('TestFishCarrierSeam', function()
 
   it('test_vendor_contract_is_still_controller_take_damage', function()
     -- 包内 _applyDamage 的两条分支是业务实现的前提：这里校对它们仍在。
-    -- 一旦官方改成别的接缝，本模块的实现前提就废了，必须在这里暴露。
+    -- 一旦官方改动该契约，本模块的实现前提就废了，必须在这里暴露。
     local src = readSource(MELEE_HIT_PATH)
     assert.is_true(contains(src, 'target.TakeDamage'), '_applyDamage 的第一条分支：target:TakeDamage')
     assert.is_true(contains(src, 'target.Controller'), '_applyDamage 的第二条分支：target.Controller')

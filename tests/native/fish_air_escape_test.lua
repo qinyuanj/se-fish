@@ -1,5 +1,5 @@
 -- #84 迁移：空中鱼逃脱与入水回收（原 tests/gameplay/fish_air_escape_test.lua，4 例）。
--- 接缝：真实 MgrFishCarrier / MgrFishUnit / MgrLoot 只换引擎对象与时间——空中鱼 1 秒内不销毁、
+-- 被测入口：真实 FishCarrier / FishTree，启用点为引擎全局与时钟替身——空中鱼 1 秒内不销毁、
 -- 朝最近水区直线逃脱、3 秒重定向、重复放下幂等、入水回收本体与受击体且不产鱼获、1 秒后可击杀且只掉一份。
 -- describe/it 名称保留旧类名与方法名，并按方法名字典序注册以保持旧套件执行顺序。
 local Cfg = require('common.game_cfg')

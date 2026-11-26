@@ -41,7 +41,7 @@ local function child(root, name)
   return root:FindFirstChild(name, true)
 end
 
-describe("客户端烧烤视图宿主接缝（#310）", function()
+describe("客户端烧烤视图宿主入口（#310）", function()
   local saved_vector, saved_color
 
   before_each(function()

@@ -187,7 +187,7 @@ local function join(runtime, player, data)
   return runtime:on_save_ready(player, data)
 end
 
-describe("玩家生命双层相位宿主接缝（#298）", function()
+describe("玩家生命双层相位宿主入口（#298）", function()
   local runtime, events, player, other, data
 
   local function boot(overrides, other_overrides)

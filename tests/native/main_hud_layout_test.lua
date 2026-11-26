@@ -1,5 +1,5 @@
 -- #179 主界面布局模块（client.main_hud_layout）：纯函数，只断言约束，不断言具体坐标。
--- 接缝：MainHudLayout.compute(input) 的输出矩形 + MainHudLayout.popup_cells(layout, kind, count)。
+-- 被测入口：MainHudLayout.compute(input) 的输出矩形与 MainHudLayout.popup_cells(layout, kind, count)。
 --
 -- 动手前列出的失败方式（本文件逐条覆盖）：
 --   1. 常驻控件两两重叠（结束收线压攻击键、提示行互叠、入口组叠在一起……）；

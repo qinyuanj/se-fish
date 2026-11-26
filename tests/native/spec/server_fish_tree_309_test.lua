@@ -161,7 +161,7 @@ local function join(runtime, player)
   return runtime:get_player_tree(player.UserId)
 end
 
-describe("活鱼树宿主接缝（#309）", function()
+describe("活鱼树宿主入口（#309）", function()
   it("举鱼期间放下、濒死、死亡或离场都会让鱼自己落地", function()
     local runtime, units = boot()
     local player = make_player(1)

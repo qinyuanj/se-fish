@@ -2,7 +2,7 @@
 -- describe / it 名沿用旧类名与方法名；注册顺序 = 旧套件实际执行顺序（单类，方法按字典序）。
 -- #37 失败方式（编码前列出）：空中鱼仍不可抽取；飞过水面即消失；投掷未执行或重复结算；
 -- 预警不锁落点导致无法躲避；俯冲不预警；死亡/超时留下攻击；本体与受击体错帧。
--- 接缝：真实业务管理器的 spawn_landed/drop/update、RemoteEvent 和 Controller 血量。
+-- 被测入口：真实业务模块的 spawn_landed/drop/update；启用点：isle_combat 夹具替换引擎对象、时钟与 RemoteEvent。
 -- 仅替换引擎对象、时间和 RemoteEvent，不替换业务管理器；不作为编辑器 E2E 证据。
 --
 -- 假引擎世界搬到 tests/support/isle_combat.lua：旧套件里 volcano_combat 用

@@ -2,7 +2,7 @@
 -- describe / it 名沿用旧类名与方法名；注册顺序 = 旧套件实际执行顺序（LuaUnit 按 `类名.方法名` 全局字典序）。
 -- 本文件是纯逻辑用例，不改全局、不改模块缓存、不改配置，因此没有需要恢复的时间或随机替换；
 --
--- 测试接缝（写明）：
+-- 被测纯函数入口：
 --   * desired(itemId)：选中槽物品 → 期望生效效果（'wings'|'godzilla'|nil），
 --     是「选中即生效」例外的唯一判定点（GameSpec §3.2）；
 --   * step_flight_y / clamp_xz：飞行垂直步进与水平钳制，边界来自 FlightPath.bounds_of
