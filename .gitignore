@@ -7,7 +7,10 @@
 /design
 
 # ===== AI 助手 / teamai 分发文件（工具自动下发，可重新生成）=====
-/.agents/
+# .agents/* 而非 .agents/：agy 通过 .agents/skills.json 登记共享技能目录，
+# 该登记文件描述仓内受管内容（.dsh/skills/spoke，见 ADR-0022），必须入库。
+/.agents/*
+!/.agents/skills.json
 /.claude/
 /.codemaker/
 /.codex/
