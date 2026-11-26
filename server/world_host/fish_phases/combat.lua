@@ -18,7 +18,6 @@ function CombatPhase.install(Mgr, context)
     local flatDirection = context.flatDirection
     local towardWater = context.towardWater
     local inWater = context.inWater
-    local resetCrabRhythm = context.resetCrabRhythm
     local publishBite = context.publishBite
 
 
@@ -298,116 +297,6 @@ function CombatPhase.install(Mgr, context)
     local engageOrChase = FishBehaviorKit.engage_or_chase
     local bossWindup = FishBehaviorKit.boss_windup
 
-    function Mgr:update_king_crab_combat(fish, now, pos, params)
-        local dt = beginCombatFrame(fish, now)
-        local move = fish.Move
-        if move then
-            if move.Name ~= 'jab' then return end
-            local elapsed = now - move.at
-            local windup = bossWindup(fish, 'jab')
-            local slot = elapsed <= windup and -1 or math.min(params.JabsPerSide * 2 - 1,
-                math.floor((elapsed - windup) / params.JabStepSec + 1e-9) - 1)
-            if slot > (move.last_slot or -1) then
-                move.last_slot = slot
-                local target, tp = self:is_target_valid(move.Target, pos, params)
-                if target and withinBite(pos, tp, params)
-                    and FishBehaviorKit.in_head_zone(pos, fish.facing, tp, params) then
-                    self:hit(fish, move.Target, params.JabDamage, 'jab')
-                end
-            end
-            if now < move.strike_at - 1e-9 then return end
-            self:end_move(fish, 'jab-end')
-            return
-        end
-        local target, tp = self:choose_target(fish, pos, params)
-        if not target then
-            if self.ai then self.ai:custom(fish) end
-            return
-        end
-        if now < (fish.JabAt or 0) then return end
-        if not withinBite(pos, tp, params) then
-            chaseStep(self, fish, pos, tp, dt, params, '帝王蟹', nil, true)
-            return
-        end
-        fish.JabAt = now + params.JabIntervalSec
-        self:start_move(fish, 'jab', pos, target, tp, now,
-            bossWindup(fish, 'jab') + params.JabStepSec * params.JabsPerSide * 2, params.BiteRange)
-    end
-
-    function Mgr:update_crab_boss_combat(fish, now, pos, params)
-        local dt = beginCombatFrame(fish, now)
-        local move = fish.Move
-        if move then
-            if move.Name == 'pinch' then
-                local elapsed = now - move.at
-                local windup = bossWindup(fish, 'pinch')
-                local strike = elapsed <= windup and 0 or math.min(params.PinchStrikes,
-                    math.floor((elapsed - windup) / params.PinchStepSec + 1e-9))
-                if strike > (move.last_strike or 0) and strike >= 1 then
-                    move.last_strike = strike
-                    local target, tp = self:is_target_valid(move.Target, pos, params)
-                    if target and withinBite(pos, tp, params)
-                        and FishBehaviorKit.in_head_zone(pos, fish.facing, tp, params) then
-                        self:hit(fish, move.Target, params.PinchDamage, 'pinch')
-                    end
-                end
-                if now < move.strike_at - 1e-9 then return end
-                self:end_move(fish, 'pinch-end')
-                return
-            elseif move.Name == 'charge' then
-                if not move.hit_done and now >= move.at + bossWindup(fish, 'charge') then
-                    local target, tp = self:choose_target(fish, pos, params)
-                    if target and tp and (tp.x - pos.x)^2 + (tp.z - pos.z)^2 <= params.ChargeRange^2 then
-                        move.hit_done = true
-                        self:hit(fish, target, params.ChargeDamage, 'charge')
-                    end
-                end
-                if now < move.strike_at - 1e-9 then return end
-                self:end_move(fish, 'charge-end')
-                return
-            elseif move.Name == 'spin' then
-                local tick = math.min(params.SpinDurationSec,
-                    math.max(0, math.floor(now - move.at)))
-                if tick > (move.last_tick or 0) then
-                    move.last_tick = tick
-                    for _, player in ipairs(self:players()) do
-                        local valid, cp = self:is_target_valid(player, move.Center)
-                        if valid and (cp.x - pos.x)^2 + (cp.z - pos.z)^2 <= params.SpinRadius^2 then
-                            self:hit(fish, player, params.SpinDamage, 'spin')
-                        end
-                    end
-                end
-                if now < move.strike_at - 1e-9 then return end
-                self:end_move(fish, 'spin-end')
-                return
-            end
-            return
-        end
-        local target, tp = self:choose_target(fish, pos, params)
-        if not target then
-            if self.ai then self.ai:custom(fish) end
-            return
-        end
-        if now >= (fish.SpecialAt or math.huge) then
-            fish.SpecialAt = now + params.SpinSec
-            self:start_move(fish, 'spin', pos, target, tp, now, params.SpinDurationSec, params.SpinRadius)
-            return
-        end
-        if now >= (fish.ChargeAt or math.huge) then
-            fish.ChargeAt = now + params.ChargeSec
-            self:start_move(fish, 'charge', pos, target, tp, now, params.ChargeWindowSec, params.ChargeRange)
-            return
-        end
-        if now >= (fish.PinchAt or 0) and withinBite(pos, tp, params) then
-            fish.PinchAt = now + params.PinchCooldownSec
-            self:start_move(fish, 'pinch', pos, target, tp, now,
-                bossWindup(fish, 'pinch') + params.PinchStepSec * params.PinchStrikes, params.BiteRange)
-            return
-        end
-        if not withinBite(pos, tp, params) then
-            chaseStep(self, fish, pos, tp, dt, params, '蟹老板', nil, true)
-        end
-    end
     function Mgr:start_jump(fish, now, pos, params)
         fish.JumpAt = now + params.JumpIntervalSec
         local rng = math.random
@@ -683,15 +572,6 @@ function CombatPhase.install(Mgr, context)
             end
         end
         local combat = GameCfg.Fish[fish.fish_id].Combat
-        if fish.State == 'stunned' and combat == 'kingCrab' then
-            body.LinearVelocity = Vector3.New(0, 0, 0)
-            if now < (fish.wake_at or math.huge) then return end
-            fish.State, fish.wake_at = Mgr.State.Combat, nil
-            local params = GameCfg.FishCombat and GameCfg.FishCombat[combat]
-            ---@cast params table?
-            if params then resetCrabRhythm(fish, now, params) end
-            self:publish_combat(fish)
-        end
         if self:boss_phase_enabled(fish.fish_id) then
             self:update_boss_phase(fish, now, pos)
             return

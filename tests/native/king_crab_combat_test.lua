@@ -3,6 +3,7 @@
 -- 同刺段重复帧不双结算且掉帧不追溯补刺，每活动 30 秒眩晕 5 秒，逃跑 / 移除打断并收起预警。
 -- 沿用 tests/support/fish_combat 共享夹具；describe/it 名称保留旧类名与方法名，
 -- 并按方法名字典序注册以保持旧套件执行顺序。
+local GameCfg = require('common.game_cfg')
 local FishCombat = require('tests.support.fish_combat')
 
 local function drop(env)
@@ -129,6 +130,18 @@ describe('TestKingCrabCombat', function()
         assert.are.equal(8, #env.vitalsCalls, '大 dt 不得补刺')
     end)
 
+    it('test_king_crab_never_uses_boss_phase', function()
+        -- 唤醒原来先于 BossPhase；只有两条路径互斥，迁入行为 step 后才不改变优先级。
+        for fish_id, enabled in pairs(GameCfg.Ability.BossPhase.Species or {}) do
+            if enabled then
+                local species = GameCfg.Fish[fish_id]
+                assert.is_not.equal('kingCrab', species and species.Combat, fish_id)
+            end
+        end
+        local fish = drop(env)
+        assert.is_false(env.mgr:boss_phase_enabled(fish.fish_id))
+    end)
+
     it('test_remove_during_jab_clears_warning_and_stops_strikes', function()
         -- 移除打断：乱刺进行中鱼被打死清场，预警收起不再结算
         local fish = drop(env)
@@ -157,11 +170,19 @@ describe('TestKingCrabCombat', function()
         env.now = 34.9
         env.mgr:update()
         assert.are.equal(0, #env.vitalsCalls, '眩晕期间不得起刺')
+        assert.are.equal(0, fish.carrier.body.LinearVelocity.x)
+        assert.are.equal(0, fish.carrier.body.LinearVelocity.y)
+        assert.are.equal(0, fish.carrier.body.LinearVelocity.z)
+        local published = {}
+        env.mgr.combat_publisher = function(payload) published[#published + 1] = payload end
         env.now = 35
         env.mgr:update()
         assert.are.equal('combat', fish.State)
         assert.is_not.is_nil(fish.Move)
         assert.are.equal('jab', fish.Move.Name)
+        assert.are.equal('combat', published[1].state)
+        assert.is_nil(published[1].move, '先发布唤醒，再发布同帧乱刺起手')
+        assert.are.equal('jab', published[#published].move)
         -- 醒来后重新计时：40 秒时不眩晕，65 秒才第二轮眩晕
         env.now = 64.9
         env.mgr:update()
