@@ -1,154 +1,159 @@
 {:entries [
-  {:name "PlayerLife.mount", :namespace "server.world_host.player_life", :complexity 424, :coverage 89.403, :crap 637.9343}
-  {:name "ServerRuntime.new", :namespace "server.world_host.server_runtime", :complexity 439, :coverage 90.9197, :crap 583.2878}
+  {:name "PlayerLife.mount", :namespace "server.world_host.player_life", :complexity 485, :coverage 90.379, :crap 694.4808}
+  {:name "ServerRuntime.new", :namespace "server.world_host.server_runtime", :complexity 441, :coverage 91.1628, :crap 575.2212}
   {:name "default_resolve_aim_target", :namespace "client.views.main_hud_item_bar_view", :complexity 23, :coverage 0.0, :crap 552.0}
-  {:name "PlayerTree.spawn", :namespace "server.world_host.player_tree", :complexity 250, :coverage 90.669, :crap 300.7767}
-  {:name "FishingPhase.mount", :namespace "server.world_host.fishing_phase", :complexity 187, :coverage 87.3239, :crap 258.2263}
-  {:name "SpecialItemPhase.mount", :namespace "server.world_host.special_item_phase", :complexity 213, :coverage 93.3333, :crap 226.4429}
-  {:name "FerryRoute.mount", :namespace "server.world_host.ferry_route", :complexity 208, :coverage 92.8767, :crap 223.6376}
-  {:name "GroundLoot.mount", :namespace "server.world_host.ground_loot", :complexity 187, :coverage 90.8257, :crap 214.0024}
-  {:name "SquadDock.mount", :namespace "server.world_host.squad_dock", :complexity 163, :coverage 87.6751, :crap 212.7422}
-  {:name "Mgr:OnSignal", :namespace "server.world_host.player_story", :complexity 16, :coverage 10.0, :crap 202.624}
+  {:name "PlayerTree.spawn", :namespace "server.world_host.player_tree", :complexity 243, :coverage 90.5097, :crap 293.4722}
+  {:name "FerryRoute.mount", :namespace "server.world_host.ferry_route", :complexity 240, :coverage 92.5134, :crap 264.17}
+  {:name "CastSourceView.spec", :namespace "client.views.cast_source_view", :complexity 35, :coverage 43.5897, :crap 254.893}
+  {:name "FishingPhase.mount", :namespace "server.world_host.fishing_phase", :complexity 185, :coverage 88.9518, :crap 231.1549}
+  {:name "SpecialItemPhase.mount", :namespace "server.world_host.special_item_phase", :complexity 218, :coverage 93.4978, :crap 231.0645}
+  {:name "GroundLoot.mount", :namespace "server.world_host.ground_loot", :complexity 189, :coverage 91.4634, :crap 211.2218}
+  {:name "SquadDock.mount", :namespace "server.world_host.squad_dock", :complexity 163, :coverage 87.9552, :crap 209.4274}
+  {:name "Mgr:on_signal", :namespace "server.world_host.player_story", :complexity 16, :coverage 10.0, :crap 202.624}
   {:name "M.Attach", :namespace "server.ability_behaviors.melee_hit", :complexity 75, :coverage 74.6988, :crap 166.1058}
-  {:name "Mgr:ReleaseAwaitLift", :namespace "server.world_host.fish_tree", :complexity 13, :coverage 4.0, :crap 162.5204}
+  {:name "get_resolution", :namespace "client.views.reel_overlay_view", :complexity 21, :coverage 31.25, :crap 164.3035}
+  {:name "Mgr:release_await_lift", :namespace "server.world_host.fish_tree", :complexity 13, :coverage 4.0, :crap 162.5204}
   {:name "create_anchor_scene_node", :namespace "client.main", :complexity 12, :coverage 0.0, :crap 156.0}
-  {:name "PlayerDataHost:Operate", :namespace "server.player_data_host", :complexity 74, :coverage 77.1186, :crap 139.6011}
+  {:name "PlayerDataHost:operate", :namespace "server.player_data_host", :complexity 74, :coverage 77.1186, :crap 139.6011}
+  {:name "PlayerGrill.mount", :namespace "server.world_host.player_grill", :complexity 126, :coverage 90.8046, :crap 138.3439}
   {:name "ClientStore.new", :namespace "client.store.client_store", :complexity 135, :coverage 95.1407, :crap 137.0912}
-  {:name "ModifierLeaf.create_entity_store", :namespace "server.world_host.modifier_leaf", :complexity 80, :coverage 79.5775, :crap 134.5138}
-  {:name "CastSourceView.spec", :namespace "client.views.cast_source_view", :complexity 30, :coverage 51.5152, :crap 132.5792}
-  {:name "PlayerGrill.mount", :namespace "server.world_host.player_grill", :complexity 122, :coverage 91.1538, :crap 132.3036}
   {:name "PlayerEffects.mount", :namespace "server.world_host.player_effects", :complexity 104, :coverage 87.931, :crap 123.0143}
-  {:name "PlayerPlatformShop.mount", :namespace "server.world_host.player_platform_shop", :complexity 106, :coverage 89.2857, :crap 119.8198}
-  {:name "LifeFacade.new", :namespace "server.world_host.life_facade", :complexity 106, :coverage 90.6404, :crap 115.2126}
-  {:name "PlayerBlindbox.mount", :namespace "server.world_host.player_blindbox", :complexity 113, :coverage 97.449, :crap 113.212}
-  {:name "MainHudActionButtonsView.mount", :namespace "client.views.main_hud_action_buttons_view", :complexity 110, :coverage 96.3265, :crap 110.5998}
-  {:name "Validate.Check", :namespace "common.content_validation", :complexity 108, :coverage 96.0, :crap 108.7465}
-  {:name "MainHudItemBarView.mount", :namespace "client.views.main_hud_item_bar_view", :complexity 100, :coverage 90.9836, :crap 107.3299}
-  {:name "GameUI:FindChildUINode", :namespace "client.game_ui", :complexity 9, :coverage 0.0, :crap 90.0}
+  {:name "LifeFacade.new", :namespace "server.world_host.life_facade", :complexity 109, :coverage 90.1478, :crap 120.3619}
+  {:name "ModifierLeaf.create_entity_store", :namespace "server.world_host.modifier_leaf", :complexity 76, :coverage 80.2817, :crap 120.2829}
+  {:name "MainHudActionButtonsView.mount", :namespace "client.views.main_hud_action_buttons_view", :complexity 112, :coverage 96.3265, :crap 112.6218}
+  {:name "PlayerBlindbox.mount", :namespace "server.world_host.player_blindbox", :complexity 112, :coverage 97.4619, :crap 112.2051}
+  {:name "PlayerPlatformShop.mount", :namespace "server.world_host.player_platform_shop", :complexity 105, :coverage 92.3858, :crap 109.8669}
+  {:name "Validate.check", :namespace "common.content_validation", :complexity 108, :coverage 96.0, :crap 108.7465}
+  {:name "ReelOverlayView.spec", :namespace "client.views.reel_overlay_view", :complexity 97, :coverage 99.2424, :crap 97.0041}
+  {:name "MainHudItemBarView.mount", :namespace "client.views.main_hud_item_bar_view", :complexity 94, :coverage 93.2489, :crap 96.7188}
+  {:name "GameUI:find_child_ui_node", :namespace "client.game_ui", :complexity 9, :coverage 0.0, :crap 90.0}
   {:name "PlayerData:Migrate", :namespace "server.data.player_data", :complexity 87, :coverage 94.6667, :crap 88.1482}
   {:name "_applyHitPower", :namespace "server.ability_behaviors.melee_hit", :complexity 10, :coverage 8.6957, :crap 86.1156}
-  {:name "MainHudBackpackView.mount", :namespace "client.views.main_hud_backpack_view", :complexity 82, :coverage 93.985, :crap 83.4633}
-  {:name "Mgr:OnDied", :namespace "server.world_host.fish_tree", :complexity 18, :coverage 42.8571, :crap 78.4549}
-  {:name "ZoneMarkers.Contract", :namespace "common.zone_markers", :complexity 9, :coverage 5.5556, :crap 77.236}
-  {:name "ReelOverlayView.spec", :namespace "client.views.reel_overlay_view", :complexity 76, :coverage 97.541, :crap 76.0859}
+  {:name "MainHudBackpackView.mount", :namespace "client.views.main_hud_backpack_view", :complexity 84, :coverage 93.985, :crap 85.5356}
+  {:name "Mgr:on_died", :namespace "server.world_host.fish_tree", :complexity 18, :coverage 42.8571, :crap 78.4549}
+  {:name "ZoneMarkers.contract", :namespace "common.zone_markers", :complexity 9, :coverage 5.5556, :crap 77.236}
+  {:name "ViewUtil.get_resolution", :namespace "client.views.view_util", :complexity 20, :coverage 48.3871, :crap 74.9965}
   {:name "LotteryView.modal_spec", :namespace "client.views.lottery_view", :complexity 64, :coverage 98.9796, :crap 64.0044}
   {:name "PlayerShop.mount", :namespace "server.world_host.player_shop", :complexity 59, :coverage 97.8261, :crap 59.0358}
+  {:name "MainHudEquipPopups.mount", :namespace "client.views.main_hud_equip_popups", :complexity 56, :coverage 97.7011, :crap 56.0381}
   {:name "AbilityLeaf.mount", :namespace "server.world_host.ability_leaf", :complexity 45, :coverage 82.4324, :crap 55.979}
   {:name "PlayerData:ApplyGMPatch", :namespace "server.data.player_data", :complexity 53, :coverage 91.8367, :crap 54.5281}
-  {:name "MainHudEquipPopups.mount", :namespace "client.views.main_hud_equip_popups", :complexity 54, :coverage 97.7011, :crap 54.0354}
   {:name "PlayerFisherman.mount", :namespace "server.world_host.player_fisherman", :complexity 53, :coverage 95.9596, :crap 53.1853}
-  {:name "Mgr:UpdateShrimpCombat", :namespace "server.world_host.fish_tree", :complexity 52, :coverage 97.7011, :crap 52.0329}
+  {:name "sync_target", :namespace "server.world_host.player_gm", :complexity 10, :coverage 25.0, :crap 52.1875}
+  {:name "Mgr:update_shrimp_combat", :namespace "server.world_host.fish_tree", :complexity 52, :coverage 97.7011, :crap 52.0329}
   {:name "RootView.mount", :namespace "client.views.root_view", :complexity 51, :coverage 97.0149, :crap 51.0692}
-  {:name "PlayerLottery.mount", :namespace "server.world_host.player_lottery", :complexity 51, :coverage 98.5294, :crap 51.0083}
-  {:name "Mgr:UpdateBossPhase", :namespace "server.world_host.fish_tree", :complexity 50, :coverage 93.6709, :crap 50.6338}
+  {:name "Mgr:update_boss_phase", :namespace "server.world_host.fish_tree", :complexity 50, :coverage 93.6709, :crap 50.6338}
   {:name "BlindboxView.modal_spec", :namespace "client.views.blindbox_view", :complexity 50, :coverage 94.8454, :crap 50.3424}
-  {:name "Mgr:Handle", :namespace "server.world_host.player_gm", :complexity 49, :coverage 100.0, :crap 49.0}
-  {:name "Mgr:Release", :namespace "server.world_host.fish_tree", :complexity 48, :coverage 97.7778, :crap 48.0253}
+  {:name "PlayerLottery.mount", :namespace "server.world_host.player_lottery", :complexity 50, :coverage 98.5294, :crap 50.008}
+  {:name "AttackView.mount", :namespace "client.views.attack_view", :complexity 49, :coverage 99.0385, :crap 49.0021}
+  {:name "Mgr:handle", :namespace "server.world_host.player_gm", :complexity 49, :coverage 100.0, :crap 49.0}
+  {:name "Mgr:release", :namespace "server.world_host.fish_tree", :complexity 48, :coverage 97.7778, :crap 48.0253}
+  {:name "consume_throwable", :namespace "server.world_host.player_weapon", :complexity 30, :coverage 73.0769, :crap 47.5638}
   {:name "PlatformShopView.modal_spec", :namespace "client.views.platform_shop_view", :complexity 47, :coverage 96.6667, :crap 47.0818}
   {:name "AttrLeaf.mount", :namespace "server.world_host.attr_leaf", :complexity 41, :coverage 85.0575, :crap 46.6084}
-  {:name "AttackView.mount", :namespace "client.views.attack_view", :complexity 45, :coverage 99.0099, :crap 45.002}
-  {:name "Mgr:UpdateFlying", :namespace "server.world_host.fish_tree", :complexity 29, :coverage 74.0, :crap 43.7814}
-  {:name "consume_throwable", :namespace "server.world_host.player_weapon", :complexity 28, :coverage 73.3333, :crap 42.867}
+  {:name "Mgr:damage_fish", :namespace "server.world_host.fish_tree", :complexity 29, :coverage 73.5849, :crap 44.5008}
+  {:name "Mgr:update_flying", :namespace "server.world_host.fish_tree", :complexity 29, :coverage 74.0, :crap 43.7814}
   {:name "default_fire_re", :namespace "client.views.main_hud_item_bar_view", :complexity 6, :coverage 0.0, :crap 42.0}
-  {:name "Mgr:Notify", :namespace "server.world_host.player_quest", :complexity 22, :coverage 65.7143, :crap 41.5067}
-  {:name "PlayerDataHost:Start", :namespace "server.player_data_host", :complexity 34, :coverage 81.6667, :crap 41.1233}
-  {:name "Mgr:UpdateAquatic", :namespace "server.world_host.fish_tree", :complexity 40, :coverage 100.0, :crap 40.0}
-  {:name "FishAbility:PotionCount", :namespace "server.fish_ability", :complexity 7, :coverage 14.2857, :crap 37.8572}
-  {:name "Mgr:Command", :namespace "server.world_host.fish_ai", :complexity 34, :coverage 85.3659, :crap 37.6229}
-  {:name "Mgr:UpdateCrabBossCombat", :namespace "server.world_host.fish_tree", :complexity 36, :coverage 91.5254, :crap 36.7888}
+  {:name "Mgr:notify", :namespace "server.world_host.player_quest", :complexity 22, :coverage 65.7143, :crap 41.5067}
+  {:name "Mgr:update_aquatic", :namespace "server.world_host.fish_tree", :complexity 40, :coverage 100.0, :crap 40.0}
+  {:name "CompendiumView.modal_spec", :namespace "client.views.compendium_view", :complexity 39, :coverage 100.0, :crap 39.0}
+  {:name "PlayerDataHost:start", :namespace "server.player_data_host", :complexity 32, :coverage 81.3559, :crap 38.6363}
+  {:name "FishAbility:potion_count", :namespace "server.fish_ability", :complexity 7, :coverage 14.2857, :crap 37.8572}
+  {:name "Mgr:command", :namespace "server.world_host.fish_ai", :complexity 34, :coverage 85.3659, :crap 37.6229}
+  {:name "Mgr:update_crab_boss_combat", :namespace "server.world_host.fish_tree", :complexity 36, :coverage 91.5254, :crap 36.7888}
   {:name "normalize_party", :namespace "client.store.client_store", :complexity 31, :coverage 82.0, :crap 36.6046}
-  {:name "Mgr:OnPlayerRemoving", :namespace "server.world_host.fish_tree", :complexity 19, :coverage 63.6364, :crap 36.3583}
-  {:name "Mgr:StartMove", :namespace "server.world_host.fish_tree", :complexity 36, :coverage 100.0, :crap 36.0}
+  {:name "Mgr:on_player_removing", :namespace "server.world_host.fish_tree", :complexity 19, :coverage 63.6364, :crap 36.3583}
+  {:name "Mgr:start_move", :namespace "server.world_host.fish_tree", :complexity 36, :coverage 100.0, :crap 36.0}
   {:name "on_action", :namespace "server.world_host.player_weapon", :complexity 32, :coverage 84.7458, :crap 35.6347}
-  {:name "SaveHost:Execute", :namespace "server.save_host", :complexity 35, :coverage 95.0, :crap 35.1531}
+  {:name "SaveHost:execute", :namespace "server.save_host", :complexity 35, :coverage 95.0, :crap 35.1531}
   {:name "GrillView.mount", :namespace "client.views.grill_view", :complexity 34, :coverage 90.1786, :crap 35.0952}
-  {:name "Mgr:Update", :namespace "server.world_host.player_story", :complexity 12, :coverage 46.1538, :crap 34.4816}
-  {:name "CompendiumView.modal_spec", :namespace "client.views.compendium_view", :complexity 34, :coverage 96.1538, :crap 34.0658}
+  {:name "Mgr:update", :namespace "server.world_host.player_story", :complexity 12, :coverage 46.1538, :crap 34.4816}
   {:name "LotteryInteraction.spec", :namespace "client.views.lottery_interaction", :complexity 34, :coverage 96.7742, :crap 34.0388}
   {:name "ShopView.modal_spec", :namespace "client.views.shop_view", :complexity 34, :coverage 98.1982, :crap 34.0068}
-  {:name "SaveHost:LoadInto", :namespace "server.save_host", :complexity 33, :coverage 94.8276, :crap 33.1507}
+  {:name "SaveHost:load_into", :namespace "server.save_host", :complexity 33, :coverage 94.8276, :crap 33.1507}
   {:name "GMView.modal_spec", :namespace "client.views.gm_view", :complexity 33, :coverage 98.6667, :crap 33.0026}
   {:name "_createHitSfx", :namespace "server.ability_behaviors.melee_hit", :complexity 7, :coverage 20.0, :crap 32.088}
-  {:name "Util:DesignNumber", :namespace "common.util", :complexity 6, :coverage 11.1111, :crap 31.284}
-  {:name "Mgr:PersistRead", :namespace "server.world_host.player_story", :complexity 16, :coverage 61.9048, :crap 30.1531}
-  {:name "Mgr:UpdateOrcaCombat", :namespace "server.world_host.fish_tree", :complexity 30, :coverage 94.6429, :crap 30.1384}
-  {:name "GameUI:ApplyTextColor", :namespace "client.game_ui", :complexity 5, :coverage 0.0, :crap 30.0}
+  {:name "Util:design_number", :namespace "common.util", :complexity 6, :coverage 11.1111, :crap 31.284}
+  {:name "resolve_read_state", :namespace "server.world_host.world_records", :complexity 9, :coverage 35.2941, :crap 30.944}
+  {:name "Mgr:persist_read", :namespace "server.world_host.player_story", :complexity 16, :coverage 61.9048, :crap 30.1531}
+  {:name "Mgr:update_orca_combat", :namespace "server.world_host.fish_tree", :complexity 30, :coverage 98.2143, :crap 30.0051}
+  {:name "GameUI:apply_text_color", :namespace "client.game_ui", :complexity 5, :coverage 0.0, :crap 30.0}
+  {:name "MainHudVitalsView.mount", :namespace "client.views.main_hud_vitals_view", :complexity 30, :coverage 100.0, :crap 30.0}
   {:name "updateLeap", :namespace "common.flight_path", :complexity 5, :coverage 0.0, :crap 30.0}
-  {:name "FishCarrier.DamageListener", :namespace "server.main", :complexity 5, :coverage 0.0, :crap 30.0}
-  {:name "Mgr:UpdateCombat", :namespace "server.world_host.fish_tree", :complexity 29, :coverage 94.5455, :crap 29.1365}
-  {:name "MainHudVitalsView.mount", :namespace "client.views.main_hud_vitals_view", :complexity 29, :coverage 100.0, :crap 29.0}
+  {:name "FishCarrier.damage_listener", :namespace "server.main", :complexity 5, :coverage 0.0, :crap 30.0}
+  {:name "Mgr:update_combat", :namespace "server.world_host.fish_tree", :complexity 29, :coverage 94.5455, :crap 29.1365}
+  {:name "PkDamageFilter.make", :namespace "server.world_host.pk_damage_filter", :complexity 29, :coverage 100.0, :crap 29.0}
   {:name "radial_damage", :namespace "server.world_host.player_weapon", :complexity 29, :coverage 100.0, :crap 29.0}
-  {:name "Mgr:Spawn", :namespace "server.world_host.fish_carrier", :complexity 25, :coverage 81.8182, :crap 28.7566}
-  {:name "Mgr:Attach", :namespace "server.world_host.fish_ai", :complexity 6, :coverage 14.2857, :crap 28.6706}
-  {:name "Mgr:HandleCombatRequest", :namespace "server.world_host.fish_tree", :complexity 6, :coverage 14.2857, :crap 28.6706}
-  {:name "Mgr:Drain", :namespace "server.world_host.player_compendium", :complexity 22, :coverage 76.9231, :crap 27.9481}
+  {:name "Mgr:spawn", :namespace "server.world_host.fish_carrier", :complexity 25, :coverage 81.8182, :crap 28.7566}
+  {:name "Mgr:attach", :namespace "server.world_host.fish_ai", :complexity 6, :coverage 14.2857, :crap 28.6706}
+  {:name "Mgr:handle_combat_request", :namespace "server.world_host.fish_tree", :complexity 6, :coverage 14.2857, :crap 28.6706}
+  {:name "gun_hit", :namespace "server.world_host.player_weapon", :complexity 26, :coverage 85.2941, :crap 28.1499}
+  {:name "Mgr:drain", :namespace "server.world_host.player_compendium", :complexity 22, :coverage 76.9231, :crap 27.9481}
   {:name "checkZone", :namespace "common.math_water_judge", :complexity 23, :coverage 78.9474, :crap 27.936}
   {:name "ModifierLeaf.mount_slot", :namespace "server.world_host.modifier_leaf", :complexity 27, :coverage 89.5833, :crap 27.824}
   {:name "FishermanView.presentation_spec", :namespace "client.views.fisherman_view", :complexity 27, :coverage 92.4528, :crap 27.3134}
   {:name "grant", :namespace "server.world_host.ground_loot", :complexity 16, :coverage 64.7059, :crap 27.255}
-  {:name "Mgr:SpawnTree", :namespace "server.world_host.fish_tree", :complexity 27, :coverage 96.4286, :crap 27.0332}
+  {:name "Mgr:spawn_tree", :namespace "server.world_host.fish_tree", :complexity 27, :coverage 96.4286, :crap 27.0332}
   {:name "notifyPlaceholder", :namespace "server.platform_host", :complexity 27, :coverage 100.0, :crap 27.0}
-  {:name "SaveHost:ResolveRequest", :namespace "server.save_host", :complexity 27, :coverage 100.0, :crap 27.0}
-  {:name "PkDamageFilter.make", :namespace "server.world_host.pk_damage_filter", :complexity 27, :coverage 100.0, :crap 27.0}
+  {:name "SaveHost:resolve_request", :namespace "server.save_host", :complexity 27, :coverage 100.0, :crap 27.0}
   {:name "PlayerData:RestoreSlot", :namespace "server.data.player_data", :complexity 6, :coverage 16.6667, :crap 26.8333}
-  {:name "gun_hit", :namespace "server.world_host.player_weapon", :complexity 25, :coverage 87.0968, :crap 26.3427}
-  {:name "FerryView.mount", :namespace "client.views.ferry_view", :complexity 25, :coverage 96.7742, :crap 25.021}
-  {:name "M.Step", :namespace "common.flight_path", :complexity 20, :coverage 76.7857, :crap 25.0041}
+  {:name "M.step", :namespace "common.flight_path", :complexity 20, :coverage 76.7857, :crap 25.0041}
   {:name "HeldRodLeaf.resolve_visual_item_id", :namespace "server.world_host.held_rod_leaf", :complexity 25, :coverage 100.0, :crap 25.0}
-  {:name "Mgr:RefreshCommitted", :namespace "server.world_host.player_quest", :complexity 21, :coverage 80.0, :crap 24.528}
+  {:name "create_world", :namespace "client.views.cast_source_view", :complexity 7, :coverage 28.5714, :crap 24.8572}
+  {:name "Mgr:refresh_committed", :namespace "server.world_host.player_quest", :complexity 21, :coverage 80.0, :crap 24.528}
   {:name "hasIndividualMult", :namespace "server.data.player_data", :complexity 6, :coverage 20.0, :crap 24.432}
-  {:name "FishAbility:CastFish", :namespace "server.fish_ability", :complexity 6, :coverage 20.0, :crap 24.432}
-  {:name "REUtil:CheckRECD", :namespace "common.re_util", :complexity 5, :coverage 8.3333, :crap 24.2564}
-  {:name "Mgr:UpdateEel", :namespace "server.world_host.fish_tree", :complexity 24, :coverage 98.3333, :crap 24.0027}
-  {:name "M.Update", :namespace "common.boss_phase", :complexity 24, :coverage 100.0, :crap 24.0}
-  {:name "Mgr:Update", :namespace "server.world_host.player_achievements", :complexity 24, :coverage 100.0, :crap 24.0}
+  {:name "FishAbility:cast_fish", :namespace "server.fish_ability", :complexity 6, :coverage 20.0, :crap 24.432}
+  {:name "REUtil:check_recd", :namespace "common.re_util", :complexity 5, :coverage 8.3333, :crap 24.2564}
+  {:name "Mgr:update_eel", :namespace "server.world_host.fish_tree", :complexity 24, :coverage 98.3333, :crap 24.0027}
+  {:name "FerryView.mount", :namespace "client.views.ferry_view", :complexity 24, :coverage 98.3871, :crap 24.0024}
+  {:name "M.update", :namespace "common.boss_phase", :complexity 24, :coverage 100.0, :crap 24.0}
+  {:name "Mgr:update", :namespace "server.world_host.player_achievements", :complexity 24, :coverage 100.0, :crap 24.0}
+  {:name "resolve_landing", :namespace "server.world_host.player_weapon", :complexity 22, :coverage 84.0, :crap 23.9825}
   {:name "check_ledger", :namespace "common.content_validation", :complexity 23, :coverage 87.8788, :crap 23.9421}
-  {:name "Mgr:Drain", :namespace "server.world_host.player_quest", :complexity 23, :coverage 89.3617, :crap 23.6369}
-  {:name "mount_banner", :namespace "client.views.survival_overlay_view", :complexity 23, :coverage 100.0, :crap 23.0}
-  {:name "resolve_landing", :namespace "server.world_host.player_weapon", :complexity 16, :coverage 70.0, :crap 22.912}
-  {:name "Util:RandomDirection", :namespace "common.util", :complexity 5, :coverage 11.1111, :crap 22.5583}
+  {:name "Mgr:drain", :namespace "server.world_host.player_quest", :complexity 23, :coverage 89.3617, :crap 23.6369}
+  {:name "StoryView.modal_spec", :namespace "client.views.story_view", :complexity 23, :coverage 95.7447, :crap 23.0408}
+  {:name "Util:random_direction", :namespace "common.util", :complexity 5, :coverage 11.1111, :crap 22.5583}
   {:name "unit_matches_player_tree", :namespace "server.world_host.ability_leaf", :complexity 12, :coverage 58.3333, :crap 22.4167}
-  {:name "FishAbility:CanCast", :namespace "server.fish_ability", :complexity 11, :coverage 54.5455, :crap 22.3636}
-  {:name "StoryView.modal_spec", :namespace "client.views.story_view", :complexity 22, :coverage 95.7447, :crap 22.0373}
-  {:name "Mgr:UpdateCarry", :namespace "server.world_host.fish_tree", :complexity 21, :coverage 88.2353, :crap 21.7181}
-  {:name "Mgr:RecordHealth", :namespace "server.world_host.fish_carrier", :complexity 21, :coverage 95.4545, :crap 21.0414}
-  {:name "Mgr:AiControlled", :namespace "server.world_host.fish_tree", :complexity 21, :coverage 97.619, :crap 21.006}
-  {:name "default_host", :namespace "client.store.client_store", :complexity 21, :coverage 100.0, :crap 21.0}
-  {:name "Mgr:Begin", :namespace "server.world_host.player_story", :complexity 17, :coverage 77.2727, :crap 20.3927}
-  {:name "Mgr:UpdateFish", :namespace "server.world_host.fish_tree", :complexity 20, :coverage 92.0, :crap 20.2048}
-  {:name "ViewUtil.get_resolution", :namespace "client.views.view_util", :complexity 20, :coverage 92.8571, :crap 20.1458}
-  {:name "GameUI:ApplyText", :namespace "client.game_ui", :complexity 4, :coverage 0.0, :crap 20.0}
-  {:name "GameUI:ReadTextColor", :namespace "client.game_ui", :complexity 4, :coverage 0.0, :crap 20.0}
-  {:name "Bubble.CreateButton", :namespace "client.interaction_bubble", :complexity 4, :coverage 0.0, :crap 20.0}
+  {:name "FishAbility:can_cast", :namespace "server.fish_ability", :complexity 11, :coverage 54.5455, :crap 22.3636}
+  {:name "Mgr:flush", :namespace "server.world_host.world_records", :complexity 19, :coverage 79.4118, :crap 22.1504}
+  {:name "mount_banner", :namespace "client.views.survival_overlay_view", :complexity 22, :coverage 100.0, :crap 22.0}
+  {:name "read_device_resolution", :namespace "client.main", :complexity 16, :coverage 71.4286, :crap 21.9708}
+  {:name "Mgr:update_carry", :namespace "server.world_host.fish_tree", :complexity 21, :coverage 88.2353, :crap 21.7181}
+  {:name "Mgr:record_health", :namespace "server.world_host.fish_carrier", :complexity 21, :coverage 95.4545, :crap 21.0414}
+  {:name "Mgr:ai_controlled", :namespace "server.world_host.fish_tree", :complexity 21, :coverage 97.619, :crap 21.006}
+  {:name "Mgr:begin", :namespace "server.world_host.player_story", :complexity 17, :coverage 77.2727, :crap 20.3927}
+  {:name "Mgr:update_fish", :namespace "server.world_host.fish_tree", :complexity 20, :coverage 92.0, :crap 20.2048}
+  {:name "GameUI:apply_text", :namespace "client.game_ui", :complexity 4, :coverage 0.0, :crap 20.0}
+  {:name "GameUI:read_text_color", :namespace "client.game_ui", :complexity 4, :coverage 0.0, :crap 20.0}
+  {:name "Bubble.create_button", :namespace "client.interaction_bubble", :complexity 4, :coverage 0.0, :crap 20.0}
   {:name "collect_squad_targets", :namespace "client.views.rescue_view", :complexity 20, :coverage 100.0, :crap 20.0}
   {:name "chaseStep", :namespace "server.world_host.fish_tree", :complexity 12, :coverage 61.9048, :crap 19.9611}
-  {:name "Mgr:Flush", :namespace "server.world_host.world_records", :complexity 17, :coverage 79.4118, :crap 19.522}
   {:name "settle", :namespace "server.world_host.player_lottery", :complexity 19, :coverage 92.6829, :crap 19.1414}
   {:name "CameraZoomView.new_controller", :namespace "client.views.camera_zoom_view", :complexity 19, :coverage 95.0, :crap 19.0451}
   {:name "detail_of", :namespace "client.views.shop_view", :complexity 19, :coverage 96.875, :crap 19.011}
-  {:name "MathWaterJudge.InspectScene", :namespace "common.math_water_judge", :complexity 19, :coverage 100.0, :crap 19.0}
+  {:name "MathWaterJudge.inspect_scene", :namespace "common.math_water_judge", :complexity 19, :coverage 100.0, :crap 19.0}
   {:name "Mgr:Damage", :namespace "server.world_host.fish_carrier", :complexity 18, :coverage 85.7143, :crap 18.9446}
   {:name "create_and_attach_anchor", :namespace "server.world_host.ability_leaf", :complexity 12, :coverage 65.0, :crap 18.174}
   {:name "HeldRodLeaf.mount", :namespace "server.world_host.held_rod_leaf", :complexity 18, :coverage 92.8571, :crap 18.1181}
-  {:name "SaveHost:WriteJob", :namespace "server.save_host", :complexity 18, :coverage 100.0, :crap 18.0}
-  {:name "Mgr:UpdateAirAttacks", :namespace "server.world_host.fish_tree", :complexity 18, :coverage 100.0, :crap 18.0}
-  {:name "Mgr:UpdateSharkCombat", :namespace "server.world_host.fish_tree", :complexity 18, :coverage 100.0, :crap 18.0}
+  {:name "default_host", :namespace "client.store.client_store", :complexity 18, :coverage 100.0, :crap 18.0}
+  {:name "SaveHost:write_job", :namespace "server.save_host", :complexity 18, :coverage 100.0, :crap 18.0}
+  {:name "Mgr:update_air_attacks", :namespace "server.world_host.fish_tree", :complexity 18, :coverage 100.0, :crap 18.0}
+  {:name "Mgr:update_shark_combat", :namespace "server.world_host.fish_tree", :complexity 18, :coverage 100.0, :crap 18.0}
   {:name "build_item_bar_snapshot", :namespace "server.world_host.player_tree", :complexity 18, :coverage 100.0, :crap 18.0}
-  {:name "Mgr:MountAiProjection", :namespace "server.world_host.fish_tree", :complexity 17, :coverage 85.1852, :crap 17.9397}
-  {:name "Mgr:FlushBeforeLeave", :namespace "server.world_host.player_story", :complexity 16, :coverage 82.3529, :crap 17.4069}
-  {:name "syncTarget", :namespace "server.world_host.player_gm", :complexity 12, :coverage 66.6667, :crap 17.3333}
-  {:name "Mgr:GrabPlayer", :namespace "server.world_host.fish_tree", :complexity 17, :coverage 92.8571, :crap 17.1053}
+  {:name "attack_gun", :namespace "server.world_host.player_weapon", :complexity 18, :coverage 100.0, :crap 18.0}
+  {:name "Mgr:mount_ai_projection", :namespace "server.world_host.fish_tree", :complexity 17, :coverage 85.1852, :crap 17.9397}
+  {:name "Mgr:flush_before_leave", :namespace "server.world_host.player_story", :complexity 16, :coverage 82.3529, :crap 17.4069}
+  {:name "Mgr:grab_player", :namespace "server.world_host.fish_tree", :complexity 17, :coverage 92.8571, :crap 17.1053}
   {:name "PlayerData:MoveSlot", :namespace "server.data.player_data", :complexity 17, :coverage 94.4444, :crap 17.0496}
   {:name "valid", :namespace "client.damage_float", :complexity 17, :coverage 100.0, :crap 17.0}
   {:name "collect_world_targets", :namespace "client.views.rescue_view", :complexity 17, :coverage 100.0, :crap 17.0}
-  {:name "QuestSteps.Restore", :namespace "common.quest_steps", :complexity 17, :coverage 100.0, :crap 17.0}
+  {:name "QuestSteps.restore", :namespace "common.quest_steps", :complexity 17, :coverage 100.0, :crap 17.0}
   {:name "openFlow", :namespace "server.platform_host", :complexity 17, :coverage 100.0, :crap 17.0}
   {:name "appendJob", :namespace "server.save_host", :complexity 6, :coverage 33.3333, :crap 16.6667}
-  {:name "AbilityAPI.AttachToSocket", :namespace "server.ability_api", :complexity 12, :coverage 68.1818, :crap 16.6386}
-  {:name "ZoneMarkers.Start", :namespace "common.zone_markers", :complexity 4, :coverage 8.3333, :crap 16.3241}
-  {:name "Mgr:Read", :namespace "server.world_host.world_records", :complexity 16, :coverage 91.6667, :crap 16.1481}
-  {:name "Mgr:UpdateKingCrabCombat", :namespace "server.world_host.fish_tree", :complexity 16, :coverage 93.1034, :crap 16.084}
-  {:name "Mgr:Attach", :namespace "server.world_host.fish_carrier", :complexity 16, :coverage 93.617, :crap 16.0666}
+  {:name "AbilityAPI.attach_to_socket", :namespace "server.ability_api", :complexity 12, :coverage 68.1818, :crap 16.6386}
+  {:name "ZoneMarkers.start", :namespace "common.zone_markers", :complexity 4, :coverage 8.3333, :crap 16.3241}
+  {:name "Mgr:update_king_crab_combat", :namespace "server.world_host.fish_tree", :complexity 16, :coverage 93.1034, :crap 16.084}
+  {:name "Mgr:attach", :namespace "server.world_host.fish_carrier", :complexity 16, :coverage 93.617, :crap 16.0666}
   {:name "FishermanView.bubble_spec", :namespace "client.views.fisherman_view", :complexity 16, :coverage 95.2381, :crap 16.0276}
   {:name "GroundLootView.aim_toggle_spec", :namespace "client.views.ground_loot_view", :complexity 16, :coverage 97.5, :crap 16.004}
   {:name "GroundLootView.pick_nearest", :namespace "client.views.ground_loot_view", :complexity 16, :coverage 100.0, :crap 16.0}
@@ -156,257 +161,272 @@
   {:name "resolveZone", :namespace "common.zone_markers", :complexity 16, :coverage 100.0, :crap 16.0}
   {:name "Dialogue.Lines", :namespace "common.npc_dialogue", :complexity 15, :coverage 83.871, :crap 15.9441}
   {:name "bindRE", :namespace "server.main", :complexity 5, :coverage 25.0, :crap 15.5469}
-  {:name "Mgr:CastFish", :namespace "server.world_host.fish_ai", :complexity 15, :coverage 89.4737, :crap 15.2624}
+  {:name "Mgr:cast_fish", :namespace "server.world_host.fish_ai", :complexity 15, :coverage 89.4737, :crap 15.2624}
   {:name "ShopView.presentation_spec", :namespace "client.views.shop_view", :complexity 13, :coverage 76.4706, :crap 15.2015}
+  {:name "EngineRead.read_vec3", :namespace "common.engine_read", :complexity 12, :coverage 72.2222, :crap 15.0864}
   {:name "result_text", :namespace "client.views.blindbox_view", :complexity 15, :coverage 100.0, :crap 15.0}
   {:name "resolve_reef_hook", :namespace "client.views.cast_source_view", :complexity 15, :coverage 100.0, :crap 15.0}
-  {:name "DamageNotice.FromHealth", :namespace "common.damage_notice", :complexity 15, :coverage 100.0, :crap 15.0}
-  {:name "M.BoundsOf", :namespace "common.flight_path", :complexity 15, :coverage 100.0, :crap 15.0}
-  {:name "GameCfg.Items.SalePrice", :namespace "common.game_cfg", :complexity 15, :coverage 100.0, :crap 15.0}
+  {:name "DamageNotice.from_health", :namespace "common.damage_notice", :complexity 15, :coverage 100.0, :crap 15.0}
+  {:name "M.bounds_of", :namespace "common.flight_path", :complexity 15, :coverage 100.0, :crap 15.0}
+  {:name "GameCfg.Items.sale_price", :namespace "common.game_cfg", :complexity 15, :coverage 100.0, :crap 15.0}
   {:name "PlayerData:Init", :namespace "server.data.player_data", :complexity 15, :coverage 100.0, :crap 15.0}
-  {:name "SaveHost:ReadExplicit", :namespace "server.save_host", :complexity 15, :coverage 100.0, :crap 15.0}
-  {:name "Mgr:ChooseTarget", :namespace "server.world_host.fish_tree", :complexity 15, :coverage 100.0, :crap 15.0}
-  {:name "Mgr:TakeKilled", :namespace "server.world_host.fish_tree", :complexity 15, :coverage 100.0, :crap 15.0}
-  {:name "Mgr:Handle", :namespace "server.world_host.world_records", :complexity 15, :coverage 100.0, :crap 15.0}
-  {:name "Mgr:RecordLanding", :namespace "server.world_host.player_compendium", :complexity 14, :coverage 88.8889, :crap 14.2689}
-  {:name "SaveHost:Drain", :namespace "server.save_host", :complexity 14, :coverage 92.3077, :crap 14.0892}
+  {:name "SaveHost:read_explicit", :namespace "server.save_host", :complexity 15, :coverage 100.0, :crap 15.0}
+  {:name "Mgr:choose_target", :namespace "server.world_host.fish_tree", :complexity 15, :coverage 100.0, :crap 15.0}
+  {:name "Mgr:take_killed", :namespace "server.world_host.fish_tree", :complexity 15, :coverage 100.0, :crap 15.0}
+  {:name "Mgr:handle", :namespace "server.world_host.world_records", :complexity 15, :coverage 100.0, :crap 15.0}
+  {:name "Mgr:record_landing", :namespace "server.world_host.player_compendium", :complexity 14, :coverage 88.8889, :crap 14.2689}
+  {:name "Mgr:read", :namespace "server.world_host.world_records", :complexity 14, :coverage 90.4762, :crap 14.1693}
+  {:name "SaveHost:drain", :namespace "server.save_host", :complexity 14, :coverage 92.3077, :crap 14.0892}
   {:name "resolve_zone", :namespace "client.store.client_store", :complexity 14, :coverage 100.0, :crap 14.0}
   {:name "GrillView.bubble_spec", :namespace "client.views.grill_view", :complexity 14, :coverage 100.0, :crap 14.0}
   {:name "ShopView.bubble_spec", :namespace "client.views.shop_view", :complexity 14, :coverage 100.0, :crap 14.0}
-  {:name "LotteryEligibility.Check", :namespace "common.lottery_eligibility", :complexity 14, :coverage 100.0, :crap 14.0}
-  {:name "Receiver:Accept", :namespace "common.rate_limit", :complexity 14, :coverage 100.0, :crap 14.0}
-  {:name "ReelProgress:Advance", :namespace "common.reel_progress", :complexity 14, :coverage 100.0, :crap 14.0}
-  {:name "ZoneMarkers.Resolve", :namespace "common.zone_markers", :complexity 14, :coverage 100.0, :crap 14.0}
+  {:name "LotteryEligibility.check", :namespace "common.lottery_eligibility", :complexity 14, :coverage 100.0, :crap 14.0}
+  {:name "Receiver:accept", :namespace "common.rate_limit", :complexity 14, :coverage 100.0, :crap 14.0}
+  {:name "ReelProgress:advance", :namespace "common.reel_progress", :complexity 14, :coverage 100.0, :crap 14.0}
+  {:name "ZoneMarkers.resolve", :namespace "common.zone_markers", :complexity 14, :coverage 100.0, :crap 14.0}
   {:name "PlayerData:CanGrant", :namespace "server.data.player_data", :complexity 14, :coverage 100.0, :crap 14.0}
   {:name "serializable", :namespace "server.data.player_data", :complexity 14, :coverage 100.0, :crap 14.0}
-  {:name "Mgr:FlightBounds", :namespace "server.world_host.fish_tree", :complexity 14, :coverage 100.0, :crap 14.0}
-  {:name "Mgr:SpawnLanded", :namespace "server.world_host.fish_tree", :complexity 14, :coverage 100.0, :crap 14.0}
-  {:name "Mgr:StartAirAttack", :namespace "server.world_host.fish_tree", :complexity 14, :coverage 100.0, :crap 14.0}
+  {:name "Mgr:flight_bounds", :namespace "server.world_host.fish_tree", :complexity 14, :coverage 100.0, :crap 14.0}
+  {:name "Mgr:spawn_landed", :namespace "server.world_host.fish_tree", :complexity 14, :coverage 100.0, :crap 14.0}
+  {:name "Mgr:start_air_attack", :namespace "server.world_host.fish_tree", :complexity 14, :coverage 100.0, :crap 14.0}
   {:name "equipped_weapon", :namespace "server.world_host.player_weapon", :complexity 14, :coverage 100.0, :crap 14.0}
-  {:name "Mgr:Confirm", :namespace "server.world_host.player_achievements", :complexity 12, :coverage 76.1905, :crap 13.9436}
-  {:name "FishAbility:EquipFish", :namespace "server.fish_ability", :complexity 13, :coverage 83.3333, :crap 13.7824}
-  {:name "create_world", :namespace "client.views.cast_source_view", :complexity 6, :coverage 40.0, :crap 13.776}
+  {:name "is_boss_summon_row", :namespace "server.world_host.player_weapon", :complexity 14, :coverage 100.0, :crap 14.0}
+  {:name "step_flights", :namespace "server.world_host.player_weapon", :complexity 14, :coverage 100.0, :crap 14.0}
+  {:name "Mgr:confirm", :namespace "server.world_host.player_achievements", :complexity 12, :coverage 76.1905, :crap 13.9436}
+  {:name "valid_res", :namespace "client.views.reel_overlay_view", :complexity 13, :coverage 83.3333, :crap 13.7824}
+  {:name "FishAbility:equip_fish", :namespace "server.fish_ability", :complexity 13, :coverage 83.3333, :crap 13.7824}
   {:name "zone_of", :namespace "server.world_host.ground_loot", :complexity 6, :coverage 40.0, :crap 13.776}
+  {:name "EngineRead.read_vec2", :namespace "common.engine_read", :complexity 10, :coverage 66.6667, :crap 13.7037}
   {:name "PlayerData:ExchangeSlot", :namespace "server.data.player_data", :complexity 10, :coverage 66.6667, :crap 13.7037}
   {:name "take_slot", :namespace "server.world_host.ground_loot", :complexity 13, :coverage 84.2105, :crap 13.6653}
-  {:name "Mgr:OnLifted", :namespace "server.world_host.fish_tree", :complexity 13, :coverage 84.6154, :crap 13.6154}
+  {:name "Mgr:on_lifted", :namespace "server.world_host.fish_tree", :complexity 13, :coverage 84.6154, :crap 13.6154}
   {:name "ModifierLeaf.push_modifier", :namespace "server.world_host.modifier_leaf", :complexity 11, :coverage 73.6842, :crap 13.2051}
   {:name "HeldRodLeaf.create_visual", :namespace "server.world_host.held_rod_leaf", :complexity 13, :coverage 90.0, :crap 13.169}
+  {:name "Mgr:note_landing", :namespace "server.world_host.world_records", :complexity 12, :coverage 80.0, :crap 13.152}
   {:name "send_reel", :namespace "client.views.reel_overlay_view", :complexity 7, :coverage 50.0, :crap 13.125}
-  {:name "Mgr:SetFocus", :namespace "server.world_host.fish_ai_target", :complexity 13, :coverage 96.1538, :crap 13.0096}
-  {:name "PlayerWeapon.mount", :namespace "server.world_host.player_weapon", :complexity 13, :coverage 98.0392, :crap 13.0013}
-  {:name "Assets.Apply", :namespace "common.cfg.placeholder_assets", :complexity 13, :coverage 100.0, :crap 13.0}
-  {:name "GarBiteNotice.Valid", :namespace "common.gar_bite_notice", :complexity 13, :coverage 100.0, :crap 13.0}
-  {:name "SaveHost:Enqueue", :namespace "server.save_host", :complexity 13, :coverage 100.0, :crap 13.0}
-  {:name "Mgr:IsTargetValid", :namespace "server.world_host.fish_tree", :complexity 13, :coverage 100.0, :crap 13.0}
-  {:name "attack_gun", :namespace "server.world_host.player_weapon", :complexity 13, :coverage 100.0, :crap 13.0}
-  {:name "Mgr:FlushBeforeLeave", :namespace "server.world_host.player_quest", :complexity 10, :coverage 69.2308, :crap 12.9131}
+  {:name "Mgr:set_focus", :namespace "server.world_host.fish_ai_target", :complexity 13, :coverage 96.1538, :crap 13.0096}
+  {:name "Assets.apply", :namespace "common.cfg.placeholder_assets", :complexity 13, :coverage 100.0, :crap 13.0}
+  {:name "GarBiteNotice.valid", :namespace "common.gar_bite_notice", :complexity 13, :coverage 100.0, :crap 13.0}
+  {:name "SaveHost:enqueue", :namespace "server.save_host", :complexity 13, :coverage 100.0, :crap 13.0}
+  {:name "Mgr:is_target_valid", :namespace "server.world_host.fish_tree", :complexity 13, :coverage 100.0, :crap 13.0}
+  {:name "Mgr:flush_before_leave", :namespace "server.world_host.player_quest", :complexity 10, :coverage 69.2308, :crap 12.9131}
+  {:name "EngineRead.is_destroyed", :namespace "common.engine_read", :complexity 6, :coverage 42.8571, :crap 12.7172}
   {:name "deliver", :namespace "server.world_host.player_fisherman", :complexity 12, :coverage 85.7143, :crap 12.4198}
-  {:name "Mgr:UpdateEscaping", :namespace "server.world_host.fish_tree", :complexity 12, :coverage 88.0, :crap 12.2488}
+  {:name "Mgr:update_escaping", :namespace "server.world_host.fish_tree", :complexity 12, :coverage 88.0, :crap 12.2488}
   {:name "send_close", :namespace "client.views.reel_overlay_view", :complexity 6, :coverage 44.4444, :crap 12.1729}
   {:name "applyAnchorAttributes", :namespace "server.fish_ability", :complexity 8, :coverage 60.0, :crap 12.096}
   {:name "Mgr.mount", :namespace "server.world_host.player_story", :complexity 12, :coverage 92.8571, :crap 12.0525}
-  {:name "AttrBridge:RefreshMaxHealth", :namespace "server.main", :complexity 12, :coverage 94.1176, :crap 12.0293}
-  {:name "Mgr:UpdateChase", :namespace "server.world_host.fish_tree", :complexity 12, :coverage 94.1176, :crap 12.0293}
+  {:name "AttrBridge:refresh_max_health", :namespace "server.main", :complexity 12, :coverage 94.1176, :crap 12.0293}
+  {:name "Mgr:update_chase", :namespace "server.world_host.fish_tree", :complexity 12, :coverage 94.1176, :crap 12.0293}
   {:name "attack_melee", :namespace "server.world_host.player_weapon", :complexity 12, :coverage 94.7368, :crap 12.021}
   {:name "build_bait_candidates", :namespace "client.views.main_hud_equip_popups", :complexity 12, :coverage 94.8718, :crap 12.0194}
   {:name "SharedWorldTree.spawn", :namespace "server.world_host.shared_world_tree", :complexity 12, :coverage 95.9459, :crap 12.0096}
   {:name "resolve_backpack_drop", :namespace "client.main", :complexity 3, :coverage 0.0, :crap 12.0}
   {:name "resolve_item_bar_drop", :namespace "client.main", :complexity 3, :coverage 0.0, :crap 12.0}
-  {:name "MainHudLayout.Compute", :namespace "client.main_hud_layout", :complexity 12, :coverage 100.0, :crap 12.0}
-  {:name "RescueView.bubble_spec", :namespace "client.views.rescue_view", :complexity 12, :coverage 100.0, :crap 12.0}
-  {:name "GameCfg.Shop.ListForPage", :namespace "common.game_cfg", :complexity 12, :coverage 100.0, :crap 12.0}
+  {:name "MainHudLayout.compute", :namespace "client.main_hud_layout", :complexity 12, :coverage 100.0, :crap 12.0}
+  {:name "GameCfg.Shop.list_for_page", :namespace "common.game_cfg", :complexity 12, :coverage 100.0, :crap 12.0}
   {:name "cookedState", :namespace "common.lottery_eligibility", :complexity 12, :coverage 100.0, :crap 12.0}
-  {:name "QuestSteps.Apply", :namespace "common.quest_steps", :complexity 12, :coverage 100.0, :crap 12.0}
+  {:name "QuestSteps.apply", :namespace "common.quest_steps", :complexity 12, :coverage 100.0, :crap 12.0}
   {:name "catalog", :namespace "common.zone_markers", :complexity 12, :coverage 100.0, :crap 12.0}
   {:name "stripArrayMeta", :namespace "server.data.player_data", :complexity 12, :coverage 100.0, :crap 12.0}
-  {:name "PlatformHost:HandleTestAction", :namespace "server.platform_host", :complexity 12, :coverage 100.0, :crap 12.0}
+  {:name "PlatformHost:handle_test_action", :namespace "server.platform_host", :complexity 12, :coverage 100.0, :crap 12.0}
   {:name "closedText", :namespace "server.platform_host", :complexity 3, :coverage 0.0, :crap 12.0}
   {:name "configured", :namespace "server.platform_host", :complexity 3, :coverage 0.0, :crap 12.0}
-  {:name "SaveHost:SelectNextSlot", :namespace "server.save_host", :complexity 12, :coverage 100.0, :crap 12.0}
+  {:name "SaveHost:select_next_slot", :namespace "server.save_host", :complexity 12, :coverage 100.0, :crap 12.0}
   {:name "resolveMesh", :namespace "server.world_host.fish_carrier", :complexity 12, :coverage 100.0, :crap 12.0}
-  {:name "Mgr:AdvanceWalrusCharge", :namespace "server.world_host.fish_tree", :complexity 12, :coverage 100.0, :crap 12.0}
-  {:name "Mgr:CleanupFish", :namespace "server.world_host.fish_tree", :complexity 12, :coverage 100.0, :crap 12.0}
-  {:name "Mgr:ReleaseCarried", :namespace "server.world_host.fish_tree", :complexity 12, :coverage 100.0, :crap 12.0}
+  {:name "Mgr:advance_walrus_charge", :namespace "server.world_host.fish_tree", :complexity 12, :coverage 100.0, :crap 12.0}
+  {:name "Mgr:cleanup_fish", :namespace "server.world_host.fish_tree", :complexity 12, :coverage 100.0, :crap 12.0}
+  {:name "Mgr:release_carried", :namespace "server.world_host.fish_tree", :complexity 12, :coverage 100.0, :crap 12.0}
   {:name "cast_landing", :namespace "server.world_host.fishing_phase", :complexity 12, :coverage 100.0, :crap 12.0}
   {:name "selected_rod", :namespace "server.world_host.fishing_phase", :complexity 12, :coverage 100.0, :crap 12.0}
-  {:name "Mgr:Snapshot", :namespace "server.world_host.player_compendium", :complexity 12, :coverage 100.0, :crap 12.0}
+  {:name "Mgr:snapshot", :namespace "server.world_host.player_compendium", :complexity 12, :coverage 100.0, :crap 12.0}
   {:name "backpack_row", :namespace "server.world_host.player_shop", :complexity 12, :coverage 100.0, :crap 12.0}
-  {:name "Mgr:Complete", :namespace "server.world_host.player_story", :complexity 12, :coverage 100.0, :crap 12.0}
+  {:name "Mgr:complete", :namespace "server.world_host.player_story", :complexity 12, :coverage 100.0, :crap 12.0}
+  {:name "PlayerWeapon.mount", :namespace "server.world_host.player_weapon", :complexity 12, :coverage 100.0, :crap 12.0}
   {:name "selected_entry", :namespace "server.world_host.player_grill", :complexity 11, :coverage 80.0, :crap 11.968}
-  {:name "DamageFloat:Update", :namespace "client.damage_float", :complexity 9, :coverage 69.2308, :crap 11.3596}
-  {:name "Mgr:NoteLanding", :namespace "server.world_host.world_records", :complexity 10, :coverage 76.1905, :crap 11.3497}
+  {:name "DamageFloat:update", :namespace "client.damage_float", :complexity 9, :coverage 69.2308, :crap 11.3596}
   {:name "AttrLeaf.project_components", :namespace "server.world_host.attr_leaf", :complexity 10, :coverage 76.9231, :crap 11.2289}
   {:name "CameraZoomView.mount", :namespace "client.views.camera_zoom_view", :complexity 11, :coverage 87.8788, :crap 11.2155}
   {:name "row_state", :namespace "client.views.shop_view", :complexity 11, :coverage 90.0, :crap 11.121}
+  {:name "ViewUtil.resolve_clock", :namespace "client.views.view_util", :complexity 11, :coverage 90.0, :crap 11.121}
   {:name "pick_blast_fish", :namespace "server.world_host.player_weapon", :complexity 10, :coverage 77.7778, :crap 11.0974}
   {:name "settle_purchase", :namespace "server.world_host.player_shop", :complexity 11, :coverage 92.5926, :crap 11.0492}
-  {:name "DamageFloat:Show", :namespace "client.damage_float", :complexity 11, :coverage 100.0, :crap 11.0}
+  {:name "DamageFloat:show", :namespace "client.damage_float", :complexity 11, :coverage 100.0, :crap 11.0}
   {:name "equipped", :namespace "client.views.attack_view", :complexity 11, :coverage 100.0, :crap 11.0}
   {:name "GroundLootView.bubble_spec", :namespace "client.views.ground_loot_view", :complexity 11, :coverage 100.0, :crap 11.0}
   {:name "equipped_weapon", :namespace "client.views.main_hud_equip_popups", :complexity 11, :coverage 100.0, :crap 11.0}
+  {:name "RescueView.bubble_spec", :namespace "client.views.rescue_view", :complexity 11, :coverage 100.0, :crap 11.0}
   {:name "build_rows", :namespace "client.views.shop_view", :complexity 11, :coverage 100.0, :crap 11.0}
   {:name "updateCruise", :namespace "common.flight_path", :complexity 11, :coverage 100.0, :crap 11.0}
   {:name "PlayerData:UpdateData", :namespace "server.data.player_data", :complexity 11, :coverage 100.0, :crap 11.0}
   {:name "placeholderGoodsId", :namespace "server.platform_host", :complexity 11, :coverage 100.0, :crap 11.0}
-  {:name "Mgr:DamageFish", :namespace "server.world_host.fish_tree", :complexity 11, :coverage 100.0, :crap 11.0}
-  {:name "Mgr:Stop", :namespace "server.world_host.fish_tree", :complexity 11, :coverage 100.0, :crap 11.0}
-  {:name "Mgr:Handle", :namespace "server.world_host.player_compendium", :complexity 11, :coverage 100.0, :crap 11.0}
+  {:name "Mgr:stop", :namespace "server.world_host.fish_tree", :complexity 11, :coverage 100.0, :crap 11.0}
+  {:name "Mgr:handle", :namespace "server.world_host.player_compendium", :complexity 11, :coverage 100.0, :crap 11.0}
   {:name "flat_distance", :namespace "server.world_host.squad_dock", :complexity 11, :coverage 100.0, :crap 11.0}
-  {:name "SaveHost:RestoreLanding", :namespace "server.save_host", :complexity 9, :coverage 71.4286, :crap 10.8892}
+  {:name "Mgr.mount", :namespace "server.world_host.world_records", :complexity 11, :coverage 100.0, :crap 11.0}
+  {:name "SaveHost:restore_landing", :namespace "server.save_host", :complexity 9, :coverage 71.4286, :crap 10.8892}
+  {:name "invoke_method_impl", :namespace "common.engine_read", :complexity 10, :coverage 81.25, :crap 10.6592}
   {:name "resolve_target_distance", :namespace "client.views.camera_zoom_view", :complexity 9, :coverage 72.7273, :crap 10.6431}
-  {:name "PlatformHost:HandleAction", :namespace "server.platform_host", :complexity 10, :coverage 81.8182, :crap 10.6011}
+  {:name "PlatformHost:handle_action", :namespace "server.platform_host", :complexity 10, :coverage 81.8182, :crap 10.6011}
   {:name "validActionValue", :namespace "server.player_data_host", :complexity 10, :coverage 83.3333, :crap 10.463}
-  {:name "Mgr:UpdateWalrusCombat", :namespace "server.world_host.fish_tree", :complexity 10, :coverage 86.9565, :crap 10.2219}
+  {:name "EngineRead.new_vector3", :namespace "common.engine_read", :complexity 8, :coverage 66.6667, :crap 10.3704}
+  {:name "Mgr:update_walrus_combat", :namespace "server.world_host.fish_tree", :complexity 10, :coverage 86.9565, :crap 10.2219}
   {:name "try_equip_entry", :namespace "server.world_host.ability_leaf", :complexity 10, :coverage 88.2353, :crap 10.1628}
-  {:name "Mgr:ResolveLifter", :namespace "server.world_host.fish_tree", :complexity 7, :coverage 60.0, :crap 10.136}
+  {:name "panel_center", :namespace "client.views.economy_modal", :complexity 10, :coverage 88.8889, :crap 10.1372}
+  {:name "Mgr:resolve_lifter", :namespace "server.world_host.fish_tree", :complexity 7, :coverage 60.0, :crap 10.136}
   {:name "AbilityLeaf.cast_ability", :namespace "server.world_host.ability_leaf", :complexity 10, :coverage 89.4737, :crap 10.1166}
-  {:name "Mgr:PublishCombat", :namespace "server.world_host.fish_tree", :complexity 10, :coverage 90.9091, :crap 10.0751}
+  {:name "Mgr:publish_combat", :namespace "server.world_host.fish_tree", :complexity 10, :coverage 90.9091, :crap 10.0751}
   {:name "normalize_survival", :namespace "client.store.client_store", :complexity 10, :coverage 100.0, :crap 10.0}
+  {:name "CompendiumView.page_spec", :namespace "client.views.compendium_view", :complexity 10, :coverage 100.0, :crap 10.0}
   {:name "rows_of", :namespace "client.views.ground_loot_view", :complexity 10, :coverage 100.0, :crap 10.0}
+  {:name "SquadView.hud_spec", :namespace "client.views.squad_view", :complexity 10, :coverage 100.0, :crap 10.0}
   {:name "SquadView.member_spec", :namespace "client.views.squad_view", :complexity 10, :coverage 100.0, :crap 10.0}
   {:name "notice_from_event", :namespace "client.views.squad_view", :complexity 10, :coverage 100.0, :crap 10.0}
-  {:name "BlindboxDraw.DrawMany", :namespace "common.blindbox_draw", :complexity 10, :coverage 100.0, :crap 10.0}
-  {:name "M.AttackTable", :namespace "common.cfg.boss_moves", :complexity 10, :coverage 100.0, :crap 10.0}
-  {:name "M.New", :namespace "common.flight_path", :complexity 10, :coverage 100.0, :crap 10.0}
-  {:name "GameCfg.Items.CookRate", :namespace "common.game_cfg", :complexity 10, :coverage 100.0, :crap 10.0}
-  {:name "LotteryDraw.ChooseWeapon", :namespace "common.lottery_draw", :complexity 10, :coverage 100.0, :crap 10.0}
-  {:name "LotteryDraw.Evaluate", :namespace "common.lottery_draw", :complexity 10, :coverage 100.0, :crap 10.0}
-  {:name "Records.Entry", :namespace "common.records", :complexity 10, :coverage 100.0, :crap 10.0}
-  {:name "Records.Valid", :namespace "common.records", :complexity 10, :coverage 100.0, :crap 10.0}
+  {:name "BlindboxDraw.draw_many", :namespace "common.blindbox_draw", :complexity 10, :coverage 100.0, :crap 10.0}
+  {:name "M.attack_table", :namespace "common.cfg.boss_moves", :complexity 10, :coverage 100.0, :crap 10.0}
+  {:name "M.new", :namespace "common.flight_path", :complexity 10, :coverage 100.0, :crap 10.0}
+  {:name "GameCfg.Items.cook_rate", :namespace "common.game_cfg", :complexity 10, :coverage 100.0, :crap 10.0}
+  {:name "LotteryDraw.choose_weapon", :namespace "common.lottery_draw", :complexity 10, :coverage 100.0, :crap 10.0}
+  {:name "LotteryDraw.evaluate", :namespace "common.lottery_draw", :complexity 10, :coverage 100.0, :crap 10.0}
+  {:name "Records.entry", :namespace "common.records", :complexity 10, :coverage 100.0, :crap 10.0}
+  {:name "Records.valid", :namespace "common.records", :complexity 10, :coverage 100.0, :crap 10.0}
   {:name "PlayerData:ChangeCoin", :namespace "server.data.player_data", :complexity 10, :coverage 100.0, :crap 10.0}
   {:name "PlayerData:HoldSlot", :namespace "server.data.player_data", :complexity 10, :coverage 100.0, :crap 10.0}
   {:name "PlayerData:MoveToItemBar", :namespace "server.data.player_data", :complexity 10, :coverage 100.0, :crap 10.0}
   {:name "PlayerData:SelectSlot", :namespace "server.data.player_data", :complexity 10, :coverage 100.0, :crap 10.0}
   {:name "finitePoint", :namespace "server.data.player_data", :complexity 10, :coverage 100.0, :crap 10.0}
   {:name "swingClock", :namespace "server.swing_registry", :complexity 10, :coverage 100.0, :crap 10.0}
-  {:name "Mgr:Custom", :namespace "server.world_host.fish_ai", :complexity 10, :coverage 100.0, :crap 10.0}
-  {:name "Mgr:SpawnBlastFish", :namespace "server.world_host.fish_tree", :complexity 10, :coverage 100.0, :crap 10.0}
+  {:name "Mgr:custom", :namespace "server.world_host.fish_ai", :complexity 10, :coverage 100.0, :crap 10.0}
+  {:name "Mgr:spawn_blast_fish", :namespace "server.world_host.fish_tree", :complexity 10, :coverage 100.0, :crap 10.0}
   {:name "towardWater", :namespace "server.world_host.fish_tree", :complexity 10, :coverage 100.0, :crap 10.0}
   {:name "occupied", :namespace "server.world_host.ground_loot", :complexity 10, :coverage 100.0, :crap 10.0}
-  {:name "InteractionPoints:InRange", :namespace "server.world_host.interaction_points", :complexity 10, :coverage 100.0, :crap 10.0}
+  {:name "InteractionPoints:in_range", :namespace "server.world_host.interaction_points", :complexity 10, :coverage 100.0, :crap 10.0}
   {:name "saleable", :namespace "server.world_host.player_fisherman", :complexity 10, :coverage 100.0, :crap 10.0}
   {:name "anchor_in_range", :namespace "server.world_host.player_grill", :complexity 10, :coverage 100.0, :crap 10.0}
   {:name "place", :namespace "server.world_host.player_grill", :complexity 10, :coverage 100.0, :crap 10.0}
-  {:name "step_flights", :namespace "server.world_host.player_weapon", :complexity 10, :coverage 100.0, :crap 10.0}
-  {:name "flat_forward", :namespace "server.world_host.special_item_phase", :complexity 10, :coverage 100.0, :crap 10.0}
-  {:name "SaveHost:Start", :namespace "server.save_host", :complexity 9, :coverage 76.9231, :crap 9.9954}
+  {:name "SaveHost:start", :namespace "server.save_host", :complexity 9, :coverage 76.9231, :crap 9.9954}
   {:name "Mgr:Item", :namespace "server.world_host.player_gm", :complexity 9, :coverage 77.7778, :crap 9.8889}
-  {:name "Util:SplitString", :namespace "common.util", :complexity 3, :coverage 11.1111, :crap 9.321}
-  {:name "sanitize_position", :namespace "client.store.client_store", :complexity 8, :coverage 72.7273, :crap 9.2983}
-  {:name "SaveHost:SaveExplicit", :namespace "server.save_host", :complexity 9, :coverage 87.5, :crap 9.1582}
+  {:name "Util:split_string", :namespace "common.util", :complexity 3, :coverage 11.1111, :crap 9.321}
+  {:name "SaveHost:save_explicit", :namespace "server.save_host", :complexity 9, :coverage 87.5, :crap 9.1582}
   {:name "in_corridor", :namespace "server.world_host.special_item_phase", :complexity 9, :coverage 88.8889, :crap 9.1111}
   {:name "PlayerData:SanitizeHeld", :namespace "server.data.player_data", :complexity 9, :coverage 90.9091, :crap 9.0609}
   {:name "send", :namespace "client.views.survival_overlay_view", :complexity 5, :coverage 45.4545, :crap 9.0571}
   {:name "boundary", :namespace "common.zone_markers", :complexity 9, :coverage 91.6667, :crap 9.0469}
-  {:name "Util:MsgNotice", :namespace "common.util", :complexity 3, :coverage 12.5, :crap 9.0293}
-  {:name "Mgr:WallAhead", :namespace "server.world_host.fish_tree", :complexity 9, :coverage 94.1176, :crap 9.0165}
+  {:name "ViewUtil.create_anchor_scene_node", :namespace "client.views.view_util", :complexity 9, :coverage 92.3077, :crap 9.0369}
+  {:name "Util:msg_notice", :namespace "common.util", :complexity 3, :coverage 12.5, :crap 9.0293}
+  {:name "Mgr:wall_ahead", :namespace "server.world_host.fish_tree", :complexity 9, :coverage 94.1176, :crap 9.0165}
   {:name "FerryView.legs_spec", :namespace "client.views.ferry_view", :complexity 9, :coverage 100.0, :crap 9.0}
   {:name "on_result", :namespace "client.views.ferry_view", :complexity 9, :coverage 100.0, :crap 9.0}
   {:name "GroundLootView.aim_spec", :namespace "client.views.ground_loot_view", :complexity 9, :coverage 100.0, :crap 9.0}
+  {:name "GuideView.spec", :namespace "client.views.guide_view", :complexity 9, :coverage 100.0, :crap 9.0}
   {:name "bait_stock", :namespace "client.views.main_hud_equip_popups", :complexity 9, :coverage 100.0, :crap 9.0}
-  {:name "SquadView.hud_spec", :namespace "client.views.squad_view", :complexity 9, :coverage 100.0, :crap 9.0}
+  {:name "resolve_clock", :namespace "client.views.reel_overlay_view", :complexity 9, :coverage 100.0, :crap 9.0}
   {:name "SurvivalOverlayView.spec", :namespace "client.views.survival_overlay_view", :complexity 9, :coverage 100.0, :crap 9.0}
-  {:name "M.Order", :namespace "common.ai_target_policy", :complexity 9, :coverage 100.0, :crap 9.0}
-  {:name "M.Plan", :namespace "common.attr_model", :complexity 9, :coverage 100.0, :crap 9.0}
-  {:name "M.CombatParams", :namespace "common.cfg.boss_moves", :complexity 9, :coverage 100.0, :crap 9.0}
-  {:name "FishCatch.Select", :namespace "common.fish_catch", :complexity 9, :coverage 100.0, :crap 9.0}
-  {:name "AbilityAPI.CastAbility", :namespace "server.ability_api", :complexity 9, :coverage 100.0, :crap 9.0}
-  {:name "M.Discharge", :namespace "server.ability_behaviors.eel_discharge", :complexity 9, :coverage 100.0, :crap 9.0}
+  {:name "M.order", :namespace "common.ai_target_policy", :complexity 9, :coverage 100.0, :crap 9.0}
+  {:name "M.plan", :namespace "common.attr_model", :complexity 9, :coverage 100.0, :crap 9.0}
+  {:name "M.combat_params", :namespace "common.cfg.boss_moves", :complexity 9, :coverage 100.0, :crap 9.0}
+  {:name "read_field_impl", :namespace "common.engine_read", :complexity 9, :coverage 100.0, :crap 9.0}
+  {:name "write_field_impl", :namespace "common.engine_read", :complexity 8, :coverage 75.0, :crap 9.0}
+  {:name "FishCatch.select", :namespace "common.fish_catch", :complexity 9, :coverage 100.0, :crap 9.0}
+  {:name "AbilityAPI.cast_ability", :namespace "server.ability_api", :complexity 9, :coverage 100.0, :crap 9.0}
+  {:name "M.discharge", :namespace "server.ability_behaviors.eel_discharge", :complexity 9, :coverage 100.0, :crap 9.0}
   {:name "PlayerData:AddBait", :namespace "server.data.player_data", :complexity 9, :coverage 100.0, :crap 9.0}
   {:name "PlayerData:AddItem", :namespace "server.data.player_data", :complexity 9, :coverage 100.0, :crap 9.0}
-  {:name "FishAbility:Update", :namespace "server.fish_ability", :complexity 9, :coverage 100.0, :crap 9.0}
+  {:name "FishAbility:update", :namespace "server.fish_ability", :complexity 9, :coverage 100.0, :crap 9.0}
   {:name "resolve", :namespace "server.platform_host", :complexity 9, :coverage 100.0, :crap 9.0}
-  {:name "SaveHost:Key", :namespace "server.save_host", :complexity 9, :coverage 100.0, :crap 9.0}
-  {:name "SaveHost:Update", :namespace "server.save_host", :complexity 9, :coverage 100.0, :crap 9.0}
-  {:name "Mgr:NoteDamage", :namespace "server.world_host.fish_tree", :complexity 9, :coverage 100.0, :crap 9.0}
-  {:name "Mgr:Speed", :namespace "server.world_host.fish_tree", :complexity 9, :coverage 100.0, :crap 9.0}
+  {:name "PlayerDataHost:send_item_bar", :namespace "server.player_data_host", :complexity 9, :coverage 100.0, :crap 9.0}
+  {:name "SaveHost:key", :namespace "server.save_host", :complexity 9, :coverage 100.0, :crap 9.0}
+  {:name "SaveHost:update", :namespace "server.save_host", :complexity 9, :coverage 100.0, :crap 9.0}
+  {:name "Mgr:note_damage", :namespace "server.world_host.fish_tree", :complexity 9, :coverage 100.0, :crap 9.0}
+  {:name "Mgr:speed", :namespace "server.world_host.fish_tree", :complexity 9, :coverage 100.0, :crap 9.0}
   {:name "prune", :namespace "server.world_host.player_blindbox", :complexity 9, :coverage 100.0, :crap 9.0}
   {:name "distance3", :namespace "server.world_host.player_life", :complexity 9, :coverage 100.0, :crap 9.0}
+  {:name "blast_candidates", :namespace "server.world_host.player_weapon", :complexity 9, :coverage 100.0, :crap 9.0}
   {:name "detonate", :namespace "server.world_host.player_weapon", :complexity 9, :coverage 100.0, :crap 9.0}
+  {:name "launch", :namespace "server.world_host.player_weapon", :complexity 9, :coverage 100.0, :crap 9.0}
   {:name "selected_explosive", :namespace "server.world_host.player_weapon", :complexity 9, :coverage 100.0, :crap 9.0}
   {:name "_isSelf", :namespace "server.ability_behaviors.melee_hit", :complexity 6, :coverage 57.1429, :crap 8.8338}
-  {:name "Gesture:Move", :namespace "client.press_gesture", :complexity 4, :coverage 33.3333, :crap 8.7407}
-  {:name "Mgr:SyncAiPosition", :namespace "server.world_host.fish_carrier", :complexity 8, :coverage 78.5714, :crap 8.6297}
+  {:name "Gesture:move", :namespace "client.press_gesture", :complexity 4, :coverage 33.3333, :crap 8.7407}
+  {:name "Mgr:sync_ai_position", :namespace "server.world_host.fish_carrier", :complexity 8, :coverage 78.5714, :crap 8.6297}
   {:name "syncReceiver", :namespace "server.world_host.fish_carrier", :complexity 8, :coverage 78.5714, :crap 8.6297}
   {:name "resolve_entity_owner", :namespace "server.world_host.modifier_leaf", :complexity 8, :coverage 80.0, :crap 8.512}
   {:name "createAnchor", :namespace "server.fish_ability", :complexity 7, :coverage 68.75, :crap 8.4954}
   {:name "AttrLeaf.validate_config", :namespace "server.world_host.attr_leaf", :complexity 8, :coverage 81.8182, :crap 8.3847}
   {:name "PlayerData:SelectWeapon", :namespace "server.data.player_data", :complexity 7, :coverage 70.0, :crap 8.323}
-  {:name "Mgr:Pause", :namespace "server.world_host.fish_ai", :complexity 7, :coverage 70.0, :crap 8.323}
+  {:name "Mgr:pause", :namespace "server.world_host.fish_ai", :complexity 7, :coverage 70.0, :crap 8.323}
   {:name "BlindboxView.entry_spec", :namespace "client.views.blindbox_view", :complexity 8, :coverage 83.3333, :crap 8.2963}
   {:name "PlatformShopView.entry_spec", :namespace "client.views.platform_shop_view", :complexity 8, :coverage 83.3333, :crap 8.2963}
-  {:name "Util:SimpleTeleport", :namespace "common.teleport_util", :complexity 3, :coverage 16.6667, :crap 8.2083}
+  {:name "Util:simple_teleport", :namespace "common.teleport_util", :complexity 3, :coverage 16.6667, :crap 8.2083}
   {:name "_isHittable", :namespace "server.ability_behaviors.melee_hit", :complexity 5, :coverage 50.0, :crap 8.125}
   {:name "can_accept", :namespace "server.world_host.ground_loot", :complexity 8, :coverage 87.5, :crap 8.125}
   {:name "has_free_item_bar_slot", :namespace "client.views.main_hud_backpack_view", :complexity 8, :coverage 88.8889, :crap 8.0878}
   {:name "_applyDamage", :namespace "server.ability_behaviors.melee_hit", :complexity 8, :coverage 88.8889, :crap 8.0878}
-  {:name "spawn_blast_fish", :namespace "server.world_host.player_weapon", :complexity 8, :coverage 89.4737, :crap 8.0746}
-  {:name "LotteryDraw.RollAxis", :namespace "common.lottery_draw", :complexity 8, :coverage 90.9091, :crap 8.0481}
-  {:name "ViewUtil.create_anchor_scene_node", :namespace "client.views.view_util", :complexity 8, :coverage 91.6667, :crap 8.037}
-  {:name "Mgr:Despawn", :namespace "server.world_host.fish_carrier", :complexity 8, :coverage 94.4444, :crap 8.011}
-  {:name "DamageFloat:Project", :namespace "client.damage_float", :complexity 8, :coverage 100.0, :crap 8.0}
-  {:name "MainHudLayout.PopupCells", :namespace "client.main_hud_layout", :complexity 8, :coverage 100.0, :crap 8.0}
+  {:name "LotteryDraw.roll_axis", :namespace "common.lottery_draw", :complexity 8, :coverage 90.9091, :crap 8.0481}
+  {:name "forward_of", :namespace "server.world_host.player_weapon", :complexity 8, :coverage 93.75, :crap 8.0156}
+  {:name "Mgr:despawn", :namespace "server.world_host.fish_carrier", :complexity 8, :coverage 94.4444, :crap 8.011}
+  {:name "DamageFloat:project", :namespace "client.damage_float", :complexity 8, :coverage 100.0, :crap 8.0}
+  {:name "MainHudLayout.popup_cells", :namespace "client.main_hud_layout", :complexity 8, :coverage 100.0, :crap 8.0}
   {:name "position_equals", :namespace "client.store.client_store", :complexity 8, :coverage 100.0, :crap 8.0}
-  {:name "CompendiumView.page_spec", :namespace "client.views.compendium_view", :complexity 8, :coverage 100.0, :crap 8.0}
   {:name "fish_rows", :namespace "client.views.compendium_view", :complexity 8, :coverage 100.0, :crap 8.0}
   {:name "rows_of", :namespace "client.views.fish_combat_view", :complexity 8, :coverage 100.0, :crap 8.0}
-  {:name "GuideView.spec", :namespace "client.views.guide_view", :complexity 8, :coverage 100.0, :crap 8.0}
   {:name "current_upgrade", :namespace "client.views.shop_view", :complexity 8, :coverage 100.0, :crap 8.0}
-  {:name "BlindboxDraw.Draw", :namespace "common.blindbox_draw", :complexity 8, :coverage 100.0, :crap 8.0}
+  {:name "BlindboxDraw.draw", :namespace "common.blindbox_draw", :complexity 8, :coverage 100.0, :crap 8.0}
   {:name "damageOf", :namespace "common.boss_phase", :complexity 8, :coverage 100.0, :crap 8.0}
-  {:name "GrillCurve.Rate", :namespace "common.grill_curve", :complexity 8, :coverage 100.0, :crap 8.0}
-  {:name "MathWaterJudge.Toward", :namespace "common.math_water_judge", :complexity 8, :coverage 100.0, :crap 8.0}
-  {:name "Records.Scale", :namespace "common.records", :complexity 8, :coverage 100.0, :crap 8.0}
-  {:name "ReelDisplay:Authority", :namespace "common.reel_display", :complexity 8, :coverage 100.0, :crap 8.0}
+  {:name "GrillCurve.rate", :namespace "common.grill_curve", :complexity 8, :coverage 100.0, :crap 8.0}
+  {:name "MathWaterJudge.toward", :namespace "common.math_water_judge", :complexity 8, :coverage 100.0, :crap 8.0}
+  {:name "Records.scale", :namespace "common.records", :complexity 8, :coverage 100.0, :crap 8.0}
+  {:name "ReelDisplay:authority", :namespace "common.reel_display", :complexity 8, :coverage 100.0, :crap 8.0}
   {:name "SpokeClock.new", :namespace "common.spoke_clock", :complexity 8, :coverage 100.0, :crap 8.0}
   {:name "M.Attach", :namespace "server.ability_behaviors.eel_discharge", :complexity 8, :coverage 100.0, :crap 8.0}
   {:name "PlayerData:EatSlot", :namespace "server.data.player_data", :complexity 8, :coverage 100.0, :crap 8.0}
-  {:name "PlatformHost:ResolvePlaceholder", :namespace "server.platform_host", :complexity 8, :coverage 100.0, :crap 8.0}
   {:name "PlatformHost:Share", :namespace "server.platform_host", :complexity 8, :coverage 100.0, :crap 8.0}
+  {:name "PlatformHost:resolve_placeholder", :namespace "server.platform_host", :complexity 8, :coverage 100.0, :crap 8.0}
   {:name "coinOffer", :namespace "server.platform_host", :complexity 8, :coverage 100.0, :crap 8.0}
-  {:name "SaveHost:NextOperation", :namespace "server.save_host", :complexity 8, :coverage 100.0, :crap 8.0}
-  {:name "M.StageSwing", :namespace "server.swing_registry", :complexity 8, :coverage 100.0, :crap 8.0}
-  {:name "Mgr:CombatPayload", :namespace "server.world_host.fish_tree", :complexity 8, :coverage 100.0, :crap 8.0}
-  {:name "Mgr:LockBite", :namespace "server.world_host.fish_tree", :complexity 8, :coverage 100.0, :crap 8.0}
-  {:name "Mgr:Start", :namespace "server.world_host.fish_tree", :complexity 8, :coverage 100.0, :crap 8.0}
-  {:name "Mgr:StartAquatic", :namespace "server.world_host.fish_tree", :complexity 8, :coverage 100.0, :crap 8.0}
-  {:name "Mgr:StartFlight", :namespace "server.world_host.fish_tree", :complexity 8, :coverage 100.0, :crap 8.0}
+  {:name "SaveHost:next_operation", :namespace "server.save_host", :complexity 8, :coverage 100.0, :crap 8.0}
+  {:name "M.stage_swing", :namespace "server.swing_registry", :complexity 8, :coverage 100.0, :crap 8.0}
+  {:name "Mgr:combat_payload", :namespace "server.world_host.fish_tree", :complexity 8, :coverage 100.0, :crap 8.0}
+  {:name "Mgr:lock_bite", :namespace "server.world_host.fish_tree", :complexity 8, :coverage 100.0, :crap 8.0}
+  {:name "Mgr:start", :namespace "server.world_host.fish_tree", :complexity 8, :coverage 100.0, :crap 8.0}
+  {:name "Mgr:start_aquatic", :namespace "server.world_host.fish_tree", :complexity 8, :coverage 100.0, :crap 8.0}
+  {:name "Mgr:start_flight", :namespace "server.world_host.fish_tree", :complexity 8, :coverage 100.0, :crap 8.0}
   {:name "hook_position", :namespace "server.world_host.fishing_phase", :complexity 8, :coverage 100.0, :crap 8.0}
   {:name "ModifierLeaf.build_add_config", :namespace "server.world_host.modifier_leaf", :complexity 8, :coverage 100.0, :crap 8.0}
-  {:name "position_of", :namespace "server.world_host.pk_damage_filter", :complexity 8, :coverage 100.0, :crap 8.0}
   {:name "coin_offer", :namespace "server.world_host.player_platform_shop", :complexity 8, :coverage 100.0, :crap 8.0}
-  {:name "Mgr:OnPlayerAdded", :namespace "server.world_host.player_quest", :complexity 8, :coverage 100.0, :crap 8.0}
+  {:name "Mgr:on_player_added", :namespace "server.world_host.player_quest", :complexity 8, :coverage 100.0, :crap 8.0}
   {:name "deep_equal", :namespace "server.world_host.player_tree", :complexity 8, :coverage 100.0, :crap 8.0}
-  {:name "blast_candidates", :namespace "server.world_host.player_weapon", :complexity 8, :coverage 100.0, :crap 8.0}
+  {:name "magazine_size", :namespace "server.world_host.player_weapon", :complexity 8, :coverage 100.0, :crap 8.0}
   {:name "normalize_aim", :namespace "server.world_host.player_weapon", :complexity 8, :coverage 100.0, :crap 8.0}
   {:name "play_anim", :namespace "server.world_host.player_weapon", :complexity 8, :coverage 100.0, :crap 8.0}
-  {:name "Mgr:Reconcile", :namespace "server.world_host.world_records", :complexity 8, :coverage 100.0, :crap 8.0}
+  {:name "spawn_blast_fish", :namespace "server.world_host.player_weapon", :complexity 8, :coverage 100.0, :crap 8.0}
+  {:name "Mgr:reconcile", :namespace "server.world_host.world_records", :complexity 8, :coverage 100.0, :crap 8.0}
   {:name "WorldSignalRouter.bind_player", :namespace "server.world_host.world_signal_router", :complexity 8, :coverage 100.0, :crap 8.0}
-  {:name "AbilityAPI.AttachAnchor", :namespace "server.ability_api", :complexity 7, :coverage 72.7273, :crap 7.994}
+  {:name "AbilityAPI.attach_anchor", :namespace "server.ability_api", :complexity 7, :coverage 72.7273, :crap 7.994}
   {:name "vitals_equals", :namespace "client.store.client_store", :complexity 7, :coverage 75.0, :crap 7.7656}
   {:name "anchor_of", :namespace "client.views.ferry_view", :complexity 7, :coverage 75.0, :crap 7.7656}
   {:name "rows_equals", :namespace "client.views.rescue_view", :complexity 7, :coverage 75.0, :crap 7.7656}
-  {:name "Mgr:FlightProfile", :namespace "server.world_host.fish_tree", :complexity 7, :coverage 75.0, :crap 7.7656}
+  {:name "Mgr:flight_profile", :namespace "server.world_host.fish_tree", :complexity 7, :coverage 75.0, :crap 7.7656}
   {:name "horizontal_distance", :namespace "server.world_host.player_life", :complexity 7, :coverage 75.0, :crap 7.7656}
   {:name "AbilityLeaf.can_act_for", :namespace "server.world_host.ability_leaf", :complexity 7, :coverage 77.7778, :crap 7.5377}
   {:name "coin_amount", :namespace "server.world_host.player_platform_shop", :complexity 7, :coverage 80.0, :crap 7.392}
   {:name "read_xy", :namespace "client.views.main_hud_backpack_view", :complexity 6, :coverage 66.6667, :crap 7.3333}
   {:name "read_xy", :namespace "client.views.main_hud_item_bar_view", :complexity 6, :coverage 66.6667, :crap 7.3333}
   {:name "ViewUtil.notify", :namespace "client.views.view_util", :complexity 7, :coverage 83.3333, :crap 7.2269}
+  {:name "parse_context", :namespace "common.engine_read", :complexity 7, :coverage 83.3333, :crap 7.2269}
   {:name "PlayerData:ConsumeSelectedBait", :namespace "server.data.player_data", :complexity 7, :coverage 83.3333, :crap 7.2269}
-  {:name "read_pos", :namespace "server.world_host.ground_loot", :complexity 7, :coverage 83.3333, :crap 7.2269}
-  {:name "safe_call", :namespace "server.world_host.server_runtime", :complexity 5, :coverage 55.5556, :crap 7.1948}
+  {:name "invoke_action_impl", :namespace "common.engine_read", :complexity 7, :coverage 84.6154, :crap 7.1784}
   {:name "column", :namespace "common.cfg.boss_moves", :complexity 7, :coverage 85.7143, :crap 7.1429}
-  {:name "FishAbility:RemoveFish", :namespace "server.fish_ability", :complexity 7, :coverage 87.5, :crap 7.0957}
+  {:name "FishAbility:remove_fish", :namespace "server.fish_ability", :complexity 7, :coverage 87.5, :crap 7.0957}
+  {:name "read_now", :namespace "server.world_host.world_records", :complexity 7, :coverage 87.5, :crap 7.0957}
+  {:name "read_xy", :namespace "client.views.economy_modal", :complexity 7, :coverage 88.8889, :crap 7.0672}
   {:name "put_into", :namespace "server.world_host.ground_loot", :complexity 7, :coverage 88.8889, :crap 7.0672}
   {:name "AttrLeaf.apply_walk_speed", :namespace "server.world_host.attr_leaf", :complexity 7, :coverage 91.6667, :crap 7.0284}
+  {:name "flat_forward", :namespace "server.world_host.special_item_phase", :complexity 7, :coverage 92.3077, :crap 7.0223}
   {:name "bounds", :namespace "client.main_hud_layout", :complexity 7, :coverage 100.0, :crap 7.0}
-  {:name "Gesture:End", :namespace "client.press_gesture", :complexity 7, :coverage 100.0, :crap 7.0}
+  {:name "Gesture:finish", :namespace "client.press_gesture", :complexity 7, :coverage 100.0, :crap 7.0}
   {:name "build_weapon_candidates", :namespace "client.views.main_hud_equip_popups", :complexity 7, :coverage 100.0, :crap 7.0}
-  {:name "M.SafeOffset", :namespace "common.carry_mount", :complexity 7, :coverage 100.0, :crap 7.0}
-  {:name "M.ClampXZ", :namespace "common.special_item", :complexity 7, :coverage 100.0, :crap 7.0}
-  {:name "M.StepFlightY", :namespace "common.special_item", :complexity 7, :coverage 100.0, :crap 7.0}
+  {:name "M.safe_offset", :namespace "common.carry_mount", :complexity 7, :coverage 100.0, :crap 7.0}
+  {:name "M.clamp_xz", :namespace "common.special_item", :complexity 7, :coverage 100.0, :crap 7.0}
+  {:name "M.step_flight_y", :namespace "common.special_item", :complexity 7, :coverage 100.0, :crap 7.0}
   {:name "PlayerData:CanShopUpgrade", :namespace "server.data.player_data", :complexity 7, :coverage 100.0, :crap 7.0}
   {:name "PlayerData:ConsumeItem", :namespace "server.data.player_data", :complexity 7, :coverage 100.0, :crap 7.0}
   {:name "PlayerData:ConsumeWeapon", :namespace "server.data.player_data", :complexity 7, :coverage 100.0, :crap 7.0}
@@ -415,168 +435,170 @@
   {:name "PlayerData:NoteSafePoint", :namespace "server.data.player_data", :complexity 7, :coverage 100.0, :crap 7.0}
   {:name "PlayerData:PersonalBestScaled", :namespace "server.data.player_data", :complexity 7, :coverage 100.0, :crap 7.0}
   {:name "PlayerData:Serialize", :namespace "server.data.player_data", :complexity 7, :coverage 100.0, :crap 7.0}
-  {:name "PlayerData:ShopUpgradeLevel", :namespace "server.data.player_data", :complexity 7, :coverage 100.0, :crap 7.0}
+  {:name "PlayerData:shop_upgrade_level", :namespace "server.data.player_data", :complexity 7, :coverage 100.0, :crap 7.0}
   {:name "integer", :namespace "server.data.player_data", :complexity 7, :coverage 100.0, :crap 7.0}
-  {:name "Behaviors.Step", :namespace "server.fish_behaviors", :complexity 7, :coverage 100.0, :crap 7.0}
-  {:name "AttrBridge:ApplyBodyScale", :namespace "server.main", :complexity 7, :coverage 100.0, :crap 7.0}
+  {:name "Behaviors.step", :namespace "server.fish_behaviors", :complexity 7, :coverage 100.0, :crap 7.0}
+  {:name "AttrBridge:apply_body_scale", :namespace "server.main", :complexity 7, :coverage 100.0, :crap 7.0}
   {:name "coinAmount", :namespace "server.platform_host", :complexity 7, :coverage 100.0, :crap 7.0}
-  {:name "PlayerDataHost:SendItemBar", :namespace "server.player_data_host", :complexity 7, :coverage 100.0, :crap 7.0}
   {:name "eatSlot", :namespace "server.player_data_host", :complexity 7, :coverage 100.0, :crap 7.0}
   {:name "equal", :namespace "server.save_host", :complexity 7, :coverage 100.0, :crap 7.0}
   {:name "logFailure", :namespace "server.world_host.fish_ai_target", :complexity 7, :coverage 100.0, :crap 7.0}
-  {:name "Mgr:NotifyDied", :namespace "server.world_host.fish_carrier", :complexity 7, :coverage 100.0, :crap 7.0}
-  {:name "Mgr:ResolveCarrier", :namespace "server.world_host.fish_carrier", :complexity 7, :coverage 100.0, :crap 7.0}
-  {:name "Mgr:AdvanceJump", :namespace "server.world_host.fish_tree", :complexity 7, :coverage 100.0, :crap 7.0}
-  {:name "Mgr:Fault", :namespace "server.world_host.fish_tree", :complexity 7, :coverage 100.0, :crap 7.0}
-  {:name "Mgr:Hit", :namespace "server.world_host.fish_tree", :complexity 7, :coverage 100.0, :crap 7.0}
-  {:name "Mgr:RequestLift", :namespace "server.world_host.fish_tree", :complexity 7, :coverage 100.0, :crap 7.0}
-  {:name "Mgr:Stabilize", :namespace "server.world_host.fish_tree", :complexity 7, :coverage 100.0, :crap 7.0}
+  {:name "Mgr:notify_died", :namespace "server.world_host.fish_carrier", :complexity 7, :coverage 100.0, :crap 7.0}
+  {:name "Mgr:resolve_carrier", :namespace "server.world_host.fish_carrier", :complexity 7, :coverage 100.0, :crap 7.0}
+  {:name "Mgr:advance_jump", :namespace "server.world_host.fish_tree", :complexity 7, :coverage 100.0, :crap 7.0}
+  {:name "Mgr:fault", :namespace "server.world_host.fish_tree", :complexity 7, :coverage 100.0, :crap 7.0}
+  {:name "Mgr:hit", :namespace "server.world_host.fish_tree", :complexity 7, :coverage 100.0, :crap 7.0}
+  {:name "Mgr:request_lift", :namespace "server.world_host.fish_tree", :complexity 7, :coverage 100.0, :crap 7.0}
+  {:name "Mgr:stabilize", :namespace "server.world_host.fish_tree", :complexity 7, :coverage 100.0, :crap 7.0}
   {:name "capacities", :namespace "server.world_host.ground_loot", :complexity 7, :coverage 100.0, :crap 7.0}
   {:name "inside", :namespace "server.world_host.pk_damage_filter", :complexity 7, :coverage 100.0, :crap 7.0}
   {:name "flat_distance", :namespace "server.world_host.player_grill", :complexity 7, :coverage 100.0, :crap 7.0}
   {:name "grillable", :namespace "server.world_host.player_grill", :complexity 7, :coverage 100.0, :crap 7.0}
   {:name "find_goods_by_number", :namespace "server.world_host.player_shop", :complexity 7, :coverage 100.0, :crap 7.0}
+  {:name "create_visual", :namespace "server.world_host.player_weapon", :complexity 7, :coverage 100.0, :crap 7.0}
   {:name "damage_scale", :namespace "server.world_host.player_weapon", :complexity 7, :coverage 100.0, :crap 7.0}
-  {:name "launch", :namespace "server.world_host.player_weapon", :complexity 7, :coverage 100.0, :crap 7.0}
-  {:name "read_position", :namespace "server.world_host.special_item_phase", :complexity 7, :coverage 100.0, :crap 7.0}
-  {:name "FishAbility:OnPlayerAdded", :namespace "server.fish_ability", :complexity 3, :coverage 25.0, :crap 6.7969}
-  {:name "read_player_phase", :namespace "client.views.rescue_view", :complexity 6, :coverage 75.0, :crap 6.5625}
+  {:name "Mgr:fresh", :namespace "server.world_host.world_records", :complexity 7, :coverage 100.0, :crap 7.0}
+  {:name "FishAbility:on_player_added", :namespace "server.fish_ability", :complexity 3, :coverage 25.0, :crap 6.7969}
   {:name "is_add_ok", :namespace "server.world_host.modifier_leaf", :complexity 6, :coverage 75.0, :crap 6.5625}
   {:name "find_anchor", :namespace "server.world_host.player_grill", :complexity 6, :coverage 75.0, :crap 6.5625}
-  {:name "now_of", :namespace "client.views.reel_overlay_view", :complexity 6, :coverage 80.0, :crap 6.288}
+  {:name "EngineRead.get_service", :namespace "common.engine_read", :complexity 6, :coverage 77.7778, :crap 6.3951}
   {:name "classify", :namespace "server.data.records_adapter", :complexity 6, :coverage 80.0, :crap 6.288}
   {:name "preset_for", :namespace "server.world_host.modifier_leaf", :complexity 6, :coverage 80.0, :crap 6.288}
   {:name "melee_index", :namespace "server.world_host.player_weapon", :complexity 6, :coverage 80.0, :crap 6.288}
   {:name "zone_name", :namespace "client.views.ferry_view", :complexity 6, :coverage 83.3333, :crap 6.1667}
-  {:name "read_player_position", :namespace "client.views.rescue_view", :complexity 6, :coverage 83.3333, :crap 6.1667}
   {:name "assert_clock", :namespace "server.world_host.player_tree", :complexity 6, :coverage 83.3333, :crap 6.1667}
   {:name "assert_clock", :namespace "server.world_host.shared_world_tree", :complexity 6, :coverage 83.3333, :crap 6.1667}
-  {:name "Util:WaitForChild", :namespace "common.util", :complexity 6, :coverage 84.6154, :crap 6.1311}
+  {:name "Util:wait_for_child", :namespace "common.util", :complexity 6, :coverage 84.6154, :crap 6.1311}
   {:name "fire_re", :namespace "client.views.main_hud_action_buttons_view", :complexity 6, :coverage 85.7143, :crap 6.105}
   {:name "default_fire_item_bar", :namespace "client.views.main_hud_backpack_view", :complexity 6, :coverage 85.7143, :crap 6.105}
   {:name "item_display_name", :namespace "client.views.main_hud_backpack_view", :complexity 6, :coverage 85.7143, :crap 6.105}
   {:name "default_fire_item_bar", :namespace "client.views.main_hud_equip_popups", :complexity 6, :coverage 85.7143, :crap 6.105}
-  {:name "ViewUtil.read_vec3", :namespace "client.views.view_util", :complexity 6, :coverage 85.7143, :crap 6.105}
+  {:name "EngineRead.fire_client", :namespace "common.engine_read", :complexity 6, :coverage 85.7143, :crap 6.105}
   {:name "updateDive", :namespace "common.flight_path", :complexity 6, :coverage 85.7143, :crap 6.105}
-  {:name "PlatformHost:Start", :namespace "server.platform_host", :complexity 6, :coverage 85.7143, :crap 6.105}
+  {:name "PlatformHost:start", :namespace "server.platform_host", :complexity 6, :coverage 85.7143, :crap 6.105}
   {:name "assert_ready_player_data", :namespace "server.world_host.player_tree", :complexity 6, :coverage 87.5, :crap 6.0703}
   {:name "PlayerData:ConsumeItemBarItem", :namespace "server.data.player_data", :complexity 6, :coverage 90.9091, :crap 6.027}
-  {:name "SaveHost:ApplyTemporary", :namespace "server.save_host", :complexity 6, :coverage 92.8571, :crap 6.0131}
+  {:name "SaveHost:apply_temporary", :namespace "server.save_host", :complexity 6, :coverage 92.8571, :crap 6.0131}
   {:name "copy_slots", :namespace "server.world_host.player_tree", :complexity 6, :coverage 92.8571, :crap 6.0131}
-  {:name "GameUI:CreateSceneNode", :namespace "client.game_ui", :complexity 2, :coverage 0.0, :crap 6.0}
-  {:name "GameUI:GetEuiManager", :namespace "client.game_ui", :complexity 2, :coverage 0.0, :crap 6.0}
-  {:name "GameUI:GetUIRoot", :namespace "client.game_ui", :complexity 2, :coverage 0.0, :crap 6.0}
+  {:name "GameUI:create_scene_node", :namespace "client.game_ui", :complexity 2, :coverage 0.0, :crap 6.0}
+  {:name "GameUI:get_eui_manager", :namespace "client.game_ui", :complexity 2, :coverage 0.0, :crap 6.0}
+  {:name "GameUI:get_ui_root", :namespace "client.game_ui", :complexity 2, :coverage 0.0, :crap 6.0}
   {:name "create_scene_node_at", :namespace "client.main", :complexity 2, :coverage 0.0, :crap 6.0}
   {:name "get_eui_manager", :namespace "client.main", :complexity 6, :coverage 100.0, :crap 6.0}
-  {:name "Gesture:Update", :namespace "client.press_gesture", :complexity 6, :coverage 100.0, :crap 6.0}
+  {:name "Gesture:update", :namespace "client.press_gesture", :complexity 6, :coverage 100.0, :crap 6.0}
   {:name "prize_names", :namespace "client.views.blindbox_view", :complexity 6, :coverage 100.0, :crap 6.0}
   {:name "CompendiumView.entry_spec", :namespace "client.views.compendium_view", :complexity 6, :coverage 100.0, :crap 6.0}
   {:name "held_slot", :namespace "client.views.main_hud_action_buttons_view", :complexity 6, :coverage 100.0, :crap 6.0}
-  {:name "M.EffectiveSpeed", :namespace "common.attr_growth", :complexity 6, :coverage 100.0, :crap 6.0}
-  {:name "M.InteractionRadius", :namespace "common.body_scale", :complexity 6, :coverage 100.0, :crap 6.0}
-  {:name "M.PercentOf", :namespace "common.boss_phase", :complexity 6, :coverage 100.0, :crap 6.0}
+  {:name "M.effective_speed", :namespace "common.attr_growth", :complexity 6, :coverage 100.0, :crap 6.0}
+  {:name "M.interaction_radius", :namespace "common.body_scale", :complexity 6, :coverage 100.0, :crap 6.0}
+  {:name "M.percent_of", :namespace "common.boss_phase", :complexity 6, :coverage 100.0, :crap 6.0}
   {:name "intervalOf", :namespace "common.boss_phase", :complexity 6, :coverage 100.0, :crap 6.0}
-  {:name "M.BreathHit", :namespace "common.special_item", :complexity 6, :coverage 100.0, :crap 6.0}
+  {:name "EngineRead.read_health", :namespace "common.engine_read", :complexity 6, :coverage 100.0, :crap 6.0}
+  {:name "M.breath_hit", :namespace "common.special_item", :complexity 6, :coverage 100.0, :crap 6.0}
   {:name "PlayerData:ApplySave", :namespace "server.data.player_data", :complexity 6, :coverage 100.0, :crap 6.0}
   {:name "PlayerData:HasBait", :namespace "server.data.player_data", :complexity 6, :coverage 100.0, :crap 6.0}
   {:name "PlayerData:HoldWeapon", :namespace "server.data.player_data", :complexity 6, :coverage 100.0, :crap 6.0}
   {:name "PlayerData:ItemCount", :namespace "server.data.player_data", :complexity 6, :coverage 100.0, :crap 6.0}
   {:name "insideBoundary", :namespace "server.data.player_data", :complexity 6, :coverage 100.0, :crap 6.0}
-  {:name "PlayerDataHost:GetDataInst", :namespace "server.player_data_host", :complexity 6, :coverage 100.0, :crap 6.0}
-  {:name "PlayerDataHost:OnPlayerAdded", :namespace "server.player_data_host", :complexity 6, :coverage 100.0, :crap 6.0}
-  {:name "PlayerDataHost:SyncPlayerTree", :namespace "server.player_data_host", :complexity 6, :coverage 100.0, :crap 6.0}
-  {:name "SaveHost:SaveLeaving", :namespace "server.save_host", :complexity 6, :coverage 100.0, :crap 6.0}
+  {:name "PlayerDataHost:get_data_inst", :namespace "server.player_data_host", :complexity 6, :coverage 100.0, :crap 6.0}
+  {:name "PlayerDataHost:on_player_added", :namespace "server.player_data_host", :complexity 6, :coverage 100.0, :crap 6.0}
+  {:name "PlayerDataHost:sync_player_tree", :namespace "server.player_data_host", :complexity 6, :coverage 100.0, :crap 6.0}
+  {:name "SaveHost:save_leaving", :namespace "server.save_host", :complexity 6, :coverage 100.0, :crap 6.0}
   {:name "swingAlive", :namespace "server.swing_registry", :complexity 6, :coverage 100.0, :crap 6.0}
   {:name "resolveMaxHealth", :namespace "server.world_host.fish_carrier", :complexity 6, :coverage 100.0, :crap 6.0}
-  {:name "Mgr:Face", :namespace "server.world_host.fish_tree", :complexity 6, :coverage 100.0, :crap 6.0}
-  {:name "Mgr:OnCarrierDied", :namespace "server.world_host.fish_tree", :complexity 6, :coverage 100.0, :crap 6.0}
-  {:name "Mgr:RayExclusions", :namespace "server.world_host.fish_tree", :complexity 6, :coverage 100.0, :crap 6.0}
-  {:name "Mgr:Remove", :namespace "server.world_host.fish_tree", :complexity 6, :coverage 100.0, :crap 6.0}
-  {:name "Mgr:UpdateSwordfishCombat", :namespace "server.world_host.fish_tree", :complexity 6, :coverage 100.0, :crap 6.0}
+  {:name "Mgr:face", :namespace "server.world_host.fish_tree", :complexity 6, :coverage 100.0, :crap 6.0}
+  {:name "Mgr:now", :namespace "server.world_host.fish_tree", :complexity 6, :coverage 100.0, :crap 6.0}
+  {:name "Mgr:on_carrier_died", :namespace "server.world_host.fish_tree", :complexity 6, :coverage 100.0, :crap 6.0}
+  {:name "Mgr:ray_exclusions", :namespace "server.world_host.fish_tree", :complexity 6, :coverage 100.0, :crap 6.0}
+  {:name "Mgr:remove", :namespace "server.world_host.fish_tree", :complexity 6, :coverage 100.0, :crap 6.0}
+  {:name "Mgr:update_swordfish_combat", :namespace "server.world_host.fish_tree", :complexity 6, :coverage 100.0, :crap 6.0}
   {:name "bossWindup", :namespace "server.world_host.fish_tree", :complexity 6, :coverage 100.0, :crap 6.0}
   {:name "passThrough", :namespace "server.world_host.fish_tree", :complexity 6, :coverage 100.0, :crap 6.0}
   {:name "readPosition", :namespace "server.world_host.fish_tree", :complexity 6, :coverage 100.0, :crap 6.0}
   {:name "item_kind", :namespace "server.world_host.ground_loot", :complexity 6, :coverage 100.0, :crap 6.0}
+  {:name "within_reach", :namespace "server.world_host.ground_loot", :complexity 6, :coverage 100.0, :crap 6.0}
   {:name "dot_cfg_for", :namespace "server.world_host.modifier_leaf", :complexity 6, :coverage 100.0, :crap 6.0}
-  {:name "Mgr:FlushBeforeLeave", :namespace "server.world_host.player_compendium", :complexity 6, :coverage 100.0, :crap 6.0}
-  {:name "Mgr:OnPlayerRemoving", :namespace "server.world_host.player_compendium", :complexity 6, :coverage 100.0, :crap 6.0}
+  {:name "Mgr:flush_before_leave", :namespace "server.world_host.player_compendium", :complexity 6, :coverage 100.0, :crap 6.0}
+  {:name "Mgr:on_player_removing", :namespace "server.world_host.player_compendium", :complexity 6, :coverage 100.0, :crap 6.0}
   {:name "finish_leave", :namespace "server.world_host.player_compendium", :complexity 6, :coverage 100.0, :crap 6.0}
   {:name "is_token", :namespace "server.world_host.player_grill", :complexity 6, :coverage 100.0, :crap 6.0}
-  {:name "push_state", :namespace "server.world_host.player_grill", :complexity 6, :coverage 100.0, :crap 6.0}
-  {:name "reply", :namespace "server.world_host.player_grill", :complexity 6, :coverage 100.0, :crap 6.0}
   {:name "cast_melee", :namespace "server.world_host.player_weapon", :complexity 6, :coverage 100.0, :crap 6.0}
-  {:name "reply", :namespace "server.world_host.player_weapon", :complexity 6, :coverage 100.0, :crap 6.0}
   {:name "selected_item_id", :namespace "server.world_host.special_item_phase", :complexity 6, :coverage 100.0, :crap 6.0}
+  {:name "Mgr:update", :namespace "server.world_host.world_records", :complexity 6, :coverage 100.0, :crap 6.0}
   {:name "WorldSignalRouter.bind_world", :namespace "server.world_host.world_signal_router", :complexity 6, :coverage 100.0, :crap 6.0}
-  {:name "Dialogue.Describe", :namespace "common.npc_dialogue", :complexity 3, :coverage 33.3333, :crap 5.6667}
-  {:name "FishAbility:Now", :namespace "server.fish_ability", :complexity 3, :coverage 33.3333, :crap 5.6667}
-  {:name "AttrBridge:CaptureBaseSpeed", :namespace "server.main", :complexity 3, :coverage 33.3333, :crap 5.6667}
-  {:name "AttrBridge:MaxHealth", :namespace "server.main", :complexity 3, :coverage 33.3333, :crap 5.6667}
+  {:name "Dialogue.describe", :namespace "common.npc_dialogue", :complexity 3, :coverage 33.3333, :crap 5.6667}
+  {:name "FishAbility:now", :namespace "server.fish_ability", :complexity 3, :coverage 33.3333, :crap 5.6667}
+  {:name "AttrBridge:capture_base_speed", :namespace "server.main", :complexity 3, :coverage 33.3333, :crap 5.6667}
+  {:name "AttrBridge:max_health", :namespace "server.main", :complexity 3, :coverage 33.3333, :crap 5.6667}
   {:name "apply_anchor_attributes", :namespace "server.world_host.ability_leaf", :complexity 5, :coverage 72.7273, :crap 5.5071}
   {:name "default_duration_for", :namespace "server.world_host.modifier_leaf", :complexity 5, :coverage 75.0, :crap 5.3906}
-  {:name "magazine_size", :namespace "server.world_host.player_weapon", :complexity 5, :coverage 75.0, :crap 5.3906}
   {:name "PlayerData:CompleteLoad", :namespace "server.data.player_data", :complexity 5, :coverage 77.7778, :crap 5.2743}
-  {:name "SaveHost:Finish", :namespace "server.save_host", :complexity 5, :coverage 77.7778, :crap 5.2743}
+  {:name "SaveHost:finish_save", :namespace "server.save_host", :complexity 5, :coverage 77.7778, :crap 5.2743}
   {:name "advanceHeadMove", :namespace "server.world_host.fish_tree", :complexity 5, :coverage 77.7778, :crap 5.2743}
-  {:name "now_of", :namespace "client.views.survival_overlay_view", :complexity 5, :coverage 80.0, :crap 5.2}
   {:name "_safeScale", :namespace "server.ability_behaviors.melee_hit", :complexity 5, :coverage 80.0, :crap 5.2}
   {:name "target", :namespace "server.world_host.player_achievements", :complexity 5, :coverage 80.0, :crap 5.2}
-  {:name "DamageFloat:Clear", :namespace "client.damage_float", :complexity 5, :coverage 83.3333, :crap 5.1157}
+  {:name "DamageFloat:clear", :namespace "client.damage_float", :complexity 5, :coverage 83.3333, :crap 5.1157}
   {:name "normalize_camera_distance", :namespace "client.store.client_store", :complexity 5, :coverage 83.3333, :crap 5.1157}
+  {:name "EngineRead.read_controller", :namespace "common.engine_read", :complexity 5, :coverage 83.3333, :crap 5.1157}
   {:name "pending_rate", :namespace "server.world_host.player_grill", :complexity 5, :coverage 83.3333, :crap 5.1157}
   {:name "ViewUtil.wrap_text", :namespace "client.views.view_util", :complexity 5, :coverage 84.6154, :crap 5.091}
   {:name "ensure_shared", :namespace "client.views.grill_view", :complexity 5, :coverage 88.8889, :crap 5.0343}
+  {:name "EngineRead.read_attribute", :namespace "common.engine_read", :complexity 5, :coverage 88.8889, :crap 5.0343}
+  {:name "safe_call", :namespace "server.world_host.server_runtime", :complexity 5, :coverage 88.8889, :crap 5.0343}
   {:name "_getYaw", :namespace "server.ability_behaviors.melee_hit", :complexity 4, :coverage 60.0, :crap 5.024}
   {:name "clear_reload", :namespace "server.world_host.player_weapon", :complexity 4, :coverage 60.0, :crap 5.024}
   {:name "freeze_snapshot", :namespace "client.store.client_store", :complexity 5, :coverage 92.3077, :crap 5.0114}
   {:name "Adapter:Submit", :namespace "server.data.records_adapter", :complexity 5, :coverage 93.3333, :crap 5.0074}
   {:name "FishermanView.confirm_modal_spec", :namespace "client.views.fisherman_view", :complexity 5, :coverage 93.75, :crap 5.0061}
-  {:name "current_now", :namespace "client.views.attack_view", :complexity 5, :coverage 100.0, :crap 5.0}
+  {:name "attack_rect", :namespace "client.views.attack_view", :complexity 5, :coverage 100.0, :crap 5.0}
   {:name "default_get_camera", :namespace "client.views.camera_zoom_view", :complexity 5, :coverage 100.0, :crap 5.0}
+  {:name "apply_active_style", :namespace "client.views.compendium_view", :complexity 5, :coverage 100.0, :crap 5.0}
   {:name "bar_text", :namespace "client.views.fish_combat_view", :complexity 5, :coverage 100.0, :crap 5.0}
   {:name "item_name", :namespace "client.views.grill_view", :complexity 5, :coverage 100.0, :crap 5.0}
   {:name "selected_food", :namespace "client.views.main_hud_action_buttons_view", :complexity 5, :coverage 100.0, :crap 5.0}
   {:name "selected_rod", :namespace "client.views.main_hud_action_buttons_view", :complexity 5, :coverage 100.0, :crap 5.0}
   {:name "MessageView.spec", :namespace "client.views.message_view", :complexity 5, :coverage 100.0, :crap 5.0}
-  {:name "ViewUtil.read_vec2", :namespace "client.views.view_util", :complexity 5, :coverage 100.0, :crap 5.0}
+  {:name "read_now", :namespace "client.views.reel_overlay_view", :complexity 5, :coverage 100.0, :crap 5.0}
+  {:name "mount_weak", :namespace "client.views.survival_overlay_view", :complexity 5, :coverage 100.0, :crap 5.0}
   {:name "valid_resolution", :namespace "client.views.view_util", :complexity 5, :coverage 100.0, :crap 5.0}
-  {:name "M.Compare", :namespace "common.ai_target_policy", :complexity 5, :coverage 100.0, :crap 5.0}
-  {:name "M.Sanitize", :namespace "common.body_scale", :complexity 5, :coverage 100.0, :crap 5.0}
-  {:name "M.Attach", :namespace "common.carry_mount", :complexity 5, :coverage 100.0, :crap 5.0}
+  {:name "M.compare", :namespace "common.ai_target_policy", :complexity 5, :coverage 100.0, :crap 5.0}
+  {:name "M.sanitize", :namespace "common.body_scale", :complexity 5, :coverage 100.0, :crap 5.0}
+  {:name "M.attach", :namespace "common.carry_mount", :complexity 5, :coverage 100.0, :crap 5.0}
+  {:name "log_error", :namespace "common.engine_read", :complexity 5, :coverage 100.0, :crap 5.0}
   {:name "clampToBounds", :namespace "common.flight_path", :complexity 5, :coverage 100.0, :crap 5.0}
-  {:name "GameCfg.Shop.DamageScale", :namespace "common.game_cfg", :complexity 5, :coverage 100.0, :crap 5.0}
-  {:name "GameCfg.Shop.MagazineSize", :namespace "common.game_cfg", :complexity 5, :coverage 100.0, :crap 5.0}
-  {:name "MathWaterJudge.Build", :namespace "common.math_water_judge", :complexity 5, :coverage 100.0, :crap 5.0}
-  {:name "MathWaterJudge.InZone", :namespace "common.math_water_judge", :complexity 5, :coverage 100.0, :crap 5.0}
+  {:name "GameCfg.Shop.damage_scale", :namespace "common.game_cfg", :complexity 5, :coverage 100.0, :crap 5.0}
+  {:name "GameCfg.Shop.magazine_size", :namespace "common.game_cfg", :complexity 5, :coverage 100.0, :crap 5.0}
+  {:name "MathWaterJudge.build", :namespace "common.math_water_judge", :complexity 5, :coverage 100.0, :crap 5.0}
+  {:name "MathWaterJudge.in_zone", :namespace "common.math_water_judge", :complexity 5, :coverage 100.0, :crap 5.0}
   {:name "itemName", :namespace "common.npc_dialogue", :complexity 5, :coverage 100.0, :crap 5.0}
-  {:name "RateLimit.NewWindow", :namespace "common.rate_limit", :complexity 5, :coverage 100.0, :crap 5.0}
-  {:name "Records.Describe", :namespace "common.records", :complexity 5, :coverage 100.0, :crap 5.0}
-  {:name "Records.ValidUserId", :namespace "common.records", :complexity 5, :coverage 100.0, :crap 5.0}
-  {:name "Records.Wins", :namespace "common.records", :complexity 5, :coverage 100.0, :crap 5.0}
-  {:name "Vitals.Advance", :namespace "common.vitals", :complexity 5, :coverage 100.0, :crap 5.0}
+  {:name "RateLimit.new_window", :namespace "common.rate_limit", :complexity 5, :coverage 100.0, :crap 5.0}
+  {:name "Records.describe", :namespace "common.records", :complexity 5, :coverage 100.0, :crap 5.0}
+  {:name "Records.valid_user_id", :namespace "common.records", :complexity 5, :coverage 100.0, :crap 5.0}
+  {:name "Records.wins", :namespace "common.records", :complexity 5, :coverage 100.0, :crap 5.0}
+  {:name "Vitals.advance", :namespace "common.vitals", :complexity 5, :coverage 100.0, :crap 5.0}
   {:name "vector", :namespace "common.zone_markers", :complexity 5, :coverage 100.0, :crap 5.0}
   {:name "PlayerData:GrantItem", :namespace "server.data.player_data", :complexity 5, :coverage 100.0, :crap 5.0}
   {:name "PlayerData:GrantWeapon", :namespace "server.data.player_data", :complexity 5, :coverage 100.0, :crap 5.0}
   {:name "PlayerData:ItemBarItemCount", :namespace "server.data.player_data", :complexity 5, :coverage 100.0, :crap 5.0}
   {:name "PlayerData:ResolveSafePoint", :namespace "server.data.player_data", :complexity 5, :coverage 100.0, :crap 5.0}
   {:name "PlayerData:SelectBait", :namespace "server.data.player_data", :complexity 5, :coverage 100.0, :crap 5.0}
-  {:name "AttrBridge:ApplyGrowth", :namespace "server.main", :complexity 5, :coverage 100.0, :crap 5.0}
-  {:name "PlatformHost:CanPurchase", :namespace "server.platform_host", :complexity 5, :coverage 100.0, :crap 5.0}
-  {:name "PlayerDataHost:OnPlayerRemoving", :namespace "server.player_data_host", :complexity 5, :coverage 100.0, :crap 5.0}
+  {:name "AttrBridge:apply_growth", :namespace "server.main", :complexity 5, :coverage 100.0, :crap 5.0}
+  {:name "PlatformHost:can_purchase", :namespace "server.platform_host", :complexity 5, :coverage 100.0, :crap 5.0}
+  {:name "PlayerDataHost:on_player_removing", :namespace "server.player_data_host", :complexity 5, :coverage 100.0, :crap 5.0}
   {:name "eatBait", :namespace "server.player_data_host", :complexity 5, :coverage 100.0, :crap 5.0}
   {:name "notifyEquippedBait", :namespace "server.player_data_host", :complexity 5, :coverage 100.0, :crap 5.0}
-  {:name "SaveHost:EstimateSize", :namespace "server.save_host", :complexity 5, :coverage 100.0, :crap 5.0}
-  {:name "SaveHost:IsPaused", :namespace "server.save_host", :complexity 5, :coverage 100.0, :crap 5.0}
-  {:name "SaveHost:Load", :namespace "server.save_host", :complexity 5, :coverage 100.0, :crap 5.0}
-  {:name "SaveHost:ReleaseSession", :namespace "server.save_host", :complexity 5, :coverage 100.0, :crap 5.0}
-  {:name "Mgr.InHeadZone", :namespace "server.world_host.fish_tree", :complexity 5, :coverage 100.0, :crap 5.0}
-  {:name "Mgr:ExitFlight", :namespace "server.world_host.fish_tree", :complexity 5, :coverage 100.0, :crap 5.0}
-  {:name "Mgr:Isolate", :namespace "server.world_host.fish_tree", :complexity 5, :coverage 100.0, :crap 5.0}
-  {:name "Mgr:WatchCharacter", :namespace "server.world_host.fish_tree", :complexity 5, :coverage 100.0, :crap 5.0}
+  {:name "SaveHost:estimate_size", :namespace "server.save_host", :complexity 5, :coverage 100.0, :crap 5.0}
+  {:name "SaveHost:is_paused", :namespace "server.save_host", :complexity 5, :coverage 100.0, :crap 5.0}
+  {:name "SaveHost:load", :namespace "server.save_host", :complexity 5, :coverage 100.0, :crap 5.0}
+  {:name "SaveHost:release_session", :namespace "server.save_host", :complexity 5, :coverage 100.0, :crap 5.0}
+  {:name "Mgr.in_head_zone", :namespace "server.world_host.fish_tree", :complexity 5, :coverage 100.0, :crap 5.0}
+  {:name "Mgr:exit_flight", :namespace "server.world_host.fish_tree", :complexity 5, :coverage 100.0, :crap 5.0}
+  {:name "Mgr:isolate", :namespace "server.world_host.fish_tree", :complexity 5, :coverage 100.0, :crap 5.0}
+  {:name "Mgr:watch_character", :namespace "server.world_host.fish_tree", :complexity 5, :coverage 100.0, :crap 5.0}
   {:name "lifePhase", :namespace "server.world_host.fish_tree", :complexity 5, :coverage 100.0, :crap 5.0}
   {:name "noCollide", :namespace "server.world_host.fish_tree", :complexity 5, :coverage 100.0, :crap 5.0}
+  {:name "validate_clock", :namespace "server.world_host.fish_tree", :complexity 5, :coverage 100.0, :crap 5.0}
   {:name "water_zone", :namespace "server.world_host.fishing_phase", :complexity 5, :coverage 100.0, :crap 5.0}
-  {:name "within_reach", :namespace "server.world_host.ground_loot", :complexity 5, :coverage 100.0, :crap 5.0}
   {:name "max_stacks_for", :namespace "server.world_host.modifier_leaf", :complexity 5, :coverage 100.0, :crap 5.0}
   {:name "positiveId", :namespace "server.world_host.player_achievements", :complexity 5, :coverage 100.0, :crap 5.0}
   {:name "bag", :namespace "server.world_host.player_blindbox", :complexity 5, :coverage 100.0, :crap 5.0}
@@ -586,44 +608,43 @@
   {:name "dot_cfg_of", :namespace "server.world_host.player_effects", :complexity 5, :coverage 100.0, :crap 5.0}
   {:name "read_walk_speed", :namespace "server.world_host.player_effects", :complexity 5, :coverage 100.0, :crap 5.0}
   {:name "exchangeable", :namespace "server.world_host.player_fisherman", :complexity 5, :coverage 100.0, :crap 5.0}
-  {:name "Mgr:ResolveTarget", :namespace "server.world_host.player_gm", :complexity 5, :coverage 100.0, :crap 5.0}
+  {:name "Mgr:resolve_target", :namespace "server.world_host.player_gm", :complexity 5, :coverage 100.0, :crap 5.0}
   {:name "bag", :namespace "server.world_host.player_platform_shop", :complexity 5, :coverage 100.0, :crap 5.0}
   {:name "placeholder_allowed", :namespace "server.world_host.player_platform_shop", :complexity 5, :coverage 100.0, :crap 5.0}
-  {:name "Mgr:Publish", :namespace "server.world_host.player_quest", :complexity 5, :coverage 100.0, :crap 5.0}
-  {:name "Mgr:OnPlayerRemoving", :namespace "server.world_host.player_story", :complexity 5, :coverage 100.0, :crap 5.0}
+  {:name "Mgr:publish", :namespace "server.world_host.player_quest", :complexity 5, :coverage 100.0, :crap 5.0}
+  {:name "Mgr:on_player_removing", :namespace "server.world_host.player_story", :complexity 5, :coverage 100.0, :crap 5.0}
   {:name "apply_effect", :namespace "server.world_host.player_weapon", :complexity 5, :coverage 100.0, :crap 5.0}
-  {:name "create_visual", :namespace "server.world_host.player_weapon", :complexity 5, :coverage 100.0, :crap 5.0}
   {:name "distance2d", :namespace "server.world_host.player_weapon", :complexity 5, :coverage 100.0, :crap 5.0}
-  {:name "forward_of", :namespace "server.world_host.player_weapon", :complexity 5, :coverage 100.0, :crap 5.0}
+  {:name "pellet_directions", :namespace "server.world_host.player_weapon", :complexity 5, :coverage 100.0, :crap 5.0}
   {:name "zone_name", :namespace "client.views.compendium_view", :complexity 4, :coverage 66.6667, :crap 4.5926}
   {:name "read_touch_pos", :namespace "client.views.main_hud_backpack_view", :complexity 4, :coverage 66.6667, :crap 4.5926}
   {:name "read_touch_pos", :namespace "client.views.main_hud_item_bar_view", :complexity 4, :coverage 66.6667, :crap 4.5926}
-  {:name "PlatformHost:CancelFlow", :namespace "server.platform_host", :complexity 2, :coverage 14.2857, :crap 4.519}
+  {:name "PlatformHost:cancel_flow", :namespace "server.platform_host", :complexity 2, :coverage 14.2857, :crap 4.519}
   {:name "GMView.entry_spec", :namespace "client.views.gm_view", :complexity 4, :coverage 75.0, :crap 4.25}
   {:name "find_editor_node", :namespace "client.views.main_hud_vitals_view", :complexity 4, :coverage 75.0, :crap 4.25}
-  {:name "read_player_user_id", :namespace "client.views.rescue_view", :complexity 4, :coverage 75.0, :crap 4.25}
   {:name "ViewUtil.color", :namespace "client.views.view_util", :complexity 4, :coverage 75.0, :crap 4.25}
-  {:name "Mgr:UnsubscribeDied", :namespace "server.world_host.fish_carrier", :complexity 4, :coverage 75.0, :crap 4.25}
+  {:name "Mgr:unsubscribe_died", :namespace "server.world_host.fish_carrier", :complexity 4, :coverage 75.0, :crap 4.25}
   {:name "engageOrChase", :namespace "server.world_host.fish_tree", :complexity 4, :coverage 75.0, :crap 4.25}
-  {:name "read_position", :namespace "server.world_host.life_facade", :complexity 4, :coverage 75.0, :crap 4.25}
-  {:name "position_of", :namespace "server.world_host.player_life", :complexity 4, :coverage 75.0, :crap 4.25}
   {:name "compute_backpack_capacity", :namespace "server.world_host.player_tree", :complexity 4, :coverage 75.0, :crap 4.25}
   {:name "Adapter:Store", :namespace "server.data.records_adapter", :complexity 4, :coverage 77.7778, :crap 4.1756}
   {:name "readPosition", :namespace "server.world_host.fish_carrier", :complexity 4, :coverage 77.7778, :crap 4.1756}
   {:name "next_seq", :namespace "client.views.grill_view", :complexity 4, :coverage 80.0, :crap 4.128}
-  {:name "Aim:AttackPayload", :namespace "client.weapon_aim", :complexity 4, :coverage 80.0, :crap 4.128}
-  {:name "InteractionPoints:FindAnchor", :namespace "server.world_host.interaction_points", :complexity 4, :coverage 80.0, :crap 4.128}
+  {:name "Aim:attack_payload", :namespace "client.weapon_aim", :complexity 4, :coverage 80.0, :crap 4.128}
+  {:name "InteractionPoints:find_anchor", :namespace "server.world_host.interaction_points", :complexity 4, :coverage 80.0, :crap 4.128}
   {:name "zoneName", :namespace "common.npc_dialogue", :complexity 3, :coverage 50.0, :crap 4.125}
-  {:name "Mgr:State", :namespace "server.world_host.fish_ai_target", :complexity 4, :coverage 83.3333, :crap 4.0741}
+  {:name "Mgr:state", :namespace "server.world_host.fish_ai_target", :complexity 4, :coverage 83.3333, :crap 4.0741}
   {:name "ClientStore.default_channels", :namespace "client.store.client_store", :complexity 2, :coverage 20.0, :crap 4.048}
-  {:name "Util:GlobalMsgNotice", :namespace "common.util", :complexity 2, :coverage 20.0, :crap 4.048}
+  {:name "Util:global_msg_notice", :namespace "common.util", :complexity 2, :coverage 20.0, :crap 4.048}
   {:name "rollGuaranteed", :namespace "common.blindbox_draw", :complexity 4, :coverage 85.7143, :crap 4.0466}
-  {:name "Mgr:SetHeading", :namespace "server.world_host.fish_tree", :complexity 4, :coverage 85.7143, :crap 4.0466}
+  {:name "Mgr:set_heading", :namespace "server.world_host.fish_tree", :complexity 4, :coverage 85.7143, :crap 4.0466}
   {:name "rollWeighted", :namespace "common.blindbox_draw", :complexity 4, :coverage 87.5, :crap 4.0312}
   {:name "send_grill", :namespace "client.views.grill_view", :complexity 4, :coverage 88.8889, :crap 4.0219}
-  {:name "Gesture.New", :namespace "client.press_gesture", :complexity 4, :coverage 100.0, :crap 4.0}
-  {:name "attack_rect", :namespace "client.views.attack_view", :complexity 4, :coverage 100.0, :crap 4.0}
+  {:name "EngineRead.read_character", :namespace "common.engine_read", :complexity 4, :coverage 88.8889, :crap 4.0219}
+  {:name "EngineRead.write_attribute", :namespace "common.engine_read", :complexity 4, :coverage 88.8889, :crap 4.0219}
+  {:name "sanitize_position", :namespace "client.store.client_store", :complexity 4, :coverage 91.6667, :crap 4.0093}
+  {:name "Gesture.new", :namespace "client.press_gesture", :complexity 4, :coverage 100.0, :crap 4.0}
   {:name "CompendiumView.catalog_spec", :namespace "client.views.compendium_view", :complexity 4, :coverage 100.0, :crap 4.0}
+  {:name "EconomyModal.label", :namespace "client.views.economy_modal", :complexity 4, :coverage 100.0, :crap 4.0}
   {:name "FishermanView.modal_spec", :namespace "client.views.fisherman_view", :complexity 4, :coverage 100.0, :crap 4.0}
   {:name "cast_action_color", :namespace "client.views.main_hud_action_buttons_view", :complexity 4, :coverage 100.0, :crap 4.0}
   {:name "compute_layout", :namespace "client.views.main_hud_action_buttons_view", :complexity 4, :coverage 100.0, :crap 4.0}
@@ -634,33 +655,36 @@
   {:name "item_display_name", :namespace "client.views.main_hud_item_bar_view", :complexity 4, :coverage 100.0, :crap 4.0}
   {:name "RescueView.driver_spec", :namespace "client.views.rescue_view", :complexity 4, :coverage 100.0, :crap 4.0}
   {:name "notify", :namespace "client.views.shop_view", :complexity 4, :coverage 100.0, :crap 4.0}
-  {:name "M.WeaponComponents", :namespace "common.attr_model", :complexity 4, :coverage 100.0, :crap 4.0}
+  {:name "ViewUtil.read_now", :namespace "client.views.view_util", :complexity 4, :coverage 100.0, :crap 4.0}
+  {:name "M.weapon_components", :namespace "common.attr_model", :complexity 4, :coverage 100.0, :crap 4.0}
   {:name "validRoll", :namespace "common.blindbox_draw", :complexity 4, :coverage 100.0, :crap 4.0}
   {:name "potionCount", :namespace "common.body_scale", :complexity 4, :coverage 100.0, :crap 4.0}
-  {:name "M.New", :namespace "common.boss_phase", :complexity 4, :coverage 100.0, :crap 4.0}
+  {:name "M.new", :namespace "common.boss_phase", :complexity 4, :coverage 100.0, :crap 4.0}
   {:name "isPoint", :namespace "common.boss_phase", :complexity 4, :coverage 100.0, :crap 4.0}
   {:name "withinRange", :namespace "common.boss_phase", :complexity 4, :coverage 100.0, :crap 4.0}
-  {:name "M.Follow", :namespace "common.carry_mount", :complexity 4, :coverage 100.0, :crap 4.0}
-  {:name "M.New", :namespace "common.carry_mount", :complexity 4, :coverage 100.0, :crap 4.0}
-  {:name "M.Step", :namespace "common.carry_mount", :complexity 4, :coverage 100.0, :crap 4.0}
+  {:name "M.follow", :namespace "common.carry_mount", :complexity 4, :coverage 100.0, :crap 4.0}
+  {:name "M.new", :namespace "common.carry_mount", :complexity 4, :coverage 100.0, :crap 4.0}
+  {:name "M.step", :namespace "common.carry_mount", :complexity 4, :coverage 100.0, :crap 4.0}
   {:name "isBadPoint", :namespace "common.carry_mount", :complexity 4, :coverage 100.0, :crap 4.0}
-  {:name "M.KeyOf", :namespace "common.cfg.boss_moves", :complexity 4, :coverage 100.0, :crap 4.0}
-  {:name "M.SetTarget", :namespace "common.flight_path", :complexity 4, :coverage 100.0, :crap 4.0}
+  {:name "M.key_of", :namespace "common.cfg.boss_moves", :complexity 4, :coverage 100.0, :crap 4.0}
+  {:name "is_destroyed_error", :namespace "common.engine_read", :complexity 4, :coverage 100.0, :crap 4.0}
+  {:name "is_missing_member_error", :namespace "common.engine_read", :complexity 4, :coverage 100.0, :crap 4.0}
+  {:name "M.set_target", :namespace "common.flight_path", :complexity 4, :coverage 100.0, :crap 4.0}
   {:name "isBadPoint", :namespace "common.flight_path", :complexity 4, :coverage 100.0, :crap 4.0}
-  {:name "GameCfg.Ferry.Route", :namespace "common.game_cfg", :complexity 4, :coverage 100.0, :crap 4.0}
-  {:name "GameCfg.Lottery.MachineAnchors", :namespace "common.game_cfg", :complexity 4, :coverage 100.0, :crap 4.0}
+  {:name "GameCfg.Ferry.route", :namespace "common.game_cfg", :complexity 4, :coverage 100.0, :crap 4.0}
+  {:name "GameCfg.Lottery.machine_anchors", :namespace "common.game_cfg", :complexity 4, :coverage 100.0, :crap 4.0}
   {:name "HostSignal.connect", :namespace "common.host_signal", :complexity 4, :coverage 100.0, :crap 4.0}
-  {:name "Number.IsFiniteNumber", :namespace "common.number", :complexity 4, :coverage 100.0, :crap 4.0}
-  {:name "QuestSteps.Text", :namespace "common.quest_steps", :complexity 4, :coverage 100.0, :crap 4.0}
-  {:name "RateLimit.NewAggregator", :namespace "common.rate_limit", :complexity 4, :coverage 100.0, :crap 4.0}
-  {:name "Window:Admit", :namespace "common.rate_limit", :complexity 4, :coverage 100.0, :crap 4.0}
-  {:name "Records.Unscale", :namespace "common.records", :complexity 4, :coverage 100.0, :crap 4.0}
-  {:name "M.CooldownRemaining", :namespace "common.special_item", :complexity 4, :coverage 100.0, :crap 4.0}
+  {:name "Number.is_finite_number", :namespace "common.number", :complexity 4, :coverage 100.0, :crap 4.0}
+  {:name "QuestSteps.text", :namespace "common.quest_steps", :complexity 4, :coverage 100.0, :crap 4.0}
+  {:name "RateLimit.new_aggregator", :namespace "common.rate_limit", :complexity 4, :coverage 100.0, :crap 4.0}
+  {:name "Window:admit", :namespace "common.rate_limit", :complexity 4, :coverage 100.0, :crap 4.0}
+  {:name "Records.unscale", :namespace "common.records", :complexity 4, :coverage 100.0, :crap 4.0}
+  {:name "M.cooldown_remaining", :namespace "common.special_item", :complexity 4, :coverage 100.0, :crap 4.0}
   {:name "inside", :namespace "common.zone_markers", :complexity 4, :coverage 100.0, :crap 4.0}
   {:name "sizeOf", :namespace "common.zone_markers", :complexity 4, :coverage 100.0, :crap 4.0}
   {:name "waterOrder", :namespace "common.zone_markers", :complexity 4, :coverage 100.0, :crap 4.0}
-  {:name "AbilityAPI.DetachFromSocket", :namespace "server.ability_api", :complexity 4, :coverage 100.0, :crap 4.0}
-  {:name "AbilityAPI.SetBodyScale", :namespace "server.ability_api", :complexity 4, :coverage 100.0, :crap 4.0}
+  {:name "AbilityAPI.detach_from_socket", :namespace "server.ability_api", :complexity 4, :coverage 100.0, :crap 4.0}
+  {:name "AbilityAPI.set_body_scale", :namespace "server.ability_api", :complexity 4, :coverage 100.0, :crap 4.0}
   {:name "PlayerData:EatBait", :namespace "server.data.player_data", :complexity 4, :coverage 100.0, :crap 4.0}
   {:name "PlayerData:NotePurchase", :namespace "server.data.player_data", :complexity 4, :coverage 100.0, :crap 4.0}
   {:name "PlayerData:PurchaseCount", :namespace "server.data.player_data", :complexity 4, :coverage 100.0, :crap 4.0}
@@ -669,24 +693,24 @@
   {:name "copySlots", :namespace "server.data.player_data", :complexity 4, :coverage 100.0, :crap 4.0}
   {:name "isWeapon", :namespace "server.data.player_data", :complexity 4, :coverage 100.0, :crap 4.0}
   {:name "zoneScene", :namespace "server.data.player_data", :complexity 4, :coverage 100.0, :crap 4.0}
-  {:name "FishAbility:ApplyGrowth", :namespace "server.fish_ability", :complexity 4, :coverage 100.0, :crap 4.0}
+  {:name "FishAbility:apply_growth", :namespace "server.fish_ability", :complexity 4, :coverage 100.0, :crap 4.0}
   {:name "attrTree", :namespace "server.main", :complexity 4, :coverage 100.0, :crap 4.0}
   {:name "notifyTestFlow", :namespace "server.platform_host", :complexity 4, :coverage 100.0, :crap 4.0}
-  {:name "SaveHost:AfterIdle", :namespace "server.save_host", :complexity 4, :coverage 100.0, :crap 4.0}
-  {:name "SaveHost:Fail", :namespace "server.save_host", :complexity 4, :coverage 100.0, :crap 4.0}
-  {:name "SaveHost:GetStore", :namespace "server.save_host", :complexity 4, :coverage 100.0, :crap 4.0}
-  {:name "SaveHost:WithRetry", :namespace "server.save_host", :complexity 4, :coverage 100.0, :crap 4.0}
+  {:name "SaveHost:after_idle", :namespace "server.save_host", :complexity 4, :coverage 100.0, :crap 4.0}
+  {:name "SaveHost:fail", :namespace "server.save_host", :complexity 4, :coverage 100.0, :crap 4.0}
+  {:name "SaveHost:get_store", :namespace "server.save_host", :complexity 4, :coverage 100.0, :crap 4.0}
+  {:name "SaveHost:with_retry", :namespace "server.save_host", :complexity 4, :coverage 100.0, :crap 4.0}
   {:name "validSlot", :namespace "server.save_host", :complexity 4, :coverage 100.0, :crap 4.0}
   {:name "make_vec3", :namespace "server.world_host.ability_leaf", :complexity 4, :coverage 100.0, :crap 4.0}
   {:name "clearFocus", :namespace "server.world_host.fish_ai_target", :complexity 4, :coverage 100.0, :crap 4.0}
   {:name "receiver", :namespace "server.world_host.fish_ai_target", :complexity 4, :coverage 100.0, :crap 4.0}
-  {:name "Mgr:ClearLinks", :namespace "server.world_host.fish_tree", :complexity 4, :coverage 100.0, :crap 4.0}
-  {:name "Mgr:EndAirAttacks", :namespace "server.world_host.fish_tree", :complexity 4, :coverage 100.0, :crap 4.0}
-  {:name "Mgr:EndBossAttack", :namespace "server.world_host.fish_tree", :complexity 4, :coverage 100.0, :crap 4.0}
-  {:name "Mgr:EnforceEscapeCap", :namespace "server.world_host.fish_tree", :complexity 4, :coverage 100.0, :crap 4.0}
-  {:name "Mgr:Escaping", :namespace "server.world_host.fish_tree", :complexity 4, :coverage 100.0, :crap 4.0}
-  {:name "Mgr:RefreshMovingCombat", :namespace "server.world_host.fish_tree", :complexity 4, :coverage 100.0, :crap 4.0}
-  {:name "Mgr:SetState", :namespace "server.world_host.fish_tree", :complexity 4, :coverage 100.0, :crap 4.0}
+  {:name "Mgr:clear_links", :namespace "server.world_host.fish_tree", :complexity 4, :coverage 100.0, :crap 4.0}
+  {:name "Mgr:end_air_attacks", :namespace "server.world_host.fish_tree", :complexity 4, :coverage 100.0, :crap 4.0}
+  {:name "Mgr:end_boss_attack", :namespace "server.world_host.fish_tree", :complexity 4, :coverage 100.0, :crap 4.0}
+  {:name "Mgr:enforce_escape_cap", :namespace "server.world_host.fish_tree", :complexity 4, :coverage 100.0, :crap 4.0}
+  {:name "Mgr:escaping", :namespace "server.world_host.fish_tree", :complexity 4, :coverage 100.0, :crap 4.0}
+  {:name "Mgr:refresh_moving_combat", :namespace "server.world_host.fish_tree", :complexity 4, :coverage 100.0, :crap 4.0}
+  {:name "Mgr:set_state", :namespace "server.world_host.fish_tree", :complexity 4, :coverage 100.0, :crap 4.0}
   {:name "createUnit", :namespace "server.world_host.fish_tree", :complexity 4, :coverage 100.0, :crap 4.0}
   {:name "resetCrabRhythm", :namespace "server.world_host.fish_tree", :complexity 4, :coverage 100.0, :crap 4.0}
   {:name "segmentDistanceSq", :namespace "server.world_host.fish_tree", :complexity 4, :coverage 100.0, :crap 4.0}
@@ -694,36 +718,36 @@
   {:name "zoneScene", :namespace "server.world_host.fish_tree", :complexity 4, :coverage 100.0, :crap 4.0}
   {:name "player_can_act", :namespace "server.world_host.ground_loot", :complexity 4, :coverage 100.0, :crap 4.0}
   {:name "resolve_source_unit", :namespace "server.world_host.modifier_leaf", :complexity 4, :coverage 100.0, :crap 4.0}
+  {:name "position_of", :namespace "server.world_host.pk_damage_filter", :complexity 4, :coverage 100.0, :crap 4.0}
   {:name "Mgr.mount", :namespace "server.world_host.player_achievements", :complexity 4, :coverage 100.0, :crap 4.0}
   {:name "apply", :namespace "server.world_host.player_compendium", :complexity 4, :coverage 100.0, :crap 4.0}
   {:name "max_stacks_of", :namespace "server.world_host.player_effects", :complexity 4, :coverage 100.0, :crap 4.0}
   {:name "selected_entry", :namespace "server.world_host.player_fisherman", :complexity 4, :coverage 100.0, :crap 4.0}
   {:name "Mgr.mount", :namespace "server.world_host.player_gm", :complexity 4, :coverage 100.0, :crap 4.0}
-  {:name "Mgr:Coin", :namespace "server.world_host.player_gm", :complexity 4, :coverage 100.0, :crap 4.0}
-  {:name "Mgr:NextFish", :namespace "server.world_host.player_gm", :complexity 4, :coverage 100.0, :crap 4.0}
+  {:name "Mgr:coin", :namespace "server.world_host.player_gm", :complexity 4, :coverage 100.0, :crap 4.0}
+  {:name "Mgr:next_fish", :namespace "server.world_host.player_gm", :complexity 4, :coverage 100.0, :crap 4.0}
+  {:name "push_state", :namespace "server.world_host.player_grill", :complexity 4, :coverage 100.0, :crap 4.0}
   {:name "rate_of", :namespace "server.world_host.player_grill", :complexity 4, :coverage 100.0, :crap 4.0}
-  {:name "read_health", :namespace "server.world_host.player_life", :complexity 4, :coverage 100.0, :crap 4.0}
+  {:name "reply", :namespace "server.world_host.player_grill", :complexity 4, :coverage 100.0, :crap 4.0}
   {:name "closed_reason", :namespace "server.world_host.player_platform_shop", :complexity 4, :coverage 100.0, :crap 4.0}
   {:name "find_goods", :namespace "server.world_host.player_shop", :complexity 4, :coverage 100.0, :crap 4.0}
-  {:name "Mgr:SendFallback", :namespace "server.world_host.player_story", :complexity 4, :coverage 100.0, :crap 4.0}
+  {:name "Mgr:send_fallback", :namespace "server.world_host.player_story", :complexity 4, :coverage 100.0, :crap 4.0}
   {:name "initial_life_phase", :namespace "server.world_host.player_tree", :complexity 4, :coverage 100.0, :crap 4.0}
   {:name "mount_phase_dock", :namespace "server.world_host.player_tree", :complexity 4, :coverage 100.0, :crap 4.0}
   {:name "fail", :namespace "server.world_host.player_weapon", :complexity 4, :coverage 100.0, :crap 4.0}
+  {:name "reply", :namespace "server.world_host.player_weapon", :complexity 4, :coverage 100.0, :crap 4.0}
   {:name "water_zone_at", :namespace "server.world_host.player_weapon", :complexity 4, :coverage 100.0, :crap 4.0}
   {:name "is_ready_data", :namespace "server.world_host.server_runtime", :complexity 4, :coverage 100.0, :crap 4.0}
-  {:name "read_character", :namespace "server.world_host.server_runtime", :complexity 4, :coverage 100.0, :crap 4.0}
   {:name "zone_scene", :namespace "server.world_host.special_item_phase", :complexity 4, :coverage 100.0, :crap 4.0}
-  {:name "Mgr:Fresh", :namespace "server.world_host.world_records", :complexity 4, :coverage 100.0, :crap 4.0}
-  {:name "Mgr:State", :namespace "server.world_host.world_records", :complexity 4, :coverage 100.0, :crap 4.0}
-  {:name "Mgr:Update", :namespace "server.world_host.world_records", :complexity 4, :coverage 100.0, :crap 4.0}
-  {:name "AttrBridge:BodyPlan", :namespace "server.main", :complexity 2, :coverage 25.0, :crap 3.6875}
+  {:name "Mgr:state", :namespace "server.world_host.world_records", :complexity 4, :coverage 100.0, :crap 4.0}
+  {:name "AttrBridge:body_plan", :namespace "server.main", :complexity 2, :coverage 25.0, :crap 3.6875}
   {:name "_getPosition", :namespace "server.ability_behaviors.melee_hit", :complexity 3, :coverage 60.0, :crap 3.576}
-  {:name "serverNow", :namespace "server.main", :complexity 3, :coverage 66.6667, :crap 3.3333}
-  {:name "Mgr:StartCombatChannel", :namespace "server.world_host.fish_tree", :complexity 3, :coverage 66.6667, :crap 3.3333}
-  {:name "character_of", :namespace "server.world_host.player_weapon", :complexity 3, :coverage 66.6667, :crap 3.3333}
+  {:name "EngineRead.write_health", :namespace "common.engine_read", :complexity 3, :coverage 62.5, :crap 3.4746}
+  {:name "make_color", :namespace "client.views.economy_modal", :complexity 3, :coverage 66.6667, :crap 3.3333}
+  {:name "Mgr:start_combat_channel", :namespace "server.world_host.fish_tree", :complexity 3, :coverage 66.6667, :crap 3.3333}
   {:name "createManager", :namespace "server.fish_ability", :complexity 3, :coverage 71.4286, :crap 3.2099}
   {:name "ModifierLeaf.mount", :namespace "server.world_host.modifier_leaf", :complexity 2, :coverage 33.3333, :crap 3.1852}
-  {:name "Mgr:Now", :namespace "server.world_host.player_story", :complexity 2, :coverage 33.3333, :crap 3.1852}
+  {:name "Mgr:now", :namespace "server.world_host.player_story", :complexity 2, :coverage 33.3333, :crap 3.1852}
   {:name "place", :namespace "client.views.main_hud_action_buttons_view", :complexity 3, :coverage 75.0, :crap 3.1406}
   {:name "clamp_backpack_count", :namespace "client.views.main_hud_backpack_view", :complexity 3, :coverage 75.0, :crap 3.1406}
   {:name "place", :namespace "client.views.main_hud_backpack_view", :complexity 3, :coverage 75.0, :crap 3.1406}
@@ -731,19 +755,19 @@
   {:name "phaseIndex", :namespace "common.boss_phase", :complexity 3, :coverage 75.0, :crap 3.1406}
   {:name "AbilityLeaf.make_cast_guard", :namespace "server.world_host.ability_leaf", :complexity 3, :coverage 75.0, :crap 3.1406}
   {:name "character_of", :namespace "server.world_host.fishing_phase", :complexity 3, :coverage 75.0, :crap 3.1406}
-  {:name "read_character", :namespace "server.world_host.life_facade", :complexity 3, :coverage 75.0, :crap 3.1406}
-  {:name "controller_of", :namespace "server.world_host.player_life", :complexity 3, :coverage 75.0, :crap 3.1406}
-  {:name "service", :namespace "server.world_host.player_weapon", :complexity 3, :coverage 75.0, :crap 3.1406}
+  {:name "EngineRead.disconnect", :namespace "common.engine_read", :complexity 3, :coverage 77.7778, :crap 3.0988}
   {:name "Mgr.mount", :namespace "server.world_host.player_quest", :complexity 3, :coverage 81.25, :crap 3.0593}
   {:name "sorted_keys", :namespace "client.views.root_view", :complexity 3, :coverage 85.7143, :crap 3.0262}
+  {:name "check_destroyed_flag", :namespace "common.engine_read", :complexity 3, :coverage 85.7143, :crap 3.0262}
   {:name "_getAreaTransform", :namespace "server.ability_behaviors.melee_hit", :complexity 3, :coverage 85.7143, :crap 3.0262}
   {:name "AttrLeaf.apply_body_presentation", :namespace "server.world_host.attr_leaf", :complexity 3, :coverage 92.3077, :crap 3.0041}
   {:name "is_positive_int", :namespace "client.main", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "MainHudLayout.Bounds", :namespace "client.main_hud_layout", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "MainHudLayout.bounds", :namespace "client.main_hud_layout", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "clampSlots", :namespace "client.main_hud_layout", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "scaledReserved", :namespace "client.main_hud_layout", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "Gesture:Begin", :namespace "client.press_gesture", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "movedFar", :namespace "client.press_gesture", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "Gesture:begin", :namespace "client.press_gesture", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "moved_far", :namespace "client.press_gesture", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "set_rect", :namespace "client.views.compendium_view", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "EconomyModal.close", :namespace "client.views.economy_modal", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "FishCombatView.bar_spec", :namespace "client.views.fish_combat_view", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "close_modal", :namespace "client.views.fisherman_view", :complexity 3, :coverage 100.0, :crap 3.0}
@@ -758,127 +782,132 @@
   {:name "make_button", :namespace "client.views.main_hud_item_bar_view", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "place_editor_node", :namespace "client.views.main_hud_vitals_view", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "vital_percent", :namespace "client.views.main_hud_vitals_view", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "read_player_phase", :namespace "client.views.rescue_view", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "read_player_position", :namespace "client.views.rescue_view", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "read_player_user_id", :namespace "client.views.rescue_view", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "close_modal", :namespace "client.views.shop_view", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "open_modal", :namespace "client.views.shop_view", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "shop_state", :namespace "client.views.shop_view", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "mount_weak", :namespace "client.views.survival_overlay_view", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "ViewUtil.distance_sq_xyz", :namespace "client.views.view_util", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "ViewUtil.distance_sq_xz", :namespace "client.views.view_util", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "ViewUtil.read_vec2", :namespace "client.views.view_util", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "ViewUtil.read_vec3", :namespace "client.views.view_util", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "ViewUtil.vec2", :namespace "client.views.view_util", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "components", :namespace "common.attr_model", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "count", :namespace "common.attr_model", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "finite", :namespace "common.attr_model", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "rngOf", :namespace "common.blindbox_draw", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "M.Derive", :namespace "common.body_scale", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "M.Plan", :namespace "common.body_scale", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "M.derive", :namespace "common.body_scale", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "M.plan", :namespace "common.body_scale", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "positiveOrZero", :namespace "common.body_scale", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "attackSet", :namespace "common.boss_phase", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "M.DropPoint", :namespace "common.carry_mount", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "M.MountPoint", :namespace "common.carry_mount", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "M.Release", :namespace "common.carry_mount", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "M.ForFish", :namespace "common.cfg.boss_moves", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "M.Get", :namespace "common.cfg.boss_moves", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "M.drop_point", :namespace "common.carry_mount", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "M.mount_point", :namespace "common.carry_mount", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "M.release", :namespace "common.carry_mount", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "M.for_fish", :namespace "common.cfg.boss_moves", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "M.get", :namespace "common.cfg.boss_moves", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "count", :namespace "common.content_validation", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "FishCatch.CookedPrice", :namespace "common.fish_catch", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "EngineRead.destroy_unit", :namespace "common.engine_read", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "FishCatch.cooked_price", :namespace "common.fish_catch", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "updateClimb", :namespace "common.flight_path", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "finite", :namespace "common.gar_bite_notice", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "LotteryDraw.RollAxes", :namespace "common.lottery_draw", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "LotteryDraw.roll_axes", :namespace "common.lottery_draw", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "rngOf", :namespace "common.lottery_draw", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "MathWaterJudge.HitZone", :namespace "common.math_water_judge", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "MathWaterJudge.hit_zone", :namespace "common.math_water_judge", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "finite", :namespace "common.math_water_judge", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "Aggregator:Collect", :namespace "common.rate_limit", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "Window:Trim", :namespace "common.rate_limit", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "Aggregator:collect", :namespace "common.rate_limit", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "Window:trim", :namespace "common.rate_limit", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "checkSessionId", :namespace "common.rate_limit", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "Records.Holder", :namespace "common.records", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "ReelDisplay:Value", :namespace "common.reel_display", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "M.TickDamages", :namespace "common.special_item", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "Records.holder", :namespace "common.records", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "ReelDisplay:value", :namespace "common.reel_display", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "M.tick_damages", :namespace "common.special_item", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "assert_non_negative_finite", :namespace "common.spoke_clock", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "finite", :namespace "common.zone_markers", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "AbilityAPI.SetCastGuard", :namespace "server.ability_api", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "AbilityAPI.set_cast_guard", :namespace "server.ability_api", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "PlayerData:ApplyShopUpgrade", :namespace "server.data.player_data", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "PlayerData:MagazineSize", :namespace "server.data.player_data", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "PlayerData:PotionCount", :namespace "server.data.player_data", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "PlayerData:Sync", :namespace "server.data.player_data", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "PlayerData:WeaponCount", :namespace "server.data.player_data", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "PlayerData:WeaponDamageScale", :namespace "server.data.player_data", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "PlayerData:magazine_size", :namespace "server.data.player_data", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "PlayerData:potion_count", :namespace "server.data.player_data", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "PlayerData:weapon_damage_scale", :namespace "server.data.player_data", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "copy", :namespace "server.data.player_data", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "isPositiveInt", :namespace "server.data.player_data", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "Adapter:Read", :namespace "server.data.records_adapter", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "FishAbility:OnPlayerRemoving", :namespace "server.fish_ability", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "FishAbility:RefreshMoveSpeed", :namespace "server.fish_ability", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "Adapter:read", :namespace "server.data.records_adapter", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "FishAbility:on_player_removing", :namespace "server.fish_ability", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "FishAbility:refresh_move_speed", :namespace "server.fish_ability", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "queueSpeed", :namespace "server.fish_ability", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "applyDotHit", :namespace "server.main", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "PlatformHost:HasFlow", :namespace "server.platform_host", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "PlatformHost:OpenCoinFlow", :namespace "server.platform_host", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "PlatformHost:Update", :namespace "server.platform_host", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "serverNow", :namespace "server.main", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "PlatformHost:has_flow", :namespace "server.platform_host", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "PlatformHost:open_coin_flow", :namespace "server.platform_host", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "PlatformHost:update", :namespace "server.platform_host", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "closedReason", :namespace "server.platform_host", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "isValidPlayer", :namespace "server.platform_host", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "placeholder", :namespace "server.platform_host", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "placeholderAllowed", :namespace "server.platform_host", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "service", :namespace "server.platform_host", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "isPositiveInt", :namespace "server.player_data_host", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "SaveHost:IsCurrent", :namespace "server.save_host", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "SaveHost:is_current", :namespace "server.save_host", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "callback", :namespace "server.save_host", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "copy", :namespace "server.save_host", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "M.SetClock", :namespace "server.swing_registry", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "Mgr:Remove", :namespace "server.world_host.fish_ai", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "Mgr:Focus", :namespace "server.world_host.fish_ai_target", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "Mgr:Select", :namespace "server.world_host.fish_ai_target", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "M.set_clock", :namespace "server.swing_registry", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "Mgr:remove", :namespace "server.world_host.fish_ai", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "Mgr:focus", :namespace "server.world_host.fish_ai_target", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "Mgr:select", :namespace "server.world_host.fish_ai_target", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "loadAPI", :namespace "server.world_host.fish_ai_target", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "loadRuntime", :namespace "server.world_host.fish_ai_target", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "Mgr:Update", :namespace "server.world_host.fish_carrier", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "Mgr:FindByCarrier", :namespace "server.world_host.fish_tree", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "Mgr:FlailEel", :namespace "server.world_host.fish_tree", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "Mgr:GetFish", :namespace "server.world_host.fish_tree", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "Mgr:GetHeld", :namespace "server.world_host.fish_tree", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "Mgr:HeldInfo", :namespace "server.world_host.fish_tree", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "Mgr:IsolateCharacter", :namespace "server.world_host.fish_tree", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "Mgr:Players", :namespace "server.world_host.fish_tree", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "Mgr:SetTargetOverride", :namespace "server.world_host.fish_tree", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "Mgr:StartJump", :namespace "server.world_host.fish_tree", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "Mgr:update", :namespace "server.world_host.fish_carrier", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "Mgr.new", :namespace "server.world_host.fish_tree", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "Mgr:find_by_carrier", :namespace "server.world_host.fish_tree", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "Mgr:flail_eel", :namespace "server.world_host.fish_tree", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "Mgr:get_fish", :namespace "server.world_host.fish_tree", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "Mgr:get_held", :namespace "server.world_host.fish_tree", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "Mgr:held_info", :namespace "server.world_host.fish_tree", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "Mgr:isolate_character", :namespace "server.world_host.fish_tree", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "Mgr:players", :namespace "server.world_host.fish_tree", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "Mgr:set_target_override", :namespace "server.world_host.fish_tree", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "Mgr:start_jump", :namespace "server.world_host.fish_tree", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "distanceSq", :namespace "server.world_host.fish_tree", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "inWater", :namespace "server.world_host.fish_tree", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "copy_row", :namespace "server.world_host.ground_loot", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "distance", :namespace "server.world_host.ground_loot", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "is_valid_player", :namespace "server.world_host.life_facade", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "Mgr:OnPlayerRemoving", :namespace "server.world_host.player_achievements", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "read_pos", :namespace "server.world_host.ground_loot", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "Mgr:on_player_removing", :namespace "server.world_host.player_achievements", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "copy", :namespace "server.world_host.player_blindbox", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "goods", :namespace "server.world_host.player_blindbox", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "sorted_keys", :namespace "server.world_host.player_blindbox", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "Mgr:Weight", :namespace "server.world_host.player_compendium", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "Mgr:weight", :namespace "server.world_host.player_compendium", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "copy", :namespace "server.world_host.player_compendium", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "product_of", :namespace "server.world_host.player_fisherman", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "resolve_fisherman", :namespace "server.world_host.player_fisherman", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "Mgr:AddAttack", :namespace "server.world_host.player_gm", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "Mgr:GetMeleeDamage", :namespace "server.world_host.player_gm", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "Mgr:add_attack", :namespace "server.world_host.player_gm", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "Mgr:get_melee_damage", :namespace "server.world_host.player_gm", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "ensure_recovery", :namespace "server.world_host.player_grill", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "copy", :namespace "server.world_host.player_lottery", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "closed_text", :namespace "server.world_host.player_platform_shop", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "copy", :namespace "server.world_host.player_platform_shop", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "placeholder", :namespace "server.world_host.player_platform_shop", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "sorted_keys", :namespace "server.world_host.player_platform_shop", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "Mgr:GetState", :namespace "server.world_host.player_quest", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "Mgr:OnPlayerRemoving", :namespace "server.world_host.player_quest", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "Mgr:get_state", :namespace "server.world_host.player_quest", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "Mgr:on_player_removing", :namespace "server.world_host.player_quest", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "stand_for", :namespace "server.world_host.player_shop", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "compute_item_bar_capacity", :namespace "server.world_host.player_tree", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "deep_copy", :namespace "server.world_host.player_tree", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "is_non_negative_int", :namespace "server.world_host.player_tree", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "is_valid_player", :namespace "server.world_host.player_tree", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "flight_position", :namespace "server.world_host.player_weapon", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "refresh_mag", :namespace "server.world_host.player_weapon", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "is_valid_player", :namespace "server.world_host.server_runtime", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "service", :namespace "server.world_host.player_weapon", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "vec", :namespace "server.world_host.player_weapon", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "copy_array", :namespace "server.world_host.squad_dock", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "Mgr.mount", :namespace "server.world_host.world_records", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "Mgr:OnPlayerRemoving", :namespace "server.world_host.world_records", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "now", :namespace "server.world_host.world_records", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "Mgr:on_player_removing", :namespace "server.world_host.world_records", :complexity 3, :coverage 100.0, :crap 3.0}
+  {:name "is_finite", :namespace "server.world_host.world_records", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "validPlayerId", :namespace "server.world_host.world_records", :complexity 3, :coverage 100.0, :crap 3.0}
   {:name "WorldSignalRouter.is_valid_player", :namespace "server.world_host.world_signal_router", :complexity 3, :coverage 100.0, :crap 3.0}
-  {:name "Mgr:Update", :namespace "server.world_host.player_compendium", :complexity 2, :coverage 50.0, :crap 2.5}
-  {:name "Mgr:SetHealth", :namespace "server.world_host.player_gm", :complexity 2, :coverage 50.0, :crap 2.5}
-  {:name "Mgr:SetHunger", :namespace "server.world_host.player_gm", :complexity 2, :coverage 50.0, :crap 2.5}
-  {:name "Mgr:Update", :namespace "server.world_host.player_quest", :complexity 2, :coverage 50.0, :crap 2.5}
-  {:name "Mgr:OnPlayerAdded", :namespace "server.world_host.player_story", :complexity 2, :coverage 50.0, :crap 2.5}
-  {:name "vec", :namespace "server.world_host.player_weapon", :complexity 2, :coverage 50.0, :crap 2.5}
+  {:name "Mgr:update", :namespace "server.world_host.player_compendium", :complexity 2, :coverage 50.0, :crap 2.5}
+  {:name "Mgr:set_health", :namespace "server.world_host.player_gm", :complexity 2, :coverage 50.0, :crap 2.5}
+  {:name "Mgr:set_hunger", :namespace "server.world_host.player_gm", :complexity 2, :coverage 50.0, :crap 2.5}
+  {:name "Mgr:update", :namespace "server.world_host.player_quest", :complexity 2, :coverage 50.0, :crap 2.5}
+  {:name "Mgr:on_player_added", :namespace "server.world_host.player_story", :complexity 2, :coverage 50.0, :crap 2.5}
   {:name "destroy_node_safely", :namespace "client.views.root_view", :complexity 2, :coverage 66.6667, :crap 2.1481}
   {:name "_eulerDegToQuat", :namespace "server.ability_behaviors.melee_hit", :complexity 2, :coverage 66.6667, :crap 2.1481}
   {:name "report_error", :namespace "server.world_host.ability_leaf", :complexity 2, :coverage 66.6667, :crap 2.1481}
@@ -886,18 +915,27 @@
   {:name "safe_destroy", :namespace "server.world_host.attr_leaf", :complexity 2, :coverage 66.6667, :crap 2.1481}
   {:name "report_error", :namespace "server.world_host.modifier_leaf", :complexity 2, :coverage 66.6667, :crap 2.1481}
   {:name "safe_remove_entity", :namespace "server.world_host.modifier_leaf", :complexity 2, :coverage 66.6667, :crap 2.1481}
+  {:name "position_of", :namespace "server.world_host.player_life", :complexity 2, :coverage 66.6667, :crap 2.1481}
+  {:name "character_of", :namespace "server.world_host.player_weapon", :complexity 2, :coverage 66.6667, :crap 2.1481}
   {:name "readonly_trigger", :namespace "client.store.client_store", :complexity 2, :coverage 75.0, :crap 2.0625}
+  {:name "read_field", :namespace "client.views.economy_modal", :complexity 2, :coverage 75.0, :crap 2.0625}
   {:name "character_readable", :namespace "server.world_host.ability_leaf", :complexity 2, :coverage 75.0, :crap 2.0625}
+  {:name "read_character", :namespace "server.world_host.life_facade", :complexity 2, :coverage 75.0, :crap 2.0625}
+  {:name "read_character", :namespace "server.world_host.server_runtime", :complexity 2, :coverage 75.0, :crap 2.0625}
+  {:name "read_position", :namespace "server.world_host.special_item_phase", :complexity 2, :coverage 75.0, :crap 2.0625}
+  {:name "write_position", :namespace "server.world_host.special_item_phase", :complexity 2, :coverage 75.0, :crap 2.0625}
   {:name "readonly_signal", :namespace "client.store.client_store", :complexity 2, :coverage 80.0, :crap 2.032}
-  {:name "Mgr:SubscribeDied", :namespace "server.world_host.fish_carrier", :complexity 2, :coverage 80.0, :crap 2.032}
-  {:name "DamageFloat:Bind", :namespace "client.damage_float", :complexity 2, :coverage 100.0, :crap 2.0}
+  {:name "Mgr:subscribe_died", :namespace "server.world_host.fish_carrier", :complexity 2, :coverage 80.0, :crap 2.032}
+  {:name "DamageFloat:bind", :namespace "client.damage_float", :complexity 2, :coverage 100.0, :crap 2.0}
+  {:name "disable_core_gui", :namespace "client.main", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "open_platform_shop", :namespace "client.main", :complexity 1, :coverage 0.0, :crap 2.0}
   {:name "send_hud_operate", :namespace "client.main", :complexity 1, :coverage 0.0, :crap 2.0}
   {:name "clone_value", :namespace "client.store.client_store", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "normalize_table_snapshot", :namespace "client.store.client_store", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "sanitize_vital_field", :namespace "client.store.client_store", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "is_gun", :namespace "client.views.attack_view", :complexity 2, :coverage 100.0, :crap 2.0}
-  {:name "EconomyModal.label", :namespace "client.views.economy_modal", :complexity 2, :coverage 100.0, :crap 2.0}
+  {:name "EconomyModal.button", :namespace "client.views.economy_modal", :complexity 2, :coverage 100.0, :crap 2.0}
+  {:name "EconomyModal.panel", :namespace "client.views.economy_modal", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "near", :namespace "client.views.ferry_view", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "FishCombatView.warning_spec", :namespace "client.views.fish_combat_view", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "near", :namespace "client.views.fisherman_view", :complexity 2, :coverage 100.0, :crap 2.0}
@@ -919,53 +957,57 @@
   {:name "near", :namespace "client.views.shop_view", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "make", :namespace "client.views.survival_overlay_view", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "services_of", :namespace "client.views.survival_overlay_view", :complexity 2, :coverage 100.0, :crap 2.0}
-  {:name "ViewUtil.is_record", :namespace "client.views.view_util", :complexity 2, :coverage 100.0, :crap 2.0}
+  {:name "try_read_res", :namespace "client.views.view_util", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "totalWeight", :namespace "common.blindbox_draw", :complexity 2, :coverage 100.0, :crap 2.0}
-  {:name "M.Land", :namespace "common.boss_phase", :complexity 2, :coverage 100.0, :crap 2.0}
+  {:name "M.land", :namespace "common.boss_phase", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "cfg", :namespace "common.boss_phase", :complexity 1, :coverage 0.0, :crap 2.0}
   {:name "chain", :namespace "common.boss_phase", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "now_", :namespace "common.boss_phase", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "resetCooldowns", :namespace "common.boss_phase", :complexity 2, :coverage 100.0, :crap 2.0}
-  {:name "M.InRange", :namespace "common.carry_mount", :complexity 2, :coverage 100.0, :crap 2.0}
-  {:name "M.Length", :namespace "common.carry_mount", :complexity 2, :coverage 100.0, :crap 2.0}
+  {:name "M.in_range", :namespace "common.carry_mount", :complexity 2, :coverage 100.0, :crap 2.0}
+  {:name "M.length", :namespace "common.carry_mount", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "cfg", :namespace "common.carry_mount", :complexity 1, :coverage 0.0, :crap 2.0}
   {:name "num", :namespace "common.carry_mount", :complexity 2, :coverage 100.0, :crap 2.0}
-  {:name "M.WarningOf", :namespace "common.cfg.boss_moves", :complexity 2, :coverage 100.0, :crap 2.0}
+  {:name "M.warning_of", :namespace "common.cfg.boss_moves", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "integer", :namespace "common.content_validation", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "nonnegative", :namespace "common.content_validation", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "positive", :namespace "common.content_validation", :complexity 2, :coverage 100.0, :crap 2.0}
+  {:name "EngineRead.is_object", :namespace "common.engine_read", :complexity 2, :coverage 100.0, :crap 2.0}
+  {:name "EngineRead.read_player_position", :namespace "common.engine_read", :complexity 2, :coverage 100.0, :crap 2.0}
+  {:name "EngineRead.read_position", :namespace "common.engine_read", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "FishCatch.Price", :namespace "common.fish_catch", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "M.CruiseHeight", :namespace "common.flight_path", :complexity 2, :coverage 100.0, :crap 2.0}
-  {:name "M.Speed", :namespace "common.flight_path", :complexity 2, :coverage 100.0, :crap 2.0}
+  {:name "M.speed", :namespace "common.flight_path", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "cfg", :namespace "common.flight_path", :complexity 1, :coverage 0.0, :crap 2.0}
-  {:name "GameCfg.ResolveZoneId", :namespace "common.game_cfg", :complexity 2, :coverage 100.0, :crap 2.0}
-  {:name "GrillCurve.IsBurnt", :namespace "common.grill_curve", :complexity 2, :coverage 100.0, :crap 2.0}
-  {:name "Aggregator:Click", :namespace "common.rate_limit", :complexity 2, :coverage 100.0, :crap 2.0}
-  {:name "Aggregator:Flush", :namespace "common.rate_limit", :complexity 2, :coverage 100.0, :crap 2.0}
-  {:name "RateLimit.NewReceiver", :namespace "common.rate_limit", :complexity 2, :coverage 100.0, :crap 2.0}
-  {:name "REUtil:GetRE", :namespace "common.re_util", :complexity 2, :coverage 100.0, :crap 2.0}
-  {:name "Records.State", :namespace "common.records", :complexity 2, :coverage 100.0, :crap 2.0}
-  {:name "ReelDisplay:Click", :namespace "common.reel_display", :complexity 2, :coverage 100.0, :crap 2.0}
-  {:name "ReelDisplay:PendingClicks", :namespace "common.reel_display", :complexity 2, :coverage 100.0, :crap 2.0}
-  {:name "M.Desired", :namespace "common.special_item", :complexity 2, :coverage 100.0, :crap 2.0}
+  {:name "GameCfg.resolve_zone_id", :namespace "common.game_cfg", :complexity 2, :coverage 100.0, :crap 2.0}
+  {:name "GrillCurve.is_burnt", :namespace "common.grill_curve", :complexity 2, :coverage 100.0, :crap 2.0}
+  {:name "Aggregator:click", :namespace "common.rate_limit", :complexity 2, :coverage 100.0, :crap 2.0}
+  {:name "Aggregator:flush", :namespace "common.rate_limit", :complexity 2, :coverage 100.0, :crap 2.0}
+  {:name "RateLimit.new_receiver", :namespace "common.rate_limit", :complexity 2, :coverage 100.0, :crap 2.0}
+  {:name "REUtil:get_re", :namespace "common.re_util", :complexity 2, :coverage 100.0, :crap 2.0}
+  {:name "Records.state", :namespace "common.records", :complexity 2, :coverage 100.0, :crap 2.0}
+  {:name "ReelDisplay:click", :namespace "common.reel_display", :complexity 2, :coverage 100.0, :crap 2.0}
+  {:name "ReelDisplay:pending_clicks", :namespace "common.reel_display", :complexity 2, :coverage 100.0, :crap 2.0}
+  {:name "M.desired", :namespace "common.special_item", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "assert_finite_number", :namespace "common.spoke_clock", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "overlaps", :namespace "common.zone_markers", :complexity 2, :coverage 100.0, :crap 2.0}
-  {:name "AbilityAPI.AddCastGuard", :namespace "server.ability_api", :complexity 2, :coverage 100.0, :crap 2.0}
+  {:name "AbilityAPI.add_cast_guard", :namespace "server.ability_api", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "PlayerData:AddCoin", :namespace "server.data.player_data", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "PlayerData:BackpackCapacity", :namespace "server.data.player_data", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "PlayerData:PublishItemBar", :namespace "server.data.player_data", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "PlayerData:SpendCoin", :namespace "server.data.player_data", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "hasBait", :namespace "server.data.player_data", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "isArrayMarker", :namespace "server.data.player_data", :complexity 2, :coverage 100.0, :crap 2.0}
-  {:name "AttrBridge:RefreshMoveSpeed", :namespace "server.main", :complexity 2, :coverage 100.0, :crap 2.0}
-  {:name "PlatformHost:Now", :namespace "server.platform_host", :complexity 2, :coverage 100.0, :crap 2.0}
+  {:name "AttrBridge:refresh_move_speed", :namespace "server.main", :complexity 2, :coverage 100.0, :crap 2.0}
+  {:name "HandleTimeUpdate", :namespace "server.main", :complexity 2, :coverage 100.0, :crap 2.0}
+  {:name "PlatformHost:now", :namespace "server.platform_host", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "debugEnabled", :namespace "server.platform_host", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "notifyFlow", :namespace "server.platform_host", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "placeholderConfigured", :namespace "server.platform_host", :complexity 2, :coverage 100.0, :crap 2.0}
-  {:name "SaveHost:NoteWrite", :namespace "server.save_host", :complexity 2, :coverage 100.0, :crap 2.0}
-  {:name "SaveHost:Session", :namespace "server.save_host", :complexity 2, :coverage 100.0, :crap 2.0}
-  {:name "SaveHost:Status", :namespace "server.save_host", :complexity 2, :coverage 100.0, :crap 2.0}
-  {:name "M.PeekSwing", :namespace "server.swing_registry", :complexity 2, :coverage 100.0, :crap 2.0}
+  {:name "SaveHost:note_write", :namespace "server.save_host", :complexity 2, :coverage 100.0, :crap 2.0}
+  {:name "SaveHost:session", :namespace "server.save_host", :complexity 2, :coverage 100.0, :crap 2.0}
+  {:name "SaveHost:status", :namespace "server.save_host", :complexity 2, :coverage 100.0, :crap 2.0}
+  {:name "M.peek_swing", :namespace "server.swing_registry", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "default_ability_api", :namespace "server.world_host.ability_leaf", :complexity 1, :coverage 0.0, :crap 2.0}
   {:name "is_object", :namespace "server.world_host.ability_leaf", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "default_attr_api", :namespace "server.world_host.attr_leaf", :complexity 1, :coverage 0.0, :crap 2.0}
@@ -976,55 +1018,53 @@
   {:name "mark_arrival", :namespace "server.world_host.ferry_route", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "leaf", :namespace "server.world_host.fish_ai", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "isPositiveNumber", :namespace "server.world_host.fish_carrier", :complexity 2, :coverage 100.0, :crap 2.0}
-  {:name "Mgr:BossPhaseEnabled", :namespace "server.world_host.fish_tree", :complexity 2, :coverage 100.0, :crap 2.0}
-  {:name "Mgr:Drop", :namespace "server.world_host.fish_tree", :complexity 2, :coverage 100.0, :crap 2.0}
-  {:name "Mgr:EndBite", :namespace "server.world_host.fish_tree", :complexity 2, :coverage 100.0, :crap 2.0}
-  {:name "Mgr:EndMove", :namespace "server.world_host.fish_tree", :complexity 2, :coverage 100.0, :crap 2.0}
-  {:name "Mgr:FrameClock", :namespace "server.world_host.fish_tree", :complexity 2, :coverage 100.0, :crap 2.0}
-  {:name "Mgr:Now", :namespace "server.world_host.fish_tree", :complexity 2, :coverage 100.0, :crap 2.0}
-  {:name "Mgr:StunFish", :namespace "server.world_host.fish_tree", :complexity 2, :coverage 100.0, :crap 2.0}
+  {:name "Mgr:boss_phase_enabled", :namespace "server.world_host.fish_tree", :complexity 2, :coverage 100.0, :crap 2.0}
+  {:name "Mgr:drop", :namespace "server.world_host.fish_tree", :complexity 2, :coverage 100.0, :crap 2.0}
+  {:name "Mgr:end_bite", :namespace "server.world_host.fish_tree", :complexity 2, :coverage 100.0, :crap 2.0}
+  {:name "Mgr:end_move", :namespace "server.world_host.fish_tree", :complexity 2, :coverage 100.0, :crap 2.0}
+  {:name "Mgr:stun_fish", :namespace "server.world_host.fish_tree", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "beginCombatFrame", :namespace "server.world_host.fish_tree", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "flatDirection", :namespace "server.world_host.fish_tree", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "publishBite", :namespace "server.world_host.fish_tree", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "service", :namespace "server.world_host.fish_tree", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "copy_holding", :namespace "server.world_host.fishing_phase", :complexity 2, :coverage 100.0, :crap 2.0}
-  {:name "is_object", :namespace "server.world_host.life_facade", :complexity 2, :coverage 100.0, :crap 2.0}
-  {:name "default_modifier_api", :namespace "server.world_host.modifier_leaf", :complexity 1, :coverage 0.0, :crap 2.0}
   {:name "is_object", :namespace "server.world_host.modifier_leaf", :complexity 2, :coverage 100.0, :crap 2.0}
+  {:name "user_id_of", :namespace "server.world_host.pk_damage_filter", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "debugEnabled", :namespace "server.world_host.player_achievements", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "finite_positive", :namespace "server.world_host.player_effects", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "fisherman_point", :namespace "server.world_host.player_fisherman", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "item_count", :namespace "server.world_host.player_fisherman", :complexity 2, :coverage 100.0, :crap 2.0}
-  {:name "Mgr:OnPlayerRemoving", :namespace "server.world_host.player_gm", :complexity 2, :coverage 100.0, :crap 2.0}
+  {:name "Mgr:on_player_removing", :namespace "server.world_host.player_gm", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "isInt", :namespace "server.world_host.player_gm", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "ceil_remaining", :namespace "server.world_host.player_life", :complexity 2, :coverage 100.0, :crap 2.0}
-  {:name "is_object", :namespace "server.world_host.player_life", :complexity 2, :coverage 100.0, :crap 2.0}
+  {:name "controller_of", :namespace "server.world_host.player_life", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "positive_amount", :namespace "server.world_host.player_life", :complexity 2, :coverage 100.0, :crap 2.0}
+  {:name "read_health", :namespace "server.world_host.player_life", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "debug_enabled", :namespace "server.world_host.player_platform_shop", :complexity 2, :coverage 100.0, :crap 2.0}
-  {:name "Mgr:RecordFact", :namespace "server.world_host.player_quest", :complexity 2, :coverage 100.0, :crap 2.0}
+  {:name "Mgr:record_fact", :namespace "server.world_host.player_quest", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "item_count", :namespace "server.world_host.player_shop", :complexity 2, :coverage 100.0, :crap 2.0}
-  {:name "Mgr:Fallback", :namespace "server.world_host.player_story", :complexity 2, :coverage 100.0, :crap 2.0}
+  {:name "Mgr:fallback", :namespace "server.world_host.player_story", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "make_phase_slots", :namespace "server.world_host.player_tree", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "normalize_held", :namespace "server.world_host.player_tree", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "mag_of", :namespace "server.world_host.player_weapon", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "has_method", :namespace "server.world_host.server_runtime", :complexity 2, :coverage 100.0, :crap 2.0}
-  {:name "is_object", :namespace "server.world_host.server_runtime", :complexity 2, :coverage 100.0, :crap 2.0}
-  {:name "is_object", :namespace "server.world_host.special_item_phase", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "is_object", :namespace "server.world_host.squad_dock", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "is_valid_player", :namespace "server.world_host.squad_dock", :complexity 2, :coverage 100.0, :crap 2.0}
+  {:name "Mgr:cache_set", :namespace "server.world_host.world_records", :complexity 2, :coverage 100.0, :crap 2.0}
   {:name "reject", :namespace "server.world_host.world_records", :complexity 2, :coverage 100.0, :crap 2.0}
-  {:name "MainHudLayout.BottomLeft", :namespace "client.main_hud_layout", :complexity 1, :coverage 50.0, :crap 1.125}
-  {:name "M.Winding", :namespace "common.boss_phase", :complexity 1, :coverage 50.0, :crap 1.125}
-  {:name "QuestSteps.Done", :namespace "common.quest_steps", :complexity 1, :coverage 50.0, :crap 1.125}
-  {:name "QuestSteps.New", :namespace "common.quest_steps", :complexity 1, :coverage 50.0, :crap 1.125}
-  {:name "FishAbility:ApplyBodyScale", :namespace "server.fish_ability", :complexity 1, :coverage 50.0, :crap 1.125}
-  {:name "FishAbility:UpdateEffects", :namespace "server.fish_ability", :complexity 1, :coverage 50.0, :crap 1.125}
+  {:name "MainHudLayout.bottom_left", :namespace "client.main_hud_layout", :complexity 1, :coverage 50.0, :crap 1.125}
+  {:name "CompendiumView.grade_tabs", :namespace "client.views.compendium_view", :complexity 1, :coverage 50.0, :crap 1.125}
+  {:name "M.winding", :namespace "common.boss_phase", :complexity 1, :coverage 50.0, :crap 1.125}
+  {:name "QuestSteps.done", :namespace "common.quest_steps", :complexity 1, :coverage 50.0, :crap 1.125}
+  {:name "QuestSteps.new", :namespace "common.quest_steps", :complexity 1, :coverage 50.0, :crap 1.125}
+  {:name "FishAbility:apply_body_scale", :namespace "server.fish_ability", :complexity 1, :coverage 50.0, :crap 1.125}
+  {:name "FishAbility:update_effects", :namespace "server.fish_ability", :complexity 1, :coverage 50.0, :crap 1.125}
   {:name "Mgr:Price", :namespace "server.world_host.fish_tree", :complexity 1, :coverage 50.0, :crap 1.125}
-  {:name "Mgr:Weight", :namespace "server.world_host.fish_tree", :complexity 1, :coverage 50.0, :crap 1.125}
+  {:name "Mgr:weight", :namespace "server.world_host.fish_tree", :complexity 1, :coverage 50.0, :crap 1.125}
   {:name "readonly_item_signal", :namespace "client.views.root_view", :complexity 1, :coverage 66.6667, :crap 1.037}
   {:name "freeze_table", :namespace "client.store.client_store", :complexity 1, :coverage 80.0, :crap 1.008}
-  {:name "DamageFloat.DisplayAmount", :namespace "client.damage_float", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "_G.LocalMsgNotice", :namespace "client.main", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "DamageFloat.display_amount", :namespace "client.damage_float", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "_G.local_msg_notice", :namespace "client.main", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "next_action_seq", :namespace "client.main", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "send_gm", :namespace "client.main", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "send_item_bar", :namespace "client.main", :complexity 1, :coverage 100.0, :crap 1.0}
@@ -1037,8 +1077,6 @@
   {:name "AttackView.spec", :namespace "client.views.attack_view", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "CameraZoomView.spec", :namespace "client.views.camera_zoom_view", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "vector", :namespace "client.views.cast_source_view", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "EconomyModal.button", :namespace "client.views.economy_modal", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "EconomyModal.panel", :namespace "client.views.economy_modal", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "FerryView.spec", :namespace "client.views.ferry_view", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "FishermanView.rescue_bubble_spec", :namespace "client.views.fisherman_view", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "FishermanView.rescue_driver_spec", :namespace "client.views.fisherman_view", :complexity 1, :coverage 100.0, :crap 1.0}
@@ -1072,8 +1110,11 @@
   {:name "SquadView.rescue_bubble_spec", :namespace "client.views.squad_view", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "SquadView.rescue_driver_spec", :namespace "client.views.squad_view", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "SquadView.rescue_state", :namespace "client.views.squad_view", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "M.MaxHealth", :namespace "common.attr_growth", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "M.SpeedFactor", :namespace "common.attr_growth", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "now_of_fn", :namespace "client.views.survival_overlay_view", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "read_now", :namespace "client.views.survival_overlay_view", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "ViewUtil.is_record", :namespace "client.views.view_util", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "M.max_health", :namespace "common.attr_growth", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "M.speed_factor", :namespace "common.attr_growth", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "entries", :namespace "common.blindbox_draw", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "pityCfg", :namespace "common.blindbox_draw", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "cfg", :namespace "common.body_scale", :complexity 1, :coverage 100.0, :crap 1.0}
@@ -1081,91 +1122,95 @@
   {:name "copy", :namespace "common.boss_phase", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "isBadNumber", :namespace "common.boss_phase", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "phaseEntry", :namespace "common.boss_phase", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "M.Carried", :namespace "common.carry_mount", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "M.carried", :namespace "common.carry_mount", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "copy", :namespace "common.carry_mount", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "isBadNumber", :namespace "common.carry_mount", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "pointDistance", :namespace "common.carry_mount", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "DamageNotice.Publish", :namespace "common.damage_notice", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "DamageNotice.publish", :namespace "common.damage_notice", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "EngineRead.call_method", :namespace "common.engine_read", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "EngineRead.is_valid_player", :namespace "common.engine_read", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "EngineRead.read_field", :namespace "common.engine_read", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "EngineRead.read_user_id", :namespace "common.engine_read", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "EngineRead.write_field", :namespace "common.engine_read", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "FishCatch.Multiplier", :namespace "common.fish_catch", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "FishCatch.Weight", :namespace "common.fish_catch", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "FishCatch.weight", :namespace "common.fish_catch", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "percent", :namespace "common.fish_catch", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "copy", :namespace "common.flight_path", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "driftLimit", :namespace "common.flight_path", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "isBadNumber", :namespace "common.flight_path", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "GarBiteNotice.Clear", :namespace "common.gar_bite_notice", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "GarBiteNotice.Lock", :namespace "common.gar_bite_notice", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "GarBiteNotice.Publish", :namespace "common.gar_bite_notice", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "GarBiteNotice.clear", :namespace "common.gar_bite_notice", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "GarBiteNotice.lock", :namespace "common.gar_bite_notice", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "GarBiteNotice.publish", :namespace "common.gar_bite_notice", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "GrillCurve.Format", :namespace "common.grill_curve", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "patterns", :namespace "common.lottery_draw", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "Aggregator:PendingCount", :namespace "common.rate_limit", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "Aggregator:SetSession", :namespace "common.rate_limit", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "Receiver:EndSession", :namespace "common.rate_limit", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "Receiver:SetSession", :namespace "common.rate_limit", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "Window:Remaining", :namespace "common.rate_limit", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "Window:Reset", :namespace "common.rate_limit", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "Window:Used", :namespace "common.rate_limit", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "Aggregator:pending_count", :namespace "common.rate_limit", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "Aggregator:set_session", :namespace "common.rate_limit", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "Receiver:end_session", :namespace "common.rate_limit", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "Receiver:set_session", :namespace "common.rate_limit", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "Window:remaining", :namespace "common.rate_limit", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "Window:reset", :namespace "common.rate_limit", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "Window:used", :namespace "common.rate_limit", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "drop", :namespace "common.rate_limit", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "cfg", :namespace "common.records", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "ReelDisplay.New", :namespace "common.reel_display", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "ReelDisplay:Sent", :namespace "common.reel_display", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "ReelDisplay.new", :namespace "common.reel_display", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "ReelDisplay:Target", :namespace "common.reel_display", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "ReelDisplay:sent", :namespace "common.reel_display", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "clamp", :namespace "common.reel_display", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "ReelProgress.New", :namespace "common.reel_progress", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "M.NewBreathLedger", :namespace "common.special_item", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "ReelProgress.new", :namespace "common.reel_progress", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "M.new_breath_ledger", :namespace "common.special_item", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "cfg", :namespace "common.special_item", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "isBadNumber", :namespace "common.special_item", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "Util:Teleport", :namespace "common.teleport_util", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "Vitals.Restore", :namespace "common.vitals", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "Util:teleport", :namespace "common.teleport_util", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "Vitals.restore", :namespace "common.vitals", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "copyPoint", :namespace "common.zone_markers", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "_rotateYaw", :namespace "server.ability_behaviors.melee_hit", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "PlayerData.New", :namespace "server.data.player_data", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "PlayerData:Destroy", :namespace "server.data.player_data", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "PlayerData.new", :namespace "server.data.player_data", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "PlayerData:IsValidSave", :namespace "server.data.player_data", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "PlayerData:ItemBarCapacity", :namespace "server.data.player_data", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "PlayerData:destroy", :namespace "server.data.player_data", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "defaults", :namespace "server.data.player_data", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "Adapter:Key", :namespace "server.data.records_adapter", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "Adapter:key", :namespace "server.data.records_adapter", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "cfg", :namespace "server.data.records_adapter", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "FishAbility:BodyPlan", :namespace "server.fish_ability", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "FishAbility:CaptureBaseSpeed", :namespace "server.fish_ability", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "FishAbility:FishParalyzed", :namespace "server.fish_ability", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "FishAbility:FishSpeedFactor", :namespace "server.fish_ability", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "FishAbility:IsParalyzed", :namespace "server.fish_ability", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "FishAbility:MaxHealth", :namespace "server.fish_ability", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "FishAbility:Start", :namespace "server.fish_ability", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "FishAbility:body_plan", :namespace "server.fish_ability", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "FishAbility:capture_base_speed", :namespace "server.fish_ability", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "FishAbility:fish_paralyzed", :namespace "server.fish_ability", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "FishAbility:fish_speed_factor", :namespace "server.fish_ability", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "FishAbility:is_paralyzed", :namespace "server.fish_ability", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "FishAbility:max_health", :namespace "server.fish_ability", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "FishAbility:start", :namespace "server.fish_ability", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "HandlePlayerAdded", :namespace "server.main", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "HandlePlayerRemoving", :namespace "server.main", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "HandleTimeUpdate", :namespace "server.main", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "registerCastGuard", :namespace "server.main", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "PlatformHost:OnGoodsPurchaseCompleted", :namespace "server.platform_host", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "PlatformHost:OnPlayerRemoving", :namespace "server.platform_host", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "PlatformHost:Purchase", :namespace "server.platform_host", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "PlatformHost:Reply", :namespace "server.platform_host", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "PlatformHost:ShowAd", :namespace "server.platform_host", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "PlatformHost:on_goods_purchase_completed", :namespace "server.platform_host", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "PlatformHost:on_player_removing", :namespace "server.platform_host", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "PlatformHost:purchase", :namespace "server.platform_host", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "PlatformHost:reply", :namespace "server.platform_host", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "PlatformHost:show_ad", :namespace "server.platform_host", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "cfg", :namespace "server.platform_host", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "SaveHost:Commit", :namespace "server.save_host", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "SaveHost:Save", :namespace "server.save_host", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "SaveHost:WithinBudget", :namespace "server.save_host", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "SaveHost:commit", :namespace "server.save_host", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "SaveHost:within_budget", :namespace "server.save_host", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "cfg", :namespace "server.save_host", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "task", :namespace "server.save_host", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "M.ClearSwing", :namespace "server.swing_registry", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "M.TakeSwing", :namespace "server.swing_registry", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "M.clear_swing", :namespace "server.swing_registry", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "M.take_swing", :namespace "server.swing_registry", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "default_create_asset", :namespace "server.world_host.ability_leaf", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "make_vec3", :namespace "server.world_host.attr_leaf", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "flat_distance", :namespace "server.world_host.ferry_route", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "Mgr:Chase", :namespace "server.world_host.fish_ai", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "Mgr:MoveDirection", :namespace "server.world_host.fish_ai", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "Mgr:Start", :namespace "server.world_host.fish_ai", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "Mgr:Stop", :namespace "server.world_host.fish_ai", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "Mgr:Start", :namespace "server.world_host.fish_ai_target", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "Mgr:OnPlayerAdded", :namespace "server.world_host.fish_carrier", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "Mgr:OnPlayerRemoving", :namespace "server.world_host.fish_carrier", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "Mgr:Start", :namespace "server.world_host.fish_carrier", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "Mgr:SyncPosition", :namespace "server.world_host.fish_carrier", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "Mgr.new", :namespace "server.world_host.fish_tree", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "Mgr:CanCast", :namespace "server.world_host.fish_tree", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "Mgr:OnPlayerAdded", :namespace "server.world_host.fish_tree", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "Mgr:PublishBite", :namespace "server.world_host.fish_tree", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "Mgr:Update", :namespace "server.world_host.fish_tree", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "Mgr:move_direction", :namespace "server.world_host.fish_ai", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "Mgr:start", :namespace "server.world_host.fish_ai", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "Mgr:stop", :namespace "server.world_host.fish_ai", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "Mgr:start", :namespace "server.world_host.fish_ai_target", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "Mgr:on_player_added", :namespace "server.world_host.fish_carrier", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "Mgr:on_player_removing", :namespace "server.world_host.fish_carrier", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "Mgr:start", :namespace "server.world_host.fish_carrier", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "Mgr:sync_position", :namespace "server.world_host.fish_carrier", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "Mgr:can_cast", :namespace "server.world_host.fish_tree", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "Mgr:frame_clock", :namespace "server.world_host.fish_tree", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "Mgr:on_player_added", :namespace "server.world_host.fish_tree", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "Mgr:publish_bite", :namespace "server.world_host.fish_tree", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "Mgr:update", :namespace "server.world_host.fish_tree", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "abilityApi", :namespace "server.world_host.fish_tree", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "cfg", :namespace "server.world_host.fish_tree", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "isBadNumber", :namespace "server.world_host.fish_tree", :complexity 1, :coverage 100.0, :crap 1.0}
@@ -1177,28 +1222,30 @@
   {:name "make_vec3", :namespace "server.world_host.held_rod_leaf", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "flat_distance", :namespace "server.world_host.interaction_points", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "ModifierLeaf.make_slot_mounter", :namespace "server.world_host.modifier_leaf", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "default_modifier_api", :namespace "server.world_host.modifier_leaf", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "cfg", :namespace "server.world_host.player_blindbox", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "Mgr.configure", :namespace "server.world_host.player_gm", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "Mgr:GetAttack", :namespace "server.world_host.player_gm", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "Mgr:Reply", :namespace "server.world_host.player_gm", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "Mgr:get_attack", :namespace "server.world_host.player_gm", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "Mgr:reply", :namespace "server.world_host.player_gm", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "cfg", :namespace "server.world_host.player_grill", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "fail", :namespace "server.world_host.player_grill", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "finite_number", :namespace "server.world_host.player_life", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "write_attr", :namespace "server.world_host.player_life", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "cfg", :namespace "server.world_host.player_platform_shop", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "Mgr:Send", :namespace "server.world_host.player_quest", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "Mgr:send", :namespace "server.world_host.player_quest", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "cfg", :namespace "server.world_host.player_quest", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "cfg", :namespace "server.world_host.player_story", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "is_valid_player", :namespace "server.world_host.player_tree", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "ability", :namespace "server.world_host.player_weapon", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "finite", :namespace "server.world_host.player_weapon", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "ServerRuntime.current", :namespace "server.world_host.server_runtime", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "ServerRuntime.set_current", :namespace "server.world_host.server_runtime", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "is_valid_player", :namespace "server.world_host.server_runtime", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "breath_cfg", :namespace "server.world_host.special_item_phase", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "cfg", :namespace "server.world_host.special_item_phase", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "finite", :namespace "server.world_host.special_item_phase", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "write_position", :namespace "server.world_host.special_item_phase", :complexity 1, :coverage 100.0, :crap 1.0}
+  {:name "is_object", :namespace "server.world_host.special_item_phase", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "cfg", :namespace "server.world_host.squad_dock", :complexity 1, :coverage 100.0, :crap 1.0}
-  {:name "Mgr:CacheSet", :namespace "server.world_host.world_records", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "cfg", :namespace "server.world_host.world_records", :complexity 1, :coverage 100.0, :crap 1.0}
   {:name "task", :namespace "server.world_host.world_records", :complexity 1, :coverage 100.0, :crap 1.0}
 ]}
