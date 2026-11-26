@@ -16,6 +16,7 @@
 - **架构导航**：需要模块依赖全景、评估改动影响或从图上操作时，打开 dsh-uml-viewer 插件面板；图由根目录 `policy.edn` 生成到 `docs/uml/se-fish.edn`（不要手编），操作规则由插件注入。
 - **架构分层**：新增模块、调整模块职责或依赖方向前，读 `docs/architecture.md`；层归属与门禁唯一声明在 `tools/arch_policy.lua`。
 - **spoke 运行时**：写或评审调用 `common.packages.spoke.*` 或 `common.packages.spoke_eggy.*` 的代码前，读 `.dsh/skills/spoke/`（库与技能都是上游 spoke 仓库的整包拷贝，两边都不就地修改）；宿主包独立成包、依赖单向，见 [ADR-0022](docs/adr/0022-introduce-spoke-runtime.md)。技能 `references/eggy-integration.md` 允许消费方自选 submodule 或纯拷贝：本仓取纯拷贝，SHA 记账在 [packages 参考](docs/packages-reference.md)。
+- **界面设计**：设计、实现或评审客户端 EUI 界面前，读 `DESIGN.md`（本仓增补）与 `.dsh/skills/eggy-se-lua-coding/references/features/eggy-se-lua-coding-eui/SKILL.md`（通用 EUI 与默认金蓝规范）。
 - **美术资产**：定位美术工作区文件、用 Blender 或 Meshy 前读 `docs/agents/art-pipeline.md`；验收资产前读 `docs/art-asset-overview.md`「验收」，尺寸口径见 `docs/adr/0004-fish-asset-scale.md`。Blender 只走无头：一律 `lua tools/cli.lua blender`，跳过上游 blender-* skill 的 Live/MCP 段落，见 `docs/adr/0009-blender-headless-only.md`。
 - **验收与条款**：判断某项做完没有、新增待办或收口工单前，先读 `docs/acceptance/README.md`（条款入口）；两列格式、等级后缀与新增条款的受控入口见 `docs/acceptance/TEMPLATE.md`，已关闭旧单的未完成项去向见 `docs/acceptance/legacy-ledger.md`。
 - **Issue**：读写前看 `docs/agents/issue-tracker.md`；打 triage 标签前看 `docs/agents/triage-labels.md`。单据在 GitHub `qinyuanj/se-fish`，用 `gh` 操作。
