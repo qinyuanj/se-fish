@@ -1,6 +1,7 @@
 local GameCfg = require('common.game_cfg')
 local BossPhase = require('common.boss_phase')
 local BossMoves = require('common.cfg.boss_moves')
+local FishBehaviors = require('server.fish_behaviors')
 
 ---@class FishEscapingSpecies
 ---@field Grade string
@@ -148,7 +149,9 @@ function EscapingPhase.install(Mgr, context)
             ---@cast combat_params table?
             if combat_params then
                 fish.bite_aim = nil
-                if species.Combat == 'shrimp' or species.Combat == 'dragon' then
+                if FishBehaviors.has(species.Combat) then
+                    FishBehaviors.init(fish, now, combat_params, species)
+                elseif species.Combat == 'shrimp' or species.Combat == 'dragon' then
                     local params = combat_params
                     fish.ActiveUntil = now + (params.ActiveSec or params.SpecialSec)
                     fish.SpecialAt = now + (params.SpecialSec or 0)

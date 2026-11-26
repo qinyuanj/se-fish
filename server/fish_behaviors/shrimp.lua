@@ -1,0 +1,3 @@
+local ShrimpBehaviors = {}
+
+return ShrimpBehaviors

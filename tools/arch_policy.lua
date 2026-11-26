@@ -27,11 +27,10 @@ M.policy = {
     },
     {
       -- ADR-0032 客户端只读响应式状态仓库（#296），归属 L3 支撑层，
-      ids = { 'client.store' },
+      ids = { 'client.store', 'server.fish_behaviors' },
       modules = {
         'client.damage_float', 'client.game_ui', 'client.interaction_bubble',
         'client.main_hud_layout', 'client.press_gesture', 'client.weapon_aim',
-        'server.fish_behaviors',
         'common.damage_notice', 'common.engine_read', 'common.gar_bite_notice', 'common.re_util',
         'common.teleport_util', 'common.util',
       },

@@ -11,6 +11,7 @@ local CombatPhase = require('server.world_host.fish_phases.combat')
 local BossPhase = require('server.world_host.fish_phases.boss')
 local Spoke = require('common.packages.spoke.api')
 local SpokeTree, Effect, State = Spoke.SpokeTree, Spoke.Effect, Spoke.State; local validate_clock ---@type fun(clock: any, caller?: string): table
+local FishBehaviorKit = require('server.fish_behaviors.kit')
 local function abilityApi(self)
     return self.ability_api
 end
@@ -84,10 +85,7 @@ local function cfg()
     return GameCfg.FishUnit
 end
 
-local function distanceSq(pos, cp)
-    if not pos or not cp then return math.huge end
-    return (cp.x - pos.x) * (cp.x - pos.x) + (cp.z - pos.z) * (cp.z - pos.z)
-end
+local distanceSq = FishBehaviorKit.distance_sq
 
 function Mgr:now()
     local clock = rawget(self, 'clock')
@@ -95,22 +93,8 @@ function Mgr:now()
     local world = self.World or service('World'); if not world or type(world.GetServerTime) ~= 'function' then error('FishTree:now 缺少注入时钟或 World', 2) end; return world:GetServerTime()
 end
 
-local function isBadNumber(v)
-    return not Number.is_finite_number(v)
-end
-
-local function readPosition(unit)
-    local ok, pos = pcall(function() return unit.Position end)
-    if ok and pos and not isBadNumber(pos.x) and not isBadNumber(pos.y) and not isBadNumber(pos.z) then
-        return pos
-    end
-end
-
-local function flatDirection(x, z)
-    local length = math.sqrt(x * x + z * z)
-    if length < 0.01 then return nil end
-    return x / length, z / length
-end
+local readPosition = FishBehaviorKit.read_position
+local flatDirection = FishBehaviorKit.flat_direction
 
 local function towardWater(pos)
     local waters = GameCfg.Water.Zones
