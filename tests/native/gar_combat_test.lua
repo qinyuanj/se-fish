@@ -4,6 +4,7 @@
 -- 沿用 tests/support/fish_combat 共享夹具（含 Quaternion / math.random 的保存与还原）。
 -- describe/it 名称保留旧类名与方法名，并按方法名字典序注册以保持旧套件执行顺序。
 local FishCombat = require('tests.support.fish_combat')
+local FishBehaviorKit = require('server.fish_behaviors.kit')
 local GameCfg = require('common.game_cfg')
 
 local function vec(x, y, z) return { x = x, y = y, z = z } end
@@ -180,7 +181,7 @@ describe('TestGarCombat', function()
     it('test_head_zone_geometry_and_range_boundary', function()
         local params = gar()
         local pos, facing = vec(0, 0, 0), { x = 0, z = 1 }
-        local head = env.mgr.in_head_zone
+        local head = FishBehaviorKit.in_head_zone
         assert.is_true(head(pos, facing, vec(0, 0, params.BiteRange), params))        -- 正前方恰好咬距
         assert.is_false(head(pos, facing, vec(0, 0, params.BiteRange + 0.01), params)) -- 超出一点
         assert.is_true(head(pos, facing, vec(1, 0, 0.2), params))                     -- 斜前方
