@@ -1,0 +1,8 @@
+{
+  "entries": [
+    {
+      "path": ".dsh/skills",
+      "include_only": ["spoke"]
+    }
+  ]
+}
