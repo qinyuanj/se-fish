@@ -22,33 +22,20 @@ for _, module in ipairs(modules) do
     end
 end
 
-local legacy_methods = {
-    kingCrab = 'update_king_crab_combat', crabBoss = 'update_crab_boss_combat',
-    swordfish = 'update_swordfish_combat', shark = 'update_shark_combat',
-    walrus = 'update_walrus_combat', orca = 'update_orca_combat',
-}
-
-local function legacy_step(mgr, fish, now, pos, params, combat)
-    if combat == 'shrimp' or combat == 'dragon' then
-        mgr:update_shrimp_combat(fish, now, pos, params, combat)
-    elseif combat == 'kingCrab' and now >= (fish.ActiveUntil or math.huge) then
-        mgr:stun_fish(fish, now, params)
-    elseif legacy_methods[combat] then
-        mgr[legacy_methods[combat]](mgr, fish, now, pos, params)
-    else
-        error('FishBehaviors 未注册战斗键: ' .. tostring(combat), 2)
-    end
+for combat in pairs(GameCfg.FishCombat) do
+    if behaviors[combat] == nil then error('FishBehaviors 未注册战斗键: ' .. tostring(combat), 2) end
 end
 
 function FishBehaviors.init(fish, now, combat, species)
     local behavior = behaviors[species.Combat]
-    if behavior and behavior.init then return behavior.init(fish, now, combat, species) end
+    if not behavior then error('FishBehaviors 未注册战斗键: ' .. tostring(species.Combat), 2) end
+    if behavior.init then return behavior.init(fish, now, combat, species) end
 end
 
 function FishBehaviors.step(mgr, fish, now, pos, params, combat)
     local behavior = behaviors[combat]
-    if behavior then return behavior.step(mgr, fish, now, pos, params, combat) end
-    return legacy_step(mgr, fish, now, pos, params, combat)
+    if not behavior then error('FishBehaviors 未注册战斗键: ' .. tostring(combat), 2) end
+    return behavior.step(mgr, fish, now, pos, params, combat)
 end
 
 function FishBehaviors.has(combat)

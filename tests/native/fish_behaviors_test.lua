@@ -6,6 +6,7 @@ local species_modules = {
     'server.fish_behaviors.shark',
     'server.fish_behaviors.walrus',
     'server.fish_behaviors.orca',
+    'server.fish_behaviors.gar',
 }
 
 local function load_registry(overrides)
@@ -26,6 +27,7 @@ describe('FishBehaviors', function()
     it('test_registered_behavior_receives_public_init_and_step_contract', function()
         local calls = {}
         local registry = load_registry({
+            ['common.game_cfg'] = { FishCombat = { shrimp = {} } },
             ['server.fish_behaviors.shrimp'] = {
                 shrimp = {
                     init = function(fish, now, combat, species)

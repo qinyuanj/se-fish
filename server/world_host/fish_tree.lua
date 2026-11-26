@@ -118,13 +118,6 @@ local function inWater(pos)
     end
 end
 
-local function resetCrabRhythm(fish, now, params)
-    if params.ActiveSec then fish.ActiveUntil = now + params.ActiveSec end
-    fish.JabAt = -1
-    fish.PinchAt = -1
-    fish.SpecialAt = now + (params.SpinSec or 0)
-    fish.ChargeAt = now + (params.ChargeSec or 0)
-end
 
 local function publishBite(self, payload)
     local ok, err = pcall(self.publish_bite, self, payload)
@@ -137,7 +130,6 @@ LiftedPhase.install(Mgr, {
 EscapingPhase.install(Mgr, {
     cfg = cfg, service = service, readPosition = readPosition, distanceSq = distanceSq,
     flatDirection = flatDirection, towardWater = towardWater, inWater = inWater,
-    resetCrabRhythm = resetCrabRhythm,
 })
 CombatPhase.install(Mgr, {
     distanceSq = distanceSq,
@@ -145,7 +137,6 @@ CombatPhase.install(Mgr, {
     flatDirection = flatDirection,
     towardWater = towardWater,
     inWater = inWater,
-    resetCrabRhythm = resetCrabRhythm,
     publishBite = publishBite,
 })
 
