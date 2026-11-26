@@ -14,6 +14,7 @@ local Spoke = require("common.packages.spoke.api")
 local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
 local PlayerEffects = require("server.world_host.player_effects")
 local PlayerLife = require("server.world_host.player_life")
+local PlayerProjection = require("server.world_host.player_projection")
 local SpecialItemPhase = require("server.world_host.special_item_phase")
 local FishingPhase = require("server.world_host.fishing_phase")
 local HeldRodLeaf = require("server.world_host.held_rod_leaf")
@@ -22,10 +23,18 @@ local PlayerQuest = require("server.world_host.player_quest")
 local PlayerStory = require("server.world_host.player_story")
 local PlayerAchievements = require("server.world_host.player_achievements")
 local PlayerGM = require("server.world_host.player_gm")
+local PlayerWeapon = require("server.world_host.player_weapon")
+local PlayerGrill = require("server.world_host.player_grill")
+local PlayerShop = require("server.world_host.player_shop")
+local PlayerFisherman = require("server.world_host.player_fisherman")
+local PlayerLottery = require("server.world_host.player_lottery")
+local PlayerBlindbox = require("server.world_host.player_blindbox")
+local PlayerPlatformShop = require("server.world_host.player_platform_shop")
 
 local SpokeTree = Spoke.SpokeTree
 local Effect = Spoke.Effect
 local State = Spoke.State
+local Trigger = Spoke.Trigger
 
 local PlayerTree = {}
 
@@ -123,80 +132,6 @@ local function compute_backpack_capacity(upgrade_level)
     return GameCfg.Items.MaxBackpackSlots
   end
   return GameCfg.Items.InitialBackpackSlots + level * GameCfg.Items.BackpackSlotsPerUpgrade
-end
-
-local function copy_slots(items, capacity)
-  local slots = {}
-  if type(items) ~= "table" then
-    return slots
-  end
-  for index = 1, capacity do
-    local entry = items[index]
-    if type(entry) == "table" and (entry.count or 0) > 0 then
-      slots[index] = {
-        itemId = entry.itemId,
-        count = entry.count,
-        containerId = entry.containerId,
-        mult = entry.mult,
-        cooked = entry.cooked,
-      }
-    end
-  end
-  return slots
-end
-
-local function build_item_bar_snapshot(
-    item_bar,
-    slot_count,
-    backpack,
-    backpack_count,
-    upgrade_level,
-    bait,
-    coin,
-    selected_slot,
-    selected_bait,
-    weapons,
-    selected_weapon,
-    held)
-  local bait_out = {}
-  for item_id, count in pairs(type(bait) == "table" and bait or {}) do
-    bait_out[item_id] = count
-  end
-
-  local boss_bait = GameCfg.Casting and GameCfg.Casting.BossBait
-  if type(boss_bait) == "table" then
-    local bosses = {}
-    for item_id in pairs(boss_bait) do
-      bosses[#bosses + 1] = item_id
-    end
-    table.sort(bosses)
-    for _, item_id in ipairs(bosses) do
-      local total = 0
-      for _, entry in pairs(type(item_bar) == "table" and item_bar or {}) do
-        if type(entry) == "table" and entry.itemId == item_id and (entry.count or 0) > 0 then
-          total = total + entry.count
-        end
-      end
-      if total >= 1 then
-        bait_out[item_id] = total
-      end
-    end
-  end
-
-  return {
-    slots = copy_slots(item_bar, slot_count),
-    slotCount = slot_count,
-    backpack = copy_slots(backpack, backpack_count),
-    backpackCount = backpack_count,
-    upgrade_level = upgrade_level,
-    bait = bait_out,
-    coin = coin,
-    selectedSlot = selected_slot,
-    selectedBait = selected_bait,
-    weapons = deep_copy(type(weapons) == "table" and weapons or {}),
-    selectedWeapon = selected_weapon,
-    held = normalize_held(held),
-  }
 end
 
 local function initial_life_phase(survival)
@@ -306,6 +241,7 @@ function PlayerTree.spawn(opts)
   local weak_touched = (raw_survival.weakRemaining or 0) > 0
   local survival_dirty = false
 
+  ---@type table<string, any>
   local handle = {
     user_id = player.UserId,
     player = player,
@@ -316,6 +252,17 @@ function PlayerTree.spawn(opts)
     states = states,
     memos = memos,
     docks = docks,
+    actions = {
+      weapon = Trigger.new("PlayerTree.weapon"),
+      grill = Trigger.new("PlayerTree.grill"),
+      shop = Trigger.new("PlayerTree.shop"),
+      interact = Trigger.new("PlayerTree.interact"),
+      lottery = Trigger.new("PlayerTree.lottery"),
+      lottery_state = Trigger.new("PlayerTree.lottery_state"),
+      blindbox = Trigger.new("PlayerTree.blindbox"),
+      blindbox_state = Trigger.new("PlayerTree.blindbox_state"),
+      platform_shop = Trigger.new("PlayerTree.platform_shop"),
+    },
     tree = nil,
   }
 
@@ -345,51 +292,35 @@ function PlayerTree.spawn(opts)
     if type(data) ~= "table" then
       return
     end
-    if type(data.data) ~= "table" then
-      data.data = {}
+    local patch = PlayerProjection.build_stage1_mirror({
+      coin = states.coin:now(),
+      zone_id = states.zone_id:now(),
+      upgrade_level = states.upgrade_level:now(),
+      item_bar = states.item_bar:now(),
+      backpack = states.backpack:now(),
+      bait = states.bait:now(),
+      weapons = states.weapons:now(),
+      selected_slot = states.selected_slot:now(),
+      selected_bait = states.selected_bait:now(),
+      selected_weapon = states.selected_weapon:now(),
+      held = states.held:now(),
+      potion_big_count = states.potion_big_count:now(),
+      potion_speed_count = states.potion_speed_count:now(),
+      shop_upgrades = states.shop_upgrades:now(),
+      cooldowns = states.cooldowns:now(),
+    }, container_ids)
+    for _, operation in ipairs(patch) do
+      local parent = data
+      local path = operation.path
+      for index = 1, #path - 1 do
+        local key = path[index]
+        if type(parent[key]) ~= "table" then
+          parent[key] = {}
+        end
+        parent = parent[key]
+      end
+      parent[path[#path]] = operation.value
     end
-    local d = data.data
-    d.FishCoin = states.coin:now()
-    d.Zone = states.zone_id:now()
-    d.upgrade_level = states.upgrade_level:now()
-    if type(d.containers) ~= "table" then
-      d.containers = {}
-    end
-    d.containers[container_ids.ItemBar] = deep_copy(states.item_bar:now() or {})
-    d.containers[container_ids.Backpack] = deep_copy(states.backpack:now() or {})
-    d.Bait = deep_copy(states.bait:now() or {})
-    d.weapons = deep_copy(states.weapons:now() or {})
-    d.selected_slot = states.selected_slot:now()
-    d.selected_bait = states.selected_bait:now()
-    d.selected_weapon = states.selected_weapon:now()
-
-    if type(data.extra) ~= "table" then
-      data.extra = {}
-    end
-    local extra = data.extra
-    if type(extra.inventory) ~= "table" then
-      extra.inventory = {}
-    end
-    extra.inventory.weapons = deep_copy(states.weapons:now() or {})
-    if type(extra.inventory.selection) ~= "table" then
-      extra.inventory.selection = {}
-    end
-    extra.inventory.selection.slot = states.selected_slot:now()
-    extra.inventory.selection.bait = states.selected_bait:now()
-    extra.inventory.selection.weapon = states.selected_weapon:now()
-    extra.inventory.selection.held = normalize_held(states.held:now())
-
-    if type(extra.growth) ~= "table" then
-      extra.growth = {}
-    end
-    if type(extra.growth.potions) ~= "table" then
-      extra.growth.potions = {}
-    end
-    extra.growth.potions.item168 = states.potion_big_count:now()
-    extra.growth.potions.item167 = states.potion_speed_count:now()
-    extra.growth.upgrades = deep_copy(states.shop_upgrades:now() or {})
-
-    extra.cooldowns = deep_copy(states.cooldowns:now() or {})
   end
 
   local function mirror_to_data(force_all)
@@ -516,20 +447,20 @@ function PlayerTree.spawn(opts)
       end)
 
       memos.item_bar_snapshot = s1:memo("ItemBarSnapshot", function(ms)
-        return build_item_bar_snapshot(
-          ms:d(states.item_bar),
-          ms:d(memos.item_bar_capacity),
-          ms:d(states.backpack),
-          ms:d(memos.backpack_capacity),
-          ms:d(states.upgrade_level),
-          ms:d(states.bait),
-          ms:d(states.coin),
-          ms:d(states.selected_slot),
-          ms:d(states.selected_bait),
-          ms:d(states.weapons),
-          ms:d(states.selected_weapon),
-          ms:d(states.held)
-        )
+        return PlayerProjection.build_item_bar_snapshot({
+          item_bar = ms:d(states.item_bar),
+          slot_count = ms:d(memos.item_bar_capacity),
+          backpack = ms:d(states.backpack),
+          backpack_count = ms:d(memos.backpack_capacity),
+          upgrade_level = ms:d(states.upgrade_level),
+          bait = ms:d(states.bait),
+          coin = ms:d(states.coin),
+          selected_slot = ms:d(states.selected_slot),
+          selected_bait = ms:d(states.selected_bait),
+          weapons = ms:d(states.weapons),
+          selected_weapon = ms:d(states.selected_weapon),
+          held = ms:d(states.held),
+        })
       end)
 
       docks.save_inventory = s1:dock("SaveInventoryDock")
@@ -612,6 +543,50 @@ function PlayerTree.spawn(opts)
           quest = opts.quest or handle.quest,
           random = opts.random,
         })
+        local weapon = PlayerWeapon.mount(ps, handle, {
+          remote = opts.remote,
+          save = opts.save,
+          physics = opts.physics,
+          players_service = opts.players_service,
+          ability = opts.ability,
+          fish_unit = opts.weapon_fish_unit,
+          fish_carrier = opts.fish_carrier,
+          world = opts.world_service,
+          random = opts.random,
+          new_hit = opts.new_hit,
+          apply_hit = opts.apply_hit,
+          apply_effect = opts.apply_effect,
+        })
+        local weapon_guard = function(unit, index) return weapon:guard(unit, index) end
+        handle.weapon_cast_guard = weapon_guard
+        ps:on_cleanup(function()
+          if handle.weapon_cast_guard == weapon_guard then handle.weapon_cast_guard = nil end
+        end)
+        PlayerGrill.mount(ps, handle, {
+          remote = opts.remote,
+          save = opts.save,
+          world = opts.world_service,
+          create_unit = opts.create_unit,
+          players = opts.players,
+          new_hit = opts.new_hit,
+          apply_hit = opts.apply_hit,
+        })
+        PlayerShop.mount(ps, handle, {
+          remote = opts.remote,
+          save = opts.save,
+          quest = handle.quest or opts.quest,
+        })
+        PlayerFisherman.mount(ps, handle, {
+          remote = opts.remote,
+          save = opts.save,
+          quest = handle.quest or opts.quest,
+        })
+        PlayerLottery.mount(ps, handle, {
+          remote = opts.remote,
+          save = opts.save,
+          random = opts.random,
+          in_range = opts.lottery_in_range,
+        })
       end)
 
       -- 濒死相位：内嵌 platform_pending 门控的倒计时子相位。
@@ -660,6 +635,22 @@ function PlayerTree.spawn(opts)
       if type(mounts.actions) == "function" then
         mounts.actions(s4, handle)
       end
+      local delivery_epoch = opts.delivery_epoch or tostring(opts.world)
+      PlayerBlindbox.mount(s4, handle, {
+        remote = opts.remote, state = State,
+        save = opts.save,
+        platform = opts.platform,
+        world = opts.world,
+        random = opts.random,
+        delivery_epoch = delivery_epoch,
+      })
+      PlayerPlatformShop.mount(s4, handle, {
+        remote = opts.remote, state = State,
+        save = opts.save,
+        platform = opts.platform,
+        world = opts.world,
+        delivery_epoch = delivery_epoch,
+      })
     end)
 
     -- 树底纯输出叶子：左手持竿 / 手持外观投影（通过可选注入 create_unit 保持建点台账不变）。
@@ -726,14 +717,14 @@ function PlayerTree.spawn(opts)
 
   handle.tree = SpokeTree.spawn("PlayerTree:" .. tostring(player.UserId), root, services)
 
-  function handle:batch(fn)
+  function handle.batch(_, fn)
     if type(fn) ~= "function" then
       error("PlayerTree:batch 需要函数", 2)
     end
     return SpokeRuntime.batch(fn)
   end
 
-  function handle:set_coin(value)
+  function handle.set_coin(_, value)
     if not is_non_negative_int(value) then
       return false
     end
@@ -741,7 +732,7 @@ function PlayerTree.spawn(opts)
     return true
   end
 
-  function handle:set_zone(zone_id)
+  function handle.set_zone(_, zone_id)
     if type(zone_id) ~= "string" or zone_id == "" then
       return false
     end
@@ -749,7 +740,7 @@ function PlayerTree.spawn(opts)
     return true
   end
 
-  function handle:set_item_bar(items)
+  function handle.set_item_bar(_, items)
     if type(items) ~= "table" then
       return false
     end
@@ -757,7 +748,7 @@ function PlayerTree.spawn(opts)
     return true
   end
 
-  function handle:set_backpack(items)
+  function handle.set_backpack(_, items)
     if type(items) ~= "table" then
       return false
     end
@@ -765,7 +756,7 @@ function PlayerTree.spawn(opts)
     return true
   end
 
-  function handle:set_weapons(weapons)
+  function handle.set_weapons(_, weapons)
     if type(weapons) ~= "table" then
       return false
     end
@@ -773,7 +764,7 @@ function PlayerTree.spawn(opts)
     return true
   end
 
-  function handle:set_bait(bait)
+  function handle.set_bait(_, bait)
     if type(bait) ~= "table" then
       return false
     end
@@ -781,7 +772,7 @@ function PlayerTree.spawn(opts)
     return true
   end
 
-  function handle:set_selected_slot(slot)
+  function handle.set_selected_slot(_, slot)
     if slot ~= nil and (not is_non_negative_int(slot) or slot < 1) then
       return false
     end
@@ -789,7 +780,7 @@ function PlayerTree.spawn(opts)
     return true
   end
 
-  function handle:set_selected_bait(item_id)
+  function handle.set_selected_bait(_, item_id)
     if item_id ~= nil and type(item_id) ~= "string" then
       return false
     end
@@ -797,7 +788,7 @@ function PlayerTree.spawn(opts)
     return true
   end
 
-  function handle:set_selected_weapon(item_id)
+  function handle.set_selected_weapon(_, item_id)
     if item_id ~= nil and type(item_id) ~= "string" then
       return false
     end
@@ -805,7 +796,7 @@ function PlayerTree.spawn(opts)
     return true
   end
 
-  function handle:set_held(held)
+  function handle.set_held(_, held)
     if held ~= nil and type(held) ~= "table" then
       return false
     end
@@ -813,7 +804,7 @@ function PlayerTree.spawn(opts)
     return true
   end
 
-  function handle:set_potion_count(item_id, count)
+  function handle.set_potion_count(_, item_id, count)
     if not is_non_negative_int(count) then
       return false
     end
@@ -828,7 +819,7 @@ function PlayerTree.spawn(opts)
     return false
   end
 
-  function handle:set_upgrade_level(level)
+  function handle.set_upgrade_level(_, level)
     if not is_non_negative_int(level) or level > #GameCfg.Items.UpgradePrices then
       return false
     end
@@ -836,7 +827,7 @@ function PlayerTree.spawn(opts)
     return true
   end
 
-  function handle:set_shop_upgrades(upgrades)
+  function handle.set_shop_upgrades(_, upgrades)
     if type(upgrades) ~= "table" then
       return false
     end
@@ -844,10 +835,14 @@ function PlayerTree.spawn(opts)
     return true
   end
 
-  function handle:set_shop_upgrade(kind, level)
+  function handle.set_shop_upgrade(_, kind, level)
     local spec = type(kind) == "string" and GameCfg.Shop and GameCfg.Shop.UpgradeKinds
         and GameCfg.Shop.UpgradeKinds[kind]
-    if not spec or not is_non_negative_int(level) or level > spec.MaxLevel then
+    if not spec or not is_non_negative_int(level) then
+      return false
+    end
+    ---@cast spec { MaxLevel: number }
+    if level > spec.MaxLevel then
       return false
     end
     local next_upgrades = deep_copy(states.shop_upgrades:now() or {})
@@ -856,7 +851,7 @@ function PlayerTree.spawn(opts)
     return true
   end
 
-  function handle:set_cooldown(key, expires_at)
+  function handle.set_cooldown(_, key, expires_at)
     if type(key) ~= "string" or key == "" then
       return false
     end
@@ -869,7 +864,7 @@ function PlayerTree.spawn(opts)
     return true
   end
 
-  function handle:set_character(character)
+  function handle.set_character(_, character)
     states.character:set(character)
     return true
   end
@@ -959,7 +954,7 @@ function PlayerTree.spawn(opts)
     return true
   end
 
-  function handle:get_item_bar_snapshot()
+  function handle.get_item_bar_snapshot(_)
     return deep_copy(memos.item_bar_snapshot:now())
   end
 
@@ -973,8 +968,16 @@ function PlayerTree.spawn(opts)
     return true
   end
 
-  function handle:mirror_to_data()
+  function handle.mirror_to_data(_)
     mirror_to_data(true)
+  end
+
+  function handle:dispatch_action(action, payload)
+    local trigger = self.actions[action]
+    if not trigger or self:is_disposed() or session_alive:now() == false then return false end
+    local event = { payload = payload, result = false }
+    trigger:invoke(event)
+    return event.result
   end
 
   function handle:mount_phase(phase_name, key, block)
@@ -1017,7 +1020,7 @@ function PlayerTree.spawn(opts)
     end
   end
 
-  function handle:register_leave_finalizer(fn)
+  function handle.register_leave_finalizer(_, fn)
     if type(fn) ~= "function" then
       error("PlayerTree:register_leave_finalizer 需要函数", 2)
     end

@@ -435,6 +435,7 @@ describe('平台适配层（MgrPlatform）', function()
         for i = 1, select('#', ...) do parts[i] = tostring(select(i, ...)) end
         logs[#logs + 1] = table.concat(parts, '\t')
       end
+      shop:reconnect()
       shop:pump()
       shop:drain()
     end)

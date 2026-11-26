@@ -18,9 +18,9 @@ local ReelOverlayView = require("client.views.reel_overlay_view"); local CastSou
 local FishermanView = require("client.views.fisherman_view"); local CompendiumView = require("client.views.compendium_view"); local GuideView = require("client.views.guide_view")
 local MessageView = require("client.views.message_view"); local StoryView = require("client.views.story_view"); local GMView = require("client.views.gm_view")
 local SquadView = require("client.views.squad_view"); local REUtil = require("common.re_util"); local GameUI = require("client.game_ui")
-local Task = game:GetService("Task")
-local World = game:GetService("World")
-local Players = game:GetService("Players")
+local Task = game:GetService("Task") ---@cast Task Task
+local World = game:GetService("World") ---@cast World World
+local Players = game:GetService("Players") ---@cast Players Players
 local get_eui_manager
 
 local function read_device_resolution()
@@ -43,8 +43,8 @@ local function read_device_resolution()
     return nil
 end
 
--- 客户端 Spoke 响应式主干（ADR-0032 / #296）：
-local ok_now, initial_now = pcall(function() return World:GetServerTime() end) -- 启动瞬间宿主时钟可能未就绪
+-- 客户端 Spoke 响应式主干（ADR-0032 / #296）；启动瞬间宿主时钟可能未就绪：
+local ok_now, initial_now = pcall(function() return World:GetServerTime() end) ---@cast initial_now any
 if not ok_now or not Number.is_finite_number(initial_now) then print("[client.main] 启动读取宿主时钟失败", tostring(initial_now)); initial_now = nil end; local client_clock = SpokeClock.new(initial_now)
 local client_store, client_store_writer = ClientStore.new({ clock = client_clock })
 client_store_writer:bind_host()
@@ -58,11 +58,8 @@ _G.GM = {
     next_fish = function(fishId, target) send_gm({ action = "NextFish", fishId = fishId, target = target }) end,
 }
 _G.ClientSpoke = { Store = client_store, clock = client_store.clock }
+_G.PlatformShop = _G.PlatformShop ---@type { open: fun(): boolean }?
 
-local hud_backpack_open = Spoke.State.new("ClientMain.hud_backpack_open", false)
-local hud_open_popup = Spoke.State.new("ClientMain.hud_open_popup", nil)
-local hud_reel = {}
-local hud_drop_resolvers = {}
 local fisherman_shared = {}
 local grill_shared = GrillView.new_shared()
 local rescue_view_state = FishermanView.rescue_state({
@@ -90,14 +87,6 @@ end
 
 local function is_positive_int(value)
     return Number.is_finite_number(value) and value >= 1 and value == math.floor(value)
-end
-
-local function resolve_item_bar_drop(pos)
-    return hud_drop_resolvers.backpack and hud_drop_resolvers.backpack(pos) or nil
-end
-
-local function resolve_backpack_drop(pos)
-    return hud_drop_resolvers.item_bar and hud_drop_resolvers.item_bar(pos) or nil
 end
 
 local function send_hud_operate(payload)
@@ -128,7 +117,7 @@ local function create_scene_node_at(position, name)
 end
 
 local function create_anchor_scene_node(entry, height, kind)
-    local anchor = entry.name and World:FindFirstChild(entry.name, true) or nil
+    local anchor = entry.name and World:FindFirstChild(entry.name, true) or nil ---@cast anchor WorldUnit?
     if kind == "shop" and anchor and type(GameUI.create_scene_node) == "function" then
         local ok, node = pcall(GameUI.create_scene_node, GameUI,
             GameCfg.Shop.BubblePreset, anchor, Vector3.New(0, height, 0))
@@ -150,7 +139,7 @@ local function open_platform_shop()
 end
 
 Task:Spawn(function()
-    local waited = 0
+    local waited = 0 ---@type number
     local ui_root = GameUI:get_ui_root()
     while not ui_root and waited < 30 do
         Task:Wait(0.05)
@@ -234,70 +223,81 @@ Task:Spawn(function()
                     return payload and payload.aim or nil
                 end,
                 grill_shared = grill_shared,
-                reel = hud_reel,
             },
             create_node = function(kind, props)
                 return World:CreateUnit(kind, props)
             end,
-            hud = {
-                CameraZoomView.spec(),
-                ShopView.presentation_spec(),
-                FishermanView.presentation_spec({
-                    shared = fisherman_shared,
-                    models = (function()
-                        local rows = {}
-                        for index, npc in ipairs(GameCfg.Interact.Fishermen) do
-                            local unit = Util:wait_for_child(World, npc.AnchorNames[1])
-                            if unit and unit.Scale then rows[index] = { unit = unit, baseScale = unit.Scale } end
-                        end
-                        return rows
-                    end)(),
-                }),
-                FishermanView.rescue_driver_spec(rescue_view_state),
-                SquadView.hud_spec(),
-                SquadView.rescue_driver_spec(squad_rescue_view_state),
-                GroundLootView.aim_toggle_spec(),
-                MainHudVitalsView.spec(),
-                MainHudEquipPopups.spec({
-                    open_popup = hud_open_popup,
-                    backpack_open = hud_backpack_open,
-                    send_operate = send_hud_operate,
-                }),
-                MainHudItemBarView.spec({
-                    backpack_open = hud_backpack_open,
-                    resolve_drop_target = resolve_item_bar_drop,
-                    on_drop_resolver = function(fn)
-                        hud_drop_resolvers.item_bar = fn
-                    end,
-                }),
-                AttackView.spec(),
-                GuideView.spec(),
-                MessageView.spec(),
-                CompendiumView.entry_spec(),
-                GMView.entry_spec(),
-                GrillView.spec(),
-                BlindboxView.entry_spec(),
-                PlatformShopView.entry_spec(),
-                FerryView.spec(),
-                CastSourceView.spec(),
-                MainHudActionButtonsView.spec({
-                    backpack_open = hud_backpack_open,
-                    send_operate = send_hud_operate,
-                    on_reel_click = function(session_id)
-                        if type(hud_reel.click) == "function" then
-                            hud_reel.click(session_id)
-                        end
-                    end,
-                }),
-                MainHudBackpackView.spec({
-                    backpack_open = hud_backpack_open,
-                    open_popup = hud_open_popup,
-                    resolve_drop_target = resolve_backpack_drop,
-                    on_drop_resolver = function(fn)
-                        hud_drop_resolvers.backpack = fn
-                    end,
-                }),
-            },
+            hud = function(scope, ctx)
+                local hud_backpack_open = Spoke.State.new("ClientMain.hud_backpack_open", false)
+                local hud_open_popup = Spoke.State.new("ClientMain.hud_open_popup", nil)
+                local hud_reel = {}
+                local hud_drop_resolvers = {}
+                local function resolve_item_bar_drop(pos) return hud_drop_resolvers.backpack and hud_drop_resolvers.backpack(pos) or nil end
+                local function resolve_backpack_drop(pos) return hud_drop_resolvers.item_bar and hud_drop_resolvers.item_bar(pos) or nil end
+                ctx.services.reel = hud_reel
+                scope:on_cleanup(function()
+                    ctx.services.reel = nil
+                end)
+                return {
+                    CameraZoomView.spec(),
+                    ShopView.presentation_spec(),
+                    FishermanView.presentation_spec({
+                        shared = fisherman_shared,
+                        models = (function()
+                            local rows = {}
+                            for index, npc in ipairs(GameCfg.Interact.Fishermen) do
+                                local unit = Util:wait_for_child(World, npc.AnchorNames[1])
+                                if unit and unit.Scale then rows[index] = { unit = unit, baseScale = unit.Scale } end
+                            end
+                            return rows
+                        end)(),
+                    }),
+                    FishermanView.rescue_driver_spec(rescue_view_state),
+                    SquadView.hud_spec(),
+                    SquadView.rescue_driver_spec(squad_rescue_view_state),
+                    GroundLootView.aim_toggle_spec(),
+                    MainHudVitalsView.spec(),
+                    MainHudEquipPopups.spec({
+                        open_popup = hud_open_popup,
+                        backpack_open = hud_backpack_open,
+                        send_operate = send_hud_operate,
+                    }),
+                    MainHudItemBarView.spec({
+                        backpack_open = hud_backpack_open,
+                        resolve_drop_target = resolve_item_bar_drop,
+                        on_drop_resolver = function(fn)
+                            hud_drop_resolvers.item_bar = fn
+                        end,
+                    }),
+                    AttackView.spec(),
+                    GuideView.spec(),
+                    MessageView.spec(),
+                    CompendiumView.entry_spec(),
+                    GMView.entry_spec(),
+                    GrillView.spec(),
+                    BlindboxView.entry_spec(),
+                    PlatformShopView.entry_spec(),
+                    FerryView.spec(),
+                    CastSourceView.spec(),
+                    MainHudActionButtonsView.spec({
+                        backpack_open = hud_backpack_open,
+                        send_operate = send_hud_operate,
+                        on_reel_click = function(session_id)
+                            if type(hud_reel.click) == "function" then
+                                hud_reel.click(session_id)
+                            end
+                        end,
+                    }),
+                    MainHudBackpackView.spec({
+                        backpack_open = hud_backpack_open,
+                        open_popup = hud_open_popup,
+                        resolve_drop_target = resolve_backpack_drop,
+                        on_drop_resolver = function(fn)
+                            hud_drop_resolvers.backpack = fn
+                        end,
+                    }),
+                }
+            end,
             modals = {
                 shop = ShopView.modal_spec(),
                 fisherman = FishermanView.modal_spec(),
@@ -321,7 +321,7 @@ Task:Spawn(function()
                         client_store_writer:set_overlay("aim_pickup", false)
                     end,
                 }),
-                reel = ReelOverlayView.spec({ controller = hud_reel }),
+                reel = ReelOverlayView.spec(),
             },
             docks = {
                 shop = ShopView.bubble_spec({ anchors = (function()
@@ -372,7 +372,7 @@ Task:Spawn(function()
     end
 end)
 
-local StarterGui = game:GetService("StarterGui")
+local StarterGui = game:GetService("StarterGui") ---@cast StarterGui StarterGui
 local function disable_core_gui(name) local ok, err = pcall(function() StarterGui:SetCoreGuiEnabled(Enums.CoreGuiType[name], false) end); if not ok then print("[client.main] StarterGui:SetCoreGuiEnabled 失败", "CoreGuiType." .. name, tostring(err)) end end -- 兼容部分宿主环境未开放 CoreGui 隐藏接口
 disable_core_gui("LiftButton"); disable_core_gui("Health")
 

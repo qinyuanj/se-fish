@@ -16,6 +16,8 @@
 local GameCfg = require('common.game_cfg')
 local Curve = require('common.grill_curve')
 local PlayerData = require('server.data.player_data')
+local PlayerTree = require('server.world_host.player_tree')
+local SpokeClock = require('common.spoke_clock')
 local LotteryEligibility = require('common.lottery_eligibility')
 local ShopFeedHost = require('tests.support.shop_feed_host')
 
@@ -392,11 +394,134 @@ describe("烧烤的接线", function()
         assert.matches('GrillAction', src, nil, true)
         assert.is_nil(src:find('MgrGrill', 1, true), '旧烧烤管理器不得再挂进服务端入口')
         assert.is_nil(src:find('MgrMap.MgrGrill.Loot'), '满格走 ready 冻结重试，不接 MgrLoot')
-        local runtime = assert(io.open('server/world_host/server_runtime.lua', 'r'))
-        local runtime_src = runtime:read('*a')
-        runtime:close()
-        assert.matches('PlayerGrill.mount', runtime_src, nil, true)
-        assert.is_not_nil(runtime_src:find('mount_phase("alive", "grill"', 1, true),
-            '烧烤会话必须挂在存活相位，离场随相位结算')
+    end)
+end)
+
+describe("PlayerTree 烧烤会话生命周期", function()
+    local ctx
+    local item_bar = GameCfg.Items.ContainerId.ItemBar
+
+    local function drain()
+        while #ctx.queue > 0 do table.remove(ctx.queue, 1)() end
+    end
+
+    before_each(function()
+        ctx = { queue = {}, values = {}, events = {}, results = {}, states = {}, units = {} }
+        ctx.old_game = _G.game
+        ctx.old_debug = GameCfg.Debug
+        GameCfg.Debug = { Enabled = false }
+        local store = {
+            GetAsync = function(_, key) return ctx.values[key] end,
+            UpdateAsync = function(_, key, transform)
+                local value = transform(ctx.values[key])
+                if value then ctx.values[key] = value end
+                return value
+            end,
+            SetAsync = function(_, key, value) ctx.values[key] = value end,
+        }
+        _G.game = { GetService = function(_, name)
+            if name == 'Task' then
+                return {
+                    Spawn = function(_, fn) ctx.queue[#ctx.queue + 1] = fn end,
+                    Wait = function() end,
+                }
+            end
+            if name == 'DataStoreService' then
+                return { GetDataStore = function() return store end }
+            end
+        end }
+
+        ctx.player = {
+            UserId = 9106,
+            Character = {
+                Name = 'Eggy',
+                Position = { x = 0, y = 0, z = 0 },
+                Size = { y = 2 },
+                Controller = { Health = GameCfg.Vitals.MaxHealth, WalkSpeed = 7 },
+            },
+            SetAttribute = function() end,
+        }
+        ctx.save = assert(loadfile('server/save_host.lua'))()
+        ctx.data = PlayerData.new(ctx.player)
+        ctx.data:Init(true)
+        ctx.save:load_into(ctx.player, ctx.data)
+        drain()
+        assert.is_true(ctx.data:AddItem('carp', 1.5))
+        assert.is_true(ctx.data:SelectSlot(1))
+
+        local anchor_name = GameCfg.Grill.Points[1].AnchorName
+        local anchor = { Name = anchor_name, Position = { x = 0, y = 0, z = 0 } }
+        ctx.remote = {
+            check_recd = function() return false end,
+            get_re = function(_, name)
+                if not ctx.events[name] then
+                    ctx.events[name] = {
+                        OnServerEvent = signal(),
+                        FireClient = function(_, _, payload)
+                            if name == 'GrillResult' then ctx.results[#ctx.results + 1] = payload end
+                            if name == 'GrillState' then ctx.states[#ctx.states + 1] = payload end
+                        end,
+                        FireAllClients = function() end,
+                    }
+                end
+                return ctx.events[name]
+            end,
+        }
+        ctx.tree = PlayerTree.spawn({
+            player = ctx.player,
+            data = ctx.data,
+            clock = SpokeClock.new(1000),
+            remote = ctx.remote,
+            save = ctx.save,
+            world_service = {
+                FindFirstChild = function(_, name)
+                    if name == anchor_name then return anchor end
+                end,
+            },
+            create_unit = function(_, props)
+                local unit = { Name = props.Name, Destroyed = false }
+                function unit:Destroy() self.Destroyed = true end
+                ctx.units[#ctx.units + 1] = unit
+                return unit
+            end,
+        })
+    end)
+
+    after_each(function()
+        if ctx.tree and not ctx.tree:is_disposed() then
+            ctx.tree:begin_leave()
+            ctx.tree:dispose()
+        end
+        drain()
+        _G.game = ctx.old_game
+        GameCfg.Debug = ctx.old_debug
+    end)
+
+    it("grill action 真实到达 alive 会话，离场清理后旧命令安全拒绝", function()
+        assert.is_true(ctx.tree.memos.is_alive:now())
+        assert.is_true(ctx.tree:dispatch_action('grill', { action = 'Start', seq = 1 }))
+        drain()
+
+        local started = ctx.results[#ctx.results]
+        assert.is_not_nil(started)
+        assert.is_true(started.ok)
+        assert.same('Start', started.action)
+        assert.same('cooking', ctx.states[#ctx.states].state)
+        assert.same(1, #ctx.units)
+        assert.is_false(ctx.units[1].Destroyed)
+
+        ctx.tree:begin_leave()
+        assert.is_false(ctx.tree:dispatch_action('grill', { action = 'Query', seq = 2 }))
+        ctx.tree:dispose()
+        drain()
+
+        assert.is_true(ctx.tree:is_disposed())
+        assert.is_true(ctx.units[1].Destroyed)
+        local entry = ctx.data.data.containers[item_bar][1]
+        assert.is_not_nil(entry)
+        assert.same('carp', entry.itemId)
+        assert.near(1, entry.cooked, 1e-9)
+        assert.is_nil(ctx.data.extra.recovery and ctx.data.extra.recovery.grill)
+        assert.is_false(ctx.tree:dispatch_action('grill', { action = 'Takeout', seq = 3 }))
     end)
 end)

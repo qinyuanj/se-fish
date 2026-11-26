@@ -32,7 +32,6 @@ end
 function LifeFacade.new(ctx)
   local player_trees = ctx.player_trees
   local active_players = ctx.active_players
-  local weapon_sessions = ctx.weapon_sessions
   local opts = ctx.opts or {}
   local get_max_health_of = ctx.get_max_health_of
   local get_damage_filter = ctx.get_damage_filter
@@ -57,15 +56,15 @@ function LifeFacade.new(ctx)
     return nil
   end
 
-  function life:get_tree(player)
+  function life.get_tree(_, player)
     return tree_of(player)
   end
 
-  function life:player_from_unit(unit)
+  function life.player_from_unit(_, unit)
     return player_from_unit(unit)
   end
 
-  function life:life_status(player)
+  function life.life_status(_, player)
     local tree = tree_of(player)
     return tree and tree.states.life_phase:now() or nil
   end
@@ -79,7 +78,7 @@ function LifeFacade.new(ctx)
     return self:life_status(player) == "rescuing"
   end
 
-  function life:player_by_user_id(user_id)
+  function life.player_by_user_id(_, user_id)
     for _, player in pairs(active_players) do
       if user_id ~= nil and select(2, EngineRead.read_user_id(player, "LifeFacade.player_by_user_id")) == user_id then return player end
     end
@@ -90,7 +89,7 @@ function LifeFacade.new(ctx)
     return self:life_status(player) == "dead"
   end
 
-  function life:can_act(player)
+  function life.can_act(_, player)
     local tree = tree_of(player)
     return tree ~= nil and tree.memos.can_act:now() == true
   end
@@ -99,20 +98,20 @@ function LifeFacade.new(ctx)
     return self:life_status(player) == "alive"
   end
 
-  function life:can_eat(player, item_id)
+  function life.can_eat(_, player, item_id)
     local tree = tree_of(player)
     if not tree or tree.memos.can_act:now() ~= true then return false end
     local definition = type(item_id) == "string" and GameCfg.Items.Definitions[item_id]
     return type(definition) == "table" and type(definition.EatPercent) == "number"
   end
 
-  function life:eat(player, item_id, cook_rate)
+  function life.eat(_, player, item_id, cook_rate)
     local tree = tree_of(player)
     if not tree then return false end
     return tree:eat(item_id, cook_rate)
   end
 
-  function life:max_health_of(player)
+  function life.max_health_of(_, player)
     local max_health_of = get_max_health_of and get_max_health_of() or nil
     if type(max_health_of) == "function" then
       local ok, value = pcall(max_health_of, player)
@@ -130,14 +129,14 @@ function LifeFacade.new(ctx)
     return math.max(0, math.floor(tree.states.health:now())), self:max_health_of(player)
   end
 
-  function life:set_damage_filter(filter)
+  function life.set_damage_filter(_, filter)
     if set_damage_filter then set_damage_filter(filter) end
     for _, tree in pairs(player_trees) do
       if tree.set_damage_filter then tree:set_damage_filter(filter or false) end
     end
   end
 
-  function life:new_hit(source, category)
+  function life.new_hit(_, source, category)
     hit_seq = hit_seq + 1
     local source_player = tree_of(source) and source or player_from_unit(source)
     return {
@@ -149,11 +148,11 @@ function LifeFacade.new(ctx)
     }
   end
 
-  function life:resolve_hit_source(hit)
+  function life.resolve_hit_source(_, hit)
     return type(hit) == "table" and hit.sourcePlayer or nil
   end
 
-  function life:apply_hit(hit, target, amount)
+  function life.apply_hit(_, hit, target, amount)
     local player = tree_of(target) and target or player_from_unit(target)
     local tree = tree_of(player) or tree_of(hit and hit.sourcePlayer)
     if not tree then
@@ -189,7 +188,7 @@ function LifeFacade.new(ctx)
     return true
   end
 
-  function life:set_hunger(player, value)
+  function life.set_hunger(_, player, value)
     local tree = tree_of(player)
     if not tree or not Number.is_finite_number(value) then return false end
     local clamped = math.max(0, math.min(GameCfg.Vitals.MaxHunger, math.floor(value)))
@@ -201,7 +200,7 @@ function LifeFacade.new(ctx)
     return self:life_status(player)
   end
 
-  function life:get_state(player)
+  function life.get_state(_, player)
     local tree = tree_of(player)
     if not tree then return nil end
     return { player = player, phase = tree.states.life_phase:now(), tree = tree }
@@ -275,7 +274,7 @@ function LifeFacade.new(ctx)
     end) == true
   end
 
-  function life:can_rescue(target, rescuer)
+  function life.can_rescue(_, target, _rescuer)
     local tree = tree_of(target)
     if not tree or type(tree._accept_rescue) ~= "function" then return false, "not-downed" end
     local phase = tree.states.life_phase:now()
@@ -284,34 +283,32 @@ function LifeFacade.new(ctx)
     return true
   end
 
-  function life:begin_rescue(target, rescuer)
+  function life.begin_rescue(_, target, rescuer)
     local rescuer_tree = tree_of(rescuer)
     if not rescuer_tree then return false, "no-rescuer" end
     return rescuer_tree:begin_rescue(target)
   end
 
-  function life:cancel_rescue(state)
+  function life.cancel_rescue(_, state)
     local tree = state and tree_of(state.player or state)
     if not tree or type(tree.cancel_rescue) ~= "function" then return false end
     return tree:cancel_rescue() == true
   end
 
-  function life:request_action(player, kind)
+  function life.request_action(_, player, kind)
     local tree = tree_of(player)
     return tree ~= nil and tree:request_action(kind) == true
   end
 
-  function life:weapon_action(player, payload)
+  function life.weapon_action(_, player, payload)
     local tree = tree_of(player)
-    if not tree then return false end
-    local weapon = weapon_sessions[player.UserId]
-    if not weapon or type(weapon.handle) ~= "function" then return false end
-    return weapon:handle(payload) == true
+    return tree ~= nil and tree:dispatch_action("weapon", payload) == true
   end
 
-  function life:weapon_cast_guard(unit, index)
-    for _, weapon in pairs(weapon_sessions) do
-      if type(weapon.guard) == "function" and weapon:guard(unit, index) ~= true then
+  function life.weapon_cast_guard(_, unit, index)
+    for _, tree in pairs(player_trees) do
+      local guard = tree.weapon_cast_guard
+      if type(guard) == "function" and guard(unit, index) ~= true then
         return false
       end
     end

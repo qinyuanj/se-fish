@@ -213,6 +213,11 @@ function PlayerShop.mount(scope, tree, opts)
     return result_value ~= nil or true
   end
 
+  if tree.actions and tree.actions.shop then
+    scope:subscribe(tree.actions.shop, function(event)
+      event.result = handle(player, event.payload)
+    end)
+  end
   scope:on_cleanup(function() cleaned = true end)
   return { handle = handle }
 end
