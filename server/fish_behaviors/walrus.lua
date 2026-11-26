@@ -1,0 +1,3 @@
+local WalrusBehaviors = {}
+
+return WalrusBehaviors

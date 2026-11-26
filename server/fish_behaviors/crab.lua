@@ -1,0 +1,3 @@
+local CrabBehaviors = {}
+
+return CrabBehaviors
