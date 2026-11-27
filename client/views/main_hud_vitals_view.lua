@@ -17,9 +17,7 @@ local HEALTH_PREFIX = "血 "
 local HUNGER_PREFIX = "饥饿度 "
 local VITAL_FONT_MAX = 20
 
-local function make_color(rgba)
-  return Color.New(rgba[1], rgba[2], rgba[3], rgba[4])
-end
+local make_color = ViewUtil.color
 
 local function columns_of(text)
   local count = 0

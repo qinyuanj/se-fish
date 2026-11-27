@@ -417,6 +417,16 @@ function ViewUtil.revoke_drop_resolver(self)
   end
 end
 
+--- 把行为表并入句柄：行为表与句柄共用同一套 self 约定，方法逐个铺到 target 上。
+--- #412 拆分后各视图各写一遍同样的 for pairs 循环，收拢到这一处，不再各写各的。
+---@param target table 句柄
+---@param source table 行为方法表
+function ViewUtil.merge_methods(target, source)
+  for name, method in pairs(source) do
+    target[name] = method
+  end
+end
+
 --- 面板句柄装配：补齐 scope/ctx/services，把行为表方法铺到句柄，建节点并接回包投影。
 --- 各面板 mount 的骨架原来逐份复制，只有初始字段与投影 effect 名不同。
 ---@param scope table EffectBuilder

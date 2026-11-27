@@ -11,6 +11,7 @@ local MainHudLayout = require("client.main_hud_layout")
 local PressGesture = require("client.press_gesture")
 local ViewUtil = require("client.views.view_util")
 local HudWidgets = require("client.views.hud_widgets")
+local MainHudItemBarAim = require("client.views.main_hud_item_bar_aim")
 
 local Effect = Spoke.Effect
 local State = Spoke.State
@@ -26,43 +27,9 @@ local COLORS = {
   PRESS = { 42, 82, 118, 255 },
   SELECTED = { 36, 130, 94, 255 },
   DISABLED = { 120, 120, 120, 255 },
-  AIM_NORMAL = { 30, 40, 30, 40 },
-  AIM_PRESS = { 30, 40, 30, 60 },
 }
 
-local function make_color(rgba)
-  return Color.New(rgba[1], rgba[2], rgba[3], rgba[4])
-end
-
-local function default_resolve_aim_target(pos)
-  if pos == nil then
-    return nil
-  end
-  local ok_ray, ray = pcall(function() -- 宿主 CameraService 未就绪或射线转换失败时安全回退无目标直投
-    local camera = game ~= nil and game:GetService("CameraService") or nil
-    return camera and camera:ScreenPointToRay(pos.x, pos.y, GameCfg.Ability.Throw.Range * 2) or nil
-  end)
-  if not ok_ray or ray == nil then
-    return nil
-  end
-  local ok_hit, target = pcall(function() -- 宿主 PhysicsService 射线检测失败时安全回退无目标直投
-    local origin, direction = ray.Origin, ray.Direction
-    if origin == nil or direction == nil then
-      return nil
-    end
-    local physics = game ~= nil and game:GetService("PhysicsService") or nil
-    local hit = physics and physics.Raycast and physics:Raycast(origin, direction, nil) or nil
-    local p = hit and hit.Position or nil
-    if p == nil then
-      return nil
-    end
-    if Number.is_finite_number(p.x) and Number.is_finite_number(p.y) and Number.is_finite_number(p.z) then
-      return { x = p.x, y = p.y, z = p.z }
-    end
-    return nil
-  end)
-  return ok_hit and target or nil
-end
+local make_color = ViewUtil.color
 
 local function clamp_slot_count(state)
   local items = GameCfg.Items
@@ -125,31 +92,6 @@ function SlotBehavior.resolve_own_slot(self, pos)
   return ViewUtil.slot_hit(pos, self.slot_rects, GameCfg.Items.ContainerId.ItemBar)
 end
 
---- 该格当前是否为爆炸物（决定点按直投 / 长按瞄准）。
----@param self MainHudItemBarHandle
----@param index number
----@return boolean
-function SlotBehavior.is_explosive_slot(self, index)
-  local state = self.ctx.store.item_bar:now()
-  local slots = type(state) == "table" and type(state.slots) == "table" and state.slots or nil
-  local entry = slots and slots[index] or nil
-  local def = entry and GameCfg.Items.Definitions[entry.itemId] or nil
-  return def ~= nil and def.Type == "爆炸物"
-end
-
---- 点按直投后紧跟的 OnClicked 只吞一次，避免同一次点按再发 SelectSlot。
----@param self MainHudItemBarHandle
----@param index number
----@return boolean
-function SlotBehavior.consume_throw_click(self, index)
-  local handled = self.throw_handled
-  if handled ~= nil and handled.index == index and handled.valid then
-    handled.valid = false
-    return true
-  end
-  return false
-end
-
 --- 落点归属：先认本视图格位，再交给外部跨容器解析（与背包共用 ViewUtil.slot_at_position）。
 SlotBehavior.slot_at_position = ViewUtil.slot_at_position
 
@@ -158,19 +100,6 @@ SlotBehavior.slot_at_position = ViewUtil.slot_at_position
 ---@param value any
 local function emit_action(action, value)
   ViewUtil.fire_re("ItemBarAction", { action = action, value = value }, "[MainHudItemBarView]")
-end
-
---- 默认投掷上行：带单调序号，目标可选。
----@param self MainHudItemBarHandle
----@param slot number
----@param target table|nil
-function SlotBehavior.emit_throw(self, slot, target)
-  self.weapon_seq = self.weapon_seq + 1
-  local payload = { action = "throw", slot = slot, seq = self.weapon_seq }
-  if type(target) == "table" then
-    payload.target = target
-  end
-  ViewUtil.fire_re("WeaponAction", payload, "[MainHudItemBarView]")
 end
 
 --- 把落点解析器交给外部（跨容器拖拽）；卸载时以 nil 收回（实现见 ViewUtil.register_drop_resolver）。
@@ -270,33 +199,6 @@ function SlotBehavior.apply_drag_drop(self, source, slot_index, ended)
       target = target.container,
       slot = target.index,
     })
-  end
-end
-
---- 爆炸物点按 / 长按手势判定：点按直投，长按进瞄准。
----@param self MainHudItemBarHandle
----@param slot_index number
----@param ended any
-function SlotBehavior.apply_press_gesture(self, slot_index, ended)
-  local press = self.slot_press
-  if press == nil or press.index ~= slot_index then
-    return
-  end
-  self.slot_press = nil
-  if not self:is_explosive_slot(slot_index) then
-    return
-  end
-  local now = self:now_sec(); if now == nil then return end; local result = press.gesture:finish(now, ended)
-  if result == "tap" then
-    self.throw_handled = { index = slot_index, valid = true }
-    self.send_throw(slot_index, nil)
-  elseif result == "long" then
-    self.throw_handled = { index = slot_index, valid = true }
-    if type(self.on_aim_begin) == "function" then
-      self.on_aim_begin(slot_index)
-    else
-      self.aim_slot:set(slot_index)
-    end
   end
 end
 
@@ -435,22 +337,6 @@ function SlotBehavior.sync_slot(self, slot_index, layout, slots, hud_visible, se
   end
 end
 
---- 关屏或展开背包时收掉拖拽 / 瞄准态，避免越界手势残留。
----@param self MainHudItemBarHandle
----@param hud_visible boolean
----@param bp_open boolean
-function SlotBehavior.refresh_aim_state(self, hud_visible, bp_open)
-  if not hud_visible then
-    self.drag_source = nil
-    self.slot_press = nil
-    if self.aim_slot:now() ~= nil then
-      self.aim_slot:set(nil)
-    end
-  elseif bp_open and self.aim_slot:now() ~= nil then
-    self.aim_slot:set(nil)
-  end
-end
-
 --- 格位同步体：扩容增量挂载、缩容自动卸载、关屏隐藏；展开背包时保留可见以支持双向拖拽。
 ---@param self MainHudItemBarHandle
 ---@param es table
@@ -473,56 +359,10 @@ function SlotBehavior.sync_slots(self, es)
   ViewUtil.drop_stale_slots(self, seen, self.slot_rects)
 end
 
---- 瞄准落点：读当前瞄准格并收起遮罩，命中则投掷。
----@param self MainHudItemBarHandle
----@param touch any
-function SlotBehavior.on_aim_touch_ended(self, touch)
-  local slot = self.aim_slot:now()
-  self.aim_slot:set(nil)
-  local ended = ViewUtil.read_touch_xy(touch, "EndedPosition")
-  if slot == nil or ended == nil then
-    return
-  end
-  local target = self.resolve_aim_target(ended)
-  self.send_throw(slot, target)
-end
-
---- 爆炸物长按瞄准全屏遮罩（选点投掷、背包展开、关屏、重连或根 UI 销毁即零残留销毁）。
----@param self MainHudItemBarHandle
----@param ps table
-function SlotBehavior.mount_aim_overlay(self, ps)
-  if self.resolution == nil then return end; local w, h = self.resolution.x, self.resolution.y
-  local ctx = self.ctx
-  local overlay = HudWidgets.button(ctx, ps, {
-    name = "ThrowAimOverlay", x = w / 2, y = h / 2, w = w, h = h,
-    normal = COLORS.AIM_NORMAL, press = COLORS.AIM_PRESS,
-  })
-  overlay.NormalImage = ""
-  overlay.PressImage = ""
-  overlay.DisableImage = ""
-  overlay.LocalZOrder = 9
-
-  self.notify("点击屏幕选择投掷落点")
-
-  ctx.connect(ps, overlay.OnTouchEnded, function(touch)
-    self:on_aim_touch_ended(touch)
-  end)
-end
-
 --- 格位同步 Effect 与瞄准 Phase 的活动信号。
 ---@param self MainHudItemBarHandle
 function SlotBehavior.bind_slots_sync(self)
   self.s:effect("ItemBarSlotsSync", function(es) self:sync_slots(es) end)
-end
-
----@param self MainHudItemBarHandle
-function SlotBehavior.bind_aim_phase(self)
-  local aim_active = self.s:memo("ThrowAimActive", function(ms)
-    return ViewUtil.overlay_active(ms, self.ctx.store, self.aim_slot, self.backpack_open)
-  end)
-  self.s:phase("ThrowAimPhase", aim_active, function(ps)
-    self:mount_aim_overlay(ps)
-  end)
 end
 
 --- 卸载：收回落点解析器、清空格位与手势状态。
@@ -556,7 +396,7 @@ local function new_view(s, ctx, options, resolution, clock_now)
     on_aim_begin = options.on_aim_begin,
     resolve_drop_target = options.resolve_drop_target,
     on_drop_resolver = options.on_drop_resolver,
-    resolve_aim_target = options.resolve_aim_target or default_resolve_aim_target,
+    resolve_aim_target = options.resolve_aim_target or MainHudItemBarAim.default_resolve_aim_target,
     backpack_open = options.backpack_open or State.new("MainHudItemBarView.backpack_open", false),
     aim_slot = State.new("MainHudItemBarView.aim_slot", nil),
     slot_dock = nil,
@@ -566,9 +406,9 @@ local function new_view(s, ctx, options, resolution, clock_now)
     slot_press = nil,
     throw_handled = nil,
   }
-  for name, method in pairs(SlotBehavior) do
-    view[name] = method
-  end
+  -- 行为表并入句柄：格位方法与瞄准、投掷行为共用同一套 self 约定。
+  ViewUtil.merge_methods(view, SlotBehavior)
+  ViewUtil.merge_methods(view, MainHudItemBarAim.Behavior)
   view.send_action = options.send_action or function(action, value)
     emit_action(action, value)
   end

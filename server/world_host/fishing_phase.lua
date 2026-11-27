@@ -2,11 +2,11 @@
 local EngineRead = require("common.engine_read")
 local GameCfg = require("common.game_cfg")
 local FishCatch = require("common.fish_catch")
-local MathWaterJudge = require("common.math_water_judge")
-local Number = require("common.number")
 local RateLimit = require("common.rate_limit")
 local ReelProgress = require("common.reel_progress")
 local State = require("common.packages.spoke.api").State
+
+local FishingPhaseRead = require("server.world_host.fishing_phase_read")
 
 local FishingPhase = {}
 -- 钓竿阶段行为表：拆分前都是 FishingPhase.mount 体内的闭包，方法名、参数顺序与返回值不变，
@@ -14,71 +14,12 @@ local FishingPhase = {}
 -- 依赖统一从 handle.fishing_env 读取，字段名沿用拆分前的局部变量名。
 local FishingBehavior = {}
 
-local function finite(value)
-  return Number.is_finite_number(value)
-end
-
-local function now_of(tree)
-  return tree.clock.now()
-end
-
-local function character_of(tree)
-  local ok, character = pcall(function()
-    return tree.states.character:now() or tree.player.Character
-  end)
-  if ok then return character end
-  return nil
-end
-
-local function selected_rod(tree, payload)
-  local slot = tree.states.selected_slot:now()
-  local items = tree.states.item_bar:now() or {}
-  local entry = type(slot) == "number" and items[slot] or nil
-  local definition = entry and (entry.count or 0) >= 1 and GameCfg.Items.Definitions[entry.itemId]
-  if not definition or type(definition.Level) ~= "number" then return nil end
-  if type(payload) ~= "table" or payload.slot ~= slot or payload.itemId ~= entry.itemId then
-    return nil
-  end
-  return slot, entry, definition
-end
-
-local function water_zone(x, z)
-  local zones = GameCfg.Water and GameCfg.Water.Zones or {}
-  for _, candidate in ipairs(zones) do
-    if MathWaterJudge.in_zone(candidate, { x = x, y = candidate.SurfaceY, z = z }) then
-      return candidate
-    end
-  end
-  return nil
-end
-
-local function cast_landing(character)
-  local origin = character and character.Position
-  local rotation = character and character.Rotation
-  if not origin or not rotation or type(rotation.GetForward) ~= "function" then return nil end
-  local forward = rotation:GetForward()
-  if not forward or not finite(forward.x) or not finite(forward.z) then return nil end
-  local length = math.sqrt(forward.x * forward.x + forward.z * forward.z)
-  if length < 0.01 then return nil end
-  local x = origin.x + GameCfg.Casting.Distance * forward.x / length
-  local z = origin.z + GameCfg.Casting.Distance * forward.z / length
-  local zone = water_zone(x, z)
-  return { x = x, y = zone and zone.SurfaceY or origin.y, z = z }, zone
-end
-
-local function hook_position(session)
-  local landing = session and session.landing
-  if not landing then return nil end
-  local species = session.fishId and GameCfg.Fish[session.fishId]
-  local source = species and species.CatchSource or "water"
-  local lift = source == "air" and GameCfg.Casting.AirSourceHeight or 0
-  return { x = landing.x, y = landing.y + lift, z = landing.z }
-end
-
-local function copy_holding(info)
-  if type(info) ~= "table" then return nil end
-  return info
-end
+local now_of = FishingPhaseRead.now_of
+local character_of = FishingPhaseRead.character_of
+local selected_rod = FishingPhaseRead.selected_rod
+local cast_landing = FishingPhaseRead.cast_landing
+local hook_position = FishingPhaseRead.hook_position
+local copy_holding = FishingPhaseRead.copy_holding
 
 -- ===== 钓线与下发 =====
 
