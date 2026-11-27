@@ -80,6 +80,51 @@ describe("common.engine_read 引擎对象读取适配器（#366）", function()
     _G.Vector3 = saved_v3
   end)
 
+  it("运行时自定义类型：Player、Players 与 EggyUnit 仍可按公共接口读取和调用（#392）", function()
+    local native_type = type
+    local character = { Controller = { Health = 100 } }
+    local player = { UserId = "runtime-player", Character = character }
+    local players = { GetPlayers = function() return { player } end }
+    local engine_game = { GetService = function(_, name) return name == "Players" and players or nil end }
+    local engine_types = {
+      [player] = "Player", [players] = "Players", [character] = "EggyUnit", [engine_game] = "Game",
+    }
+    local env = setmetatable({
+      game = engine_game,
+      type = function(value) return engine_types[value] or native_type(value) end,
+    }, { __index = _G })
+    local runtime_read = assert(loadfile("common/engine_read.lua", "t", env))()
+
+    assert.is_true(runtime_read.is_object(player))
+    assert.is_true(runtime_read.is_object(players))
+    assert.is_true(runtime_read.is_valid_player(player))
+
+    local ok_uid, uid, reason_uid = runtime_read.read_user_id(player)
+    assert.is_true(ok_uid)
+    assert.equals("runtime-player", uid)
+    assert.is_nil(reason_uid)
+
+    local ok_players, result, reason_players = runtime_read.call_method(players, "GetPlayers")
+    assert.is_true(ok_players)
+    assert.same({ player }, result)
+    assert.is_nil(reason_players)
+
+    local ok_character, result_character, reason_character = runtime_read.read_character(player)
+    assert.is_true(ok_character)
+    assert.equals(character, result_character)
+    assert.is_nil(reason_character)
+
+    local ok_service, service, reason_service = runtime_read.get_service("Players")
+    assert.is_true(ok_service)
+    assert.equals(players, service)
+    assert.is_nil(reason_service)
+
+    for _, scalar in ipairs({ false, 0, "Player" }) do
+      assert.is_false(runtime_read.is_object(scalar))
+    end
+    assert.is_false(runtime_read.is_object(nil))
+  end)
+
   it("正常读取路径：覆盖字段/玩家/角色/控制器/血量/向量/属性/服务与销毁操作", function()
     local attrs = { SurvivalPhase = "alive" }
     local destroyed = false

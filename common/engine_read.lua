@@ -54,12 +54,17 @@ local function is_destroyed_error(err)
   return lower:find("destroyed", 1, true) ~= nil or raw:find("已销毁", 1, true) ~= nil
 end
 
---- 判断值是否为可索引的宿主对象（table 或 userdata）。
+--- 判断值是否为可索引的宿主对象（table、userdata 或编辑器自定义对象类型）。
 ---@param value any
 ---@return boolean
 function EngineRead.is_object(value)
   local kind = type(value)
-  return kind == "table" or kind == "userdata"
+  if kind == "table" or kind == "userdata" then
+    return true
+  end
+  -- SE 运行时的 type 会直接返回 "Player"、"Players"、"EggyUnit" 等对象名。
+  return kind ~= "nil" and kind ~= "boolean" and kind ~= "number" and kind ~= "string"
+    and kind ~= "function" and kind ~= "thread"
 end
 
 local function check_destroyed_flag(target)
