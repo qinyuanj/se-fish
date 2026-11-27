@@ -15,7 +15,6 @@ server/world_host/fish_tree.lua:8000
 server/save_host.lua:7880
 server/world_host/ferry_route.lua:7728
 server/world_host/ground_loot.lua:6895
-common/engine_read.lua:6578
 common/cfg/boss_moves.lua:6483
 server/world_host/fishing_phase.lua:5868
 server/world_host/fish_phases/combat.lua:5752
