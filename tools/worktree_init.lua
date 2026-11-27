@@ -22,7 +22,7 @@ function M.usage()
     "  把 worktree 补齐到能跑 lua tools/cli.lua test full；重复执行只跳过已有条目。",
     "  --root         目标检出根，默认当前目录",
     "  --skills-from  上游 skill 来源，默认宿主侧 magpie 资源库（由 USERPROFILE 推导）",
-    "  同时安装/升级提交前运行 test guards 与 emmylua 的 pre-commit；已有其他 hook 时拒绝覆盖。",
+    "  同时安装/升级提交前运行 test guards、size 与 emmylua 的 pre-commit；已有其他 hook 时拒绝覆盖。",
     "  不为质量工具做准备；质量工具由 dsh-uml-viewer 插件自带。",
   }, "\n") .. "\n"
 end

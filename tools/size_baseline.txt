@@ -1,0 +1,18 @@
+-- token 预算基线（ADR-0041）：由 lua tools/cli.lua size --update-baseline 写入。
+-- 逐行格式：相对路径:token 数；棘轮只许减少，基线外的新超限文件由门禁拦住。
+common/cfg/fish.lua:13844
+common/game_cfg.lua:13734
+common/cfg/content_ledger.lua:11944
+common/cfg/items.lua:11641
+server/world_host/server_runtime.lua:10932
+server/world_host/player_life.lua:10696
+server/world_host/player_tree.lua:10332
+server/world_host/player_weapon.lua:9203
+client/store/client_store.lua:8490
+server/world_host/fish_tree.lua:7722
+server/world_host/fish_phases/boss.lua:7435
+server/save_host.lua:7011
+server/world_host/ferry_route.lua:6567
+common/cfg/boss_moves.lua:6483
+server/world_host/special_item_phase.lua:6050
+server/world_host/ground_loot.lua:5865
