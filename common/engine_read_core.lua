@@ -1,6 +1,7 @@
 -- common.engine_read 的内部原语层（L3 支撑层，ADR-0012 / ADR-0033 / ADR-0034，拆分见 #414）：
 -- 日志与错误分类、宿主对象判定、字段读写与方法/动作调用的 pcall 安全边界。
 -- 只被 common.engine_read 依赖并回导出 is_object，不是公开面；调用方仍只用 EngineRead 的公开接口。
+-- 模块表名取文件名驼峰形 EngineReadCore（ADR-0034）。
 
 local function parse_context(context)
   if type(context) == "string" then
@@ -190,7 +191,7 @@ local function read_member_impl(target, method_name, member_name, context, opera
 end
 
 -- 内部契约：主文件按名取用，不对外暴露。
-return {
+local EngineReadCore = {
   is_object = is_object,
   log_error = log_error,
   is_destroyed_error = is_destroyed_error,
@@ -202,3 +203,5 @@ return {
   read_member_impl = read_member_impl,
   MISSING_SENTINEL = MISSING_SENTINEL,
 }
+
+return EngineReadCore

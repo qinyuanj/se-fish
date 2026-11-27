@@ -7,21 +7,21 @@
 
 -- 内部原语（日志与错误分类、宿主对象判定、字段与方法安全边界）在 common.engine_read_core（拆分见 #414）。
 local Number = require("common.number")
-local Core = require("common.engine_read_core")
+local EngineReadCore = require("common.engine_read_core")
 
 local EngineRead = {}
 
-EngineRead.is_object = Core.is_object
+EngineRead.is_object = EngineReadCore.is_object
 
-local log_error = Core.log_error
-local is_destroyed_error = Core.is_destroyed_error
-local check_destroyed_flag = Core.check_destroyed_flag
-local read_field_impl = Core.read_field_impl
-local write_field_impl = Core.write_field_impl
-local invoke_action_impl = Core.invoke_action_impl
-local invoke_method_impl = Core.invoke_method_impl
-local read_member_impl = Core.read_member_impl
-local MISSING_SENTINEL = Core.MISSING_SENTINEL
+local log_error = EngineReadCore.log_error
+local is_destroyed_error = EngineReadCore.is_destroyed_error
+local check_destroyed_flag = EngineReadCore.check_destroyed_flag
+local read_field_impl = EngineReadCore.read_field_impl
+local write_field_impl = EngineReadCore.write_field_impl
+local invoke_action_impl = EngineReadCore.invoke_action_impl
+local invoke_method_impl = EngineReadCore.invoke_method_impl
+local read_member_impl = EngineReadCore.read_member_impl
+local MISSING_SENTINEL = EngineReadCore.MISSING_SENTINEL
 
 --- 安全判断对象是否已销毁。
 ---@param target any
