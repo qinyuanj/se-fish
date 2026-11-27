@@ -76,6 +76,10 @@ local function newFakeWorld()
       AngularDamping = values.AngularDamping,
       NoCollidePairs = {},
     }
+    -- 引擎 CreateUnit 的属性袋原样落到单位上：漏拷字段会让「配置有没有传下去」这类断言假绿。
+    for key, value in pairs(values) do
+      if unit[key] == nil then unit[key] = value end
+    end
     unit.SetPosition = function(_, pos)
       unit.Position = pos
     end
@@ -162,6 +166,67 @@ describe('TestFishCarrierEngine', function()
     assert.are.equal(5, carrier.body.Position.y)
     assert.are.equal(6, carrier.body.Position.z)
     assert.is_not_nil(getmetatable(carrier.body.Position), 'FishingPhase 的普通坐标表必须转换成引擎 Vector3')
+  end)
+
+  -- 失败方式：没模型号也建出空壳鱼；本体/受击体建不出来时还占用载体表或把孤儿本体留在世界里。
+  it('test_spawn_reports_missing_mesh_and_failed_units_without_registering', function()
+    local mgr = freshManager()
+    local world = newFakeWorld()
+    local created = #world.Created
+    local carrier, reason = withFakeEngine(world, function()
+      return mgr:spawn({ fish_id = 'T1', Position = newVector3(0, 0, 0) })
+    end)
+    assert.is_nil(carrier)
+    assert.are.equal('no-mesh', reason)
+    assert.are.equal(created, #world.Created)
+    assert.are.equal(0, #mgr.carriers)
+
+    carrier, reason = withFakeEngine(world, function()
+      return mgr:spawn({ fish_id = 'T1', RenderMeshId = 'official://mesh/7000544',
+        CreateUnit = function() return nil end })
+    end)
+    assert.is_nil(carrier)
+    assert.are.equal('body-create-failed', reason)
+    assert.are.equal(0, #mgr.carriers)
+
+    world.SuppressController = true
+    carrier, reason = withFakeEngine(world, function()
+      return mgr:spawn(SPAWN_OPTS)
+    end)
+    world.SuppressController = nil
+    assert.is_nil(carrier)
+    assert.are.equal('receiver-create-failed', reason)
+    assert.is_true(world.Created[#world.Created - 1].Destroyed == true, '受击体失败时本体必须销毁')
+    assert.are.equal(0, #mgr.carriers)
+  end)
+
+  -- 失败方式：缺省血量/质量/重力/名字丢掉；opts 的物理网格覆盖配置；鱼种配色不跟着模型走。
+  it('test_spawn_fills_defaults_and_species_tint', function()
+    local mgr = freshManager()
+    local world = newFakeWorld()
+    local species = assert(GameCfg.Fish.bass, '缺少鱼种配置 bass')
+    local savedColor, savedCfg = species.VisualColor, GameCfg.FishCarrier
+    local savedColorGlobal = rawget(_G, 'Color')
+    rawset(_G, 'Color', { New = function(r, g, b, a) return { r = r, g = g, b = b, a = a } end })
+    species.VisualColor = { 10, 20, 30, 255 }
+    GameCfg.FishCarrier = { PhysicsMeshId = 'official://mesh/7000000', MaxHealth = 80 }
+    local carrier = withFakeEngine(world, function()
+      return mgr:spawn({ fish_id = 'bass', model_id = '7000544' })
+    end)
+    GameCfg.FishCarrier, species.VisualColor = savedCfg, savedColor
+    rawset(_G, 'Color', savedColorGlobal)
+    assert.is_not_nil(carrier)
+    local body = carrier.body
+    assert.are.equal('official://mesh/7000544', body.RenderMeshId) -- 模型号按约定拼 official://mesh/
+    assert.are.equal('official://mesh/7000000', body.PhysicsMeshId) -- 未显式指定时取配置
+    assert.are.equal(80, carrier.MaxHealth)
+    assert.are.equal(10, body.Mass)
+    assert.are.equal(4, body.BodyType)
+    assert.is_true(body.PhysicsActive)
+    assert.is_true(body.Liftable)
+    assert.is_true(body.GravityEnabled) -- 不指定重力的鱼必须下沉
+    assert.are.equal('FishCarrier_' .. tostring(mgr.body_seq) .. '_bass', body.Name)
+    assert.same({ r = 10, g = 20, b = 30, a = 255 }, body.ModelColor1)
   end)
 
   it('test_attach_destroys_the_orphan_receiver_when_controller_is_missing', function()
