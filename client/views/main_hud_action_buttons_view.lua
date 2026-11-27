@@ -16,7 +16,7 @@ local State = Spoke.State
 local MainHudActionButtonsView = {}
 
 local COLORS = MainHudActionButtonsProjection.COLORS
-local make_color = MainHudActionButtonsProjection.make_color
+local make_color = ViewUtil.color
 local resolve_mode = MainHudActionButtonsProjection.resolve_mode
 local cast_action_color = MainHudActionButtonsProjection.cast_action_color
 

@@ -1,5 +1,7 @@
 --- HUD 通用节点构造器（L2 client.views）。
 --- 常驻 HUD 的五个视图共用同一套标签/按钮排版与点击穿透约定，避免各写一份几乎相同的构造样板。
+local ViewUtil = require("client.views.view_util")
+
 local HudWidgets = {}
 
 --- 标签默认层级；个别视图（物品栏）按槽位叠放时用 spec.z_order 覆盖。
@@ -53,9 +55,9 @@ function HudWidgets.button(ctx, scope, spec)
   local normal = spec.normal or HudWidgets.BUTTON_COLORS.NORMAL
   local press = spec.press or HudWidgets.BUTTON_COLORS.PRESS
   local disable = HudWidgets.BUTTON_COLORS.DISABLED
-  btn.ButtonNormalColor = Color.New(normal[1], normal[2], normal[3], normal[4])
-  btn.ButtonPressColor = Color.New(press[1], press[2], press[3], press[4])
-  btn.ButtonDisableColor = Color.New(disable[1], disable[2], disable[3], disable[4])
+  btn.ButtonNormalColor = ViewUtil.color(normal)
+  btn.ButtonPressColor = ViewUtil.color(press)
+  btn.ButtonDisableColor = ViewUtil.color(disable)
   if spec.visible ~= nil then
     btn.Visible = spec.visible
   end
