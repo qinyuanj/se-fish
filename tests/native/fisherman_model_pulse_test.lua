@@ -96,6 +96,29 @@ describe("钓鱼佬模型按区脉冲", function()
     root:Destroy()
   end)
 
+  it("7 个钓鱼区模型均可独立脉冲并互不串扰 (#407)", function()
+    local units, models = {}, {}
+    for index = 1, 7 do
+      units[index] = model(1 + index * 0.1)
+      models[index] = { unit = units[index], baseScale = base(1 + index * 0.1) }
+    end
+    local root, writer, _, feed = mount(models)
+    for target = 1, 7 do
+      feed(target)
+      local peak = 0
+      for _ = 1, 20 + 2 do
+        writer:advance_clock(1 / 60)
+        peak = math.max(peak, units[target].Scale.x)
+      end
+      assert.is_true(peak > 1 + target * 0.1)
+      for other = 1, 7 do
+        local expected = 1 + other * 0.1
+        assert.is_true(math.abs(units[other].Scale.x - expected) < 1e-6)
+      end
+    end
+    root:Destroy()
+  end)
+
   it("写 Scale 失败后丢弃该模型，不再重试", function()
     local writes = 0
     local broken = setmetatable({}, {

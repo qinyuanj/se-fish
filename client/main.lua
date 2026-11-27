@@ -246,7 +246,7 @@ Task:Spawn(function()
                         models = (function()
                             local rows = {}
                             for index, npc in ipairs(GameCfg.Interact.Fishermen) do
-                                local unit = Util:wait_for_child(World, npc.AnchorNames[1])
+                                local unit = Util:wait_for_child(World, npc.ModelName)
                                 if unit and unit.Scale then rows[index] = { unit = unit, baseScale = unit.Scale } end
                             end
                             return rows
