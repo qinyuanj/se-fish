@@ -186,6 +186,21 @@ describe('TestFishEscape', function()
         assert.is_true(excluded[fish.carrier.receiver])
     end)
 
+    it('test_static_optimized_wall_hit_with_nil_instance_triggers_turn (#409)', function()
+        env:prepare()
+        local fish = env:held_fish()
+        env.mgr:drop(env.player)
+        local body = fish.carrier.body
+        local before = { x = body.LinearVelocity.x, z = body.LinearVelocity.z }
+        -- 静态优化墙体在引擎射线命中时 hit.Instance == nil，必须被视为实墙触发转向
+        env.hits = { { Instance = nil, Distance = 0.5 } }
+        env.now = 0.6
+        env.mgr:update()
+        local after = body.LinearVelocity
+        local dot = before.x * after.x + before.z * after.z
+        assert.is_true(dot < 0.99 * (before.x * before.x + before.z * before.z))
+    end)
+
     it('test_reheads_toward_the_nearest_zone_after_moving', function()
         env:prepare()
         local fish = env:held_fish()

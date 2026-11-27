@@ -4,6 +4,7 @@ local ZoneMarkers = require('common.zone_markers')
 local GameCfg = require('common.game_cfg')
 local SceneGeometry = require('common.cfg.scene_geometry')
 local SceneWaterGeometry = require('common.cfg.scene_water_geometry')
+local MathWaterJudge = require('common.math_water_judge')
 local ZoneFixtures = require('tests.support.zone_fixtures')
 
 local function clone_raw_from_baked()
@@ -97,6 +98,31 @@ describe('scene_geometry_export (#406)', function()
             size = { x = w1[5], y = w1[6], z = w1[7] },
         }
         assert.error_matches(function() Exporter.validate_and_build(overlap, GameCfg) end, '区域水域重叠', nil, true)
+    end)
+
+    it('test_baked_189_waters_support_math_judge_toward_water_and_z7_cruise_water (#409)', function()
+        local snapshot = ZoneMarkers.resolve_baked(GameCfg)
+        -- 189 块水域中心全命中，SurfaceY 均对齐 -0.25
+        for _, w in ipairs(snapshot.Waters) do
+            assert.near(-0.25, w.SurfaceY, 1e-4)
+            local hit = MathWaterJudge.hit_zone(snapshot.Waters, { x = w.Center.x, y = w.SurfaceY, z = w.Center.z })
+            assert.same(w.Id, hit and hit.Id)
+        end
+        -- 7 个钓鱼区 SafePoint 均在岸上，towardWater 均返回合法单位方向向量
+        for _, zone in ipairs(GameCfg.Zones) do
+            local scene = snapshot.Zones[zone.Id]
+            local sp = scene.SafePoint
+            assert.is_nil(MathWaterJudge.hit_zone(scene.Waters, { x = sp.x, y = sp.y, z = sp.z }))
+            local dx, dz = MathWaterJudge.toward(scene.Waters, sp)
+            assert.is_not_nil(dx)
+            assert.is_not_nil(dz)
+            assert.near(1, math.sqrt(dx * dx + dz * dz), 1e-4)
+        end
+        -- 07 火山岛 cruise_water 就绪且合法
+        local z7 = snapshot.Zones[GameCfg.Zones[7].Id]
+        assert.is_not_nil(z7.cruise_water)
+        assert.near(-0.25, z7.cruise_water.SurfaceY, 1e-4)
+        assert.is_true(z7.cruise_water.HalfX > 0 and z7.cruise_water.HalfZ > 0)
     end)
 
     it('test_exporter_render_is_deterministic_and_idempotent', function()

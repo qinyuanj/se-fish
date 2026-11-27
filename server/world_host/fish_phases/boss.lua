@@ -450,8 +450,9 @@ function BossBehavior.start_aquatic(self, fish, now)
             scene=zone.Scene; break
         end
     end
-    if not scene or not scene.Waters[1] then return false end
-    fish.Aquatic={ Scene=scene, Water=scene.Waters[1], last_at=now,
+    local water = scene and (scene.cruise_water or (scene.Waters and scene.Waters[1])) or nil
+    if not scene or not water then return false end
+    fish.Aquatic={ Scene=scene, Water=water, last_at=now,
         next_leap_at=now+GameCfg.Ability.Aquatic.LeapIntervalSec, Angle=0 }
     self:publish_combat(fish)
     return true
