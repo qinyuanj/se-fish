@@ -18,6 +18,7 @@ local CLASSES = {
   { name = '架构', patterns = { '^docs/architecture%.md$' } },
   { name = '状态', patterns = {
     '^docs/art%-asset%-overview%.md$',
+    '^docs/art%-model%-inventory%.md$',
     '^docs/packages%-reference%.md$',
     '^docs/engine%-keys%.md$',
   } },
