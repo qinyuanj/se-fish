@@ -84,7 +84,11 @@ describe("视图颜色入口收拢（#415）", function()
   it("hud_widgets 的按钮三色不再内联 Color.New", function()
     local body = read(HUD_WIDGETS)
     assert.equals(0, count(body, "Color%.New%s*%("), "hud_widgets.lua 仍有内联 Color.New")
-    assert.equals(3, count(body, "ViewUtil%.color%s*%("), "hud_widgets.lua 三个按钮颜色应各走一次 ViewUtil.color")
+    -- 只锁「至少 3 处取色点且都不内联 Color.New」这个不变量；后续合法新增取色点不应误红。
+    assert.is_true(
+      count(body, "ViewUtil%.color%s*%(") >= 3,
+      "hud_widgets.lua 至少 3 个按钮颜色应各走一次 ViewUtil.color"
+    )
   end)
 
   it("视图颜色来源恒为 4 元素（缺 alpha 会从 nil 变 255）", function()

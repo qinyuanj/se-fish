@@ -1,5 +1,6 @@
 -- 主 HUD 装备浮层的候选清单构建（#412 从 main_hud_equip_popups 拆出，归属 L2 client.views）：
--- 只产出纯数据列表（武器/鱼饵候选、物品名与库存），节点、Effect 与上行都留在视图里。
+-- 产出候选数据（武器/鱼饵候选、物品名与库存）与选择回调 `choose`；
+-- 上行函数 send_operate / send_action 由视图注入、在视图内执行，节点与 Effect 也留在视图里。
 
 local GameCfg = require("common.game_cfg")
 local ViewUtil = require("client.views.view_util")

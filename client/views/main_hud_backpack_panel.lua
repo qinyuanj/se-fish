@@ -447,9 +447,7 @@ function MainHudBackpackPanel.new(view, ps, spoke)
     drag_source = nil,
     drag_handled = nil,
   }
-  for name, method in pairs(PanelBehavior) do
-    panel[name] = method
-  end
+  ViewUtil.merge_methods(panel, PanelBehavior)
   return panel
 end
 

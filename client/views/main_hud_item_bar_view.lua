@@ -406,13 +406,9 @@ local function new_view(s, ctx, options, resolution, clock_now)
     slot_press = nil,
     throw_handled = nil,
   }
-  for name, method in pairs(SlotBehavior) do
-    view[name] = method
-  end
-  -- 瞄准与投掷行为表并入句柄：与格位方法共用同一套 self 约定。
-  for name, method in pairs(MainHudItemBarAim.Behavior) do
-    view[name] = method
-  end
+  -- 行为表并入句柄：格位方法与瞄准、投掷行为共用同一套 self 约定。
+  ViewUtil.merge_methods(view, SlotBehavior)
+  ViewUtil.merge_methods(view, MainHudItemBarAim.Behavior)
   view.send_action = options.send_action or function(action, value)
     emit_action(action, value)
   end

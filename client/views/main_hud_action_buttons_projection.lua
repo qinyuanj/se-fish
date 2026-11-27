@@ -1,6 +1,7 @@
 -- 主 HUD 右侧动作键的投影与交互行为（#412 从 main_hud_action_buttons_view 拆出，归属 L2 client.views）：
 -- 版面投影、主动作键分支文案、点击 / 按住上行与 SpecialItemResult 提示；呼吸冷却与上钩高亮仍在视图模块。
 -- 视图内的选中格 / 模式解析与配色表放在本模块并导出，供视图模块复用；行为表由视图模块在造句柄时并入。
+-- 文件名里的 projection 指「版面 / 投掷投影」这条主线；交互上行处理器放在同模块，是因为它与投影共用选中态解析。
 
 local GameCfg = require("common.game_cfg")
 local MainHudLayout = require("client.main_hud_layout")

@@ -1,7 +1,7 @@
 -- Spoke 主 HUD 右侧动作键视图（ADR-0032 / #297-B3b1，归属 L2 client.views）：
 -- 挂载于 RootView 常驻 HUD 槽位，订阅只读 ClientStore.item_bar / cast / special_item / hud_visible；
--- 负责右侧 ItemDiscard（丢弃/确认丢弃）与 ItemAction2（抛竿/收竿/点击收线/已上岸/放下/手持与吃/长按飞行/原子吐息冷却）
--- 的排版、文案、呼吸高亮色、交互上行 RE 与 backpack_open 展开遮挡隐藏；
+-- 负责动作键装配（ItemDiscard / ItemAction2）、呼吸与上钩高亮、backpack_open 展开遮挡隐藏；
+-- 版面投影、分支文案与点击/上行处理器在 main_hud_action_buttons_projection.lua（#412 从本文件拆出）；
 -- 所有动态 UI 节点与事件连接统一经 ctx.create_node / ctx.connect 托管，随重连或根 UI 销毁零残留释放。
 
 local Spoke = require("common.packages.spoke.api")
@@ -245,13 +245,9 @@ local function new_view(s, ctx, options, resolution)
     hook_alert_active = State.new("MainHudActionButtonsView.hook_alert_active", false),
     flying_held = false,
   }
-  for name, method in pairs(ActionBehavior) do
-    view[name] = method
-  end
-  -- 投影与交互行为表并入句柄：与呼吸 / 警报方法共用同一套 self 约定。
-  for name, method in pairs(MainHudActionButtonsProjection.Behavior) do
-    view[name] = method
-  end
+  -- 行为表并入句柄：呼吸 / 警报方法与投影、交互行为共用同一套 self 约定。
+  ViewUtil.merge_methods(view, ActionBehavior)
+  ViewUtil.merge_methods(view, MainHudActionButtonsProjection.Behavior)
   view.send_operate = options.send_operate or function(payload)
     view:emit_operate(payload)
   end
