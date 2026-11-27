@@ -17,6 +17,7 @@
 - **架构分层**：新增模块、调整模块职责或依赖方向前，读 `docs/architecture.md`；层归属与门禁唯一声明在 `tools/arch_policy.lua`。
 - **spoke 运行时**：写或评审调用 `common.packages.spoke.*` 或 `common.packages.spoke_eggy.*` 的代码前，读 `.dsh/skills/spoke/`（库与技能都是上游 spoke 仓库的整包拷贝，两边都不就地修改）；宿主包独立成包、依赖单向，见 [ADR-0022](docs/adr/0022-introduce-spoke-runtime.md)。技能 `references/eggy-integration.md` 允许消费方自选 submodule 或纯拷贝：本仓取纯拷贝，SHA 记账在 [packages 参考](docs/packages-reference.md)。
 - **Spoke 调研**：改 Spoke 运行时、评估上游做法或写架构方案前，读 `docs/research/SPOKE_ARCHITECTURE_REPORT.md`（本仓现状快照）与 `docs/research/SPOKE_BASE_DEFENCE_RESEARCH.md`（上游 05_BaseDefence 固定提交调研）。
+- **场景动态单位**：评估场景预摆单位、静态优化或单位收口分批前，读 `docs/research/SCENE_DYNAMIC_UNITS_SPEC.md`（804 个预摆 WorldUnit 的盘点与定版规格，跟踪 #403）。
 - **界面设计**：设计、实现或评审客户端 EUI 界面前，读 `DESIGN.md`（本仓增补）与 `.dsh/skills/eggy-se-lua-coding/references/features/eggy-se-lua-coding-eui/SKILL.md`（通用 EUI 与默认金蓝规范）。
 - **美术资产**：美术创作工作流（Blender 无头链路、Meshy、动画碰撞探针、美术资产概要）已从主线移除，完整保留在 git tag `art-workflow-archive-v1`（`git show art-workflow-archive-v1:docs/agents/art-pipeline.md`）；现存资产盘点见 `docs/art-model-inventory.md`，尺寸口径见 `docs/adr/0004-fish-asset-scale.md`。
 - **验收与条款**：判断某项做完没有、新增待办或收口工单前，先读 `docs/acceptance/README.md`（条款入口）；两列格式、等级后缀与新增条款的受控入口见 `docs/acceptance/TEMPLATE.md`，已关闭旧单的未完成项去向见 `docs/acceptance/legacy-ledger.md`。
