@@ -4,11 +4,10 @@
 -- 点击遮罩、切换另一栏、选择候选、打开背包、重连或根 UI 销毁均自动零残留销毁节点与连接。
 
 local Spoke = require("common.packages.spoke.api")
-local GameCfg = require("common.game_cfg")
-local Number = require("common.number")
 local MainHudLayout = require("client.main_hud_layout")
 local ViewUtil = require("client.views.view_util")
 local HudWidgets = require("client.views.hud_widgets")
+local MainHudEquipCandidates = require("client.views.main_hud_equip_candidates")
 
 local Effect = Spoke.Effect
 local State = Spoke.State
@@ -35,103 +34,6 @@ local function cell_text(name, count, width)
   local cols = math.max(1, math.floor(width / CELL_FONT))
   local text = ViewUtil.wrap_text(name, cols)
   return count ~= nil and (text .. "\n×" .. tostring(count)) or text
-end
-
-local function item_name(id)
-  local def = GameCfg.Items.Definitions[id]
-  return def and def.Name or tostring(id)
-end
-
-local function bait_stock(state, id)
-  local bait = type(state) == "table" and type(state.bait) == "table" and state.bait or nil
-  local count = (bait ~= nil and id ~= nil) and bait[id] or nil
-  return type(count) == "number" and count or 0
-end
-
-local function worm_count(state)
-  return bait_stock(state, GameCfg.Items.Id.Worm)
-end
-
-local function build_weapon_candidates(state, send_operate)
-  local weapons = type(state) == "table" and type(state.weapons) == "table" and state.weapons or {}
-  local ids = {}
-  for id, count in pairs(weapons) do
-    if type(count) == "number" then
-      ids[#ids + 1] = id
-    end
-  end
-  table.sort(ids)
-  local equipped = ViewUtil.equipped_weapon(state)
-  local list = {}
-  for _, id in ipairs(ids) do
-    local weapon_id = id
-    list[#list + 1] = {
-      key = weapon_id,
-      name = item_name(weapon_id),
-      count = weapons[weapon_id],
-      enabled = weapons[weapon_id] > 0,
-      selected = weapon_id == equipped,
-      choose = function()
-        send_operate({ op = "attack", weapon = weapon_id })
-      end,
-    }
-  end
-  return list
-end
-
-local function build_bait_candidates(state, send_action)
-  local ids = GameCfg.Items.Id
-  local fixed = { ids.Worm, ids.Sausage, ids.Duck }
-  local dynamic, is_fixed = {}, {}
-  for _, id in ipairs(fixed) do
-    is_fixed[id] = true
-  end
-  local bait_map = type(state) == "table" and type(state.bait) == "table" and state.bait or {}
-  for id in pairs(bait_map) do
-    if not is_fixed[id] and bait_stock(state, id) > 0 then
-      dynamic[#dynamic + 1] = id
-    end
-  end
-  table.sort(dynamic)
-  local list = {}
-  local function add(id)
-    local bait_id = id
-    local count = bait_stock(state, bait_id)
-    list[#list + 1] = {
-      key = bait_id,
-      name = item_name(bait_id),
-      count = count,
-      enabled = count > 0,
-      selected = type(state) == "table" and state.selectedBait == bait_id,
-      choose = function()
-        send_action("SelectBait", bait_id)
-      end,
-    }
-  end
-  for _, id in ipairs(fixed) do
-    add(id)
-  end
-  for _, id in ipairs(dynamic) do
-    add(id)
-  end
-  list[#list + 1] = {
-    key = "NoBait",
-    name = "不挂鱼饵",
-    enabled = true,
-    selected = type(state) ~= "table" or state.selectedBait == nil,
-    choose = function()
-      send_action("SelectBait")
-    end,
-  }
-  list[#list + 1] = {
-    key = "EatWorm",
-    name = "吃蚯蚓",
-    enabled = worm_count(state) > 0,
-    choose = function()
-      send_action("EatBait", ids.Worm)
-    end,
-  }
-  return list
 end
 
 -- ---------------------------------------------------------------------------
@@ -259,7 +161,7 @@ end
 ---@return string
 local function weapon_label_text(state, rect)
   local weapon = ViewUtil.equipped_weapon(state)
-  return weapon and cell_text(item_name(weapon), nil, rect.w) or ""
+  return weapon and cell_text(MainHudEquipCandidates.item_name(weapon), nil, rect.w) or ""
 end
 
 --- 鱼饵栏文案：选中鱼饵带库存，未选中显示「不挂鱼饵」。
@@ -269,7 +171,7 @@ end
 local function bait_label_text(state, rect)
   local bait_id = type(state) == "table" and state.selectedBait or nil
   return bait_id
-    and cell_text(item_name(bait_id), bait_stock(state, bait_id), rect.w)
+    and cell_text(MainHudEquipCandidates.item_name(bait_id), MainHudEquipCandidates.bait_stock(state, bait_id), rect.w)
     or cell_text("不挂鱼饵", nil, rect.w)
 end
 
@@ -417,9 +319,9 @@ function PopupBehavior.popup_candidates(self, kind, state)
   local list = {}
   if state ~= nil then
     if kind == "Weapon" then
-      list = build_weapon_candidates(state, self.send_operate)
+      list = MainHudEquipCandidates.build_weapon_candidates(state, self.send_operate)
     elseif kind == "Bait" then
-      list = build_bait_candidates(state, self.send_action)
+      list = MainHudEquipCandidates.build_bait_candidates(state, self.send_action)
     end
   end
   return list
