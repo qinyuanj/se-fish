@@ -365,7 +365,7 @@ describe("全局小队服务端宿主入口（#314）", function()
     assert.equals(1, ctx:state(1).members[1].userId)
   end)
 
-  it("兼容 SE 引擎 userdata 玩家与 userdata Position 完成入队、邀请、建队与离场", function()
+  it("运行时 Player/EggyUnit 与 userdata Position 可完成入队、邀请、建队与离场（#392）", function()
     local SharedWorldTree = require("server.world_host.shared_world_tree")
     local SpokeClock = require("common.spoke_clock")
     local clock = SpokeClock.new(100)
@@ -391,17 +391,18 @@ describe("全局小队服务端宿主入口（#314）", function()
       player_data = { get_data_inst = function(_, player) return datas[player.UserId] end },
       session_epoch = "userdata-squad-test",
     })
-    local userdata_objects = {
-      [p1] = true,
-      [p2] = true,
-      [p1.Character.Position] = true,
-      [p2.Character.Position] = true,
+    local engine_types = {
+      [p1] = "Player",
+      [p2] = "Player",
+      [p1.Character] = "EggyUnit",
+      [p2.Character] = "EggyUnit",
+      [p1.Character.Position] = "userdata",
+      [p2.Character.Position] = "userdata",
     }
     local real_type = _G.type
     local ok, err = pcall(function()
       _G.type = function(value)
-        if userdata_objects[value] then return "userdata" end
-        return real_type(value)
+        return engine_types[value] or real_type(value)
       end
       world.squad:on_player_added(p1)
       world.squad:on_player_added(p2)

@@ -11,6 +11,7 @@
 --   * server/main.lua 的接线守卫读源码断言：assertStrContains 的 plain 子串语义用
 --     assert.matches(needle, haystack, nil, true) 保留（`.` 在 Lua pattern 里是任意字符，不能当 pattern 跑）。
 local GameCfg = require('common.game_cfg')
+local ServerRuntime = require('server.world_host.server_runtime')
 
 local function signal()
     local s = { handlers = {} }
@@ -43,7 +44,8 @@ describe('TestEelDischargeEntry', function()
     local saved
     before_each(function()
         saved = { game = rawget(_G, 'game'),
-            carrier = package.loaded['server.world_host.fish_carrier'] }
+            carrier = package.loaded['server.world_host.fish_carrier'],
+            anchorLogic = package.loaded['server.packages.ability_system.anchor_logic'] }
         ctx = { hits = {}, seenHits = {}, hitSerial = 0 }
         ctx.vitals = {
             new_hit = function(_, source, category)
@@ -71,11 +73,18 @@ describe('TestEelDischargeEntry', function()
             error('电鳗行为不应再加载 MgrFishCarrier') end })
         _G.game = { GetService = function(_, name)
             if name == 'Players' then return { GetPlayers = function() return { ctx.inside, ctx.outside } end } end
+            if name == 'Task' then return {} end
+            if name == 'RunService' then return { IsServer = function() return false end } end
         end }
+        saved.abilityServices = require('server.ability_api').behavior_services
     end)
     after_each(function()
         _G.game = saved.game
         package.loaded['server.world_host.fish_carrier'] = saved.carrier
+        package.loaded['server.packages.ability_system.anchor_logic'] = saved.anchorLogic
+        local abilityApi = require('server.ability_api')
+        abilityApi.behavior_services = saved.abilityServices
+        abilityApi.set_cast_guard(nil)
     end)
 
     it('test_discharge_uses_fish_hit_and_replay_does_not_double_apply', function()
@@ -119,6 +128,30 @@ describe('TestEelDischargeEntry', function()
         ctx.owner.Controller.Health = 300
         fired()
         assert.same(2, #ctx.hits)
+    end)
+
+    it('test_runtime_behavior_services_reach_discharge', function()
+        local FishAbility = require('server.fish_ability')
+        local AbilityAPI = require('server.ability_api')
+        local fish_ability = setmetatable({}, { __index = FishAbility })
+        local carrier = ctx.services.FishCarrier
+        local runtime = ServerRuntime.new({ fish_ability = fish_ability, fish_carrier = carrier })
+        runtime.life.new_hit = ctx.vitals.new_hit
+        runtime.life.apply_hit = ctx.vitals.apply_hit
+        fish_ability:start()
+        package.loaded['server.packages.ability_system.anchor_logic'] = { Attach = function() end }
+        local start = signal()
+        ctx.owner.Controller = { Health = 300 }
+        local anchor = {
+            Parent = { Parent = { Parent = ctx.owner } },
+            Destroying = signal(),
+            FindFirstChild = function(_, name) return name == 'AnchorStart' and start or nil end,
+            GetAttribute = function(_, key) return key == 'DischargeRadius' and 5 or 15 end,
+        }
+        assert.is_true(AbilityAPI.attach_anchor(anchor, 'eel_discharge'))
+        start:Fire()
+        assert.same(1, #ctx.hits)
+        assert.same(ctx.carrier, ctx.hits[1][1].source)
     end)
 end)
 

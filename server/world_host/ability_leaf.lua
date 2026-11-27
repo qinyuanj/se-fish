@@ -14,8 +14,8 @@ local DEFAULT_RETRY_INTERVAL = 0.1
 local DEFAULT_RETRY_COUNT = 50
 
 local function is_object(value)
-  local kind = type(value)
-  return kind == "table" or kind == "userdata"
+  local EngineRead = require("common.engine_read")
+  return EngineRead.is_object(value)
 end
 
 local function make_vec3(v)

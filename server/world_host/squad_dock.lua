@@ -9,8 +9,8 @@ local SquadDock = {}
 local function cfg() return GameCfg.Party end
 
 local function is_object(value)
-  local kind = type(value)
-  return kind == "table" or kind == "userdata"
+  local EngineRead = require("common.engine_read")
+  return EngineRead.is_object(value)
 end
 
 local function is_valid_player(player)

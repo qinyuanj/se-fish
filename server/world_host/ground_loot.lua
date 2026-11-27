@@ -539,7 +539,7 @@ function GroundLoot.mount(world, opts)
   end
 
   function world:on_carrier_killed(killed)
-    if world:is_disposed() or type(killed) ~= "table" or (type(killed.position) ~= "table" and type(killed.position) ~= "userdata") then return false end
+    if world:is_disposed() or type(killed) ~= "table" or not EngineRead.is_object(killed.position) then return false end
     local species = GameCfg.Fish[killed.fishId]
     if species == nil then return false end
     local zone_id = killed.zoneId

@@ -3,8 +3,8 @@ local GameCfg = require('common.game_cfg')
 local PlatformHost = { SpokeHost = true, flows = {}, next_flow_id = 0 }
 
 local function isValidPlayer(player)
-    local kind = type(player)
-    return (kind == 'table' or kind == 'userdata') and player.UserId ~= nil
+    local EngineRead = require('common.engine_read')
+    return EngineRead.is_object(player) and player.UserId ~= nil
 end
 
 local function cfg()

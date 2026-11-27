@@ -128,6 +128,8 @@ describe("Spoke 主 HUD 左上状态区与金币视图（#297-B2）", function()
 
     env.writer:update_vitals({ health = 150, max_health = 300, hunger = 50, max_hunger = 100 })
     env.writer:set_coin(42)
+    assert.equals("EUIProgressTimer", env.nodes.HealthRing.Kind)
+    assert.equals("EUIProgressTimer", env.nodes.HungerRing.Kind)
     assert.equals(50, env.nodes.HealthRing.Percent)
     assert.equals(50, env.nodes.HungerRing.Percent)
     assert.equals("血 150", env.nodes.HealthText.Text)

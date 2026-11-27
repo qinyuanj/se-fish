@@ -104,7 +104,7 @@ function FishingPhase.mount(scope, tree, opts)
     local ok, unit = pcall(maker, "LinkEffectUnit", {
       Name = "CastLine_" .. tostring(cast_id),
       EffectId = GameCfg.Casting.LineEffect,
-      Position = { x = landing.x, y = landing.y, z = landing.z },
+      Position = Vector3.New(landing.x, landing.y, landing.z),
     })
     if ok and unit then
       line_unit = unit

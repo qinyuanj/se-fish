@@ -96,7 +96,7 @@ function ReelOverlayView.spec(options)
         local bar_bg = make(scope, ctx, "EUIImage", mask, "ReelBarBg", 660, 820, 600, 34, {
           Image = BLOCK_IMAGE, Color = Color.New(20, 30, 40, 220), Visible = true,
         })
-        bar = make(scope, ctx, "EUIImage", bar_bg, "ReelBar", 0, 0, 600, 34, {
+        bar = make(scope, ctx, "EUILoadingBar", bar_bg, "ReelBar", 0, 0, 600, 34, {
           Image = "official://image/30007", Direction = 0, Percent = GameCfg.ReelIn.Initial,
           Color = Color.New(36, 200, 94, 255), Visible = true,
         })

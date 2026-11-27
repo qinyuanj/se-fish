@@ -241,6 +241,21 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
     env.mgr:update()
   end
 
+  it('test_runtime_custom_player_type_can_board_public_action_392', function()
+    assert.is_true(env.data[1]:AddItem(env.route.Outbound.Ticket))
+    local native_type = _G.type
+    _G.type = function(value)
+      if value == env.players[1] then return 'Player' end
+      if value == env.players[1].Character then return 'EggyUnit' end
+      return native_type(value)
+    end
+    local ok, accepted = pcall(board, 1, 1)
+    _G.type = native_type
+    assert.is_true(ok)
+    assert.is_true(accepted)
+    assert.same(0, env.data[1]:ItemCount(env.route.Outbound.Ticket))
+  end)
+
   it('test_actions_require_range', function()
     assert.is_true(env.data[3]:AddItem(env.route.Outbound.Ticket))
     assert.is_false(board(3, 1)) -- 出生点离船太远

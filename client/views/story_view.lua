@@ -12,10 +12,10 @@ function StoryView.modal_spec(options)
       Visible = true, LocalZOrder = 20,
     })
     panel.TouchEnabled, panel.SwallowTouchEnabled = true, true
-    local function label(name, x, y, w, h, size)
+    local function label(name, x, y, w, h, size, color)
       return ctx.create_node(scope, "EUITextLabel", { Parent = panel, Name = name, Text = "",
         Position = Vector2.New(x, y), Size = Vector2.New(w, h), FontSize = size,
-        Color = Color.New(255, 255, 255, 255), TextHorizontalAlignment = 1, TextVerticalAlignment = 1,
+        Color = color or Color.New(255, 255, 255, 255), TextHorizontalAlignment = 1, TextVerticalAlignment = 1,
         LocalZOrder = 22 })
     end
     local function button(name, x, w, text, on_click)
@@ -27,8 +27,8 @@ function StoryView.modal_spec(options)
       text_node.Text = text
       return node, text_node
     end
-    local title = label("DialogueTitle", 0, 120, width - 50, 50, 30)
-    title.Color = Color.New(255, 225, 130, 255)
+    local title = label("DialogueTitle", 0, 120, width - 50, 50, 30, Color.New(255, 225, 130, 255))
+
     local body = label("DialogueBody", 0, -10, width - 80, 130, 26)
     local payload, page = ctx.store.modal_payload:now() or ctx.store.story:now() or {}, 1
     local render

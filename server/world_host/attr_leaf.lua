@@ -17,8 +17,8 @@ local COMPONENT_NAMES = { "Base", "BaseExtra", "Ratio", "Bonus" }
 local WEAPON_KINDS = { "melee", "ranged", "explosive" }
 
 local function is_object(value)
-  local kind = type(value)
-  return kind == "table" or kind == "userdata"
+  local EngineRead = require("common.engine_read")
+  return EngineRead.is_object(value)
 end
 
 local function make_vec3(x, y, z)

@@ -54,6 +54,19 @@ describe("抛竿与等待上钩（ServerRuntime）", function()
     assert.are.equal(0, env:alive_units("CastLine_"))
   end)
 
+  it("test_cast_line_uses_engine_vector3_position", function()
+    env = Host.new()
+    _G.Vector3.New = function(x, y, z) return setmetatable({ x = x, y = y, z = z }, { engine_vector = true }) end
+    env:cast()
+    local line
+    for _, unit in ipairs(env.units) do if unit.Name and unit.Name:match("^CastLine_") then line = unit break end end
+    assert.is_not_nil(line)
+    assert.is_not_nil(getmetatable(line.props.Position), "LinkEffectUnit.Position 必须是引擎 Vector3")
+    assert.is_number(line.props.Position.x)
+    assert.is_number(line.props.Position.y)
+    assert.is_number(line.props.Position.z)
+  end)
+
   it("test_invalid_landing_does_not_create_line_or_consume_bait", function()
     env = Host.new({ position = { x = 0, y = 2, z = 0 } })
     local before = env.data:ItemCount(GameCfg.Items.Id.Worm)

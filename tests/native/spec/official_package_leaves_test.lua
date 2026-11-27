@@ -318,6 +318,28 @@ describe("AttrLeaf：attr_rule 官方包单向叶子投影", function()
     assert.is_true(owned_unit.destroyed)
   end)
 
+  it("运行时自定义 EggyUnit 类型仍投影移速且普通标量仍被拒绝（#392）", function()
+    local native_type = _G.type
+    local character = { Controller = { WalkSpeed = 8 } }
+    _G.type = function(value)
+      if value == character then return "EggyUnit" end
+      return native_type(value)
+    end
+    local ok, applied, err, scalar_ok, scalar_err = pcall(function()
+      local applied_value, applied_err = AttrLeaf.apply_walk_speed(character, 12)
+      local rejected_value, rejected_err = AttrLeaf.apply_walk_speed(42, 12)
+      return applied_value, applied_err, rejected_value, rejected_err
+    end)
+    _G.type = native_type
+
+    assert.is_true(ok)
+    assert.is_true(applied)
+    assert.is_nil(err)
+    assert.equals(12, character.Controller.WalkSpeed)
+    assert.is_false(scalar_ok)
+    assert.equals("no-character", scalar_err)
+  end)
+
   it("校验 GetAttrConfig 拒绝地图 Min/Max 钳制配置并上报错误", function()
     local attr_api, make_unit, world = make_real_attr_sandbox()
     local clamped_api = setmetatable({
@@ -363,6 +385,26 @@ describe("AttrLeaf：attr_rule 官方包单向叶子投影", function()
 end)
 
 describe("ModifierLeaf：modifier_system 单向叶子投影与活鱼辅助接口", function()
+  it("运行时自定义 Player/EggyUnit 类型仍解析效果来源且普通标量仍被拒绝（#392）", function()
+    local native_type = _G.type
+    local character = { UnitId = 392 }
+    local player = { Character = character }
+    _G.type = function(value)
+      if value == player then return "Player" end
+      if value == character then return "EggyUnit" end
+      return native_type(value)
+    end
+    local ok, cfg, scalar_cfg = pcall(function()
+      return ModifierLeaf.build_add_config("poison", 2, player),
+        ModifierLeaf.build_add_config("poison", 2, 42)
+    end)
+    _G.type = native_type
+
+    assert.is_true(ok)
+    assert.equals(character, cfg.source)
+    assert.is_nil(scalar_cfg.source)
+  end)
+
   it("强制传 removeMode=0、叠层刷新与角色重建/到期/树销毁对称 RemoveModifier 零残留", function()
     local mod_api, raw_api, env = make_real_modifier_sandbox()
     local clock = SpokeClock.new(100)
@@ -495,6 +537,42 @@ describe("AbilityLeaf：ability_system 单向叶子投影、can_act 门控与 us
   after_each(function()
     _G.Vector3 = saved_vec3
     saved_vec3 = nil
+  end)
+
+  it("运行时自定义 EggyUnit 类型仍施放技能且普通标量仍被拒绝（#392）", function()
+    local native_type = _G.type
+    local character = {}
+    _G.type = function(value)
+      if value == character then return "EggyUnit" end
+      return native_type(value)
+    end
+    local ok, cast_ok, cast_err, scalar_ok, scalar_err, cast_target = pcall(function()
+      local target
+      local player_tree = {
+        states = { character = { now = function() return character end } },
+        memos = {},
+      }
+      local ability_api = {
+        CastAbility = function(value, index)
+          target = value
+          return value == character and index == 2
+        end,
+      }
+      local cast_value, cast_error = AbilityLeaf.cast_ability(
+        player_tree, 2, nil, nil, nil, { ability_api = ability_api })
+      player_tree.states.character.now = function() return 42 end
+      local rejected_value, rejected_error = AbilityLeaf.cast_ability(
+        player_tree, 2, nil, nil, nil, { ability_api = ability_api })
+      return cast_value, cast_error, rejected_value, rejected_error, target
+    end)
+    _G.type = native_type
+
+    assert.is_true(ok)
+    assert.is_true(cast_ok)
+    assert.is_nil(cast_err)
+    assert.equals(character, cast_target)
+    assert.is_false(scalar_ok)
+    assert.equals("no-character", scalar_err)
   end)
 
   it("挂载能力管理器并装配 InitialAbilities（含延迟就绪重试）、can_act 拦截施法，角色更换与树销毁对称停止并销毁", function()

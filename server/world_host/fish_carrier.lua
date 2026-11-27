@@ -281,14 +281,14 @@ function Mgr:spawn(opts)
 	if not mesh then
 		return nil, "no-mesh"
 	end
-
+	local position = opts.Position; if type(position) == 'table' and getmetatable(position) == nil then position = Vector3.New(position.x, position.y, position.z) end
 	local cfg = GameCfg.FishCarrier or {}
 	local species = GameCfg.Fish[opts.fish_id]
 	local tint = species and species.VisualColor
 	Mgr.body_seq = Mgr.body_seq + 1
 	local values = {
 		Name = Mgr.BODY_NAME_PREFIX .. "_" .. tostring(Mgr.body_seq) .. "_" .. tostring(opts.fish_id or "unknown"),
-		Position = opts.Position or Vector3.New(0, 0, 0),
+		Position = position or Vector3.New(0, 0, 0),
 		Rotation = opts.Rotation or Quaternion.FromEulerAngles(0, 0, 0),
 		RenderMeshId = mesh,
 		BodyType = opts.BodyType or 4,

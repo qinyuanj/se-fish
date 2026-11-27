@@ -205,6 +205,9 @@ describe("时钟与分辨率显式注入与失败隔离（#367）", function()
     local weak = view_root:FindFirstChild("SurvivalWeak", true)
     assert.equals(GameCfg.Survival.WeakText .. "（20 秒）", weak.Text)
     assert.equals(50, reel.progress())
+    local reel_bar = view_root:FindFirstChild("ReelBar", true)
+    assert.equals("EUILoadingBar", reel_bar.Kind)
+    assert.equals(50, reel_bar.Percent)
 
     broken = true
     local restore_print = capture_print()

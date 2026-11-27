@@ -300,6 +300,27 @@ describe('平台适配层（MgrPlatform）', function()
     assert.is_false(env.platform:show_ad(env.player, 'no-such-ad', 'revive', function() end))
   end)
 
+  it('test_runtime_custom_player_type_opens_flow_and_scalars_stay_rejected_392', function()
+    local native_type = _G.type
+    local ok, err = pcall(function()
+      _G.type = function(value)
+        if value == env.player then return 'Player' end
+        return native_type(value)
+      end
+      local scalars = { false, 0, '', function() end, coroutine.create(function() end) }
+      assert.is_false(env.platform:purchase(nil, 'blindboxSingle', 'blindbox', function() end))
+      for _, value in ipairs(scalars) do
+        local accepted, reason = env.platform:purchase(value, 'blindboxSingle', 'blindbox', function() end)
+        assert.is_false(accepted)
+        assert.same('invalid', reason)
+      end
+      assert.is_true(env.platform:purchase(env.player, 'blindboxSingle', 'blindbox', function() end))
+      assert.is_true(env.platform:has_flow(env.player))
+    end)
+    _G.type = native_type
+    if not ok then error(err, 0) end
+  end)
+
   -- 同时第二个购买请求被拒（busy），第一个 flow 不受影响
   it('test_second_flow_is_busy_while_one_in_flight', function()
     assert.is_true(env.platform:purchase(env.player, 'blindboxSingle', 'blindbox', function() end))

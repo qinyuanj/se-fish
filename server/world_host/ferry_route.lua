@@ -10,8 +10,8 @@ local State = Spoke.State
 local FerryRoute = {}
 
 local function is_object(value)
-  local kind = type(value)
-  return kind == "table" or kind == "userdata"
+  -- 统一识别 Player 等 SE 自定义宿主对象类型。
+  return EngineRead.is_object(value)
 end
 
 local function is_valid_player(player)

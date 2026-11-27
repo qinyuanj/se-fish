@@ -36,12 +36,14 @@ describe("客户端图鉴纪录与剩余模态宿主入口（#315）", function(
         gm = GMView.modal_spec(),
       },
       create_node = function(kind, props)
-        return Eui.node({
+        local node = Eui.node({
           Kind = kind, Name = props and props.Name, Parent = props and props.Parent,
           Visible = props and props.Visible, Text = props and props.Text,
           ButtonText = props and props.ButtonText, Position = props and props.Position,
-          Size = props and props.Size, TouchEnabled = kind == "EUIButton",
+          Size = props and props.Size, TouchEnabled = kind == "EUIButton", Color = props and props.Color,
         })
+        if props and props.Color ~= nil then node.Color = props.Color end
+        return node
       end,
     })
   end)
@@ -93,6 +95,7 @@ describe("客户端图鉴纪录与剩余模态宿主入口（#315）", function(
     writer:ingest_event("StoryNotice", { title = "开场", lines = { "欢迎来到钓场" }, read_key = "opening" })
     assert.is_not_nil(child(root, "ScreenStory"))
     local story_title, story_body = child(root, "DialogueTitle"), child(root, "DialogueBody")
+    assert.same({ 255, 225, 130, 255 }, story_title.Color)
     assert.is_true(story_title.Position.y > story_body.Position.y)
     assert.is_true(story_body.Position.y > child(root, "DialogueRead").Position.y)
     Eui.click(child(root, "DialogueRead"))

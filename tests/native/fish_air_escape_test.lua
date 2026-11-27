@@ -261,6 +261,29 @@ describe('TestFishAirEscape', function()
         end
     end)
 
+    it('test_host_fvector3_position_produces_ground_loot', function()
+        local world = env.runtime:get_world()
+        local position = { x = 480, y = 2, z = 390 }
+        local native_type = type
+        _G.type = function(value)
+            if value == position then return 'FVector3' end
+            return native_type(value)
+        end
+        local callOk, ok, placed = pcall(world.on_carrier_killed, world, {
+            fishId = 'item87', mult = 1.57, zoneId = 'reefIsland', position = position,
+        })
+        _G.type = native_type
+        assert.is_true(callOk)
+        assert.is_true(ok)
+        assert.are.equal(1, #placed)
+        local row
+        for _, item in ipairs(world:ground_snapshot().list) do
+            if item.id == placed[1] then row = item break end
+        end
+        assert.is_not_nil(row)
+        assert.same({ 'item87', 1.57, 480, 390 }, { row.itemId, row.mult, row.x, row.z })
+    end)
+
     it('test_special_flight_lifetimes_and_ground_fish_remain_unchanged', function()
         for _, id in ipairs({ 'fish47Elite', 'fish48Boss', 'fish55Elite' }) do
             local fish = env:drop(id)

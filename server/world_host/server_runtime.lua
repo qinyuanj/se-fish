@@ -1183,7 +1183,7 @@ function ServerRuntime.new(opts)
     opts.fish_ability.Modifier = modifier_service
     opts.fish_ability.Vitals = runtime.life
     opts.fish_ability.ai = opts.fish_ai
-    opts.fish_ability.behavior_services = { Vitals = runtime.life, Modifier = modifier_service, GM = PlayerGM }
+    opts.fish_ability.behavior_services = { Vitals = runtime.life, Modifier = modifier_service, GM = PlayerGM, FishCarrier = opts.fish_carrier }
   end
 
   return runtime

@@ -148,6 +148,22 @@ local SPAWN_OPTS = {
 -- ===== 1. 引擎侧（假引擎）=====
 
 describe('TestFishCarrierEngine', function()
+  it('test_spawn_converts_plain_landed_position_to_engine_vector3', function()
+    local mgr = freshManager()
+    local world = newFakeWorld()
+    local carrier = withFakeEngine(world, function()
+      return mgr:spawn({
+        fish_id = 'T1', RenderMeshId = 'official://mesh/7000544',
+        Position = { x = 4, y = 5, z = 6 }, MaxHealth = 50, GravityEnabled = false,
+      })
+    end)
+    assert.is_not_nil(carrier)
+    assert.are.equal(4, carrier.body.Position.x)
+    assert.are.equal(5, carrier.body.Position.y)
+    assert.are.equal(6, carrier.body.Position.z)
+    assert.is_not_nil(getmetatable(carrier.body.Position), 'FishingPhase 的普通坐标表必须转换成引擎 Vector3')
+  end)
+
   it('test_attach_destroys_the_orphan_receiver_when_controller_is_missing', function()
     -- 防御路径：受击体建出来了、但引擎没给它 Controller（EnableController 引擎契约失效）。
     -- #32 的教训是这种事不能静默；受击体还是鱼本体的子节点，留着就是个跟着鱼跑的孤儿。
