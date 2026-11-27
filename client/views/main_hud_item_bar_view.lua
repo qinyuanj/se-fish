@@ -29,9 +29,7 @@ local COLORS = {
   DISABLED = { 120, 120, 120, 255 },
 }
 
-local function make_color(rgba)
-  return Color.New(rgba[1], rgba[2], rgba[3], rgba[4])
-end
+local make_color = ViewUtil.color
 
 local function clamp_slot_count(state)
   local items = GameCfg.Items

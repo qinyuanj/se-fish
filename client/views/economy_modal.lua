@@ -1,3 +1,5 @@
+local ViewUtil = require("client.views.view_util")
+
 local EconomyModal = {}
 
 -- 节点写法沿用旧界面层的实测约定：EUI 的 Position 是节点中心，坐标原点在父节点左下角；
@@ -12,12 +14,7 @@ local TITLE_FONT = 30
 local LABEL_FONT = 26
 local BUTTON_TEXT_LABEL = "LabelButtonText"
 
-local function make_color(rgba)
-  if type(Color) ~= "table" or type(Color.New) ~= "function" then
-    return nil
-  end
-  return Color.New(rgba[1], rgba[2], rgba[3], rgba[4])
-end
+local make_color = ViewUtil.color
 
 ---@param node table|userdata
 ---@param key string

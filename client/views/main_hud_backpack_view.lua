@@ -19,9 +19,7 @@ local MainHudBackpackView = {}
 
 local COLORS = MainHudBackpackPanel.COLORS
 
-local function make_color(rgba)
-  return Color.New(rgba[1], rgba[2], rgba[3], rgba[4])
-end
+local make_color = ViewUtil.color
 
 
 -- 背包视图句柄：开关信号、选中格、命中矩形与注入回调留在视图句柄上；

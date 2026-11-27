@@ -26,9 +26,7 @@ local COLORS = {
   POPUP_PLATE = { 16, 24, 34, 200 },
 }
 
-local function make_color(rgba)
-  return Color.New(rgba[1], rgba[2], rgba[3], rgba[4])
-end
+local make_color = ViewUtil.color
 
 local function cell_text(name, count, width)
   local cols = math.max(1, math.floor(width / CELL_FONT))
