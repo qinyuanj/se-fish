@@ -21,7 +21,7 @@
 - [0039](0039-acceptance-surface-as-feature-files.md) — 登记条款、补证据或改验收门禁：唯一验收面、两列条款与状态反推。
 
 ## 工具链与平台边界
-- [0009](0009-blender-headless-only.md) — 驱动 Blender 处理美术资产：只走无头，唯一入口 `lua tools/cli.lua blender`。
+- [0009](0009-blender-headless-only.md) — （已废弃，工作流存于 tag `art-workflow-archive-v1`）驱动 Blender 处理美术资产：只走无头，唯一入口 `lua tools/cli.lua blender`。
 - [0017](0017-windows-native-only.md) — 改动 `tools/` CLI、子进程、路径或测试夹具：Windows 原生单一环境与唯一接缝 `tools/seam.lua`。
 - [0035](0035-editor-sdk-enumeration-broken-and-exec-bypass.md) — 用 `editor-cli` 读写场景或写引擎替身：SDK 全树枚举故障与 `exec` 绕过四条硬边界。
 - [0036](0036-platform-commerce-and-ads-not-verifiable-in-editor.md) — 改动商城、支付或广告适配层：编辑器内不可验收、订单身份自研与超时兜底。

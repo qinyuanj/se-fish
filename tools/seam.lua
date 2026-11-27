@@ -11,11 +11,9 @@ local BACKSLASH = string.char(92)
 local DQUOTE = string.char(34)
 
 local DEFAULT_WORKSPACE_REL = "Desktop/dev/eggy/LuaSource_钓鱼怎么这么危险啊喂！"
-local MAGPIE_LIBRARY_REL = ".config/magpie/library/skills"
 local EDITOR_CLI_REL = ".eggitor/cli/editor-cli.exe"
 
 M.DEFAULT_WORKSPACE_REL = DEFAULT_WORKSPACE_REL
-M.MAGPIE_LIBRARY_REL = MAGPIE_LIBRARY_REL
 M.EDITOR_CLI_REL = EDITOR_CLI_REL
 M.LOG_FILE = "tmp/robocopy.log"
 
@@ -521,13 +519,6 @@ function M.editor_cli()
   local home, err = profile()
   if not home then return nil, err end
   return home .. "/" .. EDITOR_CLI_REL
-end
-
--- magpie 资源库 skill 目录：<USERPROFILE>/.config/magpie/library/skills
-function M.magpie_library()
-  local home, err = profile()
-  if not home then return nil, err end
-  return home .. "/" .. MAGPIE_LIBRARY_REL
 end
 
 -- %TEMP%。

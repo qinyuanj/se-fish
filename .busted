@@ -33,5 +33,4 @@ return {
   full = { ROOT = { "tests/native", "tests/native/guards", "tests/native/slow", "tests/native/spec" } },
   guards = { ROOT = { "tests/native/guards" } },
   spec = { ROOT = { "tests/native/spec" } },
-  art = { ROOT = { "tests/native/art" } },
 }

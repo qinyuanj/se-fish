@@ -1,4 +1,4 @@
-# 开发工作流
+﻿# 开发工作流
 
 修改代码、运行测试、同步宿主或操作编辑器前，以及整理过程产物时，读取本文。
 
@@ -26,7 +26,6 @@ Lua 命令使用 **Lua 5.4**，命令名统一 `lua`，执行前用 `lua -v` 核
 - `lua tools/cli.lua sync`：将宿主目录的 API 存根、`data/` 回灌仓库；`eggy.json` 不回灌，见下方「编辑器工程 ≠ 仓库检出」；三端 `packages/` 由仓库管理，也不回灌。
 - `lua tools/cli.lua naming [--recon|--apply|--check] [--layer l3a|l3b|all] [--root <目录>]`：命名改名 codemod 与旧名字符串键守卫（#337）。`--recon` 只列将要改的 `文件:行 旧名 -> 新名`，`--apply` 才落盘且要求目标 git 工作区干净（只用于父提交 worktree）；映射与 keydefs 在 `tools/naming/data/`，口径见 [ADR-0034](../adr/0034-self-written-code-snake-case.md)。`--root` 用于在父提交的干净 worktree 上重放历史层：L3a 对应 `b3a1855`（父提交 `e2a59d1`），L3b 对应 `9685b9e`（父提交 `c75e740`）。`--check` 与 `tests/native/guards/naming_string_keys_test.lua` 共用规则，发现字符串字面量里的旧方法名时报文件与行号。
 - `lua tools/cli.lua docs sync`：显式同步 SE 官方手册到已忽略的 `.toolcache/se-manual/`，覆盖 `lua/00–22`、教程与 API 总索引及 API 索引所列最新 changelog；`docs sync api <类型名或官方 URL>` 按需加入一个 `game_api` 成员页。每个纯文本文件头记录官方 URL、UTC 拉取时间与正文的 SHA-256，日志另记官网文件名提供的版本；所有核心页面下载并解析成功后才写入，失败保留旧缓存。`lua tools/cli.lua docs search <查询>` 只检索本地缓存、无需网络或编辑器，命中给出本地文件行号与官方来源 URL；缓存为空时先跑 `docs sync`，精确成员详情仍可走 `editor-cli api get` / 官方单页兜底。同步依赖 PATH 上的 `curl`，检索不依赖它。
-- `lua tools/cli.lua blender <脚本.py> [--blend <输入.blend>] [-- <脚本参数>...]`：在本机无头 Blender 里执行脚本，是唯一的 Blender 入口；`--which` 核对将用的 Blender，`--expr` 执行内联代码。路径写正斜杠 Windows 形式（`C:/...`）或仓库内相对路径；用法见 [Blender 与 Meshy 使用](art-pipeline.md)，决策见 [ADR-0009](../adr/0009-blender-headless-only.md)。
 - `lua tools/cli.lua screenshot [--window <标题子串>] [--screen] [--out <文件.png>]`：取证画面的统一入口，缺省后台抓屏（`PrintWindow`），输出落 `tmp/`。选窗、虚拟屏与判帧新旧的实测坑见 [editor-cli.md「截图」](editor-cli.md)，取证前先跑 `--info`。
 - `lua tools/cli.lua acceptance [--check|--write|--update-baseline|--infer]`：验收矩阵的统一校验入口（#326），矩阵入口见 [条款矩阵](../acceptance/README.md)（接手先读 [交接说明](../acceptance/handover.md)），判定逻辑在 `tools/acceptance.lua`，用法与退出码看 `--help`。状态从证据文件反推，`--infer` 单独列出；同一判定随 fast 车道跑（`tests/native/guards/acceptance_matrix_test.lua`）。
 - `lua tools/cli.lua emmylua [--update-baseline]`：EmmyLua 诊断门禁（[ADR-0038](../adr/0038-emmylua-agentic-coding-quality-gate.md)），固定 `emmylua_check 0.25.1`，扫描三端自写代码、排除 `tests/` 与 `packages/`；只拦 `tools/emmylua_baseline.txt` 基线外的新诊断。pre-commit 在 `test guards` 之后运行它，CI 随 `full` job 作为 required 门禁运行。
@@ -34,10 +33,10 @@ Lua 命令使用 **Lua 5.4**，命令名统一 `lua`，执行前用 `lua -v` 核
 - `lua tools/cli.lua size [--update-baseline|--report]`：单文件 token 预算门禁（[ADR-0041](../adr/0041-token-budget-gate.md)），口径 `se-fish-budget-v1`（纯 Lua 近似分词器，与 cl100k_base 中位偏差 +2%）；扫描范围同 emmylua 门禁，单文件超过 5500 tokens 且不在 `tools/size_baseline.txt` 里即失败。`--report` 只列超限清单，`--update-baseline` 只在没有新超限时收窄基线（棘轮只许减少）。pre-commit 在 `test guards` 之后、`emmylua` 之前运行它。
 - 官方包升级、直接调用接口与编辑器预设依赖见 [官方包接入参考](../packages-reference.md)。技能包预设命令见 `lua tools/cli.lua ability-presets --help`。
 - **临时产物**：agent 手工产物（验证中间文件、单据正文草稿）放仓库 `tmp/`，任务结束时删掉本任务产生的文件。脚本自建自删的目录由脚本收尾。
-- **Test lane / 测试车道**五条：单测放 `tests/native/`，slow 放 `tests/native/slow/`，**条款断言**放 `tests/native/spec/`，**门禁型**放 `tests/native/guards/`，美术放 `tests/native/art/`（**美术 optional**，Blender 用例不进 full，用 `lua tools/cli.lua test art` 单独跑）；共享夹具放 `tests/support/`，探针放 `tests/probes/`（手工探针，不入任何车道）。日常运行 `lua tools/cli.lua test`（缺省 fast），收尾运行 `lua tools/cli.lua test full`（= fast + slow + spec），单独跑条款或门禁用 `lua tools/cli.lua test spec` / `lua tools/cli.lua test guards`；`--` 之后的参数原样透传给 busted。车道真源是根目录 `.busted`，共享初始化在 `tests/native/helper.lua`。
+- **Test lane / 测试车道**四条：单测放 `tests/native/`，slow 放 `tests/native/slow/`，**条款断言**放 `tests/native/spec/`，**门禁型**放 `tests/native/guards/`；共享夹具放 `tests/support/`，探针放 `tests/probes/`（手工探针，不入任何车道）。日常运行 `lua tools/cli.lua test`（缺省 fast），收尾运行 `lua tools/cli.lua test full`（= fast + slow + spec），单独跑条款或门禁用 `lua tools/cli.lua test spec` / `lua tools/cli.lua test guards`；`--` 之后的参数原样透传给 busted。车道真源是根目录 `.busted`，共享初始化在 `tests/native/helper.lua`。
   _Avoid_: 验收车道、代码收尾门、lane（单独使用时）、test suite、test group
   - `busted` 命令：`test` 子命令与人手 shell 统一用 PATH 上的 `busted`（不在 PATH 时 CLI 退出码 3）。它由 LuaRocks 装在 `%APPDATA%\luarocks\bin`，该目录必须在 PATH 里；安装命令 `luarocks --local install busted` 在 Git Bash 里执行。
-  - `--jobs N`：把车道按文件分给 N 个 busted 进程并跑（1..8，缺省 1 即串行）。文件表从 `.busted` 现读、按文件字节数装箱；写固定路径的车道段（slow、art）始终串行，段序与 `.busted` 的 ROOT 顺序相同；每片内部按文件名字典序跑，跨片并发，所以用例的整体交错顺序与串行不同（文件级隔离靠 `.busted` 的 auto-insulate，不靠顺序）。12 逻辑核实测 fast 约 15 秒 → 4.3 秒、full 约 27 秒 → 10 秒、guards 5.3 秒 → 1.9 秒；8 路之后收益饱和（每路都要重新读盘）。并行时 `--` 之后只收 busted 选项：再给 ROOT 参数与分片冲突，按用法错误退 2。
+  - `--jobs N`：把车道按文件分给 N 个 busted 进程并跑（1..8，缺省 1 即串行）。文件表从 `.busted` 现读、按文件字节数装箱；写固定路径的车道段（slow）始终串行，段序与 `.busted` 的 ROOT 顺序相同；每片内部按文件名字典序跑，跨片并发，所以用例的整体交错顺序与串行不同（文件级隔离靠 `.busted` 的 auto-insulate，不靠顺序）。12 逻辑核实测 fast 约 15 秒 → 4.3 秒、full 约 27 秒 → 10 秒、guards 5.3 秒 → 1.9 秒；8 路之后收益饱和（每路都要重新读盘）。并行时 `--` 之后只收 busted 选项：再给 ROOT 参数与分片冲突，按用法错误退 2。
 
 ### 试玩存档隔离
 
@@ -60,10 +59,9 @@ Lua 命令使用 **Lua 5.4**，命令名统一 `lua`，执行前用 `lua -v` 核
 lua tools/cli.lua worktree-init
 ```
 
-- 从 magpie 资源库复制上游 `blender-*` skill 到 `.agents/skills/`（来源见[Blender 与 Meshy 使用](art-pipeline.md#上游-blender--skill)）；已存在的条目跳过（可重复执行），来源缺失时在写入前失败。参数见 `--help`。
-- 某个 skill 损坏时，删掉对应目录后重跑 `worktree-init`，由它重建。
+- 安装本地 `pre-commit`（提交前运行 `test guards`、`size`、`emmylua`）；可重复执行，已有其他 hook 不覆盖。参数见 `--help`。美术创作工作流已移除（保留在 tag `art-workflow-archive-v1`），不再复制上游 `blender-*` skill。
 
-**美术资产（Meshy MCP + 无头 Blender）。** Blender 与 Meshy 的接入与用法见 [Blender 与 Meshy 使用](art-pipeline.md)，尺寸口径见 [ADR-0004](../adr/0004-fish-asset-scale.md)。唯一的 MCP 是 Meshy，注册与密钥接法见 [Blender 与 Meshy 使用](art-pipeline.md#前端配置)。Blender 不接 MCP，只经 `blender` 子命令无头执行（[ADR-0009](../adr/0009-blender-headless-only.md)）。资产本体不进本仓，正式资产走编辑器导入。
+**美术资产。** 美术创作工作流（Meshy、无头 Blender、动画碰撞探针等）已从主线移除，完整保留在 git tag `art-workflow-archive-v1`；尺寸口径见 [ADR-0004](../adr/0004-fish-asset-scale.md)。资产本体不进本仓，正式资产走编辑器导入。
 
 **宿主目录专用于镜像。** 默认由 `USERPROFILE` 推导：`C:/Users/<用户名>/Desktop/dev/eggy/LuaSource_钓鱼怎么这么危险啊喂！`。可用 `EGGY_WORKSPACE` 覆盖，值写正斜杠 Windows 路径（如 `C:/Users/<用户名>/Desktop/dev/eggy/LuaSource_钓鱼怎么这么危险啊喂！`）；空串当作未设置。
 
@@ -84,7 +82,7 @@ lua tools/cli.lua worktree-init
 
 不跑 full 时，用下面的判定式说明「为什么够用」；从上往下读，先命中先执行，判不清就落 full。逐车道/逐文件的原始数据、闭包与 fast+guards 原型见 [#395](https://github.com/qinyuanj/se-fish/issues/395)。
 
-- **判定式 1（纯文档）**：改了什么——只改 `docs/**/*.md`（`docs/agents/art-pipeline.md` 除外）或根 `README.md` / `AGENTS.md` / `GLOSSARY.md` / `CODING_STANDARDS.md`。必须跑——`test guards`。可以跳过——fast、slow、spec、art。跳过的已知代价——链接、锚点、归属与验收矩阵仍由 guards 覆盖，但代码行为零验证。谁补证——PR 作者贴 CI `full` check 的 guards 结果并确认 diff 无代码，reviewer 复核；CI 对纯文档 PR 走同一快速路径。
+- **判定式 1（纯文档）**：改了什么——只改 `docs/**/*.md` 或根 `README.md` / `AGENTS.md` / `GLOSSARY.md` / `CODING_STANDARDS.md`。必须跑——`test guards`。可以跳过——fast、slow、spec。跳过的已知代价——链接、锚点、归属与验收矩阵仍由 guards 覆盖，但代码行为零验证。谁补证——PR 作者贴 CI `full` check 的 guards 结果并确认 diff 无代码，reviewer 复核；CI 对纯文档 PR 走同一快速路径。
 - **判定式 2（只改测试）**：改了什么——只在 `tests/`。必须跑——该文件所属车道（slow 不在 `lua tools/cli.lua test` 的车道表里，用 `busted tests/native/slow` 单跑）；改 `tests/support/` 时，把消费该夹具的车道一起跑。可以跳过——其余车道。跳过的已知代价——若夹具还有别的消费方而没跑那条车道，失败只会在 CI 暴露。谁补证——作者列出夹具消费方与所跑车道；CI `full` 兜底。
 - **判定式 3（三端代码，车道归属清晰，用于本地迭代）**：改了什么——`client/`、`common/`、`server/` 中的文件，且改动文件都出现在 fast 用例的覆盖集里（用一次 `busted --coverage` 或 #395 的覆盖清单判定），没有触及判定式 4 的路径。必须跑——`test fast`（guards 已含在 fast 内）。可以跳过——spec、slow。跳过的已知代价——spec 的跨端契约与 slow 的 `tools/` transport 不验；按 #395 的对拍，fast+guards 只覆盖 57.1% 的受影响用例（漏 42.9%，主要是 spec）。谁补证——本地迭代由作者记录；开 PR 前按后面的门槛补 full，或由 reviewer 写明接受该风险。
 - **判定式 4（跨车道依赖）**：改了什么——触及 `common/` 共享件、`server/world_host/`、`tools/`、`policy.edn`、`.busted`、`tests/support/`，或同时改两端以上。必须跑——`test full`。可以跳过——无。跳过的已知代价——无。谁补证——CI `full`。
@@ -99,25 +97,22 @@ lua tools/cli.lua worktree-init
 - **不证明实机可玩。** #392 的 full 是 `1611 successes / 0 failures / 0 errors`，之后仍靠试玩修掉 `ground_loot` 的宿主对象判断、`fish_carrier` 注入与 UI 颜色/进度条问题；四渔区验收至今未签收。
 - **不证明覆盖率或断言质量。** `.metrics/mutate` 的 99 份快照里只有 43 份能对上当前路径，56 份是改名/重构前的死路径；覆盖率只证明执行过，不证明断言能抓住变异。
 - **不证明工具链 transport。** slow 的 4 个文件覆盖 `tools/deploy.lua`、`tools/sync_plan.lua`、`tools/qa_slot.lua` 的真实子进程路径，fast 没有对应用例；但 `lua tools/cli.lua test slow` 会以「未知车道」退出 2，slow 只能由 full 带上（或直接 `busted tests/native/slow`）。它的去留是待决项，不是既成事实。
-- **不证明美术资产。** art 车道不进 full；当前 worktree 缺 `.agents/skills/blender-core` 时 art 的 3 条用例直接失败，CI 也没有 Blender。
 - **不证明 PR 的验收条款。** 条款矩阵与验收证据是另一套真源，full 绿不等于 `docs/acceptance/` 的条款已取证。
 
 ### 待决（由人定，不在本文替选）
 
 - 允许在什么风险下跳过 full 直接开 PR。证据见 #395：除纯文档外，自动选择没有省时间且漏约 15%。
 - slow 车道的去留：修成可单跑 / 并进 guards / 删除。观测：4 文件 28 用例 3.39 s 串行，是 `tools/deploy.lua`、`tools/sync_plan.lua`、`tools/qa_slot.lua` transport 的唯一覆盖；`lua tools/cli.lua test slow` 退出 2 是 CLI 没有 slow 车道，不是用例失败；历史提交里 4 个文件都随引入当次的修复/迁移落地，没找到它事后抓过回归的证据。
-- art 车道是否进收尾：1 文件 5 用例 1.93 s，当前缺 `.agents/skills/blender-core` 时 3 条失败，CI 无 Blender。
 
 ## 完成判据
 
-代码改动按顺序执行，全部通过才算完成。新 checkout 执行 `lua tools/cli.lua worktree-init` 会安装本地 `pre-commit`，已有 checkout 可单独执行 `lua tools/cli.lua git-hook-init`（带自家签名头的旧版 hook 会自动升级）；提交前自动依次运行 `lua tools/cli.lua test guards`、`lua tools/cli.lua size` 与 `lua tools/cli.lua emmylua`，重复安装幂等，已有其他 hook 不覆盖。PR 与 `main` 推送由 [test.yml](../../.github/workflows/test.yml) 的单一 `full` job 执行，check-run context `full`（PR 界面显示 `test / full`）是 `main` 的唯一 required status check：代码 PR 与 `push(main)` 依次运行 `lua tools/cli.lua test full --jobs <2× 核数，下限 4、上限 8>`（GitHub 托管 runner 是 4 逻辑核 → 8 片，实测 24.0 秒 → 12.3 秒）与 `lua tools/cli.lua size`、`lua tools/cli.lua emmylua`；仅修改白名单纯文档（`docs/**/*.md` 排除 `docs/agents/art-pipeline.md`，及根 `README.md` / `AGENTS.md` / `GLOSSARY.md` / `CODING_STANDARDS.md`）的 PR 在同一 `full` job 内走快速路径，只跑 `lua tools/cli.lua test guards --jobs <同上>`，任何非白名单变更或变更检测异常一律兜底全量。Lua 5.4.6 / LuaRocks 3.12.2 / Busted 2.3.0-1 直接从本仓 Release `ci-toolchain-v1` 下载预构建包并校验 SHA-256（需升级版本时由 [build-ci-toolchain.yml](../../.github/workflows/build-ci-toolchain.yml) 手动重打并回填摘要），`.emmylua` 按版本哈希经 `actions/cache@v6` 缓存；PR 同分支连续推送开启并发取消，`push(main)` 按 `run_id` 独立分组不取消。下表其余每一项仍由 agent 显式执行，质量工具由人运行，见表后的「人工验收」。
+代码改动按顺序执行，全部通过才算完成。新 checkout 执行 `lua tools/cli.lua worktree-init` 会安装本地 `pre-commit`，已有 checkout 可单独执行 `lua tools/cli.lua git-hook-init`（带自家签名头的旧版 hook 会自动升级）；提交前自动依次运行 `lua tools/cli.lua test guards`、`lua tools/cli.lua size` 与 `lua tools/cli.lua emmylua`，重复安装幂等，已有其他 hook 不覆盖。PR 与 `main` 推送由 [test.yml](../../.github/workflows/test.yml) 的单一 `full` job 执行，check-run context `full`（PR 界面显示 `test / full`）是 `main` 的唯一 required status check：代码 PR 与 `push(main)` 依次运行 `lua tools/cli.lua test full --jobs <2× 核数，下限 4、上限 8>`（GitHub 托管 runner 是 4 逻辑核 → 8 片，实测 24.0 秒 → 12.3 秒）与 `lua tools/cli.lua size`、`lua tools/cli.lua emmylua`；仅修改白名单纯文档（`docs/**/*.md`，及根 `README.md` / `AGENTS.md` / `GLOSSARY.md` / `CODING_STANDARDS.md`）的 PR 在同一 `full` job 内走快速路径，只跑 `lua tools/cli.lua test guards --jobs <同上>`，任何非白名单变更或变更检测异常一律兜底全量。Lua 5.4.6 / LuaRocks 3.12.2 / Busted 2.3.0-1 直接从本仓 Release `ci-toolchain-v1` 下载预构建包并校验 SHA-256（需升级版本时由 [build-ci-toolchain.yml](../../.github/workflows/build-ci-toolchain.yml) 手动重打并回填摘要），`.emmylua` 按版本哈希经 `actions/cache@v6` 缓存；PR 同分支连续推送开启并发取消，`push(main)` 按 `run_id` 独立分组不取消。下表其余每一项仍由 agent 显式执行，质量工具由人运行，见表后的「人工验收」。
 
 | 检查 | 通过条件 |
 |---|---|
 | `lua tools/cli.lua test full`（收尾） | 含 slow 车道，全部用例通过，末行匹配 `N successes / 0 failures / 0 errors / 0 pending : T seconds`，退出码 0。`--jobs N` 并行时这一行由工具把各分片聚合后最后打印，T 是两位小数的墙钟（串行时是 busted 自己那行） |
 | `lua tools/cli.lua emmylua`（本地门禁） | `emmylua_check 0.25.1` 跑完且没有基线外诊断，退出码 0；CI 随 `full` 强制执行 |
 | `lua tools/cli.lua size`（本地门禁） | 没有基线外超限文件，退出码 0；CI 随 `full` 强制执行 |
-| 美术资产交付（美术校验） | 仓库外的资产校验脚本跑完并产出 `validation/validation.json`，报告里 `failures` 为空（含网格封闭性硬门槛）；只看这份报告，不另开 CI，资产校验不进测试车道。预算文件、`mesh` 段或 `validation.json` 缺失同样算失败，口径见 [美术资产概要「验收」](../art-asset-overview.md#验收) |
 | `lua tools/cli.lua deploy` 后复核 `code validate` | `ok=true`、`data.valid=true`、`data.is_se_map=true`，`data.issues` 与 `meta.warnings` 均为空 |
 | validate 通过后全套试玩 | 每条验收现象都有取证产物；`log trace` 本轮窗口有效且无错误 |
 | 本轮改动提交到分支后、合入 main 前，对 `<基线>...HEAD` 跑 `/code-review`（改动尚未提交时用 `git diff <基线>` 的范围） | 取得 Standards / Spec 两轴结论；硬性违规已修复，或在交付说明里逐条写明 |
