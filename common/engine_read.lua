@@ -450,6 +450,31 @@ function EngineRead.new_vector3(x, y, z, context)
   return true, vec, nil
 end
 
+--- 按名称读取成员的公共实现：`GetAttribute` / `GetService` 都是「名称校验 → 调用方法 → nil 视为 missing」。
+---@param target any
+---@param method_name string
+---@param member_name string
+---@param context? string|table
+---@param operation string 调用点名字，拼进上下文前缀
+---@return boolean ok
+---@return any value
+---@return string|nil reason
+local function read_member_impl(target, method_name, member_name, context, operation)
+  if type(member_name) ~= "string" or member_name == "" then
+    return false, nil, "missing"
+  end
+  local ok, value, reason = invoke_method_impl(
+    target, method_name, "read_error", context, operation .. ":" .. member_name, member_name
+  )
+  if not ok then
+    return false, nil, reason
+  end
+  if value == nil then
+    return false, nil, "missing"
+  end
+  return true, value, nil
+end
+
 --- 安全读取对象属性 `GetAttribute(key)`。
 ---@param target any
 ---@param key string
@@ -458,17 +483,7 @@ end
 ---@return any value
 ---@return string|nil reason
 function EngineRead.read_attribute(target, key, context)
-  if type(key) ~= "string" or key == "" then
-    return false, nil, "missing"
-  end
-  local ok, val, reason = invoke_method_impl(target, "GetAttribute", "read_error", context, "read_attribute:" .. key, key)
-  if not ok then
-    return false, nil, reason
-  end
-  if val == nil then
-    return false, nil, "missing"
-  end
-  return true, val, nil
+  return read_member_impl(target, "GetAttribute", key, context, "read_attribute")
 end
 
 --- 安全写入对象属性 `SetAttribute(key, value)`。
@@ -502,14 +517,17 @@ function EngineRead.get_service(name, context)
   if type(name) ~= "string" or name == "" or game == nil then
     return false, nil, "missing"
   end
-  local ok, service, reason = invoke_method_impl(game, "GetService", "read_error", context, "get_service:" .. name, name)
-  if not ok then
-    return false, nil, reason
+  return read_member_impl(game, "GetService", name, context, "get_service")
+end
+
+--- 读取服务器时刻：host.World 作为可注入的 World 服务缓存（测试与会话注入点），缺省时取引擎服务。
+---@param host table 带 World 字段的调用方（World 可注入，缺省取 game:GetService("World")）
+---@return number
+function EngineRead.server_time(host)
+  if host.World == nil then
+    host.World = game:GetService("World")
   end
-  if service == nil then
-    return false, nil, "missing"
-  end
-  return true, service, nil
+  return host.World:GetServerTime()
 end
 
 --- 安全调用宿主对象方法（读取/查询类异常返回 `"read_error"`）。
@@ -591,6 +609,58 @@ function EngineRead.fire_client(remote, channel, player, payload, context)
     return false, nil, reason_send
   end
   return true, true, nil
+end
+
+--- 经 RE 下发一条客户端消息：失败时按模块标签打印一行溯源日志（模块 + 用户 + 业务字段 + 原因）。
+--- 各玩家模块原来各写一份「取事件 → 判失败 → 打印」，这里只收共用部分，频道与标签由 spec 给出。
+---@param remote any
+---@param player any
+---@param payload table|nil
+---@param spec { tag: string, channel: string, context?: string, field?: string, verb?: string }
+---   tag 日志前缀，channel RE 名，field 打印的载荷字段（缺省 action），verb 失败动作文案（缺省「下发失败」）
+---@return boolean ok
+---@return string|nil reason
+function EngineRead.notify_client(remote, player, payload, spec)
+  local ok, _, reason = EngineRead.fire_client(remote, spec.channel, player, payload, spec.context or spec.tag)
+  if ok then
+    return true
+  end
+  local detail = type(payload) == "table" and payload[spec.field or "action"] or nil
+  print("[" .. tostring(spec.tag) .. "] " .. tostring(spec.channel) .. " " .. (spec.verb or "下发失败"),
+    player and player.UserId, detail, tostring(reason))
+  return false, reason
+end
+
+--- 造「下发后原样返回载荷」的函数：频道与标签固定，烤架/武器等模块的 reply 都只是这个形状。
+---@param spec table 见 EngineRead.notify_client
+---@return fun(remote: any, player: any, payload: table|nil): table|nil
+function EngineRead.client_sender(spec)
+  return function(remote, player, payload)
+    EngineRead.notify_client(remote, player, payload, spec)
+    return payload
+  end
+end
+
+--- 造玩家行为表的 reply 方法 (self, payload)：先判销毁态再下发，失败打印见 EngineRead.notify_client。
+--- 各玩家模块原来各写一份，只有 env 字段、销毁态位置、频道与标签不同。
+---@param env_field string 句柄上的环境字段名（如 "blindbox_env"）
+---@param spec { tag: string, channel: string, context?: string, field?: string, returns?: "status", disposed_on?: "env" }
+---   returns = "status" 时返回 ok, reason；缺省原样返回载荷（渔夫/商店的回包契约）。
+---   disposed_on = "env" 时读 env.disposed，否则读 env.lifecycle.disposed。
+---@return fun(self: table, payload: table|nil): any
+function EngineRead.client_reply(env_field, spec)
+  return function(self, payload)
+    local env = self[env_field]
+    local disposed = spec.disposed_on == "env" and env.disposed or (env.lifecycle and env.lifecycle.disposed)
+    if disposed then
+      return false, "disposed"
+    end
+    local ok, reason = EngineRead.notify_client(env.remote, env.player, payload, spec)
+    if spec.returns == "status" then
+      return ok, reason
+    end
+    return payload
+  end
 end
 
 return EngineRead

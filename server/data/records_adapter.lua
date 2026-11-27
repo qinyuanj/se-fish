@@ -1,9 +1,14 @@
 local GameCfg = require('common.game_cfg')
 local Records = require('common.records')
+local StoreHandle = require('common.store_handle')
 
 local Adapter = {}
 
 local function cfg() return GameCfg.Records end
+
+-- DataStore 句柄缓存字段与取不到时的说明。字段名沿用既有的 checked/holder（测试直接复位它们模拟服务缺失）。
+local STORE_CACHE = { checked = 'checked', store = 'holder' }
+local STORE_LOG = '[RecordsAdapter] DataStore 不可用，全服纪录按暂不可用处理'
 
 local function classify(err)
     local text = tostring(err):lower()
@@ -14,18 +19,6 @@ local function classify(err)
     return 'unknown'
 end
 
-function Adapter:Store()
-    if self.checked then return self.holder end
-    self.checked = true
-    local ok, store = pcall(function() return game:GetService('DataStoreService'):GetDataStore(cfg().Store) end)
-    if not ok or not store then
-        print('[RecordsAdapter] DataStore 不可用，全服纪录按暂不可用处理', tostring(store))
-        return nil
-    end
-    self.holder = store
-    return store
-end
-
 function Adapter:key(fishId) return cfg().KeyPrefix .. fishId end
 
 -- 读一条鱼的全服纪录。返回 (ok, 三元组或 nil, 错误类别)：
@@ -33,7 +26,7 @@ function Adapter:key(fishId) return cfg().KeyPrefix .. fishId end
 --   ok = false          → 读不到，必须按"暂不可用"处理，不能当成没有纪录。
 -- 值损坏（缺重量或缺身份）按没有纪录处理：读不出可信的三元组，就不展示，也不猜。
 function Adapter:read(fishId)
-    local store = self:Store()
+    local store = StoreHandle.get(self, STORE_CACHE, cfg().Store, STORE_LOG)
     if not store then return false, nil, 'unavailable' end
     local key = self:key(fishId)
     local ok, value = pcall(function() return store:GetAsync(key) end)
@@ -45,7 +38,7 @@ end
 --   won = true  → 本次候选已写入，第三个返回的是写入后的三元组；
 --   won = false → 候选没赢（已有更大纪录，或同重量按 UserID 决胜输了），第三个返回的是当时看到的当前值。
 function Adapter:Submit(fishId, decide)
-    local store = self:Store()
+    local store = StoreHandle.get(self, STORE_CACHE, cfg().Store, STORE_LOG)
     if not store then return false, nil, nil, 'unavailable' end
     local key = self:key(fishId)
     local seen, won

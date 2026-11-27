@@ -1,19 +1,14 @@
+local EngineRead = require('common.engine_read')
 local GameCfg = require('common.game_cfg')
 
 local PlatformHost = { SpokeHost = true, flows = {}, next_flow_id = 0 }
-
-local function isValidPlayer(player)
-    local EngineRead = require('common.engine_read')
-    return EngineRead.is_object(player) and player.UserId ~= nil
-end
 
 local function cfg()
     return GameCfg.Platform
 end
 
 function PlatformHost:now()
-    self.World = self.World or game:GetService('World')
-    return self.World:GetServerTime()
+    return EngineRead.server_time(self)
 end
 
 function PlatformHost:reply(player, payload)
@@ -33,20 +28,15 @@ local function configured(row)
     return type(row) == 'table' and type(row.goodsId) == 'string' and row.goodsId ~= ''
 end
 
-local function placeholder()
-    local config = cfg().Placeholder
-    return type(config) == 'table' and config or nil
-end
-
 local function placeholderConfigured()
-    local config = placeholder()
+    local config = GameCfg.platform_placeholder()
     return config ~= nil and config.Enabled == true
 end
 
 local function placeholderAllowed()
     if not placeholderConfigured() then return false end
     if debugEnabled() then return true end
-    return placeholder().AllowInPublish == true
+    return GameCfg.platform_placeholder().AllowInPublish == true
 end
 
 local function closedReason()
@@ -57,18 +47,8 @@ local function closedText(reason)
     return reason == 'not_open' and cfg().NotOpenText or cfg().UnavailableText
 end
 
-local function coinOffer(key)
-    local config = placeholder()
-    local page = config and config.CoinPage
-    local offers = type(page) == 'table' and page.Offers or nil
-    if type(offers) ~= 'table' or type(key) ~= 'string' then return nil end
-    for _, offer in ipairs(offers) do
-        if offer.key == key then return offer end
-    end
-end
-
 local function coinAmount(offer)
-    local config = placeholder()
+    local config = GameCfg.platform_placeholder()
     local unit = config and config.CoinPage and config.CoinPage.CoinPerUnit
     if type(offer) ~= 'table' or type(offer.price) ~= 'number' then return nil end
     if type(unit) ~= 'number' or unit <= 0 then return nil end
@@ -76,11 +56,11 @@ local function coinAmount(offer)
 end
 
 local function placeholderGoodsId(kind, key)
-    local config = placeholder()
+    local config = GameCfg.platform_placeholder()
     if not config or type(key) ~= 'string' then return nil end
     local id
     if kind == 'coin' then
-        local offer = coinOffer(key)
+        local offer = GameCfg.platform_coin_offer(key)
         id = offer and offer.goodsId
     else
         local ids = kind == 'ad' and config.Ads or config.Goods
@@ -103,9 +83,9 @@ local function notifyTestFlow(mgr, player, flow, open)
 end
 
 local function notifyPlaceholder(mgr, player, flow, open)
-    local config = placeholder() or {}
+    local config = GameCfg.platform_placeholder() or {}
     local page = config.CoinPage or {}
-    local offer = flow.kind == 'coin' and coinOffer(flow.coin) or nil
+    local offer = flow.kind == 'coin' and GameCfg.platform_coin_offer(flow.coin) or nil
     local row = flow.goods and cfg().Goods[flow.goods] or nil
     local adRow = flow.kind == 'ad' and flow.ad and cfg().Ads[flow.ad] or nil
     local ok, err = pcall(mgr.reply, mgr, player, {
@@ -150,10 +130,10 @@ function PlatformHost:can_purchase(player, goodsKey)
 end
 
 local function openFlow(self, player, intent, onResult)
-    if not isValidPlayer(player) then return false, 'invalid' end
+    if not EngineRead.is_valid_player(player) then return false, 'invalid' end
     if self:has_flow(player) then return false, 'busy' end
     local key = intent.kind == 'coin' and intent.coin or (intent.kind == 'ad' and intent.ad or intent.goods)
-    local row = intent.kind == 'coin' and coinOffer(key)
+    local row = intent.kind == 'coin' and GameCfg.platform_coin_offer(key)
         or (intent.kind == 'ad' and cfg().Ads[key] or cfg().Goods[key])
     if type(row) ~= 'table' then return false, 'invalid' end
     local label, goodsId
@@ -194,7 +174,7 @@ function PlatformHost:cancel_flow(player)
 end
 
 function PlatformHost:open_coin_flow(player, key, onResult)
-    if not coinOffer(key) or type(onResult) ~= 'function' then return false end
+    if not GameCfg.platform_coin_offer(key) or type(onResult) ~= 'function' then return false end
     return openFlow(self, player, { kind = 'coin', coin = key, purpose = 'coinpage' }, onResult)
 end
 
@@ -227,7 +207,7 @@ function PlatformHost:handle_test_action(player, payload)
 end
 
 function PlatformHost:Share(player, purpose)
-    if not isValidPlayer(player) then return false, 'invalid' end
+    if not EngineRead.is_valid_player(player) then return false, 'invalid' end
     local share = cfg().Share or {}
     local reason
     if share.Enabled ~= true and not placeholderAllowed() then

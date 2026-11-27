@@ -1,15 +1,9 @@
+local DeepCopy = require('common.deep_copy')
 local GameCfg = require('common.game_cfg')
 local Records = require('common.records')
 
 local PlayerData = {}
 PlayerData.__index = PlayerData
-
-local function copy(value)
-    if type(value) ~= 'table' then return value end
-    local out = {}
-    for k, v in pairs(value) do out[k] = copy(v) end
-    return out
-end
 
 local function integer(n, min, max)
     return type(n) == 'number' and n == n and n < math.huge
@@ -50,11 +44,6 @@ local function stripArrayMeta(value, path, seen)
 end
 PlayerData.strip_array_meta = stripArrayMeta
 
-local function zoneScene(zoneId)
-    for _, zone in ipairs(GameCfg.Zones or {}) do
-        if zone.Id == zoneId then return zone.Scene end
-    end
-end
 local function finitePoint(point)
     return type(point) == 'table' and type(point.x) == 'number' and type(point.y) == 'number'
         and type(point.z) == 'number' and point.x == point.x and point.y == point.y and point.z == point.z
@@ -67,7 +56,7 @@ local function insideBoundary(point, bounds)
 end
 
 function PlayerData:ResolveSafePoint()
-    local scene = zoneScene(GameCfg.resolve_zone_id(self.data.Zone))
+    local scene = GameCfg.zone_scene(GameCfg.resolve_zone_id(self.data.Zone))
     if not scene or not scene.Boundary or not finitePoint(scene.SafePoint) then return nil, false end
     local mark = self.extra.travel.safePoint
     if insideBoundary(mark, scene.Boundary) then
@@ -80,7 +69,7 @@ end
 
 function PlayerData:NoteSafePoint()
     if not self.inited then return end
-    local scene = zoneScene(GameCfg.resolve_zone_id(self.data.Zone))
+    local scene = GameCfg.zone_scene(GameCfg.resolve_zone_id(self.data.Zone))
     if not scene or not scene.Boundary then return end
     self:ResolveSafePoint()
     local character = self.Player and self.Player.Character
@@ -186,96 +175,199 @@ function PlayerData:CompleteLoad(snapshot)
     return true
 end
 
-function PlayerData:Migrate(snapshot)
-    if type(snapshot) ~= 'table' or (snapshot.v ~= 1 and snapshot.v ~= 2)
-        or not serializable(snapshot, {}, 0) then return nil, '未知版本或不可序列化数据' end
-    local saved = stripArrayMeta(snapshot, 'save')
+-- ===== 拆分前 PlayerData:Migrate 体内的分段：提到模块级，依赖显式传参 =====
+-- 校验失败统一返回 false/nil, 原因；错误文案与拆分前逐字一致（ApplySave 会把原因打到日志）。
+-- 分段只做一段校验：基础字段/库存/持久身份/扩展字段/成长/操作日志。
+
+-- 版本与可序列化预检。
+local function migratable(snapshot)
+    return type(snapshot) == 'table' and (snapshot.v == 1 or snapshot.v == 2) and serializable(snapshot, {}, 0)
+end
+
+-- 个体倍率：可选字段，出现时须在 1..2 之间。
+local function bad_mult(mult)
+    return mult ~= nil and (type(mult) ~= 'number' or mult < 1 or mult > 2)
+end
+
+-- 熟度：可选字段，出现时须为有限正数。
+local function bad_cooked(cooked)
+    return cooked ~= nil and (type(cooked) ~= 'number' or cooked <= 0 or cooked ~= cooked or cooked >= math.huge)
+end
+
+-- 单个物品实例：ID 走旧号映射、容器合法、格号/件数/倍率/熟度合法、格号不重复（写回 slot.id）。
+local function migrate_slot(slot, max, seen)
+    slot.id = GameCfg.Items.LegacyIdMap[slot.id] or slot.id
+    local def = GameCfg.Items.Definitions[slot.id]
+    if not def or def.Container == GameCfg.Items.ContainerId.Bait
+        or not integer(slot.i, 1, max) or seen[slot.i] or not integer(slot.n, 1, 1)
+        or bad_mult(slot.m) or bad_cooked(slot.k) then
+        return false, '物品实例损坏'
+    end
+    return true
+end
+
+-- 单个容器（bar/bp）：键在容量内、实例合法且格号不重复、格子序列连续。
+local function migrate_container(packed, max)
+    if type(packed) ~= 'table' then return false, '库存缺失' end
+    local seen, total = {}, 0
+    for key, slot in pairs(packed) do
+        total = total + 1
+        if not integer(key, 1, max) or type(slot) ~= 'table' then return false, '库存结构损坏' end
+        local ok, reason = migrate_slot(slot, max, seen)
+        if not ok then return false, reason end
+        seen[slot.i] = true
+    end
+    for index = 1, total do if packed[index] == nil then return false, '库存序列不连续' end end
+    return true
+end
+
+-- 背包容量：满级按最大格数，否则按每级增量累加。
+local function backpack_capacity(level)
+    if level == #GameCfg.Items.UpgradePrices then return GameCfg.Items.MaxBackpackSlots end
+    return GameCfg.Items.InitialBackpackSlots + level * GameCfg.Items.BackpackSlotsPerUpgrade
+end
+
+-- 基础字段与鱼饵：金币/扩容等级/区名/鱼饵表，鱼饵 ID 走旧号映射并按容器类型校验。
+local function migrate_base(saved)
     if not integer(saved.coin, 0) or not integer(saved.up, 0, #GameCfg.Items.UpgradePrices)
         or type(saved.zone) ~= 'string' or saved.zone == '' or type(saved.bait) ~= 'table' then
-        return nil, '基础字段损坏'
+        return false, '基础字段损坏'
     end
     local bait = {}
     for id, count in pairs(saved.bait) do
         local mapped = GameCfg.Items.LegacyIdMap[id] or id
         local def = GameCfg.Items.Definitions[mapped]
         if not def or def.Container ~= GameCfg.Items.ContainerId.Bait or not integer(count, 0) then
-            return nil, '鱼饵字段损坏'
+            return false, '鱼饵字段损坏'
         end
         bait[mapped] = (bait[mapped] or 0) + count
     end
     saved.bait = bait
-    local capacity = GameCfg.Items.InitialBackpackSlots + saved.up * GameCfg.Items.BackpackSlotsPerUpgrade
-    if saved.up == #GameCfg.Items.UpgradePrices then capacity = GameCfg.Items.MaxBackpackSlots end
-    for _, pair in ipairs({ { saved.bar, GameCfg.Items.InitialItemBarSlots + saved.up }, { saved.bp, capacity } }) do
-        local packed, max = pair[1], pair[2]
-        if type(packed) ~= 'table' then return nil, '库存缺失' end
-        local seen, count = {}, 0
-        for key, slot in pairs(packed) do
-            count = count + 1
-            if not integer(key, 1, max) or type(slot) ~= 'table' then return nil, '库存结构损坏' end
-            slot.id = GameCfg.Items.LegacyIdMap[slot.id] or slot.id
-            local def = GameCfg.Items.Definitions[slot.id]
-            if not def or def.Container == GameCfg.Items.ContainerId.Bait
-                or not integer(slot.i, 1, max) or seen[slot.i] or not integer(slot.n, 1, 1)
-                or slot.m ~= nil and (type(slot.m) ~= 'number' or slot.m < 1 or slot.m > 2)
-                or slot.k ~= nil and (type(slot.k) ~= 'number' or slot.k <= 0 or slot.k ~= slot.k
-                    or slot.k >= math.huge) then
-                return nil, '物品实例损坏'
-            end
-            seen[slot.i] = true
-        end
-        for i = 1, count do if packed[i] == nil then return nil, '库存序列不连续' end end
+    return true
+end
+
+-- 两个容器：容量随扩容等级换算后逐个校验。
+local function migrate_inventory(saved)
+    local bar_capacity = GameCfg.Items.InitialItemBarSlots + saved.up
+    for _, pair in ipairs({ { saved.bar, bar_capacity }, { saved.bp, backpack_capacity(saved.up) } }) do
+        local ok, reason = migrate_container(pair[1], pair[2])
+        if not ok then return false, reason end
     end
-    if saved.v == 1 then
-        saved.extra = defaults(saved.zone)
-        saved.meta = { epoch = 0, revision = 0, sequence = 0, floor = 0, operations = {} }
-    else
-        local meta, extra = saved.meta, saved.extra
-        if type(meta) ~= 'table' or not integer(meta.epoch, 0) or not integer(meta.revision, 0)
-            or not integer(meta.sequence, 0) or not integer(meta.floor, 0, meta.sequence)
-            or type(meta.operations) ~= 'table' or #meta.operations > 64 or type(extra) ~= 'table' then
-            return nil, '持久身份损坏'
+    return true
+end
+
+-- v1 存档没有持久身份与扩展字段，按默认值补齐。
+local function migrate_v1(saved)
+    saved.extra = defaults(saved.zone)
+    saved.meta = { epoch = 0, revision = 0, sequence = 0, floor = 0, operations = {} }
+    return true
+end
+
+-- 持久身份：epoch/revision/sequence/floor 单调、操作日志条数上限、扩展字段存在。
+local function migrate_meta(saved)
+    local meta, extra = saved.meta, saved.extra
+    if type(meta) ~= 'table' or not integer(meta.epoch, 0) or not integer(meta.revision, 0)
+        or not integer(meta.sequence, 0) or not integer(meta.floor, 0, meta.sequence)
+        or type(meta.operations) ~= 'table' or #meta.operations > 64 or type(extra) ~= 'table' then
+        return false, '持久身份损坏'
+    end
+    return true
+end
+
+-- 操作日志：序列在 [floor+1, sequence] 内递增、字段类型合法。
+local function migrate_operations(meta)
+    local last = meta.floor
+    for _, op in ipairs(meta.operations) do
+        if type(op) ~= 'table' or not integer(op.sequence, last + 1, meta.sequence)
+            or type(op.id) ~= 'string' or type(op.kind) ~= 'string' or type(op.result) ~= 'table'
+            or op.request_key ~= nil and type(op.request_key) ~= 'string' then
+            return false, '操作日志损坏'
         end
-        if extra.party == nil then extra.party = defaults(saved.zone).party end
-        for name in pairs(defaults(saved.zone)) do
-            if type(extra[name]) ~= 'table' then return nil, '扩展字段缺失 ' .. name end
-        end
-        if not integer(extra.party.id, 0) then return nil, '队伍字段损坏' end
-        if extra.party.epoch ~= nil and type(extra.party.epoch) ~= 'string' then
-            return nil, '队伍纪元损坏'
-        end
-        if type(extra.inventory.selection) ~= 'table' or type(extra.travel.arrived) ~= 'table'
-            or type(extra.travel.safePoint) ~= 'table' or type(extra.inventory.weapons) ~= 'table' then return nil, '扩展字段损坏' end
-        local held = extra.inventory.selection.held
-        if type(held) ~= 'table' or held.kind ~= nil and held.kind ~= 'slot' and held.kind ~= 'weapon'
-            or held.id ~= nil and type(held.id) ~= 'string'
-            or held.slot ~= nil and not integer(held.slot, 1, GameCfg.Items.InitialItemBarSlots + saved.up) then return nil, '手持状态损坏' end
-        for itemId, count in pairs(extra.inventory.weapons) do
-            local def = GameCfg.Items.Definitions[itemId]
-            if not def or def.Type ~= '近战武器' and def.Type ~= '远程武器'
-                or not integer(count, 1) then return nil, '武器库存损坏' end
-        end
-        local growth = extra.growth
-        if type(growth.upgrades) ~= 'table' or type(growth.purchases) ~= 'table' then
-            return nil, '成长字段损坏'
-        end
-        for kind, level in pairs(growth.upgrades) do
-            local spec = GameCfg.Shop.UpgradeKinds[kind]
-            if not spec or not integer(level, 0, spec.MaxLevel) then return nil, '升级等级损坏' end
-        end
-        for key, count in pairs(growth.purchases) do
-            if type(key) ~= 'string' or not integer(count, 0) then return nil, '购买次数损坏' end
-        end
-        local last = meta.floor
-        for _, op in ipairs(meta.operations) do
-            if type(op) ~= 'table' or not integer(op.sequence, last + 1, meta.sequence)
-                or type(op.id) ~= 'string' or type(op.kind) ~= 'string' or type(op.result) ~= 'table'
-                or op.request_key ~= nil and type(op.request_key) ~= 'string' then
-                return nil, '操作日志损坏'
-            end
-            last = op.sequence
+        last = op.sequence
+    end
+    return true
+end
+
+-- 扩展字段外壳：分区默认子表齐备、队伍字段与手持/旅行/武器容器类型。
+local function migrate_extra(saved)
+    local extra = saved.extra
+    if extra.party == nil then extra.party = defaults(saved.zone).party end
+    for name in pairs(defaults(saved.zone)) do
+        if type(extra[name]) ~= 'table' then return false, '扩展字段缺失 ' .. name end
+    end
+    if not integer(extra.party.id, 0) then return false, '队伍字段损坏' end
+    if extra.party.epoch ~= nil and type(extra.party.epoch) ~= 'string' then
+        return false, '队伍纪元损坏'
+    end
+    if type(extra.inventory.selection) ~= 'table' or type(extra.travel.arrived) ~= 'table'
+        or type(extra.travel.safePoint) ~= 'table' or type(extra.inventory.weapons) ~= 'table' then
+        return false, '扩展字段损坏'
+    end
+    return true
+end
+
+-- 手持状态：kind/id/slot 三项都是可选字段，出现时各自合法。
+local function migrate_held(extra, saved)
+    local held = extra.inventory.selection.held
+    if type(held) ~= 'table' or held.kind ~= nil and held.kind ~= 'slot' and held.kind ~= 'weapon'
+        or held.id ~= nil and type(held.id) ~= 'string'
+        or held.slot ~= nil and not integer(held.slot, 1, GameCfg.Items.InitialItemBarSlots + saved.up) then
+        return false, '手持状态损坏'
+    end
+    return true
+end
+
+-- 武器库存：物品是近战/远程武器且件数为正整数。
+local function migrate_weapons(extra)
+    for item_id, count in pairs(extra.inventory.weapons) do
+        local def = GameCfg.Items.Definitions[item_id]
+        if not def or def.Type ~= '近战武器' and def.Type ~= '远程武器' or not integer(count, 1) then
+            return false, '武器库存损坏'
         end
     end
+    return true
+end
+
+-- 成长：升级等级按 UpgradeKinds 上限、购买次数为非负整数。
+local function migrate_growth(extra)
+    local growth = extra.growth
+    if type(growth.upgrades) ~= 'table' or type(growth.purchases) ~= 'table' then
+        return false, '成长字段损坏'
+    end
+    for kind, level in pairs(growth.upgrades) do
+        local spec = GameCfg.Shop.UpgradeKinds[kind]
+        if not spec or not integer(level, 0, spec.MaxLevel) then return false, '升级等级损坏' end
+    end
+    for key, count in pairs(growth.purchases) do
+        if type(key) ~= 'string' or not integer(count, 0) then return false, '购买次数损坏' end
+    end
+    return true
+end
+
+-- v2 存档：持久身份 → 扩展字段外壳 → 手持 → 武器 → 成长 → 操作日志，逐段校验。
+local function migrate_v2(saved)
+    local ok, reason = migrate_meta(saved)
+    if not ok then return false, reason end
+    ok, reason = migrate_extra(saved)
+    if not ok then return false, reason end
+    ok, reason = migrate_held(saved.extra, saved)
+    if not ok then return false, reason end
+    ok, reason = migrate_weapons(saved.extra)
+    if not ok then return false, reason end
+    ok, reason = migrate_growth(saved.extra)
+    if not ok then return false, reason end
+    return migrate_operations(saved.meta)
+end
+
+function PlayerData:Migrate(snapshot)
+    if not migratable(snapshot) then return nil, '未知版本或不可序列化数据' end
+    local saved = stripArrayMeta(snapshot, 'save')
+    local ok, reason = migrate_base(saved)
+    if not ok then return nil, reason end
+    ok, reason = migrate_inventory(saved)
+    if not ok then return nil, reason end
+    if saved.v == 1 then ok, reason = migrate_v1(saved) else ok, reason = migrate_v2(saved) end
+    if not ok then return nil, reason end
     saved.v = 2
     return saved
 end
@@ -291,7 +383,7 @@ function PlayerData:Serialize()
         local out = {}
         for index, entry in pairs(self.data.containers[containerId]) do
             if entry and entry.count > 0 then
-                local slot = copy(entry.saved or {})
+                local slot = DeepCopy.copy(entry.saved or {})
                 slot.i, slot.id, slot.n, slot.m = index, entry.itemId, entry.count, entry.mult
                 out[#out + 1] = slot
             end
@@ -304,12 +396,12 @@ function PlayerData:Serialize()
     self.extra.inventory.selection.slot = self.data.selected_slot
     self.extra.inventory.selection.bait = self.data.selected_bait
     self.extra.inventory.selection.weapon = self.data.selected_weapon
-    self.extra.inventory.weapons = copy(self.data.weapons)
+    self.extra.inventory.weapons = DeepCopy.copy(self.data.weapons)
     self.extra.travel.zone = GameCfg.resolve_zone_id(self.data.Zone)
     return {
         v = 2,
-        extra = copy(self.extra),
-        meta = copy(self.save_meta),
+        extra = DeepCopy.copy(self.extra),
+        meta = DeepCopy.copy(self.save_meta),
         coin = self.data.FishCoin,
         bar = pack(GameCfg.Items.ContainerId.ItemBar),
         bp = pack(GameCfg.Items.ContainerId.Backpack),
@@ -330,7 +422,7 @@ function PlayerData:ApplySave(snapshot)
         local items = {}
         for _, slot in ipairs(packed) do
             items[slot.i] = { itemId = slot.id, count = slot.n, mult = slot.m, cooked = slot.k,
-                containerId = containerId, saved = copy(slot) }
+                containerId = containerId, saved = DeepCopy.copy(slot) }
         end
         return items
     end
@@ -345,7 +437,7 @@ function PlayerData:ApplySave(snapshot)
     self.data.selected_slot = self.extra.inventory.selection.slot
     self.data.selected_bait = self.extra.inventory.selection.bait
     self.data.selected_weapon = self.extra.inventory.selection.weapon
-    self.data.weapons = copy(self.extra.inventory.weapons)
+    self.data.weapons = DeepCopy.copy(self.extra.inventory.weapons)
     self:SanitizeHeld()
     self.revision = (self.revision or 0) + 1
     self:Sync()
@@ -363,62 +455,103 @@ function PlayerData:BackpackCapacity()
     return capacity
 end
 
-function PlayerData:ApplyGMPatch(patch)
-    if not self.inited or type(patch) ~= 'table' then return false, '状态尚未就绪' end
-    local function int(n, min, max)
-        return type(n) == 'number' and n == math.floor(n) and n >= min and n <= max
+-- ===== 拆分前 PlayerData:ApplyGMPatch 体内的分段：提到模块级，显式传参 =====
+
+-- 补丁目标等级下的物品栏与背包容量（背包口径与 BackpackCapacity 一致，只是按补丁等级算）。
+local function capacity_at(level)
+    return GameCfg.Items.InitialItemBarSlots + level, backpack_capacity(level)
+end
+
+-- 容器浅拷贝：格位改动只落在副本上，全部校验通过后才由 ChangeCoin 一次性替换。
+local function clone_containers(data)
+    local ids, out = GameCfg.Items.ContainerId, {}
+    for _, id in ipairs({ ids.ItemBar, ids.Backpack }) do
+        local clone = {}
+        for index, entry in pairs(data.containers[id]) do clone[index] = entry end
+        out[id] = clone
     end
+    return out
+end
+
+-- 某个容器的两套容量：返回（补丁等级容量, 当前等级容量）；未知容器返回 nil。
+local function container_limits(self, id, level)
+    local ids = GameCfg.Items.ContainerId
+    local bar, backpack = capacity_at(level)
+    if id == ids.ItemBar then return bar, self:ItemBarCapacity() end
+    if id == ids.Backpack then return backpack, self:BackpackCapacity() end
+    return nil, nil
+end
+
+-- 写入一个格位（非清空路径）：物品合法且不是鱼饵、件数为 1、个体倍率合法。
+local function fill_slot(containers, id, edit)
+    local definition = type(edit.itemId) == 'string' and GameCfg.Items.Definitions[edit.itemId]
+    if edit.clear ~= nil or not definition or definition.Container == GameCfg.Items.ContainerId.Bait
+        or not integer(edit.count, 1, 1) then
+        return false, '格位物品或件数无效'
+    end
+    local mult = edit.mult
+    if mult ~= nil and (type(mult) ~= 'number' or mult < 1 or mult > 2
+        or math.abs(mult * 100 - math.floor(mult * 100 + 0.5)) > 1e-7
+        or not hasIndividualMult(edit.itemId)) then
+        return false, '个体倍率无效'
+    end
+    containers[id][edit.index] = { itemId = edit.itemId, count = 1, containerId = id, mult = mult }
+    return true
+end
+
+-- 单条格位操作：键/格号/重复校验，再按「清空」与「写入」两条路径落到副本上。
+local function apply_slot_edit(self, containers, key, edit, level, seen)
+    if type(key) ~= 'number' or not integer(key, 1, 100) or type(edit) ~= 'table' then
+        return false, '格位操作无效'
+    end
+    local id = edit.container
+    local max, old_max = container_limits(self, id, level)
+    if not max or not integer(edit.index, 1, edit.clear == true and math.max(max, old_max) or max) then
+        return false, '格号无效'
+    end
+    local unique = id .. ':' .. edit.index
+    if seen[unique] then return false, '格号重复' end
+    seen[unique] = true
+    if edit.clear == true and edit.itemId == nil and edit.count == nil and edit.mult == nil then
+        containers[id][edit.index] = nil
+        return true
+    end
+    return fill_slot(containers, id, edit)
+end
+
+-- 缩容检查：按补丁等级缩小后不得挤掉已有物品。
+local function check_shrink(containers, level)
+    local ids = GameCfg.Items.ContainerId
+    local bar, backpack = capacity_at(level)
+    for _, pair in ipairs({ { ids.ItemBar, bar }, { ids.Backpack, backpack } }) do
+        for index, entry in pairs(containers[pair[1]]) do
+            if entry and (type(index) ~= 'number' or index > pair[2]) then return false, '缩容将挤掉已有物品' end
+        end
+    end
+    return true
+end
+
+-- 金币与扩容等级：补丁缺省时取当前值。
+local function patch_amounts(self, patch)
     local coin = patch.coin == nil and self.data.FishCoin or patch.coin
     local level = patch.upgrade_level == nil and self.data.upgrade_level or patch.upgrade_level
-    if not int(coin, 0, math.maxinteger) or not int(level, 0, #GameCfg.Items.UpgradePrices) then
+    return coin, level
+end
+
+function PlayerData:ApplyGMPatch(patch)
+    if not self.inited or type(patch) ~= 'table' then return false, '状态尚未就绪' end
+    local coin, level = patch_amounts(self, patch)
+    if not integer(coin, 0, math.maxinteger) or not integer(level, 0, #GameCfg.Items.UpgradePrices) then
         return false, '金币或扩容等级无效'
     end
     if patch.slots ~= nil and type(patch.slots) ~= 'table' then return false, '格位操作无效' end
-    local ids = GameCfg.Items.ContainerId
-    local containers = {}
-    for _, id in ipairs({ ids.ItemBar, ids.Backpack }) do
-        local copy = {}
-        for index, entry in pairs(self.data.containers[id]) do copy[index] = entry end
-        containers[id] = copy
-    end
-    local barCount = GameCfg.Items.InitialItemBarSlots + level
-    local backpackCount = GameCfg.Items.InitialBackpackSlots + level * GameCfg.Items.BackpackSlotsPerUpgrade
-    if level == #GameCfg.Items.UpgradePrices then backpackCount = GameCfg.Items.MaxBackpackSlots end
-    local seen = {}
+    local containers, seen = clone_containers(self.data), {}
     for key, edit in pairs(patch.slots or {}) do
-        if type(key) ~= 'number' or not int(key, 1, 100) or type(edit) ~= 'table' then
-            return false, '格位操作无效'
-        end
-        local id = edit.container
-        local max = id == ids.ItemBar and barCount or id == ids.Backpack and backpackCount
-        local oldMax = id == ids.ItemBar and self:ItemBarCapacity()
-            or id == ids.Backpack and self:BackpackCapacity()
-        if not max or not int(edit.index, 1, edit.clear == true and math.max(max, oldMax) or max) then
-            return false, '格号无效'
-        end
-        local unique = id .. ':' .. edit.index
-        if seen[unique] then return false, '格号重复' end
-        seen[unique] = true
-        if edit.clear == true and edit.itemId == nil and edit.count == nil and edit.mult == nil then
-            containers[id][edit.index] = nil
-        else
-            local definition = type(edit.itemId) == 'string' and GameCfg.Items.Definitions[edit.itemId]
-            if edit.clear ~= nil or not definition or definition.Container == ids.Bait
-                or not int(edit.count, 1, 1) then return false, '格位物品或件数无效' end
-            local mult = edit.mult
-            if mult ~= nil and (type(mult) ~= 'number' or mult < 1 or mult > 2
-                or math.abs(mult * 100 - math.floor(mult * 100 + 0.5)) > 1e-7
-                or not hasIndividualMult(edit.itemId)) then return false, '个体倍率无效' end
-            containers[id][edit.index] = { itemId = edit.itemId, count = 1, containerId = id, mult = mult }
-        end
+        local ok, reason = apply_slot_edit(self, containers, key, edit, level, seen)
+        if not ok then return false, reason end
     end
-    for _, pair in ipairs({ { ids.ItemBar, barCount }, { ids.Backpack, backpackCount } }) do
-        for index, entry in pairs(containers[pair[1]]) do
-            if entry and (type(index) ~= 'number' or index > pair[2]) then
-                return false, '缩容将挤掉已有物品'
-            end
-        end
-    end
+    local ok, reason = check_shrink(containers, level)
+    if not ok then return false, reason end
     self:ChangeCoin(coin - self.data.FishCoin, function(data)
         data.upgrade_level = level
         data.containers = containers
@@ -461,9 +594,9 @@ function PlayerData:GetItemBarSnapshot()
         coin = self.data.FishCoin,
         selectedSlot = self.data.selected_slot,
         selectedBait = self.data.selected_bait,
-        weapons = copy(self.data.weapons),
+        weapons = DeepCopy.copy(self.data.weapons),
         selectedWeapon = self.data.selected_weapon,
-        held = copy(self.extra.inventory.selection.held),
+        held = DeepCopy.copy(self.extra.inventory.selection.held),
     }
 end
 

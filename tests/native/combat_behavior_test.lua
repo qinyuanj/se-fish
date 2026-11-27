@@ -346,4 +346,84 @@ describe('TestMeleeHitEntry', function()
             end
         end
     end)
+
+    -- 命中真的结算之后才谈击退力与命中音效（#212 之后的_applyHitPower / _createHitSfx）。
+    -- 失败方式：方向混进竖直分量、力度没乘方向、零力度也推人、有 Controller 时不优先控制器受力、
+    -- 音效不按目标位置+偏移生成、零尺度不回收成单位尺度、Timer 不回收单位（每次挥砍泄漏一个）。
+    it('test_hit_power_follows_flat_direction_and_skips_zero_power', function()
+        local impulses = {}
+        ctx.target.ApplyImpulse = function(_, force) impulses[#impulses + 1] = force end
+        ctx.target.Position = vec(0, 9, 3) -- 高度差 9 米不算进水平方向，力度竖直分量恒为力度值
+        ctx.swingStaged[7] = { damage = 12, range = 4 }
+        local attrs = baseAttrs()
+        attrs.ABILITY_ANOSTATE_HITPOWER = 6
+        local anchor = buildAnchor(attrs)
+        anchor.AnchorStart:Fire()
+        ctx.created[#ctx.created].OnTriggerEnter:Fire(ctx.target)
+        assert.same(1, #ctx.hits)
+        assert.same(1, #impulses)
+        assert.same(vec(0, 6, 6), impulses[1])
+
+        -- 有 Controller 且能 ApplyForce 时优先控制器受力，不再走 ApplyImpulse
+        local applied = {}
+        ctx.target.Controller.ApplyForce = function(_, force) applied[#applied + 1] = force end
+        impulses = {}
+        ctx.swingStaged[7] = { damage = 12, range = 4 }
+        anchor.AnchorStart:Fire()
+        ctx.created[#ctx.created].OnTriggerEnter:Fire(ctx.target)
+        assert.same(1, #applied)
+        assert.same(0, #impulses)
+        assert.same(vec(0, 6, 6), applied[1])
+
+        -- 力度 0（默认属性）：命中照常结算，但不推人
+        impulses = {}
+        ctx.target.Controller.ApplyForce = nil
+        ctx.swingStaged[7] = { damage = 12, range = 4 }
+        buildAnchor(baseAttrs()).AnchorStart:Fire()
+        ctx.created[#ctx.created].OnTriggerEnter:Fire(ctx.target)
+        assert.same(0, #impulses)
+    end)
+
+    it('test_hit_sfx_spawns_at_target_with_offset_and_is_reaped_by_timer', function()
+        local loaded, timers, destroyed = {}, {}, 0
+        local GetService = _G.game.GetService
+        _G.game.GetService = function(service, name)
+            local found = GetService(service, name)
+            if name == 'World' then
+                found.LoadUnitAssetByRPS = function(_, prefab, position, rotation, scale)
+                    loaded[#loaded + 1] = { prefab = prefab, position = position, rotation = rotation, scale = scale }
+                    return { { Destroy = function() destroyed = destroyed + 1 end } }
+                end
+            elseif name == 'TimerService' then
+                return { CreateTimer = function(_, _, lifetime, _, fn)
+                    timers[#timers + 1] = { lifetime = lifetime, fn = fn }
+                end }
+            end
+            return found
+        end
+        local attrs = baseAttrs()
+        attrs.ABILITY_ANOSTATE_HIT_SFX = 'official://unit/T-hitsfx'
+        attrs.ABILITY_ANOSTATE_HIT_SFX_SCALE = vec(0, 0, 0)
+        attrs.ABILITY_ANOSTATE_BULLET_HITSFXOFFSET = vec(0, 1, 0)
+        ctx.swingStaged[7] = { damage = 12, range = 4 }
+        buildAnchor(attrs).AnchorStart:Fire()
+        ctx.created[#ctx.created].OnTriggerEnter:Fire(ctx.target)
+        assert.same(1, #loaded)
+        assert.same('official://unit/T-hitsfx', loaded[1].prefab)
+        assert.same(vec(1, 1, 0), loaded[1].position) -- 目标位置 (1,0,0) + 偏移 (0,1,0)
+        assert.same(vec(1, 1, 1), loaded[1].scale) -- 零尺度非法，回退单位尺度
+        assert.same(1, #timers)
+        assert.same(1, timers[1].lifetime)
+        timers[1].fn()
+        assert.same(1, destroyed)
+
+        -- 预设没配音效（空串）时不建任何单位
+        loaded, timers = {}, {}
+        attrs.ABILITY_ANOSTATE_HIT_SFX = ''
+        ctx.swingStaged[7] = { damage = 12, range = 4 }
+        buildAnchor(attrs).AnchorStart:Fire()
+        ctx.created[#ctx.created].OnTriggerEnter:Fire(ctx.target)
+        assert.same(0, #loaded)
+        assert.same(0, #timers)
+    end)
 end)

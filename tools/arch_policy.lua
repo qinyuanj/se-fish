@@ -17,12 +17,12 @@ M.policy = {
       modules = {
         'server.swing_registry',
         'common.ai_target_policy', 'common.attr_growth', 'common.attr_model', 'common.blindbox_draw', 'common.body_scale',
-        'common.boss_phase', 'common.carry_mount', 'common.content_validation', 'common.fish_catch',
+        'common.boss_phase', 'common.carry_mount', 'common.content_validation', 'common.deep_copy', 'common.fish_catch',
         'common.flight_path', 'common.game_cfg', 'common.grill_curve', 'common.host_signal', 'common.lottery_draw',
         'common.lottery_eligibility', 'common.math_water_judge', 'common.npc_dialogue', 'common.number',
         'common.quest_steps', 'common.rate_limit', 'common.records',
         'common.reel_display', 'common.reel_progress', 'common.special_item', 'common.spoke_clock',
-        'common.vitals', 'common.zone_markers',
+        'common.store_handle', 'common.vitals', 'common.zone_markers',
       },
     },
     {

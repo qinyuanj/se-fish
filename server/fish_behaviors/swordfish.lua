@@ -2,11 +2,6 @@ local FishBehaviorKit = require('server.fish_behaviors.kit')
 
 local SwordfishBehaviors = {}
 
-local function init(fish, now, combat)
-    fish.JumpAt = now + combat.JumpIntervalSec
-    fish.roll_slot = -1
-end
-
 local function step(mgr, fish, now, pos, params)
     local dt = FishBehaviorKit.begin_combat_frame(fish, now)
     local move = fish.Move
@@ -24,6 +19,6 @@ local function step(mgr, fish, now, pos, params)
     FishBehaviorKit.engage_or_chase(mgr, fish, now, pos, params, dt, 'swing', params.SwingCooldownSec, '剑鱼')
 end
 
-SwordfishBehaviors.swordfish = { init = init, step = step }
+SwordfishBehaviors.swordfish = { init = FishBehaviorKit.init_jump_cycle, step = step }
 
 return SwordfishBehaviors

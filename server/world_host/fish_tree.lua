@@ -648,11 +648,8 @@ function Mgr.new(opts)
   return setmetatable({ Fish = {}, next_id = 0, held = {}, links = {}, clock = clock }, { __index = Mgr })
 end
 
-function Mgr:damage_fish(fish, amount)
-  if type(fish) ~= 'table' or self.Fish[fish.Id] ~= fish then return false, 'invalid-fish' end
-  if not Number.is_finite_number(amount) or amount <= 0 then return false, 'invalid-amount' end
-  local carrier = fish.carrier
-  if not carrier then return false, 'missing-carrier' end
+-- 失败日志上下文：优先走注入的 logger.error，否则 print。
+local function damage_fail_logger(self, fish)
   local logger = rawget(self, 'logger')
   local ctx = { context = 'FishTree.damage_fish (fish=' .. tostring(fish.Id) .. ')', logger = logger }
   local function log_fail(stage, err)
@@ -663,58 +660,84 @@ function Mgr:damage_fish(fish, amount)
       print(msg)
     end
   end
+  return ctx, log_fail
+end
+
+-- 读载体当前血量：missing 视为 0，其它读失败返回 nil 与原因。
+local function read_carrier_health(carrier, ctx, log_fail)
   local ok_cur, cur_health, reason_cur = EngineRead.read_field(carrier, 'Health', ctx)
   if not ok_cur then
     if reason_cur ~= 'missing' then
       log_fail('读取载体血量', reason_cur)
-      return false, reason_cur
+      return nil, reason_cur
     end
-    cur_health = 0
-  elseif not Number.is_finite_number(cur_health) then
-    log_fail('读取载体血量', 'non-finite:' .. tostring(cur_health))
-    return false, 'invalid-health'
+    return 0
   end
-  local health = cur_health - amount
-  if health < 0 then health = 0 end
+  if not Number.is_finite_number(cur_health) then
+    log_fail('读取载体血量', 'non-finite:' .. tostring(cur_health))
+    return nil, 'invalid-health'
+  end
+  return cur_health
+end
+
+-- 把新血量写到控制器（存在时）：返回控制器、原血量与失败原因。
+local function write_controller_health(carrier, health, ctx, log_fail)
   local ok_ctrl, controller, reason_ctrl = EngineRead.read_field(carrier, 'Controller', ctx)
   if not ok_ctrl and reason_ctrl ~= 'missing' then
     log_fail('读取控制器', reason_ctrl)
-    return false, reason_ctrl
+    return nil, nil, reason_ctrl
   end
-  local prev_ctrl_health = nil
+  local prev_health = nil
   if ok_ctrl and controller then
     local ok_ch, ch_val = EngineRead.read_field(controller, 'Health', ctx)
-    if ok_ch then prev_ctrl_health = ch_val end
+    if ok_ch then prev_health = ch_val end
     local ok_cw, _, reason_cw = EngineRead.write_field(controller, 'Health', health, ctx)
     if not ok_cw then
       log_fail('写入控制器血量', reason_cw)
-      return false, reason_cw
+      return nil, nil, reason_cw
     end
   end
+  return controller, prev_health
+end
+
+-- 击杀或状态变更通知：返回 true 或 false 与失败原因。
+local function notify_health_change(self, fish, carrier, health, log_fail)
+  local on_state_changed = rawget(self, 'on_state_changed')
+  if health <= 0 then
+    local ok_died, died_res = pcall(self.on_carrier_died, self, carrier)
+    if ok_died and died_res ~= false then return true end
+    local err = not ok_died and tostring(died_res) or 'on-carrier-died-failed'
+    log_fail('写入击杀状态', err)
+    return false, err
+  end
+  if type(on_state_changed) ~= 'function' then return true end
+  local ok_chg, chg_err = pcall(on_state_changed, fish)
+  if ok_chg then return true end
+  log_fail('通知状态变更', chg_err)
+  return false, tostring(chg_err)
+end
+
+function Mgr:damage_fish(fish, amount)
+  if type(fish) ~= 'table' or self.Fish[fish.Id] ~= fish then return false, 'invalid-fish' end
+  if not Number.is_finite_number(amount) or amount <= 0 then return false, 'invalid-amount' end
+  local carrier = fish.carrier
+  if not carrier then return false, 'missing-carrier' end
+  local ctx, log_fail = damage_fail_logger(self, fish)
+  local cur_health, reason = read_carrier_health(carrier, ctx, log_fail)
+  if not cur_health then return false, reason end
+  local health = cur_health - amount
+  if health < 0 then health = 0 end
+  local controller, prev_ctrl_health, ctrl_reason = write_controller_health(carrier, health, ctx, log_fail)
+  if ctrl_reason then return false, ctrl_reason end
   local ok_hw, _, reason_hw = EngineRead.write_field(carrier, 'Health', health, ctx)
   if not ok_hw then
-    if ok_ctrl and controller and prev_ctrl_health ~= nil then
+    if controller and prev_ctrl_health ~= nil then
       EngineRead.write_field(controller, 'Health', prev_ctrl_health, ctx)
     end
     log_fail('写入载体血量', reason_hw)
     return false, reason_hw
   end
-  local on_state_changed = rawget(self, 'on_state_changed')
-  if health <= 0 then
-    local ok_died, died_res = pcall(self.on_carrier_died, self, carrier)
-    if not ok_died or died_res == false then
-      local err = not ok_died and tostring(died_res) or 'on-carrier-died-failed'
-      log_fail('写入击杀状态', err)
-      return false, err
-    end
-  elseif type(on_state_changed) == 'function' then
-    local ok_chg, chg_err = pcall(on_state_changed, fish)
-    if not ok_chg then
-      log_fail('通知状态变更', chg_err)
-      return false, tostring(chg_err)
-    end
-  end
-  return true
+  return notify_health_change(self, fish, carrier, health, log_fail)
 end
 
 function Mgr:fault(fish, reason)

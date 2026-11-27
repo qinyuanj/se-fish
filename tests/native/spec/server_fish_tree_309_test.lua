@@ -206,6 +206,48 @@ describe("活鱼树宿主入口（#309）", function()
     assert.is_true(alive_units(units) > 0)
   end)
 
+  -- 死亡/离场解绑（fish_tree 的 on_died 与 on_player_removing）：鱼的咬钩、追击、威胁与锁定目标
+  -- 都指着某个玩家时，玩家死亡或离场必须全部解绑，否则鱼会继续追一个已经不存在的玩家；
+  -- 该玩家正在施法也要中断，不然法阵会挂在一个走了的人身上。
+  it("玩家死亡或离场时解绑挂在他身上的鱼目标并中断施法", function()
+    local runtime = boot()
+    local host = runtime.fish_host
+    local aborts = {}
+    host.cast = { abort = function(_, who) aborts[#aborts + 1] = who end }
+    host.ai = { custom = function() end }
+
+    -- 追着 A 的鱼属于 B：A 走了以后鱼还在，必须把指向 A 的目标解绑
+    local leaving = make_player(8, 10, -18)
+    join(runtime, leaving)
+    local owner = make_player(9, 12, -18)
+    join(runtime, owner)
+    assert.is_true(runtime:receive_landed(owner, { fishId = "bass", mult = 1, x = 12, y = 2, z = -18 }))
+    local fish
+    for _, row in pairs(host.Fish) do
+      if row.Owner == owner then fish = row end
+    end
+    assert.is_not_nil(fish)
+    fish.bite_aim = { Target = leaving }
+    fish.Move = { Target = leaving, Name = "dive" }
+    fish.threat = { [leaving] = 1 }
+    fish.target_override = leaving
+
+    host:on_player_removing(leaving)
+    assert.is_nil(fish.bite_aim, "离场后鱼的咬钩目标必须解绑")
+    assert.is_nil(fish.Move, "离场后鱼的追击目标必须解绑")
+    assert.is_nil(fish.threat[leaving], "离场后鱼的威胁表必须清掉这个人")
+    assert.is_nil(fish.target_override, "离场后鱼的锁定目标必须清掉")
+
+    -- 死亡走 on_died：同样把这条鱼指向死者的咬钩与追击解绑
+    fish.bite_aim = { Target = owner }
+    fish.Move = { Target = owner, Name = "dive" }
+    host:on_died(owner)
+    assert.is_nil(fish.bite_aim, "死亡后鱼的咬钩目标必须解绑")
+    assert.is_nil(fish.Move, "死亡后鱼的追击目标必须解绑")
+    assert.same(1, #aborts, "死亡要中断该玩家的施法")
+    assert.same(owner, aborts[1])
+  end)
+
   it("精英 180 秒、首领 300 秒到点才离场，击杀掉落进地面集合", function()
     local runtime = boot()
     local player = make_player(4)

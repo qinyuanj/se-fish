@@ -1,14 +1,13 @@
+local DeepCopy = require('common.deep_copy')
 local GameCfg = require('common.game_cfg')
+local StoreHandle = require('common.store_handle')
 local PlayerData = require('server.data.player_data')
 local SaveHost = { SpokeHost = true, ledger = {}, pending = {}, flying = {}, sessions = {}, waiters = {}, next_autosave_at = nil }
 local function cfg() return GameCfg.Save end
+-- DataStore 句柄缓存字段与取不到时的说明。字段名沿用既有的 store_checked/Store（save_test 直接复位它们模拟服务缺失）。
+local STORE_CACHE = { checked = 'store_checked', store = 'Store' }
+local STORE_LOG = '[SaveHost] DataStore 不可用，保持读档失败屏障'
 local function task() return game:GetService('Task') end
-local function copy(value)
-    if type(value) ~= 'table' then return value end
-    local out = {}
-    for k, v in pairs(value) do out[k] = copy(v) end
-    return out
-end
 local function equal(a, b)
     if type(a) ~= type(b) then return false end
     if type(a) ~= 'table' then return a == b end
@@ -78,17 +77,6 @@ function SaveHost:finish_save(userId)
     self.waiters[userId] = nil
     for _, fn in ipairs(callbacks) do callback('AfterIdle', userId, fn) end
 end
-function SaveHost:get_store()
-    if self.store_checked then return self.Store end
-    self.store_checked = true
-    local ok, store = pcall(function() return game:GetService('DataStoreService'):GetDataStore(cfg().Store) end)
-    if not ok or not store then
-        print('[SaveHost] DataStore 不可用，保持读档失败屏障', tostring(store))
-        return nil
-    end
-    self.Store = store
-    return store
-end
 function SaveHost:with_retry(label, fn)
     for attempt = 1, cfg().MaxRetries do
         local ok, value = pcall(fn)
@@ -99,7 +87,7 @@ function SaveHost:with_retry(label, fn)
     return false, nil
 end
 function SaveHost:load(userId)
-    local store = self:get_store()
+    local store = StoreHandle.get(self, STORE_CACHE, cfg().Store, STORE_LOG)
     if not store then return nil, 'failed' end
     local key = self:key(userId)
     local ok, value = self:with_retry('读档 ' .. tostring(userId), function() return store:GetAsync(key) end)
@@ -148,6 +136,85 @@ function SaveHost:restore_landing(userId, player, data, session)
     end)
 end
 
+-- 读槽选择并写入会话：失败时已 fail 并返回 nil。
+local function prepare_session_store(self, userId, s, data)
+    local store = StoreHandle.get(self, STORE_CACHE, cfg().Store, STORE_LOG)
+    if not store then self:fail(userId, s, '存档服务不可用') return nil end
+    local ok_slot, slot = self:with_retry('读取槽选择 ' .. userId, function()
+        return store:GetAsync(cfg().KeyPrefix .. userId .. ':gm-slot')
+    end)
+    if not self:is_current(userId, s, data) then return nil end
+    if not ok_slot or slot ~= nil and slot ~= '' and not validSlot(slot) then
+        self:fail(userId, s, '槽选择读取失败或损坏') return nil
+    end
+    if slot ~= nil then s.current, s.next = slot, slot end
+    s.Key = self:key(userId)
+    return store
+end
+
+-- 无存档时造新档，有存档时迁移；失败已 fail 并返回 nil。
+local function resolve_candidate(self, userId, s, data, loaded)
+    local candidate, reason
+    if loaded == nil then
+        local fresh = PlayerData.new({ UserId = userId, SetAttribute = function() end })
+        fresh:Init()
+        candidate = fresh:Serialize()
+    else
+        candidate, reason = data:Migrate(loaded)
+    end
+    if not candidate then self:fail(userId, s, reason) return nil end
+    if not self:within_budget(candidate) then self:fail(userId, s, '存档容量超预算') return nil end
+    return candidate
+end
+
+-- 在 store 上认领会话（CAS）；失败已 fail 并返回 nil。
+local function claim_session(self, userId, s, data, store, candidate, loaded)
+    local ok, claimed = self:with_retry('认领会话 ' .. userId, function()
+        return store:UpdateAsync(s.Key, function(current)
+            if not self:is_current(userId, s, data) then return nil end
+            if current and current.meta and current.meta.session == s.token then return current end
+            if not equal(current, loaded) then return nil end
+            local next_value = DeepCopy.copy(candidate)
+            next_value.meta.epoch = next_value.meta.epoch + 1
+            next_value.meta.revision = next_value.meta.revision + 1
+            next_value.meta.session = s.token
+            return next_value
+        end)
+    end)
+    if not self:is_current(userId, s, data) then return nil end
+    if not ok or not claimed or claimed.meta.session ~= s.token then
+        self:fail(userId, s, '会话认领失败或版本冲突') return nil
+    end
+    return claimed
+end
+
+-- 收尾：写回会话状态、恢复落点、记一笔写入账并通知就绪。
+local function finish_load(self, userId, player, data, s, claimed, status)
+    s.State, s.revision, s.epoch = 'ready', claimed.meta.revision, claimed.meta.epoch
+    if not data:CompleteLoad(claimed) then self:fail(userId, s, '恢复数据无效') return end
+    self:restore_landing(userId, player, data, s)
+    self:note_write(userId, claimed, status == 'missing' and 'new' or 'load')
+    player:SetAttribute('SaveState', 'ready')
+    print('[SaveHost] ready', userId, s.token, 'coin=' .. claimed.coin, 'sequence=' .. claimed.meta.sequence)
+    if self.on_ready then self.on_ready(player, data) end
+    if self.player_data then self.player_data:send_item_bar(player, true) end
+end
+
+-- 一次读档的完整流程：取 store、读槽、造档/迁移、认领会话、收尾。
+local function run_load(self, userId, player, data, s)
+    if not self:is_current(userId, s, data) then return end
+    local store = prepare_session_store(self, userId, s, data)
+    if not store then return end
+    local loaded, status = self:load(userId)
+    if not self:is_current(userId, s, data) then return end
+    if status == 'failed' then self:fail(userId, s, '读取失败，不初始化新档') return end
+    local candidate = resolve_candidate(self, userId, s, data, loaded)
+    if not candidate then return end
+    local claimed = claim_session(self, userId, s, data, store, candidate, loaded)
+    if not claimed then return end
+    finish_load(self, userId, player, data, s, claimed, status)
+end
+
 function SaveHost:load_into(player, data)
     local userId = player.UserId
     local previous = self:session(userId)
@@ -162,57 +229,7 @@ function SaveHost:load_into(player, data)
     data.inited, data.load_state = false, 'pending'
     player:SetAttribute('SaveState', 'pending')
     local function load()
-        task():Spawn(function()
-            if not self:is_current(userId, s, data) then return end
-            local store = self:get_store()
-            if not store then self:fail(userId, s, '存档服务不可用') return end
-            local okSlot, slot = self:with_retry('读取槽选择 ' .. userId, function()
-                return store:GetAsync(cfg().KeyPrefix .. userId .. ':gm-slot')
-            end)
-            if not self:is_current(userId, s, data) then return end
-            if not okSlot or slot ~= nil and slot ~= '' and not validSlot(slot) then
-                self:fail(userId, s, '槽选择读取失败或损坏') return
-            end
-            if slot ~= nil then s.current, s.next = slot, slot end
-            s.Key = self:key(userId)
-            local loaded, status = self:load(userId)
-            if not self:is_current(userId, s, data) then return end
-            if status == 'failed' then self:fail(userId, s, '读取失败，不初始化新档') return end
-            local candidate, reason
-            if loaded == nil then
-                local fresh = PlayerData.new({ UserId = userId, SetAttribute = function() end })
-                fresh:Init()
-                candidate = fresh:Serialize()
-            else
-                candidate, reason = data:Migrate(loaded)
-            end
-            if not candidate then self:fail(userId, s, reason) return end
-            if not self:within_budget(candidate) then self:fail(userId, s, '存档容量超预算') return end
-            local ok, claimed = self:with_retry('认领会话 ' .. userId, function()
-                return store:UpdateAsync(s.Key, function(current)
-                    if not self:is_current(userId, s, data) then return nil end
-                    if current and current.meta and current.meta.session == s.token then return current end
-                    if not equal(current, loaded) then return nil end
-                    local nextValue = copy(candidate)
-                    nextValue.meta.epoch = nextValue.meta.epoch + 1
-                    nextValue.meta.revision = nextValue.meta.revision + 1
-                    nextValue.meta.session = s.token
-                    return nextValue
-                end)
-            end)
-            if not self:is_current(userId, s, data) then return end
-            if not ok or not claimed or claimed.meta.session ~= s.token then
-                self:fail(userId, s, '会话认领失败或版本冲突') return
-            end
-            s.State, s.revision, s.epoch = 'ready', claimed.meta.revision, claimed.meta.epoch
-            if not data:CompleteLoad(claimed) then self:fail(userId, s, '恢复数据无效') return end
-            self:restore_landing(userId, player, data, s)
-            self:note_write(userId, claimed, status == 'missing' and 'new' or 'load')
-            player:SetAttribute('SaveState', 'ready')
-            print('[SaveHost] ready', userId, s.token, 'coin=' .. claimed.coin, 'sequence=' .. claimed.meta.sequence)
-            if self.on_ready then self.on_ready(player, data) end
-            if self.player_data then self.player_data:send_item_bar(player, true) end
-        end)
+        task():Spawn(function() run_load(self, userId, player, data, s) end)
     end
     if previous.slot_choosing then
         previous.slot_waiters = previous.slot_waiters or {}
@@ -232,13 +249,13 @@ function SaveHost:write_job(userId, job)
         job.snapshot.meta.write = job.Id
     end
     local ok, value = self:with_retry('写档 ' .. userId .. ' ' .. job.Reason, function()
-        return self.Store:UpdateAsync(job.Key, function(current)
+        return StoreHandle.get(self, STORE_CACHE, cfg().Store, STORE_LOG):UpdateAsync(job.Key, function(current)
             if self.sessions[userId] ~= s then return nil end
             if type(current) ~= 'table' or type(current.meta) ~= 'table'
                 or current.meta.session ~= s.token or current.meta.epoch ~= s.epoch then return nil end
             if current.meta.write == job.Id then return current end
             if current.meta.revision ~= job.base_revision then return nil end
-            return copy(job.snapshot)
+            return DeepCopy.copy(job.snapshot)
         end)
     end)
     if self.sessions[userId] ~= s then return false, 'stale' end
@@ -297,10 +314,10 @@ function SaveHost:drain(userId)
 end
 function SaveHost:enqueue(userId, snapshot, reason, done)
     local s = self.sessions[userId]
-    if not s or s.State ~= 'ready' or s.paused or s.transition or not self:get_store()
+    if not s or s.State ~= 'ready' or s.paused or s.transition or not StoreHandle.get(self, STORE_CACHE, cfg().Store, STORE_LOG)
         or not s.data or not s.data.inited or not snapshot or not s.data:IsValidSave(snapshot)
         or not self:within_budget(snapshot) or snapshot.meta.session ~= s.token then return false end
-    local job = { session = s, Key = s.Key, snapshot = copy(snapshot), Reason = reason or 'save', done = done,
+    local job = { session = s, Key = s.Key, snapshot = DeepCopy.copy(snapshot), Reason = reason or 'save', done = done,
         no_retry = reason == 'gm' }
     self.pending[userId] = appendJob(self.pending[userId], job)
     self:drain(userId)
@@ -352,27 +369,75 @@ end
 
 -- transform 只改隔离 draft 并返回可序列化结果；外部实体交接由调用方在成功回调按操作身份确认。
 -- 扣费、发奖、恢复记录和结果一次落在同键，失败时 draft 不向玩家发布。
-function SaveHost:execute(player, data, operation, transform, done)
-    local userId, s = player.UserId, self.sessions[player.UserId]
+-- 操作身份校验：会话、数据、序号、id 与回调都必须齐备且自洽。
+local function valid_operation(self, userId, s, data, operation, transform, done)
     if not s or not self:is_current(userId, s, data) or s.State ~= 'ready' or not data.inited
         or type(operation) ~= 'table' or type(operation.sequence) ~= 'number'
         or operation.sequence ~= math.floor(operation.sequence) or operation.sequence < 1
         or operation.id ~= tostring(userId) .. ':' .. operation.sequence
         or type(operation.kind) ~= 'string' or #operation.kind < 1 or #operation.kind > 80
         or operation.request_key ~= nil and type(operation.request_key) ~= 'string'
-        or type(transform) ~= 'function' or type(done) ~= 'function' then return false, 'invalid' end
-    local meta = data.save_meta
-    for _, recorded in ipairs(meta.operations) do
+        or type(transform) ~= 'function' or type(done) ~= 'function' then return false end
+    return true
+end
+
+-- 已记录的同 id 操作：身份一致就回放结果，不一致返回 'identity-conflict'。
+-- 返回 false 表示这一 id 还没记录过，继续走新结算。
+local function replay_recorded(userId, data, operation, done)
+    for _, recorded in ipairs(data.save_meta.operations) do
         if recorded.id == operation.id then
             if recorded.kind ~= operation.kind or operation.request_key ~= nil
-                and recorded.request_key ~= operation.request_key then return false, 'identity-conflict' end
-            callback('结果重放', userId, done, true, copy(recorded.result))
-            return true
+                and recorded.request_key ~= operation.request_key then
+                return 'identity-conflict'
+            end
+            callback('结果重放', userId, done, true, DeepCopy.copy(recorded.result))
+            return 'replayed'
         end
     end
-    if operation.sequence <= meta.sequence then return false, 'expired' end
-    if self:is_paused(userId) then return false, 'pending' end
-    if operation.sequence ~= meta.sequence + 1 then return false, 'out-of-order' end
+    return false
+end
+
+-- 序号单调性、暂停与乱序三道闸；放行返回 nil，否则返回拒绝原因。
+local function sequence_gate(self, userId, data, operation)
+    local meta = data.save_meta
+    if operation.sequence <= meta.sequence then return 'expired' end
+    if self:is_paused(userId) then return 'pending' end
+    if operation.sequence ~= meta.sequence + 1 then return 'out-of-order' end
+    return nil
+end
+
+-- 把本次结果并进 draft 序列化：写序号、追加操作记录并按 64 条裁剪。
+local function build_next_value(draft, operation, result)
+    local next_value = draft:Serialize()
+    next_value.meta.sequence = operation.sequence
+    table.insert(next_value.meta.operations, { id = operation.id, sequence = operation.sequence,
+        kind = operation.kind, request_key = operation.request_key, result = DeepCopy.copy(result) })
+    while #next_value.meta.operations > 64 do
+        next_value.meta.floor = table.remove(next_value.meta.operations, 1).sequence
+    end
+    return next_value
+end
+
+-- 写档完成回调：成功发布 draft 并回结果，失败记 fail 并回失败原因。
+local function settle_job(self, userId, data, s, operation, snapshot, result, done, written, value)
+    if not self:is_current(userId, s, data) then return end
+    s.transition = false
+    if not written then
+        self:fail(userId, s, '结算未确认 ' .. tostring(value))
+        callback('结算失败', userId, done, false, value)
+        return
+    end
+    data.inited = true
+    data:ApplySave(value)
+    data:PublishItemBar()
+    print('[SaveHost] operation', userId, operation.id, operation.kind,
+        'coinBefore=' .. snapshot.coin, 'coinAfter=' .. value.coin,
+        'bar=' .. #value.bar, 'bp=' .. #value.bp)
+    callback('结算完成', userId, done, true, DeepCopy.copy(result))
+end
+
+-- 在隔离 draft 上跑 transform 再落库：draft 不向玩家发布，只有写成功才 ApplySave。
+local function run_transition(self, userId, data, s, operation, transform, done)
     s.transition = true
     self:after_idle(userId, function()
         if not self:is_current(userId, s, data) then return end
@@ -387,40 +452,31 @@ function SaveHost:execute(player, data, operation, transform, done)
             callback('结算拒绝', userId, done, false, ok and reason or tostring(result))
             return
         end
-        local nextValue = draft:Serialize()
-        nextValue.meta.sequence = operation.sequence
-        table.insert(nextValue.meta.operations, { id = operation.id, sequence = operation.sequence,
-            kind = operation.kind, request_key = operation.request_key, result = copy(result) })
-        while #nextValue.meta.operations > 64 do
-            nextValue.meta.floor = table.remove(nextValue.meta.operations, 1).sequence
-        end
-        if not data:IsValidSave(nextValue) or not self:within_budget(nextValue) then
+        local next_value = build_next_value(draft, operation, result)
+        if not data:IsValidSave(next_value) or not self:within_budget(next_value) then
             s.transition = false
             callback('结算容量拒绝', userId, done, false, 'invalid-result-or-budget')
             return
         end
         data.inited = false
-        local job = { session = s, Key = s.Key, snapshot = nextValue, Reason = operation.kind,
+        self.pending[userId] = { session = s, Key = s.Key, snapshot = next_value, Reason = operation.kind,
             done = function(written, value)
-                if not self:is_current(userId, s, data) then return end
-                s.transition = false
-                if written then
-                    data.inited = true
-                    data:ApplySave(value)
-                    data:PublishItemBar()
-                    print('[SaveHost] operation', userId, operation.id, operation.kind,
-                        'coinBefore=' .. snapshot.coin, 'coinAfter=' .. value.coin,
-                        'bar=' .. #value.bar, 'bp=' .. #value.bp)
-                    callback('结算完成', userId, done, true, copy(result))
-                else
-                    self:fail(userId, s, '结算未确认 ' .. tostring(value))
-                    callback('结算失败', userId, done, false, value)
-                end
+                settle_job(self, userId, data, s, operation, snapshot, result, done, written, value)
             end }
-        self.pending[userId] = job
         self:drain(userId)
     end)
     return true
+end
+
+function SaveHost:execute(player, data, operation, transform, done)
+    local userId, s = player.UserId, self.sessions[player.UserId]
+    if not valid_operation(self, userId, s, data, operation, transform, done) then return false, 'invalid' end
+    local replay = replay_recorded(userId, data, operation, done)
+    if replay == 'identity-conflict' then return false, 'identity-conflict' end
+    if replay == 'replayed' then return true end
+    local rejection = sequence_gate(self, userId, data, operation)
+    if rejection then return false, rejection end
+    return run_transition(self, userId, data, s, operation, transform, done)
 end
 
 function SaveHost:apply_temporary(userId, data, patch, done)
@@ -482,7 +538,7 @@ function SaveHost:read_explicit(userId, data, done)
 end
 function SaveHost:select_next_slot(userId, slot, done)
     if slot ~= '' and not validSlot(slot) then return false, '存档槽须为 1—40 位字母、数字、下划线或连字符' end
-    local s, store = self:session(userId), self:get_store()
+    local s, store = self:session(userId), StoreHandle.get(self, STORE_CACHE, cfg().Store, STORE_LOG)
     if s.slot_choosing or not store then return false, '槽选择进行中或服务不可用' end
     s.slot_choosing = true
     task():Spawn(function()
