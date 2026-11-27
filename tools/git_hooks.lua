@@ -12,6 +12,7 @@ M.HOOK_BODY = table.concat({
   'repo_root=$(git rev-parse --show-toplevel) || exit 1',
   'cd "$repo_root" || exit 1',
   'lua tools/cli.lua test guards || exit $?',
+  'lua tools/cli.lua size || exit $?',
   'exec lua tools/cli.lua emmylua',
   '',
 }, '\n')
@@ -19,7 +20,7 @@ M.HOOK_BODY = table.concat({
 function M.usage()
   return table.concat({
     '用法: lua tools/cli.lua git-hook-init [--root <检出根>]',
-    '  安装本地 pre-commit，提交前依次运行 lua tools/cli.lua test guards 与 lua tools/cli.lua emmylua。',
+    '  安装本地 pre-commit，提交前依次运行 lua tools/cli.lua test guards、lua tools/cli.lua size 与 lua tools/cli.lua emmylua。',
     '  --root  目标检出根，默认当前仓库；重复执行幂等，自家旧版 hook 自动升级，不覆盖其他 hook。',
   }, '\n') .. '\n'
 end
