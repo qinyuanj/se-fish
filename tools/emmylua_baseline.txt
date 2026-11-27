@@ -435,10 +435,10 @@ server/world_host/fish_carrier.lua:390:unused
 server/world_host/fish_carrier.lua:393:unused
 server/world_host/fish_carrier.lua:396:unused
 server/world_host/fish_tree.lua:12:unresolved-require
-server/world_host/fishing_phase.lua:280:assign-type-mismatch
-server/world_host/fishing_phase.lua:369:assign-type-mismatch
-server/world_host/fishing_phase.lua:370:assign-type-mismatch
-server/world_host/fishing_phase.lua:9:unresolved-require
+server/world_host/fishing_phase.lua:221:assign-type-mismatch
+server/world_host/fishing_phase.lua:310:assign-type-mismatch
+server/world_host/fishing_phase.lua:311:assign-type-mismatch
+server/world_host/fishing_phase.lua:7:unresolved-require
 server/world_host/ground_loot.lua:5:unresolved-require
 server/world_host/ground_loot.lua:6:unresolved-require
 server/world_host/ground_loot.lua:8:unused
@@ -593,5 +593,5 @@ server/world_host/world_records.lua:88:unnecessary-if
 server/world_host/world_records.lua:93:need-check-nil
 server/world_host/world_signal_router.lua:21:unnecessary-if
 server/world_host/world_signal_router.lua:32:unnecessary-if
-server/world_host/fishing_phase.lua:222:assign-type-mismatch
+server/world_host/fishing_phase.lua:163:assign-type-mismatch
 server/world_host/world_signal_router.lua:45:call-non-callable
