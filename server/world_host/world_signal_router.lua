@@ -1,12 +1,13 @@
 
+local EngineRead = require("common.engine_read")
+
 local WorldSignalRouter = {}
 
 local bound_player_signals = setmetatable({}, { __mode = "k" })
 local bound_world_signals = setmetatable({}, { __mode = "k" })
 
 function WorldSignalRouter.is_valid_player(player)
-  local EngineRead = require("common.engine_read")
-  return EngineRead.is_object(player) and player.UserId ~= nil
+  return EngineRead.is_valid_player(player)
 end
 
 function WorldSignalRouter.bind_player(scope, signal, player, fn)

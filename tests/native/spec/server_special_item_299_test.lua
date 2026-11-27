@@ -552,4 +552,64 @@ describe("风神之翼与哥斯拉存活相位宿主入口（#299）", function(
       assert.is_true(unit.Destroyed)
     end
   end)
+
+  -- 客户端请求特殊道具状态（SpecialItemStateRequest）必须回推当前快照；离场后不再回包。
+  -- 失败方式：查询没有回包（面板永远空白）；或者已经离场的树还在回包（读到死对象的状态）。
+  it("状态请求回推当前特殊道具快照，离场后不再回包", function()
+    boot("item169")
+    local tree = runtime:get_player_tree(player.UserId)
+    local before = #events.SpecialItemState.clients
+    events.SpecialItemStateRequest.OnServerEvent:Fire(player)
+    local sent = events.SpecialItemState.clients
+    assert.is_true(#sent > before, "状态请求必须回推一次快照")
+    assert.same(player, sent[#sent].player)
+    assert.equals("wings", sent[#sent].value.effect)
+    assert.is_true(tree:handle_special_item_query())
+
+    runtime:on_player_removing(player)
+    local after_leave = #events.SpecialItemState.clients
+    assert.is_false(tree:handle_special_item_query(), "离场后不得再回包")
+    assert.equals(after_leave, #events.SpecialItemState.clients)
+  end)
+
+  -- 还原引擎调用失败时按 CLEANUP_RETRY_SEC 限频重试：同一窗口内不每帧重打引擎，
+  -- 恢复后一个窗口内清理完成并交还重力，功能不被卡死。
+  -- 失败方式：失败后每帧打引擎（刷爆日志/引擎调用）；或恢复后仍停在清理态（玩家再也飞不了）。
+  it("还原失败时限频重试，恢复后一个窗口内清理完成", function()
+    boot("item169")
+    assert.equals("wings", last_state(events, player).effect)
+    local unbinds, unbind_ok = 0, false
+    player.Character.EggyAppearance.UnbindAppearance = function(_, bind_id)
+      unbinds = unbinds + 1
+      player.Character.Calls[#player.Character.Calls + 1] = { "unbind", bind_id }
+      return unbind_ok
+    end
+    select_item(player, nil)
+    runtime.clock:step(0.3)
+    local attempts = unbinds
+    assert.is_true(attempts >= 1, "还原必须真的尝试过 unbind")
+
+    -- 同一个失败窗口内不得每帧重打引擎（engine_call 的失败缓存在 CLEANUP_RETRY_SEC 内生效）
+    for _ = 1, 5 do runtime.clock:step(0.1) end
+    assert.equals(attempts, unbinds, "同一失败窗口内不得重复打引擎")
+
+    unbind_ok = true
+    runtime.clock:advance(1.1)
+    assert.is_true(unbinds > attempts, "重试窗口到点后必须重新尝试")
+    assert.is_true(player.Character.Controller.GravityEnabled, "清理完成后必须交还重力")
+
+    -- 清理真的完成了：重新选中能再绑一次外观，不会因为清理失败一直卡住
+    local binds = 0
+    for _, call in ipairs(player.Character.Calls) do
+      if call[1] == "bind" then binds = binds + 1 end
+    end
+    select_item(player, "item169")
+    runtime.clock:step(0.3)
+    assert.equals("wings", last_state(events, player).effect, "清理完成后重新选中必须能生效")
+    local rebinds = 0
+    for _, call in ipairs(player.Character.Calls) do
+      if call[1] == "bind" then rebinds = rebinds + 1 end
+    end
+    assert.is_true(rebinds > binds, "清理完成后重新选中必须重新绑定外观")
+  end)
 end)

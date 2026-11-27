@@ -2,7 +2,8 @@
 -- 失败方式先列：
 --   1. FishTree 缺注入时钟时仍隐式创建 Spoke.Trigger 而不拒绝构造；
 --   2. WorldRecords / 客户端视图 / server/main.lua 在时钟异常时静默回退 0 污染缓存年龄、倒计时、进度或入口时钟；
---   3. ViewUtil.get_resolution 或 client/main.lua 在无注入且宿主不可用时仍硬编码返回 1920x1080，或客户端视图在分辨率为 nil 时崩溃。
+--   3. ViewUtil.get_resolution 或 client/main.lua 在无注入且宿主不可用时仍硬编码返回 1920x1080，或客户端视图在分辨率为 nil 时崩溃；
+--   4. ViewUtil.get_resolution 不按 options → services（get_device_resolution / resolution）→ 宿主 EUI 的顺序回退，或把 0/负数分辨率当有效值返回。
 
 local Spoke = require("common.packages.spoke.api")
 local SpokeClock = require("common.spoke_clock")
@@ -296,6 +297,58 @@ describe("时钟与分辨率显式注入与失败隔离（#367）", function()
     assert.is_nil(root:FindFirstChild("FerryCountdown", true))
 
     view:dispose()
+  end)
+
+  it("ViewUtil.get_resolution 按 options → services → 宿主 EUI 依次回退，非法读数逐级丢弃", function()
+    local function host_players(eui_manager)
+      return {
+        GetService = function(_, service)
+          if service ~= "Players" then return nil end
+          return { LocalPlayer = { PlayerGui = { EuiManager = eui_manager } } }
+        end,
+      }
+    end
+    local restore_print = capture_print()
+
+    -- 1. options.get_resolution 优先：即使 services 有合法注入也用它
+    local from_options = ViewUtil.get_resolution(
+      { services = { get_device_resolution = function() return { x = 800, y = 600 } end } },
+      { get_resolution = function() return { x = 1280, y = 720 } end }
+    )
+    -- 2. options 抛错：记录日志后回退 services.get_device_resolution
+    local from_services = ViewUtil.get_resolution(
+      { services = { get_device_resolution = function() return { x = 1600, y = 900 } end } },
+      { get_resolution = function() error("options-broken") end }
+    )
+    -- 3. options 读数非法（0 宽）：丢弃后回退 services.resolution 值
+    local from_resolution_value = ViewUtil.get_resolution(
+      { services = { resolution = { x = 1366, y = 768 } } },
+      { get_resolution = function() return { x = 0, y = 720 } end }
+    )
+    -- 4. services.resolution 允许是函数
+    local from_resolution_fn = ViewUtil.get_resolution({
+      services = { resolution = function() return { x = 1024, y = 640 } end },
+    })
+    -- 5. 宿主 EUI 提供有效设备分辨率
+    _G.game = host_players({ GetDeviceResolution = function() return { x = 1920, y = 1200 } end })
+    local from_host = ViewUtil.get_resolution({})
+    -- 6. 宿主 EUI 读设备分辨率抛错：记录日志并返回 nil
+    _G.game = host_players({ GetDeviceResolution = function() error("eui-down") end })
+    local host_read_error = ViewUtil.get_resolution({})
+    -- 7. 宿主 EUI 返回非法分辨率：静默丢弃后返回 nil
+    _G.game = host_players({ GetDeviceResolution = function() return { x = -1, y = 0 } end })
+    local host_invalid = ViewUtil.get_resolution({})
+    local joined = table.concat(restore_print(), "\n")
+
+    assert.same({ x = 1280, y = 720 }, from_options)
+    assert.same({ x = 1600, y = 900 }, from_services)
+    assert.same({ x = 1366, y = 768 }, from_resolution_value)
+    assert.same({ x = 1024, y = 640 }, from_resolution_fn)
+    assert.same({ x = 1920, y = 1200 }, from_host)
+    assert.is_nil(host_read_error)
+    assert.is_nil(host_invalid)
+    assert.matches("%[ViewUtil%] 读取分辨率失败", joined)
+    assert.matches("%[ViewUtil%] 读取宿主 EUI 分辨率失败", joined)
   end)
 
   it("server/main.lua 时钟异常时记录日志且不将入口时钟归零覆盖，client/main.lua 无 EUI 返回 nil", function()

@@ -15,14 +15,12 @@ local function isPoint(p)
     return type(p) == 'table' and not isBadNumber(p.x) and not isBadNumber(p.y) and not isBadNumber(p.z)
 end
 
-local function copy(p)
+local function vec3_of(p)
     return { x = p.x, y = p.y, z = p.z }
 end
 
-local function now_(v)
-    if isBadNumber(v) then return 0 end
-    return v
-end
+-- 非法数值按 0 处理（与 carry_mount 同口径，统一走 common.number）。
+local now_ = Number.or_zero
 
 local function chain(bossCfg)
     local list = { { Phase = 'normal' } }
@@ -97,7 +95,7 @@ function M.new(bossCfg, now, pos)
     bossCfg = bossCfg or cfg()
     local state = {
         cfg = bossCfg, Phase = 'normal', alive = true, Target = nil, pending = nil,
-        Percent = 100, pos = pos and copy(pos) or { x = 0, y = 0, z = 0 },
+        Percent = 100, pos = pos and vec3_of(pos) or { x = 0, y = 0, z = 0 },
         cooldown = {}, Log = {}, attack_log = {},
         stats = { frames = 0, transitions = 0, skipped = 0, Attacks = 0, interrupts = 0 },
     }
@@ -138,8 +136,8 @@ function M.update(state, now, dt, input)
         return events
     end
     state.alive = true
-    state.Target = isPoint(input.Target) and copy(input.Target) or nil
-    if isPoint(input.pos) then state.pos = copy(input.pos) end
+    state.Target = isPoint(input.Target) and vec3_of(input.Target) or nil
+    if isPoint(input.pos) then state.pos = vec3_of(input.pos) end
 
     local percent = M.percent_of(input.Health, input.MaxHealth)
     if percent then

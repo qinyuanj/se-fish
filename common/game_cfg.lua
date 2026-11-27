@@ -22,6 +22,28 @@ function GameCfg.resolve_zone_id(id)
     return GameCfg.LegacyZoneIdMap[id] or id
 end
 
+-- 按钓鱼区 Id 取该区的场景配置。Scene 由 zone_markers 启动时装配，纯配置模块不在加载期取服务。
+--- 取分区场景表：Scene 由 zone_markers 启动时装配，SafePoint 等字段是运行时注入的。
+---@param zone_id string?
+---@return table? scene
+function GameCfg.zone_scene(zone_id)
+    for _, zone in ipairs(GameCfg.Zones or {}) do
+        ---@cast zone FishTreeZone
+        if zone.Id == zone_id then return zone.Scene end
+    end
+end
+
+-- 状态效果默认时长：weak 走生存配置，其余走技能状态表。modifier_leaf 与 player_effects 共用这一份口径。
+---@param kind string
+---@return number
+function GameCfg.status_duration(kind)
+    if kind == "weak" then
+        return GameCfg.Survival.WeakSec
+    end
+    local effect = GameCfg.Ability.StatusEffects and GameCfg.Ability.StatusEffects[kind]
+    return effect and effect.DurationSec or 0
+end
+
 
 GameCfg.InteractionBubble = {
     Width = 220,
@@ -509,6 +531,23 @@ GameCfg.Platform.Placeholder = {
         },
     },
 }
+
+-- 占位支付/广告通道配置：未配置或形态损坏时按「未开通」处理，读不到就返回 nil。
+function GameCfg.platform_placeholder()
+    local config = GameCfg.Platform.Placeholder
+    return type(config) == 'table' and config or nil
+end
+
+-- 按 key 取占位金币页的兑换档位：CoinPage.Offers 里 key 相同的那一条。
+function GameCfg.platform_coin_offer(key)
+    local page = GameCfg.platform_placeholder()
+    page = page and page.CoinPage
+    local offers = type(page) == 'table' and page.Offers or nil
+    if type(offers) ~= 'table' or type(key) ~= 'string' then return nil end
+    for _, offer in ipairs(offers) do
+        if offer.key == key then return offer end
+    end
+end
 
 GameCfg.Ferry = {
 }

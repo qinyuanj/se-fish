@@ -164,26 +164,11 @@ function SquadView.member_spec()
   }
 end
 
-function SquadView.rescue_state(options)
-  return RescueView.create_state("SquadView.rescue_rows", options)
-end
+-- 抢救入口（state / driver_spec / bubble_spec）的参数集中在 RescueView 的预设里，这里只绑定本视图的入口。
+local RescueApi = RescueView.view_api("squad")
 
-function SquadView.rescue_driver_spec(shared)
-  return RescueView.driver_spec(shared, {
-    name = "SquadRescueDriver",
-    mode = "squad",
-  })
-end
-
-function SquadView.rescue_bubble_spec(shared)
-  return RescueView.bubble_spec(shared, {
-    key_prefix = "",
-    scene_kind = "squad_rescue",
-    scene_prefix = "SceneNodeSquadRescue_",
-    button_prefix = "BtnSquadRescue",
-    log_tag = "[SquadView]",
-    fail_label = "队友抢救按钮创建失败",
-  })
-end
+SquadView.rescue_state = RescueApi.state
+SquadView.rescue_driver_spec = RescueApi.driver_spec
+SquadView.rescue_bubble_spec = RescueApi.bubble_spec
 
 return SquadView

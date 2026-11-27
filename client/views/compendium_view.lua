@@ -1,6 +1,7 @@
 local GameCfg = require("common.game_cfg")
 local Records = require("common.records")
 local Modal = require("client.views.economy_modal")
+local ViewUtil = require("client.views.view_util")
 local CompendiumView = {}
 
 local GRADES = { normal = "普通", rare = "极品", elite = "精英", boss = "首领" }
@@ -72,6 +73,159 @@ function CompendiumView.page_spec(page, grade)
   return view
 end
 
+-- 图鉴面板句柄：面板节点、当前页/品级/选中鱼与快照都留在句柄上；
+-- 方法名沿用拆分前的局部函数名，挂载入口只做装配。
+---@class CompendiumPanelHandle: table<string, any>
+---@type CompendiumPanelHandle
+local CompendiumBehavior = {}
+
+--- 重排鱼行、刷新收集统计、成就与详情。
+---@param self CompendiumPanelHandle
+function CompendiumBehavior.refresh(self)
+  local bag = type(self.snapshot) == "table" and self.snapshot or {}
+  local collected = 0
+  for _, unlocked in pairs(bag.unlocked or {}) do if unlocked == true then collected = collected + 1 end end
+  self.summary.Text = string.format("已收集 %d/%d，累计钓取 %d", collected, #self.views, tonumber(bag.total) or 0)
+  self.achievement.Text = bag.state ~= "ready" and "通关成就：数据暂不可用"
+    or bag.completed == true and (GameCfg.Achievements.final.Name .. "：已完成")
+    or (GameCfg.Achievements.final.Name .. "：未完成")
+  for index, btn in ipairs(self.page_buttons) do
+    apply_active_style(btn, index == self.page)
+  end
+  for id, btn in pairs(self.grade_buttons) do
+    apply_active_style(btn, id == self.grade)
+  end
+  local record = self.record
+  local visible_index = 0
+  for _, row in ipairs(self.views) do
+    local unlocked = bag.unlocked and bag.unlocked[self.selected] == true
+    local is_visible = (row.zone == self.page) and (row.fish.Grade == self.grade)
+    row.node.Visible = is_visible
+    if is_visible then
+      local col = visible_index % 3
+      local row_idx = math.floor(visible_index / 3)
+      Modal.place(row.node, 20 + col * 288, 294 + row_idx * 48, 276, 40)
+      Modal.place(row.button, 0, 0, 276, 40, 40)
+      visible_index = visible_index + 1
+    end
+    Modal.set_button_text(row.button, (bag.unlocked and bag.unlocked[row.id]) and row.fish.Name or "？？？")
+    if row.id == self.selected then
+      local personal = bag.weights and bag.weights[row.id] or nil
+      local recordText = Records.describe(record)
+      if type(record) == "table" and record.stale then recordText = recordText .. "（数据可能过期）" end
+      self.detail.Text = string.format("%s｜品级：%s｜钓鱼区：%s\n个人最大钓取重量：%s\n全服纪录：%s",
+        unlocked and row.fish.Name or "？？？", GRADES[row.fish.Grade] or tostring(row.fish.Grade),
+        zone_name(row.fish.ZoneId),
+        type(personal) == "number" and string.format("%.2f 千克", personal) or "尚未钓取",
+        recordText)
+    end
+  end
+end
+
+--- 选鱼：记下鱼 id、请求纪录并刷新。
+---@param self CompendiumPanelHandle
+---@param fish_id string
+function CompendiumBehavior.select_fish(self, fish_id)
+  self.selected, self.record = fish_id, nil
+  local services = self.services
+  if type(services.request_records) == "function" then services.request_records(fish_id) end
+  self:refresh()
+end
+
+--- 写页码后刷新（两个选择器只差字段名，生成器见 ViewUtil.refresh_setter）。
+CompendiumBehavior.select_page = ViewUtil.refresh_setter("page")
+
+--- 写品级后刷新。
+CompendiumBehavior.select_grade = ViewUtil.refresh_setter("grade")
+
+--- 建面板节点：三行文本、鱼行、钓鱼区页签、品级页签与关闭按钮。
+---@param self CompendiumPanelHandle
+function CompendiumBehavior.create_nodes(self)
+  local scope, ctx = self.scope, self.ctx
+  local panel = Modal.panel(scope, ctx, "ScreenCompendium", "图鉴与全服纪录")
+  self.panel = panel
+  self.summary = Modal.place(Modal.label(scope, ctx, panel, "LabelCompendiumSummary", "图鉴加载中"), 20, 150, 420, 30)
+  self.achievement = Modal.place(Modal.label(scope, ctx, panel, "LabelCompendiumAchievement", "通关成就：数据暂不可用"), 460, 150, 420, 30)
+  self.detail = Modal.place(Modal.label(scope, ctx, panel, "LabelCompendiumDetail", "选择一条鱼查看纪录"), 20, 190, 860, 90)
+
+  for index, item in ipairs(CompendiumView.catalog_spec()) do
+    local zoneIndex = 1
+    for indexZone, zone in ipairs(GameCfg.Zones) do if zone.Id == item.fish.ZoneId then zoneIndex = indexZone break end end
+    local node = ctx.create_node(scope, "EUIImage", { Parent = panel, Name = "CompendiumRow_" .. tostring(index), Visible = false })
+    if type(Color) == "table" and type(Color.New) == "function" then
+      node.Color = Color.New(0, 0, 0, 0)
+    end
+    local button = Modal.button(scope, ctx, node, "BtnCompendiumFish_" .. item.id, item.fish.Name, function()
+      self:select_fish(item.id)
+    end)
+    Modal.place(button, 0, 0, 276, 40, 40)
+    self.views[#self.views + 1] = { id = item.id, fish = item.fish, zone = zoneIndex, node = node, button = button }
+  end
+
+  for index, zone in ipairs(GameCfg.Zones) do
+    local btn = Modal.button(scope, ctx, panel, "BtnCompendiumPage_" .. tostring(index), zone.Name, function()
+      self:select_page(index)
+    end)
+    Modal.place(btn, 20 + (index - 1) * 124, 58, 116, 36)
+    self.page_buttons[index] = btn
+  end
+
+  for index, item in ipairs(GRADE_ORDER) do
+    local btn = Modal.button(scope, ctx, panel, "BtnCompendiumGrade_" .. item.id, item.label, function()
+      self:select_grade(item.id)
+    end)
+    Modal.place(btn, 20 + (index - 1) * 140, 104, 128, 36)
+    self.grade_buttons[item.id] = btn
+  end
+
+  Modal.close(scope, ctx, panel, "BtnCompendiumClose", "compendium")
+end
+
+---@param self CompendiumPanelHandle
+---@param es table EffectScope
+function CompendiumBehavior.on_compendium_projection(self, es)
+  self.snapshot = es:d(self.ctx.store.compendium)
+  self:refresh()
+end
+
+---@param self CompendiumPanelHandle
+---@param es table EffectScope
+function CompendiumBehavior.on_records_projection(self, es)
+  local value = es:d(self.ctx.store.records)
+  if type(value) == "table" and value.fishId == self.selected then self.record = value end
+  self:refresh()
+end
+
+--- 挂载图鉴面板：造句柄、建节点、接投影与首帧刷新。
+---@param scope table
+---@param ctx table
+local function mount(scope, ctx)
+  ---@type CompendiumPanelHandle
+  local self = {
+    scope = scope,
+    ctx = ctx,
+    services = ctx.services or {},
+    page = 1,
+    grade = "normal",
+    selected = "bass",
+    snapshot = nil,
+    record = nil,
+    views = {},
+    page_buttons = {},
+    grade_buttons = {},
+    panel = nil,
+    summary = nil,
+    achievement = nil,
+    detail = nil,
+  }
+  for name, method in pairs(CompendiumBehavior) do self[name] = method end
+  self:create_nodes()
+
+  scope:effect("CompendiumProjection", function(es) self:on_compendium_projection(es) end)
+  scope:effect("RecordsProjection", function(es) self:on_records_projection(es) end)
+  self:refresh()
+end
+
 function CompendiumView.entry_spec()
   return {
     name = "CompendiumEntry",
@@ -93,108 +247,7 @@ function CompendiumView.entry_spec()
 end
 
 function CompendiumView.modal_spec()
-  return function(scope, ctx)
-    local services = ctx.services or {}
-    local panel = Modal.panel(scope, ctx, "ScreenCompendium", "图鉴与全服纪录")
-    local summary = Modal.place(Modal.label(scope, ctx, panel, "LabelCompendiumSummary", "图鉴加载中"), 20, 150, 420, 30)
-    local achievement = Modal.place(Modal.label(scope, ctx, panel, "LabelCompendiumAchievement", "通关成就：数据暂不可用"), 460, 150, 420, 30)
-    local detail = Modal.place(Modal.label(scope, ctx, panel, "LabelCompendiumDetail", "选择一条鱼查看纪录"), 20, 190, 860, 90)
-
-    local page = 1
-    local grade = "normal"
-    local selected = "bass"
-    local snapshot, record = nil, nil
-    local views = {}
-    local page_buttons = {}
-    local grade_buttons = {}
-
-    local function refresh()
-      local bag = type(snapshot) == "table" and snapshot or {}
-      local collected = 0
-      for _, unlocked in pairs(bag.unlocked or {}) do if unlocked == true then collected = collected + 1 end end
-      summary.Text = string.format("已收集 %d/%d，累计钓取 %d", collected, #views, tonumber(bag.total) or 0)
-      achievement.Text = bag.state ~= "ready" and "通关成就：数据暂不可用"
-        or bag.completed == true and (GameCfg.Achievements.final.Name .. "：已完成")
-        or (GameCfg.Achievements.final.Name .. "：未完成")
-      for index, btn in ipairs(page_buttons) do
-        apply_active_style(btn, index == page)
-      end
-      for id, btn in pairs(grade_buttons) do
-        apply_active_style(btn, id == grade)
-      end
-      local visible_index = 0
-      for _, row in ipairs(views) do
-        local unlocked = bag.unlocked and bag.unlocked[selected] == true
-        local is_visible = (row.zone == page) and (row.fish.Grade == grade)
-        row.node.Visible = is_visible
-        if is_visible then
-          local col = visible_index % 3
-          local row_idx = math.floor(visible_index / 3)
-          Modal.place(row.node, 20 + col * 288, 294 + row_idx * 48, 276, 40)
-          Modal.place(row.button, 0, 0, 276, 40, 40)
-          visible_index = visible_index + 1
-        end
-        Modal.set_button_text(row.button, (bag.unlocked and bag.unlocked[row.id]) and row.fish.Name or "？？？")
-        if row.id == selected then
-          local personal = bag.weights and bag.weights[row.id] or nil
-          local recordText = Records.describe(record)
-          if type(record) == "table" and record.stale then recordText = recordText .. "（数据可能过期）" end
-          detail.Text = string.format("%s｜品级：%s｜钓鱼区：%s\n个人最大钓取重量：%s\n全服纪录：%s",
-            unlocked and row.fish.Name or "？？？", GRADES[row.fish.Grade] or tostring(row.fish.Grade),
-            zone_name(row.fish.ZoneId),
-            type(personal) == "number" and string.format("%.2f 千克", personal) or "尚未钓取",
-            recordText)
-        end
-      end
-    end
-
-    for index, item in ipairs(CompendiumView.catalog_spec()) do
-      local zoneIndex = 1
-      for indexZone, zone in ipairs(GameCfg.Zones) do if zone.Id == item.fish.ZoneId then zoneIndex = indexZone break end end
-      local node = ctx.create_node(scope, "EUIImage", { Parent = panel, Name = "CompendiumRow_" .. tostring(index), Visible = false })
-      if type(Color) == "table" and type(Color.New) == "function" then
-        node.Color = Color.New(0, 0, 0, 0)
-      end
-      local button = Modal.button(scope, ctx, node, "BtnCompendiumFish_" .. item.id, item.fish.Name, function()
-        selected, record = item.id, nil
-        if type(services.request_records) == "function" then services.request_records(item.id) end
-        refresh()
-      end)
-      Modal.place(button, 0, 0, 276, 40, 40)
-      views[#views + 1] = { id = item.id, fish = item.fish, zone = zoneIndex, node = node, button = button }
-    end
-
-    for index, zone in ipairs(GameCfg.Zones) do
-      local btn = Modal.button(scope, ctx, panel, "BtnCompendiumPage_" .. tostring(index), zone.Name, function()
-        page = index
-        refresh()
-      end)
-      Modal.place(btn, 20 + (index - 1) * 124, 58, 116, 36)
-      page_buttons[index] = btn
-    end
-
-    for index, item in ipairs(GRADE_ORDER) do
-      local btn = Modal.button(scope, ctx, panel, "BtnCompendiumGrade_" .. item.id, item.label, function()
-        grade = item.id
-        refresh()
-      end)
-      Modal.place(btn, 20 + (index - 1) * 140, 104, 128, 36)
-      grade_buttons[item.id] = btn
-    end
-
-    Modal.close(scope, ctx, panel, "BtnCompendiumClose", "compendium")
-
-    scope:effect("CompendiumProjection", function(es)
-      snapshot = es:d(ctx.store.compendium)
-      refresh()
-    end)
-    scope:effect("RecordsProjection", function(es)
-      local value = es:d(ctx.store.records)
-      if type(value) == "table" and value.fishId == selected then record = value end
-      refresh()
-    end)
-    refresh()
-  end
+  return mount
 end
 
 return CompendiumView
