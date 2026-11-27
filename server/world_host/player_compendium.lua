@@ -6,7 +6,7 @@ local SignalRouter = require('server.world_host.world_signal_router')
 local Mgr = { queues = {}, last_seq = {}, KIND = 'compendium-land', max_queue = 16 }
 local isValidPlayer = SignalRouter.is_valid_player
 
-local function shallow_copy(value)
+local function copy(value)
     local out = {}
     for k, v in pairs(value or {}) do out[k] = v end
     return out
@@ -28,8 +28,8 @@ function Mgr:snapshot(player)
         return { state = data and data.load_state == 'loading' and 'loading' or 'unavailable',
             unlocked = {}, catches = {}, weights = {}, total = 0 }
     end
-    return { unlocked = shallow_copy(bag.unlocked), catches = shallow_copy(bag.catches),
-        weights = shallow_copy(bag.weights), total = bag.total or 0, state = 'ready',
+    return { unlocked = copy(bag.unlocked), catches = copy(bag.catches),
+        weights = copy(bag.weights), total = bag.total or 0, state = 'ready',
         completed = data.extra.achievements and data.extra.achievements.final == true }
 end
 

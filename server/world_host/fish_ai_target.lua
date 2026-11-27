@@ -2,6 +2,7 @@ local GameCfg = require('common.game_cfg')
 local Policy = require('common.ai_target_policy')
 
 local Mgr = { policy = Policy }
+local AiAPI, Runtime
 
 local function logFailure(operation, fish, unit, player, err)
     print(string.format('[FishAiTarget] operation=%s fish=%s unit=%s player=%s error=%s',
@@ -9,26 +10,28 @@ local function logFailure(operation, fish, unit, player, err)
         tostring(player and player.UserId or '-'), tostring(err)))
 end
 
--- 官方 AI 包的两个入口模块：加载失败只记录、不缓存失败（下次调用重试），成功后按 key 缓存。
-local MODULES = {
-    api = { name = 'server.packages.official_ai_feature.api', operation = 'RequireOfficialAPI' },
-    runtime = { name = 'server.packages.official_ai_feature.behavior_runtime', operation = 'RequireOfficialRuntime' },
-}
-local loaded_modules = {}
-
-local function load_module(key, fish, unit)
-    local module = loaded_modules[key]
-    if module == nil then
-        local entry = MODULES[key]
-        local ok, required = pcall(require, entry.name)
+local function loadAPI(fish, unit)
+    if AiAPI == nil then
+        local ok, module = pcall(require, 'server.packages.official_ai_feature.api')
         if not ok then
-            logFailure(entry.operation, fish, unit, nil, required)
+            logFailure('RequireOfficialAPI', fish, unit, nil, module)
             return nil
         end
-        module = required
-        loaded_modules[key] = module
+        AiAPI = module
     end
-    return module
+    return AiAPI
+end
+
+local function loadRuntime(fish, unit)
+    if Runtime == nil then
+        local ok, module = pcall(require, 'server.packages.official_ai_feature.behavior_runtime')
+        if not ok then
+            logFailure('RequireOfficialRuntime', fish, unit, nil, module)
+            return nil
+        end
+        Runtime = module
+    end
+    return Runtime
 end
 
 local function receiver(fish)
@@ -42,7 +45,7 @@ function Mgr:state(fish)
         logFailure('ReadOfficialState', fish, nil, nil, 'official AI receiver unavailable')
         return nil
     end
-    local runtime = load_module('runtime', fish, unit)
+    local runtime = loadRuntime(fish, unit)
     if not runtime then return nil end
     local ok, state = pcall(runtime.getState, unit)
     if not ok then
@@ -70,7 +73,7 @@ function Mgr:set_focus(fish, player, ranked)
         logFailure('SetFocus', fish, nil, player, 'official AI receiver unavailable')
         return false
     end
-    local apiTable, runtime = load_module('api', fish, unit), load_module('runtime', fish, unit)
+    local apiTable, runtime = loadAPI(fish, unit), loadRuntime(fish, unit)
     local funcs = apiTable and apiTable.Funcs
     if not funcs or not runtime then
         logFailure('SetFocus', fish, unit, player, 'official AI API unavailable')

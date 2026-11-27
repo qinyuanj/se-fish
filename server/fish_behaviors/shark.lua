@@ -2,6 +2,11 @@ local FishBehaviorKit = require('server.fish_behaviors.kit')
 
 local SharkBehaviors = {}
 
+local function init(fish, now, combat)
+    fish.JumpAt = now + combat.JumpIntervalSec
+    fish.roll_slot = -1
+end
+
 local function step(mgr, fish, now, pos, params)
     local dt = FishBehaviorKit.begin_combat_frame(fish, now)
     local move = fish.Move
@@ -35,6 +40,6 @@ local function step(mgr, fish, now, pos, params)
     end
 end
 
-SharkBehaviors.shark = { init = FishBehaviorKit.init_jump_cycle, step = step }
+SharkBehaviors.shark = { init = init, step = step }
 
 return SharkBehaviors

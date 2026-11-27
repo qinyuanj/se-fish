@@ -1,7 +1,11 @@
 local BodyScale = require("common.body_scale")
-local Number = require("common.number")
 
 local InteractionPoints = { anchors = {} }
+
+local function flat_distance(a, b)
+  local dx, dz = a.x - b.x, a.z - b.z
+  return math.sqrt(dx * dx + dz * dz)
+end
 
 function InteractionPoints:find_anchor(name)
   local cached = self.anchors[name]
@@ -24,7 +28,7 @@ function InteractionPoints:in_range(player, point)
   for _, name in ipairs(names) do
     local anchor = self:find_anchor(name)
     local center = anchor and anchor.Position
-    if center and Number.flat_distance(position, center)
+    if center and flat_distance(position, center)
         <= BodyScale.interaction_radius(character, point.Radius) + (point.Slack or 0) then
       return anchor
     end

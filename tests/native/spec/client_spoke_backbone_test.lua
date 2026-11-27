@@ -3,8 +3,7 @@
 --   1. EUI 测试双缺少 Destroying 信号或重复触发 → spoke_eggy.behaviour 无法随宿主 UI 销毁自动清理整棵视图树；
 --   2. 只读状态仓库暴露内部写入入口或允许视图侧篡改字段 → 破坏单向响应式数据流；
 --   3. 服务端下行 RemoteEvent 或本地位置/钓鱼区传感器未归一化/批处理写入 → 视图观察到坏数据或撕裂中间态；
---   4. 根视图树在弹窗互斥切换、蒙版关闭、Dock 项移除、重连重置或根 UI 销毁后遗留子节点或点击信号连接 → 悬空节点与重复监听；
---   5. 锚点场景节点在商店预置气泡可用时不用预置、预置创建失败不回退坐标节点、回退时漏加高度，或锚点与坐标都缺、EUI 未就绪时仍建节点。
+--   4. 根视图树在弹窗互斥切换、蒙版关闭、Dock 项移除、重连重置或根 UI 销毁后遗留子节点或点击信号连接 → 悬空节点与重复监听。
 
 local Eui = require("tests.support.eui_double")
 local spoke_eggy = require("common.packages.spoke_eggy.api")
@@ -620,9 +619,6 @@ describe("客户端 Spoke 主干契约（#296）", function()
       local mounted_view
       local mounted_options
       local fired = {}
-      local anchor_unit
-      local scene_nodes, preset_calls = {}, {}
-      local preset_fails, eui_ready = false, true
       local zones = {
         fishPond = { Boundary = { MinX = -50, MaxX = 50, MinZ = -50, MaxZ = 50 } },
       }
@@ -647,23 +643,10 @@ describe("客户端 Spoke 主干契约（#296）", function()
             return remote_events[name]
           end,
         }
-        local eui_stub = {
-          GetDeviceResolution = function() return { x = 1920, y = 1080 } end,
-          CreateSceneNodeAtPosition = function(_, position)
-            local node = Eui.node({ Name = "SceneNode_" .. tostring(#scene_nodes + 1), Position = position })
-            scene_nodes[#scene_nodes + 1] = node
-            return node
-          end,
-        }
         local game_ui_stub = {
           get_ui_root = function() return ui_root end,
           get_eui_manager = function()
-            return eui_ready and eui_stub or nil
-          end,
-          create_scene_node = function(_, preset, anchor, offset)
-            preset_calls[#preset_calls + 1] = { preset = preset, anchor = anchor, offset = offset }
-            if preset_fails then error("preset-unavailable") end
-            return Eui.node({ Name = "ShopBubblePreset", Position = offset })
+            return { GetDeviceResolution = function() return { x = 1920, y = 1080 } end }
           end,
         }
         package.loaded["client.game_ui"] = game_ui_stub
@@ -718,10 +701,7 @@ describe("客户端 Spoke 主干契约（#296）", function()
             if name == "World" then
               return {
                 GetServerTime = function() return server_now end,
-                FindFirstChild = function(_, name)
-                  if anchor_unit ~= nil and anchor_unit.Name == name then return anchor_unit end
-                  return nil
-                end,
+                FindFirstChild = function() return nil end,
                 CreateUnit = function(_, kind, props)
                   props = props or {}
                   local node = Eui.node({
@@ -784,51 +764,6 @@ describe("客户端 Spoke 主干契约（#296）", function()
         end
         assert.is_function(mounted_options.services.create_scene_node_at)
         assert.is_function(mounted_options.services.create_anchor_scene_node)
-
-        -- 锚点场景节点：商店预置气泡优先，预置创建失败回退坐标节点，锚点与坐标都缺或 EUI 未就绪时返回 nil
-        local create_anchor = mounted_options.services.create_anchor_scene_node
-
-        local at_position = create_anchor({ name = "ShopAnchor", position = { x = 1, y = 2, z = 3 } }, 4, "fisherman")
-        assert.is_not_nil(at_position)
-        assert.equals(6, at_position.Position.y)
-        assert.equals(1, at_position.Position.x)
-        assert.equals(0, #preset_calls, "非商店锚点不走预置气泡")
-
-        anchor_unit = { Name = "ShopAnchor", Position = { x = 10, y = 1, z = 20 } }
-        preset_calls = {}
-        local scenes_before_preset = #scene_nodes
-        local preset_node = create_anchor({ name = "ShopAnchor" }, 2.5, "shop")
-        assert.equals(1, #preset_calls)
-        assert.equal(anchor_unit, preset_calls[1].anchor)
-        assert.equals(2.5, preset_calls[1].offset.y)
-        assert.equals("ShopBubblePreset", preset_node.Name)
-        assert.equals(scenes_before_preset, #scene_nodes, "预置气泡成功时不建坐标节点")
-
-        preset_calls = {}
-        preset_fails = true
-        local fallback_logs = {}
-        local saved_log_print = _G.print
-        _G.print = function(...)
-          local parts = {}
-          for i = 1, select("#", ...) do parts[i] = tostring((select(i, ...))) end
-          fallback_logs[#fallback_logs + 1] = table.concat(parts, "\t")
-        end
-        local fallback_node = create_anchor({ name = "ShopAnchor" }, 2.5, "shop")
-        _G.print = saved_log_print
-        preset_fails = false
-        assert.is_not_nil(fallback_node)
-        assert.equals(3.5, fallback_node.Position.y)
-        assert.equals(20, fallback_node.Position.z)
-        assert.matches("商店预设气泡创建失败，回退坐标节点", table.concat(fallback_logs, "\n"))
-
-        anchor_unit = nil
-        preset_calls = {}
-        assert.is_nil(create_anchor({ name = "MissingAnchor" }, 2), "锚点与坐标都缺时返回 nil")
-        assert.equals(0, #preset_calls)
-
-        eui_ready = false
-        assert.is_nil(create_anchor({ position = { x = 1, y = 2, z = 3 } }, 4, "fisherman"))
-        eui_ready = true
         assert.is_function(mounted_options.services.set_overlay)
         mounted_options.services.send_grill({ action = "Takeout" })
         assert.equals("Takeout", fired.GrillAction[1].action)

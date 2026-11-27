@@ -1,4 +1,3 @@
-local EngineRead = require('common.engine_read')
 local GameCfg = require('common.game_cfg')
 local SignalRouter = require('server.world_host.world_signal_router')
 
@@ -7,6 +6,11 @@ local isValidPlayer = SignalRouter.is_valid_player
 
 local function cfg()
     return GameCfg.Story
+end
+
+function Mgr:now()
+    self.World = self.World or game:GetService('World')
+    return self.World:GetServerTime()
 end
 
 function Mgr:fallback(player, state, reason)
@@ -48,7 +52,7 @@ function Mgr:begin(player)
     local ok, err = pcall(function() self.service:StartStory(player, storyId) end)
     if not ok then return self:fallback(player, state, 'StartStory 报错 ' .. tostring(err)) end
     print('[PlayerStory] StartStory', player.UserId, storyId)
-    if state.phase == 'pending' then state.deadline = EngineRead.server_time(self) + cfg().StartTimeoutSec end
+    if state.phase == 'pending' then state.deadline = self:now() + cfg().StartTimeoutSec end
 end
 
 function Mgr:on_signal(name, player, storyId)
@@ -160,7 +164,7 @@ function Mgr:update()
     for userId, state in pairs(self.States) do
         if state.completeSource and state.phase ~= 'saving' then self:persist_read(state.player, state) end
         if state.deadline then
-            now = now or EngineRead.server_time(self)
+            now = now or self:now()
             if now >= state.deadline then
                 local player
                 for _, p in ipairs(game:GetService('Players'):GetPlayers()) do

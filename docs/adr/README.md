@@ -27,7 +27,6 @@
 - [0036](0036-platform-commerce-and-ads-not-verifiable-in-editor.md) — 改动商城、支付或广告适配层：编辑器内不可验收、订单身份自研与超时兜底。
 - [0038](0038-emmylua-agentic-coding-quality-gate.md) — 改动 Lua 诊断门禁、`.emmyrc.json` 或基线：EmmyLua 作为诊断质量门禁与单向基线。
 - [0040](0040-local-multiplayer-not-simulatable-in-editor.md) — 评估多人联机取证或本地模拟：本地模拟多人不可用，必须真实第二客户端。
-- [0041](0041-token-budget-gate.md) — 新增或调整单文件体积规则、基线或 pre-commit/CI 门禁：token 预算（`se-fish-budget-v1`）、出货集与受管集、棘轮基线。
 
 ## 美术资产
 - [0004](0004-fish-asset-scale.md) — 制作、导出或验收鱼类模型与动画：单位方块基准、100 倍导入换算、底面中心原点与贴图编码。

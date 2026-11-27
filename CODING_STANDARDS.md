@@ -30,14 +30,6 @@
 - 三端脚本目录与文件名不得与 SE 内置服务名同名（`World`、`MapData`、`Game`、`Camps`、`*Service`）：编辑器按服务名索引脚本树，重名子树同步时被跳过，见 [architecture 关键边界](docs/architecture.md)与 [ADR-0033](docs/adr/0033-script-names-must-not-shadow-se-services.md)。
 - `pcall` 的业务失败要记录模块、操作、对象标识与错误内容，再按业务返回或清理，不继续报成功；包裹可能不存在的 UI/引擎 API 时允许忽略，同行注明理由。
 
-## 文件体积
-
-**项目规则**（依据 [ADR-0041](docs/adr/0041-token-budget-gate.md)）：
-
-- 三端自写代码单文件不超过 5500 tokens（`se-fish-budget-v1` 口径，`lua tools/cli.lua size` 判定）；新文件超限先拆模块，不靠调大预算过关。
-- 存量超限文件记在 `tools/size_baseline.txt`；`--update-baseline` 只许收窄，拆分后重跑把对应条目删掉。
-- 上游 `packages/`、引擎导出 `data/`、`_trigger/`、`tests/`、`tmp/` 不计入预算（与 ADR-0038 的扫描范围一致）。
-
 ## 跨端通信
 
 **约束**（[S8]）：RemoteEvent 每次传一个可选 payload，多字段合成 table；`OnServerEvent` 的 `player` 由引擎注入，服务端以它确认请求者身份。载荷须可序列化，`CFrame` 等引擎类型先拆成位置、旋转等字段再传。

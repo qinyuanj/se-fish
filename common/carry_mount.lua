@@ -15,10 +15,12 @@ local function isBadPoint(p)
     return type(p) ~= 'table' or isBadNumber(p.x) or isBadNumber(p.y) or isBadNumber(p.z)
 end
 
--- 非法数值按 0 处理（与 boss_phase 同口径，统一走 common.number）。
-local num = Number.or_zero
+local function num(v)
+    if isBadNumber(v) then return 0 end
+    return v
+end
 
-local function vec3_of(p)
+local function copy(p)
     return { x = num(p.x), y = num(p.y), z = num(p.z) }
 end
 
@@ -80,7 +82,7 @@ end
 ---@param now? number
 function M.new(carryCfg, host, yaw, now)
     carryCfg = carryCfg or cfg()
-    host = host and vec3_of(host) or { x = 0, y = 0, z = 0 }
+    host = host and copy(host) or { x = 0, y = 0, z = 0 }
     local safe = M.safe_offset(carryCfg.Offset, carryCfg.HostHalfHeight, carryCfg.CarriedHalfHeight)
     return {
         cfg = carryCfg, host = host, Yaw = num(yaw), ground_y = host.y,
@@ -109,7 +111,7 @@ function M.attach(state, target, now)
     if isBadPoint(target) then return { Ok = false, Reason = 'noTarget' } end
     if not M.in_range(state, target) then return { Ok = false, Reason = 'outOfRange' } end
     state.carried = true
-    state.Target = vec3_of(target)
+    state.Target = copy(target)
     state.started_at = num(now)
     state.released_at = nil
     state.mount = M.mount_point(state.host, state.Offset, state.Yaw)

@@ -117,23 +117,6 @@ function EconomyModal.set_button_text(button, text)
   if text_label then text_label.Text = value end
 end
 
---- 打开模态弹层：宿主未注入 open_modal 时静默跳过。
----@param ctx table RootView 上下文
----@param modal_id string
----@param payload table|nil
-function EconomyModal.open_modal(ctx, modal_id, payload)
-  local fn = type(ctx) == "table" and ctx.services and ctx.services.open_modal or nil
-  if type(fn) == "function" then fn(modal_id, payload) end
-end
-
---- 关闭模态弹层：宿主未注入 close_modal 时静默跳过。
----@param ctx table RootView 上下文
----@param modal_id string
-function EconomyModal.close_modal(ctx, modal_id)
-  local fn = type(ctx) == "table" and ctx.services and ctx.services.close_modal or nil
-  if type(fn) == "function" then fn(modal_id) end
-end
-
 function EconomyModal.button(scope, ctx, parent, name, text, on_click)
   local button = ctx.create_node(scope, "EUIButton", {
     Parent = parent, Name = name, ButtonText = text, Visible = true,
@@ -156,7 +139,8 @@ end
 
 function EconomyModal.close(scope, ctx, parent, name, modal_id)
   local btn = EconomyModal.button(scope, ctx, parent, name, "关闭", function()
-    EconomyModal.close_modal(ctx, modal_id)
+    local services = ctx.services or {}
+    if type(services.close_modal) == "function" then services.close_modal(modal_id) end
   end)
   return EconomyModal.place(btn, 800, 12, 80, 36, PANEL_H)
 end

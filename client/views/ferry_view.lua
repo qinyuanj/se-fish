@@ -144,7 +144,7 @@ function FerryView.mount(scope, ctx)
 end
 
 function FerryView.spec()
-  return ViewUtil.hud_spec("Ferry", FerryView.mount)
+  return { name = "Ferry", mount = FerryView.mount }
 end
 
 local function anchor_of(anchor_name)

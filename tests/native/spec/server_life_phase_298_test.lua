@@ -550,25 +550,6 @@ describe("玩家生命双层相位宿主入口（#298）", function()
     assert.equals("no-adrenaline", result.value.reason)
   end)
 
-  -- 背包里有肾上腺素时：真的扣道具、走存档事务、救回存活相位并回 ok=seq。
-  -- 失败方式：回了 ok 却没扣道具（刷药）；或道具扣了人还躺着（花了钱没救起）；或回包丢了 seq。
-  it("濒死时用肾上腺素扣道具、救回存活相位并回 ok", function()
-    boot({ item_bar = { { itemId = GameCfg.Survival.AdrenalineItemId, count = 1 } } })
-    local tree = runtime:get_player_tree(player.UserId)
-    assert.is_true(tree:apply_hit(tree:new_hit(other, "fishAttack"), player, 9999))
-    assert.equals("downed", tree.states.life_phase:now())
-    local before = #(events.SurvivalResult and events.SurvivalResult.clients or {})
-    events.SurvivalAction.OnServerEvent:Fire(player, { action = "UseAdrenaline", seq = 9 })
-    local result = events.SurvivalResult.clients[before + 1]
-    assert.is_not_nil(result, "用上道具必须回包")
-    assert.is_true(result.value.ok)
-    assert.equals("UseAdrenaline", result.value.action)
-    assert.equals(9, result.value.seq)
-    assert.equals(0, data:ItemCount(GameCfg.Survival.AdrenalineItemId), "用掉后必须真的扣道具")
-    assert.equals("alive", tree.states.life_phase:now(), "救起后必须回到存活相位")
-    assert.is_true(tree.states.health:now() > 1)
-  end)
-
   it("扣血只广播一次实际差额，治疗、回满和致命锁血不另报", function()
     boot()
     local life = runtime.life

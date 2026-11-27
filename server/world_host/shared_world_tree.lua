@@ -5,7 +5,6 @@
 
 local GameCfg = require("common.game_cfg")
 local Spoke = require("common.packages.spoke.api")
-local SpokeClock = require("common.spoke_clock")
 local GroundLoot = require("server.world_host.ground_loot")
 local FerryRoute = require("server.world_host.ferry_route")
 local SquadDock = require("server.world_host.squad_dock")
@@ -15,14 +14,22 @@ local Effect = Spoke.Effect
 
 local SharedWorldTree = {}
 
+local function assert_clock(clock)
+  if type(clock) ~= "table"
+      or type(clock.now) ~= "function"
+      or type(clock.second) ~= "table"
+      or type(clock.on_second) ~= "table"
+      or type(clock.on_frame) ~= "table" then
+    error("SharedWorldTree.spawn 需要有效的 SpokeClock 实例", 3)
+  end
+end
+
 ---@param opts { clock: table, zones?: table[], logger?: table, on_mount_zone?: fun(s: table, zone: table), on_mount_world?: fun(s: table, world: table) }
 function SharedWorldTree.spawn(opts)
   if type(opts) ~= "table" then
     error("SharedWorldTree.spawn 需要参数表", 2)
   end
-  if not SpokeClock.is_valid(opts.clock) then
-    error("SharedWorldTree.spawn 需要有效的 SpokeClock 实例", 2)
-  end
+  assert_clock(opts.clock)
 
   local clock = opts.clock
   local zone_defs = opts.zones or GameCfg.Zones

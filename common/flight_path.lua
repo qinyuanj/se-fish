@@ -15,7 +15,7 @@ local function isBadPoint(p)
     return type(p) ~= 'table' or isBadNumber(p.x) or isBadNumber(p.y) or isBadNumber(p.z)
 end
 
-local function vec3_of(p)
+local function copy(p)
     return { x = p.x, y = p.y, z = p.z }
 end
 
@@ -55,7 +55,7 @@ function M.new(bounds, flightCfg, profile, start, now)
     now = isBadNumber(now) and 0 or now
     return {
         bounds = bounds, cfg = flightCfg, profile = profile,
-        pos = vec3_of(start), last = vec3_of(start), vel = { x = 0, y = 0, z = 0 },
+        pos = copy(start), last = copy(start), vel = { x = 0, y = 0, z = 0 },
         Phase = 'cruise', Target = nil,
         Center = profile.Center or { x = (bounds.MinX + bounds.MaxX) / 2, z = (bounds.MinZ + bounds.MaxZ) / 2 },
         Radius = profile.Radius or 15,
@@ -68,7 +68,7 @@ function M.new(bounds, flightCfg, profile, start, now)
 end
 
 function M.set_target(state, target)
-    state.Target = (type(target) == 'table' and not isBadPoint(target)) and vec3_of(target) or nil
+    state.Target = (type(target) == 'table' and not isBadPoint(target)) and copy(target) or nil
 end
 
 function M.speed(state)
@@ -203,21 +203,21 @@ function M.step(state, now, dt)
         events.truncated = true
     end
     if isBadPoint(state.pos) or isBadPoint(state.vel) then
-        state.pos = vec3_of(state.last)
+        state.pos = copy(state.last)
         state.vel = { x = 0, y = 0, z = 0 }
         state.stats.nan_recoveries = state.stats.nan_recoveries + 1
         events.nan = true
-        events.position = vec3_of(state.pos)
+        events.position = copy(state.pos)
         events.phase = state.Phase
         return events
     end
     local dx, dy, dz = state.pos.x - state.last.x, state.pos.y - state.last.y, state.pos.z - state.last.z
     if math.sqrt(dx * dx + dy * dy + dz * dz) > driftLimit(state, dt) then
-        state.pos = vec3_of(state.last)
+        state.pos = copy(state.last)
         state.vel = { x = 0, y = 0, z = 0 }
         state.stats.drifts = state.stats.drifts + 1
         events.drift = true
-        events.position = vec3_of(state.pos)
+        events.position = copy(state.pos)
         events.phase = state.Phase
         return events
     end
@@ -256,8 +256,8 @@ function M.step(state, now, dt)
     end
 
     events.clamped = clampToBounds(state)
-    state.last = vec3_of(state.pos)
-    events.position = vec3_of(state.pos)
+    state.last = copy(state.pos)
+    events.position = copy(state.pos)
     events.phase = state.Phase
     return events
 end

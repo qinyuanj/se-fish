@@ -69,50 +69,6 @@ function Mgr:publish(player, notice)
     })
 end
 
--- 有 Save：事件先入队再 drain，由 drain 在隔离 draft 上落库。
-local function queue_fact(self, kind, player, payload, state)
-    local c = cfg()
-    local queue = self.queues[player.UserId]
-    if queue.leaving then return false end
-    local data = self.player_data and self.player_data:get_data_inst(player)
-    if not data and queue and self.Save:status(player.UserId).loadState == 'ready'
-        and queue.data.Player == player then data = queue.data end
-    if not data then return false end
-    local event_id = payload.eventId
-    if type(event_id) ~= 'string' or #event_id < 1 or #event_id > 160 then return false end
-    local candidate = QuestSteps.restore(c.Steps, queue.tail or state)
-    local fact = { kind = kind, itemId = payload.itemId, category = payload.category,
-        eventId = tostring(data.save_meta.epoch) .. ':' .. event_id, count = payload.count }
-    if not QuestSteps.apply(c.Steps, candidate, fact) then return false end
-    queue.events[#queue.events + 1] = fact
-    queue.tail = candidate
-    self:drain(player)
-    return true
-end
-
--- 进度日志：完成一步打完成日志，否则打计数日志；返回要下发的 notice。
-local function log_quest_progress(kind, player, payload, state, c, advanced)
-    if not advanced then
-        print('[PlayerQuest] 计数', player.UserId, 'step=' .. tostring(state.step), kind,
-            tostring(state.count) .. '/' .. tostring(c.Steps[state.step].Need), tostring(payload.eventId))
-        return nil
-    end
-    local finished = c.Steps[state.step - 1]
-    local next_step = c.Steps[state.step]
-    print('[PlayerQuest] 完成', player.UserId, 'step=' .. tostring(state.step - 1), finished.Kind, tostring(payload.eventId))
-    return next_step and string.format(c.NextNotice, next_step.Text) or c.DoneText
-end
-
--- 无 Save：直接改内存 state 并发布，不落库。
-local function apply_inline(self, kind, player, payload, state, c)
-    local counted, advanced = QuestSteps.apply(c.Steps, state, { kind = kind, itemId = payload.itemId,
-        category = payload.category, eventId = payload.eventId, count = payload.count })
-    if not counted then return false end
-    local notice = log_quest_progress(kind, player, payload, state, c, advanced)
-    self:publish(player, notice)
-    return true
-end
-
 function Mgr:notify(kind, player, payload)
     if self.Save and self.player_data then
         self:refresh_committed(player, self.player_data:get_data_inst(player))
@@ -120,8 +76,39 @@ function Mgr:notify(kind, player, payload)
     local state = self:get_state(player)
     if not state or type(payload) ~= 'table' then return false end
     local c = cfg()
-    if self.Save then return queue_fact(self, kind, player, payload, state) end
-    return apply_inline(self, kind, player, payload, state, c)
+    if self.Save then
+        local queue = self.queues[player.UserId]
+        if queue.leaving then return false end
+        local data = self.player_data and self.player_data:get_data_inst(player)
+        if not data and queue and self.Save:status(player.UserId).loadState == 'ready'
+            and queue.data.Player == player then data = queue.data end
+        if not data then return false end
+        local eventId = payload.eventId
+        if type(eventId) ~= 'string' or #eventId < 1 or #eventId > 160 then return false end
+        local candidate = QuestSteps.restore(c.Steps, queue.tail or state)
+        local fact = { kind = kind, itemId = payload.itemId, category = payload.category,
+            eventId = tostring(data.save_meta.epoch) .. ':' .. eventId, count = payload.count }
+        if not QuestSteps.apply(c.Steps, candidate, fact) then return false end
+        queue.events[#queue.events + 1] = fact
+        queue.tail = candidate
+        self:drain(player)
+        return true
+    end
+    local counted, advanced = QuestSteps.apply(c.Steps, state, { kind = kind, itemId = payload.itemId,
+        category = payload.category, eventId = payload.eventId, count = payload.count })
+    if not counted then return false end
+    local notice
+    if advanced then
+        local finished = c.Steps[state.step - 1]
+        local nextStep = c.Steps[state.step]
+        notice = nextStep and string.format(c.NextNotice, nextStep.Text) or c.DoneText
+        print('[PlayerQuest] 完成', player.UserId, 'step=' .. tostring(state.step - 1), finished.Kind, tostring(payload.eventId))
+    else
+        print('[PlayerQuest] 计数', player.UserId, 'step=' .. tostring(state.step), kind,
+            tostring(state.count) .. '/' .. tostring(c.Steps[state.step].Need), tostring(payload.eventId))
+    end
+    self:publish(player, notice)
+    return true
 end
 
 function Mgr:on_player_added(player)

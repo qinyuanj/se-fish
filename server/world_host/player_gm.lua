@@ -109,54 +109,45 @@ function Mgr:get_attack()
     return true
 end
 
--- 存档类动作：只有这些走 Save 接口，其余走 Mgr 上的发放 handler。
-local SaveActions = { ApplyState = true, SaveState = true, ReadState = true, SelectSaveSlot = true, GetState = true }
-
--- 调试开关关闭时直接拒绝；返回 true 表示已回包，调用方回 false。
-local function reject_disabled(self, player, payload)
-    if GameCfg.Debug and GameCfg.Debug.Enabled then return false end
-    print('[PlayerGM] 调试开关关闭，拒绝', player and player.UserId)
-    self:reply(player, { ok = false, action = type(payload) == 'table' and payload.action or nil,
-        reason = '调试开关已关闭' })
-    return true
-end
-
--- 存档类动作的公共回包：Apply/Read 先同步树，再回状态与物品栏快照。
-local function finish_save_action(self, player, payload, target, data, method, ok, reason)
-    if ok and (method == 'ApplyState' or method == 'ReadState') then
-        sync_target(self, target, data)
+function Mgr:handle(player, payload)
+    if not (GameCfg.Debug and GameCfg.Debug.Enabled) then
+        print('[PlayerGM] 调试开关关闭，拒绝', player and player.UserId)
+        self:reply(player, { ok = false, action = type(payload) == 'table' and payload.action or nil,
+            reason = '调试开关已关闭' })
+        return false
     end
-    self:reply(player, { ok = ok, action = payload.action, target = target.UserId,
-        reason = reason, status = self.Save:status(target.UserId),
-        snapshot = data:GetItemBarSnapshot() })
-end
-
--- 存档类动作分发：GetState 直接回包，其余调对应 Save 接口并由 finish 收尾。
-local function run_save_action(self, player, payload, target, data, method)
-    local function finish(ok, reason)
-        finish_save_action(self, player, payload, target, data, method, ok, reason)
-    end
-    if method == 'GetState' then finish(true) return true end
-    if method == 'ApplyState' then
-        return self.Save:apply_temporary(target.UserId, data, payload, finish)
-    end
-    if method == 'SaveState' then
-        local ok, reason = self.Save:save_explicit(target.UserId, data, finish)
+    if type(payload) ~= 'table' then return false end
+    local method = Actions[payload.action]
+    local target = method and self:resolve_target(player, payload.target)
+    local data = target and self.player_data and self.player_data:get_data_inst(target)
+    if data and self.Save and (method == 'ApplyState' or method == 'SaveState'
+        or method == 'ReadState' or method == 'SelectSaveSlot' or method == 'GetState') then
+        local function finish(ok, reason)
+            if ok and (method == 'ApplyState' or method == 'ReadState') then
+                sync_target(self, target, data)
+            end
+            self:reply(player, { ok = ok, action = payload.action, target = target.UserId,
+                reason = reason, status = self.Save:status(target.UserId),
+                snapshot = data:GetItemBarSnapshot() })
+        end
+        if method == 'GetState' then finish(true) return true end
+        if method == 'ApplyState' then
+            return self.Save:apply_temporary(target.UserId, data, payload, finish)
+        end
+        if method == 'SaveState' then
+            local ok, reason = self.Save:save_explicit(target.UserId, data, finish)
+            if not ok then finish(false, reason) end
+            return ok
+        end
+        if method == 'ReadState' then
+            local ok, reason = self.Save:read_explicit(target.UserId, data, finish)
+            if not ok then finish(false, reason) end
+            return ok
+        end
+        local ok, reason = self.Save:select_next_slot(target.UserId, payload.slot, finish)
         if not ok then finish(false, reason) end
         return ok
     end
-    if method == 'ReadState' then
-        local ok, reason = self.Save:read_explicit(target.UserId, data, finish)
-        if not ok then finish(false, reason) end
-        return ok
-    end
-    local ok, reason = self.Save:select_next_slot(target.UserId, payload.slot, finish)
-    if not ok then finish(false, reason) end
-    return ok
-end
-
--- 发放类动作：调用对应 handler，按动作决定是否同步树，再回包与伤害数值。
-local function run_action(self, player, payload, method, target, data)
     local ok, reason = false, '请求或目标无效'
     if data then ok, reason = self[method](self, data, payload, target) end
     print('[PlayerGM]', ok and '发放' or '拒绝', player and player.UserId, '->', target and target.UserId,
@@ -168,17 +159,6 @@ local function run_action(self, player, payload, method, target, data)
         damage = ok and (method == 'add_attack' or method == 'get_attack') and self:get_melee_damage(target, BaseAttack) or nil,
         reason = not ok and (reason or '请求未通过') or nil })
     return ok
-end
-
-function Mgr:handle(player, payload)
-    if reject_disabled(self, player, payload) then return false end
-    if type(payload) ~= 'table' then return false end
-    local method = Actions[payload.action]
-    local target = method and self:resolve_target(player, payload.target)
-    local data = target and self.player_data and self.player_data:get_data_inst(target)
-    local saves = data ~= nil and self.Save ~= nil and SaveActions[method] == true
-    if saves then return run_save_action(self, player, payload, target, data, method) end
-    return run_action(self, player, payload, method, target, data)
 end
 
 function Mgr.configure(opts)

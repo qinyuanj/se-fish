@@ -7,17 +7,19 @@
 --   4. 单向投影角色 SetScale、CameraDistance / InteractRange / BodyScaleCapped 与 character.Controller.WalkSpeed。
 -- 本模块归属 L2（server.world_host），零反向依赖存量旧债务模块。
 
-local EngineRead = require("common.engine_read")
 local BodyScale = require("common.body_scale")
-local LeafReport = require("server.world_host.leaf_report")
 local GameCfg = require("common.game_cfg")
 local Number = require("common.number")
 
 local AttrLeaf = {}
-local AttrBehavior = {}
 
 local COMPONENT_NAMES = { "Base", "BaseExtra", "Ratio", "Bonus" }
 local WEAPON_KINDS = { "melee", "ranged", "explosive" }
+
+local function is_object(value)
+  local EngineRead = require("common.engine_read")
+  return EngineRead.is_object(value)
+end
 
 local function make_vec3(x, y, z)
   return Vector3.New(x, y, z)
@@ -25,6 +27,21 @@ end
 
 local function default_attr_api()
   return require("server.packages.attr_rule.api")
+end
+
+local function report_error(opts, user_id, msg)
+  if type(opts.on_error) == "function" then
+    opts.on_error(msg)
+  else
+    print("[AttrLeaf]", user_id, msg)
+  end
+end
+
+local function safe_destroy(unit)
+  if unit == nil then
+    return
+  end
+  pcall(function() unit:Destroy() end) -- 角色已销毁时引擎可能已连带回收属性单位
 end
 
 --- 校验属性键未被地图配置 Min/Max 钳制。
@@ -55,7 +72,7 @@ end
 ---@param components table
 ---@return boolean ok, number|string value_or_err
 function AttrLeaf.project_components(attr_api, character, key, components)
-  if not EngineRead.is_object(character) then
+  if not is_object(character) then
     return false, "no-character"
   end
   if type(components) ~= "table" then
@@ -97,7 +114,7 @@ end
 ---@param capped boolean
 ---@return boolean ok, table|string derived_or_err
 function AttrLeaf.apply_body_presentation(character, scale, capped)
-  if not EngineRead.is_object(character) then
+  if not is_object(character) then
     return false, "no-character"
   end
   local sanitized = BodyScale.sanitize(scale)
@@ -119,11 +136,11 @@ end
 ---@param speed number
 ---@return boolean ok, string|nil err
 function AttrLeaf.apply_walk_speed(character, speed)
-  if not EngineRead.is_object(character) then
+  if not is_object(character) then
     return false, "no-character"
   end
   local ok_ctrl, controller = pcall(function() return character.Controller end) -- 兼容引擎 userdata 角色未就绪时读取 Controller 异常
-  if not ok_ctrl or not EngineRead.is_object(controller) then
+  if not ok_ctrl or not is_object(controller) then
     return false, "no-controller"
   end
   local clamped = Number.is_finite_number(speed) and math.max(0, speed) or 0
@@ -136,195 +153,151 @@ function AttrLeaf.apply_walk_speed(character, speed)
   return true, nil
 end
 
--- ===== attr_rule 叶子投影：拆分前 AttrLeaf.mount 体内的闭包 =====
--- AttrBehavior 是挂载实例的方法表，方法名与参数顺序沿用拆分前的闭包；
--- 拆分前从 mount 的 upvalue 读取的依赖统一放进 attr.attr_env。
-
---- 记录一条投影错误并把 summary 标成失败（拆分前 Leaf:AttrProjection 体内的 record_err）。
----@param env table
----@param summary table
----@param key any
----@param err any
-local function record_projection_error(env, summary, key, err)
-  summary.ok = false
-  local msg = tostring(key) .. ": " .. tostring(err)
-  summary.errors[#summary.errors + 1] = msg
-  LeafReport.report_error(env.opts, "AttrLeaf", env.user_id, msg)
-end
-
---- 1. 体型缩放（PlayerBodyScale）及角色视觉/交互范围投影。
-function AttrBehavior.project_body(self, character, attrs, summary, attr_plan)
-  local env = self.attr_env
-  if not attrs.PlayerBodyScale then return end
-  local ok, scale = AttrLeaf.project_components(env.attr_api, character, "PlayerBodyScale", attrs.PlayerBodyScale)
-  if not ok then
-    record_projection_error(env, summary, "PlayerBodyScale", scale)
-    return
-  end
-  local sanitized = BodyScale.sanitize(scale)
-  summary.values.PlayerBodyScale = sanitized
-  local capped = type(attr_plan.body) == "table" and attr_plan.body.capped == true
-  local ok_pres, derived_or_err = AttrLeaf.apply_body_presentation(character, sanitized, capped)
-  if not ok_pres then
-    record_projection_error(env, summary, "BodyPresentation", derived_or_err)
-    return
-  end
-  summary.body_derived = derived_or_err
-end
-
---- 2. 血量上限（PlayerMaxHealth）。
-function AttrBehavior.project_health(self, character, attrs, summary)
-  if not attrs.PlayerMaxHealth then return end
-  local ok, max_hp = AttrLeaf.project_components(self.attr_env.attr_api, character, "PlayerMaxHealth", attrs.PlayerMaxHealth)
-  if not ok then
-    record_projection_error(self.attr_env, summary, "PlayerMaxHealth", max_hp)
-    return
-  end
-  summary.values.PlayerMaxHealth = math.max(1, math.min(GameCfg.Ability.BodyScale.HealthMax, max_hp))
-end
-
---- 3. 移速（PlayerWalkSpeed）及 character.Controller.WalkSpeed 投影。
-function AttrBehavior.project_walk(self, character, attrs, summary)
-  local env = self.attr_env
-  if not attrs.PlayerWalkSpeed then return end
-  local prior_speed
-  local controller = character.Controller
-  if controller then
-    local ok_prior, current = pcall(function() return controller.WalkSpeed end)
-    if ok_prior then prior_speed = current end
-  end
-  local ok, walk_speed = AttrLeaf.project_components(env.attr_api, character, "PlayerWalkSpeed", attrs.PlayerWalkSpeed)
-  if not ok then
-    record_projection_error(env, summary, "PlayerWalkSpeed", walk_speed)
-    env.player_tree.walk_projection_rejected = true
-    if controller and prior_speed ~= nil then
-      pcall(function() controller.WalkSpeed = prior_speed end)
-    end
-    return
-  end
-  env.player_tree.walk_projection_rejected = false
-  local clamped_speed = Number.is_finite_number(walk_speed) and math.max(0, walk_speed) or 0
-  summary.values.PlayerWalkSpeed = clamped_speed
-  local ok_spd, spd_err = AttrLeaf.apply_walk_speed(character, clamped_speed)
-  if not ok_spd then
-    record_projection_error(env, summary, "WalkSpeed", spd_err)
-  end
-end
-
---- 4. 饥饿度（PlayerHunger）。
-function AttrBehavior.project_hunger(self, character, attrs, summary)
-  if not attrs.PlayerHunger then return end
-  local ok, hunger = AttrLeaf.project_components(self.attr_env.attr_api, character, "PlayerHunger", attrs.PlayerHunger)
-  if not ok then
-    record_projection_error(self.attr_env, summary, "PlayerHunger", hunger)
-    return
-  end
-  summary.values.PlayerHunger = math.max(0, math.min(GameCfg.Vitals.MaxHunger, math.floor(hunger)))
-end
-
---- 5. 三类武器伤害倍率（PlayerWeaponDamage_<kind>）。
-function AttrBehavior.project_weapons(self, character, weapon_comps, summary)
-  local env = self.attr_env
-  if type(weapon_comps) ~= "table" then return end
-  for _, kind in ipairs(WEAPON_KINDS) do
-    local comp = weapon_comps[kind]
-    if type(comp) == "table" then
-      local key = "PlayerWeaponDamage_" .. kind
-      local ok, value = AttrLeaf.project_components(env.attr_api, character, key, comp)
-      if not ok then
-        record_projection_error(env, summary, key, value)
-      else
-        summary.values[key] = value
-      end
-    end
-  end
-end
-
---- 全量投影：汇总各属性键并回调 opts.on_projected（拆分前 Leaf:AttrProjection 的 effect 体）。
----@param self table
----@param character any
----@param ps any
-function AttrBehavior.project(self, character, ps)
-  local env = self.attr_env
-  local memos = env.player_tree.memos or {}
-  local attr_plan = memos.attr_plan and ps:d(memos.attr_plan)
-  local weapon_comps = memos.weapon_damage_components and ps:d(memos.weapon_damage_components)
-  if type(attr_plan) ~= "table" or type(attr_plan.attributes) ~= "table" then
-    return
-  end
-  local attrs = attr_plan.attributes
-  local summary = {
-    ok = true,
-    errors = {},
-    values = {},
-  }
-  self:project_body(character, attrs, summary, attr_plan)
-  self:project_health(character, attrs, summary)
-  self:project_walk(character, attrs, summary)
-  self:project_hunger(character, attrs, summary)
-  self:project_weapons(character, weapon_comps, summary)
-  if type(env.opts.on_projected) == "function" then
-    env.opts.on_projected(summary)
-  end
-end
-
---- 角色作用域：GetAttrUnit / EnsureAttrUnit 后挂载投影 effect（拆分前 Leaf:AttrUnitScope 的 effect 体）。
----@param self table
----@param cs any
-function AttrBehavior.open_scope(self, cs)
-  local env = self.attr_env
-  local char_sig = env.player_tree.states and env.player_tree.states.character
-  if not char_sig then
-    return
-  end
-  local character = cs:d(char_sig)
-  if not EngineRead.is_object(character) then
-    return
-  end
-
-  local ok_existing, existing = pcall(env.attr_api.Funcs.GetAttrUnit, character)
-  if not ok_existing then
-    LeafReport.report_error(env.opts, "AttrLeaf", env.user_id, "GetAttrUnit 失败: " .. tostring(existing))
-    return
-  end
-
-  local ok_ensure, unit, ensure_err = pcall(env.attr_api.Funcs.EnsureAttrUnit, character)
-  if not ok_ensure or not unit then
-    LeafReport.report_error(env.opts, "AttrLeaf", env.user_id, "EnsureAttrUnit 失败: " .. tostring(ok_ensure and ensure_err or unit))
-    return
-  end
-
-  local owned = (existing == nil)
-  if owned then
-    cs:on_cleanup(function()
-      EngineRead.destroy_unit(unit, "AttrLeaf.attr_scope")
-    end)
-  end
-
-  cs:effect("Leaf:AttrProjection", function(ps)
-    return self:project(character, ps)
-  end)
-end
-
---- 在 PlayerTree 树底挂载 attr_rule 纯输出叶子投影；本函数只做依赖归一化与装配。
+--- 在 PlayerTree 树底挂载 attr_rule 纯输出叶子投影。
 ---@param s table EffectBuilder
 ---@param player_tree table
 ---@param opts? { attr_api?: table, on_error?: fun(msg: string), on_projected?: fun(summary: table) }
 function AttrLeaf.mount(s, player_tree, opts)
   opts = type(opts) == "table" and opts or {}
-  ---@type table<string, any>
-  local attr = {
-    attr_env = {
-      attr_api = opts.attr_api or default_attr_api(),
-      player_tree = player_tree,
-      user_id = player_tree and player_tree.user_id,
-      opts = opts,
-    },
-  }
-  for name, method in pairs(AttrBehavior) do
-    attr[name] = method
-  end
-  return s:effect("Leaf:AttrUnitScope", function(cs) return attr:open_scope(cs) end)
+  local attr_api = opts.attr_api or default_attr_api()
+  local user_id = player_tree and player_tree.user_id
+
+  return s:effect("Leaf:AttrUnitScope", function(cs)
+    local char_sig = player_tree.states and player_tree.states.character
+    if not char_sig then
+      return
+    end
+    local character = cs:d(char_sig)
+    if not is_object(character) then
+      return
+    end
+
+    local ok_existing, existing = pcall(attr_api.Funcs.GetAttrUnit, character)
+    if not ok_existing then
+      report_error(opts, user_id, "GetAttrUnit 失败: " .. tostring(existing))
+      return
+    end
+
+    local ok_ensure, unit, ensure_err = pcall(attr_api.Funcs.EnsureAttrUnit, character)
+    if not ok_ensure or not unit then
+      report_error(opts, user_id, "EnsureAttrUnit 失败: " .. tostring(ok_ensure and ensure_err or unit))
+      return
+    end
+
+    local owned = (existing == nil)
+    if owned then
+      cs:on_cleanup(function()
+        safe_destroy(unit)
+      end)
+    end
+
+    cs:effect("Leaf:AttrProjection", function(ps)
+      local memos = player_tree.memos or {}
+      local attr_plan = memos.attr_plan and ps:d(memos.attr_plan)
+      local weapon_comps = memos.weapon_damage_components and ps:d(memos.weapon_damage_components)
+      if type(attr_plan) ~= "table" or type(attr_plan.attributes) ~= "table" then
+        return
+      end
+
+      local attrs = attr_plan.attributes
+      local summary = {
+        ok = true,
+        errors = {},
+        values = {},
+      }
+
+      local function record_err(key, err)
+        summary.ok = false
+        local msg = tostring(key) .. ": " .. tostring(err)
+        summary.errors[#summary.errors + 1] = msg
+        report_error(opts, user_id, msg)
+      end
+
+      -- 1. 体型缩放（PlayerBodyScale）及角色视觉/交互范围投影
+      if attrs.PlayerBodyScale then
+        local ok, scale = AttrLeaf.project_components(attr_api, character, "PlayerBodyScale", attrs.PlayerBodyScale)
+        if not ok then
+          record_err("PlayerBodyScale", scale)
+        else
+          local sanitized = BodyScale.sanitize(scale)
+          summary.values.PlayerBodyScale = sanitized
+          local capped = type(attr_plan.body) == "table" and attr_plan.body.capped == true
+          local ok_pres, derived_or_err = AttrLeaf.apply_body_presentation(character, sanitized, capped)
+          if not ok_pres then
+            record_err("BodyPresentation", derived_or_err)
+          else
+            summary.body_derived = derived_or_err
+          end
+        end
+      end
+
+      -- 2. 血量上限（PlayerMaxHealth）
+      if attrs.PlayerMaxHealth then
+        local ok, max_hp = AttrLeaf.project_components(attr_api, character, "PlayerMaxHealth", attrs.PlayerMaxHealth)
+        if not ok then
+          record_err("PlayerMaxHealth", max_hp)
+        else
+          summary.values.PlayerMaxHealth = math.max(1, math.min(GameCfg.Ability.BodyScale.HealthMax, max_hp))
+        end
+      end
+
+      -- 3. 移速（PlayerWalkSpeed）及 character.Controller.WalkSpeed 投影
+      if attrs.PlayerWalkSpeed then
+        local prior_speed
+        local controller = character.Controller
+        if controller then
+          local ok_prior, current = pcall(function() return controller.WalkSpeed end)
+          if ok_prior then prior_speed = current end
+        end
+        local ok, walk_speed = AttrLeaf.project_components(attr_api, character, "PlayerWalkSpeed", attrs.PlayerWalkSpeed)
+        if not ok then
+          record_err("PlayerWalkSpeed", walk_speed)
+          player_tree.walk_projection_rejected = true
+          if controller and prior_speed ~= nil then
+            pcall(function() controller.WalkSpeed = prior_speed end)
+          end
+        else
+          player_tree.walk_projection_rejected = false
+          local clamped_speed = Number.is_finite_number(walk_speed) and math.max(0, walk_speed) or 0
+          summary.values.PlayerWalkSpeed = clamped_speed
+          local ok_spd, spd_err = AttrLeaf.apply_walk_speed(character, clamped_speed)
+          if not ok_spd then
+            record_err("WalkSpeed", spd_err)
+          end
+        end
+      end
+
+      -- 4. 饥饿度（PlayerHunger）
+      if attrs.PlayerHunger then
+        local ok, hunger = AttrLeaf.project_components(attr_api, character, "PlayerHunger", attrs.PlayerHunger)
+        if not ok then
+          record_err("PlayerHunger", hunger)
+        else
+          summary.values.PlayerHunger = math.max(0, math.min(GameCfg.Vitals.MaxHunger, math.floor(hunger)))
+        end
+      end
+
+      -- 5. 三类武器伤害倍率（PlayerWeaponDamage_<kind>）
+      if type(weapon_comps) == "table" then
+        for _, kind in ipairs(WEAPON_KINDS) do
+          local comp = weapon_comps[kind]
+          if type(comp) == "table" then
+            local key = "PlayerWeaponDamage_" .. kind
+            local ok, value = AttrLeaf.project_components(attr_api, character, key, comp)
+            if not ok then
+              record_err(key, value)
+            else
+              summary.values[key] = value
+            end
+          end
+        end
+      end
+
+      if type(opts.on_projected) == "function" then
+        opts.on_projected(summary)
+      end
+    end)
+  end)
 end
 
 return AttrLeaf
