@@ -1,6 +1,6 @@
 local GameCfg = require('common.game_cfg')
 local BossPhase = require('common.boss_phase')
-local BossMoves = require('common.cfg.boss_moves')
+local FishBehaviors = require('server.fish_behaviors')
 
 ---@class FishEscapingSpecies
 ---@field Grade string
@@ -20,7 +20,6 @@ function EscapingPhase.install(Mgr, context)
     local flatDirection = context.flatDirection
     local towardWater = context.towardWater
     local inWater = context.inWater
-    local resetCrabRhythm = context.resetCrabRhythm
 
     function Mgr:speed(fish)
         local species = GameCfg.Fish[fish.fish_id]
@@ -148,27 +147,7 @@ function EscapingPhase.install(Mgr, context)
             ---@cast combat_params table?
             if combat_params then
                 fish.bite_aim = nil
-                if species.Combat == 'shrimp' or species.Combat == 'dragon' then
-                    local params = combat_params
-                    fish.ActiveUntil = now + (params.ActiveSec or params.SpecialSec)
-                    fish.SpecialAt = now + (params.SpecialSec or 0)
-                    fish.combo = 0
-                elseif species.Combat == 'kingCrab' or species.Combat == 'crabBoss' then
-                    resetCrabRhythm(fish, now, combat_params)
-                elseif species.Combat == 'swordfish' or species.Combat == 'shark' then
-                    local params = combat_params
-                    ---@cast params FishEscapingJumpParams
-                    fish.JumpAt = now + params.JumpIntervalSec
-                    fish.roll_slot = -1
-                elseif species.Combat == 'walrus' then
-                    fish.ChargeAt = now + combat_params.ChargeSec
-                elseif species.Combat == 'orca' then
-                    local params = BossMoves.combat_params(combat_params, BossMoves.key_of(species, fish.fish_id))
-                    fish.JumpAt = now + params.JumpIntervalSec
-                    fish.RoarAt = now + params.RoarSec
-                    fish.TailAt = now + params.TailSec
-                    fish.ClawAt = -1
-                end
+                FishBehaviors.init(fish, now, combat_params, species)
             elseif self.Ability then
                 self.Ability:equip_fish(fish)
             end

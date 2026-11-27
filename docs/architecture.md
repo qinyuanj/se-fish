@@ -10,7 +10,7 @@
 |---|---|---|
 | L1 入口 | `client.main`、`server.main` | 唯一组合根：启动、宿主适配器与玩法服务装配、引擎事件翻译和依赖注入 |
 | L2 应用流程与宿主 | `server.world_host`、`server.ability_api`、`server.ability_behaviors`、`server.player_data_host`、`server.save_host`、`server.platform_host`、`server.fish_ability`；`client.views` | 服务端 Spoke 世界/玩家/活鱼树与持久化、平台、能力宿主；客户端 Spoke 视图树与输入、交互流程 |
-| L3 展示与运行端支撑 | `client.store`、`client.game_ui` 等展示基元；`server.fish_behaviors`；`common.re_util`、`Util`、`TeleportUtil`、`DamageNotice`、`GarBiteNotice` | 客户端只读响应式状态仓库、展示、主界面布局、手势与瞄准；行为分发；引擎和协议适配 |
+| L3 展示与运行端支撑 | `client.store`、`client.game_ui` 等展示基元；`server.fish_behaviors`；`common.re_util`、`Util`、`TeleportUtil`、`DamageNotice`、`GarBiteNotice` | 客户端只读响应式状态仓库、展示、主界面布局、手势与瞄准；按 `Combat` 键注册的物种战斗行为，经战斗原语回调宿主；引擎和协议适配 |
 | L4 共享规则与业务状态 | `server.data`、`server.swing_registry`；`common.spoke_clock`、`common.game_cfg`、`AttrModel`、`FishCatch`、`Vitals` 等规则模块 | 存档与记录、一次性挥砍登记、消费方确定性时钟、配置解析与共享玩法计算 |
 | L5 配置内容 | `common.cfg` | 鱼、物品、商店、抽奖、盲盒与占位资产数据 |
 | L6 包 | `client.packages`、`server.packages`、`common.packages` | 整包交付的库：**官方包**与**自研包**。门禁仍要求可分类，但架构图不画、质量工具不度量（[ADR-0021](adr/0021-packages-outside-business-scope.md)） |
@@ -24,6 +24,7 @@
 - `common.util` 含引擎等待、通知和 `REUtil` 依赖，不是纯 foundation；它与 `REUtil` 同处 L3。
 - `common.game_cfg` 含配置解析与玩法计算，归 L4；纯配置内容归 L5 的 `common.cfg`。
 - `server.ability_api` 与本图技能行为同属 L2。行为需要的 `Vitals`、`FishCarrier`、`GM`、`Modifier` 由 `server/main.lua` 通过 `AbilityAPI.BehaviorServices` 注入，行为不得反向加载宿主组合根。
+- `server.fish_behaviors` 注册表在加载时拒绝已配置未注册、配置未知和重复的 `Combat` 键；`FishTree` 与 `CombatPhase` 只保留生命周期、状态优先级、战斗原语、协议和资源清理。对 `GameCfg.FishCombat` 注册行为，宿主不持有物种键字面量或物种招式本体；电鳗仍属 `GameCfg.Ability` / `update_eel` 路径，不扩大本次迁移。物种模块不得静态依赖 `server.world_host`。
 - `server.swing_registry` 独立持有带 TTL、一次性消费的挥砍登记，`server.world_host.player_weapon` 与 `melee_hit` 共同依赖它。时钟异常时拒绝登记与消费；失效读取、施法失败及玩家退出时清除登记，施法失败回复失败。
 - 武器持续效果由 `server/world_host/modifier_leaf.lua`（经 `PlayerTree`/`PlayerEffects` 与 `entity_modifiers`）实现，近战行为与枪击不经过 `FishAbility` 转发。
 - 三端脚本目录与文件名不得与 SE 内置服务名同名（`World`、`MapData`、`Game`、`Camps`、`*Service` 一类）：编辑器按服务名索引脚本树，同名目录在同步时被整棵跳过并报 warn「不会生效」（2026-11-24 实测 `server/World/`）。服务端世界宿主包因此叫 `server/world_host`（[ADR-0033](adr/0033-script-names-must-not-shadow-se-services.md)）；新增顶层目录或脚本文件前先按此核对。
@@ -40,6 +41,8 @@
 5. `policy.edn` 的 `:levels` 与 `M.policy.levels` 不一致，或三端包不再最底。
 
 官方包内部的既有循环依赖按包前缀豁免，因为包以官方整包升级为准。任何包含包外业务模块的循环都不豁免。门禁只分析静态 `require`；入口注入、`_G` 与 RemoteEvent 协作不伪装成静态依赖，仍由对应行为测试和入口接线测试约束。
+
+`tests/native/guards/fish_behavior_registry_guard_test.lua` 在去除注释后扫描 `fish_tree.lua` 与 `fish_phases/`，拒绝九个 `FishCombat` 键的字符串字面量；同时验证九键与 `gar` 均显式注册，以及缺失、未知和重复注册立即失败。
 
 定向检查与完整收尾：
 

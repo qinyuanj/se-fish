@@ -14,6 +14,7 @@
 -- 模块缓存（package.loaded 的 MgrFishUnit 与 common.re_util）与配置（GameCfg.Debug）逐例恢复，
 -- after_each 对未完成的 before_each 幂等。describe 顺序沿用旧执行序（类名字典序）。
 local GameCfg = require('common.game_cfg')
+local FishCombat = require('tests.support.fish_combat')
 local ClientStore = require('client.store.client_store')
 local RootView = require('client.views.root_view')
 local AttackView = require('client.views.attack_view')
@@ -38,19 +39,11 @@ describe('TestFishStatusGate', function()
     local ctx
 
     before_each(function()
-        ctx = { saved = { game = rawget(_G, 'game'), Vector3 = rawget(_G, 'Vector3'),
-            unit = package.loaded['server.world_host.fish_tree'] } }
+        ctx = FishCombat.new()
+        ctx:set_up()
         ctx.now = 10
-        local state = ctx
-        _G.Vector3 = { New = vec }
-        _G.game = { GetService = function(_, name)
-            if name == 'World' then return { GetServerTime = function() return state.now end } end
-            if name == 'Players' then return { GetPlayers = function() return {} end } end
-            return {}
-        end }
-        package.loaded['server.world_host.fish_tree'] = nil
-        ctx.mgr = assert(loadfile('server/world_host/fish_tree.lua'))()
         ctx.factor, ctx.paralyzed = 1, false
+        local state = ctx
         ctx.mgr.Ability = {
             fish_speed_factor = function() return state.factor end,
             fish_paralyzed = function() return state.paralyzed end,
@@ -59,32 +52,25 @@ describe('TestFishStatusGate', function()
     end)
 
     after_each(function()
-        if ctx and ctx.saved then
-            _G.game = ctx.saved.game
-            _G.Vector3 = ctx.saved.Vector3
-            package.loaded['server.world_host.fish_tree'] = ctx.saved.unit
-        end
+        if ctx then ctx:tear_down() end
     end)
 
-    -- 麻痹的鱼不追咬、不施法、就地停住
+    -- 麻痹的鱼不追咬、不施法、就地停住；解除后从真实 FishTree 帧流程恢复追击
     it('test_paralyzed_fish_skips_combat_actions', function()
-        local dispatched = {}
-        for _, name in ipairs({ 'update_chase', 'update_eel', 'update_boss_phase', 'update_shrimp_combat',
-            'update_king_crab_combat', 'update_crab_boss_combat', 'stun_fish' }) do
-            ctx.mgr[name] = function() dispatched[#dispatched + 1] = name end
-        end
-        ctx.mgr.refresh_moving_combat = function() end
-        ctx.mgr.boss_phase_enabled = function() return false end
-        local body = { Position = vec(9999, 500, 9999) } -- 远离任何水域，不触发入水逃脱
-        local fish = { Id = 2, fish_id = 'alligatorGar', State = 'combat', flee_at = ctx.now + 100,
-            carrier = { body = body } }
+        ctx:prepare()
+        ctx.player.Character.Controller.Health = 300
+        local fish = ctx:held_fish(ctx.player, 'alligatorGar')
+        ctx.mgr:drop(ctx.player)
+        local body = fish.carrier.body
+        ctx.player.Character.Position = vec(body.Position.x + 10, 2, body.Position.z)
         ctx.paralyzed = true
-        ctx.mgr:update_combat(fish, ctx.now)
-        assert.message('麻痹期间不追咬/不施法').same({}, dispatched)
+        ctx.mgr:update()
         assert.same(vec(0, 0, 0), body.LinearVelocity)
+        assert.same({}, ctx.notices)
         ctx.paralyzed = false
-        ctx.mgr:update_combat(fish, ctx.now)
-        assert.same({ 'update_chase' }, dispatched)
+        ctx.mgr:update()
+        assert.near(GameCfg.Fish.alligatorGar.Speed, body.LinearVelocity.x, 1e-9)
+        assert.near(0, body.LinearVelocity.z, 1e-9)
     end)
 
     -- 鱼的移速 = 基础 × 状态因子；效果口故障不拖垮移动

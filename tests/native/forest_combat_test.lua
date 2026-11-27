@@ -240,6 +240,7 @@ describe('TestForestCombat', function()
     it('test_swordfish_drop_chases_and_flees_at_180', function()
         local fish = drop(env, 'fish31Elite', 20)
         assert.are.equal(180, fish.flee_at)
+        assert.are.equal(50, fish.JumpAt)
         local body = fish.carrier.body
         local z0 = body.Position.z
         env.now = 0
