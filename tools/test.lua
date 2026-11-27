@@ -1,4 +1,4 @@
--- test 子命令：按测试车道跑 busted（#145）。`lua tools/cli.lua test [fast|full|spec|art] [--jobs N] [-- <busted 参数>...]`。
+-- test 子命令：按测试车道跑 busted（#145）。`lua tools/cli.lua test [fast|full|spec] [--jobs N] [-- <busted 参数>...]`。
 -- 车道从三条扩到四条（#243）：新增 spec（条款断言车道），并让它随 full 一起跑。
 -- 车道名与 .busted 的任务名同名，始终显式传 --run=<车道>（不依赖 .busted 的 default）。
 -- 进程调用只经 tools/seam.lua（唯一接缝）：seam.which 找 busted，seam.spawn / seam.spawn_bg 在仓库根执行。
@@ -8,7 +8,7 @@
 -- 分片并行：--jobs N 把一段车道按文件分给 N 个 busted 进程并跑，缺省 1（串行，行为与以前完全一致：
 -- 一条命令、busted 自己按 .busted 发现文件、输出直接到控制台）。
 -- 并行时文件表从 .busted 现读（车道真源只有这一份，这里不抄第二份），按文件字节数做 LPT 装箱；
--- 写固定路径的车道段（slow、art）不分片，单独成段串行跑。段序与 .busted 的 ROOT 顺序一致；
+-- 写固定路径的车道段（slow）不分片，单独成段串行跑。段序与 .busted 的 ROOT 顺序一致；
 -- 每片内部仍按文件名字典序跑，但跨片是并发的，所以用例的整体交错顺序与串行跑时不同
 -- （文件级隔离靠 .busted 的 auto-insulate，不靠顺序）。
 -- 并行时末行是聚合出来的 `N successes / M failures / E errors / P pending : T seconds`，
@@ -23,7 +23,6 @@ M.LANES = {
   { name = "full", summary = "收尾车道：fast 加 tests/native/slow 与 tests/native/spec" },
   { name = "guards", summary = "门禁型车道：tests/native/guards，随 fast 与 full 运行" },
   { name = "spec", summary = "条款断言车道：tests/native/spec，随 full 运行" },
-  { name = "art", summary = "美术车道：tests/native/art，要本机 Blender，默认不进 full" },
 }
 M.DEFAULT_LANE = "fast"
 M.DEFAULT_JOBS = 1
@@ -36,7 +35,6 @@ M.MAX_JOBS = 8
 -- 写固定路径、不能与别的段并跑的 ROOT，连同原因。加车道时先看这张表。
 M.SERIAL_ROOTS = {
   ["tests/native/slow"] = "写固定路径 tmp/sync-transport-test 与 tmp/deploy-transport-test，并改写 qa_slot 的真实配置",
-  ["tests/native/art"] = "要本机 Blender，写固定路径 tmp/blender-transport-test.out",
 }
 
 local function lane_names()
@@ -47,7 +45,7 @@ end
 
 function M.usage()
   local lines = {
-    "用法: lua tools/cli.lua test [fast|full|spec|art] [--jobs N] [-- <busted 参数>...]",
+    "用法: lua tools/cli.lua test [fast|full|spec] [--jobs N] [-- <busted 参数>...]",
     "",
     "在仓库根按测试车道跑 busted（显式 --run=<车道>），测试通过退出码 0、有失败或错误 1。缺省车道 " .. M.DEFAULT_LANE .. "。",
     "",
@@ -59,7 +57,7 @@ function M.usage()
   lines[#lines + 1] = ""
   lines[#lines + 1] = string.format("--jobs N  把车道分给 N 个 busted 进程并跑（1..%d），缺省 %d 即串行；",
     M.MAX_JOBS, M.DEFAULT_JOBS)
-  lines[#lines + 1] = "          写固定路径的车道段（slow、art）始终串行，段序与 .busted 的 ROOT 顺序相同。"
+  lines[#lines + 1] = "          写固定路径的车道段（slow）始终串行，段序与 .busted 的 ROOT 顺序相同。"
   lines[#lines + 1] = "-- 之后的参数原样追加给 busted，例如: lua tools/cli.lua test fast -- --filter=<用例名>"
   lines[#lines + 1] = "并行时 -- 之后只能给 busted 的选项：再给 ROOT 参数与分片冲突，直接按用法错误退出。"
   lines[#lines + 1] = "busted 不在 PATH 上时退出码 3。"

@@ -12,7 +12,7 @@
 -- 进程当前目录不改：deploy / sync 等按当前目录读写，与之前一致。
 --
 -- 退出码：0 成功 / 1 业务失败 / 2 用法错误（未知子命令、模块加载失败、未知参数）/
---         3 外部工具不可用（busted / editor-cli / Blender / robocopy / curl / emmylua_check 缺失）。
+--         3 外部工具不可用（busted / editor-cli / robocopy / curl / emmylua_check 缺失）。
 -- test 不原样透传 busted 的退出码（那是失败数加错误数，恰好 3 个失败会撞上退出码 3）：
 -- busted 非 0 一律收成 1。
 -- 「编辑器没装或没打开本图 → 打印跳过并返回 0」不受退出码 3 影响。
@@ -46,8 +46,7 @@ M.commands = {
   { name = "docs", mod = "tools.docs", summary = "同步并离线检索 SE 官方手册：docs sync [api <页面>] / docs search <查询>" },
   { name = "qa-slot", mod = "tools.qa_slot", summary = "查看、新建或切换 QA 存档槽（试玩前需 deploy）" },
   { name = "ability-presets", mod = "tools.ability_presets", summary = "重建技能包的编辑器侧预设（复制官方模板、刷壳与属性、回写 GameCfg key）" },
-  { name = "blender", mod = "tools.blender", summary = "在 Windows 侧无头 Blender 执行脚本（唯一 Blender 入口，透传 JSON 与退出码）" },
-  { name = "worktree-init", mod = "tools.worktree_init", summary = "把新 worktree 补齐到能跑 test full（复制上游 blender-* skill、安装 pre-commit；幂等）" },
+  { name = "worktree-init", mod = "tools.worktree_init", summary = "把新 worktree 补齐到能跑 test full（安装 pre-commit；幂等）" },
   { name = "git-hook-init", mod = "tools.git_hooks", summary = "安装本地 pre-commit（提交前依次运行 test guards、size 与 emmylua 门禁；幂等且不覆盖其他 hook）" },
   { name = "screenshot", mod = "tools.screenshot", summary = "抓画面存 PNG（缺省后台 PrintWindow，窗口被遮挡也能取当前帧）；--info 只报显示路径与选中的窗口" },
   { name = "editor", mod = "tools.editor", summary = "打开、查看、停止编辑器与地图：editor [open|status|stop] [--map <id|目录>]" },
@@ -98,7 +97,7 @@ local function usage()
   lines[#lines + 1] = "  0 成功"
   lines[#lines + 1] = "  1 业务失败（含测试失败：busted 的任何非 0 退出码都收成 1）"
   lines[#lines + 1] = "  2 用法错误（未知子命令、模块加载失败、未知参数）"
-  lines[#lines + 1] = "  3 外部工具不可用（busted / editor-cli / Blender / robocopy / curl / emmylua_check 缺失）"
+  lines[#lines + 1] = "  3 外部工具不可用（busted / editor-cli / robocopy / curl / emmylua_check 缺失）"
   lines[#lines + 1] = ""
   lines[#lines + 1] = "  lua tools/cli.lua <子命令> --help   子命令帮助"
   return table.concat(lines, "\n") .. "\n"

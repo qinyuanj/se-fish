@@ -40,11 +40,10 @@ jobs:
                 $reason = "PR 文件列表获取失败或为空（exit=$LASTEXITCODE, count=$($files.Count)），兜底全量"
               } else {
                 # 严格文档白名单（Fail-Closed）：
-                # 排除 docs/agents/art-pipeline.md（tests/native/blender_cli_test.lua 会读取其小节标题）
                 $allDocs = $true
                 foreach ($f in $files) {
                   $isRootDoc = $f -match '^(README|AGENTS|GLOSSARY|CODING_STANDARDS)\.md$'
-                  $isDocsMd = ($f -match '^docs/.*\.md$') -and ($f -ne 'docs/agents/art-pipeline.md')
+                  $isDocsMd = $f -match '^docs/.*\.md$'
                   if (-not ($isRootDoc -or $isDocsMd)) {
                     $allDocs = $false
                     $reason = "命中非纯文档白名单文件: $f"

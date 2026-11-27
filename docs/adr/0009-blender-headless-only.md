@@ -1,6 +1,6 @@
 # 0009 Blender 只走无头，唯一入口为 CLI 的 blender 子命令
 
-**Status**: accepted
+**Status**: deprecated（美术创作工作流已从主线移除，相关代码与文档保留在 git tag `art-workflow-archive-v1`；以下为历史记录，其中的路径与命令在主线已不存在）
 
 agent 驱动 Blender 原本存在实时通道（MCP、socket 桥接）与多种无头裸调并存，无人值守时先试实时通道再回退导致反复失败、环境变量不统一，且裸调无法复用上游 skill 的 QA 与渲染脚本。
 
