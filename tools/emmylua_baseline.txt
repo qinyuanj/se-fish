@@ -73,9 +73,6 @@ client/views/lottery_view.lua:18:undefined-field
 client/views/main_hud_action_buttons_view.lua:7:unresolved-require
 client/views/main_hud_backpack_view.lua:8:unresolved-require
 client/views/main_hud_equip_popups.lua:6:unresolved-require
-client/views/main_hud_equip_popups.lua:8:unused
-client/views/main_hud_item_bar_view.lua:43:undefined-field
-client/views/main_hud_item_bar_view.lua:54:undefined-field
 client/views/main_hud_item_bar_view.lua:7:unresolved-require
 client/views/main_hud_vitals_view.lua:5:unresolved-require
 client/views/main_hud_vitals_view.lua:7:unused
@@ -372,7 +369,6 @@ server/player_data_host.lua:25:undefined-field
 server/player_data_host.lua:280:unnecessary-if
 server/player_data_host.lua:287:unnecessary-if
 server/player_data_host.lua:298:undefined-field
-server/player_data_host.lua:332:undefined-field
 server/player_data_host.lua:33:unnecessary-if
 server/player_data_host.lua:39:undefined-field
 server/player_data_host.lua:40:undefined-field
@@ -494,7 +490,6 @@ server/world_host/player_compendium.lua:48:unused
 server/world_host/player_effects.lua:16:unresolved-require
 server/world_host/player_effects.lua:178:unnecessary-if
 server/world_host/player_effects.lua:17:unresolved-require
-server/world_host/player_effects.lua:483:assign-type-mismatch
 server/world_host/player_effects.lua:55:param-type-mismatch
 server/world_host/player_fisherman.lua:3:unresolved-require
 server/world_host/player_gm.lua:108:unused
