@@ -11,6 +11,10 @@
 # 该登记文件描述仓内受管内容（.dsh/skills/spoke，见 ADR-0022），必须入库。
 /.agents/*
 !/.agents/skills.json
+# 本仓自建的 verify-se-fish 技能入库；其余 .agents/skills/* 仍由工具下发。
+!/.agents/skills/
+/.agents/skills/*
+!/.agents/skills/verify-se-fish/
 /.claude/
 /.codemaker/
 /.codex/
