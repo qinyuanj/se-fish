@@ -1,18 +1,13 @@
 -- 玩家快照与存档镜像的纯数据投影；State 收集、引擎写入与离场时序归 PlayerTree。
+local DeepCopy = require("common.deep_copy")
 local GameCfg = require("common.game_cfg")
 
 local PlayerProjection = {}
 
-local function deep_copy(value)
-  if type(value) ~= "table" then return value end
-  local out = {}
-  for k, v in pairs(value) do
-    out[k] = deep_copy(v)
-  end
-  return out
-end
-
-local function normalize_held(raw)
+--- 归一化手持物（kind / id / slot）：存档镜像（player_tree）与运行时快照共用同一形状。
+---@param raw any
+---@return table
+function PlayerProjection.normalize_held(raw)
   if type(raw) ~= "table" then
     return { kind = nil, id = nil, slot = nil }
   end
@@ -22,6 +17,7 @@ local function normalize_held(raw)
     slot = raw.slot,
   }
 end
+local normalize_held = PlayerProjection.normalize_held
 
 local function copy_slots(items, capacity)
   local slots = {}
@@ -91,7 +87,7 @@ function PlayerProjection.build_item_bar_snapshot(values)
     coin = coin,
     selectedSlot = selected_slot,
     selectedBait = selected_bait,
-    weapons = deep_copy(type(weapons) == "table" and weapons or {}),
+    weapons = DeepCopy.copy(type(weapons) == "table" and weapons or {}),
     selectedWeapon = selected_weapon,
     held = normalize_held(held),
   }
@@ -107,15 +103,15 @@ function PlayerProjection.build_stage1_mirror(values, container_ids)
   put(patch, { "data", "FishCoin" }, values.coin)
   put(patch, { "data", "Zone" }, values.zone_id)
   put(patch, { "data", "upgrade_level" }, values.upgrade_level)
-  put(patch, { "data", "containers", container_ids.ItemBar }, deep_copy(values.item_bar or {}))
-  put(patch, { "data", "containers", container_ids.Backpack }, deep_copy(values.backpack or {}))
-  put(patch, { "data", "Bait" }, deep_copy(values.bait or {}))
-  put(patch, { "data", "weapons" }, deep_copy(values.weapons or {}))
+  put(patch, { "data", "containers", container_ids.ItemBar }, DeepCopy.copy(values.item_bar or {}))
+  put(patch, { "data", "containers", container_ids.Backpack }, DeepCopy.copy(values.backpack or {}))
+  put(patch, { "data", "Bait" }, DeepCopy.copy(values.bait or {}))
+  put(patch, { "data", "weapons" }, DeepCopy.copy(values.weapons or {}))
   put(patch, { "data", "selected_slot" }, values.selected_slot)
   put(patch, { "data", "selected_bait" }, values.selected_bait)
   put(patch, { "data", "selected_weapon" }, values.selected_weapon)
 
-  put(patch, { "extra", "inventory", "weapons" }, deep_copy(values.weapons or {}))
+  put(patch, { "extra", "inventory", "weapons" }, DeepCopy.copy(values.weapons or {}))
   put(patch, { "extra", "inventory", "selection", "slot" }, values.selected_slot)
   put(patch, { "extra", "inventory", "selection", "bait" }, values.selected_bait)
   put(patch, { "extra", "inventory", "selection", "weapon" }, values.selected_weapon)
@@ -123,8 +119,8 @@ function PlayerProjection.build_stage1_mirror(values, container_ids)
 
   put(patch, { "extra", "growth", "potions", "item168" }, values.potion_big_count)
   put(patch, { "extra", "growth", "potions", "item167" }, values.potion_speed_count)
-  put(patch, { "extra", "growth", "upgrades" }, deep_copy(values.shop_upgrades or {}))
-  put(patch, { "extra", "cooldowns" }, deep_copy(values.cooldowns or {}))
+  put(patch, { "extra", "growth", "upgrades" }, DeepCopy.copy(values.shop_upgrades or {}))
+  put(patch, { "extra", "cooldowns" }, DeepCopy.copy(values.cooldowns or {}))
   return patch
 end
 
