@@ -501,7 +501,7 @@ describe('TestEconomyPersistence', function()
 
     it('test_skip_level_rejected_before_persisting', function()
         -- #130 越级购买在持久前被拒绝：不产生操作、不扣钱、计数为零
-        GameCfg.Shop.Stands = { { AnchorName = 'TGUnitShop', Level = 7 } }
+        GameCfg.Shop.Stands = { { AnchorName = 'Z1_Shop', Level = 7 } }
         env.data:AddCoin(1000)
         persistSetup()
         env.shop:handle(env.player, { action = 'Buy', number = 50, seq = 1 }) -- 近战 2 级，未买过 1 级

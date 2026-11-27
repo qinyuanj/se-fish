@@ -6,7 +6,7 @@ local APPLY = false
 local MARK = 'FMM172'
 local world = editor:GetService('World')
 local ZONES = {
-  { '02 虾池', 'TGUnitFishShrimp', 'Z2_FishermanModel' },
+  { '02 虾池', 'Z2_Fisherman', 'Z2_FishermanModel' },
   { '03 蟹湖', 'Z3_Fisherman', 'Z3_FishermanModel' },
   { '04 树林岛', 'Z4_Fisherman', 'Z4_FishermanModel' },
   { '05 沙滩岛', 'Z5_Fisherman', 'Z5_FishermanModel' },

@@ -348,7 +348,7 @@ describe("钓场商店购买", function()
         assert.is_true(buy('starterRod', { price = 0 }))
         assert.same(0, ctx.data.data.FishCoin)
         -- 摊位等级不够的商品不上架
-        ctx.cfg.Shop = setmetatable({ Stands = { { AnchorName = 'TGUnitShop', Level = 1 } }, Goods = {
+        ctx.cfg.Shop = setmetatable({ Stands = { { AnchorName = 'Z1_Shop', Level = 1 } }, Goods = {
             { ItemId = 'worm', Price = 1, Page = '钓具', MinShopLevel = 2, PurchaseLimit = 0 },
         } }, { __index = ctx.savedShop })
         ctx.data:AddCoin(1, nil, 'test')

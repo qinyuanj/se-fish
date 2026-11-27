@@ -768,7 +768,7 @@ local function step()
     end
     if RT.pendingUntil and now() < RT.pendingUntil then return 'wait', 0.3 end
 
-    -- 0 摆渡：有船票就去 FerryBoat（航线 1），到达虾池即闭环完成
+    -- 0 摆渡：有船票就去 Z1_FerryOut（航线 1），到达虾池即闭环完成
     if data.data.Zone ~= zone1.Id then
         say('DONE', '已到达', tostring(data.data.Zone))
         snapshot('done')

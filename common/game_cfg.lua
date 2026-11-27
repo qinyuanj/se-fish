@@ -322,8 +322,8 @@ GameCfg.Interact = {
 
 GameCfg.Shop = {
     Stands = {
-        { AnchorName = 'TGUnitShop', Level = 1 },
-        { AnchorName = 'TGUnitShopShrimp', Level = 2 },
+        { AnchorName = 'Z1_Shop', Level = 1 },
+        { AnchorName = 'Z2_Shop', Level = 2 },
         { AnchorName = 'Z3_Shop', Level = 3 },
         { AnchorName = 'Z4_Shop', Level = 4 },
         { AnchorName = 'Z5_Shop', Level = 5 },
@@ -946,9 +946,9 @@ local ferryLegGeometry = { BoatRange = 6, Radius = 5, Slack = 0.5, BubbleHeight 
 local returnPrices = { 10, 30, 90, 270, 810, 2430 }
 for index = 1, 6 do
     local from, to = GameCfg.Zones[index], GameCfg.Zones[index + 1]
-    local outbound = { AnchorName = index == 1 and 'FerryBoat' or ('Z' .. index .. '_FerryOut'),
+    local outbound = { AnchorName = 'Z' .. index .. '_FerryOut',
         Ticket = GameCfg.Content.Exchanges[index].Result, CountdownSec = 5, Zone = to.Id }
-    local back = { AnchorName = index == 1 and 'FerryReturn' or ('Z' .. (index + 1) .. '_FerryReturn'),
+    local back = { AnchorName = 'Z' .. (index + 1) .. '_FerryReturn',
         Price = returnPrices[index], Zone = from.Id }
     for key, value in pairs(ferryLegGeometry) do outbound[key], back[key] = value, value end
     GameCfg.Ferry.Routes[index] = { Id = from.Id .. '>' .. to.Id,
@@ -967,7 +967,7 @@ end
 GameCfg.Interact.Fishermen = {}
 for index, chain in ipairs(GameCfg.Content.Exchanges) do
     local zone = GameCfg.Zones[index]
-    local fishermanName = index == 1 and 'TGUnitFish' or index == 2 and 'TGUnitFishShrimp' or ('Z' .. index .. '_Fisherman')
+    local fishermanName = 'Z' .. index .. '_Fisherman'
     GameCfg.Interact.Fishermen[index] = {
         ZoneId = zone.Id, AnchorNames = { fishermanName },
         ModelName = index == 1 and 'FishermanModel' or ('Z' .. index .. '_FishermanModel'),

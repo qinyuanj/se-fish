@@ -1,11 +1,10 @@
 local GameCfg = require('common.game_cfg')
+local SceneGeometry = require('common.cfg.scene_geometry')
+local SceneWaterGeometry = require('common.cfg.scene_water_geometry')
 
-local ZoneMarkers = { ready = false, Zones = {} }
+local ZoneMarkers = { ready = false, Zones = {}, anchor_positions = {} }
 
 local zoneNames = { '01 鱼塘', '02 虾池', '03 蟹湖', '04 树林岛', '05 沙滩岛', '06 礁石岛', '07 火山岛' }
--- 客户端 main 早于场景同步完成执行（2026-11-04 实测约早 10 ms），启动时按此节奏重试解析
-local START_POLL_SEC = 0.1
-local START_WAIT_SEC = 30
 
 local function finite(value)
     return type(value) == 'number' and value == value and math.abs(value) < math.huge
@@ -33,6 +32,7 @@ local function waterOrder(name, prefix)
 end
 
 local function catalog(world)
+    ---@type table<string, integer>
     local counts = {}
     for _, unit in ipairs(world:GetDescendants()) do
         counts[unit.Name] = (counts[unit.Name] or 0) + 1
@@ -74,6 +74,7 @@ end
 
 local function boundary(markers, zoneIndex, maxFlightHeight)
     local prefix = 'Z' .. zoneIndex .. '_Boundary'
+    ---@type table<string, { Position: { x: number, y: number, z: number }, Size: { x: number, y: number, z: number } }>
     local walls = {}
     for _, side in ipairs({ 'West', 'East', 'South', 'North' }) do
         local name = prefix .. side
@@ -218,12 +219,78 @@ local function resolveZone(markers, cfg, index, snapshot)
     snapshot.ContentWaterIds[zone.WaterId] = zone.Id
 end
 
-function ZoneMarkers.resolve(world, config)
-    local cfg = config or GameCfg
-    ZoneMarkers.ready, ZoneMarkers.Zones = false, {}
-    if not world then error('ZoneMarkers.Resolve 需要 World') end
-    local markers = catalog(world)
-    local snapshot = { Zones = {}, Waters = {}, BaitSpots = {}, ZoneIdByWater = {}, ContentWaterIds = {}, Casting = {} }
+local function catalogBaked(geom, waterGeom)
+    if type(geom) ~= 'table' or type(geom.zones) ~= 'table' then
+        error('只读场景几何表缺失或非法: common.cfg.scene_geometry')
+    end
+    if type(waterGeom) ~= 'table' or type(waterGeom.zones) ~= 'table' then
+        error('只读水域几何表缺失或非法: common.cfg.scene_water_geometry')
+    end
+    ---@type table<string, integer>
+    local counts = {}
+    local zones = {}
+    for index, zoneName in ipairs(zoneNames) do
+        local zg = geom.zones[index]
+        if type(zg) ~= 'table' then error('区域目录缺失: ' .. zoneName) end
+        counts[zoneName] = (counts[zoneName] or 0) + 1
+        local byName, waters = {}, {}
+        local prefix = 'Z' .. index .. '_'
+        for side, wall in pairs(zg.boundary or {}) do
+            local name = prefix .. 'Boundary' .. side
+            counts[name] = (counts[name] or 0) + 1
+            byName[name] = {
+                Name = name,
+                Position = { x = wall.x, y = wall.y, z = wall.z },
+                Size = { x = wall.sx, y = wall.sy, z = wall.sz },
+            }
+        end
+        for name, point in pairs(zg.points or {}) do
+            counts[name] = (counts[name] or 0) + 1
+            byName[name] = {
+                Name = name,
+                Position = { x = point.x, y = point.y, z = point.z },
+            }
+        end
+        local waterPrefix = prefix .. 'Water'
+        for _, row in ipairs(waterGeom.zones[index] or {}) do
+            local name = row[1]
+            counts[name] = (counts[name] or 0) + 1
+            local entry = {
+                Name = name,
+                Position = { x = row[2], y = row[3], z = row[4] },
+                Size = { x = row[5], y = row[6], z = row[7] },
+            }
+            byName[name] = entry
+            if type(name) == 'string' and name:sub(1, #waterPrefix) == waterPrefix and waterOrder(name, waterPrefix) then
+                waters[#waters + 1] = entry
+            end
+        end
+        table.sort(waters, function(first, second)
+            return waterOrder(first.Name, waterPrefix) < waterOrder(second.Name, waterPrefix)
+        end)
+        zones[index] = { Name = zoneName, by_name = byName, Waters = waters }
+    end
+    local function unique(name)
+        local count = counts[name] or 0
+        if count == 0 then error('区域标记缺失: ' .. name) end
+        if count > 1 then error('区域标记重名: ' .. name .. ' x' .. count) end
+    end
+    return {
+        Zones = zones,
+        Unit = function(zoneIndex, name)
+            unique(name)
+            local unit = zones[zoneIndex].by_name[name]
+            if not unit then error('区域标记不在所属区: ' .. zoneNames[zoneIndex] .. '/' .. name) end
+            return unit
+        end,
+        unique = unique,
+    }
+end
+
+local function resolveFromCatalog(markers, cfg)
+    ZoneMarkers.ready, ZoneMarkers.Zones, ZoneMarkers.anchor_positions = false, {}, {}
+    ---@type table<string, any>
+    local snapshot = { Zones = {}, Waters = {}, BaitSpots = {}, ZoneIdByWater = {}, ContentWaterIds = {}, Casting = {}, AnchorPositions = {} }
     for index = 1, #cfg.Zones do resolveZone(markers, cfg, index, snapshot) end
     local routes = {}
     for index, route in ipairs(cfg.Ferry.Routes) do
@@ -266,23 +333,41 @@ function ZoneMarkers.resolve(world, config)
         }
     end
     cfg.Ferry.planned_routes = snapshot.ferry_routes
+    for _, scene in pairs(snapshot.Zones) do
+        for _, entity in ipairs(scene.Entities or {}) do
+            if entity.Name and entity.Position then
+                snapshot.AnchorPositions[entity.Name] = copyPoint(entity.Position)
+            end
+        end
+    end
     snapshot.ready = true
-    ZoneMarkers.ready, ZoneMarkers.Zones = true, snapshot.Zones
+    ZoneMarkers.ready = true
+    ZoneMarkers.Zones = snapshot.Zones
+    ZoneMarkers.anchor_positions = snapshot.AnchorPositions
     return snapshot
 end
 
+function ZoneMarkers.resolve(world, config)
+    local cfg = config or GameCfg
+    if not world then error('ZoneMarkers.Resolve 需要 World') end
+    return resolveFromCatalog(catalog(world), cfg)
+end
+
+function ZoneMarkers.resolve_baked(config, geom, waterGeom)
+    local cfg = config or GameCfg
+    return resolveFromCatalog(catalogBaked(geom or SceneGeometry, waterGeom or SceneWaterGeometry), cfg)
+end
+
+function ZoneMarkers.anchor_position(name)
+    if type(name) ~= 'string' or name == '' then return nil end
+    local pos = ZoneMarkers.anchor_positions[name]
+    return pos and copyPoint(pos) or nil
+end
+
 function ZoneMarkers.start()
-    local world, task = game:GetService('World'), game:GetService('Task')
-    local ok, snapshot = pcall(ZoneMarkers.resolve, world)
-    local waited = 0
-    while not ok and waited < START_WAIT_SEC do
-        task:Wait(START_POLL_SEC)
-        waited = waited + START_POLL_SEC
-        ok, snapshot = pcall(ZoneMarkers.resolve, world)
-    end
-    if not ok then error(snapshot, 0) end
-    print('[ZoneMarkers] ready', 'waters=' .. #snapshot.Waters, 'baits=' .. #snapshot.BaitSpots,
-        'routes=' .. #snapshot.ferry_routes, 'waitedSec=' .. waited)
+    local snapshot = ZoneMarkers.resolve_baked(GameCfg)
+    print('[ZoneMarkers] ready', 'source=baked', 'waters=' .. #snapshot.Waters,
+        'baits=' .. #snapshot.BaitSpots, 'routes=' .. #snapshot.ferry_routes)
     return snapshot
 end
 

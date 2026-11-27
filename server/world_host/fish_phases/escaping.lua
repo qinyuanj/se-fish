@@ -15,7 +15,7 @@ local FishBehaviorKit = require('server.fish_behaviors.kit')
 local EscapingPhase = {}
 local EscapingBehavior = {}
 
--- 射线会命中 TGUnitShop 这类 TriggerUnit（V4 实测），它们和不碰撞的物体都不算墙
+-- 射线会命中 TriggerUnit 等不碰撞物体（V4 实测），它们和不碰撞的物体都不算墙
 local function pass_through(unit)
     if not unit then return true end
     local ok, trigger = pcall(function() return unit.IsA ~= nil and unit:IsA('TriggerUnit') end)

@@ -164,7 +164,7 @@ describe('TestFishEscape', function()
         local fish = env:held_fish()
         env.mgr:drop(env.player)
         local body = fish.carrier.body
-        local trigger = { Name = 'TGUnitShop', IsA = function(_, name) return name == 'TriggerUnit' end }
+        local trigger = { Name = 'Z1_Shop', IsA = function(_, name) return name == 'TriggerUnit' end }
         local ghost = { Name = 'Ghost', CanCollide = false }
         env.hits = { { Instance = trigger, Distance = 0.5 }, { Instance = env.other.Character, Distance = 0.6 },
             { Instance = ghost, Distance = 0.7 } }
