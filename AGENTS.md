@@ -11,7 +11,7 @@
 - **技术方案**：涉及平台能力、工具链或生命周期前，先查 `docs/adr/README.md` 读相关条目，剩余能力缺口与待实测项见 [#323](https://github.com/qinyuanj/se-fish/issues/323)；策划案内部矛盾与数值缺口一律记在 [`docs/to-questionnaire-策划案内部矛盾.md`](docs/to-questionnaire-策划案内部矛盾.md)（未定的题），定案后移进 [策划案已确认结论](docs/策划案已确认结论.md)。
 - **编码与审查**：编写或审查 SE 业务 Lua 前，读 `CODING_STANDARDS.md`。
 - **命名与改名**：批量改名（codemod）与旧名字符串键检查走 `lua tools/cli.lua naming [--recon|--apply|--check]`（#337），改名前先跑 `--recon` 看清单。
-- **开发工作流**：修改代码、运行测试、同步宿主或操作编辑器前，以及整理过程产物时，读 `docs/agents/workflow.md`。
+- **开发工作流**：修改代码、运行测试、同步宿主或操作编辑器前，以及整理过程产物时，读 `docs/agents/workflow.md`；选测试先看[「按改动选测试」](docs/agents/workflow.md#按改动选测试)。
 - **截图**：取证统一走 `lua tools/cli.lua screenshot`，细节见 `docs/agents/editor-cli.md`「截图」条。
 - **架构导航**：需要模块依赖全景、评估改动影响或从图上操作时，打开 dsh-uml-viewer 插件面板；图由根目录 `policy.edn` 生成到 `docs/uml/se-fish.edn`（不要手编），操作规则由插件注入。
 - **架构分层**：新增模块、调整模块职责或依赖方向前，读 `docs/architecture.md`；层归属与门禁唯一声明在 `tools/arch_policy.lua`。

@@ -80,6 +80,34 @@ lua tools/cli.lua worktree-init
 - **只写有失败方式的用例**：用例分五类——①行为（分支、边界、失败路径）、②跨真源守卫（`data/` ↔ `GameCfg` ↔ 代码里的 id 引用、表间绑定）、③复述（断言等价于把实现或配置再写一遍）、④重复覆盖（同一行为在多个文件各测一遍）、⑤基架自测（只保护 `tests/support/` 夹具或 `tools/` 工具本身）。只写 ①②；③④⑤不写，遇到就删，删时记一行「原来拦住哪种失败 / 删掉后由谁接手」。门禁型（`arch_policy_test`、`eggy_json_guard_test` 这类挡仓库不变量的）不在此列：一律放 `tests/native/guards/`，走 guards 车道、不计入验收基线的遗留测试数。共享夹具若复刻反直觉的宿主行为，可设独立契约门禁，但必须同时有业务用例消费；否则仍按⑤删除。
 - **按文件算耗时，不按用例算**：九成用例短于 busted 的一个计时 tick（15.6 ms），删单条用例几乎不减墙钟——减时间靠删或合并**文件**、降低用例里的循环规模。参数矩阵用两两覆盖（每对因子取值至少配过一次）而不是全组合。断言消息只在失败分支里拼（`if not cond then fail(fmt, ...) end`），写在断言参数里等于每个通过的断言都付一次 `string.format` 的钱（`main_hud_layout_test` 实测 2825 ms → 176 ms）。
 
+## 按改动选测试
+
+不跑 full 时，用下面的判定式说明「为什么够用」；从上往下读，先命中先执行，判不清就落 full。逐车道/逐文件的原始数据、闭包与 fast+guards 原型见 [#395](https://github.com/qinyuanj/se-fish/issues/395)。
+
+- **判定式 1（纯文档）**：改了什么——只改 `docs/**/*.md`（`docs/agents/art-pipeline.md` 除外）或根 `README.md` / `AGENTS.md` / `GLOSSARY.md` / `CODING_STANDARDS.md`。必须跑——`test guards`。可以跳过——fast、slow、spec、art。跳过的已知代价——链接、锚点、归属与验收矩阵仍由 guards 覆盖，但代码行为零验证。谁补证——PR 作者贴 CI `full` check 的 guards 结果并确认 diff 无代码，reviewer 复核；CI 对纯文档 PR 走同一快速路径。
+- **判定式 2（只改测试）**：改了什么——只在 `tests/`。必须跑——该文件所属车道（slow 不在 `lua tools/cli.lua test` 的车道表里，用 `busted tests/native/slow` 单跑）；改 `tests/support/` 时，把消费该夹具的车道一起跑。可以跳过——其余车道。跳过的已知代价——若夹具还有别的消费方而没跑那条车道，失败只会在 CI 暴露。谁补证——作者列出夹具消费方与所跑车道；CI `full` 兜底。
+- **判定式 3（三端代码，车道归属清晰，用于本地迭代）**：改了什么——`client/`、`common/`、`server/` 中的文件，且改动文件都出现在 fast 用例的覆盖集里（用一次 `busted --coverage` 或 #395 的覆盖清单判定），没有触及判定式 4 的路径。必须跑——`test fast`（guards 已含在 fast 内）。可以跳过——spec、slow。跳过的已知代价——spec 的跨端契约与 slow 的 `tools/` transport 不验；按 #395 的对拍，fast+guards 只覆盖 57.1% 的受影响用例（漏 42.9%，主要是 spec）。谁补证——本地迭代由作者记录；开 PR 前按后面的门槛补 full，或由 reviewer 写明接受该风险。
+- **判定式 4（跨车道依赖）**：改了什么——触及 `common/` 共享件、`server/world_host/`、`tools/`、`policy.edn`、`.busted`、`tests/support/`，或同时改两端以上。必须跑——`test full`。可以跳过——无。跳过的已知代价——无。谁补证——CI `full`。
+- **判定式 5（判不清）**：改了什么——闭包与覆盖结论冲突、选择集为空或比 full 还慢、新目录尚未登记。必须跑——`test full`。可以跳过——无。跳过的已知代价——无。谁补证——CI `full`。
+
+**为什么不是一张车道表。** 实测 192 个测试文件、1653 个用例：fast 1090 / guards 114 / slow 28 / spec 421；逐文件串行墙钟 fast 20.9 s、guards 7.6 s、slow 3.4 s、spec 15.9 s，8 路并行 full 13.56 s、fast 6.38 s、guards 3.50 s。闭包原型对最近 30 个三端提交的 26 个非聚合提交对拍：召回 85.2%、精确 90.4%；但选出的 113 个用例实测 13.57 s，和 full 13.56 s 打平；fast+guards 的召回只有 57.1%。所以「选得准」不等于「省时间」——省时间只在纯文档（3.5 s vs 13.5 s）和本地迭代（fast 6.4 s vs full 13.5 s）成立。
+
+**判定式只决定跑什么，不自动授权跳过 full 开 PR。** 门槛由人定（见 #395 的待决项）：在门槛确定前，只有判定式 1 允许不带 full 开 PR；判定式 2/3 跳过 full 需要作者在 PR 描述里写明代价并取得 reviewer 同意。
+
+### full 通过不能证明什么
+
+- **不证明实机可玩。** #392 的 full 是 `1611 successes / 0 failures / 0 errors`，之后仍靠试玩修掉 `ground_loot` 的宿主对象判断、`fish_carrier` 注入与 UI 颜色/进度条问题；四渔区验收至今未签收。
+- **不证明覆盖率或断言质量。** `.metrics/mutate` 的 99 份快照里只有 43 份能对上当前路径，56 份是改名/重构前的死路径；覆盖率只证明执行过，不证明断言能抓住变异。
+- **不证明工具链 transport。** slow 的 4 个文件覆盖 `tools/deploy.lua`、`tools/sync_plan.lua`、`tools/qa_slot.lua` 的真实子进程路径，fast 没有对应用例；但 `lua tools/cli.lua test slow` 会以「未知车道」退出 2，slow 只能由 full 带上（或直接 `busted tests/native/slow`）。它的去留是待决项，不是既成事实。
+- **不证明美术资产。** art 车道不进 full；当前 worktree 缺 `.agents/skills/blender-core` 时 art 的 3 条用例直接失败，CI 也没有 Blender。
+- **不证明 PR 的验收条款。** 条款矩阵与验收证据是另一套真源，full 绿不等于 `docs/acceptance/` 的条款已取证。
+
+### 待决（由人定，不在本文替选）
+
+- 允许在什么风险下跳过 full 直接开 PR。证据见 #395：除纯文档外，自动选择没有省时间且漏约 15%。
+- slow 车道的去留：修成可单跑 / 并进 guards / 删除。观测：4 文件 28 用例 3.39 s 串行，是 `tools/deploy.lua`、`tools/sync_plan.lua`、`tools/qa_slot.lua` transport 的唯一覆盖；`lua tools/cli.lua test slow` 退出 2 是 CLI 没有 slow 车道，不是用例失败；历史提交里 4 个文件都随引入当次的修复/迁移落地，没找到它事后抓过回归的证据。
+- art 车道是否进收尾：1 文件 5 用例 1.93 s，当前缺 `.agents/skills/blender-core` 时 3 条失败，CI 无 Blender。
+
 ## 完成判据
 
 代码改动按顺序执行，全部通过才算完成。新 checkout 执行 `lua tools/cli.lua worktree-init` 会安装本地 `pre-commit`，已有 checkout 可单独执行 `lua tools/cli.lua git-hook-init`（带自家签名头的旧版 hook 会自动升级）；提交前自动依次运行 `lua tools/cli.lua test guards`、`lua tools/cli.lua size` 与 `lua tools/cli.lua emmylua`，重复安装幂等，已有其他 hook 不覆盖。PR 与 `main` 推送由 [test.yml](../../.github/workflows/test.yml) 的单一 `full` job 执行，check-run context `full`（PR 界面显示 `test / full`）是 `main` 的唯一 required status check：代码 PR 与 `push(main)` 依次运行 `lua tools/cli.lua test full --jobs <2× 核数，下限 4、上限 8>`（GitHub 托管 runner 是 4 逻辑核 → 8 片，实测 24.0 秒 → 12.3 秒）与 `lua tools/cli.lua size`、`lua tools/cli.lua emmylua`；仅修改白名单纯文档（`docs/**/*.md` 排除 `docs/agents/art-pipeline.md`，及根 `README.md` / `AGENTS.md` / `GLOSSARY.md` / `CODING_STANDARDS.md`）的 PR 在同一 `full` job 内走快速路径，只跑 `lua tools/cli.lua test guards --jobs <同上>`，任何非白名单变更或变更检测异常一律兜底全量。Lua 5.4.6 / LuaRocks 3.12.2 / Busted 2.3.0-1 直接从本仓 Release `ci-toolchain-v1` 下载预构建包并校验 SHA-256（需升级版本时由 [build-ci-toolchain.yml](../../.github/workflows/build-ci-toolchain.yml) 手动重打并回填摘要），`.emmylua` 按版本哈希经 `actions/cache@v6` 缓存；PR 同分支连续推送开启并发取消，`push(main)` 按 `run_id` 独立分组不取消。下表其余每一项仍由 agent 显式执行，质量工具由人运行，见表后的「人工验收」。
