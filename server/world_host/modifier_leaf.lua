@@ -6,6 +6,7 @@
 --      同样遵循 removeMode = 0 与业务时钟主权，供淘汰 MgrModifier 时无缝承接活鱼受击。
 -- 本模块归属 L2（server.world_host），零反向依赖存量旧债务模块。
 
+local EngineRead = require("common.engine_read")
 local GameCfg = require("common.game_cfg")
 local Number = require("common.number")
 
@@ -20,11 +21,6 @@ local VALID_KINDS = {
   weak = true,
 }
 
-local function is_object(value)
-  local EngineRead = require("common.engine_read")
-  return EngineRead.is_object(value)
-end
-
 local function default_modifier_api()
   return require("server.packages.modifier_system.api")
 end
@@ -38,11 +34,11 @@ local function report_error(opts, tag, msg)
 end
 
 local function resolve_source_unit(source)
-  if not is_object(source) then
+  if not EngineRead.is_object(source) then
     return nil
   end
   local ok, ch = pcall(function() return source.Character end) -- 兼容引擎 userdata 玩家对象读取 Character
-  if ok and is_object(ch) then
+  if ok and EngineRead.is_object(ch) then
     return ch
   end
   return source
@@ -107,7 +103,7 @@ end
 ---@param opts? table
 ---@return any entity, string|nil err
 function ModifierLeaf.push_modifier(modifier_api, owner, kind, duration, source, opts)
-  if not is_object(owner) then
+  if not EngineRead.is_object(owner) then
     return nil, "no-owner"
   end
   local preset = preset_for(kind, opts)
@@ -159,7 +155,7 @@ function ModifierLeaf.mount_slot(es, player_tree, kind, _entry, opts)
   return es:effect("Leaf:ModifierSink:" .. kind, function(ls)
     local character = ls:d(char_sig)
     local is_active = ls:d(active_memo)
-    if not is_object(character) or not is_active then
+    if not EngineRead.is_object(character) or not is_active then
       return
     end
 
@@ -232,11 +228,11 @@ end
 -- ============================================================================
 
 local function resolve_entity_owner(target, allow_dead)
-  if not is_object(target) then
+  if not EngineRead.is_object(target) then
     return nil, nil, nil
   end
   local ok_carrier, carrier = pcall(function() return target.carrier end) -- 兼容引擎 userdata 直接作为非玩家目标
-  if ok_carrier and is_object(carrier) then
+  if ok_carrier and EngineRead.is_object(carrier) then
     local ok_dead, dead = pcall(function() return carrier.dead end) -- 兼容只读载体字段
     if not allow_dead and ok_dead and dead then
       return nil, nil, carrier
@@ -245,14 +241,6 @@ local function resolve_entity_owner(target, allow_dead)
     return carrier, owner, carrier
   end
   return target, target, nil
-end
-
-local function default_duration_for(kind)
-  if kind == "weak" then
-    return GameCfg.Survival.WeakSec
-  end
-  local cfg = GameCfg.Ability.StatusEffects and GameCfg.Ability.StatusEffects[kind]
-  return cfg and cfg.DurationSec or 0
 end
 
 local function max_stacks_for(kind)
@@ -271,7 +259,255 @@ local function dot_cfg_for(kind)
   return nil
 end
 
---- 创建独立轻量的非玩家实体（活鱼等）效果存储与单向叶子投影器。
+-- ===== 非玩家实体效果存储：拆分前 create_entity_store 体内的闭包 =====
+-- EntityStoreBehavior 是 store 的方法表，方法名、参数顺序与返回值与拆分前完全一致；
+-- 调用方照旧用 :method(...)，首个参数就是 store 本身；拆分前的 upvalue 统一放进 store.store_env。
+
+--- 摘除单个效果槽位并清理官方包实体（拆分前 create_entity_store 体内的 remove_entry_kind）。
+---@param env table
+---@param record table
+---@param kind string
+---@return boolean
+local function remove_entry_kind(env, record, kind)
+  local st = record.effects[kind]
+  if not st then
+    return false
+  end
+  record.effects[kind] = nil
+  safe_remove_entity(env.modifier_api, st.entity)
+  if next(record.effects) == nil and env.records[record.key] == record then
+    env.records[record.key] = nil
+  end
+  return true
+end
+
+--- 结算到期的持续伤害跳数（拆分前 create_entity_store 体内的 drain_entry_dot）。
+---@param env table
+---@param record table
+---@param kind string
+---@param st table
+---@param now number
+local function drain_entry_dot(env, record, kind, st, now)
+  local cfg = dot_cfg_for(kind)
+  if not cfg then
+    return
+  end
+  while st.next_tick_at and st.next_tick_at <= now and st.next_tick_at <= st.expires_at + 1e-9 do
+    if record.carrier and record.carrier.dead then
+      return
+    end
+    if env.records[record.key] ~= record or record.effects[kind] ~= st then
+      return
+    end
+    st.next_tick_at = st.next_tick_at + cfg.TickSec
+    if type(env.opts.on_dot_tick) == "function" then
+      env.opts.on_dot_tick(record.target, kind, st.stacks * cfg.DamagePerStack, st.source, st.stacks)
+    end
+  end
+end
+
+local EntityStoreBehavior = {}
+
+-- 解析效果宿主：拿不到 key 或宿主不是引擎对象时返回 nil。
+local function check_owner(target)
+  local key, owner, carrier = resolve_entity_owner(target)
+  if not key or not EngineRead.is_object(owner) then return nil end
+  return { key = key, owner = owner, carrier = carrier }
+end
+
+-- 取或建目标记录：owner 换了先清掉目标再重建。
+local function ensure_record(self, env, target, owner_ref)
+  local record = env.records[owner_ref.key]
+  if record and record.owner ~= owner_ref.owner then
+    self:clear_target(target)
+    record = nil
+  end
+  if not record then
+    record = { key = owner_ref.key, target = target, owner = owner_ref.owner,
+      carrier = owner_ref.carrier, effects = {} }
+    env.records[owner_ref.key] = record
+  end
+  return record
+end
+
+-- 已过期的同类效果先结算 DOT 再移除；返回仍有效的效果（可能为 nil）。
+local function expire_entry(env, record, kind, now)
+  local existing = record.effects[kind]
+  if not existing or now < existing.expires_at - 1e-9 then return existing end
+  drain_entry_dot(env, record, kind, existing, now)
+  remove_entry_kind(env, record, kind)
+  if env.records[record.key] == nil then env.records[record.key] = record end
+  return nil
+end
+
+-- 推一次引擎 modifier；失败时回收空记录并报错。
+local function push_entity(env, record, kind, duration, source)
+  local entity, err = ModifierLeaf.push_modifier(env.modifier_api, record.owner, kind, duration, source, env.opts)
+  if entity then return entity end
+  if next(record.effects) == nil then env.records[record.key] = nil end
+  report_error(env.opts, "EntityAddModifier(" .. kind .. ")", err)
+  return nil, err
+end
+
+-- 续层或新建一条效果记录：层数上限由 max_stacks 限制。
+local function store_entry(record, kind, entity, source, existing, now, duration)
+  local max_stacks = max_stacks_for(kind)
+  if existing then
+    existing.entity = entity
+    existing.source = source
+    existing.stacks = max_stacks > 1 and math.min(max_stacks, existing.stacks + 1) or 1
+    existing.expires_at = now + duration
+    return
+  end
+  local dot_cfg = dot_cfg_for(kind)
+  record.effects[kind] = {
+    entity = entity,
+    source = source,
+    stacks = 1,
+    expires_at = now + duration,
+    next_tick_at = dot_cfg and (now + dot_cfg.TickSec) or nil,
+  }
+end
+
+function EntityStoreBehavior.apply(self, source, target, kind, duration_override)
+  local env = self.store_env
+  if not VALID_KINDS[kind] then
+    return false, "invalid-modifier-kind"
+  end
+  local owner_ref = check_owner(target)
+  if not owner_ref then
+    return false, "no-effect-owner"
+  end
+  local duration = duration_override ~= nil and duration_override or GameCfg.status_duration(kind)
+  if not Number.is_finite_number(duration) or duration <= 0 then
+    return false, "invalid-duration"
+  end
+  local record = ensure_record(self, env, target, owner_ref)
+  local now = env.get_now()
+  local existing = expire_entry(env, record, kind, now)
+  local entity, err = push_entity(env, record, kind, duration, source)
+  if not entity then return false, err end
+  store_entry(record, kind, entity, source, existing, now, duration)
+  return true, nil
+end
+
+function EntityStoreBehavior.apply_weapon_effect(self, source, target, effect)
+  return self:apply(source, target, type(effect) == "table" and effect.Kind or nil)
+end
+
+function EntityStoreBehavior.step(self, now_override)
+  local env = self.store_env
+  local now = now_override ~= nil and now_override or env.get_now()
+  local snapshot = {}
+  for _, record in pairs(env.records) do
+    snapshot[#snapshot + 1] = record
+  end
+  for _, record in ipairs(snapshot) do
+    if env.records[record.key] == record then
+      if record.carrier and record.carrier.dead then
+        self:clear_target(record.target)
+      else
+        for _, kind in ipairs(ALL_KINDS) do
+          local st = record.effects[kind]
+          if st then
+            drain_entry_dot(env, record, kind, st, now)
+            if env.records[record.key] == record and record.effects[kind] == st and now >= st.expires_at - 1e-9 then
+              remove_entry_kind(env, record, kind)
+            end
+          end
+        end
+      end
+    end
+  end
+end
+
+function EntityStoreBehavior.get_remaining(self, target, kind)
+  local env = self.store_env
+  local key = resolve_entity_owner(target)
+  local record = key and env.records[key]
+  local st = record and record.effects[kind]
+  if not st then
+    return 0
+  end
+  return math.max(0, st.expires_at - env.get_now())
+end
+
+function EntityStoreBehavior.is_controlled(self, target)
+  return self:get_remaining(target, "paralyze") > 0
+end
+
+function EntityStoreBehavior.get_move_multiplier(self, target)
+  if self:is_controlled(target) then
+    return 0
+  end
+  local mult = self:get_remaining(target, "weak") > 0 and GameCfg.Survival.WeakSpeedScale or 1
+  if self:get_remaining(target, "frost") > 0 then
+    local frost_cfg = GameCfg.Ability.StatusEffects and GameCfg.Ability.StatusEffects.frost
+    local slow_pct = frost_cfg and frost_cfg.SlowPercent or 30
+    mult = mult * (1 - slow_pct / 100)
+  end
+  return mult
+end
+
+function EntityStoreBehavior.clear(self, target, kind)
+  local env = self.store_env
+  local key = resolve_entity_owner(target, true)
+  local record = key and env.records[key]
+  if not record then
+    return false
+  end
+  return remove_entry_kind(env, record, kind)
+end
+
+function EntityStoreBehavior.clear_target(self, target)
+  local env = self.store_env
+  local key = resolve_entity_owner(target, true)
+  local record = key and env.records[key]
+  if not record then
+    return
+  end
+  for _, kind in ipairs(ALL_KINDS) do
+    remove_entry_kind(env, record, kind)
+  end
+  env.records[key] = nil
+end
+
+function EntityStoreBehavior.clear_by_source(self, source)
+  local env = self.store_env
+  if source == nil then
+    return
+  end
+  local snapshot = {}
+  for _, record in pairs(env.records) do
+    snapshot[#snapshot + 1] = record
+  end
+  for _, record in ipairs(snapshot) do
+    if env.records[record.key] == record then
+      for _, kind in ipairs(ALL_KINDS) do
+        local st = record.effects[kind]
+        if st and st.source == source then
+          remove_entry_kind(env, record, kind)
+        end
+      end
+    end
+  end
+end
+
+function EntityStoreBehavior.clear_all(self)
+  local env = self.store_env
+  local snapshot = {}
+  for _, record in pairs(env.records) do
+    snapshot[#snapshot + 1] = record
+  end
+  for _, record in ipairs(snapshot) do
+    for _, kind in ipairs(ALL_KINDS) do
+      remove_entry_kind(env, record, kind)
+    end
+    env.records[record.key] = nil
+  end
+end
+
+--- 创建独立轻量的非玩家实体（活鱼等）效果存储与单向叶子投影器；本函数只做注入校验与装配。
 ---@param opts? table { modifier_api?: table, presets?: table, now?: function, on_dot_tick?: function, on_error?: function }
 function ModifierLeaf.create_entity_store(opts)
   opts = type(opts) == "table" and opts or {}
@@ -279,215 +515,18 @@ function ModifierLeaf.create_entity_store(opts)
   if type(opts.now) ~= "function" then
     error("[ModifierLeaf] create_entity_store 需要注入有效的 now 时钟函数", 2)
   end
-  local get_now = opts.now
-
-  local records = {}
-  local store = {}
-
-  local function remove_entry_kind(record, kind)
-    local st = record.effects[kind]
-    if not st then
-      return false
-    end
-    record.effects[kind] = nil
-    safe_remove_entity(modifier_api, st.entity)
-    if next(record.effects) == nil and records[record.key] == record then
-      records[record.key] = nil
-    end
-    return true
+  ---@type table<string, any>
+  local store = {
+    store_env = {
+      opts = opts,
+      modifier_api = modifier_api,
+      get_now = opts.now,
+      records = {},
+    },
+  }
+  for name, method in pairs(EntityStoreBehavior) do
+    store[name] = method
   end
-
-  local function drain_entry_dot(record, kind, st, now)
-    local cfg = dot_cfg_for(kind)
-    if not cfg then
-      return
-    end
-    while st.next_tick_at and st.next_tick_at <= now and st.next_tick_at <= st.expires_at + 1e-9 do
-      if record.carrier and record.carrier.dead then
-        return
-      end
-      if records[record.key] ~= record or record.effects[kind] ~= st then
-        return
-      end
-      st.next_tick_at = st.next_tick_at + cfg.TickSec
-      if type(opts.on_dot_tick) == "function" then
-        opts.on_dot_tick(record.target, kind, st.stacks * cfg.DamagePerStack, st.source, st.stacks)
-      end
-    end
-  end
-
-  function store:apply(source, target, kind, duration_override)
-    if not VALID_KINDS[kind] then
-      return false, "invalid-modifier-kind"
-    end
-    local key, owner, carrier = resolve_entity_owner(target)
-    if not key or not is_object(owner) then
-      return false, "no-effect-owner"
-    end
-    local duration = duration_override ~= nil and duration_override or default_duration_for(kind)
-    if not Number.is_finite_number(duration) or duration <= 0 then
-      return false, "invalid-duration"
-    end
-
-    local record = records[key]
-    if record and record.owner ~= owner then
-      self:clear_target(target)
-      record = nil
-    end
-    if not record then
-      record = { key = key, target = target, owner = owner, carrier = carrier, effects = {} }
-      records[key] = record
-    end
-
-    local now = get_now()
-    local existing = record.effects[kind]
-    if existing and now >= existing.expires_at - 1e-9 then
-      drain_entry_dot(record, kind, existing, now)
-      remove_entry_kind(record, kind)
-      existing = nil
-      if records[key] == nil then
-        records[key] = record
-      end
-    end
-
-    local entity, err = ModifierLeaf.push_modifier(modifier_api, owner, kind, duration, source, opts)
-    if not entity then
-      if next(record.effects) == nil then
-        records[key] = nil
-      end
-      report_error(opts, "EntityAddModifier(" .. kind .. ")", err)
-      return false, err
-    end
-
-    local max_stacks = max_stacks_for(kind)
-    local dot_cfg = dot_cfg_for(kind)
-    if existing then
-      existing.entity = entity
-      existing.source = source
-      existing.stacks = max_stacks > 1 and math.min(max_stacks, existing.stacks + 1) or 1
-      existing.expires_at = now + duration
-    else
-      record.effects[kind] = {
-        entity = entity,
-        source = source,
-        stacks = 1,
-        expires_at = now + duration,
-        next_tick_at = dot_cfg and (now + dot_cfg.TickSec) or nil,
-      }
-    end
-    return true, nil
-  end
-
-  function store:apply_weapon_effect(source, target, effect)
-    return self:apply(source, target, type(effect) == "table" and effect.Kind or nil)
-  end
-
-  function store:step(now_override)
-    local now = now_override ~= nil and now_override or get_now()
-    local snapshot = {}
-    for _, record in pairs(records) do
-      snapshot[#snapshot + 1] = record
-    end
-    for _, record in ipairs(snapshot) do
-      if records[record.key] == record then
-        if record.carrier and record.carrier.dead then
-          self:clear_target(record.target)
-        else
-          for _, kind in ipairs(ALL_KINDS) do
-            local st = record.effects[kind]
-            if st then
-              drain_entry_dot(record, kind, st, now)
-              if records[record.key] == record and record.effects[kind] == st and now >= st.expires_at - 1e-9 then
-                remove_entry_kind(record, kind)
-              end
-            end
-          end
-        end
-      end
-    end
-  end
-
-  function store:get_remaining(target, kind)
-    local key = resolve_entity_owner(target)
-    local record = key and records[key]
-    local st = record and record.effects[kind]
-    if not st then
-      return 0
-    end
-    return math.max(0, st.expires_at - get_now())
-  end
-
-  function store:is_controlled(target)
-    return self:get_remaining(target, "paralyze") > 0
-  end
-
-  function store:get_move_multiplier(target)
-    if self:is_controlled(target) then
-      return 0
-    end
-    local mult = self:get_remaining(target, "weak") > 0 and GameCfg.Survival.WeakSpeedScale or 1
-    if self:get_remaining(target, "frost") > 0 then
-      local frost_cfg = GameCfg.Ability.StatusEffects and GameCfg.Ability.StatusEffects.frost
-      local slow_pct = frost_cfg and frost_cfg.SlowPercent or 30
-      mult = mult * (1 - slow_pct / 100)
-    end
-    return mult
-  end
-
-  function store:clear(target, kind)
-    local key = resolve_entity_owner(target, true)
-    local record = key and records[key]
-    if not record then
-      return false
-    end
-    return remove_entry_kind(record, kind)
-  end
-
-  function store:clear_target(target)
-    local key = resolve_entity_owner(target, true)
-    local record = key and records[key]
-    if not record then
-      return
-    end
-    for _, kind in ipairs(ALL_KINDS) do
-      remove_entry_kind(record, kind)
-    end
-    records[key] = nil
-  end
-
-  function store:clear_by_source(source)
-    if source == nil then
-      return
-    end
-    local snapshot = {}
-    for _, record in pairs(records) do
-      snapshot[#snapshot + 1] = record
-    end
-    for _, record in ipairs(snapshot) do
-      if records[record.key] == record then
-        for _, kind in ipairs(ALL_KINDS) do
-          local st = record.effects[kind]
-          if st and st.source == source then
-            remove_entry_kind(record, kind)
-          end
-        end
-      end
-    end
-  end
-
-  function store:clear_all()
-    local snapshot = {}
-    for _, record in pairs(records) do
-      snapshot[#snapshot + 1] = record
-    end
-    for _, record in ipairs(snapshot) do
-      for _, kind in ipairs(ALL_KINDS) do
-        remove_entry_kind(record, kind)
-      end
-      records[record.key] = nil
-    end
-  end
-
   return store
 end
 

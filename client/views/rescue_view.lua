@@ -195,4 +195,51 @@ function RescueView.bubble_spec(shared, config)
   }
 end
 
+-- 两个宿主视图（钓鱼佬 / 小队）的抢救浮层只在文案、节点前缀与目标来源上不同；
+-- 预设集中在这里，各视图按名字取入口，不再各写一份参数表。
+local PRESETS = {
+    fisherman = {
+        state_label = "FishermanView.rescue_rows",
+        driver = { name = "FishermanRescueDriver", mode = "world" },
+        bubble = {
+            key_prefix = "rescue:", scene_kind = "rescue", scene_prefix = "SceneNodeRescue_",
+            button_prefix = "BtnRescue", log_tag = "[FishermanView]", fail_label = "抢救按钮创建失败",
+        },
+    },
+    squad = {
+        state_label = "SquadView.rescue_rows",
+        driver = { name = "SquadRescueDriver", mode = "squad" },
+        bubble = {
+            key_prefix = "", scene_kind = "squad_rescue", scene_prefix = "SceneNodeSquadRescue_",
+            button_prefix = "BtnSquadRescue", log_tag = "[SquadView]", fail_label = "队友抢救按钮创建失败",
+        },
+    },
+}
+
+---@class RescueViewApi
+---@field state fun(options: table|nil): table
+---@field driver_spec fun(shared: table): table
+---@field bubble_spec fun(shared: table): table
+
+--- 取某视图的抢救入口集合：state / driver_spec / bubble_spec。
+---@param name string 预设名："fisherman"（钓鱼佬）或 "squad"（小队）
+---@return RescueViewApi
+function RescueView.view_api(name)
+    local preset = PRESETS[name]
+    if preset == nil then
+        error("[RescueView] 未知的抢救预设：" .. tostring(name), 3)
+    end
+    return {
+        state = function(options)
+            return RescueView.create_state(preset.state_label, options)
+        end,
+        driver_spec = function(shared)
+            return RescueView.driver_spec(shared, preset.driver)
+        end,
+        bubble_spec = function(shared)
+            return RescueView.bubble_spec(shared, preset.bubble)
+        end,
+    }
+end
+
 return RescueView

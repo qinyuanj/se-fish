@@ -45,33 +45,29 @@ function Mgr:pause(fish, paused)
     state.paused = paused == true
 end
 
-function Mgr:command(fish, mode, target, direction, speed, distance, range)
-    local state = leaf(fish)
-    if self.Stopped or state.paused then return false end
-    local carrier = fish.carrier
-    local unit = carrier and carrier.receiver
-    if not unit or not unit.Controller then
-        print('[FishAi] operation=Command', 'fish=' .. tostring(fish.Id), 'missing-controller')
-        return false
-    end
-    local function horizontal_distance()
-        if mode ~= 'chase' or not target or not target.Position or not unit.Position then return nil end
-        local dx, dz = target.Position.x - unit.Position.x, target.Position.z - unit.Position.z
-        return math.sqrt(dx * dx + dz * dz)
-    end
-    local current_distance = horizontal_distance()
-    if state.Mode == mode and state.Target == target and state.Direction == direction
-        and state.Speed == speed and state.Distance == distance and state.Range == range
-        and carrier.ai_owns_movement then
-        local resume = mode == 'chase' and state.last_distance ~= nil and distance ~= nil
-            and state.last_distance <= distance and current_distance ~= nil and current_distance > distance
-        if not resume then
-            state.last_distance = current_distance
-            return true
-        end
-    end
-    if not self:custom(fish) then return false end
-    local ok, err = pcall(function()
+-- 追鱼时的水平距离；不是 chase 或拿不到位置时返回 nil。
+local function horizontal_distance(mode, target, unit)
+    if mode ~= 'chase' or not target or not target.Position or not unit.Position then return nil end
+    local dx, dz = target.Position.x - unit.Position.x, target.Position.z - unit.Position.z
+    return math.sqrt(dx * dx + dz * dz)
+end
+
+-- 同一条指令是否已经在执行：模式、目标、朝向、速度、距离、范围全一致。
+local function same_command(state, carrier, mode, target, direction, speed, distance, range)
+    if not carrier.ai_owns_movement then return false end
+    local same = state.Mode == mode and state.Target == target and state.Direction == direction
+    return same and state.Speed == speed and state.Distance == distance and state.Range == range
+end
+
+-- 正在追、已贴进射程又被拉开时才算「需要重发」。
+local function needs_resume(mode, state, distance, current_distance)
+    return mode == 'chase' and state.last_distance ~= nil and distance ~= nil
+        and state.last_distance <= distance and current_distance ~= nil and current_distance > distance
+end
+
+-- 重设站位并下发 AI 指令；引擎调用一律 pcall 包住，返回 ok, err。
+local function apply_command(self, carrier, unit, mode, target, direction, speed, distance, range)
+    return pcall(function()
         local p, offset = carrier.body.Position, carrier.receiver_offset
         unit.Position = Vector3.New(p.x + (offset and offset.x or 0),
             p.y + (offset and offset.y or 0), p.z + (offset and offset.z or 0))
@@ -84,6 +80,26 @@ function Mgr:command(fish, mode, target, direction, speed, distance, range)
             self.ai_api.Funcs.ChaseTarget(unit, target, range or 0, distance or 0.1, 0, nil, 0, 1)
         end
     end)
+end
+
+function Mgr:command(fish, mode, target, direction, speed, distance, range)
+    local state = leaf(fish)
+    if self.Stopped or state.paused then return false end
+    local carrier = fish.carrier
+    local unit = carrier and carrier.receiver
+    if not unit or not unit.Controller then
+        print('[FishAi] operation=Command', 'fish=' .. tostring(fish.Id), 'missing-controller')
+        return false
+    end
+    local current_distance = horizontal_distance(mode, target, unit)
+    if same_command(state, carrier, mode, target, direction, speed, distance, range) then
+        if not needs_resume(mode, state, distance, current_distance) then
+            state.last_distance = current_distance
+            return true
+        end
+    end
+    if not self:custom(fish) then return false end
+    local ok, err = apply_command(self, carrier, unit, mode, target, direction, speed, distance, range)
     if not ok then
         print('[FishAi] operation=Command', 'fish=' .. tostring(fish.Id), mode, tostring(err))
         state.Mode = nil

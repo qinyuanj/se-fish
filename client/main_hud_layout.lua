@@ -192,6 +192,16 @@ function MainHudLayout.compute(input)
     }
 end
 
+-- 以设备分辨率与道具栏格数算主 HUD 布局。格数口径由调用方视图给出（各视图读
+-- item_bar 状态的有效性判定与兜底不同），这里不替调用方归一。
+function MainHudLayout.from_resolution(resolution, item_bar_slots)
+    return MainHudLayout.compute({
+        width = resolution.x,
+        height = resolution.y,
+        itemBarSlots = item_bar_slots,
+    })
+end
+
 function MainHudLayout.popup_cells(layout, kind, count)
     local bar = layout and layout.rects and layout.rects[kind .. 'Bar']
     if not bar or type(count) ~= 'number' or count < 1 then return {} end

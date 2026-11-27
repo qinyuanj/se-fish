@@ -33,67 +33,55 @@ local function send(ctx, seq, action, mode)
   end
 end
 
-local function make(scope, ctx, kind, parent, name, x, y, width, height, props)
-  props = props or {}
-  props.Parent = parent
-  props.Name = name
-  props.Position = Vector2.New(x, y)
-  props.Size = Vector2.New(width, height)
-  local node = ctx.create_node(scope, kind, props)
-  node.TouchEnabled = kind == "EUIButton"
-  node.SwallowTouchEnabled = false
-  return node
-end
-
 local function mount_banner(scope, ctx, survival, seq, noticed_dead, clock_now)
   local res = ViewUtil.get_resolution(ctx); if res == nil then return end
   local cx, cy = res.x / 2, res.y / 2
-  local banner = make(scope, ctx, "EUIImage", ctx.root_node, "SurvivalBanner", cx - 320, cy - 90, 640, 180, {
+  local banner = ViewUtil.create_at(scope, ctx, "EUIImage", ctx.root_node, "SurvivalBanner", cx - 320, cy - 90, 640, 180, {
     Color = Color.New(0, 0, 0, 160),
     Image = COLOR_BLOCK,
     Visible = true,
   })
-  local title = make(scope, ctx, "EUITextLabel", banner, "SurvivalTitle", 0, -80, 640, 80, {
+  local title = ViewUtil.create_at(scope, ctx, "EUITextLabel", banner, "SurvivalTitle", 0, -80, 640, 80, {
     Text = "",
     FontSize = 48,
     TextColor = Color.New(255, 80, 80, 255),
     LocalZOrder = 1,
     Visible = true,
   })
-  local adrenaline = make(scope, ctx, "EUIButton", banner, "SurvivalAdrenaline", 10, 20, 300, 80, {
+  local adrenaline = ViewUtil.create_at(scope, ctx, "EUIButton", banner, "SurvivalAdrenaline", 10, 20, 300, 80, {
     ButtonText = "",
     NormalImage = COLOR_BLOCK,
     PressImage = COLOR_BLOCK,
     Color = Color.New(230, 120, 40, 255),
     Visible = false,
   })
-  make(scope, ctx, "EUITextLabel", adrenaline, "SurvivalAdrenalineText", 0, 0, 300, 80, {
+  ViewUtil.create_at(scope, ctx, "EUITextLabel", adrenaline, "SurvivalAdrenalineText", 0, 0, 300, 80, {
     Text = GameCfg.Survival.AdrenalineText,
     FontSize = 32,
     TextColor = Color.New(255, 255, 255, 255),
     LocalZOrder = 1,
   })
-  local ad = make(scope, ctx, "EUIButton", banner, "SurvivalAdRevive", 10, 20, 300, 80, {
+  local ad = ViewUtil.create_at(scope, ctx, "EUIButton", banner, "SurvivalAdRevive", 10, 20, 300, 80, {
     ButtonText = "",
     NormalImage = COLOR_BLOCK,
     PressImage = COLOR_BLOCK,
     Color = Color.New(60, 150, 90, 255),
     Visible = false,
   })
-  make(scope, ctx, "EUITextLabel", ad, "SurvivalAdReviveText", 0, 0, 300, 80, {
+  ViewUtil.create_at(scope, ctx, "EUITextLabel", ad, "SurvivalAdReviveText", 0, 0, 300, 80, {
     Text = GameCfg.Survival.AdReviveText,
     FontSize = 30,
     TextColor = Color.New(255, 255, 255, 255),
     LocalZOrder = 1,
   })
-  local paid = make(scope, ctx, "EUIButton", banner, "SurvivalPaidRevive", 330, 20, 300, 80, {
+  local paid = ViewUtil.create_at(scope, ctx, "EUIButton", banner, "SurvivalPaidRevive", 330, 20, 300, 80, {
     ButtonText = "",
     NormalImage = COLOR_BLOCK,
     PressImage = COLOR_BLOCK,
     Color = Color.New(210, 160, 40, 255),
     Visible = false,
   })
-  make(scope, ctx, "EUITextLabel", paid, "SurvivalPaidReviveText", 0, 0, 300, 80, {
+  ViewUtil.create_at(scope, ctx, "EUITextLabel", paid, "SurvivalPaidReviveText", 0, 0, 300, 80, {
     Text = GameCfg.Survival.PaidReviveText,
     FontSize = 30,
     TextColor = Color.New(255, 255, 255, 255),
@@ -155,7 +143,7 @@ end
 
 local function mount_weak(scope, ctx, survival, clock_now)
   local res = ViewUtil.get_resolution(ctx); if res == nil then return end
-  local label = make(scope, ctx, "EUITextLabel", ctx.root_node, "SurvivalWeak", res.x / 2 - 320, res.y - 200, 640, 60, {
+  local label = ViewUtil.create_at(scope, ctx, "EUITextLabel", ctx.root_node, "SurvivalWeak", res.x / 2 - 320, res.y - 200, 640, 60, {
     Text = "",
     FontSize = 30,
     TextColor = Color.New(200, 200, 255, 255),

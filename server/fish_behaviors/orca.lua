@@ -11,50 +11,55 @@ local function init(fish, now, combat_params, species)
     fish.ClawAt = -1
 end
 
-local function step(mgr, fish, now, pos, params)
-    local dt = FishBehaviorKit.begin_combat_frame(fish, now)
+-- 一次已起手的攻击动作推进：起手未到点就校验目标，到点按 jump / claw / roar / tail 各自结算。
+local function step_attack_move(mgr, fish, now, pos, params)
     local move = fish.Move
-    if move then
-        if move.Name == 'jump' then
-            mgr:advance_jump(fish, now, pos, params)
-            return
+    if move == nil then return end
+    if move.Name == 'jump' then
+        mgr:advance_jump(fish, now, pos, params)
+        return
+    end
+    if now < move.strike_at - 1e-9 then
+        local valid = mgr:is_target_valid(move.Target, pos, params)
+        if not valid then mgr:end_move(fish, 'cancel') end
+        return
+    end
+    if move.Name == 'claw' then
+        mgr:end_move(fish, 'claw')
+        local valid, tp = mgr:is_target_valid(move.Target, pos, params)
+        if valid and FishBehaviorKit.within_bite(pos, tp, params)
+            and FishBehaviorKit.in_head_zone(pos, fish.facing, tp, params) then
+            mgr:hit(fish, move.Target, params.ClawDamage, 'claw')
         end
-        if now < move.strike_at - 1e-9 then
-            local valid = mgr:is_target_valid(move.Target, pos, params)
-            if not valid then mgr:end_move(fish, 'cancel') end
-            return
+        return
+    end
+    if move.Name == 'roar' then
+        mgr:end_move(fish, 'roar')
+        local valid, tp = mgr:is_target_valid(move.Target, pos, params)
+        if valid and (tp.x - pos.x)^2 + (tp.z - pos.z)^2 <= params.RoarRange * params.RoarRange then
+            mgr:hit(fish, move.Target, params.RoarDamage, 'roar')
         end
-        if move.Name == 'claw' then
-            mgr:end_move(fish, 'claw')
-            local valid, tp = mgr:is_target_valid(move.Target, pos, params)
-            if valid and FishBehaviorKit.within_bite(pos, tp, params)
-                and FishBehaviorKit.in_head_zone(pos, fish.facing, tp, params) then
-                mgr:hit(fish, move.Target, params.ClawDamage, 'claw')
-            end
-            return
-        end
-        if move.Name == 'roar' then
-            mgr:end_move(fish, 'roar')
-            local valid, tp = mgr:is_target_valid(move.Target, pos, params)
-            if valid and (tp.x - pos.x)^2 + (tp.z - pos.z)^2 <= params.RoarRange * params.RoarRange then
-                mgr:hit(fish, move.Target, params.RoarDamage, 'roar')
-            end
-            return
-        end
-        if move.Name == 'tail' then
-            mgr:end_move(fish, 'tail')
-            local facing = fish.facing or { x = 0, z = 1 }
-            for _, player in ipairs(mgr:players()) do
-                local valid, cp = mgr:is_target_valid(player, pos, params)
-                if valid and (cp.x - pos.x)^2 + (cp.z - pos.z)^2 <= params.TailRadius * params.TailRadius then
-                    local dx, dz = cp.x - pos.x, cp.z - pos.z
-                    if dx * facing.x + dz * facing.z < 0 then
-                        mgr:hit(fish, player, params.TailDamage, 'tail')
-                    end
+        return
+    end
+    if move.Name == 'tail' then
+        mgr:end_move(fish, 'tail')
+        local facing = fish.facing or { x = 0, z = 1 }
+        for _, player in ipairs(mgr:players()) do
+            local valid, cp = mgr:is_target_valid(player, pos, params)
+            if valid and (cp.x - pos.x)^2 + (cp.z - pos.z)^2 <= params.TailRadius * params.TailRadius then
+                local dx, dz = cp.x - pos.x, cp.z - pos.z
+                if dx * facing.x + dz * facing.z < 0 then
+                    mgr:hit(fish, player, params.TailDamage, 'tail')
                 end
             end
-            return
         end
+    end
+end
+
+local function step(mgr, fish, now, pos, params)
+    local dt = FishBehaviorKit.begin_combat_frame(fish, now)
+    if fish.Move then
+        step_attack_move(mgr, fish, now, pos, params)
         return
     end
     if now >= (fish.JumpAt or math.huge) then
