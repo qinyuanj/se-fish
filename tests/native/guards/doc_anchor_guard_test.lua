@@ -1,4 +1,4 @@
--- 代码里的文档锚点必须可解析：`GameSpec.md#8.1-鱼塘`、`GLOSSARY.md#船票`、`策划案已确认结论.md#Q10` 这类字符串。
+-- 代码里的文档锚点必须可解析：`GameSpec.md#8.1-鱼塘`、`GLOSSARY.md#船票`、`GameSpec.md#16-物品基础数据` 这类字符串。
 -- 失败方式先列：改名或改题号后锚点静默失效，`DecisionSource` 与 `source` 指向一个不存在的位置，没人发现。
 -- 口径见 #351 的 P2。Markdown 链接的锚点由 doc_link_guard_test 负责，这里只管 Lua 源码里的字符串。
 local fs = require('tests.support.fs_fixture')

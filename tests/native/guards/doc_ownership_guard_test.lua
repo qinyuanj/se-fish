@@ -20,8 +20,6 @@ local CLASSES = {
     '^docs/art%-asset%-overview%.md$',
     '^docs/packages%-reference%.md$',
     '^docs/engine%-keys%.md$',
-    '^docs/to%-questionnaire%-',
-    '^docs/策划案已确认结论%.md$',
   } },
   { name = '生成物', patterns = { '^docs/uml/' } },
 }
