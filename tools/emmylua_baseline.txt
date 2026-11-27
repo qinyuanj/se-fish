@@ -507,8 +507,8 @@ server/world_host/player_gm.lua:57:unused
 server/world_host/player_gm.lua:60:need-check-nil
 server/world_host/player_gm.lua:65:unused
 server/world_host/player_gm.lua:72:unused
+server/world_host/player_grill.lua:4:unresolved-require
 server/world_host/player_grill.lua:5:unresolved-require
-server/world_host/player_grill.lua:6:unresolved-require
 server/world_host/player_life.lua:229:assign-type-mismatch
 server/world_host/player_life.lua:5:unresolved-require
 server/world_host/player_life.lua:6:unresolved-require
