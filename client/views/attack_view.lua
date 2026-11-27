@@ -23,18 +23,6 @@ local HINTS = {
   ["bad-aim"] = "瞄准无效",
 }
 
-local function equipped(item_bar)
-  if type(item_bar) ~= "table" then return nil end
-  local weapons = type(item_bar.weapons) == "table" and item_bar.weapons or {}
-  local held = item_bar.held
-  if type(held) == "table" and held.kind == "weapon" and (weapons[held.id] or 0) > 0 then
-    return held.id
-  end
-  local selected = item_bar.selectedWeapon
-  if selected and (weapons[selected] or 0) > 0 then return selected end
-  return nil
-end
-
 local function is_gun(weapon_id)
   return weapon_id ~= nil and GameCfg.Ability.Guns[weapon_id] ~= nil
 end
@@ -52,156 +40,219 @@ local function attack_rect(ctx)
   return layout and layout.rects and layout.rects.attack_control or nil
 end
 
-function AttackView.mount(scope, ctx)
-  local services = ctx.services or {}
-  local clock_now = ViewUtil.resolve_clock(ctx, "AttackView")
-  local function now_of()
-    return ViewUtil.read_now(clock_now, "AttackView")
+-- 攻击键句柄：按钮/标签节点、按压手势与自动开火计时都留在句柄上；
+-- 方法名沿用拆分前的局部函数名，挂载入口只做装配。
+---@class AttackHandle: table<string, any>
+---@type AttackHandle
+local AttackBehavior = {}
+
+---@param self AttackHandle
+---@return number|nil
+function AttackBehavior.now_of(self)
+  return ViewUtil.read_now(self.clock_now, "AttackView")
+end
+
+---@param self AttackHandle
+---@return table|nil
+function AttackBehavior.current_gun(self)
+  local weapon_id = ViewUtil.equipped_weapon(self.ctx.store.item_bar:now())
+  return weapon_id and GameCfg.Ability.Guns[weapon_id] or nil
+end
+
+--- 发一条武器上行；attack 附带当前瞄准方向。
+---@param self AttackHandle
+---@param action string
+function AttackBehavior.send(self, action)
+  local services = self.services
+  if type(services.send_weapon) ~= "function" then return end
+  local payload = { action = action }
+  if action == "attack" and type(services.aim_direction) == "function" then
+    local ok, direction = pcall(services.aim_direction)
+    if not ok then
+      print("[AttackView] 读取瞄准方向失败", tostring(direction))
+    elseif ViewUtil.is_record(direction) then
+      local x, y, z = ViewUtil.read_vec3(direction)
+      payload.aim = x ~= nil and { x = x, y = y, z = z } or direction
+    end
   end
+  services.send_weapon(payload)
+end
+
+--- 逐帧推进按压手势，自动武器按间隔连发。
+---@param self AttackHandle
+function AttackBehavior.tick(self)
+  local t = self:now_of(); if t == nil then return end
+  self.gesture:update(t)
+  local gun = self:current_gun()
+  if gun and gun.Auto and t >= self.next_auto then
+    self.next_auto = t + (gun.IntervalSec or 0.2)
+    self.auto_fired = true
+    self:send("attack")
+  end
+end
+
+---@param self AttackHandle
+function AttackBehavior.on_touch_began(self)
+  local t = self:now_of(); if t == nil then return end
+  self.auto_fired = false; self.next_auto = 0; self.gesture:begin(t); self.pressing:set(true)
+end
+
+---@param self AttackHandle
+function AttackBehavior.on_touch_ended(self)
+  self.pressing:set(false)
+  local t = self:now_of(); if t == nil then return end
+  local result = self.gesture:finish(t)
+  if result == "tap" then
+    if not self.auto_fired then self:send("attack") end
+  elseif result == "long" then
+    local gun = self:current_gun()
+    if gun and not gun.Auto then self:send("reload") end
+  end
+end
+
+--- 绑按压：触摸开始/结束与按压期帧订阅；没有触摸事件时退回单击。
+---@param self AttackHandle
+---@param ps table phase scope
+---@param button table
+function AttackBehavior.bind_touch(self, ps, button)
+  local ctx = self.ctx
+  if button.OnTouchBegan and button.OnTouchEnded then
+    ctx.connect(ps, button.OnTouchBegan, function() self:on_touch_began() end)
+    ctx.connect(ps, button.OnTouchEnded, function() self:on_touch_ended() end)
+    ps:phase("AttackPressPhase", self.pressing, function(press_scope)
+      if ctx.clock and ctx.clock.on_frame then
+        press_scope:subscribe(ctx.clock.on_frame, function() self:tick() end)
+      end
+    end)
+  else
+    ctx.connect(ps, button.OnClicked, function() self:send("attack") end)
+  end
+end
+
+--- 建攻击键节点：布局块、按钮、标签与两个投影，然后绑按压。
+---@param self AttackHandle
+---@param ps table phase scope
+function AttackBehavior.mount_control(self, ps)
+  local ctx = self.ctx
+  local rect = attack_rect(ctx)
+  if rect == nil then
+    return
+  end
+  local screen = ctx.root_node and ctx.root_node.FindFirstChild and ctx.root_node:FindFirstChild("ScreenMain", true)
+  local control = ctx.create_node(ps, "EUILayout", {
+    Name = "AttackControl",
+    Parent = screen or nil,
+    Position = ViewUtil.vec2(rect.x, rect.y),
+    Size = ViewUtil.vec2(rect.w, rect.h),
+  })
+  control.TouchEnabled = false
+  control.Visible = true
+  local button = ctx.create_node(ps, "EUIButton", {
+    Name = "BtnAttack",
+    Parent = control,
+    Position = ViewUtil.vec2(rect.x, rect.y),
+    Size = ViewUtil.vec2(rect.w, rect.h),
+    ButtonText = "",
+  })
+  button.TouchEnabled = false
+  button.Visible = true
+  local screen_open = ctx.store.hud_visible
+  ps:effect("AttackEnabled", function(es)
+    button.TouchEnabled = es:d(screen_open) == true
+  end)
+  local label = ctx.create_node(ps, "EUITextLabel", {
+    Name = "AttackLabel",
+    Parent = control,
+    Position = button.Position,
+    Size = button.Size,
+    Text = "攻击",
+  })
+  label.TouchEnabled = false
+
+  ps:effect("AttackCaption", function(es)
+    local weapon_id = ViewUtil.equipped_weapon(es:d(ctx.store.item_bar))
+    label.Text = is_gun(weapon_id) and "射击" or "攻击"
+  end)
+
+  self.button, self.label = button, label
+  self.pressing = State.new("AttackView.pressing", false)
+  self.auto_fired = false
+  self.next_auto = 0
+  self.gesture = PressGesture.new({ long_press_sec = GameCfg.Ability.Throw.LongPressSec })
+  self:bind_touch(ps, button)
+end
+
+--- 服务端事件：武器失败提示与伤害飘字数值。
+---@param self AttackHandle
+---@param event any
+function AttackBehavior.on_server_event(self, event)
+  if type(event) ~= "table" then return end
+  if event.channel == "WeaponResult" then
+    local payload = event.payload
+    if type(payload) == "table" and payload.ok == false then
+      ViewUtil.notify(self.ctx, HINTS[payload.reason] or ("武器操作失败 " .. tostring(payload.reason)))
+    end
+  elseif event.channel == "DamageNotice" and type(event.payload) == "table" then
+    local amount = tonumber(event.payload.amount)
+    if amount == nil or amount ~= amount or math.abs(amount) == math.huge then return end
+    local notice = self.damage_notice
+    notice:set({
+      amount = math.floor(amount + 0.5),
+      critical = event.payload.critical == true,
+      seq = (notice:now() and notice:now().seq or 0) + 1,
+    })
+  end
+end
+
+--- 伤害飘字：按暴击着色新建一个文本节点。
+---@param self AttackHandle
+---@param es table EffectScope
+function AttackBehavior.on_damage_float(self, es)
+  local notice = es:d(self.damage_notice)
+  if type(notice) ~= "table" then return end
+  local node = self.ctx.create_node(es, "EUITextLabel", {
+    Name = "DamageFloat",
+    Text = tostring(notice.amount),
+    Position = ViewUtil.vec2(0, 0),
+    Size = ViewUtil.vec2(120, 40),
+  })
+  node.TextColor = ViewUtil.color(notice.critical and { 255, 214, 74, 255 } or { 255, 255, 255, 255 })
+  node.TouchEnabled = false
+  node.Visible = true
+end
+
+--- 挂载攻击键：造句柄、注册可见性 memo 与按钮 phase、接事件与飘字投影。
+---@param scope table
+---@param ctx table
+function AttackView.mount(scope, ctx)
+  ---@type AttackHandle
+  local self = {
+    scope = scope,
+    ctx = ctx,
+    services = ctx.services or {},
+    clock_now = ViewUtil.resolve_clock(ctx, "AttackView"),
+    damage_notice = nil,
+    pressing = nil,
+    gesture = nil,
+    auto_fired = false,
+    next_auto = 0,
+    button = nil,
+    label = nil,
+  }
+  for name, method in pairs(AttackBehavior) do self[name] = method end
   local active = scope:memo("AttackVisible", function(ms)
-    return ms:d(ctx.store.hud_visible) ~= false and equipped(ms:d(ctx.store.item_bar)) ~= nil
+    return ms:d(ctx.store.hud_visible) ~= false and ViewUtil.equipped_weapon(ms:d(ctx.store.item_bar)) ~= nil
   end)
 
-  scope:phase("AttackButton", active, function(ps)
-    local rect = attack_rect(ctx)
-    if rect == nil then
-      return
-    end
-    local screen = ctx.root_node and ctx.root_node.FindFirstChild and ctx.root_node:FindFirstChild("ScreenMain", true)
-    local control = ctx.create_node(ps, "EUILayout", {
-      Name = "AttackControl",
-      Parent = screen or nil,
-      Position = ViewUtil.vec2(rect.x, rect.y),
-      Size = ViewUtil.vec2(rect.w, rect.h),
-    })
-    control.TouchEnabled = false
-    control.Visible = true
-    local button = ctx.create_node(ps, "EUIButton", {
-      Name = "BtnAttack",
-      Parent = control,
-      Position = ViewUtil.vec2(rect.x, rect.y),
-      Size = ViewUtil.vec2(rect.w, rect.h),
-      ButtonText = "",
-    })
-    button.TouchEnabled = false
-    button.Visible = true
-    local screen_open = ctx.store.hud_visible
-    ps:effect("AttackEnabled", function(es)
-      button.TouchEnabled = es:d(screen_open) == true
-    end)
-    local label = ctx.create_node(ps, "EUITextLabel", {
-      Name = "AttackLabel",
-      Parent = control,
-      Position = button.Position,
-      Size = button.Size,
-      Text = "攻击",
-    })
-    label.TouchEnabled = false
+  scope:phase("AttackButton", active, function(ps) self:mount_control(ps) end)
 
-    ps:effect("AttackCaption", function(es)
-      local weapon_id = equipped(es:d(ctx.store.item_bar))
-      label.Text = is_gun(weapon_id) and "射击" or "攻击"
-    end)
-
-    local pressing = State.new("AttackView.pressing", false)
-    local auto_fired = false
-    local next_auto = 0
-    local gesture = PressGesture.new({ long_press_sec = GameCfg.Ability.Throw.LongPressSec })
-    local function current_gun()
-      local weapon_id = equipped(ctx.store.item_bar:now())
-      return weapon_id and GameCfg.Ability.Guns[weapon_id] or nil
-    end
-    local function send(action)
-      if type(services.send_weapon) ~= "function" then return end
-      local payload = { action = action }
-      if action == "attack" and type(services.aim_direction) == "function" then
-        local ok, direction = pcall(services.aim_direction)
-        if not ok then
-          print("[AttackView] 读取瞄准方向失败", tostring(direction))
-        elseif ViewUtil.is_record(direction) then
-          local x, y, z = ViewUtil.read_vec3(direction)
-          payload.aim = x ~= nil and { x = x, y = y, z = z } or direction
-        end
-      end
-      services.send_weapon(payload)
-    end
-    local function tick()
-      local t = now_of(); if t == nil then return end
-      gesture:update(t)
-      local gun = current_gun()
-      if gun and gun.Auto and t >= next_auto then
-        next_auto = t + (gun.IntervalSec or 0.2)
-        auto_fired = true
-        send("attack")
-      end
-    end
-    if button.OnTouchBegan and button.OnTouchEnded then
-      ctx.connect(ps, button.OnTouchBegan, function()
-        local t = now_of(); if t == nil then return end
-        auto_fired = false; next_auto = 0; gesture:begin(t); pressing:set(true)
-      end)
-      ctx.connect(ps, button.OnTouchEnded, function()
-        pressing:set(false)
-        local t = now_of(); if t == nil then return end
-        local result = gesture:finish(t)
-        if result == "tap" then
-          if not auto_fired then send("attack") end
-        elseif result == "long" then
-          local gun = current_gun()
-          if gun and not gun.Auto then send("reload") end
-        end
-      end)
-      ps:phase("AttackPressPhase", pressing, function(press_scope)
-        if ctx.clock and ctx.clock.on_frame then
-          press_scope:subscribe(ctx.clock.on_frame, tick)
-        end
-      end)
-    else
-      ctx.connect(ps, button.OnClicked, function() send("attack") end)
-    end
-  end)
-
-  local damage_notice = State.new("AttackView.damage_notice", nil)
-  scope:subscribe(ctx.store.on_server_event, function(event)
-    if type(event) ~= "table" then return end
-    if event.channel == "WeaponResult" then
-      local payload = event.payload
-      if type(payload) == "table" and payload.ok == false then
-        ViewUtil.notify(ctx, HINTS[payload.reason] or ("武器操作失败 " .. tostring(payload.reason)))
-      end
-    elseif event.channel == "DamageNotice" and type(event.payload) == "table" then
-      local amount = tonumber(event.payload.amount)
-      if amount == nil or amount ~= amount or math.abs(amount) == math.huge then return end
-      damage_notice:set({
-        amount = math.floor(amount + 0.5),
-        critical = event.payload.critical == true,
-        seq = (damage_notice:now() and damage_notice:now().seq or 0) + 1,
-      })
-    end
-  end)
-
-  scope:effect("DamageFloat", function(es)
-    local notice = es:d(damage_notice)
-    if type(notice) ~= "table" then return end
-    local node = ctx.create_node(es, "EUITextLabel", {
-      Name = "DamageFloat",
-      Text = tostring(notice.amount),
-      Position = ViewUtil.vec2(0, 0),
-      Size = ViewUtil.vec2(120, 40),
-    })
-    node.TextColor = ViewUtil.color(notice.critical and { 255, 214, 74, 255 } or { 255, 255, 255, 255 })
-    node.TouchEnabled = false
-    node.Visible = true
-  end)
+  self.damage_notice = State.new("AttackView.damage_notice", nil)
+  scope:subscribe(ctx.store.on_server_event, function(event) self:on_server_event(event) end)
+  scope:effect("DamageFloat", function(es) self:on_damage_float(es) end)
 end
 
 function AttackView.spec()
-  return {
-    name = "Attack",
-    mount = function(scope, ctx)
-      AttackView.mount(scope, ctx)
-    end,
-  }
+  return ViewUtil.hud_spec("Attack", AttackView.mount)
 end
 
 return AttackView

@@ -4,6 +4,7 @@ local Dialogue = require("common.npc_dialogue")
 local Spoke = require("common.packages.spoke.api")
 local ViewUtil = require("client.views.view_util")
 local RescueView = require("client.views.rescue_view")
+local Modal = require("client.views.economy_modal")
 
 local State = Spoke.State
 local FishermanView = {}
@@ -15,16 +16,6 @@ local function near(position, center, character)
   if dist_sq == nil then return false end
   local radius = BodyScale.interaction_radius(character, GameCfg.Interact.Fisherman.Radius)
   return dist_sq <= radius * radius
-end
-
-local function open_modal(ctx, id, payload)
-  local fn = ctx.services and ctx.services.open_modal
-  if type(fn) == "function" then fn(id, payload) end
-end
-
-local function close_modal(ctx, id)
-  local fn = ctx.services and ctx.services.close_modal
-  if type(fn) == "function" then fn(id) end
 end
 
 function FishermanView.bubble_spec(options)
@@ -62,7 +53,7 @@ function FishermanView.bubble_spec(options)
         TouchEnabled = true,
       })
       ctx.connect(scope, talk.OnClicked, function()
-        open_modal(ctx, "fisherman", { zoneId = entry.npc.ZoneId, bubbleKey = key })
+        Modal.open_modal(ctx, "fisherman", { zoneId = entry.npc.ZoneId, bubbleKey = key })
       end)
       ctx.connect(scope, feed.OnClicked, function()
         if options.shared then options.shared.last_feed_index = entry.index end
@@ -80,7 +71,7 @@ function FishermanView.bubble_spec(options)
         local payload = ctx.store.modal_payload:now()
         if ctx.store.active_modal:now() == "fisherman" and type(payload) == "table"
             and payload.bubbleKey == key then
-          close_modal(ctx, "fisherman")
+          Modal.close_modal(ctx, "fisherman")
         end
       end)
     end,
@@ -105,7 +96,7 @@ function FishermanView.modal_spec()
     local close = ctx.create_node(scope, "EUIButton", {
       Name = "BtnFishermanClose", Parent = panel, ButtonText = "关闭", TouchEnabled = true,
     })
-    ctx.connect(scope, close.OnClicked, function() close_modal(ctx, "fisherman") end)
+    ctx.connect(scope, close.OnClicked, function() Modal.close_modal(ctx, "fisherman") end)
   end
 end
 
@@ -129,7 +120,7 @@ function FishermanView.confirm_modal_spec()
           print("[FishermanView] 确认弹窗回调执行失败", tostring(err))
         end
       end
-      close_modal(ctx, "confirm")
+      Modal.close_modal(ctx, "confirm")
     end
     ctx.connect(scope, yes.OnClicked, function() finish(true) end)
     ctx.connect(scope, no.OnClicked, function() finish(false) end)
@@ -210,26 +201,11 @@ function FishermanView.presentation_spec(options)
   }
 end
 
-function FishermanView.rescue_state(options)
-  return RescueView.create_state("FishermanView.rescue_rows", options)
-end
+-- 抢救入口（state / driver_spec / bubble_spec）的参数集中在 RescueView 的预设里，这里只绑定本视图的入口。
+local RescueApi = RescueView.view_api("fisherman")
 
-function FishermanView.rescue_driver_spec(shared)
-  return RescueView.driver_spec(shared, {
-    name = "FishermanRescueDriver",
-    mode = "world",
-  })
-end
-
-function FishermanView.rescue_bubble_spec(shared)
-  return RescueView.bubble_spec(shared, {
-    key_prefix = "rescue:",
-    scene_kind = "rescue",
-    scene_prefix = "SceneNodeRescue_",
-    button_prefix = "BtnRescue",
-    log_tag = "[FishermanView]",
-    fail_label = "抢救按钮创建失败",
-  })
-end
+FishermanView.rescue_state = RescueApi.state
+FishermanView.rescue_driver_spec = RescueApi.driver_spec
+FishermanView.rescue_bubble_spec = RescueApi.bubble_spec
 
 return FishermanView
