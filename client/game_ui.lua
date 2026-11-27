@@ -23,7 +23,7 @@ function GameUI:find_child_ui_node(node, name)
         if child and child.Name == name then
             return child
         end
-        local nested = GameUI:FindLabelChild(child, name)
+        local nested = self:find_child_ui_node(child, name)
         if nested then return nested end
     end
     return nil

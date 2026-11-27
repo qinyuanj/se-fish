@@ -7,6 +7,7 @@ local GameCfg = require("common.game_cfg")
 local Number = require("common.number")
 local MainHudLayout = require("client.main_hud_layout")
 local ViewUtil = require("client.views.view_util")
+local HudWidgets = require("client.views.hud_widgets")
 
 local State = Spoke.State
 
@@ -18,12 +19,6 @@ local VITAL_FONT_MAX = 20
 
 local function make_color(rgba)
   return Color.New(rgba[1], rgba[2], rgba[3], rgba[4])
-end
-
-local function make_passive(node)
-  node.TouchEnabled = false
-  node.SwallowTouchEnabled = false
-  return node
 end
 
 local function columns_of(text)
@@ -61,23 +56,6 @@ local function place_editor_node(node, rect)
   node.Anchor = Vector2.New(0.5, 0.5)
   node.Position = Vector2.New(rect.x, rect.y)
   node.Size = Vector2.New(rect.w, rect.h)
-end
-
-local function create_overlay_label(ctx, scope, name, x, y, width, height, text, font_size, text_color, z_order)
-  local label = ctx.create_node(scope, "EUITextLabel", {
-    Name = name,
-    Position = Vector2.New(x, y),
-    Size = Vector2.New(width, height),
-    Text = text,
-    FontSize = font_size,
-    TextColor = text_color,
-  })
-  label.TextHorizontalAlignment = 1
-  label.TextVerticalAlignment = 1
-  label.TouchEnabled = false
-  label.SwallowTouchEnabled = false
-  label.LocalZOrder = z_order or 1
-  return label
 end
 
 --- 挂载左上状态区（血量环、饥饿环、4 条饥饿红边）与预置金币节点排版。
@@ -120,13 +98,14 @@ function MainHudVitalsView.mount(s, ctx, options)
   }
   for _, spec in ipairs(specs) do
     local r = spec.rect
-    local bg = make_passive(ctx.create_node(s, "EUIImage", {
+    ---@cast r { x: number, y: number, w: number, h: number }
+    local bg = HudWidgets.passive(ctx.create_node(s, "EUIImage", {
       Name = spec.key .. "RingBg",
       Position = Vector2.New(r.x, r.y),
       Size = Vector2.New(r.w, r.h),
       Image = cfg.RingBg,
     }))
-    local ring = make_passive(ctx.create_node(s, "EUIProgressTimer", {
+    local ring = HudWidgets.passive(ctx.create_node(s, "EUIProgressTimer", {
       Name = spec.key .. "Ring",
       Position = Vector2.New(r.x, r.y),
       Size = Vector2.New(r.w, r.h),
@@ -135,10 +114,17 @@ function MainHudVitalsView.mount(s, ctx, options)
     }))
     ring.Color = make_color(spec.rgba)
     ring.LocalZOrder = 1
-    local text = create_overlay_label(
-      ctx, s, spec.key .. "Text", r.x, r.y, r.w, 40, "",
-      vital_font_size(r.w, cfg), Color.New(255, 255, 255, 255), 2
-    )
+    local text = HudWidgets.label(ctx, s, {
+      name = spec.key .. "Text",
+      x = r.x,
+      y = r.y,
+      w = r.w,
+      h = 40,
+      text = "",
+      font_size = vital_font_size(r.w, cfg),
+      text_color = Color.New(255, 255, 255, 255),
+      z_order = 2,
+    })
     rings[spec.key] = { bg = bg, ring = ring, text = text }
   end
 
@@ -152,7 +138,7 @@ function MainHudVitalsView.mount(s, ctx, options)
   }
   local flash_edges = {}
   for _, spec in ipairs(edge_specs) do
-    local edge = make_passive(ctx.create_node(s, "EUIImage", {
+    local edge = HudWidgets.passive(ctx.create_node(s, "EUIImage", {
       Name = spec[1],
       Position = Vector2.New(spec[2], spec[3]),
       Size = Vector2.New(spec[4], spec[5]),
@@ -242,12 +228,7 @@ end
 
 --- 返回可供 RootView.mount({ hud = { ... } }) 直接注册的 HUD spec。
 function MainHudVitalsView.spec(options)
-  return {
-    name = "MainHudVitals",
-    mount = function(s, ctx)
-      MainHudVitalsView.mount(s, ctx, options)
-    end,
-  }
+  return ViewUtil.hud_spec("MainHudVitals", MainHudVitalsView.mount, options)
 end
 
 return MainHudVitalsView
