@@ -53,27 +53,50 @@ local function check_ledger(cfg, fail, activeGoods)
     end
 end
 
-function Validate.check(cfg)
-    local errors = {}
-    local function fail(source, message) errors[#errors + 1] = tostring(source or '配置') .. ': ' .. message end
-    local zones, waters, zoneSeen = {}, {}, {}
+-- ===== 拆分前 Validate.check 体内的分段：提到模块级，fail 显式传入 =====
+-- 各段只负责一段内容表的校验；错误最后在入口统一排序，所以分段顺序不影响输出。
+-- 错误文案、条数与返回的 counts 口径与拆分前完全一致。
+
+-- 钓鱼区：ID 去重、水域登记与普通鱼饵存在性；返回按 ID / 水域索引的表。
+local function check_zones(cfg, fail)
+    local zones, waters = {}, {}
     for _, zone in ipairs(cfg.Zones or {}) do
         if zones[zone.Id] then fail(zone.source, '钓鱼区 ID 重复 ' .. tostring(zone.Id)) end
         zones[zone.Id], waters[zone.WaterId] = zone, zone
         if not cfg.Items.Definitions[zone.BaitItemId] then fail(zone.source, '普通鱼饵不存在 ' .. tostring(zone.BaitItemId)) end
     end
-    local items, fish = cfg.Items.Definitions, cfg.Fish
-    local itemNumbers = {}
+    return zones, waters
+end
+
+-- 物品：键与 ID 一致、编号去重、编号映射与售价。
+local function check_items(cfg, fail)
+    local items, numbers = cfg.Items.Definitions, {}
     for key, item in pairs(items) do
         local source = item.source
         if key ~= item.Id then fail(source, '物品键与 ID 不同 ' .. tostring(key)) end
-        if itemNumbers[item.SourceId] then fail(source, '物品编号重复 ' .. tostring(item.SourceId) .. '（' .. itemNumbers[item.SourceId] .. '）') end
-        itemNumbers[item.SourceId] = source
+        if numbers[item.SourceId] then fail(source, '物品编号重复 ' .. tostring(item.SourceId) .. '（' .. numbers[item.SourceId] .. '）') end
+        numbers[item.SourceId] = source
         if cfg.Items.SourceIdMap[item.SourceId] ~= key then fail(source, '物品编号映射失效 ' .. tostring(item.SourceId)) end
         if not nonnegative(item.BasePrice) then fail(source, '出售价格无效') end
     end
-    local fishNumbers = {}
-    for key, species in pairs(fish) do
+end
+
+-- 单条鱼种的掉落：物品存在、件数为正整数。
+local function check_drops(species, items, source, fail)
+    if type(species.Drops) ~= 'table' or #species.Drops == 0 then
+        fail(source, '缺少掉落')
+        return
+    end
+    for _, drop in ipairs(species.Drops) do
+        if not items[drop.ItemId] then fail(source, '掉落物不存在 ' .. tostring(drop.ItemId)) end
+        if not integer(drop.Count) or drop.Count < 1 then fail(source, '掉落数量无效') end
+    end
+end
+
+-- 鱼种：键、编号+品级去重、映射、所属区/水域、数值区间、鱼饵与掉落；返回有普通抽鱼表的区集合。
+local function check_fish(cfg, items, zones, waters, fail)
+    local fishNumbers, zoneSeen = {}, {}
+    for key, species in pairs(cfg.Fish) do
         local source = species.source
         if key ~= species.Id then fail(source, '鱼种键与 ID 不同 ' .. tostring(key)) end
         local sourceKey = tostring(species.SourceId) .. ':' .. tostring(species.Grade)
@@ -87,35 +110,45 @@ function Validate.check(cfg)
             or not integer(species.RodLevel) or species.RodLevel < 1 or species.RodLevel > 7
             or not nonnegative(species.BasePrice) then fail(source, '血量/重量/抽签权重/竿级/价格无效') end
         if species.Bait ~= 0 and not items[species.Bait] then fail(source, '鱼饵不存在 ' .. tostring(species.Bait)) end
-        if type(species.Drops) ~= 'table' or #species.Drops == 0 then fail(source, '缺少掉落')
-        else
-            for _, drop in ipairs(species.Drops) do
-                if not items[drop.ItemId] then fail(source, '掉落物不存在 ' .. tostring(drop.ItemId)) end
-                if not integer(drop.Count) or drop.Count < 1 then fail(source, '掉落数量无效') end
-            end
-        end
+        check_drops(species, items, source, fail)
         if species.Grade ~= 'boss' then zoneSeen[species.ZoneId] = true end
     end
+    return zoneSeen
+end
+
+-- 每个钓鱼区都要有普通抽鱼表。
+local function check_zone_coverage(cfg, zoneSeen, fail)
     for _, zone in ipairs(cfg.Zones or {}) do
         if not zoneSeen[zone.Id] then fail(zone.source, '缺少普通抽鱼表 ' .. zone.Id) end
     end
-    local goods, lottery, blindbox = cfg.Content.Shop.Goods, cfg.Content.Lottery.Patterns, cfg.Content.Blindbox.Entries
-    local shopNumbers, activeGoods = {}, {}
-    for _, row in ipairs(cfg.Shop.Goods or {}) do activeGoods[row.Number] = row end
-    for _, row in ipairs(goods) do
-        if shopNumbers[row.number] then fail(row.source, '商品编号重复 ' .. tostring(row.number) .. '（' .. shopNumbers[row.number] .. '）') end
-        shopNumbers[row.number] = row.source
-        if row.number == 27 or row.itemName == '夜明珠' then fail(row.source, '作废或禁止售卖商品') end
-        if row.itemKey and not items[row.itemKey] then fail(row.source, '商品物品不存在 ' .. row.itemKey) end
-        if row.itemKey and items[row.itemKey] and row.itemName ~= items[row.itemKey].Name then
-            fail(row.source, '商品名称与物品表不一致 ' .. row.itemName)
-        end
-        if not positive(row.price) or not integer(row.minShopLevel) or row.minShopLevel < 1 or row.minShopLevel > 7
-            or not nonnegative(row.purchaseLimit) or not integer(row.purchaseLimit) then fail(row.source, '商品价格/商店等级/限购无效') end
+end
+
+-- 单条商品：编号去重、禁售名单、名称与物品表一致、价格/等级/限购区间。
+local function check_shop_row(row, items, numbers, fail)
+    if numbers[row.number] then fail(row.source, '商品编号重复 ' .. tostring(row.number) .. '（' .. numbers[row.number] .. '）') end
+    numbers[row.number] = row.source
+    if row.number == 27 or row.itemName == '夜明珠' then fail(row.source, '作废或禁止售卖商品') end
+    if row.itemKey and not items[row.itemKey] then fail(row.source, '商品物品不存在 ' .. row.itemKey) end
+    if row.itemKey and items[row.itemKey] and row.itemName ~= items[row.itemKey].Name then
+        fail(row.source, '商品名称与物品表不一致 ' .. row.itemName)
     end
-    local lotteryWeight = 0
+    if not positive(row.price) or not integer(row.minShopLevel) or row.minShopLevel < 1 or row.minShopLevel > 7
+        or not nonnegative(row.purchaseLimit) or not integer(row.purchaseLimit) then fail(row.source, '商品价格/商店等级/限购无效') end
+end
+
+-- 商品：逐行校验，同时收集现有商店在架表（台账校验按它在架与价格/等级比对）。
+local function check_shop(cfg, items, fail)
+    local goods, numbers, active = cfg.Content.Shop.Goods, {}, {}
+    for _, row in ipairs(cfg.Shop.Goods or {}) do active[row.Number] = row end
+    for _, row in ipairs(goods) do check_shop_row(row, items, numbers, fail) end
+    return active
+end
+
+-- 抽奖图案：权重、两同倍率与三同奖项引用；返回权重合计。
+local function check_lottery(cfg, items, fail)
+    local lottery, weight = cfg.Content.Lottery.Patterns, 0
     for _, row in ipairs(lottery) do
-        lotteryWeight = lotteryWeight + (row.weight or 0)
+        weight = weight + (row.weight or 0)
         if not positive(row.weight) or not positive(row.pairMultiplier) then fail(row.source, '抽奖图案权重/两同倍率无效') end
         local reward = row.tripleReward or {}
         if reward.kind == 'weaponChoice' then
@@ -123,20 +156,32 @@ function Validate.check(cfg)
             for _, key in ipairs(reward.itemKeys) do if not items[key] then fail(row.source, '大奖武器不存在 ' .. tostring(key)) end end
         elseif reward.kind == 'item' then
             if not items[reward.itemKey] then fail(row.source, '三同物品不存在 ' .. tostring(reward.itemKey)) end
-        else fail(row.source, '三同奖项无效') end
+        else
+            fail(row.source, '三同奖项无效')
+        end
     end
-    local blindboxWeight, jackpotCount, blindboxKeys = 0, 0, {}
+    return weight
+end
+
+-- 盲盒奖池：权重合计、大奖个数、物品去重与名称/类别/基础价。
+local function check_blindbox(cfg, items, fail)
+    local blindbox, weight, jackpot, keys = cfg.Content.Blindbox.Entries, 0, 0, {}
     for _, row in ipairs(blindbox) do
-        blindboxWeight = blindboxWeight + (row.weight or 0)
-        if row.jackpot then jackpotCount = jackpotCount + 1 end
-        if blindboxKeys[row.itemKey] then fail(row.source, '盲盒物品重复 ' .. tostring(row.itemKey)) end
-        blindboxKeys[row.itemKey] = true
+        weight = weight + (row.weight or 0)
+        if row.jackpot then jackpot = jackpot + 1 end
+        if keys[row.itemKey] then fail(row.source, '盲盒物品重复 ' .. tostring(row.itemKey)) end
+        keys[row.itemKey] = true
         local item = items[row.itemKey]
         if not item then fail(row.source, '盲盒物品不存在 ' .. tostring(row.itemKey))
         elseif item.Name ~= row.itemName or item.Type ~= '极品食物' or item.BasePrice ~= row.basePrice then
             fail(row.source, '盲盒物品名称/类别/基础价与物品表不符') end
         if not positive(row.weight) or row.multiplier ~= 1 then fail(row.source, '盲盒权重或固定倍率无效') end
     end
+    return weight, jackpot, keys
+end
+
+-- 盲盒价格/保底规则与保底物品落点。
+local function check_blindbox_rules(cfg, jackpotCount, blindboxKeys, fail)
     local blind = cfg.Content.Blindbox
     if blind.Currency ~= '金豆' or blind.SinglePrice ~= 10 or blind.TenPrice ~= 90
         or blind.Pity.afterMisses ~= 49 or blind.Pity.guaranteedDraw ~= 50
@@ -144,28 +189,71 @@ function Validate.check(cfg)
     for _, key in ipairs(blind.Pity.prizeItemKeys) do
         if not blindboxKeys[key] then fail('GameSpec.md#15', '保底物品不在奖池 ' .. tostring(key)) end
     end
+end
+
+-- 单条兑换链的鱼种一致：精英/首领的存在、品级、所属区与掉落位。
+local function check_chain_fish(chain, fish, fail)
+    local source = chain.source
+    local elite, boss = fish[chain.EliteFish], fish[chain.BossFish]
+    if not elite or elite.Grade ~= 'elite' or elite.ZoneId ~= chain.ZoneId then fail(source, '精英鱼不存在或钓鱼区不匹配 ' .. tostring(chain.EliteFish)) end
+    if not boss or boss.Grade ~= 'boss' or boss.ZoneId ~= chain.ZoneId then fail(source, '首领不存在或钓鱼区不匹配 ' .. tostring(chain.BossFish)) end
+    if elite and elite.Drops[2] and elite.Drops[2].ItemId ~= chain.EliteToken then fail(source, '精英信物与掉落不匹配') end
+    if boss and (boss.Bait ~= chain.BossBait or not boss.Drops[2] or boss.Drops[2].ItemId ~= chain.BossToken) then
+        fail(source, '首领饵或首领信物与鱼种不匹配') end
+end
+
+-- 单条兑换链的物品引用：精英信物、首领饵、首领信物与兑换结果。
+local function check_chain_items(chain, items, fail)
+    local source = chain.source
+    if not items[chain.EliteToken] then fail(source, '精英信物不存在 ' .. tostring(chain.EliteToken)) end
+    if not items[chain.BossBait] or not items[chain.BossBait].BossBait then fail(source, '首领饵不存在 ' .. tostring(chain.BossBait)) end
+    if not items[chain.BossToken] then fail(source, '首领信物不存在 ' .. tostring(chain.BossToken)) end
+    if chain.Result ~= 'achievement.final' and not items[chain.Result] then fail(source, '兑换物品不存在 ' .. tostring(chain.Result)) end
+end
+
+-- 信物兑换链：逐条校验并断言链数为七组。
+local function check_exchanges(cfg, items, fish, fail)
     local chains = cfg.Content.Exchanges or {}
     for _, chain in ipairs(chains) do
-        local source = chain.source
-        local elite, boss = fish[chain.EliteFish], fish[chain.BossFish]
-        if not elite or elite.Grade ~= 'elite' or elite.ZoneId ~= chain.ZoneId then fail(source, '精英鱼不存在或钓鱼区不匹配 ' .. tostring(chain.EliteFish)) end
-        if not boss or boss.Grade ~= 'boss' or boss.ZoneId ~= chain.ZoneId then fail(source, '首领不存在或钓鱼区不匹配 ' .. tostring(chain.BossFish)) end
-        if not items[chain.EliteToken] then fail(source, '精英信物不存在 ' .. tostring(chain.EliteToken)) end
-        if not items[chain.BossBait] or not items[chain.BossBait].BossBait then fail(source, '首领饵不存在 ' .. tostring(chain.BossBait)) end
-        if not items[chain.BossToken] then fail(source, '首领信物不存在 ' .. tostring(chain.BossToken)) end
-        if chain.Result ~= 'achievement.final' and not items[chain.Result] then fail(source, '兑换物品不存在 ' .. tostring(chain.Result)) end
-        if elite and elite.Drops[2] and elite.Drops[2].ItemId ~= chain.EliteToken then fail(source, '精英信物与掉落不匹配') end
-        if boss and (boss.Bait ~= chain.BossBait or not boss.Drops[2] or boss.Drops[2].ItemId ~= chain.BossToken) then
-            fail(source, '首领饵或首领信物与鱼种不匹配') end
+        check_chain_fish(chain, fish, fail)
+        check_chain_items(chain, items, fail)
     end
     if #chains ~= 7 then fail('GameSpec.md#8.1', '信物兑换链不是七组') end
-    check_ledger(cfg, fail, activeGoods)
-    local counts = { zones = #(cfg.Zones or {}), fish = count(fish), items = count(items), shop = #goods,
-        lottery = #lottery, blindbox = #blindbox, lotteryWeight = lotteryWeight, blindboxWeight = blindboxWeight }
-    for field, expected in pairs({ zones = 7, fish = 98, items = 172, shop = 50, lottery = 7,
-        blindbox = 42, lotteryWeight = 100, blindboxWeight = 1000 }) do
+end
+
+-- 汇总数量与权重（既是校验项也是返回给调用方的统计口径）。
+local function build_counts(cfg, fish, items, lotteryWeight, blindboxWeight)
+    return { zones = #(cfg.Zones or {}), fish = count(fish), items = count(items),
+        shop = #cfg.Content.Shop.Goods, lottery = #cfg.Content.Lottery.Patterns,
+        blindbox = #cfg.Content.Blindbox.Entries, lotteryWeight = lotteryWeight, blindboxWeight = blindboxWeight }
+end
+
+-- GameSpec.md#19 数量/权重下限
+local EXPECTED_COUNTS = { zones = 7, fish = 98, items = 172, shop = 50, lottery = 7,
+    blindbox = 42, lotteryWeight = 100, blindboxWeight = 1000 }
+
+local function check_counts(counts, fail)
+    for field, expected in pairs(EXPECTED_COUNTS) do
         if counts[field] ~= expected then fail('GameSpec.md#19', field .. ' 数量/权重应为 ' .. expected .. '，实际 ' .. counts[field]) end
     end
+end
+
+function Validate.check(cfg)
+    local errors = {}
+    local function fail(source, message) errors[#errors + 1] = tostring(source or '配置') .. ': ' .. message end
+    local zones, waters = check_zones(cfg, fail)
+    local items, fish = cfg.Items.Definitions, cfg.Fish
+    check_items(cfg, fail)
+    local zoneSeen = check_fish(cfg, items, zones, waters, fail)
+    check_zone_coverage(cfg, zoneSeen, fail)
+    local activeGoods = check_shop(cfg, items, fail)
+    local lotteryWeight = check_lottery(cfg, items, fail)
+    local blindboxWeight, jackpotCount, blindboxKeys = check_blindbox(cfg, items, fail)
+    check_blindbox_rules(cfg, jackpotCount, blindboxKeys, fail)
+    check_exchanges(cfg, items, fish, fail)
+    check_ledger(cfg, fail, activeGoods)
+    local counts = build_counts(cfg, fish, items, lotteryWeight, blindboxWeight)
+    check_counts(counts, fail)
     table.sort(errors)
     return { errors = errors, counts = counts }
 end
