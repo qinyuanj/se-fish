@@ -1,5 +1,4 @@
 
-local EngineRead = require("common.engine_read")
 local GameCfg = require("common.game_cfg")
 local FishCatch = require("common.fish_catch")
 local MathWaterJudge = require("common.math_water_judge")
@@ -9,10 +8,6 @@ local ReelProgress = require("common.reel_progress")
 local State = require("common.packages.spoke.api").State
 
 local FishingPhase = {}
--- 钓竿阶段行为表：拆分前都是 FishingPhase.mount 体内的闭包，方法名、参数顺序与返回值不变，
--- 调用方照旧 handle:method(...)。句柄持阶段状态（session / active_reel / 计数器等），
--- 依赖统一从 handle.fishing_env 读取，字段名沿用拆分前的局部变量名。
-local FishingBehavior = {}
 
 local function finite(value)
   return Number.is_finite_number(value)
@@ -80,559 +75,502 @@ local function copy_holding(info)
   return info
 end
 
--- ===== 钓线与下发 =====
-
-function FishingBehavior.create_line(self, cast_id, landing)
-  local env = self.fishing_env
-  local maker = env.create_unit
-  if type(maker) ~= "function" and env.world and type(env.world.CreateUnit) == "function" then
-    maker = function(kind, props) return env.world:CreateUnit(kind, props) end
-  end
-  if self.line_unit or type(maker) ~= "function" or not landing then return end
-  local ok, unit = pcall(maker, "LinkEffectUnit", {
-    Name = "CastLine_" .. tostring(cast_id),
-    EffectId = GameCfg.Casting.LineEffect,
-    Position = Vector3.New(landing.x, landing.y, landing.z),
-  })
-  if ok and unit then
-    self.line_unit = unit
-  else
-    print("[FishingPhase] 创建钓线失败", env.player.UserId, tostring(unit))
-  end
-end
-
-function FishingBehavior.destroy_line(self)
-  local env = self.fishing_env
-  local unit = self.line_unit
-  self.line_unit = nil
-  if unit and type(unit.Destroy) == "function" then
-    local ok, err = pcall(unit.Destroy, unit)
-    if not ok then print("[FishingPhase] 销毁钓线失败", env.player.UserId, tostring(err)) end
-  end
-end
-
--- 下行推送统一走 EngineRead.fire_client（取 RE 事件 + pcall），两个通道只差频道名。
-local function fire_on(channel, tag)
-  return function(self, payload)
-    local env = self.fishing_env
-    EngineRead.fire_client(env.remote, channel, env.player, payload, tag)
-  end
-end
-
-FishingBehavior.fire_cast = fire_on("CastState", "FishingBehavior.fire_cast")
-FishingBehavior.fire_reel = fire_on("ReelInRE", "FishingBehavior.fire_reel")
-
-function FishingBehavior.holding_info(self)
-  local env = self.fishing_env
-  local fish_unit = env.fish_unit
-  if fish_unit and type(fish_unit.held_info) == "function" then
-    local ok, info = pcall(fish_unit.held_info, fish_unit, env.player)
-    if ok then return copy_holding(info) end
-  end
-  return nil
-end
-
-function FishingBehavior.publish(self, reason)
-  if self.cleaned then return end
-  local session = self.session
-  if not session then
-    self:fire_cast({ phase = "idle", holding = self:holding_info(), result = reason and { reason = reason } or nil })
-    return
-  end
-  local species = session.fishId and GameCfg.Fish[session.fishId]
-  self:fire_cast({
-    phase = session.phase,
-    castId = session.castId,
-    landing = session.landing,
-    zoneId = session.zoneId,
-    fishId = session.fishId,
-    catchSource = species and species.CatchSource or "water",
-    hookPosition = hook_position(session),
-    mult = session.mult,
-    reelSession = session.reelSession,
-    holding = self:holding_info(),
-    result = reason and { reason = reason } or nil,
-  })
-end
-
--- ===== 抛竿与收线 =====
-
-function FishingBehavior.clear_session(self, reason, notify)
-  self.session = nil
-  self.active_reel = nil
-  self.active_frame:set(false)
-  self:destroy_line()
-  if notify ~= false then self:publish(reason) end
-end
-
-function FishingBehavior.consume_bait(self)
-  local env = self.fishing_env
-  local tree = env.tree
-  local data = tree.data
-  if type(data) ~= "table" or type(data.ConsumeSelectedBait) ~= "function" then
-    return false, nil
-  end
-  local ok, success, bait_id = pcall(data.ConsumeSelectedBait, data)
-  if not ok then
-    print("[FishingPhase] 消耗鱼饵失败", env.player.UserId, tostring(success))
-    return false, nil
-  end
-  if tree.sync_from_data then tree:sync_from_data(data) end
-  return success == true, bait_id
-end
-
-function FishingBehavior.can_cast(self)
-  local env = self.fishing_env
-  local tree = env.tree
-  local fish_unit = env.fish_unit
-  if tree.memos and tree.memos.can_act and tree.memos.can_act:now() ~= true then
-    return false, "cannotAct"
-  end
-  if fish_unit and type(fish_unit.can_cast) == "function" and fish_unit:can_cast(env.player) ~= true then
-    return false, "holding"
-  end
-  return true
-end
-
-function FishingBehavior.begin_cast(self, payload)
-  local env = self.fishing_env
-  local tree = env.tree
-  local remote = env.remote
-  if self.session then
-    self:publish()
-    self:fire_cast({ phase = self.session.phase, castId = self.session.castId, result = { reason = "alreadyCasting" } })
-    return false
-  end
-  local allowed, deny = self:can_cast()
-  if not allowed then
-    self:publish(deny)
-    return false
-  end
-  if tree.sync_from_data then tree:sync_from_data(tree.data) end
-  local slot, entry, definition = selected_rod(tree, payload)
-  if not entry then
-    self:publish("invalidRod")
-    return false
-  end
-  local character = character_of(tree)
-  if not character then
-    self:publish("unavailable")
-    return false
-  end
-  local ok, landing, zone = pcall(cast_landing, character)
-  if not ok then
-    print("[FishingPhase] 计算落点失败", env.player.UserId, tostring(landing))
-    self:publish("unavailable")
-    return false
-  end
-  if not landing or not zone then
-    self:fire_cast({
-      phase = "idle",
-      result = { reason = landing and "invalidLanding" or "unavailable", landing = landing },
-      holding = self:holding_info(),
-    })
-    return false
-  end
-  if remote and type(remote.check_recd) == "function"
-    and remote:check_recd(env.player, "CastAction", GameCfg.Casting.ActionCooldownSec) then
-    self:publish("cooldown")
-    return false
-  end
-  local bait_ok, bait_id = self:consume_bait()
-  if not bait_ok then
-    self:publish("baitUnavailable")
-    return false
-  end
-  self.next_cast_id = self.next_cast_id + 1
-  self.session = {
-    castId = self.next_cast_id,
-    phase = "cast",
-    landing = landing,
-    zoneId = zone.Id,
-    baitId = bait_id,
-    slot = slot,
-    rodLevel = definition.Level or 1,
-    hookAt = now_of(tree) + GameCfg.Casting.HookDelaySec,
-  }
-  self.active_frame:set(true)
-  self:create_line(self.session.castId, landing)
-  self:publish()
-  local quest = env.quest
-  if quest and type(quest.notify) == "function" then
-    quest:notify("CastWater", env.player, {
-      itemId = bait_id,
-      eventId = "cast:" .. tostring(env.player.UserId) .. ":" .. tostring(self.session.castId),
-    })
-  end
-  return true
-end
-
-function FishingBehavior.hook_now(self)
-  local env = self.fishing_env
-  local tree = env.tree
-  local session = self.session
-  if not session or session.phase ~= "cast" then return end
-  if now_of(tree) < session.hookAt then return end
-  local boss = session.baitId and GameCfg.Casting.BossBait and GameCfg.Casting.BossBait[session.baitId]
-  local forced = GameCfg.Debug and GameCfg.Debug.Enabled and self.next_fish or nil
-  local fish_id = forced and forced.fishId or boss
-  if not fish_id then
-    fish_id = FishCatch.select(
-      GameCfg.Casting.Zones[session.zoneId],
-      session.rodLevel,
-      session.baitId,
-      env.random_fn
-    )
-  end
-  if not fish_id then
-    self:clear_session("noFish")
-    return
-  end
-  self.next_reel_id = self.next_reel_id + 1
-  session.phase = "hooked"
-  session.fishId = fish_id
-  session.forcedFishSerial = forced and forced.serial or nil
-  session.mult = FishCatch.Multiplier(env.random_fn)
-  session.reelSerial = self.next_reel_id
-  session.reelSession = tostring(self.next_reel_id) .. ":" .. tostring(env.player.UserId)
-  local receiver = RateLimit.new_receiver({
-    WindowSec = GameCfg.HighFreqInput.WindowSec,
-    MaxCount = GameCfg.HighFreqInput.MaxCount,
-  })
-  receiver:set_session(session.reelSession)
-  self.active_reel = {
-    id = session.reelSession,
-    receiver = receiver,
-    progress = ReelProgress.new(now_of(tree), GameCfg.ReelIn),
-    lastReport = now_of(tree),
-  }
-  self:fire_reel({
-    action = "started",
-    session = self.active_reel.id,
-    progress = self.active_reel.progress.Progress,
-  })
-  self:publish()
-end
-
-function FishingBehavior.finish_reel(self, outcome, notify)
-  local env = self.fishing_env
-  local tree = env.tree
-  if not self.session or not self.active_reel or self.session.phase ~= "hooked" then return end
-  local current = self.session
-  local current_reel = self.active_reel
-  current_reel.receiver:end_session()
-  self.active_reel = nil
-  if outcome == "landed" then
-    current.phase = "landed"
-    current.idleAt = now_of(tree) + GameCfg.Casting.LandedHoldSec
-    self:destroy_line()
-    self:land_fish(current)
-    if notify ~= false then
-      self:publish()
-      self:fire_reel({ action = outcome, session = current_reel.id, progress = current_reel.progress.Progress })
-    end
-    return
-  end
-  current.phase = "unhooked"
-  if notify ~= false then
-    self:publish()
-    self:fire_reel({ action = outcome or "unhooked", session = current_reel.id, progress = current_reel.progress.Progress })
-  end
-  self:clear_session()
-end
-
-function FishingBehavior.land_fish(self, current)
-  local env = self.fishing_env
-  local tree = env.tree
-  local player = env.player
-  local compendium = env.compendium
-  local fish_unit = env.fish_unit
-  if compendium and type(compendium.record_landing) == "function" then
-    local ok, recorded, reason = pcall(compendium.record_landing, compendium, player, {
-      fishId = current.fishId, mult = current.mult, reelSerial = current.reelSerial,
-    })
-    if not ok then
-      print("[FishingPhase] 图鉴入账失败", player.UserId, tostring(recorded))
-    elseif not recorded and reason ~= "replay" then
-      print("[FishingPhase] 图鉴未入账", player.UserId, current.fishId, tostring(reason))
-    end
-  end
-  local character = character_of(tree)
-  local origin = character and character.Position
-  local rotation = character and character.Rotation
-  if origin and rotation and type(rotation.GetForward) == "function" and fish_unit
-    and type(fish_unit.spawn_landed) == "function" then
-    local forward = rotation:GetForward()
-    local length = forward and math.sqrt(forward.x * forward.x + forward.z * forward.z) or 0
-    local dx, dz = 0, 0
-    if length >= 0.01 then
-      dx = GameCfg.Casting.LandingOffset * forward.x / length
-      dz = GameCfg.Casting.LandingOffset * forward.z / length
-    end
-    local position = {
-      x = origin.x + dx,
-      y = origin.y + GameCfg.Casting.LandingHeight,
-      z = origin.z + dz,
-    }
-    local ok, fish, err = pcall(fish_unit.spawn_landed, fish_unit, player, {
-      fishId = current.fishId, mult = current.mult,
-    }, position)
-    if not ok then
-      print("[FishingPhase] 上岸生成活鱼失败", player.UserId, tostring(fish))
-    elseif not fish then
-      print("[FishingPhase] 上岸生成活鱼失败", player.UserId, current.fishId, tostring(err))
-    end
-  end
-  local quest = env.quest
-  if quest and type(quest.notify) == "function" then
-    quest:notify("Land", player, {
-      itemId = current.fishId,
-      eventId = "reel:" .. tostring(current.reelSession),
-    })
-  end
-end
-
-function FishingBehavior.advance_whole_second_decay(self, active_reel, now)
-  local whole = math.floor(now)
-  local from = active_reel.decayedAt or math.floor(active_reel.progress.Time)
-  if from >= whole then return false, nil end
-  active_reel.decayedAt = whole
-  local decay_outcome = active_reel.progress:advance(whole)
-  if decay_outcome then
-    self:finish_reel(decay_outcome, true)
-    return true, decay_outcome
-  end
-  return true, nil
-end
-
-function FishingBehavior.accept_clicks(self, payload)
-  local env = self.fishing_env
-  local tree = env.tree
-  local reel = self.active_reel
-  if not reel or not self.session or self.session.phase ~= "hooked" then return false end
-  if type(payload) ~= "table" or payload.s ~= reel.id then return false end
-  if type(tree.request_action) == "function" and tree:request_action("reel") ~= true then
-    return false
-  end
-  if tree.states and tree.states.is_paralyzed and tree.states.is_paralyzed:now() == true then
-    return false
-  end
-  if tree.states and tree.states.life_phase and tree.states.life_phase:now() ~= "alive" then
-    return false
-  end
-  local now = now_of(tree)
-  local result = reel.receiver:accept(now, payload)
-  if result.Status ~= RateLimit.Result.Ok then return false end
-  local grace_deadline = reel.progress.zero_at and reel.progress.zero_at + GameCfg.ReelIn.GraceSec
-  if grace_deadline and now > grace_deadline then
-    local expired = reel.progress:advance(now)
-    if expired then
-      self:finish_reel(expired, true)
-      return true
-    end
-  end
-  local _, decayed = self:advance_whole_second_decay(reel, now)
-  if decayed then return true end
-  local outcome = reel.progress:advance(now, result.accepted, 0)
-  if outcome then
-    self:finish_reel(outcome, true)
-  else
-    self:fire_reel({
-      action = "progress",
-      session = reel.id,
-      progress = reel.progress.Progress,
-      accepted = result.accepted,
-      q = payload.q,
-    })
-  end
-  return true
-end
-
-function FishingBehavior.close_reel(self, payload)
-  local env = self.fishing_env
-  local reel = self.active_reel
-  if not reel or type(payload) ~= "table" or payload.session ~= reel.id then return false end
-  reel.progress:advance(now_of(env.tree))
-  self:finish_reel(reel and reel.progress and reel.progress.Result or "unhooked", true)
-  return true
-end
-
-function FishingBehavior.reel_back(self)
-  local env = self.fishing_env
-  local session = self.session
-  if not session then return false end
-  if session.phase ~= "cast" and session.phase ~= "unhooked" then return false end
-  if env.remote and type(env.remote.check_recd) == "function"
-    and env.remote:check_recd(env.player, "CastAction", GameCfg.Casting.ActionCooldownSec) then
-    return false
-  end
-  self:clear_session()
-  return true
-end
-
-function FishingBehavior.drop_held(self)
-  local env = self.fishing_env
-  local fish_unit = env.fish_unit
-  if not fish_unit or type(fish_unit.drop) ~= "function" then return false end
-  if env.remote and type(env.remote.check_recd) == "function"
-    and env.remote:check_recd(env.player, "CastAction", GameCfg.Casting.ActionCooldownSec) then
-    return false
-  end
-  fish_unit:drop(env.player)
-  return true
-end
-
--- ===== 帧驱动与生命周期 =====
-
-function FishingBehavior.tick(self)
-  local env = self.fishing_env
-  local tree = env.tree
-  if self.cleaned or not self.session then return end
-  if self.session.phase == "cast" then
-    self:hook_now()
-    return
-  end
-  if self.session.phase == "landed" and self.session.idleAt and now_of(tree) >= self.session.idleAt then
-    self:clear_session()
-    return
-  end
-  if not self.active_reel or self.session.phase ~= "hooked" then return end
-  local now = now_of(tree)
-  local stepped, decay_outcome = self:advance_whole_second_decay(self.active_reel, now)
-  if decay_outcome then return end
-  if stepped then
-    self.active_reel.lastReport = now
-    self:fire_reel({
-      action = "progress",
-      session = self.active_reel.id,
-      progress = self.active_reel.progress.Progress,
-      accepted = 0,
-    })
-  end
-
-  if self.active_reel and self.session and self.session.phase == "hooked" and self.active_reel.progress.zero_at
-    and now > self.active_reel.progress.zero_at + GameCfg.ReelIn.GraceSec then
-    local outcome = self.active_reel.progress:advance(now)
-    if outcome then self:finish_reel(outcome, true) end
-  end
-end
-
-function FishingBehavior.on_life_phase(self)
-  local env = self.fishing_env
-  local phase_name = env.tree.states.life_phase:now()
-  if phase_name ~= "alive" and self.session and (self.session.phase == "hooked" or self.session.phase == "cast") then
-    if self.active_reel then
-      self:finish_reel("unhooked", true)
-    else
-      self.session.phase = "unhooked"
-      self:publish()
-    end
-  end
-end
-
-function FishingBehavior.cleanup(self)
-  if self.active_reel then
-    self.active_reel.receiver:end_session()
-    self.active_reel = nil
-  end
-  local had = self.session
-  self.session = nil
-  self.next_fish = nil
-  self.active_frame:set(false)
-  self:destroy_line()
-  if had then self:publish() end
-  self.cleaned = true
-end
-
--- ===== 对外入口 =====
-
-function FishingBehavior.push_state(self)
-  if not self.cleaned then self:publish() end
-end
-
-function FishingBehavior.abort(self)
-  if self.cleaned or not self.session then return false end
-  self:clear_session()
-  return true
-end
-
-function FishingBehavior.set_next_fish(self, fish_id)
-  if self.cleaned then return false end
-  self.next_fish_serial = self.next_fish_serial + 1
-  self.next_fish = { fishId = fish_id, serial = self.next_fish_serial }
-  if self.session and self.session.phase == "hooked" then
-    self.session.fishId = fish_id
-    self.session.forcedFishSerial = self.next_fish.serial
-    self:publish()
-  end
-  return true
-end
-
-function FishingBehavior.cast(self, payload)
-  if self.cleaned then return false end
-  if type(payload) ~= "table" then return false end
-  if payload.action == "Reel" then return self:reel_back() end
-  if payload.action == "Drop" then return self:drop_held() end
-  if payload.action == "Request" then
-    self:publish()
-    return true
-  end
-  if payload.action ~= "Cast" then return false end
-  return self:begin_cast(payload)
-end
-
-function FishingBehavior.reel(self, kind, payload)
-  if self.cleaned then return false end
-  if kind == "close" then return self:close_reel(payload) end
-  return self:accept_clicks(payload)
-end
-
--- Spoke 作用域接线：注册顺序与拆分前 mount 内的 subscribe / phase / on_cleanup 一致。
-local function wire_scope(self)
-  local env = self.fishing_env
-  local tree, scope = env.tree, env.scope
-  scope:subscribe(tree.clock.on_second, function() self:tick() end)
-  scope:phase("FishingActiveFrame", self.active_frame, function(fs)
-    fs:subscribe(tree.clock.on_frame, function() self:tick() end)
-  end)
-  if tree.states and tree.states.life_phase and type(tree.states.life_phase.subscribe) == "function" then
-    scope:subscribe(tree.states.life_phase, function() self:on_life_phase() end)
-  end
-  scope:on_cleanup(function() self:cleanup() end)
-end
-
---- 组装钓竿阶段句柄：状态字段留在句柄上，依赖装进 handle.fishing_env，方法由 FishingBehavior 提供。
---- 对外方法名、参数顺序与返回值沿用拆分前的返回表，调用方照旧 handle:method(...)。
 function FishingPhase.mount(scope, tree, opts)
   opts = type(opts) == "table" and opts or {}
-  local handle = {
-    line_unit = nil,
-    session = nil,
-    active_reel = nil,
-    next_cast_id = 0,
-    next_reel_id = 0,
-    next_fish = nil,
-    next_fish_serial = 0,
-    cleaned = false,
-    active_frame = State.new("FishingPhase.active_frame", false),
-  }
-  handle.fishing_env = {
-    scope = scope,
-    tree = tree,
-    player = tree.player,
-    remote = opts.remote,
-    fish_unit = opts.fish_unit,
-    compendium = opts.compendium,
-    quest = opts.quest,
-    random_fn = opts.random or math.random,
-    world = opts.world,
-    create_unit = opts.create_unit,
-  }
-  for name, method in pairs(FishingBehavior) do
-    handle[name] = method
+  local player = tree.player
+  local remote = opts.remote
+  local fish_unit = opts.fish_unit
+  local compendium = opts.compendium
+  local quest = opts.quest
+  local random_fn = opts.random or math.random
+  local world = opts.world
+  local create_unit = opts.create_unit
+  local line_unit = nil
+  local session = nil
+  local reel = nil
+  local next_cast_id = 0
+  local next_reel_id = 0
+  local next_fish = nil
+  local next_fish_serial = 0
+  local cleaned = false
+  local active_frame = State.new("FishingPhase.active_frame", false)
+
+  local function create_line(cast_id, landing)
+    local maker = create_unit
+    if type(maker) ~= "function" and world and type(world.CreateUnit) == "function" then
+      maker = function(kind, props) return world:CreateUnit(kind, props) end
+    end
+    if line_unit or type(maker) ~= "function" or not landing then return end
+    local ok, unit = pcall(maker, "LinkEffectUnit", {
+      Name = "CastLine_" .. tostring(cast_id),
+      EffectId = GameCfg.Casting.LineEffect,
+      Position = Vector3.New(landing.x, landing.y, landing.z),
+    })
+    if ok and unit then
+      line_unit = unit
+    else
+      print("[FishingPhase] 创建钓线失败", player.UserId, tostring(unit))
+    end
   end
-  wire_scope(handle)
-  return handle
+
+  local function destroy_line()
+    local unit = line_unit
+    line_unit = nil
+    if unit and type(unit.Destroy) == "function" then
+      local ok, err = pcall(unit.Destroy, unit)
+      if not ok then print("[FishingPhase] 销毁钓线失败", player.UserId, tostring(err)) end
+    end
+  end
+
+  local function fire_cast(payload)
+    if not remote or type(remote.get_re) ~= "function" then return end
+    local ok, event = pcall(remote.get_re, remote, "CastState")
+    if ok and event and type(event.FireClient) == "function" then
+      event:FireClient(player, payload)
+    end
+  end
+
+  local function fire_reel(payload)
+    if not remote or type(remote.get_re) ~= "function" then return end
+    local ok, event = pcall(remote.get_re, remote, "ReelInRE")
+    if ok and event and type(event.FireClient) == "function" then
+      event:FireClient(player, payload)
+    end
+  end
+
+  local function holding_info()
+    if fish_unit and type(fish_unit.held_info) == "function" then
+      local ok, info = pcall(fish_unit.held_info, fish_unit, player)
+      if ok then return copy_holding(info) end
+    end
+    return nil
+  end
+
+  local function publish(reason)
+    if cleaned then return end
+    if not session then
+      fire_cast({ phase = "idle", holding = holding_info(), result = reason and { reason = reason } or nil })
+      return
+    end
+    local species = session.fishId and GameCfg.Fish[session.fishId]
+    fire_cast({
+      phase = session.phase,
+      castId = session.castId,
+      landing = session.landing,
+      zoneId = session.zoneId,
+      fishId = session.fishId,
+      catchSource = species and species.CatchSource or "water",
+      hookPosition = hook_position(session),
+      mult = session.mult,
+      reelSession = session.reelSession,
+      holding = holding_info(),
+      result = reason and { reason = reason } or nil,
+    })
+  end
+
+  local function clear_session(reason, notify)
+    session = nil
+    reel = nil
+    active_frame:set(false)
+    destroy_line()
+    if notify ~= false then publish(reason) end
+  end
+
+  local function consume_bait()
+    local data = tree.data
+    if type(data) ~= "table" or type(data.ConsumeSelectedBait) ~= "function" then
+      return false, nil
+    end
+    local ok, success, bait_id = pcall(data.ConsumeSelectedBait, data)
+    if not ok then
+      print("[FishingPhase] 消耗鱼饵失败", player.UserId, tostring(success))
+      return false, nil
+    end
+    if tree.sync_from_data then tree:sync_from_data(data) end
+    return success == true, bait_id
+  end
+
+  local function can_cast()
+    if tree.memos and tree.memos.can_act and tree.memos.can_act:now() ~= true then
+      return false, "cannotAct"
+    end
+    if fish_unit and type(fish_unit.can_cast) == "function" and fish_unit:can_cast(player) ~= true then
+      return false, "holding"
+    end
+    return true
+  end
+
+  local function begin_cast(payload)
+    if session then
+      publish()
+      fire_cast({ phase = session.phase, castId = session.castId, result = { reason = "alreadyCasting" } })
+      return false
+    end
+    local allowed, deny = can_cast()
+    if not allowed then
+      publish(deny)
+      return false
+    end
+    if tree.sync_from_data then tree:sync_from_data(tree.data) end
+    local slot, entry, definition = selected_rod(tree, payload)
+    if not entry then
+      publish("invalidRod")
+      return false
+    end
+    local character = character_of(tree)
+    if not character then
+      publish("unavailable")
+      return false
+    end
+    local ok, landing, zone = pcall(cast_landing, character)
+    if not ok then
+      print("[FishingPhase] 计算落点失败", player.UserId, tostring(landing))
+      publish("unavailable")
+      return false
+    end
+    if not landing or not zone then
+      fire_cast({
+        phase = "idle",
+        result = { reason = landing and "invalidLanding" or "unavailable", landing = landing },
+        holding = holding_info(),
+      })
+      return false
+    end
+    if remote and type(remote.check_recd) == "function"
+      and remote:check_recd(player, "CastAction", GameCfg.Casting.ActionCooldownSec) then
+      publish("cooldown")
+      return false
+    end
+    local bait_ok, bait_id = consume_bait()
+    if not bait_ok then
+      publish("baitUnavailable")
+      return false
+    end
+    next_cast_id = next_cast_id + 1
+    session = {
+      castId = next_cast_id,
+      phase = "cast",
+      landing = landing,
+      zoneId = zone.Id,
+      baitId = bait_id,
+      slot = slot,
+      rodLevel = definition.Level or 1,
+      hookAt = now_of(tree) + GameCfg.Casting.HookDelaySec,
+    }
+    active_frame:set(true)
+    create_line(session.castId, landing)
+    publish()
+    if quest and type(quest.notify) == "function" then
+      quest:notify("CastWater", player, {
+        itemId = bait_id,
+        eventId = "cast:" .. tostring(player.UserId) .. ":" .. tostring(session.castId),
+      })
+    end
+    return true
+  end
+
+  local function hook_now()
+    if not session or session.phase ~= "cast" then return end
+    if now_of(tree) < session.hookAt then return end
+    local boss = session.baitId and GameCfg.Casting.BossBait and GameCfg.Casting.BossBait[session.baitId]
+    local forced = GameCfg.Debug and GameCfg.Debug.Enabled and next_fish or nil
+    local fish_id = forced and forced.fishId or boss
+    if not fish_id then
+      fish_id = FishCatch.select(
+        GameCfg.Casting.Zones[session.zoneId],
+        session.rodLevel,
+        session.baitId,
+        random_fn
+      )
+    end
+    if not fish_id then
+      clear_session("noFish")
+      return
+    end
+    next_reel_id = next_reel_id + 1
+    session.phase = "hooked"
+    session.fishId = fish_id
+    session.forcedFishSerial = forced and forced.serial or nil
+    session.mult = FishCatch.Multiplier(random_fn)
+    session.reelSerial = next_reel_id
+    session.reelSession = tostring(next_reel_id) .. ":" .. tostring(player.UserId)
+    local receiver = RateLimit.new_receiver({
+      WindowSec = GameCfg.HighFreqInput.WindowSec,
+      MaxCount = GameCfg.HighFreqInput.MaxCount,
+    })
+    receiver:set_session(session.reelSession)
+    reel = {
+      id = session.reelSession,
+      receiver = receiver,
+      progress = ReelProgress.new(now_of(tree), GameCfg.ReelIn),
+      lastReport = now_of(tree),
+    }
+    fire_reel({
+      action = "started",
+      session = reel.id,
+      progress = reel.progress.Progress,
+    })
+    publish()
+  end
+
+  local function finish_reel(outcome, notify)
+    if not session or not reel or session.phase ~= "hooked" then return end
+    local current = session
+    local current_reel = reel
+    current_reel.receiver:end_session()
+    reel = nil
+    if outcome == "landed" then
+      current.phase = "landed"
+      current.idleAt = now_of(tree) + GameCfg.Casting.LandedHoldSec
+      destroy_line()
+      land_fish(current)
+      if notify ~= false then
+        publish()
+        fire_reel({ action = outcome, session = current_reel.id, progress = current_reel.progress.Progress })
+      end
+      return
+    end
+    current.phase = "unhooked"
+    if notify ~= false then
+      publish()
+      fire_reel({ action = outcome or "unhooked", session = current_reel.id, progress = current_reel.progress.Progress })
+    end
+    clear_session()
+  end
+
+  function land_fish(current)
+    if compendium and type(compendium.record_landing) == "function" then
+      local ok, recorded, reason = pcall(compendium.record_landing, compendium, player, {
+        fishId = current.fishId, mult = current.mult, reelSerial = current.reelSerial,
+      })
+      if not ok then
+        print("[FishingPhase] 图鉴入账失败", player.UserId, tostring(recorded))
+      elseif not recorded and reason ~= "replay" then
+        print("[FishingPhase] 图鉴未入账", player.UserId, current.fishId, tostring(reason))
+      end
+    end
+    local character = character_of(tree)
+    local origin = character and character.Position
+    local rotation = character and character.Rotation
+    if origin and rotation and type(rotation.GetForward) == "function" and fish_unit
+      and type(fish_unit.spawn_landed) == "function" then
+      local forward = rotation:GetForward()
+      local length = forward and math.sqrt(forward.x * forward.x + forward.z * forward.z) or 0
+      local dx, dz = 0, 0
+      if length >= 0.01 then
+        dx = GameCfg.Casting.LandingOffset * forward.x / length
+        dz = GameCfg.Casting.LandingOffset * forward.z / length
+      end
+      local position = {
+        x = origin.x + dx,
+        y = origin.y + GameCfg.Casting.LandingHeight,
+        z = origin.z + dz,
+      }
+      local ok, fish, err = pcall(fish_unit.spawn_landed, fish_unit, player, {
+        fishId = current.fishId, mult = current.mult,
+      }, position)
+      if not ok then
+        print("[FishingPhase] 上岸生成活鱼失败", player.UserId, tostring(fish))
+      elseif not fish then
+        print("[FishingPhase] 上岸生成活鱼失败", player.UserId, current.fishId, tostring(err))
+      end
+    end
+    if quest and type(quest.notify) == "function" then
+      quest:notify("Land", player, {
+        itemId = current.fishId,
+        eventId = "reel:" .. tostring(current.reelSession),
+      })
+    end
+  end
+
+  local function advance_whole_second_decay(active_reel, now)
+    local whole = math.floor(now)
+    local from = active_reel.decayedAt or math.floor(active_reel.progress.Time)
+    if from >= whole then return false, nil end
+    active_reel.decayedAt = whole
+    local decay_outcome = active_reel.progress:advance(whole)
+    if decay_outcome then
+      finish_reel(decay_outcome, true)
+      return true, decay_outcome
+    end
+    return true, nil
+  end
+
+  local function accept_clicks(payload)
+    if not reel or not session or session.phase ~= "hooked" then return false end
+    if type(payload) ~= "table" or payload.s ~= reel.id then return false end
+    if type(tree.request_action) == "function" and tree:request_action("reel") ~= true then
+      return false
+    end
+    if tree.states and tree.states.is_paralyzed and tree.states.is_paralyzed:now() == true then
+      return false
+    end
+    if tree.states and tree.states.life_phase and tree.states.life_phase:now() ~= "alive" then
+      return false
+    end
+    local now = now_of(tree)
+    local result = reel.receiver:accept(now, payload)
+    if result.Status ~= RateLimit.Result.Ok then return false end
+    local grace_deadline = reel.progress.zero_at and reel.progress.zero_at + GameCfg.ReelIn.GraceSec
+    if grace_deadline and now > grace_deadline then
+      local expired = reel.progress:advance(now)
+      if expired then
+        finish_reel(expired, true)
+        return true
+      end
+    end
+    local _, decayed = advance_whole_second_decay(reel, now)
+    if decayed then return true end
+    local outcome = reel.progress:advance(now, result.accepted, 0)
+    if outcome then
+      finish_reel(outcome, true)
+    else
+      fire_reel({
+        action = "progress",
+        session = reel.id,
+        progress = reel.progress.Progress,
+        accepted = result.accepted,
+        q = payload.q,
+      })
+    end
+    return true
+  end
+
+  local function close_reel(payload)
+    if not reel or type(payload) ~= "table" or payload.session ~= reel.id then return false end
+    reel.progress:advance(now_of(tree))
+    finish_reel(reel and reel.progress and reel.progress.Result or "unhooked", true)
+    return true
+  end
+
+  local function reel_back()
+    if not session then return false end
+    if session.phase ~= "cast" and session.phase ~= "unhooked" then return false end
+    if remote and type(remote.check_recd) == "function"
+      and remote:check_recd(player, "CastAction", GameCfg.Casting.ActionCooldownSec) then
+      return false
+    end
+    clear_session()
+    return true
+  end
+
+  local function drop_held()
+    if not fish_unit or type(fish_unit.drop) ~= "function" then return false end
+    if remote and type(remote.check_recd) == "function"
+      and remote:check_recd(player, "CastAction", GameCfg.Casting.ActionCooldownSec) then
+      return false
+    end
+    fish_unit:drop(player)
+    return true
+  end
+
+  local function tick()
+    if cleaned or not session then return end
+    if session.phase == "cast" then
+      hook_now()
+      return
+    end
+    if session.phase == "landed" and session.idleAt and now_of(tree) >= session.idleAt then
+      clear_session()
+      return
+    end
+    if not reel or session.phase ~= "hooked" then return end
+    local now = now_of(tree)
+    local stepped, decay_outcome = advance_whole_second_decay(reel, now)
+    if decay_outcome then return end
+    if stepped then
+      reel.lastReport = now
+      fire_reel({
+        action = "progress",
+        session = reel.id,
+        progress = reel.progress.Progress,
+        accepted = 0,
+      })
+    end
+
+    if reel and session and session.phase == "hooked" and reel.progress.zero_at
+      and now > reel.progress.zero_at + GameCfg.ReelIn.GraceSec then
+      local outcome = reel.progress:advance(now)
+      if outcome then finish_reel(outcome, true) end
+    end
+  end
+
+  scope:subscribe(tree.clock.on_second, tick)
+  scope:phase("FishingActiveFrame", active_frame, function(fs)
+    fs:subscribe(tree.clock.on_frame, tick)
+  end)
+  if tree.states and tree.states.life_phase and type(tree.states.life_phase.subscribe) == "function" then
+    scope:subscribe(tree.states.life_phase, function()
+      local phase_name = tree.states.life_phase:now()
+      if phase_name ~= "alive" and session and (session.phase == "hooked" or session.phase == "cast") then
+        if reel then
+          finish_reel("unhooked", true)
+        else
+          session.phase = "unhooked"
+          publish()
+        end
+      end
+    end)
+  end
+
+  scope:on_cleanup(function()
+    if reel then
+      reel.receiver:end_session()
+      reel = nil
+    end
+    local had = session
+    session = nil
+    next_fish = nil
+    active_frame:set(false)
+    destroy_line()
+    if had then publish() end
+    cleaned = true
+  end)
+
+  local function push_state()
+    if not cleaned then publish() end
+  end
+
+  local function abort()
+    if cleaned or not session then return false end
+    clear_session()
+    return true
+  end
+
+  local function set_next_fish(fish_id)
+    if cleaned then return false end
+    next_fish_serial = next_fish_serial + 1
+    next_fish = { fishId = fish_id, serial = next_fish_serial }
+    if session and session.phase == "hooked" then
+      session.fishId = fish_id
+      session.forcedFishSerial = next_fish.serial
+      publish()
+    end
+    return true
+  end
+
+  return {
+    push_state = push_state,
+    abort = abort,
+    set_next_fish = set_next_fish,
+    cast = function(_, payload)
+      if cleaned then return false end
+      if type(payload) ~= "table" then return false end
+      if payload.action == "Reel" then return reel_back() end
+      if payload.action == "Drop" then return drop_held() end
+      if payload.action == "Request" then
+        publish()
+        return true
+      end
+      if payload.action ~= "Cast" then return false end
+      return begin_cast(payload)
+    end,
+    reel = function(_, kind, payload)
+      if cleaned then return false end
+      if kind == "close" then return close_reel(payload) end
+      return accept_clicks(payload)
+    end,
+  }
 end
 
 return FishingPhase

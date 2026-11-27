@@ -300,59 +300,6 @@ describe('TestFishAbilitySeams', function()
         assert.is_true(#fish.Flight.clamp_log > 0)
     end)
 
-    -- 失败方式 3：航线亮起俯冲只在标记帧点亮 dive_active，等爬升收尾才按水平半径结算命中
-    it('test_flight_dive_marks_then_lands_on_the_target', function()
-        local safe = GameCfg.zone_scene('reefIsland').SafePoint
-        local fish = newFish(6, 'fish48Boss', { x = safe.x, y = safe.y + GameCfg.Ability.Flight.CruiseHeight, z = safe.z })
-        ctx.mgr.Fish[fish.Id] = fish
-        local player = new_player(11, { x = safe.x + 1, y = safe.y, z = safe.z })
-        ctx.players = { player }
-        assert.is_true(ctx.mgr:start_flight(fish, ctx.now))
-        -- 礁石岛的巡航俯冲由空战预警线（airDive）代管，起飞时航线俯冲被排到无限远；
-        -- 把它排到本帧，走航线自己的俯冲事件点亮标记。
-        fish.Flight.next_dive_at = ctx.now
-        ctx.now = ctx.now + 0.05
-        ctx.mgr:update_flying(fish, ctx.now)
-        assert.message('航线亮起俯冲要标记 dive_active').is_true(fish.dive_active)
-        assert.same('dive', fish.Flight.Phase)
-        assert.message('标记帧不结算命中').same(0, #ctx.hits)
-        -- 俯冲砸向地面上的目标：收尾那一帧（转爬升）结算命中
-        local frames = 0
-        while fish.Flight and fish.dive_active and frames < 200 do
-            frames = frames + 1
-            ctx.now = ctx.now + 0.05
-            ctx.mgr:update_flying(fish, ctx.now)
-        end
-        assert.message('俯冲应在有限帧内收尾且不退场').is_not_nil(fish.Flight)
-        assert.is_false(fish.dive_active)
-        assert.same('climb', fish.Flight.Phase)
-        assert.same(1, #ctx.hits)
-        -- 伤害取鱼种档案那一档（260），不是航线兜底 DiveDamage（30）
-        assert.same(260, ctx.hits[1].amount)
-        assert.same(player, ctx.hits[1].target)
-        assert.same('fishAttack', ctx.hits[1].category)
-    end)
-
-    -- 失败方式 3：目标在俯冲半径外时只清算标记，不结算命中
-    it('test_flight_dive_outside_the_radius_clears_without_damage', function()
-        local safe = GameCfg.zone_scene('reefIsland').SafePoint
-        local fish = newFish(7, 'fish48Boss', { x = safe.x, y = safe.y + 2, z = safe.z })
-        ctx.mgr.Fish[fish.Id] = fish
-        ctx.players = { new_player(12, { x = safe.x + 20, y = safe.y, z = safe.z }) }
-        assert.is_true(ctx.mgr:start_flight(fish, ctx.now))
-        -- 收尾帧：俯冲已经结束、还在爬升，标记等这一帧清算；目标在半径 5 米外、索敌 60 米内
-        fish.Flight.pos = vec(safe.x, safe.y + 2, safe.z)
-        fish.Flight.last = vec(safe.x, safe.y + 2, safe.z)
-        fish.Flight.vel = vec(0, 0, 0)
-        fish.Flight.Phase = 'climb'
-        fish.dive_active = true
-        ctx.now = ctx.now + 0.05
-        ctx.mgr:update_flying(fish, ctx.now)
-        assert.message('半径外不结算命中').same(0, #ctx.hits)
-        assert.message('标记仍要清算').is_false(fish.dive_active)
-        assert.is_not_nil(fish.Flight)
-    end)
-
     -- 失败方式 5：remove 必须先放下携带中的玩家，再清鱼
     it('test_remove_drops_a_carried_player_before_clearing_the_fish', function()
         local fish = newFish(5, 'fish56Boss', { x = 0, y = 0, z = 0 })

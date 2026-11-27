@@ -176,295 +176,6 @@ local function _createHitSfx(anchor_script, target)
 	end
 end
 
--- ===== 拆分前 M.Attach 体内的闭包：提到模块级，依赖显式传入 =====
--- 拆分前这些逻辑是 Attach 体内的 upvalue 闭包（捕获 anchor_script / state / swing_dock）；
--- 现在拆成模块级函数：run 是「每次挂接的运行期上下文」，state 是「每次挥砍的状态」，
--- 依赖一律显式传参。对外入口 M.Attach 的名字与签名不变，挂接顺序与拆分前一致。
-
-local function new_run(anchor_script, swing_dock)
-	return { anchor_script = anchor_script, swing_dock = swing_dock, state = nil }
-end
-
--- 回收一次挥砍占用的进入连接、触发器与武器挂载（拆分前的 _cleanup）。
-local function clear_run(run)
-	run.swing_dock:drop("active")
-	local state = run.state
-	if not state then
-		return
-	end
-	if state.enter_conn then
-		pcall(function()
-			state.enter_conn:Disconnect()
-		end) -- 触发器或信号可能已先卸载
-		state.enter_conn = nil
-	end
-	for _, field in ipairs({ "tu", "weapon_mount", "weapon_unit" }) do
-		local unit = state[field]
-		if unit and unit.UnitId then
-			pcall(function()
-				unit:Destroy()
-			end)
-		end
-		state[field] = nil
-	end
-	run.state = nil
-end
-
--- 锚点脚本 → ability_script → manager → owner，再解出挥砍玩家。
-local function resolve_swing_owner(anchor_script)
-	local ability_script = anchor_script.Parent
-	local manager = ability_script and ability_script.Parent
-	local owner = manager and manager.Parent
-	if not owner or not owner.UnitId then
-		return nil, nil
-	end
-	return owner, game:GetService("Players"):GetPlayerFromCharacter(owner)
-end
-
--- 取玩家本次挥砍的服务端登记（射程/伤害/特效）；缺失时只播表现、不结算伤害。
-local function take_swing(player)
-	if not player then
-		return nil
-	end
-	local swing = SwingRegistry.take_swing(player.UserId)
-	if not swing then
-		print("[melee_hit] 玩家挥砍缺少服务端登记，只播表现不结算伤害 uid=" .. tostring(player.UserId))
-	end
-	return swing
-end
-
--- 命中盒参数：玩家挥砍按服务端登记覆盖；玩家无登记时返回 nil 表示中止本次结算。
-local function resolve_hit_box(anchor_script, player, swing)
-	local hit_box = {
-		offset = anchor_script:GetAttribute("ABILITY_ANOSTATE_HITBOX_OFFSET") or Vector3.New(0, 1, 0),
-		scale = _safeScale(anchor_script:GetAttribute("ABILITY_ANOSTATE_HITBOX_SCALE"), Vector3.New(2, 2, 2)),
-		damage = anchor_script:GetAttribute("ABILITY_ANOSTATE_BULLET_DAMAGE") or 0.0,
-	}
-	if not player then
-		return hit_box
-	end
-	if not swing then
-		return nil
-	end
-	hit_box.offset = Vector3.New(0, 1, swing.range / 2)
-	hit_box.scale = Vector3.New(2, 2, swing.range)
-	hit_box.damage = swing.damage
-	hit_box.effect = swing.effect
-	return hit_box
-end
-
--- 是否让命中盒跟随锚点朝向：属性缺省为同步朝向。
-local function sync_facing_of(anchor_script)
-	local sync_facing = anchor_script:GetAttribute("ABILITY_ANOSTATE_FACE_SYNC")
-	if sync_facing == nil then
-		return true
-	end
-	return sync_facing
-end
-
--- 武器单位在挂载点上的可见性与碰撞设置：只有 ModelVisible 打开，其余逐项关闭（顺序沿用拆分前）。
-local WEAPON_UNIT_FLAGS = { "ModelVisible", "PhysicsActive", "CanCollide", "CanTouch", "CanTrigger", "CanQuery" }
-
-local function configure_weapon_unit(unit, scale)
-	unit.Scale = scale
-	for _, flag in ipairs(WEAPON_UNIT_FLAGS) do
-		if unit[flag] ~= nil then
-			unit[flag] = flag == "ModelVisible"
-		end
-	end
-end
-
--- 按锚点属性生成武器挂载与武器单位（拆分前 weapon_prefab ~= "" 分支）。
-local function spawn_weapon(anchor_script, owner, swing_seq, state)
-	local prefab = anchor_script:GetAttribute("ABILITY_ANOSTATE_USE_PERFAB") or ""
-	if prefab == "" then
-		return
-	end
-	local World = game:GetService("World")
-	local mount = World:CreateUnit("SkeletalSocketMount", {
-		Name = "ToolMount_" .. tostring(owner.UnitId) .. "_" .. tostring(swing_seq),
-		Parent = owner,
-		SocketName = anchor_script:GetAttribute("ABILITY_ANOSTATE_BINDSOCKET") or "origin",
-		SocketOffset = anchor_script:GetAttribute("ABILITY_ANOSTATE_OFFSET") or Vector3.New(0, 0, 0),
-		SocketRotation = _eulerDegToQuat(anchor_script:GetAttribute("ABILITY_ANOSTATE_QUD")),
-	})
-	if not mount then
-		print("[melee_hit] WARNING: CreateUnit SkeletalSocketMount failed")
-		return
-	end
-	local assets = World:CreateAsset(prefab)
-	if not assets or not assets[1] then
-		pcall(function()
-			mount:Destroy()
-		end)
-		print("[melee_hit] WARNING: CreateAsset failed:", prefab)
-		return
-	end
-	local weapon_unit = assets[1]
-	local bind_scale = _safeScale(anchor_script:GetAttribute("ABILITY_ANOSTATE_SCALE"), Vector3.New(1, 1, 1))
-	weapon_unit.Parent = mount
-	configure_weapon_unit(weapon_unit, bind_scale)
-	state.weapon_unit = weapon_unit
-	state.weapon_mount = mount
-end
-
--- 播放挥砍动画（拆分前 anim_id ~= "" and owner.Animator 分支）。
-local function play_swing_anim(owner, anim_id)
-	if anim_id == "" or not owner.Animator then
-		return
-	end
-	pcall(function()
-		local track = owner.Animator:LoadAnimation(anim_id)
-		if track then
-			track.FilterType = 30
-			track.Looped = false
-			track:Play(0.05, 1, 1)
-		end
-	end)
-end
-
--- 建命中触发盒：中心点解析失败或创建失败都返回 nil（拆分前两处提前 return）。
-local function create_hit_box(owner, hit_box, swing_seq, sync_facing)
-	local center, yaw = _getAreaTransform(owner, hit_box.offset, sync_facing)
-	if not center then
-		return nil
-	end
-	local tu = game:GetService("World"):CreateUnit("TriggerUnit", {
-		PhysicsMeshId = TRIGGER_BOX_PREFAB_ID,
-		Scale = hit_box.scale,
-		Position = center,
-		Rotation = Quaternion.FromEulerAngles(0, yaw, 0),
-		Name = "MeleeHitBox_" .. tostring(owner.UnitId) .. "_" .. tostring(swing_seq),
-	})
-	if not tu then
-		print("[melee_hit] WARNING: failed to create trigger unit")
-		return nil
-	end
-	return tu
-end
-
--- 一次挥砍的命中上下文：拆分前是 process_hit 闭包捕获的 upvalue（hit_map / hit_damage / state）。
-local function new_hit(anchor_script, owner, player, state, hit_box)
-	return {
-		anchor_script = anchor_script,
-		owner = owner,
-		player = player,
-		state = state,
-		damage = hit_box.damage,
-		power = anchor_script:GetAttribute("ABILITY_ANOSTATE_HITPOWER") or 0.0,
-		hit_map = {},
-	}
-end
-
--- 过滤与去重：返回本次可结算的目标 ID；无效目标、自身、武器单位、重复命中返回 nil。
-local function claim_target(hit, target)
-	local state = hit.state
-	if not target or not target.UnitId or not _isHittable(target) or _isSelf(target, hit.owner) then
-		return nil
-	end
-	if state and state.weapon_unit and target == state.weapon_unit then
-		return nil
-	end
-	if hit.hit_map[target.UnitId] then
-		return nil
-	end
-	hit.hit_map[target.UnitId] = true
-	return target.UnitId
-end
-
--- 武器特效结算（拆分前 process_hit 内的 Modifier 分支）。
-local function apply_weapon_effect(hit, target)
-	local modifier = M.services.Modifier
-	local player, state = hit.player, hit.state
-	if not (player and state and state.effect and modifier and modifier.apply_weapon_effect) then
-		return
-	end
-	local ok, err = pcall(modifier.apply_weapon_effect, modifier, player, target, state.effect)
-	if not ok then
-		print("[melee_hit] 武器特效应用失败", tostring(err))
-	end
-end
-
--- 结算单个目标：伤害、击退、命中特效与武器特效。
-local function land_hit(hit, target, tid)
-	if not _applyDamage(target, hit.damage, hit.owner, hit.state and hit.state.hit) then
-		return
-	end
-	print("[melee_hit] 命中 uid=" .. tostring(hit.player and hit.player.UserId or hit.owner.UnitId),
-		"target=" .. tostring(tid), "damage=" .. tostring(hit.damage))
-	_applyHitPower(target, hit.power, hit.owner)
-	_createHitSfx(hit.anchor_script, target)
-	apply_weapon_effect(hit, target)
-end
-
-local function process_hit(hit, target)
-	local tid = claim_target(hit, target)
-	if tid then
-		land_hit(hit, target, tid)
-	end
-end
-
--- 触碰进入：每次挥砍把 OnTriggerEnter 接进当前挥砍作用域（拆分前 swing_dock:effect）。
-local function wire_hit_trigger(run, hit, tu)
-	run.swing_dock:effect("active", function(swing_scope)
-		hit.state.enter_conn = HostSignal.connect(swing_scope, tu.OnTriggerEnter, function(other_unit)
-			process_hit(hit, other_unit)
-		end)
-	end)
-end
-
--- 建盒当帧已在盒内的单位直接结算一次（拆分前 PhysicsService 扫描）。
-local function scan_initial_hits(tu, hit)
-	local physics = game:GetService("PhysicsService")
-	if not physics or not physics.GetPartsInPart then
-		return
-	end
-	local units = physics:GetPartsInPart(tu)
-	if type(units) ~= "table" then
-		return
-	end
-	for _, unit in ipairs(units) do
-		process_hit(hit, unit)
-	end
-end
-
--- 一次挥砍：清理上一轮 → 解析登记 → 武器/动画/命中盒 → 触碰接线与初始扫描。
-local function start_swing(run)
-	clear_run(run)
-	local state = {}
-	run.state = state
-	local anchor_script = run.anchor_script
-	SwingSeq = SwingSeq + 1
-	local swing_seq = SwingSeq
-	local owner, player = resolve_swing_owner(anchor_script)
-	if not owner then
-		return
-	end
-	local swing = take_swing(player)
-	if player and not swing then
-		return
-	end
-	local hit_box = resolve_hit_box(anchor_script, player, swing)
-	if not hit_box then
-		return
-	end
-	if player then
-		state.effect = hit_box.effect
-		hit_box.damage = M.services.GM:get_melee_damage(player, hit_box.damage)
-	end
-	state.hit = M.services.Vitals:new_hit(player or owner, "weapon")
-	spawn_weapon(anchor_script, owner, swing_seq, state)
-	play_swing_anim(owner, anchor_script:GetAttribute("ABILITY_ANOSTATE_ANIMKEY") or "")
-	local tu = create_hit_box(owner, hit_box, swing_seq, sync_facing_of(anchor_script))
-	if not tu then
-		return
-	end
-	state.tu = tu
-	local hit = new_hit(anchor_script, owner, player, state, hit_box)
-	wire_hit_trigger(run, hit, tu)
-	scan_initial_hits(tu, hit)
-end
-
 function M.Attach(anchor_script, services)
 	if services then M.services = services end
 	for _, name in ipairs({ 'Vitals', 'FishCarrier', 'GM', 'Modifier' }) do
@@ -484,23 +195,226 @@ function M.Attach(anchor_script, services)
 	end
 
 	return SpokeEggy.behaviour(anchor_script, function(scope)
-		local run = new_run(anchor_script, scope:dock("MeleeSwing"))
+	local state = nil
+	local swing_dock = scope:dock("MeleeSwing")
 
-		scope:on_cleanup(function()
-			clear_run(run)
-		end)
-		HostSignal.connect(scope, start_sig, function()
-			start_swing(run)
-		end)
+	local function _cleanup()
+		swing_dock:drop("active")
+		if not state then
+			return
+		end
+		if state.enter_conn then
+			pcall(function()
+				state.enter_conn:Disconnect()
+			end) -- 触发器或信号可能已先卸载
+			state.enter_conn = nil
+		end
+		if state.tu and state.tu.UnitId then
+			pcall(function()
+				state.tu:Destroy()
+			end)
+		end
+		state.tu = nil
+		if state.weapon_mount and state.weapon_mount.UnitId then
+			pcall(function()
+				state.weapon_mount:Destroy()
+			end)
+		end
+		state.weapon_mount = nil
+		if state.weapon_unit and state.weapon_unit.UnitId then
+			pcall(function()
+				state.weapon_unit:Destroy()
+			end)
+		end
+		state.weapon_unit = nil
+		state = nil
+	end
 
-		for _, name in ipairs({ "AnchorEnd", "AnchorBreak", "AnchorStop" }) do
-			local sig = anchor_script:FindFirstChild(name)
-			if sig then
-				HostSignal.connect(scope, sig, function()
-					clear_run(run)
-				end)
+	scope:on_cleanup(_cleanup)
+	HostSignal.connect(scope, start_sig, function()
+		_cleanup()
+		state = {}
+		SwingSeq = SwingSeq + 1
+		local swing_seq = SwingSeq
+		local ability_script = anchor_script.Parent
+		local manager = ability_script and ability_script.Parent
+		local owner = manager and manager.Parent
+		if not owner or not owner.UnitId then
+			return
+		end
+
+		local player = game:GetService("Players"):GetPlayerFromCharacter(owner)
+		local swing = nil
+		if player then
+			swing = SwingRegistry.take_swing(player.UserId)
+			if not swing then
+				print("[melee_hit] 玩家挥砍缺少服务端登记，只播表现不结算伤害 uid=" .. tostring(player.UserId))
 			end
 		end
+
+		local hit_box_offset = anchor_script:GetAttribute("ABILITY_ANOSTATE_HITBOX_OFFSET")
+			or Vector3.New(0, 1, 0)
+		local hit_box_scale =
+			_safeScale(anchor_script:GetAttribute("ABILITY_ANOSTATE_HITBOX_SCALE"), Vector3.New(2, 2, 2))
+		local hit_damage = anchor_script:GetAttribute("ABILITY_ANOSTATE_BULLET_DAMAGE") or 0.0
+		if player then
+			if not swing then
+				return
+			end
+			hit_box_offset = Vector3.New(0, 1, swing.range / 2)
+			hit_box_scale = Vector3.New(2, 2, swing.range)
+			hit_damage = swing.damage
+			state.effect = swing.effect
+		end
+		if player then
+			hit_damage = M.services.GM:get_melee_damage(player, hit_damage)
+		end
+		state.hit = M.services.Vitals:new_hit(player or owner, "weapon")
+		local hit_power = anchor_script:GetAttribute("ABILITY_ANOSTATE_HITPOWER") or 0.0
+		local weapon_prefab = anchor_script:GetAttribute("ABILITY_ANOSTATE_USE_PERFAB") or ""
+		local anim_id = anchor_script:GetAttribute("ABILITY_ANOSTATE_ANIMKEY") or ""
+		local bind_socket = anchor_script:GetAttribute("ABILITY_ANOSTATE_BINDSOCKET") or "origin"
+		local bind_offset = anchor_script:GetAttribute("ABILITY_ANOSTATE_OFFSET") or Vector3.New(0, 0, 0)
+		local bind_rotation = _eulerDegToQuat(anchor_script:GetAttribute("ABILITY_ANOSTATE_QUD"))
+		local bind_scale =
+			_safeScale(anchor_script:GetAttribute("ABILITY_ANOSTATE_SCALE"), Vector3.New(1, 1, 1))
+		local sync_facing = anchor_script:GetAttribute("ABILITY_ANOSTATE_FACE_SYNC")
+		if sync_facing == nil then
+			sync_facing = true
+		end
+
+		local World = game:GetService("World")
+
+		if weapon_prefab ~= "" then
+			local weapon_mount = World:CreateUnit("SkeletalSocketMount", {
+				Name = "ToolMount_" .. tostring(owner.UnitId) .. "_" .. tostring(swing_seq),
+				Parent = owner,
+				SocketName = bind_socket,
+				SocketOffset = bind_offset,
+				SocketRotation = bind_rotation,
+			})
+			if weapon_mount then
+				local assets = World:CreateAsset(weapon_prefab)
+				if assets and assets[1] then
+					local weapon_unit = assets[1]
+					weapon_unit.Parent = weapon_mount
+					weapon_unit.Scale = bind_scale
+					if weapon_unit.ModelVisible ~= nil then
+						weapon_unit.ModelVisible = true
+					end
+					if weapon_unit.PhysicsActive ~= nil then
+						weapon_unit.PhysicsActive = false
+					end
+					if weapon_unit.CanCollide ~= nil then
+						weapon_unit.CanCollide = false
+					end
+					if weapon_unit.CanTouch ~= nil then
+						weapon_unit.CanTouch = false
+					end
+					if weapon_unit.CanTrigger ~= nil then
+						weapon_unit.CanTrigger = false
+					end
+					if weapon_unit.CanQuery ~= nil then
+						weapon_unit.CanQuery = false
+					end
+					state.weapon_unit = weapon_unit
+					state.weapon_mount = weapon_mount
+				else
+					pcall(function()
+						weapon_mount:Destroy()
+					end)
+					print("[melee_hit] WARNING: CreateAsset failed:", weapon_prefab)
+				end
+			else
+				print("[melee_hit] WARNING: CreateUnit SkeletalSocketMount failed")
+			end
+		end
+
+		if anim_id ~= "" and owner.Animator then
+			pcall(function()
+					local track = owner.Animator:LoadAnimation(anim_id)
+					if track then
+						track.FilterType = 30
+						track.Looped = false
+						track:Play(0.05, 1, 1)
+				end
+			end)
+		end
+
+		local hit_map = {}
+		local center, yaw = _getAreaTransform(owner, hit_box_offset, sync_facing)
+		if not center then
+			return
+		end
+		local tu = World:CreateUnit("TriggerUnit", {
+			PhysicsMeshId = TRIGGER_BOX_PREFAB_ID,
+			Scale = hit_box_scale,
+			Position = center,
+			Rotation = Quaternion.FromEulerAngles(0, yaw, 0),
+			Name = "MeleeHitBox_" .. tostring(owner.UnitId) .. "_" .. tostring(swing_seq),
+		})
+		if not tu then
+			print("[melee_hit] WARNING: failed to create trigger unit")
+			return
+		end
+		state.tu = tu
+
+		local function process_hit(target)
+			if not target or not target.UnitId then
+				return
+			end
+			if not _isHittable(target) then
+				return
+			end
+			if _isSelf(target, owner) then
+				return
+			end
+			if state and state.weapon_unit and target == state.weapon_unit then
+				return
+			end
+			local tid = target.UnitId
+			if tid and hit_map[tid] then
+				return
+			end
+			if tid then
+				hit_map[tid] = true
+			end
+			if _applyDamage(target, hit_damage, owner, state and state.hit) then
+				print("[melee_hit] 命中 uid=" .. tostring(player and player.UserId or owner.UnitId),
+					"target=" .. tostring(tid), "damage=" .. tostring(hit_damage))
+				_applyHitPower(target, hit_power, owner)
+				_createHitSfx(anchor_script, target)
+				local modifier = M.services.Modifier
+				if player and state and state.effect and modifier and modifier.apply_weapon_effect then
+					local ok, err = pcall(modifier.apply_weapon_effect, modifier, player, target, state.effect)
+					if not ok then print("[melee_hit] 武器特效应用失败", tostring(err)) end
+				end
+			end
+		end
+
+		swing_dock:effect("active", function(swing_scope)
+			state.enter_conn = HostSignal.connect(swing_scope, tu.OnTriggerEnter, function(other_unit)
+				process_hit(other_unit)
+			end)
+		end)
+
+		local Physics = game:GetService("PhysicsService")
+		if Physics and Physics.GetPartsInPart then
+			local init_units = Physics:GetPartsInPart(tu)
+			if init_units and type(init_units) == "table" then
+				for _, u in ipairs(init_units) do
+					process_hit(u)
+				end
+			end
+		end
+	end)
+
+	for _, name in ipairs({ "AnchorEnd", "AnchorBreak", "AnchorStop" }) do
+		local sig = anchor_script:FindFirstChild(name)
+		if sig then
+			HostSignal.connect(scope, sig, _cleanup)
+		end
+	end
 	end, { name = "melee_hit" })
 end
 

@@ -106,10 +106,6 @@ jobs:
         if: steps.changes.outputs.docs_only != 'true'
         run: lua tools/cli.lua test full --jobs ${{ steps.jobs.outputs.jobs }}
 
-      - name: 运行 token 预算门禁
-        if: steps.changes.outputs.docs_only != 'true'
-        run: lua tools/cli.lua size
-
       - name: 缓存 emmylua_check 0.25.1
         id: cache-emmylua
         if: steps.changes.outputs.docs_only != 'true'

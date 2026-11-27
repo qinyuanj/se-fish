@@ -1,116 +1,162 @@
-# Spoke 游戏架构现状快照
+# Spoke 游戏架构调研与本仓架构方案
 
-本文记录 se-fish 当前工作树的业务代码水位、六层依赖声明与 Spoke 运行时拓扑。统计和门禁的复核基线为 [`de5f0178fd417605c4c310a8168c320396a7938f`](https://github.com/qinyuanj/se-fish/commit/de5f0178fd417605c4c310a8168c320396a7938f)。上游 `05_BaseDefence` 的固定版本调研已拆分至 `SPOKE_BASE_DEFENCE_RESEARCH.md`。
+本文对比 `Adam4lexander/Spoke` 的 `Examples/05_BaseDefence` 范例与 `se-fish` 当前代码结构，总结 Spoke 游戏架构的核心模式，并给出本仓的架构全景与演进路线。
 
-## 数据口径
+## 调研范围与数据口径
 
-- 统计 `server/`、`client/`、`common/` 下的 Lua 文件，排除 `packages/` 与 `_trigger/`。
-- 复核窗口内共 **142 个业务 Lua 文件、34284 行**：`server/` 61 个文件 19852 行，`client/` 39 个文件 8659 行，`common/` 42 个文件 5773 行。
-- 统计包含该窗口内工作树的未提交 Lua 改动；上述 HEAD 是提交基线，不表示这些改动已入库。
-- 原样重跑下列命令可复核三端文件数和行数：
+- 上游范例来自 `Adam4lexander/Spoke` 仓库 `main` 分支的 `Examples/05_BaseDefence`，共 29 个源码与文档文件。
+- 本仓统计口径排除 `packages/` 与 `_trigger/`，共 126 个业务 Lua 文件，总计 33788 行。其中 `server/` 有 47 个文件 19375 行，`client/` 有 38 个文件 8657 行，`common/` 有 41 个文件 5756 行。
+- 复现本仓行数统计的命令如下。
 
 ```powershell
 python -c "import os, glob; [print(d, len(fs), sum(len(open(p, encoding='utf-8', errors='replace').readlines()) for p in fs)) for d in ['server','client','common'] for fs in [[p for p in glob.glob(os.path.join(d,'**','*.lua'), recursive=True) if os.sep+'packages'+os.sep not in p and os.sep+'_trigger'+os.sep not in p]]]"
 ```
 
-## 六层模块分布
+## 05_BaseDefence 的 Spoke 游戏架构
 
-本仓保留 `client/`、`server/`、`common/` 三个运行端目录。[ADR-0012](docs/adr/0012-six-layer-architecture.md) 确立六层单向依赖；[tools/arch_policy.lua](tools/arch_policy.lua) 的 `M.policy.levels` 是完整层归属的唯一声明，[policy.edn](policy.edn) 是其投影，[arch_policy_test.lua](tests/native/guards/arch_policy_test.lua) 检查二者同步。依赖只能指向同层或更内层，详见 [docs/architecture.md](docs/architecture.md)。
+`05_BaseDefence` 用 Spoke 的响应式作用域树取代了全部 `MonoBehaviour` 生命周期回调。每个实体和系统各自声明一棵状态与生命周期树，条件满足时自动挂载行为，条件失效时逆序清理资源。
 
-| 层级 | 当前命名空间 | 职责 |
+### 核心模式
+
+1. **组件即独立 Spoke 树**
+   所有玩法实体（`Building`、`PowerNode`、`Turret`、`Repair`、`Radar`、`Resource`、`Enemy`、`Health`、`BombBlast`）和全局单例（`GameState`、`WaveDirector`、`Pool`、`InputSignals`）都继承自 `SpokeBehaviour` 或 `SpokeSingleton`，在 `Init(EffectBuilder s)` 中声明全部因果关系。
+
+2. **用嵌套 `Phase` 表达状态机与资源所有权**
+   实体不写分散的 `if (isDead) return` 守卫，而是用嵌套 `s.Phase(condition, block)` 划分生命阶段。`Building.cs` 在 `IsEnabled` 相位内分叉 `health.IsAlive` 与 `isDead` 两个子相位。存活相位负责注册地面碰撞体、加入 `Building.All`、订阅受击闪烁。离开存活相位时 `OnCleanup` 自动注销碰撞体和列表项。进入死亡相位后播放破碎效果，破碎完成后回收到对象池。`Health.cs` 在 `IsEnabled` 的 `OnCleanup` 中把伤害重置为 0，确保对象池复用不带脏状态。
+
+3. **领域数据结构本身输出响应式信号**
+   `CollisionWorld<T>` 把二维圆形空间查询封装为 Spoke 信号。实体在活跃相位内通过 `s.Use(GameState.EnemyZone.AddSensor(...))` 或 `AddCollider(...)` 注册空间体，离开相位时自动调用 `Dispose()` 移出网格。`GameState.LateUpdate()` 每帧在 `SpokeRuntime.Batch` 内驱动 6 个 `CollisionWorld.Tick()`，只对脏格子的碰撞体重新计算并更新按距离排序的 `Overlaps` 信号。下游通过 `s.D(sensor.Overlaps)` 响应邻近变化。
+
+4. **分布式响应式网络取代中央调度器**
+   电网（`PowerNode.cs`）没有集中式图搜索管理器。每个节点注册自己的接收器与提供器，通过 `s.Memo` 沿 `s.D(n.parent)` 向上追溯祖先集合并判断是否连通 `Core`，对范围内未供电或更远节点按距离抢占。任何中继节点摧毁后，依赖链路沿信号自动断电并重连。
+
+5. **组合式 `EffectBlock` 与作用域绑定的临时视觉节点**
+   `Turret`、`Enemy`、`Repair`、`SideBar` 把每个子行为拆成独立 `EffectBlock`，例如 `RotateToTarget`、`IdleBehaviour`、`AttackBehaviour(target)`。`CoverageDisplay.Draw` 与 `LinkDisplay.Draw` 采用无状态静态工厂，每次进入作用域新建临时 `GameObject`、`Mesh` 与 `Material`，退出时通过 `OnCleanup` 销毁。
+
+6. **用 `Dock` 管理动态身份，用受守卫的协程承载短寿命帧循环**
+   `WaveDirector.Assault` 使用 `s.Dock()` 为每个生成的敌人挂载一次性死亡计数 `dock.Effect(enemy, ...)`，死亡时调用 `dock.Drop(enemy)`。`Announcer` 用固定键 `"announce"` 覆盖旧播报，自动停止上一条未结束的协程。`SpokeExtensions.cs` 把每帧逻辑封装为受 `IsEnabled` 守卫的 `s.Coroutine(...)`，离开相位自动停止协程。
+
+### 运行时数据流
+
+```mermaid
+flowchart TD
+    Input["InputSignals / CameraControls\n(输入转 Trigger / State)"]
+    Spatial["GameState.LateUpdate\n(6个 CollisionWorld 在 Batch 中 Tick)"]
+    State["GameState 全局状态\n(Mode / Money / CollectRate / ResourcesRemaining)"]
+    Director["WaveDirector\n(Playing -> Lull / Assault Phase + Dock)"]
+    Entities["实体树群\n(Building / PowerNode / Turret / Radar / Repair / Resource / Enemy)"]
+    UI["UI 树群\n(SideBar / BoardInteractions / Announcer / CoverageDisplay / LinkDisplay)"]
+
+    Input --> UI
+    Spatial --> Entities
+    Spatial --> UI
+    State --> Director
+    State --> Entities
+    State --> UI
+    Director --> Entities
+    Entities --> State
+    Entities --> UI
+```
+
+### 不能直接照搬到本仓的边界差异
+
+- **单机内存直读与多人服务端权威不同**
+  `05_BaseDefence` 运行在单机 Unity 进程中，UI 直接读取 `enemy.IsTracked` 并直接修改 `GameState.Money`。本仓运行在蛋仔 SE 状态同步架构下，客户端与服务端跨网络隔离，所有写入必须经 `RemoteEvent` 校验，下行状态必须走快照投影。
+- **对象池复用与 SE 销毁语义不同**
+  根据 [docs/adr/0022-introduce-spoke-runtime.md](docs/adr/0022-introduce-spoke-runtime.md)，`spoke_eggy.behaviour` 绑定到 `Unit.Destroying`，不覆盖关局事件，也没有 Unity 的 `SetActive(false/true)` 池化复用语义。
+- **多人并发写入需要显式事务边界**
+  单机下的分布式 `State.Update` 无需处理并发防刷与异步落盘，多人服务端必须收口到 `SpokeRuntime.batch` 与持久化排空栅栏。
+
+## 本仓架构全景
+
+本仓保留 `client/`、`server/`、`common/` 三个运行端目录，采用 [docs/architecture.md](docs/architecture.md) 与 [tools/arch_policy.lua](tools/arch_policy.lua) 强制约束的六层单向依赖架构。
+
+### 六层模块分布
+
+| 层级 | 真实命名空间 | 职责 |
 |---|---|---|
-| L1 入口 | [client/main.lua](client/main.lua)、[server/main.lua](server/main.lua) | 启动、宿主适配、玩法服务装配、引擎事件翻译与依赖注入 |
-| L2 应用流程与宿主 | `server.world_host`、`server.ability_api`、`server.ability_behaviors`、`server.player_data_host`、`server.save_host`、`server.platform_host`、`server.fish_ability`；[client/views/](client/views/root_view.lua) | 服务端世界、玩家和活鱼树，以及持久化、平台、能力宿主；客户端 Spoke 视图树与交互流程 |
-| L3 展示与运行端支撑 | [client/store/](client/store/client_store.lua)、`client.game_ui`、`client.damage_float`、`client.interaction_bubble`、`client.main_hud_layout`、`client.press_gesture`、`client.weapon_aim`；`server.fish_behaviors`；`common.re_util`、`common.engine_read`、`common.util`、`common.teleport_util`、`common.damage_notice`、`common.gar_bite_notice` | 对视图暴露只读响应式状态，提供展示、布局、手势、瞄准、行为分发与引擎协议适配 |
-| L4 共享规则与业务状态 | `server.data`、`server.swing_registry`；[common/spoke_clock.lua](common/spoke_clock.lua)、[common/game_cfg.lua](common/game_cfg.lua)、`common.attr_model`、`common.fish_catch`、`common.vitals` 等 | 存档与记录、挥砍登记、确定性时钟、配置解析与共享玩法计算；完整名单以 `M.policy.levels` 为准 |
-| L5 配置内容 | `common.cfg` | 鱼、物品、商店、抽奖、盲盒及占位资产数据 |
-| L6 包 | `client.packages`、`server.packages`、`common.packages` | 整包交付的官方包与自研包；包不得反向依赖包外业务 |
+| L1 入口 | [server/main.lua](server/main.lua)、[client/main.lua](client/main.lua) | 唯一组合根，装配宿主服务、绑定 `RemoteEvent`、泵入 `SpokeClock`、挂载 `RootView` |
+| L2 应用流程与宿主 | [server/world_host/](server/world_host/server_runtime.lua)、[client/views/](client/views/root_view.lua)、`server.ability_api`、`server.ability_behaviors`、`server.player_data_host`、`server.save_host`、`server.platform_host`、`server.fish_ability` | 服务端三类 Spoke 树与持久化、平台、能力宿主；客户端 Spoke 视图树与交互流程 |
+| L3 展示与运行端支撑 | [client/store/client_store.lua](client/store/client_store.lua)、`client.game_ui`、`server.fish_behaviors`、`common.re_util`、`common.engine_read`、`common.util` | 客户端只读响应式状态仓库、展示基元、行为分发、引擎读取与协议适配 |
+| L4 共享规则与业务状态 | [common/spoke_clock.lua](common/spoke_clock.lua)、[common/game_cfg.lua](common/game_cfg.lua)、`server.data`、`server.swing_registry`、`common.vitals`、`common.attr_model`、`common.fish_catch` 等 27 个规则模块 | 确定性时钟、存档模型、挥砍登记、配置解析与无引擎依赖的共享玩法计算 |
+| L5 配置内容 | `common.cfg.*` | 鱼种、道具、商店、抽奖、盲盒、Boss 招式与占位资产数据表 |
+| L6 包 | `common/packages/spoke`、`common/packages/spoke_eggy` 及三端官方包 | 整包交付的外部库，禁止反向依赖业务代码 |
 
-三端 `packages` 同属 L6，但不进入生成架构图和质量度量；它们仍受分层与循环依赖门禁约束，范围依据 [ADR-0021](docs/adr/0021-packages-outside-business-scope.md)。`common.util` 含引擎等待、通知与 `REUtil` 依赖，因此归 L3；`common.game_cfg` 含配置解析和玩法计算，因此归 L4。
+### 运行时 Spoke 树拓扑
 
-## 运行时 Spoke 树拓扑
+本仓依照 [docs/adr/0032-spoke-native-lifecycle-architecture.md](docs/adr/0032-spoke-native-lifecycle-architecture.md) 划分服务端三类隔离树与客户端单棵根视图树。
 
-[ADR-0032](docs/adr/0032-spoke-native-lifecycle-architecture.md) 定义服务端三类隔离树与客户端单轨响应式视图。当前代码中的对应实现如下。
+```mermaid
+flowchart LR
+    subgraph Server["服务端 (L1 -> L2 -> L4)"]
+        SM["server/main.lua\nHeartbeat + RE + Players"]
+        CLK["common/spoke_clock.lua\n1Hz second / on_frame"]
+        SR["ServerRuntime\n离场三步协议 + 路由"]
+        SWT["SharedWorldTree (1棵)\n7个 FishingZone Dock\nGroundLoot / Ferry / SquadDock"]
+        PT["PlayerTree (每玩家1棵)\nStage1 存档库存 -> Stage2 属性效果\nStage3 生存Phase -> Stage4 动作设施\nStage5 合并同步 + 官方包 Leaf Sink"]
+        FT["FishTree (每条活鱼1棵)\nLifted / Combat / Escaping / Wild Phase\nOfficialAiLeaf"]
+        SM --> CLK
+        SM --> SR
+        SR --> SWT
+        SR --> PT
+        SR --> FT
+        PT -. "s:d 只读观测" .-> SWT
+        FT -. "s:d 观测 holder is_alive" .-> PT
+    end
 
-| 运行单元 | 当前结构与证据 |
-|---|---|
-| `ServerRuntime` | [server_runtime.lua](server/world_host/server_runtime.lua) 持有 `SpokeClock`，启动 `SharedWorldTree`，管理玩家树与活鱼宿主，并编排离场三步协议；`step` 驱动时钟和宿主更新 |
-| `SharedWorldTree` | [shared_world_tree.lua](server/world_host/shared_world_tree.lua) 对应全局单棵树；ADR-0032 记录 7 个钓鱼区、地面物品、摆渡与全局 `SquadDock` |
-| `PlayerTree` | [player_tree.lua](server/world_host/player_tree.lua) 对应每名在场玩家一棵树；存档与库存 State、属性 Memo、生命 Phase、动作与设施会话按声明顺序协作，`dispatch_action` 把命令送入树内 Trigger |
-| `FishTree` | [fish_tree.lua](server/world_host/fish_tree.lua) 对应每条活鱼一棵树；当前直接装配 [lifted.lua](server/world_host/fish_phases/lifted.lua)、[combat.lua](server/world_host/fish_phases/combat.lua)、[escaping.lua](server/world_host/fish_phases/escaping.lua)、[wild.lua](server/world_host/fish_phases/wild.lua) 与 [boss.lua](server/world_host/fish_phases/boss.lua) |
-| `ClientStore` | [client_store.lua](client/store/client_store.lua) 收敛 RemoteEvent 快照和本地传感器，对视图暴露 Spoke `State` / `Trigger` |
-| `RootView` | [root_view.lua](client/views/root_view.lua) 与 [client/main.lua](client/main.lua) 装配单棵客户端视图树；HUD、Modal、Overlay 和动态 Dock 均由该树管理 |
-| 跨树与网络边界 | 跨树只读观测使用 `s:d(signal)`，原子状态写入使用 `SpokeRuntime.batch`，依据 ADR-0032 与 [special_item_phase.lua](server/world_host/special_item_phase.lua)；服务端 RemoteEvent 连接位于 [server_runtime.lua](server/world_host/server_runtime.lua) |
+    subgraph Client["客户端 (L1 -> L2 -> L3)"]
+        CM["client/main.lua\n组合根 + 上行 RE 发送"]
+        CS["ClientStore (L3 只读)\nRE快照 + 本地传感器 -> State/Trigger"]
+        RV["RootView (L2 单棵行为树)\nHUD / 互斥 Modal Phase\nOverlay Phase / 动态 Dock"]
+        CM --> CS
+        CS --> RV
+        RV -. "services.send_*" .-> CM
+    end
 
-模块静态依赖以 [docs/uml/se-fish.edn](docs/uml/se-fish.edn) 为准，该文件由 [policy.edn](policy.edn) 经 `uml_ir` 生成。生成图不表示 RemoteEvent、`s:d` 或运行时快照流；这些运行时关系以 ADR-0032 和上表代码路径为证据。
-
-## 口径与复核
-
-### 复核基线
-
-- 复核窗口：**2026-11-27T17:26:20+08:00 至 2026-11-27T17:26:59+08:00**（Asia/Shanghai）；窗口首尾的三端统计一致。
-- HEAD：[`de5f0178fd417605c4c310a8168c320396a7938f`](https://github.com/qinyuanj/se-fish/commit/de5f0178fd417605c4c310a8168c320396a7938f)。
-- 三端统计输出：
-
-```text
-server 61 19852
-client 39 8659
-common 42 5773
+    PT -- "下行状态快照 RE" --> CS
+    SWT -- "世界/小队/掉落 RE" --> CS
+    FT -- "FishCombatState RE" --> CS
+    CM -- "上行操作 RE" --> SM
 ```
 
-### #386 前后行数实测
+## 对照 05_BaseDefence 的 4 处结构缺口
 
-#386 对应 [`9aeb759a401ae1d2437b240945b1b7223158fa51`](https://github.com/qinyuanj/se-fish/commit/9aeb759a401ae1d2437b240945b1b7223158fa51)，父提交为 `a20c15a8bc4fcb0881e9a30fb9bbd6079d675b57`。以下结果使用 `git show <sha>:<path> | wc -l` 取得；当前值使用 `wc -l <path>` 取得。
+1. **`ServerRuntime` 维护了过多的外置会话表与手动帧遍历**
+   [server/world_host/server_runtime.lua](server/world_host/server_runtime.lua) 共 1319 行。它在树外维护了 7 张按 `user_id` 索引的平行会话表（`weapon_sessions`、`grill_handles`、`shop_handles`、`fisherman_handles`、`lottery_sessions`、`blindbox_sessions`、`platform_shop_sessions`），并在 `step(dt)` 中手动遍历 `weapon_sessions`、`blindbox_sessions`、`platform_shop_sessions` 调用 `.step()`。
 
-| 文件 | #386 前 | #386 后 | 当前 |
-|---|---:|---:|---:|
-| `server/world_host/server_runtime.lua` | 1319 | 1192 | 1192 |
-| `server/world_host/fish_tree.lua` | 2586 | 761 | 736 |
-| `server/world_host/player_tree.lua` | 1080 | 1083 | 1073 |
-| `client/main.lua` | 386 | 386 | 386 |
+2. **`FishTree` 仍是命令式大状态机**
+   [server/world_host/fish_tree.lua](server/world_host/fish_tree.lua) 共 2586 行。尽管它为每条鱼创建了 `SpokeTree` 并划分了 `LiftedPhase`、`CombatPhase`、`EscapingPhase`、`WildPhase`，但 4 个相位都订阅 `on_frame` 调用同一个 `host:update_fish(fish, now)`，再由 `if/elseif` 分发 `await_lift`、`wild`、`escaping`、`flying`、`combat`。招式、预警、抓取载体等状态仍散落在裸表 `fish` 字段上。
 
-复核命令：
+3. **`PlayerTree` 与 `ServerRuntime` 存在双向句柄耦合**
+   [server/world_host/player_tree.lua](server/world_host/player_tree.lua) 共 1080 行。`ServerRuntime` 在 `PlayerTree.spawn` 之后通过 `player_tree:mount_phase("alive", ...)` 挂载 5 个子模块（`weapon`、`grill`、`shop`、`fisherman`、`lottery`），又把子模块返回的句柄存回 `ServerRuntime` 局部表供 `RemoteEvent` 路由调用。追踪一次玩家操作需要跨越 `server/main.lua`、`server_runtime.lua`、`player_tree.lua` 和具体子模块 4 个文件。
 
-```sh
-for p in server/world_host/server_runtime.lua server/world_host/fish_tree.lua server/world_host/player_tree.lua client/main.lua; do
-  for rev in 9aeb759^ 9aeb759; do
-    printf '%s %s ' "$rev" "$p"
-    git show "$rev:$p" | wc -l
-  done
-  wc -l "$p"
-done
-```
+4. **`client/main.lua` 顶层持有跨 HUD 局部交互状态**
+   [client/main.lua](client/main.lua) 共 386 行，顶层声明了 `hud_backpack_open`、`hud_open_popup`、`hud_drop_resolvers`、`hud_reel`。这些局部状态位于 `RootView` 的 `RootBody` 作用域之外，在 `store.on_reconnect` 触发视图树重建时不会随作用域自动重置。
 
-### 结构检索口径
+## 本仓目标架构取舍与演进路线
 
-检索范围为 `server/`、`client/`、`common/`，排除 `packages/`、`_trigger/`、`EggyAPI.lua`。实测结果：
+本方案完全遵循已接受的 [ADR-0012](docs/adr/0012-six-layer-architecture.md)、[ADR-0022](docs/adr/0022-introduce-spoke-runtime.md)、[ADR-0032](docs/adr/0032-spoke-native-lifecycle-architecture.md) 与 [ADR-0033](docs/adr/0033-script-names-must-not-shadow-se-services.md)，不引入 ADR 冲突。
 
-| 检索式 | 当前结果 |
-|---|---|
-| `update_fish`、`weapon_sessions`、`MgrMap`、`OwnedUnits` | 均为 0 命中 |
-| `mount_phase(` | 2 处，均为 [player_tree.lua](server/world_host/player_tree.lua) 中的方法定义 |
-| `hud_backpack_open` | 5 处，均位于 [client/main.lua](client/main.lua) 的 HUD 装配及其视图参数中 |
-| 裸 `:Connect(` | 仍存在，例见 [server/main.lua](server/main.lua)、[fish_tree.lua](server/world_host/fish_tree.lua)、[client_store.lua](client/store/client_store.lua) |
+### 关键架构取舍
 
-### 生成图复核
+| 维度 | `05_BaseDefence` 做法 | 本仓目标架构 | 取舍理由 |
+|---|---|---|---|
+| 树拓扑 | 每个 Unity 组件 1 棵树，全局单例共享 | 服务端 3 类隔离树（`SharedWorldTree`、`PlayerTree`、`FishTree`）与客户端 1 棵 `RootView` | 多人网游需要按玩家和活鱼隔离故障并绑定存档生命周期 |
+| 状态读写边界 | 组件间直接读写公开 `State` | 服务端 `SpokeRuntime.batch` 事务写入与跨树只读 `s:d`，客户端 `ClientStore` 只读快照与上行 `RemoteEvent` | 防止多人并发脏写与客户端越权 |
+| 帧驱动方式 | `SpokeExtensions.Coroutine` 仅在活跃相位运行 | 移除 `ServerRuntime:step` 对子会话表的遍历，改为各子会话在活跃相位内按需 `s:subscribe(clock.on_second / on_frame)` | 消除外置平行表和空转轮询，相位退出自动停止步进 |
+| 实体行为组织 | 每个状态写成独立 `EffectBlock`，局部状态随相位销毁 | 把 `FishTree` 按 `Lifted`、`Combat`、`Escaping`、`Wild` 与 Boss 招式拆成独立相位块 | 删除 `update_fish` 分支分发，资源回收归属各相位 `on_cleanup` |
+| 命令路由 | `InputSignals` 将输入转为 `Trigger`，相位内订阅 | `PlayerTree` 将玩家动作命令转为 `Trigger`，由 `alive` 相位内各子模块直接订阅 | 消除 `ServerRuntime` 的 7 张外置路由表，非存活相位自动忽略动作 |
 
-- `uml_ir`：退出码 0，`validResult: true`。
-- `uml_display`：`status: ok`。
-- 当前投影含 144 个文件节点和 3 个外部包节点。
-- 当前 [docs/uml/se-fish.edn](docs/uml/se-fish.edn) 的 SHA-256 为 `f34fd846fcd766668f8d439d3760a2d25f1112025f380c4b331940a093e3a635`；`uml_display` 状态为 `ok`。
+### 演进路线
 
-### 门禁复核
+1. **收口 `ServerRuntime` 的 7 张外置会话表与手动 `step()` 轮询**
+   将会话路由与生命周期归属收回 `PlayerTree`，由 `PlayerTree` 暴露动作 `Trigger` 供 `alive` 相位内各子模块直接订阅。将 `weapon`、`blindbox`、`platform_shop` 的计时逻辑改为在各自活跃相位内订阅 `clock.on_second` 或短寿命 `clock.on_frame`，从 `ServerRuntime:step` 中删除会话遍历循环。
 
-```sh
-lua tools/cli.lua test guards -- tests/native/guards/arch_policy_test.lua
-lua tools/cli.lua test full
-```
+2. **按相位拆分 `FishTree`，移除 `update_fish` 集中分发**
+   保持 `FishTree` 作为单条活鱼的树装配外壳与共享信号定义，将 `LiftedPhase`、`CombatPhase`（含 Boss 阶段与招式子相位）、`EscapingPhase`、`WildPhase` 拆分为独立相位块。每个相位只订阅自身所需的时钟与事件，离开相位时在对应 `on_cleanup` 中清理预警贴花、叼人挂点与招式状态。
 
-在当前 HEAD 的实测结果：
+3. **抽离 `PlayerTree` 的快照构造与存档镜像逻辑**
+   把 `PlayerTree` 中约 250 行的 `mirror_stage1_to_data`、`build_item_bar_snapshot` 和离场终镜像逻辑抽为纯函数投影模块，让 [server/world_host/player_tree.lua](server/world_host/player_tree.lua) 只保留清晰的 4 段因果声明流。
 
-```text
-14 successes / 0 failures / 0 errors / 0 pending : 0.797 seconds
-1621 successes / 0 failures / 0 errors / 0 pending : 28.703 seconds
-```
-
-两条命令退出码均为 **0**。
+4. **将客户端局部 HUD 协调状态迁入 `RootView` 作用域**
+   把 [client/main.lua](client/main.lua) 顶层的 `hud_backpack_open`、`hud_open_popup`、`hud_drop_resolvers`、`hud_reel` 移入 `RootView` 的 `RootBody` 作用域内创建，使 `store.on_reconnect` 重建视图树时自动清空局部交互状态。

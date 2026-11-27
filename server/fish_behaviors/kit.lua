@@ -4,12 +4,6 @@ local BossMoves = require('common.cfg.boss_moves')
 
 local FishBehaviorKit = {}
 
--- 跳跃型鱼（三头鲨、剑鱼）共用的起手：登记首次跳跃时刻，并复位翻滚命中缓存位。
-function FishBehaviorKit.init_jump_cycle(fish, now, combat)
-    fish.JumpAt = now + combat.JumpIntervalSec
-    fish.roll_slot = -1
-end
-
 function FishBehaviorKit.distance_sq(pos, cp)
     if not pos or not cp then return math.huge end
     return (cp.x - pos.x) * (cp.x - pos.x) + (cp.z - pos.z) * (cp.z - pos.z)
@@ -123,25 +117,6 @@ function FishBehaviorKit.boss_windup(fish, move)
     local warning = row.Warning
     local windup = type(warning) == 'table' and warning.WindupSec or nil
     return type(windup) == 'number' and windup or 0
-end
-
---- 造行为表安装器：校验 context 依赖、把依赖挂到 Mgr.<env_field>、再把行为表方法铺到 Mgr 上。
---- 各阶段的行为表（combat / escaping …）的 install 只差 env 字段名、标签与依赖清单。
----@param behavior table 行为方法表
----@param required string[] 必须由 context 提供的函数键
----@param env_field string 依赖表挂在 Mgr 上的字段名
----@param tag string 断言消息前缀（模块.install）
----@return fun(Mgr: table, context: table)
-function FishBehaviorKit.install_behavior(behavior, required, env_field, tag)
-    return function(Mgr, context)
-        for _, key in ipairs(required) do
-            assert(type(context[key]) == 'function', tag .. ': context.' .. key .. ' 必须是函数')
-        end
-        Mgr[env_field] = context
-        for name, method in pairs(behavior) do
-            Mgr[name] = method
-        end
-    end
 end
 
 return FishBehaviorKit

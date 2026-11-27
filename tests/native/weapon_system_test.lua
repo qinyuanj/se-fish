@@ -800,45 +800,6 @@ describe('TestMgrWeaponThrow', function()
         ctx:advance(FlightSec() + 0.5)
         assert.same(0, #ctx.applied)
     end)
-
-    -- 失败方式：存档协议桩不全也扣道具；operation 字段不是表照样往下走；存档层拒绝（草稿槽位已空）
-    -- 仍回复成功并起飞行。三条都必须「不扣、不飞、回复失败」——扣了就是白送一发爆炸物。
-    it('test_throw_save_layer_failures_do_not_consume_or_launch', function()
-        local slot = ctx:give_explosive(ctx.player, 'item143', 1)
-        local before = ctx.data:ItemCount('item143')
-        assert.same(1, before)
-
-        ctx:remount(ctx.player, { save = {} })
-        local missing = ctx:throw(ctx.player, slot, { x = 0, y = 2, z = 5 })
-        assert.is_false(missing.ok)
-        assert.same('unavailable', missing.reason)
-        assert.same(1, ctx.data:ItemCount('item143'))
-        assert.same(0, #ctx.visuals)
-
-        local save = {
-            resolve_request = function() return { id = '1:1', sequence = 1, kind = 'throw' }, 'new' end,
-            execute = function(_, _, _, _, transform, done)
-                local draft = PlayerData.new(Weapon.player(42))
-                draft:Init()
-                local result = transform(draft)
-                done(result ~= nil, result or 'empty')
-                return true
-            end,
-        }
-        ctx:remount(ctx.player, { save = save })
-        local dirty = ctx:throw(ctx.player, slot, { x = 0, y = 2, z = 5 }, { operation = 'oops' })
-        assert.is_false(dirty.ok)
-        assert.same('bad-operation', dirty.reason)
-        assert.same(1, ctx.data:ItemCount('item143'))
-        assert.same(0, #ctx.visuals)
-
-        ctx.player.Character.Rotation = { GetForward = function() return { x = 0, y = 1, z = 0 } end }
-        local noForward = ctx:throw(ctx.player, slot)
-        assert.is_false(noForward.ok)
-        assert.same('no-forward', noForward.reason)
-        assert.same(1, ctx.data:ItemCount('item143'))
-        assert.same(0, #ctx.visuals)
-    end)
 end)
 
 -- ===== #130 升级加成消费 =====

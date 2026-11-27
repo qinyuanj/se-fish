@@ -6,7 +6,6 @@ local Spoke = require("common.packages.spoke.api")
 local BodyScale = require("common.body_scale")
 local GameCfg = require("common.game_cfg")
 local Number = require("common.number")
-local ViewUtil = require("client.views.view_util")
 
 local State = Spoke.State
 
@@ -157,7 +156,12 @@ end
 
 --- 返回可供 RootView.mount({ hud = { ... } }) 直接注册的 HUD spec。
 function CameraZoomView.spec(options)
-  return ViewUtil.hud_spec("CameraZoom", CameraZoomView.mount, options)
+  return {
+    name = "CameraZoom",
+    mount = function(s, ctx)
+      CameraZoomView.mount(s, ctx, options)
+    end,
+  }
 end
 
 return CameraZoomView

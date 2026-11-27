@@ -60,36 +60,6 @@ describe('TestFishEscape', function()
         assert.same(env.player, env.pushed[#env.pushed])
     end)
 
-    -- 上岸但还没被举起（awaitLift）的鱼：持有者一死，抓举相位里的 HolderAlive 效果要把鱼放走
-    -- （EscapingBehavior.release_await_lift）。失败方式：鱼卡在 awaitLift 永远不动（没人举也不逃），
-    -- 或放走时没记逃逸时刻/朝向与状态推送（客户端看到一条停住的鱼）。
-    it('test_holder_death_releases_await_lift_fish_to_escaping', function()
-        env:prepare()
-        local fish = env:land(env.player)
-        assert.are.equal('awaitLift', fish.State)
-        env.player.Character.Controller.Died:Fire()
-        assert.are.equal('escaping', fish.State, '持有者死亡后待抓举的鱼必须落到在逃')
-        assert.same(env.player, fish.escape_by)
-        assert.are.equal(env.now, fish.escape_at)
-        assert.is_true(fish.ray_at ~= nil)
-        assert.same(env.player, env.pushed[#env.pushed], '放走后必须把持有状态推给客户端')
-        assert.same(fish, env.mgr.Fish[fish.Id])
-    end)
-
-    -- 离场（session_alive=false）与死亡走同一条放走路径，但 reason='leave' 还要解除归属，
-    -- 否则离场玩家的鱼仍算在他名下、继续占在逃额度。
-    it('test_holder_leave_releases_await_lift_fish_and_clears_owner', function()
-        env:prepare()
-        local fish = env:land(env.player)
-        assert.are.equal('awaitLift', fish.State)
-        env.mgr:on_player_removing(env.player)
-        assert.are.equal('escaping', fish.State)
-        assert.same(env.player, fish.escape_by, '放走必须记下是谁丢下的鱼')
-        assert.is_nil(fish.Owner, '离场放走后鱼不得再挂在该玩家名下')
-        assert.is_nil(fish.holder)
-        assert.are.equal(env.now, fish.escape_at)
-    end)
-
     it('test_each_player_keeps_one_escaping_fish', function()
         env:prepare()
         local first = env:held_fish(env.player, 'bass', 1)

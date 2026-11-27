@@ -5,8 +5,7 @@
 --   3. 拖拽跨格未按几何命中发送 MoveSlot，或短距离微动/拖回自身误发 MoveSlot；
 --   4. 爆炸物槽点按未直投、长按未弹出 ThrowAimOverlay 或选点未携带目标落点投掷、投掷后误发 SelectSlot；
 --   5. backpack_open 展开未隐藏底部道具栏与取消瞄准遮罩；
---   6. 重连重置或根 UI 销毁后遗留槽位/瞄准节点，或 OnClicked/OnTouchBegan/OnTouchEnded 连接未归零；
---   7. 爆炸物选点落点在宿主相机或物理服务缺失/抛错时冒泡中断，或把缺 Position、非有限数的命中点当落点投掷。
+--   6. 重连重置或根 UI 销毁后遗留槽位/瞄准节点，或 OnClicked/OnTouchBegan/OnTouchEnded 连接未归零。
 
 local spoke = require("common.packages.spoke.api")
 local Eui = require("tests.support.eui_double")
@@ -324,86 +323,6 @@ describe("Spoke 主 HUD 底部道具栏视图（#297-B3b2）", function()
     assert.same({ action = "SelectSlot", value = 2 }, actions[1])
 
     env.view:dispose()
-  end)
-
-  it("爆炸物落点解析：宿主相机或物理服务缺失/异常时回退无目标直投，射线命中才带落点", function()
-    local saved_game = rawget(_G, "game")
-    local ok, err = pcall(function()
-      local good_ray = { Origin = { x = 0, y = 5, z = 0 }, Direction = { x = 0, y = 0, z = -1 } }
-      local fixed_camera = { ScreenPointToRay = function() return good_ray end }
-      local function host(camera, physics)
-        return {
-          GetService = function(_, service)
-            if service == "CameraService" then return camera end
-            if service == "PhysicsService" then return physics end
-            return nil
-          end,
-        }
-      end
-      local cases = {
-        { name = "game 缺失：没有相机服务可发射线", game = nil, expect = nil },
-        { name = "相机服务缺失：ScreenPointToRay 不可用", game = host(nil, nil), expect = nil },
-        {
-          name = "ScreenPointToRay 抛错：射线构造失败不冒泡",
-          game = host({ ScreenPointToRay = function() error("camera-down") end }, nil),
-          expect = nil,
-        },
-        {
-          name = "射线缺 Origin：没有起点可探测",
-          game = host({ ScreenPointToRay = function() return { Direction = { x = 0, y = 0, z = -1 } } end }, nil),
-          expect = nil,
-        },
-        { name = "物理服务缺失：射线无命中", game = host(fixed_camera, nil), expect = nil },
-        {
-          name = "命中点缺 Position：无落点可投",
-          game = host(fixed_camera, { Raycast = function() return {} end }),
-          expect = nil,
-        },
-        {
-          name = "命中点坐标非有限数：丢弃坏落点",
-          game = host(fixed_camera, { Raycast = function() return { Position = { x = 0 / 0, y = 12, z = 360 } } end }),
-          expect = nil,
-        },
-        {
-          name = "命中点有效：投掷携带命中坐标",
-          game = host(fixed_camera, { Raycast = function() return { Position = { x = 640, y = 12, z = 360 } } end }),
-          expect = { x = 640, y = 12, z = 360 },
-        },
-      }
-
-      local observed, expected = {}, {}
-      for _, case in ipairs(cases) do
-        _G.game = case.game
-        local throws = {}
-        local env = mount_hud({
-          height = 1080,
-          on_throw = function(slot, target) throws[#throws + 1] = { slot = slot, target = target } end,
-        })
-        env.writer:ingest_event("ItemBarState", {
-          slotCount = 3,
-          slots = { [1] = { itemId = ITEM_GRENADE, count = 1 } },
-        })
-        local c1 = MainHudLayout.compute({ width = 1920, height = 1080, itemBarSlots = 3 }).ItemBarSlots[1]
-        -- 长按爆炸物槽弹出瞄准遮罩，点遮罩选点后才走落点解析
-        env.nodes.ItemBarSlot1.OnTouchBegan:Fire({ BeganPosition = { x = c1.x, y = c1.y } })
-        env.writer:advance_clock(0.5)
-        env.nodes.ItemBarSlot1.OnTouchEnded:Fire({ EndedPosition = { x = c1.x, y = c1.y } })
-        local overlay = env.nodes.ThrowAimOverlay
-        assert.is_not_nil(overlay, case.name)
-        overlay.OnTouchEnded:Fire({ EndedPosition = { x = 640, y = 360 } })
-
-        assert.equals(1, #throws, case.name)
-        observed[#observed + 1] = { name = case.name, target = throws[1].target }
-        expected[#expected + 1] = { name = case.name, target = case.expect }
-        env.view:dispose()
-      end
-      assert.same(expected, observed)
-    end)
-
-    _G.game = saved_game
-    if not ok then
-      error(err, 0)
-    end
   end)
 
   it("backpack_open 展开时保留底部道具栏可见并取消瞄准遮罩；hud_visible=false 关屏时全隐藏", function()

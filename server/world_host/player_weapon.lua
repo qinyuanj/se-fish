@@ -30,10 +30,12 @@ local function distance2d(a, b)
   return math.sqrt(dx * dx + dz * dz)
 end
 
--- 失败下发带模块标签与用户标识，逻辑见 EngineRead.client_sender。
-local reply = EngineRead.client_sender({
-  tag = "PlayerWeapon", channel = "WeaponResult", context = "PlayerWeapon.reply", field = "action",
-})
+local function reply(remote, player, payload)
+  local ok, _, reason = EngineRead.fire_client(remote, "WeaponResult", player, payload, "PlayerWeapon.reply")
+  if not ok then
+    print("[PlayerWeapon] WeaponResult 下发失败", player and player.UserId, payload and payload.action, tostring(reason)) end
+  return payload
+end
 
 local function fail(remote, player, action, reason, extra)
   print("[PlayerWeapon] 拒绝", player and player.UserId, tostring(action), reason)
@@ -71,8 +73,9 @@ local function damage_scale(tree, kind)
 end
 
 local function character_of(player)
-  local _, character = EngineRead.read_character(player, "PlayerWeapon.character_of")
-  return character
+  local ok, character = EngineRead.read_character(player, "PlayerWeapon.character_of")
+  if ok then return character end
+  return nil
 end
 
 local function forward_of(character, user_id)
@@ -618,35 +621,44 @@ local function selected_explosive(tree)
   return nil
 end
 
--- 无存档：直接改内存容器，扣件成功后抛出。
-local function consume_without_save(session, player, slot, item_id, payload)
+local function consume_throwable(session, player, slot, item_id, payload)
+  local save = session.opts.save
   local data = session.tree.data
-  local container = data.data and data.data.containers and data.data.containers[GameCfg.Items.ContainerId.ItemBar]
-  local entry = container and container[slot]
-  if not entry or (entry.count or 0) <= 0 or entry.itemId ~= item_id then
-    return fail(session.remote, player, "throw", "empty", { slot = slot })
-  end
-  local landing, zone = resolve_landing(player, payload.target)
-  if not landing then
-    return fail(session.remote, player, "throw", "no-forward", { slot = slot })
-  end
-  if entry.count > 1 then entry.count = entry.count - 1 else container[slot] = nil end
-  launch(session, player, item_id, payload.target, landing, zone)
-  return reply(session.remote, player, { ok = true, action = "throw", itemId = item_id, slot = slot })
-end
-
--- 幂等重放：用一次空 transform 把上次结果回放出来。
-local function replay_throw(session, player, save, data, operation)
-  return save:execute(player, data, operation, function() return nil, "expired" end, function(ok, result)
-    if ok then
-      result.operation = operation
-      reply(session.remote, player, result)
+  if not save then
+    local container = data.data and data.data.containers and data.data.containers[GameCfg.Items.ContainerId.ItemBar]
+    local entry = container and container[slot]
+    if not entry or (entry.count or 0) <= 0 or entry.itemId ~= item_id then
+      return fail(session.remote, player, "throw", "empty", { slot = slot })
     end
-  end) == true
-end
-
--- 在隔离 draft 上扣件，写成功后回包并抛出。
-local function run_throw(session, player, slot, item_id, payload, save, data, operation)
+    local landing, zone = resolve_landing(player, payload.target)
+    if not landing then
+      return fail(session.remote, player, "throw", "no-forward", { slot = slot })
+    end
+    if entry.count > 1 then entry.count = entry.count - 1 else container[slot] = nil end
+    launch(session, player, item_id, payload.target, landing, zone)
+    return reply(session.remote, player, { ok = true, action = "throw", itemId = item_id, slot = slot })
+  end
+  if type(save.resolve_request) ~= "function" or type(save.execute) ~= "function" then
+    return fail(session.remote, player, "throw", "unavailable")
+  end
+  local request_id = payload.operation
+  if request_id ~= nil and type(request_id) ~= "table" then
+    return fail(session.remote, player, "throw", "bad-operation")
+  end
+  if request_id == nil then request_id = payload.seq end
+  local operation, mode = save:resolve_request(player, data, "throw", request_id)
+  if not operation then
+    if mode == "replay" then return true end
+    return fail(session.remote, player, "throw", "unavailable")
+  end
+  if mode == "replay" then
+    return save:execute(player, data, operation, function() return nil, "expired" end, function(ok, result)
+      if ok then
+        result.operation = operation
+        reply(session.remote, player, result)
+      end
+    end) == true
+  end
   local landing, zone = resolve_landing(player, payload.target)
   if not landing then
     fail(session.remote, player, "throw", "no-forward", { slot = slot })
@@ -675,114 +687,79 @@ local function run_throw(session, player, slot, item_id, payload, save, data, op
   end) == true
 end
 
--- 有存档：解析幂等请求，重放直接回放结果，否则走隔离 draft 结算。
-local function consume_with_save(session, player, slot, item_id, payload, save, data)
-  local request_id = payload.operation
-  if request_id ~= nil and type(request_id) ~= "table" then
-    return fail(session.remote, player, "throw", "bad-operation")
-  end
-  if request_id == nil then request_id = payload.seq end
-  local operation, mode = save:resolve_request(player, data, "throw", request_id)
-  if not operation then
-    if mode == "replay" then return true end
-    return fail(session.remote, player, "throw", "unavailable")
-  end
-  if mode == "replay" then return replay_throw(session, player, save, data, operation) end
-  return run_throw(session, player, slot, item_id, payload, save, data, operation)
-end
-
-local function consume_throwable(session, player, slot, item_id, payload)
-  local save = session.opts.save
-  local data = session.tree.data
-  if not save then return consume_without_save(session, player, slot, item_id, payload) end
-  if type(save.resolve_request) ~= "function" or type(save.execute) ~= "function" then
-    return fail(session.remote, player, "throw", "unavailable")
-  end
-  return consume_with_save(session, player, slot, item_id, payload, save, data)
-end
-
--- 攻击：瞄准校验 → 行动闸 → 按已装备武器分流枪/近战，未配置数值回落空手。
-local function handle_attack(session, player, payload)
-  local aim, aim_ok = normalize_aim(payload.aim)
-  if not aim_ok then
-    fail(session.remote, player, "attack", "bad-aim")
-    return false
-  end
-  if session.tree.memos.can_act:now() ~= true then
-    SwingRegistry.clear_swing(player.UserId)
-    fail(session.remote, player, "attack", "cannot-act")
-    return true
-  end
-  if not character_of(player) then
-    fail(session.remote, player, "attack", "unavailable")
-    return true
-  end
-  local weapon_id = equipped_weapon(session.tree)
-  local guns, melee = ability().Guns, ability().MeleeWeapons
-  if weapon_id and guns[weapon_id] then
-    attack_gun(session, player, weapon_id, guns[weapon_id], aim)
-  elseif weapon_id and melee[weapon_id] then
-    attack_melee(session, player, weapon_id)
-  else
-    if weapon_id then print("[PlayerWeapon] 武器未配置攻击数值，回落空手", player.UserId, weapon_id) end
-    attack_melee(session, player, nil)
-  end
-  return true
-end
-
--- 换弹：行动闸 → 必须是枪 → 弹匣未满且不在换弹中才开换。
-local function handle_reload(session, player)
-  if session.tree.memos.can_act:now() ~= true then
-    fail(session.remote, player, "reload", "cannot-act")
-    return true
-  end
-  local weapon_id = equipped_weapon(session.tree)
-  local gun = weapon_id and ability().Guns[weapon_id]
-  if not gun then return fail(session.remote, player, "reload", "not-a-gun", { weapon = weapon_id }) and true end
-  local now = session.now()
-  local size = magazine_size(session.tree.data, gun.Magazine)
-  local mag = mag_of(session, weapon_id, size)
-  refresh_mag(mag, size, now)
-  if mag.reload_until then return fail(session.remote, player, "reload", "reloading", { weapon = weapon_id }) and true end
-  if mag.ammo >= size then return fail(session.remote, player, "reload", "mag-full", { weapon = weapon_id }) and true end
-  mag.reload_until = now + ability().GunShared.ReloadSec
-  print("[PlayerWeapon] 手动换弹", player.UserId, weapon_id)
-  reply(session.remote, player, {
-    ok = true, action = "reload", weapon = weapon_id, reloadSec = ability().GunShared.ReloadSec,
-  })
-  return true
-end
-
--- 投掷：行动闸 → 槽位与选中物校验 → 目标点校验 → 扣件抛出。
-local function handle_throw(session, player, payload)
-  if session.tree.memos.can_act:now() ~= true then
-    fail(session.remote, player, "throw", "cannot-act")
-    return true
-  end
-  local slot = payload.slot
-  if not finite(slot) or slot ~= math.floor(slot) or slot < 1 then
-    fail(session.remote, player, "throw", "bad-slot")
-    return true
-  end
-  local selected = selected_explosive(session.tree)
-  if not selected or selected.slot ~= slot then
-    fail(session.remote, player, "throw", "bad-throwable", { slot = slot })
-    return true
-  end
-  local target = payload.target
-  if target ~= nil and (type(target) ~= "table" or not finite(target.x) or not finite(target.y) or not finite(target.z)) then
-    fail(session.remote, player, "throw", "bad-target")
-    return true
-  end
-  consume_throwable(session, player, slot, selected.item_id, payload)
-  return true
-end
-
 local function on_action(session, player, payload)
   if type(payload) ~= "table" then return false end
-  if payload.action == "attack" then return handle_attack(session, player, payload) end
-  if payload.action == "reload" then return handle_reload(session, player) end
-  if payload.action == "throw" then return handle_throw(session, player, payload) end
+  if payload.action == "attack" then
+    local aim, aim_ok = normalize_aim(payload.aim)
+    if not aim_ok then
+      fail(session.remote, player, "attack", "bad-aim")
+      return false
+    end
+    if session.tree.memos.can_act:now() ~= true then
+      SwingRegistry.clear_swing(player.UserId)
+      fail(session.remote, player, "attack", "cannot-act")
+      return true
+    end
+    if not character_of(player) then
+      fail(session.remote, player, "attack", "unavailable")
+      return true
+    end
+    local weapon_id = equipped_weapon(session.tree)
+    local guns, melee = ability().Guns, ability().MeleeWeapons
+    if weapon_id and guns[weapon_id] then
+      attack_gun(session, player, weapon_id, guns[weapon_id], aim)
+    elseif weapon_id and melee[weapon_id] then
+      attack_melee(session, player, weapon_id)
+    else
+      if weapon_id then print("[PlayerWeapon] 武器未配置攻击数值，回落空手", player.UserId, weapon_id) end
+      attack_melee(session, player, nil)
+    end
+    return true
+  end
+  if payload.action == "reload" then
+    if session.tree.memos.can_act:now() ~= true then
+      fail(session.remote, player, "reload", "cannot-act")
+      return true
+    end
+    local weapon_id = equipped_weapon(session.tree)
+    local cfg = weapon_id and ability().Guns[weapon_id]
+    if not cfg then return fail(session.remote, player, "reload", "not-a-gun", { weapon = weapon_id }) and true end
+    local now = session.now()
+    local size = magazine_size(session.tree.data, cfg.Magazine)
+    local mag = mag_of(session, weapon_id, size)
+    refresh_mag(mag, size, now)
+    if mag.reload_until then return fail(session.remote, player, "reload", "reloading", { weapon = weapon_id }) and true end
+    if mag.ammo >= size then return fail(session.remote, player, "reload", "mag-full", { weapon = weapon_id }) and true end
+    mag.reload_until = now + ability().GunShared.ReloadSec
+    print("[PlayerWeapon] 手动换弹", player.UserId, weapon_id)
+    reply(session.remote, player, {
+      ok = true, action = "reload", weapon = weapon_id, reloadSec = ability().GunShared.ReloadSec,
+    })
+    return true
+  end
+  if payload.action == "throw" then
+    if session.tree.memos.can_act:now() ~= true then
+      fail(session.remote, player, "throw", "cannot-act")
+      return true
+    end
+    local slot = payload.slot
+    if not finite(slot) or slot ~= math.floor(slot) or slot < 1 then
+      fail(session.remote, player, "throw", "bad-slot")
+      return true
+    end
+    local selected = selected_explosive(session.tree)
+    if not selected or selected.slot ~= slot then
+      fail(session.remote, player, "throw", "bad-throwable", { slot = slot })
+      return true
+    end
+    local target = payload.target
+    if target ~= nil and (type(target) ~= "table" or not finite(target.x) or not finite(target.y) or not finite(target.z)) then
+      fail(session.remote, player, "throw", "bad-target")
+      return true
+    end
+    consume_throwable(session, player, slot, selected.item_id, payload)
+    return true
+  end
   return false
 end
 

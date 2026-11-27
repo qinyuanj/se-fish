@@ -76,16 +76,4 @@ function SpokeClock.new(initial_now)
   return clock
 end
 
---- 校验对象是否具备 SpokeClock 的最小形态：now / second / on_second / on_frame。
---- 只判形态不报错：错误文案与报错层级由调用方（各自的 spawn）决定。
----@param clock any
----@return boolean
-function SpokeClock.is_valid(clock)
-  return type(clock) == "table"
-    and type(clock.now) == "function"
-    and type(clock.second) == "table"
-    and type(clock.on_second) == "table"
-    and type(clock.on_frame) == "table"
-end
-
 return SpokeClock
