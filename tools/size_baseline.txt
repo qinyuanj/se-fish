@@ -17,7 +17,6 @@ server/world_host/ferry_route.lua:7728
 client/views/main_hud_backpack_view.lua:7422
 client/views/main_hud_action_buttons_view.lua:7023
 server/world_host/ground_loot.lua:6895
-common/engine_read.lua:6578
 common/cfg/boss_moves.lua:6483
 client/views/main_hud_item_bar_view.lua:6356
 server/world_host/fishing_phase.lua:5868

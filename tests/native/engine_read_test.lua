@@ -93,6 +93,14 @@ describe("common.engine_read 引擎对象读取适配器（#366）", function()
       game = engine_game,
       type = function(value) return engine_types[value] or native_type(value) end,
     }, { __index = _G })
+    -- 原语层已拆到 common.engine_read_core（#414）：注入的运行时 type 必须同时进入两层，
+    -- 否则 #392 的沙盒覆盖会在拆分后静默失效。
+    env.require = function(name)
+      if name == "common.engine_read_core" then
+        return assert(loadfile("common/engine_read_core.lua", "t", env))()
+      end
+      return require(name)
+    end
     local runtime_read = assert(loadfile("common/engine_read.lua", "t", env))()
 
     assert.is_true(runtime_read.is_object(player))
@@ -123,6 +131,17 @@ describe("common.engine_read 引擎对象读取适配器（#366）", function()
       assert.is_false(runtime_read.is_object(scalar))
     end
     assert.is_false(runtime_read.is_object(nil))
+    -- 搬出的原语层必须跑在注入的运行时 type 下：自定义类型名同样按宿主对象处理。
+    -- 若主文件接到的是全局 type 下的旧实例，read_user_id 会退化为 missing 而不是 read_error。
+    local runtime_unit = function() end
+    engine_types[runtime_unit] = "EggyUnit"
+    local unit_logs = capture_prints(function()
+      local ok_unit, value_unit, reason_unit = runtime_read.read_user_id(runtime_unit)
+      assert.is_false(ok_unit)
+      assert.is_nil(value_unit)
+      assert.equals("read_error", reason_unit)
+    end)
+    assert.is_true(has_log(unit_logs, "operation=read_user_id reason=read_error"))
   end)
 
   it("正常读取路径：覆盖字段/玩家/角色/控制器/血量/向量/属性/服务与销毁操作", function()
