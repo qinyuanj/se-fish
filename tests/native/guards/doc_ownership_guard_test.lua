@@ -21,6 +21,7 @@ local CLASSES = {
     '^docs/packages%-reference%.md$',
     '^docs/engine%-keys%.md$',
   } },
+  { name = '调研', patterns = { '^docs/research/' } },
   { name = '生成物', patterns = { '^docs/uml/' } },
 }
 
