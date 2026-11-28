@@ -145,7 +145,7 @@
 | 离线报告 `failures` 为空，含网格封闭性硬门槛；只走当前资产校验入口，不再要求 `features/art` 或 acceptance | 1-14 | 已有条款 |
 | 游戏内导入、重进加载、尺寸、挂点、碰撞、动作全帧形变、攻击预警及正常视距可读性逐项验收；离线通过不能替代此出口 | 1-14 | 已有条款 |
 | 替换正式资源后，判定体、射程、相机、三倍体型和飞行没有明显回归；未交付项保持未完成，不阻塞 #46 的灰盒核心验收 | 1-14、2-18 | 已有条款 |
-| 业务代码改动按 `docs/agents/workflow.md` 收尾；Blender 只走 `lua5.4 tools/cli.lua blender`，不恢复实时 MCP 或裸调入口 | — | 作废（理由：采购与工具调用约定，由 ADR-0009 与 docs/agents/art-pipeline.md 承载） |
+| 业务代码改动按 `docs/agents/workflow.md` 收尾；Blender 只走 `lua5.4 tools/cli.lua blender`，不恢复实时 MCP 或裸调入口 | — | 作废（理由：采购与工具调用约定，原由 ADR-0009 与 docs/agents/art-pipeline.md 承载，已随美术创作工作流归档至 tag `art-workflow-archive-v1`） |
 | 风格样张确认，含普通／极品正常视距辨识 | 1-14 | 已有条款 |
 | 代表结构完成游戏内模型、骨架、动画和贴图导入验证 | 1-14 | 已有条款 |
 | `04-validate.py` 与 `features/art/` 通过，网格硬性 0 项不豁免；新结构／静态件先确认验证器覆盖 | — | 作废（理由：`04-validate.py` 与 `features/art/` 已从仓库删除，那个入口不存在了；网格硬性门槛与逐件验收入口现由 1-14 与当前资产校验器承载） |

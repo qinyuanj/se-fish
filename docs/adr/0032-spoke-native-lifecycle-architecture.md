@@ -10,7 +10,7 @@
 服务端按「共享世界 / 玩家隔离 / 活鱼实体」切分为三类独立 Auto `SpokeTree`（树级故障隔离，防止单玩家或单条鱼异常拖垮全服）：
 
 1. **`SharedWorldTree`（全局 1 棵）**：承载 7 个钓鱼区的地面物品 `Dock`、鱼饵刷新点、摆渡航线与全局小队 `SquadDock`。
-2. **`PlayerTree`（每名在场玩家 1 棵）**：存档 `OnReady` 时 `spawn`，离场排空前 `dispose()`。树内按**源码声明顺序**排列因果流，确保同宿主事件内上游先算、下游后跑：
+2. **`PlayerTree`（每名在场玩家 1 棵）**：存档 `SaveHost.on_ready` 时 `spawn`，离场排空前 `dispose()`。树内按**源码声明顺序**排列因果流，确保同宿主事件内上游先算、下游后跑：
    - 存档与库存 `State` → 属性与效果派生 `Memo` / `ModifierDock` → 生命与生存 `Phase` → 动作、特殊道具与设施会话 `Phase`。
 3. **`FishTree`（每条活鱼 1 棵）**：按生命阶段嵌套 `Phase`（`Lifted` → `Combat` → `Escaping`）；阶段切换或鱼死亡/入水时，`on_cleanup` 自动拆除预警贴花、叼人挂点、碰撞隔离与载体单位。
 
@@ -25,7 +25,7 @@
 - **离场三步协议**：根部持有 `session_alive`（`State<boolean>`）。`Players.PlayerRemoving` 在前置脏写后固定执行：
   1. `session_alive:set(false)`（触发离场终镜像与烧烤离场结算）；
   2. `PlayerTree:dispose()`（逆序拆除在场资源、外观绑定与连接）；
-  3. 宿主执行 `SaveLeaving` 序列化与 `AfterIdle` 异步排空栅栏（异步 I/O 栅栏不塞进 Spoke 同步 teardown）。
+  3. 宿主执行 `SaveHost:save_leaving` 序列化与 `after_idle` 异步排空栅栏（异步 I/O 栅栏不塞进 Spoke 同步 teardown）。
 
 ### 3. 跨树协作、事务模型与官方包降级
 - **跨树只读联动走 `s:d(signal)`**：下游树直接观察上游树的只读 `State` / `Memo`，禁止上游改完状态再命令式回调下游。

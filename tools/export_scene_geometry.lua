@@ -1,5 +1,5 @@
 -- 编辑态场景几何校验与只读数据表导出器（ADR-0013 / #406 / #409）。
--- 从活体编辑器按 ADR-0035 四条硬边界采集 7 区全部契约标记与 Z*_Water* 水域标记，
+-- 从活体编辑器按 ADR-0035 exec 三条硬边界采集 7 区全部契约标记与 Z*_Water* 水域标记，
 -- 执行全量契约校验（缺标记/重名/不在所属区/越界/尺寸或朝向非法/水域重叠均阻断报错），
 -- 确定性导出只读 Lua 表：
 --   common/cfg/scene_geometry.lua       （7 区边界墙与全部具名点位标记）
@@ -310,7 +310,7 @@ function M.render_water_lua(baked)
     return table.concat(out, '\n')
 end
 
--- 生成符合 ADR-0035 四条硬边界的只读编辑态采集脚本
+-- 生成符合 ADR-0035 exec 三条硬边界的只读编辑态采集脚本
 local function build_editor_probe_lua(tag)
     return string.format([=[
 local TAG = %q

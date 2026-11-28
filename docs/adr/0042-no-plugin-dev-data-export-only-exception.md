@@ -18,7 +18,7 @@
 2. **唯一例外是 `data/`**：`data/` 的生成与更新必须回编辑器用插件导出，再 `lua tools/cli.lua sync` 回灌；不手写、不脚本生成 `data/`。
 3. **判据**：`data/**` 文件首行为 `---AUTTO EXPORT BY EGGITOR PLUGIN, PLEASE DO NOT EDIT` 即视为导出物。
 4. **插件不可用不阻塞主线**：不需要 `data/` 变化的改动照常走 CLI；需要 `data/` 变化的任务显式登记为「等插件导出」，在验收记录里留缺口，不用手写绕过。
-5. **与 SDK/场景读写无关**：那条路径由 [ADR-0035](0035-editor-sdk-enumeration-broken-and-exec-bypass.md) 的 2026-11-28 复查结论管（`editor-unit` 恢复为首选读取面），插件不参与。
+5. **与 SDK/场景读写无关**：那条路径由 [ADR-0035](0035-editor-sdk-enumeration-broken-and-exec-bypass.md) 管（`editor-unit` 首选只读、`exec` 兜底），插件不参与。
 
 ## 备选方案（拒绝）
 

@@ -8,9 +8,9 @@
 
 ### 1. 编辑态具名标记校验导出只读几何表
 
-- **唯一编辑真源**：场景内具名区域标记（每区四面边界空气墙、可钓水域盒 `Z*_Water*`、安全落点、去/返程摆渡点、抽奖点、烧烤点、鱼饵刷新点、商店与渔民点；01/02 区统一命名为 `Z1_Shop`、`Z1_Fisherman`、`Z2_Shop`、`Z2_Fisherman`、`Z1_FerryOut`、`Z2_FerryReturn`）。摆渡车、烤架等美术装饰件不作查找入口。
+- **唯一编辑真源**：场景内具名区域标记（每区四面边界空气墙、可钓水域盒 `Z*_Water*`、安全落点、去/返程摆渡点、抽奖点、烧烤点、鱼饵刷新点、摊位与钓鱼佬点；01/02 区统一命名为 `Z1_Shop`、`Z1_Fisherman`、`Z2_Shop`、`Z2_Fisherman`、`Z1_FerryOut`、`Z2_FerryReturn`）。摆渡车、烤架等美术装饰件不作查找入口。空场景文件夹可以清理，但以回读无子项且无运行时按名引用为前提；不能归组的地形不强搬或删除。
 - **离线校验导出**：场景修改后执行 `lua tools/export_scene_geometry.lua` 采集并生成受控只读表 `common/cfg/scene_geometry.lua` 与 `common/cfg/scene_water_geometry.lua`（`--check` 复核一致）。缺标记、重名、越出所属区边界、空气墙朝向或尺寸非法、水域重叠均在导出期直接报错阻断。
-- **运行期只读加载与静态化**：`common/zone_markers.lua` 运行期直接加载只读导出表（仅对显式传入的测试夹具 `world` 保留树解析）；`GameCfg` 只保留爆炸半径等玩法数值，不存区域坐标。28 面边界空气墙、48 个纯坐标点位与 189 个 `Z*_Water*` 全量开启 `IsStaticOptimization = true`（纯点位与水域标记同步关闭渲染、碰撞、触发与物理），基线由 `tests/native/guards/scene_static_baseline_test.lua` 锁定。
+- **运行期只读加载与静态化**：`common/zone_markers.lua` 运行期经 `ZoneMarkers.resolve_baked` 直接加载只读导出表（测试夹具显式调 `ZoneMarkers.resolve(world, config)` 解析场景树）；`GameCfg` 只保留爆炸半径等玩法数值，不存区域坐标。28 面边界空气墙、62 个纯坐标点位与 189 个 `Z*_Water*` 全量开启 `IsStaticOptimization = true`（纯点位与水域标记同步关闭渲染、碰撞、触发与物理），基线由 `tests/native/guards/scene_static_baseline_test.lua` 锁定。
 
 ### 2. 可钓水域采用方案 A（`MathWaterJudge` + 只读水区表）
 
@@ -19,7 +19,7 @@
 
 ### 3. 交互提示采用自研响应式气泡 + 导出坐标
 
-- 退役 14 个零监听空壳 `TriggerUnit`；服务端与客户端全部 38 个交互点（7 商店、7 渔民、7 抽奖、5 烧烤、12 摆渡）统一从只读几何表读取锚点坐标。
+- 退役 14 个零监听空壳 `TriggerUnit`；服务端与客户端全部 38 个交互点（7 摊位、7 钓鱼佬、7 抽奖、5 烧烤、12 摆渡）统一从只读几何表读取锚点坐标。
 - 客户端以响应式 `EUISceneNode` 交互气泡承载跨设施单选互斥、键鼠与触屏统一点击，以及随玩家 `BodyScale` 放大的动态交互半径。
 - 除 7 个钓鱼佬站桩外观豁免保留轻量非静态 `WorldUnit`（供客户端按区脉冲缩放反馈）外，标记、装饰与地块类动态 `WorldUnit` 清零。
 

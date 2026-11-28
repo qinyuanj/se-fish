@@ -16,7 +16,7 @@
 - [0031](0031-persistent-operation-identity.md) — 改动存档写入、重试、交易或外部交付：持久会话 fencing 与三类操作身份分层。
 
 ## 验收口径与范围
-- [0028](0028-solo-clear-on-shared-world.md) — 设计业务闭环、多人接缝或存档边界：Solo clear 跑在真实多人服务端权威骨架上、四类证据与状态边界。
+- [0028](0028-solo-clear-on-shared-world.md) — 设计业务闭环、多人边界或存档边界：Solo clear 跑在真实多人服务端权威骨架上、四类证据与状态边界。
 - [0029](0029-scope-completeness-and-placeholder-first.md) — 判断需求是否在范围、缺外部参数如何推进：规格内无永久出界、占位优先与生产开关口径。
 - [0039](0039-acceptance-surface-as-feature-files.md) — 登记条款、补证据或改验收门禁：唯一验收面、两列条款与状态反推。
 

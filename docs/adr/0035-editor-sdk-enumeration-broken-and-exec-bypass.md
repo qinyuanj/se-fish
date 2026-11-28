@@ -15,7 +15,7 @@
 
 ## 沙盒与引擎附带事实
 
-- **`exec` 沙盒无外部模块与文件 I/O**：`require` 调用报错，`io` / `os` / `loadfile` / `package` 全部缺席。依赖业务配置清单的探针须离线生成字面量嵌入（见 `tools/gen_config_anchor_probe.lua`）。
+- **`exec` 沙盒无外部模块与文件 I/O**：`require` 调用报错，`io` / `os` / `loadfile` / `package` 全部缺席。依赖业务配置清单的探针须离线生成字面量嵌入（见 `tools/gen_config_anchor_probe.lua`）。探针脚本按[开发工作流](../agents/workflow.md)目录约定入库，正式证据须可重跑、可 diff。
 - **两端坐标与类型差异**：编辑态 `Unit.Position` 为数组 `[1..3]`（`.x` 为 `nil`），运行态为 `Vector3`（`.x` / `.y` / `.z`）；`EffectUnit` 不是 `SpaceUnit`，`GetPosition()` 返回 `nil`。
 - **变换与排序限制**：`SetTRS` 有旋转写入异常，统一改用 `SetPosition` / `SetRotation` / `SetScale` 分立接口；编辑器 API 无同级节点排序成员，分组顺序只能靠命名或摆位表达。
 

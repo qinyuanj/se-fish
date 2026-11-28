@@ -2,16 +2,16 @@
 
 **Status**: accepted（2026-09-22 取证，2026-11-24 收口成本条 ADR）
 
-付费与广告是唯一「代码写完了也不能证明它对」的一块：能力本身存在，但验证只能发生在真实平台上。这条 ADR 只记**能力事实与接缝后果**，不重述决策链——订单身份怎么定在 [ADR-0031](0031-persistent-operation-identity.md)，参数缺位怎么占位在 [ADR-0029](0029-scope-completeness-and-placeholder-first.md)，真实渠道单列在[生产开关台账](../acceptance/production-switches.md)。
+付费与广告是唯一「代码写完了也不能证明它对」的一块：能力本身存在，但验证只能发生在真实平台上。这条 ADR 只记**能力事实与适配后果**，不重述决策链——订单身份怎么定在 [ADR-0031](0031-persistent-operation-identity.md)，参数缺位怎么占位在 [ADR-0029](0029-scope-completeness-and-placeholder-first.md)，真实渠道单列在[生产开关台账](../acceptance/production-switches.md)。
 
 ## 能力事实
 
-- `CommodityService`：17 个函数 / 5 个事件（`EggyAPI.lua:3925-4040`）；`AdvertisementService:ShowRewardedVideoAd(player, goodsId, successEvent, failEvent, adTag)`（`:3607`）；邮件系统可发「游玩奖励」类商品。
+- `CommodityService`（17 个函数 / 5 个事件，`EggyAPI.lua`）；`AdvertisementService:ShowRewardedVideoAd(player, goodsId, successEvent, failEvent, adTag)`；邮件系统可发「游玩奖励」类商品。
 - **无公开订单 ID**：`GoodsPurchaseCompleted(goodsId, goodsNum, player)` 不携带订单标识，官方教程明说不能用 `UserId..goodsId` 做发货防重键（站点 `lua/20-platform-services.html`）。
 - **购买无取消 / 失败回调**：5 个事件里都没有；`ShowGoodsPurchasePanel(player, rawGoodsId, showTime)` 返回 void，`showTime` 的语义官方未说明。
 - **广告在编辑器内不可验收**：须服务端调用；编辑器与本地调试「可能无回调、无 UI 表现或直接静默失败」（站点 `game_api/service/AdvertisementService.html`）。`failEvent` 也不保证触发。
 - `goodsId` 来自商业化后台，后台文档不在公开站点；API 没有价格 / 货币 / 盲盒 / 抽奖接口，随机与发奖只能写 Lua，支付环节才可能走商品。
-- 需要一张**已发布**的测试图：MemoryStore 在未发布图明文不可用（`UnpublishedPlace=102`，`EggyAPI.lua:3263`）；DataStore 的错误码里没有「未发布」项，教程默认测试地图可真实读写（推断）；商品完全没有相关信息。
+- 需要一张**已发布**的测试图：MemoryStore 在未发布图明文不可用（`Enums.MemoryStoreErrorCode.UnpublishedPlace = 102`，`EggyAPI.lua`）；DataStore 的错误码里没有「未发布」项，教程默认测试地图可真实读写（推断）；商品完全没有相关信息。
 
 ## 决定
 
@@ -24,7 +24,7 @@
 
 - 跨会话防重、补发与对账没有平台真源可对，只能靠自己的落账记录；对账口径归 [ADR-0031](0031-persistent-operation-identity.md)，本 ADR 不复制。
 - 「支付期间暂停复活倒计时，取消后恢复」这类需求没有事件可挂，实现形态必然是「进入时记下剩余时间 + 超时恢复」，不是「等取消回调再恢复」。
-- 本地接缝测试（`tests/native/platform_seam_test.lua`）只断言 pending flow 关联与超时兜底，**不断言**订单身份、补发或对账能力存在——替身撑不起这三件事。
+- 本地平台适配测试（`tests/native/platform_seam_test.lua`）只断言 pending flow 关联与超时兜底，**不断言**订单身份、补发或对账能力存在——替身撑不起这三件事。
 
 ## 备选方案（拒绝）
 

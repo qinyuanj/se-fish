@@ -1,4 +1,4 @@
-# L3 命名基线：ADR-0034 的 L3（方法、自研字段）与 ADR-0037 口径下仍为 PascalCase 的存量名字。
+# L3 命名基线：ADR-0034 的 L3（方法、自研字段）与 L2（原 ADR-0037）口径下仍为 PascalCase 的存量名字。
 # naming_guard_test.lua 读它：基线之外的新名字一律失败；L3 搬完一个名字就删掉对应行（删行永远安全）。
 # 键形 `method <方法名尾段>` / `cfg <GameCfg 段名>`；包内接口实现（Attach）在守卫里点名放行，不在此列。
 cfg Ability
