@@ -25,4 +25,4 @@
 
 - 同步升级时须将核心包、宿主包与 `.dsh/skills/spoke/` 一起重拷并更新同一个 SHA，避免说明书与代码错版。
 - `spoke_eggy` 的 `is_alive` 只覆盖显式销毁（含级联），**不覆盖关局**（SE 关局不触发 `Destroying`）。
-- 两包随 `common/packages/` 自动退出架构图与质量度量（[ADR-0021](0021-packages-outside-business-scope.md)），并保留在分层门禁 L6。
+- 两包随 `common/packages/` 纳入架构图与质量度量（[ADR-0043](0043-packages-inside-business-scope.md)），并保留在分层门禁 L6；纳管不改变纯拷贝与不就地修改约束。

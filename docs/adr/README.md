@@ -4,7 +4,8 @@
 
 ## 架构、代码与生命周期
 - [0012](0012-six-layer-architecture.md) — 新增模块、调整目录职责或依赖方向：六层架构与依赖门禁。
-- [0021](0021-packages-outside-business-scope.md) — 调整质量工具或架构图范围：三端 `packages/` 退出业务范围但保留分层门禁。
+- [0021](0021-packages-outside-business-scope.md) — （已被 0043 取代）三端 `packages/` 退出业务范围的历史决策与当时理由。
+- [0043](0043-packages-inside-business-scope.md) — 调整质量工具或架构图范围：三端 `packages/` 纳入业务范围，包内模块直接建类并参与质量度量。
 - [0022](0022-introduce-spoke-runtime.md) — 引用或同步 `spoke` / `spoke_eggy`：纯拷贝落位、同源同 SHA、不就地修改、单向依赖与 `is_alive` 边界。
 - [0032](0032-spoke-native-lifecycle-architecture.md) — 改动服务端/客户端生命周期、Spoke 树、单位创建回收或官方包接入：三类树拓扑、双层 Phase、离场三步、跨树协作与单位所有权规则。
 - [0033](0033-script-names-must-not-shadow-se-services.md) — 新建三端顶层目录或脚本文件：禁止与 SE 内置服务名同名。

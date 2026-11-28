@@ -31,7 +31,6 @@ end
 
 local function is_business(id)
   return (id:match('^client%.') or id:match('^common%.') or id:match('^server%.'))
-    and not id:match('^[^.]+%.packages$') and not id:match('%.packages%.')
     and not id:match('^server%._trigger%.')
 end
 
@@ -70,12 +69,14 @@ describe('架构分层门禁', function()
   end)
 
   it('识别换行注释与长字符串参数，忽略字符串内的伪调用', function()
-    assert.same({ 'app.rules.a', 'app.rules.b', 'app.rules.c' }, Arch.requires([=[
+    assert.same({ 'app.rules.a', 'app.rules.b', 'app.rules.c', 'app.rules.d' }, Arch.requires([=[
       require
       -- 参数前允许注释
       ('app.rules.a')
       require [[app.rules.b]]
       require([==[app.rules.c]==])
+      local ok, module = pcall(require, 'app.rules.d')
+      other(require, 'app.entry.fake')
       local text = [[require('app.entry.fake')]]
     ]=]))
   end)
@@ -269,8 +270,8 @@ describe('架构分层门禁', function()
         source_edges[#source_edges + 1] = edge.from .. ' -> ' .. edge.to
       end
     end
-    for from, to in text:gmatch('{:from%s+:([%w_%.%-]+)%s+:kind%s+:dependency%s+:to%s+:([%w_%.%-]+)}') do
-      if is_business(from) and is_business(to) then
+    for from, kind, to in text:gmatch('{:from%s+:([%w_%.%-]+)%s+:kind%s+:(%a+)%s+:to%s+:([%w_%.%-]+)}') do
+      if (kind == 'dependency' or kind == 'inheritance') and is_business(from) and is_business(to) then
         uml_edges[#uml_edges + 1] = from .. ' -> ' .. to
       end
     end

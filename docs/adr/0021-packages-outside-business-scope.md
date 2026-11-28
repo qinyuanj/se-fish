@@ -1,6 +1,6 @@
 # 0021 `packages/` 退出业务范围：质量工具与架构图都不度量、不画包
 
-**Status**: accepted
+**Status**: superseded by [ADR-0043](0043-packages-inside-business-scope.md)（2026-11-28）
 
 此前三端 `packages/` 曾被收进业务范围，理由是「只有一个业务范围」，让图与质量工具对同一份源码说话；代价照常接受——包内缺 mutation 快照按每个函数算一次失败试验，图上显红。
 

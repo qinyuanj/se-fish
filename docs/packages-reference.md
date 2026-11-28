@@ -99,7 +99,7 @@
 
 ## 架构图上的位置
 
-三端 `packages/` 不进业务范围：`uml-quality.json` 的 `exclude` 与 `policy.edn` 的 `:exclude` 都把包排除，质量工具不度量、架构图上不建类；业务对包的 `require` 经 `:foreign [client.packages common.packages server.packages]` 收成外部椭圆。分层门禁不跟着退：`tools/arch_policy.lua` 仍要求包内每个模块可分类，包内循环照旧豁免。决策与后果见 [ADR-0021](adr/0021-packages-outside-business-scope.md)。
+三端 `packages/` 纳入业务范围：`uml-quality.json` 不再排除包目录，`policy.edn` 也不再把包折叠为外部节点；质量工具度量包源码，架构图直接建立包内模块与真实依赖边。`tools/arch_policy.lua` 仍要求包内每个模块可分类，包内循环照旧豁免；纳入 UML 管理不改变整包升级与不就地修改约束。决策与后果见 [ADR-0043](adr/0043-packages-inside-business-scope.md)。
 
 ## 编辑器预设依赖
 

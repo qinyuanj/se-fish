@@ -13,13 +13,13 @@
 | L3 展示与运行端支撑 | `client.store`、`client.game_ui` 等展示基元；`server.fish_behaviors`；`common.re_util`、`Util`、`TeleportUtil`、`DamageNotice`、`GarBiteNotice` | 客户端只读响应式状态仓库、展示、主界面布局、手势与瞄准；按 `Combat` 键注册的物种战斗行为，经战斗原语回调宿主；引擎和协议适配 |
 | L4 共享规则与业务状态 | `server.data`、`server.swing_registry`；`common.spoke_clock`、`common.game_cfg`、`AttrModel`、`FishCatch`、`Vitals` 等规则模块 | 存档与记录、一次性挥砍登记、消费方确定性时钟、配置解析与共享玩法计算 |
 | L5 配置内容 | `common.cfg` | 鱼、物品、商店、抽奖、盲盒与占位资产数据 |
-| L6 包 | `client.packages`、`server.packages`、`common.packages` | 整包交付的库：**官方包**与**自研包**。门禁仍要求可分类，但架构图不画、质量工具不度量（[ADR-0021](adr/0021-packages-outside-business-scope.md)） |
+| L6 包 | `client.packages`、`server.packages`、`common.packages` | 整包交付的库：**官方包**与**自研包**。包内模块纳入架构图与质量度量，门禁仍要求可分类（[ADR-0043](adr/0043-packages-inside-business-scope.md)） |
 
 完整模块名单只有一份：`tools/arch_policy.lua` 的 `M.policy.levels`。已有命名空间的后代继承归属；独立根模块逐个登记，未分类模块会使门禁失败。
 
 ## 关键边界
 
-- 三端 `packages` 同属 L6，且不进架构图与质量工具；业务对包的 `require` 在图上收成外部椭圆。门禁仍扫描包源码并保留原有规则：包不得依赖包外业务，包与包外业务共同形成的循环依赖同样被拒绝（[ADR-0021](adr/0021-packages-outside-business-scope.md)）。
+- 三端 `packages` 同属 L6，包内模块直接建类并进入质量度量，业务与包之间的 `require` 显示为真实依赖边。门禁继续扫描包源码并保留原有规则：包不得依赖包外业务，包与包外业务共同形成的循环依赖同样被拒绝（[ADR-0043](adr/0043-packages-inside-business-scope.md)）。
 - `client` 与 `server` 互不加载，`common` 不依赖任一端专属模块。
 - `common.util` 含引擎等待、通知和 `REUtil` 依赖，不是纯 foundation；它与 `REUtil` 同处 L3。
 - `common.game_cfg` 含配置解析与玩法计算，归 L4；纯配置内容归 L5 的 `common.cfg`。

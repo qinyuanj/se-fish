@@ -13,4 +13,4 @@
 - **保留 `server/World` 并忽略告警**：编辑器自己声明该子树「不会生效」，把整棵世界宿主留在同步盲区里；出问题只会在试玩时以更难定位的形态出现。
 - **改成小写 `server/world`**：大小写是否参与重名判定没有依据；靠大小写绕开保留名，编辑器行为一变就复发。
 - **把 35 个模块摊到 `server/` 根下**：`server/` 根只放入口与少量宿主文件，摊平后入口、宿主、树混在一起，也破坏 [`tools/arch_policy.lua`](../../tools/arch_policy.lua) 里 `server.WorldHost` 的命名空间归属。
-- **挪进 `server/packages/`**：包不属于业务范围（[ADR-0021](0021-packages-outside-business-scope.md)），会同时退出分层门禁与架构图。
+- **挪进 `server/packages/`**：把世界宿主伪装成整包交付库，混淆 L2 与 L6 职责；即使包已纳入业务范围（[ADR-0043](0043-packages-inside-business-scope.md)），仍破坏分层语义。

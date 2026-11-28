@@ -317,6 +317,11 @@ function M.requires(source)
     local after = text:sub(last + 1, last + 1)
     local cursor = last + 1
     while text:sub(cursor, cursor):match('%s') do cursor = cursor + 1 end
+    local prefix = text:sub(1, first - 1)
+    if prefix:match('%f[%w_]pcall%s*%(%s*$') and text:sub(cursor, cursor) == ',' then
+      cursor = cursor + 1
+      while text:sub(cursor, cursor):match('%s') do cursor = cursor + 1 end
+    end
     if text:sub(cursor, cursor) == '(' then
       cursor = cursor + 1
       while text:sub(cursor, cursor):match('%s') do cursor = cursor + 1 end
