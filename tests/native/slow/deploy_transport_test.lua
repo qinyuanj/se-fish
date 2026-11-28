@@ -79,6 +79,14 @@ describe("TestDeployCli", function()
     assert.are.equal(0, code, out)
     assert.matches("deploy ok", out, 1, true)
     assert.matches("编辑器收尾跳过", out, 1, true) -- 临时宿主没有 eggy.json
+    -- 跳过收尾时留一行独立成行的 key=value 标记：脚本据此知道编辑器内代码未校验。
+    local marker
+    for line in out:gmatch("[^\r\n]+") do
+      if line:match("^editor_verified=") then marker = line end
+    end
+    assert.is_truthy(marker, "缺少 editor_verified 标记:\n" .. out)
+    assert.is_truthy(marker:match("^editor_verified=false reason=[%w%-]+$"), "标记格式不对: " .. marker)
+    assert.is_nil(out:find("editor_verified=true", 1, true), "临时宿主不应宣称编辑器已校验")
     assert.are.equal("-- 客户端 A\n", slurp(HOST .. "/client/UI/a.lua"))
     assert.are.equal("-- 客户端 B\n", slurp(HOST .. "/client/UI/sub/b.lua"))
     assert.are.equal("-- 共享配置\n", slurp(HOST .. "/common/game_cfg.lua"))

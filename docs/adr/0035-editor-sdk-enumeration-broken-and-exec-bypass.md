@@ -1,6 +1,6 @@
 # 0035 编辑器 SDK 全树枚举故障，与 `exec` 绕过合同
 
-**Status**: accepted（2026-10-14 定不修，2026-11-24 收口成本条 ADR）
+**Status**: accepted（2026-10-14 定不修，2026-11-24 收口成本条 ADR；2026-11-28 复查：`editor-unit` 在 0.20.17 恢复，`exec` 合同降为兜底，见「2026-11-28 复查」）
 
 本图几乎所有场景取证、批量写入与逐点验收都要先读场景。而编辑器 SDK 的 `editor-unit` 子命令族在本机是全线故障的：它坏在 SDK 内部的类型反射缓存上，调用侧没有补丁点。不知道这件事，第一反应会去「修命令」或者「换个参数再试」，两头都是空耗。
 
@@ -25,7 +25,36 @@
 
 ### 复查触发
 
-`editor-cli --version` 变化即重开 #100，评估是否换回原路径；`env-res list` 的 `latest` 变化只作背景信息。本机 2026-11-20 已是 **0.20.17**，而上一次复跑停在 0.20.12，所以这条复查现在是欠着的：挂在 [#323](https://github.com/qinyuanj/se-fish/issues/323) 第五节，没复跑就没有「已修 / 未修」的结论。
+`editor-cli --version` 变化即重开 #100，评估是否换回原路径；`env-res list` 的 `latest` 变化只作背景信息。本机 2026-11-20 已是 **0.20.17**，而上一次复跑停在 0.20.12，所以这条复查现在是欠着的：挂在 [#323](https://github.com/qinyuanj/se-fish/issues/323) 第五节，没复跑就没有「已修 / 未修」的结论。2026-11-28 已复跑，见下节。
+
+## 2026-11-28 复查
+
+**触发条件已满足**：`editor-cli --version` 从 0.20.12 前进到 **0.20.17**（`~/.eggitor/cli/editor-cli.exe --version` 实测）。`env-res list` 显示 `editor_cli_win` 当前 0.20.17、`latest` 0.20.20（`needs_update: true`），只作背景信息。
+
+**实测**（本机编辑器已开图，全部只读命令，未写场景）：
+
+- `editor-unit capabilities --json`：`success: true`，`backend: se_editor_api`，`data.available` / `data.fully_aligned` / `data.editor_only` 均为 `true`，`locator: UnitId`，`unit_id_scope: current_map_load`，`list_default_limit: 50` / `list_max_limit: 200`；13 个操作在 `operation_support` 里全部为 `supported`：`capabilities` / `list` / `search` / `get` / `selected` / `select` / `create` / `rename` / `transform` / `get-property` / `set-property` / `reparent` / `delete`。
+- `editor-unit list --json`：`success: true`，单页 50 条，带 `has_more` / `next_offset` / `total` / `type_groups`；返回类型含 `WorldUnit` / `Folder` / `PresetLink` / `SpawnLocationUnit`。
+- `editor-unit get 1179017579 --json`：`success: true`，返回 `WorldUnit` `Z1_FerryOut` 的 `unit` 对象，含 `path`、`parent_unit_id`、`child_count` 与 `transform{position, rotation, scale}`。
+- `editor-unit get 1134030614 --json`：`success: true`，返回 `Folder` `01 鱼塘`。
+- `editor-unit get-property 1134030614 name --json`：`success: true`，`property: "name"`、`value: "01 鱼塘"`、`value_type: "string"`。
+- `capabilities.data.limitations`（SE）：`create` / `transform --scale` 由 `Unit:SetScale` 在单位存在后写入并读回校验，写失败回滚并报告。
+
+**结论变化**：
+
+- 原「`editor-unit` 全线故障、按 ID 的读也必须走 `exec`」作废：**按 ID 的读操作改回 `editor-unit` 首选**（`list` / `search` / `get` / `get-property` / `selected`），`exec` 退回「它覆盖不到时的兜底」。故障描述与 2026-10-14 的决定作为历史保留，不删。
+- **写操作未切换**：`capabilities` 声称 `create` / `rename` / `transform` / `set-property` / `reparent` / `delete` 均 `supported`，但本次复查只跑只读命令（禁写场景），没有实跑写操作。切换前先在目标图上实测一次；在此之前写操作仍按原合同走 `exec`。
+- **四条硬边界的新适用边界**：边界 1（任何按 ID 操作都不用 `editor-unit`）作废；边界 2 / 3 / 4 只约束 `exec` 路径（World 枚举、`Script` / `PresetLink` 类型本身、同名递归）。`editor-unit list` / `search` 可作为这些场景的替代读取面，但 `Script` / `PresetLink` **类型本身**的枚举与同名递归**本次未复测**，仍按未验证处理。
+- **UnitId 仍不可持久化**：`unit_id_scope: current_map_load`，地图重开、加载或起停试玩都会变；持久身份继续按 [ADR-0031](0031-persistent-operation-identity.md) 的操作身份口径。
+- 复跑命令（可复现，全部只读）：
+
+  ```
+  editor-cli --version
+  editor-cli editor-unit capabilities --json
+  editor-cli editor-unit list --json
+  editor-cli editor-unit get <unit-id> --json
+  editor-cli editor-unit get-property <unit-id> <attr> --json
+  ```
 
 ## 已知副作用与附带事实
 

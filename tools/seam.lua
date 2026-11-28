@@ -12,9 +12,12 @@ local DQUOTE = string.char(34)
 
 local DEFAULT_WORKSPACE_REL = "Desktop/dev/eggy/LuaSource_钓鱼怎么这么危险啊喂！"
 local EDITOR_CLI_REL = ".eggitor/cli/editor-cli.exe"
+local EDITOR_CLI_ENV = "EGGITOR_CLI"
 
 M.DEFAULT_WORKSPACE_REL = DEFAULT_WORKSPACE_REL
 M.EDITOR_CLI_REL = EDITOR_CLI_REL
+M.EDITOR_CLI_ENV = EDITOR_CLI_ENV
+M.EDITOR_CLI_HINT = "启动一次蛋仔 PC 编辑器以准备 CLI，或设置环境变量 " .. EDITOR_CLI_ENV .. " 指向 editor-cli.exe"
 M.LOG_FILE = "tmp/robocopy.log"
 
 local CMD_LINE_LIMIT = 8191
@@ -514,11 +517,56 @@ function M.default_workspace()
   return home .. "/" .. DEFAULT_WORKSPACE_REL
 end
 
--- editor-cli.exe：<USERPROFILE>/.eggitor/cli/editor-cli.exe
-function M.editor_cli()
-  local home, err = profile()
-  if not home then return nil, err end
-  return home .. "/" .. EDITOR_CLI_REL
+-- 只认文件：目录或断链都不算命中。
+local function is_file(path)
+  return lfs.attributes(tostring(path), "mode") == "file"
+end
+
+-- 在 PATH 上按目录找 editor-cli：Windows 先找 .exe，再退到无扩展名。
+-- 只做存在性探测；不走 which（which 会起进程做 --version 验证，用来找工具太重）。
+local function editor_cli_on_path(env, exists)
+  local raw = env("PATH") or ""
+  for entry in (raw .. ";"):gmatch("([^;]*);") do
+    entry = entry:gsub("^" .. DQUOTE, ""):gsub(DQUOTE .. "$", "")
+    if entry ~= "" then
+      local dir = M.normalize(entry)
+      for _, name in ipairs({ "editor-cli.exe", "editor-cli" }) do
+        local full = dir .. "/" .. name
+        if exists(full) then return full end
+      end
+    end
+  end
+  return nil
+end
+
+-- editor-cli 可执行文件解析顺序：环境变量 EGGITOR_CLI（存在且是文件）→
+-- <USERPROFILE>/.eggitor/cli/editor-cli.exe → PATH 上的 editor-cli.exe / editor-cli。
+-- 都找不到时返回 nil 与可操作原因。deps = { env = function(name), exists = function(path) }
+-- 可注入，默认读真实环境与磁盘——测试靠它钉住优先级，不依赖本机安装。
+function M.editor_cli(deps)
+  deps = deps or {}
+  local env = deps.env or os.getenv
+  local exists = deps.exists or is_file
+
+  local explicit = env(EDITOR_CLI_ENV)
+  if explicit and explicit ~= "" then
+    explicit = M.normalize(explicit)
+    if exists(explicit) then return explicit end
+  end
+
+  local home = env("USERPROFILE") or env("HOME")
+  local default
+  if home and home ~= "" then
+    default = M.normalize(home) .. "/" .. EDITOR_CLI_REL
+    if exists(default) then return default end
+  end
+
+  local found = editor_cli_on_path(env, exists)
+  if found then return found end
+
+  return nil, string.format(
+    "找不到 editor-cli（已查 EGGITOR_CLI、默认路径 %s、PATH）：%s",
+    default or "（USERPROFILE 未设置）", M.EDITOR_CLI_HINT)
 end
 
 -- %TEMP%。

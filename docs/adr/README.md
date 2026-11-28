@@ -23,11 +23,12 @@
 ## 工具链与平台边界
 - [0009](0009-blender-headless-only.md) — （已废弃，工作流存于 tag `art-workflow-archive-v1`）驱动 Blender 处理美术资产：只走无头，唯一入口 `lua tools/cli.lua blender`。
 - [0017](0017-windows-native-only.md) — 改动 `tools/` CLI、子进程、路径或测试夹具：Windows 原生单一环境与唯一接缝 `tools/seam.lua`。
-- [0035](0035-editor-sdk-enumeration-broken-and-exec-bypass.md) — 用 `editor-cli` 读写场景或写引擎替身：SDK 全树枚举故障与 `exec` 绕过四条硬边界。
+- [0035](0035-editor-sdk-enumeration-broken-and-exec-bypass.md) — 用 `editor-cli` 读写场景或写引擎替身：`editor-unit` 在 0.20.17 恢复为首选读取面、`exec` 合同降为兜底；故障与四条硬边界作历史保留。
 - [0036](0036-platform-commerce-and-ads-not-verifiable-in-editor.md) — 改动商城、支付或广告适配层：编辑器内不可验收、订单身份自研与超时兜底。
 - [0038](0038-emmylua-agentic-coding-quality-gate.md) — 改动 Lua 诊断门禁、`.emmyrc.json` 或基线：EmmyLua 作为诊断质量门禁与单向基线。
 - [0040](0040-local-multiplayer-not-simulatable-in-editor.md) — 评估多人联机取证或本地模拟：本地模拟多人不可用，必须真实第二客户端。
 - [0041](0041-token-budget-gate.md) — 新增或调整单文件体积规则、基线或 pre-commit/CI 门禁：token 预算（`se-fish-budget-v1`）、出货集与受管集、棘轮基线。
+- [0042](0042-no-plugin-dev-data-export-only-exception.md) — 判断开发是否依赖 VS Code Eggitor 插件、或如何改 `data/`：默认无插件开发，`data/` 导出是唯一插件例外。
 
 ## 美术资产
 - [0004](0004-fish-asset-scale.md) — 制作、导出或验收鱼类模型与动画：单位方块基准、100 倍导入换算、底面中心原点与贴图编码。

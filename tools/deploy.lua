@@ -29,7 +29,7 @@ local function fail(msg)
   error("deploy: " .. msg, 0)
 end
 
--- 外部工具不可用（robocopy 缺失、editor-cli.exe 推导失败）：main 收成退出码 3。
+-- 外部工具不可用（robocopy 缺失）：main 收成退出码 3。
 local function unavailable(msg)
   exit_code.unavailable("deploy: " .. msg)
 end
@@ -57,6 +57,9 @@ function M.usage()
     "三端内外的地图独有文件同时出现、或 only-on-map 清单读不全时，不推送并以退出码 1 结束；",
     "push 后仍与编辑器不一致时报告尚未同步，并以退出码 1 结束。",
     "editor-cli 不在或编辑器没开该地图时打印跳过并以退出码 0 结束（磁盘已是最新）。",
+    "收尾最后单独输出一行 key=value 标记供脚本判读：editor_verified=true 表示编辑器内代码已校验/同步；",
+    "editor_verified=false reason=<短原因> 表示跳过（missing-editor-cli / missing-eggy-json /",
+    "map-not-open / map-offline），此时只保证磁盘已最新，退出码仍为 0。",
     "三端以外的地图独有文件（temp/ 等编辑器生成物）只提示，不删。",
     "宿主目录默认为 USERPROFILE 下的 " .. workspace.DEFAULT_REL .. "，",
     "环境变量 EGGY_WORKSPACE 可覆盖（正斜杠 Windows 路径，如 C:/Users/<用户名>/...；空串当作未设置）。",
@@ -200,10 +203,14 @@ local function run_deploy(clean_only)
   -- 日常清理：宿主 log.txt 超过 512KB 或 4 小时未写入时直接删除，文件被占用时安全跳过。
   host_log.maybe_clean(WS)
 
-  local ok, err, code = finalize.run(WS)
-  if not ok then
-    if code == exit_code.UNAVAILABLE then unavailable(err) end
-    fail(err)
+  -- 收尾成功返回 true；跳过时额外返回短原因（人读提示已由 editor_finalize 打印）。这里最后补一行
+  -- 稳定标记，脚本据此区分「编辑器内代码已校验」与「只镜像了磁盘」。
+  local ok, why = finalize.run(WS)
+  if not ok then fail(why) end
+  if why then
+    print("editor_verified=false reason=" .. why)
+  else
+    print("editor_verified=true")
   end
 end
 

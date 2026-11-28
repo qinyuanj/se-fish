@@ -1,4 +1,4 @@
-﻿# 开发工作流
+# 开发工作流
 
 修改代码、运行测试、同步宿主或操作编辑器前，以及整理过程产物时，读取本文。
 
@@ -22,11 +22,13 @@
 
 Lua 命令使用 **Lua 5.4**，命令名统一 `lua`，执行前用 `lua -v` 核对；`tools/cli.lua` 入口在非 5.4 解释器下直接退 1，不提供带版本号后缀的解释器别名。Lua 5.5 对循环变量重新赋值会报 `attempt to assign to const variable`，遇到此错误先检查版本。
 
-- `lua tools/cli.lua deploy`：将三端一级子树字节镜像到宿主目录（经 `tools/seam.lua` 调用 `robocopy /MIR`，镜像前打印将被删掉的宿主多余文件；宿主三端根下仓库已删的散文件或子树同样先删）；robocopy 缺失时在镜像前以退出码 3 失败。编辑器开着本图时执行 validate → 有差异时 `code push` → `code diff` 复核，push 后仍不一致才返回失败。三端内本地已删的地图文件用 `code push --delete --yes` 删掉；三端外的地图独有文件（`temp/` 等编辑器生成物）只提示保留，两类同时出现时不推送（#167）。跨接缝约定见 [ADR-0017](../adr/0017-windows-native-only.md)。
-- `lua tools/cli.lua sync`：将宿主目录的 API 存根、`data/` 回灌仓库；`eggy.json` 不回灌，见下方「编辑器工程 ≠ 仓库检出」；三端 `packages/` 由仓库管理，也不回灌。
+**仓库 ↔ 编辑器。** 本仓默认不做 VS Code Eggitor 插件开发（插件只用于导出 `data/`，见 `AGENTS.md`「生成内容」与 [ADR-0042](../adr/0042-no-plugin-dev-data-export-only-exception.md)）：一等入口是 `editor-cli`（编辑器侧：`status`、`play`、`code`、`log`，通用用法见技能 `eggy-se-editor-cli`）与 `lua tools/cli.lua`（仓库侧，子命令见 `--help`）。已有包装命令的操作用包装命令，不手拼编辑器副作用。试玩走显式入口 `editor-cli play start` / `editor-cli play stop`（`play restart` 同理）：起停成功只表示请求已提交，必须轮询 `editor-cli status --json` 到 `in_game_runtime` / `edit_mode` 符合预期再进入下一步。
+
+- `lua tools/cli.lua deploy`：**仓库 → 编辑器宿主目录的唯一同步路径**，将三端一级子树字节镜像到宿主目录（经 `tools/seam.lua` 调用 `robocopy /MIR`，镜像前打印将被删掉的宿主多余文件；宿主三端根下仓库已删的散文件或子树同样先删）；robocopy 缺失时在镜像前以退出码 3 失败。编辑器开着本图时执行 validate → 有差异时 `code push` → `code diff` 复核，push 后仍不一致才返回失败。三端内本地已删的地图文件用 `code push --delete --yes` 删掉；三端外的地图独有文件（`temp/` 等编辑器生成物）只提示保留，两类同时出现时不推送（#167）。跨接缝约定见 [ADR-0017](../adr/0017-windows-native-only.md)。编辑器没开该图或 `editor-cli` 不可用时，收尾只打印「编辑器收尾跳过」并以退出码 0 结束——这只代表磁盘已镜像，地图内存仍是旧代码；打开编辑器后必须重跑 `deploy` 补推，确认 `code validate` → `code push` → `code diff` 走完。收尾结果另输出独立一行 `editor_verified=true`（编辑器内代码已校验/同步）或 `editor_verified=false reason=<短原因>`（跳过，原因取 `missing-editor-cli` / `missing-eggy-json` / `map-not-open` / `map-offline`），供脚本判读。
+- `lua tools/cli.lua sync`：将宿主目录的 API 存根、`data/` 回灌仓库（宿主 `data/` 由 VS Code Eggitor 插件从编辑器导出，插件在本仓仅此用途）；`eggy.json` 不回灌，见下方「编辑器工程 ≠ 仓库检出」；三端 `packages/` 由仓库管理，也不回灌。
 - `lua tools/cli.lua naming [--recon|--apply|--check] [--layer l3a|l3b|all] [--root <目录>]`：命名改名 codemod 与旧名字符串键守卫（#337）。`--recon` 只列将要改的 `文件:行 旧名 -> 新名`，`--apply` 才落盘且要求目标 git 工作区干净（只用于父提交 worktree）；映射与 keydefs 在 `tools/naming/data/`，口径见 [ADR-0034](../adr/0034-self-written-code-snake-case.md)。`--root` 用于在父提交的干净 worktree 上重放历史层：L3a 对应 `b3a1855`（父提交 `e2a59d1`），L3b 对应 `9685b9e`（父提交 `c75e740`）。`--check` 与 `tests/native/guards/naming_string_keys_test.lua` 共用规则，发现字符串字面量里的旧方法名时报文件与行号。
 - `lua tools/cli.lua docs sync`：显式同步 SE 官方手册到已忽略的 `.toolcache/se-manual/`，覆盖 `lua/00–22`、教程与 API 总索引及 API 索引所列最新 changelog；`docs sync api <类型名或官方 URL>` 按需加入一个 `game_api` 成员页。每个纯文本文件头记录官方 URL、UTC 拉取时间与正文的 SHA-256，日志另记官网文件名提供的版本；所有核心页面下载并解析成功后才写入，失败保留旧缓存。`lua tools/cli.lua docs search <查询>` 只检索本地缓存、无需网络或编辑器，命中给出本地文件行号与官方来源 URL；缓存为空时先跑 `docs sync`，精确成员详情仍可走 `editor-cli api get` / 官方单页兜底。同步依赖 PATH 上的 `curl`，检索不依赖它。
-- `lua tools/cli.lua screenshot [--window <标题子串>] [--screen] [--out <文件.png>]`：取证画面的统一入口，缺省后台抓屏（`PrintWindow`），输出落 `tmp/`。选窗、虚拟屏与判帧新旧的实测坑见 [editor-cli.md「截图」](editor-cli.md)，取证前先跑 `--info`。
+- `lua tools/cli.lua screenshot [--window <标题子串>] [--screen] [--out <文件.png>]`：截图取证的唯一入口（不用 editor-cli 原生 `screenshot`——它在虚拟屏上会抓出黑帧或停在旧帧，#185；本入口被遮挡也能取当前帧），缺省后台抓屏（`PrintWindow`），输出落 `tmp/`。选窗、虚拟屏与判帧新旧的实测坑见 [editor-cli.md「截图」](editor-cli.md)，取证前先跑 `--info`。
 - `lua tools/cli.lua acceptance [--check|--write|--update-baseline|--infer]`：验收矩阵的统一校验入口（#326），矩阵入口见 [条款矩阵](../acceptance/README.md)（接手先读 [交接说明](../acceptance/handover.md)），判定逻辑在 `tools/acceptance.lua`，用法与退出码看 `--help`。状态从证据文件反推，`--infer` 单独列出；同一判定随 fast 车道跑（`tests/native/guards/acceptance_matrix_test.lua`）。
 - `lua tools/cli.lua emmylua [--update-baseline]`：EmmyLua 诊断门禁（[ADR-0038](../adr/0038-emmylua-agentic-coding-quality-gate.md)），固定 `emmylua_check 0.25.1`，扫描三端自写代码、排除 `tests/` 与 `packages/`；只拦 `tools/emmylua_baseline.txt` 基线外的新诊断。pre-commit 在 `test guards` 之后运行它，CI 随 `full` job 作为 required 门禁运行。
   **Ratchet / 棘轮**：验收基线的单向闸门，已取证数只升。_Avoid_: 阈值、配额、budget、上限
@@ -71,7 +73,7 @@ lua tools/cli.lua worktree-init
 
 ## 测试纪律
 
-- **试玩优先**：新增验证尽量只用编辑器 E2E，复杂功能以试玩证明可用；操作见 skill `eggy-se-qa`。
+- **试玩优先**：新增验证尽量只用编辑器 E2E，复杂功能以试玩证明可用；起停走 `editor-cli play start` / `editor-cli play stop`，操作见 skill `eggy-se-qa`。
 - **先列失败方式**：确需单独测试某个系统时，先列出所有可能失败的方式，再写代码；代码写完后不补写单测。
 - **局部开发、全量收尾**：开发期间用 `lua tools/cli.lua test` 验证；业务功能仍按需试玩，收尾执行下面的全部检查。
 - **可复现取证**：每次试玩保留可重跑的触发步骤（`input` 命令、探针文件）与对应证据（`log grep` 命中行、截图路径）。
@@ -82,7 +84,7 @@ lua tools/cli.lua worktree-init
 
 不跑 full 时，用下面的判定式说明「为什么够用」；从上往下读，先命中先执行，判不清就落 full。逐车道/逐文件的原始数据、闭包与 fast+guards 原型见 [#395](https://github.com/qinyuanj/se-fish/issues/395)。
 
-- **判定式 1（纯文档）**：改了什么——只改 `docs/**/*.md` 或根 `README.md` / `AGENTS.md` / `GLOSSARY.md` / `CODING_STANDARDS.md`。必须跑——`test guards`。可以跳过——fast、slow、spec。跳过的已知代价——链接、锚点、归属与验收矩阵仍由 guards 覆盖，但代码行为零验证。谁补证——PR 作者贴 CI `full` check 的 guards 结果并确认 diff 无代码，reviewer 复核；CI 对纯文档 PR 走同一快速路径。
+- **判定式 1（纯文档）**：改了什么——只改 `docs/**/*.md` 或根 `AGENTS.md` / `GLOSSARY.md` / `CODING_STANDARDS.md`。必须跑——`test guards`。可以跳过——fast、slow、spec。跳过的已知代价——链接、锚点、归属与验收矩阵仍由 guards 覆盖，但代码行为零验证。谁补证——PR 作者贴 CI `full` check 的 guards 结果并确认 diff 无代码，reviewer 复核；CI 对纯文档 PR 走同一快速路径。
 - **判定式 2（只改测试）**：改了什么——只在 `tests/`。必须跑——该文件所属车道（slow 不在 `lua tools/cli.lua test` 的车道表里，用 `busted tests/native/slow` 单跑）；改 `tests/support/` 时，把消费该夹具的车道一起跑。可以跳过——其余车道。跳过的已知代价——若夹具还有别的消费方而没跑那条车道，失败只会在 CI 暴露。谁补证——作者列出夹具消费方与所跑车道；CI `full` 兜底。
 - **判定式 3（三端代码，车道归属清晰，用于本地迭代）**：改了什么——`client/`、`common/`、`server/` 中的文件，且改动文件都出现在 fast 用例的覆盖集里（用一次 `busted --coverage` 或 #395 的覆盖清单判定），没有触及判定式 4 的路径。必须跑——`test fast`（guards 已含在 fast 内）。可以跳过——spec、slow。跳过的已知代价——spec 的跨端契约与 slow 的 `tools/` transport 不验；按 #395 的对拍，fast+guards 只覆盖 57.1% 的受影响用例（漏 42.9%，主要是 spec）。谁补证——本地迭代由作者记录；开 PR 前按后面的门槛补 full，或由 reviewer 写明接受该风险。
 - **判定式 4（跨车道依赖）**：改了什么——触及 `common/` 共享件、`server/world_host/`、`tools/`、`policy.edn`、`.busted`、`tests/support/`，或同时改两端以上。必须跑——`test full`。可以跳过——无。跳过的已知代价——无。谁补证——CI `full`。
@@ -106,7 +108,7 @@ lua tools/cli.lua worktree-init
 
 ## 完成判据
 
-代码改动按顺序执行，全部通过才算完成。新 checkout 执行 `lua tools/cli.lua worktree-init` 会安装本地 `pre-commit`，已有 checkout 可单独执行 `lua tools/cli.lua git-hook-init`（带自家签名头的旧版 hook 会自动升级）；提交前自动依次运行 `lua tools/cli.lua test guards`、`lua tools/cli.lua size` 与 `lua tools/cli.lua emmylua`，重复安装幂等，已有其他 hook 不覆盖。PR 与 `main` 推送由 [test.yml](../../.github/workflows/test.yml) 的单一 `full` job 执行，check-run context `full`（PR 界面显示 `test / full`）是 `main` 的唯一 required status check：代码 PR 与 `push(main)` 依次运行 `lua tools/cli.lua test full --jobs <2× 核数，下限 4、上限 8>`（GitHub 托管 runner 是 4 逻辑核 → 8 片，实测 24.0 秒 → 12.3 秒）与 `lua tools/cli.lua size`、`lua tools/cli.lua emmylua`；仅修改白名单纯文档（`docs/**/*.md`，及根 `README.md` / `AGENTS.md` / `GLOSSARY.md` / `CODING_STANDARDS.md`）的 PR 在同一 `full` job 内走快速路径，只跑 `lua tools/cli.lua test guards --jobs <同上>`，任何非白名单变更或变更检测异常一律兜底全量。Lua 5.4.6 / LuaRocks 3.12.2 / Busted 2.3.0-1 直接从本仓 Release `ci-toolchain-v1` 下载预构建包并校验 SHA-256（需升级版本时由 [build-ci-toolchain.yml](../../.github/workflows/build-ci-toolchain.yml) 手动重打并回填摘要），`.emmylua` 按版本哈希经 `actions/cache@v6` 缓存；PR 同分支连续推送开启并发取消，`push(main)` 按 `run_id` 独立分组不取消。下表其余每一项仍由 agent 显式执行，质量工具由人运行，见表后的「人工验收」。
+代码改动按顺序执行，全部通过才算完成。新 checkout 执行 `lua tools/cli.lua worktree-init` 会安装本地 `pre-commit`，已有 checkout 可单独执行 `lua tools/cli.lua git-hook-init`（带自家签名头的旧版 hook 会自动升级）；提交前自动依次运行 `lua tools/cli.lua test guards`、`lua tools/cli.lua size` 与 `lua tools/cli.lua emmylua`，重复安装幂等，已有其他 hook 不覆盖。PR 与 `main` 推送由 [test.yml](../../.github/workflows/test.yml) 的单一 `full` job 执行，check-run context `full`（PR 界面显示 `test / full`）是 `main` 的唯一 required status check：代码 PR 与 `push(main)` 依次运行 `lua tools/cli.lua test full --jobs <2× 核数，下限 4、上限 8>`（GitHub 托管 runner 是 4 逻辑核 → 8 片，实测 24.0 秒 → 12.3 秒）与 `lua tools/cli.lua size`、`lua tools/cli.lua emmylua`；仅修改白名单纯文档（`docs/**/*.md`，及根 `AGENTS.md` / `GLOSSARY.md` / `CODING_STANDARDS.md`）的 PR 在同一 `full` job 内走快速路径，只跑 `lua tools/cli.lua test guards --jobs <同上>`，任何非白名单变更或变更检测异常一律兜底全量。Lua 5.4.6 / LuaRocks 3.12.2 / Busted 2.3.0-1 直接从本仓 Release `ci-toolchain-v1` 下载预构建包并校验 SHA-256（需升级版本时由 [build-ci-toolchain.yml](../../.github/workflows/build-ci-toolchain.yml) 手动重打并回填摘要），`.emmylua` 按版本哈希经 `actions/cache@v6` 缓存；PR 同分支连续推送开启并发取消，`push(main)` 按 `run_id` 独立分组不取消。下表其余每一项仍由 agent 显式执行，质量工具由人运行，见表后的「人工验收」。
 
 | 检查 | 通过条件 |
 |---|---|

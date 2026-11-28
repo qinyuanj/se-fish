@@ -157,10 +157,11 @@ describe("TestDeployOwnedTargets", function()
   end)
 end)
 
--- 退出码约定（#145）：interop 或 editor-cli.exe 推导失败属平台不可用，退 3；
--- 「编辑器没装 → 打印跳过」仍退 0。编辑器收尾走真实模块，只桩接缝层。
+-- 退出码约定（#145）：robocopy 缺失属平台不可用，退 3；编辑器收尾找不到 editor-cli、编辑器没装、
+-- 地图没开都只是跳过（退 0），用 editor_verified=false 标记与「已校验」区分。编辑器收尾走真实模块，
+-- 只桩接缝层。
 describe("TestDeployExitCodes", function()
-  local saved, deploy, world, err_text
+  local saved, deploy, world, err_text, out_text
   -- 编辑器收尾走真实模块、只桩接缝层：deploy 与 editor_finalize 共用 tools.seam（#189）。
   local MODULES = { "tools.deploy", "tools.eggy_workspace", "tools.seam", "tools.editor_finalize" }
   local EXE = "C:/Users/fixture/.eggitor/cli/editor-cli.exe"
@@ -169,8 +170,8 @@ describe("TestDeployExitCodes", function()
     HOST_ENTRIES = same_as_repo()
     saved = { modules = {}, print = print, stderr = io.stderr }
     for _, name in ipairs(MODULES) do saved.modules[name] = package.loaded[name] end
-    world = { preflight = true, editor_cli = EXE, exe_exists = true }
-    err_text = ""
+    world = { preflight = true, editor_cli = EXE, exe_exists = true, eggy_json = true }
+    err_text, out_text = "", ""
     package.loaded["tools.deploy"] = nil
     package.loaded["tools.editor_finalize"] = nil
     package.loaded["tools.eggy_workspace"] = { resolve = function() return WORKSPACE end }
@@ -188,7 +189,14 @@ describe("TestDeployExitCodes", function()
       is_dir = function() return true end,
       exists = function(path)
         if path == EXE then return world.exe_exists end
+        if path == WORKSPACE .. "/eggy.json" then return world.eggy_json end
         return true
+      end,
+      -- 收尾的 code validate / code diff 输出：按用例给的清单顺序逐条返回。
+      capture = function()
+        local step = table.remove(world.captures or {}, 1)
+        if not step then return 0, "" end
+        return step[1], step[2]
       end,
       list_entries = list_entries,
       list_files = function() return {} end,
@@ -196,7 +204,10 @@ describe("TestDeployExitCodes", function()
       mirror_cmd = function(target) return "robocopy " .. target.rel end,
       remove = function() end,
     }
-    _G.print = function() end
+    _G.print = function(...)
+      for _, v in ipairs({ ... }) do out_text = out_text .. tostring(v) end
+      out_text = out_text .. "\n"
+    end
     io.stderr = { write = function(self, ...)
       for _, v in ipairs({ ... }) do err_text = err_text .. tostring(v) end
       return self
@@ -217,14 +228,40 @@ describe("TestDeployExitCodes", function()
     assert.matches("部署工具不可用", err_text, 1, true)
   end)
 
-  it("test_editor_cli_derivation_failure_exits_3", function()
+  -- editor-cli 解析不出来（seam.editor_cli() 返回 nil）不再算平台不可用：打印跳过 + 标记 false + 退 0。
+  it("test_unresolvable_editor_cli_is_a_skip_with_exit_0", function()
     world.editor_cli = nil
-    assert.are.equal(3, deploy.main({}))
-    assert.matches("编辑器收尾失败", err_text, 1, true)
+    assert.are.equal(0, deploy.main({}))
+    assert.matches("编辑器收尾跳过", out_text, 1, true)
+    assert.is_truthy(out_text:find("\neditor_verified=false reason=missing-editor-cli\n", 1, true))
   end)
 
+  -- 解析出的路径上文件不在了同样跳过：原因相同，退出码 0。
   it("test_missing_editor_cli_is_still_a_skip_with_exit_0", function()
     world.exe_exists = false
     assert.are.equal(0, deploy.main({}))
+    assert.matches("编辑器收尾跳过", out_text, 1, true)
+    assert.is_truthy(out_text:find("\neditor_verified=false reason=missing-editor-cli\n", 1, true))
+    assert.is_nil(out_text:find("editor_verified=true", 1, true))
+  end)
+
+  -- 宿主没绑定 Lua 工程同样只跳过：原因换一个，标记仍独立成行、退出码 0。
+  it("test_missing_eggy_json_skip_marker_names_the_reason", function()
+    world.eggy_json = false
+    assert.are.equal(0, deploy.main({}))
+    assert.matches("编辑器收尾跳过", out_text, 1, true)
+    assert.is_truthy(out_text:find("\neditor_verified=false reason=missing-eggy-json\n", 1, true))
+  end)
+
+  -- 收尾走通（validate 通过、diff 有 changelist 且无差异）：输出 editor_verified=true，退出码 0。
+  it("test_editor_verified_true_after_finalize_succeeds", function()
+    world.captures = {
+      { 0, '{"ok":true,"data":{"valid":true,"issues":[],"warnings":[]},"meta":{"warnings":[]}}' },
+      { 0, "changelist: only-local=0 differs=0 only-on-map=0 unchanged=2\n" },
+    }
+    assert.are.equal(0, deploy.main({}))
+    assert.matches("编辑器: 已同步", out_text, 1, true)
+    assert.is_truthy(out_text:find("\neditor_verified=true\n", 1, true))
+    assert.is_nil(out_text:find("editor_verified=false", 1, true))
   end)
 end)

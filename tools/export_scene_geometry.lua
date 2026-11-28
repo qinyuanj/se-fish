@@ -310,15 +310,6 @@ function M.render_water_lua(baked)
     return table.concat(out, '\n')
 end
 
-local function editor_cli_path()
-    local home = os.getenv('USERPROFILE') or os.getenv('HOME') or ''
-    local candidate = seam.normalize(home) .. '/' .. seam.EDITOR_CLI_REL
-    if seam.exists(candidate) then return candidate end
-    local found = seam.which('editor-cli')
-    if found then return found end
-    error('找不到 editor-cli 可执行文件: ' .. candidate, 0)
-end
-
 -- 生成符合 ADR-0035 四条硬边界的只读编辑态采集脚本
 local function build_editor_probe_lua(tag)
     return string.format([=[
@@ -397,7 +388,8 @@ print(TAG .. " SCENE_EXPORT_DONE")
 end
 
 function M.fetch_from_editor()
-    local edcli = editor_cli_path()
+    local edcli, cli_err = seam.editor_cli()
+    if not edcli then error(cli_err, 0) end
     local tag = string.format('[EXPORT_GEOM_%d]', os.time())
     seam.ensure_dir('tmp')
     local probe_path = 'tmp/export_scene_geometry_probe.lua'

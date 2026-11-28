@@ -17,6 +17,7 @@ local SEAM_FILE_ALLOWLIST = {
   ["tools/seam.lua"] = true,
   ["tests/native/ability_seams_test.lua"] = true,
   ["tests/native/platform_seam_test.lua"] = true,
+  ["tests/native/guards/seam_cli_test.lua"] = true,
 }
 local SEAM_LABEL_PATTERNS = {
   "%-%-%s*接缝[：:]",

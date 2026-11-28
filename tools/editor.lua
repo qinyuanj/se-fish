@@ -52,10 +52,10 @@ function M.default_map()
   return M.parse_map_ledger(text)
 end
 
+-- seam.editor_cli 已按 EGGITOR_CLI → 默认路径 → PATH 解析并给出可操作原因；
+-- 这里不再二次猜路径，缺工具的原因直接透给调用方。
 local function editor_cli()
-  local exe = seam.editor_cli()
-  if not exe or not seam.exists(exe) then return nil, "找不到 editor-cli：" .. tostring(exe) end
-  return exe
+  return seam.editor_cli()
 end
 
 function M.status()

@@ -591,9 +591,6 @@ local function run(args)
 
   local exe, exe_err = seam.editor_cli()
   if not exe then unavailable(tostring(exe_err)) end
-  if not seam.exists(exe) then
-    unavailable("未找到 editor-cli.exe（" .. exe .. "）")
-  end
 
   local body = read_file(GAMECFG)
   if not body then fail("读不到 " .. GAMECFG) end
