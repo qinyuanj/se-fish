@@ -1,18 +1,28 @@
 local SpokeException = require("common.packages.spoke.runtime.spoke_exception")
 local EpochFrame = require("common.packages.spoke.runtime.epoch_frame")
 
+---@class Spoke.TreeFlush
 local TreeFlush = {}
 
+---@generic T
+---@param value T
+---@return T
 local function identity(value)
   return value
 end
 
+---@param tree Spoke.SpokeTreeInternal
+---@param fault Spoke.SpokeException
+---@param message string
 local function halt(tree, fault, message)
   tree.fault = fault
   tree:_clear_pending()
   tree:_log_error(message, fault)
 end
 
+---@param tree Spoke.SpokeTreeInternal
+---@param context Spoke.TickContext
+---@return boolean
 local function tick_once(tree, context)
   local ok, error_value = xpcall(function()
     context:tick_next()
@@ -27,6 +37,8 @@ local function tick_once(tree, context)
   return false
 end
 
+---@param tree Spoke.SpokeTreeInternal
+---@param context Spoke.TickContext
 function TreeFlush.drive(tree, context)
   if not tree._command then
     return

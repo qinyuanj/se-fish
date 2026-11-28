@@ -1,6 +1,15 @@
+---@class Spoke.SpokeHandleClass
 local SpokeHandle = {}
-SpokeHandle.__index = SpokeHandle
 
+---@class Spoke.SpokeHandle: Spoke.DisposableTable
+---@field private _id any
+---@field private _on_dispose (fun(id: any))?
+local methods = SpokeHandle --[[@as table]]
+methods.__index = methods
+
+---@param id any
+---@param on_dispose? fun(id: any)
+---@return Spoke.SpokeHandle
 function SpokeHandle.of(id, on_dispose)
   if on_dispose ~= nil and type(on_dispose) ~= "function" then
     error("SpokeHandle.on_dispose must be a function", 2)
@@ -8,18 +17,21 @@ function SpokeHandle.of(id, on_dispose)
   return setmetatable({
     _id = id,
     _on_dispose = on_dispose,
-  }, SpokeHandle)
+  }, methods)
 end
 
+---@return Spoke.SpokeHandle
 function SpokeHandle.new()
   return SpokeHandle.of(nil, nil)
 end
 
+---@param value any
+---@return boolean
 function SpokeHandle.is(value)
   return type(value) == "table" and getmetatable(value) == SpokeHandle
 end
 
-function SpokeHandle:dispose()
+function methods:dispose()
   local on_dispose = self._on_dispose
   if on_dispose then
     self._on_dispose = nil

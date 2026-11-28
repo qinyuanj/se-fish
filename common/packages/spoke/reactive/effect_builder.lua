@@ -2,12 +2,26 @@ local Computation = require("common.packages.spoke.reactive.computation")
 local Dock = require("common.packages.spoke.runtime.dock")
 local SpokeHandle = require("common.packages.spoke.runtime.spoke_handle")
 
+---@class Spoke.EffectBuilderClass
+---@field MemoBuilder Spoke.MemoBuilderClass
 local EffectBuilder = {}
-EffectBuilder.__index = EffectBuilder
 
+---@class Spoke.EffectBuilder
+---@field package _add_dynamic fun(signal: Spoke.Subscribable<any>)
+---@field package _s Spoke.EpochBuilderInternal
+local methods = EffectBuilder --[[@as table]]
+methods.__index = methods
+
+---@class Spoke.MemoBuilderClass
 local MemoBuilder = {}
-MemoBuilder.__index = MemoBuilder
 
+---@class Spoke.MemoBuilder
+---@field package _add_dynamic fun(signal: Spoke.Subscribable<any>)
+---@field package _s Spoke.EpochBuilderInternal
+local memo_methods = MemoBuilder --[[@as table]]
+memo_methods.__index = memo_methods
+
+---@param builder Spoke.EffectBuilder | Spoke.MemoBuilder
 local function assert_active(builder)
   local s = builder._s
   if not s._active
@@ -19,20 +33,30 @@ end
 
 local collect_triggers = Computation._collect_triggers
 
+---@param add_dynamic fun(signal: Spoke.Subscribable<any>)
+---@param epoch_builder Spoke.EpochBuilder
+---@return Spoke.EffectBuilder
 function EffectBuilder.new(add_dynamic, epoch_builder)
   return setmetatable({
     _add_dynamic = add_dynamic,
     _s = epoch_builder,
-  }, EffectBuilder)
+  }, methods)
 end
 
-function EffectBuilder:d(signal)
+---@generic T
+---@param signal Spoke.Signal<T>
+---@return T
+function methods:d(signal)
   assert_active(self)
   self._add_dynamic(signal)
   return signal:now()
 end
 
-function EffectBuilder:subscribe(trigger, fn)
+---@generic T
+---@param trigger Spoke.Subscribable<T>?
+---@param fn fun(value: T)
+---@return Spoke.SpokeHandle
+function methods:subscribe(trigger, fn)
   assert_active(self)
   if trigger == nil then
     return self:use(SpokeHandle.new())
@@ -40,41 +64,64 @@ function EffectBuilder:subscribe(trigger, fn)
   return self:use(trigger:subscribe(fn))
 end
 
-function EffectBuilder:use(resource)
+---@generic T: Spoke.Disposable
+---@param resource T
+---@return T
+function methods:use(resource)
   assert_active(self)
   return self._s:use(resource)
 end
 
-function EffectBuilder:call(epoch)
+---@generic T: Spoke.Epoch
+---@param epoch T
+---@return T
+function methods:call(epoch)
   assert_active(self)
   return self._s:call(epoch)
 end
 
-function EffectBuilder:export(key, value)
+---@generic T
+---@param key string
+---@param value T
+---@return T
+function methods:export(key, value)
   assert_active(self)
   return self._s:export(key, value)
 end
 
-function EffectBuilder:import(key)
+---@param key string
+---@return any
+function methods:import(key)
   assert_active(self)
   return self._s:import(key)
 end
 
-function EffectBuilder:try_import(key)
+---@param key string
+---@return boolean found
+---@return any value
+function methods:try_import(key)
   assert_active(self)
   return self._s:try_import(key)
 end
 
-function EffectBuilder:on_cleanup(fn)
+---@param fn fun()
+function methods:on_cleanup(fn)
   assert_active(self)
   self._s:on_cleanup(fn)
 end
 
-function EffectBuilder:log(message)
+---@param message any
+function methods:log(message)
   assert_active(self)
   self._s:log(message)
 end
 
+---@param builder Spoke.EffectBuilder
+---@param class { new: fun(...: any): Spoke.Epoch }
+---@param a any
+---@param b? any
+---@param ... any
+---@return Spoke.Epoch
 local function call_block_factory(builder, class, a, b, ...)
   if type(a) == "string" then
     return builder:call(class.new(a, b, collect_triggers(...)))
@@ -82,13 +129,27 @@ local function call_block_factory(builder, class, a, b, ...)
   return builder:call(class.new(a, collect_triggers(b, ...)))
 end
 
-function EffectBuilder:memo(a, b, ...)
+---@generic T
+---@overload fun(self: Spoke.EffectBuilder, name: string, selector: (fun(s: Spoke.MemoBuilder): T), ...: Spoke.TriggerList): Spoke.Memo<T>
+---@overload fun(self: Spoke.EffectBuilder, selector: (fun(s: Spoke.MemoBuilder): T), ...: Spoke.TriggerList): Spoke.Memo<T>
+---@param a any
+---@param b? any
+---@param ... any
+---@return Spoke.Memo<any>
+function methods:memo(a, b, ...)
   assert_active(self)
   local Memo = require("common.packages.spoke.reactive.memo")
-  return call_block_factory(self, Memo, a, b, ...)
+  return call_block_factory(self, Memo, a, b, ...) --[[@as Spoke.Memo<any>]]
 end
 
-function EffectBuilder:effect(a, b, ...)
+---@generic T
+---@overload fun(self: Spoke.EffectBuilder, name: string, block: (fun(s: Spoke.EffectBuilder): Spoke.Signal<T>?), ...: Spoke.TriggerList): Spoke.Effect<T>
+---@overload fun(self: Spoke.EffectBuilder, block: (fun(s: Spoke.EffectBuilder): Spoke.Signal<T>?), ...: Spoke.TriggerList): Spoke.Effect<T>
+---@param a any
+---@param b? any
+---@param ... any
+---@return Spoke.Effect<any>
+function methods:effect(a, b, ...)
   assert_active(self)
   local Effect = require("common.packages.spoke.reactive.effect")
   local name, block, triggers = Computation._parse_effect_args(a, b, ...)
@@ -98,13 +159,26 @@ function EffectBuilder:effect(a, b, ...)
   return self:call(Effect.new(block, triggers))
 end
 
-function EffectBuilder:reaction(a, b, ...)
+---@overload fun(self: Spoke.EffectBuilder, name: string, block: fun(s: Spoke.EffectBuilder), ...: Spoke.TriggerList): Spoke.Reaction
+---@overload fun(self: Spoke.EffectBuilder, block: fun(s: Spoke.EffectBuilder), ...: Spoke.TriggerList): Spoke.Reaction
+---@param a any
+---@param b? any
+---@param ... any
+---@return Spoke.Reaction
+function methods:reaction(a, b, ...)
   assert_active(self)
   local Reaction = require("common.packages.spoke.reactive.reaction")
-  return call_block_factory(self, Reaction, a, b, ...)
+  return call_block_factory(self, Reaction, a, b, ...) --[[@as Spoke.Reaction]]
 end
 
-function EffectBuilder:phase(a, b, c, ...)
+---@overload fun(self: Spoke.EffectBuilder, name: string, mount_when: Spoke.Signal<boolean>, block: fun(s: Spoke.EffectBuilder), ...: Spoke.TriggerList): Spoke.Phase
+---@overload fun(self: Spoke.EffectBuilder, mount_when: Spoke.Signal<boolean>, block: fun(s: Spoke.EffectBuilder), ...: Spoke.TriggerList): Spoke.Phase
+---@param a any
+---@param b any
+---@param c? any
+---@param ... any
+---@return Spoke.Phase
+function methods:phase(a, b, c, ...)
   assert_active(self)
   local Phase = require("common.packages.spoke.reactive.phase")
   if type(a) == "string" then
@@ -113,25 +187,34 @@ function EffectBuilder:phase(a, b, c, ...)
   return self:call(Phase.new(a, b, collect_triggers(c, ...)))
 end
 
-function EffectBuilder:dock(name)
+---@param name? string
+---@return Spoke.Dock
+function methods:dock(name)
   assert_active(self)
   return self:call(Dock.new(name))
 end
 
+---@param add_dynamic fun(signal: Spoke.Subscribable<any>)
+---@param epoch_builder Spoke.EpochBuilder
+---@return Spoke.MemoBuilder
 function MemoBuilder.new(add_dynamic, epoch_builder)
   return setmetatable({
     _add_dynamic = add_dynamic,
     _s = epoch_builder,
-  }, MemoBuilder)
+  }, memo_methods)
 end
 
-function MemoBuilder:d(signal)
+---@generic T
+---@param signal Spoke.Signal<T>
+---@return T
+function memo_methods:d(signal)
   assert_active(self)
   self._add_dynamic(signal)
   return signal:now()
 end
 
-function MemoBuilder:on_cleanup(fn)
+---@param fn fun()
+function memo_methods:on_cleanup(fn)
   assert_active(self)
   self._s:on_cleanup(fn)
 end

@@ -1,14 +1,39 @@
 local spoke = require("common.packages.spoke.api")
 local SpokeError = require("common.packages.spoke.runtime.spoke_error")
 
+---@class SpokeEggy.Connection
+---@field Disconnect fun(self: SpokeEggy.Connection)
+
+---@class SpokeEggy.DestroyingSignal
+---@field Connect fun(self: SpokeEggy.DestroyingSignal, fn: fun()): SpokeEggy.Connection
+
+---@class SpokeEggy.Unit
+---@field Name? string
+---@field Destroying SpokeEggy.DestroyingSignal
+
+---@class SpokeEggy.BehaviourOptions
+---@field name? string
+---@field services? table<string, any>
+---@field logger? Spoke.Logger
+
+---@class SpokeEggy.API
 local spoke_eggy = {}
 
+---@class SpokeEggy.Behaviour
+---@field root Spoke.SpokeTree?
+---@field unit SpokeEggy.Unit
+---@field is_alive Spoke.State<boolean>
+---@field package _connection SpokeEggy.Connection?
+---@field package _disposed boolean
+---@field package _pending_dispose boolean
 local Behaviour = {}
 Behaviour.__index = Behaviour
 
 local DEFAULT_NAME = "SpokeBehaviour"
 local TREE_SUFFIX = ":SpokeTree"
 
+---@param unit any
+---@return string?
 local function unit_name(unit)
   if unit == nil then
     return nil
@@ -22,6 +47,8 @@ local function unit_name(unit)
   return nil
 end
 
+---@param unit any
+---@return SpokeEggy.DestroyingSignal?
 local function destroying_signal(unit)
   if unit == nil then
     return nil
@@ -34,23 +61,33 @@ local function destroying_signal(unit)
     return candidate, candidate.Connect
   end)
   if ok and type(connect) == "function" then
-    return signal
+    return signal --[[@as SpokeEggy.DestroyingSignal]]
   end
   return nil
 end
 
+---@param tree_name string
+---@return Spoke.Logger
 local function prefixed_logger(tree_name)
   local prefix = "[" .. tree_name .. "] "
-  local logger = {}
-  function logger:log(message)
-    SpokeError.log(prefix .. tostring(message))
-  end
-  function logger:error(message)
-    SpokeError.log(prefix .. tostring(message))
-  end
-  return logger
+  return {
+    ---@param _ Spoke.Logger
+    ---@param message any
+    log = function(_, message)
+      SpokeError.log(prefix .. tostring(message))
+    end,
+    ---@param _ Spoke.Logger
+    ---@param message any
+    error = function(_, message)
+      SpokeError.log(prefix .. tostring(message))
+    end,
+  }
 end
 
+---@param unit SpokeEggy.Unit
+---@param init fun(s: Spoke.EffectBuilder, behaviour: SpokeEggy.Behaviour)
+---@param options? SpokeEggy.BehaviourOptions
+---@return SpokeEggy.Behaviour
 function spoke_eggy.behaviour(unit, init, options)
   if type(init) ~= "function" then
     error("spoke_eggy.behaviour expects an init function", 2)
@@ -71,6 +108,7 @@ function spoke_eggy.behaviour(unit, init, options)
   end
   local tree_name = name .. TREE_SUFFIX
 
+  ---@type SpokeEggy.Behaviour
   local self = setmetatable({
     root = nil,
     unit = unit,
@@ -107,6 +145,7 @@ function spoke_eggy.behaviour(unit, init, options)
   return self
 end
 
+---@param self SpokeEggy.Behaviour
 function Behaviour.dispose(self)
   if self._disposed then
     return

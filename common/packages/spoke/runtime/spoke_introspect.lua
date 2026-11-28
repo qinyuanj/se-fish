@@ -1,6 +1,7 @@
 local IntrospectLabels = require("common.packages.spoke.runtime.introspect_labels")
 local IntrospectTree = require("common.packages.spoke.runtime.introspect_tree")
 
+---@class Spoke.SpokeIntrospect
 local SpokeIntrospect = {}
 
 local FRAME_TRACE_HEADER = "<------------ Spoke Frame Trace ------------>"
@@ -10,6 +11,8 @@ local TREE_SIZE_THRESHOLD = 50
 SpokeIntrospect.get_children = IntrospectTree.get_children
 SpokeIntrospect.get_parent = IntrospectTree.get_parent
 
+---@param frames? Spoke.Frame[]
+---@return string
 function SpokeIntrospect.stack_trace(frames)
   frames = frames or {}
   if #frames == 0 then
@@ -33,6 +36,9 @@ end
 
 SpokeIntrospect.frame_trace = SpokeIntrospect.stack_trace
 
+---@param roots Spoke.Epoch[]
+---@param frames Spoke.Frame[]
+---@return string
 local function tree_section(roots, frames)
   local total_nodes = IntrospectTree.total_nodes(roots)
   if total_nodes > TREE_SIZE_THRESHOLD then
@@ -41,6 +47,8 @@ local function tree_section(roots, frames)
   return IntrospectTree.render(roots, frames)
 end
 
+---@param frames? Spoke.Frame[]
+---@return string
 function SpokeIntrospect.tree_trace(frames)
   frames = frames or {}
   if #frames == 0 then

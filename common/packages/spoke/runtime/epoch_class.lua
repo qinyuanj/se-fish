@@ -1,5 +1,16 @@
+---@class Spoke.EpochDefinition
+---@field constructor? fun(self: any, ...: any)
+---@field init? fun(self: any, s: Spoke.EpochBuilder): Spoke.EpochTickFn?
+---@field is_ticker? boolean
+---@field auto_arm_tick_after_init? boolean
+---@field [string] any
+
+---@class Spoke.EpochClassFactory
 local EpochClass = {}
 
+---@param class table
+---@param ... any
+---@return any
 function EpochClass.new_instance(class, ...)
   local self = setmetatable({
     name = class._default_name or "Epoch",
@@ -13,17 +24,25 @@ function EpochClass.new_instance(class, ...)
     _is_ticker = class.is_ticker == true,
     _auto_arm_tick_after_init = class.auto_arm_tick_after_init ~= false,
   }, class)
-  local args = { ... }
-  if type(args[1]) == "string" then
-    self.name = table.remove(args, 1)
+  local args = table.pack(...)
+  local start = 1
+  if args.n >= 1 and type(args[1]) == "string" then
+    self.name = args[1]
+    start = 2
   end
   if type(class.constructor) == "function" then
-    class.constructor(self, table.unpack(args))
+    class.constructor(self, table.unpack(args, start, args.n))
   end
   return self
 end
 
+---@param parent table
+---@param name string
+---@param definition? Spoke.EpochDefinition
+---@param tostring_fn? fun(self: any): string
+---@return table
 function EpochClass.define(parent, name, definition, tostring_fn)
+  ---@type table<string, any>
   local class = {
     _default_name = name,
     __tostring = tostring_fn,
