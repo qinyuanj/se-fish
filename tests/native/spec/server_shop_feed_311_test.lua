@@ -1,5 +1,6 @@
 
 local GameCfg = require("common.game_cfg")
+local ZoneMarkers = require("common.zone_markers")
 local ServerRuntime = require("server.world_host.server_runtime")
 
 local function signal()
@@ -74,12 +75,22 @@ describe("服务端商店与钓鱼佬原子事务（#311）", function()
       end,
       SetAsync = function(_, key, value) ctx.values[key] = value end,
     }
+    ctx.old_anchor_positions = ZoneMarkers.anchor_positions
+    ZoneMarkers.anchor_positions = {}
     ctx.anchors = {}
     for _, stand in ipairs(GameCfg.Shop.Stands) do
+      ZoneMarkers.anchor_positions[stand.AnchorName] = vec(0, 0, 0)
       ctx.anchors[stand.AnchorName] = { Name = stand.AnchorName, Position = vec(0, 0, 0) }
     end
     for _, npc in ipairs(GameCfg.Interact.Fishermen) do
+      if npc.ModelName then
+        ctx.anchors[npc.ModelName] = {
+          Name = npc.ModelName,
+          PlayAnimation = function(_, animation) ctx.plays[#ctx.plays + 1] = animation end,
+        }
+      end
       for _, name in ipairs(npc.AnchorNames) do
+        ZoneMarkers.anchor_positions[name] = vec(100, 0, 0)
         ctx.anchors[name] = {
           Name = name,
           Position = vec(100, 0, 0),
@@ -146,6 +157,7 @@ describe("服务端商店与钓鱼佬原子事务（#311）", function()
 
   after_each(function()
     if ctx.runtime then ctx.runtime:shutdown() end
+    ZoneMarkers.anchor_positions = ctx.old_anchor_positions
     _G.game, _G.REUtil = ctx.old_game, ctx.old_re
     GameCfg.Debug = ctx.old_debug
   end)

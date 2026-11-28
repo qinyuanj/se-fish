@@ -20,6 +20,7 @@ local PlayerTree = require('server.world_host.player_tree')
 local SpokeClock = require('common.spoke_clock')
 local LotteryEligibility = require('common.lottery_eligibility')
 local ShopFeedHost = require('tests.support.shop_feed_host')
+local ZoneMarkers = require('common.zone_markers')
 
 local function signal()
     local handlers = {}
@@ -409,6 +410,7 @@ describe("PlayerTree 烧烤会话生命周期", function()
         ctx = { queue = {}, values = {}, events = {}, results = {}, states = {}, units = {} }
         ctx.old_game = _G.game
         ctx.old_debug = GameCfg.Debug
+        ctx.old_anchor_positions = ZoneMarkers.anchor_positions
         GameCfg.Debug = { Enabled = false }
         local store = {
             GetAsync = function(_, key) return ctx.values[key] end,
@@ -451,6 +453,8 @@ describe("PlayerTree 烧烤会话生命周期", function()
 
         local anchor_name = GameCfg.Grill.Points[1].AnchorName
         local anchor = { Name = anchor_name, Position = { x = 0, y = 0, z = 0 } }
+        -- #410：交互点运行期只读编辑态导出几何；夹具把假锚点坐标注入同一快照入口。
+        ZoneMarkers.anchor_positions = { [anchor_name] = anchor.Position }
         ctx.remote = {
             check_recd = function() return false end,
             get_re = function(_, name)
@@ -495,6 +499,7 @@ describe("PlayerTree 烧烤会话生命周期", function()
         drain()
         _G.game = ctx.old_game
         GameCfg.Debug = ctx.old_debug
+        ZoneMarkers.anchor_positions = ctx.old_anchor_positions
     end)
 
     it("grill action 真实到达 alive 会话，离场清理后旧命令安全拒绝", function()

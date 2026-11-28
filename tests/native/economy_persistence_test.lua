@@ -11,6 +11,7 @@
 local GameCfg = require('common.game_cfg')
 local ServerRuntime = require('server.world_host.server_runtime')
 local SpokeClock = require('common.spoke_clock')
+local ZoneMarkers = require('common.zone_markers')
 
 describe('TestEconomyPersistence', function()
     local env
@@ -62,6 +63,7 @@ describe('TestEconomyPersistence', function()
     -- GameCfg.Save.QaSlot 由 helper 的根级 before_each/after_each 建基线并逐例恢复。
     before_each(function()
         saved.game, saved.REUtil, saved.MgrPlayerData = rawget(_G, 'game'), rawget(_G, 'REUtil'), rawget(_G, 'MgrPlayerData')
+        saved.anchor_positions = ZoneMarkers.anchor_positions
         saved.Debug, saved.Quest = GameCfg.Debug, GameCfg.Quest
         saved.EatAnimation = GameCfg.Interact.Fisherman.EatAnimation
         saved.Stands = GameCfg.Shop.Stands
@@ -71,6 +73,12 @@ describe('TestEconomyPersistence', function()
             Title = '任务', DoneText = '完成', NextNotice = '%s' }
         env = { values = {}, queue = {}, events = {}, plays = 0 }
         env.readFailure, env.writeFailure, env.loseReply = false, false, false
+        -- #410：交互点运行期只读编辑态导出几何；夹具把假锚点坐标注入同一快照入口。
+        local anchor_positions = {}
+        for _, entry in ipairs(ZoneMarkers.contract(GameCfg)) do
+            anchor_positions[entry.Name] = { x = 0, y = 0, z = 0 }
+        end
+        ZoneMarkers.anchor_positions = anchor_positions
         env.store = {
             GetAsync = function(_, key)
                 if env.readFailure then error('读档失败') end
@@ -154,6 +162,7 @@ describe('TestEconomyPersistence', function()
         GameCfg.Debug, GameCfg.Quest = saved.Debug, saved.Quest
         GameCfg.Interact.Fisherman.EatAnimation = saved.EatAnimation
         GameCfg.Shop.Stands = saved.Stands
+        ZoneMarkers.anchor_positions = saved.anchor_positions
         saved = {}
         env = nil
     end)
@@ -501,7 +510,7 @@ describe('TestEconomyPersistence', function()
 
     it('test_skip_level_rejected_before_persisting', function()
         -- #130 越级购买在持久前被拒绝：不产生操作、不扣钱、计数为零
-        GameCfg.Shop.Stands = { { AnchorName = 'TGUnitShop', Level = 7 } }
+        GameCfg.Shop.Stands = { { AnchorName = 'Z1_Shop', Level = 7 } }
         env.data:AddCoin(1000)
         persistSetup()
         env.shop:handle(env.player, { action = 'Buy', number = 50, seq = 1 }) -- 近战 2 级，未买过 1 级

@@ -116,18 +116,11 @@ local function create_scene_node_at(position, name)
     return node
 end
 
-local function create_anchor_scene_node(entry, height, kind)
-    local anchor = entry.name and World:FindFirstChild(entry.name, true) or nil ---@cast anchor WorldUnit?
-    if kind == "shop" and anchor and type(GameUI.create_scene_node) == "function" then
-        local ok, node = pcall(GameUI.create_scene_node, GameUI,
-            GameCfg.Shop.BubblePreset, anchor, Vector3.New(0, height, 0))
-        if ok and node then
-            return node
-        end
-        print("[client.main] 商店预设气泡创建失败，回退坐标节点", tostring(entry.name), tostring(node))
-    end
+-- 气泡根节点只按编辑态导出的只读坐标创建（ADR-0013 / #410）：
+-- 场景标记已静态化，游戏内不再有可挂载的完整 Unit，不能再按名字找锚点。
+local function create_anchor_scene_node(entry, height)
     local eui = get_eui_manager()
-    local center = entry.position or (anchor and anchor.Position)
+    local center = entry.position
     if not eui or not center then return nil end
     return eui:CreateSceneNodeAtPosition(Vector3.New(center.x, center.y + height, center.z))
 end
@@ -173,9 +166,20 @@ Task:Spawn(function()
                 local_character = function()
                     return Players.LocalPlayer and Players.LocalPlayer.Character or nil
                 end,
-                find_lottery_anchor = function(name) return Util:wait_for_child(World, name) end,
+                find_lottery_anchor = function(name)
+                    local position = ZoneMarkers.anchor_position(name)
+                    if not position then return nil end
+                    return { Name = name, Position = position }
+                end,
                 create_lottery_scene_node = function(preset, anchor, offset)
-                    return GameUI:create_scene_node(preset, anchor, offset)
+                    local eui = get_eui_manager()
+                    local position = anchor and anchor.Position
+                    if not eui or not position then return nil end
+                    local ox = offset and (offset.x or offset.X) or 0
+                    local oy = offset and (offset.y or offset.Y) or 0
+                    local oz = offset and (offset.z or offset.Z) or 0
+                    return eui:CreateSceneUIByPrefabKeyAtPosition(
+                        preset, Vector3.New(position.x + ox, position.y + oy, position.z + oz))
                 end,
                 hud_entry_rect = function(name)
                     local resolution = read_device_resolution()
@@ -246,7 +250,7 @@ Task:Spawn(function()
                         models = (function()
                             local rows = {}
                             for index, npc in ipairs(GameCfg.Interact.Fishermen) do
-                                local unit = Util:wait_for_child(World, npc.AnchorNames[1])
+                                local unit = Util:wait_for_child(World, npc.ModelName)
                                 if unit and unit.Scale then rows[index] = { unit = unit, baseScale = unit.Scale } end
                             end
                             return rows
@@ -327,9 +331,9 @@ Task:Spawn(function()
                 shop = ShopView.bubble_spec({ anchors = (function()
                     local rows = {}
                     for _, stand in ipairs(GameCfg.Shop.Stands) do
-                        local anchor = Util:wait_for_child(World, stand.AnchorName)
-                        if anchor then rows[#rows + 1] = {
-                            stand = stand, name = stand.AnchorName, position = anchor.Position,
+                        local position = ZoneMarkers.anchor_position(stand.AnchorName)
+                        if position then rows[#rows + 1] = {
+                            stand = stand, name = stand.AnchorName, position = position,
                         } end
                     end
                     return rows
@@ -338,9 +342,9 @@ Task:Spawn(function()
                     local rows = {}
                     for index, npc in ipairs(GameCfg.Interact.Fishermen) do
                         for _, name in ipairs(npc.AnchorNames) do
-                            local anchor = Util:wait_for_child(World, name)
-                            if anchor then rows[#rows + 1] = {
-                                npc = npc, name = name, index = index, position = anchor.Position,
+                            local position = ZoneMarkers.anchor_position(name)
+                            if position then rows[#rows + 1] = {
+                                npc = npc, name = name, index = index, position = position,
                             } end
                         end
                     end
@@ -349,9 +353,9 @@ Task:Spawn(function()
                 grill = GrillView.bubble_spec({ shared = grill_shared, anchors = (function()
                     local rows = {}
                     for index, point in ipairs(GameCfg.Grill.Points or {}) do
-                        local anchor = Util:wait_for_child(World, point.AnchorName)
-                        if anchor then rows[#rows + 1] = {
-                            point = point, index = index, name = point.AnchorName, position = anchor.Position,
+                        local position = ZoneMarkers.anchor_position(point.AnchorName)
+                        if position then rows[#rows + 1] = {
+                            point = point, index = index, name = point.AnchorName, position = position,
                         } end
                     end
                     return rows
@@ -376,6 +380,7 @@ local StarterGui = game:GetService("StarterGui") ---@cast StarterGui StarterGui
 local function disable_core_gui(name) local ok, err = pcall(function() StarterGui:SetCoreGuiEnabled(Enums.CoreGuiType[name], false) end); if not ok then print("[client.main] StarterGui:SetCoreGuiEnabled 失败", "CoreGuiType." .. name, tostring(err)) end end -- 兼容部分宿主环境未开放 CoreGui 隐藏接口
 disable_core_gui("LiftButton"); disable_core_gui("Health")
 
+---@diagnostic disable-next-line: unresolved-require
 local AbilityAPI = require("client.packages.ability_system.api")
 if AbilityAPI then
     AbilityAPI.StartClientLifecycle()

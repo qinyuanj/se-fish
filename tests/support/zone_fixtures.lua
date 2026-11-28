@@ -14,11 +14,11 @@ local sceneCenters = {
 }
 local zoneCombat = { {24,20}, {24,20}, {32,28}, {40,36}, {40,36}, {48,40}, {48,40} }
 local foldedPoints = {
-  Z1_Safe={x=6.26,y=5.01,z=-0.71}, FerryBoat={x=-8,y=1.5,z=-15},
-  TGUnitFish={x=-6.25,y=-1,z=-9.25}, TGUnitShop={x=-8.75,y=2.5,z=15.25},
+  Z1_Safe={x=6.26,y=5.01,z=-0.71}, Z1_FerryOut={x=-8,y=1.5,z=-15},
+  Z1_Fisherman={x=-6.25,y=-1,z=-9.25}, Z1_Shop={x=-8.75,y=2.5,z=15.25},
   Z1_Lottery={x=5,y=5,z=-5}, Z1_Bait1={x=5,y=6,z=-9},
-  TGUnitFishShrimp={x=213,y=6,z=-17}, TGUnitShopShrimp={x=216,y=6,z=13},
-  Z3_Grill={x=502,y=6,z=11}, FerryReturn={x=265,y=6,z=40.5},
+  Z2_Fisherman={x=213,y=6,z=-17}, Z2_Shop={x=216,y=6,z=13},
+  Z3_Grill={x=502,y=6,z=11}, Z2_FerryReturn={x=265,y=6,z=40.5},
 }
 
 function M.World()
@@ -47,12 +47,12 @@ function M.World()
     local innerWallZ = sceneCenter.z - (index == 1 and 59 or 50) + 1.5
     local safe = {x=sceneCenter.x,y=6,z=innerWallZ+18}
     unit(points,'Z'..index..'_Safe',safe.x,safe.y,safe.z)
-    unit(points,index == 1 and 'FerryBoat' or 'Z'..index..'_FerryOut',sceneCenter.x+25,6,sceneCenter.z-40.5)
+    unit(points,'Z'..index..'_FerryOut',sceneCenter.x+25,6,sceneCenter.z-40.5)
     if index > 1 then
       unit(points,'Z'..index..'_FerryReturn',sceneCenter.x-25,6,sceneCenter.z-40.5)
     end
-    local fisherman = index == 1 and 'TGUnitFish' or index == 2 and 'TGUnitFishShrimp' or 'Z'..index..'_Fisherman'
-    local shop = index == 1 and 'TGUnitShop' or index == 2 and 'TGUnitShopShrimp' or 'Z'..index..'_Shop'
+    local fisherman = 'Z'..index..'_Fisherman'
+    local shop = 'Z'..index..'_Shop'
     local combat = zoneCombat[index]
     local shoreZ = sceneCenter.z + 32
     local baitSide = index >= 2 and index <= 4 and 1 or -1
@@ -74,7 +74,6 @@ function M.World()
     for _, value in ipairs(Engine.children(points)) do
       value.Position.x = center.x + (index >= 2 and index <= 4 and -1 or 1) * (value.Position.x - sceneCenter.x)
       value.Position.z = center.z + (index >= 2 and index <= 4 and -1 or 1) * (value.Position.z - sceneCenter.z)
-      if index == 2 and value.Name == 'Z2_FerryReturn' then value.Name = 'FerryReturn' end
     end
     for _, value in ipairs(Engine.children(facilities)) do
       value.Position.x = center.x + (index >= 2 and index <= 4 and -1 or 1) * (value.Position.x - sceneCenter.x)

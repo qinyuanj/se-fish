@@ -1,4 +1,5 @@
 local GameCfg = require("common.game_cfg")
+local ZoneMarkers = require("common.zone_markers")
 local ClientStore = require("client.store.client_store")
 local RootView = require("client.views.root_view")
 local ShopView = require("client.views.shop_view")
@@ -35,14 +36,18 @@ local function mount(store, options)
 end
 
 describe("客户端商店弹窗与场景气泡（#311）", function()
-  local old_vector, old_vector2
+  local old_vector, old_vector2, saved_ready, saved_positions
   before_each(function()
     old_vector = rawget(_G, "Vector3")
     old_vector2 = rawget(_G, "Vector2")
+    saved_ready, saved_positions = ZoneMarkers.ready, ZoneMarkers.anchor_positions
     _G.Vector3 = { New = function(x, y, z) return { x = x, y = y, z = z } end }
     _G.Vector2 = { New = function(x, y) return { x = x, y = y } end }
+    ZoneMarkers.ready = true
+    ZoneMarkers.anchor_positions = {}
   end)
   after_each(function()
+    ZoneMarkers.ready, ZoneMarkers.anchor_positions = saved_ready, saved_positions
     _G.Vector3 = old_vector
     _G.Vector2 = old_vector2
   end)
@@ -50,6 +55,7 @@ describe("客户端商店弹窗与场景气泡（#311）", function()
   it("进入范围建商店气泡，点击开弹窗，切换弹窗和离开范围均对称回收", function()
     local store, writer = ClientStore.new({ initial_now = 1000 })
     local stand = GameCfg.Shop.Stands[1]
+    ZoneMarkers.anchor_positions[stand.AnchorName] = { x = 0, y = 0, z = 0 }
     local root = mount(store, {
       anchors = { { stand = stand, name = stand.AnchorName, position = { x = 0, y = 0, z = 0 } } },
       open_modal = function(id, payload) writer:open_modal(id, payload) end,
@@ -109,6 +115,7 @@ describe("客户端商店弹窗与场景气泡（#311）", function()
     local store, writer = ClientStore.new({ initial_now = 1000 })
     local npc = GameCfg.Interact.Fishermen[1]
     local anchor_name = npc.AnchorNames[1]
+    ZoneMarkers.anchor_positions[anchor_name] = { x = 0, y = 0, z = 0 }
     local sent, confirmed, seq = {}, nil, 80
     local root = Eui.node({ Name = "UIRoot" })
     RootView.mount(root, store, {

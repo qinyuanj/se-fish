@@ -4,6 +4,7 @@ local Spoke = require("common.packages.spoke.api")
 local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
 local Modal = require("client.views.economy_modal")
 local ViewUtil = require("client.views.view_util")
+local InteractPromptArbiter = require("client.views.interact_prompt_arbiter")
 local State = Spoke.State
 
 local ShopView = {}
@@ -52,7 +53,9 @@ function ShopView.bubble_spec(options)
       local character = es:d(store.local_character)
       local list = {}
       for _, entry in ipairs(options.anchors or {}) do
-        if entry.stand and near(position, entry.position, character) then
+        local aname = entry.name or (entry.stand and entry.stand.AnchorName)
+        if entry.stand and near(position, entry.position, character)
+            and InteractPromptArbiter.is_exclusive(position, character, aname) then
           list[#list + 1] = entry
         end
       end

@@ -11,7 +11,7 @@
 - [0034](0034-self-written-code-snake-case.md) — 修改命名规范、豁免名单或命名门禁：文件与成员 snake_case、模块表 PascalCase、官方契约原样。
 
 ## 玩法系统与持久化
-- [0013](0013-scene-markers-as-zone-geometry-source.md) — 改动七区坐标、水域、摆渡或交互点：区域几何以场景标记为唯一真源。
+- [0013](0013-scene-markers-as-zone-geometry-source.md) — 改动七区坐标、水域、摆渡或交互点：编辑态场景标记校验导出只读几何表、可钓水域方案 A 与自研气泡定案。
 - [0030](0030-dual-unit-fish-carrier.md) — 改动活鱼抓举、受伤、AI 或销毁：鱼本体（`WorldUnit`）与受击体（`EggyUnit`）双单位载体合同。
 - [0031](0031-persistent-operation-identity.md) — 改动存档写入、重试、交易或外部交付：持久会话 fencing 与三类操作身份分层。
 

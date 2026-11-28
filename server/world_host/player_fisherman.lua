@@ -20,6 +20,7 @@ local function fisherman_point(shared, npc)
   local point = {}
   for key, value in pairs(shared) do point[key] = value end
   point.ZoneId, point.AnchorNames = npc.ZoneId, npc.AnchorNames
+  point.ModelName = npc.ModelName
   point.Exchange, point.Chain = npc.Exchange, npc.Chain
   return point
 end
@@ -94,13 +95,51 @@ local function deliver(target, exchange, product)
   return true
 end
 
---- 吃动作播放：仅日志兜底，不读 mount 的 upvalue（拆分前 mount 体内的 play_eat）。
-local function play_eat(anchor, point)
-  if not point.EatAnimation then return end
-  local ok_read, play = pcall(function() return anchor.PlayAnimation end)
-  if not ok_read or not play then return end
-  local ok, err = pcall(play, anchor, point.EatAnimation)
-  if not ok then print("[PlayerFisherman] 吃动作播放失败", tostring(err)) end
+local cached_fisherman_world = nil
+local cached_fisherman_models = {}
+
+--- 查找并按当前 World 缓存非静态钓鱼佬外观单位，避免每次喂食全树遍历。
+local function resolve_fisherman_model(world, model_name)
+  if cached_fisherman_world ~= world then
+    cached_fisherman_world = world
+    cached_fisherman_models = {}
+  end
+  local cached = cached_fisherman_models[model_name] ---@cast cached any
+  if cached ~= nil then
+    local ok_d, destroyed = pcall(function() return cached.Destroyed end)
+    if ok_d and not destroyed then return cached end
+    cached_fisherman_models[model_name] = nil
+  end
+  local ok_find, unit = pcall(world.FindFirstChild, world, model_name, true)
+  if not ok_find then
+    print("[PlayerFisherman] 查找钓鱼佬模型失败", model_name, tostring(unit))
+    return nil
+  end
+  if unit ~= nil then cached_fisherman_models[model_name] = unit end
+  return unit
+end
+
+--- 吃动作播放：只在非静态的钓鱼佬外观上播放（#407 / #410）。
+--- 锚点标记已开启静态优化，游戏内不再创建完整 Unit，不能拿锚点当动画宿主；
+--- 仅日志兜底，不读 mount 的 upvalue（拆分前 mount 体内的 play_eat）。
+local function play_eat(point)
+  if not point.EatAnimation or not point.ModelName then return end
+  local ok_world, world = pcall(function() return game and game:GetService("World") or nil end)
+  if not ok_world then
+    print("[PlayerFisherman] 获取 World 服务失败", point.ModelName, tostring(world))
+    return
+  end
+  if not world or type(world.FindFirstChild) ~= "function" then return end
+  local unit = resolve_fisherman_model(world, point.ModelName)
+  if not unit then return end
+  local ok_read, play = pcall(function() return unit.PlayAnimation end)
+  if not ok_read then
+    print("[PlayerFisherman] 读取 PlayAnimation 失败", point.ModelName, tostring(play))
+    return
+  end
+  if type(play) ~= "function" then return end
+  local ok, err = pcall(play, unit, point.EatAnimation)
+  if not ok then print("[PlayerFisherman] 吃动作播放失败", point.ModelName, tostring(err)) end
 end
 
 -- ===== 渔夫交互：拆分前 PlayerFisherman.mount 体内的闭包 =====
@@ -118,7 +157,7 @@ FishermanBehavior.resolve = PlayerBehaviorKit.resolve_fn(FishermanBehavior, {
 })
 
 --- 信物兑换（拆分前 mount 体内的 exchange）。
-function FishermanBehavior.exchange(self, operation, point, anchor, request)
+function FishermanBehavior.exchange(self, operation, point, request)
   local env = self.fisherman_env
   local player, data, save = env.player, env.data, env.save
   local product = product_of(request.product)
@@ -150,14 +189,14 @@ function FishermanBehavior.exchange(self, operation, point, anchor, request)
     result_value = result
     SpokeRuntime.batch(function() env.tree:sync_from_data(data) end)
     self:reply(result)
-    play_eat(anchor, point)
+    play_eat(point)
   end)
   if accepted ~= true then return false end
   return result_value ~= nil or true
 end
 
 --- 卖鱼与吃鱼（拆分前 mount 体内的 feed）。
-function FishermanBehavior.feed(self, operation, point, anchor)
+function FishermanBehavior.feed(self, operation, point)
   local env = self.fisherman_env
   local player, data, save, opts = env.player, env.data, env.save, env.opts
   local selected_slot, selected_bait = data.data.selected_slot, data.data.selected_bait
@@ -185,7 +224,7 @@ function FishermanBehavior.feed(self, operation, point, anchor)
     result_value = result
     SpokeRuntime.batch(function() env.tree:sync_from_data(data) end)
     self:reply(result)
-    play_eat(anchor, point)
+    play_eat(point)
     if opts.quest and opts.quest.record_fact then
       if opts.quest.refresh_committed then opts.quest:refresh_committed(player, data) end
     elseif opts.quest and opts.quest.notify then
@@ -213,11 +252,11 @@ function FishermanBehavior.handle(self, actor, payload)
     if seq <= env.last_seq then return false end
     env.last_seq = seq
   end
-  local point, anchor = resolve_fisherman(player)
+  local point = resolve_fisherman(player)
   if not point then return false end
   local request = exchangeable(data, point)
-  if request then return self:exchange(operation, point, anchor, request) end
-  return self:feed(operation, point, anchor)
+  if request then return self:exchange(operation, point, request) end
+  return self:feed(operation, point)
 end
 
 --- 装配渔夫交互实例：状态与依赖集中在 fisherman_env，方法由 FishermanBehavior 提供。

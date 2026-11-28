@@ -1,4 +1,5 @@
 local GameCfg = require("common.game_cfg")
+local ZoneMarkers = require("common.zone_markers")
 local ClientStore = require("client.store.client_store")
 local RootView = require("client.views.root_view")
 local ShopView = require("client.views.shop_view")
@@ -8,7 +9,7 @@ local function child(root, name) return root:FindFirstChild(name, true) end
 
 describe("钓场商店统一视图行为", function()
   local ctx
-  local old_vector, old_vector2
+  local old_vector, old_vector2, saved_ready, saved_positions
 
   local function rows_for(page)
     return GameCfg.Shop.list_for_page(ctx.stand.Level, page, true)
@@ -33,7 +34,10 @@ describe("钓场商店统一视图行为", function()
     old_vector2 = rawget(_G, "Vector2")
     _G.Vector3 = { New = function(x, y, z) return { x = x, y = y, z = z } end }
     _G.Vector2 = { New = function(x, y) return { x = x, y = y } end }
+    saved_ready, saved_positions = ZoneMarkers.ready, ZoneMarkers.anchor_positions
     ctx = { sent = {}, notices = {}, seq = 10, stand = GameCfg.Shop.Stands[2] }
+    ZoneMarkers.ready = true
+    ZoneMarkers.anchor_positions = { [ctx.stand.AnchorName] = { x = 0, y = 0, z = 0 } }
     ctx.store, ctx.writer = ClientStore.new({ initial_now = 1000 })
     ctx.root = Eui.node({ Name = "UIRoot" })
     RootView.mount(ctx.root, ctx.store, {
@@ -70,6 +74,7 @@ describe("钓场商店统一视图行为", function()
 
   after_each(function()
     ctx.root:Destroy()
+    ZoneMarkers.ready, ZoneMarkers.anchor_positions = saved_ready, saved_positions
     _G.Vector3 = old_vector
     _G.Vector2 = old_vector2
   end)

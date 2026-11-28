@@ -1,10 +1,14 @@
 local GameCfg = require("common.game_cfg")
+local ZoneMarkers = require("common.zone_markers")
 local ClientWorld = require("tests.support.economy_client")
 
 describe("抽奖机场景入口（#312 LotteryInteraction）", function()
-  local env, options, anchorName
+  local env, options, anchorName, saved_ready, saved_positions
   before_each(function()
+    saved_ready, saved_positions = ZoneMarkers.ready, ZoneMarkers.anchor_positions
     anchorName = GameCfg.Lottery.machine_anchors()[1]
+    ZoneMarkers.ready = true
+    ZoneMarkers.anchor_positions = { [anchorName] = { x = 0, y = 5, z = 0 } }
     options = {
       interaction = true,
       anchors = { [anchorName] = { Name = anchorName, Position = { x = 0, y = 5, z = 0 } } },
@@ -12,7 +16,10 @@ describe("抽奖机场景入口（#312 LotteryInteraction）", function()
     }
     env = ClientWorld.new(options)
   end)
-  after_each(function() if env then env:cleanup(); env = nil end end)
+  after_each(function()
+    if env then env:cleanup(); env = nil end
+    ZoneMarkers.ready, ZoneMarkers.anchor_positions = saved_ready, saved_positions
+  end)
 
   it("test_bubble_per_anchor_and_missing_anchor_is_skipped", function()
     assert.same(1, #env.sceneNodes)

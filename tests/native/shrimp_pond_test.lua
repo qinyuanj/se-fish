@@ -7,7 +7,7 @@
 --   4. 虾池鱼表配错：新手竿（竿 1）能出波龙及以上、不挂饵出不了虾米保底、
 --      挂香肠竿 1 能出竿 2 的虾，或鱼表行指向 GameCfg.Fish 里不存在的鱼种；
 --   5. 虾池水区没进 Water.Zones（抛竿选不到虾池鱼表），或与一区水区重叠（在虾池抛竿出一区鱼）；
---   6. 钓鱼佬多锚点回归：一区钓鱼佬失效，或虾池钓鱼佬（TGUnitFishShrimp）旁喂食不结算；
+--   6. 钓鱼佬多锚点回归：一区钓鱼佬失效，或虾池钓鱼佬（Z2_Fisherman）旁喂食不结算；
 --   7. 抛竿竿种门：选中的不是竿（无 Level）也能抛，或钓虾竿抛出去竿级按 1 算（抽不出波龙）。
 --   8. 虾池迁移统一模板后残留小池几何、窄边界或旧设施落点，运行时水域与场景合同不一致。
 -- it 名字沿用旧方法名，注册顺序 = LuaUnit sortedPairs 的实际执行顺序。
@@ -18,10 +18,10 @@ local function vec(x, y, z) return { x = x, y = y, z = z } end
 
 -- 两个商店摊与两个钓鱼佬锚点的假位置；虾池侧与统一模板的场景合同一致。
 local ANCHORS = {
-  TGUnitShop = vec(0, 2, 0),
-  TGUnitShopShrimp = vec(216, 6, 13),
-  TGUnitFish = vec(0, 6, 10),
-  TGUnitFishShrimp = vec(213, 6, -17),
+  Z1_Shop = vec(0, 2, 0),
+  Z2_Shop = vec(216, 6, 13),
+  Z1_Fisherman = vec(0, 6, 10),
+  Z2_Fisherman = vec(213, 6, -17),
 }
 
 local function newInteract()
@@ -83,7 +83,7 @@ describe('虾池最小内容（水区 / 鱼表 / 商店 / 钓鱼佬 / 抛竿）'
     local ShopFeedHost = require('tests.support.shop_feed_host')
     env.host = ShopFeedHost.start({ positions = ANCHORS })
     env.cfg.Debug = { Enabled = true, InitialGrants = initial_grants }
-    env.me, env.data = env.host:join(1, 'TGUnitShop')
+    env.me, env.data = env.host:join(1, 'Z1_Shop')
     env.replies = env.host.results[1].ShopResult
   end)
 
@@ -129,13 +129,13 @@ describe('虾池最小内容（水区 / 鱼表 / 商店 / 钓鱼佬 / 抛竿）'
     assert.same({ x = 240, y = 6, z = 30.5 }, scene.SafePoint)
     local positions = {}
     for _, entity in ipairs(scene.Entities) do positions[entity.Name] = entity.Position end
-    assert.same({ x = 213, y = 6, z = -17 }, positions.TGUnitFishShrimp)
-    assert.same({ x = 216, y = 6, z = 13 }, positions.TGUnitShopShrimp)
+    assert.same({ x = 213, y = 6, z = -17 }, positions.Z2_Fisherman)
+    assert.same({ x = 216, y = 6, z = 13 }, positions.Z2_Shop)
     assert.same({ x = 258, y = 6, z = -18 }, positions.Z2_Lottery)
     assert.same({ x = 188, y = 6, z = -24 }, positions.Z2_Bait1)
     assert.same({ x = 292, y = 6, z = -24 }, positions.Z2_Bait2)
     assert.same({ x = 215, y = 6, z = 40.5 }, positions.Z2_FerryOut)
-    assert.same({ x = 265, y = 6, z = 40.5 }, positions.FerryReturn)
+    assert.same({ x = 265, y = 6, z = 40.5 }, positions.Z2_FerryReturn)
     assert.is_nil(scene.LandName)
     assert.same('Z2_Water1', scene.Waters[1].entity_name)
     assert.same({ x = 240, y = 2, z = -44 }, scene.Waters[1].Center)
@@ -168,7 +168,7 @@ describe('虾池最小内容（水区 / 鱼表 / 商店 / 钓鱼佬 / 抛竿）'
 
   it('test_buy_sausage_at_shrimp_stand_goes_to_bait_counter', function()
     -- 虾池摊买香肠：扣 2 金、进 Bait 计数、不占道具栏格
-    moveTo('TGUnitShopShrimp')
+    moveTo('Z2_Shop')
     env.data:AddCoin(10, nil, 'test')
     assert.is_true(buy('sausage'))
     assert.same(8, env.data.data.FishCoin)
@@ -200,11 +200,11 @@ describe('虾池最小内容（水区 / 鱼表 / 商店 / 钓鱼佬 / 抛竿）'
   end)
 
   it('test_fisherman_multi_anchor_feeds_at_shrimp_pond', function()
-    -- 钓鱼佬按区分派（#127）：一区锚点 TGUnitFish、虾池锚点 TGUnitFishShrimp 各一个；
+    -- 钓鱼佬按区分派（#127）：一区锚点 Z1_Fisherman、虾池锚点 Z2_Fisherman 各一个；
     -- 虾池钓鱼佬旁喂鱼获照价结算，一区钓鱼佬旁同样可用
-    assert.same({ 'TGUnitFish' }, env.cfg.Interact.Fishermen[1].AnchorNames)
+    assert.same({ 'Z1_Fisherman' }, env.cfg.Interact.Fishermen[1].AnchorNames)
     assert.same('fishPond', env.cfg.Interact.Fishermen[1].ZoneId)
-    assert.same({ 'TGUnitFishShrimp' }, env.cfg.Interact.Fishermen[2].AnchorNames)
+    assert.same({ 'Z2_Fisherman' }, env.cfg.Interact.Fishermen[2].AnchorNames)
     assert.same('shrimpPond', env.cfg.Interact.Fishermen[2].ZoneId)
     local replies = env.host.results[1].InteractResult
     local function feed(seq)
@@ -212,7 +212,7 @@ describe('虾池最小内容（水区 / 鱼表 / 商店 / 钓鱼佬 / 抛竿）'
       return reply and reply.ok or false
     end
     -- 站在虾池钓鱼佬旁：选中一格沼虾喂出 10 金（BasePrice × 倍率 1）
-    moveTo('TGUnitFishShrimp')
+    moveTo('Z2_Fisherman')
     assert.is_true(env.data:AddItem('riverShrimp'))
     local slot
     for index = 1, 8 do
@@ -224,7 +224,7 @@ describe('虾池最小内容（水区 / 鱼表 / 商店 / 钓鱼佬 / 抛竿）'
     assert.same(10, env.data.data.FishCoin)
     assert.is_true(replies[#replies].ok)
     -- 一区钓鱼佬旁同样可用（按区分派：各自只认本区锚点，互不借用）
-    moveTo('TGUnitFish')
+    moveTo('Z1_Fisherman')
     assert.is_true(env.data:AddItem('carp'))
     for index = 1, 8 do
       local entry = env.data.data.containers.itemBar[index]
@@ -237,7 +237,7 @@ describe('虾池最小内容（水区 / 鱼表 / 商店 / 钓鱼佬 / 抛竿）'
 
   it('test_home_stand_cannot_sell_shrimp_goods', function()
     -- 一区摊买不到香肠与钓虾竿（'item' 且不扣钱）；两摊都能买蚯蚓
-    moveTo('TGUnitShop')
+    moveTo('Z1_Shop')
     env.data:AddCoin(20, nil, 'test')
     assert.is_false(buy('sausage'))
     assert.same('item', lastReason())
@@ -265,7 +265,7 @@ describe('虾池最小内容（水区 / 鱼表 / 商店 / 钓鱼佬 / 抛竿）'
     -- （等级语义：第 N 钓鱼区起售竿级 N，#84；蟹湖摊 #136、树林岛摊 #141、沙滩岛摊 #142 接入）
     local stands = {}
     for _, stand in ipairs(env.cfg.Shop.Stands) do stands[stand.AnchorName] = stand.Level end
-    assert.same({ TGUnitShop = 1, TGUnitShopShrimp = 2, Z3_Shop = 3, Z4_Shop = 4,
+    assert.same({ Z1_Shop = 1, Z2_Shop = 2, Z3_Shop = 3, Z4_Shop = 4,
       Z5_Shop = 5, Z6_Shop = 6, Z7_Shop = 7 }, stands)
   end)
 
@@ -324,7 +324,7 @@ describe('虾池最小内容（水区 / 鱼表 / 商店 / 钓鱼佬 / 抛竿）'
 
   it('test_shrimp_stand_sells_shrimp_rod_at_level_two', function()
     -- 虾池摊买钓虾竿 12 金进道具栏；等级语义沿用 FindGoods(itemId, level)
-    moveTo('TGUnitShopShrimp')
+    moveTo('Z2_Shop')
     env.data:AddCoin(12, nil, 'test')
     assert.is_true(buy('shrimpRod'))
     assert.same(0, env.data.data.FishCoin)

@@ -3,6 +3,7 @@ local GameCfg = require("common.game_cfg")
 local BodyScale = require("common.body_scale")
 local Spoke = require("common.packages.spoke.api")
 local ViewUtil = require("client.views.view_util")
+local InteractPromptArbiter = require("client.views.interact_prompt_arbiter")
 
 local State = Spoke.State
 
@@ -125,6 +126,7 @@ function FerryView.mount(scope, ctx)
         end
         return
       end
+      ---@diagnostic disable-next-line: undefined-field
       local text = string.format("前往%s %d 秒", zone_name(soonest.route_id), math.ceil(soonest.remaining))
       if text ~= last_text then
         last_text = text
@@ -149,6 +151,7 @@ end
 
 local function anchor_of(anchor_name)
   for _, zone in ipairs(GameCfg.Zones) do
+    ---@cast zone table
     for _, entity in ipairs(zone.Scene and zone.Scene.Entities or {}) do
       if entity.role == "Ferry" and entity.Name == anchor_name then return entity.Position end
     end
@@ -176,7 +179,8 @@ function FerryView.legs_spec()
         }) do
           local center = anchor_of(leg.point.AnchorName)
           local radius = BodyScale.interaction_radius(character, leg.point.Radius)
-          if near(position, center, radius) then
+          if near(position, center, radius)
+              and InteractPromptArbiter.is_exclusive(position, character, leg.point.AnchorName) then
             list[#list + 1] = { key = "ferry:" .. index .. ":" .. leg.action,
               route_id = route.Id, action = leg.action, text = leg.text,
               point = leg.point, center = center }

@@ -1,6 +1,7 @@
 local GameCfg = require("common.game_cfg")
 local ServerRuntime = require("server.world_host.server_runtime")
 local SpokeClock = require("common.spoke_clock")
+local ZoneMarkers = require("common.zone_markers")
 
 local Host = {}
 
@@ -50,6 +51,11 @@ function Host.start(options)
         options.positions and options.positions[name] or { x = 10000 + (index - 1) * 1000, y = 0, z = 0 })
     end
   end
+  -- #410：交互点运行期只读编辑态导出几何；夹具把假锚点坐标注入同一快照入口。
+  host.saved.anchor_positions = ZoneMarkers.anchor_positions
+  local anchor_positions = {}
+  for name, value in pairs(host.anchors) do anchor_positions[name] = value.Position end
+  ZoneMarkers.anchor_positions = anchor_positions
   host.clock = options.clock or SpokeClock.new(options.now or 100)
   host.now = host.clock.now()
   local events = {}
@@ -234,6 +240,7 @@ function Host.start(options)
 
   function host:shutdown()
     self.runtime:shutdown()
+    ZoneMarkers.anchor_positions = self.saved.anchor_positions
     _G.game = self.saved.game
     _G.REUtil = self.saved.REUtil
     package.loaded["common.re_util"] = self.saved.reutil

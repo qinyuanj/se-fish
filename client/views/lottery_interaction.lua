@@ -2,6 +2,7 @@ local GameCfg = require("common.game_cfg")
 local BodyScale = require("common.body_scale")
 local Modal = require("client.views.economy_modal")
 local ViewUtil = require("client.views.view_util")
+local InteractPromptArbiter = require("client.views.interact_prompt_arbiter")
 
 local LotteryInteraction = {}
 
@@ -54,6 +55,7 @@ function LotteryBehavior.update(self, stored_pos, stored_character)
   for _, bubble in ipairs(self.bubbles) do
     local dist_sq = pos ~= nil and ViewUtil.distance_sq_xz(pos, bubble.center) or nil
     local near = dist_sq ~= nil and dist_sq <= radius_sq
+      and InteractPromptArbiter.is_exclusive(pos, current, bubble.name)
     if near then near_machine = bubble end
     if bubble.near ~= near then
       bubble.near = near
@@ -78,7 +80,7 @@ function LotteryBehavior.create_bubble(self, anchor)
   local offset = Vector3 and Vector3.New and Vector3.New(0, GameCfg.Lottery.BubbleHeight, 0) or nil
   local node = self:create_scene(GameCfg.Lottery.BubblePreset, anchor, offset)
   if not node then return end
-  local bubble = { node = node, center = anchor.Position, near = nil }
+  local bubble = { node = node, name = anchor.Name, center = anchor.Position, near = nil }
   self.bubbles[#self.bubbles + 1] = bubble
   self.scope:on_cleanup(function()
     local ok, err = pcall(function() if not node.Destroyed then node:Destroy() end end)

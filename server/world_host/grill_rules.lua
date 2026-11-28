@@ -5,6 +5,7 @@ local BodyScale = require("common.body_scale")
 local EngineRead = require("common.engine_read")
 local GameCfg = require("common.game_cfg")
 local GrillCurve = require("common.grill_curve")
+local ZoneMarkers = require("common.zone_markers")
 
 local GrillRules = {}
 
@@ -92,24 +93,23 @@ function GrillRules.fail(remote, player, reason, seq)
 end
 
 -- 场景锚点缓存查找；只被 anchor_in_range 使用，留在模块内不导出。
-local function find_anchor(world, name, cache)
+-- 运行期唯一锚点来源是编辑态导出的只读几何表（ADR-0013 / #410）：
+-- 烧烤点已开启静态优化，游戏内不再创建完整 Unit，不能再用 World 服务按名查单位。
+local function find_anchor(name, cache)
   if cache[name] then return cache[name] end
-  if not world or type(world.FindFirstChild) ~= "function" then return nil end
-  local ok, unit = pcall(world.FindFirstChild, world, name, true)
-  if not ok then
-    print("[PlayerGrill] 查找场景锚点失败", name, tostring(unit))
-    return nil
-  end
-  if unit then cache[name] = unit end
-  return unit
+  local position = ZoneMarkers.anchor_position(name)
+  if not position then return nil end
+  local anchor = { Name = name, Position = position }
+  cache[name] = anchor
+  return anchor
 end
 
-function GrillRules.anchor_in_range(player, world, cache)
+function GrillRules.anchor_in_range(player, cache)
   local character = player and player.Character
   local pos = character and character.Position
   if not pos then return nil, nil end
   for _, point in ipairs(GrillRules.cfg().Points or {}) do
-    local anchor = find_anchor(world, point.AnchorName, cache)
+    local anchor = find_anchor(point.AnchorName, cache)
     local center = anchor and anchor.Position
     local radius = BodyScale.interaction_radius(character, GrillRules.cfg().Radius) + (GrillRules.cfg().Slack or 0)
     if center and GrillRules.flat_distance(pos, center) <= radius then

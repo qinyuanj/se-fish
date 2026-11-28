@@ -377,7 +377,7 @@ describe('摆渡（ServerRuntime × MgrSave × PlayerData）', function()
     end
     assert.same('fishPond', env.cfg.Ferry.HomeZone)
     -- 第一段是既有现场：别名指向 Routes[1] 的两条腿（老消费端 #89 继续可用）
-    assert.same('FerryBoat', ferry.Outbound.AnchorName)
+    assert.same('Z1_FerryOut', ferry.Outbound.AnchorName)
     assert.same(env.routes[1].Outbound, ferry.Outbound)
     assert.same(env.routes[1].Return, ferry.Return)
     assert.is_nil(env.cfg.Ferry.route('fishPond>volcanoIsland'))
