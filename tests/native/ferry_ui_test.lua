@@ -93,7 +93,8 @@ describe('客户端摆渡统一视图树（RootView × ClientStore）', function
         stand(leg.point)
         local button = child('BtnFerry' .. leg.point.AnchorName)
         assert.is_not_nil(button)
-        assert.same(leg.text, button.Text)
+        assert.same('', button.ButtonText)
+        assert.same(leg.text, button:FindFirstChild('LabelButtonText', false).Text)
         assert.is_true(Eui.click(button))
         seq = seq + 1
         assert.same({ action = leg.action, route_id = route.Id, seq = seq }, env.sent[#env.sent])

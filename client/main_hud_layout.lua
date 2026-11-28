@@ -1,4 +1,5 @@
 -- 坐标约定与 EUI 一致：原点在左下、Y 向上；每个矩形是 { x, y, w, h }，x / y 指中心点。
+-- 所有控件尺寸、间距对齐 4px 栅格（DESIGN.md）。
 local GameCfg = require('common.game_cfg')
 
 local MainHudLayout = {}
@@ -6,7 +7,7 @@ local MainHudLayout = {}
 local DESIGN_W, DESIGN_H = 1920, 1238
 local SAFE = 16
 local GAP = 12
-local PAD = 10
+local PAD = 12
 
 -- 引擎控件占位实测：#173 第一阶段结论评论「引擎控件占位实测」表
 -- （https://github.com/qinyuanj/se-fish/issues/173#issuecomment-6651176291）。
@@ -23,7 +24,7 @@ local ENGINE_RESERVED = {
     { name = 'Avatar', anchor = 'bottom-right', l = 1710, r = 1920, b = 0, t = 140 },
     { name = 'Version', anchor = 'bottom-left', l = 14, r = 710, b = 15, t = 45 },
 }
-local JOYSTICK_ZONE_EXTRA = 30
+local JOYSTICK_ZONE_EXTRA = 28
 
 local function rect(x, y, w, h)
     return { x = x, y = y, w = w, h = h }
@@ -35,6 +36,14 @@ end
 
 local function edgesOf(r)
     return r.x - r.w / 2, r.x + r.w / 2, r.y - r.h / 2, r.y + r.h / 2
+end
+
+local function floor4(v)
+    return math.floor(v / 4) * 4
+end
+
+local function ceil4(v)
+    return math.ceil(v / 4) * 4
 end
 
 local function scaledReserved(spec, width, height)
@@ -65,22 +74,24 @@ local function clampSlots(n)
     return math.max(items.InitialItemBarSlots, math.min(items.ItemBarSlots, n))
 end
 
-local RING = 100
-local COIN_ICON, COIN_LABEL_W, COIN_LABEL_H = 56, 130, 50
-local ENTRY_W, ENTRY_H, ENTRY_GAP = 130, 60, 8
-local QUEST_W, QUEST_TOGGLE_W, QUEST_TOGGLE_H, QUEST_PANEL_H = 450, 120, 48, 110
+-- 1A + 2A + 4px 栅格尺寸表
+local BAR_W, BAR_H = 160, 40
+local COIN_ICON, COIN_LABEL_W, COIN_LABEL_H = 40, 120, 40
+local MENU_W, MENU_H = 128, 52
+local MENU_DRAWER_W, MENU_ITEM_H, MENU_ITEM_GAP, MENU_PAD = 224, 48, 8, 16
+local QUEST_W, QUEST_TOGGLE_H, QUEST_PANEL_H = 360, 44, 112
 local CELL, SLOT_STEP, GROUP_GAP = 80, 84, 12
-local BACKPACK_W = 130
-local ATTACK = 180
-local ACTION_W, ACTION_H = 180, 90
-local BACKPACK_PANEL_W, BACKPACK_PANEL_H = 850, 690
-local POPUP_STEP = 86
+local BACKPACK_W = 128
+local ATTACK = 176
+local ACTION_W, ACTION_H = 176, 84
+local BACKPACK_PANEL_W, BACKPACK_PANEL_H = 864, 692
+local POPUP_STEP = 88
 local CENTER_HALF_W, CENTER_HALF_H_RATIO = 280, 0.18
 
 -- input = { width, height, itemBarSlots, reeling }
--- 返回 { Regions = { 区域名 = { bounds, Controls } }, Rects = 扁平索引,
---        ItemBarSlots = { 第 1..N 格 }, Panels = { BackpackPanel }, Reserved = { { name, rect } },
---        Popup = 候选行参数（供 popup_cells） }
+-- 返回 { regions = { 区域名 = { bounds, controls } }, rects = 扁平索引,
+--        ItemBarSlots = { 第 1..N 格 }, panels = { BackpackPanel, MenuDrawer },
+--        reserved = { { name, rect } }, popup = 候选行参数（供 popup_cells） }
 function MainHudLayout.compute(input)
     input = type(input) == 'table' and input or {}
     local W = type(input.width) == 'number' and input.width or DESIGN_W
@@ -102,46 +113,48 @@ function MainHudLayout.compute(input)
     local function bottom(r) local _, _, y = edgesOf(r) return y end
     local function top(r) local _, _, _, y = edgesOf(r) return y end
 
-    local statusTop = bottom(zone.SystemButtons) - GAP
-    local ringY = statusTop - RING / 2
+    -- 1A 左上精简横向胶囊状态条：血量条 + 饥饿条 + 金币
+    local statusTop = floor4(bottom(zone.SystemButtons) - GAP)
+    local barCenterY = statusTop - BAR_H / 2
     local x0 = SAFE + 8
     local status = {
-        HealthRing = rect(x0 + RING / 2, ringY, RING, RING),
-        HungerRing = rect(x0 + RING * 1.5 + GAP, ringY, RING, RING),
+        HealthBar = rect(x0 + BAR_W / 2, barCenterY, BAR_W, BAR_H),
     }
-    local coinX = right(status.HungerRing) + GAP + COIN_ICON / 2
-    status.coin_icon = rect(coinX, ringY, COIN_ICON, COIN_ICON)
-    status.coin_label = rect(coinX + COIN_ICON / 2 + 8 + COIN_LABEL_W / 2, ringY, COIN_LABEL_W, COIN_LABEL_H)
+    status.HungerBar = rect(right(status.HealthBar) + GAP + BAR_W / 2, barCenterY, BAR_W, BAR_H)
+    local coinX = right(status.HungerBar) + GAP + COIN_ICON / 2
+    status.coin_icon = rect(coinX, barCenterY, COIN_ICON, COIN_ICON)
+    status.coin_label = rect(coinX + COIN_ICON / 2 + 8 + COIN_LABEL_W / 2, barCenterY, COIN_LABEL_W, COIN_LABEL_H)
 
-    local entryY = H - 105
-    local entryRight = left(zone.WarningKey) - GAP
+    -- 2A 右上单一「菜单」紧凑入口（展开后列出图鉴 / 盲盒 / 地图商店 / 调试 GM）
+    local entryY = floor4(H - 104)
+    local entryRight = floor4(left(zone.WarningKey) - GAP)
     local entries = {
-        BlindboxEntry = rect(entryRight - ENTRY_W / 2, entryY, ENTRY_W, ENTRY_H),
+        MenuEntry = rect(entryRight - MENU_W / 2, entryY, MENU_W, MENU_H),
     }
-    entries.ShopEntry = rect(entries.BlindboxEntry.x - ENTRY_W - ENTRY_GAP, entryY, ENTRY_W, ENTRY_H)
-    entries.CompendiumEntry = rect(entries.ShopEntry.x - ENTRY_W - ENTRY_GAP, entryY, ENTRY_W, ENTRY_H)
 
-    local hintTop = H - SAFE - 4
-    local hints = { hint_primary = rect(W / 2, hintTop - 32, 520, 64) }
-    hints.hint_secondary = rect(W / 2, bottom(hints.hint_primary) - 8 - 28, 520, 56)
-    hints.hint_transient = rect(W / 2, bottom(hints.hint_secondary) - 8 - 30, 740, 60)
+    local hintTop = floor4(H - SAFE - 4)
+    local hints = { hint_primary = rect(W / 2, hintTop - 28, 520, 56) }
+    hints.hint_secondary = rect(W / 2, bottom(hints.hint_primary) - 8 - 24, 520, 48)
+    hints.hint_transient = rect(W / 2, bottom(hints.hint_secondary) - 8 - 28, 720, 56)
 
-    local questTop = ringY - RING / 2 - GAP * 2
-    local questBottom = top(stickZone) + GAP
+    -- 1A 左侧任务：1 行折叠态当前目标条（点击展开详情面板）
+    local questTop = floor4(barCenterY - BAR_H / 2 - GAP - 4)
+    local questBottom = ceil4(top(stickZone) + GAP)
     local questLeft = SAFE + 4
     local quest = {
-        quest_toggle = rect(questLeft + QUEST_TOGGLE_W / 2, questTop - QUEST_TOGGLE_H / 2,
-            QUEST_TOGGLE_W, QUEST_TOGGLE_H),
+        quest_toggle = rect(questLeft + QUEST_W / 2, questTop - QUEST_TOGGLE_H / 2,
+            QUEST_W, QUEST_TOGGLE_H),
     }
     quest.quest_panel = rect(questLeft + QUEST_W / 2, bottom(quest.quest_toggle) - 8 - QUEST_PANEL_H / 2,
         QUEST_W, QUEST_PANEL_H)
     local questBounds = fromEdges(questLeft, questLeft + QUEST_W, questBottom, questTop)
 
-    local bandLeft, bandRight = right(stickZone) + GAP, left(zone.SkillKey) - GAP
-    local barY = top(zone.Version) + GAP + 8 + CELL / 2
+    -- 底部装备栏：武器槽 + 道具栏 + 背包键 + 鱼饵槽
+    local bandLeft, bandRight = ceil4(right(stickZone) + GAP), floor4(left(zone.SkillKey) - GAP)
+    local barY = ceil4(top(zone.Version) + GAP + 8 + CELL / 2)
     local slotsW = CELL + SLOT_STEP * (slots - 1)
     local total = CELL + GROUP_GAP + slotsW + GROUP_GAP + BACKPACK_W + GROUP_GAP + CELL
-    local barLeft = math.max(bandLeft, math.min(bandRight - total, W / 2 - total / 2))
+    local barLeft = floor4(math.max(bandLeft, math.min(bandRight - total, W / 2 - total / 2)))
     local equip = { WeaponBar = rect(barLeft + CELL / 2, barY, CELL, CELL) }
     local itemBar = {}
     local firstSlot = right(equip.WeaponBar) + GROUP_GAP + CELL / 2
@@ -154,8 +167,9 @@ function MainHudLayout.compute(input)
     equip.BaitBar = rect(right(equip.backpack_button) + GROUP_GAP + CELL / 2, barY, CELL, CELL)
     local equipBounds = fromEdges(bandLeft, bandRight, barY - CELL / 2 - 8, barY + CELL / 2 + 8)
 
-    local actionBase = top(zone.Jump) + GAP
-    local action = { attack_control = rect(W - 230, actionBase + ATTACK / 2, ATTACK, ATTACK) }
+    -- 右侧上下文动作键
+    local actionBase = ceil4(top(zone.Jump) + GAP)
+    local action = { attack_control = rect(W - 228, actionBase + ATTACK / 2, ATTACK, ATTACK) }
     action.item_action = rect(left(action.attack_control) - GAP - ACTION_W / 2, action.attack_control.y,
         ACTION_W, ACTION_H)
     action.discard = rect(action.attack_control.x, top(action.attack_control) + GAP + ACTION_H / 2,
@@ -167,9 +181,13 @@ function MainHudLayout.compute(input)
 
     local centerClear = rect(W / 2, H / 2, CENTER_HALF_W * 2, H * CENTER_HALF_H_RATIO * 2)
 
-    local panelBottom = top(equipBounds) + GAP
-    local panelY = math.max(panelBottom + BACKPACK_PANEL_H / 2, (panelBottom + H - SAFE) / 2)
+    local panelBottom = ceil4(top(equipBounds) + GAP)
+    local panelY = floor4(math.max(panelBottom + BACKPACK_PANEL_H / 2, (panelBottom + H - SAFE) / 2))
     local backpackPanel = rect(W / 2, panelY, BACKPACK_PANEL_W, BACKPACK_PANEL_H)
+
+    local drawerH = MENU_PAD * 2 + MENU_ITEM_H * 4 + MENU_ITEM_GAP * 3
+    local drawerTop = bottom(entries.MenuEntry) - GAP
+    local menuDrawer = rect(entryRight - MENU_DRAWER_W / 2, drawerTop - drawerH / 2, MENU_DRAWER_W, drawerH)
 
     local regions = {
         StatusTopLeft = { bounds = bounds(status, 4), controls = status },
@@ -186,21 +204,46 @@ function MainHudLayout.compute(input)
     end
     return {
         regions = regions, rects = rects, ItemBarSlots = itemBar,
-        panels = { BackpackPanel = backpackPanel },
+        panels = { BackpackPanel = backpackPanel, MenuDrawer = menuDrawer },
         reserved = reserved,
-        popup = { left = bandLeft, right = left(zone.Roll) - GAP, firstY = top(equipBounds) + GAP + CELL / 2,
+        menu = {
+            right = entryRight,
+            top = drawerTop,
+            width = MENU_DRAWER_W,
+            item_h = MENU_ITEM_H,
+            gap = MENU_ITEM_GAP,
+            pad = MENU_PAD,
+        },
+        popup = { left = bandLeft, right = floor4(left(zone.Roll) - GAP), firstY = ceil4(top(equipBounds) + GAP + CELL / 2),
             cell = CELL, step = POPUP_STEP },
     }
 end
 
--- 以设备分辨率与道具栏格数算主 HUD 布局。格数口径由调用方视图给出（各视图读
--- item_bar 状态的有效性判定与兜底不同），这里不替调用方归一。
+-- 以设备分辨率与道具栏格数算主 HUD 布局。
 function MainHudLayout.from_resolution(resolution, item_bar_slots)
     return MainHudLayout.compute({
         width = resolution.x,
         height = resolution.y,
         itemBarSlots = item_bar_slots,
     })
+end
+
+-- 计算右上角菜单展开浮层的外框和每个菜单项的屏幕中心矩形。
+function MainHudLayout.menu_items(layout, count)
+    local m = layout and layout.menu
+    if not m or type(count) ~= 'number' or count < 1 then
+        return nil, {}
+    end
+    local n = math.floor(count)
+    local h = m.pad * 2 + n * m.item_h + (n - 1) * m.gap
+    local drawer = rect(m.right - m.width / 2, m.top - h / 2, m.width, h)
+    local item_w = m.width - m.pad * 2
+    local items = {}
+    for i = 1, n do
+        local top_y = m.top - m.pad - (i - 1) * (m.item_h + m.gap)
+        items[i] = rect(drawer.x, top_y - m.item_h / 2, item_w, m.item_h)
+    end
+    return drawer, items
 end
 
 function MainHudLayout.popup_cells(layout, kind, count)

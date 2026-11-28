@@ -117,9 +117,13 @@ describe("地面气泡与瞄准拾取（#301 客户端宿主）", function()
 
     local toggle = node_named(env, "BtnAimPickup")
     assert.is_not_nil(toggle)
+    assert.equals("", toggle.ButtonText)
+    assert.equals("瞄准拾取", toggle:FindFirstChild("LabelButtonText", false).Text)
     assert.is_true(Eui.click(toggle))
     local mask = node_named(env, "AimPickupMask")
     assert.is_not_nil(mask)
+    assert.equals("EUILayout", mask.UnitType)
+    assert.is_not_nil(node_named(env, "LootAimHint"))
 
     assert.is_true(Eui.click(mask))
     assert.same({ { action = "Pickup", value = "near" } }, env.sent)

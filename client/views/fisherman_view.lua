@@ -2,6 +2,10 @@ local GameCfg = require("common.game_cfg")
 local BodyScale = require("common.body_scale")
 local Dialogue = require("common.npc_dialogue")
 local Spoke = require("common.packages.spoke.api")
+local Tokens = require("client.ui.tokens")
+local Layout = require("client.ui.layout")
+local Primitives = require("client.ui.primitives")
+local Controls = require("client.ui.controls")
 local ViewUtil = require("client.views.view_util")
 local InteractPromptArbiter = require("client.views.interact_prompt_arbiter")
 local RescueView = require("client.views.rescue_view")
@@ -11,6 +15,12 @@ local State = Spoke.State
 local FishermanView = {}
 local PULSE_FRAMES = 20
 local PULSE_AMPLITUDE = 0.2
+
+local DIALOG_W = 928
+local DIALOG_H = 640
+local CONFIRM_W = 640
+local CONFIRM_H = 340
+local PAD = Tokens.SPACE.PANEL_PAD
 
 local function near(position, center, character)
   local dist_sq = ViewUtil.distance_sq_xz(position, center)
@@ -44,33 +54,39 @@ function FishermanView.bubble_spec(options)
       local node = ViewUtil.create_anchor_scene_node(
         scope, ctx, entry, GameCfg.Interact.Fisherman.BubbleHeight, "fisherman", "SceneNodeFisherman_" .. suffix
       )
-      local talk = ctx.create_node(scope, "EUIButton", {
-        Name = "BtnFishermanTalk" .. suffix,
-        Parent = node,
-        ButtonText = "对话",
-        TouchEnabled = true,
+      Controls.button(scope, ctx, {
+        name = "BtnFishermanTalk" .. suffix,
+        parent = node,
+        rect = Layout.rect(52, 24, 96, 44),
+        text = "对话",
+        variant = "blue",
+        font_size = Tokens.FONT_SIZE.CAPTION,
+        z_order = 2,
+        on_click = function()
+          Modal.open_modal(ctx, "fisherman", { zoneId = entry.npc.ZoneId, bubbleKey = key })
+        end,
       })
-      local feed = ctx.create_node(scope, "EUIButton", {
-        Name = "BtnFishermanFeed" .. suffix,
-        Parent = node,
-        ButtonText = "喂食",
-        TouchEnabled = true,
+      Controls.button(scope, ctx, {
+        name = "BtnFishermanFeed" .. suffix,
+        parent = node,
+        rect = Layout.rect(156, 24, 96, 44),
+        text = "喂食",
+        variant = "gold",
+        font_size = Tokens.FONT_SIZE.CAPTION,
+        z_order = 2,
+        on_click = function()
+          if options.shared then options.shared.last_feed_index = entry.index end
+          local next_seq = ctx.services and ctx.services.next_seq
+          local send = ctx.services and ctx.services.send_interact
+          if type(send) == "function" then
+            send({
+              target = "fisherman",
+              action = "Feed",
+              seq = type(next_seq) == "function" and next_seq() or 1,
+            })
+          end
+        end,
       })
-      ctx.connect(scope, talk.OnClicked, function()
-        Modal.open_modal(ctx, "fisherman", { zoneId = entry.npc.ZoneId, bubbleKey = key })
-      end)
-      ctx.connect(scope, feed.OnClicked, function()
-        if options.shared then options.shared.last_feed_index = entry.index end
-        local next_seq = ctx.services and ctx.services.next_seq
-        local send = ctx.services and ctx.services.send_interact
-        if type(send) == "function" then
-          send({
-            target = "fisherman",
-            action = "Feed",
-            seq = type(next_seq) == "function" and next_seq() or 1,
-          })
-        end
-      end)
       scope:on_cleanup(function()
         local payload = ctx.store.modal_payload:now()
         if ctx.store.active_modal:now() == "fisherman" and type(payload) == "table"
@@ -85,37 +101,61 @@ end
 function FishermanView.modal_spec()
   return function(scope, ctx)
     local payload = ctx.store.modal_payload:now() or {}
-    local panel = ctx.create_node(scope, "EUIImage", { Name = "FishermanDialog" })
-    ctx.create_node(scope, "EUITextLabel", {
-      Name = "LabelFishermanTitle", Parent = panel, Text = "钓鱼佬",
+    local shell = Controls.modal_shell(scope, ctx, {
+      name = "PanelFisherman",
+      title = "钓鱼佬",
+      title_name = "LabelFishermanTitle",
+      close_name = "BtnFishermanClose",
+      width = DIALOG_W,
+      height = DIALOG_H,
+      on_close = function() Modal.close_modal(ctx, "fisherman") end,
     })
+    local panel = shell.panel
     local lines = Dialogue.Lines(payload.zoneId) or { GameCfg.Interact.Fisherman.DialogText }
+    local count = math.max(1, #lines)
+    local area_top = 84
+    local area_h = DIALOG_H - area_top - PAD
+    local gap = count > 1 and 4 or 0
+    local line_h = math.max(20, math.floor((area_h - gap * (count - 1)) / count / 4) * 4)
     for index, line in ipairs(lines) do
-      ctx.create_node(scope, "EUITextLabel", {
-        Name = "LabelFishermanLine" .. index,
-        Parent = panel,
-        Text = tostring(line),
+      local top = area_top + (index - 1) * (line_h + gap)
+      Primitives.label(scope, ctx, {
+        name = "LabelFishermanLine" .. index,
+        parent = panel,
+        rect = Layout.from_top_left(DIALOG_H, PAD, top, DIALOG_W - PAD * 2, line_h),
+        text = tostring(line),
+        font_size = Tokens.FONT_SIZE.CAPTION,
+        color = Tokens.COLOR.TEXT_DARK,
+        align_x = 0,
+        align_y = 1,
+        z_order = 2,
       })
     end
-    local close = ctx.create_node(scope, "EUIButton", {
-      Name = "BtnFishermanClose", Parent = panel, ButtonText = "关闭", TouchEnabled = true,
-    })
-    ctx.connect(scope, close.OnClicked, function() Modal.close_modal(ctx, "fisherman") end)
   end
 end
 
 function FishermanView.confirm_modal_spec()
   return function(scope, ctx)
     local payload = ctx.store.modal_payload:now() or {}
-    local panel = ctx.create_node(scope, "EUIImage", { Name = "DialogNoticeConfirm" })
-    ctx.create_node(scope, "EUITextLabel", {
-      Name = "LabelText", Parent = panel, Text = tostring(payload.msg or ""),
+    local shell = Controls.modal_shell(scope, ctx, {
+      name = "PanelConfirm",
+      title = tostring(payload.title or "确认提示"),
+      title_name = "LabelConfirmTitle",
+      width = CONFIRM_W,
+      height = CONFIRM_H,
+      show_close = false,
     })
-    local yes = ctx.create_node(scope, "EUIButton", {
-      Name = "BtnYes", Parent = panel, ButtonText = "是", TouchEnabled = true,
-    })
-    local no = ctx.create_node(scope, "EUIButton", {
-      Name = "BtnNo", Parent = panel, ButtonText = "否", TouchEnabled = true,
+    local panel = shell.panel
+    Primitives.label(scope, ctx, {
+      name = "LabelText",
+      parent = panel,
+      rect = Layout.from_top_left(CONFIRM_H, PAD, 96, CONFIRM_W - PAD * 2, 120),
+      text = tostring(payload.msg or ""),
+      font_size = Tokens.FONT_SIZE.BODY,
+      color = Tokens.COLOR.TEXT_DARK,
+      align_x = 1,
+      align_y = 1,
+      z_order = 2,
     })
     local function finish(value)
       if type(payload.call_back) == "function" then
@@ -126,8 +166,27 @@ function FishermanView.confirm_modal_spec()
       end
       Modal.close_modal(ctx, "confirm")
     end
-    ctx.connect(scope, yes.OnClicked, function() finish(true) end)
-    ctx.connect(scope, no.OnClicked, function() finish(false) end)
+    local btn_rects = Layout.centered_row(CONFIRM_W, PAD + 56 / 2, 2, 200, 56, 40)
+    Controls.button(scope, ctx, {
+      name = "BtnNo",
+      parent = panel,
+      rect = btn_rects[1],
+      text = tostring(payload.no_text or "否"),
+      variant = "blue",
+      font_size = Tokens.FONT_SIZE.BUTTON,
+      z_order = 2,
+      on_click = function() finish(false) end,
+    })
+    Controls.button(scope, ctx, {
+      name = "BtnYes",
+      parent = panel,
+      rect = btn_rects[2],
+      text = tostring(payload.yes_text or "是"),
+      variant = "gold",
+      font_size = Tokens.FONT_SIZE.BUTTON,
+      z_order = 2,
+      on_click = function() finish(true) end,
+    })
   end
 end
 

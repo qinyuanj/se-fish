@@ -1,10 +1,12 @@
 -- Spoke 主 HUD 武器栏/鱼饵栏及其展开浮层视图（ADR-0032 / #297-B3a，归属 L2 client.views）：
 -- 挂载于 RootView 常驻 HUD 槽位，订阅只读 ClientStore.item_bar；
 -- 武器栏与鱼饵栏常驻底部栏位，展开浮层由 Phase + Dock 管理候选格生命周期；
--- 点击遮罩、切换另一栏、选择候选、打开背包、重连或根 UI 销毁均自动零残留销毁节点与连接。
+-- 全屏点击收起层严格使用 Primitives.dismiss_mask（纯 EUILayout），根治空图 EUIButton 黑屏。
 
 local Spoke = require("common.packages.spoke.api")
 local MainHudLayout = require("client.main_hud_layout")
+local Tokens = require("client.ui.tokens")
+local Primitives = require("client.ui.primitives")
 local ViewUtil = require("client.views.view_util")
 local HudWidgets = require("client.views.hud_widgets")
 local MainHudEquipCandidates = require("client.views.main_hud_equip_candidates")
@@ -14,16 +16,14 @@ local State = Spoke.State
 
 local MainHudEquipPopups = {}
 
-local BUTTON_IMAGE = "official://image/11017"
-local CELL_FONT = 18
+local CELL_FONT = Tokens.FONT_SIZE.MICRO
 
 local COLORS = {
-  WHITE = { 255, 255, 255, 255 },
-  NORMAL = { 54, 100, 140, 255 },
-  PRESS = { 42, 82, 118, 255 },
-  SELECTED = { 36, 130, 94, 255 },
-  DISABLED = { 120, 120, 120, 255 },
-  POPUP_PLATE = { 16, 24, 34, 200 },
+  WHITE = Tokens.COLOR.WHITE,
+  NORMAL = Tokens.COLOR.HUD_SLOT,
+  PRESS = Tokens.COLOR.HUD_SLOT_PRESS,
+  SELECTED = Tokens.COLOR.SELECTED,
+  DISABLED = Tokens.COLOR.DISABLED,
 }
 
 local make_color = ViewUtil.color
@@ -65,7 +65,7 @@ end
 ---@param rects table
 ---@param plates table
 local function place_plate(kind, rects, plates)
-  local plate_rect = MainHudLayout.bounds(rects, 4)
+  local plate_rect = MainHudLayout.bounds(rects, Tokens.SPACE.SM)
   if plate_rect ~= nil and plates[kind] ~= nil then
     HudWidgets.place(plates[kind], plate_rect)
     plates[kind].Visible = true
@@ -111,7 +111,7 @@ function PopupBehavior.watch_external_popup(self)
   end)
 end
 
---- 建武器栏与鱼饵栏常驻入口按钮（按钮不设 Color 且文字置于同级高 ZOrder EUITextLabel）。
+--- 建武器栏与鱼饵栏常驻入口按钮（严禁写 ButtonText，文字置于同级高 ZOrder EUITextLabel）。
 ---@param self MainHudEquipPopupsHandle
 function PopupBehavior.create_equip_bars(self)
   local ctx, s = self.ctx, self.s
@@ -120,9 +120,16 @@ function PopupBehavior.create_equip_bars(self)
     local bar_kind = kind
     local r = self.initial_layout.rects[bar_kind .. "Bar"]
     local btn = HudWidgets.button(ctx, s, {
-      name = bar_kind .. "Bar", x = r.x, y = r.y, w = r.w, h = r.h,
+      name = bar_kind .. "Bar",
+      x = r.x,
+      y = r.y,
+      w = r.w,
+      h = r.h,
+      normal = COLORS.NORMAL,
+      press = COLORS.PRESS,
+      disabled = COLORS.DISABLED,
+      z_order = Tokens.Z.HUD_CONTENT,
     })
-    btn.LocalZOrder = 6
     local label = HudWidgets.label(ctx, s, {
       name = bar_kind .. "BarLabel",
       x = r.x,
@@ -132,7 +139,7 @@ function PopupBehavior.create_equip_bars(self)
       text = "",
       font_size = CELL_FONT,
       text_color = make_color(COLORS.WHITE),
-      z_order = 7,
+      z_order = Tokens.Z.HUD_ACCENT,
     })
     self.equip_bars[bar_kind] = { button = btn, label = label }
     ctx.connect(s, btn.OnClicked, function()
@@ -173,15 +180,21 @@ local function bait_label_text(state, rect)
     or cell_text("不挂鱼饵", nil, rect.w)
 end
 
---- 按显隐与展开态刷两个入口的可见性、可点态与高亮色。
+--- 按显隐与展开态刷两个入口的可见性、可点态、层级与高亮色。
+--- 浮层展开时把入口提至遮罩之上，确保玩家可直接切换另一栏或点自身收起。
 ---@param equip_bars table
 ---@param show_bars boolean
 ---@param open_kind string|nil
 local function apply_bar_visibility(equip_bars, show_bars, open_kind)
+  local elevated = show_bars and open_kind ~= nil
+  local btn_z = elevated and Tokens.Z.HUD_POPUP_CONTENT or Tokens.Z.HUD_CONTENT
+  local lbl_z = elevated and Tokens.Z.HUD_POPUP_LABEL or Tokens.Z.HUD_ACCENT
   for kind, bar in pairs(equip_bars) do
     bar.button.Visible = show_bars
     bar.button.TouchEnabled = show_bars
+    bar.button.LocalZOrder = btn_z
     bar.label.Visible = show_bars
+    bar.label.LocalZOrder = lbl_z
     bar.button.ButtonNormalColor = make_color(
       (show_bars and open_kind == kind) and COLORS.SELECTED or COLORS.NORMAL
     )
@@ -225,25 +238,21 @@ function PopupBehavior.bind_popup_phase(self)
   end)
 end
 
---- 建浮层底：全屏 dismiss、两块底板、单元格 Dock 与同步 Effect。
+--- 建浮层底：全屏纯 EUILayout dismiss、两块胶囊底板、单元格 Dock 与同步 Effect。
 ---@param self MainHudEquipPopupsHandle
 ---@param ps table
 function PopupBehavior.mount_popup(self, ps)
   local ctx = self.ctx
   local w, h = self.resolution.x, self.resolution.y
-  local dismiss = HudWidgets.button(ctx, ps, {
-    name = "PopupDismiss", x = w / 2, y = h / 2, w = w, h = h,
+  Primitives.dismiss_mask(ps, ctx, {
+    name = "PopupDismiss",
+    width = w,
+    height = h,
+    z_order = Tokens.Z.HUD_POPUP_MASK,
+    on_click = function()
+      self.open_popup:set(nil)
+    end,
   })
-  dismiss.NormalImage = ""
-  dismiss.PressImage = ""
-  dismiss.DisableImage = ""
-  dismiss.ButtonNormalColor = Color.New(0, 0, 0, 0)
-  dismiss.ButtonPressColor = Color.New(0, 0, 0, 0)
-  dismiss.ButtonDisableColor = Color.New(0, 0, 0, 0)
-  dismiss.LocalZOrder = 4
-  ctx.connect(ps, dismiss.OnClicked, function()
-    self.open_popup:set(nil)
-  end)
 
   local plates = self:create_plates(ps)
 
@@ -258,7 +267,7 @@ function PopupBehavior.mount_popup(self, ps)
   end)
 end
 
---- 按当前布局建两块浮层底板，默认隐藏，等同步体按展开项点亮。
+--- 按当前布局建两块深海蓝胶囊浮层底板，默认隐藏，等同步体按展开项点亮。
 ---@param self MainHudEquipPopupsHandle
 ---@param ps table
 ---@return table
@@ -268,15 +277,14 @@ function PopupBehavior.create_plates(self, ps)
     or MainHudLayout.from_resolution(self.resolution, ViewUtil.item_bar_slots(self.ctx.store.item_bar:now(), false))
   for _, kind in ipairs({ "Weapon", "Bait" }) do
     local r = cur_layout.rects[kind .. "Bar"]
-    local plate = HudWidgets.passive(self.ctx.create_node(ps, "EUIImage", {
-      Name = kind .. "Popup",
-      Position = Vector2.New(r.x, r.y),
-      Size = Vector2.New(r.w, r.h),
-      Image = BUTTON_IMAGE,
-      Color = make_color(COLORS.POPUP_PLATE),
-    }))
-    plate.LocalZOrder = 5
-    plate.Visible = false
+    local plate = Primitives.capsule(ps, self.ctx, {
+      name = kind .. "Popup",
+      parent = self.ctx.root_node,
+      rect = r,
+      opacity = Tokens.OPACITY.HUD_SURFACE,
+      z_order = Tokens.Z.HUD_POPUP_BG,
+      visible = false,
+    })
     plates[kind] = plate
   end
   return plates
@@ -372,9 +380,15 @@ function PopupBehavior.mount_cell(self, cs, dock_key, item_state)
   local init_data = item_state:now()
   local btn = HudWidgets.button(ctx, cs, {
     name = init_data.kind .. "PopupCell_" .. tostring(init_data.key),
-    x = 0, y = 0, w = 80, h = 80,
+    x = 0,
+    y = 0,
+    w = 80,
+    h = 80,
+    normal = COLORS.NORMAL,
+    press = COLORS.PRESS,
+    disabled = COLORS.DISABLED,
+    z_order = Tokens.Z.HUD_POPUP_CONTENT,
   })
-  btn.LocalZOrder = 6
   local lbl = HudWidgets.label(ctx, cs, {
     name = init_data.kind .. "PopupLabel_" .. tostring(init_data.key),
     x = 0,
@@ -384,7 +398,7 @@ function PopupBehavior.mount_cell(self, cs, dock_key, item_state)
     text = "",
     font_size = CELL_FONT,
     text_color = make_color(COLORS.WHITE),
-    z_order = 7,
+    z_order = Tokens.Z.HUD_POPUP_LABEL,
   })
   ctx.connect(cs, btn.OnClicked, function()
     self:choose_cell(item_state)

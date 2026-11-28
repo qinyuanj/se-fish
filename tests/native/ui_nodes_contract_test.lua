@@ -5,7 +5,7 @@ local ShopView = require("client.views.shop_view")
 local Eui = require("tests.support.eui_double")
 
 local REQUIRED = {
-  "ScreenShop", "LabelShopTitle", "LabelCurCoin", "ShopListPanel", "ShopList",
+  "PanelShop", "LabelShopTitle", "LabelCurCoin", "ShopListPanel", "ShopList",
   "ShopCoinPanel", "ShopDetailPanel", "LabelCoinPageHint", "BtnOpenPlatformShop",
   "LabelOpenPlatformShop", "LabelShopDetailName", "LabelShopDetailDesc",
   "LabelShopDetailPrice", "LabelShopDetailLimit", "LabelShopDetailUpgrade",
@@ -67,7 +67,7 @@ describe("商店统一视图的动态节点合同", function()
 
   it("所有动态后代的非空名字唯一，深查不会静默抓错控件", function()
     local seen, duplicates = {}, {}
-    collect_names(child(root, "ScreenShop"), seen, duplicates)
+    collect_names(child(root, "PanelShop"), seen, duplicates)
     assert.same({}, duplicates)
     for _, name in ipairs(REQUIRED) do assert.is_true(seen[name], name) end
   end)
@@ -76,7 +76,7 @@ describe("商店统一视图的动态节点合同", function()
     writer:close_modal("shop")
     writer:open_modal("shop", { stand = GameCfg.Shop.Stands[1] })
     local seen, duplicates = {}, {}
-    collect_names(child(root, "ScreenShop"), seen, duplicates)
+    collect_names(child(root, "PanelShop"), seen, duplicates)
     assert.same({}, duplicates)
     local rows = GameCfg.Shop.list_for_page(GameCfg.Shop.Stands[1].Level, GameCfg.Shop.Pages[1], true)
     assert.is_not_nil(child(root, "ShopRow" .. #rows))

@@ -44,9 +44,14 @@ function M.node(spec)
     Anchor = spec.Anchor or { x = 0.5, y = 0.5 },
     Position = spec.Position,
     Size = spec.Size,
+    Opacity = spec.Opacity ~= nil and spec.Opacity or 1,
+    LocalZOrder = spec.LocalZOrder or 0,
+    SwallowTouchEnabled = spec.SwallowTouchEnabled,
     children = spec.children or {},
     TouchEnabled = spec.TouchEnabled,
     OnClicked = spec.OnClicked or M.Signal(),
+    OnTouchBegan = spec.OnTouchBegan or M.Signal(),
+    OnTouchEnded = spec.OnTouchEnded or M.Signal(),
     Destroying = spec.Destroying or M.Signal(),
   }
   local node = setmetatable({}, {
@@ -56,6 +61,33 @@ function M.node(spec)
       fields[key] = value
     end,
   })
+
+  function fields:GetChildren()
+    local list = {}
+    for _, child in pairs(self.children) do
+      list[#list + 1] = child
+    end
+    table.sort(list, function(a, b) return tostring(a.Name or '') < tostring(b.Name or '') end)
+    return list
+  end
+
+  function fields:TweenOpacity(target, _dir, _style, _dur, _override, cb)
+    fields.Opacity = target
+    if type(cb) == 'function' then cb(0) end
+    return true
+  end
+
+  function fields:TweenPosition(target, _dir, _style, _dur, _override, cb)
+    fields.Position = target
+    if type(cb) == 'function' then cb(0) end
+    return true
+  end
+
+  function fields:TweenSize(target, _dir, _style, _dur, _override, cb)
+    fields.Size = target
+    if type(cb) == 'function' then cb(0) end
+    return true
+  end
 
   function fields:FindFirstChild(name, recursive)
     local hit = self.children[name]

@@ -3,6 +3,8 @@ local GameCfg = require("common.game_cfg")
 local ClientStore = require("client.store.client_store")
 local RootView = require("client.views.root_view")
 local SurvivalOverlayView = require("client.views.survival_overlay_view")
+local Layout = require("client.ui.layout")
+local Tokens = require("client.ui.tokens")
 local Eui = require("tests.support.eui_double")
 
 local function mount(store, sent)
@@ -24,7 +26,7 @@ local function mount(store, sent)
       end,
     },
     create_node = function(kind, props)
-      return Eui.node({
+      local node = Eui.node({
         Kind = kind,
         Name = props and props.Name,
         Parent = props and props.Parent,
@@ -34,6 +36,12 @@ local function mount(store, sent)
         Size = props and props.Size,
         TouchEnabled = kind == "EUIButton",
       })
+      for k, v in pairs(props or {}) do
+        if k ~= "Parent" then
+          node[k] = v
+        end
+      end
+      return node
     end,
   })
   return root, view
@@ -81,7 +89,18 @@ describe("客户端生存蒙版宿主入口（#298）", function()
     assert.is_false(paid.Visible)
     assert.is_false(weak.Visible)
     assert.equals(GameCfg.Survival.DownedTitle .. "（" .. "15" .. " 秒）", title.Text)
-    assert.equals(330, ad.Position.x)
+    local backdrop = child(root, "SurvivalBanner_backdrop")
+    assert.is_not_nil(backdrop)
+    assert.equals(Tokens.ASSET.MODAL_MASK, backdrop.Image)
+    assert.equals(960, backdrop.Position.x)
+    assert.equals(540, backdrop.Position.y)
+    assert.equals("", adrenaline.ButtonText)
+    assert.equals("", ad.ButtonText)
+    assert.is_false(Layout.overlaps(
+      Layout.rect(adrenaline.Position.x, adrenaline.Position.y, adrenaline.Size.x, adrenaline.Size.y),
+      Layout.rect(ad.Position.x, ad.Position.y, ad.Size.x, ad.Size.y)
+    ))
+    assert.is_true(ad.Position.x > adrenaline.Position.x)
 
     assert.is_true(Eui.click(adrenaline))
     assert.same({ action = "UseAdrenaline", seq = 1 }, sent[#sent])
@@ -101,8 +120,11 @@ describe("客户端生存蒙版宿主入口（#298）", function()
     assert.is_true(paid.Visible)
     assert.is_true(adrenaline and adrenaline.Visible == false)
     assert.is_true(ad.Visible)
-    assert.equals(10, ad.Position.x)
-    assert.equals(330, paid.Position.x)
+    assert.is_false(Layout.overlaps(
+      Layout.rect(ad.Position.x, ad.Position.y, ad.Size.x, ad.Size.y),
+      Layout.rect(paid.Position.x, paid.Position.y, paid.Size.x, paid.Size.y)
+    ))
+    assert.is_true(paid.Position.x > ad.Position.x)
     assert.equals(GameCfg.Survival.DeadTitle .. "（" .. "30" .. " 秒）", title.Text)
     assert.equals(GameCfg.Survival.CallHelpText, sent[#sent].notice)
     assert.is_true(Eui.click(paid))

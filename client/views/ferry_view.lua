@@ -1,13 +1,20 @@
-
 local GameCfg = require("common.game_cfg")
 local BodyScale = require("common.body_scale")
 local Spoke = require("common.packages.spoke.api")
+local MainHudLayout = require("client.main_hud_layout")
+local Tokens = require("client.ui.tokens")
+local Layout = require("client.ui.layout")
+local Primitives = require("client.ui.primitives")
+local Controls = require("client.ui.controls")
 local ViewUtil = require("client.views.view_util")
 local InteractPromptArbiter = require("client.views.interact_prompt_arbiter")
 
 local State = Spoke.State
 
 local FerryView = {}
+
+local BUBBLE_W = 160
+local BUBBLE_H = 56
 
 local function zone_name(route_id, action)
   local route = GameCfg.Ferry.route(route_id)
@@ -104,17 +111,26 @@ function FerryView.mount(scope, ctx)
   end)
 
   scope:phase("FerryCountdownPhase", has_countdown, function(ps)
-    local resolution = ViewUtil.get_resolution(ctx); if resolution == nil then return end
-    local label = ctx.create_node(ps, "EUITextLabel", {
-      Name = "FerryCountdown",
-      Position = Vector2.New(resolution.x / 2, resolution.y - 120),
-      Size = Vector2.New(360, 60),
-      Text = "",
-      FontSize = 36,
-      TextColor = Color.New(255, 255, 255, 255),
-      Visible = true,
-      TouchEnabled = false,
-      SwallowTouchEnabled = false,
+    local resolution = ViewUtil.get_resolution(ctx)
+    if resolution == nil then return end
+    local layout = MainHudLayout.compute({ width = resolution.x, height = resolution.y })
+    local pill_rect = layout.rects.hint_primary or Layout.top_center(resolution.x, resolution.y, 20, 520, 56)
+    local bg = Primitives.capsule(ps, ctx, {
+      name = "FerryCountdownBg",
+      rect = pill_rect,
+      z_order = Tokens.Z.HUD_ACCENT,
+    })
+    local label = Primitives.label(ps, ctx, {
+      name = "FerryCountdown",
+      parent = bg,
+      rect = Layout.rect(pill_rect.w / 2, pill_rect.h / 2, pill_rect.w - 32, pill_rect.h - 8),
+      text = "",
+      font_size = Tokens.FONT_SIZE.BUTTON,
+      bold = true,
+      color = Tokens.COLOR.WHITE,
+      outline = true,
+      outline_color = Tokens.COLOR.OUTLINE_DARK,
+      z_order = 1,
     })
 
     local last_text = nil
@@ -201,18 +217,20 @@ function FerryView.legs_spec()
         parent = create_at(position, "FerryLeg:" .. key)
         ctx.own_node(scope, parent)
       end
-      local button = ctx.create_node(scope, "EUIButton", {
-        Name = "BtnFerry" .. item.point.AnchorName,
-        Parent = parent,
-        ButtonText = item.text,
-        TouchEnabled = true,
-        Visible = true,
+      Controls.button(scope, ctx, {
+        name = "BtnFerry" .. item.point.AnchorName,
+        parent = parent,
+        rect = Layout.rect(BUBBLE_W / 2, BUBBLE_H / 2, BUBBLE_W, BUBBLE_H),
+        text = item.text,
+        variant = "gold",
+        font_size = Tokens.FONT_SIZE.BUTTON,
+        z_order = 1,
+        on_click = function()
+          seq = seq + 1
+          local payload = { action = item.action, route_id = item.route_id, seq = seq }
+          if type(services.send_ferry) == "function" then services.send_ferry(payload) end
+        end,
       })
-      ctx.connect(scope, button.OnClicked, function()
-        seq = seq + 1
-        local payload = { action = item.action, route_id = item.route_id, seq = seq }
-        if type(services.send_ferry) == "function" then services.send_ferry(payload) end
-      end)
     end,
   }
 end

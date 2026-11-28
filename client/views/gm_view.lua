@@ -1,7 +1,16 @@
 local GameCfg = require("common.game_cfg")
+local Tokens = require("client.ui.tokens")
+local Layout = require("client.ui.layout")
+local Primitives = require("client.ui.primitives")
+local Controls = require("client.ui.controls")
 local Modal = require("client.views.economy_modal")
 local ViewUtil = require("client.views.view_util")
+
 local GMView = {}
+
+local PANEL_W = 1040
+local PANEL_H = 680
+local PAD = Tokens.SPACE.PANEL_PAD
 
 local function shallow_copy(payload)
   local out = {}
@@ -21,7 +30,6 @@ local GM_ACTIONS = {
   { "BtnGMSetHealth", "恢复 100 生命", { action = "SetHealth", value = 100 } },
   { "BtnGMSetHunger", "恢复 100 饥饿", { action = "SetHunger", value = 100 } },
   { "BtnGMGetState", "读取状态", { action = "GetState" } },
-
   { "BtnGMSaveState", "显式保存", { action = "SaveState" } },
   { "BtnGMReadState", "显式读档", { action = "ReadState" } },
   { "BtnGMSelectSaveSlot", "切换存档槽", { action = "SelectSaveSlot", slot = 1 } },
@@ -33,27 +41,17 @@ local GM_INPUT_FIELDS = { "coin", "upgrade_level", "container", "index", "itemId
 --- 鱼按钮分页顺序：先两条固定鱼，其余按 id 排序。
 ---@return string[]
 local function gm_fish_ids()
-  local fishIds = { "eel", "alligatorGar" }
+  local fish_ids = { "eel", "alligatorGar" }
   local others = {}
-  for fishId in pairs(GameCfg.Fish) do
-    if fishId ~= "eel" and fishId ~= "alligatorGar" then others[#others + 1] = fishId end
+  for fish_id in pairs(GameCfg.Fish) do
+    if fish_id ~= "eel" and fish_id ~= "alligatorGar" then others[#others + 1] = fish_id end
   end
   table.sort(others)
-  for _, fishId in ipairs(others) do fishIds[#fishIds + 1] = fishId end
-  return fishIds
+  for _, fish_id in ipairs(others) do fish_ids[#fish_ids + 1] = fish_id end
+  return fish_ids
 end
 
---- 动作按钮按 5 列网格排布。
----@param btn table
----@param idx number
-local function place_action(btn, idx)
-  local col = (idx - 1) % 5
-  local row_idx = math.floor((idx - 1) / 5)
-  Modal.place(btn, 20 + col * 174, 274 + row_idx * 48, 164, 40)
-end
-
--- GM 面板句柄：面板节点、分页位置与输入框都留在句柄上；
--- 方法名沿用拆分前的局部函数名，挂载入口只做装配。
+-- GM 面板句柄：面板节点、分页位置与输入框都留在句柄上。
 ---@class GMPanelHandle: table<string, any>
 ---@type GMPanelHandle
 local GMBehavior = {}
@@ -71,10 +69,10 @@ end
 function GMBehavior.refresh_fish(self)
   local first = (self.fish_page - 1) * 6
   for index, button in ipairs(self.fish_buttons) do
-    local fishId = self.fish_ids[first + index]
-    button.Visible = fishId ~= nil
-    button.TouchEnabled = fishId ~= nil
-    Modal.set_button_text(button, fishId and GameCfg.Fish[fishId].Name or "")
+    local fish_id = self.fish_ids[first + index]
+    button.Visible = fish_id ~= nil
+    Controls.set_button_enabled(button, fish_id ~= nil, "card")
+    Controls.set_button_text(button, fish_id and GameCfg.Fish[fish_id].Name or "")
   end
   local page_label = self.fish_page_label
   if page_label then
@@ -85,8 +83,8 @@ end
 ---@param self GMPanelHandle
 ---@param index number
 function GMBehavior.next_fish(self, index)
-  local fishId = self.fish_ids[(self.fish_page - 1) * 6 + index]
-  if fishId then self:send({ action = "NextFish", fishId = fishId }) end
+  local fish_id = self.fish_ids[(self.fish_page - 1) * 6 + index]
+  if fish_id then self:send({ action = "NextFish", fishId = fish_id }) end
 end
 
 ---@param self GMPanelHandle
@@ -120,46 +118,125 @@ function GMBehavior.state_payload(self, action)
   return payload
 end
 
---- 建面板节点：结果行、鱼分页、状态补丁输入框与一键动作按钮。
+--- 建面板节点：基于 Controls.modal_shell 与 Layout.grid_cell 规范排布全部调试控件。
 ---@param self GMPanelHandle
 function GMBehavior.create_nodes(self)
   local scope, ctx = self.scope, self.ctx
-  local panel = Modal.panel(scope, ctx, "ScreenGM", "GM 调试面板")
+  local panel = Modal.panel(scope, ctx, "ScreenGM", "GM 调试面板", {
+    width = PANEL_W,
+    height = PANEL_H,
+    close_name = "BtnGMClose",
+    modal_id = "gm",
+  })
   self.panel = panel
-  self.result = Modal.place(Modal.label(scope, ctx, panel, "LabelGMResult", "等待操作"), 20, 54, 860, 30)
+
+  local content_w = PANEL_W - PAD * 2
+  self.result = Primitives.label(scope, ctx, {
+    name = "LabelGMResult",
+    parent = panel,
+    rect = Layout.from_top_left(PANEL_H, PAD, 84, content_w, 36),
+    text = "等待操作",
+    font_size = Tokens.FONT_SIZE.CAPTION,
+    bold = true,
+    color = Tokens.COLOR.TEXT_GOLD_DARK,
+    align_x = 0,
+    align_y = 1,
+    z_order = 2,
+  })
+
+  -- 鱼种分页栏
+  Controls.button(scope, ctx, {
+    name = "BtnGMFishPrev",
+    parent = panel,
+    rect = Layout.from_top_left(PANEL_H, PAD, 132, 136, 40),
+    text = "上一页鱼",
+    variant = "blue",
+    font_size = Tokens.FONT_SIZE.CAPTION,
+    z_order = 2,
+    on_click = function() self:prev_fish_page() end,
+  })
+  self.fish_page_label = Primitives.label(scope, ctx, {
+    name = "LabelGMFishPage",
+    parent = panel,
+    rect = Layout.from_top_left(PANEL_H, 180, 132, 160, 40),
+    text = "",
+    font_size = Tokens.FONT_SIZE.CAPTION,
+    bold = true,
+    color = Tokens.COLOR.TEXT_DARK,
+    align_x = 1,
+    align_y = 1,
+    z_order = 2,
+  })
+  Controls.button(scope, ctx, {
+    name = "BtnGMFishNext",
+    parent = panel,
+    rect = Layout.from_top_left(PANEL_H, 352, 132, 136, 40),
+    text = "下一页鱼",
+    variant = "blue",
+    font_size = Tokens.FONT_SIZE.CAPTION,
+    z_order = 2,
+    on_click = function() self:next_fish_page() end,
+  })
+
+  -- 6 个鱼种快捷按钮（6 列网格，总宽 976px）
   self.fish_ids = gm_fish_ids()
   for index = 1, 6 do
-    self.fish_buttons[index] = Modal.place(Modal.button(scope, ctx, panel, "BtnGMNextFish_" .. tostring(index), "", function()
-      self:next_fish(index)
-    end), 20 + (index - 1) * 144, 134, 136, 36)
+    local rect = Layout.grid_cell(PANEL_H, PAD, 184, 6, index, 156, 44, 8, 8)
+    self.fish_buttons[index] = Controls.button(scope, ctx, {
+      name = "BtnGMNextFish_" .. tostring(index),
+      parent = panel,
+      rect = rect,
+      text = "",
+      variant = "card",
+      font_size = Tokens.FONT_SIZE.CAPTION,
+      z_order = 2,
+      on_click = function() self:next_fish(index) end,
+    })
   end
-  Modal.place(Modal.button(scope, ctx, panel, "BtnGMFishPrev", "上一页鱼", function()
-    self:prev_fish_page()
-  end), 20, 92, 120, 34)
-  Modal.place(Modal.button(scope, ctx, panel, "BtnGMFishNext", "下一页鱼", function()
-    self:next_fish_page()
-  end), 300, 92, 120, 34)
-  self.fish_page_label = Modal.place(Modal.label(scope, ctx, panel, "LabelGMFishPage", ""), 150, 92, 140, 34)
   self:refresh_fish()
 
+  -- 8 个状态补丁输入框（4 列 × 2 行，总宽 976px）
   for index, field in ipairs(GM_INPUT_FIELDS) do
-    local col = (index - 1) % 4
-    local row_idx = math.floor((index - 1) / 4)
-    self.inputs[field] = Modal.place(
-      ctx.create_node(scope, "EUIInputField", { Parent = panel, Name = "GMInput_" .. field, Text = "" }),
-      20 + col * 218, 182 + row_idx * 42, 206, 34)
+    local rect = Layout.grid_cell(PANEL_H, PAD, 244, 4, index, 232, 40, 16, 12)
+    local input = ctx.create_node(scope, "EUIInputField", {
+      Parent = panel,
+      Name = "GMInput_" .. field,
+      Position = Tokens.vec2(rect.x, rect.y),
+      Size = Tokens.vec2(rect.w, rect.h),
+      Text = "",
+      Visible = true,
+      TouchEnabled = true,
+      LocalZOrder = 2,
+    })
+    input.TouchEnabled = true
+    pcall(function() input.PlaceholderText = field end) -- 兼容测试替身缺少 PlaceholderText 字段
+    self.inputs[field] = input
+  end
+
+  -- 15 个一键调试动作按钮（5 列 × 3 行）
+  local function add_action(idx, name, text, variant, on_click)
+    local rect = Layout.grid_cell(PANEL_H, PAD, 356, 5, idx, 184, 56, 12, 16)
+    Controls.button(scope, ctx, {
+      name = name,
+      parent = panel,
+      rect = rect,
+      text = text,
+      variant = variant,
+      font_size = Tokens.FONT_SIZE.CAPTION,
+      z_order = 2,
+      on_click = on_click,
+    })
   end
 
   for index, action in ipairs(GM_ACTIONS) do
-    place_action(Modal.button(scope, ctx, panel, action[1], action[2], function() self:send(action[3]) end), index)
+    add_action(index, action[1], action[2], "surface", function() self:send(action[3]) end)
   end
-  place_action(Modal.button(scope, ctx, panel, "BtnGMApplyState", "应用状态补丁", function()
+  add_action(#GM_ACTIONS + 1, "BtnGMApplyState", "应用状态补丁", "gold", function()
     self:send(self:state_payload("ApplyState"))
-  end), #GM_ACTIONS + 1)
-  place_action(Modal.button(scope, ctx, panel, "BtnGMSelectNamedSlot", "应用下次进图槽", function()
+  end)
+  add_action(#GM_ACTIONS + 2, "BtnGMSelectNamedSlot", "应用下次进图槽", "blue", function()
     self:send(self:state_payload("SelectSaveSlot"))
-  end), #GM_ACTIONS + 2)
-  Modal.close(scope, ctx, panel, "BtnGMClose", "gm")
+  end)
 end
 
 --- GM 回包投影：结果行文案与状态快照回填输入框。
@@ -198,11 +275,22 @@ function GMView.entry_spec()
   return {
     name = "GMEntry",
     mount = function(scope, ctx)
-      local button = Modal.button(scope, ctx, ctx.root_node, "BtnGMEntry", "GM", function()
-        local services = ctx.services or {}
-        if type(services.open_modal) == "function" then services.open_modal("gm") end
-      end)
-      button.Visible = GameCfg.Debug and GameCfg.Debug.Enabled == true
+      local services = ctx.services or {}
+      local rect = type(services.hud_entry_rect) == "function" and services.hud_entry_rect("GMEntry") or nil
+      local button = Controls.button(scope, ctx, {
+        name = "BtnGMEntry",
+        parent = ctx.root_node,
+        rect = rect or Layout.rect(80, 280, 96, 44),
+        text = "GM",
+        variant = "hud",
+        font_size = Tokens.FONT_SIZE.CAPTION,
+        z_order = Tokens.Z.HUD_CONTENT,
+        visible = GameCfg.Debug and GameCfg.Debug.Enabled == true,
+        on_click = function()
+          if type(services.open_modal) == "function" then services.open_modal("gm") end
+        end,
+      })
+      if rect then Layout.apply(button, rect) end
     end,
   }
 end

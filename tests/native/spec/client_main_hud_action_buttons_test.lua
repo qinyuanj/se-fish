@@ -10,6 +10,7 @@ local spoke = require("common.packages.spoke.api")
 local Eui = require("tests.support.eui_double")
 local GameCfg = require("common.game_cfg")
 local MainHudLayout = require("client.main_hud_layout")
+local Tokens = require("client.ui.tokens")
 local ClientStore = require("client.store.client_store")
 local RootView = require("client.views.root_view")
 local MainHudActionButtonsView = require("client.views.main_hud_action_buttons_view")
@@ -117,9 +118,14 @@ describe("Spoke 主 HUD 右侧动作键视图（#297-B3b1）", function()
     assert_at(btn_action, layout.rects.item_action, "ItemAction2")
     assert_at(lbl_action, layout.rects.item_action, "BtnItemActionLabel")
 
-    -- EUIButton 严禁写 Color；文案标签 LocalZOrder 必须高于按钮
+    -- EUIButton 严禁写 Color；层级走 Tokens.Z 且字号对齐 4px 栅格
     assert.is_nil(btn_discard.Color)
     assert.is_nil(btn_action.Color)
+    assert.equals(Tokens.Z.HUD_CONTENT, btn_discard.LocalZOrder)
+    assert.equals(Tokens.Z.HUD_ACCENT, lbl_discard.LocalZOrder)
+    assert.equals(Tokens.Z.HUD_CONTENT, btn_action.LocalZOrder)
+    assert.equals(Tokens.Z.HUD_ACCENT, lbl_action.LocalZOrder)
+    assert.equals(Tokens.FONT_SIZE.BUTTON, lbl_action.FontSize)
     assert.is_true(lbl_discard.LocalZOrder > btn_discard.LocalZOrder)
     assert.is_true(lbl_action.LocalZOrder > btn_action.LocalZOrder)
 
@@ -140,7 +146,7 @@ describe("Spoke 主 HUD 右侧动作键视图（#297-B3b1）", function()
     assert.is_true(btn_action.Visible)
     assert.is_true(btn_action.TouchEnabled)
     assert.equals("抛竿", lbl_action.Text)
-    assert.same({ 54, 100, 140, 255 }, btn_action.ButtonNormalColor)
+    assert.same(Tokens.COLOR.HUD_SLOT, btn_action.ButtonNormalColor)
 
     -- 2. 选中鱼（未手持 -> 手持XX；已手持 -> 吃XX + 确认丢弃）
     local fish_name = GameCfg.Items.Definitions[ITEM_FISH].Name
@@ -173,7 +179,7 @@ describe("Spoke 主 HUD 右侧动作键视图（#297-B3b1）", function()
     env.writer:ingest_event("CastState", { phase = "landed" })
     assert.equals("已上岸", lbl_action.Text)
     assert.is_false(btn_action.TouchEnabled)
-    assert.same({ 120, 120, 120, 255 }, btn_action.ButtonNormalColor)
+    assert.same(Tokens.COLOR.DISABLED, btn_action.ButtonNormalColor)
 
     env.writer:ingest_event("CastState", { phase = "idle", holding = { fishId = ITEM_FISH } })
     assert.equals("放下", lbl_action.Text)
@@ -289,8 +295,8 @@ describe("Spoke 主 HUD 右侧动作键视图（#297-B3b1）", function()
     -- 超过高亮时长后恢复常态颜色并退出闪烁 Phase，同样不触发 ActionButtonsProjection 重跑
     writer:step_clock(GameCfg.HookAlert.DurationSec + 0.5, 100 + GameCfg.HookAlert.DurationSec + 1)
     assert.equals(writes_before_frames, discard_visible_writes)
-    assert.same({ 54, 100, 140, 255 }, btn_action.ButtonNormalColor)
-    assert.same({ 42, 82, 118, 255 }, btn_action.ButtonPressColor)
+    assert.same(Tokens.COLOR.HUD_SLOT, btn_action.ButtonNormalColor)
+    assert.same(Tokens.COLOR.HUD_SLOT_PRESS, btn_action.ButtonPressColor)
     assert.equals(0, layout_reads)
 
     view:dispose()

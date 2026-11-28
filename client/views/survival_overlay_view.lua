@@ -1,19 +1,34 @@
-
 local GameCfg = require("common.game_cfg")
 local Spoke = require("common.packages.spoke.api")
+local MainHudLayout = require("client.main_hud_layout")
+local Tokens = require("client.ui.tokens")
+local Layout = require("client.ui.layout")
+local Primitives = require("client.ui.primitives")
+local Controls = require("client.ui.controls")
 local ViewUtil = require("client.views.view_util")
 
 local State = Spoke.State
 
 local SurvivalOverlayView = {}
 
-local COLOR_BLOCK = "official://image/11017"
+local PANEL_W = 832
+local PANEL_H = 240
+local BTN_W = 340
+local BTN_H = 68
+local BTN_GAP = 32
+local BTN_Y = 72
 
 local function services_of(ctx)
   return ctx.services or {}
 end
-local function now_of_fn(ctx) return ViewUtil.resolve_clock(ctx, "SurvivalOverlayView") end
-local function read_now(clock_now) return ViewUtil.read_now(clock_now, "SurvivalOverlayView") end
+
+local function now_of_fn(ctx)
+  return ViewUtil.resolve_clock(ctx, "SurvivalOverlayView")
+end
+
+local function read_now(clock_now)
+  return ViewUtil.read_now(clock_now, "SurvivalOverlayView")
+end
 
 local function send(ctx, seq, action, mode)
   local services = services_of(ctx)
@@ -33,59 +48,83 @@ local function send(ctx, seq, action, mode)
   end
 end
 
+-- 倒地 / 抢救中 / 死亡覆盖蒙版：14588 半透遮罩 + 3A 奶白卡片 + 顶部倒计时标题 + 底部并排双按钮。
 local function mount_banner(scope, ctx, survival, seq, noticed_dead, clock_now)
-  local res = ViewUtil.get_resolution(ctx); if res == nil then return end
-  local cx, cy = res.x / 2, res.y / 2
-  local banner = ViewUtil.create_at(scope, ctx, "EUIImage", ctx.root_node, "SurvivalBanner", cx - 320, cy - 90, 640, 180, {
-    Color = Color.New(0, 0, 0, 160),
-    Image = COLOR_BLOCK,
-    Visible = true,
+  local res = ViewUtil.get_resolution(ctx)
+  if res == nil then
+    return
+  end
+  local shell = Controls.modal_shell(scope, ctx, {
+    name = "SurvivalBanner",
+    title = "",
+    title_name = "SurvivalTitle",
+    width = PANEL_W,
+    height = PANEL_H,
+    show_close = false,
+    backdrop_dismiss = false,
+    z_mask = Tokens.Z.OVERLAY_MASK,
+    z_panel = Tokens.Z.OVERLAY_PANEL,
+    get_resolution = function()
+      return res
+    end,
   })
-  local title = ViewUtil.create_at(scope, ctx, "EUITextLabel", banner, "SurvivalTitle", 0, -80, 640, 80, {
-    Text = "",
-    FontSize = 48,
-    TextColor = Color.New(255, 80, 80, 255),
-    LocalZOrder = 1,
-    Visible = true,
+  local panel = shell.panel
+  local title = shell.title_label
+  pcall(function()
+    title.TextHorizontalAlignment = 1
+  end) -- 兼容离线测试替身无对齐字段
+
+  local slots = Layout.centered_row(PANEL_W, BTN_Y, 2, BTN_W, BTN_H, BTN_GAP)
+  local left_slot = slots[1]
+  local right_slot = slots[2]
+  ---@cast left_slot { x: number, y: number, w: number, h: number }
+  ---@cast right_slot { x: number, y: number, w: number, h: number }
+
+  local adrenaline = Controls.button(scope, ctx, {
+    name = "SurvivalAdrenaline",
+    parent = panel,
+    rect = left_slot,
+    text = GameCfg.Survival.AdrenalineText,
+    variant = "gold",
+    font_size = Tokens.FONT_SIZE.BUTTON,
+    z_order = 2,
+    visible = false,
+    on_click = function()
+      seq:set(seq:now() + 1)
+      send(ctx, seq, "UseAdrenaline", nil)
+    end,
   })
-  local adrenaline = ViewUtil.create_at(scope, ctx, "EUIButton", banner, "SurvivalAdrenaline", 10, 20, 300, 80, {
-    ButtonText = "",
-    NormalImage = COLOR_BLOCK,
-    PressImage = COLOR_BLOCK,
-    Color = Color.New(230, 120, 40, 255),
-    Visible = false,
+
+  local ad = Controls.button(scope, ctx, {
+    name = "SurvivalAdRevive",
+    label_name = "SurvivalAdReviveText",
+    parent = panel,
+    rect = right_slot,
+    text = GameCfg.Survival.AdReviveText,
+    variant = "blue",
+    font_size = Tokens.FONT_SIZE.BUTTON,
+    z_order = 2,
+    visible = false,
+    on_click = function()
+      seq:set(seq:now() + 1)
+      send(ctx, seq, "FullRevive", "ad")
+    end,
   })
-  ViewUtil.create_at(scope, ctx, "EUITextLabel", adrenaline, "SurvivalAdrenalineText", 0, 0, 300, 80, {
-    Text = GameCfg.Survival.AdrenalineText,
-    FontSize = 32,
-    TextColor = Color.New(255, 255, 255, 255),
-    LocalZOrder = 1,
-  })
-  local ad = ViewUtil.create_at(scope, ctx, "EUIButton", banner, "SurvivalAdRevive", 10, 20, 300, 80, {
-    ButtonText = "",
-    NormalImage = COLOR_BLOCK,
-    PressImage = COLOR_BLOCK,
-    Color = Color.New(60, 150, 90, 255),
-    Visible = false,
-  })
-  ViewUtil.create_at(scope, ctx, "EUITextLabel", ad, "SurvivalAdReviveText", 0, 0, 300, 80, {
-    Text = GameCfg.Survival.AdReviveText,
-    FontSize = 30,
-    TextColor = Color.New(255, 255, 255, 255),
-    LocalZOrder = 1,
-  })
-  local paid = ViewUtil.create_at(scope, ctx, "EUIButton", banner, "SurvivalPaidRevive", 330, 20, 300, 80, {
-    ButtonText = "",
-    NormalImage = COLOR_BLOCK,
-    PressImage = COLOR_BLOCK,
-    Color = Color.New(210, 160, 40, 255),
-    Visible = false,
-  })
-  ViewUtil.create_at(scope, ctx, "EUITextLabel", paid, "SurvivalPaidReviveText", 0, 0, 300, 80, {
-    Text = GameCfg.Survival.PaidReviveText,
-    FontSize = 30,
-    TextColor = Color.New(255, 255, 255, 255),
-    LocalZOrder = 1,
+
+  local paid = Controls.button(scope, ctx, {
+    name = "SurvivalPaidRevive",
+    label_name = "SurvivalPaidReviveText",
+    parent = panel,
+    rect = right_slot,
+    text = GameCfg.Survival.PaidReviveText,
+    variant = "gold",
+    font_size = Tokens.FONT_SIZE.BUTTON,
+    z_order = 2,
+    visible = false,
+    on_click = function()
+      seq:set(seq:now() + 1)
+      send(ctx, seq, "FullRevive", "goods")
+    end,
   })
 
   local function refresh()
@@ -94,19 +133,28 @@ local function mount_banner(scope, ctx, survival, seq, noticed_dead, clock_now)
     local pending = state.platformPending == true
     if pending then
       title.Text = GameCfg.Survival.PlatformWaitText
+      title.TextColor = ViewUtil.color(Tokens.COLOR.TEXT_DARK)
     else
       local now = read_now(clock_now)
       if now ~= nil then
         local left = math.max(0, math.ceil((state.endsAt or 0) - now))
-        local base = phase == "rescuing" and GameCfg.Rescue.RescuingTitle or GameCfg.Survival[phase == "dead" and "DeadTitle" or "DownedTitle"]
+        local base = phase == "rescuing" and GameCfg.Rescue.RescuingTitle
+          or GameCfg.Survival[phase == "dead" and "DeadTitle" or "DownedTitle"]
         title.Text = base .. "（" .. tostring(left) .. " 秒）"
+        title.TextColor = ViewUtil.color(phase == "rescuing" and Tokens.COLOR.TEXT_DARK or Tokens.COLOR.DANGER)
       end
     end
-    adrenaline.Visible = phase == "downed" and not pending
-    ad.Visible = (phase == "downed" or phase == "dead") and not pending
-    ad.Position = Vector2.New(phase == "downed" and 330 or 10, 20)
-    paid.Visible = phase == "dead" and not pending
-    paid.Position = Vector2.New(330, 20)
+
+    local show_adrenaline = phase == "downed" and not pending
+    local show_ad = (phase == "downed" or phase == "dead") and not pending
+    local show_paid = phase == "dead" and not pending
+
+    adrenaline.Visible = show_adrenaline
+    ad.Visible = show_ad
+    paid.Visible = show_paid
+    Layout.apply(ad, phase == "downed" and right_slot or left_slot)
+    Layout.apply(paid, right_slot)
+
     if phase == "dead" and not noticed_dead:now() then
       noticed_dead:set(true)
       ViewUtil.notify(ctx, GameCfg.Survival.CallHelpText)
@@ -120,41 +168,47 @@ local function mount_banner(scope, ctx, survival, seq, noticed_dead, clock_now)
     es:d(ctx.clock.second)
     refresh()
   end)
-
-  if adrenaline.OnClicked then
-    ctx.connect(scope, adrenaline.OnClicked, function()
-      seq:set(seq:now() + 1)
-      send(ctx, seq, "UseAdrenaline", nil)
-    end)
-  end
-  if ad.OnClicked then
-    ctx.connect(scope, ad.OnClicked, function()
-      seq:set(seq:now() + 1)
-      send(ctx, seq, "FullRevive", "ad")
-    end)
-  end
-  if paid.OnClicked then
-    ctx.connect(scope, paid.OnClicked, function()
-      seq:set(seq:now() + 1)
-      send(ctx, seq, "FullRevive", "goods")
-    end)
-  end
 end
 
+-- 虚弱状态提示：放在顶部安全区 MainHudLayout hint_secondary 的深海蓝半透明胶囊条。
 local function mount_weak(scope, ctx, survival, clock_now)
-  local res = ViewUtil.get_resolution(ctx); if res == nil then return end
-  local label = ViewUtil.create_at(scope, ctx, "EUITextLabel", ctx.root_node, "SurvivalWeak", res.x / 2 - 320, res.y - 200, 640, 60, {
-    Text = "",
-    FontSize = 30,
-    TextColor = Color.New(200, 200, 255, 255),
-    Visible = true,
+  local res = ViewUtil.get_resolution(ctx)
+  if res == nil then
+    return
+  end
+  local layout = MainHudLayout.compute({ width = res.x, height = res.y })
+  local pill_rect = layout.rects.hint_secondary or Layout.top_center(res.x, res.y, 84, 520, 48)
+  local bg = Primitives.capsule(scope, ctx, {
+    name = "SurvivalWeakBg",
+    rect = pill_rect,
+    z_order = Tokens.Z.HUD_ACCENT,
+    visible = false,
   })
+  local label = Primitives.label(scope, ctx, {
+    name = "SurvivalWeak",
+    parent = bg,
+    rect = Layout.rect(pill_rect.w / 2, pill_rect.h / 2, pill_rect.w - 32, pill_rect.h - 8),
+    text = "",
+    font_size = Tokens.FONT_SIZE.BODY,
+    bold = true,
+    color = Tokens.COLOR.TEXT_SOFT_WHITE,
+    outline = true,
+    outline_color = Tokens.COLOR.OUTLINE_DARK,
+    z_order = 1,
+    visible = false,
+  })
+
   scope:effect("SurvivalWeakRefresh", function(es)
     local state = es:d(survival) or {}
     es:d(ctx.clock.second)
-    local now = read_now(clock_now); if now == nil then return end
+    local now = read_now(clock_now)
+    if now == nil then
+      return
+    end
     local left = math.max(0, math.ceil((state.weakUntil or 0) - now))
-    label.Visible = left > 0
+    local active = left > 0
+    bg.Visible = active
+    label.Visible = active
     label.Text = GameCfg.Survival.WeakText .. "（" .. tostring(left) .. " 秒）"
   end)
 end
@@ -164,7 +218,9 @@ function SurvivalOverlayView.spec()
     name = "SurvivalOverlay",
     when = function(ms, store)
       local state = ms:d(store.survival)
-      if type(state) ~= "table" then return false end
+      if type(state) ~= "table" then
+        return false
+      end
       if state.phase == "downed" or state.phase == "rescuing" or state.phase == "dead" then
         return true
       end

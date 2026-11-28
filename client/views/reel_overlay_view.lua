@@ -2,11 +2,23 @@ local GameCfg = require("common.game_cfg")
 local RateLimit = require("common.rate_limit")
 local ReelDisplay = require("common.reel_display")
 local Spoke = require("common.packages.spoke.api")
+local Tokens = require("client.ui.tokens")
+local Layout = require("client.ui.layout")
+local Primitives = require("client.ui.primitives")
+local Controls = require("client.ui.controls")
 local ViewUtil = require("client.views.view_util")
 
 local State = Spoke.State
 local ReelOverlayView = {}
-local BLOCK_IMAGE = "official://image/11017"
+
+-- 中下方安全带（y ∈ [176, 272]）：稳避 EquipBottom (<=168) 与两档分辨率下的 CenterClear (>=283.5)。
+local PANEL_MAX_W = 720
+local PANEL_H = 96
+local PANEL_BOTTOM = 176
+local CLOSE_W = 160
+local CLOSE_H = 56
+local PAD_X = 20
+local GAP_X = 16
 
 -- 收线浮层句柄：session / aggregator / display 与节点、ctx、scope 都留在句柄上；
 -- 方法名沿用拆分前的局部函数名，调用方照旧用 :method(...)。
@@ -53,7 +65,8 @@ local function valid_res(raw)
   if type(raw) ~= "table" and type(raw) ~= "userdata" then return nil end
   local ok_x, x = pcall(function() return raw.x end)
   local ok_y, y = pcall(function() return raw.y end)
-  if ok_x and ok_y and type(x) == "number" and x == x and math.abs(x) ~= math.huge and type(y) == "number" and y == y and math.abs(y) ~= math.huge and x > 0 and y > 0 then
+  if ok_x and ok_y and type(x) == "number" and x == x and math.abs(x) ~= math.huge
+      and type(y) == "number" and y == y and math.abs(y) ~= math.huge and x > 0 and y > 0 then
     return { x = x, y = y }
   end
   return nil
@@ -105,18 +118,11 @@ local function get_resolution(ctx, options)
 end
 
 local function resolve_clock(ctx)
-  local services = type(ctx) == "table" and ctx.services or nil
-  if type(services) == "table" and type(services.now) == "function" then return services.now end
-  local clock = type(ctx) == "table" and ctx.clock or nil
-  if type(clock) == "table" and type(clock.now) == "function" then return clock.now end
-  error("[ReelOverlayView] 缺少注入时钟（services.now 或 ctx.clock.now）", 3)
+  return ViewUtil.resolve_clock(ctx, "ReelOverlayView")
 end
 
 local function read_now(clock_now)
-  local ok, value = pcall(clock_now)
-  if ok and type(value) == "number" and value == value and math.abs(value) ~= math.huge then return value end
-  print("[ReelOverlayView] 读取时钟失败", tostring(value))
-  return nil
+  return ViewUtil.read_now(clock_now, "ReelOverlayView")
 end
 
 --- 浮层可见性判据：存活、处于上钩态，且不是已关闭的收线会话。
@@ -146,13 +152,17 @@ end
 ---@param current_cast table|nil
 function ReelBehavior.render_progress(self, value, current_cast)
   local current = current_cast or self.ctx.store.cast:now() or {}
+  local pct_int = math.floor(value + 0.5)
   if self.bar ~= nil and value ~= self.last_percent then
     self.last_percent = value
     self.bar.Percent = value
+    if self.bar_label ~= nil then
+      self.bar_label.Text = tostring(pct_int) .. "%"
+    end
   end
   local text = current.phase == "landed" and "鱼已上岸"
     or (self.last_payload and self.last_payload.action == "started" and GameCfg.HookAlert.Text)
-    or ("收线 " .. tostring(math.floor(value + 0.5)) .. "%")
+    or ("收线 " .. tostring(pct_int) .. "%")
   if self.hint ~= nil and text ~= self.last_hint_text then
     self.last_hint_text = text
     self.hint.Text = text
@@ -285,7 +295,7 @@ function ReelBehavior.release_controller(self)
   if controller.progress == fns.progress then controller.progress = nil end
 end
 
---- 按设备分辨率建遮罩、进度条、提示与「结束收线」按钮；分辨率不可用时整层不建。
+--- 按设备分辨率建纯 EUILayout 全屏点击层、深海蓝进度胶囊与「结束收线」按钮；分辨率不可用时整层不建。
 ---@param self ReelOverlayHandle
 function ReelBehavior.create_nodes(self)
   local scope, ctx = self.scope, self.ctx
@@ -293,25 +303,71 @@ function ReelBehavior.create_nodes(self)
   if resolution == nil then
     return
   end
-  local mask = ViewUtil.create_at(scope, ctx, "EUIImage", ctx.root_node, "ReelMask", 0, 0, resolution.x, resolution.y, {
-    Image = BLOCK_IMAGE, Color = Color.New(0, 0, 0, 1), Visible = true,
+
+  -- 全屏收线点击捕获层：唯一合法实现为纯 EUILayout（杜绝左下角黑块）。
+  Primitives.dismiss_mask(scope, ctx, {
+    name = "ReelMask",
+    width = resolution.x,
+    height = resolution.y,
+    z_order = Tokens.Z.OVERLAY_MASK,
+    swallow = false,
+    on_click = function()
+      self:click(nil)
+    end,
   })
-  local bar_bg = ViewUtil.create_at(scope, ctx, "EUIImage", mask, "ReelBarBg", 660, 820, 600, 34, {
-    Image = BLOCK_IMAGE, Color = Color.New(20, 30, 40, 220), Visible = true,
+
+  local panel_w = math.min(PANEL_MAX_W, Layout.snap4(resolution.x - 64, 480))
+  local panel_rect = Layout.bottom_center(resolution.x, PANEL_BOTTOM, panel_w, PANEL_H)
+  local panel = Primitives.capsule(scope, ctx, {
+    name = "ReelPanel",
+    rect = panel_rect,
+    z_order = Tokens.Z.OVERLAY_PANEL,
+    visible = true,
   })
-  self.bar = ViewUtil.create_at(scope, ctx, "EUILoadingBar", bar_bg, "ReelBar", 0, 0, 600, 34, {
-    Image = "official://image/30007", Direction = 0, Percent = GameCfg.ReelIn.Initial,
-    Color = Color.New(36, 200, 94, 255), Visible = true,
+  panel.TouchEnabled = true
+  panel.SwallowTouchEnabled = true
+
+  local left_w = panel_w - PAD_X * 2 - CLOSE_W - GAP_X
+  self.hint = Primitives.label(scope, ctx, {
+    name = "HookHint",
+    parent = panel,
+    rect = Layout.from_top_left(PANEL_H, PAD_X, 8, left_w, 32),
+    text = GameCfg.HookAlert.Text,
+    font_size = Tokens.FONT_SIZE.BODY,
+    bold = true,
+    color = Tokens.COLOR.TEXT_GOLD,
+    outline = true,
+    outline_color = Tokens.COLOR.OUTLINE_DARK,
+    align_x = 0,
+    align_y = 1,
+    z_order = 1,
   })
-  self.hint = ViewUtil.create_at(scope, ctx, "EUITextLabel", mask, "HookHint", 660, 740, 600, 60, {
-    Text = GameCfg.HookAlert.Text, FontSize = 32, TextColor = Color.New(255, 220, 40, 255), Visible = true,
+
+  local init_pct = GameCfg.ReelIn.Initial
+  local progress = Controls.progress_bar(scope, ctx, {
+    name = "ReelBar",
+    parent = panel,
+    rect = Layout.from_top_left(PANEL_H, PAD_X, 48, left_w, 36),
+    fill_color = Tokens.COLOR.REEL_FILL,
+    percent = init_pct,
+    text = tostring(math.floor(init_pct + 0.5)) .. "%",
+    font_size = Tokens.FONT_SIZE.CAPTION,
+    z_order = 1,
   })
-  self.close = ViewUtil.create_at(scope, ctx, "EUIButton", mask, "BtnReelClose", 840, 900, 240, 70, {
-    ButtonText = "", NormalImage = BLOCK_IMAGE, PressImage = BLOCK_IMAGE,
-    Color = Color.New(60, 80, 100, 255), Visible = true,
-  })
-  ViewUtil.create_at(scope, ctx, "EUITextLabel", self.close, "BtnReelCloseLabel", 0, 0, 240, 70, {
-    Text = "结束收线", FontSize = 30, TextColor = Color.New(255, 255, 255, 255), Visible = true,
+  self.bar = progress.fill
+  self.bar_label = progress.label
+
+  self.close = Controls.button(scope, ctx, {
+    name = "BtnReelClose",
+    parent = panel,
+    rect = Layout.from_top_right(panel_w, PANEL_H, PAD_X, 20, CLOSE_W, CLOSE_H),
+    text = "结束收线",
+    variant = "blue",
+    font_size = Tokens.FONT_SIZE.BODY,
+    z_order = 2,
+    on_click = function()
+      self:request_close(nil)
+    end,
   })
 end
 
@@ -382,8 +438,6 @@ end
 function ReelBehavior.release(self)
   self:flush(true)
   self:release_controller()
-  -- 释放本地聚合与显示状态，等待下次上钩重建
-  -- 不保留任何悬空引用
   self.aggregator = nil
   self.display = nil
   self.session = nil
@@ -412,9 +466,6 @@ function ReelBehavior.mount_view(self, scope, ctx)
   scope:subscribe(ctx.store.on_server_event, function(event) self:on_server_event(event) end)
   scope:subscribe(ctx.clock.on_frame, function() self:on_frame() end)
   scope:effect("ReelOverlayCastRefresh", function(es) self:on_cast_refresh(es) end)
-  if self.close ~= nil then
-    ctx.connect(scope, self.close.OnClicked, function() self:request_close(nil) end)
-  end
   scope:on_cleanup(function() self:release() end)
 end
 
@@ -433,6 +484,7 @@ local function new_view(options)
     controller = nil,
     controller_fns = nil,
     bar = nil,
+    bar_label = nil,
     hint = nil,
     close = nil,
     current_progress = GameCfg.ReelIn.Initial,

@@ -1,8 +1,15 @@
+-- Spoke 主 HUD 武器攻击按钮与伤害飘字视图（#300，归属 L2 client.views）：
+-- 攻击按钮直接挂载于 ctx.root_node（不再挂入已隐藏的 ScreenMain），子节点采用相对父容器左下角局部居中坐标杜绝二次叠加；
+-- 伤害飘字居中于屏幕中上部安全区（Tokens.Z.TOAST + 圆体描边 + 位移飘字），不再停留在 (0, 0)。
 
 local GameCfg = require("common.game_cfg")
 local PressGesture = require("client.press_gesture")
 local Spoke = require("common.packages.spoke.api")
 local MainHudLayout = require("client.main_hud_layout")
+local Tokens = require("client.ui.tokens")
+local Layout = require("client.ui.layout")
+local Primitives = require("client.ui.primitives")
+local Controls = require("client.ui.controls")
 local ViewUtil = require("client.views.view_util")
 
 local State = Spoke.State
@@ -23,6 +30,9 @@ local HINTS = {
   ["bad-aim"] = "瞄准无效",
 }
 
+local DAMAGE_FLOAT_W, DAMAGE_FLOAT_H = 160, 48
+local DAMAGE_DRIFT_Y = 48
+
 local function is_gun(weapon_id)
   return weapon_id ~= nil and GameCfg.Ability.Guns[weapon_id] ~= nil
 end
@@ -35,7 +45,7 @@ local function attack_rect(ctx)
   local layout = MainHudLayout.compute({
     width = resolution.x,
     height = resolution.y,
-    slots = 1,
+    itemBarSlots = GameCfg.Items.InitialItemBarSlots,
   })
   return layout and layout.rects and layout.rects.attack_control or nil
 end
@@ -94,12 +104,14 @@ end
 ---@param self AttackHandle
 function AttackBehavior.on_touch_began(self)
   local t = self:now_of(); if t == nil then return end
+  self.touch_handled = false
   self.auto_fired = false; self.next_auto = 0; self.gesture:begin(t); self.pressing:set(true)
 end
 
 ---@param self AttackHandle
 function AttackBehavior.on_touch_ended(self)
   self.pressing:set(false)
+  self.touch_handled = true
   local t = self:now_of(); if t == nil then return end
   local result = self.gesture:finish(t)
   if result == "tap" then
@@ -110,7 +122,17 @@ function AttackBehavior.on_touch_ended(self)
   end
 end
 
---- 绑按压：触摸开始/结束与按压期帧订阅；没有触摸事件时退回单击。
+--- 单击兜底：已由 OnTouchBegan/OnTouchEnded 结算的同一次点击吞掉防重，直接点击则发一次 attack。
+---@param self AttackHandle
+function AttackBehavior.on_clicked(self)
+  if self.touch_handled then
+    self.touch_handled = false
+    return
+  end
+  self:send("attack")
+end
+
+--- 绑按压：触摸开始/结束与按压期帧订阅，并保留防重 OnClicked 单击入口。
 ---@param self AttackHandle
 ---@param ps table phase scope
 ---@param button table
@@ -124,12 +146,13 @@ function AttackBehavior.bind_touch(self, ps, button)
         press_scope:subscribe(ctx.clock.on_frame, function() self:tick() end)
       end
     end)
-  else
-    ctx.connect(ps, button.OnClicked, function() self:send("attack") end)
+  end
+  if button.OnClicked then
+    ctx.connect(ps, button.OnClicked, function() self:on_clicked() end)
   end
 end
 
---- 建攻击键节点：布局块、按钮、标签与两个投影，然后绑按压。
+--- 建攻击键节点：外层容器按屏幕坐标定位，内部按钮采用局部居中坐标 (w/2, h/2) 杜绝二次叠加。
 ---@param self AttackHandle
 ---@param ps table phase scope
 function AttackBehavior.mount_control(self, ps)
@@ -138,45 +161,44 @@ function AttackBehavior.mount_control(self, ps)
   if rect == nil then
     return
   end
-  local screen = ctx.root_node and ctx.root_node.FindFirstChild and ctx.root_node:FindFirstChild("ScreenMain", true)
-  local control = ctx.create_node(ps, "EUILayout", {
-    Name = "AttackControl",
-    Parent = screen or nil,
-    Position = ViewUtil.vec2(rect.x, rect.y),
-    Size = ViewUtil.vec2(rect.w, rect.h),
+  local control = Primitives.container(ps, ctx, {
+    name = "AttackControl",
+    parent = ctx.root_node,
+    rect = rect,
+    z_order = Tokens.Z.HUD_CONTENT,
+    touch = false,
+    swallow = false,
   })
-  control.TouchEnabled = false
-  control.Visible = true
-  local button = ctx.create_node(ps, "EUIButton", {
-    Name = "BtnAttack",
-    Parent = control,
-    Position = ViewUtil.vec2(rect.x, rect.y),
-    Size = ViewUtil.vec2(rect.w, rect.h),
-    ButtonText = "",
+  local local_rect = Layout.rect(rect.w / 2, rect.h / 2, rect.w, rect.h)
+  local button, label = Controls.button(ps, ctx, {
+    name = "BtnAttack",
+    parent = control,
+    rect = local_rect,
+    text = "攻击",
+    variant = "hud",
+    font_size = Tokens.FONT_SIZE.SUBTITLE,
+    bold = true,
+    outline = true,
+    z_order = 1,
+    touch = false,
+    label_name = "AttackLabel",
   })
-  button.TouchEnabled = false
-  button.Visible = true
   local screen_open = ctx.store.hud_visible
   ps:effect("AttackEnabled", function(es)
     button.TouchEnabled = es:d(screen_open) == true
   end)
-  local label = ctx.create_node(ps, "EUITextLabel", {
-    Name = "AttackLabel",
-    Parent = control,
-    Position = button.Position,
-    Size = button.Size,
-    Text = "攻击",
-  })
-  label.TouchEnabled = false
 
   ps:effect("AttackCaption", function(es)
     local weapon_id = ViewUtil.equipped_weapon(es:d(ctx.store.item_bar))
-    label.Text = is_gun(weapon_id) and "射击" or "攻击"
+    if label ~= nil then
+      label.Text = is_gun(weapon_id) and "射击" or "攻击"
+    end
   end)
 
   self.button, self.label = button, label
   self.pressing = State.new("AttackView.pressing", false)
   self.auto_fired = false
+  self.touch_handled = false
   self.next_auto = 0
   self.gesture = PressGesture.new({ long_press_sec = GameCfg.Ability.Throw.LongPressSec })
   self:bind_touch(ps, button)
@@ -204,21 +226,31 @@ function AttackBehavior.on_server_event(self, event)
   end
 end
 
---- 伤害飘字：按暴击着色新建一个文本节点。
+--- 伤害飘字：置于屏幕中上部 HUD 强调层（Tokens.Z.HUD_ACCENT + 圆体描边 + 上飘位移），
+--- 打开模态弹窗时自动抑制，杜绝穿模盖住弹窗文字或停留在 (0, 0)。
 ---@param self AttackHandle
 ---@param es table EffectScope
 function AttackBehavior.on_damage_float(self, es)
   local notice = es:d(self.damage_notice)
   if type(notice) ~= "table" then return end
-  local node = self.ctx.create_node(es, "EUITextLabel", {
-    Name = "DamageFloat",
-    Text = tostring(notice.amount),
-    Position = ViewUtil.vec2(0, 0),
-    Size = ViewUtil.vec2(120, 40),
+  if es:d(self.ctx.store.active_modal) ~= nil then return end
+  local res = Primitives.resolution(self.ctx) or { x = 1920, y = 1080 }
+  local jitter_x = (((notice.seq or 0) % 5) - 2) * 28
+  local base_x = Layout.snap4(res.x / 2 + jitter_x)
+  local base_y = Layout.snap4(res.y * 0.62)
+  local node = Primitives.label(es, self.ctx, {
+    name = "DamageFloat",
+    parent = self.ctx.root_node,
+    rect = Layout.rect(base_x, base_y, DAMAGE_FLOAT_W, DAMAGE_FLOAT_H),
+    text = tostring(notice.amount),
+    font_size = notice.critical and Tokens.FONT_SIZE.TITLE or Tokens.FONT_SIZE.SUBTITLE,
+    bold = true,
+    color = notice.critical and Tokens.COLOR.TEXT_GOLD or Tokens.COLOR.WHITE,
+    outline = true,
+    outline_color = Tokens.COLOR.OUTLINE_DARK,
+    z_order = Tokens.Z.HUD_ACCENT,
   })
-  node.TextColor = ViewUtil.color(notice.critical and { 255, 214, 74, 255 } or { 255, 255, 255, 255 })
-  node.TouchEnabled = false
-  node.Visible = true
+  Primitives.tween_position(node, base_x, base_y + DAMAGE_DRIFT_Y, Tokens.ANIM.SLOW)
 end
 
 --- 挂载攻击键：造句柄、注册可见性 memo 与按钮 phase、接事件与飘字投影。

@@ -1,9 +1,18 @@
 local GameCfg = require("common.game_cfg")
 local Eligibility = require("common.lottery_eligibility")
+local Tokens = require("client.ui.tokens")
+local Layout = require("client.ui.layout")
+local Primitives = require("client.ui.primitives")
+local Controls = require("client.ui.controls")
 local Modal = require("client.views.economy_modal")
 local ViewUtil = require("client.views.view_util")
 
 local LotteryView = {}
+
+local PANEL_W = 928
+local PANEL_H = 640
+local PAD = Tokens.SPACE.PANEL_PAD
+
 local FAIL_TEXT = {
   ["not-premium"] = "只能投入极品鱼获或信物",
   ["cooked"] = "烤过的物品不能抽奖",
@@ -13,34 +22,98 @@ local FAIL_TEXT = {
   range = "请靠近抽奖机",
 }
 
+local REEL_SPECS = {
+  { key = "left", card = "LotteryReelCardLeft", label = "LabelReelLeft" },
+  { key = "middle", card = "LotteryReelCardMiddle", label = "LabelReelMiddle" },
+  { key = "right", card = "LotteryReelCardRight", label = "LabelReelRight" },
+}
+
 local function pattern_name(number)
   local pattern = GameCfg.Lottery.Patterns[number]
   return pattern and pattern.name or "?"
 end
 
--- 抽奖面板句柄：面板节点、请求序号与等待/滚动中标记都留在句柄上；
--- 方法名沿用拆分前的局部函数名，挂载入口只做装配。
+-- 抽奖面板句柄：面板节点、请求序号与等待/滚动中标记都留在句柄上。
 ---@class LotteryPanelHandle: table<string, any>
 ---@type LotteryPanelHandle
 local LotteryBehavior = {}
 
---- 建面板节点：下注行、结果行、三滚轴与抽奖/关闭按钮。
+--- 建面板节点：浅奶白底板 + 投注信息条 + 三滚轴浅白卡片 + 结果卡片 + 金主抽奖按钮。
 ---@param self LotteryPanelHandle
 function LotteryBehavior.create_nodes(self)
   local scope, ctx = self.scope, self.ctx
-  local panel = Modal.panel(scope, ctx, "ScreenLottery", "抽奖机")
+  local panel = Modal.panel(scope, ctx, "ScreenLottery", "抽奖机", {
+    width = PANEL_W,
+    height = PANEL_H,
+    close_name = "BtnLotteryClose",
+    modal_id = "lottery",
+  })
   self.panel = panel
-  self.bet = Modal.place(Modal.label(scope, ctx, panel, "LabelLotteryBet", ""), 20, 68, 860, 48)
-  self.result_label = Modal.place(Modal.label(scope, ctx, panel, "LabelLotteryResult", ""), 20, 290, 860, 90)
-  self.reels = {
-    left = Modal.place(Modal.label(scope, ctx, panel, "LabelReelLeft", "?"), 60, 144, 240, 120),
-    middle = Modal.place(Modal.label(scope, ctx, panel, "LabelReelMiddle", "?"), 330, 144, 240, 120),
-    right = Modal.place(Modal.label(scope, ctx, panel, "LabelReelRight", "?"), 600, 144, 240, 120),
-  }
-  self.draw = Modal.place(Modal.button(scope, ctx, panel, "BtnLotteryDraw", "抽奖", function()
-    self:request_draw()
-  end), 330, 410, 240, 64)
-  Modal.close(scope, ctx, panel, "BtnLotteryClose", "lottery")
+
+  local content_w = PANEL_W - PAD * 2
+  local bet_card = Modal.surface(scope, ctx, panel, "LotteryBetCard",
+    Layout.from_top_left(PANEL_H, PAD, 84, content_w, 64), { z_order = 1 })
+  self.bet = Primitives.label(scope, ctx, {
+    name = "LabelLotteryBet",
+    parent = bet_card,
+    rect = Layout.from_top_left(64, 20, 8, content_w - 40, 48),
+    text = "",
+    font_size = Tokens.FONT_SIZE.BODY,
+    bold = true,
+    color = Tokens.COLOR.TEXT_DARK,
+    align_x = 1,
+    align_y = 1,
+    z_order = 2,
+  })
+
+  self.reels = {}
+  for index, spec in ipairs(REEL_SPECS) do
+    local card_rect = Layout.grid_cell(PANEL_H, PAD, 168, 3, index, 264, 152, 36, 0)
+    local card = Modal.surface(scope, ctx, panel, spec.card, card_rect, {
+      color = Tokens.COLOR.MODAL_CARD,
+      z_order = 1,
+    })
+    self.reels[spec.key] = Primitives.label(scope, ctx, {
+      name = spec.label,
+      parent = card,
+      rect = Layout.center_in(264, 152, 232, 120),
+      text = "?",
+      font_size = 36,
+      bold = true,
+      color = Tokens.COLOR.TEXT_GOLD_DARK,
+      align_x = 1,
+      align_y = 1,
+      z_order = 2,
+    })
+  end
+
+  local result_card = Modal.surface(scope, ctx, panel, "LotteryResultCard",
+    Layout.from_top_left(PANEL_H, PAD, 340, content_w, 120), { z_order = 1 })
+  self.result_label = Primitives.label(scope, ctx, {
+    name = "LabelLotteryResult",
+    parent = result_card,
+    rect = Layout.from_top_left(120, 24, 16, content_w - 48, 88),
+    text = "",
+    font_size = Tokens.FONT_SIZE.BUTTON,
+    bold = true,
+    color = Tokens.COLOR.TEXT_DARK,
+    align_x = 1,
+    align_y = 1,
+    z_order = 2,
+  })
+
+  self.draw = Controls.button(scope, ctx, {
+    name = "BtnLotteryDraw",
+    parent = panel,
+    rect = Layout.bottom_center(PANEL_W, 44, 320, 68),
+    text = "抽奖",
+    variant = "gold",
+    font_size = Tokens.FONT_SIZE.SUBTITLE,
+    z_order = 2,
+    on_click = function()
+      self:request_draw()
+    end,
+  })
 end
 
 --- 面板提示统一走 ViewUtil.notify（services.notify 缺失或文本为空时忽略）。
@@ -73,8 +146,7 @@ function LotteryBehavior.refresh_bet(self)
   local entry = slot and snapshot.slots and snapshot.slots[slot] or nil
   self.selected_slot = entry and slot or nil
   local enabled = entry ~= nil and Eligibility.check(entry) == true and not self.awaiting and not self.spinning
-  self.draw.Disabled = not enabled
-  self.draw.TouchEnabled = enabled
+  Controls.set_button_enabled(self.draw, enabled, "gold")
   if not entry then
     self.bet.Text = "请先在道具栏选中一件极品食物"
   elseif Eligibility.check(entry) then

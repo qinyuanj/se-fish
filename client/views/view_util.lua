@@ -1,6 +1,7 @@
 local EngineRead = require("common.engine_read")
 local GameCfg = require("common.game_cfg")
 local Number = require("common.number")
+local Tokens = require("client.ui.tokens")
 
 local ViewUtil = {}
 
@@ -134,17 +135,11 @@ function ViewUtil.notify(ctx, text)
 end
 
 function ViewUtil.vec2(x, y)
-  if Vector2 ~= nil and type(Vector2.New) == "function" then
-    return Vector2.New(x, y)
-  end
-  return { x = x, y = y }
+  return Tokens.vec2(x, y)
 end
 
 function ViewUtil.color(rgba)
-  if Color ~= nil and type(Color.New) == "function" then
-    return Color.New(rgba[1], rgba[2], rgba[3], rgba[4] or 255)
-  end
-  return rgba
+  return Tokens.color(rgba)
 end
 
 function ViewUtil.create_anchor_scene_node(scope, ctx, entry, height, kind, fallback_name)

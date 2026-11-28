@@ -5,6 +5,7 @@
 
 local Spoke = require("common.packages.spoke.api")
 local SpokeEggy = require("common.packages.spoke_eggy.api")
+local Tokens = require("client.ui.tokens")
 local ViewUtil = require("client.views.view_util")
 
 local Effect = Spoke.Effect
@@ -271,8 +272,23 @@ local function mount_dock_specs(bs, ctx, dock_specs, active_docks)
   end
 end
 
---- RootBody 装配体：HUD -> 模态 -> 覆盖蒙版 -> Dock，顺序沿用拆分前。
+--- 隐藏编辑器预置旧业务画布（ScreenMain/ScreenShop/DialogNoticeConfirm/ScreenMsg）：
+--- 绝不销毁预置节点，仅显式置 Visible=false 杜绝旧黑底遮挡与重名查找冲突。
+local function hide_legacy_preset_screens(root_node)
+  if root_node == nil or type(root_node.FindFirstChild) ~= "function" then
+    return
+  end
+  for _, name in ipairs(Tokens.LEGACY_PRESET_SCREENS) do
+    local ok, node = pcall(function() return root_node:FindFirstChild(name, false) end) -- 兼容测试替身与引擎节点
+    if ok and node ~= nil then
+      pcall(function() node.Visible = false end)
+    end
+  end
+end
+
+--- RootBody 装配体：隐藏旧预置画布 -> HUD -> 模态 -> 覆盖蒙版 -> Dock，顺序沿用拆分前。
 local function mount_root_body(bs, ctx, sources)
+  hide_legacy_preset_screens(ctx.root_node)
   mount_hud_specs(bs, ctx, sources.hud)
   mount_modal_specs(bs, ctx, sources.modals)
   mount_overlay_specs(bs, ctx, sources.overlays)

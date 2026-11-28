@@ -1,117 +1,201 @@
+-- 互斥弹窗薄适配层（归属 L2 client.views）：
+-- 统一收口到 client/ui/{tokens,layout,primitives,controls}.lua，
+-- 强制按钮单源子 LabelButtonText（零 ButtonText 双字重影）与 3A 明亮奶白风弹窗壳。
+
+local Tokens = require("client.ui.tokens")
+local Layout = require("client.ui.layout")
+local Primitives = require("client.ui.primitives")
+local Controls = require("client.ui.controls")
 local ViewUtil = require("client.views.view_util")
 
 local EconomyModal = {}
 
--- 节点写法沿用旧界面层的实测约定：EUI 的 Position 是节点中心，坐标原点在父节点左下角；
--- 纯色块必须给 ColorBlockImage，否则 EUIButton / EUIImage 用自己的圆角贴图，实机是一团白椭圆。
--- 面板若不带底色就是白底白字，玩家既看不见入口也读不到内容。
-local ColorBlockImage = "official://image/11017"
-local PANEL_BG = { 30, 46, 66, 240 }
-local BUTTON_NORMAL = { 54, 100, 140, 255 }
-local TEXT = { 240, 245, 250, 255 }
-local PANEL_W, PANEL_H = 900, 600
-local TITLE_FONT = 30
-local LABEL_FONT = 26
-local BUTTON_TEXT_LABEL = "LabelButtonText"
+local DEFAULT_PANEL_W = 928
+local DEFAULT_PANEL_H = 640
 
-local make_color = ViewUtil.color
+EconomyModal.PANEL_W = DEFAULT_PANEL_W
+EconomyModal.PANEL_H = DEFAULT_PANEL_H
+EconomyModal.BUTTON_LABEL_NAME = Controls.BUTTON_LABEL_NAME
+EconomyModal.color = ViewUtil.color
 
 ---@param node table|userdata
 ---@param key string
 ---@return any
 local function read_field(node, key)
-  local ok, value = pcall(function() return node[key] end) -- 兼容 Vector2 userdata 字段读取，异常时视为无效
+  local ok, value = pcall(function() return node[key] end) -- 兼容引擎 userdata 字段读取，异常视为缺失
   if not ok then
     return nil
   end
   return value
 end
 
-local function read_xy(pos)
-  if type(pos) ~= "table" and type(pos) ~= "userdata" then
+local function read_height(size)
+  if type(size) ~= "table" and type(size) ~= "userdata" then
     return nil
   end
-  local x = read_field(pos, "x")
-  if x == nil then x = read_field(pos, "X") end
-  local y = read_field(pos, "y")
-  if y == nil then y = read_field(pos, "Y") end
-  if type(x) ~= "number" or type(y) ~= "number" then
-    return nil
+  local y = read_field(size, "y")
+  if y == nil then
+    y = read_field(size, "Y")
   end
-  return x, y
+  return type(y) == "number" and y > 0 and y or nil
 end
 
--- Position 是节点中心。根节点 Size 在挂载当帧还没算好，所以优先问设备分辨率服务。
-local function panel_center(ctx)
-  local services = ctx and ctx.services
-  if type(services) == "table" and type(services.get_device_resolution) == "function" then
-    local w, h = read_xy(services.get_device_resolution())
-    if w and h then
-      return w / 2, h / 2
-    end
-  end
-  local w, h = read_xy(ctx and ctx.root_node and ctx.root_node.Size)
-  if not w or not h then
-    return PANEL_W / 2, PANEL_H / 2
-  end
-  return w / 2, h / 2
-end
-
--- 入参 (x, y, w, h) 按父节点左上角语义；EUI 实际以父左下为原点、Y 向上、Position 为节点中心。
+--- 入参 (x, y, w, h) 按父节点左上角语义；通过 Layout 统一转为 EUI Y-up 中心坐标并同步子标签。
+---@param node any
+---@param x number
+---@param y number
+---@param w number
+---@param h number
+---@param parent_h number|nil
+---@return any
 function EconomyModal.place(node, x, y, w, h, parent_h)
   local ph = parent_h
   if type(ph) ~= "number" then
     local parent = read_field(node, "Parent")
-    local _, py = read_xy(parent and read_field(parent, "Size") or nil)
-    ph = py or PANEL_H
+    ph = read_height(parent and read_field(parent, "Size") or nil) or DEFAULT_PANEL_H
   end
-  node.Position = Vector2.New(x + w / 2, ph - y - h / 2)
-  node.Size = Vector2.New(w, h)
-  local text_label = node:FindFirstChild(BUTTON_TEXT_LABEL, false)
-  if text_label then
-    text_label.Position = Vector2.New(w / 2, h / 2)
-    text_label.Size = Vector2.New(w, h)
-  end
-  return node
+  return Layout.apply(node, Layout.from_top_left(ph, x, y, w, h))
 end
 
-function EconomyModal.panel(scope, ctx, name, title)
-  local cx, cy = panel_center(ctx)
-  local panel = ctx.create_node(scope, "EUIImage", {
-    Parent = ctx.root_node, Name = name, Visible = true,
-    Position = Vector2.New(cx, cy), Size = Vector2.New(PANEL_W, PANEL_H),
-    Image = ColorBlockImage,
+--- 直接套用 Layout 计算好的中心矩形。
+---@param node any
+---@param rect { x: number, y: number, w: number, h: number }
+---@return any
+function EconomyModal.apply_rect(node, rect)
+  return Layout.apply(node, rect)
+end
+
+--- 构造完整模态弹窗壳（14588 半透遮罩 + 浅奶白底板 + 标题 + 可选不撞字关闭按钮）。
+---@param scope table
+---@param ctx table
+---@param opts table
+---@return table shell
+function EconomyModal.shell(scope, ctx, opts)
+  opts = opts or {}
+  local name = opts.name or "PanelModal"
+  local modal_id = opts.modal_id
+  local on_close = opts.on_close
+  if on_close == nil and modal_id ~= nil then
+    on_close = function()
+      EconomyModal.close_modal(ctx, modal_id)
+    end
+  end
+  local derived_title = "Label" .. name:gsub("^Screen", ""):gsub("^Panel", "") .. "Title"
+  return Controls.modal_shell(scope, ctx, {
+    name = name,
+    title = opts.title or "",
+    width = opts.width or DEFAULT_PANEL_W,
+    height = opts.height or DEFAULT_PANEL_H,
+    title_name = opts.title_name or derived_title,
+    close_name = opts.close_name,
+    show_close = opts.show_close,
+    on_close = on_close,
+    backdrop_dismiss = opts.backdrop_dismiss,
+    theme = opts.theme,
+    z_mask = opts.z_mask,
+    z_panel = opts.z_panel,
+    animate = opts.animate,
+    get_resolution = opts.get_resolution,
   })
-  local bg = make_color(PANEL_BG)
-  if bg ~= nil then
-    panel.Color = bg
-  end
-  local title_label = EconomyModal.label(scope, ctx, panel, "Label" .. name:gsub("Screen", "") .. "Title", title, TITLE_FONT)
-  EconomyModal.place(title_label, 20, 12, 740, 36, PANEL_H)
-  return panel
 end
 
-function EconomyModal.label(scope, ctx, parent, name, text, font_size)
-  local label = ctx.create_node(scope, "EUITextLabel", {
-    Parent = parent, Name = name, Text = text or "", Visible = true,
-    FontSize = font_size or LABEL_FONT,
+--- 兼容旧签名的模态面板入口：底层使用 Controls.modal_shell，返回 panel 与 shell。
+---@param scope table
+---@param ctx table
+---@param name string
+---@param title string
+---@param opts table|nil
+---@return any, table
+function EconomyModal.panel(scope, ctx, name, title, opts)
+  local merged = {}
+  if type(opts) == "table" then
+    for k, v in pairs(opts) do
+      merged[k] = v
+    end
+  end
+  merged.name = name
+  merged.title = title
+  if merged.show_close == nil then
+    merged.show_close = merged.close_name ~= nil or merged.modal_id ~= nil or merged.on_close ~= nil
+  end
+  local shell = EconomyModal.shell(scope, ctx, merged)
+  return shell.panel, shell
+end
+
+--- 浅色内容卡片/分区底板（默认穿透触控，零黑屏风险）。
+---@param scope table
+---@param ctx table
+---@param parent any
+---@param name string
+---@param rect { x: number, y: number, w: number, h: number }
+---@param opts table|nil
+---@return any
+function EconomyModal.surface(scope, ctx, parent, name, rect, opts)
+  opts = opts or {}
+  return Primitives.image(scope, ctx, {
+    name = name,
+    parent = parent,
+    rect = rect,
+    image = opts.image or Tokens.ASSET.ROUND_RECT,
+    color = opts.color or Tokens.COLOR.MODAL_SURFACE,
+    opacity = opts.opacity or Tokens.OPACITY.SOLID,
+    stretch = opts.stretch or Tokens.vec4(24, 24, 24, 24),
+    z_order = opts.z_order or 1,
+    visible = opts.visible,
+    touch = false,
+    swallow = false,
   })
-  local color = make_color(TEXT)
-  if color ~= nil then
-    label.TextColor = color
-  end
-  label.TouchEnabled = false
-  label.SwallowTouchEnabled = false
-  return label
 end
 
+--- 规范化文本标签（圆体、TextColor、无阴影、穿透触控）。
+---@param scope table
+---@param ctx table
+---@param parent any
+---@param name string
+---@param text string|nil
+---@param font_size number|nil
+---@param opts table|nil
+---@return any
+function EconomyModal.label(scope, ctx, parent, name, text, font_size, opts)
+  opts = opts or {}
+  local rect = opts.rect or Layout.rect(100, 20, 200, 40)
+  return Primitives.label(scope, ctx, {
+    name = name,
+    parent = parent,
+    rect = rect,
+    text = text or "",
+    font_size = font_size or opts.font_size or Tokens.FONT_SIZE.BODY,
+    bold = opts.bold,
+    color = opts.color or Tokens.COLOR.TEXT_DARK,
+    align_x = opts.align_x,
+    align_y = opts.align_y,
+    outline = opts.outline,
+    outline_color = opts.outline_color,
+    z_order = opts.z_order or 2,
+    visible = opts.visible,
+  })
+end
+
+--- 设置按钮文本：只写唯一子 LabelButtonText，强制清空原生 ButtonText 防双字重影。
 ---@param button table|userdata
 ---@param text string|nil
 function EconomyModal.set_button_text(button, text)
-  local value = text or ""
-  button.ButtonText = value
-  local text_label = button:FindFirstChild(BUTTON_TEXT_LABEL, false)
-  if text_label then text_label.Text = value end
+  Controls.set_button_text(button, text)
+end
+
+--- 切换按钮主题变体（gold/blue/primary/secondary/selected/danger/surface/card/hud/disabled）。
+---@param button table|userdata
+---@param variant string
+function EconomyModal.set_button_style(button, variant)
+  Controls.set_button_style(button, variant)
+end
+
+--- 设置按钮可用态并同步变体色。
+---@param button table|userdata
+---@param enabled boolean
+---@param active_variant string|nil
+function EconomyModal.set_button_enabled(button, enabled, active_variant)
+  Controls.set_button_enabled(button, enabled, active_variant)
 end
 
 --- 打开模态弹层：宿主未注入 open_modal 时静默跳过。
@@ -131,31 +215,65 @@ function EconomyModal.close_modal(ctx, modal_id)
   if type(fn) == "function" then fn(modal_id) end
 end
 
-function EconomyModal.button(scope, ctx, parent, name, text, on_click)
-  local button = ctx.create_node(scope, "EUIButton", {
-    Parent = parent, Name = name, ButtonText = text, Visible = true,
-    NormalImage = ColorBlockImage, PressImage = ColorBlockImage,
+--- 规范化按钮（强制 ButtonText="" + 唯一子 LabelButtonText）。
+---@param scope table
+---@param ctx table
+---@param parent any
+---@param name string
+---@param text string|nil
+---@param on_click function|nil
+---@param opts table|nil
+---@return any, any
+function EconomyModal.button(scope, ctx, parent, name, text, on_click, opts)
+  opts = opts or {}
+  local rect = opts.rect or Layout.rect(64, 24, 128, 48)
+  return Controls.button(scope, ctx, {
+    name = name,
+    parent = parent,
+    rect = rect,
+    text = text or "",
+    variant = opts.variant or "secondary",
+    font_size = opts.font_size or Tokens.FONT_SIZE.BODY,
+    bold = opts.bold,
+    text_color = opts.text_color,
+    outline = opts.outline,
+    outline_color = opts.outline_color,
+    align_x = opts.align_x,
+    align_y = opts.align_y,
+    z_order = opts.z_order or 2,
+    visible = opts.visible,
+    touch = opts.touch,
+    icon_only = opts.icon_only,
+    label_name = opts.label_name,
+    on_click = on_click,
   })
-  button.TouchEnabled = true
-  local color = make_color(BUTTON_NORMAL)
-  if color ~= nil then
-    button.ButtonNormalColor = color
-  end
-  local text_label = EconomyModal.label(scope, ctx, button, BUTTON_TEXT_LABEL, text, LABEL_FONT)
-  local w, h = read_xy(button.Size)
-  if w and h then
-    text_label.Position = Vector2.New(w / 2, h / 2)
-    text_label.Size = Vector2.New(w, h)
-  end
-  ctx.connect(scope, button.OnClicked, on_click)
-  return button
 end
 
+--- 兼容旧签名：若面板未在 panel() 中内置关闭键，可在右上角补建标准蓝色关闭按钮。
+---@param scope table
+---@param ctx table
+---@param parent any
+---@param name string
+---@param modal_id string
+---@return any
 function EconomyModal.close(scope, ctx, parent, name, modal_id)
-  local btn = EconomyModal.button(scope, ctx, parent, name, "关闭", function()
-    EconomyModal.close_modal(ctx, modal_id)
-  end)
-  return EconomyModal.place(btn, 800, 12, 80, 36, PANEL_H)
+  local pw = read_field(parent, "Size")
+  local parent_w = (type(pw) == "table" or type(pw) == "userdata") and (read_field(pw, "x") or read_field(pw, "X")) or DEFAULT_PANEL_W
+  local parent_h = read_height(pw) or DEFAULT_PANEL_H
+  local rect = Layout.from_top_right(parent_w, parent_h, Tokens.SPACE.PANEL_PAD, 20, 96, 48)
+  local btn = Controls.button(scope, ctx, {
+    name = name,
+    parent = parent,
+    rect = rect,
+    text = "关闭",
+    variant = "blue",
+    font_size = Tokens.FONT_SIZE.BODY,
+    z_order = 2,
+    on_click = function()
+      EconomyModal.close_modal(ctx, modal_id)
+    end,
+  })
+  return btn
 end
 
 return EconomyModal

@@ -1,17 +1,18 @@
 -- 主 HUD 道具栏的瞄准与投掷行为（#412 从 main_hud_item_bar_view 拆出，归属 L2 client.views）：
--- 爆炸物点按直投 / 长按瞄准的手势判定、遮罩与投掷上行；格位同步与拖拽仍留在视图模块。
+-- 爆炸物点按直投 / 长按瞄准的手势判定、全屏纯 EUILayout 落点捕获层与顶部半透深海蓝提示胶囊；
 -- 行为表由视图模块在造句柄时并入，方法沿用同一套 self 约定。
 
 local GameCfg = require("common.game_cfg")
 local Number = require("common.number")
+local Tokens = require("client.ui.tokens")
+local Layout = require("client.ui.layout")
+local Primitives = require("client.ui.primitives")
 local ViewUtil = require("client.views.view_util")
-local HudWidgets = require("client.views.hud_widgets")
 
 local MainHudItemBarAim = {}
 
---- 瞄准遮罩的半透明底色：只服务长按瞄准，随本模块迁移。
-local AIM_NORMAL = { 30, 40, 30, 40 }
-local AIM_PRESS = { 30, 40, 30, 60 }
+local AIM_HINT_TEXT = "点击屏幕选择投掷落点"
+local BANNER_W, BANNER_H = 440, 48
 
 local Behavior = {}
 
@@ -143,26 +144,60 @@ function Behavior.on_aim_touch_ended(self, touch)
   self.send_throw(slot, target)
 end
 
---- 爆炸物长按瞄准全屏遮罩（选点投掷、背包展开、关屏、重连或根 UI 销毁即零残留销毁）。
+--- 爆炸物长按瞄准全屏透明捕获层（纯 EUILayout，杜绝空图 EUIButton 黑屏）+ 顶部提示胶囊。
 ---@param self MainHudItemBarHandle
 ---@param ps table
 function Behavior.mount_aim_overlay(self, ps)
-  if self.resolution == nil then return end; local w, h = self.resolution.x, self.resolution.y
+  if self.resolution == nil then
+    return
+  end
+  local w, h = self.resolution.x, self.resolution.y
   local ctx = self.ctx
-  local overlay = HudWidgets.button(ctx, ps, {
-    name = "ThrowAimOverlay", x = w / 2, y = h / 2, w = w, h = h,
-    normal = AIM_NORMAL, press = AIM_PRESS,
+
+  Primitives.dismiss_mask(ps, ctx, {
+    name = "ThrowAimOverlay",
+    width = w,
+    height = h,
+    z_order = Tokens.Z.HUD_POPUP_MASK,
+    on_touch_ended = function(touch)
+      self:on_aim_touch_ended(touch)
+    end,
+    on_click = function()
+      if self.aim_slot:now() ~= nil then
+        self.aim_slot:set(nil)
+      end
+    end,
   })
-  overlay.NormalImage = ""
-  overlay.PressImage = ""
-  overlay.DisableImage = ""
-  overlay.LocalZOrder = 9
 
-  self.notify("点击屏幕选择投掷落点")
+  local cur_layout = self.layout_sig ~= nil and self.layout_sig:now() or nil
+  local hint_rect = cur_layout and cur_layout.rects and cur_layout.rects.hint_secondary or nil
+  local banner_rect = hint_rect
+    and Layout.rect(hint_rect.x, hint_rect.y, BANNER_W, BANNER_H)
+    or Layout.top_center(w, h, 84, BANNER_W, BANNER_H)
 
-  ctx.connect(ps, overlay.OnTouchEnded, function(touch)
-    self:on_aim_touch_ended(touch)
-  end)
+  local banner = Primitives.capsule(ps, ctx, {
+    name = "ThrowAimBanner",
+    parent = ctx.root_node,
+    rect = banner_rect,
+    opacity = Tokens.OPACITY.HUD_SURFACE,
+    z_order = Tokens.Z.HUD_POPUP_BG,
+  })
+  Primitives.tween_fade_in(banner, Tokens.OPACITY.HUD_SURFACE, Tokens.ANIM.FAST)
+
+  Primitives.label(ps, ctx, {
+    name = "ThrowAimBannerLabel",
+    parent = ctx.root_node,
+    rect = banner_rect,
+    text = AIM_HINT_TEXT,
+    font_size = Tokens.FONT_SIZE.BODY,
+    bold = true,
+    color = Tokens.COLOR.WHITE,
+    outline = true,
+    outline_color = Tokens.COLOR.OUTLINE_DARK,
+    z_order = Tokens.Z.HUD_POPUP_LABEL,
+  })
+
+  self.notify(AIM_HINT_TEXT)
 end
 
 ---@param self MainHudItemBarHandle

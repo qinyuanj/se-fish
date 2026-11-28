@@ -8,6 +8,7 @@
 local Eui = require("tests.support.eui_double")
 local GameCfg = require("common.game_cfg")
 local MainHudLayout = require("client.main_hud_layout")
+local Tokens = require("client.ui.tokens")
 local ClientStore = require("client.store.client_store")
 local RootView = require("client.views.root_view")
 local MainHudEquipPopups = require("client.views.main_hud_equip_popups")
@@ -140,12 +141,17 @@ describe("Spoke 主 HUD 武器栏/鱼饵栏与展开浮层视图（#297-B3a）",
     assert.is_nil(env.nodes.PopupDismiss)
     assert.is_nil(env.nodes.WeaponPopup)
 
-    -- 1. 点击武器栏展开武器浮层
+    -- 1. 点击武器栏展开武器浮层（全屏收起层必须为纯 EUILayout，杜绝空图 EUIButton 黑屏）
     assert.is_true(Eui.click(env.nodes.WeaponBar))
     local dismiss = env.nodes.PopupDismiss
     local knife_btn = env.nodes["WeaponPopupCell_" .. WEAPON_KNIFE]
     local pistol_btn = env.nodes["WeaponPopupCell_" .. WEAPON_PISTOL]
     assert.is_not_nil(dismiss)
+    assert.equals("EUILayout", dismiss.Kind)
+    assert.equals(Tokens.Z.HUD_POPUP_MASK, dismiss.LocalZOrder)
+    assert.equals(Tokens.Z.HUD_POPUP_BG, env.nodes.WeaponPopup.LocalZOrder)
+    assert.equals(Tokens.Z.HUD_POPUP_CONTENT, knife_btn.LocalZOrder)
+    assert.equals("", knife_btn.ButtonText)
     assert.is_not_nil(knife_btn)
     assert.is_not_nil(pistol_btn)
     assert.is_true(env.nodes.WeaponPopup.Visible)

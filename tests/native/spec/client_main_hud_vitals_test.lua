@@ -1,13 +1,14 @@
--- #297-B2 主 HUD 左上状态区（血量环、饥饿环、4 条饥饿红边）与预置金币节点 Spoke 视图测试。
+-- 主 HUD 1A 左上横向胶囊状态条（血量条、饥饿条、金币胶囊）与 4 条饥饿红边 Spoke 视图测试。
 -- 失败方式先列：
---   1. 血量/饥饿度文案未用「血 」「饥饿度 」，或满值字号溢出框宽 / 与金币重叠；
+--   1. 血量/饥饿条未按 MainHudLayout 排版为横向胶囊 EUILoadingBar，或满值文案溢出框宽 / 与金币胶囊重叠；
 --   2. 血量/饥饿/金币变化不随 ClientStore 实时刷新，或脱离饥饿后红边残留可见；
 --   3. 饥饿提醒未按 WarnIntervalSec 节流，或重新进入饥饿时不立即再次提醒；
---   4. 重连重置或根 UI 销毁后遗留动态状态区节点，或误销毁编辑器预置节点 ImageCoin / LabelCoin。
+--   4. 重连重置或根 UI 销毁后遗留动态状态区节点，或非法分辨率导致视图崩溃。
 
 local Eui = require("tests.support.eui_double")
 local GameCfg = require("common.game_cfg")
 local MainHudLayout = require("client.main_hud_layout")
+local Tokens = require("client.ui.tokens")
 local ClientStore = require("client.store.client_store")
 local RootView = require("client.views.root_view")
 local MainHudVitalsView = require("client.views.main_hud_vitals_view")
@@ -23,7 +24,7 @@ local function overlaps(a, b)
     and math.abs(a.Position.y - b.Position.y) * 2 < a.Size.y + b.Size.y
 end
 
-describe("Spoke 主 HUD 左上状态区与金币视图（#297-B2）", function()
+describe("Spoke 主 HUD 1A 左上横向胶囊状态条与金币视图", function()
   local saved_globals
 
   before_each(function()
@@ -47,12 +48,6 @@ describe("Spoke 主 HUD 左上状态区与金币视图（#297-B2）", function()
     local nodes = {}
     local created = {}
     local notices = {}
-
-    if not opts.missing_coin then
-      local screen_main = Eui.node({ Name = "ScreenMain", Parent = root_node })
-      nodes.ImageCoin = Eui.node({ Name = "ImageCoin", Parent = screen_main })
-      nodes.LabelCoin = Eui.node({ Name = "LabelCoin", Parent = screen_main })
-    end
 
     local function create_node(kind, props)
       local node = Eui.node({
@@ -95,28 +90,32 @@ describe("Spoke 主 HUD 左上状态区与金币视图（#297-B2）", function()
   end
 
   for _, height in ipairs({ 886, 1080, 1238, 1440 }) do
-    it("多分辨率排版对齐 MainHudLayout 且满值文案不截断不重叠_" .. height, function()
+    it("多分辨率排版对齐 MainHudLayout 且横向胶囊状态条与金币胶囊零重叠_" .. height, function()
       local env = mount_vitals(height)
       local layout = MainHudLayout.compute({ width = 1920, height = height, itemBarSlots = 8 })
       local r = layout.rects
 
-      assert_at(env.nodes.HealthRing, r.HealthRing, "HealthRing")
-      assert_at(env.nodes.HungerRing, r.HungerRing, "HungerRing")
-      assert_at(env.nodes.ImageCoin, r.coin_icon, "ImageCoin")
-      assert_at(env.nodes.LabelCoin, r.coin_label, "LabelCoin")
-      assert.same({ x = 0.5, y = 0.5 }, env.nodes.ImageCoin.Anchor)
-      assert.same({ x = 0.5, y = 0.5 }, env.nodes.LabelCoin.Anchor)
+      assert_at(env.nodes.HealthBar_bg, r.HealthBar, "HealthBar_bg")
+      assert_at(env.nodes.HungerBar_bg, r.HungerBar, "HungerBar_bg")
+      assert_at(env.nodes.CoinIcon, r.coin_icon, "CoinIcon")
+      assert_at(env.nodes.CoinLabel, r.coin_label, "CoinLabel")
+      assert.equals(Tokens.Z.HUD_BG, env.nodes.HealthBar_bg.LocalZOrder)
+      assert.equals(Tokens.Z.HUD_BG, env.nodes.CoinCapsule.LocalZOrder)
+      assert.equals(Tokens.Z.HUD_CONTENT, env.nodes.CoinLabel.LocalZOrder)
+      assert.equals(Tokens.Z.HUD_FLASH, env.nodes.FlashTop.LocalZOrder)
 
       local c = GameCfg.Vitals
       env.writer:update_vitals({ health = c.MaxHealth, max_health = c.MaxHealth, hunger = c.MaxHunger, max_hunger = c.MaxHunger })
-      assert.equals("血 " .. c.MaxHealth, env.nodes.HealthText.Text)
-      assert.equals("饥饿度 " .. c.MaxHunger, env.nodes.HungerText.Text)
-      for _, label in ipairs({ env.nodes.HealthText, env.nodes.HungerText }) do
+      assert.equals("血 " .. c.MaxHealth, env.nodes.HealthBar_label.Text)
+      assert.equals("饥饿度 " .. c.MaxHunger, env.nodes.HungerBar_label.Text)
+      for _, label in ipairs({ env.nodes.HealthBar_label, env.nodes.HungerBar_label }) do
         assert.is_true(utf8.len(label.Text) * label.FontSize <= label.Size.x)
         assert.is_true(label.FontSize <= label.Size.y)
+        assert.is_false(label.TouchEnabled)
+        assert.is_false(label.SwallowTouchEnabled)
       end
-      assert.is_false(overlaps(env.nodes.HealthText, env.nodes.HungerText))
-      assert.is_false(overlaps(env.nodes.HungerText, env.nodes.ImageCoin))
+      assert.is_false(overlaps(env.nodes.HealthBar_bg, env.nodes.HungerBar_bg))
+      assert.is_false(overlaps(env.nodes.HungerBar_bg, env.nodes.CoinCapsule))
 
       env.view:dispose()
     end)
@@ -128,13 +127,13 @@ describe("Spoke 主 HUD 左上状态区与金币视图（#297-B2）", function()
 
     env.writer:update_vitals({ health = 150, max_health = 300, hunger = 50, max_hunger = 100 })
     env.writer:set_coin(42)
-    assert.equals("EUIProgressTimer", env.nodes.HealthRing.Kind)
-    assert.equals("EUIProgressTimer", env.nodes.HungerRing.Kind)
-    assert.equals(50, env.nodes.HealthRing.Percent)
-    assert.equals(50, env.nodes.HungerRing.Percent)
-    assert.equals("血 150", env.nodes.HealthText.Text)
-    assert.equals("饥饿度 50", env.nodes.HungerText.Text)
-    assert.equals("42", env.nodes.LabelCoin.Text)
+    assert.equals("EUILoadingBar", env.nodes.HealthBar.Kind)
+    assert.equals("EUILoadingBar", env.nodes.HungerBar.Kind)
+    assert.equals(50, env.nodes.HealthBar.Percent)
+    assert.equals(50, env.nodes.HungerBar.Percent)
+    assert.equals("血 150", env.nodes.HealthBar_label.Text)
+    assert.equals("饥饿度 50", env.nodes.HungerBar_label.Text)
+    assert.equals("42", env.nodes.CoinLabel.Text)
     for _, name in ipairs({ "FlashTop", "FlashBottom", "FlashLeft", "FlashRight" }) do
       assert.is_false(env.nodes[name].Visible, name)
     end
@@ -142,7 +141,7 @@ describe("Spoke 主 HUD 左上状态区与金币视图（#297-B2）", function()
 
     -- ItemBarState 下发新金币同步刷新
     env.writer:ingest_event("ItemBarState", { slots = {}, coin = 388 })
-    assert.equals("388", env.nodes.LabelCoin.Text)
+    assert.equals("388", env.nodes.CoinLabel.Text)
 
     -- 进入饥饿（hunger <= 0 and health > 0）：立即闪红边并触发首次提醒
     env.writer:update_vitals({ hunger = 0 })
@@ -175,49 +174,32 @@ describe("Spoke 主 HUD 左上状态区与金币视图（#297-B2）", function()
     env.view:dispose()
   end)
 
-  it("缺失预置金币节点不报错；重连重置与销毁后动态节点零残留且不销毁预置节点", function()
-    local no_coin = mount_vitals(1080, { missing_coin = true })
-    no_coin.writer:set_coin(99)
-    assert.is_nil(no_coin.view.root.fault)
-    no_coin.view:dispose()
-
+  it("重连重置与销毁后全部动态节点零残留", function()
     local env = mount_vitals(1080)
     local first_batch = {}
     for i = 1, #env.created do first_batch[i] = env.created[i] end
-    assert.equals(10, #first_batch) -- 2*(Bg+Ring+Text) + 4 FlashEdges
+    -- 2*(bg+fill+label) + 3*(CoinCapsule+CoinIcon+CoinLabel) + 4 FlashEdges = 13
+    assert.equals(13, #first_batch)
 
-    -- 重连重置：旧动态节点全部销毁，预置金币节点保持存活且重新绑定
+    -- 重连重置：旧动态节点全部销毁并干净重建
     env.writer:reset_session("reconnect")
     for _, node in ipairs(first_batch) do
       assert.is_true(node.Destroyed, "重连后旧动态节点必须销毁: " .. tostring(node.Name))
     end
-    assert.is_nil(env.nodes.ImageCoin.Destroyed)
-    assert.is_nil(env.nodes.LabelCoin.Destroyed)
-    assert.equals("0", env.nodes.LabelCoin.Text)
+    assert.is_nil(env.nodes.CoinLabel.Destroyed)
+    assert.equals("0", env.nodes.CoinLabel.Text)
 
-    -- dispose 视图树：全部新动态节点销毁，预置金币节点仍保持存活
+    -- dispose 视图树：全部新动态节点销毁
     env.view:dispose()
     for _, node in ipairs(env.created) do
       assert.is_true(node.Destroyed, "卸载视图树后动态节点不得残留: " .. tostring(node.Name))
     end
-    assert.is_nil(env.nodes.ImageCoin.Destroyed)
-    assert.is_nil(env.nodes.LabelCoin.Destroyed)
   end)
 
-  it("分辨率读取兼容非 1080p 与代理 FindFirstChild，非法分辨率返回 nil 且视图不崩溃", function()
+  it("分辨率读取兼容非 1080p，非法分辨率返回 nil 且视图不崩溃", function()
     local store, writer = ClientStore.new({ initial_now = 10 })
-    local image_coin = Eui.node({ Name = "ImageCoin" })
-    local label_coin = Eui.node({ Name = "LabelCoin" })
-    local proxy_nodes = { ImageCoin = image_coin, LabelCoin = label_coin }
-    local root_node = {
-      Name = "ProxyRoot",
-      Destroying = Eui.Signal(),
-      FindFirstChild = setmetatable({}, {
-        __call = function(_, _, name) return proxy_nodes[name] end,
-      }),
-    }
     local nodes = {}
-    local view = RootView.mount(root_node, store, {
+    local view = RootView.mount(Eui.node({ Name = "ProxyRoot" }), store, {
       services = {
         get_device_resolution = function() return { x = 1920, y = 886 } end,
       },
@@ -233,11 +215,11 @@ describe("Spoke 主 HUD 左上状态区与金币视图（#297-B2）", function()
     })
     assert.is_nil(view.root.fault)
     local layout_886 = MainHudLayout.compute({ width = 1920, height = 886, itemBarSlots = 8 })
-    assert_at(nodes.HealthRing, layout_886.rects.HealthRing, "HealthRing @886")
-    assert_at(image_coin, layout_886.rects.coin_icon, "ImageCoin @886")
-    assert_at(label_coin, layout_886.rects.coin_label, "LabelCoin @886")
+    assert_at(nodes.HealthBar_bg, layout_886.rects.HealthBar, "HealthBar_bg @886")
+    assert_at(nodes.CoinIcon, layout_886.rects.coin_icon, "CoinIcon @886")
+    assert_at(nodes.CoinLabel, layout_886.rects.coin_label, "CoinLabel @886")
     writer:set_coin(77)
-    assert.equals("77", label_coin.Text)
+    assert.equals("77", nodes.CoinLabel.Text)
     view:dispose()
 
     local nodes_fb = {}
@@ -256,7 +238,7 @@ describe("Spoke 主 HUD 左上状态区与金币视图（#297-B2）", function()
       hud = { MainHudVitalsView.spec() },
     })
     assert.is_nil(view_fb.root.fault)
-    assert.is_nil(nodes_fb.HealthRing)
+    assert.is_nil(nodes_fb.HealthBar)
     view_fb:dispose()
   end)
 end)

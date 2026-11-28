@@ -1,22 +1,22 @@
 -- 主 HUD 右侧动作键的投影与交互行为（#412 从 main_hud_action_buttons_view 拆出，归属 L2 client.views）：
 -- 版面投影、主动作键分支文案、点击 / 按住上行与 SpecialItemResult 提示；呼吸冷却与上钩高亮仍在视图模块。
--- 视图内的选中格 / 模式解析与配色表放在本模块并导出，供视图模块复用；行为表由视图模块在造句柄时并入。
--- 文件名里的 projection 指「版面 / 投掷投影」这条主线；交互上行处理器放在同模块，是因为它与投影共用选中态解析。
+-- 统一走 Tokens.Z 全局层级表、4px 栅格与圆体描边，保持 ViewUtil.color 与上下文显隐逻辑不变。
 
 local GameCfg = require("common.game_cfg")
 local MainHudLayout = require("client.main_hud_layout")
+local Tokens = require("client.ui.tokens")
 local ViewUtil = require("client.views.view_util")
 local HudWidgets = require("client.views.hud_widgets")
 
 local MainHudActionButtonsProjection = {}
 
-local LABEL_FONT_SIZE = 30
+local LABEL_FONT_SIZE = Tokens.FONT_SIZE.BUTTON
 
 local COLORS = {
-  WHITE = { 255, 255, 255, 255 },
-  NORMAL = { 54, 100, 140, 255 },
-  PRESS = { 42, 82, 118, 255 },
-  DISABLED = { 120, 120, 120, 255 },
+  WHITE = Tokens.COLOR.WHITE,
+  NORMAL = Tokens.COLOR.HUD_SLOT,
+  PRESS = Tokens.COLOR.HUD_SLOT_PRESS,
+  DISABLED = Tokens.COLOR.DISABLED,
 }
 
 local make_color = ViewUtil.color
@@ -89,13 +89,14 @@ local function cast_action_color(phase, alert_now)
   end
   local alert = GameCfg.HookAlert
   local k = (math.sin(alert_now * 2 * math.pi / alert.BreathPeriodSec) + 1) / 2
+  local base = COLORS.NORMAL
   local h = alert.HighlightColor
-  return Color.New(
-    math.floor(54 + (h[1] - 54) * k),
-    math.floor(100 + (h[2] - 100) * k),
-    math.floor(140 + (h[3] - 140) * k),
-    h[4]
-  )
+  return make_color({
+    math.floor(base[1] + (h[1] - base[1]) * k),
+    math.floor(base[2] + (h[2] - base[2]) * k),
+    math.floor(base[3] + (h[3] - base[3]) * k),
+    h[4] or 255,
+  })
 end
 
 MainHudActionButtonsProjection.resolve_mode = resolve_mode
@@ -112,15 +113,23 @@ local SPECIAL_ITEM_HINTS = {
 --- 投影 / 交互行为表：与视图方法共用同一套 handle（self）约定。
 local ProjectionBehavior = {}
 
---- 建 ItemDiscard / ItemAction2 按钮与同级高 ZOrder 文案标签（全部由 ctx.create_node 托管）。
+--- 建 ItemDiscard / ItemAction2 按钮与同级高 ZOrder 圆体描边文案标签（全部由 ctx.create_node 托管）。
 ---@param self MainHudActionButtonsHandle
 function ProjectionBehavior.create_nodes(self)
   local ctx, s = self.ctx, self.s
   local layout = self.initial_layout
   self.btn_discard = HudWidgets.button(ctx, s, {
-    name = "ItemDiscard", x = layout.rects.discard.x, y = layout.rects.discard.y,
-    w = layout.rects.discard.w, h = layout.rects.discard.h,
-    touch = false, visible = false, z_order = 0,
+    name = "ItemDiscard",
+    x = layout.rects.discard.x,
+    y = layout.rects.discard.y,
+    w = layout.rects.discard.w,
+    h = layout.rects.discard.h,
+    normal = COLORS.NORMAL,
+    press = COLORS.PRESS,
+    disabled = COLORS.DISABLED,
+    touch = false,
+    visible = false,
+    z_order = Tokens.Z.HUD_CONTENT,
   })
   self.label_discard = HudWidgets.label(ctx, s, {
     name = "BtnDiscardLabel",
@@ -130,13 +139,24 @@ function ProjectionBehavior.create_nodes(self)
     h = layout.rects.discard.h,
     text = "丢弃选中物",
     font_size = LABEL_FONT_SIZE,
+    bold = true,
+    outline = true,
     text_color = make_color(COLORS.WHITE),
+    z_order = Tokens.Z.HUD_ACCENT,
     visible = false,
   })
   self.btn_action = HudWidgets.button(ctx, s, {
-    name = "ItemAction2", x = layout.rects.item_action.x, y = layout.rects.item_action.y,
-    w = layout.rects.item_action.w, h = layout.rects.item_action.h,
-    touch = false, visible = false, z_order = 0,
+    name = "ItemAction2",
+    x = layout.rects.item_action.x,
+    y = layout.rects.item_action.y,
+    w = layout.rects.item_action.w,
+    h = layout.rects.item_action.h,
+    normal = COLORS.NORMAL,
+    press = COLORS.PRESS,
+    disabled = COLORS.DISABLED,
+    touch = false,
+    visible = false,
+    z_order = Tokens.Z.HUD_CONTENT,
   })
   self.label_action = HudWidgets.label(ctx, s, {
     name = "BtnItemActionLabel",
@@ -146,7 +166,10 @@ function ProjectionBehavior.create_nodes(self)
     h = layout.rects.item_action.h,
     text = "抛竿",
     font_size = LABEL_FONT_SIZE,
+    bold = true,
+    outline = true,
     text_color = make_color(COLORS.WHITE),
+    z_order = Tokens.Z.HUD_ACCENT,
     visible = false,
   })
 end

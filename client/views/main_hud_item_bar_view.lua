@@ -2,12 +2,14 @@
 -- 挂载于 RootView 常驻 HUD 槽位，订阅只读 ClientStore.item_bar；
 -- 通过 Dock 增量管理 ItemBarSlot1..N（随 slotCount 2..8 扩容重排与缩容卸载）；
 -- 支持点击选槽（SelectSlot）、拖拽换格（MoveSlot）、爆炸物点按直投/长按瞄准手势（PressGesture + ThrowAimPhase）；
--- 响应 backpack_open 展开遮挡隐藏，重连或根 UI 销毁自动零残留清理全部节点与连接。
+-- 响应 backpack_open 展开（提升层级置于背包遮罩之上以支持双向拖拽）与 hud_visible 关屏隐藏。
 
 local Spoke = require("common.packages.spoke.api")
 local GameCfg = require("common.game_cfg")
 local Number = require("common.number")
 local MainHudLayout = require("client.main_hud_layout")
+local Tokens = require("client.ui.tokens")
+local Layout = require("client.ui.layout")
 local PressGesture = require("client.press_gesture")
 local ViewUtil = require("client.views.view_util")
 local HudWidgets = require("client.views.hud_widgets")
@@ -21,12 +23,12 @@ local MainHudItemBarView = {}
 local DRAG_THRESHOLD_PX = 10
 
 local COLORS = {
-  WHITE = { 255, 255, 255, 255 },
-  AMOUNT = { 255, 220, 40, 255 },
-  NORMAL = { 54, 100, 140, 255 },
-  PRESS = { 42, 82, 118, 255 },
-  SELECTED = { 36, 130, 94, 255 },
-  DISABLED = { 120, 120, 120, 255 },
+  WHITE = Tokens.COLOR.WHITE,
+  AMOUNT = Tokens.COLOR.TEXT_GOLD,
+  NORMAL = Tokens.COLOR.HUD_SLOT,
+  PRESS = Tokens.COLOR.HUD_SLOT_PRESS,
+  SELECTED = Tokens.COLOR.SELECTED,
+  DISABLED = Tokens.COLOR.DISABLED,
 }
 
 local make_color = ViewUtil.color
@@ -48,14 +50,13 @@ end
 
 local function place_slot(nodes, cell)
   local x, y, w, h = cell.x, cell.y, cell.w, cell.h
-  nodes.background.Position = Vector2.New(x, y)
-  nodes.background.Size = Vector2.New(w, h)
-  nodes.icon.Position = Vector2.New(x, y + h * 0.1)
-  nodes.icon.Size = Vector2.New(w * 0.6, h * 0.6)
-  nodes.label.Position = Vector2.New(x, y - h * 0.34)
-  nodes.label.Size = Vector2.New(w, h * 0.28)
-  nodes.count.Position = Vector2.New(x + w * 0.33, y + h * 0.33)
-  nodes.count.Size = Vector2.New(w * 0.32, h * 0.32)
+  local icon_w, icon_h = Layout.snap4(w * 0.6, 16), Layout.snap4(h * 0.6, 16)
+  local label_h = Layout.snap4(h * 0.3, 16)
+  local count_w, count_h = Layout.snap4(w * 0.35, 16), Layout.snap4(h * 0.3, 16)
+  Layout.apply(nodes.background, cell)
+  Layout.apply(nodes.icon, Layout.rect(x, y + Layout.snap4(h * 0.1), icon_w, icon_h))
+  Layout.apply(nodes.label, Layout.rect(x, y - Layout.snap4(h * 0.35), w, label_h))
+  Layout.apply(nodes.count, Layout.rect(x + Layout.snap4(w * 0.3), y + Layout.snap4(h * 0.3), count_w, count_h))
 end
 
 -- 道具栏句柄：格位 dock、拖拽 / 长按手势状态与注入回调都留在句柄上；
@@ -69,16 +70,6 @@ local SlotBehavior = {}
 ---@return number|nil
 function SlotBehavior.now_sec(self)
   return ViewUtil.read_now(self.clock_now, "MainHudItemBarView")
-  -- 时钟由入口或 options.now_sec 显式注入
-  -- 运行期读取失败记日志返回 nil
-  -- 跳过本次手势时间结算
-  -- 不回退 World:GetServerTime()
-  -- 也不再回退 0
-  -- 确保多端时钟一致
-  -- 避免长按误判
-  -- #367 时钟显式注入契约
-  -- 保持挂载期报错校验
-  -- 校验通过后绑定槽位
 end
 
 --- 命中本视图道具栏格位时返回 { container, index }；关屏或未命中返回 nil。
@@ -105,7 +96,7 @@ end
 --- 把落点解析器交给外部（跨容器拖拽）；卸载时以 nil 收回（实现见 ViewUtil.register_drop_resolver）。
 SlotBehavior.register_drop_resolver = ViewUtil.register_drop_resolver
 
---- 建单个格位节点：底板按钮 + 图标 + 文案 + 数量，全部由当前 dock 作用域托管。
+--- 建单个格位节点：底板按钮 + 图标 + 文案 + 数量，层级统一走 Tokens.Z。
 ---@param self MainHudItemBarHandle
 ---@param cs table
 ---@param init_cell table
@@ -115,16 +106,22 @@ function SlotBehavior.create_slot_nodes(self, cs, init_cell, index)
   local ctx = self.ctx
   local background = HudWidgets.button(ctx, cs, {
     name = "ItemBarSlot" .. tostring(index),
-    x = init_cell.x, y = init_cell.y, w = init_cell.w, h = init_cell.h,
+    x = init_cell.x,
+    y = init_cell.y,
+    w = init_cell.w,
+    h = init_cell.h,
+    normal = COLORS.NORMAL,
+    press = COLORS.PRESS,
+    disabled = COLORS.DISABLED,
+    z_order = Tokens.Z.HUD_CONTENT,
   })
-  background.LocalZOrder = 6
 
   local icon = HudWidgets.passive(ctx.create_node(cs, "EUIImage", {
     Name = "ItemBarIcon" .. tostring(index),
-    Position = Vector2.New(init_cell.x, init_cell.y),
-    Size = Vector2.New(init_cell.w * 0.6, init_cell.h * 0.6),
+    Position = Tokens.vec2(init_cell.x, init_cell.y),
+    Size = Tokens.vec2(Layout.snap4(init_cell.w * 0.6, 16), Layout.snap4(init_cell.h * 0.6, 16)),
   }))
-  icon.LocalZOrder = 7
+  icon.LocalZOrder = Tokens.Z.HUD_ACCENT
   icon.Visible = false
 
   local label = HudWidgets.label(ctx, cs, {
@@ -132,11 +129,11 @@ function SlotBehavior.create_slot_nodes(self, cs, init_cell, index)
     x = init_cell.x,
     y = init_cell.y,
     w = init_cell.w,
-    h = init_cell.h * 0.28,
+    h = Layout.snap4(init_cell.h * 0.3, 16),
     text = "",
-    font_size = 18,
+    font_size = Tokens.FONT_SIZE.MICRO,
     text_color = make_color(COLORS.WHITE),
-    z_order = 8,
+    z_order = Tokens.Z.HUD_ACCENT + 2,
   })
   label.Visible = false
 
@@ -144,12 +141,12 @@ function SlotBehavior.create_slot_nodes(self, cs, init_cell, index)
     name = "ItemBarAmount" .. tostring(index),
     x = init_cell.x,
     y = init_cell.y,
-    w = init_cell.w * 0.32,
-    h = init_cell.h * 0.32,
+    w = Layout.snap4(init_cell.w * 0.35, 16),
+    h = Layout.snap4(init_cell.h * 0.3, 16),
     text = "",
-    font_size = 20,
+    font_size = Tokens.FONT_SIZE.CAPTION,
     text_color = make_color(COLORS.AMOUNT),
-    z_order = 8,
+    z_order = Tokens.Z.HUD_ACCENT + 2,
   })
   count.Visible = false
 
@@ -161,7 +158,8 @@ end
 ---@param touch any
 ---@param slot_index number
 function SlotBehavior.on_slot_touch_began(self, touch, slot_index)
-  if self.ctx.store.hud_visible:now() == false then return
+  if self.ctx.store.hud_visible:now() == false then
+    return
   end
   local began = ViewUtil.read_touch_xy(touch, "BeganPosition")
   self.drag_source = {
@@ -232,7 +230,7 @@ function SlotBehavior.on_slot_clicked(self, slot_index)
   self.send_action("SelectSlot", slot_index)
 end
 
---- 格位渲染：占位、图标与颜色、文案、数量、选中高亮。
+--- 格位渲染：占位、图标与颜色、文案、数量、选中高亮与背包展开期层级提升。
 ---@param nodes table
 ---@param rs table
 ---@param item_state table
@@ -243,6 +241,15 @@ local function render_slot(nodes, rs, item_state)
   end
   local show = data.visible == true
   local show_item = show and data.has_item == true
+  local elevated = data.backpack_open == true
+  local bg_z = elevated and Tokens.Z.BACKPACK_CONTENT or Tokens.Z.HUD_CONTENT
+  local icon_z = elevated and (Tokens.Z.BACKPACK_CONTENT + 2) or Tokens.Z.HUD_ACCENT
+  local text_z = elevated and Tokens.Z.BACKPACK_LABEL or (Tokens.Z.HUD_ACCENT + 2)
+  nodes.background.LocalZOrder = bg_z
+  nodes.icon.LocalZOrder = icon_z
+  nodes.label.LocalZOrder = text_z
+  nodes.count.LocalZOrder = text_z
+
   nodes.background.Visible = show
   nodes.background.TouchEnabled = show
   nodes.background.ButtonNormalColor = make_color(
@@ -299,9 +306,10 @@ end
 ---@param layout table
 ---@param slots table
 ---@param hud_visible boolean
+---@param bp_open boolean
 ---@param selected_slot number|nil
 ---@param seen table
-function SlotBehavior.sync_slot(self, slot_index, layout, slots, hud_visible, selected_slot, seen)
+function SlotBehavior.sync_slot(self, slot_index, layout, slots, hud_visible, bp_open, selected_slot, seen)
   local dock_key = tostring(slot_index)
   seen[dock_key] = true
 
@@ -317,6 +325,7 @@ function SlotBehavior.sync_slot(self, slot_index, layout, slots, hud_visible, se
     index = slot_index,
     cell = cell,
     visible = hud_visible,
+    backpack_open = bp_open,
     selected = selected_slot == slot_index,
     has_item = def ~= nil,
     icon = def ~= nil and def.Icon or nil,
@@ -337,7 +346,7 @@ function SlotBehavior.sync_slot(self, slot_index, layout, slots, hud_visible, se
   end
 end
 
---- 格位同步体：扩容增量挂载、缩容自动卸载、关屏隐藏；展开背包时保留可见以支持双向拖拽。
+--- 格位同步体：扩容增量挂载、缩容自动卸载、关屏隐藏；展开背包时保留可见并提至遮罩之上以支持双向拖拽。
 ---@param self MainHudItemBarHandle
 ---@param es table
 function SlotBehavior.sync_slots(self, es)
@@ -354,7 +363,7 @@ function SlotBehavior.sync_slots(self, es)
 
   local seen = {}
   for index = 1, capacity do
-    self:sync_slot(index, layout, slots, hud_visible, selected_slot, seen)
+    self:sync_slot(index, layout, slots, hud_visible, bp_open, selected_slot, seen)
   end
   ViewUtil.drop_stale_slots(self, seen, self.slot_rects)
 end

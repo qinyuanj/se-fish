@@ -26,8 +26,8 @@ M.policy = {
       },
     },
     {
-      -- ADR-0032 客户端只读响应式状态仓库（#296），归属 L3 支撑层，
-      ids = { 'client.store', 'server.fish_behaviors' },
+      -- ADR-0032 客户端只读响应式状态仓库（#296）与统一 UI 原语层，归属 L3 支撑层，
+      ids = { 'client.store', 'client.ui', 'server.fish_behaviors' },
       modules = {
         'client.damage_float', 'client.game_ui', 'client.interaction_bubble',
         'client.main_hud_layout', 'client.press_gesture', 'client.weapon_aim',

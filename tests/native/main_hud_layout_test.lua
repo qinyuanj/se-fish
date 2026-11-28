@@ -139,9 +139,12 @@ describe('主界面布局模块', function()
     it('test_residents_pairwise_disjoint', function()
         each_case(function(layout, case)
             local list = residents(layout)
-            if #list < 20 then fail('%s 常驻控件只有 %d 个', case, #list) end
+            if #list < 16 then fail('%s 常驻控件只有 %d 个', case, #list) end
             for i = 1, #list do
                 local a = list[i]
+                if a.rect.w % 4 ~= 0 or a.rect.h % 4 ~= 0 then
+                    fail('%s %s 尺寸 %s 非 4px 栅格倍数', case, a.name, describe_rect(a.rect))
+                end
                 for j = i + 1, #list do
                     local b = list[j]
                     if overlaps(a.rect, b.rect) then
@@ -266,11 +269,30 @@ describe('主界面布局模块', function()
         end)
     end)
 
-    it('test_entries_reserve_shop_slot', function()
-        each_case(function(layout, case)
-            for _, name in ipairs({ 'CompendiumEntry', 'ShopEntry', 'BlindboxEntry' }) do
-                if layout.regions.EntriesTopRight.controls[name] == nil then
-                    fail('%s 入口区缺 %s', case, name)
+    it('test_entries_collapse_into_single_menu_and_drawer', function()
+        each_case(function(layout, case, input)
+            local entry = layout.regions.EntriesTopRight.controls.MenuEntry
+            if entry == nil then
+                fail('%s 入口区缺 MenuEntry', case)
+            end
+            local drawer, items = MainHudLayout.menu_items(layout, 4)
+            assert.is_not_nil(drawer, case)
+            assert.equals(4, #items, case)
+            local screen = { x = 960, y = input.height / 2, w = 1920 - 2 * EDGE, h = input.height - 2 * EDGE }
+            if not inside(drawer, screen) then
+                fail('%s 菜单浮层出屏 %s', case, describe_rect(drawer))
+            end
+            if overlaps(drawer, entry) then
+                fail('%s 菜单浮层压住 MenuEntry', case)
+            end
+            for i = 1, #items do
+                if not inside(items[i], drawer) then
+                    fail('%s 菜单项 %d 越出浮层', case, i)
+                end
+                for j = i + 1, #items do
+                    if overlaps(items[i], items[j]) then
+                        fail('%s 菜单项 %d 与 %d 互叠', case, i, j)
+                    end
                 end
             end
         end)

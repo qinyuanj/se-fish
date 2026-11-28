@@ -1,5 +1,7 @@
 
 local GameCfg = require("common.game_cfg")
+local MainHudLayout = require("client.main_hud_layout")
+local Tokens = require("client.ui.tokens")
 local ClientStore = require("client.store.client_store")
 local RootView = require("client.views.root_view")
 local AttackView = require("client.views.attack_view")
@@ -65,10 +67,19 @@ describe("客户端攻击与瞄准投影宿主入口（#300）", function()
       held = { kind = "weapon", id = "item137" },
       slots = {},
     })
+    local control = child(root, "AttackControl")
     local button = child(root, "BtnAttack")
     local label = child(root, "AttackLabel")
+    local expected_rect = MainHudLayout.compute({ width = 1920, height = 1080 }).rects.attack_control
+    assert.is_not_nil(control)
     assert.is_not_nil(button)
     assert.is_not_nil(label)
+    assert.equals(root, control.Parent)
+    assert.equals(Tokens.Z.HUD_CONTENT, control.LocalZOrder)
+    assert.same({ x = expected_rect.x, y = expected_rect.y }, { x = control.Position.x, y = control.Position.y })
+    -- 子按钮相对父容器左下角局部居中，绝不与父容器屏幕坐标二次叠加
+    assert.same({ x = expected_rect.w / 2, y = expected_rect.h / 2 }, { x = button.Position.x, y = button.Position.y })
+    assert.equals("", button.ButtonText)
     assert.is_true(button.Visible)
     assert.equals("射击", label.Text)
 
@@ -87,6 +98,9 @@ describe("客户端攻击与瞄准投影宿主入口（#300）", function()
     local floater = child(root, "DamageFloat")
     assert.is_not_nil(floater)
     assert.equals("12", floater.Text)
+    assert.equals(Tokens.Z.HUD_ACCENT, floater.LocalZOrder)
+    assert.is_false(floater.TouchEnabled)
+    assert.is_true(floater.Position.x > 0 and floater.Position.y > 0, "DamageFloat 不得停留在 (0, 0)")
 
     writer:set_hud_visible(false)
     assert.is_nil(child(root, "BtnAttack"))

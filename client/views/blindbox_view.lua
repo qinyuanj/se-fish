@@ -1,8 +1,16 @@
 local GameCfg = require("common.game_cfg")
+local Tokens = require("client.ui.tokens")
+local Layout = require("client.ui.layout")
+local Primitives = require("client.ui.primitives")
+local Controls = require("client.ui.controls")
 local Modal = require("client.views.economy_modal")
 local ViewUtil = require("client.views.view_util")
 
 local BlindboxView = {}
+
+local PANEL_W = 928
+local PANEL_H = 640
+local PAD = Tokens.SPACE.PANEL_PAD
 
 local function prize_names()
   local names = {}
@@ -27,25 +35,73 @@ local function result_text(result)
   return table.concat(lines, "\n")
 end
 
--- 盲盒面板句柄：面板节点、请求序号与等待/确认标记都留在句柄上；
--- 方法名沿用拆分前的局部函数名，挂载入口只做装配。
+-- 盲盒面板句柄：面板节点、请求序号与等待/确认标记都留在句柄上。
 ---@class BlindboxPanelHandle: table<string, any>
 ---@type BlindboxPanelHandle
 local BlindboxBehavior = {}
 
---- 建面板节点：保底行、结果行与单抽/十连/关闭按钮。
+--- 建面板节点：浅奶白底板 + 保底提示卡片 + 蓝单抽/金十连按钮 + 结果卡片。
 ---@param self BlindboxPanelHandle
 function BlindboxBehavior.create_nodes(self)
   local scope, ctx = self.scope, self.ctx
-  local panel = Modal.panel(scope, ctx, "ScreenBlindbox", GameCfg.Blindbox.HintText)
+  local panel = Modal.panel(scope, ctx, "ScreenBlindbox", GameCfg.Blindbox.HintText, {
+    width = PANEL_W,
+    height = PANEL_H,
+    close_name = "BtnBlindboxClose",
+    modal_id = "blindbox",
+  })
   self.panel = panel
-  self.pity = Modal.place(Modal.label(scope, ctx, panel, "LabelBlindboxPity", ""), 20, 64, 860, 44)
-  self.result_label = Modal.place(Modal.label(scope, ctx, panel, "LabelBlindboxResult", ""), 20, 196, 860, 384)
-  self.single = Modal.place(Modal.button(scope, ctx, panel, "BtnBlindboxSingle",
-    string.format("单抽（%d金豆）", GameCfg.Platform.Goods.blindboxSingle.beans), function() self:draw(1) end), 140, 124, 280, 56)
-  self.ten = Modal.place(Modal.button(scope, ctx, panel, "BtnBlindboxTen",
-    string.format("十连（%d金豆）", GameCfg.Platform.Goods.blindboxTen.beans), function() self:draw(10) end), 480, 124, 280, 56)
-  Modal.close(scope, ctx, panel, "BtnBlindboxClose", "blindbox")
+
+  local content_w = PANEL_W - PAD * 2
+  local pity_card = Modal.surface(scope, ctx, panel, "BlindboxPityCard",
+    Layout.from_top_left(PANEL_H, PAD, 84, content_w, 64), { z_order = 1 })
+  self.pity = Primitives.label(scope, ctx, {
+    name = "LabelBlindboxPity",
+    parent = pity_card,
+    rect = Layout.from_top_left(64, 20, 8, content_w - 40, 48),
+    text = "",
+    font_size = Tokens.FONT_SIZE.BODY,
+    bold = true,
+    color = Tokens.COLOR.TEXT_GOLD_DARK,
+    align_x = 1,
+    align_y = 1,
+    z_order = 2,
+  })
+
+  self.single = Controls.button(scope, ctx, {
+    name = "BtnBlindboxSingle",
+    parent = panel,
+    rect = Layout.from_top_left(PANEL_H, 144, 168, 296, 64),
+    text = string.format("单抽（%d金豆）", GameCfg.Platform.Goods.blindboxSingle.beans),
+    variant = "blue",
+    font_size = Tokens.FONT_SIZE.BUTTON,
+    z_order = 2,
+    on_click = function() self:draw(1) end,
+  })
+  self.ten = Controls.button(scope, ctx, {
+    name = "BtnBlindboxTen",
+    parent = panel,
+    rect = Layout.from_top_left(PANEL_H, 488, 168, 296, 64),
+    text = string.format("十连（%d金豆）", GameCfg.Platform.Goods.blindboxTen.beans),
+    variant = "gold",
+    font_size = Tokens.FONT_SIZE.BUTTON,
+    z_order = 2,
+    on_click = function() self:draw(10) end,
+  })
+
+  local result_card = Modal.surface(scope, ctx, panel, "BlindboxResultCard",
+    Layout.from_top_left(PANEL_H, PAD, 252, content_w, 356), { z_order = 1 })
+  self.result_label = Primitives.label(scope, ctx, {
+    name = "LabelBlindboxResult",
+    parent = result_card,
+    rect = Layout.from_top_left(356, 24, 20, content_w - 48, 316),
+    text = "",
+    font_size = Tokens.FONT_SIZE.BODY,
+    color = Tokens.COLOR.TEXT_DARK,
+    align_x = 1,
+    align_y = 0,
+    z_order = 2,
+  })
 end
 
 --- 面板提示统一走 ViewUtil.notify（services.notify 缺失或文本为空时忽略）。
@@ -71,9 +127,9 @@ end
 
 ---@param self BlindboxPanelHandle
 function BlindboxBehavior.refresh_buttons(self)
-  local awaiting = self.awaiting
-  self.single.Disabled, self.ten.Disabled = awaiting, awaiting
-  self.single.TouchEnabled, self.ten.TouchEnabled = not awaiting, not awaiting
+  local enabled = not self.awaiting
+  Controls.set_button_enabled(self.single, enabled, "blue")
+  Controls.set_button_enabled(self.ten, enabled, "gold")
   self.pity.Text = string.format("已连续 %d 次未出大奖；再抽 %d 次内必出%s",
     self.pity_count, math.max(1, GameCfg.Blindbox.Pity.afterMisses + 1 - self.pity_count), prize_names())
 end
@@ -217,16 +273,22 @@ function BlindboxView.entry_spec()
   return {
     name = "BlindboxEntry",
     mount = function(scope, ctx)
-      local button = Modal.button(scope, ctx, ctx.root_node, "BtnBlindboxEntry", GameCfg.Blindbox.HintText, function()
-        local services = ctx.services or {}
-        if type(services.open_modal) == "function" then services.open_modal("blindbox") end
-        if type(services.request_blindbox_state) == "function" then services.request_blindbox_state() end
-      end)
-      local rect = type((ctx.services or {}).hud_entry_rect) == "function" and ctx.services.hud_entry_rect("BlindboxEntry") or nil
-      if rect then
-        button.Position = Vector2.New(rect.x, rect.y)
-        button.Size = Vector2.New(rect.w, rect.h)
-      end
+      local services = ctx.services or {}
+      local rect = type(services.hud_entry_rect) == "function" and services.hud_entry_rect("BlindboxEntry") or nil
+      local btn = Controls.button(scope, ctx, {
+        name = "BtnBlindboxEntry",
+        parent = ctx.root_node,
+        rect = rect or Layout.rect(100, 160, 112, 48),
+        text = GameCfg.Blindbox.HintText,
+        variant = "hud",
+        font_size = Tokens.FONT_SIZE.BODY,
+        z_order = Tokens.Z.HUD_CONTENT,
+        on_click = function()
+          if type(services.open_modal) == "function" then services.open_modal("blindbox") end
+          if type(services.request_blindbox_state) == "function" then services.request_blindbox_state() end
+        end,
+      })
+      if rect then Layout.apply(btn, rect) end
     end,
   }
 end

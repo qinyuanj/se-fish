@@ -12,6 +12,7 @@ local spoke = require("common.packages.spoke.api")
 local Eui = require("tests.support.eui_double")
 local GameCfg = require("common.game_cfg")
 local MainHudLayout = require("client.main_hud_layout")
+local Tokens = require("client.ui.tokens")
 local ClientStore = require("client.store.client_store")
 local RootView = require("client.views.root_view")
 local MainHudItemBarView = require("client.views.main_hud_item_bar_view")
@@ -187,13 +188,13 @@ describe("Spoke 主 HUD 底部道具栏视图（#297-B3b2）", function()
     assert.equals(fish_def.Icon, env.nodes.ItemBarIcon1.Image)
     assert.equals(GameCfg.Grill.CookedPrefix .. fish_def.Name, env.nodes.ItemBarLabel1.Text)
     assert.equals("3", env.nodes.ItemBarAmount1.Text)
-    assert.same({ 54, 100, 140, 255 }, env.nodes.ItemBarSlot1.ButtonNormalColor)
+    assert.same(Tokens.COLOR.HUD_SLOT, env.nodes.ItemBarSlot1.ButtonNormalColor)
 
     -- 第 2 格：选中高亮
     assert.is_true(env.nodes.ItemBarIcon2.Visible)
     assert.equals(rod_def.Name, env.nodes.ItemBarLabel2.Text)
     assert.equals("1", env.nodes.ItemBarAmount2.Text)
-    assert.same({ 36, 130, 94, 255 }, env.nodes.ItemBarSlot2.ButtonNormalColor)
+    assert.same(Tokens.COLOR.SELECTED, env.nodes.ItemBarSlot2.ButtonNormalColor)
 
     -- 第 3 格：空槽隐藏图标与文案
     assert.is_false(env.nodes.ItemBarIcon3.Visible)
@@ -302,13 +303,22 @@ describe("Spoke 主 HUD 底部道具栏视图（#297-B3b2）", function()
     assert.equals(0, #actions)
 
     local overlay = env.nodes.ThrowAimOverlay
+    local banner = env.nodes.ThrowAimBanner
+    local banner_label = env.nodes.ThrowAimBannerLabel
     assert.is_not_nil(overlay)
+    assert.equals("EUILayout", overlay.Kind)
+    assert.equals(Tokens.Z.HUD_POPUP_MASK, overlay.LocalZOrder)
     assert.is_nil(overlay.Color)
+    assert.is_not_nil(banner)
+    assert.equals(Tokens.Z.HUD_POPUP_BG, banner.LocalZOrder)
+    assert.equals("点击屏幕选择投掷落点", banner_label.Text)
     assert.equals("点击屏幕选择投掷落点", notices[#notices])
 
-    -- 点击遮罩选点：卸载 ThrowAimOverlay（节点销毁、连接归零）并按目标落点投掷
+    -- 点击遮罩选点：卸载 ThrowAimOverlay 与提示胶囊（节点销毁、连接归零）并按目标落点投掷
     overlay.OnTouchEnded:Fire({ EndedPosition = { x = 640, y = 360 } })
     assert.is_true(overlay.Destroyed)
+    assert.is_true(banner.Destroyed)
+    assert.is_true(banner_label.Destroyed)
     assert.equals(0, overlay.OnTouchEnded:Count())
     assert.equals(2, #throws)
     assert.same({ slot = 1, target = { x = 640, y = 0, z = 360 } }, throws[2])

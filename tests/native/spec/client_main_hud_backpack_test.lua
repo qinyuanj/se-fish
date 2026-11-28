@@ -10,6 +10,8 @@ local spoke = require("common.packages.spoke.api")
 local Eui = require("tests.support.eui_double")
 local GameCfg = require("common.game_cfg")
 local MainHudLayout = require("client.main_hud_layout")
+local Tokens = require("client.ui.tokens")
+local Layout = require("client.ui.layout")
 local ClientStore = require("client.store.client_store")
 local RootView = require("client.views.root_view")
 local MainHudBackpackView = require("client.views.main_hud_backpack_view")
@@ -208,23 +210,47 @@ describe("Spoke 主 HUD 背包入口与背包面板视图（#297-B3c）", functi
     assert.is_false(Eui.click(slot3))
     assert.is_false(env.nodes.BtnMoveToItemBar.Visible)
 
+    -- 3A 明亮奶白底板 + 14588 半透遮罩 + 标题与关闭按钮严格零重叠 + 零 ButtonText 双字
+    local backdrop = env.nodes.BackpackBackdrop
+    assert.is_not_nil(backdrop)
+    assert.equals(Tokens.ASSET.MODAL_MASK, backdrop.Image)
+    assert.equals(Tokens.Z.BACKPACK_MASK, backdrop.LocalZOrder)
+    assert.equals(Tokens.Z.BACKPACK_PANEL, panel.LocalZOrder)
+    assert.same(Tokens.COLOR.MODAL_BG, panel.Color)
+    assert.equals("", btn_close.ButtonText)
+    assert.equals("", env.nodes.BtnMoveToItemBar.ButtonText)
+    local title_node = env.nodes.BackpackTitle
+    local title_r = Layout.rect(title_node.Position.x, title_node.Position.y, title_node.Size.x, title_node.Size.y)
+    local close_r = Layout.rect(btn_close.Position.x, btn_close.Position.y, btn_close.Size.x, btn_close.Size.y)
+    local panel_r = Layout.rect(panel.Position.x, panel.Position.y, panel.Size.x, panel.Size.y)
+    assert.is_false(Layout.overlaps(title_r, close_r), "BackpackTitle 与 BtnBackpackClose 不得重叠")
+    assert.is_true(Layout.inside(title_r, panel_r))
+    assert.is_true(Layout.inside(close_r, panel_r))
+
     -- 点击第 1 格：高亮切换并显示「转入道具栏」按钮
     local normal_color = slot2.ButtonNormalColor
     assert.is_true(Eui.click(slot1))
-    assert.same({ 36, 130, 94, 255 }, slot1.ButtonNormalColor)
+    assert.same(Tokens.COLOR.SELECTED, slot1.ButtonNormalColor)
     assert.same(normal_color, slot2.ButtonNormalColor)
     assert.is_true(env.nodes.BtnMoveToItemBar.Visible)
     assert.is_true(env.nodes.BtnMoveToItemBar.TouchEnabled)
     assert.equals("转入道具栏", env.nodes.LabelMoveToItemBar.Text)
 
-    -- 点击面板关闭按钮：Phase 卸载，面板/关闭键/全部格位均销毁且连接归零
+    -- 点击面板关闭按钮：Phase 卸载，遮罩/面板/关闭键/全部格位均销毁且连接归零
     assert.is_true(Eui.click(btn_close))
+    assert.is_true(backdrop.Destroyed)
     assert.is_true(panel.Destroyed)
     assert.is_true(btn_close.Destroyed)
     assert.is_true(slot1.Destroyed)
     assert.is_true(slot2.Destroyed)
     assert.equals(0, btn_close.OnClicked:Count())
     assert.equals(0, slot1.OnClicked:Count())
+
+    -- 再次展开后点遮罩也可收起
+    assert.is_true(Eui.click(env.nodes.BtnBackpack))
+    local backdrop_dismiss = env.nodes.BackpackBackdrop
+    assert.is_true(Eui.click(backdrop_dismiss))
+    assert.is_true(backdrop_dismiss.Destroyed)
 
     -- 再次展开时选格状态已复位，点 BtnBackpack 自身也可收起
     assert.is_true(Eui.click(env.nodes.BtnBackpack))
@@ -640,9 +666,9 @@ describe("Spoke 主 HUD 背包入口与背包面板视图（#297-B3c）", functi
     -- 全部常驻主 HUD 节点必须隐藏，且展开的背包面板必须销毁
     assert.is_true(panel.Destroyed)
     for _, name in ipairs({
-      "ImageCoin", "LabelCoin",
-      "HealthRingBg", "HealthRing", "HealthText",
-      "HungerRingBg", "HungerRing", "HungerText",
+      "CoinCapsule", "CoinIcon", "CoinLabel",
+      "HealthBar_bg", "HealthBar", "HealthBar_label",
+      "HungerBar_bg", "HungerBar", "HungerBar_label",
       "FlashTop", "FlashBottom", "FlashLeft", "FlashRight",
       "WeaponBar", "WeaponBarLabel", "BaitBar", "BaitBarLabel",
       "ItemBarSlot1", "ItemBarIcon1", "ItemBarLabel1", "ItemBarAmount1",
@@ -658,9 +684,9 @@ describe("Spoke 主 HUD 背包入口与背包面板视图（#297-B3c）", functi
     backpack_open:set(false)
     writer:set_hud_visible(true)
     for _, name in ipairs({
-      "ImageCoin", "LabelCoin",
-      "HealthRingBg", "HealthRing", "HealthText",
-      "HungerRingBg", "HungerRing", "HungerText",
+      "CoinCapsule", "CoinIcon", "CoinLabel",
+      "HealthBar_bg", "HealthBar", "HealthBar_label",
+      "HungerBar_bg", "HungerBar", "HungerBar_label",
       "WeaponBar", "BaitBar",
       "ItemBarSlot1", "ItemBarIcon1",
       "ItemDiscard", "ItemAction2",

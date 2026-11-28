@@ -1,9 +1,18 @@
-
 local BodyScale = require("common.body_scale")
 local GameCfg = require("common.game_cfg")
+local MainHudLayout = require("client.main_hud_layout")
+local Tokens = require("client.ui.tokens")
+local Layout = require("client.ui.layout")
+local Primitives = require("client.ui.primitives")
+local Controls = require("client.ui.controls")
 local ViewUtil = require("client.views.view_util")
 
 local GroundLootView = {}
+
+local TOGGLE_W = 152
+local TOGGLE_H = 56
+local BUBBLE_W = 160
+local BUBBLE_H = 56
 
 local function rows_of(loot)
   local list = {}
@@ -68,21 +77,25 @@ function GroundLootView.bubble_spec(options)
     mount = function(scope, ctx, item_signal)
       local row = item_signal:now() or {}
       local id = row.id or row.Id
-      local button = ctx.create_node(scope, "EUIButton", {
-        Name = "BtnPickup_" .. tostring(id),
-        ButtonText = "拾取",
-        TouchEnabled = true,
-        Visible = true,
+      local res = Primitives.resolution(ctx, options) or { x = 1920, y = 1080 }
+      Controls.button(scope, ctx, {
+        name = "BtnPickup_" .. tostring(id),
+        rect = Layout.bottom_center(res.x, 180, BUBBLE_W, BUBBLE_H),
+        text = "拾取",
+        variant = "gold",
+        font_size = Tokens.FONT_SIZE.BODY,
+        z_order = Tokens.Z.HUD_CONTENT,
+        on_click = function()
+          if type(options.send) == "function" then
+            options.send({ action = "Pickup", value = id })
+          end
+        end,
       })
-      ctx.connect(scope, button.OnClicked, function()
-        if type(options.send) == "function" then
-          options.send({ action = "Pickup", value = id })
-        end
-      end)
     end,
   }
 end
 
+-- 瞄准拾取上下文按钮：摆在右侧 item_action 左侧安全空位，避开 StatusTopLeft / MenuEntry / ActionRight / CenterClear。
 function GroundLootView.aim_toggle_spec(options)
   options = type(options) == "table" and options or {}
   local base_radius = options.radius or GameCfg.Loot.PickupRadius
@@ -116,17 +129,24 @@ function GroundLootView.aim_toggle_spec(options)
       end)
 
       scope:phase("GroundLootAimTogglePhase", has_nearby, function(ps)
-        local button = ctx.create_node(ps, "EUIButton", {
-          Name = "BtnAimPickup",
-          ButtonText = "瞄准拾取",
-          TouchEnabled = true,
-          Visible = true,
+        local res = Primitives.resolution(ctx, options) or { x = 1920, y = 1080 }
+        local layout = MainHudLayout.compute({ width = res.x, height = res.y })
+        local action_rect = layout.rects.item_action or Layout.rect(res.x - 416, 544, 176, 84)
+        local btn_x = Layout.snap4(action_rect.x - action_rect.w / 2 - Tokens.SPACE.MD - TOGGLE_W / 2)
+        local btn_y = Layout.snap4(action_rect.y)
+        Controls.button(ps, ctx, {
+          name = "BtnAimPickup",
+          rect = Layout.rect(btn_x, btn_y, TOGGLE_W, TOGGLE_H),
+          text = "瞄准拾取",
+          variant = "hud",
+          font_size = Tokens.FONT_SIZE.BODY,
+          z_order = Tokens.Z.HUD_CONTENT,
+          on_click = function()
+            local flags = ctx.store.overlays:now()
+            local active = type(flags) == "table" and flags.aim_pickup == true
+            set_aim(not active)
+          end,
         })
-        ctx.connect(ps, button.OnClicked, function()
-          local flags = ctx.store.overlays:now()
-          local active = type(flags) == "table" and flags.aim_pickup == true
-          set_aim(not active)
-        end)
         ps:on_cleanup(function()
           set_aim(false)
         end)
@@ -145,6 +165,7 @@ function GroundLootView.aim_toggle_spec(options)
   }
 end
 
+-- 瞄准拾取全屏捕获层：纯 EUILayout（严禁空图 EUIButton 或暗黑 EUIImage）+ 顶部深海蓝胶囊提示条。
 function GroundLootView.aim_spec(options)
   options = type(options) == "table" and options or {}
   return {
@@ -153,11 +174,7 @@ function GroundLootView.aim_spec(options)
       return type(flags) == "table" and flags.aim_pickup == true
     end,
     mount = function(scope, ctx)
-      local mask = ctx.create_node(scope, "EUIImage", {
-        Name = "AimPickupMask",
-        Visible = true,
-      })
-      mask.TouchEnabled = true
+      local res = Primitives.resolution(ctx, options) or { x = 1920, y = 1080 }
       local function handle_pick()
         if type(options.on_pick) == "function" then
           options.on_pick(ctx)
@@ -172,7 +189,35 @@ function GroundLootView.aim_spec(options)
           set_overlay("aim_pickup", false)
         end
       end
-      ctx.connect(scope, mask.OnClicked, handle_pick)
+
+      Primitives.dismiss_mask(scope, ctx, {
+        name = "AimPickupMask",
+        width = res.x,
+        height = res.y,
+        z_order = Tokens.Z.OVERLAY_MASK,
+        swallow = true,
+        on_click = handle_pick,
+      })
+
+      local layout = MainHudLayout.compute({ width = res.x, height = res.y })
+      local hint_rect = layout.rects.hint_primary or Layout.top_center(res.x, res.y, 20, 520, 56)
+      local hint_bg = Primitives.capsule(scope, ctx, {
+        name = "LootAimHintBg",
+        rect = hint_rect,
+        z_order = Tokens.Z.OVERLAY_PANEL,
+      })
+      Primitives.label(scope, ctx, {
+        name = "LootAimHint",
+        parent = hint_bg,
+        rect = Layout.rect(hint_rect.w / 2, hint_rect.h / 2, hint_rect.w - 32, hint_rect.h - 8),
+        text = "点击屏幕拾取附近物品",
+        font_size = Tokens.FONT_SIZE.BODY,
+        bold = true,
+        color = Tokens.COLOR.WHITE,
+        outline = true,
+        outline_color = Tokens.COLOR.OUTLINE_DARK,
+        z_order = 1,
+      })
     end,
   }
 end

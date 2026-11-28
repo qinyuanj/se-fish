@@ -3,6 +3,7 @@ local GameCfg = require("common.game_cfg")
 local ClientStore = require("client.store.client_store")
 local RootView = require("client.views.root_view")
 local SquadView = require("client.views.squad_view")
+local Tokens = require("client.ui.tokens")
 local Eui = require("tests.support.eui_double")
 
 local function child(root, name) return root:FindFirstChild(name, true) end
@@ -77,8 +78,11 @@ describe("客户端小队 HUD 与队友抢救气泡（#314）", function()
     assert.is_nil(child(ctx.root, "PartyMember1"))
     assert.equals("甲", child(ctx.root, "PartyMemberName2").Text)
     assert.equals("50 / 100", child(ctx.root, "PartyHealthText2").Text)
-    assert.equals(GameCfg.Party.HUD.BarWidth * 0.5, child(ctx.root, "PartyHealthFill2").Size.x)
-    assert.equals(GameCfg.Party.HUD.ColorBlockImage, child(ctx.root, "PartyHealthFill2").Image)
+    assert.equals("EUILoadingBar", child(ctx.root, "PartyHealthFill2").Kind)
+    assert.equals(50, child(ctx.root, "PartyHealthFill2").Percent)
+    assert.equals(Tokens.ASSET.BAR_FILL, child(ctx.root, "PartyHealthFill2").Image)
+    assert.equals(0, child(ctx.root, "PartyHealthFill3").Percent)
+    assert.is_true(child(ctx.root, "PartyHealthFill3").Size.x > 0)
     assert.is_true(child(ctx.root, "PartyMember3").Visible)
 
     local row = child(ctx.root, "PartyMember2")
@@ -244,8 +248,11 @@ describe("客户端小队 HUD 与队友抢救气泡（#314）", function()
         return node
       end,
     })
-    local hud = GameCfg.Party.HUD
-    assert.equals(1280 - hud.RowWidth - hud.MarginRight, child(root, "PartyHud").Position.x)
+    local party_hud = child(root, "PartyHud")
+    assert.is_true(party_hud.Position.x - party_hud.Size.x / 2 >= 0)
+    assert.is_true(party_hud.Position.x + party_hud.Size.x / 2 <= 1280)
+    assert.is_true(party_hud.Position.y + party_hud.Size.y / 2 <= 720)
+    assert.is_true(party_hud.Position.y - party_hud.Size.y / 2 >= 0)
 
     writer:update_spatial({ x = 0, y = 0, z = 0 }, {})
     writer:ingest_event("PartyState", snapshot({

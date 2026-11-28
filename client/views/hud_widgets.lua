@@ -1,94 +1,96 @@
---- HUD 通用节点构造器（L2 client.views）。
---- 常驻 HUD 的五个视图共用同一套标签/按钮排版与点击穿透约定，避免各写一份几乎相同的构造样板。
+--- HUD 通用节点构造器（L4 client.views，委托 L3 client.ui 统一原语层）。
+--- 保持常驻 HUD 各视图简洁构造入口，并严格遵守圆体、4px 栅格、零 ButtonText 双重重影与触控穿透约定。
+local Tokens = require("client.ui.tokens")
+local Layout = require("client.ui.layout")
+local Primitives = require("client.ui.primitives")
 local ViewUtil = require("client.views.view_util")
 
 local HudWidgets = {}
 
---- 标签默认层级；个别视图（物品栏）按槽位叠放时用 spec.z_order 覆盖。
-HudWidgets.DEFAULT_Z_ORDER = 1
+--- 标签默认层级；按全局 Z-Layer 分层表取值。
+HudWidgets.DEFAULT_Z_ORDER = Tokens.Z.HUD_CONTENT
 
---- 按钮默认底色（EUI 蓝金规范）；遮罩、槽位等特例用 spec.normal / spec.press 覆盖。
+--- 按钮默认底色（深海蓝半透明 HUD 槽位风格）；特例用 spec.normal / spec.press 覆盖。
 HudWidgets.BUTTON_COLORS = {
-  NORMAL = { 54, 100, 140, 255 },
-  PRESS = { 42, 82, 118, 255 },
-  DISABLED = { 120, 120, 120, 255 },
+  NORMAL = Tokens.COLOR.HUD_SLOT,
+  PRESS = Tokens.COLOR.HUD_SLOT_PRESS,
+  DISABLED = Tokens.COLOR.DISABLED,
 }
 
-local BUTTON_IMAGE = "official://image/11017"
+local BUTTON_IMAGE = Tokens.ASSET.ROUND_RECT
 
 --- 静态展示节点不接收触摸，避免挡住下面的按钮。
 function HudWidgets.passive(node)
-  node.TouchEnabled = false
-  node.SwallowTouchEnabled = false
-  return node
+  return Primitives.passive(node)
 end
 
---- 按 MainHudLayout 的中心点矩形摆放节点的位置与尺寸。
---- 节点与矩形都来自动态创建的 EUI 节点/布局表，诊断器推不出形状，按 any 标注避免假阳性。
+--- 按中心点矩形摆放节点的位置与尺寸（同步刷新按钮内子 LabelButtonText 尺寸）。
 ---@param node any
 ---@param rect any { x, y, w, h }
 function HudWidgets.place(node, rect)
-  if node == nil or rect == nil then
-    return
-  end
-  node.Position = Vector2.New(rect.x, rect.y)
-  node.Size = Vector2.New(rect.w, rect.h)
+  Layout.apply(node, rect)
 end
 
--- EUIButton 不写 Color：底色只走 ButtonNormalColor / ButtonPressColor / ButtonDisableColor，
--- 文字另置于同级高 ZOrder 的 EUITextLabel（见 HudWidgets.label）。
+--- HUD 按钮（严禁写 ButtonText，图标/文字独立于同级高 ZOrder 标签或居中子标签）。
 ---@param ctx table RootView 上下文
 ---@param scope table EffectBuilder
----@param spec table { name, x, y, w, h, normal?, press?, touch?, visible?, z_order? }
+---@param spec table { name, x, y, w, h, parent?, image?, normal?, press?, disabled?, touch?, swallow?, visible?, z_order? }
 ---@return table button
 function HudWidgets.button(ctx, scope, spec)
+  local img = spec.image or BUTTON_IMAGE
   local btn = ctx.create_node(scope, "EUIButton", {
     Name = spec.name,
-    Position = Vector2.New(spec.x, spec.y),
-    Size = Vector2.New(spec.w, spec.h),
+    Parent = spec.parent or ctx.root_node,
+    Position = Tokens.vec2(spec.x, spec.y),
+    Size = Tokens.vec2(spec.w, spec.h),
+    ButtonText = "",
+    NormalImage = img,
+    PressImage = img,
+    DisableImage = img,
   })
   btn.TouchEnabled = spec.touch ~= false
+  btn.SwallowTouchEnabled = spec.swallow ~= false
   btn.ButtonText = ""
-  btn.NormalImage = BUTTON_IMAGE
-  btn.PressImage = BUTTON_IMAGE
-  btn.DisableImage = BUTTON_IMAGE
+  btn.NormalImage = img
+  btn.PressImage = img
+  btn.DisableImage = img
   local normal = spec.normal or HudWidgets.BUTTON_COLORS.NORMAL
   local press = spec.press or HudWidgets.BUTTON_COLORS.PRESS
-  local disable = HudWidgets.BUTTON_COLORS.DISABLED
+  local disable = spec.disabled or HudWidgets.BUTTON_COLORS.DISABLED
   btn.ButtonNormalColor = ViewUtil.color(normal)
   btn.ButtonPressColor = ViewUtil.color(press)
   btn.ButtonDisableColor = ViewUtil.color(disable)
+  if img == BUTTON_IMAGE then
+    pcall(function() btn.StretchArea = Tokens.vec4(24, 24, 24, 24) end) -- 离线测试替身无 StretchArea 时安全跳过
+  end
   if spec.visible ~= nil then
     btn.Visible = spec.visible
   end
-  if spec.z_order ~= nil then
-    btn.LocalZOrder = spec.z_order
-  end
+  btn.LocalZOrder = spec.z_order or Tokens.Z.HUD_CONTENT
   return btn
 end
 
+--- HUD 标签（委托 Primitives.label，默认圆体白字 + 轻量描边 + 禁用阴影与触控）。
 ---@param ctx table RootView 上下文
 ---@param scope table EffectBuilder
----@param spec table { name, x, y, w, h, text?, font_size?, text_color?, z_order?, visible? }
+---@param spec table { name, x, y, w, h, parent?, text?, font_size?, bold?, text_color?, outline?, outline_color?, align_x?, align_y?, z_order?, visible? }
 ---@return table label
 function HudWidgets.label(ctx, scope, spec)
-  local label = ctx.create_node(scope, "EUITextLabel", {
-    Name = spec.name,
-    Position = Vector2.New(spec.x, spec.y),
-    Size = Vector2.New(spec.w, spec.h),
-    Text = spec.text,
-    FontSize = spec.font_size,
-    TextColor = spec.text_color,
+  return Primitives.label(scope, ctx, {
+    name = spec.name,
+    parent = spec.parent,
+    rect = Layout.rect(spec.x, spec.y, spec.w, spec.h),
+    text = spec.text,
+    font_size = spec.font_size or Tokens.FONT_SIZE.CAPTION,
+    bold = spec.bold ~= false,
+    color = spec.text_color or Tokens.COLOR.WHITE,
+    outline = spec.outline ~= false,
+    outline_color = spec.outline_color or Tokens.COLOR.OUTLINE_DARK,
+    align_x = spec.align_x ~= nil and spec.align_x or 1,
+    align_y = spec.align_y ~= nil and spec.align_y or 1,
+    z_order = spec.z_order or HudWidgets.DEFAULT_Z_ORDER,
+    visible = spec.visible,
   })
-  label.TextHorizontalAlignment = 1
-  label.TextVerticalAlignment = 1
-  label.TouchEnabled = false
-  label.SwallowTouchEnabled = false
-  label.LocalZOrder = spec.z_order or HudWidgets.DEFAULT_Z_ORDER
-  if spec.visible ~= nil then
-    label.Visible = spec.visible
-  end
-  return label
 end
 
 return HudWidgets

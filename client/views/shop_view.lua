@@ -2,11 +2,16 @@ local GameCfg = require("common.game_cfg")
 local BodyScale = require("common.body_scale")
 local Spoke = require("common.packages.spoke.api")
 local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
+local Tokens = require("client.ui.tokens")
+local Layout = require("client.ui.layout")
+local Primitives = require("client.ui.primitives")
+local Controls = require("client.ui.controls")
 local Modal = require("client.views.economy_modal")
+local ShopPanelNodes = require("client.views.shop_panel_nodes")
 local ViewUtil = require("client.views.view_util")
 local InteractPromptArbiter = require("client.views.interact_prompt_arbiter")
-local State = Spoke.State
 
+local State = Spoke.State
 local ShopView = {}
 
 ShopView.fail_text = {
@@ -67,21 +72,30 @@ function ShopView.bubble_spec(options)
       local key = "shop:" .. tostring(entry.name or entry.stand.AnchorName)
       local fallback_name = "SceneNodeShop_" .. tostring(entry.name or entry.stand.AnchorName)
       local node = ViewUtil.create_anchor_scene_node(scope, ctx, entry, GameCfg.Shop.BubbleHeight, "shop", fallback_name)
-      local title = ctx.create_node(scope, "EUITextLabel", {
-        Name = "LabelShopTitle",
-        Parent = node,
-        Text = GameCfg.Shop.HintText,
+      Primitives.label(scope, ctx, {
+        name = "LabelShopTitle",
+        parent = node,
+        rect = Layout.rect(80, 68, 160, 28),
+        text = GameCfg.Shop.HintText,
+        font_size = Tokens.FONT_SIZE.CAPTION,
+        bold = true,
+        color = Tokens.COLOR.WHITE,
+        outline = true,
+        outline_color = Tokens.COLOR.OUTLINE_DARK,
+        z_order = 1,
       })
-      title.TouchEnabled = false
-      local button = ctx.create_node(scope, "EUIButton", {
-        Name = "BtnShopEnter_" .. tostring(entry.name or entry.stand.AnchorName),
-        Parent = node,
-        ButtonText = GameCfg.Shop.HintText,
-        TouchEnabled = true,
+      Controls.button(scope, ctx, {
+        name = "BtnShopEnter_" .. tostring(entry.name or entry.stand.AnchorName),
+        parent = node,
+        rect = Layout.rect(80, 24, 160, 44),
+        text = GameCfg.Shop.HintText,
+        variant = "gold",
+        font_size = Tokens.FONT_SIZE.CAPTION,
+        z_order = 2,
+        on_click = function()
+          Modal.open_modal(ctx, "shop", { stand = entry.stand, bubbleKey = key })
+        end,
       })
-      ctx.connect(scope, button.OnClicked, function()
-        Modal.open_modal(ctx, "shop", { stand = entry.stand, bubbleKey = key })
-      end)
       scope:on_cleanup(function()
         local payload = ctx.store.modal_payload:now()
         if ctx.store.active_modal:now() == "shop" and type(payload) == "table"
@@ -151,8 +165,15 @@ end
 
 local function detail_of(ctx, row)
   if not row then
-    return { name = "", desc = "", priceText = "", limitText = "", upgradeText = "",
-      buyText = ShopView.shop_text.Buy, buyEnabled = false }
+    return {
+      name = "",
+      desc = "",
+      priceText = "",
+      limitText = "",
+      upgradeText = "",
+      buyText = ShopView.shop_text.Buy,
+      buyEnabled = false,
+    }
   end
   local goods = row.goods
   local shop = shop_state(ctx) or {}
@@ -170,8 +191,8 @@ local function detail_of(ctx, row)
   if goods.Upgrade then
     local current = row.upgrade_level or 0
     upgrade_text = current >= goods.Upgrade.level
-        and string.format(ShopView.shop_text.upgrade_owned, current)
-        or string.format(ShopView.shop_text.upgrade_target, current, goods.Upgrade.level)
+      and string.format(ShopView.shop_text.upgrade_owned, current)
+      or string.format(ShopView.shop_text.upgrade_target, current, goods.Upgrade.level)
   end
   return {
     number = row.number,
@@ -180,7 +201,7 @@ local function detail_of(ctx, row)
     icon = row.icon,
     priceText = row.priceText,
     limitText = limit > 0 and string.format(ShopView.shop_text.limit_text, bought, limit)
-        or ShopView.shop_text.no_limit,
+      or ShopView.shop_text.no_limit,
     upgradeText = upgrade_text,
     buyText = buy_text,
     buyAction = action,
@@ -188,21 +209,7 @@ local function detail_of(ctx, row)
   }
 end
 
-local function text_node(ctx, scope, parent, name)
-  return ctx.create_node(scope, "EUITextLabel", { Name = name, Parent = parent, Text = "" })
-end
-
--- 详情块五个文本节点的名字与排布（x, y, w, h 按父节点左上角语义）。
-local SHOP_DETAIL_LAYOUT = {
-  { "LabelShopDetailName", 88, 12, 224, 36 },
-  { "LabelShopDetailPrice", 118, 52, 194, 28 },
-  { "LabelShopDetailDesc", 12, 90, 300, 140 },
-  { "LabelShopDetailLimit", 12, 242, 300, 36 },
-  { "LabelShopDetailUpgrade", 12, 288, 300, 36 },
-}
-
--- 商店面板句柄：分页/选中/提示 State、面板节点与详情节点都留在句柄上；
--- 方法名沿用拆分前的局部函数名，挂载入口只做装配。
+-- 商店面板句柄：分页/选中/提示 State、面板节点与详情节点都留在句柄上。
 ---@class ShopPanelHandle: table<string, any>
 ---@type ShopPanelHandle
 local ShopBehavior = {}
@@ -227,75 +234,10 @@ function ShopBehavior.select_page(self, name)
   end)
 end
 
---- 建面板节点：金币数、列表/金币页/详情三块、分页页签与关闭按钮。
+--- 建面板节点：委托 ShopPanelNodes 保持单文件紧凑。
 ---@param self ShopPanelHandle
 function ShopBehavior.create_nodes(self)
-  local scope, ctx = self.scope, self.ctx
-  local panel = Modal.panel(scope, ctx, "ScreenShop", GameCfg.Shop.HintText)
-  self.panel = panel
-  self.coin_label = Modal.place(text_node(ctx, scope, panel, "LabelCurCoin"), 620, 60, 260, 36)
-  self.list_panel = Modal.place(ctx.create_node(scope, "EUIImage", { Name = "ShopListPanel", Parent = panel }), 20, 108, 520, 472)
-  self.list = Modal.place(ctx.create_node(scope, "EUIImage", { Name = "ShopList", Parent = self.list_panel }), 0, 0, 520, 472, 472)
-  self.coin_panel = Modal.place(ctx.create_node(scope, "EUIImage", { Name = "ShopCoinPanel", Parent = panel }), 20, 108, 860, 472)
-  self.detail_panel = Modal.place(ctx.create_node(scope, "EUIImage", { Name = "ShopDetailPanel", Parent = panel }), 556, 108, 324, 472)
-  self.hint_label = Modal.place(text_node(ctx, scope, self.coin_panel, "LabelCoinPageHint"), 40, 120, 780, 64, 472)
-  self.platform = Modal.place(ctx.create_node(scope, "EUIButton", {
-    Name = "BtnOpenPlatformShop", Parent = self.coin_panel, TouchEnabled = true,
-  }), 300, 220, 260, 60, 472)
-  Modal.place(text_node(ctx, scope, self.platform, "LabelOpenPlatformShop"), 0, 0, 260, 60, 60).Text = ShopView.shop_text.open_platform_shop
-  local detail = {}
-  for _, spec in ipairs(SHOP_DETAIL_LAYOUT) do
-    detail[spec[1]] = Modal.place(text_node(ctx, scope, self.detail_panel, spec[1]), spec[2], spec[3], spec[4], spec[5], 472)
-  end
-  self.detail = detail
-  self.detail_icon = Modal.place(ctx.create_node(scope, "EUIImage", { Name = "ImageShopDetailIcon", Parent = self.detail_panel }), 12, 12, 64, 64, 472)
-  self.detail_coin = Modal.place(ctx.create_node(scope, "EUIImage", { Name = "ImageShopDetailCoin", Parent = self.detail_panel }), 88, 54, 24, 24, 472)
-  self.buy = Modal.place(ctx.create_node(scope, "EUIButton", {
-    Name = "BtnShopBuyDetail", Parent = self.detail_panel, TouchEnabled = false,
-  }), 42, 396, 240, 56, 472)
-  self.buy_label = Modal.place(text_node(ctx, scope, self.buy, "LabelShopBuyDetail"), 0, 0, 240, 56, 56)
-
-  for index, name in ipairs(self.pages) do
-    local tab = Modal.place(ctx.create_node(scope, "EUIButton", {
-      Name = "BtnShopPage" .. index, Parent = panel, TouchEnabled = true,
-    }), 20 + (index - 1) * 144, 60, 134, 36)
-    Modal.place(text_node(ctx, scope, tab, "LabelShopPage" .. index), 0, 0, 134, 30, 36).Text = name
-    local indicator = Modal.place(ctx.create_node(scope, "EUIImage", {
-      Name = "ImageShopTabIndicator" .. index, Parent = tab,
-    }), 0, 31, 134, 5, 36)
-    indicator.Visible = index == 1
-    ctx.connect(scope, tab.OnClicked, function()
-      self:select_page(name)
-    end)
-  end
-
-  Modal.close(scope, ctx, panel, "BtnShopClose", "shop")
-end
-
---- 建一行商品：名称/价格/状态/新品/图标/底色/金币标与点击选中。
----@param self ShopPanelHandle
----@param es table
----@param row table
----@param index number
-function ShopBehavior.create_row(self, es, row, index)
-  local ctx = self.ctx
-  local col = (index - 1) % 2
-  local row_idx = math.floor((index - 1) / 2)
-  local button = Modal.place(ctx.create_node(es, "EUIButton", {
-    Name = "ShopRow" .. index, Parent = self.list, TouchEnabled = row.selectable,
-  }), 4 + col * 258, 4 + row_idx * 38, 250, 34, 472)
-  Modal.place(text_node(ctx, es, button, "ShopRowName" .. index), 36, 3, 104, 28, 34).Text = row.name
-  Modal.place(text_node(ctx, es, button, "ShopRowPrice" .. index), 164, 3, 40, 28, 34).Text = row.priceText
-  Modal.place(text_node(ctx, es, button, "ShopRowState" .. index), 206, 3, 40, 14, 34).Text = row.stateText
-  Modal.place(text_node(ctx, es, button, "ShopRowNew" .. index), 206, 17, 40, 14, 34).Text = row.newText
-  local icon = Modal.place(ctx.create_node(es, "EUIImage", { Name = "ShopRowIcon" .. index, Parent = button }), 4, 3, 28, 28, 34)
-  icon.Visible = row.icon ~= nil and row.icon ~= ""
-  if row.icon then icon.Image = row.icon end
-  Modal.place(ctx.create_node(es, "EUIImage", { Name = "ShopRowBackground" .. index, Parent = button }), 0, 0, 250, 34, 34)
-  Modal.place(ctx.create_node(es, "EUIImage", { Name = "ShopRowCoin" .. index, Parent = button }), 142, 7, 20, 20, 34)
-  ctx.connect(es, button.OnClicked, function()
-    if row.selectable then self.selected:set(index) end
-  end)
+  ShopPanelNodes.create_nodes(self, ShopView.shop_text)
 end
 
 --- 商品行与详情投影：切页可见性、页签高亮、行节点重建与详情文案。
@@ -314,12 +256,17 @@ function ShopBehavior.on_rows_and_detail(self, es)
   self.detail_panel.Visible = current_page ~= self.coin_page
   self.hint_label.Text = es:d(self.hint) or ""
   for index, name in ipairs(self.pages) do
-    local indicator = self.panel:FindFirstChild("ImageShopTabIndicator" .. index, true)
-    if indicator then indicator.Visible = name == current_page end
+    local is_active = name == current_page
+    if self.tab_buttons[index] then
+      Controls.set_button_style(self.tab_buttons[index], is_active and "primary" or "surface")
+    end
+    if self.tab_indicators[index] then
+      self.tab_indicators[index].Visible = is_active
+    end
   end
   local rows = self:current_rows()
   for index, row in ipairs(rows) do
-    self:create_row(es, row, index)
+    ShopPanelNodes.create_row(self, es, row, index, index == current_selected)
   end
   local row = rows[current_selected or 0]
   local model = detail_of(ctx, row)
@@ -329,10 +276,15 @@ function ShopBehavior.on_rows_and_detail(self, es)
   self.detail.LabelShopDetailLimit.Text = model.limitText
   self.detail.LabelShopDetailUpgrade.Text = model.upgradeText
   self.buy_label.Text = model.buyText
+  local buy_variant = model.buyAction == "buy" and "gold"
+    or model.buyAction == "coin" and "blue"
+    or "disabled"
+  Controls.set_button_style(self.buy, buy_variant)
+  -- #235：Disabled=true 会关闭 TouchEnabled；锁定行需要保留点击以弹出原因提示，故先写 Disabled 再写 TouchEnabled。
   self.buy.Disabled = not model.buyEnabled
   self.buy.TouchEnabled = row ~= nil
   self.detail_icon.Visible = row ~= nil and model.icon ~= nil and model.icon ~= ""
-  if model.icon then self.detail_icon.Image = model.icon end
+  if model.icon ~= nil and model.icon ~= "" then self.detail_icon.Image = model.icon end
   self.detail_coin.Visible = row ~= nil
 end
 
@@ -392,6 +344,8 @@ local function mount(scope, ctx)
     selected = State.new("ShopView.selected", nil),
     hint = State.new("ShopView.hint", ShopView.shop_text.coin_page_hint),
     panel = nil,
+    tab_buttons = {},
+    tab_indicators = {},
     coin_label = nil,
     list_panel = nil,
     list = nil,

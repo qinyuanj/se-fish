@@ -1,8 +1,16 @@
 local GameCfg = require("common.game_cfg")
+local Tokens = require("client.ui.tokens")
+local Layout = require("client.ui.layout")
+local Primitives = require("client.ui.primitives")
+local Controls = require("client.ui.controls")
 local Modal = require("client.views.economy_modal")
 local ViewUtil = require("client.views.view_util")
 
 local PlatformShopView = {}
+
+local PANEL_W = 928
+local PANEL_H = 640
+local PAD = Tokens.SPACE.PANEL_PAD
 
 --- 商品清单：占位页 CoinPage 的 Offer 加两种肾上腺素商品。
 ---@return table[]
@@ -17,25 +25,53 @@ local function platform_definitions()
   return definitions
 end
 
--- 地图商店面板句柄：面板节点、请求序号与可买动作表都留在句柄上；
--- 方法名沿用拆分前的局部函数名，挂载入口只做装配。
+-- 地图商店面板句柄：面板节点、请求序号与可买动作表都留在句柄上。
 ---@class PlatformShopPanelHandle: table<string, any>
 ---@type PlatformShopPanelHandle
 local PlatformShopBehavior = {}
 
---- 建面板节点：结果行、关闭按钮与逐个商品按钮。
+--- 建面板节点：浅奶白底板 + 顶部提示卡片 + 2 列商品卡片网格。
 ---@param self PlatformShopPanelHandle
 function PlatformShopBehavior.create_nodes(self)
   local scope, ctx = self.scope, self.ctx
-  local panel = Modal.panel(scope, ctx, "ScreenPlatform", "地图商店")
+  local panel = Modal.panel(scope, ctx, "ScreenPlatform", "地图商店", {
+    width = PANEL_W,
+    height = PANEL_H,
+    close_name = "BtnPlatformClose",
+    modal_id = "platform",
+  })
   self.panel = panel
-  self.result_label = Modal.place(Modal.label(scope, ctx, panel, "LabelPlatformResult", "请选择商品"), 20, 64, 860, 64)
-  Modal.close(scope, ctx, panel, "BtnPlatformClose", "platform")
+
+  local content_w = PANEL_W - PAD * 2
+  local result_card = Modal.surface(scope, ctx, panel, "PlatformResultCard",
+    Layout.from_top_left(PANEL_H, PAD, 84, content_w, 72), { z_order = 1 })
+  self.result_label = Primitives.label(scope, ctx, {
+    name = "LabelPlatformResult",
+    parent = result_card,
+    rect = Layout.from_top_left(72, 20, 12, content_w - 40, 48),
+    text = "请选择商品",
+    font_size = Tokens.FONT_SIZE.BODY,
+    bold = true,
+    color = Tokens.COLOR.TEXT_DARK,
+    align_x = 1,
+    align_y = 1,
+    z_order = 2,
+  })
+
   for index, offer in ipairs(platform_definitions()) do
-    local button = Modal.button(scope, ctx, panel, "BtnPlatformOffer_" .. offer.key, offer.name or offer.key, function()
-      self:send_action(offer.key)
-    end)
-    self.buttons[offer.key] = Modal.place(button, 20 + ((index - 1) % 2) * 440, 148 + math.floor((index - 1) / 2) * 72, 420, 56)
+    local rect = Layout.grid_cell(PANEL_H, PAD, 176, 2, index, 420, 72, 24, 20)
+    self.buttons[offer.key] = Controls.button(scope, ctx, {
+      name = "BtnPlatformOffer_" .. offer.key,
+      parent = panel,
+      rect = rect,
+      text = offer.name or offer.key,
+      variant = "gold",
+      font_size = Tokens.FONT_SIZE.BODY,
+      z_order = 2,
+      on_click = function()
+        self:send_action(offer.key)
+      end,
+    })
   end
   self:refresh_buttons()
 end
@@ -49,9 +85,9 @@ function PlatformShopBehavior.refresh_buttons(self)
   local actions = self.actions
   local awaiting = self.awaiting
   for key, button in pairs(self.buttons) do
-    button.Visible = actions[key] ~= nil and not awaiting
-    button.TouchEnabled = actions[key] ~= nil and not awaiting
-    button.Disabled = awaiting
+    local active = actions[key] ~= nil and not awaiting
+    button.Visible = active
+    Controls.set_button_enabled(button, active, "gold")
   end
 end
 
@@ -82,7 +118,7 @@ local function apply_shop_offers(self, result)
     local button = self.buttons[offer.key]
     if button then
       self.actions[offer.key] = result.action == "CoinShop" and "BuyCoin" or "Purchase"
-      Modal.set_button_text(button, string.format("%s（%s）", offer.name or offer.key,
+      Controls.set_button_text(button, string.format("%s（%s）", offer.name or offer.key,
         tostring(offer.price or offer.beans or 0)))
     end
   end
@@ -131,7 +167,7 @@ function PlatformShopBehavior.on_result_projection(self, es)
   self:refresh_buttons()
 end
 
---- 挂载地图商店：造句柄、建节点、接回包投影与帧订阅。
+--- 挂载地图商店：造句柄、建节点、接回包投影。
 ---@param scope table
 ---@param ctx table
 local function mount(scope, ctx)
@@ -146,16 +182,22 @@ function PlatformShopView.entry_spec()
   return {
     name = "PlatformShopEntry",
     mount = function(scope, ctx)
-      local button = Modal.button(scope, ctx, ctx.root_node, "BtnMapShopEntry", "地图商店", function()
-        local services = ctx.services or {}
-        if type(services.open_modal) == "function" then services.open_modal("platform") end
-        if type(services.send_platform) == "function" then services.send_platform({ action = "OpenCoinShop" }) end
-      end)
-      local rect = type((ctx.services or {}).hud_entry_rect) == "function" and ctx.services.hud_entry_rect("ShopEntry") or nil
-      if rect then
-        button.Position = Vector2.New(rect.x, rect.y)
-        button.Size = Vector2.New(rect.w, rect.h)
-      end
+      local services = ctx.services or {}
+      local rect = type(services.hud_entry_rect) == "function" and services.hud_entry_rect("ShopEntry") or nil
+      local btn = Controls.button(scope, ctx, {
+        name = "BtnMapShopEntry",
+        parent = ctx.root_node,
+        rect = rect or Layout.rect(100, 220, 112, 48),
+        text = "地图商店",
+        variant = "hud",
+        font_size = Tokens.FONT_SIZE.BODY,
+        z_order = Tokens.Z.HUD_CONTENT,
+        on_click = function()
+          if type(services.open_modal) == "function" then services.open_modal("platform") end
+          if type(services.send_platform) == "function" then services.send_platform({ action = "OpenCoinShop" }) end
+        end,
+      })
+      if rect then Layout.apply(btn, rect) end
     end,
   }
 end

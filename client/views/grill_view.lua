@@ -1,14 +1,27 @@
-
 local BodyScale = require("common.body_scale")
 local GameCfg = require("common.game_cfg")
 local GrillCurve = require("common.grill_curve")
 local Spoke = require("common.packages.spoke.api")
+local Tokens = require("client.ui.tokens")
+local Layout = require("client.ui.layout")
+local Primitives = require("client.ui.primitives")
+local Controls = require("client.ui.controls")
 local ViewUtil = require("client.views.view_util")
 local InteractPromptArbiter = require("client.views.interact_prompt_arbiter")
 
 local State = Spoke.State
 
 local GrillView = {}
+
+-- 烤架进度操作面板尺寸（中下方安全带 y ∈ [176, 276]，避开 EquipBottom 与 CenterClear）。
+local PANEL_W = 720
+local PANEL_H = 100
+local PANEL_BOTTOM = 176
+local PAD_X = 20
+local TAKEOUT_W = 132
+local CLOSE_W = 96
+local BTN_H = 56
+local BTN_GAP = 12
 
 local function cfg()
   return GameCfg.Grill
@@ -87,7 +100,7 @@ end
 ---@type GrillHandle
 local GrillBehavior = {}
 
---- 刷新时间与倍率两行；文案没变就不写节点。
+--- 刷新时间、倍率与进度条；文案没变就不写节点。
 ---@param self GrillHandle
 ---@param snapshot table|nil
 function GrillBehavior.render_progress(self, snapshot)
@@ -114,6 +127,11 @@ function GrillBehavior.render_progress(self, snapshot)
     self.last_rate_text = rate_text
     self.rate_label.Text = rate_text
   end
+  if self.progress ~= nil then
+    local burn_sec = cfg().BurnSec or 4.5
+    local pct = burn_sec > 0 and math.max(0, math.min(100, (elapsed / burn_sec) * 100)) or 0
+    self.progress.set_percent(pct)
+  end
 end
 
 --- 焦糊提示每轮只发一次。
@@ -124,56 +142,111 @@ function GrillBehavior.notice_burnt(self)
   ViewUtil.notify(self.ctx, cfg().BurntText)
 end
 
---- 建面板节点并接标签投影、逐帧刷新与取餐/关闭按钮。
+--- 建烤架深海蓝半透明胶囊面板、进度条与取出/关闭操作按钮（全量 4px 栅格中心排版，零文字重叠）。
 ---@param self GrillHandle
 ---@param ps table phase scope
 function GrillBehavior.mount_panel(self, ps)
   local ctx, shared = self.ctx, self.shared
-  local panel = ctx.create_node(ps, "EUIImage", {
-    Name = "GrillPanel",
-    Visible = true,
+  local res = Primitives.resolution(ctx, self.options) or { x = 1920, y = 1080 }
+  local panel_w = math.min(PANEL_W, Layout.snap4(res.x - 64, 560))
+  local panel = Primitives.capsule(ps, ctx, {
+    name = "GrillPanel",
+    rect = Layout.bottom_center(res.x, PANEL_BOTTOM, panel_w, PANEL_H),
+    z_order = Tokens.Z.HUD_POPUP_BG,
+    visible = true,
   })
-  local title = ctx.create_node(ps, "EUITextLabel", {
-    Name = "GrillTitle",
-    Parent = panel,
-    Text = "",
+  panel.TouchEnabled = true
+  panel.SwallowTouchEnabled = true
+
+  local left_w = panel_w - PAD_X * 2 - TAKEOUT_W - BTN_GAP - CLOSE_W - 16
+  local rate_w = 116
+  local time_w = 144
+  local title_w = math.max(88, left_w - time_w - rate_w - 16)
+
+  local title = Primitives.label(ps, ctx, {
+    name = "GrillTitle",
+    parent = panel,
+    rect = Layout.from_top_left(PANEL_H, PAD_X, 8, title_w, 32),
+    text = "",
+    font_size = Tokens.FONT_SIZE.BODY,
+    bold = true,
+    color = Tokens.COLOR.TEXT_GOLD,
+    outline = true,
+    outline_color = Tokens.COLOR.OUTLINE_DARK,
+    align_x = 0,
+    align_y = 1,
+    z_order = 1,
   })
-  local time_label = ctx.create_node(ps, "EUITextLabel", {
-    Name = "GrillTime",
-    Parent = panel,
-    Text = "",
+
+  local time_label = Primitives.label(ps, ctx, {
+    name = "GrillTime",
+    parent = panel,
+    rect = Layout.from_top_left(PANEL_H, PAD_X + title_w + 8, 8, time_w, 32),
+    text = "",
+    font_size = Tokens.FONT_SIZE.CAPTION,
+    bold = true,
+    color = Tokens.COLOR.WHITE,
+    outline = true,
+    outline_color = Tokens.COLOR.OUTLINE_DARK,
+    align_x = 1,
+    align_y = 1,
+    z_order = 1,
   })
-  local rate_label = ctx.create_node(ps, "EUITextLabel", {
-    Name = "GrillRate",
-    Parent = panel,
-    Text = "",
+
+  local rate_label = Primitives.label(ps, ctx, {
+    name = "GrillRate",
+    parent = panel,
+    rect = Layout.from_top_left(PANEL_H, PAD_X + title_w + 8 + time_w + 8, 8, rate_w, 32),
+    text = "",
+    font_size = Tokens.FONT_SIZE.CAPTION,
+    bold = true,
+    color = Tokens.COLOR.TEXT_GOLD,
+    outline = true,
+    outline_color = Tokens.COLOR.OUTLINE_DARK,
+    align_x = 2,
+    align_y = 1,
+    z_order = 1,
   })
-  local takeout = ctx.create_node(ps, "EUIButton", {
-    Name = "GrillTakeout",
-    Parent = panel,
-    ButtonText = cfg().TakeoutText,
+
+  local progress = Controls.progress_bar(ps, ctx, {
+    name = "GrillProgress",
+    parent = panel,
+    rect = Layout.from_top_left(PANEL_H, PAD_X, 52, left_w, 36),
+    fill_color = Tokens.COLOR.HUNGER,
+    percent = 0,
+    text = "",
+    font_size = Tokens.FONT_SIZE.CAPTION,
+    z_order = 1,
   })
-  takeout.TouchEnabled = true
-  local takeout_text = ctx.create_node(ps, "EUITextLabel", {
-    Name = "GrillTakeoutText",
-    Parent = takeout,
-    Text = cfg().TakeoutText,
+
+  Controls.button(ps, ctx, {
+    name = "GrillTakeout",
+    parent = panel,
+    rect = Layout.from_top_right(panel_w, PANEL_H, PAD_X + CLOSE_W + BTN_GAP, 22, TAKEOUT_W, BTN_H),
+    text = cfg().TakeoutText,
+    variant = "gold",
+    font_size = Tokens.FONT_SIZE.BODY,
+    z_order = 2,
+    on_click = function()
+      send_grill(ctx, shared, "Takeout")
+    end,
   })
-  takeout_text.Visible = true
-  local close_btn = ctx.create_node(ps, "EUIButton", {
-    Name = "GrillClose",
-    Parent = panel,
-    ButtonText = "关闭",
+
+  Controls.button(ps, ctx, {
+    name = "GrillClose",
+    parent = panel,
+    rect = Layout.from_top_right(panel_w, PANEL_H, PAD_X, 22, CLOSE_W, BTN_H),
+    text = "关闭",
+    variant = "blue",
+    font_size = Tokens.FONT_SIZE.BODY,
+    z_order = 2,
+    on_click = function()
+      shared.panel_hidden:set(true)
+    end,
   })
-  close_btn.TouchEnabled = true
-  local close_text = ctx.create_node(ps, "EUITextLabel", {
-    Name = "GrillCloseText",
-    Parent = close_btn,
-    Text = "关闭",
-  })
-  close_text.Visible = true
 
   self.panel, self.title, self.time_label, self.rate_label = panel, title, time_label, rate_label
+  self.progress = progress
   self.last_time_text, self.last_rate_text = nil, nil
 
   ps:effect("GrillLabels", function(es)
@@ -189,14 +262,6 @@ function GrillBehavior.mount_panel(self, ps)
       return
     end
     self:render_progress(snapshot)
-  end)
-
-  ctx.connect(ps, takeout.OnClicked, function()
-    send_grill(ctx, shared, "Takeout")
-  end)
-
-  ctx.connect(ps, close_btn.OnClicked, function()
-    shared.panel_hidden:set(true)
   end)
 end
 
@@ -272,6 +337,7 @@ function GrillView.mount(scope, ctx, options)
     title = nil,
     time_label = nil,
     rate_label = nil,
+    progress = nil,
     last_time_text = nil,
     last_rate_text = nil,
   }
@@ -329,16 +395,20 @@ function GrillView.bubble_spec(options)
       local node = ViewUtil.create_anchor_scene_node(
         scope, ctx, entry, cfg().BubbleHeight, "grill", "SceneNodeGrill_" .. suffix
       )
-      local button = ctx.create_node(scope, "EUIButton", {
-        Name = "BtnGrill" .. suffix,
-        Parent = node,
-        ButtonText = cfg().BubbleText,
-        TouchEnabled = true,
-        Visible = true,
+      local bw = Layout.snap4(GameCfg.InteractionBubble.Width, 160)
+      local bh = Layout.snap4(GameCfg.InteractionBubble.Height, 64)
+      Controls.button(scope, ctx, {
+        name = "BtnGrill" .. suffix,
+        parent = node,
+        rect = Layout.rect(bw / 2, bh / 2, bw, bh),
+        text = cfg().BubbleText,
+        variant = "gold",
+        font_size = Tokens.FONT_SIZE.BUTTON,
+        z_order = 1,
+        on_click = function()
+          click_grill(ctx, shared)
+        end,
       })
-      ctx.connect(scope, button.OnClicked, function()
-        click_grill(ctx, shared)
-      end)
     end,
   }
 end

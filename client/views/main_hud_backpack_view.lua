@@ -2,13 +2,13 @@
 -- 挂载于 RootView 常驻 HUD 槽位，订阅只读 ClientStore.item_bar；
 -- 常驻入口 BtnBackpack 实时显示「背包 N 格」并随道具栏扩容重排；
 -- 展开态 BackpackPanel 由 Phase + Dock 管理 BackpackSlot1..N 与转入道具栏按钮生命周期；
--- 通过共享 backpack_open / open_popup 信号与回调协同控制展开遮挡（关闭装备浮层、隐藏底部装备栏与动作键）；
--- 关闭面板、重连或根 UI 销毁均自动零残留销毁节点与信号连接。
+-- 通过共享 backpack_open / open_popup 信号与回调协同控制展开遮挡（关闭装备浮层、隐藏底部装备栏与动作键）。
 
 local Spoke = require("common.packages.spoke.api")
 local GameCfg = require("common.game_cfg")
 local Number = require("common.number")
 local MainHudLayout = require("client.main_hud_layout")
+local Tokens = require("client.ui.tokens")
 local ViewUtil = require("client.views.view_util")
 local HudWidgets = require("client.views.hud_widgets")
 local MainHudBackpackPanel = require("client.views.main_hud_backpack_panel")
@@ -20,7 +20,6 @@ local MainHudBackpackView = {}
 local COLORS = MainHudBackpackPanel.COLORS
 
 local make_color = ViewUtil.color
-
 
 -- 背包视图句柄：开关信号、选中格、命中矩形与注入回调留在视图句柄上；
 -- 方法名沿用拆分前的局部函数名，挂载入口只做装配并返回对外句柄。
@@ -88,15 +87,22 @@ function BackpackBehavior.release(self)
   end
 end
 
---- 建常驻背包入口按钮与同级文案（EUIButton 不写 Color，文字置于同级高 ZOrder EUITextLabel）。
+--- 建常驻背包入口按钮与同级圆体描边文案（严禁写 ButtonText，层级走 Tokens.Z）。
 ---@param self MainHudBackpackHandle
 function BackpackBehavior.create_entry_nodes(self)
   local ctx, s = self.ctx, self.s
   local entry_rect = self.initial_layout.rects.backpack_button
   self.btn_backpack = HudWidgets.button(ctx, s, {
-    name = "BtnBackpack", x = entry_rect.x, y = entry_rect.y, w = entry_rect.w, h = entry_rect.h,
+    name = "BtnBackpack",
+    x = entry_rect.x,
+    y = entry_rect.y,
+    w = entry_rect.w,
+    h = entry_rect.h,
+    normal = COLORS.NORMAL,
+    press = COLORS.PRESS,
+    disabled = COLORS.DISABLED,
+    z_order = Tokens.Z.HUD_CONTENT,
   })
-  self.btn_backpack.LocalZOrder = 6
   self.label_backpack = HudWidgets.label(ctx, s, {
     name = "LabelBackpack",
     x = entry_rect.x,
@@ -104,9 +110,11 @@ function BackpackBehavior.create_entry_nodes(self)
     w = entry_rect.w,
     h = entry_rect.h,
     text = "背包",
-    font_size = 22,
+    font_size = Tokens.FONT_SIZE.CAPTION,
+    bold = true,
+    outline = true,
     text_color = make_color(COLORS.WHITE),
-    z_order = 7,
+    z_order = Tokens.Z.HUD_ACCENT,
   })
 end
 
@@ -121,7 +129,7 @@ function BackpackBehavior.bind_entry_click(self)
   end)
 end
 
---- 入口投影：排版、关屏显隐与容量文案。
+--- 入口投影：排版、关屏显隐、展开期提层与容量文案。
 ---@param self MainHudBackpackHandle
 ---@param es table
 function BackpackBehavior.project_entry(self, es)
@@ -136,6 +144,8 @@ function BackpackBehavior.project_entry(self, es)
   self.btn_backpack.Visible = hud_visible
   self.btn_backpack.TouchEnabled = hud_visible
   self.label_backpack.Visible = hud_visible
+  self.btn_backpack.LocalZOrder = (hud_visible and is_open) and Tokens.Z.BACKPACK_CONTENT or Tokens.Z.HUD_CONTENT
+  self.label_backpack.LocalZOrder = (hud_visible and is_open) and Tokens.Z.BACKPACK_LABEL or Tokens.Z.HUD_ACCENT
   self.btn_backpack.ButtonNormalColor = make_color((hud_visible and is_open) and COLORS.SELECTED or COLORS.NORMAL)
 
   self.label_backpack.Text = backpack_entry_text(state)

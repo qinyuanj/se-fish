@@ -10,6 +10,8 @@ local LotteryView = require("client.views.lottery_view")
 local BlindboxView = require("client.views.blindbox_view")
 local GMView = require("client.views.gm_view")
 local ShopView = require("client.views.shop_view")
+local StoryView = require("client.views.story_view")
+local FishermanView = require("client.views.fisherman_view")
 local Eui = require("tests.support.eui_double")
 
 local function child(root, name)
@@ -35,9 +37,13 @@ local function is_background_node(node)
   return tostring(node.Name or ""):match("^ShopRowBackground") ~= nil
 end
 
-local function has_visible_text(node, text)
+local function has_single_source_button_label(node)
+  -- ShopRow 为多子标签商品卡片（icon_only），由 ShopRowName/Price/State 构成，不走单标签约定
+  if tostring(node.Name or ""):match("^ShopRow%d+$") then
+    return true
+  end
   for _, child_node in pairs(node.children) do
-    if child_node.Visible ~= false and child_node.Text == text and (child_node.FontSize or 0) > 0 then
+    if child_node.Kind == "EUITextLabel" and child_node.Visible ~= false and (child_node.FontSize or 0) > 0 then
       return true
     end
   end
@@ -69,9 +75,14 @@ local function assert_tree_layout_valid(parent, modal_label)
       if not is_background_node(node) then
         siblings[#siblings + 1] = { node = node, l = l, r = r, b = b, t = t }
       end
-      if node.Kind == "EUIButton" and type(node.ButtonText) == "string" and node.ButtonText ~= ""
-          and not has_visible_text(node, node.ButtonText) then
-        error(string.format("%s 按钮 %s 缺少可见文字", modal_label, tostring(node.Name)))
+      if node.Kind == "EUIButton" then
+        if type(node.ButtonText) == "string" and node.ButtonText ~= "" then
+          error(string.format("%s 按钮 %s 违规写入原生 ButtonText=%q（应清空防双字重影）",
+            modal_label, tostring(node.Name), node.ButtonText))
+        end
+        if not has_single_source_button_label(node) then
+          error(string.format("%s 按钮 %s 缺少可见子标签", modal_label, tostring(node.Name)))
+        end
       end
       if next(node.children) ~= nil then
         assert_tree_layout_valid(node, modal_label)
@@ -125,6 +136,9 @@ describe("弹窗定位与配色", function()
         blindbox = BlindboxView.modal_spec(),
         gm = GMView.modal_spec(),
         shop = ShopView.modal_spec(),
+        story = StoryView.modal_spec(),
+        fisherman = FishermanView.modal_spec(),
+        confirm = FishermanView.confirm_modal_spec(),
       },
       create_node = function(kind, props)
         local node = Eui.node({
@@ -135,9 +149,11 @@ describe("弹窗定位与配色", function()
           Text = props and props.Text,
           Position = props and props.Position,
           Size = props and props.Size,
+          Opacity = props and props.Opacity,
           TouchEnabled = kind == "EUIButton",
         })
         node.FontSize = props and props.FontSize
+        if props and props.Image ~= nil then node.Image = props.Image end
         if props and props.ButtonText ~= nil then
           node.ButtonText = props.ButtonText
         end
@@ -151,12 +167,16 @@ describe("弹窗定位与配色", function()
     _G.Vector2, _G.Color = oldVector, oldColor
   end)
 
-  it("面板落在界面中心，不再钉在左下角", function()
+  it("面板落在界面中心并挂载 14588 半透遮罩，不再钉在左下角", function()
     Eui.click(child(root, "BtnCompendiumEntry"))
     local panel = child(root, "ScreenCompendium")
+    local backdrop = child(root, "ScreenCompendium_backdrop")
     assert.is_not_nil(panel)
     assert.are.equal(1140, panel.Position.x)
     assert.are.equal(540, panel.Position.y)
+    assert.is_not_nil(backdrop)
+    assert.are.equal("official://image/14588", backdrop.Image)
+    assert.is_true(backdrop.Opacity > 0.3 and backdrop.Opacity < 0.9)
   end)
 
   it("面板与入口按钮都带不透明底色", function()
@@ -164,6 +184,8 @@ describe("弹窗定位与配色", function()
     assert.is_not_nil(entry)
     assert.is_not_nil(entry.ButtonNormalColor)
     assert.is_true(entry.ButtonNormalColor.a > 200)
+    assert.are.equal("", entry.ButtonText)
+    assert.is_not_nil(entry:FindFirstChild("LabelButtonText", false))
 
     Eui.click(entry)
     local panel = child(root, "ScreenCompendium")
@@ -172,7 +194,7 @@ describe("弹窗定位与配色", function()
     assert.is_true(panel.Color.a > 200)
   end)
 
-  it("图鉴弹窗内部控件按中心语义自上而下排布、互不重叠且不越出面板", function()
+  it("图鉴弹窗内部控件按中心语义自上而下排布、列表行用纯容器且零重叠", function()
     Eui.click(child(root, "BtnCompendiumEntry"))
     local panel = child(root, "ScreenCompendium")
     assert_tree_layout_valid(panel, "图鉴")
@@ -181,13 +203,14 @@ describe("弹窗定位与配色", function()
     local page1 = child(panel, "BtnCompendiumPage_1")
     local grade1 = child(panel, "BtnCompendiumGrade_normal")
     local summary = child(panel, "LabelCompendiumSummary")
-    local detail = child(panel, "LabelCompendiumDetail")
+    local detail_card = child(panel, "CompendiumDetailCard")
     local fish_btn = child(panel, "BtnCompendiumFish_bass")
+    assert.are.equal("EUILayout", fish_btn.Parent.Kind)
     assert.is_true(title.Position.y > page1.Position.y)
     assert.is_true(page1.Position.y > grade1.Position.y)
     assert.is_true(grade1.Position.y > summary.Position.y)
-    assert.is_true(summary.Position.y > detail.Position.y)
-    assert.is_true(detail.Position.y > fish_btn.Parent.Position.y)
+    assert.is_true(summary.Position.y > detail_card.Position.y)
+    assert.is_true(summary.Position.y > fish_btn.Parent.Position.y)
     assert.is_true(fish_btn.Position.x > 0 and fish_btn.Position.y > 0)
 
     Eui.click(child(root, "BtnCompendiumGrade_rare"))
@@ -196,7 +219,7 @@ describe("弹窗定位与配色", function()
     assert_tree_layout_valid(panel, "图鉴第二区极品页")
   end)
 
-  it("地图商店、抽奖机、盲盒、GM、钓场商店弹窗内部控件互不重叠且不越出面板", function()
+  it("地图商店、抽奖机、盲盒、GM、钓场商店、剧情与钓鱼佬弹窗均零重叠、零双字且不越界", function()
     writer:open_modal("platform")
     writer:ingest_event("PlatformResult", {
       action = "CoinShop",
@@ -215,10 +238,19 @@ describe("弹窗定位与配色", function()
     assert_tree_layout_valid(child(root, "ScreenGM"), "GM")
 
     writer:open_modal("shop", { stand = GameCfg.Shop.Stands[#GameCfg.Shop.Stands] })
-    assert_tree_layout_valid(child(root, "ScreenShop"), "钓场商店(默认页)")
+    assert_tree_layout_valid(child(root, "PanelShop"), "钓场商店(默认页)")
     Eui.click(child(root, "BtnShopPage3"))
-    assert_tree_layout_valid(child(root, "ScreenShop"), "钓场商店(升级页)")
+    assert_tree_layout_valid(child(root, "PanelShop"), "钓场商店(升级页)")
     Eui.click(child(root, "BtnShopPage4"))
-    assert_tree_layout_valid(child(root, "ScreenShop"), "钓场商店(金币页)")
+    assert_tree_layout_valid(child(root, "PanelShop"), "钓场商店(金币页)")
+
+    writer:open_modal("story", { title = "开场", lines = { "欢迎来到钓场" }, read_key = "opening" })
+    assert_tree_layout_valid(child(root, "ScreenStory"), "剧情弹窗")
+
+    writer:open_modal("fisherman", { zoneId = GameCfg.Zones[1].Id })
+    assert_tree_layout_valid(child(root, "PanelFisherman"), "钓鱼佬对话弹窗")
+
+    writer:open_modal("confirm", { msg = "确认交付信物？" })
+    assert_tree_layout_valid(child(root, "PanelConfirm"), "确认弹窗")
   end)
 end)

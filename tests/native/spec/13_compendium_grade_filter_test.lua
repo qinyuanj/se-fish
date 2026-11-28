@@ -26,12 +26,19 @@ local function visible_fish_ids(panel)
   return ids
 end
 
+local function btn_label_text(btn)
+  assert.same("", btn.ButtonText or "", tostring(btn.Name) .. " 必须清空原生 ButtonText 防重影")
+  local sub = btn:FindFirstChild("LabelButtonText", false)
+  assert.is_not_nil(sub, tostring(btn.Name) .. " 缺少子 LabelButtonText")
+  return sub.Text
+end
+
 local function rects_overlap(a, b)
-  local ax1, ay1 = a.Position.x, a.Position.y
-  local ax2, ay2 = ax1 + a.Size.x, ay1 + a.Size.y
-  local bx1, by1 = b.Position.x, b.Position.y
-  local bx2, by2 = bx1 + b.Size.x, by1 + b.Size.y
-  return ax1 < bx2 and ax2 > bx1 and ay1 < by2 and ay2 > by1
+  local ax1, ax2 = a.Position.x - a.Size.x / 2, a.Position.x + a.Size.x / 2
+  local ay1, ay2 = a.Position.y - a.Size.y / 2, a.Position.y + a.Size.y / 2
+  local bx1, bx2 = b.Position.x - b.Size.x / 2, b.Position.x + b.Size.x / 2
+  local by1, by2 = b.Position.y - b.Size.y / 2, b.Position.y + b.Size.y / 2
+  return ax1 < bx2 - 0.01 and ax2 > bx1 + 0.01 and ay1 < by2 - 0.01 and ay2 > by1 + 0.01
 end
 
 describe("条款 13-03：图鉴四档品级筛选与七区分页正交", function()
@@ -99,7 +106,7 @@ describe("条款 13-03：图鉴四档品级筛选与七区分页正交", functio
     for _, item in ipairs(expected) do
       local grade_btn = child(panel, "BtnCompendiumGrade_" .. item.id)
       assert.is_not_nil(grade_btn)
-      assert.same(item.label, grade_btn.ButtonText)
+      assert.same(item.label, btn_label_text(grade_btn))
       assert.is_true(grade_btn.TouchEnabled)
       buttons[#buttons + 1] = grade_btn
     end
@@ -177,11 +184,11 @@ describe("条款 13-03：图鉴四档品级筛选与七区分页正交", functio
     })
 
     assert.matches("已收集 1/98", child(panel, "LabelCompendiumSummary").Text, 1, true)
-    assert.same("？？？", child(panel, "BtnCompendiumFish_bass").ButtonText)
+    assert.same("？？？", btn_label_text(child(panel, "BtnCompendiumFish_bass")))
 
     Eui.click(child(panel, "BtnCompendiumGrade_elite"))
     local eel_btn = child(panel, "BtnCompendiumFish_eel")
-    assert.same("电鳗", eel_btn.ButtonText)
+    assert.same("电鳗", btn_label_text(eel_btn))
     Eui.click(eel_btn)
     assert.same("eel", sent.records[#sent.records])
 

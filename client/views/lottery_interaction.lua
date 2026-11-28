@@ -1,10 +1,16 @@
 local GameCfg = require("common.game_cfg")
 local BodyScale = require("common.body_scale")
-local Modal = require("client.views.economy_modal")
+local Tokens = require("client.ui.tokens")
+local Layout = require("client.ui.layout")
+local Primitives = require("client.ui.primitives")
+local Controls = require("client.ui.controls")
 local ViewUtil = require("client.views.view_util")
 local InteractPromptArbiter = require("client.views.interact_prompt_arbiter")
 
 local LotteryInteraction = {}
+
+local BUBBLE_W = 224
+local BUBBLE_H = 84
 
 -- 抽奖机交互句柄：文字泡列表与当前靠近的机器都留在句柄上；
 -- 方法名沿用拆分前的局部函数名，挂载入口只做装配。
@@ -72,7 +78,7 @@ function LotteryBehavior.update(self, stored_pos, stored_character)
   end
 end
 
---- 建一台机器的文字泡：根节点、进入按钮与主题文案，并挂销毁收尾。
+--- 建一台机器的文字泡：根节点、进入按钮与主题文案（全 4px 栅格、圆体、零 ButtonText 双字），并挂销毁收尾。
 ---@param self LotteryInteractionHandle
 ---@param anchor any
 function LotteryBehavior.create_bubble(self, anchor)
@@ -86,16 +92,33 @@ function LotteryBehavior.create_bubble(self, anchor)
     local ok, err = pcall(function() if not node.Destroyed then node:Destroy() end end)
     if not ok then print("[LotteryInteraction] 气泡根节点销毁失败", tostring(err)) end
   end)
-  local button = Modal.button(self.scope, self.ctx, node, "BtnLotteryEnter", "", function()
-    self.machine = bubble
-    if type(services.open_modal) == "function" then services.open_modal("lottery") end
-  end)
-  button.NormalImage = "official://image/11017"
-  button.PressImage = "official://image/11017"
-  button.DisableImage = "official://image/11017"
-  local label = Modal.label(self.scope, self.ctx, node, "LabelLotteryEnterTheme", GameCfg.Lottery.HintText)
-  label.TouchEnabled = false
-  label.SwallowTouchEnabled = false
+
+  Controls.button(self.scope, self.ctx, {
+    name = "BtnLotteryEnter",
+    parent = node,
+    rect = Layout.rect(BUBBLE_W / 2, BUBBLE_H / 2, BUBBLE_W, BUBBLE_H),
+    icon_only = true,
+    variant = "gold",
+    z_order = 1,
+    on_click = function()
+      self.machine = bubble
+      if type(services.open_modal) == "function" then services.open_modal("lottery") end
+    end,
+  })
+
+  Primitives.label(self.scope, self.ctx, {
+    name = "LabelLotteryEnterTheme",
+    parent = node,
+    rect = Layout.rect(BUBBLE_W / 2, BUBBLE_H / 2, BUBBLE_W - 24, BUBBLE_H - 16),
+    text = GameCfg.Lottery.HintText,
+    font_size = Tokens.FONT_SIZE.BODY,
+    bold = true,
+    color = Tokens.COLOR.WHITE,
+    outline = true,
+    outline_color = Tokens.COLOR.OUTLINE_GOLD,
+    z_order = 2,
+  })
+
   node.Visible = false
   bubble.near = false
 end

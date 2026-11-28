@@ -17,6 +17,7 @@ local MainHudLayout = require("client.main_hud_layout"); local Util = require("c
 local ReelOverlayView = require("client.views.reel_overlay_view"); local CastSourceView = require("client.views.cast_source_view"); local ShopView = require("client.views.shop_view")
 local FishermanView = require("client.views.fisherman_view"); local CompendiumView = require("client.views.compendium_view"); local GuideView = require("client.views.guide_view")
 local MessageView = require("client.views.message_view"); local StoryView = require("client.views.story_view"); local GMView = require("client.views.gm_view")
+local HudMenuView = require("client.views.hud_menu_view")
 local SquadView = require("client.views.squad_view"); local REUtil = require("common.re_util"); local GameUI = require("client.game_ui")
 local Task = game:GetService("Task") ---@cast Task Task
 local World = game:GetService("World") ---@cast World World
@@ -276,11 +277,8 @@ Task:Spawn(function()
                     AttackView.spec(),
                     GuideView.spec(),
                     MessageView.spec(),
-                    CompendiumView.entry_spec(),
-                    GMView.entry_spec(),
+                    HudMenuView.spec(),
                     GrillView.spec(),
-                    BlindboxView.entry_spec(),
-                    PlatformShopView.entry_spec(),
                     FerryView.spec(),
                     CastSourceView.spec(),
                     MainHudActionButtonsView.spec({

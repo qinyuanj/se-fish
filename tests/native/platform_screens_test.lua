@@ -28,10 +28,19 @@ describe("盲盒与地图商店界面（#312 RootView 宿主）", function()
     assert.matches("原请求", env.notices[#env.notices])
   end)
 
+  local function btn_text(name)
+    local btn = env:child(name)
+    assert.is_not_nil(btn, name)
+    assert.same("", btn.ButtonText or "")
+    local sub = btn:FindFirstChild("LabelButtonText", false)
+    assert.is_not_nil(sub, name .. " 缺少子 LabelButtonText")
+    return sub.Text
+  end
+
   it("test_buttons_show_platform_prices_and_send_counts", function()
     open_blindbox()
-    assert.matches(tostring(GameCfg.Platform.Goods.blindboxSingle.beans), env:child("BtnBlindboxSingle").Text)
-    assert.matches(tostring(GameCfg.Platform.Goods.blindboxTen.beans), env:child("BtnBlindboxTen").Text)
+    assert.matches(tostring(GameCfg.Platform.Goods.blindboxSingle.beans), btn_text("BtnBlindboxSingle"))
+    assert.matches(tostring(GameCfg.Platform.Goods.blindboxTen.beans), btn_text("BtnBlindboxTen"))
     env:click("BtnBlindboxTen")
     assert.same({ action = "Draw", count = 10, seq = 1 }, env.sent.blindbox[1])
   end)
@@ -123,7 +132,7 @@ describe("盲盒与地图商店界面（#312 RootView 宿主）", function()
       { key = "adrenaline1", name = "肾上腺素", beans = 1 },
       { key = "adrenaline5", name = "肾上腺素×5", beans = 4 },
     } })
-    assert.matches("4", env:child("BtnPlatformOffer_adrenaline5").ButtonText)
+    assert.matches("4", btn_text("BtnPlatformOffer_adrenaline5"))
     env:click("BtnPlatformOffer_adrenaline5")
     assert.same({ action = "Purchase", goods = "adrenaline5", seq = 1 }, env.sent.platform[1])
     assert.is_false(env:child("BtnPlatformOffer_adrenaline5").Visible)
