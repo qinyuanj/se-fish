@@ -632,7 +632,7 @@ describe("客户端 Spoke 主干契约（#296）", function()
       local ok, err = pcall(function()
         _G.Vector2 = { New = function(x, y) return { x = x, y = y } end }
         _G.Color = { New = function(...) return { ... } end }
-        package.loaded["common.zone_markers"] = { start = noop, Zones = zones }
+        package.loaded["common.zone_markers"] = { start = noop, Zones = zones, anchor_position = function() return nil end }
         package.loaded["common.re_util"] = {
           get_re = function(_, name)
             if not remote_events[name] then
@@ -785,45 +785,25 @@ describe("客户端 Spoke 主干契约（#296）", function()
         assert.is_function(mounted_options.services.create_scene_node_at)
         assert.is_function(mounted_options.services.create_anchor_scene_node)
 
-        -- 锚点场景节点：商店预置气泡优先，预置创建失败回退坐标节点，锚点与坐标都缺或 EUI 未就绪时返回 nil
+        -- 锚点场景节点（ADR-0013 / #410）：只按导出坐标走 CreateSceneNodeAtPosition，不再挂到场景单位
         local create_anchor = mounted_options.services.create_anchor_scene_node
 
         local at_position = create_anchor({ name = "ShopAnchor", position = { x = 1, y = 2, z = 3 } }, 4, "fisherman")
         assert.is_not_nil(at_position)
         assert.equals(6, at_position.Position.y)
         assert.equals(1, at_position.Position.x)
-        assert.equals(0, #preset_calls, "非商店锚点不走预置气泡")
+        assert.equals(0, #preset_calls, "气泡根节点不再依赖场景单位预置挂接")
+
+        local shop_at_pos = create_anchor({ name = "ShopAnchor", position = { x = 10, y = 1, z = 20 } }, 2.5, "shop")
+        assert.is_not_nil(shop_at_pos)
+        assert.equals(3.5, shop_at_pos.Position.y)
+        assert.equals(20, shop_at_pos.Position.z)
+        assert.equals(0, #preset_calls)
 
         anchor_unit = { Name = "ShopAnchor", Position = { x = 10, y = 1, z = 20 } }
-        preset_calls = {}
-        local scenes_before_preset = #scene_nodes
-        local preset_node = create_anchor({ name = "ShopAnchor" }, 2.5, "shop")
-        assert.equals(1, #preset_calls)
-        assert.equal(anchor_unit, preset_calls[1].anchor)
-        assert.equals(2.5, preset_calls[1].offset.y)
-        assert.equals("ShopBubblePreset", preset_node.Name)
-        assert.equals(scenes_before_preset, #scene_nodes, "预置气泡成功时不建坐标节点")
-
-        preset_calls = {}
-        preset_fails = true
-        local fallback_logs = {}
-        local saved_log_print = _G.print
-        _G.print = function(...)
-          local parts = {}
-          for i = 1, select("#", ...) do parts[i] = tostring((select(i, ...))) end
-          fallback_logs[#fallback_logs + 1] = table.concat(parts, "\t")
-        end
-        local fallback_node = create_anchor({ name = "ShopAnchor" }, 2.5, "shop")
-        _G.print = saved_log_print
-        preset_fails = false
-        assert.is_not_nil(fallback_node)
-        assert.equals(3.5, fallback_node.Position.y)
-        assert.equals(20, fallback_node.Position.z)
-        assert.matches("商店预设气泡创建失败，回退坐标节点", table.concat(fallback_logs, "\n"))
-
+        assert.is_nil(create_anchor({ name = "ShopAnchor" }, 2.5, "shop"), "缺少导出坐标时不得回退查场景单位")
         anchor_unit = nil
-        preset_calls = {}
-        assert.is_nil(create_anchor({ name = "MissingAnchor" }, 2), "锚点与坐标都缺时返回 nil")
+        assert.is_nil(create_anchor({ name = "MissingAnchor" }, 2), "缺坐标时返回 nil")
         assert.equals(0, #preset_calls)
 
         eui_ready = false

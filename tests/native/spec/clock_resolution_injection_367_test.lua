@@ -474,7 +474,7 @@ describe("时钟与分辨率显式注入与失败隔离（#367）", function()
       end,
     }
     local re_stub = { get_re = function() return { OnClientEvent = Eui.Signal(), FireServer = noop } end }
-    package.loaded["common.zone_markers"] = { start = noop, Zones = {} }
+    package.loaded["common.zone_markers"] = { start = noop, Zones = {}, anchor_position = function() return nil end }
     package.loaded["common.re_util"] = re_stub
     package.loaded["common.util"] = nil
     for _, name in ipairs({ "client.LocalMgrUtil", "client.LocalMotorUnitCtrl", "client.LocalLoot", "client.views.GarBiteWarning" }) do
